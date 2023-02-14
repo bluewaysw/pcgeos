@@ -35,6 +35,8 @@
   extern "C" {
 #endif
 
+#define MAX_BLOCK_SIZE  32000
+
 #define MEM_Set( dest, byte, count )  memset( dest, byte, count )
 
 #ifdef __GEOS__
@@ -57,8 +59,14 @@
 #define MEM_Alloc( _pointer_, _size_ ) \
   TT_Alloc( _size_, (void**)&(_pointer_) )
 
+#define MEM_GAlloc( _pointer_, _size_ ) \
+  GTT_Alloc( _size_, &_pointer_ )
+
 #define ALLOC( _pointer_, _size_ ) \
   ( ( error = MEM_Alloc( _pointer_, _size_ ) ) != TT_Err_Ok )
+
+#define GALLOC( _chunk_, _size_ ) \
+  ( ( error = MEM_GAlloc( _chunk_, _size_ ) ) != TT_Err_Ok )
 
 #define ALLOC_ARRAY( _pointer_, _count_, _type_ ) \
   ( ( error = MEM_Alloc( _pointer_, \
@@ -67,13 +75,19 @@
 #define FREE( _pointer_ ) \
   TT_Free( (void**)&(_pointer_) )
 
+#define GFREE( _pointer_ ) \
+  GTT_Free( &_pointer_ )
+
 
   /* Allocate a block of memory of 'Size' bytes from the heap, and */
   /* sets the pointer '*P' to its address.  If 'Size' is 0, or in  */
   /* case of error, the pointer is always set to NULL.             */
 
   EXPORT_DEF
-  TT_Error  TT_Alloc( ULong  Size, void**  P );
+  TT_Error  TT_Alloc( UShort  Size, void**  P );
+
+  EXPORT_DEF
+  TT_Error  GTT_Alloc( UShort  Size, void**  P );
 
 
   /* Releases a block that was previously allocated through Alloc. */
@@ -83,6 +97,9 @@
 
   EXPORT_DEF
   TT_Error  TT_Free( void**  P );
+
+  EXPORT_DEF
+  TT_Error  GTT_Free( void**  P );
 
 
   LOCAL_DEF TT_Error  TTMemory_Init( void );

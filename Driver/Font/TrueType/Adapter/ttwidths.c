@@ -48,17 +48,23 @@ static WWFixedAsDWord CalcScaleForWidths(
                         TextStyle       stylesToImplement,
                         word            unitsPerEM );
 
-TT_Error ConvertHeader( TT_Face face, WWFixedAsDWord pointSize, FontHeader* fontHeader, FontBuf* fontBuf );
+static TT_Error ConvertHeader( 
+                        TT_Face         face, 
+                        WWFixedAsDWord  pointSize, 
+                        FontHeader*     fontHeader, 
+                        FontBuf*        fontBuf );
 
-static void ConvertWidhts( TT_Face face, 
-                        FontHeader* fontHeader, 
-                        WWFixedAsDWord scaleFactor, 
-                        CharTableEntry* charTableEntries );
+static void ConvertWidths( 
+                        TT_Face         face, 
+                        FontHeader*     fontHeader, 
+                        WWFixedAsDWord  scaleFactor, 
+                        FontBuf*        fontBuf );
+            
+static void ConvertKernPairs( TT_Face face, FontBuf* fontBuf );
 
-void ConvertKernPairs();
-
-static void CalcTransform(     TT_Matrix*   resultMatrix, 
-                        FontMatrix*  transformMatrix, 
+static void CalcTransform( 
+                        TT_Matrix*   transMatrix, 
+                        FontMatrix*  fontMatrix, 
                         TextStyle    styleToImplement );
 
 
@@ -69,10 +75,11 @@ static void CalcTransform(     TT_Matrix*   resultMatrix,
  *                in a given pointsize, style and weight.
  * 
  * PARAMETERS:    fontHandle            Memory handle to font block.
- *                tMatrix               Pointer to tranformation matrix.
+ *                fontMatrix            Pointer to tranformation matrix.
  *                fontInfo              Pointer to font info structure.
  *                pointSize             Desired point size.
  *                textStyle             Desired text style.
+ *                fontWidth             Desired font width.
  *                fontWeight            Desired font weight.
  * 
  * RETURNS:       MemHandle             Memory handle to font block.
@@ -106,9 +113,6 @@ MemHandle _pascal TrueType_Gen_Widths(
         word                   size;
         FontHeader*            fontHeader;
         FontBuf*               fontBuf;
-        CharTableEntry*        charTableEntries;
-        KernPair*              kernPair;
-        WBFixed*               kernValue;
         WWFixedAsDWord         scaleFactor;
         
         
@@ -141,7 +145,7 @@ MemHandle _pascal TrueType_Gen_Widths(
                 goto Fail;
         
         /* alloc Block for FontBuf, CharTableEntries, KernPairs and kerning values */
-        size = AllocFontBlock( 0, 
+        size = AllocFontBlock( sizeof( TT_Matrix ), 
                                 fontHeader->FH_numChars, 
                                 CountKernPairsWithGeosChars( face ), 
                                 &fontHandle );
@@ -153,20 +157,21 @@ MemHandle _pascal TrueType_Gen_Widths(
                                           stylesToImplement, 
                                           faceProperties.header->Units_Per_EM );
 
-        /* convert FontHeader */
-        fontBuf = MemDeref( fontHandle );
+        /* convert FontHeader and fill FontBuf structure */
+        fontBuf = (FontBuf*)MemDeref( fontHandle );
         fontBuf->FB_dataSize = size;
-
         ConvertHeader( face, pointSize, fontHeader, fontBuf );
 
-        /* convert Widths */
-        charTableEntries = (CharTableEntry*) ((byte*)fontBuf) + sizeof( FontBuf );
-        ConvertWidths( face, fontHeader, scaleFactor, charTableEntries );
+        /* fill kerning pairs and kerning values */
+        ConvertKernPairs( face, fontBuf );
 
-        //TODO: Kernpairs konvertieren und einfügen
+        /* convert widths and fill CharTableEntries */
+        ConvertWidths( face, fontHeader, scaleFactor, fontBuf );
 
-        //TODO: Tranformationsmatix berechnen und in FontBlock kopieren
-
+        /* calculate the transformation matrix and copy it into the FontBlock */
+        CalcTransform( (TT_Matrix*)((byte*)fontBuf) + sizeof( FontBuf ) + fontHeader->FH_numChars * sizeof( CharTableEntry ),
+                       fontMatrix, 
+                       stylesToImplement );
 
 Fail:
         TT_Close_Face( face );
@@ -175,13 +180,38 @@ Fail:
 	return fontHandle;
 }
 
-static void ConvertWidths( TT_Face face, FontHeader* fontHeader, WWFixedAsDWord scaleFactor, CharTableEntry* charTableEntry )
+
+/********************************************************************
+ *                      ConvertWidths
+ ********************************************************************
+ * SYNOPSIS:	  Converts the information from the FontHeader and 
+ *                fills FontBuf with it.
+ * 
+ * PARAMETERS:    face
+ *                fontHeader
+ *                scaleFactor
+ *                fontbuf
+ * 
+ * RETURNS:       
+ * 
+ * SIDE EFFECTS:  none
+ * 
+ * STRATEGY:      
+ * 
+ * REVISION HISTORY:
+ *      Date      Name      Description
+ *      ----      ----      -----------
+ *      12/02/23  JK        Initial Revision
+ *******************************************************************/
+
+static void ConvertWidths( TT_Face face, FontHeader* fontHeader, WWFixedAsDWord scaleFactor, FontBuf* fontBuf )
 {
         TT_Instance       instance;
         TT_Glyph          glyph;
         TT_CharMap        charMap;
         TT_Glyph_Metrics  metrics;
         char              currentChar;
+        CharTableEntry*   charTableEntry = (CharTableEntry*) ((byte*)fontBuf) + sizeof( FontBuf );
 
         TT_New_Glyph( face, &glyph );
         TT_New_Instance( face, &instance );
@@ -231,12 +261,16 @@ static void ConvertWidths( TT_Face face, FontHeader* fontHeader, WWFixedAsDWord 
                         charTableEntry->CTE_flags |= CTF_BELOW_DESCENT;
 
                 //above ascent
-                if( metrics.bbox.yMax > fontHeader->FH_accent )
+                if( metrics.bbox.yMax > fontHeader->FH_ascent )
                         charTableEntry->CTE_flags |= CTF_ABOVE_ASCENT;
 
-                //first kern
 
-                //second kern
+                if( fontBuf->FB_kernCount > 0 )
+                {
+                        //first kern
+
+                        //second kern
+                }
 
                 charTableEntry++;
         } 
@@ -245,6 +279,25 @@ static void ConvertWidths( TT_Face face, FontHeader* fontHeader, WWFixedAsDWord 
         TT_Done_Glyph( glyph );
 }
 
+
+/********************************************************************
+ *                      findOutlineData
+ ********************************************************************
+ * SYNOPSIS:	  
+ * 
+ * PARAMETERS:    
+ * 
+ * RETURNS:       
+ * 
+ * SIDE EFFECTS:  none
+ * 
+ * STRATEGY:      
+ * 
+ * REVISION HISTORY:
+ *      Date      Name      Description
+ *      ----      ----      -----------
+ *      12/02/23  JK        Initial Revision
+ *******************************************************************/
 
 static TextStyle  findOutlineData( 
                         OutlineDataEntry**  outline,
@@ -303,6 +356,26 @@ static TextStyle  findOutlineData(
         return styleDiff;
 }
 
+
+/********************************************************************
+ *                      CalcScaleForWidths
+ ********************************************************************
+ * SYNOPSIS:	  
+ * 
+ * PARAMETERS:    
+ * 
+ * RETURNS:       
+ * 
+ * SIDE EFFECTS:  none
+ * 
+ * STRATEGY:      
+ * 
+ * REVISION HISTORY:
+ *      Date      Name      Description
+ *      ----      ----      -----------
+ *      12/02/23  JK        Initial Revision
+ *******************************************************************/
+
 static WWFixedAsDWord CalcScaleForWidths( 
                         WWFixedAsDWord  pointSize,
                         FontWidth       fontWidth,
@@ -343,8 +416,6 @@ static WWFixedAsDWord CalcScaleForWidths(
  * 
  * SIDE EFFECTS:  none
  * 
- * CONDITION:     
- * 
  * STRATEGY:      
  * 
  * REVISION HISTORY:
@@ -353,22 +424,38 @@ static WWFixedAsDWord CalcScaleForWidths(
  *      20/12/22  JK        Initial Revision
  *******************************************************************/
 
-void ConvertKernPairs()
+static void ConvertKernPairs( TT_Face face, FontBuf* fontBuf )
 {
+        KernPair*  kernPair;
+        WBFixed*   wbFixed;
 
+        //lade TT_Kern Tabelle
+
+        //iteriere über den FreeGEOS Zeichensatz
+
+                //wandle das akt. Zeichen in den TT Index
+
+                //suche den Index in der TT Kern Tabelle
+
+                        // wenn gefunden: ist das zweite Zeichen auch ein GEOS Zeichen?
+                        // ja: Kernpair in den FontBuf eintragen
+                        //     Kernvalue in den FontBuf eintragen
+                        //     KernCounter hochzählen
+
+        fontBuf->FB_kernValuePtr = 0;
 }
 
 
 /********************************************************************
  *                      CalcTransform
  ********************************************************************
- * SYNOPSIS:	        Calculates the transformation matrix to 
- *                      calculate missing style attributes and weights.
+ * SYNOPSIS:	        Calculates the transformation matrix for
+ *                      missing style attributes and weights.
  * 
- * PARAMETERS:          resultMatrix*
+ * PARAMETERS:          fontBuf
+ *                      fontMatrix
  *                      styleToImplement
  *                      
- * 
  * RETURNS:       
  * 
  * SIDE EFFECTS:  none
@@ -381,11 +468,35 @@ void ConvertKernPairs()
  *      20/12/22  JK        Initial Revision
  *******************************************************************/
 
-static void CalcTransform(      TT_Matrix*   resultMatrix, 
-                                FontMatrix*  fontMatrix, 
-                                TextStyle    styleToImplement )
+static void CalcTransform( TT_Matrix*   transMatrix, 
+                           FontMatrix*  fontMatrix, 
+                           TextStyle    stylesToImplement )
 {
+        /* copy fontMatrix into transMatrix */
+        transMatrix->xx = fontMatrix->FM_11;
+        transMatrix->xy = fontMatrix->FM_12;
+        transMatrix->yx = fontMatrix->FM_21;
+        transMatrix->yy = fontMatrix->FM_22;
 
+        /* fake bold style       */
+        /* xx = xx * BOLD_FACTOR */
+        if( stylesToImplement & TS_BOLD )
+        {
+                transMatrix->xx = GrMulWWFixed( transMatrix->xx, BOLD_FACTOR );
+        }
+
+        /* fake italic style       */
+        /* yx = yy * ITALIC_FACTOR */
+        if( stylesToImplement & TS_ITALIC )
+        {
+                transMatrix->yx = GrMulWWFixed( transMatrix->yy, ITALIC_FACTOR );
+        }
+
+        /* fake script style      */
+        if( stylesToImplement & TS_SUBSCRIPT || stylesToImplement & TS_SUBSCRIPT )
+        {
+
+        }
 }
 
 
@@ -406,8 +517,6 @@ static void CalcTransform(      TT_Matrix*   resultMatrix,
  * 
  * SIDE EFFECTS:  none
  * 
- * CONDITION:     
- * 
  * STRATEGY:      
  * 
  * REVISION HISTORY:
@@ -421,8 +530,7 @@ static word AllocFontBlock(
                 word        numOfKernPairs,
                 MemHandle*  fontHandle )
 {
-        word size = sizeof( FontBuf ) +
-                numOfCharacters * sizeof( CharTableEntry ) +
+        word size = sizeof( FontBuf ) + numOfCharacters * sizeof( CharTableEntry ) +
                 numOfKernPairs * ( sizeof( KernPair ) + sizeof( WBFixed ) ) +
                 additionalSpace; 
                      
@@ -456,8 +564,6 @@ static word AllocFontBlock(
  * RETURNS:       TT_Error = FreeType errorcode (see tterrid.h)
  * 
  * SIDE EFFECTS:  none
- * 
- * CONDITION:     The current directory must be the ttf font directory.
  * 
  * STRATEGY:      
  * 

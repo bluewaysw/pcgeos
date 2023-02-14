@@ -32,6 +32,7 @@
  *      global dgoup objects
  ***********************************************************************/
 extern TEngine_Instance engineInstance;
+extern MemHandle        engineBlock;
 
 
 #define TTF_DIRECTORY                   "TTF"

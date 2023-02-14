@@ -82,10 +82,10 @@ ForceRef DriverTable
 idata	ends
 
 ;TODO: remove dependencys from ansic
-udata	segment
-	mallocOffset	word	(?)
-		public	mallocOffset
-udata	ends
+;udata	segment
+;	mallocOffset	word	(?)
+;		public	mallocOffset
+;udata	ends
 
 include		truetypeMacros.def
 
@@ -120,6 +120,7 @@ global TRUETYPE_CHAR_METRICS:far
 global TRUETYPE_GEN_WIDTHS:far
 
 global  engineInstance:TrueTypeEngineInstance
+global  engineBlock:hptr
 
 MetricsMod segment resource
 include		truetypeMetrics.asm

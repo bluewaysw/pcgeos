@@ -11,6 +11,7 @@
 ### 2.1 ttinit.c
 - Hilfsfunktionen auslagern
 - lokale Variablen reduzieren
+- das Ermitteln des KernCounts hierhin auslagern -> das macht es in ttwidths.c leichter
 
 ### 2.2 ttwidths.c
 - Ermittlung stylesToImplement in ASM-Teil verschieben (Kernel-Routine FontDrFindOutlineData)
@@ -23,12 +24,23 @@
 
 ## Optimierungen
 - prüfen: ob TT_Error in tterrid.h von long auf word reduziert werden kann
-- prüfen: ob in ttraster.c traceG, gTarget entfernt werden kann
+- ~~prüfen: ob in ttraster.c traceG, gTarget entfernt werden kann~~
 - prüfen: ob in ttraster.c in TRasterInstance für lastX, lastY, minX, minY, TraceOfs und TraceOfsLastLine ein word genügt
-- in ttobj.h kann in T_Font_Input_ ->fontIndex entfernt werden (Überbleibsel der TTCollections die wir nicht brauchen)
+- ~~in ttobj.h kann in T_Font_Input_ ->fontIndex entfernt werden (Überbleibsel der TTCollections die wir nicht brauchen)~~
 - in ttraster.c (Set_Hight_Precision) kann gesteuert werden wie 'genau' ein Glyph gerendert wird; falls wir noch Performanceprobleme haben kann hier auch angesetzt werden (ggf. auch mehrstufig)
 - prüfen: kann die AvgWidth aus der OS/2 übernommen werden kann
 
 ## offene Probleme
 - klären: der Aufruf von TT_Init_Kerning lässt swat crashen
+- das Speichermanagements muss überarbeitet werden, aktuell ist in ttwidths.c Schluss
+
+## aktuelle Verbräuche
+
+Speicherbedarf/Blöcke (ohne Code):
+| Stand          | 10.02.2023 |
+|----------------|------------|
+|vor ProcessFont | 4896/5     |
+|nach ProcessFont| 19232/18   |
+|vor Gen_Widths  | 19232/18   |
+|nach Gen_Widths |  n.a.      |
 

@@ -25,29 +25,11 @@
 
 #include "ttmemory.h"
 #include "ttengine.h"
+#include "ttadapter.h"
 #include <geode.h>
+#include <heap.h>
 #include <lmem.h>
 #include <ec.h>
-
-/* required by the tracing mode */
-#undef  TT_COMPONENT
-#define TT_COMPONENT  trace_memory
-
-
-#ifndef TT_CONFIG_OPTION_THREAD_SAFE
-  Long  TTMemory_Allocated;
-  Long  TTMemory_MaxAllocated;
-#endif
-
-
-#define MAX_BLOCK_SIZE  32000
-#define MAX_LMEM_BLOCKS 32
-
-/* Block for small allocs */
-MemHandle lmem;
-
-ChunkHandle   lmemBlock[MAX_LMEM_BLOCKS];
-void*         ptrToBlock[MAX_LMEM_BLOCKS];
 
 
 /*******************************************************************
@@ -61,37 +43,78 @@ void*         ptrToBlock[MAX_LMEM_BLOCKS];
  *
  *  Output :  Error code.
  *
- *  NOTE :  The newly allocated block should _always_ be zeroed
- *          on return.  Many parts of the engine rely on this to
- *          work properly.
+ *  NOTE :  - The newly allocated block should _always_ be zeroed
+ *            on return.  Many parts of the engine rely on this to
+ *            work properly.
+ *          - This function is replaced step by step by GTT_Alloc().
  *
  ******************************************************************/
 
   EXPORT_FUNC
-  TT_Error  TT_Alloc( ULong  Size, void**  P )
+  TT_Error  TT_Alloc( UShort  Size, void**  P )
   {
-    MemHandle  handle;
-
+    MemHandle  M;
 
     if ( !P )
       return TT_Err_Invalid_Argument;
 
     if ( Size > MAX_BLOCK_SIZE )
-    {
-      EC_ERROR( 100 );
       return TT_Err_Out_Of_Memory;
-    }
-
+  
     if ( Size > 0 )
     {
-      handle = MemAllocSetOwner( GeodeGetCodeProcessHandle(), 
-                                 Size,
-                                 HF_SHARABLE | HF_SWAPABLE, 
-                                 HAF_ZERO_INIT | HAF_LOCK );
-      if ( !handle )
+      M = MemAllocSetOwner( GeodeGetCodeProcessHandle(), 
+                            Size,
+                            HF_SHARABLE | HF_SWAPABLE, 
+                            HAF_ZERO_INIT | HAF_LOCK );
+
+      if ( !M )
         return TT_Err_Out_Of_Memory;
-      
-      *P     = MemDeref( handle );
+        
+      *P = MemDeref( M );
+    }
+    else
+      *P = NULL;
+
+    return TT_Err_Ok;
+  }
+
+/*******************************************************************
+ *
+ *  Function    :  GTT_Alloc
+ *
+ *  Description :  Allocates memory from the engine memory block.
+ *
+ *  Input  :  Size      size of the memory to be allocated
+ *            chunk     ChunkHandle to allocated memory
+ *
+ *  Output :  Error code.
+ *
+ *  NOTE :  - The newly allocated block should _always_ be zeroed
+ *            on return.  Many parts of the engine rely on this to
+ *            work properly.
+ *          - We want to move all the memory blocks to the engine 
+ *            block step by step. So that TT_Alloc() is no longer 
+ *            needed.
+ *
+ ******************************************************************/
+  EXPORT_FUNC
+  TT_Error  GTT_Alloc( UShort  Size, void**  P )
+  {
+    ChunkHandle  H;
+
+    if ( !P )
+      return TT_Err_Invalid_Argument;
+
+    
+     if ( Size > MAX_BLOCK_SIZE )
+      return TT_Err_Out_Of_Memory;
+  
+    if ( Size > 0 )
+    {
+      H = LMemAlloc( engineBlock, Size );
+      *P = ConstructOptr( engineBlock, H );
+      MEM_Set( *P, 0, Size );
     }
     else
       *P = NULL;
@@ -121,6 +144,19 @@ void*         ptrToBlock[MAX_LMEM_BLOCKS];
       return TT_Err_Ok;
 
     MemFree( MemPtrToHandle( *P ) );
+    
+    *P = NULL;
+
+    return TT_Err_Ok;
+  }
+
+  EXPORT_FUNC
+  TT_Error  GTT_Free( void** P )
+  {
+    if ( !P || !*P )
+      return TT_Err_Ok;
+
+    LMemFree( *P );
 
     *P = NULL;
 
@@ -141,15 +177,17 @@ void*         ptrToBlock[MAX_LMEM_BLOCKS];
   LOCAL_FUNC
   TT_Error  TTMemory_Init( void )
   {
-   /* lmem = MemAllocSetOwner(GeodeGetCodeProcessHandle(), 
+    engineBlock = MemAllocSetOwner(GeodeGetCodeProcessHandle(), 
                             10 * 1024,
-                            HF_SHARABLE | HF_SWAPABLE, 
-                            HAF_ZERO_INIT | HAF_NO_ERR | HAF_LOCK );
+                            HF_SHARABLE | HF_FIXED, HAF_ZERO_INIT );
+
+    ECCheckMemHandle( engineBlock );
     
-    LMemInitHeap(block, LMEM_TYPE_GENERAL, 
-                     LMF_NO_HANDLES | LMF_NO_ENLARGE | LMF_RETURN_ERRORS, 
-                     sizeof(LMemBlockHeader), 0, 
-		     newSize - sizeof(LMemBlockHeader));*/
+    LMemInitHeap( engineBlock, LMEM_TYPE_GENERAL, 
+                     LMF_NO_HANDLES, 
+                     sizeof(LMemBlockHeader), 
+                     STD_INIT_HANDLES, 
+                     STD_INIT_HEAP );
 
     return TT_Err_Ok;
   }
@@ -168,10 +206,6 @@ void*         ptrToBlock[MAX_LMEM_BLOCKS];
   LOCAL_FUNC
   TT_Error  TTMemory_Done( void )
   {
-    //MemFree( lmem );
-
+    MemFree( engineBlock );
     return TT_Err_Ok;
   }
-
-
-/* END */

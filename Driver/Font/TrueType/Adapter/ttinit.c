@@ -221,8 +221,6 @@ static TT_Error ProcessFont( const char* fileName, MemHandle fontInfoBlock )
         TT_Error            error = TT_Err_Ok;
         char                familyName[FID_NAME_LEN];
         char                styleName[STYLE_NAME_LENGTH];
-        word                familyNameLength;
-        word                styleNameLegth;
         FontID              fontID;
         sword               availIndex;
 
