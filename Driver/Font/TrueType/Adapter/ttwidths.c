@@ -63,9 +63,9 @@ static void ConvertWidths(
 static void ConvertKernPairs( TT_Face face, FontBuf* fontBuf );
 
 static void CalcTransform( 
-                        TT_Matrix*   transMatrix, 
-                        FontMatrix*  fontMatrix, 
-                        TextStyle    styleToImplement );
+                        TransformMatrix*  transMatrix,
+                        FontMatrix*       fontMatrix, 
+                        TextStyle         styleToImplement );
 
 
 /********************************************************************
@@ -145,10 +145,10 @@ MemHandle _pascal TrueType_Gen_Widths(
                 goto Fail;
         
         /* alloc Block for FontBuf, CharTableEntries, KernPairs and kerning values */
-        size = AllocFontBlock( sizeof( TT_Matrix ), 
-                                fontHeader->FH_numChars, 
-                                CountKernPairsWithGeosChars( face ), 
-                                &fontHandle );
+        size = AllocFontBlock( sizeof( TransformMatrix ), 
+                               fontHeader->FH_numChars, 
+                               CountKernPairsWithGeosChars( face ), 
+                               &fontHandle );
 
         /* calculate scale factor and transformation matrix */
         scaleFactor = CalcScaleForWidths( pointSize, 
@@ -169,7 +169,7 @@ MemHandle _pascal TrueType_Gen_Widths(
         ConvertWidths( face, fontHeader, scaleFactor, fontBuf );
 
         /* calculate the transformation matrix and copy it into the FontBlock */
-        CalcTransform( (TT_Matrix*)((byte*)fontBuf) + sizeof( FontBuf ) + fontHeader->FH_numChars * sizeof( CharTableEntry ),
+        CalcTransform( (TransformMatrix*)((byte*)fontBuf) + sizeof( FontBuf ) + fontHeader->FH_numChars * sizeof( CharTableEntry ),
                        fontMatrix, 
                        stylesToImplement );
 
@@ -449,14 +449,14 @@ static void ConvertKernPairs( TT_Face face, FontBuf* fontBuf )
 /********************************************************************
  *                      CalcTransform
  ********************************************************************
- * SYNOPSIS:	        Calculates the transformation matrix for
- *                      missing style attributes and weights.
+ * SYNOPSIS:	  Calculates the transformation matrix for missing
+ *                style attributes and weights.
  * 
- * PARAMETERS:          fontBuf
- *                      fontMatrix
- *                      styleToImplement
+ * PARAMETERS:    fontBuf          Pointer to FontBuf stucture.
+ *                fontMatrix       Systems transformation matrix.
+ *                styleToImplement Styles that must be added.
  *                      
- * RETURNS:       
+ * RETURNS:       void
  * 
  * SIDE EFFECTS:  none
  * 
@@ -468,35 +468,48 @@ static void ConvertKernPairs( TT_Face face, FontBuf* fontBuf )
  *      20/12/22  JK        Initial Revision
  *******************************************************************/
 
-static void CalcTransform( TT_Matrix*   transMatrix, 
-                           FontMatrix*  fontMatrix, 
-                           TextStyle    stylesToImplement )
+static void CalcTransform( TransformMatrix*  transMatrix, 
+                           FontMatrix*       fontMatrix, 
+                           TextStyle         stylesToImplement )
 {
         /* copy fontMatrix into transMatrix */
-        transMatrix->xx = fontMatrix->FM_11;
-        transMatrix->xy = fontMatrix->FM_12;
-        transMatrix->yx = fontMatrix->FM_21;
-        transMatrix->yy = fontMatrix->FM_22;
+        transMatrix->TM_matrix.xx = 1 << 16;
+        transMatrix->TM_matrix.xy = 0;
+        transMatrix->TM_matrix.yx = 0;
+        transMatrix->TM_matrix.yy = 1 << 16;
 
         /* fake bold style       */
         /* xx = xx * BOLD_FACTOR */
         if( stylesToImplement & TS_BOLD )
         {
-                transMatrix->xx = GrMulWWFixed( transMatrix->xx, BOLD_FACTOR );
+                transMatrix->TM_matrix.xx = GrMulWWFixed( transMatrix->TM_matrix.xx, BOLD_FACTOR );
         }
 
         /* fake italic style       */
         /* yx = yy * ITALIC_FACTOR */
         if( stylesToImplement & TS_ITALIC )
         {
-                transMatrix->yx = GrMulWWFixed( transMatrix->yy, ITALIC_FACTOR );
+                transMatrix->TM_matrix.yx = ITALIC_FACTOR;
         }
 
         /* fake script style      */
         if( stylesToImplement & TS_SUBSCRIPT || stylesToImplement & TS_SUBSCRIPT )
-        {
+        {      
+                transMatrix->TM_matrix.xx = GrMulWWFixed( transMatrix->TM_matrix.xx, SCRIPT_FACTOR );
+                transMatrix->TM_matrix.yy = GrMulWWFixed( transMatrix->TM_matrix.yy, SCRIPT_FACTOR );
 
+                if( stylesToImplement & TS_SUBSCRIPT )
+                {
+                        transMatrix->TM_shiftY = -SCRIPT_SHIFT_FACTOR;
+                }
+                else
+                {
+                        transMatrix->TM_shiftY = SCRIPT_SHIFT_FACTOR;
+                }
         }
+
+        /* integrate fontMatrix */
+        //TODO
 }
 
 

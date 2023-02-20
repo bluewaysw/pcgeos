@@ -14,7 +14,7 @@
  *	20/12/22  JK	    Initial version
  *
  * DESCRIPTION:
- *	    Declarations of types and functions for the driver function 
+ *	Declarations of types and functions for the driver function 
  *      DR_FONT_GEN_WIDTHS.
  ***********************************************************************/
 
@@ -29,13 +29,18 @@
 #define WWFIXED_1_POINR_1                   0x00012000
 
 #define ITALIC_FACTOR                       0x0000366A
-#define BOLD_FACTOR                         0x00012000  
+#define BOLD_FACTOR                         0x00012000 
+#define SCRIPT_FACTOR                       0x00006000 
+#define SCRIPT_SHIFT_FACTOR                 0x00015000
 
 
 /***********************************************************************
  *      structues
  ***********************************************************************/
 
+/*
+ * c definition of kernels FontMatrix structure
+ */
 typedef	struct
 {
         WWFixedAsDWord          FM_11;

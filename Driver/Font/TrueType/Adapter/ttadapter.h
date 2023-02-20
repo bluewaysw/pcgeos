@@ -239,6 +239,16 @@ typedef struct
     char                        KB_char2;
 } KernPair;
 
+/*
+ * drivers TransformMatrix structure
+ */
+typedef struct
+{
+    TT_Matrix                   TM_matrix;
+    WWFixedAsDWord              TM_shiftY;
+} TransformMatrix;
+
+
 
 /***********************************************************************
  *      macros
