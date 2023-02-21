@@ -978,28 +978,6 @@
 
 /*******************************************************************
  *
- *  Function    :  GET_Byte
- *
- *  Description :  Extracts a byte from the current file frame.
- *
- *  Input  :  None or current frame
- *
- *  Output :  Extracted Byte.
- *
- ******************************************************************/
-#if 0
-  EXPORT_FUNC
-  Byte  TT_Get_Byte( FRAME_ARG )
-  {
-    CHECK_FRAME( CUR_Frame, 1 );
-
-    return (Byte)(*CUR_Frame.cursor++);
-  }
-#endif
-
-
-/*******************************************************************
- *
  *  Function    :  GET_Char
  *
  *  Description :  Extracts a signed byte from the current file frame.
@@ -1049,36 +1027,6 @@
 
 /*******************************************************************
  *
- *  Function    :  GET_UShort
- *
- *  Description :  Extracts an unsigned short from the frame.
- *
- *  Input  :  None or current frame
- *
- *  Output :  Extracted ushort.
- *
- ******************************************************************/
-#if 0
-  EXPORT_FUNC
-  UShort  TT_Get_UShort( FRAME_ARG )
-  {
-    UShort  getshort;
-
-
-    CHECK_FRAME( CUR_Frame, 2 );
-
-    getshort = (UShort)((CUR_Frame.cursor[0] << 8) |
-                         CUR_Frame.cursor[1]);
-
-    CUR_Frame.cursor += 2;
-
-    return getshort;
-  }
-#endif
-
-
-/*******************************************************************
- *
  *  Function    :  GET_Long
  *
  *  Description :  Extracts a long from the frame.
@@ -1106,38 +1054,6 @@
 
     return getlong;
   }
-
-
-/*******************************************************************
- *
- *  Function    :  GET_ULong
- *
- *  Description :  Extracts an unsigned long from the frame.
- *
- *  Input  :  None or current frame
- *
- *  Output :  Extracted ulong.
- *
- ******************************************************************/
-#if 0
-  EXPORT_FUNC
-  ULong  TT_Get_ULong( FRAME_ARG )
-  {
-    ULong  getlong;
-
-
-    CHECK_FRAME( CUR_Frame, 4 );
-
-    getlong = ( ((ULong)CUR_Frame.cursor[0] << 24) |
-                ((ULong)CUR_Frame.cursor[1] << 16) |
-                ((ULong)CUR_Frame.cursor[2] << 8 ) |
-                 (ULong)CUR_Frame.cursor[3] );
-
-    CUR_Frame.cursor += 4;
-
-    return getlong;
-  }
-#endif
 
 
 /* END */

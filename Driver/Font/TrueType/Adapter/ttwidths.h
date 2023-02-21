@@ -39,7 +39,7 @@
  ***********************************************************************/
 
 /*
- * c definition of kernels FontMatrix structure
+ * c definition of drivers FontMatrix structure
  */
 typedef	struct
 {

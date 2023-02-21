@@ -75,8 +75,8 @@ static void CalcTransform(
  *                in a given pointsize, style and weight.
  * 
  * PARAMETERS:    fontHandle            Memory handle to font block.
- *                fontMatrix            Pointer to tranformation matrix.
- *                fontInfo              Pointer to font info structure.
+ *                *fontMatrix           Pointer to tranformation matrix.
+ *                *fontInfo             Pointer to font info structure.
  *                pointSize             Desired point size.
  *                textStyle             Desired text style.
  *                fontWidth             Desired font width.
@@ -187,14 +187,13 @@ Fail:
  * SYNOPSIS:	  Converts the information from the FontHeader and 
  *                fills FontBuf with it.
  * 
- * PARAMETERS:    face
- *                fontHeader
- *                scaleFactor
- *                fontbuf
+ * PARAMETERS:    face                  TrueType face of font file.
+ *                *fontHeader           Pointer to FontHeader structure.
+ *                scaleFactor           Factor by which the chars width
+ *                                      must be scaled.
+ *                *fontBuf              Pointer to FontBuf structure.
  * 
- * RETURNS:       
- * 
- * SIDE EFFECTS:  none
+ * RETURNS:       void
  * 
  * STRATEGY:      
  * 
@@ -288,8 +287,6 @@ static void ConvertWidths( TT_Face face, FontHeader* fontHeader, WWFixedAsDWord 
  * PARAMETERS:    
  * 
  * RETURNS:       
- * 
- * SIDE EFFECTS:  none
  * 
  * STRATEGY:      
  * 
@@ -452,13 +449,12 @@ static void ConvertKernPairs( TT_Face face, FontBuf* fontBuf )
  * SYNOPSIS:	  Calculates the transformation matrix for missing
  *                style attributes and weights.
  * 
- * PARAMETERS:    fontBuf          Pointer to FontBuf stucture.
- *                fontMatrix       Systems transformation matrix.
- *                styleToImplement Styles that must be added.
+ * PARAMETERS:    *transMatrix          Pointer to TransformMatrix
+ *                                      in font block.
+ *                *fontMatrix           Systems transformation matrix.
+ *                styleToImplement      Styles that must be added.
  *                      
  * RETURNS:       void
- * 
- * SIDE EFFECTS:  none
  * 
  * STRATEGY:      
  * 
@@ -472,31 +468,31 @@ static void CalcTransform( TransformMatrix*  transMatrix,
                            FontMatrix*       fontMatrix, 
                            TextStyle         stylesToImplement )
 {
+        TT_Matrix  tempMatrix;
+
         /* copy fontMatrix into transMatrix */
-        transMatrix->TM_matrix.xx = 1 << 16;
-        transMatrix->TM_matrix.xy = 0;
-        transMatrix->TM_matrix.yx = 0;
-        transMatrix->TM_matrix.yy = 1 << 16;
+        tempMatrix.xx = 1 << 16;
+        tempMatrix.xy = 0;
+        tempMatrix.yx = 0;
+        tempMatrix.yy = 1 << 16;
 
         /* fake bold style       */
-        /* xx = xx * BOLD_FACTOR */
         if( stylesToImplement & TS_BOLD )
         {
-                transMatrix->TM_matrix.xx = GrMulWWFixed( transMatrix->TM_matrix.xx, BOLD_FACTOR );
+                tempMatrix.xx = BOLD_FACTOR;
         }
 
         /* fake italic style       */
-        /* yx = yy * ITALIC_FACTOR */
         if( stylesToImplement & TS_ITALIC )
         {
-                transMatrix->TM_matrix.yx = ITALIC_FACTOR;
+                tempMatrix.yx = ITALIC_FACTOR;
         }
 
         /* fake script style      */
         if( stylesToImplement & TS_SUBSCRIPT || stylesToImplement & TS_SUBSCRIPT )
         {      
-                transMatrix->TM_matrix.xx = GrMulWWFixed( transMatrix->TM_matrix.xx, SCRIPT_FACTOR );
-                transMatrix->TM_matrix.yy = GrMulWWFixed( transMatrix->TM_matrix.yy, SCRIPT_FACTOR );
+                tempMatrix.xx = GrMulWWFixed( tempMatrix.xx, SCRIPT_FACTOR );
+                tempMatrix.yy = GrMulWWFixed( tempMatrix.yy, SCRIPT_FACTOR );
 
                 if( stylesToImplement & TS_SUBSCRIPT )
                 {
@@ -509,7 +505,14 @@ static void CalcTransform( TransformMatrix*  transMatrix,
         }
 
         /* integrate fontMatrix */
-        //TODO
+        transMatrix->TM_matrix.xx = GrMulWWFixed( tempMatrix.xx, fontMatrix->FM_11 ) +
+                                    GrMulWWFixed( tempMatrix.xy, fontMatrix->FM_21 );
+        transMatrix->TM_matrix.xy = GrMulWWFixed( tempMatrix.xx, fontMatrix->FM_12 ) +
+                                    GrMulWWFixed( tempMatrix.xy, fontMatrix->FM_22 );
+        transMatrix->TM_matrix.yx = GrMulWWFixed( tempMatrix.yx, fontMatrix->FM_11 ) +
+                                    GrMulWWFixed( tempMatrix.yy, fontMatrix->FM_21 );
+        transMatrix->TM_matrix.yy = GrMulWWFixed( tempMatrix.yx, fontMatrix->FM_12 ) +
+                                    GrMulWWFixed( tempMatrix.yy, fontMatrix->FM_22 );
 }
 
 
@@ -518,17 +521,18 @@ static void CalcTransform( TransformMatrix*  transMatrix,
  ********************************************************************
  * SYNOPSIS:	  Allocate or reallocate memory block for font.
  * 
- * PARAMETERS:    additionalSpace       additional space in block
- *                                      for driver
- *                numOfCharacters       number of characters
- *                numOfKernPairs        number of kerning pairs
- *                fontHandle*           pointer to MemHandle of font block
- *                                      if NullHandle alloc new block, if not
- *                                      realloc existing block
+ * PARAMETERS:    additionalSpace       Additional space in block
+ *                                      for driver.
+ *                numOfCharacters       Number of GEOS characters in 
+ *                                      font.
+ *                numOfKernPairs        Number of kerning pairs of 
+ *                                      GEOS characters in font.
+ *                *fontHandle           Pointer to MemHandle of font 
+ *                                      block. If NullHandle alloc new 
+ *                                      block. If not, realloc existing 
+ *                                      one.
  * 
- * RETURNS:       word                  size of allocated block              
- * 
- * SIDE EFFECTS:  none
+ * RETURNS:       word                  Size of allocated block.
  * 
  * STRATEGY:      
  * 
@@ -569,14 +573,14 @@ static word AllocFontBlock(
  ********************************************************************
  * SYNOPSIS:	  Converts FontInfo and fill FontBuf structure.
  * 
- * PARAMETERS:    fileName              Name of font file.
- *                pointSize             Current Pointsize.
- *                fontBuf               Pointer to FontBuf structure 
+ * PARAMETERS:    face                  TrueType face of font file.
+ *                pointSize             Current pointsize.
+ *                *fontHeader           Pointer to FontHeader structure
+ *                                      to fill fontBuf.
+ *                *fontBuf              Pointer to FontBuf structure 
  *                                      to fill.
  * 
  * RETURNS:       TT_Error = FreeType errorcode (see tterrid.h)
- * 
- * SIDE EFFECTS:  none
  * 
  * STRATEGY:      
  * 
