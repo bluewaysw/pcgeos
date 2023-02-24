@@ -55,19 +55,32 @@ REVISION HISTORY:
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
 
 TrueTypeCharMetrics	proc	far
-	uses	bx, cx, si, di, ds
+	uses	ax, bx, cx, si, di, ds
 
 resultAXDX	local	dword
 
 	.enter
 
-	push	dx		; character code
-	push	ds		; ptr to fontInfo
-	mov	bx, 0		; segment offset 0
-	push	bx
-	push	es		; ptr to gstate
-	push	bx		; segment offset 0
-	push	cx		; GCM_info
+	mov	si, cx
+	push	dx		; pass character code
+	push	cx		; pass GCM_info
+
+	mov	cx, es:GS_fontAttr.FCA_fontID
+	call	FontDrFindFontInfo
+	push	ds		; pass ptr to FontInfo
+	push	di
+	
+	clr	ah		                   
+	mov	al, es:GS_fontAttr.FCA_textStyle
+	call	FontDrFindOutlineData
+	push	ds		; pass ptr to OutlineEntry
+	push	di
+	push	ax		; pass stylesToImplement
+
+	clr	al
+	movwbf	dxah, es:GS_fontAttr.FCA_pointsize
+	push	dx		; pass point size
+	push 	ax
 
 	push 	ss		; pass ptr to result dword in ss
 	lea	cx, resultAXDX
@@ -76,14 +89,23 @@ resultAXDX	local	dword
 	segmov	ds, dgroup, cx
 	call	TRUETYPE_CHAR_METRICS
 
-	clc
-	cmp	ax, 0
-	jnc	ok
-	stc
-ok:
+;	clc
+;	cmp	ax, 0
+;	jnc	ok
+;	stc
+
 	mov	ax, {word} resultAXDX
 	mov	dx, {word} resultAXDX+2
 
+	test 	si, GCMI_ROUNDED
+	jnz	roundToInt
+	rndwwbf axdx
+done:
 	.leave
 	ret
+
+roundToInt:
+	rndwwf	dxcx
+	jmp	done
+
 TrueTypeCharMetrics	endp

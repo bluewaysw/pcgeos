@@ -25,15 +25,6 @@
 #include "ttadapter.h"
 
 
-#define WWFIXED_0_POINT_5                   0x00008000
-#define WWFIXED_1_POINR_1                   0x00012000
-
-#define ITALIC_FACTOR                       0x0000366A
-#define BOLD_FACTOR                         0x00012000 
-#define SCRIPT_FACTOR                       0x00006000 
-#define SCRIPT_SHIFT_FACTOR                 0x00015000
-
-
 /***********************************************************************
  *      structues
  ***********************************************************************/

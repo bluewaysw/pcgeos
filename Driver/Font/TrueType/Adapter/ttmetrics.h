@@ -22,10 +22,12 @@
 
 
 TT_Error _pascal TrueType_Char_Metrics( 
-                                   word             character, 
-                                   const FontInfo*  fontInfo, 
-                                   void*            gstatePtr, 
-                                   GCM_info         info, 
-                                   dword*           result );
+                                   word                     character, 
+                                   GCM_info                 info, 
+                                   const FontInfo*          fontInfo,
+	                           const OutlineDataEntry*  outlineData, 
+                                   TextStyle                stylesToImplement,
+                                   WWFixedAsDWord           pointSize,
+                                   dword*                   result );
 
 #endif /* _TTMETRICS_H_ */
