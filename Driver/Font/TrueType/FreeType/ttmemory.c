@@ -79,49 +79,6 @@
     return TT_Err_Ok;
   }
 
-/*******************************************************************
- *
- *  Function    :  GTT_Alloc
- *
- *  Description :  Allocates memory from the engine memory block.
- *
- *  Input  :  Size      size of the memory to be allocated
- *            chunk     ChunkHandle to allocated memory
- *
- *  Output :  Error code.
- *
- *  NOTE :  - The newly allocated block should _always_ be zeroed
- *            on return.  Many parts of the engine rely on this to
- *            work properly.
- *          - We want to move all the memory blocks to the engine 
- *            block step by step. So that TT_Alloc() is no longer 
- *            needed.
- *
- ******************************************************************/
-  EXPORT_FUNC
-  TT_Error  GTT_Alloc( UShort  Size, void**  P )
-  {
-    ChunkHandle  H;
-
-    if ( !P )
-      return TT_Err_Invalid_Argument;
-
-    
-     if ( Size > MAX_BLOCK_SIZE )
-      return TT_Err_Out_Of_Memory;
-  
-    if ( Size > 0 )
-    {
-      H = LMemAlloc( engineBlock, Size );
-      *P = ConstructOptr( engineBlock, H );
-      MEM_Set( *P, 0, Size );
-    }
-    else
-      *P = NULL;
-
-    return TT_Err_Ok;
-  }
-
 
 /*******************************************************************
  *
@@ -150,19 +107,6 @@
     return TT_Err_Ok;
   }
 
-  EXPORT_FUNC
-  TT_Error  GTT_Free( void** P )
-  {
-    if ( !P || !*P )
-      return TT_Err_Ok;
-
-    LMemFree( *P );
-
-    *P = NULL;
-
-    return TT_Err_Ok;
-  }
-
 
 /*******************************************************************
  *
@@ -177,18 +121,6 @@
   LOCAL_FUNC
   TT_Error  TTMemory_Init( void )
   {
-    engineBlock = MemAllocSetOwner(GeodeGetCodeProcessHandle(), 
-                            10 * 1024,
-                            HF_SHARABLE | HF_FIXED, HAF_ZERO_INIT );
-
-    ECCheckMemHandle( engineBlock );
-    
-    LMemInitHeap( engineBlock, LMEM_TYPE_GENERAL, 
-                     LMF_NO_HANDLES, 
-                     sizeof(LMemBlockHeader), 
-                     STD_INIT_HANDLES, 
-                     STD_INIT_HEAP );
-
     return TT_Err_Ok;
   }
 
@@ -206,6 +138,5 @@
   LOCAL_FUNC
   TT_Error  TTMemory_Done( void )
   {
-    MemFree( engineBlock );
     return TT_Err_Ok;
   }

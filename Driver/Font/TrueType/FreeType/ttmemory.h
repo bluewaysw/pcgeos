@@ -59,14 +59,8 @@
 #define MEM_Alloc( _pointer_, _size_ ) \
   TT_Alloc( _size_, (void**)&(_pointer_) )
 
-#define MEM_GAlloc( _pointer_, _size_ ) \
-  GTT_Alloc( _size_, &_pointer_ )
-
 #define ALLOC( _pointer_, _size_ ) \
   ( ( error = MEM_Alloc( _pointer_, _size_ ) ) != TT_Err_Ok )
-
-#define GALLOC( _chunk_, _size_ ) \
-  ( ( error = MEM_GAlloc( _chunk_, _size_ ) ) != TT_Err_Ok )
 
 #define ALLOC_ARRAY( _pointer_, _count_, _type_ ) \
   ( ( error = MEM_Alloc( _pointer_, \
@@ -74,9 +68,6 @@
 
 #define FREE( _pointer_ ) \
   TT_Free( (void**)&(_pointer_) )
-
-#define GFREE( _pointer_ ) \
-  GTT_Free( &_pointer_ )
 
 
   /* Allocate a block of memory of 'Size' bytes from the heap, and */
@@ -86,9 +77,6 @@
   EXPORT_DEF
   TT_Error  TT_Alloc( UShort  Size, void**  P );
 
-  EXPORT_DEF
-  TT_Error  GTT_Alloc( UShort  Size, void**  P );
-
 
   /* Releases a block that was previously allocated through Alloc. */
   /* Note that the function returns successfully when P or *P are  */
@@ -97,9 +85,6 @@
 
   EXPORT_DEF
   TT_Error  TT_Free( void**  P );
-
-  EXPORT_DEF
-  TT_Error  GTT_Free( void**  P );
 
 
   LOCAL_DEF TT_Error  TTMemory_Init( void );
