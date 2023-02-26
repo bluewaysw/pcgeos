@@ -72,6 +72,7 @@ resultAXDX	local	dword
 	
 	clr	ah		                   
 	mov	al, es:GS_fontAttr.FCA_textStyle
+	mov	bx, ODF_HEADER
 	call	FontDrFindOutlineData
 	push	ds		; pass ptr to OutlineEntry
 	push	di
@@ -101,6 +102,7 @@ resultAXDX	local	dword
 	jnz	roundToInt
 	rndwwbf axdx
 done:
+	clc
 	.leave
 	ret
 

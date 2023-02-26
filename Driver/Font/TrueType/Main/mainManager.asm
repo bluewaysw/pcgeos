@@ -120,7 +120,7 @@ global TRUETYPE_CHAR_METRICS:far
 global TRUETYPE_GEN_WIDTHS:far
 
 global  engineInstance:TrueTypeEngineInstance
-global  engineBlock:hptr
+;global  engineBlock:hptr
 
 MetricsMod segment resource
 include		truetypeMetrics.asm

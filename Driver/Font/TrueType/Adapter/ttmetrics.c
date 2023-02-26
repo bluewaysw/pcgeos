@@ -22,6 +22,7 @@
 #include "ttadapter.h"
 #include "freetype.h"
 #include "ttcharmapper.h"
+#include <ec.h>
 
 
 static void CalcTransformMatrix( TextStyle         stylesToImplement,
@@ -53,20 +54,19 @@ static void CalcTransformMatrix( TextStyle         stylesToImplement,
  * 
  *******************************************************************/
 TT_Error _pascal TrueType_Char_Metrics( 
-                                   word                     character, 
-                                   GCM_info                 info, 
-                                   const FontInfo*          fontInfo,
-	                           const OutlineDataEntry*  outlineData, 
-                                   TextStyle                stylesToImplement,
-                                   WWFixedAsDWord           pointSize,
-                                   dword*                   result ) 
+                                   word                 character, 
+                                   GCM_info             info, 
+                                   const FontInfo*      fontInfo,
+	                           const OutlineEntry*  outlineEntry, 
+                                   TextStyle            stylesToImplement,
+                                   WWFixedAsDWord       pointSize,
+                                   dword*               result ) 
 {
         FileHandle             truetypeFile;
         TrueTypeOutlineEntry*  trueTypeOutline;
         TransformMatrix        transMatrix;
         TT_Face                face;
         word                   charIndex;
-        word                   unicode;
         TT_Outline             outline;
         TT_Instance            instance;
         TT_Instance_Metrics    instanceMetrics;
@@ -76,38 +76,44 @@ TT_Error _pascal TrueType_Char_Metrics(
         TT_Error               error;
 
 
-        /* get filename an load ttf file */
+        ECCheckBounds( (void*)fontInfo );
+        ECCheckBounds( (void*)outlineEntry );
+
+
+        // get filename an load ttf file 
         FilePushDir();
         FileSetCurrentPath( SP_FONT, TTF_DIRECTORY );
 
-        trueTypeOutline = LMemDerefHandles( MemPtrToHandle( (void*)fontInfo ), outlineData->ODE_header.OE_handle );
+        trueTypeOutline = LMemDerefHandles( MemPtrToHandle( (void*)fontInfo ), outlineEntry->OE_handle );
         truetypeFile = FileOpen( trueTypeOutline->TTOE_fontFileName, FILE_ACCESS_R | FILE_DENY_W );
         
+        ECCheckFileHandle( truetypeFile );
+
         CalcTransformMatrix( stylesToImplement, &transMatrix );
 
         error = TT_Open_Face( truetypeFile, &face );
         if( error )
                 goto Fail;
 
-        /* get TT char index */
+        // get TT char index
         getCharMap( face, &charMap );
 
         charIndex = TT_Char_Index( charMap, GeosCharToUnicode( character ) );
 
-        /* load glyph */
+        // load glyph
         TT_New_Glyph( face, &glyph );
         TT_New_Instance( face, &instance );
 
-        /* transform glyphs outline */
+        // transform glyphs outline
         TT_Get_Glyph_Outline( glyph, &outline );
         TT_Transform_Outline( &outline, &transMatrix.TM_matrix );
         TT_Translate_Outline( &outline, 0, WWFIXEDASDWORD_TO_FIXED26DOT6( transMatrix.TM_shiftY ) );
 
-        /* scale glyph */
+        // scale glyph
         TT_Set_Instance_CharSize( instance, pointSize );
         TT_Get_Instance_Metrics( instance, &instanceMetrics );
 
-        /* get metrics */
+        // get metrics
         TT_Get_Glyph_Metrics( glyph, &glyphMetrics );
 
         switch( info )
