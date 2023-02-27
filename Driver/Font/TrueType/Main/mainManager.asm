@@ -81,12 +81,6 @@ ForceRef DriverTable
 
 idata	ends
 
-;TODO: remove dependencys from ansic
-;udata	segment
-;	mallocOffset	word	(?)
-;		public	mallocOffset
-;udata	ends
-
 include		truetypeMacros.def
 
 WidthMod segment resource
@@ -119,8 +113,9 @@ global TRUETYPE_GEN_CHARS:far
 global TRUETYPE_CHAR_METRICS:far
 global TRUETYPE_GEN_WIDTHS:far
 
+global  bitmapHandle:hptr
+global  bitmapSize:word
 global  engineInstance:TrueTypeEngineInstance
-;global  engineBlock:hptr
 
 MetricsMod segment resource
 include		truetypeMetrics.asm

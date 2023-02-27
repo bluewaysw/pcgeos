@@ -60,13 +60,28 @@ TrueTypeGenChar	proc	far
 	push	cx		; remember handle
 
 	push	dx		; pass character code
+
+	clr	al
+	movwbf	dxah, es:GS_fontAttr.FCA_pointsize
+	push	dx		; pass point size
+	push 	ax
+				
 	push	es		; pass font ptr
 	mov	ax, 0		; with segment offset 0
 	push	ax
-	push	bp		; pass gstate ptr
-	push	ax		; with segment offset 0
-	push	ds		; pass font info block
-	push	ax		; with segment offset 0
+
+	mov	cx, es:GS_fontAttr.FCA_fontID
+	call	FontDrFindFontInfo
+	push	ds		; pass ptr to FontInfo
+	push	di
+
+	clr	ah		                   
+	mov	al, es:GS_fontAttr.FCA_textStyle
+	mov	bx, ODF_HEADER
+	call	FontDrFindOutlineData
+	push	ds		; pass ptr to OutlineEntry
+	push	di
+	push	ax		; pass stylesToImplement
 
 	segmov	ds, dgroup, ax
 	call	TRUETYPE_GEN_CHARS

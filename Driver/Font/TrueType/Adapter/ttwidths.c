@@ -439,7 +439,9 @@ static void ConvertKernPairs( TT_Face face, FontBuf* fontBuf )
                         //     Kernvalue in den FontBuf eintragen
                         //     KernCounter hochzählen
 
-        fontBuf->FB_kernValuePtr = 0;
+        fontBuf->FB_kernCount    = 0;
+        fontBuf->FB_kernValuePtr = NULL;
+        fontBuf->FB_kernPairPtr  = NULL;
 }
 
 

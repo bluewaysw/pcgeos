@@ -90,11 +90,6 @@ resultAXDX	local	dword
 	segmov	ds, dgroup, cx
 	call	TRUETYPE_CHAR_METRICS
 
-;	clc
-;	cmp	ax, 0
-;	jnc	ok
-;	stc
-
 	mov	ax, {word} resultAXDX
 	mov	dx, {word} resultAXDX+2
 

@@ -143,7 +143,7 @@ Fail:
         TT_Close_Face( face );
         FileClose( truetypeFile, FALSE );
         FilePopDir();
-        return TT_Err_Ok;
+        return error;
 }
 
 
