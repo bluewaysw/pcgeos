@@ -87,7 +87,7 @@
     PTableDirEntry  entry;
 
 
-    if ( ACCESS_Frame( 12L ) )
+    if ( FILE_Seek( 0L ) || ACCESS_Frame( 12L ) )
       return error;
 
     tableDir.version   = GET_Long();
