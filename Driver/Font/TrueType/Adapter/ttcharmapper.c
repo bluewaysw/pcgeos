@@ -334,7 +334,7 @@ word InitGeosCharsInCharMap( TT_CharMap map, char *firstChar, char *lastChar )
                 }
         }
 
-        return *lastChar - *firstChar;
+        return 1 + ( *lastChar - *firstChar );
 }
 
 
