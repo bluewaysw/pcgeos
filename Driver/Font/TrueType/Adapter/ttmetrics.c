@@ -110,7 +110,7 @@ TT_Error _pascal TrueType_Char_Metrics(
         TT_Translate_Outline( &outline, 0, WWFIXEDASDWORD_TO_FIXED26DOT6( transMatrix.TM_shiftY ) );
 
         // scale glyph
-        TT_Set_Instance_CharSize( instance, pointSize );
+        TT_Set_Instance_CharSize( instance, ( pointSize >> 10 ) );
         TT_Get_Instance_Metrics( instance, &instanceMetrics );
 
         // get metrics
