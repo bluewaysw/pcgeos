@@ -452,7 +452,7 @@ main(int argc, char **argv)
 	token = 'P';
     }
 
-    if (strcmp(subcmd, "neweng") == 0) || strcmp(subcmd, "ne") == 0) {
+    if (strcmp(subcmd, "neweng") == 0 || strcmp(subcmd, "ne") == 0) {
 	sc = NEW_ENG;
 	token = 'R';
     }
