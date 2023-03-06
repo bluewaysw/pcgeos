@@ -255,6 +255,19 @@ typedef struct
     WWFixedAsDWord              TM_shiftY;
 } TransformMatrix;
 
+/*
+ * drivers CharData structure (see fontDr.def)
+ */
+typedef struct 
+{
+    byte                        CD_pictureWidth;
+    byte                        CD_numRows;
+    sbyte                       CD_yoff;
+    sbyte                       CD_xoff;
+    byte                        CD_data;
+} CharData;
+
+#define SIZE_CHAR_HEADER        ( sizeof( CharData ) - 1 )
 
 
 /***********************************************************************

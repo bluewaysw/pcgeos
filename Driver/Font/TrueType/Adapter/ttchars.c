@@ -132,7 +132,8 @@ void _pascal TrueType_Gen_Chars(
         }
         else
         {
-                word size = height * (width + 7) / 8; // + sizeof(bitmap)
+                CharData*  charData;
+                word       size = height * ( ( width + 7 ) / 8 ) + SIZE_CHAR_HEADER;
 
                 // absichern dass im BitmapBlock genügend Platz vorhanden ist
 
@@ -140,10 +141,14 @@ void _pascal TrueType_Gen_Chars(
 
                 // an TT_Get_Outline_Bitmap delegieren
 
-                // Header in Bitmap füllen
+                /* fill charData */
+                charData->CD_pictureWidth = width;
+                charData->CD_numRows      = height;
+                charData->CD_xoff         = bbox.xMin;
+                charData->CD_yoff         = bbox.yMin;
 
-                // size in dgoup zurückschreiben
-
+                /* save size of bitmap */
+                bitmapSize = size;
         }
 
         // FontBlock ggf. kürzen und neues Glyph anhängen erfolgt auf asm Seite
