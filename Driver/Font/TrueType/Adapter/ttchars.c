@@ -19,7 +19,12 @@
 
 #include "ttadapter.h"
 #include "ttchars.h"
+#include "ttcharmapper.h"
 #include <ec.h>
+
+
+static void EnsureBitmapHandle( word size );
+
 
 /********************************************************************
  *                      TrueType_Gen_Chars
@@ -68,9 +73,9 @@ void _pascal TrueType_Gen_Chars(
         word                   width, height;
 
 
-        ECCheckBounds( fontBuf );
-        ECCheckBounds( fontInfo );
-        ECCheckBounds( outlineEntry );
+        ECCheckBounds( (void*)fontBuf );
+        ECCheckBounds( (void*)fontInfo );
+        ECCheckBounds( (void*)outlineEntry );
 
 
         FilePushDir();
@@ -132,16 +137,26 @@ void _pascal TrueType_Gen_Chars(
         }
         else
         {
-                CharData*  charData;
-                word       size = height * ( ( width + 7 ) / 8 ) + SIZE_CHAR_HEADER;
+                CharData*      charData;
+                TT_Raster_Map  rasterMap;
+                word           size = height * ( ( width + 7 ) / 8 ) + SIZE_CHAR_HEADER;
 
-                // absichern dass im BitmapBlock genügend Platz vorhanden ist
+                /* get pointer to bitmapBlock */
+                EnsureBitmapHandle( size );
+                charData = MemDeref( bitmapHandle );
 
-                // Outline verschieben
+                /* init rasterMap */
+                rasterMap.rows   = height;
+                rasterMap.width  = width;
+                rasterMap.cols   = (width + 7) / 8;
+                rasterMap.size   = rasterMap.rows * rasterMap.cols;
+                rasterMap.bitmap = charData + SIZE_CHAR_HEADER;
 
-                // an TT_Get_Outline_Bitmap delegieren
+                /* translate outline and render it */
+                TT_Translate_Outline( &outline, -bbox.xMin, -bbox.yMin );
+                TT_Get_Outline_Bitmap( &outline, &rasterMap );
 
-                /* fill charData */
+                /* fill header of charData */
                 charData->CD_pictureWidth = width;
                 charData->CD_numRows      = height;
                 charData->CD_xoff         = bbox.xMin;
@@ -158,6 +173,9 @@ void _pascal TrueType_Gen_Chars(
 
 Fail:
         FileClose( truetypeFile, FALSE );
-        FilePopDir();
-        
+        FilePopDir(); 
+}
+
+static void EnsureBitmapHandle( word size ) {
+        //TODO: implement
 }
