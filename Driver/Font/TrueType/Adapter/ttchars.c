@@ -23,9 +23,6 @@
 #include <ec.h>
 
 
-static void EnsureBitmapHandle( word size );
-
-
 /********************************************************************
  *                      TrueType_Gen_Chars
  ********************************************************************
@@ -121,7 +118,7 @@ void _pascal TrueType_Gen_Chars(
         width  = (bbox.xMax - bbox.xMin) / 64;
         height = (bbox.yMax - bbox.yMin) / 64;
 
-        if( fontBuf->FB_flags && FBF_IS_REGION )
+        if( fontBuf->FB_flags & FBF_IS_REGION )
         {
                 // Platzbedarf der Region ermitteln
 
@@ -142,8 +139,9 @@ void _pascal TrueType_Gen_Chars(
                 word           size = height * ( ( width + 7 ) / 8 ) + SIZE_CHAR_HEADER;
 
                 /* get pointer to bitmapBlock */
-                EnsureBitmapHandle( size );
-                charData = MemDeref( bitmapHandle );
+                if( MemGetInfo( bitmapHandle, MGIT_SIZE ) < size )
+                        MemReAlloc( bitmapHandle, size, HAF_NO_ERR );
+                charData = MemLock( bitmapHandle );
 
                 /* init rasterMap */
                 rasterMap.rows   = height;
@@ -174,8 +172,4 @@ void _pascal TrueType_Gen_Chars(
 Fail:
         FileClose( truetypeFile, FALSE );
         FilePopDir(); 
-}
-
-static void EnsureBitmapHandle( word size ) {
-        //TODO: implement
 }

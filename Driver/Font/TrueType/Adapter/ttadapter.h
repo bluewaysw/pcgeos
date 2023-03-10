@@ -34,11 +34,11 @@
 extern TEngine_Instance engineInstance;
 
 
-#define TTF_DIRECTORY                   "TTF"
-#define FONT_MAN_ID                     0x20
+#define TTF_DIRECTORY                       "TTF"
+#define FONT_MAN_ID                         0x20
 
-#define CHAR_NOT_EXIST                  0
-#define CHAR_NOT_BUILT                  2	
+#define CHAR_NOT_EXIST                      0
+#define CHAR_NOT_BUILT                      2	
 
 #define WWFIXED_0_POINT_5                   0x00008000
 #define WWFIXED_1_POINR_1                   0x00012000
@@ -47,6 +47,7 @@ extern TEngine_Instance engineInstance;
 #define BOLD_FACTOR                         0x00012000 
 #define SCRIPT_FACTOR                       0x00006000 
 #define SCRIPT_SHIFT_FACTOR                 0x00015000
+
 
 /***********************************************************************
  *      structures

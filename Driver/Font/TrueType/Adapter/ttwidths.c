@@ -473,10 +473,10 @@ static void CalcTransform( TransformMatrix*  transMatrix,
         TT_Matrix  tempMatrix;
 
         /* copy fontMatrix into transMatrix */
-        tempMatrix.xx = 1 << 16;
+        tempMatrix.xx = 1L << 16;
         tempMatrix.xy = 0;
         tempMatrix.yx = 0;
-        tempMatrix.yy = 1 << 16;
+        tempMatrix.yy = 1L << 16;
 
         /* fake bold style       */
         if( stylesToImplement & TS_BOLD )
