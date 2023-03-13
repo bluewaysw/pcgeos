@@ -13,9 +13,9 @@
 *	Name	Date		Description
 *	----	----		-----------
 *	jimmy	8/19/92		Initial version
-*   jacob   9/9/96		Win32 port
-*	RainerB	01/15/2023	Usage() added, command help added
- *
+*       jacob   9/9/96		Win32 port
+*	RainerB	02/13/2023	Usage() added, command help added
+*
 *	DESCRIPTION: this file contains code for the DOS version of grev
 *
 *	$Id: grev.c,v 1.1 92/10/27 17:34:47 jimmy Exp $
@@ -65,7 +65,7 @@ Commands are:
     grev  newrev <file> <rev> [<comment>]
 	Set the revision for <file> to <rev> where rev is of the form "1.2.3".
 
-	grev help
+    grev help
 	Output detailed description.
 
 Instead of a comment a special parameter (either -P or -R) may be passed so
@@ -129,7 +129,7 @@ typedef enum {
 } SubCommand;
 
 #define EXIT(errstring) {fprintf(stderr, "grev: %s", errstring); \
-						Usage(FALSE); \
+                         Usage(FALSE); \
                          exit(1);}
 
 const char *InvalidRevisionNumber = "invalid revision number, no changes made\n";
@@ -182,27 +182,27 @@ main(int argc, char **argv)
 #if 0
 {
     int	n;
-	fp = fopen("D:\\gparam.txt", "at");		// <-- at == append text
-	if (fp == NULL) {
-	    printf("GREV Debug: GParam.txt not open");
-	    exit(1);
-	}
-	// dump current path to file
-	getcwd( buf, 256);
-	strcat(buf, ":\n");
-	fwrite(buf, strlen(buf), 1, fp);
 
-	// dump parameters to file
-	sprintf(buf,"   ");
-	for ( n=0; n<argc; n++)
-	{
-		strcat(buf,argv[n]);
-		strcat(buf, "   ");
-	}
-	strcat(buf, " *\n");
-	fwrite(buf, strlen(buf), 1, fp);
+    fp = fopen("D:\\gparam.txt", "at");		// <-- at == append text
+    if (fp == NULL) {
+	printf("GREV Debug: GParam.txt not open");
+	exit(1);
+    }
+    // dump current path to file
+    getcwd( buf, 256);
+    strcat(buf, ":\n");
+    fwrite(buf, strlen(buf), 1, fp);
 
-	fclose(fp);
+    // dump parameters to file
+    sprintf(buf,"   ");
+    for ( n=0; n<argc; n++) {
+	strcat(buf,argv[n]);
+	strcat(buf, "   ");
+    }
+    strcat(buf, " *\n");
+    fwrite(buf, strlen(buf), 1, fp);
+
+    fclose(fp);
 }
 #endif
 /*** DEBUG ENDS ****/
@@ -218,14 +218,14 @@ main(int argc, char **argv)
     }
     subcmd = argv[1];
 
-	/*
-	 * If the subcommand is 'help' or similar, output an detailed help.
-	 * In this case no rev file is required.
-	 */
-	if ( strcmp(subcmd, "help") * strcmp(subcmd, "-help") * strcmp(subcmd, "?") * strcmp(subcmd, "-?") == 0 ) {
+    /*
+     * If the subcommand is 'help' or similar, output an detailed help.
+     * In this case no rev file is required.
+     */
+    if ( strcmp(subcmd, "help") * strcmp(subcmd, "-help") * strcmp(subcmd, "?") * strcmp(subcmd, "-?") == 0 ) {
 	Usage(TRUE);
 	exit(0);
-	}
+    }
 
 
     if (argc < 3) {
@@ -264,7 +264,7 @@ main(int argc, char **argv)
 		save = TRUE;
 		break;
 	    case '?':
-	    Usage(FALSE);
+		Usage(FALSE);
 		exit(1);
 	    }
 	}
@@ -374,7 +374,7 @@ main(int argc, char **argv)
 	if (save) {
 	    InsertIntoFileAndExit(buf, sizeof (buf), fp, revFile, 0);
 	} else {
-		WarnNotSaved(revFile, terseOutput);
+	    WarnNotSaved(revFile, terseOutput);
 	    fclose(fp);
 	    exit(0);
 	}
@@ -589,8 +589,8 @@ main(int argc, char **argv)
 	if (save) {
 	    InsertIntoFileAndExit(buf, sizeof (buf), fp, revFile, terseOutput);
 	} else {
-		WarnNotSaved(revFile, terseOutput);
-		fclose(fp);
+	    WarnNotSaved(revFile, terseOutput);
+	    fclose(fp);
 	    exit(0);
 	}
     }
@@ -731,21 +731,21 @@ Targ_FmtTime (long time)
  * REVISION HISTORY:
  *	Name	Date		Description
  *	----	----		-----------
- *	??		??			Initial version
+ *	??	??		Initial version
  *	RainerB	01/15/2023	Parameter full added
  *
  *********************************************************************/
 static void
 Usage(int full)
 {
-	if (!full) {
-    puts( "\nUsage:  grev <command> <file> [-PRs] [-B <branch>] [<rev>] [\"comment\"]" );
-    puts( "        Allowed commands: new, info, getproto, newprotomajor, newprotominor, ");
-    puts( "                          neweng, newchange, newrev, help" );
-    puts( "        Must give -s option to commit changes to file." );
-    puts( "\nUse 'grev help' for a detailed description." );
-    return;
-	}
+    if (!full) {
+	puts( "\nUsage:  grev <command> <file> [-PRs] [-B <branch>] [<rev>] [\"comment\"]" );
+	puts( "        Allowed commands: new, info, getproto, newprotomajor, newprotominor, ");
+	puts( "                          neweng, newchange, newrev, help" );
+	puts( "        Must give -s option to commit changes to file." );
+	puts( "\nUse 'grev help' for a detailed description." );
+	return;
+    }
 
     puts( "\nAll commands take the following general form:" );
     puts( "    grev <command> <file> [-PRs] [-B <branch>] [<rev>] [\"comment\"]" );
@@ -789,7 +789,7 @@ Usage(int full)
     puts( "\ngrev help" );
     puts( "    Output detailed help." );
 
-	puts( "\nExample: grev newrev myapp.rev -s 12.7.4 \"New features added\"" );
+    puts( "\nExample: grev newrev myapp.rev -s 12.7.4 \"New features added\"" );
 }
 
 /*********************************************************************
@@ -809,9 +809,9 @@ Usage(int full)
 void
 WarnNotSaved(char *revFile, char noOutput)
 {
-	if (noOutput) return;
-	printf("\nFlag -s not given. No changes made in ");
-	printf(revFile);
-	printf("!");
+    if (noOutput) return;
+    printf("\nFlag -s not given. No changes made in ");
+    printf(revFile);
+    printf("!");
 }
 
