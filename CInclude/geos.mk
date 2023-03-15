@@ -85,6 +85,8 @@
 #       Name    Date            Description
 #       ----    ----            -----------
 #       ardeb   7/23/89         Initial Revision
+#	RainerB	1/22/2023	Add -s flag to grev
+#		3/5/2023	made rev file in LOCAL_ROOT working
 #
 # DESCRIPTION:
 #       This is a makefile to be included by all makefiles in the PC/GEOS
@@ -213,6 +215,18 @@ _PROTO  !=      $(GREVCMD) newprotominor $(REVFILE) -P -s
 # else
 _PROTO  !=      $(GREVCMD) getproto $(REVFILE) -P
 # endif
+
+#elif defined(GEODE) && exists($(CURRENT_DIR)/$(GEODE).rev)
+## the .rev file is local, use it.
+REVFILE		= $(CURRENT_DIR)/$(GEODE).rev
+_GEODE 		:= $(GEODE)
+GREV		?= grev
+GREVFLAGS	=
+#
+# Don't use a branch option on a local .rev file
+
+_REL	!=	$(GREV) neweng $(REVFILE) $(GREVFLAGS) -R -s
+_PROTO	!=	$(GREV) getproto $(REVFILE) $(GREVFLAGS) -P
 
 #else
 
