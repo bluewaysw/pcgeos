@@ -35,7 +35,7 @@
  *                *outlineEntry         Handle to current gstate.
  *                stylesToImplement
  * 
- * RETURNS:       void
+ * RETURNS:       word                  Size of bitmap or region.
  * 
  * STRATEGY:      - find font-file for the requested style from fontInfo
  *                - open outline of character in founded font-file
@@ -48,7 +48,7 @@
  * 
  *******************************************************************/
 
-void _pascal TrueType_Gen_Chars(
+word _pascal TrueType_Gen_Chars(
                         word                 character, 
                         WWFixedAsDWord       pointSize,
                         FontBuf*             fontBuf,
@@ -67,7 +67,7 @@ void _pascal TrueType_Gen_Chars(
         TT_BBox                bbox;
         TT_CharMap             charMap;
         TT_UShort              charIndex;
-        word                   width, height;
+        word                   width, height, size;
 
 
         ECCheckBounds( (void*)fontBuf );
@@ -120,9 +120,15 @@ void _pascal TrueType_Gen_Chars(
 
         if( fontBuf->FB_flags & FBF_IS_REGION )
         {
-                // Platzbedarf der Region ermitteln
+                RegionCharData*  regionData;
 
-                // absichern dass im BitmapBlock genügend Platz vorhanden ist
+                /* We calculate with an average of 4 on/off points, line number and line end code. */
+                size = height * 6 * sizeof( word ) + SIZE_REGION_HEADER; 
+
+                /* get pointer to bitmapBlock */
+                if( MemGetInfo( bitmapHandle, MGIT_SIZE ) < size )
+                        MemReAlloc( bitmapHandle, size, HAF_NO_ERR );
+                regionData = MemLock( bitmapHandle );
 
                 // Outline verschieben
 
@@ -136,7 +142,8 @@ void _pascal TrueType_Gen_Chars(
         {
                 CharData*      charData;
                 TT_Raster_Map  rasterMap;
-                word           size = height * ( ( width + 7 ) / 8 ) + SIZE_CHAR_HEADER;
+                
+                size = height * ( ( width + 7 ) / 8 ) + SIZE_CHAR_HEADER;
 
                 /* get pointer to bitmapBlock */
                 if( MemGetInfo( bitmapHandle, MGIT_SIZE ) < size )
@@ -172,4 +179,5 @@ void _pascal TrueType_Gen_Chars(
 Fail:
         FileClose( truetypeFile, FALSE );
         FilePopDir(); 
+        return size;
 }

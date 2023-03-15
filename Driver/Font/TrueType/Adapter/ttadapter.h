@@ -271,6 +271,24 @@ typedef struct
 #define SIZE_CHAR_HEADER        ( sizeof( CharData ) - 1 )
 
 
+/*
+ * drivers RegionCharData structure (see fontDr.def)
+ */
+typedef struct
+{
+    sword                       RCD_yoff;       /* (signed) offset to first row */
+    sword                       RCD_xoff;       /* (signed) offset to first column */
+    word                        RCD_size;       /* size of region (in bytes) */
+if DBCS_PCGEOS
+    word                        RCD_usage;      /* LRU count */
+endif
+    Recangle                    RCD_bounds;     /* bounding box of region */
+    word                        RCD_data;       /* data for region */
+} RegionCharData;
+
+#define SIZE_REGION_HEADER	    ( sizeof( RegionCharData) - 2 )
+
+
 /***********************************************************************
  *      macros
  ***********************************************************************/

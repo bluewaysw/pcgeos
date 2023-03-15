@@ -35,7 +35,7 @@ extern word       bitmapSize;
  *      functions called by driver
  ***********************************************************************/
 
-void _pascal  TrueType_Gen_Chars( word                 character, 
+word _pascal  TrueType_Gen_Chars( word                 character, 
                                   WWFixedAsDWord       pointSize,
                                   FontBuf*             fontBuf,
 			          const FontInfo*      fontInfo, 
