@@ -24,6 +24,7 @@
 #include <ec.h>
 #include <fontID.h>
 #include <file.h>
+#include <graphics.h>
 #include "../FreeType/freetype.h"
 #include "../FreeType/ttengine.h"
 #include "../FreeType/ttcalc.h"
@@ -279,10 +280,10 @@ typedef struct
     sword                       RCD_yoff;       /* (signed) offset to first row */
     sword                       RCD_xoff;       /* (signed) offset to first column */
     word                        RCD_size;       /* size of region (in bytes) */
-if DBCS_PCGEOS
+#if DBCS_PCGEOS
     word                        RCD_usage;      /* LRU count */
-endif
-    Recangle                    RCD_bounds;     /* bounding box of region */
+#endif
+    Rectangle                   RCD_bounds;     /* bounding box of region */
     word                        RCD_data;       /* data for region */
 } RegionCharData;
 

@@ -121,6 +121,7 @@ word _pascal TrueType_Gen_Chars(
         if( fontBuf->FB_flags & FBF_IS_REGION )
         {
                 RegionCharData*  regionData;
+                TT_Raster_Map    rasterMap;
 
                 /* We calculate with an average of 4 on/off points, line number and line end code. */
                 size = height * 6 * sizeof( word ) + SIZE_REGION_HEADER; 
@@ -130,13 +131,26 @@ word _pascal TrueType_Gen_Chars(
                         MemReAlloc( bitmapHandle, size, HAF_NO_ERR );
                 regionData = MemLock( bitmapHandle );
 
-                // Outline verschieben
+                /* init rasterMap */
+                rasterMap.rows   = height;
+                rasterMap.width  = width;
+                rasterMap.flow   = TT_Flow_Down;
+                rasterMap.bitmap = regionData + SIZE_REGION_HEADER;
 
-                // an TT_Get_Outline_Region delegieren
+                /* translate outline and render it */
+                TT_Translate_Outline( &outline, -bbox.xMin, -bbox.yMin );
+                TT_Get_Outline_Region( &outline, &rasterMap );
 
-                // Header in Region verschieben
+                /* fill header of charData */
+                regionData->RCD_xoff = bbox.xMin;
+                regionData->RCD_xoff = bbox.yMin;
+                regionData->RCD_size = rasterMap.size;
+                regionData->RCD_bounds.R_left   = 0;
+                regionData->RCD_bounds.R_right  = width;
+                regionData->RCD_bounds.R_top    = height;
+                regionData->RCD_bounds.R_bottom = 0;
 
-                // size in dgoup zurückschreiben
+                size = rasterMap.size;
         }
         else
         {
@@ -155,6 +169,7 @@ word _pascal TrueType_Gen_Chars(
                 rasterMap.width  = width;
                 rasterMap.cols   = (width + 7) / 8;
                 rasterMap.size   = rasterMap.rows * rasterMap.cols;
+                rasterMap.flow   = TT_Flow_Down;
                 rasterMap.bitmap = charData + SIZE_CHAR_HEADER;
 
                 /* translate outline and render it */
