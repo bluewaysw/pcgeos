@@ -93,8 +93,8 @@
 #	Name	Date		Description
 #	----	----		-----------
 #	ardeb	7/23/89		Initial Revision
-#	RainerB	1/22/2023	Add -s flag to grev
-#		3/5/2023	made rev file in LOCAL_ROOT working
+#	RainerB	3/20/2023	Add -s flag to grev when pmake is called in LOCAL_ROOT
+#				Add -z flag to glue also for EC version
 #
 # DESCRIPTION:
 #	This is a makefile to be included by all makefiles in the PC/GEOS
@@ -359,7 +359,10 @@ GREVFLAGS	=
 GREVFLAGS	+= -B $(BRANCH)
 #endif
 
-_REL	!=	$(GREV) neweng $(REVFILE) $(GREVFLAGS) -R -s 
+# Don't pass the -s flag so that the rev files are not changed with every build.
+# This means that the automatic versioning in the ROOT_DIR is disabled.
+
+_REL	!=	$(GREV) neweng $(REVFILE) $(GREVFLAGS) -R
 _PROTO	!=	$(GREV) getproto $(REVFILE) $(GREVFLAGS) -P
 
 #elif defined(GEODE) && exists($(CURRENT_DIR)/$(GEODE).rev)
@@ -370,6 +373,7 @@ GREV		?= grev
 GREVFLAGS	=
 #
 # Don't use a branch option on a local .rev file
+# Pass the -s flag to automatically save the new revision number in the rev file
 
 _REL	!=	$(GREV) neweng $(REVFILE) $(GREVFLAGS) -R -s
 _PROTO	!=	$(GREV) getproto $(REVFILE) $(GREVFLAGS) -P
