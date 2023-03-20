@@ -35,7 +35,7 @@
  *                *outlineEntry         Handle to current gstate.
  *                stylesToImplement
  * 
- * RETURNS:       word                  Size of bitmap or region.
+ * RETURNS:       void
  * 
  * STRATEGY:      - find font-file for the requested style from fontInfo
  *                - open outline of character in founded font-file
@@ -44,11 +44,11 @@
  * REVISION HISTORY:
  *      Date      Name      Description
  *      ----      ----      -----------
- *      23/12/22  JK        Initial Revision
+ *      12/23/22  JK        Initial Revision
  * 
  *******************************************************************/
 
-word _pascal TrueType_Gen_Chars(
+void _pascal TrueType_Gen_Chars(
                         word                 character, 
                         WWFixedAsDWord       pointSize,
                         FontBuf*             fontBuf,
@@ -194,5 +194,14 @@ word _pascal TrueType_Gen_Chars(
 Fail:
         FileClose( truetypeFile, FALSE );
         FilePopDir(); 
-        return size;
+}
+
+
+/********************************************************************
+ *                      DeleteLRUChar
+ ********************************************************************
+ *
+ *******************************************************************/
+void DeleteLRUChar() {
+
 }

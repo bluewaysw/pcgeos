@@ -57,31 +57,32 @@ TrueTypeGenChar	proc	far
 	call	MemSegmentToHandle
 	jnc	err
 
-	push	cx		; remember handle
+	push	cx				; remember handle
+	push	dx				; remember character to build
 
-	push	dx		; pass character code
+	push	dx				; pass character code
 
 	clr	al
 	movwbf	dxah, es:GS_fontAttr.FCA_pointsize
-	push	dx		; pass point size
+	push	dx				; pass point size
 	push 	ax
 				
-	push	es		; pass font ptr
-	mov	ax, 0		; with segment offset 0
+	push	es				; pass font ptr
+	mov	ax, 0				; with segment offset 0
 	push	ax
 
 	mov	cx, es:GS_fontAttr.FCA_fontID
 	call	FontDrFindFontInfo
-	push	ds		; pass ptr to FontInfo
+	push	ds				; pass ptr to FontInfo
 	push	di
 
 	clr	ah		                   
 	mov	al, es:GS_fontAttr.FCA_textStyle
 	mov	bx, ODF_HEADER
 	call	FontDrFindOutlineData
-	push	ds		; pass ptr to OutlineEntry
+	push	ds				; pass ptr to OutlineEntry
 	push	di
-	push	ax		; pass stylesToImplement
+	push	ax				; pass stylesToImplement
 
 	segmov	ds, dgroup, ax
 	call	TRUETYPE_GEN_CHARS
