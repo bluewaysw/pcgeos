@@ -91,6 +91,8 @@
 #	Name	Date		Description
 #	----	----		-----------
 #	ardeb	7/23/89		Initial Revision
+#	RainerB	3/20/2023	Add -s flag to grev when pmake is called in LOCAL_ROOT
+#				Add -z flag to glue also for EC version
 #
 # DESCRIPTION:
 #	This is a makefile to be included by all makefiles in the PC/GEOS
@@ -324,6 +326,9 @@ GREV		?= grev
 GREVCMD		= RFILE=$(INSTALL_DIR)/$(_GEODE).rev \
                   $(GREV) -B$(BRANCH) $(GREVTREE)
 
+# Don't pass the -s flag so that the rev files are not changed with every build.
+# This means that the automatic versioning in the ROOT_DIR is disabled.
+
 _REL	!=	$(GREVCMD) neweng $(GEODE).rev
 #if	defined(NPM) || exists(NPM)
 _PROTO	!=	$(GREVCMD) newprotomajor $(GEODE).rev
@@ -332,6 +337,19 @@ _PROTO	!=	$(GREVCMD) newprotominor $(GEODE).rev
 #else
 _PROTO	!=	$(GREVCMD) getproto $(GEODE).rev
 #endif
+
+#elif defined(GEODE) && exists($(CURRENT_DIR)/$(GEODE).rev)
+## the .rev file is local, use it.
+REVFILE		= $(CURRENT_DIR)/$(GEODE).rev
+_GEODE 		:= $(GEODE)
+GREV		?= grev
+GREVFLAGS	=
+#
+# Don't use a branch option on a local .rev file
+# Pass the -s flag to automatically save the new revision number in the rev file
+
+_REL	!=	$(GREV) neweng $(REVFILE) $(GREVFLAGS) -R -s
+_PROTO	!=	$(GREV) getproto $(REVFILE) $(GREVFLAGS) -P
 
 #else
 
@@ -645,9 +663,9 @@ GPFILE		= $(GEODE).gp
 SETLIBFLAG	?= lf=""
 LINK		: .USE .NOEXPORT
 	case "$(.TARGET)" in
-	    *ec.geo)	of="-Og $(.ALLSRC:M*.gp) -P $(_PROTO) -R $(_REL) -E" ;;
+	    *ec.geo)	of="-Og $(.ALLSRC:M*.gp) -P $(_PROTO) -R $(_REL) -E -z" ;;
 #if !empty(BRANCH:MRelease1*)
-	    *.geo)  	of="-Og $(.ALLSRC:M*.gp) -P $(_PROTO) -R $(_REL)" ;;
+	    *.geo)  	of="-Og $(.ALLSRC:M*.gp) -P $(_PROTO) -R $(_REL) -z" ;;
 #else
 	    *.geo)  	of="-Og $(.ALLSRC:M*.gp) -P $(_PROTO) -R $(_REL) -z" ;;
 #endif

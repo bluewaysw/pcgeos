@@ -900,7 +900,7 @@ OpenOutputFile(char *outFile)
 	OPEN_AND_ASSIGN_OUTPUT_FILE(foutput,outFile);
 	if (localize){
 
-	    Localize_Init(outFile,TRUE); /*TRUE. resource names are all caps */
+	    Localize_Init(outFile,FALSE); /*FALSE. Do not capitalize resource names. */
 	}
 
 	if (foutput == NULL) {
