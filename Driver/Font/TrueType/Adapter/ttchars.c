@@ -21,6 +21,13 @@
 #include "ttchars.h"
 #include "ttcharmapper.h"
 #include <ec.h>
+#include <string.h>
+
+
+static void CopyChar( FontBuf* fontBuf, word sizeToAdd );
+
+static word ShiftCharData( FontBuf* fontBuf, CharData* charData );
+static word ShiftRegionCharData( FontBuf* fontBuf, RegionCharData* charData );
 
 
 /********************************************************************
@@ -186,10 +193,11 @@ void _pascal TrueType_Gen_Chars(
                 bitmapSize = size;
         }
 
-        // FontBlock ggf. kürzen und neues Glyph anhängen erfolgt auf asm Seite
-
         TT_Done_Glyph( glyph );
         TT_Done_Instance( instance );
+
+        /* add rendered glyph to fontbuf */
+        CopyChar( fontBuf, size );
 
 Fail:
         FileClose( truetypeFile, FALSE );
@@ -198,10 +206,122 @@ Fail:
 
 
 /********************************************************************
- *                      DeleteLRUChar
+ *                      CopyChar
  ********************************************************************
  *
  *******************************************************************/
-void DeleteLRUChar() {
+static void CopyChar( FontBuf* fontBuf, word sizeToAdd ) 
+{
+        word  numOfChars = fontBuf->FB_lastChar - fontBuf->FB_firstChar + 1;
+        CharTableEntry*  charTableEntries = (CharTableEntry*) ((byte*)fontBuf) + sizeof( FontBuf );
 
+
+        /* shrink fontBuf if necessary */
+        while( fontBuf->FB_dataSize > MAX_FONTBUF_SIZE )
+        {
+                word  sizeCharData;
+                word  indexLRUChar = FindLRUChar( fontBuf, numOfChars );
+                void* charData = ((byte*)fontBuf) + charTableEntries[indexLRUChar].CTE_dataOffset;
+
+
+                /* remove CharData of lru char */
+                if( fontBuf->FB_flags & FBF_IS_REGION )
+                        sizeCharData = ShiftRegionCharData( fontBuf, (RegionCharData*)charData );
+                else
+                        sizeCharData = ShiftCharData( fontBuf, (CharData*)charData );
+
+                /* adjust pointers in CharTableEntries */
+                AdjustPointers( charTableEntries, &charTableEntries[indexLRUChar], sizeCharData, numOfChars );
+
+                /* update CharTableEntry */
+                charTableEntries[indexLRUChar].CTE_dataOffset = CHAR_NOT_BUILT;
+                charTableEntries[indexLRUChar].CTE_usage      = 0;
+
+                /* update FontBuf */
+                fontBuf->FB_dataSize -= sizeCharData;
+        }
+
+        /* copy rendered Glyph to fontBuf */
+        // TODO
+}
+
+/********************************************************************
+ *                      FindLRUChar
+ ********************************************************************
+ *
+ *******************************************************************/
+static int FindLRUChar( FontBuf* fontBuf, int numOfChars )
+{
+        word             lru = 0xffff;
+        int              indexLRUChar = -1;
+        int              i;
+        CharTableEntry*  charTableEntry = (CharTableEntry*) ((byte*)fontBuf) + sizeof( FontBuf );
+
+
+        for( i = 0; i < numOfChars; i++, charTableEntry++ )
+        {
+                /* if no data, go to next char */
+                if( charTableEntry->CTE_dataOffset < CHAR_MISSING )
+                        continue;
+
+                if( charTableEntry->CTE_usage < lru )
+                {
+                        lru = charTableEntry->CTE_usage;
+                        indexLRUChar = i;
+                }
+
+        }
+
+        return indexLRUChar;
+} 
+
+/********************************************************************
+ *                      AdjustPointers
+ ********************************************************************
+ *
+ *******************************************************************/
+static void AdjustPointers( CharTableEntry* charTableEntries, 
+                            CharTableEntry* lruEntry, 
+                            word sizeLRUEntry,
+                            word numOfChars )
+{
+        word  i;
+
+        for( i = 0; i < numOfChars; i++ )
+                if( charTableEntries[i].CTE_dataOffset > lruEntry->CTE_dataOffset )
+                        charTableEntries[i].CTE_dataOffset -= sizeLRUEntry;
+}
+
+/********************************************************************
+ *                      ShiftCharData
+ ********************************************************************
+ *
+ *******************************************************************/
+static word ShiftCharData( FontBuf* fontBuf, CharData* charData )
+{
+        word  size = charData->CD_pictureWidth * charData->CD_numRows + SIZE_CHAR_HEADER;
+ 
+ 
+        memmove( charData, 
+                ((byte*)charData) + size, 
+                ((byte*)charData) - ((byte*)fontBuf) + fontBuf->FB_dataSize );
+
+        return size;
+}
+
+/********************************************************************
+ *                      ShiftRegionCharData
+ ********************************************************************
+ *
+ *******************************************************************/
+static word ShiftRegionCharData( FontBuf* fontBuf, RegionCharData* charData )
+{
+        word size = charData->RCD_size + SIZE_REGION_HEADER;
+
+
+        memmove( charData, 
+                ((byte*)charData) + size, 
+                ((byte*)charData) - ((byte*)fontBuf) + fontBuf->FB_dataSize );
+
+        return size;
 }
