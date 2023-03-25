@@ -259,6 +259,9 @@ static void ShrinkFontBuf( FontBuf* fontBuf )
                 word  indexLRUChar = FindLRUChar( fontBuf, numOfChars );
                 void* charData = ((byte*)fontBuf) + charTableEntries[indexLRUChar].CTE_dataOffset;
 
+                /* ensure that we have a char to remove */
+                if( indexLRUChar == -1 )
+                        return;
 
                 /* remove CharData of lru char */
                 if( fontBuf->FB_flags & FBF_IS_REGION )
