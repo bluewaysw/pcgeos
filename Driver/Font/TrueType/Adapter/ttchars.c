@@ -24,8 +24,13 @@
 #include <string.h>
 
 
-static void CopyChar( FontBuf* fontBuf, word sizeToAdd );
-
+static void CopyChar( FontBuf* fontBuf, word geosChar, void* charData, word charDataSize );
+static void ShrinkFontBuf( FontBuf* fontBuf );
+static int FindLRUChar( FontBuf* fontBuf, int numOfChars );
+static void AdjustPointers( CharTableEntry* charTableEntries, 
+                            CharTableEntry* lruEntry, 
+                            word sizeLRUEntry,
+                            word numOfChars );
 static word ShiftCharData( FontBuf* fontBuf, CharData* charData );
 static word ShiftRegionCharData( FontBuf* fontBuf, RegionCharData* charData );
 
@@ -74,6 +79,7 @@ void _pascal TrueType_Gen_Chars(
         TT_BBox                bbox;
         TT_CharMap             charMap;
         TT_UShort              charIndex;
+        void*                  charData;
         word                   width, height, size;
 
 
@@ -127,7 +133,6 @@ void _pascal TrueType_Gen_Chars(
 
         if( fontBuf->FB_flags & FBF_IS_REGION )
         {
-                RegionCharData*  regionData;
                 TT_Raster_Map    rasterMap;
 
                 /* We calculate with an average of 4 on/off points, line number and line end code. */
@@ -136,26 +141,26 @@ void _pascal TrueType_Gen_Chars(
                 /* get pointer to bitmapBlock */
                 if( MemGetInfo( bitmapHandle, MGIT_SIZE ) < size )
                         MemReAlloc( bitmapHandle, size, HAF_NO_ERR );
-                regionData = MemLock( bitmapHandle );
+                charData = MemLock( bitmapHandle );
 
                 /* init rasterMap */
                 rasterMap.rows   = height;
                 rasterMap.width  = width;
                 rasterMap.flow   = TT_Flow_Down;
-                rasterMap.bitmap = regionData + SIZE_REGION_HEADER;
+                rasterMap.bitmap = ((byte*)charData) + SIZE_REGION_HEADER;
 
                 /* translate outline and render it */
                 TT_Translate_Outline( &outline, -bbox.xMin, -bbox.yMin );
                 TT_Get_Outline_Region( &outline, &rasterMap );
 
                 /* fill header of charData */
-                regionData->RCD_xoff = bbox.xMin;
-                regionData->RCD_xoff = bbox.yMin;
-                regionData->RCD_size = rasterMap.size;
-                regionData->RCD_bounds.R_left   = 0;
-                regionData->RCD_bounds.R_right  = width;
-                regionData->RCD_bounds.R_top    = height;
-                regionData->RCD_bounds.R_bottom = 0;
+                ((RegionCharData*)charData)->RCD_xoff = bbox.xMin;
+                ((RegionCharData*)charData)->RCD_xoff = bbox.yMin;
+                ((RegionCharData*)charData)->RCD_size = rasterMap.size;
+                ((RegionCharData*)charData)->RCD_bounds.R_left   = 0;
+                ((RegionCharData*)charData)->RCD_bounds.R_right  = width;
+                ((RegionCharData*)charData)->RCD_bounds.R_top    = height;
+                ((RegionCharData*)charData)->RCD_bounds.R_bottom = 0;
 
                 size = rasterMap.size;
         }
@@ -188,17 +193,28 @@ void _pascal TrueType_Gen_Chars(
                 charData->CD_numRows      = height;
                 charData->CD_xoff         = bbox.xMin;
                 charData->CD_yoff         = bbox.yMin;
-
-                /* save size of bitmap */
-                bitmapSize = size;
         }
 
         TT_Done_Glyph( glyph );
         TT_Done_Instance( instance );
 
-        /* add rendered glyph to fontbuf */
-        CopyChar( fontBuf, size );
+        if( fontBuf->FB_dataSize > MAX_FONTBUF_SIZE )
+                ShrinkFontBuf( fontBuf );
 
+        /* realloc FontBuf if necessary */
+        if( MemGetInfo( PtrToSegment( fontBuf ), MGIT_SIZE ) < fontBuf->FB_dataSize + size )
+        {
+                MemReAlloc( PtrToSegment( fontBuf ),
+                        fontBuf->FB_dataSize + size,
+                        HAF_STANDARD_NO_ERR );
+                fontBuf = MemDeref( PtrToSegment( fontBuf ));
+        }
+
+        /* add rendered glyph to fontbuf */
+        CopyChar( fontBuf, character, charData ,size );
+
+        /* cleanup */
+        MemUnlock( bitmapHandle );
 Fail:
         FileClose( truetypeFile, FALSE );
         FilePopDir(); 
@@ -210,16 +226,36 @@ Fail:
  ********************************************************************
  *
  *******************************************************************/
-static void CopyChar( FontBuf* fontBuf, word sizeToAdd ) 
+static void CopyChar( FontBuf* fontBuf, word geosChar, void* charData, word charDataSize ) 
+{
+        word  indexGeosChar = geosChar - fontBuf->FB_firstChar;
+        CharTableEntry*  charTableEntries = (CharTableEntry*) ((byte*)fontBuf) + sizeof( FontBuf );
+
+
+        /* copy rendered Glyph to fontBuf */
+        memmove( ((byte*)fontBuf) + fontBuf->FB_dataSize, charData, charDataSize );
+
+        /* update CharTableEntry and FontBuf */
+        charTableEntries[indexGeosChar].CTE_dataOffset = fontBuf->FB_dataSize;       
+        fontBuf->FB_dataSize += charDataSize;
+}
+
+
+/********************************************************************
+ *                      ShrinkFontBuf
+ ********************************************************************
+ *
+ *******************************************************************/
+static void ShrinkFontBuf( FontBuf* fontBuf ) 
 {
         word  numOfChars = fontBuf->FB_lastChar - fontBuf->FB_firstChar + 1;
         CharTableEntry*  charTableEntries = (CharTableEntry*) ((byte*)fontBuf) + sizeof( FontBuf );
+        word  sizeCharData;
 
 
         /* shrink fontBuf if necessary */
         while( fontBuf->FB_dataSize > MAX_FONTBUF_SIZE )
         {
-                word  sizeCharData;
                 word  indexLRUChar = FindLRUChar( fontBuf, numOfChars );
                 void* charData = ((byte*)fontBuf) + charTableEntries[indexLRUChar].CTE_dataOffset;
 
@@ -240,9 +276,6 @@ static void CopyChar( FontBuf* fontBuf, word sizeToAdd )
                 /* update FontBuf */
                 fontBuf->FB_dataSize -= sizeCharData;
         }
-
-        /* copy rendered Glyph to fontBuf */
-        // TODO
 }
 
 /********************************************************************
