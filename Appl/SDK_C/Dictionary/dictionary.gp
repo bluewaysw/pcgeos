@@ -7,6 +7,12 @@
 #
 # AUTHOR:	Joon Song, Sep 21, 1994
 #
+# REVISION HISTORY:
+#       Name    Date            Description
+#       ----    ----            -----------
+#       Joon   	9/21/94	        Initial version
+#	RainerB	4/21/2022	Resource names adjusted for Watcom compatibility
+#
 # DESCRIPTION:	This file contains Geode definitions for the "Dictionary"
 #		sample application. This file is read by the Glue linker to
 #		build this application.
@@ -75,9 +81,9 @@ library spell
 # object blocks, fixed code resources, or data resources that are read-only.
 # Standard discardable code resources do not need to be mentioned.
 #
-resource APPRESOURCE object
-resource INTERFACE object
-resource DICTIONARYSTRINGS shared lmem read-only
+resource AppResource object
+resource Interface object
+resource DictionaryStrings shared lmem read-only
 #
 # Exported classes and functions
 #

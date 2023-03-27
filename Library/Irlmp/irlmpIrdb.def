@@ -1,0 +1,181 @@
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+	Copyright (c) Geoworks 1996 -- All Rights Reserved
+	Geoworks Confidential
+
+PROJECT:	GEOS
+MODULE:		Irlmp
+FILE:		irlmpIrdb.def
+
+AUTHOR:		Andy Chiu, Feb  9, 1996
+
+MACROS:
+	Name			Description
+	----			-----------
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	AC	2/ 9/96   	Initial revision
+
+
+DESCRIPTION:
+	Contains routines to use to get and retrieve information from
+	the IAS database.
+		
+	$Id: irlmpIrdb.def,v 1.1 97/04/05 01:07:34 newdeal Exp $
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+
+IrdbErrorType		etype	word, 0, 2	
+	IET_OK		enum		IrdbErrorType
+	IET_OPEN_ERROR	enum		IrdbErrorType
+	IET_SHARE	enum		IrdbErrorType
+	IET_DISK_FULL	enum		IrdbErrorType
+	IET_MEM_ERROR	enum		IrdbErrorType
+
+IrdbCode	segment	resource
+
+global	IRDBOPENDATABASE:far
+global	IRDBCLOSEDATABASE:far
+FXIP<	IrdbCode	ends			>
+FXIP<	ResidentXIP	segment resource 	>
+
+global	IrdbCreateEntry:far
+global	IrdbAddAttribute:far
+
+FXIP<	ResidentXIP	ends			>
+FXIP<	IrdbCode	segment resource 	>
+
+
+; -------------------------------------------------
+  global	IrdbDestroyEntry:far
+; -------------------------------------------------
+; Erase an entry for an object out of the database.
+;
+; PASS:		bx	= Object ID
+;
+; RETURN:	carry set if error
+;			ax = IrlmpErrorType
+;
+; DESTROYED:	nothing (ax if error)
+;
+
+; -------------------------------------------------
+  global	IrdbGetAttributeCount:far
+; -------------------------------------------------
+; Return how many attributes there are in the database
+; for an object.
+;
+; PASS:		bx	= Object ID
+; RETURN:	carry clear if sucessful
+;			ax = attribute count
+; 		carry set on error
+; 			ax = IrdbErrorType
+;
+
+; -------------------------------------------------
+  global	IrdbDeleteAttribute:far
+; -------------------------------------------------
+; Delete an attribute for the database.
+; The attributes are kept like an array.  If you delete
+; a non-last element, it will decrease the attributes numbers
+; of the attributes after it.
+;
+; PASS:		bx	= Object ID
+; 		ax	= Attribute number to delete
+;
+; RETURN:	carry set if error
+;			ax = IrdbErrorType
+;
+; DESTROYED:	nothing (ax if error)
+;
+
+; -------------------------------------------------
+  global	IrdbEnumClassAttributeName:far
+; -------------------------------------------------
+; Pass in a class name and attribute name.  This routine
+; enumerates through all the objects that match and
+; calls your callback routine.
+; 
+; PASS:		ds:si	= fptr to Class Name
+;		es:di	= fptr to Attribute Name
+;		cx:dx	= vptr to callback routine
+;
+;		ax, bp	= data passed to callback
+;
+; RETURN:	ax, cx	= Set by callback
+;		carry set if callback aborted
+;
+; Passed To Callback:
+;
+;		di	= IrdbAttributeType
+;		Data	=
+;			if IAT_MISSING
+;				nothing
+;			if IAT_INTEGER
+;				dssi 	= dword integer
+;			IF IAT_OCTET_SEQUENCE
+;				cx   	= length of sequence
+;				ds:si	= fptr to octet sequence
+;			IF IAT_USER_STRING
+;				cl	= length of sequence
+;				ch	= charset (0 is ascii)
+;				ds:si	= fptr to user string
+;
+;
+
+; -------------------------------------------------
+  global	IrdbGetValueByClass:far
+; -------------------------------------------------
+;
+; Handle the GetValueByClass call.
+; This function will search through the database
+; To find the requested data about a class.
+; It will then send the data back to the
+; IasServerFsm that called this routine.
+;
+; PASS:		*ds:si	= Object Ptr to server fsm to write data too
+;		es:di	= stream of data passed in to search for
+;			 8 bit unsigned integer (class name length)
+;			 "Length" octets - (class name)
+;			 8 bit unsigned integer (attribute name length)
+;			 "Length" octets - (attribute name)
+; RETURN:	nothing
+; DESTROYED:	nothing
+; 		
+;	
+
+; -------------------------------------------------
+  global	IrdbDeleteUsingClientHandle:far
+; -------------------------------------------------
+;
+; Delete an entry in the database from the client handle
+; it uses. 
+;
+; PASS:		si	= client handle
+; RETURN:	nothing
+; DESTORYED:	nothing
+;	
+
+; -------------------------------------------------
+  global	IrdbDestroyDatabase:far
+; -------------------------------------------------
+;
+; Delete the database file so next time we start up
+; we recreate it.
+;
+; PASS:		nothing
+; RETURN:	nothing
+; DESTORYED:	nothing
+;	
+
+IrdbCode	ends
+
+
+
+
+
+
+
+

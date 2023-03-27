@@ -35,13 +35,19 @@ typedef struct {
 } VisTextRange;
 
 /*
- * This constant can be placed in either VTR_start or VTR_end
+ * Special value for VTR_end
  */
 #define TEXT_ADDRESS_PAST_END		0x00ffffffL
 #define TEXT_ADDRESS_PAST_END_HIGH	0x00ff
 #define TEXT_ADDRESS_PAST_END_LOW	0xffff
-	/* Special value for VTR_start.high */
+/* Description:
+ *	Indicates that the area form VTR_start to the end of the text will be used.
+ */
 
+
+/*
+ * Special values for VTR_start. Pass zero to VTR_end.
+ */
 #define	VIS_TEXT_RANGE_SELECTION_HIGH	0xffff
 #define	VIS_TEXT_RANGE_SELECTION_LOW	0x0000
 #define	VIS_TEXT_RANGE_SELECTION	0xffff0000L
@@ -78,7 +84,7 @@ typedef WordFlags LineFlags;
 
 /*  Set if line ends a paragraph */
 #define LF_ENDS_PARAGRAPH	(0x4000)
-    
+
 /*  Set if field ends in CR. */
 #define LF_ENDS_IN_CR	(0x2000)
 
@@ -90,22 +96,22 @@ typedef WordFlags LineFlags;
 
 /*  Set if line ends in NULL, last one in document */
 #define LF_ENDS_IN_NULL	(0x0400)
-    
+
 /*  Set if line needs redrawing */
 #define LF_NEEDS_DRAW	(0x0200)
 
 /*  Set if line needs calculating */
 #define LF_NEEDS_CALC	(0x0100)
-    
+
 /*  Set if line ends in a generated hyphen */
 #define LF_ENDS_IN_AUTO_HYPHEN	(0x0080)
 
 /*  Set if line ends in an optional hyphen */
 #define LF_ENDS_IN_OPTIONAL_HYPHEN	(0x0040)
-    
+
 /*
  *  Sometimes characters in a line will extend outside the top and bottom
- *  bounds of the line. We mark these lines with these bits. 
+ *  bounds of the line. We mark these lines with these bits.
  */
 /*  Set if line interacts with line above it */
 #define LF_INTERACTS_ABOVE	(0x0020)
@@ -131,21 +137,21 @@ typedef WordFlags LineFlags;
  *   to the right of its font box.
  */
 #define LF_LAST_CHAR_EXTENDS_RIGHT	(0x0008)
-    
+
 /*
- *  Set if the last character on the line is 
+ *  Set if the last character on the line is
  *  kerned. The only time we use this is to copy
  *  it into the next field...
  */
 #define LF_LAST_CHAR_KERNED	(0x0004)
-    
+
 /*
  *  Set if the line contains styles which are not supported by the kernel.
  *  This allows applications to optimize line redraw by skipping over code
  *  which may attempt to draw attributes which don't exist for the line.
  */
 #define LF_CONTAINS_EXTENDED_STYLE	(0x0002)
-    
+
 /*
  * 	Structure of a tab
  */
@@ -155,20 +161,20 @@ typedef ByteEnum TabLeader;
 #define TL_LINE	    0x2
 #define TL_BULLET   0x3
 
-typedef ByteEnum TabType;	
+typedef ByteEnum TabType;
 #define TT_LEFT	    	0x0
 #define TT_CENTER	0x1
 #define TT_RIGHT	0x2
 #define TT_ANCHORED	0x3
 
-typedef ByteFlags TabAttributes;	
+typedef ByteFlags TabAttributes;
 /* 3 bits unused */
 #define TabLeader	(0x10 | 0x08 | 0x04)
 #define TabLeader_OFFSET	2
 #define TabType	    	(0x02 | 0x01)
 #define TabType_OFFSET	    	0
 
-typedef ByteEnum TabReferenceType;	
+typedef ByteEnum TabReferenceType;
 #define TRT_RULER	0x0 	    /*  Reference is into the ruler. */
 #define TRT_OTHER	0x1
 
@@ -196,7 +202,7 @@ typedef ByteFlags TabReference;
 #define RULER_TAB_TO_PARA_MARGIN	0x7d
 
 /*
- *  Reference number that means tab has an intrinsic width and 
+ *  Reference number that means tab has an intrinsic width and
  *  is not associated with any tabstop.
  */
 #define OTHER_INTRINSIC_TAB		0x7f
@@ -228,7 +234,7 @@ typedef struct {
 /*
  *  A line is made up of a list of fields...
  */
-typedef struct {	
+typedef struct {
     word	FI_nChars;  	/*  Number of characters in the field */
     word	FI_position; 	/*  X position of field on line */
     word	FI_width;   	/*  Width of the field */
@@ -247,14 +253,14 @@ typedef	struct {
 					 * This is the total of the field
 					 * counts.
 					 */
-    WBFixed 	LI_spacePad;		/* Amount to pad last field to 
-					 * get full justification 
+    WBFixed 	LI_spacePad;		/* Amount to pad last field to
+					 * get full justification
 					 */
     word    	LI_lineEnd; 	    	/* The rounded end-of-line position
 					 * which indicates the end of the
 					 * last non-white-space character.
 					 */
-    FieldInfo	LI_firstField;	        /* Contains the always present 
+    FieldInfo	LI_firstField;	        /* Contains the always present
 					 * first field .
 					 */
 
@@ -312,7 +318,7 @@ typedef ByteEnum VisTextDefaultSize;
 #define     VTDS_36 7
 
 /*
- *	Default CharAttr record (incorporates the default sizes 
+ *	Default CharAttr record (incorporates the default sizes
  *	and color map modes).
  */
 
@@ -349,7 +355,7 @@ typedef WordFlags VisTextDefaultCharAttr;
 #define VTDCA_FONT_OFFSET	0
 
 /*
- *	The initial CharAttr for a text object 
+ *	The initial CharAttr for a text object
  */
 #define VIS_TEXT_INITIAL_CHAR_ATTR \
  	    	((VTDS_12 << VTDCA_SIZE_OFFSET) | VTDF_BERKELEY)
@@ -357,8 +363,8 @@ typedef WordFlags VisTextDefaultCharAttr;
 #define VIS_TEXT_DEFAULT_POINT_SIZE 12
 
 
-/*--------------------------------------------------------------------------- 
- *	Macros for defining VisTextCharAttr structures 
+/*---------------------------------------------------------------------------
+ *	Macros for defining VisTextCharAttr structures
  */
 
 #define CHAR_ATTR_STYLE_FONT_SIZE_STYLE_COLOR(ref, style, font, psize, tstyle, color) { \
@@ -389,8 +395,8 @@ typedef WordFlags VisTextDefaultCharAttr;
 	    CHAR_ATTR_STYLE_FONT_SIZE_STYLE_COLOR(2, CA_NULL_ELEMENT, font, \
 						psize, 0, C_BLACK)
 
-/* 
- *	Macros for typical default attribute structures 
+/*
+ *	Macros for typical default attribute structures
  */
 
 #define DEF_CHAR_ATTR_FONT_SIZE(font, psize) (((psize) << VTDCA_SIZE_OFFSET) | \
@@ -409,7 +415,7 @@ typedef WordFlags VisTextDefaultCharAttr;
 #define VIS_TEXT_MAX_PARA_WIDTH			4000
 #endif
 
-#define VIS_TEXT_MIN_NON_ZERO_LINE_SPACING 	((0 << 8) + 128)	
+#define VIS_TEXT_MIN_NON_ZERO_LINE_SPACING 	((0 << 8) + 128)
 	/* BBFixed constant */
 
 #define VIS_TEXT_MIN_NON_ZERO_LINE_SPACING_INT 	0
@@ -433,14 +439,14 @@ typedef WordFlags VisTextDefaultCharAttr;
 
 
 /*
- *	Structure of a paraAttr				
+ *	Structure of a paraAttr
  *
  * The size of a paraAttr can be computed by:
  *
  *	size = (size VisTextParaAttr) + (VTPA_numberOfTabs * (size Tab))
  */
 
-/* 
+/*
  *	Different types of borders on a paragraph
  */
 typedef ByteEnum ShadowAnchor;
@@ -557,7 +563,7 @@ typedef WordFlags VisTextDefaultParaAttr;
 #define VTDPA_RIGHT_MARGIN_OFFSET	0
 
 
-/* 
+/*
  *	Structure of a ParaAttr
  */
 typedef struct {
@@ -572,7 +578,7 @@ typedef struct {
     word	    	    VTPA_paraMargin;
 						/* ** See note on line height
 						 * ** calculation below */
-    BBFixedAsWord    	    VTPA_lineSpacing;	/* line spacing - unsigned 
+    BBFixedAsWord    	    VTPA_lineSpacing;	/* line spacing - unsigned
 						 * 1.0 is normal  */
 
 	/* extra space above/below paragraph, in points (13.3) */
@@ -615,7 +621,7 @@ typedef struct {
 
 
 /*
- *	The initial ParaAttr for a text object 
+ *	The initial ParaAttr for a text object
  */
 #define VIS_TEXT_INITIAL_PARA_ATTR (VisTextDefaultParaAttr) ( (0*2) << VTDPA_LEFT_MARGIN_OFFSET ) | \
 				( (0*2) << VTDPA_PARA_MARGIN_OFFSET ) | \
@@ -658,7 +664,7 @@ typedef struct {
  * the text object's data
  */
 typedef ByteFlags VisTextStorageFlags;
-#define VTSF_LARGE	    	    	0x80	
+#define VTSF_LARGE	    	    	0x80
     /* If set: this object uses the large storage format and the bits below
      * 	       are unused.
      * If clear: this object uses the model storage format and the bits below

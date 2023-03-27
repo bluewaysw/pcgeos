@@ -14,6 +14,7 @@
 #       AS      7/9/92          Initial version
 #       NF      9/19/96         Corrected some common errors
 #       NF      10/7/96         Corrected heapspace value.
+#	RainerB	4/27/2022	Resource names adjusted for Watcom compatibility
 #
 # DESCRIPTION:
 #       This file contains Geode definitions for the "InkTest" sample
@@ -93,10 +94,10 @@ exempt inkfix
 # object blocks, fixed code resources, or data resources that are read-only.
 # Standard discardable code resources do not need to be mentioned.
 #
-resource APPLICATION ui-object
-resource INTERFACE   ui-object
-resource DISPLAYUI   ui-object
-resource DOCGROUP    object
+resource Application ui-object
+resource Interface   ui-object
+resource DisplayUI   ui-object
+resource DocGroup    object
 #
 # Classes we defined in our program.
 #

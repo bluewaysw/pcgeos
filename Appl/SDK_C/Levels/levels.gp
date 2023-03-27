@@ -12,6 +12,7 @@
 #       Name    Date            Description
 #       ----    ----            -----------
 #       JDM     10/7/92         Initial version
+#	RainerB	4/27/2022	Resource names adjusted for Watcom compatibility
 #
 # DESCRIPTION:
 #       This file contains Geode definitions for the "Levels" sample
@@ -81,11 +82,11 @@ library	ansic
 # object blocks, fixed code resources, or data resources that are read-only.
 # Standard discardable code resources do not need to be mentioned.
 #
-resource APPRESOURCE   ui-object
-resource INTERFACE     ui-object
-resource OPTIONSMENUUI ui-object
-resource USERLEVELUI   ui-object
-resource STRINGS       lmem read-only shared
+resource AppResource   ui-object
+resource Interface     ui-object
+resource OptionsMenuUI ui-object
+resource UserLevelUI   ui-object
+resource Strings       lmem read-only shared
 #
 # Export classes: list classes which are defined by the application here.
 #

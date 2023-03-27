@@ -93,6 +93,8 @@
 #	Name	Date		Description
 #	----	----		-----------
 #	ardeb	7/23/89		Initial Revision
+#	RainerB	3/20/2023	Add -s flag to grev when pmake is called in LOCAL_ROOT
+#				Add -z flag to glue also for EC version
 #
 # DESCRIPTION:
 #	This is a makefile to be included by all makefiles in the PC/GEOS
@@ -340,7 +342,6 @@ INSTALL_DIR	:= $(INSTALL_DIR:H)
 #	Obtain revision control information. Results are left in
 #	$(_REL) and $(_PROTO).
 #
-# XXX: disabled until grev.c has branch stuff added to it...
 #if	defined(GEODE) && exists($(INSTALL_DIR)/$(GEODE).rev)
 REVFILE		= $(INSTALL_DIR)/$(GEODE).rev
 
@@ -358,7 +359,23 @@ GREVFLAGS	=
 GREVFLAGS	+= -B $(BRANCH)
 #endif
 
+# Don't pass the -s flag so that the rev files are not changed with every build.
+# This means that the automatic versioning in the ROOT_DIR is disabled.
+
 _REL	!=	$(GREV) neweng $(REVFILE) $(GREVFLAGS) -R
+_PROTO	!=	$(GREV) getproto $(REVFILE) $(GREVFLAGS) -P
+
+#elif defined(GEODE) && exists($(CURRENT_DIR)/$(GEODE).rev)
+## the .rev file is local, use it.
+REVFILE		= $(CURRENT_DIR)/$(GEODE).rev
+_GEODE 		:= $(GEODE)
+GREV		?= grev
+GREVFLAGS	=
+#
+# Don't use a branch option on a local .rev file
+# Pass the -s flag to automatically save the new revision number in the rev file
+
+_REL	!=	$(GREV) neweng $(REVFILE) $(GREVFLAGS) -R -s
 _PROTO	!=	$(GREV) getproto $(REVFILE) $(GREVFLAGS) -P
 
 #else
@@ -775,7 +792,7 @@ LINK		: .USE
 	del /F $(.TARGET:S|/|\\|g)
 #endif
 	$(LINK) \
-	  $(.TARGET:M*ec.geo:S/$(.TARGET)/-Og $(.ALLSRC:M*.gp) -P $(_PROTO) -R $(_REL) -E/)\
+	  $(.TARGET:M*ec.geo:S/$(.TARGET)/-Og $(.ALLSRC:M*.gp) -P $(_PROTO) -R $(_REL) -E -z/)\
 	  $(.TARGET:M*.geo:N*ec.geo:S/$(.TARGET)/-Og $(.ALLSRC:M*.gp) -P $(_PROTO) -R $(_REL) -z/)\
 	  -F./$(PRODUCT) \
 	  $(.TARGET:M*.vm:S/$(.TARGET)/-Ov -P $(_PROTO) -R $(_REL)/)\
@@ -793,7 +810,7 @@ LINK		: .USE
 	del /F $(.TARGET:S|/|\\|g)
 #endif
 	$(LINK) \
-	  $(.TARGET:M*EC.geo:S/$(.TARGET)/-Og $(.ALLSRC:M*.gp) -P $(_PROTO) -R $(_REL) -E/)\
+	  $(.TARGET:M*EC.geo:S/$(.TARGET)/-Og $(.ALLSRC:M*.gp) -P $(_PROTO) -R $(_REL) -E -z/)\
 	  $(.TARGET:M*.geo:N*EC.geo:S/$(.TARGET)/-Og $(.ALLSRC:M*.gp) -P $(_PROTO) -R $(_REL) -z/)\
 	  $(.TARGET:M*.vm:S/$(.TARGET)/-Ov -P $(_PROTO) -R $(_REL)/)\
 	  $(.TARGET:M*.com:S/$(.TARGET)/-Oc/)\
