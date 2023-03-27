@@ -12,6 +12,7 @@
 #       Name    Date            Description
 #       ----    ----            -----------
 #       NF      11/13/96        Initial version
+#		RainerB	4/27/2022		Resource names adjusted for Watcom compatibility
 #
 # DESCRIPTION:
 #       This file contains Geode definitions for the "GenContent"
@@ -77,8 +78,8 @@ library ui
 # object blocks, fixed code resources, or data resources that are read-only.
 # Standard discardable code resources do not need to be mentioned.
 #
-resource APPRESOURCE ui-object
-resource INTERFACE   ui-object
+resource AppResource ui-object
+resource Interface   ui-object
 #
 # Any classes that are defined in the application should be exported here.
 #

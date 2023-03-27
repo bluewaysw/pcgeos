@@ -8,6 +8,12 @@
 #
 # AUTHOR:	Edward Di Geronimo Jr., 2/11/01
 #
+# REVISION HISTORY:
+#       Name    Date            Description
+#       ----    ----            -----------
+#       Ed	2/11/01	        Initial version
+#	RainerB	4/27/2022	Resource names adjusted for Watcom compatibility
+#
 # DESCRIPTION:	Your basic GP file for the tabs sample application
 #
 ##############################################################################
@@ -28,5 +34,5 @@ appobj	TabsApp
 library	geos
 library	ui
 #
-resource APPRESOURCE object
-resource INTERFACE object
+resource AppResource object
+resource Interface object

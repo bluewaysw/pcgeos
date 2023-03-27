@@ -13,6 +13,7 @@
 #       ----    ----            -----------
 #       josh    5/92            Initial version
 #       NF      9/26/96         Made tokenchars unique
+#		RainerB	4/27/2022		Resource names adjusted for Watcom compatibility
 #
 # DESCRIPTION:
 #       This file contains Geode definitions for the "Gstest" sample
@@ -74,6 +75,6 @@ library	ui
 # (standard discardable code resources do not need to be mentioned).
 # Don't change these to ui-object or crash will occur.
 #
-resource APPRESOURCE object
-resource INTERFACE   object
+resource AppResource object
+resource Interface   object
 

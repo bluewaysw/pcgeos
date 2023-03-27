@@ -14,6 +14,7 @@
 #       TM      10/9/92         Initial version
 #       NF      9/18/96         Screwed up heapspace value
 #       NF      10/3/96         Corrected heapspace value
+#		RainerB	4/27/2022		Resource names adjusted for Watcom compatibility
 #
 # DESCRIPTION:
 #       This file contains Geode definitions for the "GenTree" sample
@@ -79,8 +80,8 @@ library	ui
 # object blocks, fixed code resources, or data resources that are read-only.
 # Standard discardable code resources do not need to be mentioned.
 #
-resource APPRESOURCE      ui-object
-resource INTERFACE        ui-object
-resource DESTRUCTRESOURCE ui-object
-resource DIALERRESOURCE   ui-object
+resource AppResource      ui-object
+resource Interface        ui-object
+resource DestructResource ui-object
+resource DialerResource   ui-object
 

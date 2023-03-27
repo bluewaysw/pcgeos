@@ -13,6 +13,7 @@
 #       ----    ----            -----------
 #       EB      1/4/96          Initial version
 #       NF      9/24/96         Fixed heapspace value
+#		RainerB	4/21/2022		Resource names adjusted for Watcom compatibility
 #
 # DESCRIPTION:  This file contains Geode definitions for the ChunkArray
 #               sample application. This file is read by the Glue linker
@@ -77,10 +78,10 @@ library ui
 # object blocks, fixed code resources, or data resources that are read-only.
 # Standard discardable code resources do not need to be mentioned.
 #
-resource APPRESOURCE            ui-object
-resource APPMENURESOURCE        ui-object
-resource INTERFACE              ui-object
-resource DIALOGSTRINGRESOURCE   lmem read-only
+resource AppResource            ui-object
+resource AppMenuResource        ui-object
+resource Interface              ui-object
+resource DialogStringResource   lmem read-only
 #
 # Exported Classes
 #

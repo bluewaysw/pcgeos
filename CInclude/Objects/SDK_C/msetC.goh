@@ -1,0 +1,407 @@
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+	Copyright (c) GeoWorks 1993 -- All Rights Reserved
+
+PROJECT:	PC SDK
+MODULE:		Sample Library -- Mandelbrot Set Library
+FILE:		msetC.goh
+
+AUTHOR:		Paul DuBois, Aug  9, 1993
+
+ROUTINES:
+	Name			Description
+	----			-----------
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	dubois	8/ 9/93   	Initial version.
+
+DESCRIPTION:
+	Class definitions for the Mandelbrot Set library.
+	This file contains the definition of MSetClass.
+
+	$Id: msetC.goh,v 1.1 97/04/04 15:51:12 newdeal Exp $
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+
+#ifndef __MSET_CLASS_GOH
+#define __MSET_CLASS_GOH
+
+/*
+ * Any .goh files which define classes in a library should be delimited with
+ * the @deflib and @endlib keywords.  Note that files which containe just
+ * code and/or data do not require these keywords (though they are allowed).
+ *
+ * Do not forget to pass the -L <libname> to goc when compiling the library.
+ * If you don't, you will most probably get compile errors in any file which
+ * has a @classdecl for a class defined in the library.
+ *
+ * For more information on @deflib and @endlib, see Concepts section 5.4.3.1
+ */
+@deflib mset
+
+@include <SDK_C/mset.goh>
+
+@include <Objects/visC.goh>
+
+@class	MSetClass, VisClass;
+
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		Messages
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+
+/*
+ * This message sets up all the VM storage that the MSet object needs to
+ * store the results of its calculations.  There are a couple possibilities:
+ * 
+ * 1.	A new MSet is being calculated
+ * 	Pass in the VMFileHandle, and a NULL VMBlockHandle.  The MSet will
+ *	initialize a block for its own use and return its VMBlockHandle.
+ *	Pass this VMBlockHandle when restoring from a VM File.
+ *
+ * 2.	The MSet is being restored from a VM File
+ *	Pass in the VMFileHandle and the VMBlockHandle of the MSet data
+ *	block, described above in #2.  The return value may be ignored
+ *
+ * Context:	 MSet initialization
+ * Source:	 Any object (but probably the parent)
+ * Destination:	 Any MSet object
+ * Interception: unlikely; be sure to @callsuper().
+ */
+@message VMBlockHandle MSG_MSET_INITIALIZE(VMFileHandle vmfh,
+					   VMBlockHandle vmbh);
+
+/***********************************************************************
+ *		Thread control messages
+ ***********************************************************************/
+
+/*
+ * Causes the calculation thread to pause, with the side effect that after
+ * it has stopped, it will not be locking any VM blocks in the MSet's
+ * associated VM file.  Note that to be sure that calculation has stopped,
+ * this message should be used with @call, not @send.
+ * 
+ * This message is useful when you want to know that the calculation thread
+ * will not be locking (and changing!) any VM blocks for a while.  You might
+ * need this if the VM file being used by the thread is not marked for
+ * multiple thread access, and you wish to perform some functions on the
+ * file -- VMSave, for instance.
+ *
+ * Context:	 MSet calculation thread control
+ * Source:	 any object
+ * Destination:	 any MSet object
+ * Interception: unlikely
+ */
+@message void MSG_MSET_PAUSE_CALCULATION();
+
+/*
+ * Causes the calculation thread to begin running again.  May safely be sent
+ * even if the thread is already calculating.  Most of the time, you will
+ * only want to use this to resume a thread that has been paused with the
+ * MSG_MSET_PAUSE_CALCULATION message.
+ *
+ * This message is also used for starting up newly-initialized MSet objects.
+ *
+ * Context:	 MSet calculation thread control
+ * Source:	 any object
+ * Destination:	 any MSet object
+ * Interception: unlikely
+ */
+@message void MSG_MSET_CONTINUE_CALCULATION();
+
+/*
+ * Stops the calculation thread, empties out all the data blocks.
+ * Resets MSP_lastLine to its original value, and clears out any messages
+ * from the MSetCalc object, since they will be out-of-date.
+ * 
+ * Right now, the only messages the MSetCalc sends out are
+ * MSG_MSET_NEW_LINEs.
+ * 
+ * Context:	 MSet calculation thread control
+ * Source:	 any object
+ * Destination:	 any MSet object
+ * Interception: unlikely
+ */
+@message void MSG_MSET_RESET_CALCULATION();
+
+/*
+ * Causes the calculation thread to destroy itself.  This causes the MSet
+ * object to become, in effect, uninitialized.  To start calculating again,
+ * you must send another MSG_MSET_INITIALIZE message.
+ *
+ * Context:	 MSet calculation thread control
+ * Source:	 any object
+ * Destination:	 any MSet object
+ * Interception: unlikely
+ */
+@message void MSG_MSET_STOP_CALCULATION();
+
+/***********************************************************************
+ *		_GET_ and _SET_ messages
+ ***********************************************************************
+ *	These messages should only be sent to initialized MSets.
+ ***********************************************************************/
+
+/*
+ * Modifies the priority of the calculation thread.  See ThreadCreate
+ * documentation for a list of standard priorities, or pass a number between
+ * 0 and 255.  The lower the number, the higher the priority.
+ *
+ * Context:	 MSet calculation thread control
+ * Source:	 any object
+ * Destination:	 any MSet object
+ * Interception: unlikely
+ */
+@message void MSG_MSET_SET_PRIORITY(word newPriority);
+
+/*
+ * Changes the mapping between scaled dwell values and colors.
+ * 
+ * Context:	 MSet visual display
+ * Source:	 any object (probably an MSetColorControl object)
+ * Destination:	 any MSet object
+ * Interception: no
+ */
+@message void MSG_MSET_SET_COLOR_SCHEME(MSetColor newColorScheme);
+
+/*
+ * Sets the width and height of the MSet, and starts the calculations over
+ * from scratch.
+ *
+ * Context:	 MSet parameter setting
+ * Source:	 any object (probably a controller object)
+ * Destination:	 any MSet object
+ * Interception: unlikely
+ */
+@message void MSG_MSET_SET_SIZE(word newWidth, word newHeight);
+
+/*
+ * Sets the top-left corner of the MSet, and starts the calculations over
+ * from scratch.
+ *
+ * Context:	 MSet parameter setting
+ * Source:	 any object (probably a controller object)
+ * Destination:	 any MSet object
+ * Interception: unlikely
+ */
+@message void MSG_MSET_SET_POSITION(FixNum* newLeft, FixNum* newTop);
+
+/*
+ * Sets the resolution (magnification) of the MSet, and starts the
+ * calculations over from scratch.
+ *
+ * Context:	 MSet parameter setting
+ * Source:	 any object (possibly a controller object)
+ * Destination:	 any MSet object
+ * Interception: unlikely
+ */
+@message void MSG_MSET_SET_RESOLUTION(FixNum* newHRes, FixNum* newVRes);
+
+/*
+ * Sets the precision (16 bit or 48 bit fixed point) of the MSet, and
+ * starts the calculations over from scratch.
+ *
+ * Context:	 MSet parameter setting
+ * Source:	 any object (possibly a controller object)
+ * Destination:	 any MSet object
+ * Interception: unlikely
+ */
+@message void MSG_MSET_SET_PRECISION(MSetPrecision newPrecision);
+
+/*
+ * Sets the "selected point" of the MSet
+ *
+ * Context:	 MSet parameter setting
+ * Source:	 any object (most likely as a result of a mouse event)
+ * Destination:	 any MSet object
+ * Interception: maybe
+ */
+@message void MSG_MSET_SET_SELECT_XY(sword newX, sword newY);
+
+/*
+ * Sets the maximum dwell of the MSet
+ *
+ * Context:	 MSet parameter setting
+ * Source:	 any object (possibly a controller object)
+ * Destination:	 any MSet object
+ * Interception: maybe
+ */
+@message void MSG_MSET_SET_MAX_DWELL(word newMaxDwell);
+
+/*
+ * Causes the MSet to adjust itself to zoom in or out on the "selected
+ * point".  This is by default the point in the very middle of the MSet.
+ * It may also be set by left-clicking on the MSet.  zoomVal determines
+ * how much to zoom in.  Values greater than 1.0 will cause the MSet to zoom
+ * outward; values less than 1.0 will cause the MSet to zoom inward.
+ * Passing 1.0 will not cause any zooming, but will still cause the image to
+ * be re-centered on the selected point.
+ * 
+ * The zoom is effected by scaling hRes and vRes by zoomVal.  Thus, passing
+ * 2.0 will double the distance between calculated points; the image will
+ * appear to have zoomed out by a factor of two.  Inversely, passing 0.5
+ * halves the distance between points, and the image will appear to have
+ * zoomed in by a factor of two.
+ * 
+ * All the calculated points are thrown away during a zoom; the calculation
+ * thread restarts from scratch.
+ * 
+ * Do not pass values with an integer portion greater than 15 -- the high
+ * bits will be truncated.
+ *
+ * Context:	 MSet parameter setting
+ * Source:	 any object
+ * Destination:	 any MSet object
+ * Interception: possible, for keeping around data that will still be used.
+ */
+@message void MSG_MSET_ZOOM(BBFixedAsWord zoomVal);
+
+/***********************************************************************
+ *		Drawing-related messages
+ ***********************************************************************/
+
+/*
+ * Signal from the MSetCalc object that new points have been calculated.
+ * This causes the MSet object to draw all the lines between the previous
+ * and current value of newLine.
+ * 
+ * The values of newLine are expected to be strictly increasing; the only
+ * exception is passing -1.  When one passes -1, this message will not try
+ * to draw the MSet; it will just cache -1.  This is useful when restarting
+ * a calculation.
+ *
+ * Note that MSG_MSET_RESTART_CALCULATION assumes that there is at most one
+ * of this message in the MSet's event queue at any given time; furthermore,
+ * the values of newLine are expected to be strictly increasing.  The only
+ * exception is passing -1, in which case the MSet will not generate a
+ * MSET_DRAW.  It is an error to try to draw a block of data that has not
+ * yet been calculated.
+ *
+ * Context:	 MSet drawing
+ * Source:	 MSet's associated MSetCalc object
+ * Destination:	 MSetCalc's associated MSet object
+ * Interception: Possible; could intercept to create a progress slider.
+ */
+@message void MSG_MSET_NEW_LINE(sword newLine);
+
+/*
+ * Code common to MSG_MSET_NEW_LINE and MSG_VIS_DRAW.
+ * Draws all lines > lowLine and <= highLine.
+ *
+ * Context:	 MSet drawing
+ * Source:	 Sent by an MSet to itself
+ * Destination:	 Sent by an MSet to itself
+ * Interception: Possible, for optimized drawing
+ */
+@message void MSG_MSET_DRAW(GStateHandle gstate, sword lowLine, sword highLine);
+
+/***********************************************************************
+ *		Controller support messages
+ ***********************************************************************/
+
+/*
+ * To prevent _SET_COLOR_SCHEME messages from piling up if the user changes
+ * them repeatedly, the controller will send this message to the MSet object
+ * in lieu of sending MSG_MSET_SET_COLOR_SCHEME.  All this message does is
+ * send a _SET_COLOR_SCHEME, but with the forceQueue, checkDuplicate, replace
+ * flags.
+ *
+ * Context:	 Controller support
+ * Source:	 MSetColorControl object
+ * Destination:	 MSet object
+ * Interception: no
+ */
+@message void MSG_MSET_CONTROLLER_SET_COLOR_SCHEME(MSetColor newColor);
+
+/*
+ * Copies the MSet object's info into a passed MSetParameters struct.
+ * 
+ * Context:	 Controller support
+ * Source:	 Any MSet controller
+ * Destination:	 any MSet object
+ * Interception: no
+ */
+@message void MSG_MSET_LOAD_PARAM_BLOCK(MSetParameters* infoPtr);
+
+/*
+ * Sends notification to the controllers of a change in parameters.
+ * When the MSet changes any data that a controller reflects, it should
+ * send this message to itself.
+ * 
+ * Context:	 Controller support
+ * Source:	 any object
+ * Destination:	 any MSet object, ususally sent to itself
+ * Interception: no
+ */
+@message void MSG_MSET_SEND_NOTIFICATION_OF_PARAM_CHANGE();
+
+/* 
+ * Sends NULL status notification to the GCN list.  Used when an MSet object
+ * loses the target.
+ * 
+ * Context:	 Controller support
+ * Source:	 any object
+ * Destination:	 any MSet object
+ * Interception: no
+ */
+@message void MSG_MSET_SEND_NULL_STATUS_NOTIFICATION();
+
+/***********************************************************************
+ *		Error detection and recovery
+ ***********************************************************************/
+
+/*
+ * Message sent by the MSetCalc object when it has failed a memory
+ * allocation, and has paused itself as a result.
+ *
+ * Context:	 Error handling
+ * Source:	 MSetCalc object
+ * Destination:	 MSet object
+ * Interception: Possible, to provide notification to the application.
+ */
+@message void MSG_MSET_NO_CALC_MEMORY();
+
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		Instance data and defaults
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+/*
+ * Context:	Initialization of MSet
+ * Usage:	Set in MSG_MSET_INITIALIZE, when a VM File has been
+ *		associated with the object.  When this is FALSE, MSI_vmFile
+ *		and MSI_msetVMBlock may not be used.  This variable should
+ *		be TRUE iff a calculation thread and vm file exist for the
+ *		MSet. 
+ */
+	@instance	Boolean		MSI_initialized;
+	@default	MSI_initialized = 0;
+
+/*
+ * Context:	MSet point storage
+ * Usage:	Set in MSG_MSET_INITIALIZE.  Use it but don't alter it.
+ */
+	@instance	VMFileHandle	MSI_vmFile;
+
+/*
+ * Context:	MSet point storage
+ * Usage:	Set in MSG_MSET_INITIALIZE.  This block consists of an
+ *		MSetParameters struct, followed by a series of
+ *		MSetDataHandles.  Not to be changed.
+ */
+	@instance	VMBlockHandle	MSI_msetVMBlock;
+
+/*
+ * Context:	MSet calculation thread control
+ * Usage:	Set in MSG_MSET_INITIALIZE, when the thread that will be
+ *		calculating the MSet has been spawned.  Not much can be done
+ *		with a ThreadHandle except for getting its CPU usage and
+ *		modifying its priority.
+ */
+	@instance	ThreadHandle	MSI_calcThread;
+	@default	MSI_calcThread = NullHandle;
+
+@endc
+
+@endlib
+
+#endif	/* __MSET_CLASS_GOH */

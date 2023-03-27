@@ -8,6 +8,12 @@
 #
 # AUTHOR:	Tony Requist
 #
+# REVISION HISTORY:
+#       Name    Date            Description
+#       ----    ----            -----------
+#       Tony   	4/4/97	        Initial version
+#		RainerB	4/21/2022		Resource names adjusted for Watcom compatibility
+#
 # DESCRIPTION:	This file contains Geode definitions for the "DocUI" sample
 #		application. This file is read by the Glue linker to
 #		build this application.
@@ -40,11 +46,11 @@ heapspace 4330
 library	geos
 library	ui
 #
-resource APPRESOURCE ui-object
-resource INTERFACE ui-object
-resource DOCUMENTUI object
+resource AppResource ui-object
+resource Interface ui-object
+resource DocumentUI object
 #
-# Exported entry points. To allow the relocation of the DOCUMENTUI resource
+# Exported entry points. To allow the relocation of the DocumentUI resource
 # to occur and be independent of insignificant (as far as the operation of
 # the application is concerned) changes in the physical location of the
 # DUIDocumentClass class record, the relocation information for the

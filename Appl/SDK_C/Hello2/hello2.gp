@@ -13,6 +13,7 @@
 #       ----    ----            -----------
 #       doug    2/3/91          Initial version
 #       NF      10/4/96         Corrected heapspace value
+#		RainerB	4/27/2022		Resource names adjusted for Watcom compatibility
 #
 # DESCRIPTION:
 #       This file contains Geode definitions for the "Hello2" sample
@@ -78,7 +79,7 @@ library	ui
 # object blocks, fixed code resources, or data resources that are read-only.
 # Standard discardable code resources do not need to be mentioned.
 #
-resource APPRESOURCE      ui-object
-resource INTERFACE        ui-object
-resource CHANGETEXTDIALOG ui-object
+resource AppResource      ui-object
+resource Interface        ui-object
+resource ChangeTextDialog ui-object
 
