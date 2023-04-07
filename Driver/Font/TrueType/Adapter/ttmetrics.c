@@ -151,10 +151,10 @@ static void CalcTransformMatrix( TextStyle         stylesToImplement,
                                  TransformMatrix*  transMatrix )
 {
         /* make unity matrix       */
-        transMatrix->TM_matrix.xx = 1 << 16;
+        transMatrix->TM_matrix.xx = 1L << 16;
         transMatrix->TM_matrix.xy = 0;
         transMatrix->TM_matrix.yx = 0;
-        transMatrix->TM_matrix.yy = 1 << 16;
+        transMatrix->TM_matrix.yy = 1L << 16;
         transMatrix->TM_shiftY    = 0;
 
         /* fake bold style         */

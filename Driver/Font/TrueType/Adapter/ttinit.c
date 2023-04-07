@@ -149,7 +149,6 @@ void _pascal TrueType_InitFonts( MemHandle fontInfoBlock )
         FileEnumParams   ttfEnumParams;
         word             numOtherFiles;
         word             numFiles;
-        word             file;
         FileLongName*    ptrFileName;
         MemHandle        fileEnumBlock    = NullHandle;
         FileExtAttrDesc  ttfExtAttrDesc[] =
@@ -181,7 +180,7 @@ void _pascal TrueType_InitFonts( MemHandle fontInfoBlock )
 
         /* iterate over all filenames and try to register a font.*/
         ptrFileName = MemLock( fileEnumBlock );
-        for( file = 0; file < numFiles; file++ )
+        while( numFiles-- )
                 ProcessFont( ptrFileName++, fontInfoBlock );
 
         MemFree( fileEnumBlock );
@@ -800,8 +799,8 @@ static void convertHeader(
                                                            &fontHeader->FH_firstChar, 
                                                            &fontHeader->FH_lastChar ); 
 
-        TT_New_Glyph( face, &glyph );
         TT_New_Instance( face, &instance );
+        TT_New_Glyph( face, &glyph );
 
         for ( geosChar = fontHeader->FH_firstChar; geosChar < fontHeader->FH_lastChar; ++geosChar )
         {
@@ -812,7 +811,7 @@ static void convertHeader(
                         break;
 
                 /* load glyph without scaling or hinting */
-                TT_Load_Glyph( instance, glyph, charIndex, TTLOAD_DEFAULT );
+                TT_Load_Glyph( instance, glyph, charIndex, 0 );
                 TT_Get_Glyph_Metrics( glyph, &metrics );
 
                 //h_height

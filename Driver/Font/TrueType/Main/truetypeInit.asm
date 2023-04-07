@@ -173,7 +173,11 @@ initFontReturnAttr	FileExtAttrDesc \
 	<FEA_NAME, 0, size FileLongName>,
 	<FEA_END_OF_LIST>
 
+ifndef USE_OLD_FONT_LOADER
+TrueTypeInitFonts	proc	far	uses	cx
+else
 TrueTypeInitFonts	proc	far	uses	ax,bx,cx,dx,si,di,es,bp
+endif
 
 	.enter
 ifndef USE_OLD_FONT_LOADER
