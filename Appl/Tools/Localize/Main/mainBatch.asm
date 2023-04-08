@@ -90,6 +90,9 @@ fileEnumParams		local   FileEnumParams
 		mov	al, BM_ON		
 		call	SetBatchMode
 
+	; check for autorun batch mode?
+
+
 	; Initiate the status dialog.
 
 		call	InitiateBatchStatusDialog
@@ -121,14 +124,39 @@ fileEnumParams		local   FileEnumParams
 
 	; Get the path of the directory holding translation files to batch.
 
-		mov	ax, MSG_GEN_FILE_SELECTOR_GET_FULL_SELECTION_PATH
+
+		; try autorun batch dir configuration first
+		GetResourceHandleNS	StringsUI, bx
+		call	MemLock
+		mov	ds, ax
+		mov	si, offset AutorunBatchKey	
+		mov	dx, ds:[si]			; ds:si <- key string
+		mov	cx, ds				; cx:dx <- key string
+		mov	si, offset CategoryString	
+		mov	si, ds:[si]			; ds:si <- category string
+
+		mov	bp, size [BPS_docParams].DCP_path	
+		lea	di, es:[BPS_docParams].DCP_path ; es:di - buffer to fill
+		call	InitFileReadString		; ^hbx <- contains dest path
+		
+		pushf
+		mov	bx, ds:[LMBH_handle]
+		call	MemUnlock
 		mov	cx, es
+		lea	dx, es:[BPS_docParams].DCP_path
+		mov	al, 'M' - 'A'			; Disk handle.
+		call	DiskRegisterDiskSilently
+		popf
+		jnc	autorun
+
+		mov	ax, MSG_GEN_FILE_SELECTOR_GET_FULL_SELECTION_PATH
 		lea	dx, es:[BPS_docParams].DCP_path
 		GetResourceHandleNS	FileMenuUI, bx
 		mov	si, offset ResEditBatchDirSelector 
 		mov	di, mask MF_CALL
 		call	ObjMessage
 		mov	bx, ax			; Disk handle.
+autorun:
 		pop	bp
 
 	; Change to selected directory.
@@ -622,6 +650,10 @@ fileFreeList:
 		call	BatchReport
 		call	BatchReportReturn
 		pop	bp
+
+	; force shutdown ensemble if in autorun batch
+		mov	ax, SST_PANIC
+		call	SysShutdown
 		jmp	done
 
 REAProcessBatchFile	endm
