@@ -234,6 +234,7 @@ static void ConvertWidths( TT_Face face, FontHeader* fontHeader, WWFixedAsDWord 
                         charTableEntry->CTE_dataOffset     = CHAR_NOT_EXIST;
                         charTableEntry->CTE_width.WBF_int  = 0;
                         charTableEntry->CTE_width.WBF_frac = 0;
+                        charTableEntry->CTE_usage          = 0;
 
                         charTableEntry++;
                         continue;
@@ -247,9 +248,10 @@ static void ConvertWidths( TT_Face face, FontHeader* fontHeader, WWFixedAsDWord 
                 width = metrics.bbox.xMax - metrics.bbox.xMin;
                 scaledWidth = SCALE_WORD( width, scaleFactor );
                 charTableEntry->CTE_width.WBF_int  = INTEGER_OF_WWFIXEDASDWORD( scaledWidth );
-                charTableEntry->CTE_width.WBF_frac = FRACTION_OF_WWFIXEDASDWORD(scaledWidth );
+                charTableEntry->CTE_width.WBF_frac = FRACTION_OF_WWFIXEDASDWORD( scaledWidth );
                 charTableEntry->CTE_dataOffset     = CHAR_NOT_BUILT;
                 charTableEntry->CTE_flags          = 0;
+                charTableEntry->CTE_usage          = 0;
                 
                 // set flags in CTE_flags if needed
                 if( metrics.bbox.xMin < 0 )
