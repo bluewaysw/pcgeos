@@ -1,3 +1,5 @@
+#!/bin/sh
+
 echo Destination folder: %1
 echo Source folder: %2
 echo Tools folder: %3
