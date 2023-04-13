@@ -62,8 +62,8 @@ static word ShiftRegionCharData( FontBuf* fontBuf, RegionCharData* charData );
 
 void _pascal TrueType_Gen_Chars(
                         word                 character, 
-                        WWFixedAsDWord       pointSize,
                         FontBuf*             fontBuf,
+                        WWFixedAsDWord       pointSize,
 			const FontInfo*      fontInfo, 
                         const OutlineEntry*  outlineEntry,
                         TextStyle            stylesToImplement
@@ -182,7 +182,7 @@ void _pascal TrueType_Gen_Chars(
                 rasterMap.cols   = (width + 7) / 8;
                 rasterMap.size   = rasterMap.rows * rasterMap.cols;
                 rasterMap.flow   = TT_Flow_Down;
-                rasterMap.bitmap = charData + SIZE_CHAR_HEADER;
+                rasterMap.bitmap = ((byte*)charData) + SIZE_CHAR_HEADER;
 
                 /* translate outline and render it */
                 TT_Translate_Outline( &outline, -bbox.xMin, -bbox.yMin );

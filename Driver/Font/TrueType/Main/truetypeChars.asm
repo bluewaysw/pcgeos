@@ -58,19 +58,20 @@ TrueTypeGenChar	proc	far
 	jnc	err
 
 	push	cx				; remember handle
-	push	dx				; remember character to build
 
 	push	dx				; pass character code
+
+	push	es				; pass font ptr
+	mov	ax, 0				; with segment offset 0
+	push	ax
+
+	mov	es, bp				; es <- seg addr of gstate
 
 	clr	al
 	movwbf	dxah, es:GS_fontAttr.FCA_pointsize
 	push	dx				; pass point size
 	push 	ax
 				
-	push	es				; pass font ptr
-	mov	ax, 0				; with segment offset 0
-	push	ax
-
 	mov	cx, es:GS_fontAttr.FCA_fontID
 	call	FontDrFindFontInfo
 	push	ds				; pass ptr to FontInfo
