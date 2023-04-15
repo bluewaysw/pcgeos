@@ -29,7 +29,9 @@
 #include <unicode.h>
 
 
-static TT_Error ProcessFont( const char* file, MemHandle fontInfoBlock );
+static word DetectFontFiles( MemHandle* fileEnumBlock );
+
+static void ProcessFont( const char* file, MemHandle fontInfoBlock );
 
 static sword getFontIDAvailIndex( 
                         FontID          fontID, 
@@ -144,16 +146,12 @@ TT_Error _pascal Exit_FreeType()
  *      ----      ----      -----------
  *      7/15/22   JK        Initial Revision
  *******************************************************************/
+
 void _pascal TrueType_InitFonts( MemHandle fontInfoBlock )
 {
-        FileEnumParams   ttfEnumParams;
-        word             numOtherFiles;
         word             numFiles;
         FileLongName*    ptrFileName;
         MemHandle        fileEnumBlock    = NullHandle;
-        FileExtAttrDesc  ttfExtAttrDesc[] =
-                { { FEA_NAME, 0, sizeof( FileLongName ), NULL },
-                  { FEA_END_OF_LIST, 0, 0, NULL } };
 
 
         FilePushDir();
@@ -161,24 +159,14 @@ void _pascal TrueType_InitFonts( MemHandle fontInfoBlock )
         /* go to font/ttf directory */
         FileSetCurrentPath( SP_FONT, TTF_DIRECTORY );
 
-        /* get all filenames contained in current directory */
-        ttfEnumParams.FEP_searchFlags   = FESF_NON_GEOS;
-        ttfEnumParams.FEP_returnAttrs   = ttfExtAttrDesc;
-        ttfEnumParams.FEP_returnSize    = sizeof( FileLongName );
-        ttfEnumParams.FEP_matchAttrs    = NullHandle;
-        ttfEnumParams.FEP_bufSize       = FE_BUFSIZE_UNLIMITED;
-        ttfEnumParams.FEP_skipCount     = 0;
-        ttfEnumParams.FEP_callback      = NullHandle;
-        ttfEnumParams.FEP_callbackAttrs = NullHandle;
-        ttfEnumParams.FEP_headerSize    = 0;
-
-        numFiles = FileEnum( &ttfEnumParams, &fileEnumBlock, &numOtherFiles );
+        /* detect all filenames in current directory */
+        numFiles = DetectFontFiles( &fileEnumBlock );
         ECCheckMemHandle( fileEnumBlock );
 
         if( numFiles == 0 )
                 goto Fin;
 
-        /* iterate over all filenames and try to register a font.*/
+        /* iterate over all filenames and try to register a font */
         ptrFileName = MemLock( fileEnumBlock );
         while( numFiles-- )
                 ProcessFont( ptrFileName++, fontInfoBlock );
@@ -191,6 +179,47 @@ Fin:
 
 
 /********************************************************************
+ *                      DetectFontFiles
+ ********************************************************************
+ * SYNOPSIS:	  
+ * 
+ * PARAMETERS:    fileEnumBlock
+ * 
+ * RETURNS:       word
+ * 
+ * SIDE EFFECTS:  none
+ * 
+ * STRATEGY:      
+ * 
+ * REVISION HISTORY:
+ *      Date      Name      Description
+ *      ----      ----      -----------
+ *      14/4/23   JK        Initial Revision
+ *******************************************************************/
+
+static word DetectFontFiles( MemHandle* fileEnumBlock )
+{
+        FileEnumParams   ttfEnumParams;
+        word             numOtherFiles;
+        FileExtAttrDesc  ttfExtAttrDesc[] = { { FEA_NAME, 0, sizeof( FileLongName ), NULL },
+                                              { FEA_END_OF_LIST, 0, 0, NULL } };
+
+        /* get all filenames contained in current directory */
+        ttfEnumParams.FEP_searchFlags   = FESF_NON_GEOS;
+        ttfEnumParams.FEP_returnAttrs   = ttfExtAttrDesc;
+        ttfEnumParams.FEP_returnSize    = sizeof( FileLongName );
+        ttfEnumParams.FEP_matchAttrs    = NullHandle;
+        ttfEnumParams.FEP_bufSize       = FE_BUFSIZE_UNLIMITED;
+        ttfEnumParams.FEP_skipCount     = 0;
+        ttfEnumParams.FEP_callback      = NullHandle;
+        ttfEnumParams.FEP_callbackAttrs = NullHandle;
+        ttfEnumParams.FEP_headerSize    = 0;
+
+        return FileEnum( &ttfEnumParams, fileEnumBlock, &numOtherFiles );
+}
+
+
+/********************************************************************
  *                      ProcessFont
  ********************************************************************
  * SYNOPSIS:	  Registers a font with its styles as an available font.
@@ -199,7 +228,7 @@ Fin:
  *                fontInfoBlock         Handle to memory block with all
  *                                      infos about aviable fonts.
  * 
- * RETURNS:       TT_Error              Error code (see fterror.h).
+ * RETURNS:       void
  * 
  * SIDE EFFECTS:  none
  * 
@@ -211,17 +240,23 @@ Fin:
  *      20/01/23  JK        Initial Revision
  *******************************************************************/
 
-static TT_Error ProcessFont( const char* fileName, MemHandle fontInfoBlock )
+static void ProcessFont( const char* fileName, MemHandle fontInfoBlock )
 {
-        FileHandle          truetypeFile;
-        TT_Face             face;
-        TT_CharMap          charMap;
-        TT_Face_Properties  faceProperties;
-        TT_Error            error = TT_Err_Ok;
-        char                familyName[FID_NAME_LEN];
-        char                styleName[STYLE_NAME_LENGTH];
-        FontID              fontID;
-        sword               availIndex;
+        FileHandle              truetypeFile;
+        TT_Face                 face;
+        TT_CharMap              charMap;
+        TT_Face_Properties      faceProperties;
+        ChunkHandle             trueTypeOutlineChunk;
+        ChunkHandle             fontHeaderChunk;
+        ChunkHandle             fontInfoChunk;
+        FontHeader*             fontHeader;
+        FontInfo*               fontInfo;
+        TrueTypeOutlineEntry*   trueTypeOutlineEntry;
+        TT_Error                error = TT_Err_Ok;
+        char                    familyName[FID_NAME_LEN];
+        char                    styleName[STYLE_NAME_LENGTH];
+        FontID                  fontID;
+        sword                   availIndex;
 
 
         ECCheckBounds( (void*)fileName );
@@ -256,14 +291,9 @@ static TT_Error ProcessFont( const char* fileName, MemHandle fontInfoBlock )
         /* if we have an new font FontAvailEntry, FontInfo and Outline must be created */
         if ( availIndex < 0 )
         {
-		ChunkHandle            fontInfoChunk;
-		FontsAvailEntry*       newEntry;
-		FontInfo*              fontInfo;
-                TrueTypeOutlineEntry*  trueTypeOutlineEntry;
-                ChunkHandle            trueTypeOutlineChunk;
+		FontsAvailEntry*       newEntry; 
                 OutlineDataEntry*      outlineDataEntry;
-                ChunkHandle            fontHeaderChunk;
-                FontHeader*            fontHeader;
+
 		
 		/* allocate chunk for FontsAvailEntry and fill it */
 		if( LMemInsertAtHandles( fontInfoBlock, sizeof(LMemBlockHeader), 0, sizeof(FontsAvailEntry) ) ) 
@@ -332,7 +362,8 @@ static TT_Error ProcessFont( const char* fileName, MemHandle fontInfoBlock )
 	
                 /* fill FontHeader */
                 fontHeader = LMemDerefHandles( fontInfoBlock, fontHeaderChunk );
-                convertHeader( face, faceProperties, charMap, fontHeader );
+                convertHeader( face, faceProperties, charMap, fontHeader ); // Stackoverflow!!!
+                convert( face, faceProperties, charMap, fontHeader );
 
 		fontInfo->FI_outlineTab = sizeof( FontInfo );
 		fontInfo->FI_outlineEnd = sizeof( FontInfo ) + sizeof( OutlineDataEntry );
@@ -343,16 +374,11 @@ static TT_Error ProcessFont( const char* fileName, MemHandle fontInfoBlock )
 	}
         else
         {
-		ChunkHandle           trueTypeOutlineChunk;
-                TrueTypeOutlineEntry* trueTypeOutlineEntry;
-                ChunkHandle           fontHeaderChunk;
-                FontHeader*           fontHeader;
-		FontInfo*             fontInfo;
                 FontsAvailEntry*      availEntries = LMemDeref( ConstructOptr(fontInfoBlock, sizeof(LMemBlockHeader)) );
-                ChunkHandle           fontInfoChunk = availEntries[availIndex].FAE_infoHandle;
 		OutlineDataEntry*     outlineData = (OutlineDataEntry*) (((byte*)fontInfo) + fontInfo->FI_outlineTab);
                 OutlineDataEntry*     outlineDataEnd = (OutlineDataEntry*) (((byte*)fontInfo) + fontInfo->FI_outlineEnd);
 
+                fontInfoChunk = availEntries[availIndex].FAE_infoHandle;
 		while( outlineData < outlineDataEnd)
 		{
                         if( ( mapTextStyle( styleName ) == outlineData->ODE_style ) &&
@@ -403,7 +429,8 @@ static TT_Error ProcessFont( const char* fileName, MemHandle fontInfoBlock )
 
                 /* fill FontHeader */
                 fontHeader = LMemDerefHandles( fontInfoBlock, fontHeaderChunk );
-                convertHeader( face, faceProperties, charMap, fontHeader );
+                //convertHeader( face, faceProperties, charMap, fontHeader );
+                convert( face, faceProperties, charMap, fontHeader );
 		
 		fontInfo = LMemDeref( ConstructOptr(fontInfoBlock, fontInfoChunk) );
         	fontInfo->FI_outlineEnd += sizeof( OutlineDataEntry );
@@ -413,7 +440,6 @@ Fail:
         TT_Close_Face( face );
 Fin:        
         FileClose( truetypeFile, FALSE );
-        return error;
 }
 
 
@@ -779,11 +805,11 @@ static void convertHeader(
 {
         TT_UShort           charIndex;
         TT_Glyph            glyph;
-        TT_Glyph_Metrics    metrics;
         TT_Instance         instance;
+        TT_Outline          outline;
+        TT_BBox             bbox;
         word                geosChar;
         sword               maxAccentOrAscent;
-        word                unitsPerEM = faceProperties.header->Units_Per_EM;
 
 
         ECCheckBounds( (void*)fontHeader );
@@ -794,6 +820,8 @@ static void convertHeader(
         fontHeader->FH_minTSB   = -9999;
         fontHeader->FH_maxRSB   = -9999;
         fontHeader->FH_avgwidth = 0;
+        fontHeader->FH_descent  = 9999;
+        fontHeader->FH_accent   = -9999;
 
         fontHeader->FH_numChars = InitGeosCharsInCharMap( charMap, 
                                                            &fontHeader->FH_firstChar, 
@@ -812,55 +840,65 @@ static void convertHeader(
 
                 /* load glyph without scaling or hinting */
                 TT_Load_Glyph( instance, glyph, charIndex, 0 );
-                TT_Get_Glyph_Metrics( glyph, &metrics );
+                TT_Get_Glyph_Outline( glyph, &outline );
+                TT_Get_Outline_BBox( &outline, &bbox );
 
                 //h_height
                 if( unicode == C_LATIN_CAPITAL_LETTER_H )
-                        fontHeader->FH_h_height = metrics.bbox.yMax;
+                        fontHeader->FH_h_height = bbox.yMax;
 
                 //x_height
                 if ( unicode == C_LATIN_SMALL_LETTER_X )
-                        fontHeader->FH_x_height = metrics.bbox.yMax;
+                        fontHeader->FH_x_height = bbox.yMax;
 
                 //ascender
                 if ( unicode == C_LATIN_SMALL_LETTER_D )
-                        fontHeader->FH_ascender = metrics.bbox.yMax;
+                        fontHeader->FH_ascender = bbox.yMax;
 
                 //descender
                 if ( unicode == C_LATIN_SMALL_LETTER_P )
-                        fontHeader->FH_descender = metrics.bbox.yMin;
+                        fontHeader->FH_descender = bbox.yMin;
 
                 //width
-                if ( fontHeader->FH_maxwidth < ( metrics.bbox.xMax - metrics.bbox.xMin ) )
-                        fontHeader->FH_maxwidth = metrics.bbox.xMax - metrics.bbox.xMin;
+                if ( fontHeader->FH_maxwidth < ( bbox.xMax - bbox.xMin ) )
+                        fontHeader->FH_maxwidth = bbox.xMax - bbox.xMin;
 
                 //avg width
                 if ( GeosAvgWidth( geosChar ) ) 
                 {
                         fontHeader->FH_avgwidth = fontHeader->FH_avgwidth + (
-                                  ( metrics.bbox.xMax - metrics.bbox.xMin ) * GeosAvgWidth( geosChar ) / 1000 );
+                                  ( bbox.xMax - bbox.xMin ) * GeosAvgWidth( geosChar ) / 1000 );
                 }
                 
                 /* scan xMin */
-                if( fontHeader->FH_minLSB > metrics.bbox.xMin )
-                        fontHeader->FH_minLSB = (sword) metrics.bbox.xMin;
+                if( fontHeader->FH_minLSB > bbox.xMin )
+                        fontHeader->FH_minLSB = (sword) bbox.xMin;
 
                 /* scan xMax */
-                if ( fontHeader->FH_maxRSB < metrics.bbox.xMax )
-                        fontHeader->FH_maxRSB = metrics.bbox.xMax;
-                /* scan yMin */
-                if ( fontHeader->FH_maxBSB < metrics.bbox.yMin )
-                        fontHeader->FH_maxBSB = metrics.bbox.yMin;
+                if ( fontHeader->FH_maxRSB < bbox.xMax )
+                        fontHeader->FH_maxRSB = bbox.xMax;
 
-                //yMax
-                if ( fontHeader->FH_minTSB < metrics.bbox.yMax )
+                /* scan yMin */
+                if ( fontHeader->FH_maxBSB < bbox.yMin )
+                        fontHeader->FH_maxBSB = bbox.yMin;
+                if ( GeosCharMapFlag( geosChar) & CMF_DESCENT &&
+                        fontHeader->FH_descent > bbox.yMin )
+                        fontHeader->FH_descent = bbox.yMin;
+
+                /* scan yMax */
+                if ( fontHeader->FH_minTSB < bbox.yMax )
                 {
-                        fontHeader->FH_minTSB = metrics.bbox.yMax;
-                        if ( GeosCharMapFlag( geosChar ) == CMF_ACCENT && 
-                             fontHeader->FH_accent < metrics.bbox.yMax )
-                             fontHeader->FH_accent = metrics.bbox.yMax;
+                        fontHeader->FH_minTSB = bbox.yMax;
+
+                        if ( GeosCharMapFlag( geosChar ) & ( CMF_ASCENT || CMF_CAP ) )
+                             fontHeader->FH_ascent = bbox.yMax;
+
+                        if ( GeosCharMapFlag( geosChar ) & CMF_ACCENT && 
+                             fontHeader->FH_accent < bbox.yMax )
+                             fontHeader->FH_accent = bbox.yMax;
                 }
 
+                TT_Flush_Face( face );
         }
         TT_Done_Glyph( glyph );
         TT_Done_Instance( instance );
@@ -877,28 +915,64 @@ static void convertHeader(
                 fontHeader->FH_accent = fontHeader->FH_accent - fontHeader->FH_ascent;
         }
                 
-        fontHeader->FH_baseAdjust = BASELINE( unitsPerEM )- maxAccentOrAscent;
+        fontHeader->FH_baseAdjust = BASELINE( faceProperties.header->Units_Per_EM )- maxAccentOrAscent;
         fontHeader->FH_height = fontHeader->FH_maxBSB + maxAccentOrAscent;
-        fontHeader->FH_minTSB = fontHeader->FH_minTSB - BASELINE( unitsPerEM );
-        fontHeader->FH_maxBSB = fontHeader->FH_maxBSB - ( DESCENT( unitsPerEM ) -
-                                                          SAFETY( unitsPerEM ) );
+        fontHeader->FH_minTSB = fontHeader->FH_minTSB - BASELINE( faceProperties.header->Units_Per_EM );
+        fontHeader->FH_maxBSB = fontHeader->FH_maxBSB - ( DESCENT( faceProperties.header->Units_Per_EM ) -
+                                                          SAFETY( faceProperties.header->Units_Per_EM ) );
 
         fontHeader->FH_underPos = faceProperties.postscript->underlinePosition;
         if( fontHeader->FH_underPos == 0 )
-                fontHeader->FH_underPos = DEFAULT_UNDER_POSITION( unitsPerEM );
+                fontHeader->FH_underPos = DEFAULT_UNDER_POSITION( faceProperties.header->Units_Per_EM );
 
         fontHeader->FH_underPos = maxAccentOrAscent - fontHeader->FH_underPos;
 
         fontHeader->FH_underThick = faceProperties.postscript->underlineThickness; 
         if( fontHeader->FH_underThick == 0 )
-                fontHeader->FH_underThick = DEFAULT_UNDER_THICK( unitsPerEM );
+                fontHeader->FH_underThick = DEFAULT_UNDER_THICK( faceProperties.header->Units_Per_EM );
         
         if( fontHeader->FH_x_height > 0 )
                 fontHeader->FH_strikePos = 3 * fontHeader->FH_x_height / 5;
         else
                 fontHeader->FH_strikePos = 3 * fontHeader->FH_ascent / 5;
 
-        fontHeader->FH_continuitySize = DEFAULT_CONTINUITY_CUTOFF( unitsPerEM );
+        fontHeader->FH_continuitySize = DEFAULT_CONTINUITY_CUTOFF( faceProperties.header->Units_Per_EM );
+}
+
+/* temporarily for the test */
+void convert(   TT_Face             face, 
+                TT_Face_Properties  faceProperties, 
+                TT_CharMap          charMap, 
+                FontHeader*         fontHeader) 
+{
+
+        fontHeader->FH_numChars = InitGeosCharsInCharMap( charMap, 
+                                                           &fontHeader->FH_firstChar, 
+                                                           &fontHeader->FH_lastChar ); 
+        
+        fontHeader->FH_h_height = 0x0233;
+        fontHeader->FH_x_height = 0x01b1;
+
+        fontHeader->FH_ascender = 0x0276;
+        fontHeader->FH_descender = 0xff65;
+        fontHeader->FH_avgwidth = 0x0258;
+        fontHeader->FH_maxwidth = 0x0258;
+
+        fontHeader->FH_height = 0x040e;
+        fontHeader->FH_accent = 0x0075;
+        fontHeader->FH_ascent = 0x0292;
+        fontHeader->FH_descent = 0x006a;
+
+        fontHeader->FH_baseAdjust = 0xffe7;
+        fontHeader->FH_underPos = 0x0354;
+        fontHeader->FH_underThick = 0x004d; 
+        fontHeader->FH_strikePos = 0x02035;
+
+        fontHeader->FH_minLSB = 0xffea;
+        fontHeader->FH_maxRSB = 0x0274;
+        fontHeader->FH_maxBSB = 0x0026;
+        fontHeader->FH_minTSB = 0x0019;
+        fontHeader->FH_continuitySize = 0x0019;
 }
 
 
