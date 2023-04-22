@@ -57,8 +57,6 @@
  *      constants for string length
  ***********************************************************************/
 
-#define FAMILY_NAME_LENGTH              20
-#define STYLE_NAME_LENGTH               16
 #define FONT_FILE_LENGTH                FILE_LONGNAME_BUFFER_SIZE
 
 
@@ -86,39 +84,14 @@
  *      structues
  ***********************************************************************/
 
-typedef struct
-{
-    word                        FH_h_height;        //top of 'H'
-    word                        FH_x_height;        //top of 'x'
-    word                        FH_ascender;        //top of 'd'
-    word                        FH_descender;       //bottom of 'p'
-    word                        FH_avgwidth;        //average character width
-    word                        FH_maxwidth;        //widest character width
-    word                        FH_height;          //height of font box
-    word                        FH_accent;          //height of accents
-    word                        FH_ascent;          //height of caps
-    word                        FH_descent;         //descent (from baseline)
-    word                        FH_baseAdjust;      //adjustment for baseline
-    char                        FH_firstChar;       //first char defined
-    char                        FH_lastChar;        //last char defined
-    char                        FH_defaultChar;     //default character
-    word                        FH_underPos;        //position of underline   		
-    word                        FH_underThick;      //thickness of underline
-    word                        FH_strikePos;       //position of strikethrough
-    word                        FH_numChars;        //number of characters
-    sword                       FH_minLSB;          //minimum left side bearing
-    sword                       FH_minTSB;          //minimum top side bound
-    sword                       FH_maxBSB;          //maximum bottom side bound
-    sword                       FH_maxRSB;          //maximum right side bound
-    sword                       FH_continuitySize;  //continuity cutoff
-} FontHeader;
+
 
 
 /***********************************************************************
  *      functions called by driver
  ***********************************************************************/
 
-void _pascal  TrueType_InitFonts( MemHandle fontInfoBlock );
+void _pascal  TrueType_InitFonts( MemHandle fontInfoBlock, MemHandle varBlock );
 
 
 #endif  /* _TTINT_H_ */

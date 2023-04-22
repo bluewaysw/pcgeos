@@ -55,6 +55,9 @@ extern TEngine_Instance engineInstance;
 
 #define MAX_FONTBUF_SIZE                    10 * 1024
 
+#define FAMILY_NAME_LENGTH              20
+#define STYLE_NAME_LENGTH               16
+
 
 /***********************************************************************
  *      structures
@@ -294,6 +297,73 @@ typedef struct
 } RegionCharData;
 
 #define SIZE_REGION_HEADER	    ( sizeof( RegionCharData) - 2 )
+
+
+typedef struct
+{
+    word                        FH_h_height;        //top of 'H'
+    word                        FH_x_height;        //top of 'x'
+    word                        FH_ascender;        //top of 'd'
+    word                        FH_descender;       //bottom of 'p'
+    word                        FH_avgwidth;        //average character width
+    word                        FH_maxwidth;        //widest character width
+    word                        FH_height;          //height of font box
+    word                        FH_accent;          //height of accents
+    word                        FH_ascent;          //height of caps
+    word                        FH_descent;         //descent (from baseline)
+    word                        FH_baseAdjust;      //adjustment for baseline
+    char                        FH_firstChar;       //first char defined
+    char                        FH_lastChar;        //last char defined
+    char                        FH_defaultChar;     //default character
+    word                        FH_underPos;        //position of underline   		
+    word                        FH_underThick;      //thickness of underline
+    word                        FH_strikePos;       //position of strikethrough
+    word                        FH_numChars;        //number of characters
+    sword                       FH_minLSB;          //minimum left side bearing
+    sword                       FH_minTSB;          //minimum top side bound
+    sword                       FH_maxBSB;          //maximum bottom side bound
+    sword                       FH_maxRSB;          //maximum right side bound
+    sword                       FH_continuitySize;  //continuity cutoff
+} FontHeader;
+
+
+typedef struct
+{
+    /* init fonts */
+    char                        familyName[FID_NAME_LEN];
+    char                        styleName[STYLE_NAME_LENGTH];
+
+    /* render glyphs */
+    TT_Raster_Map               rasterMap;
+
+    /* general purpose */
+    TT_Face                     face;
+    TT_Face_Properties          faceProperties; 
+    TT_Instance                 instance;
+    TT_Glyph                    glyph;
+    TT_Glyph_Metrics            glyphMetrics;
+    TT_CharMap                  charMap;
+    TT_Outline                  outline;
+    TT_BBox                     bbox;
+} TrueTypeVars;
+
+
+#define TRUETYPE_VARS           TrueTypeVars* trueTypeVars
+
+#define FAMILY_NAME             trueTypeVars->familyName
+#define STYLE_NAME              trueTypeVars->styleName
+#define FACE                    trueTypeVars->face
+#define FACE_PROPERTIES         trueTypeVars->faceProperties
+#define INSTANCE                trueTypeVars->instance
+#define GLYPH                   trueTypeVars->glyph
+#define CHAR_MAP                trueTypeVars->charMap
+#define OUTLINE                 trueTypeVars->outline
+#define BBOX                    trueTypeVars->bbox
+#define GLYPH_METRICS           trueTypeVars->glyphMetrics
+#define GLYPH_BBOX              trueTypeVars->glyphMetrics.bbox
+
+#define UNITS_PER_EM            FACE_PROPERTIES.header->Units_Per_EM
+
 
 
 /***********************************************************************

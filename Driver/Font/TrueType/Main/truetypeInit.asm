@@ -188,6 +188,7 @@ ifndef USE_OLD_FONT_LOADER
 
 	push	cx			; handle to font info block
 	segmov	ds, dgroup, cx
+	push	ds:variableHandle
 	call 	TRUETYPE_INITFONTS
 
 	pop	ds
