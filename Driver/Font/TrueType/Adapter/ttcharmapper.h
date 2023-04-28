@@ -53,5 +53,7 @@ word CountKernPairsWithGeosChars( TT_Face face );
 
 TT_Error getCharMap( TT_Face face, TT_CharMap* charMap );
 
+CharMapFlags GeosCharMapFlag( word geosChar );
+
 
 #endif  /* _TTCHARMAPPER_H_ */

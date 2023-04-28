@@ -79,6 +79,7 @@ void _pascal TrueType_Gen_Chars(
         TT_BBox                bbox;
         TT_CharMap             charMap;
         TT_UShort              charIndex;
+        TT_Raster_Map          rasterMap;
         void*                  charData;
         word                   width, height, size;
 
@@ -133,8 +134,6 @@ void _pascal TrueType_Gen_Chars(
 
         if( fontBuf->FB_flags & FBF_IS_REGION )
         {
-                TT_Raster_Map    rasterMap;
-
                 /* We calculate with an average of 4 on/off points, line number and line end code. */
                 size = height * 6 * sizeof( word ) + SIZE_REGION_HEADER; 
 
@@ -165,10 +164,7 @@ void _pascal TrueType_Gen_Chars(
                 size = rasterMap.size;
         }
         else
-        {
-                CharData*      charData;
-                TT_Raster_Map  rasterMap;
-                
+        {      
                 size = height * ( ( width + 7 ) / 8 ) + SIZE_CHAR_HEADER;
 
                 /* get pointer to bitmapBlock */
@@ -189,10 +185,10 @@ void _pascal TrueType_Gen_Chars(
                 TT_Get_Outline_Bitmap( &outline, &rasterMap );
 
                 /* fill header of charData */
-                charData->CD_pictureWidth = width;
-                charData->CD_numRows      = height;
-                charData->CD_xoff         = bbox.xMin;
-                charData->CD_yoff         = bbox.yMin;
+                ((CharData*)charData)->CD_pictureWidth = width;
+                ((CharData*)charData)->CD_numRows      = height;
+                ((CharData*)charData)->CD_xoff         = bbox.xMin;
+                ((CharData*)charData)->CD_yoff         = bbox.yMin;
         }
 
         TT_Done_Glyph( glyph );

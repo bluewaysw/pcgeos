@@ -54,6 +54,8 @@ static word getNameFromNameTable(
 
 static void ConvertHeader(      TRUETYPE_VARS, FontHeader* fontHeader );
 
+static char GetDefaultChar(     TRUETYPE_VARS, char firstChar );
+
 static word toHash( const char* str );
 
 static int  strlen( const char* str );
@@ -462,7 +464,7 @@ static word toHash( const char* str )
         word    i;
         dword   hash = strlen( str );
 
-        for ( i = 0; i < strlen( str ) ; ++i )
+        for ( i = 0; i < strlen( str ); ++i )
 		hash = ( ( hash * 7 ) % 65535 ) + str[i];
 
         return (word) hash;
@@ -676,7 +678,7 @@ static sword getFontIDAvailIndex( FontID fontID, MemHandle fontInfoBlock )
 
         /* set fontsAvailEntrys to first Element after LMemBlockHeader */
         fontsAvailEntrys = ( (byte*)LMemDeref( 
-			ConstructOptr(fontInfoBlock, sizeof(LMemBlockHeader))) );
+			ConstructOptr( fontInfoBlock, sizeof(LMemBlockHeader))) );
         elements = LMemGetChunkSizePtr( fontsAvailEntrys ) / sizeof( FontsAvailEntry );
 
         for( element = 0; element < elements; element++ )
@@ -789,7 +791,6 @@ static void ConvertHeader( TRUETYPE_VARS, FontHeader* fontHeader )
 {
         TT_UShort           charIndex;
         word                geosChar;
-        sword               maxAccentOrAscent;
 
 
         ECCheckBounds( (void*)fontHeader );
@@ -802,104 +803,96 @@ static void ConvertHeader( TRUETYPE_VARS, FontHeader* fontHeader )
         fontHeader->FH_avgwidth = 0;
         fontHeader->FH_maxwidth = 0;
         fontHeader->FH_descent  = 9999;
-        fontHeader->FH_accent   = -9999;
+        fontHeader->FH_accent   = 0;
+        fontHeader->FH_ascent   = 0;
 
         fontHeader->FH_numChars = InitGeosCharsInCharMap( CHAR_MAP, 
                                                            &fontHeader->FH_firstChar, 
                                                            &fontHeader->FH_lastChar ); 
+        fontHeader->FH_defaultChar = GetDefaultChar( trueTypeVars, fontHeader->FH_firstChar );
 
         TT_New_Instance( FACE, &INSTANCE );
         TT_New_Glyph( FACE, &GLYPH );
 
-        for ( geosChar = fontHeader->FH_firstChar; geosChar < fontHeader->FH_lastChar; ++geosChar )
+        for ( geosChar = fontHeader->FH_firstChar; geosChar < fontHeader->FH_lastChar; geosChar++ )
         {
                 word unicode = GeosCharToUnicode( geosChar );
 
+
                 charIndex = TT_Char_Index( CHAR_MAP, unicode );
                 if ( charIndex == 0 )
-                        break;
+                        continue;
 
                 /* load glyph without scaling or hinting */
                 TT_Load_Glyph( INSTANCE, GLYPH, charIndex, 0 );
                 TT_Get_Glyph_Metrics( GLYPH, &GLYPH_METRICS );
 
-                //h_height
+                //h_height -> check
                 if( unicode == C_LATIN_CAPITAL_LETTER_H )
                         fontHeader->FH_h_height = GLYPH_BBOX.yMax;
 
-                //x_height
+                //x_height -> check
                 if ( unicode == C_LATIN_SMALL_LETTER_X )
                         fontHeader->FH_x_height = GLYPH_BBOX.yMax;
-
-                //ascender
+        
+                //ascender -> check
                 if ( unicode == C_LATIN_SMALL_LETTER_D )
                         fontHeader->FH_ascender = GLYPH_BBOX.yMax;
 
-                //descender
+                //descender -> check
                 if ( unicode == C_LATIN_SMALL_LETTER_P )
                         fontHeader->FH_descender = GLYPH_BBOX.yMin;
 
-                //width
+                //width -> check
                 if ( fontHeader->FH_maxwidth < GLYPH_METRICS.advance )
                         fontHeader->FH_maxwidth = GLYPH_METRICS.advance;
                 
-                /* scan xMin */
+                /* scan xMin -> check */
                 if( fontHeader->FH_minLSB > GLYPH_BBOX.xMin )
-                        fontHeader->FH_minLSB = (sword) GLYPH_BBOX.xMin;
+                        fontHeader->FH_minLSB = GLYPH_BBOX.xMin;
 
-                /* scan xMax */
+                /* scan xMax -> check */
                 if ( fontHeader->FH_maxRSB < GLYPH_BBOX.xMax )
                         fontHeader->FH_maxRSB = GLYPH_BBOX.xMax;
 
-                /* scan yMin */
+                /* scan yMin -> check */
                 if ( fontHeader->FH_maxBSB < -GLYPH_BBOX.yMin )
                         fontHeader->FH_maxBSB = -GLYPH_BBOX.yMin;
                         
+                /* check */
                 if ( GeosCharMapFlag( geosChar) & CMF_DESCENT &&
-                        fontHeader->FH_descent > GLYPH_BBOX.yMin )
-                        fontHeader->FH_descent = GLYPH_BBOX.yMin;
+                        fontHeader->FH_descent > -GLYPH_BBOX.yMin )
+                        fontHeader->FH_descent = -GLYPH_BBOX.yMin;
 
-                /* scan yMax */
+                /* scan yMax -> check */
                 if ( fontHeader->FH_minTSB < GLYPH_BBOX.yMax )
-                {
                         fontHeader->FH_minTSB = GLYPH_BBOX.yMax;
 
-                        if ( GeosCharMapFlag( geosChar ) & ( CMF_ASCENT || CMF_CAP ) )
-                             fontHeader->FH_ascent = GLYPH_BBOX.yMax;
+                /* check */
+                if ( GeosCharMapFlag( geosChar ) & ( CMF_ASCENT | CMF_CAP ) )
+                        if ( fontHeader->FH_ascent < GLYPH_BBOX.yMax )
+                                fontHeader->FH_ascent = GLYPH_BBOX.yMax;
 
-                        if ( GeosCharMapFlag( geosChar ) & CMF_ACCENT && 
-                             fontHeader->FH_accent < GLYPH_BBOX.yMax )
-                             fontHeader->FH_accent = GLYPH_BBOX.yMax;
-                }
+                /* check */
+                if ( GeosCharMapFlag( geosChar ) == CMF_ACCENT )
+                        if ( fontHeader->FH_accent < GLYPH_BBOX.yMax )
+                                fontHeader->FH_accent = GLYPH_BBOX.yMax;
         }
+
         TT_Done_Glyph( GLYPH );
         TT_Done_Instance( INSTANCE );
 
-        //avg width
         fontHeader->FH_avgwidth = FACE_PROPERTIES.os2->xAvgCharWidth;
-
-        //baseline
-        if ( fontHeader->FH_accent <= 0 )
-        {
-                fontHeader->FH_accent = 0;
-                maxAccentOrAscent = fontHeader->FH_ascent;
-        }
-        else
-        {
-                maxAccentOrAscent = fontHeader->FH_accent;
-                fontHeader->FH_accent = fontHeader->FH_accent - fontHeader->FH_ascent;
-        }
-                
-        fontHeader->FH_baseAdjust = BASELINE( UNITS_PER_EM )- maxAccentOrAscent;
-        fontHeader->FH_height = fontHeader->FH_maxBSB + maxAccentOrAscent;
+        fontHeader->FH_accent = fontHeader->FH_accent - fontHeader->FH_ascent;    
+        fontHeader->FH_baseAdjust = BASELINE( UNITS_PER_EM ) - fontHeader->FH_ascent - fontHeader->FH_accent;
+        fontHeader->FH_height = fontHeader->FH_maxBSB + fontHeader->FH_ascent + DESCENT( UNITS_PER_EM ) - SAFETY( UNITS_PER_EM );
         fontHeader->FH_minTSB = fontHeader->FH_minTSB - BASELINE( UNITS_PER_EM );
         fontHeader->FH_maxBSB = fontHeader->FH_maxBSB - ( DESCENT( UNITS_PER_EM ) - SAFETY( UNITS_PER_EM ) );
 
-        fontHeader->FH_underPos = FACE_PROPERTIES.postscript->underlinePosition;
+        fontHeader->FH_underPos = -FACE_PROPERTIES.postscript->underlinePosition;
         if( fontHeader->FH_underPos == 0 )
                 fontHeader->FH_underPos = DEFAULT_UNDER_POSITION( UNITS_PER_EM );
-
-        fontHeader->FH_underPos = maxAccentOrAscent - fontHeader->FH_underPos;
+        fontHeader->FH_underPos = fontHeader->FH_underPos + fontHeader->FH_accent + fontHeader->FH_ascent;
 
         fontHeader->FH_underThick = FACE_PROPERTIES.postscript->underlineThickness; 
         if( fontHeader->FH_underThick == 0 )
@@ -911,6 +904,37 @@ static void ConvertHeader( TRUETYPE_VARS, FontHeader* fontHeader )
                 fontHeader->FH_strikePos = 3 * fontHeader->FH_ascent / 5;
 
         fontHeader->FH_continuitySize = DEFAULT_CONTINUITY_CUTOFF( UNITS_PER_EM );
+}
+
+
+/********************************************************************
+ *                      GetDefaultChar
+ ********************************************************************
+ * SYNOPSIS:	  
+ * 
+ * PARAMETERS:    
+ * 
+ * RETURNS:       char
+ * 
+ * SIDE EFFECTS:  none
+ * 
+ * STRATEGY:      
+ * 
+ * REVISION HISTORY:
+ *      Date      Name      Description
+ *      ----      ----      -----------
+ *      23/04/23  JK        Initial Revision
+ *******************************************************************/
+static char GetDefaultChar( TRUETYPE_VARS, char firstChar )
+{
+        word unicode = GeosCharToUnicode( DEFAULT_DEFAULT_CHAR );
+        word charIndex = TT_Char_Index( CHAR_MAP, unicode );
+
+
+        if ( charIndex == 0 )
+                return firstChar;  
+
+        return DEFAULT_DEFAULT_CHAR; 
 }
 
 

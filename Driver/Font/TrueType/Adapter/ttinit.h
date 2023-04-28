@@ -69,8 +69,8 @@
 #define BASELINE( value )                   ( 3 * value / 4 )	// 75% of size
 #define DESCENT( value )            	    ( value / 4 )       // 25% of size
 #define DEFAULT_UNDER_THICK( value )	    ( value / 10 )      // 10% of size
-#define DEFAULT_UNDER_POSITION( value )	    ( value / -10 )     // -10% of size
-#define SAFETY( value )			            ( value / 40 )      // 2.5% of size
+#define DEFAULT_UNDER_POSITION( value )	    ( value / 10 )      // -10% of size
+#define SAFETY( value )			    ( value / 40 )      // 2.5% of size
 
 
 /***********************************************************************

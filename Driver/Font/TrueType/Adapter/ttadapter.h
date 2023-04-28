@@ -358,7 +358,6 @@ typedef struct
 #define GLYPH                   trueTypeVars->glyph
 #define CHAR_MAP                trueTypeVars->charMap
 #define OUTLINE                 trueTypeVars->outline
-#define BBOX                    trueTypeVars->bbox
 #define GLYPH_METRICS           trueTypeVars->glyphMetrics
 #define GLYPH_BBOX              trueTypeVars->glyphMetrics.bbox
 
