@@ -86,6 +86,7 @@ TrueTypeGenChar	proc	far
 	push	ax				; pass stylesToImplement
 
 	segmov	ds, dgroup, ax
+	push	ds:bitmapHandle
 	call	TRUETYPE_GEN_CHARS
 
 	; deref font block (may have moved)

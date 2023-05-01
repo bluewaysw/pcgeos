@@ -66,7 +66,8 @@ void _pascal TrueType_Gen_Chars(
                         WWFixedAsDWord       pointSize,
 			const FontInfo*      fontInfo, 
                         const OutlineEntry*  outlineEntry,
-                        TextStyle            stylesToImplement
+                        TextStyle            stylesToImplement,
+                        MemHandle            bitmapHandle
 			) 
 {
         FileHandle             truetypeFile;
@@ -198,13 +199,13 @@ void _pascal TrueType_Gen_Chars(
                 ShrinkFontBuf( fontBuf );
 
         /* realloc FontBuf if necessary */
-        if( MemGetInfo( PtrToSegment( fontBuf ), MGIT_SIZE ) < fontBuf->FB_dataSize + size )
+ /*       if( MemGetInfo( MemPtrToHandle( fontBuf ), MGIT_SIZE ) < fontBuf->FB_dataSize + size )
         {
                 MemReAlloc( PtrToSegment( fontBuf ),
                         fontBuf->FB_dataSize + size,
                         HAF_STANDARD_NO_ERR );
                 fontBuf = MemDeref( PtrToSegment( fontBuf ));
-        }
+        } */
 
         /* add rendered glyph to fontbuf */
         CopyChar( fontBuf, character, charData ,size );

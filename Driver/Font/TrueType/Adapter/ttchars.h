@@ -27,7 +27,6 @@
  *      varaibles initialized by driver
  ***********************************************************************/
 
-extern MemHandle  bitmapHandle;
 extern word       bitmapSize;
 
 
@@ -40,7 +39,8 @@ void _pascal  TrueType_Gen_Chars( word                 character,
                                   WWFixedAsDWord       pointSize,
 			          const FontInfo*      fontInfo, 
                                   const OutlineEntry*  outlineEntry,
-                                  TextStyle            stylesToImplement );
+                                  TextStyle            stylesToImplement,
+                                  MemHandle            bitmapBlock );
 
 
 #endif /* _TTCHARS_H_ */

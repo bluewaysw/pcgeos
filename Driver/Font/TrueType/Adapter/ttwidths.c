@@ -161,6 +161,7 @@ MemHandle _pascal TrueType_Gen_Widths(
         fontBuf = (FontBuf*)MemDeref( fontHandle );
         fontBuf->FB_dataSize = size;
         ConvertHeader( face, pointSize, fontHeader, fontBuf );
+        //Convert( face, pointSize, fontHeader, fontBuf );
 
         /* fill kerning pairs and kerning values */
         ConvertKernPairs( face, fontBuf );
@@ -210,7 +211,7 @@ static void ConvertWidths( TT_Face face, FontHeader* fontHeader, WWFixedAsDWord 
         TT_CharMap        charMap;
         TT_Glyph_Metrics  metrics;
         char              currentChar;
-        CharTableEntry*   charTableEntry = (CharTableEntry*) ((byte*)fontBuf) + sizeof( FontBuf );
+        CharTableEntry*   charTableEntry = (CharTableEntry*) (((byte*)fontBuf) + sizeof( FontBuf ));
 
         TT_New_Glyph( face, &glyph );
         TT_New_Instance( face, &instance );
@@ -249,10 +250,13 @@ static void ConvertWidths( TT_Face face, FontHeader* fontHeader, WWFixedAsDWord 
                 scaledWidth = SCALE_WORD( width, scaleFactor );
                 charTableEntry->CTE_width.WBF_int  = INTEGER_OF_WWFIXEDASDWORD( scaledWidth );
                 charTableEntry->CTE_width.WBF_frac = FRACTION_OF_WWFIXEDASDWORD( scaledWidth );
+
+                /* nur TEST */
                 charTableEntry->CTE_dataOffset     = CHAR_NOT_BUILT;
                 charTableEntry->CTE_flags          = 0;
                 charTableEntry->CTE_usage          = 0;
                 
+               
                 // set flags in CTE_flags if needed
                 if( metrics.bbox.xMin < 0 )
                         charTableEntry->CTE_flags |= CTF_NEGATIVE_LSB;
@@ -264,7 +268,7 @@ static void ConvertWidths( TT_Face face, FontHeader* fontHeader, WWFixedAsDWord 
                 //above ascent
                 if( metrics.bbox.yMax > fontHeader->FH_ascent )
                         charTableEntry->CTE_flags |= CTF_ABOVE_ASCENT;
-
+                
 
                 if( fontBuf->FB_kernCount > 0 )
                 {
@@ -712,7 +716,132 @@ TT_Error ConvertHeader( TT_Face face, WWFixedAsDWord pointSize, FontHeader* font
         fontBuf->FB_lastChar    = fontHeader->FH_lastChar;
         fontBuf->FB_defaultChar = fontHeader->FH_defaultChar;
 
+        //TODO: MAX_BSB, MAX_RSB
+
         TT_Done_Instance( instance );
+
+        /* Test */
+ /*              fontBuf->FB_minLSB = 0xffff; 
+
+        fontBuf->FB_avgwidth.WBF_int  = 0x000e;
+        fontBuf->FB_avgwidth.WBF_frac = 0x64;
+        fontBuf->FB_maxwidth.WBF_int  = 0x000e;
+        fontBuf->FB_maxwidth.WBF_frac = 0x64;
+
+        fontBuf->FB_height.WBF_int  = 0x0038;
+        //TEST fontBuf->FB_height.WBF_int  = 0x0018;
+        fontBuf->FB_height.WBF_frac = 0xe6;
+
+        fontBuf->FB_heightAdjust.WBF_int  = 0xffff;
+        fontBuf->FB_heightAdjust.WBF_frac = 0x1a;
+
+        fontBuf->FB_accent.WBF_int  = 0x0004;
+        //TEST fontBuf->FB_accent.WBF_int  = 0x0002;
+        fontBuf->FB_accent.WBF_frac = 0xce;
+
+        fontBuf->FB_mean.WBF_int  = 0x000a;
+        fontBuf->FB_mean.WBF_frac = 0x63;
+
+        fontBuf->FB_baseAdjust.WBF_int  = 0xffff;
+        fontBuf->FB_baseAdjust.WBF_frac = 0x0;
+
+        fontBuf->FB_baselinePos.WBF_int  = 0x0043;
+        //TEST fontBuf->FB_baselinePos.WBF_int  = 0x0023;
+        fontBuf->FB_baselinePos.WBF_frac = 0;
+
+        fontBuf->FB_descent.WBF_int  = 0x0003;
+        fontBuf->FB_descent.WBF_frac = 0xfb;
+
+        fontBuf->FB_extLeading.WBF_int  = 0;
+        fontBuf->FB_extLeading.WBF_frac = 0;
+
+        fontBuf->FB_underPos.WBF_int  = 0x0014;
+        fontBuf->FB_underPos.WBF_frac = 0x70;
+
+        fontBuf->FB_underThickness.WBF_int  = 0x0001;
+        fontBuf->FB_underThickness.WBF_frac = 0xd9;
+
+        fontBuf->FB_strikePos.WBF_int  = 0x000c;
+        fontBuf->FB_strikePos.WBF_frac = 0x5a;
+
+        fontBuf->FB_aboveBox.WBF_int  = 0x0003;
+        //TEST fontBuf->FB_aboveBox.WBF_int  = 0x0001;
+        fontBuf->FB_aboveBox.WBF_frac = 0;
+
+        fontBuf->FB_belowBox.WBF_int  = 0x0001;
+        fontBuf->FB_belowBox.WBF_frac = 0;
+
+        fontBuf->FB_minTSB = 0x0001;
+        fontBuf->FB_maxBSB = 0x0001;
+        fontBuf->FB_maxRSB = 0x000f;
+        fontBuf->FB_pixHeight = 0x1a;*/
 
         return TT_Err_Ok;
 }
+
+/***
+static void Convert( TT_Face face, WWFixedAsDWord pointSize, FontHeader* fontHeader, FontBuf* fontBuf )
+{
+        fontBuf->FB_maker        = FM_TRUETYPE;
+        fontBuf->FB_kernPairPtr  = 0;
+        fontBuf->FB_kernValuePtr = 0;
+        fontBuf->FB_kernCount    = 0;
+        fontBuf->FB_heapCount    = 0;
+	fontBuf->FB_flags        = FBF_IS_OUTLINE;
+
+        fontBuf->FB_minLSB = 0xffff; 
+
+        fontBuf->FB_avgwidth.WBF_int  = 0x000e;
+        fontBuf->FB_avgwidth.WBF_frac = 0x64;
+        fontBuf->FB_maxwidth.WBF_int  = 0x000e;
+        fontBuf->FB_maxwidth.WBF_frac = 0x64;
+
+        fontBuf->FB_height.WBF_int  = 0x0018;
+        fontBuf->FB_height.WBF_frac = 0xe6;
+
+        fontBuf->FB_heightAdjust.WBF_int  = 0xffff;
+        fontBuf->FB_heightAdjust.WBF_frac = 0x1a;
+
+        fontBuf->FB_accent.WBF_int  = 0x0002;
+        fontBuf->FB_accent.WBF_frac = 0xce;
+
+        fontBuf->FB_mean.WBF_int  = 0x000a;
+        fontBuf->FB_mean.WBF_frac = 0x63;
+
+        fontBuf->FB_baseAdjust.WBF_int  = 0xffff;
+        fontBuf->FB_baseAdjust.WBF_frac = 0x0;
+
+        fontBuf->FB_baselinePos.WBF_int  = 0x0023;
+        fontBuf->FB_baselinePos.WBF_frac = 0;
+
+        fontBuf->FB_descent.WBF_int  = 0x0003;
+        fontBuf->FB_descent.WBF_frac = 0xfb;
+
+        fontBuf->FB_extLeading.WBF_int  = 0;
+        fontBuf->FB_extLeading.WBF_frac = 0;
+
+        fontBuf->FB_firstChar   = fontHeader->FH_firstChar;
+        fontBuf->FB_lastChar    = fontHeader->FH_lastChar;
+        fontBuf->FB_defaultChar = fontHeader->FH_defaultChar;
+
+        fontBuf->FB_underPos.WBF_int  = 0x0014;
+        fontBuf->FB_underPos.WBF_frac = 0x70;
+
+        fontBuf->FB_underThickness.WBF_int  = 0x0001;
+        fontBuf->FB_underThickness.WBF_frac = 0xd9;
+
+        fontBuf->FB_strikePos.WBF_int  = 0x000c;
+        fontBuf->FB_strikePos.WBF_frac = 0x5a;
+
+        fontBuf->FB_aboveBox.WBF_int  = 0x0001;
+        fontBuf->FB_aboveBox.WBF_frac = 0;
+
+        fontBuf->FB_belowBox.WBF_int  = 0x0001;
+        fontBuf->FB_belowBox.WBF_frac = 0;
+
+        fontBuf->FB_minTSB = 0x0001;
+        fontBuf->FB_maxBSB = 0x0001;
+        fontBuf->FB_maxRSB = 0x000f;
+        fontBuf->FB_pixHeight = 0x1a;
+
+} ****/
