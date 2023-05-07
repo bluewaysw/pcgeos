@@ -169,9 +169,14 @@ void _pascal TrueType_Gen_Chars(
                 size = height * ( ( width + 7 ) / 8 ) + SIZE_CHAR_HEADER;
 
                 /* get pointer to bitmapBlock */
-                if( MemGetInfo( bitmapHandle, MGIT_SIZE ) < size )
-                        MemReAlloc( bitmapHandle, size, HAF_NO_ERR );
                 charData = MemLock( bitmapHandle );
+                if( charData == NULL )
+                {
+                        MemReAlloc( bitmapHandle, size, HAF_NO_ERR );
+                        charData = MemLock( bitmapHandle );
+                }
+                memset( charData, 0, size );
+                //if( MemGetInfo( bitmapHandle, MGIT_SIZE ) < size )
 
                 /* init rasterMap */
                 rasterMap.rows   = height;
@@ -188,8 +193,8 @@ void _pascal TrueType_Gen_Chars(
                 /* fill header of charData */
                 ((CharData*)charData)->CD_pictureWidth = width;
                 ((CharData*)charData)->CD_numRows      = height;
-                ((CharData*)charData)->CD_xoff         = bbox.xMin;
-                ((CharData*)charData)->CD_yoff         = bbox.yMin;
+                ((CharData*)charData)->CD_xoff         = bbox.xMin / 64;
+                ((CharData*)charData)->CD_yoff         = bbox.yMin / 64; 
         }
 
         TT_Done_Glyph( glyph );
@@ -226,7 +231,7 @@ Fail:
 static void CopyChar( FontBuf* fontBuf, word geosChar, void* charData, word charDataSize ) 
 {
         word  indexGeosChar = geosChar - fontBuf->FB_firstChar;
-        CharTableEntry*  charTableEntries = (CharTableEntry*) ((byte*)fontBuf) + sizeof( FontBuf );
+        CharTableEntry*  charTableEntries = (CharTableEntry*) (((byte*)fontBuf) + sizeof( FontBuf ));
 
 
         /* copy rendered Glyph to fontBuf */

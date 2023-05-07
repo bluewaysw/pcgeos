@@ -29,12 +29,6 @@
 #include "../FreeType/ftxkern.h"
 
 
-static TextStyle  findOutlineData( 
-                        OutlineDataEntry**  outlineData,
-                        const FontInfo*  fontInfo, 
-                        TextStyle        textStyle, 
-                        FontWeight       fontWeight );
-
 static word  AllocFontBlock( 
                         word        additionalSpace,
                         word        numOfCharacters,
@@ -43,24 +37,21 @@ static word  AllocFontBlock(
 
 static WWFixedAsDWord CalcScaleForWidths( 
                         WWFixedAsDWord  pointSize,
-                        FontWidth       fontWidth,
-                        FontWeight      fontWeight,
                         TextStyle       stylesToImplement,
                         word            unitsPerEM );
 
-static TT_Error ConvertHeader( 
-                        TT_Face         face, 
-                        WWFixedAsDWord  pointSize, 
+static void ConvertHeader( 
+                        WWFixedAsDWord  scaleFactor, 
                         FontHeader*     fontHeader, 
                         FontBuf*        fontBuf );
 
 static void ConvertWidths( 
-                        TT_Face         face, 
+                        TRUETYPE_VARS, 
                         FontHeader*     fontHeader, 
                         WWFixedAsDWord  scaleFactor, 
                         FontBuf*        fontBuf );
             
-static void ConvertKernPairs( TT_Face face, FontBuf* fontBuf );
+static void ConvertKernPairs( TRUETYPE_VARS, FontBuf* fontBuf );
 
 static void CalcTransform( 
                         TransformMatrix*  transMatrix,
@@ -72,15 +63,14 @@ static void CalcTransform(
  *                      TrueType_Gen_Widths
  ********************************************************************
  * SYNOPSIS:	  Generate header width infomation about a front 
- *                in a given pointsize, style and weight.
+ *                in a given pointsize and style.
  * 
  * PARAMETERS:    fontHandle            Memory handle to font block.
  *                *fontMatrix           Pointer to tranformation matrix.
- *                *fontInfo             Pointer to font info structure.
  *                pointSize             Desired point size.
+ *                *fontInfo             Pointer to font info structure.
  *                textStyle             Desired text style.
- *                fontWidth             Desired font width.
- *                fontWeight            Desired font weight.
+ *                MemHandle             Memory handle to var block.
  * 
  * RETURNS:       MemHandle             Memory handle to font block.
  * 
@@ -95,79 +85,79 @@ static void CalcTransform(
  *******************************************************************/
 
 MemHandle _pascal TrueType_Gen_Widths(
-                            MemHandle        fontHandle,
-                            FontMatrix*      fontMatrix,
-                            const FontInfo*  fontInfo,
-                            WWFixedAsDWord   pointSize,
-                            TextStyle        textStyle,
-                            FontWidth        fontWidth,
-                            FontWeight       fontWeight )
+                        MemHandle            fontHandle,
+                        FontMatrix*          fontMatrix,
+                        WWFixedAsDWord       pointSize,
+			const FontInfo*      fontInfo, 
+                        const OutlineEntry*  headerEntry,
+                        const OutlineEntry*  firstEntry,
+                        TextStyle            stylesToImplement,
+                        MemHandle            varBlock ) 
 {
         FileHandle             truetypeFile;
-        OutlineDataEntry*      outlineData;
-        TrueTypeOutlineEntry*  trueTypeOutlineEntry;
-        TextStyle              stylesToImplement;
-        TT_Face                face;
-        TT_Face_Properties     faceProperties;
-        TT_Error               error;
-        word                   size;
+        TrueTypeOutlineEntry*  trueTypeOutline;
+        TrueTypeVars*          trueTypeVars;
         FontHeader*            fontHeader;
         FontBuf*               fontBuf;
         WWFixedAsDWord         scaleFactor;
-        
-        
+        word                   size;
+
+
         ECCheckMemHandle( fontHandle );
         ECCheckBounds( fontMatrix );
         ECCheckBounds( (void*)fontInfo );
+        ECCheckBounds( (void*)headerEntry );
+        ECCheckBounds( (void*)firstEntry );
 
-        /* find outline for textStyle and fontWeight */
-        stylesToImplement = findOutlineData( &outlineData, fontInfo, textStyle, fontWeight );
 
-        /* get filename an load ttf file */
+        // get trueTypeVar block
+        trueTypeVars = MemLock( varBlock );
+        if( trueTypeVars == NULL )
+        {
+                MemReAlloc( varBlock, sizeof( TrueTypeVars ), HAF_NO_ERR );
+                trueTypeVars = MemLock( varBlock );
+        }
+
+        // get filename an load ttf file
         FilePushDir();
         FileSetCurrentPath( SP_FONT, TTF_DIRECTORY );
 
-        /* get pointer to TrueTypeOutline and FontHeader*/
-        trueTypeOutlineEntry = LMemDerefHandles( MemPtrToHandle( (void*)fontInfo ), outlineData->ODE_header.OE_handle );
-        fontHeader = LMemDerefHandles( MemPtrToHandle( (void*)fontInfo ), outlineData->ODE_first.OE_handle );
-
-        /* open ttf file, face, properties and properties */
-        truetypeFile = FileOpen( trueTypeOutlineEntry->TTOE_fontFileName, FILE_ACCESS_R | FILE_DENY_W );
+        // get filename an load ttf file 
+        trueTypeOutline = LMemDerefHandles( MemPtrToHandle( (void*)fontInfo ), headerEntry->OE_handle );
+        truetypeFile = FileOpen( trueTypeOutline->TTOE_fontFileName, FILE_ACCESS_R | FILE_DENY_W );
 
         ECCheckFileHandle( truetypeFile );
 
-        error = TT_Open_Face( truetypeFile, &face );
-        if( error )
+        // get pointer to FontHeader
+        fontHeader = LMemDerefHandles( MemPtrToHandle( (void*)fontInfo ), firstEntry->OE_handle );
+
+        if ( TT_Open_Face( truetypeFile, &FACE ) )
+                goto Fin;
+
+        if ( TT_Get_Face_Properties( FACE, &FACE_PROPERTIES ) )
                 goto Fail;
 
-        error = TT_Get_Face_Properties( face, &faceProperties );
-        if( error )
-                goto Fail;
-        
         /* alloc Block for FontBuf, CharTableEntries, KernPairs and kerning values */
         size = AllocFontBlock( sizeof( TransformMatrix ), 
                                fontHeader->FH_numChars, 
-                               CountKernPairsWithGeosChars( face ), 
+                               CountKernPairsWithGeosChars( FACE ), 
                                &fontHandle );
 
         /* calculate scale factor and transformation matrix */
         scaleFactor = CalcScaleForWidths( pointSize, 
-                                          fontWidth, 
-                                          fontWeight, 
                                           stylesToImplement, 
-                                          faceProperties.header->Units_Per_EM );
+                                          FACE_PROPERTIES.header->Units_Per_EM );
 
         /* convert FontHeader and fill FontBuf structure */
         fontBuf = (FontBuf*)MemDeref( fontHandle );
         fontBuf->FB_dataSize = size;
-        ConvertHeader( face, pointSize, fontHeader, fontBuf );
-        //Convert( face, pointSize, fontHeader, fontBuf );
+        ConvertHeader( scaleFactor, fontHeader, fontBuf );
 
         /* fill kerning pairs and kerning values */
-        ConvertKernPairs( face, fontBuf );
+        ConvertKernPairs( trueTypeVars, fontBuf );
 
         /* convert widths and fill CharTableEntries */
-        ConvertWidths( face, fontHeader, scaleFactor, fontBuf );
+        ConvertWidths( trueTypeVars, fontHeader, scaleFactor, fontBuf );
 
         /* calculate the transformation matrix and copy it into the FontBlock */
         CalcTransform( (TransformMatrix*)((byte*)fontBuf) + sizeof( FontBuf ) + fontHeader->FH_numChars * sizeof( CharTableEntry ),
@@ -175,10 +165,12 @@ MemHandle _pascal TrueType_Gen_Widths(
                        stylesToImplement );
 
 Fail:
-        TT_Close_Face( face );
+        TT_Close_Face( FACE );
+Fin:        
         FileClose( truetypeFile, FALSE );
+        MemUnlock( varBlock );
         FilePopDir();
-	return fontHandle;
+        return fontHandle;
 }
 
 
@@ -204,32 +196,22 @@ Fail:
  *      12/02/23  JK        Initial Revision
  *******************************************************************/
 
-static void ConvertWidths( TT_Face face, FontHeader* fontHeader, WWFixedAsDWord scaleFactor, FontBuf* fontBuf )
+static void ConvertWidths( TRUETYPE_VARS, FontHeader* fontHeader, WWFixedAsDWord scaleFactor, FontBuf* fontBuf )
 {
-        TT_Instance       instance;
-        TT_Glyph          glyph;
-        TT_CharMap        charMap;
-        TT_Glyph_Metrics  metrics;
-        char              currentChar;
-        CharTableEntry*   charTableEntry = (CharTableEntry*) (((byte*)fontBuf) + sizeof( FontBuf ));
+        char             currentChar;
+        CharTableEntry*  charTableEntry = (CharTableEntry*) (((byte*)fontBuf) + sizeof( FontBuf ));
+        WWFixedAsDWord   scaledWidth;
 
-        TT_New_Glyph( face, &glyph );
-        TT_New_Instance( face, &instance );
-        getCharMap( face, &charMap );
+
+        TT_New_Glyph( FACE, &GLYPH );
+        TT_New_Instance( FACE, &INSTANCE );
+        getCharMap( FACE, &CHAR_MAP );
 
         for( currentChar = fontHeader->FH_firstChar; currentChar < fontHeader->FH_lastChar; currentChar++ )
         {
-                word charIndex;
-                word width;
-                WWFixedAsDWord scaledWidth;
-                
-
-                //Geos Char to Unicode
-                word unicode = GeosCharToUnicode( currentChar );
-
                 //Unicode to TT ID
-                charIndex = TT_Char_Index( charMap, unicode );
-                if ( charIndex == 0 )
+                CHARINDEX = TT_Char_Index( CHAR_MAP, GeosCharToUnicode( currentChar ) );
+                if ( CHARINDEX == 0 )
                 {
                         charTableEntry->CTE_flags          = CTF_NO_DATA;
                         charTableEntry->CTE_dataOffset     = CHAR_NOT_EXIST;
@@ -242,12 +224,11 @@ static void ConvertWidths( TT_Face face, FontHeader* fontHeader, WWFixedAsDWord 
                 }
                         
                 //Glyph laden
-                TT_Load_Glyph( instance, glyph, charIndex, TTLOAD_DEFAULT );
-                TT_Get_Glyph_Metrics( glyph, &metrics );
+                TT_Load_Glyph( INSTANCE, GLYPH, CHARINDEX, 0 );
+                TT_Get_Glyph_Metrics( GLYPH, &GLYPH_METRICS );
 
                 //width berechnen
-                width = metrics.bbox.xMax - metrics.bbox.xMin;
-                scaledWidth = SCALE_WORD( width, scaleFactor );
+                scaledWidth = GrMulWWFixed( MakeWWFixed( GLYPH_METRICS.advance), scaleFactor );
                 charTableEntry->CTE_width.WBF_int  = INTEGER_OF_WWFIXEDASDWORD( scaledWidth );
                 charTableEntry->CTE_width.WBF_frac = FRACTION_OF_WWFIXEDASDWORD( scaledWidth );
 
@@ -258,15 +239,15 @@ static void ConvertWidths( TT_Face face, FontHeader* fontHeader, WWFixedAsDWord 
                 
                
                 // set flags in CTE_flags if needed
-                if( metrics.bbox.xMin < 0 )
+                if( GLYPH_BBOX.xMin < 0 )
                         charTableEntry->CTE_flags |= CTF_NEGATIVE_LSB;
 
                 //below descent
-                if( -metrics.bbox.yMin > fontHeader->FH_descent )
+                if( -GLYPH_BBOX.yMin > fontHeader->FH_descent )
                         charTableEntry->CTE_flags |= CTF_BELOW_DESCENT;
 
                 //above ascent
-                if( metrics.bbox.yMax > fontHeader->FH_ascent )
+                if( GLYPH_BBOX.yMax > fontHeader->FH_ascent )
                         charTableEntry->CTE_flags |= CTF_ABOVE_ASCENT;
                 
 
@@ -280,83 +261,8 @@ static void ConvertWidths( TT_Face face, FontHeader* fontHeader, WWFixedAsDWord 
                 charTableEntry++;
         } 
 
-        TT_Done_Instance( instance );
-        TT_Done_Glyph( glyph );
-}
-
-
-/********************************************************************
- *                      findOutlineData
- ********************************************************************
- * SYNOPSIS:	  
- * 
- * PARAMETERS:    
- * 
- * RETURNS:       
- * 
- * STRATEGY:      
- * 
- * REVISION HISTORY:
- *      Date      Name      Description
- *      ----      ----      -----------
- *      12/02/23  JK        Initial Revision
- *******************************************************************/
-
-static TextStyle  findOutlineData( 
-                        OutlineDataEntry**  outline,
-                        const FontInfo*    fontInfo, 
-                        TextStyle          textStyle, 
-                        FontWeight         fontWeight )
-{
-        OutlineDataEntry*  outlineToUse;
-        OutlineDataEntry*  outlineData = (OutlineDataEntry*) (((byte*)fontInfo) + fontInfo->FI_outlineTab);
-        OutlineDataEntry*  outlineDataEnd = (OutlineDataEntry*) (((byte*)fontInfo) + fontInfo->FI_outlineEnd);
-        TextStyle          styleDiff = 127;
-        byte               weightDiff = 127;
-
-
-        /* adjust textWeight for AW_BOLD */
-        if( textStyle >= AW_BOLD )
-                textStyle = AW_BLACK;
-
-        while( outlineData < outlineDataEnd)
-	{
-                /* exact match? */
-                if( outlineData->ODE_style == textStyle &&
-	            outlineData->ODE_weight == fontWeight )
-		{
-                        *outline = outlineData;
-                        return 0;  // no styles to implement
-		}
-
-                /* style match? */
-                if( outlineData->ODE_style == textStyle )
-                {
-                        byte currentWeightDiff = ABS( fontWeight - outlineData->ODE_weight );
-
-                        styleDiff = 0;
-                        if( weightDiff >= currentWeightDiff )
-                        {
-                                outlineToUse = outlineData;
-                                weightDiff = currentWeightDiff;
-                        }
-
-                }
-
-                /* try to find nearest style */
-                if( ( ( textStyle & outlineData->ODE_style ) ^ outlineData->ODE_style ) == 0 )
-                {
-                        byte currentStyleDiff = textStyle ^ outlineData->ODE_style;
-                        if( styleDiff >= currentStyleDiff )
-                        {
-                                outlineToUse = outlineData;
-                                styleDiff = currentStyleDiff;
-                        }
-                }
-		outlineData++;
-	}
-        *outline = outlineToUse;
-        return styleDiff;
+        TT_Done_Instance( INSTANCE );
+        TT_Done_Glyph( GLYPH );
 }
 
 
@@ -381,12 +287,10 @@ static TextStyle  findOutlineData(
 
 static WWFixedAsDWord CalcScaleForWidths( 
                         WWFixedAsDWord  pointSize,
-                        FontWidth       fontWidth,
-                        FontWeight      fontWeight,
                         TextStyle       stylesToImplement,
                         word            unitsPerEM )
 {
-        WWFixedAsDWord scaleWidth = GrUDivWWFixed( pointSize, WORD_TO_WWFIXEDASDWORD( unitsPerEM ) );
+        WWFixedAsDWord scaleWidth = GrUDivWWFixed( pointSize, MakeWWFixed( unitsPerEM ) );
 
         /* do bold need to be added? */
         if( stylesToImplement & TS_BOLD )
@@ -395,14 +299,6 @@ static WWFixedAsDWord CalcScaleForWidths(
         /* do subscript or superscript to be added? */
         if( stylesToImplement & ( TS_SUBSCRIPT | TS_SUPERSCRIPT ) )
                 scaleWidth = GrMulWWFixed( scaleWidth, WWFIXED_0_POINT_5 );
-
-        /* adjust for fontWidth */
-        if( fontWeight != FWI_MEDIUM )
-                scaleWidth = GrMulWWFixed( scaleWidth, MakeWWFixed( fontWidth ) );
-
-        /* adjust für fontWeight */
-        if( fontWidth != FW_NORMAL )
-                scaleWidth = GrMulWWFixed( scaleWidth, MakeWWFixed( fontWeight ) );
 
         return scaleWidth;
 }
@@ -427,7 +323,7 @@ static WWFixedAsDWord CalcScaleForWidths(
  *      20/12/22  JK        Initial Revision
  *******************************************************************/
 
-static void ConvertKernPairs( TT_Face face, FontBuf* fontBuf )
+static void ConvertKernPairs( TRUETYPE_VARS, FontBuf* fontBuf )
 {
         KernPair*  kernPair;
         WBFixed*   wbFixed;
@@ -457,8 +353,7 @@ static void ConvertKernPairs( TT_Face face, FontBuf* fontBuf )
  * SYNOPSIS:	  Calculates the transformation matrix for missing
  *                style attributes and weights.
  * 
- * PARAMETERS:    *transMatrix          Pointer to TransformMatrix
- *                                      in font block.
+ * PARAMETERS:    *transMatrix          Pointer to TransformMatrix.
  *                *fontMatrix           Systems transformation matrix.
  *                styleToImplement      Styles that must be added.
  *                      
@@ -486,15 +381,11 @@ static void CalcTransform( TransformMatrix*  transMatrix,
 
         /* fake bold style       */
         if( stylesToImplement & TS_BOLD )
-        {
                 tempMatrix.xx = BOLD_FACTOR;
-        }
 
         /* fake italic style       */
         if( stylesToImplement & TS_ITALIC )
-        {
                 tempMatrix.yx = ITALIC_FACTOR;
-        }
 
         /* fake script style      */
         if( stylesToImplement & TS_SUBSCRIPT || stylesToImplement & TS_SUBSCRIPT )
@@ -503,13 +394,9 @@ static void CalcTransform( TransformMatrix*  transMatrix,
                 tempMatrix.yy = GrMulWWFixed( tempMatrix.yy, SCRIPT_FACTOR );
 
                 if( stylesToImplement & TS_SUBSCRIPT )
-                {
                         transMatrix->TM_shiftY = -SCRIPT_SHIFT_FACTOR;
-                }
                 else
-                {
                         transMatrix->TM_shiftY = SCRIPT_SHIFT_FACTOR;
-                }
         }
 
         /* integrate fontMatrix */
@@ -529,16 +416,11 @@ static void CalcTransform( TransformMatrix*  transMatrix,
  ********************************************************************
  * SYNOPSIS:	  Allocate or reallocate memory block for font.
  * 
- * PARAMETERS:    additionalSpace       Additional space in block
- *                                      for driver.
- *                numOfCharacters       Number of GEOS characters in 
- *                                      font.
- *                numOfKernPairs        Number of kerning pairs of 
- *                                      GEOS characters in font.
+ * PARAMETERS:    additionalSpace       Additional space in block.
+ *                numOfCharacters       Number of GEOS characters.
+ *                numOfKernPairs        Number of kerning pairs.
  *                *fontHandle           Pointer to MemHandle of font 
- *                                      block. If NullHandle alloc new 
- *                                      block. If not, realloc existing 
- *                                      one.
+ *                                      block.
  * 
  * RETURNS:       word                  Size of allocated block.
  * 
@@ -560,16 +442,16 @@ static word AllocFontBlock(
                 additionalSpace; 
                      
         /* allocate memory for FontBuf, CharTableEntries, KernPairs and additional space */
-        if( fontHandle == NullHandle )
+        if( *fontHandle == NullHandle )
         {
-                *fontHandle = MemAllocSetOwner( FONT_MAN_ID, size, 
+                *fontHandle = MemAllocSetOwner( FONT_MAN_ID, MAX_FONTBUF_SIZE, 
                         HF_SWAPABLE | HF_SHARABLE | HF_DISCARDABLE,
                         HAF_NO_ERR | HAF_LOCK );
                 HandleP( *fontHandle );
         }
         else
         {
-                MemReAlloc( *fontHandle, size, HAF_NO_ERR | HAF_LOCK );
+                MemReAlloc( *fontHandle, MAX_FONTBUF_SIZE, HAF_NO_ERR | HAF_LOCK );
         }
 
         return size;
@@ -581,14 +463,11 @@ static word AllocFontBlock(
  ********************************************************************
  * SYNOPSIS:	  Converts FontInfo and fill FontBuf structure.
  * 
- * PARAMETERS:    face                  TrueType face of font file.
- *                pointSize             Current pointsize.
- *                *fontHeader           Pointer to FontHeader structure
- *                                      to fill fontBuf.
- *                *fontBuf              Pointer to FontBuf structure 
- *                                      to fill.
+ * PARAMETERS:    pointSize             Current pointsize.
+ *                *fontHeader           Ptr to FontHeader structure.
+ *                *fontBuf              Ptr to FontBuf structure.
  * 
- * RETURNS:       TT_Error = FreeType errorcode (see tterrid.h)
+ * RETURNS:       void
  * 
  * STRATEGY:      
  * 
@@ -598,12 +477,8 @@ static word AllocFontBlock(
  *      11/12/22  JK        Initial Revision
  *******************************************************************/
 
-TT_Error ConvertHeader( TT_Face face, WWFixedAsDWord pointSize, FontHeader* fontHeader, FontBuf* fontBuf ) 
+void ConvertHeader( WWFixedAsDWord scaleFactor, FontHeader* fontHeader, FontBuf* fontBuf ) 
 {
-        TT_Error            error;
-        TT_Instance         instance;
-        TT_Instance_Metrics instanceMetrics;
-        WWFixedAsDWord      scaleFactor;
         WWFixedAsDWord      ttfElement;
         
 
@@ -611,31 +486,13 @@ TT_Error ConvertHeader( TT_Face face, WWFixedAsDWord pointSize, FontHeader* font
         ECCheckBounds( (void*)fontHeader );
 
 
-        error = TT_New_Instance( face, &instance );
-        if ( error )
-                return error;
-
-        error = TT_Set_Instance_CharSize( instance, pointSize >> 10 );
-        if ( error )
-                return error;
-
-        error = TT_Get_Instance_Metrics( instance, &instanceMetrics );
-        if ( error )
-                return error;
-
-        scaleFactor = instanceMetrics.x_scale;
-
         /* Fill elements in FontBuf structure.                               */
-
         fontBuf->FB_maker        = FM_TRUETYPE;
         fontBuf->FB_kernPairPtr  = 0;
         fontBuf->FB_kernValuePtr = 0;
         fontBuf->FB_kernCount    = 0;
         fontBuf->FB_heapCount    = 0;
 	fontBuf->FB_flags        = FBF_IS_OUTLINE;
-
-        ttfElement = SCALE_WORD( fontHeader->FH_minLSB, scaleFactor );
-        fontBuf->FB_minLSB = ROUND_WWFIXEDASDWORD( ttfElement ); 
 
         ttfElement = SCALE_WORD( fontHeader->FH_avgwidth, scaleFactor );
         fontBuf->FB_avgwidth.WBF_int  = INTEGER_OF_WWFIXEDASDWORD( ttfElement );
@@ -645,39 +502,36 @@ TT_Error ConvertHeader( TT_Face face, WWFixedAsDWord pointSize, FontHeader* font
         fontBuf->FB_maxwidth.WBF_int  = INTEGER_OF_WWFIXEDASDWORD( ttfElement );
         fontBuf->FB_maxwidth.WBF_frac = FRACTION_OF_WWFIXEDASDWORD( ttfElement );
 
-#ifndef DBCS_PCGEOS
-        ttfElement = SCALE_WORD( fontHeader->FH_maxRSB, scaleFactor );
-        fontBuf->FB_maxRSB  = ROUND_WWFIXEDASDWORD( ttfElement );
-#endif  /* DBCS_PCGEOS */
-
-        scaleFactor = instanceMetrics.y_scale;
+        ttfElement = SCALE_WORD( fontHeader->FH_baseAdjust, scaleFactor );
+        fontBuf->FB_heightAdjust.WBF_int  = INTEGER_OF_WWFIXEDASDWORD( ttfElement );
+        fontBuf->FB_heightAdjust.WBF_frac = FRACTION_OF_WWFIXEDASDWORD( ttfElement );
 
         ttfElement = SCALE_WORD( fontHeader->FH_height, scaleFactor );
         fontBuf->FB_height.WBF_int  = INTEGER_OF_WWFIXEDASDWORD( ttfElement );
         fontBuf->FB_height.WBF_frac = FRACTION_OF_WWFIXEDASDWORD( ttfElement );
 
-        /* FB_heightAdjust = pointSize - FH_height                           */
-        ttfElement = pointSize - WORD_TO_WWFIXEDASDWORD( fontHeader->FH_height );
-        fontBuf->FB_heightAdjust.WBF_int  = INTEGER_OF_WWFIXEDASDWORD( ttfElement );
-        fontBuf->FB_heightAdjust.WBF_frac = FRACTION_OF_WWFIXEDASDWORD( ttfElement );
-        fontBuf->FB_pixHeight = ROUND_WWFIXEDASDWORD( ttfElement );
-
+        ttfElement = SCALE_WORD( fontHeader->FH_accent, scaleFactor );
+        fontBuf->FB_accent.WBF_int  = INTEGER_OF_WWFIXEDASDWORD( ttfElement );
+        fontBuf->FB_accent.WBF_frac = FRACTION_OF_WWFIXEDASDWORD( ttfElement );
+ 
+        ttfElement = SCALE_WORD( fontHeader->FH_x_height, scaleFactor );
+        fontBuf->FB_mean.WBF_int  = INTEGER_OF_WWFIXEDASDWORD( ttfElement );
+        fontBuf->FB_mean.WBF_frac = FRACTION_OF_WWFIXEDASDWORD( ttfElement );
+ 
         ttfElement = SCALE_WORD( fontHeader->FH_baseAdjust, scaleFactor );
-        fontBuf->FB_baseAdjust.WBF_int  = INTEGER_OF_WWFIXEDASDWORD( ROUND_WWFIXEDASDWORD( ttfElement ) );
+        fontBuf->FB_baseAdjust.WBF_int  = INTEGER_OF_WWFIXEDASDWORD( ttfElement );
         fontBuf->FB_baseAdjust.WBF_frac = 0;
 
-        ttfElement = SCALE_WORD( fontHeader->FH_minTSB, scaleFactor );
-        fontBuf->FB_aboveBox.WBF_int  = CEIL_WWFIXEDASDWORD( ttfElement );
-        fontBuf->FB_aboveBox.WBF_frac = 0;
-        fontBuf->FB_minTSB = CEIL_WWFIXEDASDWORD( ttfElement );
-        fontBuf->FB_pixHeight += CEIL_WWFIXEDASDWORD( ttfElement );
+        ttfElement = SCALE_WORD( fontHeader->FH_ascent + fontHeader->FH_accent, scaleFactor );
+        fontBuf->FB_baselinePos.WBF_int  = INTEGER_OF_WWFIXEDASDWORD( ttfElement );
+        fontBuf->FB_baselinePos.WBF_frac = 0;
 
-        ttfElement = SCALE_WORD( fontHeader->FH_maxBSB, scaleFactor );
-        fontBuf->FB_belowBox.WBF_int  = CEIL_WWFIXEDASDWORD( ttfElement );
-        fontBuf->FB_belowBox.WBF_frac = 0;
-#ifdef SBCS_PCGEOS
-        fontBuf->FB_maxBSB = CEIL_WWFIXEDASDWORD( ttfElement );
-#endif  /* SBCS_PCGEOS */
+        ttfElement = SCALE_WORD( fontHeader->FH_descent, scaleFactor );
+        fontBuf->FB_descent.WBF_int  = INTEGER_OF_WWFIXEDASDWORD( ttfElement );
+        fontBuf->FB_descent.WBF_frac = FRACTION_OF_WWFIXEDASDWORD( ttfElement );
+
+        fontBuf->FB_extLeading.WBF_int  = 0;
+        fontBuf->FB_extLeading.WBF_frac = 0;
 
         ttfElement = SCALE_WORD( fontHeader->FH_underPos, scaleFactor );
         fontBuf->FB_underPos.WBF_int  = INTEGER_OF_WWFIXEDASDWORD( ttfElement );
@@ -691,157 +545,29 @@ TT_Error ConvertHeader( TT_Face face, WWFixedAsDWord pointSize, FontHeader* font
         fontBuf->FB_strikePos.WBF_int  = INTEGER_OF_WWFIXEDASDWORD( ttfElement );
         fontBuf->FB_strikePos.WBF_frac = FRACTION_OF_WWFIXEDASDWORD( ttfElement );
 
-        ttfElement = SCALE_WORD( fontHeader->FH_x_height, scaleFactor );
-        fontBuf->FB_mean.WBF_int  = INTEGER_OF_WWFIXEDASDWORD( ttfElement );
-        fontBuf->FB_mean.WBF_frac = FRACTION_OF_WWFIXEDASDWORD( ttfElement );
+        ttfElement = SCALE_WORD( fontHeader->FH_minTSB, scaleFactor );
+        fontBuf->FB_aboveBox.WBF_int  = INTEGER_OF_WWFIXEDASDWORD( ttfElement );
+        fontBuf->FB_aboveBox.WBF_frac = 0;
+        fontBuf->FB_minTSB = INTEGER_OF_WWFIXEDASDWORD( ttfElement );
 
-        ttfElement = SCALE_WORD( fontHeader->FH_descent, scaleFactor );
-        fontBuf->FB_descent.WBF_int  = INTEGER_OF_WWFIXEDASDWORD( ttfElement );
-        fontBuf->FB_descent.WBF_frac = FRACTION_OF_WWFIXEDASDWORD( ttfElement );
+        ttfElement = SCALE_WORD( fontHeader->FH_maxBSB, scaleFactor );
+        //fontBuf->FB_belowBox.WBF_int  = INTEGER_OF_WWFIXEDASDWORD( ttfElement );
+        fontBuf->FB_belowBox.WBF_int  = 1; //hack
+        fontBuf->FB_belowBox.WBF_frac = 0;
+        //fontBuf->FB_maxBSB = INTEGER_OF_WWFIXEDASDWORD( ttfElement );
+        fontBuf->FB_maxBSB = 1; //hack
 
-        ttfElement = SCALE_WORD( fontHeader->FH_accent, scaleFactor );
-        fontBuf->FB_accent.WBF_int  = INTEGER_OF_WWFIXEDASDWORD( ttfElement );
-        fontBuf->FB_accent.WBF_frac = FRACTION_OF_WWFIXEDASDWORD( ttfElement );
+        ttfElement = SCALE_WORD( fontHeader->FH_minLSB, scaleFactor );
+        //fontBuf->FB_minLSB = INTEGER_OF_WWFIXEDASDWORD( ttfElement ); 
+        fontBuf->FB_minLSB = 0xffff; //hack 
 
-        /* baslinepos = accent + ascent                                      */
-        ttfElement = SCALE_WORD( fontHeader->FH_ascent + fontHeader->FH_accent, scaleFactor );
-        fontBuf->FB_baselinePos.WBF_int  = ROUND_WWFIXEDASDWORD( ttfElement );
-        fontBuf->FB_baselinePos.WBF_frac = 0;
+        ttfElement = SCALE_WORD( fontHeader->FH_maxRSB, scaleFactor );
+        fontBuf->FB_maxRSB  = INTEGER_OF_WWFIXEDASDWORD( ttfElement );
 
-        /* Nimbus fonts and TrueType fonts has no external leading           */
-        fontBuf->FB_extLeading.WBF_int  = 0;
-        fontBuf->FB_extLeading.WBF_frac = 0;
+        ttfElement = SCALE_WORD( fontHeader->FH_height + fontHeader->FH_accent, scaleFactor );
+        fontBuf->FB_pixHeight = INTEGER_OF_WWFIXEDASDWORD( ttfElement );
 
         fontBuf->FB_firstChar   = fontHeader->FH_firstChar;
         fontBuf->FB_lastChar    = fontHeader->FH_lastChar;
         fontBuf->FB_defaultChar = fontHeader->FH_defaultChar;
-
-        //TODO: MAX_BSB, MAX_RSB
-
-        TT_Done_Instance( instance );
-
-        /* Test */
- /*              fontBuf->FB_minLSB = 0xffff; 
-
-        fontBuf->FB_avgwidth.WBF_int  = 0x000e;
-        fontBuf->FB_avgwidth.WBF_frac = 0x64;
-        fontBuf->FB_maxwidth.WBF_int  = 0x000e;
-        fontBuf->FB_maxwidth.WBF_frac = 0x64;
-
-        fontBuf->FB_height.WBF_int  = 0x0038;
-        //TEST fontBuf->FB_height.WBF_int  = 0x0018;
-        fontBuf->FB_height.WBF_frac = 0xe6;
-
-        fontBuf->FB_heightAdjust.WBF_int  = 0xffff;
-        fontBuf->FB_heightAdjust.WBF_frac = 0x1a;
-
-        fontBuf->FB_accent.WBF_int  = 0x0004;
-        //TEST fontBuf->FB_accent.WBF_int  = 0x0002;
-        fontBuf->FB_accent.WBF_frac = 0xce;
-
-        fontBuf->FB_mean.WBF_int  = 0x000a;
-        fontBuf->FB_mean.WBF_frac = 0x63;
-
-        fontBuf->FB_baseAdjust.WBF_int  = 0xffff;
-        fontBuf->FB_baseAdjust.WBF_frac = 0x0;
-
-        fontBuf->FB_baselinePos.WBF_int  = 0x0043;
-        //TEST fontBuf->FB_baselinePos.WBF_int  = 0x0023;
-        fontBuf->FB_baselinePos.WBF_frac = 0;
-
-        fontBuf->FB_descent.WBF_int  = 0x0003;
-        fontBuf->FB_descent.WBF_frac = 0xfb;
-
-        fontBuf->FB_extLeading.WBF_int  = 0;
-        fontBuf->FB_extLeading.WBF_frac = 0;
-
-        fontBuf->FB_underPos.WBF_int  = 0x0014;
-        fontBuf->FB_underPos.WBF_frac = 0x70;
-
-        fontBuf->FB_underThickness.WBF_int  = 0x0001;
-        fontBuf->FB_underThickness.WBF_frac = 0xd9;
-
-        fontBuf->FB_strikePos.WBF_int  = 0x000c;
-        fontBuf->FB_strikePos.WBF_frac = 0x5a;
-
-        fontBuf->FB_aboveBox.WBF_int  = 0x0003;
-        //TEST fontBuf->FB_aboveBox.WBF_int  = 0x0001;
-        fontBuf->FB_aboveBox.WBF_frac = 0;
-
-        fontBuf->FB_belowBox.WBF_int  = 0x0001;
-        fontBuf->FB_belowBox.WBF_frac = 0;
-
-        fontBuf->FB_minTSB = 0x0001;
-        fontBuf->FB_maxBSB = 0x0001;
-        fontBuf->FB_maxRSB = 0x000f;
-        fontBuf->FB_pixHeight = 0x1a;*/
-
-        return TT_Err_Ok;
 }
-
-/***
-static void Convert( TT_Face face, WWFixedAsDWord pointSize, FontHeader* fontHeader, FontBuf* fontBuf )
-{
-        fontBuf->FB_maker        = FM_TRUETYPE;
-        fontBuf->FB_kernPairPtr  = 0;
-        fontBuf->FB_kernValuePtr = 0;
-        fontBuf->FB_kernCount    = 0;
-        fontBuf->FB_heapCount    = 0;
-	fontBuf->FB_flags        = FBF_IS_OUTLINE;
-
-        fontBuf->FB_minLSB = 0xffff; 
-
-        fontBuf->FB_avgwidth.WBF_int  = 0x000e;
-        fontBuf->FB_avgwidth.WBF_frac = 0x64;
-        fontBuf->FB_maxwidth.WBF_int  = 0x000e;
-        fontBuf->FB_maxwidth.WBF_frac = 0x64;
-
-        fontBuf->FB_height.WBF_int  = 0x0018;
-        fontBuf->FB_height.WBF_frac = 0xe6;
-
-        fontBuf->FB_heightAdjust.WBF_int  = 0xffff;
-        fontBuf->FB_heightAdjust.WBF_frac = 0x1a;
-
-        fontBuf->FB_accent.WBF_int  = 0x0002;
-        fontBuf->FB_accent.WBF_frac = 0xce;
-
-        fontBuf->FB_mean.WBF_int  = 0x000a;
-        fontBuf->FB_mean.WBF_frac = 0x63;
-
-        fontBuf->FB_baseAdjust.WBF_int  = 0xffff;
-        fontBuf->FB_baseAdjust.WBF_frac = 0x0;
-
-        fontBuf->FB_baselinePos.WBF_int  = 0x0023;
-        fontBuf->FB_baselinePos.WBF_frac = 0;
-
-        fontBuf->FB_descent.WBF_int  = 0x0003;
-        fontBuf->FB_descent.WBF_frac = 0xfb;
-
-        fontBuf->FB_extLeading.WBF_int  = 0;
-        fontBuf->FB_extLeading.WBF_frac = 0;
-
-        fontBuf->FB_firstChar   = fontHeader->FH_firstChar;
-        fontBuf->FB_lastChar    = fontHeader->FH_lastChar;
-        fontBuf->FB_defaultChar = fontHeader->FH_defaultChar;
-
-        fontBuf->FB_underPos.WBF_int  = 0x0014;
-        fontBuf->FB_underPos.WBF_frac = 0x70;
-
-        fontBuf->FB_underThickness.WBF_int  = 0x0001;
-        fontBuf->FB_underThickness.WBF_frac = 0xd9;
-
-        fontBuf->FB_strikePos.WBF_int  = 0x000c;
-        fontBuf->FB_strikePos.WBF_frac = 0x5a;
-
-        fontBuf->FB_aboveBox.WBF_int  = 0x0001;
-        fontBuf->FB_aboveBox.WBF_frac = 0;
-
-        fontBuf->FB_belowBox.WBF_int  = 0x0001;
-        fontBuf->FB_belowBox.WBF_frac = 0;
-
-        fontBuf->FB_minTSB = 0x0001;
-        fontBuf->FB_maxBSB = 0x0001;
-        fontBuf->FB_maxRSB = 0x000f;
-        fontBuf->FB_pixHeight = 0x1a;
-
-} ****/

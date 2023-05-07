@@ -62,42 +62,51 @@ TrueTypeGenWidths	proc	far
 	mov	bx, bp
 	.enter
 	
-	push	di		; font handle or 0
+	push	di			; font handle or 0
 
-	push	bx		; send tMatrix ptr
+	push	bx			; send tMatrix ptr
 	push 	cx
+
+	clr	al
+	movwbf	dxah, es:GS_fontAttr.FCA_pointsize
+	push	dx			; pass point size
+	push 	ax
 		
-				; find font info
 	mov	cx, es:GS_fontAttr.FCA_fontID
 	call	FontDrFindFontInfo
-	push	ds		; pass font info ptr
+	push	ds			; pass ptr to FontInfo
 	push 	di
 
-	clr	al		; pointsize from gstate
-	movwbf	dxah, es:GS_fontAttr.FCA_pointsize
-	push	dx		; pass point size
-	push 	ax
+	mov	cx, ds			; save ptr to FontInfo
+	mov	dx, di
 
-	clr	ah		; text style from gstate
+	clr	ah
 	mov	al, es:GS_fontAttr.FCA_textStyle
-	push	ax		; pass text style
+	mov	bx, ODF_HEADER
+	call	FontDrFindOutlineData
+	push	ds			; pass ptr to OutlineEntry
+	push	di
 
-				; font weight from gstate
-	mov	al, es:GS_fontAttr.FCA_weight
-	push	ax		; pass font weight
+	mov	ds, cx
+	mov	di, dx
 
-				; font width from gstate
-	mov     al, es:GS_fontAttr.FCA_width
-	push    ax		; pass font width
+	clr	ah
+	mov	al, es:GS_fontAttr.FCA_textStyle
+	mov	bx, ODF_PART1
+	call	FontDrFindOutlineData
+	push	ds			; pass ptr to OutlineEntry
+	push	di
+	push	ax			; pass stylesToImplement
 
 	segmov	ds, dgroup, dx
+	push	ds:variableHandle	; pass varBlock
 	call	TRUETYPE_GEN_WIDTHS
 
-	mov	bx, ax		; mov font hdl to bx
+	mov	bx, ax			; mov font hdl to bx
 	call	MemDerefDS
 	segmov	ax, ds
 
-	clc			;indicate no error
+	clc				;indicate no error
 
 	.leave
 	ret

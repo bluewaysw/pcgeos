@@ -71,7 +71,7 @@ static void strcpy( char* dest, const char* source );
  * 
  * PARAMETERS:    void
  * 
- * RETURNS:       TT_Error = FreeType errorcode (see tterrid.h)
+ * RETURNS:       TT_Error        FreeType errorcode (see tterrid.h)
  * 
  * SIDE EFFECTS:  none
  * 
@@ -108,7 +108,7 @@ TT_Error _pascal Init_FreeType()
  * 
  * PARAMETERS:    void
  * 
- * RETURNS:       TT_Error = FreeType errorcode (see tterrid.h)
+ * RETURNS:       TT_Error        FreeType errorcode (see tterrid.h)
  * 
  * SIDE EFFECTS:  none
  * 
@@ -133,8 +133,8 @@ TT_Error _pascal Exit_FreeType()
  * SYNOPSIS:	  Search for TTF fonts and register them. This is the 
  *                adapter function for DR_FONT_INIT_FONTS.
  * 
- * PARAMETERS:    fontInfoBlock         MemHandle to fontInfo.
- *                varBlock              MemHandle to truetypeVarBlock.
+ * PARAMETERS:    fontInfoBlock   MemHandle to fontInfo.
+ *                varBlock        MemHandle to truetypeVarBlock.
  * 
  * RETURNS:       void
  * 
@@ -197,8 +197,8 @@ Fin:
  ********************************************************************
  * SYNOPSIS:	  Lists all file names in the current directory.
  * 
- * PARAMETERS:    fileEnumBlock         Handle to the memory block in 
- *                                      which the file names are stored.
+ * PARAMETERS:    fileEnumBlock   Handle to the memory block in 
+ *                                which the file names are stored.
  * 
  * RETURNS:       word
  * 
@@ -239,9 +239,9 @@ static word DetectFontFiles( MemHandle* fileEnumBlock )
  ********************************************************************
  * SYNOPSIS:	  Registers a font with its styles as an available font.
  * 
- * PARAMETERS:    fileName              Name of font file.
- *                fontInfoBlock         Handle to memory block with all
- *                                      infos about aviable fonts.
+ * PARAMETERS:    fileName        Name of font file.
+ *                fontInfoBlock   Handle to memory block with all
+ *                                infos about aviable fonts.
  * 
  * RETURNS:       void
  * 
@@ -445,9 +445,9 @@ Fin:
  ********************************************************************
  * SYNOPSIS:	  Calculates the hash value of the passed string.
  * 
- * PARAMETERS:    str           Pointer to the string.
+ * PARAMETERS:    str             Pointer to the string.
  * 
- * RETURNS:       word          Hash value for passed string.
+ * RETURNS:       word            Hash value for passed string.
  * 
  * SIDE EFFECTS:  none
  * 
@@ -476,9 +476,9 @@ static word toHash( const char* str )
  ********************************************************************
  * SYNOPSIS:	  Maps the TrueType family class to FreeGEOS FontAttrs.
  * 
- * PARAMETERS:    familyClass           TrueType family class.
+ * PARAMETERS:    familyClass     TrueType family class.
  * 
- * RETURNS:       FontAttrs             FreeGEOS FontAttrs.
+ * RETURNS:       FontAttrs       FreeGEOS FontAttrs.
  * 
  * SIDE EFFECTS:  none
  * 
@@ -540,9 +540,9 @@ static FontAttrs mapFamilyClass( TT_Short familyClass )
  * SYNOPSIS:	  Maps the TrueType font weight class to FreeGEOS 
  *                AdjustedWeight.
  * 
- * PARAMETERS:    weightClass           TrueType weight class.
+ * PARAMETERS:    weightClass     TrueType weight class.
  * 
- * RETURNS:       AdjustedWeight        FreeGEOS AdjustedWeight.
+ * RETURNS:       AdjustedWeight  FreeGEOS AdjustedWeight.
  * 
  * SIDE EFFECTS:  none
  * 
@@ -585,9 +585,9 @@ static AdjustedWeight mapFontWeight( TT_Short weightClass )
  ********************************************************************
  * SYNOPSIS:	  Maps the TrueType subfamily to FreeGEOS TextStyle.
  * 
- * PARAMETERS:    subfamily*            String with subfamiliy name. 
+ * PARAMETERS:    subfamily*      String with subfamiliy name. 
  * 
- * RETURNS:       TextStyle             FreeGEOS TextStyle.
+ * RETURNS:       TextStyle       FreeGEOS TextStyle.
  * 
  * SIDE EFFECTS:  none
  * 
@@ -620,13 +620,13 @@ static TextStyle mapTextStyle( const char* subfamily )
 /********************************************************************
  *                      getFontID
  ********************************************************************
- * SYNOPSIS:	        If the passed font family is a mapped font, 
- *                      the FontID form geos.ini is returned, otherwise
- *                      we calculate new FontID and return it.
+ * SYNOPSIS:	  If the passed font family is a mapped font, the 
+ *                FontID form geos.ini is returned, otherwise we 
+ *                calculate new FontID and return it.
  * 
- * PARAMETERS:          familyName*     Font family name.
+ * PARAMETERS:    familyName*     Font family name.
  *
- * RETURNS:             FontID          FontID found geos.ini or calculated.
+ * RETURNS:       FontID          FontID found geos.ini or calculated.
  * 
  * SIDE EFFECTS:  none
  * 
@@ -652,14 +652,15 @@ static FontID getFontID( const char* familyName )
 /********************************************************************
  *                      getFontIDAvailIndex
  ********************************************************************
- * SYNOPSIS:	        Searches all FontsAvailEntries for the passed 
- *                      FontID and returns its index. If no FontsAvailEntry 
- *                      is found for the FontID, -1 is returned.
+ * SYNOPSIS:	  Searches all FontsAvailEntries for the passed 
+ *                FontID and returns its index. If no FontsAvailEntry 
+ *                is found for the FontID, -1 is returned.
  * 
- * PARAMETERS:          fontID          Searched FontID.
- *                      fontInfoBlock   Memory block with font information.
+ * PARAMETERS:    fontID          Searched FontID.
+ *                fontInfoBlock   Memory block with font information.
  * 
- * RETURNS:       
+ * RETURNS:       sword           Index in FontBlock, if FontID 
+ *                                was not found -1 will return.
  * 
  * SIDE EFFECTS:  none
  * 
@@ -910,9 +911,12 @@ static void ConvertHeader( TRUETYPE_VARS, FontHeader* fontHeader )
 /********************************************************************
  *                      GetDefaultChar
  ********************************************************************
- * SYNOPSIS:	  
+ * SYNOPSIS:	  Returns the default character, if this is not present 
+ *                in the face, the first GEOS character in the font is 
+ *                the default character.
  * 
- * PARAMETERS:    
+ * PARAMETERS:    TRUETYPE_VARS         Pointer to truetypevar block.
+ *                firstChar             First GEOS char in face.
  * 
  * RETURNS:       char
  * 

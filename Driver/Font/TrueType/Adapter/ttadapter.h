@@ -29,6 +29,7 @@
 #include "../FreeType/ttengine.h"
 #include "../FreeType/ttcalc.h"
 
+
 /***********************************************************************
  *      global dgoup objects
  ***********************************************************************/
@@ -345,6 +346,10 @@ typedef struct
     TT_CharMap                  charMap;
     TT_Outline                  outline;
     TT_BBox                     bbox;
+
+    /* iterating over glyphs of a font */
+    word                        charIndex;
+    word                        unicode;
 } TrueTypeVars;
 
 
@@ -362,6 +367,9 @@ typedef struct
 #define GLYPH_BBOX              trueTypeVars->glyphMetrics.bbox
 
 #define UNITS_PER_EM            FACE_PROPERTIES.header->Units_Per_EM
+
+#define UNICODE                 trueTypeVars->unicode
+#define CHARINDEX               trueTypeVars->charIndex
 
 
 
@@ -405,6 +413,8 @@ typedef struct
         ( value & 0x8000 ?                       \
             ( value & 0x00ff ? ( ( value >> 16 ) - 1 ) : ( ( value >> 16 ) ) ) : \
             ( value >> 16 ) )
+
+#define CEIL( value )       ( value & 0x000000ff ? ( value >> 16 ) + 1 : ( value ) ) 
 
 /*
  * get integral part of value (WWFixedAsDWord)

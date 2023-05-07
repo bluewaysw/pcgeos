@@ -46,13 +46,14 @@ typedef	struct
  ***********************************************************************/
 
 MemHandle _pascal TrueType_Gen_Widths(
-                                MemHandle        fontHandle,
-                                FontMatrix*      fontMatrix,
-                                const FontInfo*  fontInfo,
-                                WWFixedAsDWord   pointSize,
-                                TextStyle        textStyle,
-                                FontWidth        fontWidth,
-                                FontWeight       fontWeight
+                                MemHandle            fontHandle,
+                                FontMatrix*          fontMatrix,
+                                WWFixedAsDWord       pointSize,
+			        const FontInfo*      fontInfo, 
+                                const OutlineEntry*  headerEntry,
+                                const OutlineEntry*  firstEntry,
+                                TextStyle            stylesToImplement,
+                                MemHandle            varBlock
 );
 
 
