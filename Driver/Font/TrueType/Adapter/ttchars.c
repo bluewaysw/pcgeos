@@ -66,13 +66,11 @@ void _pascal TrueType_Gen_Chars(
                         WWFixedAsDWord       pointSize,
 			const FontInfo*      fontInfo, 
                         const OutlineEntry*  outlineEntry,
-                        TextStyle            stylesToImplement,
                         MemHandle            bitmapHandle
 			) 
 {
         FileHandle             truetypeFile;
         TrueTypeOutlineEntry*  trueTypeOutline;
-        TT_Error               error;
         TT_Face                face;
         TT_Instance            instance;
         TT_Glyph               glyph;
@@ -100,12 +98,12 @@ void _pascal TrueType_Gen_Chars(
         ECCheckFileHandle( truetypeFile );
 
         /* open face, create instance and glyph */
-        error = TT_Open_Face( truetypeFile, &face );
-        if( error )
+        if( TT_Open_Face( truetypeFile, &face ) )
                 goto Fail;
 
         TT_New_Glyph( face, &glyph );
         TT_New_Instance( face, &instance );
+        TT_Set_Instance_Resolutions( instance, 72, 72 );
 
          /* get TT char index */
         getCharMap( face, &charMap );
@@ -187,14 +185,14 @@ void _pascal TrueType_Gen_Chars(
                 rasterMap.bitmap = ((byte*)charData) + SIZE_CHAR_HEADER;
 
                 /* translate outline and render it */
-                TT_Translate_Outline( &outline, -bbox.xMin, -bbox.yMin );
+                //TT_Translate_Outline( &outline, -bbox.xMin, bbox.yMin );
                 TT_Get_Outline_Bitmap( &outline, &rasterMap );
 
                 /* fill header of charData */
                 ((CharData*)charData)->CD_pictureWidth = width;
                 ((CharData*)charData)->CD_numRows      = height;
                 ((CharData*)charData)->CD_xoff         = bbox.xMin / 64;
-                ((CharData*)charData)->CD_yoff         = bbox.yMin / 64; 
+                ((CharData*)charData)->CD_yoff         = fontBuf->FB_pixHeight - ( bbox.yMax / 64 ); 
         }
 
         TT_Done_Glyph( glyph );
@@ -218,6 +216,7 @@ void _pascal TrueType_Gen_Chars(
         /* cleanup */
         MemUnlock( bitmapHandle );
 Fail:
+        TT_Close_Face( face );
         FileClose( truetypeFile, FALSE );
         FilePopDir(); 
 }
