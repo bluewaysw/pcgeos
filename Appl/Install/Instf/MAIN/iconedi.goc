@@ -1,0 +1,131 @@
+
+/* ####################################################################### */
+/*	Code for Icon access
+/*  This code is a copy of the code from the IconEdit Library by RABE-Soft.
+/*	So the program is not depending on this library anymore.
+/*  
+/* ####################################################################### */
+
+@include <stdapp.goh>
+@include <string.h>
+@include <stdio.h>
+@include <token.h>
+@include "instf.goh"
+@include "main\iconedi.goh"
+@include "ui\appui.goh"
+
+@classdecl IconEditDialogClass;
+
+/* globale Varibalen werden hier definiert */
+MemHandle globalTokenList = 0; 		/* Liste aller Token in der DataBase */
+word 	globalTokenCount = 0;		/* Anzahl aller Token in der DataBase */
+
+
+/*---------------------  ---------------------
+ *      Purpose:        
+ *---------------------------------------------------------------------------*/
+void IconEditGetTokensFromDatabase(void) {
+dword ret;
+
+	ret = TokenListTokens(TRF_ONLY_GSTRING,0,0);
+	globalTokenList = TokenListTokensHandleFromDWord(ret);
+	globalTokenCount = TokenListTokensCountFromDWord(ret);
+}
+
+
+/*---------------------  ---------------------
+ *      Purpose:        
+ *---------------------------------------------------------------------------*/
+int IconEditSelectToken(GeodeToken *tok) {
+int ret,n;
+
+	if ( globalTokenList == 0 )  IconEditGetTokensFromDatabase();
+
+	@send MonikerList::MSG_GEN_DYNAMIC_LIST_INITIALIZE(globalTokenCount);
+	@send IconInfoCount::MSG_GEN_VALUE_SET_INTEGER_VALUE(globalTokenCount,FALSE);
+	@send IconEditOKTrigger::MSG_GEN_SET_NOT_ENABLED(VUM_DELAYED_VIA_APP_QUEUE);
+
+	n = IconEditGetItemFromTokenList(*tok);
+	if ( n != -1) {
+		@send MonikerList::MSG_GEN_ITEM_GROUP_SET_SINGLE_SELECTION(n,FALSE);
+		@send MonikerList::MSG_GEN_ITEM_GROUP_SET_MODIFIED_STATE(TRUE);
+		@send, forceQueue MonikerList::MSG_GEN_APPLY();
+		}
+	else {
+		@send MonikerList::MSG_GEN_ITEM_GROUP_SET_NONE_SELECTED(FALSE);
+		@send MonikerList::MSG_GEN_ITEM_GROUP_MAKE_ITEM_VISIBLE(0);
+		@call IconInfoID::MSG_GEN_REPLACE_VIS_MONIKER_TEXT("-",0);
+		}
+
+	ret = UserDoDialog(@IconEditDialog);
+	if ( ret == IC_OK ) @call IconEditDialog::MSG_IED_GET_ICON(tok);
+	return ret;
+}
+
+
+
+/*---------------------  ---------------------
+ *      Purpose:        
+ *---------------------------------------------------------------------------*/
+void IconEditGetTokenFromTokenList(word item,GeodeToken *t) {
+/* liefert das Token, das zum Eintrag Item geh”rt */
+GeodeToken *toklist;
+
+	toklist = MemLock(globalTokenList);
+	*t = toklist[item];
+	MemUnlock(globalTokenList);
+	}
+
+int IconEditGetItemFromTokenList(GeodeToken t) {
+/* Liefert Nummer des Tokens in der Liste oder - 1 */
+int i,n;
+GeodeToken *toklist;
+	toklist = MemLock(globalTokenList);
+	for ( i=0, n=-1; i< globalTokenCount; i++ ) {
+		if ( (memcmp(t.GT_chars,toklist[i].GT_chars,4)==0)
+			&& (t.GT_manufID == toklist[i].GT_manufID) ) {
+			n=i;
+			break;
+			}
+		}
+	MemUnlock(globalTokenList);
+	return n;
+}
+
+
+/*--------------------- MSG_IED_QUERY_TOKEN ---------------------
+ *	Purpose:
+ *	Context:
+ *	Strategy:
+ *	Paramters:
+ ---------------------------------------------------------------------------*/
+@method IconEditDialogClass, MSG_IED_QUERY_TOKEN {
+GeodeToken t;
+	IconEditGetTokenFromTokenList(item,&t);
+	@call MonikerList::MSG_GEN_DYNAMIC_LIST_REPLACE_ITEM_MONIKER(
+	    item,0,30,48,0,VMDT_TOKEN,VMST_FPTR,(dword)&t);
+}
+
+/*--------------------- MSG_IED_TOKEN_SELECTED ---------------------
+ *	Purpose:
+ *	Context:
+ *	Strategy:
+ *	Paramters:
+ ---------------------------------------------------------------------------*/
+
+@method IconEditDialogClass, MSG_IED_TOKEN_SELECTED {
+GeodeToken t;
+char buffer[20];
+	   IconEditGetTokenFromTokenList(selection,&t);
+	   pself->IEDI_token = t;
+	   @send IconEditOKTrigger::MSG_GEN_SET_ENABLED(VUM_NOW);
+	   WriteTokenIDString(buffer,t);
+	   @call IconInfoID::MSG_GEN_REPLACE_VIS_MONIKER_TEXT(buffer,VUM_NOW);
+
+}
+
+
+@method	IconEditDialogClass, MSG_IED_GET_ICON {
+	*tok = pself->IEDI_token;
+}
+

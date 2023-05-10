@@ -1,0 +1,217 @@
+/* ------------------------ */
+/* 1. Hilfreiche Konstanten */
+/* ------------------------ */
+
+
+#define RABE_SOFT_ID    0x4060
+#define MANUFACTURER_ID_RABE_SOFT       RABE_SOFT_ID
+
+// Default temporÑres Directory
+#define RS_TEMP_SP	SP_USER_DATA
+#define RS_TEMP_DIR	"RABE-Soft Temp-Dir"
+#define RS_RESOURCE_DIR	"RABE-Soft Resources"
+/* Beispiel fÅr Anlegen und reinwechseln:
+	FileSetStandardPath(RS_TEMP_SP);
+	FileCreateDir(RS_TEMP_DIR);
+	FileSetCurrentPath(0,RS_TEMP_DIR);
+*/
+
+/* ------------------------ */
+/* 2. NÅtzliche Macros      */
+/* ------------------------ */
+
+#ifndef int2wwf
+#define int2wwf(i) ( ((dword)i) << 16 )
+#endif
+
+#ifndef min
+#define min(a,b)	( ((a) < (b)) ?  (a) : (b) )
+#endif
+
+#ifndef max
+#define max(a,b)	( ((a) > (b)) ?  (a) : (b) )
+#endif
+
+
+#ifndef  SetTokenTo
+#define 	SetTokenTo(tok,a,b,c,d,n)   {	(tok).GT_chars[0]=a; (tok).GT_chars[1]=b;\
+	(tok).GT_chars[2]=c; (tok).GT_chars[3]=d; (tok).GT_manufID=n;}
+#endif
+
+
+/*--------------------- MemCopyAsm ---------------------
+ *	Aufgabe:	Schnelles Inline Speicher-Kopier-Macro
+ *			Speicherbereiche dÅrfen sich nicht Åberlappen
+ *	Anmerkung: da mov cx,nn immer eine Word-variable voraussetzt,
+ *		kommt es zu Problemen, wenn die Valiable byte ist
+ *		-> etwas auf Sicherheit programmiert
+ ---------------------------------------------------------------------------*/
+#ifndef MemCopyAsm
+#define MemCopyAsm(dest, src, count) { int l_count; \
+	     l_count = count; \
+	     asm { \
+	     push ax; push cx; push di; push si; push es; push ds; \
+	     les di, (dest); 	\
+	     lds si, (src);        \
+	     mov cx, (l_count);    \
+	     rep movsb;		\
+	     pop ds; pop es; pop si; pop di; pop cx; pop ax    } }
+#endif
+
+/*--------------------- MemCopyAsm2 ---------------------
+ *	Aufgabe:	Modifiziertes schnelles Inline Speicher-Kopier-Macro
+ *			FÅr den Fall, dass auf einen der Parameter nicht
+ *			direkt in Assembelr zugegriffen werden kann
+ ---------------------------------------------------------------------------*/
+#ifndef MemCopyAsm2
+#define MemCopyAsm2(dest, src, count) { \
+	byte *src_loc, *dest_loc; \
+	src_loc = (src); \
+	dest_loc = (dest); \
+	MemCopyAsm(dest_loc, src_loc, count); }
+#endif
+
+/*--------------------- MemSetAsm ---------------------
+ *	Aufgabe:	Schnelles Inline memset()-Macro
+ *	Anmerkung: da mov cx,nn immer eine Word-variable voraussetzt,
+ *		kommt es zu Problemen, wenn die Valiable byte ist
+ *		-> etwas auf Sicherheit programmiert
+ ---------------------------------------------------------------------------*/
+#ifndef MemSetAsm
+#define MemSetAsm(dest, value, size) { int l_size; \
+		l_size = size; \
+		asm { \
+		push ax; push cx; push di; push es; \
+		les di, (dest); 	\
+		mov cx, (l_size);	\
+		mov ax, (value);	\
+		rep stosb;	\
+		pop es; pop di; pop cx; pop ax; } }
+#endif
+
+/*--------------------- MemSetAsm2 ---------------------
+ *	Aufgabe:	Modifiziertes schnelles Inline memset()-Macro
+ *			FÅr den Fall, dass auf einen der Parameter nicht
+ *			direkt in Assembeler zugegriffen werden kann
+ ---------------------------------------------------------------------------*/
+#ifndef MemSetAsm2
+#define MemSetAsm2(dest, value, size) { int l_size2; \
+		void *l_dest; word l_val; \
+		l_size2 = (size); \
+		l_dest = (dest); \
+		l_val = (value); \
+		MemSetAsm(l_dest, l_val, l_size2); };
+#endif
+
+
+/* ------------------------ */
+/* 3. Debug-MessageBoxen    */
+/* ------------------------ */
+
+#ifndef MessageBox
+#define MessageBox(txt) { \
+		UserStandardDialog ( (char *)0,(char *)0,(char *)0,(char *)0,txt, \
+		(( CDT_NOTIFICATION << CDBF_DIALOG_TYPE_OFFSET) | \
+		 ( GIT_NOTIFICATION << CDBF_INTERACTION_TYPE_OFFSET)) ); \
+		 }
+#endif
+
+// MessageBox die nicht Debugging-Zwecken dienen soll, sondern anziegt,
+// dass ich etwas Åbersehen habe (anderer Name, besser zu greppen)
+#ifndef ProgError
+#define ProgError(txt) { \
+		UserStandardDialog ( (char *)0,(char *)0,(char *)0,(char *)0,txt, \
+		(( CDT_NOTIFICATION << CDBF_DIALOG_TYPE_OFFSET) | \
+		 ( GIT_NOTIFICATION << CDBF_INTERACTION_TYPE_OFFSET)) ); \
+		 }
+#endif
+
+#ifndef MessageBoxOptr
+#define MessageBoxOptr(op) { \
+		UserStandardDialogOptr ( (optr)0,(optr)0,(optr)0,(optr)0,op, \
+		(( CDT_NOTIFICATION << CDBF_DIALOG_TYPE_OFFSET) | \
+		 ( GIT_NOTIFICATION << CDBF_INTERACTION_TYPE_OFFSET)) ); \
+		 }
+#endif
+
+#ifndef MessageNumberBox
+#define  MessageNumberBox(number) { \
+		char txt[20]; \
+		LocalFixedToAscii(txt,MakeWWFixed(number),0); \
+		UserStandardDialog ( (char *)0,(char *)0,(char *)0,(char *)0,txt, \
+		(( CDT_NOTIFICATION << CDBF_DIALOG_TYPE_OFFSET) | \
+		 ( GIT_NOTIFICATION << CDBF_INTERACTION_TYPE_OFFSET)) ); \
+		 }
+#endif
+
+#ifndef MessageDWordBox
+#define  MessageDWordBox(number) { \
+		char txt[14]; \
+		UtilHex32ToAscii(txt,number,UHTAF_NULL_TERMINATE); \
+		UserStandardDialog ( (char *)0,(char *)0,(char *)0,(char *)0,txt, \
+		(( CDT_NOTIFICATION << CDBF_DIALOG_TYPE_OFFSET) | \
+		 ( GIT_NOTIFICATION << CDBF_INTERACTION_TYPE_OFFSET)) ); \
+		 }
+#endif
+
+
+/* ------------------------ */
+/* 4. Bugfixes              */
+/* ------------------------ */
+
+
+#ifndef TOKEN_CHARS_fixed
+#define TOKEN_CHARS_fixed(a,b,c,d) \
+  TOKEN_CHARS((dword)(a),(dword)(b),(dword)(c),(dword)(d))
+#endif
+
+
+#ifndef FEP_BUFSIZE_UNLIMITED
+#define FEP_BUFSIZE_UNLIMITED	FE_BUFSIZE_UNLIMITED
+#endif
+
+
+/* ------------------------ */
+/* 5. Vorgefertigte Objekte */
+/* ------------------------ */
+
+
+@define GetDocUIOptr(obj)	ConstructOptr(pself->GDI_display,ChunkOf(obj))
+
+/* Simples GenItem-Objekt */
+@define GenItem(obj,name,id)	@object GenItemClass obj = { \
+	GI_visMoniker = name; \
+	GII_identifier = id; }
+
+/* Erweiterbares GenItem-Objekt */
+@define GenItemExt(obj,name,id)	@object GenItemClass obj = { \
+	GI_visMoniker = name; \
+	GII_identifier = id
+
+/* BooleanGroup mit einem einzelnen Boolean drin */
+@define SingleBoolean(groupName,itemName,moniker) @object \
+	GenBooleanGroupClass groupName = { GI_comp = itemName; }\
+	@object GenBooleanClass itemName = { GBI_identifier = 1;\
+	GI_visMoniker = moniker; }
+
+/* Simples BooleanObject */
+@define GenBoolean(obj,name,id)	@object GenBooleanClass obj = { \
+	GBI_identifier = id;\
+	GI_visMoniker = name; }
+
+/* Read-Only-Text */
+@define ROText(obj,name,txt) @object GenTextClass obj = { \
+	GI_visMoniker = name; GTXI_text = txt; \
+	GI_attrs = @default | GA_READ_ONLY; }
+
+/* Read-Only-Text, erweiterbar */
+@define ROTextExt(obj,name,txt) @object GenTextClass obj = { \
+	GI_visMoniker = name; GTXI_text = txt; \
+	GI_attrs = @default | GA_READ_ONLY
+
+/* ----------------- end of file ------------------------ */
+
+
+
+
+

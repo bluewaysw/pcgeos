@@ -1,0 +1,812 @@
+/**************************************************************************
+ *	GEODE-File fÅr
+ *
+ *	Beschreibung	Universelles Installationsprogramm
+ *			Creator
+ *
+ *	Copyright:	(c) by RABE-Soft 5/99 - 10/2010
+ *	Sonstiges:	-
+ *
+ **************************************************************************/
+
+/*  Standard include files */
+/*  Standard include files */
+@include <stdapp.goh>
+@include "..\Shared\instllr.goh"
+@include "..\Shared\rainer.goh"
+/* inst auskommentieren, wenn nclean meckert */
+@include "instc.goh"
+@include "process.goh"
+@include "ftool\ftool.goh"
+@include "main\iconedi.goh"
+@include "ui\appui.goh"
+@include "..\Shared\msgbox.goh"
+
+
+#include <string.h>
+#include <stdio.h>
+#include <token.h>
+#include <initfile.h>
+
+
+extern FileHandle docFile;
+extern VMBlockHandle docMapBlock; /* VM block handle of the file's map block */
+
+
+/*--------------------- ICDoSortList_old ---------------------
+ *	Aufgabe:        Liste sortieren, nach Eintrags-Typ
+ *			Alte Version, nur Typ, keine Namen
+ *	Zusammenhang:
+ *	Strategie:
+ *	Parameter:
+ ---------------------------------------------------------------------------*/
+void ICDoSortList_old(void) {
+MemHandle 	mh;
+ICMapBlock 	*mapPtr;
+int item,count, typ;
+InstallEntry * entryPtr;
+VMBlockHandle 	oldMainArray, newMainArray;
+
+/* neues Main-HugeArray anlegen */
+   newMainArray = HugeArrayCreate(docFile,sizeof(InstallEntry),0);
+
+   oldMainArray = ICGetMainArrayHandle();
+   count = HugeArrayGetCount(docFile,oldMainArray);
+
+/* EintrÑge kopieren */
+   for ( typ = IOT_FILE; typ <= IOT_LAST; typ ++ )
+     {
+     item = 0;
+     while ( item < count ) {
+	entryPtr = ICLockMainArrayElement(item);
+	if ( entryPtr->type == typ) {
+		HugeArrayAppend(docFile, newMainArray,1,entryPtr);
+		}
+	item++;
+	ICUnlockMainArray(entryPtr);
+	}	/* while */
+     }		/* for.. */
+/* Neues Array als Main-Array setzen */
+   mapPtr = VMLock(docFile, docMapBlock, &mh);
+   mapPtr->mainArray = newMainArray;
+   HugeArrayDestroy(docFile,oldMainArray);
+   VMDirty(mh);
+   VMUnlock(mh);
+}
+
+/*--------------------- ICCompareStrings ---------------------
+ *	Aufgabe: 	Vergleichen zweier Texte (Datei-Namen etc)
+ *	Zusammenhang:   Tool fÅr ICSortCompateItems
+ *	Return:		-1 wenn Eintrag(e1) < Eintrag(e2)
+ *	      		 0 wenn gleichwertig
+ *	      		 1 wenn Eintrag(e1) > Eintrag(e2)
+ ---------------------------------------------------------------------------*/
+int ICCompareStrings( char *name1, char *name2) {
+int retVal;
+char *n1, *n2;
+
+	n1 = malloc(strlen(name1) + 10);
+	if ( !n1) return 0;
+	n2 = malloc(strlen(name2) + 10);
+	if ( !n2) { free(n1); return 0; }
+
+	strcpy(n1, name1);
+	LocalUpcaseString(n1,0);
+	strcpy(n2, name2);
+	LocalUpcaseString(n2,0);
+
+	retVal = strcmp(n1,n2);
+	free(n1);
+	free(n2);
+
+	if ( retVal < 0 ) return -1;
+	if ( retVal > 0 ) return 1;
+	return 0;
+}
+
+
+/*--------------------- ICCompareIniEntry ---------------------
+ *	Aufgabe: 	Vergleichen zweier INI-EintrÑge
+ *	Zusammenhang:   Tool fÅr ICSortCompateItems
+ *	Return:		-1 wenn Eintrag(e1) < Eintrag(e2)
+ *	      		 0 wenn gleichwertig
+ *	      		 1 wenn Eintrag(e1) > Eintrag(e2)
+ ---------------------------------------------------------------------------*/
+int ICCompareIniEntry( char *kat1, char *key1, char *kat2, char *key2) {
+int retVal;
+	retVal = ICCompareStrings(kat1, kat2);
+	if ( retVal ) return retVal;
+	return   ICCompareStrings(key1, key2);
+}
+
+/*--------------------- ICCompareFiles ---------------------
+ *	Aufgabe: 	Vergleichen zweier Datei-Referenzen
+ *	Zusammenhang:   Tool fÅr ICSortCompateItems
+ *	Return:		-1 wenn Eintrag(e1) < Eintrag(e2)
+ *	      		 0 wenn gleichwertig
+ *	      		 1 wenn Eintrag(e1) > Eintrag(e2)
+ ---------------------------------------------------------------------------*/
+int ICCompareFiles(DiskHandle dh1, char *path1, char *name1,
+		DiskHandle dh2, char *path2, char *name2) {
+int retVal;
+
+	if ( dh1 < dh2) return -1;
+	if ( dh1 > dh2) return 1;
+	retVal = ICCompareStrings(path1, path2);
+	if ( retVal ) return retVal;
+	return ICCompareStrings(name1, name2);
+}
+
+
+/*--------------------- ICSortCompareItems ---------------------
+ *	Aufgabe: 	Vergleichen zweier EintrÑge
+ *	Zusammenhang:
+ *	Strategie:
+ *	Parameter:
+ *	Return:		-1 wenn Eintrag(e1) < Eintrag(e2)
+ *	      		 0 wenn gleichwertig
+ *	      		 1 wenn Eintrag(e1) > Eintrag(e2)
+ ---------------------------------------------------------------------------*/
+int ICSortCompareItems(int e1, int e2 ) {
+InstallEntry  *entry1, *entry2;
+//VMBlockHandle	mainArray;
+int retVal = 0;			// default. Gleichwertig oder ich habe keine Lust
+				// das abzufragen, weil es i.a. zu erwarten ist, dass
+				// von diesem Typ nur sehr wenige eintrÑge existieren
+
+//    mainArray = ICGetMainArrayHandle();
+
+    // ersten Eintrag locken und in Speicher kopieren
+    entry1 = malloc(sizeof(InstallEntry));
+    if ( !entry1 ) return 0;			// Kein Speicher mehr.
+    entry2 = ICLockMainArrayElement(e1);        // entry2 temp anders nutzen
+    *entry1 = *entry2;
+    ICUnlockMainArray(entry2);
+
+    // zweiten Eintrag locken
+    entry2 = ICLockMainArrayElement(e2);
+    do {			// aufrÑumen sicherstellen
+				// break, wenn ergebnis feststeht
+	// Vergleich nach Typen geht vor
+	if ( entry1->type < entry2->type )  { retVal = -1; break; }
+	if ( entry1->type > entry2->type )  { retVal = +1; break; }
+
+	// Typen sind gleich: jetzt Details vergleichen
+	switch ( entry1->type ) {
+	   case IOT_FILE:		/* Eintrag ist eine Datei: data enthÑlt
+				   ein VMBlockHandle auf ein HugeArray: in dem
+				   die Datei gespeichert ist */
+	   case IOT_UPDATE_TOOL:	/* Update-Tool installieren: starten und lîschen */
+				/* main ist identisch mit IOT_FILE */
+				/* Ab Protocol 1.1 verfÅgbar */
+	   case IOT_CLEANUP_TOOL:	/* CleanUp-Tool installieren: starten und lîschen */
+				/* main ist identisch mit IOT_FILE */
+				/* Ab Protocol 1.1 verfÅgbar */
+		retVal = ICCompareFiles(entry1->main.file.dh, entry1->main.file.path, entry1->main.file.geosName,
+					entry2->main.file.dh, entry2->main.file.path, entry2->main.file.geosName);
+		break;
+
+	   case IOT_INSTALL_TOKEN:
+	   case IOT_LOAD_TOKEN:
+	   case IOT_DUMMY1:
+	   case IOT_DUMMY2:
+	   case IOT_DUMMY3:
+		break;		// Alles nicht implementiert
+
+	   case IOT_INI_ENTRY_INSTALL:	/* éndern/lîschen eines einzelenen INI-Eintrages
+				   Bei der Installation. VerfÅgbar ab Version 1.2 */
+	   case IOT_INI_ENTRY_DEINSTALL:/* éndern/lîschen eines einzelenen INI-Eintrages
+				   bei der De-Installation. VerfÅgbar ab Version 1.2 */
+		retVal = ICCompareIniEntry(entry1->main.iniEntry.kategorie, entry1->main.iniEntry.key,
+				entry2->main.iniEntry.kategorie,entry2->main.iniEntry.key);
+		break;
+
+	   case IOT_DELETE_EXTERN_FILE:	/* Datei lîschen: die sich schon im System befindet.
+				   VerfÅgbar ab Version 1.2 */
+	   case IOT_DEL_TEMP_FILE:      /* Lîschen einer vom Programm selbst angelegten Datei
+				   bei der De-Installation. VerfÅgbar ab Version 1.2 */
+		retVal = ICCompareFiles(entry1->main.deleteFile.dh, entry1->main.deleteFile.path, entry1->main.deleteFile.fileName,
+				entry2->main.deleteFile.dh, entry2->main.deleteFile.path, entry2->main.deleteFile.fileName);
+		break;
+
+	   case IOT_DOS_TOKEN:		/* Eintrag beschreibt eine Verbindung einer
+				   Applikation mit einem DOS-Token. Der User wird
+				   beim Installieren aufgefordert: das Icon
+				   auszuwÑhlen. */
+		retVal = ICCompareStrings(entry1->main.dosToken.appName,
+					entry2->main.dosToken.appName);
+		break;
+
+	   case IOT_DUMMY12:            /* noch 4 Platzhalter fÅr Aktionen vor File Start*/
+	   case IOT_DUMMY13:
+	   case IOT_DUMMY14:
+	   case IOT_DUMMY15:
+		break;
+
+// hier gehts weiter:
+	   case IOT_START_FILE:		/* Applikation oder Dokument starten.
+				   main enthÑlt StartFileParams */
+	   case IOT_START_EXTERN_FILE:	/* dito: aber Datei befindet sich nicht im
+				   Paket. VerfÅgbar ab Version 1.2 */
+		retVal = ICCompareFiles(entry1->main.startFile.dh, entry1->main.startFile.path, entry1->main.startFile.fileName,
+					entry2->main.startFile.dh, entry2->main.startFile.path, entry2->main.startFile.fileName);
+		break;
+
+
+	   case IOT_TOKEN:	/* Eintrag ist eine Icon ID: die beim
+				   Deinstallieren gelîscht werden soll */
+		retVal = 0;
+		break;		// unsortiert lassen
+
+
+	   case IOT_INI:		/* Eintrag ist eine INI-Kategorie: die beim
+				   Deinstallieren gelîscht werden soll. */
+		retVal = ICCompareStrings(entry1->main.ini.kategorie,
+					entry2->main.ini.kategorie);
+		break;
+
+	   case IOT_DELETE_FOLDER:	/* Leeres Verzeichnis lîschen
+				 * VerfÅgbar ab Version 1.2 */
+		retVal = ICCompareFiles(entry1->main.deleteFolder.dh, entry1->main.deleteFolder.path,"",
+					entry2->main.deleteFolder.dh, entry2->main.deleteFolder.path,"");
+		break;
+
+/* letzter Eintrag! */
+	   case IOT_LAST:	/* Dummy-Wert: wird nur vom Liste-Sortierer
+				   in Version vor dieser benutzt */
+
+	   default:
+		break;
+	   }			// end of switch (type)
+
+
+	} while (0);
+
+    // aufrÑumen
+    if ( entry1) free(entry1);
+    ICUnlockMainArray(entry2);
+    return retVal;
+
+}
+
+
+/*--------------------- ICSortMoveItem ---------------------
+ *	Aufgabe:        Verschieben eines Eintrags im MainArray
+ *	Zusammenhang:
+ *	Strategie:
+ *	Parameter:	oldPos:	welchen Eintrag (alter Index)
+ *			newPos: neue Position (neuer Index)
+ ---------------------------------------------------------------------------*/
+void ICSortMoveItem(int oldPos, int newPos ) {
+InstallEntry  *entryPtr, *entryInRam;
+VMBlockHandle	mainArray;
+int	count;
+
+
+    // Sicherheitsabfragen
+    if ( oldPos == newPos ) return;
+    if ( oldPos < 0 )	return;
+    if ( newPos < 0 )	return;
+
+    mainArray = ICGetMainArrayHandle();
+    count = HugeArrayGetCount(docFile, mainArray);
+    if ( count <= 1 ) return;
+
+    if ( oldPos >= count ) return;
+    if ( newPos >= count ) return;
+
+    // zu verschiebenen Eintrag locken und in Speicher kopieren
+    entryInRam = malloc(sizeof(InstallEntry));
+    if ( !entryInRam ) return;			// Kein Speicher mehr.
+    entryPtr = ICLockMainArrayElement(oldPos);
+    *entryInRam = *entryPtr;
+    ICUnlockMainArray(entryPtr);
+
+    // an alter Position lîschen
+    HugeArrayDelete(docFile, mainArray, 1, oldPos);
+
+    // an neue Position einfÅgen
+    HugeArrayInsert(docFile, mainArray, 1, newPos, entryInRam);
+
+    if (entryInRam) free(entryInRam);
+
+}
+
+/*--------------------- ICDoSortList ---------------------
+ *	Aufgabe:        Liste sortieren, nach Eintrags-Typ und Pfad/Name
+ *
+ *	Zusammenhang:	Ausgelagerte Zentrale Sortierroutine
+ *	Strategie:      Algorithmus: Insertion-Sort
+ *			Der Routinen-Rumpf ist vom Zeugnisprogramm Åbenommen
+ *	Parameter:      void(void)
+ ---------------------------------------------------------------------------*/
+void ICDoSortList(void) {
+int count, i, vgl;
+VMBlockHandle	mainArray;
+
+    mainArray = ICGetMainArrayHandle();
+    count = HugeArrayGetCount(docFile, mainArray);
+    if ( count <= 1 ) return;
+
+    for ( vgl = 1; vgl < count; vgl++)	// Eintrag Nr vgl ist zu vergleichen
+      {
+      //send SortInfoValue::MSG_GEN_VALUE_SET_INTEGER_VALUE(count-vgl, FALSE);
+      for ( i = vgl-1; i >= 0; i--)	// mit SchÅler cmp wird verglichen
+	{
+
+	if ( ICSortCompareItems(i, vgl) <= 0 ) break;
+			/* vgl muss hinter i einsortiert werden
+			 * Sollte es nicht zu einem break kommen, so ist
+			 * vgl der kleinste eintrag und i wird (-1)
+			 * -> einzusortieren ganz am Anfang
+			 */
+	}	// end of for(i)
+
+      ICSortMoveItem(vgl, i+1);	// schieben vgl nach position i+1
+      if ( (vgl>=count) || (vgl<0) || (i+1>=count) || (i+1<0) )
+	{
+	MessageBox("Progg-Fehler beim Sortierten. Debug vgl=, i=");
+	MessageNumberBox(vgl);
+	MessageNumberBox(i);
+	}  	// end of if(error)
+
+      } 	// end of for (vgl)
+
+}
+
+/*--------------------- MSG_IC_SORT_LIST ---------------------
+ *	Aufgabe:        Liste sortieren
+ *	Zusammenhang:
+ *	Strategie:
+ *	Parameter:
+ ---------------------------------------------------------------------------*/
+@extern method ICProcessClass, MSG_IC_SORT_LIST {
+
+   if ( !docFile || !docMapBlock) return;
+   @send application::MSG_GEN_APPLICATION_MARK_BUSY();
+
+   ICDoSortList();
+
+   @send application::MSG_GEN_APPLICATION_MARK_NOT_BUSY();
+   UpdateDocumentUI();
+   }
+
+/*--------------------- MSG_IC_REBUILD_LIST ---------------------
+ *	Aufgabe:        Liste neu aufbauen um die Datei-Infos 
+ *			(Frabkaros) auf den neuesten Stand zu bringen
+ *	Zusammenhang:
+ *	Strategie:
+ *	Parameter:
+ ---------------------------------------------------------------------------*/
+@extern method ICProcessClass, MSG_IC_REBUILD_LIST {
+// 
+word count, sel;
+
+   count = @call ICFileList::MSG_GEN_DYNAMIC_LIST_GET_NUM_ITEMS();
+   if ( count == 0 ) return;
+   sel = @call ICFileList::MSG_GEN_ITEM_GROUP_GET_SELECTION();
+
+
+   @send ICFileList::MSG_GEN_DYNAMIC_LIST_INITIALIZE(count);
+   if ( sel != GIGS_NONE ) {
+	@call ICFileList::MSG_GEN_ITEM_GROUP_SET_SINGLE_SELECTION(sel, FALSE);
+	@call ICFileList::MSG_GEN_ITEM_GROUP_SET_MODIFIED_STATE(TRUE);
+	@call ICFileList::MSG_GEN_APPLY();
+//	ICUpdateCurrentDataText(0, FALSE);
+	}
+   }
+
+
+/*--------------------- ICCheckProtocol ---------------------
+ *	Aufgabe:        Protocoll-Nummer vergleichen
+ *	Return:		-1 Datei auf Platte ist neuer
+ *			 0 Dateien gleich
+ *			+1 Datei im Archiv ist neuer
+ ---------------------------------------------------------------------------*/
+int ICCheckProtocol(FileMainParams *info) {
+ProtocolNumber protocol;
+
+	if ( info->fileType == GFT_NOT_GEOS_FILE ) return 0;  // DOS-Files: immer OK
+	FileGetPathExtAttributes(info->geosName,FEA_PROTOCOL,
+				&(protocol),sizeof(ProtocolNumber));
+
+	switch ( FileToolCompareProtocol (protocol, info->protocol) ) {
+	  case  CRP_FILE_SAME :  return 0;
+	  case  CRP_FILE_OLDER :  return +1;
+	  case  CRP_FILE_NEWER :  return -1;
+	  }
+
+	ProgError("ICCheckProtocol: CRP-Wert unbekannt.");
+	return 0;	// sollte nicht passieren
+}
+
+
+/*--------------------- ICCheckRelease ---------------------
+ *	Aufgabe:        Release-Nummer vergleichen
+ *	Return:		-1 Datei auf Platte ist neuer
+ *			 0 Dateien gleich
+ *			+1 Datei im Archiv ist neuer
+ ---------------------------------------------------------------------------*/
+int ICCheckRelease(FileMainParams *info) {
+ReleaseNumber release;
+
+	if ( info->fileType == GFT_NOT_GEOS_FILE ) return 0;  // DOS-Files: immer OK
+	FileGetPathExtAttributes(info->geosName,FEA_RELEASE,
+				&(release),sizeof(ReleaseNumber));
+
+	switch ( FileToolCompareRelease (release, info->release) ) {
+	  case  CRP_FILE_SAME :  return 0;
+	  case  CRP_FILE_OLDER :  return +1;
+	  case  CRP_FILE_NEWER :  return -1;
+	  }
+
+	ProgError("ICCheckRelease: CRP-Wert unbekannt.");
+	return 0;	// sollte nicht passieren
+}
+
+/*--------------------- InternalCompareFileDateAndTime ---------------------
+   Datums und Zeitvergleich zweier FileDateAndTime-Strukturen
+   return 	bitflags, welche Elemente sich unterscheiden
+ ---------------------------------------------------------------------------*/
+word InternalCompareFileDateAndTime(FileDateAndTime fdat1, FileDateAndTime fdat2) {
+word cmpBits = 0;
+int v1, v2;
+
+	v1 = FDATExtractYear(fdat1);
+	v2 = FDATExtractYear(fdat2);
+	if ( v1 != v2 ) cmpBits |= FTIME_YEAR_DIFFERS;
+
+	v1 = FDATExtractMonth(fdat1);
+	v2 = FDATExtractMonth(fdat2);
+	if ( v1 != v2 ) cmpBits |= FTIME_MONTH_DIFFERS;
+
+	v1 = FDATExtractDay(fdat1);
+	v2 = FDATExtractDay(fdat2);
+	if ( v1 != v2 ) cmpBits |= FTIME_DAY_DIFFERS;
+
+	v1 = FDATExtractHour(fdat1);
+	v2 = FDATExtractHour(fdat2);
+	if ( v1 != v2 ) cmpBits |= FTIME_HOUR_DIFFERS;
+
+	v1 = FDATExtractMinute(fdat1);
+	v2 = FDATExtractMinute(fdat2);
+	if ( v1 != v2 ) cmpBits |= FTIME_MINUTE_DIFFERS;
+
+	v1 = FDATExtractSecond(fdat1);
+	v2 = FDATExtractSecond(fdat2);
+	if ( v1 != v2 ) cmpBits |= FTIME_SECOND_DIFFERS;
+
+	return cmpBits;
+}
+
+/*---------------------	CalcJD -------------------------------*
+ * 	Aufgabe:	Juliansiches Datum aus Kalenderadten berechnen
+ *				Das Julianische Datum gibt die Anzahl der Tage an,
+ *				die seit dem 1.1.4713 vor Christus (Jahr: -4712)
+ *				12 Uhr Mittags, vergangen sind.
+ * 	Parameter:	Kalendarisches Datum
+ *	Quelle:		Wikipedia: Julianisches Datum
+ *				Wikibooks: Astronomische Berechungen f¸r Amateure
+ *	Return:		*jdPtr:	Julianisches Datum
+ *----------------------------------------------------------------------*/
+void CalcJD(int year, int month, int day, int h, int min, int sek, long double *jdPtr) {
+long double time, b, jd;
+sdword		a, a4, i1, i2;
+
+	// 1. Monate verschieben
+	if ( month < 3 ) {
+		month += 12;
+		year -= 1;
+		}
+
+	// Anteiligen Zeitwert f¸r den Tag ausrechnen
+	// Floating Point Berechung erzwingen
+	time = h/24.0 + min/1440.0 + sek/86400.0;
+
+	// Vor dem 15.10.1582 -> julianischer Jalender. b = 0
+	do {
+		b = 0;
+		if ( year < 1582 ) break;
+		if ( (year==1582) && (month < 10) ) break;
+		if ( (year==1582) && (month == 10) && (day < 15) ) break;
+
+		// jetzt ist der 15.10.1582 oder sp‰ter
+		// Korrekturwert f¸r gregorianischen Kalender berechnen
+		a =  year / 100;
+		a4 = a/4;
+		b = 2 - a + a4;
+		} while (0);
+
+	// Julianisches Datum berechnen
+	i1 = 365.25*((long double)year+4716);
+	i2 = 30.6001*((long double)month+1);
+	jd = i1 + i2 + day + time + b - 1524.5;
+	memcpy(jdPtr, &jd, sizeof(long double));
+
+}
+
+/*--------------------- CompareFileDateAndTime ---------------------
+   Datums und Zeitvergleich zweier FileDateAndTime-Strukturen
+   return 	TRUE:	unterschiedlich (=Fehler)
+			FALSE: Gleich (OK)
+ ---------------------------------------------------------------------------*/
+int CompareFileDateAndTime(FileDateAndTime fdat1, FileDateAndTime fdat2, dword *deltaMinutes) {
+word cmpBits, selBools;
+long double juldat1, juldat2, diff, diffMin;
+
+	cmpBits = InternalCompareFileDateAndTime(fdat1, fdat2);
+	if ( cmpBits == 0 ) return FALSE;
+
+	// julianisches datum der beiden zeiten bilden und Minutendifferenz ausrechnen
+	CalcJD(FDATExtractYear(fdat1), FDATExtractMonth(fdat1),
+			FDATExtractDay(fdat1), 	FDATExtractHour(fdat1),
+			FDATExtractMinute(fdat1), FDATExtractSecond(fdat1), &juldat1);
+	CalcJD(FDATExtractYear(fdat2), FDATExtractMonth(fdat2),
+			FDATExtractDay(fdat2), 	FDATExtractHour(fdat2),
+			FDATExtractMinute(fdat2), FDATExtractSecond(fdat2), &juldat2);
+
+	diff = juldat2 - juldat1;
+	if (diff < 0 ) diff = -diff;
+
+	if ( deltaMinutes) {
+		diffMin = (diff * 1440.0)+0.5;	// --> runden
+		*deltaMinutes = diffMin;
+		}
+
+
+	// jetzt checken, ob eine Stunde Sommerzeit/Winterzeit-Toleranz
+	// ber¸cksichtigt werden soll
+	selBools = @call ICDisplayOptionsGroup::MSG_GEN_BOOLEAN_GROUP_GET_SELECTED_BOOLEANS();
+	if ( (selBools & IC_OPT_IGNORE_ONE_HOUR) == 0 ) {
+		// nein, nicht ber¸cksichtigen --> daten sind unterschiedlich
+		return TRUE;
+		}
+
+	// Wenn Minuten oder Sekunden anders sind kann es nicht der Sommerzeitbug sein
+	if ( cmpBits & FTIME_SECOND_DIFFERS ) return TRUE;
+	if ( cmpBits & FTIME_MINUTE_DIFFERS ) return TRUE;
+
+
+	// Jetzt vergleiche ich das julianischen Datum
+	// Die Abfrage oben auf Sekundengleichheit behalte ich bei weil ich
+	// durch numerische Fehler nicht sicher Sekundenganu vergleichen kann
+
+	// 1h entspricht  0.04166666
+	// Vergleich ob diff im Breich 0.04165 bis 0.04168 liegt (1 Sekunde Toleranz)
+	if ( diff < 0.04165 ) return TRUE;
+	if ( diff > 0.04168 ) return TRUE;
+
+	return FALSE;		// OK, Abweichung betr‰gt 1h +/- 1 Sekunde
+}
+
+/*--------------------- ICCheckDateTime ---------------------
+ *	Aufgabe:        Datum, Uhrzeit (Erstellung und letzte ébderung) vergleichen
+ *	Return:		TRUE: Daten sind unterschiedlich
+ *			 	FLASE (0) Datei-Daten sind gleich
+ ---------------------------------------------------------------------------*/
+int ICCheckDateTime(FileMainParams *info, dword *diffMin) {
+FileDateAndTime	fdat2;
+
+
+//	if ( info->fileType == GFT_NOT_GEOS_FILE ) return 0;  // DOS-Files: immer OK
+	FileGetPathExtAttributes(info->geosName, FEA_MODIFICATION,
+				&(fdat2),sizeof(FileDateAndTime));
+
+	return CompareFileDateAndTime(info->fdat, fdat2, diffMin) ? TRUE: FALSE;;
+}
+
+/*--------------------- ICCheckFileSize ---------------------
+ *	Aufgabe:        Dateigrî·e vergleichen
+ *	Return:		-1 Dateien sind verschieden (TRUE)
+ *			 0 Dateien gleich  (FALSE)
+ ---------------------------------------------------------------------------*/
+Boolean ICCheckFileSize(FileMainParams *info) {
+dword	fileSize;
+
+
+	FileGetPathExtAttributes(info->geosName, FEA_SIZE,
+				&(fileSize),sizeof(dword));
+	// Bei Geos-Dateien zÑhlt FileGetPathExtAttributes den Hader nicht mit
+	// --> manuell anpassen
+	if ( info->fileType != GFT_NOT_GEOS_FILE ) fileSize += 256;
+	return ( fileSize != info->fileSize );
+}
+
+/*--------------------- ICCheckUserNotes ---------------------
+ *	Aufgabe:        UserNotizen vergleichen
+ *	Return:		-1, +1 Dateien sind verschieden
+ *			 0 Dateien gleich
+ ---------------------------------------------------------------------------*/
+Boolean ICCheckUserNotes(FileMainParams *info) {
+char notes[104], stored[104];
+VMBlockHandle	fileArray;
+GeosHeader * header;
+word size;
+
+	if ( info->fileType == GFT_NOT_GEOS_FILE ) return 0;  // DOS-Files: immer OK
+
+	notes[0] = 0;
+	FileGetPathExtAttributes(info->geosName, FEA_USER_NOTES,
+				&(notes[0]), 99);
+	notes[99]=0;					// wichtig! In der Datei muss bei 99 Zeichen kein Endenull folgen
+
+	// Die User-Notes muss ich aus der Datei im Archiv selber auslesen
+	fileArray = info->data;
+	HugeArrayLock(docFile,fileArray,0,(void**)&header,&size);
+	memcpy(stored,header->notiz,99);
+	stored[99]=0;
+	HugeArrayUnlock(header);
+
+	return strcmp(notes, stored);
+}
+
+/*--------------------- ICGotoFilePath ---------------------
+ *	Aufgabe:	PrÅfen, obe oien Dateientrag in der Installer-Datei
+ *			auf dem neuesten Stand ist
+ *	Return:		C_GREEN:	OK
+ *			C_RED:		Update erforderlich, Protocol oder
+ *					Release stimmen nicht Åberein
+ *			C_YELLOW:	Protocol/Release ok, Datei-Datum,
+ *					LÑnge, Usernotes sind unterschiedlich
+ *			C_BLACK		Datei nicht gefunden
+ *			C_CYAN		Widerspruch! (fileType ...)
+ ---------------------------------------------------------------------------*/
+int ICGotoFilePath(FileMainParams *info, int *errorColor) {
+int  color = C_GREEN, fileType, err;
+DiskHandle	dh;
+
+	do {
+	   dh = FileSetCurrentPath(info->dh, info->path);
+	   if ( dh == 0 ) {
+		color = C_BLACK;   // File not found
+		break;
+		}
+	   // Dateityp prÅfen
+	   err = FileGetPathExtAttributes(info->geosName,FEA_FILE_TYPE,
+				&fileType,sizeof(GeosFileType));
+	   if ( (err == ERROR_ATTR_NOT_FOUND) || (err == ERROR_ATTR_NOT_SUPPORTED) )
+		{
+		fileType = GFT_NOT_GEOS_FILE;
+		err = 0;
+		}
+	   if ( err ) {
+		color = C_BLACK;   // File not found
+		break;
+		}
+	   if ( fileType != info->fileType ) {
+		color = C_CYAN; 	// Dateitypen widersprÅchlich
+		break;
+		}
+	   } while (FALSE);
+
+	if ( errorColor ) *errorColor = color;
+	return err;
+	}
+
+/*--------------------- ICCheckFileEntryOK ---------------------
+ *	Aufgabe:	PrÅfen, obe oien Dateientrag in der Installer-Datei
+ *			auf dem neuesten Stand ist
+ *	Return:		C_GREEN:	OK
+ *			C_RED:		Update erforderlich, Protocol oder
+ *					Release stimmen nicht Åberein
+ *			C_YELLOW:	Protocol/Release ok, Datei-Datum,
+ *					LÑnge, Usernotes sind unterschiedlich
+ *			C_BLACK		Datei nicht gefunden
+ *			C_CYAN		Widerspruch! (fileType ...)
+ ---------------------------------------------------------------------------*/
+int ICCheckFileEntryOK(InstallEntry * entryPtr) {
+FileMainParams 	*info = &(entryPtr->main.file);
+int	color = C_GREEN;
+
+
+/*
+typedef struct {			// IOT_FILE: Eintrag ist eine Datei
+	char		dosName[DOS_NAME_BUFFER_LEN];	// 16
+	word		extendedMagic;			// ->18 Byte
+	FileDateAndTime	fdat;				// dword -> 22 Byte
+	byte		unused[F_MAIN_UNUSED_SIZE];	// 14, fÅr Erweiterungen
+							// ->36 Byte
+	FileLongName	geosName;
+	PathName 	path;
+	DiskHandle	dh;
+	ProtocolNumber	protocol;
+	ReleaseNumber 	release;
+	GeosFileType	fileType;
+	dword		fileSize;
+	GeodeToken	appToken;
+	GeodeToken	creatorToken;
+	VMBlockHandle	data;
+	byte		fileAttrs;
+	} FileMainParams;
+
+*/
+	FilePushDir();
+	do {		// Ausstieg mit break
+
+	   if ( ICGotoFilePath(info, &color) ) break;
+
+	   // PrÅfen ob Protocol und Release OK sind (sonst C_RED)
+	   if ( ICCheckProtocol(info) ) { color = C_RED; break; }
+	   if ( ICCheckRelease(info) ) { color = C_RED; break; }
+
+	   // PrÅfen ob andere Infos OK sind (sonst C_YELLOW)
+	   if ( ICCheckDateTime(info, NULL) ) { color = C_YELLOW; break; }
+	   if ( ICCheckFileSize(info) ) { color = C_YELLOW; break; }
+	   if ( ICCheckUserNotes(info) ) { color = C_YELLOW; break; }
+	   } while(0);
+
+	FilePopDir();
+	return color;
+}
+/*--------------------- ICGetListeEntryBitmapOptr ---------------------
+ *	Aufgabe:	Optr von farbigem Klîtzchen fÅr Install-Liste holen
+ *			Zur Anzeige, ob der Einrtrag OK ist
+ ---------------------------------------------------------------------------*/
+optr ICGetListeEntryBitmapOptr(int item, int h) {
+InstallEntry * entryPtr;
+optr retObj;
+int color;		// da die Grî·e 10 und 12 sein kann, und ich nicht
+			// stÑndige if-Abfrage haben will, lege ich zuerst den
+			// Farbindex fest und wandle den dann unten in den oprt
+
+	entryPtr = ICLockMainArrayElement(item);
+	color = C_BLACK;	// ungÅltiger Wert -> unten Fehler wenn nicht geÑndert
+	switch (entryPtr->type) {
+		case 	IOT_FILE:
+			color = ICCheckFileEntryOK(entryPtr);
+			break;
+		case 	IOT_DELETE_EXTERN_FILE:
+			color = C_BLUE; // ICCheckFileEntryOK(entryPtr);
+			break;
+		case 	IOT_DOS_TOKEN:
+		case 	IOT_TOKEN:
+		case 	IOT_INI:
+		case 	IOT_INI_ENTRY_INSTALL:
+		case 	IOT_INI_ENTRY_DEINSTALL:
+			color = C_BLUE;
+			break;
+		case 	IOT_START_FILE:
+		case 	IOT_START_EXTERN_FILE:
+			color = C_BLUE; // ICCheckFileEntryOK(entryPtr);
+			break;
+		case 	IOT_UPDATE_TOOL:
+		case 	IOT_CLEANUP_TOOL:
+			color = ICCheckFileEntryOK(entryPtr);
+			break;
+		case 	IOT_DELETE_FOLDER:
+		case 	IOT_DEL_TEMP_FILE:
+			color = C_BLUE;
+			break;
+		}
+
+	ICUnlockMainArray(entryPtr);
+
+	switch ( color ) {
+	   case C_RED:
+		retObj = (h > 14) ? @Karo12rt : @Karo10rt;
+		break;
+	   case C_BLUE:
+		retObj = (h > 14) ? @Karo12bl : @Karo10bl;
+		break;
+	   case C_GREEN:
+		retObj = (h > 14) ? @Karo12gn : @Karo10gn;
+		break;
+	   case C_YELLOW:
+		retObj = (h > 14) ? @Karo12gb : @Karo10gb;
+		break;
+	   case C_BLACK:	// Datei nicht gefunden
+		retObj = (h > 14) ? @Karo12nf : @Karo10nf;
+		break;
+	   case C_CYAN: 	// invalid
+		retObj = (h > 14) ? @Karo12inv : @Karo10inv;
+		break;
+	   default:
+		MessageBox("ICGetListeEntryBitmapOptr: unbehandelter Eintrag");
+		retObj = h > 12 ? @Karo12rt : @Karo10rt;
+	   }
+
+	return retObj;
+}
+
+
+

@@ -1,0 +1,513 @@
+/**************************************************************************
+ *	GEODE-File fÅr
+ *
+ *	Beschreibung	Universelles Installationsprogramm
+ *			Creator
+ *
+ *	Copyright:	(c) by RABE-Soft 5/99 - 10/2010
+ *	Sonstiges:	-
+ *
+ **************************************************************************/
+
+/*  Standard include files */
+/*  Standard include files */
+@include <stdapp.goh>
+@include "..\Shared\instllr.goh"
+@include "..\Shared\rainer.goh"
+/* inst auskommentieren, wenn nclean meckert */
+@include "instc.goh"
+@include "process.goh"
+@include "ftool\ftool.goh"
+@include "main\iconedi.goh"
+@include "ui\appui.goh"
+@include "..\Shared\msgbox.goh"
+
+
+#include <string.h>
+#include <stdio.h>
+#include <token.h>
+#include <initfile.h>
+
+
+extern FileHandle docFile;
+extern VMBlockHandle docMapBlock; /* VM block handle of the file's map block */
+
+int ICCheckProtocol(FileMainParams *info);
+int ICCheckRelease(FileMainParams *info);
+int ICCheckDateTime(FileMainParams *info, dword *diffMin);
+Boolean ICCheckFileSize(FileMainParams *info);
+Boolean ICCheckUserNotes(FileMainParams *info);
+int ICGotoFilePath(FileMainParams *info, int *errorColor);
+int ICGotoFilePath(FileMainParams *info, int *errorColor);
+optr ICGetListeEntryBitmapOptr(int item, int h);
+
+
+
+/* Ausgelagerte Routinen, um die Texte fÅr die Query-Msg zu erzeugen */
+
+void GetFileEntryListText(InstallEntry * entryPtr, char * text) {
+char *txt;
+
+	txt = text;
+	if ( !(entryPtr->instFlags & INST_DELETE_ON_DE_INST) ) {
+		*txt = '*'; txt++;
+		}
+	ToolConstructPath(txt, entryPtr->main.file.dh,
+		entryPtr->main.file.path, entryPtr->main.file.geosName);
+	}
+
+void GetDeleteFileListText(InstallEntry * entryPtr, char * textPtr) {
+char *text;
+
+	text = textPtr;
+	MemLock(HandleOf(@DeleteFileText));
+	strcpy(text,LMemDeref(@DeleteFileText));
+	MemUnlock(HandleOf(@DeleteFileText));
+
+	text = strchr(text,0);
+	ToolConstructPath(text, entryPtr->main.deleteFile.dh,
+		entryPtr->main.deleteFile.path, entryPtr->main.deleteFile.fileName);
+	}
+
+void GetDelTempFileListText(InstallEntry * entryPtr, char * textPtr) {
+char *text;
+
+	text = textPtr;
+	MemLock(HandleOf(@DelTempFileText));
+	strcpy(text,LMemDeref(@DelTempFileText));
+	MemUnlock(HandleOf(@DelTempFileText));
+
+	text = strchr(text,0);
+	ToolConstructPath(text, entryPtr->main.deleteFile.dh,
+		entryPtr->main.deleteFile.path, entryPtr->main.deleteFile.fileName);
+	}
+
+void GetTokenEntryListText(InstallEntry * entryPtr, char * text) {
+char tokenID[16];
+	MemLock(HandleOf(@TokenEntryText));
+	WriteTokenIDString(tokenID,entryPtr->main.appToken);
+	strcpy(text,LMemDeref(@TokenEntryText));
+	strcat(text,tokenID);
+	MemUnlock(HandleOf(@TokenEntryText));
+	}
+
+void GetDosTokenEntryListText(InstallEntry * entryPtr, char * text) {
+	MemLock(HandleOf(@DosTokenEntryText));
+	strcpy(text,LMemDeref(@DosTokenEntryText));
+	strcat(text,entryPtr->main.dosToken.dosFile);
+	strcat(text,LMemDeref(@DosTokenEntryText2));
+	strcat(text,entryPtr->main.dosToken.appName);
+	MemUnlock(HandleOf(@DosTokenEntryText));
+	}
+
+
+void GetIniKatListText(InstallEntry * entryPtr, char * text) {
+	MemLock(HandleOf(@IniKategorieEntryText));
+	strcpy(text,LMemDeref(@IniKategorieEntryText));
+	strcat(text,entryPtr->main.ini.kategorie);
+	strcat(text,"]");
+	MemUnlock(HandleOf(@IniKategorieEntryText));
+	}
+
+void GetIniEntryInstallListText(InstallEntry * entryPtr, char * text) {
+	MemLock(HandleOf(@IniSetEntryText));
+
+	if ( entryPtr->main.iniEntry.flags == INIF_DELETE )
+		strcpy(text,LMemDeref(@IniDeleteEntryText));
+	   else strcpy(text,LMemDeref(@IniSetEntryText));
+	MemUnlock(HandleOf(@IniSetEntryText));
+
+	strcat(text,entryPtr->main.iniEntry.kategorie);
+	strcat(text,"] ");
+	strcat(text,entryPtr->main.iniEntry.key);
+
+	if ( entryPtr->main.iniEntry.flags != INIF_DELETE ) {
+		strcat(text," = ");
+		strcat(text,entryPtr->main.iniEntry.data);
+		}
+	}
+
+void GetIniEntryDeinstallListText(InstallEntry * entryPtr, char * text) {
+	MemLock(HandleOf(@DeinstallCommonText));
+	strcpy(text,LMemDeref(@DeinstallCommonText));
+	MemUnlock(HandleOf(@DeinstallCommonText));
+	GetIniEntryInstallListText(entryPtr, strchr(text, 0));
+	}
+
+
+void GetStartFileEntryListText(InstallEntry * entryPtr, char *text, Boolean isExtern) {
+StartFileParams	*sfpPtr;
+char *txtPtr;
+
+	sfpPtr = &(entryPtr->main.startFile);
+	MemLock(HandleOf(@StartSysProgText));
+	switch ( sfpPtr->fileType ) {
+	case GFT_EXECUTABLE:
+		if ( isExtern ) strcpy(text,LMemDeref(@StartSysProgText));
+		else strcpy(text,LMemDeref(@StartCommonText));
+		break;
+	case GFT_NOT_GEOS_FILE:
+		strcpy(text,LMemDeref(@OpenDosText));
+		strcat(text,sfpPtr->appName);
+		strcat(text,": ");
+		break;
+	default: if ( isExtern ) strcpy(text,LMemDeref(@OpenSysFileText));
+		else strcpy(text,LMemDeref(@OpenCommonText));
+		}
+	MemUnlock(HandleOf(@StartSysProgText));
+	txtPtr = &text[strlen(text)];
+	ToolConstructPath(txtPtr, entryPtr->main.startFile.dh,
+		entryPtr->main.startFile.path, entryPtr->main.startFile.fileName);
+
+	}
+
+
+void GetToolEntryListText(InstallEntry * entryPtr, char *text, word type) {
+char *txtPtr;
+
+	MemLock(HandleOf(@UpdateToolText));
+	switch (type) {
+		case IOT_UPDATE_TOOL:	strcpy(text,LMemDeref(@UpdateToolText));
+				break;
+		case IOT_CLEANUP_TOOL:	strcpy(text,LMemDeref(@CleanupToolText));
+				break;
+		}
+	MemUnlock(HandleOf(@UpdateToolText));
+	txtPtr = &text[strlen(text)];
+
+	if ( !(entryPtr->instFlags & INST_DELETE_ON_DE_INST) ) {
+		*txtPtr = '*'; txtPtr++;
+		}
+	ToolConstructPath(txtPtr, entryPtr->main.file.dh,
+		entryPtr->main.file.path, entryPtr->main.file.geosName);
+
+	}
+
+void GetDeleteFolderListText(InstallEntry * entryPtr, char * text) {
+char *txtPtr;
+
+	MemLock(HandleOf(@DeleteFolderText));
+	strcpy(text,LMemDeref(@DeleteFolderText));
+	MemUnlock(HandleOf(@DeleteFolderText));
+
+	txtPtr = strchr(text,0);
+	ToolConstructPath(txtPtr, entryPtr->main.deleteFolder.dh,
+		entryPtr->main.deleteFolder.path, 0);
+
+	}
+
+/*--------------------- ICGetListeEntryText ---------------------
+ *	Aufgabe:	Text-Eintrag fÅr Install-Liste holen
+ ---------------------------------------------------------------------------*/
+void ICGetListeEntryText(char*text, int item) {
+InstallEntry * entryPtr;
+
+	entryPtr = ICLockMainArrayElement(item);
+	text[0]=0;
+	switch (entryPtr->type) {
+		case 	IOT_FILE:
+			GetFileEntryListText(entryPtr, text);
+			break;
+		case 	IOT_DELETE_EXTERN_FILE:
+			GetDeleteFileListText(entryPtr, text);
+			break;
+		case 	IOT_DOS_TOKEN:
+			GetDosTokenEntryListText(entryPtr, text);
+			break;
+
+		case 	IOT_TOKEN:
+			GetTokenEntryListText(entryPtr, text);
+			break;
+		case 	IOT_INI:
+			GetIniKatListText(entryPtr, text);
+			break;
+		case 	IOT_INI_ENTRY_INSTALL:
+			GetIniEntryInstallListText(entryPtr, text);
+			break;
+		case 	IOT_INI_ENTRY_DEINSTALL:
+			GetIniEntryDeinstallListText(entryPtr, text);
+			break;
+		case 	IOT_START_FILE:
+		case 	IOT_START_EXTERN_FILE:
+			GetStartFileEntryListText(entryPtr, text,
+					entryPtr->type == IOT_START_EXTERN_FILE);
+			break;
+		case 	IOT_UPDATE_TOOL:
+		case 	IOT_CLEANUP_TOOL:
+			GetToolEntryListText(entryPtr, text,entryPtr->type);
+			break;
+		case 	IOT_DELETE_FOLDER:
+			GetDeleteFolderListText(entryPtr, text);
+			break;
+		case 	IOT_DEL_TEMP_FILE:
+			GetDelTempFileListText(entryPtr, text);
+			break;
+
+		default: MemLock(HandleOf(@InvalidEntryTypeText));
+			sprintf(text,LMemDeref(@InvalidEntryTypeText),entryPtr->type);
+			MemUnlock(HandleOf(@InvalidEntryTypeText));
+		}
+	ICUnlockMainArray(entryPtr);
+}
+
+
+
+/*--------------------- MSG_IC_QUERY_LIST_ITEM ---------------------
+ *	Aufgabe:        Query fÅr Install-Liste
+ *	Zusammenhang:
+ *	Strategie:
+ *	Parameter:	optr list, word item
+ ---------------------------------------------------------------------------*/
+@extern method ICProcessClass, MSG_IC_QUERY_LIST_ITEM {
+char 	text[QUERY_TEXT_LEN];
+MemHandle	gsHandle;
+GStateHandle	gsState;
+word 		gsChunk; // ChunkHandle 	gsChunk;
+optr		gsOptr;
+optr 		bmpOptr;
+Rectangle	bounds;
+int		h, b, fontID;
+word		size, fontsize;
+#define 	START_OF_TEXT_OFFSET	17
+FileLongName 	fontName;
+
+
+	ICGetListeEntryText(text, item);
+
+	gsHandle = MemAllocLMem(LMEM_TYPE_GENERAL, 0);
+	gsState = GrCreateGString( gsHandle, GST_CHUNK, &gsChunk);
+	gsOptr = ConstructOptr(gsHandle, gsChunk);
+
+	// font und GRî·e herausfinden
+	if ( InitFileReadInteger( "ui", "fontsize", &fontsize) ) fontsize = 10;
+	if ( !fontsize) fontsize = 10; // be save.
+	if ( InitFileReadStringBuffer("ui", "fontID", fontName, IFCC_INTACT, &size) ) strcpy(fontName, "Berkeley");
+	fontID = GrCheckFontAvailName(FEF_BITMAPS | FEF_OUTLINES | FEF_STRING, 0, fontName);
+	if ( !fontID ) fontID = FID_BERKELEY;
+	GrSetFont(gsState, fontID, MakeWWFixed(fontsize));
+
+	GrGetTextBounds(gsState, text,  0, 0, 0, &bounds);
+	h = bounds.R_bottom -  bounds.R_top;
+	b = bounds.R_right -  bounds.R_left;
+
+	bmpOptr = ICGetListeEntryBitmapOptr(item,  h);
+	MemLock(HandleOf(bmpOptr));
+	GrDrawBitmap ( gsState, 2, 1, LMemDeref(bmpOptr), 0);
+	MemUnlock(HandleOf(bmpOptr));
+
+	GrDrawText(gsState, START_OF_TEXT_OFFSET, 0, text,0);
+	GrEndGString(gsState);
+
+	@call list::MSG_GEN_DYNAMIC_LIST_REPLACE_ITEM_MONIKER(item,0,h,b+START_OF_TEXT_OFFSET,0,
+				VMDT_GSTRING,VMST_OPTR,gsOptr);
+
+	GrDestroyGString(gsState,0,GSKT_KILL_DATA);
+	MemFree(gsHandle);
+
+/*
+	@call list::MSG_GEN_DYNAMIC_LIST_REPLACE_ITEM_TEXT(item,text);
+*/
+	}
+
+
+
+/*--------------------- ICUpdateStatusBar ---------------------
+ *      Aufgabe:        Mehr FileInfo in der Statusbar anzeigen.
+ *			oder Entry muss Null sein
+ *      Strategie:
+ ---------------------------------------------------------------------------*/
+void ICUpdateStatusBar(InstallEntry	* entryPtr) {
+VMBlockHandle	fileArray;
+GeosHeader * gHeader;
+word size;
+char hilfstext[105], *p;
+Boolean err = FALSE;
+FileMainParams	*mainParams;
+
+/*
+typedef struct {
+	union {                 	// fÅr jeden Typ ein Eintrag
+		FileMainParams	file;		// IOT_FILE
+		GeodeToken	appToken;	// IOT_TOKEN
+		IniMainParams	ini;		// IOT_INI
+		DosTokenParams	dosToken;	// IOT_DOS_TOKEN
+		StartFileParams startFile;	// IOT_START_FILE
+		DeleteFileParams deleteFile;	// IOT_DELETE_EXTERN_FILE
+		DeleteFolderParams deleteFolder; // IOT_DELETE_FOLDER
+		IniEntryParams	iniEntry;	// IOT_INI_ENTRY_INSTALL
+						// IOT_INI_ENTRY_DEINSTALL
+		}	main;
+	word		instFlags;		// INST_xxxx -Werte
+	InstallObjectType type;
+	} InstallEntry;
+*/
+
+	if ( !docFile || !docMapBlock) err = TRUE;
+	if ( !entryPtr ) err = TRUE;
+	if ( entryPtr->type != IOT_FILE ) err = TRUE;
+
+	if ( err ) {
+		@call ICFReleaseStatusText::MSG_VIS_TEXT_REPLACE_ALL_PTR("",0);
+		@call ICFUserNotesStatusText::MSG_VIS_TEXT_REPLACE_ALL_PTR("",0);
+		return;
+		}
+
+	fileArray = entryPtr->main.file.data;
+
+	HugeArrayLock(docFile,fileArray,0, (void**)&gHeader,&size);
+
+	if ( gHeader->Kennung == GEOS_HEADER_MAGIC ) {
+		// es ist eine GEOS-datei --> Infos anziegen
+		mainParams = &(entryPtr->main.file);
+
+		/* aktuelle Versionsnummer (release number) anziegen */
+		strcpy(hilfstext, "Version: ");
+		ViewToolAddNumber(hilfstext, mainParams->release.RN_major);
+		strcat(hilfstext,".");
+		ViewToolAddNumber(hilfstext, mainParams->release.RN_minor);
+		strcat(hilfstext,"  ");
+		ViewToolAddNumber(hilfstext, mainParams->release.RN_change);
+		strcat(hilfstext,"-");
+		ViewToolAddNumber(hilfstext, mainParams->release.RN_engineering);
+		@call ICFReleaseStatusText::MSG_VIS_TEXT_REPLACE_ALL_PTR(hilfstext,0);
+
+		/* UserNotes anzeigen */
+		memcpy(hilfstext,gHeader->notiz,99);
+		hilfstext[99]=0;
+		p = hilfstext;				// CR --> space
+		while (strchr(p, 13) ) {
+			p = strchr(p, 13);
+			*p = ' ';
+			p++;
+			}
+		@call ICFUserNotesStatusText::MSG_VIS_TEXT_REPLACE_ALL_PTR(hilfstext,0);
+
+		}
+	  else 	{
+	  	// es ist eine DOS-Datei -> nichts anziegen
+		@call ICFReleaseStatusText::MSG_VIS_TEXT_REPLACE_ALL_PTR("--",0);
+		@call ICFUserNotesStatusText::MSG_VIS_TEXT_REPLACE_ALL_PTR("--",0);
+		}
+	HugeArrayUnlock(gHeader);
+
+	}
+
+
+/*--------------------- ICUpdateCurrentDataText ---------------------
+ *	Aufgabe:
+ *	Zusammenhang:
+ *	Strategie:
+ *	Parameter:
+ ---------------------------------------------------------------------------*/
+void ICUpdateCurrentDataText(FileMainParams *info, Boolean enable) {
+optr state;
+dword diffMinutes;
+char timeDiffTxt[30];
+
+   if ( enable ) @send ICCurrentDataText::MSG_GEN_SET_ENABLED(VUM_NOW);
+	else @send ICCurrentDataText::MSG_GEN_SET_NOT_ENABLED(VUM_NOW);
+
+   // Sonderfall: kein dateieintrag
+   if ( info == 0)  {
+	@call ICCurrentDataText::MSG_VIS_TEXT_REPLACE_ALL_OPTR(@InfoTextNoFile, 0);
+
+/*	@call ICCurrentDataText::MSG_VIS_TEXT_REPLACE_ALL_OPTR(@InfoTextTime, 0);
+	@call ICCurrentDataText::MSG_VIS_TEXT_APPEND_OPTR(@InfoTextNA, 0);
+	@call ICCurrentDataText::MSG_VIS_TEXT_APPEND_OPTR(@InfoTextSize, 0);
+	@call ICCurrentDataText::MSG_VIS_TEXT_APPEND_OPTR(@InfoTextNA, 0);
+	@call ICCurrentDataText::MSG_VIS_TEXT_APPEND_OPTR(@InfoTextProtocol, 0);
+	@call ICCurrentDataText::MSG_VIS_TEXT_APPEND_OPTR(@InfoTextNA, 0);
+	@call ICCurrentDataText::MSG_VIS_TEXT_APPEND_OPTR(@InfoTextRelease, 0);
+	@call ICCurrentDataText::MSG_VIS_TEXT_APPEND_OPTR(@InfoTextNA, 0);
+	@call ICCurrentDataText::MSG_VIS_TEXT_APPEND_OPTR(@InfoTextNotes, 0);
+	@call ICCurrentDataText::MSG_VIS_TEXT_APPEND_OPTR(@InfoTextNA, 0);
+/**/
+	return;
+	}
+
+
+
+   FilePushDir();
+   if ( ICGotoFilePath(info, 0) ) {
+	@call ICCurrentDataText::MSG_VIS_TEXT_REPLACE_ALL_OPTR(@InfoFileNotInstalled, 0);
+	FilePopDir();
+	return;
+	}
+
+   /* F¸r die ƒnderungszeit mache ich mir etwas Aufwand */
+   @call ICCurrentDataText::MSG_VIS_TEXT_REPLACE_ALL_OPTR(@InfoTextTime, 0);
+   if ( ICCheckDateTime(info, &diffMinutes) ) {
+   		optr unitText;
+   		@call ICCurrentDataText::MSG_VIS_TEXT_APPEND_OPTR(@InfoTextTimeDiffers, 0);
+   		// timeDiffTxt: max 30 Zeichen
+   		*timeDiffTxt=0;
+   		if ( diffMinutes > 4320 ) {		// mehr als 3 Tage
+   			diffMinutes = (diffMinutes+720)/1440;	// -> Tage, gerundet
+   			if ( diffMinutes > 30 ) {
+   				unitText = @InfoTextManyDays;
+   				}
+   			else {
+				unitText = @InfoTextDays;
+				sprintf(timeDiffTxt, "ca. %lu", diffMinutes);
+   				}
+   			}
+   		else {
+			if ( diffMinutes > 120 ) {		// mehr als 2 Std.
+				unitText = @InfoTextManyHours;
+				diffMinutes = (diffMinutes+30)/60;
+				sprintf(timeDiffTxt, "ca. %lu", diffMinutes);
+				}
+			else {
+				unitText = @InfoTextManyMinutes;
+				sprintf(timeDiffTxt, "ca. %lu", diffMinutes);
+				}
+			}
+
+   		@call ICCurrentDataText::MSG_VIS_TEXT_APPEND_PTR(timeDiffTxt, 0);
+   		@call ICCurrentDataText::MSG_VIS_TEXT_APPEND_OPTR(unitText, 0);
+		}
+	else {
+   		@call ICCurrentDataText::MSG_VIS_TEXT_APPEND_OPTR(@InfoTextOK, 0);
+   		}
+
+
+
+   @call ICCurrentDataText::MSG_VIS_TEXT_APPEND_OPTR(@InfoTextSize, 0);
+   if ( ICCheckFileSize(info) )
+		state = @InfoTextDiffers; else state = @InfoTextOK;
+   @call ICCurrentDataText::MSG_VIS_TEXT_APPEND_OPTR(state, 0);
+
+
+   @call ICCurrentDataText::MSG_VIS_TEXT_APPEND_OPTR(@InfoTextProtocol, 0);
+   if ( info->fileType == GFT_NOT_GEOS_FILE )  state = @InfoTextNA;
+	   else {
+		if ( ICCheckProtocol(info) )
+		state = @InfoTextDiffers; else state = @InfoTextOK;
+		}
+   @call ICCurrentDataText::MSG_VIS_TEXT_APPEND_OPTR(state, 0);
+
+
+   @call ICCurrentDataText::MSG_VIS_TEXT_APPEND_OPTR(@InfoTextRelease, 0);
+   if ( info->fileType == GFT_NOT_GEOS_FILE )  state = @InfoTextNA;
+	   else {
+		if ( ICCheckRelease(info) )
+		state = @InfoTextDiffers; else state = @InfoTextOK;
+		}
+   @call ICCurrentDataText::MSG_VIS_TEXT_APPEND_OPTR(state, 0);
+
+
+   @call ICCurrentDataText::MSG_VIS_TEXT_APPEND_OPTR(@InfoTextNotes, 0);
+   if ( info->fileType == GFT_NOT_GEOS_FILE )  state = @InfoTextNA;
+	   else {
+		if ( ICCheckUserNotes(info) )
+		state = @InfoTextDiffers; else state = @InfoTextOK;
+		}
+   @call ICCurrentDataText::MSG_VIS_TEXT_APPEND_OPTR(state, 0);
+
+
+   FilePopDir();
+/**@chunk char InfoTextOK[] = " ok.";
+@chunk char InfoTextNA[] = " -";
+@chunk char InfoTextDiffers[] = " Abweichend";
+*/
+   }

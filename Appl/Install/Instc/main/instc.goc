@@ -1,0 +1,933 @@
+/**************************************************************************
+ *	GEODE-File fÅr
+ *
+ *	Beschreibung	Universelles Installationsprogramm
+ *			Creator
+ *
+ *	Copyright:	(c) by RABE-Soft 5/99
+ *	Sonstiges:	-
+ *
+ **************************************************************************/
+
+/*  Standard include files */
+@include <stdapp.goh>
+@include <stdlib.h>
+@include <file.h>
+@include "..\Shared\instllr.goh"
+@include "..\Shared\rainer.goh"
+@include "instc.goh"
+@include "ftool\ftool.goh"
+@include "process.goh"
+@include "main\iconedi.goh"
+@include "ui\appui.goh"
+@include "inif\inif.goh"
+@include "..\Shared\msgbox.goh"
+
+
+#include <string.h>
+#include <stdio.h>
+#include <token.h>
+#include <initfile.h>
+
+@classdecl ICProcessClass, neverSaved;
+
+@extern method ICProcessClass, MSG_IC_SORT_LIST;
+@extern method ICProcessClass, MSG_IC_REBUILD_LIST;
+@extern method ICProcessClass, MSG_IC_QUERY_LIST_ITEM;
+
+@extern method ICProcessClass, MSG_META_DOC_OUTPUT_INITIALIZE_DOCUMENT_FILE;
+@extern method ICProcessClass, MSG_META_DOC_OUTPUT_ATTACH_UI_TO_DOCUMENT;
+@extern method ICProcessClass, MSG_META_DOC_OUTPUT_DETACH_UI_FROM_DOCUMENT;
+@extern method ICProcessClass, MSG_META_DOC_OUTPUT_SAVE_AS_COMPLETED;
+@extern method ICProcessClass, MSG_META_DOC_OUTPUT_WRITE_CACHED_DATA_TO_FILE;
+
+@extern method ICProcessClass, MSG_GEN_PROCESS_INSTALL_TOKEN;
+@extern method ICProcessClass, MSG_GEN_PROCESS_OPEN_APPLICATION;
+@extern method ICProcessClass, MSG_IC_SET_DEFAULT_FOLDER;
+@extern method ICProcessClass, MSG_IC_OPTIONS_CHANGED;
+
+@extern method ICProcessClass, MSG_IC_START_TEXT_EDITOR;
+@extern method ICProcessClass, MSG_IC_CONFIG_TEXT_EDITOR;
+@extern method ICProcessClass, MSG_IC_SET_DEFAULT_APP_OPTIONS;
+@extern method ICProcessClass, MSG_IC_SET_DEFAULT_DOC_OPTIONS;
+@extern method ICProcessClass, MSG_IC_SET_DEFAULT_BASIC_OPTIONS;
+@extern method ICProcessClass, MSG_IC_SET_PASSWORT;
+
+/*---------------------------------------------------------------------------
+ Globale Variablen und Typen
+ ---------------------------------------------------------------------------*/
+
+FileHandle docFile = NullHandle;    /* The handle of the document that's
+				     * currently open. */
+VMBlockHandle docMapBlock; /* VM block handle of the file's map block */
+//int topPathLen = 0;
+
+
+/*###########################################################################
+	CODE fÅr ICProcessClass und andere
+/*###########################################################################
+	Teil 2: Behandlung der Messages der UI-Objekte
+/*###########################################################################*/
+
+//message (GEN_ITEM_GROUP_APPLY_MSG)
+@method ICProcessClass, MSG_IC_LIST_ITEM_SELECTED {
+int count, item, trgs;
+InstallEntry * entryPtr;
+FileMainParams *fileParams = 0;
+
+
+char st[200];
+strcpy(st, "Paul ist doof");
+
+
+
+	count = @call ICFileList::MSG_GEN_ITEM_GROUP_GET_NUM_SELECTIONS();
+	if ( count != 1 ) {
+			ICUpdateCurrentDataText(0, FALSE);
+			ICUpdateStatusBar(0);
+			ICEnableTriggers(0);
+			return;
+			}
+	item = @call ICFileList::MSG_GEN_ITEM_GROUP_GET_SELECTION();
+	entryPtr = ICLockMainArrayElement(item);
+	switch (entryPtr->type) {
+		case IOT_FILE: 	trgs = TRG_DELETE | TRG_EDIT | TRG_UPDATE
+					| TRG_START_FILE | TRG_FILE_DETAILS;
+			if (entryPtr->main.file.fileType == GFT_EXECUTABLE)
+				trgs |=  TRG_DOSTOK;
+			fileParams = &(entryPtr->main.file);
+			break;
+		case IOT_TOKEN:	trgs = TRG_DELETE | TRG_EDIT ;
+			break;
+		case IOT_INI: 	trgs = TRG_DELETE | TRG_EDIT;
+			break;
+		case IOT_DOS_TOKEN: trgs = TRG_DELETE | TRG_EDIT;
+			break;
+		case IOT_INI_ENTRY_INSTALL:
+		case IOT_INI_ENTRY_DEINSTALL: trgs = TRG_DELETE | TRG_EDIT;
+			break;
+		case IOT_DELETE_EXTERN_FILE: trgs = TRG_DELETE;
+			break;
+		case IOT_START_FILE:
+		case IOT_START_EXTERN_FILE: trgs = TRG_DELETE;
+			if ( entryPtr->main.startFile.fileType
+				== GFT_NOT_GEOS_FILE) trgs  |= TRG_EDIT;
+			break;
+		case IOT_UPDATE_TOOL:
+		case IOT_CLEANUP_TOOL: trgs = TRG_DELETE | TRG_UPDATE | TRG_FILE_DETAILS;
+			fileParams = &(entryPtr->main.file);
+			break;
+		case IOT_DELETE_FOLDER: trgs = TRG_DELETE;
+			break;
+		case IOT_DEL_TEMP_FILE: trgs = TRG_DELETE;
+			break;
+		default: 	trgs = 0;
+		}
+	ICUpdateCurrentDataText(fileParams, (fileParams != 0));
+	ICUpdateStatusBar(entryPtr);
+	ICUnlockMainArray(entryPtr);
+	ICEnableTriggers(trgs);
+	}
+
+/*---------------------  ---------------------
+ *	Aufgabe:
+ *	Zusammenhang:
+ *	Strategie:
+ *	Parameter:
+ ---------------------------------------------------------------------------*/
+@method ICProcessClass, MSG_IC_UPDATE_ALL {
+InstallEntry * entryPtr;
+VMBlockHandle 	mainArray;
+int item,count,type;
+
+  if ( !docFile || !docMapBlock) return;
+  mainArray = ICGetMainArrayHandle();
+  count = HugeArrayGetCount(docFile,mainArray);
+
+  ICInitiateReadFileBox();
+
+  item = 0;
+  while ( item < count ) {
+	entryPtr = ICLockMainArrayElement(item);
+	type = entryPtr->type;
+	ICUnlockMainArray(entryPtr);
+	if (  (type == IOT_FILE)
+		|| (type == IOT_UPDATE_TOOL)
+		|| (type == IOT_CLEANUP_TOOL) )
+		{
+		ICUpdateFileEntry ( item );
+		}
+	item++;
+	}
+  ICCloseReadFileBox();
+  }
+
+
+/*---------------------  ---------------------
+ *	Aufgabe:
+ *	Zusammenhang:
+ *	Strategie:
+ *	Parameter:
+ ---------------------------------------------------------------------------*/
+@method ICProcessClass, MSG_IC_FILE_DETAILS {
+InstallEntry	* entryPtr;
+int item,count;
+
+	count = @call ICFileList::MSG_GEN_ITEM_GROUP_GET_NUM_SELECTIONS();
+	if ( count != 1 ) {
+		ErrorMsgBox(@MustBeOne,0,0);
+		return;
+		}
+	item = @call ICFileList::MSG_GEN_ITEM_GROUP_GET_SELECTION();
+
+	entryPtr = ICLockMainArrayElement(item);
+	switch ( entryPtr->type ) {
+	   case	IOT_FILE:
+	   case	IOT_UPDATE_TOOL:
+	   case	IOT_CLEANUP_TOOL:
+		ToolDisplayFileInfo(entryPtr);
+		break;
+	   default:	ErrorMsgBox(@MustBeFile,0,0);
+		}
+
+	ICUnlockMainArray(entryPtr);
+
+	}
+
+/*--------------------- ToolGetAppToken ---------------------
+ *      Aufgabe:        TokenID der zugeordneten Applikation holen
+ *			Code Kopie aus DosIcon Library
+ *      Params/Return:	Return TRUE, wenn keine Applikation zugeordnet ist
+ ---------------------------------------------------------------------------*/
+Boolean ToolGetAppToken( GeodeToken *t, char * text)
+  {
+  char * p, zahl[8];
+  int n;
+  sdword z;
+
+// GeodeTokenChars lesen. Applikation ist der zweite Eintrag,
+// beginnt also mit dem dritten '"'
+  p = strchr(text,'"');
+  if (!p) return TRUE;
+  p++;
+  p = strchr(p,'"');
+  if (!p) return TRUE;
+  p++;
+  p = strchr(p,'"');
+  if (!p) return TRUE;
+  p++;			// p zeigt nach das dritte '"'
+
+  if ( strlen(p) < 7 ) return TRUE;	// mind: 'TOKN",1' => 7 Zeichen
+  memcpy(t->GT_chars, p, 4);
+
+// Manufacturer ID holen
+  p = strchr(p,',');
+  if (!p) return TRUE;
+  p++;
+  while ( (*p == ' ') || (*p == '\t') ) p++;	// p zeigt auf Ziffernfolge
+
+// Zahlenstring kopieren
+  n = 0;
+  while ( (*p >= '0') && (*p <= '9') && (n<5) ) {
+	zahl[n] = *p;
+	p++; n++;
+	}
+  zahl[n] = 0;
+
+// blîdsinnige Type-konvertiererei
+  n = UtilAsciiToHex32(zahl, &z );
+  t->GT_manufID = (word)z;
+  return n;		// TRUE == FEHLER
+  }
+
+/*--------------------- ToolGetFileToken ---------------------
+ *      Aufgabe:        TokenID lesen, das angezeigt wewrden soll
+ *			Code Kopie aus DosIcon Library
+ *      Params/Return:	Return TRUE, wenn kein Token zugeordnet ist
+ ---------------------------------------------------------------------------*/
+Boolean ToolGetFileToken( GeodeToken *t, char * text)
+  {
+  char * p, zahl[8];
+  int n;
+  sdword z;
+
+// GeodeTokenChars lesen. AnzeigeToken ist der erste Eintrag,
+// beginnt also mit dem ersten '"'
+  p = strchr(text,'"');
+  if (!p) return TRUE;
+  p++;			// p zeigt nach das erste '"'
+
+  if ( strlen(p) < 7 ) return TRUE;	// mind: 'TOKN",1' => 7 Zeichen
+  memcpy(t->GT_chars, p, 4);
+
+// Manufacturer ID holen
+  p = strchr(p,',');
+  if (!p) return TRUE;
+  p++;
+  while ( (*p == ' ') || (*p == '\t') ) p++;	// p zeigt auf Ziffernfolge
+
+// Zahlenstring kopieren
+  n = 0;
+  while ( (*p >= '0') && (*p <= '9') && (n<5) ) {
+	zahl[n] = *p;
+	p++; n++;
+	}
+  zahl[n] = 0;
+
+// blîdsinnige Type-konvertiererei
+  n = UtilAsciiToHex32(zahl, &z );
+  t->GT_manufID = (word)z;
+  return n;		// TRUE == FEHLER
+  }
+
+
+/*--------------------- TestForBASICFile ---------------------
+ *	Aufgabe:        Entscheidung, ob eine Datei ein R-BASIC-Programm
+ *			ist. Dann sind ander Installations-Optionen fÑllig
+ *	Zusammenhang:
+ *	Strategie:
+ *	Parameter:
+ *	Return:		TRUE; wenn es eine BASIC-Datei ist
+ *			FALSE: nomale (andere) Datei
+ ---------------------------------------------------------------------------*/
+Boolean TestForBASICFile(FileMainParams *params) {
+char buffer[32]; // >"rbas",16480,"RBAS",16480< = 24 Zeichen
+word	size;
+int sect;
+Boolean err, ok1, ok2;
+GeodeToken	token, appToken;
+
+	if (params->fileType == GFT_NOT_GEOS_FILE ) return FALSE; // DOS-File
+
+	err = InitFileReadStringSectionBuffer("InstCre",
+			"BasProgs", 0, buffer, 32, &size); // weil IFCC_INTACT = 0
+	if ( err ) {
+		// Standard-String schreiben
+		InitFileWriteString( "InstCre", "BasProgs", "\"DBas\",16480,\"RBas\",16480");
+		// evt erweitern mit InitFileWriteStringSection()
+		err = InitFileReadStringSectionBuffer("InstCre",
+			"BasProgs", 0, buffer, 32, &size); // weil IFCC_INTACT = 0
+		}
+
+	sect = 0;
+	while ( !err) {
+		if ( ToolGetFileToken( &token, buffer) ) return FALSE; // Notausstieg
+		if ( ToolGetAppToken( &appToken, buffer) ) return FALSE; // Notausstieg
+
+		// Tokens vergleichen. Da es ein Document ist: etwas Bezeichnungschaos
+		// memcmp liefert null (FALSE), wenn gleich
+		ok1 = !memcmp(&token, &params->appToken, sizeof(GeodeToken) );
+		ok2 = !memcmp(&appToken, &params->creatorToken, sizeof(GeodeToken) );
+
+		// Gefunden, wenn beide Åbereinstimmen
+		if ( ok1 && ok2 ) return TRUE;
+
+		// Mist. nÑchster Vesuch
+		sect++;
+		err = InitFileReadStringSectionBuffer("InstCre",
+			"BasProgs", sect, buffer, 32, &size); // weil IFCC_INTACT = 0
+
+		}
+
+	return FALSE;
+
+}
+/*--------------------- MSG_IC_ADD_FILE ---------------------
+ *	Aufgabe:
+ *	Zusammenhang:
+ *	Strategie:
+ *	Parameter:
+ ---------------------------------------------------------------------------*/
+@method ICProcessClass, MSG_IC_ADD_FILE {
+FileMainParams params;
+word options,item;
+word flags;
+int ret;
+MemHandle 	mh;
+ICMapBlock 	*mapPtr;
+
+	if ( SelectInstallFile(&params, SIF_TYPE_ALL) ) {
+		return;
+		}
+/* FileParameter sind OK */
+/* Check ob schon existiert und notfalls updaten */
+       ret = ICCheckForExistingFile(&params,&item);
+       switch (ret) {
+	  case	ICCFEF_REPLACE:
+		ICInitiateReadFileBox();
+		ICUpdateFileEntry ( item );
+		ICCloseReadFileBox();
+	  case	ICCFEF_CANCEL:
+		return;
+		}
+
+/* installations-Flags holen */
+       mapPtr = VMLock(docFile, docMapBlock, &mh);
+
+       if (params.fileType == GFT_EXECUTABLE) {
+	       flags = mapPtr->appInstDefaultFlags;
+	       }
+       else {   if ( TestForBASICFile(&params) ) {
+			flags = mapPtr->rbasicInstDefaultFlags;
+			if (flags == 0 ) flags = RBASIC_INST_DEFAULT_FLAGS;
+			}
+		   else {
+			flags = mapPtr->docInstDefaultFlags;
+			if (flags == 0 ) flags = DOC_INST_DEFAULT_FLAGS;
+			if (params.fileType == GFT_NOT_GEOS_FILE)
+				flags |= INST_IGNORE_P_AND_R;
+			}
+		}
+       VMUnlock(mh);
+       if (ICIsSystemDir(&params)) {
+		flags &= ~(word)INST_DELETE_ON_DE_INST;
+		flags |= INST_KEEP_DOS_NAME;
+		}
+       options = GetInstallOptions(flags);
+
+       ICInitiateReadFileBox();
+       ICAddFileEntry(&params,options, IOT_FILE);
+       ICCloseReadFileBox();
+       }
+
+
+/*--------------------- MSG_IC_ADD_UPDATE_TOOL  ---------------------
+/*--------------------- MSG_IC_ADD_CLEANUP_TOOL ---------------------
+ *	Aufgabe:
+ *	Zusammenhang:
+ *	Strategie:
+ *	Parameter:
+ ---------------------------------------------------------------------------*/
+@method ICProcessClass, MSG_IC_ADD_UPDATE_TOOL, MSG_IC_ADD_CLEANUP_TOOL {
+FileMainParams params;
+word ret,item;
+
+
+	if ( SelectInstallFile(&params, SIF_TYPE_GEOS) ) {
+		return;
+		}
+/* FileParameter sind OK */
+/* Check ob schon existiert und notfalls updaten */
+       ret = ICCheckForExistingFile(&params,&item);
+       switch (ret) {
+	  case	ICCFEF_REPLACE:
+		ICInitiateReadFileBox();
+		ICUpdateFileEntry ( item );
+		ICCloseReadFileBox();
+	  case	ICCFEF_CANCEL:
+		return;
+		}
+
+       if (params.fileType != GFT_EXECUTABLE) {
+	       ErrorMsgBox(@MustBeApp,0,0);
+	       return;
+	       }
+
+       ICInitiateReadFileBox();
+       if ( message == MSG_IC_ADD_UPDATE_TOOL )
+	       {
+	       ICAddFileEntry(&params,
+			INST_IGNORE_P_AND_R | INST_DELETE_ON_DE_INST,
+			IOT_UPDATE_TOOL);
+	       }
+	  else {
+		ICAddFileEntry(&params,
+			INST_IGNORE_P_AND_R | INST_DELETE_ON_DE_INST,
+			IOT_CLEANUP_TOOL);
+                }
+       ICCloseReadFileBox();
+       }
+/*--------------------- MSG_IC_DELETE, ICDeleteEntry ---------------------
+ *	Aufgabe:	Lîschen eines (des selektierten) Eintrages aus der Liste
+ *	Strategie:   	Die eigentliche Lîsch-Routine ist zur anderweitigen
+ *			Verwendung ausgelagert
+ *	Parameter:	item: Nummer des Eintrages (Zerobased)
+ ---------------------------------------------------------------------------*/
+void ICDeleteEntry( word item) {
+VMBlockHandle	mainArray;
+VMBlockHandle	dataArray;
+InstallEntry	* elemPtr;
+
+/* Daten lîschen */
+	if ( !docFile || !docMapBlock) return;
+	elemPtr = ICLockMainArrayElement(item);
+	switch (elemPtr->type) {
+	case 	IOT_FILE:
+	case 	IOT_UPDATE_TOOL:
+	case 	IOT_CLEANUP_TOOL:
+		dataArray = elemPtr->main.file.data;
+		if (dataArray) HugeArrayDestroy(docFile,dataArray);
+		break;
+		}
+/* Main Array updaten: Dirty machen und Eintrag lîschen */
+	HugeArrayDirty(elemPtr);
+	ICUnlockMainArray(elemPtr);
+	mainArray = ICGetMainArrayHandle();
+	HugeArrayDelete(docFile,mainArray,1,item);
+}
+
+@method ICProcessClass, MSG_IC_DELETE {
+int item,count;
+
+	count = @call ICFileList::MSG_GEN_ITEM_GROUP_GET_NUM_SELECTIONS();
+	if ( count != 1 ) {
+		ErrorMsgBox(@MustBeOne,0,0);
+		return;
+		}
+	item = @call ICFileList::MSG_GEN_ITEM_GROUP_GET_SELECTION();
+	ICDeleteEntry(item);
+	UpdateDocumentUI();
+	}
+
+/*--------------------- MSG_IC_START_FILE, ICAddStartEntry ---------------------
+ *	Aufgabe:	HinzufÅhgen eines "start / îffen -Eintrages
+ *	Strategie:   	Die eigentliche HinzufÅge Routine ist ausgelagert
+ *	Parameter:	item: Nummer des Eintrages (Zerobased)
+ ---------------------------------------------------------------------------*/
+void LocalGetDosFileGeode(StartFileParams *sParams, Boolean isNew) {
+char idstr[16];
+GeodeToken	tok;
+FileLongName	appl;
+FileMainParams fparams;
+int ret;
+
+   if ( isNew) {
+	strcpy(sParams->appName,"Text-Editor");
+	SetTokenTo(sParams->creator,'T','e','E','d',0);
+	}
+
+  tok = sParams->creator;
+  strcpy(appl,sParams->appName);
+  @call DosGeodeFile::
+		MSG_VIS_TEXT_REPLACE_ALL_PTR(sParams->fileName,0);
+
+  do {
+	@call DosGeodeApplication::
+		MSG_VIS_TEXT_REPLACE_ALL_PTR(appl,0);
+	WriteTokenIDString(idstr,tok);
+	@call DosGeodeAppIconID::
+		MSG_VIS_TEXT_REPLACE_ALL_PTR(idstr,0);
+
+	ret = UserDoDialog(@DosGeodeBox);
+	switch (ret) {
+		case IC_YES:
+			if (SelectInstallFile( &fparams, SIF_TYPE_GEOS) ) break;
+			strcpy(appl,fparams.geosName);
+			tok = fparams.appToken;
+			break;
+		case IC_OK:
+			strcpy(sParams->appName,appl);
+			sParams->creator = tok;
+			break;
+		}
+	} while ( ret == IC_YES);
+   }
+
+
+void ICAddStartEntry(int item) {
+StartFileParams	sParams;
+InstallEntry	entry, *entryPtr;
+
+/* Bekannte Werte holen */
+	entryPtr = ICLockMainArrayElement(item);
+	strcpy(sParams.fileName,entryPtr->main.file.geosName);
+	strcpy(sParams.path,entryPtr->main.file.path);
+	sParams.dh = entryPtr->main.file.dh;
+	sParams.fileType = entryPtr->main.file.fileType;
+	sParams.creator =  entryPtr->main.file.creatorToken;
+	sParams.token =  entryPtr->main.file.appToken;
+	ICUnlockMainArray(entryPtr);
+
+/*  Weitere Daten besorgen */
+	switch (sParams.fileType ) {
+	case GFT_NOT_GEOS_FILE:
+		LocalGetDosFileGeode(&sParams,TRUE);
+		break;
+	case GFT_VM:
+	case GFT_DATA:
+	case GFT_EXECUTABLE:
+		break;
+	default:
+		ErrorMsgNumberBox(@ErrorUnknownFileType,sParams.fileName,sParams.fileType);
+		return;
+		}
+
+/* Eintrag ist fertig -> hinzufÅgen */
+/* allgemeine Informationen */
+	entry.main.startFile = sParams;
+	entry.instFlags = 0;
+	entry.type = IOT_START_FILE;
+/* Main HugeArray */
+	ICAddMainEntry(&entry);
+/* Anzeige erneuern */
+	UpdateDocumentUI();
+
+	}
+
+
+@method ICProcessClass, MSG_IC_START_FILE {
+InstallEntry	* entryPtr;
+int item,count, type;
+
+	count = @call ICFileList::MSG_GEN_ITEM_GROUP_GET_NUM_SELECTIONS();
+	if ( count != 1 ) {
+		ErrorMsgBox(@MustBeOne,0,0);
+		return;
+		}
+	item = @call ICFileList::MSG_GEN_ITEM_GROUP_GET_SELECTION();
+	entryPtr = ICLockMainArrayElement(item);
+	type = entryPtr->type;
+	ICUnlockMainArray(entryPtr);
+	if ( type != IOT_FILE ) {
+		ErrorMsgBox(@MustBeFile,0,0);
+		return;
+		}
+
+	ICAddStartEntry(item);
+	UpdateDocumentUI();
+	}
+
+/*---------------------  ---------------------
+ *	Aufgabe:
+ *	Zusammenhang:
+ *	Strategie:
+ *	Parameter:
+ ---------------------------------------------------------------------------*/
+@method ICProcessClass, MSG_IC_EDIT {
+InstallEntry	*entryPtr;
+word 		flags,item;
+MemHandle 	mh;
+
+	item = @call ICFileList::MSG_GEN_ITEM_GROUP_GET_SELECTION();
+	entryPtr = ICLockMainArrayElement(item);
+	switch (entryPtr->type) {
+		case 	IOT_FILE:
+		case 	IOT_UPDATE_TOOL:
+		case 	IOT_CLEANUP_TOOL:
+			flags = GetInstallOptions(entryPtr->instFlags);
+			entryPtr->instFlags = flags;
+			break;
+		case IOT_TOKEN:
+			IconEditSelectToken(&entryPtr->main.appToken);
+			break;
+		case IOT_INI:
+		     @call IniFileCategoryText::
+				MSG_VIS_TEXT_REPLACE_ALL_PTR(entryPtr->main.ini.kategorie,0);
+		     @call IniFileCategoryText::MSG_VIS_TEXT_SELECT_ALL();
+		     if ( UserDoDialog(@IniFileBox) == IC_OK ) {
+			mh = @call IniFileCategoryText::MSG_VIS_TEXT_GET_ALL_BLOCK(0);
+			strcpy(entryPtr->main.ini.kategorie,MemLock(mh));
+			MemFree(mh);
+			}
+			break;
+		case IOT_INI_ENTRY_INSTALL:
+			InifEdit(&(entryPtr->main.iniEntry), TRUE );
+			break;
+		case IOT_INI_ENTRY_DEINSTALL:
+			InifEdit(&(entryPtr->main.iniEntry), FALSE );
+			break;
+		case IOT_DOS_TOKEN:
+			ICDoDosTokenDialog(&(entryPtr->main.dosToken));
+			break;
+		case IOT_START_FILE:
+		case IOT_START_EXTERN_FILE:
+			LocalGetDosFileGeode(&(entryPtr->main.startFile),FALSE);
+			break;
+		}
+	HugeArrayDirty(entryPtr);
+	ICUnlockMainArray(entryPtr);
+	UpdateDocumentUI();
+	}
+
+/*---------------------  ---------------------
+ *	Aufgabe:
+ *	Zusammenhang:
+ *	Strategie:
+ *	Parameter:
+ ---------------------------------------------------------------------------*/
+void ICUpdateFileEntry ( word item ) {
+InstallEntry * entryPtr;
+VMBlockHandle	oldArray;
+Boolean err = FALSE;
+
+	if ( !docFile || !docMapBlock) return;
+	entryPtr = ICLockMainArrayElement(item);
+	if ( (entryPtr->type != IOT_FILE)
+	     && (entryPtr->type != IOT_UPDATE_TOOL)
+	     && (entryPtr->type != IOT_CLEANUP_TOOL) )
+		{
+		ICUnlockMainArray(entryPtr);
+		return;
+		}
+	oldArray = entryPtr->main.file.data;
+	entryPtr->main.file.data = HugeArrayCreate(docFile,HUGE_ARRAY_ELEMENT_SIZE,0);
+
+	do {
+	   if ( ICCompleteFileMainParams(&(entryPtr->main.file)) ) {
+		err = TRUE;
+		break;
+		}
+	   if ( ICWriteFileToHugeArray(&entryPtr->main.file,docFile) ) {
+		err = TRUE;
+		break;
+		}
+	   } while (0);
+
+	if ( err ) {
+		ErrorMsgBox(@ErrorUpdate,entryPtr->main.file.geosName,0);
+		if (entryPtr->main.file.data) HugeArrayDestroy(docFile,entryPtr->main.file.data);
+		entryPtr->main.file.data = oldArray;
+		}
+	else	{
+		if (oldArray) HugeArrayDestroy(docFile,oldArray);
+		}
+	HugeArrayDirty(entryPtr);
+	ICUnlockMainArray(entryPtr);
+	}
+
+
+@method ICProcessClass, MSG_IC_UPDATE {
+word count, item;
+
+	count = @call ICFileList::MSG_GEN_ITEM_GROUP_GET_NUM_SELECTIONS();
+	if ( count != 1 ) {
+		ErrorMsgBox(@MustBeOne,0,0);
+		return;
+		}
+	item = @call ICFileList::MSG_GEN_ITEM_GROUP_GET_SELECTION();
+	ICInitiateReadFileBox();
+	ICUpdateFileEntry(item);
+	ICCloseReadFileBox();
+
+	@send process::MSG_IC_REBUILD_LIST(); // Datei-Info-Text auch aktualisieren
+	}
+
+@method ICProcessClass, MSG_IC_SET_INFO_TEXT {
+ICMapBlock	*mapPtr;
+MemHandle	mh, vmh;
+
+	if ( !docFile || !docMapBlock) return;
+	mapPtr = VMLock(docFile,docMapBlock,&vmh);
+
+	mh = @call ICPrognameText::
+		MSG_VIS_TEXT_GET_ALL_BLOCK(0);
+	strcpy(mapPtr->programName,MemLock(mh));
+	MemFree(mh);
+
+	mh = @call ICBeschreibungText::
+		MSG_VIS_TEXT_GET_ALL_BLOCK(0);
+	strcpy(mapPtr->beschreibung,MemLock(mh));
+	MemFree(mh);
+
+	mh = @call ICCopyrightText::
+		MSG_VIS_TEXT_GET_ALL_BLOCK(0);
+	strcpy(mapPtr->copyright,MemLock(mh));
+	MemFree(mh);
+
+	VMDirty(vmh);
+	VMUnlock(vmh);
+	@send ICInfoTextDialog::MSG_GEN_GUP_INTERACTION_COMMAND(IC_DISMISS);
+	}
+
+
+@method ICProcessClass, MSG_IC_INI_FILE {
+InstallEntry	entry;
+MemHandle mh;
+	@call IniFileCategoryText::MSG_VIS_TEXT_SELECT_ALL();
+	if ( UserDoDialog(@IniFileBox) == IC_OK ) {
+	/* allgemeine Informationen */
+		mh = @call IniFileCategoryText::MSG_VIS_TEXT_GET_ALL_BLOCK(0);
+		strcpy(entry.main.ini.kategorie,MemLock(mh));
+		MemFree(mh);
+		entry.instFlags = 0;
+		entry.type = IOT_INI;
+	/* Main HugeArray */
+		ICAddMainEntry(&entry);
+	/* Anzeige erneuern */
+		UpdateDocumentUI();
+		}
+	}
+
+@method ICProcessClass, MSG_IC_DOS_TOKEN {
+int item,count,ret;
+InstallEntry * entryPtr;
+DosTokenParams	tokenParams;
+
+  /* Sicherheitsabfragen */
+	count = @call ICFileList::MSG_GEN_ITEM_GROUP_GET_NUM_SELECTIONS();
+	if ( count != 1 ) {
+		ErrorMsgBox(@MustBeOne,0,0);
+		return;
+		}
+	item = @call ICFileList::MSG_GEN_ITEM_GROUP_GET_SELECTION();
+	entryPtr = ICLockMainArrayElement(item);
+	if ( (entryPtr->type != IOT_FILE) ) {
+		ErrorMsgBox(@MustBeFile,0,0);
+		ICUnlockMainArray(entryPtr);
+		return;
+		}
+	if ( (entryPtr->main.file.fileType != GFT_EXECUTABLE) ) {
+		ErrorMsgBox(@MustBeApp,0,0);
+		ICUnlockMainArray(entryPtr);
+		return;
+		}
+  /* Vorbereiten */
+  strcpy(tokenParams.appName,entryPtr->main.file.geosName);
+  tokenParams.appToken = entryPtr->main.file.appToken;
+  MemLock(HandleOf(@EmptyFileText));
+  strcpy(tokenParams.dosFile,LMemDeref(@EmptyFileText));
+  MemUnlock(HandleOf(@EmptyFileText));
+  ICUnlockMainArray(entryPtr);
+
+  /* Dialogbox ausfÅhren und  evt neuen  Eintrag anlegen */
+  ret = ICDoDosTokenDialog(&tokenParams);
+  if ( ret ) ICAddDosTokenEntry(&tokenParams);
+
+  }
+
+@method ICProcessClass, MSG_IC_APP_TOKEN {
+InstallEntry	entry, *entryPtr;
+word count, item;
+GeodeToken tok;
+
+/* Testen ob File selektiert und evt App-Token vorgeben */
+	SetTokenTo(tok,0,0,0,0,0);	/* Sicherheit */
+	count = @call ICFileList::MSG_GEN_ITEM_GROUP_GET_NUM_SELECTIONS();
+	if ( count == 1 ) {
+		item = @call ICFileList::MSG_GEN_ITEM_GROUP_GET_SELECTION();
+		entryPtr = ICLockMainArrayElement(item);
+		if (entryPtr->type == IOT_FILE) {
+			tok = entryPtr->main.file.appToken;
+			}
+		ICUnlockMainArray(entryPtr);
+		}
+
+	if ( IconEditSelectToken(&tok) == IC_OK ){
+	/* allgemeine Informationen */
+		entry.main.appToken = tok;
+		entry.instFlags = 0;
+		entry.type = IOT_TOKEN;
+	/* Main HugeArray */
+		ICAddMainEntry(&entry);
+	/* Anzeige erneuern */
+		UpdateDocumentUI();
+		}
+	}
+
+@method ICProcessClass, MSG_IC_INFO_TEXTE {
+	@send ICInfoTextDialog::MSG_GEN_INTERACTION_INITIATE();
+	}
+
+@method ICProcessClass, MSG_IC_START_EXTERN_FILE {
+FileMainParams fparams;
+InstallEntry	entry;
+
+   // Datei anfordern und nîtige Paramter kopieren
+   if ( SelectInstallFile( &fparams, SIF_TYPE_ALL) ) return;
+
+   strcpy(entry.main.startFile.fileName, fparams.geosName);
+   strcpy(entry.main.startFile.path, fparams.path);
+   entry.main.startFile.dh = fparams.dh;
+   entry.main.startFile.fileType = fparams.fileType;
+   entry.main.startFile.token = fparams.appToken;
+   entry.main.startFile.creator = fparams.creatorToken;
+   strcpy(entry.main.startFile.appName, "");
+   if ( fparams.fileType == GFT_NOT_GEOS_FILE )
+	   LocalGetDosFileGeode(&entry.main.startFile, TRUE);
+
+
+/* allgemeine Informationen */
+	entry.instFlags = 0;
+	entry.type = IOT_START_EXTERN_FILE;
+/* Main HugeArray */
+	ICAddMainEntry(&entry);
+/* Anzeige erneuern */
+	UpdateDocumentUI();
+
+}
+
+@method ICProcessClass, MSG_IC_DELETE_EXTERN_FILE {
+FileMainParams fparams;
+InstallEntry	entry;
+
+   // Datei anfordern und nîtige Paramter kopieren
+   if ( SelectInstallFile( &fparams, SIF_TYPE_ALL) ) return;
+
+   strcpy(entry.main.deleteFile.fileName, fparams.geosName);
+   strcpy(entry.main.deleteFile.path, fparams.path);
+   entry.main.deleteFile.dh = fparams.dh;
+
+/* allgemeine Informationen */
+	entry.instFlags = 0;
+	entry.type = IOT_DELETE_EXTERN_FILE;
+/* Main HugeArray */
+	ICAddMainEntry(&entry);
+/* Anzeige erneuern */
+	UpdateDocumentUI();
+
+}
+@method ICProcessClass, MSG_IC_DELETE_FOLDER {
+FileMainParams fparams;
+InstallEntry	entry;
+
+   // Datei anfordern und nîtige Paramter kopieren
+   if ( SelectInstallFile( &fparams, SIF_TYPE_FOLDERS) ) return;
+
+   strcpy(entry.main.deleteFolder.path, fparams.path);
+   entry.main.deleteFolder.dh = fparams.dh;
+
+/* allgemeine Informationen */
+	entry.instFlags = 0;
+	entry.type = IOT_DELETE_FOLDER;
+/* Main HugeArray */
+	ICAddMainEntry(&entry);
+/* Anzeige erneuern */
+	UpdateDocumentUI();
+
+}
+@method ICProcessClass, MSG_IC_CREATE_INI_ENTRY, MSG_IC_DELETE_INI_ENTRY {
+InstallEntry	entry;
+
+    memset(&entry, 0, sizeof(InstallEntry));
+    if ( message == MSG_IC_CREATE_INI_ENTRY ) {
+		entry.type = IOT_INI_ENTRY_INSTALL;
+		entry.main.iniEntry.flags = INIF_REPLACE;
+		}
+	else  {	entry.type = IOT_INI_ENTRY_DEINSTALL;
+		entry.main.iniEntry.flags = INIF_DELETE;
+		}
+    if ( !InifEdit(&entry.main.iniEntry, message == MSG_IC_CREATE_INI_ENTRY)  ) {
+		return;
+		}
+    ICAddMainEntry(&entry);
+    UpdateDocumentUI();
+}
+
+@method ICProcessClass, MSG_IC_DEL_TEMP_FILE {
+FileMainParams fparams;
+InstallEntry	entry;
+
+   // Datei anfordern und nîtige Paramter kopieren
+   if ( SelectInstallFile( &fparams, SIF_TYPE_ALL) ) return;
+
+   strcpy(entry.main.deleteFile.fileName, fparams.geosName);
+   strcpy(entry.main.deleteFile.path, fparams.path);
+   entry.main.deleteFile.dh = fparams.dh;
+
+/* allgemeine Informationen */
+	entry.instFlags = 0;
+	entry.type = IOT_DEL_TEMP_FILE;
+/* Main HugeArray */
+	ICAddMainEntry(&entry);
+/* Anzeige erneuern */
+	UpdateDocumentUI();
+
+}
+
+/*---------------------  ---------------------
+ *	Aufgabe:
+ *	Zusammenhang:
+ *	Strategie:
+ *	Parameter:
+ ---------------------------------------------------------------------------*/
+

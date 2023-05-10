@@ -1,0 +1,488 @@
+/**************************************************************************
+ *	GEODE-File f¸r
+ *
+ *	Beschreibung	Universelles Installationsprogramm
+ *			Installer
+ *
+ *	Copyright:	(c) by RABE-Soft 5/99
+ *	Sonstiges:	-
+ *
+ **************************************************************************/
+
+/*  Standard include files */
+@include <stdapp.goh>
+@include <stdlib.h>
+@include <sysstats.h>
+@include "instf.goh"
+@include "main\iconedi.goh"
+@include "main\dosicon.goh"
+@include "ui\appui.goh"
+@include "..\Shared\instllr.goh"
+@include "..\Shared\rainer.goh"
+@include "..\Shared\msgbox.goh"
+
+#include <string.h>
+#include <stdio.h>
+#include <token.h>
+#include <initfile.h>
+#include <stdlib.h>
+
+
+extern GlobalStruct	global;
+
+/*--------------------- Local Header ---------------------
+ *---------------------------------------------------------------------------*/
+Boolean LocalOpenFile( StartFileParams * sfpp);
+Boolean LocalExecGeode( StartFileParams * sfpp);
+void LocalInstallAndExecuteTool(InstallEntry *  entryPtr, optr introText);
+Boolean LocalStartTool( FileMainParams * fmp);
+void LocalDeinstallBoxShow(char * text,optr label);
+void LocalDeinstallBoxShowSpace(void);
+void LocalHideDeinstallBox(void);
+void LocalInstallBoxShow(char * text,optr label);
+void LocalInstallBoxShowSpace(void);
+void LocalHideInstallBox(void);
+void ToolInsert0x0A(char *txt);
+
+word LocalReadOptions(void );
+void LocalSaveOptions(word options);
+
+
+
+
+/*###########################################################################
+	CODE f¸r IFProcessClass
+/*###########################################################################
+	Teil 1: Handling des System-Document-Messages
+	UpdateDocumentUI
+	MSG_META_DOC_OUTPUT_INITIALIZE_DOCUMENT_FILE
+	MSG_META_DOC_OUTPUT_ATTACH_UI_TO_DOCUMENT
+	MSG_META_DOC_OUTPUT_DETACH_UI_FROM_DOCUMENT
+	MSG_META_DOC_OUTPUT_SAVE_AS_COMPLETED
+/*###########################################################################*/
+
+
+/*---------------------  ---------------------
+ *	Aufgabe:
+ *	Zusammenhang:
+ *	Strategie:
+ *	Parameter:
+ ---------------------------------------------------------------------------*/
+@extern method IFProcessClass, MSG_META_DOC_OUTPUT_INITIALIZE_DOCUMENT_FILE
+{
+    ICMapBlock *mapPtr;    /* The locked map block */
+    MemHandle mh;  	    /* Memory handle of the locked VM blocks */
+    VMBlockHandle  arrBlock, mBlock;
+    GeodeToken	cTok;
+
+/* Main-HugeArray anlegen */
+   arrBlock = HugeArrayCreate(file,sizeof(InstallEntry),0);
+
+/* MapBlock anlegen und initialisieren */
+    mBlock = VMAlloc(file, sizeof(ICMapBlock), 0);
+    VMSetMapBlock(file, mBlock);
+    mapPtr = VMLock(file, mBlock, &mh);
+    memset (mapPtr, 0, sizeof(ICMapBlock));
+    mapPtr->mainArray = arrBlock;
+    mapPtr->appInstDefaultFlags = APP_INST_DEFAULT_FLAGS;
+    mapPtr->docInstDefaultFlags = DOC_INST_DEFAULT_FLAGS;
+    mapPtr->rbasicInstDefaultFlags = RBASIC_INST_DEFAULT_FLAGS;
+    VMDirty(mh);
+    VMUnlock(mh);
+/* Creator-Token des UNI-Installers setzen */
+    SetTokenTo(cTok,'I','s','t','F',16480);
+    FileSetHandleExtAttributes(file,FEA_CREATOR,&cTok,sizeof(GeodeToken));
+
+    return(FALSE);		/* Return no error */
+}
+
+/***********************************************************************
+ *				UpdateDocumentUI
+ ***********************************************************************
+ * SYNOPSIS:	    Update the UI components to display the values
+ *		    stored in the document.
+ ***********************************************************************/
+
+/*---------------------  ---------------------
+ *      Purpose:        
+ *---------------------------------------------------------------------------*/
+static void UpdateDocumentUI(void)
+{
+int 		count;
+MemHandle	mh;
+ICMapBlock	*mapPtr;
+
+
+   if (!global.docFile) return;	// sicher ist sicher!
+
+   mapPtr = VMLock(global.docFile,global.docMapBlock,&mh);
+
+/* Liste initialisieren */
+   count = HugeArrayGetCount(global.docFile,mapPtr->mainArray);
+
+   @send DetailFileList::MSG_GEN_DYNAMIC_LIST_INITIALIZE(count);
+
+/* InfoTexte setzen */
+   @call IFPrognameText::
+		MSG_VIS_TEXT_REPLACE_ALL_PTR(mapPtr->programName,0);
+   @call IFBeschreibungText::
+		MSG_VIS_TEXT_REPLACE_ALL_PTR(mapPtr->beschreibung,0);
+   @call IFCopyrightText::
+		MSG_VIS_TEXT_REPLACE_ALL_PTR(mapPtr->copyright,0);
+   VMUnlock(mh);
+   }
+
+/*--------------------- MSG_META_DOC_OUTPUT_ATTACH_UI_TO_DOCUMENT ---------------------
+ * Purpose:	    Update der globalen Variablen und der UI zu einem
+ *		    	gerade geîffneten oder angelegten Document
+ * Paramters:	void (optr document, FileHandle file)
+ *---------------------------------------------------------------------------*/
+@extern method IFProcessClass, MSG_META_DOC_OUTPUT_ATTACH_UI_TO_DOCUMENT
+{
+    /* Daten des aktuellen Dokuments speichern. Das Objekt IFDocumentGroup
+     * hat ein Document-Objekt erzeugt, dessen optr hier Åbergeben wird.*/
+    @call document::MSG_GEN_DOCUMENT_GET_FILE_NAME(global.docName);
+    @call document::MSG_GEN_PATH_GET(global.docPath, sizeof(PathName));
+    global.docDisk = @call document::MSG_GEN_PATH_GET_DISK_HANDLE();
+
+    global.docFile = file;
+    global.docMapBlock = VMGetMapBlock(global.docFile);
+    UpdateDocumentUI();
+}
+
+
+
+
+/*--------------------- MSG_META_DOC_OUTPUT_DETACH_UI_FROM_DOCUMENT ---------------------
+ * Purpose:		Das Document wird geschlossen, daher sind alle Anzeigen
+ *		    	zu deaktivieren
+ * Paramters:   void (optr document, FileHandle file)
+ *---------------------------------------------------------------------------*/
+@extern method IFProcessClass, MSG_META_DOC_OUTPUT_DETACH_UI_FROM_DOCUMENT
+{
+char leer[]="";
+    global.docFile = NullHandle;
+    global.docMapBlock = 0;
+    @send DetailFileList::MSG_GEN_DYNAMIC_LIST_INITIALIZE(0);
+/* InfoTexte zurÅcksetzen */
+   @call IFPrognameText::
+		MSG_VIS_TEXT_REPLACE_ALL_PTR(leer,0);
+   @call IFBeschreibungText::
+		MSG_VIS_TEXT_REPLACE_ALL_PTR(leer,0);
+   @call IFCopyrightText::
+		MSG_VIS_TEXT_REPLACE_ALL_PTR(leer,0);
+}
+
+/*--------------------- MSG_META_DOC_OUTPUT_SAVE_AS_COMPLETED ---------------------
+ * Purpose:	    Nach einem "Speichern unter" gibts eine neues FileHandle
+ *		    	und der Map-Block (das Handle) ist auch zu updaten
+ * Paramters:   void (optr document, FileHandle file)
+ *---------------------------------------------------------------------------*/
+@extern method IFProcessClass, MSG_META_DOC_OUTPUT_SAVE_AS_COMPLETED
+{
+    global.docFile = file;
+    global.docMapBlock = VMGetMapBlock(global.docFile);
+}
+
+/*###########################################################################
+	CODE f¸r IFProcessClass
+/*###########################################################################
+	Initialisierung
+	MSG_GEN_PROCESS_OPEN_APPLICATION 
+	MSG_GEN_PROCESS_CLOSE_APPLICATION 
+	MSG_IF_LOAD_OPTIONS
+
+/*###########################################################################*/
+
+/*---------------------  ---------------------
+ *      Purpose:        
+ *---------------------------------------------------------------------------*/
+@extern method IFProcessClass, MSG_GEN_PROCESS_OPEN_APPLICATION {
+	memset(&global, 0, sizeof(GlobalStruct));
+	@callsuper();
+	@call oself::MSG_IF_LOAD_OPTIONS();
+	}
+
+/*---------------------  ---------------------
+ *	Aufgabe:
+ *	Zusammenhang:
+ *	Strategie:
+ *	Parameter:
+ ---------------------------------------------------------------------------*/
+@extern method IFProcessClass, MSG_GEN_PROCESS_CLOSE_APPLICATION {
+word count, ctok;
+MemHandle mh;
+AppLaunchBlock  *albPtr;
+GeodeToken token = { 'I','C','r','e',16480 };
+
+	if ( global.launchCreator ) {
+		/* UniInstallCreator mit dem Dokument starten */
+		mh = IACPCreateDefaultLaunchBlock(MSG_GEN_PROCESS_OPEN_APPLICATION);
+		albPtr = MemLock(mh);
+		strcpy(albPtr->ALB_path,global.docPath);
+		strcpy(albPtr->ALB_dataFile,global.docName);
+		albPtr->ALB_diskHandle = global.docDisk;
+		MemUnlock(mh);
+		ctok = IACPConnect(&token,
+			IACPSM_USER_INTERACTIBLE | IACPCF_FIRST_ONLY
+				, mh, NullOptr, &count);
+
+		if ( ctok != 0 ) IACPShutdown(ctok,NullOptr);
+		// Ne Fehlermeldung wird in CLOSE_APP nicht mehr angezeigt
+		// Deswegen wurde die App schon in MSG_..START_EDIT gestartet
+		}
+
+	return @callsuper();
+	}
+
+
+
+/* ####################################################################### */
+
+/*---------------------  ---------------------
+ *      Purpose:        
+ *---------------------------------------------------------------------------*/
+word LocalReadOptions(void ) {
+word options, err;
+       MemLock(HandleOf(@InifKat));
+       err = InitFileReadInteger(LMemDeref(@InifKat),
+		LMemDeref(@InifKey), &options);
+       if ( err ) options = IF_DEFAULT_OPTIONS;
+       MemUnlock(HandleOf(@InifKat));
+
+       return options;
+       }
+
+/*---------------------  ---------------------
+ *      Purpose:        
+ *---------------------------------------------------------------------------*/
+void LocalSaveOptions(word options) {
+       MemLock(HandleOf(@InifKat));
+       InitFileWriteInteger(LMemDeref(@InifKat), LMemDeref(@InifKey), options);
+       MemUnlock(HandleOf(@InifKat));
+       }
+
+
+/*---------------------  ---------------------
+ *      Purpose:        
+ *---------------------------------------------------------------------------*/
+@extern method IFProcessClass, MSG_IF_LOAD_OPTIONS {
+word options;
+
+     options = LocalReadOptions();
+     @send EditSelektor::MSG_GEN_BOOLEAN_GROUP_SET_GROUP_STATE(options, 0);
+     if ( options & ID_ENABLE_EDIT ) {
+	// Modus aktivieren
+	@send IFStartEditTrigger::MSG_GEN_SET_USABLE(VUM_NOW);
+	}
+   else {
+	// Modus deaktivieren
+	@send IFStartEditTrigger::MSG_GEN_SET_NOT_USABLE(VUM_NOW);
+	}
+   @send IFPrimary::MSG_GEN_SET_USABLE(VUM_NOW);
+}
+
+/* ####################################################################### */
+
+/*---------------------  ---------------------
+ *      Purpose:        
+ *---------------------------------------------------------------------------*/
+Boolean LocalOpenFile( StartFileParams * sfpp) {
+
+word count, ctok;
+MemHandle mh;
+AppLaunchBlock  *albPtr;
+
+
+   mh = IACPCreateDefaultLaunchBlock(MSG_GEN_PROCESS_OPEN_APPLICATION);
+   albPtr = MemLock(mh);
+
+   strcpy(albPtr->ALB_path,sfpp->path);
+   strcpy(albPtr->ALB_dataFile,sfpp->fileName);
+   albPtr->ALB_diskHandle = sfpp->dh;
+   MemUnlock(mh);
+
+   ctok = IACPConnect(&sfpp->creator,
+	IACPSM_USER_INTERACTIBLE | IACPCF_FIRST_ONLY
+				, mh, NullOptr, &count);
+   if ( ctok == 0 ) {
+	ErrorMsgBox(@ErrorDataConnectFailed,sfpp->fileName,0);
+	}
+   else IACPShutdown(ctok,NullOptr);
+
+   return FALSE;
+   }
+
+/*--------------------- LocalExecGeode ---------------------
+ *      Purpose:        Starten einer AusfÅhrbaeren Datei
+ *      Params/Return:	True wenn Fehler
+ ---------------------------------------------------------------------------*/
+Boolean LocalExecGeode( StartFileParams * sfpp) {
+word count, ctok;
+MemHandle mh;
+AppLaunchBlock  *albPtr;
+
+
+   mh = IACPCreateDefaultLaunchBlock(MSG_GEN_PROCESS_OPEN_APPLICATION);
+   albPtr = MemLock(mh);
+
+   strcpy(albPtr->ALB_appRef.AIR_fileName,sfpp->path);
+   strcat(albPtr->ALB_appRef.AIR_fileName,"\\");
+   strcat(albPtr->ALB_appRef.AIR_fileName,sfpp->fileName);
+   albPtr->ALB_appRef.AIR_diskHandle = sfpp->dh;
+
+   MemUnlock(mh);
+   ctok = IACPConnect(&sfpp->token,
+		IACPSM_USER_INTERACTIBLE | IACPCF_FIRST_ONLY
+			, mh, NullOptr, &count);
+   if ( ctok == 0 ) {
+	ErrorMsgBox(@ErrorAppConnectFailed,sfpp->fileName,0);
+	}
+   else    {
+	IACPShutdown(ctok,NullOptr);
+	}
+   return FALSE;
+}
+
+/*--------------------- LocalInstallAndExecuteTool ---------------------
+ *      Purpose:        Installieren, ausfÅhren und wieder lîschen
+ *			eines Update oder CleanUp-Tools
+ ---------------------------------------------------------------------------*/
+
+void LocalInstallAndExecuteTool(InstallEntry *  entryPtr, optr introText) {
+
+      InfoMsgBox(introText,entryPtr->main.file.geosName,0);
+
+      @call IFWriteFileGlyph::MSG_GEN_REPLACE_VIS_MONIKER_TEXT
+			      (entryPtr->main.file.geosName,VUM_NOW);
+      @send IFWriteFileBox::MSG_GEN_INTERACTION_INITIATE();
+      IFInstallFile(&entryPtr->main.file,entryPtr->instFlags);
+      @send IFWriteFileBox::MSG_GEN_GUP_INTERACTION_COMMAND(IC_DISMISS);
+
+      if (global.cancelInstall) return;
+      if ( LocalStartTool( &entryPtr->main.file) ) return;
+
+      InfoMsgBox(@ContinueUpdateTool,entryPtr->main.file.geosName,0);
+
+      FilePushDir();
+      if ( FileSetCurrentPath(entryPtr->main.file.dh,
+	      entryPtr->main.file.path) ) {
+	      // Pfad gefunden und reingewechselt
+	      int err;
+	      LocalDeinstallBoxShow(entryPtr->main.file.geosName,@DelFileMoniker);
+	      err = FileToolDeleteFile(entryPtr->main.file.geosName);
+	      if ( err ) {
+		      ErrorMsgBox(@ErrorDeinstallUpdateTool,
+			      entryPtr->main.file.geosName,0);
+		      }
+	      LocalHideDeinstallBox();
+	      }	// if (SetCurrentPath)
+      FilePopDir();
+      }
+
+/*--------------------- LocalStartTool ---------------------
+ *      Purpose:        Starten einer AusfÅhrbaeren Datei
+ *      Params/Return:	True wenn Fehler
+ ---------------------------------------------------------------------------*/
+Boolean LocalStartTool( FileMainParams * fmp) {
+word count, ctok;
+MemHandle mh;
+AppLaunchBlock  *albPtr;
+
+
+   mh = IACPCreateDefaultLaunchBlock(MSG_GEN_PROCESS_OPEN_APPLICATION);
+   albPtr = MemLock(mh);
+
+   strcpy(albPtr->ALB_appRef.AIR_fileName,fmp->path);
+   strcat(albPtr->ALB_appRef.AIR_fileName,"\\");
+   strcat(albPtr->ALB_appRef.AIR_fileName,fmp->geosName);
+   albPtr->ALB_appRef.AIR_diskHandle = fmp->dh;
+
+   MemUnlock(mh);
+   ctok = IACPConnect(&fmp->appToken,
+		IACPSM_USER_INTERACTIBLE | IACPCF_FIRST_ONLY
+			, mh, NullOptr, &count);
+   if ( ctok == 0 ) {
+	ErrorMsgBox(@ErrorAppConnectFailed,fmp->geosName,0);
+	}
+   else    {
+	IACPShutdown(ctok,NullOptr);
+	}
+   return FALSE;
+}
+
+/*--------------------- ToolConstructPath ---------------------
+ *      Purpose:	Textstring konstruieren, der den Pfad zu einer Datei
+ *			oder einem Verzeichnis darstellt, aber ohne der
+ *			Pfad zum SP_TOP zu enthalten
+ *	Paramters:	buffer: wohin mit dem Text (Grî·e: QUERY_TEXT_LEN)
+ *			dh: Diskhandle
+ *			path: Pfadstring
+ *			file: eventuelle Datei oder Unetrverz.
+ *				Nullpointer ist hier erlaubt
+ *      Return:
+ ---------------------------------------------------------------------------*/
+void ToolConstructPath(char *buffer, DiskHandle dh, char *path, char *file) {
+static int topLen = 0;
+char * p, *s, *d;
+
+	/* Bei Bedarf: LÑnge des SP_Top-Path ermitteln */
+	if (topLen == 0 ) {
+		p = buffer;
+		FileConstructFullPath(&p, QUERY_TEXT_LEN, SP_TOP,
+				".", FALSE);
+		topLen = strlen(buffer)+1;  	/* incl abschlie·endem '\'*/
+		}
+
+	p = buffer;
+	FileConstructFullPath(&p, QUERY_TEXT_LEN, dh, path, FALSE);
+	// evt Datei oder Verzeichnis anhÑngen
+	strcat(buffer,"\\");	// der muss sein, weil er in topLen enthalten
+				// ist, falls es SP_TOP ist
+	if ( file ) strcat(buffer, file);
+
+	/* SP_Top-Path rauskopieren */
+	s = &buffer[topLen];
+	d = buffer;
+	while ( *s != 0 ) {
+		*d = *s;
+		d++; s++;
+		}
+	*d = 0;
+
+	/* evt einen Backslash am Ende entfernen */
+	if ( strlen(buffer) > 0 ) {
+		d = strchr(buffer, 0);
+		d--;
+		if ( *d == '\\' ) *d=0;
+		}
+
+	}
+
+/* ------------------------------------------------------------------------
+ * ein einzelnes 0x0A am Anfang EinfÅgen (string wird lÑnger!)
+ * ------------------------------------------------------------------------*/
+void ToolInsert0x0A(char *txt) {
+char *src, *dest;
+int count, n;
+
+    src = strchr(txt,0);
+    dest = src+1;
+    count = dest - txt;		// Anzahl zu kopierender Zeichen
+    for ( n = 0; n < count; n++ )
+	{
+	*dest = *src;
+	dest--;
+	src--;
+	}
+    *txt = 0x0A;
+    }
+
+
+/*---------------------  ---------------------
+ *	Purpose:
+ *	Context:
+ *	Strategy:
+ *	Paramters:
+ ---------------------------------------------------------------------------*/
+

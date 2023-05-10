@@ -1,0 +1,146 @@
+/***********************************************************************
+ *
+ *	UI-File fÅr Template Data Format Library
+ *		UI-Objekte usw. fÅr die Library
+ *
+ *	Copyright:	(c) by RABE-Soft
+ *
+ *	Sonstiges:	-
+ *
+ ***********************************************************************/
+
+
+@include <stdapp.goh>
+@include "inif\inif.goh"
+@include "..\Shared\stdfrmt.goh"
+
+@start InifUIResource;
+
+
+@chunk char ErrorEmptyKategorie[] = "Error!\rYou have to set a value for 'Category'.";
+@chunk char ErrorEmptyKey[] = "Error!\rYou have to set a value for 'Keyword'.";
+@chunk char ErrorEmptyData[] = "Error!\rYou have to set a value for 'Value'.";
+@chunk char ErrorReadINI[] = "Error!\rThe requested entry was not found.";
+@chunk char ErrorINIEntryToLarge[] = "Error!\rThe requested entry contains too \
+many characters. You have to split it manually.";
+
+@end InifUIResource;
+
+/* ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+	Part 3: Chunks oder Ui-Objekte, die streng Format-spezifisch sind.
+	Beim Schreiben einer neuen Format-Library ist dieser Teil oftmals
+	komplett durch andere Objekte zu ersetzen.
+/* ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++*/
+
+@start InifDialogResource;
+
+/* ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+	Aus irgendwelchen, mir nicht nÑher verstÑndlichen GrÅnden
+	akzeptiert swat Dialoge, die mit UserCreateDialog() erzeugt
+	werden, nur, wenn sie in eine eigenen Resource sind.
+/* ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++*/
+
+/*-------------------------------------------------------------------------
+	Objekte zum Anlegen und Bearbeiten eines INI-Eintrages
+  -----------------------------------------------------------------------*/
+@object InifEditDialogClass InifEditDialog = {
+	GI_visMoniker = "Create/Modify Ini-File Entry";
+	GI_comp = @InifInstInfoText,@InifDeInfoText,
+		@InifTopGroup,@InifData,@InifReplyBar;
+	GII_visibility = GIV_DIALOG;
+	GII_type = GIT_NOTIFICATION;
+	GII_attrs = GIA_MODAL | GIA_INITIATED_VIA_USER_DO_DIALOG | GIA_NOT_USER_INITIATABLE;
+	GI_states = @default & ~GS_USABLE;
+	ATTR_GEN_HELP_CONTEXT = "IniEntry";
+	}
+@object GenTextClass InifInstInfoText = {
+	GTXI_text = "The INI file becomes modified at installation time, but becomes not \
+reset automatically when the user removes the software. You must specify this explicitely. \
+Note, that INI file modifications may be dangerous.";
+	GI_attrs = @default | GA_READ_ONLY;
+	HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+	}
+@object GenTextClass InifDeInfoText = {
+	GTXI_text = "The INI file entry becomes modified when the user REMOVES the software. \
+Note, that INI file modifications may be dangerous.";
+	GI_attrs = @default | GA_READ_ONLY;
+	HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+	}
+
+
+@object GenInteractionClass InifTopGroup = {
+	GI_comp = @InifKategorie,@InifKey,@InifFlagSelector;
+	HINT_RIGHT_JUSTIFY_CHILDREN;
+	HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+	}
+
+@object GenTextClass InifKategorie = {
+	GI_visMoniker = 't',"   Category [ ]:";
+	HINT_PLACE_MONIKER_TO_LEFT;
+	GTXI_maxLength = MAX_INITFILE_CATEGORY_LENGTH-1;
+	HINT_TEXT_WHITE_WASH_COLOR;
+	HINT_FIXED_SIZE = { SST_PIXELS | 200, SST_LINES_OF_TEXT | 1, 1 };
+	HINT_DEFAULT_FOCUS;
+	GTXI_attrs = @default | GTA_SINGLE_LINE_TEXT;
+	}
+@object GenTextClass InifKey = {
+	GI_visMoniker = 'o',"Keyword:";
+	GTXI_maxLength = MAX_INITFILE_CATEGORY_LENGTH-1;
+	HINT_TEXT_WHITE_WASH_COLOR;
+	HINT_FIXED_SIZE = { SST_PIXELS | 200, SST_LINES_OF_TEXT | 1, 1 };
+	GTXI_attrs = @default | GTA_SINGLE_LINE_TEXT;
+	}
+@object GenTextClass InifData = {
+	GI_visMoniker = 'V',"Value:";
+	HINT_PLACE_MONIKER_ABOVE;
+	HINT_TEXT_WHITE_WASH_COLOR;
+	HINT_INITIAL_SIZE = { SST_PIXELS | 300, SST_LINES_OF_TEXT | 5, 5 };
+	GTXI_attrs = @default | GTA_INIT_SCROLLING;
+	HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+	GTXI_maxLength = 2*MAX_INITFILE_CATEGORY_LENGTH-1;
+	}
+@object GenItemGroupClass InifFlagSelector = {
+	GI_visMoniker = "Write to INI options:";
+	GI_comp = @EntryReplace,@EntryInsert,@EntryAppend,@EntryDelete;
+	HINT_ORIENT_CHILDREN_VERTICALLY;
+	GIGI_applyMsg = MSG_INIF_TYPE_CHANGED;
+	}
+@object GenItemClass EntryReplace = {
+	GI_visMoniker = 'R',"Replace old value";
+	GII_identifier = INIF_REPLACE;
+	}
+@object GenItemClass EntryAppend = {
+	GI_visMoniker = 'A',"Append to old values";
+	GII_identifier = INIF_APPEND;
+	}
+@object GenItemClass EntryInsert = {
+	GI_visMoniker = 'I',"Insert in front of old values";
+	GII_identifier = INIF_INSERT;
+	}
+@object GenItemClass EntryDelete = {
+	GI_visMoniker = 'D',"Delete entry";
+	GII_identifier = INIF_DELETE;
+	}
+
+@object GenInteractionClass InifReplyBar = {
+	GI_comp = @InifReadTrigger,@InifCancelTrigger,@InifOKTrigger;
+	HINT_MAKE_REPLY_BAR;
+	}
+@object GenTriggerClass InifReadTrigger = {
+	GI_visMoniker = 'R',"Read from INI";
+	GTI_destination = InifEditDialog;
+	GTI_actionMsg = MSG_INIF_READ;
+	}
+@object GenTriggerClass InifCancelTrigger = {
+	GI_visMoniker = 'C',"Cancel";
+	ATTR_GEN_TRIGGER_INTERACTION_COMMAND = IC_DISMISS;
+	}
+
+@object GenTriggerClass InifOKTrigger = {
+	GI_visMoniker = 'l',"Apply";
+	ATTR_GEN_TRIGGER_INTERACTION_COMMAND = IC_OK;
+	}
+
+
+@end InifDialogResource;
+

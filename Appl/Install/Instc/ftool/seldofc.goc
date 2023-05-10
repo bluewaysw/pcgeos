@@ -1,0 +1,355 @@
+/**************************************************************************
+ *	GEODE-File f¸r InstallCreator
+ *
+ * 	This file implements the FileTool routines which comes from the
+ *	Rabe-Soft FileTool-Library to remove the dependency of the 
+ *	InstallCreator program on this library
+
+ *	Beschreibung	Universelles Installationsprogramm
+ *			Installer
+ *
+ *	Copyright:	(c) by RABE-Soft 5/99
+ *	Sonstiges:	-
+ *
+ **************************************************************************/
+
+/*  Standard include files */
+@include <stdapp.goh>
+#include <stdio.h>
+#include <string.h>
+
+@include "ftool\ftool.goh"
+@include "ftool\ftoolui.goh"
+@include "..\Shared\msgbox.goh"
+
+
+
+
+/*###########################################################################
+ #	Implementation der Methoden f¸r SelectDirOrFileDialogClass
+ ###########################################################################*/
+
+@classdecl SelectDirOrFileDialogClass;
+
+/*--------------------- MSG_SDOF_SEL_DIR_NOTIFICATION ---------------------
+ *	Parameter	void	(word	entryNum,
+ *				GenFileSelectorEntryFlags entryFlags);
+ ---------------------------------------------------------------------------*/
+@method SelectDirOrFileDialogClass, MSG_SDOF_SEL_DIR_NOTIFICATION  {
+char    fullPath[PATH_BUFFER_SIZE];
+optr	fsel, child;
+
+
+	if ( entryFlags & GFSEF_OPEN ) {
+		return;
+		}
+	fsel = @GetChildOptr(DIALOG_CHILD_FILE_SELECTOR);
+
+/* Selektionsstring basteln und anzeigen */
+	FileToolGetFileSelectorFullPath(fullPath,fsel,TRUE);
+
+	child = @GetChildOptr(DIALOG_CHILD_PATH_TEXT);
+	@call child::MSG_VIS_TEXT_REPLACE_ALL_PTR(fullPath,0);
+
+	}
+
+/*--------------------- MSG_SDOF_SET_INFO_TEXT ---------------------
+ *	Aufgabe:	Freischalten und belegen des Info-textes
+ *	Parameter	void	(void *text, Boolean isOptr );
+ ---------------------------------------------------------------------------*/
+@method SelectDirOrFileDialogClass, MSG_SDOF_SET_INFO_TEXT {
+optr child;
+	child = @GetChildOptr(DIALOG_CHILD_INFO_TEXT);
+	if ( isOptr ) @call child::MSG_VIS_TEXT_REPLACE_ALL_OPTR((optr)text,0);
+		else  @call child::MSG_VIS_TEXT_REPLACE_ALL_PTR(text,0);
+	@call child::MSG_GEN_SET_USABLE(VUM_NOW);
+	}
+/*--------------------- MSG_SDOF_ENABLE_CANCEL_TRIGGER ---------------------
+ * 	Aufgabe:	Cancel-Trigger freischalten
+ *	Parameter	void	();
+ ---------------------------------------------------------------------------*/
+@method SelectDirOrFileDialogClass, MSG_SDOF_ENABLE_CANCEL_TRIGGER  {
+optr child;
+	child = @GetChildOptr(DIALOG_CHILD_CANCEL_TRIGGER);
+	@call child::MSG_GEN_SET_USABLE(VUM_NOW);
+	}
+/*--------------------- MSG_SDOF_ENABLE_CUSTOM_TRIGGER ---------------------
+ *	Aufgabe:	Custom-Trigger belegen und freischalten
+ *	Parameter	void	(char * moniker,Boolean enableOnlyIfFileSelected);
+ ---------------------------------------------------------------------------*/
+@method SelectDirOrFileDialogClass, MSG_SDOF_ENABLE_CUSTOM_TRIGGER  {
+optr child;
+	child = @GetChildOptr(DIALOG_CHILD_CUSTOM_TRIGGER);
+	if ( enableOnlyIfFileSelected ) {
+		@call child::MSG_GEN_SET_NOT_ENABLED(VUM_NOW);
+		pself->SDI_customFileOnly = TRUE;
+		}
+	@call child::MSG_GEN_REPLACE_VIS_MONIKER_TEXT(moniker, VUM_NOW);
+	@call child::MSG_GEN_SET_USABLE(VUM_NOW);
+	}
+
+/*--------------------- MSG_SDOF_SET_FSEL_TO_PATH ---------------------
+ *	Aufgabe:	File-Selector auf Pfad einstellen
+ *	Parameter	void	(char *path, DiskHandle dh);
+ ---------------------------------------------------------------------------*/
+@method SelectDirOrFileDialogClass, MSG_SDOF_SET_FSEL_TO_PATH {
+optr child;
+	child = @GetChildOptr(DIALOG_CHILD_FILE_SELECTOR);
+	@call child::MSG_GEN_PATH_SET(path,dh);
+	}
+
+/*--------------------- MSG_SDOF_GET_FILE_SELECTOR ---------------------
+ *	Aufgabe:	File-Selector-optr zurÅckliefern, damit Main-Routine ihn
+ *			modifizieren oder befragen kann
+ *	Parameter	optr	(void);
+ ---------------------------------------------------------------------------*/
+@method SelectDirOrFileDialogClass, MSG_SDOF_GET_FILE_SELECTOR {
+optr child;
+	child = @GetChildOptr(DIALOG_CHILD_FILE_SELECTOR);
+	return child;
+	}
+
+
+/*##########################################################################
+ #	Fehler und Warnungen
+ ###########################################################################*/
+
+/*---------------------	GetErrorText -------------------------------*
+ * 	Aufgabe:        Beschreibung zu einem Fehler-Code holen
+ * 	Parameter:
+ *----------------------------------------------------------------------*/
+void GetErrorText(int code, char *errText) {
+
+   switch ( code ) {
+
+	case 0:
+		strcpy(errText, "NO_ERROR");
+		break;
+	case ERROR_UNSUPPORTED_FUNCTION:
+		strcpy(errText, "UNSUPPORTED_FUNCTION");
+		break;
+	case ERROR_FILE_NOT_FOUND:
+		strcpy(errText, "FILE_NOT_FOUND");
+		break;
+	case ERROR_PATH_NOT_FOUND:
+		strcpy(errText, "PATH_NOT_FOUND");
+		break;
+	case ERROR_TOO_MANY_OPEN_FILES:
+		strcpy(errText, "TOO_MANY_OPEN_FILES");
+		break;
+	case ERROR_ACCESS_DENIED:
+		strcpy(errText, "ACCESS_DENIED");
+		break;
+	case ERROR_INSUFFICIENT_MEMORY:
+		strcpy(errText, "INSUFFICIENT_MEMORY");
+		break;
+	case ERROR_INVALID_VOLUME:
+		strcpy(errText, "INVALID_VOLUME");
+		break;
+	case ERROR_IS_CURRENT_DIRECTORY:
+		strcpy(errText, "IS_CURRENT_DIRECTORY");
+		break;
+	case ERROR_DIFFERENT_DEVICE:
+		strcpy(errText, "DIFFERENT_DEVICE");
+		break;
+	case ERROR_NO_MORE_FILES:
+		strcpy(errText, "NO_MORE_FILES");
+		break;
+	case ERROR_WRITE_PROTECTED:
+		strcpy(errText, "WRITE_PROTECTED");
+		break;
+	case ERROR_UNKNOWN_VOLUME:
+		strcpy(errText, "UNKNOWN_VOLUME");
+		break;
+	case ERROR_DRIVE_NOT_READY:
+		strcpy(errText, "DRIVE_NOT_READY");
+		break;
+	case ERROR_CRC_ERROR:
+		strcpy(errText, "CRC_ERROR");
+		break;
+	case ERROR_SEEK_ERROR:
+		strcpy(errText, "SEEK_ERROR");
+		break;
+	case ERROR_UNKNOWN_MEDIA:
+		strcpy(errText, "UNKNOWN_MEDIA");
+		break;
+	case ERROR_SECTOR_NOT_FOUND:
+		strcpy(errText, "SECTOR_NOT_FOUND");
+		break;
+	case ERROR_WRITE_FAULT:
+		strcpy(errText, "WRITE_FAULT");
+		break;
+	case ERROR_READ_FAULT:
+		strcpy(errText, "READ_FAULT");
+		break;
+	case ERROR_GENERAL_FAILURE:
+		strcpy(errText, "GENERAL_FAILURE");
+		break;
+	case ERROR_SHARING_VIOLATION:
+		strcpy(errText, "SHARING_VIOLATION");
+		break;
+	case ERROR_ALREADY_LOCKED:
+		strcpy(errText, "ALREADY_LOCKED");
+		break;
+	case ERROR_SHARING_OVERFLOW:
+		strcpy(errText, "SHARING_OVERFLOW");
+		break;
+	case ERROR_SHORT_READ_WRITE:
+		strcpy(errText, "SHORT_READ_WRITE");
+		break;
+	case ERROR_INVALID_LONGNAME:
+		strcpy(errText, "INVALID_LONGNAME");
+		break;
+	case ERROR_FILE_EXISTS:
+		strcpy(errText, "FILE_EXISTS");
+		break;
+	case ERROR_DOS_EXEC_IN_PROGRESS:
+		strcpy(errText, "DOS_EXEC_IN_PROGRESS");
+		break;
+	case ERROR_FILE_IN_USE:
+		strcpy(errText, "FILE_IN_USE");
+		break;
+	case ERROR_ARGS_TOO_LONG:
+		strcpy(errText, "ARGS_TOO_LONG");
+		break;
+	case ERROR_DISK_UNAVAILABLE:
+		strcpy(errText, "DISK_UNAVAILABLE");
+		break;
+	case ERROR_DISK_STALE:
+		strcpy(errText, "DISK_STALE");
+		break;
+	case ERROR_FILE_FORMAT_MISMATCH:
+		strcpy(errText, "FILE_FORMAT_MISMATCH");
+		break;
+	case ERROR_CANNOT_MAP_NAME:
+		strcpy(errText, "CANNOT_MAP_NAME");
+		break;
+	case ERROR_DIRECTORY_NOT_EMPTY:
+		strcpy(errText, "DIRECTORY_NOT_EMPTY");
+		break;
+	case ERROR_ATTR_NOT_SUPPORTED:
+		strcpy(errText, "ATTR_NOT_SUPPORTED");
+		break;
+	case ERROR_ATTR_NOT_FOUND:
+		strcpy(errText, "ATTR_NOT_FOUND");
+		break;
+	case ERROR_ATTR_SIZE_MISMATCH:
+		strcpy(errText, "ATTR_SIZE_MISMATCH");
+		break;
+	case ERROR_ATTR_CANNOT_BE_SET:
+		strcpy(errText, "ATTR_CANNOT_BE_SET");
+		break;
+	case ERROR_CANNOT_MOVE_DIRECTORY:
+		strcpy(errText, "CANNOT_MOVE_DIRECTORY");
+		break;
+	case ERROR_PATH_TOO_LONG:
+		strcpy(errText, "PATH_TOO_LONG");
+		break;
+	case ERROR_ARGS_INVALID:
+		strcpy(errText, "ARGS_INVALID");
+		break;
+	case ERROR_CANNOT_FIND_COMMAND_INTERPRETER:
+		strcpy(errText, "CANNOT_FIND_COMMAND_INTERPRETER");
+		break;
+	case ERROR_NO_TASK_DRIVER_LOADED:
+		strcpy(errText, "NO_TASK_DRIVER_LOADED");
+		break;
+
+	/* VM-Fehler-Codes */
+	case VM_FILE_EXISTS:
+		strcpy(errText, "VM_FILE_EXISTS");
+		break;
+	case VM_FILE_NOT_FOUND:
+		strcpy(errText, "VM_FILE_NOT_FOUND");
+		break;
+	case VM_SHARING_DENIED:
+		strcpy(errText, "VM_SHARING_DENIED");
+		break;
+	case VM_OPEN_INVALID_VM_FILE:
+		strcpy(errText, "VM_OPEN_INVALID_VM_FILE");
+		break;
+	case VM_CANNOT_CREATE:
+		strcpy(errText, "VM_CANNOT_CREATE");
+		break;
+	case VM_TRUNCATE_FAILED:
+		strcpy(errText, "VM_TRUNCATE_FAILED");
+		break;
+	case VM_WRITE_PROTECTED:
+		strcpy(errText, "VM_WRITE_PROTECTED");
+		break;
+	case VM_CANNOT_OPEN_SHARED_MULTIPLE:
+		strcpy(errText, "VM_CANNOT_OPEN_SHARED_MULTIPLE");
+		break;
+	case VM_FILE_FORMAT_MISMATCH:
+		strcpy(errText, "VM_FILE_FORMAT_MISMATCH");
+		break;
+
+/* VMUpdate status codes */
+
+	case VM_UPDATE_NOTHING_DIRTY:
+		strcpy(errText, "VM_UPDATE_NOTHING_DIRTY");
+		break;
+	case VM_UPDATE_INSUFFICIENT_DISK_SPACE:
+		strcpy(errText, "VM_UPDATE_INSUFFICIENT_DISK_SPACE");
+		break;
+	case VM_UPDATE_BLOCK_WAS_LOCKED:
+		strcpy(errText, "VM_UPDATE_BLOCK_WAS_LOCKED");
+		break;
+
+/* VMDiscardDirtyBlock status codes */
+	case VM_DISCARD_CANNOT_DISCARD_BLOCK:
+		strcpy(errText, "VM_DISCARD_CANNOT_DISCARD_BLOCK");
+		break;
+
+	default: sprintf(errText, "<CODE: %d>", code);
+	}
+
+   }
+
+
+/*--------------------- ErrorMsgCodeBox ---------------------
+ *	Aufgabe:	Fehlermeldung mit halbwegs klarem Code
+ *			ausgeben (FILE_NOT_FOUND etc.)
+ ---------------------------------------------------------------------------*/
+word ErrorMsgCodeBox(optr info, char *param1, int errorCode)	{
+char *p, param2[64];	// Fehlermeldung
+word ret;
+
+	GetErrorText(errorCode, param2);
+
+	MemLock(OptrToHandle(info));		/* Resource pinnen */
+	p = LMemDeref(info);			/* Zeiger besorgen */
+	ret = UserStandardDialog(0,0, param2, param1,p,
+		( ( CDT_ERROR << CDBF_DIALOG_TYPE_OFFSET) |
+		  (GIT_NOTIFICATION << CDBF_INTERACTION_TYPE_OFFSET)));
+	MemUnlock(OptrToHandle(info));		/* Resource freigen */
+	return ret;
+	}
+
+/*--------------------- WarningMsgCodeBox ---------------------
+ *	Aufgabe:	Fehlermeldung mit halbwegs klarem Code
+ *			ausgeben (FILE_NOT_FOUND etc.)
+ ---------------------------------------------------------------------------*/
+word WarningMsgCodeBox(optr info, char *param1, int errorCode)	{
+char *p, param2[64];	// Fehlermeldung
+word ret;
+
+	GetErrorText(errorCode, param2);
+
+	MemLock(OptrToHandle(info));		/* Resource pinnen */
+	p = LMemDeref(info);			/* Zeiger besorgen */
+	ret = UserStandardDialog(0,0, param2, param1,p,
+		( ( CDT_WARNING << CDBF_DIALOG_TYPE_OFFSET) |
+		  (GIT_AFFIRMATION << CDBF_INTERACTION_TYPE_OFFSET)));
+	MemUnlock(OptrToHandle(info));		/* Resource freigen */
+	return ret;
+	}
+
+
+/*---------------------  ---------------------
+ *	Purpose:
+ *	Context:
+ *	Strategy:
+ *	Paramters:
+ ---------------------------------------------------------------------------*/
+

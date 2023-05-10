@@ -1,0 +1,1004 @@
+/**************************************************************************
+ *	GEODE-File für
+ *
+ *	Beschreibung	Universelles Installationsprogramm
+ *			Installer
+ *
+ *	Copyright:	(c) by RABE-Soft 5/99
+ *	Sonstiges:	-
+ *
+ **************************************************************************/
+
+/*  Standard include files */
+@include <stdapp.goh>
+@include <stdlib.h>
+@include <sysstats.h>
+@include "instf.goh"
+@include "main\iconedi.goh"
+@include "main\dosicon.goh"
+@include "ui\appui.goh"
+@include "..\Shared\instllr.goh"
+@include "..\Shared\rainer.goh"
+@include "..\Shared\msgbox.goh"
+
+#include <string.h>
+#include <stdio.h>
+#include <token.h>
+#include <initfile.h>
+#include <stdlib.h>
+
+/*--------------------- Local Header ---------------------
+ *---------------------------------------------------------------------------*/
+Boolean LocalOpenFile( StartFileParams * sfpp);
+Boolean LocalExecGeode( StartFileParams * sfpp);
+void LocalInstallAndExecuteTool(InstallEntry *  entryPtr, optr introText);
+Boolean LocalStartTool( FileMainParams * fmp);
+void LocalDeinstallBoxShow(char * text,optr label);
+void LocalDeinstallBoxShowSpace(void);
+void LocalHideDeinstallBox(void);
+void LocalInstallBoxShow(char * text,optr label);
+void LocalInstallBoxShowSpace(void);
+void LocalHideInstallBox(void);
+void ToolInsert0x0A(char *txt);
+
+word LocalReadOptions(void );
+void LocalSaveOptions(word options);
+
+
+@classdecl IFProcessClass, neverSaved;
+
+@extern method IFProcessClass, MSG_IF_QUERY_LIST_ITEM;
+
+@extern method IFProcessClass, MSG_META_DOC_OUTPUT_INITIALIZE_DOCUMENT_FILE;
+@extern method IFProcessClass, MSG_META_DOC_OUTPUT_ATTACH_UI_TO_DOCUMENT;
+@extern method IFProcessClass, MSG_META_DOC_OUTPUT_DETACH_UI_FROM_DOCUMENT;
+@extern method IFProcessClass, MSG_META_DOC_OUTPUT_SAVE_AS_COMPLETED;
+@extern method IFProcessClass, MSG_GEN_PROCESS_OPEN_APPLICATION;
+@extern method IFProcessClass, MSG_GEN_PROCESS_OPEN_APPLICATION;
+@extern method IFProcessClass, MSG_IF_LOAD_OPTIONS;
+
+/*---------------------------------------------------------------------------
+ Globale Variablen und Typen
+ ---------------------------------------------------------------------------*/
+
+GlobalStruct	global;
+
+
+/*###########################################################################
+	CODE für IFProcessClass und andere
+/*###########################################################################
+	Teil 2: Behandlung der Messages der UI-Objekte
+/*###########################################################################*/
+
+
+/*---------------------  ---------------------
+ *	Purpose:
+ ---------------------------------------------------------------------------*/
+int QuestionDeleteFile(InstallEntry *entryPtr) {
+char *text, *p;
+int retVal;
+
+	text = malloc(QUERY_TEXT_LEN);
+	if (!text) return IC_YES;
+
+	p = text;
+	FileConstructFullPath(&p, QUERY_TEXT_LEN, entryPtr->main.deleteFile.dh,
+		entryPtr->main.deleteFile.path, FALSE);
+	strcat(text,"\\");
+	strcat(text,entryPtr->main.deleteFile.fileName);
+	retVal = QuestionMsgBox(@QuestionDelFile, text, 0);
+	free(text);
+	return retVal;
+}
+
+/*---------------------  ---------------------
+ *      Purpose:        
+ *---------------------------------------------------------------------------*/
+void IFDeleteFile(InstallEntry *entryPtr) {
+
+    FilePushDir();
+    if ( FileSetCurrentPath(entryPtr->main.deleteFile.dh,
+		entryPtr->main.deleteFile.path) ) {
+		// Pfad gefunden und reingewechselt
+		int err, ignf;
+		ignf = global.ignoreNotFound;
+		global.ignoreNotFound  = TRUE;
+		err = FileToolDeleteFile(entryPtr->main.deleteFile.fileName);
+		global.ignoreNotFound  = ignf;
+		if ( err ) {
+			ErrorMsgNumberBox(@ErrorInstallDeleteFile,
+				entryPtr->main.deleteFile.fileName,err);
+			}
+		}	// if (SetCurrentPath)
+    FilePopDir();
+}
+
+/*---------------------  ---------------------
+ *      Purpose:        
+ *---------------------------------------------------------------------------*/
+void IFWriteIniEntry(IniEntryParams *iniEntry) {
+//char kat[MAX_INITFILE_CATEGORY_LENGTH+2];
+//char key[MAX_INITFILE_CATEGORY_LENGTH+2];
+char *p, *txt;
+int len, err, crcount = 0;
+MemHandle mh, r_mh=0, w_mh=0;
+word size;
+
+	//dataSize = ToolGetKatAndKeyAndSize(oself,kat,key, TRUE);
+	// dataSize == 0 heiát: kat or key or data sind leer
+	//if (!dataSize) return;
+
+	// 0D wieder durch 0D0A ersetzen, sonst ist nicht gut INI-Schreiben!
+	// Dazu wird der Text in einen Speicherblock kopiert, die 0x0D
+	// gez„hlt und dann der Block entsprechend vergr”áert
+
+	mh = MemAlloc(strlen(iniEntry->data) + 3, HF_SWAPABLE, HAF_ZERO_INIT);
+	txt = MemLock(mh);
+	strcpy(txt, iniEntry->data);
+	len = strlen(txt);
+	p = strchr(txt,0x0D);
+	while ( p ) { crcount++; txt = p+1; p = strchr(txt,0x0D); }
+
+	MemReAlloc(mh, len + crcount +1 , 0 );
+	txt = MemDeref(mh);
+	p = strchr(txt,0x0D);
+	while ( p )  { ToolInsert0x0A(p+1); txt = p+2; p = strchr(txt,0x0D); }
+
+	txt = MemDeref(mh);
+
+	switch (iniEntry->flags) {
+	  case INIF_DELETE:
+		InitFileDeleteEntry(iniEntry->kategorie, iniEntry->key);
+		break;
+	  case INIF_REPLACE:
+		InitFileWriteString(iniEntry->kategorie,
+				iniEntry->key, txt);
+		break;
+	  case INIF_APPEND:
+		/* Da InitFileWriteStringSection() keine CR/LF versteht, muss
+		 * in jedem Fall gebastelt werden. */
+	  case INIF_INSERT:
+		/* Jetzt ist ganz viel Basteln angesagt */
+		err = InitFileReadStringBlock(iniEntry->kategorie,
+				iniEntry->key,
+				&r_mh, 0, &size);
+		if (err || !r_mh) {
+			InitFileWriteString(iniEntry->kategorie,
+				iniEntry->key, txt);
+			/* Wenn err!=0, dann r_mh ungltig! -> nicht Free'en!!!*/
+			break;
+			}
+		w_mh = MemAlloc(size + strlen(txt) + 3, HF_SWAPABLE, HAF_ZERO_INIT);
+
+		if ( (iniEntry->flags) == INIF_INSERT ) {
+			strcpy(MemLock(w_mh),txt);          	// neue Infos
+			strcat(MemDeref(w_mh),"\15\12");	// 0D0A
+			strcat(MemDeref(w_mh),MemLock(r_mh));	// alte Infos
+			}
+		  else {
+			strcpy(MemLock(w_mh),MemLock(r_mh));	// alte Infos
+			strcat(MemDeref(w_mh),"\15\12");	// 0D0A
+			strcat(MemDeref(w_mh),txt);          	// neue Infos
+			}
+
+		InitFileWriteString(iniEntry->kategorie,
+				iniEntry->key,
+				MemDeref(w_mh));
+		MemFree(w_mh);
+		MemFree(r_mh);
+		break;
+	  /*default: InfoBox(@InvalidFlags);*/
+	  }
+
+	MemFree(mh);
+
+}
+
+/*--------------------- SleepIfLowOnHandles ---------------------
+ *	Purpose:
+ *	Context:
+ *	Strategy:
+ 		 * Work-Around: Die File-Routinen in WriteFileFromHugeArray()
+ 		 * verbrauchen temporär Handles, geben sie aber dann selbst wieder
+ 		 * frei. Ruft man die Routinen im Zyklus (wie hier) können die
+ 		 * Handles schneller verbraucht werden, als sie freigegeben werden.
+ 		 * [Das scheint auch von der Systemgeschwindigkeit anzuhängen]
+ 		 * --> Ich schicke den aufrufenen Thread für eine kurze Zeit schlafen,
+ 		 *     so dass der Kernel Zeit hat, die Handles freizugeben.
+ *	Paramters:
+ ---------------------------------------------------------------------------*/
+void SleepIfLowOnHandles( word hanLimit) {
+
+		if ( SysGetInfo(SGIT_NUMBER_OF_FREE_HANDLES) < hanLimit ) {
+			// Jetzt dem System Zeit geben: 0,25 sek.
+			TimerSleep(15);
+			if ( SysGetInfo(SGIT_NUMBER_OF_FREE_HANDLES) < (hanLimit + HANDLE_EATER_LIMIT/2) ) {
+				// Wenn das nicht gereicht hat: nachlegen, aber richtig
+				TimerSleep(60);		// Eine Sekunde. Das stockt jetzt schon ...
+				}
+			}
+}
+
+
+/*--------------------- MSG_IF_INSTALL ---------------------
+ *	Purpose:
+ *	Context:
+ *	Strategy:
+ *	Paramters:	Hanldes-Grenze, die nicht unterschrittwen werden soll
+ ---------------------------------------------------------------------------*/
+@method IFProcessClass, MSG_IF_INSTALL {
+InstallEntry * entryPtr;
+VMBlockHandle 	mainArray;
+int item, count, type, retVal, userInfoState;
+Boolean showStartInfoBox, modifyIni, shutDown = FALSE;
+char text[INI_CATEGORY_BUFFER_SIZE+2];	/* 66 */
+
+/* Work-Around Handlefresser -> siehe unten */
+word	hanLimit;
+
+
+  if ( !global.docFile ) {
+	UserStandardSound(SST_ERROR);
+	return;
+	}
+
+  @send application::MSG_GEN_APPLICATION_MARK_BUSY();
+  hanLimit = SysGetInfo(SGIT_NUMBER_OF_FREE_HANDLES) - HANDLE_EATER_LIMIT;
+
+  mainArray = IFGetMainArrayHandle();
+  count = HugeArrayGetCount(global.docFile,mainArray);
+
+/* 0. Vorarbeit: evt GEOS.INI sichern */
+  item = 0;
+  modifyIni = FALSE;
+  while ( item < count ) {
+	entryPtr = IFLockMainArrayElement(item);
+	switch (entryPtr->type) {
+	    case IOT_INI_ENTRY_INSTALL:
+//	    case IOT_DOS_TOKEN:	 	// hat eigene Warnung
+//	    case IOT_INI:		// Beim Deinstallieren
+//	    case IOT_INI_ENTRY_DEINSTALL: // beim Deinstallieren
+			modifyIni = TRUE;
+			break;
+	    }
+
+	IFUnlockMainArray(entryPtr);
+	if (modifyIni) break;
+	item++;
+	}
+  if ( modifyIni ) {
+	if ( QuestionMsgBox(@QuestionBackupIni, 0, 0) == IC_YES )
+		{
+		if ( ToolBackupGeosIni() ) {
+			@send application::MSG_GEN_APPLICATION_MARK_NOT_BUSY();
+			return;
+			}
+		}
+	}
+
+
+/* 1. Runde: Installieren aller Dateien */
+  item = 0;
+  global.cancelInstall = FALSE;
+  LocalInstallBoxShowSpace();
+  while ( (item < count) && !global.cancelInstall ) {
+	entryPtr = IFLockMainArrayElement(item);
+	if (entryPtr->type == IOT_FILE) {
+
+		/* ----------------------------------------------------------------
+		 * Work-Around: Die File-Routinen in WriteFileFromHugeArray()
+		 * verbrauchen temporär Handles, geben sie aber dann selbst wieder
+		 * frei. Ruft man die Routinen im Zyklus (wie hier) können die
+		 * Handles schneller verbraucht werden, als sie freigegeben werden.
+		 * [Das scheint auch von der Systemgeschwindigkeit anzuhängen]
+		 * --> Ich schicke den aufrufenen Thread für eine kurze Zeit schlafen,
+		 *     so dass der Kernel Zeit hat, die Handles freizugeben.
+		 * ----------------------------------------------------------------*/
+		SleepIfLowOnHandles(hanLimit);
+
+		LocalInstallBoxShow(entryPtr->main.file.geosName, @InstallFileMoniker);
+		IFInstallFile(&entryPtr->main.file,entryPtr->instFlags);
+		}
+
+	IFUnlockMainArray(entryPtr);
+	item++;
+	}
+  LocalInstallBoxShowSpace();
+
+/* Nachtrag: Ab Version 1.2: Eventuell Datei l”schen. INI-Eintr„ge */
+  item = 0;
+  userInfoState = 0;
+  while ( (item < count) && !global.cancelInstall ) {
+	entryPtr = IFLockMainArrayElement(item);
+
+	if (entryPtr->type == IOT_DELETE_EXTERN_FILE) {
+		if ( userInfoState == 0 ) {
+			int retVal = QuestionMsgBox(@WarningForDelete, 0, 0);
+			if ( retVal == IC_YES ) userInfoState = 1;
+				else userInfoState = 2;
+			}
+		if ( userInfoState == 1 ) retVal = QuestionDeleteFile(entryPtr);
+			else retVal = IC_YES;
+		if ( retVal == IC_YES ) {
+
+		/* ----------------------------------------------------------------
+		 * Work-Around: Auch DeleteFile macht Probleme. Siehe oben
+		 * ----------------------------------------------------------------*/
+			SleepIfLowOnHandles(hanLimit);
+
+
+			LocalInstallBoxShow(entryPtr->main.deleteFile.fileName,@DelFileMoniker);
+			IFDeleteFile(entryPtr);
+			}
+		}
+
+	if (entryPtr->type == IOT_INI_ENTRY_INSTALL) {
+		strcpy(text,"[");
+		strcat(text,entryPtr->main.iniEntry.kategorie);
+		strcat(text,"]");
+		LocalInstallBoxShow(text,@ModiIniMoniker);
+		IFWriteIniEntry(&entryPtr->main.iniEntry);
+		}
+
+	IFUnlockMainArray(entryPtr);
+	item++;
+	}
+
+   LocalInstallBoxShowSpace();
+   LocalHideInstallBox();
+
+/* 2. Runde: DOS-Icons anfordern */
+  item = 0;
+  while ( (item < count) && !global.cancelInstall ) {
+	entryPtr = IFLockMainArrayElement(item);
+	if (entryPtr->type == IOT_DOS_TOKEN)
+			shutDown = IFRequestDosToken(&entryPtr->main.dosToken);
+	IFUnlockMainArray(entryPtr);
+	item++;
+	}
+  if (shutDown)	DosIconWriteDosFileList();
+
+/* 3. Runde: Update-Tool(s) starten */
+  item = 0;
+  while ( (item < count) && !global.cancelInstall ) {
+	entryPtr = IFLockMainArrayElement(item);
+	if (entryPtr->type == IOT_UPDATE_TOOL) {
+		SleepIfLowOnHandles(hanLimit);
+		LocalInstallAndExecuteTool(entryPtr, @InfoStartUpdateTool);
+		}
+	IFUnlockMainArray(entryPtr);
+	item++;
+	}
+
+
+/* 4. Runde: Dateien Starten */
+  item = 0; showStartInfoBox = FALSE;
+  while ( (item < count) && !global.cancelInstall ) {
+	entryPtr = IFLockMainArrayElement(item);
+	if ((entryPtr->type == IOT_START_FILE)
+	|| (entryPtr->type == IOT_START_EXTERN_FILE) )
+		{
+		switch ( entryPtr->main.startFile.fileType ) {
+		case GFT_EXECUTABLE:
+			if ( showStartInfoBox) InfoMsgBox(@InfoStartApp,
+				entryPtr->main.startFile.fileName,0);
+			SleepIfLowOnHandles(hanLimit);
+			LocalExecGeode( &entryPtr->main.startFile);
+			break;
+		case GFT_VM:
+		case GFT_DATA:
+		case GFT_NOT_GEOS_FILE:
+			if ( showStartInfoBox) InfoMsgBox(@InfoStartData,
+				entryPtr->main.startFile.fileName,0);
+			SleepIfLowOnHandles(hanLimit);
+			LocalOpenFile( &entryPtr->main.startFile);
+			break;
+			}
+		showStartInfoBox = TRUE;
+		}
+	IFUnlockMainArray(entryPtr);
+	item++;
+	}
+  if (shutDown)	DosIconWriteDosFileList();
+
+
+
+
+/* Letzte Runde: Unbekannte Eintr„ge anzeige.. Nur für den Fall... */
+  item = 0;
+  while ( (item < count) && !global.cancelInstall ) {
+	entryPtr = IFLockMainArrayElement(item);
+	type = entryPtr->type;
+	switch ( type ) {
+		case 	IOT_FILE:
+		case 	IOT_DOS_TOKEN:
+		case 	IOT_TOKEN:
+		case 	IOT_INI:
+		case 	IOT_INI_ENTRY_INSTALL:
+		case 	IOT_INI_ENTRY_DEINSTALL:
+		case 	IOT_START_FILE:
+		case	IOT_DELETE_EXTERN_FILE:
+		case 	IOT_START_EXTERN_FILE:
+		case 	IOT_UPDATE_TOOL:
+		case 	IOT_CLEANUP_TOOL:
+		case	IOT_DELETE_FOLDER:
+		case	IOT_DEL_TEMP_FILE:
+			break;
+		default: MemLock(HandleOf(@InvalidEntryTypeText2));
+			ErrorMsgNumberBox(@InvalidEntryTypeText2,0,entryPtr->type);
+			MemUnlock(HandleOf(@InvalidEntryTypeText2));
+		}
+	IFUnlockMainArray(entryPtr);
+	item++;
+	}
+
+  @send application::MSG_GEN_APPLICATION_MARK_NOT_BUSY();
+
+  if (shutDown || modifyIni) {
+	UserStandardSound(SST_NOTIFY);
+	if ( QuestionMsgBox(@SysShutDownQuestion,0,0) == IC_YES )
+		  {	/* Do ShutDown */
+		  SysShutdown(SST_RESTART);
+		  }
+	}
+
+  if (!global.cancelInstall) {
+	UserStandardSound(SST_NOTIFY);
+	UserDoDialog(@InstallEndeInfoBox);
+	}
+}
+
+
+/*---------------------  ---------------------
+ *      Purpose:        
+ *---------------------------------------------------------------------------*/
+void LocalDeinstallBoxShow(char * text,optr label) {
+	@call IFLabelGlyph::
+			MSG_GEN_REPLACE_VIS_MONIKER_OPTR(label,VUM_NOW);
+	@call IFDeleteFileGlyph::
+			MSG_GEN_REPLACE_VIS_MONIKER_TEXT(text,VUM_NOW);
+	@send IFDeleteBox::MSG_GEN_INTERACTION_INITIATE();
+	}
+
+/*---------------------  ---------------------
+ *      Purpose:        
+ *---------------------------------------------------------------------------*/
+void LocalDeinstallBoxShowSpace(void) {
+	@call IFLabelGlyph::
+			MSG_GEN_REPLACE_VIS_MONIKER_OPTR(@SearchLabel,VUM_NOW);
+	@call IFDeleteFileGlyph::
+			MSG_GEN_REPLACE_VIS_MONIKER_TEXT("",VUM_NOW);
+	@send IFDeleteBox::MSG_GEN_INTERACTION_INITIATE();
+	}
+
+/*---------------------  ---------------------
+ *      Purpose:        
+ *---------------------------------------------------------------------------*/
+void LocalHideDeinstallBox(void) {
+	@send IFDeleteBox::MSG_GEN_GUP_INTERACTION_COMMAND(IC_DISMISS);
+	}
+
+/*---------------------  ---------------------
+ *      Purpose:        
+ *---------------------------------------------------------------------------*/
+void LocalInstallBoxShow(char * text,optr label) {
+	@call IFWriteLabelGlyph::
+			MSG_GEN_REPLACE_VIS_MONIKER_OPTR(label,VUM_NOW);
+	@call IFWriteFileGlyph::
+			MSG_GEN_REPLACE_VIS_MONIKER_TEXT(text,VUM_NOW);
+	@send IFWriteFileBox::MSG_GEN_INTERACTION_INITIATE();
+	}
+
+/*---------------------  ---------------------
+ *      Purpose:        
+ *---------------------------------------------------------------------------*/
+void LocalInstallBoxShowSpace(void) {
+	@call IFWriteLabelGlyph::
+			MSG_GEN_REPLACE_VIS_MONIKER_OPTR(@SearchLabel,VUM_NOW);
+	@call IFWriteFileGlyph::
+			MSG_GEN_REPLACE_VIS_MONIKER_TEXT("",VUM_NOW);
+	@send IFWriteFileBox::MSG_GEN_INTERACTION_INITIATE();
+	}
+	
+/*---------------------  ---------------------
+ *      Purpose:        
+ *---------------------------------------------------------------------------*/
+void LocalHideInstallBox(void) {
+	@send IFWriteFileBox::MSG_GEN_GUP_INTERACTION_COMMAND(IC_DISMISS);
+	}
+
+
+/*--------------------- MSG_IF_DEINSTALL ---------------------
+ *      Purpose:        
+ *---------------------------------------------------------------------------*/
+@method IFProcessClass, MSG_IF_DEINSTALL {
+InstallEntry * entryPtr;
+VMBlockHandle 	mainArray;
+int item, count, type;
+Boolean skipTokens, tokenWarnung , modifyIni, shutDown = FALSE;
+char text[INI_CATEGORY_BUFFER_SIZE+2];	/* 66 */
+/* Work-Around Handlefresser -> siehe unten */
+word	hanLimit;
+
+
+  if ( !global.docFile ) {
+	UserStandardSound(SST_ERROR);
+	return;
+	}
+  hanLimit = SysGetInfo(SGIT_NUMBER_OF_FREE_HANDLES) - HANDLE_EATER_LIMIT;
+
+  mainArray = IFGetMainArrayHandle();
+  count = HugeArrayGetCount(global.docFile,mainArray);
+
+  @send application::MSG_GEN_APPLICATION_MARK_BUSY();
+
+
+/* 0. Vorarbeit: evt GEOS.INI sichern */
+  item = 0;
+  modifyIni = FALSE;
+  while ( item < count ) {
+	entryPtr = IFLockMainArrayElement(item);
+	switch (entryPtr->type) {
+//	    case IOT_INI_ENTRY_INSTALL:		// Beim Installieren
+//	    case IOT_DOS_TOKEN:			// Beim Installieren
+	    case IOT_INI:
+	    case IOT_INI_ENTRY_DEINSTALL:
+			modifyIni = TRUE;
+			break;
+	    }
+
+	IFUnlockMainArray(entryPtr);
+	if (modifyIni) break;
+	item++;
+	}
+  if ( modifyIni ) {
+	if ( QuestionMsgBox(@QuestionBackupIni, 0, 0) == IC_YES )
+		{
+		if ( ToolBackupGeosIni() ) {
+			@send application::MSG_GEN_APPLICATION_MARK_NOT_BUSY();
+			return;
+			}
+		}
+	}
+
+
+/* 1. Runde: L”schen aller Dateien. Ab Vers. 1.2 auch temp. Dateien */
+  item = 0;
+  global.ignoreNotFound = FALSE;	// MessageBox anzeigen, wenn nicht gefunden
+  global.cancelInstall = FALSE;		// wird eigentlich nicht gebraucht
+  LocalDeinstallBoxShowSpace();
+  while ( (item < count) && !global.cancelInstall ) {
+	entryPtr = IFLockMainArrayElement(item);
+
+	if (entryPtr->type == IOT_FILE) {
+	   if (entryPtr->instFlags & INST_DELETE_ON_DE_INST ) {
+		FilePushDir();
+		if ( FileSetCurrentPath(entryPtr->main.file.dh,
+			entryPtr->main.file.path) ) {
+			// Pfad gefunden und reingewechselt
+			int err;
+		    SleepIfLowOnHandles(hanLimit);
+			LocalDeinstallBoxShow(entryPtr->main.file.geosName,@DelFileMoniker);
+			err = FileToolDeleteFile(entryPtr->main.file.geosName);
+			if ( err ) {
+				ErrorMsgBox(@ErrorDeinstallDeleteFile,
+					entryPtr->main.file.geosName,0);
+				}
+			}	// if (SetCurrentPath)
+		FilePopDir();
+		}               // if (Delete_on_deinst)
+	   }			// if (IOT_FILE)
+
+	if (entryPtr->type == IOT_DEL_TEMP_FILE) {
+		FilePushDir();
+		if ( FileSetCurrentPath(entryPtr->main.deleteFile.dh,
+		      entryPtr->main.deleteFile.path) ) {
+		      // Pfad gefunden und reingewechselt
+		      int err, ignf;
+		      ignf = global.ignoreNotFound;
+		      global.ignoreNotFound  = TRUE;
+			  SleepIfLowOnHandles(hanLimit);
+		      LocalDeinstallBoxShow(entryPtr->main.deleteFile.fileName,@DelFileMoniker);
+		      err = FileToolDeleteFile(entryPtr->main.deleteFile.fileName);
+		      global.ignoreNotFound  = ignf;
+		      if ( err ) {
+			      ErrorMsgNumberBox(@ErrorDeinstallDeleteFile,
+				      entryPtr->main.deleteFile.fileName,err);
+			      }
+		      }		// if (SetCurrentPath)
+		FilePopDir();
+	   }			// if (IOT_DEL_TEMP_FILE)
+
+	IFUnlockMainArray(entryPtr);
+	item++;
+	}
+  LocalDeinstallBoxShowSpace();
+
+/* 2. Runde: DOS-Icons l”schen, Token aus Database. INI-Einr„ge */
+  item = 0;
+  skipTokens = tokenWarnung = FALSE;
+  while ( (item < count) && !global.cancelInstall ) {
+	entryPtr = IFLockMainArrayElement(item);
+	switch ( entryPtr->type ) {
+	case	IOT_DOS_TOKEN:
+		LocalDeinstallBoxShow(entryPtr->main.dosToken.dosFile,
+						@DelDosFileTokenMoniker);
+		shutDown |= !DosIconDeleteTokenInfo(entryPtr->main.dosToken.dosFile,TRUE);
+		break;
+	case	IOT_TOKEN:
+		if (skipTokens) break;
+		if ( !tokenWarnung ) {
+			int ret;
+			UserStandardSound(SST_NOTIFY);
+			ret = QuestionMsgBox(@TokenDeinstallWarning,0,0);
+			if ( ret != IC_YES ) {
+				UserStandardSound(SST_NOTIFY);
+				InfoMsgBox(@DoNotDelToken,0,0);
+				skipTokens = TRUE;
+				break;
+				}
+			tokenWarnung = TRUE;
+			}
+		WriteTokenIDString(text,entryPtr->main.appToken);
+		LocalDeinstallBoxShow(text,@DelTokenMoniker);
+		shutDown |= TokenRemoveToken(
+			TOKEN_CHARS_fixed(entryPtr->main.appToken.GT_chars[0],
+			entryPtr->main.appToken.GT_chars[1],
+			entryPtr->main.appToken.GT_chars[2],
+			entryPtr->main.appToken.GT_chars[3]),
+			entryPtr->main.appToken.GT_manufID);
+		if ( globalTokenList ) {
+			MemFree(globalTokenList);
+			globalTokenList = 0;
+			globalTokenCount = 0;
+			}
+		break;
+	case	IOT_INI:
+		strcpy(text,"[");
+		strcat(text,entryPtr->main.ini.kategorie);
+		strcat(text,"]");
+		LocalDeinstallBoxShow(text,@DelIniMoniker);
+		InitFileDeleteCategory(entryPtr->main.ini.kategorie);
+		shutDown = TRUE;
+		break;
+	case 	IOT_INI_ENTRY_DEINSTALL:
+		strcpy(text,"[");
+		strcat(text,entryPtr->main.iniEntry.kategorie);
+		strcat(text,"]");
+		LocalDeinstallBoxShow(text,@ModiIniMoniker);
+		IFWriteIniEntry(&entryPtr->main.iniEntry);
+		break;
+		}
+
+	IFUnlockMainArray(entryPtr);
+	item++;
+	}
+
+  LocalDeinstallBoxShowSpace();
+  LocalHideDeinstallBox();
+
+
+/* 3. Runde: CLEANUP-Tool(s) starten */
+  item = 0;
+  while ( (item < count) && !global.cancelInstall ) {
+	entryPtr = IFLockMainArrayElement(item);
+	if (entryPtr->type == IOT_CLEANUP_TOOL) {
+		SleepIfLowOnHandles(hanLimit);
+		LocalInstallAndExecuteTool(entryPtr, @InfoStartCleanUpTool);
+
+		}
+	IFUnlockMainArray(entryPtr);
+	item++;
+	}
+
+/* 4. Ab version 1.2 L”schen aller leeren Verzeichnisse */
+  item = 0;
+  global.ignoreNotFound = FALSE;
+  global.cancelInstall = FALSE;	// wird eigentlich nicht gebraucht
+  while ( (item < count) && !global.cancelInstall ) {
+
+	entryPtr = IFLockMainArrayElement(item);
+	if (entryPtr->type == IOT_DELETE_FOLDER) {
+		SleepIfLowOnHandles(hanLimit);
+		LocalDeinstallBoxShow(entryPtr->main.deleteFolder.path,@DelFolderMoniker);
+		FilePushDir();
+		FileSetStandardPath(entryPtr->main.deleteFolder.dh);
+		FileDeleteDir(entryPtr->main.deleteFolder.path);
+		FilePopDir();
+		}			// if (IOT_DELETE_FOLDER)
+	IFUnlockMainArray(entryPtr);
+	item++;
+	}
+  LocalHideDeinstallBox();
+
+/* Letzte Runde: Unbekannte Eintr„ge anzeigen.. Nur für den Fall... */
+  item = 0;
+  while ( (item < count) && !global.cancelInstall ) {
+	entryPtr = IFLockMainArrayElement(item);
+	type = entryPtr->type;
+	switch ( type ) {
+		case 	IOT_FILE:
+		case 	IOT_DOS_TOKEN:
+		case 	IOT_TOKEN:
+		case 	IOT_INI:
+		case 	IOT_INI_ENTRY_INSTALL:
+		case 	IOT_INI_ENTRY_DEINSTALL:
+		case 	IOT_START_FILE:
+		case	IOT_DELETE_EXTERN_FILE:
+		case 	IOT_START_EXTERN_FILE:
+		case 	IOT_UPDATE_TOOL:
+		case 	IOT_CLEANUP_TOOL:
+		case 	IOT_DELETE_FOLDER:
+		case 	IOT_DEL_TEMP_FILE:
+			break;
+		default: MemLock(HandleOf(@InvalidEntryTypeText2));
+			ErrorMsgNumberBox(@InvalidEntryTypeText2,0,entryPtr->type);
+			MemUnlock(HandleOf(@InvalidEntryTypeText2));
+		}
+	IFUnlockMainArray(entryPtr);
+	item++;
+	}
+
+  @send application::MSG_GEN_APPLICATION_MARK_NOT_BUSY();
+
+    if (shutDown || modifyIni) {
+	DosIconWriteDosFileList();
+	UserStandardSound(SST_NOTIFY);
+	if ( QuestionMsgBox(@SysShutDownQuestion,0,0) == IC_YES )
+		  {	/* Do ShutDown */
+		  SysShutdown(SST_RESTART);
+		  }
+	}
+
+  UserStandardSound(SST_NOTIFY);
+  InfoMsgBox(@InfoDeinstallEnde,0,0);
+
+  }
+
+
+/*--------------------- MSG_IF_START_EDIT ---------------------
+ *	Purpose:	Aufrufen des UniInstall-Creators
+ ---------------------------------------------------------------------------*/
+@method IFProcessClass, MSG_IF_START_EDIT {
+word count, ctok;
+MemHandle mh;
+GeodeToken token = { 'I','C','r','e',16480 };
+
+      /* der UniInstaller wird gestartet.
+       * Wenn nicht, gibt es eine Fehlermeldung */
+
+       mh = IACPCreateDefaultLaunchBlock(MSG_GEN_PROCESS_OPEN_APPLICATION);
+       ctok = IACPConnect(&token,
+		IACPSM_USER_INTERACTIBLE | IACPCF_FIRST_ONLY
+				, mh, NullOptr, &count);
+
+       if ( ctok != 0 ) {	// OK. Das šbergeben der Datendatei wird
+			// an MSG_GEN_PROCESS_CLOSE_APPLICATION bergeben,
+			// damit die Datei nicht mehr offen ist.
+			// Im Test hat es auch hier geklappt, aber sicher ist sicher.
+		global.launchCreator = TRUE;
+		IACPShutdown(ctok,NullOptr);
+		@send application::MSG_META_QUIT();
+		}
+       else     {
+		ErrorMsgBox(@ErrorLaunchCreatorFailed,0,0);
+		}
+
+
+}
+
+/*--------------------- MSG_IF_EDIT_MODIFIED ---------------------
+ *	Purpose:	Umschalten des Edit-Modus
+ *			Derzeit nur "Bearbeiten"-Schalter
+ *	void	GEN_BOOLEAN_GROUP_APPLY_MSG(word selectedBooleans,
+ *		word indeterminateBooleans, word modifiedBooleans);
+ ---------------------------------------------------------------------------*/
+@method IFProcessClass, MSG_IF_EDIT_MODIFIED {
+word options;
+
+   options = LocalReadOptions();
+   if ( selectedBooleans & ID_ENABLE_EDIT ) {
+	// Modus aktivieren
+	@send IFStartEditTrigger::MSG_GEN_SET_USABLE(VUM_NOW);
+	options |= ID_ENABLE_EDIT;
+	}
+   else {
+	// Modus deaktivieren
+	@send IFStartEditTrigger::MSG_GEN_SET_NOT_USABLE(VUM_NOW);
+	options &= ~ID_ENABLE_EDIT;
+	}
+   LocalSaveOptions(options);
+}
+
+/*--------------------- MSG_GEN_PROCESS_INSTALL_TOKEN ---------------------
+ *	Purpose:	Installation des Dokument-Token
+ *			(Applikation-Token macht die SuperCalss)
+ *	Context:	Wird vom GeoManager gerufen, wenn er mit dem Token der
+ *			Applikation nichts anfangen kann
+ *	Strategy:	Nach Installation des ApllikationsTokens wir ein
+ *			DokumentToken installiert
+ *	Paramters:	void ( void )
+ *	Quelle:		Quelltext GeoFile: MPROCESS.GOC
+ ---------------------------------------------------------------------------*/
+
+@method IFProcessClass, MSG_GEN_PROCESS_INSTALL_TOKEN {
+	@callsuper();
+	TokenDefineToken(
+		TOKEN_CHARS_fixed('I','n','s','D'), MANUFACTURER_ID_RABE_SOFT,
+		@InstallDocMonikerList,0);
+	/* weil sich die Moniker-List in einer Daten-Resource befindet ist keine
+	Objekt-Relocation n”tig (zum Glck) */
+	}
+
+/*###########################################################################
+	CODE für IFProcessClass und andere
+/*###########################################################################
+	Teil 3: Funktionen und Routinen
+		Weitere Funktionen und Routinen sind in tools.goc ausgelagert
+/*###########################################################################*/
+
+/*###################### Installations-Routinen ###########################*/
+
+
+
+/*---------------------  ---------------------
+ *      Purpose:        
+ *---------------------------------------------------------------------------*/
+int IFInstallFile(FileMainParams * fParams ,word flags) {
+int err;
+CheckForOverwriteValue	owVal;
+FTExistFilesValue foundVal;
+DiskHandle   ndh;
+Boolean keepDos, doInstall, fileNotFound;
+
+/* Verzeichnis anlegen und hineinwechseln */
+	FilePushDir();
+	err = FileToolCreatePath(fParams->dh, fParams->path);
+	ndh = FileSetCurrentPath(fParams->dh, fParams->path);
+	if ( err || !ndh ) {
+		char *pf,*p;
+		p = pf = malloc(PATH_BUFFER_SIZE+10);
+		FileConstructFullPath(&p, PATH_BUFFER_SIZE+10,
+				fParams->dh,fParams->path, TRUE);
+		ErrorMsgBox(@ErrorCreatePath,pf,0);
+		free(pf);
+		global.cancelInstall = TRUE;
+		FilePopDir();
+		return 	INST_ERROR;
+		}
+
+/* testen ob Datei vorhanden ist un bei Bedarf berschreiben */
+	doInstall = TRUE;		// Prinzip Hoffung
+	fileNotFound = FALSE;
+	keepDos = flags & INST_KEEP_DOS_NAME;
+	foundVal = FileToolExistFileGD(fParams->geosName, fParams->dosName);
+	switch ( foundVal ) {
+	case	FTEF_INVALID_GEOSNAME:          // Geos-Datei existiert nicht,
+			fileNotFound = TRUE;	// aber DOS-NAme ist vergeben
+						// Z„hlt erstmal als nicht gefunden
+
+	case	FTEF_INVALID_DOSNAME:		// Geos-Datei existiert, aber
+	case	FTEF_DIFFERENT_FILES:		// mit anderem DOS-Namen
+						// fileNotFound beleibt TRUE
+			if ( keepDos ) {
+				optr msg;
+				switch ( foundVal ) {
+				case	FTEF_INVALID_GEOSNAME:
+					msg = @ErrorInvalidGeosName;
+					break;
+				case	FTEF_INVALID_DOSNAME:
+					msg = @ErrorInvalidDosName;
+					break;
+				case	FTEF_DIFFERENT_FILES:
+					msg = @ErrorDifferentFiles;
+					break;
+				default: msg = @ErrorInvalidDosName;
+					// default nur, damit im
+					// katastrofenfall msg nicht leer bleibt
+					}
+				ErrorMsgBox(msg,fParams->geosName, fParams->dosName);
+				global.cancelInstall = TRUE;
+				break;
+				}
+			if ( fileNotFound ) break;
+	case	FTEF_YES:
+		/* Abbrechen bei Option "nur wenn NICHT vorhanden" */
+		if ( flags & INST_ONLY_IF_NOT_EXIST ) {
+				doInstall = FALSE;
+				break;
+				}
+
+		/* testen, ob vorhandene Datei berschreiben */
+		owVal =  CheckForOverwrite(  fParams->geosName,
+				fParams->protocol,fParams->release,flags,
+				fParams->fileType);
+		switch ( owVal ) {
+		case	CFO_TYPE_MISMATCH:
+			ErrorMsgBox(@ErrorDifferentFileTypes,fParams->geosName,0);
+			global.cancelInstall = TRUE;
+			break;
+		case	CFO_ERROR:
+			ErrorMsgBox(@ErrorFileRead,fParams->geosName,0);
+			global.cancelInstall = TRUE;
+			break;
+		case	CFO_DOIT:
+			if ( FileToolDeleteFile(fParams->geosName) ) {
+				ErrorMsgBox(@ErrorInstallDelete,fParams->geosName,0);
+				global.cancelInstall = TRUE;
+				break;
+				}
+			break;
+		case	CFO_KEEP:
+			doInstall = FALSE;
+			break;
+			}       // end of swicth owVal
+		break;
+	case	FTEF_NO:	// Datei nicht gefunden
+		fileNotFound = TRUE;
+		break;
+		}		// end of swicth foundVal
+
+	if ( global.cancelInstall ) doInstall = FALSE;
+
+	if ( fileNotFound )	// wenn nicht gefunden: evt auch nicht installieren
+		   if ( flags & INST_ONLY_IF_EXIST ) doInstall = FALSE;
+
+	if ( doInstall ) {
+
+		if ( WriteFileFromHugeArray(fParams, foundVal, keepDos ) ) {
+			ErrorMsgBox(@ErrorWriteFile,fParams->geosName,0);
+			global.cancelInstall = TRUE;
+			}
+
+		}
+	else	{	// nicht Installieren-> evt Abbrechen
+		if ( flags & INST_CANCEL_IF_NOT_INSTALL ) {
+			ErrorMsgBox(@CancelBecauseFlags,fParams->geosName,0);
+			global.cancelInstall = TRUE;
+			}
+		}
+
+	FilePopDir();
+
+	return ( global.cancelInstall ? INST_OK : INST_ERROR );
+	}
+
+/*---------------------  ---------------------
+ *      Purpose:        
+ *---------------------------------------------------------------------------*/
+Boolean IFRequestDosToken(DosTokenParams * tParams) {
+GeodeToken tok = { 0,0,0,0,0};
+DosFileEntry	entry;
+extern MemHandle dosFileList;
+
+	@call IconEditInfoText::MSG_VIS_TEXT_REPLACE_ALL_OPTR(@IconEditText1,0);
+	@call IconEditInfoText::MSG_VIS_TEXT_APPEND_PTR(tParams->appName,0);
+	@call IconEditInfoText::MSG_VIS_TEXT_APPEND_OPTR(@IconEditText2,0);
+	@call IconEditInfoText::MSG_VIS_TEXT_APPEND_PTR(tParams->dosFile,0);
+	@call IconEditInfoText::MSG_VIS_TEXT_APPEND_OPTR(@IconEditText3,0);
+	if (!dosFileList)  {
+		DosIconReadDosFileList();
+		}
+	if (!DosIconFindTokenInfo(&entry,tParams->dosFile) )
+		{
+		tok = entry.fileToken;
+		}
+	if ( IconEditSelectToken(&tok) == IC_OK ) {
+		entry.fileToken = tok;
+		entry.appToken = tParams->appToken;
+		entry.hasApp = TRUE;
+		DosIconReplaceTokenInfo(&entry,tParams->dosFile);
+		return TRUE;
+		}
+	else return FALSE;
+	}
+
+
+
+/*---------------------  ---------------------
+ *	Purpose:
+ *	Context:
+ *	Strategy:
+ *	Paramters:
+ ---------------------------------------------------------------------------*/
+

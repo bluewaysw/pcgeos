@@ -1,0 +1,1516 @@
+
+@include <stdapp.goh>
+@include <gstring.h>
+@include "stdio.h"
+@include "instc.goh"
+@include "..\Shared\instllr.goh"
+@include "..\Shared\rainer.goh"
+
+
+/*---------------------------------------------------------------------------
+ Resourcendefinition AppResource
+ enthÑlt nur das Applikations-Objekt (dessen Child das Primary-Objekt ist )
+ ---------------------------------------------------------------------------*/
+@start AppResource;
+
+@object GenApplicationClass ICApp = {
+	GI_visMoniker = list { @ICTextMoniker,
+	@Moniker0,@Moniker1,@Moniker2,@Moniker3,@Moniker4,@Moniker5 };
+	GI_comp = @ICPrimary;
+	gcnList(MANUFACTURER_ID_GEOWORKS,GAGCNLT_WINDOWS) = @ICPrimary;
+	gcnList(MANUFACTURER_ID_GEOWORKS,MGCNLT_ACTIVE_LIST) = @ICDocumentControl;
+	gcnList(MANUFACTURER_ID_GEOWORKS,MGCNLT_APP_STARTUP) = @ICDocumentControl;
+	gcnList(MANUFACTURER_ID_GEOWORKS,GAGCNLT_SELF_LOAD_OPTIONS) =
+							@ICDocumentControl;
+/*    ATTR_GEN_INIT_FILE_CATEGORY = "procui";*/
+	ATTR_GEN_HELP_FILE ="Install Creator Help";
+	}	/* end of ICApp */
+
+@visMoniker ICTextMoniker = "Install File Creator";
+@end AppResource;
+
+/*---------------------------------------------------------------------------
+ Resourcendefinition Interface
+ enthÑlt die Objekte fÅr die Interaktion mit dem User
+ ---------------------------------------------------------------------------*/
+@start Interface;
+
+
+/* ----------------- Elemente des Hauptfensters ------------------------------*/
+
+@object GenPrimaryClass ICPrimary = {
+	GI_comp =  @ICFileMenu, @ICToolMenu,@ICOptionsMenu,@AuslagerGroup;
+	HINT_SIZE_WINDOW_AS_DESIRED;
+/*	ATTR_GEN_WINDOW_KBD_OVERRIDE = (KO_KEYBOARD_REQUIRED);
+  */
+	ATTR_GEN_HELP_CONTEXT ="TOC";
+	} /* end of 	Primary */
+
+@object GenInteractionClass AuslagerGroup = {
+	GI_comp = @ICFTopGroup, @ICFStatusbar, @ICFBottomGroup,
+		@ICSelectFileDialog,@ICOptionsDialog,@ICReadFileBox,
+		@IniFileBox,@DosTokenBox,@ICInfoTextDialog,
+		@IconEditDialog,@ICPasswortDialog,@RequestPwdDialog,
+		@DosGeodeBox,@GeosInfoBox;
+	HINT_ORIENT_CHILDREN_VERTICALLY;
+	HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+	HINT_EXPAND_HEIGHT_TO_FIT_PARENT;
+	}
+
+@object GenInteractionClass ICFTopGroup = {
+	GI_comp = @ICFileList, @ICTriggerGroup;
+	HINT_ORIENT_CHILDREN_HORIZONTALLY;
+	HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+	HINT_EXPAND_HEIGHT_TO_FIT_PARENT;
+	}
+
+@object GenInteractionClass ICFBottomGroup = {
+	GI_comp = @ICLegendeGroup, @ICCurrentDataText;
+	HINT_ORIENT_CHILDREN_HORIZONTALLY;
+	HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+	HINT_EXPAND_HEIGHT_TO_FIT_PARENT;
+	}
+
+@object GenInteractionClass ICFileMenu = {
+    GI_comp = @ICDocumentControl, @AboutBoxGroup; 
+    GII_visibility = GIV_POPUP;
+    ATTR_GEN_INTERACTION_GROUP_TYPE = (GIGT_FILE_MENU);
+    }
+
+/* ------------------------ ICFStatusbar -----------------------------*/
+@object GenInteractionClass ICFStatusbar = {
+	GI_comp = @ICFReleaseStatusText, @ICFUserNotesStatusText;
+	HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+	HINT_ORIENT_CHILDREN_HORIZONTALLY;
+}
+
+@object GenTextClass ICFReleaseStatusText = {
+/*	GI_visMoniker = "Release:";
+	HINT_PLACE_MONIKER_TO_LEFT;
+*/	HINT_TEXT_WASH_COLOR = { 28, CF_INDEX,0,0 };
+	HINT_FIXED_SIZE = { 27 | SST_AVG_CHAR_WIDTHS,  1 | SST_LINES_OF_TEXT, 0 };
+	GI_attrs = @default | GA_READ_ONLY;
+	HINT_TEXT_FRAME;
+	ATTR_GEN_TEXT_NEVER_MAKE_SCROLLABLE;
+	}
+/*
+@object GenInteractionClass ICFUserNotesStatusGroup = {
+	GI_comp = @ICFUserNotesStatusText;
+	HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+	}
+*/
+@object GenTextClass ICFUserNotesStatusText = {
+/*	GI_visMoniker = "Usernotes:";
+	HINT_PLACE_MONIKER_TO_LEFT;
+*/	HINT_TEXT_WASH_COLOR =  { 28, CF_INDEX,0,0 };
+	HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+	GI_attrs = @default | GA_READ_ONLY;
+	HINT_TEXT_FRAME;
+	ATTR_GEN_TEXT_NEVER_MAKE_SCROLLABLE;
+	}
+
+
+/* ------------------------ ICToolMenu -----------------------------*/
+@object GenInteractionClass ICToolMenu = {
+    GI_visMoniker = 'T',"Tools";
+    GI_comp = @ICToolsGroup,@ICRebuildListTrigger, @ICStartTextEditorTriggerGroup;
+    GII_visibility = GIV_POPUP;
+    }
+@object GenInteractionClass ICToolsGroup = {
+    GI_comp = @ICUpdateAllTrigger,@ICDefaultAppOptionsTrigger,
+		@ICDefaultDocOptionsTrigger,@ICDefaultRBasicOptionsTrigger,
+		@ICSortListTrigger,@ICPasswortTrigger,@FileInfoTrigger;
+    GI_states = @default & ~GS_ENABLED;
+    }
+
+@object GenTriggerClass ICUpdateAllTrigger = {
+	GI_visMoniker = 'a',"Update all";
+	GTI_destination = process;
+	GTI_actionMsg = MSG_IC_UPDATE_ALL;
+	}
+@object GenTriggerClass ICDefaultAppOptionsTrigger = {
+	GI_visMoniker = 'D',"Default PC/GEOS program options";
+	GTI_destination = process;
+	GTI_actionMsg = MSG_IC_SET_DEFAULT_APP_OPTIONS;
+	}
+@object GenTriggerClass ICDefaultDocOptionsTrigger = {
+	GI_visMoniker = 'o',"Default document options";
+	GTI_destination = process;
+	GTI_actionMsg = MSG_IC_SET_DEFAULT_DOC_OPTIONS;
+	}
+@object GenTriggerClass ICDefaultRBasicOptionsTrigger = {
+	GI_visMoniker = 'B',"Default R-BASIC program options";
+	GTI_destination = process;
+	GTI_actionMsg = MSG_IC_SET_DEFAULT_BASIC_OPTIONS;
+	}
+@object GenTriggerClass ICSortListTrigger = {
+	GI_visMoniker = 'S',"Sort list";
+	GTI_destination = process;
+	GTI_actionMsg = MSG_IC_SORT_LIST;
+	}
+
+@object GenTriggerClass ICRebuildListTrigger = {
+	GI_visMoniker = 'n',"Read List again";
+	GTI_destination = process;
+	GTI_actionMsg = MSG_IC_REBUILD_LIST;
+	}
+
+@object GenInteractionClass ICStartTextEditorTriggerGroup = {
+	GI_comp = @ICStartTextEditorTrigger,@ConfigTextEditorTrigger;
+	}
+
+@object GenTriggerClass ICStartTextEditorTrigger = {
+	GI_visMoniker = 'T',"Run Text Editor";
+	GTI_destination = process;
+	GTI_actionMsg = MSG_IC_START_TEXT_EDITOR;
+	}
+@object GenTriggerClass ConfigTextEditorTrigger = {
+	GI_visMoniker = 'E',"Select Text Editor";
+	GTI_destination = process;
+	GTI_actionMsg = MSG_IC_CONFIG_TEXT_EDITOR;
+	}
+
+
+@object GenTriggerClass ICPasswortTrigger = {
+	GI_visMoniker = 'p',"Set password";
+	GTI_destination = process;
+	GTI_actionMsg = MSG_IC_SET_PASSWORT;
+	}
+
+
+@object	GenInteractionClass ICPasswortDialog  = {
+	GI_visMoniker = "Edit-Password";
+	GI_comp = @PasswortInfoText,@PasswortEingabeText,@PasswortCancelTrigger;
+	GII_visibility = GIV_DIALOG;
+	GII_type = GIT_NOTIFICATION;
+	GII_attrs = @default | GIA_NOT_USER_INITIATABLE
+		| GIA_INITIATED_VIA_USER_DO_DIALOG
+		| GIA_MODAL;
+	}
+
+@object GenTextClass PasswortInfoText = {
+	GI_attrs = @default | GA_READ_ONLY;
+	GTXI_text = "Enter a password. The package can then be installed anyway, \
+but for edit it is password protected. If you leave the password empty, there will \
+be no password set and an existing password becomes deleted.";
+    	HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+	}
+@object GenTextClass PasswortEingabeText = {
+	GI_visMoniker = 'P',"Password:";
+	GTXI_text = "";
+	GTXI_maxLength = PWD_BUFFER_SIZE - 4;
+	GTXI_attrs = @default | GTA_SINGLE_LINE_TEXT;
+	HINT_DEFAULT_FOCUS;
+	HINT_TEXT_WHITE_WASH_COLOR;
+	}
+@object GenTriggerClass PasswortCancelTrigger = {
+	GI_visMoniker = 'n', "Cancel";
+	ATTR_GEN_TRIGGER_INTERACTION_COMMAND = IC_DISMISS;
+	HINT_SEEK_REPLY_BAR;
+	}
+
+
+/* ------------------------ Einstellungen-Men¸ -----------------------------*/
+@object GenInteractionClass ICOptionsMenu = {
+    GI_visMoniker = 'S',"Settings";
+    GI_comp = @ICDefaultFolderTrigger, @ICOptionsSubMenu;
+    GII_visibility = GIV_POPUP;
+    }
+
+@object GenInteractionClass ICOptionsSubMenu = {
+	GI_visMoniker = "Display Options";
+    GII_visibility = GIV_POPUP;
+	GI_comp = @ICDisplayOptionsGroup,@ICOptionsInfoTrigger, @IgnoreOneHourInfoDialog;
+}
+@object GenBooleanGroupClass ICDisplayOptionsGroup = {
+	GI_comp = @ICIgnoreOneHoureOption;
+	GBGI_selectedBooleans = IC_DEFAULT_OPTIONS;
+	GBGI_destination = process;
+	GBGI_applyMsg = MSG_IC_OPTIONS_CHANGED;
+}
+
+@object GenBooleanClass ICIgnoreOneHoureOption = {
+	GI_visMoniker = "Ignore a time difference of one hour";
+	GBI_identifier = IC_OPT_IGNORE_ONE_HOUR;
+}
+
+@object GenTriggerClass ICOptionsInfoTrigger = {
+	GI_visMoniker = "  What does this mean?";
+	GTI_destination = @IgnoreOneHourInfoDialog;
+	GTI_actionMsg = MSG_GEN_INTERACTION_INITIATE;
+	}
+
+@object GenInteractionClass IgnoreOneHourInfoDialog = {
+	GI_visMoniker = "  Ignore a time difference of one hour  ";
+	GI_comp = @IgnoreOneHourInfoText;
+	GII_visibility = GIV_DIALOG;
+	GII_type = GIT_NOTIFICATION;
+	GII_attrs = @default | GIA_NOT_USER_INITIATABLE | GIA_MODAL;
+	}
+@object GenTextClass IgnoreOneHourInfoText = {
+	GTXI_text = "Some host systems (Windows, e.g.) 'correct' the time stamp of a file, \
+depending on if we have summer time or not. Then, it looks as if the files are different \
+(marked yellow), but they are not. This option is a work around for this problem.";
+	HINT_INITIAL_SIZE = { SST_AVG_CHAR_WIDTHS | 45, SST_LINES_OF_TEXT | 10, 0 };
+	HINT_TEXT_FRAME;
+	}
+
+@object GenTriggerClass ICDefaultFolderTrigger = {
+	GI_visMoniker = "Default Folder";
+	GTI_destination = process;
+	GTI_actionMsg = MSG_IC_SET_DEFAULT_FOLDER;
+	}
+
+/* ------------------------ RequestPwdDialog -----------------------------*/
+@object	GenInteractionClass RequestPwdDialog  = {
+	GI_visMoniker = "Enter Password";
+	GI_comp = @RequestPwdInfoText,@RequestPwdEingabeText;
+	GII_visibility = GIV_DIALOG;
+	GII_type = GIT_NOTIFICATION;
+	GII_attrs = @default | GIA_NOT_USER_INITIATABLE
+		| GIA_INITIATED_VIA_USER_DO_DIALOG
+		| GIA_MODAL;
+	}
+
+@object GenTextClass RequestPwdInfoText = {
+	GI_attrs = @default | GA_READ_ONLY;
+	GTXI_text = "This file is protected edit by an edit password. Enter the password exactly as you have set it.";
+    	HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+	}
+@object GenTextClass RequestPwdEingabeText = {
+	GI_visMoniker = 'P',"Password:";
+	GTXI_text = "";
+	GTXI_maxLength = PWD_BUFFER_SIZE - 4;
+	GTXI_attrs = @default | GTA_SINGLE_LINE_TEXT;
+	HINT_DEFAULT_FOCUS;
+	HINT_TEXT_WHITE_WASH_COLOR;
+	}
+
+@object GenTriggerClass SkipPWDTrigger = {
+	GI_visMoniker = 'S',"Skip";
+	GI_states = @default & ~GS_USABLE;
+	GI_attrs = @default | GA_SIGNAL_INTERACTION_COMPLETE;
+	ATTR_GEN_TRIGGER_INTERACTION_COMMAND = IC_NO;
+	HINT_SEEK_REPLY_BAR;
+	}
+
+@object GenDynamicListClass ICFileList = {
+	GI_visMoniker = 'f',"Files and installation functions:";
+	GIGI_destination = process;
+	GIGI_behaviorType = GIGBT_EXCLUSIVE_NONE;
+	GIGI_applyMsg = MSG_IC_LIST_ITEM_SELECTED;
+	GDLI_queryMsg = MSG_IC_QUERY_LIST_ITEM;
+	HINT_ITEM_GROUP_SCROLLABLE;
+	HINT_PLACE_MONIKER_ABOVE;
+	HINT_INITIAL_SIZE = { SST_AVG_CHAR_WIDTHS | 70 ,
+				SST_LINES_OF_TEXT | 15, 15 };
+	HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+	HINT_EXPAND_HEIGHT_TO_FIT_PARENT;
+	}
+
+@object GenInteractionClass ICTriggerGroup = {
+	GI_visMoniker = " ";
+	GI_comp = @ICInfoTextTrigger,@AddTrigger,
+		@UpdateTrigger,@DosTokenTrigger,
+		@StartFileTrigger,@EditTrigger,
+		@DeleteTrigger,
+		@UpdateToolTrigger,
+		@DeleteExternFileTrigger,
+		@StartExternFileTrigger,@CreateIniEntryTrigger,
+		@ICDeInstallGroup;
+	HINT_PLACE_MONIKER_ABOVE;
+	HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+	GI_states = @default & ~GS_ENABLED;
+	HINT_TOOLBOX;
+	}
+
+@object GenTriggerClass AddTrigger = {
+	GI_visMoniker = 'A'," Add a file ";
+	GTI_destination = process;
+	GTI_actionMsg = MSG_IC_ADD_FILE;
+	HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+	HINT_CENTER_MONIKER;
+	HINT_GADGET_BACKGROUND_COLORS = { C_WHITE,C_WHITE,C_CYAN,C_CYAN};
+	}
+@object GenTriggerClass DeleteTrigger = {
+	GI_visMoniker = 'D'," Delete entry ";
+	GTI_destination = process;
+	GTI_actionMsg = MSG_IC_DELETE;
+	HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+	HINT_CENTER_MONIKER;
+	HINT_GADGET_BACKGROUND_COLORS = { C_LIGHT_RED,C_LIGHT_RED,C_YELLOW,C_YELLOW};
+	}
+@object GenTriggerClass DeleteExternFileTrigger = {
+	GI_visMoniker = 'x'," Delete an external file ";
+	GTI_destination = process;
+	GTI_actionMsg = MSG_IC_DELETE_EXTERN_FILE;
+	HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+	HINT_CENTER_MONIKER;
+	HINT_GADGET_BACKGROUND_COLORS = { C_LIGHT_CYAN,C_LIGHT_CYAN,C_CYAN,C_CYAN};
+	}
+@object GenTriggerClass StartExternFileTrigger = {
+	GI_visMoniker = 'y'," Run a system file ";
+	GTI_destination = process;
+	GTI_actionMsg = MSG_IC_START_EXTERN_FILE;
+	HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+	HINT_CENTER_MONIKER;
+	HINT_GADGET_BACKGROUND_COLORS = { C_LIGHT_CYAN,C_LIGHT_CYAN,C_CYAN,C_CYAN};
+	}
+@object GenTriggerClass CreateIniEntryTrigger = {
+	GI_visMoniker = 'I'," Modify INI-entry ";
+	GTI_destination = process;
+	GTI_actionMsg = MSG_IC_CREATE_INI_ENTRY;
+	HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+	HINT_CENTER_MONIKER;
+	HINT_GADGET_BACKGROUND_COLORS = { C_LIGHT_CYAN,C_LIGHT_CYAN,C_CYAN,C_CYAN};
+	}
+@object GenTriggerClass EditTrigger = {
+	GI_visMoniker = 'M'," Modify Entry ";
+	GTI_destination = process;
+	GTI_actionMsg = MSG_IC_EDIT;
+	HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+	HINT_CENTER_MONIKER;
+	HINT_GADGET_BACKGROUND_COLORS = { C_WHITE,C_WHITE,C_CYAN,C_CYAN};
+	}
+@object GenTriggerClass StartFileTrigger = {
+	GI_visMoniker = 'O'," Run/Open ";
+	GTI_destination = process;
+	GTI_actionMsg = MSG_IC_START_FILE;
+	HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+	HINT_CENTER_MONIKER;
+	HINT_GADGET_BACKGROUND_COLORS = { C_WHITE,C_WHITE,C_CYAN,C_CYAN};
+	}
+@object GenTriggerClass UpdateTrigger = {
+	GI_visMoniker = 'U'," Update file ";
+	GTI_destination = process;
+	GTI_actionMsg = MSG_IC_UPDATE;
+	HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+	HINT_CENTER_MONIKER;
+	HINT_GADGET_BACKGROUND_COLORS = { C_WHITE,C_WHITE,C_CYAN,C_CYAN};
+	}
+@object GenTriggerClass DosTokenTrigger = {
+	GI_visMoniker = 'D'," Assign DOS icon ";
+	GTI_destination = process;
+	GTI_actionMsg = MSG_IC_DOS_TOKEN;
+	HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+	HINT_CENTER_MONIKER;
+	HINT_GADGET_BACKGROUND_COLORS = { C_WHITE,C_WHITE,C_CYAN,C_CYAN};
+	}
+@object GenTriggerClass UpdateToolTrigger = {
+	GI_visMoniker = 'U'," Update-Tool ";
+	GTI_destination = process;
+	GTI_actionMsg = MSG_IC_ADD_UPDATE_TOOL;
+	HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+	HINT_CENTER_MONIKER;
+	HINT_GADGET_BACKGROUND_COLORS = { C_LIGHT_CYAN,C_LIGHT_CYAN,C_CYAN,C_CYAN};
+	}
+@object GenTriggerClass ICInfoTextTrigger = {
+	GI_visMoniker = 'T'," Info Text ";
+	GTI_destination = process;
+	GTI_actionMsg = MSG_IC_INFO_TEXTE;
+	HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+	HINT_CENTER_MONIKER;
+	}
+
+
+@object GenInteractionClass ICDeInstallGroup = {
+	GI_visMoniker = " When removing software ";
+	GI_comp = @IniFileTrigger,@AppTokenTrigger,
+		@DeleteFolderTrigger,@DelTempFileTrigger,
+		@CleanUpToolTrigger,@DeleteIniEntryTrigger;
+	HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+	HINT_CENTER_MONIKER;
+	HINT_DRAW_IN_BOX;
+	}
+@object GenTriggerClass IniFileTrigger = {
+	GI_visMoniker = 'C'," Delete INI-Category ";
+	GTI_destination = process;
+	GTI_actionMsg = MSG_IC_INI_FILE;
+	HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+	HINT_CENTER_MONIKER;
+	HINT_GADGET_BACKGROUND_COLORS = { C_WHITE,C_WHITE,C_CYAN,C_CYAN};
+	}
+@object GenTriggerClass AppTokenTrigger = {
+	GI_visMoniker = 'l'," Delete App icon ";
+	GTI_destination = process;
+	GTI_actionMsg = MSG_IC_APP_TOKEN;
+	HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+	HINT_CENTER_MONIKER;
+	HINT_GADGET_BACKGROUND_COLORS = { C_WHITE,C_WHITE,C_CYAN,C_CYAN};
+	}
+@object GenTriggerClass CleanUpToolTrigger = {
+	GI_visMoniker = 'C'," CleanUp-Tool ";
+	GTI_destination = process;
+	GTI_actionMsg = MSG_IC_ADD_CLEANUP_TOOL;
+	HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+	HINT_CENTER_MONIKER;
+	HINT_GADGET_BACKGROUND_COLORS = { C_LIGHT_CYAN,C_LIGHT_CYAN,C_CYAN,C_CYAN};
+	}
+@object GenTriggerClass DeleteFolderTrigger = {
+	GI_visMoniker = 'f'," Delete empty folder ";
+	GTI_destination = process;
+	GTI_actionMsg = MSG_IC_DELETE_FOLDER;
+	HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+	HINT_CENTER_MONIKER;
+	HINT_GADGET_BACKGROUND_COLORS = { C_WHITE,C_WHITE,C_CYAN,C_CYAN};
+	}
+
+@object GenTriggerClass DelTempFileTrigger = {
+	GI_visMoniker = 'm'," Delete temporary file ";
+	GTI_destination = process;
+	GTI_actionMsg = MSG_IC_DEL_TEMP_FILE;
+	HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+	HINT_CENTER_MONIKER;
+	HINT_GADGET_BACKGROUND_COLORS = { C_WHITE,C_WHITE,C_CYAN,C_CYAN};
+	}
+@object GenTriggerClass DeleteIniEntryTrigger = {
+	GI_visMoniker = 'E'," Modify INI-Entry ";
+	GTI_destination = process;
+	GTI_actionMsg = MSG_IC_DELETE_INI_ENTRY;
+	HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+	HINT_CENTER_MONIKER;
+	HINT_GADGET_BACKGROUND_COLORS = { C_LIGHT_CYAN,C_LIGHT_CYAN,C_CYAN,C_CYAN};
+	}
+
+/* ----------------- ICInfoTextDialog ------------------------------*/
+
+@object	GenInteractionClass ICInfoTextDialog = {
+	GI_visMoniker = " Info Text ";
+	GI_comp = @ICPrognameText,@ICBeschreibungText,@ICCopyrightText,
+		@ICUpdateTextTrigger;
+	GII_visibility = GIV_DIALOG;
+	GII_type = GIT_COMMAND;
+	GII_attrs = @default | GIA_NOT_USER_INITIATABLE
+		| GIA_MODAL;
+	}
+
+@object GenTextClass ICPrognameText = {
+	GI_visMoniker = "Program name:";
+	GTXI_maxLength = COPYRIGHT_TEXT_LEN;
+	GTXI_attrs = @default | GTA_SINGLE_LINE_TEXT;
+	HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+	HINT_PLACE_MONIKER_ABOVE;
+	HINT_TEXT_WHITE_WASH_COLOR;
+	HINT_FIXED_SIZE = { SST_AVG_CHAR_WIDTHS | 65 ,
+				SST_LINES_OF_TEXT | 1, 1 };
+	}
+@object GenTextClass ICBeschreibungText = {
+	GI_visMoniker = "Description:";
+	GTXI_attrs = @default | GTA_INIT_SCROLLING;
+	GTXI_maxLength = INFO_TEXT_LEN;
+	HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+	HINT_PLACE_MONIKER_ABOVE;
+	HINT_TEXT_WHITE_WASH_COLOR;
+	HINT_FIXED_SIZE = { SST_AVG_CHAR_WIDTHS | 65 ,
+				SST_LINES_OF_TEXT | 8, 8 };
+	}
+@object GenTextClass ICCopyrightText = {
+	GI_visMoniker = "Copyright:";
+	GTXI_maxLength = COPYRIGHT_TEXT_LEN;
+	GTXI_attrs = @default | GTA_SINGLE_LINE_TEXT;
+	HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+	HINT_PLACE_MONIKER_ABOVE;
+	HINT_TEXT_WHITE_WASH_COLOR;
+	HINT_FIXED_SIZE = { SST_AVG_CHAR_WIDTHS | 65 ,
+				SST_LINES_OF_TEXT | 1, 1 };
+	}
+@object GenTriggerClass ICUpdateTextTrigger = {
+	GI_visMoniker = "Set Info Text";
+	ATTR_GEN_TRIGGER_INTERACTION_COMMAND = IC_APPLY;
+	GTI_destination = process;
+	GTI_actionMsg = MSG_IC_SET_INFO_TEXT;
+	HINT_SEEK_REPLY_BAR;
+	}
+
+/* ----------------- Document-Control ------------------------------*/
+
+@object GenDocumentControlClass ICDocumentControl = {
+    GDCI_documentToken = { "InsD", MANUFACTURER_ID_RABE_SOFT };
+    GDCI_noNameText = "No Installation Package";
+    GDCI_documentGroup = ICDocumentGroup;
+    GDCI_enableDisableList = ICEnableList;
+    GDCI_templateDir ="Install Templates";
+/*    GDCI_features = GDCF_SINGLE_FILE_CLEAN_CAN_NEW_OPEN
+		| GDCF_NAME_ON_PRIMARY;*/
+}
+
+@chunk optr ICEnableList[] = { @ICTriggerGroup,@ICToolsGroup };
+
+/* ----------------- Legende und aktuelle Info ------------- */
+@object GenInteractionClass ICLegendeGroup = {
+	GI_comp = @LegendeLeft, @LegendeRight;
+	HINT_ORIENT_CHILDREN_HORIZONTALLY;
+	/*HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+	HINT_EXPAND_HEIGHT_TO_FIT_PARENT;*/
+	HINT_MINIMIZE_CHILD_SPACING;
+}
+@object GenInteractionClass LegendeLeft = {
+	GI_comp = @TextGreen, @TextYellow,@TextRed;
+	HINT_ORIENT_CHILDREN_VERTICALLY;
+	HINT_MINIMIZE_CHILD_SPACING;
+}
+@object GenInteractionClass LegendeRight = {
+	GI_comp = @TextNotFound, @TextInvalid,@TextNoFile;
+	HINT_ORIENT_CHILDREN_VERTICALLY;
+	HINT_MINIMIZE_CHILD_SPACING;
+}
+@define LEGENDE_TEXT_SIZE 	HINT_MINIMUM_SIZE = { SST_AVG_CHAR_WIDTHS | 35 , SST_LINES_OF_TEXT | 1, 1 }
+
+@object GenTextClass TextGreen = {
+	GI_visMoniker = list{@KaroGreenMoniker};
+	GTXI_text = "Protocol/Release, Size etc. OK. ";
+	GI_attrs = @default | GA_READ_ONLY;
+	@LEGENDE_TEXT_SIZE;
+	ATTR_GEN_TEXT_NEVER_MAKE_SCROLLABLE;
+	}
+@object GenTextClass TextYellow = {
+	GI_visMoniker = list{@KaroYellowMoniker};
+	GTXI_text = "Protocol/Release OK.\rDate/size different.";
+	GI_attrs = @default | GA_READ_ONLY;
+	@LEGENDE_TEXT_SIZE;
+	ATTR_GEN_TEXT_NEVER_MAKE_SCROLLABLE;
+	}
+@object GenTextClass TextRed = {
+	GI_visMoniker = list{@KaroRedMoniker};
+	GTXI_text = "Update required. File in package is older than the file in your system.";
+	GI_attrs = @default | GA_READ_ONLY;
+	@LEGENDE_TEXT_SIZE;
+	ATTR_GEN_TEXT_NEVER_MAKE_SCROLLABLE;
+	}
+@object GenTextClass TextNoFile = {
+	GI_visMoniker = list{@KaroBlueMoniker};
+	GTXI_text = "No File.";
+	GI_attrs = @default | GA_READ_ONLY;
+	@LEGENDE_TEXT_SIZE;
+	ATTR_GEN_TEXT_NEVER_MAKE_SCROLLABLE;
+	}
+@object GenTextClass TextInvalid = {
+	GI_visMoniker = list{@KaroInvMoniker};
+	GTXI_text = "File in your system and in the package are fundamentally different, a different file type e.g.";
+	GI_attrs = @default | GA_READ_ONLY;
+	@LEGENDE_TEXT_SIZE;
+	ATTR_GEN_TEXT_NEVER_MAKE_SCROLLABLE;
+	}
+@object GenTextClass TextNotFound = {
+	GI_visMoniker = list{@KaroNfMoniker};
+	GTXI_text = "File is not installed in your system.";
+	GI_attrs = @default | GA_READ_ONLY;
+	@LEGENDE_TEXT_SIZE;
+	ATTR_GEN_TEXT_NEVER_MAKE_SCROLLABLE;
+	}
+@include "art\gruen12.goh"
+@include "art\gelb12.goh"
+@include "art\rot12.goh"
+@include "art\blau12.goh"
+@include "art\nf12.goh"
+@include "art\inv12.goh"
+
+@object GenTextClass ICCurrentDataText = {
+	GTXI_text = "";
+	GI_attrs = @default | GA_READ_ONLY;
+	HINT_TEXT_FRAME;
+	HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+	HINT_EXPAND_HEIGHT_TO_FIT_PARENT;
+	HINT_INITIAL_SIZE = { SST_AVG_CHAR_WIDTHS | 10 ,
+				SST_LINES_OF_TEXT | 6, 6 };
+	HINT_MINIMUM_SIZE = { SST_AVG_CHAR_WIDTHS | 10 ,
+				SST_LINES_OF_TEXT | 6, 6 };
+}
+
+@end Interface; /*-------------------------------------------------------*/
+
+
+/* ----------------- Eigene Resource fÅr Doc-UI ------------------------------*/
+/*		Dummy, weil "UI" == ICFileList im Interface	*/
+
+@start DocumentUI ;
+
+@object GenDocumentGroupClass ICDocumentGroup = {
+    GDGI_untitledName = "Install unnamed";
+    GDGI_protocolMajor = DOCUMENT_PROTOCOL_MAJOR;
+    GDGI_protocolMinor = DOCUMENT_PROTOCOL_MINOR;
+    GDGI_output = process;
+    GDGI_documentControl = ICDocumentControl;
+}
+
+@end DocumentUI;
+
+
+@start DialogResource;
+
+/* Auswahl einer Datei zum HinzufÅgen */
+@object FileSelectDialogClass ICSelectFileDialog = {
+	GI_visMoniker = "Select a file";
+	GI_comp = @ICFileSelector,@ICFSTriggerGroup,
+		@ICSelectOKTrigger,@ICSelectFolderTrigger,@ICSelectCancelTrigger;
+/*	HINT_ORIENT_CHILDREN_VERTICALLY;*/
+	GII_visibility = GIV_DIALOG;
+	GII_attrs = @default | GIA_NOT_USER_INITIATABLE
+		| GIA_INITIATED_VIA_USER_DO_DIALOG
+		| GIA_MODAL;
+	HINT_CENTER_CHILDREN_HORIZONTALLY;
+	}
+
+@visMoniker SelFileMoniker = "Select a file";
+@visMoniker SelFolderMoniker = "Select a folder";
+
+@object GenFileSelectorClass ICFileSelector = {
+	HINT_FILE_SELECTOR_NUMBER_OF_FILES_TO_SHOW = 10;
+	ATTR_GEN_FILE_SELECTOR_FILE_ATTR = { 0, FA_LINK};
+	ATTR_GEN_PATH_DATA = { SP_APPLICATION, "."};
+	GFSI_destination = ICSelectFileDialog;
+	GFSI_notificationMsg = MSG_FS_FILE_SELECTED;
+	}
+@object GenInteractionClass ICFSTriggerGroup = {
+	GI_visMoniker = "Other folders:";
+	GI_comp = @ICSelectWorldTrigger,@ICSelectHelpTrigger,
+			@ICSelectUserdataTrigger,
+			@ICSelectSystemTrigger,@ICSelectPrefTrigger,
+			@ICSelectSysApplTrigger;
+	HINT_ORIENT_CHILDREN_HORIZONTALLY;
+/*	HINT_CENTER_CHILDREN_HORIZONTALLY;
+/*	HINT_FULL_JUSTIFY_CHILDREN_HORIZONTALLY;
+	HINT_INCLUDE_ENDS_IN_CHILD_SPACING;
+  */	HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+	HINT_PLACE_MONIKER_ABOVE;
+/*	HINT_ALLOW_CHILDREN_TO_WRAP;
+	HINT_WRAP_AFTER_CHILD_COUNT = 3;
+	HINT_CUSTOM_CHILD_SPACING = 10;
+/**/
+	}
+
+@object GenTriggerClass ICSelectHelpTrigger = {
+	GI_visMoniker = 'H',"Help";
+	GTI_destination = ICSelectFileDialog;
+	GTI_actionMsg = MSG_FS_SET_DIRECTORY;
+	ATTR_GEN_TRIGGER_ACTION_DATA = SP_HELP_FILES;
+	}
+@object GenTriggerClass ICSelectSysApplTrigger = {
+	GI_visMoniker = 'y',"SysAppl";
+	GTI_destination = ICSelectFileDialog;
+	GTI_actionMsg = MSG_FS_SET_DIRECTORY;
+	ATTR_GEN_TRIGGER_ACTION_DATA = SP_SYS_APPLICATION;
+	}
+@object GenTriggerClass ICSelectSystemTrigger = {
+	GI_visMoniker = 'S',"System";
+	GTI_destination = ICSelectFileDialog;
+	GTI_actionMsg = MSG_FS_SET_DIRECTORY;
+	ATTR_GEN_TRIGGER_ACTION_DATA = SP_SYSTEM;
+	}
+@object GenTriggerClass ICSelectPrefTrigger = {
+	GI_visMoniker = 'f',"Pref";
+	GTI_destination = ICSelectFileDialog;
+	GTI_actionMsg = MSG_FS_SET_DIRECTORY;
+	ATTR_GEN_TRIGGER_ACTION_DATA = (-1);
+	}
+@object GenTriggerClass ICSelectWorldTrigger = {
+	GI_visMoniker = 'W',"World";
+	GTI_destination = ICSelectFileDialog;
+	GTI_actionMsg = MSG_FS_SET_DIRECTORY;
+	ATTR_GEN_TRIGGER_ACTION_DATA = SP_APPLICATION;
+	}
+@object GenTriggerClass ICSelectUserdataTrigger = {
+	GI_visMoniker = 'U',"Userdata";
+	GTI_destination = ICSelectFileDialog;
+	GTI_actionMsg = MSG_FS_SET_DIRECTORY;
+	ATTR_GEN_TRIGGER_ACTION_DATA = SP_USER_DATA;
+	}
+
+@object GenTriggerClass ICSelectOKTrigger = {
+	GI_visMoniker = "This file";
+	GI_states = @default & ~GS_ENABLED;
+	GI_attrs = @default | GA_SIGNAL_INTERACTION_COMPLETE;
+	ATTR_GEN_TRIGGER_INTERACTION_COMMAND = IC_OK;
+	HINT_SEEK_REPLY_BAR;
+	}
+@object GenTriggerClass ICSelectFolderTrigger = {
+	GI_visMoniker = "This folder";
+	GI_states = @default & ~GS_ENABLED;
+	GI_attrs = @default | GA_SIGNAL_INTERACTION_COMPLETE;
+	ATTR_GEN_TRIGGER_INTERACTION_COMMAND = IC_OK;
+	HINT_SEEK_REPLY_BAR;
+	}
+@object GenTriggerClass ICSelectCancelTrigger = {
+	GI_visMoniker = "Cancel";
+	GI_attrs = @default | GA_SIGNAL_INTERACTION_COMPLETE;
+	ATTR_GEN_TRIGGER_INTERACTION_COMMAND = IC_NO;
+	HINT_SEEK_REPLY_BAR;
+	}
+	
+/* InstallationsOptionen einstellen */
+@object ICOptionsDialogClass ICOptionsDialog = {
+	GI_visMoniker = "Installation options";
+	GI_comp = @ICAllwaysSelector,@ICOptionsBottomGroup;
+	HINT_ORIENT_CHILDREN_VERTICALLY;
+	GII_visibility = GIV_DIALOG;
+	GII_type = GIT_NOTIFICATION;
+	GII_attrs = @default | GIA_NOT_USER_INITIATABLE
+		| GIA_INITIATED_VIA_USER_DO_DIALOG
+		| GIA_MODAL;
+	ATTR_GEN_HELP_CONTEXT = "Optionen";
+	}
+@object GenInteractionClass ICOptionsBottomGroup = {
+	GI_comp = @ICReleaseSelector,@ICProtocolSelector;
+	HINT_ORIENT_CHILDREN_HORIZONTALLY;
+	HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+	HINT_FULL_JUSTIFY_CHILDREN_HORIZONTALLY;
+	HINT_INCLUDE_ENDS_IN_CHILD_SPACING;
+	}
+
+@object GenBooleanGroupClass ICAllwaysSelector = {
+	GI_visMoniker = 'C',"Common things:";
+	GI_comp = @ICAllwaysBoolean,@ICOnlyExistBoolean,@ICOnlyNotExistBoolean,
+			@ICCancelIfNotInstallBoolean,@KeepDosNameBoolean,
+			@DeleteOnDeinstallBoolean;
+	GBGI_selectedBooleans = 0;
+	GBGI_destination = ICOptionsDialog;
+	GBGI_applyMsg = MSG_OD_INSTALL_ALLWAYS_CHANGED;
+	HINT_ORIENT_CHILDREN_VERTICALLY;
+	}
+
+@object GenBooleanClass ICAllwaysBoolean = {
+	GI_visMoniker = 'I',"Ignore Protocol and Release";
+	GBI_identifier = INST_IGNORE_P_AND_R;
+	}
+@object GenBooleanClass ICOnlyExistBoolean = {
+	GI_visMoniker = 'a',"Only, if already installed";
+	GBI_identifier = INST_ONLY_IF_EXIST;
+	}
+@object GenBooleanClass ICOnlyNotExistBoolean = {
+	GI_visMoniker = 'n',"Only, if not yet installed";
+	GBI_identifier = INST_ONLY_IF_NOT_EXIST;
+	}
+@object GenBooleanClass ICCancelIfNotInstallBoolean = {
+	GI_visMoniker = 'e',"Cancel, if installation fails";
+	GBI_identifier = INST_CANCEL_IF_NOT_INSTALL;
+	}
+@object GenBooleanClass DeleteOnDeinstallBoolean = {
+	GI_visMoniker = 'l',"Delete, on remove this package";
+	GBI_identifier = INST_DELETE_ON_DE_INST;
+	}
+@object GenBooleanClass KeepDosNameBoolean = {
+	GI_visMoniker = 'D',"Keep DOS file name";
+	GBI_identifier = INST_KEEP_DOS_NAME;
+	}
+
+
+@object GenItemGroupClass ICProtocolSelector = {
+	GI_visMoniker = 'P',"Protocol number:";
+	GI_comp = @ICProtocolIgnore, @ICProtocolEqual,@ICProtocolGreaterOrEqual,
+			@ICProtocolGreater;
+	GIGI_selection = INST_IGNORE_PROTOCOL;
+	HINT_ORIENT_CHILDREN_VERTICALLY;
+	HINT_PLACE_MONIKER_ABOVE;
+	}
+@object GenItemClass ICProtocolIgnore = {
+	GI_visMoniker = "Ignore";
+	GII_identifier = INST_IGNORE_PROTOCOL;
+	}
+@object GenItemClass ICProtocolEqual = {
+	GI_visMoniker = "Only if equal";
+	GII_identifier = INST_ON_SAME_PROTOCOL;
+	}
+@object GenItemClass ICProtocolGreaterOrEqual = {
+	GI_visMoniker = "Equal or newer";
+	GII_identifier = INST_ON_SAME_PROTOCOL | INST_ON_NEWER_PROTOCOL;
+	}
+@object GenItemClass ICProtocolGreater = {
+	GI_visMoniker = "Only if newer";
+	GII_identifier = INST_ON_NEWER_PROTOCOL;
+	}
+
+@object GenItemGroupClass ICReleaseSelector = {
+	GI_visMoniker = 'R',"Release number:";
+	GI_comp = @ICReleaseIgnore, @ICReleaseEqual,@ICReleaseGreaterOrEqual,
+			@ICReleaseGreater;
+	GIGI_selection = INST_ON_SAME_RELEASE | INST_ON_NEWER_RELEASE;
+	HINT_ORIENT_CHILDREN_VERTICALLY;
+	HINT_PLACE_MONIKER_ABOVE;
+	}
+@object GenItemClass ICReleaseIgnore = {
+	GI_visMoniker = "Ignore";
+	GII_identifier = INST_IGNORE_RELEASE;
+	}
+@object GenItemClass ICReleaseEqual = {
+	GI_visMoniker = "Only if equal";
+	GII_identifier = INST_ON_SAME_RELEASE;
+	}
+@object GenItemClass ICReleaseGreaterOrEqual = {
+	GI_visMoniker = "Equal or newer";
+	GII_identifier = INST_ON_SAME_RELEASE | INST_ON_NEWER_RELEASE;
+	}
+@object GenItemClass ICReleaseGreater = {
+	GI_visMoniker = "Only if newer";
+	GII_identifier = INST_ON_NEWER_RELEASE;
+	}
+
+/* ------------------------- InfoBox: Lese ------------------------ */
+@object GenInteractionClass ICReadFileBox = {
+	GI_visMoniker = "Reading form file";
+	GI_comp = /*@DummyGlyph1,*/@ICReadFileGlyph/*,@DummyGlyph2*/;
+	GII_visibility = GIV_DIALOG;
+	GII_attrs = @default | GIA_NOT_USER_INITIATABLE;
+	}
+@object GenGlyphClass DummyGlyph1 = { GI_visMoniker = " ";  }
+@object GenGlyphClass ICReadFileGlyph = {
+	GI_visMoniker = " ";
+	HINT_CENTER_MONIKER;
+	HINT_FIXED_SIZE = { SST_AVG_CHAR_WIDTHS | 30 ,
+				SST_LINES_OF_TEXT | 1, 1 };
+	}
+@object GenGlyphClass DummyGlyph2 = { GI_visMoniker = " ";  }
+
+
+/* ------------------------- Copyright Box ------------------------ */
+@include "..\Shared\crbox.goh"
+@include "..\Shared\rabelogo.goh"
+
+@object GenInteractionClass AboutBoxGroup = {
+	GI_comp = @AboutBox;
+	}
+@DefDefaultEnglishCRBox(AboutBox,"Information",@AboutBoxGlyphe);
+@object GenInteractionClass AboutBoxGlyphe= {
+	GI_comp = @AboutGlyph1, @AboutGlyph2, @AboutGlyph3, @AboutGlyph4; 
+	HINT_EXPAND_WIDTH_TO_FIT_PARENT; HINT_CENTER_CHILDREN_HORIZONTALLY; }
+@object GenGlyphClass AboutGlyph1= {
+	GI_visMoniker = "Install Creator"; }
+@object GenGlyphClass AboutGlyph2= {
+	GI_visMoniker = " Create Installation Packages "; }
+@object GenGlyphClass AboutGlyph3= {
+	GI_visMoniker = "(version=release)"; }
+@object GenGlyphClass AboutGlyph4= {
+	GI_visMoniker = "Freeware"; }
+
+/* ------------------ InfoBox zur Anzeige von Geos-Infos ------------------*/
+
+@object GenTriggerClass FileInfoTrigger = {
+	GI_visMoniker = 'I',"File Detail Information";
+	GTI_destination = process;
+	GTI_actionMsg = MSG_IC_FILE_DETAILS;
+	}
+
+@object GenInteractionClass GeosInfoBox = {
+	GI_visMoniker = "< File Name >";
+	GI_comp = @InfoCopyrightText,@GeosInfoTopGroup,@GeosInfoUserNotes;
+	HINT_ORIENT_CHILDREN_VERTICALLY;
+
+	GII_visibility = GIV_DIALOG;
+	GII_type = GIT_COMMAND;
+	GII_attrs = @default | GIA_NOT_USER_INITIATABLE
+		| GIA_INITIATED_VIA_USER_DO_DIALOG
+		| GIA_MODAL;
+	}
+
+
+@object GenInteractionClass GeosInfoTopGroup = {
+	GI_comp = @InfoLeftClump,@InfoRightClump;
+	HINT_ORIENT_CHILDREN_HORIZONTALLY;
+	HINT_FULL_JUSTIFY_CHILDREN_HORIZONTALLY;
+	HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+	}
+@object GenInteractionClass InfoLeftClump = {
+	GI_comp = @InfoLeftLabelGroup,@InfoLeftTextGroup;
+	HINT_ORIENT_CHILDREN_HORIZONTALLY;
+	HINT_DRAW_IN_BOX;
+	}
+@object GenInteractionClass InfoRightClump = {
+	GI_comp = @InfoRightLabelGroup,@InfoRightTextGroup;
+	HINT_ORIENT_CHILDREN_HORIZONTALLY;
+	HINT_DRAW_IN_BOX;
+	}
+
+@object GenInteractionClass InfoLeftLabelGroup = {
+	GI_comp = @InfoCreateDateLabel,@InfoCreateTimeLabel,@InfoCreatorLabel,
+			@InfoDosNameLabel,@InfoFileSizeLabel,@InfoIconIDLabel;
+	HINT_ORIENT_CHILDREN_VERTICALLY;
+	HINT_RIGHT_JUSTIFY_CHILDREN;
+	HINT_MINIMIZE_CHILD_SPACING;
+	}
+@object GenInteractionClass InfoLeftTextGroup = {
+	GI_comp = @InfoCreateDateText,@InfoCreateTimeText,@InfoCreatorText,
+			@InfoDosNameText,@InfoFileSizeText,@InfoIconIDText;
+	HINT_ORIENT_CHILDREN_VERTICALLY;
+	HINT_MINIMIZE_CHILD_SPACING;
+	}
+
+@object GenInteractionClass InfoRightLabelGroup = {
+	GI_comp = @InfoModifiedDateLabel,@InfoModifiedTimeLabel,@InfoProtocolLabel,
+			@InfoReleaseLabel,@InfoAttributeLabel,@InfoPasswordLabel;
+	HINT_ORIENT_CHILDREN_VERTICALLY;
+	HINT_RIGHT_JUSTIFY_CHILDREN;
+	HINT_MINIMIZE_CHILD_SPACING;
+	}
+@object GenInteractionClass InfoRightTextGroup = {
+	GI_comp = @InfoModifiedDateText,@InfoModifiedTimeText,@InfoProtocolText,
+			@InfoReleaseText,@InfoAttributeText,@InfoPasswordText;
+	HINT_ORIENT_CHILDREN_VERTICALLY;
+	HINT_MINIMIZE_CHILD_SPACING;
+	}
+
+@define INFOLABELCLASS GenGlyphClass
+
+@object @INFOLABELCLASS InfoCreateDateLabel= {
+	GI_visMoniker = "Created: "; }
+@object @INFOLABELCLASS InfoCreateTimeLabel= {
+	GI_visMoniker = "Time: "; }
+@object @INFOLABELCLASS InfoCreatorLabel= {
+	GI_visMoniker = "Created by: "; }
+@object @INFOLABELCLASS InfoDosNameLabel= {
+	GI_visMoniker = "Dos name: "; }
+@object @INFOLABELCLASS InfoFileSizeLabel= {
+	GI_visMoniker = "Size: "; }
+@object @INFOLABELCLASS InfoIconIDLabel= {
+	GI_visMoniker = "Icon ID: "; }
+@object @INFOLABELCLASS InfoModifiedDateLabel= {
+	/*GI_visMoniker = "Letzte \x080nderung: "; } */
+	GI_visMoniker = "Last modified: "; } 
+@object @INFOLABELCLASS InfoModifiedTimeLabel= {
+	GI_visMoniker = "Time: "; }
+@object @INFOLABELCLASS InfoProtocolLabel= {
+	GI_visMoniker = "Protocol: "; }
+@object @INFOLABELCLASS InfoReleaseLabel= {
+	GI_visMoniker = "Release: "; }
+@object @INFOLABELCLASS InfoAttributeLabel= {
+	GI_visMoniker = "Attributes: "; }
+@object @INFOLABELCLASS InfoPasswordLabel= {
+	GI_visMoniker = "Password ? "; }
+
+
+@object @INFOLABELCLASS InfoCreateDateText= {
+	GI_visMoniker = "-"; }
+@object @INFOLABELCLASS InfoCreateTimeText= {
+	GI_visMoniker = "-"; }
+@object @INFOLABELCLASS InfoCreatorText= {
+	GI_visMoniker = "-"; }
+@object @INFOLABELCLASS InfoDosNameText= {
+	GI_visMoniker = "-"; }
+@object @INFOLABELCLASS InfoFileSizeText= {
+	GI_visMoniker = "-"; }
+@object @INFOLABELCLASS InfoIconIDText= {
+	GI_visMoniker = "-"; }
+@object @INFOLABELCLASS InfoModifiedDateText= {
+	GI_visMoniker = "-"; }
+@object @INFOLABELCLASS InfoModifiedTimeText= {
+	GI_visMoniker = "-"; }
+@object @INFOLABELCLASS InfoProtocolText= {
+	GI_visMoniker = "-"; }
+@object @INFOLABELCLASS InfoReleaseText= {
+	GI_visMoniker = "-"; }
+@object @INFOLABELCLASS InfoAttributeText= {
+	GI_visMoniker = "-"; }
+@object @INFOLABELCLASS InfoPasswordText= {
+	GI_visMoniker = "-"; }
+
+	
+
+@object GenTextClass InfoCopyrightText = {
+	GI_visMoniker = "© Note:";
+	GI_attrs = @default | GA_READ_ONLY;
+	GTXI_text= "";
+/*	GTXI_attrs = @default | GTA_SINGLE_LINE_TEXT; */
+	}
+
+@object GenTextClass GeosInfoUserNotes = {
+	GI_visMoniker = "Usernotes:";
+	GI_attrs = @default | GA_READ_ONLY;
+	HINT_PLACE_MONIKER_ABOVE;
+	HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+	HINT_MINIMUM_SIZE = {SST_AVG_CHAR_WIDTHS | 20,
+				SST_LINES_OF_TEXT | 4,4};
+	HINT_TEXT_FRAME;
+	}
+	
+
+@end DialogResource;
+
+@start MonikerResource, data;
+
+@include "art\appmon1.goh"
+@include "art\appmon2.goh"
+@include "art\docmonik.goh"
+@visMoniker InstallDocMonikerList = list { @DocMoniker0,@DocMoniker1,@DocMoniker2 };
+
+
+@chunk InfoBitmap Karo12gn = {
+		{ 12,12,BMC_PACKBITS,(BMT_MASK | BMF_8BIT) },
+		0x01, 0xff, 0xe0, 0xf6, 0x00, 0x00, 0x0f, 0x02,
+		0xff, 0xf0, 0x00, 0xf7, 0x0a, 0x00, 0x0f, 0x02,
+		0xff, 0xf0, 0x00, 0xf7, 0x0a, 0x00, 0x0f, 0x02,
+		0xff, 0xf0, 0x00, 0xf7, 0x0a, 0x00, 0x0f, 0x02,
+		0xff, 0xf0, 0x00, 0xf7, 0x0a, 0x00, 0x0f, 0x02,
+		0xff, 0xf0, 0x00, 0xf7, 0x0a, 0x00, 0x0f, 0x02,
+		0xff, 0xf0, 0x00, 0xf7, 0x0a, 0x00, 0x0f, 0x02,
+		0xff, 0xf0, 0x00, 0xf7, 0x0a, 0x00, 0x0f, 0x02,
+		0xff, 0xf0, 0x00, 0xf7, 0x0a, 0x00, 0x0f, 0x02,
+		0xff, 0xf0, 0x00, 0xf7, 0x0a, 0x00, 0x0f, 0x02,
+		0xff, 0xf0, 0x00, 0xf7, 0x0a, 0x00, 0x0f, 0x01,
+		0x7f, 0xf0, 0xf5, 0x0f
+		};
+@chunk InfoBitmap Karo12rt = {
+		{ 12,12,BMC_PACKBITS,(BMT_MASK | BMF_8BIT) },
+		0x01, 0xff, 0xe0, 0xf6, 0x00, 0x00, 0x0f, 0x02,
+		0xff, 0xf0, 0x00, 0xf7, 0xdc, 0x00, 0x0f, 0x02,
+		0xff, 0xf0, 0x00, 0xf7, 0xdc, 0x00, 0x0f, 0x02,
+		0xff, 0xf0, 0x00, 0xf7, 0xdc, 0x00, 0x0f, 0x02,
+		0xff, 0xf0, 0x00, 0xf7, 0xdc, 0x00, 0x0f, 0x02,
+		0xff, 0xf0, 0x00, 0xf7, 0xdc, 0x00, 0x0f, 0x02,
+		0xff, 0xf0, 0x00, 0xf7, 0xdc, 0x00, 0x0f, 0x02,
+		0xff, 0xf0, 0x00, 0xf7, 0xdc, 0x00, 0x0f, 0x02,
+		0xff, 0xf0, 0x00, 0xf7, 0xdc, 0x00, 0x0f, 0x02,
+		0xff, 0xf0, 0x00, 0xf7, 0xdc, 0x00, 0x0f, 0x02,
+		0xff, 0xf0, 0x00, 0xf7, 0xdc, 0x00, 0x0f, 0x01,
+		0x7f, 0xf0, 0xf5, 0x0f};
+@chunk InfoBitmap Karo12bl = {
+		{ 12,12,BMC_PACKBITS,(BMT_MASK | BMF_8BIT) },
+		0x01, 0xff, 0xe0, 0xf6, 0x00, 0x00, 0x0f, 0x02,
+		0xff, 0xf0, 0x00, 0xf7, 0x09, 0x00, 0x0f, 0x02,
+		0xff, 0xf0, 0x00, 0xf7, 0x09, 0x00, 0x0f, 0x02,
+		0xff, 0xf0, 0x00, 0xf7, 0x09, 0x00, 0x0f, 0x02,
+		0xff, 0xf0, 0x00, 0xf7, 0x09, 0x00, 0x0f, 0x02,
+		0xff, 0xf0, 0x00, 0xf7, 0x09, 0x00, 0x0f, 0x02,
+		0xff, 0xf0, 0x00, 0xf7, 0x09, 0x00, 0x0f, 0x02,
+		0xff, 0xf0, 0x00, 0xf7, 0x09, 0x00, 0x0f, 0x02,
+		0xff, 0xf0, 0x00, 0xf7, 0x09, 0x00, 0x0f, 0x02,
+		0xff, 0xf0, 0x00, 0xf7, 0x09, 0x00, 0x0f, 0x02,
+		0xff, 0xf0, 0x00, 0xf7, 0x09, 0x00, 0x0f, 0x01,
+		0x7f, 0xf0, 0xf5, 0x0f};
+@chunk InfoBitmap Karo12gb = {
+		{ 12,12,BMC_PACKBITS,(BMT_MASK | BMF_8BIT) },
+		0x01, 0xff, 0xe0, 0xf6, 0x00, 0x00, 0x0f, 0x02,
+		0xff, 0xf0, 0x00, 0xf7, 0x0e, 0x00, 0x0f, 0x02,
+		0xff, 0xf0, 0x00, 0xf7, 0x0e, 0x00, 0x0f, 0x02,
+		0xff, 0xf0, 0x00, 0xf7, 0x0e, 0x00, 0x0f, 0x02,
+		0xff, 0xf0, 0x00, 0xf7, 0x0e, 0x00, 0x0f, 0x02,
+		0xff, 0xf0, 0x00, 0xf7, 0x0e, 0x00, 0x0f, 0x02,
+		0xff, 0xf0, 0x00, 0xf7, 0x0e, 0x00, 0x0f, 0x02,
+		0xff, 0xf0, 0x00, 0xf7, 0x0e, 0x00, 0x0f, 0x02,
+		0xff, 0xf0, 0x00, 0xf7, 0x0e, 0x00, 0x0f, 0x02,
+		0xff, 0xf0, 0x00, 0xf7, 0x0e, 0x00, 0x0f, 0x02,
+		0xff, 0xf0, 0x00, 0xf7, 0x0e, 0x00, 0x0f, 0x01,
+		0x7f, 0xf0, 0xf5, 0x0f};
+@chunk InfoBitmap Karo12nf = {
+		{ 12,12,BMC_PACKBITS,(BMT_MASK | BMF_8BIT) },
+		0x01, 0xff, 0xe0, 0xf6, 0x00, 0x00, 0x0f, 0x02,
+		0xff, 0xf0, 0x00, 0xf7, 0x0a, 0x00, 0x0f, 0x02,
+		0xff, 0xf0, 0x00, 0xfd, 0x0a, 0x01, 0x00, 0x00,
+		0xfd, 0x0a, 0x00, 0x0f, 0x02, 0xff, 0xf0, 0x00,
+		0xfd, 0x0a, 0x01, 0x00, 0x00, 0xfd, 0x0a, 0x00,
+		0x0f, 0x02, 0xff, 0xf0, 0x00, 0xfd, 0x0a, 0x01,
+		0x00, 0x00, 0xfd, 0x0a, 0x00, 0x0f, 0x02, 0xff,
+		0xf0, 0x00, 0xfd, 0x0a, 0x01, 0x00, 0x00, 0xfd,
+		0x0a, 0x00, 0x0f, 0x02, 0xff, 0xf0, 0x00, 0xfd,
+		0x0a, 0x01, 0x00, 0x00, 0xfd, 0x0a, 0x00, 0x0f,
+		0x02, 0xff, 0xf0, 0x00, 0xf7, 0x0a, 0x00, 0x0f,
+		0x02, 0xff, 0xf0, 0x00, 0xfd, 0x0a, 0x01, 0x00,
+		0x00, 0xfd, 0x0a, 0x00, 0x0f, 0x02, 0xff, 0xf0,
+		0x00, 0xfd, 0x0a, 0x01, 0x00, 0x00, 0xfd, 0x0a,
+		0x00, 0x0f, 0x02, 0xff, 0xf0, 0x00, 0xf7, 0x0a,
+		0x00, 0x0f, 0x01, 0x7f, 0xf0, 0xf5, 0x0f};
+@chunk InfoBitmap Karo12inv = {
+		{ 12,12,BMC_PACKBITS,(BMT_MASK | BMF_8BIT) },
+		0x01, 0xff, 0xe0, 0xf6, 0x00, 0x00, 0x0f, 0x02,
+		0xff, 0xf0, 0x00, 0xf7, 0xdc, 0x00, 0x0f, 0x02,
+		0xff, 0xf0, 0x00, 0xfd, 0xdc, 0x01, 0x0f, 0x0f,
+		0xfd, 0xdc, 0x00, 0x0f, 0x02, 0xff, 0xf0, 0x00,
+		0xfd, 0xdc, 0x01, 0x0f, 0x0f, 0xfd, 0xdc, 0x00,
+		0x0f, 0x02, 0xff, 0xf0, 0x00, 0xfd, 0xdc, 0x01,
+		0x0f, 0x0f, 0xfd, 0xdc, 0x00, 0x0f, 0x02, 0xff,
+		0xf0, 0x00, 0xfd, 0xdc, 0x01, 0x0f, 0x0f, 0xfd,
+		0xdc, 0x00, 0x0f, 0x02, 0xff, 0xf0, 0x00, 0xfd,
+		0xdc, 0x01, 0x0f, 0x0f, 0xfd, 0xdc, 0x00, 0x0f,
+		0x02, 0xff, 0xf0, 0x00, 0xf7, 0xdc, 0x00, 0x0f,
+		0x02, 0xff, 0xf0, 0x00, 0xfd, 0xdc, 0x01, 0x0f,
+		0x0f, 0xfd, 0xdc, 0x00, 0x0f, 0x02, 0xff, 0xf0,
+		0x00, 0xfd, 0xdc, 0x01, 0x0f, 0x0f, 0xfd, 0xdc,
+		0x00, 0x0f, 0x02, 0xff, 0xf0, 0x00, 0xf7, 0xdc,
+		0x00, 0x0f, 0x01, 0x7f, 0xf0, 0xf5, 0x0f};
+
+@chunk InfoBitmap Karo10gn = {
+		{ 10,10,BMC_PACKBITS,(BMT_MASK | BMF_8BIT) },
+		0x01, 0xff, 0x80, 0xf8, 0x00, 0x00, 0x0f, 0x02,
+		0xff, 0xc0, 0x00, 0xf9, 0x0a, 0x00, 0x0f, 0x02,
+		0xff, 0xc0, 0x00, 0xf9, 0x0a, 0x00, 0x0f, 0x02,
+		0xff, 0xc0, 0x00, 0xf9, 0x0a, 0x00, 0x0f, 0x02,
+		0xff, 0xc0, 0x00, 0xf9, 0x0a, 0x00, 0x0f, 0x02,
+		0xff, 0xc0, 0x00, 0xf9, 0x0a, 0x00, 0x0f, 0x02,
+		0xff, 0xc0, 0x00, 0xf9, 0x0a, 0x00, 0x0f, 0x02,
+		0xff, 0xc0, 0x00, 0xf9, 0x0a, 0x00, 0x0f, 0x02,
+		0xff, 0xc0, 0x00, 0xf9, 0x0a, 0x00, 0x0f, 0x01,
+		0x7f, 0xc0, 0xf7, 0x0f};
+@chunk InfoBitmap Karo10rt = {
+		{ 10,10,BMC_PACKBITS,(BMT_MASK | BMF_8BIT) },
+		0x01, 0xff, 0x80, 0xf8, 0x00, 0x00, 0x0f, 0x02,
+		0xff, 0xc0, 0x00, 0xf9, 0xdc, 0x00, 0x0f, 0x02,
+		0xff, 0xc0, 0x00, 0xf9, 0xdc, 0x00, 0x0f, 0x02,
+		0xff, 0xc0, 0x00, 0xf9, 0xdc, 0x00, 0x0f, 0x02,
+		0xff, 0xc0, 0x00, 0xf9, 0xdc, 0x00, 0x0f, 0x02,
+		0xff, 0xc0, 0x00, 0xf9, 0xdc, 0x00, 0x0f, 0x02,
+		0xff, 0xc0, 0x00, 0xf9, 0xdc, 0x00, 0x0f, 0x02,
+		0xff, 0xc0, 0x00, 0xf9, 0xdc, 0x00, 0x0f, 0x02,
+		0xff, 0xc0, 0x00, 0xf9, 0xdc, 0x00, 0x0f, 0x01,
+		0x7f, 0xc0, 0xf7, 0x0f};
+@chunk InfoBitmap Karo10bl = {
+		{ 10,10,BMC_PACKBITS,(BMT_MASK | BMF_8BIT) },
+		0x01, 0xff, 0x80, 0xf8, 0x00, 0x00, 0x0f, 0x02,
+		0xff, 0xc0, 0x00, 0xf9, 0x09, 0x00, 0x0f, 0x02,
+		0xff, 0xc0, 0x00, 0xf9, 0x09, 0x00, 0x0f, 0x02,
+		0xff, 0xc0, 0x00, 0xf9, 0x09, 0x00, 0x0f, 0x02,
+		0xff, 0xc0, 0x00, 0xf9, 0x09, 0x00, 0x0f, 0x02,
+		0xff, 0xc0, 0x00, 0xf9, 0x09, 0x00, 0x0f, 0x02,
+		0xff, 0xc0, 0x00, 0xf9, 0x09, 0x00, 0x0f, 0x02,
+		0xff, 0xc0, 0x00, 0xf9, 0x09, 0x00, 0x0f, 0x02,
+		0xff, 0xc0, 0x00, 0xf9, 0x09, 0x00, 0x0f, 0x01,
+		0x7f, 0xc0, 0xf7, 0x0f};
+@chunk InfoBitmap Karo10gb = {
+		{ 10,10,BMC_PACKBITS,(BMT_MASK | BMF_8BIT) },
+		0x01, 0xff, 0x80, 0xf8, 0x00, 0x00, 0x0f, 0x02,
+		0xff, 0xc0, 0x00, 0xf9, 0x0e, 0x00, 0x0f, 0x02,
+		0xff, 0xc0, 0x00, 0xf9, 0x0e, 0x00, 0x0f, 0x02,
+		0xff, 0xc0, 0x00, 0xf9, 0x0e, 0x00, 0x0f, 0x02,
+		0xff, 0xc0, 0x00, 0xf9, 0x0e, 0x00, 0x0f, 0x02,
+		0xff, 0xc0, 0x00, 0xf9, 0x0e, 0x00, 0x0f, 0x02,
+		0xff, 0xc0, 0x00, 0xf9, 0x0e, 0x00, 0x0f, 0x02,
+		0xff, 0xc0, 0x00, 0xf9, 0x0e, 0x00, 0x0f, 0x02,
+		0xff, 0xc0, 0x00, 0xf9, 0x0e, 0x00, 0x0f, 0x01,
+		0x7f, 0xc0, 0xf7, 0x0f};
+
+@chunk InfoBitmap Karo10inv = {
+		{ 10,10,BMC_PACKBITS,(BMT_MASK | BMF_8BIT) },
+		0x01, 0xff, 0x80, 0xf8, 0x00, 0x00, 0x0f, 0x02,
+		0xff, 0xc0, 0x00, 0xf9, 0xdc, 0x00, 0x0f, 0x02,
+		0xff, 0xc0, 0x00, 0xfe, 0xdc, 0x01, 0x0f, 0x0f,
+		0xfe, 0xdc, 0x00, 0x0f, 0x02, 0xff, 0xc0, 0x00,
+		0xfe, 0xdc, 0x01, 0x0f, 0x0f, 0xfe, 0xdc, 0x00,
+		0x0f, 0x02, 0xff, 0xc0, 0x00, 0xfe, 0xdc, 0x01,
+		0x0f, 0x0f, 0xfe, 0xdc, 0x00, 0x0f, 0x02, 0xff,
+		0xc0, 0x00, 0xf9, 0xdc, 0x00, 0x0f, 0x02, 0xff,
+		0xc0, 0x00, 0xfe, 0xdc, 0x01, 0x0f, 0x0f, 0xfe,
+		0xdc, 0x00, 0x0f, 0x02, 0xff, 0xc0, 0x00, 0xfe,
+		0xdc, 0x01, 0x0f, 0x0f, 0xfe, 0xdc, 0x00, 0x0f,
+		0x02, 0xff, 0xc0, 0x00, 0xf9, 0xdc, 0x00, 0x0f,
+		0x01, 0x7f, 0xc0, 0xf7, 0x0f};
+@chunk InfoBitmap Karo10nf = {
+		{ 10,10,BMC_PACKBITS,(BMT_MASK | BMF_8BIT) },
+		0x01, 0xff, 0x80, 0xf8, 0x00, 0x00, 0x0f, 0x02,
+		0xff, 0xc0, 0x00, 0xf9, 0x0a, 0x00, 0x0f, 0x02,
+		0xff, 0xc0, 0x00, 0xfe, 0x0a, 0x01, 0x00, 0x00,
+		0xfe, 0x0a, 0x00, 0x0f, 0x02, 0xff, 0xc0, 0x00,
+		0xfe, 0x0a, 0x01, 0x00, 0x00, 0xfe, 0x0a, 0x00,
+		0x0f, 0x02, 0xff, 0xc0, 0x00, 0xfe, 0x0a, 0x01,
+		0x00, 0x00, 0xfe, 0x0a, 0x00, 0x0f, 0x02, 0xff,
+		0xc0, 0x00, 0xf9, 0x0a, 0x00, 0x0f, 0x02, 0xff,
+		0xc0, 0x00, 0xfe, 0x0a, 0x01, 0x00, 0x00, 0xfe,
+		0x0a, 0x00, 0x0f, 0x02, 0xff, 0xc0, 0x00, 0xfe,
+		0x0a, 0x01, 0x00, 0x00, 0xfe, 0x0a, 0x00, 0x0f,
+		0x02, 0xff, 0xc0, 0x00, 0xf9, 0x0a, 0x00, 0x0f,
+		0x01, 0x7f, 0xc0, 0xf7, 0x0f};
+
+@end MonikerResource;
+
+
+/* ####################################################################### */
+/*	UI-Objekte fÅr IconEdit Dialog
+/* ####################################################################### */
+
+
+/*---------------------------------------------------------------------------
+ Resourcendefinition IconEditResource
+ EnthÑlt die DialogBox um ein Icon zu Ñndern
+ und ander Dialogboxen, die nicht ins Interface sollen
+ sowie die Meldungstexte
+ ---------------------------------------------------------------------------*/
+
+@start IconEditResource;
+
+@object IconEditDialogClass IconEditDialog = {
+	GI_visMoniker = "Edit Icon";
+	GI_comp = @IconEditInfoText,@MonikerList,@IconInfoGroup/*,@MonikerRangeGroup*/ ,@IconEditOKTrigger;
+	GII_attrs = @default | GIA_MODAL | GIA_INITIATED_VIA_USER_DO_DIALOG;
+	GII_visibility = GIV_DIALOG;
+	GII_type = GIT_COMMAND;
+	HINT_ORIENT_CHILDREN_VERTICALLY;
+	HINT_CENTER_CHILDREN_HORIZONTALLY;
+	}
+
+@object GenTextClass IconEditInfoText = {
+	GI_attrs = @default | GA_READ_ONLY;
+	GTXI_text = "Select the icon to remove from token database if the user \
+REMOVES the software. Usually, this are the icons of the PC/GEOS program and its documents.";
+	HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+	}
+
+@object GenDynamicListClass MonikerList = {
+    GIGI_selection = -1;
+    GIGI_applyMsg = MSG_IED_TOKEN_SELECTED;
+    GIGI_destination = IconEditDialog;
+    GIGI_behaviorType = GIGBT_EXCLUSIVE;
+    GDLI_numItems = 0;
+    GDLI_queryMsg = MSG_IED_QUERY_TOKEN;
+    HINT_ORIENT_CHILDREN_HORIZONTALLY;
+    HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+    HINT_ITEM_GROUP_SCROLLABLE;
+/*    HINT_INITIAL_SIZE = {SST_PIXELS | 490,SST_PIXELS | 60,7};*/
+    HINT_INITIAL_SIZE = {SST_PIXELS | 7*60,SST_PIXELS | 45,7};
+	}
+
+/*----------- MonikerRangeGroup ------------------------- */
+/*
+@object GenInteractionClass MonikerRangeGroup = {
+	GI_visMoniker = "ID-Nummer";
+	GI_comp = @ManufIDMinimumValue,@ManufIDMaximumValue,@ManufIDApplayTrigger;
+	HINT_ORIENT_CHILDREN_HORIZONTALLY;
+	HINT_CENTER_CHILDREN_VERTICALLY;
+	}
+@object WordValueClass ManufIDMinimumValue = {
+	GI_visMoniker = "von:";
+	HINT_VALUE_NAVIGATE_TO_NEXT_FIELD_ON_RETURN_PRESS;
+	}
+@object WordValueClass ManufIDMaximumValue = {
+	GI_visMoniker = "bis:";
+	GVLI_value = 0xFFFF;
+	HINT_VALUE_NAVIGATE_TO_NEXT_FIELD_ON_RETURN_PRESS;
+	}
+@object GenTriggerClass ManufIDApplayTrigger = {
+	GI_visMoniker = 'z',"Anzeigen";
+	GTI_destination = IconEditDialog;
+	GTI_actionMsg = MSG_IED_MANUFID_APPLAY_TRIGGER_SELECTED;
+	}
+*/
+/* ------------------------ IconInfoGroup ----------------- */
+
+@object GenInteractionClass IconInfoGroup = {
+	GI_comp = @IconInfoCount,@IconInfoIDLabel,@IconInfoID;
+	HINT_ORIENT_CHILDREN_HORIZONTALLY;
+	HINT_TOP_JUSTIFY_CHILDREN;
+	}
+
+@object GenValueClass IconInfoCount = {
+	GI_visMoniker = "Icons found: ";
+	GI_attrs = @default | GA_READ_ONLY;
+	}
+@object GenGlyphClass IconInfoIDLabel = {
+	GI_visMoniker =" Current Icon ID:";
+	}
+@object GenGlyphClass IconInfoID = {
+	GI_visMoniker = "-";
+	}
+
+
+/* ------------------------ ReplyBarTrigger ----------------- */
+
+@object GenTriggerClass IconEditOKTrigger = {
+	GI_visMoniker = 'A',"Apply";
+	GI_states = @default & ~GS_ENABLED;
+	GI_attrs =  @default | GA_SIGNAL_INTERACTION_COMPLETE;
+	ATTR_GEN_TRIGGER_INTERACTION_COMMAND = IC_OK;
+	HINT_SEEK_REPLY_BAR;
+	}
+
+/* ------------------------ Dialog-Boxen ----------------- */
+
+
+@object GenInteractionClass DosTokenBox = {
+	GI_visMoniker = " DOS-Icon ";
+	GI_comp = @DosTokenInfoText,@DosTokenDescriptorGroup,
+			@DosTokenCancelTrigger,@DosTokenSelectAppTrigger;
+	GII_visibility = GIV_DIALOG;
+	GII_type = GIT_NOTIFICATION;
+	GII_attrs = @default | GIA_NOT_USER_INITIATABLE
+		| GIA_INITIATED_VIA_USER_DO_DIALOG
+		| GIA_MODAL;
+	}
+
+@object GenTextClass DosTokenInfoText = {
+	GI_attrs = @default | GA_READ_ONLY;
+	GTXI_text = "At the end of the installation process, the user is prompted \
+to assign an icon to the DOS files, used by this PC/GEOS program. You have to \
+specify now both, the PC/GEOS program and the DOS file mask to assign with.\r\
+When the user removes the software, the assignment will be removed.";
+	HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+	}
+@object GenInteractionClass DosTokenDescriptorGroup = {
+	GI_comp = @DosTokenApplication,@DosTokenAppIconID,@DosTokenFileMask;
+	HINT_ORIENT_CHILDREN_VERTICALLY;
+	HINT_CENTER_CHILDREN_ON_MONIKERS;
+	HINT_DRAW_IN_BOX;
+	}
+@object GenTextClass DosTokenApplication = {
+	GI_visMoniker = "PC/GEOS program:";
+	GI_attrs = @default | GA_READ_ONLY;
+	}
+@object GenTextClass DosTokenAppIconID = {
+	GI_visMoniker = "PC/GEOS program token:";
+	GI_attrs = @default | GA_READ_ONLY;
+	}
+@object GenTextClass DosTokenFileMask = {
+	GI_visMoniker = 'm',"DOS file mask:";
+	GTXI_text = "*.*";
+	GTXI_attrs = @default | GTA_SINGLE_LINE_TEXT;
+	GTXI_maxLength = 13;
+	ATTR_GEN_TEXT_MAKE_UPPERCASE;
+	HINT_DEFAULT_FOCUS;
+	HINT_TEXT_WHITE_WASH_COLOR;
+	HINT_INITIAL_SIZE = { SST_AVG_CHAR_WIDTHS | 30 ,
+				SST_LINES_OF_TEXT | 1, 1 };
+	}
+@object GenTriggerClass DosTokenCancelTrigger = {
+	GI_visMoniker = "Cancel";
+	GI_attrs = @default | GA_SIGNAL_INTERACTION_COMPLETE;
+	ATTR_GEN_TRIGGER_INTERACTION_COMMAND = IC_NO;
+	HINT_SEEK_REPLY_BAR;
+	}
+@object GenTriggerClass DosTokenSelectAppTrigger = {
+	GI_visMoniker = "Other PC/GEOS program";
+	GI_attrs = @default | GA_SIGNAL_INTERACTION_COMPLETE;
+	ATTR_GEN_TRIGGER_INTERACTION_COMMAND = IC_YES;
+	HINT_SEEK_REPLY_BAR;
+	}
+
+@object GenInteractionClass IniFileBox = {
+	GI_visMoniker = " INI-File ";
+	GI_comp = @IniFileInfoText,@IniFileCategoryText,
+			@IniFileCancelTrigger;
+	GII_visibility = GIV_DIALOG;
+	GII_type = GIT_NOTIFICATION;
+	GII_attrs = @default | GIA_NOT_USER_INITIATABLE
+		| GIA_INITIATED_VIA_USER_DO_DIALOG
+		| GIA_MODAL;
+	}
+
+@object GenTextClass IniFileInfoText = {
+	GI_attrs = @default | GA_READ_ONLY;
+	GTXI_text = "Specify the name of the category in GEOS.INI to be deleted when \
+the software is REMOVED. Usually, this is a Category, that is created by your PC/GEOS program.";
+	HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+	}
+@object GenTextClass IniFileCategoryText = {
+	GI_visMoniker = 'C',"INI-Category:";
+	GTXI_attrs = @default | GTA_SINGLE_LINE_TEXT;
+	GTXI_maxLength = INI_CATEGORY_BUFFER_SIZE;
+	HINT_DEFAULT_FOCUS;
+	}
+@object GenTriggerClass IniFileCancelTrigger = {
+	GI_visMoniker = "Cancel";
+	GI_attrs = @default | GA_SIGNAL_INTERACTION_COMPLETE;
+	ATTR_GEN_TRIGGER_INTERACTION_COMMAND = IC_NO;
+	HINT_SEEK_REPLY_BAR;
+	}
+
+@object GenInteractionClass DosGeodeBox = {
+	GI_visMoniker = "Launch DOS file";
+	GI_comp = @DosGeodeInfoText,@DosGeodeDescriptorGroup,
+			@DosGeodeCancelTrigger,@DosGeodeSelectAppTrigger;
+	GII_visibility = GIV_DIALOG;
+	GII_type = GIT_NOTIFICATION;
+	GII_attrs = @default | GIA_NOT_USER_INITIATABLE
+		| GIA_INITIATED_VIA_USER_DO_DIALOG
+		| GIA_MODAL;
+	}
+
+@object GenTextClass DosGeodeInfoText = {
+	GI_attrs = @default | GA_READ_ONLY;
+	GTXI_text = "In order to open a DOS file you must select a suitable \
+PC/GEOS program. It must be located in WORLD or one of its subfolders.";
+	HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+	}
+@object GenInteractionClass DosGeodeDescriptorGroup = {
+	GI_comp = @DosGeodeFile,@DosGeodeApplication,@DosGeodeAppIconID;
+	HINT_ORIENT_CHILDREN_VERTICALLY;
+	HINT_CENTER_CHILDREN_ON_MONIKERS;
+	}
+@object GenTextClass DosGeodeApplication = {
+	GI_visMoniker = "PC/GEOS program:";
+	GI_attrs = @default | GA_READ_ONLY;
+	}
+@object GenTextClass DosGeodeAppIconID = {
+	GI_visMoniker = "PC/GEOS program token:";
+	GI_attrs = @default | GA_READ_ONLY;
+	}
+@object GenTextClass DosGeodeFile = {
+	GI_attrs = @default | GA_READ_ONLY;
+	GI_visMoniker = "DOS file:";
+	GTXI_text = "*.*";
+	HINT_INITIAL_SIZE = { SST_AVG_CHAR_WIDTHS | 30 ,
+				SST_LINES_OF_TEXT | 1, 1 };
+	}
+@object GenTriggerClass DosGeodeCancelTrigger = {
+	GI_visMoniker = "Cancel";
+	GI_attrs = @default | GA_SIGNAL_INTERACTION_COMPLETE;
+	ATTR_GEN_TRIGGER_INTERACTION_COMMAND = IC_NO;
+	HINT_SEEK_REPLY_BAR;
+	}
+@object GenTriggerClass DosGeodeSelectAppTrigger = {
+	GI_visMoniker = "Other PC/GEOS program";
+	GI_attrs = @default | GA_SIGNAL_INTERACTION_COMPLETE;
+	ATTR_GEN_TRIGGER_INTERACTION_COMMAND = IC_YES;
+	HINT_SEEK_REPLY_BAR;
+	}
+@end IconEditResource;	/*-------------------------------------------------------*/
+
+
+@start DataResource, data;
+
+@chunk char InvalidEntryTypeText[] = "### Unknown Entry of Type %u ####";
+@chunk char DosTokenEntryText[] = "Request a DOS icon for ";
+@chunk char DosTokenEntryText2[] = " with ";
+@chunk char TokenEntryText[] = "- When removing: delete token ";
+@chunk char IniKategorieEntryText[] = "- When removing: delete INI-Category [";
+@chunk char DeinstallCommonText[] = "- When removing ";
+@chunk char IniSetEntryText[] = "Set INI-Entry: [";
+@chunk char IniDeleteEntryText[] = "Remove INI-Entry: [";
+
+
+@chunk char EmptyFileText[] = "FILE.EXT";
+@chunk char DeleteFileText[] = "Remove file: ";
+@chunk char DeleteFolderText[] = "- When removing: delete empty folder: ";
+@chunk char StartSysProgText[] = "Launch system program: ";
+@chunk char StartCommonText[] = "Launch: ";
+@chunk char OpenDosText[] = "Open with ";
+@chunk char OpenSysFileText[] = "Open system file: ";
+@chunk char OpenCommonText[] = "Open: ";
+@chunk char UpdateToolText[] = "Run Update-Tool: ";
+@chunk char CleanupToolText[] = "- When removing: CleanUp-Tool: ";
+@chunk char DelTempFileText[] = "- When removing: delete temporary file: ";
+
+
+@chunk char EditorNotFound[] ="Text Editor not found!";
+@chunk char MustBeOne[] ="You have to select exactly one entry!";
+@chunk char MustBeFile[] ="You have to select a file entry!";
+@chunk char MustBeApp[] ="You have to select a PC/GEOS program entry!";
+@chunk char MustBeUnderGeos[] ="The file has to be inside your GEOS tree!";
+@chunk char ErrFileNotFound[] ="The file '\01' was not found. Error code \02.";
+@chunk char ErrOpenFile[] ="The file '\01' could not be opened. Error code \02.";
+@chunk char ErrReadFile[] ="The file '\01' could not be read. Error code \02.";
+@chunk char FileAllreadyExist[] = "The file '\01' is already in the list. Dou you wish to update the file?";
+@chunk char FileDeleteDangerous[] = "The '\01' file will be deleted from the system when the package is installed. Use this option only if you are sure that it will not affect system stability.";
+
+@chunk char ErrorUpdate[] = "An error occurred while updating the file '\01'. The old data is preserved.";
+@chunk char InvalidPasswort[] = "The password was wrong. Pay attention to upcased and downcased letters. \
+Don't forget spaces. Look at the caps lock key.\r\rThe file will not be opened.";
+@chunk char ErrorUnknownFileType[] = "Unexpected problem: The file '\01' has the unknown \
+type \02 and cannot be launched.";
+
+@chunk char WrongPwdHackDialog[] = "Wrong password. Press No, please.";
+
+@chunk char InfoTextTime[] = "Date/Time:";
+@chunk char InfoTextSize[] = "\rSize:";
+@chunk char InfoTextProtocol[] = "\rProtocol:";
+@chunk char InfoTextRelease[] = "\rRelease:";
+@chunk char InfoTextNotes[] = "\rUsernotes:";
+@chunk char InfoTextOK[] = " ok.";
+@chunk char InfoTextNA[] = " -";
+@chunk char InfoTextDiffers[] = " different";
+@chunk char InfoTextTimeDiffers[] = " different\r    (";
+@chunk char InfoTextDays[] = " days)";
+@chunk char InfoTextManyDays[] = " > 30 days )";
+@chunk char InfoTextManyHours[] = " hours)";
+@chunk char InfoTextManyMinutes[] = " minutes)";
+
+@chunk char InfoFileNotInstalled[] = "File not installed in your system!";
+@chunk char InfoTextNoFile[] = "Entry is not a file.";
+
+@chunk char ErrorInvalidDefaultPath[] = "The default folder has to be a part of your PC/GEOS tree.";
+
+@end DataResource;	/*-------------------------------------------------------*/
+
+
