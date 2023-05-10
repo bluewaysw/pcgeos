@@ -14,6 +14,6 @@ NO_EC = 1
 
 
 # Create a Copyrigth-notice
-LINKFLAGS += -N "(c) by RABE-Soft 10/99-09/2022"
+LINKFLAGS += -N "(c) by RABE-Soft 10/99-05/2023"
 
 #include <$(SYSMAKEFILE)>

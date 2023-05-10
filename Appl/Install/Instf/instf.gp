@@ -10,7 +10,7 @@ name install.app
 # Name für GeoManager
 
 longname "Universal Installer"
-usernotes "Version 1.3.3"
+usernotes "Version 1.4.0"
 
 # spezifiziert den Applikations-typ
 
