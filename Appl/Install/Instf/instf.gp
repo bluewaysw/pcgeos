@@ -1,6 +1,6 @@
 #**************************************************************************
 #       GEODE-Parameter-File für UniInstaller-Applikation
-#       (c) by RABE-Soft 7/99 - 01/2023
+#       (c) by RABE-Soft 7/99 - 05/2023
 #**************************************************************************
 
 # Name der Applikation für glue und swat
@@ -10,7 +10,7 @@ name install.app
 # Name für GeoManager
 
 longname "Universal Installer"
-usernotes "Version 1.4.0"
+usernotes "English Version 1.4.0"
 
 # spezifiziert den Applikations-typ
 
@@ -31,7 +31,7 @@ export IFDocumentControlClass
 # Dieses Objekt ist gleichzeitig das Top-Level-Objekt im UI-tree
 appobj IFApp
 
-# make the app compatible with BBX 4.1.3
+# if required: make the app compatible with BBX 4.1.3
 #currently not needed
 #platform geos21
 

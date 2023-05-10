@@ -1,6 +1,6 @@
 #**************************************************************************
 #       GEODE-Parameter-File for Install Creator-Applikation
-#       (c) by RABE-Soft 10/96
+#       (c) by RABE-Soft 10/96 - 05/2023
 #**************************************************************************
 
 # Name der Applikation fÅr glue und swat
@@ -10,7 +10,7 @@ name ICreat.app
 # Name for GeoManager
 
 longname "Install Creator"
-usernotes "English Version 1.3.1"
+usernotes "English Version 1.4.0"
 # spezifiziert den Applikations-typ
 
 type appl, process, single

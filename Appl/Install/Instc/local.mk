@@ -12,6 +12,6 @@ XCCOMFLAGS += -zc
 
 
 # Create a Copyrigth-notice
-LINKFLAGS += -N "(c) by RABE-Soft 8/99-01/2023"
+LINKFLAGS += -N "(c) by RABE-Soft 8/99-05/2023"
 
 #include <$(SYSMAKEFILE)>
