@@ -903,8 +903,6 @@ static void ConvertHeader( TRUETYPE_VARS, FontHeader* fontHeader )
                 fontHeader->FH_strikePos = 3 * fontHeader->FH_x_height / 5;
         else
                 fontHeader->FH_strikePos = 3 * fontHeader->FH_ascent / 5;
-
-        fontHeader->FH_continuitySize = DEFAULT_CONTINUITY_CUTOFF( UNITS_PER_EM );
 }
 
 

@@ -38,7 +38,6 @@ typedef ByteFlags CharMapFlags;
 typedef struct 
 {
         word            unicode;
-        byte            weight;
         CharMapFlags    flags;
 } CharMapEntry;
 

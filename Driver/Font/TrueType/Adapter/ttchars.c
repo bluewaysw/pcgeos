@@ -185,14 +185,14 @@ void _pascal TrueType_Gen_Chars(
                 rasterMap.bitmap = ((byte*)charData) + SIZE_CHAR_HEADER;
 
                 /* translate outline and render it */
-                //TT_Translate_Outline( &outline, -bbox.xMin, bbox.yMin );
+                TT_Translate_Outline( &outline, -bbox.xMin, -bbox.yMin );
                 TT_Get_Outline_Bitmap( &outline, &rasterMap );
 
                 /* fill header of charData */
                 ((CharData*)charData)->CD_pictureWidth = width;
                 ((CharData*)charData)->CD_numRows      = height;
                 ((CharData*)charData)->CD_xoff         = bbox.xMin / 64;
-                ((CharData*)charData)->CD_yoff         = fontBuf->FB_pixHeight - ( bbox.yMax / 64 ); 
+                ((CharData*)charData)->CD_yoff         = fontBuf->FB_baselinePos.WBF_int - ( bbox.yMax / 64 ); 
         }
 
         TT_Done_Glyph( glyph );

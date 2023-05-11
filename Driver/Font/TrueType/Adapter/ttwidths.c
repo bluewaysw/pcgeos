@@ -58,6 +58,8 @@ static void CalcTransform(
                         FontMatrix*       fontMatrix, 
                         TextStyle         styleToImplement );
 
+static word round( WWFixedAsDWord toRound );
+
 
 /********************************************************************
  *                      TrueType_Gen_Widths
@@ -523,7 +525,7 @@ void ConvertHeader( WWFixedAsDWord scaleFactor, FontHeader* fontHeader, FontBuf*
         fontBuf->FB_baseAdjust.WBF_frac = 0;
 
         ttfElement = SCALE_WORD( fontHeader->FH_ascent + fontHeader->FH_accent, scaleFactor );
-        fontBuf->FB_baselinePos.WBF_int  = INTEGER_OF_WWFIXEDASDWORD( ttfElement );
+        fontBuf->FB_baselinePos.WBF_int  = round( ttfElement );
         fontBuf->FB_baselinePos.WBF_frac = 0;
 
         ttfElement = SCALE_WORD( fontHeader->FH_descent, scaleFactor );
@@ -570,4 +572,9 @@ void ConvertHeader( WWFixedAsDWord scaleFactor, FontHeader* fontHeader, FontBuf*
         fontBuf->FB_firstChar   = fontHeader->FH_firstChar;
         fontBuf->FB_lastChar    = fontHeader->FH_lastChar;
         fontBuf->FB_defaultChar = fontHeader->FH_defaultChar;
+}
+
+static word round( WWFixedAsDWord toRound )
+{
+        return toRound & 0xffff ? ( toRound >> 16 ) + 1 : toRound >> 16;
 }

@@ -324,7 +324,6 @@ typedef struct
     sword                       FH_minTSB;          //minimum top side bound
     sword                       FH_maxBSB;          //maximum bottom side bound
     sword                       FH_maxRSB;          //maximum right side bound
-    sword                       FH_continuitySize;  //continuity cutoff
 } FontHeader;
 
 
