@@ -6,8 +6,8 @@ other file collections can be conveniently distributed and installed.
 By considering the protocol and release numbers, it is guaranteed that newer
 versions (e.g. of libraries) are not overwritten by older versions.
 
-The original code is written in German. Therefore, many comments are still in
-German. 
+The original code was written in German. Therefore, most of the comments 
+are still in German. 
 
 Folders
 -------
@@ -21,4 +21,4 @@ INSTF	Code for the Uni Installer application
 Shared	Files that are used for both, the Install Creator and the Uni Installer
 
 German	Additional files, which are needed to build the German version:
-	German help file, Ferman translation files for both apps.
+        German help file, German translation files for both apps.
