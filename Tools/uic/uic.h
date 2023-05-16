@@ -115,8 +115,17 @@ typedef enum {
  * The creation of .rsc files was removed in favor of passing
  * localization info through to esp.  If the .rsc file is desired
  * once again, uncomment this #define.  CT 6/24/97
+ *
+ * 05/16/2023	RainerB
+ *	#define uncommented because without rsc files, the LOC tool creates
+ *	vm files without the correct chunk names. Instead, generic names like
+ *	chunk1 are used. Changes in the code can then cause the correct
+ *	mapping between chunk and translation to be lost in an existing
+ *	loclization file. The newly translated geode may then contain grossly
+ *	incorrect strings and you will have to do all the localization work
+ *	again.
  */
-/* #define EXTERNAL_LOCALIZATION_FILE */
+#define EXTERNAL_LOCALIZATION_FILE
 
 /******************************************************/
 
