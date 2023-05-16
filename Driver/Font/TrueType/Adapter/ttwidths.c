@@ -41,14 +41,13 @@ static WWFixedAsDWord CalcScaleForWidths(
                         word            unitsPerEM );
 
 static void ConvertHeader( 
-                        WWFixedAsDWord  scaleFactor, 
+                        WWFixedAsDWord  scaleFactor,
                         FontHeader*     fontHeader, 
                         FontBuf*        fontBuf );
 
 static void ConvertWidths( 
                         TRUETYPE_VARS, 
                         FontHeader*     fontHeader, 
-                        WWFixedAsDWord  scaleFactor, 
                         FontBuf*        fontBuf );
             
 static void ConvertKernPairs( TRUETYPE_VARS, FontBuf* fontBuf );
@@ -101,15 +100,15 @@ MemHandle _pascal TrueType_Gen_Widths(
         TrueTypeVars*          trueTypeVars;
         FontHeader*            fontHeader;
         FontBuf*               fontBuf;
-        WWFixedAsDWord         scaleFactor;
         word                   size;
 
 
         ECCheckMemHandle( fontHandle );
-        ECCheckBounds( fontMatrix );
+        ECCheckBounds( (void*)fontMatrix );
         ECCheckBounds( (void*)fontInfo );
         ECCheckBounds( (void*)headerEntry );
         ECCheckBounds( (void*)firstEntry );
+        ECCheckStack();
 
 
         // get trueTypeVar block
@@ -146,23 +145,23 @@ MemHandle _pascal TrueType_Gen_Widths(
                                &fontHandle );
 
         /* calculate scale factor and transformation matrix */
-        scaleFactor = CalcScaleForWidths( pointSize, 
+        SCALE_FACTOR = CalcScaleForWidths( pointSize, 
                                           stylesToImplement, 
                                           FACE_PROPERTIES.header->Units_Per_EM );
 
         /* convert FontHeader and fill FontBuf structure */
         fontBuf = (FontBuf*)MemDeref( fontHandle );
         fontBuf->FB_dataSize = size;
-        ConvertHeader( scaleFactor, fontHeader, fontBuf );
+        ConvertHeader( SCALE_FACTOR, fontHeader, fontBuf );
 
         /* fill kerning pairs and kerning values */
         ConvertKernPairs( trueTypeVars, fontBuf );
 
         /* convert widths and fill CharTableEntries */
-        ConvertWidths( trueTypeVars, fontHeader, scaleFactor, fontBuf );
+        ConvertWidths( trueTypeVars, fontHeader, fontBuf );
 
         /* calculate the transformation matrix and copy it into the FontBlock */
-        CalcTransform( (TransformMatrix*)((byte*)fontBuf) + sizeof( FontBuf ) + fontHeader->FH_numChars * sizeof( CharTableEntry ),
+        CalcTransform( (TransformMatrix*)(((byte*)fontBuf) + sizeof( FontBuf ) + fontHeader->FH_numChars * sizeof( CharTableEntry )),
                        fontMatrix, 
                        stylesToImplement );
 
@@ -198,7 +197,7 @@ Fin:
  *      12/02/23  JK        Initial Revision
  *******************************************************************/
 
-static void ConvertWidths( TRUETYPE_VARS, FontHeader* fontHeader, WWFixedAsDWord scaleFactor, FontBuf* fontBuf )
+static void ConvertWidths( TRUETYPE_VARS, FontHeader* fontHeader, FontBuf* fontBuf )
 {
         char             currentChar;
         CharTableEntry*  charTableEntry = (CharTableEntry*) (((byte*)fontBuf) + sizeof( FontBuf ));
@@ -211,6 +210,8 @@ static void ConvertWidths( TRUETYPE_VARS, FontHeader* fontHeader, WWFixedAsDWord
 
         for( currentChar = fontHeader->FH_firstChar; currentChar < fontHeader->FH_lastChar; currentChar++ )
         {
+                ECCheckBounds( (void*)charTableEntry );
+
                 //Unicode to TT ID
                 CHARINDEX = TT_Char_Index( CHAR_MAP, GeosCharToUnicode( currentChar ) );
                 if ( CHARINDEX == 0 )
@@ -230,7 +231,7 @@ static void ConvertWidths( TRUETYPE_VARS, FontHeader* fontHeader, WWFixedAsDWord
                 TT_Get_Glyph_Metrics( GLYPH, &GLYPH_METRICS );
 
                 //width berechnen
-                scaledWidth = GrMulWWFixed( MakeWWFixed( GLYPH_METRICS.advance), scaleFactor );
+                scaledWidth = GrMulWWFixed( MakeWWFixed( GLYPH_METRICS.advance), SCALE_FACTOR );
                 charTableEntry->CTE_width.WBF_int  = INTEGER_OF_WWFIXEDASDWORD( scaledWidth );
                 charTableEntry->CTE_width.WBF_frac = FRACTION_OF_WWFIXEDASDWORD( scaledWidth );
 
@@ -375,6 +376,10 @@ static void CalcTransform( TransformMatrix*  transMatrix,
 {
         TT_Matrix  tempMatrix;
 
+
+        ECCheckBounds( (void*)transMatrix );
+        ECCheckBounds( (void*)fontMatrix );
+
         /* copy fontMatrix into transMatrix */
         tempMatrix.xx = 1L << 16;
         tempMatrix.xy = 0;
@@ -482,7 +487,7 @@ static word AllocFontBlock(
 void ConvertHeader( WWFixedAsDWord scaleFactor, FontHeader* fontHeader, FontBuf* fontBuf ) 
 {
         WWFixedAsDWord      ttfElement;
-        
+      
 
         ECCheckBounds( (void*)fontBuf );
         ECCheckBounds( (void*)fontHeader );
@@ -553,15 +558,14 @@ void ConvertHeader( WWFixedAsDWord scaleFactor, FontHeader* fontHeader, FontBuf*
         fontBuf->FB_minTSB = INTEGER_OF_WWFIXEDASDWORD( ttfElement );
 
         ttfElement = SCALE_WORD( fontHeader->FH_maxBSB, scaleFactor );
-        //fontBuf->FB_belowBox.WBF_int  = INTEGER_OF_WWFIXEDASDWORD( ttfElement );
-        fontBuf->FB_belowBox.WBF_int  = 1; //hack
+        fontBuf->FB_belowBox.WBF_int  = INTEGER_OF_WWFIXEDASDWORD( ttfElement );
+        //fontBuf->FB_belowBox.WBF_int  = 1; //hack
         fontBuf->FB_belowBox.WBF_frac = 0;
-        //fontBuf->FB_maxBSB = INTEGER_OF_WWFIXEDASDWORD( ttfElement );
-        fontBuf->FB_maxBSB = 1; //hack
+        fontBuf->FB_maxBSB = INTEGER_OF_WWFIXEDASDWORD( ttfElement );
+        //fontBuf->FB_maxBSB = 1; //hack
 
         ttfElement = SCALE_WORD( fontHeader->FH_minLSB, scaleFactor );
-        //fontBuf->FB_minLSB = INTEGER_OF_WWFIXEDASDWORD( ttfElement ); 
-        fontBuf->FB_minLSB = 0xffff; //hack 
+        fontBuf->FB_minLSB = INTEGER_OF_WWFIXEDASDWORD( ttfElement ); 
 
         ttfElement = SCALE_WORD( fontHeader->FH_maxRSB, scaleFactor );
         fontBuf->FB_maxRSB  = INTEGER_OF_WWFIXEDASDWORD( ttfElement );

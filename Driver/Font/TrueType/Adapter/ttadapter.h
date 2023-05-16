@@ -349,6 +349,9 @@ typedef struct
     /* iterating over glyphs of a font */
     word                        charIndex;
     word                        unicode;
+
+    /* scaling */
+    WWFixedAsDWord              scaleFactor;
 } TrueTypeVars;
 
 
@@ -369,6 +372,8 @@ typedef struct
 
 #define UNICODE                 trueTypeVars->unicode
 #define CHARINDEX               trueTypeVars->charIndex
+
+#define SCALE_FACTOR            trueTypeVars->scaleFactor
 
 
 

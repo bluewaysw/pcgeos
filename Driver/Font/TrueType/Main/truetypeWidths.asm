@@ -57,7 +57,7 @@ REVISION HISTORY:
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
 
 TrueTypeGenWidths	proc	far
-	uses	cx, dx, si, di, ds, es, bp
+	uses	cx, dx, di, ds
 
 	mov	bx, bp
 	.enter

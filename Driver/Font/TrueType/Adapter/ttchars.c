@@ -86,6 +86,7 @@ void _pascal TrueType_Gen_Chars(
         ECCheckBounds( (void*)fontBuf );
         ECCheckBounds( (void*)fontInfo );
         ECCheckBounds( (void*)outlineEntry );
+        ECCheckStack();
 
 
         FilePushDir();
@@ -153,7 +154,7 @@ void _pascal TrueType_Gen_Chars(
 
                 /* fill header of charData */
                 ((RegionCharData*)charData)->RCD_xoff = bbox.xMin;
-                ((RegionCharData*)charData)->RCD_xoff = bbox.yMin;
+                ((RegionCharData*)charData)->RCD_yoff = bbox.yMin;
                 ((RegionCharData*)charData)->RCD_size = rasterMap.size;
                 ((RegionCharData*)charData)->RCD_bounds.R_left   = 0;
                 ((RegionCharData*)charData)->RCD_bounds.R_right  = width;
