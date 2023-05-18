@@ -18,13 +18,6 @@
 #include <ec.h>
 
 
-/* FreeGEOS specific constants and definitions. */
-#define MAX_LMEM_CHUNKSIZE        32000
-
-/* MemHandle to our global memory block under FreeGEOS. In this memory block */
-/* we hold all dynamically allocated FreeType structures we need.            */
-extern MemHandle         trueTypeHandle;
-
 /* Define to empty if the keyword does not work.  */
 /* #undef const */
 
@@ -123,7 +116,7 @@ extern MemHandle         trueTypeHandle;
 /* emerged recently on the FreeType lists.  We still do not have Apple's */
 /* opinion on the subject and will change this as soon as we have.       */
 
-#undef   TT_CONFIG_OPTION_NO_INTERPRETER
+#define   TT_CONFIG_OPTION_NO_INTERPRETER
 
 
 /*************************************************************************/

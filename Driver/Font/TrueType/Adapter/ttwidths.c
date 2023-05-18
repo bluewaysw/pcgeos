@@ -118,6 +118,8 @@ MemHandle _pascal TrueType_Gen_Widths(
                 MemReAlloc( varBlock, sizeof( TrueTypeVars ), HAF_NO_ERR );
                 trueTypeVars = MemLock( varBlock );
         }
+        
+        ECCheckBounds( (void*)trueTypeVars );
 
         // get filename an load ttf file
         FilePushDir();
@@ -559,10 +561,8 @@ void ConvertHeader( WWFixedAsDWord scaleFactor, FontHeader* fontHeader, FontBuf*
 
         ttfElement = SCALE_WORD( fontHeader->FH_maxBSB, scaleFactor );
         fontBuf->FB_belowBox.WBF_int  = INTEGER_OF_WWFIXEDASDWORD( ttfElement );
-        //fontBuf->FB_belowBox.WBF_int  = 1; //hack
         fontBuf->FB_belowBox.WBF_frac = 0;
         fontBuf->FB_maxBSB = INTEGER_OF_WWFIXEDASDWORD( ttfElement );
-        //fontBuf->FB_maxBSB = 1; //hack
 
         ttfElement = SCALE_WORD( fontHeader->FH_minLSB, scaleFactor );
         fontBuf->FB_minLSB = INTEGER_OF_WWFIXEDASDWORD( ttfElement ); 

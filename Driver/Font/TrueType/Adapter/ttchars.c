@@ -138,9 +138,14 @@ void _pascal TrueType_Gen_Chars(
                 size = height * 6 * sizeof( word ) + SIZE_REGION_HEADER; 
 
                 /* get pointer to bitmapBlock */
-                if( MemGetInfo( bitmapHandle, MGIT_SIZE ) < size )
-                        MemReAlloc( bitmapHandle, size, HAF_NO_ERR );
                 charData = MemLock( bitmapHandle );
+                //TODO: verfügbaren Platz prüfen?
+                if( charData == NULL )
+                {
+                        MemReAlloc( bitmapHandle, /* size */ 1024, HAF_NO_ERR );
+                        charData = MemLock( bitmapHandle );
+                }
+                memset( charData, 0, size );
 
                 /* init rasterMap */
                 rasterMap.rows   = height;
@@ -153,8 +158,8 @@ void _pascal TrueType_Gen_Chars(
                 TT_Get_Outline_Region( &outline, &rasterMap );
 
                 /* fill header of charData */
-                ((RegionCharData*)charData)->RCD_xoff = bbox.xMin;
-                ((RegionCharData*)charData)->RCD_yoff = bbox.yMin;
+                ((RegionCharData*)charData)->RCD_xoff = bbox.xMin / 64;
+                ((RegionCharData*)charData)->RCD_yoff = bbox.yMin / 64;
                 ((RegionCharData*)charData)->RCD_size = rasterMap.size;
                 ((RegionCharData*)charData)->RCD_bounds.R_left   = 0;
                 ((RegionCharData*)charData)->RCD_bounds.R_right  = width;
@@ -169,13 +174,13 @@ void _pascal TrueType_Gen_Chars(
 
                 /* get pointer to bitmapBlock */
                 charData = MemLock( bitmapHandle );
+                //TODO: verfügbaren Platz prüfen?
                 if( charData == NULL )
                 {
-                        MemReAlloc( bitmapHandle, size, HAF_NO_ERR );
+                        MemReAlloc( bitmapHandle, /* size */ 1024, HAF_NO_ERR );
                         charData = MemLock( bitmapHandle );
                 }
                 memset( charData, 0, size );
-                //if( MemGetInfo( bitmapHandle, MGIT_SIZE ) < size )
 
                 /* init rasterMap */
                 rasterMap.rows   = height;
@@ -293,7 +298,7 @@ static int FindLRUChar( FontBuf* fontBuf, int numOfChars )
         word             lru = 0xffff;
         int              indexLRUChar = -1;
         int              i;
-        CharTableEntry*  charTableEntry = (CharTableEntry*) ((byte*)fontBuf) + sizeof( FontBuf );
+        CharTableEntry*  charTableEntry = (CharTableEntry*) (((byte*)fontBuf) + sizeof( FontBuf ));
 
 
         for( i = 0; i < numOfChars; i++, charTableEntry++ )
