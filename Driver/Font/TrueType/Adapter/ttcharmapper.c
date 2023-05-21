@@ -220,7 +220,7 @@ CharMapEntry geosCharMap[] =
         C_LATIN_SMALL_LETTER_Y_DIAERESIS,       0,
         C_LATIN_CAPITAL_LETTER_Y_DIAERESIS,     CMF_ACCENT,
         C_FRACTION_SLASH,                       0,
-        C_EURO_CURRENCY_SIGN,                   0,
+        C_EURO_SIGN,                            0,
         C_LEFT_POINTING_SINGLE_GUILLEMET,       0,
         C_RIGHT_POINTING_SINGLE_GUILLEMET,      0,
         C_LATIN_SMALL_LETTER_Y_ACUTE,           0,
