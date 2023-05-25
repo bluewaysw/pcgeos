@@ -292,7 +292,7 @@ extern TEngine_Instance engineInstance;
  *            developers, so it shouldn't be a problem.
  *
  ******************************************************************/
-
+/*
   EXPORT_FUNC
   TT_Error  TT_Set_Face_Pointer( TT_Face  face,
                                  void*    data )
@@ -307,7 +307,7 @@ extern TEngine_Instance engineInstance;
 
     return TT_Err_Ok;
   }
-
+*/
 
 /*******************************************************************
  *
@@ -328,7 +328,7 @@ extern TEngine_Instance engineInstance;
  *            developers, so it shouldn't be a problem.
  *
  ******************************************************************/
-
+/*
   EXPORT_FUNC
   void*  TT_Get_Face_Pointer( TT_Face  face )
   {
@@ -340,7 +340,7 @@ extern TEngine_Instance engineInstance;
     else
       return faze->generic;
   }
-
+*/
 
 /*******************************************************************
  *
@@ -396,7 +396,7 @@ extern TEngine_Instance engineInstance;
  *  MT-Note : YES!  Reads only permanent data.
  *
  ******************************************************************/
-
+/*
   EXPORT_FUNC
   TT_Error  TT_Get_Face_Metrics( TT_Face     face,
                                  TT_UShort   firstGlyph,
@@ -413,13 +413,13 @@ extern TEngine_Instance engineInstance;
     if ( !_face )
       return TT_Err_Invalid_Face_Handle;
 
-    /* Check the glyph range */
+    // Check the glyph range
     if ( lastGlyph >= _face->numGlyphs || firstGlyph > lastGlyph )
       return TT_Err_Invalid_Argument;
 
-    num = lastGlyph - firstGlyph;   /* number of elements-1 in each array */
+    num = lastGlyph - firstGlyph;   // number of elements-1 in each array
 
-    /* store the left side bearings and advance widths first */
+    // store the left side bearings and advance widths first
     {
       UShort  n;
       Short   left_bearing;
@@ -436,14 +436,14 @@ extern TEngine_Instance engineInstance;
       }
     }
 
-    /* check for vertical data if topBearings or heights is non-NULL */
+    // check for vertical data if topBearings or heights is non-NULL
     if ( !topBearings && !heights )
       return TT_Err_Ok;
 
     if ( !_face->verticalInfo )
       return TT_Err_No_Vertical_Data;
 
-    /* store the top side bearings */
+    // store the top side bearings
     {
       UShort  n;
       Short   top_bearing;
@@ -461,7 +461,7 @@ extern TEngine_Instance engineInstance;
 
     return TT_Err_Ok;
   }
-
+*/
 
 /*******************************************************************
  *
@@ -877,7 +877,7 @@ extern TEngine_Instance engineInstance;
  *  MT-Note : NO!
  *
  ******************************************************************/
-
+/*
   EXPORT_FUNC
   TT_Error  TT_Set_Instance_Pointer( TT_Instance  instance,
                                      void*        data )
@@ -892,7 +892,7 @@ extern TEngine_Instance engineInstance;
 
     return TT_Err_Ok;
   }
-
+*/
 
 /*******************************************************************
  *
@@ -912,7 +912,7 @@ extern TEngine_Instance engineInstance;
  *  MT-Safe : NO!
  *
  ******************************************************************/
-
+/*
   EXPORT_FUNC
   void*  TT_Get_Instance_Pointer( TT_Instance  instance )
   {
@@ -924,7 +924,7 @@ extern TEngine_Instance engineInstance;
     else
       return ins->generic;
   }
-
+*/
 
 /*******************************************************************
  *
@@ -1158,7 +1158,7 @@ extern TEngine_Instance engineInstance;
  *  MT-Safe : NO!  Glyph containers can't be shared.
  *
  ******************************************************************/
-
+/*
   EXPORT_FUNC
   TT_Error  TT_Get_Glyph_Big_Metrics( TT_Glyph               glyph,
                                       TT_Big_Glyph_Metrics*  metrics )
@@ -1173,7 +1173,7 @@ extern TEngine_Instance engineInstance;
 
     return TT_Err_Ok;
   }
-
+*/
 
 /*******************************************************************
  *
@@ -1594,7 +1594,7 @@ TT_Error  TT_Get_Outline_Region( TT_Outline*     outline,
  *  MT-Safe : YES!
  *
  ******************************************************************/
-
+/*
   EXPORT_FUNC
   TT_Error  TT_Copy_Outline( TT_Outline*  source,
                              TT_Outline*  target )
@@ -1619,7 +1619,7 @@ TT_Error  TT_Get_Outline_Region( TT_Outline*     outline,
 
     return TT_Err_Ok;
   }
-
+*/
 
 /*******************************************************************
  *
@@ -2072,7 +2072,7 @@ TT_Error  TT_Get_Outline_Region( TT_Outline*     outline,
  *  MT-Safe : YES!
  *
  ******************************************************************/
-
+/*
   EXPORT_FUNC
   TT_Error  TT_Get_Font_Data( TT_Face   face,
                               TT_ULong  tag,
@@ -2088,6 +2088,6 @@ TT_Error  TT_Get_Outline_Region( TT_Outline*     outline,
 
     return Load_TrueType_Any( faze, tag, offset, buffer, length );
   }
-
+*/
 
 /* END */

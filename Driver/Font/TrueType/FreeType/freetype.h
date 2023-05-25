@@ -697,16 +697,17 @@
 
   /* Set a face object's generic pointer */
 
+/*
   EXPORT_DEF
   TT_Error  TT_Set_Face_Pointer( TT_Face  face,
                                  void*    data );
-
+*/
 
   /* Get a face object's generic pointer */
-
+/*
   EXPORT_DEF
   void*  TT_Get_Face_Pointer( TT_Face  face );
-
+*/
 
   /* Close a face's file handle to save system resources.  The file */
   /* will be re-opened automatically on the next disk access.       */
@@ -717,7 +718,7 @@
   /* Get a face's glyph metrics expressed in font units.  Returns any    */
   /* number of arrays.  Set the fields to NULL if you are not interested */
   /* by a given array.                                                   */
-
+/*
   EXPORT_DEF
   TT_Error  TT_Get_Face_Metrics( TT_Face     face,
                                  TT_UShort   firstGlyph,
@@ -726,7 +727,7 @@
                                  TT_UShort*  widths,
                                  TT_Short*   topBearings,
                                  TT_UShort*  heights );
-
+*/
 
   /* Close a given font object, destroying all associated */
   /* instances.                                           */
@@ -736,14 +737,14 @@
 
 
   /* Get font or table data. */
-
+/*
   EXPORT_DEF
   TT_Error  TT_Get_Font_Data( TT_Face   face,
                               TT_ULong  tag,
                               TT_Long   offset,
                               void*     buffer,
                               TT_Long*  length );
-
+*/
 
 /* A simple macro to build table tags from ASCII chars */
 
@@ -813,17 +814,17 @@
 
 
   /* Set an instance's generic pointer. */
-
+/*
   EXPORT_DEF
   TT_Error  TT_Set_Instance_Pointer( TT_Instance  instance,
                                      void*        data );
-
+*/
 
   /* Get an instance's generic pointer. */
-
+/*
   EXPORT_DEF
   void*     TT_Get_Instance_Pointer( TT_Instance  instance );
-
+*/
 
   /* Close a given instance object, destroying all associated data. */
 
@@ -901,11 +902,11 @@
 
   /* Copy the glyph's big metrics into `metrics'. */
   /* Necessary to obtain vertical metrics.        */
-
+/*
   EXPORT_DEF
   TT_Error  TT_Get_Glyph_Big_Metrics( TT_Glyph               glyph,
                                       TT_Big_Glyph_Metrics*  metrics );
-
+*/
 
   /* Render the glyph into a bitmap, with given position offsets.     */
   /*                                                                  */
@@ -970,10 +971,10 @@
 
 
   /* Copy an outline into another one. */
-
+/*
   EXPORT_DEF
   TT_Error  TT_Copy_Outline( TT_Outline*  source,
-                             TT_Outline*  target );
+                             TT_Outline*  target ); */
 
 
   /* Render an outline into a bitmap. */

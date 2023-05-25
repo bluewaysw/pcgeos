@@ -41,7 +41,7 @@ static void CalcTransformMatrix( TextStyle         stylesToImplement,
  *                result                Pointer in wich the result will 
  *                                      stored.
  * 
- * RETURNS:       TT_Error = FreeType errorcode (see tterrid.h)
+ * RETURNS:       void
  * 
  * SIDE EFFECTS:  none
  * 
@@ -53,32 +53,36 @@ static void CalcTransformMatrix( TextStyle         stylesToImplement,
  *      23/12/22  JK        Initial Revision
  * 
  *******************************************************************/
-TT_Error _pascal TrueType_Char_Metrics( 
+void _pascal TrueType_Char_Metrics( 
                                    word                 character, 
                                    GCM_info             info, 
                                    const FontInfo*      fontInfo,
 	                           const OutlineEntry*  outlineEntry, 
                                    TextStyle            stylesToImplement,
                                    WWFixedAsDWord       pointSize,
-                                   dword*               result ) 
+                                   dword*               result,
+                                   MemHandle            varBlock ) 
 {
         FileHandle             truetypeFile;
         TrueTypeOutlineEntry*  trueTypeOutline;
         TransformMatrix        transMatrix;
-        TT_Face                face;
         word                   charIndex;
-        TT_Outline             outline;
-        TT_Instance            instance;
-        TT_Instance_Metrics    instanceMetrics;
-        TT_CharMap             charMap;
-        TT_Glyph               glyph;
-        TT_Glyph_Metrics       glyphMetrics;
-        TT_Error               error;
+        TrueTypeVars*          trueTypeVars;
 
 
         ECCheckBounds( (void*)fontInfo );
         ECCheckBounds( (void*)outlineEntry );
+        ECCheckMemHandle( varBlock );
+        ECCheckStack();
 
+
+        /* get trueTypeVar block */
+        trueTypeVars = MemLock( varBlock );
+        if( trueTypeVars == NULL )
+        {
+                MemReAlloc( varBlock, sizeof( TrueTypeVars ), HAF_NO_ERR );
+                trueTypeVars = MemLock( varBlock );
+        }     
 
         // get filename an load ttf file 
         FilePushDir();
@@ -91,59 +95,59 @@ TT_Error _pascal TrueType_Char_Metrics(
 
         CalcTransformMatrix( stylesToImplement, &transMatrix );
 
-        error = TT_Open_Face( truetypeFile, &face );
-        if( error )
+        if( TT_Open_Face( truetypeFile, &FACE ) )
                 goto Fail;
 
         // get TT char index
-        getCharMap( face, &charMap );
+        getCharMap( FACE, &CHAR_MAP );
 
-        charIndex = TT_Char_Index( charMap, GeosCharToUnicode( character ) );
+        charIndex = TT_Char_Index( CHAR_MAP, GeosCharToUnicode( character ) );
 
         // load glyph
-        TT_New_Glyph( face, &glyph );
-        TT_New_Instance( face, &instance );
+        TT_New_Glyph( FACE, &GLYPH );
+        TT_New_Instance( FACE, &INSTANCE );
 
         // transform glyphs outline
-        TT_Get_Glyph_Outline( glyph, &outline );
-        TT_Transform_Outline( &outline, &transMatrix.TM_matrix );
-        TT_Translate_Outline( &outline, 0, WWFIXEDASDWORD_TO_FIXED26DOT6( transMatrix.TM_shiftY ) );
+        TT_Get_Glyph_Outline( GLYPH, &OUTLINE );
+        TT_Transform_Outline( &OUTLINE, &transMatrix.TM_matrix );
+        TT_Translate_Outline( &OUTLINE, 0, WWFIXEDASDWORD_TO_FIXED26DOT6( transMatrix.TM_shiftY ) );
 
         // scale glyph
-        TT_Set_Instance_CharSize( instance, ( pointSize >> 10 ) );
-        TT_Get_Instance_Metrics( instance, &instanceMetrics );
+        TT_Set_Instance_CharSize( INSTANCE, ( pointSize >> 10 ) );
+        TT_Set_Instance_Resolutions( INSTANCE, 72, 72 );
+        TT_Get_Instance_Metrics( INSTANCE, &INSTANCE_METRICS );
 
         // get metrics
-        TT_Get_Glyph_Metrics( glyph, &glyphMetrics );
+        TT_Get_Glyph_Metrics( GLYPH, &GLYPH_METRICS );
 
         switch( info )
         {
                 case GCMI_MIN_X:
                 case GCMI_MIN_X_ROUNDED:
-                        *result = SCALE_WORD( glyphMetrics.bbox.xMin, instanceMetrics.x_scale );
+                        *result = SCALE_WORD( GLYPH_BBOX.xMin, INSTANCE_METRICS.x_scale );
                         break;
                 case GCMI_MIN_Y:
                 case GCMI_MIN_Y_ROUNDED:
-                        *result = SCALE_WORD( glyphMetrics.bbox.yMin, instanceMetrics.y_scale );
+                        *result = SCALE_WORD( GLYPH_BBOX.yMin, INSTANCE_METRICS.y_scale );
                         break;
                 case GCMI_MAX_X:
                 case GCMI_MAX_X_ROUNDED:
-                        *result = SCALE_WORD( glyphMetrics.bbox.xMax, instanceMetrics.x_scale );
+                        *result = SCALE_WORD( GLYPH_BBOX.xMax, INSTANCE_METRICS.x_scale );
                         break;
                 case GCMI_MAX_Y:
                 case GCMI_MAX_Y_ROUNDED:
-                        *result = SCALE_WORD( glyphMetrics.bbox.yMax, instanceMetrics.y_scale );
+                        *result = SCALE_WORD( GLYPH_BBOX.yMax, INSTANCE_METRICS.y_scale );
                         break;
         }
 
-        TT_Done_Instance( instance );
-        TT_Done_Glyph( glyph );
+        TT_Done_Instance( INSTANCE );
+        TT_Done_Glyph( GLYPH );
 
 Fail:
-        TT_Close_Face( face );
+        TT_Close_Face( FACE );
+        MemUnlock( varBlock );
         FileClose( truetypeFile, FALSE );
         FilePopDir();
-        return error;
 }
 
 

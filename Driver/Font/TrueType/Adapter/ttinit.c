@@ -393,9 +393,7 @@ static void ProcessFont( TRUETYPE_VARS, const char* fileName, MemHandle fontInfo
 		/* not found append new outline entry */
 		trueTypeOutlineChunk = LMemAlloc( fontInfoBlock, sizeof(TrueTypeOutlineEntry) );
 		if( trueTypeOutlineChunk == NullChunk )
-		{
 			goto Fail;			
-		}
 
                 /* insert OutlineDataEntry behinde fontinfo */
                 fontInfo = LMemDeref( ConstructOptr(fontInfoBlock, fontInfoChunk) );
@@ -432,7 +430,6 @@ static void ProcessFont( TRUETYPE_VARS, const char* fileName, MemHandle fontInfo
 		fontInfo = LMemDeref( ConstructOptr(fontInfoBlock, fontInfoChunk) );
         	fontInfo->FI_outlineEnd += sizeof( OutlineDataEntry );
 	}
-
 Fail:
         TT_Close_Face( FACE );
 Fin:        

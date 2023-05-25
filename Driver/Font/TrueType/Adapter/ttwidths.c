@@ -47,6 +47,7 @@ static void ConvertHeader(
 
 static void ConvertWidths( 
                         TRUETYPE_VARS, 
+                        WWFixedAsDWord  scaleFactor,
                         FontHeader*     fontHeader, 
                         FontBuf*        fontBuf );
             
@@ -101,6 +102,7 @@ MemHandle _pascal TrueType_Gen_Widths(
         FontHeader*            fontHeader;
         FontBuf*               fontBuf;
         word                   size;
+        WWFixedAsDWord         scaleFactor;
 
 
         ECCheckMemHandle( fontHandle );
@@ -147,20 +149,20 @@ MemHandle _pascal TrueType_Gen_Widths(
                                &fontHandle );
 
         /* calculate scale factor and transformation matrix */
-        SCALE_FACTOR = CalcScaleForWidths( pointSize, 
+        scaleFactor = CalcScaleForWidths( pointSize, 
                                           stylesToImplement, 
                                           FACE_PROPERTIES.header->Units_Per_EM );
 
         /* convert FontHeader and fill FontBuf structure */
         fontBuf = (FontBuf*)MemDeref( fontHandle );
         fontBuf->FB_dataSize = size;
-        ConvertHeader( SCALE_FACTOR, fontHeader, fontBuf );
+        ConvertHeader( scaleFactor, fontHeader, fontBuf );
 
         /* fill kerning pairs and kerning values */
         ConvertKernPairs( trueTypeVars, fontBuf );
 
         /* convert widths and fill CharTableEntries */
-        ConvertWidths( trueTypeVars, fontHeader, fontBuf );
+        ConvertWidths( trueTypeVars, scaleFactor ,fontHeader, fontBuf );
 
         /* calculate the transformation matrix and copy it into the FontBlock */
         CalcTransform( (TransformMatrix*)(((byte*)fontBuf) + sizeof( FontBuf ) + fontHeader->FH_numChars * sizeof( CharTableEntry )),
@@ -199,7 +201,7 @@ Fin:
  *      12/02/23  JK        Initial Revision
  *******************************************************************/
 
-static void ConvertWidths( TRUETYPE_VARS, FontHeader* fontHeader, FontBuf* fontBuf )
+static void ConvertWidths( TRUETYPE_VARS, WWFixedAsDWord scaleFactor, FontHeader* fontHeader, FontBuf* fontBuf )
 {
         char             currentChar;
         CharTableEntry*  charTableEntry = (CharTableEntry*) (((byte*)fontBuf) + sizeof( FontBuf ));
@@ -212,11 +214,14 @@ static void ConvertWidths( TRUETYPE_VARS, FontHeader* fontHeader, FontBuf* fontB
 
         for( currentChar = fontHeader->FH_firstChar; currentChar < fontHeader->FH_lastChar; currentChar++ )
         {
+                word    charIndex;
+
+
                 ECCheckBounds( (void*)charTableEntry );
 
                 //Unicode to TT ID
-                CHARINDEX = TT_Char_Index( CHAR_MAP, GeosCharToUnicode( currentChar ) );
-                if ( CHARINDEX == 0 )
+                charIndex = TT_Char_Index( CHAR_MAP, GeosCharToUnicode( currentChar ) );
+                if ( charIndex == 0 )
                 {
                         charTableEntry->CTE_flags          = CTF_NO_DATA;
                         charTableEntry->CTE_dataOffset     = CHAR_NOT_EXIST;
@@ -229,11 +234,11 @@ static void ConvertWidths( TRUETYPE_VARS, FontHeader* fontHeader, FontBuf* fontB
                 }
                         
                 //Glyph laden
-                TT_Load_Glyph( INSTANCE, GLYPH, CHARINDEX, 0 );
+                TT_Load_Glyph( INSTANCE, GLYPH, charIndex, 0 );
                 TT_Get_Glyph_Metrics( GLYPH, &GLYPH_METRICS );
 
                 //width berechnen
-                scaledWidth = GrMulWWFixed( MakeWWFixed( GLYPH_METRICS.advance), SCALE_FACTOR );
+                scaledWidth = GrMulWWFixed( MakeWWFixed( GLYPH_METRICS.advance), scaleFactor );
                 charTableEntry->CTE_width.WBF_int  = INTEGER_OF_WWFIXEDASDWORD( scaledWidth );
                 charTableEntry->CTE_width.WBF_frac = FRACTION_OF_WWFIXEDASDWORD( scaledWidth );
 

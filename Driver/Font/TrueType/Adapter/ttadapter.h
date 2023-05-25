@@ -340,18 +340,12 @@ typedef struct
     TT_Face                     face;
     TT_Face_Properties          faceProperties; 
     TT_Instance                 instance;
+    TT_Instance_Metrics         instanceMetrics;
     TT_Glyph                    glyph;
     TT_Glyph_Metrics            glyphMetrics;
     TT_CharMap                  charMap;
     TT_Outline                  outline;
     TT_BBox                     bbox;
-
-    /* iterating over glyphs of a font */
-    word                        charIndex;
-    word                        unicode;
-
-    /* scaling */
-    WWFixedAsDWord              scaleFactor;
 } TrueTypeVars;
 
 
@@ -362,6 +356,7 @@ typedef struct
 #define FACE                    trueTypeVars->face
 #define FACE_PROPERTIES         trueTypeVars->faceProperties
 #define INSTANCE                trueTypeVars->instance
+#define INSTANCE_METRICS        trueTypeVars->instanceMetrics
 #define GLYPH                   trueTypeVars->glyph
 #define CHAR_MAP                trueTypeVars->charMap
 #define OUTLINE                 trueTypeVars->outline
@@ -369,12 +364,6 @@ typedef struct
 #define GLYPH_BBOX              trueTypeVars->glyphMetrics.bbox
 
 #define UNITS_PER_EM            FACE_PROPERTIES.header->Units_Per_EM
-
-#define UNICODE                 trueTypeVars->unicode
-#define CHARINDEX               trueTypeVars->charIndex
-
-#define SCALE_FACTOR            trueTypeVars->scaleFactor
-
 
 
 /***********************************************************************

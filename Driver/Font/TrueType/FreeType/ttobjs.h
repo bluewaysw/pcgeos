@@ -574,7 +574,7 @@
     /* directory to know how to do that.                        */
 
     /* a generic pointer for client use - see TT_Set/Get_Face_Pointer */
-    void*  generic;
+    //void*  generic;
   };
 
 
@@ -627,7 +627,7 @@
     PExecution_Context  context;
 
     /* a generic pointer for client use - see TT_Set/Get_Instance_Pointer */
-    void*            generic;
+    //void*            generic;
   };
 
 

@@ -1279,7 +1279,7 @@
  *  Output :  Error condition
  *
  ******************************************************************/
-
+/*
   LOCAL_FUNC
   TT_Error  Load_TrueType_Any( PFace  face,
                                ULong  tag,
@@ -1295,7 +1295,7 @@
 
     if ( tag != 0 )
     {
-      /* look for tag in font directory */
+      // look for tag in font directory
       table = TT_LookUp_Table( face, tag );
       if ( table < 0 )
         return TT_Err_Table_Missing;
@@ -1304,7 +1304,7 @@
       size    = face->dirTables[table].Length;
     }
     else
-      /* tag = 0 -- the use want to access the font file directly */
+      // tag = 0 -- the use want to access the font file directly
       size = TT_Stream_Size( face->stream );
 
     if ( length && *length == 0 )
@@ -1322,6 +1322,6 @@
 
     return error;
   }
-
+*/
 
 /* END */

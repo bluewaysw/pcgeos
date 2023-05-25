@@ -47,7 +47,7 @@
 
 #define ENCODING_ID_MAC_ROMAN           0
 #define ENCODING_ID_MS_UNICODE_BMP      1
-#define ENCODING_ID_UNICODE		        3
+#define ENCODING_ID_UNICODE		3
 
 #define LANGUAGE_ID_MAC_EN              0
 #define LANGUAGE_ID_WIN_EN_US           0x0409
@@ -64,7 +64,6 @@
  *      macros for calculating values in FontHeader
  ***********************************************************************/
 
-#define DEFAULT_CONTINUITY_CUTOFF( value )  ( value / 40 )      // 2.5% of size
 #define DEFAULT_DEFAULT_CHAR                '.'
 #define BASELINE( value )                   ( 3 * value / 4 )	// 75% of size
 #define DESCENT( value )            	    ( value / 4 )       // 25% of size
@@ -78,13 +77,6 @@
  ***********************************************************************/
 
 #define MAKE_FONTID( family )               ( FM_TRUETYPE | ( 0x0fff & toHash ( family )))
-
-
-/***********************************************************************
- *      structues
- ***********************************************************************/
-
-
 
 
 /***********************************************************************

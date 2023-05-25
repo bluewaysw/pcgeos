@@ -88,6 +88,7 @@ resultAXDX	local	dword
 	push	cx
 
 	segmov	ds, dgroup, cx
+	push	ds:variableHandle
 	call	TRUETYPE_CHAR_METRICS
 
 	mov	ax, {word} resultAXDX
