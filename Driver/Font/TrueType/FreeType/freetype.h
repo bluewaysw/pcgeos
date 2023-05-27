@@ -630,7 +630,7 @@
 
   /* Almost all functions return an error code of this type. */
 
-  typedef long  TT_Error;
+  typedef int  TT_Error;
 
 
   /* Flags for control path generation for FreeGEOS. */
