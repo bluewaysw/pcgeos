@@ -61,7 +61,7 @@ TrueTypeGenWidths	proc	far
 
 	mov	bx, bp
 	.enter
-	
+
 	push	di			; font handle or 0
 
 	push	bx			; send tMatrix ptr

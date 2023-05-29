@@ -1772,8 +1772,8 @@
       *targetLastLine = *target;
       ras.traceIncr   = 0;
       return;
-    }
-    
+    }   
+
 
     /* move to the next line */
 

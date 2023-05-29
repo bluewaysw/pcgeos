@@ -352,7 +352,7 @@
   /* subglyph loading record.  Used to load composite components */
   struct  TSubglyph_Record_
   {
-    Long         index;        /* subglyph index; initialized with -1 */
+    Short        index;        /* subglyph index; initialized with -1 */
     Bool         is_scaled;    /* is the subglyph scaled?  */
     Bool         is_hinted;    /* should it be hinted?     */
     Bool         preserve_pps; /* preserve phantom points? */

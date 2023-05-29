@@ -84,7 +84,7 @@ void _pascal TrueType_Char_Metrics(
                 trueTypeVars = MemLock( varBlock );
         }     
 
-        // get filename an load ttf file 
+        /* get filename an load ttf file */
         FilePushDir();
         FileSetCurrentPath( SP_FONT, TTF_DIRECTORY );
 

@@ -142,10 +142,10 @@ void _pascal TrueType_Gen_Chars(
                 //TODO: verfügbaren Platz prüfen?
                 if( charData == NULL )
                 {
-                        MemReAlloc( bitmapHandle, /* size */ 1024, HAF_NO_ERR );
+                        MemReAlloc( bitmapHandle, /* size */ 2048, HAF_NO_ERR );
                         charData = MemLock( bitmapHandle );
                 }
-                memset( charData, 0, size );
+                memset( charData, 0, /*size*/ 2048 );
 
                 /* init rasterMap */
                 rasterMap.rows   = height;
@@ -154,19 +154,20 @@ void _pascal TrueType_Gen_Chars(
                 rasterMap.bitmap = ((byte*)charData) + SIZE_REGION_HEADER;
 
                 /* translate outline and render it */
-                TT_Translate_Outline( &outline, -bbox.xMin, -bbox.yMin );
-                TT_Get_Outline_Region( &outline, &rasterMap );
+                //TT_Translate_Outline( &outline, -bbox.xMin, -bbox.yMin );
+                TT_Get_Glyph_Region( glyph, &rasterMap, -bbox.xMin, -bbox.yMin );
+                //TT_Get_Outline_Region( &outline, &rasterMap );
 
                 /* fill header of charData */
                 ((RegionCharData*)charData)->RCD_xoff = bbox.xMin / 64;
-                ((RegionCharData*)charData)->RCD_yoff = bbox.yMin / 64;
+                ((RegionCharData*)charData)->RCD_yoff = fontBuf->FB_baselinePos.WBF_int - ( bbox.yMax / 64 );
                 ((RegionCharData*)charData)->RCD_size = rasterMap.size;
                 ((RegionCharData*)charData)->RCD_bounds.R_left   = 0;
                 ((RegionCharData*)charData)->RCD_bounds.R_right  = width;
-                ((RegionCharData*)charData)->RCD_bounds.R_top    = height;
-                ((RegionCharData*)charData)->RCD_bounds.R_bottom = 0;
+                ((RegionCharData*)charData)->RCD_bounds.R_top    = 0;
+                ((RegionCharData*)charData)->RCD_bounds.R_bottom = height;
 
-                size = rasterMap.size;
+                size = rasterMap.size + SIZE_REGION_HEADER;
         }
         else
         {      

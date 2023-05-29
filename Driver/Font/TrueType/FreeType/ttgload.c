@@ -199,6 +199,9 @@
     TT_F26Dot6   x, y;
 
 
+    ECCheckStack();
+
+
     face = exec->face;
 
     /* simple check */
@@ -568,7 +571,7 @@
     UShort  load_top;
     Long    k, l;
     UShort  new_flags;
-    Long    index;
+    Short   index;
     UShort  u, v;
 
     Long  glyph_offset, offset;
@@ -588,6 +591,9 @@
 
 /*  TT_Glyph_Loader_Callback  cacheCb;        */
 /*  TT_Outline                cached_outline; */
+
+
+    ECCheckStack();
 
 
     /* first of all, check arguments */
@@ -702,7 +708,7 @@
           UShort  advance_width;
 
 
-          Get_HMetrics( face, (UShort)index,
+          Get_HMetrics( face, index,
                         !(load_flags & TTLOAD_IGNORE_GLOBAL_ADVANCE_WIDTH),
                         &left_bearing,
                         &advance_width );

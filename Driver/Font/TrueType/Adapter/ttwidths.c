@@ -203,7 +203,7 @@ Fin:
 
 static void ConvertWidths( TRUETYPE_VARS, WWFixedAsDWord scaleFactor, FontHeader* fontHeader, FontBuf* fontBuf )
 {
-        char             currentChar;
+        word             currentChar;
         CharTableEntry*  charTableEntry = (CharTableEntry*) (((byte*)fontBuf) + sizeof( FontBuf ));
         WWFixedAsDWord   scaledWidth;
 
@@ -212,7 +212,7 @@ static void ConvertWidths( TRUETYPE_VARS, WWFixedAsDWord scaleFactor, FontHeader
         TT_New_Instance( FACE, &INSTANCE );
         getCharMap( FACE, &CHAR_MAP );
 
-        for( currentChar = fontHeader->FH_firstChar; currentChar < fontHeader->FH_lastChar; currentChar++ )
+        for( currentChar = fontHeader->FH_firstChar; currentChar <= fontHeader->FH_lastChar; ++currentChar )
         {
                 word    charIndex;
 
@@ -229,10 +229,10 @@ static void ConvertWidths( TRUETYPE_VARS, WWFixedAsDWord scaleFactor, FontHeader
                         charTableEntry->CTE_width.WBF_frac = 0;
                         charTableEntry->CTE_usage          = 0;
 
-                        charTableEntry++;
+                        ++charTableEntry;
                         continue;
                 }
-                        
+                      
                 //Glyph laden
                 TT_Load_Glyph( INSTANCE, GLYPH, charIndex, 0 );
                 TT_Get_Glyph_Metrics( GLYPH, &GLYPH_METRICS );
@@ -242,7 +242,7 @@ static void ConvertWidths( TRUETYPE_VARS, WWFixedAsDWord scaleFactor, FontHeader
                 charTableEntry->CTE_width.WBF_int  = INTEGER_OF_WWFIXEDASDWORD( scaledWidth );
                 charTableEntry->CTE_width.WBF_frac = FRACTION_OF_WWFIXEDASDWORD( scaledWidth );
 
-                /* nur TEST */
+                // nur TEST
                 charTableEntry->CTE_dataOffset     = CHAR_NOT_BUILT;
                 charTableEntry->CTE_flags          = 0;
                 charTableEntry->CTE_usage          = 0;
@@ -268,7 +268,7 @@ static void ConvertWidths( TRUETYPE_VARS, WWFixedAsDWord scaleFactor, FontHeader
                         //second kern
                 }
 
-                charTableEntry++;
+                ++charTableEntry;
         } 
 
         TT_Done_Instance( INSTANCE );
@@ -501,13 +501,6 @@ void ConvertHeader( WWFixedAsDWord scaleFactor, FontHeader* fontHeader, FontBuf*
 
 
         /* Fill elements in FontBuf structure.                               */
-        fontBuf->FB_maker        = FM_TRUETYPE;
-        fontBuf->FB_kernPairPtr  = 0;
-        fontBuf->FB_kernValuePtr = 0;
-        fontBuf->FB_kernCount    = 0;
-        fontBuf->FB_heapCount    = 0;
-	fontBuf->FB_flags        = FBF_IS_OUTLINE;
-
         ttfElement = SCALE_WORD( fontHeader->FH_avgwidth, scaleFactor );
         fontBuf->FB_avgwidth.WBF_int  = INTEGER_OF_WWFIXEDASDWORD( ttfElement );
         fontBuf->FB_avgwidth.WBF_frac = FRACTION_OF_WWFIXEDASDWORD( ttfElement );
@@ -578,9 +571,15 @@ void ConvertHeader( WWFixedAsDWord scaleFactor, FontHeader* fontHeader, FontBuf*
         ttfElement = SCALE_WORD( fontHeader->FH_height + fontHeader->FH_accent, scaleFactor );
         fontBuf->FB_pixHeight = INTEGER_OF_WWFIXEDASDWORD( ttfElement );
 
-        fontBuf->FB_firstChar   = fontHeader->FH_firstChar;
-        fontBuf->FB_lastChar    = fontHeader->FH_lastChar;
-        fontBuf->FB_defaultChar = fontHeader->FH_defaultChar;
+        fontBuf->FB_maker        = FM_TRUETYPE;
+        fontBuf->FB_kernPairPtr  = 0;
+        fontBuf->FB_kernValuePtr = 0;
+        fontBuf->FB_kernCount    = 0;
+        fontBuf->FB_heapCount    = 0;
+	fontBuf->FB_flags        = fontBuf->FB_pixHeight < 125 ? FBF_IS_OUTLINE : FBF_IS_REGION;
+        fontBuf->FB_firstChar    = fontHeader->FH_firstChar;
+        fontBuf->FB_lastChar     = fontHeader->FH_lastChar;
+        fontBuf->FB_defaultChar  = fontHeader->FH_defaultChar;
 }
 
 static word round( WWFixedAsDWord toRound )

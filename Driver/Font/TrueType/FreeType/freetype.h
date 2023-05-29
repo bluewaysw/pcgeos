@@ -799,12 +799,12 @@
   /* This function has been deprecated!  Do not use it, as it      */
   /* doesn't work reliably.  You can perfectly control hinting     */
   /* yourself when loading glyphs, then apply transforms as usual. */
-
+/*
   EXPORT_DEF
   TT_Error  TT_Set_Instance_Transform_Flags( TT_Instance  instance,
                                              TT_Bool      rotated,
                                              TT_Bool      stretched );
-
+*/
 
   /* Return instance metrics in `metrics'. */
 

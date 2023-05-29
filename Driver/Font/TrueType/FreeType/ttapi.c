@@ -792,7 +792,7 @@ extern TEngine_Instance engineInstance;
  *            instances, so there is no need to protect.
  *
  ******************************************************************/
-
+/*
   EXPORT_FUNC
   TT_Error  TT_Set_Instance_Transform_Flags( TT_Instance  instance,
                                              TT_Bool      rotated,
@@ -809,7 +809,7 @@ extern TEngine_Instance engineInstance;
     ins->valid             = FALSE;
 
     return TT_Err_Ok;
-  }
+  }*/
 
 
 /*******************************************************************
@@ -1285,7 +1285,7 @@ extern TEngine_Instance engineInstance;
     TT_Transform_Outline( &outline, &flipmatrix );
     TT_Translate_Outline( &outline, xOffset, yOffset + map->rows * 64 );
     error = TT_Get_Outline_Region( &outline, map );
-    TT_Translate_Outline( &outline, -xOffset, -yOffset - map->rows * 64 );
+    TT_Translate_Outline( &outline, -xOffset, - ( yOffset + map->rows * 64 ) );
     TT_Transform_Outline( &outline, &flipmatrix );
 
     return error;

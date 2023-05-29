@@ -53,7 +53,7 @@ extern TEngine_Instance engineInstance;
 #define SCRIPT_FACTOR                       0x00006000 
 #define SCRIPT_SHIFT_FACTOR                 0x00015000
 
-
+#define MAX_BITMAP_SIZE		                125
 #define MAX_FONTBUF_SIZE                    10 * 1024
 
 #define FAMILY_NAME_LENGTH              20
