@@ -1229,7 +1229,6 @@ extern TEngine_Instance engineInstance;
 
 #ifdef __GEOS__
 
-#define HORIZONTAL_FLIP_MATRIX    { ( 1L << 16 ), 0, 0, -1 * ( 1L << 16 ) }
 
 /*******************************************************************
  *

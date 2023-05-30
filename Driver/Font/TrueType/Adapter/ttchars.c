@@ -134,6 +134,8 @@ void _pascal TrueType_Gen_Chars(
 
         if( fontBuf->FB_flags & FBF_IS_REGION )
         {
+                TT_Matrix         flipmatrix = HORIZONTAL_FLIP_MATRIX; 
+
                 /* We calculate with an average of 4 on/off points, line number and line end code. */
                 size = height * 6 * sizeof( word ) + SIZE_REGION_HEADER; 
 
@@ -154,9 +156,9 @@ void _pascal TrueType_Gen_Chars(
                 rasterMap.bitmap = ((byte*)charData) + SIZE_REGION_HEADER;
 
                 /* translate outline and render it */
-                //TT_Translate_Outline( &outline, -bbox.xMin, -bbox.yMin );
-                TT_Get_Glyph_Region( glyph, &rasterMap, -bbox.xMin, -bbox.yMin );
-                //TT_Get_Outline_Region( &outline, &rasterMap );
+                TT_Transform_Outline( &outline, &flipmatrix );
+                TT_Translate_Outline( &outline, -bbox.xMin, -bbox.yMin + bbox.yMax );
+                TT_Get_Outline_Region( &outline, &rasterMap );
 
                 /* fill header of charData */
                 ((RegionCharData*)charData)->RCD_xoff = bbox.xMin / 64;

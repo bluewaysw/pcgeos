@@ -199,9 +199,6 @@
     TT_F26Dot6   x, y;
 
 
-    ECCheckStack();
-
-
     face = exec->face;
 
     /* simple check */
@@ -588,12 +585,6 @@
 
     TPhases     phase;
     PByte       widths;
-
-/*  TT_Glyph_Loader_Callback  cacheCb;        */
-/*  TT_Outline                cached_outline; */
-
-
-    ECCheckStack();
 
 
     /* first of all, check arguments */
