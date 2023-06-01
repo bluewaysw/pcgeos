@@ -157,7 +157,7 @@ void _pascal TrueType_Gen_Chars(
 
                 /* translate outline and render it */
                 TT_Transform_Outline( &outline, &flipmatrix );
-                TT_Translate_Outline( &outline, -bbox.xMin, -bbox.yMin + bbox.yMax );
+                TT_Translate_Outline( &outline, -bbox.xMin, bbox.yMin + bbox.yMax );
                 TT_Get_Outline_Region( &outline, &rasterMap );
 
                 /* fill header of charData */

@@ -1007,6 +1007,9 @@
                               TT_Matrix*   matrix );
 
 
+#define HORIZONTAL_FLIP_MATRIX    { ( 1L << 16 ), 0, 0, -1 * ( 1L << 16 ) }
+
+
   /* Apply a translation to a glyph outline. */
 
   EXPORT_DEF
