@@ -1845,15 +1845,6 @@
         }
       }
     }
-#if 0
-      e2 = TRUNC( e2 );
-
-      if ( e2 >= 0 && e2 < ras.target.rows )
-        if ( ras.target.flow == TT_Flow_Down )
-          bits[(ras.target.rows-1-e2) * ras.target.cols] |= f1;
-        else
-          bits[e2 * ras.target.cols] |= f1;
-#endif
   }
 
 
@@ -2261,7 +2252,7 @@
           {
             case TT_Flow_Up:    InsNew( &draw_left,  P ); break;
             case TT_Flow_Down:  InsNew( &draw_right, P ); break;
-          }
+          } 
         }
 
         P = Q;

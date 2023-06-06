@@ -342,13 +342,8 @@
     int    cols;    /* number of columns (bytes) per row */
     int    width;   /* number of pixels per line         */
     int    flow;    /* bitmap orientation                */
-
     void*  bitmap;  /* bit/pixmap buffer                 */
-#ifndef __GEOS__
-    long   size;    /* bit/pixmap size in bytes          */
-#else
     int    size;    /* bit/pixmap/region size in bytes   */
-#endif  /* __GEOS__ */
   };
 
   typedef struct TT_Raster_Map_  TT_Raster_Map;
@@ -915,12 +910,12 @@
   /*       (where vertical and horizontal stems aren't grayed).  This */
   /*       means that `xOffset' and `yOffset' must be multiples       */
   /*       of 64!                                                     */
-
+/*
   EXPORT_DEF
   TT_Error  TT_Get_Glyph_Bitmap( TT_Glyph        glyph,
                                  TT_Raster_Map*  map,
                                  TT_F26Dot6      xOffset,
-                                 TT_F26Dot6      yOffset );
+                                 TT_F26Dot6      yOffset );*/
 
 
   /* Render the glyph into a region, with given position offsets.     */
@@ -930,12 +925,12 @@
   /*       (where vertical and horizontal stems aren't grayed).  This */
   /*       means that `xOffset' and `yOffset' must be multiples       */
   /*       of 64!                                                     */
-  
+  /*
   EXPORT_DEF
   TT_Error  TT_Get_Glyph_Region( TT_Glyph          glyph,
                                  TT_Raster_Map*    map,
                                  TT_F26Dot6        xOffset,
-                                 TT_F26Dot6        yOffset );
+                                 TT_F26Dot6        yOffset ); */
 
 
   /* Render the glyph into the passed GEOS regionpath.                */

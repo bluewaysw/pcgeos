@@ -1195,7 +1195,7 @@ extern TEngine_Instance engineInstance;
  *  MT-Safe : NO!  Glyph containers can't be shared.
  *
  ******************************************************************/
-
+/*
   EXPORT_FUNC
   TT_Error  TT_Get_Glyph_Bitmap( TT_Glyph        glyph,
                                  TT_Raster_Map*  map,
@@ -1215,8 +1215,8 @@ extern TEngine_Instance engineInstance;
     _engine = _glyph->face->engine;
 
     outline = _glyph->outline;
-    /* XXX : For now, use only dropout mode 2    */
-    /* outline.dropout_mode = _glyph->scan_type; */
+    // XXX : For now, use only dropout mode 2
+    // outline.dropout_mode = _glyph->scan_type;
     outline.dropout_mode = 2;
 
     TT_Translate_Outline( &outline, xOffset, yOffset );
@@ -1225,7 +1225,7 @@ extern TEngine_Instance engineInstance;
 
     return error;
   }
-
+*/
 
 #ifdef __GEOS__
 
@@ -1256,7 +1256,7 @@ extern TEngine_Instance engineInstance;
  *  MT-Safe : NO!  Glyph containers can't be shared.
  *
  ******************************************************************/
-
+/*
   EXPORT_FUNC
   TT_Error  TT_Get_Glyph_Region( TT_Glyph        glyph,
                                  TT_Raster_Map*  map,
@@ -1277,8 +1277,8 @@ extern TEngine_Instance engineInstance;
     _engine = _glyph->face->engine;
 
     outline = _glyph->outline;
-    /* XXX : For now, use only dropout mode 2    */
-    /* outline.dropout_mode = _glyph->scan_type; */
+    // XXX : For now, use only dropout mode 2
+    // outline.dropout_mode = _glyph->scan_type;
     outline.dropout_mode = 2;
 
     TT_Transform_Outline( &outline, &flipmatrix );
@@ -1289,7 +1289,7 @@ extern TEngine_Instance engineInstance;
 
     return error;
   }
-
+*/
 
  /*******************************************************************
   *
