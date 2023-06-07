@@ -1499,17 +1499,17 @@
 
   static void  Vertical_Sweep_Init( RAS_ARGS Short*  min, Short*  max )
   {
-    switch ( ras.target.flow )
+    /*switch ( ras.target.flow )
     {
     case TT_Flow_Up:
       ras.traceOfs  = *min * ras.target.cols;
       ras.traceIncr = ras.target.cols;
-      break;
+      break;*/
 
-    default:
+    //default:
       ras.traceOfs  = ( ras.target.rows - 1 - *min ) * ras.target.cols;
       ras.traceIncr = -ras.target.cols;
-    }
+    //}
 
   }
 
@@ -1838,9 +1838,9 @@
 
         if ( e1 >= 0 && e1 < ras.target.rows )
         {
-          if ( ras.target.flow == TT_Flow_Down )
+          /*if ( ras.target.flow == TT_Flow_Down )
             bits[(ras.target.rows-1 - e1) * ras.target.cols] |= f1;
-          else
+          else*/
             bits[e1 * ras.target.cols] |= f1;
         }
       }
@@ -1903,10 +1903,10 @@
           bits = ras.bTarget + (y >> 3);
           f1   = (Byte)(0x80 >> (y &  7));
 
-          if ( ras.target.flow == TT_Flow_Down )
+          //if ( ras.target.flow == TT_Flow_Down )
             bits += (ras.target.rows-1-e1) * ras.target.cols;
-          else
-            bits += e1 * ras.target.cols;
+          /*else
+            bits += e1 * ras.target.cols;*/
 
           if ( e1 >= 0              &&
                e1 < ras.target.rows &&
@@ -1935,10 +1935,10 @@
 
     if ( e1 >= 0 && e1 < ras.target.rows )
     {
-      if (ras.target.flow==TT_Flow_Down)
+      //if (ras.target.flow==TT_Flow_Down)
         bits[(ras.target.rows-1-e1) * ras.target.cols] |= f1;
-      else
-        bits[e1 * ras.target.cols] |= f1;
+      /*else
+        bits[e1 * ras.target.cols] |= f1;*/
     }
   }
 

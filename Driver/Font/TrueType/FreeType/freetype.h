@@ -341,7 +341,7 @@
     int    rows;    /* number of rows                    */
     int    cols;    /* number of columns (bytes) per row */
     int    width;   /* number of pixels per line         */
-    int    flow;    /* bitmap orientation                */
+  //  int    flow;    /* bitmap orientation                */
     void*  bitmap;  /* bit/pixmap buffer                 */
     int    size;    /* bit/pixmap/region size in bytes   */
   };

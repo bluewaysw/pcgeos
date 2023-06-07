@@ -152,7 +152,7 @@ void _pascal TrueType_Gen_Chars(
                 /* init rasterMap */
                 rasterMap.rows   = height;
                 rasterMap.width  = width;
-                rasterMap.flow   = TT_Flow_Down;
+                //rasterMap.flow   = TT_Flow_Down;
                 rasterMap.bitmap = ((byte*)charData) + SIZE_REGION_HEADER;
 
                 /* translate outline and render it */
@@ -190,7 +190,7 @@ void _pascal TrueType_Gen_Chars(
                 rasterMap.width  = width;
                 rasterMap.cols   = (width + 7) / 8;
                 rasterMap.size   = rasterMap.rows * rasterMap.cols;
-                rasterMap.flow   = TT_Flow_Down;
+                //rasterMap.flow   = TT_Flow_Down;
                 rasterMap.bitmap = ((byte*)charData) + SIZE_CHAR_HEADER;
 
                 /* translate outline and render it */

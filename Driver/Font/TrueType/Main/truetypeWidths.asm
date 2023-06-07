@@ -62,15 +62,12 @@ TrueTypeGenWidths	proc	far
 	mov	bx, bp
 	.enter
 
-	;TEST
 	xchg	di, ax
 	mov	di, 800
 	call	ThreadBorrowStackSpace
 	push	di
 
-	;push	di			; font handle or 0
-	push	ax
-
+	push	ax			; pass fonthandel
 	push	bx			; send tMatrix ptr
 	push 	cx
 
