@@ -55,9 +55,10 @@ extern TEngine_Instance engineInstance;
 
 #define MAX_BITMAP_SIZE		                125
 #define MAX_FONTBUF_SIZE                    10 * 1024
+#define BITMAP_BLOCKSIZE                    2 * 1024
 
-#define FAMILY_NAME_LENGTH              20
-#define STYLE_NAME_LENGTH               16
+#define FAMILY_NAME_LENGTH                  20
+#define STYLE_NAME_LENGTH                   16
 
 
 /***********************************************************************
@@ -362,6 +363,7 @@ typedef struct
 #define OUTLINE                 trueTypeVars->outline
 #define GLYPH_METRICS           trueTypeVars->glyphMetrics
 #define GLYPH_BBOX              trueTypeVars->glyphMetrics.bbox
+#define RASTER_MAP              trueTypeVars->rasterMap
 
 #define UNITS_PER_EM            FACE_PROPERTIES.header->Units_Per_EM
 

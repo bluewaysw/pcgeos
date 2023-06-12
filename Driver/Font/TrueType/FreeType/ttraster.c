@@ -1499,18 +1499,8 @@
 
   static void  Vertical_Sweep_Init( RAS_ARGS Short*  min, Short*  max )
   {
-    /*switch ( ras.target.flow )
-    {
-    case TT_Flow_Up:
-      ras.traceOfs  = *min * ras.target.cols;
-      ras.traceIncr = ras.target.cols;
-      break;*/
-
-    //default:
-      ras.traceOfs  = ( ras.target.rows - 1 - *min ) * ras.target.cols;
-      ras.traceIncr = -ras.target.cols;
-    //}
-
+    ras.traceOfs  = ( ras.target.rows - 1 - *min ) * ras.target.cols;
+    ras.traceIncr = -ras.target.cols;
   }
 
 
@@ -1837,12 +1827,7 @@
         e1 = TRUNC( e1 );
 
         if ( e1 >= 0 && e1 < ras.target.rows )
-        {
-          /*if ( ras.target.flow == TT_Flow_Down )
-            bits[(ras.target.rows-1 - e1) * ras.target.cols] |= f1;
-          else*/
-            bits[e1 * ras.target.cols] |= f1;
-        }
+          bits[(ras.target.rows-1 - e1) * ras.target.cols] |= f1;
       }
     }
   }
@@ -1903,10 +1888,7 @@
           bits = ras.bTarget + (y >> 3);
           f1   = (Byte)(0x80 >> (y &  7));
 
-          //if ( ras.target.flow == TT_Flow_Down )
-            bits += (ras.target.rows-1-e1) * ras.target.cols;
-          /*else
-            bits += e1 * ras.target.cols;*/
+          bits += (ras.target.rows-1-e1) * ras.target.cols;
 
           if ( e1 >= 0              &&
                e1 < ras.target.rows &&
@@ -1934,12 +1916,7 @@
     e1 = TRUNC( e1 );
 
     if ( e1 >= 0 && e1 < ras.target.rows )
-    {
-      //if (ras.target.flow==TT_Flow_Down)
         bits[(ras.target.rows-1-e1) * ras.target.cols] |= f1;
-      /*else
-        bits[e1 * ras.target.cols] |= f1;*/
-    }
   }
 
 
@@ -2684,7 +2661,6 @@ TT_Error  Render_Region_Glyph( RAS_ARGS TT_Outline*     glyph,
 
 #ifndef TT_CONFIG_OPTION_STATIC_RASTER
     FREE( engine->raster_component );
-    //GFREE( engine->raster_component );
 #endif
 
     return TT_Err_Ok;
@@ -2702,7 +2678,6 @@ TT_Error  Render_Region_Glyph( RAS_ARGS TT_Outline*     glyph,
     ras = engine->raster_component = &cur_ras;
 #else
     if ( ALLOC( engine->raster_component, sizeof ( TRaster_Instance ) ) )
-    //if ( GALLOC( engine->raster_component, sizeof ( TRaster_Instance ) ) )
       return error;
 
     ras = (TRaster_Instance*)engine->raster_component;

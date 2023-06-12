@@ -86,6 +86,7 @@ TrueTypeGenChar	proc	far
 
 	segmov	ds, dgroup, ax
 	push	ds:bitmapHandle
+	push	ds:variableHandle
 	call	TRUETYPE_GEN_CHARS
 
 	; deref font block (may have moved)
@@ -98,4 +99,3 @@ err:
 	ret
 TrueTypeGenChar	endp
 
-

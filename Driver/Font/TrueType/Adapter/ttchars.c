@@ -33,6 +33,7 @@ static void AdjustPointers( CharTableEntry* charTableEntries,
                             word numOfChars );
 static word ShiftCharData( FontBuf* fontBuf, CharData* charData );
 static word ShiftRegionCharData( FontBuf* fontBuf, RegionCharData* charData );
+static void* ensureBitmapBlock( MemHandle bitmapHandle, word size );
 
 
 /********************************************************************
@@ -66,19 +67,13 @@ void _pascal TrueType_Gen_Chars(
                         WWFixedAsDWord       pointSize,
 			const FontInfo*      fontInfo, 
                         const OutlineEntry*  outlineEntry,
-                        MemHandle            bitmapHandle
-			) 
+                        MemHandle            bitmapHandle,
+                        MemHandle            varBlock ) 
 {
         FileHandle             truetypeFile;
         TrueTypeOutlineEntry*  trueTypeOutline;
-        TT_Face                face;
-        TT_Instance            instance;
-        TT_Glyph               glyph;
-        TT_Outline             outline;
-        TT_BBox                bbox;
-        TT_CharMap             charMap;
         TT_UShort              charIndex;
-        TT_Raster_Map          rasterMap;
+        TrueTypeVars*          trueTypeVars;
         void*                  charData;
         word                   width, height, size;
 
@@ -86,7 +81,16 @@ void _pascal TrueType_Gen_Chars(
         ECCheckBounds( (void*)fontBuf );
         ECCheckBounds( (void*)fontInfo );
         ECCheckBounds( (void*)outlineEntry );
-        ECCheckStack();
+        ECCheckMemHandle( bitmapHandle );
+        ECCheckMemHandle( varBlock );
+
+        /* get trueTypeVar block */
+        trueTypeVars = MemLock( varBlock );
+        if( trueTypeVars == NULL )
+        {
+                MemReAlloc( varBlock, sizeof( TrueTypeVars ), HAF_NO_ERR );
+                trueTypeVars = MemLock( varBlock );
+        }
 
 
         FilePushDir();
@@ -99,38 +103,38 @@ void _pascal TrueType_Gen_Chars(
         ECCheckFileHandle( truetypeFile );
 
         /* open face, create instance and glyph */
-        if( TT_Open_Face( truetypeFile, &face ) )
+        if( TT_Open_Face( truetypeFile, &FACE ) )
                 goto Fail;
 
-        TT_New_Glyph( face, &glyph );
-        TT_New_Instance( face, &instance );
-        TT_Set_Instance_Resolutions( instance, 72, 72 );
+        TT_New_Glyph( FACE, &GLYPH );
+        TT_New_Instance( FACE, &INSTANCE );
+        TT_Set_Instance_Resolutions( INSTANCE, 72, 72 );
 
          /* get TT char index */
-        getCharMap( face, &charMap );
-        charIndex = TT_Char_Index( charMap, GeosCharToUnicode( character ) );
+        getCharMap( FACE, &CHAR_MAP );
+        charIndex = TT_Char_Index( CHAR_MAP, GeosCharToUnicode( character ) );
 
         /* set pointsize and get metrics */
-        TT_Set_Instance_CharSize( instance, ( pointSize >> 10 ) );
+        TT_Set_Instance_CharSize( INSTANCE, ( pointSize >> 10 ) );
 
         /* load glyph and load glyphs outline */
-        TT_Load_Glyph( instance, glyph, charIndex, TTLOAD_DEFAULT );
+        TT_Load_Glyph( INSTANCE, GLYPH, charIndex, TTLOAD_DEFAULT );
 
         // TODO: Transformationsmatrix anwenden
 
 
-        TT_Get_Glyph_Outline( glyph, &outline );
-        TT_Get_Outline_BBox( &outline, &bbox );
+        TT_Get_Glyph_Outline( GLYPH, &OUTLINE );
+        TT_Get_Outline_BBox( &OUTLINE, &GLYPH_BBOX );
 
         /* Grid-fit it */
-        bbox.xMin &= -64;
-        bbox.xMax  = ( bbox.xMax + 63 ) & -64;
-        bbox.yMin &= -64;
-        bbox.yMax  = ( bbox.yMax + 63 ) & -64;
+        GLYPH_BBOX.xMin &= -64;
+        GLYPH_BBOX.xMax  = ( GLYPH_BBOX.xMax + 63 ) & -64;
+        GLYPH_BBOX.yMin &= -64;
+        GLYPH_BBOX.yMax  = ( GLYPH_BBOX.yMax + 63 ) & -64;
 
         /* compute pixel dimensions */
-        width  = (bbox.xMax - bbox.xMin) / 64;
-        height = (bbox.yMax - bbox.yMin) / 64;
+        width  = (GLYPH_BBOX.xMax - GLYPH_BBOX.xMin) / 64;
+        height = (GLYPH_BBOX.yMax - GLYPH_BBOX.yMin) / 64;
 
         if( fontBuf->FB_flags & FBF_IS_REGION )
         {
@@ -140,72 +144,56 @@ void _pascal TrueType_Gen_Chars(
                 size = height * 6 * sizeof( word ) + SIZE_REGION_HEADER; 
 
                 /* get pointer to bitmapBlock */
-                charData = MemLock( bitmapHandle );
-                //TODO: verfügbaren Platz prüfen?
-                if( charData == NULL )
-                {
-                        MemReAlloc( bitmapHandle, /* size */ 2048, HAF_NO_ERR );
-                        charData = MemLock( bitmapHandle );
-                }
-                memset( charData, 0, /*size*/ 2048 );
+                charData = ensureBitmapBlock( bitmapHandle, size );
 
-                /* init rasterMap */
-                rasterMap.rows   = height;
-                rasterMap.width  = width;
-                //rasterMap.flow   = TT_Flow_Down;
-                rasterMap.bitmap = ((byte*)charData) + SIZE_REGION_HEADER;
+                /* init RASTER_MAP */
+                RASTER_MAP.rows   = height;
+                RASTER_MAP.width  = width;
+                RASTER_MAP.bitmap = ((byte*)charData) + SIZE_REGION_HEADER;
 
                 /* translate outline and render it */
-                TT_Transform_Outline( &outline, &flipmatrix );
-                TT_Translate_Outline( &outline, -bbox.xMin, bbox.yMin + bbox.yMax );
-                TT_Get_Outline_Region( &outline, &rasterMap );
+                TT_Transform_Outline( &OUTLINE, &flipmatrix );
+                TT_Translate_Outline( &OUTLINE, -GLYPH_BBOX.xMin, GLYPH_BBOX.yMin + GLYPH_BBOX.yMax );
+                TT_Get_Outline_Region( &OUTLINE, &RASTER_MAP );
 
                 /* fill header of charData */
-                ((RegionCharData*)charData)->RCD_xoff = bbox.xMin / 64;
-                ((RegionCharData*)charData)->RCD_yoff = fontBuf->FB_baselinePos.WBF_int - ( bbox.yMax / 64 );
-                ((RegionCharData*)charData)->RCD_size = rasterMap.size;
+                ((RegionCharData*)charData)->RCD_xoff = GLYPH_BBOX.xMin / 64;
+                ((RegionCharData*)charData)->RCD_yoff = fontBuf->FB_baselinePos.WBF_int - ( GLYPH_BBOX.yMax / 64 );
+                ((RegionCharData*)charData)->RCD_size = RASTER_MAP.size;
                 ((RegionCharData*)charData)->RCD_bounds.R_left   = 0;
                 ((RegionCharData*)charData)->RCD_bounds.R_right  = width;
                 ((RegionCharData*)charData)->RCD_bounds.R_top    = 0;
                 ((RegionCharData*)charData)->RCD_bounds.R_bottom = height;
 
-                size = rasterMap.size + SIZE_REGION_HEADER;
+                size = RASTER_MAP.size + SIZE_REGION_HEADER;
         }
         else
         {      
                 size = height * ( ( width + 7 ) / 8 ) + SIZE_CHAR_HEADER;
 
                 /* get pointer to bitmapBlock */
-                charData = MemLock( bitmapHandle );
-                //TODO: verfügbaren Platz prüfen?
-                if( charData == NULL )
-                {
-                        MemReAlloc( bitmapHandle, /* size */ 1024, HAF_NO_ERR );
-                        charData = MemLock( bitmapHandle );
-                }
-                memset( charData, 0, size );
+                charData = ensureBitmapBlock( bitmapHandle, size );
 
                 /* init rasterMap */
-                rasterMap.rows   = height;
-                rasterMap.width  = width;
-                rasterMap.cols   = (width + 7) / 8;
-                rasterMap.size   = rasterMap.rows * rasterMap.cols;
-                //rasterMap.flow   = TT_Flow_Down;
-                rasterMap.bitmap = ((byte*)charData) + SIZE_CHAR_HEADER;
+                RASTER_MAP.rows   = height;
+                RASTER_MAP.width  = width;
+                RASTER_MAP.cols   = (width + 7) / 8;
+                RASTER_MAP.size   = RASTER_MAP.rows * RASTER_MAP.cols;
+                RASTER_MAP.bitmap = ((byte*)charData) + SIZE_CHAR_HEADER;
 
                 /* translate outline and render it */
-                TT_Translate_Outline( &outline, -bbox.xMin, -bbox.yMin );
-                TT_Get_Outline_Bitmap( &outline, &rasterMap );
+                TT_Translate_Outline( &OUTLINE, -GLYPH_BBOX.xMin, -GLYPH_BBOX.yMin );
+                TT_Get_Outline_Bitmap( &OUTLINE, &RASTER_MAP );
 
                 /* fill header of charData */
                 ((CharData*)charData)->CD_pictureWidth = width;
                 ((CharData*)charData)->CD_numRows      = height;
-                ((CharData*)charData)->CD_xoff         = bbox.xMin / 64;
-                ((CharData*)charData)->CD_yoff         = fontBuf->FB_baselinePos.WBF_int - ( bbox.yMax / 64 ); 
+                ((CharData*)charData)->CD_xoff         = GLYPH_BBOX.xMin / 64;
+                ((CharData*)charData)->CD_yoff         = fontBuf->FB_baselinePos.WBF_int - ( GLYPH_BBOX.yMax / 64 ) + 1; 
         }
 
-        TT_Done_Glyph( glyph );
-        TT_Done_Instance( instance );
+        TT_Done_Glyph( GLYPH );
+        TT_Done_Instance( INSTANCE );
 
         if( fontBuf->FB_dataSize > MAX_FONTBUF_SIZE )
                 ShrinkFontBuf( fontBuf );
@@ -225,9 +213,10 @@ void _pascal TrueType_Gen_Chars(
         /* cleanup */
         MemUnlock( bitmapHandle );
 Fail:
-        TT_Close_Face( face );
+        TT_Close_Face( FACE );
         FileClose( truetypeFile, FALSE );
         FilePopDir(); 
+        MemUnlock( varBlock );
 }
 
 
@@ -370,4 +359,23 @@ static word ShiftRegionCharData( FontBuf* fontBuf, RegionCharData* charData )
                 ((byte*)charData) - ((byte*)fontBuf) + fontBuf->FB_dataSize );
 
         return size;
+}
+
+static void* ensureBitmapBlock( MemHandle bitmapHandle, word size )
+{
+        void* bitmapData = MemLock( bitmapHandle );
+        if( bitmapData == NULL )
+        {
+                MemReAlloc( bitmapHandle, MAX( size, 1024 ), HAF_NO_ERR );
+                bitmapData = MemLock( bitmapHandle );
+        } else {
+                if( MemGetInfo( bitmapHandle, MGIT_SIZE ) < size )
+                {
+                        MemReAlloc( bitmapHandle, size, HAF_NO_ERR );
+                        bitmapData = MemLock( bitmapHandle );
+                }
+        }
+        memset( bitmapData, 0, size );
+
+        return bitmapData;
 }

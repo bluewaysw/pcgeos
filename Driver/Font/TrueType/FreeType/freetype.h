@@ -320,28 +320,18 @@
   /*       rows  = H                                                   */
   /*       cols  = (W+7) / 8                                           */
   /*       width = W                                                   */
-  /*       flow  = your_choice                                         */
-  /*                                                                   */
-  /*   - for a WxH pixmap:                                             */
-  /*                                                                   */
-  /*       rows  = H                                                   */
-  /*       cols  = (W+3) & ~3                                          */
-  /*       width = cols                                                */
-  /*       flow  = your_choice                                         */
   /*                                                                   */
   /*   - for a WxH region:                                             */
   /*                                                                   */
   /*       rows  = H                                                   */
   /*       cols  = W                                                   */
   /*       width = cols                                                */
-  /*       flow  = your_choise                                         */
 
   struct  TT_Raster_Map_
   {
     int    rows;    /* number of rows                    */
     int    cols;    /* number of columns (bytes) per row */
     int    width;   /* number of pixels per line         */
-  //  int    flow;    /* bitmap orientation                */
     void*  bitmap;  /* bit/pixmap buffer                 */
     int    size;    /* bit/pixmap/region size in bytes   */
   };
@@ -706,10 +696,10 @@
 
   /* Close a face's file handle to save system resources.  The file */
   /* will be re-opened automatically on the next disk access.       */
-
+/*
   EXPORT_DEF
   TT_Error  TT_Flush_Face( TT_Face  face );
-
+*/
   /* Get a face's glyph metrics expressed in font units.  Returns any    */
   /* number of arrays.  Set the fields to NULL if you are not interested */
   /* by a given array.                                                   */

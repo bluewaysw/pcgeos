@@ -479,7 +479,7 @@ extern TEngine_Instance engineInstance;
  *  MT-Note : YES!  (If ttfile is.)
  *
  ******************************************************************/
-
+/*
   EXPORT_FUNC
   TT_Error  TT_Flush_Face( TT_Face  face )
   {
@@ -491,7 +491,7 @@ extern TEngine_Instance engineInstance;
     else
       return TT_Flush_Stream( &faze->stream );
   }
-
+*/
 
 /*******************************************************************
  *
