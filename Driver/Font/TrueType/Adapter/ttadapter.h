@@ -268,6 +268,26 @@ typedef struct
     WWFixedAsDWord              TM_shiftY;
 } TransformMatrix;
 
+typedef ByteFlags TransFlags;
+#define TF_INV_VALID    0x08
+#define TF_ROTATED      0x04
+#define TF_SCALED       0x02 
+#define TF_TRANSLATED   0x01
+
+typedef struct
+{
+    WWFixedAsDWord              FM_11;
+    WWFixedAsDWord              FM_12;
+    WWFixedAsDWord              FM_21;
+    WWFixedAsDWord              FM_22;
+    WWFixedAsDWord              FM_31;
+    WWFixedAsDWord              FM_32;
+    DDFixed                     FM_xInv;    /* inverse translation factor (x coords) */
+    DDFixed                     FM_yInv;    /* inverse translation factor (y coords) */
+    TransFlags                  FM_flags;
+} FontMatrix;
+
+
 /*
  * drivers CharData structure (see fontDr.def)
  */

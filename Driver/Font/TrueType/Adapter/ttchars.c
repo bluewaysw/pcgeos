@@ -71,9 +71,11 @@ void _pascal TrueType_Gen_Chars(
                         MemHandle            varBlock ) 
 {
         FileHandle             truetypeFile;
+        MemHandle              fontBufHandle;
         TrueTypeOutlineEntry*  trueTypeOutline;
         TT_UShort              charIndex;
         TrueTypeVars*          trueTypeVars;
+        TransformMatrix*       transformMatrix;
         void*                  charData;
         word                   width, height, size;
 
@@ -119,11 +121,13 @@ void _pascal TrueType_Gen_Chars(
 
         /* load glyph and load glyphs outline */
         TT_Load_Glyph( INSTANCE, GLYPH, charIndex, TTLOAD_DEFAULT );
+        TT_Get_Glyph_Outline( GLYPH, &OUTLINE );
 
         // TODO: Transformationsmatrix anwenden
+        transformMatrix = (TransformMatrix*)(((byte*)fontBuf) + sizeof( FontBuf ) + ( fontBuf->FB_lastChar - fontBuf->FB_firstChar + 1 ) * sizeof( CharTableEntry ));
+        TT_Transform_Outline( &OUTLINE, &transformMatrix->TM_matrix );
 
-
-        TT_Get_Glyph_Outline( GLYPH, &OUTLINE );
+        /* get glyphs boundig box */
         TT_Get_Outline_BBox( &OUTLINE, &GLYPH_BBOX );
 
         /* Grid-fit it */
@@ -149,6 +153,7 @@ void _pascal TrueType_Gen_Chars(
                 /* init RASTER_MAP */
                 RASTER_MAP.rows   = height;
                 RASTER_MAP.width  = width;
+                RASTER_MAP.cols   = width;
                 RASTER_MAP.bitmap = ((byte*)charData) + SIZE_REGION_HEADER;
 
                 /* translate outline and render it */
@@ -199,13 +204,12 @@ void _pascal TrueType_Gen_Chars(
                 ShrinkFontBuf( fontBuf );
 
         /* realloc FontBuf if necessary */
- /*       if( MemGetInfo( MemPtrToHandle( fontBuf ), MGIT_SIZE ) < fontBuf->FB_dataSize + size )
+        fontBufHandle = MemPtrToHandle( fontBuf );
+        if( MemGetInfo( fontBufHandle, MGIT_SIZE ) < fontBuf->FB_dataSize + size )
         {
-                MemReAlloc( PtrToSegment( fontBuf ),
-                        fontBuf->FB_dataSize + size,
-                        HAF_STANDARD_NO_ERR );
-                fontBuf = MemDeref( PtrToSegment( fontBuf ));
-        } */
+                MemReAlloc( fontBufHandle, fontBuf->FB_dataSize + size, HAF_STANDARD_NO_ERR );
+                fontBuf = MemDeref( fontBufHandle );
+        }
 
         /* add rendered glyph to fontbuf */
         CopyChar( fontBuf, character, charData ,size );

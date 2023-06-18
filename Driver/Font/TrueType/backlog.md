@@ -1,46 +1,25 @@
-## 1 TODOs
-- ~~FontHeader füllen und im FontInfoBlock ablegen~~
-- ~~FontBuf auf Basis des FontHeaders füllen (Gen_Widths)~~
-- CharTableEntries füllen (Gen_Widths)
-- KernPairs und KernValues füllen (Achtung: sie offene Probleme)
-- Transformationsmatrix berechnen und im FontBlock halten (die FakeStyles sind in der Matrix 'enthalten')(Gen_Widths)
-- in Gen_Char eine Bitmap erzeugen (notfalls eine Fake Bitmap damit endlich etwas zu sehen ist)
+# TTF-Treiber für FreeGEOS
 
-## 2 Refactorings
+## 1 Fehlende Features
+- Support für Kerning
+- Handler für GEN_IN_REGION
+- Handler für GEN_PATH
+- Refactoring des Speichermanagments
+- Bytecodeinterpreter aktivieren
 
-### 2.1 ttinit.c
-- Hilfsfunktionen auslagern
-- lokale Variablen reduzieren
-- das Ermitteln des KernCounts hierhin auslagern -> das macht es in ttwidths.c leichter
+## 2 Bekannte Probleme
+- Zeichen mit einer Pointsize > 400 werden oben und/oder unten abgeschnitten
+- das Resizing des Fontbuffers ist noch fehlerhaft
+- die Fontmatrix wird noch nicht genutzt (Dokument-Zoom, Rotation und Sklaierung gehen deshalb nicht)
 
-### 2.2 ttwidths.c
-- Ermittlung stylesToImplement in ASM-Teil verschieben (Kernel-Routine FontDrFindOutlineData)
-
-### 2.3 FreeType
+## 3 Performance
+Der TrueType-Treiber ist noch sehr träge. Hier einige Ideen wie das verbessert werden kann:
+- Fonts (zumindest die, die wir initial in der Distribution mitliefern) auf die 224 Zeichen des GEOS-Zeichensatzes reduzieren
+- Caching wie beim Nimbus-Treiber implementieren. D.h. ein Face bleibt im Speicher. Wird beim nächsten Rendern der gleiche Font angefordert wird das Face aus dem Cache genutzt ansonsten wird es verworfen und neu geladen.
+- Im FreeType-Code wird an vielen Stellen long-Arithmetik genutzt. Hier gibt es sicher viel Stellen an denen ein word genügt. Siehe auch unter Optimierungen.
 - FreeType Strukturen zusammenführen (Strukturen die eine 1:1 Kardinalität zu TT_Engine haben in TT_Engine integrieren)
+- Wenn das Refactoring des Speichermanagements erfolgt ist, prüfen ober der Render-Cache (derzeit 4096 Bytes) vergrößert werden kann.
 
-### 2.4 Sonstiges
-- bessere Lösung für das Mappen GeosChar -> UniCode finden
-
-## Optimierungen
-- prüfen: ob TT_Error in tterrid.h von long auf word reduziert werden kann
-- ~~prüfen: ob in ttraster.c traceG, gTarget entfernt werden kann~~
+## 4 Optimierungen
 - prüfen: ob in ttraster.c in TRasterInstance für lastX, lastY, minX, minY, TraceOfs und TraceOfsLastLine ein word genügt
-- ~~in ttobj.h kann in T_Font_Input_ ->fontIndex entfernt werden (Überbleibsel der TTCollections die wir nicht brauchen)~~
 - in ttraster.c (Set_Hight_Precision) kann gesteuert werden wie 'genau' ein Glyph gerendert wird; falls wir noch Performanceprobleme haben kann hier auch angesetzt werden (ggf. auch mehrstufig)
-- prüfen: kann die AvgWidth aus der OS/2 übernommen werden kann
-
-## offene Probleme
-- klären: der Aufruf von TT_Init_Kerning lässt swat crashen
-- das Speichermanagements muss überarbeitet werden, aktuell ist in ttwidths.c Schluss
-
-## aktuelle Verbräuche
-
-Speicherbedarf/Blöcke (ohne Code):
-| Stand          | 10.02.2023 |
-|----------------|------------|
-|vor ProcessFont | 4896/5     |
-|nach ProcessFont| 19232/18   |
-|vor Gen_Widths  | 19232/18   |
-|nach Gen_Widths |  n.a.      |
-

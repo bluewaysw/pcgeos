@@ -29,17 +29,6 @@
  *      structues
  ***********************************************************************/
 
-/*
- * c definition of drivers FontMatrix structure
- */
-typedef	struct
-{
-        WWFixedAsDWord          FM_11;
-        WWFixedAsDWord          FM_12;
-        WWFixedAsDWord          FM_21;
-        WWFixedAsDWord          FM_22;
-} FontMatrix;
-
 
 /***********************************************************************
  *      functions called by driver
