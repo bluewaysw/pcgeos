@@ -103,6 +103,7 @@ MemHandle _pascal TrueType_Gen_Widths(
         FontBuf*               fontBuf;
         word                   size;
         WWFixedAsDWord         scaleFactor;
+        TransformMatrix*       transMatrix;
 
 
         ECCheckMemHandle( fontHandle );
@@ -165,9 +166,10 @@ MemHandle _pascal TrueType_Gen_Widths(
         ConvertWidths( trueTypeVars, scaleFactor ,fontHeader, fontBuf );
 
         /* calculate the transformation matrix and copy it into the FontBlock */
-        CalcTransform( (TransformMatrix*)(((byte*)fontBuf) + sizeof( FontBuf ) + fontHeader->FH_numChars * sizeof( CharTableEntry )),
-                       fontMatrix, 
-                       stylesToImplement );
+        transMatrix = (TransformMatrix*)(((byte*)fontBuf) + sizeof( FontBuf ) + fontHeader->FH_numChars * sizeof( CharTableEntry ));
+        CalcTransform( transMatrix, fontMatrix, stylesToImplement );
+
+        //TODO: adjust FB_height, FB_minTSB, FB_pixHeight and FB_baselinePos
 
 Fail:
         TT_Close_Face( FACE );

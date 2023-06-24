@@ -680,20 +680,6 @@
                                     TT_Face_Properties*  properties );
 
 
-  /* Set a face object's generic pointer */
-
-/*
-  EXPORT_DEF
-  TT_Error  TT_Set_Face_Pointer( TT_Face  face,
-                                 void*    data );
-*/
-
-  /* Get a face object's generic pointer */
-/*
-  EXPORT_DEF
-  void*  TT_Get_Face_Pointer( TT_Face  face );
-*/
-
   /* Close a face's file handle to save system resources.  The file */
   /* will be re-opened automatically on the next disk access.       */
 /*
@@ -797,19 +783,6 @@
   TT_Error  TT_Get_Instance_Metrics( TT_Instance           instance,
                                      TT_Instance_Metrics*  metrics );
 
-
-  /* Set an instance's generic pointer. */
-/*
-  EXPORT_DEF
-  TT_Error  TT_Set_Instance_Pointer( TT_Instance  instance,
-                                     void*        data );
-*/
-
-  /* Get an instance's generic pointer. */
-/*
-  EXPORT_DEF
-  void*     TT_Get_Instance_Pointer( TT_Instance  instance );
-*/
 
   /* Close a given instance object, destroying all associated data. */
 
@@ -953,13 +926,6 @@
 
   EXPORT_DEF
   TT_Error  TT_Done_Outline( TT_Outline*  outline );
-
-
-  /* Copy an outline into another one. */
-/*
-  EXPORT_DEF
-  TT_Error  TT_Copy_Outline( TT_Outline*  source,
-                             TT_Outline*  target ); */
 
 
   /* Render an outline into a bitmap. */

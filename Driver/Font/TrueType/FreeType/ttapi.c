@@ -275,75 +275,6 @@ extern TEngine_Instance engineInstance;
 
 /*******************************************************************
  *
- *  Function    :  TT_Set_Face_Pointer
- *
- *  Description :  Each face object has one pointer, which use is
- *                 reserved to client applications.  The TrueType
- *                 engine never accesses or uses this field.
- *
- *                 This function is used to set the pointer.
- *
- *  Input  :  face    the given face handle
- *            data    the generic pointer value
- *
- *  Output :  Error code.
- *
- *  MT-Note : NO!  But this function is reserved to "enlightened"
- *            developers, so it shouldn't be a problem.
- *
- ******************************************************************/
-/*
-  EXPORT_FUNC
-  TT_Error  TT_Set_Face_Pointer( TT_Face  face,
-                                 void*    data )
-  {
-    PFace  faze = HANDLE_Face( face );
-
-
-    if ( !faze )
-      return TT_Err_Invalid_Face_Handle;
-    else
-      faze->generic = data;
-
-    return TT_Err_Ok;
-  }
-*/
-
-/*******************************************************************
- *
- *  Function    :  TT_Get_Face_Pointer
- *
- *  Description :  Each face object has one pointer, which use is
- *                 reserved to client applications.  The TrueType
- *                 engine never access or use this field.
- *
- *                 This function is used to read the pointer.
- *
- *  Input  :  face    the given face handle
- *            data    the generic pointer value
- *
- *  Output :  Error code.
- *
- *  MT-Note : NO!  But this function is reserved to "enlightened"
- *            developers, so it shouldn't be a problem.
- *
- ******************************************************************/
-/*
-  EXPORT_FUNC
-  void*  TT_Get_Face_Pointer( TT_Face  face )
-  {
-    PFace  faze = HANDLE_Face( face );
-
-
-    if ( !faze )
-      return NULL;
-    else
-      return faze->generic;
-  }
-*/
-
-/*******************************************************************
- *
  *  Function    :  TT_Get_Face_Metrics
  *
  *  Description :  This function returns the original horizontal AND
@@ -1573,52 +1504,6 @@ TT_Error  TT_Get_Outline_Region( TT_Outline*     outline,
 
 #endif    /* __GEOS__ */
 
-
-/*******************************************************************
- *
- *  Function    :  TT_Copy_Outline
- *
- *  Description :  Copy an outline into another.  The source and
- *                 target outlines must have the same points and
- *                 contours numbers.
- *
- *  Input  :  source         address of source outline
- *            target         address of target outline
- *
- *  Output :  Error code
- *
- *  Note :    This function doesn't touch the target outline's 'owner'
- *            field.
- *
- *  MT-Safe : YES!
- *
- ******************************************************************/
-/*
-  EXPORT_FUNC
-  TT_Error  TT_Copy_Outline( TT_Outline*  source,
-                             TT_Outline*  target )
-  {
-    if ( !source            || !target            ||
-         source->n_points   != target->n_points   ||
-         source->n_contours != target->n_contours )
-      return TT_Err_Invalid_Argument;
-
-    MEM_Copy( target->points, source->points,
-              source->n_points * 2 * sizeof ( TT_F26Dot6 ) );
-
-    MEM_Copy( target->flags, source->flags,
-              source->n_points * sizeof ( Byte ) );
-
-    MEM_Copy( target->contours, source->contours,
-              source->n_contours * sizeof ( Short ) );
-
-    target->high_precision = source->high_precision;
-    target->second_pass    = target->second_pass;
-    target->dropout_mode   = source->dropout_mode;
-
-    return TT_Err_Ok;
-  }
-*/
 
 /*******************************************************************
  *
