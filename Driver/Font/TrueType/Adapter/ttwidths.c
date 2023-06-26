@@ -550,7 +550,7 @@ void ConvertHeader( WWFixedAsDWord scaleFactor, FontHeader* fontHeader, FontBuf*
         fontBuf->FB_underThickness.WBF_int  = INTEGER_OF_WWFIXEDASDWORD( ttfElement );
         fontBuf->FB_underThickness.WBF_frac = FRACTION_OF_WWFIXEDASDWORD( ttfElement );
 
-        ttfElement = SCALE_WORD( fontHeader->FH_strikePos, scaleFactor );
+        ttfElement = SCALE_WORD( fontHeader->FH_accent + fontHeader->FH_ascent - fontHeader->FH_strikePos, scaleFactor );
         fontBuf->FB_strikePos.WBF_int  = INTEGER_OF_WWFIXEDASDWORD( ttfElement );
         fontBuf->FB_strikePos.WBF_frac = FRACTION_OF_WWFIXEDASDWORD( ttfElement );
 
