@@ -404,7 +404,7 @@ static void CalcTransform( TransformMatrix*  transMatrix,
                 tempMatrix.yx = ITALIC_FACTOR;
 
         /* fake script style      */
-        if( stylesToImplement & TS_SUBSCRIPT || stylesToImplement & TS_SUBSCRIPT )
+        if( stylesToImplement & ( TS_SUBSCRIPT | TS_SUPERSCRIPT ) )
         {      
                 tempMatrix.xx = GrMulWWFixed( tempMatrix.xx, SCRIPT_FACTOR );
                 tempMatrix.yy = GrMulWWFixed( tempMatrix.yy, SCRIPT_FACTOR );
