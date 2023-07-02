@@ -39,6 +39,7 @@ void _pascal  TrueType_Gen_Chars( word                 character,
                                   WWFixedAsDWord       pointSize,
 			          const FontInfo*      fontInfo, 
                                   const OutlineEntry*  outlineEntry,
+                                  TextStyle            stylesToImplement,
                                   MemHandle            bitmapBlock,
                                   MemHandle            varBlock );
 

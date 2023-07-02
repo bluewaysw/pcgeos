@@ -67,6 +67,7 @@ void _pascal TrueType_Gen_Chars(
                         WWFixedAsDWord       pointSize,
 			const FontInfo*      fontInfo, 
                         const OutlineEntry*  outlineEntry,
+                        TextStyle            stylesToImplement,
                         MemHandle            bitmapHandle,
                         MemHandle            varBlock ) 
 {
@@ -80,11 +81,11 @@ void _pascal TrueType_Gen_Chars(
         word                   width, height, size;
 
 
-        ECCheckBounds( (void*)fontBuf );
-        ECCheckBounds( (void*)fontInfo );
-        ECCheckBounds( (void*)outlineEntry );
-        ECCheckMemHandle( bitmapHandle );
-        ECCheckMemHandle( varBlock );
+EC(     ECCheckBounds( (void*)fontBuf ) );
+EC(     ECCheckBounds( (void*)fontInfo ) );
+EC(     ECCheckBounds( (void*)outlineEntry ) );
+EC(     ECCheckMemHandle( bitmapHandle ) );
+EC(     ECCheckMemHandle( varBlock ) );
 
         /* get trueTypeVar block */
         trueTypeVars = MemLock( varBlock );
@@ -102,7 +103,7 @@ void _pascal TrueType_Gen_Chars(
         trueTypeOutline = LMemDerefHandles( MemPtrToHandle( (void*)fontInfo ), outlineEntry->OE_handle );
         truetypeFile = FileOpen( trueTypeOutline->TTOE_fontFileName, FILE_ACCESS_R | FILE_DENY_W );
         
-        ECCheckFileHandle( truetypeFile );
+EC(     ECCheckFileHandle( truetypeFile ) );
 
         /* open face, create instance and glyph */
         if( TT_Open_Face( truetypeFile, &FACE ) )

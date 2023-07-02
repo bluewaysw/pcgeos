@@ -106,12 +106,12 @@ MemHandle _pascal TrueType_Gen_Widths(
         TransformMatrix*       transMatrix;
 
 
-        ECCheckMemHandle( fontHandle );
-        ECCheckBounds( (void*)fontMatrix );
-        ECCheckBounds( (void*)fontInfo );
-        ECCheckBounds( (void*)headerEntry );
-        ECCheckBounds( (void*)firstEntry );
-        ECCheckStack();
+ EC(    ECCheckMemHandle( fontHandle ) );
+ EC(    ECCheckBounds( (void*)fontMatrix ) );
+ EC(    ECCheckBounds( (void*)fontInfo ) );
+ EC(    ECCheckBounds( (void*)headerEntry ) );
+ EC(    ECCheckBounds( (void*)firstEntry ) );
+ EC(    ECCheckStack() );
 
 
         // get trueTypeVar block
@@ -122,7 +122,7 @@ MemHandle _pascal TrueType_Gen_Widths(
                 trueTypeVars = MemLock( varBlock );
         }
         
-        ECCheckBounds( (void*)trueTypeVars );
+EC(     ECCheckBounds( (void*)trueTypeVars ) );
 
         // get filename an load ttf file
         FilePushDir();
@@ -132,7 +132,7 @@ MemHandle _pascal TrueType_Gen_Widths(
         trueTypeOutline = LMemDerefHandles( MemPtrToHandle( (void*)fontInfo ), headerEntry->OE_handle );
         truetypeFile = FileOpen( trueTypeOutline->TTOE_fontFileName, FILE_ACCESS_R | FILE_DENY_W );
 
-        ECCheckFileHandle( truetypeFile );
+EC(     ECCheckFileHandle( truetypeFile ) );
 
         // get pointer to FontHeader
         fontHeader = LMemDerefHandles( MemPtrToHandle( (void*)fontInfo ), firstEntry->OE_handle );
@@ -219,7 +219,7 @@ static void ConvertWidths( TRUETYPE_VARS, WWFixedAsDWord scaleFactor, FontHeader
                 word    charIndex;
 
 
-                ECCheckBounds( (void*)charTableEntry );
+EC(             ECCheckBounds( (void*)charTableEntry ) );
 
                 //Unicode to TT ID
                 charIndex = TT_Char_Index( CHAR_MAP, GeosCharToUnicode( currentChar ) );
@@ -386,8 +386,8 @@ static void CalcTransform( TransformMatrix*  transMatrix,
         TT_Matrix  tempMatrix;
 
 
-        ECCheckBounds( (void*)transMatrix );
-        ECCheckBounds( (void*)fontMatrix );
+EC(     ECCheckBounds( (void*)transMatrix ) );
+EC(     ECCheckBounds( (void*)fontMatrix ) );
 
         /* copy fontMatrix into transMatrix */
         tempMatrix.xx = 1L << 16;
@@ -498,8 +498,8 @@ void ConvertHeader( WWFixedAsDWord scaleFactor, FontHeader* fontHeader, FontBuf*
         WWFixedAsDWord      ttfElement;
       
 
-        ECCheckBounds( (void*)fontBuf );
-        ECCheckBounds( (void*)fontHeader );
+ EC(    ECCheckBounds( (void*)fontBuf ) );
+ EC(    ECCheckBounds( (void*)fontHeader ) );
 
 
         /* Fill elements in FontBuf structure.                               */

@@ -83,6 +83,7 @@ TrueTypeGenChar	proc	far
 	call	FontDrFindOutlineData
 	push	ds				; pass ptr to OutlineEntry
 	push	di
+	push	ax				; pass styles to implement
 
 	segmov	ds, dgroup, ax
 	push	ds:bitmapHandle

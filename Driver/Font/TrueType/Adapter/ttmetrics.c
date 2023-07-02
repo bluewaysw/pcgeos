@@ -70,10 +70,10 @@ void _pascal TrueType_Char_Metrics(
         TrueTypeVars*          trueTypeVars;
 
 
-        ECCheckBounds( (void*)fontInfo );
-        ECCheckBounds( (void*)outlineEntry );
-        ECCheckMemHandle( varBlock );
-        ECCheckStack();
+EC(     ECCheckBounds( (void*)fontInfo ) );
+EC(     ECCheckBounds( (void*)outlineEntry ) );
+EC(     ECCheckMemHandle( varBlock ) );
+EC(     ECCheckStack() );
 
 
         /* get trueTypeVar block */
@@ -91,7 +91,7 @@ void _pascal TrueType_Char_Metrics(
         trueTypeOutline = LMemDerefHandles( MemPtrToHandle( (void*)fontInfo ), outlineEntry->OE_handle );
         truetypeFile = FileOpen( trueTypeOutline->TTOE_fontFileName, FILE_ACCESS_R | FILE_DENY_W );
         
-        ECCheckFileHandle( truetypeFile );
+EC(     ECCheckFileHandle( truetypeFile ) );
 
         CalcTransformMatrix( stylesToImplement, &transMatrix );
 
