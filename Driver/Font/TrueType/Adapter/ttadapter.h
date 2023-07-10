@@ -50,8 +50,12 @@ extern TEngine_Instance engineInstance;
 
 #define ITALIC_FACTOR                       0x0000366A
 #define BOLD_FACTOR                         0x00012000 
-#define SCRIPT_FACTOR                       0x00006000 
+#define SCRIPT_FACTOR                       0x00008000
 #define SCRIPT_SHIFT_FACTOR                 0x00015000
+
+#define SUPERSCRIPT_OFFSET                  0x00006000
+#define SUBSCRIPT_OFFSET                    0x00001a00
+
 
 #define MAX_BITMAP_SIZE		                125
 #define MAX_FONTBUF_SIZE                    10 * 1024
@@ -354,6 +358,10 @@ typedef struct
     char                        familyName[FID_NAME_LEN];
     char                        styleName[STYLE_NAME_LENGTH];
 
+    /* scaling */
+    WWFixedAsDWord              scaleHeight;
+    WWFixedAsDWord              scaleWidth;
+
     /* render glyphs */
     TT_Raster_Map               rasterMap;
 
@@ -384,6 +392,8 @@ typedef struct
 #define GLYPH_METRICS           trueTypeVars->glyphMetrics
 #define GLYPH_BBOX              trueTypeVars->glyphMetrics.bbox
 #define RASTER_MAP              trueTypeVars->rasterMap
+#define SCALE_HEIGHT            trueTypeVars->scaleHeight
+#define SCALE_WIDTH             trueTypeVars->scaleWidth   
 
 #define UNITS_PER_EM            FACE_PROPERTIES.header->Units_Per_EM
 

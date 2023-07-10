@@ -29,34 +29,26 @@
 #include "../FreeType/ftxkern.h"
 
 
-static word  AllocFontBlock( 
-                        word        additionalSpace,
-                        word        numOfCharacters,
-                        word        numOfKernPairs,
-                        MemHandle*  fontHandle );
+static word  AllocFontBlock( word               additionalSpace,
+                        word                    numOfCharacters,
+                        word                    numOfKernPairs,
+                        MemHandle*              fontHandle );
 
-static WWFixedAsDWord CalcScaleForWidths( 
-                        WWFixedAsDWord  pointSize,
-                        TextStyle       stylesToImplement,
-                        word            unitsPerEM );
+static void ConvertHeader( TRUETYPE_VARS,
+                        FontHeader*             fontHeader, 
+                        FontBuf*                fontBuf );
 
-static void ConvertHeader( 
-                        WWFixedAsDWord  scaleFactor,
-                        FontHeader*     fontHeader, 
-                        FontBuf*        fontBuf );
-
-static void ConvertWidths( 
-                        TRUETYPE_VARS, 
-                        WWFixedAsDWord  scaleFactor,
-                        FontHeader*     fontHeader, 
-                        FontBuf*        fontBuf );
+static void ConvertWidths( TRUETYPE_VARS, 
+                        FontHeader*             fontHeader, 
+                        FontBuf*                fontBuf );
             
 static void ConvertKernPairs( TRUETYPE_VARS, FontBuf* fontBuf );
 
-static void CalcTransform( 
-                        TransformMatrix*  transMatrix,
-                        FontMatrix*       fontMatrix, 
-                        TextStyle         styleToImplement );
+static void CalcTransform( TransformMatrix*     transMatrix,
+                        FontMatrix*             fontMatrix, 
+                        TextStyle               styleToImplement );
+
+static void AdjustFontBuf( TransformMatrix* transMatrix, FontBuf* fontBuf );
 
 static word round( WWFixedAsDWord toRound );
 
@@ -102,7 +94,6 @@ MemHandle _pascal TrueType_Gen_Widths(
         FontHeader*            fontHeader;
         FontBuf*               fontBuf;
         word                   size;
-        WWFixedAsDWord         scaleFactor;
         TransformMatrix*       transMatrix;
 
 
@@ -114,7 +105,7 @@ MemHandle _pascal TrueType_Gen_Widths(
  EC(    ECCheckStack() );
 
 
-        // get trueTypeVar block
+        /* get trueTypeVar block */
         trueTypeVars = MemLock( varBlock );
         if( trueTypeVars == NULL )
         {
@@ -149,27 +140,51 @@ EC(     ECCheckFileHandle( truetypeFile ) );
                                CountKernPairsWithGeosChars( FACE ), 
                                &fontHandle );
 
-        /* calculate scale factor and transformation matrix */
-        scaleFactor = CalcScaleForWidths( pointSize, 
-                                          stylesToImplement, 
-                                          FACE_PROPERTIES.header->Units_Per_EM );
-
-        /* convert FontHeader and fill FontBuf structure */
+        /* deref FontBuf */
         fontBuf = (FontBuf*)MemDeref( fontHandle );
         fontBuf->FB_dataSize = size;
-        ConvertHeader( scaleFactor, fontHeader, fontBuf );
-
-        /* fill kerning pairs and kerning values */
-        ConvertKernPairs( trueTypeVars, fontBuf );
-
-        /* convert widths and fill CharTableEntries */
-        ConvertWidths( trueTypeVars, scaleFactor ,fontHeader, fontBuf );
 
         /* calculate the transformation matrix and copy it into the FontBlock */
         transMatrix = (TransformMatrix*)(((byte*)fontBuf) + sizeof( FontBuf ) + fontHeader->FH_numChars * sizeof( CharTableEntry ));
         CalcTransform( transMatrix, fontMatrix, stylesToImplement );
 
+        /* calculate scale factor for width and height */
+        SCALE_HEIGHT = GrUDivWWFixed( pointSize, MakeWWFixed( FACE_PROPERTIES.header->Units_Per_EM ) );
+        SCALE_WIDTH  = SCALE_HEIGHT;
+
+        if( stylesToImplement & TS_BOLD )
+                SCALE_WIDTH = GrMulWWFixed( SCALE_HEIGHT, WWFIXED_1_POINR_1 );
+
+        if( stylesToImplement & TS_SUBSCRIPT )
+        {
+                SCALE_WIDTH = GrMulWWFixed( SCALE_WIDTH, WWFIXED_0_POINT_5 );
+                transMatrix->TM_shiftY = GrMulWWFixed(SUBSCRIPT_OFFSET, 
+                                         WBFIXED_TO_WWFIXEDASDWORD( fontBuf->FB_height ) +
+                                         WBFIXED_TO_WWFIXEDASDWORD( fontBuf->FB_heightAdjust ) );
+        }
+
+        if( stylesToImplement & TS_SUPERSCRIPT )
+        {
+                SCALE_WIDTH = GrMulWWFixed( SCALE_WIDTH, WWFIXED_0_POINT_5 );
+                transMatrix->TM_shiftY = GrMulWWFixed( SUPERSCRIPT_OFFSET,
+                                         WBFIXED_TO_WWFIXEDASDWORD( fontBuf->FB_height ) +
+                                         WBFIXED_TO_WWFIXEDASDWORD( fontBuf->FB_heightAdjust ) ) -
+                                         WBFIXED_TO_WWFIXEDASDWORD( fontBuf->FB_baselinePos ) -
+                                         WBFIXED_TO_WWFIXEDASDWORD( fontBuf->FB_baseAdjust );
+        }
+
+        /* convert FontHeader and fill FontBuf structure */
+
+        ConvertHeader( trueTypeVars, fontHeader, fontBuf );
+
+        /* fill kerning pairs and kerning values */
+        ConvertKernPairs( trueTypeVars, fontBuf );
+
+        /* convert widths and fill CharTableEntries */
+        ConvertWidths( trueTypeVars, fontHeader, fontBuf );
+
         //TODO: adjust FB_height, FB_minTSB, FB_pixHeight and FB_baselinePos
+        AdjustFontBuf( transMatrix, fontBuf );
 
 Fail:
         TT_Close_Face( FACE );
@@ -203,7 +218,7 @@ Fin:
  *      12/02/23  JK        Initial Revision
  *******************************************************************/
 
-static void ConvertWidths( TRUETYPE_VARS, WWFixedAsDWord scaleFactor, FontHeader* fontHeader, FontBuf* fontBuf )
+static void ConvertWidths( TRUETYPE_VARS, FontHeader* fontHeader, FontBuf* fontBuf )
 {
         word             currentChar;
         CharTableEntry*  charTableEntry = (CharTableEntry*) (((byte*)fontBuf) + sizeof( FontBuf ));
@@ -240,7 +255,7 @@ EC(             ECCheckBounds( (void*)charTableEntry ) );
                 TT_Get_Glyph_Metrics( GLYPH, &GLYPH_METRICS );
 
                 //width berechnen
-                scaledWidth = GrMulWWFixed( MakeWWFixed( GLYPH_METRICS.advance), scaleFactor );
+                scaledWidth = GrMulWWFixed( MakeWWFixed( GLYPH_METRICS.advance), SCALE_WIDTH );
                 charTableEntry->CTE_width.WBF_int  = INTEGER_OF_WWFIXEDASDWORD( scaledWidth );
                 charTableEntry->CTE_width.WBF_frac = FRACTION_OF_WWFIXEDASDWORD( scaledWidth );
 
@@ -275,44 +290,6 @@ EC(             ECCheckBounds( (void*)charTableEntry ) );
 
         TT_Done_Instance( INSTANCE );
         TT_Done_Glyph( GLYPH );
-}
-
-
-/********************************************************************
- *                      CalcScaleForWidths
- ********************************************************************
- * SYNOPSIS:	  
- * 
- * PARAMETERS:    
- * 
- * RETURNS:       
- * 
- * SIDE EFFECTS:  none
- * 
- * STRATEGY:      
- * 
- * REVISION HISTORY:
- *      Date      Name      Description
- *      ----      ----      -----------
- *      12/02/23  JK        Initial Revision
- *******************************************************************/
-
-static WWFixedAsDWord CalcScaleForWidths( 
-                        WWFixedAsDWord  pointSize,
-                        TextStyle       stylesToImplement,
-                        word            unitsPerEM )
-{
-        WWFixedAsDWord scaleWidth = GrUDivWWFixed( pointSize, MakeWWFixed( unitsPerEM ) );
-
-        /* do bold need to be added? */
-        if( stylesToImplement & TS_BOLD )
-                scaleWidth = GrMulWWFixed( scaleWidth, WWFIXED_1_POINR_1 );
-
-        /* do subscript or superscript to be added? */
-        if( stylesToImplement & ( TS_SUBSCRIPT | TS_SUPERSCRIPT ) )
-                scaleWidth = GrMulWWFixed( scaleWidth, WWFIXED_0_POINT_5 );
-
-        return scaleWidth;
 }
 
 
@@ -401,18 +378,13 @@ EC(     ECCheckBounds( (void*)fontMatrix ) );
 
         /* fake italic style       */
         if( stylesToImplement & TS_ITALIC )
-                tempMatrix.yx = ITALIC_FACTOR;
+                tempMatrix.xy = ITALIC_FACTOR;//tempMatrix.yx = ITALIC_FACTOR;
 
         /* fake script style      */
         if( stylesToImplement & ( TS_SUBSCRIPT | TS_SUPERSCRIPT ) )
         {      
                 tempMatrix.xx = GrMulWWFixed( tempMatrix.xx, SCRIPT_FACTOR );
                 tempMatrix.yy = GrMulWWFixed( tempMatrix.yy, SCRIPT_FACTOR );
-
-                if( stylesToImplement & TS_SUBSCRIPT )
-                        transMatrix->TM_shiftY = -SCRIPT_SHIFT_FACTOR;
-                else
-                        transMatrix->TM_shiftY = SCRIPT_SHIFT_FACTOR;
         }
 
         /* integrate fontMatrix */
@@ -493,9 +465,11 @@ static word AllocFontBlock(
  *      11/12/22  JK        Initial Revision
  *******************************************************************/
 
-void ConvertHeader( WWFixedAsDWord scaleFactor, FontHeader* fontHeader, FontBuf* fontBuf ) 
+void ConvertHeader( TRUETYPE_VARS, FontHeader* fontHeader, FontBuf* fontBuf ) 
 {
         WWFixedAsDWord      ttfElement;
+        WWFixedAsDWord      scaleWidth  = SCALE_WIDTH;
+        WWFixedAsDWord      scaleHeight = SCALE_HEIGHT;
       
 
  EC(    ECCheckBounds( (void*)fontBuf ) );
@@ -503,74 +477,74 @@ void ConvertHeader( WWFixedAsDWord scaleFactor, FontHeader* fontHeader, FontBuf*
 
 
         /* Fill elements in FontBuf structure.                               */
-        ttfElement = SCALE_WORD( fontHeader->FH_avgwidth, scaleFactor );
+        ttfElement = SCALE_WORD( fontHeader->FH_avgwidth, scaleWidth );
         fontBuf->FB_avgwidth.WBF_int  = INTEGER_OF_WWFIXEDASDWORD( ttfElement );
         fontBuf->FB_avgwidth.WBF_frac = FRACTION_OF_WWFIXEDASDWORD( ttfElement );
 
-        ttfElement = SCALE_WORD( fontHeader->FH_maxwidth, scaleFactor );
+        ttfElement = SCALE_WORD( fontHeader->FH_maxwidth, scaleWidth );
         fontBuf->FB_maxwidth.WBF_int  = INTEGER_OF_WWFIXEDASDWORD( ttfElement );
         fontBuf->FB_maxwidth.WBF_frac = FRACTION_OF_WWFIXEDASDWORD( ttfElement );
 
-        ttfElement = SCALE_WORD( fontHeader->FH_baseAdjust, scaleFactor );
+        ttfElement = SCALE_WORD( fontHeader->FH_baseAdjust, scaleHeight );
         fontBuf->FB_heightAdjust.WBF_int  = INTEGER_OF_WWFIXEDASDWORD( ttfElement );
         fontBuf->FB_heightAdjust.WBF_frac = FRACTION_OF_WWFIXEDASDWORD( ttfElement );
 
-        ttfElement = SCALE_WORD( fontHeader->FH_height, scaleFactor );
+        ttfElement = SCALE_WORD( fontHeader->FH_height, scaleHeight );
         fontBuf->FB_height.WBF_int  = INTEGER_OF_WWFIXEDASDWORD( ttfElement );
         fontBuf->FB_height.WBF_frac = FRACTION_OF_WWFIXEDASDWORD( ttfElement );
 
-        ttfElement = SCALE_WORD( fontHeader->FH_accent, scaleFactor );
+        ttfElement = SCALE_WORD( fontHeader->FH_accent, scaleHeight );
         fontBuf->FB_accent.WBF_int  = INTEGER_OF_WWFIXEDASDWORD( ttfElement );
         fontBuf->FB_accent.WBF_frac = FRACTION_OF_WWFIXEDASDWORD( ttfElement );
  
-        ttfElement = SCALE_WORD( fontHeader->FH_x_height, scaleFactor );
+        ttfElement = SCALE_WORD( fontHeader->FH_x_height, scaleHeight );
         fontBuf->FB_mean.WBF_int  = INTEGER_OF_WWFIXEDASDWORD( ttfElement );
         fontBuf->FB_mean.WBF_frac = FRACTION_OF_WWFIXEDASDWORD( ttfElement );
  
-        ttfElement = SCALE_WORD( fontHeader->FH_baseAdjust, scaleFactor );
+        ttfElement = SCALE_WORD( fontHeader->FH_baseAdjust, scaleHeight );
         fontBuf->FB_baseAdjust.WBF_int  = INTEGER_OF_WWFIXEDASDWORD( ttfElement );
         fontBuf->FB_baseAdjust.WBF_frac = 0;
 
-        ttfElement = SCALE_WORD( fontHeader->FH_ascent + fontHeader->FH_accent, scaleFactor );
+        ttfElement = SCALE_WORD( fontHeader->FH_ascent + fontHeader->FH_accent, scaleHeight );
         fontBuf->FB_baselinePos.WBF_int  = round( ttfElement );
         fontBuf->FB_baselinePos.WBF_frac = 0;
 
-        ttfElement = SCALE_WORD( fontHeader->FH_descent, scaleFactor );
+        ttfElement = SCALE_WORD( fontHeader->FH_descent, scaleHeight );
         fontBuf->FB_descent.WBF_int  = INTEGER_OF_WWFIXEDASDWORD( ttfElement );
         fontBuf->FB_descent.WBF_frac = FRACTION_OF_WWFIXEDASDWORD( ttfElement );
 
         fontBuf->FB_extLeading.WBF_int  = 0;
         fontBuf->FB_extLeading.WBF_frac = 0;
 
-        ttfElement = SCALE_WORD( fontHeader->FH_underPos, scaleFactor );
+        ttfElement = SCALE_WORD( fontHeader->FH_underPos, scaleHeight );
         fontBuf->FB_underPos.WBF_int  = INTEGER_OF_WWFIXEDASDWORD( ttfElement );
         fontBuf->FB_underPos.WBF_frac = FRACTION_OF_WWFIXEDASDWORD( ttfElement );
 
-        ttfElement = SCALE_WORD( fontHeader->FH_underThick, scaleFactor );
+        ttfElement = SCALE_WORD( fontHeader->FH_underThick, scaleHeight );
         fontBuf->FB_underThickness.WBF_int  = INTEGER_OF_WWFIXEDASDWORD( ttfElement );
         fontBuf->FB_underThickness.WBF_frac = FRACTION_OF_WWFIXEDASDWORD( ttfElement );
 
-        ttfElement = SCALE_WORD( fontHeader->FH_accent + fontHeader->FH_ascent - fontHeader->FH_strikePos, scaleFactor );
+        ttfElement = SCALE_WORD( fontHeader->FH_accent + fontHeader->FH_ascent - fontHeader->FH_strikePos, scaleHeight );
         fontBuf->FB_strikePos.WBF_int  = INTEGER_OF_WWFIXEDASDWORD( ttfElement );
         fontBuf->FB_strikePos.WBF_frac = FRACTION_OF_WWFIXEDASDWORD( ttfElement );
 
-        ttfElement = SCALE_WORD( fontHeader->FH_minTSB, scaleFactor );
+        ttfElement = SCALE_WORD( fontHeader->FH_minTSB, scaleHeight );
         fontBuf->FB_aboveBox.WBF_int  = INTEGER_OF_WWFIXEDASDWORD( ttfElement );
         fontBuf->FB_aboveBox.WBF_frac = 0;
         fontBuf->FB_minTSB = INTEGER_OF_WWFIXEDASDWORD( ttfElement );
 
-        ttfElement = SCALE_WORD( fontHeader->FH_maxBSB, scaleFactor );
+        ttfElement = SCALE_WORD( fontHeader->FH_maxBSB, scaleHeight );
         fontBuf->FB_belowBox.WBF_int  = INTEGER_OF_WWFIXEDASDWORD( ttfElement );
         fontBuf->FB_belowBox.WBF_frac = 0;
         fontBuf->FB_maxBSB = INTEGER_OF_WWFIXEDASDWORD( ttfElement );
 
-        ttfElement = SCALE_WORD( fontHeader->FH_minLSB, scaleFactor );
+        ttfElement = SCALE_WORD( fontHeader->FH_minLSB, scaleWidth );
         fontBuf->FB_minLSB = INTEGER_OF_WWFIXEDASDWORD( ttfElement ); 
 
-        ttfElement = SCALE_WORD( fontHeader->FH_maxRSB, scaleFactor );
+        ttfElement = SCALE_WORD( fontHeader->FH_maxRSB, scaleWidth );
         fontBuf->FB_maxRSB  = INTEGER_OF_WWFIXEDASDWORD( ttfElement );
 
-        ttfElement = SCALE_WORD( fontHeader->FH_height + fontHeader->FH_accent, scaleFactor );
+        ttfElement = SCALE_WORD( fontHeader->FH_height + fontHeader->FH_accent, scaleHeight );
         fontBuf->FB_pixHeight = INTEGER_OF_WWFIXEDASDWORD( ttfElement );
 
         fontBuf->FB_maker        = FM_TRUETYPE;
@@ -583,6 +557,13 @@ void ConvertHeader( WWFixedAsDWord scaleFactor, FontHeader* fontHeader, FontBuf*
         fontBuf->FB_lastChar     = fontHeader->FH_lastChar;
         fontBuf->FB_defaultChar  = fontHeader->FH_defaultChar;
 }
+
+
+static void AdjustFontBuf( TransformMatrix* transMatrix, FontBuf* fontBuf )
+{
+        //TODO: adjust FB_height, FB_minTSB, FB_pixHeight and FB_baselinePos
+}
+
 
 static word round( WWFixedAsDWord toRound )
 {

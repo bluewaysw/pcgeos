@@ -196,6 +196,10 @@ EC(     ECCheckFileHandle( truetypeFile ) );
                 ((CharData*)charData)->CD_numRows      = height;
                 ((CharData*)charData)->CD_xoff         = GLYPH_BBOX.xMin / 64;
                 ((CharData*)charData)->CD_yoff         = fontBuf->FB_baselinePos.WBF_int - ( GLYPH_BBOX.yMax / 64 ) + 1; 
+
+                /* shift if subscript style */
+                if( stylesToImplement & ( TS_SUBSCRIPT | TS_SUPERSCRIPT ) )
+                        ((CharData*)charData)->CD_yoff += ( transformMatrix->TM_shiftY >> 16 );
         }
 
         TT_Done_Glyph( GLYPH );
