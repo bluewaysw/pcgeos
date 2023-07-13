@@ -48,7 +48,8 @@ static void CalcTransform( TransformMatrix*     transMatrix,
                         FontMatrix*             fontMatrix, 
                         TextStyle               styleToImplement );
 
-static void AdjustFontBuf( TransformMatrix* transMatrix, FontBuf* fontBuf );
+static void AdjustFontBuf( TransformMatrix* transMatrix, 
+                        FontMatrix* fontMatrix, FontBuf* fontBuf );
 
 static word round( WWFixedAsDWord toRound );
 
@@ -184,7 +185,7 @@ EC(     ECCheckFileHandle( truetypeFile ) );
         ConvertWidths( trueTypeVars, fontHeader, fontBuf );
 
         //TODO: adjust FB_height, FB_minTSB, FB_pixHeight and FB_baselinePos
-        AdjustFontBuf( transMatrix, fontBuf );
+        AdjustFontBuf( transMatrix, fontMatrix, fontBuf );
 
 Fail:
         TT_Close_Face( FACE );
@@ -374,11 +375,14 @@ EC(     ECCheckBounds( (void*)fontMatrix ) );
 
         /* fake bold style       */
         if( stylesToImplement & TS_BOLD )
+        {
                 tempMatrix.xx = BOLD_FACTOR;
+                tempMatrix.yy = BOLD_FACTOR;
+        }
 
         /* fake italic style       */
         if( stylesToImplement & TS_ITALIC )
-                tempMatrix.xy = ITALIC_FACTOR;//tempMatrix.yx = ITALIC_FACTOR;
+                tempMatrix.xy = ITALIC_FACTOR;
 
         /* fake script style      */
         if( stylesToImplement & ( TS_SUBSCRIPT | TS_SUPERSCRIPT ) )
@@ -559,9 +563,28 @@ void ConvertHeader( TRUETYPE_VARS, FontHeader* fontHeader, FontBuf* fontBuf )
 }
 
 
-static void AdjustFontBuf( TransformMatrix* transMatrix, FontBuf* fontBuf )
+static void AdjustFontBuf( TransformMatrix* transMatrix, FontMatrix* fontMatrix, FontBuf* fontBuf )
 {
         //TODO: adjust FB_height, FB_minTSB, FB_pixHeight and FB_baselinePos
+
+        //FBF_IS_COMPLEX setzen
+        //tempMatrix = transMatrix
+
+        //FB_pixHeight = truncate( FB_height * TM_22 )
+        //FB_minTSB    = truncate( FB_minTSB * TM_22 )
+        //FB_pixHeight = FB_pixHeight + FB_minTSB
+
+        //height_Y     = FB_baselinePos * TM_22
+        //script_Y     = script_Y * TM_22
+
+
+        fontBuf->FB_pixHeight = INTEGER_OF_WWFIXEDASDWORD( GrMulWWFixed( WBFIXED_TO_WWFIXEDASDWORD( fontBuf->FB_height ), fontMatrix->FM_22 ) );
+        fontBuf->FB_minTSB    = INTEGER_OF_WWFIXEDASDWORD( GrMulWWFixed( MakeWWFixed( fontBuf->FB_minTSB ), fontMatrix->FM_22 ) );
+        fontBuf->FB_pixHeight += fontBuf->FB_minTSB;
+
+        fontBuf->FB_flags |= FBF_IS_COMPLEX;
+
+
 }
 
 
