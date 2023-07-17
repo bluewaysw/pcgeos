@@ -71,7 +71,6 @@ void _pascal TrueType_Gen_Chars(
                         MemHandle            bitmapHandle,
                         MemHandle            varBlock ) 
 {
-        FileHandle             truetypeFile;
         MemHandle              fontBufHandle;
         TrueTypeOutlineEntry*  trueTypeOutline;
         TT_UShort              charIndex;
@@ -89,24 +88,12 @@ EC(     ECCheckMemHandle( varBlock ) );
 
         /* get trueTypeVar block */
         trueTypeVars = MemLock( varBlock );
-        if( trueTypeVars == NULL )
-        {
-                MemReAlloc( varBlock, sizeof( TrueTypeVars ), HAF_NO_ERR );
-                trueTypeVars = MemLock( varBlock );
-        }
+EC(     ECCheckBounds( (void*)trueTypeVars ) );
 
-
-        FilePushDir();
-        FileSetCurrentPath( SP_FONT, TTF_DIRECTORY );
-
-        // get filename an load ttf file 
         trueTypeOutline = LMemDerefHandles( MemPtrToHandle( (void*)fontInfo ), outlineEntry->OE_handle );
-        truetypeFile = FileOpen( trueTypeOutline->TTOE_fontFileName, FILE_ACCESS_R | FILE_DENY_W );
-        
-EC(     ECCheckFileHandle( truetypeFile ) );
 
         /* open face, create instance and glyph */
-        if( TT_Open_Face( truetypeFile, &FACE ) )
+        if( TrueType_Lock_Face(trueTypeVars, trueTypeOutline) )
                 goto Fail;
 
         TT_New_Glyph( FACE, &GLYPH );
@@ -114,7 +101,6 @@ EC(     ECCheckFileHandle( truetypeFile ) );
         TT_Set_Instance_Resolutions( INSTANCE, 72, 72 );
 
          /* get TT char index */
-        getCharMap( FACE, &CHAR_MAP );
         charIndex = TT_Char_Index( CHAR_MAP, GeosCharToUnicode( character ) );
 
         /* set pointsize and get metrics */
@@ -221,10 +207,8 @@ EC(     ECCheckFileHandle( truetypeFile ) );
 
         /* cleanup */
         MemUnlock( bitmapHandle );
+        TrueType_Unlock_Face( trueTypeVars );
 Fail:
-        TT_Close_Face( FACE );
-        FileClose( truetypeFile, FALSE );
-        FilePopDir(); 
         MemUnlock( varBlock );
 }
 

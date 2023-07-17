@@ -22,6 +22,7 @@
 
 #include <geos.h>
 #include <freetype.h>
+#include "ttadapter.h"
 
 
 typedef ByteFlags CharMapFlags;
@@ -46,11 +47,13 @@ typedef struct
  *      internal functions
  ***********************************************************************/
 
+word GeosCharToUnicode( word geosChar );
+
 word InitGeosCharsInCharMap( TT_CharMap map, char* firstChar, char* lastChar );
 
 word CountKernPairsWithGeosChars( TT_Face face );
 
-TT_Error getCharMap( TT_Face face, TT_CharMap* charMap );
+TT_Error getCharMap( TRUETYPE_VARS, TT_CharMap* charMap );
 
 CharMapFlags GeosCharMapFlag( word geosChar );
 
