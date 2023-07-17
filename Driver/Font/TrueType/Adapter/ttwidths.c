@@ -95,7 +95,6 @@ MemHandle _pascal TrueType_Gen_Widths(
                         TextStyle            stylesToImplement,
                         MemHandle            varBlock ) 
 {
-        FileHandle             truetypeFile;
         TrueTypeOutlineEntry*  trueTypeOutline;
         TrueTypeVars*          trueTypeVars;
         FontHeader*            fontHeader;
@@ -114,31 +113,15 @@ MemHandle _pascal TrueType_Gen_Widths(
 
         /* get trueTypeVar block */
         trueTypeVars = MemLock( varBlock );
-        if( trueTypeVars == NULL )
-        {
-                MemReAlloc( varBlock, sizeof( TrueTypeVars ), HAF_NO_ERR );
-                trueTypeVars = MemLock( varBlock );
-        }
-        
 EC(     ECCheckBounds( (void*)trueTypeVars ) );
-
-        // get filename an load ttf file
-        FilePushDir();
-        FileSetCurrentPath( SP_FONT, TTF_DIRECTORY );
 
         // get filename an load ttf file 
         trueTypeOutline = LMemDerefHandles( MemPtrToHandle( (void*)fontInfo ), headerEntry->OE_handle );
-        truetypeFile = FileOpen( trueTypeOutline->TTOE_fontFileName, FILE_ACCESS_R | FILE_DENY_W );
-
-EC(     ECCheckFileHandle( truetypeFile ) );
 
         // get pointer to FontHeader
         fontHeader = LMemDerefHandles( MemPtrToHandle( (void*)fontInfo ), firstEntry->OE_handle );
 
-        if ( TT_Open_Face( truetypeFile, &FACE ) )
-                goto Fin;
-
-        if ( TT_Get_Face_Properties( FACE, &FACE_PROPERTIES ) )
+        if( TrueType_Lock_Face(trueTypeVars, trueTypeOutline) )
                 goto Fail;
 
         /* alloc Block for FontBuf, CharTableEntries, KernPairs and kerning values */
@@ -170,12 +153,9 @@ EC(     ECCheckFileHandle( truetypeFile ) );
         //TODO: adjust FB_height, FB_minTSB, FB_pixHeight and FB_baselinePos
         AdjustFontBuf( transMatrix, fontMatrix, fontBuf );
 
-Fail:
-        TT_Close_Face( FACE );
-Fin:        
-        FileClose( truetypeFile, FALSE );
+        TrueType_Unlock_Face( trueTypeVars );
+Fail:        
         MemUnlock( varBlock );
-        FilePopDir();
         return fontHandle;
 }
 
@@ -211,7 +191,6 @@ static void ConvertWidths( TRUETYPE_VARS, FontHeader* fontHeader, FontBuf* fontB
 
         TT_New_Glyph( FACE, &GLYPH );
         TT_New_Instance( FACE, &INSTANCE );
-        getCharMap( FACE, &CHAR_MAP );
 
         for( currentChar = fontHeader->FH_firstChar; currentChar <= fontHeader->FH_lastChar; ++currentChar )
         {

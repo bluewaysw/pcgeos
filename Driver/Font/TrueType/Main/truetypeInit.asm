@@ -76,10 +76,9 @@ TrueTypeInit	proc	far
 	; We also need a block to use for variables. We don't
 	; need it yet, either.
 	;
-	mov	ax, size TrueTypeVars		;ax <- size of block
+	mov	ax, TRUETYPE_BLOCK_SIZE		;ax <- size of block
 	mov	bx, handle 0			;bx <- make TrueType owner
-	mov	cx, mask HF_DISCARDABLE \
-		 or mask HF_SWAPABLE \
+	mov	cx, mask HF_SWAPABLE \
 		 or mask HF_SHARABLE \
 		 or mask HF_DISCARDED \
 		 or (mask HAF_NO_ERR shl 8) 	;cl, ch <- alloc flags
