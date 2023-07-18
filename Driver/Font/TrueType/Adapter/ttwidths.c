@@ -159,19 +159,19 @@ EC(     ECCheckFileHandle( truetypeFile ) );
         if( stylesToImplement & TS_SUBSCRIPT )
         {
                 SCALE_WIDTH = GrMulWWFixed( SCALE_WIDTH, WWFIXED_0_POINT_5 );
-                transMatrix->TM_shiftY = GrMulWWFixed(SUBSCRIPT_OFFSET, 
+                transMatrix->TM_scriptY = GrMulWWFixed(SUBSCRIPT_OFFSET, 
                                          WBFIXED_TO_WWFIXEDASDWORD( fontBuf->FB_height ) +
-                                         WBFIXED_TO_WWFIXEDASDWORD( fontBuf->FB_heightAdjust ) );
+                                         WBFIXED_TO_WWFIXEDASDWORD( fontBuf->FB_heightAdjust ) ) >> 16;
         }
 
         if( stylesToImplement & TS_SUPERSCRIPT )
         {
                 SCALE_WIDTH = GrMulWWFixed( SCALE_WIDTH, WWFIXED_0_POINT_5 );
-                transMatrix->TM_shiftY = GrMulWWFixed( SUPERSCRIPT_OFFSET,
+                transMatrix->TM_scriptY = ( GrMulWWFixed( SUPERSCRIPT_OFFSET,
                                          WBFIXED_TO_WWFIXEDASDWORD( fontBuf->FB_height ) +
                                          WBFIXED_TO_WWFIXEDASDWORD( fontBuf->FB_heightAdjust ) ) -
                                          WBFIXED_TO_WWFIXEDASDWORD( fontBuf->FB_baselinePos ) -
-                                         WBFIXED_TO_WWFIXEDASDWORD( fontBuf->FB_baseAdjust );
+                                         WBFIXED_TO_WWFIXEDASDWORD( fontBuf->FB_baseAdjust ) ) >> 16;
         }
 
         /* convert FontHeader and fill FontBuf structure */
@@ -400,6 +400,10 @@ EC(     ECCheckBounds( (void*)fontMatrix ) );
                                     GrMulWWFixed( tempMatrix.yy, fontMatrix->FM_21 );
         transMatrix->TM_matrix.yy = GrMulWWFixed( tempMatrix.yx, fontMatrix->FM_12 ) +
                                     GrMulWWFixed( tempMatrix.yy, fontMatrix->FM_22 );
+        transMatrix->TM_heightX   = 0;
+        transMatrix->TM_scriptX   = 0;
+        transMatrix->TM_heightY   = 0;
+        transMatrix->TM_scriptY   = 0;
 }
 
 
@@ -548,8 +552,9 @@ void ConvertHeader( TRUETYPE_VARS, FontHeader* fontHeader, FontBuf* fontBuf )
         ttfElement = SCALE_WORD( fontHeader->FH_maxRSB, scaleWidth );
         fontBuf->FB_maxRSB  = INTEGER_OF_WWFIXEDASDWORD( ttfElement );
 
-        ttfElement = SCALE_WORD( fontHeader->FH_height + fontHeader->FH_accent, scaleHeight );
-        fontBuf->FB_pixHeight = INTEGER_OF_WWFIXEDASDWORD( ttfElement );
+        //ttfElement = SCALE_WORD( fontHeader->FH_height + fontHeader->FH_accent, scaleHeight );
+        ttfElement = SCALE_WORD( fontHeader->FH_height, scaleHeight );
+        fontBuf->FB_pixHeight = INTEGER_OF_WWFIXEDASDWORD( ttfElement );// + fontBuf->FB_minTSB;
 
         fontBuf->FB_maker        = FM_TRUETYPE;
         fontBuf->FB_kernPairPtr  = 0;
@@ -565,26 +570,17 @@ void ConvertHeader( TRUETYPE_VARS, FontHeader* fontHeader, FontBuf* fontBuf )
 
 static void AdjustFontBuf( TransformMatrix* transMatrix, FontMatrix* fontMatrix, FontBuf* fontBuf )
 {
-        //TODO: adjust FB_height, FB_minTSB, FB_pixHeight and FB_baselinePos
 
-        //FBF_IS_COMPLEX setzen
-        //tempMatrix = transMatrix
+        //adjust FB_pixHeight, FB_minTSB, heightY
+        fontBuf->FB_flags     |= FBF_IS_COMPLEX;
 
-        //FB_pixHeight = truncate( FB_height * TM_22 )
-        //FB_minTSB    = truncate( FB_minTSB * TM_22 )
-        //FB_pixHeight = FB_pixHeight + FB_minTSB
+        //TODO: das ist nur eine provisorische Lösung --> 
+        transMatrix->TM_heightY = fontBuf->FB_baselinePos.WBF_int + 1;
 
-        //height_Y     = FB_baselinePos * TM_22
-        //script_Y     = script_Y * TM_22
-
-
-        fontBuf->FB_pixHeight = INTEGER_OF_WWFIXEDASDWORD( GrMulWWFixed( WBFIXED_TO_WWFIXEDASDWORD( fontBuf->FB_height ), fontMatrix->FM_22 ) );
-        fontBuf->FB_minTSB    = INTEGER_OF_WWFIXEDASDWORD( GrMulWWFixed( MakeWWFixed( fontBuf->FB_minTSB ), fontMatrix->FM_22 ) );
-        fontBuf->FB_pixHeight += fontBuf->FB_minTSB;
-
-        fontBuf->FB_flags |= FBF_IS_COMPLEX;
-
-
+        if( fontMatrix->FM_flags & TF_ROTATED )
+        {
+             //adjust scriptX, heightX   
+        }
 }
 
 

@@ -110,7 +110,7 @@ EC(     ECCheckFileHandle( truetypeFile ) );
         // transform glyphs outline
         TT_Get_Glyph_Outline( GLYPH, &OUTLINE );
         TT_Transform_Outline( &OUTLINE, &transMatrix.TM_matrix );
-        TT_Translate_Outline( &OUTLINE, 0, WWFIXEDASDWORD_TO_FIXED26DOT6( transMatrix.TM_shiftY ) );
+        TT_Translate_Outline( &OUTLINE, 0, WWFIXEDASDWORD_TO_FIXED26DOT6( transMatrix.TM_scriptY ) );
 
         // scale glyph
         TT_Set_Instance_CharSize( INSTANCE, ( pointSize >> 10 ) );
@@ -159,7 +159,7 @@ static void CalcTransformMatrix( TextStyle         stylesToImplement,
         transMatrix->TM_matrix.xy = 0;
         transMatrix->TM_matrix.yx = 0;
         transMatrix->TM_matrix.yy = 1L << 16;
-        transMatrix->TM_shiftY    = 0;
+        transMatrix->TM_scriptY   = 0;
 
         /* fake bold style         */
         if( stylesToImplement & TS_BOLD )
@@ -176,8 +176,8 @@ static void CalcTransformMatrix( TextStyle         stylesToImplement,
                 transMatrix->TM_matrix.yy = GrMulWWFixed( transMatrix->TM_matrix.yy, SCRIPT_FACTOR );
 
                 if( stylesToImplement & TS_SUBSCRIPT )
-                        transMatrix->TM_shiftY = -SCRIPT_SHIFT_FACTOR;
+                        transMatrix->TM_scriptY = -SCRIPT_SHIFT_FACTOR;
                 else
-                        transMatrix->TM_shiftY = SCRIPT_SHIFT_FACTOR;
+                        transMatrix->TM_scriptY = SCRIPT_SHIFT_FACTOR;
         }
 }

@@ -269,7 +269,10 @@ typedef struct
 typedef struct
 {
     TT_Matrix                   TM_matrix;
-    WWFixedAsDWord              TM_shiftY;
+    sword                       TM_scriptX;
+    sword                       TM_heightX;
+    sword                       TM_scriptY;
+    sword                       TM_heightY;
 } TransformMatrix;
 
 typedef ByteFlags TransFlags;

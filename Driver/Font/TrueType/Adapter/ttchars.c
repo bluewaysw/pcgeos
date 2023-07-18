@@ -163,8 +163,10 @@ EC(     ECCheckFileHandle( truetypeFile ) );
                 TT_Get_Outline_Region( &OUTLINE, &RASTER_MAP );
 
                 /* fill header of charData */
-                ((RegionCharData*)charData)->RCD_xoff = GLYPH_BBOX.xMin / 64;
-                ((RegionCharData*)charData)->RCD_yoff = fontBuf->FB_baselinePos.WBF_int - ( GLYPH_BBOX.yMax / 64 );
+                ((RegionCharData*)charData)->RCD_xoff = transformMatrix->TM_scriptX + 
+                                                        transformMatrix->TM_heightX + GLYPH_BBOX.xMin / 64;
+                ((RegionCharData*)charData)->RCD_yoff = transformMatrix->TM_scriptY + 
+                                                        transformMatrix->TM_heightY - GLYPH_BBOX.yMax / 64; 
                 ((RegionCharData*)charData)->RCD_size = RASTER_MAP.size;
                 ((RegionCharData*)charData)->RCD_bounds.R_left   = 0;
                 ((RegionCharData*)charData)->RCD_bounds.R_right  = width;
@@ -194,12 +196,10 @@ EC(     ECCheckFileHandle( truetypeFile ) );
                 /* fill header of charData */
                 ((CharData*)charData)->CD_pictureWidth = width;
                 ((CharData*)charData)->CD_numRows      = height;
-                ((CharData*)charData)->CD_xoff         = GLYPH_BBOX.xMin / 64;
-                ((CharData*)charData)->CD_yoff         = fontBuf->FB_baselinePos.WBF_int - ( GLYPH_BBOX.yMax / 64 ) + 1; 
-
-                /* shift if subscript style */
-                if( stylesToImplement & ( TS_SUBSCRIPT | TS_SUPERSCRIPT ) )
-                        ((CharData*)charData)->CD_yoff += ( transformMatrix->TM_shiftY >> 16 );
+                ((CharData*)charData)->CD_xoff         = transformMatrix->TM_scriptX + 
+                                                         transformMatrix->TM_heightX + GLYPH_BBOX.xMin / 64;
+                ((CharData*)charData)->CD_yoff         = transformMatrix->TM_scriptY + 
+                                                         transformMatrix->TM_heightY - GLYPH_BBOX.yMax / 64; 
         }
 
         TT_Done_Glyph( GLYPH );
