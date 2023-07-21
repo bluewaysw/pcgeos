@@ -80,8 +80,6 @@ void _pascal TrueType_Gen_Chars(
         void*                  charData;
         word                   width, height, size;
 
-        int                     s, h;
-
 
 EC(     ECCheckBounds( (void*)fontBuf ) );
 EC(     ECCheckBounds( (void*)fontInfo ) );
@@ -129,9 +127,6 @@ EC(     ECCheckFileHandle( truetypeFile ) );
         // TODO: Transformationsmatrix anwenden
         transformMatrix = (TransformMatrix*)(((byte*)fontBuf) + sizeof( FontBuf ) + ( fontBuf->FB_lastChar - fontBuf->FB_firstChar + 1 ) * sizeof( CharTableEntry ));
         TT_Transform_Outline( &OUTLINE, &transformMatrix->TM_matrix );
-
-        s = transformMatrix->TM_scriptY;
-        h = transformMatrix->TM_heightY;
 
         /* get glyphs boundig box */
         TT_Get_Outline_BBox( &OUTLINE, &GLYPH_BBOX );
