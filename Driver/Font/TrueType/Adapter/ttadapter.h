@@ -457,13 +457,10 @@ typedef struct
         ( (byte) ( (WWFixedAsDWord)value >> 8 ) )
 
 /*
- * convert value (WBFixed) to TT_F26DOT6 
+ * convert value (WBFixed) to WWFixedAsDWord 
  */
-#define WBFIXED_TO_FIXED26DOT6( value )          \
-        ( ( ( (long)value.WBF_int ) * 1024 ) | value.WBF_frac >> 2 )
-
 #define WBFIXED_TO_WWFIXEDASDWORD( value )       \
-        ( ( (long)value.WBF_int << 16 ) | ( value.WBF_frac << 8 ) )
+        ( (long) ( ( (long)(value.WBF_int) ) * 0x00010000 ) | ( ( (long)value.WBF_frac) << 8 ) )
 
 
 #endif /* _TTADAPTER_H_ */
