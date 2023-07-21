@@ -60,8 +60,7 @@ Build the target environment:
 
 Launch the target environment in dosbox:
 - make sure dosbox is added to your path variable, or [pcgeos-basebox](https://github.com/bluewaysw/pcgeos-basebox/tags) is installed and configured using BASEBOX environmental variable
-- `cd %ROOT_DIR%`
-- `bin/target`
+- `%ROOT_DIR%/bin/target`
   - the "swat" debugger stops immediately after the first stage of the boot process
   - enter `quit` at the "=>" prompt to detach the debugger and launch PC/GEOS stand-alone
     - or: enter `c` to launch with the debugger running in the background (slower)
