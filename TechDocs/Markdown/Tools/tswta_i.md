@@ -4297,6 +4297,8 @@ disables them all.
 
 ### intFormat
 
+{% raw %}
+
 **Usage:**  
 `var intFormat [<format-string>]`
 
@@ -4315,6 +4317,8 @@ by an "h".
 
 **See Also:**  
 print, byteAsChar.
+
+{% endraw %}
 
 ----------
 
