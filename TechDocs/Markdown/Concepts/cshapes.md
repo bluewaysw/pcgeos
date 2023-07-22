@@ -1270,7 +1270,7 @@ static HatchDash dash 2 = {
     {24, 0} };                            /* ...and Off for 24 points */
 
 static HatchLine line3 = {
-    {{12,0} , MakeWWFixed(0)},            /* Origin this line family will be at
+    { {12,0}, MakeWWFixed(0) },           /* Origin this line family will be at
                                            * a 12 pt. horizontal offset
                                            * from the other two families. */
     MakeWWFixed(0),                       /* Delta X */
