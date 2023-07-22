@@ -496,7 +496,7 @@ style runs vastly easier.
 
 	#define CHAR_ATTR_STYLE_FONT_SIZE_STYLE_COLOR(ref, style, font, psize, tstyle, \ 
 	color) { \
-		{{{ref, 0}}, style}, font, {0, psize}, tstyle, \
+		{ { {ref, 0} }, style}, font, {0, psize}, tstyle, \
 			{color, CF_INDEX, 0, 0}, 0, FWI_MEDIUM, FW_NORMAL, 0, SDM_100, {0}, \
 			{C_WHITE, CF_INDEX, 0, 0}, SDM_0, {0}, {0, 0, 0, 0, 0, 0, 0}}
 
@@ -952,7 +952,7 @@ style runs vastly easier.
 
 	#define PARA_ATTR_STYLE_JUST_LEFT_RIGHT_PARA(ref, style, just, left, right, para)\
 	{ \
-			{{{ref, 0}}, style}, 0, {C_BLACK, CF_INDEX, 0, 0}, \
+			{ { {ref, 0}}, style}, 0, {C_BLACK, CF_INDEX, 0, 0}, \
 			just << VTPAA_JUSTIFICATION_OFFSET, (left)*PIXELS_PER_INCH, \
 			(right)*PIXELS_PER_INCH, (para)*PIXELS_PER_INCH, \
 			1<<8, 0, 0, 0, {C_WHITE, CF_INDEX, 0, 0}, \

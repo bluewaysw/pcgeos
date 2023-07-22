@@ -508,7 +508,7 @@ is itself made up of lists, each of whose first element is a key.
 **Notes:**	
 
 + A typical associative list is made of key/value pairs, like this:
- `{{<key> <value>} {<key> <value>} ...}`
+ `{ {<key> <value>} {<key> <value>} ...}`
 
 + If an element is found whose `<key>` matches the passed <key>, the entire 
 element is returned as the result. If no `<key>` matches, nil is returned.
@@ -3359,7 +3359,7 @@ Used by the various memory-access commands. Takes one argument, ADDR,
 being the address argument for the command. Typically, the command is 
 declared as 
 
-`[defcmd cmd {{addr nil}}...]`
+`[defcmd cmd { {addr nil}}...]`
 
 allowing the address to be unspecified. This function will return the given 
 address if it was, else it will return the last-accessed address (stored in the 

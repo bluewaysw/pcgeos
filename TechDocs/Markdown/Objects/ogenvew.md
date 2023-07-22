@@ -408,10 +408,10 @@ changeable with the use of messages defined by GenView.
 	/* Default settings are shown in the definitions. Other possible settings are
 	 * shown in a comment after the definition. */
 
-		@instance PointDWFixed			GVI_origin = {{0, 0}, {0,0}};
+		@instance PointDWFixed			GVI_origin = { {0, 0}, {0,0} };
 		@instance RectDWord				GVI_docBounds = {0, 0, 0, 0};
 		@instance PointDWord			GVI_increment = {20, 15};
-		@instance PointWWFixed			GVI_scaleFactor = {{0, 1}, {0, 1}};
+		@instance PointWWFixed			GVI_scaleFactor = { {0, 1}, {0, 1} };
 		@instance ColorQuad				GVI_color = {WHITE, 0, 0, 0};
 		@instance GenViewAttrs			GVI_attrs = (GVA_FOCUSABLE);
 			/* Possible flags for GVI_attrs:
@@ -1592,12 +1592,12 @@ The **PointWWFixed** structure contains two fields, each of which is a
 
 A scale factor of 2.5 (250%) in both dimensions would be declared as follows:
 
-	GVI_scaleFactor = {{5, 2}, {5, 2}};
+	GVI_scaleFactor = { {5, 2}, {5, 2} };
 
 A scale factor of 100% in the horizontal and 250% in the vertical would be 
 declared as follows:
 
-	GVI_scaleFactor = {{0, 1}, {5, 2}};
+	GVI_scaleFactor = { {0, 1}, {5, 2} };
 
 To change the scale factor at run-time (for example, when a user clicks on a 
 Zoom button), send MSG_GEN_VIEW_SET_SCALE_FACTOR to the view, 

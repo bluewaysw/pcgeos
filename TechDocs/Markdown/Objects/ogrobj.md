@@ -1012,7 +1012,7 @@ interacts with.
 	@instance BBFixed 		GBI_curNudgeX;					/* Internal */
 	@instance BBFixed 		GBI_curNudgeY;					/* Internal */
 	@instance PointWWFixed 	GBI_curScaleFactor = {MakeWWFixed(1), MakeWWFixed(0)};
-	@instance PointDWFixed	GBI_interestingPoint = {{0, -30000}, {0, -30000}};
+	@instance PointDWFixed	GBI_interestingPoint = { {0, -30000}, {0, -30000} };
 	@instance PointDWFixed 	GBI_lastPtr = {0,0}; 
 	@instance word 			GBI_suspendCount = 0;			/* Internal */
 	@instance GrObjBodyUnsuspendOps GBI_unsuspendOps;		/* Internal */

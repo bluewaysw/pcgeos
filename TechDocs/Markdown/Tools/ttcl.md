@@ -1333,7 +1333,7 @@ concat, index, range.
 `proc <name> <args> <body>`
 
 **Examples:**  
-`proc poof {{arg1 one} args} {return [list $arg1 $args]}`  
+`proc poof { {arg1 one} args} {return [list $arg1 $args]}`  
  Defines a procedure poof that takes 0 or more arguments and 
 merges them into a list of two elements. If no argument is 
 given, the result will be the list {one {}}

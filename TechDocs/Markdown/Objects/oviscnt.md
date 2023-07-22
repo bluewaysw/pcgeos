@@ -55,7 +55,7 @@ shown in Code Display 25-1. Each field is described later in this section.
 
 	/* The following fields determine features of the content's document. */
 	@instance PointDWord		VCNI_docOrigin = {0, 0};
-	@instance PointWWFixed		VCNI_scaleFactor = {{0, 1}, {0, 1}};
+	@instance PointWWFixed		VCNI_scaleFactor = { {0, 1}, {0, 1} };
 
 	/* The following fields deal with how the content handles input. */
 	@instance ChunkHandle		VCNI_prePassiveMouseGrabList = 0;

@@ -147,10 +147,10 @@
 
 **Instance Data**
 
-	PointDWFixed 	GVI_origin = {{0, 0}, {0, 0}}
+	PointDWFixed 	GVI_origin = { {0, 0}, {0, 0} }
 	RectDWord		GVI_docBounds = {0, 0, 0, 0}
 	PointDWord		GVI_increment = {20, 15}
-	PointWWFixed 	GVI_scaleFactor = {{0, 1}, {0, 1}}
+	PointWWFixed 	GVI_scaleFactor = { {0, 1}, {0, 1} }
 	ColorQuad		GVI_color = {C_WHITE, 0, 0, 0}
 	GenViewAttrs	GVI_attrs = (GVA_FOCUSABLE)
 	GenViewDimensionAttrs GVI_horizAttrs = 0
@@ -761,7 +761,7 @@
 							{MakeWWFixed(1),
 							 MakeWWFixed(0)}
 	PointDWFixed 		GBI_interestingPoint =
-							{{0, -30000}, {0, -30000}}
+							{ {0, -30000}, {0, -30000} }
 	PointDWFixed 		GBI_lastPtr = {0,0}
 	word 				GBI_suspendCount = 0
 	GrObjBodyUnsuspendOps GBI_unsuspendOps = 0
@@ -4126,18 +4126,18 @@ Messages
 	word 				SSI_maxRow = MAX_ROW
 	word 				SSI_maxCol = MAX_COLUMN
 	PointDWord 			SSI_offset = {0, 0}
-	CellRange 			SSI_visible = {{0, 0}, {0, 0}}
+	CellRange 			SSI_visible = { {0, 0}, {0, 0} }
 	CellReference 		SSI_active = {0, 0}
-	CellRange 			SSI_quickSource = {{0, 0}, {0, 0}}
-	CellRange 			SSI_selected = {{0, 0}, {0, 0}}
+	CellRange 			SSI_quickSource = { {0, 0}, {0, 0} }
+	CellRange 			SSI_selected = { {0, 0}, {0, 0} }
 	word 				SSI_curAttrs = 0
 	word 				SSI_gstate = NullHandle
 	byte 				SSI_gsRefCount = 0
 	SpreadsheetFlags 	SSI_flags = 0
 	SpreadsheetDrawFlags 	SSI_drawFlags = 0
 	byte 				SSI_attributes = 0
-	CellRange 			SSI_header = {{-1, -1}, {-1, -1}}
-	CellRange 			SSI_footer = {{-1, -1}, {-1, -1}}
+	CellRange 			SSI_header = { {-1, -1}, {-1, -1} }
+	CellRange 			SSI_footer = { {-1, -1}, {-1, -1} }
 	word 				SSI_circCount = 0
 	FloatNum 			SSI_converge = 0
 	word 				SSI_ancestorList = 0
@@ -5559,7 +5559,7 @@ Messages
 	word		VCNI_viewWidth = 0
 	VisContentAttrs VCNI_attrs = 0
 	PointDWord		VCNI_docOrigin = {0, 0}
-	PointWWFixed		VCNI_scaleFactor = {{0, 1}, {0, 1}}
+	PointWWFixed		VCNI_scaleFactor = { {0, 1}, {0, 1} }
 	ChunkHandle		VCNI_prePassiveMouseGrabList = 0
 	VisMouseGrab		VCNI_impliedMouseGrab =
 				{0, 0, {0, 0},
@@ -6710,10 +6710,10 @@ Messages
 
 **Macros**
 
-	TRAE(pos, base, type)		{{pos-base, 0}, type}
-	TRAE_ABS(pos, type)			{{pos, 0}, type}
-	TRAE_ALL(type)				{{0, 0}, type}
-	TRAE_END		{{TEXT_ADDRESS_PAST_END&0xffff,
+	TRAE(pos, base, type)		{ {pos-base, 0}, type}
+	TRAE_ABS(pos, type)			{ {pos, 0}, type}
+	TRAE_ALL(type)				{ {0, 0}, type}
+	TRAE_END		{ {TEXT_ADDRESS_PAST_END&0xffff,
 			TEXT_ADDRESS_PAST_END>>16},
 			CA_NULL_ELEMENT}
 	@define CHAR_ATTR_ELEMENT_ARRAY_HEADER

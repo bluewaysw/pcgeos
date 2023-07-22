@@ -306,7 +306,7 @@ variable name.
 `map {i j} {a b} {c d} {list $i $j}`  
 Executes the command "list $i $j" with i and j assigned to 
 successive elements of the lists {a b} and {c d}, respectively, 
-merging the results into the list {{a c} {b d}}
+merging the results into the list { {a c} {b d} }
 
 **Synopsis:**  
 This applies a command string to the successive elements of one or more lists, 
