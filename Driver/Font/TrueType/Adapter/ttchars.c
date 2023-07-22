@@ -257,14 +257,14 @@ static void CopyChar( FontBuf* fontBuf, word geosChar, void* charData, word char
 static void ShrinkFontBuf( FontBuf* fontBuf ) 
 {
         word  numOfChars = fontBuf->FB_lastChar - fontBuf->FB_firstChar + 1;
-        CharTableEntry*  charTableEntries = (CharTableEntry*) ((byte*)fontBuf) + sizeof( FontBuf );
+        CharTableEntry*  charTableEntries = (CharTableEntry*) ( ( (byte*)fontBuf ) + sizeof( FontBuf ) );
         word  sizeCharData;
 
 
         /* shrink fontBuf if necessary */
         while( fontBuf->FB_dataSize > MAX_FONTBUF_SIZE )
         {
-                word  indexLRUChar = FindLRUChar( fontBuf, numOfChars );
+                int   indexLRUChar = FindLRUChar( fontBuf, numOfChars );
                 void* charData = ((byte*)fontBuf) + charTableEntries[indexLRUChar].CTE_dataOffset;
 
                 /* ensure that we have a char to remove */
@@ -305,7 +305,7 @@ static int FindLRUChar( FontBuf* fontBuf, int numOfChars )
         for( i = 0; i < numOfChars; i++, charTableEntry++ )
         {
                 /* if no data, go to next char */
-                if( charTableEntry->CTE_dataOffset < CHAR_MISSING )
+                if( charTableEntry->CTE_dataOffset <= CHAR_MISSING )
                         continue;
 
                 if( charTableEntry->CTE_usage < lru )
@@ -343,12 +343,12 @@ static void AdjustPointers( CharTableEntry* charTableEntries,
  *******************************************************************/
 static word ShiftCharData( FontBuf* fontBuf, CharData* charData )
 {
-        word  size = charData->CD_pictureWidth * charData->CD_numRows + SIZE_CHAR_HEADER;
- 
+        word  size = charData->CD_pictureWidth * 
+                     ( ( charData->CD_numRows + 7 ) / 8 ) + SIZE_CHAR_HEADER;
  
         memmove( charData, 
                 ((byte*)charData) + size, 
-                ((byte*)charData) - ((byte*)fontBuf) + fontBuf->FB_dataSize );
+                (((byte*)fontBuf) + fontBuf->FB_dataSize) - ((byte*)charData) + size );
 
         return size;
 }
@@ -365,7 +365,7 @@ static word ShiftRegionCharData( FontBuf* fontBuf, RegionCharData* charData )
 
         memmove( charData, 
                 ((byte*)charData) + size, 
-                ((byte*)charData) - ((byte*)fontBuf) + fontBuf->FB_dataSize );
+                (((byte*)fontBuf) + fontBuf->FB_dataSize) - ((byte*)charData) + size );
 
         return size;
 }
