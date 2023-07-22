@@ -483,7 +483,7 @@ in detail the different things you can do to the File Selector.
 	@object GenFileSelectorClass CreatorFileSelector = {
 		GFSI_destination = process;
 		GFSI_notificationMsg = MSG_MY_APP_FILE_SELECTED;
-		ATTR_GEN_FILE_SELECTOR_CREATOR_MATCH = {{"CRTR"}, 0};
+		ATTR_GEN_FILE_SELECTOR_CREATOR_MATCH = { {"CRTR"}, 0 };
 	};
 
 ----------
