@@ -2997,6 +2997,8 @@ symbol) command to find the address of the given variable `<addr>` of class `<va
 
 ----------
 
+{% raw %}
+
 **Swat Display 5-4 The Bytes Command**
 
 	1	var addr [get-address $addr ds:si]
@@ -3052,6 +3054,8 @@ symbol) command to find the address of the given variable `<addr>` of class `<va
 
 This example shows the code for the **bytes** commands. Notice the use of the **type** command on the 
 fifth line, and the **range** command on the twenty-ninth line.
+
+{% endraw %}
 
 ----------
 
