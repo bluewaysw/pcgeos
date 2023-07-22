@@ -15,4 +15,4 @@
   - [Assembly Reference](asmref.md)
   - [Driver Development Kit](ddk.md)
 
-Project repository: https://github.com/bluewaysw/pcgeos
+Official project repository: [GitHub](https://github.com/bluewaysw/pcgeos)
