@@ -2407,10 +2407,6 @@ Scan_DropOuts :
 
         /* sub-banding */
 
-#ifdef DEBUG_RASTER
-        ClearBand( RAS_VARS  TRUNC( ras.minY ), TRUNC( ras.maxY ) );
-#endif
-
         i = ras.band_stack[ras.band_top].y_min;
         j = ras.band_stack[ras.band_top].y_max;
 
@@ -2425,7 +2421,6 @@ Scan_DropOuts :
 
         ras.band_stack[ras.band_top+1].y_min = k;
         ras.band_stack[ras.band_top+1].y_max = j;
-
         ras.band_stack[ras.band_top].y_max = k - 1;
 
         ras.band_top++;

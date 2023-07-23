@@ -57,6 +57,9 @@ static void CalcTransform( TRUETYPE_VARS,
 static void AdjustFontBuf( TransformMatrix* transMatrix, 
                         FontMatrix* fontMatrix, FontBuf* fontBuf );
 
+static Boolean IsRegionNeeded( TransformMatrix* transMatrix, 
+                        FontMatrix* fontMatrix, FontBuf* fontBuf );
+
 static word round( WWFixedAsDWord toRound );
 
 
@@ -152,6 +155,12 @@ EC(     ECCheckBounds( (void*)trueTypeVars ) );
 
         //TODO: adjust FB_height, FB_minTSB, FB_pixHeight and FB_baselinePos
         AdjustFontBuf( transMatrix, fontMatrix, fontBuf );
+
+        /* Are the glyphs rendered as regions? */
+        if( IsRegionNeeded( transMatrix, fontMatrix, fontBuf ) )
+                fontBuf->FB_flags |= FBF_IS_REGION;
+        else
+                fontBuf->FB_flags &= ~FBF_IS_REGION;
 
         TrueType_Unlock_Face( trueTypeVars );
 Fail:        
@@ -574,7 +583,6 @@ void ConvertHeader( TRUETYPE_VARS, FontHeader* fontHeader, FontBuf* fontBuf )
         fontBuf->FB_kernValuePtr = 0;
         fontBuf->FB_kernCount    = 0;
         fontBuf->FB_heapCount    = 0;
-	fontBuf->FB_flags        = fontBuf->FB_pixHeight < 125 ? FBF_IS_OUTLINE : FBF_IS_REGION;
         fontBuf->FB_firstChar    = fontHeader->FH_firstChar;
         fontBuf->FB_lastChar     = fontHeader->FH_lastChar;
         fontBuf->FB_defaultChar  = fontHeader->FH_defaultChar;
@@ -593,6 +601,51 @@ static void AdjustFontBuf( TransformMatrix* transMatrix, FontMatrix* fontMatrix,
         {
              //adjust scriptX, heightX   
         }
+}
+
+
+/********************************************************************
+ *                      IsRegionNeeded
+ ********************************************************************
+ * SYNOPSIS:	  Determines whether glyphs should be rendered as 
+ *                bitmap or as region.
+ * 
+ * PARAMETERS:    *transMatrix          Ptr to tranfomation matrix.
+ *                *fontMatrix           Ptr to systems font matrix.
+ *                *fontBuf              Ptr to FontBuf structure.
+ * 
+ * RETURNS:       Boolean
+ * 
+ * STRATEGY:      
+ * 
+ * REVISION HISTORY:
+ *      Date      Name      Description
+ *      ----      ----      -----------
+ *      22/07/23  JK        Initial Revision
+ *******************************************************************/
+static Boolean IsRegionNeeded( TransformMatrix* transMatrix, FontMatrix* fontMatrix, FontBuf* fontBuf )
+{
+        word param1;
+        word param2;
+
+
+        param1 = ABS( GrMulWWFixed( fontMatrix->FM_11, WORD_TO_WWFIXEDASDWORD( fontBuf->FB_pixHeight ) ) >> 16 );
+        param2 = ABS( GrMulWWFixed( fontMatrix->FM_21, WORD_TO_WWFIXEDASDWORD( fontBuf->FB_pixHeight ) ) >> 16 );
+        if( param1 + param2 > MAX_BITMAP_SIZE )
+                return TRUE;
+
+        param1 = ABS( GrMulWWFixed( fontMatrix->FM_12, WORD_TO_WWFIXEDASDWORD( fontBuf->FB_pixHeight ) ) >> 16 );
+        param2 = ABS( GrMulWWFixed( fontMatrix->FM_22, WORD_TO_WWFIXEDASDWORD( fontBuf->FB_pixHeight ) ) >> 16 );
+        if( param1 + param2 > MAX_BITMAP_SIZE )
+                return TRUE;
+
+        if( transMatrix->TM_heightX + transMatrix->TM_scriptX > MAX_BITMAP_SIZE )
+                return TRUE;
+
+        if( transMatrix->TM_heightY + transMatrix->TM_scriptY > MAX_BITMAP_SIZE )
+                return TRUE;
+
+        return FALSE;
 }
 
 
