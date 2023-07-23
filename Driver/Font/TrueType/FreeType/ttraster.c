@@ -275,11 +275,11 @@
 
     /* dispatch variables */
 
-    Function_Sweep_Init*    Proc_Sweep_Init;
-    Function_Sweep_Span*    Proc_Sweep_Span;
-    Function_Sweep_Span*    Proc_Sweep_Drop;
-    Function_Sweep_Step*    Proc_Sweep_Step;
-    Function_Sweep_Finish*  Proc_Sweep_Finish;
+    Function_Sweep_Init _near *    Proc_Sweep_Init;
+    Function_Sweep_Span _near *    Proc_Sweep_Span;
+    Function_Sweep_Span _near *    Proc_Sweep_Drop;
+    Function_Sweep_Step _near *    Proc_Sweep_Step;
+    Function_Sweep_Finish _near *  Proc_Sweep_Finish;
 
     TT_Vector*  coords;
 
@@ -320,7 +320,7 @@
 /*                                                                      */
 /************************************************************************/
 
-  static void  Set_High_Precision( RAS_ARGS Bool  High )
+  static void _near  Set_High_Precision( RAS_ARGS Bool  High )
   {
     if ( High )
     {
@@ -354,7 +354,7 @@
 /*                                                                          */
 /****************************************************************************/
 
-  static Bool  New_Profile( RAS_ARGS TStates  aState )
+  static Bool _near  New_Profile( RAS_ARGS TStates  aState )
   {
     if ( !ras.fProfile )
     {
@@ -414,7 +414,7 @@
 /*                                                                          */
 /****************************************************************************/
 
-  static Bool  End_Profile( RAS_ARG )
+  static Bool _near  End_Profile( RAS_ARG )
   {
     Long      h;
     PProfile  oldProfile;
@@ -585,7 +585,7 @@
 /*                                                                          */
 /****************************************************************************/
 
-  static void  Split_Bezier( TPoint*  base )
+  static void _near  Split_Bezier( TPoint*  base )
   {
     Long     a, b;
 
@@ -619,7 +619,7 @@
 /*                                                                          */
 /****************************************************************************/
 
-  static void  Push_Bezier( RAS_ARGS Long  x1, Long  y1,
+  static void _near  Push_Bezier( RAS_ARGS Long  x1, Long  y1,
                                      Long  x2, Long  y2,
                                      Long  x3, Long  y3 )
   {
@@ -644,7 +644,7 @@
 /*                                                                          */
 /****************************************************************************/
 
-  static Bool  Line_Up( RAS_ARGS Long  x1, Long  y1,
+  static Bool _near  Line_Up( RAS_ARGS Long  x1, Long  y1,
                                  Long  x2, Long  y2,
                                  Long  miny, Long  maxy )
   {
@@ -755,7 +755,7 @@
   }
 
 
-  static Bool  Line_Down( RAS_ARGS Long  x1, Long  y1,
+  static Bool _near  Line_Down( RAS_ARGS Long  x1, Long  y1,
                                    Long  x2, Long  y2,
                                    Long  miny, Long  maxy )
   {
@@ -787,7 +787,7 @@
 /*                                                                          */
 /****************************************************************************/
 
-  static Bool  Bezier_Up( RAS_ARGS Long  miny, Long  maxy )
+  static Bool _near  Bezier_Up( RAS_ARGS Long  miny, Long  maxy )
   {
     Long   y1, y2, e, e2, e0;
     Short  f1;
@@ -916,7 +916,7 @@
 /*                                                                          */
 /****************************************************************************/
 
-  static Bool  Bezier_Down( RAS_ARGS Long  miny, Long  maxy )
+  static Bool _near  Bezier_Down( RAS_ARGS Long  miny, Long  maxy )
   {
     TPoint*  arc = ras.arc;
     Bool     result, fresh;
@@ -951,7 +951,7 @@
 /*                                                                          */
 /****************************************************************************/
 
-  static Bool  Line_To( RAS_ARGS Long  x, Long  y )
+  static Bool _near  Line_To( RAS_ARGS Long  x, Long  y )
   {
     /* First, detect a change of direction */
 
@@ -1030,7 +1030,7 @@
 /*                                                                          */
 /****************************************************************************/
 
-  static Bool  Bezier_To( RAS_ARGS Long  x,
+  static Bool _near  Bezier_To( RAS_ARGS Long  x,
                                    Long  y,
                                    Long  cx,
                                    Long  cy )
@@ -1144,7 +1144,7 @@
 #undef  SWAP_
 #define SWAP_(x,y)  { Long swap = x; x = y; y = swap; }
 
-  static Bool  Decompose_Curve( RAS_ARGS UShort  first,
+  static Bool _near  Decompose_Curve( RAS_ARGS UShort  first,
                                          UShort  last,
                                          Bool    flipped )
   {
@@ -1276,7 +1276,7 @@
 /*                                                                          */
 /****************************************************************************/
 
-  static Bool  Convert_Glyph( RAS_ARGS int  flipped )
+  static Bool _near  Convert_Glyph( RAS_ARGS int  flipped )
   {
     Short     i;
     UShort    start;
@@ -1340,7 +1340,7 @@
 /*                                              */
 /************************************************/
 
-  static void  Init_Linked( TProfileList*  l )
+  static void _near  Init_Linked( TProfileList*  l )
   {
     *l = NULL;
   }
@@ -1354,7 +1354,7 @@
 /*                                              */
 /************************************************/
 
-  static void  InsNew( PProfileList  list,
+  static void _near  InsNew( PProfileList  list,
                        PProfile      profile )
   {
     PProfile  *old, current;
@@ -1386,7 +1386,7 @@
 /*                                               */
 /*************************************************/
 
-  static void  DelOld( PProfileList  list,
+  static void _near  DelOld( PProfileList  list,
                        PProfile      profile )
   {
     PProfile  *old, current;
@@ -1420,7 +1420,7 @@
 /*                                              */
 /************************************************/
 
-  static void  Update( PProfile  first )
+  static void _near  Update( PProfile  first )
   {
     PProfile  current = first;
 
@@ -1446,7 +1446,7 @@
 /*                                              */
 /************************************************/
 
-  static void  Sort( PProfileList  list )
+  static void _near  Sort( PProfileList  list )
   {
     PProfile  *old, current, next;
 
@@ -1497,14 +1497,14 @@
 /*                                                                     */
 /***********************************************************************/
 
-  static void  Vertical_Sweep_Init( RAS_ARGS Short*  min, Short*  max )
+  static void _near  Vertical_Sweep_Init( RAS_ARGS Short*  min, Short*  max )
   {
     ras.traceOfs  = ( ras.target.rows - 1 - *min ) * ras.target.cols;
     ras.traceIncr = -ras.target.cols;
   }
 
 
-  static void  Vertical_Sweep_Span( RAS_ARGS Short       y,
+  static void _near  Vertical_Sweep_Span( RAS_ARGS Short       y,
                                              TT_F26Dot6  x1,
                                              TT_F26Dot6  x2,
                                              PProfile    left,
@@ -1553,7 +1553,7 @@
   }
 
 
-  static void  Vertical_Sweep_Drop( RAS_ARGS Short       y,
+  static void _near  Vertical_Sweep_Drop( RAS_ARGS Short       y,
                                              TT_F26Dot6  x1,
                                              TT_F26Dot6  x2,
                                              PProfile    left,
@@ -1658,13 +1658,13 @@
   }
 
 
-  static void Vertical_Sweep_Step( RAS_ARGS Short y )
+  static void _near Vertical_Sweep_Step( RAS_ARGS Short y )
   {
     ras.traceOfs += ras.traceIncr;
   }
 
 
-  static void Vertical_Sweep_Finish( RAS_ARG )
+  static void _near Vertical_Sweep_Finish( RAS_ARG )
   {
     /* nothing to do */
   }
@@ -1681,7 +1681,7 @@
 /*                                                                     */
 /***********************************************************************/
 
-  static void  Vertical_Region_Sweep_Init( RAS_ARGS 
+  static void _near  Vertical_Region_Sweep_Init( RAS_ARGS 
                                            Short*  min, 
                                            Short*  max )
   {
@@ -1690,7 +1690,7 @@
     ras.traceOfsLastLine = -1;
   }
 
-  static void  Vertical_Region_Sweep_Span( RAS_ARGS Short       y,
+  static void _near  Vertical_Region_Sweep_Span( RAS_ARGS Short       y,
                                                     TT_F26Dot6  x1,
                                                     TT_F26Dot6  x2,
                                                     PProfile    left,
@@ -1724,7 +1724,7 @@
     }
   }
 
-  static void  Vertical_Region_Sweep_Drop( RAS_ARGS Short       y,
+  static void _near  Vertical_Region_Sweep_Drop( RAS_ARGS Short       y,
                                                     TT_F26Dot6  x1,
                                                     TT_F26Dot6  x2,
                                                     PProfile    left,
@@ -1733,7 +1733,7 @@
     /* nothing to do */
   } 
 
-  static void  Vertical_Region_Sweep_Step( RAS_ARGS Short y )
+  static void _near  Vertical_Region_Sweep_Step( RAS_ARGS Short y )
   {
     Short*  target;
     Short*  targetLastLine;
@@ -1772,7 +1772,7 @@
     ras.traceIncr        = 0;
   }
 
-  static void Vertical_Region_Sweep_Finish( RAS_ARG )
+  static void _near  Vertical_Region_Sweep_Finish( RAS_ARG )
   {
     Short*  target;
 
@@ -1797,13 +1797,13 @@
 /*                                                                     */
 /***********************************************************************/
 
-  static void  Horizontal_Sweep_Init( RAS_ARGS Short*  min, Short*  max )
+  static void _near  Horizontal_Sweep_Init( RAS_ARGS Short*  min, Short*  max )
   {
     /* nothing, really */
   }
 
 
-  static void  Horizontal_Sweep_Span( RAS_ARGS Short       y,
+  static void _near  Horizontal_Sweep_Span( RAS_ARGS Short       y,
                                                TT_F26Dot6  x1,
                                                TT_F26Dot6  x2,
                                                PProfile    left,
@@ -1833,7 +1833,7 @@
   }
 
 
-  static void  Horizontal_Sweep_Drop( RAS_ARGS Short       y,
+  static void _near  Horizontal_Sweep_Drop( RAS_ARGS Short       y,
                                                TT_F26Dot6  x1,
                                                TT_F26Dot6  x2,
                                                PProfile    left,
@@ -1920,12 +1920,12 @@
   }
 
 
-  static void Horizontal_Sweep_Step( RAS_ARGS Short y )
+  static void _near Horizontal_Sweep_Step( RAS_ARGS Short y )
   {
     /* Nothing, really */
   }
 
-    static void Horizontal_Sweep_Finish( RAS_ARG )
+    static void _near Horizontal_Sweep_Finish( RAS_ARG )
   {
     /* nothing to do */
   }
@@ -2134,7 +2134,7 @@
 /*                                                                  */
 /********************************************************************/
 
-  static Bool  Draw_Sweep( RAS_ARG )
+  static Bool _near  Draw_Sweep( RAS_ARG )
   {
     Short  y, y_change, y_height;
 
@@ -2186,11 +2186,7 @@
 
     /* Now inits the sweep */
 
-#ifdef __GEOS__
-    ProcCallFixedOrMovable_cdecl( ras.Proc_Sweep_Init, RAS_VARS  &min_Y, &max_Y );
-#else
     ras.Proc_Sweep_Init( RAS_VARS  &min_Y, &max_Y );
-#endif  /* __GEOS__ */
 
     /* Then compute the distance of each profile from min_Y */
 
@@ -2286,11 +2282,7 @@
             }
           }
 
-#ifdef __GEOS__
-          ProcCallFixedOrMovable_cdecl( ras.Proc_Sweep_Span, RAS_VARS  y, x1, x2, P_Left, P_Right );
-#else
           ras.Proc_Sweep_Span( RAS_VARS  y, x1, x2, P_Left, P_Right );
-#endif  /* __GEOS__ */
 
    Skip_To_Next:
 
@@ -2306,11 +2298,7 @@
 
    Next_Line:
 
-#ifdef __GEOS__
-        ProcCallFixedOrMovable_cdecl( ras.Proc_Sweep_Step, RAS_VARS y );
-#else
         ras.Proc_Sweep_Step( RAS_VARS y );
-#endif  /* __GEOS__ */
 
         y++;
 
@@ -2351,19 +2339,11 @@
     /* for gray-scaling, flushes the bitmap scanline cache */
     while ( y <= max_Y )
     {
-#ifdef __GEOS__
-      ProcCallFixedOrMovable_cdecl( ras.Proc_Sweep_Step, RAS_VARS y );
-#else
       ras.Proc_Sweep_Step( RAS_VARS y );
-#endif  /* __GEOS__ */
       y++;
     }
 
-#ifdef __GEOS__
-    ProcCallFixedOrMovable_cdecl( ras.Proc_Sweep_Finish, RAS_VAR );
-#else
     ras.Proc_Sweep_Finish( RAS_VAR );
-#endif
     return SUCCESS;
 
 Scan_DropOuts :
@@ -2377,19 +2357,11 @@ Scan_DropOuts :
       {
         P_Left->countL = 0;
         /* dropouts--;    -- this is useful when debugging only */
-#ifdef __GEOS__
-        ProcCallFixedOrMovable_cdecl( ras.Proc_Sweep_Drop, RAS_VARS  y,
-                                       P_Left->X,
-                                       P_Right->X,
-                                       P_Left,
-                                       P_Right );
-#else
         ras.Proc_Sweep_Drop( RAS_VARS  y,
                                        P_Left->X,
                                        P_Right->X,
                                        P_Left,
                                        P_Right );
-#endif  /* __GEOS__ */
       }
 
       P_Left  = P_Left->link;
