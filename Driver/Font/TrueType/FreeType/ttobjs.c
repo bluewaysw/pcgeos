@@ -739,8 +739,8 @@
       metrics->x_ppem = 0;
       metrics->y_ppem = 0;
 
-      metrics->rotated   = FALSE;
-      metrics->stretched = FALSE;
+     // metrics->rotated   = FALSE;
+     // metrics->stretched = FALSE;
 
       /* set default compensation ( all 0 ) */
       for ( i = 0; i < 4; i++ )

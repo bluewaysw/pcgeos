@@ -460,8 +460,8 @@
 
     TT_F26Dot6  compensations[4];  /* device-specific compensations */
 
-    Bool        rotated;        /* `is the glyph rotated?'-flag   */
-    Bool        stretched;      /* `is the glyph stretched?'-flag */
+    //Bool        rotated;        /* `is the glyph rotated?'-flag   */
+    //Bool        stretched;      /* `is the glyph stretched?'-flag */
   };
 
   typedef struct TIns_Metrics_  TIns_Metrics;
