@@ -156,8 +156,8 @@ void _pascal TrueType_InitFonts( MemHandle fontInfoBlock, MemHandle varBlock )
         TrueTypeVars*   trueTypeVars;
 
 
-        ECCheckMemHandle( fontInfoBlock );
-        ECCheckMemHandle( varBlock );
+EC(     ECCheckMemHandle( fontInfoBlock ) );
+EC(     ECCheckMemHandle( varBlock ) );
 
 
         /* get trueTypeVar block */
@@ -174,7 +174,7 @@ void _pascal TrueType_InitFonts( MemHandle fontInfoBlock, MemHandle varBlock )
 
         /* detect all filenames in current directory */
         numFiles = DetectFontFiles( &fileEnumBlock );
-        ECCheckMemHandle( fileEnumBlock );
+EC(     ECCheckMemHandle( fileEnumBlock ) );
 
         if( numFiles == 0 )
                 goto Fin;
@@ -268,12 +268,12 @@ static void ProcessFont( TRUETYPE_VARS, const char* fileName, MemHandle fontInfo
         sword                   availIndex;
 
 
-        ECCheckBounds( (void*)fileName );
-        ECCheckBounds( (void*)trueTypeVars );
+EC(     ECCheckBounds( (void*)fileName ) );
+EC(     ECCheckBounds( (void*)trueTypeVars ) );
         
         truetypeFile = FileOpen( fileName, FILE_ACCESS_R | FILE_DENY_W );
         
-        ECCheckFileHandle( truetypeFile );
+EC(     ECCheckFileHandle( truetypeFile ) );
 
         if ( TT_Open_Face( truetypeFile, &FACE ) )
                 goto Fin;
@@ -791,7 +791,7 @@ static void ConvertHeader( TRUETYPE_VARS, FontHeader* fontHeader )
         word                geosChar;
 
 
-        ECCheckBounds( (void*)fontHeader );
+EC(     ECCheckBounds( (void*)fontHeader ) );
         
         /* initialize min, max and avg values in fontHeader */
         fontHeader->FH_minLSB   =  9999;

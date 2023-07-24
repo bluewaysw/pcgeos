@@ -60,6 +60,9 @@ static void AdjustFontBuf( TransformMatrix* transMatrix,
 static Boolean IsRegionNeeded( TransformMatrix* transMatrix, 
                         FontMatrix* fontMatrix, FontBuf* fontBuf );
 
+
+#define ROUND_WWFIXED( value )    ( value & 0xffff ? ( value >> 16 ) + 1 : value >> 16 )
+
 static word round( WWFixedAsDWord toRound );
 
 
@@ -70,10 +73,14 @@ static word round( WWFixedAsDWord toRound );
  *                in a given pointsize and style.
  * 
  * PARAMETERS:    fontHandle            Memory handle to font block.
- *                *fontMatrix           Pointer to tranformation matrix.
+ *                *fontMatrix           Ptr. to tranformation matrix.
  *                pointSize             Desired point size.
- *                *fontInfo             Pointer to font info structure.
- *                textStyle             Desired text style.
+ *                *fontInfo             Ptr. to font info structure.
+ *                *headerEntry          Ptr. to outline entry containing 
+ *                                      TrueTypeOutlineEntry.
+ *                *firstEntry           Ptr. to outline entry containing 
+ *                                      FontHeader.
+ *                stylesToImplement     Desired text style.
  *                MemHandle             Memory handle to var block.
  * 
  * RETURNS:       MemHandle             Memory handle to font block.
@@ -176,8 +183,6 @@ EC(     ECCheckFileHandle( truetypeFile ) );
         /* Are the glyphs rendered as regions? */
         if( IsRegionNeeded( transMatrix, fontMatrix, fontBuf ) )
                 fontBuf->FB_flags |= FBF_IS_REGION;
-        else
-                fontBuf->FB_flags &= ~FBF_IS_REGION;
 
 Fail:
         TT_Close_Face( FACE );
@@ -195,11 +200,9 @@ Fin:
  * SYNOPSIS:	  Converts the information from the FontHeader and 
  *                fills FontBuf with it.
  * 
- * PARAMETERS:    face                  TrueType face of font file.
- *                *fontHeader           Pointer to FontHeader structure.
- *                scaleFactor           Factor by which the chars width
- *                                      must be scaled.
- *                *fontBuf              Pointer to FontBuf structure.
+ * PARAMETERS:    TRUETYPE_VARS         Cached variables needed by driver.
+ *                *fontHeader           Ptr. to FontHeader structure.
+ *                *fontBuf              Ptr. to FontBuf structure.
  * 
  * RETURNS:       void
  * 
@@ -289,11 +292,12 @@ EC(             ECCheckBounds( (void*)charTableEntry ) );
 /********************************************************************
  *                      ConvertKernPairs
  ********************************************************************
- * SYNOPSIS:	  
+ * SYNOPSIS:	  Fills FontBuf with kerning information.
  * 
- * PARAMETERS:    
+ * PARAMETERS:    TRUETYPE_VARS         Cached variables needed by driver.
+ *                *fontBuf              Ptr. to FontBuf structure.
  * 
- * RETURNS:       
+ * RETURNS:       void
  * 
  * SIDE EFFECTS:  none
  * 
@@ -331,11 +335,12 @@ static void ConvertKernPairs( TRUETYPE_VARS, FontBuf* fontBuf )
 /********************************************************************
  *                      CalcScaleForWidths
  ********************************************************************
- * SYNOPSIS:	  
+ * SYNOPSIS:	  Fills scale factors in chached variables for calculating 
+ *                FontBuf and ChatTableEntries.
  * 
- * PARAMETERS:    TRUETYPE_VARS
- *                pointSize
- *                styleToImplement
+ * PARAMETERS:    TRUETYPE_VARS         Cached variables needed by driver.
+ *                pointSize             Desired point size.
+ *                stylesToImplement     Desired text style.
  * 
  * RETURNS:       void
  * 
@@ -368,9 +373,11 @@ static void CalcScaleForWidths( TRUETYPE_VARS,
  * SYNOPSIS:	  Calculates the transformation matrix for missing
  *                style attributes and weights.
  * 
- * PARAMETERS:    *transMatrix          Pointer to TransformMatrix.
+ * PARAMETERS:    TRUETYPE_VARS         Cached variables needed by driver.
+ *                *transMatrix          Pointer to TransformMatrix.
  *                *fontMatrix           Systems transformation matrix.
  *                styleToImplement      Styles that must be added.
+ *                *fontBuf              Ptr. to FontBuf structure.
  *                      
  * RETURNS:       void
  * 
@@ -470,11 +477,11 @@ EC(     ECCheckBounds( (void*)fontMatrix ) );
  *      ----      ----      -----------
  *      14/01/23  JK        Initial Revision
  *******************************************************************/
-static word AllocFontBlock( 
-                word        additionalSpace,
-                word        numOfCharacters,
-                word        numOfKernPairs,
-                MemHandle*  fontHandle )
+
+static word AllocFontBlock( word        additionalSpace,
+                            word        numOfCharacters,
+                            word        numOfKernPairs,
+                            MemHandle*  fontHandle )
 {
         word size = sizeof( FontBuf ) + numOfCharacters * sizeof( CharTableEntry ) +
                 numOfKernPairs * ( sizeof( KernPair ) + sizeof( WBFixed ) ) +
@@ -502,7 +509,7 @@ static word AllocFontBlock(
  ********************************************************************
  * SYNOPSIS:	  Converts FontInfo and fill FontBuf structure.
  * 
- * PARAMETERS:    pointSize             Current pointsize.
+ * PARAMETERS:    TRUETYPE_VARS         Cached variables needed by driver.
  *                *fontHeader           Ptr to FontHeader structure.
  *                *fontBuf              Ptr to FontBuf structure.
  * 
@@ -516,7 +523,7 @@ static word AllocFontBlock(
  *      11/12/22  JK        Initial Revision
  *******************************************************************/
 
-void ConvertHeader( TRUETYPE_VARS, FontHeader* fontHeader, FontBuf* fontBuf ) 
+static void ConvertHeader( TRUETYPE_VARS, FontHeader* fontHeader, FontBuf* fontBuf ) 
 {
         WWFixedAsDWord      ttfElement;
         WWFixedAsDWord      scaleWidth  = SCALE_WIDTH;
@@ -600,6 +607,7 @@ void ConvertHeader( TRUETYPE_VARS, FontHeader* fontHeader, FontBuf* fontBuf )
         fontBuf->FB_pixHeight = INTEGER_OF_WWFIXEDASDWORD( ttfElement );// + fontBuf->FB_minTSB;
 
         fontBuf->FB_maker        = FM_TRUETYPE;
+        fontBuf->FB_flags        = FBF_IS_OUTLINE;
         fontBuf->FB_kernPairPtr  = 0;
         fontBuf->FB_kernValuePtr = 0;
         fontBuf->FB_kernCount    = 0;
@@ -609,6 +617,25 @@ void ConvertHeader( TRUETYPE_VARS, FontHeader* fontHeader, FontBuf* fontBuf )
         fontBuf->FB_defaultChar  = fontHeader->FH_defaultChar;
 }
 
+
+/********************************************************************
+ *                      AdjustFontBuf
+ ********************************************************************
+ * SYNOPSIS:	  Adjust fields in FontBuf to reflect rotating and scaling.
+ * 
+ * PARAMETERS:    *transMatrix          Ptr to tranfomation matrix.
+ *                *fontMatrix           Ptr to systems font matrix.
+ *                *fontBuf              Ptr to FontBuf structure.
+ * 
+ * RETURNS:       void
+ * 
+ * STRATEGY:      
+ * 
+ * REVISION HISTORY:
+ *      Date      Name      Description
+ *      ----      ----      -----------
+ *      22/07/23  JK        Initial Revision
+ *******************************************************************/
 
 static void AdjustFontBuf( TransformMatrix* transMatrix, FontMatrix* fontMatrix, FontBuf* fontBuf )
 {
@@ -629,7 +656,7 @@ static void AdjustFontBuf( TransformMatrix* transMatrix, FontMatrix* fontMatrix,
  *                      IsRegionNeeded
  ********************************************************************
  * SYNOPSIS:	  Determines whether glyphs should be rendered as 
- *                bitmap or as region.
+ *                region.
  * 
  * PARAMETERS:    *transMatrix          Ptr to tranfomation matrix.
  *                *fontMatrix           Ptr to systems font matrix.
@@ -644,6 +671,7 @@ static void AdjustFontBuf( TransformMatrix* transMatrix, FontMatrix* fontMatrix,
  *      ----      ----      -----------
  *      22/07/23  JK        Initial Revision
  *******************************************************************/
+
 static Boolean IsRegionNeeded( TransformMatrix* transMatrix, FontMatrix* fontMatrix, FontBuf* fontBuf )
 {
         word param1;
