@@ -159,7 +159,7 @@ EC(     ECCheckFileHandle( truetypeFile ) );
 
                 /* translate outline and render it */
                 TT_Transform_Outline( &OUTLINE, &flipmatrix );
-                TT_Translate_Outline( &OUTLINE, -GLYPH_BBOX.xMin, GLYPH_BBOX.yMin + GLYPH_BBOX.yMax );
+                TT_Translate_Outline( &OUTLINE, -GLYPH_BBOX.xMin, GLYPH_BBOX.yMax );
                 TT_Get_Outline_Region( &OUTLINE, &RASTER_MAP );
 
                 /* fill header of charData */
