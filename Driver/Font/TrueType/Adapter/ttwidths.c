@@ -639,11 +639,20 @@ static void ConvertHeader( TRUETYPE_VARS, FontHeader* fontHeader, FontBuf* fontB
 
 static void AdjustFontBuf( TransformMatrix* transMatrix, FontMatrix* fontMatrix, FontBuf* fontBuf )
 {
-        //adjust FB_pixHeight, FB_minTSB, heightY
-        fontBuf->FB_flags     |= FBF_IS_COMPLEX;
-
-        //TODO: Das ist nur eine provisorische Lösung:
+        /* set height */
         transMatrix->TM_heightY = fontBuf->FB_baselinePos.WBF_int + 1;
+
+        if( fontMatrix->FM_flags & TF_COMPLEX )
+        {
+                fontBuf->FB_flags     |= FBF_IS_COMPLEX;
+
+
+
+        }
+
+        //adjust FB_pixHeight, FB_minTSB, heightY
+
+        
 
         if( fontMatrix->FM_flags & TF_ROTATED )
         {

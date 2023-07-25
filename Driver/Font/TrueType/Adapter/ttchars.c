@@ -111,7 +111,6 @@ EC(     ECCheckFileHandle( truetypeFile ) );
 
         TT_New_Glyph( FACE, &GLYPH );
         TT_New_Instance( FACE, &INSTANCE );
-        TT_Set_Instance_Resolutions( INSTANCE, 72, 72 );
 
          /* get TT char index */
         getCharMap( FACE, &CHAR_MAP );

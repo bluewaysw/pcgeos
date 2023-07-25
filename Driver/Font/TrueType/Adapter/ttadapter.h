@@ -281,6 +281,8 @@ typedef ByteFlags TransFlags;
 #define TF_SCALED       0x02 
 #define TF_TRANSLATED   0x01
 
+#define TF_COMPLEX      ( TF_ROTATED | TF_SCALED | TF_TRANSLATED )
+
 typedef struct
 {
     WWFixedAsDWord              FM_11;
