@@ -35,19 +35,19 @@ Document is work in progress.... stay tuned!
 
 ## Building PC/GEOS SDK
 Build pmake tool:
-- `cd pcgeos/Tools/pmake/pmake`
+- `cd %ROOT_DIR%/Tools/pmake/pmake`
 - `wmake install`
 
 Build all the other SDK Tools:
-- `cd pcgeos/Installed/Tools`
+- `cd %ROOT_DIR%/Installed/Tools`
 - `pmake install`
 
 Build all PC/GEOS (target) components:
-- `cd pcgeos/Installed`
+- `cd %ROOT_DIR%/Installed`
 - `pmake`
 
 Build the target environment:
-- `cd pcgeos/Tools/build/product/bbxensem/Scripts`
+- `cd %ROOT_DIR%/Tools/build/product/bbxensem/Scripts`
 - `perl -I. buildbbx.pl`
   - the answers to the questions from the above perl-script are:
     - nt (for the platform)
@@ -60,8 +60,7 @@ Build the target environment:
 
 Launch the target environment in dosbox:
 - make sure dosbox is added to your path variable, or [pcgeos-basebox](https://github.com/bluewaysw/pcgeos-basebox/tags) is installed and configured using BASEBOX environmental variable
-- `cd pcgeos`
-- `bin/target`
+- `%ROOT_DIR%/bin/target`
   - the "swat" debugger stops immediately after the first stage of the boot process
   - enter `quit` at the "=>" prompt to detach the debugger and launch PC/GEOS stand-alone
     - or: enter `c` to launch with the debugger running in the background (slower)

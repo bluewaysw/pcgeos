@@ -164,7 +164,7 @@ EC(     ECCheckMemHandle( varBlock ) );
         trueTypeVars = MemLock( varBlock );
         if( trueTypeVars == NULL )
         {
-                MemReAlloc( varBlock, sizeof( TrueTypeVars ), HAF_NO_ERR );
+                MemReAlloc( varBlock, sizeof( TrueTypeVars ), HAF_NO_ERR | HAF_ZERO_INIT );
                 trueTypeVars = MemLock( varBlock );
         }
 
@@ -281,7 +281,7 @@ EC(     ECCheckFileHandle( truetypeFile ) );
         if ( TT_Get_Face_Properties( FACE, &FACE_PROPERTIES ) )
                 goto Fail;
 
-        if ( getCharMap( FACE, &CHAR_MAP ) )
+        if ( getCharMap( trueTypeVars, &CHAR_MAP ) )
                 goto Fail;
 
         if ( getNameFromNameTable( trueTypeVars, FAMILY_NAME, FAMILY_NAME_ID ) == 0 )

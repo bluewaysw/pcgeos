@@ -380,6 +380,10 @@ typedef struct
     TT_CharMap                  charMap;
     TT_Outline                  outline;
     TT_BBox                     bbox;
+
+    /* currently open face */
+    FileHandle                  ttfile;
+    TrueTypeOutlineEntry        entry;
 } TrueTypeVars;
 
 
@@ -398,7 +402,8 @@ typedef struct
 #define GLYPH_BBOX              trueTypeVars->glyphMetrics.bbox
 #define RASTER_MAP              trueTypeVars->rasterMap
 #define SCALE_HEIGHT            trueTypeVars->scaleHeight
-#define SCALE_WIDTH             trueTypeVars->scaleWidth   
+#define SCALE_WIDTH             trueTypeVars->scaleWidth
+#define TTFILE                  trueTypeVars->ttfile
 
 #define UNITS_PER_EM            FACE_PROPERTIES.header->Units_Per_EM
 
@@ -464,5 +469,13 @@ typedef struct
 #define WBFIXED_TO_WWFIXEDASDWORD( value )       \
         ( (long) ( ( (long)(value.WBF_int) ) * 0x00010000 ) | ( ( (long)value.WBF_frac) << 8 ) )
 
+
+/***********************************************************************
+ *      functions
+ ***********************************************************************/
+
+Boolean TrueType_Lock_Face(TRUETYPE_VARS, TrueTypeOutlineEntry* entry);
+void TrueType_Unlock_Face(TRUETYPE_VARS);
+void TrueType_Free_Face(TRUETYPE_VARS);
 
 #endif /* _TTADAPTER_H_ */
