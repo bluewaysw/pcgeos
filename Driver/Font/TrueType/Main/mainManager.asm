@@ -117,6 +117,9 @@ global  bitmapHandle:hptr
 global  bitmapSize:word
 global  engineInstance:TrueTypeEngineInstance
 
+global smallListHandle: word
+global largeListHandle: word
+
 MetricsMod segment resource
 include		truetypeMetrics.asm
 include		truetypePath.asm
@@ -131,6 +134,7 @@ InitMod ends
 include		truetypeEC.asm
 include	        ansic_runtime.asm
 include		ansic_memory.asm
+include		ttmemory_asm.asm
 
 Resident segment resource	;MODULE_FIXED
 

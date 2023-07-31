@@ -15,6 +15,7 @@ FREETYPE        = ftxkern.c ttapi.c ttcache.c ttcalc.c ttcmap.c ttextend.c\
                   ttgload.h ttinterp.h ttload.h ttmemory.h ttmutex.h\
                   ttobjs.h ttraster.h tttables.h tttags.h tttypes.h
 MAIN            = ansic_memory.asm ansic_runtime.asm mainManager.asm\
+                  ttmemory_asm.asm\
                   truetypeChars.asm truetypeEC.asm truetypeEscape.asm\
                   truetypeInit.asm truetypeMetrics.asm truetypePath.asm\
                   truetypeWidths.asm truetypeConstant.def\
