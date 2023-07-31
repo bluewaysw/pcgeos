@@ -281,7 +281,7 @@ typedef ByteFlags TransFlags;
 #define TF_SCALED       0x02 
 #define TF_TRANSLATED   0x01
 
-#define TF_COMPLEX      ( TF_ROTATED | TF_SCALED | TF_TRANSLATED )
+#define TF_COMPLEX      ( TF_ROTATED | TF_SCALED )
 
 typedef struct
 {
@@ -289,8 +289,8 @@ typedef struct
     WWFixedAsDWord              FM_12;
     WWFixedAsDWord              FM_21;
     WWFixedAsDWord              FM_22;
-    WWFixedAsDWord              FM_31;
-    WWFixedAsDWord              FM_32;
+    DWFixed                     FM_31;
+    DWFixed                     FM_32;
     DDFixed                     FM_xInv;    /* inverse translation factor (x coords) */
     DDFixed                     FM_yInv;    /* inverse translation factor (y coords) */
     TransFlags                  FM_flags;

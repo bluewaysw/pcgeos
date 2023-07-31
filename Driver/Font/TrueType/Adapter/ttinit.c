@@ -798,7 +798,6 @@ EC(     ECCheckBounds( (void*)fontHeader ) );
         fontHeader->FH_maxBSB   = -9999;
         fontHeader->FH_minTSB   = -9999;
         fontHeader->FH_maxRSB   = -9999;
-        fontHeader->FH_avgwidth = 0;
         fontHeader->FH_maxwidth = 0;
         fontHeader->FH_descent  = 9999;
         fontHeader->FH_accent   = 0;
