@@ -54,14 +54,18 @@ static void CalcTransform( TRUETYPE_VARS,
                         TextStyle               stylesToImplement,
                         FontBuf*                fontBuf );
 
-static void AdjustFontBuf( TransformMatrix* transMatrix, 
-                        FontMatrix* fontMatrix, FontBuf* fontBuf );
+static void AdjustFontBuf( TransformMatrix*     transMatrix, 
+                        FontMatrix*             fontMatrix, 
+                        TextStyle               stylesToImplement, 
+                        FontBuf*                fontBuf );
 
 static Boolean IsRegionNeeded( TransformMatrix* transMatrix, 
                         FontMatrix* fontMatrix, FontBuf* fontBuf );
 
 
 #define ROUND_WWFIXED( value )    ( value & 0xffff ? ( value >> 16 ) + 1 : value >> 16 )
+
+#define ROUND_WBFIXED( value )    ( value.WBF_frac ? ( value.WBF_int + 1 ) : value.WBF_int )
 
 static word round( WWFixedAsDWord toRound );
 
@@ -161,7 +165,7 @@ EC(     ECCheckBounds( (void*)trueTypeVars ) );
         CalcTransform( trueTypeVars, transMatrix, fontMatrix, stylesToImplement, fontBuf );
 
         //TODO: adjust FB_height, FB_minTSB, FB_pixHeight and FB_baselinePos
-        AdjustFontBuf( transMatrix, fontMatrix, fontBuf );
+        AdjustFontBuf( transMatrix, fontMatrix, stylesToImplement, fontBuf );
 
         /* Are the glyphs rendered as regions? */
         if( IsRegionNeeded( transMatrix, fontMatrix, fontBuf ) )
@@ -393,10 +397,7 @@ EC(     ECCheckBounds( (void*)fontMatrix ) );
 
         /* fake bold style       */
         if( stylesToImplement & TS_BOLD )
-        {
                 tempMatrix.xx = BOLD_FACTOR;
-                tempMatrix.yy = BOLD_FACTOR;
-        }
 
         /* fake italic style       */
         if( stylesToImplement & TS_ITALIC )
@@ -581,9 +582,8 @@ static void ConvertHeader( TRUETYPE_VARS, FontHeader* fontHeader, FontBuf* fontB
         ttfElement = SCALE_WORD( fontHeader->FH_maxRSB, scaleWidth );
         fontBuf->FB_maxRSB  = INTEGER_OF_WWFIXEDASDWORD( ttfElement );
 
-        //ttfElement = SCALE_WORD( fontHeader->FH_height + fontHeader->FH_accent, scaleHeight );
         ttfElement = SCALE_WORD( fontHeader->FH_height, scaleHeight );
-        fontBuf->FB_pixHeight = INTEGER_OF_WWFIXEDASDWORD( ttfElement );// + fontBuf->FB_minTSB;
+        fontBuf->FB_pixHeight = INTEGER_OF_WWFIXEDASDWORD( ttfElement ) + fontBuf->FB_minTSB;
 
         fontBuf->FB_maker        = FM_TRUETYPE;
         fontBuf->FB_flags        = FBF_IS_OUTLINE;
@@ -604,6 +604,7 @@ static void ConvertHeader( TRUETYPE_VARS, FontHeader* fontHeader, FontBuf* fontB
  * 
  * PARAMETERS:    *transMatrix          Ptr to tranfomation matrix.
  *                *fontMatrix           Ptr to systems font matrix.
+ *                stylesToImplement
  *                *fontBuf              Ptr to FontBuf structure.
  * 
  * RETURNS:       void
@@ -616,18 +617,52 @@ static void ConvertHeader( TRUETYPE_VARS, FontHeader* fontHeader, FontBuf* fontB
  *      22/07/23  JK        Initial Revision
  *******************************************************************/
 
-static void AdjustFontBuf( TransformMatrix* transMatrix, FontMatrix* fontMatrix, FontBuf* fontBuf )
+static void AdjustFontBuf( TransformMatrix* transMatrix, 
+                           FontMatrix*      fontMatrix, 
+                           TextStyle        stylesToImplement, 
+                           FontBuf*         fontBuf )
 {
-        //adjust FB_pixHeight, FB_minTSB, heightY
-        fontBuf->FB_flags     |= FBF_IS_COMPLEX;
+        transMatrix->TM_heightY = INTEGER_OF_WWFIXEDASDWORD( GrMulWWFixed( WORD_TO_WWFIXEDASDWORD( fontBuf->FB_baselinePos.WBF_int ), fontMatrix->FM_22 ) ) + 1;
 
-        //TODO: Das ist nur eine provisorische Lösung:
-        transMatrix->TM_heightY = fontBuf->FB_baselinePos.WBF_int + 1;
-
-        if( fontMatrix->FM_flags & TF_ROTATED )
+        if( fontMatrix->FM_flags & TF_COMPLEX )
         {
-             //adjust scriptX, heightX   
+                fontBuf->FB_flags     |= FBF_IS_COMPLEX;
+
+                /* adjust FB_pixHeight, FB_minTSB */
+                fontBuf->FB_pixHeight = INTEGER_OF_WWFIXEDASDWORD( GrMulWWFixed( 
+                                                WORD_TO_WWFIXEDASDWORD( fontBuf->FB_pixHeight ), fontMatrix->FM_22 ) );
+                fontBuf->FB_minTSB    = INTEGER_OF_WWFIXEDASDWORD( GrMulWWFixed( 
+                                                WORD_TO_WWFIXEDASDWORD( fontBuf->FB_minTSB ), fontMatrix->FM_22 ) );
+                fontBuf->FB_pixHeight += fontBuf->FB_minTSB;
+
+
+                if( fontMatrix->FM_flags & TF_ROTATED )
+                {
+                        sword savedHeightY = transMatrix->TM_heightY;
+
+                        /* adjust FB_pixHeight, FB_minTSB */
+                        fontBuf->FB_pixHeight = INTEGER_OF_WWFIXEDASDWORD( GrMulWWFixed( 
+                                                        WORD_TO_WWFIXEDASDWORD( fontBuf->FB_pixHeight ), transMatrix->TM_matrix.yy ) );
+                        fontBuf->FB_minTSB    = INTEGER_OF_WWFIXEDASDWORD( GrMulWWFixed( 
+                                                        WORD_TO_WWFIXEDASDWORD( fontBuf->FB_minTSB ), transMatrix->TM_matrix.yy ) );
+                        fontBuf->FB_pixHeight += fontBuf->FB_minTSB;
+
+                        /* adjust script and height */
+                        transMatrix->TM_heightY = INTEGER_OF_WWFIXEDASDWORD( GrMulWWFixed( 
+                                                        WORD_TO_WWFIXEDASDWORD( transMatrix->TM_heightY ), transMatrix->TM_matrix.yy ) );
+                        transMatrix->TM_scriptY = INTEGER_OF_WWFIXEDASDWORD( GrMulWWFixed( 
+                                                        WORD_TO_WWFIXEDASDWORD( transMatrix->TM_scriptY ), transMatrix->TM_matrix.yy ) );
+
+                        transMatrix->TM_heightX = INTEGER_OF_WWFIXEDASDWORD( GrMulWWFixed( 
+                                                        WORD_TO_WWFIXEDASDWORD( fontBuf->FB_baselinePos.WBF_int ), transMatrix->TM_matrix.yx ) );
+                        transMatrix->TM_scriptX = INTEGER_OF_WWFIXEDASDWORD( GrMulWWFixed( 
+                                                        WORD_TO_WWFIXEDASDWORD( savedHeightY ), transMatrix->TM_matrix.yx ) );
+                }
+
+                fontMatrix->FM_12 = -fontMatrix->FM_12;
+                fontMatrix->FM_21 = -fontMatrix->FM_21;
         }
+
 }
 
 

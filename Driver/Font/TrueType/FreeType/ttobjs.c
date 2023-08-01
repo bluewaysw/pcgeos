@@ -733,14 +733,11 @@
 
       metrics->pointSize    = 10 * 64;     /* default pointsize  = 10pts */
 
-      metrics->x_resolution = 96;          /* default resolution = 96dpi */
-      metrics->y_resolution = 96;
+      metrics->x_resolution = 72;          /* default resolution = 72dpi */
+      metrics->y_resolution = 72;
 
       metrics->x_ppem = 0;
       metrics->y_ppem = 0;
-
-     // metrics->rotated   = FALSE;
-     // metrics->stretched = FALSE;
 
       /* set default compensation ( all 0 ) */
       for ( i = 0; i < 4; i++ )

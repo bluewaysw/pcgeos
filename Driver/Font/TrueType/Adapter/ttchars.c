@@ -98,7 +98,6 @@ EC(     ECCheckBounds( (void*)trueTypeVars ) );
 
         TT_New_Glyph( FACE, &GLYPH );
         TT_New_Instance( FACE, &INSTANCE );
-        TT_Set_Instance_Resolutions( INSTANCE, 72, 72 );
 
          /* get TT char index */
         charIndex = TT_Char_Index( CHAR_MAP, GeosCharToUnicode( character ) );
@@ -145,7 +144,7 @@ EC(     ECCheckBounds( (void*)trueTypeVars ) );
 
                 /* translate outline and render it */
                 TT_Transform_Outline( &OUTLINE, &flipmatrix );
-                TT_Translate_Outline( &OUTLINE, -GLYPH_BBOX.xMin, GLYPH_BBOX.yMin + GLYPH_BBOX.yMax );
+                TT_Translate_Outline( &OUTLINE, -GLYPH_BBOX.xMin, GLYPH_BBOX.yMax );
                 TT_Get_Outline_Region( &OUTLINE, &RASTER_MAP );
 
                 /* fill header of charData */
