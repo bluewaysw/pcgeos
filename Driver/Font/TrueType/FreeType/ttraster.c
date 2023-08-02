@@ -2548,7 +2548,10 @@ TT_Error  Render_Region_Glyph( RAS_ARGS TT_Outline*     glyph,
   TT_Error  error;
 
   if ( glyph->n_points == 0 || glyph->n_contours <= 0 )
+  {
+    Render_Region_Empty_Glyph( raster );
     return TT_Err_Ok;
+  }
 
   if ( !ras.buff )
   {
@@ -2598,6 +2601,19 @@ TT_Error  Render_Region_Glyph( RAS_ARGS TT_Outline*     glyph,
   map->size = ras.target.size;
 
   return TT_Err_Ok;
+}
+
+
+static void Render_Region_Empty_Glyph( RAS_ARG )
+{
+    Short*  target = ras.rTarget;
+
+
+    /* complete a region */
+
+    target[0] = EOREGREC;
+    target[1] = EOREGREC;
+    ras.target.size = 2 * sizeof( Short );
 }
 
 #endif  /* __GEOS__ */
