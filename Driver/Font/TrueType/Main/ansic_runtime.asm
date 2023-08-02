@@ -13,8 +13,8 @@
 ; limitations under the License.
 
 
-WCC_TEXT        SEGMENT BYTE PUBLIC 'CODE'
-                ASSUME  CS:WCC_TEXT
+ttcalc_TEXT	SEGMENT BYTE PUBLIC 'CODE'
+                ASSUME  CS:ttcalc_TEXT
 
 	public __U4M
 	public __U4D
@@ -147,4 +147,4 @@ WCC_TEXT        SEGMENT BYTE PUBLIC 'CODE'
 	__I4D endp
 
 	
-WCC_TEXT        ENDS
+ttcalc_TEXT        ENDS
