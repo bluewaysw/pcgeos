@@ -42,11 +42,14 @@ static void* ensureBitmapBlock( MemHandle bitmapHandle, word size );
  * SYNOPSIS:	  Generate one character for a font.
  * 
  * PARAMETERS:    character             Character to build (Chars).
- *                pointsize
  *                *fontBuf              Ptr to font data structure.
+ *                pointsize             Desired point size.
  *                *fontInfo             Pointer to FontInfo structure.
- *                *outlineEntry         Handle to current gstate.
- *                stylesToImplement
+ *                *outlineEntry         Ptr. to outline entry containing 
+ *                                      TrueTypeOutlineEntry.
+ *                bitmapHandle          Memory handle to bitmapblock.
+ *                varBlock              Memory handle to var block.
+ *                
  * 
  * RETURNS:       void
  * 
@@ -67,7 +70,6 @@ void _pascal TrueType_Gen_Chars(
                         WWFixedAsDWord       pointSize,
 			const FontInfo*      fontInfo, 
                         const OutlineEntry*  outlineEntry,
-                        TextStyle            stylesToImplement,
                         MemHandle            bitmapHandle,
                         MemHandle            varBlock ) 
 {
