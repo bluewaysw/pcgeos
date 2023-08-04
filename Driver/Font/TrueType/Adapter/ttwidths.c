@@ -67,8 +67,6 @@ static Boolean IsRegionNeeded( TransformMatrix* transMatrix,
 
 #define ROUND_WBFIXED( value )    ( value.WBF_frac ? ( value.WBF_int + 1 ) : value.WBF_int )
 
-static word round( WWFixedAsDWord toRound );
-
 
 /********************************************************************
  *                      TrueType_Gen_Widths
@@ -85,7 +83,7 @@ static word round( WWFixedAsDWord toRound );
  *                *firstEntry           Ptr. to outline entry containing 
  *                                      FontHeader.
  *                stylesToImplement     Desired text style.
- *                MemHandle             Memory handle to var block.
+ *                varBlock              Memory handle to var block.
  * 
  * RETURNS:       MemHandle             Memory handle to font block.
  * 
@@ -117,12 +115,12 @@ MemHandle _pascal TrueType_Gen_Widths(
         TransformMatrix*       transMatrix;
 
 
- EC(    ECCheckMemHandle( fontHandle ) );
- EC(    ECCheckBounds( (void*)fontMatrix ) );
- EC(    ECCheckBounds( (void*)fontInfo ) );
- EC(    ECCheckBounds( (void*)headerEntry ) );
- EC(    ECCheckBounds( (void*)firstEntry ) );
- EC(    ECCheckStack() );
+EC(     ECCheckMemHandle( fontHandle ) );
+EC(     ECCheckBounds( (void*)fontMatrix ) );
+EC(     ECCheckBounds( (void*)fontInfo ) );
+EC(     ECCheckBounds( (void*)headerEntry ) );
+EC(     ECCheckBounds( (void*)firstEntry ) );
+EC(     ECCheckStack() );
 
 
         /* get trueTypeVar block */
@@ -335,8 +333,7 @@ static void ConvertKernPairs( TRUETYPE_VARS, FontBuf* fontBuf )
  *      20/07/23  JK        Initial Revision
  *******************************************************************/
 
-static void CalcScaleForWidths( TRUETYPE_VARS, 
-                                WWFixedAsDWord pointSize, 
+static void CalcScaleForWidths( TRUETYPE_VARS, WWFixedAsDWord pointSize, 
                                 TextStyle stylesToImplement )
 {
         SCALE_HEIGHT = GrUDivWWFixed( pointSize, MakeWWFixed( FACE_PROPERTIES.header->Units_Per_EM ) );
@@ -544,7 +541,7 @@ static void ConvertHeader( TRUETYPE_VARS, FontHeader* fontHeader, FontBuf* fontB
         fontBuf->FB_baseAdjust.WBF_frac = 0;
 
         ttfElement = SCALE_WORD( fontHeader->FH_ascent + fontHeader->FH_accent, scaleHeight );
-        fontBuf->FB_baselinePos.WBF_int  = round( ttfElement );
+        fontBuf->FB_baselinePos.WBF_int  = ROUND_WWFIXED( ttfElement );
         fontBuf->FB_baselinePos.WBF_frac = 0;
 
         ttfElement = SCALE_WORD( fontHeader->FH_descent, scaleHeight );
@@ -709,10 +706,4 @@ static Boolean IsRegionNeeded( TransformMatrix* transMatrix, FontMatrix* fontMat
                 return TRUE;
 
         return FALSE;
-}
-
-
-static word round( WWFixedAsDWord toRound )
-{
-        return toRound & 0xffff ? ( toRound >> 16 ) + 1 : toRound >> 16;
 }

@@ -199,7 +199,7 @@
       }
 
 
-#define CHECK_FILE( _handle_ )  ECCheckFileHandle( _handle_ )
+#define CHECK_FILE( _handle_ )  EC( ECCheckFileHandle( _handle_ ) )
 
 
 /* The macros FRAME_ARGS and FRAME_ARG let us build a thread-safe   */

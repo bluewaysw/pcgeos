@@ -100,7 +100,6 @@ EC(     ECCheckBounds( (void*)trueTypeVars ) );
 
         // scale glyph
         TT_Set_Instance_CharSize( INSTANCE, ( pointSize >> 10 ) );
-        TT_Set_Instance_Resolutions( INSTANCE, 72, 72 );
         TT_Get_Instance_Metrics( INSTANCE, &INSTANCE_METRICS );
 
         // get metrics
