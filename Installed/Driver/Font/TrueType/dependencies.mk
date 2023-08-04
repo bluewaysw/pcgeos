@@ -12,7 +12,8 @@ Main.eobj: Main/mainManager.asm \
                 ../FontCom/fontcomUtils.asm truetypeChars.asm \
                 truetypeMetrics.asm truetypePath.asm truetypeInit.asm \
                 truetypeEscape.asm ../FontCom/fontcomEscape.asm \
-                truetypeEC.asm ansic_runtime.asm ansic_memory.asm
+                truetypeEC.asm ansic_runtime.asm ansic_memory.asm \
+                ttmemory_asm.asm
 ttadapter.obj \
 ttadapter.eobj: Adapter/ttadapter.h geos.h ec.h fontID.h file.h \
                 Adapter/../FreeType/freetype.h \
