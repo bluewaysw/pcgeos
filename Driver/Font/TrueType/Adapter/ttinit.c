@@ -93,8 +93,7 @@ TT_Error _pascal Init_FreeType()
         if ( error != TT_Err_Ok )
                 return error;
 
-        //commented out because it freezes swat
-        //TT_Init_Kerning()
+        TT_Init_Kerning_Extension();
 
         return TT_Err_Ok;
 }

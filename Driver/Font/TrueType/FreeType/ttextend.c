@@ -160,8 +160,12 @@
       ext   = (PByte)face->extension + clazz->offset;
 
       /* the destructor is optional */
-      if ( clazz->destroy )
+      if ( clazz->destroy )  
+#ifdef __GEOS__
+        ProcCallFixedOrMovable_cdecl( clazz->destroy, (void*)ext, face );
+#else
         clazz->destroy( (void*)ext, face );
+#endif
     }
 
     /* destroy the face's extension block too */
@@ -196,7 +200,13 @@
     {
       clazz = registry->classes + n;
       ext   = (PByte)face->extension + clazz->offset;
+
+#ifdef __GEOS__
+      error = ProcCallFixedOrMovable_cdecl( clazz->build, (void*)ext, face );
+#else
       error = clazz->build( (void*)ext, face );
+#endif
+
       if ( error )
         goto Fail;
     }
