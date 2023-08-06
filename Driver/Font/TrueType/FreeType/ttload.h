@@ -32,7 +32,7 @@
 #endif
 
   EXPORT_DEF
-  Long  TT_LookUp_Table( PFace  face, ULong  tag  );
+  Short  TT_LookUp_Table( PFace  face, ULong  tag  );
 
   LOCAL_DEF TT_Error  Load_TrueType_Directory        ( PFace  face );
   LOCAL_DEF TT_Error  Load_TrueType_MaxProfile       ( PFace  face );

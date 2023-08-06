@@ -285,7 +285,7 @@ extern TEngine_Instance engineInstance;
 
     TT_Kerning*  kern = (TT_Kerning*)ext;
     UShort       num_tables;
-    Long         table;
+    Short        table;
 
     TT_Kern_Subtable*  sub;
 

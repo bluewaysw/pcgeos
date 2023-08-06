@@ -213,7 +213,7 @@ static void ConvertWidths( TRUETYPE_VARS, FontHeader* fontHeader, FontBuf* fontB
 
 EC(             ECCheckBounds( (void*)charTableEntry ) );
 
-                //Unicode to TT ID
+                /* get glyph index of currentChar */
                 charIndex = TT_Char_Index( CHAR_MAP, GeosCharToUnicode( currentChar ) );
                 if ( charIndex == 0 )
                 {
@@ -227,30 +227,26 @@ EC(             ECCheckBounds( (void*)charTableEntry ) );
                         continue;
                 }
                       
-                //Glyph laden
+                /* load glyph and metrics */
                 TT_Load_Glyph( INSTANCE, GLYPH, charIndex, 0 );
                 TT_Get_Glyph_Metrics( GLYPH, &GLYPH_METRICS );
 
-                //width berechnen
+                /* fill CharTableEntry */
                 scaledWidth = GrMulWWFixed( MakeWWFixed( GLYPH_METRICS.advance), SCALE_WIDTH );
                 charTableEntry->CTE_width.WBF_int  = INTEGER_OF_WWFIXEDASDWORD( scaledWidth );
                 charTableEntry->CTE_width.WBF_frac = FRACTION_OF_WWFIXEDASDWORD( scaledWidth );
-
-                // nur TEST
                 charTableEntry->CTE_dataOffset     = CHAR_NOT_BUILT;
                 charTableEntry->CTE_flags          = 0;
                 charTableEntry->CTE_usage          = 0;
                 
                
-                // set flags in CTE_flags if needed
+                /* set flags in CTE_flags if needed */
                 if( GLYPH_BBOX.xMin < 0 )
                         charTableEntry->CTE_flags |= CTF_NEGATIVE_LSB;
-
-                //below descent
+                        
                 if( -GLYPH_BBOX.yMin > fontHeader->FH_descent )
                         charTableEntry->CTE_flags |= CTF_BELOW_DESCENT;
 
-                //above ascent
                 if( GLYPH_BBOX.yMax > fontHeader->FH_ascent )
                         charTableEntry->CTE_flags |= CTF_ABOVE_ASCENT;
                 

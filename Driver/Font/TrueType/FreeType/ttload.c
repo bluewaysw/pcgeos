@@ -49,7 +49,7 @@
  ******************************************************************/
 
   EXPORT_FUNC
-  Long  TT_LookUp_Table( PFace  face,
+  Short  TT_LookUp_Table( PFace  face,
                          ULong  tag  )
   {
     UShort  i;
@@ -154,7 +154,7 @@
   {
     DEFINE_LOCALS;
 
-    Long         i;
+    Short        i;
     PMaxProfile  maxProfile = &face->maxProfile;
 
 
@@ -240,7 +240,7 @@
   {
     DEFINE_LOCALS;
 
-    Long        i;
+    Short       i;
     UShort      j;
     TGasp*      gas;
     GaspRange*  gaspranges;
@@ -300,7 +300,7 @@
   {
     DEFINE_LOCALS;
 
-    Long        i;
+    Short       i;
     TT_Header*  header;
 
 
@@ -366,7 +366,8 @@
   {
     DEFINE_LOCALS;
 
-    Long              n, num_shorts, num_shorts_checked, num_longs;
+    Short             n;
+    UShort            num_shorts, num_shorts_checked, num_longs;
 
     PLongMetrics*     longs;
     PShortMetrics*    shorts;
@@ -484,7 +485,7 @@
   {
     DEFINE_LOCALS;
 
-    Long  i;
+    Short  i;
 
     TT_Horizontal_Header*  header;
 
@@ -570,7 +571,7 @@
   {
     DEFINE_LOCALS;
 
-    Long   n, limit;
+    Short  n, limit;
     Short  LongOffsets;
 
 
@@ -644,7 +645,7 @@
     DEFINE_LOCALS;
 
     UShort  i, bytes;
-    Long    n;
+    Short   n;
     PByte   storage;
 
     TName_Table*  names;
@@ -787,7 +788,7 @@
   {
     DEFINE_LOCALS;
 
-    Long  n, limit;
+    Short  n, limit;
 
 
     if ( ( n = TT_LookUp_Table( face, TTAG_cvt ) ) < 0 )
@@ -837,8 +838,8 @@
   {
     DEFINE_LOCALS;
 
-    Long  off, table_start;
-    Long  n, limit;
+    Long   off, table_start;
+    Short  n, limit;
 
     TCMapDir       cmap_dir;
     TCMapDirEntry  entry_;
@@ -926,7 +927,7 @@
   {
     DEFINE_LOCALS_WO_FRAME;
 
-    Long  n;
+    Short  n;
 
 
     /* The font program is optional */
@@ -985,7 +986,7 @@
   {
     DEFINE_LOCALS;
 
-    Long     i;
+    Short    i;
     TT_OS2*  os2;
 
 
@@ -1083,7 +1084,7 @@
   {
     DEFINE_LOCALS;
 
-    Long  i;
+    Short  i;
 
     TT_Postscript*  post = &face->postscript;
 
@@ -1135,7 +1136,7 @@
 
     TT_Hdmx_Record*  rec;
     TT_Hdmx          hdmx;
-    Long             table;
+    Short            table;
     UShort           n, num_glyphs;
     Long             record_size;
 

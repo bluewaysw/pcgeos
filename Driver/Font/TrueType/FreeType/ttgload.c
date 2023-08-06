@@ -564,7 +564,7 @@
     Short   left_contours;
     UShort  num_elem_points;
 
-    Long    table;
+    Short   table;
     UShort  load_top;
     Long    k, l;
     UShort  new_flags;
