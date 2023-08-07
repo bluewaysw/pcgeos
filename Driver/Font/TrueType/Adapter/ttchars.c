@@ -99,7 +99,6 @@ EC(     ECCheckBounds( (void*)trueTypeVars ) );
                 goto Fail;
 
         TT_New_Glyph( FACE, &GLYPH );
-        TT_New_Instance( FACE, &INSTANCE );
 
          /* get TT char index */
         charIndex = TT_Char_Index( CHAR_MAP, GeosCharToUnicode( character ) );
@@ -190,7 +189,6 @@ EC(     ECCheckBounds( (void*)trueTypeVars ) );
         }
 
         TT_Done_Glyph( GLYPH );
-        TT_Done_Instance( INSTANCE );
 
         if( fontBuf->FB_dataSize > MAX_FONTBUF_SIZE )
                 ShrinkFontBuf( fontBuf );

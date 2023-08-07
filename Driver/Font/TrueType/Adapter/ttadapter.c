@@ -35,7 +35,7 @@ static int strcmp( const char* s1, const char* s2 );
  * RETURNS:       TT_Error
  * 
  * STRATEGY:      - check if face is already loaded
- *                - if not, open file with face
+ *                - if not, open file with face and instance
  *                - load face from file
  * 
  * REVISION HISTORY:
@@ -71,6 +71,8 @@ Boolean TrueType_Lock_Face(TRUETYPE_VARS, TrueTypeOutlineEntry* entry)
         if ( TT_Get_Face_Properties( FACE, &FACE_PROPERTIES ) )
                 goto Fail;
         if ( getCharMap( trueTypeVars, &CHAR_MAP ) )
+                goto Fail;
+        if ( TT_New_Instance( FACE, &INSTANCE ) )
                 goto Fail;
 
         /* font has been fully loaded */
@@ -118,7 +120,7 @@ void TrueType_Unlock_Face(TRUETYPE_VARS)
  * 
  * RETURNS:       TT_Error
  * 
- * STRATEGY:      - free resources used by face
+ * STRATEGY:      - free resources used by instance and face
  *                - close file
  * 
  * REVISION HISTORY:
@@ -132,6 +134,7 @@ void TrueType_Free_Face(TRUETYPE_VARS)
 {
         if ( trueTypeVars->entry.TTOE_fontFileName[0] )
         {
+            TT_Done_Instance( INSTANCE );
             TT_Close_Face( FACE );
             trueTypeVars->entry.TTOE_fontFileName[0] = 0;
         }

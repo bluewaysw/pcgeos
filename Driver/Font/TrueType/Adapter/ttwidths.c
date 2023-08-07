@@ -26,6 +26,7 @@
 #include "ttcharmapper.h"
 #include "ttinit.h"
 #include "freetype.h"
+#include "ftxkern.h"
 #include "../FreeType/ftxkern.h"
 
 
@@ -204,7 +205,6 @@ static void ConvertWidths( TRUETYPE_VARS, FontHeader* fontHeader, FontBuf* fontB
 
 
         TT_New_Glyph( FACE, &GLYPH );
-        TT_New_Instance( FACE, &INSTANCE );
 
         for( currentChar = fontHeader->FH_firstChar; currentChar <= fontHeader->FH_lastChar; ++currentChar )
         {
@@ -261,7 +261,6 @@ EC(             ECCheckBounds( (void*)charTableEntry ) );
                 ++charTableEntry;
         } 
 
-        TT_Done_Instance( INSTANCE );
         TT_Done_Glyph( GLYPH );
 }
 
@@ -305,8 +304,8 @@ static void ConvertKernPairs( TRUETYPE_VARS, FontBuf* fontBuf )
                         //     KernCounter hochzählen
 
         fontBuf->FB_kernCount    = 0;
-        fontBuf->FB_kernValuePtr = NULL;
-        fontBuf->FB_kernPairPtr  = NULL;
+        fontBuf->FB_kernValuePtr = 0;
+        fontBuf->FB_kernPairPtr  = 0;
 }
 
 /********************************************************************
