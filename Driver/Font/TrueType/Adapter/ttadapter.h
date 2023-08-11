@@ -64,6 +64,8 @@ extern TEngine_Instance engineInstance;
 #define FAMILY_NAME_LENGTH                  20
 #define STYLE_NAME_LENGTH                   16
 
+#define MAX_KERN_TABLE_LENGTH               6000
+
 
 /***********************************************************************
  *      structures
@@ -354,6 +356,7 @@ typedef struct
     sword                       FH_minTSB;          //minimum top side bound
     sword                       FH_maxBSB;          //maximum bottom side bound
     sword                       FH_maxRSB;          //maximum right side bound
+    word                        FH_kernCount;       //num of kerning pairs
 } FontHeader;
 
 

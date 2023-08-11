@@ -140,12 +140,13 @@ EC(     ECCheckBounds( (void*)trueTypeVars ) );
         /* alloc Block for FontBuf, CharTableEntries, KernPairs and kerning values */
         size = AllocFontBlock( sizeof( TransformMatrix ), 
                                fontHeader->FH_numChars, 
-                               CountKernPairsWithGeosChars( FACE ), 
+                               fontHeader->FH_kernCount, 
                                &fontHandle );
 
         /* deref FontBuf */
         fontBuf = (FontBuf*)MemDeref( fontHandle );
         fontBuf->FB_dataSize = size;
+        fontBuf->FB_kernCount = fontHeader->FH_kernCount;
 
         /* calculate scale factor */
         CalcScaleForWidths( trueTypeVars, pointSize, stylesToImplement );

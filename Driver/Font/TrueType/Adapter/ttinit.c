@@ -20,6 +20,7 @@
 #include "ttinit.h"
 #include "ttadapter.h"
 #include "ttcharmapper.h"
+#include "ftxkern.h"
 #include <fileEnum.h>
 #include <geos.h>
 #include <heap.h>
@@ -56,11 +57,15 @@ static void ConvertHeader(      TRUETYPE_VARS, FontHeader* fontHeader );
 
 static char GetDefaultChar(     TRUETYPE_VARS, char firstChar );
 
+static word GetKernCount(       TRUETYPE_VARS );
+
 static word toHash( const char* str );
 
 static int  strlen( const char* str );
 
 static void strcpy( char* dest, const char* source );
+
+static int strcmp( const char* s1, const char* s2 );
 
 
 /********************************************************************
@@ -674,7 +679,7 @@ static sword getFontIDAvailIndex( FontID fontID, MemHandle fontInfoBlock )
         sword   element;
 
         /* set fontsAvailEntrys to first Element after LMemBlockHeader */
-        fontsAvailEntrys = ( (byte*)LMemDeref( 
+        fontsAvailEntrys = ( (FontsAvailEntry*)LMemDeref( 
 			ConstructOptr( fontInfoBlock, sizeof(LMemBlockHeader))) );
         elements = LMemGetChunkSizePtr( fontsAvailEntrys ) / sizeof( FontsAvailEntry );
 
@@ -805,6 +810,7 @@ EC(     ECCheckBounds( (void*)fontHeader ) );
                                                            &fontHeader->FH_firstChar, 
                                                            &fontHeader->FH_lastChar ); 
         fontHeader->FH_defaultChar = GetDefaultChar( trueTypeVars, fontHeader->FH_firstChar );
+        fontHeader->FH_kernCount   = GetKernCount( trueTypeVars );
 
         TT_New_Instance( FACE, &INSTANCE );
         TT_New_Glyph( FACE, &GLYPH );
@@ -929,6 +935,53 @@ static char GetDefaultChar( TRUETYPE_VARS, char firstChar )
                 return firstChar;  
 
         return DEFAULT_DEFAULT_CHAR; 
+}
+
+
+/********************************************************************
+ *                      GetKernCount
+ ********************************************************************
+ * SYNOPSIS:	  Returns the number of kernpairs with chars from 
+ *                FreeGEOS char set.
+ * 
+ * PARAMETERS:    TRUETYPE_VARS         Pointer to truetypevar block.
+ * 
+ * RETURNS:       word
+ * 
+ * SIDE EFFECTS:  none
+ * 
+ * STRATEGY:      
+ * 
+ * REVISION HISTORY:
+ *      Date      Name      Description
+ *      ----      ----      -----------
+ *      11/08/23  JK        Initial Revision
+ *******************************************************************/
+
+static word GetKernCount( TRUETYPE_VARS )
+{
+        TT_Kerning        kerningDir;
+        word              table;
+
+        if( TT_Get_Kerning_Directory( FACE, &kerningDir ) )
+                goto Fail;
+
+        /* search for format 0 subtable */
+        for( table = 0; table < kerningDir.nTables; table++ )
+        {
+                if( TT_Load_Kerning_Table( FACE, table ) )
+                        goto Fail;
+
+                if( kerningDir.tables->format != 0 )
+                        continue;
+        }
+
+        //TODO: return only number of pairs with FreeGEOS chars
+        return kerningDir.tables->length <= MAX_KERN_TABLE_LENGTH ?
+                        kerningDir.tables->t.kern0.nPairs : 0;
+
+Fail:
+        return 0;
 }
 
 

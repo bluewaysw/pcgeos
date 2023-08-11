@@ -40,6 +40,7 @@ typedef struct
 {
         word            unicode;
         CharMapFlags    flags;
+        word            ttIndex;
 } CharMapEntry;
 
 
@@ -50,8 +51,6 @@ typedef struct
 word GeosCharToUnicode( word geosChar );
 
 word InitGeosCharsInCharMap( TT_CharMap map, char* firstChar, char* lastChar );
-
-word CountKernPairsWithGeosChars( TT_Face face );
 
 TT_Error getCharMap( TRUETYPE_VARS, TT_CharMap* charMap );
 

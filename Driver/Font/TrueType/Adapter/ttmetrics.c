@@ -91,7 +91,6 @@ EC(     ECCheckBounds( (void*)trueTypeVars ) );
 
         // load glyph
         TT_New_Glyph( FACE, &GLYPH );
-        TT_New_Instance( FACE, &INSTANCE );
 
         // transform glyphs outline
         TT_Get_Glyph_Outline( GLYPH, &OUTLINE );
@@ -125,7 +124,6 @@ EC(     ECCheckBounds( (void*)trueTypeVars ) );
                         break;
         }
 
-        TT_Done_Instance( INSTANCE );
         TT_Done_Glyph( GLYPH );
         TrueType_Unlock_Face( trueTypeVars );
 
