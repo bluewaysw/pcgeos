@@ -927,11 +927,7 @@ EC(     ECCheckBounds( (void*)fontHeader ) );
  *******************************************************************/
 static char GetDefaultChar( TRUETYPE_VARS, char firstChar )
 {
-        word unicode = GeosCharToUnicode( DEFAULT_DEFAULT_CHAR );
-        word charIndex = TT_Char_Index( CHAR_MAP, unicode );
-
-
-        if ( charIndex == 0 )
+        if ( !TT_Char_Index( CHAR_MAP, GeosCharToUnicode( DEFAULT_DEFAULT_CHAR ) ) )
                 return firstChar;  
 
         return DEFAULT_DEFAULT_CHAR; 
@@ -962,6 +958,7 @@ static word GetKernCount( TRUETYPE_VARS )
 {
         TT_Kerning        kerningDir;
         word              table;
+        word              numGeosKernPairs = 0;
 
         if( TT_Get_Kerning_Directory( FACE, &kerningDir ) )
                 goto Fail;
@@ -969,19 +966,24 @@ static word GetKernCount( TRUETYPE_VARS )
         /* search for format 0 subtable */
         for( table = 0; table < kerningDir.nTables; table++ )
         {
+                word i;
+
                 if( TT_Load_Kerning_Table( FACE, table ) )
                         goto Fail;
 
                 if( kerningDir.tables->format != 0 )
                         continue;
+
+                for( i = 0; i < kerningDir.tables->t.kern0.nPairs; i++ )
+                {
+                        if( isGeosCharPair( kerningDir.tables->t.kern0.pairs[i].left,
+                                        kerningDir.tables->t.kern0.pairs[i].right ) )
+                                numGeosKernPairs++;
+                }
         }
 
-        //TODO: return only number of pairs with FreeGEOS chars
-        return kerningDir.tables->length <= MAX_KERN_TABLE_LENGTH ?
-                        kerningDir.tables->t.kern0.nPairs : 0;
-
 Fail:
-        return 0;
+        return numGeosKernPairs;
 }
 
 

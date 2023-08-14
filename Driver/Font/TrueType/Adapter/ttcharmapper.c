@@ -330,6 +330,27 @@ word InitGeosCharsInCharMap( TT_CharMap map, char *firstChar, char *lastChar )
         return 1 + ( *lastChar - *firstChar );
 }
 
+
+Boolean isGeosCharPair( word ttIndex_1, word ttIndex_2 )
+{
+        word charIndex;
+        word hits = 0;
+
+        for( charIndex = 0; charIndex < NUM_CHARMAPENTRIES; ++charIndex )
+        {
+                if( geosCharMap[charIndex].ttIndex == ttIndex_1 || 
+                    geosCharMap[charIndex].ttIndex == ttIndex_2 )
+                        ++hits; 
+
+                if( hits == 2 )
+                        return TRUE;
+
+        }
+
+        return FALSE;
+}
+
+
 char getGeosCharForIndex( word ttIndex )
 {
         word charIndex;

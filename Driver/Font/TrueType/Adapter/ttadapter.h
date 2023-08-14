@@ -189,8 +189,8 @@ typedef	struct
     WBFixed                     FB_descent;
     WBFixed                     FB_extLeading;
     word                        FB_kernCount;
-    word                        FB_kernPairPtr;     //offset to kerning pair table
-    word                        FB_kernValuePtr;    //offset to kerning value table
+    word                        FB_kernPairs;     //offset to kerning pair table
+    word                        FB_kernValues;    //offset to kerning value table
 #ifdef DBCS_PCGEOS
     wchar                       FB_firstChar;
     wchar                       FB_lastChar;
@@ -261,8 +261,8 @@ typedef struct
  */
 typedef struct
 {
-    char                        KB_char1;
-    char                        KB_char2;
+    char                        KP_charRight;
+    char                        KP_charLeft;
 } KernPair;
 
 /*

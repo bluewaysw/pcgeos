@@ -68,6 +68,16 @@ static Boolean IsRegionNeeded( TransformMatrix* transMatrix,
 
 #define ROUND_WBFIXED( value )    ( value.WBF_frac ? ( value.WBF_int + 1 ) : value.WBF_int )
 
+#define OFFSET_KERN_PAIRS         ( sizeof(FontBuf) +                                   \
+                                    fontHeader->FH_numChars * sizeof( CharTableEntry) + \
+                                    sizeof( TransformMatrix ) )
+
+
+#define OFFSET_KERN_VALUES        ( sizeof(FontBuf) +                                   \
+                                    fontHeader->FH_numChars * sizeof( CharTableEntry) + \
+                                    sizeof( TransformMatrix ) +                              \
+                                    fontHeader->FH_kernCount * sizeof( KernPair ) )
+
 
 /********************************************************************
  *                      TrueType_Gen_Widths
@@ -142,11 +152,21 @@ EC(     ECCheckBounds( (void*)trueTypeVars ) );
                                fontHeader->FH_numChars, 
                                fontHeader->FH_kernCount, 
                                &fontHandle );
-
-        /* deref FontBuf */
         fontBuf = (FontBuf*)MemDeref( fontHandle );
-        fontBuf->FB_dataSize = size;
-        fontBuf->FB_kernCount = fontHeader->FH_kernCount;
+
+        /* initialize fields in FontBuf that do not have to be scaled */
+        fontBuf->FB_dataSize     = size;
+        fontBuf->FB_maker        = FM_TRUETYPE;
+        fontBuf->FB_flags        = FBF_IS_OUTLINE;
+        fontBuf->FB_heapCount    = 0;
+
+        fontBuf->FB_firstChar    = fontHeader->FH_firstChar;
+        fontBuf->FB_lastChar     = fontHeader->FH_lastChar;
+        fontBuf->FB_defaultChar  = fontHeader->FH_defaultChar;
+
+        fontBuf->FB_kernCount    = fontHeader->FH_kernCount;
+        fontBuf->FB_kernPairs    = fontHeader->FH_kernCount ? OFFSET_KERN_PAIRS : 0;
+        fontBuf->FB_kernValues   = fontHeader->FH_kernCount ? OFFSET_KERN_VALUES : 0;
 
         /* calculate scale factor */
         CalcScaleForWidths( trueTypeVars, pointSize, stylesToImplement );
@@ -237,7 +257,6 @@ EC(             ECCheckBounds( (void*)charTableEntry ) );
                 charTableEntry->CTE_width.WBF_int  = INTEGER_OF_WWFIXEDASDWORD( scaledWidth );
                 charTableEntry->CTE_width.WBF_frac = FRACTION_OF_WWFIXEDASDWORD( scaledWidth );
                 charTableEntry->CTE_dataOffset     = CHAR_NOT_BUILT;
-                charTableEntry->CTE_flags          = 0;
                 charTableEntry->CTE_usage          = 0;
                 
                
@@ -252,11 +271,22 @@ EC(             ECCheckBounds( (void*)charTableEntry ) );
                         charTableEntry->CTE_flags |= CTF_ABOVE_ASCENT;
                 
 
-                if( fontBuf->FB_kernCount > 0 )
+                if( fontBuf->FB_kernCount )
                 {
-                        //first kern
+                        word       i;
+                        KernPair*  kernPair  = (KernPair*) ( ( (byte*)fontBuf ) + fontBuf->FB_kernPairs );
 
-                        //second kern
+                        for( i = 0; i < fontBuf->FB_kernCount; ++i )
+                        {
+                                if( currentChar == kernPair->KP_charRight )
+                                        charTableEntry->CTE_flags |= CTF_IS_FIRST_KERN;
+                                else if ( currentChar == kernPair->KP_charLeft )
+                                        charTableEntry->CTE_flags |= CTF_IS_SECOND_KERN;
+
+                                if( charTableEntry->CTE_flags && CTF_IS_FIRST_KERN & 
+                                    charTableEntry->CTE_flags && CTF_IS_SECOND_KERN )
+                                        break;
+                        }
                 }
 
                 ++charTableEntry;
@@ -269,7 +299,8 @@ EC(             ECCheckBounds( (void*)charTableEntry ) );
 /********************************************************************
  *                      ConvertKernPairs
  ********************************************************************
- * SYNOPSIS:	  Fills FontBuf with kerning information.
+ * SYNOPSIS:	  Fills kern pairs and kern values in FontBuf with 
+ *                kerning information.
  * 
  * PARAMETERS:    TRUETYPE_VARS         Cached variables needed by driver.
  *                *fontBuf              Ptr. to FontBuf structure.
@@ -288,25 +319,51 @@ EC(             ECCheckBounds( (void*)charTableEntry ) );
 
 static void ConvertKernPairs( TRUETYPE_VARS, FontBuf* fontBuf )
 {
-        KernPair*  kernPair;
-        WBFixed*   wbFixed;
+        TT_Kerning        kerningDir;
+        word              table;
 
-        //lade TT_Kern Tabelle
+        KernPair*  kernPair  = (KernPair*) ( ( (byte*)fontBuf ) + fontBuf->FB_kernPairs );
+        BBFixed*   kernValue = (BBFixed*) ( ( (byte*)fontBuf ) + fontBuf->FB_kernValues );
 
-        //iteriere über den FreeGEOS Zeichensatz
 
-                //wandle das akt. Zeichen in den TT Index
+        /* load kerning directory */
+        if( TT_Get_Kerning_Directory( FACE, &kerningDir ) )
+                return;
 
-                //suche den Index in der TT Kern Tabelle
+        /* search for format 0 subtable */
+        for( table = 0; table < kerningDir.nTables; ++table )
+        {
+                word i;
 
-                        // wenn gefunden: ist das zweite Zeichen auch ein GEOS Zeichen?
-                        // ja: Kernpair in den FontBuf eintragen
-                        //     Kernvalue in den FontBuf eintragen
-                        //     KernCounter hochzählen
+                if( TT_Load_Kerning_Table( FACE, table ) )
+                        return;
 
-        fontBuf->FB_kernCount    = 0;
-        fontBuf->FB_kernValuePtr = 0;
-        fontBuf->FB_kernPairPtr  = 0;
+                if( kerningDir.tables->format != 0 )
+                        continue;
+
+                for( i = 0; i < kerningDir.tables->t.kern0.nPairs; ++i )
+                {
+                        char left  = getGeosCharForIndex( kerningDir.tables->t.kern0.pairs[i].left );
+                        char right = getGeosCharForIndex( kerningDir.tables->t.kern0.pairs[i].right );
+
+                        if( left && right )
+                        {
+                                WWFixedAsDWord  scaledKernValue;
+
+
+                                kernPair->KP_charLeft  = left;
+                                kernPair->KP_charRight = right;
+
+                                /* save scaled kerning value */
+                                scaledKernValue = SCALE_WORD( kerningDir.tables->t.kern0.pairs[i].value, SCALE_WIDTH );
+                                kernValue->BBF_int = IntegerOf( scaledKernValue );
+                                kernValue->BBF_frac = FractionOf( scaledKernValue ) >> 8;
+
+                                ++kernPair;
+                                ++kernValue;
+                        }
+                }
+        }
 }
 
 /********************************************************************
@@ -465,7 +522,7 @@ static word AllocFontBlock( word        additionalSpace,
         {
                 *fontHandle = MemAllocSetOwner( FONT_MAN_ID, MAX_FONTBUF_SIZE, 
                         HF_SWAPABLE | HF_SHARABLE | HF_DISCARDABLE,
-                        HAF_NO_ERR | HAF_LOCK );
+                        HAF_NO_ERR | HAF_LOCK | HAF_ZERO_INIT );
                 HandleP( *fontHandle );
         }
         else
@@ -577,16 +634,6 @@ static void ConvertHeader( TRUETYPE_VARS, FontHeader* fontHeader, FontBuf* fontB
 
         ttfElement = SCALE_WORD( fontHeader->FH_height, scaleHeight );
         fontBuf->FB_pixHeight = INTEGER_OF_WWFIXEDASDWORD( ttfElement ) + fontBuf->FB_minTSB;
-
-        fontBuf->FB_maker        = FM_TRUETYPE;
-        fontBuf->FB_flags        = FBF_IS_OUTLINE;
-        fontBuf->FB_kernPairPtr  = 0;
-        fontBuf->FB_kernValuePtr = 0;
-        fontBuf->FB_kernCount    = 0;
-        fontBuf->FB_heapCount    = 0;
-        fontBuf->FB_firstChar    = fontHeader->FH_firstChar;
-        fontBuf->FB_lastChar     = fontHeader->FH_lastChar;
-        fontBuf->FB_defaultChar  = fontHeader->FH_defaultChar;
 }
 
 

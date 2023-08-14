@@ -358,7 +358,7 @@ static void* ensureBitmapBlock( MemHandle bitmapHandle, word size )
         void* bitmapData = MemLock( bitmapHandle );
         if( bitmapData == NULL )
         {
-                MemReAlloc( bitmapHandle, MAX( size, 1024 ), HAF_NO_ERR );
+                MemReAlloc( bitmapHandle, MAX( size, 2048 ), HAF_NO_ERR );
                 bitmapData = MemLock( bitmapHandle );
         } else {
                 if( MemGetInfo( bitmapHandle, MGIT_SIZE ) < size )
