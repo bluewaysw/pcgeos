@@ -974,6 +974,10 @@ static word GetKernCount( TRUETYPE_VARS )
                 if( kerningDir.tables->format != 0 )
                         continue;
 
+                /* We only support decreasing the character spacing.*/
+                if( kerningDir.tables->t.kern0.pairs[i].value > 0 )
+                        continue;
+
                 for( i = 0; i < kerningDir.tables->t.kern0.nPairs; i++ )
                 {
                         if( isGeosCharPair( kerningDir.tables->t.kern0.pairs[i].left,

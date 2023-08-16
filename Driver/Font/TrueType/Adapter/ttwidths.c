@@ -346,10 +346,14 @@ static void ConvertKernPairs( TRUETYPE_VARS, FontBuf* fontBuf )
                         char left  = getGeosCharForIndex( kerningDir.tables->t.kern0.pairs[i].left );
                         char right = getGeosCharForIndex( kerningDir.tables->t.kern0.pairs[i].right );
 
+
+                        /* We only support decreasing the character spacing.*/
+                        if( kerningDir.tables->t.kern0.pairs[i].value > 0 )
+                                continue;
+
                         if( left && right )
                         {
                                 WWFixedAsDWord  scaledKernValue;
-
 
                                 kernPair->KP_charLeft  = left;
                                 kernPair->KP_charRight = right;
