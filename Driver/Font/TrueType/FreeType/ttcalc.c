@@ -398,5 +398,17 @@
 
 #endif /* LONG64 */
 
+/* This convenience function applies TT_MulDiv to a vector.                */
+/* Its main purpose is to reduce the number of inter-module calls in GEOS. */
+
+LOCAL_FUNC
+void  MulDivVector( TT_Long*  a, ULong  n, TT_Long  b, TT_Long  c )
+{
+  ULong i;
+
+  for ( i = 0; i < n; i++ )
+    a[i] = TT_MulDiv( a[i], b, c );
+}
+
 
 /* END */
