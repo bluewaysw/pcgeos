@@ -243,7 +243,8 @@ static word DetectFontFiles( MemHandle* fileEnumBlock )
  ********************************************************************
  * SYNOPSIS:	  Registers a font with its styles as an available font.
  * 
- * PARAMETERS:    fileName        Name of font file.
+ * PARAMETERS:    TRUETYPE_VARS   Pointer to truetypevar block.
+ *                fileName        Name of font file.
  *                fontInfoBlock   Handle to memory block with all
  *                                infos about aviable fonts.
  * 
@@ -672,6 +673,7 @@ static FontID getFontID( const char* familyName )
  *      ----      ----      -----------
  *      21/01/23  JK        Initial Revision
  *******************************************************************/
+
 static sword getFontIDAvailIndex( FontID fontID, MemHandle fontInfoBlock )
 {
         FontsAvailEntry*  fontsAvailEntrys;
@@ -697,11 +699,11 @@ static sword getFontIDAvailIndex( FontID fontID, MemHandle fontInfoBlock )
  * SYNOPSIS:	  Searches the font's name tables for the given NameID 
  *                and returns its content.
  * 
- * PARAMETERS:    TRUETYPE_VARS         Pointer to truetypevar block.
- *                name*                 Pointer to result string.
- *                nameID                ID to be searched.
+ * PARAMETERS:    TRUETYPE_VARS   Pointer to truetypevar block.
+ *                name*           Pointer to result string.
+ *                nameID          ID to be searched.
  * 
- * RETURNS:       word                  Length of the table entry found.
+ * RETURNS:       word            Length of the table entry found.
  * 
  * SIDE EFFECTS:  none
  * 
@@ -773,9 +775,9 @@ static word getNameFromNameTable( TRUETYPE_VARS, char* name, TT_UShort nameID )
  * SYNOPSIS:	  Converts information from a TrueType font into a 
  *                FreeGEOS FontHeader.
  * 
- * PARAMETERS:    TRUETYPE_VARS         Pointer to truetypevar block. 
- *                fontHeader*           Pointer to FontInfo in which the
- *                                      converted information is to be stored.
+ * PARAMETERS:    TRUETYPE_VARS   Pointer to truetypevar block. 
+ *                fontHeader*     Pointer to FontInfo in which the
+ *                                converted information is to be stored.
  * 
  * RETURNS:       void
  * 
@@ -819,6 +821,9 @@ EC(     ECCheckBounds( (void*)fontHeader ) );
         {
                 word unicode = GeosCharToUnicode( geosChar );
 
+
+                if( !GeosCharMapFlag( geosChar ) )
+                        continue;
 
                 charIndex = TT_Char_Index( CHAR_MAP, unicode );
                 if ( charIndex == 0 )
@@ -911,8 +916,8 @@ EC(     ECCheckBounds( (void*)fontHeader ) );
  *                in the face, the first GEOS character in the font is 
  *                the default character.
  * 
- * PARAMETERS:    TRUETYPE_VARS         Pointer to truetypevar block.
- *                firstChar             First GEOS char in face.
+ * PARAMETERS:    TRUETYPE_VARS   Pointer to truetypevar block.
+ *                firstChar       First GEOS char in face.
  * 
  * RETURNS:       char
  * 
@@ -925,6 +930,7 @@ EC(     ECCheckBounds( (void*)fontHeader ) );
  *      ----      ----      -----------
  *      23/04/23  JK        Initial Revision
  *******************************************************************/
+
 static char GetDefaultChar( TRUETYPE_VARS, char firstChar )
 {
         if ( !TT_Char_Index( CHAR_MAP, GeosCharToUnicode( DEFAULT_DEFAULT_CHAR ) ) )
@@ -940,7 +946,7 @@ static char GetDefaultChar( TRUETYPE_VARS, char firstChar )
  * SYNOPSIS:	  Returns the number of kernpairs with chars from 
  *                FreeGEOS char set.
  * 
- * PARAMETERS:    TRUETYPE_VARS         Pointer to truetypevar block.
+ * PARAMETERS:    TRUETYPE_VARS   Pointer to truetypevar block.
  * 
  * RETURNS:       word
  * 

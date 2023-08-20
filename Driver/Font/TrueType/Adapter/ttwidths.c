@@ -278,11 +278,13 @@ EC(             ECCheckBounds( (void*)charTableEntry ) );
 
                         for( i = 0; i < fontBuf->FB_kernCount; ++i )
                         {
+                                /* If currentChar is right or left char in a kernpair set corresponding flags. */
                                 if( currentChar == kernPair->KP_charRight )
                                         charTableEntry->CTE_flags |= CTF_IS_FIRST_KERN;
                                 else if ( currentChar == kernPair->KP_charLeft )
                                         charTableEntry->CTE_flags |= CTF_IS_SECOND_KERN;
 
+                                /* If currentChar is right and left char in a kernpair, it can be aborted. */
                                 if( charTableEntry->CTE_flags && CTF_IS_FIRST_KERN & 
                                     charTableEntry->CTE_flags && CTF_IS_SECOND_KERN )
                                         break;
