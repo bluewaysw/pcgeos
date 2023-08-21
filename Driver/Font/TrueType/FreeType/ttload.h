@@ -123,10 +123,26 @@
 #define FORGET_Frame() \
           ( (void)TT_Forget_Frame( &frame ) )
 
-#define GET_Byte()    TT_Get_Byte  ( &frame )
-#define GET_Char()    TT_Get_Char  ( &frame )
-#define GET_UShort()  TT_Get_UShort( &frame )
-#define GET_Short()   TT_Get_Short ( &frame )
+#if defined(__GEOS__) && !DEBUG_FILE
+
+  #define GET_Byte()    (Byte)  (*frame.cursor++)
+  #define GET_Char()    (Char)  (*frame.cursor++)
+  #define GET_UShort()  (UShort)(frame.cursor += 2, \
+                                 (frame.cursor[-2] << 8) | \
+                                  frame.cursor[-1])
+  #define GET_Short()   (Short) (frame.cursor += 2, \
+                                 (frame.cursor[-2] << 8) | \
+                                  frame.cursor[-1])
+  
+#else
+
+  #define GET_Byte()    TT_Get_Byte  ( &frame )
+  #define GET_Char()    TT_Get_Char  ( &frame )
+  #define GET_UShort()  TT_Get_UShort( &frame )
+  #define GET_Short()   TT_Get_Short ( &frame )
+
+#endif
+
 #define GET_Long()    TT_Get_Long  ( &frame )
 #define GET_ULong()   TT_Get_ULong ( &frame )
 #define GET_Tag4()    TT_Get_ULong ( &frame )
