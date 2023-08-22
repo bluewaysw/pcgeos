@@ -397,7 +397,7 @@ GOC		?= goc
 XGOCFLAGS	?=
 GOCFLAGS	+= -D__GEOS__ $(-CIFLAGS) -I- $(-CIFLAGS) \
 		   `$(PRODUCT_FLAGS) goc $(PRODUCT)` \
-                   $(XGOCFLAGS) -w -l $(LIBNAME:S/^/-L /)
+                   $(XGOCFLAGS) -w $(LIBNAME:S/^/-L /)
 
 
 #
@@ -894,7 +894,7 @@ LINK		: .USE
 	$(CCOM) $(CCOMFLAGS) -fo="$(.TARGET)" "$(.IMPSRC)" $(GEOERRFL)
 
 .goc.obj	:
-	$(GOC) $(GOCFLAGS) -o $(.TARGET:R).nc $(.IMPSRC) $(GEOERRFL)
+	$(GOC) $(GOCFLAGS) -l -o $(.TARGET:R).nc $(.IMPSRC) $(GEOERRFL)
 	$(CCOM) $(CCOMFLAGS) -fo="$(.TARGET)" "$(.TARGET:R).nc" $(GEOERRFL)
 #if $(DEVEL_DIR:T) == "Installed"
 #if defined(linux)
