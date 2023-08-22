@@ -90,8 +90,53 @@ fileEnumParams		local   FileEnumParams
 		mov	al, BM_ON		
 		call	SetBatchMode
 
-	; check for autorun batch mode?
+	; open/create fresh batch log file if requested
 
+		push	ds
+		push	bx, dx, cx, si
+		GetResourceHandleNS	StringsUI, bx
+		call	MemLock
+	
+		mov	ds, ax
+		mov	si, offset BatchLogFileKey	
+		mov	dx, ds:[si]			; ds:si <- key string
+		mov	cx, ds				; cx:dx <- key string
+		mov	si, offset CategoryString	
+		mov	si, ds:[si]			; ds:si <- category string
+
+		push	bp
+		clr	bp				; allocate a block
+		call	InitFileReadString		; ^hbx <- contains dest path
+		pop	bp
+		jc	noLogFile			; branch if not found (or other error)
+
+		call	FilePushDir
+		mov	ax, SP_DOCUMENT
+		call	FileSetStandardPath
+		jc	logFileError
+
+		call 	MemLock 			; lock block with handle in bx
+		mov	ds, ax				; ds:0 points to file name
+		mov	dx, 0				; ds:dx <- fileName 
+		mov	ax, ((mask FCF_NATIVE or FILE_CREATE_NO_TRUNCATE)\
+				shl 8) or (FileAccessFlags \
+				<FE_NONE, FA_WRITE_ONLY>)
+		mov	cx, FILE_ATTR_NORMAL
+		call	FileCreate
+		jc	logFileError			; error opening the log file?
+
+		; remember the log file handle to be used in the batch process
+		mov	es:[batchLogFile], ax
+
+logFileError:
+		call	MemFree				; free block with handle in bx
+		call	FilePopDir
+
+noLogFile:
+		mov	bx, ds:[LMBH_handle]
+		call	MemUnlock
+		pop	bx, dx, cx, si
+		pop	ds
 
 	; Initiate the status dialog.
 
@@ -699,6 +744,10 @@ BatchReport	proc	far
 		clr	cx
 		call	ObjMessage
 
+		mov	ax, batchLogFile
+		jz	done
+
+done:
 		.leave
 		ret
 BatchReport	endp

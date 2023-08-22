@@ -60,6 +60,7 @@ idata	ends
 
 udata	segment
     restoringFromState		BooleanByte (?)
+    batchLogFile		word (?)	
 udata	ends
 
 MainProcessCode		segment resource
@@ -103,6 +104,7 @@ MainProcessOpenApplication		method dynamic ResEditProcessClass,
 
 	; Start with batch processing mode off.
 
+	mov	es:[batchLogFile], NULL 	;initially no batch log file
 	mov	al, BM_OFF	
 	call	SetBatchMode
 
