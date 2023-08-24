@@ -760,12 +760,13 @@
 #define TT_Set_Instance_PointSize( ins, ptsize )   \
             TT_Set_Instance_CharSize( ins, ptsize*64L )
 
+/*
   EXPORT_DEF
   TT_Error  TT_Set_Instance_PixelSizes( TT_Instance  instance,
                                         TT_UShort    pixelWidth,
                                         TT_UShort    pixelHeight,
                                         TT_F26Dot6   pointSize );
-
+*/
 
   /* This function has been deprecated!  Do not use it, as it      */
   /* doesn't work reliably.  You can perfectly control hinting     */

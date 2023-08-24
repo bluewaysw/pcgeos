@@ -124,8 +124,8 @@ EC(     ECCheckBounds( (void*)trueTypeVars ) );
         GLYPH_BBOX.yMax  = ( GLYPH_BBOX.yMax + 63 ) & -64;
 
         /* compute pixel dimensions */
-        width  = (GLYPH_BBOX.xMax - GLYPH_BBOX.xMin) / 64;
-        height = (GLYPH_BBOX.yMax - GLYPH_BBOX.yMin) / 64;
+        width  = (GLYPH_BBOX.xMax - GLYPH_BBOX.xMin) >> 6;
+        height = (GLYPH_BBOX.yMax - GLYPH_BBOX.yMin) >> 6;
 
         if( fontBuf->FB_flags & FBF_IS_REGION )
         {
@@ -150,9 +150,9 @@ EC(     ECCheckBounds( (void*)trueTypeVars ) );
 
                 /* fill header of charData */
                 ((RegionCharData*)charData)->RCD_xoff = transformMatrix->TM_scriptX + 
-                                                        transformMatrix->TM_heightX + GLYPH_BBOX.xMin / 64;
+                                                        transformMatrix->TM_heightX + ( GLYPH_BBOX.xMin >> 6 );
                 ((RegionCharData*)charData)->RCD_yoff = transformMatrix->TM_scriptY + 
-                                                        transformMatrix->TM_heightY - GLYPH_BBOX.yMax / 64; 
+                                                        transformMatrix->TM_heightY - ( GLYPH_BBOX.yMax >> 6 ); 
                 ((RegionCharData*)charData)->RCD_size = RASTER_MAP.size;
                 ((RegionCharData*)charData)->RCD_bounds.R_left   = 0;
                 ((RegionCharData*)charData)->RCD_bounds.R_right  = width;
@@ -183,9 +183,9 @@ EC(     ECCheckBounds( (void*)trueTypeVars ) );
                 ((CharData*)charData)->CD_pictureWidth = width;
                 ((CharData*)charData)->CD_numRows      = height;
                 ((CharData*)charData)->CD_xoff         = transformMatrix->TM_scriptX + 
-                                                         transformMatrix->TM_heightX + GLYPH_BBOX.xMin / 64;
+                                                         transformMatrix->TM_heightX + ( GLYPH_BBOX.xMin >> 6 );
                 ((CharData*)charData)->CD_yoff         = transformMatrix->TM_scriptY + 
-                                                         transformMatrix->TM_heightY - GLYPH_BBOX.yMax / 64; 
+                                                         transformMatrix->TM_heightY - ( GLYPH_BBOX.yMax >> 6 );
         }
 
         TT_Done_Glyph( GLYPH );
@@ -358,7 +358,7 @@ static void* ensureBitmapBlock( MemHandle bitmapHandle, word size )
         void* bitmapData = MemLock( bitmapHandle );
         if( bitmapData == NULL )
         {
-                MemReAlloc( bitmapHandle, MAX( size, 2048 ), HAF_NO_ERR );
+                MemReAlloc( bitmapHandle, MAX( size, BITMAP_BLOCKSIZE ), HAF_NO_ERR );
                 bitmapData = MemLock( bitmapHandle );
         } else {
                 if( MemGetInfo( bitmapHandle, MGIT_SIZE ) < size )

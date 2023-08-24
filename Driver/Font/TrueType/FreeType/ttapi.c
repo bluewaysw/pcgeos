@@ -608,8 +608,8 @@ extern TEngine_Instance engineInstance;
       ins->metrics.y_scale1 = (ins->metrics.y_scale1+32) & -64;
     }
 
-    ins->metrics.x_ppem = ins->metrics.x_scale1 / 64;
-    ins->metrics.y_ppem = ins->metrics.y_scale1 / 64;
+    ins->metrics.x_ppem = ins->metrics.x_scale1 >> 6;
+    ins->metrics.y_ppem = ins->metrics.y_scale1 >> 6;
 
     if ( charWidth > charHeight )
       ins->metrics.pointSize = charWidth;
@@ -670,7 +670,7 @@ extern TEngine_Instance engineInstance;
  *            instances, so there is no need to protect.
  *
  ******************************************************************/
-
+ /*
   EXPORT_FUNC
   TT_Error  TT_Set_Instance_PixelSizes( TT_Instance  instance,
                                         TT_UShort    pixelWidth,
@@ -698,7 +698,7 @@ extern TEngine_Instance engineInstance;
 
     return Instance_Reset( ins );
   }
-
+*/
 
 /*******************************************************************
  *
