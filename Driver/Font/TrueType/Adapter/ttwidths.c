@@ -52,6 +52,7 @@ static void CalcScaleForWidths( TRUETYPE_VARS,
 static void CalcTransform( TRUETYPE_VARS,
                         TransformMatrix*        transMatrix,
                         FontMatrix*             fontMatrix, 
+                        WWFixedAsDWord          pointSize,
                         TextStyle               stylesToImplement,
                         FontBuf*                fontBuf );
 
@@ -75,7 +76,7 @@ static Boolean IsRegionNeeded( TransformMatrix* transMatrix,
 
 #define OFFSET_KERN_VALUES        ( sizeof(FontBuf) +                                   \
                                     fontHeader->FH_numChars * sizeof( CharTableEntry) + \
-                                    sizeof( TransformMatrix ) +                              \
+                                    sizeof( TransformMatrix ) +                         \
                                     fontHeader->FH_kernCount * sizeof( KernPair ) )
 
 
@@ -182,7 +183,7 @@ EC(     ECCheckBounds( (void*)trueTypeVars ) );
 
         /* calculate the transformation matrix and copy it into the FontBlock */
         transMatrix = (TransformMatrix*)(((byte*)fontBuf) + sizeof( FontBuf ) + fontHeader->FH_numChars * sizeof( CharTableEntry ));
-        CalcTransform( trueTypeVars, transMatrix, fontMatrix, stylesToImplement, fontBuf );
+        CalcTransform( trueTypeVars, transMatrix, fontMatrix, pointSize, stylesToImplement, fontBuf );
 
         //TODO: adjust FB_height, FB_minTSB, FB_pixHeight and FB_baselinePos
         AdjustFontBuf( transMatrix, fontMatrix, stylesToImplement, fontBuf );
@@ -431,6 +432,7 @@ static void CalcScaleForWidths( TRUETYPE_VARS, WWFixedAsDWord pointSize,
 static void CalcTransform( TRUETYPE_VARS,
                            TransformMatrix*  transMatrix, 
                            FontMatrix*       fontMatrix, 
+                           WWFixedAsDWord    pointSize,
                            TextStyle         stylesToImplement,
                            FontBuf*          fontBuf )
 {
@@ -467,15 +469,13 @@ EC(     ECCheckBounds( (void*)fontMatrix ) );
 
                 if( stylesToImplement & TS_SUBSCRIPT )
                 {
-                        transMatrix->TM_scriptY = GrMulWWFixed( SUBSCRIPT_OFFSET, 
-                                        WBFIXED_TO_WWFIXEDASDWORD( fontBuf->FB_height ) +
-                                        WBFIXED_TO_WWFIXEDASDWORD( fontBuf->FB_heightAdjust ) ) >> 16;
+                        transMatrix->TM_scriptY = GrMulWWFixed( 
+                                        SUBSCRIPT_OFFSET, pointSize ) >> 16;
                 }
                 else
                 {
-                        transMatrix->TM_scriptY = GrMulWWFixed( SUPERSCRIPT_OFFSET,
-                                        WBFIXED_TO_WWFIXEDASDWORD( fontBuf->FB_height ) +
-                                        WBFIXED_TO_WWFIXEDASDWORD( fontBuf->FB_heightAdjust ) ) -
+                        transMatrix->TM_scriptY = GrMulWWFixed( 
+                                        SUPERSCRIPT_OFFSET, pointSize ) -
                                         WBFIXED_TO_WWFIXEDASDWORD( fontBuf->FB_baselinePos ) -
                                         WBFIXED_TO_WWFIXEDASDWORD( fontBuf->FB_baseAdjust ) >> 16;
                 }
