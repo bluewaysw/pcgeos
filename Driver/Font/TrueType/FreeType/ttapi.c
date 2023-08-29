@@ -1460,24 +1460,7 @@ TT_Error  TT_Get_Outline_Region( TT_Outline*     outline,
   void  TT_Transform_Outline( TT_Outline*  outline,
                               TT_Matrix*   matrix )
   {
-    UShort      n;
-    TT_F26Dot6  x, y;
-    TT_Vector*  vec;
-
-
-    vec = outline->points;
-    for ( n = 0; n < outline->n_points; n++ )
-    {
-      x = TT_MulFix( vec->x, matrix->xx ) +
-          TT_MulFix( vec->y, matrix->xy );
-
-      y = TT_MulFix( vec->x, matrix->yx ) +
-          TT_MulFix( vec->y, matrix->yy );
-
-      vec->x = x;
-      vec->y = y;
-      vec++;
-    }
+    TransVecList( outline->points, outline->n_points, matrix );
   }
 
 

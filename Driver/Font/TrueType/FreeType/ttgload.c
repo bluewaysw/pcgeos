@@ -573,7 +573,7 @@
 
     Long  glyph_offset, offset;
 
-    TT_F26Dot6  x, y, nx, ny;
+    TT_F26Dot6  x, y;
 
     Fixed  xx, xy, yx, yy;
 
@@ -984,32 +984,14 @@
 
           if ( subglyph2->is_scaled )
           {
-            TT_Vector*  cur = subglyph2->zone.cur;
-            TT_Vector*  org = subglyph2->zone.org;
+            TT_Matrix matrix;
+            matrix.xx = subglyph->transform.xx;
+            matrix.xy = subglyph->transform.xy;
+            matrix.yx = subglyph->transform.yx;
+            matrix.yy = subglyph->transform.yy;
 
-            for ( u = 0; u < num_points; u++ )
-            {
-              nx = TT_MulFix( cur->x, subglyph->transform.xx ) +
-                   TT_MulFix( cur->y, subglyph->transform.yx );
-
-              ny = TT_MulFix( cur->x, subglyph->transform.xy ) +
-                   TT_MulFix( cur->y, subglyph->transform.yy );
-
-              cur->x = nx;
-              cur->y = ny;
-
-              nx = TT_MulFix( org->x, subglyph->transform.xx ) +
-                   TT_MulFix( org->y, subglyph->transform.yx );
-
-              ny = TT_MulFix( org->x, subglyph->transform.xy ) +
-                   TT_MulFix( org->y, subglyph->transform.yy );
-
-              org->x = nx;
-              org->y = ny;
-
-              cur++;
-              org++;
-            }
+            TransVecList( subglyph2->zone.cur, num_points, &matrix );
+            TransVecList( subglyph2->zone.org, num_points, &matrix );
           }
 
           /* adjust counts */

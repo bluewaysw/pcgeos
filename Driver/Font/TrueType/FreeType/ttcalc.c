@@ -398,11 +398,11 @@
 
 #endif /* LONG64 */
 
-/* This convenience function applies TT_MulDiv to a vector.                */
+/* This convenience function applies TT_MulDiv to a list.                  */
 /* Its main purpose is to reduce the number of inter-module calls in GEOS. */
 
 LOCAL_FUNC
-void  MulDivVector( TT_Long*  a, ULong  n, TT_Long  b, TT_Long  c )
+void  MulDivList( TT_Long*  a, ULong  n, TT_Long  b, TT_Long  c )
 {
   ULong i;
 
@@ -410,5 +410,27 @@ void  MulDivVector( TT_Long*  a, ULong  n, TT_Long  b, TT_Long  c )
     a[i] = TT_MulDiv( a[i], b, c );
 }
 
+/* This convenience function applies a matrix  to a list of vectors.       */
+/* Its main purpose is to reduce the number of inter-module calls in GEOS. */
+
+LOCAL_FUNC
+void  TransVecList( TT_Vector*  vec, ULong  n, TT_Matrix*  matrix )
+{
+    ULong  i;
+    TT_F26Dot6  x, y;
+
+    for ( i = 0; i < n; i++ )
+    {
+      x = TT_MulFix( vec->x, matrix->xx ) +
+          TT_MulFix( vec->y, matrix->xy );
+
+      y = TT_MulFix( vec->x, matrix->yx ) +
+          TT_MulFix( vec->y, matrix->yy );
+
+      vec->x = x;
+      vec->y = y;
+      vec++;
+    }  
+}
 
 /* END */
