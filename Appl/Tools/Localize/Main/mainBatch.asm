@@ -903,6 +903,7 @@ REVISION HISTORY:
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
 returnChar char C_ENTER,0
+returnCharWin char C_ENTER,C_LINEFEED,0
 
 BatchReportReturn	proc	far
 		uses	ax,bx,cx,dx,bp,si,di
@@ -921,8 +922,8 @@ BatchReportReturn	proc	far
 		; ds:dx - buffer from which to write
 		; 	(vfptr if from XIP'ed resource)
 		segmov  ds, cs
-		mov	dx, offset returnChar
-		mov	cx, 1
+		mov	dx, offset returnCharWin
+		mov	cx, 2
 		mov	al, FILE_NO_ERRORS
 		call	FileWrite
 noAutorun:

@@ -12,4 +12,5 @@ echo exit >> %3\ensemble\INIT.BAT
 set OLD_PATH=%cd%
 cd /D %3 
 %BASEBOX% -conf %ROOT_DIR%\bin\basebox.conf -conf %LOCAL_ROOT%\basebox_user.conf
+more TRANSLOG.TXT
 cd %OLD_PATH%
