@@ -56,6 +56,8 @@ idata 	segment
     ResEditProcessClass		mask CLASSF_NEVER_SAVED
     ResEditApplicationClass
 
+    autorunMode			BooleanByte BB_FALSE
+
 idata	ends
 
 udata	segment
@@ -183,6 +185,8 @@ done:
 
 	; just checked availablity, free again
 	call	MemFree
+
+	mov	ss:[autorunMode], BB_TRUE
 
 	mov	cx, es
 	mov	ax, MSG_RESEDIT_RUN_BATCH_JOB
