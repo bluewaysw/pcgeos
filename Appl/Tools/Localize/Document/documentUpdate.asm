@@ -2280,7 +2280,7 @@ BatchDisplayChunkStateCounts	proc	near
 	; No chunks changed.  Report this in status dialog.
 
 		mov	ax, MSG_VIS_TEXT_APPEND_OPTR
-		GetResourceHandleNS	FileMenuUI, dx
+		GetResourceHandleNS	BatchStringsUI, dx
 		mov	bp, offset ResEditBatchNoChange
 		call	BatchReportTab
 		call	BatchReportTab
@@ -2302,7 +2302,7 @@ somethingChanged:
 		call	BatchReportTab
 		call	BatchReportNumber
 		mov	ax, MSG_VIS_TEXT_APPEND_OPTR
-		GetResourceHandleNS	FileMenuUI, dx
+		GetResourceHandleNS	BatchStringsUI, dx
 		mov	bp, offset ResEditBatchChunksChanged
 		call	BatchReport
 		call	BatchReportReturn
@@ -2323,7 +2323,7 @@ deletedChunks:
 		call	BatchReportTab
 		call	BatchReportNumber
 		mov	ax, MSG_VIS_TEXT_APPEND_OPTR
-		GetResourceHandleNS	FileMenuUI, dx
+		GetResourceHandleNS	BatchStringsUI, dx
 		mov	bp, offset ResEditBatchChunksDeleted
 		call	BatchReport
 		call	BatchReportReturn
@@ -2343,7 +2343,7 @@ addedChunks:
 		call	BatchReportTab
 		call	BatchReportNumber
 		mov	ax, MSG_VIS_TEXT_APPEND_OPTR
-		GetResourceHandleNS	FileMenuUI, dx
+		GetResourceHandleNS	BatchStringsUI, dx
 		mov	bp, offset ResEditBatchChunksAdded
 		call	BatchReport
 		call	BatchReportReturn

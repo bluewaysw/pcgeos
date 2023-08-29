@@ -56,10 +56,13 @@ idata 	segment
     ResEditProcessClass		mask CLASSF_NEVER_SAVED
     ResEditApplicationClass
 
+    autorunMode			BooleanByte BB_FALSE
+
 idata	ends
 
 udata	segment
     restoringFromState		BooleanByte (?)
+    batchLogFile		word (?)	
 udata	ends
 
 MainProcessCode		segment resource
@@ -103,6 +106,7 @@ MainProcessOpenApplication		method dynamic ResEditProcessClass,
 
 	; Start with batch processing mode off.
 
+	mov	es:[batchLogFile], NULL 	;initially no batch log file
 	mov	al, BM_OFF	
 	call	SetBatchMode
 
@@ -163,6 +167,36 @@ MainProcessOpenApplication		method dynamic ResEditProcessClass,
 
 	call	FilePopDir
 done:
+	; if autorun batch, start batch now
+	GetResourceHandleNS	StringsUI, bx
+	call	MemLock
+	mov	ds, ax
+	mov	si, offset AutorunBatchKey	
+	mov	dx, ds:[si]			; ds:si <- key string
+	mov	cx, ds				; cx:dx <- key string
+	mov	si, offset CategoryString	
+	mov	si, ds:[si]			; ds:si <- category string
+
+	push	bp
+	clr	bp				; allocate a block
+	call	InitFileReadString		; ^hbx <- contains dest path
+	pop	bp
+	jc	finalDone
+
+	; just checked availablity, free again
+	call	MemFree
+
+	mov	ss:[autorunMode], BB_TRUE
+
+	mov	cx, es
+	mov	ax, MSG_RESEDIT_RUN_BATCH_JOB
+	call	GeodeGetProcessHandle		; bx = process handle
+	mov	di, mask MF_CALL
+	call	ObjMessage
+finalDone:
+	mov	bx, ds:[LMBH_handle]
+	call	MemUnlock
+	
 	ret
 MainProcessOpenApplication		endm
 
