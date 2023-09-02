@@ -28,6 +28,10 @@
 static void CalcTransformMatrix( TextStyle         stylesToImplement,
                                  TransformMatrix*  transMatrix );
 
+static void CalcScaleForWidths( TRUETYPE_VARS, 
+                                WWFixedAsDWord     pointSize, 
+                                TextStyle          stylesToImplement );
+
 /********************************************************************
  *                      TrueType_Char_Metrics
  ********************************************************************
@@ -35,11 +39,14 @@ static void CalcTransformMatrix( TextStyle         stylesToImplement,
  * 
  * PARAMETERS:    character             Character to get metrics of.
  *                info                  Info to return (GCM_info).
- *                *fontInfo              
- *                *outlineData
- *                stylesToImplement
+ *                *fontInfo             Ptr. to font info structure.
+ *                *outlineEntry         Ptr. to outline entry containing 
+ *                                      TrueTypeOutlineEntry.
+ *                stylesToImplement     Desired text style.
+ *                pointSize             Desired point size.
  *                result                Pointer in wich the result will 
  *                                      stored.
+ *                varBlock              Memory handle to var block.
  * 
  * RETURNS:       void
  * 
@@ -51,7 +58,6 @@ static void CalcTransformMatrix( TextStyle         stylesToImplement,
  *      Date      Name      Description
  *      ----      ----      -----------
  *      23/12/22  JK        Initial Revision
- * 
  *******************************************************************/
 void _pascal TrueType_Char_Metrics( 
                                    word                 character, 
@@ -84,6 +90,7 @@ EC(     ECCheckBounds( (void*)trueTypeVars ) );
         if( TrueType_Lock_Face(trueTypeVars, trueTypeOutline) )
                 goto Fail;
 
+        CalcScaleForWidths( trueTypeVars, pointSize, stylesToImplement );
         CalcTransformMatrix( stylesToImplement, &transMatrix );
 
         // get TT char index
@@ -97,30 +104,27 @@ EC(     ECCheckBounds( (void*)trueTypeVars ) );
         TT_Transform_Outline( &OUTLINE, &transMatrix.TM_matrix );
         TT_Translate_Outline( &OUTLINE, 0, WWFIXEDASDWORD_TO_FIXED26DOT6( transMatrix.TM_scriptY ) );
 
-        // scale glyph
-        TT_Set_Instance_CharSize( INSTANCE, ( pointSize >> 10 ) );
-        TT_Get_Instance_Metrics( INSTANCE, &INSTANCE_METRICS );
-
         // get metrics
+        TT_Load_Glyph( INSTANCE, GLYPH, charIndex, 0 );
         TT_Get_Glyph_Metrics( GLYPH, &GLYPH_METRICS );
 
         switch( info )
         {
                 case GCMI_MIN_X:
                 case GCMI_MIN_X_ROUNDED:
-                        *result = SCALE_WORD( GLYPH_BBOX.xMin, INSTANCE_METRICS.x_scale );
+                        *result = SCALE_WORD( GLYPH_BBOX.xMin, trueTypeVars->scaleWidth );
                         break;
                 case GCMI_MIN_Y:
                 case GCMI_MIN_Y_ROUNDED:
-                        *result = SCALE_WORD( GLYPH_BBOX.yMin, INSTANCE_METRICS.y_scale );
+                        *result = SCALE_WORD( GLYPH_BBOX.yMin, trueTypeVars->scaleHeight );
                         break;
                 case GCMI_MAX_X:
                 case GCMI_MAX_X_ROUNDED:
-                        *result = SCALE_WORD( GLYPH_BBOX.xMax, INSTANCE_METRICS.x_scale );
+                        *result = SCALE_WORD( GLYPH_BBOX.xMax, trueTypeVars->scaleWidth );
                         break;
                 case GCMI_MAX_Y:
                 case GCMI_MAX_Y_ROUNDED:
-                        *result = SCALE_WORD( GLYPH_BBOX.yMax, INSTANCE_METRICS.y_scale );
+                        *result = SCALE_WORD( GLYPH_BBOX.yMax, trueTypeVars->scaleHeight );
                         break;
         }
 
@@ -129,6 +133,20 @@ EC(     ECCheckBounds( (void*)trueTypeVars ) );
 
 Fail:
         MemUnlock( varBlock );
+}
+
+
+static void CalcScaleForWidths( TRUETYPE_VARS, WWFixedAsDWord pointSize, 
+                                TextStyle stylesToImplement )
+{
+        SCALE_HEIGHT = GrUDivWWFixed( pointSize, MakeWWFixed( FACE_PROPERTIES.header->Units_Per_EM ) );
+        SCALE_WIDTH  = SCALE_HEIGHT;
+
+        if( stylesToImplement & ( TS_BOLD ) )
+                SCALE_WIDTH = GrMulWWFixed( SCALE_WIDTH, WWFIXED_1_POINR_1 );
+
+        if( stylesToImplement & ( TS_SUBSCRIPT | TS_SUPERSCRIPT ) )     
+                SCALE_WIDTH = GrMulWWFixed( SCALE_WIDTH, WWFIXED_0_POINT_5 );
 }
 
 
