@@ -645,7 +645,7 @@ static FontID getFontID( const char* familyName )
         FontID  fontID;
 
         if( !InitFileReadInteger( FONTMAPPING_CATEGORY, familyName, &fontID ) )
-                return FM_TRUETYPE || (fontID && 0x0fff);
+                return FM_TRUETYPE | (fontID & 0x0fff);
 
         return MAKE_FONTID( familyName );
 }
