@@ -1,306 +1,310 @@
-/***********************************************************************
- *
- *      Copyright (c) Geoworks 1994 -- All Rights Reserved
- *
- * PROJECT:       GEOS SDK
- * MODULE:        SimpInk (Sample GEOS application)
- * FILE:          simpink.goc
- *
- * AUTHOR:        David J. Noha, 4/21/94
- *
- * REVISION HISTORY:
- *	Date	  Name	    Description
- *	----	  ----	    -----------
- *      4/21/94   noha      Initial version
- *
- * DESCRIPTION:
- *         This is a simple ink-using application; there are NO
- *       controllers of any type (not even an InkControl).  It saves
- *       and loads a single ink "drawing" to a specific file.
- *
+/***********************************************************************
+ *
+ *      Copyright (c) Geoworks 1994 -- All Rights Reserved
+ *
+ * PROJECT:       GEOS SDK
+ * MODULE:        SimpInk (Sample GEOS application)
+ * FILE:          simpink.goc
+ *
+ * AUTHOR:        David J. Noha, 4/21/94
+ *
+ * REVISION HISTORY:
+ *	Date	  Name	    Description
+ *	----	  ----	    -----------
+ *      4/21/94   noha      Initial version
+ *	12/04/2022 RainerB  Invalid end-of-line characters removed
+ *			    MSG_SIP_SAVE_INK boundaries fixed
+ *
+ * DESCRIPTION:
+ *         This is a simple ink-using application; there are NO
+ *       controllers of any type (not even an InkControl).  It saves
+ *       and loads a single ink "drawing" to a specific file.
+ *
  *      $Id: simpink.goc,v 1.1 97/04/04 16:40:08 newdeal Exp $
- *
- ***********************************************************************/
-
-/*
- ***************************************************************************
- *		Include files
- ***************************************************************************
- */
-
-@include <stdapp.goh>
-@include <pen.goh>
-
-/*
- *  The File Handle of the file used to store the ink data.
- */
-
-VMFileHandle dbfile;
-
-/*
- ***************************************************************************
- *		Class & Message Definitions
- ***************************************************************************
- */
-
-@class  SIProcessClass, GenProcessClass;
-
-@message (GEN_TRIGGER_ACTION) MSG_SIP_SAVE_INK;
-@message (GEN_TRIGGER_ACTION) MSG_SIP_LOAD_INK;
-
-@endc
-
-@classdecl  SIProcessClass, neverSaved;
-
-/*
- ***************************************************************************
- *		UI Objects
- ***************************************************************************
- */
-
-@start	AppResource;
-
-@object GenApplicationClass SIApp = {
-    GI_visMoniker = list { @SITextMoniker }
-    GI_comp = @SIPrimary;
-    gcnList(MANUFACTURER_ID_GEOWORKS,GAGCNLT_WINDOWS) = @SIPrimary;
-
-    /*
-     * The following line is necessary only for InkControl use.
-     */
-    gcnList(MANUFACTURER_ID_GEOWORKS,GAGCNLT_SELF_LOAD_OPTIONS) = @SIInkControl;
-}
-
-@visMoniker SITextMoniker = "C Simple Ink App";
-
-@end    AppResource;
-
-
-@start  Interface;
-
-@object GenPrimaryClass SIPrimary  = {
-    GI_comp = @SIFileMenu, @SIInkMenu, @SIView;
-    ATTR_GEN_DISPLAY_NOT_MINIMIZABLE;
-}
-
-@object GenInteractionClass SIFileMenu = {
-    GI_comp = @SILoadItem, @SISaveItem;
-    GII_visibility = GIV_POPUP;
-    ATTR_GEN_INTERACTION_GROUP_TYPE = GIGT_FILE_MENU;
-}
-
-@object GenTriggerClass SILoadItem = {
-    GI_visMoniker = 'L',"Load";
-    GTI_destination = process;
-    GTI_actionMsg = MSG_SIP_LOAD_INK;
-}
-
-@object GenTriggerClass SISaveItem = {
-    GI_visMoniker = 'S',"Save";
-    GTI_destination = process;
-    GTI_actionMsg = MSG_SIP_SAVE_INK;
-}
-
-@object GenViewClass SIView = {
-    /*
-     * GVI_inkType can also be GVIT_QUERY_OUTPUT; if so, the content
-     * must respond to MSG_META_QUERY_IF_PRESS_IS_INK, which
-     * GenDocument, VisContent, and GenContent all do.
-     */
-
-    GVI_inkType = GVIT_PRESSES_ARE_INK;
-
-    GVI_content = SIContent;
-    GVI_horizAttrs = (@default | GVDA_SCROLLABLE | \
-                      GVDA_DONT_DISPLAY_SCROLLBAR | \
-                      GVDA_NO_LARGER_THAN_CONTENT );
-    GVI_vertAttrs = (@default | GVDA_SCROLLABLE | \
-                     GVDA_DONT_DISPLAY_SCROLLBAR | \
-                     GVDA_NO_LARGER_THAN_CONTENT );
-    /*
-     *  Keep the floating keyboard from coming up.
-     */
-    ATTR_GEN_VIEW_DOES_NOT_ACCEPT_TEXT_INPUT;
-
-    HINT_DEFAULT_TARGET;
-}
-
-@object VisContentClass SIContent = {
-    VI_bounds = {0, 0, 200, 200};
-    VCI_comp = @SIInk;
-    VCNI_view = @SIView;
-    VCI_geoDimensionAttrs = VCGDA_EXPAND_WIDTH_TO_FIT_PARENT |
-                            VCGDA_EXPAND_HEIGHT_TO_FIT_PARENT;
-}
-
-@object InkClass SIInk = {
-    VI_bounds = {0, 0, 200, 200};
-    /*
-     * If you add children to the content other than the ink object,
-     * make sure to remove IF_ONLY_CHILD_OF_CONTENT.  Oherwise, leave
-     * it in, because it speeds things up nicely.
-     *
-     * Make sure to clear IF_HAS_UNDO if your app does not support Undo.
-     *
-     * If IF_CONTROLLED is not set, the InkControl will not affect
-     * the Ink object; all presses will be as if "Pencil" were selected.
-     */
-    II_flags = (@default & ~IF_HAS_UNDO) |
-               IF_ONLY_CHILD_OF_CONTENT |
-               IF_CONTROLLED;
-}
-
-/*
- * The following two objects are necessary only for InkControl use.
- * Also, SIInkMenu is listed above as a child of SIPrimary.
- */
-@object GenInteractionClass SIInkMenu = {
-	GI_visMoniker = 'I', "Ink";
-        GI_comp = @SIInkControl;
-	GII_visibility = GIV_POPUP;
-}
-
-@object InkControlClass SIInkControl = {
-	GII_visibility = GIV_SUB_GROUP;
-	ATTR_GEN_DESTINATION_CLASS = (ClassStruct *) &InkClass;
-}
-
-@end Interface;
-
-
-
-/*
- ***************************************************************************
- *		Code for FSelSampProcessClass
- ***************************************************************************
- */
-
-/***********************************************************************
- *
- * MESSAGE:     MSG_GEN_PROCESS_OPEN_APPLICATION for SIProcessClass
- *
- * DESCRIPTION: Opens the DB file.
- *
- * RETURN:	none
- *
- * STRATEGY:
- *
- * KNOWN BUGS/SIDE EFFECTS/CAVEATS/IDEAS:
- *
- * REVISION HISTORY:
- *	Name	Date		Description
- *	----	----		-----------
- *      noha    4/94            Initial Revision
- *
- ***********************************************************************/
-@method SIProcessClass, MSG_GEN_PROCESS_OPEN_APPLICATION
-{
-    @callsuper();
-    dbfile = VMOpen("simpink.vm", 0, VMO_CREATE, 0);
-}
-
-/***********************************************************************
- *
- * MESSAGE:     MSG_SIP_LOAD_INK for SIProcessClass
- *
- * DESCRIPTION: Loads data into the Ink object from the DB map item.
- *
- * RETURN:	none
- *
- * STRATEGY:
- *
- * KNOWN BUGS/SIDE EFFECTS/CAVEATS/IDEAS:
- *
- * REVISION HISTORY:
- *	Name	Date		Description
- *	----	----		-----------
- *      noha    4/94            Initial Revision
- *
- * PARAMETERS:
- *      void (optr trigger)
- *
- ***********************************************************************/
-@method SIProcessClass, MSG_SIP_LOAD_INK
-{
-    DBGroupAndItem map;
-    InkDBFrame idbf;
-
-    map = DBGetMap(dbfile);
-    if (map == NULL)
-        return;
-
-    idbf.IDBF_VMFile = dbfile;
-    idbf.IDBF_DBGroupAndItem = map;
-    idbf.IDBF_DBExtra = 0;
-    idbf.IDBF_bounds.R_left = 0;
-    idbf.IDBF_bounds.R_top = 0;
-
-    @call SIInk::MSG_INK_LOAD_FROM_DB_ITEM(&idbf);
-}
-
-/***********************************************************************
- *
- * MESSAGE:     MSG_SIP_SAVE_INK for SIProcessClass
- *
- * DESCRIPTION: Saves the Ink data into the DB map item.
- *
- * RETURN:	none
- *
- * STRATEGY:
- *
- * KNOWN BUGS/SIDE EFFECTS/CAVEATS/IDEAS:
- *
- * REVISION HISTORY:
- *	Name	Date		Description
- *	----	----		-----------
- *      noha    4/94            Initial Revision
- *
- * PARAMETERS:
- *      void (optr trigger)
- *
- ***********************************************************************/
-@method SIProcessClass, MSG_SIP_SAVE_INK
-{
-    DBGroupAndItem  map;
-    InkDBFrame      idbf;
-    DBReturn        dbret;
-
-    map = DBGetMap(dbfile);
-    if (map == NULL) {
-        map = DBAllocUngrouped(dbfile, 4);
-        DBSetMapUngrouped(dbfile, map);
-    }
-
-    idbf.IDBF_VMFile = dbfile;
-    idbf.IDBF_DBGroupAndItem = map;
-    idbf.IDBF_DBExtra = 0;
-    idbf.IDBF_bounds.R_left = 0;
-    idbf.IDBF_bounds.R_top = 0;
-    idbf.IDBF_bounds.R_right = 0xffff;
-    idbf.IDBF_bounds.R_bottom = 0xffff;
-
-    @call SIInk::MSG_INK_SAVE_TO_DB_ITEM(&dbret, &idbf);
-}
-
-/***********************************************************************
- *
- * MESSAGE:     MSG_GEN_PROCESS_CLOSE_APPLICATION for SIProcessClass
- *
- * DESCRIPTION: Closes the DB file.
- *
- * RETURN:	none
- *
- * STRATEGY:
- *
- * REVISION HISTORY:
- *	Name	Date		Description
- *	----	----		-----------
- *      noha    4/94            Initial Revision
- *
- ***********************************************************************/
-@method SIProcessClass, MSG_GEN_PROCESS_CLOSE_APPLICATION
-{
-    VMClose(dbfile, FILE_NO_ERRORS);
-    return @callsuper();
-}
-
+ *
+ ***********************************************************************/
+
+/*
+ ***************************************************************************
+ *		Include files
+ ***************************************************************************
+ */
+
+@include <stdapp.goh>
+@include <pen.goh>
+
+/*
+ *  The File Handle of the file used to store the ink data.
+ */
+
+VMFileHandle dbfile;
+
+/*
+ ***************************************************************************
+ *		Class & Message Definitions
+ ***************************************************************************
+ */
+
+@class  SIProcessClass, GenProcessClass;
+
+@message (GEN_TRIGGER_ACTION) MSG_SIP_SAVE_INK;
+@message (GEN_TRIGGER_ACTION) MSG_SIP_LOAD_INK;
+
+@endc
+
+@classdecl  SIProcessClass, neverSaved;
+
+/*
+ ***************************************************************************
+ *		UI Objects
+ ***************************************************************************
+ */
+
+@start	AppResource;
+
+@object GenApplicationClass SIApp = {
+    GI_visMoniker = list { @SITextMoniker }
+    GI_comp = @SIPrimary;
+    gcnList(MANUFACTURER_ID_GEOWORKS,GAGCNLT_WINDOWS) = @SIPrimary;
+
+    /*
+     * The following line is necessary only for InkControl use.
+     */
+    gcnList(MANUFACTURER_ID_GEOWORKS,GAGCNLT_SELF_LOAD_OPTIONS) = @SIInkControl;
+}
+
+@visMoniker SITextMoniker = "C Simple Ink App";
+
+@end    AppResource;
+
+
+@start  Interface;
+
+@object GenPrimaryClass SIPrimary  = {
+    GI_comp = @SIFileMenu, @SIInkMenu, @SIView;
+    ATTR_GEN_DISPLAY_NOT_MINIMIZABLE;
+}
+
+@object GenInteractionClass SIFileMenu = {
+    GI_comp = @SILoadItem, @SISaveItem;
+    GII_visibility = GIV_POPUP;
+    ATTR_GEN_INTERACTION_GROUP_TYPE = GIGT_FILE_MENU;
+}
+
+@object GenTriggerClass SILoadItem = {
+    GI_visMoniker = 'L',"Load";
+    GTI_destination = process;
+    GTI_actionMsg = MSG_SIP_LOAD_INK;
+}
+
+@object GenTriggerClass SISaveItem = {
+    GI_visMoniker = 'S',"Save";
+    GTI_destination = process;
+    GTI_actionMsg = MSG_SIP_SAVE_INK;
+}
+
+@object GenViewClass SIView = {
+    /*
+     * GVI_inkType can also be GVIT_QUERY_OUTPUT; if so, the content
+     * must respond to MSG_META_QUERY_IF_PRESS_IS_INK, which
+     * GenDocument, VisContent, and GenContent all do.
+     */
+
+    GVI_inkType = GVIT_PRESSES_ARE_INK;
+
+    GVI_content = SIContent;
+    GVI_horizAttrs = (@default | GVDA_SCROLLABLE | \
+                      GVDA_DONT_DISPLAY_SCROLLBAR | \
+                      GVDA_NO_LARGER_THAN_CONTENT );
+    GVI_vertAttrs = (@default | GVDA_SCROLLABLE | \
+                     GVDA_DONT_DISPLAY_SCROLLBAR | \
+                     GVDA_NO_LARGER_THAN_CONTENT );
+    /*
+     *  Keep the floating keyboard from coming up.
+     */
+    ATTR_GEN_VIEW_DOES_NOT_ACCEPT_TEXT_INPUT;
+
+    HINT_DEFAULT_TARGET;
+}
+
+@object VisContentClass SIContent = {
+    VI_bounds = {0, 0, 200, 200};
+    VCI_comp = @SIInk;
+    VCNI_view = @SIView;
+    VCI_geoDimensionAttrs = VCGDA_EXPAND_WIDTH_TO_FIT_PARENT |
+                            VCGDA_EXPAND_HEIGHT_TO_FIT_PARENT;
+}
+
+@object InkClass SIInk = {
+    VI_bounds = {0, 0, 200, 200};
+    /*
+     * If you add children to the content other than the ink object,
+     * make sure to remove IF_ONLY_CHILD_OF_CONTENT.  Oherwise, leave
+     * it in, because it speeds things up nicely.
+     *
+     * Make sure to clear IF_HAS_UNDO if your app does not support Undo.
+     *
+     * If IF_CONTROLLED is not set, the InkControl will not affect
+     * the Ink object; all presses will be as if "Pencil" were selected.
+     */
+    II_flags = (@default & ~IF_HAS_UNDO) |
+               IF_ONLY_CHILD_OF_CONTENT |
+               IF_CONTROLLED;          
+
+}
+
+/*
+ * The following two objects are necessary only for InkControl use.
+ * Also, SIInkMenu is listed above as a child of SIPrimary.
+ */
+@object GenInteractionClass SIInkMenu = {
+	GI_visMoniker = 'I', "Ink";
+        GI_comp = @SIInkControl;
+	GII_visibility = GIV_POPUP;
+}
+
+@object InkControlClass SIInkControl = {
+	GII_visibility = GIV_SUB_GROUP;
+	ATTR_GEN_DESTINATION_CLASS = (ClassStruct *) &InkClass;
+}
+
+@end Interface;
+
+
+
+/*
+ ***************************************************************************
+ *		Code for FSelSampProcessClass
+ ***************************************************************************
+ */
+
+/***********************************************************************
+ *
+ * MESSAGE:     MSG_GEN_PROCESS_OPEN_APPLICATION for SIProcessClass
+ *
+ * DESCRIPTION: Opens the DB file.
+ *
+ * RETURN:	none
+ *
+ * STRATEGY:
+ *
+ * KNOWN BUGS/SIDE EFFECTS/CAVEATS/IDEAS:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *      noha    4/94            Initial Revision
+ *
+ ***********************************************************************/
+@method SIProcessClass, MSG_GEN_PROCESS_OPEN_APPLICATION
+{
+    @callsuper();
+    dbfile = VMOpen("simpink.vm", 0, VMO_CREATE, 0);
+}
+
+/***********************************************************************
+ *
+ * MESSAGE:     MSG_SIP_LOAD_INK for SIProcessClass
+ *
+ * DESCRIPTION: Loads data into the Ink object from the DB map item.
+ *
+ * RETURN:	none
+ *
+ * STRATEGY:
+ *
+ * KNOWN BUGS/SIDE EFFECTS/CAVEATS/IDEAS:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *      noha    4/94            Initial Revision
+ *
+ * PARAMETERS:
+ *      void (optr trigger)
+ *
+ ***********************************************************************/
+@method SIProcessClass, MSG_SIP_LOAD_INK
+{
+    DBGroupAndItem map;
+    InkDBFrame idbf;
+
+    map = DBGetMap(dbfile);
+    if (map == NULL)
+        return;
+
+    idbf.IDBF_VMFile = dbfile;
+    idbf.IDBF_DBGroupAndItem = map;
+    idbf.IDBF_DBExtra = 0;
+    idbf.IDBF_bounds.R_left = 0;
+    idbf.IDBF_bounds.R_top = 0;
+
+    @call SIInk::MSG_INK_LOAD_FROM_DB_ITEM(&idbf);
+}
+
+/***********************************************************************
+ *
+ * MESSAGE:     MSG_SIP_SAVE_INK for SIProcessClass
+ *
+ * DESCRIPTION: Saves the Ink data into the DB map item.
+ *
+ * RETURN:	none
+ *
+ * STRATEGY:
+ *
+ * KNOWN BUGS/SIDE EFFECTS/CAVEATS/IDEAS:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *      noha    4/94            Initial Revision
+ *	RainerB	12/5/2022	Boundaries limited to sword
+ *
+ * PARAMETERS:
+ *      void (optr trigger)
+ *
+ ***********************************************************************/
+@method SIProcessClass, MSG_SIP_SAVE_INK
+{
+    DBGroupAndItem  map;
+    InkDBFrame      idbf;
+    DBReturn        dbret;
+
+    map = DBGetMap(dbfile);
+    if (map == NULL) {
+        map = DBAllocUngrouped(dbfile, 4);
+        DBSetMapUngrouped(dbfile, map);
+    }
+
+    idbf.IDBF_VMFile = dbfile;
+    idbf.IDBF_DBGroupAndItem = map;
+    idbf.IDBF_DBExtra = 0;
+    idbf.IDBF_bounds.R_left = 0;
+    idbf.IDBF_bounds.R_top = 0;
+    idbf.IDBF_bounds.R_right = 0x7fff;
+    idbf.IDBF_bounds.R_bottom = 0x7fff;
+
+    @call SIInk::MSG_INK_SAVE_TO_DB_ITEM(&dbret, &idbf);
+}
+
+/***********************************************************************
+ *
+ * MESSAGE:     MSG_GEN_PROCESS_CLOSE_APPLICATION for SIProcessClass
+ *
+ * DESCRIPTION: Closes the DB file.
+ *
+ * RETURN:	none
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *      noha    4/94            Initial Revision
+ *
+ ***********************************************************************/
+@method SIProcessClass, MSG_GEN_PROCESS_CLOSE_APPLICATION
+{
+    VMClose(dbfile, FILE_NO_ERRORS);
+    return @callsuper();
+}
+ 

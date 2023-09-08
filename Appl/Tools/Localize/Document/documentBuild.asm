@@ -139,7 +139,7 @@ REDCreatePatchFile	method dynamic ResEditDocumentClass,
 		call	IsBatchMode
 		jnc	afterBatchReport
 		mov	ax, MSG_VIS_TEXT_APPEND_OPTR
-		GetResourceHandleNS	FileMenuUI, dx
+		GetResourceHandleNS	BatchStringsUI, dx
 		mov	bp, offset ResEditBatchTempGeodeCreated
 		call	BatchReportTab
 		call	BatchReport
@@ -213,7 +213,7 @@ errorInTempGeodeCreate:
 	; Indicate failure in creating temporary geode.
 
 		mov	ax, MSG_VIS_TEXT_APPEND_OPTR
-		GetResourceHandleNS	FileMenuUI, dx
+		GetResourceHandleNS	BatchStringsUI, dx
 		mov	bp, offset ResEditBatchTempGeodeError
 		call	BatchReportTab
 		call	BatchReport
@@ -520,7 +520,7 @@ done:
 		mov	bp, offset ResEditBatchGeodeCreateError
 
 		mov	ax, MSG_VIS_TEXT_APPEND_OPTR
-		GetResourceHandleNS	FileMenuUI, dx
+		GetResourceHandleNS	BatchStringsUI, dx
 		call	BatchReportTab
 		call	BatchReport
 		call	BatchReportReturn

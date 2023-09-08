@@ -90,6 +90,55 @@ fileEnumParams		local   FileEnumParams
 		mov	al, BM_ON		
 		call	SetBatchMode
 
+	; open/create fresh batch log file if requested
+
+		push	ds
+		push	bx, dx, cx, si
+		GetResourceHandleNS	StringsUI, bx
+		call	MemLock
+	
+		mov	ds, ax
+		mov	si, offset BatchLogFileKey	
+		mov	dx, ds:[si]			; ds:si <- key string
+		mov	cx, ds				; cx:dx <- key string
+		mov	si, offset CategoryString	
+		mov	si, ds:[si]			; ds:si <- category string
+
+		push	bp
+		clr	bp				; allocate a block
+		call	InitFileReadString		; ^hbx <- contains dest path
+		pop	bp
+		jc	noLogFile			; branch if not found (or other error)
+
+		push	ds
+		call	FilePushDir
+		mov	ax, SP_DOCUMENT
+		call	FileSetStandardPath
+		jc	logFileError
+
+		call 	MemLock 			; lock block with handle in bx
+		mov	ds, ax				; ds:0 points to file name
+		mov	dx, 0				; ds:dx <- fileName 
+		mov	ax, ((mask FCF_NATIVE)\
+				shl 8) or (FileAccessFlags \
+				<FE_NONE, FA_WRITE_ONLY>)
+		mov	cx, FILE_ATTR_NORMAL
+		call	FileCreate
+		jc	logFileError			; error opening the log file?
+
+		; remember the log file handle to be used in the batch process
+		mov	es:[batchLogFile], ax
+
+logFileError:
+		call	MemFree				; free block with handle in bx
+		call	FilePopDir
+		pop	ds
+noLogFile:
+		mov	bx, ds:[LMBH_handle]
+		call	MemUnlock
+		pop	bx, dx, cx, si
+		pop	ds
+
 	; Initiate the status dialog.
 
 		call	InitiateBatchStatusDialog
@@ -121,14 +170,39 @@ fileEnumParams		local   FileEnumParams
 
 	; Get the path of the directory holding translation files to batch.
 
-		mov	ax, MSG_GEN_FILE_SELECTOR_GET_FULL_SELECTION_PATH
+
+		; try autorun batch dir configuration first
+		GetResourceHandleNS	StringsUI, bx
+		call	MemLock
+		mov	ds, ax
+		mov	si, offset AutorunBatchKey	
+		mov	dx, ds:[si]			; ds:si <- key string
+		mov	cx, ds				; cx:dx <- key string
+		mov	si, offset CategoryString	
+		mov	si, ds:[si]			; ds:si <- category string
+
+		mov	bp, size [BPS_docParams].DCP_path	
+		lea	di, es:[BPS_docParams].DCP_path ; es:di - buffer to fill
+		call	InitFileReadString		; ^hbx <- contains dest path
+		
+		pushf
+		mov	bx, ds:[LMBH_handle]
+		call	MemUnlock
 		mov	cx, es
+		lea	dx, es:[BPS_docParams].DCP_path
+		mov	al, 'M' - 'A'			; Disk handle.
+		call	DiskRegisterDiskSilently
+		popf
+		jnc	autorun
+
+		mov	ax, MSG_GEN_FILE_SELECTOR_GET_FULL_SELECTION_PATH
 		lea	dx, es:[BPS_docParams].DCP_path
 		GetResourceHandleNS	FileMenuUI, bx
 		mov	si, offset ResEditBatchDirSelector 
 		mov	di, mask MF_CALL
 		call	ObjMessage
 		mov	bx, ax			; Disk handle.
+autorun:
 		pop	bp
 
 	; Change to selected directory.
@@ -312,7 +386,8 @@ InitiateBatchStatusDialog	proc	near
 	; Indicate the start of the batch job.
 
 		mov	ax, MSG_VIS_TEXT_APPEND_OPTR
-		mov	dx, bx
+		;mov	dx, bx
+		GetResourceHandleNS	BatchStringsUI, dx
 		mov	bp, offset ResEditBatchStartText
 		call	ObjMessage
 		call	BatchReport
@@ -616,12 +691,34 @@ fileFreeList:
 	; Indicate the end of the batch job.
 
 		mov	ax, MSG_VIS_TEXT_APPEND_OPTR
-		mov	dx, bx
+		;mov	dx, bx
+		GetResourceHandleNS	BatchStringsUI, dx
 		mov	bp, offset ResEditBatchEndText
 		call	ObjMessage
 		call	BatchReport
 		call	BatchReportReturn
 		pop	bp
+
+	; close log file if open
+
+closeLogFile:
+		mov	bx, ss:[batchLogFile]
+		cmp	bx, 0
+		jz	noLogFile
+
+		mov	al, FILE_NO_ERRORS
+		call	FileClose
+
+noLogFile:
+
+	; force shutdown ensemble if in autorun batch
+		mov	al, ss:[autorunMode]
+		cmp	al, BB_TRUE
+		jnz	noExit
+
+		mov	ax, SST_PANIC
+		call	SysShutdown
+noExit:
 		jmp	done
 
 REAProcessBatchFile	endm
@@ -658,8 +755,66 @@ REVISION HISTORY:
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
 BatchReport	proc	far
-		uses	ax,bx,cx,si,di
+		uses	ax,bx,cx,si,di,ds
 		.enter
+
+		push	dx, ds
+
+		mov	bx, ss:[batchLogFile]
+		cmp	bx, 0
+		jz	noAutorun
+
+		; al - flags:
+		; 	bit 7 - set to not return errors (FILE_NO_ERRORS)
+		;	bits 6-0 - RESERVED (must be 0)
+		; bx - file handle
+		; cx - number of bytes to write
+		; ds:dx - buffer from which to write
+		; 	(vfptr if from XIP'ed resource)
+		push	dx, bp, ax, es, di
+		cmp	ax, MSG_VIS_TEXT_APPEND_OPTR
+		jne	noOptr
+
+		; lock down the resource string
+		; Pass:
+		; bx - Handle to block of memory.
+		; Returns:
+		; CF - Set on error (Block is discarded).
+		; ax - Segment address of block of memory.
+		push	bx
+		mov	bx, dx
+		call	MemLock
+		pop	bx
+		jc	err
+		mov	dx, ax		; segment in ax
+		mov	ds, dx
+		mov	bp, ds:[bp]	; deref the chunk 
+noOptr:
+		mov	ds, dx
+		mov	es, dx
+		push	dx
+		mov  	dx, bp
+		mov	di, bp
+		mov	cx, 1
+		call	LocalStringLength
+
+		mov	al, FILE_NO_ERRORS
+		call	FileWrite
+		pop	dx
+
+		pop	dx, bp, ax, es, di
+		cmp	ax, MSG_VIS_TEXT_APPEND_OPTR
+		jne	noOptrAgain
+
+		; bx, handle of block
+		push	bx
+		mov	bx, dx
+		call	MemUnlock
+		pop	bx
+err:
+noOptrAgain:
+noAutorun:
+		pop	dx, ds
 
 		GetResourceHandleNS	FileMenuUI, bx
 		mov	si, offset ResEditBatchStatusText
@@ -667,6 +822,10 @@ BatchReport	proc	far
 		clr	cx
 		call	ObjMessage
 
+		mov	ax, batchLogFile
+		jz	done
+
+done:
 		.leave
 		ret
 BatchReport	endp
@@ -744,11 +903,31 @@ REVISION HISTORY:
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
 returnChar char C_ENTER,0
+returnCharWin char C_ENTER,C_LINEFEED,0
 
 BatchReportReturn	proc	far
 		uses	ax,bx,cx,dx,bp,si,di
 		.enter
 
+		push	ds
+		mov	bx, ss:[batchLogFile]
+		cmp	bx, 0
+		jz	noAutorun
+
+		; al - flags:
+		; 	bit 7 - set to not return errors (FILE_NO_ERRORS)
+		;	bits 6-0 - RESERVED (must be 0)
+		; bx - file handle
+		; cx - number of bytes to write
+		; ds:dx - buffer from which to write
+		; 	(vfptr if from XIP'ed resource)
+		segmov  ds, cs
+		mov	dx, offset returnCharWin
+		mov	cx, 2
+		mov	al, FILE_NO_ERRORS
+		call	FileWrite
+noAutorun:
+		pop	ds
 		mov	ax, MSG_VIS_TEXT_APPEND
 		mov	dx, cs
 		mov	bp, offset returnChar
@@ -791,6 +970,25 @@ BatchReportTab	proc	far
 		uses	ax,bx,cx,dx,si,di,bp
 		.enter
 
+		push	ds
+		mov	bx, ss:[batchLogFile]
+		cmp	bx, 0
+		jz	noAutorun
+
+		; al - flags:
+		; 	bit 7 - set to not return errors (FILE_NO_ERRORS)
+		;	bits 6-0 - RESERVED (must be 0)
+		; bx - file handle
+		; cx - number of bytes to write
+		; ds:dx - buffer from which to write
+		; 	(vfptr if from XIP'ed resource)
+		segmov  ds, cs
+		mov	dx, offset tabChar
+		mov	cx, 1
+		mov	al, FILE_NO_ERRORS
+		call	FileWrite
+noAutorun:
+		pop	ds
 		mov	ax, MSG_VIS_TEXT_APPEND
 		mov	dx, cs
 		mov	bp, offset tabChar
@@ -910,7 +1108,7 @@ BatchReportError	proc	far
 
 		mov	bp, ax
 		mov	ax, MSG_VIS_TEXT_APPEND_OPTR
-		GetResourceHandleNS	FileMenuUI, dx
+		GetResourceHandleNS	BatchStringsUI, dx
 		call	BatchReportTab
 		call	BatchReport
 		call	BatchReportReturn
@@ -950,7 +1148,7 @@ BatchReportDocumentOpen	proc	near
 
 		push	cx, dx
 		mov	ax, MSG_VIS_TEXT_APPEND_OPTR
-		GetResourceHandleNS	FileMenuUI, dx
+		GetResourceHandleNS	BatchStringsUI, dx
 		mov	bp, offset ResEditBatchOpenDocumentText
 		call	BatchReport
 

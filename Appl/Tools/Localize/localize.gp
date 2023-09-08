@@ -85,6 +85,7 @@ ifndef	DO_DBCS
 resource ResEditKeywordResource  lmem read-only shared
 resource ImportResource  lmem
 endif
+resource BatchStringsUI  lmem read-only shared
 
 #
 # Export classes defined by the application

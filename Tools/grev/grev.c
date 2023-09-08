@@ -14,6 +14,7 @@
 *	----	----		-----------
 *	jimmy	8/19/92		Initial version
 *       jacob   9/9/96		Win32 port
+*	RainerB	02/13/2023	Usage() added, command help added
 *
 *	DESCRIPTION: this file contains code for the DOS version of grev
 *
@@ -64,16 +65,18 @@ Commands are:
     grev  newrev <file> <rev> [<comment>]
 	Set the revision for <file> to <rev> where rev is of the form "1.2.3".
 
+    grev help
+	Output detailed description.
 
-Instead of a comment a special paramter (either -P or -R) may be passed so
+Instead of a comment a special parameter (either -P or -R) may be passed so
 that the output will only be either the Protocol number or the Revision number
 this is used by pmake to get at these values
 
-The stanard pmake include files call 'grev' and pass information to the
+The standard pmake include files call 'grev' and pass information to the
 linker with the -R flag, overriding any revision number specified in the
 geode parameter file. e.g.
 
-	rev=`grev neweng $(GEODE).rev`
+	rev=`grev neweng $(GEODE).rev -s`
 	$(LINK) -R $rev $(LINKFLAGS) $(.ALLSRC) -o $(.TARGET)
 
 The linker places the protocol and revision number in several places:
@@ -126,12 +129,16 @@ typedef enum {
 } SubCommand;
 
 #define EXIT(errstring) {fprintf(stderr, "grev: %s", errstring); \
+                         Usage(FALSE); \
                          exit(1);}
 
 const char *InvalidRevisionNumber = "invalid revision number, no changes made\n";
 const char *InvalidRevisionFile = "invalid revision file\n";
 
-
+static void Usage(int full);
+void WarnNotSaved(char *revFile, char noOutput);
+
+
 /*********************************************************************
  *			main
  *********************************************************************
@@ -144,6 +151,7 @@ const char *InvalidRevisionFile = "invalid revision file\n";
  *	Name	Date		Description
  *	----	----		-----------
  *	jimmy	8/19/92		Initial version
+ *	RainerB	01/15/2023	Usage() added, 'help' command added
  *
  *********************************************************************/
 void
@@ -170,17 +178,59 @@ main(int argc, char **argv)
     }
 #endif
 
+/*** DEBUG - log any call to grev ****/
+#if 0
+{
+    int	n;
+
+    fp = fopen("D:\\gparam.txt", "at");		// <-- at == append text
+    if (fp == NULL) {
+	printf("GREV Debug: GParam.txt not open");
+	exit(1);
+    }
+    // dump current path to file
+    getcwd( buf, 256);
+    strcat(buf, ":\n");
+    fwrite(buf, strlen(buf), 1, fp);
+
+    // dump parameters to file
+    sprintf(buf,"   ");
+    for ( n=0; n<argc; n++) {
+	strcat(buf,argv[n]);
+	strcat(buf, "   ");
+    }
+    strcat(buf, " *\n");
+    fwrite(buf, strlen(buf), 1, fp);
+
+    fclose(fp);
+}
+#endif
+/*** DEBUG ENDS ****/
+
     /*
      * The first 2 words on the command-line must be the subcommand
      * followed by the name of the .rev file.
      */
     if (argc < 2) {
 	fprintf(stderr, "grev: no command specified\n");
+	Usage(FALSE);
 	exit(1);
     }
     subcmd = argv[1];
+
+    /*
+     * If the subcommand is 'help' or similar, output an detailed help.
+     * In this case no rev file is required.
+     */
+    if ( strcmp(subcmd, "help") * strcmp(subcmd, "-help") * strcmp(subcmd, "?") * strcmp(subcmd, "-?") == 0 ) {
+	Usage(TRUE);
+	exit(0);
+    }
+
+
     if (argc < 3) {
 	fprintf(stderr, "grev: no .rev file specified\n");
+	Usage(FALSE);
 	exit(1);
     }
     revFile = argv[2];
@@ -214,6 +264,7 @@ main(int argc, char **argv)
 		save = TRUE;
 		break;
 	    case '?':
+		Usage(FALSE);
 		exit(1);
 	    }
 	}
@@ -323,6 +374,7 @@ main(int argc, char **argv)
 	if (save) {
 	    InsertIntoFileAndExit(buf, sizeof (buf), fp, revFile, 0);
 	} else {
+	    WarnNotSaved(revFile, terseOutput);
 	    fclose(fp);
 	    exit(0);
 	}
@@ -400,7 +452,7 @@ main(int argc, char **argv)
 	token = 'P';
     }
 
-    if (strcmp(subcmd, "neweng") == 0) {
+    if (strcmp(subcmd, "neweng") == 0 || strcmp(subcmd, "ne") == 0) {
 	sc = NEW_ENG;
 	token = 'R';
     }
@@ -537,12 +589,14 @@ main(int argc, char **argv)
 	if (save) {
 	    InsertIntoFileAndExit(buf, sizeof (buf), fp, revFile, terseOutput);
 	} else {
+	    WarnNotSaved(revFile, terseOutput);
 	    fclose(fp);
 	    exit(0);
 	}
     }
 
     fprintf(stderr, "grev: unknown command: %s\n", subcmd);
+    Usage(FALSE);
     exit(1);
 }
 
@@ -659,9 +713,105 @@ Targ_FmtTime (long time)
     parts = localtime(&time);
 
     year += parts->tm_year;
-	
+
     sprintf (buf, "%d:%02d:%02d %s %d, %d",
 	     parts->tm_hour, parts->tm_min, parts->tm_sec,
 	     months[parts->tm_mon], parts->tm_mday, year);
     return(buf);
 }
+
+/*********************************************************************
+ *			Usage
+ *********************************************************************
+ * SYNOPSIS:	Display how to use grev
+ * CALLED BY:	main
+ * RETURN:	nothing
+ * SIDE EFFECTS:
+ * STRATEGY:	Routine was taken from VC++ version of grev.c and updated
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	??	??		Initial version
+ *	RainerB	01/15/2023	Parameter full added
+ *
+ *********************************************************************/
+static void
+Usage(int full)
+{
+    if (!full) {
+	puts( "\nUsage:  grev <command> <file> [-PRs] [-B <branch>] [<rev>] [\"comment\"]" );
+	puts( "        Allowed commands: new, info, getproto, newprotomajor, newprotominor, ");
+	puts( "                          neweng, newchange, newrev, help" );
+	puts( "        Must give -s option to commit changes to file." );
+	puts( "\nUse 'grev help' for a detailed description." );
+	return;
+    }
+
+    puts( "\nAll commands take the following general form:" );
+    puts( "    grev <command> <file> [-PRs] [-B <branch>] [<rev>] [\"comment\"]" );
+    puts( "    -P\t\tProduce terse output of only protocol number (used by pmake)." );
+    puts( "    -R\t\tProduces terse output of only release number (used by pmake)." );
+    puts( "    -s\t\tSave changes to rev file.  **MUST PASS TO MODIFY .rev FILE**" );
+    puts( "    -B <branch>\tUse <branch> rather then trunk." );
+    puts( "  ** Note the placement of flags and arguments is unforunately important **\n" );
+
+    puts( "\nCommands are:" );
+
+    puts( "\ngrev new <file> [flags] [\"comment\"]" );
+    puts( "    Create a new '.rev' file with protocol revision 0.0 and release\n    number 0.0.0.0." );
+
+    puts( "\ngrev info <file> [flags]" );
+    puts( "    Display information about the given revision file." );
+
+    puts( "\ngrev getproto <file> [flags]" );
+    puts( "    Output the current protocol number to stdout." );
+
+    puts( "\ngrev newprotomajor <file> [flags] [\"comment\"]\ngrev NPM <file> [flags] [\"comment\"]" );
+    puts( "    Add a new major protocol number for <file>.  Adds one line to the .rev" );
+    puts( "    file (if '-s' given).  Outputs the new protocol number to stdout." );
+
+    puts( "\ngrev newprotominor <file> [flags] [\"comment\"]\ngrev npm <file> [flags] [\"comment\"]" );
+    puts( "    Add a new minor protocol number for <file>.  Adds one line to the .rev" );
+    puts( "    file (if '-s' given).  Outputs the new protocol number to stdout." );
+
+    puts( "\ngrev neweng <file> [flags] [\"comment\"]\ngrev ne <file> [flags] [\"comment\"]" );
+    puts( "    Add a new engineering revision for <file>.  Adds one line to the .rev" );
+    puts( "    file (if '-s' given).  Outputs the new release number to stdout." );
+
+    puts( "\ngrev newchange <file> [flags] [\"comment\"]" );
+    puts( "    Add a new running change revision for <file>.  Adds one line to the .rev" );
+    puts( "    file (if '-s' given).  Outputs the new release number to stdout." );
+
+    puts( "\ngrev newrev <file> [flags] <rev> [\"comment\"]" );
+    puts( "    Set the release number for <file> to <rev> where rev is of the form \"1.2.3\"" );
+    puts( "    Must give -s option to commit change to file." );
+
+    puts( "\ngrev help" );
+    puts( "    Output detailed help." );
+
+    puts( "\nExample: grev newrev myapp.rev -s 12.7.4 \"New features added\"" );
+}
+
+/*********************************************************************
+ *			WarnNotSaved
+ *********************************************************************
+ * SYNOPSIS:	Display a warning that change is not saved to rev file
+ * CALLED BY:	main
+ * RETURN:	nothing
+ * SIDE EFFECTS:
+ * STRATEGY:
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	RainerB	01/19/2023	Initial version
+ *
+ *********************************************************************/
+void
+WarnNotSaved(char *revFile, char noOutput)
+{
+    if (noOutput) return;
+    printf("\nFlag -s not given. No changes made in ");
+    printf(revFile);
+    printf("!");
+}
+
