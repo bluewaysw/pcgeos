@@ -79,7 +79,7 @@ $DEST_SUB_DIRECTORY = "gbuild"; # sub-directory to download files to in
 $CONFIG_FILE_ROOT = ".bbxxip";	# Config file root
 $LOCAL_LIST_FILE = ".local";    # File that specifies the list of files 
                                 # to include in download
-$TARGET_LANGUAGE = "english";   # start out with English 
+$TARGET_LANGUAGE = $ENV{TARGET_LANG} || "english";   # start out with English 
 
 ######################################################################
 #	Process command line options

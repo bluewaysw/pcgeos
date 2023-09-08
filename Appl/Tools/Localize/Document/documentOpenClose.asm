@@ -2555,7 +2555,7 @@ openFile:
 		push	ax, bp
 		push	bp
 		mov	ax, MSG_VIS_TEXT_APPEND_OPTR
-		GetResourceHandleNS	FileMenuUI, dx
+		GetResourceHandleNS	BatchStringsUI, dx
 		mov	bp, offset ResEditBatchUpdateText
 		call	BatchReportTab
 		call	BatchReport
