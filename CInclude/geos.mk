@@ -85,6 +85,7 @@
 #       Name    Date            Description
 #       ----    ----            -----------
 #       ardeb   7/23/89         Initial Revision
+#	RainerB	3/20/2023	Add -s flag to grev when pmake is called in LOCAL_ROOT
 #
 # DESCRIPTION:
 #       This is a makefile to be included by all makefiles in the PC/GEOS
@@ -205,6 +206,9 @@ _GEODE  :=      $(GEODE)
 GREV            ?= grev
 GREVCMD         := $(GREV) 
 
+# Don't pass the -s flag so that the rev files are not changed with every build.
+# This means that the automatic versioning in the ROOT_DIR is disabled.
+
 _REL    !=      $(GREVCMD) neweng $(REVFILE) -R
 # if    defined(NPM) || exists(NPM)
 _PROTO  !=      $(GREVCMD) newprotomajor $(REVFILE) -P
@@ -213,6 +217,19 @@ _PROTO  !=      $(GREVCMD) newprotominor $(REVFILE) -P
 # else
 _PROTO  !=      $(GREVCMD) getproto $(REVFILE) -P
 # endif
+
+#elif defined(GEODE) && exists($(CURRENT_DIR)/$(GEODE).rev)
+## the .rev file is local, use it.
+REVFILE		= $(CURRENT_DIR)/$(GEODE).rev
+_GEODE 		:= $(GEODE)
+GREV		?= grev
+GREVFLAGS	=
+#
+# Don't use a branch option on a local .rev file
+# Pass the -s flag to automatically save the new revision number in the rev file
+
+_REL	!=	$(GREV) neweng $(REVFILE) $(GREVFLAGS) -R -s
+_PROTO	!=	$(GREV) getproto $(REVFILE) $(GREVFLAGS) -P
 
 #else
 
