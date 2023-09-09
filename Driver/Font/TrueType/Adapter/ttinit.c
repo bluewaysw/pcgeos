@@ -40,9 +40,8 @@ static sword getFontIDAvailIndex(
                                 FontID     fontID, 
                                 MemHandle  fontInfoBlock );
 
-static FontID getFontID( const char* familiyName );
-
-static FontAttrs mapFamilyClass( TT_Short familyClass );
+static Boolean getFontID(       const char* familiyName, 
+                                FontID*     fontID );
 
 static FontWeight mapFontWeight( TT_Short weightClass );
 
@@ -270,6 +269,7 @@ static void ProcessFont( TRUETYPE_VARS, const char* fileName, MemHandle fontInfo
         FontInfo*               fontInfo;
         TrueTypeOutlineEntry*   trueTypeOutlineEntry;
         FontID                  fontID;
+        Boolean                 mappedFont;
         sword                   availIndex;
 
 
@@ -295,7 +295,8 @@ EC(     ECCheckFileHandle( truetypeFile ) );
         if ( getNameFromNameTable( trueTypeVars, STYLE_NAME, STYLE_NAME_ID ) == 0 )
                 goto Fail;
 
-        fontID = getFontID( FAMILY_NAME );
+        //fontID = getFontID( FAMILY_NAME );
+        mappedFont = getFontID( FAMILY_NAME, &fontID );
 	availIndex = getFontIDAvailIndex( fontID, fontInfoBlock );
 
         /* if we have an new font FontAvailEntry, FontInfo and Outline must be created */
@@ -328,7 +329,7 @@ EC(     ECCheckFileHandle( truetypeFile ) );
                 strcpy( fontInfo->FI_faceName, FAMILY_NAME );
                 fontInfo->FI_fileHandle   = NullHandle;
                 fontInfo->FI_fontID       = fontID;
-                fontInfo->FI_family       = mapFamilyClass( FACE_PROPERTIES.os2->sFamilyClass );
+                fontInfo->FI_family       = FA_USEFUL | FA_OUTLINE | ( mappedFont ? FA_FAMILY : 0 ); // family;//mapFamilyClass( FACE_PROPERTIES.os2->sFamilyClass );
                 fontInfo->FI_maker        = FM_TRUETYPE;
                 fontInfo->FI_pointSizeTab = 0;
                 fontInfo->FI_pointSizeEnd = 0;
@@ -474,69 +475,6 @@ static word toHash( const char* str )
 
 
 /********************************************************************
- *                      mapFamiliClass
- ********************************************************************
- * SYNOPSIS:	  Maps the TrueType family class to FreeGEOS FontAttrs.
- * 
- * PARAMETERS:    familyClass     TrueType family class.
- * 
- * RETURNS:       FontAttrs       FreeGEOS FontAttrs.
- * 
- * SIDE EFFECTS:  none
- * 
- * STRATEGY:      
- * 
- * REVISION HISTORY:
- *      Date      Name      Description
- *      ----      ----      -----------
- *      21/01/23  JK        Initial Revision
- *******************************************************************/
-
-static FontAttrs mapFamilyClass( TT_Short familyClass ) 
-{
-        byte        class    = familyClass >> 8;
-        byte        subclass = (byte) familyClass & 0x00ff;
-        FontFamily  family;
-
-        switch ( class )
-        {
-        case 1:         //old style serifs
-        case 2:         //transitional serifs
-        case 3:         //modern serifs
-                family = FF_SERIF;
-                break;
-        case 4:         //clarendon serifs
-                family = subclass == 6 ? FF_MONO : FF_SERIF;
-                break;
-        case 5:         //slab serifs
-                family = subclass == 1 ? FF_MONO : FF_SERIF;
-                break;
-                        //6 = reserved
-        case 7:         //freeform serfis
-                family = FF_SERIF;
-                break;
-        case 8:         //sans serif
-                family = FF_SANS_SERIF;
-                break;
-        case 9:         //ornamentals
-                family = FF_ORNAMENT;
-                break;
-        case 10:        //scripts
-                family = FF_SCRIPT;
-                break;
-                        //11 = reserved
-        case 12:        //symbolic
-                family = FF_SYMBOL;
-                break;
-        default:
-                family = FF_NON_PORTABLE;
-        } 
-
-        return  FA_USEFUL | FA_OUTLINE | family;   
-}
-
-
-/********************************************************************
  *                      mapFontWeight
  ********************************************************************
  * SYNOPSIS:	  Maps the TrueType font weight class to FreeGEOS 
@@ -640,14 +578,16 @@ static TextStyle mapTextStyle( const char* subfamily )
  *      21/01/23  JK        Initial Revision
  *******************************************************************/
 
-static FontID getFontID( const char* familyName ) 
+static Boolean getFontID( const char* familyName, FontID* fontID ) 
 {
-        FontID  fontID;
+        if( !InitFileReadInteger( FONTMAPPING_CATEGORY, familyName, fontID ) )
+        {
+                *fontID = ( FM_TRUETYPE | (*fontID & 0x0fff) );
+                return TRUE;
+        }
 
-        if( !InitFileReadInteger( FONTMAPPING_CATEGORY, familyName, &fontID ) )
-                return FM_TRUETYPE | (fontID & 0x0fff);
-
-        return MAKE_FONTID( familyName );
+        *fontID = MAKE_FONTID( familyName );
+        return FALSE;
 }
 
 
