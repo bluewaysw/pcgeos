@@ -792,7 +792,7 @@ LINK		: .USE
 	del /F $(.TARGET:S|/|\\|g)
 #endif
 	$(LINK) \
-	  $(.TARGET:M*ec.geo:S/$(.TARGET)/-Og $(.ALLSRC:M*.gp) -P $(_PROTO) -R $(_REL) -E -z/)\
+	  $(.TARGET:M*ec.geo:S/$(.TARGET)/-Og $(.ALLSRC:M*.gp) -P $(_PROTO) -R $(_REL) -E/)\
 	  $(.TARGET:M*.geo:N*ec.geo:S/$(.TARGET)/-Og $(.ALLSRC:M*.gp) -P $(_PROTO) -R $(_REL) -z/)\
 	  -F./$(PRODUCT) \
 	  $(.TARGET:M*.vm:S/$(.TARGET)/-Ov -P $(_PROTO) -R $(_REL)/)\
@@ -810,7 +810,7 @@ LINK		: .USE
 	del /F $(.TARGET:S|/|\\|g)
 #endif
 	$(LINK) \
-	  $(.TARGET:M*EC.geo:S/$(.TARGET)/-Og $(.ALLSRC:M*.gp) -P $(_PROTO) -R $(_REL) -E -z/)\
+	  $(.TARGET:M*EC.geo:S/$(.TARGET)/-Og $(.ALLSRC:M*.gp) -P $(_PROTO) -R $(_REL) -E/)\
 	  $(.TARGET:M*.geo:N*EC.geo:S/$(.TARGET)/-Og $(.ALLSRC:M*.gp) -P $(_PROTO) -R $(_REL) -z/)\
 	  $(.TARGET:M*.vm:S/$(.TARGET)/-Ov -P $(_PROTO) -R $(_REL)/)\
 	  $(.TARGET:M*.com:S/$(.TARGET)/-Oc/)\
