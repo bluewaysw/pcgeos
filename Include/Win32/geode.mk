@@ -431,7 +431,11 @@ $(GEODE).vm	: $(GEODE).$(GSUFF)
 
 #   ifdef PRODUCTS
 $(_COMMAPRODS)/$(GEODE).vm : $(.TARGET:R).$(GSUFF)
+# if defined(linux)
+	$(LOC) $(LOCFLAGS) -o $(.TARGET) `ls $(.TARGET:H)/*.rsc `
+# else
 	$(LOC) $(LOCFLAGS) -o $(.TARGET) $(.TARGET:H)/*.rsc
+# endif
 $(PRODUCTS:S/$/_full/g) :: $(.TARGET:S/_full//)/$(GEODE).vm
 
 #   endif
