@@ -422,8 +422,12 @@ $(GEODE)gcm.$(GSUFF): $(GOBJS)					LINK
 
 ## XXX: ditto
 # if !defined(NO_LOC) && ($(GSUFF) == "geo" || $(GSUFF) == "GEO")
-$(GEODE).vm	: $(GEODE).$(GSUFF)
+$(GEODE).vm	: $(GEODE).$(GSUFF) 
+# if defined(linux)
+	$(LOC) $(LOCFLAGS) -o $(.TARGET) `ls *.rsc `
+# else
 	$(LOC) $(LOCFLAGS) -o $(.TARGET) *.rsc
+# endif
 
 #   ifdef PRODUCTS
 $(_COMMAPRODS)/$(GEODE).vm : $(.TARGET:R).$(GSUFF)
