@@ -12,7 +12,7 @@
 #       Name    Date            Description
 #       ----    ----            -----------
 #       dubois  12/6/93         Initial version
-#	RainerB	4/27/2022	Resource names adjusted for Watcom compatibility
+#		RainerB	4/27/2022		Resource names adjusted for Watcom compatibility
 #
 # DESCRIPTION:
 #       This file contatins Geode definitions for the "Wavsamp"

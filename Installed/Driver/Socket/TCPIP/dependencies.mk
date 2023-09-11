@@ -28,18 +28,36 @@ tcpip.eobj: geos.h heap.h geode.h resource.h ec.h object.h lmem.h \
                 parallDr.h hugearr.h fileEnum.h sem.h initfile.h \
                 Internal/socketDr.h sockmisc.h ip.h tcp.h udp.h rawIp.h \
                 tcpip.h tcpipLog.h Ansi/string.h
-tcpOutput.obj \
-tcpOutput.eobj: geos.h resource.h Ansi/string.h lmem.h timer.h timedate.h \
-                ec.h Internal/socketDr.h sockmisc.h ip.h tcp.h tcpip.h \
-                tcpipLog.h
-ipOutput.obj \
-ipOutput.eobj: geos.h resource.h Ansi/string.h timer.h lmem.h ec.h \
-                Internal/socketDr.h sockmisc.h ip.h tcp.h icmp.h tcpip.h \
-                tcpipLog.h
-tcpInput.obj \
-tcpInput.eobj: geos.h resource.h Ansi/string.h lmem.h timer.h timedate.h \
-                ec.h Internal/socketDr.h sockmisc.h ip.h tcp.h tcpip.h \
-                tcpipLog.h
+tcpip.obj \
+tcpip.eobj: stdapp.goh object.goh ui.goh Objects/metaC.goh \
+                Objects/inputC.goh Objects/clipbrd.goh \
+                Objects/uiInputC.goh iacp.goh Objects/winC.goh \
+                Objects/gProcC.goh alb.goh Objects/processC.goh \
+                Objects/visC.goh Objects/vCompC.goh Objects/vCntC.goh \
+                Objects/gAppC.goh Objects/genC.goh Objects/gInterC.goh \
+                Objects/gPrimC.goh Objects/gDispC.goh Objects/gTrigC.goh \
+                Objects/gViewC.goh Objects/gTextC.goh Objects/vTextC.goh \
+                Objects/gCtrlC.goh gcnlist.goh spool.goh \
+                Objects/gFSelC.goh Objects/gGlyphC.goh \
+                Objects/gDocCtrl.goh Objects/gDocGrpC.goh \
+                Objects/gDocC.goh Objects/gContC.goh Objects/gDCtrlC.goh \
+                Objects/gEditCC.goh Objects/gBoolGC.goh \
+                Objects/gItemGC.goh Objects/gDListC.goh \
+                Objects/gItemC.goh Objects/gBoolC.goh \
+                Objects/gGadgetC.goh Objects/gToolCC.goh \
+                Objects/gValueC.goh Objects/gToolGC.goh \
+                Objects/helpCC.goh accpnt.goh
+tcpip.obj \
+tcpip.eobj: geos.h heap.h geode.h resource.h ec.h object.h lmem.h \
+                graphics.h fontID.h font.h color.h gstring.h timer.h vm.h \
+                dbase.h localize.h Ansi/ctype.h timedate.h file.h \
+                sllang.h system.h geoworks.h chunkarr.h Objects/helpCC.h \
+                disk.h drive.h input.h char.h hwr.h win.h uDialog.h \
+                Objects/gInterC.h Objects/Text/tCommon.h stylesh.h \
+                driver.h thread.h print.h Internal/spoolInt.h serialDr.h \
+                parallDr.h hugearr.h fileEnum.h sem.h initfile.h \
+                Internal/socketDr.h sockmisc.h ip.h tcp.h udp.h rawIp.h \
+                tcpip.h tcpipLog.h Ansi/string.h
 icmp.obj \
 icmp.eobj: geos.h Ansi/string.h timer.h lmem.h timedate.h ec.h \
                 Internal/socketDr.h sockmisc.h ip.h tcp.h icmp.h udp.h \
@@ -48,20 +66,66 @@ ipInput.obj \
 ipInput.eobj: geos.h resource.h geode.h Ansi/string.h timer.h heap.h \
                 lmem.h ec.h Internal/socketDr.h sockmisc.h ip.h tcp.h \
                 icmp.h udp.h rawIp.h tcpip.h tcpipLog.h
+ipOutput.obj \
+ipOutput.eobj: geos.h resource.h Ansi/string.h timer.h lmem.h ec.h \
+                Internal/socketDr.h sockmisc.h ip.h tcp.h icmp.h tcpip.h \
+                tcpipLog.h
 rawIp.obj \
 rawIp.eobj: geos.h resource.h Ansi/string.h lmem.h ec.h \
                 Internal/socketDr.h sockmisc.h ip.h rawIp.h icmp.h \
                 tcpip.h timer.h
+tcpInput.obj \
+tcpInput.eobj: geos.h resource.h Ansi/string.h lmem.h timer.h timedate.h \
+                ec.h Internal/socketDr.h sockmisc.h ip.h tcp.h tcpip.h \
+                tcpipLog.h
 tcpipLog.obj \
 tcpipLog.eobj: tcpipLog.c
-udp.obj \
-udp.eobj: geos.h resource.h Ansi/string.h lmem.h initfile.h ec.h \
-                Internal/socketDr.h sockmisc.h ip.h udp.h icmp.h tcpip.h \
-                timer.h tcpipLog.h
+tcpOutput.obj \
+tcpOutput.eobj: geos.h resource.h Ansi/string.h lmem.h timer.h timedate.h \
+                ec.h Internal/socketDr.h sockmisc.h ip.h tcp.h tcpip.h \
+                tcpipLog.h
 tcpUtils.obj \
 tcpUtils.eobj: geos.h resource.h geode.h Ansi/string.h lmem.h timer.h \
                 timedate.h ec.h Internal/socketDr.h sockmisc.h ip.h tcp.h \
                 icmp.h tcpip.h tcpipLog.h
+udp.obj \
+udp.eobj: geos.h resource.h Ansi/string.h lmem.h initfile.h ec.h \
+                Internal/socketDr.h sockmisc.h ip.h udp.h icmp.h tcpip.h \
+                timer.h tcpipLog.h
+icmp.obj \
+icmp.eobj: geos.h Ansi/string.h timer.h lmem.h timedate.h ec.h \
+                Internal/socketDr.h sockmisc.h ip.h tcp.h icmp.h udp.h \
+                rawIp.h tcpip.h tcpipLog.h
+ipInput.obj \
+ipInput.eobj: geos.h resource.h geode.h Ansi/string.h timer.h heap.h \
+                lmem.h ec.h Internal/socketDr.h sockmisc.h ip.h tcp.h \
+                icmp.h udp.h rawIp.h tcpip.h tcpipLog.h
+ipOutput.obj \
+ipOutput.eobj: geos.h resource.h Ansi/string.h timer.h lmem.h ec.h \
+                Internal/socketDr.h sockmisc.h ip.h tcp.h icmp.h tcpip.h \
+                tcpipLog.h
+rawIp.obj \
+rawIp.eobj: geos.h resource.h Ansi/string.h lmem.h ec.h \
+                Internal/socketDr.h sockmisc.h ip.h rawIp.h icmp.h \
+                tcpip.h timer.h
+tcpInput.obj \
+tcpInput.eobj: geos.h resource.h Ansi/string.h lmem.h timer.h timedate.h \
+                ec.h Internal/socketDr.h sockmisc.h ip.h tcp.h tcpip.h \
+                tcpipLog.h
+tcpipLog.obj \
+tcpipLog.eobj: tcpipLog.c
+tcpOutput.obj \
+tcpOutput.eobj: geos.h resource.h Ansi/string.h lmem.h timer.h timedate.h \
+                ec.h Internal/socketDr.h sockmisc.h ip.h tcp.h tcpip.h \
+                tcpipLog.h
+tcpUtils.obj \
+tcpUtils.eobj: geos.h resource.h geode.h Ansi/string.h lmem.h timer.h \
+                timedate.h ec.h Internal/socketDr.h sockmisc.h ip.h tcp.h \
+                icmp.h tcpip.h tcpipLog.h
+udp.obj \
+udp.eobj: geos.h resource.h Ansi/string.h lmem.h initfile.h ec.h \
+                Internal/socketDr.h sockmisc.h ip.h udp.h icmp.h tcpip.h \
+                timer.h tcpipLog.h
 tcpipStrings.rdef: tcpipStrings.ui
 tcpipAddrCtrl.rdef: generic.uih product.uih
 tcpipManager.obj \
@@ -104,4 +168,4 @@ tcpipManager.eobj: geos.def heap.def geode.def resource.def ec.def system.def \
                 tcpipSocket.asm tcpipLink.asm tcpipUtils.asm \
                 tcpipAddrCtrl.asm tcpipDhcp.asm
 
-tcpipEC.geo tcpip.geo : geos.ldf netutils.ldf socket.ldf ansic.ldf accpnt.ldf resolver.ldf resolver.ldf
+tcpipEC.geo tcpip.geo : geos.ldf netutils.ldf socket.ldf ansic.ldf accpnt.ldf resolver.ldf resolver.ldf 

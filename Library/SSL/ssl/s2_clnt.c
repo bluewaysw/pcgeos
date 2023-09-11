@@ -68,6 +68,7 @@
 #include "objects.h"
 #include "ssl_locl.h"
 #include "evp.h"
+#include "ssl_host.h"
 
 #ifndef NOPROTO
 static int get_server_finished(SSL *s);
@@ -107,6 +108,14 @@ SSL_METHOD* _export _pascal SSLv2_client_method()
 	static SSL_METHOD SSLv2_client_data;
 #ifdef __GEOS__
 	SSL_METHOD *ret;
+#endif
+#ifdef COMPILE_OPTION_HOST_SERVICE
+	if(SSLCheckHost())
+		{
+		return (SSL_METHOD *) SSLCallHost(
+			SSLHFN_SSLV2_CLIENT_METHOD, 
+			(dword) NULL, (dword) NULL, 0);
+		}
 #endif
 
     SSLEnter() ;

@@ -3,15 +3,17 @@
 #
 # If you edit it, you will lose your changes, should it be regenerated.
 #
-GEODE           = basicdb
-ASM_TO_OBJS     = PATCH.asm
+GEODE           = fjpeg
+CODE            = decode.c init.c main.c
 UI_TO_RDFS      =
-SRCS            = PATCH.asm internal.h basicDB.h bdbtypes.h patch.h\
-                  dbclass.goc basicdb.goc basicdb.goh
-OBJS            = PATCH.obj dbclass.obj basicdb.obj
+OBJS            = decode.obj init.obj main.obj
+COMMON          = fjpeg.h intern.h
+MODULES         =
+CMODULES        = code
+SRCS            = $(CODE) $(COMMON)
 LOBJS           =
 LIBOBJ          = $(DEVEL_DIR)/Include/$(GEODE).ldf
-LIBNAME         = basicdb
+LIBNAME         = fjpeg
 
 SYSMAKEFILE     = geode.mk
 

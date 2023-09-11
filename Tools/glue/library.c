@@ -1751,8 +1751,9 @@ Library_LoadPublished(void)
     int             whichLib;       /* index for cycling through libs */
 
     for (whichLib = 0; whichLib < numLibs; whichLib++) {
-	strcpy(strippedName, libs[whichLib].entry.name);
-
+	strncpy(strippedName, libs[whichLib].entry.name, 8);
+	strippedName[8] = ' ';
+	
 	for (i = 0; i < 20; i++) {
 	    if (strippedName[i] == ' ') {
 		strippedName[i] = 0;

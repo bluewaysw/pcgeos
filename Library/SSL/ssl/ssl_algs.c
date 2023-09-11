@@ -64,9 +64,20 @@
 #include "objects.h"
 #include "lhash.h"
 #include "ssl_locl.h"
+#include "ssl_host.h"
 
 void _export _pascal SSLeay_add_ssl_algorithms()
 	{
+#ifdef COMPILE_OPTION_HOST_SERVICE
+	if(SSLCheckHost())
+		{
+		SSLCallHost(
+			SSLHFN_SSLEAY_ADD_SSL_ALGORITHMS,
+			 			(dword) NULL, (dword) NULL, 0);
+		return;
+		}
+#endif
+
     SSLEnter() ;
 #ifndef NO_DES
 /*	EVP_add_cipher(EVP_des_cbc());
