@@ -54,6 +54,7 @@ include sem.def
 include Internal/heapInt.def
 include Internal/im.def
 include Internal/threadIn.def
+include Internal/host.def
 
 include file.def
 include localize.def
@@ -75,7 +76,6 @@ UseLib	sac.def
 UseLib	Internal/netutils.def
 UseLib	Internal/socketInt.def
 UseLib 	resolver.def
-UseLib	hostif.def
 
 ;---------------------------------------------------------------------------
 ;				Driver Declaration
@@ -90,6 +90,7 @@ DefDriver Internal/ip.def
 include tcpip.def
 include tcpipGlobal.def
 include tcpipAddrCtrl.def
+include dhcpConstant.def
 
 ;---------------------------------------------------------------------------
 ;				Compiled UI definitions

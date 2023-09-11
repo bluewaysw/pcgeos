@@ -64,19 +64,15 @@
 #include "objects.h"
 #include "lhash.h"
 #include "ssl_locl.h"
-#include <hostif.h>
-
-#ifdef COMPILE_OPTION_HOST_SERVICE
-extern Boolean hostApiAvailable;
-#endif
+#include "ssl_host.h"
 
 void _export _pascal SSLeay_add_ssl_algorithms()
 	{
 #ifdef COMPILE_OPTION_HOST_SERVICE
-	if(hostApiAvailable)
+	if(SSLCheckHost())
 		{
-		HostIfCall(
-			HIF_SSL_SSLEAY_ADD_SSL_ALGO,
+		SSLCallHost(
+			SSLHFN_SSLEAY_ADD_SSL_ALGORITHMS,
 			 			(dword) NULL, (dword) NULL, 0);
 		return;
 		}
