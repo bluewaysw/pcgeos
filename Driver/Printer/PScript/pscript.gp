@@ -7,7 +7,8 @@
 # FILE:		postcript.gp
 #
 # AUTHOR:	Jim, 2/90, from epson24.gp
-#           Falk 2015, added PS 2 PDF lib and resource
+#           Falk 2015, added PS 2 PDF lib and resource 
+#           Include ps2pdf.goc 
 #
 # Parameters file for: pscript.geo
 #
@@ -38,7 +39,7 @@ type	driver, single
 library	geos
 library	spool
 library	eps noload
-library ps2pdf
+library ps2pdf  # added by Falk 2015
 #
 # Make this module fixed so we can put the strategy routine there
 #
