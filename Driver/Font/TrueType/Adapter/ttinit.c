@@ -295,7 +295,6 @@ EC(     ECCheckFileHandle( truetypeFile ) );
         if ( getNameFromNameTable( trueTypeVars, STYLE_NAME, STYLE_NAME_ID ) == 0 )
                 goto Fail;
 
-        //fontID = getFontID( FAMILY_NAME );
         mappedFont = getFontID( FAMILY_NAME, &fontID );
 	availIndex = getFontIDAvailIndex( fontID, fontInfoBlock );
 
@@ -329,7 +328,7 @@ EC(     ECCheckFileHandle( truetypeFile ) );
                 strcpy( fontInfo->FI_faceName, FAMILY_NAME );
                 fontInfo->FI_fileHandle   = NullHandle;
                 fontInfo->FI_fontID       = fontID;
-                fontInfo->FI_family       = FA_USEFUL | FA_OUTLINE | ( mappedFont ? FA_FAMILY : 0 ); // family;//mapFamilyClass( FACE_PROPERTIES.os2->sFamilyClass );
+                fontInfo->FI_family       = FA_USEFUL | FA_OUTLINE | ( mappedFont ? FA_FAMILY : 0 );
                 fontInfo->FI_maker        = FM_TRUETYPE;
                 fontInfo->FI_pointSizeTab = 0;
                 fontInfo->FI_pointSizeEnd = 0;
