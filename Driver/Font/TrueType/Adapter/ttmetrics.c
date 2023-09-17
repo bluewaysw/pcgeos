@@ -98,6 +98,7 @@ EC(     ECCheckBounds( (void*)trueTypeVars ) );
 
         // load glyph
         TT_New_Glyph( FACE, &GLYPH );
+        TT_Load_Glyph( INSTANCE, GLYPH, charIndex, 0 );
 
         // transform glyphs outline
         TT_Get_Glyph_Outline( GLYPH, &OUTLINE );
@@ -105,26 +106,25 @@ EC(     ECCheckBounds( (void*)trueTypeVars ) );
         TT_Translate_Outline( &OUTLINE, 0, WWFIXEDASDWORD_TO_FIXED26DOT6( transMatrix.TM_scriptY ) );
 
         // get metrics
-        TT_Load_Glyph( INSTANCE, GLYPH, charIndex, 0 );
         TT_Get_Glyph_Metrics( GLYPH, &GLYPH_METRICS );
 
         switch( info )
         {
                 case GCMI_MIN_X:
                 case GCMI_MIN_X_ROUNDED:
-                        *result = SCALE_WORD( GLYPH_BBOX.xMin, trueTypeVars->scaleWidth );
+                        *result = SCALE_WORD( GLYPH_BBOX.xMin, SCALE_WIDTH );
                         break;
                 case GCMI_MIN_Y:
                 case GCMI_MIN_Y_ROUNDED:
-                        *result = SCALE_WORD( GLYPH_BBOX.yMin, trueTypeVars->scaleHeight );
+                        *result = SCALE_WORD( GLYPH_BBOX.yMin, SCALE_HEIGHT );
                         break;
                 case GCMI_MAX_X:
                 case GCMI_MAX_X_ROUNDED:
-                        *result = SCALE_WORD( GLYPH_BBOX.xMax, trueTypeVars->scaleWidth );
+                        *result = SCALE_WORD( GLYPH_BBOX.xMax, SCALE_WIDTH );
                         break;
                 case GCMI_MAX_Y:
                 case GCMI_MAX_Y_ROUNDED:
-                        *result = SCALE_WORD( GLYPH_BBOX.yMax, trueTypeVars->scaleHeight );
+                        *result = SCALE_WORD( GLYPH_BBOX.yMax, SCALE_HEIGHT );
                         break;
         }
 
@@ -169,7 +169,7 @@ static void CalcTransformMatrix( TextStyle         stylesToImplement,
                 transMatrix->TM_matrix.yx = ITALIC_FACTOR;
 
         /* fake script style       */
-        if( stylesToImplement & TS_SUBSCRIPT || stylesToImplement & TS_SUBSCRIPT )
+        if( stylesToImplement & ( TS_SUBSCRIPT | TS_SUBSCRIPT ) )
         {      
                 transMatrix->TM_matrix.xx = GrMulWWFixed( transMatrix->TM_matrix.xx, SCRIPT_FACTOR );
                 transMatrix->TM_matrix.yy = GrMulWWFixed( transMatrix->TM_matrix.yy, SCRIPT_FACTOR );
