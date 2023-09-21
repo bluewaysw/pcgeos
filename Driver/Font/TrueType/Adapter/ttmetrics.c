@@ -59,6 +59,7 @@ static void CalcScaleForWidths( TRUETYPE_VARS,
  *      ----      ----      -----------
  *      23/12/22  JK        Initial Revision
  *******************************************************************/
+
 void _pascal TrueType_Char_Metrics( 
                                    word                 character, 
                                    GCM_info             info, 
@@ -66,7 +67,7 @@ void _pascal TrueType_Char_Metrics(
 	                           const OutlineEntry*  outlineEntry, 
                                    TextStyle            stylesToImplement,
                                    WWFixedAsDWord       pointSize,
-                                   dword*               result,
+                                   WWFixedAsDWord*      result,
                                    MemHandle            varBlock ) 
 {
         TrueTypeOutlineEntry*  trueTypeOutline;
@@ -112,19 +113,19 @@ EC(     ECCheckBounds( (void*)trueTypeVars ) );
         {
                 case GCMI_MIN_X:
                 case GCMI_MIN_X_ROUNDED:
-                        *result = SCALE_WORD( GLYPH_BBOX.xMin, SCALE_WIDTH );
+                        *result = GrMulWWFixed( MakeWWFixed( GLYPH_BBOX.xMin ), SCALE_WIDTH );
                         break;
                 case GCMI_MIN_Y:
                 case GCMI_MIN_Y_ROUNDED:
-                        *result = SCALE_WORD( GLYPH_BBOX.yMin, SCALE_HEIGHT );
+                        *result = GrMulWWFixed( MakeWWFixed( GLYPH_BBOX.yMin ), SCALE_HEIGHT );
                         break;
                 case GCMI_MAX_X:
                 case GCMI_MAX_X_ROUNDED:
-                        *result = SCALE_WORD( GLYPH_BBOX.xMax, SCALE_WIDTH );
+                        *result = GrMulWWFixed( MakeWWFixed( GLYPH_BBOX.xMax ), SCALE_WIDTH );
                         break;
                 case GCMI_MAX_Y:
                 case GCMI_MAX_Y_ROUNDED:
-                        *result = SCALE_WORD( GLYPH_BBOX.yMax, SCALE_HEIGHT );
+                        *result = GrMulWWFixed( MakeWWFixed( GLYPH_BBOX.yMax ), SCALE_HEIGHT );
                         break;
         }
 
@@ -136,8 +137,29 @@ Fail:
 }
 
 
-static void CalcScaleForWidths( TRUETYPE_VARS, WWFixedAsDWord pointSize, 
-                                TextStyle stylesToImplement )
+/********************************************************************
+ *                      CalcScaleForWidths
+ ********************************************************************
+ * SYNOPSIS:	  Fills scale factors in chached variables for calculating 
+ *                FontBuf and ChatTableEntries.
+ * 
+ * PARAMETERS:    TRUETYPE_VARS         Cached variables needed by driver.
+ *                pointSize             Desired point size.
+ *                stylesToImplement     Desired text style.
+ * 
+ * RETURNS:       void
+ * 
+ * STRATEGY:      
+ * 
+ * REVISION HISTORY:
+ *      Date      Name      Description
+ *      ----      ----      -----------
+ *      20/07/23  JK        Initial Revision
+ *******************************************************************/
+
+static void CalcScaleForWidths( TRUETYPE_VARS, 
+                                WWFixedAsDWord  pointSize, 
+                                TextStyle       stylesToImplement )
 {
         SCALE_HEIGHT = GrUDivWWFixed( pointSize, MakeWWFixed( FACE_PROPERTIES.header->Units_Per_EM ) );
         SCALE_WIDTH  = SCALE_HEIGHT;
@@ -149,6 +171,25 @@ static void CalcScaleForWidths( TRUETYPE_VARS, WWFixedAsDWord pointSize,
                 SCALE_WIDTH = GrMulWWFixed( SCALE_WIDTH, WWFIXED_0_POINT_5 );
 }
 
+
+/********************************************************************
+ *                      CalcTransformMatrix
+ ********************************************************************
+ * SYNOPSIS:	  Calculates the transformation matrix for missing
+ *                style attributes and weights.
+ * 
+ * PARAMETERS:    styleToImplement      Styles that must be added.
+ *                *transMatrix          Pointer to TransformMatrix.
+ *                      
+ * RETURNS:       void
+ * 
+ * STRATEGY:      
+ * 
+ * REVISION HISTORY:
+ *      Date      Name      Description
+ *      ----      ----      -----------
+ *      20/12/22  JK        Initial Revision
+ *******************************************************************/
 
 static void CalcTransformMatrix( TextStyle         stylesToImplement,
                                  TransformMatrix*  transMatrix )
