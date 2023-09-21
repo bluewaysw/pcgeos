@@ -55,9 +55,9 @@ REVISION HISTORY:
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
 
 TrueTypeCharMetrics	proc	far
-	uses	ax, bx, cx, si, di, ds
+	uses	bx, cx, si, di, ds
 
-resultAXDX	local	dword
+resultDXAX	local	dword
 
 	.enter
 
@@ -84,26 +84,26 @@ resultAXDX	local	dword
 	push 	ax
 
 	push 	ss		; pass ptr to result dword in ss
-	lea	cx, resultAXDX
+	lea	cx, resultDXAX
 	push	cx
 
 	segmov	ds, dgroup, cx
 	push	ds:variableHandle
 	call	TRUETYPE_CHAR_METRICS
 
-	mov	ax, {word} resultAXDX
-	mov	dx, {word} resultAXDX+2
+	mov	ax, {word} resultDXAX
+	mov	dx, {word} resultDXAX+2
 
 	test 	si, GCMI_ROUNDED
 	jnz	roundToInt
-	rndwwbf axdx
+	rndwwbf dxax
 done:
 	clc
 	.leave
 	ret
 
 roundToInt:
-	rndwwf	dxcx
+	rndwwf dxax
 	jmp	done
 
 TrueTypeCharMetrics	endp
