@@ -397,7 +397,7 @@ GOC		?= goc
 XGOCFLAGS	?=
 GOCFLAGS	+= -D__GEOS__ $(-CIFLAGS) -I- $(-CIFLAGS) \
 		   `$(PRODUCT_FLAGS) goc $(PRODUCT)` \
-                   $(XGOCFLAGS) -w -l $(LIBNAME:S/^/-L /)
+                   $(XGOCFLAGS) -w $(LIBNAME:S/^/-L /)
 
 
 #
@@ -792,7 +792,7 @@ LINK		: .USE
 	del /F $(.TARGET:S|/|\\|g)
 #endif
 	$(LINK) \
-	  $(.TARGET:M*ec.geo:S/$(.TARGET)/-Og $(.ALLSRC:M*.gp) -P $(_PROTO) -R $(_REL) -E -z/)\
+	  $(.TARGET:M*ec.geo:S/$(.TARGET)/-Og $(.ALLSRC:M*.gp) -P $(_PROTO) -R $(_REL) -E/)\
 	  $(.TARGET:M*.geo:N*ec.geo:S/$(.TARGET)/-Og $(.ALLSRC:M*.gp) -P $(_PROTO) -R $(_REL) -z/)\
 	  -F./$(PRODUCT) \
 	  $(.TARGET:M*.vm:S/$(.TARGET)/-Ov -P $(_PROTO) -R $(_REL)/)\
@@ -810,7 +810,7 @@ LINK		: .USE
 	del /F $(.TARGET:S|/|\\|g)
 #endif
 	$(LINK) \
-	  $(.TARGET:M*EC.geo:S/$(.TARGET)/-Og $(.ALLSRC:M*.gp) -P $(_PROTO) -R $(_REL) -E -z/)\
+	  $(.TARGET:M*EC.geo:S/$(.TARGET)/-Og $(.ALLSRC:M*.gp) -P $(_PROTO) -R $(_REL) -E/)\
 	  $(.TARGET:M*.geo:N*EC.geo:S/$(.TARGET)/-Og $(.ALLSRC:M*.gp) -P $(_PROTO) -R $(_REL) -z/)\
 	  $(.TARGET:M*.vm:S/$(.TARGET)/-Ov -P $(_PROTO) -R $(_REL)/)\
 	  $(.TARGET:M*.com:S/$(.TARGET)/-Oc/)\
@@ -894,7 +894,7 @@ LINK		: .USE
 	$(CCOM) $(CCOMFLAGS) -fo="$(.TARGET)" "$(.IMPSRC)" $(GEOERRFL)
 
 .goc.obj	:
-	$(GOC) $(GOCFLAGS) -o $(.TARGET:R).nc $(.IMPSRC) $(GEOERRFL)
+	$(GOC) $(GOCFLAGS) -l -o $(.TARGET:R).nc $(.IMPSRC) $(GEOERRFL)
 	$(CCOM) $(CCOMFLAGS) -fo="$(.TARGET)" "$(.TARGET:R).nc" $(GEOERRFL)
 #if $(DEVEL_DIR:T) == "Installed"
 #if defined(linux)

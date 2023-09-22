@@ -2072,7 +2072,7 @@ main(int argc, char **argv)
     char	*rscFileNames = "*.rsc";
     int	    	i;
 
-#if defined(unix)
+#if defined(_LINUX)
     if (argc == 1) {
 	exit(0);
     }
@@ -2108,7 +2108,7 @@ main(int argc, char **argv)
 	    }
 	} else {
 
-#if defined(unix)
+#if defined(_LINUX)
 	    yyin = fopen(argv[i], "rt");
 	    if (yyin == NULL) {
 		perror(argv[i]);
