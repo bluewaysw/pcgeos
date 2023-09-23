@@ -683,7 +683,6 @@ static void AdjustFontBuf( TransformMatrix* transMatrix,
                 if( fontMatrix->FM_flags & TF_ROTATED )
                 {
                         sword savedHeightY = transMatrix->TM_scriptY;
-                        //sword savedHeightY = transMatrix->TM_heightY;
 
                         /* adjust FB_pixHeight, FB_minTSB */
                         fontBuf->FB_pixHeight = INTEGER_OF_WWFIXEDASDWORD( GrMulWWFixed( 
@@ -694,13 +693,13 @@ static void AdjustFontBuf( TransformMatrix* transMatrix,
                         /* adjust script and height */
                         transMatrix->TM_heightY = INTEGER_OF_WWFIXEDASDWORD( GrMulWWFixed( 
                                                         WORD_TO_WWFIXEDASDWORD( fontBuf->FB_baselinePos.WBF_int ), transMatrix->TM_matrix.yy ) );
-                        /*transMatrix->TM_scriptY = INTEGER_OF_WWFIXEDASDWORD( GrMulWWFixed( 
-                                                        WORD_TO_WWFIXEDASDWORD( savedHeightY ), transMatrix->TM_matrix.yy ) );*/
+                        transMatrix->TM_scriptY = INTEGER_OF_WWFIXEDASDWORD( GrMulWWFixed( 
+                                                        WORD_TO_WWFIXEDASDWORD( savedHeightY ), transMatrix->TM_matrix.yy ) );
 
                         transMatrix->TM_heightX = -INTEGER_OF_WWFIXEDASDWORD( GrMulWWFixed( 
                                                         WORD_TO_WWFIXEDASDWORD( fontBuf->FB_baselinePos.WBF_int ), transMatrix->TM_matrix.xy ) );
-                        /*transMatrix->TM_scriptX = INTEGER_OF_WWFIXEDASDWORD( GrMulWWFixed( 
-                                                        WORD_TO_WWFIXEDASDWORD( savedHeightY ), transMatrix->TM_matrix.xy ) );*/
+                        transMatrix->TM_scriptX = -INTEGER_OF_WWFIXEDASDWORD( GrMulWWFixed( 
+                                                        WORD_TO_WWFIXEDASDWORD( savedHeightY ), transMatrix->TM_matrix.xy ) );
                 }
 
                 fontMatrix->FM_12 = -fontMatrix->FM_12;
