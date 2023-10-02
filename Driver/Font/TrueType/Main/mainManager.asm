@@ -108,10 +108,12 @@ CharMod ends
 ;routines from GEOS adapter
 global	INIT_FREETYPE:far
 global	EXIT_FREETYPE:far
-global TRUETYPE_INITFONTS:far
-global TRUETYPE_GEN_CHARS:far
-global TRUETYPE_CHAR_METRICS:far
-global TRUETYPE_GEN_WIDTHS:far
+global  TRUETYPE_INITFONTS:far
+global  TRUETYPE_GEN_CHARS:far
+global  TRUETYPE_CHAR_METRICS:far
+global  TRUETYPE_GEN_WIDTHS:far
+global  TRUETYPE_GEN_PATH:far
+global  TRUETYPE_GEN_IN_REGION:far
 
 global  bitmapHandle:hptr
 global  bitmapSize:word
@@ -132,7 +134,7 @@ include		../FontCom/fontcomEscape.asm
 InitMod ends
 
 include		truetypeEC.asm
-include	        ansic_runtime.asm
+include	    ansic_runtime.asm
 include		ansic_memory.asm
 include		ttmemory_asm.asm
 

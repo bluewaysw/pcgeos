@@ -41,8 +41,20 @@
  *      20/12/22  JK        Initial Revision
  *******************************************************************/
 
-void _pascal TrueType_Gen_Path( )
+void _pascal TrueType_Gen_Path(          
+                        GStateHandle         gstate,
+                        FontGenPathFlags     pathFlags,
+                        word                 character,
+                        WWFixedAsDWord       pointSize,
+                        const FontInfo*      fontInfo, 
+                        const OutlineEntry*  outlineEntry,
+                        MemHandle            varBlock )
 {
+
+EC(     ECCheckGStateHandle( gstate ) );
+EC(     ECCheckBounds( (void*)fontInfo ) );
+EC(     ECCheckBounds( (void*)outlineEntry ) );
+EC(     ECCheckMemHandle( varBlock ) );
 
 }
 
@@ -68,7 +80,14 @@ void _pascal TrueType_Gen_Path( )
  *      20/12/22  JK        Initial Revision
  *******************************************************************/
 
-void _pascal TrueType_Gen_In_Region( )
+void _pascal TrueType_Gen_In_Region( 
+                        GStateHandle         gstate,
+                        Handle               regionPath,
+                        word                 character,
+                        WWFixedAsDWord       pointSize,
+			const FontInfo*      fontInfo, 
+                        const OutlineEntry*  outlineEntry,
+                        MemHandle            varBlock )
 {
 
 }
