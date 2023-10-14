@@ -38,7 +38,7 @@ type	driver, single
 library	geos
 library	spool
 library	eps noload
-library ps2pdf
+#library ps2pdf
 #
 # Make this module fixed so we can put the strategy routine there
 #
