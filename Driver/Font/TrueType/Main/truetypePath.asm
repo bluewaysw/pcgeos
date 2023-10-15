@@ -56,23 +56,28 @@ TrueTypeGenPath	proc	far
 	uses	ax, bx, ds, es
 	.enter
 
-	push 	di					;pass gstate handle
+	xchg	di, ax				;ax <- handle of GState
+	mov		di, 400
+	call	ThreadBorrowStackSpace
+	push	di
+
+	push 	ax					;pass gstate handle
 	mov		ch, 0
 	push 	cx					;pass FontGenPathFlags
 	push	dx					;pass characters code
-	clr		al
-	mov 	es, di				;es <- seg addr of gstate
-	movwbf	dxah, es:GS_fontAttr.FCA_pointsize
-	push	dx					;pass point size
-	push 	ax
-				
+
+	mov 	bx, ax
+	call 	MemLock
+	mov		es, ax				;es <- seg addr of gstate		
 	mov		cx, es:GS_fontAttr.FCA_fontID
+	clr		ah		                   
+	mov		al, es:GS_fontAttr.FCA_textStyle
+	call	MemUnlock
+
 	call	FontDrFindFontInfo
 	push	ds					;pass ptr to FontInfo
 	push	di
 
-	clr		ah		                   
-	mov		al, es:GS_fontAttr.FCA_textStyle
 	mov		bx, ODF_HEADER
 	call	FontDrFindOutlineData
 	push	ds					;pass ptr to OutlineEntry
@@ -81,6 +86,9 @@ TrueTypeGenPath	proc	far
 	segmov	ds, dgroup, ax
 	push	ds:variableHandle	;pass handle to truetype block
 	call	TRUETYPE_GEN_PATH
+
+	pop		di
+	call	ThreadReturnStackSpace
 
 	.leave
 	ret

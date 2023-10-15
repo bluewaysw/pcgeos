@@ -61,41 +61,41 @@ resultDXAX	local	dword
 
 	.enter
 
-	mov	si, cx
+	mov		si, cx
 	push	dx		; pass character code
 	push	cx		; pass GCM_info
 
-	mov	cx, es:GS_fontAttr.FCA_fontID
+	mov		cx, es:GS_fontAttr.FCA_fontID
 	call	FontDrFindFontInfo
 	push	ds		; pass ptr to FontInfo
 	push	di
 	
-	clr	ah		                   
-	mov	al, es:GS_fontAttr.FCA_textStyle
-	mov	bx, ODF_HEADER
+	clr		ah		                   
+	mov		al, es:GS_fontAttr.FCA_textStyle
+	mov		bx, ODF_HEADER
 	call	FontDrFindOutlineData
 	push	ds		; pass ptr to OutlineEntry
 	push	di
 	push	ax		; pass stylesToImplement
 
-	clr	al
+	clr		al
 	movwbf	dxah, es:GS_fontAttr.FCA_pointsize
 	push	dx		; pass point size
 	push 	ax
 
 	push 	ss		; pass ptr to result dword in ss
-	lea	cx, resultDXAX
+	lea		cx, resultDXAX
 	push	cx
 
 	segmov	ds, dgroup, cx
 	push	ds:variableHandle
 	call	TRUETYPE_CHAR_METRICS
 
-	mov	ax, {word} resultDXAX
-	mov	dx, {word} resultDXAX+2
+	mov		ax, {word} resultDXAX
+	mov		dx, {word} resultDXAX+2
 
 	test 	si, GCMI_ROUNDED
-	jnz	roundToInt
+	jnz		roundToInt
 	rndwwbf dxax
 done:
 	clc
@@ -103,7 +103,7 @@ done:
 	ret
 
 roundToInt:
-	rndwwf dxax
-	jmp	done
+	rndwwf 	dxax
+	jmp		done
 
 TrueTypeCharMetrics	endp

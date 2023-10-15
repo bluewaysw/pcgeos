@@ -16,7 +16,7 @@ EXT	TrueTypeGenWidths	Generate font header and widths for a font.
 REVISION HISTORY:
 	Name	Date		Description
 	----	----		-----------
-	FR	29/1/21		Initial revision
+	FR      29/1/21	    Initial revision
 
 DESCRIPTION:
 	Implements a font driver for:
@@ -63,11 +63,11 @@ TrueTypeGenWidths	proc	far
 	.enter
 
 	xchg	di, ax
-	mov	di, 800
+	mov		di, 800
 	call	ThreadBorrowStackSpace
 	push	di
 
-	push	ax			; pass fonthandel
+	push	ax			; pass seg addr to fontBuf
 	push	bx			; send tMatrix ptr
 	push 	cx
 
@@ -98,7 +98,7 @@ TrueTypeGenWidths	proc	far
 	mov	al, es:GS_fontAttr.FCA_textStyle
 	mov	bx, ODF_PART1
 	call	FontDrFindOutlineData
-	push	ds			; pass ptr to OutlineEntry
+	push	ds			; pass ptr to FontHeader
 	push	di
 	push	ax			; pass stylesToImplement
 
@@ -110,10 +110,10 @@ TrueTypeGenWidths	proc	far
 	call	MemDerefDS
 	segmov	ax, ds
 
-	pop	di
+	pop		di
 	call	ThreadReturnStackSpace
 
-	clc				;indicate no error
+	clc					;indicate no error
 
 	.leave
 	ret

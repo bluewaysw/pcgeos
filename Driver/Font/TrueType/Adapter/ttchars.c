@@ -79,7 +79,7 @@ void _pascal TrueType_Gen_Chars(
         TrueTypeVars*          trueTypeVars;
         TransformMatrix*       transformMatrix;
         void*                  charData;
-        word                   width, height, size;
+        sword                  width, height, size;
 
 
 EC(     ECCheckBounds( (void*)fontBuf ) );

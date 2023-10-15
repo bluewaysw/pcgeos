@@ -65,7 +65,7 @@ TrueTypeGenChar	proc	far
 	mov	ax, 0				; with segment offset 0
 	push	ax
 
-	mov	es, bp				; es <- seg addr of gstate
+	mov		es, bp			; es <- seg addr of gstate
 
 	clr	al
 	movwbf	dxah, es:GS_fontAttr.FCA_pointsize
@@ -77,9 +77,9 @@ TrueTypeGenChar	proc	far
 	push	ds				; pass ptr to FontInfo
 	push	di
 
-	clr	ah		                   
-	mov	al, es:GS_fontAttr.FCA_textStyle
-	mov	bx, ODF_HEADER
+	clr		ah		                   
+	mov		al, es:GS_fontAttr.FCA_textStyle
+	mov		bx, ODF_HEADER
 	call	FontDrFindOutlineData
 	push	ds				; pass ptr to OutlineEntry
 	push	di
@@ -90,7 +90,7 @@ TrueTypeGenChar	proc	far
 	call	TRUETYPE_GEN_CHARS
 
 	; deref font block (may have moved)
-	pop	bx
+	pop		bx
 	call	MemDerefES
 
 err:

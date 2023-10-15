@@ -693,13 +693,13 @@ static void AdjustFontBuf( TransformMatrix* transMatrix,
                         /* adjust script and height */
                         transMatrix->TM_heightY = INTEGER_OF_WWFIXEDASDWORD( GrMulWWFixed( 
                                                         WORD_TO_WWFIXEDASDWORD( fontBuf->FB_baselinePos.WBF_int ), transMatrix->TM_matrix.yy ) );
-                        transMatrix->TM_scriptY = INTEGER_OF_WWFIXEDASDWORD( GrMulWWFixed( 
-                                                        WORD_TO_WWFIXEDASDWORD( savedHeightY ), transMatrix->TM_matrix.yy ) );
+                        transMatrix->TM_scriptY = 0; /*INTEGER_OF_WWFIXEDASDWORD( GrMulWWFixed( 
+                                                        WORD_TO_WWFIXEDASDWORD( savedHeightY ), transMatrix->TM_matrix.yx ) );*/
 
                         transMatrix->TM_heightX = -INTEGER_OF_WWFIXEDASDWORD( GrMulWWFixed( 
                                                         WORD_TO_WWFIXEDASDWORD( fontBuf->FB_baselinePos.WBF_int ), transMatrix->TM_matrix.xy ) );
-                        transMatrix->TM_scriptX = -INTEGER_OF_WWFIXEDASDWORD( GrMulWWFixed( 
-                                                        WORD_TO_WWFIXEDASDWORD( savedHeightY ), transMatrix->TM_matrix.xy ) );
+                        transMatrix->TM_scriptX = 0; /*-INTEGER_OF_WWFIXEDASDWORD( GrMulWWFixed( 
+                                                        WORD_TO_WWFIXEDASDWORD( savedHeightY ), transMatrix->TM_matrix.xy ) );*/
                 }
 
                 fontMatrix->FM_12 = -fontMatrix->FM_12;

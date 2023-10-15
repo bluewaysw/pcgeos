@@ -38,7 +38,6 @@ void _pascal TrueType_Gen_Path(
                         GStateHandle         gstate,
                         FontGenPathFlags     pathFlags,
                         word                 character,
-                        WWFixedAsDWord       pointSize,
                         const FontInfo*      fontInfo, 
                         const OutlineEntry*  outlineEntry,
                         MemHandle            varBlock );
