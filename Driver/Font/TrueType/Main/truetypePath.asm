@@ -41,7 +41,7 @@ PASS:		ds - seg addr of font info block
 						Type 1 or Type 3 font.
 			FGPF_SAVE_STATE - do save/restore for GState
 RETURN:		none
-DESTROYED:	ax, bx, di (on the way here)
+DESTROYED:	
 
 PSEUDO CODE/STRATEGY:
 KNOWN BUGS/SIDE EFFECTS/IDEAS:
@@ -53,8 +53,34 @@ REVISION HISTORY:
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
 
 TrueTypeGenPath	proc	far
-	uses	cx, dx, si, ds, es
+	uses	ax, bx, ds, es
 	.enter
+
+	push 	di					;pass gstate handle
+	mov		ch, 0
+	push 	cx					;pass FontGenPathFlags
+	push	dx					;pass characters code
+	clr		al
+	mov 	es, di				;es <- seg addr of gstate
+	movwbf	dxah, es:GS_fontAttr.FCA_pointsize
+	push	dx					;pass point size
+	push 	ax
+				
+	mov		cx, es:GS_fontAttr.FCA_fontID
+	call	FontDrFindFontInfo
+	push	ds					;pass ptr to FontInfo
+	push	di
+
+	clr		ah		                   
+	mov		al, es:GS_fontAttr.FCA_textStyle
+	mov		bx, ODF_HEADER
+	call	FontDrFindOutlineData
+	push	ds					;pass ptr to OutlineEntry
+	push	di
+
+	segmov	ds, dgroup, ax
+	push	ds:variableHandle	;pass handle to truetype block
+	call	TRUETYPE_GEN_PATH
 
 	.leave
 	ret
@@ -97,8 +123,33 @@ REVISION HISTORY:
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
 
 TrueTypeGenInRegion	proc	far
-	uses	cx, dx, si, ds, es
+	uses	ax, bx, ds, es
 	.enter
+
+	push 	di					;pass gstate handle
+	push	cx					;pass regionpath handle
+	push	dx					;pass character code	
+	clr		al
+	mov 	es, di				;es <- seg addr of gstate
+	movwbf	dxah, es:GS_fontAttr.FCA_pointsize
+	push	dx					;pass point size
+	push 	ax		
+
+	mov		cx, es:GS_fontAttr.FCA_fontID
+	call	FontDrFindFontInfo
+	push	ds					;pass ptr to FontInfo
+	push	di
+
+	clr		ah		                   
+	mov		al, es:GS_fontAttr.FCA_textStyle
+	mov		bx, ODF_HEADER
+	call	FontDrFindOutlineData
+	push	ds					;pass ptr to OutlineEntry
+	push	di
+
+	segmov	ds, dgroup, ax
+	push	ds:variableHandle	;pass handle to truetype block
+	call	TRUETYPE_GEN_IN_REGION
 
 	.leave
 	ret
