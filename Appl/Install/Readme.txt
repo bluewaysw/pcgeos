@@ -20,5 +20,3 @@ INSTF	Code for the Uni Installer application
 	
 Shared	Files that are used for both, the Install Creator and the Uni Installer
 
-German	Additional files, which are needed to build the German version:
-        German help file, German translation files for both apps.
