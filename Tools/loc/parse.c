@@ -2074,12 +2074,12 @@ void LocErr(int foundFlags, char *outputName)
     switch (foundFlags)
     {
     	case 0: 	// no .rsc file found
-    	    fprintf(stderr, "\nloc ERROR: No .rsc files found.\n");
+    	    fprintf(stderr, "\nloc: No .rsc files found.\n");
     	    fprintf(stderr, "* Build the NC version to create the .rsc files. *\n");
     	    return;
-    	case 1: fprintf(stderr, "\nloc WARNING: Only the file 'rsc.rsc' found. Missing other .rsc file(s).\n");
+    	case 1: fprintf(stderr, "\nloc warning: Only the file 'rsc.rsc' found. Missing other .rsc file(s).\n");
 	    break;
-	case 2: fprintf(stderr, "\nloc WARNING: Reqired file 'rsc.rsc' not found.\n");
+	case 2: fprintf(stderr, "\nloc warning: Reqired file 'rsc.rsc' not found.\n");
 	    break;
     	case 3: 	// anything is OK
     	    return;
