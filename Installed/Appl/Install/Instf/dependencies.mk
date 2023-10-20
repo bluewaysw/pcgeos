@@ -16,7 +16,7 @@ dosicon.eobj: stdapp.goh object.goh ui.goh Objects/metaC.goh \
                 Objects/gItemC.goh Objects/gBoolC.goh \
                 Objects/gGadgetC.goh Objects/gToolCC.goh \
                 Objects/gValueC.goh Objects/gToolGC.goh \
-                Objects/helpCC.goh main/dosicon.goh
+                Objects/helpCC.goh Main/dosicon.goh
 dosicon.obj \
 dosicon.eobj: geos.h heap.h geode.h resource.h ec.h object.h lmem.h \
                 graphics.h fontID.h font.h color.h gstring.h timer.h vm.h \
@@ -46,7 +46,7 @@ iconedi.eobj: stdapp.goh object.goh ui.goh Objects/metaC.goh \
                 Objects/gGadgetC.goh Objects/gToolCC.goh \
                 Objects/gValueC.goh Objects/gToolGC.goh \
                 Objects/helpCC.goh string.h stdio.h token.h instf.goh \
-                ../Shared/instllr.goh main/iconedi.goh ui/appui.goh
+                ../Shared/instllr.goh Main/iconedi.goh UI/appui.goh
 iconedi.obj \
 iconedi.eobj: geos.h heap.h geode.h resource.h ec.h object.h lmem.h \
                 graphics.h fontID.h font.h color.h gstring.h timer.h vm.h \
@@ -75,8 +75,8 @@ instf.eobj: stdapp.goh object.goh ui.goh Objects/metaC.goh \
                 Objects/gGadgetC.goh Objects/gToolCC.goh \
                 Objects/gValueC.goh Objects/gToolGC.goh \
                 Objects/helpCC.goh stdlib.h sysstats.h instf.goh \
-                ../Shared/instllr.goh main/iconedi.goh main/dosicon.goh \
-                ui/appui.goh ../Shared/rainer.goh ../Shared/msgbox.goh
+                ../Shared/instllr.goh Main/iconedi.goh Main/dosicon.goh \
+                UI/appui.goh ../Shared/rainer.goh ../Shared/msgbox.goh
 instf.obj \
 instf.eobj: geos.h heap.h geode.h resource.h ec.h object.h lmem.h \
                 graphics.h fontID.h font.h color.h gstring.h timer.h vm.h \
@@ -106,8 +106,8 @@ instf2.eobj: stdapp.goh object.goh ui.goh Objects/metaC.goh \
                 Objects/gGadgetC.goh Objects/gToolCC.goh \
                 Objects/gValueC.goh Objects/gToolGC.goh \
                 Objects/helpCC.goh stdlib.h sysstats.h instf.goh \
-                ../Shared/instllr.goh main/iconedi.goh main/dosicon.goh \
-                ui/appui.goh ../Shared/rainer.goh ../Shared/msgbox.goh
+                ../Shared/instllr.goh Main/iconedi.goh Main/dosicon.goh \
+                UI/appui.goh ../Shared/rainer.goh ../Shared/msgbox.goh
 instf2.obj \
 instf2.eobj: geos.h heap.h geode.h resource.h ec.h object.h lmem.h \
                 graphics.h fontID.h font.h color.h gstring.h timer.h vm.h \
@@ -137,8 +137,8 @@ tools.eobj: stdapp.goh object.goh ui.goh Objects/metaC.goh \
                 Objects/gGadgetC.goh Objects/gToolCC.goh \
                 Objects/gValueC.goh Objects/gToolGC.goh \
                 Objects/helpCC.goh stdlib.h stdio.h sysstats.h instf.goh \
-                ../Shared/instllr.goh main/iconedi.goh ui/appui.goh \
-                main/dosicon.goh ../Shared/rainer.goh \
+                ../Shared/instllr.goh Main/iconedi.goh UI/appui.goh \
+                Main/dosicon.goh ../Shared/rainer.goh \
                 ../Shared/msgbox.goh ../Shared/msgboxcode.goh
 tools.obj \
 tools.eobj: geos.h heap.h geode.h resource.h ec.h object.h lmem.h \
@@ -171,7 +171,7 @@ appui.eobj: stdapp.goh object.goh ui.goh Objects/metaC.goh \
                 Objects/helpCC.goh gstring.h stdio.h instf.goh \
                 ../Shared/instllr.goh ../Shared/rainer.goh \
                 ../Shared/crbox.goh ../Shared/rabelogo.goh \
-                art/appmon1.goh art/appmon2.goh art/docmonik.goh
+                Art/appmon1.goh Art/appmon2.goh Art/docmonik.goh
 appui.obj \
 appui.eobj: geos.h heap.h geode.h resource.h ec.h object.h lmem.h \
                 graphics.h fontID.h font.h color.h gstring.h timer.h vm.h \
@@ -199,7 +199,7 @@ dosicon.eobj: stdapp.goh object.goh ui.goh Objects/metaC.goh \
                 Objects/gItemC.goh Objects/gBoolC.goh \
                 Objects/gGadgetC.goh Objects/gToolCC.goh \
                 Objects/gValueC.goh Objects/gToolGC.goh \
-                Objects/helpCC.goh main/dosicon.goh
+                Objects/helpCC.goh Main/dosicon.goh
 dosicon.obj \
 dosicon.eobj: geos.h heap.h geode.h resource.h ec.h object.h lmem.h \
                 graphics.h fontID.h font.h color.h gstring.h timer.h vm.h \
@@ -229,7 +229,7 @@ iconedi.eobj: stdapp.goh object.goh ui.goh Objects/metaC.goh \
                 Objects/gGadgetC.goh Objects/gToolCC.goh \
                 Objects/gValueC.goh Objects/gToolGC.goh \
                 Objects/helpCC.goh string.h stdio.h token.h instf.goh \
-                ../Shared/instllr.goh main/iconedi.goh ui/appui.goh
+                ../Shared/instllr.goh Main/iconedi.goh UI/appui.goh
 iconedi.obj \
 iconedi.eobj: geos.h heap.h geode.h resource.h ec.h object.h lmem.h \
                 graphics.h fontID.h font.h color.h gstring.h timer.h vm.h \
@@ -258,8 +258,8 @@ instf.eobj: stdapp.goh object.goh ui.goh Objects/metaC.goh \
                 Objects/gGadgetC.goh Objects/gToolCC.goh \
                 Objects/gValueC.goh Objects/gToolGC.goh \
                 Objects/helpCC.goh stdlib.h sysstats.h instf.goh \
-                ../Shared/instllr.goh main/iconedi.goh main/dosicon.goh \
-                ui/appui.goh ../Shared/rainer.goh ../Shared/msgbox.goh
+                ../Shared/instllr.goh Main/iconedi.goh Main/dosicon.goh \
+                UI/appui.goh ../Shared/rainer.goh ../Shared/msgbox.goh
 instf.obj \
 instf.eobj: geos.h heap.h geode.h resource.h ec.h object.h lmem.h \
                 graphics.h fontID.h font.h color.h gstring.h timer.h vm.h \
@@ -289,8 +289,8 @@ instf2.eobj: stdapp.goh object.goh ui.goh Objects/metaC.goh \
                 Objects/gGadgetC.goh Objects/gToolCC.goh \
                 Objects/gValueC.goh Objects/gToolGC.goh \
                 Objects/helpCC.goh stdlib.h sysstats.h instf.goh \
-                ../Shared/instllr.goh main/iconedi.goh main/dosicon.goh \
-                ui/appui.goh ../Shared/rainer.goh ../Shared/msgbox.goh
+                ../Shared/instllr.goh Main/iconedi.goh Main/dosicon.goh \
+                UI/appui.goh ../Shared/rainer.goh ../Shared/msgbox.goh
 instf2.obj \
 instf2.eobj: geos.h heap.h geode.h resource.h ec.h object.h lmem.h \
                 graphics.h fontID.h font.h color.h gstring.h timer.h vm.h \
@@ -320,8 +320,8 @@ tools.eobj: stdapp.goh object.goh ui.goh Objects/metaC.goh \
                 Objects/gGadgetC.goh Objects/gToolCC.goh \
                 Objects/gValueC.goh Objects/gToolGC.goh \
                 Objects/helpCC.goh stdlib.h stdio.h sysstats.h instf.goh \
-                ../Shared/instllr.goh main/iconedi.goh ui/appui.goh \
-                main/dosicon.goh ../Shared/rainer.goh \
+                ../Shared/instllr.goh Main/iconedi.goh UI/appui.goh \
+                Main/dosicon.goh ../Shared/rainer.goh \
                 ../Shared/msgbox.goh ../Shared/msgboxcode.goh
 tools.obj \
 tools.eobj: geos.h heap.h geode.h resource.h ec.h object.h lmem.h \
@@ -354,7 +354,7 @@ appui.eobj: stdapp.goh object.goh ui.goh Objects/metaC.goh \
                 Objects/helpCC.goh gstring.h stdio.h instf.goh \
                 ../Shared/instllr.goh ../Shared/rainer.goh \
                 ../Shared/crbox.goh ../Shared/rabelogo.goh \
-                art/appmon1.goh art/appmon2.goh art/docmonik.goh
+                Art/appmon1.goh Art/appmon2.goh Art/docmonik.goh
 appui.obj \
 appui.eobj: geos.h heap.h geode.h resource.h ec.h object.h lmem.h \
                 graphics.h fontID.h font.h color.h gstring.h timer.h vm.h \

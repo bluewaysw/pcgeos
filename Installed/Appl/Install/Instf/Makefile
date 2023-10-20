@@ -12,7 +12,7 @@ OBJS            = dosicon.obj iconedi.obj instf.obj instf2.obj tools.obj\
                   appui.obj
 COMMON          = instf.goh
 MODULES         =
-CMODULES        = MAIN UI
+CMODULES        = Main UI
 SRCS            = $(MAIN) $(UI) $(COMMON)
 LOBJS           =
 
