@@ -53,7 +53,7 @@ REVISION HISTORY:
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
 
 TrueTypeGenPath	proc	far
-	uses	ax, bx, ds, es
+	uses	ax, bx, cx, si, ds, es
 	.enter
 
 	xchg	di, ax				;ax <- handle of GState
@@ -67,21 +67,37 @@ TrueTypeGenPath	proc	far
 	push	dx					;pass characters code
 
 	mov 	bx, ax
-	call 	MemLock
+	call 	MemLock				;lock gstate block
 	mov		es, ax				;es <- seg addr of gstate		
 	mov		cx, es:GS_fontAttr.FCA_fontID
 	clr		ah		                   
 	mov		al, es:GS_fontAttr.FCA_textStyle
-	call	MemUnlock
 
 	call	FontDrFindFontInfo
 	push	ds					;pass ptr to FontInfo
 	push	di
 
+	mov		cx, ds				;save ptr to FontInfo
+	mov		dx, di
+
+	mov		si, bx				;si <-> handle of GState
 	mov		bx, ODF_HEADER
 	call	FontDrFindOutlineData
 	push	ds					;pass ptr to OutlineEntry
 	push	di
+
+	mov		ds, cx
+	mov		di, dx
+
+	clr		ah
+	mov		al, es:GS_fontAttr.FCA_textStyle
+	mov		bx, ODF_PART1
+	call	FontDrFindOutlineData
+	push	ds					;pass ptr to FontHeader
+	push	di
+	push	ax					;pass stylesToImplement
+	mov		bx, si				;bx <- handle of GState
+	call	MemUnlock			;unlock gstate block
 
 	segmov	ds, dgroup, ax
 	push	ds:variableHandle	;pass handle to truetype block

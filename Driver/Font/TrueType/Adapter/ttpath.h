@@ -40,6 +40,8 @@ void _pascal TrueType_Gen_Path(
                         word                 character,
                         const FontInfo*      fontInfo, 
                         const OutlineEntry*  outlineEntry,
+                        const OutlineEntry*  firstEntry,
+                        TextStyle            stylesToImplement,
                         MemHandle            varBlock );
 
 void _pascal TrueType_Gen_In_Region( 
