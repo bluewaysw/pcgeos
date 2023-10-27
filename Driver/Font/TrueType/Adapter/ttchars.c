@@ -33,7 +33,7 @@ static void AdjustPointers( CharTableEntry* charTableEntries,
                             word numOfChars );
 static word ShiftCharData( FontBuf* fontBuf, CharData* charData );
 static word ShiftRegionCharData( FontBuf* fontBuf, RegionCharData* charData );
-static void* ensureBitmapBlock( MemHandle bitmapHandle, word size );
+static void* EnsureBitmapBlock( MemHandle bitmapHandle, word size );
 
 
 /********************************************************************
@@ -135,7 +135,7 @@ EC(     ECCheckBounds( (void*)trueTypeVars ) );
                 size = height * 6 * sizeof( word ) + SIZE_REGION_HEADER; 
 
                 /* get pointer to bitmapBlock */
-                charData = ensureBitmapBlock( bitmapHandle, size );
+                charData = EnsureBitmapBlock( bitmapHandle, size );
 
                 /* init RASTER_MAP */
                 RASTER_MAP.rows   = height;
@@ -166,7 +166,7 @@ EC(     ECCheckBounds( (void*)trueTypeVars ) );
                 size = height * ( ( width + 7 ) / 8 ) + SIZE_CHAR_HEADER;
 
                 /* get pointer to bitmapBlock */
-                charData = ensureBitmapBlock( bitmapHandle, size );
+                charData = EnsureBitmapBlock( bitmapHandle, size );
 
                 /* init rasterMap */
                 RASTER_MAP.rows   = height;
@@ -216,6 +216,28 @@ Fail:
  *                      CopyChar
  ********************************************************************
  *
+ * SYNOPSIS:	  
+ * 
+ * PARAMETERS:    character             Character to build (Chars).
+ *                *fontBuf              Ptr to font data structure.
+ *                pointsize             Desired point size.
+ *                *fontInfo             Pointer to FontInfo structure.
+ *                *outlineEntry         Ptr. to outline entry containing 
+ *                                      TrueTypeOutlineEntry.
+ *                bitmapHandle          Memory handle to bitmapblock.
+ *                varBlock              Memory handle to var block.
+ *                
+ * 
+ * RETURNS:       void
+ * 
+ * STRATEGY:      - find font-file for the requested style from fontInfo
+ *                - open outline of character in founded font-file
+ *                - calculate requested metrics and return it
+ * 
+ * REVISION HISTORY:
+ *      Date      Name      Description
+ *      ----      ----      -----------
+ *      12/23/22  JK        Initial Revision
  *******************************************************************/
 static void CopyChar( FontBuf* fontBuf, word geosChar, void* charData, word charDataSize ) 
 {
@@ -235,7 +257,28 @@ static void CopyChar( FontBuf* fontBuf, word geosChar, void* charData, word char
 /********************************************************************
  *                      ShrinkFontBuf
  ********************************************************************
- *
+ * SYNOPSIS:	  Generate one character for a font.
+ * 
+ * PARAMETERS:    character             Character to build (Chars).
+ *                *fontBuf              Ptr to font data structure.
+ *                pointsize             Desired point size.
+ *                *fontInfo             Pointer to FontInfo structure.
+ *                *outlineEntry         Ptr. to outline entry containing 
+ *                                      TrueTypeOutlineEntry.
+ *                bitmapHandle          Memory handle to bitmapblock.
+ *                varBlock              Memory handle to var block.
+ *                
+ * 
+ * RETURNS:       void
+ * 
+ * STRATEGY:      - find font-file for the requested style from fontInfo
+ *                - open outline of character in founded font-file
+ *                - calculate requested metrics and return it
+ * 
+ * REVISION HISTORY:
+ *      Date      Name      Description
+ *      ----      ----      -----------
+ *      12/23/22  JK        Initial Revision
  *******************************************************************/
 static void ShrinkFontBuf( FontBuf* fontBuf ) 
 {
@@ -353,21 +396,50 @@ static word ShiftRegionCharData( FontBuf* fontBuf, RegionCharData* charData )
         return size;
 }
 
-static void* ensureBitmapBlock( MemHandle bitmapHandle, word size )
+
+/********************************************************************
+ *                      EnsureBitmapBlock
+ ********************************************************************
+ * SYNOPSIS:	  Ensures that the required space is available in the 
+ *                bitmap block.
+ * 
+ * PARAMETERS:    bitmapHandle          Memory handle to bitmap block.
+ *                size                  Required size of bitmap block.
+ *                
+
+ * RETURNS:       void*                 Pointer to locked bitmap block.
+ * 
+ * STRATEGY:      
+ * 
+ * REVISION HISTORY:
+ *      Date      Name      Description
+ *      ----      ----      -----------
+ *      12/23/22  JK        Initial Revision
+ *******************************************************************/
+
+static void* EnsureBitmapBlock( MemHandle bitmapHandle, word size )
 {
         void* bitmapData = MemLock( bitmapHandle );
+
         if( bitmapData == NULL )
         {
-                MemReAlloc( bitmapHandle, MAX( size, BITMAP_BLOCKSIZE ), HAF_NO_ERR );
-                bitmapData = MemLock( bitmapHandle );
+                MemReAlloc( bitmapHandle, MAX( size, BITMAP_BLOCKSIZE ), HAF_ZERO_INIT | HAF_NO_ERR );
+                return MemLock( bitmapHandle );
         } else {
-                if( MemGetInfo( bitmapHandle, MGIT_SIZE ) < size )
+                word  bitmapBlockSize = MemGetInfo( bitmapHandle, MGIT_SIZE );
+
+                if( bitmapBlockSize < size )
                 {
-                        MemReAlloc( bitmapHandle, size, HAF_NO_ERR );
-                        bitmapData = MemLock( bitmapHandle );
+                        MemReAlloc( bitmapHandle, size, HAF_ZERO_INIT | HAF_NO_ERR );
+                        return MemLock( bitmapHandle );
+                }
+                
+                if( size < BITMAP_BLOCKSIZE )
+                {
+                        MemReAlloc( bitmapHandle, BITMAP_BLOCKSIZE, HAF_ZERO_INIT | HAF_NO_ERR );
+                        return MemLock( bitmapHandle );
                 }
         }
-        memset( bitmapData, 0, size );
 
         return bitmapData;
 }
