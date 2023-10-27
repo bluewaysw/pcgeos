@@ -302,11 +302,25 @@ static void ShrinkFontBuf( FontBuf* fontBuf )
         }
 }
 
+
 /********************************************************************
  *                      FindLRUChar
  ********************************************************************
- *
+ * SYNOPSIS:	  Find least recently used char in FontBuf.
+ * 
+ * PARAMETERS:    *fontBuf              Ptr to font data structure.  
+ *                numOfChars            Number of chars in FontBuf.          
+ * 
+ * RETURNS:       int                   Index of lru char.
+ * 
+ * STRATEGY:      
+ * 
+ * REVISION HISTORY:
+ *      Date      Name      Description
+ *      ----      ----      -----------
+ *      12/23/22  JK        Initial Revision
  *******************************************************************/
+
 static int FindLRUChar( FontBuf* fontBuf, int numOfChars )
 {
         word             lru = 0xffff;
@@ -332,10 +346,27 @@ static int FindLRUChar( FontBuf* fontBuf, int numOfChars )
         return indexLRUChar;
 } 
 
+
 /********************************************************************
  *                      AdjustPointers
  ********************************************************************
- *
+ * SYNOPSIS:	  Adjust pointers after removing a rendered glyph 
+ *                from FontBuf.
+ * 
+ * PARAMETERS:    *charTableEntries     Ptr to first CharTableEntry.  
+ *                *lruEntry             Ptr to CharTableEntry of 
+ *                                      removed rendered glyph.    
+ *                sizeLRUEntry          Size of removed rendered glyph.
+ *                numOfChars            Number of chars in FontBuf.  
+ * 
+ * RETURNS:       void
+ * 
+ * STRATEGY:      
+ * 
+ * REVISION HISTORY:
+ *      Date      Name      Description
+ *      ----      ----      -----------
+ *      12/23/22  JK        Initial Revision
  *******************************************************************/
 static void AdjustPointers( CharTableEntry* charTableEntries, 
                             CharTableEntry* lruEntry, 
@@ -349,11 +380,27 @@ static void AdjustPointers( CharTableEntry* charTableEntries,
                         charTableEntries[i].CTE_dataOffset -= sizeLRUEntry;
 }
 
+
 /********************************************************************
  *                      ShiftCharData
  ********************************************************************
- *
+ * SYNOPSIS:	  Shift rendered glyphs as bitmap to fill gaps after 
+ *                removing a glyph from FontBuf.
+ * 
+ * PARAMETERS:    *fontBuf              Ptr to font data structure.    
+ *                *charData             Ptr to removed rendered glyph 
+ *                                      as bitmap. 
+ * 
+ * RETURNS:       void
+ * 
+ * STRATEGY:      
+ * 
+ * REVISION HISTORY:
+ *      Date      Name      Description
+ *      ----      ----      -----------
+ *      12/23/22  JK        Initial Revision
  *******************************************************************/
+
 static word ShiftCharData( FontBuf* fontBuf, CharData* charData )
 {
         word  size = charData->CD_pictureWidth * 
@@ -369,7 +416,21 @@ static word ShiftCharData( FontBuf* fontBuf, CharData* charData )
 /********************************************************************
  *                      ShiftRegionCharData
  ********************************************************************
- *
+ *SYNOPSIS:	  Shift rendered glyphs as region to fill gaps after 
+ *                removing a glyph from FontBuf.
+ * 
+ * PARAMETERS:    *fontBuf              Ptr to font data structure.    
+ *                *charData             Ptr to removed rendered glyph 
+ *                                      as region. 
+ * 
+ * RETURNS:       void
+ * 
+ * STRATEGY:      
+ * 
+ * REVISION HISTORY:
+ *      Date      Name      Description
+ *      ----      ----      -----------
+ *      12/23/22  JK        Initial Revision
  *******************************************************************/
 static word ShiftRegionCharData( FontBuf* fontBuf, RegionCharData* charData )
 {
