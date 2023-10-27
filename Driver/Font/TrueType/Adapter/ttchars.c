@@ -216,29 +216,25 @@ Fail:
  *                      CopyChar
  ********************************************************************
  *
- * SYNOPSIS:	  
+ * SYNOPSIS:	  Copies a rendered glyph from the BitmapBlock to the 
+ *                fontbuf and updates the CharTableEntry.
  * 
- * PARAMETERS:    character             Character to build (Chars).
- *                *fontBuf              Ptr to font data structure.
- *                pointsize             Desired point size.
- *                *fontInfo             Pointer to FontInfo structure.
- *                *outlineEntry         Ptr. to outline entry containing 
- *                                      TrueTypeOutlineEntry.
- *                bitmapHandle          Memory handle to bitmapblock.
- *                varBlock              Memory handle to var block.
+ * PARAMETERS:    *fontBuf              Ptr to font data structure.
+ *                geosChar              Code of character to copy.
+ *                *charData             Ptr to bitmap block.
+ *                charDataSize          Number of bytes to copy.
  *                
  * 
  * RETURNS:       void
  * 
- * STRATEGY:      - find font-file for the requested style from fontInfo
- *                - open outline of character in founded font-file
- *                - calculate requested metrics and return it
+ * STRATEGY:      
  * 
  * REVISION HISTORY:
  *      Date      Name      Description
  *      ----      ----      -----------
  *      12/23/22  JK        Initial Revision
  *******************************************************************/
+
 static void CopyChar( FontBuf* fontBuf, word geosChar, void* charData, word charDataSize ) 
 {
         word  indexGeosChar = geosChar - fontBuf->FB_firstChar;
@@ -257,29 +253,20 @@ static void CopyChar( FontBuf* fontBuf, word geosChar, void* charData, word char
 /********************************************************************
  *                      ShrinkFontBuf
  ********************************************************************
- * SYNOPSIS:	  Generate one character for a font.
+ * SYNOPSIS:	  Shrint FontBuf if it is to large.
  * 
- * PARAMETERS:    character             Character to build (Chars).
- *                *fontBuf              Ptr to font data structure.
- *                pointsize             Desired point size.
- *                *fontInfo             Pointer to FontInfo structure.
- *                *outlineEntry         Ptr. to outline entry containing 
- *                                      TrueTypeOutlineEntry.
- *                bitmapHandle          Memory handle to bitmapblock.
- *                varBlock              Memory handle to var block.
- *                
+ * PARAMETERS:    *fontBuf              Ptr to font data structure.            
  * 
  * RETURNS:       void
  * 
- * STRATEGY:      - find font-file for the requested style from fontInfo
- *                - open outline of character in founded font-file
- *                - calculate requested metrics and return it
+ * STRATEGY:      
  * 
  * REVISION HISTORY:
  *      Date      Name      Description
  *      ----      ----      -----------
  *      12/23/22  JK        Initial Revision
  *******************************************************************/
+
 static void ShrinkFontBuf( FontBuf* fontBuf ) 
 {
         word  numOfChars = fontBuf->FB_lastChar - fontBuf->FB_firstChar + 1;
