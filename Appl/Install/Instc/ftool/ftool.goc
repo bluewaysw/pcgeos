@@ -1,0 +1,607 @@
+/**************************************************************************
+ *	GEODE-File f¸r InstallCreator
+ *
+ * 	This file implements the FileTool routines which comes from the
+ *	Rabe-Soft FileTool-Library to remove the dependency of the 
+ *	InstallCreator program on this library
+
+ *	Beschreibung	Universelles Installationsprogramm
+ *			Installer
+ *
+ *	Copyright:	(c) by RABE-Soft 5/99
+ *	Sonstiges:	-
+ *
+ **************************************************************************/
+
+/*  Standard include files */
+@include <stdapp.goh>
+#include <stdio.h>
+#include <string.h>
+
+@include "ftool/ftool.goh"
+@include "ftool/ftoolui.goh"
+@include "../Shared/msgbox.goh"
+
+
+Boolean LocalSeeIfFolder(char *name);
+int    LocalModifyDosName(char * oldName, char * newName);
+int LocalCreateDir(char *path);
+
+
+
+
+/*##########################################################################
+ #	Vergleichen und Konvertieren
+ ###########################################################################*/
+
+/*--------------------- FileToolCompareProtocol ---------------------
+ *	Aufgabe:        Vegleicht zwei Protocol-Nummern
+ *	Return:		CRP_FILE_SAME	: Nummern sind gleich
+ *			CRP_FILE_OLDER	: fileProtocol ist Ñlter als compProtocol
+ *			CRP_FILE_NEWER	: fileProtocol ist neuer als compProtocol
+ ---------------------------------------------------------------------------*/
+int FileToolCompareProtocol
+		(ProtocolNumber fileProtocol,ProtocolNumber compProtocol) {
+
+	if ( fileProtocol.PN_major > compProtocol.PN_major ) return CRP_FILE_NEWER;
+	if ( fileProtocol.PN_major < compProtocol.PN_major ) return CRP_FILE_OLDER;
+
+	if ( fileProtocol.PN_minor > compProtocol.PN_minor ) return CRP_FILE_NEWER;
+	if ( fileProtocol.PN_minor < compProtocol.PN_minor ) return CRP_FILE_OLDER;
+
+	return  CRP_FILE_SAME;
+	}
+
+/*--------------------- FileToolCompareRelease ---------------------
+ *	Aufgabe:        Vegleicht zwei Release-Nummern
+ *	Return:		CRP_FILE_SAME	: Nummern sind gleich
+ *			CRP_FILE_OLDER	: fileRelease ist Ñlter als compRelease
+ *			CRP_FILE_NEWER	: fileRelease ist neuer als compRelease
+ ---------------------------------------------------------------------------*/
+int FileToolCompareRelease
+		(ReleaseNumber fileRelease,ReleaseNumber compRelease) {
+
+	if ( fileRelease.RN_major > compRelease.RN_major ) return CRP_FILE_NEWER;
+	if ( fileRelease.RN_major < compRelease.RN_major ) return CRP_FILE_OLDER;
+
+	if ( fileRelease.RN_minor > compRelease.RN_minor ) return CRP_FILE_NEWER;
+	if ( fileRelease.RN_minor < compRelease.RN_minor ) return CRP_FILE_OLDER;
+
+	if ( fileRelease.RN_change > compRelease.RN_change ) return CRP_FILE_NEWER;
+	if ( fileRelease.RN_change < compRelease.RN_change ) return CRP_FILE_OLDER;
+
+	if ( fileRelease.RN_engineering > compRelease.RN_engineering ) return CRP_FILE_NEWER;
+	if ( fileRelease.RN_engineering < compRelease.RN_engineering ) return CRP_FILE_OLDER;
+
+	return  CRP_FILE_SAME;
+	}
+
+/*###########################################################################
+ #	Pfade und Dateien (ungeˆffnet)
+ ###########################################################################*/
+
+
+/*--------------------- FileToolAddPathElement ---------------------
+ *	Aufgabe:	AnhÑngen eines neuen Elements an einen Verzeichnispfad
+ *			Bei Bedarf wird ein Backslash dazwischengesetzt.
+ *			Es wirk kein Backslash angehÑngt
+ *	Return:		Alte PfadlÑnge
+ ---------------------------------------------------------------------------*/
+int FileToolAddPathElement(char * path, char *tail) {
+int n;
+    n = strlen(path);
+    if ( n>0 ) if (path[n-1] != '\\' ) {	/* Backslash anhÑngen */
+		path[n] ='\\';
+		path[n+1] = 0;
+		}
+    strcat(path,tail);
+    return n;
+    }
+
+
+/*--------------------- FileToolCreateSubdir ---------------------
+ *	Aufgabe:	Anlegen Unterverzeichnisses relativ zu Working Dir
+ *			Bei Bedarf rekursiver Aufruf
+ *	Strategie:
+ *	Return:		 -1, wenn sich der Pfad nicht anlegen lÑ·t
+ *			oder Fehlercode von FileCreateDir()
+ *			OK: FALSE  ( == 0 )
+ ---------------------------------------------------------------------------*/
+int FileToolCreateSubdir( char *path ) {
+int 	i,err;
+char	z;
+
+/* versuchen normal anzulegen, zu lange Namen ausbremsen */
+
+	err = LocalCreateDir(path);
+	if (err == 0 ) return FALSE;		/* erfolgreich angelegt  */
+	if (err == ERROR_FILE_EXISTS ) 		/* existiert schon */
+	{
+		/* Dann muss es ein Ordner sein, sonst Fehler */
+		if (LocalSeeIfFolder(path))	return FALSE;
+		return err;
+	}
+
+
+
+/* Schreibschutzfehler extra behandeln */
+	if ( err == ERROR_WRITE_PROTECTED ) {
+		return ERROR_WRITE_PROTECTED;
+		}
+
+
+/* es hat nicht geklappt: Versuchen einzukÅrzen und neu zu rufen */
+	i = strlen(path);
+	if ( i==0 )
+	{
+	return (-1);	/* leere Strings ausbremsen */
+	}
+
+	while ( i != 0 && path[i] != '\\' ) i--;	/* Backslash finden */
+	z = path[i];
+	path[i] = 0;	/* String einkÅrzen */
+			/* i ist Null, wenn kein Backslash enthalten ist, oder er
+			 * am Anfang stand -> es hat nicht geklappt */
+	if ( i != 0 ) err = FileToolCreateSubdir(path);	/* rekursiver Aufruf */
+		else	err = (-1);
+	path[i] = z;				/* alten String restaurieren */
+
+	if ( err == 0 )
+	{
+		/* nochmal versuchen normal anzulegen, zu lange Namen ausbremsen */
+		err = LocalCreateDir(path);
+		if (err == 0 ) return FALSE;		/* erfolgreich angelegt  */
+		if (err == ERROR_FILE_EXISTS ) 		/* existiert schon */
+		{
+			/* Dann muss es ein Ordner sein, sonst Fehler */
+			if (LocalSeeIfFolder(path))	return FALSE;
+			return err;
+		}
+
+	}
+
+	return err;
+}
+
+/*--------------------- FileToolCreatePath ---------------------
+ *	Aufgabe:	Anlegen eines Pfades auf einem DatentrÑger
+ *	Strategie:
+ *	Return:		-1, wenn sich der Pfad nicht anlegen lÑ·t
+ *			oder Fehlercode von FileToolCreateSubdir()
+ *			OK: FALSE ( ==0 )
+ ---------------------------------------------------------------------------*/
+int FileToolCreatePath (DiskHandle dh, char *path) {
+DiskHandle ndh;
+int ret;
+
+	if ( dh==0) return (-1);	/* kein Handle: kein DatentrÑger */
+	FilePushDir();
+	ndh = FileSetCurrentPath(dh,"\\");
+	if ( ndh == 0 ) {
+		FilePopDir();
+		return (-1);
+		}
+	ret = FileToolCreateSubdir(path);		/* Vezeichnis anlegen, b.Bed. rekursiv*/
+	FilePopDir();
+	return ret;
+	}
+
+
+/*--------------------- LocalCreateDir ---------------------
+ *	Aufgabe:	Ausgelagerte FileCreateDir()-Routine, um nach
+ *			Mîglichkeit den DOS-Namen einkÅrzen zu kînnen
+ *			z.B. NEUER_OR.000 -> NEUER_OR
+ *	Strategie:
+ *	Return:		Fehlercode von FileCreateDir()
+ *			OK: FALSE  ( == 0 )
+ ---------------------------------------------------------------------------*/
+int LocalCreateDir(char *path) {
+int err, dosErr;
+FileLongName	dosName, oldName;
+char *p;
+
+    err = FileCreateDir(path);
+
+    /* Nur wenn der Ordner neu (und erfolgreich) angelegt wurde, wird
+     * versucht, den DOS-Namen einzukÅrzen. Auch der Fehler ERROR_FILE_EXIST
+     * (Ordner existiert schon) fÅhrt zum Abbruch, damit das Tool nicht
+     * unkontroliert vorhandene Verzeichnistrukturen umbenennt - manchmal
+     * hat der User sich nÑmlich etwas bei bei den DOS-Namen gedacht. */
+    if ( err ) return err;
+
+
+    /* Ordner wurde neu angelegt -> versuchen den DOS-Namen einzukÅrzen
+     * Dazu aktuellen DOS-Namen des Verzeichnisses ermitteln */
+    dosErr = FileGetPathExtAttributes(path, FEA_DOS_NAME, dosName, sizeof(FileLongName));
+    if ( !dosErr ) {
+	/* Das Verzeichnis hat einen DOS-Namen, d.h es existiert :-) */
+	p = strchr(dosName, '.');
+	if ( p ) {
+		/* Dos-Ordner hat eine Erweiterung -> lîschen
+		 * Dazu in das gerade Åbergeordnete Verzeichnis wechseln, da
+		 * path auch "\Paulchen Daten\Meine\Willi\Neuer Ordner"
+		 * sein kann */
+		FilePushDir();
+		FileSetCurrentPath(0, path);
+		FileSetCurrentPath(0, "..");
+
+		strcpy(oldName, dosName);
+		*p = 0;			/* dosName: NEUER_OR.000 -> NEUER_OR */
+		if ( strlen(dosName) ) {
+			/* Umbenennen, ohne Meldung falls es nicht geht */
+			FileToolModifyDosName( oldName, dosName, FALSE);
+			}
+		FilePopDir();
+		}
+	}
+
+
+    return err;
+    }
+
+/*--------------------- LocalSeeIfFolder ---------------------
+ *	Aufgabe:	Nachsehen, ob ein existierenders Ordner (ERROR_FILE_EXISTS) wirklich
+ *				ein Ordner ist und nicht evt eine Datei
+ *				Dann muss eine Fehlermeldung erfolgen
+ *	Strategie:
+ *	Return:		TRUE: Es ist ein Ordner (alles OK)
+ *				FALSE: Es ist eine Datei (Fehler)
+ *
+ *	Anmerkung: Bei Links kann ich das nicht entscheiden -> mache Fehlermeldung
+ *				Es sei denn, Links liefern auch FA_SUBDIR -> teste ich jetzt nicht
+ ---------------------------------------------------------------------------*/
+Boolean LocalSeeIfFolder(char *name) {
+int attr;
+
+	attr = FileGetAttributes(name);
+	if ( attr & FA_SUBDIR ) return TRUE;
+	return FALSE;
+}
+
+
+/*--------------------- LocalCheckSystemDir ---------------------
+ *	Aufgabe:        Test ob ¸bergebener Name ein System-Verzeichnis
+ *			darstellt. Dieses darf nicht umbennat werden
+ *	Return: 	Fehlerflag:
+ *			FALSE (==0) OK
+ *			TRUE  ( >0) Systemverzeichnis
+ *			TRUE (-1) Kein Speicher mehr frei (MemAlloc failed)
+ ---------------------------------------------------------------------------*/
+Boolean LocalCheckSystemDir(char * fileName, Boolean msgOnError) {
+char * path, *pptr;
+int len;
+MemHandle mh;
+DiskHandle dh,ndh;
+
+	mh = MemAlloc(1024,HF_SWAPABLE,HAF_ZERO_INIT | HAF_LOCK);
+	if ( !mh ) {
+		if ( msgOnError ) ErrorMsgBox(@ErrorAccessMemoryCommon,0,0);
+		return (-1);
+		}
+	path = MemDeref(mh);
+	dh = FileGetCurrentPath(path,500);
+	FileToolAddPathElement(path, fileName);
+	pptr = (char*)MemDeref(mh) + 512;
+	dh = FileConstructFullPath(&pptr,512,dh,path,FALSE);
+	pptr = (char*)MemDeref(mh) + 512;
+	ndh = FileParseStandardPath(dh, (char const **)&pptr);
+	len =strlen(pptr);
+	MemFree(mh);
+
+	if ( (ndh == 0) || (len>0) ) return FALSE;
+	if ( msgOnError ) ErrorMsgBox(@ErrorIsSystemDir,fileName,0);
+	return TRUE;
+	}
+
+
+/*--------------------- LocalModifyDosName ---------------------
+ *	Aufgabe:        DOS-Name einer Datei Ñndern. Ohne Feherbehandlung
+ *	Strategie:	DOS-Dateien oder Verzeichnisse ohne Dirname werden
+ *			umbenannt, Geos-Dateien behalten ihren alten Namen,
+ *			indem er explizit ausgelesen wird
+ *	Return: 	Fehlerflag:
+ *			FALSE (==0) OK
+ *			TRUE  ( >0) Fehlercode von FileRead() oder FileWrite()
+ *			TRUE (-1) Kein Speicher mehr frei (MemAlloc failed)
+ ---------------------------------------------------------------------------*/
+typedef struct {
+	dword kennung;
+	char name[34];
+	} GeosIDAndName;
+
+@define FTSetAttrDesc(ad,attr,value,size) ad.FEAD_attr = attr; \
+	ad.FEAD_value = value; ad.FEAD_size  = size;	ad.FEAD_name  = NULL;
+
+extern char dirnameFile[] = "@DIRNAME.000";
+
+
+
+int    LocalModifyDosName(char * oldName, char * newName) {
+word	fileType, err=0, nullword = 0,nameModifier = 0xFEFF;
+FileHandle	fh;
+GeosIDAndName	info;
+FileExtAttrDesc	attrDesc[2];	/* Array 0..1 */
+FileLongName	dosName;
+
+	@FTSetAttrDesc(attrDesc[0],FEA_FILE_TYPE,&fileType,2);
+	@FTSetAttrDesc(attrDesc[1],FEA_DOS_NAME,&dosName,sizeof(FileLongName));
+	err = FileGetPathExtAttributes(oldName,FEA_MULTIPLE,attrDesc,2);
+	if ( err ) return err;
+
+	if ( fileType == GFT_NOT_GEOS_FILE )
+		return FileRename(oldName,newName);
+
+	if ( fileType == GFT_DIRECTORY ) {
+	    /* Dirname îffnen */
+		FileSetCurrentPath(0,oldName);
+		fh = FileOpen(dirnameFile, FILE_DENY_RW | FILE_ACCESS_RW | 0x80);
+		FileSetCurrentPath(0,"..");
+		if (!fh) {	// DOS-Verzeichnis
+			return FileRename(oldName,newName);
+			}
+	    /* Dirname gefunden: Kennung und Name auslesen, umbennen */
+		FileRead(fh,&info,sizeof(GeosIDAndName),FALSE);
+		FilePos(fh,5,FILE_POS_START);
+		FileWrite(fh,&nameModifier,2,FALSE);
+		FileWrite(fh,&nullword,2,FALSE);
+		FileClose(fh,FALSE);
+	    /* umbenennen */
+		err = FileRename(dosName,newName);
+	    /* Alten GEOS-Namen restaurieren */
+		if ( err ) FileSetCurrentPath(0,dosName);
+		     else FileSetCurrentPath(0,newName);
+		fh = FileOpen(dirnameFile, FILE_DENY_RW | FILE_ACCESS_RW | 0x80);
+		if ( !fh ) return ThreadGetError();	// Gro·e Kacke!
+		FilePos(fh,0,FILE_POS_START);
+		FileWrite(fh,&info,sizeof(GeosIDAndName),FALSE);
+		FileClose(fh,FALSE);
+		FileSetCurrentPath(0,"..");
+		return err;
+		}
+
+/* es ist eine GEOS-Datei */
+	fh = FileOpen(oldName, FILE_DENY_RW | FILE_ACCESS_RW | 0x80);
+	if ( !fh ) return ThreadGetError();
+/* Geos-Name lesen und Kennung vernichten */
+	FileRead(fh,&info,sizeof(GeosIDAndName),FALSE);
+	FilePos(fh,0,FILE_POS_START);
+	FileWrite(fh,&nullword,2,FALSE);
+	FileClose(fh,FALSE);
+/* umbennen, wieder îffnen und Kennung sowie Namen zurÅckschreiben */
+	err = FileRename(dosName,newName);
+	if ( err ) fh = FileOpen(dosName, FILE_DENY_RW | FILE_ACCESS_RW | 0x80);
+	     else  fh = FileOpen(newName, FILE_DENY_RW | FILE_ACCESS_RW | 0x80);
+	if ( !fh ) return ThreadGetError();	// Gro·e Kacke!!
+	FileWrite(fh,&info,sizeof(GeosIDAndName),FALSE);
+	FileClose(fh,FALSE);
+
+	return err;
+      }
+
+
+/*--------------------- FileToolModifyDosName ---------------------
+ *	Aufgabe:	éndern des DOS-Namen einer Datei
+ *			Geos-Dateien bekommen einen anderen DOS-Namen
+ *			DOS-Dateien werden umbenannt
+ *			mit Fehlermeldung, falls gewÅnscht
+ *	Warnung:	Der neue DOS-Name der GEOS-Datei wird NICHT auf
+ *			GÅltigkeit geprÅft
+ *	Parameter:      Boolean ( char *oldName, *newName, Boolean msgOnError)
+ *			oldName kann bei Geos-Dateien der Geos oder DOS-Name sein
+ *	Seiteneffekt:   u.U wird das Verzeichnis gewechselt
+ *			irgendwelche Fileselektorem kînnten zum Rescan angeregt
+ *			werden und u.U. ihre Selektion verlieren
+ *	Return: 	Fehlerflag:
+ *			FALSE (==0) OK
+ *			TRUE  ( >0) Fehlercode von FileRename();
+ ---------------------------------------------------------------------------*/
+Boolean FileToolModifyDosName( char * oldName,char *newName, Boolean msgOnError) {
+/* Der Nutzer darf die Datei suchen, Fehler beheben etc. */
+return FileToolModifyDosNameInternal(oldName, newName, msgOnError, TRUE);
+}
+
+
+
+Boolean FileToolModifyDosNameInternal( char * oldName,char *newName,
+		Boolean msgOnError, Boolean userMayRetry) {
+int	err=0;
+int attrs, aerr=0, ret;
+Boolean	retry;
+
+     if (LocalCheckSystemDir(oldName, msgOnError) ) return ERROR_ACCESS_DENIED;
+     if (!strcmp(oldName,".") ) {
+		if (msgOnError) ErrorMsgBox(@ErrorModiDosIsCurrentDir,0,0);
+		return ERROR_ACCESS_DENIED;
+		}
+     do {
+	retry = FALSE;
+	err = LocalModifyDosName(oldName,newName);
+	if ( !err ) return 0;	// kein Fehler
+
+	attrs = FileGetAttributes(oldName);
+	if ( attrs & FA_RDONLY )	{
+		aerr = FileSetAttributes(oldName,attrs & ~FA_RDONLY);
+		if ( !aerr ) {
+			err = LocalModifyDosName(oldName,newName);
+			if ( ! err )	FileSetAttributes(newName,attrs);
+				else	FileSetAttributes(oldName,attrs);
+			}
+		}
+
+	if ( !err ) return 0;		// kein Fehler
+	if ( !msgOnError ) return err;  // Fehler, aber keine Meldung
+
+	switch ( err ) {
+		case 0: break;		// OK
+		case ERROR_INVALID_LONGNAME:
+			ErrorMsgBox(@ModifyDosInvalidName,newName,oldName);
+			break;
+		case ERROR_FILE_EXISTS:
+			ErrorMsgBox(@ModifyDosFileExits,newName,oldName);
+			break;
+		case ERROR_FILE_NOT_FOUND:
+			if ( userMayRetry ) {
+			   ret = WarningMsgBox(@ModifyDosNotFound,newName,oldName);
+			   if ( ret == IC_YES ) {
+				ret = FileToolRequestChangeDir(
+				@FileToolModifyDosNameInfoText,oldName,0,TRUE);
+				if ( ret == IC_OK ) retry = TRUE;
+				}
+			   }
+			else ErrorMsgBox(@ModifyDosNotFound2,newName,oldName);
+			break;
+		case ERROR_SHARING_VIOLATION:
+		case ERROR_FILE_IN_USE:
+			if ( userMayRetry ) {
+				ret = WarningMsgBox(@ModifyDosAccessDenied,newName,oldName);
+				if ( ret == IC_YES ) retry = TRUE;
+				}
+			else ErrorMsgBox(@ModifyDosAccessDenied2,newName,oldName);
+			break;
+		case ERROR_WRITE_PROTECTED:
+			ret = WarningMsgBox(@ModifyDosDiskWriteProtected,oldName,0);
+			if ( ret == IC_YES ) retry = TRUE;
+			break;
+		case ERROR_ACCESS_DENIED:
+		default:
+			if ( userMayRetry ) {
+				ret = WarningMsgCodeBox(@ModifyDosError,oldName,err);
+				if ( ret == IC_YES ) retry = TRUE;
+				}
+			else ErrorMsgCodeBox(@ModifyDosError2,oldName,err);
+		}
+	} while (retry);
+
+     return err;
+}
+
+/*###########################################################################
+ #	Unterst¸tzung FileSelectoren und Tool-Dialoge
+ ###########################################################################*/
+
+
+/*--------------------- FileToolGetFileSelectorFullPath ---------------------
+ *	Aufgabe:	VollstÑndigen PfadString (mit Selektion) vom
+ *			FileSelektor holen
+ *	Parameter	void ( char * fullPath, // return: Pfad
+ *						// mindestens PATH_BUFFER_SIZE gro·
+ *			optr fsel,		// GenFileSelektor
+ *			Boolean addDriveLetter)	// Mit Drive Letter ?
+ ---------------------------------------------------------------------------*/
+void FileToolGetFileSelectorFullPath(char *fullPath,
+			optr fsel,Boolean addDriveLetter) {
+DiskHandle	dh;
+MemHandle 	mh;
+char * path, *p;
+
+	mh = FTGetMem(PATH_BUFFER_SIZE);
+	path = MemLock(mh);
+
+	dh = @call fsel::MSG_GEN_PATH_GET_DISK_HANDLE();
+	@call fsel::MSG_GEN_FILE_SELECTOR_GET_FULL_SELECTION_PATH(path);
+	p= fullPath;    /* p zeigt nachher auf das Ende des Strings */
+	FileConstructFullPath(&p,PATH_BUFFER_SIZE,dh,path,addDriveLetter);
+	MemFree(mh);
+	}
+
+/*--------------------- FileToolSetCurrentPathFromFileSelector ---------------------
+ *	Aufgabe:	Wechseln in ein verzeichnis, da· vom FileSelektor
+ *			ausgewÑhlt wurde. Dir gegenwÑrtige Selektion wird
+ *			berÅcksichtigt, wenn es ein Verzeichnis ist.
+ * 	Return:		TRUE, wenn eine Datei selektiert war, sonst FALSE
+ ---------------------------------------------------------------------------*/
+Boolean FileToolSetCurrentPathFromFileSelector(optr fsel) {
+DiskHandle dh;
+char *path, *selection;
+MemHandle mh;
+dword	selFlags;
+word 	entryFlags, entryType;
+
+	mh = FTGetMem(PATH_BUFFER_SIZE + 100);
+	path = MemLock(mh);
+	selection = path + PATH_BUFFER_SIZE + 50;	// genug Platz dazwischen
+
+	dh = @call fsel::MSG_GEN_PATH_GET_DISK_HANDLE();
+	@call fsel::MSG_GEN_PATH_GET(path,PATH_BUFFER_SIZE);
+	selFlags = @call fsel::MSG_GEN_FILE_SELECTOR_GET_SELECTION(selection);
+	entryFlags = GFS_GET_ENTRY_FLAGS(selFlags);
+	entryType = GFS_GET_ENTRY_TYPE(entryFlags);
+	if ( !(entryFlags & GFSEF_PARENT_DIR) )	{
+		// es ist nicht das Parent-Dir -> Selektion evt erweitern
+		if ( entryType == GFSET_SUBDIR)
+			{
+			FileToolAddPathElement(path, selection);
+			}
+		}
+
+	if ( !FileSetCurrentPath(dh, path) ) {
+		ErrorMsgBox(@ErrorOpenDir,path, 0);
+		}
+	MemFree(mh);
+	return (entryType == GFSET_FILE);
+	}
+
+
+/*--------------------- FileToolRequestChangeDir ---------------------
+ *	Aufgabe:        Anfordern eines Directories, Åber eine Dialogbox
+ *			Startpunkt ist das Current-Dir
+ *	Seiteneffekt:	Es wird in das entsprechende Verzeichnis gewechselt,
+ *			wenn OK oder Custom-Trigger aktiviert ist,
+ *			nicht aber, wenn Cancel-Trigger gedÅckt
+ *	Parameter:	infoText:	optr eines Info-Textes, Null fÅr keinen
+ *			tilel:		Dialogbox-Titel,
+ *					Null fÅr "Verzeichnis auswÑhlen"
+ *			customTriggerMoniker: Moniker eines extra-Schalters, der
+ *					IC_YES zurÅckgibt, NULL fÅr keinen
+ *					solchen Schalter
+ *			hasCancelTrigger: TRUE, wenn Cancel-Trigger vorhanden sein soll
+ *	Return:		IC_OK 		wenn OK-Trigger gerdrÅckt
+ *			IC_NO       	wenn Cancel-Trigger gerdrÅckt
+ *			IC_YES      	wenn Custom-Trigger gerdrÅckt
+ *			IC_NULL		systemShutDown oder sowas
+ ---------------------------------------------------------------------------*/
+
+int FileToolRequestChangeDir(optr infoText, char *titel,
+			char *customTriggerMoniker, Boolean hasCancelTrigger) {
+optr	dialog, fsel;
+int	ret;
+DiskHandle dh;
+char *path;
+MemHandle mh;
+
+	dialog = UserCreateDialog(@SelectDirDialog);
+	mh = FTGetMem(PATH_BUFFER_SIZE);
+	path = MemLock(mh);
+	dh = FileGetCurrentPath(path,PATH_BUFFER_SIZE);
+	@call dialog::MSG_SDOF_SET_FSEL_TO_PATH(path,dh);
+	MemFree(mh);
+
+
+	if ( titel ) @call dialog::MSG_GEN_REPLACE_VIS_MONIKER_TEXT(titel,VUM_NOW);
+	if ( infoText )	@call dialog::MSG_SDOF_SET_INFO_TEXT((void*)infoText, TRUE);
+	if ( hasCancelTrigger) @call dialog::MSG_SDOF_ENABLE_CANCEL_TRIGGER();
+	if ( customTriggerMoniker ) @call dialog::MSG_SDOF_ENABLE_CUSTOM_TRIGGER
+				(customTriggerMoniker,FALSE);
+
+	FilePushDir();
+	ret = UserDoDialog(dialog);
+	FilePopDir();
+
+	if ( (ret == IC_YES) || (ret == IC_OK) ) {
+		fsel = @call dialog::MSG_SDOF_GET_FILE_SELECTOR();
+		FileToolSetCurrentPathFromFileSelector(fsel);
+		}
+
+	UserDestroyDialog(dialog);
+	
+	return ret;
+	}
+
+
+/*---------------------  ---------------------
+ *	Purpose:
+ *	Context:
+ *	Strategy:
+ *	Paramters:
+ ---------------------------------------------------------------------------*/
+

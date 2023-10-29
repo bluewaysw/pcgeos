@@ -1,0 +1,325 @@
+/***********************************************************************
+ *
+ *      Code-File fÅr DataResource Format-Library
+ *
+ *	Format: Ini-File Eintrag
+ *
+ *
+ *	File: 	inif.goc
+ *		Format-spezifische Routinen fÅr das Daten-Format "INI-File Entry"
+ *
+ *	Copyright:	(c) by RABE-Soft  03/2001
+ *			Diese Library dient als Beispiel, wie man
+ *			Format-Libraries fÅr den Resource-Maker schreiben kann
+ *			Alle hier verwendeten Routinen, Strukturen und
+ *			Algorithmen dÅrfen auch fÅr andere Zwecke verwendet
+ *			werden. In diesem Fall darf die wahre Urheberschaft
+ *			aber nicht verschleiert werden.
+ *
+ *		Inif.GOC enthÑlt
+ *			Routinen, die fÅr Das Daten-Format "INI-File-Entry"
+ *			benîtigt werden. Diese beginnen alle mit "Inif...".
+
+ *	Die Trennung in zwei GOC-Dateien dient vornehmlich der öbersicht, welche
+ *	Routinen fÅr neue Daten-Formate wirkliche benîtigt werden (Lib.goc) und
+ *	welche formatspezifisch sind ( Inif.goc).
+ *	Die format-spezifischen Routinen kînnen gefahrlos gelîscht werden,
+ *	andererseits kînnen sie als Beispiel dienen, wie bestimmte Probleme
+ *	zu lîsen sind.
+ *
+ ***********************************************************************/
+
+
+@include <stdapp.goh>
+#include <stdio.h>
+#include <string.h>
+#include <stdlib.h>
+#include <initfile.h>
+
+@include "../Shared/rainer.goh"
+@include "inif/inif.goh"
+
+@include "inif/inifui.goh"
+//include "inif/lib.goh"
+
+
+/* ------------------------------------------------------------------------
+ * 	InfoBox
+ *      Informationstext ausgeben
+ * ------------------------------------------------------------------------*/
+void InfoBox(optr info) {
+	UserStandardDialogOptr ( (optr)0,(optr)0,(optr)0,(optr)0,info,
+	(( CDT_NOTIFICATION << CDBF_DIALOG_TYPE_OFFSET) |
+	 ( GIT_NOTIFICATION << CDBF_INTERACTION_TYPE_OFFSET)) );
+	 }
+
+/* ------------------------------------------------------------------------
+ * 	QuestionBox
+ *      Nachfrage bei einer Unklarkeit
+ *	return IC_YES | IC_NO | IC_NULL
+ * ------------------------------------------------------------------------*/
+int QuestionBox(optr question, char * param ) {
+int retVal;
+
+	MemLock(HandleOf(question));
+	retVal = UserStandardDialog ( 0, 0, 0,param,LMemDeref(question),
+		(( CDT_WARNING << CDBF_DIALOG_TYPE_OFFSET) |
+		( GIT_AFFIRMATION << CDBF_INTERACTION_TYPE_OFFSET)) );
+	MemUnlock(HandleOf(question));
+	return retVal;
+	}
+
+
+/***********************************************************************
+	Implementation des Dialogs zum Berabeiten eine Daten-Gruppe
+ ***********************************************************************/
+
+@classdecl InifEditDialogClass;
+
+/* Lîschen fÅhrender und folgender Leerzeichen sowie von [] */
+void ToolTrimText(char *txt, Boolean killBrackets) {
+char *p;
+char c;
+
+	/* eckige Klammern ersetzen. INI_demange vorbeugen */
+	if (strlen(txt) == 0) return;
+	if ( killBrackets ) {
+	     p = strchr(txt,'[');
+	     while (p) { *p = ' ';
+		     p = strchr(txt,'[');
+		     }
+	     p = strchr(txt,']');
+	     while (p) { *p = ' ';
+		     p = strchr(txt,']');
+		     }
+	     }
+
+	/* Leerzeichen am Ende killen */
+	p = strchr(txt,0) - 1;
+	while (*p == ' ') {
+		*p = 0; p--;
+		}
+	if (strlen(txt) == 0) return;
+
+	/* Leerzeichen am Anfang killen */
+	p = txt;
+	while ( *p == ' ' ) p++;
+	do {
+	    c = *p; *txt = c;
+	    p++; txt++;
+	    } while (c != 0);
+	}
+
+
+
+
+
+int ToolGetKatAndKeyAndSize(optr oself, char * kat1, char *key1, Boolean checkData ) {
+int dataSize = 1;	// somewhat tricky
+char *buf;
+/* Routine returns NULL, if
+ * - kategory empty
+ * - key empty
+ * - data empty (if requested)
+ * It returns the lenght of the data-filed ( if checkData is true)
+ * or 1 (one) if checkData is FALSE and kategorie and key are ok */
+
+
+/* 1. Schritt: Daten in einen Buffer laden, schauen ob irgendwas leer ist */
+  buf = malloc(309);	/* sizeof(InstallEntry), da passt alles rein! */
+  if (!buf) return 0;
+
+  @call @GetDialogOptr(InifKategorie)::MSG_VIS_TEXT_GET_ALL_PTR(buf);
+  ToolTrimText(buf, TRUE);
+  @call @GetDialogOptr(InifKategorie)::MSG_VIS_TEXT_REPLACE_ALL_PTR(buf,0);
+  if (!strlen(buf)) {
+	UserStandardSound(SST_ERROR);
+	InfoBox(@ErrorEmptyKategorie);
+	return 0;
+	}
+  @call @GetDialogOptr(InifKey)::MSG_VIS_TEXT_GET_ALL_PTR(buf);
+  ToolTrimText(buf, TRUE);
+  @call @GetDialogOptr(InifKey)::MSG_VIS_TEXT_REPLACE_ALL_PTR(buf,0);
+  if (!strlen(buf)) {
+	UserStandardSound(SST_ERROR);
+	InfoBox(@ErrorEmptyKey);
+	return 0;
+	}
+
+  @call @GetDialogOptr(InifData)::MSG_VIS_TEXT_GET_ALL_PTR(buf);
+  ToolTrimText(buf, FALSE);
+  @call @GetDialogOptr(InifData)::MSG_VIS_TEXT_REPLACE_ALL_PTR(buf,0);
+  if ( checkData) {
+     dataSize = strlen(buf);
+     if ( dataSize == 0 )
+	{
+	UserStandardSound(SST_ERROR);
+	InfoBox(@ErrorEmptyData);
+	return 0;
+	}
+     }
+
+/* Jetzt ist alle OK und die Daten kînnen gelesen werden */
+  @call @GetDialogOptr(InifKategorie)::MSG_VIS_TEXT_GET_ALL_PTR(kat1);
+  @call @GetDialogOptr(InifKey)::MSG_VIS_TEXT_GET_ALL_PTR(key1);
+
+  return dataSize;
+  }
+
+/* ------------------------------------------------------------------------
+ * Lîschen aller 0x0A aus einem String
+ * ------------------------------------------------------------------------*/
+void ToolKill0x0A(char *txt) {
+char *src, *dest;
+
+    src = dest = txt;
+    do {
+       while (*src == 0x0A) src++;
+       *dest = *src;
+       dest++;
+       src++;
+       } while ( *src != 0);
+    *dest = 0;
+    }
+
+/* ------------------------------------------------------------------------
+ * ein einzelnes 0x0A am Anfang EinfÅgen (string wird lÑnger!)
+ * ------------------------------------------------------------------------*/
+void ToolInsert0x0A(char *txt) {
+char *src, *dest;
+int count, n;
+
+    src = strchr(txt,0);
+    dest = src+1;
+    count = dest - txt;		// Anzahl zu kopierender Zeichen
+    for ( n = 0; n < count; n++ )
+	{
+	*dest = *src;
+	dest--;
+	src--;
+	}
+    *txt = 0x0A;
+    }
+
+/* -------------------- MSG_INIF_READ  ---------------------------
+ *	Aufgabe:        Lesen eine INI-Eintrages aus der GEOS.INI
+ *	Parameter:	void(void)
+ * ------------------------------------------------------------------------*/
+@method InifEditDialogClass, MSG_INIF_READ {
+char kat[MAX_INITFILE_CATEGORY_LENGTH+2];
+char key[MAX_INITFILE_CATEGORY_LENGTH+2];
+MemHandle mh = 0;
+int dataSize, err;
+char *p;
+
+	dataSize = ToolGetKatAndKeyAndSize(oself,kat,key, FALSE);
+	if (!dataSize) return;
+
+	err = InitFileReadStringBlock(kat,key,&mh,IFCC_INTACT | IFRF_READ_ALL, (unsigned short *)&dataSize);
+	if ( err ) {
+		InfoBox(@ErrorReadINI);
+		return;
+		}
+
+	if (!mh) return;
+	p = MemLock(mh);
+	ToolKill0x0A(p);	// 0D0A -> 0D only
+
+	if ( strlen(p) > (2*INI_CATEGORY_BUFFER_SIZE - 1) ) {
+		InfoBox(@ErrorINIEntryToLarge);
+		}
+	else {
+		@call @GetDialogOptr(InifData)::MSG_VIS_TEXT_REPLACE_ALL_PTR(p, 0);
+		}
+	MemFree(mh);
+	return;
+}
+
+/* -------------------- MSG_INIF_TYPE_CHANGED  ---------------------------
+ *	Aufgabe:        Handlen der InifFlagSelector-énderungen
+ *	void	GEN_ITEM_GROUP_APPLY_MSG(word selection,
+			word numSelections, byte stateFlags);
+ * ------------------------------------------------------------------------*/
+@method InifEditDialogClass, MSG_INIF_TYPE_CHANGED {
+	if (selection == INIF_DELETE) {
+		@send @GetDialogOptr(InifData)::MSG_GEN_SET_NOT_ENABLED(VUM_NOW);
+		@send @GetDialogOptr(InifReadTrigger)::MSG_GEN_SET_NOT_ENABLED(VUM_NOW);
+		}
+	   else {
+		@send @GetDialogOptr(InifData)::MSG_GEN_SET_ENABLED(VUM_NOW);
+		@send @GetDialogOptr(InifReadTrigger)::MSG_GEN_SET_ENABLED(VUM_NOW);
+		}
+
+}
+
+
+/***********************************************************************
+	Routinen zum Verwalten des Formats
+ ***********************************************************************/
+
+/* -------------------- InifEdit  ---------------------------
+ *	Aufgabe:        Bearbeiten eines vorhandenen INI-Eintrages.
+ *	Parameter:	infoPtr: Zeiger auf Data-Info-Block
+ *			fh:	Handle der Daten-Datei
+ *	Return:		TRUE, wenn Daten Åbernommen werden sollen
+ *			FALSE, wenn énderungen verworfen wurden (Abbruch)
+ * ------------------------------------------------------------------------*/
+Boolean InifEdit(IniEntryParams *iniParams, Boolean isInstall) {
+optr dialog;	// Name "dialog" ist wichtig fÅr das Macro!
+int	newSize, retVal;
+
+
+  dialog = UserCreateDialog(@InifEditDialog);
+  @call @DialogObj(InifFlagSelector)::MSG_GEN_ITEM_GROUP_SET_DESTINATION(dialog);
+
+  @call @DialogObj(InifKategorie)::MSG_VIS_TEXT_REPLACE_ALL_PTR(iniParams->kategorie, 0);
+  @call @DialogObj(InifKey)::MSG_VIS_TEXT_REPLACE_ALL_PTR(iniParams->key, 0);
+
+  @call @DialogObj(InifFlagSelector)::
+	MSG_GEN_ITEM_GROUP_SET_SINGLE_SELECTION(iniParams->flags,FALSE);
+
+  @call @DialogObj(InifData)::MSG_VIS_TEXT_REPLACE_ALL_PTR(iniParams->data, 0);
+  if ( iniParams->flags == INIF_DELETE ) {
+	  @send @DialogObj(InifData)::MSG_GEN_SET_NOT_ENABLED(VUM_NOW);
+	  @send @DialogObj(InifReadTrigger)::MSG_GEN_SET_NOT_ENABLED(VUM_NOW);
+	  }
+  if ( isInstall ) @send @DialogObj(InifDeInfoText)::MSG_GEN_SET_NOT_USABLE(VUM_NOW);
+	else	@send @DialogObj(InifInstInfoText)::MSG_GEN_SET_NOT_USABLE(VUM_NOW);
+
+
+retry:
+  retVal = UserDoDialog(dialog);
+  if (retVal != IC_OK ) {
+	retVal = FALSE;
+	goto exit;		/* Schînen Gru· an alle GOTO-Hasser! */
+	}
+
+  /* geÑnderte Daten ablegen */
+  iniParams->flags =@call @DialogObj(InifFlagSelector)::MSG_GEN_ITEM_GROUP_GET_SELECTION();
+  newSize = ToolGetKatAndKeyAndSize(dialog,
+		iniParams->kategorie,
+		iniParams->key,
+		iniParams->flags != INIF_DELETE	);
+  // newSize == 0 hei·t: kat or key (evt data) sind leer
+  if (!(newSize)) {
+	goto retry;
+	}
+
+  @call @DialogObj(InifData)::MSG_VIS_TEXT_GET_ALL_PTR(iniParams->data);
+
+  retVal = TRUE;
+
+exit:
+  UserDestroyDialog(dialog);
+  return retVal;
+
+}
+
+
+/* --------------------   ---------------------------
+ *	Aufgabe:
+ *	Parameter:
+ *	Return:
+ * ------------------------------------------------------------------------*/
+
+

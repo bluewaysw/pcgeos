@@ -1,0 +1,239 @@
+/***************************************************************************
+ *
+ *      Header-File for InstallCreator
+ *
+ *	This file declares the File-Tool routines which comes from the
+ *	Rabe-Soft FileTool-Library to remove the dependency of the 
+ *	InstallCreator program on this library
+ *
+ *      (c) by RABE-Soft 12/2022
+ *
+ ***************************************************************************/
+
+/*##########################################################################
+ #	Vergleichen und Konvertieren
+ ###########################################################################*/
+
+/*--------------------- FileToolCompareProtocol ---------------------
+ *	Aufgabe:        Vegleicht zwei Protocol-Nummern
+ *	Return:		CRP_FILE_SAME	: Nummern sind gleich
+ *			CRP_FILE_OLDER	: fileProtocol ist Ñlter als compProtocol
+ *			CRP_FILE_NEWER	: fileProtocol ist neuer als compProtocol
+ ---------------------------------------------------------------------------*/
+
+typedef enum {	CRP_FILE_SAME,	// file hat gleiches Protocol / release
+		CRP_FILE_OLDER,	// file hat Ñlteres Protocol / release
+		CRP_FILE_NEWER	// file hat neueres Protocol / release
+		} CompareReleaseAndProtocolValue;
+
+#define	CRP_COMP_SAME	CRP_FILE_SAME
+#define	CRP_COMP_NEWER	CRP_FILE_OLDER
+#define	CRP_COMP_OLDER	CRP_FILE_NEWER
+
+
+int FileToolCompareProtocol
+		(ProtocolNumber fileProtocol,ProtocolNumber compProtocol);
+
+/*--------------------- FileToolCompareRelease ---------------------
+ *	Aufgabe:        Vegleicht zwei Release-Nummern
+ *	Return:		CRP_FILE_SAME	: Nummern sind gleich
+ *			CRP_FILE_OLDER	: fileRelease ist Ñlter als compRelease
+ *			CRP_FILE_NEWER	: fileRelease ist neuer als compRelease
+ ---------------------------------------------------------------------------*/
+int FileToolCompareRelease
+		(ReleaseNumber fileRelease,ReleaseNumber compRelease);
+
+
+/*###########################################################################
+ #	Pfade und Dateien (ungeˆffnet)
+ ###########################################################################*/
+
+/*--------------------- FileToolCreateSubdir ---------------------
+ *	Aufgabe:	Anlegen Unterverzeichnisses relativ zu Working Dir
+ *			Bei Bedarf rekursiver Aufruf
+ *	Strategie:
+ *	Return:		 -1, wenn sich der Pfad nicht anlegen lÑ·t
+ *			oder Fehlercode von FileCreateDir()
+ *			OK: FALSE  ( == 0 )
+ ---------------------------------------------------------------------------*/
+int FileToolCreateSubdir( char *path );
+
+/*--------------------- FileToolCreatePath ---------------------
+ *	Aufgabe:	Anlegen eines Pfades auf einem DatentrÑger
+ *	Strategie:
+ *	Return:		-1, wenn sich der Pfad nicht anlegen lÑ·t
+ *			oder Fehlercode von FileToolCreateSubdir()
+ *			OK: FALSE ( ==0 )
+ ---------------------------------------------------------------------------*/
+int FileToolCreatePath (DiskHandle dh, char *path);
+
+
+/*###########################################################################
+ #	Unterst¸tzung FileSelectoren und Tool-Dialoge
+ ###########################################################################*/
+
+#define FTGetMem( size ) 	MemAlloc( size, HF_SWAPABLE, HAF_ZERO_INIT)
+
+
+#ifndef min
+#define min(a,b)	( ((a) < (b)) ?  (a) : (b) )
+#endif
+
+
+
+/*--------------------- FileToolGetFileSelectorFullPath ---------------------
+ *	Aufgabe:	VollstÑndigen PfadString (mit Selektion) vom
+ *			FileSelektor holen
+ *	Parameter	void ( char * fullPath, // return: Pfad
+ *						// mindestens PATH_BUFFER_SIZE gro·
+ *			optr fsel,		// GenFileSelektor
+ *			Boolean addDriveLetter)	// Mit Drive Letter ?
+ ---------------------------------------------------------------------------*/
+void FileToolGetFileSelectorFullPath(char *fullPath,
+			optr fsel,Boolean addDriveLetter);
+
+
+/*--------------------- FileToolSetCurrentPathFromFileSelector -----------------
+ *	Aufgabe:	Wechseln in ein verzeichnis, da· vom FileSelektor
+ *			ausgewÑhlt wurde. Dir gegenwÑrtige Selektion wird
+ *			berÅcksichtigt, wenn es ein Verzeichnis ist.
+ * 	Return:		TRUE, wenn eine Datei selektiert war, sonst FALSE
+ ---------------------------------------------------------------------------*/
+Boolean FileToolSetCurrentPathFromFileSelector(optr fsel);
+
+
+
+/*--------------------- FileToolModifyDosName ---------------------
+ *	Aufgabe:	éndern des DOS-Namen einer Datei
+ *			Geos-Dateien bekommen einen anderen DOS-Namen
+ *			DOS-Dateien werden umbenannt
+ *			mit Fehlermeldung, falls gewÅnscht
+ *	Warnung:	Der neue DOS-Name der GEOS-Datei wird NICHT auf
+ *			GÅltigkeit geprÅft
+ *	Parameter:      Boolean ( char *oldName, *newName, Boolean msgOnError)
+ *			oldName kann bei Geos-Dateien der Geos oder DOS-Name sein
+ *	Seiteneffekt:   u.U wird das Verzeichnis gewechselt
+ *			irgendwelche Fileselektorem kînnten zum Rescan angeregt
+ *			werden und u.U. ihre Selektion verlieren
+ *	Return: 	Fehlerflag:
+ *			FALSE (==0) OK
+ *			TRUE  ( >0) Fehlercode von FileRename();
+ ---------------------------------------------------------------------------*/
+Boolean FileToolModifyDosName( char * oldName,char *newName, Boolean msgOnError);
+
+/* Internal Header */
+Boolean FileToolModifyDosNameInternal( char * oldName,char *newName,
+		Boolean msgOnError, Boolean userMayRetry);
+
+/*--------------------- FileToolRequestChangeDir ---------------------
+ *	Aufgabe:        Anfordern eines Directories, ¸ber eine Dialogbox
+ *			Startpunkt ist das Current-Dir
+ *	Seiteneffekt:	Es wird in das entsprechende Verzeichnis gewechselt,
+ *			wenn OK oder Custom-Trigger aktiviert ist,
+ *			nicht aber, wenn Cancel-Trigger gedÅckt
+ *	Parameter:	infoText:	optr eines Info-Textes, Null fÅr keinen
+ *			tilel:		Dialogbox-Titel,
+ *					Null f¸r "Verzeichnis ausw‰hlen"
+ *			customTriggerMoniker: Moniker eines extra-Schalters, der
+ *					IC_YES zur¸ckgibt, NULL f¸r keinen
+ *					solchen Schalter
+ *			hasCancelTrigger: TRUE, wenn Cancel-Trigger
+ *					vorhanden sein soll
+ *	Return:		IC_OK 		wenn OK-Trigger gerdrÅckt
+ *			IC_NO       	wenn Cancel-Trigger gerdrÅckt
+ *			IC_YES      	wenn Custom-Trigger gerdrÅckt
+ *			IC_NULL		systemShutDown oder sowas
+ ---------------------------------------------------------------------------*/
+
+int FileToolRequestChangeDir(optr infoText, char *titel,
+			char *customTriggerMoniker, Boolean hasCancelTrigger);
+
+
+/*--------------------- FileToolFileDateToTimeDate ---------------------
+ *      Aufgabe:        Konvertieren der GeosDatenStrukturen
+ *      Params/Return:	void ( Zielstruktur, Quellstruktur)
+ ---------------------------------------------------------------------------*/
+void FileToolFileDateToTimeDate( TimerDateAndTime *tdat,
+			FileDateAndTime fdat);
+
+
+/*--------------------- FileToolAddPathElement ---------------------
+*	Aufgabe:	AnhÑngen eines neuen Elements an einen Verzeichnispfad
+*			Bei Bedarf wird ein Backslash dazwischengesetzt.
+*			Es wirk kein Backslash angehÑngt
+*	Return:		Alte PfadlÑnge
+---------------------------------------------------------------------------*/
+int FileToolAddPathElement(char * path, char *tail);
+
+
+/*---------------------	GetErrorText -------------------------------*
+ * 	Aufgabe:        Beschreibung zu einem Fehler-Code holen
+ * 	Parameter:
+ *----------------------------------------------------------------------*/
+void GetErrorText(int code, char *errText);
+
+/*--------------------- ErrorMsgCodeBox ---------------------
+ *	Aufgabe:	Fehlermeldung mit halbwegs klarem Code
+ *			ausgeben (FILE_NOT_FOUND etc.)
+ ---------------------------------------------------------------------------*/
+word ErrorMsgCodeBox(optr info, char *param1, int errorCode);
+
+/*--------------------- WarningMsgCodeBox ---------------------
+ *	Aufgabe:	Fehlermeldung mit halbwegs klarem Code
+ *			ausgeben (FILE_NOT_FOUND etc.)
+ ---------------------------------------------------------------------------*/
+word WarningMsgCodeBox(optr info, char *param1, int errorCode);
+
+
+/*###########################################################################
+ *	Lokal definierte Klassen
+ ###########################################################################
+ *	SelectDirOrFileDialogClass
+ ###########################################################################*/
+
+@class SelectDirOrFileDialogClass, GenInteractionClass;
+/* Verwaltung der anderen UI-Objekte */
+	@instance Boolean SDI_customFileOnly = FALSE;
+	@message void	MSG_SDOF_SET_INFO_TEXT(void *text, Boolean isOptr);
+	@message void	MSG_SDOF_ENABLE_CANCEL_TRIGGER();
+	@message void	MSG_SDOF_ENABLE_CUSTOM_TRIGGER(char * moniker,
+				Boolean enableOnlyIfFileSelected);
+	@message void   MSG_SDOF_SET_FSEL_TO_PATH(char *path, DiskHandle dh);
+	@message optr	MSG_SDOF_GET_FILE_SELECTOR();
+
+// Handler f¸r den File-Selector
+	@message (GEN_FILE_SELECTOR_NOTIFICATION_MSG) MSG_SDOF_SEL_DIR_NOTIFICATION;
+/*	
+Messages that are not used here, but in the FileTool libarry
+	@message (GEN_FILE_SELECTOR_NOTIFICATION_MSG) MSG_SDOF_SEL_FILE_NOTIFICATION;
+
+
+	@message void	MSG_SDOF_CONFIGURE_INPUT_FILENAME_TEXT(char *startText,
+				FTInputFileNameInputFlags inputFlags,
+				Boolean visMonikerNewFileName);
+	@message void	MSG_SDOF_GET_INPUT_TEXT(char *text);
+*/				
+/*	@message void	MSG_SDOF_*/
+
+@endc;
+
+/* Konstanten, die die Reihenfolge der Children in SelectDirOrFileDialogClass-
+   Objekten angeben. Wichtig! Bei ƒnderungen unbedingt *ALLE* Objekt-Definitionen
+   mit ‰ndern!!!!! */
+#define DIALOG_CHILD_INFO_TEXT		0
+#define DIALOG_CHILD_FILE_SELECTOR	1
+#define DIALOG_CHILD_STATUS_TEXT	2
+#define DIALOG_CHILD_PATH_TEXT		3
+#define DIALOG_CHILD_CANCEL_TRIGGER	4
+#define DIALOG_CHILD_CUSTOM_TRIGGER	5
+#define DIALOG_CHILD_OK_TRIGGER		6
+/* F¸r SaveFile: - unused in this program
+#define DIALOG_CHILD_INPUT_TEXT		7
+#define DIALOG_CHILD_DOS_FILE_INFO	8
+*/
+
+// Zugriff auf die Children des Dialogs
+@define GetChildOptr(childNr) @call oself::MSG_GEN_FIND_CHILD_AT_POSITION(childNr);
+
+
+
