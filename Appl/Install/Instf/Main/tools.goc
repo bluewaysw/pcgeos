@@ -1,0 +1,942 @@
+/**************************************************************************
+ *	GEODE-File fÅr
+ *
+ *	Beschreibung	Universelles Installationsprogramm
+ *			Installer - Tool-Routinen
+ *
+ *	Copyright:	(c) by RABE-Soft 5/99
+ *	Sonstiges:	-
+ *
+ **************************************************************************/
+
+/*  Standard include files */
+@include <stdapp.goh>
+@include <stdlib.h>
+@include <stdio.h>
+@include <sysstats.h>
+@include "instf.goh"
+@include "Main/iconedi.goh"
+@include "UI/appui.goh"
+@include "Main/dosicon.goh"
+@include "../Shared/instllr.goh"
+@include "../Shared/rainer.goh"
+@include "../Shared/msgbox.goh"
+
+#include <string.h>
+#include <stdio.h>
+#include <token.h>
+#include <initfile.h>
+#include <stdlib.h>
+
+extern GlobalStruct global;
+
+/* Include MessageBox code here */
+@include "../Shared/msgboxcode.goh"
+
+
+/*###########################################################################
+	CODE fÅr IFProcessClass und andere
+/*###########################################################################
+	Teil 3: Funktionen und Routinen
+		Weitere Funktionen und Routinen sind in tools.goc ausgelagert
+/*###########################################################################*/
+
+/*###################### Spezifische Tool-Routinen ###########################*/
+
+/*---------------------  ---------------------
+ *      Purpose:        
+ *---------------------------------------------------------------------------*/
+VMBlockHandle IFGetMainArrayHandle(void) {
+MemHandle 	mh;
+ICMapBlock 	*mapPtr;
+VMBlockHandle	mainArray;
+
+	mapPtr = VMLock(global.docFile, global.docMapBlock, &mh);
+	mainArray = mapPtr->mainArray;
+	VMUnlock(mh);
+	return mainArray;
+	}
+
+
+/*---------------------  ---------------------
+ *      Purpose:        
+ *---------------------------------------------------------------------------*/
+InstallEntry * IFLockMainArrayElement(word item) {
+VMBlockHandle	mainArray;
+InstallEntry 	*elemPtr;
+word 		size;
+
+   mainArray = IFGetMainArrayHandle();
+   HugeArrayLock(global.docFile,mainArray,item, (void**)&elemPtr, &size);
+   return	elemPtr;
+   }
+
+/*---------------------  ---------------------
+ *      Purpose:        
+ *---------------------------------------------------------------------------*/
+void	IFUnlockMainArray(InstallEntry 	*elemPtr ) {
+	HugeArrayUnlock(elemPtr);
+	}
+
+
+/*--------------------- WriteFileFromHugeArray ---------------------
+ *	Purpose:	Schreibt eine Datei vom Huge Array auf die Platte
+ *			in das momentan gesetzte Arbeits-Verzeichnis
+ *	Strategy:	Nach Mîglichkeit wird der der DOS-Name benutzt.
+ *			Der Geos-Name bleibt auf jeden Fall erhalten
+ *			Er wird aber zum Anlegen nur benutzt, wen der DOS-Name
+ *			schon vergeben ist.
+ *
+ 		 * Problem: Die File-Routinen in WriteFileFromHugeArray()
+ 		 * (besonders FileClose, FileSetAttributes, FileSetPathExtAttributes)
+ 		 * verbrauchen tempor‰r Handles, geben sie aber dann selbst wieder
+ 		 * frei. Ruft man die Routinen im Zyklus (wie hier) kˆnnen die
+ 		 * Handles schneller verbraucht werden, als sie freigegeben werden.
+ 		 * [Das scheint auch von der Systemgeschwindigkeit anzuh‰ngen]
+ 		 * --> Ich fixe das durch ein TimerSleep() in MSG_IF_INSTALL
+ *
+ *	Return:		TRUE, wenn Fehler
+ ---------------------------------------------------------------------------*/
+Boolean WriteFileFromHugeArray(FileMainParams * fParams,
+			FTExistFilesValue foundVal, Boolean keepDos ) {
+FileHandle fh;
+VMBlockHandle array;
+sdword count;
+void * bufPtr;
+word size;
+int  written, n;
+sdword rest;
+Boolean errFlag;
+FileLongName newDosName;
+
+	if ( keepDos )	foundVal = FTEF_NO;	// ;-)
+
+	switch (foundVal) {
+	// in folgenden FÑllen ist der DOS-Name schon vergeben
+	// ein Neuer mu· gefunden werden
+	case	FTEF_INVALID_GEOSNAME:
+	case	FTEF_DIFFERENT_FILES:
+		fh = FileCreate(fParams->geosName,FILE_CREATE_ONLY | FILE_ACCESS_RW | FILE_DENY_RW, 0);
+		if (!fh) return TRUE;	// sollte aber nie passieren
+		FileClose(fh,FALSE);
+
+		n = FileGetPathExtAttributes(fParams->geosName, FEA_DOS_NAME, newDosName, sizeof(FileLongName));
+		fh = FileOpen(newDosName, FILE_ACCESS_RW | FILE_DENY_RW | 0x80 );
+		break;
+	// in folgenden FÑllen existiert keine Datei mit dem Dos-Namen
+	// bzw sie wurde gelîscht -> fParams->dosName ist verwendbar
+	case	FTEF_INVALID_DOSNAME:
+	case	FTEF_YES:
+	case	FTEF_NO:
+		fh = FileCreate(fParams->dosName,FILE_CREATE_ONLY | FCF_NATIVE
+			| FILE_ACCESS_RW | FILE_DENY_RW, 0);
+		break;
+		}		// end of swicth foundVal
+	if (!fh) return TRUE;
+
+	array = fParams->data;
+	rest =  fParams->fileSize;
+	errFlag = FALSE;
+
+	count = HugeArrayGetCount(global.docFile, array );
+
+	n = -1;
+	do {
+	   n ++; if ( n >= count ) {
+			errFlag = TRUE;
+			break;
+			}
+
+	   HugeArrayLock(global.docFile,array,n, &bufPtr, &size);
+	   if ( rest > HUGE_ARRAY_ELEMENT_SIZE )
+			size = HUGE_ARRAY_ELEMENT_SIZE;
+	   else		size = rest;
+
+
+	   written = FileWrite(fh,bufPtr, size, FALSE);
+	   rest -= size;
+	   HugeArrayUnlock(bufPtr);
+	   if ( written != size ) errFlag = TRUE;
+
+		} while ( (rest > 0) && !errFlag );
+
+	FileClose(fh,FALSE);
+
+	FileSetAttributes(fParams->geosName,fParams->fileAttrs);
+	if (fParams->extendedMagic == EXTENDED_MAGIC ) {
+		// Hier kommen die Funktionen, die von der ersten
+		// offiziellen Release vergessen wurden :(
+		FileSetPathExtAttributes(fParams->geosName,FEA_MODIFICATION,
+			&(fParams->fdat),sizeof(FileDateAndTime));
+		}
+
+	return errFlag;
+	}
+
+/*--------------------- CheckForOverwrite ---------------------
+ *	Purpose:	Testet, ob eine  vorhandene Datei von einer
+ *			neuen Åberschrieben werden soll
+ *	Strategy:	anhand der Åbergebenen Flags werden Protocol-
+ *			und Release-Nummer geprÅft
+ *	Return:		CFO_DOIT | CFO_KEEP | CFO_ERROR
+ ---------------------------------------------------------------------------*/
+int CheckForOverwrite(  char * name, ProtocolNumber compProtocol,
+			ReleaseNumber compRelease, word flags, word type) 	{
+ProtocolNumber	fileProtocol;
+ReleaseNumber	fileRelease;
+Boolean	protoDoit, releDoit;
+int err, err2, cv, fileType;
+
+   err = FileGetPathExtAttributes(name, FEA_FILE_TYPE,&fileType,2);
+   if ( type != fileType ) return CFO_TYPE_MISMATCH;
+
+   if ( type == GFT_NOT_GEOS_FILE ) return CFO_DOIT;
+   if ( flags & INST_IGNORE_P_AND_R ) return  CFO_DOIT;
+
+   err = FileGetPathExtAttributes(name, FEA_PROTOCOL,
+			&fileProtocol,sizeof(ProtocolNumber));
+   if ( err == ERROR_ATTR_NOT_SUPPORTED ) err = 0;
+   err2 = FileGetPathExtAttributes(name, FEA_RELEASE,
+			&fileRelease,sizeof(ReleaseNumber));
+   if ( err2 == ERROR_ATTR_NOT_SUPPORTED ) err2 = 0;
+   if ( err || err2 )	return CFO_ERROR;	/* Lesefehler */
+
+// Protocol-Nummer vergleichen
+   protoDoit = FALSE;
+   if ( flags & INST_IGNORE_PROTOCOL ) {
+	protoDoit = TRUE;
+	}
+   else {
+	cv = FileToolCompareProtocol(fileProtocol, compProtocol);
+	switch ( cv ) {
+	case  CRP_COMP_OLDER:		// vorh. Datei ist neuer
+		break;
+	case  CRP_COMP_SAME:            // gleiche Nummer
+		if (flags & INST_ON_SAME_PROTOCOL) protoDoit = TRUE;
+		break;
+	case  CRP_COMP_NEWER:           // vorh. Datei ist Ñlter
+		if (flags & INST_ON_NEWER_PROTOCOL) protoDoit = TRUE;
+		break;
+		}
+	}		// if  INST_IGNORE_PROTOCOL
+
+// Release-Nummer vergleichen
+   releDoit = FALSE;
+   if ( flags & INST_IGNORE_RELEASE ) {
+	releDoit = TRUE;
+	}
+   else {
+	cv = FileToolCompareRelease(fileRelease, compRelease);
+	switch ( cv ) {
+	case  CRP_COMP_OLDER:		// vorh. Datei ist neuer
+		break;
+	case  CRP_COMP_SAME:            // gleiche Nummer
+		if (flags & INST_ON_SAME_RELEASE) releDoit = TRUE;
+		break;
+	case  CRP_COMP_NEWER:           // vorh. Datei ist Ñlter
+		if (flags & INST_ON_NEWER_RELEASE) releDoit = TRUE;
+		break;
+		}
+	}		// if  INST_IGNORE_RELEASE
+
+// Auswerten: Installation nur bei zwei TRUE
+   if ( protoDoit && releDoit )	return	CFO_DOIT;
+   return CFO_KEEP;
+   }
+
+
+/*--------------------- ToolBackupGeosIni ---------------------
+ *	Purpose:        Anfertigen eines Backup der GEOS.INI
+ *	Return:		TRUE, wenn der Ganze Prozess unterbrochen werden soll
+ ---------------------------------------------------------------------------*/
+extern Boolean ToolBackupGeosIni(void) {
+int retVal, year, err;
+FileLongName fileName;
+TimerDateAndTime dateAndTime;
+
+/* Konstruktion des Dateinamens */
+    TimerGetDateAndTime(&dateAndTime);
+    year = dateAndTime.TDAT_year; /* Year based on 1980. (10 => 1990)
+				     Was aber falsch ist!!!	*/
+    while ( year > 100 ) year -= 100;
+
+    sprintf(fileName, "GI%02u%02u%02u.SIK",
+				dateAndTime.TDAT_day,
+				dateAndTime.TDAT_month,
+				year);
+    @call CopyIniName::MSG_VIS_TEXT_REPLACE_ALL_PTR(fileName, 0);
+
+doDialog:
+    retVal = UserDoDialog(@CopyIniDialog);
+    switch ( retVal ) {
+	case IC_YES:
+
+	     @call CopyIniName::MSG_VIS_TEXT_GET_ALL_PTR(fileName);
+	     FileSetStandardPath(SP_TOP);
+
+	     if ( FileToolExistFileGD(fileName, 0) == FTEF_YES ) {
+		err = WarningMsgBox(@WarningBackupExist, 0, 0);
+		if ( err == IC_NO ) goto doDialog;	// also nochmal!
+		}
+		else err = IC_YES;	// do it!
+
+	     if ( err == IC_YES ) {
+		     err = FileCopy("GEOS.INI", fileName, 0, 0);
+
+		     if ( !err ) InfoMsgBox( @DoneBackupIni, 0, 0);
+			else {
+			     char * txt;
+			     MemLock(HandleOf(@CopyErrorDefault));
+			     switch ( err ) {
+				case ERROR_ACCESS_DENIED:
+				case ERROR_FILE_FORMAT_MISMATCH:
+				case ERROR_FILE_IN_USE:
+				case ERROR_SHARING_VIOLATION:
+					txt = LMemDeref(@ErrorAccessDenied);
+					break;
+				case ERROR_WRITE_PROTECTED:
+					txt = LMemDeref(@ErrorWriteProtected);
+					break;
+				case ERROR_INVALID_LONGNAME:
+					txt = LMemDeref(@ErrorInvalidName);
+					break;
+				default :
+					txt = LMemDeref(@CopyErrorDefault);
+					break;
+				}
+			     InfoMsgBox( @ErrorBackupIni, txt, 0);
+			     MemUnlock(HandleOf(@CopyErrorDefault));
+			     }
+		     }
+
+	     break;
+
+	case IC_OK:
+	     InfoMsgBox(@WarningBackupIni, 0, 0 );
+	     goto doDialog;
+	case IC_CUSTOM_START+1:
+	     return TRUE;
+	case IC_NO:
+	     break;
+	}
+    return FALSE;
+}
+
+/*###################### Allgemeine Tool-Routinen ###########################*/
+
+/*--------------------- FileToolExistFileGD ---------------------
+ *	Purpose:        testet, ob eine Datei mit dem angegebenen Geos und
+ *			DOS-Namen existiert. Der Dateiname darf keinen
+ *			Pfad-Anteil enthalten
+ *	Paramters:	geosName: 	(mu· belegt sein)
+ *			dosName		(darf Null sein. in diesem Fall darf
+ *					 geosName auch eine DOS-Datei bezeichnen)
+ *	Return:		FTEF_YES | FTEF_NO | FTEF_INVALID_DOSNAME |
+ *			FTEF_IVALID_GEOSNAME | FTEF_DIFFERENT_FILES
+ *			{ FTExistFilesValue }
+ ---------------------------------------------------------------------------*/
+FTExistFilesValue FileToolExistFileGD(char * geosName, char * dosName) {
+Boolean		geosFound, dosFound;
+FileLongName	dosNameOfGeos;
+
+    FileGetAttributes(geosName);
+    geosFound = ThreadGetError();
+    geosFound = !geosFound;
+    if ( !dosName) {
+	return ( geosFound ? FTEF_YES : FTEF_NO );
+	}
+
+    FileGetAttributes(dosName);
+    dosFound = ThreadGetError();
+    dosFound = !dosFound;
+
+    if ( geosFound ) {		// Datei mit Geos-Name existiert
+	FileGetPathExtAttributes(geosName, FEA_DOS_NAME,
+				dosNameOfGeos, sizeof(FileLongName));
+	if ( !strcmp(dosName,dosNameOfGeos) ) {
+		return FTEF_YES;
+		}
+	// DOS-Name ist anders als gefordert
+	return ( dosFound ? FTEF_DIFFERENT_FILES : FTEF_INVALID_DOSNAME );
+	}
+
+    // Geos_datei existiert nicht
+    return ( dosFound ? FTEF_INVALID_GEOSNAME : FTEF_NO );
+    }
+
+/*--------------------- FileToolCreatePath ---------------------
+ *	Purpose:	Anlegen eines Pfades auf einem DatentrÑger
+ *	Strategy:
+ *	Return:		-1, wenn sich der Pfad nicht anlegen lÑ·t
+ *			oder Fehlercode von FileToolCreateSubdir()
+ *			OK: TRUE ( ==0 )
+ ---------------------------------------------------------------------------*/
+int FileToolCreatePath (DiskHandle dh, char *path) {
+DiskHandle ndh;
+int ret;
+
+	if ( dh==0) return (-1);	/* kein Handle: kein DatentrÑger */
+	FilePushDir();
+	ndh = FileSetCurrentPath(dh,"\\");
+	if ( ndh == 0 ) {
+		FilePopDir();
+		return (-1);
+		}
+	ret = FileToolCreateSubdir(path);		/* Vezeichnis anlegen, b.Bed. rekursiv*/
+	FilePopDir();
+	return ret;
+	}
+
+
+/*--------------------- FileToolCreateSubdir ---------------------
+ *	Purpose:	Anlegen Unterverzeichnisses relativ zu Working Dir
+ *			Bei Bedarf rekursiver Aufruf
+ *	Strategy:
+ *	Return:		 -1, wenn sich der Pfad nicht anlegen lÑ·t
+ *			oder Fehlercode von FileCreateDir()
+ *			OK: FALSE  ( == 0 )
+ ---------------------------------------------------------------------------*/
+
+int FileToolCreateSubdir( char *path ) {
+int 	i,err;
+char	z;
+
+/* versuchen normal anzulegen, zu lange Namen ausbremsen */
+	err = FileCreateDir(path);
+	if (err == 0 || err == ERROR_FILE_EXISTS ) {
+		/* erfolgreich angelegt oder existiert schon */
+		return FALSE;
+		}
+/* Schreibschutzfehler extra behandeln */
+	if ( err == ERROR_WRITE_PROTECTED ) {
+		return ERROR_WRITE_PROTECTED;
+		}
+/* es hat nicht geklappt: Versuchen einzukÅrzen und neu zu rufen */
+	i = strlen(path);
+	if ( i==0 )
+	{
+	return (-1);	/* leere Strings ausbremsen */
+	}
+
+	while ( i != 0 && path[i] != '\\' ) i--;	/* Backslash finden */
+	z = path[i];
+	path[i] = 0;	/* String einkÅrzen */
+			/* i ist Null, wenn kein Backslash enthalten ist, oder er
+			 * am Anfang stand -> es hat nicht geklappt */
+	if ( i != 0 ) err = FileToolCreateSubdir(path);	/* rekursiver Aufruf */
+		else	err = (-1);
+	path[i] = z;				/* alten String restaurieren */
+	if ( err == 0 ) {
+/* nochmal versuchen normal anzulegen, zu lange Namen ausbremsen */
+		err = FileCreateDir(path);
+
+		if (err == 0 || err == ERROR_FILE_EXISTS ) {
+			/* erfolgreich angelegt oder existiert schon */
+			return 0;
+			}
+		}
+	return err;
+	}
+
+/*--------------------- FileToolCompareProtocol ---------------------
+ *	Purpose:        Vegleicht zwei Protocol-Nummern
+ *	Return:		CRP_SAME	: Nummern sind gleich
+ *			CRP_OLDER	: fileProtocol ist Ñlter als compProtocol
+ *			CRP_NEWER	: fileProtocol ist neuer als compProtocol
+ ---------------------------------------------------------------------------*/
+int FileToolCompareProtocol
+		(ProtocolNumber fileProtocol,ProtocolNumber compProtocol) {
+
+	if ( fileProtocol.PN_major > compProtocol.PN_major ) return CRP_FILE_NEWER;
+	if ( fileProtocol.PN_major < compProtocol.PN_major ) return CRP_FILE_OLDER;
+
+	if ( fileProtocol.PN_minor > compProtocol.PN_minor ) return CRP_FILE_NEWER;
+	if ( fileProtocol.PN_minor < compProtocol.PN_minor ) return CRP_FILE_OLDER;
+
+	return  CRP_FILE_SAME;
+	}
+
+/*--------------------- FileToolCompareRelease ---------------------
+ *	Purpose:        Vegleicht zwei Release-Nummern
+ *	Return:		CRP_FILE_SAME	: Nummern sind gleich
+ *			CRP_FILE_OLDER	: fileRelease ist Ñlter als compRelease
+ *			CRP_FILE_NEWER	: fileRelease ist neuer als compRelease
+ ---------------------------------------------------------------------------*/
+int FileToolCompareRelease
+		(ReleaseNumber fileRelease,ReleaseNumber compRelease) {
+
+	if ( fileRelease.RN_major > compRelease.RN_major ) return CRP_FILE_NEWER;
+	if ( fileRelease.RN_major < compRelease.RN_major ) return CRP_FILE_OLDER;
+
+	if ( fileRelease.RN_minor > compRelease.RN_minor ) return CRP_FILE_NEWER;
+	if ( fileRelease.RN_minor < compRelease.RN_minor ) return CRP_FILE_OLDER;
+
+	if ( fileRelease.RN_change > compRelease.RN_change ) return CRP_FILE_NEWER;
+	if ( fileRelease.RN_change < compRelease.RN_change ) return CRP_FILE_OLDER;
+
+	if ( fileRelease.RN_engineering > compRelease.RN_engineering ) return CRP_FILE_NEWER;
+	if ( fileRelease.RN_engineering < compRelease.RN_engineering ) return CRP_FILE_OLDER;
+
+	return  CRP_FILE_SAME;
+	}
+
+/*--------------------- FileToolDeleteFile ---------------------
+ *	Purpose:	Lîscht eine Datei
+ *	Strategy:	auch RO-Dateien werden gelîscht
+ *			Keine Fehlermeldung wenn Datei nicht gefunden
+ *	Return:		TRUE, wenn Fehler
+ *			-> Fehlernummer von FileDelete();
+ ---------------------------------------------------------------------------*/
+int FileToolDeleteFile(char * fileName) {
+  word attrs, err, ret;
+  PathName	path;
+  DiskHandle dh;
+
+DelStart:
+  err = FileDelete(fileName);
+  if ( err == ERROR_FILE_NOT_FOUND  ) {
+	if ( global.ignoreNotFound ) return FALSE;
+	dh = FileGetCurrentPath(path,sizeof(PathName));
+	@call FileSelector::MSG_GEN_PATH_SET(path,dh);
+	@call SelectFileDialog::MSG_GEN_REPLACE_VIS_MONIKER_TEXT(fileName,0);
+	ret = UserDoDialog(@SelectFileDialog);
+	switch ( ret ) {
+	case IC_OK:
+		dh = @call FileSelector::MSG_GEN_PATH_GET_DISK_HANDLE();
+		@call FileSelector::MSG_GEN_FILE_SELECTOR_GET_FULL_SELECTION_PATH(path);
+		FileSetCurrentPath(dh,path);
+		goto DelStart;
+	case IC_STOP:
+		global.ignoreNotFound = TRUE;
+		break;
+		}
+	return FALSE;
+	}
+  if ( !err ) {
+	return FALSE;
+	}
+  attrs = FileGetAttributes(fileName);
+/*
+  if ( ThreadGetError() == ERROR_FILE_NOT_FOUND ) {
+	return FALSE;
+	}
+  */
+  if ( !( attrs & FA_RDONLY ) )	{
+	// unerwarteter Fehler
+	return err;
+	}
+/*
+  err = QuestionMsgBox(@QuestionRO,fileName,0);
+  if ( err != IC_YES ) return TRUE;
+  Problem: dann gibts noch ne Fehlermeldung
+*/
+  attrs = 0;		// öberschreiben
+  FileSetPathExtAttributes(fileName,FEA_FILE_ATTR,&attrs,1);
+  err = FileDelete(fileName);
+  return err;
+  }
+
+/*###########################################################################
+	Behandlung der Querry-Message der Detailliste
+/*###########################################################################*/
+
+
+/* Ausgelagerte Routinen, um die Texte fÅr die Query-Msg zu erzeugen */
+
+
+/*---------------------  ---------------------
+ *      Purpose:        
+ *---------------------------------------------------------------------------*/
+void GetFileEntryListText(InstallEntry * entryPtr, char * text) {
+char *txt;
+
+	txt = text;
+	if ( !(entryPtr->instFlags & INST_DELETE_ON_DE_INST) ) {
+		*txt = '*'; txt++;
+		}
+	ToolConstructPath(txt, entryPtr->main.file.dh,
+		entryPtr->main.file.path, entryPtr->main.file.geosName);
+	}
+
+/*---------------------  ---------------------
+ *      Purpose:        
+ *---------------------------------------------------------------------------*/
+void GetDeleteFileListText(InstallEntry * entryPtr, char * textPtr) {
+char *text;
+
+	text = textPtr;
+	MemLock(HandleOf(@DeleteFileText));
+	strcpy(text,LMemDeref(@DeleteFileText));
+	MemUnlock(HandleOf(@DeleteFileText));
+
+	text = strchr(text,0);
+	ToolConstructPath(text, entryPtr->main.deleteFile.dh,
+		entryPtr->main.deleteFile.path, entryPtr->main.deleteFile.fileName);
+	}
+
+/*---------------------  ---------------------
+ *      Purpose:        
+ *---------------------------------------------------------------------------*/
+void GetTokenEntryListText(InstallEntry * entryPtr, char * text) {
+char tokenID[16];
+	MemLock(HandleOf(@TokenEntryText));
+	WriteTokenIDString(tokenID,entryPtr->main.appToken);
+	strcpy(text,LMemDeref(@TokenEntryText));
+	strcat(text,tokenID);
+	MemUnlock(HandleOf(@TokenEntryText));
+	}
+
+/*---------------------  ---------------------
+ *      Purpose:        
+ *---------------------------------------------------------------------------*/
+void GetDosTokenEntryListText(InstallEntry * entryPtr, char * text) {
+	MemLock(HandleOf(@DosTokenEntryText));
+	strcpy(text,LMemDeref(@DosTokenEntryText));
+	strcat(text,entryPtr->main.dosToken.dosFile);
+	strcat(text,LMemDeref(@DosTokenEntryText2));
+	strcat(text,entryPtr->main.dosToken.appName);
+	MemUnlock(HandleOf(@DosTokenEntryText));
+	}
+
+
+/*---------------------  ---------------------
+ *      Purpose:        
+ *---------------------------------------------------------------------------*/
+void GetIniKatListText(InstallEntry * entryPtr, char * text) {
+	MemLock(HandleOf(@IniKategorieEntryText));
+	strcpy(text,LMemDeref(@IniKategorieEntryText));
+	strcat(text,entryPtr->main.ini.kategorie);
+	strcat(text,"]");
+	MemUnlock(HandleOf(@IniKategorieEntryText));
+	}
+
+/*---------------------  ---------------------
+ *      Purpose:        
+ *---------------------------------------------------------------------------*/
+void GetIniEntryInstallListText(InstallEntry * entryPtr, char * text) {
+	MemLock(HandleOf(@IniSetEntryText));
+
+	if ( entryPtr->main.iniEntry.flags == INIF_DELETE )
+		strcpy(text,LMemDeref(@IniDeleteEntryText));
+	   else strcpy(text,LMemDeref(@IniSetEntryText));
+	MemUnlock(HandleOf(@IniSetEntryText));
+
+	strcat(text,entryPtr->main.iniEntry.kategorie);
+	strcat(text,"] ");
+	strcat(text,entryPtr->main.iniEntry.key);
+
+	if ( entryPtr->main.iniEntry.flags != INIF_DELETE ) {
+		strcat(text," = ");
+		strcat(text,entryPtr->main.iniEntry.data);
+		}
+	}
+
+/*---------------------  ---------------------
+ *      Purpose:        
+ *---------------------------------------------------------------------------*/
+void GetIniEntryDeinstallListText(InstallEntry * entryPtr, char * text) {
+	MemLock(HandleOf(@DeinstallCommonText));
+	strcpy(text,LMemDeref(@DeinstallCommonText));
+	MemUnlock(HandleOf(@DeinstallCommonText));
+	GetIniEntryInstallListText(entryPtr, strchr(text, 0));
+	}
+
+
+/*---------------------  ---------------------
+ *      Purpose:        
+ *---------------------------------------------------------------------------*/
+void GetStartFileEntryListText(InstallEntry * entryPtr, char *text, Boolean isExtern) {
+StartFileParams	*sfpPtr;
+char *txtPtr;
+
+	sfpPtr = &(entryPtr->main.startFile);
+	MemLock(HandleOf(@StartSysProgText));
+	switch ( sfpPtr->fileType ) {
+	case GFT_EXECUTABLE:
+		if ( isExtern ) strcpy(text,LMemDeref(@StartSysProgText));
+		else strcpy(text,LMemDeref(@StartCommonText));
+		break;
+	case GFT_NOT_GEOS_FILE:
+		strcpy(text,LMemDeref(@OpenDosText));
+		strcat(text,sfpPtr->appName);
+		strcat(text,": ");
+		break;
+	default: if ( isExtern ) strcpy(text,LMemDeref(@OpenSysFileText));
+		else strcpy(text,LMemDeref(@OpenCommonText));
+		}
+	MemUnlock(HandleOf(@StartSysProgText));
+	txtPtr = &text[strlen(text)];
+	ToolConstructPath(txtPtr, entryPtr->main.startFile.dh,
+		entryPtr->main.startFile.path, entryPtr->main.startFile.fileName);
+
+	}
+
+
+/*---------------------  ---------------------
+ *      Purpose:        
+ *---------------------------------------------------------------------------*/
+void GetToolEntryListText(InstallEntry * entryPtr, char *text, word type) {
+char *txtPtr;
+
+	MemLock(HandleOf(@UpdateToolText));
+	switch (type) {
+		case IOT_UPDATE_TOOL:	strcpy(text,LMemDeref(@UpdateToolText));
+				break;
+		case IOT_CLEANUP_TOOL:	strcpy(text,LMemDeref(@CleanupToolText));
+				break;
+		}
+	MemUnlock(HandleOf(@UpdateToolText));
+	txtPtr = &text[strlen(text)];
+
+	if ( !(entryPtr->instFlags & INST_DELETE_ON_DE_INST) ) {
+		*txtPtr = '*'; txtPtr++;
+		}
+	ToolConstructPath(txtPtr, entryPtr->main.file.dh,
+		entryPtr->main.file.path, entryPtr->main.file.geosName);
+
+	}
+
+/*---------------------  ---------------------
+ *      Purpose:        
+ *---------------------------------------------------------------------------*/
+void GetDeleteFolderListText(InstallEntry * entryPtr, char * text) {
+char *txtPtr;
+
+	MemLock(HandleOf(@DeleteFolderText));
+	strcpy(text,LMemDeref(@DeleteFolderText));
+	MemUnlock(HandleOf(@DeleteFolderText));
+
+	txtPtr = strchr(text,0);
+	ToolConstructPath(txtPtr, entryPtr->main.deleteFolder.dh,
+		entryPtr->main.deleteFolder.path, 0);
+
+	}
+
+/*---------------------  ---------------------
+ *      Purpose:        
+ *---------------------------------------------------------------------------*/
+void GetDelTempFileListText(InstallEntry * entryPtr, char * textPtr) {
+char *text;
+
+	text = textPtr;
+	MemLock(HandleOf(@DelTempFileText));
+	strcpy(text,LMemDeref(@DelTempFileText));
+	MemUnlock(HandleOf(@DelTempFileText));
+
+	text = strchr(text,0);
+	ToolConstructPath(text, entryPtr->main.deleteFile.dh,
+		entryPtr->main.deleteFile.path, entryPtr->main.deleteFile.fileName);
+	}
+
+
+/*---------------------  ---------------------
+ *      Purpose:        
+ *---------------------------------------------------------------------------*/
+/* message (GEN_DYNAMIC_LIST_QUERY_MSG)
+optr list, word item */
+@extern method IFProcessClass, MSG_IF_QUERY_LIST_ITEM {
+char 	text[QUERY_TEXT_LEN];
+InstallEntry * entryPtr;
+
+	entryPtr = IFLockMainArrayElement(item);
+	text[0]=0;
+	switch (entryPtr->type) {
+		case 	IOT_FILE:
+			GetFileEntryListText(entryPtr, text);
+			break;
+		case 	IOT_DELETE_EXTERN_FILE:
+			GetDeleteFileListText(entryPtr, text);
+			break;
+		case 	IOT_DOS_TOKEN:
+			GetDosTokenEntryListText(entryPtr, text);
+			break;
+
+		case 	IOT_TOKEN:
+			GetTokenEntryListText(entryPtr, text);
+			break;
+		case 	IOT_INI:
+			GetIniKatListText(entryPtr, text);
+			break;
+		case 	IOT_INI_ENTRY_INSTALL:
+			GetIniEntryInstallListText(entryPtr, text);
+			break;
+		case 	IOT_INI_ENTRY_DEINSTALL:
+			GetIniEntryDeinstallListText(entryPtr, text);
+			break;
+		case 	IOT_START_FILE:
+		case 	IOT_START_EXTERN_FILE:
+			GetStartFileEntryListText(entryPtr, text,
+					entryPtr->type == IOT_START_EXTERN_FILE);
+			break;
+		case 	IOT_UPDATE_TOOL:
+		case 	IOT_CLEANUP_TOOL:
+			GetToolEntryListText(entryPtr, text,entryPtr->type);
+			break;
+		case 	IOT_DELETE_FOLDER:
+			GetDeleteFolderListText(entryPtr, text);
+			break;
+		case 	IOT_DEL_TEMP_FILE:
+			GetDelTempFileListText(entryPtr, text);
+			break;
+
+		default: MemLock(HandleOf(@InvalidEntryTypeText));
+			sprintf(text,LMemDeref(@InvalidEntryTypeText),entryPtr->type);
+			MemUnlock(HandleOf(@InvalidEntryTypeText));
+		}
+	IFUnlockMainArray(entryPtr);
+	@call list::MSG_GEN_DYNAMIC_LIST_REPLACE_ITEM_TEXT(item,text);
+	}
+
+/* ####################################################################### *
+ *	Spezielle Klassendefinitionen
+/* ####################################################################### */
+
+/*---------------------  ---------------------
+ *      Purpose:        
+ *---------------------------------------------------------------------------*/
+@classdecl FileSelectDialogClass;
+
+/*---------------------  ---------------------
+ *      Purpose:        
+ *---------------------------------------------------------------------------*/
+@method FileSelectDialogClass, MSG_FS_FILE_SELECTED {
+char    path[PATH_BUFFER_SIZE],
+	fullPath[PATH_BUFFER_SIZE],
+	*p;
+DiskHandle dh;
+
+	if ( entryFlags & GFSEF_OPEN ) {
+		return;
+		}
+/* Selektionsstring basteln und anzeigen */
+	dh = @call FileSelector::MSG_GEN_PATH_GET_DISK_HANDLE();
+	@call FileSelector::MSG_GEN_FILE_SELECTOR_GET_FULL_SELECTION_PATH(path);
+	p= fullPath;    /* p zeigt nachher auf das Ende des Strings */
+	FileConstructFullPath(&p,PATH_BUFFER_SIZE,dh,path,TRUE);
+	@call FSPathText::MSG_VIS_TEXT_REPLACE_ALL_PTR(fullPath,0);
+	}
+
+/*---------------------  ---------------------
+ *      Purpose:        
+ *---------------------------------------------------------------------------*/
+@method FileSelectDialogClass, MSG_FS_SET_DIRECTORY {
+	if ( stdPath == (-1) ) {
+		@call FileSelector::MSG_GEN_PATH_SET("PREF",SP_SYSTEM);
+		}
+	else {
+		@call FileSelector::MSG_GEN_PATH_SET(".",stdPath);
+		}
+	}
+
+/*--------------------- IFDocumentControlClass ---------------------
+ *---------------------------------------------------------------------------*/
+@classdecl IFDocumentControlClass;
+
+/*--------------------- MSG_GEN_DOCUMENT_CONTROL_CONFIGURE_FILE_SELECTOR ---------------------
+ *      Purpose:        
+ *---------------------------------------------------------------------------*/
+@method IFDocumentControlClass, MSG_GEN_DOCUMENT_CONTROL_CONFIGURE_FILE_SELECTOR {
+//	optr 		fileSelector,
+DiskHandle	disk;
+PathName 	path;
+GetActionParams retValue;
+
+	@callsuper();
+	if ( ! (pself->isInitialised) ) {
+		pself->isInitialised = TRUE;
+		disk = FileGetCurrentPath(path,sizeof(PathName));
+		if ( disk != SP_TOP )
+			@call fileSelector::MSG_GEN_PATH_SET(path,disk);
+		}
+
+	@call fileSelector::MSG_GEN_FILE_SELECTOR_GET_ACTION(&retValue);
+
+	}
+
+@if 0
+word BoxMessageBox(optr info, char *param1, char *param2, word dtyp, word ityp)	{
+char *p;
+word ret;
+	MemLock(OptrToHandle(info));		/* Resource pinnen */
+	p = LMemDeref(info);			/* Zeiger besorgen */
+	ret = UserStandardDialog(0,0,param2,param1,p,
+		( (dtyp << CDBF_DIALOG_TYPE_OFFSET) |
+		  (ityp << CDBF_INTERACTION_TYPE_OFFSET)));
+	MemUnlock(OptrToHandle(info));		/* Resource freigen */
+	return ret;
+	}
+
+word BoxMessageNumberBox(optr info, char *param, int nr, word dtyp, word ityp)	{
+char *p;
+word ret;
+char zahl[10];
+	sprintf(zahl,"%d",nr);
+	MemLock(OptrToHandle(info));		/* Resource pinnen */
+	p = LMemDeref(info);			/* Zeiger besorgen */
+	ret = UserStandardDialog(0,0,zahl,param,p,
+		( (dtyp << CDBF_DIALOG_TYPE_OFFSET) |
+		  (ityp << CDBF_INTERACTION_TYPE_OFFSET)));
+	MemUnlock(OptrToHandle(info));		/* Resource freigen */
+	return ret;
+	}
+@endif
+
+/*
+void MessageBox(char *txt) {
+		UserStandardDialog ( (char *)0,(char *)0,(char *)0,(char *)0,txt,
+		(( CDT_NOTIFICATION << CDBF_DIALOG_TYPE_OFFSET) |
+		 ( GIT_NOTIFICATION << CDBF_INTERACTION_TYPE_OFFSET)) );
+		 }
+
+void MessageNumberBox(word number) {
+		char txt[15];
+		LocalFixedToAscii(txt,MakeWWFixed(number),0);
+		UserStandardDialog ( (char *)0,(char *)0,(char *)0,(char *)0,txt,
+		(( CDT_NOTIFICATION << CDBF_DIALOG_TYPE_OFFSET) |
+		 ( GIT_NOTIFICATION << CDBF_INTERACTION_TYPE_OFFSET)) );
+		 }
+*/
+
+/*--------------------- Debuging ---------------------
+ *      Purpose:        Display debug information  
+ *---------------------------------------------------------------------------*/
+@if @DEBUG_FLAG
+
+void DebugInfo (char *i ) {
+	@call DebugText::MSG_VIS_TEXT_APPEND_PTR(i,0);
+	}
+
+void DebugInfoOptr( optr text) {
+	@call DebugText::MSG_VIS_TEXT_APPEND_OPTR(text,0);
+	}
+void DebugInfo1 (char *i, int arg) {
+char p[100];
+	sprintf(p,i,arg);
+	@call DebugText::MSG_VIS_TEXT_APPEND_PTR(p,0);
+	}
+
+void DebugShowText(char *t ) {
+	@send DebugInfoGlyph::MSG_GEN_REPLACE_VIS_MONIKER_TEXT(t,VUM_NOW);
+	}
+
+void DebugShowValue1(int v) {
+	@send DebugValue1::MSG_GEN_VALUE_SET_INTEGER_VALUE(v,FALSE);
+	}
+
+void DebugShowValue2(int v) {
+	@send DebugValue2::MSG_GEN_VALUE_SET_INTEGER_VALUE(v,FALSE);
+	}
+
+void DebugShowValue3(int v) {
+	@send DebugValue3::MSG_GEN_VALUE_SET_INTEGER_VALUE(v,FALSE);
+	}
+
+@endif
+
+
+
+
+/* ------- end of file --------- */
+
+
+
