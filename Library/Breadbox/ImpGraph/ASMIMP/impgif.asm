@@ -3617,10 +3617,10 @@ ImpGIFGetInfo endp
 ; C stubs:
 ;----------------------------------------------------------------------------
 IMPGIFCREATE proc far file:word, allocwatcher:word, useSysPal:word, mimeStatus:fptr
-        uses bx, cx, dx, es, di
+        uses bx, cx, dx, es, si, di
         .enter
 
-		movdw esdi, mimeStatus, ax
+	movdw esdi, mimeStatus, ax
         mov ax, file
         mov cx, allocwatcher
         mov si, useSysPal

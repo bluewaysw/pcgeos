@@ -663,9 +663,9 @@ GPFILE		= $(GEODE).gp
 SETLIBFLAG	?= lf=""
 LINK		: .USE .NOEXPORT
 	case "$(.TARGET)" in
-	    *ec.geo)	of="-Og $(.ALLSRC:M*.gp) -P $(_PROTO) -R $(_REL) -E -z" ;;
+	    *ec.geo)	of="-Og $(.ALLSRC:M*.gp) -P $(_PROTO) -R $(_REL) -E" ;;
 #if !empty(BRANCH:MRelease1*)
-	    *.geo)  	of="-Og $(.ALLSRC:M*.gp) -P $(_PROTO) -R $(_REL) -z" ;;
+	    *.geo)  	of="-Og $(.ALLSRC:M*.gp) -P $(_PROTO) -R $(_REL)" ;;
 #else
 	    *.geo)  	of="-Og $(.ALLSRC:M*.gp) -P $(_PROTO) -R $(_REL) -z" ;;
 #endif

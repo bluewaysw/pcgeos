@@ -127,7 +127,8 @@ minimalAppl	: minimalGame minimalUtils minimalTools minimalSavers \
 		  charm wordmat banner \
 		  bbxchat bbxmail \
 		  newsread geozip sclock\
- 	  	  hmbase pdfvu  bnkr30 ftpc
+ 	  	  hmbase pdfvu  bnkr30 ftpc \
+ 	  	  instc instf
 
 minimalUtils	: prefmgr
 
@@ -1538,6 +1539,12 @@ Installed/Appl/EduApps/ttkr:		ui ansic text math basicdb MAKEAPPL
 oliner	: Installed/Appl/EduApps/oliner
 Installed/Appl/EduApps/oliner:		ui ansic text math spool basicdb \
 					treplib spell MAKEAPPL
+
+instc	: Installed/Appl/Install/Instc
+Installed/Appl/Install/Instc:		ui ansic MAKEAPPL
+
+instf	: Installed/Appl/Install/Instf
+Installed/Appl/Install/Instf:		ui ansic MAKEAPPL
 
 
 #=======================================================================
