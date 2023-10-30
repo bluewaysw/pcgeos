@@ -1,0 +1,226 @@
+/***********************************************************************
+ *
+ *      Project:	Universal Data Resource Files
+ *	File:	 	StdFrmt.GOH
+ *
+ *	Standard-Format-Definitonen fÅr
+ *			- Bitmaps (HugeBitmaps)	BITMAP_FORMAT
+ *			- GStrings		GSTRING_FORMAT
+ *			- Daten-Guppen		DATA_GROUP_FORMAT
+ *			- Kommentare		COMMENT_FORMAT und TEXT_FORMAT
+ *
+ *	Include in:   - Jedes Programm, das eines dieser
+ *			Formate verwenden will
+ *
+ *	Copyright:	(c) by RABE-Soft
+ *			Freeware
+ *
+ *	Sonstiges:
+ *
+ ***********************************************************************/
+/* DataInfoMainStruct includen */
+
+@if 0
+@include "..\Shared\datares.goh"
+@include "initfile.h"
+
+/*--------------------------------------------------------------------------
+ *
+ *   Allgemeines:
+ *	Zur Beschreibung eines Format-Typs sehen in DataInfoMainStruct
+ *	drei Felder zur VerfÅgung:
+ *		dword	format;
+ *		word	formatExtraData1;
+ *		word	formatExtraData2;
+ *
+ *	Das Format wird durch eine dword ID bestimmt. Das Konzept dahinter
+ *	lehnt sich an das Clipboard an, so dass Daten aus dem Clipboard
+ *	direkt in die Datei kopiert werden kînnen (oder umgekehrt).
+ *	- format: Low-word: Manufacturer ID des Formats, High-word: Format
+ *	- Clipboard-Formate sind zulÑssig
+ *	- extraData: Bedeutung wie im Clipboard: NÑhere Beschreibung des
+ *		Formats, wenn dies erforderlich sein sollte
+ *
+ *-------------------------------------------------------------------------*/
+
+
+/* ---------------------- Bereits definierte Datenformate -------------------
+ *
+ * Prinzipiell gelten alle Clipboard-Formate als vordefiniert. Wenn in einer
+ * Resourcen-Datei ein Format verwendet wird, das eine Clipboard-Format
+ * entspricht so kann sie fÅr die Format-ID auch die des Clipboards zu verwenden.
+
+ * Anmerkung: Per Definition gilt dies fÅr die im SDK definierten Formate. Es
+ * steht jedem Programmierer natÅrlich frei fÅr selbstdefinierte Formate im
+ * Clipboard und in einer Resourcen-Datei verschiede Format-ID's zu verwenden.
+ * Das COMMENT_FORMAT (siehe unten) macht davon Gebrauch.
+ *
+ * FÅr jeden Datentyp in der Datei wird eine eigene Struktur definiert,
+ * die immer mit einer DataInfoMainStruct beginnen muss
+ *
+ */
+
+/*###########################################################################
+ *		Grafik-Formate
+ * 		identisch mit den entprechendenClipboard-Formaten
+ *###########################################################################
+ *
+ *	BITMAP_FORMAT:  Speichert eine Standard-GEOS-Bitmap
+ *			main.dataBlock enthÑlt das Handle der HugeBitmap
+ *	GSTRING_FORMAT: Speichert einen Standard-GEOS-GString
+ *			main.dataBlock enthÑlt das Handle des GString
+ *
+ *##########################################################################*/
+
+#define BITMAP_FORMAT \
+	FormatIDFromManufacturerAndType(MANUFACTURER_ID_GEOWORKS, CIF_BITMAP)
+#define GSTRING_FORMAT \
+	FormatIDFromManufacturerAndType(MANUFACTURER_ID_GEOWORKS, CIF_GRAPHICS_STRING)
+
+typedef struct {
+	DataInfoMainStruct	main;	/* allg. Informationen */
+	word	bmType;			/* enthalt die BMFormat- und BMType-
+					 * Informationen, also Farbtiefe
+					 * und BMT_xx Flags z.B.
+					 * BMT_MASK | BMT_COMPLEX | BMF_8BIT */
+	} BitmapInfoBlock;
+
+typedef struct {
+	DataInfoMainStruct	main;	/* allg. Informationen */
+					/* alle notwendigen Daten kînnen
+					 * im main-Feld gespeichert werden.
+					 */
+	} GStringInfoBlock;
+
+/*###########################################################################
+ *		Andere-Formate
+ * 		werden Åber eigene Format-ID's identifiziert
+ *###########################################################################
+ *
+ *	COMMENT_FORMAT: Beschreibt einen Kommentar-Text
+ *			main.dataBlock enthÑlt das VMHandle eines VMBlocks
+ *			mit dem Text (nullterminiert)
+ *			Besonderheit: als ClipBoard-Format wird das
+ *			Standard-GEOS-Text-Format verwendet.
+ *	DATA_GROUP_FORMAT:	ist Format zum Gruppieren anderer Daten.
+ * 			main.dataBlock enthÑlt das Handle eines VMBlocks, der
+ *			eine Liste mit Namen anderer Daten (FileLongName)
+ *			enthÑlt.
+ * 		Achtung!
+ * 			Es gibt keinen automatischen Mechanismus, der
+ *			sicherstellt, dass die Namen jederzeit gÅltig sind.
+ *			Lîschen und Umbenennungen von Daten, die von einer
+ *			Gruppe verwendet werden, fÅhren nicht zum automatischen
+ *			Anpassen der Gruppen-Informationen!
+ *	INI_FILE_FORMAT: Speichert einen Eintrag in der GEOS.INI
+ *			main.dataBlock enthÑlt das Handle eines Speicherblocks
+ *			mit einer IniEntryStruct-Struktur
+ *	ANIMATION_FORMAT:	enthÑlt eine Folge von Grafiken, die eine
+ *			Animation darstellen.
+ * 			main.dataBlock enthÑlt das Handle eines HugeArrays mit
+ *			einer Liste der Namen der Grafiken (FileLongName)
+ * 		Achtung!
+ * 			Es gibt keinen automatischen Mechanismus, der
+ *			sicherstellt, dass die Namen jederzeit gÅltig sind.
+ *			Lîschen und Umbenennungen von Daten, die von einer
+ *			Animation verwendet werden, fÅhren nicht zum automatischen
+ *			Anpassen der Animations-Informationen!
+ *
+ *##########################################################################*/
+
+#ifndef RABE_SOFT_ID
+#define RABE_SOFT_ID	0x4060
+#endif
+
+#define RS_DATA_GROUP	0
+#define RS_COMMENT	1
+#define RS_INI_FILE	2
+#define RS_ANIMATION	3
+
+#define DATA_GROUP_FORMAT \
+	FormatIDFromManufacturerAndType(RABE_SOFT_ID, RS_DATA_GROUP)
+#define COMMENT_FORMAT \
+	FormatIDFromManufacturerAndType(RABE_SOFT_ID, RS_COMMENT)
+#define INI_FILE_FORMAT \
+	FormatIDFromManufacturerAndType(RABE_SOFT_ID, RS_INI_FILE)
+#define ANIMATION_FORMAT \
+	FormatIDFromManufacturerAndType(RABE_SOFT_ID, RS_ANIMATION)
+
+// Kommetar-Daten werden als Text im Clipboard gespeichert
+#define TEXT_FORMAT \
+	FormatIDFromManufacturerAndType(MANUFACTURER_ID_GEOWORKS, CIF_TEXT)
+
+typedef struct {
+	DataInfoMainStruct	main;	/* allg. Informationen */
+	word			count;	/* Anzahl der Elemente in der Liste */
+	} DataGroupInfoBlock;
+
+
+typedef struct {
+	DataInfoMainStruct	main;	/* allg. Informationen */
+					/* das Feld main.format enthÑlt immer
+					 * COMMENT_FORMAT
+					 * TEXT_FORMAT wird nur fÅr das
+					 * Clipbaord verwendet.*/
+	} CommentInfoBlock;
+
+typedef struct {
+	DataInfoMainStruct	main;	/* allg. Informationen */
+	} IniFileInfoBlock;
+#define MAX_INIF_COMMENT_LEN	(510)
+typedef struct {
+	char kategory[MAX_INITFILE_CATEGORY_LENGTH+2];
+	char key[MAX_INITFILE_CATEGORY_LENGTH+2];
+	word flags;
+	char comment[MAX_INIF_COMMENT_LEN];
+	char value[];		/* varaible size lengh */
+	} IniEntryStruct;
+
+/* 'flags' bestimmt, auf welche Art der INI-Eintrag geschrieben wird */
+#define INIF_REPLACE		0	/* Eintrag ersetzt alten */
+#define INIF_APPEND		1	/* Eintrag wird angehÑngt */
+#define INIF_INSERT		2	/* Eintrag wird am Anfang eingefÅgt */
+		/* Beispiel: zu schreiben ist:
+		 * 	[paul]
+		 *	test = Hallo
+		 * In der INI vorhanden ist
+		 *	[paul]
+		 *	test = Das Leben ist schîn
+		 *
+		 * Nach Schreiben mit INIF_REPLACE steht in der INI
+		 * 	[paul]
+		 *	test = Hallo
+		 *
+		 * Nach Schreiben mit INIF_APPEND steht in der INI
+		 * 	[paul]
+		 *	test = {
+		 *	Das Leben ist schîn
+		 *	Hallo
+		 *	}
+		 *
+		 * Nach Schreiben mit INIF_INSERT steht in der INI
+		 * 	[paul]
+		 *	test = {
+		 *	Hallo
+		 *	Das Leben ist schîn
+		 *	}
+		 */
+
+typedef struct {
+	DataInfoMainStruct	main;	/* allg. Informationen */
+	word			count;	/* Anzahl der Bilder in der Liste */
+	word			tics;	/* Tics (1/60s) pro Bild.
+					 * Bit 15 wird genutzt, um dem
+					 * Animations-Objekt mitzuteilen,
+					 * dass es standardmÑ·ig eine
+					 * continuierliche Wiedergabe
+					 * (Auto-Loop) zu aktivieren hat */
+	} AnimationInfoBlock;
+
+#define ANIM_TICS_MASK			0x7FFF
+#define ANIM_FLAG_DEFAULT_CONTINUAL 	0x8000
+
+@endif
+
+/* ------- end of file ------------*/
+

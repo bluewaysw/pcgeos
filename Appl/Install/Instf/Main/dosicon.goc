@@ -1,0 +1,550 @@
+
+@include <stdapp.goh>
+#include "initfile.h"
+#include "string.h"
+#include "stdio.h"
+@include "Main/dosicon.goh"
+
+MemHandle 	dosFileList = 0;	// Block fÅrs Array
+optr            dosFileArray = 0;	// chunkArray mit DosFileEntrys
+
+@extern object FileManagerKategory;
+@extern object FileManagerKey;
+
+
+/* ####################################################################### */
+/*	Code for DOS file icon assignment
+/*  This code is a copy of the code from the DosIcon Library by RABE-Soft.
+/*	So the program is not depending on this library anymore.
+/*  
+/* ####################################################################### */
+
+
+
+/* #######################################################################
+ *	MainRoutinen zum Lesen uns schreiben der DosFile Icon Zuweisungen
+/* #######################################################################*/
+
+/*--------------------- DosIconReadDosFileList ---------------------
+ *      Purpose:        Einlesen der Geos.ini und Anlegen einer Liste mit
+ *			allen DOS-Datei-Typen, die mit Icons verknÅpft sind
+ *	Return:		TRUE; wenn Error (z.B. kein Eintrag in der INI )
+ ---------------------------------------------------------------------------*/
+Boolean DosIconReadDosFileList(void)
+  {
+  MemHandle mh;
+  word size;
+  char * iniStr, *p, * txt;
+  DosFileEntry	fileEntry, *fep;
+  int err;
+
+
+// chunkArray erzeugen
+  dosFileList = MemAllocLMem(LMEM_TYPE_GENERAL, 0 );
+  MemLock(dosFileList);
+  dosFileArray =ConstructOptr(dosFileList,
+		ChunkArrayCreate(dosFileList,sizeof(DosFileEntry),0,OCF_DIRTY));
+
+// Init-String lesen
+  MemLock(HandleOf(@FileManagerKategory));
+  err = InitFileReadStringBlock(LMemDeref(@FileManagerKategory),
+		LMemDeref(@FileManagerKey), &mh, 0, &size);
+  MemUnlock(HandleOf(@FileManagerKategory));
+
+  if ( err || ( mh == 0 ) ) return TRUE;
+
+  iniStr = MemLock(mh);
+
+// String durchsuchen
+  do {
+     txt = iniStr;              // Zeiger auf akktuelle Zeile
+     p = strchr(txt, '\r');	// Zeiger auf Ende der Zeile, Null falls letzte Z.
+     iniStr = p+1;		// Zeiger auf nÑchste Zeile, fÅr nÑchste Runde
+				// ungÅltig wenn txt auf letzte Zeile zeigt!
+     while ( (*iniStr== 0x0A) || (*iniStr== 0x0D) ) iniStr ++;
+
+     if ( p ) {			// Wenn es nicht die letzte Zeile war
+	      *p = 0;		// Terminator fÅr aktuelle Zeile setzen
+	      if ( !DosIconToolCreateFileEntry(&fileEntry, txt) ) {
+		    // Element hinzufÅgen
+			fep = ChunkArrayAppend(dosFileArray,sizeof(DosFileEntry));
+			*fep = fileEntry;
+			}
+	      }
+     } while (p);
+  // letzte Zeile bearbeiten
+  if ( !DosIconToolCreateFileEntry(&fileEntry, txt) ) {
+	    // Element hinzufÅgen
+		fep = ChunkArrayAppend(dosFileArray,sizeof(DosFileEntry));
+		*fep = fileEntry;
+		}
+
+  MemFree(mh);
+  MemUnlock(dosFileList);
+  return FALSE;
+}
+
+/*--------------------- DosIconFindTokenInfo ---------------------
+ *      Purpose:        Liste nach den zu dosFile passenden Eintrag durchsuchen
+ *      Params/Return:	wenn gefunden:  info enthÑlt den eintrag
+ *					return FALSE
+ *			wenn nicht gefunden: info unverÑndert
+ *					return TRUE
+ ---------------------------------------------------------------------------*/
+Boolean DosIconFindTokenInfo(DosFileEntry * info, char * dosFile)
+  {
+  int count, n;
+  DosFileEntry	dfe;
+
+  if (!dosFileList)  DosIconReadDosFileList();
+
+  MemLock(dosFileList);
+  count = ChunkArrayGetCount(dosFileArray);
+  if ( ! count ) {
+		  MemUnlock(dosFileList);
+		  return TRUE;
+		  }
+
+  for ( n= 0; n < count ; n++ )
+	{
+	ChunkArrayGetElement(dosFileArray,n, & dfe);
+	if ( DosIconToolCompareFileName( &dfe, dosFile) ) {
+		  *info = dfe;
+		  MemUnlock(dosFileList);
+		  return FALSE;
+		  }
+	}
+  MemUnlock(dosFileList);
+  return TRUE;
+}
+
+/*--------------------- DosIconReplaceTokenInfo ---------------------
+ *      Purpose:        ersetzt den zu dosFile passenden Eintrag.
+ *                      Der DosFileNameDescriptor entry->dosName wird ignoriert
+ *			und entsprechend 'dosFile' neu belegt
+ *                      Falls nichts zu dosFile passendes gefunden wurde,
+ *                      wird der Eintrag am Anfang (!) eingefÅgt
+ *      Params/Return:  wenn gefunden:  return FALSE
+ *                      wenn nicht gefunden: return TRUE
+ ---------------------------------------------------------------------------*/
+Boolean DosIconReplaceTokenInfo(DosFileEntry * info, char * dosFile) {
+  int count, n, foundIndex;
+  DosFileEntry	dfe, *dfePtr;
+  Boolean	found = FALSE;
+  word size;
+
+  if (!dosFileList) DosIconReadDosFileList();
+
+/* suche nach Passendem Eintrag */
+  MemLock(dosFileList);
+  count = ChunkArrayGetCount(dosFileArray);
+  if ( ! count ) {
+		foundIndex = -1;		// Kennung: Array leer
+		}
+  else for ( n= 0; n < count ; n++ )
+	{
+	ChunkArrayGetElement(dosFileArray,n, & dfe);
+	if ( DosIconToolCompareFullFileName( &dfe, dosFile) ) {
+		  foundIndex = n;
+		  found = TRUE;
+		  break;
+		  }
+	}
+
+/* evt neues Element anlegen */
+  if ( ! found ) {
+	  if ( foundIndex == (-1) )	{	// Array ist leer
+		ChunkArrayAppend(dosFileArray,sizeof(DosFileEntry));
+		}
+	  else {	// am Anfang einfÅgen
+		dfePtr = ChunkArrayElementToPtr(dosFileArray,0,&size);
+		ChunkArrayInsertAt(dosFileArray,dfePtr,sizeof(DosFileEntry));
+		}
+	  foundIndex = 0;
+	  }
+
+/* neue Werte kopieren */
+  DosIconToolCreateFileNameDescriptor( &info->dosFile,dosFile);
+  dfePtr = ChunkArrayElementToPtr(dosFileArray,foundIndex,&size);
+  *dfePtr = *info;
+  MemUnlock(dosFileList);
+  return (!found);	// True wenn nicht gefunden
+}
+
+/*--------------------- DosIconDeleteTokenInfo ---------------------
+ *      Purpose:        Liste nach den zu dosFile passenden Eintrag durchsuchen
+ *			und diesen Eintrag lîschen
+ *			onlyApp == TRUE : nur App-Token entfernen, Anzeige-Token bleibt
+ *	Strategy: 	Der Eintrag mu· exakt auf den Namen passen
+ *	Return:		TRUE, wenn nicht geÑndert wurde
+ *			   - der Eintrag nicht gefunden wurde
+ *			   - onlyApp== TRUE : keine App vorhanden war
+ *
+ ---------------------------------------------------------------------------*/
+Boolean DosIconDeleteTokenInfo(char * dosFile, Boolean onlyApp) {
+  int count, n, foundIndex;
+  DosFileEntry	dfe, *dfePtr;
+  Boolean	found = FALSE;
+  word size;
+
+  if (!dosFileList) DosIconReadDosFileList();
+
+/* suche nach Passendem Eintrag */
+  MemLock(dosFileList);
+  count = ChunkArrayGetCount(dosFileArray);
+  if ( ! count ) {
+		foundIndex = -1;		// Kennung: Array leer
+		}
+  else for ( n= 0; n < count ; n++ )
+	{
+	ChunkArrayGetElement(dosFileArray,n, & dfe);
+	if ( DosIconToolCompareFullFileName( &dfe, dosFile) ) {
+		  foundIndex = n;
+		  found = TRUE;
+		  break;
+		  }
+	}
+
+  if ( ! found ) {
+	MemUnlock(dosFileList);
+	return TRUE;
+	}
+
+/* Eintrag gefunden, aus ChunkArray lîschen */
+  dfePtr = ChunkArrayElementToPtr(dosFileArray,foundIndex,&size);
+  if ( onlyApp ) {	// Nur App-Zuweiosung lîschen, Token erhalten
+	if (!dfePtr->hasApp) {
+		MemUnlock(dosFileList);
+		return TRUE;	// Hat gar keine App-> nicht zu lîschen
+		}
+	dfePtr->hasApp = FALSE;	// jetzt hat er keine mehr
+	MemUnlock(dosFileList);
+	return FALSE;
+	}
+// Token komplett lîschen
+  ChunkArrayDelete(dosFileArray,dfePtr);
+
+  MemUnlock(dosFileList);
+  return FALSE;
+}
+
+/*--------------------- DosIconWriteDosFileList ---------------------
+ *      Purpose:        Schreiben der aktuellen Liste in die INI
+ ---------------------------------------------------------------------------*/
+void DosIconWriteDosFileList(void) {
+int count, n;
+word size;
+char text[70], *p;
+DosFileEntry	*entryPtr;
+
+  if ( !dosFileList ) return; // keine Liste nicht schreiben
+
+  MemLock(dosFileList);
+  count = ChunkArrayGetCount(dosFileArray);
+  if ( ! count ) {
+		  MemUnlock(dosFileList);
+		  return;		// nix da zum schreiben
+		  }
+
+  MemLock(HandleOf(@FileManagerKategory));
+  for ( n= 0; n < count ; n++ )
+	{
+	entryPtr = ChunkArrayElementToPtr(dosFileArray,n,&size);
+	strcpy(text,entryPtr->dosFile.fullName);
+	strcat(text,"= ");
+
+	p = strchr(text, 0);
+	WriteTokenIDString(p,entryPtr->fileToken);
+	if (entryPtr->hasApp) {
+		strcat(text,",");
+		p = strchr(text, 0);
+		WriteTokenIDString(p,entryPtr->appToken);
+		}
+
+	if (n==0) InitFileWriteString(LMemDeref(@FileManagerKategory),
+			LMemDeref(@FileManagerKey),text);
+	else InitFileWriteStringSection(LMemDeref(@FileManagerKategory),
+			LMemDeref(@FileManagerKey),text);
+	}
+
+  MemUnlock(dosFileList);
+  MemUnlock(HandleOf(@FileManagerKategory));
+
+  return;
+}
+
+
+
+/* #######################################################################
+ *	ToolRoutinen die extern eigentlich nicht gerufen werden mÅssen
+/* #######################################################################*/
+
+/*--------------------- DosIconToolCreateFileNameDescriptor ---------------------
+ *      Purpose:        Bereitet einen Dateinamen (mit wildcrds) in 'text'
+ *			so auf auf, da· er fÅr die DosIcon Liste verwendbar wird
+ ---------------------------------------------------------------------------*/
+void  DosIconToolCreateFileNameDescriptor
+			(DosFileNameDescriptor *dsc ,char * text) {
+  char name[16], *p, *t;
+
+/* vollen Namenseintrag abspalten, mîglichst wenig eingreifen */
+/* entweder text ist ein INI-Eintag -> Endezeichen '='
+   oder es soll ein Dateiname sein -> Endet mit 00 */
+	t = text;
+	p = strchr(t,'=');
+	if (!p) p = strchr(t,0);
+
+	if ( p-t > FULL_NAME_LEN ) {
+		  while ( (*t == ' ') || (*t == '\t') ) t++;
+		  }
+	memcpy(dsc->fullName,t,FULL_NAME_LEN);
+	dsc->fullName[FULL_NAME_LEN] = 0;	// terminator
+	p = strchr(dsc->fullName,'=');
+	if ( p ) *p = 0;
+/* ein Leerzeichen anhÑngen, wenn es nicht schon da ist und der Platz es erlaubt */
+	if ( strlen(dsc->fullName) > 0 )		// kein Leerstring
+	   if ( strlen(dsc->fullName) < FULL_NAME_LEN)	// Platz vorhanden
+		{
+		p = strchr(dsc->fullName,0);
+		p--;
+		if ( *p != ' ' ) strcat(dsc->fullName," ");
+		}
+
+  while ( (*text == ' ') || (*text == '\t') ) text++;
+  memcpy(name,text,14);
+  name[14] = 0;
+
+  DosIconToolSplitDosFileName(name, dsc->body, dsc->ext);
+
+// Position der Sterne bestimmen und merken ( -1 == kein Stern )
+  p = strchr(dsc->body, '*' );
+  if (p) {	dsc->bodyStar = p - dsc->body;
+		*p = 0;
+		}
+	else {  dsc->bodyStar = -1 ;
+		}
+  p = strchr(dsc->ext, '*' );
+  if (p) {	dsc->extStar = p - dsc->ext;
+		*p = 0;
+		}
+	else {  dsc->extStar = -1 ;
+		}
+  }
+
+/*--------------------- DosIconToolCreateFileEntry ---------------------
+ *      Purpose:        Erzeugen eines DosFileEntry aus einem Åbergebenen Text
+ *      Params/Return:	Return TRUE, wenn kein Token zugeordnet ist
+ *	Wichtig:	dfep->dosFile.body und dfep->dosFile.ext werden in jedem Fall belegt
+ ---------------------------------------------------------------------------*/
+Boolean DosIconToolCreateFileEntry(DosFileEntry * dfep, char * text )
+  {
+  char *p;
+
+  DosIconToolCreateFileNameDescriptor(&dfep->dosFile,text);
+
+// Anzeige und Applikation-Token holen
+  p = strchr(text,'=');
+  if (!p)	return TRUE;	// eintrag ungÅltig
+
+  if (DosIconToolGetFileToken(&(dfep->fileToken), p) ) return TRUE;
+
+  dfep->hasApp = !DosIconToolGetAppToken(&(dfep->appToken), p);
+
+  return FALSE;
+}
+
+/*--------------------- DosIconToolGetAppToken ---------------------
+ *      Purpose:        TokenID der zugeordneten Applikation holen
+ *      Params/Return:	Return TRUE, wenn keine Applikation zugeordnet ist
+ ---------------------------------------------------------------------------*/
+Boolean DosIconToolGetAppToken( GeodeToken *t, char * text)
+  {
+  char * p, zahl[8];
+  int n;
+  sdword z;
+
+// GeodeTokenChars lesen. Applikation ist der zweite Eintrag,
+// beginnt also mit dem dritten '"'
+  p = strchr(text,'"');
+  if (!p) return TRUE;
+  p++;
+  p = strchr(p,'"');
+  if (!p) return TRUE;
+  p++;
+  p = strchr(p,'"');
+  if (!p) return TRUE;
+  p++;			// p zeigt nach das dritte '"'
+
+  if ( strlen(p) < 7 ) return TRUE;	// mind: 'TOKN",1' => 7 Zeichen
+  memcpy(t->GT_chars, p, 4);
+
+// Manufacturer ID holen
+  p = strchr(p,',');
+  if (!p) return TRUE;
+  p++;
+  while ( (*p == ' ') || (*p == '\t') ) p++;	// p zeigt auf Ziffernfolge
+
+// Zahlenstring kopieren
+  n = 0;
+  while ( (*p >= '0') && (*p <= '9') && (n<5) ) {
+	zahl[n] = *p;
+	p++; n++;
+	}
+  zahl[n] = 0;
+
+// blîdsinnige Type-konvertiererei
+  n = UtilAsciiToHex32(zahl, &z );
+  t->GT_manufID = (word)z;
+  return n;		// TRUE == FEHLER
+}
+
+/*--------------------- DosIconToolGetFileToken ---------------------
+ *      Purpose:        TokenID lesen, das angezeigt wewrden soll
+ *      Params/Return:	Return TRUE, wenn kein Token zugeordnet ist
+ ---------------------------------------------------------------------------*/
+Boolean DosIconToolGetFileToken( GeodeToken *t, char * text)
+  {
+  char * p, zahl[8];
+  int n;
+  sdword z;
+
+// GeodeTokenChars lesen. AnzeigeToken ist der erste Eintrag,
+// beginnt also mit dem ersten '"'
+  p = strchr(text,'"');
+  if (!p) return TRUE;
+  p++;			// p zeigt nach das erste '"'
+
+  if ( strlen(p) < 7 ) return TRUE;	// mind: 'TOKN",1' => 7 Zeichen
+  memcpy(t->GT_chars, p, 4);
+
+// Manufacturer ID holen
+  p = strchr(p,',');
+  if (!p) return TRUE;
+  p++;
+  while ( (*p == ' ') || (*p == '\t') ) p++;	// p zeigt auf Ziffernfolge
+
+// Zahlenstring kopieren
+  n = 0;
+  while ( (*p >= '0') && (*p <= '9') && (n<5) ) {
+	zahl[n] = *p;
+	p++; n++;
+	}
+  zahl[n] = 0;
+
+// blîdsinnige Type-konvertiererei
+  n = UtilAsciiToHex32(zahl, &z );
+  t->GT_manufID = (word)z;
+  return n;		// TRUE == FEHLER
+  }
+
+/*--------------------- DosIconToolSplitDosFileName ---------------------
+ *  Purpose:    Aufteilen eines DOS-Dateinamens in Body und Extension
+ *				Inclusive Leerzeichenskipping und Umwandlung in
+ *				Gro·buchstaben
+ ---------------------------------------------------------------------------*/
+void DosIconToolSplitDosFileName(char * fName, char * body, char * ext)
+  {
+  char name[16], * p, *p0;
+
+  strcpy(name,fName);		// String soll evt. modifiziert werden
+  p0 = name;
+  while ( (*p0 == ' ') || (*p0 == '\t') ) p0++;
+
+  p = strchr(p0,'.');
+  if ( !p ) { strcat(p0,".");
+	  p = strchr(p0,'.');
+	  }
+  *p = 0;
+  p++;			// erstes Zeichen Extension
+  strcpy(body,p0);      // body kopiert
+
+  memcpy(ext,p,3);	// Extension (maximal)
+  ext[3] = 0;
+
+  p = strchr(ext, ' '); // ungÅltige Zeichen am Ende streichen
+  if (p) *p = 0;
+  p = strchr(ext, '\t');
+  if (p) *p = 0;
+  p = strchr(ext, '=');
+  if (p) *p = 0;
+
+  LocalUpcaseString(body,0);
+  LocalUpcaseString(ext,0);
+}
+
+/*---------------------  ---------------------
+ *      Purpose:        
+ *---------------------------------------------------------------------------*/
+char * LocalToolTrim(char * text) {
+char * termi;
+
+// FÅhrende Leerzeichen und Tabs streichen
+	while ( (*text == ' ') || (*text == '\t') ) text++;
+// folgende Leerzeichen und Tabs streichen
+	termi = strchr(text,' ');
+	if ( termi ) *termi = 0;
+	termi = strchr(text,'\t');
+	if ( termi ) *termi = 0;
+
+	LocalUpcaseString(text,0);
+	return text;
+}
+
+/*--------------------- DosIconToolCompareFullFileName ---------------------
+ *      Purpose:        Vergleich eines Dateinamens mit einer
+ *                      DosFileEntry-Struktur zum test, ob genau dieser
+ *			DOS-Datei Eintrag schon vorhanden ist
+ *	Strategy:	Wildcards werden nicht bearbeitet, dh:
+ *			"A*.ZIP" passt NICHT auf "*.ZIP" oder "*.*"
+ *      Params/Return:  TRUE wenn die Namen Åbereinstimmen
+ ---------------------------------------------------------------------------*/
+Boolean DosIconToolCompareFullFileName(DosFileEntry * dfep, char * name) {
+char fullName[FULL_NAME_SIZE], *fn;
+char newName[FULL_NAME_SIZE], *nn;
+
+	strcpy(fullName, dfep->dosFile.fullName);
+	fn = LocalToolTrim(fullName);
+	strcpy(newName,name);
+	nn = LocalToolTrim(newName);
+	return ( !strcmp(nn,fn) ) ;
+}
+
+
+/*--------------------- DosIconToolCompareFileName ---------------------
+ *      Purpose:        Vergleich eines Dateinamens mit einer
+ *                      DosFileEntry-Struktur zum finden eines "passenden"
+ *			Eintrags
+ *      Strategy:      Die DosFileentry-Struktur enthÑlt Infos Åber die
+ *                      evt. vorhandenen WildCards '*' -> Werden berÅcksichtigt
+ *      Params/Return:  TRUE wenn die Namen Åbereinstimmen
+ ---------------------------------------------------------------------------*/
+Boolean DosIconToolCompareFileName(DosFileEntry * dfep, char * name)
+  {
+  char body[16], ext[8], *p;
+  int n;
+
+  DosIconToolSplitDosFileName(name, body, ext);
+
+// Wildcard '*' beachten
+  if ( dfep->dosFile.bodyStar != (-1) ) body[dfep->dosFile.bodyStar] = 0;
+  if ( dfep->dosFile.extStar != (-1) ) ext[dfep->dosFile.extStar] = 0;
+
+// Wildcard '?' beachten
+  p = dfep->dosFile.body; n= -1;
+  while ( *p != 0 ) { n++; if ( *p == '?' ) body[n] = '?'; p++; }
+  p = dfep->dosFile.ext; n= -1;
+  while ( *p != 0 ) { n++; if ( *p == '?' ) ext[n] = '?'; p++; }
+
+// Vergleich ausfÅhren
+  if ( strcmp(ext,dfep->dosFile.ext) ) return FALSE;
+  if ( strcmp(body,dfep->dosFile.body) ) return FALSE;
+  return TRUE;
+}
+
+
+/*---------------------  ---------------------
+ *      Purpose:        
+ *---------------------------------------------------------------------------*/
+
+// end of file
+

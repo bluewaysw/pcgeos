@@ -1,0 +1,766 @@
+/**************************************************************************
+ *	GEODE-File fÅr
+ *
+ *	Beschreibung	Universelles Installationsprogramm
+ *			Creator
+ *
+ *	Copyright:	(c) by RABE-Soft 5/99
+ *	Sonstiges:	-
+ *
+ **************************************************************************/
+
+/*  Standard include files */
+@include <stdapp.goh>
+@include <stdlib.h>
+@include <file.h>
+@include "../Shared/instllr.goh"
+@include "../Shared/rainer.goh"
+@include "instc.goh"
+@include "ftool/ftool.goh"
+@include "process.goh"
+@include "main/iconedi.goh"
+@include "ui/appui.goh"
+@include "inif/inif.goh"
+@include "../Shared/msgbox.goh"
+
+
+#include <string.h>
+#include <stdio.h>
+#include <token.h>
+#include <initfile.h>
+
+extern FileHandle docFile;    /* The handle of the document that's
+				     * currently open. */
+extern VMBlockHandle docMapBlock; /* VM block handle of the file's map block */
+
+
+/*###########################################################################
+	CODE for ICProcessClass
+/*###########################################################################
+	Teil 1: Handling des System-Document-Messages
+	UpdateDocumentUI
+	MSG_META_DOC_OUTPUT_INITIALIZE_DOCUMENT_FILE
+	MSG_META_DOC_OUTPUT_ATTACH_UI_TO_DOCUMENT
+	MSG_META_DOC_OUTPUT_DETACH_UI_FROM_DOCUMENT
+	MSG_META_DOC_OUTPUT_SAVE_AS_COMPLETED
+	MSG_META_DOC_OUTPUT_WRITE_CACHED_DATA_TO_FILE
+/*###########################################################################*/
+
+/***********************************************************************
+ *				UpdateDocumentUI
+ ***********************************************************************
+ * SYNOPSIS:	    Update the UI components to display the values
+ *		    stored in the document.
+ ***********************************************************************/
+VMBlockHandle ICGetMainArrayHandle(void) {
+MemHandle 	mh;
+ICMapBlock 	*mapPtr;
+VMBlockHandle	mainArray;
+
+	if ( !docFile || !docMapBlock) return 0;
+	mapPtr = VMLock(docFile, docMapBlock, &mh);
+	mainArray = mapPtr->mainArray;
+	VMUnlock(mh);
+	return mainArray;
+	}
+
+void ICAddMainEntry(InstallEntry *entryPtr) {
+VMBlockHandle 	mainArray;
+word 		newIndex;
+InstallEntry 	*dataPtr;
+
+	if ( !docFile || !docMapBlock) return;
+	mainArray = ICGetMainArrayHandle();
+	newIndex = HugeArrayGetCount(docFile,mainArray);
+	HugeArrayAppend(docFile, mainArray,1,0);
+
+	dataPtr = ICLockMainArrayElement(newIndex);
+	*dataPtr = *entryPtr;
+	HugeArrayDirty(dataPtr);
+	ICUnlockMainArray(dataPtr);
+	}
+
+
+InstallEntry * ICLockMainArrayElement(word item) {
+VMBlockHandle	mainArray;
+InstallEntry 	*elemPtr;
+word 		size;
+
+   if ( !docFile || !docMapBlock) return 0;
+
+   mainArray = ICGetMainArrayHandle();
+   HugeArrayLock(docFile,mainArray,item, (void**)&elemPtr, &size);
+   return	elemPtr;
+   }
+
+void	ICUnlockMainArray(InstallEntry 	*elemPtr ) {
+	HugeArrayUnlock(elemPtr);
+	}
+
+void ICEnableTriggers(word triggers) {
+	if ( triggers & TRG_DELETE) {
+		@send DeleteTrigger::MSG_GEN_SET_ENABLED(VUM_DELAYED_VIA_APP_QUEUE); }
+	else { @send DeleteTrigger::MSG_GEN_SET_NOT_ENABLED(VUM_DELAYED_VIA_APP_QUEUE); }
+
+	if ( triggers & TRG_EDIT) {
+		@send EditTrigger::MSG_GEN_SET_ENABLED(VUM_DELAYED_VIA_APP_QUEUE); }
+	else { @send EditTrigger::MSG_GEN_SET_NOT_ENABLED(VUM_DELAYED_VIA_APP_QUEUE); }
+
+	if ( triggers & TRG_UPDATE) {
+		@send UpdateTrigger::MSG_GEN_SET_ENABLED(VUM_DELAYED_VIA_APP_QUEUE); }
+	else { @send UpdateTrigger::MSG_GEN_SET_NOT_ENABLED(VUM_DELAYED_VIA_APP_QUEUE); }
+
+	if ( triggers & TRG_DOSTOK) {
+		@send DosTokenTrigger::MSG_GEN_SET_ENABLED(VUM_DELAYED_VIA_APP_QUEUE); }
+	else { @send DosTokenTrigger::MSG_GEN_SET_NOT_ENABLED(VUM_DELAYED_VIA_APP_QUEUE); }
+
+	if ( triggers & TRG_START_FILE) {
+		@send StartFileTrigger::MSG_GEN_SET_ENABLED(VUM_DELAYED_VIA_APP_QUEUE); }
+	else { @send StartFileTrigger::MSG_GEN_SET_NOT_ENABLED(VUM_DELAYED_VIA_APP_QUEUE); }
+
+	if ( triggers & TRG_FILE_DETAILS) {
+		@send FileInfoTrigger::MSG_GEN_SET_ENABLED(VUM_DELAYED_VIA_APP_QUEUE); }
+	else { @send FileInfoTrigger::MSG_GEN_SET_NOT_ENABLED(VUM_DELAYED_VIA_APP_QUEUE); }
+
+	}
+
+void ICInitiateReadFileBox(void) {
+  @send application::MSG_GEN_APPLICATION_MARK_BUSY();
+  @call ICReadFileGlyph::MSG_GEN_REPLACE_VIS_MONIKER_TEXT("",VUM_NOW);
+  @send ICReadFileBox::MSG_GEN_INTERACTION_INITIATE();
+  }
+
+void ICCloseReadFileBox(void) {
+  @send ICReadFileBox::MSG_GEN_GUP_INTERACTION_COMMAND(IC_DISMISS);
+  @send application::MSG_GEN_APPLICATION_MARK_NOT_BUSY();
+  }
+
+
+extern Boolean ICIsSystemDir(FileMainParams *params) {
+/* return True, wenn Das Verzeichnis das System oder einer seine Subdirs ist */
+char path[QUERY_TEXT_LEN];
+
+   if (params->dh == SP_SYSTEM) return TRUE;
+
+   ToolConstructPath(path, params->dh, params->path, 0);
+
+   path[6]=0;
+   return (!strcmp(path,"SYSTEM"));
+   }
+
+
+void UpdateDocumentUI(void)
+{
+int 		count;
+MemHandle	mh;
+ICMapBlock	*mapPtr;
+
+
+   if ( !docFile || !docMapBlock) return;
+
+   mapPtr = VMLock(docFile,docMapBlock,&mh);
+
+/* Liste initialisieren */
+   count = HugeArrayGetCount(docFile,mapPtr->mainArray);
+
+   @send ICFileList::MSG_GEN_DYNAMIC_LIST_INITIALIZE(count);
+   ICUpdateCurrentDataText(0, FALSE);
+   ICUpdateStatusBar(0);
+   ICEnableTriggers(0);
+
+/* InfoTexte setzen */
+   @call ICPrognameText::
+		MSG_VIS_TEXT_REPLACE_ALL_PTR(mapPtr->programName,0);
+   @call ICBeschreibungText::
+		MSG_VIS_TEXT_REPLACE_ALL_PTR(mapPtr->beschreibung,0);
+   @call ICCopyrightText::
+		MSG_VIS_TEXT_REPLACE_ALL_PTR(mapPtr->copyright,0);
+   VMUnlock(mh);
+
+}
+
+/***********************************************************************
+ *	MSG_META_DOC_OUTPUT_INITIALIZE_DOCUMENT_FILE for ICProcessClass
+ ***********************************************************************
+ * Aufgabe:		Neu erzeugtes Document initialisieren
+ * PARAMETERS:	    	void (optr document, FileHandle file)
+ * Strategie:           Anlegen eines neuen MapBlocks und eines Leeren
+ *			HugeArray fÅr die Liste
+ *			Die globalen doc-Variablen werden nicht angefasst
+ ***********************************************************************/
+@extern method ICProcessClass, MSG_META_DOC_OUTPUT_INITIALIZE_DOCUMENT_FILE
+{
+    ICMapBlock *mapPtr;    /* The locked map block */
+    MemHandle mh;  	    /* Memory handle of the locked VM blocks */
+    VMBlockHandle  arrBlock, mBlock;
+    GeodeToken	cTok;
+
+/* Main-HugeArray anlegen */
+   arrBlock = HugeArrayCreate(file,sizeof(InstallEntry),0);
+
+/* MapBlock anlegen und initialisieren */
+    mBlock = VMAlloc(file, sizeof(ICMapBlock), 0);
+    VMSetMapBlock(file, mBlock);
+    mapPtr = VMLock(file, mBlock, &mh);
+    memset (mapPtr, 0, sizeof(ICMapBlock));
+    mapPtr->mainArray = arrBlock;
+    mapPtr->appInstDefaultFlags = APP_INST_DEFAULT_FLAGS;
+    mapPtr->docInstDefaultFlags = DOC_INST_DEFAULT_FLAGS;
+    mapPtr->rbasicInstDefaultFlags = RBASIC_INST_DEFAULT_FLAGS;
+    VMDirty(mh);
+    VMUnlock(mh);
+/* Creator-Token des UNI-Installers setzen */
+    SetTokenTo(cTok,'I','s','t','F',16480);
+    FileSetHandleExtAttributes(file,FEA_CREATOR,&cTok,sizeof(GeodeToken));
+
+    @send ICInfoTextDialog::MSG_GEN_INTERACTION_INITIATE();
+    return(FALSE);		/* Return no error */
+}
+
+/***********************************************************************
+ *	MSG_META_DOC_OUTPUT_ATTACH_UI_TO_DOCUMENT for ICProcessClass
+ ***********************************************************************
+ * Aufgabe:	    Update der globalen Variablen und der UI zu einem
+ *		    gerade geîffneten oder angelegten Document
+ * PARAMETERS:	    void (optr document, FileHandle file)
+ ***********************************************************************/
+@extern method ICProcessClass, MSG_META_DOC_OUTPUT_ATTACH_UI_TO_DOCUMENT
+{
+MemHandle 	mh, pwdmh;
+ICMapBlock 	*mapPtr;
+Boolean close = FALSE;
+char pwd[PWD_BUFFER_SIZE], *cPwd;
+int n;
+
+    docFile = file;
+    docMapBlock = VMGetMapBlock(docFile);
+    mapPtr = VMLock(docFile, docMapBlock, &mh);
+
+    if (mapPtr->password ) {
+	// Passwort vom User anfordern
+      if (UserDoDialog(@RequestPwdDialog) != IC_NO) {
+	@call RequestPwdEingabeText::MSG_VIS_TEXT_GET_ALL_PTR(pwd);
+	LocalScramblePwd(pwd);
+	// Passwort aus Datei holen
+	cPwd = VMLock(docFile, mapPtr->password, &pwdmh);
+	for ( n = 0; n < PWD_BUFFER_LEN; n++ ) {
+		close |= (pwd[n] != cPwd[n]);
+		}
+	VMUnlock(pwdmh);
+
+@if 1
+	/* Hack: Skip Password check if myself=TRUE in [system] category */
+	if ( close ) do {
+	  Boolean err, ichbins;
+	  ichbins = FALSE;
+	  err = InitFileReadBoolean("System", "myself", &ichbins);
+	  if (err) break;
+	  if (!ichbins) break;
+	  if ( QuestionMsgBox(@WrongPwdHackDialog,0,0) != IC_YES ) break;
+	  /* It's me :-) */
+	  close = FALSE;
+	  } while(FALSE);
+@endif
+
+	/*@send application::MSG_META_QUIT();*/
+	}
+      }
+    VMUnlock(mh);
+    if ( close)	{
+	ErrorMsgBox(@InvalidPasswort,0,0);
+	@send ICDocumentControl::MSG_GEN_DOCUMENT_CONTROL_INITIATE_NEW_DOC();
+	}
+    else {
+	UpdateDocumentUI();
+	/* evt hier: initiate info texte */
+	}
+}
+
+/***********************************************************************
+ *	MSG_META_DOC_OUTPUT_DETACH_UI_FROM_DOCUMENT for ICProcessClass
+ ***********************************************************************
+ * Aufgabe:	    Das Document wird geschlossen, daher sind alle Anzeigen
+ *		    zu deaktivieren
+ * PARAMETERS:	    void (optr document, FileHandle file)
+ ***********************************************************************/
+@extern method ICProcessClass, MSG_META_DOC_OUTPUT_DETACH_UI_FROM_DOCUMENT
+{
+    docFile = NullHandle;
+    docMapBlock = 0;
+    @send ICFileList::MSG_GEN_DYNAMIC_LIST_INITIALIZE(0);
+    ICUpdateCurrentDataText(0, FALSE);
+   ICUpdateStatusBar(0);
+}
+
+/***********************************************************************
+ *	MSG_META_DOC_OUTPUT_SAVE_AS_COMPLETED for ICProcessClass
+ ***********************************************************************
+ * Aufgabe:	    Nach einem "Speichern unter" gibts eine neues FileHandle
+ *		    und der Map-Block (das Handle) ist auch zu updaten
+ * PARAMETERS:	    void (optr document, FileHandle file)
+ ***********************************************************************/
+@extern method ICProcessClass, MSG_META_DOC_OUTPUT_SAVE_AS_COMPLETED
+{
+    docFile = file;
+    docMapBlock = VMGetMapBlock(docFile);
+//MessageNumberBox(VMGetDirtyState(file));
+    @send oself::MSG_IC_SET_PASSWORT();
+//MessageNumberBox(VMGetDirtyState(file));
+    VMSave(file);
+//MessageNumberBox(VMGetDirtyState(file));
+}
+
+/***********************************************************************
+ *	MSG_META_DOC_OUTPUT_WRITE_CACHED_DATA_TO_FILE for ICProcessClass
+ ***********************************************************************
+ * Aufgabe:	    Eigentlich: gepufferte Daten in die Datei schreiben.
+ *		    Hier: Protokoll-Nummer anhand der Liste setzen
+ * PARAMETERS:	    void (optr document, FileHandle file)
+ ***********************************************************************/
+@extern method ICProcessClass, MSG_META_DOC_OUTPUT_WRITE_CACHED_DATA_TO_FILE {
+ProtocolNumber	pnum;
+	pnum.PN_major = DOCUMENT_PROTOCOL_MAJOR;
+	pnum.PN_minor = DOCUMENT_PROTOCOL_MINOR;
+	FileSetHandleExtAttributes(file,FEA_PROTOCOL,&pnum,sizeof(ProtocolNumber));
+/* richtige Auswahl wurde deaktiviert. Kein Bock mehr
+	@call self::MSG_IC_SET_MINIMUM_PROTOCOL_NUMBER(file);
+*/
+	@callsuper();
+	}
+
+@if 0
+	----- Funktion deaktiviert, da ab 1.2 sehr AufwÑndig & kein Bock
+@extern method ICProcessClass, MSG_IC_SET_MINIMUM_PROTOCOL_NUMBER {
+InstallEntry * entryPtr;
+VMBlockHandle 	mainArray;
+int item,count,minorNr;
+ProtocolNumber	pnum;
+
+
+   if ( !docFile || !docMapBlock) return;
+
+   mainArray = ICGetMainArrayHandle();
+   count = HugeArrayGetCount(docFile,mainArray);
+
+   item = 0;
+   minorNr = 0;		// Falls nichts anderes gefunden wird
+/* EintrÑge durchhecheln */
+   while ( item < count ) {
+	entryPtr = ICLockMainArrayElement(item);
+	switch ( entryPtr->type ) {
+	// Folgende EintrÑge erforden mindestens Protocol 1.1
+	   case	IOT_UPDATE_TOOL:
+	   case	IOT_CLEANUP_TOOL:
+		if ( minorNr < 1 ) minorNr = 1;
+	// Protcol 1.2 fÅht neue EintrÑge und ein neues Flag hinzu !
+
+		}
+
+	item++;
+	ICUnlockMainArray(entryPtr);
+	}	/* while */
+
+   pnum.PN_major = DOCUMENT_PROTOCOL_MAJOR;
+   pnum.PN_minor = minorNr;
+   FileSetHandleExtAttributes(fh,FEA_PROTOCOL,&pnum,sizeof(ProtocolNumber));
+   }
+@endif
+
+/*###########################################################################
+	CODE for ICProcessClass
+/*###########################################################################
+	Teil 3: Initialisierung
+	MSG_GEN_PROCESS_INSTALL_TOKEN 
+	MSG_GEN_PROCESS_OPEN_APPLICATION 
+	MSG_IC_SET_DEFAULT_FOLDER 
+	MSG_IC_OPTIONS_CHANGED 
+/*###########################################################################*/
+
+
+
+/*--------------------- MSG_GEN_PROCESS_INSTALL_TOKEN ---------------------
+ *	Aufgabe:	Installation des Dokument-Token
+ *			(Applikation-Token macht die SuperCalss)
+ *	Zusammenhang:	Wird vom GeoManager gerufen, wenn er mit dem Token der
+ *			Applikation nichts anfangen kann
+ *	Strategie:	Nach Installation des ApllikationsTokens wir ein
+ *			DokumentToken installiert
+ *	Parameter:	void ( void )
+ *	Quelle:		Quelltext GeoFile: MPROCESS.GOC
+ ---------------------------------------------------------------------------*/
+@extern method ICProcessClass, MSG_GEN_PROCESS_INSTALL_TOKEN {
+	@callsuper();
+	TokenDefineToken(
+		TOKEN_CHARS_fixed('I','n','s','D'), MANUFACTURER_ID_RABE_SOFT,
+		@InstallDocMonikerList,0);
+	/* weil sich die Moniker-List in einer Daten-Resource befindet ist keine
+	Objekt-Relocation nîtig (zum GlÅck) */
+
+	}
+
+@extern object AboutGlyph3;
+@extern method ICProcessClass, MSG_GEN_PROCESS_OPEN_APPLICATION {
+
+@if @ENABLE_SKIP_PWD
+char buf[10] = "";
+word size;
+	/* 
+	 * Add Skip Password Trigger to password dialog if INI settings allow this
+	 */
+	InitFileReadStringBuffer("InstallCreator","MasterMode",&buf,3,&size);
+	if (!strcmp(buf,"ON"))
+	  if ( !(@call SkipPWDTrigger::MSG_GEN_GET_USABLE()) )
+		{
+		@call RequestPwdDialog::MSG_GEN_ADD_CHILD(
+			@SkipPWDTrigger,CCF_MARK_DIRTY | CCO_LAST);
+		@send SkipPWDTrigger::MSG_GEN_SET_USABLE(VUM_NOW);
+		}
+@endif
+
+	ToolInitializeDocumentGroup();
+	ToolInitializeOptions();
+
+	@callsuper();
+	{
+	char buffer[25];
+	ReleaseNumber release;
+	/* Aktuelle Release-Nummer in About-Box vermerken */
+	GeodeGetInfo(GeodeGetProcessHandle(), GGIT_GEODE_RELEASE, &release);
+	sprintf(buffer, "Version %u.%u.%u.%u",release.RN_major,
+		release.RN_minor, release.RN_change, release.RN_engineering);
+	@call AboutGlyph3::MSG_GEN_REPLACE_VIS_MONIKER_TEXT(buffer, 0);
+	}
+
+	   { // Programmierfehlern vorbeugen (und dabei Compiler Åberlisten)
+	     word size = sizeof(InstallEntry);
+	     if ( size != 309) {
+		MessageBox("Programmierfehler! InstallEntry-Struktur muss 309 Bytes groß sein.");
+		}
+	     size = sizeof(ICMapBlock);
+	     if ( size != 822) {
+		MessageBox("Programmierfehler! ICMapBlock muss 822 Bytes groß sein.");
+		MessageNumberBox(size);
+		MessageNumberBox(sizeof(FileLongName));
+		}
+	   }
+
+	}
+
+/* ---------------------------------------------------------------------------
+ *		Default Ordner setzen
+ *----------------------------------------------------------------------------*/
+/*--------------------- ToolCheckPathValid ---------------------
+ *	Aufgabe:	Pr¸fen, ob eine Pfadstring synatktisch in Ordnung ist
+ *	Return:		TRUE, if error
+ ---------------------------------------------------------------------------*/
+Boolean ToolCheckPathValid(int sp, char *path) {
+char *p;
+char temp[PATH_BUFFER_SIZE];
+
+  strcpy(temp, path);
+
+  do {			// Ausstieg bei Fehler
+	if ( strchr(path, ':') ) break;		// verbotenes Zeichen
+	if ( strchr(path, '*') ) break;		// verbotenes Zeichen
+	if ( strchr(path, '?') ) break;		// verbotenes Zeichen
+	if ( strchr(path, '<') ) break;		// verbotenes Zeichen
+	if ( strchr(path, '>') ) break;		// verbotenes Zeichen
+	if ( strchr(path, '|') ) break;		// verbotenes Zeichen
+	if ( strchr(path, '"') ) break;		// verbotenes Zeichen
+
+	p = temp;
+	sp = FileConstructFullPath(&p, PATH_BUFFER_SIZE, sp, path, TRUE);
+	if ( !sp) break;		// Kein FullPfad erzeugbar
+
+	p = temp;
+	sp = FileParseStandardPath(0, (char const **)&p);
+	if ( !sp) break;		// Kein StandardPfad erzeugbar
+
+	return FALSE;			// Alles OK
+	} while(0);
+
+    UserStandardDialogOptr( 0,(optr)0,(optr)0,(optr)0,
+		@ErrorInvalidDefaultPath,
+		(( CDT_ERROR << CDBF_DIALOG_TYPE_OFFSET) | \
+		 ( GIT_NOTIFICATION << CDBF_INTERACTION_TYPE_OFFSET)) );
+  return TRUE;
+
+}
+
+/*--------------------- MSG_IC_SET_DEFAULT_FOLDER ---------------------
+ *	Aufgabe:
+ *	Zusammenhang:
+ *	Strategie:
+ *	Parameter:
+ ---------------------------------------------------------------------------*/
+@extern method ICProcessClass, MSG_IC_SET_DEFAULT_FOLDER {
+int cmd;
+word pathLen;
+char path[PATH_BUFFER_SIZE];
+DiskHandle dh;
+char *p;
+char temp[PATH_BUFFER_SIZE];
+word len;
+
+
+	FilePushDir();
+	do {
+
+		/* Aktuellen Pfad aus der INI einstellen	*/
+		InitFileReadStringBuffer ("InstCre", "DefaultPath", path,
+				     PATH_BUFFER_SIZE, &pathLen);
+		FileToolCreatePath(SP_TOP, path);
+		FileSetCurrentPath(SP_TOP, path);
+
+
+		/* FileSelector mit Verzeichnis anzeigen */
+retry:
+		cmd = FileToolRequestChangeDir(NULL /*infoTextOptr*/, NULL, NULL, TRUE);
+				/*optr infoText, char *titel,
+					char *customTriggerMoniker, Boolean hasCancelTrigger);*/
+
+
+		/* Je nach Nutzreingabe: unterschiedlich reagieren */
+		switch (cmd) {
+			case IC_OK:	// Neuen Pfad setzen
+				// Current Pfad ermitteln und Sicherheitscheck
+				dh = FileGetCurrentPath (path, PATH_BUFFER_SIZE);
+				if ( ToolCheckPathValid(dh, path)  ) goto retry;
+
+				// L‰nge des SP-Top-Pfades ermitteln
+				p = temp;
+				FileConstructFullPath(&p, PATH_BUFFER_SIZE, SP_TOP, "", FALSE);
+				len = strlen(temp);
+
+				// Pfadanteil unter SP_TOP ermitteln
+				p = temp;
+				FileConstructFullPath(&p, PATH_BUFFER_SIZE, dh, path, FALSE);
+				p = &(temp[len]);
+				if ( *p == '\\') p++;
+
+				// Speichern
+				InitFileWriteString ("InstCre", "DefaultPath", p);
+				break;
+
+			case IC_NO:		// 	wenn Cancel-Trigger gerdr¸Åckt
+				break;
+
+/*			case IC_YES: 	// wenn Custom-Trigger gerdr¸Åckt
+				ToolCreateNewFolder();
+				break;
+				*/
+			}
+
+		} while (0);
+
+		FilePopDir();
+}
+
+
+/*--------------------- ToolWriteEmtpyDocPathToIni ---------------------
+ *	Aufgabe:	Startwerte f¸r die Pfad zu leeren Dokumenten initialisieren
+ ---------------------------------------------------------------------------*/
+void ToolWriteEmtpyDocPathToIni(void) {
+char *p;
+char temp[PATH_BUFFER_SIZE];
+word len;
+
+	// L‰nge des SP-Top-Pfades ermitteln
+	p = temp;
+	FileConstructFullPath(&p, PATH_BUFFER_SIZE, SP_TOP, "", FALSE);
+	len = strlen(temp);
+
+	// DOCUMENT	schreiben
+	p = temp;
+	FileConstructFullPath(&p, PATH_BUFFER_SIZE, SP_DOCUMENT, "", FALSE);
+	p = &(temp[len]);
+	if ( *p == '\\') p++;
+	InitFileWriteString ("InstCre", "DefaultPath", p);
+
+}
+
+
+/*--------------------- ToolInitializeDocumentGroup ---------------------
+ *	Aufgabe:	Standardpfad f¸r Leere Dokumente an das DocumentGroup-Objekt ¸bergeben
+ ---------------------------------------------------------------------------*/
+void ToolInitializeDocumentGroup(void) {
+word pathLen, err;
+char path[PATH_BUFFER_SIZE], *p;
+DiskHandle	dh;
+
+	err = InitFileReadStringBuffer ("InstCre", "DefaultPath", path,
+				     PATH_BUFFER_SIZE, &pathLen);
+	if ( err ) {
+		// Der Eintrag existiert noch nicht
+		ToolWriteEmtpyDocPathToIni();
+		InitFileReadStringBuffer ("InstCre", "DefaultPath", path,
+				     PATH_BUFFER_SIZE, &pathLen);
+		}
+
+	p = path;
+	dh = FileParseStandardPath(SP_TOP ,(char const **) &p);
+	@call ICDocumentGroup::MSG_GEN_PATH_SET(p, dh);
+}
+
+/*--------------------- MSG_IC_OPTIONS_CHANGED ---------------------
+ *	Aufgabe:
+ *	Zusammenhang:
+ *	Strategie:
+ *	Parameter:		(GEN_BOOLEAN_GROUP_APPLY_MSG)
+ ---------------------------------------------------------------------------*/
+@extern method ICProcessClass, MSG_IC_OPTIONS_CHANGED {
+
+	InitFileWriteInteger("InstCre","DisplayOptions", selectedBooleans);
+	@send process::MSG_IC_REBUILD_LIST();
+
+	}
+
+/*--------------------- ToolInitializeOptions ---------------------
+ *	Aufgabe:	Anzeigeoptionen initialisieren
+ ---------------------------------------------------------------------------*/
+void ToolInitializeOptions() {
+int err;
+word options;
+
+	err = InitFileReadInteger("InstCre","DisplayOptions", &options);
+	if (err) {
+		InitFileWriteInteger("InstCre","DisplayOptions", IC_DEFAULT_OPTIONS);
+		options = IC_DEFAULT_OPTIONS;
+		}
+
+	@call ICDisplayOptionsGroup::MSG_GEN_BOOLEAN_GROUP_SET_GROUP_STATE(options, 0);
+}
+
+/*---------------------  ---------------------
+ *	Aufgabe:
+ *	Zusammenhang:
+ *	Strategie:
+ *	Parameter:
+ ---------------------------------------------------------------------------*/
+@extern method ICProcessClass, MSG_IC_START_TEXT_EDITOR {
+word count, ctok,size;
+MemHandle mh;
+GeodeToken t;
+	if ( InitFileReadDataBuffer("InstallCreator","Editor",&t,
+					sizeof(GeodeToken),&size) ) {
+			SetTokenTo(t,'T','e','E','d',0);
+			}
+	mh = IACPCreateDefaultLaunchBlock(MSG_GEN_PROCESS_OPEN_APPLICATION);
+	ctok = IACPConnect(&t, IACPSM_USER_INTERACTIBLE, mh, NullOptr, &count);
+	if ( ctok == 0 ) {
+		ErrorMsgBox(@EditorNotFound,0,0);
+		}
+	else IACPShutdown(ctok, NullOptr);
+	}
+
+/*---------------------  ---------------------
+ *	Aufgabe:
+ *	Zusammenhang:
+ *	Strategie:
+ *	Parameter:
+ ---------------------------------------------------------------------------*/
+@extern method ICProcessClass, MSG_IC_CONFIG_TEXT_EDITOR {
+FileMainParams params;
+	@call ICFileSelector::MSG_GEN_PATH_SET(".",SP_APPLICATION);
+	if (SelectInstallFile( &params, SIF_TYPE_GEOS) ) return;
+	InitFileWriteData("InstallCreator","Editor",&params.appToken,sizeof(GeodeToken));
+	}
+
+
+
+/*---------------------  ---------------------
+ *	Aufgabe:
+ *	Zusammenhang:
+ *	Strategie:
+ *	Parameter:
+ ---------------------------------------------------------------------------*/
+@extern method ICProcessClass, MSG_IC_SET_DEFAULT_APP_OPTIONS {
+word flags;
+MemHandle 	mh;
+ICMapBlock 	*mapPtr;
+
+       if ( !docFile || !docMapBlock) return;
+       mapPtr = VMLock(docFile, docMapBlock, &mh);
+       flags = mapPtr->appInstDefaultFlags;
+       mapPtr->appInstDefaultFlags = GetInstallOptions(flags);
+       VMDirty(mh);
+       VMUnlock(mh);
+       }
+
+/*--------------------- MSG_IC_SET_DEFAULT_DOC_OPTIONS ---------------------
+ ---------------------------------------------------------------------------*/
+@extern method ICProcessClass, MSG_IC_SET_DEFAULT_DOC_OPTIONS {
+word flags;
+MemHandle 	mh;
+ICMapBlock 	*mapPtr;
+
+       if ( !docFile || !docMapBlock) return;
+       mapPtr = VMLock(docFile, docMapBlock, &mh);
+       flags = mapPtr->docInstDefaultFlags;
+       if (flags == 0 ) flags = DOC_INST_DEFAULT_FLAGS;
+       mapPtr->docInstDefaultFlags = GetInstallOptions(flags);
+       VMDirty(mh);
+       VMUnlock(mh);
+       }
+/*--------------------- MSG_IC_SET_DEFAULT_BASIC_OPTIONS ---------------------
+ ---------------------------------------------------------------------------*/
+@extern method ICProcessClass, MSG_IC_SET_DEFAULT_BASIC_OPTIONS {
+word flags;
+MemHandle 	mh;
+ICMapBlock 	*mapPtr;
+
+       if ( !docFile || !docMapBlock) return;
+       mapPtr = VMLock(docFile, docMapBlock, &mh);
+       flags = mapPtr->rbasicInstDefaultFlags;
+       if (flags == 0 ) flags = RBASIC_INST_DEFAULT_FLAGS;
+       mapPtr->rbasicInstDefaultFlags = GetInstallOptions(flags);
+       VMDirty(mh);
+       VMUnlock(mh);
+       }
+
+
+
+/*---------------------  ---------------------
+ *	Aufgabe:
+ *	Zusammenhang:
+ *	Strategie:
+ *	Parameter:
+ ---------------------------------------------------------------------------*/
+@extern method ICProcessClass, MSG_IC_SET_PASSWORT {
+MemHandle 	mh ,pwdmh;
+ICMapBlock 	*mapPtr;
+int n;
+char pwd[PWD_BUFFER_SIZE], *p;
+
+   if ( !docFile || !docMapBlock) return;
+   n = UserDoDialog(@ICPasswortDialog);
+   if (n == IC_OK )
+	{
+	mapPtr = VMLock(docFile, docMapBlock, &mh);
+	@call PasswortEingabeText::MSG_VIS_TEXT_GET_ALL_PTR(pwd);
+	// zunÑchst mal altes Passwort lîschen
+	if (mapPtr->password) VMFree(docFile,mapPtr->password);
+	mapPtr->password = 0;
+	if ( strlen(pwd) != 0 )
+		{	// Neues Passwort setzen
+		mapPtr->password = VMAlloc(docFile, PWD_BUFFER_SIZE, 0);
+		p = VMLock(docFile, mapPtr->password, &pwdmh);
+		LocalScramblePwd(pwd);
+		memcpy(p,pwd,PWD_BUFFER_SIZE);
+		VMDirty(pwdmh);
+		VMUnlock(pwdmh);
+		}
+	VMDirty(mh);
+	VMUnlock(mh);
+	}
+   }
+
+
+
+/*---------------------  ---------------------
+ *	Aufgabe:
+ *	Zusammenhang:
+ *	Strategie:
+ *	Parameter:
+ ---------------------------------------------------------------------------*/
+

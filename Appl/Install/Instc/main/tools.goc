@@ -1,0 +1,754 @@
+/**************************************************************************
+ *	GEODE-File fÅr
+ *
+ *	Beschreibung	Universelles Installationsprogramm
+ *			Creator
+ *
+ *	Copyright:	(c) by RABE-Soft 5/99
+ *	Sonstiges:	-
+ *
+ **************************************************************************/
+
+/*  Standard include files */
+@include <stdapp.goh>
+@include "instc.goh"
+@include "process.goh"
+@include "main/iconedi.goh"
+@include "ui/appui.goh"
+@include "../Shared/msgbox.goh"
+@include "../Shared/instllr.goh"
+@include "../Shared/rainer.goh"
+
+#include <string.h>
+#include <stdio.h>
+#include <token.h>
+#include <initfile.h>
+
+/* Include MessageBox code here */
+@include "../Shared/msgboxcode.goh"
+
+
+extern FileHandle docFile;    /* The handle of the document that's
+				     * currently open. */
+extern VMBlockHandle docMapBlock; /* VM block handle of the file's map block */
+extern int topPathLen;
+extern void UpdateDocumentUI(void);
+
+
+@classdecl ICOptionsDialogClass;
+
+
+@method ICOptionsDialogClass, MSG_OD_INSTALL_ALLWAYS_CHANGED  {
+
+	if (selectedBooleans & INST_IGNORE_P_AND_R )
+		{
+		@send ICProtocolSelector::MSG_GEN_SET_NOT_ENABLED(VUM_NOW);
+		@send ICReleaseSelector::MSG_GEN_SET_NOT_ENABLED(VUM_NOW);
+		}
+	  else 	{
+		@send ICProtocolSelector::MSG_GEN_SET_ENABLED(VUM_NOW);
+		@send ICReleaseSelector::MSG_GEN_SET_ENABLED(VUM_NOW);
+		}
+
+	if ( modifiedBooleans & INST_ONLY_IF_EXIST )
+		{
+		@send ICAllwaysSelector::
+			MSG_GEN_BOOLEAN_GROUP_SET_BOOLEAN_STATE(
+			INST_ONLY_IF_NOT_EXIST, FALSE);
+		}
+	if ( modifiedBooleans & INST_ONLY_IF_NOT_EXIST  )
+		{
+		@send ICAllwaysSelector::
+			MSG_GEN_BOOLEAN_GROUP_SET_BOOLEAN_STATE(
+			INST_ONLY_IF_EXIST, FALSE);
+		}
+
+
+/*
+	if (selectedBooleans & INST_ONLY_IF_EXIST ) {
+		@send ICCancelIfNotExistBoolean::MSG_GEN_SET_ENABLED(VUM_NOW);
+		}
+	  else  {
+		@send ICCancelIfNotExistBoolean::MSG_GEN_SET_NOT_ENABLED(VUM_NOW);
+		@send ICAllwaysSelector::MSG_GEN_BOOLEAN_GROUP_SET_GROUP_STATE
+				(selectedBooleans & ~INST_CANCEL_IF_NOT_EXIST,0);
+		}
+		*/
+	}
+
+
+@classdecl FileSelectDialogClass;
+
+Boolean ICIsAllowedFolderSelected(optr fileSelector) {
+/* PrÅft ob ein Order selektiert ist, der a) kein Systemordner ist
+ * und b) sich unter GEOS befindet */
+DiskHandle dh;
+PathName path;
+FileLongName  selection;
+char fullPath[QUERY_TEXT_LEN];	// Pfad + Name
+char * p;
+
+
+	@call fileSelector::MSG_GEN_PATH_GET(path,sizeof(PathName));
+	dh = @call fileSelector::MSG_GEN_PATH_GET_DISK_HANDLE();
+	@call fileSelector::MSG_GEN_FILE_SELECTOR_GET_SELECTION(selection);
+
+	// Selektion anhÑngen
+	if ( strlen(path) > 0 ) {
+		p = strchr(path, 0); p--;	// letztes Zeichen
+		if (*p == '.') { *p = 0; p--; }	// evt Punkt lîschen
+		if ( strlen(path) > 0 )		// nur wenn jetzt noch nicht leer
+			if (*p != '\\') strcat(path,"\\");
+		}
+	strcat(path, selection);
+
+	// Vollen Pfad konstruieren.
+	p = fullPath;
+	FileConstructFullPath(&p, QUERY_TEXT_LEN, dh, path, TRUE);
+
+	// Jetzt StandardPfad parsen. p zeigt auf "Nicht-Standard-Teil"
+	p = fullPath;
+	dh = FileParseStandardPath(0,(const char **) &p);
+
+	if ( dh == SP_NOT_STANDARD_PATH ) return FALSE;
+	if ( *p == 0 ) return FALSE;
+		else   return TRUE;
+
+}
+
+
+@method FileSelectDialogClass, MSG_FS_FILE_SELECTED {
+	/* word entryNum, word entryFlags */
+	if ( GFS_GET_ENTRY_TYPE(entryFlags) != GFSET_FILE )
+		{
+		@send ICSelectOKTrigger::MSG_GEN_SET_NOT_ENABLED(VUM_NOW);
+		if ( ICIsAllowedFolderSelected(@ICFileSelector) )
+			@send ICSelectFolderTrigger::MSG_GEN_SET_ENABLED(VUM_NOW);
+		   else @send ICSelectFolderTrigger::MSG_GEN_SET_NOT_ENABLED(VUM_NOW);
+		return;
+		}
+	@send ICSelectOKTrigger::MSG_GEN_SET_ENABLED(VUM_NOW);
+	@send ICSelectFolderTrigger::MSG_GEN_SET_NOT_ENABLED(VUM_NOW);
+	if ( entryFlags & GFSEF_OPEN) {
+		@send ICSelectOKTrigger::MSG_GEN_TRIGGER_SEND_ACTION(FALSE);
+		}
+
+	}
+
+@method FileSelectDialogClass, MSG_FS_SET_DIRECTORY {
+	if ( stdPath == (-1) ) {
+		@call ICFileSelector::MSG_GEN_PATH_SET("PREF",SP_SYSTEM);
+		}
+	else {
+		@call ICFileSelector::MSG_GEN_PATH_SET(".",stdPath);
+		}
+	}
+
+
+/*###########################################################################
+	CODE fÅr ICProcessClass und andere
+/*###########################################################################
+	Teil 3: Funktionen und Routinen
+/*###########################################################################*/
+
+void 	LocalScramblePwd(char * pwd) {
+// Verschl¸sseln eines Textes. pwd muss PWD_BUFFER_SIZE groﬂ sein,
+// PWD_BUFFER_LEN  bytes werden verschlÅsselt
+int x, a, n;
+char *p;
+  while ( strlen(pwd) < PWD_BUFFER_LEN ) strcat(pwd," ");
+  p = pwd; x = a = 0;
+  for ( n = 0; n<PWD_BUFFER_LEN; n++, p++ ) {
+	a += ( *p & 0xAA);
+	x += ( *p & 0x55);
+	}
+
+  for ( p = pwd, n = 0; n<PWD_BUFFER_LEN; n++, p++ ) {
+	*p += a;
+	*p ^= x;
+	x += ( a >>1 );
+	}
+  }
+
+word GetInstallOptions(word startOptions) {
+word options,o;
+
+	o = startOptions & INST_ALLG_MASK;
+	@call ICAllwaysSelector::MSG_GEN_BOOLEAN_GROUP_SET_GROUP_STATE(o,0);
+	@send ICAllwaysSelector::MSG_GEN_BOOLEAN_GROUP_SET_GROUP_MODIFIED_STATE
+				(INST_ALLG_MASK & ~(INST_ONLY_IF_EXIST | INST_ONLY_IF_NOT_EXIST),
+				0);
+	@send ICAllwaysSelector::MSG_GEN_APPLY();
+	if (o & INST_IGNORE_P_AND_R )
+		{
+		@send ICProtocolSelector::MSG_GEN_SET_NOT_ENABLED(VUM_NOW);
+		@send ICReleaseSelector::MSG_GEN_SET_NOT_ENABLED(VUM_NOW);
+		}
+	else 	{
+		@send ICProtocolSelector::MSG_GEN_SET_ENABLED(VUM_NOW);
+		@send ICReleaseSelector::MSG_GEN_SET_ENABLED(VUM_NOW);
+		}
+
+	o = (startOptions & INST_PROTOCOL_MASK);
+	@call ICProtocolSelector::MSG_GEN_ITEM_GROUP_SET_SINGLE_SELECTION(o,FALSE);
+	o = (startOptions & INST_RELEASE_MASK);
+	@call ICReleaseSelector::MSG_GEN_ITEM_GROUP_SET_SINGLE_SELECTION(o,FALSE);
+
+	UserDoDialog(@ICOptionsDialog);
+
+	o = @call ICAllwaysSelector::MSG_GEN_BOOLEAN_GROUP_GET_SELECTED_BOOLEANS();
+	options = (o & INST_ALLG_MASK );
+	o = @call ICProtocolSelector::MSG_GEN_ITEM_GROUP_GET_SELECTION();
+	options |= (o & INST_PROTOCOL_MASK );
+	o = @call ICReleaseSelector::MSG_GEN_ITEM_GROUP_GET_SELECTION();
+	options |= (o & INST_RELEASE_MASK );
+
+	return options;
+	}
+
+/*--------------------- SelectInstallFile ---------------------
+ *	Aufgabe:        Anzeige einer DialogBox zum AuswÑhlen der nÑchsten
+ *			Datei
+ *	Strategie:	Die FileMainParams werden auch gelesen
+ *	Parameter:	return TRUE, wenn Abbruch oder Fehler
+ ---------------------------------------------------------------------------*/
+Boolean SelectInstallFile( FileMainParams *params, SelectInstallType type) {
+DiskHandle dh;
+PathName path, fullPath;
+char * p;
+dword selParams;
+	if ( type == SIF_TYPE_ALL ) {
+		@send ICFileSelector::
+				MSG_GEN_FILE_SELECTOR_SET_FILE_CRITERIA(
+				FSFC_DIRS | FSFC_GEOS_EXECUTABLES
+				| FSFC_NON_GEOS_FILES
+				| FSFC_GEOS_NON_EXECUTABLES);
+		}
+	if ( type == SIF_TYPE_GEOS ) {
+		@send ICFileSelector::
+				MSG_GEN_FILE_SELECTOR_SET_FILE_CRITERIA(
+				FSFC_DIRS | FSFC_GEOS_EXECUTABLES);
+		}
+	if ( type == SIF_TYPE_FOLDERS ) {
+		@send ICFileSelector::
+				MSG_GEN_FILE_SELECTOR_SET_FILE_CRITERIA(
+				FSFC_DIRS);
+		@send ICSelectOKTrigger::MSG_GEN_SET_NOT_USABLE(VUM_NOW);
+		@send ICSelectFolderTrigger::MSG_GEN_SET_USABLE(VUM_NOW);
+		@send ICSelectFileDialog::MSG_GEN_USE_VIS_MONIKER(OptrToChunk(@SelFolderMoniker), VUM_NOW);
+		}
+	   else {
+		@send ICSelectFolderTrigger::MSG_GEN_SET_NOT_USABLE(VUM_NOW);
+		@send ICSelectOKTrigger::MSG_GEN_SET_USABLE(VUM_NOW);
+		@send ICSelectFileDialog::MSG_GEN_USE_VIS_MONIKER(OptrToChunk(@SelFileMoniker), VUM_NOW);
+		}
+
+	if ( UserDoDialog(@ICSelectFileDialog) != IC_OK ) return TRUE;
+
+/* Datei oder Ordner wurde gewÑhlt */
+
+	if ( type == SIF_TYPE_FOLDERS)	{
+		selParams = @call ICFileSelector::
+				 MSG_GEN_FILE_SELECTOR_GET_FULL_SELECTION_PATH(
+				 path);
+		dh = GFS_GET_FULL_SELECTION_PATH_DISK_HANDLE(selParams);
+		params->geosName[0] = 0;
+		}
+	   else {
+		@call ICFileSelector::MSG_GEN_PATH_GET(path,sizeof(PathName));
+		dh = @call ICFileSelector::MSG_GEN_PATH_GET_DISK_HANDLE();
+		@call ICFileSelector::MSG_GEN_FILE_SELECTOR_GET_SELECTION(params->geosName);
+		}
+
+	// Vollen Pfad konstruieren.
+	p = fullPath;
+	dh = FileConstructFullPath(&p, sizeof(PathName), dh, path, FALSE);
+
+	// Jetzt StandardPfad parsen. p zeigt auf "Nicht-Standard-Teil"
+	p = fullPath;
+	params->dh = FileParseStandardPath(dh ,(const char **) &p);
+
+	strcpy(params->path,p);
+	if ( params->dh == SP_NOT_STANDARD_PATH ) {
+		ErrorMsgBox(@MustBeUnderGeos,0,0);
+		return TRUE;
+		}
+
+	ICCompleteFileMainParams(params);
+	return FALSE;
+	}
+
+/*--------------------- ICCompleteFileMainParams ---------------------
+ *	Aufgabe:	lesen (oder updaten) der FileMainParams zu einer
+ *			Datei
+ *	Strategie:	geosName, path und diskHandle mÅssen schon belegt
+ *			sein, der Rest (au·er fileSize) wird neu gelesen
+ *			fileSize wird von ICWriteFileToHugeArray gesetzt
+ *	Parameter:      return TRUE, wenn Fehler
+ ---------------------------------------------------------------------------*/
+Boolean ICCompleteFileMainParams(FileMainParams *params) {
+DiskHandle dh;
+int err;
+	FilePushDir();
+	dh = FileSetCurrentPath(params->dh,params->path);
+
+	err = FileGetPathExtAttributes(params->geosName,FEA_FILE_TYPE,
+				&(params->fileType),sizeof(GeosFileType));
+
+	if ( (err == ERROR_ATTR_NOT_FOUND) || (err == ERROR_ATTR_NOT_SUPPORTED) )
+		{
+		params->fileType = GFT_NOT_GEOS_FILE;
+		err = 0;
+		}
+
+	if ( (dh == 0) || err )
+		{
+		ErrorMsgNumberBox(@ErrFileNotFound,params->geosName,err);
+		FilePopDir();
+		return TRUE;
+		}
+
+	params->fileAttrs = FileGetAttributes(params->geosName);
+	err = FileGetPathExtAttributes(params->geosName,FEA_DOS_NAME,
+				&(params->dosName),DOS_NAME_BUFFER_LEN);
+	params->extendedMagic = EXTENDED_MAGIC;
+	err = FileGetPathExtAttributes(params->geosName,FEA_MODIFICATION,
+				&(params->fdat),sizeof(FileDateAndTime));
+	memset(params->unused,0,F_MAIN_UNUSED_SIZE);
+
+	params->fileSize = 0;
+	FileGetPathExtAttributes(params->geosName,FEA_PROTOCOL,
+				&(params->protocol),sizeof(ProtocolNumber));
+	FileGetPathExtAttributes(params->geosName,FEA_RELEASE,
+				&(params->release),sizeof(ReleaseNumber));
+	FileGetPathExtAttributes(params->geosName,FEA_TOKEN,
+				&(params->appToken),sizeof(GeodeToken));
+	FileGetPathExtAttributes(params->geosName,FEA_CREATOR,
+				&(params->creatorToken),sizeof(GeodeToken));
+	FilePopDir();
+	return FALSE;
+	}
+
+
+int ICCheckForExistingFile(FileMainParams *params, word *itemFound) {
+InstallEntry * entryPtr;
+VMBlockHandle 	mainArray;
+int item , count,ret;
+Boolean   found = FALSE;
+
+  if ( !docFile || !docMapBlock) return ICCFEF_NOT_FOUND;
+  mainArray = ICGetMainArrayHandle();
+  count = HugeArrayGetCount(docFile,mainArray);
+  item = 0;
+  while ( item < count ) {
+	entryPtr = ICLockMainArrayElement(item);
+	if ( (entryPtr->type == IOT_FILE)
+			|| (entryPtr->type == IOT_UPDATE_TOOL)
+			|| (entryPtr->type == IOT_CLEANUP_TOOL) )
+	   if ( entryPtr->main.file.dh == params->dh )
+	      if ( !strcmp(entryPtr->main.file.path, params->path ) )
+		 if ( !strcmp(entryPtr->main.file.geosName, params->geosName ) )
+			{
+			found = TRUE;
+			ICUnlockMainArray(entryPtr);
+			*itemFound = item;
+			break;
+			}
+	item++;
+	ICUnlockMainArray(entryPtr);
+	}
+	if ( !found) return ICCFEF_NOT_FOUND;
+	ret = QuestionMsgBox(@FileAllreadyExist,params->geosName,0);
+	if ( ret == IC_YES ) return ICCFEF_REPLACE;
+	return ICCFEF_CANCEL;
+	}
+
+
+/* return TRUE wenn OK gedrÅckt */
+Boolean ICDoDosTokenDialog(DosTokenParams *tokParams) {
+FileMainParams params;
+GeodeToken	tok;
+FileLongName	appl;
+char idstr[16];
+int ret;
+
+  tok = tokParams->appToken;
+  strcpy(appl,tokParams->appName);
+  @call DosTokenFileMask::
+		MSG_VIS_TEXT_REPLACE_ALL_PTR(tokParams->dosFile,0);
+  @call DosTokenFileMask::MSG_VIS_TEXT_SELECT_ALL();
+
+  do {
+	@call DosTokenApplication::
+		MSG_VIS_TEXT_REPLACE_ALL_PTR(appl,0);
+	WriteTokenIDString(idstr,tok);
+	@call DosTokenAppIconID::
+		MSG_VIS_TEXT_REPLACE_ALL_PTR(idstr,0);
+
+	ret = UserDoDialog(@DosTokenBox);
+	switch (ret) {
+		case IC_YES:
+			if (SelectInstallFile( &params, SIF_TYPE_GEOS) ) break;
+			strcpy(appl,params.geosName);
+			tok = params.appToken;
+			break;
+		case IC_OK:
+			@call DosTokenFileMask::
+				MSG_VIS_TEXT_GET_ALL_PTR(tokParams->dosFile);
+			strcpy(tokParams->appName,appl);
+			tokParams->appToken = tok;
+			break;
+		}
+	} while ( ret == IC_YES);
+  return ( ret == IC_OK);
+  }
+
+/*---------------------  ---------------------
+ *	Aufgabe:
+ *	Zusammenhang:
+ *	Strategie:
+ *	Parameter:
+ ---------------------------------------------------------------------------*/
+void	ICAddFileEntry(FileMainParams *params, word flags, word type) {
+InstallEntry	entry;
+
+	if ( !docFile || !docMapBlock) return;
+/* allgemeine Informationen */
+	entry.main.file = *params;
+	entry.instFlags = flags;
+	entry.type = type;
+/* File HugeArray */
+	entry.main.file.data = HugeArrayCreate(docFile,HUGE_ARRAY_ELEMENT_SIZE,0);
+/* Datei abspeichern und FileSize belegen */
+	if ( ! ICWriteFileToHugeArray(&entry.main.file,docFile) ) {
+		ICAddMainEntry(&entry);
+		}
+/* Anzeige erneuern */
+	UpdateDocumentUI();
+	}
+
+void ICAddDosTokenEntry(DosTokenParams *tokenParams) {
+InstallEntry	entry;
+
+	/* allgemeine Informationen */
+		entry.main.dosToken = *tokenParams;
+		entry.instFlags = 0;
+		entry.type = IOT_DOS_TOKEN;
+	/* Main HugeArray */
+		ICAddMainEntry(&entry);
+	/* Anzeige erneuern */
+		UpdateDocumentUI();
+	}
+
+/*---------------------  ---------------------
+ *	Aufgabe:
+ *	Zusammenhang:
+ *	Strategie:
+ *	Parameter:
+ ---------------------------------------------------------------------------*/
+Boolean	ICWriteFileToHugeArray(FileMainParams *fParams,VMFileHandle file) {
+word size;
+sdword gelesen;
+int  read;
+dword count;
+VMBlockHandle array;
+FileHandle fh;		/* Zu lesende Datei */
+Boolean errFlag;
+void	* bufPtr;
+
+	@call ICReadFileGlyph::MSG_GEN_REPLACE_VIS_MONIKER_TEXT
+						(fParams->geosName,VUM_NOW);
+	FilePushDir();
+	FileSetCurrentPath(fParams->dh,fParams->path);
+	fh = FileOpen(fParams->geosName,FILE_ACCESS_R | FILE_DENY_NONE| 0x80);
+	if (!fh) {
+		ErrorMsgNumberBox(@ErrOpenFile,fParams->geosName,ThreadGetError());
+		FilePopDir();
+		return TRUE;
+		}
+	array = fParams->data;
+	errFlag = FALSE;
+	gelesen = 0;
+	do {
+	   count = HugeArrayGetCount(file, array );
+	   HugeArrayAppend(file, array,1,0);
+	   HugeArrayLock(file,array,count, &bufPtr, &size);
+	   read = FileRead(fh,bufPtr, HUGE_ARRAY_ELEMENT_SIZE, FALSE);
+	   gelesen += read;
+	   HugeArrayDirty(bufPtr);
+	   HugeArrayUnlock(bufPtr);
+	   if ( read == -1 ) errFlag = TRUE;
+	   } while ( (read == HUGE_ARRAY_ELEMENT_SIZE) && !errFlag );
+
+	fParams->fileSize = gelesen;
+	FileClose(fh,FALSE);
+	FilePopDir();
+	if (errFlag ) {
+		ErrorMsgNumberBox(@ErrReadFile,fParams->geosName,ThreadGetError());
+		}
+	return errFlag;		// TRUE, wenn Fehler
+	}
+
+/* ausgelagerte Tool-Routinen, um Das Anzeigen der Geos-Informationen im
+	Detail-Dialog zu erleichtern */
+
+/*--------------------- ViewToolFileDateToTimeDate ---------------------
+ *      Aufgabe:        Konvertieren der GeosDatenStrukturen
+ *      Params/Return:	void ( Zielstruktur, Quellstruktur)
+ ---------------------------------------------------------------------------*/
+void ViewToolFileDateToTimeDate( TimerDateAndTime *tdat, FileDateAndTime fdat) {
+  tdat->TDAT_year = FDATExtractYearAD(fdat);
+  tdat->TDAT_month = FDATExtractMonth(fdat);
+  tdat->TDAT_day = FDATExtractDay(fdat);
+  tdat->TDAT_hours = FDATExtractHour(fdat);
+  tdat->TDAT_minutes= FDATExtractMinute(fdat);
+  tdat->TDAT_seconds = FDATExtractSecond(fdat);
+  }
+
+/*--------------------- ViewToolShowDate ---------------------
+ *      Aufgabe:        Ein Datum als VisMoniker an ein Objekt senden
+ ---------------------------------------------------------------------------*/
+void ViewToolShowDate(optr glyph, FileDateAndTime fdat ) {
+char date[16];
+TimerDateAndTime tdat;
+
+  ViewToolFileDateToTimeDate( &tdat, fdat);
+  LocalFormatDateTime(date, DTF_ZERO_PADDED_SHORT, &tdat);
+  @call glyph::MSG_GEN_REPLACE_VIS_MONIKER_TEXT(date,VUM_NOW);
+  }
+
+/*--------------------- ViewToolShowDate ---------------------
+ *      Aufgabe:        Eine Uhrzeit als VisMoniker an ein Objekt senden
+ ---------------------------------------------------------------------------*/
+void ViewToolShowTime(optr glyph, FileDateAndTime fdat ) {
+  char time[16];
+TimerDateAndTime tdat;
+
+  ViewToolFileDateToTimeDate( &tdat, fdat);
+  LocalFormatDateTime(time, DTF_HMS, &tdat);
+  @call glyph::MSG_GEN_REPLACE_VIS_MONIKER_TEXT(time,VUM_NOW);
+  }
+
+
+/*--------------------- ViewToolShowIconID ---------------------
+ *      Aufgabe:        Eine Icon-ID als VisMoniker an ein Objekt senden
+ ---------------------------------------------------------------------------*/
+void ViewToolShowIconID(optr glyph, GeodeToken t ) {
+char icon[16];
+
+   memcpy(icon,t.GT_chars,4);
+   icon[4]=',';
+   UtilHex32ToAscii(&icon[5],t.GT_manufID, UHTAF_NULL_TERMINATE);
+   @call glyph::MSG_GEN_REPLACE_VIS_MONIKER_TEXT(icon,VUM_NOW);
+  }
+
+/*--------------------- ViewToolAddNumber ---------------------
+ *      Aufgabe:        Ene Nummer an eine String hÑngen
+ ---------------------------------------------------------------------------*/
+void ViewToolAddNumber(char * st, dword num ) {
+char *p;
+  p = strchr(st,0);	// Zeiger auf die Null
+  UtilHex32ToAscii(p,num, UHTAF_NULL_TERMINATE);
+  }
+
+/*--------------------- ViewToolUpdateGeodeInfo ---------------------
+ *      Aufgabe:        Geode-Informationen aus dem Header und FileMainParams lesen
+ *			und an den dafÅr vorgesehenen AnzeigeDialog senden
+ *      Strategie:	Der Dialog wird geÑndert, aber nicht gestartet
+ ---------------------------------------------------------------------------*/
+void	ViewToolUpdateGeodeInfo(GeosHeader *header, FileMainParams * fParams) {
+char hilfstext[100];
+
+   @call GeosInfoBox::MSG_GEN_REPLACE_VIS_MONIKER_TEXT(fParams->geosName,VUM_NOW);
+   @call InfoDosNameText::MSG_GEN_REPLACE_VIS_MONIKER_TEXT(fParams->dosName,VUM_NOW);
+
+   ViewToolShowDate(@InfoCreateDateText,header->createDate);
+   ViewToolShowTime(@InfoCreateTimeText,header->createDate);
+   ViewToolShowIconID(@InfoCreatorText,header->creatorToken);
+
+   UtilHex32ToAscii(hilfstext,fParams->fileSize, UHTAF_NULL_TERMINATE);
+   @call InfoFileSizeText::MSG_GEN_REPLACE_VIS_MONIKER_TEXT(hilfstext,VUM_NOW);
+
+   ViewToolShowIconID(@InfoIconIDText,fParams->appToken);
+
+   ViewToolShowDate(@InfoModifiedDateText,fParams->fdat);
+   ViewToolShowTime(@InfoModifiedTimeText,fParams->fdat);
+
+   hilfstext[0]=0;
+   ViewToolAddNumber(hilfstext,fParams->protocol.PN_major);
+   strcat(hilfstext,".");
+   ViewToolAddNumber(hilfstext,fParams->protocol.PN_minor);
+   @call InfoProtocolText::MSG_GEN_REPLACE_VIS_MONIKER_TEXT(hilfstext,VUM_NOW);
+
+   hilfstext[0]=0;
+   ViewToolAddNumber(hilfstext,fParams->release.RN_major);
+   strcat(hilfstext,".");
+   ViewToolAddNumber(hilfstext,fParams->release.RN_minor);
+   strcat(hilfstext,"  ");
+   ViewToolAddNumber(hilfstext,fParams->release.RN_change);
+   strcat(hilfstext,"-");
+   ViewToolAddNumber(hilfstext,fParams->release.RN_engineering);
+   @call InfoReleaseText::MSG_GEN_REPLACE_VIS_MONIKER_TEXT(hilfstext,VUM_NOW);
+
+   if ( *(header->password) ) {	/* Passwort gesetzt */
+	@call InfoPasswordText::MSG_GEN_REPLACE_VIS_MONIKER_TEXT("Ja",VUM_NOW);
+	}
+   else {
+	@call InfoPasswordText::MSG_GEN_REPLACE_VIS_MONIKER_TEXT("Nein",VUM_NOW);
+	}
+
+   memcpy(hilfstext,header->copyright,32);
+   hilfstext[32]=0;
+   @call InfoCopyrightText::MSG_GEN_SET_ENABLED(VUM_NOW);
+   @call InfoCopyrightText::MSG_VIS_TEXT_REPLACE_ALL_PTR(hilfstext,0);
+
+   memcpy(hilfstext,header->notiz,99);
+   hilfstext[99]=0;
+   @call GeosInfoUserNotes::MSG_GEN_SET_ENABLED(VUM_NOW);
+   @call GeosInfoUserNotes::MSG_VIS_TEXT_REPLACE_ALL_PTR(hilfstext,0);
+
+   if (fParams->fileAttrs & FA_HIDDEN ) hilfstext [0] = 'H'; else hilfstext [0] = ' ';
+   if (fParams->fileAttrs & FA_SYSTEM ) hilfstext [1] = 'S'; else hilfstext [1] = ' ';
+   if (fParams->fileAttrs & FA_ARCHIVE ) hilfstext [2] = 'A';else hilfstext [2] = ' ';
+   if (fParams->fileAttrs & FA_RDONLY ) hilfstext [3] = 'R'; else hilfstext [3] = ' ';
+   if (fParams->fileAttrs & FA_SUBDIR ) hilfstext [4] = 'D'; else hilfstext [4] = ' ';
+   hilfstext[5]=0;
+
+   @call InfoAttributeText::MSG_GEN_REPLACE_VIS_MONIKER_TEXT(hilfstext,VUM_NOW);
+
+   }
+
+/*--------------------- ViewToolSetNotAvail ---------------------
+ *      Aufgabe:        Einen "Nicht Vorhanden" Text als VisMoniker setzen
+ ---------------------------------------------------------------------------*/
+void ViewToolSetNotAvail(optr obj) {
+   @call obj::MSG_GEN_REPLACE_VIS_MONIKER_TEXT("-",VUM_NOW);
+   }
+
+/*--------------------- ViewToolUpdateDosInfo ---------------------
+ *      Aufgabe:        Dos-File-Informationen aus den FileMainParams lesen
+ *			und an den dafÅr vorgesehenen AnzeigeDialog senden
+ *      Strategie:	Der Dialog wird geÑndert, aber nicht gestartet
+ ---------------------------------------------------------------------------*/
+void	ViewToolUpdateDosInfo(FileMainParams * fParams) {
+char hilfstext[100];
+
+   @call GeosInfoBox::MSG_GEN_REPLACE_VIS_MONIKER_TEXT(fParams->geosName,VUM_NOW);
+   @call InfoDosNameText::MSG_GEN_REPLACE_VIS_MONIKER_TEXT(fParams->dosName,VUM_NOW);
+
+   ViewToolSetNotAvail(@InfoCreateDateText);
+   ViewToolSetNotAvail(@InfoCreateTimeText);
+   @call InfoCreatorText::MSG_GEN_REPLACE_VIS_MONIKER_TEXT("DOS",VUM_NOW);
+
+   UtilHex32ToAscii(hilfstext,fParams->fileSize, UHTAF_NULL_TERMINATE);
+   @call InfoFileSizeText::MSG_GEN_REPLACE_VIS_MONIKER_TEXT(hilfstext,VUM_NOW);
+
+   ViewToolSetNotAvail(@InfoIconIDText);
+
+   ViewToolShowDate(@InfoModifiedDateText,fParams->fdat);
+   ViewToolShowTime(@InfoModifiedTimeText,fParams->fdat);
+
+   ViewToolSetNotAvail(@InfoProtocolText);
+   ViewToolSetNotAvail(@InfoReleaseText);
+   ViewToolSetNotAvail(@InfoPasswordText);
+
+
+   hilfstext[0]=0;
+   @call InfoCopyrightText::MSG_VIS_TEXT_REPLACE_ALL_PTR(hilfstext,0);
+   @call InfoCopyrightText::MSG_GEN_SET_NOT_ENABLED(VUM_NOW);
+
+   @call GeosInfoUserNotes::MSG_VIS_TEXT_REPLACE_ALL_PTR(hilfstext,0);
+   @call GeosInfoUserNotes::MSG_GEN_SET_NOT_ENABLED(VUM_NOW);
+
+   if (fParams->fileAttrs & FA_HIDDEN ) hilfstext [0] = 'H'; else hilfstext [0] = ' ';
+   if (fParams->fileAttrs & FA_SYSTEM ) hilfstext [1] = 'S'; else hilfstext [1] = ' ';
+   if (fParams->fileAttrs & FA_ARCHIVE ) hilfstext [2] = 'A';else hilfstext [2] = ' ';
+   if (fParams->fileAttrs & FA_RDONLY ) hilfstext [3] = 'R'; else hilfstext [3] = ' ';
+   if (fParams->fileAttrs & FA_SUBDIR ) hilfstext [4] = 'D'; else hilfstext [4] = ' ';
+   hilfstext[5]=0;
+
+   @call InfoAttributeText::MSG_GEN_REPLACE_VIS_MONIKER_TEXT(hilfstext,VUM_NOW);
+   }
+
+
+/*--------------------- ToolDisplayFileInfo ---------------------
+ *      Aufgabe:        FileInfo anzeigen.
+ *			Es mu· sicher sein, da· item einen Eintrag
+ *			referenziert, der eine FileMainParam Eintrag enthÑlt
+ *      Strategie:
+ ---------------------------------------------------------------------------*/
+void ToolDisplayFileInfo(InstallEntry	* entryPtr) {
+VMBlockHandle	fileArray;
+GeosHeader * gHeader;
+word size;
+
+	if ( !docFile || !docMapBlock) return;
+	fileArray = entryPtr->main.file.data;
+
+	HugeArrayLock(docFile,fileArray,0, (void**)&gHeader,&size);
+
+	if ( gHeader->Kennung == GEOS_HEADER_MAGIC ) {
+		ViewToolUpdateGeodeInfo(gHeader, &(entryPtr->main.file));
+		}
+	  else 	{
+		ViewToolUpdateDosInfo(&(entryPtr->main.file));
+		}
+	HugeArrayUnlock(gHeader);
+	UserDoDialog(@GeosInfoBox);
+	}
+
+/*--------------------- ToolConstructPath ---------------------
+ *      Aufgabe:	Textstring konstruieren, der den Pfad zu einer Datei
+ *			oder einem Verzeichnis darstellt, aber ohne der
+ *			Pfad zum SP_TOP zu enthalten
+ *	Parameter:	buffer: wohin mit dem Text (Grî·e: QUERY_TEXT_LEN)
+ *			dh: Diskhandle
+ *			path: Pfadstring
+ *			file: eventuelle Datei oder Unetrverz.
+ *				Nullpointer ist hier erlaubt
+ *      Return:
+ ---------------------------------------------------------------------------*/
+void ToolConstructPath(char *buffer, DiskHandle dh, char *path, char *file) {
+static int topLen = 0;
+char * p, *s, *d;
+
+	/* Bei Bedarf: LÑnge des SP_Top-Path ermitteln */
+	if (topLen == 0 ) {
+		p = buffer;
+		FileConstructFullPath(&p, QUERY_TEXT_LEN, SP_TOP,
+				".", FALSE);
+		topLen = strlen(buffer)+1;  	/* incl abschlie·endem '\'*/
+		}
+
+	p = buffer;
+	FileConstructFullPath(&p, QUERY_TEXT_LEN, dh, path, FALSE);
+	// evt Datei oder Verzeichnis anhÑngen
+	strcat(buffer,"\\");	// der muss sein, weil er in topLen enthalten
+				// ist, falls es SP_TOP ist
+	if ( file ) strcat(buffer, file);
+
+	/* SP_Top-Path rauskopieren */
+	s = &buffer[topLen];
+	d = buffer;
+	while ( *s != 0 ) {
+		*d = *s;
+		d++; s++;
+		}
+	*d = 0;
+
+	/* evt einen Backslash am Ende entfernen */
+	if ( strlen(buffer) > 0 ) {
+		d = strchr(buffer, 0);
+		d--;
+		if ( *d == '\\' ) *d=0;
+		}
+
+	}
+
+
+/*---------------------  ---------------------
+ *      Aufgabe:
+ *	Parameter:
+ *      Return:
+ ---------------------------------------------------------------------------*/
+

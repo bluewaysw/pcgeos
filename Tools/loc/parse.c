@@ -29,6 +29,7 @@ REVISION HISTORY:
 	----	----		-----------
 	JHP	11/19/92   	Initial version.
 	jacob   9/9/96		Ported to Win32.
+ 	RainerB	9/21/2023   	Error message added to main
 
 DESCRIPTION:
 	Takes .rsc file(s) and turns them into a single .vm file
@@ -41,7 +42,7 @@ DESCRIPTION:
 #include <config.h>
 
 #ifdef __BORLANDC__
-/* 
+/*
  * !@#!@#!@ Borland hoses us by not defining this unless you pass -A,
  * which we don't want to do because it's too restrictive.  But if _STDC_
  * isn't defined, then bison.simple will #define "const" to nothing.
@@ -842,7 +843,7 @@ case 5:
 case 6:
 #line 266 "parse.y"
 {
-		    EnterChunk(yyvsp[-6].string, atoi(yyvsp[-5].string), atoi(yyvsp[-4].string), yyvsp[-3].string, 
+		    EnterChunk(yyvsp[-6].string, atoi(yyvsp[-5].string), atoi(yyvsp[-4].string), yyvsp[-3].string,
 			       atoi(yyvsp[-2].string), atoi(yyvsp[-1].string), atoi(yyvsp[0].string));
 		    free(yyvsp[-5].string);
 		    free(yyvsp[-4].string);
@@ -1132,7 +1133,7 @@ EnterChunk(char *name,
 	currentResource->locTail->next = loc;
 	currentResource->locTail = loc;
     }
-    
+
     currentResource->count++;
 }
 
@@ -1201,13 +1202,13 @@ DBEnlargeGroup (MemHandle   	mem,
     word	    size;
 
     size = swaps(hdr->DBGH_blockSize) + newBytes;
-	
+
     MemReAlloc(mem, size, 0);
     MemInfo(mem, (genptr *)&hdr, (word *)NULL);
     hdr->DBGH_blockSize = swaps(size);
 
     *hdrPtr = hdr;
-    
+
     return ((void *)((genptr)hdr + size - newBytes));
 }
 
@@ -1254,7 +1255,7 @@ DBAlloc(VMHandle    	file,
 
     if (hdr->DBGH_itemBlocks != 0) {
 	word	ibSize;
-	
+
 	ibi = (DBItemBlockInfo *)((genptr)hdr + swaps(hdr->DBGH_itemBlocks));
 	VMInfo(file, swaps(ibi->DBIBI_block), &ibSize, (MemHandle *)NULL,
 	       (VMID *)NULL);
@@ -1286,7 +1287,7 @@ DBAlloc(VMHandle    	file,
 	 * right when it's locked down...
 	 */
 	VMSetLMemFlag(file, itemBlock);
-	
+
 	/*
 	 * First make room for and initialize the DBItemBlockInfo structure in
 	 * the group.
@@ -1408,15 +1409,15 @@ DBAlloc(VMHandle    	file,
 	 */
 	MemReAlloc(imem, swaps(ibh->DBIBH_standard.LMBH_blockSize) + csize, 0);
 	MemInfo(imem, (genptr *)&ibh, (word *)NULL);
-	
+
 	/*
 	 * The block may move, however, so we have to recompute "chunk"
 	 */
 	chunk = (word *)((genptr)ibh + swaps(ibh->DBIBH_standard.LMBH_offset) +
 			 2 * (swaps(ibh->DBIBH_standard.LMBH_nHandles) - 1));
-	
+
     }
-	
+
     /*
      * Point the chosen chunk handle at the data allocated at the end of the
      * block.
@@ -1433,7 +1434,7 @@ DBAlloc(VMHandle    	file,
     /*
      * Increase the block size by the rounded size of the chunk.
      */
-    ibh->DBIBH_standard.LMBH_blockSize = 
+    ibh->DBIBH_standard.LMBH_blockSize =
 	swaps(swaps(ibh->DBIBH_standard.LMBH_blockSize) + csize);
 
     /*
@@ -1452,7 +1453,7 @@ DBAlloc(VMHandle    	file,
 
     return(result);
 }
-	
+
 
 /***********************************************************************
  *				DBLock
@@ -1576,7 +1577,7 @@ DumpMapBlock (VMHandle	output)
     item = DBAlloc(output, group, mapItemLen);
 
     bp = DBLock(output, group, item);
-    
+
     /*
      * Initialize the ChunkArrayHeader
      */
@@ -1614,7 +1615,7 @@ DumpMapBlock (VMHandle	output)
 	strcpy((char *) bp, longName);
 	bp += strlen(longName) + 1;
     }
-    
+
     /*
      * Next come the offsets to the elements.
      */
@@ -1635,7 +1636,7 @@ DumpMapBlock (VMHandle	output)
 						strlen(res->name));
 	}
     }
-    
+
     /*
      * Now the elements themselves.
      */
@@ -1643,7 +1644,7 @@ DumpMapBlock (VMHandle	output)
 	 ent != NULL;
 	 ent = Hash_EnumNext(&search))
     {
-	
+
 	res = (ResourceSym *)Hash_GetValue(ent);
 	if (res->locHead != NULL) {
 	    int nameLen = strlen(res->name);
@@ -1715,7 +1716,7 @@ DumpResource (ResourceSym *res,
     LocalizeInfo    *loc;
     word    	    offset;
     int		    maxLen;
-    
+
     res->group = DBAllocGroup(output);
 
     /*
@@ -1723,7 +1724,7 @@ DumpResource (ResourceSym *res,
      */
     for (loc = res->locHead; loc != NULL; loc = loc->next) {
 	char	*inst;
-	
+
 	if (strlen(loc->instructions) == 0) {
 	    loc->item = 0;
 	} else if (dbcsRelease != 0) {
@@ -1751,7 +1752,7 @@ DumpResource (ResourceSym *res,
 	    	(strlen(loc->chunkName) << 1) :
 		strlen(loc->chunkName));
     }
-    
+
     res->item = DBAlloc(output, res->group, len);
     bp = DBLock(output, res->group, res->item);
 
@@ -1789,7 +1790,7 @@ DumpResource (ResourceSym *res,
 		   (strlen(loc->chunkName) << 1) :
 		   strlen(loc->chunkName));
     }
-    
+
     /*
      * Now the elements themselves.
      */
@@ -1860,7 +1861,7 @@ DumpLocalizations(const char *outputName)
 	perror(outputName);
 	exit(1);
     }
-    
+
 
     VMGetHeader(output, (char *)&gfh);
     gfh.protocol.major = swaps(LOC_PROTO_MAJOR);
@@ -1900,9 +1901,9 @@ DumpLocalizations(const char *outputName)
  * SYNOPSIS:	    Enum to next .rsc file name in CWD
  * CALLED BY:	    main, GetFirstRSCFile
  * RETURN:	    char *, or NULL if none left or error
- * SIDE EFFECTS:    
+ * SIDE EFFECTS:
  *
- * STRATEGY:	    
+ * STRATEGY:
  *
  * REVISION HISTORY:
  *	Name	Date		Description
@@ -1916,7 +1917,7 @@ static struct find_t	findStruct;
 #include <compat/windows.h>
 static WIN32_FIND_DATA	findStruct;
 static HANDLE		findHandle;
-/* 
+/*
  * Pass in file attributes, get back TRUE if this is
  * not a directory or weird psuedo-file.
  */
@@ -1932,7 +1933,7 @@ GetNextRSCFile(void)
 	return findStruct.name;
     }
     return NULL;
-#elif defined(_WIN32) 
+#elif defined(_WIN32)
     char *fileName = NULL;
 
     while (1) {
@@ -1957,9 +1958,9 @@ GetNextRSCFile(void)
  *		    .rsc files in CWD
  * CALLED BY:	    main
  * RETURN:	    char * of file name, NULL if error or none found
- * SIDE EFFECTS:    
+ * SIDE EFFECTS:
  *
- * STRATEGY:	    
+ * STRATEGY:
  *
  * REVISION HISTORY:
  *	Name	Date		Description
@@ -1980,7 +1981,7 @@ GetFirstRSCFile(char *path)
 	if (!IS_OKAY_FILE(findStruct.dwFileAttributes)) {
 	    /*
 	     * Not a plain file, skip it.
-	     */  
+	     */
 	    return GetNextRSCFile();
 	}
 
@@ -2000,12 +2001,12 @@ GetFirstRSCFile(char *path)
  * SYNOPSIS:	    Construct full path to enumerated file name
  * CALLED BY:	    main
  * RETURN:	    char * (must be free()'d)
- * SIDE EFFECTS:    
+ * SIDE EFFECTS:
  *	Allocates space for string.
  *
- * STRATEGY:	    
+ * STRATEGY:
  *	Lame-o FindFirstFile, when given something like FOO/*.rsc
- *      only returns names like Boot.rsc, not FOO/Boot.rsc.  
+ *      only returns names like Boot.rsc, not FOO/Boot.rsc.
  *	So we have to manually add that back in.
  *
  * REVISION HISTORY:
@@ -2022,7 +2023,7 @@ ConstructPath (const char *wildcard, const char *path)
     char *slash;
 
     if (lastSlash == NULL && lastBackSlash == NULL) {
-	/* 
+	/*
 	 * Wasn't in a subdir, just return a copy of the path.
 	 */
 	return strdup(path);
@@ -2051,18 +2052,57 @@ ConstructPath (const char *wildcard, const char *path)
 
 
 /***********************************************************************
+ *				LocErr
+ ***********************************************************************
+ * SYNOPSIS:	    Print out an error message if the required .rsc files
+ *		    are not found
+ * RETURN:
+ * SIDE EFFECTS:
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	RainerB	9/21/2023   	Initial Revision
+ *
+ ***********************************************************************/
+
+void LocErr(int foundFlags, char *outputName)
+{
+
+    switch (foundFlags)
+    {
+    	case 0: 	// no .rsc file found
+    	    fprintf(stderr, "\nloc: No .rsc files found.\n");
+    	    fprintf(stderr, "* Build the NC version to create the .rsc files. *\n");
+    	    return;
+    	case 1: fprintf(stderr, "\nloc warning: Only the file 'rsc.rsc' found. Missing other .rsc file(s).\n");
+	    break;
+	case 2: fprintf(stderr, "\nloc warning: Reqired file 'rsc.rsc' not found.\n");
+	    break;
+    	case 3: 	// anything is OK
+    	    return;
+    }
+    fprintf(stderr, "* '");
+    fprintf(stderr, outputName);
+    fprintf(stderr, "' may NOT contain the correct lables. Build the NC version to create all required .rsc files. *\n");
+}
+
+/***********************************************************************
  *				main
  ***********************************************************************
  * SYNOPSIS:	    You know
  * RETURN:	    int
- * SIDE EFFECTS:    
+ * SIDE EFFECTS:
  *
- * STRATEGY:	    
+ * STRATEGY:
  *
  * REVISION HISTORY:
  *	Name	Date		Description
  *	----	----		-----------
  *	JAG	5/19/96   	Initial Revision
+ *	RainerB	9/21/2023   	Error message added
  *
  ***********************************************************************/
 void
@@ -2071,13 +2111,14 @@ main(int argc, char **argv)
     char	*outputName = "loc.vm";
     char	*rscFileNames = "*.rsc";
     int	    	i;
+    int 	foundFlags = 0;
 
-#if defined(unix)
+#if defined(_LINUX)
     if (argc == 1) {
 	exit(0);
     }
 #endif
-    
+
     Hash_InitTable(&locHash, -1, HASH_STRING_KEYS, -1);
 
     for (i = 1; i < argc; i++) {
@@ -2108,7 +2149,7 @@ main(int argc, char **argv)
 	    }
 	} else {
 
-#if defined(unix)
+#if defined(_LINUX)
 	    yyin = fopen(argv[i], "rt");
 	    if (yyin == NULL) {
 		perror(argv[i]);
@@ -2135,11 +2176,16 @@ main(int argc, char **argv)
     {
 	curFile = GetFirstRSCFile(rscFileNames);
 	if (curFile == NULL) {
-	    fprintf(stderr, "loc: no .rsc files found\n");
-	    errors = 1;
+	    errors = 1;			// error message will be printed below
 	} else {
 	    do {
 		char *fullPath = ConstructPath(rscFileNames, curFile); /* #1 */
+
+		if (strcmp(curFile, "rsc.rsc")==0) {
+		    foundFlags |= 1;
+		} else {
+		    foundFlags |= 2;
+		}
 
 		yyin = fopen(fullPath, "rt"); /* #1 */
 		if (yyin == NULL) {
@@ -2155,7 +2201,7 @@ main(int argc, char **argv)
 		    break;
 		}
 		(void)fclose(yyin);
-		
+
 		curFile = GetNextRSCFile();
 	    } while (curFile != NULL);
 #if defined(_WIN32)
@@ -2169,10 +2215,15 @@ main(int argc, char **argv)
 	}
     }
 #endif /* _MSDOS || _WIN32 */
-    
+
     if (errors == 0) {
 	DumpLocalizations(outputName);
     }
+
+    /*
+     * Print out an error message if the requred .rsc files was not found.
+     */
+    LocErr(foundFlags, outputName);
 
     /*
      * Free up Hash table to cut down on leaks that BoundsChecker finds.
@@ -2197,21 +2248,21 @@ yylex(void)
 	yylineno += 1;
 	bumpLine = 0;
     }
-    
+
     /*
      * Skip leading whitespace
      */
     do {
 	c = getc(yyin);
     } while (isspace(c) && (c != '\n'));
-    
+
     if (c == '\n') {
 	bumpLine = 1;
 	return c;
     } else if (c == EOF) {
 	return 0;
     }
-    
+
     if (c == '"') {
 	/*
 	 * Quoted string -- read to the matching double-quote. String is
@@ -2234,7 +2285,7 @@ yylex(void)
 	    *temp++ = c;
 	    c = getc(yyin);
 	} while (!isspace(c));
-	
+
 	*temp = '\0';
 
 	/* Put final char back in case it's newline. */
@@ -2248,13 +2299,13 @@ yylex(void)
 	    return PROTOCOL;
 	}
     }
-    
+
     yylval.string = (char *)malloc(temp - lex_buf + 2);
     strcpy(yylval.string, lex_buf);
     return THING;
 }
 
-static void 
+static void
 yyerror(const char *fmt, ...)
 {
     va_list	args;

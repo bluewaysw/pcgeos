@@ -1,0 +1,297 @@
+/**************************************************************************
+ *	HEADER-File fÅr Universal-Installer
+ *		EnthÑlt globale Strukturen usw. fÅr Creator und Installer
+ *
+ *	Copyright:	(c) by RABE-Soft 5/99
+ *	Sonstiges:	-
+ *
+ **************************************************************************/
+
+/* +-----------------------------------------------------------------------+
+   |	Struktur der Installer-Datei
+   +-----------------------------------------------------------------------+
+   |	Der MapBlock enthÑlt u.a.:
+   |		- Handle auf das Main-Array (siehe unten)
+   |		- Info-Texte (Copyright, Beschreibung, ..)
+   |		- Handle auf VMBlock mit Passwort
+   |		- leere Felder fÅr Erweiterbarkeit
+   +-----------------------------------------------------------------------+
+   |	Das MainArray ist ein fixed-Size HugeArray { sizeof(InstallEntry) }
+   |	Jeder Eintrag bedeutet eine Aktion, die beim Installieren oder
+   |	Entfernen der Software nîtig ist.
+   |	Jeder Ientrag (typ: InstallEntry) enthÑlt Informationen darÅber
+   |		- was zu tun ist (InstallObjectType type;)
+   |		- Abbruch oder sonstioge Bedingungen (instFlags)
+   |		- die genauen Parameter der Aktion (union main)
+   |	FÅr jeden Typ gibt es un der union ein eigenes Feld.
+   +-----------------------------------------------------------------------+
+   |	DesignschwÑchen:
+   |		- Die Festlegung auf 512 Byte fixed-Size HugeArrays
+   |			fÅr die zu installierenden Dateien begrenzt die
+   |			Grî·e des Gesamtpaktes sehr stark. Auch die
+   |			"update alles" Funktion wird davon beeintrÑchtigt
+   |			-> bei Version 2.0 auf 1-Byte Ñndern!
+   |		- Die ungÅnstige Strukturierung der Struktur 'InstallEntry'
+   |			blockiert eine beliebige Erweiterbarkeit
+   |			Wenn die union 'main' durch neue EintrÑge erweitert
+   |			wird, darf die gesamtgrî·e der Struktur NICHT wachsen
+   |			Ganz so tragisch ist das aber nicht, da sie jetzt schon
+   |			recht gro· ist und aussderdem habe ich in MSG_GEN_~
+   |			PROCESS_OPEN_APPLICATION eine Warnmeldung eingebaut.
+   +-----------------------------------------------------------------------+*/
+
+
+/* Map-Block im Document */
+
+#define INFO_TEXT_LEN	   512
+#define COPYRIGHT_TEXT_LEN 128
+
+typedef struct {
+	word 		allgFlags;	/* z. Zt. ungenutzt */
+	VMBlockHandle	mainArray;	/* HugeArray of InstallEntry's */
+	char programName[COPYRIGHT_TEXT_LEN+2];
+	char copyright[COPYRIGHT_TEXT_LEN+2];
+	char beschreibung[INFO_TEXT_LEN+2];
+	word		appInstDefaultFlags; /* INST_xxx default-Werte beim HinzufÅgen */
+	word		reserve[17];	/* 34 Byte - z.Zt ungenutzt*/
+	word		rbasicInstDefaultFlags; /* beim HinzufÅgen von R-BASIC Programmen */
+	word		docInstDefaultFlags; /* INST_xxx default-Werte beim HinzufÅgen */
+	VMBlockHandle	password;
+	VMBlockHandle   extraData;		/* spÑtere Erweiterbarkeit */
+	} ICMapBlock;   // 822 Byte
+
+/* Art des Eintrages */
+/* Damit das sortieren der List auch klappt, wenn die Typen erweitert werden,
+   ohne die AbwÑrtskompatibilitÑt zu zerstîren, mu·
+   a) mit IOT_FILE begonnen werden
+   b) mit IOT_LAST aufgehîrt werden
+   c) neue Install-typen vor IOT_TOKEN eingefÅgt werden,
+   d) neue De-InstallTypen nach IOT_INI eingefÅgt werden.
+   Au·erdem sollte ICDoSortList() angepasst werden
+   */
+typedef enum {
+	IOT_FILE,		/* Eintrag ist eine Datei, data enthÑlt
+				   ein VMBlockHandle auf ein HugeArray, in dem
+				   die Datei gespeichert ist */
+// noch nicht implementiert:
+	IOT_INSTALL_TOKEN,	/* Applikation zum installieren eines Tokens starten
+				   main enthÑlt StartFileParams */
+// noch nicht implementiert:
+	IOT_LOAD_TOKEN,		/* Token aus dem Installations-Paket installieren, damit es
+				   fÅr DOS_TOKEN_ZUWEISUNG zur verfÅgung steht. */
+	IOT_DUMMY1,		/* Platzhalter fÅr Aktionen vor Dos-Token anforderung */
+	IOT_DUMMY2,
+	IOT_DUMMY3,
+	IOT_INI_ENTRY_INSTALL,	/* éndern/lîschen eines einzelenen INI-Eintrages
+				   Bei der Installation. VerfÅgbar ab Version 1.2 */
+	IOT_DELETE_EXTERN_FILE,	/* Datei lîschen, die sich schon im System befindet.
+				   VerfÅgbar ab Version 1.2 */
+
+
+	IOT_DOS_TOKEN,		/* Eintrag beschreibt eine Verbindung einer
+				   Applikation mit einem DOS-Token. Der User wird
+				   beim Installieren aufgefordert, das Icon
+				   auszuwÑhlen. */
+	IOT_UPDATE_TOOL,	/* Update-Tool installieren, starten und lîschen */
+				/* main ist identisch mit IOT_FILE */
+				/* Ab Protocol 1.1 verfÅgbar */
+	IOT_DUMMY12,            /* noch 4 Platzhalter fÅr Aktionen vor File Start*/
+	IOT_DUMMY13,
+	IOT_DUMMY14,
+	IOT_DUMMY15,
+
+// hier gehts weiter:
+	IOT_START_FILE,		/* Applikation oder Dokument starten.
+				   main enthÑlt StartFileParams */
+	IOT_START_EXTERN_FILE,	/* dito, aber Datei befindet sich nicht im
+				   Paket. VerfÅgbar ab Version 1.2 */
+
+/* hier kann man neue Install-Typen hinzufÅgen */
+
+/* ab hier beginnen die ID's fÅr Operationen, die nur beim Deinstallieren
+   von Bedeutung sind */
+	IOT_TOKEN = 0x80,	/* Eintrag ist eine Icon ID, die beim
+				   Deinstallieren gelîscht werden soll */
+	IOT_INI,		/* Eintrag ist eine INI-Kategorie, die beim
+				   Deinstallieren gelîscht werden soll. */
+
+/* hier kann man neue De-Install-Typen hinzufÅgen */
+	IOT_CLEANUP_TOOL,	/* CleanUp-Tool installieren, starten und lîschen */
+				/* main ist identisch mit IOT_FILE */
+				/* Ab Protocol 1.1 verfÅgbar */
+	IOT_DELETE_FOLDER,	/* Leeres Verzeichnis lîschen
+				 * VerfÅgbar ab Version 1.2 */
+	IOT_INI_ENTRY_DEINSTALL,/* éndern/lîschen eines einzelenen INI-Eintrages
+				   bei der De-Installation. VerfÅgbar ab Version 1.2 */
+	IOT_DEL_TEMP_FILE,      /* Lîschen einer vom Programm selbst angelegten Datei
+				   bei der De-Installation. VerfÅgbar ab Version 1.2 */
+
+/* letzter Eintrag! */
+	IOT_LAST = 0xFF		/* Dummy-Wert, wird nur vom Liste-Sortierer
+				   benutzt */
+	} InstallObjectType;
+
+
+/* Beschreibung einer einzelnen Install-EintrÑge */
+
+#define DOS_NAME_BUFFER_LEN	16
+#define EXTENDED_MAGIC		((word)0xA55A)
+// ExtendedMagic ist gesetzt, wenn FileDateAndTime belegt ist
+// das ist nur ab der zweiten îffentlichen Release der Fall
+#define F_MAIN_UNUSED_SIZE	14
+
+typedef struct {			/* IOT_FILE: Eintrag ist eine Datei */
+	char		dosName[DOS_NAME_BUFFER_LEN];	// 16
+	word		extendedMagic;			// ->18 Byte
+	FileDateAndTime	fdat;				// dword -> 22 Byte
+	byte		unused[F_MAIN_UNUSED_SIZE];	// 14, fÅr Erweiterungen
+							// ->36 Byte
+	FileLongName	geosName;
+	PathName 	path;
+	DiskHandle	dh;
+	ProtocolNumber	protocol;
+	ReleaseNumber 	release;
+	GeosFileType	fileType;
+	dword		fileSize;
+	GeodeToken	appToken;
+	GeodeToken	creatorToken;
+	VMBlockHandle	data;
+	byte		fileAttrs;
+	} FileMainParams;
+
+/* IOT_TOKEN:   Eintrag ist ein App-Token -> GeodeToken reicht */
+
+typedef struct	{               	/* IOT_INI: Eine INI-Kategorie */
+	char	kategorie[INI_CATEGORY_BUFFER_SIZE];	/* 64 */
+	} IniMainParams;
+
+typedef struct	{ /* IOT_INI_ENTRY_INSTALL, IOT_INI_ENTRY_DEINSTALL
+		   * Eine einzelner INI-Eintrag beim Installioeren oder
+		   * beim De-Installieren */
+	word	flags;	/* INIF_xxx-Flags */
+	char	kategorie[INI_CATEGORY_BUFFER_SIZE];	/* 64 */
+	char	key[INI_CATEGORY_BUFFER_SIZE];	/* 64 */
+	char	data[2*INI_CATEGORY_BUFFER_SIZE];	/* 128 */
+	} IniEntryParams;
+/* 'flags' bestimmt, auf welche Art der INI-Eintrag geschrieben wird */
+#define INIF_REPLACE		0	/* Eintrag ersetzt alten */
+#define INIF_APPEND		1	/* Eintrag wird angehÑngt */
+#define INIF_INSERT		2	/* Eintrag wird am Anfang eingefÅgt */
+#define INIF_DELETE		3	/* Eintrag wird gelîscht */
+		/* Beispiel: zu schreiben ist:
+		 * 	[paul]
+		 *	test = Hallo
+		 * In der INI vorhanden ist
+		 *	[paul]
+		 *	test = Das Leben ist schîn
+		 *
+		 * Nach Schreiben mit INIF_REPLACE steht in der INI
+		 * 	[paul]
+		 *	test = Hallo
+		 *
+		 * Nach Schreiben mit INIF_APPEND steht in der INI
+		 * 	[paul]
+		 *	test = {
+		 *	Das Leben ist schîn
+		 *	Hallo
+		 *	}
+		 *
+		 * Nach Schreiben mit INIF_INSERT steht in der INI
+		 * 	[paul]
+		 *	test = {
+		 *	Hallo
+		 *	Das Leben ist schîn
+		 *	}
+		 */
+
+typedef struct	{               	/* IOT_DOS_TOKEN: Verbindung App
+					mit  Icon anbieten */
+	FileLongName	appName;
+	GeodeToken	appToken;
+	char		dosFile[13];
+	GeodeToken	preferedFileToken;	// noch nicht genutzt
+	} DosTokenParams;
+
+typedef struct {
+	FileLongName	fileName;	// file to start / open
+	PathName 	path;
+	DiskHandle	dh;
+	GeosFileType	fileType;	// GFT_xxxx
+	GeodeToken	token;		// fÅr Start App: ihr Token
+	GeodeToken	creator;	// fÅr Start Geos-Data files
+					// bei DOS-File: AppToken
+	FileLongName	appName;	// bei Dos-File: Klartext: Name der App
+	} StartFileParams;
+
+typedef struct {
+	FileLongName	fileName;	// file to delete
+	PathName 	path;
+	DiskHandle	dh;
+	} DeleteFileParams;
+
+typedef struct {
+	PathName 	path;
+	DiskHandle	dh;
+	} DeleteFolderParams;
+
+typedef struct {
+	union {                 	// fÅr jeden Typ ein Eintrag
+		FileMainParams	file;		// IOT_FILE
+		GeodeToken	appToken;	// IOT_TOKEN
+		IniMainParams	ini;		// IOT_INI
+		DosTokenParams	dosToken;	// IOT_DOS_TOKEN
+		StartFileParams startFile;	// IOT_START_FILE
+		DeleteFileParams deleteFile;	// IOT_DELETE_EXTERN_FILE
+		DeleteFolderParams deleteFolder; // IOT_DELETE_FOLDER
+		IniEntryParams	iniEntry;	// IOT_INI_ENTRY_INSTALL
+						// IOT_INI_ENTRY_DEINSTALL
+		}	main;
+	word		instFlags;		// INST_xxxx -Werte
+	InstallObjectType type;
+	} InstallEntry;
+/* ----	Diese Struktur muss 309 Bytes gro· bleiben! ------
+	Warnmledung ist in MSG~:~OPEN_APLICATION eingebaut */
+
+#define HUGE_ARRAY_ELEMENT_SIZE	512
+
+#define DOCUMENT_PROTOCOL_MAJOR	1
+#define DOCUMENT_PROTOCOL_MINOR	2
+
+
+/* Festlegung, wann installliert werden soll */
+
+// Bits 0 bis 3 und 12..15 - Allg. Infos
+#define INST_ALLG_MASK	0xF00F
+#define	INST_IGNORE_P_AND_R		1
+#define	INST_ONLY_IF_EXIST		2
+#define	INST_CANCEL_IF_NOT_INSTALL 	4
+#define INST_DELETE_ON_DE_INST		8
+#define INST_KEEP_DOS_NAME		0x1000
+// Ab Version 1.2:
+#define INST_ONLY_IF_NOT_EXIST		0x2000
+
+// Bits 4 .. 7 Protocol-Nummer-Behandlung
+#define INST_PROTOCOL_MASK	0xF0
+#define INST_IGNORE_PROTOCOL	0x10
+#define INST_ON_NEWER_PROTOCOL	0x20
+#define INST_ON_SAME_PROTOCOL   0x40
+// Bits 8 .. 11 Release-Nummer-Behandlung
+#define INST_RELEASE_MASK	0xF00
+#define INST_IGNORE_RELEASE	0x100
+#define INST_ON_NEWER_RELEASE	0x200
+#define INST_ON_SAME_RELEASE	0x400
+
+#define APP_INST_DEFAULT_FLAGS	(INST_IGNORE_PROTOCOL \
+			| INST_ON_NEWER_RELEASE | INST_ON_SAME_RELEASE | \
+			INST_DELETE_ON_DE_INST)
+
+#define DOC_INST_DEFAULT_FLAGS	(INST_IGNORE_PROTOCOL \
+			| INST_IGNORE_RELEASE |  \
+			INST_DELETE_ON_DE_INST)
+
+#define RBASIC_INST_DEFAULT_FLAGS (INST_ON_NEWER_PROTOCOL | INST_ON_SAME_PROTOCOL \
+			| INST_ON_NEWER_RELEASE | INST_ON_SAME_RELEASE | \
+			INST_DELETE_ON_DE_INST)
+
+
+

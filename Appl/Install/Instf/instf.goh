@@ -1,0 +1,173 @@
+/*---------------------------------------------------------------------------
+ Klassendefinition IFProcessClass  : die Prozess-Klasse der Applikation
+ ---------------------------------------------------------------------------*/
+@include <stdapp.goh>
+@include "../Shared/instllr.goh"
+
+
+
+// Debug Fenster (Primary) verwenden
+
+@define DEBUG_FLAG 	0
+
+// Workaround f¸r File-Routine, die temporˆr handles brauchen
+#define HANDLE_EATER_LIMIT		380		/* intuituiv, gutes feeling */
+
+void ToolConstructPath(char *buffer, DiskHandle dh, char *path, char *file);
+
+
+typedef struct {
+	/* Daten der gerade offenen Datei */
+	FileHandle 	docFile;
+	DiskHandle 	docDisk;
+	PathName 	docPath;
+	FileLongName	docName;
+
+	VMBlockHandle docMapBlock; /* VM block handle of the file's map block */
+
+	/* Verwaltungsinformationen */
+	int topPathLen;
+	Boolean cancelInstall;
+	Boolean ignoreNotFound;
+
+	Boolean	launchCreator;	/* TRUE, falls die Applikation geschlossen
+				 * wird, damit der UniInsall Creator die
+				 * Datei bearbeiten kann */
+	} GlobalStruct;
+
+
+
+@class IFProcessClass, GenProcessClass;
+
+/* UnterstÅtzung der Info-Datei-Liste */
+	@message (GEN_DYNAMIC_LIST_QUERY_MSG) MSG_IF_QUERY_LIST_ITEM;
+
+/* Bearbeiten-Schalter */
+	@message void MSG_IF_INSTALL();
+	@message void MSG_IF_DEINSTALL();
+	@message void MSG_IF_START_EDIT();
+
+	@message (GEN_BOOLEAN_GROUP_APPLY_MSG) MSG_IF_EDIT_MODIFIED;
+		#define ID_ENABLE_EDIT 		1
+		#define IF_DEFAULT_OPTIONS	0
+	@message void MSG_IF_LOAD_OPTIONS();
+
+@endc /* IFProcessClass */
+
+@class IconEditDialogClass, GenInteractionClass;
+#define QUERY_TEXT_LEN PATH_BUFFER_SIZE+FILE_LONGNAME_BUFFER_SIZE+2
+
+	@instance GeodeToken IEDI_token;
+	@message (GEN_DYNAMIC_LIST_QUERY_MSG) MSG_IED_QUERY_TOKEN;
+
+	@message (GEN_ITEM_GROUP_APPLY_MSG) MSG_IED_TOKEN_SELECTED;
+/*	@message	void	MSG_IED_MANUFID_APPLAY_TRIGGER_SELECTED();*/
+	@message	void	MSG_IED_GET_ICON(GeodeToken *tok);
+
+@endc
+
+
+@class FileSelectDialogClass, GenInteractionClass;
+	@message (GEN_FILE_SELECTOR_NOTIFICATION_MSG) MSG_FS_FILE_SELECTED;
+	@message void MSG_FS_SET_DIRECTORY(int stdPath);
+@endc
+
+@class IFDocumentControlClass, GenDocumentControlClass;
+	@instance Boolean isInitialised = FALSE;
+@endc
+
+
+#ifndef WriteTokenIDString
+#define WriteTokenIDString(buf,tok)  { sprintf(buf,"\"%c%c%c%c\",%u",tok.GT_chars[0],\
+			tok.GT_chars[1],tok.GT_chars[2],tok.GT_chars[3],tok.GT_manufID);}
+#endif
+
+#ifndef TOKEN_CHARS_fixed
+#define TOKEN_CHARS_fixed(a,b,c,d) \
+  TOKEN_CHARS((dword)(a),(dword)(b),(dword)(c),(dword)(d))
+#endif
+
+
+
+typedef enum {
+	FTEF_YES,
+	FTEF_NO,
+	FTEF_INVALID_DOSNAME,
+	FTEF_INVALID_GEOSNAME,
+	FTEF_DIFFERENT_FILES
+	} FTExistFilesValue;
+
+typedef enum {	INST_ERROR,
+		INST_OK } InstallStatus;
+
+typedef enum {  CFO_DOIT,	// ja, Åberschreiben
+		CFO_KEEP,	// nein, lassen
+		CFO_ERROR,	// Lesefehler
+		CFO_TYPE_MISMATCH	// andere fileTyp ( GFT_xxx
+		} CheckForOverwriteValue;
+
+typedef enum {	CRP_FILE_SAME,	// file hat gleiches Protocol / release
+		CRP_FILE_OLDER,	// file hat Ñlteres Protocol / release
+		CRP_FILE_NEWER	// file hat neueres Protocol / release
+		} CompareReleaseAndProtocolValue;
+
+#define	CRP_COMP_SAME	CRP_FILE_SAME
+#define	CRP_COMP_NEWER	CRP_FILE_OLDER
+#define	CRP_COMP_OLDER	CRP_FILE_NEWER
+
+#ifndef SGIT_NUMBER_OF_FREE_HANDLES
+#define SGIT_NUMBER_OF_FREE_HANDLES	0x800E
+#endif
+
+
+// Programmspezifische Tools
+extern VMBlockHandle IFGetMainArrayHandle(void);
+extern InstallEntry * IFLockMainArrayElement(word item);
+extern void IFUnlockMainArray(InstallEntry 	*elemPtr );
+extern Boolean WriteFileFromHugeArray(FileMainParams *fParams,
+			FTExistFilesValue foundVal, Boolean keepDos );
+extern int CheckForOverwrite(  char * name, ProtocolNumber compProtocol,
+			ReleaseNumber compRelease, word flags, word type);
+extern Boolean ToolBackupGeosIni(void);
+
+// allgemeine Tools
+extern FTExistFilesValue FileToolExistFileGD(char * geosName, char * dosName);
+extern int FileToolCreatePath (DiskHandle dh, char *path);
+extern int FileToolCreateSubdir( char *path );
+extern int FileToolCompareProtocol(ProtocolNumber fileProtocol, ProtocolNumber compProtocol);
+extern int FileToolCompareRelease(ReleaseNumber fileRelease, ReleaseNumber compRelease);
+extern int FileToolDeleteFile(char * fileName);
+
+
+// InstallationsRoutinen
+extern int IFInstallFile(FileMainParams * fParams ,word flags);
+extern Boolean IFRequestDosToken(DosTokenParams * tParams);
+
+
+@if @DEBUG_FLAG
+
+// Ausgabe von Texten auf das Debug-Window
+
+void DebugInfo (char *i ) ;
+void DebugInfoOptr( optr text) ;
+void DebugInfo1 (char *i, int arg);
+
+// Ausgabe von Infos in der unteren Statuszeile
+
+void DebugShowText(char *t );
+void DebugShowValue1(int v);
+void DebugShowValue2(int v);
+void DebugShowValue3(int v);
+
+@elseif
+
+#define DebugInfo(i)
+#define DebugInfoOptr(text)
+#define DebugInfo1(i, arg)
+#define DebugShowText(t)
+#define DebugShowValue1(v)
+#define DebugShowValue2(v)
+#define DebugShowValue3(v)
+
+@endif
+
