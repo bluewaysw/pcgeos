@@ -27,8 +27,6 @@ static void CalcTransformMatrix( TransMatrix*    transMatrix,
                                  WWFixedAsDWord  pointSize, 
                                  TextStyle       stylesToImplement );
 
-static void ScaleOutline( TRUETYPE_VARS, WWFixedAsDWord scale );
-
 static void ConvertOutline( GStateHandle gstate, TT_Outline* outline );
 
 
@@ -70,10 +68,10 @@ void _pascal TrueType_Gen_Path(
 {
         TrueTypeVars*          trueTypeVars;
         TrueTypeOutlineEntry*  trueTypeOutline;
+        FontHeader*            fontHeader;
         TransMatrix            transMatrix;
         TT_UShort              charIndex;
         WWFixedAsDWord         pointSize;
-        WWFixedAsDWord         scalePointSize;
         XYValueAsDWord         cursorPos;
 
 
@@ -82,12 +80,18 @@ EC(     ECCheckBounds( (void*)fontInfo ) );
 EC(     ECCheckBounds( (void*)outlineEntry ) );
 EC(     ECCheckBounds( (void*)firstEntry ) );
 EC(     ECCheckMemHandle( varBlock ) );
+EC(     ECCheckStack() );
 
         /* get trueTypeVar block */
         trueTypeVars = MemLock( varBlock );
 EC(     ECCheckBounds( (void*)trueTypeVars ) );
 
         trueTypeOutline = LMemDerefHandles( MemPtrToHandle( (void*)fontInfo ), outlineEntry->OE_handle );
+EC(     ECCheckBounds( (void*)trueTypeOutline ) );
+
+        /* get pointer to FontHeader */
+        fontHeader = LMemDerefHandles( MemPtrToHandle( (void*)fontInfo ), firstEntry->OE_handle );
+EC(     ECCheckBounds( (void*)fontHeader ) );
 
         /* open face, create instance and glyph */
         if( TrueType_Lock_Face(trueTypeVars, trueTypeOutline) )
@@ -105,8 +109,6 @@ EC(     ECCheckBounds( (void*)trueTypeVars ) );
         /* load glyph and scale its outline to 1000 units per em */
         TT_Load_Glyph( INSTANCE, GLYPH, charIndex, 0 );
         TT_Get_Glyph_Outline( GLYPH, &OUTLINE );
-        ScaleOutline( trueTypeVars, GrUDivWWFixed( 
-                ((dword)STANDARD_GRIDSIZE) << 16, ((dword)UNITS_PER_EM) << 16 ) );
 
         /* write comment with glyph parameters */
         WriteComment( trueTypeVars, gstate );
@@ -127,37 +129,25 @@ EC(     ECCheckBounds( (void*)trueTypeVars ) );
         cursorPos = GrGetCurPos( gstate );
         GrApplyTranslationDWord( gstate, DWORD_X( cursorPos ), DWORD_Y( cursorPos ) );
 
+        /* get pointsize for scaling */
+        GrGetFont( gstate, &pointSize );
+
         /* we only perform steps 2 & 3 if the POSTSCRIPT flag wasn't passed */
         if( !(pathFlags & FGPF_POSTSCRIPT) )
         {
-                GrGetFont( gstate, &pointSize );
-                scalePointSize = GrUDivWWFixed( pointSize, MakeWWFixed( STANDARD_GRIDSIZE ) );
+                word            translation = fontHeader->FH_accent + fontHeader->FH_ascent;
+                WWFixedAsDWord  scale = GrUDivWWFixed( pointSize, ((dword)UNITS_PER_EM) << 16 );
 
-                //TODO:
-                //ascent und accent laden
-                //translation = ( accent + ascent ) * scalePointsize
-                //AppyTranslate( 0, translation )
 
-                //Test
-                GrApplyTranslationDWord( gstate, 0, 199 );
+                /* translate to baseline */
+                GrApplyTranslation( gstate, 0, GrMulWWFixed( ((dword)translation) << 16, scale ) );
 
                 /* flip on x-axis */ 
                 GrApplyScale( gstate, 1L << 16, -1L << 16 );
-
         }
 
-        /* calc scaling factor and calculate transformation matrix */
-        GrGetTransform( gstate, &transMatrix );
-        
-        //TODO: auslagern und korrigieren
-        transMatrix.TM_e11.WWF_frac = 16384;
-        transMatrix.TM_e11.WWF_int  = 0;
-        transMatrix.TM_e22.WWF_frac = 16384;
-        transMatrix.TM_e22.WWF_int  = 0;
-        transMatrix.TM_e31.DWF_frac = 0;
-        transMatrix.TM_e31.DWF_int  = 0;
-        transMatrix.TM_e32.DWF_frac = 0;
-        transMatrix.TM_e32.DWF_int  = 0;
+        /* calculate transformation matrix and apply it */
+        CalcTransformMatrix( &transMatrix, pointSize, stylesToImplement );
         GrApplyTransform( gstate, &transMatrix );
         
         /* convert outline into GrDraw...() calls */
@@ -184,10 +174,6 @@ Fin:
  * 
  * RETURNS:       
  * 
- * SIDE EFFECTS:  none
- * 
- * CONDITION:     
- * 
  * STRATEGY:      
  * 
  * REVISION HISTORY:
@@ -212,15 +198,13 @@ void _pascal TrueType_Gen_In_Region(
 /********************************************************************
  *                      ConvertOutline
  ********************************************************************
- * SYNOPSIS:	  
+ * SYNOPSIS:	  Convert glyphs outline into GrDraw..() calls.
  * 
- * PARAMETERS:    
+ * PARAMETERS:    gstate                GStateHande in which the outline 
+ *                                      of the character is written.
+ *                *outline              Ptr. to glyphs outline.
  * 
- * RETURNS:       
- * 
- * SIDE EFFECTS:  none
- * 
- * CONDITION:     
+ * RETURNS:       void
  * 
  * STRATEGY:      
  * 
@@ -240,9 +224,6 @@ static void ConvertOutline( GStateHandle gstate, TT_Outline* outline )
 
 
 
-
-
-
         // Test mit Bindestrich
         GrMoveTo( gstate, 198, 303 );
         GrDrawVLineTo( gstate, 269 );
@@ -252,68 +233,68 @@ static void ConvertOutline( GStateHandle gstate, TT_Outline* outline )
 
 } 
 
-/********************************************************************
- *                      ScaleOutline
- ********************************************************************
- * SYNOPSIS:	  
- * 
- * PARAMETERS:    
- * 
- * RETURNS:       
- * 
- * SIDE EFFECTS:  none
- * 
- * CONDITION:     
- * 
- * STRATEGY:      
- * 
- * REVISION HISTORY:
- *      Date      Name      Description
- *      ----      ----      -----------
- *      14/10/23  JK        Initial Revision
- *******************************************************************/
-
-static void ScaleOutline( TRUETYPE_VARS, WWFixedAsDWord scale )
-{
-        TT_Matrix matrix = { 0, 0, 0, 0};
-        
-        matrix.xx = scale;
-        matrix.yy = scale;
-
-        TT_Transform_Outline( &OUTLINE, &matrix );
-}
-
 
 static void CalcTransformMatrix( TransMatrix*    transMatrix, 
                                  WWFixedAsDWord  pointSize, 
                                  TextStyle       stylesToImplement )
 {
-        WWFixedAsDWord scale = GrUDivWWFixed( pointSize, MakeWWFixed( STANDARD_GRIDSIZE ) );
+        WWFixedAsDWord scalePointSize = GrUDivWWFixed( pointSize, MakeWWFixed( STANDARD_GRIDSIZE ) );
+
+        transMatrix->TM_e11.WWF_frac = FractionOf( scalePointSize );
+        transMatrix->TM_e11.WWF_int  = IntegerOf( scalePointSize );
+        transMatrix->TM_e12.WWF_frac = 0;
+        transMatrix->TM_e12.WWF_int  = 0;
+        transMatrix->TM_e21.WWF_frac = 0;
+        transMatrix->TM_e21.WWF_int  = 0;
+        transMatrix->TM_e22.WWF_frac = FractionOf( scalePointSize );
+        transMatrix->TM_e22.WWF_int  = IntegerOf( scalePointSize );
+        transMatrix->TM_e31.DWF_frac = 0;
+        transMatrix->TM_e31.DWF_int  = 0;
+        transMatrix->TM_e32.DWF_frac = 0;
+        transMatrix->TM_e32.DWF_int  = 0;
+
+        /* add styles if needed */
+        if( stylesToImplement & TS_BOLD )
+        {
+                WWFixedAsDWord scaleScript = GrMulWWFixed( scalePointSize, BOLD_FACTOR );
 
 
-        transMatrix->TM_e11.WWF_frac = scale & 0x0000ffff;
-        transMatrix->TM_e11.WWF_int  = scale >> 16;
-        transMatrix->TM_e22.WWF_frac = scale & 0x0000ffff;
-        transMatrix->TM_e22.WWF_int  = scale >> 16;
+                transMatrix->TM_e11.WWF_frac = FractionOf( scaleScript );
+                transMatrix->TM_e11.WWF_int  = IntegerOf( scaleScript );
+        }
+
+        if( stylesToImplement & TS_ITALIC )
+        {
+                transMatrix->TM_e12.WWF_frac = FractionOf( ITALIC_FACTOR );
+                transMatrix->TM_e12.WWF_int  = IntegerOf( ITALIC_FACTOR );
+        }
+
+        if( stylesToImplement & ( TS_SUBSCRIPT | TS_SUPERSCRIPT ) )
+        {
+                WWFixedAsDWord scaleScript = GrMulWWFixed( scalePointSize, SCRIPT_FACTOR );
 
 
+                transMatrix->TM_e11.WWF_frac = FractionOf( scaleScript );
+                transMatrix->TM_e11.WWF_int  = IntegerOf( scaleScript );
+                transMatrix->TM_e22.WWF_frac = FractionOf( scaleScript );
+                transMatrix->TM_e22.WWF_int  = IntegerOf( scaleScript );
 
-        //TODO Styles einbauen
+                //TODO: tm_e31 und tm_e32 füllen
+        }
+
+        //TODO:
+        //width & weight einarbeiten
 }
 
 
 /********************************************************************
  *                      WriteComment
  ********************************************************************
- * SYNOPSIS:	  
+ * SYNOPSIS:	  Write glyphbox to gstate as comment.
  * 
  * PARAMETERS:    
  * 
- * RETURNS:       
- * 
- * SIDE EFFECTS:  none
- * 
- * CONDITION:     
+ * RETURNS:       void   
  * 
  * STRATEGY:      
  * 
@@ -326,17 +307,19 @@ static void CalcTransformMatrix( TransMatrix*    transMatrix,
 #define NUM_PARAMS              6
 static void WriteComment( TRUETYPE_VARS, GStateHandle gstate )
 {
-        word params[NUM_PARAMS];
+        word            params[NUM_PARAMS];
+        WWFixedAsDWord  scale = GrUDivWWFixed( ((dword)STANDARD_GRIDSIZE) << 16, ((dword)UNITS_PER_EM) << 16 );
 
 
         TT_Get_Glyph_Metrics( GLYPH, &GLYPH_METRICS );
-        params[0] = 600; //GLYPH_METRICS.advance;// GLYPH_BBOX.xMax - GLYPH_BBOX.xMin; //width
-        params[1] = 0; //GLYPH_BBOX.yMax - GLYPH_BBOX.yMin; //height
-        params[2] = 198; //GLYPH_BBOX.xMin;
-        params[3] = 269; //GLYPH_BBOX.yMin;
-        params[4] = 401; //GLYPH_BBOX.xMax;
-        params[5] = 303; //GLYPH_BBOX.yMax;
 
+        /* the glyph box must be scaled to 1000 units per em */
+        params[0] = IntegerOf( GrMulWWFixed( ((dword)GLYPH_METRICS.advance) << 16, scale ) );
+        params[1] = 0;
+        params[2] = IntegerOf( GrMulWWFixed( ((dword)GLYPH_BBOX.xMin) << 16, scale ) );
+        params[3] = IntegerOf( GrMulWWFixed( ((dword)GLYPH_BBOX.yMin) << 16, scale ) );
+        params[4] = IntegerOf( GrMulWWFixed( ((dword)GLYPH_BBOX.xMax) << 16, scale ) );
+        params[5] = IntegerOf( GrMulWWFixed( ((dword)GLYPH_BBOX.yMax) << 16, scale ) );
 
         GrComment( gstate, &params, NUM_PARAMS );
 }

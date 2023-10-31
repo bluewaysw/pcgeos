@@ -132,7 +132,7 @@ EC(     ECCheckBounds( (void*)trueTypeVars ) );
                 TT_Matrix         flipmatrix = HORIZONTAL_FLIP_MATRIX; 
 
                 /* We calculate with an average of 4 on/off points, line number and line end code. */
-                size = height * 6 * sizeof( word ) + SIZE_REGION_HEADER; 
+                size = height * 6 * sizeof( word ) + REGION_SAFETY + SIZE_REGION_HEADER; 
 
                 /* get pointer to bitmapBlock */
                 charData = EnsureBitmapBlock( bitmapHandle, size );

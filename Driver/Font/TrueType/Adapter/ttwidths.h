@@ -15,7 +15,7 @@
  *
  * DESCRIPTION:
  *	Declarations of types and functions for the driver function 
- *      DR_FONT_GEN_WIDTHS.
+ *  DR_FONT_GEN_WIDTHS.
  ***********************************************************************/
 
 #ifndef _TTWIDTHS_H_
@@ -38,7 +38,7 @@ MemHandle _pascal TrueType_Gen_Widths(
                                 MemHandle            fontHandle,
                                 FontMatrix*          fontMatrix,
                                 WWFixedAsDWord       pointSize,
-			        const FontInfo*      fontInfo, 
+			                    const FontInfo*      fontInfo, 
                                 const OutlineEntry*  headerEntry,
                                 const OutlineEntry*  firstEntry,
                                 TextStyle            stylesToImplement,
