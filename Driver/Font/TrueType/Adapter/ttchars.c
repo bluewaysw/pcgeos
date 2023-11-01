@@ -471,23 +471,24 @@ static void* EnsureBitmapBlock( MemHandle bitmapHandle, word size )
 
         if( bitmapData == NULL )
         {
-                MemReAlloc( bitmapHandle, MAX( size, BITMAP_BLOCKSIZE ), HAF_ZERO_INIT | HAF_NO_ERR );
-                return MemLock( bitmapHandle );
+                MemReAlloc( bitmapHandle, MAX( size, BITMAP_BLOCKSIZE ), HAF_NO_ERR );
+                bitmapData = MemLock( bitmapHandle );
         } else {
                 word  bitmapBlockSize = MemGetInfo( bitmapHandle, MGIT_SIZE );
 
                 if( bitmapBlockSize < size )
                 {
-                        MemReAlloc( bitmapHandle, size, HAF_ZERO_INIT | HAF_NO_ERR );
-                        return MemLock( bitmapHandle );
+                        MemReAlloc( bitmapHandle, size, HAF_NO_ERR );
+                        bitmapData = MemLock( bitmapHandle );
                 }
                 
                 if( size < BITMAP_BLOCKSIZE )
                 {
-                        MemReAlloc( bitmapHandle, BITMAP_BLOCKSIZE, HAF_ZERO_INIT | HAF_NO_ERR );
-                        return MemLock( bitmapHandle );
+                        MemReAlloc( bitmapHandle, BITMAP_BLOCKSIZE, HAF_NO_ERR );
+                        bitmapData = MemLock( bitmapHandle );
                 }
         }
 
+        memset( bitmapData, 0, size );
         return bitmapData;
 }
