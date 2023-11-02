@@ -1,0 +1,876 @@
+
+@include <stdapp.goh>
+@include <gstring.h>
+@include "stdio.h"
+@include "instf.goh"
+@include "../Shared/instllr.goh"
+@include "../Shared/rainer.goh"
+
+/*---------------------------------------------------------------------------
+ Resourcendefinition AppResource
+ enthÑlt nur das Applikations-Objekt (dessen Child das Primary-Objekt ist )
+ ---------------------------------------------------------------------------*/
+@start AppResource;
+
+@object GenApplicationClass IFApp = {
+	GI_visMoniker = list { @IFTextMoniker,
+	@Moniker0,@Moniker1,@Moniker2,@Moniker3,@Moniker4,@Moniker5 };
+	GI_comp = @IFPrimary
+@if @DEBUG_FLAG
+	,@DebugPrimary
+@endif
+	;
+	gcnList(MANUFACTURER_ID_GEOWORKS,GAGCNLT_WINDOWS) = @IFPrimary
+@if @DEBUG_FLAG
+	,@DebugPrimary
+@endif
+	;
+	gcnList(MANUFACTURER_ID_GEOWORKS,MGCNLT_ACTIVE_LIST) = @IFDocumentControl;
+	gcnList(MANUFACTURER_ID_GEOWORKS,MGCNLT_APP_STARTUP) = @IFDocumentControl;
+	gcnList(MANUFACTURER_ID_GEOWORKS,GAGCNLT_SELF_LOAD_OPTIONS) =
+							@IFDocumentControl;
+/*	ATTR_GEN_HELP_FILE ="Universal Installer Help";*/
+	}	/* end of IFApp */
+
+@visMoniker IFTextMoniker = "Uni Installer 1.4";
+@end AppResource;
+
+/*---------------------------------------------------------------------------
+ Resourcendefinition Interface
+ enthÑlt die Objekte fÅr die Interaktion mit dem User
+ ---------------------------------------------------------------------------*/
+@start Interface;
+
+
+/* ----------------- Elemente des Hauptfensters ------------------------------*/
+
+@object GenPrimaryClass IFPrimary = {
+	GI_comp =  @IFFileMenu, @IFOptionsMenu, @AuslagerGroup;
+	HINT_SIZE_WINDOW_AS_DESIRED;
+/*	GI_states = @default & ~GS_USABLE;
+/*	ATTR_GEN_WINDOW_KBD_OVERRIDE = (KO_KEYBOARD_REQUIRED);
+  */
+/*	ATTR_GEN_HELP_CONTEXT="TOC";*/
+	} /* end of 	Primary */
+
+@object GenInteractionClass AuslagerGroup = {
+	GI_comp = @IFInfoTextGroup,@IFTriggerGroup,@IconEditDialog,
+		@IFWriteFileBox,@IFDeleteBox,@SelectFileDialog,
+		@InstallEndeInfoBox,@CopyIniDialog;
+	HINT_ORIENT_CHILDREN_VERTICALLY;
+	HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+	HINT_EXPAND_HEIGHT_TO_FIT_PARENT;
+	}
+
+@object GenInteractionClass IFFileMenu = {
+    GI_comp = @IFDocumentControl,@AboutBoxGroup;
+    GII_visibility = GIV_POPUP;
+    ATTR_GEN_INTERACTION_GROUP_TYPE = (GIGT_FILE_MENU);
+    }
+@object	GenInteractionClass IFInfoTextGroup = {
+	GI_comp = @IFPrognameText,@IFBeschreibungText,@IFCopyrightText;
+	HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+	HINT_EXPAND_HEIGHT_TO_FIT_PARENT;
+/*	GII_visibility = GIV_DIALOG;
+	GII_type = GIT_PROPERTIES;
+	GII_attrs = @default | GIA_NOT_USER_INITIATABLE
+		| GIA_MODAL;         */
+	}
+
+@object GenTextClass IFPrognameText = {
+	GI_visMoniker = " Program name ";
+	GI_attrs = @default | GA_READ_ONLY;
+	GTXI_maxLength = COPYRIGHT_TEXT_LEN;
+	HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+	HINT_PLACE_MONIKER_ABOVE;
+	HINT_CENTER_MONIKER;
+	HINT_DRAW_IN_BOX;
+/*	HINT_TEXT_WHITE_WASH_COLOR; */
+	HINT_INITIAL_SIZE = { SST_AVG_CHAR_WIDTHS | 65 ,
+				SST_LINES_OF_TEXT | 1, 1 };
+	HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+	}
+@object GenTextClass IFBeschreibungText = {
+	GI_visMoniker = "Description:";
+	GI_attrs = @default | GA_READ_ONLY;
+	GTXI_attrs = @default | GTA_INIT_SCROLLING | GTA_DONT_SCROLL_TO_CHANGES;
+	GTXI_maxLength = INFO_TEXT_LEN;
+	HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+	HINT_PLACE_MONIKER_ABOVE;
+	HINT_TEXT_WHITE_WASH_COLOR;
+	HINT_INITIAL_SIZE = { SST_AVG_CHAR_WIDTHS | 65 ,
+				SST_LINES_OF_TEXT | 8, 8 };
+	HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+	HINT_EXPAND_HEIGHT_TO_FIT_PARENT;
+	}
+@object GenTextClass IFCopyrightText = {
+	GI_visMoniker = "Copyright-Information:";
+	GI_attrs = @default | GA_READ_ONLY;
+	GTXI_maxLength = COPYRIGHT_TEXT_LEN;
+	HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+	HINT_PLACE_MONIKER_ABOVE;
+/*	HINT_TEXT_WHITE_WASH_COLOR;*/
+	HINT_INITIAL_SIZE = { SST_AVG_CHAR_WIDTHS | 65 ,
+				SST_LINES_OF_TEXT | 1, 1 };
+	HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+	}
+
+
+@object GenInteractionClass IFTriggerGroup = {
+	GI_comp = @IFStartEditTrigger,@IFInstallTrigger,
+		@IFDeinstallTrigger,@DetailInfoDialog;
+	GI_states = @default & ~GS_ENABLED;
+	HINT_PLACE_MONIKER_ABOVE;
+	HINT_MAKE_REPLY_BAR;
+	HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+	HINT_DONT_ALLOW_CHILDREN_TO_WRAP;
+	}
+
+@object GenTriggerClass IFStartEditTrigger = {
+	GI_visMoniker = 'E'," Edit ";
+	GTI_destination = process;
+	GTI_actionMsg = MSG_IF_START_EDIT;
+/*	GI_states = @default & ~GS_USABLE; */
+	}
+@object GenTriggerClass IFInstallTrigger = {
+	GI_visMoniker = 'I'," Install software ";
+	GTI_destination = process;
+	GTI_actionMsg = MSG_IF_INSTALL;
+	}
+@object GenTriggerClass IFDeinstallTrigger = {
+	GI_visMoniker = 'R'," Remove software ";
+	GTI_destination = process;
+	GTI_actionMsg = MSG_IF_DEINSTALL;
+	}
+
+/* ----------------- DetailInfoDialog ------------------------------*/
+
+@object	GenInteractionClass DetailInfoDialog = {
+	GI_visMoniker = 'L'," Detail-List ";
+	GI_comp = @DetailFileList,@DetailsInfoText/*,@IFCheckTrigger*/;
+	GII_visibility = GIV_DIALOG;
+	GII_type = GIT_COMMAND;
+	HINT_INTERACTION_MAKE_RESIZABLE;
+/*	GII_attrs = @default | GIA_NOT_USER_INITIATABLE
+		| GIA_MODAL; */
+
+	}
+
+@object GenDynamicListClass DetailFileList = {
+	GI_visMoniker = 'I',"Files and Install Functions:";
+	GI_attrs = @default | GA_READ_ONLY;
+	GIGI_destination = process;
+/*	GIGI_behaviorType = GIGBT_EXCLUSIVE_NONE;*/
+/*	GIGI_applyMsg = MSG_IF_LIST_ITEM_SELECTED; */
+	GDLI_queryMsg = MSG_IF_QUERY_LIST_ITEM;
+	HINT_ITEM_GROUP_SCROLLABLE;
+	HINT_PLACE_MONIKER_ABOVE;
+	HINT_INITIAL_SIZE = { SST_AVG_CHAR_WIDTHS | 75 ,
+				SST_LINES_OF_TEXT | 15, 15 };
+	HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+	HINT_EXPAND_HEIGHT_TO_FIT_PARENT;
+	}
+@object GenTextClass DetailsInfoText = {
+	GTXI_text = "Files marked with '*' are not automatically deleted when uninstalling!";
+	GI_attrs = @default | GA_READ_ONLY;
+	HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+	}
+@if 0
+@object GenTriggerClass IFCheckTrigger = {
+	GI_visMoniker = 'p'," Dateien pr\237fen ";
+	GTI_destination = process;
+	HINT_SEEK_REPLY_BAR;
+/*	GTI_actionMsg = MSG_IF_START_EDIT;
+*/
+	}
+@endif
+
+/* ----------------- CopyIniDialog ------------------------------*/
+
+@object	GenInteractionClass CopyIniDialog = {
+	GI_visMoniker = " Copy GEOS.INI ";
+	GI_comp = @CopyIniInfoText,@CopyIniName,@CopyIniReplyBar;
+	GII_visibility = GIV_DIALOG;
+	GII_attrs = @default | GIA_NOT_USER_INITIATABLE
+		| GIA_INITIATED_VIA_USER_DO_DIALOG | GIA_MODAL;
+	}
+
+@object GenTextClass CopyIniInfoText = {
+	GI_visMoniker = " ";
+	HINT_PLACE_MONIKER_TO_LEFT;
+	GTXI_text = "Enter a name for the copy of the GEOS.INI file. \
+It must fit to the DOS file name specification 'FILENAME.EXT'. You may use \
+the suggested name, which contains the current date.";
+	GI_attrs = @default | GA_READ_ONLY;
+}
+@object GenTextClass CopyIniName = {
+	GI_visMoniker = 'N',"   Name of the copy: ";
+	HINT_PLACE_MONIKER_TO_LEFT;
+	GTXI_attrs = @default | GTA_SINGLE_LINE_TEXT;
+	GTXI_maxLength = 12;
+	HINT_FIXED_SIZE = { 20 | SST_AVG_CHAR_WIDTHS, 1 | SST_LINES_OF_TEXT , 0};
+	HINT_TEXT_WHITE_WASH_COLOR;
+	ATTR_GEN_TEXT_LEGAL_DOS_FILENAMES;
+	HINT_DEFAULT_FOCUS;
+}
+@object GenInteractionClass CopyIniReplyBar = {
+	GI_comp = @CopyIniReplyBarTop,@CopyIniCancelTrigger;
+	HINT_MAKE_REPLY_BAR;
+	HINT_ORIENT_CHILDREN_VERTICALLY;
+	HINT_CENTER_CHILDREN_HORIZONTALLY;
+}
+@object GenInteractionClass CopyIniReplyBarTop = {
+	GI_comp = @LeftSpace,@CopyIniYesTrigger,@CopyIniNoTrigger,
+		@CopyIniWarningTrigger,@RightSpace;
+	HINT_ORIENT_CHILDREN_HORIZONTALLY;
+}
+@object GenGlyphClass LeftSpace = { GI_visMoniker = " "; }
+@object GenGlyphClass RightSpace = { GI_visMoniker = " "; }
+@object GenTriggerClass CopyIniYesTrigger = {
+	GI_visMoniker = 'a', " Create copy ";
+	ATTR_GEN_TRIGGER_INTERACTION_COMMAND = IC_YES;
+	GI_attrs = @default | GA_SIGNAL_INTERACTION_COMPLETE;
+	}
+@object GenTriggerClass CopyIniNoTrigger = {
+	GI_visMoniker = 'o', " No copy ";
+	ATTR_GEN_TRIGGER_INTERACTION_COMMAND = IC_NO;
+	GI_attrs = @default | GA_SIGNAL_INTERACTION_COMPLETE;
+	}
+@object GenTriggerClass CopyIniWarningTrigger = {
+	GI_visMoniker = 'n', " Additional note ";
+	ATTR_GEN_TRIGGER_INTERACTION_COMMAND = IC_OK;
+	GI_attrs = @default | GA_SIGNAL_INTERACTION_COMPLETE;
+	}
+@object GenTriggerClass CopyIniCancelTrigger = {
+	GI_visMoniker = 'p', " Cancel entire process now ";
+	ATTR_GEN_TRIGGER_INTERACTION_COMMAND = IC_CUSTOM_START+1;
+	GI_attrs = @default | GA_SIGNAL_INTERACTION_COMPLETE;
+	}
+
+/* ----------------- Document-Control ------------------------------*/
+
+@object IFDocumentControlClass IFDocumentControl = {
+    GDCI_documentToken = { "InsD", MANUFACTURER_ID_RABE_SOFT };
+    GDCI_noNameText = "Nothing to do";
+    GDCI_documentGroup = IFDocumentGroup;
+    GDCI_enableDisableList = IFEnableList;
+
+	ATTR_GEN_CONTROL_REQUIRE_UI = (GDCF_OPEN_CLOSE);
+	ATTR_GEN_CONTROL_PROHIBIT_UI = ~(GDCF_OPEN_CLOSE);
+
+
+/**
+Wenn das Programm als GDCM_VIEWER arbeitet weden beim ÷ffen einer datei hunderte oder
+tausende handles gebraucht, weil das System anderen Applikationen r/w Zugriff gew‰hrt
+und deshalb die Datei vollst‰ndig in den RAM l‰dt. Mist.
+    GDCI_attrs = (@default & ~(GDCA_MODE | GDCA_CURRENT_TASK))
+			| (GDCM_VIEWER << GDCA_MODE_OFFSET)
+			| (GDCT_OPEN << GDCA_CURRENT_TASK_OFFSET);
+**/
+
+	GDCI_attrs =
+			((GDCM_SHARED_SINGLE << GDCA_MODE_OFFSET) |
+			 GDCA_VM_FILE |
+			 (GDCT_OPEN << GDCA_CURRENT_TASK_OFFSET));
+
+/* Die New/Open-Box enth‰lt jetzt aber einen "Neu" Trigger. deswegen MUSS
+ich MSG_META_DOC_OUTPUT_INITIALIZE_DOCUMENT_FILE unterst¸tzen. Mist #2*/
+
+    GDCI_features = GDCF_SINGLE_FILE_CLEAN_CAN_NEW_OPEN | GDCF_NAME_ON_PRIMARY;
+}
+
+@chunk optr IFEnableList[] = { @IFTriggerGroup };
+
+@end Interface; /*-------------------------------------------------------*/
+
+
+/* ----------------- Eigene Resource fÅr Doc-UI ------------------------------*/
+/*		Dummy, weil "UI" == IFFileList im Interface	*/
+
+@start DocumentUI ;
+
+@object GenDocumentGroupClass IFDocumentGroup = {
+    GDGI_untitledName = "Install unnamed";
+    GDGI_protocolMajor = DOCUMENT_PROTOCOL_MAJOR;
+    GDGI_protocolMinor = DOCUMENT_PROTOCOL_MINOR;
+    GDGI_output = process;
+    GDGI_documentControl = IFDocumentControl;
+}
+
+@end DocumentUI;
+
+
+@start DialogResource;
+
+@chunk char FileManagerKategory[] = "fileManager";
+@chunk char FileManagerKey[] = "filenameTokens";
+
+/* ------------------------- InfoBox: Lîsche ------------------------ */
+@object GenInteractionClass IFDeleteBox = {
+	GI_visMoniker = "Remove software";
+	GI_comp = @IFLabelGlyph,@IFDeleteFileGlyph/*,@DummyGlyph2*/;
+	GII_visibility = GIV_DIALOG;
+	GII_attrs = @default | GIA_NOT_USER_INITIATABLE;
+	HINT_ORIENT_CHILDREN_VERTICALLY;
+	HINT_CENTER_CHILDREN_HORIZONTALLY;
+	}
+@object GenGlyphClass IFLabelGlyph = {
+	GI_visMoniker = "Delete:";
+	HINT_CENTER_MONIKER;
+	}
+@object GenGlyphClass IFDeleteFileGlyph = {
+	GI_visMoniker = " ";
+	HINT_CENTER_MONIKER;
+	HINT_FIXED_SIZE = { SST_AVG_CHAR_WIDTHS | 30 ,
+				SST_LINES_OF_TEXT | 1, 1 };
+	}
+@visMoniker	DelFileMoniker = " Delete file";
+@visMoniker	DelIniMoniker = " Delete GEOS.INI category ";
+@visMoniker	ModiIniMoniker = " Edit GEOS.INI category ";
+@visMoniker	DelDosFileTokenMoniker = " Delete Icon association with ";
+@visMoniker    	DelTokenMoniker = " Delete token entry ";
+@visMoniker   	SearchLabel = " Searching ... ";
+@visMoniker     DelFolderMoniker = " Remove folder, if empty ";
+
+
+/* ------------------------- InfoBox: Lese ------------------------ */
+@object GenInteractionClass IFWriteFileBox = {
+	GI_visMoniker = "Installing software";
+	GI_comp = @IFWriteLabelGlyph,@IFWriteFileGlyph/*,@DummyGlyph2*/;
+	GII_visibility = GIV_DIALOG;
+	GII_attrs = @default | GIA_NOT_USER_INITIATABLE;
+	}
+@object GenGlyphClass IFWriteLabelGlyph = { GI_visMoniker = " ";  }
+@object GenGlyphClass IFWriteFileGlyph = {
+	GI_visMoniker = " ";
+	HINT_CENTER_MONIKER;
+	HINT_FIXED_SIZE = { SST_AVG_CHAR_WIDTHS | 30 ,
+				SST_LINES_OF_TEXT | 1, 1 };
+	}
+
+@visMoniker InstallFileMoniker = "Installing file";
+
+
+
+/* ------------------------- InfoBox: fertig ------------------------ */
+@object GenInteractionClass InstallEndeInfoBox = {
+	GI_visMoniker = "Universal Installer - Finished!";
+	GI_comp = @SpaceGlyph,@EndeLogo,@EndeInfoText;
+	GII_visibility = GIV_DIALOG;
+	GII_attrs = @default | GIA_NOT_USER_INITIATABLE
+		| GIA_INITIATED_VIA_USER_DO_DIALOG  | GIA_MODAL;
+	GII_type = GIT_NOTIFICATION;
+	ATTR_GEN_WINDOW_CUSTOM_LAYER_ID = {0};
+	ATTR_GEN_WINDOW_CUSTOM_LAYER_PRIORITY = {LAYER_PRIO_ON_TOP};
+	ATTR_GEN_WINDOW_CUSTOM_WINDOW_PRIORITY = {WIN_PRIO_ON_TOP};
+	ATTR_GEN_WINDOW_CUSTOM_PARENT = {0};
+	HINT_ORIENT_CHILDREN_HORIZONTALLY;
+        HINT_CENTER_CHILDREN_VERTICALLY;
+	}
+
+@object GenGlyphClass SpaceGlyph = {
+	GI_visMoniker = "   ";
+	}
+@object GenInteractionClass EndeLogo = {
+	GI_visMoniker = list { @RabeLogo };
+	}
+@object GenTextClass EndeInfoText = {
+	GTXI_text = "Congratulations! The installation has been completed.";
+	GI_attrs = @default | GA_READ_ONLY;
+	}
+/* ------------------------- Copyright Box ------------------------ */
+
+@include "../Shared/crbox.goh"
+@include "../Shared/rabelogo.goh"
+
+@object GenInteractionClass AboutBoxGroup = {
+	GI_comp = @AboutBox;
+	}
+@DefDefaultEnglishCRBox(AboutBox,"Information",@AboutBoxGlyphe);
+@object GenInteractionClass AboutBoxGlyphe= {
+	GI_comp = @AboutGlyph1, @AboutGlyph2, @AboutGlyph3, @AboutGlyph4; 
+	HINT_EXPAND_WIDTH_TO_FIT_PARENT; HINT_CENTER_CHILDREN_HORIZONTALLY; }
+@object GenGlyphClass AboutGlyph1= {
+	GI_visMoniker = "Universal Installer"; }
+@object GenGlyphClass AboutGlyph2= {
+	GI_visMoniker = " Install / Remove Tool "; }
+@object GenGlyphClass AboutGlyph3= {
+	GI_visMoniker = "(version=release)"; }
+@object GenGlyphClass AboutGlyph4= {
+	GI_visMoniker = "Freeware"; }
+
+
+/* ------------------------- Edit-Mode-Selektor ------------------------ */
+@object GenInteractionClass IFOptionsMenu = {
+    GI_comp = @EditSelektor;
+    GII_visibility = GIV_POPUP;
+    ATTR_GEN_INTERACTION_GROUP_TYPE = (GIGT_OPTIONS_MENU);
+    }
+@object GenBooleanGroupClass EditSelektor = {
+	GI_comp = @EnableEditBoolean;
+	GBGI_destination = process;
+	GBGI_applyMsg = MSG_IF_EDIT_MODIFIED;
+	}
+@object GenBooleanClass EnableEditBoolean = {
+	GBI_identifier = ID_ENABLE_EDIT;
+	GI_visMoniker = 'E',"Edit-Button";
+	}
+
+/* -------------------------  ------------------------ */
+
+@object FileSelectDialogClass SelectFileDialog = {
+	GI_visMoniker = "Select folder";
+	GI_comp = @SelectInfoText,
+		@FileSelector,@FSPathText,@FSTriggerGroup,@FSReplyBar;
+		HINT_CENTER_CHILDREN_HORIZONTALLY;
+	GII_visibility = GIV_DIALOG;
+	GII_attrs = @default | GIA_NOT_USER_INITIATABLE
+		| GIA_INITIATED_VIA_USER_DO_DIALOG
+		| GIA_MODAL;
+	}
+
+@object GenTextClass FSPathText = {
+	GI_attrs = @default | GA_READ_ONLY;
+	GTXI_text = "";
+/*	HINT_TEXT_WHITE_WASH_COLOR;*/
+	HINT_FIXED_SIZE = { SST_AVG_CHAR_WIDTHS | 50 ,
+				SST_LINES_OF_TEXT | 2, 2 };
+	}
+@object GenTextClass SelectInfoText = {
+	GI_attrs = @default | GA_READ_ONLY;
+	GTXI_text = "The file shown in the title should be deleted, but it was \
+not found in the expected folder. Select the directory where it is located. \
+Or click Ignore to prevent the file from being deleted.";
+	}
+@object GenFileSelectorClass FileSelector = {
+/*	HINT_FILE_SELECTOR_NUMBER_OF_FILES_TO_SHOW = 10;*/
+	ATTR_GEN_FILE_SELECTOR_FILE_ATTR = { 0, FA_LINK};
+	GFSI_attrs = @default | FSA_SHOW_FILES_DISABLED;
+	GFSI_destination = SelectFileDialog;
+	GFSI_notificationMsg = MSG_FS_FILE_SELECTED;
+	}
+@object GenInteractionClass FSTriggerGroup = {
+	GI_visMoniker = "Other folders:";
+	GI_comp = @SelectWorldTrigger,@SelectHelpTrigger,
+			@SelectSystemTrigger,@SelectPrefTrigger,
+			@SelectSysApplTrigger;
+	HINT_ORIENT_CHILDREN_HORIZONTALLY;
+	HINT_FULL_JUSTIFY_CHILDREN_HORIZONTALLY;
+	HINT_INCLUDE_ENDS_IN_CHILD_SPACING;
+	HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+	HINT_PLACE_MONIKER_ABOVE;
+	}
+@object GenInteractionClass FSReplyBar = {
+	GI_comp = @SelectOKTrigger,@SelectCancelTrigger,
+		@SelectIgnoreAllTrigger;
+	HINT_MAKE_REPLY_BAR;
+	HINT_MINIMIZE_CHILD_SPACING;
+	}
+
+@object GenTriggerClass SelectHelpTrigger = {
+	GI_visMoniker = 'H',"Help";
+	GTI_destination = SelectFileDialog;
+	GTI_actionMsg = MSG_FS_SET_DIRECTORY;
+	ATTR_GEN_TRIGGER_ACTION_DATA = SP_HELP_FILES;
+	}
+@object GenTriggerClass SelectSysApplTrigger = {
+	GI_visMoniker = 'y',"SysAppl";
+	GTI_destination = SelectFileDialog;
+	GTI_actionMsg = MSG_FS_SET_DIRECTORY;
+	ATTR_GEN_TRIGGER_ACTION_DATA = SP_SYS_APPLICATION;
+	}
+@object GenTriggerClass SelectSystemTrigger = {
+	GI_visMoniker = 'S',"System";
+	GTI_destination = SelectFileDialog;
+	GTI_actionMsg = MSG_FS_SET_DIRECTORY;
+	ATTR_GEN_TRIGGER_ACTION_DATA = SP_SYSTEM;
+	}
+@object GenTriggerClass SelectPrefTrigger = {
+	GI_visMoniker = 'f',"Pref";
+	GTI_destination = SelectFileDialog;
+	GTI_actionMsg = MSG_FS_SET_DIRECTORY;
+	ATTR_GEN_TRIGGER_ACTION_DATA = (-1);
+	}
+@object GenTriggerClass SelectWorldTrigger = {
+	GI_visMoniker = 'W',"World";
+	GTI_destination = SelectFileDialog;
+	GTI_actionMsg = MSG_FS_SET_DIRECTORY;
+	ATTR_GEN_TRIGGER_ACTION_DATA = SP_APPLICATION;
+	}
+
+@object GenTriggerClass SelectOKTrigger = {
+	GI_visMoniker = "This folder";
+	GI_attrs = @default | GA_SIGNAL_INTERACTION_COMPLETE;
+	ATTR_GEN_TRIGGER_INTERACTION_COMMAND = IC_OK;
+	HINT_DEFAULT_FOCUS;
+	}
+@object GenTriggerClass SelectCancelTrigger = {
+	GI_visMoniker = "Ignore";
+	GI_attrs = @default | GA_SIGNAL_INTERACTION_COMPLETE;
+	ATTR_GEN_TRIGGER_INTERACTION_COMMAND = IC_NO;
+	}
+@object GenTriggerClass SelectIgnoreAllTrigger = {
+	GI_visMoniker = "Ignore all";
+	GI_attrs = @default | GA_SIGNAL_INTERACTION_COMPLETE;
+	ATTR_GEN_TRIGGER_INTERACTION_COMMAND = IC_STOP;
+	}
+
+
+@end DialogResource;
+
+@start MonikerResource, data;
+
+@include "Art/appmon1.goh"
+@include "Art/appmon2.goh"
+@include "Art/docmonik.goh"
+@visMoniker InstallDocMonikerList = list { @DocMoniker0,@DocMoniker1,@DocMoniker2 };
+
+@end MonikerResource;
+
+
+/* ####################################################################### */
+/*	UI-Objekte fÅr IconEdit Dialog
+/* ####################################################################### */
+
+
+/*---------------------------------------------------------------------------
+ Resourcendefinition IconEditResource
+ EnthÑlt die DialogBox um ein Icon zu Ñndern
+ und ander Dialogboxen, die nicht ins Interface sollen
+ sowie die Meldungstexte
+ ---------------------------------------------------------------------------*/
+
+@start IconEditResource;
+
+@object IconEditDialogClass IconEditDialog = {
+	GI_visMoniker = "Select Icon";
+	GI_comp = @IconEditInfoText,@MonikerList,@IconInfoGroup/*,@MonikerRangeGroup*/ ,@IconEditOKTrigger;
+	GII_attrs = @default | GIA_MODAL | GIA_INITIATED_VIA_USER_DO_DIALOG;
+	GII_visibility = GIV_DIALOG;
+/*	GII_type = GIT_COMMAND;*/
+	HINT_ORIENT_CHILDREN_VERTICALLY;
+	HINT_CENTER_CHILDREN_HORIZONTALLY;
+	}
+
+@object GenTextClass IconEditInfoText = {
+	GI_attrs = @default | GA_READ_ONLY;
+	GTXI_text = "Select DOS token for:\r";
+	GTXI_attrs = @default | GTA_INIT_SCROLLING;
+	HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+	}
+
+@object GenDynamicListClass MonikerList = {
+    GIGI_selection = -1;
+    GIGI_applyMsg = MSG_IED_TOKEN_SELECTED;
+    GIGI_destination = IconEditDialog;
+    GIGI_behaviorType = GIGBT_EXCLUSIVE;
+    GDLI_numItems = 0;
+    GDLI_queryMsg = MSG_IED_QUERY_TOKEN;
+    HINT_ORIENT_CHILDREN_HORIZONTALLY;
+    HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+    HINT_ITEM_GROUP_SCROLLABLE;
+/*    HINT_INITIAL_SIZE = {SST_PIXELS | 490,SST_PIXELS | 60,7};*/
+    HINT_INITIAL_SIZE = {SST_PIXELS | 7*60,SST_PIXELS | 45,7};
+	}
+
+/*----------- MonikerRangeGroup ------------------------- */
+/*
+@object GenInteractionClass MonikerRangeGroup = {
+	GI_visMoniker = "ID-Nummer";
+	GI_comp = @ManufIDMinimumValue,@ManufIDMaximumValue,@ManufIDApplayTrigger;
+	HINT_ORIENT_CHILDREN_HORIZONTALLY;
+	HINT_CENTER_CHILDREN_VERTICALLY;
+	}
+@object WordValueClass ManufIDMinimumValue = {
+	GI_visMoniker = "von:";
+	HINT_VALUE_NAVIGATE_TO_NEXT_FIELD_ON_RETURN_PRESS;
+	}
+@object WordValueClass ManufIDMaximumValue = {
+	GI_visMoniker = "bis:";
+	GVLI_value = 0xFFFF;
+	HINT_VALUE_NAVIGATE_TO_NEXT_FIELD_ON_RETURN_PRESS;
+	}
+@object GenTriggerClass ManufIDApplayTrigger = {
+	GI_visMoniker = 'z',"Anzeigen";
+	GTI_destination = IconEditDialog;
+	GTI_actionMsg = MSG_IED_MANUFID_APPLAY_TRIGGER_SELECTED;
+	}
+*/
+/* ------------------------ IconInfoGroup ----------------- */
+
+@object GenInteractionClass IconInfoGroup = {
+	GI_comp = @IconInfoCount,@IconInfoIDLabel,@IconInfoID;
+	HINT_ORIENT_CHILDREN_HORIZONTALLY;
+	HINT_TOP_JUSTIFY_CHILDREN;
+	}
+
+@object GenValueClass IconInfoCount = {
+	GI_visMoniker = "Icons found: ";
+	GI_attrs = @default | GA_READ_ONLY;
+	}
+@object GenGlyphClass IconInfoIDLabel = {
+	GI_visMoniker =" Current icon ID:";
+	}
+@object GenGlyphClass IconInfoID = {
+	GI_visMoniker = "-";
+	}
+
+
+/* ------------------------ ReplyBarTrigger ----------------- */
+
+@object GenTriggerClass IconEditOKTrigger = {
+	GI_visMoniker = 'A',"Apply";
+	GI_states = @default & ~GS_ENABLED;
+	GI_attrs =  @default | GA_SIGNAL_INTERACTION_COMPLETE;
+	ATTR_GEN_TRIGGER_INTERACTION_COMMAND = IC_OK;
+	HINT_SEEK_REPLY_BAR;
+	}
+
+@end IconEditResource;
+
+
+@start IconEditDataResource, data;
+
+/* Texte f¸r Icon edit */
+@chunk char IconEditText1[] = "The GEOS program '";
+@chunk char IconEditText2[] = "' works with '";
+@chunk char IconEditText3[] = "' DOS files. You have to select an icon for these DOS files now.";
+
+
+@chunk char InvalidEntryTypeText[] = "### Unknown entry of type %u ####";
+
+@chunk char InvalidEntryTypeText2[] = "An entry of unknown type \02 was found and cannot be \
+handled by this program version. Search for a new program version on the known GEOS web pages.";
+
+@chunk char DosTokenEntryText[] = "Request DOS icon for ";
+@chunk char DosTokenEntryText2[] = " with ";
+@chunk char TokenEntryText[] = "- While removing: Delete icon ";
+@chunk char IniKategorieEntryText[] = "- While removing: Delete INI category [";
+@chunk char DeleteFileText[] = "Delete file: ";
+@chunk char DeleteFolderText[] = "- While removing: Delete empty folder: ";
+@chunk char StartSysProgText[] = "Launch system application: ";
+@chunk char StartCommonText[] = "Launch: ";
+@chunk char OpenDosText[] = "Open with ";
+@chunk char OpenSysFileText[] = "Open system file: ";
+@chunk char OpenCommonText[] = "Open: ";
+@chunk char UpdateToolText[] = "Run update tool: ";
+@chunk char CleanupToolText[] = "- While removing: Use clean-up tool: ";
+@chunk char DelTempFileText[] = "- While removing: Delete temporary file: ";
+
+
+
+@chunk char DeinstallCommonText[] = "- While removing ";
+@chunk char IniSetEntryText[] = "Set INI file entry: [";
+@chunk char IniDeleteEntryText[] = "Delete INI file entry: [";
+
+
+@chunk char WarningForDelete[] = "The installer has to delete one or more files from your system. \
+Do you want to be prompted for confirmation before deleting each file?";
+
+@chunk char SysShutDownQuestion[] = "Changes have been made to GEOS.INI or the token \
+database that require the system to be shut down and restarted. Do you want to do this now?";
+
+/* write protected files will be overwritten always
+@chunk char QuestionRO[] = "The file '\01' should be replaced by a newer version. \
+But it is write protected. Do you wish to overwrite this file?";
+*/
+
+@chunk char InfoDeinstallEnde[] = "The uninstallation is completed.";
+ 
+@chunk char ErrorDeinstallDeleteFile[] = "An error occurred while deleting the file '\01'. \
+It may be in use at the moment. You can delete it manually later or simply repeat the uninstallation.";
+@chunk char ErrorDeinstallUpdateTool[] = "An error occurred while deleting the file '\01'. \
+You can delete it manually later, since it is no longer needed.";
+@chunk char ErrorWriteFile[] = "An error occurred while writing the file '\01'. \
+The installation process will be aborted.";
+
+@chunk char ErrorInstallDelete[] = "The file '\01' is to be replaced by a newer version. \
+However, it cannot be overwritten. Maybe it is currently in use. Fix the problem and \
+start the installation again. The installation process will be aborted now.";
+
+@chunk char ErrorFileRead[] ="An error occurred while installing the file '\01'. \
+A file with this name already exists in the system, but it is not possible to access it. \
+The installation process is therefore aborted.";
+
+@chunk char ErrorCreatePath[] = "An error has occurred. The path '\01' required for \
+the complete installation could not be created. The installation process is therefore aborted.";
+@chunk char CancelBecauseFlags[] = "Exception: The file '\01' from the installation \
+package should be copied to the system. However, the necessary conditions were not met. \
+\r\rThe manufacturer of the installation package has specified, \
+that the installation process should be aborted in this case.";
+@chunk char ErrorDifferentFileTypes[] = "An error occurred while installing the file '\01'. \
+A file with this name already exists in the system, but it is of a different type than the file \
+to be installed. Therefore, installation process is aborted.";
+
+@chunk char ErrorInvalidDosName[] = "An unusual error has occurred. \
+The GEOS file '\01' is to be installed under the DOS name '\02'. In the \
+system there is a GEOS file with this name, but it has a different DOS name. \
+\r\rThe manufacturer of the installation package has specified, \
+that the installation process should be aborted in this case.";
+
+@chunk char ErrorInvalidGeosName[] = "An unusual error has occurred. \
+The GEOS file '\01' is to be installed under the DOS name '\02'. In the system \
+there is no GEOS file with this name, but another file has \
+the specified DOS name.\
+\r\rThe manufacturer of the installation package has specified, \
+that the installation process should be aborted in this case.";
+
+@chunk char ErrorDifferentFiles[] = "An unusual error has occurred. \
+The GEOS file '\01' is to be installed under the DOS name '\02'. \
+But the file has another DOS name in your system and the specified DOS name is \
+assigned to another GEOS file.\
+\r\rThe manufacturer of the installation package has specified, \
+that the installation process should be aborted in this case.";
+
+@chunk char ErrorDataConnectFailed[] ="The GEOS program associated with the file '\01' \
+could not be found. If you know how to open this file, please do so, because it contains important information.";
+/**/
+@chunk char ErrorAppConnectFailed[] ="The application '\01' could not be launched. Probably, the \
+installation procedure is not finished. Contact the creator of this package, please.";
+@chunk char InfoStartData[] = "In order to finish the installation process, the file '\01' \
+will be opened now. Click on OK to continue.";
+@chunk char InfoStartApp[] = "In order to finish the installation process, the application '\01' \
+will be launched now. Click on OK to continue.";
+
+@chunk char TokenDeinstallWarning[] = "Now, some icons from your token database file will be deleted. \
+Close all windows of your file manager, now! After that click on Yes to delete the icons.";
+@chunk char DoNotDelToken[] ="The icons still remain in your token database. You may restart the \
+remove procedure to delete the icons later.";
+
+ 
+@chunk char InfoStartUpdateTool[] = "The next step is to install and launch the application '\01'. \
+It executes some functions to complete the installation procedure. After that, it is no longer needed \
+and will be deleted automatically. Click on OK to continue.";
+
+@chunk char ContinueUpdateTool[] = "When you have executed the \
+functions offered by the tool program '\01', close it. Than \
+click on OK. The tool program will be deleted afterwards";
+
+@chunk char InfoStartCleanUpTool[] = "Next, the GEOS program '\01' will be run. It executes \
+functions to complete the de-installation. Afterwards, it is no longer needed and removed again. \
+Click OK to continue.";
+
+
+@chunk char QuestionDelFile[] = "The file '\01' is to be deleted. Do you agree? \
+\Note: If the file is not deleted, there may be problems with the \
+software in the package.";
+@chunk char ErrorInstallDeleteFile[] = "An error occurred while deleting the file '\01'. \r\
+Error number \02. If this causes problems with the software in the package, \
+please contact the manufacturer.";
+
+@chunk char ErrorLaunchCreatorFailed[] = "Could not find the Install-Creator application. \
+It must be located in WORLD or one of its sub folders.";
+ 
+@chunk char InifKat[] = "InstF";
+@chunk char InifKey[] = "Options";
+@chunk char QuestionBackupIni[] = "The Installer is about to modify your GEOS.INI file. \
+Do you wish to create a backup of your GEOS.INI now?";
+
+@chunk char WarningBackupExist[] = "A file with this name already exist. Do you wish to overwrite it?";
+
+@chunk char WarningBackupIni[] = "Note: On a few systems, especially \
+if SHARE.EXE is loaded, after successfully copying the GEOS.INI \
+the GEOS system may become unstable or crash. Restart \
+restart the GEIS system and make future backup copies of the \
+GEOS.INI only on operating system level.";
+@chunk char DoneBackupIni[] = "The GEOS.INI has been copied successfully. \
+The copy is located in the same folder where the GEOS.INI is.";
+
+@chunk char ErrorBackupIni[] = "An error occurred while copying the GEOS.INI. \
+The backup could not be created.\rError type: \01";
+
+@chunk char ErrorAccessDenied[] = "Access denied";
+@chunk char ErrorWriteProtected[] = "Write protection error";
+@chunk char ErrorInvalidName[] = "Invalid name";
+@chunk char CopyErrorDefault[] = "Common error";
+
+
+
+@end IconEditDataResource;	/*-------------------------------------------------------*/
+
+
+@start DebugResource;
+
+@if @DEBUG_FLAG
+
+@object GenPrimaryClass DebugPrimary = {
+	GI_visMoniker = "Debug-Window";
+	GI_comp = @DebugText,@DebugInfoGroup;
+/*	,DebugSetBreakTrigger,DebugClearBreakTrigger,@DebugContinueTrigger;*/
+	HINT_SIZE_WINDOW_AS_DESIRED;
+	HINT_ORIENT_CHILDREN_VERTICALLY;
+	} /* end of 	Primary */
+
+
+@object GenTextClass DebugText = {
+	GTXI_text = "Debug Informationen:\15";
+	GTXI_attrs = @default | GTA_INIT_SCROLLING;
+	HINT_TEXT_WASH_COLOR = {C_LIGHT_CYAN,CF_INDEX,0,0 };
+	/*	HINT_TEXT_WHITE_WASH_COLOR;*/
+	HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+	HINT_EXPAND_HEIGHT_TO_FIT_PARENT;
+@if @DEBUG_FLAG
+	HINT_INITIAL_SIZE = { SST_AVG_CHAR_WIDTHS | 65,
+		SST_LINES_OF_TEXT | 20, 0};
+@elseif
+	HINT_INITIAL_SIZE = { SST_AVG_CHAR_WIDTHS | 65,
+		SST_LINES_OF_TEXT | 8, 0};
+@endif
+	}
+
+@object GenInteractionClass DebugInfoGroup = {
+	GI_comp = @DebugInfoGlyph,@DebugValue1,@DebugValue2,@DebugValue3;
+	HINT_ORIENT_CHILDREN_HORIZONTALLY;
+	HINT_FULL_JUSTIFY_CHILDREN_HORIZONTALLY;
+	HINT_INCLUDE_ENDS_IN_CHILD_SPACING;
+	}
+
+@object GenGlyphClass DebugInfoGlyph = {
+	GI_visMoniker = "-";
+	}
+
+@object GenValueClass DebugValue1 = {
+	GI_visMoniker = "Value1:";
+	GVLI_minimum = MakeWWFixed( -16*1024 );
+	GI_attrs = @default | GA_READ_ONLY;
+	}
+
+@object GenValueClass DebugValue2 = {
+	GI_visMoniker = "Value2:";
+	GI_attrs = @default | GA_READ_ONLY;
+	GVLI_minimum = MakeWWFixed( -16*1024 );
+	}
+
+@object GenValueClass DebugValue3 = {
+	GI_visMoniker = "Value3:";
+	GI_attrs = @default | GA_READ_ONLY;
+	GVLI_minimum = MakeWWFixed( -16*1024 );
+	}
+
+/* noch nicht implementiert, weil dann eine neue Klasse nîtig ist, die
+ in AbhÑngigkeit vom DebugFlag in der GP-datei einzubinden ist.
+@object GenTriggerClass DebugSetBreakTrigger = {
+	GI_visMoniker =
+	GTI_actionMsg = MSG_DEBUG_SET_BREAK;
+	GTI_destination = @DebugInfoGroup;
+	}
+
+@object GenTriggerClass DebugClearBreakTrigger = {
+	GI_visMoniker =
+	GTI_actionMsg = MSG_DEBUG_CLEAR_BREAK;
+	GTI_destination = @DebugInfoGroup;
+	}
+
+@object GenTriggerClass DebugContiniueTrigger = {
+	GI_visMoniker =
+	GTI_actionMsg = MSG_DEBUG_CONTINUE;
+	GTI_destination = @DebugInfoGroup;
+	}
+
+*/
+
+@endif
+
+@end DebugResource;
+
+

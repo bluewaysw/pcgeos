@@ -1,0 +1,135 @@
+/****************************************************************************
+*/ /*µµchunk char FileManagerKategory[] = "fileManager";
+*/ /*µµchunk char FileManagerKey[] = "filenameTokens";
+
+/****************************************************************************/
+
+
+// InfoStruktur zum Suchen des passenden Application-Tokens
+// Diese Struktur wird fr jeden Eintrag in "fileNameTokens" angelegt,
+
+#define	FULL_NAME_SIZE	16
+#define FULL_NAME_LEN	(FULL_NAME_SIZE-1)
+
+typedef struct {
+	char 	fullName[FULL_NAME_SIZE]; //das erspart die Rck-Konvertierung
+	char    body[16],
+		ext[8];         //      NamensStrings, eingekrzt
+	int     bodyStar,
+		extStar;        // Position eine evt. vorhandene Sterns
+	}       DosFileNameDescriptor;
+
+typedef struct {
+	DosFileNameDescriptor   dosFile;
+	GeodeToken      fileToken; // Token , das Angezeigt wird
+	GeodeToken      appToken;  // Token der zugeordneten Applikation
+	Boolean         hasApp;    // True, wenn App zugeordent
+	}       DosFileEntry;
+
+#ifndef WriteTokenIDString
+#define WriteTokenIDString(buf,tok)  { sprintf(buf,"\"%c%c%c%c\",%u",tok.GT_chars[0],\
+			tok.GT_chars[1],tok.GT_chars[2],tok.GT_chars[3],tok.GT_manufID);}
+#endif
+
+
+/* #######################################################################
+ *      MainRoutinen zum Lesen uns schreiben der DosFile Icon Zuweisungen
+/* #######################################################################*/
+
+extern Boolean DosIconReadDosFileList(void);
+extern Boolean DosIconFindTokenInfo(DosFileEntry * info, char * dosFile);
+extern Boolean DosIconReplaceTokenInfo(DosFileEntry * info, char * dosFile);
+extern Boolean DosIconDeleteTokenInfo(char * dosFile, Boolean onlyApp);
+extern void    DosIconWriteDosFileList(void);
+
+/*--------------------- DosIconReadDosFileList ---------------------
+ *      Aufgabe:        Einlesen der Geos.ini und Anlegen einer Liste mit
+ *                      allen DOS-Datei-Typen, die mit Icons verknpft sind
+ *      Return:         TRUE; wenn Error (z.B. kein Eintrag in der INI )
+ *
+/*--------------------- DosIconFindTokenInfo ---------------------
+ *      Aufgabe:        Liste nach den zu dosFile passenden Eintrag durchsuchen
+ *      Params/Return:  wenn gefunden:  info enth„lt den eintrag
+ *                                      return FALSE
+ *                      wenn nicht gefunden: info unver„ndert
+ *                                      return TRUE
+ *
+/*--------------------- DosIconDeleteTokenInfo ---------------------
+ *      Aufgabe:        Liste nach den zu dosFile passenden Eintrag durchsuchen
+ *			und diesen Eintrag l”schen
+ *			onlyApp == TRUE : nur App-Token entfernen, Anzeige-Token bleibt
+ *	Strategie: 	Der Eintrag muá exakt auf den Namen passen
+ *	Return:		TRUE, wenn nicht ge„ndert wurde
+ *			   - der Eintrag nicht gefunden wurde
+ *			   - onlyApp== TRUE : keine App vorhanden war
+ *
+/*--------------------- DosIconReplaceTokenInfo ---------------------
+ *      Aufgabe:        ersetzt den zu dosFile passenden Eintrag.
+ *                      Der DosFileNameDescriptor entry->dosName wird ignoriert
+ *			und entsprechend 'dosFile' neu belegt
+ *                      Falls nichts zu dosFile passendes gefunden wurde,
+ *                      wird der Eintrag am Anfang (!) eingefgt
+ *      Params/Return:  wenn gefunden:  return FALSE
+ *                      wenn nicht gefunden: return TRUE
+ *
+/*--------------------- DosIconWriteDosFileList ---------------------
+ *      Aufgabe:        Schreiben der aktuellen Liste in die INI
+ *      Return:         TRUE; wenn Error
+ ---------------------------------------------------------------------------*/
+
+
+/* #######################################################################
+ *      ToolRoutinen die extern eigentlich nicht gerufen werden mssen
+/* #######################################################################*/
+
+void  DosIconToolCreateFileNameDescriptor
+			(DosFileNameDescriptor *dsc ,char * text);
+extern Boolean DosIconToolCreateFileEntry(DosFileEntry * dfep, char * text );
+extern Boolean DosIconToolGetAppToken( GeodeToken *t, char * text);
+extern Boolean DosIconToolGetFileToken( GeodeToken *t, char * text);
+extern void    DosIconToolSplitDosFileName(char * fName, char * body, char * ext);
+extern Boolean DosIconToolCompareFullFileName(DosFileEntry * dfep, char * name);
+extern Boolean DosIconToolCompareFileName(DosFileEntry * dfep, char * name);
+
+/*--------------------- DosIconToolCreateFileNameDescriptor ---------------------
+ *      Aufgabe:        Bereitet einen Dateinamen (mit wildcards) in 'text'
+ *			so auf auf, daá er fr die DosIcon Liste verwendbar wird
+ *
+/*--------------------- DosIconToolCreateFileEntry ---------------------
+ *      Aufgabe:        Erzeugen eines DosFileEntry aus einem bergebenen Text
+ *      Params/Return:  Return TRUE, wenn kein Token
+ *      Wichtig:        dfep->body und dfep->ext werden in jedem Fall belegt
+ *
+/*--------------------- DosIconToolGetAppToken ---------------------
+ *      Aufgabe:        TokenID der zugeordneten Applikation holen
+ *      Params/Return:  Return TRUE, wenn keine Applikation zugeordnet ist
+ *
+/*--------------------- DosIconToolGetFileToken ---------------------
+ *      Aufgabe:        TokenID lesen, das angezeigt wewrden soll
+ *      Params/Return:  Return TRUE, wenn kein Token zugeordnet ist
+ *
+/*--------------------- DosIconToolSplitDosFileName ---------------------
+ *      Aufgabe:        Aufteilen eines DOS-Dateinamens in Body und Extension
+ *                      Inclusive Leerzeichenskipping und Umwandlung in
+ *                      Groábuchstaben
+ *
+/*--------------------- DosIconToolCompareFullFileName ---------------------
+ *      Aufgabe:        Vergleich eines Dateinamens mit einer
+ *                      DosFileEntry-Struktur zum test, ob genau dieser
+ *			DOS-Datei Eintrag schon vorhanden ist
+ *	Strategie:	Wildcards werden nicht bearbeitet, dh:
+ *			"A*.ZIP" passt NICHT auf "*.ZIP" oder "*.*"
+ *      Params/Return:  TRUE wenn die Namen bereinstimmen
+/*--------------------- DosIconToolCompareFileName ---------------------
+ *      Aufgabe:        Vergleich eines Dateinamens mit einer
+ *                      DosFileEntry-Struktur zum finden eines "passenden"
+ *			Eintrags
+ *      Strategie:      Die DosFileentry-Struktur enth„lt Infos ber die
+ *                      evt. vorhandenen WildCards '*' -> Werden bercksichtigt
+ *      Params/Return:  TRUE wenn die Namen bereinstimmen
+/* #######################################################################*/
+
+
+
+
+

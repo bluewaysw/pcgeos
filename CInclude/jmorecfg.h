@@ -192,14 +192,33 @@ typedef unsigned int JDIMENSION;
 /* a function used only in its module: */
 #define LOCAL(type)     static type _pascal _near
 /* a function referenced thru EXTERNs: */
-#define GLOBAL(type)    type _pascal _export
+#define GLOBAL(type)    type _pascal _export 
 /* a reference to a GLOBAL function: */
-#define EXTERN(type)    extern type _pascal
+#define EXTERN(type)    extern type _pascal _export
 
 
 /* Macros to assign a const function pointer in a glue-friendly way. All
    but the first are only required because glue doesn't like to *local*
    variables in different scopes to have the same name... */
+#ifdef __WATCOMC__
+
+#define MASSIGN(dst, src) {\
+    (void *)(dst) = src;\
+  }
+#define MASSIGN2(dst, src) {\
+    (void *)(dst) = src;\
+  }
+#define MASSIGN3(dst, src) {\
+    (void *)(dst) = src;\
+  }
+#define MASSIGN4(dst, src) {\
+    (void *)(dst) = src;\
+  }
+#define MASSIGN5(dst, src) {\
+    (void *)(dst) = src;\
+  }
+
+#else
 
 #define MASSIGN(dst, src) {\
     static void *method_##src = src;\
@@ -222,6 +241,8 @@ typedef unsigned int JDIMENSION;
     (void *)(dst) = method5_##src;\
   }
 
+#endif
+
 /* This macro is used to declare a "method", that is, a function pointer.
  * We want to supply prototype parameters if the compiler can cope.
  * Note that the arglist parameter must be parenthesized!
@@ -229,9 +250,9 @@ typedef unsigned int JDIMENSION;
  */
 
 #ifdef HAVE_PROTOTYPES
-#define JMETHOD(type,methodname,arglist)  type (*methodname) arglist
+#define JMETHOD(type,methodname,arglist)  type _pascal (*methodname) arglist
 #else
-#define JMETHOD(type,methodname,arglist)  type (*methodname) ()
+#define JMETHOD(type,methodname,arglist)  type _pascal (*methodname) ()
 #endif
 
 
