@@ -53,8 +53,7 @@ static void CalcTransform( TRUETYPE_VARS,
                         TransformMatrix*        transMatrix,
                         FontMatrix*             fontMatrix, 
                         WWFixedAsDWord          pointSize,
-                        TextStyle               stylesToImplement,
-                        FontBuf*                fontBuf );
+                        TextStyle               stylesToImplement );
 
 static void AdjustFontBuf( TransformMatrix*     transMatrix, 
                         FontMatrix*             fontMatrix, 
@@ -183,7 +182,7 @@ EC(     ECCheckBounds( (void*)trueTypeVars ) );
 
         /* calculate the transformation matrix and copy it into the FontBlock */
         transMatrix = (TransformMatrix*)(((byte*)fontBuf) + sizeof( FontBuf ) + fontHeader->FH_numChars * sizeof( CharTableEntry ));
-        CalcTransform( trueTypeVars, transMatrix, fontMatrix, pointSize, stylesToImplement, fontBuf );
+        CalcTransform( trueTypeVars, transMatrix, fontMatrix, pointSize, stylesToImplement );
 
         //TODO: adjust FB_height, FB_minTSB, FB_pixHeight and FB_baselinePos
         AdjustFontBuf( transMatrix, fontMatrix, stylesToImplement, fontBuf );
@@ -417,7 +416,6 @@ static void CalcScaleForWidths( TRUETYPE_VARS, WWFixedAsDWord pointSize,
  *                *transMatrix          Pointer to TransformMatrix.
  *                *fontMatrix           Systems transformation matrix.
  *                styleToImplement      Styles that must be added.
- *                *fontBuf              Ptr. to FontBuf structure.
  *                      
  * RETURNS:       void
  * 
@@ -433,8 +431,7 @@ static void CalcTransform( TRUETYPE_VARS,
                            TransformMatrix*  transMatrix, 
                            FontMatrix*       fontMatrix, 
                            WWFixedAsDWord    pointSize,
-                           TextStyle         stylesToImplement,
-                           FontBuf*          fontBuf )
+                           TextStyle         stylesToImplement )
 {
         TT_Matrix  tempMatrix;
  
@@ -469,15 +466,11 @@ EC(     ECCheckBounds( (void*)fontMatrix ) );
 
                 if( stylesToImplement & TS_SUBSCRIPT )
                 {
-                        transMatrix->TM_scriptY = GrMulWWFixed( 
-                                        SUBSCRIPT_OFFSET, pointSize ) >> 16;
+                        transMatrix->TM_scriptY = GrMulWWFixed( SUBSCRIPT_OFFSET, pointSize ) >> 16;
                 }
                 else
                 {
-                        transMatrix->TM_scriptY = GrMulWWFixed( 
-                                        SUPERSCRIPT_OFFSET, pointSize ) -
-                                        WBFIXED_TO_WWFIXEDASDWORD( fontBuf->FB_baselinePos ) -
-                                        WBFIXED_TO_WWFIXEDASDWORD( fontBuf->FB_baseAdjust ) >> 16;
+                        transMatrix->TM_scriptY = -( GrMulWWFixed( SUPERSCRIPT_OFFSET, pointSize ) ) >> 16;
                 }
         }
 
