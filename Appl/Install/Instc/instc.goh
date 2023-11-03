@@ -1,0 +1,170 @@
+/*---------------------------------------------------------------------------
+ Klassendefinition ICProcessClass  : die Prozess-Klasse der Applikation
+ alle Trigger der MenÅs werden hier behandelt.
+ ---------------------------------------------------------------------------*/
+#ifndef INST_GOH
+#define INST_GOH
+
+@include <stdapp.goh>
+@include <stdlib.h>
+@include <file.h>
+
+//define DEBUG_FLAG	0
+// A DebugWindow ist currently not implemented. See INSTF app for an example
+
+@define ENABLE_SKIP_PWD		0	/* Never set this flag to 1 for an offical release! */
+					/* Special INI settings are required. See Code */
+
+@class ICProcessClass, GenProcessClass;
+/* Tools Menu  */
+	@message void MSG_IC_UPDATE_ALL();
+	@message void MSG_IC_START_TEXT_EDITOR();
+	@message void MSG_IC_CONFIG_TEXT_EDITOR();
+	@message void MSG_IC_SET_DEFAULT_DOC_OPTIONS();
+	@message void MSG_IC_SET_DEFAULT_APP_OPTIONS();
+	@message void MSG_IC_SET_DEFAULT_BASIC_OPTIONS();
+	@message void MSG_IC_SORT_LIST();
+	@message void MSG_IC_SET_PASSWORT();
+	@message void MSG_IC_FILE_DETAILS();
+	@message void MSG_IC_REBUILD_LIST();
+
+/* UnterstÅtzung der Main-Datei-Liste */
+	@message (GEN_ITEM_GROUP_APPLY_MSG) MSG_IC_LIST_ITEM_SELECTED;
+	@message (GEN_DYNAMIC_LIST_QUERY_MSG) MSG_IC_QUERY_LIST_ITEM;
+
+/* Bearbeiten-Schalter */
+	@message void MSG_IC_ADD_FILE();
+	@message void MSG_IC_ADD_UPDATE_TOOL();
+	@message void MSG_IC_ADD_CLEANUP_TOOL();
+	@message void MSG_IC_DELETE();
+	@message void MSG_IC_EDIT();
+	@message void MSG_IC_UPDATE();
+	@message void MSG_IC_START_FILE();
+	@message void MSG_IC_SET_INFO_TEXT();
+	@message void MSG_IC_INI_FILE();
+	@message void MSG_IC_DOS_TOKEN();
+	@message void MSG_IC_APP_TOKEN();
+	@message void MSG_IC_INFO_TEXTE();
+
+	@message void MSG_IC_START_EXTERN_FILE();
+	@message void MSG_IC_DELETE_EXTERN_FILE();
+	@message void MSG_IC_DELETE_FOLDER();
+	@message void MSG_IC_CREATE_INI_ENTRY();
+	@message void MSG_IC_DELETE_INI_ENTRY();
+	@message void 	MSG_IC_DEL_TEMP_FILE();
+
+/* Protokol-Nummer des Dokuments an die wirkliche Liste anpassen */
+	@message void MSG_IC_SET_MINIMUM_PROTOCOL_NUMBER(FileHandle fh);
+
+	@message void MSG_IC_SET_DEFAULT_FOLDER();
+	@message (GEN_BOOLEAN_GROUP_APPLY_MSG) MSG_IC_OPTIONS_CHANGED;
+
+@endc /* ICProcessClass */
+
+@class IconEditDialogClass, GenInteractionClass;
+
+	@instance GeodeToken IEDI_token;
+	@message (GEN_DYNAMIC_LIST_QUERY_MSG) MSG_IED_QUERY_TOKEN;
+	@message (GEN_ITEM_GROUP_APPLY_MSG) MSG_IED_TOKEN_SELECTED;
+/*	@message	void	MSG_IED_MANUFID_APPLAY_TRIGGER_SELECTED();*/
+	@message	void	MSG_IED_GET_ICON(GeodeToken *tok);
+
+@endc
+
+#define WriteTokenIDString(buf,tok)  { sprintf(buf,"%c%c%c%c,%u",tok.GT_chars[0],\
+			tok.GT_chars[1],tok.GT_chars[2],tok.GT_chars[3],tok.GT_manufID);}
+
+#ifndef TOKEN_CHARS_fixed
+#define TOKEN_CHARS_fixed(a,b,c,d) \
+  TOKEN_CHARS((dword)(a),(dword)(b),(dword)(c),(dword)(d))
+#endif
+
+
+
+@class ICOptionsDialogClass, GenInteractionClass;
+	@message (GEN_BOOLEAN_GROUP_APPLY_MSG) MSG_OD_INSTALL_ALLWAYS_CHANGED;
+@endc
+
+@class FileSelectDialogClass, GenInteractionClass;
+	@message (GEN_FILE_SELECTOR_NOTIFICATION_MSG) MSG_FS_FILE_SELECTED;
+	@message void MSG_FS_SET_DIRECTORY(int stdPath);
+@endc
+
+#define QUERY_TEXT_LEN PATH_BUFFER_SIZE+FILE_LONGNAME_BUFFER_SIZE+2
+#define PWD_BUFFER_SIZE	20
+#define PWD_BUFFER_LEN (PWD_BUFFER_SIZE- 2)
+
+/* Trigger-Flags zum enablen / disablen */
+#define TRG_DELETE	1
+#define TRG_EDIT	2
+#define TRG_UPDATE	4
+#define TRG_DOSTOK	8
+#define TRG_START_FILE	0x10
+#define TRG_FILE_DETAILS 0x20
+
+/* returnwerte fÅr ICCheckForExistingFile */
+#define ICCFEF_NOT_FOUND	0
+#define ICCFEF_REPLACE		1
+#define ICCFEF_CANCEL           2
+
+
+// Header-Struktur einer geos-Datei - Ohne Garantie!
+
+#define GEOS_HEADER_MAGIC (dword)1405175239
+
+typedef struct	{
+/*00*/	dword	Kennung;       		/* 'G+0x80','E+0x80','O','S' */
+/*04*/	char		Name[36];	/* = FILE_LONGNAME_BUFFER_SIZE  = 32 + 4 */
+/*28*/	GeosFileType	fileType;			/* word enum, 	FEA_FILE_TYPE */
+					/* ZulÑssig 0 .. 4 = GFT_NOT_GEOS_FILE .. GFT_DIRECTORY */
+					/* hîhere Werte: [CTRL-G] liefert 1.X VM-Datei */
+/*2A*/	GeosFileHeaderFlags	headerFlags;	/* WordFlags,	FEA_FLAGS */
+/*2C*/ 	ReleaseNumber	releaseNumber;		/* 4 Word,	FEA_RELEASE */
+/*34*/	ProtocolNumber	protocolNumber;	/* 2 Word;	FEA_PROTOCOL */
+/*38*/	GeodeToken	fileToken;		/* 6 Byte,	FEA_TOKEN */
+/*3E*/	GeodeToken	creatorToken;		/* 6 Byte,	FEA_CREATOR */
+/*44*/	char		notiz[99];	/* 99 Bytes, Dokument-Notizen */
+/*A7*/	byte		fill;	  	/* 1 Byte, unbekannt, öbernahme zur Vereinfachung */
+/*A8*/  char 		copyright[32];	/* Copyright-Notiz */
+/*C8*/	FileDateAndTime	createDate;	/* Datum der Dokument-Erstellung */
+/*CC*/	byte		password[8];	/* verschlÅsseltes Passwort */
+	} 	GeosHeader;
+
+typedef struct {
+	Bitmap	header;
+	byte	bmpData[160];
+	} InfoBitmap;
+
+
+/* Options f¸r Options-Men¸ */
+#define IC_OPT_IGNORE_ONE_HOUR		1
+#define IC_DEFAULT_OPTIONS			(IC_OPT_IGNORE_ONE_HOUR)
+
+
+
+
+#define FTIME_YEAR_DIFFERS		1
+#define FTIME_MONTH_DIFFERS		2
+#define FTIME_DAY_DIFFERS		4
+#define FTIME_HOUR_DIFFERS		8
+#define FTIME_MINUTE_DIFFERS		0x10
+#define FTIME_SECOND_DIFFERS		0x20
+
+/*--------------------- ViewToolAddNumber ---------------------
+ *      Aufgabe:        Ene Nummer an eine String hÑngen
+ ---------------------------------------------------------------------------*/
+void ViewToolAddNumber(char * st, dword num );
+
+/*--------------------- ToolInitializeDocumentGroup ---------------------
+ *	Aufgabe:	Standardpfad f¸r Leere Dokumente an das DocumentGroup-Objekt ¸bergeben
+ ---------------------------------------------------------------------------*/
+void ToolInitializeDocumentGroup(void);
+
+/*--------------------- ToolInitializeOptions ---------------------
+ *	Aufgabe:	Anzeigeoptionen initialisieren
+ ---------------------------------------------------------------------------*/
+void ToolInitializeOptions(void);
+
+
+
+#endif

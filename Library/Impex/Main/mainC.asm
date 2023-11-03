@@ -197,7 +197,7 @@ REVISION HISTORY:
 
 -----------------------------------------------------------------------------@
 IMPEXUPDATEIMPORTEXPORTSTATUS	proc far	message:fptr, percent:word
-	uses	ds
+	uses	si, ds
 	.enter
 
 	movdw	dxsi, message
