@@ -73,6 +73,7 @@ void _pascal TrueType_Gen_Path(
         TT_UShort              charIndex;
         WWFixedAsDWord         pointSize;
         XYValueAsDWord         cursorPos;
+        word                   baseline;
 
 
 EC(     ECCheckGStateHandle( gstate ) );
@@ -125,6 +126,9 @@ EC(     ECCheckBounds( (void*)fontHeader ) );
 	/* extremely important, we must perform these transformations      */
 	/* in reverse order. Step 5 is, of course, already in the GState.  */
 
+        /* calculate baseline for further use */
+        baseline = fontHeader->FH_accent + fontHeader->FH_ascent;
+
         /* translate by current cursor position */
         cursorPos = GrGetCurPos( gstate );
         GrApplyTranslationDWord( gstate, DWORD_X( cursorPos ), DWORD_Y( cursorPos ) );
@@ -135,12 +139,11 @@ EC(     ECCheckBounds( (void*)fontHeader ) );
         /* we only perform steps 2 & 3 if the POSTSCRIPT flag wasn't passed */
         if( !(pathFlags & FGPF_POSTSCRIPT) )
         {
-                word            translation = fontHeader->FH_accent + fontHeader->FH_ascent;
                 WWFixedAsDWord  scale = GrUDivWWFixed( pointSize, ((dword)UNITS_PER_EM) << 16 );
 
 
                 /* translate to baseline */
-                GrApplyTranslation( gstate, 0, GrMulWWFixed( ((dword)translation) << 16, scale ) );
+                GrApplyTranslation( gstate, 0, GrMulWWFixed( ((dword)baseline) << 16, scale ) );
 
                 /* flip on x-axis */ 
                 GrApplyScale( gstate, 1L << 16, -1L << 16 );
@@ -234,6 +237,26 @@ static void ConvertOutline( GStateHandle gstate, TT_Outline* outline )
 } 
 
 
+/********************************************************************
+ *                      CalcTransformMatrix
+ ********************************************************************
+ * SYNOPSIS:	  Calculate tranformation matrix for scale and styles.
+ * 
+ * PARAMETERS:    *transmatrix          Ptr. to transformation matrix
+ *                                      to fill.
+ *                pointsize             Desired point size.
+ *                stylesToImplement     Styles that must be added.
+ * 
+ * RETURNS:       void
+ * 
+ * STRATEGY:      
+ * 
+ * REVISION HISTORY:
+ *      Date      Name      Description
+ *      ----      ----      -----------
+ *      22/10/23  JK        Initial Revision
+ *******************************************************************/
+
 static void CalcTransformMatrix( TransMatrix*    transMatrix, 
                                  WWFixedAsDWord  pointSize, 
                                  TextStyle       stylesToImplement )
@@ -271,15 +294,25 @@ static void CalcTransformMatrix( TransMatrix*    transMatrix,
 
         if( stylesToImplement & ( TS_SUBSCRIPT | TS_SUPERSCRIPT ) )
         {
-                WWFixedAsDWord scaleScript = GrMulWWFixed( scalePointSize, SCRIPT_FACTOR );
+                WWFixedAsDWord translation;
+                WWFixedAsDWord scaleScript;
+              
 
-
+            /*    scaleScript = GrMulWWFixed( scaleScript,  );
                 transMatrix->TM_e11.WWF_frac = FractionOf( scaleScript );
                 transMatrix->TM_e11.WWF_int  = IntegerOf( scaleScript );
+
                 transMatrix->TM_e22.WWF_frac = FractionOf( scaleScript );
                 transMatrix->TM_e22.WWF_int  = IntegerOf( scaleScript );
 
-                //TODO: tm_e31 und tm_e32 füllen
+                if( stylesToImplement & TS_SUPERSCRIPT )
+                        translation = GrMulWWFixed( SUPERSCRIPT_OFFSET, scalePointSize );
+
+                if( stylesToImplement & TS_SUBSCRIPT )
+                        translation = -GrMulWWFixed( SUBSCRIPT_OFFSET, scalePointSize );
+
+                transMatrix->TM_e32.DWF_frac = FractionOf( translation );
+                transMatrix->TM_e32.DWF_int  = IntegerOf( translation ); */
         }
 
         //TODO:
@@ -292,7 +325,9 @@ static void CalcTransformMatrix( TransMatrix*    transMatrix,
  ********************************************************************
  * SYNOPSIS:	  Write glyphbox to gstate as comment.
  * 
- * PARAMETERS:    
+ * PARAMETERS:    TRUETYPE_VARS         Cached variables needed by driver.
+ *                gstate                GStateHande in which the comment 
+ *                                      is written.
  * 
  * RETURNS:       void   
  * 
