@@ -662,7 +662,6 @@ static void AdjustFontBuf( TransformMatrix* transMatrix,
                            FontBuf*         fontBuf )
 {
         sword savedHeightY = transMatrix->TM_heightY;
-        sword savedScriptY = transMatrix->TM_scriptY;
 
 
         transMatrix->TM_heightY = INTEGER_OF_WWFIXEDASDWORD( GrMulWWFixed( WORD_TO_WWFIXEDASDWORD( fontBuf->FB_baselinePos.WBF_int ), fontMatrix->FM_22 ) ) + 1;
@@ -680,7 +679,6 @@ static void AdjustFontBuf( TransformMatrix* transMatrix,
 
                 if( fontMatrix->FM_flags & TF_ROTATED )
                 {
-
                         /* adjust FB_pixHeight, FB_minTSB */
                         fontBuf->FB_pixHeight = INTEGER_OF_WWFIXEDASDWORD( GrMulWWFixed( 
                                                         WORD_TO_WWFIXEDASDWORD( fontBuf->FB_height.WBF_int ), transMatrix->TM_matrix.yy ) );
@@ -692,11 +690,12 @@ static void AdjustFontBuf( TransformMatrix* transMatrix,
                                                         WORD_TO_WWFIXEDASDWORD( fontBuf->FB_baselinePos.WBF_int ), transMatrix->TM_matrix.yy ) );
                         transMatrix->TM_heightX = -INTEGER_OF_WWFIXEDASDWORD( GrMulWWFixed( 
                                                         WORD_TO_WWFIXEDASDWORD( fontBuf->FB_baselinePos.WBF_int ), transMatrix->TM_matrix.xy ) );
+                        
                         transMatrix->TM_scriptX = 0; /*-INTEGER_OF_WWFIXEDASDWORD( GrMulWWFixed( 
                                                         WORD_TO_WWFIXEDASDWORD( savedHeightY ), transMatrix->TM_matrix.xy ) );*/
 
-                        transMatrix->TM_scriptY = 0; /*INTEGER_OF_WWFIXEDASDWORD( GrMulWWFixed( 
-                                                        WORD_TO_WWFIXEDASDWORD( savedHeightY ), transMatrix->TM_matrix.yx ) );*/
+                        transMatrix->TM_scriptY = 0; /* INTEGER_OF_WWFIXEDASDWORD( GrMulWWFixed( 
+                                                        WORD_TO_WWFIXEDASDWORD( savedHeightY - transMatrix->TM_heightY + transMatrix->TM_scriptY ), -transMatrix->TM_matrix.yx ) );*/
                 }
 
                 fontMatrix->FM_12 = -fontMatrix->FM_12;
