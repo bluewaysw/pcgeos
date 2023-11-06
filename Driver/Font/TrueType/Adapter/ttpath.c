@@ -219,21 +219,32 @@ void _pascal TrueType_Gen_In_Region(
 
 static void ConvertOutline( GStateHandle gstate, TT_Outline* outline )
 {
+        word contour = 0;
+        word point   = 0;
+
+
         if( outline->contours <= 0 || outline->points == 0 )
                 return;
 
-        //TODO: iteriere über Konturen
-        //              wandle Segmente in Gr... Kommandos
+        /* iterate over contours */
+        for( contour = 0; contour < outline->n_contours; contour++ )
+        {
+                TT_Vector* startPoint = &outline->points[point];
+                TT_UShort endPoint = outline->contours[contour];
 
+                /* move to first point of contour */
+                GrMoveTo( gstate, outline->points[point].x, outline->points[point].y );
+              
 
+                while( endPoint != point )
+                {
+                        ++point;
+                        GrDrawLineTo( gstate, outline->points[point].x, outline->points[point].y );
+                }
 
-        // Test mit Bindestrich
-        GrMoveTo( gstate, 198, 303 );
-        GrDrawVLineTo( gstate, 269 );
-        GrDrawHLineTo( gstate, 401 );
-        GrDrawVLineTo( gstate, 303 );
-        GrDrawHLineTo( gstate, 198 );
-
+                ++point;
+                GrDrawLineTo( gstate, startPoint->x, startPoint->y );
+        }
 } 
 
 
