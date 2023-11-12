@@ -618,16 +618,6 @@
   typedef int  TT_Error;
 
 
-  /* Flags for control path generation for FreeGEOS. */
-
-  #ifdef __GEOS__
-
-  #define GEOS_TTF_POSTSCRIPT   0x0002
-  #define GEOS_TTF_SAVE_STATE   0x0001
-
-  #endif /* __GEOS__ */
-
-
   /*******************************************************************/
   /*                                                                 */
   /*  FreeType API                                                   */
@@ -903,13 +893,6 @@
   TT_Error  TT_Get_Glyph_In_Region( TT_Glyph      glyph,
                                     MemHandle     bitmapBlock,
                                     Handle        regionPath );
-
-  /* Render the glyphs outline into the passsed GStateHandle          */
-  
-  EXPORT_DEF
-  TT_Error  TT_Get_Glyph_Path( TT_Glyph       glyph,
-                               GStateHandle   gstate,
-                               TT_UShort      controlFlags );
 
 
   /* ----------------------- outline support ------------------------ */

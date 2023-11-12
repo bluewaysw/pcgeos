@@ -1208,68 +1208,6 @@ extern TEngine_Instance engineInstance;
     return TT_Err_Ok;
   }
 
-
- /*******************************************************************
-  *
-  *  Function    :  TT_Get_Glyph_Path
-  *
-  *  Description :  Renders glyphs outline into the given GStateHandle.
-  *
-  *  Input  :  glyph         the glyph container's handle
-  *            gstate        handle to the graphic state
-  *            controlFlags  controls how the outline should be rendered
-  *
-  *  Output :  Error code.
-  *
-  *  MT-Safe : NO!  Glyph containers can't be shared.
-  *
-  ******************************************************************/
-
-  EXPORT_FUNC
-  TT_Error  TT_Get_Glyph_Path( TT_Glyph       glyph,
-                               GStateHandle   gstate,
-                               TT_UShort      controlFlags )
-  {
-    PEngine_Instance  _engine;
-    TT_Error          error;
-    PGlyph            _glyph = HANDLE_Glyph( glyph );
-
-    TT_Outline  outline;
-
-    if ( !_glyph )
-      return TT_Err_Invalid_Glyph_Handle;
-
-    _engine = _glyph->face->engine;
-
-    outline = _glyph->outline;
-
-    // if SAVE_STATE set save gstate
-
-    // set Comment with glyphs boundig box
-
-    // translate by current x,y position
-
-    // if POSTSCRIPT set -> transform by hight and flip outline
-
-    // transform by font matrix
-
-    // iterate over contours
-
-      // iterate over segments of current contour
-
-        // switch over current segment
-
-          // LINE_SEGMENT --> GrDrawHLine(), GrDrawVLine() or GrDrawLine()
-          // CURVE_SEGMENT --> GrDrawCurve()
-          // ...
-
-    // restore glyphs outline
-
-    // if SAVE_STATE set restore gstate
-
-    return TT_Err_Ok;
-  }
-
 #endif /* __GEOS__ */
 
 
