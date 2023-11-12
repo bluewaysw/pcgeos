@@ -49,11 +49,12 @@ resource Application        ui-object
 resource Interface          ui-object
 resource Content            object
 resource AppMonikerResource lmem read-only shared
+resource DataResource lmem read-only shared
 
 export CMMapClass
 export CMRowClass
 export CMTextClass
 export CMGenPrimaryClass
 
-usernotes "Character Map - Kinda like the Windows program."
+usernotes "Character Map 2.0 - Get quick access to all characters of a font."
 

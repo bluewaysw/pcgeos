@@ -26,6 +26,14 @@
    */
 #define DESKTOP
 @define DESKTOP
+
+   /*
+    * Disable some UI fetures if (UserGetDefaultUILevel() == UIIL_INTRODUCTORY)
+    * But this is in contradiction to the help file. Therefore it is set to zero.
+    */
+@define SUPPORT_CHECK_INTRODUCTORY_LEVEL	0
+	
+
 /*
 #define ZOOMER
 @define ZOOMER
@@ -37,50 +45,70 @@
  *              Constants
  *******************************************************************/
       /* Box height and width in points. */
+      /* Initial values are written with _I_ and correspond to 
+       * the smallest box size. They are managed in global variables. */
 #ifdef DESKTOP
-    #define CHARM_BOX_WIDTH  18
-    #define CHARM_BOX_HEIGHT 18
+    #define CHARM_I_BOX_WIDTH  18
+    #define CHARM_I_BOX_HEIGHT 18
 #endif
 #ifdef ZOOMER
-    #define CHARM_BOX_WIDTH  14
-    #define CHARM_BOX_HEIGHT 15
+    #define CHARM_I_BOX_WIDTH  14
+    #define CHARM_I_BOX_HEIGHT 15
 #endif
 #ifdef OMNIGO
-    #define CHARM_BOX_WIDTH  14
-    #define CHARM_BOX_HEIGHT 12
+    #define CHARM_I_BOX_WIDTH  14
+    #define CHARM_I_BOX_HEIGHT 12
 #endif
 
       /* Magnified character size. */
-    #define CHARM_MAG_HEIGHT 28
-    #define CHARM_MAG_WIDTH  28
+    #define CHARM_I_MAG_HEIGHT 34
+    #define CHARM_I_MAG_WIDTH  34
 
       /* Default point size of map text. */
 #ifdef DESKTOP
-    #define CHARM_MAP_TEXT_POINT_SIZE 14
+    #define CHARM_I_MAP_TEXT_POINT_SIZE 14
 #endif
 #ifdef ZOOMER
-    #define CHARM_MAP_TEXT_POINT_SIZE 12
+    #define CHARM_I_MAP_TEXT_POINT_SIZE 12
 #endif
 #ifdef OMNIGO
-    #define CHARM_MAP_TEXT_POINT_SIZE 9
+    #define CHARM_I_MAP_TEXT_POINT_SIZE 9
 #endif
-    #define CHARM_MAP_MAG_TEXT_SIZE   27
+    #define CHARM_I_MAP_MAG_TEXT_SIZE   27
 
       /* Map height and width in boxes. */
     #define CHARM_MAP_HEIGHT 14
     #define CHARM_MAP_WIDTH  16
 
       /* Boundaries of the map. */
-    #define CHARM_MAP_LEFT   0
-    #define CHARM_MAP_TOP    0
-    #define CHARM_MAP_RIGHT  ( CHARM_BOX_WIDTH * CHARM_MAP_WIDTH)
-    #define CHARM_MAP_BOTTOM ( CHARM_BOX_HEIGHT * CHARM_MAP_HEIGHT)
+    #define CHARM_MAP_LEFT   0	
+    #define CHARM_MAP_TOP    0	
+    #define CHARM_I_MAP_RIGHT  ( CHARM_I_BOX_WIDTH * CHARM_MAP_WIDTH)
+    #define CHARM_I_MAP_BOTTOM ( CHARM_I_BOX_HEIGHT * CHARM_MAP_HEIGHT)
 
       /* Size of map in points. */
-    #define CHARM_MAP_PT_HEIGHT   ( CHARM_MAP_BOTTOM - CHARM_MAP_TOP )
-    #define CHARM_MAP_PT_WIDTH    ( CHARM_MAP_RIGHT - CHARM_MAP_LEFT )
-    #define CHARM_MAP_HALF_HEIGHT ( CHARM_MAP_PT_HEIGHT / 2 )
-    #define CHARM_MAP_HALF_WIDTH  ( CHARM_MAP_PT_WIDTH / 2 )
+    #define CHARM_I_MAP_PT_HEIGHT   ( CHARM_I_MAP_BOTTOM - CHARM_MAP_TOP )
+    #define CHARM_I_MAP_PT_WIDTH    ( CHARM_I_MAP_RIGHT - CHARM_MAP_LEFT )    
+
+
+
+
+      /* Identifer for Settings menu - values are also stored in settings_g variable */
+    #define CHARM_MAP_SMALL_BOX		1
+    #define CHARM_MAP_MEDIUM_BOX	2
+    #define CHARM_MAP_LARGE_BOX		3
+    #define CHARM_DEFAULT_BOX_SIZE	(CHARM_MAP_MEDIUM_BOX)
+    #define CHARM_MAP_BOX_SIZE_MASK	0x0F
+    
+    #define CHARM_SHOW_FONT_MENU	0x010
+    #define CHARM_SHOW_CHAR_CODES	0x020
+    #define CHARM_MAG_CHARS_BOLD	0x040
+    #define CHARM_ALLOW_MULTIPLE_CHARS	0x080
+    #define CHARM_COPY_ALWAYS_12PT	0x100
+    #define CHARM_AUTO_COPY_TO_CLIPBOARD	0x200
+    #define CHARM_DEFAULT_MORE_OPTIONS ( CHARM_SHOW_FONT_MENU | CHARM_SHOW_CHAR_CODES | CHARM_COPY_ALWAYS_12PT)
+    #define CHARM_MORE_OPTIONS_MASK	0xFF0
+	    
 
 /********************************************************************
  *              Data Types
@@ -96,8 +124,12 @@
 /********************************************************************
  *              Class Definitions
  *******************************************************************/
-      /* This does some startup and shutdown stuff. */
+      /* This does some startup and shutdown stuff and handles the menu triggers. */
     @class CMProcessClass, GenProcessClass;
+    @message (GEN_ITEM_GROUP_APPLY_MSG) MSG_CM_PROCESS_BOX_SIZE_CHANGED;
+    @message (GEN_BOOLEAN_GROUP_APPLY_MSG) MSG_CM_PROCESS_MORE_OPTIONS_CHANGED;
+    @message void MSG_CM_PROCESS_RESIZE_WIN();    
+    @message void MSG_CM_PROCESS_SET_DEFAULT_FONT(word fid);    
     @endc;
 
     @class CMGenPrimaryClass, GenPrimaryClass;
@@ -120,7 +152,7 @@
       /* Forces redraw of two magchar regions. */
     @message void MSG_CM_MAP_REDRAW_MAG_CHAR();
       /* Copy selected character to text object. */
-    @message void MSG_CM_MAP_SELECT_CHAR();
+    @message void MSG_CM_MAP_SELECT_CHAR(Boolean single_char_mode_only);
       /* Create/destroy the pointer definition table. */
     @message void MSG_CM_MAP_CREATE_POINTER_DEF();
     @message void MSG_CM_MAP_DESTROY_POINTER_DEF();
@@ -128,6 +160,8 @@
     @message void MSG_CM_MAP_SET_POINTER_IMAGE();
     @message void MSG_CM_MAP_RESET_POINTER_IMAGE();
     @message void MSG_CM_MAP_COPY_TO_CLIPBOARD();
+    
+    
           /* Current and previous characters. */
         @instance unsigned char CMMI_crCurrent;
         @instance unsigned char CMMI_crPrevious;
