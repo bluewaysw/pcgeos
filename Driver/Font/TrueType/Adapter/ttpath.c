@@ -30,6 +30,15 @@ static void CalcTransformMatrix( TransMatrix*    transMatrix,
 static void ConvertOutline( GStateHandle gstate, TT_Outline* outline );
 
 
+static void move_to( GStateHandle gstate, TT_Vector* v );
+
+static void line_to( GStateHandle gstate, TT_Vector* v );
+
+static void conic_to( GStateHandle gstate, TT_Vector* v_control, TT_Vector* v );
+
+static void cubic_to( GStateHandle gstate, TT_Vector* v1, TT_Vector* v2, TT_Vector* vec );
+
+
 /********************************************************************
  *                      TrueType_Gen_Path
  ********************************************************************
@@ -217,35 +226,97 @@ void _pascal TrueType_Gen_In_Region(
  *      22/10/23  JK        Initial Revision
  *******************************************************************/
 
+#define CURVE_TAG_ON            0x01
+#define CURVE_TAG_CONIC         0x00
+#define CURVE_TAG_CUBIC         0x02
 static void ConvertOutline( GStateHandle gstate, TT_Outline* outline )
 {
         word contour = 0;
         word point   = 0;
 
 
-        if( outline->contours <= 0 || outline->points == 0 )
+        if( outline->n_contours <= 0 || outline->n_points == 0 )
                 return;
 
         /* iterate over contours */
         for( contour = 0; contour < outline->n_contours; contour++ )
         {
-                TT_Vector* startPoint = &outline->points[point];
-                TT_UShort endPoint = outline->contours[contour];
+                TT_UShort startPoint = contour == 0 ? 0 : outline->contours[contour - 1] + 1;
+                TT_UShort endPoint   = outline->contours[contour];
+
+                //TODO: erster und letzter Punkt einer Kontour kann ein Kontrollpunkt sein
 
                 /* move to first point of contour */
-                GrMoveTo( gstate, outline->points[point].x, outline->points[point].y );
-              
+                GrMoveTo( gstate, outline->points[startPoint].x, outline->points[startPoint].y );
 
-                while( endPoint != point )
+                /* iterate over points of contour */
+                for( point = startPoint + 1; point <= endPoint; point++ )
                 {
-                        ++point;
-                        GrDrawLineTo( gstate, outline->points[point].x, outline->points[point].y );
-                }
+                        TT_UShort pointTo;
 
-                ++point;
-                GrDrawLineTo( gstate, startPoint->x, startPoint->y );
+
+                        switch (outline->flags[point] & 3)
+                        {
+                        case CURVE_TAG_ON:
+                                line_to( gstate, &outline->points[point]);
+                                if( point == endPoint )
+                                        line_to( gstate, &outline->points[startPoint]);
+                                break;
+
+                        case CURVE_TAG_CONIC:
+                                pointTo = point == endPoint ? startPoint : point + 1;
+                                conic_to( gstate, &outline->points[point], &outline->points[pointTo] );
+                                point++;
+                                break;
+
+                        case CURVE_TAG_CUBIC:
+                                pointTo = point + 1 == endPoint ? startPoint : point + 2;
+                                cubic_to( gstate, &outline->points[point], &outline->points[point + 1], &outline->points[pointTo] );
+                                point += 2;
+                                break;
+                        }
+                }
         }
 } 
+
+
+static void move_to( GStateHandle gstate, TT_Vector* v )
+{
+        GrMoveTo( gstate, v->x, v->y );
+}
+
+static void line_to( GStateHandle gstate, TT_Vector* v )
+{
+        GrDrawLineTo( gstate, v->x, v->y );
+}
+
+static void conic_to( GStateHandle gstate, TT_Vector* v_control, TT_Vector* v )
+{
+        Point p[3];
+
+
+        p[0].P_x = v_control->x;
+        p[0].P_y = v_control->y;
+        p[1].P_x = p[2].P_x = v->x;
+        p[1].P_y = p[2].P_y = v->y;
+
+        GrDrawCurveTo( gstate, p );
+}
+
+static void cubic_to( GStateHandle gstate, TT_Vector* v1, TT_Vector* v2, TT_Vector* vec )
+{
+        Point p[3];
+
+
+        p[0].P_x = v1->x;
+        p[0].P_y = v1->y;
+        p[1].P_x = v2->x;
+        p[1].P_y = v2->y;
+        p[2].P_x = vec->x;
+        p[2].P_y = vec->y;
+
+        GrDrawCurveTo( gstate, p );
+}
 
 
 /********************************************************************
