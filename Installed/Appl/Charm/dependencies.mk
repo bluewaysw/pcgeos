@@ -233,4 +233,4 @@ Text.eobj: geos.h heap.h geode.h resource.h ec.h object.h lmem.h \
                 driver.h thread.h print.h Internal/spoolInt.h serialDr.h \
                 parallDr.h hugearr.h fileEnum.h
 
-charm.geo : geos.ldf ui.ldf text.ldf ansic.ldf 
+charmEC.geo charm.geo : geos.ldf ui.ldf text.ldf ansic.ldf 
