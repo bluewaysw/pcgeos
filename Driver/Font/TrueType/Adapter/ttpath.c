@@ -29,7 +29,6 @@ static void CalcTransformMatrix( TransMatrix*    transMatrix,
 
 static void ConvertOutline( GStateHandle gstate, TT_Outline* outline );
 
-
 static void move_to( GStateHandle gstate, TT_Vector* v );
 
 static void line_to( GStateHandle gstate, TT_Vector* v );
@@ -228,50 +227,116 @@ void _pascal TrueType_Gen_In_Region(
 #define CURVE_TAG_CONIC         0x00
 static void ConvertOutline( GStateHandle gstate, TT_Outline* outline )
 {
-        word contour = 0;
-        word point   = 0;
+        TT_Vector   v_last;
+        TT_Vector   v_control;
+        TT_Vector   v_start;
 
+        TT_Vector*  point;
+        TT_Vector*  limit;
+        char*       tags;
 
-        if( outline->n_contours <= 0 || outline->n_points == 0 )
-                return;
+        TT_Int   n;
+        TT_Int   first;
+        TT_Int   last;
+        TT_Int   tag;
 
-        /* iterate over contours */
-        for( contour = 0; contour < outline->n_contours; contour++ )
+ 
+        last = -1;
+        for ( n = 0; n < outline->n_contours; ++n )
         {
-                TT_UShort startPoint = contour == 0 ? 0 : outline->contours[contour - 1] + 1;
-                TT_UShort endPoint   = outline->contours[contour];
+                first = last + 1;
+                last  = outline->contours[n];
+                if ( last < first )
+                        return;
 
-                //TODO: erster und letzter Punkt einer Kontour kann ein Kontrollpunkt sein
-                if( outline->flags[startPoint] & 3 == CURVE_TAG_CONIC )
+                limit     = outline->points + last;
+                v_start   = outline->points[first];
+                v_last    = outline->points[last];
+
+                v_control = v_start;
+
+                point = outline->points + first;
+                tags  = outline->flags  + first;
+                tag   = tags[0] & 1;
+
+                /* check first point to determine origin */
+                if ( tag & CURVE_TAG_CONIC )
                 {
-                        startPoint++;
-                }
-
-                /* move to first point of contour */
-                GrMoveTo( gstate, outline->points[startPoint].x, outline->points[startPoint].y );
-
-                /* iterate over points of contour */
-                for( point = startPoint + 1; point <= endPoint; point++ )
-                {
-                        TT_UShort pointTo;
-
-
-                        switch (outline->flags[point] & 3)
+                        /* first point is conic control. Yes, this happens. */
+                        if ( outline->flags[last] & CURVE_TAG_ON )
                         {
-                        case CURVE_TAG_ON:
-                                line_to( gstate, &outline->points[point]);
-                                if( point == endPoint )
-                                        line_to( gstate, &outline->points[startPoint]);
-                                break;
-                        case CURVE_TAG_CONIC:
-                                pointTo = point == endPoint ? startPoint : point + 1;
-                                conic_to( gstate, &outline->points[point], &outline->points[pointTo] );
-                                point++;
+                                /* start at last point if it is on the curve */
+                                v_start = v_last;
+                                --limit;
+                        }
+                        else
+                        {
+                                /* if both first and last points are conic,         */
+                                /* start at their middle and record its position    */
+                                v_start.x = ( v_start.x + v_last.x ) / 2;
+                                v_start.y = ( v_start.y + v_last.y ) / 2;
+                        }
+                --point;
+                --tags;
+        }
+
+        move_to( gstate, &v_start );
+
+        while ( point < limit )
+        {
+                ++point;
+                ++tags;
+
+                tag = tags[0] & 1;
+                switch ( tag )
+                {
+                        case CURVE_TAG_ON:  /* emit a single line_to */
+                        {
+                                line_to( gstate, point );
+                                continue;
+                        }
+
+                        case CURVE_TAG_CONIC:  /* consume conic arcs */
+                                v_control.x = point->x;
+                                v_control.y = point->y;
+
+                        Do_Conic:
+                                if ( point < limit )
+                                {
+                                        TT_Vector  vec;
+                                        TT_Vector  v_middle;
+
+
+                                        ++point;
+                                        ++tags;
+
+                                        vec.x = point->x;
+                                        vec.y = point->y;
+
+                                        if ( tags[0] & CURVE_TAG_ON )
+                                        {
+                                                conic_to( gstate, &v_control, &vec );
+                                                continue;
+                                        }
+
+                                        v_middle.x = ( v_control.x + vec.x ) / 2;
+                                        v_middle.y = ( v_control.y + vec.y ) / 2;
+
+                                        conic_to( gstate, &v_control, &v_middle );
+
+                                        v_control = vec;
+                                        goto Do_Conic;
+                                }
+
+                                conic_to( gstate, &v_control, &v_start );
                                 break;
                         }
                 }
+
+                /* close the contour with a line segment */
+                line_to( gstate, &v_start );
         }
-} 
+}
 
 
 static void move_to( GStateHandle gstate, TT_Vector* v )
