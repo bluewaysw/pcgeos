@@ -888,11 +888,11 @@
 
 
   /* Render the glyph into the passed GEOS regionpath.                */
-  
+  /*
   EXPORT_DEF
   TT_Error  TT_Get_Glyph_In_Region( TT_Glyph      glyph,
                                     MemHandle     bitmapBlock,
-                                    Handle        regionPath );
+                                    Handle        regionPath ); */
 
 
   /* ----------------------- outline support ------------------------ */

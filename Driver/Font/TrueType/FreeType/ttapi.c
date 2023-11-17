@@ -1170,7 +1170,7 @@ extern TEngine_Instance engineInstance;
   *  MT-Safe : NO!  Glyph containers can't be shared.
   *
   ******************************************************************/
-
+/*
   EXPORT_FUNC
   TT_Error  TT_Get_Glyph_In_Region( TT_Glyph      glyph,
                                     MemHandle     bitmapBlock,
@@ -1207,7 +1207,7 @@ extern TEngine_Instance engineInstance;
 
     return TT_Err_Ok;
   }
-
+*/
 #endif /* __GEOS__ */
 
 

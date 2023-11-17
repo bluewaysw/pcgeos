@@ -35,6 +35,10 @@ static void line_to( GStateHandle gstate, TT_Vector* v );
 
 static void conic_to( GStateHandle gstate, TT_Vector* v_control, TT_Vector* v );
 
+static void WriteComment( TRUETYPE_VARS, GStateHandle gstate );
+
+static void ScaleOutline( TRUETYPE_VARS, TT_Outline* outline );
+
 
 /********************************************************************
  *                      TrueType_Gen_Path
@@ -116,6 +120,7 @@ EC(     ECCheckBounds( (void*)fontHeader ) );
         /* load glyph and scale its outline to 1000 units per em */
         TT_Load_Glyph( INSTANCE, GLYPH, charIndex, 0 );
         TT_Get_Glyph_Outline( GLYPH, &OUTLINE );
+        //TODO: auf 1000 Units per EM skalieren
 
         /* write comment with glyph parameters */
         WriteComment( trueTypeVars, gstate );
@@ -200,7 +205,42 @@ void _pascal TrueType_Gen_In_Region(
                         const OutlineEntry*  outlineEntry,
                         MemHandle            varBlock )
 {
+        TrueTypeVars*          trueTypeVars;
+        TrueTypeOutlineEntry*  trueTypeOutline;
+        TT_UShort              charIndex;
 
+
+EC(     ECCheckGStateHandle( gstate ) );
+EC(     ECCheckBounds( (void*) fontInfo ) );
+EC(     ECCheckBounds( (void*) outlineEntry ) );
+EC(     ECCheckMemHandle( varBlock ) );
+
+        /* get trueTypeVar block */
+        trueTypeVars = MemLock( varBlock );
+EC(     ECCheckBounds( (void*)trueTypeVars ) );
+
+        trueTypeOutline = LMemDerefHandles( MemPtrToHandle( (void*)fontInfo ), outlineEntry->OE_handle );
+EC(     ECCheckBounds( (void*)trueTypeOutline ) );
+
+        /* open face, create instance and glyph */
+        if( TrueType_Lock_Face(trueTypeVars, trueTypeOutline) )
+                goto Fin;
+
+        TT_New_Glyph( FACE, &GLYPH );
+
+        TT_Load_Glyph( INSTANCE, GLYPH, charIndex, 0 );
+        TT_Get_Glyph_Outline( GLYPH, &OUTLINE );
+
+        /* get TT char index */
+        charIndex = TT_Char_Index( CHAR_MAP, GeosCharToUnicode( character ) );
+
+
+
+Fail:
+        TT_Done_Glyph( GLYPH );
+
+Fin:
+        MemUnlock( varBlock );
 }
 
 
@@ -257,10 +297,9 @@ static void ConvertOutline( GStateHandle gstate, TT_Outline* outline )
 
                 point = outline->points + first;
                 tags  = outline->flags  + first;
-                tag   = tags[0] & 1;
 
                 /* check first point to determine origin */
-                if ( tag & CURVE_TAG_CONIC )
+                if ( *tags & CURVE_TAG_CONIC )
                 {
                         /* first point is conic control. Yes, this happens. */
                         if ( outline->flags[last] & CURVE_TAG_ON )
@@ -273,8 +312,8 @@ static void ConvertOutline( GStateHandle gstate, TT_Outline* outline )
                         {
                                 /* if both first and last points are conic,         */
                                 /* start at their middle and record its position    */
-                                v_start.x = ( v_start.x + v_last.x ) / 2;
-                                v_start.y = ( v_start.y + v_last.y ) / 2;
+                                v_start.x = ( v_start.x + v_last.x ) >> 1;
+                                v_start.y = ( v_start.y + v_last.y ) >> 1;
                         }
                 --point;
                 --tags;
@@ -287,8 +326,7 @@ static void ConvertOutline( GStateHandle gstate, TT_Outline* outline )
                 ++point;
                 ++tags;
 
-                tag = tags[0] & 1;
-                switch ( tag )
+                switch ( *tags & 1 )
                 {
                         case CURVE_TAG_ON:  /* emit a single line_to */
                         {
@@ -313,14 +351,14 @@ static void ConvertOutline( GStateHandle gstate, TT_Outline* outline )
                                         vec.x = point->x;
                                         vec.y = point->y;
 
-                                        if ( tags[0] & CURVE_TAG_ON )
+                                        if (  *tags & CURVE_TAG_ON )
                                         {
                                                 conic_to( gstate, &v_control, &vec );
                                                 continue;
                                         }
 
-                                        v_middle.x = ( v_control.x + vec.x ) / 2;
-                                        v_middle.y = ( v_control.y + vec.y ) / 2;
+                                        v_middle.x = ( v_control.x + vec.x ) >> 1;
+                                        v_middle.y = ( v_control.y + vec.y ) >> 1;
 
                                         conic_to( gstate, &v_control, &v_middle );
 
@@ -483,4 +521,17 @@ static void WriteComment( TRUETYPE_VARS, GStateHandle gstate )
         params[5] = IntegerOf( GrMulWWFixed( ((dword)GLYPH_BBOX.yMax) << 16, scale ) );
 
         GrComment( gstate, &params, NUM_PARAMS );
+}
+
+
+static void ScaleOutline( TRUETYPE_VARS, TT_Outline* outline )
+{
+        TT_Matrix       scaleMatrix = { 0, 0, 0, 0 };
+        WWFixedAsDWord  scaleFactor = GrUDivWWFixed( STANDARD_GRIDSIZE, UNITS_PER_EM << 16 );
+
+
+        scaleMatrix.xx = scaleFactor;
+        scaleMatrix.yy = scaleFactor;
+
+        TT_Transform_Outline( outline, &scaleFactor );
 }
