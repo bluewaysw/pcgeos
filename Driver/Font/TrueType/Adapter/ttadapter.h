@@ -59,7 +59,7 @@ extern TEngine_Instance engineInstance;
 
 #define MAX_BITMAP_SIZE		                125
 #define MAX_FONTBUF_SIZE                    10 * 1024
-#define BITMAP_BLOCKSIZE                    2 * 1024
+#define INITIAL_BITMAP_BLOCKSIZE            2 * 1024
 #define REGION_SAFETY                       400
 
 #define FAMILY_NAME_LENGTH                  20
