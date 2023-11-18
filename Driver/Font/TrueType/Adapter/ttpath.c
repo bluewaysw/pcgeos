@@ -37,8 +37,6 @@ static void conic_to( GStateHandle gstate, TT_Vector* v_control, TT_Vector* v );
 
 static void WriteComment( TRUETYPE_VARS, GStateHandle gstate );
 
-static void ScaleOutline( TRUETYPE_VARS, TT_Outline* outline );
-
 
 /********************************************************************
  *                      TrueType_Gen_Path
@@ -521,17 +519,4 @@ static void WriteComment( TRUETYPE_VARS, GStateHandle gstate )
         params[5] = IntegerOf( GrMulWWFixed( ((dword)GLYPH_BBOX.yMax) << 16, scale ) );
 
         GrComment( gstate, &params, NUM_PARAMS );
-}
-
-
-static void ScaleOutline( TRUETYPE_VARS, TT_Outline* outline )
-{
-        TT_Matrix       scaleMatrix = { 0, 0, 0, 0 };
-        WWFixedAsDWord  scaleFactor = GrUDivWWFixed( STANDARD_GRIDSIZE, UNITS_PER_EM << 16 );
-
-
-        scaleMatrix.xx = scaleFactor;
-        scaleMatrix.yy = scaleFactor;
-
-        TT_Transform_Outline( outline, &scaleFactor );
 }
