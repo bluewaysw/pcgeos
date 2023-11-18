@@ -312,7 +312,20 @@ INSTALL_DIR	:= $(INSTALL_DIR:H)
 #	Obtain revision control information. Results are left in
 #	$(_REL) and $(_PROTO).
 #
-#if	defined(GEODE) && exists( $(INSTALL_DIR)/$(GEODE).rev )
+#if defined(GEODE) && exists($(CURRENT_DIR)/$(GEODE).rev)
+## the .rev file is local, use it.
+REVFILE		= $(CURRENT_DIR)/$(GEODE).rev
+_GEODE 		:= $(GEODE)
+GREV		?= grev
+GREVFLAGS	=
+#
+# Don't use a branch option on a local .rev file
+# Pass the -s flag to automatically save the new revision number in the rev file
+
+_REL	!=	$(GREV) neweng $(REVFILE) $(GREVFLAGS) -R -s
+_PROTO	!=	$(GREV) getproto $(REVFILE) $(GREVFLAGS) -P
+
+#elif defined(GEODE) && exists( $(INSTALL_DIR)/$(GEODE).rev )
 
 #if $T == "Installed"
 GREVTREE	= -I
@@ -337,19 +350,6 @@ _PROTO	!=	$(GREVCMD) newprotominor $(GEODE).rev
 #else
 _PROTO	!=	$(GREVCMD) getproto $(GEODE).rev
 #endif
-
-#elif defined(GEODE) && exists($(CURRENT_DIR)/$(GEODE).rev)
-## the .rev file is local, use it.
-REVFILE		= $(CURRENT_DIR)/$(GEODE).rev
-_GEODE 		:= $(GEODE)
-GREV		?= grev
-GREVFLAGS	=
-#
-# Don't use a branch option on a local .rev file
-# Pass the -s flag to automatically save the new revision number in the rev file
-
-_REL	!=	$(GREV) neweng $(REVFILE) $(GREVFLAGS) -R -s
-_PROTO	!=	$(GREV) getproto $(REVFILE) $(GREVFLAGS) -P
 
 #else
 
