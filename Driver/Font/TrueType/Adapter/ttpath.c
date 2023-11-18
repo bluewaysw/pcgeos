@@ -512,24 +512,22 @@ static void CalcTransformMatrix( TransMatrix*    transMatrix,
         if( stylesToImplement & ( TS_SUBSCRIPT | TS_SUPERSCRIPT ) )
         {
                 WWFixedAsDWord translation;
-                WWFixedAsDWord scaleScript;
               
 
-            /*    scaleScript = GrMulWWFixed( scaleScript,  );
-                transMatrix->TM_e11.WWF_frac = FractionOf( scaleScript );
-                transMatrix->TM_e11.WWF_int  = IntegerOf( scaleScript );
+                transMatrix->TM_e11.WWF_frac = FractionOf( SCRIPT_FACTOR );
+                transMatrix->TM_e11.WWF_int  = IntegerOf( SCRIPT_FACTOR );
 
-                transMatrix->TM_e22.WWF_frac = FractionOf( scaleScript );
-                transMatrix->TM_e22.WWF_int  = IntegerOf( scaleScript );
+                transMatrix->TM_e22.WWF_frac = FractionOf( SCRIPT_FACTOR );
+                transMatrix->TM_e22.WWF_int  = IntegerOf( SCRIPT_FACTOR );
 
                 if( stylesToImplement & TS_SUPERSCRIPT )
-                        translation = GrMulWWFixed( SUPERSCRIPT_OFFSET, scalePointSize );
+                        translation = GrMulWWFixed( SUPERSCRIPT_OFFSET, (dword)STANDARD_GRIDSIZE << 16 );
 
                 if( stylesToImplement & TS_SUBSCRIPT )
-                        translation = -GrMulWWFixed( SUBSCRIPT_OFFSET, scalePointSize );
+                        translation = -GrMulWWFixed( SUBSCRIPT_OFFSET, (dword)STANDARD_GRIDSIZE << 16 );
 
                 transMatrix->TM_e32.DWF_frac = FractionOf( translation );
-                transMatrix->TM_e32.DWF_int  = IntegerOf( translation ); */
+                transMatrix->TM_e32.DWF_int  = IntegerOf( translation );
         }
 
         //TODO:
