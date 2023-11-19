@@ -3,7 +3,7 @@
 #
 # If you edit it, you will lose your changes, should it be regenerated.
 #
-GEODE           = gdi
+GEODE           = gdikbd
 LIBNAME         = kbd
 PROTOCONST      = KEYBOARD
 ASM_TO_OBJS     = gdiKeyboardManager.asm

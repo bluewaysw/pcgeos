@@ -177,10 +177,10 @@ EC(     ECCheckMemHandle( varBlock ) );
 
         /* detect all filenames in current directory */
         numFiles = DetectFontFiles( &fileEnumBlock );
-EC(     ECCheckMemHandle( fileEnumBlock ) );
 
         if( numFiles == 0 )
                 goto Fin;
+EC(     ECCheckMemHandle( fileEnumBlock ) );
 
         /* iterate over all filenames and try to register a font */
         ptrFileName = MemLock( fileEnumBlock );
