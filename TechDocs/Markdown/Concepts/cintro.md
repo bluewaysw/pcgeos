@@ -71,7 +71,7 @@ language in which most of the GEOS kernel is written. Using Esp, you
 will be able to write optimized routines and applications to handle your 
 most processing-intensive tasks.
 
-**[C Reference Book](cref.md)**  
+**[C Reference Book](../routines.md)**  
 The Routines Book details the data structures, routines, and other 
 typical reference material you'll need. It focuses on the routines and 
 functions provided by the GEOS kernel including the Graphics System 

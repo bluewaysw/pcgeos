@@ -87,7 +87,7 @@ the Object Reference Book](../Objects/ogentrg.md).
 
 + Lists  
 Dynamic, static, and scrolling lists are all described in ["The List Objects", 
-Chapter 11 of the Object Reference Book](../Obects/ogenlst.md).
+Chapter 11 of the Object Reference Book](../Objects/ogenlst.md).
 
 + Value Setters  
 The GenValue object allows the user to set a value within a given range. 
