@@ -1453,4 +1453,4 @@ sd mchrt
 run mchrt
 ~~~
 
-[Data Structures and UI Gadgetry](Data_Structures_and_UI_Gadgetry.md) <-- &nbsp;&nbsp; [table of contents](../Tutorial.md) &nbsp;&nbsp; --> [Troubleshooting Communications](Troubleshooting_Communications.md)
+[Data Structures and UI Gadgetry](Data_Structures_and_UI_Gadgetry.md) <-- &nbsp;&nbsp; [table of contents](../tutorial.md) &nbsp;&nbsp; --> [Troubleshooting Communications](Troubleshooting_Communications.md)

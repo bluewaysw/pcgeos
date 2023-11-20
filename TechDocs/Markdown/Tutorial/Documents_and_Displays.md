@@ -1674,4 +1674,4 @@ typedef struct {
 } /* end of MSG_MCC_RESIZE_BAR */
 ~~~
 
-[Views and Visual Objects](Views_and_Visual_Objects.md) <-- &nbsp;&nbsp; [table of contents](../Tutorial.md) &nbsp;&nbsp; --> [Troubleshooting Communications](Troubleshooting_Communications.md)
+[Views and Visual Objects](Views_and_Visual_Objects.md) <-- &nbsp;&nbsp; [table of contents](../tutorial.md) &nbsp;&nbsp; --> [Troubleshooting Communications](Troubleshooting_Communications.md)

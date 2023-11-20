@@ -25,4 +25,4 @@ structured, and you'll program an application that uses
 many of the user interface and object-oriented features 
 of GEOS.
 
-[table of contents](../Tutorial.md) &nbsp;&nbsp; --> [Setting Up](Setting_Up.md)
+[table of contents](../tutorial.md) &nbsp;&nbsp; --> [Setting Up](Setting_Up.md)

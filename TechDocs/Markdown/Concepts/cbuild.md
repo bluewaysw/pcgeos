@@ -118,7 +118,7 @@ in ["The Text Objects", Chapter 10 of the Object Reference Book](../Objects/otex
 + Providing Help  
 An application can include an object that automatically provides 
 context-sensitive help to the user. This object is discussed in ["Help Object 
-Library", Chapter 15 of the Object Reference Book](../Objects/ohlep.md).
+Library", Chapter 15 of the Object Reference Book](../Objects/ohelp.md).
 
 + Handling Input  
 Many applications may want to track mouse or keyboard input. Input 
@@ -151,7 +151,7 @@ These commands are described in ["Drawing Graphics", Chapter 24](cshapes.md).
 The Graphic Object Library provides many different graphic objects that 
 know how to position, resize, and draw themselves as well as handle user 
 input. This library is described in ["Drawing Graphics", Chapter 24](cshapes.md) and 
-["Graphic Object Library", Chapter 18 of the Object Reference Book](../Objects/ogropj.md).
+["Graphic Object Library", Chapter 18 of the Object Reference Book](../Objects/ogrobj.md).
 
 #### 2.2.3 Documents and Data Structures
 
