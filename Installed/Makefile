@@ -564,7 +564,7 @@ nimbus	: Installed/Driver/Font/Nimbus
 Installed/Driver/Font/Nimbus:		kernel MAKEDRV
 
 truetype : Installed/Driver/Font/TrueType
-Installed/Driver/Font/TrueType:		kernel ansic MAKEDRV
+Installed/Driver/Font/TrueType:		kernel MAKEDRV
 	
 ms4	: Installed/Driver/IFS/DOS/MS4
 Installed/Driver/IFS/DOS/MS4:		kernel MAKEDRV

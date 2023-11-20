@@ -3,7 +3,7 @@
 #
 # If you edit it, you will lose your changes, should it be regenerated.
 #
-GEODE           = Standard
+GEODE           = standard
 ASM_TO_OBJS     = standardManager.asm
 UI_TO_RDFS      =
 SRCS            = pcCode.asm standardManager.asm standardStrategy.asm\
