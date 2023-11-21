@@ -365,6 +365,7 @@ GREVFLAGS	+= -B $(BRANCH)
 _REL	!=	$(GREV) neweng $(REVFILE) $(GREVFLAGS) -R
 _PROTO	!=	$(GREV) getproto $(REVFILE) $(GREVFLAGS) -P
 
+_REL   = $(_REL:S/.*/7.7.7.7/g)
 #elif defined(GEODE) && exists($(CURRENT_DIR)/$(GEODE).rev)
 ## the .rev file is local, use it.
 REVFILE		= $(CURRENT_DIR)/$(GEODE).rev
@@ -377,6 +378,8 @@ GREVFLAGS	=
 
 _REL	!=	$(GREV) neweng $(REVFILE) $(GREVFLAGS) -R -s
 _PROTO	!=	$(GREV) getproto $(REVFILE) $(GREVFLAGS) -P
+
+_REL   = $(_REL:S/.*/7.7.7.7/g)
 
 #else
 
