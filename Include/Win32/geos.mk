@@ -362,10 +362,15 @@ GREVFLAGS	+= -B $(BRANCH)
 # Don't pass the -s flag so that the rev files are not changed with every build.
 # This means that the automatic versioning in the ROOT_DIR is disabled.
 
-_REL	!=	$(GREV) neweng $(REVFILE) $(GREVFLAGS) -R
+_REL2	!=	$(GREV) neweng $(REVFILE) $(GREVFLAGS) -R
 _PROTO	!=	$(GREV) getproto $(REVFILE) $(GREVFLAGS) -P
 
-_REL   = $(_REL:S/.*/7.7.7.7/g)
+#if defined(GEOS_BUILD_NUMBER)
+_REL    = $(_REL2:S/.1$/.$(GEOS_BUILD_NUMBER)/)
+#else
+_REL	= $(_REL2)
+#endif
+
 #elif defined(GEODE) && exists($(CURRENT_DIR)/$(GEODE).rev)
 ## the .rev file is local, use it.
 REVFILE		= $(CURRENT_DIR)/$(GEODE).rev
@@ -378,8 +383,6 @@ GREVFLAGS	=
 
 _REL	!=	$(GREV) neweng $(REVFILE) $(GREVFLAGS) -R -s
 _PROTO	!=	$(GREV) getproto $(REVFILE) $(GREVFLAGS) -P
-
-_REL   = $(_REL:S/.*/7.7.7.7/g)
 
 #else
 
