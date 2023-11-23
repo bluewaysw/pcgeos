@@ -37,6 +37,8 @@ static void ConicTo( GStateHandle gstate, TT_Vector* v_control, TT_Vector* vec )
 
 static void WriteComment( TRUETYPE_VARS, GStateHandle gstate );
 
+static void ScaleOutline( TRUETYPE_VARS );
+
 
 /********************************************************************
  *                      TrueType_Gen_Path
@@ -169,9 +171,7 @@ EC(     ECCheckBounds( (void*)fontHeader ) );
         if( pathFlags & FGPF_SAVE_STATE )
                 GrRestoreState( gstate );
 
-Fail:
         TT_Done_Glyph( GLYPH );
-
 Fin:
         MemUnlock( varBlock );
 }
@@ -274,7 +274,6 @@ static void ConvertOutline( GStateHandle gstate, TT_Outline* outline )
         TT_Int   n;
         TT_Int   first;
         TT_Int   last;
-        TT_Int   tag;
 
  
         last = -1;
@@ -572,6 +571,23 @@ static void WriteComment( TRUETYPE_VARS, GStateHandle gstate )
         GrComment( gstate, &params, NUM_PARAMS );
 }
 
+
+/********************************************************************
+ *                      ScaleOutline
+ ********************************************************************
+ * SYNOPSIS:	  Scale current outline to 1000 untits per em.
+ * 
+ * PARAMETERS:    TRUETYPE_VARS         Cached variables needed by driver.
+ * 
+ * RETURNS:       void   
+ * 
+ * STRATEGY:      
+ * 
+ * REVISION HISTORY:
+ *      Date      Name      Description
+ *      ----      ----      -----------
+ *      18/11/23  JK        Initial Revision
+ *******************************************************************/
 
 static void ScaleOutline( TRUETYPE_VARS )
 {
