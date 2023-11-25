@@ -7,7 +7,7 @@
 #
 ##############################################################################
 
-name            sbarutil.lib
+name            SBarUtil.lib
 longname        "Startbar Utilities Module"
 tokenchars      "SBrU"
 tokenid         16431
@@ -26,4 +26,4 @@ export          StartbarHighlightBoxClass
 export          StartbarUtilLoadApplication
 
 
-usernotes "Copyright 1994-2002  Breadbox Computer Company LLC  All Rights Reserved"
+# usernotes "Copyright 1994-2002  Breadbox Computer Company LLC  All Rights Reserved"
