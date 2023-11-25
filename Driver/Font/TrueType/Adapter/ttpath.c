@@ -232,6 +232,8 @@ EC(     ECCheckBounds( (void*)trueTypeOutline ) );
         /* get TT char index */
         charIndex = TT_Char_Index( CHAR_MAP, GeosCharToUnicode( character ) );
 
+        //TODO: render glyph as regionpath
+
 Fail:
         TT_Done_Glyph( GLYPH );
 
@@ -402,7 +404,7 @@ static void MoveTo( GStateHandle gstate, TT_Vector* vec )
  * SYNOPSIS:	  Draw line to given position.
  * 
  * PARAMETERS:    gstate                Handle in which the line is drawed.
- *                *vec                  Ptr. to Vector to end position.
+ *                *vec                  Ptr. to Vector of end position.
  * 
  * RETURNS:       void
  * 
@@ -427,7 +429,7 @@ static void LineTo( GStateHandle gstate, TT_Vector* vec )
  * 
  * PARAMETERS:    gstate                Handle in which the curve is drawed.
  *                *v_control            Vector with control point.
- *                *vec                  Vector to new position.
+ *                *vec                  Vector of new position.
  * 
  * RETURNS:       void
  * 
@@ -561,12 +563,12 @@ static void WriteComment( TRUETYPE_VARS, GStateHandle gstate )
 
         TT_Get_Glyph_Metrics( GLYPH, &GLYPH_METRICS );
 
-        params[0] = GLYPH_METRICS.advance >> 16;
+        params[0] = GLYPH_METRICS.advance >> 6;
         params[1] = 0;
-        params[2] = GLYPH_BBOX.xMin >> 16;
-        params[3] = GLYPH_BBOX.yMin >> 16;
-        params[4] = GLYPH_BBOX.xMax >> 16;
-        params[5] = GLYPH_BBOX.yMax >> 16;
+        params[2] = GLYPH_BBOX.xMin >> 6;
+        params[3] = GLYPH_BBOX.yMin >> 6;
+        params[4] = GLYPH_BBOX.xMax >> 6;
+        params[5] = GLYPH_BBOX.yMax >> 6;
 
         GrComment( gstate, &params, NUM_PARAMS );
 }
