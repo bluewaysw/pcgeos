@@ -284,10 +284,10 @@ CommonUIClassStructures segment resource
 				mask CLASSF_NEVER_SAVED
 
 
-if _ISUI
+;if _ISUI
 	OLWindowListItemClass	mask CLASSF_DISCARD_ON_SAVE or \
 				mask CLASSF_NEVER_SAVED
-endif
+;endif
 
 if RADIO_STATUS_ICON_ON_PRIMARY
 	RadioStatusIconClass	mask CLASSF_DISCARD_ON_SAVE or \
@@ -1328,7 +1328,7 @@ REVISION HISTORY:
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
 
-if _ISUI ; We will be adding this window to the window list ------------------
+;if _ISUI ; We will be adding this window to the window list ------------------
 
 OLBaseWinSpecBuild	method dynamic OLBaseWinClass, MSG_SPEC_BUILD
 
@@ -1343,7 +1343,7 @@ OLBaseWinSpecBuild	method dynamic OLBaseWinClass, MSG_SPEC_BUILD
 	ret
 OLBaseWinSpecBuild	endm
 
-endif	; if _ISUI -----------------------------------------------------------
+;endif	; if _ISUI -----------------------------------------------------------
 
 
 
@@ -1370,7 +1370,7 @@ REVISION HISTORY:
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
 
-if _ISUI ;--------------------------------------------------------------------
+;if _ISUI ;--------------------------------------------------------------------
 
 EnsureItemAddedToWindowList	proc	near
 
@@ -1454,7 +1454,7 @@ done:
 	ret
 EnsureItemAddedToWindowList	endp
 
-endif	;----------------------------------------------------------------------
+;endif	;----------------------------------------------------------------------
 
 
 COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -1479,7 +1479,7 @@ REVISION HISTORY:
 	JS	9/19/92		Initial version
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
-if _ISUI
+;if _ISUI
 UpdateTaskBarList	proc	far
 	uses	ax,bx,cx,dx,si,di,bp
 	.enter
@@ -1495,7 +1495,7 @@ UpdateTaskBarList	proc	far
 	.leave
 	ret
 UpdateTaskBarList	endp
-endif ; _ISUI
+;endif ; _ISUI
 
 
 COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -1527,7 +1527,7 @@ REVISION HISTORY:
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
 
-if _ISUI ;--------------------------------------------------------------------
+;if _ISUI ;--------------------------------------------------------------------
 
 OLBaseWinUpdateVisMoniker	method dynamic OLBaseWinClass,
 					MSG_SPEC_UPDATE_VIS_MONIKER
@@ -1538,7 +1538,7 @@ OLBaseWinUpdateVisMoniker	method dynamic OLBaseWinClass,
 
 OLBaseWinUpdateVisMoniker	endm
 
-endif	;----------------------------------------------------------------------
+;endif	;----------------------------------------------------------------------
 
 
 
@@ -1564,7 +1564,7 @@ REVISION HISTORY:
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
 
-if _ISUI ; We will be adding this window to the window list ------------------
+;if _ISUI ; We will be adding this window to the window list ------------------
 
 OLBaseWinSetWindowEntryMoniker	method OLBaseWinClass,
 				MSG_OL_BASE_WIN_SET_WINDOW_ENTRY_MONIKER
@@ -1638,7 +1638,7 @@ done:
 	ret
 OLBaseWinSetWindowEntryMoniker	endm
 
-endif	; if _ISUI -----------------------------------------------------------
+;endif	; if _ISUI -----------------------------------------------------------
 
 
 COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -1665,7 +1665,7 @@ REVISION HISTORY:
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
 
-if _ISUI	;--------------------
+;if _ISUI	;--------------------
 
 OLBaseWinCreateCombinationMoniker	proc	far
 combMkr		local	optr		push	bp, 0
@@ -1790,7 +1790,7 @@ done:
 	ret
 OLBaseWinCreateCombinationMoniker	endp
 
-endif ; _ISUI -----------------------
+;endif ; _ISUI -----------------------
 
 
 
@@ -1820,7 +1820,7 @@ REVISION HISTORY:
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
 
-if _ISUI ;--------------------------------------------------------------------
+;if _ISUI ;--------------------------------------------------------------------
 
 OLBaseWinUpdateWindowEntry	method dynamic OLBaseWinClass,
 					MSG_OL_BASE_WIN_UPDATE_WINDOW_ENTRY
@@ -1887,7 +1887,7 @@ callWindowList:
 
 OLBaseWinUpdateWindowEntry	endm
 
-endif	;----------------------------------------------------------------------
+;endif	;----------------------------------------------------------------------
 
 
 
@@ -1916,7 +1916,7 @@ REVISION HISTORY:
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
 
-if _ISUI ;--------------------------------------------------------------------
+;if _ISUI ;--------------------------------------------------------------------
 
 OLBaseWinNotifyWindowSelected	method dynamic OLBaseWinClass,
 					MSG_META_NOTIFY_TASK_SELECTED
@@ -1933,7 +1933,7 @@ done:
 	ret
 OLBaseWinNotifyWindowSelected	endm
 
-endif	;----------------------------------------------------------------------
+;endif	;----------------------------------------------------------------------
 
 
 
@@ -1962,7 +1962,7 @@ REVISION HISTORY:
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
 
-if _ISUI ; NOTE: this is not OLBaseWin, It is OLWindowListItem ---------------
+;if _ISUI ; NOTE: this is not OLBaseWin, It is OLWindowListItem ---------------
 
 OLWindowListItemNotifyWindowSelected	method dynamic OLWindowListItemClass,
 					MSG_META_NOTIFY_TASK_SELECTED
@@ -1991,7 +1991,7 @@ OLWindowListItemNotifyWindowSelected	method dynamic OLWindowListItemClass,
 	ret
 OLWindowListItemNotifyWindowSelected	endm
 
-endif	;----------------------------------------------------------------------
+;endif	;----------------------------------------------------------------------
 
 
 
@@ -2022,7 +2022,7 @@ REVISION HISTORY:
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
 
-if _ISUI ; NOTE: this is not OLBaseWin, It is OLWindowListItem ---------------
+;if _ISUI ; NOTE: this is not OLBaseWin, It is OLWindowListItem ---------------
 
 OLWindowListItemSetOperatingParams	method dynamic OLWindowListItemClass,
 				MSG_OL_WINDOW_LIST_ITEM_SET_OPERATING_PARAMS
@@ -2032,7 +2032,7 @@ OLWindowListItemSetOperatingParams	method dynamic OLWindowListItemClass,
 	ret
 OLWindowListItemSetOperatingParams	endm
 
-endif	;----------------------------------------------------------------------
+;endif	;----------------------------------------------------------------------
 
 
 
@@ -2061,7 +2061,7 @@ REVISION HISTORY:
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
 
-if _ISUI ; NOTE: this is not OLBaseWin, It is OLWindowListItem ---------------
+;if _ISUI ; NOTE: this is not OLBaseWin, It is OLWindowListItem ---------------
 
 OLWindowListItemCloseWindow	method dynamic OLWindowListItemClass,
 					MSG_OL_WINDOW_LIST_ITEM_CLOSE_WINDOW
@@ -2074,7 +2074,7 @@ OLWindowListItemCloseWindow	method dynamic OLWindowListItemClass,
 
 OLWindowListItemCloseWindow	endm
 
-endif	; if _ISUI -----------------------------------------------------------
+;endif	; if _ISUI -----------------------------------------------------------
 
 
 
@@ -2108,7 +2108,7 @@ REVISION HISTORY:
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
 
-if _ISUI ; NOTE: this is not OLBaseWin, It is OLWindowListItem ---------------
+;if _ISUI ; NOTE: this is not OLBaseWin, It is OLWindowListItem ---------------
 
 OLWindowListItemKeyboardChar	method dynamic OLWindowListItemClass,
 					MSG_META_KBD_CHAR
@@ -2131,7 +2131,7 @@ callSuper:
 
 OLWindowListItemKeyboardChar	endm
 
-endif	; if _ISUI -----------------------------------------------------------
+;endif	; if _ISUI -----------------------------------------------------------
 
 
 COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%

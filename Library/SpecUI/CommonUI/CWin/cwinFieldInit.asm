@@ -21,37 +21,37 @@ ROUTINES:
 				continueSetup boolean equals true, we
 				ignore any size.
 
-    INT OLFieldEnsureExpressMenu 
+    INT OLFieldEnsureExpressMenu
 				This procedure creates the ExpressMenu for
 				the OLField if not done already.
 
-    INT OLFieldEnsureWindowListDialog 
+    INT OLFieldEnsureWindowListDialog
 				This procedure creates the Window List
 				Dialog for the OLField if not done already.
 
     INT OLFieldEnsureToolArea   This procedure creates the ToolArea for the
 				OLField if not done already.
 
-    MTD MSG_GEN_FIELD_CREATE_EXPRESS_MENU 
+    MTD MSG_GEN_FIELD_CREATE_EXPRESS_MENU
 				Creates the default workspace menu.
 
-    MTD MSG_GEN_FIELD_CREATE_SPECIFIC_WORKSPACE_SUBGROUP 
+    MTD MSG_GEN_FIELD_CREATE_SPECIFIC_WORKSPACE_SUBGROUP
 				Creates the UI specific portion of the
 				Express menu
 
-    INT BuildExpressMenuAppletList 
+    INT BuildExpressMenuAppletList
 				Add applet list to express menu
 
     INT AddAppletToAppletList   Add a GenTrigger to the Applet List.
 
-    INT BuildAppletListClassCallBack 
+    INT BuildAppletListClassCallBack
 				Callback function for a class (class the
 				student is in)
 
-    INT BuildAppletListCoursewareCallBack 
+    INT BuildAppletListCoursewareCallBack
 				Callback function for courseware
 
-    MTD MSG_EXPRESS_MENU_CONTROL_CREATE_ITEM 
+    MTD MSG_EXPRESS_MENU_CONTROL_CREATE_ITEM
 				Prevent screen lock button from being added
 				if user does not have permission.
 
@@ -60,7 +60,7 @@ ROUTINES:
     INT MaybeMoveField          See if we need to move the field, and if
 				so, do so.
 
-    INT OLFieldEnsureStickyMonitor 
+    INT OLFieldEnsureStickyMonitor
 				Install an input monitor to intercept
 				sticky-key presses.
 
@@ -70,7 +70,7 @@ ROUTINES:
 
     INT SendKeyboardEventGCN    send GCN notification for sticky state
 
-    MTD MSG_OL_FIELD_SEND_KEYBOARD_EVENT_GCN 
+    MTD MSG_OL_FIELD_SEND_KEYBOARD_EVENT_GCN
 				send out GCN notification
 
     INT OLAdjustContrast        Adjust contrast setting
@@ -166,13 +166,13 @@ PASS:		*ds:si	= OLFieldClass object
 
 		ss:bp - GenOptionsParams
 
-RETURN:		
+RETURN:
 
-DESTROYED:	nothing 
+DESTROYED:	nothing
 
 REGISTER/STACK USAGE:
 
-PSEUDO CODE/STRATEGY:	
+PSEUDO CODE/STRATEGY:
 
 	Moved here from OLFieldInitialize, so that the call can be
 made AFTER the GenFieldAttach handler is called.  This is
@@ -191,7 +191,7 @@ initialized, after which UserGetDisplayType, which these routines rely
 on, may be used.	- doug 2/11/92
 
 
-KNOWN BUGS/SIDE EFFECTS/CAVEATS/IDEAS:	
+KNOWN BUGS/SIDE EFFECTS/CAVEATS/IDEAS:
 
 REVISION HISTORY:
 	Name	Date		Description
@@ -304,15 +304,15 @@ HaveVisParent:
 					; get size of screen window
 	push	si
 	mov	ax, MSG_VIS_GET_SIZE
-	mov	bx, segment VisClass	;set to the base class that can handle 
+	mov	bx, segment VisClass	;set to the base class that can handle
 	mov	si, offset VisClass	;  the message in ax
-	mov	di, mask MF_RECORD 
+	mov	di, mask MF_RECORD
 	call	ObjMessage
 	mov	cx, di		; Get handle to ClassedEvent in cx
-	pop	si		; Get object 
+	pop	si		; Get object
 	mov	ax, MSG_VIS_VUP_CALL_WIN_GROUP
 	call	VisCallParent
-	
+
 					; cx, dx = size of screen window
 	mov	di, ds:[si]
 	add	di, ds:[di].Vis_offset	; ds:di = VisInstance
@@ -369,7 +369,8 @@ if EVENT_MENU
 	call	OLFieldEnsureEventMenu
 endif
 
-ISU <	call	OLFieldEnsureWindowListDialog				>
+;ISU <	call	OLFieldEnsureWindowListDialog				>
+	call	OLFieldEnsureWindowListDialog
 
 	ret
 
@@ -420,7 +421,7 @@ FakeField		proc	near	uses ax, bx, cx, dx, bp
 	tst	ax
 	jnz	afterSized		; if we're in SETUP, don't change size
 10$:
-	pop	ax			
+	pop	ax
 
 	mov	si, offset screenSizeCategoryStr
 
@@ -528,10 +529,10 @@ CALLED BY:	INTERNAL
 PASS:		*ds:si = OLField
 RETURN:		nothing
 DESTROYED:	ax, bx, cx, dx, di, bp
-SIDE EFFECTS:	
+SIDE EFFECTS:
 
 PSEUDO CODE/STRATEGY:
-		
+
 
 REVISION HISTORY:
 	Name	Date		Description
@@ -624,9 +625,9 @@ PASS:		*ds:si	= EventMenuClass object
 		ds:bx	= EventMenuClass object (same as *ds:si)
 		es 	= segment of EventMenuClass
 		ax	= message #
-RETURN:		
-DESTROYED:	
-SIDE EFFECTS:	
+RETURN:
+DESTROYED:
+SIDE EFFECTS:
 
 PSEUDO CODE/STRATEGY:
 
@@ -636,7 +637,7 @@ REVISION HISTORY:
 	brianc	10/22/96   	Initial version
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
-EMEhUpdateEventList	method dynamic EventMenuClass, 
+EMEhUpdateEventList	method dynamic EventMenuClass,
 					MSG_EH_UPDATE_EVENT_LIST
 	;
 	; call superclass for normal handling
@@ -689,8 +690,8 @@ PASS:		*ds:si	= EventMenuClass object
 		^lcx:dx = event menu
 		bp 	= SpecBuildFlags
 RETURN:		nothing
-DESTROYED:	
-SIDE EFFECTS:	
+DESTROYED:
+SIDE EFFECTS:
 
 PSEUDO CODE/STRATEGY:
 
@@ -700,7 +701,7 @@ REVISION HISTORY:
 	brianc	10/22/96   	Initial version
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
-EMEhModifyEventMenu	method dynamic EventMenuClass, 
+EMEhModifyEventMenu	method dynamic EventMenuClass,
 					MSG_EH_MODIFY_EVENT_MENU
 
 	test	bp, mask SBF_WIN_GROUP	; ignore win group changes
@@ -764,7 +765,7 @@ REVISION HISTORY:
 
 ------------------------------------------------------------------------------@
 
-if _ISUI ;--------------------------------------------------------------------
+;if _ISUI ;--------------------------------------------------------------------
 
 OLFieldEnsureWindowListDialog	proc	far
 
@@ -844,7 +845,7 @@ done:
 	ret
 OLFieldEnsureWindowListDialog	endp
 
-endif ;---------------------------------------------------------------------
+;endif ;---------------------------------------------------------------------
 
 
 COMMENT @----------------------------------------------------------------------
@@ -1042,10 +1043,10 @@ CALLED BY:	INTERNAL
 PASS:		*ds:si = OLField
 RETURN:		^lcx:dx = tool area for event menu
 DESTROYED:	ax, bx, di, bp
-SIDE EFFECTS:	
+SIDE EFFECTS:
 
 PSEUDO CODE/STRATEGY:
-		
+
 
 REVISION HISTORY:
 	Name	Date		Description
@@ -1237,7 +1238,7 @@ afterLauncher:
 	pushf				; save documents list flag
 	mov	cl, width UIEO_POSITION
 	shr	ax, cl			; ax = ExpressMenuControlFeatures
-	popf				; restore documents list flag 
+	popf				; restore documents list flag
 	jz	10$
 	ornf	ax, mask EMCF_DOCUMENTS_LIST
 10$:
@@ -1384,7 +1385,7 @@ EC <	ERROR_NZ	OPEN_WIN_ON_OPEN_WINDOW				>
 					; Use same layer ID for
 					; ALL field windows, regardless of who
 					; owns the field.  (This so that UI &
-					; Welcome rooms are all in the same 
+					; Welcome rooms are all in the same
 					; layer)
 	clr	bx			; Common ID of 0 should be fine.
 	push	bx			; Push layer ID to use
@@ -1406,14 +1407,14 @@ FXIP <	mov	bx, handle RegionResourceXIP			>
 FXIP <	call	MemLock			; ax = segment		>
 FXIP <	pop	bx						>
 FXIP <	push	ax						>
-	
+
 	mov	ax, offset fieldRegion
 	push	ax
 
 	call	OpenGetLineBounds	; push parameters to region
 	push	dx			; bottom
 	push	cx			; right
-	push	ax			; last two params aren't used, so 
+	push	ax			; last two params aren't used, so
 	push	cx			;	just push whatever
 
 	mov	bx, ds:[si]
@@ -1466,7 +1467,7 @@ FXIP <	push	bx						>
 FXIP <	mov	bx, handle RegionResourceXIP			>
 FXIP <	call	MemUnlock					>
 FXIP <	pop	bx						>
-	
+
 if FAKE_SIZE_OPTIONS
 	call	MaybeMoveField
 endif

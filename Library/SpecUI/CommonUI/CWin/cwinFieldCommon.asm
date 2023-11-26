@@ -10,17 +10,17 @@ FILE:		cwinFieldCommon.asm
 ROUTINES:
 	Name			Description
 	----			-----------
-    MTD MSG_SPEC_GUP_QUERY_VIS_PARENT 
+    MTD MSG_SPEC_GUP_QUERY_VIS_PARENT
 				Respond to a query travaeling up the
 				generic composite tree
 
-    MTD MSG_SPEC_VUP_GET_WIN_SIZE_INFO 
+    MTD MSG_SPEC_VUP_GET_WIN_SIZE_INFO
 				Returns margins for use with windows that
 				wish to avoid extending over icon areas in
 				the parent window.  Also size of window
 				area.
 
-    MTD MSG_META_POST_PASSIVE_BUTTON 
+    MTD MSG_META_POST_PASSIVE_BUTTON
 				Bring down the workspace menu if all
 				buttons released
 
@@ -30,7 +30,7 @@ ROUTINES:
 
     MTD MSG_VIS_DRAW            This procedure draws the field.
 
-    MTD MSG_META_ENSURE_ACTIVE_FT 
+    MTD MSG_META_ENSURE_ACTIVE_FT
 				If nothing currently has focus or target
 				exclusives, find most deserving object(s)
 				to give the focus & target, & give them the
@@ -39,7 +39,7 @@ ROUTINES:
     INT FieldAlterFTVMCCore     Allows object to grab/release any of the
 				FTVMC exlusives.
 
-    INT FieldTestForModalGeodeWithin 
+    INT FieldTestForModalGeodeWithin
 				Determine if there is a "modal" entity
 				within this field. Basically, that means
 				that something that has a temporary focus
@@ -52,23 +52,23 @@ ROUTINES:
     MTD MSG_META_GET_FOCUS_EXCL Returns the current focus/target below this
 				point in hierarchy
 
-    MTD MSG_META_GET_TARGET_EXCL 
+    MTD MSG_META_GET_TARGET_EXCL
 				Returns the current focus/target below this
 				point in hierarchy
 
     INT OLFieldGetCommon        Returns the current focus/target below this
 				point in hierarchy
 
-    MTD MSG_OL_FIELD_CREATE_WINDOW_LIST_ENTRY 
+    MTD MSG_OL_FIELD_CREATE_WINDOW_LIST_ENTRY
 				Create window list entry
 
-    MTD MSG_OL_FIELD_MOVE_TOOL_AREA 
+    MTD MSG_OL_FIELD_MOVE_TOOL_AREA
 				Move tool area to new location on screen
 
-    MTD MSG_OL_FIELD_SIZE_TOOL_AREA 
+    MTD MSG_OL_FIELD_SIZE_TOOL_AREA
 				Sizes the tool area.
 
-    MTD MSG_OL_FIELD_GET_TOOL_AREA_SIZE 
+    MTD MSG_OL_FIELD_GET_TOOL_AREA_SIZE
 				Returns size of tool area
 
     MTD MSG_VIS_VUP_QUERY       Respond to a query traveling up the generic
@@ -113,7 +113,7 @@ ROUTINES:
 				from DETACHED windows UNLESS it is
 				necessary.
 
-    INT FieldCalcStaggerPosition 
+    INT FieldCalcStaggerPosition
 				This procedure calculates the screen
 				position for a window or icon given a
 				specific slot number.
@@ -125,7 +125,7 @@ ROUTINES:
 
     MTD MSG_META_START_SELECT   Beeps on all types of presses.
 
-    MTD MSG_VIS_VUP_ALTER_INPUT_FLOW 
+    MTD MSG_VIS_VUP_ALTER_INPUT_FLOW
 				TEMPORARY HACK!!!!  The UI is not yet an
 				application, & so the express menu has
 				problems with the new input model.  This
@@ -140,11 +140,11 @@ ROUTINES:
 				lists).  SOOOooo.. we just redirect the
 				method.
 
-    MTD MSG_OL_FIELD_RELEASE_EXPRESS_MENU 
+    MTD MSG_OL_FIELD_RELEASE_EXPRESS_MENU
 				TEMPORARY HACK!!!!  Dismiss Express menu.
 				Sent from OLReleaseAllStayUpModeMenus.
 
-    MTD MSG_GEN_FIELD_ENABLE_EXPRESS_MENU 
+    MTD MSG_GEN_FIELD_ENABLE_EXPRESS_MENU
 				Redwood-only, enables the express menu
 				items.
 
@@ -205,7 +205,7 @@ REVISION HISTORY:
 
 ------------------------------------------------------------------------------@
 
-OLFieldGupQueryVisParent	method	dynamic OLFieldClass, 
+OLFieldGupQueryVisParent	method	dynamic OLFieldClass,
 					MSG_SPEC_GUP_QUERY_VIS_PARENT
 
 	; Sys modal dialogs go on the screen window, so continue the search
@@ -230,7 +230,7 @@ OLFieldGupQueryVisParent	endm
 
 COMMENT @----------------------------------------------------------------------
 
-METHOD:		OLFieldGetWinSizeInfo -- 
+METHOD:		OLFieldGetWinSizeInfo --
 		MSG_SPEC_VUP_GET_WIN_SIZE_INFO for OLFieldClass
 
 DESCRIPTION:	Returns margins for use with windows that wish to avoid
@@ -246,7 +246,7 @@ RETURN:		cx, dx  - size of window area
 		bp high - margins to the right edge of object
 		ax, cx, dx - destroyed
 
-ALLOWED TO DESTROY:	
+ALLOWED TO DESTROY:
 		bx, si, di, ds, es
 
 REGISTER/STACK USAGE:
@@ -265,7 +265,7 @@ REVISION HISTORY:
 OLFieldGetWinSizeInfo	method dynamic	OLFieldClass, \
 				MSG_SPEC_VUP_GET_WIN_SIZE_INFO
 	call	VisGetSize		;return current size
-	
+
 	;return margin info in bp - is used for staggered windows which
 	;want to extend ALMOST to their parent's limits - so that they don't
 	;cover the icon area, etc.
@@ -301,7 +301,7 @@ PSEUDO CODE/STRATEGY:
 		IC_INTERACTION_COMPLETE to the menu to get it to go away.
 
 KNOWN BUGS/SIDE EFFECTS/IDEAS:
-		
+
 
 REVISION HISTORY:
 	Name	Date		Description
@@ -309,7 +309,7 @@ REVISION HISTORY:
 	ardeb	12/28/89	Initial version
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
-OLFieldPostPassiveButton method	dynamic OLFieldClass, 
+OLFieldPostPassiveButton method	dynamic OLFieldClass,
 						MSG_META_POST_PASSIVE_BUTTON
 	.enter
 	;are any buttons pressed?
@@ -317,7 +317,7 @@ OLFieldPostPassiveButton method	dynamic OLFieldClass,
 	test	bp, mask BI_B3_DOWN or mask BI_B2_DOWN or \
 		    mask BI_B1_DOWN or mask BI_B0_DOWN
 	jnz	done			;Yes -- do nothing
-		
+
 	;Remove our post-passive grab
 
 	call	VisRemoveButtonPostPassive
@@ -354,13 +354,13 @@ PASS:		*ds:si	= instance data
 RETURN:		carry	= set if acknowledged, clear if not
 		bp	= OLBuildFlags
 		cx:dx	= vis parent
-DESTROYED:	
+DESTROYED:
 
 PSEUDO CODE/STRATEGY:
-		
+
 
 KNOWN BUGS/SIDE EFFECTS/IDEAS:
-		
+
 
 REVISION HISTORY:
 	Name	Date		Description
@@ -531,7 +531,7 @@ PASS:		*ds:si 	- instance data
 
 		^lcx:dx - object requesting grab/release
 		bp	- MetaAlterFTVMCExclFlags
-		
+
 RETURN:		nothing
 
 DESTROYED:	bx, si, di, ds, es
@@ -559,7 +559,7 @@ EC<	call	ECCheckODCXDX						>
 
 	pop	ax
 
-if (not TOOL_AREA_IS_TASK_BAR)	
+if (not TOOL_AREA_IS_TASK_BAR)
 	tst	ax
 	jz	afterNoTarget
 	mov	di, ds:[si]
@@ -760,7 +760,7 @@ PASS:		*ds:si 	- instance data
 		ds:di	- SpecInstance
 		es     	- segment of class
 		ax 	- MSG_META_GET_[FOCUS/TARGET]_EXCL
-		
+
 RETURN:		^lcx:dx - handle of object
 		ax, bp	- destroyed
 		carry	- set
@@ -882,9 +882,9 @@ REVISION HISTORY:
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
 
-if _ISUI ;--------------------------------------------------------------------
+;if _ISUI ;--------------------------------------------------------------------
 
-OLFieldCreateWindowListEntry method dynamic OLFieldClass, 
+OLFieldCreateWindowListEntry method dynamic OLFieldClass,
 					MSG_OL_FIELD_CREATE_WINDOW_LIST_ENTRY
 	clr	cx			; assume no window list dialog
 	tst	ds:[di].OLFI_windowListDialog
@@ -925,7 +925,7 @@ done:
 	ret
 OLFieldCreateWindowListEntry endm
 
-endif	;----------------------------------------------------------------------
+;endif	;----------------------------------------------------------------------
 
 HighCommon ends
 HighCommon segment resource
@@ -1007,7 +1007,7 @@ if (not TOOL_AREA_IS_TASK_BAR)
 	; so that it will keep its new position when messed with.
 	;
 	push	di
-	mov	di, ds:[si]			
+	mov	di, ds:[si]
 	add	di, ds:[di].Vis_offset
 	and	ds:[di].OLWI_winPosSizeFlags, not mask WPSF_POSITION_TYPE
 	or	ds:[di].OLWI_winPosSizeFlags, \
@@ -1119,7 +1119,7 @@ endif ; (not TOOL_AREA_IS_TASK_BAR)
 
 COMMENT @----------------------------------------------------------------------
 
-METHOD:		OLFieldSizeToolArea -- 
+METHOD:		OLFieldSizeToolArea --
 		MSG_OL_FIELD_SIZE_TOOL_AREA for OLFieldClass
 
 DESCRIPTION:	Sizes the tool area.
@@ -1132,7 +1132,7 @@ PASS:		*ds:si 	- instance data
 RETURN:		nothing
 		ax, cx, dx, bp - destroyed
 
-ALLOWED TO DESTROY:	
+ALLOWED TO DESTROY:
 		bx, si, di, ds, es
 
 REGISTER/STACK USAGE:
@@ -1163,17 +1163,17 @@ endif
 if EVENT_MENU
 sizeToolArea	label	far
 endif
-	tst	si				
+	tst	si
 	jz	done
 
 	mov	ax, cx
 	call	VisGetSize
 
 ;	mov	dx, cx
-;	mov	cx, CUAS_WIN_ICON_WIDTH		
+;	mov	cx, CUAS_WIN_ICON_WIDTH
 
 	mov	dx, ax
-	mov	ax, MSG_VIS_SET_SIZE	
+	mov	ax, MSG_VIS_SET_SIZE
 	call	ObjCallInstanceNoLock		;force new size of window
 
 	mov	ax, MSG_VIS_MARK_INVALID	;hope it trickles down to kid
@@ -1291,7 +1291,7 @@ PSEUDO CODE/STRATEGY:
 
 	SVQT_REQUEST_NEAREST_ICON_SLOT	-> used to assign the nearest available
 						icon position
-						
+
 	SVQT_FREE_STAGGER_SLOT 		-> used to free-up a staggered screen
 						position - as a window is
 						DETACHED.
@@ -1338,24 +1338,24 @@ OLFVUQ_RequestNearestIconSlot:
 	jbe	10$			;no, go assign a slot and return pos
 	clr	bp			;return slot 0 (not staggered)
 	pop	cx, dx			;return passed position
-	stc				;and exit	
+	stc				;and exit
 	ret
 10$:
 	pop	dx			;unload passed position
 	pop	dx
 	mov	dl, cl			;pass slot in dl
 	or	dl, mask SSPR_REASSIGN_IF_CONFLICT or mask SSPR_ICON
-	
+
 OLFVUQ_FieldRequestStaggerSlot:
-	mov	di, ds:[si]			
-	add	di, ds:[di].Vis_offset	
+	mov	di, ds:[si]
+	add	di, ds:[di].Vis_offset
 	add	di, offset OLFI_staggerSlotMap
 	mov	cl, dl
 	call	FieldRequestStaggerSlot
 
 	clr	ch			;set bp = staggered slot # for return
 	push	es
-	segmov	es, dgroup, bp	
+	segmov	es, dgroup, bp
 	mov	bp, cx
 	call	FieldCalcStaggerPosition ;use new slot # to calculate position.
 					 ;returns (cx, dx)
@@ -1590,7 +1590,7 @@ EC <	and	cl, mask SSPR_SLOT	;look at this only		>
 EC <	cmp	cl, 63			;don't allow slots over 64	>
 EC <	ERROR_A OL_ERROR						>
 EC <	pop	cx							>
-   
+
 	and	cl, not mask SSPR_REASSIGN_IF_CONFLICT
 					;keep ICON/WINDOW and slot # only
 
@@ -1712,7 +1712,7 @@ EC <	pop	ax							>
 	jnc	4$
 	mov	al, TINY_FIRST_BASE_X_POS
 4$:
-	add	dl, ah	
+	add	dl, ah
 	adc	dh, 0
 	clr	ah
 	add	cx, ax		; first position to put application
@@ -1744,12 +1744,12 @@ calcIconPosition:
 	div	bl			;al = ax/bl
 					;sets ah = remainder (column)
 					;sets al = quotient (row)
-					
+
 if	USE_EVERY_OTHER_SLOT_IF_POSSIBLE
-	
+
 	;let's do some things to the row number so that we skip a slot
 	;each time, and fill in the blanks afterwards.
-	
+
 	shl	ah, 1			;double our slot number
 	cmp	ah, bl			;are we past the rightmost slot?
 	jb	10$			;no, we've got a slot
@@ -1781,7 +1781,7 @@ gotValues:
 	mul	bl			;ax = al * HEIGHT
 	add	ax, di
 	sub	dx, ax			;dx = pixel Y position
-	
+
 	tst	dx			;keep onscreen!
 	jns	20$
 	clr	dx
@@ -1821,9 +1821,9 @@ DESTROYED:	ax, bx, dx, bp, di
 PSEUDO CODE/STRATEGY:
 		slotsPerRow = (fieldWidth-WIN_ICON_PLOT_MARGIN_X)/
 					WIN_ICON_PLOT_WIDTH
-		column = (x - WIN_ICON_PLOT_MARGIN_X + WIN_ICON_PLOT_WIDTH/2) 
+		column = (x - WIN_ICON_PLOT_MARGIN_X + WIN_ICON_PLOT_WIDTH/2)
 				/ WIN_ICON_PLOT_WIDTH
-		row = (fieldHeight - WIN_ICON_PLOT_MARGIN_Y - y - 
+		row = (fieldHeight - WIN_ICON_PLOT_MARGIN_Y - y -
 				WIN_ICON_PLOT_HEIGHT/2) / WIN_ICON_PLOT_HEIGHT
 		slot = (row * slotsPerRow) + column + 1
 
@@ -1838,7 +1838,7 @@ REVISION HISTORY:
 
 FieldFindIconSlot	proc	near
 	;
-	; column = (x - WIN_ICON_PLOT_MARGIN_X + WIN_ICON_PLOT_WIDTH/2) 
+	; column = (x - WIN_ICON_PLOT_MARGIN_X + WIN_ICON_PLOT_WIDTH/2)
 	;				/ WIN_ICON_PLOT_WIDTH
 	;
 	sub	dx, WIN_ICON_PLOT_MARGIN_X - WIN_ICON_PLOT_WIDTH/2
@@ -1850,7 +1850,7 @@ FieldFindIconSlot	proc	near
 	div	cl			; column in al
 	clr	ah
 	mov	di, ax			; keep column in di
-	
+
 	;
 	; slotsPerRow = (fieldWidth-WIN_ICON_PLOT_MARGIN_X)/ WIN_ICON_PLOT_WIDTH
 	;
@@ -1860,11 +1860,11 @@ FieldFindIconSlot	proc	near
 	mov	bl, WIN_ICON_PLOT_WIDTH
 	div	bl			;al = ax/WIDTH
 	mov	bl, al			;bl = slotsPerRow
-	
+
 	clr	bh
-	cmp	di, bx			
+	cmp	di, bx
 	jb	15$
-	mov	di, bx			
+	mov	di, bx
 	dec	di			;keep column between 0 and slotsPerRow-1
 15$:
 	;
@@ -1893,9 +1893,9 @@ gotValues:
 	;
 	; slot = (row * slotsPerRow) + column + 1
 	;
-	mul	bl			
+	mul	bl
 	mov	cx, di			;column in cl
-	
+
 if	USE_EVERY_OTHER_SLOT_IF_POSSIBLE
 	;
 	; Make adjustments so columns go 0-5-1-6-2-7-3-8-4...
@@ -1940,7 +1940,7 @@ CALLED BY:	GLOBAL
 PASS:		nada
 RETURN:		nada
 DESTROYED:	various important but undocumented things
- 
+
 PSEUDO CODE/STRATEGY:
 		This page intentionally left blank
 
@@ -1980,7 +1980,7 @@ METHOD:		OLFieldVupGrabWithinView
 
 DESCRIPTION:	TEMPORARY HACK!!!!  The UI is not yet an application, & so
 		the express menu has problems with the new input model.  This
-		handler exists solely to help a particular problem:  The 
+		handler exists solely to help a particular problem:  The
 		express menu, & submenus, still have the field as their
 		visible parent.  This is a problem when the window goes to
 		set up a passive grab, as the vup gets here instead of the
@@ -2015,7 +2015,7 @@ REVISION HISTORY:
 ------------------------------------------------------------------------------@
 
 
-OLFieldVupGrabWithinView method dynamic OLFieldClass, 
+OLFieldVupGrabWithinView method dynamic OLFieldClass,
 					MSG_VIS_VUP_ALTER_INPUT_FLOW
 
 	mov	bx, ds:[LMBH_handle]	; Get "app object" this field is
@@ -2073,7 +2073,7 @@ REVISION HISTORY:
 ------------------------------------------------------------------------------@
 
 
-OLFieldReleaseExpressMenu method dynamic OLFieldClass, 
+OLFieldReleaseExpressMenu method dynamic OLFieldClass,
 					MSG_OL_FIELD_RELEASE_EXPRESS_MENU
 
 	mov	si, ds:[di].OLFI_expressMenu	; *ds:si = express menu

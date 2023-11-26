@@ -165,14 +165,14 @@ CommonUIClassStructures segment resource
 
 	ToolAreaClass		0
 
-if _ISUI
+;if _ISUI
 	WindowListDialogClass	mask CLASSF_DISCARD_ON_SAVE
 	WindowListListClass	mask CLASSF_DISCARD_ON_SAVE
 	TaskBarListClass	mask CLASSF_DISCARD_ON_SAVE
-endif
-if _ISUI or (_MOTIF and EXTENDIBLE_SYSTEM_TRAY)
+;endif
+;if _ISUI or (_MOTIF and EXTENDIBLE_SYSTEM_TRAY)
 	SysTrayInteractionClass	mask CLASSF_DISCARD_ON_SAVE
-endif
+;endif
 
 if EVENT_MENU
 	EventMenuClass		mask CLASSF_DISCARD_ON_SAVE
@@ -437,7 +437,7 @@ noEventMenu:
 noToolArea2:
 endif
 
-if _ISUI
+;if _ISUI
 	;
 	; clobber window list dialog
 	;
@@ -449,7 +449,7 @@ if _ISUI
 	jz	noWindowListDialog
 	call	clobber
 noWindowListDialog:
-endif
+;endif
 	ret
 
 ;
@@ -1004,7 +1004,7 @@ if EVENT_MENU
 	jc	done
 endif
 
-if _ISUI ;--------------------------------------------------------------------
+;if _ISUI ;--------------------------------------------------------------------
 	push	si				;save our handle
 	mov	di, ds:[si]
 	add	di, ds:[di].Gen_offset
@@ -1023,7 +1023,7 @@ if _ISUI ;--------------------------------------------------------------------
 20$:
 	pop	si
 	jc	done
-endif ;---------------------------------------------------------------------
+;endif ;---------------------------------------------------------------------
 
 callSuper:
 	mov	di, offset OLFieldClass
