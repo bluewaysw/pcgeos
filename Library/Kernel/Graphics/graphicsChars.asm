@@ -439,6 +439,7 @@ IsFaceAvail	proc	near
 	uses	ax, bx, dx
 	.enter
 
+	andnf   al, not KERNEL_STYLES
 	mov	di, bx				;di <- ptr to chunk
 	;
 	; Is there a complex transformation?
