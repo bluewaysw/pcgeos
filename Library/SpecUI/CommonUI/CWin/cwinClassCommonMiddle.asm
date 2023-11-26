@@ -10,7 +10,7 @@ FILE:		cwinClassCommonMiddle.asm
 ROUTINES:
 	Name			Description
 	----			-----------
-    INT OpenWinCheckMenusInHeader 
+    INT OpenWinCheckMenusInHeader
 				Checks if menus can go in header.
 
     MTD MSG_SPEC_UNBUILD        For ANY window, if unbuilt, then shouldn't
@@ -22,7 +22,7 @@ ROUTINES:
 				is set NOT_USABLE, & not if any of its
 				parents are.
 
-    INT WinCommon_ObjCallSuperNoLock_OLWinClass_Far 
+    INT WinCommon_ObjCallSuperNoLock_OLWinClass_Far
 				For ANY window, if unbuilt, then shouldn't
 				be on active list, as windows are only
 				unbuilt if completely not USABLE.  This
@@ -32,26 +32,26 @@ ROUTINES:
 				is set NOT_USABLE, & not if any of its
 				parents are.
 
-    INT OpenWinEnsureOnWindowList 
+    INT OpenWinEnsureOnWindowList
 				Makes sure that the OLWinClass object
 				passed is on the window list.
 
     INT OLWinTakeOffWindowList  Deal with window list, now that window no
 				longer needs to be on it.
 
-    INT OpenWinEnsureRealizableOnTop 
+    INT OpenWinEnsureRealizableOnTop
 				A general routine for making sure that a
 				window is marked as REALIABLE, & if
 				otherwise allowed, visible on screen, on
 				top of all other windows within the layer.
 
-    MTD MSG_SPEC_ACTIVATE_INTERACTION_DEFAULT 
+    MTD MSG_SPEC_ACTIVATE_INTERACTION_DEFAULT
 				This method is sent up the focus hierarchy
 				(visible tree) by some object in this
 				window which thinks that the default action
 				for the window should be triggered.
 
-    MTD MSG_SPEC_NAVIGATE_TO_NEXT_FIELD 
+    MTD MSG_SPEC_NAVIGATE_TO_NEXT_FIELD
 				This method is used to implement the
 				keyboard navigation within-a-window
 				mechanism. See method declaration for full
@@ -62,34 +62,34 @@ ROUTINES:
 				MSG_SPEC_NAVIGATE_TO_PREVIOUS_FIELD
 				handlers.
 
-    MTD MSG_SPEC_START_BROADCAST_FOR_DEFAULT_FOCUS 
+    MTD MSG_SPEC_START_BROADCAST_FOR_DEFAULT_FOCUS
 				The generic version of this method is sent
 				when the specific UI opens a window, and
 				wants to know if an object within the
 				window has HINT_DEFAULT_FOCUS{_WIN}.
 
-    MTD MSG_SPEC_UPDATE_VIS_MONIKER 
+    MTD MSG_SPEC_UPDATE_VIS_MONIKER
 				Intercept method heading for VisClass which
 				would normally cause whole window to be
 				invalidated.  Instead, just redraw the
 				header.
 
-    INT OpenWinHeaderMarkInvalid 
+    INT OpenWinHeaderMarkInvalid
 				This procedure is used to mark that certain
 				aspects of the window header area are
 				invalid and must be redrawn.
 
-    INT OpenWinTestForFocusAndTarget 
+    INT OpenWinTestForFocusAndTarget
 				This procedure tests if this window should
 				be drawn with a highlighted border (BLUE in
 				CUA, Dark in OpenLook, etc).
 
-    INT OpenWinHeaderResetInvalid 
+    INT OpenWinHeaderResetInvalid
 				This procedure is called to reset one or
 				more of the header area INVALID flags. We
 				generally so this as we draw that item.
 
-    MTD MSG_OL_WIN_UPDATE_HEADER 
+    MTD MSG_OL_WIN_UPDATE_HEADER
 				This method is sent by
 				OpenWinHeaderMarkInvalid when it changes
 				the OLWI_headerState flags. By the time
@@ -99,12 +99,12 @@ ROUTINES:
 				can redraw the appropriate sections of the
 				header.
 
-    INT OpenWinDrawFieldIconsIfBaseWindow 
+    INT OpenWinDrawFieldIconsIfBaseWindow
 				This procedure draws the Express Menu
 				button if this window is an OLBaseWinClass
 				object.
 
-    INT OpenWinCalcWinHdrGeometry 
+    INT OpenWinCalcWinHdrGeometry
 				This procedure is called when the window is
 				created, moved, or resized. We determine
 				which UI-specific icons should appear in
@@ -114,12 +114,12 @@ ROUTINES:
 
     MTD MSG_VIS_VUP_QUERY       Handle various VUP query
 
-    INT OpenWinReleaseDefaultGrabAndFixFlag 
+    INT OpenWinReleaseDefaultGrabAndFixFlag
 				Handle various VUP query
 
     MTD MSG_VIS_OPEN_WIN        Perform MSG_VIS_OPEN_WIN given an OLWinPart
 
-    MTD MSG_OL_WIN_UPDATE_FOR_TITLE_GROUP 
+    MTD MSG_OL_WIN_UPDATE_FOR_TITLE_GROUP
 				update for title group change
 
 REVISION HISTORY:
@@ -171,7 +171,7 @@ OpenWinCheckMenusInHeader	proc	far		uses	di
 	.enter
 	;
 	; Check first to see if we're in appropriate mode.
-	; 
+	;
 	call	OpenCheckMenusInHeaderOnMax
 	jnc	exit
 
@@ -329,7 +329,7 @@ haveObjectToDestroy:
 						; the branch (menu & button)
 						; (NOTE:  can't use
 						; SET_NOT_USABLE, since parent
-						; is already NOT_USABLE, & 
+						; is already NOT_USABLE, &
 						; hence nothing will be done.)
 	and	bp, not mask SBF_UPDATE_MODE
 	or	bp, VUM_NOW			; update NOW
@@ -372,7 +372,7 @@ CALLED BY:	GLOBAL
 PASS:		*ds:si - OLWinClass object
 RETURN:		carry set, saying that the object can be nuked
 DESTROYED:	ax, cx, dx, bp
- 
+
 PSEUDO CODE/STRATEGY:
 
 KNOWN BUGS/SIDE EFFECTS/IDEAS:
@@ -485,12 +485,12 @@ COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 		OLWinTakeOffWindowList
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-SYNOPSIS:	Deal with window list, now that window no longer needs to 
+SYNOPSIS:	Deal with window list, now that window no longer needs to
 		be on it.
 
 CALLED BY:	OpenWinVisUnbuild
 
-PASS:		*ds:si	- object to get off window list	
+PASS:		*ds:si	- object to get off window list
 
 RETURN:		nothing
 DESTROYED:	nothing
@@ -652,9 +652,9 @@ OpenWinActivateInteractionDefault	method dynamic	OLWinClass, \
 
 notNavigate:
 	;
-	; ENTER key has been pressed in this window, or some object 
+	; ENTER key has been pressed in this window, or some object
 	; decided to send a MSG_SPEC_ACTIVATE_INTERACTION_DEFAULT.
-	; Send MSG_GEN_ACTIVATE to GenTrigger which has the default 
+	; Send MSG_GEN_ACTIVATE to GenTrigger which has the default
 	; exclusive.
 	;
 	mov	bx, offset OLWI_defaultExcl
@@ -791,11 +791,11 @@ OpenWinNavigateCommon	proc	far
 
 	call	WinCommon_Mov_CXDX_Self	;set ^lcx:dx = this root object
 	ANDNF	bp, not (mask NF_SKIP_NODE)
-	
+
 sendNavQueryToOD:
 	;
 	; send a navigation query to the specified object. It will forward
-	; the method around the navigation circuit (visible tree) if 
+	; the method around the navigation circuit (visible tree) if
 	; necessary, to find the NEXT/PREVIOUS object we are seeking.
 	;
 EC <	call	ECVisStartNavigation	;for swat's showcalls		>
@@ -808,8 +808,8 @@ EC <	push	bp			;save pass flags		>
 	pop	si
 EC <	pop	ax			;get passed flags		>
 	;
-	; error check: if sent to focused object, it MUST return respond 
-	; by setting the carry flag, even if it is the only object in the 
+	; error check: if sent to focused object, it MUST return respond
+	; by setting the carry flag, even if it is the only object in the
 	; navigation circuit. If the focused object was disabled, and there
 	; are no other focused objects, then it should have released the
 	; focus exclusive already.
@@ -825,7 +825,7 @@ EC <	call	ECVisEndNavigation	;for swat's showcalls		>
 EC <	popf								>
 
 	pop	ax
-					
+
 	;
 	; Nothing returned; release the focus.
 	;
@@ -910,14 +910,14 @@ REVISION HISTORY:
 OpenWinSpecStartBroadcastForDefaultFocus	method dynamic	OLWinClass, \
 			MSG_SPEC_START_BROADCAST_FOR_DEFAULT_FOCUS
 	;
-	; initialize OD to nil, since we do not yet know of a default 
+	; initialize OD to nil, since we do not yet know of a default
 	; focus obj.
 	;
 	clr	cx, dx, bp
 
 	;
 	; send MSG_SPEC_BROADCAST_FOR_DEFAULT_FOCUS to all visible
-	; children which are FULLY_ENABLED. Returns OD of last object 
+	; children which are FULLY_ENABLED. Returns OD of last object
 	; in visible tree which has HINT_DEFAULT_FOCUS{_WIN}.
 	;
 	mov	ax, MSG_SPEC_BROADCAST_FOR_DEFAULT_FOCUS
@@ -1295,7 +1295,7 @@ if _GCM
 notGCM:
 endif
 	;
-	; Clear invalid flags manually. (We don't want 
+	; Clear invalid flags manually. (We don't want
 	; OLMenuButtonClass to have to do this work.)
 	;
 	mov	cl, mask OLWHS_FIELD_ICON_IMAGES_INVALID
@@ -1456,7 +1456,7 @@ endif		;---------------------------------------------------------------
 
 	;If this should have round border, include that in the title
 	;bar calculations
-	
+
 if THREE_DIMENSIONAL_BORDERS
 	add	ax, THREE_D_BORDER_THICKNESS
 	sub	cx, THREE_D_BORDER_THICKNESS
@@ -1466,11 +1466,11 @@ if	_ROUND_THICK_DIALOGS
 	call	OpenWinShouldHaveRoundBorder
 	pushf				; check again later
 	jnc	notRoundBorder
-	
+
 	; Doing the mov to bp and the add/subs takes the same number of
 	; cycles (16) as doing the add/subs directly, but 5 less bytes
 	; (11 vs. 16).
-	
+
 	mov	bp, _ROUND_THICK_DIALOG_BORDER
 	add	ax, bp
 	add	bx, bp
@@ -1484,7 +1484,7 @@ endif	;THREE_DIMENSIONAL_BORDERS
 	mov	ds:[di].OLWI_titleBarBounds.R_top, bx
 	mov	ds:[di].OLWI_titleBarBounds.R_right, cx
 	mov	ds:[di].OLWI_titleBarBounds.R_bottom, dx
-	
+
 if	 _ROUND_THICK_DIALOGS
 	; save the left and right title bar bounds for later
 	push	ax, cx
@@ -1499,23 +1499,23 @@ CUAS <	call	OpenWinPositionSysMenuIcons	;see Motif/Win/winClassSpec >
 if	 _ROUND_THICK_DIALOGS or (not _OL_STYLE)
 	call	WinCommon_DerefVisSpec_DI
 endif	;_ROUND_THICK_DIALOGS or (not _OL_STYLE)
-	
+
 if	 _ROUND_THICK_DIALOGS
 	; Here we compare the left and right bounds before any system icons
 	; or title bar groups were added to the bounds afterwords.  This
 	; comparison can tell us whether or not the corners have to be drawn
 	; rounded or rectangular.  We then set vardata to indicate this state.
-	
+
 	pop	bx, cx			; restore original left, right bounds
-	
+
 	popf				; do we even have rounded window?
 	jnc	doneWithRoundedCorner	; nope! outta' here.
-	
+
 	; Quick check to see if this window *really* has a title bar.  If
 	; not, no point in adding the VarData.
 	test	ds:[di].OLWI_attrs, mask OWA_HEADER or mask OWA_TITLED
 	jz	doneWithRoundedCorner
-	
+
 	clr	dx
 	cmp	ds:[di].OLWI_titleBarBounds.R_left, bx
 	jne	testRightBoundary
@@ -1531,7 +1531,7 @@ testRightBoundary:
 setRoundVarData:
 	tst	dl
 	jz	removeOldVarData
-	
+
 	mov	ax, ATTR_TITLE_BAR_HAS_ROUNDED_CORNERS
 	mov	cx, size OLWinTitleBarCornerAttributes
 	call	ObjVarAddData
@@ -1539,10 +1539,10 @@ setRoundVarData:
 	jmp	short doneWithRoundedCorner
 
 removeOldVarData:
-	; clean up old 
+	; clean up old
 	mov	ax, ATTR_TITLE_BAR_HAS_ROUNDED_CORNERS
 	call	ObjVarDeleteData
-	
+
 doneWithRoundedCorner:
 endif	;_ROUND_THICK_DIALOGS
 
@@ -1556,7 +1556,7 @@ CUAS <	cmp	ds:[di].OLWI_type, MOWT_PRIMARY_WINDOW			>
 
 	;UPDATE the express tool area location, to match any window change.
 
-	call	OLBaseWinAdjustTitleBoundsForExpressToolArea
+	;call	OLBaseWinAdjustTitleBoundsForExpressToolArea
 endif ; PLACE_EXPRESS_MENU_ON_PRIMARY
 
 done:
@@ -1813,7 +1813,7 @@ releaseDefaultExclusiveCXDX:
 ;	je	225$			;don't give default back to releaser
 ;setMaster:
 	mov	dx, ds:[di].OLWI_masterDefault.chunk
-	mov	bx, bp	
+	mov	bx, bp
 	or	bx, dx
 	jz	225$
 
@@ -1971,7 +1971,7 @@ grabFocusWinExclForMenu:
 	cmp	cx, SVQT_QUERY_FOR_REPLY_BAR
 	jne	callSuper
 	clc				; end fruitless search right here, to
-					; keep it from going all the way 
+					; keep it from going all the way
 					; through the system object
 	ret
 ;------------------------------------------------------------------------------
@@ -2051,11 +2051,11 @@ EC <	cmp	ds:[di].VCI_window, 0	; already have a window?	>
 EC <	ERROR_NZ	OPEN_WIN_ON_OPEN_WINDOW				>
 
 	; first check for general window positioning preferences
-	; (most can be handled at SPEC_BUILD, but some have to be handled 
+	; (most can be handled at SPEC_BUILD, but some have to be handled
 	; here, because now we have size information.)
 
 	; if the visible bounds for this object are actually
-	; ratios of the Parent/Field window, convert to pixel coordinates 
+	; ratios of the Parent/Field window, convert to pixel coordinates
 	; now. (Note: if parent geometry is not yet valid, this does nothing)
 
 	push	bp			; save locals
@@ -2064,7 +2064,7 @@ EC <	ERROR_NZ	OPEN_WIN_ON_OPEN_WINDOW				>
 					;have enough info. If not, then wait
 					;until MSG_VIS_MOVE_RESIZE_WIN to
 					;do this.
-	
+
 	;
 	; New code to make one last gasp to move the window onscreen, if needed.
 	; Some of the positioning may not have been done until now.
@@ -2076,7 +2076,7 @@ EC <	ERROR_NZ	OPEN_WIN_ON_OPEN_WINDOW				>
 	jz	dontMove
 
 	;
-	; Don't force onscreen if the user has moved it...	
+	; Don't force onscreen if the user has moved it...
 	;
 
 	test	ds:[di].OLWI_winPosSizeState, mask WPSS_HAS_MOVED_OR_RESIZED
@@ -2168,9 +2168,9 @@ if	DRAW_SHADOWS_ON_BW_GADGETS
 	call	OpenCheckIfBW		; doing color, branch
 	jnc	10$
 
-	mov	di, ds:[si]			
+	mov	di, ds:[si]
 	add	di, ds:[di].Vis_offset
-	
+
 	test	ds:[di].OLWI_moreFixedAttr, mask OWMFA_CUSTOM_WINDOW
 	jnz	10$			; custom window, branch
 endif	; DRAW_SHADOWS_ON_BW_GADGETS
@@ -2179,13 +2179,13 @@ if _ROUND_THICK_DIALOGS
 	call	OpenWinShouldHaveRoundBorder
 	jnc	10$
 endif ; _ROUND_THICK_DIALOGS
-	
+
 if DRAW_SHADOWS_ON_BW_GADGETS or _ROUND_THICK_DIALOGS	;----------------------
 NOFXIP<	mov	ax, cs						>
 
 FXIP <	push	bx						>
 FXIP <	mov	bx, handle RegionResourceXIP			>
-FXIP <	call	MemLock			; ax = segment		>	
+FXIP <	call	MemLock			; ax = segment		>
 FXIP <	pop	bx						>
 FXIP <	inc	unlockBlock					>
 
@@ -2230,7 +2230,7 @@ openNow::
 	mov	di, cx			; & exposureOD
 	mov	bp, dx
 	call	WinOpen
-	
+
 	pop	bp			; restore stack frame
 
 	;
@@ -2260,7 +2260,7 @@ if BUBBLE_DIALOGS ;oooooooooooooooooooooooooooooooooooooooooooooooooooooooooooo
 30$:
 	pop	bx
 endif	; BUBBLE_DIALOGS oooooooooooooooooooooooooooooooooooooooooooooooooooooo
-	
+
 if DIALOGS_WITH_FOLDER_TABS
 	push	bx
 	mov	bx, regionBlock
@@ -2270,7 +2270,7 @@ if DIALOGS_WITH_FOLDER_TABS
 30$:
 	pop	bx
 endif	; DIALOGS_WITH_FOLDER_TABS
-	
+
 	pop	si			; get back chunk handle of obj.
 
 	call	WinCommon_DerefVisSpec_DI
@@ -2278,9 +2278,9 @@ endif	; DIALOGS_WITH_FOLDER_TABS
 
 	;
 	; Now add the OD of this object to the window list
-	; This will allow the window to be notified when the system is 
+	; This will allow the window to be notified when the system is
 	; shutting down, so that it can save position and size info, etc.
-	; NOTE: see OpenWinDetach for how we store extra data on the active 
+	; NOTE: see OpenWinDetach for how we store extra data on the active
 	; list.
 	;
 	call	OpenWinEnsureOnWindowList
@@ -2305,7 +2305,7 @@ endif	; DIALOGS_WITH_FOLDER_TABS
 	call	GenCallApplication
 
 afterTopTest:
-		
+
 	pop	bp
 	.leave
 	ret
@@ -2326,7 +2326,7 @@ PASS:		*ds:si	= OLWinClass object
 		ax	= message #
 RETURN:		nothing
 DESTROYED:	ax, cx, dx, bp
-SIDE EFFECTS:	
+SIDE EFFECTS:
 
 PSEUDO CODE/STRATEGY:
 		Wouldn't it be cool to be able to update for the title
@@ -2338,7 +2338,7 @@ REVISION HISTORY:
 	brianc	12/21/94   	Initial version
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
-OLWinUpdateForTitleGroup	method dynamic OLWinClass, 
+OLWinUpdateForTitleGroup	method dynamic OLWinClass,
 					MSG_OL_WIN_UPDATE_FOR_TITLE_GROUP
 	.enter
 

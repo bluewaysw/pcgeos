@@ -12,26 +12,26 @@ ROUTINES:
 	----			-----------
     MTD MSG_META_INITIALIZE     Initialize an open look base window
 
-    INT BaseWinAttrGenDisplayNotMinimizable 
+    INT BaseWinAttrGenDisplayNotMinimizable
 				Initialize an open look base window
 
-    INT BaseWinAttrGenDisplayNotMaximizable 
+    INT BaseWinAttrGenDisplayNotMaximizable
 				Initialize an open look base window
 
-    INT BaseWinAttrGenDisplayNotRestorable 
+    INT BaseWinAttrGenDisplayNotRestorable
 				Initialize an open look base window
 
-    INT BaseWinHintDisplayNotResizable 
+    INT BaseWinHintDisplayNotResizable
 				Initialize an open look base window
 
-    INT BaseWinHintNoExpressMenu 
+    INT BaseWinHintNoExpressMenu
 				Initialize an open look base window
 
-    INT MakeNotResizableIfKeyboardOnly 
+    INT MakeNotResizableIfKeyboardOnly
 				Clear the OWA_RESIZABLE bit if user is
 				working with a keyboard only, i.e. no mouse
 
-    MTD MSG_SPEC_SCAN_GEOMETRY_HINTS 
+    MTD MSG_SPEC_SCAN_GEOMETRY_HINTS
 				Scans geometry hints.
 
     INT AA_DerefVisSpec_DI      Scans geometry hints.
@@ -47,27 +47,27 @@ ROUTINES:
     MTD MSG_SPEC_BUILD          Make sure this window is added to the
 				window list
 
-    INT EnsureItemAddedToWindowList 
+    INT EnsureItemAddedToWindowList
 				Make sure this window is added to the
 				window list.
 
-    MTD MSG_SPEC_UPDATE_VIS_MONIKER 
+    MTD MSG_SPEC_UPDATE_VIS_MONIKER
 				If a new moniker is set, then we need to
 				update the entry in the Window List
 
-    MTD MSG_OL_BASE_WIN_UPDATE_WINDOW_ENTRY 
+    MTD MSG_OL_BASE_WIN_UPDATE_WINDOW_ENTRY
 				Update window list selection
 
-    MTD MSG_META_NOTIFY_TASK_SELECTED 
+    MTD MSG_META_NOTIFY_TASK_SELECTED
 				Bring window to front.
 
-    MTD MSG_META_NOTIFY_TASK_SELECTED 
+    MTD MSG_META_NOTIFY_TASK_SELECTED
 				Notify window that it has been selected.
 
-    MTD MSG_OL_WINDOW_LIST_ITEM_SET_OPERATING_PARAMS 
+    MTD MSG_OL_WINDOW_LIST_ITEM_SET_OPERATING_PARAMS
 				Save data.
 
-    MTD MSG_OL_WINDOW_LIST_ITEM_CLOSE_WINDOW 
+    MTD MSG_OL_WINDOW_LIST_ITEM_CLOSE_WINDOW
 				Close window
 
     MTD MSG_META_KBD_CHAR       Handle keyboard events for WindowListItem.
@@ -82,13 +82,13 @@ ROUTINES:
 
     INT CheckForJotterControl   see if this child is a JotterControl
 
-    MTD MSG_OL_BASE_WIN_REBUILD_APP_MENU_BUTTON 
+    MTD MSG_OL_BASE_WIN_REBUILD_APP_MENU_BUTTON
 				rebuild App menu button
 
-    MTD MSG_OL_BASE_WIN_NOTIFY_OF_FILE_MENU 
+    MTD MSG_OL_BASE_WIN_NOTIFY_OF_FILE_MENU
 				notification that "File" menu exists
 
-    INT OLBaseWinDetermineInitialMinimizedStatus 
+    INT OLBaseWinDetermineInitialMinimizedStatus
 				See if this app should come up minimized
 
     MTD MSG_META_UPDATE_WINDOW  *ds:si - instance data (for object in
@@ -100,10 +100,10 @@ ROUTINES:
 				cx	- UpdateWindowFlags dl	-
 				VisUpdateMode
 
-    INT RemoveTitleBarIfPossible 
+    INT RemoveTitleBarIfPossible
 				RemoveTitleBarIfPossible
 
-    INT OLBaseWinDetermineInitialMaximizedStatus 
+    INT OLBaseWinDetermineInitialMaximizedStatus
 				Determine intitial MAXIMIZED status for
 				this primary window. At this time, always
 				preserve state if restoring from state.  If
@@ -118,7 +118,7 @@ ROUTINES:
     MTD MSG_SPEC_UNBUILD        Remove this window from the window list
 				before doing normal unbuild.
 
-    INT OLBaseWinRemoveSpecBuildCreatedObjects 
+    INT OLBaseWinRemoveSpecBuildCreatedObjects
 				remove ui objects added to this OLBaseWin
 				during spec build
 
@@ -130,24 +130,24 @@ ROUTINES:
 
     INT RemoveAppMenuButton     remove creatd App menu button
 
-    INT EnsureItemRemovedFromWindowList 
+    INT EnsureItemRemovedFromWindowList
 				Ensures that this window is removed from
 				the window list
 
-    MTD MSG_VIS_COMP_GET_MINIMUM_SIZE 
+    MTD MSG_VIS_COMP_GET_MINIMUM_SIZE
 				Returns the minimum size for a window.
 
-    MTD MSG_GEN_DISPLAY_SET_MINIMIZED 
+    MTD MSG_GEN_DISPLAY_SET_MINIMIZED
 				Moves base window off-screen, then performs
 				superclass action
 
-    MTD MSG_GEN_DISPLAY_SET_NOT_MINIMIZED 
+    MTD MSG_GEN_DISPLAY_SET_NOT_MINIMIZED
 				Call superclass and update express menu
 
     INT OLWinMoveOffScreen      Move window off-screen, so it will not be
 				visible
 
-    MTD MSG_META_GAINED_SYS_TARGET_EXCL 
+    MTD MSG_META_GAINED_SYS_TARGET_EXCL
 				We intercept this method here so that we
 				can update the TaskEntry in the express
 				menu.
@@ -156,25 +156,25 @@ ROUTINES:
 				can update the TaskEntry in the express
 				menu.
 
-    INT OLRedoMenuBarGeometryIfMenusInHeader 
+    INT OLRedoMenuBarGeometryIfMenusInHeader
 				We intercept this method here so that we
 				can update the TaskEntry in the express
 				menu.
 
-    INT OLBaseWinHideExpressToolArea 
+    INT OLBaseWinHideExpressToolArea
 				Hide the express tool area by moving it off
 				screen
 
-    INT OLBaseWinAdjustTitleBoundsForExpressToolArea 
+    INT OLBaseWinAdjustTitleBoundsForExpressToolArea
 				Adjusts bounds of title area to be smaller
 				if this app currently has the express tool
 				area associated with it.
 
-    MTD MSG_META_LOST_SYS_TARGET_EXCL 
+    MTD MSG_META_LOST_SYS_TARGET_EXCL
 				We intercept this method here so that we
 				can release our hold on the express menu
 
-    MTD MSG_META_GET_TARGET_AT_TARGET_LEVEL 
+    MTD MSG_META_GET_TARGET_AT_TARGET_LEVEL
 				Returns current target object within this
 				branch of the hierarchical target
 				exclusive, at level requested
@@ -194,7 +194,7 @@ ROUTINES:
     INT DrawZoomLines           Draw zoom lines before a window opens to
 				indicate where the window was opened from.
 
-    INT ZoomLinesStuffPositionHint 
+    INT ZoomLinesStuffPositionHint
 				If we are zooming all primarys (as opposed
 				to just those with the
 				HINT_PRIMARY_OPEN_ICON_BOUNDS hint) then
@@ -207,38 +207,38 @@ ROUTINES:
     MTD MSG_SPEC_GUP_QUERY      Respond to a query traveling up the generic
 				composite tree
 
-    MTD MSG_GEN_PRIMARY_USE_LONG_TERM_MONIKER 
+    MTD MSG_GEN_PRIMARY_USE_LONG_TERM_MONIKER
 				Switch to specific long term moniker.
 
-    INT WinUncommon_DerefVisSpec_DI 
+    INT WinUncommon_DerefVisSpec_DI
 				Switch to specific long term moniker.
 
-    INT WinUncommon_ObjMessageCallFixupDS 
+    INT WinUncommon_ObjMessageCallFixupDS
 				Switch to specific long term moniker.
 
     INT OLBaseWinDrawGCMIcon    Draw the Exit or Help buttons in the header
 				of this window.
 
-    MTD MSG_OL_BASE_WIN_UPDATE_EXPRESS_TOOL_AREA 
+    MTD MSG_OL_BASE_WIN_UPDATE_EXPRESS_TOOL_AREA
 				This procedure positions the "express tool area", if this app current "has it" floating above it.  Does NOT mess with the title bar bounds, just references them to figure out where the area should be moved.
 
-    INT OLBaseWinEnableAndPositionHeaderIcon 
+    INT OLBaseWinEnableAndPositionHeaderIcon
 				This procedure is used to position and enable the icons which appear in the header area of a window:
 
 				- GCM "Exit" and "Help" icons - Workspace
 				and Application menu buttons
 
-    INT OLBaseWinPositionGCMHeaderIcons 
+    INT OLBaseWinPositionGCMHeaderIcons
 				This procedure positions and enables the "Exit" and "Help" icons in the header when running in GC mode.
 
-    MTD MSG_OL_WIN_UPDATE_FOR_TITLE_GROUP 
+    MTD MSG_OL_WIN_UPDATE_FOR_TITLE_GROUP
 				update express menu button, if any
 
-    MTD MSG_OL_WIN_GET_HEADER_TITLE_BOUNDS 
+    MTD MSG_OL_WIN_GET_HEADER_TITLE_BOUNDS
 				Returns widths of icons left and right of
 				title bar.
 
-    INT OLBaseWinGetExpressMenuButtonWidth 
+    INT OLBaseWinGetExpressMenuButtonWidth
 				Returns width of window's system menu
 				button.
 
@@ -261,7 +261,7 @@ ROUTINES:
 				if HINT_DISPLAY_MAXIMIZED_ON_STARTUP is
 				set.
 
-    MTD MSG_OL_BASE_WIN_TOGGLE_MENU_BAR 
+    MTD MSG_OL_BASE_WIN_TOGGLE_MENU_BAR
 				toggle menu bar, if togglable
 
 REVISION HISTORY:
@@ -440,13 +440,13 @@ if	 _ALLOW_MINIMIZED_TITLE_BARS
 	; to be not closable (no close button).  Also, go ahead and set the
 	; window to be not minimizable nor restorable - there won't be any
 	; gadgetry for it anyway.
-	
+
 	call	WinCommon_DerefVisSpec_DI
 	test	ds:[di].OLWI_moreFixedAttr, mask OMWFA_MINIMIZE_TITLE_BAR
 	jz	checkMinMaxRestoreControls
 	andnf	ds:[di].OLWI_attrs, not mask OWA_CLOSABLE
 	jmp	SHORT dontAllowMinRestore
-	
+
 checkMinMaxRestoreControls:
 endif	;_ALLOW_MINIMIZED_TITLE_BARS
 
@@ -524,7 +524,7 @@ afterDeskAccessory:
 if _GCM
 	;
 	; If marked as GCM, maximize & prevent min/restore behavior.
-	; 
+	;
 	call	WinCommon_DerefVisSpec_DI
 	test	ds:[di].OLWI_fixedAttr, mask OWFA_GCM_TITLED
 	jz	notGCM
@@ -622,13 +622,13 @@ BaseWinHintNoExpressMenu	proc	far
 	ORNF	ds:[di].OLBWI_flags, mask OLBWF_REJECT_EXPRESS_TOOL_AREA
 	ret
 BaseWinHintNoExpressMenu	endp
-			
+
 
 COMMENT @----------------------------------------------------------------------
 
 FUNCTION:	MakeNotResizableIfKeyboardOnly
 
-DESCRIPTION:	Clear the OWA_RESIZABLE bit if user is working with a 
+DESCRIPTION:	Clear the OWA_RESIZABLE bit if user is working with a
 		keyboard only, i.e. no mouse
 
 CALLED BY:	INTERNAL
@@ -654,7 +654,7 @@ MakeNotResizableIfKeyboardOnly	endp
 
 COMMENT @----------------------------------------------------------------------
 
-METHOD:		OLBaseWinScanGeometryHints -- 
+METHOD:		OLBaseWinScanGeometryHints --
 		MSG_SPEC_SCAN_GEOMETRY_HINTS for OLBaseWinClass
 
 DESCRIPTION:	Scans geometry hints.
@@ -666,7 +666,7 @@ PASS:		*ds:si 	- instance data
 RETURN:		nothing
 		ax, cx, dx, bp - destroyed
 
-ALLOWED TO DESTROY:	
+ALLOWED TO DESTROY:
 		bx, si, di, ds, es
 
 REGISTER/STACK USAGE:
@@ -763,7 +763,7 @@ endif	; if _NO_WIN_ICONS ----------------------------------------------------
 	mov	ds:[di].R_left, mask SWSS_RATIO or PCT_0
 	mov	ds:[di].R_top, mask SWSS_RATIO or PCT_0
 				; indicate that VI_bounds.R_left and R_top
-				;	contain a SpecWinSizePair 
+				;	contain a SpecWinSizePair
 	ornf	{word} ds:[bp]+2, mask WPSS_VIS_POS_IS_SPEC_PAIR
 
 done:
@@ -802,7 +802,7 @@ REVISION HISTORY:
 	stevey	1/ 1/96   	Initial version
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
-OLBaseWinQueryIfPressIsInk	method dynamic OLBaseWinClass, 
+OLBaseWinQueryIfPressIsInk	method dynamic OLBaseWinClass,
 					MSG_META_QUERY_IF_PRESS_IS_INK
 		.enter
 	;
@@ -858,7 +858,7 @@ COMMENT @----------------------------------------------------------------------
 
 METHOD:         OLBaseWinUpdateSpecBuild
 
-DESCRIPTION:    
+DESCRIPTION:
 
 PASS:           *ds:si - instance data
                 es - segment of OpenWinClass
@@ -892,7 +892,7 @@ OLBaseWinUpdateSpecBuild   method dynamic  OLBaseWinClass, \
 	; Set optimization flag indicating that no object
 	; at this point or below in the tree, when being
 	; TREE_BUILD'd, will be adding itself visually
-	; outside the visual realm of this Base window.  (Allows 
+	; outside the visual realm of this Base window.  (Allows
 	; VisAddChildRelativeToGen to work much quicker)
 
 	or	bp, mask SBF_VIS_PARENT_WITHIN_SCOPE_OF_TREE_BUILD
@@ -1081,10 +1081,10 @@ CALLED BY:	OLBaseWinUpdateSpecBuild
 PASS:		*ds:si - OLBaseWin object
 RETURN:		ds - fixed up
 DESTROYED:	bx,cx,dx,di
-SIDE EFFECTS:	
+SIDE EFFECTS:
 
 PSEUDO CODE/STRATEGY:
-		
+
 
 REVISION HISTORY:
 	Name	Date		Description
@@ -1128,7 +1128,7 @@ addButton:
 	push	ax
 	mov  	ax, 'BD'
 	push	ax
-	mov	ax, ' K'	
+	mov	ax, ' K'
 	push	ax
 	movdw	cxdx, sssp
 	mov	ax, MSG_GEN_REPLACE_VIS_MONIKER_TEXT
@@ -1165,7 +1165,7 @@ addButton:
 	call	GeodeGetAppObject
 	movdw	cxdx, bxsi			;^lcx:dx <- appObj
 	pop	si
-	
+
 	mov	ax, MSG_GEN_TRIGGER_SET_DESTINATION
 	call	ObjCallInstanceNoLock
 
@@ -1206,10 +1206,10 @@ CALLED BY:	OLBaseWinUpdateSpecBuild
 PASS:		*ds:si - OLBaseWin object
 RETURN:		ds - fixed up
 DESTROYED:	ax,bx,cx,dx,di,bp
-SIDE EFFECTS:	
+SIDE EFFECTS:
 
 PSEUDO CODE/STRATEGY:
-		
+
 
 REVISION HISTORY:
 	Name	Date		Description
@@ -1274,7 +1274,7 @@ AddPrimaryRadioStatusIcon	proc	near
 
 	;
 	; Save radio status icon chunk handle in OLBaseWin instance data
-	; 
+	;
 	mov	bx, dx				;*ds:bx = OLBaseWin object
 	mov	bx, ds:[bx]
 	add	bx, ds:[bx].Vis_offset
@@ -1317,7 +1317,7 @@ PASS:		*ds:si	= OLBaseWinClass object
 		ax	= message #
 RETURN:		nothing
 DESTROYED:	ax, cx, dx, bp
-SIDE EFFECTS:	
+SIDE EFFECTS:
 
 PSEUDO CODE/STRATEGY:
 
@@ -1358,10 +1358,10 @@ CALLED BY:	OLBaseWinSpecBuild
 PASS:		*ds:si	- OLBaseWin object
 RETURN:		nothing
 DESTROYED:	ax, cx, dx, bp
-SIDE EFFECTS:	
+SIDE EFFECTS:
 
 PSEUDO CODE/STRATEGY:
-		
+
 
 REVISION HISTORY:
 	Name	Date		Description
@@ -1406,7 +1406,7 @@ if EXTENDIBLE_SYSTEM_TRAY
 	jc	done
 endif
 
-	; Get default field window (presume only one), where most all windows 
+	; Get default field window (presume only one), where most all windows
 	; of the app will be placed.
 	;
 	mov	cx, GUQT_FIELD
@@ -1468,10 +1468,10 @@ PASS:		cx	= TRUE - reinitialize list and update current selection
 			  FALSE - just update current selection
 RETURN:		nothing
 DESTROYED:	nothing
-SIDE EFFECTS:	
+SIDE EFFECTS:
 
 PSEUDO CODE/STRATEGY:
-		
+
 
 REVISION HISTORY:
 	Name	Date		Description
@@ -1482,7 +1482,7 @@ REVISION HISTORY:
 if _ISUI
 UpdateTaskBarList	proc	far
 	uses	ax,bx,cx,dx,si,di,bp
-	.enter	
+	.enter
 	mov	bx, segment OLFieldClass
 	mov	si, offset OLFieldClass
 	mov	ax, MSG_OL_FIELD_UPDATE_TASK_BAR_LIST
@@ -1512,11 +1512,11 @@ PASS:		*ds:si	= OLBaseWinClass object
 		es 	= segment of OLBaseWinClass
 		ax	= message #
 		dl	- VisUpdateMode
-		cx 	- width of old moniker  
-		bp 	- height of old moniker 
+		cx 	- width of old moniker
+		bp 	- height of old moniker
 RETURN:		nothing
 DESTROYED:	ax, cx, dx, bp
-SIDE EFFECTS:	
+SIDE EFFECTS:
 
 PSEUDO CODE/STRATEGY:
 
@@ -1529,7 +1529,7 @@ REVISION HISTORY:
 
 if _ISUI ;--------------------------------------------------------------------
 
-OLBaseWinUpdateVisMoniker	method dynamic OLBaseWinClass, 
+OLBaseWinUpdateVisMoniker	method dynamic OLBaseWinClass,
 					MSG_SPEC_UPDATE_VIS_MONIKER
 	mov	di, offset OLBaseWinClass
 	call	ObjCallSuperNoLock
@@ -1551,9 +1551,9 @@ SYNOPSIS:	Set the moniker for this window in the window list
 CALLED BY:	MSG_OL_BASE_WIN_SET_WINDOW_ENTRY_MONIKER
 PASS:		*ds:si	= OLBaseWinClass object
 		es	= segment of OLBaseWinClass
-RETURN:		nothing	
+RETURN:		nothing
 DESTROYED:	ax, cx, dx, bp
-SIDE EFFECTS:	
+SIDE EFFECTS:
 
 PSEUDO CODE/STRATEGY:
 
@@ -1566,7 +1566,7 @@ REVISION HISTORY:
 
 if _ISUI ; We will be adding this window to the window list ------------------
 
-OLBaseWinSetWindowEntryMoniker	method OLBaseWinClass, 
+OLBaseWinSetWindowEntryMoniker	method OLBaseWinClass,
 				MSG_OL_BASE_WIN_SET_WINDOW_ENTRY_MONIKER
 	mov	di, ds:[si]
 	add	di, ds:[di].Vis_offset
@@ -1651,18 +1651,18 @@ CALLED BY:	OLBaseWinSetWindowEntryMoniker
 PASS:		*ds:si	= OLBaseWinClass object
 		^lbx:di	= icon moniker
 		^lcx:dx	= text moniker
-RETURN:		^lcx:dx	= combination moniker in a new sharable memory block 
+RETURN:		^lcx:dx	= combination moniker in a new sharable memory block
 DESTROYED:	nothing
-SIDE EFFECTS:	
+SIDE EFFECTS:
 
 PSEUDO CODE/STRATEGY:
-		
+
 
 REVISION HISTORY:
 	Name		Date		Description
 	----		----		-----------
 	joon    	3/31/97    	Initial version
-	
+
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
 
 if _ISUI	;--------------------
@@ -1809,7 +1809,7 @@ PASS:		*ds:si	= OLBaseWinClass object
 		cx	= TRUE/FALSE - gained/lost target
 RETURN:		nothing
 DESTROYED:	ax, cx, dx, bp
-SIDE EFFECTS:	
+SIDE EFFECTS:
 
 PSEUDO CODE/STRATEGY:
 
@@ -1822,7 +1822,7 @@ REVISION HISTORY:
 
 if _ISUI ;--------------------------------------------------------------------
 
-OLBaseWinUpdateWindowEntry	method dynamic OLBaseWinClass, 
+OLBaseWinUpdateWindowEntry	method dynamic OLBaseWinClass,
 					MSG_OL_BASE_WIN_UPDATE_WINDOW_ENTRY
 EC <	cmp	cx, TRUE						>
 EC <	je	10$							>
@@ -1905,7 +1905,7 @@ PASS:		*ds:si	= OLBaseWinClass object
 		ax	= message #
 RETURN:		nothing
 DESTROYED:	ax, cx, dx, bp
-SIDE EFFECTS:	
+SIDE EFFECTS:
 
 PSEUDO CODE/STRATEGY:
 
@@ -1918,12 +1918,12 @@ REVISION HISTORY:
 
 if _ISUI ;--------------------------------------------------------------------
 
-OLBaseWinNotifyWindowSelected	method dynamic OLBaseWinClass, 
+OLBaseWinNotifyWindowSelected	method dynamic OLBaseWinClass,
 					MSG_META_NOTIFY_TASK_SELECTED
 	add	bx, ds:[bx].Gen_offset
-	test	ds:[bx].GI_states, mask GS_USABLE		
+	test	ds:[bx].GI_states, mask GS_USABLE
 	jz	done				; abort is window is not usable
-		
+
 	mov	ax, MSG_GEN_DISPLAY_SET_NOT_MINIMIZED
 	call	ObjCallInstanceNoLock
 
@@ -1951,7 +1951,7 @@ PASS:		*ds:si	= OLWindowListItemClass object
 		ax	= message #
 RETURN:		carry set
 DESTROYED:	ax, cx, dx, bp
-SIDE EFFECTS:	
+SIDE EFFECTS:
 
 PSEUDO CODE/STRATEGY:
 
@@ -1964,7 +1964,7 @@ REVISION HISTORY:
 
 if _ISUI ; NOTE: this is not OLBaseWin, It is OLWindowListItem ---------------
 
-OLWindowListItemNotifyWindowSelected	method dynamic OLWindowListItemClass, 
+OLWindowListItemNotifyWindowSelected	method dynamic OLWindowListItemClass,
 					MSG_META_NOTIFY_TASK_SELECTED
 
 	mov	bx, ds:[di].OLWLI_windowObj.handle
@@ -2011,7 +2011,7 @@ PASS:		*ds:si	= OLWindowListItemClass object
 		bp	= field window
 RETURN:		nothing
 DESTROYED:	nothing
-SIDE EFFECTS:	
+SIDE EFFECTS:
 
 PSEUDO CODE/STRATEGY:
 
@@ -2024,7 +2024,7 @@ REVISION HISTORY:
 
 if _ISUI ; NOTE: this is not OLBaseWin, It is OLWindowListItem ---------------
 
-OLWindowListItemSetOperatingParams	method dynamic OLWindowListItemClass, 
+OLWindowListItemSetOperatingParams	method dynamic OLWindowListItemClass,
 				MSG_OL_WINDOW_LIST_ITEM_SET_OPERATING_PARAMS
 	mov	ds:[di].OLWLI_windowObj.handle, cx
 	mov	ds:[di].OLWLI_windowObj.chunk, dx
@@ -2050,7 +2050,7 @@ PASS:		*ds:si	= OLWindowListItemClass object
 		ax	= message #
 RETURN:		nothing
 DESTROYED:	ax, cx, dx, bp
-SIDE EFFECTS:	
+SIDE EFFECTS:
 
 PSEUDO CODE/STRATEGY:
 
@@ -2063,7 +2063,7 @@ REVISION HISTORY:
 
 if _ISUI ; NOTE: this is not OLBaseWin, It is OLWindowListItem ---------------
 
-OLWindowListItemCloseWindow	method dynamic OLWindowListItemClass, 
+OLWindowListItemCloseWindow	method dynamic OLWindowListItemClass,
 					MSG_OL_WINDOW_LIST_ITEM_CLOSE_WINDOW
 	mov	bx, ds:[di].OLWLI_windowObj.handle
 	mov	si, ds:[di].OLWLI_windowObj.chunk
@@ -2097,7 +2097,7 @@ PASS:		*ds:si	= OLWindowListItemClass object
 		bp high	= scan code
 RETURN:		nothing
 DESTROYED:	ax,cx,dx,bp
-SIDE EFFECTS:	
+SIDE EFFECTS:
 
 PSEUDO CODE/STRATEGY:
 
@@ -2127,7 +2127,7 @@ DBCS <	cmp	cx, C_SYS_ENTER						>
 
 callSuper:
 	mov	di, offset OLWindowListItemClass
-	GOTO	ObjCallSuperNoLock		
+	GOTO	ObjCallSuperNoLock
 
 OLWindowListItemKeyboardChar	endm
 
@@ -2152,7 +2152,7 @@ PASS:		*ds:si	= RadioStatusIconClass object
 		bp	= change specific data
 RETURN:		nothing
 DESTROYED:	ax, cx, dx, bp
-SIDE EFFECTS:	
+SIDE EFFECTS:
 
 PSEUDO CODE/STRATEGY:
 
@@ -2160,12 +2160,12 @@ REVISION HISTORY:
 	Name		Date		Description
 	----		----		-----------
 	joon    	3/26/97   	Initial version
-	
+
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
 
 if RADIO_STATUS_ICON_ON_PRIMARY	;------------------------
 
-RadioStatusIconNotify	method dynamic RadioStatusIconClass, 
+RadioStatusIconNotify	method dynamic RadioStatusIconClass,
 					MSG_META_NOTIFY
 	cmp	dx, GWNT_PENELOPE_RADIO_STATUS_NOTIFICATION
 	jne	callSuper
@@ -2212,7 +2212,7 @@ PASS:		*ds:si	= RadioStatusIconClass object
 		^hbp	= GState to draw through
 RETURN:		nothing
 DESTROYED:	ax, cx, dx, bp
-SIDE EFFECTS:	
+SIDE EFFECTS:
 
 PSEUDO CODE/STRATEGY:
 
@@ -2220,12 +2220,12 @@ REVISION HISTORY:
 	Name		Date		Description
 	----		----		-----------
 	joon    	3/27/97   	Initial version
-	
+
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
 
 if RADIO_STATUS_ICON_ON_PRIMARY	;-----------------------
 
-RadioStatusIconDraw	method RadioStatusIconClass, 
+RadioStatusIconDraw	method RadioStatusIconClass,
 					MSG_VIS_DRAW
 	push	bp
 	mov	di, offset RadioStatusIconClass
@@ -2288,7 +2288,7 @@ PASS:		*ds:si	= RadioStatusIconClass object
 		ax	= message #
 RETURN:		nothing
 DESTROYED:	ax, cx, dx, bp
-SIDE EFFECTS:	
+SIDE EFFECTS:
 
 PSEUDO CODE/STRATEGY:
 
@@ -2296,12 +2296,12 @@ REVISION HISTORY:
 	Name		Date		Description
 	----		----		-----------
 	joon    	3/26/97   	Initial version
-	
+
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
 
 if RADIO_STATUS_ICON_ON_PRIMARY	;-----------------------
 
-RadioStatusIconCallInProgressTimerMsg	method dynamic RadioStatusIconClass, 
+RadioStatusIconCallInProgressTimerMsg	method dynamic RadioStatusIconClass,
 			MSG_RADIO_STATUS_ICON_CALL_IN_PROGRESS_TIMER_MSG
 	clr	ds:[di].RSII_cycleTimer
 
@@ -2336,7 +2336,7 @@ PASS:		*ds:si	= RadioStatusIconClass object
 		ax	= message #
 RETURN:		nothing
 DESTROYED:	ax, cx, dx, bp
-SIDE EFFECTS:	
+SIDE EFFECTS:
 
 PSEUDO CODE/STRATEGY:
 
@@ -2344,12 +2344,12 @@ REVISION HISTORY:
 	Name		Date		Description
 	----		----		-----------
 	joon    	3/27/97   	Initial version
-	
+
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
 
 if RADIO_STATUS_ICON_ON_PRIMARY	;----------------------------
 
-RadioStatusIconShortTouch	method dynamic RadioStatusIconClass, 
+RadioStatusIconShortTouch	method dynamic RadioStatusIconClass,
 					MSG_RADIO_STATUS_ICON_SHORT_TOUCH
 token	local	GeodeToken
 msg	local	word
@@ -2386,7 +2386,7 @@ PASS:		*ds:si	= RadioStatusIconClass object
 		ax	= message #
 RETURN:		nothing
 DESTROYED:	ax, cx, dx, bp
-SIDE EFFECTS:	
+SIDE EFFECTS:
 
 PSEUDO CODE/STRATEGY:
 
@@ -2394,12 +2394,12 @@ REVISION HISTORY:
 	Name		Date		Description
 	----		----		-----------
 	joon    	3/27/97   	Initial version
-	
+
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
 
 if RADIO_STATUS_ICON_ON_PRIMARY	;----------------------------
 
-RadioStatusIconLongTouch	method dynamic RadioStatusIconClass, 
+RadioStatusIconLongTouch	method dynamic RadioStatusIconClass,
 					MSG_RADIO_STATUS_ICON_LONG_TOUCH
 token	local	GeodeToken
 msg	local	word
@@ -2432,16 +2432,16 @@ CALLED BY:	RadioStatusIconShortTouch, RadioStatusIconLongTouch
 PASS:		inherit stack
 RETURN:		nothing
 DESTROYED:	ax,bx,cx,dx,si,di,ds,es
-SIDE EFFECTS:	
+SIDE EFFECTS:
 
 PSEUDO CODE/STRATEGY:
-		
+
 
 REVISION HISTORY:
 	Name		Date		Description
 	----		----		-----------
 	joon    	3/27/97    	Initial version
-	
+
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
 
 if RADIO_STATUS_ICON_ON_PRIMARY	;--------------------------
@@ -2484,7 +2484,7 @@ RadioStatusIconSendIACPMessage	proc	near
 	clr	cx
 	call	IACPShutdown
 	pop	bp
-done:	
+done:
 	.leave
 	ret
 RadioStatusIconSendIACPMessage	endp
@@ -2506,7 +2506,7 @@ PASS:		*ds:si	= RadioStatusIconClass object
 		ax	= message #
 RETURN:		nothing
 DESTROYED:	ax, cx, dx, bp
-SIDE EFFECTS:	
+SIDE EFFECTS:
 
 PSEUDO CODE/STRATEGY:
 
@@ -2514,16 +2514,16 @@ REVISION HISTORY:
 	Name		Date		Description
 	----		----		-----------
 	joon    	3/26/97   	Initial version
-	
+
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
 
 if RADIO_STATUS_ICON_ON_PRIMARY	;-----------------------------
 
-RadioStatusIconGainedSysTargetExcl	method dynamic RadioStatusIconClass, 
+RadioStatusIconGainedSysTargetExcl	method dynamic RadioStatusIconClass,
 					MSG_META_GAINED_SYS_TARGET_EXCL
 	mov	ds:[di].RSII_sysTarget, TRUE
 	cmp	ds:[di].RSII_radioStatus, PRS_CALL_IN_PROGRESS
-	jne	done	
+	jne	done
 
 	clr	ds:[di].RSII_iconCycleCount
 	GOTO	RadioStatusIconStartTimer
@@ -2548,7 +2548,7 @@ PASS:		*ds:si	= RadioStatusIconClass object
 		ax	= message #
 RETURN:		nothing
 DESTROYED:	ax, cx, dx, bp
-SIDE EFFECTS:	
+SIDE EFFECTS:
 
 PSEUDO CODE/STRATEGY:
 
@@ -2556,12 +2556,12 @@ REVISION HISTORY:
 	Name		Date		Description
 	----		----		-----------
 	joon    	3/26/97   	Initial version
-	
+
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
 
 if RADIO_STATUS_ICON_ON_PRIMARY	;---------------------------
 
-RadioStatusIconLostSysTargetExcl	method dynamic RadioStatusIconClass, 
+RadioStatusIconLostSysTargetExcl	method dynamic RadioStatusIconClass,
 					MSG_META_LOST_SYS_TARGET_EXCL
 	mov	ds:[di].RSII_sysTarget, FALSE
 
@@ -2591,16 +2591,16 @@ CALLED BY:	RadioStatusIconNotify,
 PASS:		*ds:si	= RadioStatusIconClass object
 RETURN:		nothing
 DESTROYED:	ax, bx, cx, dx, di
-SIDE EFFECTS:	
+SIDE EFFECTS:
 
 PSEUDO CODE/STRATEGY:
-		
+
 
 REVISION HISTORY:
 	Name		Date		Description
 	----		----		-----------
 	joon    	3/26/97    	Initial version
-	
+
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
 
 if RADIO_STATUS_ICON_ON_PRIMARY	;---------------------
@@ -2665,7 +2665,7 @@ REVISION HISTORY:
 
 ------------------------------------------------------------------------------@
 EnsureFileMenu	proc	near
-		
+
 if not _DISABLE_APP_EXIT_UI
 
 	call	AA_DerefVisSpec_DI
@@ -2808,11 +2808,11 @@ CALLED BY:	OLBaseWinUpdateWindow
 PASS:		*ds:si - OLBaseWinClass object
 		cx - UpdateWindowFlags
 
-RETURN:		nothing 
+RETURN:		nothing
 
 DESTROYED:	ax, dx, bp
 
-PSEUDO CODE/STRATEGY:	
+PSEUDO CODE/STRATEGY:
 
 KNOWN BUGS/SIDE EFFECTS/IDEAS:
 
@@ -2826,11 +2826,11 @@ OLBaseWinDetermineInitialMinimizedStatus	proc near
 
 		test	cx, mask UWF_RESTORING_FROM_STATE
 		jz	done
-		
+
 	;
 	; If we're not in transparent mode, then leave it the way it is.
 	;
-		
+
 		call	UserGetLaunchModel
 		cmp	al, UILM_TRANSPARENT
 		jne	done
@@ -2846,7 +2846,7 @@ OLBaseWinDetermineInitialMinimizedStatus	proc near
 		mov	ax, MSG_GEN_APPLICATION_GET_LAUNCH_FLAGS
 		call	UserCallApplication
 		pop	cx
-		
+
 		test	al, mask ALF_OPEN_IN_BACK
 		jnz	done
 
@@ -2907,7 +2907,7 @@ OLBaseWinUpdateWindow	method dynamic	OLBaseWinClass, MSG_META_UPDATE_WINDOW
 
 	; Attaching:
 	;
-		
+
 	push	ax, cx, dx
 
 	;
@@ -2920,7 +2920,7 @@ OLBaseWinUpdateWindow	method dynamic	OLBaseWinClass, MSG_META_UPDATE_WINDOW
 	; and then detached, then we want to come back full-sized.
 
 	call	OLBaseWinDetermineInitialMinimizedStatus
-		
+
 	; Decided here whether applications coming up for the first time
 	; should be maximized or not.  If restarting, leave in whatever state
 	; they were in.
@@ -3067,7 +3067,7 @@ COMMENT @----------------------------------------------------------------------
 FUNCTION:	OLBaseWinDetermineInitialMaximizedStatus
 
 DESCRIPTION:	Determine intitial MAXIMIZED status for this primary window.
-		At this time, always preserve state if restoring from state.  
+		At this time, always preserve state if restoring from state.
 		If coming up fresh, we generally rely on application hints,
 		though override forcing maximization in certain situations
 
@@ -3127,7 +3127,7 @@ else		; else of if (not _IGNORE_STATES_MAXIMIZING)
 	jz	done			; if not set, believe state.
 
 	;
-	; nuke this hint if it was there when we shut down, and 
+	; nuke this hint if it was there when we shut down, and
 	; just believe the sytem's defaults for bringing up the Primary
 	;
 	mov	ax, ATTR_GEN_DISPLAY_MAXIMIZED_STATE
@@ -3198,7 +3198,7 @@ PASS:		*ds:si	= OLBaseWinClass object
 		ax	= message #
 RETURN:		nothing
 DESTROYED:	ax, cx, dx, bp
-SIDE EFFECTS:	
+SIDE EFFECTS:
 
 PSEUDO CODE/STRATEGY:
 
@@ -3213,7 +3213,7 @@ OLBaseWinSpecUnbuild	method dynamic OLBaseWinClass, MSG_SPEC_UNBUILD
 
 	mov	di, offset OLBaseWinClass
 	call	ObjCallSuperNoLock
-	
+
 	;
 	; If we added objects to the primary during spec build,
 	; remove them now during unbuild
@@ -3267,11 +3267,11 @@ if _GCM
 afterLeftGCM:
 endif
 	mov	ax, TEMP_OL_BASE_WIN_HELP_TRIGGER
-	call	OLBWRSBO_destroyIfFound	
+	call	OLBWRSBO_destroyIfFound
 
 if _FLOATING_KEYBOARD_TRIGGER_ON_PRIMARY
 	mov	ax, TEMP_OL_BASE_WIN_KBD_TRIGGER
-	call	OLBWRSBO_destroyIfFound	
+	call	OLBWRSBO_destroyIfFound
 endif
 
 	mov	ax, TEMP_OL_BASE_WIN_FILE_MENU
@@ -3317,10 +3317,10 @@ CALLED BY:	OLBaseWinSpecUnbuild
 PASS:		*ds:si	- OLBaseWin object
 RETURN:		nothing
 DESTROYED:	ax, cx, dx, bp, ds
-SIDE EFFECTS:	
+SIDE EFFECTS:
 
 PSEUDO CODE/STRATEGY:
-		
+
 
 REVISION HISTORY:
 	Name	Date		Description
@@ -3348,7 +3348,7 @@ EnsureItemRemovedFromWindowList	proc	far
 	call	ObjMessage
 	pop	si
 
-	mov	cx, TRUE		; re-initialize list 
+	mov	cx, TRUE		; re-initialize list
 	call	UpdateTaskBarList
 done:
 	ret
@@ -3376,7 +3376,7 @@ PASS:		*ds:si -- object
 RETURN:		cx -- minimum width
 		dx -- minimum height
 
-DESTROYED:	
+DESTROYED:
 
 PSEUDO CODE/STRATEGY:
 
@@ -3471,7 +3471,7 @@ OLBaseWinMoveOffScreen	method dynamic	OLBaseWinClass, \
 
 if _NO_WIN_ICONS
 	; Since we do not create an icon when we minimize, we need to make
-	;     sure that some other object has the active focus/target. 
+	;     sure that some other object has the active focus/target.
 
 	clr	bx
 	call	GeodeGetAppObject
@@ -3500,7 +3500,7 @@ PASS:		*ds:si	= OLBaseWinClass object
 		ax	= message #
 RETURN:		nothing
 DESTROYED:	ax, cx, dx, bp
-SIDE EFFECTS:	
+SIDE EFFECTS:
 
 PSEUDO CODE/STRATEGY:
 
@@ -3511,7 +3511,7 @@ REVISION HISTORY:
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
 if PLACE_EXPRESS_MENU_ON_PRIMARY and (not TOOL_AREA_IS_TASK_BAR)
-OLBaseWinDisplaySetNotMinimized	method dynamic OLBaseWinClass, 
+OLBaseWinDisplaySetNotMinimized	method dynamic OLBaseWinClass,
 					MSG_GEN_DISPLAY_SET_NOT_MINIMIZED
 	mov	di, offset OLBaseWinClass
 	call	ObjCallSuperNoLock
@@ -3625,14 +3625,14 @@ if PLACE_EXPRESS_MENU_ON_PRIMARY
 	test	ds:[di].OLBWI_flags, mask OLBWF_REJECT_EXPRESS_TOOL_AREA
 	jz	haveExpress
 
-	call	OLBaseWinHideExpressToolArea
+	;call	OLBaseWinHideExpressToolArea
 	jmp	short afterExpressMenu
 
 haveExpress:
 endif ; PLACE_EXPRESS_MENU_ON_PRIMARY
 
 if PLACE_EXPRESS_MENU_ON_PRIMARY or TOOL_AREA_IS_TASK_BAR
-	; Set flag indicating we have the express tool area now, & 
+	; Set flag indicating we have the express tool area now, &
 	; move it to the correct place.
 	;
 	call	WinClasses_DerefVisSpec_DI
@@ -3645,7 +3645,7 @@ if PLACE_EXPRESS_MENU_ON_PRIMARY
 	; Cheat -- instead of doing full geometry, just update
 	; OLWI_titleBarBounds to reflect the addition of the express tool area.
 	;
-	call	OLBaseWinAdjustTitleBoundsForExpressToolArea
+	;call	OLBaseWinAdjustTitleBoundsForExpressToolArea
 
 if REDO_GEOMETRY_FOR_EXPRESS_MENU
 	; If we're putting the menu bar in the title area, we need to
@@ -3706,7 +3706,7 @@ OLRedoMenuBarGeometryIfMenusInHeader	proc	near
 	call	WinClasses_DerefVisSpec_DI
 	push	si
 	mov	bx, ds:[LMBH_handle]
-	mov	si, ds:[di].OLMDWI_menuBar		
+	mov	si, ds:[di].OLMDWI_menuBar
 	mov	cl, mask VOF_GEOMETRY_INVALID
 	mov	dl, VUM_NOW
 	mov	ax, MSG_VIS_MARK_INVALID
@@ -3730,10 +3730,10 @@ CALLED BY:	OLBaseWinGainedSystemTargetExcl
 PASS:		*ds:si	= instance data
 RETURN:		nothing
 DESTROYED:	ax, bx, cx, dx, di, bp
-SIDE EFFECTS:	
+SIDE EFFECTS:
 
 PSEUDO CODE/STRATEGY:
-		
+
 
 REVISION HISTORY:
 	Name	Date		Description
@@ -3935,16 +3935,16 @@ PASS:		*ds:si	= instance data
 		ax	= MSG_META_{GAINED/LOST}_SYS_TARGET_EXCL
 RETURN:		nothing
 DESTROYED:	nothing
-SIDE EFFECTS:	
+SIDE EFFECTS:
 
 PSEUDO CODE/STRATEGY:
-		
+
 
 REVISION HISTORY:
 	Name		Date		Description
 	----		----		-----------
 	joon    	3/26/97    	Initial version
-	
+
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
 
 if RADIO_STATUS_ICON_ON_PRIMARY	;----------------------
@@ -3978,16 +3978,16 @@ CALLED BY:	OLBaseWinSpecUnbuild, OLBaseWinUpdateWindow
 PASS:		*ds:si	= OLBaseWinClass instance data
 RETURN:		nothing
 DESTROYED:	nothing
-SIDE EFFECTS:	
+SIDE EFFECTS:
 
 PSEUDO CODE/STRATEGY:
-		
+
 
 REVISION HISTORY:
 	Name		Date		Description
 	----		----		-----------
 	joon    	3/26/97    	Initial version
-	
+
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
 
 if RADIO_STATUS_ICON_ON_PRIMARY	;-----------------------
@@ -4109,7 +4109,7 @@ ife (_DISABLE_APP_EXIT_UI)
 	cmp	ax, UILM_TRANSPARENT
 	jne	closeApp
 
-	; If in transparent mode, but closable apps are allowed, 
+	; If in transparent mode, but closable apps are allowed,
 	; then close the app, otherwise, just move it to the back
 	; (hide it)
 
@@ -4172,7 +4172,7 @@ RETURN:		nothing
 
 DESTROYED:	ax, cx, dx, bp
 
-SIDE EFFECTS:	
+SIDE EFFECTS:
 
 PSEUDO CODE/STRATEGY:
 
@@ -4252,13 +4252,13 @@ COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 SYNOPSIS:	Draw zoom lines before a window opens to indicate where
 		the window was opened from.
 
-CALLED BY:	
+CALLED BY:
 PASS:		*ds:si	= instance data
 		ax	= MSG_VIS_OPEN if opening zoom lines
 			  MSG_VIS_CLOSE if closing zoom lines
 RETURN:		nothing
 DESTROYED:	bx, cx, dx, di
-SIDE EFFECTS:	
+SIDE EFFECTS:
 
 PSEUDO CODE/STRATEGY:
 
@@ -4301,7 +4301,7 @@ endif	;_ROUND_THICK_DIALOGS
 ;
 ; If we are Zooming all primarys:  We want to stuff the hint with
 ; the mouses's position for opening.  If we are closing and can't
-; find the hint then it has been nuked by a transparent detatch, 
+; find the hint then it has been nuked by a transparent detatch,
 ; and so we want skip drawing the close lines.
 ; dlitwin 3/4/94
 ;
@@ -4316,7 +4316,7 @@ LONG	je	done
 gotVarData:
 else						; else of if _ZOOM_ALL_PRIMARYS
 ;
-; If not zooming all primarys then we exit if we don't find the 
+; If not zooming all primarys then we exit if we don't find the
 ; hint.
 ;
 	LONG	jnc	done
@@ -4328,7 +4328,7 @@ if	 _ROUND_THICK_DIALOGS
 	; pointing to object.
 	;
 	mov	ss:[zoomRegionOffset], offset RoundedPrimaryResizeRegion
-	call	OpenWinShouldHaveRoundBorderFar	
+	call	OpenWinShouldHaveRoundBorderFar
 	jc	useRoundBorder
 	mov	ss:[zoomRegionOffset], offset PrimaryResizeRegion
 
@@ -4428,7 +4428,7 @@ lineLoop:
 	push	bp				; save stack frame pointer
 	push	cx				; pass mouse x-position
 	push	dx				; pass mouse y-position
-	
+
 	mov	ax, ss:[zoomLine].R_left	; get bounds for zoom-lines
 	mov	bx, ss:[zoomLine].R_top		;
 	mov	cx, ss:[zoomLine].R_right	;
@@ -4466,7 +4466,7 @@ nextLine:
 	mov	ss:[zoomLine].R_right, cx	;
 	add	dx, ss:[zoomIncrement].R_bottom	;
 	mov	ss:[zoomLine].R_bottom, dx	;
-	
+
 	call	ImStopMoveResize		; erase previous zoom-lines
 
 	dec	ss:[lineCount]			; decrement line count
@@ -4504,7 +4504,7 @@ PASS:		*ds:si	= GenPrimary
 RETURN:		ds:bx	= set to mouse position
 DESTROYED:	ax, cx, dx
 
-SIDE EFFECTS:	
+SIDE EFFECTS:
 PSEUDO CODE/STRATEGY:
 
 REVISION HISTORY:
@@ -4519,7 +4519,7 @@ ZoomLinesStuffPositionHint	proc	near
 	mov	ax, HINT_PRIMARY_OPEN_ICON_BOUNDS
 	mov	cx, size Rectangle
 	call	ObjVarAddData
-	
+
 	call	ImGetMousePos
 	mov	ds:[bx].R_left, cx
 	mov	ds:[bx].R_right, cx
@@ -4654,7 +4654,7 @@ OLBaseWinGupQuery	endp
 
 COMMENT @----------------------------------------------------------------------
 
-METHOD:		OLBaseWinUseLongTermMoniker -- 
+METHOD:		OLBaseWinUseLongTermMoniker --
 		MSG_GEN_PRIMARY_USE_LONG_TERM_MONIKER for OLBaseWinClass
 
 DESCRIPTION:	Switch to specific long term moniker.
@@ -4668,7 +4668,7 @@ PASS:		*ds:si 	- instance data
 RETURN:		nothing
 		ax, cx, dx, bp - destroyed
 
-ALLOWED TO DESTROY:	
+ALLOWED TO DESTROY:
 		bx, si, di, ds, es
 
 REGISTER/STACK USAGE:
@@ -4914,11 +4914,11 @@ if (not TOOL_AREA_IS_TASK_BAR)
 	;Must match similar code in EnableDisableAndPosSysIcon.
 
 	call	OpenWinCheckIfSquished		; running CGA?
-	jc	5$				; yes, skip this   
-	call	OpenWinCheckMenusInHeader	; are we in the header?    
-	jnc	5$				; nope, done		   
+	jc	5$				; yes, skip this
+	call	OpenWinCheckMenusInHeader	; are we in the header?
+	jnc	5$				; nope, done
 	add	cx, 3				; else expand to match menu bar
-5$:								       
+5$:
 MO <	push	ds							>
 MO <	mov	ax, segment dgroup					>
 MO <	mov	ds, ax							>
@@ -4970,8 +4970,8 @@ PASS:		*ds:si	= OLBaseWinClass object
 		es 	= segment of OLBaseWinClass
 		ax	= message #
 RETURN:		nothing
-DESTROYED:	
-SIDE EFFECTS:	
+DESTROYED:
+SIDE EFFECTS:
 
 PSEUDO CODE/STRATEGY:
 
@@ -4982,7 +4982,7 @@ REVISION HISTORY:
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
 if EVENT_MENU
-OLBaseWinUpdateToolAreas	method dynamic OLBaseWinClass, 
+OLBaseWinUpdateToolAreas	method dynamic OLBaseWinClass,
 					MSG_OL_BASE_WIN_UPDATE_TOOL_AREAS
 
 	mov	cl, mask VOF_IMAGE_INVALID
@@ -5120,7 +5120,7 @@ CUAS <	mov	ax, CUAS_GCM_HEADER_HEIGHT				>
 	jnc	10$
 CUAS <	mov	ax, CUAS_GCM_CGA_HEADER_HEIGHT				>
 10$:
-	
+
 OLS <	add	ds:[di].OLWI_titleBarBounds.R_left, OLS_GCM_HEADER_ICON_WIDTH+4>
 CUAS <	add	ds:[di].OLWI_titleBarBounds.R_left, CUAS_GCM_HEADER_ICON_WIDTH >
 					;reduce the size of the title area
@@ -5185,7 +5185,7 @@ PASS:		*ds:si	= OLBaseWinClass object
 		ax	= message #
 RETURN:		nothing
 DESTROYED:	ax, cx, dx, bp
-SIDE EFFECTS:	
+SIDE EFFECTS:
 
 PSEUDO CODE/STRATEGY:
 
@@ -5195,7 +5195,7 @@ REVISION HISTORY:
 	brianc	12/21/94   	Initial version
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
-OLBaseWinUpdateForTitleGroup	method dynamic OLBaseWinClass, 
+OLBaseWinUpdateForTitleGroup	method dynamic OLBaseWinClass,
 					MSG_OL_WIN_UPDATE_FOR_TITLE_GROUP
 	.enter
 	;
@@ -5223,7 +5223,7 @@ WinClasses segment resource
 
 COMMENT @----------------------------------------------------------------------
 
-METHOD:		OLBaseWinGetHeaderTitleBounds -- 
+METHOD:		OLBaseWinGetHeaderTitleBounds --
 		MSG_OL_WIN_GET_HEADER_TITLE_BOUNDS for OLBaseWinClass
 
 DESCRIPTION:	Returns widths of icons left and right of title bar.
@@ -5236,7 +5236,7 @@ RETURN:		ax 	- width of icons left of title
 		bp	- width of icons right of title
 		cx, dx	- preserved
 
-ALLOWED TO DESTROY:	
+ALLOWED TO DESTROY:
 		bx, si, di, ds, es
 
 REGISTER/STACK USAGE:
@@ -5262,7 +5262,7 @@ if _GCM	;----------------------------------------------------------------------
 						;call superclass to get
 						;	system menu icon width
 endif	; if _GCM -------------------------------------------------------------
-		
+
 	mov	ax, MSG_OL_WIN_GET_HEADER_TITLE_BOUNDS
 	call	WinClasses_ObjCallSuperNoLock_OLBaseWinClass
 						;ax, bp = widths
@@ -5366,7 +5366,7 @@ endif
 if TOOL_AREA_IS_TASK_BAR
 OLWinGetToolAreaSize	proc	far
 	uses	ax, bx, di, bp
-	.enter	
+	.enter
 
 	;
 	; doesn't work from UI thread, so return 0 as size
@@ -5580,11 +5580,11 @@ PASS:		*ds:si	= OLBaseWin object
 
 RETURN:		nothing
 
-ALLOWED TO DESTROY:	
+ALLOWED TO DESTROY:
 		ax, cx, dx, bp
 		bx, si, di, ds, es
 
-SIDE EFFECTS:	
+SIDE EFFECTS:
 
 PSEUDO CODE/STRATEGY:
 
@@ -5629,7 +5629,7 @@ PASS:		*ds:si	= OLBaseWinClass object
 		bp	= change specific data
 RETURN:		nothing
 DESTROYED:	nothing
-SIDE EFFECTS:	
+SIDE EFFECTS:
 
 PSEUDO CODE/STRATEGY:
 
@@ -5640,7 +5640,7 @@ REVISION HISTORY:
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
 if _DUI
-OLBaseWinMetaNotify	method dynamic OLBaseWinClass, 
+OLBaseWinMetaNotify	method dynamic OLBaseWinClass,
 					MSG_META_NOTIFY
 		uses	ax, cx, dx, bp
 		.enter

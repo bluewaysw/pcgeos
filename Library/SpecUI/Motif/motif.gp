@@ -178,6 +178,9 @@ resource ControlInfoXIP read-only shared
 endif
 resource CommonUIClassStructures fixed read-only shared
 
+resource ExitResource shared read-only ui-object
+
+
 #
 # Export routines called by UI, by offset (*must* be first)
 #
@@ -220,9 +223,10 @@ export SpecGetWindowOptions
 # Other things the specific UI needs to export
 #
 export ToolAreaClass
+export WindowListDialogClass
 export OLFSDynamicListClass
 # see /staff/pcgeos/Include/Internal/specUI.def for why this skip is here
-skip 2
+skip 1
 
 #
 # This comes after four classes are exported, so the SpecificUIRoutine enum
@@ -240,10 +244,14 @@ export VisKeyboardClass
 export VisCharTableClass
 export VisHWRGridClass
 export HWRGridContextTextClass
+skip 1
+export WindowListListClass
+export TaskBarListClass
+export SysTrayInteractionClass
 
-skip 1
+#skip 1
 #export SysTrayInteractionClass
-skip 1
+#skip 1
 
 #
 # READ ME:
