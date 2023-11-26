@@ -1253,8 +1253,10 @@ LibFindBestFace	proc	far
 
 	mov	cx, es:GS_fontAttr.FCA_fontID	;cx <- font to find
 	movwbf	dxah, es:GS_fontAttr.FCA_pointsize
-	mov	al, es:GS_fontAttr.FCA_textStyle
+	mov	bl, es:GS_fontAttr.FCA_textStyle
+	mov	al, bl
 	andnf	al, not KERNEL_STYLES		;al <- no kernel styles
+	push	bx
 	;
 	; See if the font is even available.
 	;
@@ -1276,6 +1278,9 @@ useDefaultFont:
 DBCS <	mov	bh, FCS_ASCII			;bh <- FontCharSet of default>
 foundFont:
 DBCS <	mov	es:GS_fontAttr.FCA_charSet, bh				>
+	pop	bx
+	and	bl, KERNEL_STYLES
+	or	al, bl
 	mov	es:GS_fontAttr.FCA_textStyle, al
 	movwbf	es:GS_fontAttr.FCA_pointsize, dxah
 	mov	es:GS_fontAttr.FCA_weight, FW_NORMAL
