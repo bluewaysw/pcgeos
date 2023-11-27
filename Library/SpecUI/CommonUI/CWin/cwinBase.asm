@@ -2956,6 +2956,8 @@ if RADIO_STATUS_ICON_ON_PRIMARY
 endif
 
 ISU <	call	EnsureItemRemovedFromWindowList				>
+MO  <	call	EnsureItemRemovedFromWindowList				>
+
 	jmp	short done
 
 notDetaching:
@@ -2963,6 +2965,12 @@ notDetaching:
 ISU <	test	cx, mask UWF_ATTACHING					>
 ISU <	jz	done							>
 ISU <	call	EnsureItemAddedToWindowList				>
+
+MO  <	test	cx, mask UWF_ATTACHING					>
+MO  <	jz	done							>
+MO  <	call	EnsureItemAddedToWindowList				>
+
+
 
 done:
 	ret
@@ -3225,6 +3233,7 @@ if RADIO_STATUS_ICON_ON_PRIMARY
 endif
 
 ISU <	call	EnsureItemRemovedFromWindowList				>
+MO  <	call	EnsureItemRemovedFromWindowList				>
 	ret
 OLBaseWinSpecUnbuild	endm
 
@@ -3329,7 +3338,7 @@ REVISION HISTORY:
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
 
-if _ISUI ;--------------------------------------------------------------------
+;if _ISUI ;--------------------------------------------------------------------
 
 EnsureItemRemovedFromWindowList	proc	far
 	clr	bx
@@ -3354,7 +3363,7 @@ done:
 	ret
 EnsureItemRemovedFromWindowList	endp
 
-endif	;----------------------------------------------------------------------
+;endif	;----------------------------------------------------------------------
 
 Unbuild ends
 
@@ -3684,12 +3693,12 @@ OLBaseWinGainedSystemTargetExcl	endp
 
 UpdateAppMenuItemCommon	proc	far
 
-if _ISUI
+;if _ISUI
 	push	cx
 	mov	ax, MSG_OL_BASE_WIN_UPDATE_WINDOW_ENTRY
 	call	ObjCallInstanceNoLock
 	pop	cx
-endif
+;endif
 	mov	ax, MSG_OL_APP_UPDATE_TASK_ENTRY
 	call	GenCallApplication
 	ret
