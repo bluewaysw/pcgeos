@@ -35,19 +35,19 @@ Document is work in progress.... stay tuned!
 
 ## Building PC/GEOS SDK
 Build pmake tool:
-- `cd pcgeos/Tools/pmake/pmake`
+- `cd %ROOT_DIR%/Tools/pmake/pmake`
 - `wmake install`
 
 Build all the other SDK Tools:
-- `cd pcgeos/Installed/Tools`
+- `cd %ROOT_DIR%/Installed/Tools`
 - `pmake install`
 
 Build all PC/GEOS (target) components:
-- `cd pcgeos/Installed`
+- `cd %ROOT_DIR%/Installed`
 - `pmake`
 
 Build the target environment:
-- `cd pcgeos/Tools/build/product/bbxensem/Scripts`
+- `cd %ROOT_DIR%/Tools/build/product/bbxensem/Scripts`
 - `perl -I. buildbbx.pl`
   - the answers to the questions from the above perl-script are:
     - nt (for the platform)
@@ -60,8 +60,7 @@ Build the target environment:
 
 Launch the target environment in dosbox:
 - make sure dosbox is added to your path variable, or [pcgeos-basebox](https://github.com/bluewaysw/pcgeos-basebox/tags) is installed and configured using BASEBOX environmental variable
-- `cd pcgeos`
-- `bin/target`
+- `%ROOT_DIR%/bin/target`
   - the "swat" debugger stops immediately after the first stage of the boot process
   - enter `quit` at the "=>" prompt to detach the debugger and launch PC/GEOS stand-alone
     - or: enter `c` to launch with the debugger running in the background (slower)
@@ -77,20 +76,9 @@ If you want to customize the target environment settings only for yourself, you 
 
 # How to develop?
 
-PC/GEOS comes with extensive technical documentation that describes tools, programming languages and API calls from the perspective of an SDK user. This documentation can be found in the `TechDocs` folder and is available in Markdown format. Here are some entry points to the main volumes:
+PC/GEOS comes with extensive technical documentation that describes tools, programming languages and API calls from the perspective of an SDK user. This documentation can be found in the `TechDocs` folder and is available in Markdown format.
 
-- Introduction
-  - [Tutorial](TechDocs/Markdown/tutorial.md) - the initial chapters describing the development environment are somewhat outdated, and still refer to the original two-machine setup for debugging, but this nevertheless gives a good idea of overall development process.
-  - [Concepts](TechDocs/Markdown/concepts.md)
-  - [Tools](TechDocs/Markdown/tools.md)
-- C development
-  - [GOC keywords and API calls](TechDocs/Markdown/routines.md)
-  - [Objects Reference](TechDocs/Markdown/objects.md)
-  - [Quick Reference](TechDocs/Markdown/quickref.md)
-- Assembly development
-  - [ESP Assembly Language](TechDocs/Markdown/esp.md)
-  - [Assembly Reference](TechDocs/Markdown/asmref.md)
-  - [Driver Development Kit](TechDocs/Markdown/ddk.md)
+You can find a browseable, searchable version of the documentation here: https://bluewaysw.github.io/pcgeos/
 
 ##
 We are on https://bluewaysw.slack.com/ for more efficient collaboration. Please register at https://blog.bluewaysw.de for MyGEOS and use the Slack section and receive access to our developer community. Welcome!

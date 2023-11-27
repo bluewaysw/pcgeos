@@ -45,7 +45,7 @@ Then it discusses how to manage generic UI objects (using a dialog box as an
 example) in [section 12.2](#122-arranging-your-generic-objects). For the hints 
 you can apply to window objects, see [section 12.3](#123-positioning-and-sizing-windows). 
 For descriptions of managing the geometry of visible object trees and composites, see 
-["VisClass," Chapter 23 of the Object Reference Book](../Objects/oviscla.md).
+["VisClass," Chapter 23 of the Object Reference Book](../Objects/ovis.md).
 
 #### 12.1.1 Geometry Manager Features
 
@@ -765,7 +765,7 @@ HINT_CENTER_MONIKER. Figure 12-9 shows several different moniker
 placements.
 
 ![](Art/figure_12-9.png)
-![](Art/figure_12-9a-png)
+![](Art/figure_12-9a.png)
 
 **Figure 12-9** Placing Monikers  
 _The top-left has the moniker placed to the left by default. The second uses 

@@ -641,7 +641,7 @@ must be passed a structure of CSRegisterClientArgs containing (among
 other things) the address of the callback routine with which CardServices
 should contact the driver. CardServices will send CardServicesEventCode
 types to this callback routine. (For more information on defining your
-callback routine see [“CardServices Events”](34-CardService-Events).)  
+callback routine see [“CardServices Events”](#34-CardService-Events).)  
 This registration should occur when the driver is first loaded, upon receipt of
 DR_INIT.
 ~~~

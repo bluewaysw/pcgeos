@@ -372,6 +372,10 @@ typedef struct {
     sdword      DWF_int;
 } DWFixed;
 
+typedef struct {
+    dword       DDF_frac;
+    sdword      DDF_int;	
+} DDFixed;
 
 typedef WordFlags CPUFlags;
 #define CPU_OVERFLOW_OFFSET     (11)

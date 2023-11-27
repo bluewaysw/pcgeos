@@ -363,7 +363,7 @@ of the Object Reference Book.
 Geodes that wish to allow the user to edit graphical elements would do well 
 to incorporate a Graphic Object into their hierarchies. These objects have 
 considerable power and include UI to allow the user to work graphics within 
-them. See ["Graphic Object Library," Chapter 18](../Objects/cgrobj.md) of the 
+them. See ["Graphic Object Library," Chapter 18](../Objects/ogrobj.md) of the 
 Object Reference Book for more information about these object classes.
 
 As you learn more advanced graphics concepts you may discover shortcuts. 
@@ -426,7 +426,7 @@ graphics system will do all the worrying about device coordinates so your
 program doesn't have to. (Note, however, that **GrDrawImage()**, 
 **GrDrawHugeImage()**, and **GrBrushPolyline()** are more device-dependant than most 
 routines; see section [24.2.10 of chapter 24](cshapes.md#24210-drawing-bitmaps) and 
-[section 24.2.8 of chapter 24](2428-polylines-and-polygons) for information on these routines).
+[section 24.2.8 of chapter 24](cshapes.md#2428-polylines-and-polygons) for information on these routines).
 
 Standard GEOS coordinates depart from the device model, taking an 
 approach closer to a pure mathematical Cartesian plane. Programmers used 

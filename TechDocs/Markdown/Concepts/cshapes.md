@@ -138,7 +138,7 @@ GrDrawArc(), GrFillArc()
 
 An arc is a partial ellipse. An arc is defined in terms of its base ellipse, the 
 angle at which to start drawing the arc, and the angle at which to stop 
-drawing. Angles are counted in degrees counter-clockwise with 0° 
+drawing. Angles are counted in degrees counter-clockwise with 0ï¿½ 
 corresponding to the positive x axis (i.e., "3 o'clock").
 
 ![](Art/figure_24-5.png)  
@@ -267,23 +267,23 @@ where speed is a top priority.
 To find out whether a given point falls within a polygon, call 
 **GrTestPointInPolygon()**.
 
-#### 24.2.9 Bézier Curves and Splines
+#### 24.2.9 BÃ©zier Curves and Splines
 
 GrDrawCurve(), GrDrawCurveTo(), GrDrawSpline(), 
 GrDrawSplineTo(), GrDrawRelCurveTo()
 
-Bézier curves are mathematical constructs which provide a cheap and easy 
+BÃ©zier curves are mathematical constructs which provide a cheap and easy 
 way to define smooth curves in a manner that computers can understand. 
-There are other ways to define curves to computers, but the Bézier was 
+There are other ways to define curves to computers, but the BÃ©zier was 
 chosen for the GEOS kernel because it is used in many standard font 
 description formats. Splines, as implemented in GEOS, are created by 
 drawing curves in sequence.
 
 ![](Art/figure_24-10.png)  
-**Figure 24-10** Splines and Bézier Curves  
+**Figure 24-10** Splines and BÃ©zier Curves  
 _Curves and a spline, shown here with control points._
 
-Bézier curves are defined in terms of four points. Two of these points are the 
+BÃ©zier curves are defined in terms of four points. Two of these points are the 
 endpoints, known as anchor points. The other two points are known as 
 control points, one associated with each anchor point. The curve extends from 
 anchor point to anchor point. The line between an anchor point and its 
@@ -294,7 +294,7 @@ anchor point. A control point at zero distance from its anchor point won't
 affect the curve; if both control points are at zero distance from their anchors, 
 the result will be a straight line segment.
 
-**GrDrawCurve()** draws a Bézier curve. It takes four points as arguments, 
+**GrDrawCurve()** draws a BÃ©zier curve. It takes four points as arguments, 
 using the first and last as anchor points and the middle two as control points. 
 **GrDrawCurveTo()** draws a curve but uses the current pen position as the 
 first anchor point, setting the pen position to the second anchor point after 
@@ -314,8 +314,8 @@ this function the array should start with the first control point, and there
 should be 3n points passed.
 
 ![](Art/equation_24-1.png)  
-**Equation 24-1** Bézier Curve Equations  
-_Coordinates of the points of a Bézier curve can be expressed by parametric 
+**Equation 24-1** Bï¿½zier Curve Equations  
+_Coordinates of the points of a Bï¿½zier curve can be expressed by parametric 
 equations. The equation for both x and y is given in two forms here, one a 
 rearrangement of the other._
 
@@ -836,7 +836,7 @@ that the "T" and "o" are closer together than normal leading
 would dictate. Do not confuse kerned pairs with ligatures. A 
 kerned pair just has strange spacing (e.g. "To" vs. "To"); a 
 ligature is a pair of characters which have been combined into 
-one (e.g. "¿" and "æ").
+one (e.g. "ï¿½" and "ï¿½").
 
 **Driver**  
 The font driver associated with the font, specified by a member 
@@ -1178,7 +1178,7 @@ Figure 24-22.
 ![](Art/figure_24-22.png)  
 **Figure 24-22** Custom Hatch Patterns  
 _This simple hatch pattern is made up of three line families. The 
-measurements used to compute the 120° family are illustrated to the right. 
+measurements used to compute the 120ï¿½ family are illustrated to the right. 
 Full measurements are shown below._
 |Origin |DeltaX, DeltaY |Angle |numDash; Dashes |
 |:------|:--------------|:-----|:---------------|
