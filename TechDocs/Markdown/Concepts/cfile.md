@@ -1837,7 +1837,7 @@ If you want to find out the handle of the disk containing an open file, call
 **FileGetDiskHandle()**. This routine is passed the file handle; it returns the disk 
 handle. This is useful if the geode has to prepare for a shutdown; it can get the 
 disk handle with **FileGetDiskHandle()**, then save that handle with **DiskSave()** (see 
-["Saving and Restoring a Disk Handle"](17323-saving-and-restoring-a-disk-handle)). With 
+["Saving and Restoring a Disk Handle"](#17323-saving-and-restoring-a-disk-handle)). With 
 this information (and the file name), the geode will be able to reopen the file 
 when it restarts.
 

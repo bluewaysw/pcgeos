@@ -109,7 +109,7 @@
     UShort  n;
 
 
-    for ( n = 0; n < face->hdmx.num_records; n++ )
+    for ( n = 0; n < face->hdmx.num_records; ++n )
       if ( face->hdmx.records[n].ppem == ppem )
         return face->hdmx.records[n].widths;
 
@@ -141,11 +141,11 @@
 
 
     if ( delta_x )
-      for ( k = 0; k < n; k++ )
+      for ( k = 0; k < n; ++k )
         coords[k].x += delta_x;
 
     if ( delta_y )
-      for ( k = 0; k < n; k++ )
+      for ( k = 0; k < n; ++k )
         coords[k].y += delta_y;
   }
 
@@ -210,10 +210,10 @@
     mount_zone( &subg->zone, &exec->pts );
 
     /* reading the contours endpoints */
-    if ( ACCESS_Frame( (n_contours + 1) * 2L ) )
+    if ( ACCESS_Frame( (n_contours + 1) << 1 ) )
       return error;
 
-    for ( k = 0; k < n_contours; k++ )
+    for ( k = 0; k < n_contours; ++k )
       exec->pts.contours[k] = GET_UShort();
 
 
@@ -257,7 +257,7 @@
       Byte  c, cnt;
 
       flag[j] = c = GET_Byte();
-      j++;
+      ++j;
 
       if ( c & 8 )
       {
@@ -265,7 +265,7 @@
         while( cnt > 0 )
         {
           flag[j++] = c;
-          cnt--;
+          --cnt;
         }
       }
     }
@@ -275,7 +275,7 @@
     x    = 0;
     vec  = exec->pts.org;
 
-    for ( j = 0; j < n_points; j++ )
+    for ( j = 0; j < n_points; ++j )
     {
       if ( flag[j] & 2 )
       {
@@ -298,7 +298,7 @@
 
     y    = 0;
 
-    for ( j = 0; j < n_points; j++ )
+    for ( j = 0; j < n_points; ++j )
     {
       if ( flag[j] & 4 )
       {
@@ -331,7 +331,7 @@
 
     /* clear the touch flags */
 
-    for ( j = 0; j < n_points; j++ )
+    for ( j = 0; j < n_points; ++j )
       exec->pts.touch[j] &= TT_Flag_On_Curve;
 
     exec->pts.touch[n_points    ] = 0;
@@ -357,7 +357,7 @@
     {
      /* first scale the glyph points */
 
-      for ( j = 0; j < n_points; j++ )
+      for ( j = 0; j < n_points; ++j )
       {
         pts->org[j].x = Scale_X( &exec->metrics, pts->org[j].x );
         pts->org[j].y = Scale_Y( &exec->metrics, pts->org[j].y );
@@ -469,7 +469,7 @@
       pts->cur[n_points - 1].x = (subg->pp2.x + 32) & -64;
     }
 
-    for ( k = 0; k < n_points; k++ )
+    for ( k = 0; k < n_points; ++k )
       pts->touch[k] &= TT_Flag_On_Curve;
 
     cur_to_org( n_points, pts );
@@ -840,7 +840,7 @@
       case Load_Composite:
 
         /* create a new element on the stack */
-        load_top++;
+        ++load_top;
 
         if ( load_top > face->maxComponents )
         {
@@ -963,7 +963,7 @@
         {
           subglyph2 = subglyph;
 
-          load_top--;
+          --load_top;
           subglyph = exec->loadStack + load_top;
 
           /* check advance width and left side bearing */
@@ -998,7 +998,7 @@
 
           num_elem_points = subglyph->zone.n_points;
 
-          for ( k = 0; k < num_contours; k++ )
+          for ( k = 0; k < num_contours; ++k )
             subglyph2->zone.contours[k] += num_elem_points;
 
           subglyph->zone.n_points   += num_points;
@@ -1091,13 +1091,13 @@
 
     exec->pts = base_pts;
 
-    for ( u = 0; u < num_points + 2; u++ )
+    for ( u = 0; u < num_points + 2; ++u )
     {
       glyph->outline.points[u] = exec->pts.cur[u];
       glyph->outline.flags [u] = exec->pts.touch[u];
     }
 
-    for ( k = 0; k < num_contours; k++ )
+    for ( k = 0; k < num_contours; ++k )
       glyph->outline.contours[k] = exec->pts.contours[k];
 
     glyph->outline.n_points    = num_points;
@@ -1186,7 +1186,7 @@
         /*        here with :                                     */
         /*             ascender - descender + linegap             */
         /*                                                        */
-        top_bearing    = (Short) (face->os2.sTypoLineGap / 2);
+        top_bearing    = (Short) (face->os2.sTypoLineGap >> 1 );
         advance_height = (UShort)(face->os2.sTypoAscender -
                                   face->os2.sTypoDescender +
                                   face->os2.sTypoLineGap);
@@ -1219,7 +1219,7 @@
       /* XXX : for now, we have no better algo for the lsb, but it should */
       /*       work ok..                                                  */
       /*                                                                  */
-      left = ( glyph->metrics.bbox.xMin - glyph->metrics.bbox.xMax ) / 2;
+      left = ( glyph->metrics.bbox.xMin - glyph->metrics.bbox.xMax ) >> 1;
 
       /* grid-fit them if necessary */
       if ( subglyph->is_hinted )

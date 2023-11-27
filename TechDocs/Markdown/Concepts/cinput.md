@@ -766,7 +766,7 @@ pre-passive grab allows the visible object to receive keyboard events before
 the focus object gets them. A post-passive grab delivers events to the visible 
 object after they have been sent to the focus. For more information about 
 gaining and releasing the passive keyboard grabs, see ["VisClass," Chapter 23 
-of the Object Reference Book](../Object/ovis.md).
+of the Object Reference Book](../Objects/ovis.md).
 
 If you intercept keyboard events, you must be sure to return any events that 
 you don't use. For example, if you only want to detect when the user hits the 

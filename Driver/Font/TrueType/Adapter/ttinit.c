@@ -392,7 +392,7 @@ EC(     ECCheckFileHandle( truetypeFile ) );
 			{
 				goto Fail;
 			}
-			outlineData++;
+			++outlineData;
 		}
 
 		/* not found append new outline entry */
@@ -756,7 +756,7 @@ EC(     ECCheckBounds( (void*)fontHeader ) );
         TT_New_Instance( FACE, &INSTANCE );
         TT_New_Glyph( FACE, &GLYPH );
 
-        for ( geosChar = fontHeader->FH_firstChar; geosChar < fontHeader->FH_lastChar; geosChar++ )
+        for ( geosChar = fontHeader->FH_firstChar; geosChar < fontHeader->FH_lastChar; ++geosChar )
         {
                 word unicode = GeosCharToUnicode( geosChar );
 
@@ -823,23 +823,15 @@ EC(     ECCheckBounds( (void*)fontHeader ) );
         TT_Done_Glyph( GLYPH );
         TT_Done_Instance( INSTANCE );
 
-        fontHeader->FH_avgwidth = FACE_PROPERTIES.os2->xAvgCharWidth;
-        fontHeader->FH_maxwidth = FACE_PROPERTIES.horizontal->advance_Width_Max;
-
-        fontHeader->FH_accent = fontHeader->FH_accent - fontHeader->FH_ascent;    
+        fontHeader->FH_avgwidth   = FACE_PROPERTIES.os2->xAvgCharWidth;
+        fontHeader->FH_maxwidth   = FACE_PROPERTIES.horizontal->advance_Width_Max;
+        fontHeader->FH_accent     = fontHeader->FH_accent - fontHeader->FH_ascent;    
         fontHeader->FH_baseAdjust = BASELINE( UNITS_PER_EM ) - fontHeader->FH_ascent - fontHeader->FH_accent;
-        fontHeader->FH_height = fontHeader->FH_maxBSB + fontHeader->FH_ascent + DESCENT( UNITS_PER_EM ) - SAFETY( UNITS_PER_EM );
-        fontHeader->FH_minTSB = fontHeader->FH_minTSB - BASELINE( UNITS_PER_EM );
-        fontHeader->FH_maxBSB = fontHeader->FH_maxBSB - ( DESCENT( UNITS_PER_EM ) - SAFETY( UNITS_PER_EM ) );
-
-        fontHeader->FH_underPos = -FACE_PROPERTIES.postscript->underlinePosition;
-        if( fontHeader->FH_underPos == 0 )
-                fontHeader->FH_underPos = DEFAULT_UNDER_POSITION( UNITS_PER_EM );
-        fontHeader->FH_underPos = fontHeader->FH_underPos + fontHeader->FH_accent + fontHeader->FH_ascent;
-
-        fontHeader->FH_underThick = FACE_PROPERTIES.postscript->underlineThickness; 
-        if( fontHeader->FH_underThick == 0 )
-                fontHeader->FH_underThick = DEFAULT_UNDER_THICK( UNITS_PER_EM );
+        fontHeader->FH_height     = fontHeader->FH_maxBSB + fontHeader->FH_ascent + DESCENT( UNITS_PER_EM ) - SAFETY( UNITS_PER_EM );
+        fontHeader->FH_minTSB     = fontHeader->FH_minTSB - BASELINE( UNITS_PER_EM );
+        fontHeader->FH_maxBSB     = fontHeader->FH_maxBSB - ( DESCENT( UNITS_PER_EM ) - SAFETY( UNITS_PER_EM ) );
+        fontHeader->FH_underPos   = DEFAULT_UNDER_POSITION( UNITS_PER_EM ) + fontHeader->FH_accent + fontHeader->FH_ascent;
+        fontHeader->FH_underThick = DEFAULT_UNDER_THICK( UNITS_PER_EM );
         
         if( fontHeader->FH_x_height > 0 )
                 fontHeader->FH_strikePos = 3 * fontHeader->FH_x_height / 5;
@@ -909,7 +901,7 @@ static word GetKernCount( TRUETYPE_VARS )
                 goto Fail;
 
         /* search for format 0 subtable */
-        for( table = 0; table < kerningDir.nTables; table++ )
+        for( table = 0; table < kerningDir.nTables; ++table )
         {
                 word i;
 
@@ -923,11 +915,11 @@ static word GetKernCount( TRUETYPE_VARS )
                 if( kerningDir.tables->t.kern0.pairs[i].value > 0 )
                         continue;
 
-                for( i = 0; i < kerningDir.tables->t.kern0.nPairs; i++ )
+                for( i = 0; i < kerningDir.tables->t.kern0.nPairs; ++i )
                 {
                         if( isGeosCharPair( kerningDir.tables->t.kern0.pairs[i].left,
                                         kerningDir.tables->t.kern0.pairs[i].right ) )
-                                numGeosKernPairs++;
+                                ++numGeosKernPairs;
                 }
         }
 
@@ -961,8 +953,8 @@ static int strcmp( const char* s1, const char* s2 )
 {
         while ( *s1 && ( *s1 == *s2 ) )
         {
-                s1++;
-                s2++;
+                ++s1;
+                ++s2;
         }
         return *(const unsigned char*)s1 - *(const unsigned char*)s2;
 }

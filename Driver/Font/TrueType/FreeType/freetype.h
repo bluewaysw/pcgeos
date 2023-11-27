@@ -741,11 +741,11 @@
   EXPORT_DEF
   TT_Error  TT_Set_Instance_CharSize( TT_Instance  instance,
                                       TT_F26Dot6   charSize );
-
+  /*
   EXPORT_DEF
   TT_Error  TT_Set_Instance_CharSizes( TT_Instance  instance,
                                        TT_F26Dot6   charWidth,
-                                       TT_F26Dot6   charHeight );
+                                       TT_F26Dot6   charHeight ); */
 
 #define TT_Set_Instance_PointSize( ins, ptsize )   \
             TT_Set_Instance_CharSize( ins, ptsize*64L )

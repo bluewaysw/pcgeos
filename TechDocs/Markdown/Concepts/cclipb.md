@@ -605,7 +605,7 @@ Code Display 7-5 Handling Clipboard Changes
 As stated above, most applications will simply let a GenEditControl object 
 create and maintain their Edit menu. **GenEditControlClass** is a subclass 
 of GenControlClass (see ["Generic UI Controllers," Chapter 12 of the Object 
-Reference Book](../Objects/ogenctrl.md) for usage of controllers in general).
+Reference Book](../Objects/ogenctl.md) for usage of controllers in general).
 
 The GenEditControl object can provide triggers and/or tools for Undo, Cut, 
 Copy, Paste, Select All, and Delete operations. These operations must all be 
