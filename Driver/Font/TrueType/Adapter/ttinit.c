@@ -823,23 +823,15 @@ EC(     ECCheckBounds( (void*)fontHeader ) );
         TT_Done_Glyph( GLYPH );
         TT_Done_Instance( INSTANCE );
 
-        fontHeader->FH_avgwidth = FACE_PROPERTIES.os2->xAvgCharWidth;
-        fontHeader->FH_maxwidth = FACE_PROPERTIES.horizontal->advance_Width_Max;
-
-        fontHeader->FH_accent = fontHeader->FH_accent - fontHeader->FH_ascent;    
+        fontHeader->FH_avgwidth   = FACE_PROPERTIES.os2->xAvgCharWidth;
+        fontHeader->FH_maxwidth   = FACE_PROPERTIES.horizontal->advance_Width_Max;
+        fontHeader->FH_accent     = fontHeader->FH_accent - fontHeader->FH_ascent;    
         fontHeader->FH_baseAdjust = BASELINE( UNITS_PER_EM ) - fontHeader->FH_ascent - fontHeader->FH_accent;
-        fontHeader->FH_height = fontHeader->FH_maxBSB + fontHeader->FH_ascent + DESCENT( UNITS_PER_EM ) - SAFETY( UNITS_PER_EM );
-        fontHeader->FH_minTSB = fontHeader->FH_minTSB - BASELINE( UNITS_PER_EM );
-        fontHeader->FH_maxBSB = fontHeader->FH_maxBSB - ( DESCENT( UNITS_PER_EM ) - SAFETY( UNITS_PER_EM ) );
-
-        fontHeader->FH_underPos = -FACE_PROPERTIES.postscript->underlinePosition;
-        if( fontHeader->FH_underPos == 0 )
-                fontHeader->FH_underPos = DEFAULT_UNDER_POSITION( UNITS_PER_EM );
-        fontHeader->FH_underPos = fontHeader->FH_underPos + fontHeader->FH_accent + fontHeader->FH_ascent;
-
-        fontHeader->FH_underThick = FACE_PROPERTIES.postscript->underlineThickness; 
-        if( fontHeader->FH_underThick == 0 )
-                fontHeader->FH_underThick = DEFAULT_UNDER_THICK( UNITS_PER_EM );
+        fontHeader->FH_height     = fontHeader->FH_maxBSB + fontHeader->FH_ascent + DESCENT( UNITS_PER_EM ) - SAFETY( UNITS_PER_EM );
+        fontHeader->FH_minTSB     = fontHeader->FH_minTSB - BASELINE( UNITS_PER_EM );
+        fontHeader->FH_maxBSB     = fontHeader->FH_maxBSB - ( DESCENT( UNITS_PER_EM ) - SAFETY( UNITS_PER_EM ) );
+        fontHeader->FH_underPos   = DEFAULT_UNDER_POSITION( UNITS_PER_EM ) + fontHeader->FH_accent + fontHeader->FH_ascent;
+        fontHeader->FH_underThick = DEFAULT_UNDER_THICK( UNITS_PER_EM );
         
         if( fontHeader->FH_x_height > 0 )
                 fontHeader->FH_strikePos = 3 * fontHeader->FH_x_height / 5;
