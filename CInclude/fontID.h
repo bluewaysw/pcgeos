@@ -29,6 +29,7 @@ typedef word FontMaker;
 #define FM_MICROLOGIC 0xe000
 #define FM_ATECH 0xd000
 #define FM_PUBLIC 0xc000
+#define FM_TRUETYPE 0x5000
 #define FM_AGFA 0x4000
 #define FM_BITSTREAM 0x3000
 #define FM_ADOBE 0x2000

@@ -90,4 +90,4 @@ will have behavior added so that it will draw axes and the bars of the
 chart. It will draw these things using kernel graphics routines.
 
 
-[Setting Up](Setting_Up.md) <-- &nbsp;&nbsp; [table of contents](../Tutorial.md) &nbsp;&nbsp; --> [The Primary Window](The_Primary_Window.md)
+[Setting Up](Setting_Up.md) <-- &nbsp;&nbsp; [table of contents](../tutorial.md) &nbsp;&nbsp; --> [The Primary Window](The_Primary_Window.md)

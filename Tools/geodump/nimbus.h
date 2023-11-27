@@ -1,7 +1,7 @@
 /*
         NIMBUS.H
 
-        by Marcus Gr”ber 1995
+        by Marcus Grï¿½ber 1995
 
         Include file for PC/Geos font file format
 
@@ -21,22 +21,22 @@
 
 typedef struct {                /*** Common font file header */
   long          ID;                     // identification "magic" (signature)
-  unsigned      ver;                    // format version (Hi=major, Lo=minor)
-  unsigned      hdrSize;                // total size of following header
-  unsigned      fontID;                 // font ID number
-  unsigned      rasterizer;             // Rasterizer ID
+  unsigned short      ver;                    // format version (Hi=major, Lo=minor)
+  unsigned short     hdrSize;                // total size of following header
+  unsigned short     fontID;                 // font ID number
+  unsigned short     rasterizer;             // Rasterizer ID
   char          family;                 // Font family flags
   char          name[20];               // name of font
-  unsigned      pointSizeTab;           // start of point size tables-6
-  unsigned      pointSizeEnd;           // end of point size tables-6
-  unsigned      outlineTab;             // start of outline tables-6
-  unsigned      outlineEnd;             // end of outline tables-6
+  unsigned short     pointSizeTab;           // start of point size tables-6
+  unsigned short     pointSizeEnd;           // end of point size tables-6
+  unsigned short     outlineTab;             // start of outline tables-6
+  unsigned short     outlineEnd;             // end of outline tables-6
 } BSWFheader;
 
 typedef struct {                /*** Entry of point size table */
   unsigned char PSE_style;              // struct TextStyle
   unsigned char PSE_pointSize[3];       // struct WBFixed
-  unsigned      PSE_dataSize;           // size of data block
+  unsigned short     PSE_dataSize;           // size of data block
   long          PSE_filePos;            // position of data block
 } my_PointSizeEntry;
 
@@ -54,30 +54,30 @@ typedef struct {                /*** Entry of outline data table */
  ******************************************************************************/
 typedef struct {                /*** Header for a specific typeface */
   struct NimbusFontHeader {
-    unsigned NFH_h_height;
-    unsigned NFH_x_height;
-    unsigned NFH_ascender;
-    unsigned NFH_descender;
+    unsigned short NFH_h_height;
+    unsigned short NFH_x_height;
+    unsigned short NFH_ascender;
+    unsigned short NFH_descender;
   } NFH_nimbus;
-  unsigned NFH_avgwidth;
-  unsigned NFH_maxwidth;
-  unsigned NFH_height;
-  unsigned NFH_accent;
-  unsigned NFH_ascent;
-  unsigned NFH_descent;
-  unsigned NFH_baseAdjust;
+  unsigned short NFH_avgwidth;
+  unsigned short NFH_maxwidth;
+  unsigned short NFH_height;
+  unsigned short NFH_accent;
+  unsigned short NFH_ascent;
+  unsigned short NFH_descent;
+  unsigned short NFH_baseAdjust;
   unsigned char NFH_firstchar;
   unsigned char NFH_lastchar;
   unsigned char NFH_defaultchar;
-  unsigned NFH_underPos;
-  unsigned NFH_underThick;
-  unsigned NFH_strikePos;
-  unsigned NFH_numchars;
-  int NFH_minLSB;
-  int NFH_minTSB;
-  int NFH_maxBSB;
-  int NFH_maxRSB;
-  int NFH_continuitySize;
+  unsigned short NFH_underPos;
+  unsigned short NFH_underThick;
+  unsigned short NFH_strikePos;
+  unsigned short NFH_numchars;
+  short int NFH_minLSB;
+  short int NFH_minTSB;
+  short int NFH_maxBSB;
+  short int NFH_maxRSB;
+  short int NFH_continuitySize;
 } NimbusNewFontHeader;
 
 /*
@@ -86,7 +86,7 @@ typedef struct {                /*** Header for a specific typeface */
  * characters:
  */
 typedef struct {                /*** Width table entry */
-  unsigned NW_width;                    // unsigned character width
+  unsigned short NW_width;                    // unsigned character width
   unsigned char NW_flags;               // struct unsigned charTableFlags
 } NimbusNewWidth;
 
@@ -105,16 +105,16 @@ typedef struct {                /*** Width table entry */
 #define CTF_NOT_VISIBLE    0x01
 
 typedef struct {                /*** Header for individual character */
-  int ND_xmin;
-  int ND_ymin;
-  int ND_xmax;
-  int ND_ymax;
+  short int ND_xmin;
+  short int ND_ymin;
+  short int ND_xmax;
+  short int ND_ymax;
 } NimbusData;
 
 typedef struct {                /*** Pair of hinting lines */
-  int NT_start;
-  int NT_end;
-  int NT_width;
+  short int NT_start;
+  short int NT_end;
+  short int NT_width;
 } NimbusTuple;
 
 /* enumerated type "NimbusCommands" (byte): opcodes in character description */
@@ -130,23 +130,23 @@ typedef struct {                /*** Pair of hinting lines */
 #define NIMBUS_MOVE      0
 
 typedef struct {                /*** Args to "move"/"line" opcode */
-  int NLD_x;
-  int NLD_y;
+  short int NLD_x;
+  short int NLD_y;
 } NimbusLineData;
 
 typedef struct {                /*** Args to "Bezier" opcode */
-  int NBD_x1;
-  int NBD_y1;
-  int NBD_x2;
-  int NBD_y2;
-  int NBD_x3;
-  int NBD_y3;
+  short int NBD_x1;
+  short int NBD_y1;
+  short int NBD_x2;
+  short int NBD_y2;
+  short int NBD_x3;
+  short int NBD_y3;
 } NimbusBezierData;
 
 typedef struct {                /*** Arguments to "accent" opcode */
   unsigned char NAD_char1;
-  int NAD_x;
-  int NAD_y;
+  short int NAD_x;
+  short int NAD_y;
   unsigned char NAD_char2;
 } NimbusAccentData;
 

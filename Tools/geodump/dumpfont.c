@@ -1,7 +1,7 @@
 /*
         DUMPFONT.C
 
-        by Marcus Gr”ber 1991-95
+        by Marcus Grï¿½ber 1991-95
 
         Creates structured dumps of PC/Geos files (Geodes, VM Files, fonts)
 */
@@ -31,7 +31,7 @@ void DisplayChar(FILE *f,long pos,unsigned size)
         NimbusLineData argMoveLine;
         NimbusBezierData argBezier;
         NimbusAccentData argAccent;
-        int argVHLine;
+        int short argVHLine;
         NimbusRelLineData argRelLine;
         NimbusRelBezierData argRelBezier;
         char nhints,i;
@@ -121,18 +121,18 @@ void DisplayBSWF(FILE *f)
         my_OutlineDataEntry face;
         NimbusNewFontHeader nfh;        // typeface info header
         NimbusNewWidth nw[256];         // character width array
-        unsigned charOfs[256];          // pointer to character shapes
+        unsigned short charOfs[256];          // pointer to character shapes
         struct s_kerntab {
           struct {
             unsigned char c1,c2;
           } pair;                       // character pair
-          int kern;
+          short int kern;
         } *kerntab;
-        unsigned n_kern;
+        unsigned short n_kern;
 
         unsigned long pos;
         long size,tsize=0;
-        unsigned ch,ch2,len,pos2;
+        unsigned short ch,ch2,len,pos2;
         char buf[]=" ",buf2[]=" ";
 
         fseek(f,0,SEEK_SET);            // Read from top of file

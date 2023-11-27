@@ -1051,4 +1051,4 @@ Code Display 3-2 MCHRT.GOC
 @end Interface;
 ~~~
 
-[The Plan](The_Plan.md) <-- &nbsp;&nbsp; [table of contents](../Tutorial.md) &nbsp;&nbsp; --> [Data Structures and UI Gadgetry](Data_Structures_and_UI_Gadgetry.md)
+[The Plan](The_Plan.md) <-- &nbsp;&nbsp; [table of contents](../tutorial.md) &nbsp;&nbsp; --> [Data Structures and UI Gadgetry](Data_Structures_and_UI.md)
