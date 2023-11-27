@@ -55,14 +55,14 @@ exempt treplib
 exempt spell
 
 # Resources:
-resource APPRESOURCE ui-object
-resource INTERFACE ui-object
-resource DOCUMENTUI object
-resource DIALOGUI ui-object
-resource BUTTONRESOURCE data
-resource TOOLRESOURCE data
-resource APPICONRESOURCE  data object
-resource DOCICONRESOURCE  data object
+resource AppResource ui-object
+resource Interface ui-object
+resource DocumentUI object
+resource DialogUI ui-object
+resource ButtonResource data
+resource ToolResource data
+resource AppIconResource  data object
+resource DocIconResource  data object
 
 
 # classes
