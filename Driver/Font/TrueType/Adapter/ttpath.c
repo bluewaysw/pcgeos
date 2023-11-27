@@ -29,13 +29,15 @@ static void CalcTransformMatrix( TransMatrix*    transMatrix,
 
 static void ConvertOutline( GStateHandle gstate, TT_Outline* outline );
 
-static void move_to( GStateHandle gstate, TT_Vector* v );
+static void MoveTo( GStateHandle gstate, TT_Vector* vec );
 
-static void line_to( GStateHandle gstate, TT_Vector* v );
+static void LineTo( GStateHandle gstate, TT_Vector* vec );
 
-static void conic_to( GStateHandle gstate, TT_Vector* v_control, TT_Vector* v );
+static void ConicTo( GStateHandle gstate, TT_Vector* v_control, TT_Vector* vec );
 
 static void WriteComment( TRUETYPE_VARS, GStateHandle gstate );
+
+static void ScaleOutline( TRUETYPE_VARS );
 
 
 /********************************************************************
@@ -118,7 +120,7 @@ EC(     ECCheckBounds( (void*)fontHeader ) );
         /* load glyph and scale its outline to 1000 units per em */
         TT_Load_Glyph( INSTANCE, GLYPH, charIndex, 0 );
         TT_Get_Glyph_Outline( GLYPH, &OUTLINE );
-        //TODO: auf 1000 Units per EM skalieren
+        ScaleOutline( trueTypeVars );
 
         /* write comment with glyph parameters */
         WriteComment( trueTypeVars, gstate );
@@ -169,9 +171,7 @@ EC(     ECCheckBounds( (void*)fontHeader ) );
         if( pathFlags & FGPF_SAVE_STATE )
                 GrRestoreState( gstate );
 
-Fail:
         TT_Done_Glyph( GLYPH );
-
 Fin:
         MemUnlock( varBlock );
 }
@@ -232,7 +232,7 @@ EC(     ECCheckBounds( (void*)trueTypeOutline ) );
         /* get TT char index */
         charIndex = TT_Char_Index( CHAR_MAP, GeosCharToUnicode( character ) );
 
-
+        //TODO: render glyph as regionpath
 
 Fail:
         TT_Done_Glyph( GLYPH );
@@ -276,7 +276,6 @@ static void ConvertOutline( GStateHandle gstate, TT_Outline* outline )
         TT_Int   n;
         TT_Int   first;
         TT_Int   last;
-        TT_Int   tag;
 
  
         last = -1;
@@ -317,7 +316,7 @@ static void ConvertOutline( GStateHandle gstate, TT_Outline* outline )
                 --tags;
         }
 
-        move_to( gstate, &v_start );
+        MoveTo( gstate, &v_start );
 
         while ( point < limit )
         {
@@ -326,9 +325,9 @@ static void ConvertOutline( GStateHandle gstate, TT_Outline* outline )
 
                 switch ( *tags & 1 )
                 {
-                        case CURVE_TAG_ON:  /* emit a single line_to */
+                        case CURVE_TAG_ON:
                         {
-                                line_to( gstate, point );
+                                LineTo( gstate, point );
                                 continue;
                         }
 
@@ -351,49 +350,106 @@ static void ConvertOutline( GStateHandle gstate, TT_Outline* outline )
 
                                         if (  *tags & CURVE_TAG_ON )
                                         {
-                                                conic_to( gstate, &v_control, &vec );
+                                                ConicTo( gstate, &v_control, &vec );
                                                 continue;
                                         }
 
                                         v_middle.x = ( v_control.x + vec.x ) >> 1;
                                         v_middle.y = ( v_control.y + vec.y ) >> 1;
 
-                                        conic_to( gstate, &v_control, &v_middle );
+                                        ConicTo( gstate, &v_control, &v_middle );
 
                                         v_control = vec;
                                         goto Do_Conic;
                                 }
 
-                                conic_to( gstate, &v_control, &v_start );
+                                ConicTo( gstate, &v_control, &v_start );
                                 break;
                         }
                 }
 
                 /* close the contour with a line segment */
-                line_to( gstate, &v_start );
+                LineTo( gstate, &v_start );
         }
 }
 
 
-static void move_to( GStateHandle gstate, TT_Vector* v )
+/********************************************************************
+ *                      MoveTo
+ ********************************************************************
+ * SYNOPSIS:	  Change current position.
+ * 
+ * PARAMETERS:    gstate                Handle in which the position is changed.
+ *                *vec                  Ptr to Vector to new position.
+ * 
+ * RETURNS:       void
+ * 
+ * STRATEGY:      
+ * 
+ * REVISION HISTORY:
+ *      Date      Name      Description
+ *      ----      ----      -----------
+ *      18/11/23  JK        Initial Revision
+ *******************************************************************/
+
+static void MoveTo( GStateHandle gstate, TT_Vector* vec )
 {
-        GrMoveTo( gstate, v->x, v->y );
+        GrMoveTo( gstate, vec->x, vec->y );
 }
 
-static void line_to( GStateHandle gstate, TT_Vector* v )
+
+/********************************************************************
+ *                      LineTo
+ ********************************************************************
+ * SYNOPSIS:	  Draw line to given position.
+ * 
+ * PARAMETERS:    gstate                Handle in which the line is drawed.
+ *                *vec                  Ptr. to Vector of end position.
+ * 
+ * RETURNS:       void
+ * 
+ * STRATEGY:      
+ * 
+ * REVISION HISTORY:
+ *      Date      Name      Description
+ *      ----      ----      -----------
+ *      18/11/23  JK        Initial Revision
+ *******************************************************************/
+
+static void LineTo( GStateHandle gstate, TT_Vector* vec )
 {
-        GrDrawLineTo( gstate, v->x, v->y );
+        GrDrawLineTo( gstate, vec->x, vec->y );
 }
 
-static void conic_to( GStateHandle gstate, TT_Vector* v_control, TT_Vector* v )
+
+/********************************************************************
+ *                      ConicTo
+ ********************************************************************
+ * SYNOPSIS:	  Draw conic curve to given position.
+ * 
+ * PARAMETERS:    gstate                Handle in which the curve is drawed.
+ *                *v_control            Vector with control point.
+ *                *vec                  Vector of new position.
+ * 
+ * RETURNS:       void
+ * 
+ * STRATEGY:      
+ * 
+ * REVISION HISTORY:
+ *      Date      Name      Description
+ *      ----      ----      -----------
+ *      18/11/23  JK        Initial Revision
+ *******************************************************************/
+
+static void ConicTo( GStateHandle gstate, TT_Vector* v_control, TT_Vector* vec )
 {
         Point p[3];
 
 
         p[0].P_x = v_control->x;
         p[0].P_y = v_control->y;
-        p[1].P_x = p[2].P_x = v->x;
-        p[1].P_y = p[2].P_y = v->y;
+        p[1].P_x = p[2].P_x = vec->x;
+        p[1].P_y = p[2].P_y = vec->y;
 
         GrDrawCurveTo( gstate, p );
 }
@@ -457,24 +513,22 @@ static void CalcTransformMatrix( TransMatrix*    transMatrix,
         if( stylesToImplement & ( TS_SUBSCRIPT | TS_SUPERSCRIPT ) )
         {
                 WWFixedAsDWord translation;
-                WWFixedAsDWord scaleScript;
               
 
-            /*    scaleScript = GrMulWWFixed( scaleScript,  );
-                transMatrix->TM_e11.WWF_frac = FractionOf( scaleScript );
-                transMatrix->TM_e11.WWF_int  = IntegerOf( scaleScript );
+                transMatrix->TM_e11.WWF_frac = FractionOf( SCRIPT_FACTOR );
+                transMatrix->TM_e11.WWF_int  = IntegerOf( SCRIPT_FACTOR );
 
-                transMatrix->TM_e22.WWF_frac = FractionOf( scaleScript );
-                transMatrix->TM_e22.WWF_int  = IntegerOf( scaleScript );
+                transMatrix->TM_e22.WWF_frac = FractionOf( SCRIPT_FACTOR );
+                transMatrix->TM_e22.WWF_int  = IntegerOf( SCRIPT_FACTOR );
 
                 if( stylesToImplement & TS_SUPERSCRIPT )
-                        translation = GrMulWWFixed( SUPERSCRIPT_OFFSET, scalePointSize );
+                        translation = GrMulWWFixed( SUPERSCRIPT_OFFSET, (dword)STANDARD_GRIDSIZE << 16 );
 
                 if( stylesToImplement & TS_SUBSCRIPT )
-                        translation = -GrMulWWFixed( SUBSCRIPT_OFFSET, scalePointSize );
+                        translation = -GrMulWWFixed( SUBSCRIPT_OFFSET, (dword)STANDARD_GRIDSIZE << 16 );
 
                 transMatrix->TM_e32.DWF_frac = FractionOf( translation );
-                transMatrix->TM_e32.DWF_int  = IntegerOf( translation ); */
+                transMatrix->TM_e32.DWF_int  = IntegerOf( translation );
         }
 
         //TODO:
@@ -505,18 +559,46 @@ static void CalcTransformMatrix( TransMatrix*    transMatrix,
 static void WriteComment( TRUETYPE_VARS, GStateHandle gstate )
 {
         word            params[NUM_PARAMS];
-        WWFixedAsDWord  scale = GrUDivWWFixed( ((dword)STANDARD_GRIDSIZE) << 16, ((dword)UNITS_PER_EM) << 16 );
-
+       
 
         TT_Get_Glyph_Metrics( GLYPH, &GLYPH_METRICS );
 
-        /* the glyph box must be scaled to 1000 units per em */
-        params[0] = IntegerOf( GrMulWWFixed( ((dword)GLYPH_METRICS.advance) << 16, scale ) );
+        params[0] = GLYPH_METRICS.advance >> 6;
         params[1] = 0;
-        params[2] = IntegerOf( GrMulWWFixed( ((dword)GLYPH_BBOX.xMin) << 16, scale ) );
-        params[3] = IntegerOf( GrMulWWFixed( ((dword)GLYPH_BBOX.yMin) << 16, scale ) );
-        params[4] = IntegerOf( GrMulWWFixed( ((dword)GLYPH_BBOX.xMax) << 16, scale ) );
-        params[5] = IntegerOf( GrMulWWFixed( ((dword)GLYPH_BBOX.yMax) << 16, scale ) );
+        params[2] = GLYPH_BBOX.xMin >> 6;
+        params[3] = GLYPH_BBOX.yMin >> 6;
+        params[4] = GLYPH_BBOX.xMax >> 6;
+        params[5] = GLYPH_BBOX.yMax >> 6;
 
         GrComment( gstate, &params, NUM_PARAMS );
+}
+
+
+/********************************************************************
+ *                      ScaleOutline
+ ********************************************************************
+ * SYNOPSIS:	  Scale current outline to 1000 untits per em.
+ * 
+ * PARAMETERS:    TRUETYPE_VARS         Cached variables needed by driver.
+ * 
+ * RETURNS:       void   
+ * 
+ * STRATEGY:      
+ * 
+ * REVISION HISTORY:
+ *      Date      Name      Description
+ *      ----      ----      -----------
+ *      18/11/23  JK        Initial Revision
+ *******************************************************************/
+
+static void ScaleOutline( TRUETYPE_VARS )
+{
+        TT_Matrix      scaleMatrix = { 0, 0, 0, 0 };
+        WWFixedAsDWord scale       = GrUDivWWFixed( STANDARD_GRIDSIZE, UNITS_PER_EM );
+
+
+        scaleMatrix.xx = scale;
+        scaleMatrix.yy = scale;
+
+        TT_Transform_Outline( &OUTLINE, &scaleMatrix );
 }

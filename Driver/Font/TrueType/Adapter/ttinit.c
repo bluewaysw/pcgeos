@@ -392,7 +392,7 @@ EC(     ECCheckFileHandle( truetypeFile ) );
 			{
 				goto Fail;
 			}
-			outlineData++;
+			++outlineData;
 		}
 
 		/* not found append new outline entry */
@@ -756,7 +756,7 @@ EC(     ECCheckBounds( (void*)fontHeader ) );
         TT_New_Instance( FACE, &INSTANCE );
         TT_New_Glyph( FACE, &GLYPH );
 
-        for ( geosChar = fontHeader->FH_firstChar; geosChar < fontHeader->FH_lastChar; geosChar++ )
+        for ( geosChar = fontHeader->FH_firstChar; geosChar < fontHeader->FH_lastChar; ++geosChar )
         {
                 word unicode = GeosCharToUnicode( geosChar );
 
@@ -901,7 +901,7 @@ static word GetKernCount( TRUETYPE_VARS )
                 goto Fail;
 
         /* search for format 0 subtable */
-        for( table = 0; table < kerningDir.nTables; table++ )
+        for( table = 0; table < kerningDir.nTables; ++table )
         {
                 word i;
 
@@ -915,11 +915,11 @@ static word GetKernCount( TRUETYPE_VARS )
                 if( kerningDir.tables->t.kern0.pairs[i].value > 0 )
                         continue;
 
-                for( i = 0; i < kerningDir.tables->t.kern0.nPairs; i++ )
+                for( i = 0; i < kerningDir.tables->t.kern0.nPairs; ++i )
                 {
                         if( isGeosCharPair( kerningDir.tables->t.kern0.pairs[i].left,
                                         kerningDir.tables->t.kern0.pairs[i].right ) )
-                                numGeosKernPairs++;
+                                ++numGeosKernPairs;
                 }
         }
 
@@ -953,8 +953,8 @@ static int strcmp( const char* s1, const char* s2 )
 {
         while ( *s1 && ( *s1 == *s2 ) )
         {
-                s1++;
-                s2++;
+                ++s1;
+                ++s2;
         }
         return *(const unsigned char*)s1 - *(const unsigned char*)s2;
 }

@@ -202,7 +202,7 @@ CharMapEntry geosCharMap[] =
         C_GREEK_CAPITAL_LETTER_DELTA,           0,              0,
         C_LEFT_POINTING_GUILLEMET,              0,              0,
         C_RIGHT_POINTING_GUILLEMET,             0,              0,
-        C_MIDLINE_HORIZONTAL_ELLIPSIS,          0,              0,
+        C_HORIZONTAL_ELLIPSIS,                  0,              0,
         C_NON_BREAKING_SPACE,                   0,              0,
         C_LATIN_CAPITAL_LETTER_A_GRAVE,         CMF_ACCENT,     0,
         C_LATIN_CAPITAL_LETTER_A_TILDE,         CMF_ACCENT,     0,

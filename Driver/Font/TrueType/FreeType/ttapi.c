@@ -560,13 +560,12 @@ extern TEngine_Instance engineInstance;
 
 /*******************************************************************
  *
- *  Function    :  TT_Set_Instance_CharSizes
+ *  Function    :  TT_Set_Instance_CharSize
  *
  *  Description :  Resets an instance to new point size.
  *
  *  Input  :  instance      the instance handle
- *            charWidth     the new width in 26.6 char points
- *            charHeight    the new height in 26.6 char points
+ *            charSize      the new character size in 26.6 char points
  *
  *  Output :  Error code.
  *
@@ -580,9 +579,8 @@ extern TEngine_Instance engineInstance;
  ******************************************************************/
 
   EXPORT_FUNC
-  TT_Error  TT_Set_Instance_CharSizes( TT_Instance  instance,
-                                       TT_F26Dot6   charWidth,
-                                       TT_F26Dot6   charHeight )
+  TT_Error  TT_Set_Instance_CharSize( TT_Instance  instance,
+                                       TT_F26Dot6   charSize )
   {
     PInstance  ins = HANDLE_Instance( instance );
 
@@ -590,16 +588,13 @@ extern TEngine_Instance engineInstance;
     if ( !ins )
       return TT_Err_Invalid_Instance_Handle;
 
-    if ( charWidth < 1 * 64 )
-      charWidth = 1 * 64;
+    if ( charSize < 1 * 64 )
+      charSize = 1 * 64;
 
-    if ( charHeight < 1 * 64 )
-      charHeight = 1 * 64;
-
-    ins->metrics.x_scale1 = ( charWidth * ins->metrics.x_resolution ) / 72;
+    ins->metrics.x_scale1 = ( charSize * ins->metrics.x_resolution ) / 72;
     ins->metrics.x_scale2 = ins->owner->fontHeader.Units_Per_EM;
 
-    ins->metrics.y_scale1 = ( charHeight * ins->metrics.y_resolution ) / 72;
+    ins->metrics.y_scale1 = ( charSize * ins->metrics.y_resolution ) / 72;
     ins->metrics.y_scale2 = ins->owner->fontHeader.Units_Per_EM;
 
     if ( ins->owner->fontHeader.Flags & 8 )
@@ -610,11 +605,7 @@ extern TEngine_Instance engineInstance;
 
     ins->metrics.x_ppem = ins->metrics.x_scale1 >> 6;
     ins->metrics.y_ppem = ins->metrics.y_scale1 >> 6;
-
-    if ( charWidth > charHeight )
-      ins->metrics.pointSize = charWidth;
-    else
-      ins->metrics.pointSize = charHeight;
+    ins->metrics.pointSize = charSize;
 
     ins->valid  = FALSE;
 
@@ -641,14 +632,14 @@ extern TEngine_Instance engineInstance;
  *            instances, so there is no need to protect.
  *
  ******************************************************************/
-
+/*
   EXPORT_FUNC
   TT_Error  TT_Set_Instance_CharSize( TT_Instance  instance,
                                       TT_F26Dot6   charSize )
   {
     return TT_Set_Instance_CharSizes( instance, charSize, charSize );
   }
-
+*/
 
 /*******************************************************************
  *
