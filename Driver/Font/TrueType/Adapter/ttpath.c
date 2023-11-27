@@ -563,14 +563,14 @@ static void WriteComment( TRUETYPE_VARS, GStateHandle gstate )
 
         TT_Get_Glyph_Metrics( GLYPH, &GLYPH_METRICS );
 
-        params[0] = GLYPH_METRICS.advance >> 6;
+        params[0] = GLYPH_METRICS.advance;
         params[1] = 0;
-        params[2] = GLYPH_BBOX.xMin >> 6;
-        params[3] = GLYPH_BBOX.yMin >> 6;
-        params[4] = GLYPH_BBOX.xMax >> 6;
-        params[5] = GLYPH_BBOX.yMax >> 6;
+        params[2] = GLYPH_BBOX.xMin;
+        params[3] = GLYPH_BBOX.yMin;
+        params[4] = GLYPH_BBOX.xMax;
+        params[5] = GLYPH_BBOX.yMax;
 
-        GrComment( gstate, &params, NUM_PARAMS );
+        GrComment( gstate, params, NUM_PARAMS * sizeof( word ) );
 }
 
 
