@@ -452,7 +452,7 @@ normal graphics commands to draw anything wherever it wants (not just
 within its bounds).
 
 For examples of visible objects that know their bounds and that handle 
-MSG_VIS_DRAW, see ["A UI Example"](105-a-ui-example).
+MSG_VIS_DRAW, see ["A UI Example"](#105-a-ui-example).
 
 #### 10.4.3 Visible Object Abilities
 
@@ -734,7 +734,7 @@ When the user presses the New Game trigger, the trigger sends its message,
 MSG_TICTAC_NEW_GAME, to the TicTacBoard object. The TicTacBoard 
 object is the top object in the visible tree and, upon receipt of this message, 
 resets the game board and notifies all the piece objects of the reset. This 
-process is described below in ["TicTacBoard Specifics"](1054-tictacboard-specifics).
+process is described below in ["TicTacBoard Specifics"](#1054-tictacboard-specifics).
 
 ---
 Code Display 10-2 The TicTac Game Menu

@@ -220,4 +220,4 @@ see what happens. The pccom communication is
 bi-directional, so you may use the above tests just as well, 
 substituting the word "host" for "target," and vice versa.
 
-[Documents and Displays](Documents_and_Displays.md) <-- &nbsp;&nbsp; [table of contents](../Tutorial.md) 
+[Documents and Displays](Documents_and_Displays.md) <-- &nbsp;&nbsp; [table of contents](../tutorial.md) 

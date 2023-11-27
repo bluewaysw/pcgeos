@@ -4786,5 +4786,5 @@ that is on the screen. MSG_VIS_DESTROY first removes the
 object from the tree (with MSG_VIS_REMOVE) and then destroys it 
 (through the **MetaClass** detach and destroy mechanisms).
 
-[Config Library](ocinfig.md) <-- [Table of Contents](../objects.md) &nbsp;&nbsp; --> [VisComp](oviscmp.md)
+[Config Library](oconfig.md) <-- [Table of Contents](../objects.md) &nbsp;&nbsp; --> [VisComp](oviscmp.md)
 
