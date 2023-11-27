@@ -43,7 +43,28 @@ WCC_TEXT        SEGMENT BYTE PUBLIC 'CODE'
 ;	ax := low( low( int1 ) * low( int2 ) )    --> part4
 
 	__U4M proc far
-	.fall_thru
+
+	push bx				; save low( int2 )
+	push ax				; save low( int1 )
+
+	xchg ax, dx			; ax := high( int1 ), dx := low( int1 )
+	mul bx				; ax := low( high( int1 ) * low( int2 ) ) --> part1
+	xchg ax, bx			; bx := part1, ax := low( int2 )
+
+	pop ax				; restore low( int1 )
+	xchg ax, cx			; ax := high( int2 ), cx := low( int1 )
+	mul cx				; ax := low( low( int1 ) * high( int2 ) ) --> part2
+	add ax, bx			; ax := part1 + part2
+
+	xchg ax, cx			; cx := part1 + part2, ax := high( int2 )
+	pop bx				; restore low( int2 )
+	mul bx				; ax := low( high( int2 ) * low( int2 ) ) --> part4
+						; dx := high( high( int2 ) * low( int2 ) ) --> part3
+
+	add dx, cx			; dx := part 3 + part 1 + part 2
+
+	ret
+
 	__U4M endp
 
 	__I4M proc far

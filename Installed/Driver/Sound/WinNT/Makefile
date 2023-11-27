@@ -3,7 +3,7 @@
 #
 # If you edit it, you will lose your changes, should it be regenerated.
 #
-GEODE           = winnt
+GEODE           = sndwinnt
 ASM_TO_OBJS     = sndwinntManager.asm
 UI_TO_RDFS      =
 SRCS            = pcCode.asm sndwinntManager.asm sndwinntStrategy.asm\

@@ -96,7 +96,7 @@ typedef struct {                        /*** Additional VM file header */
 typedef struct {                        /*** Additional obj block header */
     unsigned short           OLMBH_inUseCount;
     unsigned short           OLMBH_interactibleCount;
-    unsigned int       OLMBH_output;
+    unsigned short int       OLMBH_output;
     unsigned short           OLMBH_resourceSize;
 } GEOSObjLMemBlockHeader;
 

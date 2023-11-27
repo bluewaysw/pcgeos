@@ -1986,4 +1986,4 @@ ChunkHandle tempListItem; /*Chunk handle we will use when traversing lists */
 ListNode *tempNode; /* List item which we will use when traversing lists. */
 ~~~
 
-[The Primary Window](The_Primary_Window.md) <-- &nbsp;&nbsp; [table of contents](../Tutorial.md) &nbsp;&nbsp; --> [Views and Visual Objects](Views_and_Visual_Objects.md)
+[The Primary Window](The_Primary_Window.md) <-- &nbsp;&nbsp; [table of contents](../tutorial.md) &nbsp;&nbsp; --> [Views and Visual Objects](Views_and_Visual_Objects.md)

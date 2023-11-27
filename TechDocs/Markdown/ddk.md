@@ -25,3 +25,10 @@
     [3.2 PCMCIA Library Functions](Ddk/ddkpcmcia.md#32-PCMCIA-Library-Functions)  
     [3.3 CardServices Functions](Ddk/ddkpcmcia.md#33-CardServices-Functions)  
     [3.4 CardServices Events](Ddk/ddkpcmcia.md#34-CardServices-Events)  
+
+**[4 Font Driver](Ddk/ddkfont.md#4-font-driver)**   
+    [4.1 Overview](Ddk/ddkfont.md#41-Overview)   
+    [4.2 Initialization Routines](Ddk/ddkfont.md#42-Initialization-Routines)   
+    [4.3 Data Routines](Ddk/ddkfont.md#43-Data-Routines)   
+    [4.4 Metrics Routines](Ddk/ddkfont.md#44-Metrics-Routines)   
+    [4.5 Debugging Tips](Ddk/ddkfont.md#45-Debugging-Tips)   

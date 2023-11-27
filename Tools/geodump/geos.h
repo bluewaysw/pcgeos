@@ -137,51 +137,51 @@ typedef struct {                        /*** Base typ of segment fixup table */
 
 typedef struct {                        /*** Additional VM file header */
   char _x1[8];
-  unsigned IDVM;                        // VM id "magic"
-  unsigned dirsize;                     // size of directory block (bytes)
+  unsigned short IDVM;                        // VM id "magic"
+  unsigned short dirsize;                     // size of directory block (bytes)
   long dirptr;                          // absolute file pos of dir block
 } GEOSvmfheader;
 
 typedef struct {                        /*** File header of directory block */
-  unsigned IDvmfdir;                    // ID sequence (?) 0xFB 0x00
-  unsigned hdl_1stfree;                 // handle of first free block
-  unsigned hdl_lastfree;                // handle of last free block
-  unsigned hdl_1stunused;               // first unused handle entry
-  unsigned dirsize;                     // total size of directory record
-  unsigned nblocks_free;                // number of free blocks
-  unsigned nhdls_free;                  // number of unused handle entries
-  unsigned nblocks_used;                // number of used blocks
-  unsigned nblocks_loaded;              // number of loded blocks (?)
+  unsigned short IDvmfdir;                    // ID sequence (?) 0xFB 0x00
+  unsigned short hdl_1stfree;                 // handle of first free block
+  unsigned short hdl_lastfree;                // handle of last free block
+  unsigned short hdl_1stunused;               // first unused handle entry
+  unsigned short dirsize;                     // total size of directory record
+  unsigned short nblocks_free;                // number of free blocks
+  unsigned short nhdls_free;                  // number of unused handle entries
+  unsigned short nblocks_used;                // number of used blocks
+  unsigned short nblocks_loaded;              // number of loded blocks (?)
   char _x2[2];
-  unsigned hdl_first;                   // handle of map data block
+  unsigned short hdl_first;                   // handle of map data block
   char _x2b[2];
   long totalsize;                       // Total size of allocated blocks
-  unsigned flags;                       // flags (?)
-  unsigned hdl_dbmap;                   // handle of DB map data block
+  unsigned short flags;                       // flags (?)
+  unsigned short hdl_dbmap;                   // handle of DB map data block
 } GEOSvmfdirheader;                     // (handle table follows)
 
 typedef struct {                        /*** Entry in handle table */
   union {
     struct {                            /*** Belegter Block */
-      unsigned hdl;                     // handle in memory, if loaded (?)
-      unsigned flags;                   // flags for this block:
+      unsigned short hdl;                     // handle in memory, if loaded (?)
+      unsigned short flags;                   // flags for this block:
                                         // 000000xx11111xx1
                                         //       ��     ��� 0 = not SAVEd
                                         //       ��     ��� 0 = unSAVEed changes
                                         //       ��             block exists
                                         //       ���������� 1 = has LMem heap
                                         //       ���������� 1 = not SAVEd
-      unsigned ID;                      // block type (application dependant)
+      unsigned short ID;                      // block type (application dependant)
                                         // if block with unSAVEd changes exists,
                                         //   handle of block with recent changes
     } used;
     struct {                            /*** free block */
-      unsigned next;                    // VM handle of next free block
-      unsigned prev;                    // VM handle of previous free block
-      unsigned size;                    // size of free block
+      unsigned short next;                    // VM handle of next free block
+      unsigned short prev;                    // VM handle of previous free block
+      unsigned short size;                    // size of free block
     } free;
   };
-  unsigned blocksize;                   // size of block (bytes, 0 if free)
+  unsigned short blocksize;                   // size of block (bytes, 0 if free)
   long blockptr;                        // file pointer to beginning of block
                                         // (0=unused handle entry)
 } GEOSvmfdirrec;
@@ -216,37 +216,37 @@ typedef unsigned GEOSlocallist;         /*** Base type of local heap table */
  *             GEOS database manager files (subtype of VM files)              *
  ******************************************************************************/
 typedef struct {                        /*** Database adress in dbman file */
-  unsigned group;                       // VM handle of group index
-  unsigned item;                        // item number in that group
+  unsigned short group;                       // VM handle of group index
+  unsigned short item;                        // item number in that group
 } GEOSdbadr;
 
 typedef struct {                        /*** Header block of dbmanager file */
-  unsigned hdl;                         // VM file handle
-  unsigned seg;                         // Memory handle (?)
+  unsigned short hdl;                         // VM file handle
+  unsigned short seg;                         // Memory handle (?)
   GEOSdbadr prim;                       // db adress of primary item
-  unsigned _x;
+  unsigned short x;
   char _x1[6];
 } GEOSdbheader;
 
 typedef struct {                        /*** Header of group index block */
-  unsigned hdl;                         // VM file handle
-  unsigned seg;                         // Memory handle (?)
-  unsigned flags;
-  unsigned maxitemlist;                 // top of item list space
-  unsigned curitemlist;                 // current top of item list
-  unsigned curblocklist;                // curent top of block list
-  unsigned blocksize;                   // size of index data in block
+  unsigned short hdl;                         // VM file handle
+  unsigned short seg;                         // Memory handle (?)
+  unsigned short flags;
+  unsigned short maxitemlist;                 // top of item list space
+  unsigned short curitemlist;                 // current top of item list
+  unsigned short curblocklist;                // curent top of block list
+  unsigned short blocksize;                   // size of index data in block
 } GEOSdbidx;
 
 typedef struct {                        /*** Base type of item list */
-  unsigned block;                       // Pointer to block record
-  unsigned hdl;                         // Local handle within that block
+  unsigned short block;                       // Pointer to block record
+  unsigned short hdl;                         // Local handle within that block
 } GEOSdbitemlist;
 
 typedef struct {                        /*** Base type of storage block list */
-  unsigned _x;
-  unsigned hdl;                         // VM handle of storage block
-  unsigned num;                         // number of items in that block
+  unsigned short _x;
+  unsigned short hdl;                         // VM handle of storage block
+  unsigned short num;                         // number of items in that block
 } GEOSdbblocklist;
 #pragma pack()
 

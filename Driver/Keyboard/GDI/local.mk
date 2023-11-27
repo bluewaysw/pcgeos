@@ -20,7 +20,7 @@
 #
 ##############################################################################
 #
-GEODE		= gdiKbd
+GEODE		= gdikbd
 
 LINKFLAGS	+= -Wunref
 ASMFLAGS	+= -Wall 
