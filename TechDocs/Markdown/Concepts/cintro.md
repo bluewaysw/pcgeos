@@ -71,7 +71,7 @@ language in which most of the GEOS kernel is written. Using Esp, you
 will be able to write optimized routines and applications to handle your 
 most processing-intensive tasks.
 
-**[C Reference Book](../cref.md)**  
+**[C Reference Book](../routines.md)**  
 The Routines Book details the data structures, routines, and other 
 typical reference material you'll need. It focuses on the routines and 
 functions provided by the GEOS kernel including the Graphics System 
@@ -240,7 +240,7 @@ This details the Database Library provided with GEOS. The Database
 Library provides the low-level routines to create, edit, free up, and 
 organize individual database items.
 
-20. [Parse Library](cparce.md)  
+20. [Parse Library](cparse.md)  
 This details the Parse Library. This library implements a special 
 mathematical description language.
 
@@ -341,7 +341,7 @@ This details the different types of lists you can create with the various
 list-related classes including GenBoolean, GenBooleanGroup, GenItem, 
 GenItemGroup, and GenDynamicList.
 
-12. [GenControl/GenToolControl](../Objects/ogenctrl.md)  
+12. [GenControl/GenToolControl](../Objects/ogenctl.md)  
 This details the controller and toolbox classes that allow an application 
 to use and create controllers. Controller objects automatically build 
 menus and dialog boxes to manage a certain feature set of an application. 
@@ -443,7 +443,7 @@ This introduces you to Swat, the powerful system debugger supplied in
 the SDK. This chapter also gives you the most popular Swat commands 
 and explains how you can put them to use for you.
 
-4. [Swat Referenc](../Tools/tswta-i.md)  
+4. [Swat Referenc](../Tools/tswta_i.md)  
 This gives detailed command reference entries for each Swat command. 
 You should use this section when you need to know the specifics of one or 
 more Swat commands.
@@ -452,7 +452,7 @@ more Swat commands.
 This explains how to use the Debug tool, which allows you to simulate a 
 number of GEOS platforms and hardware configurations.
 
-6. [Tool Command Language](../Tools/ttlc.md)  
+6. [Tool Command Language](../Tools/ttcl.md)  
 This describes Tcl, the Tool Command Language that allows you to 
 extend Swat's functionality. Nearly all Swat commands are programmed 
 in Tcl, and most are accessible as functions within other Tcl commands. 
