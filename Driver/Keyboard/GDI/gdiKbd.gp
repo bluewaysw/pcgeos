@@ -24,7 +24,7 @@
 #
 # Specify permanent name first
 #
-name 	gdiKbd.drvr
+name 	gdikbd.drvr
 
 #
 # Specify geode type

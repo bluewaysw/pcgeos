@@ -13,7 +13,7 @@
 #
 ##############################################################################
 #
-name ntstandardsound.drvr
+name sndwinnt.drvr
 #
 longname "NT Standard Sound Driver"
 #

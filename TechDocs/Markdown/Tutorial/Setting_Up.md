@@ -516,5 +516,5 @@ To exit from Swat (so that you can go on to other things), type quit at the
 Swat prompt. You may need to enter the DOS command cls to reset your 
 screen after exiting Swat.
 
-[Introduction](Introduction.md) <-- &nbsp;&nbsp; [table of contents](../Tutorial.md) &nbsp;&nbsp; --> [The Plan](The_Plan.md)
+[Introduction](Introduction.md) <-- &nbsp;&nbsp; [table of contents](../tutorial.md) &nbsp;&nbsp; --> [The Plan](The_Plan.md)
 

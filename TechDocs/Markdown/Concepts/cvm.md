@@ -1259,7 +1259,7 @@ thus, you can often make many array accesses with a single Huge Array
 lookup command.) There is also a certain amount of memory overhead for 
 Huge Arrays. Thus, if you are confident that the array size will be small 
 enough for a single block, you are generally better off with a Chunk Array 
-(see [section 16.4.1 of chapter 16](lmem.md#1641-chunk-arrays)).
+(see [section 16.4.1 of chapter 16](clmem.md#1641-chunk-arrays)).
 
 Huge arrays may have fixed-size or variable-sized elements. If elements are 
 variable-sized, there is a slight increase in memory overhead, but no 

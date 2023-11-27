@@ -2968,7 +2968,7 @@ CV32ProcessSymbols(const char	*file)	/* Object file name (for errors) */
 				&lastLocal, &symBase);
 			os->flags = 0;
 			MSObj_GetWord(blockSeg, bp);
-			if (bp < base + len) {
+			if (bp < base + len && *bp != 0) {
 				os->name = ST_Enter(symbols, strings, (char *)bp + 1, *bp);
 			}
 			else {
