@@ -72,11 +72,12 @@ static Boolean IsRegionNeeded( TransformMatrix* transMatrix,
                                     fontHeader->FH_numChars * sizeof( CharTableEntry) + \
                                     sizeof( TransformMatrix ) )
 
-
 #define OFFSET_KERN_VALUES        ( sizeof(FontBuf) +                                   \
                                     fontHeader->FH_numChars * sizeof( CharTableEntry) + \
                                     sizeof( TransformMatrix ) +                         \
                                     fontHeader->FH_kernCount * sizeof( KernPair ) )
+
+#define BASELINE_CORRECTION       1
 
 
 /********************************************************************
@@ -604,7 +605,7 @@ static void ConvertHeader( TRUETYPE_VARS, FontHeader* fontHeader, FontBuf* fontB
         fontBuf->FB_extLeading.WBF_frac = 0;
 
         ttfElement = SCALE_WORD( fontHeader->FH_underPos, scaleHeight );
-        fontBuf->FB_underPos.WBF_int  = INTEGER_OF_WWFIXEDASDWORD( ttfElement );
+        fontBuf->FB_underPos.WBF_int  = INTEGER_OF_WWFIXEDASDWORD( ttfElement ) + BASELINE_CORRECTION;
         fontBuf->FB_underPos.WBF_frac = FRACTION_OF_WWFIXEDASDWORD( ttfElement );
 
         ttfElement = SCALE_WORD( fontHeader->FH_underThick, scaleHeight );
@@ -664,7 +665,7 @@ static void AdjustFontBuf( TransformMatrix* transMatrix,
         sword savedHeightY = transMatrix->TM_heightY;
 
 
-        transMatrix->TM_heightY = INTEGER_OF_WWFIXEDASDWORD( GrMulWWFixed( WORD_TO_WWFIXEDASDWORD( fontBuf->FB_baselinePos.WBF_int ), fontMatrix->FM_22 ) ) + 1;
+        transMatrix->TM_heightY = INTEGER_OF_WWFIXEDASDWORD( GrMulWWFixed( WORD_TO_WWFIXEDASDWORD( fontBuf->FB_baselinePos.WBF_int ), fontMatrix->FM_22 ) ) + BASELINE_CORRECTION;
         transMatrix->TM_scriptY = INTEGER_OF_WWFIXEDASDWORD( GrMulWWFixed( WORD_TO_WWFIXEDASDWORD( transMatrix->TM_scriptY ), fontMatrix->FM_22 ) );
 
         if( fontMatrix->FM_flags & TF_COMPLEX )

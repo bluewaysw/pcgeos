@@ -159,7 +159,10 @@ EC(     ECCheckBounds( (void*)trueTypeVars ) );
                 ((RegionCharData*)charData)->RCD_bounds.R_top    = 0;
                 ((RegionCharData*)charData)->RCD_bounds.R_bottom = height;
 
+EC_ERROR_IF(    size < RASTER_MAP.size, -1 );
+
                 size = RASTER_MAP.size + SIZE_REGION_HEADER;
+
         }
         else
         {      
@@ -329,7 +332,7 @@ static int FindLRUChar( FontBuf* fontBuf, int numOfChars )
         CharTableEntry*  charTableEntry = (CharTableEntry*) (((byte*)fontBuf) + sizeof( FontBuf ));
 
 
-        for( i = 0; i < numOfChars; i++, charTableEntry++ )
+        for( i = 0; i < numOfChars; ++i, ++charTableEntry )
         {
                 /* if no data, go to next char */
                 if( charTableEntry->CTE_dataOffset <= CHAR_MISSING )
@@ -375,7 +378,7 @@ static void AdjustPointers( CharTableEntry* charTableEntries,
 {
         word  i;
 
-        for( i = 0; i < numOfChars; i++ )
+        for( i = 0; i < numOfChars; ++i )
                 if( charTableEntries[i].CTE_dataOffset > lruEntry->CTE_dataOffset )
                         charTableEntries[i].CTE_dataOffset -= sizeLRUEntry;
 }
