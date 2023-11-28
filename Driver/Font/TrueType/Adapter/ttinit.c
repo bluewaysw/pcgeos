@@ -47,6 +47,8 @@ static FontWeight mapFontWeight( TT_Short weightClass );
 
 static TextStyle mapTextStyle( const char* subfamily );
 
+static FontFamily mapFontFamily( TRUETYPE_VARS );
+
 static word getNameFromNameTable( 
                                 TRUETYPE_VARS,
                                 char*      name, 
@@ -557,6 +559,56 @@ static TextStyle mapTextStyle( const char* subfamily )
 
 
 /********************************************************************
+ *                      mapFontFamily
+ ********************************************************************
+ * SYNOPSIS:	  
+ * 
+ * PARAMETERS:    
+ * 
+ * RETURNS:       
+ * 
+ * SIDE EFFECTS:  none
+ * 
+ * STRATEGY:      
+ * 
+ * REVISION HISTORY:
+ *      Date      Name      Description
+ *      ----      ----      -----------
+ *      28/11/23  JK        Initial Revision
+ *******************************************************************/
+
+#define B_FAMILY_TYPE           0
+#define B_PROPORTION            3
+static FontFamily mapFontFamily( TRUETYPE_VARS )
+{
+        /* recognize FF_MONO and FF_SCRIPT type from panose fields */
+        if( FACE_PROPERTIES.os2->panose[B_PROPORTION] == 9 )    //Monospaced
+                return FF_MONO;
+        if( FACE_PROPERTIES.os2->panose[B_FAMILY_TYPE] == 2 )   //Script
+                return FF_ORNAMENT;
+
+        /* recognize FF_SANS_SERIF, FF_SERIF, FF_SYMBOL and FF_ORNAMENT from sFamilyClass */
+        switch( FACE_PROPERTIES.os2->sFamilyClass >> 8 )
+        {
+                case 1:
+                case 2:
+                case 3:
+                case 4:
+                case 5:
+                case 7:
+                        return FF_SERIF;
+                case 8:
+                        return FF_SANS_SERIF;
+                case 9:
+                        return FF_ORNAMENT;
+                case 12:
+                        return FF_SYMBOL;
+        }
+        return FF_NON_PORTABLE;
+}
+
+
+/********************************************************************
  *                      getFontID
  ********************************************************************
  * SYNOPSIS:	  If the passed font family is a mapped font, the 
@@ -565,7 +617,7 @@ static TextStyle mapTextStyle( const char* subfamily )
  * 
  * PARAMETERS:    familyName*     Font family name.
  *
- * RETURNS:       FontID          FontID found geos.ini or calculated.
+ * RETURNS:       FontID          FontID found in geos.ini or calculated.
  * 
  * SIDE EFFECTS:  none
  * 
@@ -665,7 +717,7 @@ static word getNameFromNameTable( TRUETYPE_VARS, char* name, TT_UShort nameID )
         char*               str;
         
         
-        for( n = 0; n < FACE_PROPERTIES.num_Names; n++ )
+        for( n = 0; n < FACE_PROPERTIES.num_Names; ++n )
         {
                 TT_Get_Name_ID( FACE, n, &platformID, &encodingID, &languageID, &id );
                 if( id != nameID )
@@ -677,7 +729,7 @@ static word getNameFromNameTable( TRUETYPE_VARS, char* name, TT_UShort nameID )
                 {
                         TT_Get_Name_String( FACE, n, &str, &nameLength );
 
-                        for (i = 1; str != 0 && i < nameLength; i += 2)
+                        for( i = 1; str != 0 && i < nameLength; i += 2 )
                                 *name++ = str[i];
                         *name = 0;
                         return nameLength >> 1;
@@ -688,7 +740,7 @@ static word getNameFromNameTable( TRUETYPE_VARS, char* name, TT_UShort nameID )
                 {
                         TT_Get_Name_String( FACE, n, &str, &nameLength );
 
-                        for (i = 0; str != 0 && i < nameLength; i++)
+                        for( i = 0; str != 0 && i < nameLength; ++i )
                                 *name++ = str[i];
                         *name = 0;
                         return nameLength;
@@ -697,7 +749,7 @@ static word getNameFromNameTable( TRUETYPE_VARS, char* name, TT_UShort nameID )
 		{
 			TT_Get_Name_String( FACE, n, &str, &nameLength );
 	
-			for (i = 1; str != 0 && i < nameLength; i += 2)
+			for( i = 1; str != 0 && i < nameLength; i += 2 )
 				*name++ = str[i];
 			*name = 0;
 			return nameLength >> 1;
