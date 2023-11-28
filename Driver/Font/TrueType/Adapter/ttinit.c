@@ -585,7 +585,7 @@ static FontFamily mapFontFamily( TRUETYPE_VARS )
         if( FACE_PROPERTIES.os2->panose[B_PROPORTION] == 9 )    //Monospaced
                 return FF_MONO;
         if( FACE_PROPERTIES.os2->panose[B_FAMILY_TYPE] == 2 )   //Script
-                return FF_ORNAMENT;
+                return FF_SCRIPT;
 
         /* recognize FF_SANS_SERIF, FF_SERIF, FF_SYMBOL and FF_ORNAMENT from sFamilyClass */
         switch( FACE_PROPERTIES.os2->sFamilyClass >> 8 )
