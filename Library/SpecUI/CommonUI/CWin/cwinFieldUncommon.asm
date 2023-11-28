@@ -2298,8 +2298,8 @@ ToolAreaInitPosition	method	dynamic	ToolAreaClass, MSG_TOOL_AREA_INIT_POSITION
 	mov	dx, mask SWSS_RATIO or PCT_100
 
 setPosition:
-	mov	ds:[bx].SWSP_x, cx
-	mov	ds:[bx].SWSP_y, dx
+	mov	ds:[bx].SWSP_x, mask SWSS_RATIO or PCT_50		; cx
+	mov	ds:[bx].SWSP_y, mask SWSS_RATIO or PCT_75		; dx
 	ret
 ToolAreaInitPosition	endm
 endif ; TOOL_AREA_IS_TASK_BAR
