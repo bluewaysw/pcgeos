@@ -40,12 +40,11 @@ static sword getFontIDAvailIndex(
                                 FontID     fontID, 
                                 MemHandle  fontInfoBlock );
 
-static Boolean getFontID(       const char* familiyName, 
-                                FontID*     fontID );
+static Boolean getFontID( TRUETYPE_VARS, FontID* fontID );
 
 static FontWeight mapFontWeight( TT_Short weightClass );
 
-static TextStyle mapTextStyle( const char* subfamily );
+static TextStyle mapTextStyle(  const char* subfamily );
 
 static FontFamily mapFontFamily( TRUETYPE_VARS );
 
@@ -297,7 +296,7 @@ EC(     ECCheckFileHandle( truetypeFile ) );
         if ( getNameFromNameTable( trueTypeVars, STYLE_NAME, STYLE_NAME_ID ) == 0 )
                 goto Fail;
 
-        mappedFont = getFontID( FAMILY_NAME, &fontID );
+        mappedFont = getFontID( trueTypeVars, &fontID );
 	availIndex = getFontIDAvailIndex( fontID, fontInfoBlock );
 
         /* if we have an new font FontAvailEntry, FontInfo and Outline must be created */
@@ -465,13 +464,13 @@ Fin:
 
 static word toHash( const char* str )
 {
-        word    i;
-        dword   hash = strlen( str );
+        word   i;
+        word   hash = strlen( str );
 
         for ( i = 0; i < strlen( str ); ++i )
-		hash = ( ( hash * 7 ) % 65535 ) + str[i];
+		hash = ( ( hash * 7 ) % 255 ) + str[i];
 
-        return (word) hash;
+        return hash % 240 + 15;
 }
 
 
@@ -561,11 +560,11 @@ static TextStyle mapTextStyle( const char* subfamily )
 /********************************************************************
  *                      mapFontFamily
  ********************************************************************
- * SYNOPSIS:	  
+ * SYNOPSIS:	  Determines the font family on different parameters.
  * 
- * PARAMETERS:    
+ * PARAMETERS:    TRUETYPE_VARS   Pointer to truetypevar block.
  * 
- * RETURNS:       
+ * RETURNS:       FontFamily      Family of the given font.
  * 
  * SIDE EFFECTS:  none
  * 
@@ -581,11 +580,13 @@ static TextStyle mapTextStyle( const char* subfamily )
 #define B_PROPORTION            3
 static FontFamily mapFontFamily( TRUETYPE_VARS )
 {
-        /* recognize FF_MONO and FF_SCRIPT type from panose fields */
+        /* The font family of a TrueType font cannot be determined exactly. */
+        /* This implementation is therefore more of an approximation than   */
+        /* an exact determination.                                          */
+
+        /* recognize FF_MONO from panose fields */
         if( FACE_PROPERTIES.os2->panose[B_PROPORTION] == 9 )    //Monospaced
                 return FF_MONO;
-        if( FACE_PROPERTIES.os2->panose[B_FAMILY_TYPE] == 2 )   //Script
-                return FF_SCRIPT;
 
         /* recognize FF_SANS_SERIF, FF_SERIF, FF_SYMBOL and FF_ORNAMENT from sFamilyClass */
         switch( FACE_PROPERTIES.os2->sFamilyClass >> 8 )
@@ -604,6 +605,11 @@ static FontFamily mapFontFamily( TRUETYPE_VARS )
                 case 12:
                         return FF_SYMBOL;
         }
+
+        /* recognize FF_SCRIPT from panose fields */
+        if( FACE_PROPERTIES.os2->panose[B_FAMILY_TYPE] == 2 )   //Script
+                return FF_SCRIPT;
+
         return FF_NON_PORTABLE;
 }
 
@@ -629,15 +635,18 @@ static FontFamily mapFontFamily( TRUETYPE_VARS )
  *      21/01/23  JK        Initial Revision
  *******************************************************************/
 
-static Boolean getFontID( const char* familyName, FontID* fontID ) 
+static Boolean getFontID( TRUETYPE_VARS, FontID* fontID ) 
 {
-        if( !InitFileReadInteger( FONTMAPPING_CATEGORY, familyName, fontID ) )
+        FontFamily fontFamily = mapFontFamily( trueTypeVars );
+
+
+        if( !InitFileReadInteger( FONTMAPPING_CATEGORY, trueTypeVars->familyName, fontID ) )
         {
                 *fontID = ( FM_TRUETYPE | (*fontID & 0x0fff) );
                 return TRUE;
         }
 
-        *fontID = MAKE_FONTID( familyName );
+        *fontID = MAKE_FONTID( fontFamily, trueTypeVars->familyName );
         return FALSE;
 }
 
