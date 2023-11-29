@@ -2179,16 +2179,17 @@ ToolAreaVisMoveResizeWin	method dynamic ToolAreaClass,
 	sub	ds:[di].VI_bounds.R_left, cx
 	sub	ds:[di].VI_bounds.R_right, cx
 
-	call	OpenGetScreenDimensions
+	call	OpenGetScreenDimensions ; get field dimensions in cx = width, dx = height
 	mov	bp, dx
-	shr	bp, 1
+	shr	bp, 1			; shr 1 = divide height by two => upper and lower half of screen?
 
-	cmp	ds:[di].VI_bounds.R_top, bp
-	jg	bottom
+	cmp	ds:[di].VI_bounds.R_top, bp	; compare taskbar y position with half of screen?
+	jg	bottom				; if greater than half of screen, position taskbar at bottom
 
 	test	bl, mask TASF_AUTO_HIDE
 	jnz	topHide
 
+;top:
 	clr	cx
 	xchg	cx, ds:[di].VI_bounds.R_top
 	sub	ds:[di].VI_bounds.R_bottom, cx
