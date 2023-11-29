@@ -3650,11 +3650,11 @@ EC <	ERROR_NZ	OL_ERROR					>
 	ornf	ds:[di].OLBWI_flags, mask OLBWF_HAS_EXPRESS_TOOL_AREA
 endif ; PLACE_EXPRESS_MENU_ON_PRIMARY or TOOL_AREA_IS_TASK_BAR
 
-if PLACE_EXPRESS_MENU_ON_PRIMARY
+if PLACE_EXPRESS_MENU_ON_PRIMARY and (not TOOL_AREA_IS_TASK_BAR)
 	; Cheat -- instead of doing full geometry, just update
 	; OLWI_titleBarBounds to reflect the addition of the express tool area.
 	;
-	;call	OLBaseWinAdjustTitleBoundsForExpressToolArea
+	call	OLBaseWinAdjustTitleBoundsForExpressToolArea
 
 if REDO_GEOMETRY_FOR_EXPRESS_MENU
 	; If we're putting the menu bar in the title area, we need to
