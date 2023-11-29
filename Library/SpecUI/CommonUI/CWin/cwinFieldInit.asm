@@ -369,8 +369,8 @@ if EVENT_MENU
 	call	OLFieldEnsureEventMenu
 endif
 
-;ISU <	call	OLFieldEnsureWindowListDialog				>
-	call	OLFieldEnsureWindowListDialog
+ISU <	call	OLFieldEnsureWindowListDialog				>
+MO  <	call	OLFieldEnsureWindowListDialog				>
 
 	ret
 

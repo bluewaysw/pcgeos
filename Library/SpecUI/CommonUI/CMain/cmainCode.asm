@@ -495,6 +495,10 @@ if _ISUI
 			mask UIEO_UTILITIES_PANEL
 	andnf	ax, not (mask UIEO_GEOS_TASKS_LIST)
 endif
+
+if _MOTIF and TOOL_AREA_IS_TASK_BAR
+	andnf	ax, not (mask UIEO_GEOS_TASKS_LIST)
+endif
 	mov	bx, ax			; just copy from .ini file
 
 haveDecision:
