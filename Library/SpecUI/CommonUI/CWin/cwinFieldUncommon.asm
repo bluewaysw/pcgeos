@@ -2183,7 +2183,7 @@ ToolAreaVisMoveResizeWin	method dynamic ToolAreaClass,
 	mov	bp, dx
 	shr	bp, 1			; shr 1 = divide height by two => upper and lower half of screen?
 
-	cmp	ds:[di].VI_bounds.R_top, bp	; compare taskbar y position with half of screen?
+	cmp	ds:[di].VI_bounds.R_top, bp	; compare taskbar y position with half of screen
 	jg	bottom				; if greater than half of screen, position taskbar at bottom
 
 	test	bl, mask TASF_AUTO_HIDE
@@ -2296,11 +2296,11 @@ ToolAreaInitPosition	method	dynamic	ToolAreaClass, MSG_TOOL_AREA_INIT_POSITION
 	tst	ds:[taskBarPosition]
 	pop	ds
 	jle	setPosition
-	mov	dx, mask SWSS_RATIO or PCT_100
+	mov	dx, mask SWSS_RATIO or PCT_95 ; PCT_100 apparently produces a wrap-around somewhere - and the taskbar appears on top again!
 
 setPosition:
-	mov	ds:[bx].SWSP_x, mask SWSS_RATIO or PCT_50		; FIXME!!! cx
-	mov	ds:[bx].SWSP_y, mask SWSS_RATIO or PCT_75		; FIXME!!! dx
+	mov	ds:[bx].SWSP_x, cx
+	mov	ds:[bx].SWSP_y, dx
 	ret
 ToolAreaInitPosition	endm
 endif ; TOOL_AREA_IS_TASK_BAR
