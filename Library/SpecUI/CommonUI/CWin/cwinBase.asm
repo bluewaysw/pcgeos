@@ -3634,7 +3634,9 @@ if PLACE_EXPRESS_MENU_ON_PRIMARY
 	test	ds:[di].OLBWI_flags, mask OLBWF_REJECT_EXPRESS_TOOL_AREA
 	jz	haveExpress
 
-	;call	OLBaseWinHideExpressToolArea
+if (not TOOL_AREA_IS_TASK_BAR)
+	call	OLBaseWinHideExpressToolArea
+endif
 	jmp	short afterExpressMenu
 
 haveExpress:
