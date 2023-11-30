@@ -468,7 +468,7 @@ static word toHash( const char* str )
         word   hash = strlen( str );
 
         for ( i = 0; i < strlen( str ); ++i )
-		hash = ( ( hash * 7 ) % 255 ) + str[i];
+		hash = hash * 7 + str[i];
 
         return hash % 240 + 15;
 }
