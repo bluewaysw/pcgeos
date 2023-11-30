@@ -3618,7 +3618,7 @@ OLBaseWinGainedSystemTargetExcl	method dynamic	OLBaseWinClass,
 
 	call	WinClasses_ObjCallSuperNoLock_OLBaseWinClass
 
-if PLACE_EXPRESS_MENU_ON_PRIMARY
+if PLACE_EXPRESS_MENU_ON_PRIMARY and (not TOOL_AREA_IS_TASK_BAR)
 	push	es
 	segmov	es, dgroup, ax
 	mov	ax, es:[olExpressOptions]
@@ -3634,9 +3634,8 @@ if PLACE_EXPRESS_MENU_ON_PRIMARY
 	test	ds:[di].OLBWI_flags, mask OLBWF_REJECT_EXPRESS_TOOL_AREA
 	jz	haveExpress
 
-if (not TOOL_AREA_IS_TASK_BAR)
-	call	OLBaseWinHideExpressToolArea
-endif
+	call	OLBaseWinHideExpressToolArea ; wrap with if
+
 	jmp	short afterExpressMenu
 
 haveExpress:

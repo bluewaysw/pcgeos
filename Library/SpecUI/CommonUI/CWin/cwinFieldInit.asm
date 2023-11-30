@@ -1272,6 +1272,7 @@ EC <	ERROR_NC	OL_ERROR					>
 	pop	bx
 	call	ObjSwapUnlock		; ^lbx:si = new express menu
 	mov	cx, bx			; ^lcx:dx = new express menu
+
 	.leave
 	ret
 OLFieldCreateExpressMenu	endm
