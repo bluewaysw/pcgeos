@@ -1571,7 +1571,7 @@ OLBaseWinSetWindowEntryMoniker	method OLBaseWinClass,
 	mov	di, ds:[si]
 	add	di, ds:[di].Vis_offset
 	tst	ds:[di].OLBWI_windowListEntry.handle
-	LONG jz	done
+	LONG 	jz done
 
 getTextMoniker:
 	mov	bp, (VMS_TEXT shl offset VMSF_STYLE)
@@ -1582,10 +1582,26 @@ getTextMoniker:
 	stc				;check app's moniker list
 	call	GenFindMoniker
 	tst	cx
-	jz	done
+	LONG	jz done
 
 getIconMoniker:
-	; get system menu button icon moniker
+
+if _MOTIF and TOOL_AREA_IS_TASK_BAR
+
+	; in Motif, get icon moniker from app monikers
+
+	push	cx, dx
+	mov	bp, mask VMSF_GSTRING or (VMS_TOOL shl offset VMSF_STYLE)
+	stc				; check app's moniker list
+	call	GenFindMoniker		; result: ^lcx:dx = moniker...
+	tst	cx
+	LONG	jz done
+	mov	bx, cx			; ...but we need the icon moniker in ^lbx:di
+	mov 	di, dx
+	pop	cx, dx
+	jmp 	haveMonikers
+else
+	; in ISUI, get system menu button icon moniker from window
 
 	mov	di, ds:[si]
 	add	di, ds:[di].Vis_offset
@@ -1602,7 +1618,7 @@ getIconMoniker:
 	add	di, ds:[di].Gen_offset
 	mov	di, ds:[di].GI_visMoniker
 	call	ObjSwapUnlock
-
+endif
 haveMonikers:
 	push	bx, cx
 	mov	ax, LMEM_TYPE_GENERAL
