@@ -10,7 +10,7 @@ name install.app
 # Name für GeoManager
 
 longname "Universal Installer"
-usernotes "English Version 1.4.0"
+usernotes "English FreeGEOS Version 6.0"
 
 # spezifiziert den Applikations-typ
 
