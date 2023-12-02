@@ -882,7 +882,7 @@ REVISION HISTORY:
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
 
-;if _ISUI ;--------------------------------------------------------------------
+if TOOL_AREA_IS_TASK_BAR
 
 OLFieldCreateWindowListEntry method dynamic OLFieldClass,
 					MSG_OL_FIELD_CREATE_WINDOW_LIST_ENTRY
@@ -925,7 +925,7 @@ done:
 	ret
 OLFieldCreateWindowListEntry endm
 
-;endif	;----------------------------------------------------------------------
+endif	;TOOL_AREA_IS_TASK_BAR
 
 HighCommon ends
 HighCommon segment resource

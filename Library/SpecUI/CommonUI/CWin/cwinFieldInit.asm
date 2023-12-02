@@ -369,9 +369,9 @@ if EVENT_MENU
 	call	OLFieldEnsureEventMenu
 endif
 
-ISU <	call	OLFieldEnsureWindowListDialog				>
-MO  <	call	OLFieldEnsureWindowListDialog				>
-
+if TOOL_AREA_IS_TASK_BAR
+	call	OLFieldEnsureWindowListDialog
+endif
 	ret
 
 OLFieldSpecBuild	endm
@@ -765,7 +765,7 @@ REVISION HISTORY:
 
 ------------------------------------------------------------------------------@
 
-;if _ISUI ;--------------------------------------------------------------------
+if TOOL_AREA_IS_TASK_BAR
 
 OLFieldEnsureWindowListDialog	proc	far
 
@@ -845,7 +845,7 @@ done:
 	ret
 OLFieldEnsureWindowListDialog	endp
 
-;endif ;---------------------------------------------------------------------
+endif ; TOOL_AREA_IS_TASK_BAR
 
 
 COMMENT @----------------------------------------------------------------------

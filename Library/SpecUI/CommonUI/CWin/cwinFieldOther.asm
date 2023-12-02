@@ -165,13 +165,17 @@ CommonUIClassStructures segment resource
 
 	ToolAreaClass		0
 
-;if _ISUI
+; if TOOL_AREA_IS_TASK_BAR
+
 	WindowListDialogClass	mask CLASSF_DISCARD_ON_SAVE
 	WindowListListClass	mask CLASSF_DISCARD_ON_SAVE
 	TaskBarListClass	mask CLASSF_DISCARD_ON_SAVE
-;endif
+; endif
+
 ;if _ISUI or (_MOTIF and EXTENDIBLE_SYSTEM_TRAY)
+
 	SysTrayInteractionClass	mask CLASSF_DISCARD_ON_SAVE
+
 ;endif
 
 if EVENT_MENU
@@ -437,7 +441,7 @@ noEventMenu:
 noToolArea2:
 endif
 
-;if _ISUI
+if TOOL_AREA_IS_TASK_BAR
 	;
 	; clobber window list dialog
 	;
@@ -449,7 +453,7 @@ endif
 	jz	noWindowListDialog
 	call	clobber
 noWindowListDialog:
-;endif
+endif
 	ret
 
 ;
@@ -1004,7 +1008,7 @@ if EVENT_MENU
 	jc	done
 endif
 
-;if _ISUI ;--------------------------------------------------------------------
+if TOOL_AREA_IS_TASK_BAR
 	push	si				;save our handle
 	mov	di, ds:[si]
 	add	di, ds:[di].Gen_offset
@@ -1023,7 +1027,7 @@ endif
 20$:
 	pop	si
 	jc	done
-;endif ;---------------------------------------------------------------------
+endif ; TOOL_AREA_IS_TASK_BAR
 
 callSuper:
 	mov	di, offset OLFieldClass

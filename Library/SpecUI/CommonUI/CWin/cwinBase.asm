@@ -284,10 +284,10 @@ CommonUIClassStructures segment resource
 				mask CLASSF_NEVER_SAVED
 
 
-;if _ISUI
+if TOOL_AREA_IS_TASK_BAR
 	OLWindowListItemClass	mask CLASSF_DISCARD_ON_SAVE or \
 				mask CLASSF_NEVER_SAVED
-;endif
+endif
 
 if RADIO_STATUS_ICON_ON_PRIMARY
 	RadioStatusIconClass	mask CLASSF_DISCARD_ON_SAVE or \
@@ -1328,7 +1328,7 @@ REVISION HISTORY:
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
 
-;if _ISUI ; We will be adding this window to the window list ------------------
+if TOOL_AREA_IS_TASK_BAR ; We will be adding this window to the window list ------------------
 
 OLBaseWinSpecBuild	method dynamic OLBaseWinClass, MSG_SPEC_BUILD
 
@@ -1343,7 +1343,7 @@ OLBaseWinSpecBuild	method dynamic OLBaseWinClass, MSG_SPEC_BUILD
 	ret
 OLBaseWinSpecBuild	endm
 
-;endif	; if _ISUI -----------------------------------------------------------
+endif	; if TOOL_AREA_IS_TASK_BAR
 
 
 
@@ -1370,7 +1370,7 @@ REVISION HISTORY:
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
 
-;if _ISUI ;--------------------------------------------------------------------
+if TOOL_AREA_IS_TASK_BAR
 
 EnsureItemAddedToWindowList	proc	near
 
@@ -1454,7 +1454,7 @@ done:
 	ret
 EnsureItemAddedToWindowList	endp
 
-;endif	;----------------------------------------------------------------------
+endif	; TOOL_AREA_IS_TASK_BAR
 
 
 COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -1479,7 +1479,7 @@ REVISION HISTORY:
 	JS	9/19/92		Initial version
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
-;if _ISUI
+if TOOL_AREA_IS_TASK_BAR
 UpdateTaskBarList	proc	far
 	uses	ax,bx,cx,dx,si,di,bp
 	.enter
@@ -1495,7 +1495,7 @@ UpdateTaskBarList	proc	far
 	.leave
 	ret
 UpdateTaskBarList	endp
-;endif ; _ISUI
+endif ; TOOL_AREA_IS_TASK_BAR
 
 
 COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -1527,7 +1527,7 @@ REVISION HISTORY:
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
 
-;if _ISUI ;--------------------------------------------------------------------
+if TOOL_AREA_IS_TASK_BAR
 
 OLBaseWinUpdateVisMoniker	method dynamic OLBaseWinClass,
 					MSG_SPEC_UPDATE_VIS_MONIKER
@@ -1538,7 +1538,7 @@ OLBaseWinUpdateVisMoniker	method dynamic OLBaseWinClass,
 
 OLBaseWinUpdateVisMoniker	endm
 
-;endif	;----------------------------------------------------------------------
+endif ; TOOL_AREA_IS_TASK_BAR
 
 
 
@@ -1564,7 +1564,7 @@ REVISION HISTORY:
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
 
-;if _ISUI ; We will be adding this window to the window list ------------------
+if TOOL_AREA_IS_TASK_BAR
 
 OLBaseWinSetWindowEntryMoniker	method OLBaseWinClass,
 				MSG_OL_BASE_WIN_SET_WINDOW_ENTRY_MONIKER
@@ -1586,7 +1586,7 @@ getTextMoniker:
 
 getIconMoniker:
 
-if _MOTIF and TOOL_AREA_IS_TASK_BAR
+if _MOTIF
 
 	; in Motif, get icon moniker from app monikers
 
@@ -1654,7 +1654,7 @@ done:
 	ret
 OLBaseWinSetWindowEntryMoniker	endm
 
-;endif	; if _ISUI -----------------------------------------------------------
+endif	; if TOOL_AREA_IS_TASK_BAR
 
 
 COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -1681,7 +1681,7 @@ REVISION HISTORY:
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
 
-;if _ISUI	;--------------------
+if TOOL_AREA_IS_TASK_BAR	;--------------------
 
 OLBaseWinCreateCombinationMoniker	proc	far
 combMkr		local	optr		push	bp, 0
@@ -1806,7 +1806,7 @@ done:
 	ret
 OLBaseWinCreateCombinationMoniker	endp
 
-;endif ; _ISUI -----------------------
+endif ; TOOL_AREA_IS_TASK_BAR
 
 
 
@@ -1836,7 +1836,7 @@ REVISION HISTORY:
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
 
-;if _ISUI ;--------------------------------------------------------------------
+if TOOL_AREA_IS_TASK_BAR ;--------------------------------------------------------------------
 
 OLBaseWinUpdateWindowEntry	method dynamic OLBaseWinClass,
 					MSG_OL_BASE_WIN_UPDATE_WINDOW_ENTRY
@@ -1903,7 +1903,7 @@ callWindowList:
 
 OLBaseWinUpdateWindowEntry	endm
 
-;endif	;----------------------------------------------------------------------
+endif	; TOOL_AREA_IS_TASK_BAR ------------------------
 
 
 
@@ -1932,7 +1932,7 @@ REVISION HISTORY:
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
 
-;if _ISUI ;--------------------------------------------------------------------
+if TOOL_AREA_IS_TASK_BAR ;--------------------------------------
 
 OLBaseWinNotifyWindowSelected	method dynamic OLBaseWinClass,
 					MSG_META_NOTIFY_TASK_SELECTED
@@ -1949,7 +1949,7 @@ done:
 	ret
 OLBaseWinNotifyWindowSelected	endm
 
-;endif	;----------------------------------------------------------------------
+endif	; TOOL_AREA_IS_TASK_BAR ---------------------------
 
 
 
@@ -1978,7 +1978,7 @@ REVISION HISTORY:
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
 
-;if _ISUI ; NOTE: this is not OLBaseWin, It is OLWindowListItem ---------------
+if TOOL_AREA_IS_TASK_BAR ; NOTE: this is not OLBaseWin, It is OLWindowListItem!
 
 OLWindowListItemNotifyWindowSelected	method dynamic OLWindowListItemClass,
 					MSG_META_NOTIFY_TASK_SELECTED
@@ -2007,7 +2007,7 @@ OLWindowListItemNotifyWindowSelected	method dynamic OLWindowListItemClass,
 	ret
 OLWindowListItemNotifyWindowSelected	endm
 
-;endif	;----------------------------------------------------------------------
+endif	; TOOL_AREA_IS_TASK_BAR
 
 
 
@@ -2038,7 +2038,7 @@ REVISION HISTORY:
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
 
-;if _ISUI ; NOTE: this is not OLBaseWin, It is OLWindowListItem ---------------
+if TOOL_AREA_IS_TASK_BAR ; NOTE: this is not OLBaseWin, It is OLWindowListItem ---------------
 
 OLWindowListItemSetOperatingParams	method dynamic OLWindowListItemClass,
 				MSG_OL_WINDOW_LIST_ITEM_SET_OPERATING_PARAMS
@@ -2048,7 +2048,7 @@ OLWindowListItemSetOperatingParams	method dynamic OLWindowListItemClass,
 	ret
 OLWindowListItemSetOperatingParams	endm
 
-;endif	;----------------------------------------------------------------------
+endif	;----------------------------------------------------------------------
 
 
 
@@ -2077,7 +2077,7 @@ REVISION HISTORY:
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
 
-;if _ISUI ; NOTE: this is not OLBaseWin, It is OLWindowListItem ---------------
+if TOOL_AREA_IS_TASK_BAR ; NOTE: this is not OLBaseWin, It is OLWindowListItem ---------------
 
 OLWindowListItemCloseWindow	method dynamic OLWindowListItemClass,
 					MSG_OL_WINDOW_LIST_ITEM_CLOSE_WINDOW
@@ -2090,7 +2090,7 @@ OLWindowListItemCloseWindow	method dynamic OLWindowListItemClass,
 
 OLWindowListItemCloseWindow	endm
 
-;endif	; if _ISUI -----------------------------------------------------------
+endif	; if TOOL_AREA_IS_TASK_BAR
 
 
 
@@ -2124,7 +2124,7 @@ REVISION HISTORY:
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
 
-;if _ISUI ; NOTE: this is not OLBaseWin, It is OLWindowListItem ---------------
+if TOOL_AREA_IS_TASK_BAR ; NOTE: this is not OLBaseWin, It is OLWindowListItem ---------------
 
 OLWindowListItemKeyboardChar	method dynamic OLWindowListItemClass,
 					MSG_META_KBD_CHAR
@@ -2147,7 +2147,7 @@ callSuper:
 
 OLWindowListItemKeyboardChar	endm
 
-;endif	; if _ISUI -----------------------------------------------------------
+endif	; if TOOL_AREA_IS_TASK_BAR
 
 
 COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -2971,22 +2971,19 @@ if RADIO_STATUS_ICON_ON_PRIMARY
 	call	OLBaseWinRemoveRadioStatusIcon
 endif
 
-ISU <	call	EnsureItemRemovedFromWindowList				>
-MO  <	call	EnsureItemRemovedFromWindowList				>
-
+if TOOL_AREA_IS_TASK_BAR
+	call	EnsureItemRemovedFromWindowList
+endif
 	jmp	short done
 
 notDetaching:
 
-ISU <	test	cx, mask UWF_ATTACHING					>
-ISU <	jz	done							>
-ISU <	call	EnsureItemAddedToWindowList				>
-
-MO  <	test	cx, mask UWF_ATTACHING					>
-MO  <	jz	done							>
-MO  <	call	EnsureItemAddedToWindowList				>
-
-
+; FIXME!!! - should this be "if _ISUI"?
+if TOOL_AREA_IS_TASK_BAR
+	test	cx, mask UWF_ATTACHING
+	jz	done
+	call	EnsureItemAddedToWindowList
+endif
 
 done:
 	ret
@@ -3248,8 +3245,10 @@ if RADIO_STATUS_ICON_ON_PRIMARY
 	call	OLBaseWinRemoveRadioStatusIcon
 endif
 
-ISU <	call	EnsureItemRemovedFromWindowList				>
-MO  <	call	EnsureItemRemovedFromWindowList				>
+if TOOL_AREA_IS_TASK_BAR
+	call	EnsureItemRemovedFromWindowList
+endif
+
 	ret
 OLBaseWinSpecUnbuild	endm
 
@@ -3354,7 +3353,7 @@ REVISION HISTORY:
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
 
-;if _ISUI ;--------------------------------------------------------------------
+if TOOL_AREA_IS_TASK_BAR
 
 EnsureItemRemovedFromWindowList	proc	far
 	clr	bx
@@ -3379,7 +3378,7 @@ done:
 	ret
 EnsureItemRemovedFromWindowList	endp
 
-;endif	;----------------------------------------------------------------------
+endif	;TOOL_AREA_IS_TASK_BAR
 
 Unbuild ends
 
@@ -3496,7 +3495,7 @@ OLBaseWinMoveOffScreen	method dynamic	OLBaseWinClass, \
 
 if _NO_WIN_ICONS
 	; Since we do not create an icon when we minimize, we need to make
-	;     sure that some other object has the active focus/target.
+	; sure that some other object has the active focus/target.
 
 	clr	bx
 	call	GeodeGetAppObject
@@ -3710,12 +3709,12 @@ OLBaseWinGainedSystemTargetExcl	endp
 
 UpdateAppMenuItemCommon	proc	far
 
-;if _ISUI
+if TOOL_AREA_IS_TASK_BAR
 	push	cx
 	mov	ax, MSG_OL_BASE_WIN_UPDATE_WINDOW_ENTRY
 	call	ObjCallInstanceNoLock
 	pop	cx
-;endif
+endif
 	mov	ax, MSG_OL_APP_UPDATE_TASK_ENTRY
 	call	GenCallApplication
 	ret
