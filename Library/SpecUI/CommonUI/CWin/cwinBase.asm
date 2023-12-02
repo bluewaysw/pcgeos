@@ -3941,9 +3941,11 @@ endif
 	mov	cl, mask OLWHS_TITLE_IMAGE_INVALID
 	call	OpenWinHeaderMarkInvalid
 
-ISU <	mov	ax, MSG_OL_BASE_WIN_UPDATE_WINDOW_ENTRY			>
-ISU <	clr	cx							>
-ISU <	call	ObjCallInstanceNoLock					>
+if TOOL_AREA_IS_TASK_BAR
+	mov	ax, MSG_OL_BASE_WIN_UPDATE_WINDOW_ENTRY
+	clr	cx
+	call	ObjCallInstanceNoLock
+endif
 
 	ret
 OLBaseWinLostSystemTargetExcl	endp

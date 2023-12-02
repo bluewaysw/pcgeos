@@ -12,14 +12,14 @@ ROUTINES:
 	----			-----------
     INT EnsureHeaderGCMIcons    Ensure Header GCM Icons :)
 
-    INT OLWinCreateGCMChildTrigger 
+    INT OLWinCreateGCMChildTrigger
 				Creates a GCM child trigger in parent
 				object's block, gives it a
 				ATTR_GEN_TRIGGER_ACTION_DATA w/OD of parent
 				object, adds it with a one-way linkage, &
 				SPEC_BUILD's it.
 
-    MTD MSG_GEN_SET_WIN_POSITION 
+    MTD MSG_GEN_SET_WIN_POSITION
 				This method is used by applications to
 				override a window's positioning attributes
 				and update the window.
@@ -28,28 +28,28 @@ ROUTINES:
 				override a window's sizing attributes and
 				update the window.
 
-    MTD MSG_GEN_SET_WIN_CONSTRAIN 
+    MTD MSG_GEN_SET_WIN_CONSTRAIN
 				This method is used by applications to
 				override a window's constrain attributes
 				and update the window.
 
     MTD MSG_OL_WIN_IS_MAXIMIZED Returns whether maximized.
 
-    MTD MSG_OL_WIN_IS_DEFAULT_ACTION_NAVIGATE_TO_NEXT_FIELD 
+    MTD MSG_OL_WIN_IS_DEFAULT_ACTION_NAVIGATE_TO_NEXT_FIELD
 				Returns whether default action is navigate
 				to next field.
 
-    MTD MSG_SPEC_NAVIGATE_TO_PREVIOUS_FIELD 
+    MTD MSG_SPEC_NAVIGATE_TO_PREVIOUS_FIELD
 				Returns whether default action is navigate
 				to next field.
 
-    MTD MSG_SPEC_NAVIGATION_QUERY 
+    MTD MSG_SPEC_NAVIGATION_QUERY
 				This method is used to implement the
 				keyboard navigation within-a-window
 				mechanism. See method declaration for full
 				details.
 
-    INT OpenWinGetHeaderTitleBounds 
+    INT OpenWinGetHeaderTitleBounds
 				This procedure returns the bounds of the
 				title area of an OLWinClass object (this is
 				the Header area, less the area taken up by
@@ -71,7 +71,7 @@ ROUTINES:
 				parent (if this is a Display) or
 				GenApplication object.
 
-    MTD MSG_OL_WIN_ACTIVATE_DEFAULT_OR_NAVIGATE 
+    MTD MSG_OL_WIN_ACTIVATE_DEFAULT_OR_NAVIGATE
 				Activate default or navigate if no default
 
     INT HandleMenuToggling      Figures out whether we should toggle menu
@@ -85,16 +85,16 @@ ROUTINES:
 
     INT HandleMenuNavigation    Handles any menu navigation.
 
-    MTD MSG_OL_WIN_TOGGLE_MENU_NAVIGATION 
+    MTD MSG_OL_WIN_TOGGLE_MENU_NAVIGATION
 				A window sends this method to itself when
 				then user presses the Alt key, to begin or
 				end menu navigation.
 
-    MTD MSG_OL_WIN_QUERY_MENU_BAR 
+    MTD MSG_OL_WIN_QUERY_MENU_BAR
 				Returns menu bar handle in cx.  The class
 				default is none.
 
-    MTD MSG_OL_WIN_QUERY_MENU_BAR_HAS_FOCUS 
+    MTD MSG_OL_WIN_QUERY_MENU_BAR_HAS_FOCUS
 				Sees if menu bar currently has the focus.
 
     MTD MSG_SPEC_NOTIFY_ENABLED Handles notifying an object that it is
@@ -112,11 +112,11 @@ ROUTINES:
 
     MTD MSG_SPEC_GET_LEGOS_LOOK Get the legos look.
 
-    MTD MSG_OL_WIN_CHECK_IF_POTENTIAL_NEXT_WINDOW 
+    MTD MSG_OL_WIN_CHECK_IF_POTENTIAL_NEXT_WINDOW
 				see if this window should be "next window"
 				for Alt-F6 function.
 
-    MTD MSG_OL_WIN_CLEAR_TOGGLE_MENU_NAV_PENDING 
+    MTD MSG_OL_WIN_CLEAR_TOGGLE_MENU_NAV_PENDING
 				clears OLWMS_TOGGLE_MENU_NAV_PENDING
 
 REVISION HISTORY:
@@ -154,11 +154,11 @@ SYNOPSIS:	Ensure Header GCM Icons :)
 
 CALLED BY:
 
-PASS:		
+PASS:
 
-RETURN:		
+RETURN:
 
-DESTROYED:	
+DESTROYED:
 
 PSEUDO CODE/STRATEGY:
 
@@ -248,7 +248,7 @@ OLWinCreateGCMChildTrigger	proc	near	uses	ax, bx
 	mov	ax, ds:[LMBH_handle]	; set CXDX data = parent
 	mov	ds:[bx].handle, ax
 	mov	ds:[bx].chunk, dx
-	xchg	si, dx			; get *ds:si = parent, 
+	xchg	si, dx			; get *ds:si = parent,
 					; ^lcx:dx = new trigger
 	pop	cx
 	.leave
@@ -650,7 +650,7 @@ WinMethods	segment resource
 
 COMMENT @----------------------------------------------------------------------
 
-METHOD:		OLWinIsMaximized -- 
+METHOD:		OLWinIsMaximized --
 		MSG_OL_WIN_IS_MAXIMIZED for OLWinClass
 
 DESCRIPTION:	Returns whether maximized.
@@ -662,7 +662,7 @@ PASS:		*ds:si 	- instance data
 RETURN:		carry set if maximized
 		ax, cx, dx, bp - preserved
 
-ALLOWED TO DESTROY:	
+ALLOWED TO DESTROY:
 		bx, si, di, ds, es
 
 REGISTER/STACK USAGE:
@@ -692,7 +692,7 @@ OLWinIsMaximized	endm
 
 COMMENT @----------------------------------------------------------------------
 
-METHOD:		OLWinIsDefaultActionNavigateToNextField -- 
+METHOD:		OLWinIsDefaultActionNavigateToNextField --
 		MSG_OL_WIN_IS_DEFAULT_ACTION_NAVIGATE_TO_NEXT_FIELD for
 		OLWinClass
 
@@ -702,10 +702,10 @@ PASS:		*ds:si 	- instance data
 		es     	- segment of MetaClass
 		ax 	- MSG_OL_WIN_IS_DEFAULT_ACTION_NAVIGATE_TO_NEXT_FIELD
 
-RETURN:		carry set if default action is navigate to next field 
+RETURN:		carry set if default action is navigate to next field
 		ax, cx, dx, bp - preserved
 
-ALLOWED TO DESTROY:	
+ALLOWED TO DESTROY:
 		bx, si, di, ds, es
 
 REGISTER/STACK USAGE:
@@ -864,7 +864,7 @@ if	_ROUND_THICK_DIALOGS
 
 windowRegionBW	label	Region
 	; Implied Bounds (UL - LR): (PARAM_0, PARAM_1) - (PARAM_2, PARAM_3)
-	
+
 	word	PARAM_1-1,					EOREGREC
 	word	PARAM_1,    PARAM_0+4, PARAM_2-4,		EOREGREC
 	word	PARAM_1+1,  PARAM_0+2, PARAM_2-2,		EOREGREC
@@ -907,7 +907,7 @@ CALLED BY:	utility
 
 PASS:		ds:*si	- handle of instance data
 
-RETURN:		(ax, bx, cx, dx) = bounds		
+RETURN:		(ax, bx, cx, dx) = bounds
 
 DESTROYED:	nothing
 
@@ -950,7 +950,7 @@ DESCRIPTION:	This method is sent by child which 1) is the focused object
 		parent in the focus hierarchy.
 
 		At this class level, the parent in the focus hierarchy is
-		either the generic parent (if this is a Display) or 
+		either the generic parent (if this is a Display) or
 		GenApplication object.
 
 PASS:		*ds:si	= instance data for object
@@ -1018,11 +1018,11 @@ endif	;----------------------------------------------------------------------
 	;Try using the character as a mnemonic, unless some stay-up window
 	;currently has the focus exclusive.  (I'm not sure why this is done.
 	;Presumably the opened menu will be checked first.  -cbh 10/13/93)
-	
+
 	call	KN_DerefVisSpec_DI
 	test	ds:[di].OLWI_menuState, mask OLWMS_HAS_MENU_IN_STAY_UP_MODE
 	jnz	tryAccelerators			;has stay up menu, skip
-	
+
 	test	dh, CTRL_KEYS			;are these down?
 	jnz	tryAccelerators			;yes, forget mnemonics
 
@@ -1036,7 +1036,7 @@ endif	;----------------------------------------------------------------------
 	call	ObjCallInstanceNoLock
 	pop	cx, dx, bp
 	jc	done				;mnemonic found, exit
-	
+
 tryAccelerators:
 	;Before sending up the key to the application, to look for application
 	;accelerators, we'll look for accelerators in this window's system menu
@@ -1044,7 +1044,7 @@ tryAccelerators:
 	;ISUI: we need to check for a custom sys menu before checking the
 	;    standard sys menu.
 
-if _ISUI ;--------------------------------------------------------------------
+if TOOL_AREA_IS_TASK_BAR ;--------------------------------------------------------------------
 	call	KN_DerefVisSpec_DI
 	cmp	ds:[di].OLWI_type, MOWT_PRIMARY_WINDOW	;only primaries have
 	jne	checkSysMenu				; custom sys menus
@@ -1208,7 +1208,7 @@ PASS:		*ds:si -- handle
 
 RETURN:		carry set if handled
 
-DESTROYED:	
+DESTROYED:
 
 PSEUDO CODE/STRATEGY:
 
@@ -1238,7 +1238,7 @@ DBCS <	cmp	cx, C_SYS_ESCAPE			;escape key?	>
 	call	KN_DerefVisSpec_DI
 CUAS <	cmp	ds:[di].OLWI_type, MOWT_DISPLAY_WINDOW			>
 OLS  <	cmp	ds:[di].OLWI_type, OLWT_DISPLAY_WINDOW			>
-     	je	notHandled				
+     	je	notHandled
 
 checkToggling:
 
@@ -1269,13 +1269,13 @@ checkToggling:
 
 	test	ds:[di].OLWI_menuState,mask OLWMS_TOGGLE_MENU_NAV_PENDING
 	jz	notHandled
-	
-sendToggle:	
+
+sendToggle:
 	;
 	; Clear the pending flag and send out a toggle method.
 	;
 	ANDNF	ds:[di].OLWI_menuState, not mask OLWMS_TOGGLE_MENU_NAV_PENDING
-	
+
 	mov	ax, MSG_OL_WIN_TOGGLE_MENU_NAVIGATION
 	call	ObjCallInstanceNoLock
 handled:
@@ -1346,7 +1346,7 @@ MenuKeyToggles?	proc	near
 	jz	checkToggleKeys				;skip if not doing menus
 	test	ds:[di].OLWI_focusExcl.FTVMC_flags, mask MAEF_OD_IS_WINDOW
 	jnz	notTogglable				;menu up, skip these
-	
+
 checkToggleKeys:
 	; not togglable if CTRL-ALT-release ALT or SHIFT-ALT-release ALT
 SBCS <	cmp	cx, (CS_CONTROL shl 8) or VC_LALT	;left ALT key?	>
@@ -1374,12 +1374,12 @@ DBCS <	cmp	cx, C_SYS_ESCAPE			;escape key?	>
 	jne	notTogglable				;nope, branch
 
 	call	AnyMouseButtonDown?		; If mouse button down, skip
-	jnz	notTogglable					
+	jnz	notTogglable
 
 	tst	cl					;else clear zero flag
 	stc						;and don't wait for
 	ret						;    release.
-	
+
 notDoingMenus:
 
 if _USE_KBD_ACCELERATORS and 0
@@ -1397,7 +1397,7 @@ endif
 							;else activate onrelease
 togglable:
 	call	AnyMouseButtonDown?		; If mouse button down, skip
-	jnz	notTogglable					
+	jnz	notTogglable
 
 reallyTogglable:
 	tst	cl					;clear zero flag
@@ -1498,7 +1498,7 @@ REVISION HISTORY:
 
 HandleMenuNavigation	proc	near
 	class	OLWinClass
-			
+
 if _MENU_NAVIGATION	;------------------------------------------------------
 	push	ax   			;save method
 	test	dl, mask CF_FIRST_PRESS or mask CF_REPEAT_PRESS
@@ -1575,7 +1575,7 @@ exitCarry:
 sendToSelf:
 	call	ObjCallInstanceNoLock
 	jmp	exitCarry
-	
+
 exitNotHandled:
 	clc				;key not handled
 exit:
@@ -1584,7 +1584,7 @@ endif			;------------------------------------------------------
 	ret
 HandleMenuNavigation	endp
 
-			
+
 if _MENU_NAVIGATION	;------------------------------------------------------
 
 ;Keyboard shortcut bindings for OLMenuedWinClass, USED ONLY IN CASE WHERE
@@ -1703,14 +1703,14 @@ else
 	tst	cx
 	jz	useSysMenu			;no children, use system menu
 
-	mov	dx, ds:[di].VCI_comp.CP_firstChild.chunk	
+	mov	dx, ds:[di].VCI_comp.CP_firstChild.chunk
 	jmp	setFocus
 endif	; MENU_BAR_IS_A_MENU
 
 useSysMenu:
 	call	KN_DerefVisSpec_DI
 
-if _ISUI ;--------------------------------------------------------------------
+if TOOL_AREA_IS_TASK_BAR ;--------------------------------------------------------------------
 	call	GetSystemMenuBlockHandle	;returns bx = block handle
 						; zf - if no titleBarMenu
 	mov	ax, offset StandardWindowMenu
@@ -1721,7 +1721,7 @@ if _ISUI ;--------------------------------------------------------------------
 	jz	exitMenuBar
 
 	test	ds:[di].OLWI_menuState, mask OWA_SYS_MENU_IS_CLOSE_BUTTON
-	jnz	exitMenuBar	
+	jnz	exitMenuBar
 
 	push	si
 	mov	si, ax
@@ -1743,7 +1743,7 @@ endif	;----------------------------------------------------------------------
 	pop	si
 	tst	dx				;any button?
 	jz	exitMenuBar			;no, let's give up
-	
+
 setFocus:
 	mov	bp, mask MAEF_OD_IS_MENU_RELATED or \
 		    mask MAEF_GRAB or mask MAEF_FOCUS
@@ -1754,10 +1754,10 @@ callAndExit:
 	; Start a pre-passive grab so we can release the menu focus on ANY
 	; mouse click.  -cbh 10/22/90
 
-	call	VisAddButtonPrePassive		
+	call	VisAddButtonPrePassive
 exit:
 	ret
-	
+
 exitMenuBar:
 
 	; No previous focus exclusive, there's not much point in leaving menu
@@ -1773,7 +1773,7 @@ exitMenuBar:
 else
 	ret
 endif
-	
+
 OLWinToggleMenuNavigation	endm
 
 endif	;----------------------------------------------------------------------
@@ -1788,7 +1788,7 @@ KbdNavigation	segment resource
 
 COMMENT @----------------------------------------------------------------------
 
-METHOD:		OLWinQueryMenuBar -- 
+METHOD:		OLWinQueryMenuBar --
 		MSG_OL_WIN_QUERY_MENU_BAR for OLWinClass
 
 DESCRIPTION:	Returns menu bar handle in cx.  The class default is none.
@@ -1822,7 +1822,7 @@ OLWinQueryMenuBar	endm
 
 COMMENT @----------------------------------------------------------------------
 
-METHOD:		OLWinMenuBarHasFocus -- 
+METHOD:		OLWinMenuBarHasFocus --
 		MSG_OL_WIN_QUERY_MENU_BAR_HAS_FOCUS for OLWinClass
 
 DESCRIPTION:	Sees if menu bar currently has the focus.
@@ -1857,8 +1857,8 @@ exit:
 	ret
 OLWinQueryMenuBarHasFocus	endm
 
-KbdNavigation	ends				
-				
+KbdNavigation	ends
+
 ;-------------------------------
 
 WinMethods	segment resource
@@ -1866,7 +1866,7 @@ WinMethods	segment resource
 
 COMMENT @----------------------------------------------------------------------
 
-METHOD:		OLWinNotifyEnabled -- 
+METHOD:		OLWinNotifyEnabled --
 		MSG_SPEC_NOTIFY_ENABLED for OLWinClass
 
 DESCRIPTION:	Handles notifying an object that it is enabled.
@@ -1882,7 +1882,7 @@ PASS:		*ds:si 	- instance data
 RETURN:		nothing
 		ax, cx, dx, bp - destroyed
 
-ALLOWED TO DESTROY:	
+ALLOWED TO DESTROY:
 		bx, si, di, ds, es
 
 REGISTER/STACK USAGE:
@@ -1905,13 +1905,13 @@ OLWinNotifyEnabled	method dynamic	OLWinClass, MSG_SPEC_NOTIFY_ENABLED,
 	call	ObjCallSuperNoLock		;call superclass
 	DoPop	dx, ax				;restore method
 	jnc	exit				;no state change, exit
-	
+
 if NORMAL_HEADERS_ON_DISABLED_WINDOWS
 						;never disable if normal headers
 	cmp	ax, MSG_SPEC_NOTIFY_NOT_ENABLED
 	je	afterNotifications
 endif
-	mov	di, ds:[si]			
+	mov	di, ds:[si]
 	add	di, ds:[di].Vis_offset
 	mov	bx, ds:[di].OLWI_sysMenu	;get block that objects are in
 	tst	bx
@@ -1969,7 +1969,7 @@ PASS:		*ds:si	= OLWinClass object
 RETURN:		carry	= set if the look was invalid (new look not set)
 			= clear if the look was valid (new look set)
 DESTROYED:	nothing
-SIDE EFFECTS:	
+SIDE EFFECTS:
 
 PSEUDO CODE/STRATEGY:
 
@@ -1979,7 +1979,7 @@ REVISION HISTORY:
 	dlitwin	10/11/95   	Initial version
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
-OLWSpecSetLegosLook	method dynamic OLWinClass, 
+OLWSpecSetLegosLook	method dynamic OLWinClass,
 					MSG_SPEC_SET_LEGOS_LOOK
 	uses	ax, cx
 	.enter
@@ -2056,7 +2056,7 @@ PASS:		*ds:si	= OLWinClass object
 		ds:di	= OLWinClass instance data
 RETURN:		cl	= legos look
 DESTROYED:	nothing
-SIDE EFFECTS:	
+SIDE EFFECTS:
 
 PSEUDO CODE/STRATEGY:
 
@@ -2066,7 +2066,7 @@ REVISION HISTORY:
 	dlitwin	10/11/95   	Initial version
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
-OLWSpecGetLegosLook	method dynamic OLWinClass, 
+OLWSpecGetLegosLook	method dynamic OLWinClass,
 					MSG_SPEC_GET_LEGOS_LOOK
 	.enter
 	mov	cl, ds:[di].OLWI_legosLook
@@ -2120,7 +2120,7 @@ OLWinRotateDisplay	method dynamic OLWinClass, MSG_GEN_ROTATE_DISPLAY
 
 		mov	ax, MSG_VIS_MOVE_RESIZE_WIN
 		call	ObjCallInstanceNoLock
-		
+
 noWindow:
 	;
 	;  Invalidate children.
@@ -2166,11 +2166,11 @@ PASS:		*ds:si	= OLWinClass object
 
 RETURN:		carry set if so
 
-ALLOWED TO DESTROY:	
+ALLOWED TO DESTROY:
 		ax, cx, dx, bp
 		bx, si, di, ds, es
 
-SIDE EFFECTS:	
+SIDE EFFECTS:
 
 PSEUDO CODE/STRATEGY:
 
@@ -2215,11 +2215,11 @@ PASS:		*ds:si	= OLWinClass object
 
 RETURN:		nothing
 
-ALLOWED TO DESTROY:	
+ALLOWED TO DESTROY:
 		ax, cx, dx, bp
 		bx, si, di, ds, es
 
-SIDE EFFECTS:	
+SIDE EFFECTS:
 
 PSEUDO CODE/STRATEGY:
 

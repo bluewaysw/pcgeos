@@ -16,11 +16,11 @@ ROUTINES:
     INT WinCommon_CallSysMenu   This procedure creates the System Menu
 				which appears in the window header area.
 
-    INT WinCommon_CallSysMenuButton 
+    INT WinCommon_CallSysMenuButton
 				This procedure creates the System Menu
 				which appears in the window header area.
 
-    INT GetSystemMenuBlockHandle 
+    INT GetSystemMenuBlockHandle
 				Return the block in which the system menu
 				resides
 
@@ -29,14 +29,14 @@ ROUTINES:
 				so we only had one template, but I had
 				trouble with COPY_VIS_MONIKER.
 
-    INT OpenWinEnsureSysMenuIcons 
+    INT OpenWinEnsureSysMenuIcons
 				This procedure creates the System icons
 				which appear in the window header
 				area. (The System Menu itself is now
 				created by a separate routine: see
 				OpenWinEnsureSysMenu.)
 
-    INT AttachAndBuildSysMenuIcon 
+    INT AttachAndBuildSysMenuIcon
 				Attach system menu icon to window, & build
 				it out
 
@@ -47,35 +47,35 @@ ROUTINES:
 				work! See OLPopupWinTogglePushpin of a good
 				example of the rest.
 
-    INT OpenWinPositionSysMenuIcons 
+    INT OpenWinPositionSysMenuIcons
 				This CUA/MOTIF specific procedure positions
 				and enables the appropriate icons for the
 				system menu - minimize, maximize, system
 				menu button, etc.
 
-    INT OpenWinGetTitleBarGroupSize 
+    INT OpenWinGetTitleBarGroupSize
 				Get width and height of title bar group.
 
-    INT OpenWinPositionTitleBarGroup 
+    INT OpenWinPositionTitleBarGroup
 				Set width and height and position of title
 				bar group.
 
-    INT OpenWinEnableAndPosSysMenuIcon 
+    INT OpenWinEnableAndPosSysMenuIcon
 				This procedure updates one of the objects
 				related to the Motif/CUA system menu:
 				system menu button, triggers inside the
 				system menu, and the icons which serve as
 				shortcuts to the items in the system menu.
 
-    INT EnableDisableAndPosSysIcon 
+    INT EnableDisableAndPosSysIcon
 				Enable/disables system icon, & positions it
 				if being enabled.
 
-    INT EnableDisableSysMenuItem 
+    INT EnableDisableSysMenuItem
 				Enables/disables a menu item somewhere on
 				the system menu.
 
-    INT OpenWinGetSysMenuButtonWidth 
+    INT OpenWinGetSysMenuButtonWidth
 				Returns width of window's system menu
 				button.
 
@@ -83,10 +83,10 @@ ROUTINES:
 				the Move icon or menu item in the system
 				menu.
 
-    INT OpenWinStartMoveResizeCommon 
+    INT OpenWinStartMoveResizeCommon
 				setup params for and call ImStartMoveResize
 
-    INT OpenWinStartMoveResizeMonitor 
+    INT OpenWinStartMoveResizeMonitor
 				set up input monitor to detect mouse button
 				activity to stop keyboard move/resize
 
@@ -94,11 +94,11 @@ ROUTINES:
 				the Size icon or menu item in the system
 				menu.
 
-    INT OpenWinMoveResizeAbortMonitor 
+    INT OpenWinMoveResizeAbortMonitor
 				input monitor to detect mouse press on
 				which to abort keyboard move/resize
 
-    MTD MSG_OL_WIN_TURN_ON_AND_BUMP_MOUSE 
+    MTD MSG_OL_WIN_TURN_ON_AND_BUMP_MOUSE
 				Turn on ptr and do MSG_VIS_VUP_BUMP_MOUSE
 
 REVISION HISTORY:
@@ -158,11 +158,13 @@ OpenWinEnsureSysMenu	proc	far
 
 	;see if we have created a custom system menu object yet
 
-ISU <	cmp	ds:[di].OLWI_type, MOWT_PRIMARY_WINDOW			>
-ISU <	jne	notPrimary						>
-ISU <	tst	ds:[di].OLBWI_titleBarMenu.handle			>
-ISU <	jnz	next2							>
-ISU <notPrimary:							>
+if TOOL_AREA_IS_TASK_BAR
+	cmp	ds:[di].OLWI_type, MOWT_PRIMARY_WINDOW
+	jne	notPrimary
+	tst	ds:[di].OLBWI_titleBarMenu.handle
+	LONG	jnz	next2
+	notPrimary:
+endif
 
 	;see if we have created the system menu objects yet
 
@@ -187,7 +189,7 @@ if (not _ISUI)
 				;assume display system menu close button
 	mov	bx, handle DisplayWindowMenuResource
 	mov	dx, offset DisplayWindowMenuButton
-	
+
 	cmp	ds:[di].OLWI_type, MOWT_DISPLAY_WINDOW
 	je	createSysMenuCloseButton	;skip if a display window
 				;else regular system menu close button
@@ -208,12 +210,12 @@ endif	; if (not _ISUI)
 	mov	ax, offset OLWI_sysMenu		;point to field which has handle
 	mov	bx, handle DisplayWindowMenuResource
 	mov	dx, offset DisplayWindowMenu	;assume display system menu
-	
+
 	cmp	ds:[di].OLWI_type, MOWT_DISPLAY_WINDOW
 	je	createSysMenu			;skip if a display window
 	mov	bx, handle StandardWindowMenuResource
 	mov	dx, offset StandardWindowMenu	;assume regular system menu
-	
+
 createSysMenu:
 	call	OpenWinDuplicateBlock
 	call	CustomizeSysMenu		;setup correct accelerators
@@ -231,7 +233,7 @@ sendUpdateSpecBuild:
 	and	bp, not mask SBF_WIN_GROUP	; NOT doing WIN_GROUP, rather,
 						; we're doing its children
 	or	bp, mask SBF_TREE_BUILD		; & doing tree build
-	
+
 	mov	cx, -1				; do full, non-optimized check
 	call	GenCheckIfFullyEnabled	; see if we're fully enabled
 	jnc	10$			; no, branch
@@ -290,7 +292,7 @@ WinCommon_CallSysMenu	proc	near	uses	bx, si, di
 	.enter
 	call	WinCommon_DerefVisSpec_DI
 
-if _ISUI
+if TOOL_AREA_IS_TASK_BAR
 	call	GetSystemMenuBlockHandle	;returns bx = block handle
 	mov	si, offset StandardWindowMenu
 	jz	haveSysMenu
@@ -310,7 +312,7 @@ WinCommon_CallSysMenu	endp
 WinCommon_CallSysMenuButton	proc	near	uses	bx, si, di
 	.enter
 	call	WinCommon_DerefVisSpec_DI
-if _ISUI
+if TOOL_AREA_IS_TASK_BAR
 	call	GetSystemMenuBlockHandle	;returns bx = block handle
 else
 	mov	bx, ds:[di].OLWI_sysMenu
@@ -339,10 +341,12 @@ SetAppMonikerForSysMenu	proc	near
 	;
 	; if custom system menu, exit
 	;
+if TOOL_AREA_IS_TASK_BAR
 		cmp	ds:[di].OLWI_type, MOWT_PRIMARY_WINDOW
 		jne	normalSysMenu
 		tst	ds:[di].OLBWI_titleBarMenu.handle
 		jnz	done
+endif
 normalSysMenu:
 	;
 	; copy app tool moniker into this block
@@ -403,7 +407,7 @@ RETURN:		bx		block handle of system menu
 
 DESTROYED:	nothing
 
-SIDE EFFECTS:	
+SIDE EFFECTS:
 
 PSEUDO CODE/STRATEGY:
 		If the window is a primary, check to see if it has a custom
@@ -417,7 +421,7 @@ REVISION HISTORY:
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
 
-if _ISUI
+if TOOL_AREA_IS_TASK_BAR
 
 GetSystemMenuBlockHandle	proc	far
 
@@ -468,32 +472,32 @@ REVISION HISTORY:
 
 CustomizeSysMenu	proc	far		uses	si
 	.enter
-	mov	di, ds:[si]			
+	mov	di, ds:[si]
 	add	di, ds:[di].Vis_offset
-	
+
 	mov	bx, cx			; new menu in ^lbx:si
 	mov	si, dx
 
 	mov	cx, 0ffffh			;assume menu, clear accelerator
 	clr	dx				;no bits to set
-	cmp	ds:[di].OLWI_type, MOWT_MENU	
+	cmp	ds:[di].OLWI_type, MOWT_MENU
 	je	setAccel			;
 	cmp	ds:[di].OLWI_type, MOWT_SUBMENU
 	je	setAccel			;
-	
+
 	inc	cx				;assume normal sys menu, set ALT
 	mov	dx, KSS_ALT
 	cmp	ds:[di].OLWI_type, MOWT_DISPLAY_WINDOW
 	jne	setAccel			;not display, branch to set
-	
+
 	clr	cx				;no bits to clear
 	mov	dx, KSS_CTRL			;assume display, set CTRL bit
-	
+
 setAccel:
 	call	ObjSwapLock
 	push	bx
 	;
-	; Let's modify the monikers of the menu items. Bits to clear in cx, 
+	; Let's modify the monikers of the menu items. Bits to clear in cx,
 	; bits to set in dx.
 	;
 	mov	ax, MSG_GEN_CHANGE_ACCELERATOR
@@ -520,7 +524,7 @@ PASS:		ds:*si	- instance data
 
 RETURN:		nothing
 
-DESTROYED:	?	
+DESTROYED:	?
 
 PSEUDO CODE/STRATEGY:
 
@@ -638,7 +642,7 @@ AttachAndBuildSysMenuIcon	proc	near	uses	cx, si, bp
 	mov	bx, cx
 	mov	si, dx
 	call	ObjSwapLock
-	
+
 	mov     ax, MSG_SPEC_BUILD_BRANCH
 	call    WinCommon_ObjCallInstanceNoLock
 
@@ -1078,7 +1082,7 @@ if _ISUI
 	pop	bx
 	jc	OWCWHG_60
 endif
-	
+
 	;
 	; if keyboard only, don't make room for system menu icons
 	;
@@ -1281,7 +1285,7 @@ noLeftStandardIcons:
 	;
 	mov	bp, offset OLWI_titleBarRightGroup
 	call	OpenWinPositionTitleBarGroup
-	
+
 	jc	noRightGroupPosition
 	push	cx, dx
 	mov	bp, OLWI_titleBarRightGroup
@@ -1329,7 +1333,7 @@ noRightGroupPosition:
 	mov	ax, offset SMI_Close		;chunk handle of menu item
 	mov	bl, mask OLWSI_CLOSABLE		;mask for Close icon
 if _ISUI
-	add	cx, 2				;gap between min/max & close 
+	add	cx, 2				;gap between min/max & close
 	mov	bp, offset SMI_CloseIcon	;chunk handle of icon
 else
 	clr	bp				;pass: no icon
@@ -1464,15 +1468,15 @@ else
 gotHeight:
 endif
 	;
-	; Fairly bad hack to match menu bar height.  -cbh 5/12/92	
+	; Fairly bad hack to match menu bar height.  -cbh 5/12/92
 	; Must match similar hack in OLBaseWinUpdateExpressToolArea.
 	;
 	call	OpenWinCheckIfSquished		; running CGA?
-	jc	205$				; yes, skip this   
-	call	OpenWinCheckMenusInHeader	; are we in the header?    
-	jnc	205$				; nope, done		   
+	jc	205$				; yes, skip this
+	call	OpenWinCheckMenusInHeader	; are we in the header?
+	jnc	205$				; nope, done
 	add	ax, 3				; else expand to match menu bar
-205$:								       
+205$:
 
 	mov	si, ({optr} ds:[di][bp]).chunk
 	call	ObjSwapLock			; *ds:si = title bar group
@@ -1567,7 +1571,7 @@ REVISION HISTORY:
 OpenWinEnableAndPosSysMenuIcon	proc	near
 	class	OLWinClass
 	;
-	; If no system menu, skip icons, though update the system menu 
+	; If no system menu, skip icons, though update the system menu
 	; button itself (pinnable menus have this button added when pinned,
 	; removed when unpinned)
 	;
@@ -1685,15 +1689,15 @@ notSysMenuButton:
 afterAdjustment:
 endif
 
-	;Fairly bad hack to match menu bar height.  -cbh 5/12/92	
+	;Fairly bad hack to match menu bar height.  -cbh 5/12/92
 	;Must match similar hack in OLBaseWinUpdateExpressToolArea.
 
 	call	OpenWinCheckIfSquished		; running CGA?
-	jc	5$				; yes, skip this   
-	call	OpenWinCheckMenusInHeader	; are we in the header?    
-	jnc	5$				; nope, done		   
+	jc	5$				; yes, skip this
+	call	OpenWinCheckMenusInHeader	; are we in the header?
+	jnc	5$				; nope, done
 	add	dx, 3				; else expand to match menu bar
-5$:								       
+5$:
 
 	mov	di, dx
 	pop	cx, dx
@@ -1706,10 +1710,12 @@ readyWithWidthHeight:
 	;
 	push	di
 	call	WinCommon_DerefVisSpec_DI
-ISU <	test	bl, mask OLWSI_SYS_MENU		;mask for Sys Menu icon	>
-ISU <	jz	normalSysMenu						>
-ISU <	call	GetSystemMenuBlockHandle	; return bx = sys menu  >
-ISU <	jmp	short haveSysMenu
+if TOOL_AREA_IS_TASK_BAR
+	test	bl, mask OLWSI_SYS_MENU		;mask for Sys Menu icon
+	jz	normalSysMenu
+	call	GetSystemMenuBlockHandle	; return bx = sys menu
+	jmp	short haveSysMenu
+endif
 normalSysMenu:
 	mov	bx, ds:[di].OLWI_sysMenu	; fetch system menu block
 haveSysMenu:
@@ -1877,10 +1883,12 @@ EnableDisableSysMenuItem	proc	near	uses	ax, cx, dx, bp, bx, si
 	jz	disableIcon			; skip to disable icon...
 	mov	ax, MSG_GEN_SET_ENABLED		; wrong -- enable it.
 disableIcon:
-ISU <	test	bl, mask OLWSI_SYS_MENU		; mask for Sys Menu icon>
-ISU <	jz	normalSysMenu						>
-ISU <	call	GetSystemMenuBlockHandle	; return bx = sys menu  >
-ISU <	jmp	short haveSysMenu
+if TOOL_AREA_IS_TASK_BAR
+	test	bl, mask OLWSI_SYS_MENU		; mask for Sys Menu icon
+	jz	normalSysMenu
+	call	GetSystemMenuBlockHandle	; return bx = sys menu
+	jmp	short haveSysMenu
+endif
 
 normalSysMenu:
 	mov	bx, ds:[di].OLWI_sysMenu	; get system menu block handle,
@@ -1949,7 +1957,7 @@ OpenWinGetSysMenuButtonWidth	proc	far
 	tst	si
 	jz	done				; no button --> no width
 
-if _ISUI
+if TOOL_AREA_IS_TASK_BAR
 	call	GetSystemMenuBlockHandle	; returns bx = sys menu block
 else
 	mov	bx, ds:[di].OLWI_sysMenu
@@ -2044,7 +2052,7 @@ PASS:		*ds:si = OLWin
 
 RETURN:		nothing
 
-DESTROYED:	
+DESTROYED:
 
 PSEUDO CODE/STRATEGY:
 
@@ -2147,7 +2155,7 @@ if	 _ROUND_THICK_DIALOGS
 	call	OpenWinShouldHaveRoundBorderFar		;destroys nothing
 	jc	wasRounded
 endif	;_ROUND_THICK_DIALOGS
-	
+
 	mov	ax, offset PrimaryResizeRegion
 					;assume is normal window
 	push	di
@@ -2394,7 +2402,7 @@ skip:
 	popf
 	pop	ds
 	jnc	consume
-	
+
 SBCS <	mov	cx, VC_ENTER or (CS_CONTROL shl 8) 			>
 DBCS <	mov	cx, C_SYS_ENTER						>
 	mov	dx, mask CF_FIRST_PRESS
@@ -2435,11 +2443,11 @@ PASS:		*ds:si	= class object
 
 RETURN:		Same as MSG_VIS_VUP_BUMP_MOUSE
 
-ALLOWED TO DESTROY:	
+ALLOWED TO DESTROY:
 		ax, cx, dx, bp
 		bx, si, di, ds, es
 
-SIDE EFFECTS:	
+SIDE EFFECTS:
 
 PSEUDO CODE/STRATEGY:
 

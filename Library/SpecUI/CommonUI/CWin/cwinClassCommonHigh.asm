@@ -485,7 +485,7 @@ OpenWinInitialize	endp
 
 COMMENT @----------------------------------------------------------------------
 
-METHOD:		OLWinScanGeometryHints -- 
+METHOD:		OLWinScanGeometryHints --
 		MSG_SPEC_SCAN_GEOMETRY_HINTS for OLWinClass
 
 DESCRIPTION:	Scans geometry hints.  The default handler for OLWinClass.
@@ -500,7 +500,7 @@ PASS:		*ds:si 	- instance data
 RETURN:		nothing
 		ax, cx, dx, bp - destroyed
 
-ALLOWED TO DESTROY:	
+ALLOWED TO DESTROY:
 		bx, si, di, ds, es
 
 REGISTER/STACK USAGE:
@@ -528,8 +528,8 @@ OLWinScanGeometryHints	method static OLWinClass, MSG_SPEC_SCAN_GEOMETRY_HINTS
 	mov	di, offset OLWinClass
 	CallSuper	MSG_SPEC_SCAN_GEOMETRY_HINTS
 
-	;Make sure minimum size method is called.  
-	
+	;Make sure minimum size method is called.
+
 	call	WinCommon_DerefVisSpec_DI
 	ORNF	ds:[di].VCI_geoAttrs, mask VCGA_HAS_MINIMUM_SIZE
 
@@ -567,7 +567,7 @@ COMMENT @----------------------------------------------------------------------
 FUNCTION:	OpenWinProcessHints
 
 DESCRIPTION:	This is a general hint-checker for OLWinClass objects.
-		We would normally handle this directly in the 
+		We would normally handle this directly in the
 		MSG_META_INITIALIZE handler for OLWinClass, but we want
 		the subclass's handler to have a chance to assert some
 		object-specific defaults BEFORE we scan hints. So we call
@@ -597,7 +597,7 @@ OpenWinProcessHints	proc	far
 	;Make any resizeable window expand-to-fit, so that they can be resized
 	;without regard to the contents of the windows (and also so they will
 	;hold their size.)   This is done here so gadget areas can copy the
-	;correct attributes when they're built, but I may change them to 
+	;correct attributes when they're built, but I may change them to
 	;always be expand to fit anyway.  -cbh 6/12/92 (Used to only set these
 	;for non-menu menued wins)  (Changed 6/17/92 to make *any* non-menu
 	;expand-to-fit, even if not resizable.  Fixes problems with keyboard-
@@ -775,7 +775,7 @@ HintNoTallerThanChildrenRequire	proc	far
 	class	OLWinClass
 	call	WinCommon_DerefVisSpec_DI
 	and	ds:[di].VCI_geoDimensionAttrs, \
-				not mask VCGDA_EXPAND_HEIGHT_TO_FIT_PARENT 
+				not mask VCGDA_EXPAND_HEIGHT_TO_FIT_PARENT
 	ret
 HintNoTallerThanChildrenRequire	endp
 
@@ -783,7 +783,7 @@ HintNoWiderThanChildrenRequire	proc	far
 	class	OLWinClass
 	call	WinCommon_DerefVisSpec_DI
 	and	ds:[di].VCI_geoDimensionAttrs, \
-				not mask VCGDA_EXPAND_WIDTH_TO_FIT_PARENT 
+				not mask VCGDA_EXPAND_WIDTH_TO_FIT_PARENT
 	ret
 HintNoWiderThanChildrenRequire	endp
 
@@ -811,14 +811,14 @@ endif			; if not _NO_WIN_ICONS --------------------------------
 ;pass cx = 0 if this window does not support a window icon.
 
 
-			
+
 HintUseInitialBoundsWhenRestored	proc	far
 	clr	cx				;bits to clear
 	mov	dx, mask WPSF_PERSIST		;bits to set
 	call	SetWinPosSizeAttrFromRegs
 	ret
 HintUseInitialBoundsWhenRestored	endp
-					
+
 HintWindowShouldFitInParent 	proc	far
 	clr	cx			;bits to clear
 	mov	dx, mask WPSF_SHRINK_DESIRED_SIZE_TO_FIT_IN_PARENT
@@ -839,14 +839,14 @@ HintKeepPartiallyVisible	proc	far
 	call	SetWinPosSizeAttrFromRegs
 	ret
 HintKeepPartiallyVisible	endp
-			
+
 HintKeepEntirelyVisibleWithMargin	proc	far
 	mov	cx, mask WPSF_CONSTRAIN_TYPE	;bits to clear
 	mov	dx, WCT_KEEP_VISIBLE_WITH_MARGIN shl offset WPSF_CONSTRAIN_TYPE
 	call	SetWinPosSizeAttrFromRegs
 	ret
 HintKeepEntirelyVisibleWithMargin	endp
-					
+
 HintKeepEntirelyVisible	proc	far
 	mov	cx, mask WPSF_CONSTRAIN_TYPE	;bits to clear
 	mov	dx, WCT_KEEP_VISIBLE shl offset WPSF_CONSTRAIN_TYPE
@@ -880,21 +880,21 @@ HintStaggerWindow	proc	far
 	call	SetWinPosSizeAttrFromRegs
 	ret
 HintStaggerWindow	endp
-			
+
 HintCenterWindow	proc	far
 	mov	cx, mask WPSF_POSITION_TYPE
 	mov	dx, WPT_CENTER shl offset WPSF_POSITION_TYPE
 	call	SetWinPosSizeAttrFromRegs
 	ret
 HintCenterWindow	endp
-			
+
 HintTileWindow	proc	far
 	mov	cx, mask WPSF_POSITION_TYPE
 	mov	dx, WPT_TILED shl offset WPSF_POSITION_TYPE
 	call	SetWinPosSizeAttrFromRegs
 	ret
 HintTileWindow	endp
-		
+
 HintPositionWindowAtMouse	proc	far
 	mov	cx, mask WPSF_POSITION_TYPE
 	mov	dx, WPT_AT_MOUSE_POSITION shl offset WPSF_POSITION_TYPE
@@ -908,14 +908,14 @@ HintExtendWindowToBottomRight	proc	far
 	call	SetWinPosSizeAttrFromRegs
 	ret
 HintExtendWindowToBottomRight	endp
-				
+
 HintSizeWindowAsDesired	proc	far
 	mov	cx, mask WPSF_SIZE_TYPE
 	mov	dx, WST_AS_DESIRED shl offset WPSF_SIZE_TYPE
 	call	SetWinPosSizeAttrFromRegs
 	ret
 HintSizeWindowAsDesired	endp
-				
+
 HintSizeWindowAsRatioOfParent	proc	far
 EC <	push	ax							  >
 EC <	VarDataSizePtr	ds, bx, ax					  >
@@ -928,7 +928,7 @@ EC <	pop	ax							  >
 	call	SetWinPosSizeAttrFromRegs
 	ret
 HintSizeWindowAsRatioOfParent	endp
-				
+
 HintSizeWindowAsRatioOfField	proc	far
 EC <	push	ax							  >
 EC <	VarDataSizePtr	ds, bx, ax					  >
@@ -941,7 +941,7 @@ EC <	pop	ax							  >
 	call	SetWinPosSizeAttrFromRegs
 	ret
 HintSizeWindowAsRatioOfField	endp
-				
+
 HintExtendWindowNearBottomRight	proc	far
 	mov	cx, mask WPSF_SIZE_TYPE
 	mov	dx, WST_EXTEND_NEAR_BOTTOM_RIGHT shl offset WPSF_SIZE_TYPE
@@ -996,12 +996,12 @@ HintWindowNoSysMenu	endp
 
 HintWindowMinimizeTitleBar	proc	far
 	class	OLWinClass
-	
+
 if	 _ALLOW_MINIMIZED_TITLE_BARS
 	; set bit to indicate minimized title bar
 	call	WinCommon_DerefVisSpec_DI
 	ornf	ds:[di].OLWI_moreFixedAttr, mask OMWFA_MINIMIZE_TITLE_BAR
-	
+
 	; disable sys menu since the title bar will not be big enough to
 	; support it.
 	andnf	ds:[di].OLWI_attrs, not mask OWA_HAS_SYS_MENU
@@ -1050,7 +1050,7 @@ SetWinPosSizeAttrFromRegs	proc	near
 	call	WinCommon_DerefVisSpec_DI
 	lea	bp, ds:[di].OLWI_winPosSizeFlags ;set ds:bp = WinPosSizeFlags
 
-	add	di, offset VI_bounds		
+	add	di, offset VI_bounds
 
 	test	dx, mask WPSF_HINT_FOR_ICON	;is hint for icon?
 
@@ -1152,9 +1152,9 @@ done:
 SetWinPosSizeAttrFromRegs	endp
 
 
-			
-			
-			
+
+
+
 ;make sure that the size of this object is not descibed using
 ;the difference between bounds values.
 ;pass	ds:di = Rectangle
@@ -1194,7 +1194,7 @@ done:
 	ret
 EnsureRightBottomBoundsAreIndependent	endp
 
-			
+
 ;make sure that the size of this object *is* descibed using
 ;the difference between bounds values.  (Added 5/18/93 cbh)
 ;pass	ds:di = Rectangle
@@ -1212,7 +1212,7 @@ EnsureBoundsAreDependent	proc	far
 	test	byte ptr ds:[bp]+2, mask WPSS_VIS_POS_IS_SPEC_PAIR \
 				 or mask WPSS_VIS_SIZE_IS_SPEC_PAIR_PARENT \
 				 or mask WPSS_VIS_SIZE_IS_SPEC_PAIR_PARENT
-	jnz	done			
+	jnz	done
 
 	;We need Chris Hawley bounds - pixels, size is difference between.
 
@@ -1264,12 +1264,12 @@ AvoidCenteringIfExtending	proc	near
 	; Not extending to bottom right, exit.
 	;
 	call	WinCommon_DerefVisSpec_DI
-	mov	ax, ds:[di].OLWI_winPosSizeFlags	
+	mov	ax, ds:[di].OLWI_winPosSizeFlags
 	mov	ah, al
 	and	al, mask WPSF_SIZE_TYPE
 	cmp	al, WST_EXTEND_TO_BOTTOM_RIGHT shl offset WPSF_SIZE_TYPE
 	je	checkCentering
-	cmp	al, WST_EXTEND_NEAR_BOTTOM_RIGHT shl offset WPSF_SIZE_TYPE 
+	cmp	al, WST_EXTEND_NEAR_BOTTOM_RIGHT shl offset WPSF_SIZE_TYPE
 	jne	exit
 
 checkCentering:
@@ -1290,12 +1290,12 @@ nukeCenter:
 	; Replace center stuff by whatever the default was before hints were
 	; processed.
 	;
-	mov	ax, ds:[di].OLWI_winPosSizeFlags	
+	mov	ax, ds:[di].OLWI_winPosSizeFlags
 	and	ax, not mask WPSF_POSITION_TYPE
 	and	cx, mask WPSF_POSITION_TYPE
 	or	ax, cx
 	mov	ds:[di].OLWI_winPosSizeFlags, ax
-		
+
 exit:
 	ret
 AvoidCenteringIfExtending	endp
@@ -1316,7 +1316,7 @@ DESCRIPTION:	We get this method when the UI is recursively SPEC_BUILDing
 
 PASS:		*ds:si - instance data
 		es - segment of OpenWinClass
-	
+
 		ax - MSG_SPEC_BUILD_BRANCH
 		cx - ?
 		dx - ?
@@ -1378,7 +1378,7 @@ if _MENUS_PINNABLE
 endif
 
 if _GCM
-	; 
+	;
 	; if running in General Consumer Mode, create the appropriate
 	; big icons in the header area.
 	; (pass bp = SpecBuildFlags)
@@ -1394,18 +1394,19 @@ endif	; _GCM
 CUAS <	call	OpenWinEnsureSysMenu					     >
 CUAS <	call	OpenWinEnsureSysMenuIcons				     >
 	;
-	; Now that we have setup the system menu, we can go ahead and 
+	; Now that we have setup the system menu, we can go ahead and
 	; find the title monikers for OLMenued windows.  (And destroy
 	; the window's moniker list in the process.)
 	;
-
-ISU <	call	WinCommon_DerefVisSpec_DI				     >
-ISU <	cmp	ds:[di].OLWI_type, MOWT_PRIMARY_WINDOW			     >
-ISU <	je	findTitle						     >
-ISU <	cmp	ds:[di].OLWI_type, MOWT_DISPLAY_WINDOW			     >
-ISU <	jne	done							     >
-ISU <findTitle:								     >
-ISU <	call	OLMenuedWinFindTitleMonikerFar				     >
+if TOOL_AREA_IS_TASK_BAR
+	call	WinCommon_DerefVisSpec_DI
+	cmp	ds:[di].OLWI_type, MOWT_PRIMARY_WINDOW
+	je	findTitle
+	cmp	ds:[di].OLWI_type, MOWT_DISPLAY_WINDOW
+	jne	done
+findTitle:
+	call	OLMenuedWinFindTitleMonikerFar
+endif
 
 done:
 	ret
@@ -1465,14 +1466,14 @@ COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 SYNOPSIS:	This handles the SGQT_BRING_UP_KEYBOARD GupQuery by setting
-		the appropriate flag on the object, so when it gets the 
+		the appropriate flag on the object, so when it gets the
 		focus, it will bring up the keyboard.
 
 CALLED BY:	GLOBAL
 PASS:		nada
 RETURN:		nada
 DESTROYED:	nada
- 
+
 PSEUDO CODE/STRATEGY:
 
 KNOWN BUGS/SIDE EFFECTS/IDEAS:
@@ -1491,7 +1492,7 @@ if _DUI
 	cmp	cx, SGQT_SET_KEYBOARD_TYPE
 	je	setKeyboardType
 endif
-	
+
 	cmp	cx, SGQT_WIN_GROUP
 	je	checkWinGroup
 
@@ -1506,7 +1507,7 @@ checkWinGroup:
 	jz	passItUp
 	tst	ds:[di].VCI_window
 	jz	passItUp
-	
+
 	mov	cx, ds:[LMBH_handle]
 	mov	dx, si
 	mov	bp, ds:[di].VCI_window
@@ -1592,10 +1593,10 @@ if 0	; I tried this to get popups to come up on the screen, not the field,
 ;;;RETURN:		carry set if answered:
 ;;;			^lcx:dx	= vis parent to use
 ;;;DESTROYED:	ax, bp
-;;;SIDE EFFECTS:	
+;;;SIDE EFFECTS:
 ;;;
 ;;;PSEUDO CODE/STRATEGY:
-;;;		
+;;;
 ;;;
 ;;;REVISION HISTORY:
 ;;;	Name	Date		Description
@@ -1634,7 +1635,7 @@ CALLED BY:	GLOBAL
 PASS:		cx, dx - x,y coord
 RETURN:		nada
 DESTROYED:	nada
- 
+
 PSEUDO CODE/STRATEGY:
 
 KNOWN BUGS/SIDE EFFECTS/IDEAS:
@@ -1667,7 +1668,7 @@ PASS:		cx - KeyboardOverride
 		*ds:si - OLWin object
 RETURN:		nada
 DESTROYED:	nada
- 
+
 PSEUDO CODE/STRATEGY:
 
 KNOWN BUGS/SIDE EFFECTS/IDEAS:
@@ -1720,9 +1721,9 @@ PASS:		*ds:si	= OLWinClass object
 		ds:bx	= OLWinClass object (same as *ds:si)
 		es 	= segment of OLWinClass
 		ax	= message #
-RETURN:		
-DESTROYED:	
-SIDE EFFECTS:	
+RETURN:
+DESTROYED:
+SIDE EFFECTS:
 
 PSEUDO CODE/STRATEGY:
 
@@ -1733,7 +1734,7 @@ REVISION HISTORY:
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
 
-OLWinToggleFloatingKbd	method dynamic OLWinClass, 
+OLWinToggleFloatingKbd	method dynamic OLWinClass,
 					MSG_GEN_TOGGLE_FLOATING_KBD
 	.enter
 	mov	ax, ATTR_GEN_WINDOW_KBD_OVERRIDE
@@ -1841,12 +1842,12 @@ EC <	ERROR_Z	OL_ERROR						>
 
 	call	VisCheckIfSpecBuilt	; If already vis built, done.
 	jc	Done
-		
+
 	; First, set the fully enabled based on our parent's fully enabled
 	; state (passed in with BuildFlags) and our enabled state.
-	
-	call	VisSpecBuildSetEnabledState	
-   
+
+	call	VisSpecBuildSetEnabledState
+
 if	ERROR_CHECK	;------------------------------------------------------
 	;
 	; Ensure that GenPrimary and GenDisplay are handled by
@@ -1899,10 +1900,10 @@ endif
 
 	; If ALL_DIALOGS_ARE_MODAL, don't grab the focus before the
 	; window is built  -- kho, 7/13/95
-		
-ife	ALL_DIALOGS_ARE_MODAL	
+
+ife	ALL_DIALOGS_ARE_MODAL
 	call	ScanFocusTargetHintHandlers
-endif	
+endif
 	;
 	; NOTE: we do not handling restoring maximized state as only
 	; GenDisplay and its subclass GenPrimary supports this.  This
@@ -1927,10 +1928,10 @@ CALLED BY:	OpenWinSpecBuild
 PASS:		*ds:si	= object
 RETURN:		nothing
 DESTROYED:	nothing
-SIDE EFFECTS:	
+SIDE EFFECTS:
 
 PSEUDO CODE/STRATEGY:
-		
+
 
 REVISION HISTORY:
 	Name	Date		Description
@@ -2059,7 +2060,7 @@ UWPS_done:
 	;save state record back to object instance data
 
 	call	WinCommon_DerefVisSpec_DI
-	ANDNF	bx, not mask WPSS_HAS_RESTARTED  
+	ANDNF	bx, not mask WPSS_HAS_RESTARTED
 					;clear this now -- cbh 7/ 2/90
 	mov	ds:[di].OLWI_winPosSizeState, bx
 	ret
@@ -2102,11 +2103,11 @@ UpdateWinPosition	proc	far
 
 	mov	cl, al			;cl = position request (LOW BYTE)
 	and	cl, mask WPSF_POSITION_TYPE
-	
+
 ;no, let icons go wherever they want! - brianc 3/27/92
-;	test	bh, mask SSPR_ICON		;if an icon always request slot	
+;	test	bh, mask SSPR_ICON		;if an icon always request slot
 ;	jnz	checkPosRequest1		;  (added cbh 7/ 2/90)
-	
+
 	test	ch, (mask WPSF_PERSIST) shr 8
 	jnz	useCurrentBoundsAsPosition	;skip if moved and care...
 
@@ -2223,7 +2224,7 @@ checkPosRequest2:
 	LONG	jc havePositionCxDx	;skip if failed...
 	tst	bp
 	LONG	jz havePositionCxDx	;skip if is first child
-	
+
 	; bp = child # for this child, and it has an older sibling.
 	;
 	; THIS IS A HACK
@@ -2326,7 +2327,7 @@ handleCenter::
 	sar	dx, 1			;divide by 2
 
 	;
-	; If we can have a floating keyboard, then center the box so it 
+	; If we can have a floating keyboard, then center the box so it
 	; won't be obscured by the floating keyboard (-atw 4/19/93)
 	;
 
@@ -2372,7 +2373,7 @@ EC <	ERROR_NZ OL_ILLEGAL_WIN_POSITION_FLAG				>
 	call	ImGetMousePos		;returns cx, dx
 					;does not trash registers
 
-havePositionCxDx:		
+havePositionCxDx:
 	call	VisSetPosition			;move window
 
 					;Just moving the window won't do it.
@@ -2529,14 +2530,14 @@ if TOOL_AREA_IS_TASK_BAR
 	sub	dx, di			; subtract off taskbar adjustment
 
 endif ; TOOL_AREA_IS_TASK_BAR
-	
+
 	;
 	; We're going to add some code for B/W that allows the edges of windows
 	; to sit OUTSIDE of their visual parent, which will avoid unneeded line
 	; drawing in both the DisplayControl and a Primary.  (We only have to
 	; take into account an extra pixel on the right and bottom, as the
 	; left and top are accounted for in the size in handleExtend when it
-	; subtracts the left/top of our window.)  -cbh 2/ 7/92    (Do it in 
+	; subtracts the left/top of our window.)  -cbh 2/ 7/92    (Do it in
 	; color, too, at least in Motif.  -cbh 12/ 7/92)  (Now, we'll do it
 	; doubly in B/W, since there is not a right-bottom shadow on windows.
 	; -3/11/93)
@@ -2630,13 +2631,13 @@ endif
 handleExtend:
 	;
 	; cx, dx = size of parent window
-	; bp high, bp low = x and y margins recommended by parent for 
+	; bp high, bp low = x and y margins recommended by parent for
 	; windows which are extending to NEAR parent size.
 	;
 	call	WinCommon_DerefVisSpec_DI
 	sub	cx, ds:[di].VI_bounds.R_left
 	sub	dx, ds:[di].VI_bounds.R_top
-	
+
 	mov	ax, bp			;get margin info
 
 	mov	al, ah			;ax = width margin
@@ -2670,7 +2671,7 @@ COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 		OpenWinSwapState
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-SYNOPSIS:	save current position, size, and state information in 
+SYNOPSIS:	save current position, size, and state information in
 		instance data
 
 CALLED BY:	UTILITY
@@ -2879,10 +2880,10 @@ FUNCTION:	OpenWinSetVisParent
 DESCRIPTION:	This procedure handles the "visibly attach to parent"
 		phase of the standard OLWinClass SPEC_BUILD method handler.
 
-CALLED BY:	
+CALLED BY:
 
 PASS:		ds:*si	- instance data
-		es	- segment of OLWinClass 
+		es	- segment of OLWinClass
 		ax	- MSG_SPEC_BUILD
 		cx, dx	- ?
 		bp	- BuildFlags
@@ -2901,11 +2902,11 @@ REVISION HISTORY:
 
 ------------------------------------------------------------------------------@
 
-OpenWinSetVisParent	proc	far	
+OpenWinSetVisParent	proc	far
 ;	class	OLWinClass		;can use OLWinClass instance data
 
 	;THIS ROUTINE CAN'T DO A NON_WIN_GROUP BUILD. Classes w/dual build
-	;should replace the non-win group case. 
+	;should replace the non-win group case.
 
 EC <	test	bp, mask SBF_WIN_GROUP					>
 EC <	ERROR_Z	OL_OPEN_WIN_SPEC_BUILD_CANNOT_HANDLE_NON_WIN_GROUP_BUILD	>
@@ -3028,7 +3029,7 @@ endif ; TOOL_AREA_IS_TASK_BAR
 	;
 	; We're going to add some code for B/W that allows the edges of windows
 	; to sit OUTSIDE of their visual parent, which will avoid unneeded line
-	; drawing in both the DisplayControl and a Primary.  We do this 
+	; drawing in both the DisplayControl and a Primary.  We do this
 	; regardless of the zeroness of ax and bx, to cover the display control
 	; case.  -cbh 2/14/92  (Now in color, too, at least in Motif.  -cbh
 	; 12/ 7/92)
@@ -3138,7 +3139,7 @@ GetTaskBarPositionAdjustment	proc	far
 
 	push	cx, dx
 	call	OLWinGetToolAreaSize
-	mov	di, dx			; di = height of tool area (taskbar) 
+	mov	di, dx			; di = height of tool area (taskbar)
 	pop	cx, dx
 done:
 	ret
@@ -3154,7 +3155,7 @@ GetTaskBarSizeAdjustment	proc	far
 	mov	di, 0			; assume no adjustment (di = 0)
 	je	done
 
-	; If taskbar is at the bottom of the screen, adjust size to 
+	; If taskbar is at the bottom of the screen, adjust size to
 	; account for taskbar.
 
 	push	ds
@@ -3176,7 +3177,7 @@ GetTaskBarSizeAdjustment	proc	far
 
 	push	cx, dx
 	call	OLWinGetToolAreaSize
-	mov	di, dx			; di = height of tool area (taskbar) 
+	mov	di, dx			; di = height of tool area (taskbar)
 	pop	cx, dx
 done:
 	ret
@@ -3210,7 +3211,7 @@ REVISION HISTORY:
 	stevey	9/28/94   	Initial version
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
-OLWinGetOrCreateTitleGroup	method dynamic OLWinClass, 
+OLWinGetOrCreateTitleGroup	method dynamic OLWinClass,
 					MSG_OL_WIN_GET_OR_CREATE_TITLE_GROUP
 		.enter
 	;

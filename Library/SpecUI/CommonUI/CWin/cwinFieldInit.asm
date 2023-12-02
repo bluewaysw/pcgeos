@@ -913,8 +913,8 @@ OLFieldEnsureToolArea	proc	far
 	mov	ds:[di].OLFI_toolArea, dx
 
 	push	cx, dx, si
-if EXTENDIBLE_SYSTEM_TRAY
-if _ISUI
+
+if TOOL_AREA_IS_TASK_BAR and EXTENDIBLE_SYSTEM_TRAY
 	;
 	; Find the system tray. Since it's copied during via COPY_TREE, we
 	; don't know the chunk handle. This code is dependent on the order
@@ -954,7 +954,7 @@ EC <	pop	es							>
 	mov	ds:[di].OLFI_systemTray, dx
 NEC < cantFindSysTray:							>
 	pop	cx, dx
-elseif _MOTIF
+elseif _MOTIF and EXTENDIBLE_SYSTEM_TRAY
 	;
 	; Find the system tray. Since it's copied during the COPY_TREE, we
 	; don't know the chunk handle. So, we've got to find it. This code
@@ -1008,7 +1008,6 @@ NEC < cantFindSysTray:							>
 	pop	cx, dx
 else
 	.err < SysTray init code not written for this SPUI >
-endif
 endif
 
 	; Get it up on screen (a queue delay later)

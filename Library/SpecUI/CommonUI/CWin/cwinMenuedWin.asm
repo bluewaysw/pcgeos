@@ -454,7 +454,7 @@ REVISION HISTORY:
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
 
-if _ISUI ;--------------------------------------------------------------------
+if TOOL_AREA_IS_TASK_BAR ;--------------------------------------------------------------------
 
 OLMenuedWinSetCustomSystemMenuMoniker	method dynamic OLMenuedWinClass,
 				MSG_OL_WIN_SET_CUSTOM_SYSTEM_MENU_MONIKER
@@ -544,7 +544,7 @@ OLMenuedWinFindTitleMonikerFar	proc	far
 	ret
 OLMenuedWinFindTitleMonikerFar	endp
 
-endif	; if _ISUI -----------------------------------------------------------
+endif	; if TOOL_AREA_IS_TASK_BAR -----------------------------------------------------------
 
 
 
