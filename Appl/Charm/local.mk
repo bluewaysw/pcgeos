@@ -20,11 +20,12 @@
 #
 # Put our copyright message in geode (32 char. max.).
 #
-LINKFLAGS += -N Blue\20Marsh\20Softworks
+LINKFLAGS += -N "Blue Marsh Softworks, Rabe-Soft"
 #
 # Turn off error-checking.
 #
-#NO_EC = 1
+# NO_EC = 1
+
 #
 # Include the system makefile.
 #
