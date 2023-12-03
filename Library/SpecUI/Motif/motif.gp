@@ -178,9 +178,6 @@ resource ControlInfoXIP read-only shared
 endif
 resource CommonUIClassStructures fixed read-only shared
 
-resource ExitResource shared read-only ui-object
-
-
 #
 # Export routines called by UI, by offset (*must* be first)
 #
@@ -248,10 +245,6 @@ skip 1
 export WindowListListClass
 export TaskBarListClass
 export SysTrayInteractionClass
-
-#skip 1
-#export SysTrayInteractionClass
-#skip 1
 
 #
 # READ ME:

@@ -1876,7 +1876,7 @@ REVISION HISTORY:
 	Joon	3/5/92		Initial version
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
-if _ISUI or (_MOTIF and EXTENDIBLE_SYSTEM_TRAY)
+if TOOL_AREA_IS_TASK_BAR
 SysTrayInteractionVisDraw	method dynamic SysTrayInteractionClass,
 				MSG_VIS_DRAW
 	push	bp
@@ -1893,7 +1893,7 @@ SysTrayInteractionVisDraw	method dynamic SysTrayInteractionClass,
 	call	OpenDrawRect
 	ret
 SysTrayInteractionVisDraw	endm
-endif ; _ISUI
+endif ; TOOL_AREA_IS_TASK_BAR
 
 
 COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -2098,7 +2098,7 @@ DESTROYED:	ax, cx, dx, bp
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
 
-if TOOL_AREA_IS_TASK_BAR or (_MOTIF and EXTENDIBLE_SYSTEM_TRAY)
+if TOOL_AREA_IS_TASK_BAR
 ToolAreaStartSelect	method dynamic ToolAreaClass,
 					MSG_META_START_SELECT
 	; update the mouse pointer image, in case we have not received a
@@ -2120,15 +2120,8 @@ ToolAreaStartSelect	method dynamic ToolAreaClass,
 	; set MOVING or RESIZING flags
 
 	segmov	es, dgroup, ax
-if TOOL_AREA_IS_TASK_BAR
 	tst	es:[taskBarMovable]
 	jz	noMove				; not supported
-else
-	mov	di, ds:[si]
-	add	di, ds:[di].Gen_offset
-	test	ds:[di].TAI_state, mask TASF_FLOATING_TRAY
-	jz	noMove
-endif
 
 	mov	di, ds:[si]
 	add	di, ds:[di].Vis_offset
@@ -2144,7 +2137,7 @@ noMove:
 done:
 	ret
 ToolAreaStartSelect	endm
-endif ; TOOL_AREA_IS_TASK_BAR or (_MOTIF and EXTENDIBLE_SYSTEM_TRAY)
+endif ; TOOL_AREA_IS_TASK_BAR
 
 
 COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%

@@ -165,18 +165,12 @@ CommonUIClassStructures segment resource
 
 	ToolAreaClass		0
 
-; if TOOL_AREA_IS_TASK_BAR
-
 	WindowListDialogClass	mask CLASSF_DISCARD_ON_SAVE
 	WindowListListClass	mask CLASSF_DISCARD_ON_SAVE
 	TaskBarListClass	mask CLASSF_DISCARD_ON_SAVE
-; endif
-
-;if _ISUI or (_MOTIF and EXTENDIBLE_SYSTEM_TRAY)
 
 	SysTrayInteractionClass	mask CLASSF_DISCARD_ON_SAVE
 
-;endif
 
 if EVENT_MENU
 	EventMenuClass		mask CLASSF_DISCARD_ON_SAVE
@@ -403,24 +397,13 @@ noExpressMenu:
 	add	di, ds:[di].Vis_offset
 	clr	ax
 	xchg	ax, ds:[di].OLFI_toolArea
-if _ISUI and EXTENDIBLE_SYSTEM_TRAY
+if TOOL_AREA_IS_TASK_BAR
 	clr	ds:[di].OLFI_systemTray
 endif
-	tst	ax
-	jz	noToolArea
-	call	clobber
-noToolArea:
-if _MOTIF and EXTENDIBLE_SYSTEM_TRAY
-	mov	di, ds:[si]
-	add	di, ds:[di].Vis_offset
-	clr	ax
-	xchg	ax, ds:[di].OLFI_floatingSystemTray
-	clr	ds:[di].OLFI_systemTray
 	tst	ax
 	jz	noSystemTray
 	call	clobber
 noSystemTray:
-endif
 
 if EVENT_MENU
 	mov	di, ds:[si]
@@ -605,7 +588,7 @@ OLFieldDetach	method dynamic OLFieldClass, MSG_META_DETACH
 		pop	ax, cx, dx, bp, si
 
 passItUp:
-if EXTENDIBLE_SYSTEM_TRAY
+if TOOL_AREA_IS_TASK_BAR
 	;
 	; Check for system tray, and send it a detach
 	;

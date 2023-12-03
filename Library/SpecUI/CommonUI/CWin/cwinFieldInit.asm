@@ -914,7 +914,7 @@ OLFieldEnsureToolArea	proc	far
 
 	push	cx, dx, si
 
-if TOOL_AREA_IS_TASK_BAR and EXTENDIBLE_SYSTEM_TRAY
+if TOOL_AREA_IS_TASK_BAR
 	;
 	; Find the system tray. Since it's copied during via COPY_TREE, we
 	; don't know the chunk handle. This code is dependent on the order
@@ -954,62 +954,7 @@ EC <	pop	es							>
 	mov	ds:[di].OLFI_systemTray, dx
 NEC < cantFindSysTray:							>
 	pop	cx, dx
-elseif _MOTIF and EXTENDIBLE_SYSTEM_TRAY
-	;
-	; Find the system tray. Since it's copied during the COPY_TREE, we
-	; don't know the chunk handle. So, we've got to find it. This code
-	; is entirely dependant on the order of the children, so if anything
-	; gets changed in ExpressMenuResource, this code has to be changed too
-	;
-	push	cx, dx
-	push	si
-	; Creating floating systray
-	mov	cx, ds:[LMBH_handle]	; block to copy into
-	clr	dx
-	mov	bx, handle FloatingSysTray
-	mov	si, offset FloatingSysTray
-	mov	ax, MSG_GEN_COPY_TREE
-	mov	di, mask MF_CALL or mask MF_FIXUP_DS
-	clr	bp		; no special CompChildFlags
-	call	ObjMessage
-
-	pop	si
-	push	si
-	call	GenAddChildUpwardLinkOnly
-	mov	di, ds:[si]
-	add	di, ds:[di].Vis_offset
-	mov	ds:[di].OLFI_floatingSystemTray, dx
-	mov	bx, cx
-	mov	si, dx
-	mov	ax, MSG_GEN_FIND_CHILD_AT_POSITION
-	mov	cx, 1	; object SysTray is 2nd child of FloatingSysTray
-	mov	di, mask MF_CALL or mask MF_FIXUP_DS
-	call	ObjMessage
-NEC <	jc	cantFindSysTray						>
-EC <	ERROR_C	OL_ERROR_CANT_FIND_SYSTRAY_OBJECT			>
-	mov	ax, MSG_GEN_FIND_CHILD_AT_POSITION
-	mov	bx, cx
-	mov	si, dx
-	mov	cx, 0	; object SysTrayExpress is 1st child of SysTray
-	mov	di, mask MF_CALL or mask MF_FIXUP_DS
-	call	ObjMessage
-	pop	si
-EC <	ERROR_C OL_ERROR_CANT_FIND_SYSTRAY_OBJECT			>
-NEC <	jc	cantFindSysTray						>
-	mov	di, ds:[si]
-	add	di, ds:[di].Vis_offset
-	mov	ds:[di].OLFI_systemTray, dx
-	mov	bx, ds:[LMBH_handle]
-	mov	si, ds:[di].OLFI_floatingSystemTray
-	mov	ax, MSG_GEN_INTERACTION_INITIATE
-	mov	di, mask MF_FORCE_QUEUE
-	call	ObjMessage
-NEC < cantFindSysTray:							>
-	pop	cx, dx
-else
-	.err < SysTray init code not written for this SPUI >
 endif
-
 	; Get it up on screen (a queue delay later)
 	;
 	mov	bx, cx

@@ -1400,11 +1400,9 @@ continue:
 	mov	ax, HINT_AVOID_MENU_BAR
 	call	ObjVarFindData
 	jc	done
-if EXTENDIBLE_SYSTEM_TRAY
 	mov	ax, HINT_PRIMARY_AVOID_MENU_BAR_IF_EXTENDIBLE_SYSTRAY
 	call	ObjVarFindData
 	jc	done
-endif
 
 	; Get default field window (presume only one), where most all windows
 	; of the app will be placed.
