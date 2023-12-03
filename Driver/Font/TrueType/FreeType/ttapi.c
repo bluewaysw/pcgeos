@@ -111,8 +111,6 @@ extern TEngine_Instance engineInstance;
 
 #undef TT_FAIL
 
-    /* create the engine lock */
-    MUTEX_Create( _engine->lock );
     return TT_Err_Ok;
 
   Fail:
@@ -148,8 +146,6 @@ extern TEngine_Instance engineInstance;
 
     if ( !_engine )
       return TT_Err_Ok;
-
-    MUTEX_Destroy( _engine->lock );
 
     TTRaster_Done( _engine );
     TTObjs_Done  ( _engine );

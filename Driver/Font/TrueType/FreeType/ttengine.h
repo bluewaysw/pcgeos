@@ -49,8 +49,6 @@
 
   struct  TEngine_Instance_
   {
-     TMutex  lock;               /* engine lock */
-
      void*   list_free_elements;
 
      void*   objs_face_class;       /* the face cache class     */
