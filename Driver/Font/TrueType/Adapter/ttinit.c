@@ -46,7 +46,7 @@ static FontWeight mapFontWeight( TT_Short weightClass );
 
 static TextStyle mapTextStyle(  const char* subfamily );
 
-static FontFamily mapFontFamily( TRUETYPE_VARS );
+static FontGroup mapFontGroup( TRUETYPE_VARS );
 
 static word getNameFromNameTable( 
                                 TRUETYPE_VARS,
@@ -64,6 +64,8 @@ static word toHash( const char* str );
 static int  strlen( const char* str );
 
 static void strcpy( char* dest, const char* source );
+
+static void strcpyname( char* dest, const char* source );
 
 static int strcmp( const char* s1, const char* s2 );
 
@@ -558,13 +560,13 @@ static TextStyle mapTextStyle( const char* subfamily )
 
 
 /********************************************************************
- *                      mapFontFamily
+ *                      mapFontGroup
  ********************************************************************
- * SYNOPSIS:	  Determines the font family on different parameters.
+ * SYNOPSIS:	  Determines the font goup on different parameters.
  * 
  * PARAMETERS:    TRUETYPE_VARS   Pointer to truetypevar block.
  * 
- * RETURNS:       FontFamily      Family of the given font.
+ * RETURNS:       FontGroup       Group of the given font.
  * 
  * SIDE EFFECTS:  none
  * 
@@ -578,15 +580,15 @@ static TextStyle mapTextStyle( const char* subfamily )
 
 #define B_FAMILY_TYPE           0
 #define B_PROPORTION            3
-static FontFamily mapFontFamily( TRUETYPE_VARS )
+static FontGroup mapFontGroup( TRUETYPE_VARS )
 {
-        /* The font family of a TrueType font cannot be determined exactly. */
+        /* The font group of a TrueType font cannot be determined exactly.  */
         /* This implementation is therefore more of an approximation than   */
         /* an exact determination.                                          */
 
         /* recognize FF_MONO from panose fields */
         if( FACE_PROPERTIES.os2->panose[B_PROPORTION] == 9 )    //Monospaced
-                return FF_MONO;
+                return FG_MONO;
 
         /* recognize FF_SANS_SERIF, FF_SERIF, FF_SYMBOL and FF_ORNAMENT from sFamilyClass */
         switch( FACE_PROPERTIES.os2->sFamilyClass >> 8 )
@@ -597,20 +599,20 @@ static FontFamily mapFontFamily( TRUETYPE_VARS )
                 case 4:
                 case 5:
                 case 7:
-                        return FF_SERIF;
+                        return FG_SERIF;
                 case 8:
-                        return FF_SANS_SERIF;
+                        return FG_SANS_SERIF;
                 case 9:
-                        return FF_ORNAMENT;
+                        return FG_ORNAMENT;
                 case 12:
-                        return FF_SYMBOL;
+                        return FG_SYMBOL;
         }
 
         /* recognize FF_SCRIPT from panose fields */
         if( FACE_PROPERTIES.os2->panose[B_FAMILY_TYPE] == 2 )   //Script
-                return FF_SCRIPT;
+                return FG_SCRIPT;
 
-        return FF_NON_PORTABLE;
+        return FG_NON_PORTABLE;
 }
 
 
@@ -637,16 +639,21 @@ static FontFamily mapFontFamily( TRUETYPE_VARS )
 
 static Boolean getFontID( TRUETYPE_VARS, FontID* fontID ) 
 {
-        FontFamily fontFamily = mapFontFamily( trueTypeVars );
+        char  familyName[FID_NAME_LEN];
 
 
-        if( !InitFileReadInteger( FONTMAPPING_CATEGORY, trueTypeVars->familyName, fontID ) )
+        /* clean up family name */
+        strcpyname( familyName, trueTypeVars->familyName );
+
+        /* get FontID from geos.ini */
+        if( !InitFileReadInteger( FONTMAPPING_CATEGORY, familyName, fontID ) )
         {
                 *fontID = ( FM_TRUETYPE | (*fontID & 0x0fff) );
                 return TRUE;
         }
 
-        *fontID = MAKE_FONTID( fontFamily, trueTypeVars->familyName );
+        /* generate FontID */
+        *fontID = MAKE_FONTID( mapFontGroup( trueTypeVars ), trueTypeVars->familyName );
         return FALSE;
 }
 
@@ -1006,7 +1013,22 @@ static int strlen( const char* str )
 
 static void strcpy( char* dest, const char* source )
 {
-        while ((*dest++ = *source++) != '\0');
+        while( (*dest++ = *source++) != '\0' );
+}
+
+
+static void strcpyname( char* dest, const char* source )
+{
+        while( *source != '\0' ) 
+        {
+                if( *source != ' ' ) 
+                {
+                        *dest = *source;
+                        ++dest;
+                }
+                ++source;
+        }
+        *dest = '\0';  // stringending
 }
 
 

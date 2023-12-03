@@ -76,7 +76,7 @@
  *      macro for calculating font ID
  ***********************************************************************/
 
-#define MAKE_FONTID( fontFamily, familyName )   ( FM_TRUETYPE | (fontFamily << 8) | ( 0x00ff & toHash ( familyName )))
+#define MAKE_FONTID( fontGroup, familyName )   ( FM_TRUETYPE | fontGroup | ( 0x00ff & toHash ( familyName )))
 
 
 /***********************************************************************
