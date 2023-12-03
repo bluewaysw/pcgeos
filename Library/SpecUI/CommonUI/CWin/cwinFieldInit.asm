@@ -878,7 +878,7 @@ OLFieldEnsureToolArea	proc	far
 	mov	cx, ds:[LMBH_handle]
 	mov	dx, ds:[di].OLFI_toolArea
 	tst	dx
-	LONG jnz	done
+	LONG 	jnz done
 
 	; Before sending first message to Tool Area, make sure it is marked
 	; as being run by the global UI thread.

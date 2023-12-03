@@ -3764,7 +3764,7 @@ REVISION HISTORY:
 	JS	11/15/92    	Initial version
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
-if PLACE_EXPRESS_MENU_ON_PRIMARY and (not TOOL_AREA_IS_TASK_BAR)
+if PLACE_EXPRESS_MENU_ON_PRIMARY ;and (not TOOL_AREA_IS_TASK_BAR)
 OLBaseWinHideExpressToolArea	proc	near
 
 	push	si
@@ -4852,7 +4852,7 @@ OLBaseWinUpdateExpressToolArea	method static OLBaseWinClass,
 
 	call	WinClasses_DerefVisSpec_DI
 	test	ds:[di].OLBWI_flags, mask OLBWF_HAS_EXPRESS_TOOL_AREA
-	LONG jz	done
+	LONG 	jz	done
 
 	; Move tool area w/Express menu to the corner of our title area
 	;

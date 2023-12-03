@@ -2323,7 +2323,7 @@ noHide:
 
 endif ; TOOL_AREA_IS_TASK_BAR
 
-if (not TOOL_AREA_IS_TASK_BAR)
+;if (not TOOL_AREA_IS_TASK_BAR)
 
 	;
 	; if UIEP_LOWER_LEFT, force a move so that it'll be position at
@@ -2360,7 +2360,7 @@ endif
 	mov	ax, MSG_GEN_GUP_CALL_OBJECT_OF_CLASS
 	call	GenCallParent
 
-endif	; (not TOOL_AREA_IS_TASK_BAR)
+;endif	; (not TOOL_AREA_IS_TASK_BAR)
 
 done:
 	ret

@@ -961,11 +961,11 @@ REVISION HISTORY:
 ------------------------------------------------------------------------------@
 
 ;never change priority of task bar -- brianc 11/12/99
-if (not TOOL_AREA_IS_TASK_BAR)
+;if (not TOOL_AREA_IS_TASK_BAR)
 
 OLFieldMoveToolArea	method	dynamic OLFieldClass, \
 					MSG_OL_FIELD_MOVE_TOOL_AREA
-if (not TOOL_AREA_IS_TASK_BAR)
+;if (not TOOL_AREA_IS_TASK_BAR)
 
 if EVENT_MENU
 	;
@@ -991,7 +991,7 @@ endif
 	pop	es
 	LONG jz	done
 
-endif ; (not TOOL_AREA_IS_TASK_BAR)
+;endif ; (not TOOL_AREA_IS_TASK_BAR)
 
 	mov	si, ds:[di].OLFI_toolArea	; get *ds:si = tool area
 if EVENT_MENU
@@ -1000,7 +1000,7 @@ endif
 	tst	si
 	LONG jz	done
 
-if (not TOOL_AREA_IS_TASK_BAR)
+;if (not TOOL_AREA_IS_TASK_BAR)
 
 	;
 	; First, mark the position flags in the window as WPF_AS_REQUIRED
@@ -1048,7 +1048,7 @@ doItInUILayer:
 	mov	ax, handle ui		; Move to UI's layer
 	jmp	short doIt
 
-endif ; (not TOOL_AREA_IS_TASK_BAR)
+;endif ; (not TOOL_AREA_IS_TASK_BAR)
 
 realGeode:
 	; Ignore request if not from geode owning current target
@@ -1074,7 +1074,7 @@ doIt:
 
 	push	ax			; save layerID
 
-if (not TOOL_AREA_IS_TASK_BAR)
+;if (not TOOL_AREA_IS_TASK_BAR)
 	;
 	; Convert coordinates from screen-absolute to parent-relative
 	;
@@ -1096,7 +1096,7 @@ if (not TOOL_AREA_IS_TASK_BAR)
 	mov	si, mask WPF_ABS	; move to new absolute position
 	call	WinMove
 
-endif ; (not TOOL_AREA_IS_TASK_BAR)
+;endif ; (not TOOL_AREA_IS_TASK_BAR)
 
 	pop	dx			; Pass handle of Geode as
 					; new LayerID
@@ -1114,7 +1114,7 @@ done:
 	ret
 OLFieldMoveToolArea	endm
 
-endif ; (not TOOL_AREA_IS_TASK_BAR)
+;endif ; (not TOOL_AREA_IS_TASK_BAR)
 
 
 COMMENT @----------------------------------------------------------------------
@@ -1147,7 +1147,7 @@ REVISION HISTORY:
 	chris	6/29/92		Initial Version
 
 ------------------------------------------------------------------------------@
-if (not TOOL_AREA_IS_TASK_BAR)
+;if (not TOOL_AREA_IS_TASK_BAR)
 OLFieldSizeToolArea	method dynamic	OLFieldClass, \
 				MSG_OL_FIELD_SIZE_TOOL_AREA
 if EVENT_MENU
@@ -1183,7 +1183,7 @@ endif
 done:
 	ret
 OLFieldSizeToolArea	endm
-endif ; (not TOOL_AREA_IS_TASK_BAR)
+;endif ; (not TOOL_AREA_IS_TASK_BAR)
 
 
 COMMENT @----------------------------------------------------------------------
@@ -1216,7 +1216,6 @@ REVISION HISTORY:
 	----	----		-----------
 	Doug	6/92		Initial version
 ------------------------------------------------------------------------------@
-
 
 OLFieldGetToolAreaSize	method	dynamic OLFieldClass, \
 					MSG_OL_FIELD_GET_TOOL_AREA_SIZE
@@ -1250,7 +1249,6 @@ endif
 OLFieldGetToolAreaSize	endm
 
 
-
 COMMENT @----------------------------------------------------------------------
 
 METHOD:		OLFieldVisUpwardQuery -- MSG_VIS_VUP_QUERY for
