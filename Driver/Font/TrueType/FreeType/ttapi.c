@@ -1599,9 +1599,6 @@ TT_Error  TT_Get_Outline_Region( TT_Outline*     outline,
     /* Load table if needed */
     error = TT_Err_Ok;
 
-    /* MT-NOTE: We're modifying the face object, so protect it. */
-    MUTEX_Lock( faze->lock );
-
     if ( !cmap->loaded )
     {
       (void)USE_Stream( faze->stream, stream );
@@ -1616,7 +1613,6 @@ TT_Error  TT_Get_Outline_Region( TT_Outline*     outline,
       else
         cmap->loaded = TRUE;
     }
-    MUTEX_Release( faze->lock );
 
     HANDLE_Set( *charMap, cmap );
 

@@ -1038,10 +1038,6 @@
     if ( !face )
       return TT_Err_Ok;
 
-    /* well, we assume that no other thread is using the face */
-    /* at this moment, but one is never sure enough.          */
-    MUTEX_Lock( face->lock );
-
     /* first of all, destroys the cached sub-objects */
     Cache_Destroy( &face->instances );
     Cache_Destroy( &face->glyphs );
@@ -1100,9 +1096,6 @@
 
     /* TT_Close_Stream( &face->stream ); -- this is performed by the API */
 
-    /* destroy the mutex */
-    MUTEX_Destroy(face->lock);
-
     return TT_Err_Ok;
   }
 
@@ -1143,8 +1136,6 @@
     face->engine = input->engine;
 
     engine = face->engine;
-
-    MUTEX_Create( face->lock );
 
     Cache_Create( engine,
                   engine->objs_instance_class,
