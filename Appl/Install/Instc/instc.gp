@@ -10,7 +10,7 @@ name ICreat.app
 # Name for GeoManager
 
 longname "Install Creator"
-usernotes "English Version 1.4.0"
+usernotes "English FreeGEOS Version 6.0"
 # spezifiziert den Applikations-typ
 
 type appl, process, single
