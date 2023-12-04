@@ -452,7 +452,9 @@ You can turn on or off certain bits in a record, while leaving the rest of the
 flags in their default settings. You do this in much the same way you do it 
 when specifying classes, i.e. 
 
+~~~
 <record> = default + <flagName>, - <flagname>... ;
+~~~
 
 **record**  
 This is the name of the instance data field, as given in the 

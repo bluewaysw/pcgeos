@@ -1729,8 +1729,8 @@ HOME environment variable
 	patient-default mess1
 	run
 	
-	This example shows a sample initialization file which sets up windows to display the source code 
-	and current register values, set the length of the save buffer to 500 lines, and continue running swat 
-	until the mess1 application has been loaded, at which point execution will automatically stop.
+This example shows a sample initialization file which sets up windows to display the source code 
+and current register values, set the length of the save buffer to 500 lines, and continue running swat 
+until the mess1 application has been loaded, at which point execution will automatically stop.
 
 [System Configuration](tconfig.md) <-- &nbsp;&nbsp; [Table of Contents](../tools.md) &nbsp;&nbsp; --> [Swat Reference](tswta_i.md)
