@@ -1306,7 +1306,6 @@ extern TEngine_Instance engineInstance;
                                    TT_Raster_Map*  map )
   {
     PEngine_Instance  _engine = &engineInstance;
-    TT_Error          error;
 
 
     if ( !_engine )
@@ -1315,11 +1314,7 @@ extern TEngine_Instance engineInstance;
     if ( !outline || !map )
       return TT_Err_Invalid_Argument;
 
-    MUTEX_Lock( _engine->raster_lock );
-    error = RENDER_Glyph( outline, map );
-    MUTEX_Release( _engine->raster_lock );
-
-    return error;
+    return RENDER_Glyph( outline, map );
   }
 
 
@@ -1345,7 +1340,6 @@ TT_Error  TT_Get_Outline_Region( TT_Outline*     outline,
                                  TT_Raster_Map*  map )
 {
   PEngine_Instance  _engine = &engineInstance;
-  TT_Error          error;
 
 
   if ( !_engine )
@@ -1354,10 +1348,7 @@ TT_Error  TT_Get_Outline_Region( TT_Outline*     outline,
   if ( !outline || !map )
     return TT_Err_Invalid_Argument;
 
-  MUTEX_Lock( _engine->raster_lock );
-  error = RENDER_Region_Glyph( outline, map );
-  MUTEX_Release( _engine->raster_lock );
-  return error;
+  return RENDER_Region_Glyph( outline, map );
 }
 
 #endif    /* __GEOS__ */

@@ -35,14 +35,6 @@
 /* free list_elements recycle list.                              */
 #define FREE_Elements  ( engine->list_free_elements )
 
-/* Redefinition of LOCK and UNLOCK macros for New_Element and Done_Element */
-/* Note: The macros are redefined below for the cache functions            */
-
-#undef  LOCK
-#define LOCK()    MUTEX_Lock   ( engine->lock )
-
-#undef  UNLOCK
-#define UNLOCK()  MUTEX_Release( engine->lock )
 
 /*******************************************************************
  *

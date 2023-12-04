@@ -26,7 +26,6 @@
 #include "tttypes.h"
 #include "ttconfig.h"
 #include "freetype.h"
-#include "ttmutex.h"
 
 #ifdef __cplusplus
   extern "C" {
@@ -60,7 +59,6 @@
      void*   objs_exec_cache;  /* the current face and execution */
                                /* context objects                */
 
-     TMutex  raster_lock;          /* mutex for this engine's render pool */
      void*   raster_component;     /* ttraster implementation depedent    */
      void*   extension_component;  /* extensions dependent */
   };
