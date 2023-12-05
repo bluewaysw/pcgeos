@@ -466,7 +466,7 @@ SpecInitExpressPreferences	proc	near	uses ds
 			mask UIEO_UTILITIES_PANEL or \
 			mask UIEO_EXIT_TO_DOS or \
 			mask UIEO_DOCUMENTS_LIST or \
-			UIEP_TOP_PRIMARY shl offset UIEO_POSITION
+			UIEP_LOWER_LEFT shl offset UIEO_POSITION ; UIEP_TOP_PRIMARY
 	cmp	ax, UIIL_BEGINNING		; intro and beginning use this
 	jbe	haveDefaultExpressPrefs
 	mov	bx, mask UIEO_DESK_ACCESSORY_LIST or \
@@ -477,13 +477,13 @@ SpecInitExpressPreferences	proc	near	uses ds
 			mask UIEO_UTILITIES_PANEL or \
 			mask UIEO_EXIT_TO_DOS or \
 			mask UIEO_DOCUMENTS_LIST or \
-			UIEP_TOP_PRIMARY shl offset UIEO_POSITION
+			UIEP_LOWER_LEFT shl offset UIEO_POSITION ; UIEP_TOP_PRIMARY
 
 haveDefaultExpressPrefs:
-	mov	cx, cs
-	mov	dx, offset expressOptionsString
-	call	InitFileReadInteger
-	jc	haveDecision
+	;mov	cx, cs
+	;mov	dx, offset expressOptionsString
+	;call	InitFileReadInteger
+	;jc	haveDecision
 
 	;
 	; require some things for ISUI, don't allow others
@@ -496,9 +496,17 @@ if _ISUI
 	andnf	ax, not (mask UIEO_GEOS_TASKS_LIST)
 endif
 
-if _MOTIF and TOOL_AREA_IS_TASK_BAR
-	andnf	ax, not (mask UIEO_GEOS_TASKS_LIST)
-endif
+	;ornf	ax, mask UIEO_DOCUMENTS_LIST or \
+	;		mask UIEO_EXIT_TO_DOS or \
+	;		mask UIEO_CONTROL_PANEL or \
+	;		mask UIEO_UTILITIES_PANEL
+
+; FIXME!!!
+	;andnf	ax, (UIEP_LOWER_LEFT shl offset UIEO_POSITION)
+
+;if _MOTIF and TOOL_AREA_IS_TASK_BAR
+;	andnf	ax, not (mask UIEO_GEOS_TASKS_LIST)
+;endif
 	mov	bx, ax			; just copy from .ini file
 
 haveDecision:

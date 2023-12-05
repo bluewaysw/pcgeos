@@ -3631,7 +3631,7 @@ OLBaseWinGainedSystemTargetExcl	method dynamic	OLBaseWinClass,
 
 	call	WinClasses_ObjCallSuperNoLock_OLBaseWinClass
 
-if PLACE_EXPRESS_MENU_ON_PRIMARY and (not TOOL_AREA_IS_TASK_BAR)
+if PLACE_EXPRESS_MENU_ON_PRIMARY ;and (not TOOL_AREA_IS_TASK_BAR)
 	push	es
 	segmov	es, dgroup, ax
 	mov	ax, es:[olExpressOptions]
@@ -3664,21 +3664,21 @@ EC <	ERROR_NZ	OL_ERROR					>
 	ornf	ds:[di].OLBWI_flags, mask OLBWF_HAS_EXPRESS_TOOL_AREA
 endif ; PLACE_EXPRESS_MENU_ON_PRIMARY or TOOL_AREA_IS_TASK_BAR
 
-if PLACE_EXPRESS_MENU_ON_PRIMARY and (not TOOL_AREA_IS_TASK_BAR)
+if PLACE_EXPRESS_MENU_ON_PRIMARY ;and (not TOOL_AREA_IS_TASK_BAR)
 	; Cheat -- instead of doing full geometry, just update
 	; OLWI_titleBarBounds to reflect the addition of the express tool area.
 	;
 	call	OLBaseWinAdjustTitleBoundsForExpressToolArea
 
-if REDO_GEOMETRY_FOR_EXPRESS_MENU
+;if REDO_GEOMETRY_FOR_EXPRESS_MENU
 	; If we're putting the menu bar in the title area, we need to
 	; invalidate the geometry of the menu bar so it gets resized.
 	;
 	call	OLRedoMenuBarGeometryIfMenusInHeader
-endif
+;endif
 endif ; PLACE_EXPRESS_MENU_ON_PRIMARY
 
-if PLACE_EXPRESS_MENU_ON_PRIMARY or TOOL_AREA_IS_TASK_BAR
+if PLACE_EXPRESS_MENU_ON_PRIMARY ;or TOOL_AREA_IS_TASK_BAR
 	; Now that the new title bounds have been determined, ask the field
 	; to position the little tool area over the edge of it.
 	;
@@ -3719,7 +3719,7 @@ endif
 UpdateAppMenuItemCommon	endp
 
 
-if REDO_GEOMETRY_FOR_EXPRESS_MENU
+;if REDO_GEOMETRY_FOR_EXPRESS_MENU
 OLRedoMenuBarGeometryIfMenusInHeader	proc	near
 	; If we're putting the menu bar in the title area, we need to
 	; invalidate the geometry of the menu bar so it gets resized.
@@ -3739,7 +3739,7 @@ OLRedoMenuBarGeometryIfMenusInHeader	proc	near
 noInval:
 	ret
 OLRedoMenuBarGeometryIfMenusInHeader	endp
-endif
+;endif
 
 
 
@@ -3823,7 +3823,7 @@ REVISION HISTORY:
 	Doug	6/92		Initial version
 
 ------------------------------------------------------------------------------@
-if PLACE_EXPRESS_MENU_ON_PRIMARY and (not TOOL_AREA_IS_TASK_BAR)
+if PLACE_EXPRESS_MENU_ON_PRIMARY ;and (not TOOL_AREA_IS_TASK_BAR)
 OLBaseWinAdjustTitleBoundsForExpressToolArea	proc	far
 
 	; If doesn't have Express tool area, then nothing to adjust.
@@ -3910,7 +3910,7 @@ else
 endif
 endif ; PLACE_EXPRESS_MENU_ON_PRIMARY or TOOL_AREA_IS_TASK_BAR
 
-if PLACE_EXPRESS_MENU_ON_PRIMARY and (not TOOL_AREA_IS_TASK_BAR)
+if PLACE_EXPRESS_MENU_ON_PRIMARY ;and (not TOOL_AREA_IS_TASK_BAR)
 
 	; Adjust left edge of title area
 	;
