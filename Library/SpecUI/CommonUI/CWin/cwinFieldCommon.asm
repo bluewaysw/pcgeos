@@ -559,7 +559,7 @@ EC<	call	ECCheckODCXDX						>
 
 	pop	ax
 
-if (not TOOL_AREA_IS_TASK_BAR)
+; if (not TOOL_AREA_IS_TASK_BAR)
 	tst	ax
 	jz	afterNoTarget
 	mov	di, ds:[si]
@@ -584,7 +584,7 @@ endif
 	call	ObjCallInstanceNoLock
 	add	sp, size OLFieldMoveToolAreaParams
 afterNoTarget:
-endif	; (not TOOL_AREA_IS_TASK_BAR)
+;endif	; (not TOOL_AREA_IS_TASK_BAR)
 
 	Destroy	ax, cx, dx, bp
 	ret

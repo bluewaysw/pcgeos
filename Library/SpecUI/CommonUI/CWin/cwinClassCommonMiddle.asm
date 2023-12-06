@@ -1556,9 +1556,9 @@ CUAS <	cmp	ds:[di].OLWI_type, MOWT_PRIMARY_WINDOW			>
 
 	;UPDATE the express tool area location, to match any window change.
 
-if (not TOOL_AREA_IS_TASK_BAR)
+;if (not TOOL_AREA_IS_TASK_BAR)
 	call	OLBaseWinAdjustTitleBoundsForExpressToolArea
-endif ;(not TOOL_AREA_IS_TASK_BAR)
+;endif ;(not TOOL_AREA_IS_TASK_BAR)
 
 endif ; PLACE_EXPRESS_MENU_ON_PRIMARY
 

@@ -466,7 +466,7 @@ SpecInitExpressPreferences	proc	near	uses ds
 			mask UIEO_UTILITIES_PANEL or \
 			mask UIEO_EXIT_TO_DOS or \
 			mask UIEO_DOCUMENTS_LIST or \
-			UIEP_LOWER_LEFT shl offset UIEO_POSITION ; UIEP_TOP_PRIMARY
+			UIEP_TOP_PRIMARY shl offset UIEO_POSITION ;
 	cmp	ax, UIIL_BEGINNING		; intro and beginning use this
 	jbe	haveDefaultExpressPrefs
 	mov	bx, mask UIEO_DESK_ACCESSORY_LIST or \
@@ -477,13 +477,13 @@ SpecInitExpressPreferences	proc	near	uses ds
 			mask UIEO_UTILITIES_PANEL or \
 			mask UIEO_EXIT_TO_DOS or \
 			mask UIEO_DOCUMENTS_LIST or \
-			UIEP_LOWER_LEFT shl offset UIEO_POSITION ; UIEP_TOP_PRIMARY
+			UIEP_TOP_PRIMARY shl offset UIEO_POSITION ; UIEP_TOP_PRIMARY
 
 haveDefaultExpressPrefs:
-	;mov	cx, cs
-	;mov	dx, offset expressOptionsString
-	;call	InitFileReadInteger
-	;jc	haveDecision
+	mov	cx, cs
+	mov	dx, offset expressOptionsString
+	call	InitFileReadInteger
+	jc	haveDecision
 
 	;
 	; require some things for ISUI, don't allow others
@@ -496,10 +496,10 @@ if _ISUI
 	andnf	ax, not (mask UIEO_GEOS_TASKS_LIST)
 endif
 
-	;ornf	ax, mask UIEO_DOCUMENTS_LIST or \
-	;		mask UIEO_EXIT_TO_DOS or \
-	;		mask UIEO_CONTROL_PANEL or \
-	;		mask UIEO_UTILITIES_PANEL
+	ornf	ax, mask UIEO_DOCUMENTS_LIST or \
+			mask UIEO_EXIT_TO_DOS or \
+			mask UIEO_CONTROL_PANEL or \
+			mask UIEO_UTILITIES_PANEL
 
 ; FIXME!!!
 	;andnf	ax, (UIEP_LOWER_LEFT shl offset UIEO_POSITION)
@@ -1596,11 +1596,11 @@ pdaKeyString	char	"pda",0
 inputCat		char	"input",0
 floatingKbdKey		char	"floatingKbd",0
 
-if	TOOL_AREA_IS_TASK_BAR
+;if	TOOL_AREA_IS_TASK_BAR
 taskBarPositionString	char	"taskBarPosition",0
 taskBarAutoHideString	char	"taskBarAutoHide",0
 taskBarMovableString	char	"taskBarMovable",0
-endif
+;endif
 
 if _ISUI
 rightClickHelpString	char	"rightClickHelp",0
