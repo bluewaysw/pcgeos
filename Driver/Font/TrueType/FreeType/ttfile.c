@@ -51,7 +51,6 @@
 #include "freetype.h"
 #include "tttypes.h"
 #include "ttengine.h"
-#include "ttmutex.h"
 #include "ttmemory.h"
 #include "ttfile.h"     /* our prototypes */
 
@@ -143,7 +142,6 @@
 
   struct  TFile_Component_
   {
-    TMutex       lock;        /* used by the thread-safe build only */
     Byte*        frame_cache; /* frame cache     */
     PStream_Rec  stream;      /* current stream  */
     TFileFrame   frame;       /* current frame   */
@@ -185,7 +183,6 @@
     TT_Error  error;
 
 
-    MUTEX_Create( files.lock );
     files.stream = NULL;
     ZERO_Frame( files.frame );
 
@@ -208,7 +205,6 @@
   TT_Error  TTFile_Done( PEngine_Instance  engine )
   {
     FREE( files.frame_cache );
-    MUTEX_Destroy( files.lock );
 
     return TT_Err_Ok;
   }
@@ -231,8 +227,6 @@
   TT_Error  TT_Use_Stream( TT_Stream   org_stream,
                            TT_Stream*  stream )
   {
-     MUTEX_Lock( files.lock );                /* lock file mutex    */
-
      *stream = org_stream;                    /* copy the stream    */
      files.stream = STREAM2REC(org_stream);   /* set current stream */
 
@@ -258,7 +252,6 @@
   TT_Error  TT_Done_Stream( TT_Stream*  stream )
   {
      HANDLE_Set( *stream, NULL );
-     MUTEX_Release( files.lock );
 
      return TT_Err_Ok;
   }

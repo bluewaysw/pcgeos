@@ -472,7 +472,15 @@ static word toHash( const char* str )
         for ( i = 0; i < strlen( str ); ++i )
 		hash = hash * 7 + str[i];
 
-        return hash % 240 + 15;
+        /* The generated FontID has the following structure:      */
+        /* 0bMMMMGGGHHHHHHHHH        MMMM      Fontmaker (4 bit)  */
+        /*                           GGG       FontGroup (3 bit)  */
+        /*                           HHHHHHHHH hash      (9 bit)  */
+        /*                                                        */
+        /* From hash the range from 0b000000000 to 0b000001111 is */
+        /* reserved for mapping original Nimbus Fonts to TrueType */
+        /* fonts via geos.ini.                                    */
+        return hash % 0x01f0 + 15;
 }
 
 

@@ -20,7 +20,6 @@
 
 #include "ttconfig.h"
 #include "ttengine.h"
-#include "ttmutex.h"
 #include "ttcache.h"
 #include "tttables.h"
 #include "ttcmap.h"
@@ -480,9 +479,6 @@
     /* i/o stream */
     TT_Stream  stream;
 
-    /* used only by the threaded builds of the library */
-    TMutex  lock;
-
     /* maximum profile table, as found in the TrueType file */
     TMaxProfile  maxProfile;
 
@@ -569,9 +565,6 @@
     /* Use extensions to provide additional capabilities to the */
     /* engine.  Read the developer's guide in the documentation */
     /* directory to know how to do that.                        */
-
-    /* a generic pointer for client use - see TT_Set/Get_Face_Pointer */
-    //void*  generic;
   };
 
 
@@ -622,9 +615,6 @@
 
     Bool                debug;
     PExecution_Context  context;
-
-    /* a generic pointer for client use - see TT_Set/Get_Instance_Pointer */
-    //void*            generic;
   };
 
 
