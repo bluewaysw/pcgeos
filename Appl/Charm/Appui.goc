@@ -10,6 +10,9 @@
  *      Name    Date            Description
  *      ----    ----            -----------
  *      NF      9/23/96         Initial version
+ *	RainerB	11/11/2023	Add some new features, in particular 
+ *				allow different character box sizes
+ *				ans a settings menu.
  *
  * DESCRIPTION:
  *      This program is very much like the Windows program which
@@ -47,6 +50,30 @@
 @end AppMonikerResource;
 @endif
 
+/********************************************************************
+ *              DataResource Resource - localizable strings
+ *******************************************************************/
+@start DataResource, data;
+
+    @chunk char InfoBoldChars[] = "Please note that some fonts do not support the 'bold' text style.";
+    @localize "This info is given to the user when he selects bold magnified characters";
+    
+    @chunk char InfoMultipleChars[] = "Use the \"Select\" button in the menu bar to copy the selected character \
+to the \"Characters to copy\" field.\rYou may also double-click on a character or simply press Enter to do that.";
+    @localize "This info is given to the user when he switches to allow multiple characters.";
+    
+    @chunk char InfoDynamicPointSize[] = "The point size of the text copied to the clipboard now depends on the character box size.";
+    
+    @chunk char CMTextMonikerCallerNotSys[] = "Insert Special character";
+    @localize "Name of application when called from another application, such as GeoWrite.";
+
+    @chunk char CMInsertTriggerMonikerNotSys[] = "Insert into Document";
+    @localize "Caption for Insert into Document trigger.";
+    
+    @visMoniker CMCopyToClipboardMoniker = 'o',"Copy to Clipboard";
+    
+@end DataResource;
+
 
 /********************************************************************
  *              Class Declarations
@@ -65,7 +92,10 @@
     @extern method CMProcessClass, MSG_GEN_PROCESS_CLOSE_APPLICATION;
     @extern method CMProcessClass, MSG_GEN_PROCESS_CREATE_NEW_STATE_FILE;
     @extern method CMProcessClass, MSG_NOTIFY_APP_EXITED;
-
+    @extern method CMProcessClass, MSG_CM_PROCESS_BOX_SIZE_CHANGED;
+    @extern method CMProcessClass, MSG_CM_PROCESS_MORE_OPTIONS_CHANGED;
+    @extern method CMProcessClass, MSG_CM_PROCESS_RESIZE_WIN;
+    @extern method CMProcessClass, MSG_CM_PROCESS_SET_DEFAULT_FONT;
     @extern method CMMapClass, MSG_META_START_SELECT;
     @extern method CMMapClass, MSG_META_START_MOVE_COPY;
     @extern method CMMapClass, MSG_META_DRAG_SELECT;
@@ -97,9 +127,24 @@
  *******************************************************************/
       /*
        * acrShortcut_g - Shortcut keystroke text string.
+       * settings_g - Currently used settings.
        */
     char acrShortcut_g[30];
-
+    word settings_g;
+      /* 
+       * To make the box size variable, we need some global variables.
+       */
+    word charm_box_width_g = CHARM_I_BOX_WIDTH;	/* box size */
+    word charm_box_height_g = CHARM_I_BOX_HEIGHT;	
+    word charm_mag_width_g = CHARM_I_MAG_WIDTH;	
+    word charm_mag_height_g = CHARM_I_MAG_HEIGHT;	
+    word charm_map_text_point_size_g = CHARM_I_MAP_TEXT_POINT_SIZE;	/* Text font size in point */
+    word charm_map_mag_text_point_size_g = CHARM_I_MAP_MAG_TEXT_SIZE;
+    word charm_map_right_g = CHARM_I_MAP_RIGHT;		/* right/bottom border of the whole map (top/left == 0) */
+    word charm_map_bottom_g = CHARM_I_MAP_BOTTOM;
+    word charm_map_pt_height_g = CHARM_I_MAP_PT_HEIGHT;		/* map size in points */
+    word charm_map_pt_width_g = CHARM_I_MAP_PT_WIDTH;
+    
 
 /********************************************************************
  *              Static Object Resources
@@ -128,20 +173,14 @@
     gcnList( MANUFACTURER_ID_GEOWORKS, GAGCNLT_WINDOWS ) =
 	@CMPrimary;
     gcnList( MANUFACTURER_ID_GEOWORKS, GAGCNLT_SELF_LOAD_OPTIONS ) =
-	@CMFontControl;
+	@CMFontControl,@CMFontControl2;
 	/* We set the help file name in the application class, otherwise the
 	 * help-contents trigger will look for the wrong help file. */
     ATTR_GEN_HELP_FILE = "map";
 }
 
-@visMoniker CMTextMoniker = "Special Characters";
-@localize { "Name of the application." };
-
-@chunk char CMTextMonikerCallerNotSys[] = "Insert Special character";
-@localize "Name of application when called from another application, such as GeoWrite.";
-
-@chunk char CMInsertTriggerMonikerNotSys[] = "Insert into Document";
-@localize "Caption for Insert into Document trigger.";
+@visMoniker CMTextMoniker = "Character Map";
+@localize { "Name of the application when launched by the GeoManager." };
 
 @end Application;
 
@@ -150,15 +189,17 @@
  *******************************************************************/
 @start Interface;
 
-@object CMGenPrimaryClass CMPrimary = 
+@object GenPrimaryClass CMPrimary = 
 {
-    GI_comp = @CMFontControl,
-/*              @CMSelectTrigger, */
-	      @CMFontContainer,
+    GI_comp = @CMFontControl2,
+    	      @CMFontControlDB,
+    	      @CMMessageBox,
+              @CMSelectTrigger,
+              @CMOptionsMenu,
+	      @CMTopGroup,
 	      @CMView,
-	      @CMKeystrokeText,
-	      @TriggerGroup,
-	      @CMCharsToCopyTextDB;
+	      @CMBottomGroup,
+	      @TriggerGroup;
     GI_states = @default & ~ GS_USABLE;
     HINT_SIZE_WINDOW_AS_DESIRED;
     HINT_ORIENT_CHILDREN_VERTICALLY;
@@ -167,97 +208,35 @@
     HINT_MINIMIZE_CHILD_SPACING;
 @endif
 @ifdef DESKTOP
-    ATTR_GEN_DISPLAY_NOT_MAXIMIZABLE;
+    ATTR_GEN_DISPLAY_NOT_MAXIMIZABLE; 
 @endif
-    HINT_DISPLAY_NOT_RESIZABLE;
-    HINT_PRIMARY_NO_FILE_MENU;
     ATTR_GEN_HELP_CONTEXT = "TOC";
+    /*
     HINT_POSITION_WINDOW_AT_RATIO_OF_PARENT = { SWSS_RATIO | PCT_25,
 						SWSS_RATIO | PCT_5 };
+    */
     ATTR_GEN_HELP_FILE = "map";
 }
 
-@object GenToolGroupClass CMFontContainer = {
-@ifdef PRODUCT_NDO2000
-    GI_visMoniker = 'S', "Select Font:";
-@else
-    GI_visMoniker = "Select Font:";
-@endif
-    GTGI_controller = @CMFontControl;
-    HINT_SAME_ORIENTATION_AS_PARENT;
-}
-
-@object FontControlClass CMFontControl = {
-    GI_states = @default | GS_ENABLED;
-    GI_visMoniker = 'o', "Font";
-    @localize { "Menu to let user select different fonts." };
-    GII_visibility = GIV_POPUP;
-    GCI_output = @CMCharsToCopyText;
-    ATTR_GEN_CONTROL_PROHIBIT_UI = FCF_SHORT_LIST | FCF_LONG_LIST;
-    HINT_FIXED_SIZE = {
-	SST_AVG_CHAR_WIDTHS | 20,
-	SST_LINES_OF_TEXT | 1,
-	0
-    };
-}
-
-@object GenTriggerClass CMSelectTrigger = {
-    GI_visMoniker = 'S', "Select";
-    @localize { "Button to copy the current character to the \
-text field." };
-    GTI_destination = @CMMap;
-    GTI_actionMsg = MSG_CM_MAP_SELECT_CHAR;
-    HINT_SEEK_MENU_BAR;
-}
-
-@object GenInteractionClass TriggerGroup = {
-    GI_comp = @CMCopyTrigger, @CMDoneTrigger;
+/*
+ ************* TopGroup and related objetcs ************* 
+ */
+@object GenInteractionClass CMTopGroup = {
+    GI_comp = @CMCharsToCopyText,
+    	      @CMTopSpacer,
+	      @CMFontContainer;
     HINT_ORIENT_CHILDREN_HORIZONTALLY;
-}
-
-@object GenTriggerClass CMCopyTrigger = {
-@ifdef PRODUCT_NDO2000
-    GI_visMoniker = 'o', "Copy to Clipboard";
-@else
-    GI_visMoniker = "Copy to Clipboard";
-@endif
-    GI_states = @default & ~GS_ENABLED;
-    @localize { "Button to copy text in text field to the clipboard." };
-    GTI_destination = @CMMap; /* @CMCharsToCopyText; */
-    GTI_actionMsg = MSG_CM_MAP_COPY_TO_CLIPBOARD; /*MSG_CM_TEXT_COPY_TEXT;*/
-}
-
-@object GenTriggerClass CMDoneTrigger = {
-@ifdef PRODUCT_NDO2000
-    GI_visMoniker = 'C', "Close";
-@else
-    GI_visMoniker = "Close";
-@endif
-    /* GI_states = @default & ~GS_USABLE; */
-    GTI_destination = @CMApplication;
-    GTI_actionMsg = MSG_META_QUIT;
-}
-
-@object GenInteractionClass CMCharsToCopyTextDB = {
-    GII_visibility = GIV_DIALOG;
-    GI_attrs = @default | GA_TARGETABLE;
-    GII_attrs = @default | GIA_NOT_USER_INITIATABLE;
-    GI_comp = @CMCharsToCopyText;
-    HINT_DONT_KEEP_INITIALLY_ONSCREEN;
-    HINT_DONT_KEEP_PARTIALLY_ONSCREEN;
-    HINT_POSITION_WINDOW_AT_RATIO_OF_PARENT = { SWSS_RATIO | PCT_100,
-						SWSS_RATIO | PCT_100 };
 }
 
 @object CMTextClass CMCharsToCopyText = {
     GI_visMoniker = "Characters to copy:";
-    GTXI_text = " ";
     @localize { "Name of text field for copying characters to clipboard." };
+    HINT_PLACE_MONIKER_ABOVE;
+    GTXI_text = "";
     GI_attrs = @default | GA_TARGETABLE;
     GTXI_attrs = @default | GTA_SINGLE_LINE_TEXT;
-      /* Must set GTXI_text to something. */
-    ATTR_GEN_TEXT_MULTIPLE_CHAR_ATTR_RUNS = @ParaCharAttrRuns;
-    HINT_FIXED_SIZE = {
+    ATTR_GEN_TEXT_MULTIPLE_CHAR_ATTR_RUNS = OptrToChunk(@ParaCharAttrRuns);
+    HINT_INITIAL_SIZE = {
 	SST_AVG_CHAR_WIDTHS | 20,
 	SST_LINES_OF_TEXT | 1,
 	0
@@ -267,6 +246,7 @@ text field." };
     HINT_TEXT_DO_NOT_MAKE_LARGER_ON_PEN_SYSTEMS;
 @endif
 }
+
 @CHAR_ATTR_ELEMENT_ARRAY_HEADER ParaCharAttrElements = {
     CHAR_ATTR_FONT_SIZE( FID_DTC_URW_MONO, 12 )
 };
@@ -275,6 +255,174 @@ text field." };
     TRAE_END
 };
 
+@object GenGlyphClass CMTopSpacer = {
+    GI_visMoniker = "    ";
+}
+
+@object GenToolGroupClass CMFontContainer = {
+    HINT_PLACE_MONIKER_ABOVE;
+    GI_visMoniker = 'S', "Select Font:";
+    GTGI_controller = @CMFontControl;
+    HINT_SAME_ORIENTATION_AS_PARENT;
+}
+	/*
+	 * We have the main FontControl in a hidden dialog box so that the 
+	 * FontControlTool (CMFontContainer) always remains usable.
+	 * A 2nd FontControl is located in the menu bar. This can be marked 
+	 * as 'not visible' via the settings menu without affecting the 
+	 * CMFontContainer.
+	 */
+@object GenInteractionClass CMFontControlDB = {
+    GI_comp = @CMFontControl;
+    GI_attrs = @default | GA_TARGETABLE;
+    GII_visibility = GIV_DIALOG;
+    GII_attrs = GIA_NOT_USER_INITIATABLE;
+}
+@object FontControlClass CMFontControl = {
+    GI_states = @default | GS_ENABLED;
+    GII_visibility = GIV_POPUP;
+    GCI_output = @CMCharsToCopyText;
+    }; 
+@object FontControlClass CMFontControl2 = {
+    GI_states = @default | GS_ENABLED;
+    GI_visMoniker = 'o', "Font";
+    @localize { "Menu to let user select different fonts." };
+    GII_visibility = GIV_POPUP;
+    GCI_output = @CMCharsToCopyText;
+    }; 
+
+/*
+ ************* Menu stuff ************* 
+ */
+
+@object GenTriggerClass CMSelectTrigger = {
+    GI_visMoniker = 'S', "Select";
+    @localize { "Button to copy the current character to the \
+text field." };
+    GTI_destination = @CMMap;
+    GTI_actionMsg = MSG_CM_MAP_SELECT_CHAR;
+    ATTR_GEN_TRIGGER_ACTION_DATA = FALSE;
+    HINT_SEEK_MENU_BAR;
+}
+
+@object GenInteractionClass CMOptionsMenu = {
+    GI_visMoniker = 't',"Settings";
+    GI_comp = @CMMoreOptionsGroup, @CMOptionsSubGroup;
+    GII_visibility = GIV_POPUP;
+}
+@object GenInteractionClass CMOptionsSubGroup = {
+    GI_comp = @CMBoxSizeGroup,@CMDefaultFontGroup;
+}
+@object GenInteractionClass CMBoxSizeGroup = {
+    GI_visMoniker = 'S', "Character Box Size";
+    GII_visibility = GIV_POPUP;
+    GI_comp = @CMBoxSizeSelector;
+}
+@object GenItemGroupClass CMBoxSizeSelector = {
+    GI_comp = @SmallBoxSize,@MediumBoxSize,@LargeBoxSize;
+    GIGI_selection = CHARM_DEFAULT_BOX_SIZE;
+    GIGI_destination = process;
+    GIGI_applyMsg = MSG_CM_PROCESS_BOX_SIZE_CHANGED;
+}
+@object GenItemClass SmallBoxSize = {
+    GI_visMoniker = 'S', "Small Box";
+    GII_identifier = CHARM_MAP_SMALL_BOX;
+}
+@object GenItemClass MediumBoxSize = {
+    GI_visMoniker = 'M', "Medium Box";
+    GII_identifier = CHARM_MAP_MEDIUM_BOX;
+}
+@object GenItemClass LargeBoxSize = {
+    GI_visMoniker = 'L', "Large Box";
+    GII_identifier = CHARM_MAP_LARGE_BOX;
+}
+
+@object GenBooleanGroupClass CMMoreOptionsGroup = {
+    GI_comp = 	@CMFontMenuBoolean, @CMCodeGroupBoolean,
+    		@CMBigCharsBoolean,@CMAllowMultipleBoolean,
+    		@CMAllways12PtBoolean,@CMAutoCopyBoolean;
+    GBGI_selectedBooleans = CHARM_DEFAULT_MORE_OPTIONS;
+    GBGI_destination = process;
+    GBGI_applyMsg = MSG_CM_PROCESS_MORE_OPTIONS_CHANGED;
+}
+@object GenBooleanClass CMFontMenuBoolean = {
+    GI_visMoniker = 'F',"Show Font Menu Item";
+    GBI_identifier = CHARM_SHOW_FONT_MENU;
+}
+@object GenBooleanClass CMCodeGroupBoolean = {
+    GI_visMoniker = 'C',"Show Character Codes";
+    GBI_identifier = CHARM_SHOW_CHAR_CODES;
+}
+@object GenBooleanClass CMBigCharsBoolean = {
+    GI_visMoniker = 'B',"Magnified Characters Bold";
+    GBI_identifier = CHARM_MAG_CHARS_BOLD;
+}
+@object GenBooleanClass CMAllowMultipleBoolean = {
+    GI_visMoniker = 'A',"Allow Multiple Characters";
+    GBI_identifier = CHARM_ALLOW_MULTIPLE_CHARS;
+}
+@object GenBooleanClass CMAllways12PtBoolean = {
+    GI_visMoniker = 'T',"Always Copy Text in 12pt Size";
+    GBI_identifier = CHARM_COPY_ALWAYS_12PT;
+}
+@object GenBooleanClass CMAutoCopyBoolean = {
+    GI_visMoniker = 'o',"Automatically Copy Characters to Clipboard";
+    GBI_identifier = CHARM_AUTO_COPY_TO_CLIPBOARD;
+}
+
+@object GenInteractionClass CMDefaultFontGroup = {
+    GI_visMoniker = 'D', "Default Font at Startup";
+    GII_visibility = GIV_POPUP;
+    GI_comp = @CMDefaultMonoFont,@CMDefaultSymbolFont,@CMDefaultCurrentFont;
+}
+
+@object GenTriggerClass @CMDefaultMonoFont = {
+    GI_visMoniker = 'M', "Mono Spaced Font";
+    GTI_destination = process;
+    GTI_actionMsg = MSG_CM_PROCESS_SET_DEFAULT_FONT;
+    ATTR_GEN_TRIGGER_ACTION_DATA = FID_DTC_URW_MONO;
+}
+@object GenTriggerClass @CMDefaultSymbolFont = {
+    GI_visMoniker = 'S', "Symbol Font";
+    GTI_destination = process;
+    GTI_actionMsg = MSG_CM_PROCESS_SET_DEFAULT_FONT;
+    ATTR_GEN_TRIGGER_ACTION_DATA = FID_DTC_URW_SYMBOLPS;
+}
+@object GenTriggerClass @CMDefaultCurrentFont = {
+    GI_visMoniker = 'C', "Currently Selected Font";
+    GTI_destination = process;
+    GTI_actionMsg = MSG_CM_PROCESS_SET_DEFAULT_FONT;
+    ATTR_GEN_TRIGGER_ACTION_DATA = 0;
+}
+
+
+/*
+ ************* Replybar and triggers ************* 
+ */
+@object GenInteractionClass TriggerGroup = {
+    GI_comp = @CMCopyTrigger, @CMDoneTrigger;
+    HINT_ORIENT_CHILDREN_HORIZONTALLY;
+    HINT_MAKE_REPLY_BAR;
+}
+
+@object GenTriggerClass CMCopyTrigger = {
+    GI_visMoniker = 'o', "Copy to Clipboard";
+    GI_states = @default & ~GS_ENABLED;
+    @localize { "Button to copy text in text field to the clipboard." };
+    GTI_destination = @CMMap; 			/* @CMCharsToCopyText; */
+    GTI_actionMsg = MSG_CM_MAP_COPY_TO_CLIPBOARD; /*MSG_CM_TEXT_COPY_TEXT;*/
+}
+
+@object GenTriggerClass CMDoneTrigger = {
+    GI_visMoniker = 'C', "Close";
+    /* GI_states = @default & ~GS_USABLE; */
+    GTI_destination = @CMApplication;
+    GTI_actionMsg = MSG_META_QUIT;
+}
+
+/*
+ ************* Main View ************* 
+ */
 @object GenViewClass CMView = {
 	GI_attrs = (@default) & ~GA_TARGETABLE;
 	GVI_content = @CMMap;
@@ -284,6 +432,13 @@ text field." };
 			    | GVDA_NO_LARGER_THAN_CONTENT;
 }
 
+/*
+ ************* BottomGroup and related objetcs ************* 
+ */
+@object GenInteractionClass CMBottomGroup = {
+    GI_comp = @CMKeystrokeText,@CMCharCodesText;
+    HINT_ORIENT_CHILDREN_VERTICALLY;
+}
 @object GenTextClass CMKeystrokeText = {
     GI_visMoniker = "Character Keystroke:";
     @localize { "Text field that shows the key sequence used to \
@@ -292,12 +447,42 @@ generate the selected character." };
     GTXI_text = "";
     GTXI_attrs = @default | GTA_SINGLE_LINE_TEXT;
     HINT_FIXED_SIZE = {
-	SST_AVG_CHAR_WIDTHS | 18,
+	SST_AVG_CHAR_WIDTHS | 22,
 	0,
 	0
     };
     HINT_TEXT_FRAME;
     HINT_TEXT_DO_NOT_MAKE_LARGER_ON_PEN_SYSTEMS;
+}
+@object GenTextClass CMCharCodesText = {
+    GI_visMoniker = "Character Codes:";
+    @localize { "Text field that shows the ASCII and other codes of the selected character." };
+    GI_attrs = (@default | GA_READ_ONLY) & ~GA_TARGETABLE;
+    GTXI_text = "";
+    GTXI_attrs = @default | GTA_SINGLE_LINE_TEXT;
+    HINT_TEXT_FRAME;
+    HINT_TEXT_DO_NOT_MAKE_LARGER_ON_PEN_SYSTEMS;
+    HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+}
+
+/*
+ ************* Message Box ************* 
+ */
+@object GenInteractionClass CMMessageBox = {
+    GI_comp = @CMMessageText;
+    GII_visibility = GIV_DIALOG;
+    GII_type = GIT_NOTIFICATION;
+    GII_attrs = GIA_NOT_USER_INITIATABLE;
+    HINT_POSITION_WINDOW_AT_MOUSE;
+}
+@object GenTextClass CMMessageText = {
+    GI_attrs = (@default | GA_READ_ONLY);
+    ATTR_GEN_TEXT_NEVER_MAKE_SCROLLABLE;
+HINT_MINIMUM_SIZE = { 
+	SST_AVG_CHAR_WIDTHS | 40,
+	SST_LINES_OF_TEXT | 2,
+	0    
+    }; 
 }
 
 @end Interface;
@@ -313,8 +498,8 @@ generate the selected character." };
     VI_bounds = {
 	CHARM_MAP_LEFT,
 	CHARM_MAP_TOP,
-	CHARM_MAP_RIGHT,
-	CHARM_MAP_BOTTOM
+	CHARM_I_MAP_RIGHT,
+	CHARM_I_MAP_BOTTOM
     };
     VCI_comp = @CMRow1,
 	       @CMRow2,
@@ -341,9 +526,9 @@ generate the selected character." };
 @object CMRowClass CMRow1 = {
     VI_bounds = {
 	CHARM_MAP_LEFT,
-	CHARM_MAP_TOP + 0 * CHARM_BOX_HEIGHT,
-	CHARM_MAP_RIGHT,
-	CHARM_MAP_TOP + ( 1 * CHARM_BOX_HEIGHT ) - 1
+	CHARM_MAP_TOP + 0 * CHARM_I_BOX_HEIGHT,
+	CHARM_I_MAP_RIGHT,
+	CHARM_MAP_TOP + ( 1 * CHARM_I_BOX_HEIGHT ) - 1
     };
     CMRI_crStart = 32;
 }
@@ -351,9 +536,9 @@ generate the selected character." };
 @object CMRowClass CMRow2 = {
     VI_bounds = {
 	CHARM_MAP_LEFT,
-	CHARM_MAP_TOP + 1 * CHARM_BOX_HEIGHT,
-	CHARM_MAP_RIGHT,
-	CHARM_MAP_TOP + ( 2 * CHARM_BOX_HEIGHT ) - 1
+	CHARM_MAP_TOP + 1 * CHARM_I_BOX_HEIGHT,
+	CHARM_I_MAP_RIGHT,
+	CHARM_MAP_TOP + ( 2 * CHARM_I_BOX_HEIGHT ) - 1
     };
     CMRI_crStart = 48;
 }
@@ -361,9 +546,9 @@ generate the selected character." };
 @object CMRowClass CMRow3 = {
     VI_bounds = {
 	CHARM_MAP_LEFT,
-	CHARM_MAP_TOP + 2 * CHARM_BOX_HEIGHT,
-	CHARM_MAP_RIGHT,
-	CHARM_MAP_TOP + ( 3 * CHARM_BOX_HEIGHT ) - 1
+	CHARM_MAP_TOP + 2 * CHARM_I_BOX_HEIGHT,
+	CHARM_I_MAP_RIGHT,
+	CHARM_MAP_TOP + ( 3 * CHARM_I_BOX_HEIGHT ) - 1
     };
     CMRI_crStart = 64;
 }
@@ -371,9 +556,9 @@ generate the selected character." };
 @object CMRowClass CMRow4 = {
     VI_bounds = {
 	CHARM_MAP_LEFT,
-	CHARM_MAP_TOP + 3 * CHARM_BOX_HEIGHT,
-	CHARM_MAP_RIGHT,
-	CHARM_MAP_TOP + ( 4 * CHARM_BOX_HEIGHT ) - 1
+	CHARM_MAP_TOP + 3 * CHARM_I_BOX_HEIGHT,
+	CHARM_I_MAP_RIGHT,
+	CHARM_MAP_TOP + ( 4 * CHARM_I_BOX_HEIGHT ) - 1
     };
     CMRI_crStart = 80;
 }
@@ -381,9 +566,9 @@ generate the selected character." };
 @object CMRowClass CMRow5 = {
     VI_bounds = {
 	CHARM_MAP_LEFT,
-	CHARM_MAP_TOP + 4 * CHARM_BOX_HEIGHT,
-	CHARM_MAP_RIGHT,
-	CHARM_MAP_TOP + ( 5 * CHARM_BOX_HEIGHT ) - 1
+	CHARM_MAP_TOP + 4 * CHARM_I_BOX_HEIGHT,
+	CHARM_I_MAP_RIGHT,
+	CHARM_MAP_TOP + ( 5 * CHARM_I_BOX_HEIGHT ) - 1
     };
     CMRI_crStart = 96;
 }
@@ -391,9 +576,9 @@ generate the selected character." };
 @object CMRowClass CMRow6 = {
     VI_bounds = {
 	CHARM_MAP_LEFT,
-	CHARM_MAP_TOP + 5 * CHARM_BOX_HEIGHT,
-	CHARM_MAP_RIGHT,
-	CHARM_MAP_TOP + ( 6 * CHARM_BOX_HEIGHT ) - 1
+	CHARM_MAP_TOP + 5 * CHARM_I_BOX_HEIGHT,
+	CHARM_I_MAP_RIGHT,
+	CHARM_MAP_TOP + ( 6 * CHARM_I_BOX_HEIGHT ) - 1
     };
     CMRI_crStart = 112;
 }
@@ -401,9 +586,9 @@ generate the selected character." };
 @object CMRowClass CMRow7 = {
     VI_bounds = {
 	CHARM_MAP_LEFT,
-	CHARM_MAP_TOP + 6 * CHARM_BOX_HEIGHT,
-	CHARM_MAP_RIGHT,
-	CHARM_MAP_TOP + ( 7 * CHARM_BOX_HEIGHT ) - 1
+	CHARM_MAP_TOP + 6 * CHARM_I_BOX_HEIGHT,
+	CHARM_I_MAP_RIGHT,
+	CHARM_MAP_TOP + ( 7 * CHARM_I_BOX_HEIGHT ) - 1
     };
     CMRI_crStart = 128;
 }
@@ -411,9 +596,9 @@ generate the selected character." };
 @object CMRowClass CMRow8 = {
     VI_bounds = {
 	CHARM_MAP_LEFT,
-	CHARM_MAP_TOP + 7 * CHARM_BOX_HEIGHT,
-	CHARM_MAP_RIGHT,
-	CHARM_MAP_TOP + ( 8 * CHARM_BOX_HEIGHT ) - 1
+	CHARM_MAP_TOP + 7 * CHARM_I_BOX_HEIGHT,
+	CHARM_I_MAP_RIGHT,
+	CHARM_MAP_TOP + ( 8 * CHARM_I_BOX_HEIGHT ) - 1
     };
     CMRI_crStart = 144;
 }
@@ -421,9 +606,9 @@ generate the selected character." };
 @object CMRowClass CMRow9 = {
     VI_bounds = {
 	CHARM_MAP_LEFT,
-	CHARM_MAP_TOP + 8 * CHARM_BOX_HEIGHT,
-	CHARM_MAP_RIGHT,
-	CHARM_MAP_TOP + ( 9 * CHARM_BOX_HEIGHT ) - 1
+	CHARM_MAP_TOP + 8 * CHARM_I_BOX_HEIGHT,
+	CHARM_I_MAP_RIGHT,
+	CHARM_MAP_TOP + ( 9 * CHARM_I_BOX_HEIGHT ) - 1
     };
     CMRI_crStart = 160;
 }
@@ -431,9 +616,9 @@ generate the selected character." };
 @object CMRowClass CMRow10 = {
     VI_bounds = {
 	CHARM_MAP_LEFT,
-	CHARM_MAP_TOP + 9 * CHARM_BOX_HEIGHT,
-	CHARM_MAP_RIGHT,
-	CHARM_MAP_TOP + ( 10 * CHARM_BOX_HEIGHT ) - 1
+	CHARM_MAP_TOP + 9 * CHARM_I_BOX_HEIGHT,
+	CHARM_I_MAP_RIGHT,
+	CHARM_MAP_TOP + ( 10 * CHARM_I_BOX_HEIGHT ) - 1
     };
     CMRI_crStart = 176;
 }
@@ -441,9 +626,9 @@ generate the selected character." };
 @object CMRowClass CMRow11 = {
     VI_bounds = {
 	CHARM_MAP_LEFT,
-	CHARM_MAP_TOP + 10 * CHARM_BOX_HEIGHT,
-	CHARM_MAP_RIGHT,
-	CHARM_MAP_TOP + ( 11 * CHARM_BOX_HEIGHT ) - 1
+	CHARM_MAP_TOP + 10 * CHARM_I_BOX_HEIGHT,
+	CHARM_I_MAP_RIGHT,
+	CHARM_MAP_TOP + ( 11 * CHARM_I_BOX_HEIGHT ) - 1
     };
     CMRI_crStart = 192;
 }
@@ -451,9 +636,9 @@ generate the selected character." };
 @object CMRowClass CMRow12 = {
     VI_bounds = {
 	CHARM_MAP_LEFT,
-	CHARM_MAP_TOP + 11 * CHARM_BOX_HEIGHT,
-	CHARM_MAP_RIGHT,
-	CHARM_MAP_TOP + ( 12 * CHARM_BOX_HEIGHT ) - 1
+	CHARM_MAP_TOP + 11 * CHARM_I_BOX_HEIGHT,
+	CHARM_I_MAP_RIGHT,
+	CHARM_MAP_TOP + ( 12 * CHARM_I_BOX_HEIGHT ) - 1
     };
     CMRI_crStart = 208;
 }
@@ -461,9 +646,9 @@ generate the selected character." };
 @object CMRowClass CMRow13 = {
     VI_bounds = {
 	CHARM_MAP_LEFT,
-	CHARM_MAP_TOP + 12 * CHARM_BOX_HEIGHT,
-	CHARM_MAP_RIGHT,
-	CHARM_MAP_TOP + ( 13 * CHARM_BOX_HEIGHT ) - 1
+	CHARM_MAP_TOP + 12 * CHARM_I_BOX_HEIGHT,
+	CHARM_I_MAP_RIGHT,
+	CHARM_MAP_TOP + ( 13 * CHARM_I_BOX_HEIGHT ) - 1
     };
     CMRI_crStart = 224;
 }
@@ -471,9 +656,9 @@ generate the selected character." };
 @object CMRowClass CMRow14 = {
     VI_bounds = {
 	CHARM_MAP_LEFT,
-	CHARM_MAP_TOP + 13 * CHARM_BOX_HEIGHT,
-	CHARM_MAP_RIGHT,
-	CHARM_MAP_TOP + ( 14 * CHARM_BOX_HEIGHT ) - 1
+	CHARM_MAP_TOP + 13 * CHARM_I_BOX_HEIGHT,
+	CHARM_I_MAP_RIGHT,
+	CHARM_MAP_TOP + ( 14 * CHARM_I_BOX_HEIGHT ) - 1
     };
     CMRI_crStart = 240;
 }
