@@ -10,6 +10,7 @@ REVISION HISTORY:
 	Name	Date		Description
 	----	----		-----------
 	Tony	3/92		Initial version
+	RainerB	12/2023		Renamed from Writer to GeoWrite
 
 DESCRIPTION:
 	This file contains the code for WriteProcessClass
@@ -1058,7 +1059,7 @@ COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 SYNOPSIS:	Sets the style sheet to apply when importing
-		from RTF format.  The Writer file which the style sheet
+		from RTF format.  The GeoWrite file which the style sheet
 		is taken from is selected on the StyleSheetFileSelector.
 		(TOOLS only)
 
@@ -1365,7 +1366,7 @@ COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 SYNOPSIS:	Gets a list of files in the current directory.  If we're
 		importing, it gets a list of all .RTF files in the current
-		directory.  If we're exporting, it gets a list of all Writer
+		directory.  If we're exporting, it gets a list of all GeoWrite
 		files in the current directory.
 
 CALLED BY:	BatchSetupCommon
@@ -1434,7 +1435,7 @@ EC <	ERROR_NZ INVALID_BATCH_SETUP_TYPE_SPECIFIED >
 exportSetup:
 	; EXPORT SETUP
 	;
-	; Look only for Writer files, which will export to RTF
+	; Look only for GeoWrite files, which will export to RTF
 	;	
 	mov	ss:[fileEnumParams].FEP_matchAttrs.segment, ss
 	lea	bx, ss:fileEnumMatchAttrs
@@ -1544,7 +1545,7 @@ COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 		GetBatchPath
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-SYNOPSIS:	Gets the path of the directory holding Writer/RTF files to
+SYNOPSIS:	Gets the path of the directory holding GeoWrite/RTF files to
 		batch.
 
 CALLED BY:	
@@ -2208,7 +2209,7 @@ extNotFound:
 	pop	bp
 
 	;
-	; Save the imported document as a Writer file with the
+	; Save the imported document as a GeoWrite file with the
 	; new filename, then close it.
 	;
 	mov	ax, MSG_GEN_DOCUMENT_CLOSE
