@@ -40,12 +40,13 @@ static sword getFontIDAvailIndex(
                                 FontID     fontID, 
                                 MemHandle  fontInfoBlock );
 
-static Boolean getFontID(       const char* familiyName, 
-                                FontID*     fontID );
+static Boolean getFontID( TRUETYPE_VARS, FontID* fontID );
 
 static FontWeight mapFontWeight( TT_Short weightClass );
 
-static TextStyle mapTextStyle( const char* subfamily );
+static TextStyle mapTextStyle(  const char* subfamily );
+
+static FontGroup mapFontGroup( TRUETYPE_VARS );
 
 static word getNameFromNameTable( 
                                 TRUETYPE_VARS,
@@ -63,6 +64,8 @@ static word toHash( const char* str );
 static int  strlen( const char* str );
 
 static void strcpy( char* dest, const char* source );
+
+static void strcpyname( char* dest, const char* source );
 
 static int strcmp( const char* s1, const char* s2 );
 
@@ -295,7 +298,7 @@ EC(     ECCheckFileHandle( truetypeFile ) );
         if ( getNameFromNameTable( trueTypeVars, STYLE_NAME, STYLE_NAME_ID ) == 0 )
                 goto Fail;
 
-        mappedFont = getFontID( FAMILY_NAME, &fontID );
+        mappedFont = getFontID( trueTypeVars, &fontID );
 	availIndex = getFontIDAvailIndex( fontID, fontInfoBlock );
 
         /* if we have an new font FontAvailEntry, FontInfo and Outline must be created */
@@ -463,13 +466,21 @@ Fin:
 
 static word toHash( const char* str )
 {
-        word    i;
-        dword   hash = strlen( str );
+        word   i;
+        word   hash = strlen( str );
 
         for ( i = 0; i < strlen( str ); ++i )
-		hash = ( ( hash * 7 ) % 65535 ) + str[i];
+		hash = hash * 7 + str[i];
 
-        return (word) hash;
+        /* The generated FontID has the following structure:      */
+        /* 0bMMMMGGGHHHHHHHHH        MMMM      Fontmaker (4 bit)  */
+        /*                           GGG       FontGroup (3 bit)  */
+        /*                           HHHHHHHHH hash      (9 bit)  */
+        /*                                                        */
+        /* From hash the range from 0b000000000 to 0b000001111 is */
+        /* reserved for mapping original Nimbus Fonts to TrueType */
+        /* fonts via geos.ini.                                    */
+        return hash % 0x01f0 + 15;
 }
 
 
@@ -557,6 +568,63 @@ static TextStyle mapTextStyle( const char* subfamily )
 
 
 /********************************************************************
+ *                      mapFontGroup
+ ********************************************************************
+ * SYNOPSIS:	  Determines the font goup on different parameters.
+ * 
+ * PARAMETERS:    TRUETYPE_VARS   Pointer to truetypevar block.
+ * 
+ * RETURNS:       FontGroup       Group of the given font.
+ * 
+ * SIDE EFFECTS:  none
+ * 
+ * STRATEGY:      
+ * 
+ * REVISION HISTORY:
+ *      Date      Name      Description
+ *      ----      ----      -----------
+ *      28/11/23  JK        Initial Revision
+ *******************************************************************/
+
+#define B_FAMILY_TYPE           0
+#define B_PROPORTION            3
+static FontGroup mapFontGroup( TRUETYPE_VARS )
+{
+        /* The font group of a TrueType font cannot be determined exactly.  */
+        /* This implementation is therefore more of an approximation than   */
+        /* an exact determination.                                          */
+
+        /* recognize FF_MONO from panose fields */
+        if( FACE_PROPERTIES.os2->panose[B_PROPORTION] == 9 )    //Monospaced
+                return FG_MONO;
+
+        /* recognize FF_SANS_SERIF, FF_SERIF, FF_SYMBOL and FF_ORNAMENT from sFamilyClass */
+        switch( FACE_PROPERTIES.os2->sFamilyClass >> 8 )
+        {
+                case 1:
+                case 2:
+                case 3:
+                case 4:
+                case 5:
+                case 7:
+                        return FG_SERIF;
+                case 8:
+                        return FG_SANS_SERIF;
+                case 9:
+                        return FG_ORNAMENT;
+                case 12:
+                        return FG_SYMBOL;
+        }
+
+        /* recognize FF_SCRIPT from panose fields */
+        if( FACE_PROPERTIES.os2->panose[B_FAMILY_TYPE] == 2 )   //Script
+                return FG_SCRIPT;
+
+        return FG_NON_PORTABLE;
+}
+
+
+/********************************************************************
  *                      getFontID
  ********************************************************************
  * SYNOPSIS:	  If the passed font family is a mapped font, the 
@@ -565,7 +633,7 @@ static TextStyle mapTextStyle( const char* subfamily )
  * 
  * PARAMETERS:    familyName*     Font family name.
  *
- * RETURNS:       FontID          FontID found geos.ini or calculated.
+ * RETURNS:       FontID          FontID found in geos.ini or calculated.
  * 
  * SIDE EFFECTS:  none
  * 
@@ -577,15 +645,23 @@ static TextStyle mapTextStyle( const char* subfamily )
  *      21/01/23  JK        Initial Revision
  *******************************************************************/
 
-static Boolean getFontID( const char* familyName, FontID* fontID ) 
+static Boolean getFontID( TRUETYPE_VARS, FontID* fontID ) 
 {
+        char  familyName[FID_NAME_LEN];
+
+
+        /* clean up family name */
+        strcpyname( familyName, trueTypeVars->familyName );
+
+        /* get FontID from geos.ini */
         if( !InitFileReadInteger( FONTMAPPING_CATEGORY, familyName, fontID ) )
         {
                 *fontID = ( FM_TRUETYPE | (*fontID & 0x0fff) );
                 return TRUE;
         }
 
-        *fontID = MAKE_FONTID( familyName );
+        /* generate FontID */
+        *fontID = MAKE_FONTID( mapFontGroup( trueTypeVars ), trueTypeVars->familyName );
         return FALSE;
 }
 
@@ -665,7 +741,7 @@ static word getNameFromNameTable( TRUETYPE_VARS, char* name, TT_UShort nameID )
         char*               str;
         
         
-        for( n = 0; n < FACE_PROPERTIES.num_Names; n++ )
+        for( n = 0; n < FACE_PROPERTIES.num_Names; ++n )
         {
                 TT_Get_Name_ID( FACE, n, &platformID, &encodingID, &languageID, &id );
                 if( id != nameID )
@@ -677,7 +753,7 @@ static word getNameFromNameTable( TRUETYPE_VARS, char* name, TT_UShort nameID )
                 {
                         TT_Get_Name_String( FACE, n, &str, &nameLength );
 
-                        for (i = 1; str != 0 && i < nameLength; i += 2)
+                        for( i = 1; str != 0 && i < nameLength; i += 2 )
                                 *name++ = str[i];
                         *name = 0;
                         return nameLength >> 1;
@@ -688,7 +764,7 @@ static word getNameFromNameTable( TRUETYPE_VARS, char* name, TT_UShort nameID )
                 {
                         TT_Get_Name_String( FACE, n, &str, &nameLength );
 
-                        for (i = 0; str != 0 && i < nameLength; i++)
+                        for( i = 0; str != 0 && i < nameLength; ++i )
                                 *name++ = str[i];
                         *name = 0;
                         return nameLength;
@@ -697,7 +773,7 @@ static word getNameFromNameTable( TRUETYPE_VARS, char* name, TT_UShort nameID )
 		{
 			TT_Get_Name_String( FACE, n, &str, &nameLength );
 	
-			for (i = 1; str != 0 && i < nameLength; i += 2)
+			for( i = 1; str != 0 && i < nameLength; i += 2 )
 				*name++ = str[i];
 			*name = 0;
 			return nameLength >> 1;
@@ -945,7 +1021,22 @@ static int strlen( const char* str )
 
 static void strcpy( char* dest, const char* source )
 {
-        while ((*dest++ = *source++) != '\0');
+        while( (*dest++ = *source++) != '\0' );
+}
+
+
+static void strcpyname( char* dest, const char* source )
+{
+        while( *source != '\0' ) 
+        {
+                if( *source != ' ' ) 
+                {
+                        *dest = *source;
+                        ++dest;
+                }
+                ++source;
+        }
+        *dest = '\0';  // stringending
 }
 
 

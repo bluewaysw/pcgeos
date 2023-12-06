@@ -1227,40 +1227,40 @@ typedef word FontID;
 #define FID_INVALID 0x0000
 
 typedef byte SerifFace;
-#define SF_SLAB 0x00c0
-#define SF_MODERN 0x0080
-#define SF_TRANS 0x0040
-#define SF_OLD 0x0000
+#define SF_SLAB         0xc0
+#define SF_MODERN       0x80
+#define SF_TRANS        0x40
+#define SF_OLD          0x00
 
 typedef byte SansFace;
-#define SF_A_CLOSED 0x0080
-#define SF_A_OPEN 0x0000
+#define SF_A_CLOSED     0x80
+#define SF_A_OPEN       0x00
 
 typedef byte ScriptFace;
-#define SF_CURSIVE 0x0080
-#define SF_CALLIGRAPHIC 0x0000
+#define SF_CURSIVE      0x80
+#define SF_CALLIGRAPHIC 0x00
 
 typedef word FontGroup;
 #define FG_NON_PORTABLE 0x0e00
-#define FG_SPECIAL 0x0c00
-#define FG_MONO 0x0a00
-#define FG_SYMBOL 0x0800
-#define FG_ORNAMENT 0x0600
-#define FG_SCRIPT 0x0400
-#define FG_SANS_SERIF 0x0200
-#define FG_SERIF 0x0000
+#define FG_SPECIAL      0x0c00
+#define FG_MONO         0x0a00
+#define FG_SYMBOL       0x0800
+#define FG_ORNAMENT     0x0600
+#define FG_SCRIPT       0x0400
+#define FG_SANS_SERIF   0x0200
+#define FG_SERIF        0x0000
 
 typedef byte FontFamily;
-#define FF_NON_PORTABLE 0x0007
-#define FF_SPECIAL 0x0006
-#define FF_MONO 0x0005
-#define FF_SYMBOL 0x0004
-#define FF_ORNAMENT 0x0003
-#define FF_SCRIPT 0x0002
-#define FF_SANS_SERIF 0x0001
-#define FF_SERIF 0x0000
+#define FF_NON_PORTABLE 0x07
+#define FF_SPECIAL      0x06
+#define FF_MONO         0x05
+#define FF_SYMBOL       0x04
+#define FF_ORNAMENT     0x03
+#define FF_SCRIPT       0x02
+#define FF_SANS_SERIF   0x01
+#define FF_SERIF        0x00
 
 typedef byte FontMap;
-#define FM_DONT_USE 0x00ff
-#define FM_EXACT 0x0000
+#define FM_DONT_USE     0xff
+#define FM_EXACT        0x00
 #endif /* __FONTID_H */
