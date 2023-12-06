@@ -10,6 +10,8 @@
  *      Name    Date            Description
  *      ----    ----            -----------
  *      NF      9/26/96         Initial version
+ *	RainerB	11/11/2023	Add some new features, in particular 
+ *				allow different character box sizes.
  *
  * DESCRIPTION:
  *      This file contains all the CMMapClass and CMRowClass methods.
@@ -24,6 +26,7 @@
  *******************************************************************/
     @include <stdapp.goh>
     #include <Ansi/string.h>
+    #include <Ansi/stdio.h>
     @include "app.goh"
     @include "global.goh"
 
@@ -64,8 +67,8 @@ MapFindCharFromPos( sword xPosition,
        * to the first result. Add in 32 because the first
        * character displayed in the map is the space.
        */
-    return( xPosition / CHARM_BOX_WIDTH +
-            yPosition / CHARM_BOX_HEIGHT * CHARM_MAP_WIDTH + 32 );
+    return( xPosition / charm_box_width_g +
+            yPosition / charm_box_height_g * CHARM_MAP_WIDTH + 32 );
 } /* MapFindCharFromPos */
 
 /********************************************************************
@@ -85,10 +88,11 @@ MapFindCharFromPos( sword xPosition,
  *      NF     10/5/96          Initial Version
  *******************************************************************/
 void
-MapCalcMagCharRegion( unsigned char ch,
+MapCalcMagCharRegion( unsigned char ch,		
                       Rectangle *   reg )
   /*
    * ch  - Character to find magnified region for (in).
+   *	   note about ch see MSG_META_KBD_CHAR
    * reg - Magnified region (out).
    */
 {
@@ -100,8 +104,8 @@ MapCalcMagCharRegion( unsigned char ch,
        * diffX      - Amount to adjust X position by.
        * diffY      - Amount to adjust Y position by.
        */
-    byte  iCharXPos;
-    byte  iCharYPos;
+    int  iCharXPos;
+    int  iCharYPos;
     sword iPointXPos;
     sword iPointYPos;
     sword diffX;
@@ -125,7 +129,7 @@ MapCalcMagCharRegion( unsigned char ch,
            * x position in points.
            */
         iCharXPos = (byte)ch % (byte)CHARM_MAP_WIDTH;
-        iPointXPos = iCharXPos * (sword)CHARM_BOX_WIDTH +
+        iPointXPos = iCharXPos * (sword)charm_box_width_g +
                      (sword)CHARM_MAP_LEFT;
 
           /*
@@ -136,20 +140,21 @@ MapCalcMagCharRegion( unsigned char ch,
            * Those rows would be for characters 0-31.
            */
         iCharYPos = ( (byte)ch / (byte)CHARM_MAP_WIDTH ) - 2;
-        iPointYPos = iCharYPos * (sword)CHARM_BOX_HEIGHT +
+        iPointYPos = iCharYPos * (sword)charm_box_height_g +
                      (sword)CHARM_MAP_TOP;
 
           /*
            * Create the boundaries of the magnified
            * character using the x,y position and the
            * height/width of the magnified character.
+           * Round up the diff values to keep the shadow visible.
            */
-        diffX = ( CHARM_MAG_WIDTH - CHARM_BOX_WIDTH ) / 2;
-        diffY = ( CHARM_MAG_HEIGHT - CHARM_BOX_HEIGHT ) /2;
+        diffX = 1 + ( charm_mag_width_g - charm_box_width_g) / 2;
+        diffY = 1 + ( charm_mag_height_g - charm_box_height_g) /2;
         reg->R_left = iPointXPos - diffX;
         reg->R_top = iPointYPos - diffY;
-        reg->R_right = reg->R_left + CHARM_MAG_WIDTH;
-        reg->R_bottom = reg->R_top + CHARM_MAG_HEIGHT;
+        reg->R_right = reg->R_left + charm_mag_width_g;
+        reg->R_bottom = reg->R_top + charm_mag_height_g;
 
           /*
            * Do some bounds checking. Make sure it
@@ -187,9 +192,10 @@ MapCalcMagCharRegion( unsigned char ch,
  *               Then display the real keystroke used to make the
  *               character in question.
  * REVISION HISTORY:
- *      Name   Date             Description
- *      ----   ----             -----------
- *      NF     10/5/96          Initial Version
+ *      Name   	Date             Description
+ *      ----   	----             -----------
+ *      NF     	10/5/96          Initial Version
+ *	RainerB	10/11/2023	 Add Charcter codes
  *******************************************************************/
 void
 MapUpdateShortcut( unsigned char iChar_p )
@@ -207,6 +213,8 @@ MapUpdateShortcut( unsigned char iChar_p )
     word         cElemSize;
     CMCharType * pShortcut;
     char         achTemp[2];
+    char 	 codeTxt[30];
+    word 	 o1, o2, o3;	/* octal digits */
 
       /*
        * Find the actual index value into the shortcut array.
@@ -286,6 +294,17 @@ EC( ECCheckBounds( pShortcut ); )
         acrShortcut_g,
         0 );
     MemUnlock( OptrToHandle( @CMShortcuts ) );
+    
+    	/*
+    	 * Build the codes text and sent it to CMCharCodesText
+    	 * Unfortunately %o (oktal) is not supported by sprintf.
+    	 */
+    o1 = iChar_p / 64;
+    o2 = (iChar_p - o1*64)/8;
+    o3 = iChar_p - o1*64 - o2*8;
+    sprintf(codeTxt,"%03udez  %2Xhex  %u%u%uokt", iChar_p, iChar_p, o1, o2, o3);
+    @call CMCharCodesText::MSG_VIS_TEXT_REPLACE_ALL_PTR(codeTxt, 0);
+    
 } /* MapUpdateShortcut */
 
 /********************************************************************
@@ -325,6 +344,7 @@ EC( ECCheckBounds( pShortcut ); )
 
     if ( inputState & BI_DOUBLE_PRESS ) {
         pself->CMMI_bDragging = FALSE;
+        @call self::MSG_CM_MAP_SELECT_CHAR(FALSE);
     }
     else {
         pself->CMMI_bDragging = TRUE;
@@ -337,7 +357,7 @@ EC( ECCheckBounds( pShortcut ); )
            */
         MapUpdateShortcut( pself->CMMI_crCurrent );
     }
-    @call self::MSG_CM_MAP_SELECT_CHAR();
+   @call self::MSG_CM_MAP_SELECT_CHAR(TRUE);
 
     @send self::MSG_CM_MAP_REDRAW_MAG_CHAR();
     retVal->flags = MRF_PROCESSED;
@@ -386,7 +406,7 @@ EC( ECCheckBounds( pShortcut ); )
     pself->CMMI_crPrevious = pself->CMMI_crCurrent;
     pself->CMMI_crCurrent = pText[0];
     pself->CMMI_bCursoring = FALSE;
-    @call self::MSG_CM_MAP_SELECT_CHAR();
+    @call self::MSG_CM_MAP_SELECT_CHAR(TRUE);
     @send self::MSG_CM_MAP_REDRAW_MAG_CHAR();
       /*
        * Tell clipboard that the view is not pastable.
@@ -418,7 +438,7 @@ EC( ECCheckBounds( pShortcut ); )
       /*
        * ch - Character under mouse position.
        */
-    unsigned char ch;
+    unsigned char ch;	// <-- note about ch see MSG_META_KBD_CHAR
 
       /*
        * Check that we are in fact dragging the mouse.
@@ -429,13 +449,13 @@ EC( ECCheckBounds( pShortcut ); )
     ch = MapFindCharFromPos( xPosition, yPosition );
     if ( ( TRUE == pself->CMMI_bDragging ) &&
          ( xPosition > 0 ) &&
-         ( xPosition < CHARM_MAP_PT_WIDTH ) &&
+         ( xPosition < charm_map_pt_width_g ) &&
          ( yPosition > 0 ) &&
-         ( yPosition < CHARM_MAP_PT_HEIGHT ) &&
+         ( yPosition < charm_map_pt_height_g ) &&
          ( ch != pself->CMMI_crCurrent ) ) {
         pself->CMMI_crPrevious = pself->CMMI_crCurrent;
         pself->CMMI_crCurrent = ch;
-	@call self::MSG_CM_MAP_SELECT_CHAR();
+	@call self::MSG_CM_MAP_SELECT_CHAR(TRUE); 
         MapUpdateShortcut( pself->CMMI_crCurrent );
         @send self::MSG_CM_MAP_REDRAW_MAG_CHAR();
     }
@@ -464,7 +484,7 @@ EC( ECCheckBounds( pShortcut ); )
       /*
        * ch - Character under mouse position.
        */
-    unsigned char ch;
+    unsigned char ch;	// <-- note about ch see MSG_META_KBD_CHAR
 
       /*
        * Check that we are in fact dragging the mouse.
@@ -477,14 +497,14 @@ EC( ECCheckBounds( pShortcut ); )
     ch = MapFindCharFromPos( xPosition, yPosition );
     if ( ( TRUE == pself->CMMI_bDragging ) &&
          ( xPosition > 0 ) &&
-         ( xPosition < CHARM_MAP_PT_WIDTH ) &&
+         ( xPosition < charm_map_pt_width_g ) &&
          ( yPosition > 0 ) &&
-         ( yPosition < CHARM_MAP_PT_HEIGHT ) ) {
+         ( yPosition < charm_map_pt_height_g ) ) {
         if ( ch != pself->CMMI_crCurrent ) {
             pself->CMMI_crPrevious = pself->CMMI_crCurrent;
             pself->CMMI_crCurrent = ch;
             MapUpdateShortcut( pself->CMMI_crCurrent );
-	    @call self::MSG_CM_MAP_SELECT_CHAR();
+	    @call self::MSG_CM_MAP_SELECT_CHAR(TRUE);
             @send self::MSG_CM_MAP_REDRAW_MAG_CHAR();
         }
         @send self::MSG_CM_MAP_SET_POINTER_IMAGE();
@@ -537,15 +557,17 @@ EC( ECCheckBounds( pShortcut ); )
  *               then change the current character. If not, try
  *               to highlight the character the user pressed.
  * REVISION HISTORY:
- *      Name   Date             Description
- *      ----   ----             -----------
- *      NF     10/13/96         Initial Version
+ *      Name   	Date             Description
+ *      ----  	----             -----------
+ *      NF     	10/13/96         Initial Version
+ *	RainerB	11/11/2023	 Enter selectes character
  *******************************************************************/
 @extern method CMMapClass, MSG_META_KBD_CHAR {
       /*
        * ch - Working character value.
        */
-    unsigned char ch;
+    unsigned char ch;	// <-- note that in swat the 'p ch' command probabely displays 
+    			// the CH register, but not the local varaoable ch.
 
       /*
        * Only want to process keypresses, not releases.
@@ -585,6 +607,9 @@ EC( ECCheckBounds( pShortcut ); )
             case VC_END :
                 ch = ch + ( CHARM_MAP_WIDTH - ch % CHARM_MAP_WIDTH ) - 1;
                 break;
+            case VC_ENTER:
+	        @call self::MSG_CM_MAP_SELECT_CHAR(FALSE);
+	        break;
             default :
                   /*
                    * User pressed some other key. Try to
@@ -593,13 +618,14 @@ EC( ECCheckBounds( pShortcut ); )
                    * If the CF_STATE_KEY flag is set that means
                    * that the Shift, Ctrl, or Alt keys are being
                    * pressed by themselves.
+                   *
                    */
                 if ( ( character >= 32 ) &&
                      ( ( flags & CF_STATE_KEY ) == 0 ) &&
                      ( ( flags & ( ~( SS_LSHIFT | SS_RSHIFT ) << 8 ) )
                          == 0 ) ) {
                     ch = character;
-                }
+                } 
         } /* switch */
 
           /*
@@ -611,7 +637,7 @@ EC( ECCheckBounds( pShortcut ); )
             pself->CMMI_crCurrent = ch;
             pself->CMMI_bCursoring = TRUE;
             MapUpdateShortcut( pself->CMMI_crCurrent );
-	    @call self::MSG_CM_MAP_SELECT_CHAR();
+	    @call self::MSG_CM_MAP_SELECT_CHAR(TRUE); 
             @send self::MSG_CM_MAP_REDRAW_MAG_CHAR();
         }
     }
@@ -637,7 +663,6 @@ EC( ECCheckBounds( pShortcut ); )
     @callsuper();
 
     @send CMCharsToCopyText::MSG_META_GRAB_TARGET_EXCL();
-    @send, forceQueue CMCharsToCopyTextDB::MSG_META_GRAB_TARGET_EXCL();
 
 }
  *******************************************************************/
@@ -659,6 +684,7 @@ EC( ECCheckBounds( pShortcut ); )
  *      Name   Date             Description
  *      ----   ----             -----------
  *      NF     9/26/96          Initial Version
+ *	RainerB	11/11/2023	 Add magnified characters in bold feature
  *******************************************************************/
 @extern method CMMapClass, MSG_VIS_DRAW {
       /*
@@ -679,7 +705,7 @@ EC( ECCheckBounds( pShortcut ); )
        */
     GrSetFont( gstate,
                pself->CMMI_curFont,
-               MakeWWFixed( CHARM_MAP_TEXT_POINT_SIZE ) );
+               MakeWWFixed( charm_map_text_point_size_g ) );
 
     @callsuper();
     pself = ObjDerefVis( oself );
@@ -687,10 +713,10 @@ EC( ECCheckBounds( pShortcut ); )
       /*
        * Draw the vertical lines separating the columns.
        */
-    for ( iXPos = CHARM_MAP_LEFT + CHARM_BOX_WIDTH;
-          iXPos < CHARM_MAP_RIGHT;
-          iXPos += CHARM_BOX_WIDTH ) {
-        GrDrawVLine( gstate, iXPos, CHARM_MAP_TOP, CHARM_MAP_BOTTOM );
+    for ( iXPos = CHARM_MAP_LEFT + charm_box_width_g;
+          iXPos < charm_map_right_g;
+          iXPos += charm_box_width_g ) {
+        GrDrawVLine( gstate, iXPos, CHARM_MAP_TOP, charm_map_bottom_g );
     }
 
       /*
@@ -730,13 +756,17 @@ EC( ECCheckBounds( pShortcut ); )
 
         GrSetFont( gstate,
                    pself->CMMI_curFont,
-                   MakeWWFixed( CHARM_MAP_MAG_TEXT_SIZE ) );
+                   MakeWWFixed( charm_map_mag_text_point_size_g ) );
         charWidth = GrCharWidth( gstate, pself->CMMI_crCurrent ) >> 16;
+
+	GrSaveState(gstate);
+	if ( settings_g & CHARM_MAG_CHARS_BOLD) GrSetTextStyle (gstate, TS_BOLD, 0);
         GrDrawChar( gstate,
-                    region.R_left + ( CHARM_MAG_WIDTH - charWidth ) / 2,
-                    region.R_top + ( CHARM_MAG_HEIGHT -
-                                     CHARM_MAP_MAG_TEXT_SIZE ) / 2,
+                    region.R_left + ( charm_mag_width_g - charWidth ) / 2,
+                    region.R_top + ( charm_mag_height_g -
+                                     charm_map_mag_text_point_size_g ) / 2,
                     pself->CMMI_crCurrent );
+	GrRestoreState(gstate);        
     }
 
       /*
@@ -746,7 +776,7 @@ EC( ECCheckBounds( pShortcut ); )
     else {
         iXPos = ( (byte)pself->CMMI_crCurrent %
                   (byte)CHARM_MAP_WIDTH ) *
-                (sword)CHARM_BOX_WIDTH +
+                (sword)charm_box_width_g +
                 (sword)CHARM_MAP_LEFT;
           /*
            * Subtract two for non-existent top two rows.
@@ -754,29 +784,30 @@ EC( ECCheckBounds( pShortcut ); )
            */
         iYPos = ( ( (byte)pself->CMMI_crCurrent /
                   (byte)CHARM_MAP_WIDTH ) - 2 ) *
-                (sword)CHARM_BOX_HEIGHT +
+                (sword)charm_box_height_g +
                 (sword)CHARM_MAP_TOP;
         GrSetAreaColor( gstate, CF_INDEX, C_BLUE, 0, 0 );
         GrFillRect( gstate,
                     iXPos + 1,
                     iYPos + 1,
-                    iXPos + CHARM_BOX_WIDTH - 1,
-                    iYPos + CHARM_BOX_HEIGHT -1 );
+                    iXPos + charm_box_width_g - 1,
+                    iYPos + charm_box_height_g -1 );
         GrSetLineMaskSys( gstate, SDM_50 );
         GrSetLineColor( gstate, CF_INDEX, C_WHITE, 0, 0 );
         GrDrawRect( gstate,
                     iXPos + 1,
                     iYPos + 1,
-                    iXPos + CHARM_BOX_WIDTH - 1,
-                    iYPos + CHARM_BOX_HEIGHT -1 );
+                    iXPos + charm_box_width_g - 1,
+                    iYPos + charm_box_height_g -1 );
         GrSetTextColor( gstate, CF_INDEX, C_WHITE, 0, 0 );
         charWidth = GrCharWidth( gstate, pself->CMMI_crCurrent ) >> 16;
         GrDrawChar( gstate,
-                    iXPos + ( CHARM_BOX_WIDTH - charWidth ) / 2,
-                    iYPos + ( CHARM_BOX_HEIGHT -
-                              CHARM_MAP_TEXT_POINT_SIZE ) / 2,
+                    iXPos + ( charm_box_width_g - charWidth ) / 2,
+                    iYPos + ( charm_box_height_g -
+                              charm_map_text_point_size_g ) / 2,
                     pself->CMMI_crCurrent );
     }
+    
 } /* MSG_VIS_DRAW */
 
 /********************************************************************
@@ -844,7 +875,7 @@ EC( ECCheckBounds( pShortcut ); )
 EC( ECCheckWindowHandle( win ); )
     gstate = GrCreateState( win );
     GrInvalRect( gstate, CHARM_MAP_LEFT, CHARM_MAP_TOP,
-                 CHARM_MAP_RIGHT, CHARM_MAP_BOTTOM );
+                 charm_map_right_g, charm_map_bottom_g );
     GrDestroyState( gstate );
 } /* MSG_CM_MAP_REDRAW */
 
@@ -902,25 +933,49 @@ EC( ECCheckWindowHandle( win ); )
  ********************************************************************
  * SYNOPSIS:     User wants the currently selected character to be
  *               copied to the "Copy" text object.
- * PARAMETERS:   void
+ * PARAMETERS:   Boolean single_char_mode_only
  * RETURNS:      void
  * SIDE EFFECTS: none
  * STRATEGY:     Simply pass the current character to the text
- *               object using the append message.
+ *               object using the append or the replace all message.
  * REVISION HISTORY:
- *      Name   Date             Description
- *      ----   ----             -----------
- *      NF     10/13/96         Initial Version
+ *      Name   	Date             Description
+ *      ----   	----             -----------
+ *      NF     	10/13/96         Initial Version
+ *	RainerB	11/11/2023	 Multiple char mode added
  *******************************************************************/
 @extern method CMMapClass, MSG_CM_MAP_SELECT_CHAR {
+
+	/*
+	 * See if single_char_mode_only is passed as true.
+	 * In this case, copy the character to the text object only if 
+	 * the flag CHARM_ALLOW_MULTIPLE_CHARS is NOT set in settings_g
+	 */
+    if ( single_char_mode_only ) {
+    	if ( settings_g & CHARM_ALLOW_MULTIPLE_CHARS ) return;
+    }
 
     @send CMCopyTrigger::MSG_GEN_SET_ENABLED(VUM_DELAYED_VIA_UI_QUEUE);
     /* If no character in the map is highlighted, we need to ignore it */
     if (pself->CMMI_crCurrent) {
-	@send CMCharsToCopyText::MSG_VIS_TEXT_SELECT_ALL();
-        @call CMCharsToCopyText::MSG_VIS_TEXT_REPLACE_SELECTION_PTR(
-            (char*)&pself->CMMI_crCurrent, 1 );
+    	if (settings_g & CHARM_ALLOW_MULTIPLE_CHARS) {
+    	    /* Mutiple chars allowed: Append character */
+            @call CMCharsToCopyText::MSG_VIS_TEXT_APPEND_PTR(
+        	    (char*)&pself->CMMI_crCurrent, 1 );
+    	} else {
+    	    /* Singe character mode: Replace text */
+            @call CMCharsToCopyText::MSG_VIS_TEXT_REPLACE_ALL_PTR(
+        	    (char*)&pself->CMMI_crCurrent, 1 );
+    	}
     }
+
+    /* 
+     *	Copy selected characters to clipboard, if desired.
+     */
+    if (settings_g & CHARM_AUTO_COPY_TO_CLIPBOARD ) {
+    	@send CMCharsToCopyText::MSG_CM_TEXT_COPY_TEXT();
+    }
+    
 } /* MSG_CM_MAP_SELECT_CHAR */
 
 /********************************************************************
@@ -1050,14 +1105,18 @@ EC( ECCheckBounds( pDefTable ); )
  *      Name   Date             Description
  *      ----   ----             -----------
  *      edwin  1/19/99          Initial Version
+ *	RainerB	11/11/2023	 Add empty text handling, leave copy trigger disabled
  *******************************************************************/
 @extern method CMMapClass, MSG_CM_MAP_COPY_TO_CLIPBOARD 
 {
     GeodeHandle token;
     EventHandle msg;
     optr target;
-
-    @call self::MSG_CM_MAP_SELECT_CHAR();
+    
+	/* if CMCharsToCopyText is empty, copy selected char */
+    if ( @call CMCharsToCopyText::MSG_VIS_TEXT_GET_TEXT_SIZE() == 0 ) {	
+	@call self::MSG_CM_MAP_SELECT_CHAR(FALSE);
+    }
     @call CMCharsToCopyText::MSG_CM_TEXT_COPY_TEXT();
     if (callerAppName[0] && callerAppGeodeHandle) {
 	/*  Check to see if the caller app is still running */
@@ -1070,11 +1129,17 @@ EC( ECCheckBounds( pDefTable ); )
 	    @call target::MSG_META_SEND_CLASSED_EVENT(msg, TO_TARGET);
 	    /* @send CMApplication::MSG_META_QUIT(); */
 	}
-    } else {
+    } 
+      /* leave Copy trigger enabled in any case. If CMCharsToCopyText is empty, 
+       * the currently selected char will be used 
+      else {
 	@send CMCopyTrigger::MSG_GEN_SET_NOT_ENABLED
 	     (VUM_DELAYED_VIA_UI_QUEUE);
-    }
+      }
+      */
+      
     return;
+    
 } /* MSG_CM_MAP_COPY_TO_CLIPBOARD */
 
 /********************************************************************
@@ -1116,18 +1181,18 @@ EC( ECCheckBounds( pDefTable ); )
 
     iYPos = pself->VI_bounds.R_top;
     if ( ' ' != pself->CMRI_crStart ) {
-        GrDrawHLine( gstate, CHARM_MAP_LEFT, iYPos, CHARM_MAP_RIGHT );
+        GrDrawHLine( gstate, CHARM_MAP_LEFT, iYPos, charm_map_right_g );
     }
 
     crCurChar = pself->CMRI_crStart;
     for ( iXPos = 0;
-          iXPos < CHARM_MAP_RIGHT;
-          iXPos += CHARM_BOX_WIDTH ) {
+          iXPos < charm_map_right_g;
+          iXPos += charm_box_width_g ) {
         charWidth = GrCharWidth( gstate, crCurChar ) >> 16;
         GrDrawChar( gstate,
-                    iXPos + ( CHARM_BOX_WIDTH - charWidth ) / 2,
-                    iYPos + ( CHARM_BOX_HEIGHT -
-                              CHARM_MAP_TEXT_POINT_SIZE - 4) / 2,
+                    iXPos + ( charm_box_width_g - charWidth ) / 2,
+                    iYPos + ( charm_box_height_g -
+                              charm_map_text_point_size_g - 4) / 2,
                     crCurChar );
         crCurChar++;
     }
