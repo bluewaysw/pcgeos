@@ -950,6 +950,12 @@ DocumentDisplayMessage		method  ResEditDocumentClass,
 	uses	bx,dx,si,bp
 	.enter
 
+        push    bx
+        mov	bl, ss:[autorunMode]
+        cmp	bl, BB_TRUE
+        pop     bx
+        je	isAutorun
+
 	push	ds:[LMBH_handle]
 
 EC <	cmp	cx, ErrorValue						>
@@ -982,6 +988,7 @@ EC <	ERROR_E		DISPLAY_ERROR_BAD_ERROR_VALUE			>
 	pop	bx
 	call	MemDerefDS
 
+isAutorun:
 	.leave
 	ret
 
