@@ -10,6 +10,8 @@
  *      Name    Date            Description
  *      ----    ----            -----------
  *      NF      9/30/96         Initial version
+ *	RainerB	11/11/2023	Add some new features, in particular 
+ *				allow different character box sizes.
  *
  * DESCRIPTION:
  *      This file contains all the text object methods and functions
@@ -30,6 +32,59 @@
  *******************************************************************/
 
 /********************************************************************
+ *              CMGetCopyTextPointSize
+ ********************************************************************
+ * SYNOPSIS:     Read the point size from CMCharsToCopyText
+ * PARAMETERS:   void
+ * RETURNS:      point size
+ * SIDE EFFECTS: none
+ * STRATEGY:     
+ * REVISION HISTORY:
+ *      Name   	Date             Description
+ *      ----   	----             -----------
+ *	RainerB	11/11/2023	 Initial Version
+ *******************************************************************/
+int CMGetCopyTextPointSize(void) {
+	/*
+	 * Structures needed to find out text point size
+	 */
+    VisTextCharAttr charAttrs;
+    VisTextCharAttrDiffs diffs;
+    int ptSize;
+     
+    @call CMCharsToCopyText::MSG_VIS_TEXT_GET_CHAR_ATTR(0, &diffs, &charAttrs, 0xffff, 0);
+    ptSize = charAttrs.VTCA_pointSize.WBF_int;
+    
+    return ptSize;
+}
+
+
+
+/********************************************************************
+ *              CMSetCopyTextPointSize
+ ********************************************************************
+ * SYNOPSIS:     Set a point size for CMCharsToCopyText
+ * PARAMETERS:   
+ * RETURNS:      
+ * SIDE EFFECTS: none
+ * STRATEGY:     
+ * REVISION HISTORY:
+ *      Name   	Date		Description
+ *      ----   	---- 		-----------
+ *      RainerB	11/1/2023      Initial Version
+ *******************************************************************/
+void CMSetCopyTextPointSize(word size) {
+WWFixed	ptSize;
+
+    ptSize.WWF_int  = size;
+    ptSize.WWF_frac = 0;
+    
+    @send CMCharsToCopyText::MSG_VIS_TEXT_SET_POINT_SIZE(ptSize, TEXT_ADDRESS_PAST_END, 0);
+    @send CMCharsToCopyText::MSG_META_GRAB_TARGET_EXCL();
+}
+
+
+/********************************************************************
  *              BuildTextTransferItem
  ********************************************************************
  * SYNOPSIS:     Build a CIF_TEXT transfer item for storage in the
@@ -42,6 +97,7 @@
  *      Name    Date            Description
  *      ----    ----            -----------
  *      brianc  7/91            Initial Revision
+ *	RainerB	11/11/2023	Add 'Copy always in 12pt' feature
  *******************************************************************/
 TransferBlockID
 BuildTextTransferItem( MemHandle hmemText_p )
@@ -59,6 +115,7 @@ BuildTextTransferItem( MemHandle hmemText_p )
     optr          odText;
     VMBlockHandle hvmTransferItem;
     FontID        fid;
+    WWFixed	  ptSize = {0, 0};
 
       /*
        * Create a temporary text object to build CIF_TEXT
@@ -73,9 +130,21 @@ EC( ECVMCheckVMFile( hfilTransfer ); )
     	VTSF_MULTIPLE_CHAR_ATTRS, /* if you want to transfer Font info, etc. */
     	0 );
 EC( ECCheckLMemOD( odText ); )
+
+	/*
+	 * Set text, font ID and point size for text to copy.
+	 */
     @call odText::MSG_VIS_TEXT_REPLACE_ALL_BLOCK( hmemText_p, 0 );
     fid = @call CMMap::MSG_CM_MAP_GET_CUR_FONT();
     @call odText::MSG_VIS_TEXT_SET_FONT_ID(fid, TEXT_ADDRESS_PAST_END, 0);
+    
+    if (settings_g & CHARM_COPY_ALWAYS_12PT) {
+    	ptSize.WWF_int = 12;
+    } else {
+    	ptSize.WWF_int = CMGetCopyTextPointSize();
+    }
+    @call odText::MSG_VIS_TEXT_SET_POINT_SIZE(ptSize, TEXT_ADDRESS_PAST_END, 0);    
+    
       /*
        * Tell the text object that we are done with it. It will
        * destroy itself after it has converted all its text into
@@ -185,34 +254,32 @@ EC( ECCheckMemHandle( hmemText_p ); )
  * SIDE EFFECTS: none
  * STRATEGY:     Grab the text from the CMCharsToCopyText into a
  *               block and send that to the copy routine. It will
- *               make a clipboard item out of it. Free the block
- *               of text when it's done.
+ *               make a clipboard item out of it. 
+ *		 If appropriate, set the point size temporary to 12 point.
  * REVISION HISTORY:
- *      Name   Date             Description
- *      ----   ----             -----------
- *      NF     10/14/96         Initial Version
+ *      Name   	Date             Description
+ *      ----   	----             -----------
+ *      NF     	10/14/96         Initial Version
+ *	RainerB	11/11/2023	 Add 'Copy always in 12pt' feature
  *******************************************************************/
 @extern method CMTextClass, MSG_CM_TEXT_COPY_TEXT {
 
+    int ptSize;
+
+    if (settings_g & CHARM_COPY_ALWAYS_12PT) {
+    	/* Find out current point size an set it to 12 point */
+    	ptSize = CMGetCopyTextPointSize();
+    	CMSetCopyTextPointSize(12);
+    }
+
     @send CMCharsToCopyText::MSG_VIS_TEXT_SELECT_ALL();
     @send CMCharsToCopyText::MSG_META_CLIPBOARD_COPY();
-@if 0
-      /*
-       * hmemText - Temporary block for text while copying.
-       */
-    MemHandle hmemText;
-
-      /*
-       * Get the text into a memory block.
-       * Call our copy routine (we don't care about its success).
-       * Free the memory block.
-       */
-    hmemText = @call CMCharsToCopyText::MSG_VIS_TEXT_GET_ALL_BLOCK(
-        NullHandle );
-EC( ECCheckMemHandle( hmemText ); )
-    CopyCommon( TIF_NORMAL, hmemText );
-    MemFree( hmemText );
-@endif
+    @send CMCharsToCopyText::MSG_VIS_TEXT_SELECT_END();
+    
+    if (settings_g & CHARM_COPY_ALWAYS_12PT) {
+    	/* reset to old size */
+    	CMSetCopyTextPointSize(ptSize);
+    }
 
 } /* MSG_CM_TEXT_COPY_TEXT */
 
