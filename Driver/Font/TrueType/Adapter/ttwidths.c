@@ -49,7 +49,7 @@ static void CalcScaleForWidths( TRUETYPE_VARS,
                         WWFixedAsDWord          pointSize,
                         TextStyle               styleToImplement );
 
-static void CalcTransform( TRUETYPE_VARS,
+static void CalcTransform( 
                         TransformMatrix*        transMatrix,
                         FontMatrix*             fontMatrix, 
                         WWFixedAsDWord          pointSize,
@@ -141,9 +141,11 @@ EC(     ECCheckBounds( (void*)trueTypeVars ) );
 
         // get filename an load ttf file 
         trueTypeOutline = LMemDerefHandles( MemPtrToHandle( (void*)fontInfo ), headerEntry->OE_handle );
+EC(     ECCheckBounds( (void*)trueTypeOutline ) );
 
         // get pointer to FontHeader
         fontHeader = LMemDerefHandles( MemPtrToHandle( (void*)fontInfo ), firstEntry->OE_handle );
+EC(     ECCheckBounds( (void*)fontHeader ) );
 
         if( TrueType_Lock_Face(trueTypeVars, trueTypeOutline) )
                 goto Fail;
@@ -154,6 +156,7 @@ EC(     ECCheckBounds( (void*)trueTypeVars ) );
                                fontHeader->FH_kernCount, 
                                &fontHandle );
         fontBuf = (FontBuf*)MemDeref( fontHandle );
+EC(     ECCheckBounds( (void*) fontBuf ) );
 
         /* initialize fields in FontBuf that do not have to be scaled */
         fontBuf->FB_dataSize     = size;
@@ -183,9 +186,10 @@ EC(     ECCheckBounds( (void*)trueTypeVars ) );
 
         /* calculate the transformation matrix and copy it into the FontBlock */
         transMatrix = (TransformMatrix*)(((byte*)fontBuf) + sizeof( FontBuf ) + fontHeader->FH_numChars * sizeof( CharTableEntry ));
-        CalcTransform( trueTypeVars, transMatrix, fontMatrix, pointSize, stylesToImplement );
+EC(     ECCheckBounds( (void*)transMatrix ) );
+        CalcTransform( transMatrix, fontMatrix, pointSize, stylesToImplement );
 
-        //TODO: adjust FB_height, FB_minTSB, FB_pixHeight and FB_baselinePos
+        /* adjust FB_height, FB_minTSB, FB_pixHeight and FB_baselinePos */
         AdjustFontBuf( transMatrix, fontMatrix, stylesToImplement, fontBuf );
 
         /* Are the glyphs rendered as regions? */
@@ -329,6 +333,9 @@ static void ConvertKernPairs( TRUETYPE_VARS, FontBuf* fontBuf )
         BBFixed*   kernValue = (BBFixed*) ( ( (byte*)fontBuf ) + fontBuf->FB_kernValues );
 
 
+EC(     ECCheckBounds( (void*)kernPair ) );
+EC(     ECCheckBounds( (void*)kernValue ) );
+
         /* load kerning directory */
         if( TT_Get_Kerning_Directory( FACE, &kerningDir ) )
                 return;
@@ -413,8 +420,7 @@ static void CalcScaleForWidths( TRUETYPE_VARS, WWFixedAsDWord pointSize,
  * SYNOPSIS:	  Calculates the transformation matrix for missing
  *                style attributes and weights.
  * 
- * PARAMETERS:    TRUETYPE_VARS         Cached variables needed by driver.
- *                *transMatrix          Pointer to TransformMatrix.
+ * PARAMETERS:    *transMatrix          Pointer to TransformMatrix.
  *                *fontMatrix           Systems transformation matrix.
  *                styleToImplement      Styles that must be added.
  *                      
@@ -428,8 +434,7 @@ static void CalcScaleForWidths( TRUETYPE_VARS, WWFixedAsDWord pointSize,
  *      20/12/22  JK        Initial Revision
  *******************************************************************/
 
-static void CalcTransform( TRUETYPE_VARS,
-                           TransformMatrix*  transMatrix, 
+static void CalcTransform( TransformMatrix*  transMatrix, 
                            FontMatrix*       fontMatrix, 
                            WWFixedAsDWord    pointSize,
                            TextStyle         stylesToImplement )
@@ -523,11 +528,13 @@ static word AllocFontBlock( word        additionalSpace,
                 *fontHandle = MemAllocSetOwner( FONT_MAN_ID, MAX_FONTBUF_SIZE, 
                         HF_SWAPABLE | HF_SHARABLE | HF_DISCARDABLE,
                         HAF_NO_ERR | HAF_LOCK | HAF_ZERO_INIT );
+EC(             ECCheckMemHandle( *fontHandle ) );
                 HandleP( *fontHandle );
         }
         else
         {
                 MemReAlloc( *fontHandle, MAX_FONTBUF_SIZE, HAF_NO_ERR | HAF_LOCK );
+EC(             ECCheckMemHandle( *fontHandle ) );
         }
 
         return size;
@@ -732,14 +739,14 @@ static Boolean IsRegionNeeded( TransformMatrix* transMatrix, FontMatrix* fontMat
         word param2;
 
 
-        param1 = ABS( GrMulWWFixed( fontMatrix->FM_11, WORD_TO_WWFIXEDASDWORD( fontBuf->FB_pixHeight ) ) >> 16 );
-        param2 = ABS( GrMulWWFixed( fontMatrix->FM_21, WORD_TO_WWFIXEDASDWORD( fontBuf->FB_pixHeight ) ) >> 16 );
-        if( param1 + param2 > MAX_BITMAP_SIZE )
+        param1 = IntegerOf( GrMulWWFixed( fontMatrix->FM_11, WORD_TO_WWFIXEDASDWORD( fontBuf->FB_pixHeight ) ) );
+        param2 = IntegerOf( GrMulWWFixed( fontMatrix->FM_21, WORD_TO_WWFIXEDASDWORD( fontBuf->FB_pixHeight ) ) );
+        if( ABS( param1 ) + ABS( param2 ) > MAX_BITMAP_SIZE )
                 return TRUE;
 
-        param1 = ABS( GrMulWWFixed( fontMatrix->FM_12, WORD_TO_WWFIXEDASDWORD( fontBuf->FB_pixHeight ) ) >> 16 );
-        param2 = ABS( GrMulWWFixed( fontMatrix->FM_22, WORD_TO_WWFIXEDASDWORD( fontBuf->FB_pixHeight ) ) >> 16 );
-        if( param1 + param2 > MAX_BITMAP_SIZE )
+        param1 = IntegerOf( GrMulWWFixed( fontMatrix->FM_12, WORD_TO_WWFIXEDASDWORD( fontBuf->FB_pixHeight ) ) );
+        param2 = IntegerOf( GrMulWWFixed( fontMatrix->FM_22, WORD_TO_WWFIXEDASDWORD( fontBuf->FB_pixHeight ) ) );
+        if( ABS( param1 ) + ABS( param2 ) > MAX_BITMAP_SIZE )
                 return TRUE;
 
         if( transMatrix->TM_heightX + transMatrix->TM_scriptX > MAX_BITMAP_SIZE )
