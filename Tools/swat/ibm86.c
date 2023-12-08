@@ -4190,7 +4190,7 @@ Ibm86DecodeInt(byte	*ibuf,	    	/* Buffer of bytes to decode */
     Boolean             prefixSize[2] = {FALSE, FALSE} ;
     byte *              ibuf2;          /* Start of instruction without size prefixes */
 #endif
-    OperandSize		vals[2];	/* Argument values */
+    OperandSize		vals[3];	/* Argument values */
     GeosAddr		ea;		/* Effective address. */
     int			eaNum;		/* Which arg is the effective address*/
     int			valNum;		/* Index into vals */

@@ -987,7 +987,7 @@ following entry:
 
 A string by which remote machines may identify you. When the remote 
 machine sees your drives, their names will be  
-<machine-name>-<drive-letter>:.
+`<machine-name>-<drive-letter>:`.
 
 #### port
 

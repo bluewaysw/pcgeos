@@ -4953,7 +4953,7 @@ returned as \n).
 array. 
 
 	Structures, unions and records are returned as a list of elements, each of 
-which is a 3-element list: `{<field-name> <type> <value>}` `<field-name>` is 
+which is a 3-element list: `{<field-name> <type> <value>}`. `<field-name>` is 
 the name of the field, `<type>` is the type token for the type of data stored 
 in the field, and `<value>` is the value list for the data in the field, 
 appropriate to its data type. 
@@ -4962,8 +4962,7 @@ appropriate to its data type.
 if a structure has a field that is an array, the `<value>` element in the list 
 that describes that particular field will be itself a list whose elements are 
 the elements of the array. If that array were an array of structures, each 
-element of that list would again be a list of `{<field-name> <type> 
-<value>}` lists. 
+element of that list would again be a list of `{<field-name> <type> <value>}` lists. 
 
 + The "field" command is very useful when you want to extract the value 
 for a structure field from a value list.
@@ -5400,8 +5399,7 @@ Examine memory as a dump of words.
 address after the last examined memory location is used. If no address 
 has been examined then DS:SI is used for the address.
 
-+ The `<length>` argument is the number of bytes to examine. It defaults to 
-8.
++ The `<length>` argument is the number of bytes to examine. It defaults to 8.
 
 + Pressing `<Return>` after this command continues the list.
 
