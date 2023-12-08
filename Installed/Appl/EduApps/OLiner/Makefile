@@ -3,11 +3,13 @@
 #
 # If you edit it, you will lose your changes, should it be regenerated.
 #
-GEODE           = charm
+GEODE           = oliner
 ASM_TO_OBJS     =
 UI_TO_RDFS      =
-SRCS            = Appui.goc Map.goc Process.goc Text.goc app.goh global.goh
-OBJS            = Appui.obj Map.obj Process.obj Text.obj
+SRCS            = ui.goc strings.goc pprev.goc doc.goc move.goc find.goc\
+                  proc.goc functs.goc ecall.goc oliner.goh
+OBJS            = ui.obj strings.obj pprev.obj doc.obj move.obj find.obj\
+                  proc.obj functs.obj ecall.obj
 LOBJS           =
 
 SYSMAKEFILE     = geode.mk

@@ -10,6 +10,8 @@
 #       Name    Date            Description
 #       ----    ----            -----------
 #       NF      9/23/96         Initial version
+#	RainerB	12/05/2023	Some changes for FreeGEOS 6.0 release.
+#				See app.goh for details
 #
 # DESCRIPTION:
 #       This file contains Geode definitions for the "CharMap"
@@ -49,11 +51,12 @@ resource Application        ui-object
 resource Interface          ui-object
 resource Content            object
 resource AppMonikerResource lmem read-only shared
+resource DataResource lmem read-only shared
 
 export CMMapClass
 export CMRowClass
 export CMTextClass
 export CMGenPrimaryClass
 
-usernotes "Character Map - Kinda like the Windows program."
+usernotes "Character Map - Get quick access to all characters of a font.\rFreeGEOS version 6"
 
