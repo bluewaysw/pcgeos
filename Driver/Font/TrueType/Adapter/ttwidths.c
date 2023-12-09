@@ -706,8 +706,9 @@ static void AdjustFontBuf( TransformMatrix* transMatrix,
                                                         WORD_TO_WWFIXEDASDWORD( savedHeightY - transMatrix->TM_heightY + transMatrix->TM_scriptY ), -transMatrix->TM_matrix.yx ) );*/
                 }
 
-                fontMatrix->FM_12 = -fontMatrix->FM_12;
-                fontMatrix->FM_21 = -fontMatrix->FM_21;
+                /* fontMatrix->FM_12 = -fontMatrix->FM_12;
+                fontMatrix->FM_21 = -fontMatrix->FM_21; */
+                transMatrix->TM_matrix.xy = -transMatrix->TM_matrix.yx;
         }
 
 }
@@ -735,18 +736,18 @@ static void AdjustFontBuf( TransformMatrix* transMatrix,
 
 static Boolean IsRegionNeeded( TransformMatrix* transMatrix, FontMatrix* fontMatrix, FontBuf* fontBuf )
 {
-        word param1;
-        word param2;
+        sword param1;
+        sword param2;
 
 
-        param1 = IntegerOf( GrMulWWFixed( fontMatrix->FM_11, WORD_TO_WWFIXEDASDWORD( fontBuf->FB_pixHeight ) ) );
+        param1 = IntegerOf( GrMulWWFixed( fontMatrix->FM_11, ( (WWFixedAsDWord)fontBuf->FB_pixHeight ) >> 16 ) );
         param2 = IntegerOf( GrMulWWFixed( fontMatrix->FM_21, WORD_TO_WWFIXEDASDWORD( fontBuf->FB_pixHeight ) ) );
-        if( ABS( param1 ) + ABS( param2 ) > MAX_BITMAP_SIZE )
+        if( ( ABS( param1 ) + ABS( param2 ) ) > MAX_BITMAP_SIZE )
                 return TRUE;
 
         param1 = IntegerOf( GrMulWWFixed( fontMatrix->FM_12, WORD_TO_WWFIXEDASDWORD( fontBuf->FB_pixHeight ) ) );
         param2 = IntegerOf( GrMulWWFixed( fontMatrix->FM_22, WORD_TO_WWFIXEDASDWORD( fontBuf->FB_pixHeight ) ) );
-        if( ABS( param1 ) + ABS( param2 ) > MAX_BITMAP_SIZE )
+        if( ( ABS( param1 ) + ABS( param2 ) ) > MAX_BITMAP_SIZE )
                 return TRUE;
 
         if( transMatrix->TM_heightX + transMatrix->TM_scriptX > MAX_BITMAP_SIZE )
