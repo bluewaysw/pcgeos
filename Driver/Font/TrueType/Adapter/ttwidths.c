@@ -482,9 +482,6 @@ EC(     ECCheckBounds( (void*)fontMatrix ) );
         transMatrix->TM_matrix.yx = - ( GrMulWWFixed( tempMatrix.xx, fontMatrix->FM_12 ) +
                                     GrMulWWFixed( tempMatrix.xy, fontMatrix->FM_22 ) );
         transMatrix->TM_matrix.yy = GrMulWWFixed( tempMatrix.yy, fontMatrix->FM_22 );
-
-      /*  transMatrix->TM_matrix.xy = -transMatrix->TM_matrix.xy;
-        transMatrix->TM_matrix.yx = -transMatrix->TM_matrix.yx;*/
 }
 
 
