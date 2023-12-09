@@ -1,0 +1,317 @@
+/***********************************************************************
+ *
+ *
+ * PROJECT:	Breadbox Gourmet
+ * FILE:	rbox.goh
+ * AUTHOR:	John F. Howard,   12/95  
+ *
+ * DESCRIPTION:
+ *	This file has the global variables
+ *      and structures for the application.
+ *
+ *
+ ***********************************************************************/
+
+/*
+ ***************************************************************************
+ *		Include files
+ ***************************************************************************
+ */
+
+@include <stdapp.goh>
+@include <gstring.h>
+#include <ansi/string.h>
+@include <initfile.h>
+#include <print.h>      /* These two for printing  */
+@include <spool.goh>
+#include <token.h>	/* for assigning doc token */
+/* Needed to include text controllers */
+@include <Objects/Text/tCtrlC.goh>
+@include <Objects/vLTextC.goh>    /* VisLargeText definitions */
+
+/*
+ ***************************************************************************
+ *		Class & Message Definitions
+ ***************************************************************************
+ */
+@class	RBoxProcessClass, GenProcessClass ;
+
+/* Messages for creating new DB recipes & ingreds */
+@message void MSG_OPEN_CREATE_RECIPE();
+@message void MSG_OPEN_SELECT_RECIPE(int whichSelect);
+@message (GEN_TRIGGER_ACTION) MSG_ENTER_RECIPE;
+@message (GEN_TRIGGER_ACTION) MSG_ADD_INGRED;
+@message (GEN_TRIGGER_ACTION) MSG_EDIT_INGRED;
+@message (GEN_TRIGGER_ACTION) MSG_CREATE_RECIPE;
+@message (GEN_TRIGGER_ACTION) MSG_MODIFY_RECIPE;
+
+/* Messages for data display */
+@message void MSG_DISPLAY_RECIPE();
+@message (GEN_TRIGGER_ACTION) MSG_CANCEL_SELECT;
+@message (GEN_TRIGGER_ACTION) MSG_SELECT_MODIFY_RECIPE;
+@message (GEN_TRIGGER_ACTION) MSG_CANCEL_MODIFY_RECIPE;
+
+/* Messages for deleting DB recipes & ingreds */
+@message (GEN_TRIGGER_ACTION) MSG_DELETE_RECIPE;
+@message (GEN_TRIGGER_ACTION) MSG_CANCEL_RECIPE;
+@message (GEN_TRIGGER_ACTION) MSG_DELETE_INGRED;
+
+/* Messages for setting the monikers in the lists */
+@message (GEN_DYNAMIC_LIST_QUERY_MSG) MSG_RECIPE_DLIST_MONIKER_QUERY;
+@message (GEN_DYNAMIC_LIST_QUERY_MSG) MSG_INGRED_DLIST_MONIKER_QUERY;
+
+/* Messages for handling selections in the lists */
+@message (GEN_ITEM_GROUP_APPLY_MSG) MSG_RECIPE_DLIST_APPLY;
+@message (GEN_ITEM_GROUP_APPLY_MSG) MSG_INGRED_DLIST_APPLY;
+@message (GEN_ITEM_GROUP_APPLY_MSG) MSG_CAT_ILIST_APPLY;
+@message (GEN_ITEM_GROUP_APPLY_MSG) MSG_SYST_ILIST_APPLY;
+@message (GEN_ITEM_GROUP_APPLY_MSG) MSG_POINT_SIZE_APPLY;
+
+/* Saving meas system to geos.ini */
+@message (GEN_TRIGGER_ACTION) MSG_SAVE_MEAS_OPTS;
+
+/* serving size recalc routines */
+@message void MSG_INGRED_TO_ARRAY();
+@message (GEN_TRIGGER_ACTION) MSG_RECALC_SERVINGS;
+
+@message (GEN_TRIGGER_ACTION) MSG_ADD_TO_LIST;
+@message void MSG_DISPLAY_SHOPPING_LIST(int whichList);
+@message (GEN_TRIGGER_ACTION) MSG_CLEAR_SHOPPING_LIST;
+
+@message (GEN_TRIGGER_ACTION) MSG_COPY_RECIPE;
+@message (GEN_TRIGGER_ACTION) MSG_PASTE_RECIPE;
+
+@message void MSG_GOURMET_SCREEN();
+
+@endc
+
+/*
+ ***************************************************************************
+ *		Global variables and definitions
+ ***************************************************************************
+ */
+
+extern FileHandle  rBoxFile;  /* handle to the rbox file that's open. */
+
+extern word  currentRecipe;      /* the currently selected recipe */
+
+extern word  currentIngred;     /* the currently selected ingredient */
+
+extern word  currentCat;     /* the currently selected category */
+
+extern word  measSystem;    /* the currently selected meas syst */
+
+extern word  pointSize;    /* the currently selected point size */
+
+extern MemHandle   sortHeapHandle, ingredHeapHandle, listHeapHandle;
+extern ChunkHandle    sortChunkArray, ingredChunkArray, listChunkArray;
+extern word   index;
+
+extern Boolean  calledByRecalc;
+
+extern word	onScreen;      /* lets content know what to put
+                                  on screen when opening  */
+
+extern VMFileHandle  clipfile;      /* handle to the clip file. */
+
+
+/* constants for various char strings */
+#define NAME_SIZE 50
+#define NUM_DATA_SIZE 15
+#define CLIP_FILENAME   "grmtclip.vm"
+
+typedef ByteEnum ScreenDisplay;
+#define TITLE 1
+#define RECIPE 2
+#define LIST0 3
+#define LIST1 4
+
+typedef ByteEnum System;
+#define USA 1
+#define MET 2
+
+typedef ByteEnum PointSize;
+#define TEN 1
+#define TWL 2
+#define FRT 3
+
+typedef ByteEnum Categories;
+#define CATS 0
+#define APTZ 1
+#define BEVG 2
+#define BRED 3
+#define CNDY 4
+#define DSRT 5
+#define EGGS 6
+#define FISH 7
+#define FRVG 8
+#define MEAT 9
+#define PSTA 10
+#define PLTY 11
+#define SALD 12
+#define SAUC 13
+#define SOUP 14
+#define POTP 15
+
+typedef ByteEnum USUnits;
+#define USUN 0
+#define PNCH 1
+#define TSP 2
+#define TBSP 3
+#define CUP 4
+#define FLOZ 5
+#define PINT 6
+#define QT 7
+#define GAL 8
+#define OZ 9
+#define LB 10
+#define EACH 11
+#define CAN 12
+#define PKG 13
+#define STK 14
+
+typedef ByteEnum MUnits;
+#define MUN 0
+#define MPNCH 1
+#define MTSP 2
+#define MTBSP 3
+#define MLS 4
+#define DLS 5
+#define LTRS 6
+#define GRMS 7
+#define KILO 8
+#define MEACH 9
+#define MCAN 10
+#define MPKG 11
+
+
+
+/*
+ ***************************************************************************
+ *		Structure Definitions
+ ***************************************************************************
+ */
+
+/* This is the structure of the DB mapblock  */
+typedef struct {
+
+    word	MS_numRecipes;     /* the number of recipes */
+
+} DBMapStruct;
+
+
+/*
+ * RecipeStruct
+ *
+ * These structures contain pertinent information about a DB Group,
+ * and are stored in an array in the DB Map item.
+ */
+
+typedef struct {
+
+    DBGroup     RS_group;               /* DB Group ID for this room */
+    DBItem      RS_head;                /* First item in the group */
+    word        RS_size;                /* Number of items in this group */
+    char        RS_name[NAME_SIZE];  	/* Name of this recipe */
+    word 	RS_cat;			/* Recipe category */
+    word 	RS_serves;		/* number served */
+    char	RS_mainIngred[NAME_SIZE];/* main ingredient */
+    char	RS_author[NAME_SIZE];	/* recipe author */
+    char	RS_prepTime[NUM_DATA_SIZE];	/* recipe prep time */
+    word	RS_index;		/* index number */
+    word	RS_system;		/* US or Metric */
+    Boolean	RS_list;		/* shopping list marker */
+    word	RS_spare;		/* might need it sometime */
+
+} RecipeStruct;
+
+/*
+ * IngredStruct
+ *
+ * These structures are stored in individual DB items.  They form a
+ * linked list; the "next pointer" is, in this case, a DBItem in the
+ * same group.
+ *
+ */
+
+typedef struct {
+
+    DBItem      IS_next;                /* Next item in this DB group */
+    char        IS_ingred[NAME_SIZE]; 	/* Name of this ingredient */
+    word        IS_units;               /* units of measure */
+    char	IS_quant[NUM_DATA_SIZE];           /* amount */
+
+} IngredStruct;
+
+/*
+ * AlfaSortStruct
+ *
+ * Stores the recipe name and index for sorting in chunk array
+ */
+
+typedef struct {
+
+    char	ASS_name[NAME_SIZE];	/* recipe name */
+    word	ASS_index;              /* recipe index # */
+
+} AlfaSortStruct;
+
+/*
+ * IngredRecalcStruct
+ *
+ * Stores the ingredient info for display/recalc in chunk array
+ */
+
+typedef struct {
+
+    char        IRS_ingred[NAME_SIZE]; 	/* Name of this ingredient */
+    word        IRS_units;               /* units of measure */
+    char	IRS_origQuant[NUM_DATA_SIZE];       /* amount for recalculating */
+    char	IRS_newQuant[NUM_DATA_SIZE];       /* amount for display */
+
+} IngredRecalcStruct;
+
+/*
+ * IngredChunkArrayHeaderStruct
+ *
+ * Stores the numIngreds and serves in chunk array header
+ */
+
+typedef struct {
+
+    ChunkArrayHeader	standardChunkArrayHeader;
+    word        CAH_numIngreds;		/* to set loop counter */               
+    word	CAH_newServes;          /* for the displays */ 
+    word	CAH_origServes;         /* for calculation */
+
+} IngredChunkArrayHeaderStruct;
+
+/*
+ * ListArrayHeaderStruct
+ *
+ * Stores the number of list elements in chunk array header
+ */
+
+typedef struct {
+
+    ChunkArrayHeader	standardChunkArrayHeader;
+    word        LAH_numElements;	/* to set counter */
+
+} ListArrayHeaderStruct;
+
+/*
+ * ListChunkStruct
+ *
+ * Stores the ingredient shopping list info in chunk array
+ */
+
+typedef struct {
+
+    char        LCS_name[NAME_SIZE]; 	/* Name of this recipe */
+    char        LCS_ingred[NAME_SIZE]; 	/* Name of this ingredient */
+    word        LCS_units;               /* units of measure */
+    char	LCS_quant[NUM_DATA_SIZE];       /* amount for display */
+    word	LCS_system;		/* which meas system */
+
+} ListChunkStruct;
+

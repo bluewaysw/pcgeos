@@ -149,7 +149,8 @@ minimalSavers	: lol blackhole blank bobbin circles dribble dust \
 minimalTools	: prntscrn
 
 otherEnsemble	: conview reader term tedit geofile dirls  \
-		   graphvwr macror dump perf bim ffind bbxcd webbox
+		  graphvwr macror dump perf bim ffind bbxcd webbox \
+		  hinv10 bbg10
 #geocon3
 
 #
@@ -1474,6 +1475,12 @@ Installed/Appl/Breadbox/bbxcd:			ui ansic sound cdaudio MAKEAPPL
 webbox	: Installed/Appl/Breadbox/Webbox
 Installed/Appl/Breadbox/Webbox:			ui ansic text spool spell \
 						MAKEAPPL
+
+hinv10	: Installed/Appl/Breadbox/Hinv10
+Installed/Appl/Breadbox/Hinv10:			ui ansic spool text MAKEAPPL
+
+bbg10	: Installed/Appl/Breadbox/BBGrmt
+Installed/Appl/Breadbox/BBGrmt:			ui ansic spool text MAKEAPPL
 
 #geocon3	: Installed/Appl/Breadbox/Geocon3
 #Installed/Appl/Breadbox/Geocon3:		ui ansic color MAKEAPPL
