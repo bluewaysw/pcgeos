@@ -1493,7 +1493,7 @@ UpdateTaskBarList	proc	far
 	.enter
 
 	;
-	; TOOL_AREA_IS_TASK_BAR
+	; if TOOL_AREA_IS_TASK_BAR
 	;
 	push	ds
 	segmov	ds, dgroup
@@ -3850,15 +3850,24 @@ OLBaseWinGainedSystemTargetExcl	endp
 
 
 UpdateAppMenuItemCommon	proc	far
+	;
+	; if TOOL_AREA_IS_TASK_BAR
+	;
+	push	ds
+	segmov	ds, dgroup
+	tst	ds:[taskBarEnabled] ; if taskbar == on, ZF == 1
+	pop	ds
+	jz	hasNoTaskbar ; if ZF==0 skip the following code
 
-if TOOL_AREA_IS_TASK_BAR
 	push	cx
 	mov	ax, MSG_OL_BASE_WIN_UPDATE_WINDOW_ENTRY
 	call	ObjCallInstanceNoLock
 	pop	cx
-endif
+
+hasNoTaskbar:
 	mov	ax, MSG_OL_APP_UPDATE_TASK_ENTRY
 	call	GenCallApplication
+
 	ret
 UpdateAppMenuItemCommon	endp
 
@@ -4071,7 +4080,7 @@ else
 endif
 endif ; PLACE_EXPRESS_MENU_ON_PRIMARY or TOOL_AREA_IS_TASK_BAR
 
-if PLACE_EXPRESS_MENU_ON_PRIMARY ;and (not TOOL_AREA_IS_TASK_BAR)
+if PLACE_EXPRESS_MENU_ON_PRIMARY
 
 	;
 	; if (not TOOL_AREA_IS_TASK_BAR)
@@ -4094,7 +4103,7 @@ if PLACE_EXPRESS_MENU_ON_PRIMARY ;and (not TOOL_AREA_IS_TASK_BAR)
 if REDO_GEOMETRY_FOR_EXPRESS_MENU
 	call	OLRedoMenuBarGeometryIfMenusInHeader
 endif
-endif ; PLACE_EXPRESS_MENU_ON_PRIMARY and (not TOOL_AREA_IS_TASK_BAR)
+endif ; PLACE_EXPRESS_MENU_ON_PRIMARY
 
 afterExpressMenu:
 

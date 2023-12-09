@@ -10,10 +10,10 @@ FILE:		copenAppMisc.asm
 ROUTINES:
 	Name			Description
 	----			-----------
-    MTD MSG_GEN_APPLICATION_SET_MEASUREMENT_TYPE 
+    MTD MSG_GEN_APPLICATION_SET_MEASUREMENT_TYPE
 				Set the application's measurement type
 
-    MTD MSG_META_QUERY_IF_PRESS_IS_INK 
+    MTD MSG_META_QUERY_IF_PRESS_IS_INK
 				If the application is *not* the focus
 				application, then presses on it are not
 				turned into ink.
@@ -24,25 +24,25 @@ ROUTINES:
     MTD MSG_META_GET_MODEL_EXCL Returns the current focus/target/model
 				below this point in hierarchy
 
-    MTD MSG_META_GET_TARGET_EXCL 
+    MTD MSG_META_GET_TARGET_EXCL
 				Returns the current focus/target/model
 				below this point in hierarchy
 
     INT OLApplicationGetCommon  Returns the current focus/target/model
 				below this point in hierarchy
 
-    MTD MSG_META_GET_TARGET_AT_TARGET_LEVEL 
+    MTD MSG_META_GET_TARGET_AT_TARGET_LEVEL
 				Returns current target object within this
 				branch of the hierarchical target
 				exclusive, at level requested
 
-    MTD MSG_SPEC_RESOLVE_MONIKER_LIST 
+    MTD MSG_SPEC_RESOLVE_MONIKER_LIST
 				Intercept MSG_SPEC_RESOLVE_MONIKER_LIST to
 				NOT resolve moniker list into a single
 				moniker.  GenApplication is allowed keep a
 				moniker list.
 
-    MTD MSG_SPEC_UPDATE_VIS_MONIKER 
+    MTD MSG_SPEC_UPDATE_VIS_MONIKER
 				Handle change in GenApplication moniker by
 				telling iconified apps' icon, if any, to
 				update.
@@ -50,30 +50,30 @@ ROUTINES:
     MTD MSG_META_KBD_CHAR       Intercept keyboard events to ignore input
 				when necessary
 
-    MTD MSG_OL_APP_NAVIGATE_TO_NEXT_WINDOW 
+    MTD MSG_OL_APP_NAVIGATE_TO_NEXT_WINDOW
 				navigate to next window, ignored if modal
 				window is up
 
     INT OLANTNW_Callback        callback routine to find next window
 
-    MTD MSG_OL_APP_NAVIGATE_TO_NEXT_APP 
+    MTD MSG_OL_APP_NAVIGATE_TO_NEXT_APP
 				navigate to next app in field
 
-    MTD MSG_OL_APP_NAVIGATE_TO_NEXT_APP 
+    MTD MSG_OL_APP_NAVIGATE_TO_NEXT_APP
 				navigate to next app in field
 
-    MTD MSG_OL_APP_TRY_NAVIGATE_TO_APP 
+    MTD MSG_OL_APP_TRY_NAVIGATE_TO_APP
 				try navigating to this app, navigate to
 				next if not possible
 
-    MTD MSG_GEN_APPLICATION_BUILD_STANDARD_DIALOG 
+    MTD MSG_GEN_APPLICATION_BUILD_STANDARD_DIALOG
 				Build a standard dialog box, attach it to
 				this application object, & set it USABLE.
 
     INT CreateHelpHintIfNeeded  Create a ATTR_GEN_HELP_CONTEXT if one was
 				specified in the parameters
 
-    INT CreateMultipleResponseTriggers 
+    INT CreateMultipleResponseTriggers
 				Create response triggers for a
 				GIT_MULTIPLE_RESPONSE dialog.
 
@@ -82,10 +82,10 @@ ROUTINES:
     INT SubstituteStringArg     Substitute a string for a character in a
 				chunk
 
-    MTD MSG_GEN_APPLICATION_DO_STANDARD_DIALOG 
+    MTD MSG_GEN_APPLICATION_DO_STANDARD_DIALOG
 				Execute a standard dialog box.
 
-    MTD MSG_OL_APP_DO_DIALOG_RESPONSE 
+    MTD MSG_OL_APP_DO_DIALOG_RESPONSE
 				Finish a standard dialog box.
 
     MTD MSG_META_START_SELECT   Mouse button stuff.
@@ -98,21 +98,21 @@ ROUTINES:
 				GWNT_STARTUP_INDEXED_APP has occurred - do
 				a NukeExpressMenu.
 
-    MTD MSG_GEN_APPLICATION_TEST_FOR_CANCEL_MNEMONIC 
+    MTD MSG_GEN_APPLICATION_TEST_FOR_CANCEL_MNEMONIC
 				Tests for cancel mnemonic for the specific
 				UI.
 
-    MTD MSG_GEN_APPLICATION_TOGGLE_CURRENT_MENU_BAR 
+    MTD MSG_GEN_APPLICATION_TOGGLE_CURRENT_MENU_BAR
 				toggle current GenPrimary's menu bar, if
 				togglable
 
-    MTD MSG_GEN_APPLICATION_TOGGLE_EXPRESS_MENU 
+    MTD MSG_GEN_APPLICATION_TOGGLE_EXPRESS_MENU
 				toggle parent field's express menu.
 
-    MTD MSG_META_QUERY_SAVE_DOCUMENTS 
+    MTD MSG_META_QUERY_SAVE_DOCUMENTS
 				Save documents on an app switch.
 
-    MTD MSG_META_GAINED_FULL_SCREEN_EXCL 
+    MTD MSG_META_GAINED_FULL_SCREEN_EXCL
 				Hack to force the model to match the target
 				when the application comes to the front.
 				Currently the document control stuff is
@@ -121,7 +121,7 @@ ROUTINES:
 				apps, so that the model document is not on
 				top.
 
-    MTD MSG_META_GAINED_FULL_SCREEN_EXCL 
+    MTD MSG_META_GAINED_FULL_SCREEN_EXCL
 				Sends data blocks containing, the text
 				moniker, and icon moniker to the Indicator
 				App.
@@ -198,7 +198,7 @@ COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 		OLApplicationQueryIfPressIsInk
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-SYNOPSIS:	If the application is *not* the focus application, then 
+SYNOPSIS:	If the application is *not* the focus application, then
 		presses on it are not turned into ink.
 
 CALLED BY:	GLOBAL
@@ -206,7 +206,7 @@ PASS:		ds:di - OLApplication instance data
 		cx, dx - position of mouse
 RETURN:		ax - InkReturnValue
 DESTROYED:	nada
- 
+
 PSEUDO CODE/STRATEGY:
 
 KNOWN BUGS/SIDE EFFECTS/IDEAS:
@@ -240,7 +240,7 @@ if GRAFFITI_ANYWHERE and 0
 	call	ObjCallInstanceNoLock		;   is being held up
 	pop	ax
 else
-		
+
 	;
 	; If any menus were up, release them now.  -cbh 12/15/92
 	;
@@ -287,7 +287,7 @@ PASS:		*ds:si 	- instance data
 		ds:di	- SpecInstance
 		es     	- segment of class
 		ax 	- MSG_META_GET_[FOCUS/TARGET/MODEL]
-		
+
 RETURN:		^lcx:dx - handle of object
 		ax, bp	- destroyed
 		carry	- set
@@ -379,7 +379,7 @@ ActionObscure	segment resource
 
 COMMENT @----------------------------------------------------------------------
 
-FUNCTION:	OLApplicationSpecResolveMonikerList - 
+FUNCTION:	OLApplicationSpecResolveMonikerList -
 		MSG_SPEC_RESOLVE_MONIKER_LIST handler.
 
 DESCRIPTION:	Intercept MSG_SPEC_RESOLVE_MONIKER_LIST to NOT resolve moniker
@@ -411,7 +411,7 @@ OLApplicationSpecResolveMonikerList	endm
 
 COMMENT @----------------------------------------------------------------------
 
-FUNCTION:	OLApplicationSpecUpdateVisMoniker - 
+FUNCTION:	OLApplicationSpecUpdateVisMoniker -
 		MSG_SPEC_UPDATE_VIS_MONIKER handler.
 
 DESCRIPTION:	Handle change in GenApplication moniker by telling iconified
@@ -539,7 +539,7 @@ PASS:		*ds:si	= OLApplicationClass object
 		bp high	= scan code
 RETURN:		nothing
 DESTROYED:	ax, cx, dx, bp
-SIDE EFFECTS:	
+SIDE EFFECTS:
 
 PSEUDO CODE/STRATEGY:
 
@@ -551,8 +551,8 @@ REVISION HISTORY:
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
 
 if _KBD_NAVIGATION	;------------------------------------------------------
- 
-OLApplicationKbdChar	method dynamic OLApplicationClass, 
+
+OLApplicationKbdChar	method dynamic OLApplicationClass,
 					MSG_META_KBD_CHAR
 	;
 	; If overriding input restrictions, process kbd input.
@@ -566,7 +566,7 @@ OLApplicationKbdChar	method dynamic OLApplicationClass,
 						; field & do nothing else.
 	mov	ax, MSG_META_FUP_KBD_CHAR
 	GOTO	GenCallParent			; Send to field
- 
+
 processKbdChar:
 	;
 	; If we're low on handles, ignore input and then send accept input via
@@ -592,21 +592,21 @@ manyHandles:
 
 	mov	di, offset OLApplicationClass
 	GOTO	ObjCallSuperNoLock
- 
+
 
 OLApplicationKbdChar  endm
 
- 
+
 endif			;------------------------------------------------------
 
 
 
 COMMENT @----------------------------------------------------------------------
 
-METHOD:		OLApplicationFupKbdChar -- 
+METHOD:		OLApplicationFupKbdChar --
 		MSG_META_FUP_KBD_CHAR for OLApplicationClass
 
-DESCRIPTION:	Handles keyboard characters, in order to do application 
+DESCRIPTION:	Handles keyboard characters, in order to do application
 		shortcuts.
 
 PASS:		*ds:si 	- instance data
@@ -652,7 +652,7 @@ SBCS <	LONG je	callField			; don't need to do anything >
 						; overridden)
 
 if _KBD_NAVIGATION	;------------------------------------------------------
-   
+
 	; If overriding input restrictions, process kbd input.
 	; Otherwise, check ignore input flag
 	;
@@ -690,13 +690,13 @@ notHelp:
 	; shortcuts.
 	;
  	mov	ax, MSG_GEN_FIND_KBD_ACCELERATOR
-	mov	bx, ds:[di].OLAI_modalWin.handle	
+	mov	bx, ds:[di].OLAI_modalWin.handle
 	tst	bx				;is there a modal window?
 	jz	findAccel			;nope, branch to do entire appl
 
 if	ALL_DIALOGS_ARE_MODAL
 	;
-	; Redwood, make sure we can access the express menu.  We'll allow 
+	; Redwood, make sure we can access the express menu.  We'll allow
 	; characters to be fupped.   8/30/93 cbh    (Changed to not send
 	; to express menu if window is sys-modal.  9/ 2/93 cbh)  (Changed
 	; yet again to only allow windows with a special hint on them,
@@ -732,7 +732,7 @@ endif
 
 else	; not ALL_DIALOGS_ARE_MODAL
 
-	push	si				;save application handle 
+	push	si				;save application handle
 	mov	si, ds:[di].OLAI_modalWin.chunk
 						;need to check carry afterwards
 	call	ObjMessageCallFixupDS		;send method to modal win
@@ -740,13 +740,13 @@ else	; not ALL_DIALOGS_ARE_MODAL
 	jmp	short bringUpMenus		;branch to bring up menus
 
 endif	; ALL_DIALOGS_ARE_MODAL
-	
+
 findAccel:
 	push	cx, dx, bp
 	call	ObjCallInstanceNoLock		;send to ourselves
 	pop	cx, dx, bp
 	jnc	doLocalShortcuts		;nothing found, move on
-	
+
 bringUpMenus:
 	;
 	; Call a utility routine to send a method to the Flow object that
@@ -755,9 +755,9 @@ bringUpMenus:
 	call	OLReleaseAllStayUpModeMenus
 	stc					;handled...
 	jmp	short done
-	
+
 doLocalShortcuts:
-  
+
 	;Don't handle state keys (shift, ctrl, etc).
 	;
 	test	dl, mask CF_STATE_KEY or mask CF_TEMP_ACCENT
@@ -782,7 +782,7 @@ doLocalShortcuts:
 	call	ObjCallInstanceNoLock
 	stc					;say handled
 	jmp	short done
-	
+
 afterLocalShortcuts:
 endif	;----------------------------------------------------------------------
 
@@ -795,7 +795,7 @@ done:
 	ret
 
 
-	
+
 OLApplicationFupKbdChar	endm
 
 
@@ -817,7 +817,7 @@ OLAShortcutList	KeyboardShortcut \
 	<0, 0, 0, 0, C_SYS_F3 and mask KS_CHAR>,	;Quit application
 	<0, 0, 0, 0, C_SYS_F1 and mask KS_CHAR>		;Help
 
-else ; ISUI but not DBCS 
+else ; ISUI but not DBCS
 
 OLAShortcutList	KeyboardShortcut \
 	<0, 1, 0, 0, 0xf, VC_ESCAPE>,	;NEXT application
@@ -883,11 +883,11 @@ PASS:		*ds:si	= OLApplicationClass object
 
 RETURN:		nothing
 
-ALLOWED TO DESTROY:	
+ALLOWED TO DESTROY:
 		ax, cx, dx, bp
 		bx, si, di, ds, es
 
-SIDE EFFECTS:	
+SIDE EFFECTS:
 
 PSEUDO CODE/STRATEGY:
 
@@ -903,7 +903,7 @@ OLApplicationNavigateToNextWindow	method	dynamic	OLApplicationClass,
 	;
 	; if we have a modal win up, ignore
 	;
-	tst	ds:[di].OLAI_modalWin.handle	
+	tst	ds:[di].OLAI_modalWin.handle
 	LONG jnz	done
 	;
 	; get current focus window
@@ -945,7 +945,7 @@ haveFocusWin:
 	mov	ax, TEMP_META_GCN
 	call	ObjVarFindData
 	jnc	done			; if no lists, done
-	
+
 	mov	bp, si			; *ds:bp = OLApp
 	mov	di, ds:[bx].TMGCND_listOfLists
 	mov	bx, MANUFACTURER_ID_GEOWORKS
@@ -1032,7 +1032,7 @@ RETURN:		carry clear to continue enumeration
 		carry set to stop enumeration, when next window is found
 			^lcx:dx = next window
 
-DESTROYED:	
+DESTROYED:
 
 PSEUDO CODE/STRATEGY:
 		Windows are moved to the front of the list when they are
@@ -1156,11 +1156,11 @@ PASS:		*ds:si	= OLApplicationClass object
 
 RETURN:		nothing
 
-ALLOWED TO DESTROY:	
+ALLOWED TO DESTROY:
 		ax, cx, dx, bp
 		bx, si, di, ds, es
 
-SIDE EFFECTS:	
+SIDE EFFECTS:
 
 PSEUDO CODE/STRATEGY:
 
@@ -1210,7 +1210,7 @@ else	; ISUI ---------------------------------------------------------------
 ; ISUI just asks the field to bring to front the next window listed in the
 ; window list
 ;
-OLApplicationNavigateToNextApp	method	dynamic OLApplicationClass, 
+OLApplicationNavigateToNextApp	method	dynamic OLApplicationClass,
 					MSG_OL_APP_NAVIGATE_TO_NEXT_APP
 	; ask field to handle this
 	push	si
@@ -1246,11 +1246,11 @@ PASS:		*ds:si	= OLApplicationClass object
 
 RETURN:		nothing
 
-ALLOWED TO DESTROY:	
+ALLOWED TO DESTROY:
 		ax, cx, dx, bp
 		bx, si, di, ds, es
 
-SIDE EFFECTS:	
+SIDE EFFECTS:
 
 PSEUDO CODE/STRATEGY:
 
@@ -1381,7 +1381,7 @@ continue:
 	clr	cx				; have current thread run block
 	call	ObjDuplicateResource		; bx = new block
 
-	
+
 	; set the correct moniker for the glyph
 
 	push	ds:[LMBH_handle], si
@@ -1391,7 +1391,7 @@ continue:
 	; If _MINIMAL_STANDARD_DIALOGS is true, then we do not have a glyph
 	; or any artwork, so skip all of this.
 if	 not _MINIMAL_STANDARD_DIALOGS
-	
+
 	mov	ax, ss:[bp].SDP_customFlags
 	and	ax, mask CDBF_DIALOG_TYPE
 	mov	cx, offset StdDialogQuestionMoniker
@@ -1479,7 +1479,7 @@ notSysModal:
 
 notMultipleResponse:
 
-	
+
 	; copy over correct string
 
 	les	di, ss:[bp].SDP_customString
@@ -1528,10 +1528,10 @@ endif
 	call	SubstituteStringArg
 
 	; create a help hint if needed
-		
+
 	mov	si, offset StandardDialogSummons
 	call	CreateHelpHintIfNeeded
-		
+
 	call	MemUnlock
 	pop	ax, si				;ax = handle
 	xchg	ax, bx
@@ -1646,7 +1646,7 @@ endif
 
 	;
 	; If dialog is system modal, make sure the help controller knows this.
-	; 
+	;
 	test	ss:[bp].SDP_customFlags, mask CDBF_SYSTEM_MODAL
 	jz	done
 
@@ -2091,7 +2091,7 @@ afterTimer:
 
 	;
 	; Record the summons & link new chunk at the head of the list.
-	; 
+	;
 	mov	di, ds:[bx]
 	movdw	ds:[di].OLASD_summons, cxdx
 	mov	ds:[di].OLASD_timerHandle, bp
@@ -2247,7 +2247,7 @@ afterTimer:
 
 	pop	si, bx				;*ds:si = app
 						;*ds:bx = OLASD
-			
+
 EC <	mov	di, ds:[si]						>
 EC <	add	di, ds:[di].Vis_offset					>
 EC <	cmp	ds:[di].VCNI_focusExcl.FTVMC_OD.handle, cx		>
@@ -2298,7 +2298,7 @@ PASS:		*ds:si	= OLApplicationClass object
 		bp	= timer ID
 RETURN:		nothing
 DESTROYED:	ax, cx, dx, bp
-SIDE EFFECTS:	
+SIDE EFFECTS:
 
 PSEUDO CODE/STRATEGY:
 
@@ -2308,7 +2308,7 @@ REVISION HISTORY:
 	ayuen	10/22/00   	Initial version
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
-OLApplicationTimedDialogTimerExpired	method dynamic OLApplicationClass, 
+OLApplicationTimedDialogTimerExpired	method dynamic OLApplicationClass,
 					MSG_OL_APP_TIMED_DIALOG_TIMER_EXPIRED
 
 	;
@@ -2344,7 +2344,7 @@ CommonFunctional	segment resource
 
 COMMENT @----------------------------------------------------------------------
 
-METHOD:		OLApplicationStartTimer -- 
+METHOD:		OLApplicationStartTimer --
 		MSG_OL_APP_START_TIMER for OLApplicationClass
 
 DESCRIPTION:	Starts a timer up for an object that has the gadget exclusive.
@@ -2355,9 +2355,9 @@ DESCRIPTION:	Starts a timer up for an object that has the gadget exclusive.
 PASS:		*ds:si 	- instance data
 		es     	- segment of MetaClass
 		ax 	- MSG_OL_APP_START_TIMER
-		
+
 		cx:dx	- OD to send MSG_TIMER_EXPIRED
-		bp	- number of ticks until expiration, or zero for 
+		bp	- number of ticks until expiration, or zero for
 			  standard olGadgetRepeatDelay from the .ui file.
 
 RETURN:		nothing
@@ -2385,7 +2385,7 @@ EC <	xchg	bx, cx				;make sure OD OK	      >
 EC <	xchg	si, dx							      >
 	tst	bp				;see if standard time desired
 	jnz	10$				;nope, branch
-	
+
 	push	ds
 	mov	ax, segment idata		;get segment of core blk
 	mov	ds, ax
@@ -2404,7 +2404,7 @@ EC <	ERROR_NZ OL_TIMER_STARTED_WHILE_ONE_ALREADY_RUNNING		      >
 	mov	dx, MSG_TIMER_EXPIRED
 	mov	ax, TIMER_EVENT_ONE_SHOT
 	call	TimerStart			;
-	
+
 ;	Commented out until we decide to send repeat events through the IM
 ; 	queue again.
 ;	mov	cx, bp				;put delay in cx
@@ -2415,10 +2415,10 @@ EC <	ERROR_NZ OL_TIMER_STARTED_WHILE_ONE_ALREADY_RUNNING		      >
 ;	mov	ax, TIMER_EVENT_ONE_SHOT
 ;	call	TimerStart			;
 ;	pop	si
-	
+
 	mov	di, ds:[si]			;point to instance
 	add	di, ds:[di].Vis_offset		;ds:[di] -- SpecInstance
-	mov	ds:[di].OLAI_timerID, ax	;save these	
+	mov	ds:[di].OLAI_timerID, ax	;save these
 	mov	ds:[di].OLAI_timerHandle, bx
 	ret
 OLApplicationStartTimer	endm
@@ -2427,7 +2427,7 @@ OLApplicationStartTimer	endm
 
 COMMENT @----------------------------------------------------------------------
 
-METHOD:		OLApplicationStopTimer -- 
+METHOD:		OLApplicationStopTimer --
 		MSG_OL_APP_STOP_TIMER for OLApplicationClass
 
 DESCRIPTION:	Stops a previously started timer, if any.  An object that
@@ -2462,7 +2462,7 @@ EC <	xchg	si, dx							      >
 EC <	call	ECCheckOD				      		      >
 EC <	xchg	bx, cx				;make sure OD OK	      >
 EC <	xchg	si, dx							      >
-   
+
 	mov	di, ds:[si]			;point to instance
 	add	di, ds:[di].Vis_offset		;ds:[di] -- SpecInstance
 	;
@@ -2474,7 +2474,7 @@ EC <	xchg	si, dx							      >
 	jnz	exit				;  (should eventually be a
 	cmp	dx, ds:[di].OLAI_timerOD.chunk	;   a fatal error)
 	jnz	exit
-	
+
 	clr	ax
 	xchg	ax, ds:[di].OLAI_timerID	;turn off timer, if any
 	clr	bx
@@ -2492,10 +2492,10 @@ OLApplicationStopTimer	endm
 
 COMMENT @----------------------------------------------------------------------
 
-METHOD:		OLApplicationTimerExpired -- 
+METHOD:		OLApplicationTimerExpired --
 		MSG_TIMER_EXPIRED for OLApplicationClass
 
-DESCRIPTION:	Sent by gadget when done (it gets it from the timer); we will 
+DESCRIPTION:	Sent by gadget when done (it gets it from the timer); we will
 		send it off to our timerOD and clear the timer instance data.
 
 PASS:		*ds:si 	- instance data
@@ -2534,7 +2534,7 @@ OLApplicationTimerExpired	method OLApplicationClass, MSG_TIMER_EXPIRED
 	xchg	si, ds:[di].OLAI_timerOD.chunk	;get chunk (and clear it)
 	clr	bx
 	xchg	bx, ds:[di].OLAI_timerOD.handle	;get handle
-	tst	si							    
+	tst	si
 	jz	exit				;no OD anymore, exit
 	tst	ds:[di].OLAI_timerHandle	;timer's been canceled, exit
 	jz	exit
@@ -2546,7 +2546,7 @@ OLApplicationTimerExpired	method OLApplicationClass, MSG_TIMER_EXPIRED
 exit:
 	ret
 OLApplicationTimerExpired	endm
-				
+
 ;OLApplicationRepeatPress	endm
 
 
@@ -2556,7 +2556,7 @@ OLApplicationTimerExpired	endm
 
 COMMENT @----------------------------------------------------------------------
 
-METHOD:		OLApplicationStartSelect -- 
+METHOD:		OLApplicationStartSelect --
 		MSG_META_START_SELECT for OLApplicationClass
 
 DESCRIPTION:	Mouse button stuff.
@@ -2564,12 +2564,12 @@ DESCRIPTION:	Mouse button stuff.
 PASS:		*ds:si 	- instance data
 		es     	- segment of MetaClass
 		ax 	- MSG_META_START_SELECT
-		cx, dx, bp	- mouse data 
+		cx, dx, bp	- mouse data
 
 RETURN:		ax	- mask MRF_PROCESSED
 		ax, cx, dx, bp - destroyed
 
-ALLOWED TO DESTROY:	
+ALLOWED TO DESTROY:
 		bx, si, di, ds, es
 
 REGISTER/STACK USAGE:
@@ -2585,7 +2585,7 @@ REVISION HISTORY:
 
 ------------------------------------------------------------------------------@
 
-OLApplicationStartSelect	method dynamic	OLApplicationClass, 
+OLApplicationStartSelect	method dynamic	OLApplicationClass,
 						MSG_META_START_SELECT,
 						MSG_META_START_MOVE_COPY
 	call	NukeExpressMenu
@@ -2630,7 +2630,7 @@ NukeExpressMenu	proc	near
 	;
 	push	ax, cx, dx, bp
 	push	si
-	clrdw	cxdx	
+	clrdw	cxdx
 	mov	ax, MSG_OL_FIELD_RELEASE_EXPRESS_MENU
 	mov	bx, segment OLFieldClass	; for OLFieldClass
 	mov	si, offset OLFieldClass
@@ -2667,11 +2667,11 @@ PASS:		*ds:si	= OLApplicationClass object
 
 RETURN:		nothing
 
-ALLOWED TO DESTROY:	
+ALLOWED TO DESTROY:
 		ax, cx, dx, bp
 		bx, si, di, ds, es
 
-SIDE EFFECTS:	
+SIDE EFFECTS:
 
 PSEUDO CODE/STRATEGY:
 
@@ -2708,7 +2708,7 @@ KbdNavigation	segment resource
 
 COMMENT @----------------------------------------------------------------------
 
-METHOD:		OLApplicationTestForCancelMnemonic -- 
+METHOD:		OLApplicationTestForCancelMnemonic --
 		MSG_GEN_APPLICATION_TEST_FOR_CANCEL_MNEMONIC for OLApplicationClass
 
 DESCRIPTION:	Tests for cancel mnemonic for the specific UI.
@@ -2722,11 +2722,11 @@ PASS:		*ds:si 	- instance data
 		bp low = ToggleState
 		bp high = scan code
 
-RETURN:		carry set if match found	
+RETURN:		carry set if match found
 		cx, dx, bp - preserved
 		ax - destroyed
 
-ALLOWED TO DESTROY:	
+ALLOWED TO DESTROY:
 		bx, si, di, ds, es
 
 REGISTER/STACK USAGE:
@@ -2784,11 +2784,11 @@ PASS:		*ds:si	= class object
 
 RETURN:		nothing
 
-ALLOWED TO DESTROY:	
+ALLOWED TO DESTROY:
 		ax, cx, dx, bp
 		bx, si, di, ds, es
 
-SIDE EFFECTS:	
+SIDE EFFECTS:
 
 PSEUDO CODE/STRATEGY:
 
@@ -2844,11 +2844,11 @@ PASS:		*ds:si	= class object
 
 RETURN:		nothing
 
-ALLOWED TO DESTROY:	
+ALLOWED TO DESTROY:
 		ax, cx, dx, bp
 		bx, si, di, ds, es
 
-SIDE EFFECTS:	
+SIDE EFFECTS:
 
 PSEUDO CODE/STRATEGY:
 
@@ -2897,7 +2897,7 @@ endif
 
 COMMENT @----------------------------------------------------------------------
 
-METHOD:		OLApplicationQuerySaveDocuments -- 
+METHOD:		OLApplicationQuerySaveDocuments --
 		MSG_META_QUERY_SAVE_DOCUMENTS for OLApplicationClass
 
 DESCRIPTION:	Save documents on an app switch.
@@ -2910,7 +2910,7 @@ PASS:		*ds:si 	- instance data
 RETURN:		nothing
 		ax, cx, dx, bp - destroyed
 
-ALLOWED TO DESTROY:	
+ALLOWED TO DESTROY:
 		bx, si, di, ds, es
 
 REGISTER/STACK USAGE:
@@ -2945,8 +2945,8 @@ OLApplicationQuerySaveDocuments	method dynamic	OLApplicationClass, \
 
 returnQuery:
 	mov	bx, cx
-	mov	di, mask MF_FORCE_QUEUE		
-	call	MessageDispatch	
+	mov	di, mask MF_FORCE_QUEUE
+	call	MessageDispatch
 
 	ret
 OLApplicationQuerySaveDocuments	endm
@@ -2958,7 +2958,7 @@ endif
 
 COMMENT @----------------------------------------------------------------------
 
-METHOD:		OLApplicationGainedFullScreenExcl -- 
+METHOD:		OLApplicationGainedFullScreenExcl --
 		MSG_META_GAINED_FULL_SCREEN_EXCL for OLApplicationClass
 
 DESCRIPTION:	Hack to force the model to match the target when the application
@@ -2971,10 +2971,10 @@ PASS:		*ds:si 	- instance data
 		es     	- segment of MetaClass
 		ax 	- MSG_META_GAINED_FULL_SCREEN_EXCL
 
-RETURN:		
+RETURN:
 		ax, cx, dx, bp - destroyed
 
-ALLOWED TO DESTROY:	
+ALLOWED TO DESTROY:
 		bx, si, di, ds, es
 
 REGISTER/STACK USAGE:
@@ -3017,7 +3017,7 @@ endif 	; VOLATILE_SYSTEM_STATE
 
 
 COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-		OLApplicationAppShutdown -- 
+		OLApplicationAppShutdown --
 		MSG_META_APP_SHUTDOWN for OLApplicationClass
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
@@ -3033,10 +3033,10 @@ PASS:		*ds:si 	- instance data
 		es     	- segment of MetaClass
 		ax 	- MSG_META_APP_SHUTDOWN
 
-RETURN:		
+RETURN:
 		ax, cx, dx, bp - destroyed
 
-ALLOWED TO DESTROY:	
+ALLOWED TO DESTROY:
 		bx, si, di, ds, es
 
 REGISTER/STACK USAGE:
@@ -3090,7 +3090,7 @@ REVISION HISTORY:
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
 if RECTANGULAR_ROTATION
 
-OLAppRotateDisplay	method dynamic OLApplicationClass, 
+OLAppRotateDisplay	method dynamic OLApplicationClass,
 					MSG_GEN_ROTATE_DISPLAY
 		uses	ax, cx, dx, bp
 		.enter
@@ -3138,10 +3138,19 @@ REVISION HISTORY:
 	joon	7/8/98   	Initial version
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
-if TOOL_AREA_IS_TASK_BAR
-OLAppUpdateWindowsForTaskBar	method dynamic OLApplicationClass, 
+
+OLAppUpdateWindowsForTaskBar	method dynamic OLApplicationClass,
 					MSG_OL_APP_UPDATE_WINDOWS_FOR_TASK_BAR
 	; close menus
+
+	;
+	; if TOOL_AREA_IS_TASK_BAR
+	;
+	push	ds
+	segmov	ds, dgroup
+	tst	ds:[taskBarEnabled] ; if taskbar == on, ZF == 1
+	pop	ds
+	jz	done ; if ZF==0 skip the following code
 
 	call	OLReleaseAllStayUpModeMenus
 
@@ -3159,7 +3168,7 @@ OLAppUpdateWindowsForTaskBar	method dynamic OLApplicationClass,
 	call	ObjCallInstanceNoLock
 
 	; now do something for windows that have been minimized
-	
+
 	push	si
 	mov	bx, segment OLWinClass
 	mov	si, offset OLWinClass
@@ -3172,8 +3181,9 @@ OLAppUpdateWindowsForTaskBar	method dynamic OLApplicationClass,
 	mov	ax, MSG_GEN_SEND_TO_CHILDREN
 	mov	cx, di
 	GOTO	ObjCallInstanceNoLock
+done:
 
 OLAppUpdateWindowsForTaskBar	endm
-endif ; TOOL_AREA_IS_TASK_BAR
+
 
 ActionObscure	ends

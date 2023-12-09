@@ -1245,7 +1245,6 @@ REVISION HISTORY:
 
 OLFieldUpdateTaskBarList	method	dynamic OLFieldClass,
 					MSG_OL_FIELD_UPDATE_TASK_BAR_LIST
-
 	;
 	; if TOOL_AREA_IS_TASK_BAR
 	;
@@ -1626,6 +1625,7 @@ REVISION HISTORY:
 WindowListLostTargetExcl	method dynamic WindowListDialogClass,
 					MSG_META_LOST_TARGET_EXCL
 
+	; FIXME!!! do we need to call superclass here?
 	mov	di, offset WindowListDialogClass
 	call	ObjCallSuperNoLock
 
@@ -1678,6 +1678,8 @@ REVISION HISTORY:
 
 WindowListInteractionCommand	method dynamic WindowListDialogClass,
 					MSG_GEN_GUP_INTERACTION_COMMAND
+
+	; FIXME!!! is this necessary even with no taskbar?
 	push	cx
 	mov	di, offset WindowListDialogClass
 	call	ObjCallSuperNoLock
@@ -2003,6 +2005,7 @@ REVISION HISTORY:
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
 ToolAreaRawUnivEnter	method dynamic ToolAreaClass,
 					MSG_META_RAW_UNIV_ENTER
+	; FIXME!!! - Do we need to call this always?
 	mov	di, offset ToolAreaClass
 	call	ObjCallSuperNoLock
 
@@ -2061,6 +2064,8 @@ DESTROYED:	ax, cx, dx, bp
 
 ToolAreaRawUnivLeave	method dynamic ToolAreaClass,
 					MSG_META_RAW_UNIV_LEAVE
+
+	; FIXME!!! do we need to always call this?
 	mov	di, offset ToolAreaClass
 	call	ObjCallSuperNoLock
 
@@ -2424,7 +2429,9 @@ ToolAreaInitPosition	endm
 
 ToolAreaInteractionInitiate	method dynamic ToolAreaClass,
 					MSG_GEN_INTERACTION_INITIATE
-
+	;
+	; We NEED to always call this first
+	;
 	mov	di, offset ToolAreaClass
 	call	ObjCallSuperNoLock
 
@@ -2437,6 +2444,9 @@ ToolAreaInteractionInitiate	method dynamic ToolAreaClass,
 	pop	ds
 	jz	noHide ; if ZF==0 skip the following code
 
+	;
+	; handle hiding
+	;
 	push	ds
 	segmov	ds, dgroup
 	tst	ds:[taskBarAutoHide]

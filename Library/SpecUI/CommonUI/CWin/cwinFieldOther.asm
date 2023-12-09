@@ -609,11 +609,11 @@ passItUp:
 	;
 	; if TOOL_AREA_IS_TASK_BAR
 	;
-	push	ds
-	segmov	ds, dgroup
-	tst	ds:[taskBarEnabled] ; if taskbar == on, ZF == 1
-	pop	ds
-	jz	reallyPassItUp ; if ZF==0 skip the following code
+		push	ds
+		segmov	ds, dgroup
+		tst	ds:[taskBarEnabled] ; if taskbar == on, ZF == 1
+		pop	ds
+		jz	reallyPassItUp ; if ZF==0 skip the following code
 
 	;
 	; Check for system tray, and send it a detach

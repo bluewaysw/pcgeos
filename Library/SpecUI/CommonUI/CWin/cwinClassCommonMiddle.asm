@@ -1567,8 +1567,6 @@ CUAS <	cmp	ds:[di].OLWI_type, MOWT_PRIMARY_WINDOW			>
 
 	call	OLBaseWinAdjustTitleBoundsForExpressToolArea
 
-	;endif ;(not TOOL_AREA_IS_TASK_BAR)
-
 endif ; PLACE_EXPRESS_MENU_ON_PRIMARY
 
 done:

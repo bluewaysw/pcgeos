@@ -3143,8 +3143,16 @@ RETURN:		di	= position/size adjustment
 DESTROYED:	nothing
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
-if TOOL_AREA_IS_TASK_BAR
 GetTaskBarPositionAdjustment	proc	far
+
+	;
+	; if TOOL_AREA_IS_TASK_BAR
+	;
+	push	ds
+	segmov	ds, dgroup
+	tst	ds:[taskBarEnabled] ; if taskbar == on, ZF == 1
+	pop	ds
+	jz	done ; if ZF==0 skip the following code
 
 	; No adjustment for GenDisplay.
 
@@ -3184,6 +3192,15 @@ GetTaskBarPositionAdjustment	endp
 
 GetTaskBarSizeAdjustment	proc	far
 
+	;
+	; if TOOL_AREA_IS_TASK_BAR
+	;
+	push	ds
+	segmov	ds, dgroup
+	tst	ds:[taskBarEnabled] ; if taskbar == on, ZF == 1
+	pop	ds
+	jz	done ; if ZF==0 skip the following code
+
 	; No adjustment for GenDisplay.
 
 	mov	di, ds:[si]
@@ -3219,7 +3236,6 @@ GetTaskBarSizeAdjustment	proc	far
 done:
 	ret
 GetTaskBarSizeAdjustment	endp
-endif ; TOOL_AREA_IS_TASK_BAR
 
 WinCommon	ends
 WinCommon	segment resource
