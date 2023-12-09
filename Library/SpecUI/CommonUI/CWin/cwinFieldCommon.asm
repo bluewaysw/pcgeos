@@ -1147,7 +1147,7 @@ REVISION HISTORY:
 	chris	6/29/92		Initial Version
 
 ------------------------------------------------------------------------------@
-;if (not TOOL_AREA_IS_TASK_BAR)
+; if (not TOOL_AREA_IS_TASK_BAR)
 OLFieldSizeToolArea	method dynamic	OLFieldClass, \
 				MSG_OL_FIELD_SIZE_TOOL_AREA
 if EVENT_MENU

@@ -3532,7 +3532,7 @@ REVISION HISTORY:
 	Joon	5/31/94   	Initial version
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
-if PLACE_EXPRESS_MENU_ON_PRIMARY and (not TOOL_AREA_IS_TASK_BAR)
+if PLACE_EXPRESS_MENU_ON_PRIMARY ;and (not TOOL_AREA_IS_TASK_BAR)
 OLBaseWinDisplaySetNotMinimized	method dynamic OLBaseWinClass,
 					MSG_GEN_DISPLAY_SET_NOT_MINIMIZED
 	mov	di, offset OLBaseWinClass
@@ -4929,7 +4929,15 @@ endif
 	mov	ax, MSG_GEN_GUP_CALL_OBJECT_OF_CLASS
 	call	GenCallParent
 
-if (not TOOL_AREA_IS_TASK_BAR)
+; DYNAMIC_TASKBAR
+
+	push	ds
+	segmov	ds, dgroup
+	tst	ds:[taskBarEnabled]
+	pop	ds
+	jnz	done
+
+;if (not TOOL_AREA_IS_TASK_BAR)
 
 	call	WinClasses_DerefVisSpec_DI
 	mov	cx, ds:[di].OLWI_titleBarBounds.R_bottom
@@ -4973,7 +4981,7 @@ ISU <20$:					;   display		   >
 	mov	ax, MSG_GEN_GUP_CALL_OBJECT_OF_CLASS
 	call	GenCallParent
 
-endif ; (not TOOL_AREA_IS_TASK_BAR)
+;endif ; (not TOOL_AREA_IS_TASK_BAR)
 
 done:
 	.leave
