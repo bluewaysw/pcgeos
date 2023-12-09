@@ -439,18 +439,13 @@ static void CalcTransform( TransformMatrix*  transMatrix,
                            WWFixedAsDWord    pointSize,
                            TextStyle         stylesToImplement )
 {
-        TT_Matrix  tempMatrix;
+        TT_Matrix  tempMatrix = { 1L << 16, 0, 0, 1L << 16 };
  
 
 EC(     ECCheckBounds( (void*)transMatrix ) );
 EC(     ECCheckBounds( (void*)fontMatrix ) );
 
-        /* copy fontMatrix into transMatrix */
-        tempMatrix.xx           = 1L << 16;
-        tempMatrix.xy           = 0;
-        tempMatrix.yx           = 0;
-        tempMatrix.yy           = 1L << 16;
-
+        /* initialize transMatrix */
         transMatrix->TM_heightX = 0;
         transMatrix->TM_scriptX = 0;
         transMatrix->TM_heightY = 0;
@@ -462,7 +457,7 @@ EC(     ECCheckBounds( (void*)fontMatrix ) );
 
         /* fake italic style       */
         if( stylesToImplement & TS_ITALIC )
-                tempMatrix.xy = ITALIC_FACTOR;
+                tempMatrix.yx = NEGATVE_ITALIC_FACTOR;
 
         /* fake script style      */
         if( stylesToImplement & ( TS_SUBSCRIPT | TS_SUPERSCRIPT ) )
@@ -481,14 +476,15 @@ EC(     ECCheckBounds( (void*)fontMatrix ) );
         }
 
         /* integrate fontMatrix */
-        transMatrix->TM_matrix.xx = GrMulWWFixed( tempMatrix.xx, fontMatrix->FM_11 ) +
-                                    GrMulWWFixed( tempMatrix.xy, fontMatrix->FM_21 );
-        transMatrix->TM_matrix.xy = GrMulWWFixed( tempMatrix.xx, fontMatrix->FM_12 ) +
-                                    GrMulWWFixed( tempMatrix.xy, fontMatrix->FM_22 );
-        transMatrix->TM_matrix.yx = GrMulWWFixed( tempMatrix.yx, fontMatrix->FM_11 ) +
-                                    GrMulWWFixed( tempMatrix.yy, fontMatrix->FM_21 );
-        transMatrix->TM_matrix.yy = GrMulWWFixed( tempMatrix.yx, fontMatrix->FM_12 ) +
-                                    GrMulWWFixed( tempMatrix.yy, fontMatrix->FM_22 );
+        transMatrix->TM_matrix.xx = GrMulWWFixed( tempMatrix.xx, fontMatrix->FM_11 );
+        transMatrix->TM_matrix.xy = - ( GrMulWWFixed( tempMatrix.yx, fontMatrix->FM_11 ) +
+                                    GrMulWWFixed( tempMatrix.yy, fontMatrix->FM_21 ) );
+        transMatrix->TM_matrix.yx = - ( GrMulWWFixed( tempMatrix.xx, fontMatrix->FM_12 ) +
+                                    GrMulWWFixed( tempMatrix.xy, fontMatrix->FM_22 ) );
+        transMatrix->TM_matrix.yy = GrMulWWFixed( tempMatrix.yy, fontMatrix->FM_22 );
+
+      /*  transMatrix->TM_matrix.xy = -transMatrix->TM_matrix.xy;
+        transMatrix->TM_matrix.yx = -transMatrix->TM_matrix.yx;*/
 }
 
 
@@ -705,12 +701,7 @@ static void AdjustFontBuf( TransformMatrix* transMatrix,
                         transMatrix->TM_scriptY = 0; /* INTEGER_OF_WWFIXEDASDWORD( GrMulWWFixed( 
                                                         WORD_TO_WWFIXEDASDWORD( savedHeightY - transMatrix->TM_heightY + transMatrix->TM_scriptY ), -transMatrix->TM_matrix.yx ) );*/
                 }
-
-                /* fontMatrix->FM_12 = -fontMatrix->FM_12;
-                fontMatrix->FM_21 = -fontMatrix->FM_21; */
-                transMatrix->TM_matrix.xy = -transMatrix->TM_matrix.yx;
         }
-
 }
 
 
