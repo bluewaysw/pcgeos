@@ -1694,7 +1694,7 @@ purposes.
 "uplevel 1 {var foo 36}", you would modify (or create) the 
 variable "foo" in your caller's scope.  
     `<= 0` - Indicates the number of scopes to go down from the global one. 
-"uplevel 0 `<body>` will execute <body> in the top-most scope, 
+"uplevel 0 `<body>` will execute `<body>` in the top-most scope, 
 which means that no local variables are involved, and any 
 variables created by the commands in `<body>` persist as global 
 variables.
@@ -2338,8 +2338,8 @@ element of the result with the "index" command, however; you'll have to
 use the "range" command to get the first 8 characters, then use "index" to 
 trim the trailing spaces off, if you want to.
 
-+ "patient data" returns a three-element list: `{<name> <fullname> 
-<thread-number>}` `<name>` and `<fullname>` are the same as returned by 
++ "patient data" returns a three-element list: `{<name> <fullname> <thread-number>}`.
+`<name>` and `<fullname>` are the same as returned by 
 the "name" and "fullname" subcommands. `<thread-number`> is the 
 number of the current thread for the patient. Each patient has a single 
 thread that is the one the user looked at most recently, and that is its 
@@ -2528,8 +2528,8 @@ passed address.
 uniquely identifies the symbol. Thus if a procedure-local variable belongs 
 to the current patient, the fullname would be  
  `<segment>::<procedure>::<name>`  
- where `<segment>` is the segment holding the `<procedure>`, which is the 
-procedure for which the local variable named <name> is defined.
+where `<segment>` is the segment holding the `<procedure>`, which is the 
+procedure for which the local variable named `<name>` is defined.
 
 + You can force the prepending of the owning patient to the fullname by 
 passing `<with-patient>` as a non-empty argument ("yes" or "1" are both 
@@ -2930,8 +2930,8 @@ of `{<name> <value>}` pairs for the members of the enumerated type.
 of pointer ("near", "far", "seg", "lmem", "handle", or "object") and the 
 token for the type to which it points.
 
-+ "type bfget" returns a three-list for the given bitfield type: `{<offset> 
-<width> <is-signed>}`
++ "type bfget" returns a three-list for the given bitfield type:
+`{<offset> <width> <is-signed>}`
 
 + "type signed" returns non-zero if the type is signed. If the `<type>` is not 
 an int-class type, it is considered unsigned.
@@ -2972,8 +2972,8 @@ procedure has not been loaded into Swat yet (i.e. it has not been used yet). If
 this is the case, Swat will have no information about the procedure and will 
 thus print nothing. The command must be loaded into Swat either with the 
 load command, or by just typing the command name which will usually 
-autoload the command. (See section 5.7.) Then the `info body 
-<procname>` command can be used.
+autoload the command. (See section 5.7.) Then the
+`info body <procname>` command can be used.
 
 Some code examples:
 
