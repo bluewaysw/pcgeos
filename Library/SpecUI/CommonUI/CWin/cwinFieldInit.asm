@@ -369,9 +369,18 @@ if EVENT_MENU
 	call	OLFieldEnsureEventMenu
 endif
 
-if TOOL_AREA_IS_TASK_BAR
+	;
+	; if TOOL_AREA_IS_TASK_BAR
+	;
+	push	ds
+	segmov	ds, dgroup
+	tst	ds:[taskBarEnabled] ; if taskbar == on, ZF == 1
+	pop	ds
+	jz	done ; if ZF==0 skip the following code
+
 	call	OLFieldEnsureWindowListDialog
-endif
+
+done:
 	ret
 
 OLFieldSpecBuild	endm
@@ -765,9 +774,16 @@ REVISION HISTORY:
 
 ------------------------------------------------------------------------------@
 
-if TOOL_AREA_IS_TASK_BAR
-
 OLFieldEnsureWindowListDialog	proc	far
+
+	;
+	; if TOOL_AREA_IS_TASK_BAR
+	;
+	push	ds
+	segmov	ds, dgroup
+	tst	ds:[taskBarEnabled] ; if taskbar == on, ZF == 1
+	pop	ds
+	jz	done ; if ZF==0 skip the following code
 
 	mov	di, ds:[si]
 	mov	bp, di
@@ -845,9 +861,7 @@ done:
 	ret
 OLFieldEnsureWindowListDialog	endp
 
-endif ; TOOL_AREA_IS_TASK_BAR
 
-
 COMMENT @----------------------------------------------------------------------
 
 FUNCTION:	OLFieldEnsureToolArea
@@ -914,7 +928,15 @@ OLFieldEnsureToolArea	proc	far
 
 	push	cx, dx, si
 
-if TOOL_AREA_IS_TASK_BAR
+	;
+	; if TOOL_AREA_IS_TASK_BAR
+	;
+	push	ds
+	segmov	ds, dgroup
+	tst	ds:[taskBarEnabled] ; if taskbar == on, ZF == 1
+	pop	ds
+	jz	endIfTaskbar ; if ZF==0 skip the following code
+
 	;
 	; Find the system tray. Since it's copied during via COPY_TREE, we
 	; don't know the chunk handle. This code is dependent on the order
@@ -954,17 +976,27 @@ EC <	pop	es							>
 	mov	ds:[di].OLFI_systemTray, dx
 NEC < cantFindSysTray:							>
 	pop	cx, dx
-endif
+endIfTaskbar:
 	; Get it up on screen (a queue delay later)
 	;
 	mov	bx, cx
 	mov	si, dx
-if TOOL_AREA_IS_TASK_BAR
+
+	;
+	; if TOOL_AREA_IS_TASK_BAR
+	;
+	push	ds
+	segmov	ds, dgroup
+	tst	ds:[taskBarEnabled] ; if taskbar == on, ZF == 1
+	pop	ds
+	jz	hasNoTaskbar ; if ZF==0 skip the following code
+
 	; init position
 	mov	ax, MSG_TOOL_AREA_INIT_POSITION
 	mov	di, mask MF_CALL or mask MF_FIXUP_DS
 	call	ObjMessage
-endif
+
+hasNoTaskbar:
 	mov	ax, MSG_GEN_INTERACTION_INITIATE
 	mov	di, mask MF_FORCE_QUEUE
 	call	ObjMessage
@@ -975,7 +1007,7 @@ done:
 	ret
 OLFieldEnsureToolArea	endp
 
-
+
 COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 		OLFieldEnsureEventToolArea
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%

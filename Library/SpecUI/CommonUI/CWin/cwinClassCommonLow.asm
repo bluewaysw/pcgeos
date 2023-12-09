@@ -10,16 +10,16 @@ FILE:		cwinClassCommonLow.asm
 ROUTINES:
 	Name			Description
 	----			-----------
-    INT OpenWinCreateTabbedWindowRegion 
+    INT OpenWinCreateTabbedWindowRegion
 				Create a tabbed window region
 
-    INT OpenWinCreateWindowRegion 
+    INT OpenWinCreateWindowRegion
 				Create a window region
 
     INT BubbleGetOriginalBounds Returns the bounds of the bubble without
 				considering the spout.
 
-    INT BubbleForceRecalcSizeIfNeeded 
+    INT BubbleForceRecalcSizeIfNeeded
 				Determines if the window's geometry needs
 				to be recalculcated because of the spout.
 				It really attempts to not do recalculations
@@ -27,7 +27,7 @@ ROUTINES:
 				this routine guarentees that the left edge
 				of the window is equal to the spoutOriginX.
 
-    INT OpenWinCreateWindowRegion 
+    INT OpenWinCreateWindowRegion
 				Determines if the window's geometry needs
 				to be recalculcated because of the spout.
 				It really attempts to not do recalculations
@@ -35,7 +35,7 @@ ROUTINES:
 				this routine guarentees that the left edge
 				of the window is equal to the spoutOriginX.
 
-    INT OpenWinCreateWindowRegion 
+    INT OpenWinCreateWindowRegion
 				Determines if the window's geometry needs
 				to be recalculcated because of the spout.
 				It really attempts to not do recalculations
@@ -50,7 +50,7 @@ ROUTINES:
 
     INT GetCoreWinOpenParams    Fetches core info needed for WinOpen
 
-    INT OpenWinModifyWithNearestWinGroupPriority 
+    INT OpenWinModifyWithNearestWinGroupPriority
 				Raise the layer and window priority of the
 				new window to be at least as high as the
 				nearest win group up the generic tree.
@@ -60,7 +60,7 @@ ROUTINES:
     INT OpenWinGetState         This procedure checks if there is saved
 				state information for this window.
 
-    INT ConvertPixelBoundsToSpecWinSizePairs 
+    INT ConvertPixelBoundsToSpecWinSizePairs
 				Convert this windowed object's bounds into
 				ratio values. This is done before the data
 				is saved.
@@ -98,36 +98,36 @@ ROUTINES:
 				lost off-screen, or even too close to the
 				edge of the screen.
 
-    MTD MSG_OL_WIN_SHOULD_TITLE_BUTTON_HAVE_ROUNDED_CORNER 
+    MTD MSG_OL_WIN_SHOULD_TITLE_BUTTON_HAVE_ROUNDED_CORNER
 				Check if a given title button should have a
 				round corner in this particular window.
 				Assumes that the button is in the title
 				bar.
 
-    INT OpenWinShouldHaveRoundBorderFar 
+    INT OpenWinShouldHaveRoundBorderFar
 				Checks appropriate instance data flags and
 				returns if this window should have round
 				thick windows. (Basically just calls
 				OpenWinShouldHaveRoundBorder.)
 
-    INT OpenWinShouldHaveRoundBorder 
+    INT OpenWinShouldHaveRoundBorder
 				Checks appropriate instance data flags and
 				returns if this window should have round
 				thick windows.
 
-    INT OpenWinCheckVisibleConstraints 
+    INT OpenWinCheckVisibleConstraints
 				This procedure ensure's that a window's
 				visiblility constraints are met as it is
 				opened or moved on the screen.
 
-    INT OpenWinCheckMenuWinVisibilityConstraints 
+    INT OpenWinCheckMenuWinVisibilityConstraints
 				This procedure is called after we have
 				adjusted a menu window so that it is
 				on-screen. If the menu is now obscuring the
 				menu button which opens it, we will push
 				the menu above the menu button.
 
-    INT TryAgainInOtherDirection 
+    INT TryAgainInOtherDirection
 				This procedure is called after we have
 				adjusted a menu window so that it is
 				on-screen. If the menu is now obscuring the
@@ -140,37 +140,37 @@ ROUTINES:
 				menu button which opens it, we will push
 				the menu above the menu button.
 
-    MTD MSG_OL_WIN_GET_HEADER_TITLE_BOUNDS 
+    MTD MSG_OL_WIN_GET_HEADER_TITLE_BOUNDS
 				Returns widths of icons left and right of
 				title bar.
 
-    MTD MSG_OL_WIN_GET_TITLE_BAR_HEIGHT 
+    MTD MSG_OL_WIN_GET_TITLE_BAR_HEIGHT
 				Returns height of title bar
 
-    INT OpenWinGetHeaderBoundsFar 
+    INT OpenWinGetHeaderBoundsFar
 				Returns height of title bar
 
     INT OpenWinDrawMoniker      Draws complete moniker, including long term
 				moniker, unless we're running in GCM mode.
 
-    INT OpenWinGCMSetTitleFontSize 
+    INT OpenWinGCMSetTitleFontSize
 				(Great documentation, EDS) That's why we
 				don't let him code any more...
 
-    INT OpenWinGCMResetTitleFontSize 
+    INT OpenWinGCMResetTitleFontSize
 				(Great documentation, EDS) That's why we
 				don't let him code any more...
 
     INT OpenWinFlushMonikerSize (Great documentation, EDS) That's why we
 				don't let him code any more...
 
-    INT OpenWinUpdateWindowMenuItems 
+    INT OpenWinUpdateWindowMenuItems
 				This OpenLook specific procedure
 				enables/disables the appropriate menu items
 				in the WindowMenu (popup menu) for this
 				window.
 
-    INT OpenWinEnableOrDisableWindowMenuItem 
+    INT OpenWinEnableOrDisableWindowMenuItem
 				This OpenLook specific procedure
 				enables/disables the appropriate menu items
 				in the WindowMenu (popup menu) for this
@@ -207,10 +207,10 @@ RETURN:		^hbx = region (NULL if no region created)
 			dx:ax = address of region
 
 DESTROYED:	cx
-SIDE EFFECTS:	
+SIDE EFFECTS:
 
 PSEUDO CODE/STRATEGY:
-		
+
 
 REVISION HISTORY:
 	Name	Date		Description
@@ -404,7 +404,7 @@ cardBottomLoop:
 	add	dx, TAB_SHADOW_SIZE		; increment scanline
 	add	cx, TAB_SHADOW_SIZE
 	cmp	cx, (NUMBER_OF_TABS-1) * TAB_SHADOW_SIZE
-	jle	cardBottomLoop	
+	jle	cardBottomLoop
 
 	mov	ax, EOREGREC
 	stosw
@@ -449,10 +449,10 @@ CALLED BY:	OpenWinOpenWin
 PASS:		*ds:si	= OLWinClass object
 RETURN:		^hbx	= region (NULL if no region created)
 DESTROYED:	cx, dx
-SIDE EFFECTS:	
+SIDE EFFECTS:
 
 PSEUDO CODE/STRATEGY:
-		
+
 
 REVISION HISTORY:
 	Name	Date		Description
@@ -1358,7 +1358,7 @@ recalcGeometry:
 	mov	ax, MSG_VIS_RESET_TO_INITIAL_SIZE
 	mov	dl, VUM_DELAYED_VIA_UI_QUEUE
 	call	ObjCallInstanceNoLock
-	
+
 	mov	ax, MSG_VIS_UPDATE_GEOMETRY
 	call	ObjCallInstanceNoLock
 	pop	bp
@@ -1379,7 +1379,7 @@ PASS:		cx, dx		= activator center
 		ds:di		= dialog instance
 RETURN:		nothing
 DESTROYED:	nothing
-SIDE EFFECTS:	
+SIDE EFFECTS:
 
 PSEUDO CODE/STRATEGY:
 
@@ -1459,7 +1459,7 @@ PASS:		cx, dx		= activator center
 		*ds:si		= dialog
 RETURN:		cx		= x position to place dialog
 DESTROYED:	nothing
-SIDE EFFECTS:	
+SIDE EFFECTS:
 
 PSEUDO CODE/STRATEGY:
 
@@ -1544,7 +1544,7 @@ RETURN:		dx		= new y pos of dialog
 				  vertically.  Place left or right.
 
 DESTROYED:	nothing
-SIDE EFFECTS:	
+SIDE EFFECTS:
 
 PSEUDO CODE/STRATEGY:
 
@@ -1624,16 +1624,16 @@ COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 SYNOPSIS:	The dialog is being centered vertically.  Place it to
 		the left or right of the activator (whatever fits
-		best). 
+		best).
 CALLED BY:	PositionBubbleDialog
 PASS:		cx, dx		= center of activator
 		*ds:si		= dialog
 RETURN:		cx		= new x position of dialog
 DESTROYED:	nothing
-SIDE EFFECTS:	
+SIDE EFFECTS:
 
 PSEUDO CODE/STRATEGY:
-		
+
 
 REVISION HISTORY:
 	Name	Date		Description
@@ -1689,13 +1689,13 @@ PASS:		*ds:si = OLWinClass object
 
 RETURN:		^hbx = region (NULL if no region created)
     NOT IN CURRENT RUDY VERSION: (cx,dx) = difference Win origin and Vis origin
-    
+
 DESTROYED:	ax, cx, dx
 
-SIDE EFFECTS:	
+SIDE EFFECTS:
 
 PSEUDO CODE/STRATEGY:
-		
+
 
 REVISION HISTORY:
 	Name	Date		Description
@@ -1762,7 +1762,7 @@ spoutOriginX	local	word
 	LONG	jnc	noRegion
 
 	; Coordinates are in (ax, di) - (cx, dx)
-	
+
 	;
 	; Make sure that the upper-left coords are positive (on the screen!)
 	;
@@ -1770,10 +1770,10 @@ spoutOriginX	local	word
 	LONG	js	noRegion
 	tst	di
 	LONG	js	noRegion
-	
+
 	mov	activatorBounds.R_left, ax
 	mov	activatorBounds.R_top, di
-	
+
 	;
 	; Make sure that the lower-right coords are within the screen's
 	; dimensions.
@@ -1789,7 +1789,7 @@ endif
 	LONG	jge	noRegion
 	cmp	di, dx
 	LONG	jge	noRegion
-	
+
 	mov	activatorBounds.R_right, ax
 	mov	activatorBounds.R_bottom, di
 
@@ -1804,7 +1804,7 @@ endif
 	;
 	cmp	activatorBounds.R_left, ax
 	LONG	jg	tryMinWedge
-	
+
 	clr	si
 	push	ax
 	sub	ax, MINIMUM_WEDGE_WIDTH	  ; make sure wedges at least this wide
@@ -1913,7 +1913,7 @@ stubbySpout:
 
 afterSpout:
 	pop	ax			;ax = left bound
-	
+
 	call	BubbleForceRecalcSizeIfNeeded
 
 	mov	ss:points[0].P_x, ax
@@ -1940,7 +1940,7 @@ afterSpout:
 	mov	cx, ss:[spoutOriginX]
 	mov	ss:points[20].P_x, cx
 	mov	ss:points[24].P_x, cx
-	
+
 	; I thought I'd go ahead and document this little fact so future
 	; generations could benefit.  It turns out that the polygon used for
 	; the window region is slightly different from the polygon used to
@@ -1994,7 +1994,7 @@ adjustForLineBounds::
 	movdw	ss:points[24], ss:points[28], ax
 
 	push	bx			; save region handle
-	
+
 	; Allocate vardata and store the points to be drawn in
 	; RudyDrawBubbleBorder.
 	;
@@ -2042,10 +2042,10 @@ noRegion:
 	mov	ax, TEMP_OL_WIN_BORDER_POINTS
 	mov	si, ss:[self]
 	call	ObjVarDeleteData
-	
+
 	mov	ss:[spoutOriginX], -1
 	call	BubbleForceRecalcSizeIfNeeded
-	
+
 noRegionNotPopup:			; not a popup, don't bother with above
 					; stuff...
 	clr	bx
@@ -2130,7 +2130,7 @@ RETURN:		ax,bx,cx,dx	= bounds of bubble without spout
 
 DESTROYED:	nothing
 
-SIDE EFFECTS:	
+SIDE EFFECTS:
 
 PSEUDO CODE/STRATEGY:
 	    This is a pretty simple idea.  Get the vis bounds of the
@@ -2149,7 +2149,7 @@ REVISION HISTORY:
 BubbleGetOriginalBounds	proc	near
 	uses	bp
 	.enter
-	
+
 	clr	bp
 	mov	ax, TEMP_OL_WIN_BUBBLE_MARGIN
 	call	ObjVarFindData
@@ -2159,7 +2159,7 @@ BubbleGetOriginalBounds	proc	near
 notTouchedYet:
 	call	VisGetBounds
 	add	ax, bp
-	
+
 	.leave
 	ret
 BubbleGetOriginalBounds	endp
@@ -2172,8 +2172,8 @@ COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 SYNOPSIS:	Determines if the window's geometry needs to be
 		recalculcated because of the spout.  It really attempts to
 		not do recalculations more than needed.
-		
-		If there is a spout, this routine guarentees that the 
+
+		If there is a spout, this routine guarentees that the
 		left edge of the window is equal to the spoutOriginX.
 
 CALLED BY:	OpenWinCreateWindowRegion
@@ -2182,9 +2182,9 @@ PASS:		ss:bp	= OpenWinCreateWindowRegion stack frame
 			  (uses spoutOriginX and self)
 
 		If spoutOriginX >= 0, then
-		    
+
 		    ax	= left margin of window NOT INCLUDING any spout
-		    
+
 		else this function assumes that there will be no spout and
 		may force the window's geometry to be recalculated if
 		necessary.  I.e., it does the "right thing."
@@ -2193,7 +2193,7 @@ RETURN:		nothing
 
 DESTROYED:	nothing
 
-SIDE EFFECTS:	
+SIDE EFFECTS:
 
 PSEUDO CODE/STRATEGY:
 	    If there is a spout, then recalculate the margin and force geometry
@@ -2203,20 +2203,20 @@ PSEUDO CODE/STRATEGY:
 		    (TEMP_OL_WIN_BUBBLE_MARGIN).
 		    	This covers initial condition or if the popup's
 			spout origin changes to where it is now visible.
-		    
+
 		    If the margin isn't the same as the margin calculated
 		    by taking the passed AX (left bound without spout)
 		    and subtracting spoutOriginX.
 		    	This covers the case of the window content's size
 			changing or the spout origin changing so that the
 			margin is different.
-		    
+
 		    If the true left bound of the window isn't the same as
 		    spoutOriginX.
 		    	This, basically, just CYA in case all else fails.
 			This fact, that the left bound should be equal to
 			the spoutOriginX, needs to be true.
-	    
+
 	    If there is NO SPOUT, then recalculate the margin and force
 	    geometry recalculation of the window (and its children) if
 	    there the extra margin vardata exists.
@@ -2230,10 +2230,10 @@ REVISION HISTORY:
 BubbleForceRecalcSizeIfNeeded	proc	near
 	uses	di, bp, bx, si
 	.enter	inherit OpenWinCreateWindowRegion
-	
+
 	; load my own chunk handle
 	mov	si, ss:[self]
-	
+
 	; Check for temporary margin vardata.  If it doesn't exist, and we
 	; have a valid spout X origin, then we need to force recalculation.
 	; If there isn't a spout, deal with cleaning up any vardata.
@@ -2243,15 +2243,15 @@ BubbleForceRecalcSizeIfNeeded	proc	near
 	mov	ax, TEMP_OL_WIN_BUBBLE_MARGIN
 	call	ObjVarFindData
 	pop	ax
-	
+
 	pushf
 	cmp	ss:[spoutOriginX], 0		; if < 0, no spout.
 	jl	noSpout				;   clean up.
 	popf
-	
+
 	jnc	forceRecalc
 	mov	di, {word}ds:[bx]		; load di with stored margin
-	
+
 	; If left margin of window WITHOUT SPOUT - spout origin X does NOT
 	; equal our current margin, then we need to recalculate the margin
 	; and thus the geometry.
@@ -2261,7 +2261,7 @@ BubbleForceRecalcSizeIfNeeded	proc	near
 	cmp	di, ax
 	pop	ax
 	jne	forceRecalc
-	
+
 	; If the left bounds of the window itself does not equal the spout
 	; origin X coordinate, then we again need to recalculate.
 	;
@@ -2269,7 +2269,7 @@ BubbleForceRecalcSizeIfNeeded	proc	near
 	mov	di, ds:[di].VI_bounds.R_left
 	cmp	ss:[spoutOriginX], di
 	jne	forceRecalc
-	
+
 exit:
 
 if ERROR_CHECK
@@ -2293,7 +2293,7 @@ endif ;ERROR_CHECK
 
 	.leave
 	ret
-	
+
 	; Add the vardata with the correct margin and force the
 	; recalculation of the window's geometry.
 	;
@@ -2303,10 +2303,10 @@ forceRecalc:
 	mov	ax, TEMP_OL_WIN_BUBBLE_MARGIN
 	mov	cx, 2
 	call	ObjVarAddData
-	
+
 	sub	dx, ss:[spoutOriginX]		; new margin
 	mov	{word}ds:[bx], dx
-	
+
 forceRecalcOnly:
 	;; NOTE: At this point we expect (AX CX DX) to be on the stack.
 	;; PLEASE BE CAREFUL.
@@ -2324,17 +2324,17 @@ forceRecalcOnly:
 	mov	ax, MSG_VIS_RESET_TO_INITIAL_SIZE
 	mov	dl, VUM_MANUAL
 	call	ObjCallInstanceNoLock
-	
+
 	call	WinCommon_DerefVisSpec_DI
 	mov	ax, ds:[di].VI_bounds.R_right
 	dec	ax
 	mov	ds:[di].VI_bounds.R_left, ax
-	
+
 	mov	ax, MSG_VIS_UPDATE_GEOMETRY
 	call	ObjCallInstanceNoLock
 
 	pop	bp
-	
+
 	pop	ax, cx, dx
 	jmp	exit
 
@@ -2343,18 +2343,18 @@ noSpout:
 	;
 	popf					; carry set if vardata exists
 	jnc	exit				; no vardata, no recalc needed
-	
+
 	; Otherwise, vardata exists, but there's no spout so we need to zap
 	; that vardata and force the recalculation.
-	
+
 	push	ax, cx, dx			; save registers just like
 						; expected in forceRecalc
-									
+
 	mov	ax, TEMP_OL_WIN_BUBBLE_MARGIN
 	call	ObjVarDeleteData
 EC <	ERROR_C	OL_ERROR			; vardata should be here>
 	jmp	forceRecalcOnly
-	
+
 BubbleForceRecalcSizeIfNeeded	endp
 
 
@@ -2437,7 +2437,7 @@ checkTop:
 	push	bx
 	mov	bx, activatorBounds.R_bottom
 	sub	ss:points[0].P_y, bx
-	pop	bx	
+	pop	bx
 	jmp	chooseSide
 
 checkBottom:
@@ -2474,7 +2474,7 @@ chooseSide:
 	jmp	haveSide
 
 leftRight:
-	andnf	si, not (WIN_TOP or WIN_BOTTOM)	
+	andnf	si, not (WIN_TOP or WIN_BOTTOM)
 
 haveSide:
 	mov	ss:[side], si
@@ -2529,7 +2529,7 @@ tryRight:
 
 	movdw	ss:points[20], dxcx
 	jmp	makeRegion
-	
+
 tryTop:
 	test	si, WIN_TOP
 	jz	doBottom
@@ -2711,7 +2711,7 @@ nextPoint:
 	stosw
 	loop	nextPoint
 	pop	ds, es
-	pop	cx, dx	
+	pop	cx, dx
 
 	pop	bx
 done:
@@ -2859,7 +2859,7 @@ checkTop:
 	push	bx
 	mov	bx, activatorBounds.R_bottom
 	sub	ss:points[0].P_y, bx
-	pop	bx	
+	pop	bx
 	jmp	chooseSide
 
 checkBottom:
@@ -2896,7 +2896,7 @@ chooseSide:
 	jmp	haveSide
 
 leftRight:
-	andnf	si, not (WIN_TOP or WIN_BOTTOM)	
+	andnf	si, not (WIN_TOP or WIN_BOTTOM)
 
 haveSide:
 	add	ax, 10		;10 points reserved for curve
@@ -2930,7 +2930,7 @@ haveSide:
 	mov	ss:points[48].P_y, cx
 
 	movdw	ss:points[52], bxax
-	
+
 	movdw	dxax, ss:points[0]	;our destination
 	mov	cx, 52 or CCP_COUNTING_DOWN
 	call	CalcCurvePoints
@@ -2961,7 +2961,7 @@ haveSide:
 
 	dec	ss:points[12].P_y
 	inc	ss:points[12].P_x
-	
+
 	dec	ss:points[16].P_y
 	inc	ss:points[16].P_x
 
@@ -2970,19 +2970,19 @@ haveSide:
 
 	dec	ss:points[24].P_y
 	inc	ss:points[24].P_x
-	
+
 	dec	ss:points[28].P_y
 	inc	ss:points[28].P_x
-	
+
 	dec	ss:points[32].P_y
 	inc	ss:points[32].P_x
-	
+
 	dec	ss:points[36].P_y
 	inc	ss:points[36].P_x
-	
+
 	dec	ss:points[40].P_y
 	inc	ss:points[40].P_x
-	
+
 	inc	ss:points[48].P_x		;point
 	inc	ss:points[48].P_y
 	movdw	ss:points[44], ss:points[48], ax
@@ -3047,7 +3047,7 @@ nextPoint:
 	stosw
 	loop	nextPoint
 	pop	ds, es
-	pop	cx, dx	
+	pop	cx, dx
 
 	pop	bx
 done:
@@ -3117,7 +3117,7 @@ GetWedgeYoffsets:
 	pop	ax
 	retn
 
-	
+
 OpenWinCreateWindowRegion	endp
 
 endif   ; CURVED_BUBBLE_DIALOG
@@ -3162,7 +3162,7 @@ PSEUDO CODE/STRATEGY:
 
 KNOWN BUGS/SIDE EFFECTS/IDEAS:
 	the curveTable and xChangeTable are not rocket science, they're just
-	derived from making a 10 x 10 point curve on a piece of graph paper	
+	derived from making a 10 x 10 point curve on a piece of graph paper
 
 REVISION HISTORY:
 	Name	Date		Description
@@ -3180,7 +3180,7 @@ CCP_COUNTING_DOWN equ	(offset curveTableEnd - offset curveTableDown) shl 8
 CalcCurvePoints	proc	near		uses	ax,bx,cx,dx,si,di
 	.enter inherit OpenWinCreateWindowRegion
 	clr	bx
-	mov	bl, cl				
+	mov	bl, cl
 	mov	si, bx				;si <- point index
 
 	sub	dx, points[si].P_y		;see y distance to go
@@ -3207,7 +3207,7 @@ ptLoop:
 	mul	bx				;multiply by dist -> dx.ax
 	tst	ax
 	jns	10$
-	inc	dx				
+	inc	dx
 10$:						;OK, value to subtract in dx.
 	mov	cx, dx				;now in cx
 	pop	ax, dx				;restore our registers
@@ -3219,7 +3219,7 @@ ptLoop:
 
 	add	si, size Point			;advance to next point
 	add	di, cx				;inc or dec table count
-	cmp	di, offset curveTableMiddle - offset curveTable		
+	cmp	di, offset curveTableMiddle - offset curveTable
 						;have we gone negative or
 						;  past the end of the table?
 	jne	ptLoop				;nope, do another point
@@ -3322,7 +3322,7 @@ if _CUA_STYLE	;START of CUA_STYLE specific code -----------------------------
 
 	;is not menu or icon: is fixed color
 	;(changed 2/15/91 cbh to use real light color)
-	
+
 MO <	mov	al, C_WHITE		;assume B&W display		>
 MO <	test	ds:[moCS_flags], mask CSF_BW ; is this a B&W display?	>
 MO <	jnz	OWOW_haveColor		;   skip if so...		>
@@ -3419,7 +3419,7 @@ GetCoreWinOpenParams	proc	near
 	mov	dx, bx			;	handle
 
 	;
-	; Icons should have the same low priority, regardless of 
+	; Icons should have the same low priority, regardless of
 	; what the application priorities are, so give them a unique
 	; layer ID.
 	;
@@ -3431,7 +3431,7 @@ if (0)	; Don't give unique layer ID, so icons for desk -----------------------
 	; accessories will stay on top. - Joon (7/18/94)
 
 if _CUA_STYLE
-	cmp	ds:[bx].OLWI_type, MOWT_WINDOW_ICON			
+	cmp	ds:[bx].OLWI_type, MOWT_WINDOW_ICON
 else
 	.err	<Must choose either CUA_STYLE or MAC>
 endif
@@ -3510,12 +3510,12 @@ haveBasicDefaults:
 	je	afterDeskAccessoryCheck	; sys modal, leave layer priority
 
 if (0)	; We'll let icons for desk accessories stay on top as well ------------
-	
+
 	mov	bx, ds:[si]
 	add	bx, ds:[bx].OLWin_offset
 
 if _CUA_STYLE
-	cmp	ds:[bx].OLWI_type, MOWT_WINDOW_ICON			
+	cmp	ds:[bx].OLWI_type, MOWT_WINDOW_ICON
 else
 	.err	<Must choose either CUA_STYLE or MAC>
 endif
@@ -3547,7 +3547,7 @@ afterCustomLayerPrio:
 afterDeskAccessoryCheck:
 ;----------------------------------------
 	;
-	; OK, at this point we've got the standard win parent, priority & 
+	; OK, at this point we've got the standard win parent, priority &
 	; LayerID to use.  Before we get into custom attributes on this object
 	; itself, we need to adjust the defaults to accomodate the case of
 	; this being a system menu (or ideally any popup), which springs from
@@ -3563,7 +3563,7 @@ afterDeskAccessoryCheck:
 	call	OpenWinModifyWithNearestWinGroupPriority
 
 ;----------------------------------------
-	; 
+	;
 	; OK, now we *really* have default window parent, priority, & LayerID,
 	; as the specific UI would have it.  Now, we'll check the various
 	; "custom window" attributes that a programmer might have stuck on
@@ -3604,7 +3604,7 @@ afterLayerPrio:
 	add	bx, ds:[bx].OLWin_offset
 
 if _CUA_STYLE
-	cmp	ds:[bx].OLWI_type, MOWT_WINDOW_ICON			
+	cmp	ds:[bx].OLWI_type, MOWT_WINDOW_ICON
 else
 	.err	<Must choose either CUA_STYLE or MAC>
 endif
@@ -3701,10 +3701,10 @@ PASS:		*ds:si	= windowed object
 RETURN:		cl, ch, di, dx = modified according to values of nearest
 				 wingroup
 DESTROYED:	ax
-SIDE EFFECTS:	
+SIDE EFFECTS:
 
 PSEUDO CODE/STRATEGY:
-		
+
 
 REVISION HISTORY:
 	Name	Date		Description
@@ -3720,7 +3720,7 @@ layerID		local	word		push dx
 		.enter
 	;
 	; Only do this for popups
-	; 
+	;
 		call	WinCommon_DerefVisSpec_DI
 		test	ds:[di].OLWI_moreFixedAttr, mask OWMFA_IS_POPUP
 		jz	toReload
@@ -3733,7 +3733,7 @@ layerID		local	word		push dx
 		jnz	toReload
 	;
 	; Locate the generically-closest win group using our internal query.
-	; 
+	;
 		mov	ax, MSG_SPEC_GUP_QUERY
 		mov	cx, SGQT_WIN_GROUP
 		push	bp
@@ -3748,13 +3748,13 @@ haveWinGroup:
 		mov_tr	di, ax
 	;
 	; Always use the same layer ID
-	; 
+	;
    		mov	si, WIT_LAYER_ID
 		call	WinGetInfo
 		mov	ss:[layerID], ax
 	;
 	; Inherit any custom window parent the win group has.
-	; 
+	;
 		push	di
 		movdw	bxsi, cxdx
 		call	ObjSwapLock
@@ -3785,7 +3785,7 @@ afterParentCheckedForCustomWinParent:
 	; thwarted that gallant attempt by returning itself & the screen (as
 	; opposed to its usual return of itself & the field), but no one was
 	; ready to receive the window there, so... -- ardeb
-	; 
+	;
 		mov	si, WIT_PARENT_WIN
 		call	WinGetInfo
 		xchg	ss:[parentWin], ax	; assume ancestral and ok
@@ -3800,7 +3800,7 @@ checkAncestorLoop:
 		call	WinGetInfo
 	    ;
 	    ; win group's parent not an ancestor, so restore previous parentWin
-	    ; 
+	    ;
 		tst	ax
 		jnz	checkAncestorLoop
 		pop	ax
@@ -3811,7 +3811,7 @@ parentWinOK:
 	;
 	; Use parent priority for layer & window only if higher (numerically
 	; lower) than our own.
-	; 
+	;
 		mov	si, WIT_PRIORITY
 		call	WinGetInfo
 
@@ -3824,13 +3824,13 @@ parentWinOK:
 	; priorities, while the low bytes hold the respective window
 	; priorities. Set cl to the highest of each in their respective
 	; fields.
-	; 
+	;
 		andnf	ax, (mask WPD_LAYER shl 8) or mask WPD_WIN
 		andnf	bx, (mask WPD_LAYER shl 8) or mask WPD_WIN
 	    ;
 	    ; Map passed priorities of 0 to their standard counterparts to
 	    ; avoid throwing off the comparison.
-	    ; 
+	    ;
 		tst	bh
 		jnz	havePassedLayerPrio
 		mov	bh, LAYER_PRIO_STD shl offset WPD_LAYER
@@ -3901,9 +3901,9 @@ GetScreenWin	proc	near	uses ax, bx, cx, dx, bp
 	push	si
 EC <	clr	cx			; assume no window		>
 	mov	ax, MSG_VIS_QUERY_WINDOW
-	mov	bx, segment OLScreenClass 
-	mov	si, offset OLScreenClass 
-	mov	di, mask MF_RECORD 
+	mov	bx, segment OLScreenClass
+	mov	si, offset OLScreenClass
+	mov	di, mask MF_RECORD
 	call	ObjMessage
 	mov	cx, di		; Get handle to ClassedEvent in cx
 	pop	si		; Get object
@@ -3996,7 +3996,7 @@ OpenWinGetState	proc	far
 ;saved in iconified form (i.e. pixel bounds CAN be saved to state, bleah)
 ;-- brianc 4/2/92
 ;	ORNF	es:[di].OLWI_winPosSizeState, mask WPSS_VIS_POS_IS_SPEC_PAIR \
-;			or mask WPSS_VIS_SIZE_IS_SPEC_PAIR_PARENT 
+;			or mask WPSS_VIS_SIZE_IS_SPEC_PAIR_PARENT
 
 	;the only data remaining in the chunk is the bounds of this window -
 	;saved as a % of the parent window. Grab this info now.
@@ -4124,7 +4124,7 @@ endif		;--------------------------------------------------------------
 	;mark this thing as storing percent coordinates - brianc 4/2/92
 
 	ORNF	ss:[bp].GSWI_winPosSizeState, mask WPSS_VIS_POS_IS_SPEC_PAIR \
-			or mask WPSS_VIS_SIZE_IS_SPEC_PAIR_PARENT 
+			or mask WPSS_VIS_SIZE_IS_SPEC_PAIR_PARENT
 
 	;convert size into ratio of parent window (DO THIS FIRST)
 	;(bounds values have been copied into the GenSaveWindowInfo structure,
@@ -4241,7 +4241,7 @@ callSuper:
 done:
 	ret
 OpenWinUpdateWindow	endp
-	
+
 OpenWinAttaching	proc	near
 
 EC <	;Make sure we are actually attaching				>
@@ -4498,7 +4498,7 @@ PASS:		*ds:si = OLWin
 RETURN:		carry set to grab focus
 		carry clear to not grab focus
 DESTROYED:	ax, bx, cx, dx, bp, di
-SIDE EFFECTS:	
+SIDE EFFECTS:
 
 PSEUDO CODE/STRATEGY:
 		Must be top-most system modal window or top-most
@@ -4683,15 +4683,15 @@ OpenWinMoveResizeWin	method dynamic	OLWinClass, MSG_VIS_MOVE_RESIZE_WIN
 	call	OpenWinCheckVisibleConstraints
 
 	; Do the move/resize.
-	
+
 	; If either shadows or round thick dialogs is selected, then
 	; check to see if the window has the special shape, and call WinResize
 	; directly with the special region that defines the window.
-	
+
 	; If either of these options is selected, but the window does
 	; not have the special shape, then WinResize is called to
 	; resize a rectangular shape.
-	
+
 	; If these options aren't selected, then call the superclass
 	; to do the move/resize.
 
@@ -4752,7 +4752,7 @@ if	DRAW_SHADOWS_ON_BW_GADGETS or _ROUND_THICK_DIALOGS
 	call	VisGetBounds
 	dec	cx			; use screen pixel bounds
 	dec	dx
-	
+
 if _ROUND_THICK_DIALOGS
 	; ds:si must still point to object for this procedure
 	call	OpenWinShouldHaveRoundBorder
@@ -4761,7 +4761,7 @@ endif ;_ROUND_THICK_DIALOGS
 	mov	si, mask WPF_ABS	; resize absolute (i.e. move)
 	push	si			; must be top item on stack!
 					; removed by WinResize
-	
+
 if _ROUND_THICK_DIALOGS
 	jnc	rectWindow		; not a round window!
 endif ;_ROUND_THICK_DIALOGS
@@ -4780,7 +4780,7 @@ FXIP <	push	bx, ax						>
 FXIP <	mov	bx, handle RegionResourceXIP			>
 FXIP <	call	MemLock						>
 FXIP <	mov	bp, ax						>
-FXIP <	pop	bx, ax						>	
+FXIP <	pop	bx, ax						>
 
 	mov	si, offset windowRegionBW
 
@@ -4790,15 +4790,15 @@ FXIP <	jmp	short resizeEm2					>
 rectWindow:
 	clrdw	bpsi			; rectangular region
 resizeEm::
-	call	WinResize	; Pops one word off stack	
-	pop	si						
+	call	WinResize	; Pops one word off stack
+	pop	si
 FXIP <	jmp	fin						>
 resizeEm2:
 FXIP <	call	WinResize					>
 FXIP <	push	bx						>
 FXIP <	mov	bx, handle RegionResourceXIP			>
 FXIP <	call	MemUnlock					>
-FXIP <	pop	bx						>	
+FXIP <	pop	bx						>
 FXIP <	pop	si						>
 fin::
 else
@@ -4864,20 +4864,20 @@ REVISION HISTORY:
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
 if	 _ROUND_THICK_DIALOGS
-OpenWinTitleButtonRoundedCorner	method dynamic OLWinClass, 
+OpenWinTitleButtonRoundedCorner	method dynamic OLWinClass,
 			    MSG_OL_WIN_SHOULD_TITLE_BUTTON_HAVE_ROUNDED_CORNER
 	.enter
-	
+
 	; Check if window has a round border first of all.
 	call	OpenWinShouldHaveRoundBorder
 	jnc	done				; carry clear
-	
+
 	; OK - window has round border.
 	push	cx, dx
-	
+
 	; assume ds:di is still instance ptr
 	mov	bp, di				; ds:bp = ptr to instance data
-	
+
 	; Get inside border (the titleBarBounds include the sys icons,
 	; but here we need the real boundaries of the window to check
 	; if this button is on the edge).
@@ -4885,13 +4885,13 @@ OpenWinTitleButtonRoundedCorner	method dynamic OLWinClass,
 	add	ax, _ROUND_THICK_DIALOG_BORDER
 	sub	cx, _ROUND_THICK_DIALOG_BORDER
 	mov	dx, ax
-	
+
 	pop	ax, bx
-	
+
 	; ax = button left pos, bx = button right pos
 	; dx = left inside edge of window border
 	; cx = right inside edge of window border
-	
+
 	cmp	ax, dx
 	jne	notLeftEdge
 	mov	ax, TRUE			; left corner!
@@ -4899,7 +4899,7 @@ OpenWinTitleButtonRoundedCorner	method dynamic OLWinClass,
 
 notLeftEdge:
 	cmp	bx, cx
-	clc	
+	clc
 	jne	done				; ignores C flag
 
 	mov	ax, FALSE			; right corner!
@@ -4981,21 +4981,21 @@ OpenWinShouldHaveRoundBorder	proc	near
 	uses	di
 	.enter
 	call	WinCommon_DerefVisSpec_DI
-	
+
 	; NOTE: test clears carry flag.
-	
+
 	test	ds:[di].OLWI_fixedAttr, mask OWFA_IS_MENU
 	jnz	done				; Is a menu, skip this
-	
+
 	test	ds:[di].OLWI_attrs, mask OWA_RESIZABLE
 	jnz	done				; Is resizable, skip this
-	
+
 	test	ds:[di].OLWI_moreFixedAttr, mask OWMFA_CUSTOM_WINDOW
 	jnz	done				; Has custom window, skip this
-	
+
 	test	ds:[di].OLWI_moreFixedAttr, mask OWMFA_IS_POPUP
 	jz	checkForNonMaxPrimary		; Not a popup, skip this
-	
+
 setDone:
 	stc					; Should be round.. set carry
 
@@ -5010,10 +5010,10 @@ done:
 checkForNonMaxPrimary:
 	cmp	ds:[di].OLWI_type, MOWT_PRIMARY_WINDOW
 	jne	done				; Not a primary.. done
-	
+
 	test	ds:[di].OLWI_attrs, mask OWA_MAXIMIZABLE
 	jnz	done				; Maximizable.. done
-	
+
 	; Fits requirements.. set the carry and exit
 	jmp	short setDone
 
@@ -5139,7 +5139,7 @@ OpenWinCheckMenuWinVisibilityConstraints	proc	near
 
 	mov	ax, TEMP_POPUP_OPENING_TO_RIGHT	;keep whether opening to right
 	call	ObjVarFindData			;  if so, go deal with it.
-	jc	doit				
+	jc	doit
 
 	clr	ch				;not opening to right
 	call	WinCommon_DerefVisSpec_DI
@@ -5147,7 +5147,7 @@ OpenWinCheckMenuWinVisibilityConstraints	proc	near
 
 	cmp     ds:[di].OLWI_type, MOWT_SYSTEM_MENU	;menus are always a
 	je      doit					;  vertical check
-	cmp     ds:[di].OLWI_type, MOWT_MENU		;other types of 
+	cmp     ds:[di].OLWI_type, MOWT_MENU		;other types of
 	jne     exit					;  windows, exit
 doit:
 	;let's make sure this is a menu before we go screwing with instance data
@@ -5198,14 +5198,14 @@ EC <	ERROR_NC OL_ERROR		;die if not correct class	>
 EC <	pop	di							>
 
 	;
-	; cl holds orientation as direction to check, ch non-zero if window is 
+	; cl holds orientation as direction to check, ch non-zero if window is
 	; opening to the right.
 	;
 	clr	bx			;assume not vertical
 	test	cl, mask VCGA_ORIENT_CHILDREN_VERTICALLY
 	jz	10$			;good assumption, go celebrate
 	mov	bl, AMO_VERTICAL	;else set this baby
-10$:	
+10$:
 	clr	cl			;cx now non-zero if submenu.
 	call	AvoidMenuOverlap	;check the overlap situation
 	jnc	exit			;nothing strange happened, done
@@ -5242,20 +5242,29 @@ KeepMenuOnscreen	proc	near
 	push	bx, di, cx
 EC <	call	ECCheckLMemObject					>
 	call	OpenGetParentWinSize
-if TOOL_AREA_IS_TASK_BAR
+
+	;
+	; if TOOL_AREA_IS_TASK_BAR
+	;
+	push	ds
+	segmov	ds, dgroup
+	tst	ds:[taskBarEnabled] ; if taskbar == on, ZF == 1
+	pop	ds
+	jz	hasNoTaskbar ; if ZF==0 skip the following code
+
 	; If taskbar is at the bottom of the screen, subtract off the
 	; height of the tool area (taskbar) from parent window size so
 	; maximized windows don't extend below the taskbar.
 	call	GetTaskBarSizeAdjustment
 	sub	dx, di			; subtract off taskbar adjustment
-endif ; TOOL_AREA_IS_TASK_BAR
+
+hasNoTaskbar:
 	movdw	axbp, cxdx		;put size values in weird places
 	call	MoveWindowToKeepOnscreen
 	pop	bx, di, cx
 	xchg	si, di
 	ret
 KeepMenuOnscreen	endp
-
 
 
 WinCommon	ends
@@ -5264,7 +5273,7 @@ WinCommon	segment resource
 
 COMMENT @----------------------------------------------------------------------
 
-METHOD:		OLWinGetHeaderTitleBounds -- 
+METHOD:		OLWinGetHeaderTitleBounds --
 		MSG_OL_WIN_GET_HEADER_TITLE_BOUNDS for OLWinClass
 
 DESCRIPTION:	Returns widths of icons left and right of title bar.
@@ -5278,7 +5287,7 @@ RETURN:		ax 	- width of icons left of title
 		bp	- width of icons right of title
 		cx, dx	- preserved
 
-ALLOWED TO DESTROY:	
+ALLOWED TO DESTROY:
 		bx, si, di, ds, es
 
 REGISTER/STACK USAGE:
@@ -5385,7 +5394,7 @@ WinCommon	segment resource
 
 COMMENT @----------------------------------------------------------------------
 
-METHOD:		OLWinGetTitleBarHeight -- 
+METHOD:		OLWinGetTitleBarHeight --
 		MSG_OL_WIN_GET_TITLE_BAR_HEIGHT for OLWinClass
 
 DESCRIPTION:	Returns height of title bar
@@ -5397,7 +5406,7 @@ PASS:		*ds:si 	- instance data
 
 RETURN:		dx 	- height to title bar
 
-ALLOWED TO DESTROY:	
+ALLOWED TO DESTROY:
 		bx, si, di, ds, es
 
 REGISTER/STACK USAGE:
@@ -5421,7 +5430,7 @@ OLWinGetTitleBarHeight	method dynamic	OLWinClass, \
 if _ISUI
 	call	OpenCheckIfBW			; that's all for BW
 	jc	done
-	sub	dx, 4				; margins = 2 above / 2 below 
+	sub	dx, 4				; margins = 2 above / 2 below
 else
 	call	OpenCheckIfBW			; that's all for BW
 	jc	done
@@ -5439,7 +5448,7 @@ OpenWinGetHeaderBoundsFar	endp
 
 WinCommon	ends
 WinCommon	segment resource
-				
+
 
 COMMENT @----------------------------------------------------------------------
 
@@ -5578,7 +5587,7 @@ if _GCM
 	;
 	test	ds:[di].OLWI_fixedAttr, mask OWFA_GCM_TITLED
 	jnz	exit
-endif	
+endif
 	;
 	; Else move past the drawn vis moniker and draw the long term moniker.
 	;
@@ -5598,7 +5607,7 @@ endif
 
 	.warn	-private
 
-	mov	di, ds:[di].GPI_longTermMoniker	
+	mov	di, ds:[di].GPI_longTermMoniker
 
 	.warn	@private
 
@@ -5619,7 +5628,7 @@ endif
 	add	dx, cx			;add length of gen moniker
 	cmp	ss:[bp].DMA_xMaximum, dx   ;any room left for the divider?
 	jb	afterDivider		;no, skip it
-	
+
 	;
 	; Draw the separator between the gen and long-term monikers.
 	;
@@ -5631,12 +5640,12 @@ DBCS <	segmov	ds, <segment resLongTermStr>, si			>
 DBCS <	mov	si, offset resLongTermStr				>
 FXIP <	call	SysCopyToStackDSSI					>
 	call	GrDrawText
-FXIP <	call	SysRemoveFromStack					>	
+FXIP <	call	SysRemoveFromStack					>
 	DoPop	si, ds
-	
+
 afterDivider:
 	pop	di			;restore pointer to long term moniker
-	
+
 drawLongTermMoniker:
 	mov	bx, di			;pass long term moniker in es:bx
 	pop	cx			;pop draw moniker flags
@@ -5665,7 +5674,7 @@ getWinMonikerSize:
 	mov	di, bp			;di <- GState
 	mov	ax, mask TS_BOLD	;al <- set bold
 	call	GrSetTextStyle
-	mov	si, ds:[si]			
+	mov	si, ds:[si]
 	add	si, ds:[si].Gen_offset
 	mov	si, ds:[si].GI_visMoniker
 	mov	si, ds:[si]		;ds:si <- VisMoniker
@@ -5702,7 +5711,7 @@ drawMoniker:
 endif
 
 OpenWinDrawMoniker	endp
-			
+
 SBCS <longTermStr	db	" - ",0					>
 
 WinCommon	ends

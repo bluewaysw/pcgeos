@@ -454,12 +454,20 @@ REVISION HISTORY:
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
 
-if TOOL_AREA_IS_TASK_BAR ;--------------------------------------------------------------------
-
 OLMenuedWinSetCustomSystemMenuMoniker	method dynamic OLMenuedWinClass,
 				MSG_OL_WIN_SET_CUSTOM_SYSTEM_MENU_MONIKER
 	uses	ax, cx, dx, bp
 	.enter
+
+	;
+	; if TOOL_AREA_IS_TASK_BAR
+	;
+	push	ds
+	segmov	ds, dgroup
+	tst	ds:[taskBarEnabled] ; if taskbar == on, ZF == 1
+	pop	ds
+	jz	done ; if ZF==0 skip the following code
+
 	;
 	; check this window for a VMS_TINY, gstring moniker
 	;
@@ -544,10 +552,10 @@ OLMenuedWinFindTitleMonikerFar	proc	far
 	ret
 OLMenuedWinFindTitleMonikerFar	endp
 
-endif	; if TOOL_AREA_IS_TASK_BAR -----------------------------------------------------------
+;endif	; FIXME!!! if TOOL_AREA_IS_TASK_BAR -----------------------------------------------------------
 
 
-
+
 COMMENT @----------------------------------------------------------------------
 
 FUNCTION:	OLMenuedWinCheckForGensMinimized
@@ -1545,7 +1553,14 @@ else
 	mov	ds:[di].VI_bounds.R_bottom, ax
 endif
 
-if TOOL_AREA_IS_TASK_BAR
+	;
+	; if TOOL_AREA_IS_TASK_BAR
+	;
+	push	ds
+	segmov	ds, dgroup
+	tst	ds:[taskBarEnabled] ; if taskbar == on, ZF == 1
+	pop	ds
+	jz	endIfTaskbar ; if ZF==0 skip the following code
 
 	; If the taskbar is at the top of the screen, then move maximized
 	; windows down below the taskbar.
@@ -1557,7 +1572,7 @@ if TOOL_AREA_IS_TASK_BAR
 	add	di, ds:[di].Vis_offset
 	add	ds:[di].VI_bounds.R_top, dx
 	add	ds:[di].VI_bounds.R_bottom, dx
-endif
+endIfTaskbar:
 
 	call	UpdateWinPosSize	;update window position and size if
 					;have enough info. If not, then wait

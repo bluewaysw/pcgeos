@@ -559,7 +559,15 @@ EC<	call	ECCheckODCXDX						>
 
 	pop	ax
 
-; if (not TOOL_AREA_IS_TASK_BAR)
+	;
+	; if (not TOOL_AREA_IS_TASK_BAR)
+	;
+	push	ds
+	segmov	ds, dgroup
+	tst	ds:[taskBarEnabled] ; if taskbar == on, ZF == 1
+	pop	ds
+	jnz	afterNoTarget ; if ZF==1 skip the following code
+
 	tst	ax
 	jz	afterNoTarget
 	mov	di, ds:[si]
@@ -882,10 +890,18 @@ REVISION HISTORY:
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
 
-if TOOL_AREA_IS_TASK_BAR
-
 OLFieldCreateWindowListEntry method dynamic OLFieldClass,
 					MSG_OL_FIELD_CREATE_WINDOW_LIST_ENTRY
+
+	;
+	; if TOOL_AREA_IS_TASK_BAR
+	;
+	push	ds
+	segmov	ds, dgroup
+	tst	ds:[taskBarEnabled] ; if taskbar == on, ZF == 1
+	pop	ds
+	jz	done ; if ZF==0 skip the following code
+
 	clr	cx			; assume no window list dialog
 	tst	ds:[di].OLFI_windowListDialog
 	jz	done
@@ -925,12 +941,10 @@ done:
 	ret
 OLFieldCreateWindowListEntry endm
 
-endif	;TOOL_AREA_IS_TASK_BAR
-
 HighCommon ends
 HighCommon segment resource
 
-
+
 COMMENT @----------------------------------------------------------------------
 
 FUNCTION:	OLFieldMoveToolArea
@@ -965,7 +979,15 @@ REVISION HISTORY:
 
 OLFieldMoveToolArea	method	dynamic OLFieldClass, \
 					MSG_OL_FIELD_MOVE_TOOL_AREA
-;if (not TOOL_AREA_IS_TASK_BAR)
+
+	;
+	; if (not TOOL_AREA_IS_TASK_BAR)
+	;
+	push	ds
+	segmov	ds, dgroup
+	tst	ds:[taskBarEnabled] ; if taskbar == on, ZF == 1
+	pop	ds
+	LONG	jnz done	;afterHasTaskbar1 ; if ZF==1 skip the following code
 
 if EVENT_MENU
 	;
@@ -991,7 +1013,7 @@ endif
 	pop	es
 	LONG jz	done
 
-;endif ; (not TOOL_AREA_IS_TASK_BAR)
+afterHasTaskbar1:
 
 	mov	si, ds:[di].OLFI_toolArea	; get *ds:si = tool area
 if EVENT_MENU
@@ -1000,7 +1022,14 @@ endif
 	tst	si
 	LONG jz	done
 
-;if (not TOOL_AREA_IS_TASK_BAR)
+	;
+	; if (not TOOL_AREA_IS_TASK_BAR)
+	;
+	push	ds
+	segmov	ds, dgroup
+	tst	ds:[taskBarEnabled] ; if taskbar == on, ZF == 1
+	pop	ds
+	jnz	realGeode ; if ZF==1 skip the following code
 
 	;
 	; First, mark the position flags in the window as WPF_AS_REQUIRED
@@ -1074,7 +1103,15 @@ doIt:
 
 	push	ax			; save layerID
 
-;if (not TOOL_AREA_IS_TASK_BAR)
+	;
+	; if (not TOOL_AREA_IS_TASK_BAR)
+	;
+	push	ds
+	segmov	ds, dgroup
+	tst	ds:[taskBarEnabled] ; if taskbar == on, ZF == 1
+	pop	ds
+	jnz	afterHasTaskbar2 ; if ZF==1 skip the following code
+
 	;
 	; Convert coordinates from screen-absolute to parent-relative
 	;
@@ -1097,7 +1134,7 @@ doIt:
 	call	WinMove
 
 ;endif ; (not TOOL_AREA_IS_TASK_BAR)
-
+afterHasTaskbar2:
 	pop	dx			; Pass handle of Geode as
 					; new LayerID
 	mov	si, WIT_PRIORITY
@@ -1150,6 +1187,16 @@ REVISION HISTORY:
 ; if (not TOOL_AREA_IS_TASK_BAR)
 OLFieldSizeToolArea	method dynamic	OLFieldClass, \
 				MSG_OL_FIELD_SIZE_TOOL_AREA
+
+	;
+	; if (not TOOL_AREA_IS_TASK_BAR)
+	;
+	push	ds
+	segmov	ds, dgroup
+	tst	ds:[taskBarEnabled] ; if taskbar == on, ZF == 1
+	pop	ds
+	jnz	done ; if ZF==1 skip the following code
+
 if EVENT_MENU
 	push	cx, si				; save size
 	mov	si, ds:[di].OLFI_eventToolArea

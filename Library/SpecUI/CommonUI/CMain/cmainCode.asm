@@ -1515,8 +1515,6 @@ afterInvertDelay:
 	call	InitFileReadInteger
 	mov	es:[olExtWinAttrs], ax
 
-if TOOL_AREA_IS_TASK_BAR
-
 	;
 	; init taskBar
 	;
@@ -1552,7 +1550,7 @@ if TOOL_AREA_IS_TASK_BAR
 	mov	ax, FALSE			;default = no moving
 	call	InitFileReadBoolean
 	mov	es:[taskBarMovable], ax
-endif
+
 if _ISUI
 	mov	si, offset optionsCatString
 	mov	dx, offset rightClickHelpString

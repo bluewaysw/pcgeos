@@ -1556,9 +1556,18 @@ CUAS <	cmp	ds:[di].OLWI_type, MOWT_PRIMARY_WINDOW			>
 
 	;UPDATE the express tool area location, to match any window change.
 
-;if (not TOOL_AREA_IS_TASK_BAR)
+	;
+	; if (not TOOL_AREA_IS_TASK_BAR)
+	;
+	push	ds
+	segmov	ds, dgroup
+	tst	ds:[taskBarEnabled] ; if taskbar == on, ZF == 1
+	pop	ds
+	jnz	done ; if ZF==1 skip the following code
+
 	call	OLBaseWinAdjustTitleBoundsForExpressToolArea
-;endif ;(not TOOL_AREA_IS_TASK_BAR)
+
+	;endif ;(not TOOL_AREA_IS_TASK_BAR)
 
 endif ; PLACE_EXPRESS_MENU_ON_PRIMARY
 
@@ -2087,13 +2096,23 @@ EC <	ERROR_NZ	OPEN_WIN_ON_OPEN_WINDOW				>
 
 	push	bx
 	call	OpenGetParentWinSize
-if TOOL_AREA_IS_TASK_BAR
+
+	;
+	; if TOOL_AREA_IS_TASK_BAR
+	;
+	push	ds
+	segmov	ds, dgroup
+	tst	ds:[taskBarEnabled] ; if taskbar == on, ZF == 1
+	pop	ds
+	jz	hasNoTaskbar ; if ZF==0 skip the following code
+
 	; If taskbar is at the bottom of the screen, subtract off the
 	; height of the tool area (taskbar) from parent window size so
 	; maximized windows don't extend below the taskbar.
 	call	GetTaskBarSizeAdjustment
 	sub	dx, di			; subtract off taskbar adjustment
-endif ; TOOL_AREA_IS_TASK_BAR
+
+hasNoTaskbar:
 	movdw	axbp, cxdx		 ;put size values in weird places
 	call	MoveWindowToKeepOnscreen ;try to move the window onscreen
 	pop	bx

@@ -1398,7 +1398,16 @@ CUAS <	call	OpenWinEnsureSysMenuIcons				     >
 	; find the title monikers for OLMenued windows.  (And destroy
 	; the window's moniker list in the process.)
 	;
-if TOOL_AREA_IS_TASK_BAR
+
+	;
+	; if TOOL_AREA_IS_TASK_BAR
+	;
+	push	ds
+	segmov	ds, dgroup
+	tst	ds:[taskBarEnabled] ; if taskbar == on, ZF == 1
+	pop	ds
+	jz	done ; if ZF==0 skip the following code
+
 	call	WinCommon_DerefVisSpec_DI
 	cmp	ds:[di].OLWI_type, MOWT_PRIMARY_WINDOW
 	je	findTitle
@@ -1406,7 +1415,6 @@ if TOOL_AREA_IS_TASK_BAR
 	jne	done
 findTitle:
 	call	OLMenuedWinFindTitleMonikerFar
-endif
 
 done:
 	ret
@@ -2178,7 +2186,15 @@ requestSlot:
 					;returns bp = slot #, (cx,dx) position
 EC <	ERROR_NC OL_ERROR		;parent MUST answer!		>
 
-if TOOL_AREA_IS_TASK_BAR
+	;
+	; if TOOL_AREA_IS_TASK_BAR
+	;
+	push	ds
+	segmov	ds, dgroup
+	tst	ds:[taskBarEnabled] ; if taskbar == on, ZF == 1
+	pop	ds
+	jz	hasNoTaskbar ; if ZF==0 skip the following code
+
 	;
 	; If taskbar is at the top of the screen, adjust position to
 	; account for taskbar above.
@@ -2186,7 +2202,7 @@ if TOOL_AREA_IS_TASK_BAR
 	call	GetTaskBarPositionAdjustment
 	add	dx, di			; add adjustment for taskbar
 
-endif ; TOOL_AREA_IS_TASK_BAR
+hasNoTaskbar:
 
 	pop	bx			;get WinPosSizeState
 	mov	ax, bp
@@ -2475,7 +2491,7 @@ useCurrentBoundsAsSize:
 
 	mov	dx, ds:[di].VI_bounds.R_bottom
 	sub	dx, ds:[di].VI_bounds.R_top
-	jmp	short haveSizeCxDx
+	jmp	haveSizeCxDx
 
 checkSizeRequest1:
 	cmp	cl, WST_AS_DESIRED shl offset WPSF_SIZE_TYPE
@@ -2520,7 +2536,14 @@ checkSizeRequest2:
 					;(returns bp = x and y margins)
 	jc	UWS_end			;skip if parent size invalid...
 
-if TOOL_AREA_IS_TASK_BAR
+	;
+	; if TOOL_AREA_IS_TASK_BAR
+	;
+	push	ds
+	segmov	ds, dgroup
+	tst	ds:[taskBarEnabled] ; if taskbar == on, ZF == 1
+	pop	ds
+	jz	hasNoTaskbar ; if ZF==0 skip the following code
 
 	; If taskbar is at the bottom of the screen, subtract off the
 	; height of the tool area (taskbar) from parent window size so
@@ -2529,7 +2552,7 @@ if TOOL_AREA_IS_TASK_BAR
 	call	GetTaskBarSizeAdjustment
 	sub	dx, di			; subtract off taskbar adjustment
 
-endif ; TOOL_AREA_IS_TASK_BAR
+hasNoTaskbar:
 
 	;
 	; We're going to add some code for B/W that allows the edges of windows
@@ -2589,7 +2612,14 @@ EC <	ERROR_NZ OL_ILLEGAL_WIN_SIZE_FLAG				   >
 					;(returns bp = x and y margins)
 	jc	UWS_end
 
-if TOOL_AREA_IS_TASK_BAR
+	;
+	; if TOOL_AREA_IS_TASK_BAR
+	;
+	push	ds
+	segmov	ds, dgroup
+	tst	ds:[taskBarEnabled] ; if taskbar == on, ZF == 1
+	pop	ds
+	jz	hasNoTaskbar2 ; if ZF==0 skip the following code
 
 	; If taskbar is at the top of the screen, subtract off the
 	; height of the tool area (taskbar) from y margin.
@@ -2597,7 +2627,7 @@ if TOOL_AREA_IS_TASK_BAR
 	call	GetTaskBarPositionAdjustment
 	sub	bp, di			; subtract off taskbar adjustment
 
-endif ; TOOL_AREA_IS_TASK_BAR
+hasNoTaskbar2:
 
 	;
 	; We're going to add some code for B/W that allows the edges of windows
@@ -3016,7 +3046,14 @@ ConvertSpecWinSizePairsToPixels	proc	far
 	clr	cx			;get size of parent window
 	call	VisConvertRatioToCoords ;returns SpecWinSizePair in ax, bx
 
-if TOOL_AREA_IS_TASK_BAR
+	;
+	; if TOOL_AREA_IS_TASK_BAR
+	;
+	push	ds
+	segmov	ds, dgroup
+	tst	ds:[taskBarEnabled] ; if taskbar == on, ZF == 1
+	pop	ds
+	jz	hasNoTaskbar ; if ZF==0 skip the following code
 
 	; If taskbar is at the top of the screen, adjust position
 	; so window is below taskbar.
@@ -3024,7 +3061,7 @@ if TOOL_AREA_IS_TASK_BAR
 	call	GetTaskBarPositionAdjustment
 	add	bx, di			;add adjustment to position
 
-endif ; TOOL_AREA_IS_TASK_BAR
+hasNoTaskbar:
 
 	;
 	; We're going to add some code for B/W that allows the edges of windows

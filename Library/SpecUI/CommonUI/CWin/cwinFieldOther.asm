@@ -397,9 +397,18 @@ noExpressMenu:
 	add	di, ds:[di].Vis_offset
 	clr	ax
 	xchg	ax, ds:[di].OLFI_toolArea
-if TOOL_AREA_IS_TASK_BAR
+
+	;
+	; if TOOL_AREA_IS_TASK_BAR
+	;
+	push	ds
+	segmov	ds, dgroup
+	tst	ds:[taskBarEnabled] ; if taskbar == on, ZF == 1
+	pop	ds
+	jz	hasNoTaskbar ; if ZF==0 skip the following code
+
 	clr	ds:[di].OLFI_systemTray
-endif
+hasNoTaskbar:
 	tst	ax
 	jz	noSystemTray
 	call	clobber
@@ -424,7 +433,15 @@ noEventMenu:
 noToolArea2:
 endif
 
-if TOOL_AREA_IS_TASK_BAR
+	;
+	; if TOOL_AREA_IS_TASK_BAR
+	;
+	push	ds
+	segmov	ds, dgroup
+	tst	ds:[taskBarEnabled] ; if taskbar == on, ZF == 1
+	pop	ds
+	jz	noWindowListDialog ; if ZF==0 skip the following code
+
 	;
 	; clobber window list dialog
 	;
@@ -435,8 +452,9 @@ if TOOL_AREA_IS_TASK_BAR
 	tst	ax
 	jz	noWindowListDialog
 	call	clobber
+
 noWindowListDialog:
-endif
+
 	ret
 
 ;
@@ -588,7 +606,15 @@ OLFieldDetach	method dynamic OLFieldClass, MSG_META_DETACH
 		pop	ax, cx, dx, bp, si
 
 passItUp:
-if TOOL_AREA_IS_TASK_BAR
+	;
+	; if TOOL_AREA_IS_TASK_BAR
+	;
+	push	ds
+	segmov	ds, dgroup
+	tst	ds:[taskBarEnabled] ; if taskbar == on, ZF == 1
+	pop	ds
+	jz	reallyPassItUp ; if ZF==0 skip the following code
+
 	;
 	; Check for system tray, and send it a detach
 	;
@@ -616,7 +642,7 @@ if TOOL_AREA_IS_TASK_BAR
 		pop	ax, cx, dx, bp, si
 
 reallyPassItUp:
-endif
+
 	;
 	; Let our superclass know.
 	;
@@ -991,7 +1017,15 @@ if EVENT_MENU
 	jc	done
 endif
 
-if TOOL_AREA_IS_TASK_BAR
+	;
+	; if TOOL_AREA_IS_TASK_BAR
+	;
+	push	ds
+	segmov	ds, dgroup
+	tst	ds:[taskBarEnabled] ; if taskbar == on, ZF == 1
+	pop	ds
+	jz	callSuper ; if ZF==0 skip the following code
+
 	push	si				;save our handle
 	mov	di, ds:[si]
 	add	di, ds:[di].Gen_offset
@@ -1010,7 +1044,6 @@ if TOOL_AREA_IS_TASK_BAR
 20$:
 	pop	si
 	jc	done
-endif ; TOOL_AREA_IS_TASK_BAR
 
 callSuper:
 	mov	di, offset OLFieldClass

@@ -28,7 +28,7 @@ DESCRIPTION:
 	;
 	;	For documentation of the OLMenuWinClass see:
 	;	/staff/pcgeos/Spec/olMenuWinClass.doc
-	; 
+	;
 
 CommonUIClassStructures segment resource
 
@@ -189,7 +189,7 @@ OLMenuWinHintInfrequentUsage	endp
 
 COMMENT @----------------------------------------------------------------------
 
-METHOD:		OLMenuWinScanGeometryHints -- 
+METHOD:		OLMenuWinScanGeometryHints --
 		MSG_SPEC_SCAN_GEOMETRY_HINTS for OLMenuWinClass
 
 DESCRIPTION:	Scans geometry hints.
@@ -201,7 +201,7 @@ PASS:		*ds:si 	- instance data
 RETURN:		nothing
 		ax, cx, dx, bp - destroyed
 
-ALLOWED TO DESTROY:	
+ALLOWED TO DESTROY:
 		bx, si, di, ds, es
 
 REGISTER/STACK USAGE:
@@ -352,7 +352,7 @@ REVISION HISTORY:
 
 OLMenuWinUpdateSpecBuild	method dynamic	OLMenuWinClass,
 					MSG_SPEC_BUILD_BRANCH
-			
+
 if	ALLOW_ACTIVATION_OF_DISABLED_MENUS
 	;
 	; Make sure this is set.  System menus are always enabled regardless
@@ -396,7 +396,7 @@ callSuper:
 	pop	bp
 
 alreadyBuilt:
-	;get our orientation correct.  We'll be horizontal if our button 
+	;get our orientation correct.  We'll be horizontal if our button
 	;desires it.
 
 	call	MenuBuild_DerefVisSpec_DI
@@ -435,7 +435,7 @@ OLMenuWinUpdateSpecBuild	endp
 
 
 MenuBuild_DerefVisSpec_DI	proc	near
-	mov	di, ds:[si]			
+	mov	di, ds:[si]
 	add	di, ds:[di].Vis_offset
 	ret
 MenuBuild_DerefVisSpec_DI	endp
@@ -458,10 +458,10 @@ RETURN:		carry set if we called our superclass to do SPEC_BUILD_BRANCH
 
 DESTROYED:	ax, bx, cx, dx, di
 
-SIDE EFFECTS:	
+SIDE EFFECTS:
 
 PSEUDO CODE/STRATEGY:
-		
+
 
 REVISION HISTORY:
 	Name	Date		Description
@@ -472,16 +472,16 @@ REVISION HISTORY:
 
 
 
-MenuBuild_DerefGen_DI	proc	near	
-	mov	di, ds:[si]			
+MenuBuild_DerefGen_DI	proc	near
+	mov	di, ds:[si]
 	add	di, ds:[di].Gen_offset
-	ret	
+	ret
 MenuBuild_DerefGen_DI	endp
 
 if not	(_DISABLE_APP_EXIT_UI)
 
 MenuBuild_ObjMessageCallFixupDS	proc	near
-	mov	di, mask MF_CALL or mask MF_FIXUP_DS 
+	mov	di, mask MF_CALL or mask MF_FIXUP_DS
 	call	ObjMessage
 	ret
 MenuBuild_ObjMessageCallFixupDS	endp
@@ -508,7 +508,7 @@ RETURN:		cx, dx	= unchanged
 
 DESTROYED:	ax, bp
 
-SIDE EFFECTS:	
+SIDE EFFECTS:
 
 PSEUDO CODE/STRATEGY:
 
@@ -699,7 +699,7 @@ REVISION HISTORY:
 				_DISABLE_APP_EXIT_UI if true.
 
 ------------------------------------------------------------------------------@
-EnsureFileExit	proc	near	
+EnsureFileExit	proc	near
 	; Don't want a File Exit if _DISABLE_APP_EXIT_UI is true.
 if not	(_DISABLE_APP_EXIT_UI) ;-----------------------------------------------
 	uses	si
@@ -718,7 +718,7 @@ if not	(_DISABLE_APP_EXIT_UI) ;-----------------------------------------------
 	cmp	ax, UILM_TRANSPARENT
 	jne	addExit				; not UILM_TRANSPARENT, add
 	call	UserGetLaunchOptions
-	test	ax, mask UILO_CLOSABLE_APPS	;In transparent mode, but 
+	test	ax, mask UILO_CLOSABLE_APPS	;In transparent mode, but
 	jnz	addExit				; override flag present, so add
 						; exit trigger.
 	mov	ax, MSG_GEN_APPLICATION_GET_LAUNCH_FLAGS
@@ -802,7 +802,7 @@ DBCS <	shl	cx, 1						>
 	call	LMemInsertAt		; insert space in app name chunk for Exit
 DBCS <	shr	cx, 1						>
 	pop	bx			; bl = mnemonic offset
-	mov	si, di	
+	mov	si, di
 	mov	di, dx
 	mov	di, ds:[di]
 	mov	ds:[di].VM_width, 0	; recompute size
@@ -925,11 +925,11 @@ if	ALLOW_ACTIVATION_OF_DISABLED_MENUS
 	; Enable menus of any kind.  -cbh 12/10/92   (Actually, only those in
 	; a menu bar. -cbh 12/17/92)
 	;
-	mov	di, ds:[di].OLCI_buildFlags			
+	mov	di, ds:[di].OLCI_buildFlags
 	test	di, mask OLBF_AVOID_MENU_BAR
 	jz	notInMenuBar
-	and	di, mask OLBF_TARGET					
-	cmp	di, OLBT_IS_POPUP_LIST shl offset OLBF_TARGET		
+	and	di, mask OLBF_TARGET
+	cmp	di, OLBT_IS_POPUP_LIST shl offset OLBF_TARGET
 	jne	notInMenuBar
 	or	bp, mask SBF_VIS_PARENT_FULLY_ENABLED
 notInMenuBar:
@@ -1052,7 +1052,7 @@ OLMenuWinNotifyOfInteractionCommand	method dynamic	OLMenuWinClass,
 	;
 	mov	es, dx				; es:bp = NOICS_
 	cmp	es:[bp].NOICS_ic, IC_EXIT
-	jne	done				; if non-EXIT IC trigger in 
+	jne	done				; if non-EXIT IC trigger in
 						;	menu, ignore it
 						; did we create one?
 	test	ds:[di].OLMWI_specState, mask OMWSS_EXIT_CREATED
@@ -1080,7 +1080,7 @@ DESTROYED:	nothing, even flags are maintained.
 SIDE EFFECTS:	Dies if inconsistent.
 
 PSEUDO CODE/STRATEGY:
-		
+
 
 REVISION HISTORY:
 	Name	Date		Description
@@ -1092,15 +1092,15 @@ if	 _CASCADING_MENUS and ERROR_CHECK
 OLMenuWinECCheckCascadeData	proc	far
 	uses	ax,bx,cx,dx,di,ds,es
 	.enter
-	
+
 	pushf
-	
+
 	mov	ax, ATTR_OL_MENU_WIN_CASCADED_MENU
 	call	ObjVarFindData			; if data, ds:bx = ptr
 	mov	dl, TRUE			; found var data?
 	jc	lookAtBit
 	mov	dl, FALSE			; no.. didn't find it
-	
+
 lookAtBit:
 	mov	di, ds:[si]
 	add	di, ds:[di].Vis_offset
@@ -1116,7 +1116,7 @@ doTests:
 	ERROR_NE	OL_ERROR		; INCONSISTENT dl & dh
 	tst	dl
 	jz	done
-	
+
 	; check var data's contents -- should be valid optr
 	push	si
 	mov	si, ds:[bx].offset
@@ -1125,7 +1125,7 @@ doTests:
 	pop	si
 done:
 	popf
-	
+
 	.leave
 	ret
 OLMenuWinECCheckCascadeData	endp
@@ -1190,7 +1190,7 @@ EC <	ERROR_NZ	OL_BUILD_FLAGS_MULTIPLE_REPLIES			>
 	; of the querying object, it will set itself as the visual parent
 	; rather than this object.  -cbh 5/11/92
 	;
-	call	WinClasses_Mov_CXDX_Self	
+	call	WinClasses_Mov_CXDX_Self
 	stc					;return query acknowledged
 	ret
 
@@ -1371,7 +1371,7 @@ CUAS <	ANDNF	ds:[di].OLWI_attrs, not (mask OWA_PINNABLE) >
 	;borders and header attributes have been updated, and children
 	;marked as invalid if necessary. Now resize window to desired size
 	;again, and update it.
-	
+
 	mov	cx, mask RSA_CHOOSE_OWN_SIZE	;set win group to desired size
 	mov	dx, mask RSA_CHOOSE_OWN_SIZE	;(just changes bounds)
 	call	VisSetSize
@@ -1470,7 +1470,7 @@ PASS:		*ds:si	= OLMenuWinClass object
 		ax	= message #
 RETURN:		nothing
 DESTROYED:	ax, cx, dx, bp
-SIDE EFFECTS:	
+SIDE EFFECTS:
 
 PSEUDO CODE/STRATEGY:
 
@@ -1595,7 +1595,7 @@ notPinned: ;if this menu was pinned before it was opened under the menu button,
 
 ;notPinnedButWasPinned:
 	;HACK: the toggle pushpin code is going to release the FOCUS exclusive
-	;from this window, and so the base window may restore the FOCUS 
+	;from this window, and so the base window may restore the FOCUS
 	;to an object on the base window which will take the gadget exclusive,
 	;such as a GenTrigger. The menu button which opens this menu will
 	;lose the gadget exclusive, and tell this menu to close. To prevent the
@@ -1703,17 +1703,17 @@ ifdef	ALLOW_SCROLLABLE_POPUP_LISTS
 	;processed.  Mouse interactions needs to be handled by the items in
 	;the popup list.
 
-	mov	di, ds:[di].OLCI_buildFlags			
-	and	di, mask OLBF_TARGET					
-	cmp	di, OLBT_IS_POPUP_LIST shl offset OLBF_TARGET		
-	jne	notPopupList						
-	call	VisTestPointInBounds					
-	jc	returnProcessed						
-notPopupList:								
+	mov	di, ds:[di].OLCI_buildFlags
+	and	di, mask OLBF_TARGET
+	cmp	di, OLBT_IS_POPUP_LIST shl offset OLBF_TARGET
+	jne	notPopupList
+	call	VisTestPointInBounds
+	jc	returnProcessed
+notPopupList:
 
 endif
 
-	; don't leave stay up mode if press is not UIFA_IN and 
+	; don't leave stay up mode if press is not UIFA_IN and
 	; VisTestPointInBounds is true
 
 	test	bp, (mask UIFA_IN) shl 8
@@ -1734,16 +1734,16 @@ continue:
 
 if BUBBLE_HELP
 	test	bp, (mask UIFA_IN) shl 8
-	jz	leaveStayUpMode		
+	jz	leaveStayUpMode
 
 	; button press inside menu
 
-	mov	ax, bp			
+	mov	ax, bp
 	andnf	ax, mask BI_BUTTON	;is it BUTTON_2?
-	cmp	ax, BUTTON_2 shl offset BI_BUTTON		
+	cmp	ax, BUTTON_2 shl offset BI_BUTTON
 	je	done			;skip if so...
 
-leaveStayUpMode:		
+leaveStayUpMode:
 endif	; BUBBLE_HELP
 
 	mov	ax, cx
@@ -2007,7 +2007,7 @@ OLMenuWinLeaveStayUpMode	method dynamic	OLMenuWinClass,
 					MSG_MO_MW_LEAVE_STAY_UP_MODE
 
 EC <	call	VisCheckVisAssumption	;make sure ds:*si ok		>
-   
+
 	;FIRST: make sure that we are in stay-up-mode, so that we don't
 	;mess up the state of the parent window (GenPrimary) by telling it
 	;that we are leaving stay-up-mode when we aren't.
@@ -2050,8 +2050,8 @@ EC <	call	VisCheckVisAssumption	;make sure ds:*si ok		>
 	jnz	sendToButton		;if yes, send to button
 
 	clr	cx			;else return cx = FALSE
-	ret 
-	
+	ret
+
 sendToButton:
 	mov	ax, MSG_MO_MB_LEAVE_STAY_UP_MODE
 	call	OLPopupWinSendToButton
@@ -2082,15 +2082,15 @@ PASS:		*ds:si	= OLMenuWinClass object
 			    OMWCMO_START_GRAB
 			    	If TRUE, will take the grabs and take the gadget
 				exclusive after setting the cascade mode.
-			
+
 		if OMWCMO_CASCADE = TRUE
 		    ^ldx:bp = optr to submenu
 		else
 		    dx, bp are ignored
-		    
+
 RETURN:		Nothing
 DESTROYED:	ax, cx
-SIDE EFFECTS:	
+SIDE EFFECTS:
 	If cascade mode is enabled, the menu will NOT be closed when a
 	lost gadget exclusive is received, nor when the passive grab wants
 	to close it.  It will, however, still be closed by a
@@ -2107,78 +2107,78 @@ REVISION HISTORY:
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
 if	 _CASCADING_MENUS
-OLMenuWinCascadeMode	method dynamic OLMenuWinClass, 
+OLMenuWinCascadeMode	method dynamic OLMenuWinClass,
 					MSG_MO_MW_CASCADE_MODE
 	.enter
-	
+
 	push	cx				; save for last	(cl)
-	
+
 	; set cascading information based upon argument
-	
+
 	; ensure original cascade data is correct before changing (EC)
 EC <	call	OLMenuWinECCheckCascadeData				>
-	
+
 	mov	ch, ds:[di].OLMWI_moreSpecState	; save original state
 	clr	ax				; use ah to keep cascade bit
-	
+
 	; Here we put the new cascade bit into ah, later into ch.
 	; This value is or'ed back into instance data after the "done"
 	; label.  This is done this way because some routines called below
 	; depend upon the moreSpecState's CASCADE bit to be consistent with
 	; the vardata which hasn't been changed yet.
-	
+
 	test	cl, mask OMWCMO_CASCADE
 	jz	handleVarData
 	ornf	ah, mask OMWMSS_IS_CASCADING
 
 handleVarData:
 	; check to see if the cascading bit changed
-	
+
 	xor	ch, ah
 	test	ch, mask OMWMSS_IS_CASCADING	; test if bit changed
 	push	cx				; case "changed" info (ch)
 	mov	ch, ah				; new state is now in ch
 	mov	ax, ATTR_OL_MENU_WIN_CASCADED_MENU
 	jnz	updateVarData			; bit changed - fix var data
-	
+
 	; cascade bit hasn't change.  Check to see if the bit is true.
 	test	cl, mask OMWCMO_CASCADE
 	jz	done				; not cascading, we're done
-	
+
 	; We are cascading.  Make sure that the handle passed is the same as
 	; the handle stored.
-	
+
 	call	ObjVarFindData			; ds:bx = ptr to data
 EC <	ERROR_NC	OL_ERROR		; SHOULD HAVE VAR DATA	>
-	
+
 	; compare handle already in var data with ^ldx:bp (handle passed in)
-	
+
 	cmp	ds:[bx].handle, dx		; ^ldx:bp = handle passed in
 	jne	changeVarData			; nope, need to change vardata
 	cmp	ds:[bx].offset, bp
 	je	done				; handle is the same, we're done
-	
+
 changeVarData:
 	; handle not the same.  we need to force the close of the submenu
 	; tree starting with the old handle, and then update the stored handle.
-	
+
 	; Close "old" submenus below this menu
 	push	ax, cx, dx, bp, bx
 	mov	cx, TRUE
 	call	OLMenuWinSendCloseRequestToLastMenu	; destroy:ax,bx,cx,dx,bp
 	pop	ax, cx, dx, bp, bx
-	
+
 	; change var data to reflect the new submenu.  Then we're done.
 	call	ObjVarFindData				; may have moved
 	movdw	ds:[bx], dxbp
 	jmp	short done
-	
+
 updateVarData:
 	; the bit has changed.. adjust the var data accordingly
-	
+
 	test	cl, mask OMWCMO_CASCADE
 	jz	deleteVarData
-	
+
 	; add var data
 	push	cx
 	mov	cx, size optr			; size of data
@@ -2193,13 +2193,13 @@ deleteVarData:
 	mov	cx, TRUE
 	call	OLMenuWinSendCloseRequestToLastMenu
 	pop	ax, cx
-	
+
 	; Delete the var data
 	call	ObjVarDeleteData
 EC <	ERROR_C	OL_ERROR	; nothing deleted? should have var data!>
-	
+
 done:
-	
+
 	; ONLY the cascade bit should be set in ch.
 EC <	test	ch, not (mask OMWMSS_IS_CASCADING)			>
 EC <	ERROR_NZ	OL_ERROR			;ch got trashed >
@@ -2209,15 +2209,15 @@ EC <	ERROR_NZ	OL_ERROR			;ch got trashed >
 	; store new cascade bit
 	andnf	ds:[di].OLMWI_moreSpecState, not mask OMWMSS_IS_CASCADING
 	ornf	ds:[di].OLMWI_moreSpecState, ch
-	
+
 	; check to make sure that we didn't screw up the data consistency
 EC <	call	OLMenuWinECCheckCascadeData				>
-	
+
 	; Decide to start up grabs and/or enter stay up mode.
-	
+
 	pop	cx					; "change" info (ch)
 	pop	ax					; get passed flags (al)
-	
+
 	; If we are cascading, then don't do any of this.. we don't want to
 	; take the gadget exclusive away from someone else...
 
@@ -2231,17 +2231,17 @@ EC <	call	OLMenuWinECCheckCascadeData				>
 	mov	cl, al
 	test	cx, (mask OMWMSS_IS_CASCADING shl 8) or mask OMWCMO_START_GRAB
 	jz	dontGrab				; nope.. done
-	
+
 	push	ax					; preserve passed flags
 	mov	ax, MSG_OL_WIN_STARTUP_GRAB
 	call	ObjCallInstanceNoLock
 	pop	ax
-	
+
 	; Were we told to start grab? If so, then we also enter stay up
 	; mode.  Otherwise, we just bail.
 	test	al, mask OMWCMO_START_GRAB
 	jz	dontGrab				; skip stay up mode...
-	
+
 	mov	cx, TRUE				; grab gadget exclusive
 	mov	ax, MSG_MO_MW_ENTER_STAY_UP_MODE
 	call	ObjCallInstanceNoLock
@@ -2349,7 +2349,7 @@ OLMenuWinVisClose	method dynamic	OLMenuWinClass, MSG_VIS_CLOSE
 
 	mov	al, 0
 	call	OLMenuWinUpdateUpDownScrollers
-	
+
 	ret
 OLMenuWinVisClose	endp
 
@@ -2369,7 +2369,7 @@ PASS:		*ds:si - instance data
 
 RETURN:		ax = 0 (due to byte-saving measure in FlowObject)
 
-DESTROYED:	
+DESTROYED:
 
 PSEUDO CODE/STRATEGY:
 
@@ -2516,7 +2516,7 @@ sendToButton:
 
 	;
 	; Code put in here to do nothing with left and right arrows for express
-	; menus, so we won't have complicated deaths in express submenus.  
+	; menus, so we won't have complicated deaths in express submenus.
 	; There's probably a cleaner solution than this.  -cbh 11/ 4/92
 	;
 if EVENT_MENU
@@ -2534,7 +2534,7 @@ endif
 19$::
 SBCS <	mov	cx, (CS_CONTROL shl 8) or VC_ESCAPE	;make an escape key >
 DBCS <	mov	cx, C_SYS_ESCAPE			;make an escape key >
-	mov	ax, MSG_META_FUP_KBD_CHAR	
+	mov	ax, MSG_META_FUP_KBD_CHAR
 20$:
 
 	call	OLMenuWinFocusAndCallButton ;trashes si
@@ -2583,7 +2583,7 @@ sendToSelf::
 	mov	cx, IC_INTERACTION_COMPLETE	;in case we send
 						;MSG_GEN_GUP_INTERACTION_COMMAND
 	call	ObjCallInstanceNoLock
-	
+
 	push	ds			;reset our saved KBD char to "none"
 	mov	bp, segment idata	;so that if a genlist gains the focus
 	segmov	ds, bp
@@ -2780,7 +2780,7 @@ afterFocus:
 	;Do whatever navigation is called for at the menu bar level.
 	;(send to menu button, not its parent, since we might be sending
 	;MSG_META_FUP_KBD_CHAR.)
-	
+
 	push	ax
 	call	ObjCallInstanceNoLock		;navigate / handle ESCAPE
 	pop	ax
@@ -2853,7 +2853,7 @@ searchLoop:
 	mov	ax, MSG_VIS_FIND_PARENT
 	mov	di, mask MF_CALL or mask MF_FIXUP_DS
 	call	ObjMessage
-	jcxz	done	
+	jcxz	done
 
 	movdw	bxsi, cxdx			; ^lbx:si = parent
 	call	ObjSwapLock
@@ -2923,7 +2923,7 @@ if ERROR_CHECK
 ;	the parent menu. Once the sub-menu is visible, press left-arrow to
 ;	get back to parent.
 ;
-;	test	ds:[di].OLMWI_specState, mask OMWSS_WAS_PINNED 
+;	test	ds:[di].OLMWI_specState, mask OMWSS_WAS_PINNED
 ;	ERROR_NZ OL_ERROR
 
 	;make sure this menu is a sub-menu
@@ -3085,11 +3085,11 @@ OLMenuWinBringToTop	method dynamic	OLMenuWinClass, MSG_GEN_BRING_TO_TOP
 	; of its bounds, which causes it to release the mouse, and realizing
 	; that it did have the mouse beforehand, causes it to give the focus
 	; back to its parent window.  So submenus never get the focus.
-	; -cbh 6/22/92  (Removed -- causes problems when clicking and 
+	; -cbh 6/22/92  (Removed -- causes problems when clicking and
 	; releasing on the left-edge of submenu menu buttons -- the submenu
 	; goes away without doing anyway when you click on it. -cbh 10/13/92)
 	;
-;	call	VisGrabMouse		
+;	call	VisGrabMouse
 
 	mov	ax, MSG_META_GRAB_FOCUS_EXCL
 	call	WinClasses_ObjCallInstanceNoLock
@@ -3286,10 +3286,10 @@ REVISION HISTORY:
 OLMenuWinCallSuperIfPinned	proc	far
 	class	OLMenuWinClass
 	call	WinClasses_DerefVisSpec_DI
-	test	ds:[di].OLWI_specState, mask OLWSS_PINNED 
+	test	ds:[di].OLWI_specState, mask OLWSS_PINNED
 	jnz	callSuper		;skip if pinned (cy=0)...
 
-	test	ds:[di].OLMWI_specState, mask OMWSS_WAS_PINNED 
+	test	ds:[di].OLMWI_specState, mask OMWSS_WAS_PINNED
 	jnz	callSuper		;skip if pinned (cy=0)...
 
 	;this menu is not pinned: is an intermediate menu inbetween the
@@ -3400,10 +3400,10 @@ release:
 	;and so we would forward this VUP to the Primary, when in fact we
 	;should handle it here, since this menu was recently pinned.
 
-	test	ds:[di].OLWI_specState, mask OLWSS_PINNED 
+	test	ds:[di].OLWI_specState, mask OLWSS_PINNED
 	jnz	callSuper		;skip if pinned (cy=0)...
 
-	test	ds:[di].OLMWI_specState, mask OMWSS_WAS_PINNED 
+	test	ds:[di].OLMWI_specState, mask OMWSS_WAS_PINNED
 	jnz	callSuper		;skip if pinned (cy=0)...
 
 	;If not pinned, might have been recently pinned, or object releasing
@@ -3450,7 +3450,7 @@ callSuper:
 ; Should we do this test also - brianc 1/22/93
 ; Yes.  2/24/94 cbh (
 
-	test	ds:[di].OLWI_specState, mask OLWSS_PINNED 
+	test	ds:[di].OLWI_specState, mask OLWSS_PINNED
 	jz	done			; wasn't pinned
 ; )
 
@@ -3468,7 +3468,7 @@ OLMenuWinAlterFTVMCExcl	endm
 
 COMMENT @----------------------------------------------------------------------
 
-METHOD:		OLMenuWinRecalcSize -- 
+METHOD:		OLMenuWinRecalcSize --
 		MSG_VIS_RECALC_SIZE for OLMenuWinClass
 
 DESCRIPTION:	Recalc's size.
@@ -3482,7 +3482,7 @@ PASS:		*ds:si 	- instance data
 RETURN:		cx, dx  - size to use
 		ax, bp - destroyed
 
-ALLOWED TO DESTROY:	
+ALLOWED TO DESTROY:
 		bx, si, di, ds, es
 
 REGISTER/STACK USAGE:
@@ -3510,7 +3510,7 @@ OLMenuWinRecalcSize	endm
 
 COMMENT @----------------------------------------------------------------------
 
-METHOD:		OLMenuWinVisPositionBranch -- 
+METHOD:		OLMenuWinVisPositionBranch --
 		MSG_VIS_POSITION_BRANCH for OLMenuWinClass
 
 DESCRIPTION:	Positions the object.
@@ -3523,7 +3523,7 @@ PASS:		*ds:si 	- instance data
 RETURN:		nothing
 		ax, cx, dx, bp - destroyed
 
-ALLOWED TO DESTROY:	
+ALLOWED TO DESTROY:
 		bx, si, di, ds, es
 
 REGISTER/STACK USAGE:
@@ -3542,7 +3542,7 @@ REVISION HISTORY:
 OLMenuWinVisPositionBranch	method dynamic	OLMenuWinClass, \
 				MSG_VIS_POSITION_BRANCH
 
-	call	MenuWinPassMarginInfo	
+	call	MenuWinPassMarginInfo
 	call	VisCompPosition
 	ret
 OLMenuWinVisPositionBranch	endm
@@ -3654,7 +3654,7 @@ KbdNavigation	segment resource
 
 COMMENT @----------------------------------------------------------------------
 
-METHOD:		OLMenuWinFindKbdAccelerator -- 
+METHOD:		OLMenuWinFindKbdAccelerator --
 		MSG_GEN_FIND_KBD_ACCELERATOR for OLMenuWinClass
 
 DESCRIPTION:	Looks for keyboard accelerator.  The only reason this is
@@ -3693,11 +3693,11 @@ OLMenuWinFindKbdAccelerator method OLMenuWinClass, \
 				   MSG_GEN_FIND_KBD_ACCELERATOR
 	call	GenCheckKbdAccelerator		;see if we have a match
 	jnc	exit				;nope, exit
-	
+
 	call	KN_DerefVisSpec_DI
 	mov	si, ds:[di].OLPWI_button	;application releasing the
 	tst	si				;no button, exit
-	jz	exit			
+	jz	exit
 
 	mov	bx, ds:[LMBH_handle]
 	mov	ax, MSG_OL_BUTTON_KBD_ACTIVATE
@@ -3797,9 +3797,9 @@ PASS:		*ds:si	= OLMenuWinClass object
 		ds:bx	= OLMenuWinClass object (same as *ds:si)
 		es 	= segment of OLMenuWinClass
 		ax	= message #
-RETURN:		
-DESTROYED:	
-SIDE EFFECTS:	
+RETURN:
+DESTROYED:
+SIDE EFFECTS:
 
 PSEUDO CODE/STRATEGY:
 
@@ -3841,27 +3841,27 @@ REVISION HISTORY:
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
 if	 _CASCADING_MENUS
-OLMenuWinGupSubmenuRequestsClose	method dynamic OLMenuWinClass, 
+OLMenuWinGupSubmenuRequestsClose	method dynamic OLMenuWinClass,
 					MSG_MO_MW_GUP_SUBMENU_REQUESTS_CLOSE
-	
+
 	; check this before saving the passed args since it would be a waste
 	; of time if the jump was followed.
-	
+
 	test	ds:[di].OLMWI_moreSpecState, \
 			mask OMWMSS_IGNORE_SUBMENU_CLOSE_REQUEST
 	jnz	done
-	
+
 	push	cx, dx, bp			; save args
-	
+
 	; ensure cascade data is consistent
 EC <	call	OLMenuWinECCheckCascadeData				>
 
 	; since this menu is going down, disable the cascading bit.
 	test	ds:[di].OLMWI_moreSpecState, mask OMWMSS_IS_CASCADING
 	jz	notCascading
-	
+
 	andnf	ds:[di].OLMWI_moreSpecState, not (mask OMWMSS_IS_CASCADING)
-	
+
 	; Delete the cascaded var data
 	mov	ax, ATTR_OL_MENU_WIN_CASCADED_MENU
 	call	ObjVarDeleteData
@@ -3871,20 +3871,20 @@ EC <	ERROR_C	OL_ERROR			; no var data-inconsistent >
 notCascading:
 	; prevent this message from being resent by lost_gadget_excl handler.
 	ornf	ds:[di].OLMWI_moreSpecState, mask OMWMSS_DONT_SEND_REQUEST
-	
+
 	; close this menu
 	mov	ax, MSG_GEN_GUP_INTERACTION_COMMAND
 	mov	cx, IC_INTERACTION_COMPLETE
 	call	ObjCallInstanceNoLock
-	
+
 	call	OLMenuWinSendCloseRequest	; Destroys ax, bx, cx, dx, bp
 
 	mov	di, ds:[si]
 	add	di, ds:[di].Vis_offset
 
-donePop::	
+donePop::
 	pop	cx, dx, bp			; restore args
-	
+
 	; ONLY JUMP HERE FROM BEFORE PUSHING THE ARGS
 done:
 	; the ignore is only valid for one request at a time.  also,
@@ -3906,10 +3906,10 @@ SYNOPSIS:	Closes the current menu and sends the submenu close request
 
 CALLED BY:	OLMenuWinLostGadgetExcl, OLMenuWinPostPassiveButton
 PASS:		*ds:si	= menu object
-		
+
 RETURN:		None.
 DESTROYED:	ax, bx, cx, dx, bp, di
-SIDE EFFECTS:	
+SIDE EFFECTS:
 	WARNING:  This routine MAY resize LMem and/or object blocks, moving
 		  them on the heap and invalidating stored segment pointers
 		  and current register or stored offsets to them.
@@ -3928,36 +3928,36 @@ OLMenuWinCloseOrCascade	proc	far
 	.enter
 	mov	di, ds:[si]
 	add	di, ds:[di].Vis_offset
-	
+
 	test	ds:[di].OLMWI_moreSpecState, mask OMWMSS_IS_CASCADING
 	jnz	done				; menu is cascading..
 						; don't close
-	
+
 	; be sure to always clear this flag if the menu is going down
 	andnf	ds:[di].OLMWI_moreSpecState, \
 			not mask OMWMSS_IGNORE_SUBMENU_CLOSE_REQUEST
-	
+
 	; prevent close request from being resent by lost_gadget_excl handler.
 	mov	bl, ds:[di].OLMWI_moreSpecState	; store original state for later
 	ornf	ds:[di].OLMWI_moreSpecState, mask OMWMSS_DONT_SEND_REQUEST
-	
+
 	; close this menu
 	mov	ax, MSG_GEN_GUP_INTERACTION_COMMAND
 	mov	cx, IC_INTERACTION_COMPLETE
 	call	ObjCallInstanceNoLock
-	
+
 	; okay, send the request.  restore the flag first.
 	mov	di, ds:[si]
 	add	di, ds:[di].Vis_offset
 	andnf	ds:[di].OLMWI_moreSpecState, not mask OMWMSS_DONT_SEND_REQUEST
-	
+
 	; told not to send request.. skip to end.
 	test	bl, mask OMWMSS_DONT_SEND_REQUEST
 	jnz	done
-	
+
 	; send close request to menu parents, if they exists.
 	call	OLMenuWinSendCloseRequest	; destroys: ax,bx,cx,dx,bp
-	
+
 done:
 	.leave
 	ret
@@ -4009,7 +4009,7 @@ searchLoop:
 	mov	ax, MSG_VIS_FIND_PARENT
 	mov	di, mask MF_CALL or mask MF_FIXUP_DS
 	call	ObjMessage
-	jcxz	done	
+	jcxz	done
 
 	movdw	bxsi, cxdx			; ^lbx:si = parent
 	call	ObjSwapLock
@@ -4047,7 +4047,7 @@ SYNOPSIS:	Sends a MSG_MO_MW_GUP_SUBMENU_REQUESTS_CLOSE to the last
 		in the this chain of menus or may close only the menus BELOW
 		the current menu depending upon the value of cx.
 
-CALLED BY:	
+CALLED BY:
 PASS:		*ds:si	= current menu object
 		cx	= Preserve current menu and those above it
 			  TRUE: Only close menus BELOW the current menu
@@ -4055,13 +4055,13 @@ PASS:		*ds:si	= current menu object
 
 RETURN:		*ds:si = current menu object.  (ds is fixed up).
 DESTROYED:	ax, bx, cx, dx, bp, di
-SIDE EFFECTS:	
+SIDE EFFECTS:
 	WARNING:  This routine MAY resize LMem and/or object blocks, moving
 		  them on the heap and invalidating stored segment pointers
 		  and current register or stored offsets to them.
 
 PSEUDO CODE/STRATEGY:
-		
+
 
 REVISION HISTORY:
 	Name	Date		Description
@@ -4072,20 +4072,20 @@ REVISION HISTORY:
 if	 _CASCADING_MENUS
 OLMenuWinSendCloseRequestToLastMenu	proc	far
 	.enter
-	
+
 	; Set ignore bit to preserve the current menu based upon cx.
 	mov	di, ds:[si]
 	add	di, ds:[di].Vis_offset
-	
+
 	; Assume we close all menus.
 	andnf	ds:[di].OLMWI_moreSpecState, \
 			not (mask OMWMSS_IGNORE_SUBMENU_CLOSE_REQUEST)
 	jcxz	beginLoop
-	
+
 	; Nope, preserve current menu.
 	ornf	ds:[di].OLMWI_moreSpecState, \
 			mask OMWMSS_IGNORE_SUBMENU_CLOSE_REQUEST
-	
+
 beginLoop:
 	; Add extra lock to original object to make loop work correctly.
 	mov	bx, ds:[LMBH_handle]		; ^lbx = orig obj handle
@@ -4097,7 +4097,7 @@ EC <	ERROR_NE	OL_ERROR		; SHOULD BE EQUAL!	>
 
 tryAgain:
 	; *ds:si = current menu, locked
-	
+
 	; ensure cascade data consistency
 EC <	call	OLMenuWinECCheckCascadeData				>
 
@@ -4116,37 +4116,37 @@ EC <	ERROR_NC	OL_ERROR		; NOT OLMenuWinClass !!	>
 	add	di, ds:[di].Vis_offset
 	test	ds:[di].OLMWI_moreSpecState, mask OMWMSS_IS_CASCADING
 	jz	sendMessage			; Yes -- send message
-	
+
 	; No -- find next child in cascade.
 	mov	ax, ATTR_OL_MENU_WIN_CASCADED_MENU
 	call	ObjVarFindData			; if data, ds:bx = ptr
 						; (ds still ptr to our block)
 EC <	ERROR_NC	OL_ERROR		; no var data - that's bad >
-	
+
 	; Get optr from vardata of next child.
 	mov	si, ds:[bx].offset
 	mov	bx, ds:[bx].handle		; ^lbx:si = next child menu
 	call	ObjLockObjBlock			; *ax:si = next child, locked
-	
+
 	mov	bx, ds:[LMBH_handle]		; ^lbx = parent menu handle
 	call	MemUnlock			; unlock parent menu
 	mov	ds, ax				; *ds:si = next child, locked
-	
+
 	; Continue looking for child
 	jmp	tryAgain
-	
+
 sendMessage:
 	; *ds:si = correct object to send message to, locked.
 	mov	ax, MSG_MO_MW_GUP_SUBMENU_REQUESTS_CLOSE
 	call	ObjCallInstanceNoLock
-	
+
 	; unlock last block
 	mov	bx, ds:[LMBH_handle]
 	call	MemUnlock
-	
+
 	pop	bx, si				; ^lbx:si = original obj optr
 	call	MemDerefDS			; fixup ds.. *ds:si = orig obj
-	
+
 	.leave
 	ret
 OLMenuWinSendCloseRequestToLastMenu	endp
@@ -4170,7 +4170,7 @@ PASS:		*ds:si	= OLMenuWinClass object
 
 RETURN:		None
 DESTROYED:	ax, cx, bp
-SIDE EFFECTS:	
+SIDE EFFECTS:
 	May close all menus in cascade!
 
 PSEUDO CODE/STRATEGY:
@@ -4182,15 +4182,15 @@ REVISION HISTORY:
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
 if	 _CASCADING_MENUS
-OLMenuWinCloseAllMenusInCascade	method dynamic OLMenuWinClass, 
+OLMenuWinCloseAllMenusInCascade	method dynamic OLMenuWinClass,
 					MSG_MO_MW_CLOSE_ALL_MENUS_IN_CASCADE
 	uses	dx
 	.enter
-	
+
 	; send close request to last menu.  do not preserve the current menu.
 	clr	cx
 	call	OLMenuWinSendCloseRequestToLastMenu
-	
+
 	.leave
 	ret
 OLMenuWinCloseAllMenusInCascade	endm
@@ -4211,7 +4211,7 @@ PASS:		*ds:si	= OLMenuWinClass object
 		es 	= segment of OLMenuWinClass
 		ax	= message #
 		bp	= 0 if top window, else window for obejct to open on
-		
+
 RETURN:		Nothing
 DESTROYED:	ax, cx, dx, bp
 SIDE EFFECTS:
@@ -4224,19 +4224,19 @@ REVISION HISTORY:
 	JimG	4/21/94   	Initial version
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
-OLMenuWinVisOpen	method dynamic OLMenuWinClass, 
+OLMenuWinVisOpen	method dynamic OLMenuWinClass,
 					MSG_VIS_OPEN
 	.enter
-	
+
 if	 _CASCADING_MENUS
 
 	; ensure cascade data is consistent
 EC <	call	OLMenuWinECCheckCascadeData				>
-	
+
 	; clear cascade var data, if any remaining.
 	test	ds:[di].OLMWI_moreSpecState, mask OMWMSS_IS_CASCADING
 	jz	notCascading
-	
+
 	; Delete the cascaded var data
 	push	ax
 	mov	ax, ATTR_OL_MENU_WIN_CASCADED_MENU
@@ -4253,7 +4253,7 @@ endif	;_CASCADING_MENUS
 	; Call superclass
 	mov	di, offset OLMenuWinClass
 	call	ObjCallSuperNoLock
-	
+
 	; Update up/down scrollers as needed
 
 	mov	al, 0
@@ -4275,10 +4275,10 @@ PASS:		*ds:si	= OLMenuWinClass object
 		al = non-zero to delay closing until END_SELECT
 RETURN:		nothing
 DESTROYED:	nothing
-SIDE EFFECTS:	
+SIDE EFFECTS:
 
 PSEUDO CODE/STRATEGY:
-		
+
 
 REVISION HISTORY:
 	Name	Date		Description
@@ -4303,7 +4303,7 @@ menuWin		local	hptr
 
 	; not needed for pinned menus
 
-	mov	di, ds:[si]			
+	mov	di, ds:[si]
 	add	di, ds:[di].Vis_offset
 	test	ds:[di].OLWI_specState, mask OLWSS_PINNED
 	LONG jnz	done
@@ -4318,7 +4318,16 @@ menuWin		local	hptr
 	mov	ss:[parent].R_top, bx
 	mov	ss:[parent].R_bottom, dx
 	mov	ss:[parentWin], di
-if TOOL_AREA_IS_TASK_BAR
+
+	;
+	; if TOOL_AREA_IS_TASK_BAR
+	;
+	push	ds
+	segmov	ds, dgroup
+	tst	ds:[taskBarEnabled] ; if taskbar == on, ZF == 1
+	pop	ds
+	jz	hasNoTaskbar ; if ZF==0 skip the following code
+
 	call	OLWinGetToolAreaSize		; dx = height
 	push	ds
 	segmov	ds, dgroup
@@ -4332,7 +4341,8 @@ atBottom:
 	sub	ss:[parent].R_bottom, dx
 doneTaskBar:
 	pop	ds
-endif
+
+hasNoTaskbar:
 
 	call	VisQueryWindow			; di = window handle
 	tst	di
@@ -4357,7 +4367,7 @@ checkDown:
 
 	; now update the scrollers
 checkUpdate:
-	tst	ss:[scrollers]		
+	tst	ss:[scrollers]
 	jnz	update
 
 	mov	ax, TEMP_OL_MENU_WIN_SCROLLERS	; if no hint and no scrollers
@@ -4401,10 +4411,10 @@ PASS:		*ds:si	= OLMenuWinClass object
 		OLMenuWinUpdateUpDownScrollers stack frame
 RETURN:		nothing
 DESTROYED:	ax,bx,cx,dx,di,es
-SIDE EFFECTS:	
+SIDE EFFECTS:
 
 PSEUDO CODE/STRATEGY:
-		
+
 
 REVISION HISTORY:
 	Name	Date		Description
@@ -4476,10 +4486,10 @@ PASS:		*ds:si	= MenuWinScrollerClass object
 		OLMenuWinUpdateUpDownScrollers stack frame
 RETURN:		nothing
 DESTROYED:	ax,bx,cx,dx,di
-SIDE EFFECTS:	
+SIDE EFFECTS:
 
 PSEUDO CODE/STRATEGY:
-		
+
 
 REVISION HISTORY:
 	Name	Date		Description
@@ -4602,10 +4612,10 @@ CALLED BY:	INTERNAL
 PASS:		*ds:si	= MenuWinScrollerClass
 RETURN:		nothing
 DESTROYED:	ax,di
-SIDE EFFECTS:	
+SIDE EFFECTS:
 
 PSEUDO CODE/STRATEGY:
-		
+
 
 REVISION HISTORY:
 	Name	Date		Description
@@ -4647,7 +4657,7 @@ LessUsedGeometry	segment resource
 
 COMMENT @----------------------------------------------------------------------
 
-METHOD:		OLMenuWinUpdateGeometry -- 
+METHOD:		OLMenuWinUpdateGeometry --
 		MSG_VIS_UPDATE_GEOMETRY for OLMenuWinClass
 
 DESCRIPTION:	Updates geometry.
@@ -4659,7 +4669,7 @@ PASS:		*ds:si 	- instance data
 RETURN:		nothing
 		ax, cx, dx, bp - destroyed
 
-ALLOWED TO DESTROY:	
+ALLOWED TO DESTROY:
 		bx, si, di, ds, es
 
 REGISTER/STACK USAGE:
@@ -4732,7 +4742,7 @@ OLMenuCalcCenters	proc	near
 	;
 	; Before we do geometry, we'll go through all the child menu items and
 	; determinate who is the biggest one.    (We'll make two passes if the
-	; first pass yields an object allowing wrapping, so that all the 
+	; first pass yields an object allowing wrapping, so that all the
 	; children can clear their optimization bits and set expand-width-to-fit
 	; bits correctly. -cbh 1/18/93)
 	;
@@ -4742,7 +4752,7 @@ OLMenuCalcCenters	proc	near
 	; -cbh 2/12/93
 	;
 	clr	bp
-	mov	di, ds:[si]			
+	mov	di, ds:[si]
 	add	di, ds:[di].Vis_offset
 	test	ds:[di].OLWI_specState, mask OLWSS_PINNED
 	jz	5$
@@ -4758,16 +4768,16 @@ OLMenuCalcCenters	proc	near
 	cmp	dx, ds:[di].OLMWI_accelSpace
 	clc					;assume sizes not changing
 	je	exit				;nope, exit
-	
+
 sizesChanged:
 	;
-	; If the menu item sizes changed, we'll store the new values and 
+	; If the menu item sizes changed, we'll store the new values and
 	; reset the geometry of all the objects in the window, so the menus
 	; will get their sizes recalculated.  (We could also do this via
 	; VGA_ALWAYS_RECALC_SIZE in the buttons, but this will be more efficient
 	; for most situations.)
 	;
-	mov	di, ds:[si]			
+	mov	di, ds:[si]
 	add	di, ds:[di].Vis_offset
 	mov	ds:[di].OLMWI_monikerSpace, cx
 	mov	ds:[di].OLMWI_accelSpace, dx
@@ -4789,7 +4799,7 @@ GetMenuCenter	endp
 
 COMMENT @----------------------------------------------------------------------
 
-METHOD:		OLMenuWinConvertDesiredSizeHint -- 
+METHOD:		OLMenuWinConvertDesiredSizeHint --
 		MSG_SPEC_CONVERT_DESIRED_SIZE_HINT for OLMenuWinClass
 
 DESCRIPTION:	Converts desired size for this object.
@@ -4804,7 +4814,7 @@ PASS:		*ds:si 	- instance data
 RETURN:		cx, dx  - converted size
 		ax, bp - destroyed
 
-ALLOWED TO DESTROY:	
+ALLOWED TO DESTROY:
 		bx, si, di, ds, es
 
 REGISTER/STACK USAGE:
@@ -4837,7 +4847,7 @@ callSuper:
 	mov	di, offset OLMenuWinClass
 	GOTO	ObjCallSuperNoLock		;do normal OLCtrl stuff
 
-isPopupList:	
+isPopupList:
 	mov	di, ds:[di].OLPWI_button
 	tst	di
 	jz	callSuper			;no button, call superclass
@@ -4859,7 +4869,7 @@ OLMenuWinConvertDesiredSizeHint	endm
 
 COMMENT @----------------------------------------------------------------------
 
-METHOD:		OLMenuWinResetSizeToStayOnscreen -- 
+METHOD:		OLMenuWinResetSizeToStayOnscreen --
 		MSG_SPEC_RESET_SIZE_TO_STAY_ONSCREEN for OLMenuWinClass
 
 DESCRIPTION:	Resets size to keep itself onscreen.
@@ -4872,7 +4882,7 @@ PASS:		*ds:si 	- instance data
 RETURN:		nothing
 		ax, cx, dx, bp - destroyed
 
-ALLOWED TO DESTROY:	
+ALLOWED TO DESTROY:
 		bx, si, di, ds, es
 
 REGISTER/STACK USAGE:
@@ -4903,7 +4913,7 @@ OLMenuWinResetSizeToStayOnscreen	method dynamic	OLMenuWinClass, \
 	call	OLMenuCalcCenters		;this needs to be redone now,
 						;  mainly so that the ONE_PASS
 						;  OPTIMIZATION flag is cleared.
-	ret	
+	ret
 
 OLMenuWinResetSizeToStayOnscreen	endm
 
@@ -4934,7 +4944,7 @@ PASS:		*ds:si	= MenuWinScrollerClass object
 		bp high	= UIFunctionsActive	(In Objects/uiInputC.def)
 RETURN:		ax	= MouseReturnFlags	(In Objects/uiInputC.def)
 DESTROYED:	bp
-SIDE EFFECTS:	
+SIDE EFFECTS:
 
 PSEUDO CODE/STRATEGY:
 
@@ -4944,7 +4954,7 @@ REVISION HISTORY:
 	joon	3/03/99   	Initial version
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
-MenuWinScrollerStartSelect	method dynamic MenuWinScrollerClass, 
+MenuWinScrollerStartSelect	method dynamic MenuWinScrollerClass,
 					MSG_META_START_SELECT
 MenuWinScrollerScroll	label	far
 	push	si
@@ -4974,7 +4984,16 @@ MenuWinScrollerScrollOnly	proc	near
 	tst	di
 	jz	update
 	call	WinGetWinScreenBounds
-if TOOL_AREA_IS_TASK_BAR
+
+	;
+	; if TOOL_AREA_IS_TASK_BAR
+	;
+	push	ds
+	segmov	ds, dgroup
+	tst	ds:[taskBarEnabled] ; if taskbar == on, ZF == 1
+	pop	ds
+	jz	hasNoTaskbar ; if ZF==0 skip the following code
+
 	; bx = top, dx = bottom
 	mov	ax, dx				; ax = bottom
 	call	OLWinGetToolAreaSize		; cx = width, dx = height
@@ -4991,9 +5010,10 @@ atBottom:
 doneTaskBar:
 	pop	ds
 	push	bx, ax				; save top, bottom
-else
+	jmp	endIfTaskbar
+hasNoTaskbar:
 	push	bx, dx				; save top, bottom
-endif
+endIfTaskbar:
 	call	VisQueryWindow			; di = window handle
 	tst	di
 	jz	update
@@ -5028,7 +5048,7 @@ exit:
 	ret
 MenuWinScrollerScrollOnly	endp
 
-
+
 COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 		MenuWinScrollerEndSelect
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -5048,7 +5068,7 @@ PASS:		*ds:si	= MenuWinScrollerClass object
 		bp high	= UIFunctionsActive	(In Objects/uiInputC.def)
 RETURN:		ax	= MouseReturnFlags	(In Objects/uiInputC.def)
 DESTROYED:	bp
-SIDE EFFECTS:	
+SIDE EFFECTS:
 
 PSEUDO CODE/STRATEGY:
 
@@ -5058,7 +5078,7 @@ REVISION HISTORY:
 	joon	3/03/99   	Initial version
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
-MenuWinScrollerEndSelect	method dynamic MenuWinScrollerClass, 
+MenuWinScrollerEndSelect	method dynamic MenuWinScrollerClass,
 					MSG_META_END_SELECT, MSG_META_END_OTHER
 	call	MenuWinScrollerStopTimer
 	;
@@ -5090,7 +5110,7 @@ PASS:		*ds:si	= MenuWinScrollerClass object
 		^hbp	= Window that method refers to
 RETURN:		nothing
 DESTROYED:	ax, cx, dx, bp
-SIDE EFFECTS:	
+SIDE EFFECTS:
 
 PSEUDO CODE/STRATEGY:
 
@@ -5100,7 +5120,7 @@ REVISION HISTORY:
 	joon	3/03/99   	Initial version
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
-MenuWinScrollerRawUnivEnter	method dynamic MenuWinScrollerClass, 
+MenuWinScrollerRawUnivEnter	method dynamic MenuWinScrollerClass,
 					MSG_META_RAW_UNIV_ENTER
 	mov	di, offset MenuWinScrollerClass
 	call	ObjCallSuperNoLock
@@ -5145,7 +5165,7 @@ PASS:		*ds:si	= MenuWinScrollerClass object
 		^hbp	= Window that method refers to
 RETURN:		nothing
 DESTROYED:	ax, cx, dx, bp
-SIDE EFFECTS:	
+SIDE EFFECTS:
 
 PSEUDO CODE/STRATEGY:
 
@@ -5155,7 +5175,7 @@ REVISION HISTORY:
 	joon	3/03/99   	Initial version
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
-MenuWinScrollerRawUnivLeave	method dynamic MenuWinScrollerClass, 
+MenuWinScrollerRawUnivLeave	method dynamic MenuWinScrollerClass,
 					MSG_META_RAW_UNIV_LEAVE
 	mov	di, offset MenuWinScrollerClass
 	call	ObjCallSuperNoLock
@@ -5196,9 +5216,9 @@ PASS:		*ds:si	= MenuWinScrollerClass object
 		ds:bx	= MenuWinScrollerClass object (same as *ds:si)
 		es 	= segment of MenuWinScrollerClass
 		ax	= message #
-RETURN:		
-DESTROYED:	
-SIDE EFFECTS:	
+RETURN:
+DESTROYED:
+SIDE EFFECTS:
 
 PSEUDO CODE/STRATEGY:
 
@@ -5208,7 +5228,7 @@ REVISION HISTORY:
 	joon	3/03/99   	Initial version
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
-MenuWinScrollerTimerExpired	method dynamic MenuWinScrollerClass, 
+MenuWinScrollerTimerExpired	method dynamic MenuWinScrollerClass,
 					MSG_MENU_WIN_SCROLLER_TIMER_EXPIRED
 	clr	ax, bx
 	xchg	ax, ds:[di].MWSI_timerID
@@ -5246,7 +5266,7 @@ PASS:		*ds:si	= MenuWinScrollerClass object
 		^hcx	= Window
 RETURN:		nothing
 DESTROYED:	ax, cx, dx, bp
-SIDE EFFECTS:	
+SIDE EFFECTS:
 
 PSEUDO CODE/STRATEGY:
 
@@ -5256,7 +5276,7 @@ REVISION HISTORY:
 	joon	3/03/99   	Initial version
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
-MenuWinScrollerExposed	method dynamic MenuWinScrollerClass, 
+MenuWinScrollerExposed	method dynamic MenuWinScrollerClass,
 					MSG_META_EXPOSED
 	mov	di, cx
 	call	GrCreateState

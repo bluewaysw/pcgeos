@@ -1044,7 +1044,15 @@ tryAccelerators:
 	;ISUI: we need to check for a custom sys menu before checking the
 	;    standard sys menu.
 
-if TOOL_AREA_IS_TASK_BAR ;--------------------------------------------------------------------
+	;
+	; if TOOL_AREA_IS_TASK_BAR
+	;
+	push	ds
+	segmov	ds, dgroup
+	tst	ds:[taskBarEnabled] ; if taskbar == on, ZF == 1
+	pop	ds
+	jz	checkSysMenu ; if ZF==0 skip the following code
+
 	call	KN_DerefVisSpec_DI
 	cmp	ds:[di].OLWI_type, MOWT_PRIMARY_WINDOW	;only primaries have
 	jne	checkSysMenu				; custom sys menus
@@ -1059,7 +1067,6 @@ if TOOL_AREA_IS_TASK_BAR ;------------------------------------------------------
 	pop	si, cx, dx, bp
 	jc	foundKbdAccel				;found, branch
 checkSysMenu:
-endif	;----------------------------------------------------------------------
 
 	call	KN_DerefVisSpec_DI
 OLS <	mov	bx, ds:[di].OLWI_menu		;get popup menu button handle >
@@ -1710,7 +1717,15 @@ endif	; MENU_BAR_IS_A_MENU
 useSysMenu:
 	call	KN_DerefVisSpec_DI
 
-if TOOL_AREA_IS_TASK_BAR ;--------------------------------------------------------------------
+	;
+	; if TOOL_AREA_IS_TASK_BAR
+	;
+	push	ds
+	segmov	ds, dgroup
+	tst	ds:[taskBarEnabled] ; if taskbar == on, ZF == 1
+	pop	ds
+	jz	hasNoTaskbar ; if ZF==0 skip the following code
+
 	call	GetSystemMenuBlockHandle	;returns bx = block handle
 						; zf - if no titleBarMenu
 	mov	ax, offset StandardWindowMenu
@@ -1725,7 +1740,10 @@ if TOOL_AREA_IS_TASK_BAR ;------------------------------------------------------
 
 	push	si
 	mov	si, ax
-else	;----------------------------------------------------------------------
+	jmp	endIfTaskbar
+
+hasNoTaskbar:
+
 	mov	bx, ds:[di].OLWI_sysMenu	;start pointing to sys menu
 	tst	bx				;any sys menu?
 	jz	exitMenuBar			;none, let's give up on this
@@ -1735,7 +1753,8 @@ else	;----------------------------------------------------------------------
 
 	push	si
 	mov	si, offset StandardWindowMenu
-endif	;----------------------------------------------------------------------
+
+endIfTaskbar:
 
 	mov	di, mask MF_CALL or mask MF_FIXUP_DS
 	mov	ax, MSG_OL_POPUP_FIND_BUTTON	;point to its button

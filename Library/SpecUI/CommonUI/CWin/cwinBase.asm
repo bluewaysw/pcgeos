@@ -1328,25 +1328,30 @@ REVISION HISTORY:
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
 
-if TOOL_AREA_IS_TASK_BAR ; We will be adding this window to the window list ------------------
-
 OLBaseWinSpecBuild	method dynamic OLBaseWinClass, MSG_SPEC_BUILD
 
 	mov	di, offset OLBaseWinClass
 	call	ObjCallSuperNoLock
+
+	;
+	; if TOOL_AREA_IS_TASK_BAR ; We will be adding this window to the window list ------------------
+	;
+	push	ds
+	segmov	ds, dgroup
+	tst	ds:[taskBarEnabled] ; if taskbar == on, ZF == 1
+	pop	ds
+	jz	done ; if ZF==0 skip the following code
 
 	; Create a GenItem to represent this primary in the GenField's
 	; WindowList.
 
 	call	EnsureItemAddedToWindowList
 
+done:
 	ret
 OLBaseWinSpecBuild	endm
 
-endif	; if TOOL_AREA_IS_TASK_BAR
 
-
-
 COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 		EnsureItemAddedToWindowList
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -1370,9 +1375,16 @@ REVISION HISTORY:
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
 
-if TOOL_AREA_IS_TASK_BAR
-
 EnsureItemAddedToWindowList	proc	near
+
+	;
+	; if TOOL_AREA_IS_TASK_BAR...
+	;
+	push	ds
+	segmov	ds, dgroup
+	tst	ds:[taskBarEnabled] ; if taskbar == on, ZF == 1
+	pop	ds
+	LONG	jz	done ; if ZF==0 skip the following code
 
 	mov	di, ds:[si]
 	add	di, ds:[di].Gen_offset
@@ -1452,9 +1464,7 @@ done:
 	ret
 EnsureItemAddedToWindowList	endp
 
-endif	; TOOL_AREA_IS_TASK_BAR
 
-
 COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 		UpdateTaskBarList
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -1477,10 +1487,20 @@ REVISION HISTORY:
 	JS	9/19/92		Initial version
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
-if TOOL_AREA_IS_TASK_BAR
+
 UpdateTaskBarList	proc	far
 	uses	ax,bx,cx,dx,si,di,bp
 	.enter
+
+	;
+	; TOOL_AREA_IS_TASK_BAR
+	;
+	push	ds
+	segmov	ds, dgroup
+	tst	ds:[taskBarEnabled] ; if taskbar == on, ZF == 1
+	pop	ds
+	jz	done ; if ZF==0 skip the following code
+
 	mov	bx, segment OLFieldClass
 	mov	si, offset OLFieldClass
 	mov	ax, MSG_OL_FIELD_UPDATE_TASK_BAR_LIST
@@ -1490,12 +1510,11 @@ UpdateTaskBarList	proc	far
 	mov	ax, MSG_GEN_GUP_CALL_OBJECT_OF_CLASS
 	mov	cx, di
 	call	UserCallApplication
+done:
 	.leave
 	ret
 UpdateTaskBarList	endp
-endif ; TOOL_AREA_IS_TASK_BAR
 
-
 COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 		OLBaseWinUpdateVisMoniker
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -1525,21 +1544,26 @@ REVISION HISTORY:
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
 
-if TOOL_AREA_IS_TASK_BAR
-
 OLBaseWinUpdateVisMoniker	method dynamic OLBaseWinClass,
 					MSG_SPEC_UPDATE_VIS_MONIKER
 	mov	di, offset OLBaseWinClass
 	call	ObjCallSuperNoLock
 
+	;
+	; if TOOL_AREA_IS_TASK_BAR
+	;
+	push	ds
+	segmov	ds, dgroup
+	tst	ds:[taskBarEnabled] ; if taskbar == on, ZF == 1
+	pop	ds
+	jz	done ; if ZF==0 skip the following code
+
 	FALL_THRU OLBaseWinSetWindowEntryMoniker
 
+done:
 OLBaseWinUpdateVisMoniker	endm
 
-endif ; TOOL_AREA_IS_TASK_BAR
 
-
-
 COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 		OLBaseWinSetWindowEntryMoniker
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -1562,10 +1586,18 @@ REVISION HISTORY:
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
 
-if TOOL_AREA_IS_TASK_BAR
-
 OLBaseWinSetWindowEntryMoniker	method OLBaseWinClass,
 				MSG_OL_BASE_WIN_SET_WINDOW_ENTRY_MONIKER
+
+	;
+	; if TOOL_AREA_IS_TASK_BAR
+	;
+	push	ds
+	segmov	ds, dgroup
+	tst	ds:[taskBarEnabled] ; if taskbar == on, ZF == 1
+	pop	ds
+	LONG	jz done ; if ZF==0 skip the following code
+
 	mov	di, ds:[si]
 	add	di, ds:[di].Vis_offset
 	tst	ds:[di].OLBWI_windowListEntry.handle
@@ -1652,9 +1684,7 @@ done:
 	ret
 OLBaseWinSetWindowEntryMoniker	endm
 
-endif	; if TOOL_AREA_IS_TASK_BAR
 
-
 COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 		OLBaseWinCreateCombinationMoniker
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -1679,8 +1709,6 @@ REVISION HISTORY:
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
 
-if TOOL_AREA_IS_TASK_BAR	;--------------------
-
 OLBaseWinCreateCombinationMoniker	proc	far
 combMkr		local	optr		push	bp, 0
 iconMkr		local	optr		push	bx, di
@@ -1690,12 +1718,21 @@ iconHeight	local	word
 	uses	ax, bx, si, di, es
 	.enter
 
+	;
+	; if TOOL_AREA_IS_TASK_BAR
+	;
+	push	ds
+	segmov	ds, dgroup
+	tst	ds:[taskBarEnabled] ; if taskbar == on, ZF == 1
+	pop	ds
+	LONG	jz totallyDone ; if ZF==0 skip the following code
+
 	movdw	bxdi, ss:[iconMkr]	;^lbx:di = moniker
 	tst	bx
 	jnz	copyMoniker
 	movdw	bxdi, ss:[textMkr]	;^lbx:di = moniker
 	tst	bx
-	LONG jz	done
+	LONG 	jz done
 	clr	ax			;set the zero flag = no icon moniker
 
 copyMoniker:
@@ -1800,14 +1837,12 @@ unlockCombMkr:
 done:
 	movdw	cxdx, ss:[combMkr]
 
+totallyDone:
 	.leave
 	ret
 OLBaseWinCreateCombinationMoniker	endp
 
-endif ; TOOL_AREA_IS_TASK_BAR
 
-
-
 COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 		OLBaseWinUpdateWindowEntry
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -1834,8 +1869,6 @@ REVISION HISTORY:
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
 
-if TOOL_AREA_IS_TASK_BAR ;--------------------------------------------------------------------
-
 OLBaseWinUpdateWindowEntry	method dynamic OLBaseWinClass,
 					MSG_OL_BASE_WIN_UPDATE_WINDOW_ENTRY
 EC <	cmp	cx, TRUE						>
@@ -1843,6 +1876,16 @@ EC <	je	10$							>
 EC <	cmp	cx, FALSE						>
 EC <	ERROR_NE OL_ERROR						>
 EC <10$:								>
+
+	;
+	; if TOOL_AREA_IS_TASK_BAR
+	;
+	push	ds
+	segmov	ds, dgroup
+	tst	ds:[taskBarEnabled] ; if taskbar == on, ZF == 1
+	pop	ds
+	jz	done ; if ZF==0 skip the following code
+
 	;
 	; Find the WindowItem we created earlier, that's in the Window List
 	;
@@ -1901,10 +1944,7 @@ callWindowList:
 
 OLBaseWinUpdateWindowEntry	endm
 
-endif	; TOOL_AREA_IS_TASK_BAR ------------------------
 
-
-
 COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 		OLBaseWinNotifyWindowSelected
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -1930,10 +1970,18 @@ REVISION HISTORY:
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
 
-if TOOL_AREA_IS_TASK_BAR ;--------------------------------------
-
 OLBaseWinNotifyWindowSelected	method dynamic OLBaseWinClass,
 					MSG_META_NOTIFY_TASK_SELECTED
+
+	;
+	; if TOOL_AREA_IS_TASK_BAR
+	;
+	push	ds
+	segmov	ds, dgroup
+	tst	ds:[taskBarEnabled] ; if taskbar == on, ZF == 1
+	pop	ds
+	jz	done ; if ZF==0 skip the following code
+
 	add	bx, ds:[bx].Gen_offset
 	test	ds:[bx].GI_states, mask GS_USABLE
 	jz	done				; abort is window is not usable
@@ -1946,8 +1994,6 @@ OLBaseWinNotifyWindowSelected	method dynamic OLBaseWinClass,
 done:
 	ret
 OLBaseWinNotifyWindowSelected	endm
-
-endif	; TOOL_AREA_IS_TASK_BAR ---------------------------
 
 
 
@@ -1976,10 +2022,19 @@ REVISION HISTORY:
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
 
-if TOOL_AREA_IS_TASK_BAR ; NOTE: this is not OLBaseWin, It is OLWindowListItem!
+; NOTE: this is not OLBaseWin, It is OLWindowListItem!
 
 OLWindowListItemNotifyWindowSelected	method dynamic OLWindowListItemClass,
 					MSG_META_NOTIFY_TASK_SELECTED
+
+	;
+	; if TOOL_AREA_IS_TASK_BAR
+	;
+	push	ds
+	segmov	ds, dgroup
+	tst	ds:[taskBarEnabled] ; if taskbar == on, ZF == 1
+	pop	ds
+	jz	done ; if ZF==0 skip the following code
 
 	mov	bx, ds:[di].OLWLI_windowObj.handle
 	push	bx
@@ -2002,10 +2057,10 @@ OLWindowListItemNotifyWindowSelected	method dynamic OLWindowListItemClass,
 	mov	di, mask MF_FORCE_QUEUE
 	call	ObjMessage
 	stc
+
+done:
 	ret
 OLWindowListItemNotifyWindowSelected	endm
-
-endif	; TOOL_AREA_IS_TASK_BAR
 
 
 
@@ -2036,20 +2091,29 @@ REVISION HISTORY:
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
 
-if TOOL_AREA_IS_TASK_BAR ; NOTE: this is not OLBaseWin, It is OLWindowListItem ---------------
+; NOTE: this is not OLBaseWin, It is OLWindowListItem ---------------
 
 OLWindowListItemSetOperatingParams	method dynamic OLWindowListItemClass,
 				MSG_OL_WINDOW_LIST_ITEM_SET_OPERATING_PARAMS
+
+	;
+	; if TOOL_AREA_IS_TASK_BAR
+	;
+	push	ds
+	segmov	ds, dgroup
+	tst	ds:[taskBarEnabled] ; if taskbar == on, ZF == 1
+	pop	ds
+	jz	done ; if ZF==0 skip the following code
+
 	mov	ds:[di].OLWLI_windowObj.handle, cx
 	mov	ds:[di].OLWLI_windowObj.chunk, dx
 	mov	ds:[di].OLWLI_parentWin, bp
+
+done:
 	ret
 OLWindowListItemSetOperatingParams	endm
 
-endif	;----------------------------------------------------------------------
 
-
-
 COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 		OLWindowListItemCloseWindow
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -2075,23 +2139,31 @@ REVISION HISTORY:
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
 
-if TOOL_AREA_IS_TASK_BAR ; NOTE: this is not OLBaseWin, It is OLWindowListItem ---------------
+; NOTE: this is not OLBaseWin, It is OLWindowListItem ---------------
 
 OLWindowListItemCloseWindow	method dynamic OLWindowListItemClass,
 					MSG_OL_WINDOW_LIST_ITEM_CLOSE_WINDOW
+	;
+	; if TOOL_AREA_IS_TASK_BAR
+	;
+	push	ds
+	segmov	ds, dgroup
+	tst	ds:[taskBarEnabled] ; if taskbar == on, ZF == 1
+	pop	ds
+	jz	done ; if ZF==0 skip the following code
+
 	mov	bx, ds:[di].OLWLI_windowObj.handle
 	mov	si, ds:[di].OLWLI_windowObj.chunk
 
 	mov	ax, MSG_GEN_DISPLAY_CLOSE
 	mov	di, mask MF_FORCE_QUEUE
 	GOTO	ObjMessage
+done:
 
 OLWindowListItemCloseWindow	endm
 
-endif	; if TOOL_AREA_IS_TASK_BAR
 
 
-
 COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 		OLWindowListItemKeyboardChar
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -2122,10 +2194,20 @@ REVISION HISTORY:
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
 
-if TOOL_AREA_IS_TASK_BAR ; NOTE: this is not OLBaseWin, It is OLWindowListItem ---------------
+; NOTE: this is not OLBaseWin, It is OLWindowListItem ---------------
 
 OLWindowListItemKeyboardChar	method dynamic OLWindowListItemClass,
 					MSG_META_KBD_CHAR
+
+	;
+	; if TOOL_AREA_IS_TASK_BAR
+	;
+	push	ds
+	segmov	ds, dgroup
+	tst	ds:[taskBarEnabled] ; if taskbar == on, ZF == 1
+	pop	ds
+	jz	callSuper ; if ZF==0 skip the following code
+
 	test	dl, mask CF_FIRST_PRESS
 	jz	callSuper			; callsuper if not first press
 
@@ -2145,9 +2227,7 @@ callSuper:
 
 OLWindowListItemKeyboardChar	endm
 
-endif	; if TOOL_AREA_IS_TASK_BAR
 
-
 COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 		RadioStatusIconNotify
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -2969,25 +3049,41 @@ if RADIO_STATUS_ICON_ON_PRIMARY
 	call	OLBaseWinRemoveRadioStatusIcon
 endif
 
-if TOOL_AREA_IS_TASK_BAR
+	;
+	; if TOOL_AREA_IS_TASK_BAR
+	;
+	push	ds
+	segmov	ds, dgroup
+	tst	ds:[taskBarEnabled] ; if taskbar == on, ZF == 1
+	pop	ds
+	jz	hasNoTaskbar ; if ZF==0 skip the following code
+
 	call	EnsureItemRemovedFromWindowList
-endif
+
+hasNoTaskbar:
+
 	jmp	short done
 
 notDetaching:
 
-; FIXME!!! - should this be "if _ISUI"?
-if TOOL_AREA_IS_TASK_BAR
+	;
+	; if TOOL_AREA_IS_TASK_BAR
+	;
+	push	ds
+	segmov	ds, dgroup
+	tst	ds:[taskBarEnabled] ; if taskbar == on, ZF == 1
+	pop	ds
+	jz	done ; if ZF==0 skip the following code
+
 	test	cx, mask UWF_ATTACHING
 	jz	done
 	call	EnsureItemAddedToWindowList
-endif
 
 done:
 	ret
 OLBaseWinUpdateWindow	endm
 
-
+
 COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 		RemoveTitleBarIfPossible
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -3243,9 +3339,17 @@ if RADIO_STATUS_ICON_ON_PRIMARY
 	call	OLBaseWinRemoveRadioStatusIcon
 endif
 
-if TOOL_AREA_IS_TASK_BAR
+	;
+	; if TOOL_AREA_IS_TASK_BAR
+	;
+	push	ds
+	segmov	ds, dgroup
+	tst	ds:[taskBarEnabled] ; if taskbar == on, ZF == 1
+	pop	ds
+	jz	done ; if ZF==0 skip the following code
+
 	call	EnsureItemRemovedFromWindowList
-endif
+done:
 
 	ret
 OLBaseWinSpecUnbuild	endm
@@ -3351,9 +3455,17 @@ REVISION HISTORY:
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
 
-if TOOL_AREA_IS_TASK_BAR
-
 EnsureItemRemovedFromWindowList	proc	far
+
+	;
+	; if TOOL_AREA_IS_TASK_BAR
+	;
+	push	ds
+	segmov	ds, dgroup
+	tst	ds:[taskBarEnabled] ; if taskbar == on, ZF == 1
+	pop	ds
+	jz	done ; if ZF==0 skip the following code
+
 	clr	bx
 	mov	di, ds:[si]
 	add	di, ds:[di].Vis_offset
@@ -3376,7 +3488,6 @@ done:
 	ret
 EnsureItemRemovedFromWindowList	endp
 
-endif	;TOOL_AREA_IS_TASK_BAR
 
 Unbuild ends
 
@@ -3532,18 +3643,30 @@ REVISION HISTORY:
 	Joon	5/31/94   	Initial version
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
-if PLACE_EXPRESS_MENU_ON_PRIMARY ;and (not TOOL_AREA_IS_TASK_BAR)
+if PLACE_EXPRESS_MENU_ON_PRIMARY
 OLBaseWinDisplaySetNotMinimized	method dynamic OLBaseWinClass,
 					MSG_GEN_DISPLAY_SET_NOT_MINIMIZED
+
 	mov	di, offset OLBaseWinClass
 	call	ObjCallSuperNoLock
 
+	;
+	; if (not TOOL_AREA_IS_TASK_BAR)
+	;
+	push	ds
+	segmov	ds, dgroup
+	tst	ds:[taskBarEnabled] ; if taskbar == on, ZF == 1
+	pop	ds
+	jnz	done ; if ZF==1 skip the following code
+
 	call	OLBaseWinUpdateExpressToolArea
+
+done:
 	ret
 OLBaseWinDisplaySetNotMinimized	endm
-endif ; PLACE_EXPRESS_MENU_ON_PRIMARY and (not TOOL_AREA_IS_TASK_BAR)
+endif ; PLACE_EXPRESS_MENU_ON_PRIMARY
 
-
+
 COMMENT @----------------------------------------------------------------------
 
 FUNCTION:	OLWinMoveOffScreen
@@ -3632,6 +3755,16 @@ OLBaseWinGainedSystemTargetExcl	method dynamic	OLBaseWinClass,
 	call	WinClasses_ObjCallSuperNoLock_OLBaseWinClass
 
 if PLACE_EXPRESS_MENU_ON_PRIMARY ;and (not TOOL_AREA_IS_TASK_BAR)
+
+	;
+	; if (not TOOL_AREA_IS_TASK_BAR)
+	;
+	push	ds
+	segmov	ds, dgroup
+	tst	ds:[taskBarEnabled] ; if taskbar == on, ZF == 1
+	pop	ds
+	jnz	haveExpress ; if ZF==1 skip the following code
+
 	push	es
 	segmov	es, dgroup, ax
 	mov	ax, es:[olExpressOptions]
@@ -3665,20 +3798,31 @@ EC <	ERROR_NZ	OL_ERROR					>
 endif ; PLACE_EXPRESS_MENU_ON_PRIMARY or TOOL_AREA_IS_TASK_BAR
 
 if PLACE_EXPRESS_MENU_ON_PRIMARY ;and (not TOOL_AREA_IS_TASK_BAR)
+
+	;
+	; if (not TOOL_AREA_IS_TASK_BAR)
+	;
+	push	ds
+	segmov	ds, dgroup
+	tst	ds:[taskBarEnabled] ; if taskbar == on, ZF == 1
+	pop	ds
+	jnz	haveTaskbar ; if ZF==1 skip the following code
+
 	; Cheat -- instead of doing full geometry, just update
 	; OLWI_titleBarBounds to reflect the addition of the express tool area.
 	;
 	call	OLBaseWinAdjustTitleBoundsForExpressToolArea
 
-;if REDO_GEOMETRY_FOR_EXPRESS_MENU
+if REDO_GEOMETRY_FOR_EXPRESS_MENU
 	; If we're putting the menu bar in the title area, we need to
 	; invalidate the geometry of the menu bar so it gets resized.
 	;
 	call	OLRedoMenuBarGeometryIfMenusInHeader
-;endif
+endif
 endif ; PLACE_EXPRESS_MENU_ON_PRIMARY
 
-if PLACE_EXPRESS_MENU_ON_PRIMARY ;or TOOL_AREA_IS_TASK_BAR
+haveTaskbar:
+if PLACE_EXPRESS_MENU_ON_PRIMARY or TOOL_AREA_IS_TASK_BAR
 	; Now that the new title bounds have been determined, ask the field
 	; to position the little tool area over the edge of it.
 	;
@@ -3719,7 +3863,7 @@ endif
 UpdateAppMenuItemCommon	endp
 
 
-;if REDO_GEOMETRY_FOR_EXPRESS_MENU
+if REDO_GEOMETRY_FOR_EXPRESS_MENU
 OLRedoMenuBarGeometryIfMenusInHeader	proc	near
 	; If we're putting the menu bar in the title area, we need to
 	; invalidate the geometry of the menu bar so it gets resized.
@@ -3739,7 +3883,7 @@ OLRedoMenuBarGeometryIfMenusInHeader	proc	near
 noInval:
 	ret
 OLRedoMenuBarGeometryIfMenusInHeader	endp
-;endif
+endif
 
 
 
@@ -3764,8 +3908,17 @@ REVISION HISTORY:
 	JS	11/15/92    	Initial version
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
-if PLACE_EXPRESS_MENU_ON_PRIMARY ;and (not TOOL_AREA_IS_TASK_BAR)
+if PLACE_EXPRESS_MENU_ON_PRIMARY
 OLBaseWinHideExpressToolArea	proc	near
+
+	;
+	; if (not TOOL_AREA_IS_TASK_BAR)
+	;
+	push	ds
+	segmov	ds, dgroup
+	tst	ds:[taskBarEnabled] ; if taskbar == on, ZF == 1
+	pop	ds
+	jnz	done ; if ZF==1 skip the following code
 
 	push	si
 	mov	bx, segment OLFieldClass
@@ -3787,12 +3940,11 @@ OLBaseWinHideExpressToolArea	proc	near
 	mov	ax, MSG_GEN_GUP_CALL_OBJECT_OF_CLASS
 	call	GenCallParent
 
+done:
 	ret
 OLBaseWinHideExpressToolArea	endp
-endif ; PLACE_EXPRESS_MENU_ON_PRIMARY and (not TOOL_AREA_IS_TASK_BAR)
+endif
 
-
-
 COMMENT @----------------------------------------------------------------------
 
 FUNCTION:	OLBaseWinAdjustTitleBoundsForExpressToolArea
@@ -3823,8 +3975,17 @@ REVISION HISTORY:
 	Doug	6/92		Initial version
 
 ------------------------------------------------------------------------------@
-if PLACE_EXPRESS_MENU_ON_PRIMARY ;and (not TOOL_AREA_IS_TASK_BAR)
+if PLACE_EXPRESS_MENU_ON_PRIMARY
 OLBaseWinAdjustTitleBoundsForExpressToolArea	proc	far
+
+	;
+	; if (not TOOL_AREA_IS_TASK_BAR)
+	;
+	push	ds
+	segmov	ds, dgroup
+	tst	ds:[taskBarEnabled] ; if taskbar == on, ZF == 1
+	pop	ds
+	jnz	done ; if ZF==1 skip the following code
 
 	; If doesn't have Express tool area, then nothing to adjust.
 	;
@@ -3840,7 +4001,7 @@ OLBaseWinAdjustTitleBoundsForExpressToolArea	proc	far
 done:
 	ret
 OLBaseWinAdjustTitleBoundsForExpressToolArea	endp
-endif ; PLACE_EXPRESS_MENU_ON_PRIMARY and (not TOOL_AREA_IS_TASK_BAR)
+endif ; PLACE_EXPRESS_MENU_ON_PRIMARY
 
 
 
@@ -3912,6 +4073,15 @@ endif ; PLACE_EXPRESS_MENU_ON_PRIMARY or TOOL_AREA_IS_TASK_BAR
 
 if PLACE_EXPRESS_MENU_ON_PRIMARY ;and (not TOOL_AREA_IS_TASK_BAR)
 
+	;
+	; if (not TOOL_AREA_IS_TASK_BAR)
+	;
+	push	ds
+	segmov	ds, dgroup
+	tst	ds:[taskBarEnabled] ; if taskbar == on, ZF == 1
+	pop	ds
+	jnz	afterExpressMenu ; if ZF==1 skip the following code
+
 	; Adjust left edge of title area
 	;
 	call	OLBaseWinGetExpressMenuButtonWidth
@@ -3939,12 +4109,20 @@ endif
 	mov	cl, mask OLWHS_TITLE_IMAGE_INVALID
 	call	OpenWinHeaderMarkInvalid
 
-if TOOL_AREA_IS_TASK_BAR
+	;
+	; if TOOL_AREA_IS_TASK_BAR
+	;
+	push	ds
+	segmov	ds, dgroup
+	tst	ds:[taskBarEnabled] ; if taskbar == on, ZF == 1
+	pop	ds
+	jz	done ; if ZF==0 skip the following code
+
 	mov	ax, MSG_OL_BASE_WIN_UPDATE_WINDOW_ENTRY
 	clr	cx
 	call	ObjCallInstanceNoLock
-endif
 
+done:
 	ret
 OLBaseWinLostSystemTargetExcl	endp
 
@@ -4929,15 +5107,14 @@ endif
 	mov	ax, MSG_GEN_GUP_CALL_OBJECT_OF_CLASS
 	call	GenCallParent
 
-; DYNAMIC_TASKBAR
-
+	;
+	; if (not TOOL_AREA_IS_TASK_BAR)
+	;
 	push	ds
 	segmov	ds, dgroup
-	tst	ds:[taskBarEnabled]
+	tst	ds:[taskBarEnabled] ; if taskbar == on, ZF == 1
 	pop	ds
-	jnz	done
-
-;if (not TOOL_AREA_IS_TASK_BAR)
+	jnz	done ; if ZF==1 skip the following code
 
 	call	WinClasses_DerefVisSpec_DI
 	mov	cx, ds:[di].OLWI_titleBarBounds.R_bottom
@@ -5396,10 +5573,18 @@ done:
 OLBaseWinGetEventMenuButtonWidth	endp
 endif
 
-if TOOL_AREA_IS_TASK_BAR
 OLWinGetToolAreaSize	proc	far
 	uses	ax, bx, di, bp
 	.enter
+
+	;
+	; if TOOL_AREA_IS_TASK_BAR
+	;
+	push	ds
+	segmov	ds, dgroup
+	tst	ds:[taskBarEnabled] ; if taskbar == on, ZF == 1
+	pop	ds
+	jz	done ; if ZF==0 skip the following code
 
 	;
 	; doesn't work from UI thread, so return 0 as size
@@ -5425,14 +5610,13 @@ done:
 	.leave
 	ret
 OLWinGetToolAreaSize	endp
-endif ; TOOL_AREA_IS_TASK_BAR
 
 WinClasses	ends
 
 
 KbdNavigation	segment resource
 
-
+
 COMMENT @----------------------------------------------------------------------
 
 FUNCTION:	OLBaseWinFupKbdChar - MSG_META_FUP_KBD_CHAR handler
