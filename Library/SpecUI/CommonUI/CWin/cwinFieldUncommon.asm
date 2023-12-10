@@ -1518,6 +1518,7 @@ WindowListClose	method dynamic WindowListDialogClass, MSG_OL_WIN_CLOSE
 	mov	ax, MSG_META_RELEASE_TARGET_EXCL
 	GOTO	ObjCallInstanceNoLock
 done:
+	ret
 
 WindowListClose	endm
 
@@ -1624,11 +1625,6 @@ REVISION HISTORY:
 
 WindowListLostTargetExcl	method dynamic WindowListDialogClass,
 					MSG_META_LOST_TARGET_EXCL
-
-	; FIXME!!! do we need to call superclass here?
-	mov	di, offset WindowListDialogClass
-	call	ObjCallSuperNoLock
-
 	;
 	; if TOOL_AREA_IS_TASK_BAR
 	;
@@ -1639,6 +1635,12 @@ WindowListLostTargetExcl	method dynamic WindowListDialogClass,
 	jz	done ; if ZF==0 skip the following code
 
 	;
+	; FIXME!!! do we need to call superclass here?
+	;
+	mov	di, offset WindowListDialogClass
+	call	ObjCallSuperNoLock
+
+	;
 	; Close window list dialog.
 	;
 	mov	ax, MSG_GEN_GUP_INTERACTION_COMMAND
@@ -1647,6 +1649,7 @@ WindowListLostTargetExcl	method dynamic WindowListDialogClass,
 	mov	di, mask MF_FORCE_QUEUE
 	GOTO	ObjMessage
 done:
+	ret
 WindowListLostTargetExcl	endm
 
 
@@ -1678,13 +1681,6 @@ REVISION HISTORY:
 
 WindowListInteractionCommand	method dynamic WindowListDialogClass,
 					MSG_GEN_GUP_INTERACTION_COMMAND
-
-	; FIXME!!! is this necessary even with no taskbar?
-	push	cx
-	mov	di, offset WindowListDialogClass
-	call	ObjCallSuperNoLock
-	pop	cx
-
 	;
 	; if TOOL_AREA_IS_TASK_BAR
 	;
@@ -1693,6 +1689,12 @@ WindowListInteractionCommand	method dynamic WindowListDialogClass,
 	tst	ds:[taskBarEnabled] ; if taskbar == on, ZF == 1
 	pop	ds
 	jz	done ; if ZF==0 skip the following code
+
+	; FIXME!!! is this necessary even with no taskbar?
+	push	cx
+	mov	di, offset WindowListDialogClass
+	call	ObjCallSuperNoLock
+	pop	cx
 
 	cmp	cx, IC_DISMISS
 	jne	done
@@ -1751,6 +1753,7 @@ WindowListSendToFlow	method dynamic WindowListDialogClass,
 	mov	di, mask MF_CALL
 	GOTO	UserCallFlow
 done:
+	ret
 WindowListSendToFlow	endm
 
 
@@ -2005,7 +2008,6 @@ REVISION HISTORY:
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
 ToolAreaRawUnivEnter	method dynamic ToolAreaClass,
 					MSG_META_RAW_UNIV_ENTER
-
 	;
 	; if TOOL_AREA_IS_TASK_BAR
 	;
@@ -2076,7 +2078,9 @@ ToolAreaRawUnivLeave	method dynamic ToolAreaClass,
 	pop	ds
 	jz	done ; if ZF==0 skip the following code
 
+	;
 	; FIXME!!! do we need to always call this?
+	;
 	mov	di, offset ToolAreaClass
 	call	ObjCallSuperNoLock
 
@@ -2405,7 +2409,7 @@ ToolAreaInitPosition	method	dynamic	ToolAreaClass, MSG_TOOL_AREA_INIT_POSITION
 	segmov	ds, dgroup
 	tst	ds:[taskBarEnabled] ; if taskbar == on, ZF == 1
 	pop	ds
-	jz	done ; if ZF==0 skip the following code
+	LONG	jz done ; if ZF==0 skip the following code
 
 	;
 	; set size of taskbar
@@ -2414,7 +2418,7 @@ ToolAreaInitPosition	method	dynamic	ToolAreaClass, MSG_TOOL_AREA_INIT_POSITION
 	mov	cx, size SpecWinSizePair
 	call	ObjVarAddData
 	mov	ds:[bx].SWSP_x, mask SWSS_RATIO or PCT_100
-	mov	ds:[bx].SWSP_y, SWSS_RATIO or PCT_0
+	mov	ds:[bx].SWSP_y, mask SWSS_RATIO or PCT_0
 
 	;
 	; set position of taskbar
@@ -2590,11 +2594,9 @@ REVISION HISTORY:
 	doug	6/92		Initial version
 
 ------------------------------------------------------------------------------@
-
 
 ToolAreaAlterFTVMCExcl method dynamic ToolAreaClass,
 					MSG_META_MUP_ALTER_FTVMC_EXCL
-
 	;
 	; redirect requests to UIApp, if a OLWin object
 	;

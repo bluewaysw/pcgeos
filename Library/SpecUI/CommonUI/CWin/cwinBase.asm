@@ -1558,9 +1558,9 @@ OLBaseWinUpdateVisMoniker	method dynamic OLBaseWinClass,
 	pop	ds
 	jz	done ; if ZF==0 skip the following code
 
-	FALL_THRU OLBaseWinSetWindowEntryMoniker
-
+	GOTO OLBaseWinSetWindowEntryMoniker
 done:
+	ret
 OLBaseWinUpdateVisMoniker	endm
 
 
@@ -2159,7 +2159,7 @@ OLWindowListItemCloseWindow	method dynamic OLWindowListItemClass,
 	mov	di, mask MF_FORCE_QUEUE
 	GOTO	ObjMessage
 done:
-
+	ret
 OLWindowListItemCloseWindow	endm
 
 

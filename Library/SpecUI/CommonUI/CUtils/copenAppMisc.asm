@@ -3182,6 +3182,7 @@ OLAppUpdateWindowsForTaskBar	method dynamic OLApplicationClass,
 	mov	cx, di
 	GOTO	ObjCallInstanceNoLock
 done:
+	ret
 
 OLAppUpdateWindowsForTaskBar	endm
 
