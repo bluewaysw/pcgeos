@@ -1,0 +1,722 @@
+/*
+ **************************************************************************
+ *  FILE:		i3mthds.goc
+ *  PROJECT:	Breadbox Home Inventory
+ *  DESCRIPTION:	This file has methods for important info section
+ *			
+ **************************************************************************
+ */
+/*
+ ***************************************************************************
+ *		Include files
+ ***************************************************************************
+ */
+
+@include <stdapp.goh>
+@include "hivar.goh"
+@include <gstring.h>
+#include <string.h>
+
+/* Prototypes */
+void FMclearFields(void);
+
+/*
+ ***************************************************************************
+ *		Class & Message Definitions
+ ***************************************************************************
+ */
+
+/* Declare UI object references to those in hinv0s.GOC */
+@extern object FamBox;
+@extern object FamDList;
+@extern object FamNameField;
+@extern object FamSSANField;
+@extern object FamDrivField;
+@extern object FamDExpField;
+@extern object FamDOBField;
+@extern object FamHospField;
+@extern object FamDocField;
+@extern object FamCityField;
+@extern object FamLocField;
+@extern object FamWillField;
+@extern object FamExecField;
+@extern object OthBox;
+@extern object SDBDisplay;
+@extern object SDBNumField;
+@extern object SDBLocField;
+@extern object SDBRentField;
+@extern object SDBDueField;
+@extern object POBDisplay;
+@extern object POBNumField;
+@extern object POBLocField;
+@extern object POBRentField;
+@extern object POBDueField;
+@extern object SafeDisplay;
+@extern object SafeLocField;
+@extern object SafeComboField;
+
+
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_OPEN_FAM_DB for HInvProcessClass
+ *
+ * DESCRIPTION:	calls the dialog box when fam button
+ *               is clicked.  
+ *              Done so that buttons would expand to full width
+ *               which doesn't work w/GenInters
+ *     
+ ***********************************************************************/
+
+@extern method HInvProcessClass, MSG_OPEN_FAM_DB
+{
+
+    /* set to no selections */
+    @call FamDList::MSG_GEN_ITEM_GROUP_SET_NONE_SELECTED(FALSE);
+		/* This is to keep old data (from the entry fields)
+		 * from cluttering things up
+                 */
+    /* Now we clear the fields */
+    FMclearFields();
+
+    @call FamBox::MSG_GEN_INTERACTION_INITIATE();
+}
+
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_NEW_FAM for HInvProcessClass
+ *
+ * DESCRIPTION:	Creates a new family member entry
+ *              
+ ***********************************************************************/
+
+@extern method HInvProcessClass, MSG_NEW_FAM
+{
+    FamStruct         *mfam;
+    VMBlockHandle     houseblock;
+    HouseStruct *     houseMemPtr ;
+    word              numFam;
+    char              field1[51];
+    VMBlockHandle     block;
+    MemHandle         mh, newmh;
+
+    /*
+     * Retrieve the name of the new member from the type field.
+     */
+    @call FamNameField::MSG_VIS_TEXT_GET_ALL_PTR(field1);
+
+    /* Exit if entry is blank. */
+    if (*field1 == 0)
+        return;
+
+    /* Lock the map item, get number of fam members, increment and unlock it */
+    houseblock = VMGetMapBlock(hmInvFile);
+    houseMemPtr = VMLock(hmInvFile, houseblock, &mh);
+    numFam = houseMemPtr->HS_numFam;
+    numFam++;                         /* remember this new num is used */
+    houseMemPtr->HS_numFam = numFam;    /* in the rest of the method!!! */
+    VMDirty(mh);
+    VMUnlock(mh);
+
+    /* get the fam handle - its id is 7 */
+    block = VMFind(hmInvFile, NullHandle, 7);
+
+    /* and lock the block */
+    VMLock(hmInvFile, block, &mh);
+
+    /* resize and lock the associated mem block */
+    newmh = MemReAlloc(mh,(numFam *(sizeof(FamStruct))), HAF_LOCK);
+
+    /* get its address */
+    mfam = MemDeref(newmh);
+
+    /* add the new fam member info */
+    @call FamNameField::MSG_VIS_TEXT_GET_ALL_PTR(
+                  mfam[(numFam - 1)].FS_name);
+    @call FamSSANField::MSG_VIS_TEXT_GET_ALL_PTR(
+                  mfam[(numFam - 1)].FS_SSAN);
+    @call FamDrivField::MSG_VIS_TEXT_GET_ALL_PTR(
+                  mfam[(numFam - 1)].FS_driv);
+    @call FamDExpField::MSG_VIS_TEXT_GET_ALL_PTR(
+                  mfam[(numFam - 1)].FS_dexp);
+    @call FamDOBField::MSG_VIS_TEXT_GET_ALL_PTR(
+                  mfam[(numFam - 1)].FS_DOB);
+    @call FamHospField::MSG_VIS_TEXT_GET_ALL_PTR(
+                  mfam[(numFam - 1)].FS_hosp);
+    @call FamDocField::MSG_VIS_TEXT_GET_ALL_PTR(
+                  mfam[(numFam - 1)].FS_doc);
+    @call FamCityField::MSG_VIS_TEXT_GET_ALL_PTR(
+                  mfam[(numFam - 1)].FS_city);
+    @call FamLocField::MSG_VIS_TEXT_GET_ALL_PTR(
+                  mfam[(numFam - 1)].FS_loc);
+    @call FamWillField::MSG_VIS_TEXT_GET_ALL_PTR(
+                  mfam[(numFam - 1)].FS_will);
+    @call FamExecField::MSG_VIS_TEXT_GET_ALL_PTR(
+                  mfam[(numFam - 1)].FS_exec);
+
+    VMDirty(mh);
+    VMUnlock(mh);
+    MemUnlock(mh);
+    MemUnlock(newmh);
+
+    /* Now we clear the fields */
+    FMclearFields();
+
+    /* Tell the list */
+    @send FamDList::MSG_GEN_DYNAMIC_LIST_ADD_ITEMS((numFam - 1), 1);
+
+}
+
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_EDIT_FAM_NAME for HInvProcessClass
+ *
+ * DESCRIPTION:	Edits an fam member entry
+ *              
+ ***********************************************************************/
+
+@extern method HInvProcessClass, MSG_EDIT_FAM_NAME
+{
+    FamStruct      *fam;
+    VMBlockHandle    block;
+    MemHandle        mh;
+
+    /* first check to see if a fam member is selected */
+    if ( currentFam != GIGS_NONE ) {
+
+       /* OK - put up are you sure you want to change box */
+       if ((UserStandardDialog((char*)0,
+			    (char*)0,
+			    (char*)0,
+			    (char*)0,
+			    "Are you sure you want to change the information for this family member?",
+			    ((CDT_WARNING << CDBF_DIALOG_TYPE_OFFSET) |
+			    (GIT_AFFIRMATION << CDBF_INTERACTION_TYPE_OFFSET))
+                            ) == IC_YES))  {
+
+       /* get the fam handle - its id is 7 */
+       block = VMFind(hmInvFile, NullHandle, 7);
+
+       /* and lock the block */
+       fam = VMLock(hmInvFile, block, &mh);
+   
+       /* change the data */
+       @call FamNameField::MSG_VIS_TEXT_GET_ALL_PTR(
+                     fam[currentFam].FS_name);
+       @call FamSSANField::MSG_VIS_TEXT_GET_ALL_PTR(
+                     fam[currentFam].FS_SSAN);
+       @call FamDrivField::MSG_VIS_TEXT_GET_ALL_PTR(
+                     fam[currentFam].FS_driv);
+       @call FamDExpField::MSG_VIS_TEXT_GET_ALL_PTR(
+                     fam[currentFam].FS_dexp);
+       @call FamDOBField::MSG_VIS_TEXT_GET_ALL_PTR(
+                     fam[currentFam].FS_DOB);
+       @call FamHospField::MSG_VIS_TEXT_GET_ALL_PTR(
+                     fam[currentFam].FS_hosp);
+       @call FamDocField::MSG_VIS_TEXT_GET_ALL_PTR(
+                     fam[currentFam].FS_doc);
+       @call FamCityField::MSG_VIS_TEXT_GET_ALL_PTR(
+                     fam[currentFam].FS_city);
+       @call FamLocField::MSG_VIS_TEXT_GET_ALL_PTR(
+                     fam[currentFam].FS_loc);
+       @call FamWillField::MSG_VIS_TEXT_GET_ALL_PTR(
+                     fam[currentFam].FS_will);
+       @call FamExecField::MSG_VIS_TEXT_GET_ALL_PTR(
+                     fam[currentFam].FS_exec);
+
+       VMDirty(mh);
+       VMUnlock(mh);
+
+       /* Now we clear the fields */
+       FMclearFields();
+
+       /* change the list */
+       @send FamDList::MSG_GEN_DYNAMIC_LIST_INITIALIZE(GDLI_NO_CHANGE);
+
+       }  /* end of are you sure if */
+
+    }  /* end of selection check if */
+
+}
+
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_DELETE_FAM for HInvProcessClass
+ *
+ * DESCRIPTION:	Deletes a family member entry
+ *              
+ ***********************************************************************/
+
+@extern method HInvProcessClass, MSG_DELETE_FAM
+{
+    FamStruct       *mfam;
+    VMBlockHandle     houseblock;
+    HouseStruct *     houseMemPtr ;
+    word              numFam, i;
+    VMBlockHandle     block;
+    MemHandle         mh, newmh;
+
+    /* Exit if no member selected */
+    if (currentFam == GIGS_NONE)
+        return;
+
+    /* put up an Are you sure box */
+    if ((UserStandardDialog((char*)0,
+			    (char*)0,
+			    (char*)0,
+			    (char*)0,
+			    "Are you sure you want to delete this family member?",
+			    ((CDT_WARNING << CDBF_DIALOG_TYPE_OFFSET) |
+			    (GIT_AFFIRMATION << CDBF_INTERACTION_TYPE_OFFSET))
+                            ) == IC_YES))  {
+
+    /* Lock the map item, get number of members, decrement and unlock it */
+    houseblock = VMGetMapBlock(hmInvFile);
+    houseMemPtr = VMLock(hmInvFile, houseblock, &mh);
+    numFam = houseMemPtr->HS_numFam;
+    numFam--;                         /* remember this new num is used */
+    houseMemPtr->HS_numFam = numFam;    /* in the rest of the method!!! */
+    VMDirty(mh);
+    VMUnlock(mh);
+
+    /* get the fam handle - its id is 7 */
+    block = VMFind(hmInvFile, NullHandle, 7);
+
+    /* and lock the block */
+    VMLock(hmInvFile, block, &mh);
+
+    /* get the address of the associated mem block */
+    mfam = MemLock(mh);
+
+    /* loop thru to delete inv & info 
+     * unless only member deleted...
+     * Still want to keep an empty structure so there'll
+     * always be a mem block assoc with the VM block
+     * just as at initialization of new file */
+    if (numFam == 0) {
+       strcpy(mfam[0].FS_name, "");
+       strcpy(mfam[0].FS_SSAN, "");
+       strcpy(mfam[0].FS_driv, "");
+       strcpy(mfam[0].FS_dexp, "");
+       strcpy(mfam[0].FS_DOB, "");
+       strcpy(mfam[0].FS_hosp, "");
+       strcpy(mfam[0].FS_doc, "");
+       strcpy(mfam[0].FS_city, "");
+       strcpy(mfam[0].FS_loc, "");
+       strcpy(mfam[0].FS_will, "");
+       strcpy(mfam[0].FS_exec, "");
+       }
+
+    for (i = currentFam; i < numFam; i++) {
+       strcpy(mfam[i].FS_name, mfam[i+1].FS_name);
+       strcpy(mfam[i].FS_SSAN, mfam[i+1].FS_SSAN);
+       strcpy(mfam[i].FS_driv, mfam[i+1].FS_driv);
+       strcpy(mfam[i].FS_dexp, mfam[i+1].FS_dexp);
+       strcpy(mfam[i].FS_DOB, mfam[i+1].FS_DOB);
+       strcpy(mfam[i].FS_hosp, mfam[i+1].FS_hosp);
+       strcpy(mfam[i].FS_doc, mfam[i+1].FS_doc);
+       strcpy(mfam[i].FS_city, mfam[i+1].FS_city);
+       strcpy(mfam[i].FS_loc, mfam[i+1].FS_loc);
+       strcpy(mfam[i].FS_will, mfam[i+1].FS_will);
+       strcpy(mfam[i].FS_exec, mfam[i+1].FS_exec);
+       }
+
+    /* resize the associated mem block
+     * if not the only remaining struct */
+    if (numFam != 0) {
+       newmh = MemReAlloc(mh,((numFam+1)*(sizeof(FamStruct))), HAF_LOCK);
+       MemUnlock(newmh);
+       }
+
+    VMDirty(mh);
+    VMUnlock(mh);
+    MemUnlock(mh);
+    
+    /* Now we clear the fields */
+    FMclearFields();
+
+    /* Tell the list */
+    @send FamDList::MSG_GEN_DYNAMIC_LIST_REMOVE_ITEMS(currentFam, 1);
+
+    } /* end of are you sure if */
+}
+
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_FAM_LIST_MONIKER_QUERY for HInvProcessClass
+ *
+ * DESCRIPTION:	Queries for monikers for family list.
+ *
+ * PARAMETERS:  void (optr list, word item)
+ *
+ *
+ ***********************************************************************/
+
+@extern method HInvProcessClass, MSG_FAM_LIST_MONIKER_QUERY
+{
+    FamStruct       *fam;
+    VMBlockHandle    block;
+    MemHandle        mh;
+
+    /* get the fam handle - its id is 7 */
+    block = VMFind(hmInvFile, NullHandle, 7);
+
+    /* and lock the block */
+    fam = VMLock(hmInvFile, block, &mh);
+
+    /* Set the text in the list item. */
+    @call list::MSG_GEN_DYNAMIC_LIST_REPLACE_ITEM_TEXT(item, fam[item].FS_name);
+
+    /* Unlock the block. */
+    VMUnlock(mh);
+}
+
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_FAM_LIST_APPLY for HInvProcessClass
+ *
+ * DESCRIPTION:	Handles an apply of user changes to the family list.
+ *
+ * PARAMETERS:  void (word selection, numSelections, flags)
+ *
+ * 
+ *
+ ***********************************************************************/
+
+@extern method HInvProcessClass, MSG_FAM_LIST_APPLY
+{
+    FamStruct       *fam;
+    VMBlockHandle    block;
+    MemHandle        mh;
+
+    /* Set the current family member global variable */
+    currentFam = selection;
+
+    /* get the fam handle - its id is 7 */
+    block = VMFind(hmInvFile, NullHandle, 7);
+
+    /* and lock the block */
+    fam = VMLock(hmInvFile, block, &mh);
+
+    /* Now we set up fields based on new member. */
+    @call FamNameField::MSG_VIS_TEXT_REPLACE_ALL_PTR(
+		fam[currentFam].FS_name, 0);
+    @call FamSSANField::MSG_VIS_TEXT_REPLACE_ALL_PTR(
+		fam[currentFam].FS_SSAN, 0);
+    @call FamDrivField::MSG_VIS_TEXT_REPLACE_ALL_PTR(
+		fam[currentFam].FS_driv, 0);
+    @call FamDExpField::MSG_VIS_TEXT_REPLACE_ALL_PTR(
+		fam[currentFam].FS_dexp, 0);
+    @call FamDOBField::MSG_VIS_TEXT_REPLACE_ALL_PTR(
+		fam[currentFam].FS_DOB, 0);
+    @call FamHospField::MSG_VIS_TEXT_REPLACE_ALL_PTR(
+		fam[currentFam].FS_hosp, 0);
+    @call FamDocField::MSG_VIS_TEXT_REPLACE_ALL_PTR(
+		fam[currentFam].FS_doc, 0);
+    @call FamCityField::MSG_VIS_TEXT_REPLACE_ALL_PTR(
+		fam[currentFam].FS_city, 0);
+    @call FamLocField::MSG_VIS_TEXT_REPLACE_ALL_PTR(
+		fam[currentFam].FS_loc, 0);
+    @call FamWillField::MSG_VIS_TEXT_REPLACE_ALL_PTR(
+		fam[currentFam].FS_will, 0);
+    @call FamExecField::MSG_VIS_TEXT_REPLACE_ALL_PTR(
+		fam[currentFam].FS_exec, 0);
+
+    /* Unlock the block. */
+    VMUnlock(mh);
+
+}
+
+/*------------------------------------------------------------------
+ *  FUNCTION	FMclearFields
+ *-------------------------------------------------------------------
+ */
+ void FMclearFields() {
+
+    /* Now we clear the fields */
+    @call FamNameField::MSG_VIS_TEXT_REPLACE_ALL_PTR("", 0);
+    @call FamSSANField::MSG_VIS_TEXT_REPLACE_ALL_PTR("", 0);
+    @call FamDrivField::MSG_VIS_TEXT_REPLACE_ALL_PTR("", 0);
+    @call FamDExpField::MSG_VIS_TEXT_REPLACE_ALL_PTR("", 0);
+    @call FamDOBField::MSG_VIS_TEXT_REPLACE_ALL_PTR("", 0);
+    @call FamHospField::MSG_VIS_TEXT_REPLACE_ALL_PTR("", 0);
+    @call FamDocField::MSG_VIS_TEXT_REPLACE_ALL_PTR("", 0);
+    @call FamCityField::MSG_VIS_TEXT_REPLACE_ALL_PTR("", 0);
+    @call FamLocField::MSG_VIS_TEXT_REPLACE_ALL_PTR("", 0);
+    @call FamWillField::MSG_VIS_TEXT_REPLACE_ALL_PTR("", 0);
+    @call FamExecField::MSG_VIS_TEXT_REPLACE_ALL_PTR("", 0);
+
+}
+
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_OPEN_OTH_DB for HInvProcessClass
+ *
+ * DESCRIPTION:	calls the dialog box when OTH button
+ *               is clicked.  
+ *              Done so that buttons would expand to full width
+ *               which doesn't work w/GenInters
+ *     
+ ***********************************************************************/
+
+@extern method HInvProcessClass, MSG_OPEN_OTH_DB
+{
+    @call OthBox::MSG_GEN_INTERACTION_INITIATE();
+}
+
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_SDB_DB_DISPLAY for HInvProcessClass
+ *
+ * DESCRIPTION:	Fills and calls the dialog box when SDB button
+ *               is clicked.  
+ *     
+ ***********************************************************************/
+
+@extern method HInvProcessClass, MSG_SDB_DB_DISPLAY
+{
+    /* Put any saved data into the box. */
+    @call oself::MSG_SHOW_SDB_INFO();
+
+    @call SDBDisplay::MSG_GEN_INTERACTION_INITIATE();
+}
+
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_SHOW_SDB_INFO for HInvProcessClass
+ *
+ * DESCRIPTION:	Puts any SDB info into the DB
+ *              before the db draws   
+ *     
+ ***********************************************************************/
+
+@extern method HInvProcessClass, MSG_SHOW_SDB_INFO
+{
+   VMBlockHandle    SBBlock;
+   SafBoxStruct     *sbBaseAddr;
+   MemHandle        mh;
+
+   /* get the SBBlock handle - it's id is 8 */
+   SBBlock = VMFind(hmInvFile, NullHandle, 8);
+
+   /* and lock it */
+   sbBaseAddr = VMLock(hmInvFile, SBBlock, &mh);
+
+   /* copy data to the fields */
+   @call SDBNumField::MSG_VIS_TEXT_REPLACE_ALL_PTR(
+                   sbBaseAddr->SB_SDBnum,0);
+   @call SDBLocField::MSG_VIS_TEXT_REPLACE_ALL_PTR(
+                   sbBaseAddr->SB_SDBloc,0);
+   @call SDBRentField::MSG_VIS_TEXT_REPLACE_ALL_PTR(
+                   sbBaseAddr->SB_SDBrent,0);
+   @call SDBDueField::MSG_VIS_TEXT_REPLACE_ALL_PTR(
+                   sbBaseAddr->SB_SDBdue,0);
+
+   VMUnlock(mh);
+}
+
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_ENTER_SDB_DATA for HInvProcessClass
+ *
+ * DESCRIPTION:	Saves any SDB data from the DB
+ *              to the VM file   
+ *     
+ *              
+ *
+ ***********************************************************************/
+
+@extern method HInvProcessClass, MSG_ENTER_SDB_DATA
+{
+   VMBlockHandle    SBBlock;
+   SafBoxStruct     *sbBaseAddr;
+   MemHandle        mh;
+
+   /* get the SBBlock handle - its id is 8 */
+   SBBlock = VMFind(hmInvFile, NullHandle, 8);
+
+   /* and lock it */
+   sbBaseAddr = VMLock(hmInvFile, SBBlock, &mh);
+
+   /* copy the data to the file */
+   @call SDBNumField::MSG_VIS_TEXT_GET_ALL_PTR(
+                 sbBaseAddr->SB_SDBnum);
+   @call SDBLocField::MSG_VIS_TEXT_GET_ALL_PTR(
+                 sbBaseAddr->SB_SDBloc);
+   @call SDBRentField::MSG_VIS_TEXT_GET_ALL_PTR(
+                 sbBaseAddr->SB_SDBrent);
+   @call SDBDueField::MSG_VIS_TEXT_GET_ALL_PTR(
+                 sbBaseAddr->SB_SDBdue);
+
+   VMDirty(mh);
+   VMUnlock(mh);
+
+}
+
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_POB_DB_DISPLAY for HInvProcessClass
+ *
+ * DESCRIPTION:	Fills and calls the dialog box when POB button
+ *               is clicked.  
+ *     
+ ***********************************************************************/
+
+@extern method HInvProcessClass, MSG_POB_DB_DISPLAY
+{
+    /* Put any saved data into the box. */
+    @call oself::MSG_SHOW_POB_INFO();
+
+    @call POBDisplay::MSG_GEN_INTERACTION_INITIATE();
+}
+
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_SHOW_POB_INFO for HInvProcessClass
+ *
+ * DESCRIPTION:	Puts any POB info into the DB
+ *              before the db draws   
+ *     
+ ***********************************************************************/
+
+@extern method HInvProcessClass, MSG_SHOW_POB_INFO
+{
+   VMBlockHandle    SBBlock;
+   SafBoxStruct     *sbBaseAddr;
+   MemHandle        mh;
+
+   /* get the SBBlock handle - it's id is 8 */
+   SBBlock = VMFind(hmInvFile, NullHandle, 8);
+
+   /* and lock it */
+   sbBaseAddr = VMLock(hmInvFile, SBBlock, &mh);
+
+   /* copy data to the fields */
+   @call POBNumField::MSG_VIS_TEXT_REPLACE_ALL_PTR(
+                sbBaseAddr->SB_POBnum, 0);
+   @call POBLocField::MSG_VIS_TEXT_REPLACE_ALL_PTR(
+		sbBaseAddr->SB_POBloc, 0);
+   @call POBRentField::MSG_VIS_TEXT_REPLACE_ALL_PTR(
+                sbBaseAddr->SB_POBrent, 0);
+   @call POBDueField::MSG_VIS_TEXT_REPLACE_ALL_PTR(
+                sbBaseAddr->SB_POBdue, 0);
+
+   VMUnlock(mh);
+}
+
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_ENTER_POB_DATA for HInvProcessClass
+ *
+ * DESCRIPTION:	Saves any POB data from the DB
+ *              to the VM file   
+ *     
+ *              
+ *
+ ***********************************************************************/
+
+@extern method HInvProcessClass, MSG_ENTER_POB_DATA
+{
+   VMBlockHandle    SBBlock;
+   SafBoxStruct     *sbBaseAddr;
+   MemHandle        mh;
+
+   /* get the SBBlock handle - its id is 8 */
+   SBBlock = VMFind(hmInvFile, NullHandle, 8);
+
+   /* and lock it */
+   sbBaseAddr = VMLock(hmInvFile, SBBlock, &mh);
+
+   /* copy the data to the file */
+   @call POBNumField::MSG_VIS_TEXT_GET_ALL_PTR(
+                 sbBaseAddr->SB_POBnum);
+   @call POBLocField::MSG_VIS_TEXT_GET_ALL_PTR(
+                 sbBaseAddr->SB_POBloc);
+   @call POBRentField::MSG_VIS_TEXT_GET_ALL_PTR(
+                 sbBaseAddr->SB_POBrent);
+   @call POBDueField::MSG_VIS_TEXT_GET_ALL_PTR(
+                 sbBaseAddr->SB_POBdue);
+
+   VMDirty(mh);
+   VMUnlock(mh);
+
+}
+
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_SAFE_DB_DISPLAY for HInvProcessClass
+ *
+ * DESCRIPTION:	Fills and calls the dialog box when safe button
+ *               is clicked.  
+ *     
+ ***********************************************************************/
+
+@extern method HInvProcessClass, MSG_SAFE_DB_DISPLAY
+{
+    /* Put any saved data into the box. */
+    @call oself::MSG_SHOW_SAFE_INFO();
+
+    @call SafeDisplay::MSG_GEN_INTERACTION_INITIATE();
+}
+
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_SHOW_SAFE_INFO for HInvProcessClass
+ *
+ * DESCRIPTION:	Puts any Safe info into the DB
+ *              before the db draws   
+ *     
+ ***********************************************************************/
+
+@extern method HInvProcessClass, MSG_SHOW_SAFE_INFO
+{
+   VMBlockHandle    SBBlock;
+   SafBoxStruct     *sbBaseAddr;
+   MemHandle        mh;
+
+   /* get the SBBlock handle - it's id is 8 */
+   SBBlock = VMFind(hmInvFile, NullHandle, 8);
+
+   /* and lock it */
+   sbBaseAddr = VMLock(hmInvFile, SBBlock, &mh);
+
+   /* copy data to the fields */
+   @call SafeComboField::MSG_VIS_TEXT_REPLACE_ALL_PTR(
+                    sbBaseAddr->SB_safecombo,0);
+   @call SafeLocField::MSG_VIS_TEXT_REPLACE_ALL_PTR(
+                    sbBaseAddr->SB_safeloc,0);
+
+   VMUnlock(mh);
+}
+
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_ENTER_SAFE_DATA for HInvProcessClass
+ *
+ * DESCRIPTION:	Saves any Safe data from the DB
+ *              to the VM file   
+ *     
+ ***********************************************************************/
+
+@extern method HInvProcessClass, MSG_ENTER_SAFE_DATA
+{
+   VMBlockHandle    SBBlock;
+   SafBoxStruct     *sbBaseAddr;
+   MemHandle        mh;
+
+   /* get the SBBlock handle - its id is 8 */
+   SBBlock = VMFind(hmInvFile, NullHandle, 8);
+
+   /* and lock it */
+   sbBaseAddr = VMLock(hmInvFile, SBBlock, &mh);
+
+   /* copy the data to the file */
+   @call SafeComboField::MSG_VIS_TEXT_GET_ALL_PTR(
+                   sbBaseAddr->SB_safecombo);
+   @call SafeLocField::MSG_VIS_TEXT_GET_ALL_PTR(
+                   sbBaseAddr->SB_safeloc);
+
+   VMDirty(mh);
+   VMUnlock(mh);
+
+}
+
