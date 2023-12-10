@@ -1006,7 +1006,7 @@ sent by any program that can access the serial port.
 **1** - Notify PCCOM that a file is on its way.  
 Send the Send File escape character sequence to the serial port, notifying 
 PCCOM that a file is about to be sent to it. The escape sequence is 
-<Esc>XF1.
+`<Esc>XF1`.
 
 **2** - Send the destination file name.  
 Send the name PCCOM should use for the file when saving it. The name 
@@ -1111,7 +1111,7 @@ of commands is different, however, and is listed below.
 **1** - Notify PCCOM that you're getting a file.  
 Send the Get File escape character sequence to the serial port, notifying 
 PCCOM that it should get ready to send a file. The escape sequence is 
-<Esc>XF2.
+`<Esc>XF2`.
 
 **2** - Send the source file name.  
 Send the name of the file to be retrieved. The name is a string of 

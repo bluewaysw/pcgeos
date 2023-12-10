@@ -138,7 +138,7 @@ minimalGame	: solitaire cword amateur bjack hearts gwpoker \
                   pyramid sokoban taipei uki mine column
 
 minimalEdu	: flash fontmgck hangman laserl mflash numbers pvault \
-                  taide thinker wsm wsplay xwm
+                  oliner taide thinker wsm wsplay xwm
 # ttype
 
 minimalSavers	: lol blackhole blank bobbin circles dribble dust \
@@ -1539,8 +1539,8 @@ Installed/Appl/EduApps/tgen:		ui ansic text math spool basicdb \
 ttkr	: Installed/Appl/EduApps/ttkr
 Installed/Appl/EduApps/ttkr:		ui ansic text math basicdb MAKEAPPL
 
-oliner	: Installed/Appl/EduApps/oliner
-Installed/Appl/EduApps/oliner:		ui ansic text math spool basicdb \
+oliner	: Installed/Appl/EduApps/OLiner
+Installed/Appl/EduApps/OLiner:		ui ansic text math spool basicdb \
 					treplib spell MAKEAPPL
 
 instc	: Installed/Appl/Install/Instc
