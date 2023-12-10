@@ -2437,30 +2437,32 @@ setPosition:
 	mov	ds:[bx].SWSP_y, dx
 
 	;
-	; set usable
+	; set TaskBar usable
 	;
+	push 	ax, ds, cx, dx, si, bp
+	mov	ax, MSG_GEN_FIND_CHILD_AT_POSITION
+	clr	cx				; find first child = 0
+	call	ObjCallInstanceNoLock
+	jc	done				; abort if child not found
+	mov 	si, dx				; *ds:si <- TaskBar
+	mov	ax, MSG_GEN_SET_USABLE
+	mov	dl, VUM_DELAYED_VIA_APP_QUEUE	; dl <- VisUpdateMode
+	call	ObjCallInstanceNoLock
+	pop	ax, ds, cx, dx, si, bp
 
 	;
-	; Find the system tray. Since it's copied during via COPY_TREE, we
-	; don't know the chunk handle. This code is dependent on the order
-	; of the children, so if anything gets changed in the
-	; ExpressMenuResource...
+	; set Tray usable
 	;
-	;push	cx, dx
-	;push	si
-	;mov	bx, cx
-	;mov	si, dx
-	;mov	ax, MSG_GEN_FIND_CHILD_AT_POSITION
-	;mov	cx, 1	; object SysTray is 2nd child of ToolArea
-	;mov	di, mask MF_CALL or mask MF_FIXUP_DS
-	;call	ObjMessage
-
-
-	;mov	si, dx				;*ds:si <- trigger
-	;mov	ax, MSG_GEN_SET_USABLE
-	;mov	dl, VUM_NOW	;dl <- VisUpdateMode
-	;call	ObjCallInstanceNoLock
-
+	push 	ax, ds, cx, dx, si, bp
+	mov	ax, MSG_GEN_FIND_CHILD_AT_POSITION
+	mov	cx, 1				; second child = 1
+	call	ObjCallInstanceNoLock
+	jc	done				; abort if child not found
+	mov 	si, dx				; *ds:si <- TaskBar
+	mov	ax, MSG_GEN_SET_USABLE
+	mov	dl, VUM_DELAYED_VIA_APP_QUEUE	; dl <- VisUpdateMode
+	call	ObjCallInstanceNoLock
+	pop	ax, ds, cx, dx, si, bp
 
 done:
 	ret
