@@ -57,7 +57,6 @@ static void CalcTransform( TRUETYPE_VARS,
 
 static void AdjustFontBuf( TransformMatrix*     transMatrix, 
                         FontMatrix*             fontMatrix, 
-                        TextStyle               stylesToImplement, 
                         FontBuf*                fontBuf );
 
 static Boolean IsRegionNeeded( TransformMatrix* transMatrix, 
@@ -186,7 +185,7 @@ EC(     ECCheckBounds( (void*)trueTypeVars ) );
         CalcTransform( trueTypeVars, transMatrix, fontMatrix, pointSize, stylesToImplement );
 
         //TODO: adjust FB_height, FB_minTSB, FB_pixHeight and FB_baselinePos
-        AdjustFontBuf( transMatrix, fontMatrix, stylesToImplement, fontBuf );
+        AdjustFontBuf( transMatrix, fontMatrix, fontBuf );
 
         /* Are the glyphs rendered as regions? */
         if( IsRegionNeeded( transMatrix, fontMatrix, fontBuf ) )
@@ -659,7 +658,6 @@ static void ConvertHeader( TRUETYPE_VARS, FontHeader* fontHeader, FontBuf* fontB
 
 static void AdjustFontBuf( TransformMatrix* transMatrix, 
                            FontMatrix*      fontMatrix, 
-                           TextStyle        stylesToImplement, 
                            FontBuf*         fontBuf )
 {
         sword savedHeightY = transMatrix->TM_heightY;
