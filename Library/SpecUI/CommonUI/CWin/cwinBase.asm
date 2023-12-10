@@ -4042,7 +4042,7 @@ OLBaseWinLostSystemTargetExcl	method dynamic	OLBaseWinClass,
 
 	call	WinClasses_ObjCallSuperNoLock_OLBaseWinClass
 
-if PLACE_EXPRESS_MENU_ON_PRIMARY or TOOL_AREA_IS_TASK_BAR
+if PLACE_EXPRESS_MENU_ON_PRIMARY ; or TOOL_AREA_IS_TASK_BAR
 ;
 ; we cannot use olExpressOptions as MSG_META_LOST_SYS_TARGET_EXCL could
 ; come in after we've switched to another field and updated olExpressOptions
@@ -5031,7 +5031,7 @@ REVISION HISTORY:
 	Doug	6/92		Inital Version
 
 ------------------------------------------------------------------------------@
-if PLACE_EXPRESS_MENU_ON_PRIMARY or TOOL_AREA_IS_TASK_BAR
+if PLACE_EXPRESS_MENU_ON_PRIMARY; or TOOL_AREA_IS_TASK_BAR
 OLBaseWinUpdateExpressToolArea	method static OLBaseWinClass,
 				 MSG_OL_BASE_WIN_UPDATE_EXPRESS_TOOL_AREA
 

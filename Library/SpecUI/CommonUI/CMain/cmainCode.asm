@@ -501,9 +501,6 @@ endif
 			mask UIEO_CONTROL_PANEL or \
 			mask UIEO_UTILITIES_PANEL
 
-; FIXME!!!
-	;andnf	ax, (UIEP_LOWER_LEFT shl offset UIEO_POSITION)
-
 ;if _MOTIF and TOOL_AREA_IS_TASK_BAR
 ;	andnf	ax, not (mask UIEO_GEOS_TASKS_LIST)
 ;endif

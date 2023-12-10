@@ -675,7 +675,7 @@ REVISION HISTORY:
 	Doug	9/91		Initial version
 
 ------------------------------------------------------------------------------@
-
+
 
 OLFieldLostFocusExcl	method	dynamic OLFieldClass,
 					MSG_META_LOST_FOCUS_EXCL
@@ -739,7 +739,7 @@ REVISION HISTORY:
 	Doug	9/91		Initial version
 
 ------------------------------------------------------------------------------@
-
+
 
 OLFieldGainedTargetExcl	method	dynamic OLFieldClass,
 					MSG_META_GAINED_TARGET_EXCL
@@ -763,7 +763,7 @@ OLFieldGainedTargetExcl	method	dynamic OLFieldClass,
 
 OLFieldGainedTargetExcl	endm
 
-
+
 COMMENT @----------------------------------------------------------------------
 
 METHOD:		OLFieldLostTargetExcl
@@ -871,14 +871,14 @@ REVISION HISTORY:
 	Doug	4/93		Initial version
 
 ------------------------------------------------------------------------------@
-
+
 
 OLFieldGainedFullScreenExcl	method	dynamic OLFieldClass,
 					MSG_META_GAINED_FULL_SCREEN_EXCL
 	GOTO	OLFieldUpdateFullScreenCommon
 OLFieldGainedFullScreenExcl	endm
 
-
+
 COMMENT @----------------------------------------------------------------------
 
 METHOD:		OLFieldLostFullScreenExcl
@@ -912,7 +912,7 @@ REVISION HISTORY:
 	Doug	4/93		Initial version
 
 ------------------------------------------------------------------------------@
-
+
 
 OLFieldLostFullScreenExcl	method	dynamic OLFieldClass,
 					MSG_META_LOST_FULL_SCREEN_EXCL
@@ -2280,7 +2280,7 @@ ToolAreaVisMoveResizeWin	method dynamic ToolAreaClass,
 	segmov	ds, dgroup
 	tst	ds:[taskBarEnabled] ; if taskbar == on, ZF == 1
 	pop	ds
-	jz	callSuper ; if ZF==0 skip the following code
+	LONG	jz callSuper ; if ZF==0 skip the following code
 
 	mov	bl, ds:[di].TAI_state
 
