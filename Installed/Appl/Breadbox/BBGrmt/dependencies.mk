@@ -27,7 +27,7 @@ CR8_MTDS.eobj: geos.h heap.h geode.h resource.h ec.h object.h lmem.h \
                 disk.h drive.h input.h char.h hwr.h win.h uDialog.h \
                 Objects/gInterC.h Objects/Text/tCommon.h stylesh.h \
                 driver.h thread.h print.h Internal/spoolInt.h serialDr.h \
-                parallDr.h hugearr.h fileEnum.h ansi/string.h token.h
+                parallDr.h hugearr.h fileEnum.h Ansi/string.h token.h
 DOC_MTDS.obj \
 DOC_MTDS.eobj: rbox.goh stdapp.goh object.goh ui.goh Objects/metaC.goh \
                 Objects/inputC.goh Objects/clipbrd.goh \
@@ -57,7 +57,7 @@ DOC_MTDS.eobj: geos.h heap.h geode.h resource.h ec.h object.h lmem.h \
                 disk.h drive.h input.h char.h hwr.h win.h uDialog.h \
                 Objects/gInterC.h Objects/Text/tCommon.h stylesh.h \
                 driver.h thread.h print.h Internal/spoolInt.h serialDr.h \
-                parallDr.h hugearr.h fileEnum.h ansi/string.h token.h
+                parallDr.h hugearr.h fileEnum.h Ansi/string.h token.h
 LST_MTDS.obj \
 LST_MTDS.eobj: rbox.goh stdapp.goh object.goh ui.goh Objects/metaC.goh \
                 Objects/inputC.goh Objects/clipbrd.goh \
@@ -87,7 +87,7 @@ LST_MTDS.eobj: geos.h heap.h geode.h resource.h ec.h object.h lmem.h \
                 disk.h drive.h input.h char.h hwr.h win.h uDialog.h \
                 Objects/gInterC.h Objects/Text/tCommon.h stylesh.h \
                 driver.h thread.h print.h Internal/spoolInt.h serialDr.h \
-                parallDr.h hugearr.h fileEnum.h ansi/string.h token.h
+                parallDr.h hugearr.h fileEnum.h Ansi/string.h token.h
 RBOXUI.obj \
 RBOXUI.eobj: rbox.goh stdapp.goh object.goh ui.goh Objects/metaC.goh \
                 Objects/inputC.goh Objects/clipbrd.goh \
@@ -118,7 +118,7 @@ RBOXUI.eobj: geos.h heap.h geode.h resource.h ec.h object.h lmem.h \
                 disk.h drive.h input.h char.h hwr.h win.h uDialog.h \
                 Objects/gInterC.h Objects/Text/tCommon.h stylesh.h \
                 driver.h thread.h print.h Internal/spoolInt.h serialDr.h \
-                parallDr.h hugearr.h fileEnum.h ansi/string.h token.h
+                parallDr.h hugearr.h fileEnum.h Ansi/string.h token.h
 SEL_MTDS.obj \
 SEL_MTDS.eobj: rbox.goh stdapp.goh object.goh ui.goh Objects/metaC.goh \
                 Objects/inputC.goh Objects/clipbrd.goh \
@@ -148,7 +148,7 @@ SEL_MTDS.eobj: geos.h heap.h geode.h resource.h ec.h object.h lmem.h \
                 disk.h drive.h input.h char.h hwr.h win.h uDialog.h \
                 Objects/gInterC.h Objects/Text/tCommon.h stylesh.h \
                 driver.h thread.h print.h Internal/spoolInt.h serialDr.h \
-                parallDr.h hugearr.h fileEnum.h ansi/string.h token.h
+                parallDr.h hugearr.h fileEnum.h Ansi/string.h token.h
 SRV_MTDS.obj \
 SRV_MTDS.eobj: rbox.goh stdapp.goh object.goh ui.goh Objects/metaC.goh \
                 Objects/inputC.goh Objects/clipbrd.goh \
@@ -178,7 +178,7 @@ SRV_MTDS.eobj: geos.h heap.h geode.h resource.h ec.h object.h lmem.h \
                 disk.h drive.h input.h char.h hwr.h win.h uDialog.h \
                 Objects/gInterC.h Objects/Text/tCommon.h stylesh.h \
                 driver.h thread.h print.h Internal/spoolInt.h serialDr.h \
-                parallDr.h hugearr.h fileEnum.h ansi/string.h token.h
+                parallDr.h hugearr.h fileEnum.h Ansi/string.h token.h
 CR8_MTDS.obj \
 CR8_MTDS.eobj: rbox.goh stdapp.goh object.goh ui.goh Objects/metaC.goh \
                 Objects/inputC.goh Objects/clipbrd.goh \
@@ -208,7 +208,7 @@ CR8_MTDS.eobj: geos.h heap.h geode.h resource.h ec.h object.h lmem.h \
                 disk.h drive.h input.h char.h hwr.h win.h uDialog.h \
                 Objects/gInterC.h Objects/Text/tCommon.h stylesh.h \
                 driver.h thread.h print.h Internal/spoolInt.h serialDr.h \
-                parallDr.h hugearr.h fileEnum.h ansi/string.h token.h
+                parallDr.h hugearr.h fileEnum.h Ansi/string.h token.h
 DOC_MTDS.obj \
 DOC_MTDS.eobj: rbox.goh stdapp.goh object.goh ui.goh Objects/metaC.goh \
                 Objects/inputC.goh Objects/clipbrd.goh \
@@ -238,7 +238,7 @@ DOC_MTDS.eobj: geos.h heap.h geode.h resource.h ec.h object.h lmem.h \
                 disk.h drive.h input.h char.h hwr.h win.h uDialog.h \
                 Objects/gInterC.h Objects/Text/tCommon.h stylesh.h \
                 driver.h thread.h print.h Internal/spoolInt.h serialDr.h \
-                parallDr.h hugearr.h fileEnum.h ansi/string.h token.h
+                parallDr.h hugearr.h fileEnum.h Ansi/string.h token.h
 LST_MTDS.obj \
 LST_MTDS.eobj: rbox.goh stdapp.goh object.goh ui.goh Objects/metaC.goh \
                 Objects/inputC.goh Objects/clipbrd.goh \
@@ -268,7 +268,7 @@ LST_MTDS.eobj: geos.h heap.h geode.h resource.h ec.h object.h lmem.h \
                 disk.h drive.h input.h char.h hwr.h win.h uDialog.h \
                 Objects/gInterC.h Objects/Text/tCommon.h stylesh.h \
                 driver.h thread.h print.h Internal/spoolInt.h serialDr.h \
-                parallDr.h hugearr.h fileEnum.h ansi/string.h token.h
+                parallDr.h hugearr.h fileEnum.h Ansi/string.h token.h
 RBOXUI.obj \
 RBOXUI.eobj: rbox.goh stdapp.goh object.goh ui.goh Objects/metaC.goh \
                 Objects/inputC.goh Objects/clipbrd.goh \
@@ -299,7 +299,7 @@ RBOXUI.eobj: geos.h heap.h geode.h resource.h ec.h object.h lmem.h \
                 disk.h drive.h input.h char.h hwr.h win.h uDialog.h \
                 Objects/gInterC.h Objects/Text/tCommon.h stylesh.h \
                 driver.h thread.h print.h Internal/spoolInt.h serialDr.h \
-                parallDr.h hugearr.h fileEnum.h ansi/string.h token.h
+                parallDr.h hugearr.h fileEnum.h Ansi/string.h token.h
 SEL_MTDS.obj \
 SEL_MTDS.eobj: rbox.goh stdapp.goh object.goh ui.goh Objects/metaC.goh \
                 Objects/inputC.goh Objects/clipbrd.goh \
@@ -329,7 +329,7 @@ SEL_MTDS.eobj: geos.h heap.h geode.h resource.h ec.h object.h lmem.h \
                 disk.h drive.h input.h char.h hwr.h win.h uDialog.h \
                 Objects/gInterC.h Objects/Text/tCommon.h stylesh.h \
                 driver.h thread.h print.h Internal/spoolInt.h serialDr.h \
-                parallDr.h hugearr.h fileEnum.h ansi/string.h token.h
+                parallDr.h hugearr.h fileEnum.h Ansi/string.h token.h
 SRV_MTDS.obj \
 SRV_MTDS.eobj: rbox.goh stdapp.goh object.goh ui.goh Objects/metaC.goh \
                 Objects/inputC.goh Objects/clipbrd.goh \
@@ -359,6 +359,6 @@ SRV_MTDS.eobj: geos.h heap.h geode.h resource.h ec.h object.h lmem.h \
                 disk.h drive.h input.h char.h hwr.h win.h uDialog.h \
                 Objects/gInterC.h Objects/Text/tCommon.h stylesh.h \
                 driver.h thread.h print.h Internal/spoolInt.h serialDr.h \
-                parallDr.h hugearr.h fileEnum.h ansi/string.h token.h
+                parallDr.h hugearr.h fileEnum.h Ansi/string.h token.h
 
 bbgrmtEC.geo bbgrmt.geo : geos.ldf ui.ldf ansic.ldf text.ldf spool.ldf 
