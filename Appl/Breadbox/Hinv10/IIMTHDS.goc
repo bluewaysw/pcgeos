@@ -1,0 +1,1285 @@
+/*
+ **************************************************************************
+ *  FILE:		iimthds.goc
+ *  PROJECT:	Breadbox Home Inventory
+ *  DESCRIPTION:	This file has methods for important info section
+ *			
+ **************************************************************************
+ */
+/*
+ ***************************************************************************
+ *		Include files
+ ***************************************************************************
+ */
+
+@include <stdapp.goh>
+@include "hivar.goh"
+@include <gstring.h>
+#include <string.h>
+
+/* Prototypes */
+void CCclearFields(void);
+void BAclearFields(void);
+void REclearFields(void);
+
+/*
+ ***************************************************************************
+ *		Class & Message Definitions
+ ***************************************************************************
+ */
+
+/* Declare UI object references to those in hinv0s.GOC */
+@extern object ProBox;
+@extern object ProDisplay;
+@extern object ProTypeGroup;
+@extern visMoniker AttyMoniker;
+@extern visMoniker CPAMoniker;
+@extern visMoniker FinPlnMoniker;
+@extern visMoniker StkBrkMoniker;
+@extern visMoniker DoctorMoniker;
+@extern visMoniker DentistMoniker;
+@extern object ProNameField;
+@extern object ProFirmField;
+@extern object ProAddrField;
+@extern object ProCityField;
+@extern object ProPhoneField;
+@extern object CCBox;
+@extern object CCDList;
+@extern object CCNameField;
+@extern object CCAcctField;
+@extern object CCLimitField;
+@extern object CCBPhonField;
+@extern object CCLPhonField;
+@extern object BankingBox;
+@extern object BADList;
+@extern object BABankField;
+@extern object BATypeField;
+@extern object BANumField;
+@extern object BARateField;
+@extern object BAAmountField;
+@extern object REBox;
+@extern object REDList;
+@extern object RELocField;
+@extern object REDescField;
+@extern object REMtgeField;
+@extern object REApprField;
+@extern object REBasisField;
+@extern object REAssmtField;
+@extern object RETaxField;
+
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_OPEN_PRO_DB for HInvProcessClass
+ *
+ * DESCRIPTION:	calls the dialog box when pro button
+ *               is clicked.  
+ *              Done so that buttons would expand to full width
+ *               which doesn't work w/GenInters
+ *     
+ ***********************************************************************/
+
+@extern method HInvProcessClass, MSG_OPEN_PRO_DB
+{
+    @call ProBox::MSG_GEN_INTERACTION_INITIATE();
+}
+
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_PRO_DB_DISPLAY for HInvProcessClass
+ *
+ * DESCRIPTION:	Fills and calls the dialog box when a Pro button
+ *               is clicked.  
+ *     
+ *              (int  whichPro)
+ *
+ ***********************************************************************/
+
+@extern method HInvProcessClass, MSG_PRO_DB_DISPLAY
+{
+    /* Put any saved data into the box. */
+    @call oself::MSG_SHOW_PRO_INFO(whichPro) ;
+
+    @call ProDisplay::MSG_GEN_INTERACTION_INITIATE();
+}
+
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_SHOW_PRO_INFO for HInvProcessClass
+ *
+ * DESCRIPTION:	Puts any professional info into the DB
+ *              before the db draws   
+ *     
+ *              (int   whichPro)
+ *
+ ***********************************************************************/
+
+@extern method HInvProcessClass, MSG_SHOW_PRO_INFO
+{
+   VMBlockHandle    proBlock;
+   ProStruct        *proBaseAddr;
+   MemHandle        mh;
+   int              i;
+
+   /* set which pro and counter value */
+   if (whichPro == ATTY) {
+      @call ProTypeGroup::MSG_GEN_USE_VIS_MONIKER(OptrToChunk(@AttyMoniker),
+                          VUM_DELAYED_VIA_UI_QUEUE);
+      i = 0;
+      }
+   if (whichPro == CPA) {
+      @call ProTypeGroup::MSG_GEN_USE_VIS_MONIKER(OptrToChunk(@CPAMoniker),
+                          VUM_DELAYED_VIA_UI_QUEUE);
+      i = 1;
+      }
+   if (whichPro == FINPLN)  {
+      @call ProTypeGroup::MSG_GEN_USE_VIS_MONIKER(OptrToChunk(@FinPlnMoniker),
+                          VUM_DELAYED_VIA_UI_QUEUE);
+      i = 2;
+      }
+   if (whichPro == STKBRK)  {
+      @call ProTypeGroup::MSG_GEN_USE_VIS_MONIKER(OptrToChunk(@StkBrkMoniker),
+                          VUM_DELAYED_VIA_UI_QUEUE);
+      i = 3;
+      }
+
+   if (whichPro == 4)  {
+      @call ProTypeGroup::MSG_GEN_USE_VIS_MONIKER(OptrToChunk(@DoctorMoniker),
+                          VUM_DELAYED_VIA_UI_QUEUE);
+      i = 4;
+      }
+
+   if (whichPro == 5)  {
+      @call ProTypeGroup::MSG_GEN_USE_VIS_MONIKER(OptrToChunk(@DentistMoniker),
+                          VUM_DELAYED_VIA_UI_QUEUE);
+      i = 5;
+      }
+
+   /* get the ProBlock handle - it's id is 1 */
+   proBlock = VMFind(hmInvFile, NullHandle, 1);
+
+   /* and lock it */
+   proBaseAddr = VMLock(hmInvFile, proBlock, &mh);
+
+   /* get the data & copy it to the fields*/
+
+   @call ProNameField::MSG_VIS_TEXT_REPLACE_ALL_PTR(
+            proBaseAddr[i].ProS_name,0);
+   @call ProFirmField::MSG_VIS_TEXT_REPLACE_ALL_PTR(
+	    proBaseAddr[i].ProS_firm,0);
+   @call ProAddrField::MSG_VIS_TEXT_REPLACE_ALL_PTR(
+	    proBaseAddr[i].ProS_addr,0);
+   @call ProCityField::MSG_VIS_TEXT_REPLACE_ALL_PTR(
+	    proBaseAddr[i].ProS_city,0);
+   @call ProPhoneField::MSG_VIS_TEXT_REPLACE_ALL_PTR(
+	    proBaseAddr[i].ProS_phone,0);
+
+   VMUnlock(mh);
+
+}
+
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_ENTER_PRO_DATA for HInvProcessClass
+ *
+ * DESCRIPTION:	Saves any professional data from the DB
+ *              to the VM file   
+ *     
+ *              
+ *
+ ***********************************************************************/
+
+@extern method HInvProcessClass, MSG_ENTER_PRO_DATA
+{
+   VMBlockHandle    proBlock;
+   ProStruct        *proBaseAddr;
+   MemHandle        mh;
+   ChunkHandle      testMoniker;
+   int              i;
+
+   /* get the moniker */
+   testMoniker = @call ProTypeGroup::MSG_GEN_GET_VIS_MONIKER();
+
+   /* get the ProBlock handle - its id is 1 */
+   proBlock = VMFind(hmInvFile, NullHandle, 1);
+
+   /* and lock it */
+   proBaseAddr = VMLock(hmInvFile, proBlock, &mh);
+
+   /* get pro type */
+   if (testMoniker == OptrToChunk(@AttyMoniker))
+         i = 0;
+   if (testMoniker == OptrToChunk(@CPAMoniker))
+         i = 1;
+   if (testMoniker == OptrToChunk(@FinPlnMoniker))
+         i = 2;
+   if (testMoniker == OptrToChunk(@StkBrkMoniker))
+	 i = 3;
+   if (testMoniker == OptrToChunk(@DoctorMoniker))
+	 i = 4;
+   if (testMoniker == OptrToChunk(@DentistMoniker))
+	 i = 5;
+
+   /* get the info from the fields & copy it to the file */
+   @call ProNameField::MSG_VIS_TEXT_GET_ALL_PTR(proBaseAddr[i].ProS_name);
+   @call ProFirmField::MSG_VIS_TEXT_GET_ALL_PTR(proBaseAddr[i].ProS_firm);
+   @call ProAddrField::MSG_VIS_TEXT_GET_ALL_PTR(proBaseAddr[i].ProS_addr);
+   @call ProCityField::MSG_VIS_TEXT_GET_ALL_PTR(proBaseAddr[i].ProS_city);
+   @call ProPhoneField::MSG_VIS_TEXT_GET_ALL_PTR(proBaseAddr[i].ProS_phone);
+
+   VMDirty(mh);
+   VMUnlock(mh);
+
+}
+
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_OPEN_CC_DB for HInvProcessClass
+ *
+ * DESCRIPTION:	calls the dialog box when CC button
+ *               is clicked.  
+ *              Done so that buttons would expand to full width
+ *               which doesn't work w/GenInters
+ *     
+ ***********************************************************************/
+
+@extern method HInvProcessClass, MSG_OPEN_CC_DB
+{
+
+    /* set to no selections */
+    @call CCDList::MSG_GEN_ITEM_GROUP_SET_NONE_SELECTED(FALSE);
+		/* This is to keep old data (from the entry fields)
+		 * from cluttering things up
+                 */
+    /* Now we clear the fields */
+    CCclearFields();
+
+    @call CCBox::MSG_GEN_INTERACTION_INITIATE();
+}
+
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_NEW_CC for HInvProcessClass
+ *
+ * DESCRIPTION:	Creates a new credit card entry
+ *              
+ *     
+ *              
+ *
+ ***********************************************************************/
+
+@extern method HInvProcessClass, MSG_NEW_CC
+{
+    CCardStruct      *mcard;
+    VMBlockHandle     houseblock;
+    HouseStruct *     houseMemPtr ;
+    word              numCards;
+    char              field1[50];
+    VMBlockHandle     ccBlock;
+    MemHandle         mh, newmh;
+
+    /*
+     * Retrieve the name of the new card from the name field.
+     */
+    @call CCNameField::MSG_VIS_TEXT_GET_ALL_PTR(field1);
+
+    /* Exit if card is unnamed. */
+    if (*field1 == 0)
+        return;
+
+    /* Lock the map item, get number of cards, increment and unlock it */
+    houseblock = VMGetMapBlock(hmInvFile);
+    houseMemPtr = VMLock(hmInvFile, houseblock, &mh);
+    numCards = houseMemPtr->HS_numCCards;
+    numCards++;                         /* remember this new num is used */
+    houseMemPtr->HS_numCCards = numCards;    /* in the rest of the method!!! */
+    VMDirty(mh);
+    VMUnlock(mh);
+
+    /* get the ccard handle - its id is 2 */
+    ccBlock = VMFind(hmInvFile, NullHandle, 2);
+
+    /* and lock the block */
+    VMLock(hmInvFile, ccBlock, &mh);
+
+    /* resize and lock the associated mem block */
+    newmh = MemReAlloc(mh,(numCards *(sizeof(CCardStruct))), HAF_LOCK);
+
+    /* get its address */
+    mcard = MemDeref(newmh);
+
+    /* add the new card info */
+    @call CCNameField::MSG_VIS_TEXT_GET_ALL_PTR(
+                     mcard[(numCards - 1)].CCS_name);
+    @call CCAcctField::MSG_VIS_TEXT_GET_ALL_PTR(
+		     mcard[(numCards - 1)].CCS_acct);
+    @call CCLimitField::MSG_VIS_TEXT_GET_ALL_PTR(
+		     mcard[(numCards - 1)].CCS_limit);
+    @call CCBPhonField::MSG_VIS_TEXT_GET_ALL_PTR(
+		     mcard[(numCards - 1)].CCS_bphon);
+    @call CCLPhonField::MSG_VIS_TEXT_GET_ALL_PTR(
+		     mcard[(numCards - 1)].CCS_lphon);
+
+
+    VMDirty(mh);
+    VMUnlock(mh);
+    MemUnlock(mh);
+    MemUnlock(newmh);
+
+    /* Now we clear the fields */
+    CCclearFields();
+
+    /* Tell the list */
+    @send CCDList::MSG_GEN_DYNAMIC_LIST_ADD_ITEMS((numCards - 1), 1);
+
+}
+
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_EDIT_CC_NAME for HInvProcessClass
+ *
+ * DESCRIPTION:	Edits a credit card entry
+ *              
+ *     
+ *              
+ *
+ ***********************************************************************/
+
+@extern method HInvProcessClass, MSG_EDIT_CC_NAME
+{
+    CCardStruct      *card;
+    VMBlockHandle    ccBlock;
+    MemHandle        mh;
+
+    /* first check to see if a room is selected */
+    if ( currentCCard != GIGS_NONE ) {
+
+       /* OK - put up are you sure you want to change box */
+       if ((UserStandardDialog((char*)0,
+			    (char*)0,
+			    (char*)0,
+			    (char*)0,
+			    "Are you sure you want to change the information for this card?",
+			    ((CDT_WARNING << CDBF_DIALOG_TYPE_OFFSET) |
+			    (GIT_AFFIRMATION << CDBF_INTERACTION_TYPE_OFFSET))
+                            ) == IC_YES))  {
+
+
+       /* get the ccard handle - its id is 2 */
+       ccBlock = VMFind(hmInvFile, NullHandle, 2);
+
+       /* and lock the block */
+       card = VMLock(hmInvFile, ccBlock, &mh);
+   
+       /* change the data */
+       @call CCNameField::MSG_VIS_TEXT_GET_ALL_PTR(
+                      card[currentCCard].CCS_name);
+       @call CCAcctField::MSG_VIS_TEXT_GET_ALL_PTR(
+                      card[currentCCard].CCS_acct);
+       @call CCLimitField::MSG_VIS_TEXT_GET_ALL_PTR(
+                      card[currentCCard].CCS_limit);
+       @call CCBPhonField::MSG_VIS_TEXT_GET_ALL_PTR(
+                      card[currentCCard].CCS_bphon);
+       @call CCLPhonField::MSG_VIS_TEXT_GET_ALL_PTR(
+                      card[currentCCard].CCS_lphon);
+
+
+       VMDirty(mh);
+       VMUnlock(mh);
+
+       /* Now we clear the fields */
+       CCclearFields();
+
+
+       /* change the list */
+       @send CCDList::MSG_GEN_DYNAMIC_LIST_INITIALIZE(GDLI_NO_CHANGE);
+
+       }  /* end of are you sure if */
+
+    }  /* end of selection check if */
+
+
+}
+
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_DELETE_CC for HInvProcessClass
+ *
+ * DESCRIPTION:	Deletes a credit card entry
+ *              
+ *     
+ *              
+ *
+ ***********************************************************************/
+
+@extern method HInvProcessClass, MSG_DELETE_CC
+{
+    CCardStruct      *mcard;
+    VMBlockHandle     houseblock;
+    HouseStruct *     houseMemPtr ;
+    word              numCards, i;
+    VMBlockHandle     ccBlock;
+    MemHandle         mh, newmh;
+
+    /* Exit if no piece selected */
+    if (currentCCard == GIGS_NONE)
+        return;
+
+    /* put up an Are you sure box */
+    if ((UserStandardDialog((char*)0,
+			    (char*)0,
+			    (char*)0,
+			    (char*)0,
+			    "Are you sure you want to delete this credit card?",
+			    ((CDT_WARNING << CDBF_DIALOG_TYPE_OFFSET) |
+			    (GIT_AFFIRMATION << CDBF_INTERACTION_TYPE_OFFSET))
+                            ) == IC_YES))  {
+
+    /* Lock the map item, get number of cards, decrement and unlock it */
+    houseblock = VMGetMapBlock(hmInvFile);
+    houseMemPtr = VMLock(hmInvFile, houseblock, &mh);
+    numCards = houseMemPtr->HS_numCCards;
+    numCards--;                         /* remember this new num is used */
+    houseMemPtr->HS_numCCards = numCards;    /* in the rest of the method!!! */
+    VMDirty(mh);
+    VMUnlock(mh);
+
+    /* get the ccard handle - its id is 2 */
+    ccBlock = VMFind(hmInvFile, NullHandle, 2);
+
+    /* and lock the block */
+    /*card = VMLock(hmInvFile, ccBlock, &mh);*/
+    VMLock(hmInvFile, ccBlock, &mh);
+
+    /* get the address of the associated mem block */
+    mcard = MemLock(mh);
+
+    /* loop thru to delete card & info 
+     * unless only card deleted...
+     * Still want to keep an empty structure so there'll
+     * always be a mem block assoc with the VM block
+     * just as at initialization of new file */
+    if (numCards == 0) {
+       strcpy(mcard[0].CCS_name, "");
+       strcpy(mcard[0].CCS_acct, "");
+       strcpy(mcard[0].CCS_limit, "");
+       strcpy(mcard[0].CCS_bphon, "");
+       strcpy(mcard[0].CCS_lphon, "");
+       }
+
+    for (i = currentCCard; i < numCards; i++) {
+       strcpy(mcard[i].CCS_name, mcard[i+1].CCS_name);
+       strcpy(mcard[i].CCS_acct, mcard[i+1].CCS_acct);
+       strcpy(mcard[i].CCS_limit, mcard[i+1].CCS_limit);
+       strcpy(mcard[i].CCS_bphon, mcard[i+1].CCS_bphon);
+       strcpy(mcard[i].CCS_lphon, mcard[i+1].CCS_lphon);
+       }
+
+    /* resize the associated mem block
+     * if not the only remaining struct */
+    if (numCards != 0) {
+       newmh = MemReAlloc(mh,((numCards+1)*(sizeof(CCardStruct))), HAF_LOCK);
+       MemUnlock(newmh);
+       }
+
+    VMDirty(mh);
+    VMUnlock(mh);
+    MemUnlock(mh);
+    
+    /* Now we clear the fields */
+    CCclearFields();
+
+    /* Tell the list */
+    @send CCDList::MSG_GEN_DYNAMIC_LIST_REMOVE_ITEMS(currentCCard, 1);
+
+    } /* end of are you sure if */
+}
+
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_CC_LIST_MONIKER_QUERY for HInvProcessClass
+ *
+ * DESCRIPTION:	Queries for monikers for credit card list.
+ *
+ * PARAMETERS:  void (optr list, word item)
+ *
+ *
+ ***********************************************************************/
+
+@extern method HInvProcessClass, MSG_CC_LIST_MONIKER_QUERY
+{
+    CCardStruct      *card;
+    VMBlockHandle    ccBlock;
+    MemHandle        mh;
+
+    /* get the ccard handle - its id is 2 */
+    ccBlock = VMFind(hmInvFile, NullHandle, 2);
+
+    /* and lock the block */
+    card = VMLock(hmInvFile, ccBlock, &mh);
+
+    /* Set the text in the list item. */
+    @call list::MSG_GEN_DYNAMIC_LIST_REPLACE_ITEM_TEXT(item, card[item].CCS_name);
+
+    /* Unlock the block. */
+    VMUnlock(mh);
+}
+
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_CC_LIST_APPLY for HInvProcessClass
+ *
+ * DESCRIPTION:	Handles an apply of user changes to the ccard list.
+ *
+ * PARAMETERS:  void (word selection, numSelections, flags)
+ *
+ * 
+ *
+ ***********************************************************************/
+
+@extern method HInvProcessClass, MSG_CC_LIST_APPLY
+{
+    CCardStruct      *card;
+    VMBlockHandle    ccBlock;
+    MemHandle        mh;
+
+    /* Set the current card global variable */
+    currentCCard = selection;
+
+    /* get the ccard handle - its id is 2 */
+    ccBlock = VMFind(hmInvFile, NullHandle, 2);
+
+    /* and lock the block */
+    card = VMLock(hmInvFile, ccBlock, &mh);
+
+    /* Now we set up fields based on new card. */
+    @call CCNameField::MSG_VIS_TEXT_REPLACE_ALL_PTR(
+		card[currentCCard].CCS_name, 0);
+    @call CCAcctField::MSG_VIS_TEXT_REPLACE_ALL_PTR(
+		card[currentCCard].CCS_acct, 0);
+    @call CCLimitField::MSG_VIS_TEXT_REPLACE_ALL_PTR(
+		card[currentCCard].CCS_limit, 0);
+    @call CCBPhonField::MSG_VIS_TEXT_REPLACE_ALL_PTR(
+		card[currentCCard].CCS_bphon, 0);
+    @call CCLPhonField::MSG_VIS_TEXT_REPLACE_ALL_PTR(
+		card[currentCCard].CCS_lphon, 0);
+
+    /* Unlock the block. */
+    VMUnlock(mh);
+
+
+}
+
+/*------------------------------------------------------------------
+ *  FUNCTION	CCclearFields
+ *-------------------------------------------------------------------
+ */
+ void CCclearFields() {
+
+    /* Now we clear the fields */
+    @call CCNameField::MSG_VIS_TEXT_REPLACE_ALL_PTR("", 0);
+    @call CCAcctField::MSG_VIS_TEXT_REPLACE_ALL_PTR("", 0);
+    @call CCLimitField::MSG_VIS_TEXT_REPLACE_ALL_PTR("", 0);
+    @call CCBPhonField::MSG_VIS_TEXT_REPLACE_ALL_PTR("", 0);
+    @call CCLPhonField::MSG_VIS_TEXT_REPLACE_ALL_PTR("", 0);
+
+}
+
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_OPEN_BA_DB for HInvProcessClass
+ *
+ * DESCRIPTION:	calls the dialog box when Banking button
+ *               is clicked.  
+ *              Done so that buttons would expand to full width
+ *               which doesn't work w/GenInters
+ *     
+ ***********************************************************************/
+
+@extern method HInvProcessClass, MSG_OPEN_BA_DB
+{
+    /* set to no selections */
+    @call BADList::MSG_GEN_ITEM_GROUP_SET_NONE_SELECTED(FALSE);
+		/* This is to keep old data (from the entry fields)
+		 * from cluttering things up
+                 */
+    /* Now we clear the fields */
+    BAclearFields();
+
+    @call BankingBox::MSG_GEN_INTERACTION_INITIATE();
+}
+
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_NEW_BA for HInvProcessClass
+ *
+ * DESCRIPTION:	Creates a new bank account entry
+ *              
+ ***********************************************************************/
+
+@extern method HInvProcessClass, MSG_NEW_BA
+{
+    BAcctStruct      *macct;
+    VMBlockHandle     houseblock;
+    HouseStruct *     houseMemPtr ;
+    word              numAccts;
+    char              field1[50];
+    VMBlockHandle     block;
+    MemHandle         mh, newmh;
+
+    /*
+     * Retrieve the name of the new acct from the name field.
+     */
+    @call BABankField::MSG_VIS_TEXT_GET_ALL_PTR(field1);
+
+    /* Exit if acct is unnamed. */
+    if (*field1 == 0)
+        return;
+
+    /* Lock the map item, get number of accts, increment and unlock it */
+    houseblock = VMGetMapBlock(hmInvFile);
+    houseMemPtr = VMLock(hmInvFile, houseblock, &mh);
+    numAccts = houseMemPtr->HS_numBAccts;
+    numAccts++;                         /* remember this new num is used */
+    houseMemPtr->HS_numBAccts = numAccts;    /* in the rest of the method!!! */
+    VMDirty(mh);
+    VMUnlock(mh);
+
+    /* get the acct handle - its id is 3 */
+    block = VMFind(hmInvFile, NullHandle, 3);
+
+    /* and lock the block */
+    VMLock(hmInvFile, block, &mh);
+
+    /* resize and lock the associated mem block */
+    newmh = MemReAlloc(mh,(numAccts *(sizeof(BAcctStruct))), HAF_LOCK);
+
+    /* get its address */
+    macct = MemDeref(newmh);
+
+    /* add the new acct info */
+    @call BABankField::MSG_VIS_TEXT_GET_ALL_PTR(
+                  macct[(numAccts - 1)].BAS_bank);
+    @call BATypeField::MSG_VIS_TEXT_GET_ALL_PTR(
+                  macct[(numAccts - 1)].BAS_type);
+    @call BANumField::MSG_VIS_TEXT_GET_ALL_PTR(
+                  macct[(numAccts - 1)].BAS_num);
+    @call BARateField::MSG_VIS_TEXT_GET_ALL_PTR(
+                  macct[(numAccts - 1)].BAS_rate);
+    @call BAAmountField::MSG_VIS_TEXT_GET_ALL_PTR(
+                  macct[(numAccts - 1)].BAS_amount);
+
+    VMDirty(mh);
+    VMUnlock(mh);
+    MemUnlock(mh);
+    MemUnlock(newmh);
+
+    /* Now we clear the fields */
+    BAclearFields();
+
+    /* Tell the list */
+    @send BADList::MSG_GEN_DYNAMIC_LIST_ADD_ITEMS((numAccts - 1), 1);
+
+}
+
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_EDIT_BA_NAME for HInvProcessClass
+ *
+ * DESCRIPTION:	Edits a bank account entry
+ *              
+ ***********************************************************************/
+
+@extern method HInvProcessClass, MSG_EDIT_BA_NAME
+{
+    BAcctStruct      *acct;
+    VMBlockHandle    block;
+    MemHandle        mh;
+
+    /* first check to see if an account is selected */
+    if ( currentBAcct != GIGS_NONE ) {
+
+       /* OK - put up are you sure you want to change box */
+       if ((UserStandardDialog((char*)0,
+			    (char*)0,
+			    (char*)0,
+			    (char*)0,
+			    "Are you sure you want to change the information for this bank account?",
+			    ((CDT_WARNING << CDBF_DIALOG_TYPE_OFFSET) |
+			    (GIT_AFFIRMATION << CDBF_INTERACTION_TYPE_OFFSET))
+                            ) == IC_YES))  {
+
+
+       /* get the acct handle - its id is 3 */
+       block = VMFind(hmInvFile, NullHandle, 3);
+
+       /* and lock the block */
+       acct = VMLock(hmInvFile, block, &mh);
+   
+       /* get the new info & change the data */
+       @call BABankField::MSG_VIS_TEXT_GET_ALL_PTR(
+                      acct[currentBAcct].BAS_bank);
+       @call BATypeField::MSG_VIS_TEXT_GET_ALL_PTR(
+                      acct[currentBAcct].BAS_type);
+       @call BANumField::MSG_VIS_TEXT_GET_ALL_PTR(
+                      acct[currentBAcct].BAS_num);
+       @call BARateField::MSG_VIS_TEXT_GET_ALL_PTR(
+                      acct[currentBAcct].BAS_rate);
+       @call BAAmountField::MSG_VIS_TEXT_GET_ALL_PTR(
+                      acct[currentBAcct].BAS_amount);
+
+       VMDirty(mh);
+       VMUnlock(mh);
+
+       /* Now we clear the fields */
+       BAclearFields();
+
+       /* change the list */
+       @send BADList::MSG_GEN_DYNAMIC_LIST_INITIALIZE(GDLI_NO_CHANGE);
+
+       }  /* end of are you sure if */
+
+    }  /* end of selection check if */
+
+
+}
+
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_DELETE_BA for HInvProcessClass
+ *
+ * DESCRIPTION:	Deletes a bank account entry
+ *              
+ *     
+ *              
+ *
+ ***********************************************************************/
+
+@extern method HInvProcessClass, MSG_DELETE_BA
+{
+    BAcctStruct       *macct;
+    VMBlockHandle     houseblock;
+    HouseStruct *     houseMemPtr ;
+    word              numAccts, i;
+    VMBlockHandle     block;
+    MemHandle         mh, newmh;
+
+    /* Exit if no bank account selected */
+    if (currentBAcct == GIGS_NONE)
+        return;
+
+    /* put up an Are you sure box */
+    if ((UserStandardDialog((char*)0,
+			    (char*)0,
+			    (char*)0,
+			    (char*)0,
+			    "Are you sure you want to delete this bank account?",
+			    ((CDT_WARNING << CDBF_DIALOG_TYPE_OFFSET) |
+			    (GIT_AFFIRMATION << CDBF_INTERACTION_TYPE_OFFSET))
+                            ) == IC_YES))  {
+
+    /* Lock the map item, get number of acctss, decrement and unlock it */
+    houseblock = VMGetMapBlock(hmInvFile);
+    houseMemPtr = VMLock(hmInvFile, houseblock, &mh);
+    numAccts = houseMemPtr->HS_numBAccts;
+    numAccts--;                         /* remember this new num is used */
+    houseMemPtr->HS_numBAccts = numAccts;    /* in the rest of the method!!! */
+    VMDirty(mh);
+    VMUnlock(mh);
+
+    /* get the acct handle - its id is 3 */
+    block = VMFind(hmInvFile, NullHandle, 3);
+
+    /* and lock the block */
+    VMLock(hmInvFile, block, &mh);
+
+    /* get the address of the associated mem block */
+    macct = MemLock(mh);
+
+    /* loop thru to delete acct & info 
+     * unless only acct deleted...
+     * Still want to keep an empty structure so there'll
+     * always be a mem block assoc with the VM block
+     * just as at initialization of new file */
+    if (numAccts == 0) {
+       strcpy(macct[0].BAS_bank, "");
+       strcpy(macct[0].BAS_type, "");
+       strcpy(macct[0].BAS_num, "");
+       strcpy(macct[0].BAS_rate, "");
+       strcpy(macct[0].BAS_amount, "");
+       }
+
+    for (i = currentBAcct; i < numAccts; i++) {
+       strcpy(macct[i].BAS_bank, macct[i+1].BAS_bank);
+       strcpy(macct[i].BAS_type, macct[i+1].BAS_type);
+       strcpy(macct[i].BAS_num, macct[i+1].BAS_num);
+       strcpy(macct[i].BAS_rate, macct[i+1].BAS_rate);
+       strcpy(macct[i].BAS_amount, macct[i+1].BAS_amount);
+       }
+
+    /* resize the associated mem block
+     * if not the only remaining struct */
+    if (numAccts != 0) {
+       newmh = MemReAlloc(mh,((numAccts+1)*(sizeof(BAcctStruct))), HAF_LOCK);
+       MemUnlock(newmh);
+       }
+
+    VMDirty(mh);
+    VMUnlock(mh);
+    MemUnlock(mh);
+    
+    /* Now we clear the fields */
+    BAclearFields();
+
+    /* Tell the list */
+    @send BADList::MSG_GEN_DYNAMIC_LIST_REMOVE_ITEMS(currentBAcct, 1);
+
+    } /* end of are you sure if */
+}
+
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_BA_LIST_MONIKER_QUERY for HInvProcessClass
+ *
+ * DESCRIPTION:	Queries for monikers for bank account list.
+ *
+ * PARAMETERS:  void (optr list, word item)
+ *
+ *
+ ***********************************************************************/
+
+@extern method HInvProcessClass, MSG_BA_LIST_MONIKER_QUERY
+{
+    BAcctStruct      *acct;
+    VMBlockHandle    block;
+    MemHandle        mh;
+
+    /* get the acct handle - its id is 3 */
+    block = VMFind(hmInvFile, NullHandle, 3);
+
+    /* and lock the block */
+    acct = VMLock(hmInvFile, block, &mh);
+
+    /* Set the text in the list item. */
+    @call list::MSG_GEN_DYNAMIC_LIST_REPLACE_ITEM_TEXT(item, acct[item].BAS_bank);
+
+    /* Unlock the block. */
+    VMUnlock(mh);
+}
+
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_BA_LIST_APPLY for HInvProcessClass
+ *
+ * DESCRIPTION:	Handles an apply of user changes to the bank account list.
+ *
+ * PARAMETERS:  void (word selection, numSelections, flags)
+ *
+ * 
+ *
+ ***********************************************************************/
+
+@extern method HInvProcessClass, MSG_BA_LIST_APPLY
+{
+    BAcctStruct      *acct;
+    VMBlockHandle    block;
+    MemHandle        mh;
+
+    /* Set the current bank account global variable */
+    currentBAcct = selection;
+
+    /* get the acct handle - its id is 3 */
+    block = VMFind(hmInvFile, NullHandle, 3);
+
+    /* and lock the block */
+    acct = VMLock(hmInvFile, block, &mh);
+
+    /* Now we set up fields based on new acct. */
+    @call BABankField::MSG_VIS_TEXT_REPLACE_ALL_PTR(
+		acct[currentBAcct].BAS_bank, 0);
+    @call BATypeField::MSG_VIS_TEXT_REPLACE_ALL_PTR(
+		acct[currentBAcct].BAS_type, 0);
+    @call BANumField::MSG_VIS_TEXT_REPLACE_ALL_PTR(
+		acct[currentBAcct].BAS_num, 0);
+    @call BARateField::MSG_VIS_TEXT_REPLACE_ALL_PTR(
+		acct[currentBAcct].BAS_rate, 0);
+    @call BAAmountField::MSG_VIS_TEXT_REPLACE_ALL_PTR(
+		acct[currentBAcct].BAS_amount, 0);
+
+    /* Unlock the block. */
+    VMUnlock(mh);
+
+}
+
+/*------------------------------------------------------------------
+ *  FUNCTION	BAclearFields
+ *-------------------------------------------------------------------
+ */
+ void BAclearFields() {
+
+    /* Now we clear the fields */
+    @call BABankField::MSG_VIS_TEXT_REPLACE_ALL_PTR("", 0);
+    @call BATypeField::MSG_VIS_TEXT_REPLACE_ALL_PTR("", 0);
+    @call BANumField::MSG_VIS_TEXT_REPLACE_ALL_PTR("", 0);
+    @call BARateField::MSG_VIS_TEXT_REPLACE_ALL_PTR("", 0);
+    @call BAAmountField::MSG_VIS_TEXT_REPLACE_ALL_PTR("", 0);
+
+}
+
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_OPEN_RE_DB for HInvProcessClass
+ *
+ * DESCRIPTION:	calls the dialog box when RE button
+ *               is clicked.  
+ *              Done so that buttons would expand to full width
+ *               which doesn't work w/GenInters
+ *     
+ ***********************************************************************/
+
+@extern method HInvProcessClass, MSG_OPEN_RE_DB
+{
+    /* set to no selections */
+    @call REDList::MSG_GEN_ITEM_GROUP_SET_NONE_SELECTED(FALSE);
+		/* This is to keep old data (from the entry fields)
+		 * from cluttering things up
+                 */
+    /* Now we clear the fields */
+    REclearFields();
+
+    @call REBox::MSG_GEN_INTERACTION_INITIATE();
+}
+
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_NEW_RE for HInvProcessClass
+ *
+ * DESCRIPTION:	Creates a new real estate entry
+ *              
+ ***********************************************************************/
+
+@extern method HInvProcessClass, MSG_NEW_RE
+{
+    REstStruct       *mrest;
+    VMBlockHandle     houseblock;
+    HouseStruct *     houseMemPtr ;
+    word              numREst;
+    char              field1[50];
+    VMBlockHandle     block;
+    MemHandle         mh, newmh;
+
+    /*
+     * Retrieve the name of the new property from the name field.
+     */
+    @call RELocField::MSG_VIS_TEXT_GET_ALL_PTR(field1);
+
+    /* Exit if property is unnamed. */
+    if (*field1 == 0)
+        return;
+
+    /* Lock the map item, get number of properties, increment and unlock it */
+    houseblock = VMGetMapBlock(hmInvFile);
+    houseMemPtr = VMLock(hmInvFile, houseblock, &mh);
+    numREst = houseMemPtr->HS_numREst;
+    numREst++;                         /* remember this new num is used */
+    houseMemPtr->HS_numREst = numREst;    /* in the rest of the method!!! */
+    VMDirty(mh);
+    VMUnlock(mh);
+
+    /* get the acct handle - its id is 4 */
+    block = VMFind(hmInvFile, NullHandle, 4);
+
+    /* and lock the block */
+    VMLock(hmInvFile, block, &mh);
+
+    /* resize and lock the associated mem block */
+    newmh = MemReAlloc(mh,(numREst *(sizeof(REstStruct))), HAF_LOCK);
+
+    /* get its address */
+    mrest = MemDeref(newmh);
+
+    /* add the new property info */
+    @call RELocField::MSG_VIS_TEXT_GET_ALL_PTR(
+               mrest[(numREst - 1)].RES_loc);
+    @call REDescField::MSG_VIS_TEXT_GET_ALL_PTR(
+               mrest[(numREst - 1)].RES_desc);
+    @call REMtgeField::MSG_VIS_TEXT_GET_ALL_PTR(
+               mrest[(numREst - 1)].RES_mtge);
+    @call REApprField::MSG_VIS_TEXT_GET_ALL_PTR(
+               mrest[(numREst - 1)].RES_appr);
+    @call REBasisField::MSG_VIS_TEXT_GET_ALL_PTR(
+               mrest[(numREst - 1)].RES_basis);
+    @call REAssmtField::MSG_VIS_TEXT_GET_ALL_PTR(
+               mrest[(numREst - 1)].RES_assmt);
+    @call RETaxField::MSG_VIS_TEXT_GET_ALL_PTR(
+               mrest[(numREst - 1)].RES_tax);
+
+
+    VMDirty(mh);
+    VMUnlock(mh);
+    MemUnlock(mh);
+    MemUnlock(newmh);
+
+    /* Now we clear the fields */
+    REclearFields();
+
+    /* Tell the list */
+    @send REDList::MSG_GEN_DYNAMIC_LIST_ADD_ITEMS((numREst - 1), 1);
+
+}
+
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_EDIT_RE_NAME for HInvProcessClass
+ *
+ * DESCRIPTION:	Edits a real estate entry
+ *              
+ *     
+ *              
+ *
+ ***********************************************************************/
+
+@extern method HInvProcessClass, MSG_EDIT_RE_NAME
+{
+    REstStruct      *rest;
+    VMBlockHandle    block;
+    MemHandle        mh;
+
+    /* first check to see if a property is selected */
+    if ( currentREst != GIGS_NONE ) {
+
+       /* OK - put up are you sure you want to change box */
+       if ((UserStandardDialog((char*)0,
+			    (char*)0,
+			    (char*)0,
+			    (char*)0,
+			    "Are you sure you want to change the information for this property?",
+			    ((CDT_WARNING << CDBF_DIALOG_TYPE_OFFSET) |
+			    (GIT_AFFIRMATION << CDBF_INTERACTION_TYPE_OFFSET))
+                            ) == IC_YES))  {
+
+       /* get the acct handle - its id is 4 */
+       block = VMFind(hmInvFile, NullHandle, 4);
+
+       /* and lock the block */
+       rest = VMLock(hmInvFile, block, &mh);
+   
+       /* change the data */
+       @call RELocField::MSG_VIS_TEXT_GET_ALL_PTR(
+                  rest[currentREst].RES_loc);
+       @call REDescField::MSG_VIS_TEXT_GET_ALL_PTR(
+                  rest[currentREst].RES_desc);
+       @call REMtgeField::MSG_VIS_TEXT_GET_ALL_PTR(
+                  rest[currentREst].RES_mtge);
+       @call REApprField::MSG_VIS_TEXT_GET_ALL_PTR(
+                  rest[currentREst].RES_appr);
+       @call REBasisField::MSG_VIS_TEXT_GET_ALL_PTR(
+                  rest[currentREst].RES_basis);
+       @call REAssmtField::MSG_VIS_TEXT_GET_ALL_PTR(
+                  rest[currentREst].RES_assmt);
+       @call RETaxField::MSG_VIS_TEXT_GET_ALL_PTR(
+                  rest[currentREst].RES_tax);
+
+       VMDirty(mh);
+       VMUnlock(mh);
+
+       /* Now we clear the fields */
+       REclearFields();
+
+       /* change the list */
+       @send REDList::MSG_GEN_DYNAMIC_LIST_INITIALIZE(GDLI_NO_CHANGE);
+
+       }  /* end of are you sure if */
+
+    }  /* end of selection check if */
+
+
+}
+
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_DELETE_RE for HInvProcessClass
+ *
+ * DESCRIPTION:	Deletes a real estate entry
+ *              
+ ***********************************************************************/
+
+@extern method HInvProcessClass, MSG_DELETE_RE
+{
+    REstStruct       *mrest;
+    VMBlockHandle     houseblock;
+    HouseStruct *     houseMemPtr ;
+    word              numREst, i;
+    VMBlockHandle     block;
+    MemHandle         mh, newmh;
+
+    /* Exit if no bank account selected */
+    if (currentREst == GIGS_NONE)
+        return;
+
+    /* put up an Are you sure box */
+    if ((UserStandardDialog((char*)0,
+			    (char*)0,
+			    (char*)0,
+			    (char*)0,
+			    "Are you sure you want to delete this property?",
+			    ((CDT_WARNING << CDBF_DIALOG_TYPE_OFFSET) |
+			    (GIT_AFFIRMATION << CDBF_INTERACTION_TYPE_OFFSET))
+                            ) == IC_YES))  {
+
+    /* Lock the map item, get number of properties, decrement and unlock it */
+    houseblock = VMGetMapBlock(hmInvFile);
+    houseMemPtr = VMLock(hmInvFile, houseblock, &mh);
+    numREst = houseMemPtr->HS_numREst;
+    numREst--;                         /* remember this new num is used */
+    houseMemPtr->HS_numREst = numREst;    /* in the rest of the method!!! */
+    VMDirty(mh);
+    VMUnlock(mh);
+
+    /* get the acct handle - its id is 4 */
+    block = VMFind(hmInvFile, NullHandle, 4);
+
+    /* and lock the block */
+    VMLock(hmInvFile, block, &mh);
+
+    /* get the address of the associated mem block */
+    mrest = MemLock(mh);
+
+    /* loop thru to delete property & info 
+     * unless only property deleted...
+     * Still want to keep an empty structure so there'll
+     * always be a mem block assoc with the VM block
+     * just as at initialization of new file */
+    if (numREst == 0) {
+       strcpy(mrest[0].RES_loc, "");
+       strcpy(mrest[0].RES_desc, "");
+       strcpy(mrest[0].RES_mtge, "");
+       strcpy(mrest[0].RES_appr, "");
+       strcpy(mrest[0].RES_basis, "");
+       strcpy(mrest[0].RES_assmt, "");
+       strcpy(mrest[0].RES_tax, "");
+       }
+
+    for (i = currentREst; i < numREst; i++) {
+       strcpy(mrest[i].RES_loc, mrest[i+1].RES_loc);
+       strcpy(mrest[i].RES_desc, mrest[i+1].RES_desc);
+       strcpy(mrest[i].RES_mtge, mrest[i+1].RES_mtge);
+       strcpy(mrest[i].RES_appr, mrest[i+1].RES_appr);
+       strcpy(mrest[i].RES_basis, mrest[i+1].RES_basis);
+       strcpy(mrest[i].RES_assmt, mrest[i+1].RES_assmt);
+       strcpy(mrest[i].RES_tax, mrest[i+1].RES_tax);
+       }
+
+    /* resize the associated mem block
+     * if not the only remaining struct */
+    if (numREst != 0) {
+       newmh = MemReAlloc(mh,((numREst+1)*(sizeof(REstStruct))), HAF_LOCK);
+       MemUnlock(newmh);
+       }
+
+    VMDirty(mh);
+    VMUnlock(mh);
+    MemUnlock(mh);
+    
+    /* Now we clear the fields */
+    REclearFields();
+
+    /* Tell the list */
+    @send REDList::MSG_GEN_DYNAMIC_LIST_REMOVE_ITEMS(currentREst, 1);
+
+    } /* end of are you sure if */
+}
+
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_RE_LIST_MONIKER_QUERY for HInvProcessClass
+ *
+ * DESCRIPTION:	Queries for monikers for real estate list.
+ *
+ * PARAMETERS:  void (optr list, word item)
+ *
+ *
+ ***********************************************************************/
+
+@extern method HInvProcessClass, MSG_RE_LIST_MONIKER_QUERY
+{
+    REstStruct      *rest;
+    VMBlockHandle    block;
+    MemHandle        mh;
+
+    /* get the acct handle - its id is 4 */
+    block = VMFind(hmInvFile, NullHandle, 4);
+
+    /* and lock the block */
+    rest = VMLock(hmInvFile, block, &mh);
+
+    /* Set the text in the list item. */
+    @call list::MSG_GEN_DYNAMIC_LIST_REPLACE_ITEM_TEXT(item, rest[item].RES_loc);
+
+    /* Unlock the block. */
+    VMUnlock(mh);
+}
+
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_RE_LIST_APPLY for HInvProcessClass
+ *
+ * DESCRIPTION:	Handles an apply of user changes to the real estate list.
+ *
+ * PARAMETERS:  void (word selection, numSelections, flags)
+ *
+ * 
+ *
+ ***********************************************************************/
+
+@extern method HInvProcessClass, MSG_RE_LIST_APPLY
+{
+    REstStruct      *rest;
+    VMBlockHandle    block;
+    MemHandle        mh;
+
+    /* Set the current bank account global variable */
+    currentREst = selection;
+
+    /* get the acct handle - its id is 4 */
+    block = VMFind(hmInvFile, NullHandle, 4);
+
+    /* and lock the block */
+    rest = VMLock(hmInvFile, block, &mh);
+
+    /* Now we set up fields based on new property. */
+    @call RELocField::MSG_VIS_TEXT_REPLACE_ALL_PTR(
+		rest[currentREst].RES_loc, 0);
+    @call REDescField::MSG_VIS_TEXT_REPLACE_ALL_PTR(
+		rest[currentREst].RES_desc, 0);
+    @call REMtgeField::MSG_VIS_TEXT_REPLACE_ALL_PTR(
+		rest[currentREst].RES_mtge, 0);
+    @call REApprField::MSG_VIS_TEXT_REPLACE_ALL_PTR(
+		rest[currentREst].RES_appr, 0);
+    @call REBasisField::MSG_VIS_TEXT_REPLACE_ALL_PTR(
+		rest[currentREst].RES_basis, 0);
+    @call REAssmtField::MSG_VIS_TEXT_REPLACE_ALL_PTR(
+		rest[currentREst].RES_assmt, 0);
+    @call RETaxField::MSG_VIS_TEXT_REPLACE_ALL_PTR(
+		rest[currentREst].RES_tax, 0);
+
+    /* Unlock the block. */
+    VMUnlock(mh);
+
+}
+
+/*------------------------------------------------------------------
+ *  FUNCTION	REclearFields
+ *-------------------------------------------------------------------
+ */
+ void REclearFields() {
+
+    /* Now we clear the fields */
+    @call RELocField::MSG_VIS_TEXT_REPLACE_ALL_PTR("", 0);
+    @call REDescField::MSG_VIS_TEXT_REPLACE_ALL_PTR("", 0);
+    @call REMtgeField::MSG_VIS_TEXT_REPLACE_ALL_PTR("", 0);
+    @call REApprField::MSG_VIS_TEXT_REPLACE_ALL_PTR("", 0);
+    @call REBasisField::MSG_VIS_TEXT_REPLACE_ALL_PTR("", 0);
+    @call REAssmtField::MSG_VIS_TEXT_REPLACE_ALL_PTR("", 0);
+    @call RETaxField::MSG_VIS_TEXT_REPLACE_ALL_PTR("", 0);
+
+}
