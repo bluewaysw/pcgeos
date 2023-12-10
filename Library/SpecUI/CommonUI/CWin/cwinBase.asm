@@ -3754,16 +3754,7 @@ OLBaseWinGainedSystemTargetExcl	method dynamic	OLBaseWinClass,
 
 	call	WinClasses_ObjCallSuperNoLock_OLBaseWinClass
 
-if PLACE_EXPRESS_MENU_ON_PRIMARY ;and (not TOOL_AREA_IS_TASK_BAR)
-
-	;
-	; if (not TOOL_AREA_IS_TASK_BAR)
-	;
-	push	ds
-	segmov	ds, dgroup
-	tst	ds:[taskBarEnabled] ; if taskbar == on, ZF == 1
-	pop	ds
-	jnz	haveExpress ; if ZF==1 skip the following code
+if PLACE_EXPRESS_MENU_ON_PRIMARY
 
 	push	es
 	segmov	es, dgroup, ax
@@ -3780,14 +3771,24 @@ if PLACE_EXPRESS_MENU_ON_PRIMARY ;and (not TOOL_AREA_IS_TASK_BAR)
 	test	ds:[di].OLBWI_flags, mask OLBWF_REJECT_EXPRESS_TOOL_AREA
 	jz	haveExpress
 
+	;
+	; if (not TOOL_AREA_IS_TASK_BAR)
+	;
+	push	ds
+	segmov	ds, dgroup
+	tst	ds:[taskBarEnabled] ; if taskbar == on, ZF == 1
+	pop	ds
+	jnz	hasTaskbar1 ; if ZF==1 skip the following code
+
 	call	OLBaseWinHideExpressToolArea ; wrap with if
 
+hasTaskbar1:
 	jmp	short afterExpressMenu
 
 haveExpress:
 endif ; PLACE_EXPRESS_MENU_ON_PRIMARY
 
-if PLACE_EXPRESS_MENU_ON_PRIMARY or TOOL_AREA_IS_TASK_BAR
+if PLACE_EXPRESS_MENU_ON_PRIMARY ; or TOOL_AREA_IS_TASK_BAR
 	; Set flag indicating we have the express tool area now, &
 	; move it to the correct place.
 	;
@@ -3806,7 +3807,7 @@ if PLACE_EXPRESS_MENU_ON_PRIMARY ;and (not TOOL_AREA_IS_TASK_BAR)
 	segmov	ds, dgroup
 	tst	ds:[taskBarEnabled] ; if taskbar == on, ZF == 1
 	pop	ds
-	jnz	haveTaskbar ; if ZF==1 skip the following code
+	jnz	hasTaskbar2 ; if ZF==1 skip the following code
 
 	; Cheat -- instead of doing full geometry, just update
 	; OLWI_titleBarBounds to reflect the addition of the express tool area.
@@ -3821,8 +3822,8 @@ if REDO_GEOMETRY_FOR_EXPRESS_MENU
 endif
 endif ; PLACE_EXPRESS_MENU_ON_PRIMARY
 
-haveTaskbar:
-if PLACE_EXPRESS_MENU_ON_PRIMARY or TOOL_AREA_IS_TASK_BAR
+hasTaskbar2:
+if PLACE_EXPRESS_MENU_ON_PRIMARY ;or TOOL_AREA_IS_TASK_BAR
 	; Now that the new title bounds have been determined, ask the field
 	; to position the little tool area over the edge of it.
 	;
@@ -5429,6 +5430,7 @@ OLBaseWinUpdateForTitleGroup	method dynamic OLBaseWinClass,
 	mov	bx, ds:[LMBH_handle]
 	mov	di, mask MF_FORCE_QUEUE
 	call	ObjMessage
+
 	.leave
 	ret
 OLBaseWinUpdateForTitleGroup	endm

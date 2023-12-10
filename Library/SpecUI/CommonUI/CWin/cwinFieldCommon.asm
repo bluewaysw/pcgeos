@@ -1229,7 +1229,7 @@ done:
 	ret
 OLFieldSizeToolArea	endm
 
-
+
 COMMENT @----------------------------------------------------------------------
 
 FUNCTION:	OLFieldGetToolAreaSize

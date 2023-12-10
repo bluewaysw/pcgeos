@@ -2005,9 +2005,6 @@ REVISION HISTORY:
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
 ToolAreaRawUnivEnter	method dynamic ToolAreaClass,
 					MSG_META_RAW_UNIV_ENTER
-	; FIXME!!! - Do we need to call this always?
-	mov	di, offset ToolAreaClass
-	call	ObjCallSuperNoLock
 
 	;
 	; if TOOL_AREA_IS_TASK_BAR
@@ -2017,6 +2014,12 @@ ToolAreaRawUnivEnter	method dynamic ToolAreaClass,
 	tst	ds:[taskBarEnabled] ; if taskbar == on, ZF == 1
 	pop	ds
 	jz	done ; if ZF==0 skip the following code
+
+	;
+	; FIXME!!! - Do we need to call this always?
+	;
+	mov	di, offset ToolAreaClass
+	call	ObjCallSuperNoLock
 
 	push	ds
 	segmov	ds, dgroup
@@ -2064,11 +2067,6 @@ DESTROYED:	ax, cx, dx, bp
 
 ToolAreaRawUnivLeave	method dynamic ToolAreaClass,
 					MSG_META_RAW_UNIV_LEAVE
-
-	; FIXME!!! do we need to always call this?
-	mov	di, offset ToolAreaClass
-	call	ObjCallSuperNoLock
-
 	;
 	; if TOOL_AREA_IS_TASK_BAR
 	;
@@ -2077,6 +2075,10 @@ ToolAreaRawUnivLeave	method dynamic ToolAreaClass,
 	tst	ds:[taskBarEnabled] ; if taskbar == on, ZF == 1
 	pop	ds
 	jz	done ; if ZF==0 skip the following code
+
+	; FIXME!!! do we need to always call this?
+	mov	di, offset ToolAreaClass
+	call	ObjCallSuperNoLock
 
 	push	ds
 	segmov	ds, dgroup
