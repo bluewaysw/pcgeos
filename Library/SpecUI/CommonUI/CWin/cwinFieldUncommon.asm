@@ -2407,6 +2407,18 @@ ToolAreaInitPosition	method	dynamic	ToolAreaClass, MSG_TOOL_AREA_INIT_POSITION
 	pop	ds
 	jz	done ; if ZF==0 skip the following code
 
+	;
+	; set size of taskbar
+	;
+	mov	ax, HINT_SIZE_WINDOW_AS_RATIO_OF_PARENT
+	mov	cx, size SpecWinSizePair
+	call	ObjVarAddData
+	mov	ds:[bx].SWSP_x, mask SWSS_RATIO or PCT_100
+	mov	ds:[bx].SWSP_y, SWSS_RATIO or PCT_0
+
+	;
+	; set position of taskbar
+	;
 	mov	ax, HINT_POSITION_WINDOW_AT_RATIO_OF_PARENT
 	mov	cx, size SpecWinSizePair
 	call	ObjVarAddData
@@ -2423,6 +2435,32 @@ ToolAreaInitPosition	method	dynamic	ToolAreaClass, MSG_TOOL_AREA_INIT_POSITION
 setPosition:
 	mov	ds:[bx].SWSP_x, cx
 	mov	ds:[bx].SWSP_y, dx
+
+	;
+	; set usable
+	;
+
+	;
+	; Find the system tray. Since it's copied during via COPY_TREE, we
+	; don't know the chunk handle. This code is dependent on the order
+	; of the children, so if anything gets changed in the
+	; ExpressMenuResource...
+	;
+	;push	cx, dx
+	;push	si
+	;mov	bx, cx
+	;mov	si, dx
+	;mov	ax, MSG_GEN_FIND_CHILD_AT_POSITION
+	;mov	cx, 1	; object SysTray is 2nd child of ToolArea
+	;mov	di, mask MF_CALL or mask MF_FIXUP_DS
+	;call	ObjMessage
+
+
+	;mov	si, dx				;*ds:si <- trigger
+	;mov	ax, MSG_GEN_SET_USABLE
+	;mov	dl, VUM_NOW	;dl <- VisUpdateMode
+	;call	ObjCallInstanceNoLock
+
 
 done:
 	ret
