@@ -158,23 +158,11 @@ OpenWinEnsureSysMenu	proc	far
 
 	;see if we have created a custom system menu object yet
 
-	;
-	; if TOOL_AREA_IS_TASK_BAR
-	; FIXME!!! is this just ISUI?
-	;
-	push	ds
-	segmov	ds, dgroup
-	tst	ds:[taskBarEnabled] ; if taskbar == on, ZF == 1
-	pop	ds
-	jz	hasNoTaskbar ; if ZF==0 skip the following code
-
-	cmp	ds:[di].OLWI_type, MOWT_PRIMARY_WINDOW
-	jne	notPrimary
-	tst	ds:[di].OLBWI_titleBarMenu.handle
-	LONG	jnz	next2
-
-notPrimary:
-hasNoTaskbar:
+ISU <	cmp	ds:[di].OLWI_type, MOWT_PRIMARY_WINDOW			>
+ISU <	jne	notPrimary						>
+ISU <	tst	ds:[di].OLBWI_titleBarMenu.handle			>
+ISU <	jnz	next2							>
+ISU <notPrimary:							>
 
 	;see if we have created the system menu objects yet
 
@@ -302,26 +290,16 @@ WinCommon_CallSysMenu	proc	near	uses	bx, si, di
 	.enter
 	call	WinCommon_DerefVisSpec_DI
 
-	;
-	; if TOOL_AREA_IS_TASK_BAR
-	; FIXME!!! is this just ISUI?
-	;
-	push	ds
-	segmov	ds, dgroup
-	tst	ds:[taskBarEnabled] ; if taskbar == on, ZF == 1
-	pop	ds
-	jz	hasNoTaskbar ; if ZF==0 skip the following code
-
+if _ISUI
 	call	GetSystemMenuBlockHandle	;returns bx = block handle
 	mov	si, offset StandardWindowMenu
 	jz	haveSysMenu
 	mov	si, ds:[di].OLBWI_titleBarMenu.chunk
-	jmp	endIfTaskbar
 haveSysMenu:
-hasNoTaskbar:
+else
 	mov	bx, ds:[di].OLWI_sysMenu
 	mov	si, offset StandardWindowMenu
-endIfTaskbar:
+endif
 
 	mov	di, mask MF_CALL or mask MF_FIXUP_DS
 	call	ObjMessage
@@ -332,28 +310,14 @@ WinCommon_CallSysMenu	endp
 WinCommon_CallSysMenuButton	proc	near	uses	bx, si, di
 	.enter
 	call	WinCommon_DerefVisSpec_DI
-
-	;
-	; if TOOL_AREA_IS_TASK_BAR
-	; FIXME!!! is this just ISUI?
-	;
-	push	ds
-	segmov	ds, dgroup
-	tst	ds:[taskBarEnabled] ; if taskbar == on, ZF == 1
-	pop	ds
-	jz	hasNoTaskbar ; if ZF==0 skip the following code
-
+if _ISUI
 	call	GetSystemMenuBlockHandle	;returns bx = block handle
-	jmp	endIfTaskbar
-
-hasNoTaskbar:
+else
 	mov	bx, ds:[di].OLWI_sysMenu
-
-endIfTaskbar:
+endif
 	mov	si, ds:[di].OLWI_sysMenuButton
 	mov	di, mask MF_CALL or mask MF_FIXUP_DS
 	call	ObjMessage
-
 	.leave
 	ret
 WinCommon_CallSysMenuButton	endp
@@ -375,12 +339,10 @@ SetAppMonikerForSysMenu	proc	near
 	;
 	; if custom system menu, exit
 	;
-
 		cmp	ds:[di].OLWI_type, MOWT_PRIMARY_WINDOW
 		jne	normalSysMenu
 		tst	ds:[di].OLBWI_titleBarMenu.handle
 		jnz	done
-
 normalSysMenu:
 	;
 	; copy app tool moniker into this block
@@ -457,16 +419,6 @@ REVISION HISTORY:
 
 GetSystemMenuBlockHandle	proc	far
 
-	;
-	; if TOOL_AREA_IS_TASK_BAR
-	; FIXME!!! is this just ISUI, not TASK_BAR
-	;
-	push	ds
-	segmov	ds, dgroup
-	tst	ds:[taskBarEnabled] ; if taskbar == on, ZF == 1
-	pop	ds
-	jz	haveMenu ; if ZF==0 skip the following code
-
 	cmp	ds:[di].OLWI_type, MOWT_PRIMARY_WINDOW
 	jne	normalSysMenu
 	mov	bx, ds:[di].OLBWI_titleBarMenu.handle
@@ -481,6 +433,7 @@ haveMenu:
 GetSystemMenuBlockHandle	endp
 
 
+
 COMMENT @----------------------------------------------------------------------
 
 ROUTINE:	CustomizeSysMenu
@@ -1749,22 +1702,10 @@ readyWithWidthHeight:
 	;
 	push	di
 	call	WinCommon_DerefVisSpec_DI
-
-	;
-	; if TOOL_AREA_IS_TASK_BAR
-	; FIXME: is this not just ISUI?
-	;
-	push	ds
-	segmov	ds, dgroup
-	tst	ds:[taskBarEnabled] ; if taskbar == on, ZF == 1
-	pop	ds
-	jz	normalSysMenu ; if ZF==0 skip the following code
-
-	test	bl, mask OLWSI_SYS_MENU		;mask for Sys Menu icon
-	jz	normalSysMenu
-	call	GetSystemMenuBlockHandle	; return bx = sys menu
-	jmp	short haveSysMenu
-
+ISU <	test	bl, mask OLWSI_SYS_MENU		;mask for Sys Menu icon	>
+ISU <	jz	normalSysMenu						>
+ISU <	call	GetSystemMenuBlockHandle	; return bx = sys menu  >
+ISU <	jmp	short haveSysMenu
 normalSysMenu:
 	mov	bx, ds:[di].OLWI_sysMenu	; fetch system menu block
 haveSysMenu:
@@ -1932,21 +1873,10 @@ EnableDisableSysMenuItem	proc	near	uses	ax, cx, dx, bp, bx, si
 	jz	disableIcon			; skip to disable icon...
 	mov	ax, MSG_GEN_SET_ENABLED		; wrong -- enable it.
 disableIcon:
-	;
-	; if TOOL_AREA_IS_TASK_BAR
-	; FIXME: is this really needed for taskbar or
-	; is it just ISUI?
-	;
-	push	ds
-	segmov	ds, dgroup
-	tst	ds:[taskBarEnabled] ; if taskbar == on, ZF == 1
-	pop	ds
-	jz	normalSysMenu ; if ZF==0 skip the following code
-
-	test	bl, mask OLWSI_SYS_MENU		; mask for Sys Menu icon
-	jz	normalSysMenu
-	call	GetSystemMenuBlockHandle	; return bx = sys menu
-	jmp	short haveSysMenu
+ISU <	test	bl, mask OLWSI_SYS_MENU		; mask for Sys Menu icon>
+ISU <	jz	normalSysMenu						>
+ISU <	call	GetSystemMenuBlockHandle	; return bx = sys menu  >
+ISU <	jmp	short haveSysMenu
 
 normalSysMenu:
 	mov	bx, ds:[di].OLWI_sysMenu	; get system menu block handle,
@@ -2015,21 +1945,11 @@ OpenWinGetSysMenuButtonWidth	proc	far
 	tst	si
 	jz	done				; no button --> no width
 
-	;
-	; if TOOL_AREA_IS_TASK_BAR
-	; FIXME!!! - is this really TOOL_AREA_IS_TASK_BAR or just ISUI???
-	;
-	push	ds
-	segmov	ds, dgroup
-	tst	ds:[taskBarEnabled] ; if taskbar == on, ZF == 1
-	pop	ds
-	jz	hasNoTaskbar ; if ZF==0 skip the following code
-
+if _ISUI
 	call	GetSystemMenuBlockHandle	; returns bx = sys menu block
-	jmp	endIfTaskbar
-hasNoTaskbar:
+else
 	mov	bx, ds:[di].OLWI_sysMenu
-endIfTaskbar:
+endif
 
 	call	ObjSwapLock			; *ds:si is menu button
 	push	bx
