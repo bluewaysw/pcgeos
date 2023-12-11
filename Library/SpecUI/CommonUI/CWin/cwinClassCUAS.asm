@@ -160,6 +160,7 @@ OpenWinEnsureSysMenu	proc	far
 
 	;
 	; if TOOL_AREA_IS_TASK_BAR
+	; FIXME!!! is this just ISUI?
 	;
 	push	ds
 	segmov	ds, dgroup
@@ -303,6 +304,7 @@ WinCommon_CallSysMenu	proc	near	uses	bx, si, di
 
 	;
 	; if TOOL_AREA_IS_TASK_BAR
+	; FIXME!!! is this just ISUI?
 	;
 	push	ds
 	segmov	ds, dgroup
@@ -333,6 +335,7 @@ WinCommon_CallSysMenuButton	proc	near	uses	bx, si, di
 
 	;
 	; if TOOL_AREA_IS_TASK_BAR
+	; FIXME!!! is this just ISUI?
 	;
 	push	ds
 	segmov	ds, dgroup
@@ -372,15 +375,6 @@ SetAppMonikerForSysMenu	proc	near
 	;
 	; if custom system menu, exit
 	;
-
-	;
-	; if TOOL_AREA_IS_TASK_BAR
-	;
-		push	ds
-		segmov	ds, dgroup
-		tst	ds:[taskBarEnabled] ; if taskbar == on, ZF == 1
-		pop	ds
-		jz	normalSysMenu ; if ZF==0 skip the following code
 
 		cmp	ds:[di].OLWI_type, MOWT_PRIMARY_WINDOW
 		jne	normalSysMenu
@@ -465,6 +459,7 @@ GetSystemMenuBlockHandle	proc	far
 
 	;
 	; if TOOL_AREA_IS_TASK_BAR
+	; FIXME!!! is this just ISUI, not TASK_BAR
 	;
 	push	ds
 	segmov	ds, dgroup
@@ -1757,6 +1752,7 @@ readyWithWidthHeight:
 
 	;
 	; if TOOL_AREA_IS_TASK_BAR
+	; FIXME: is this not just ISUI?
 	;
 	push	ds
 	segmov	ds, dgroup
@@ -1938,6 +1934,8 @@ EnableDisableSysMenuItem	proc	near	uses	ax, cx, dx, bp, bx, si
 disableIcon:
 	;
 	; if TOOL_AREA_IS_TASK_BAR
+	; FIXME: is this really needed for taskbar or
+	; is it just ISUI?
 	;
 	push	ds
 	segmov	ds, dgroup
@@ -2019,6 +2017,7 @@ OpenWinGetSysMenuButtonWidth	proc	far
 
 	;
 	; if TOOL_AREA_IS_TASK_BAR
+	; FIXME!!! - is this really TOOL_AREA_IS_TASK_BAR or just ISUI???
 	;
 	push	ds
 	segmov	ds, dgroup

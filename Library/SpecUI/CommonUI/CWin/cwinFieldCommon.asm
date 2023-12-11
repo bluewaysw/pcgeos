@@ -980,13 +980,14 @@ OLFieldMoveToolArea	method	dynamic OLFieldClass, \
 					MSG_OL_FIELD_MOVE_TOOL_AREA
 
 	;
+	; FIXME!!! - should this be skipping everything or only something in between?
 	; if (not TOOL_AREA_IS_TASK_BAR)
 	;
 	push	ds
 	segmov	ds, dgroup
 	tst	ds:[taskBarEnabled] ; if taskbar == on, ZF == 1
 	pop	ds
-	LONG	jnz done	;afterHasTaskbar1 ; if ZF==1 skip the following code
+	LONG	jnz afterHasTaskbar1 ; if ZF==1 skip the following code
 
 if EVENT_MENU
 	;
