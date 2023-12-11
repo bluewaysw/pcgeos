@@ -52,6 +52,7 @@ static void CalcScaleForWidths( TRUETYPE_VARS,
 static void CalcTransform( 
                         TransformMatrix*        transMatrix,
                         FontMatrix*             fontMatrix, 
+                        FontBuf*                fontBuf,
                         WWFixedAsDWord          pointSize,
                         TextStyle               stylesToImplement );
 
@@ -186,7 +187,7 @@ EC(     ECCheckBounds( (void*) fontBuf ) );
         /* calculate the transformation matrix and copy it into the FontBlock */
         transMatrix = (TransformMatrix*)(((byte*)fontBuf) + sizeof( FontBuf ) + fontHeader->FH_numChars * sizeof( CharTableEntry ));
 EC(     ECCheckBounds( (void*)transMatrix ) );
-        CalcTransform( transMatrix, fontMatrix, pointSize, stylesToImplement );
+        CalcTransform( transMatrix, fontMatrix, fontBuf, pointSize, stylesToImplement );
 
         //TODO: adjust FB_height, FB_minTSB, FB_pixHeight and FB_baselinePos
         AdjustFontBuf( transMatrix, fontBuf, fontMatrix->FM_flags );
@@ -435,6 +436,7 @@ static void CalcScaleForWidths( TRUETYPE_VARS, WWFixedAsDWord pointSize,
 
 static void CalcTransform( TransformMatrix*  transMatrix, 
                            FontMatrix*       fontMatrix, 
+                           FontBuf*          fontBuf,
                            WWFixedAsDWord    pointSize,
                            TextStyle         stylesToImplement )
 {
@@ -461,15 +463,20 @@ EC(     ECCheckBounds( (void*)fontMatrix ) );
         /* fake script style      */
         if( stylesToImplement & ( TS_SUBSCRIPT | TS_SUPERSCRIPT ) )
         {      
+                WWFixedAsDWord scriptOffset = WBFIXED_TO_WWFIXEDASDWORD( fontBuf->FB_height ) + 
+                                              WBFIXED_TO_WWFIXEDASDWORD( fontBuf->FB_heightAdjust );
+
+
                 tempMatrix.xx = GrMulWWFixed( tempMatrix.xx, SCRIPT_FACTOR );
                 tempMatrix.yy = GrMulWWFixed( tempMatrix.yy, SCRIPT_FACTOR );
 
                 if( stylesToImplement & TS_SUBSCRIPT )
                 {
-                        transMatrix->TM_scriptY = GrMulWWFixed( SUBSCRIPT_OFFSET, pointSize ) >> 16;
+                        transMatrix->TM_scriptY = GrMulWWFixed( scriptOffset, SUBSCRIPT_OFFSET ) >> 16;
                 }
                 else
                 {
+                        //TODO: auf scriptOffset umstellen
                         transMatrix->TM_scriptY = -( GrMulWWFixed( SUPERSCRIPT_OFFSET, pointSize ) ) >> 16;
                 }
         }
@@ -660,17 +667,20 @@ static void AdjustFontBuf( TransformMatrix* transMatrix,
                            FontBuf*         fontBuf,
                            TransFlags       flags )
 {
-        sword savedHeightY = transMatrix->TM_heightY;
+        transMatrix->TM_heightY = fontBuf->FB_baselinePos.WBF_int + BASELINE_CORRECTION;
 
-
-        transMatrix->TM_heightY = INTEGER_OF_WWFIXEDASDWORD( GrMulWWFixed( 
-                                        WORD_TO_WWFIXEDASDWORD( fontBuf->FB_baselinePos.WBF_int ), transMatrix->TM_matrix.yy ) ) + BASELINE_CORRECTION;
-        transMatrix->TM_scriptY = INTEGER_OF_WWFIXEDASDWORD( GrMulWWFixed( 
-                                        WORD_TO_WWFIXEDASDWORD( transMatrix->TM_scriptY ), transMatrix->TM_matrix.yy ) );
-
+        /* further transformation if rotated or scaled */
         if( flags & TF_COMPLEX )
         {
+                sword savedHeightY = transMatrix->TM_heightY;
+
+
                 fontBuf->FB_flags     |= FBF_IS_COMPLEX;
+
+                transMatrix->TM_heightY = INTEGER_OF_WWFIXEDASDWORD( GrMulWWFixed( 
+                                        WORD_TO_WWFIXEDASDWORD( fontBuf->FB_baselinePos.WBF_int ), transMatrix->TM_matrix.yy ) ) + BASELINE_CORRECTION;
+                transMatrix->TM_scriptY = INTEGER_OF_WWFIXEDASDWORD( GrMulWWFixed( 
+                                        WORD_TO_WWFIXEDASDWORD( transMatrix->TM_scriptY ), transMatrix->TM_matrix.yy ) );
 
                 /* adjust FB_pixHeight, FB_minTSB */
                 fontBuf->FB_pixHeight = INTEGER_OF_WWFIXEDASDWORD( GrMulWWFixed( 
