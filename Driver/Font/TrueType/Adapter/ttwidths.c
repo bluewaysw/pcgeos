@@ -53,7 +53,6 @@ static void CalcTransform(
                         TransformMatrix*        transMatrix,
                         FontMatrix*             fontMatrix, 
                         FontBuf*                fontBuf,
-                        WWFixedAsDWord          pointSize,
                         TextStyle               stylesToImplement );
 
 static void AdjustFontBuf( TransformMatrix*     transMatrix, 
@@ -187,7 +186,7 @@ EC(     ECCheckBounds( (void*) fontBuf ) );
         /* calculate the transformation matrix and copy it into the FontBlock */
         transMatrix = (TransformMatrix*)(((byte*)fontBuf) + sizeof( FontBuf ) + fontHeader->FH_numChars * sizeof( CharTableEntry ));
 EC(     ECCheckBounds( (void*)transMatrix ) );
-        CalcTransform( transMatrix, fontMatrix, fontBuf, pointSize, stylesToImplement );
+        CalcTransform( transMatrix, fontMatrix, fontBuf, stylesToImplement );
 
         //TODO: adjust FB_height, FB_minTSB, FB_pixHeight and FB_baselinePos
         AdjustFontBuf( transMatrix, fontBuf, fontMatrix->FM_flags );
@@ -437,7 +436,6 @@ static void CalcScaleForWidths( TRUETYPE_VARS, WWFixedAsDWord pointSize,
 static void CalcTransform( TransformMatrix*  transMatrix, 
                            FontMatrix*       fontMatrix, 
                            FontBuf*          fontBuf,
-                           WWFixedAsDWord    pointSize,
                            TextStyle         stylesToImplement )
 {
         TT_Matrix  tempMatrix = { 1L << 16, 0, 0, 1L << 16 };
@@ -476,8 +474,9 @@ EC(     ECCheckBounds( (void*)fontMatrix ) );
                 }
                 else
                 {
-                        //TODO: auf scriptOffset umstellen
-                        transMatrix->TM_scriptY = -( GrMulWWFixed( SUPERSCRIPT_OFFSET, pointSize ) ) >> 16;
+                        transMatrix->TM_scriptY = ( GrMulWWFixed( scriptOffset, SUPERSCRIPT_OFFSET) -
+                                                WBFIXED_TO_WWFIXEDASDWORD( fontBuf->FB_baselinePos ) -
+                                                WBFIXED_TO_WWFIXEDASDWORD( fontBuf->FB_baseAdjust ) ) >> 16;
                 }
         }
 
