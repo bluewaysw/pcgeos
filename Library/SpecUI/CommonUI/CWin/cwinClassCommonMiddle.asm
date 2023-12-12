@@ -1558,6 +1558,7 @@ CUAS <	cmp	ds:[di].OLWI_type, MOWT_PRIMARY_WINDOW			>
 
 	;
 	; if (not TOOL_AREA_IS_TASK_BAR)
+	; FIXME!!!: is this just NOT ISUI?
 	;
 	push	ds
 	segmov	ds, dgroup

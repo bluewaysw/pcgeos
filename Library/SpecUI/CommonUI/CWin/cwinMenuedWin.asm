@@ -461,6 +461,7 @@ OLMenuedWinSetCustomSystemMenuMoniker	method dynamic OLMenuedWinClass,
 
 	;
 	; if TOOL_AREA_IS_TASK_BAR
+	; FIXME!!! should this just be ISUI?
 	;
 	push	ds
 	segmov	ds, dgroup

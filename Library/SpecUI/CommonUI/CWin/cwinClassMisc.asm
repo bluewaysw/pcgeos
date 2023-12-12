@@ -1046,6 +1046,7 @@ tryAccelerators:
 
 	;
 	; if TOOL_AREA_IS_TASK_BAR
+	; FIXME!!!: is this just ISUI?
 	;
 	push	ds
 	segmov	ds, dgroup
@@ -1719,6 +1720,7 @@ useSysMenu:
 
 	;
 	; if TOOL_AREA_IS_TASK_BAR
+	; FIXME!!! this should be just ISUI!!!
 	;
 	push	ds
 	segmov	ds, dgroup
