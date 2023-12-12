@@ -453,21 +453,11 @@ REVISION HISTORY:
 	JS	7/30/92   	Initial version taken from FindIconMonikers
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
-
+if _ISUI ;-----------------------------------
 OLMenuedWinSetCustomSystemMenuMoniker	method dynamic OLMenuedWinClass,
 				MSG_OL_WIN_SET_CUSTOM_SYSTEM_MENU_MONIKER
 	uses	ax, cx, dx, bp
 	.enter
-
-	;
-	; if TOOL_AREA_IS_TASK_BAR
-	; FIXME!!! should this just be ISUI?
-	;
-	push	ds
-	segmov	ds, dgroup
-	tst	ds:[taskBarEnabled] ; if taskbar == on, ZF == 1
-	pop	ds
-	jz	done ; if ZF==0 skip the following code
 
 	;
 	; check this window for a VMS_TINY, gstring moniker
@@ -553,7 +543,7 @@ OLMenuedWinFindTitleMonikerFar	proc	far
 	ret
 OLMenuedWinFindTitleMonikerFar	endp
 
-;endif	; FIXME!!! if TOOL_AREA_IS_TASK_BAR -----------------------------------------------------------
+endif	; if _ISUI ----------------------------------------
 
 
 

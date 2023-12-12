@@ -1044,16 +1044,7 @@ tryAccelerators:
 	;ISUI: we need to check for a custom sys menu before checking the
 	;    standard sys menu.
 
-	;
-	; if TOOL_AREA_IS_TASK_BAR
-	; FIXME!!!: is this just ISUI?
-	;
-	push	ds
-	segmov	ds, dgroup
-	tst	ds:[taskBarEnabled] ; if taskbar == on, ZF == 1
-	pop	ds
-	jz	checkSysMenu ; if ZF==0 skip the following code
-
+if _ISUI
 	call	KN_DerefVisSpec_DI
 	cmp	ds:[di].OLWI_type, MOWT_PRIMARY_WINDOW	;only primaries have
 	jne	checkSysMenu				; custom sys menus
@@ -1068,6 +1059,7 @@ tryAccelerators:
 	pop	si, cx, dx, bp
 	jc	foundKbdAccel				;found, branch
 checkSysMenu:
+endif
 
 	call	KN_DerefVisSpec_DI
 OLS <	mov	bx, ds:[di].OLWI_menu		;get popup menu button handle >
@@ -1718,22 +1710,13 @@ endif	; MENU_BAR_IS_A_MENU
 useSysMenu:
 	call	KN_DerefVisSpec_DI
 
-	;
-	; if TOOL_AREA_IS_TASK_BAR
-	; FIXME!!! this should be just ISUI!!!
-	;
-	push	ds
-	segmov	ds, dgroup
-	tst	ds:[taskBarEnabled] ; if taskbar == on, ZF == 1
-	pop	ds
-	jz	hasNoTaskbar ; if ZF==0 skip the following code
-
+if _ISUI
 	call	GetSystemMenuBlockHandle	;returns bx = block handle
 						; zf - if no titleBarMenu
 	mov	ax, offset StandardWindowMenu
 	jz	haveSysMenu
 	mov	ax, ds:[di].OLBWI_titleBarMenu.chunk
-    haveSysMenu:
+haveSysMenu:
 	tst	bx
 	jz	exitMenuBar
 
@@ -1742,10 +1725,7 @@ useSysMenu:
 
 	push	si
 	mov	si, ax
-	jmp	endIfTaskbar
-
-hasNoTaskbar:
-
+else
 	mov	bx, ds:[di].OLWI_sysMenu	;start pointing to sys menu
 	tst	bx				;any sys menu?
 	jz	exitMenuBar			;none, let's give up on this
@@ -1755,8 +1735,7 @@ hasNoTaskbar:
 
 	push	si
 	mov	si, offset StandardWindowMenu
-
-endIfTaskbar:
+endif
 
 	mov	di, mask MF_CALL or mask MF_FIXUP_DS
 	mov	ax, MSG_OL_POPUP_FIND_BUTTON	;point to its button

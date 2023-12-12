@@ -1399,23 +1399,13 @@ CUAS <	call	OpenWinEnsureSysMenuIcons				     >
 	; the window's moniker list in the process.)
 	;
 
-	;
-	; if TOOL_AREA_IS_TASK_BAR
-	; FIXME!!! is this just ISUI?
-	;
-	push	ds
-	segmov	ds, dgroup
-	tst	ds:[taskBarEnabled] ; if taskbar == on, ZF == 1
-	pop	ds
-	jz	done ; if ZF==0 skip the following code
-
-	call	WinCommon_DerefVisSpec_DI
-	cmp	ds:[di].OLWI_type, MOWT_PRIMARY_WINDOW
-	je	findTitle
-	cmp	ds:[di].OLWI_type, MOWT_DISPLAY_WINDOW
-	jne	done
-findTitle:
-	call	OLMenuedWinFindTitleMonikerFar
+ISU <	call	WinCommon_DerefVisSpec_DI				     >
+ISU <	cmp	ds:[di].OLWI_type, MOWT_PRIMARY_WINDOW			     >
+ISU <	je	findTitle						     >
+ISU <	cmp	ds:[di].OLWI_type, MOWT_DISPLAY_WINDOW			     >
+ISU <	jne	done							     >
+ISU <findTitle:								     >
+ISU <	call	OLMenuedWinFindTitleMonikerFar				     >
 
 done:
 	ret

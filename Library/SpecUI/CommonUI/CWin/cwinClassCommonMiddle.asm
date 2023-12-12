@@ -1555,17 +1555,6 @@ CUAS <	cmp	ds:[di].OLWI_type, MOWT_PRIMARY_WINDOW			>
 	jne	done
 
 	;UPDATE the express tool area location, to match any window change.
-
-	;
-	; if (not TOOL_AREA_IS_TASK_BAR)
-	; FIXME!!!: is this just NOT ISUI?
-	;
-	push	ds
-	segmov	ds, dgroup
-	tst	ds:[taskBarEnabled] ; if taskbar == on, ZF == 1
-	pop	ds
-	jnz	done ; if ZF==1 skip the following code
-
 	call	OLBaseWinAdjustTitleBoundsForExpressToolArea
 
 endif ; PLACE_EXPRESS_MENU_ON_PRIMARY
