@@ -283,11 +283,10 @@ CommonUIClassStructures segment resource
 	OLBaseWinClass		mask CLASSF_DISCARD_ON_SAVE or \
 				mask CLASSF_NEVER_SAVED
 
-
-if TOOL_AREA_IS_TASK_BAR
+; if TOOL_AREA_IS_TASK_BAR
 	OLWindowListItemClass	mask CLASSF_DISCARD_ON_SAVE or \
 				mask CLASSF_NEVER_SAVED
-endif
+; endif
 
 if RADIO_STATUS_ICON_ON_PRIMARY
 	RadioStatusIconClass	mask CLASSF_DISCARD_ON_SAVE or \
@@ -1975,22 +1974,28 @@ OLBaseWinNotifyWindowSelected	method dynamic OLBaseWinClass,
 
 	;
 	; if TOOL_AREA_IS_TASK_BAR
+	; FIXME!!! do we really need to callSuper here?
 	;
 	push	ds
 	segmov	ds, dgroup
 	tst	ds:[taskBarEnabled] ; if taskbar == on, ZF == 1
 	pop	ds
-	jz	done ; if ZF==0 skip the following code
+	jz	callSuper ; if ZF==0 skip the following code
 
 	add	bx, ds:[bx].Gen_offset
 	test	ds:[bx].GI_states, mask GS_USABLE
-	jz	done				; abort is window is not usable
+	jz	done				; abort if window is not usable
 
 	mov	ax, MSG_GEN_DISPLAY_SET_NOT_MINIMIZED
 	call	ObjCallInstanceNoLock
 
 	mov	ax, MSG_GEN_BRING_TO_TOP
 	GOTO	ObjCallInstanceNoLock
+
+callSuper:
+	mov	di, offset OLBaseWinClass
+	GOTO	ObjCallSuperNoLock
+
 done:
 	ret
 OLBaseWinNotifyWindowSelected	endm
@@ -2029,12 +2034,13 @@ OLWindowListItemNotifyWindowSelected	method dynamic OLWindowListItemClass,
 
 	;
 	; if TOOL_AREA_IS_TASK_BAR
+	; FIXME!!! do we really need to callSuper here?
 	;
 	push	ds
 	segmov	ds, dgroup
 	tst	ds:[taskBarEnabled] ; if taskbar == on, ZF == 1
 	pop	ds
-	jz	done ; if ZF==0 skip the following code
+	jz	callSuper ; if ZF==0 skip the following code
 
 	mov	bx, ds:[di].OLWLI_windowObj.handle
 	push	bx
@@ -2057,6 +2063,11 @@ OLWindowListItemNotifyWindowSelected	method dynamic OLWindowListItemClass,
 	mov	di, mask MF_FORCE_QUEUE
 	call	ObjMessage
 	stc
+	jmp	done
+
+callSuper:
+	mov	di, offset OLWindowListItemClass
+	GOTO	ObjCallSuperNoLock
 
 done:
 	ret
@@ -2095,7 +2106,6 @@ REVISION HISTORY:
 
 OLWindowListItemSetOperatingParams	method dynamic OLWindowListItemClass,
 				MSG_OL_WINDOW_LIST_ITEM_SET_OPERATING_PARAMS
-
 	;
 	; if TOOL_AREA_IS_TASK_BAR
 	;
@@ -2158,6 +2168,7 @@ OLWindowListItemCloseWindow	method dynamic OLWindowListItemClass,
 	mov	ax, MSG_GEN_DISPLAY_CLOSE
 	mov	di, mask MF_FORCE_QUEUE
 	GOTO	ObjMessage
+
 done:
 	ret
 OLWindowListItemCloseWindow	endm
@@ -3780,7 +3791,7 @@ if PLACE_EXPRESS_MENU_ON_PRIMARY
 	pop	ds
 	jnz	hasTaskbar1 ; if ZF==1 skip the following code
 
-	call	OLBaseWinHideExpressToolArea ; wrap with if
+	call	OLBaseWinHideExpressToolArea
 
 hasTaskbar1:
 	jmp	short afterExpressMenu
