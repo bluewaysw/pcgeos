@@ -1518,7 +1518,8 @@ WindowListClose	method dynamic WindowListDialogClass, MSG_OL_WIN_CLOSE
 	mov	ax, MSG_META_RELEASE_TARGET_EXCL
 	GOTO	ObjCallInstanceNoLock
 done:
-	ret
+	mov	di, offset WindowListDialogClass
+	GOTO	ObjCallSuperNoLock
 
 WindowListClose	endm
 
@@ -1561,7 +1562,7 @@ WindowListKeyboard	method dynamic WindowListDialogClass,
 	segmov	ds, dgroup
 	tst	ds:[taskBarEnabled] ; if taskbar == on, ZF == 1
 	pop	ds
-	jz	done ; if ZF==0 skip the following code
+	jz	callSuper ; if ZF==0 skip the following code
 
 	test	dl, mask CF_FIRST_PRESS
 	jz	done				; ignore if not first press
@@ -1634,9 +1635,6 @@ WindowListLostTargetExcl	method dynamic WindowListDialogClass,
 	pop	ds
 	jz	done ; if ZF==0 skip the following code
 
-	;
-	; FIXME!!! do we need to call superclass here?
-	;
 	mov	di, offset WindowListDialogClass
 	call	ObjCallSuperNoLock
 
@@ -1649,7 +1647,12 @@ WindowListLostTargetExcl	method dynamic WindowListDialogClass,
 	mov	di, mask MF_FORCE_QUEUE
 	GOTO	ObjMessage
 done:
-	ret
+	;
+	; if no Taskbar/WindowList, just callSuper
+	;
+	mov	di, offset WindowListDialogClass
+	GOTO	ObjCallSuperNoLock
+
 WindowListLostTargetExcl	endm
 
 
@@ -1690,7 +1693,6 @@ WindowListInteractionCommand	method dynamic WindowListDialogClass,
 	pop	ds
 	jz	done ; if ZF==0 skip the following code
 
-	; FIXME!!! is this necessary even with no taskbar?
 	push	cx
 	mov	di, offset WindowListDialogClass
 	call	ObjCallSuperNoLock
@@ -1707,7 +1709,12 @@ WindowListInteractionCommand	method dynamic WindowListDialogClass,
 	clr	di
 	GOTO	ObjMessage
 done:
-	ret
+	;
+	; if no Taskbar/WindowList, just callSuper
+	;
+	mov	di, offset WindowListDialogClass
+	GOTO	ObjCallSuperNoLock
+
 WindowListInteractionCommand	endm
 
 
@@ -1753,7 +1760,12 @@ WindowListSendToFlow	method dynamic WindowListDialogClass,
 	mov	di, mask MF_CALL
 	GOTO	UserCallFlow
 done:
-	ret
+	;
+	; if no Taskbar/WindowList, just callSuper
+	;
+	mov	di, offset WindowListDialogClass
+	GOTO	ObjCallSuperNoLock
+
 WindowListSendToFlow	endm
 
 
@@ -1896,7 +1908,7 @@ TaskBarListAddChild	method dynamic TaskBarListClass,
 	segmov	ds, dgroup
 	tst	ds:[taskBarEnabled] ; if taskbar == on, ZF == 1
 	pop	ds
-	jz	done ; if ZF==0 skip the following code
+	jz	callSuper ; if ZF==0 skip the following code
 
 	push	cx, dx
 	mov	di, offset TaskBarListClass
@@ -1920,6 +1932,15 @@ TaskBarListAddChild	method dynamic TaskBarListClass,
 	mov	ds:[bx].GSHA_height, 0
 	pop	bx
 	call	ObjSwapUnlock
+	jmp	done
+
+callSuper:
+	;
+	; if no Taskbar/WindowList, just callSuper
+	;
+	mov	di, offset TaskBarListClass
+	call	ObjCallSuperNoLock
+
 done:
 	ret
 TaskBarListAddChild	endm
@@ -1959,7 +1980,7 @@ SysTrayInteractionVisDraw	method dynamic SysTrayInteractionClass,
 	segmov	ds, dgroup
 	tst	ds:[taskBarEnabled] ; if taskbar == on, ZF == 1
 	pop	ds
-	jz	done ; if ZF==0 skip the following code
+	jz	callSuper ; if ZF==0 skip the following code
 
 	push	bp
 	mov	di, offset SysTrayInteractionClass
@@ -1973,6 +1994,12 @@ SysTrayInteractionVisDraw	method dynamic SysTrayInteractionClass,
 	mov	bp, ax
 	pop	ax
 	call	OpenDrawRect
+	jmp	done
+
+callSuper:
+	mov	di, offset SysTrayInteractionClass
+	call	ObjCallSuperNoLock
+
 done:
 	ret
 SysTrayInteractionVisDraw	endm
@@ -2008,9 +2035,6 @@ REVISION HISTORY:
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
 ToolAreaRawUnivEnter	method dynamic ToolAreaClass,
 					MSG_META_RAW_UNIV_ENTER
-	;
-	; FIXME!!! - Do we need to call this always?
-	;
 	mov	di, offset ToolAreaClass
 	call	ObjCallSuperNoLock
 
@@ -2069,9 +2093,6 @@ DESTROYED:	ax, cx, dx, bp
 
 ToolAreaRawUnivLeave	method dynamic ToolAreaClass,
 					MSG_META_RAW_UNIV_LEAVE
-	;
-	; FIXME!!! do we need to always call this?
-	;
 	mov	di, offset ToolAreaClass
 	call	ObjCallSuperNoLock
 
@@ -2253,13 +2274,15 @@ ToolAreaStartSelect	method dynamic ToolAreaClass,
 	call	VisGrabMouse
 noMove:
 	mov	ax, mask MRF_PROCESSED
-done:
-	ret
+
+	jmp	done
 
 callSuper:
 	mov	di, offset ToolAreaClass
 	GOTO	ObjCallSuperNoLock
 
+done:
+	ret
 ToolAreaStartSelect	endm
 
 
@@ -2479,10 +2502,7 @@ ToolAreaInitPosition	endm
 
 
 ToolAreaInteractionInitiate	method dynamic ToolAreaClass,
-					MSG_GEN_INTERACTION_INITIATE
-	;
-	; We NEED to always call this first
-	;
+						MSG_GEN_INTERACTION_INITIATE
 	mov	di, offset ToolAreaClass
 	call	ObjCallSuperNoLock
 
