@@ -2218,7 +2218,7 @@ ToolAreaStartSelect	method dynamic ToolAreaClass,
 	segmov	ds, dgroup
 	tst	ds:[taskBarEnabled] ; if taskbar == on, ZF == 1
 	pop	ds
-	jz	done ; if ZF==0 skip the following code
+	jz	callSuper ; if ZF==0 skip the following code
 
 	; update the mouse pointer image, in case we have not received a
 	; MSG_META_PTR event recently
@@ -2255,6 +2255,11 @@ noMove:
 	mov	ax, mask MRF_PROCESSED
 done:
 	ret
+
+callSuper:
+	mov	di, offset ToolAreaClass
+	GOTO	ObjCallSuperNoLock
+
 ToolAreaStartSelect	endm
 
 
