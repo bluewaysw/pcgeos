@@ -43,20 +43,21 @@ library text
 library spool
 #
 # Resources:
-resource AppResource ui-object
-resource Interface ui-object
-resource Menu ui-object
-resource Infoandpick ui-object
-resource Datalists ui-object
-resource ImportantInfo ui-object
-resource DocumentUI object
-resource HILCAppIcon ui-object
-resource HIDocIcons data object
-resource RoomsMonText data object
-resource ItemsMonText data object
-resource HouseMonText data object
-resource ImpInfMonText data object
-resource QTipsResource ui-object
+resource APPRESOURCE ui-object
+resource INTERFACE ui-object
+resource MENU ui-object
+resource INFOANDPICK ui-object
+resource DATALISTS ui-object
+resource IMPORTANTINFO ui-object
+resource DOCUMENTUI object
+resource HILCAPPICON ui-object
+resource HIDOCICONS data object
+resource ROOMSMONTEXT data object
+resource ITEMSMONTEXT data object
+resource HOUSEMONTEXT data object
+resource IMPINFMONTEXT data object
+resource QTIPSRESOURCE ui-object
+resource STRINGS data object
 
 # classes
 export HInvProcessClass
