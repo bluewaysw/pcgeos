@@ -987,7 +987,7 @@ OLFieldMoveToolArea	method	dynamic OLFieldClass, \
 	segmov	ds, dgroup
 	tst	ds:[taskBarEnabled] ; if taskbar == on, ZF == 1
 	pop	ds
-	LONG	jnz afterHasTaskbar1 ; if ZF==1 skip the following code
+	LONG	jnz done	;afterHasTaskbar1 ; if ZF==1 skip the following code
 
 if EVENT_MENU
 	;
@@ -1020,7 +1020,7 @@ if EVENT_MENU
 moveToolArea	label	far
 endif
 	tst	si
-	LONG jz	done
+	LONG 	jz done
 
 	;
 	; if (not TOOL_AREA_IS_TASK_BAR)
@@ -1077,8 +1077,6 @@ doItInUILayer:
 	mov	ax, handle ui		; Move to UI's layer
 	jmp	short doIt
 
-;endif ; (not TOOL_AREA_IS_TASK_BAR)
-
 realGeode:
 	; Ignore request if not from geode owning current target
 	;
@@ -1133,7 +1131,6 @@ doIt:
 	mov	si, mask WPF_ABS	; move to new absolute position
 	call	WinMove
 
-;endif ; (not TOOL_AREA_IS_TASK_BAR)
 afterHasTaskbar2:
 	pop	dx			; Pass handle of Geode as
 					; new LayerID
@@ -1151,9 +1148,7 @@ done:
 	ret
 OLFieldMoveToolArea	endm
 
-;endif ; (not TOOL_AREA_IS_TASK_BAR)
 
-
 COMMENT @----------------------------------------------------------------------
 
 METHOD:		OLFieldSizeToolArea --
