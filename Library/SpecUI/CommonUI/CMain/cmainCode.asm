@@ -493,17 +493,21 @@ if _ISUI
 			mask UIEO_EXIT_TO_DOS or \
 			mask UIEO_CONTROL_PANEL or \
 			mask UIEO_UTILITIES_PANEL
-	andnf	ax, not (mask UIEO_GEOS_TASKS_LIST)
 endif
 
-	ornf	ax, mask UIEO_DOCUMENTS_LIST or \
-			mask UIEO_EXIT_TO_DOS or \
-			mask UIEO_CONTROL_PANEL or \
-			mask UIEO_UTILITIES_PANEL
+	;
+	; if TOOL_AREA_IS_TASK_BAR
+	;
+	push	ds
+	segmov	ds, dgroup
+	tst	ds:[taskBarEnabled] ; if taskbar == on, ZF == 1
+	pop	ds
+	jz	hasNoTaskbar ; if ZF==0 skip the following code
 
-;if _MOTIF and TOOL_AREA_IS_TASK_BAR
-;	andnf	ax, not (mask UIEO_GEOS_TASKS_LIST)
-;endif
+	andnf	ax, not (mask UIEO_GEOS_TASKS_LIST)
+
+hasNoTaskbar:
+
 	mov	bx, ax			; just copy from .ini file
 
 haveDecision:
