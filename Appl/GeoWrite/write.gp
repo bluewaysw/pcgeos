@@ -6,7 +6,12 @@
 # MODULE:	GeoWrite
 # FILE:		geowrite.gp
 #
-# AUTHOR:	Tony, 3/92
+# AUTHOR:	
+# REVISION HISTORY:
+#	Name	Date		Description
+#	----	----		-----------
+#	Tony	3/92		Initial version
+#	RainerB	12/2023		Renamed to GeoWrite
 #
 #
 # Parameters file for: write.geo
@@ -21,7 +26,7 @@ name write.app
 #
 # Long name
 #
-longname "Writer"
+longname "GeoWrite"
 #
 # DB Token
 #

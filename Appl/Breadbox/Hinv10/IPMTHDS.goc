@@ -1,0 +1,686 @@
+/*
+ **************************************************************************
+ *  FILE:		ipmthds.goc
+ *  PROJECT:	Breadbox Home Inventory
+ *  DESCRIPTION:	This file has methods for imp info printing
+ *			and text display
+ **************************************************************************
+ */
+/*
+ ***************************************************************************
+ *		Include files
+ ***************************************************************************
+ */
+
+@include "hivar.goh"
+@include "imtxtstr.goh"
+
+ /*
+ ***************************************************************************
+ *		Class & Message Definitions
+ ***************************************************************************
+ */
+
+/* Declare UI object references to those in hinv0w.GOC */
+
+
+@extern object ImpInfoDisplay ;
+@extern object IIDispText ;
+@extern object IIPrintControl ;
+
+char	  lineBuffer[80];
+
+
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_SHOW_IMPINFO for HInvProcessClass
+ *
+ * DESCRIPTION:	Put any household info and data into GenText for printing.
+ *              
+ *
+ ***********************************************************************/
+@extern method HInvProcessClass, MSG_SHOW_IMPINFO
+{
+   VMBlockHandle    block;
+   MemHandle        mh;
+   ProStruct        *proBaseAddr;
+   CCardStruct      *card;
+   HouseStruct      *houseMemPtr ;
+   BAcctStruct      *acct;
+   REstStruct       *rest;
+   InsStruct        *ins;
+   InvStruct        *inv;
+   FamStruct        *fam;
+   SafBoxStruct     *sbBaseAddr;
+   char             fld1[51];
+   int              i;
+   word		    numLines, numItems;
+
+
+   /* clear the text box */
+   @call IIDispText::MSG_VIS_TEXT_REPLACE_ALL_PTR(" ", 1);
+
+//   getMonText(74,0);  /* bbox */
+   getMonText(0,0);  /* Imp Info Title */
+   getMonText(1,0);  /* Professionals */
+
+   numLines = 5;
+
+   /* get the professionals info */
+   /* get the block handle - it's id is 1 */
+   block = VMFind(hmInvFile, NullHandle, 1);
+   /* and lock it */
+   proBaseAddr = VMLock(hmInvFile, block, &mh);
+
+   for (i = 0; i < 6; i++) {
+
+      strcpy(fld1, proBaseAddr[i].ProS_name);
+
+      if ( *fld1 == NULL)
+	 ;        /* don't print pro type - not listed */
+        else {
+         if (i==0){   /*Attorney*/
+	    getMonText(2,0);
+	    }
+	 if (i==1){  /* CPA*/
+	    getMonText(3,0);
+	    }
+	 if (i==2){  /*Fin Plnr*/
+	    getMonText(4,0);
+	    }
+	 if (i==3){ /*Stock Brkr*/
+	    getMonText(5,0);
+	    }
+	 if (i==4){  /*Doctor*/
+	    getMonText(6,0);
+	    }
+	 if (i==5){  /*Dentist*/
+	    getMonText(7,0);
+	    }
+	 getMonText(8,1);
+	 strcat(lineBuffer, proBaseAddr[i].ProS_name);
+	 @call IIDispText::MSG_VIS_TEXT_APPEND_PTR(
+		lineBuffer, 0);
+	 getMonText(9,1);
+	 strcat(lineBuffer, proBaseAddr[i].ProS_firm);
+	 @call IIDispText::MSG_VIS_TEXT_APPEND_PTR(
+		lineBuffer, 0);
+	 getMonText(10,1);
+	 strcat(lineBuffer, proBaseAddr[i].ProS_addr);
+	 @call IIDispText::MSG_VIS_TEXT_APPEND_PTR(
+		lineBuffer, 0);
+	 getMonText(11,1);
+	 strcat(lineBuffer, proBaseAddr[i].ProS_city);
+	 @call IIDispText::MSG_VIS_TEXT_APPEND_PTR(
+		lineBuffer, 0);
+	 getMonText(12,1);
+	 strcat(lineBuffer, proBaseAddr[i].ProS_phone);
+	 strcat(lineBuffer, "\r\r");
+	 @call IIDispText::MSG_VIS_TEXT_APPEND_PTR(
+		lineBuffer, 0);
+	 numLines = numLines + 7;
+      } /* end of given pro else */
+   } /* end of pro for */
+   VMUnlock(mh);
+
+   /*Credit Cards*/
+   getMonText(13,0);
+   numLines++;
+
+   /* get credit card info */
+   block = VMGetMapBlock(hmInvFile);
+   houseMemPtr = VMLock(hmInvFile, block, &mh);
+   numItems = houseMemPtr->HS_numCCards;
+   VMUnlock(mh);
+
+   if (numItems == 0)
+      ;    /* no cards - so skip it */
+     else {
+      /* get the ccard handle - its id is 2 */
+      block = VMFind(hmInvFile, NullHandle, 2);
+      card = VMLock(hmInvFile, block, &mh);
+      for (i=0; i<numItems; i++) {
+	 getMonText(14,1);
+	 strcat(lineBuffer, card[i].CCS_name);
+	 @call IIDispText::MSG_VIS_TEXT_APPEND_PTR(
+		lineBuffer, 0);
+	 getMonText(15,1);
+	 strcat(lineBuffer, card[i].CCS_acct);
+	 @call IIDispText::MSG_VIS_TEXT_APPEND_PTR(
+		lineBuffer, 0);
+	 getMonText(16,1);
+	 strcat(lineBuffer, card[i].CCS_limit);
+	 @call IIDispText::MSG_VIS_TEXT_APPEND_PTR(
+		lineBuffer, 0);
+	 getMonText(17,1);
+	 strcat(lineBuffer, card[i].CCS_bphon);
+	 @call IIDispText::MSG_VIS_TEXT_APPEND_PTR(
+		lineBuffer, 0);
+	 getMonText(18,1);
+	 strcat(lineBuffer, card[i].CCS_lphon);
+	 strcat(lineBuffer, "\r\r");
+	 @call IIDispText::MSG_VIS_TEXT_APPEND_PTR(
+		lineBuffer, 0);
+	 numLines = numLines + 6;
+      } /* end of for loop */
+      VMUnlock(mh);
+   }  /* end of credit card else */
+
+   /*Banking*/
+   getMonText(19,0);
+   numLines++;
+
+   /* get bank acct info */
+   block = VMGetMapBlock(hmInvFile);
+   houseMemPtr = VMLock(hmInvFile, block, &mh);
+   numItems = houseMemPtr->HS_numBAccts;
+   VMUnlock(mh);
+
+   if (numItems == 0)
+      ;    /* no accts - so skip it */
+     else {
+      /* get the bank handle - its id is 3 */
+      block = VMFind(hmInvFile, NullHandle, 3);
+      acct = VMLock(hmInvFile, block, &mh);
+      for (i=0; i<numItems; i++) {
+	 getMonText(20,1);
+	 strcat(lineBuffer, acct[i].BAS_bank);
+	 @call IIDispText::MSG_VIS_TEXT_APPEND_PTR(
+		lineBuffer, 0);
+	 getMonText(21,1);
+	 strcat(lineBuffer, acct[i].BAS_type);
+	 @call IIDispText::MSG_VIS_TEXT_APPEND_PTR(
+		lineBuffer, 0);
+	 getMonText(22,1);
+	 strcat(lineBuffer, acct[i].BAS_num);
+	 @call IIDispText::MSG_VIS_TEXT_APPEND_PTR(
+		lineBuffer, 0);
+	 getMonText(23,1);
+	 strcat(lineBuffer, acct[i].BAS_rate);
+	 @call IIDispText::MSG_VIS_TEXT_APPEND_PTR(
+		lineBuffer, 0);
+	 getMonText(24,1);
+	 strcat(lineBuffer, acct[i].BAS_amount);
+	 strcat(lineBuffer, "\r\r");
+	 @call IIDispText::MSG_VIS_TEXT_APPEND_PTR(
+		lineBuffer, 0);
+	 numLines = numLines + 6;
+      } /* end of for loop */
+      VMUnlock(mh);
+   }  /* end of banking else */
+
+   /*Real Estate*/
+   getMonText(25,0);
+   numLines++;
+
+   /* get real estate info */
+   block = VMGetMapBlock(hmInvFile);
+   houseMemPtr = VMLock(hmInvFile, block, &mh);
+   numItems = houseMemPtr->HS_numREst;
+   VMUnlock(mh);
+
+   if (numItems == 0)
+      ;    /* no properties - so skip it */
+     else {
+      /* get the real est handle - its id is 4 */
+      block = VMFind(hmInvFile, NullHandle, 4);
+      rest = VMLock(hmInvFile, block, &mh);
+      for (i=0; i<numItems; i++) {
+	 getMonText(26,1);
+	 strcat(lineBuffer, rest[i].RES_loc);
+	 @call IIDispText::MSG_VIS_TEXT_APPEND_PTR(
+		lineBuffer, 0);
+	 getMonText(27,1);
+	 strcat(lineBuffer, rest[i].RES_desc);
+	 @call IIDispText::MSG_VIS_TEXT_APPEND_PTR(
+		lineBuffer, 0);
+	 getMonText(28,1);
+	 strcat(lineBuffer, rest[i].RES_mtge);
+	 @call IIDispText::MSG_VIS_TEXT_APPEND_PTR(
+		lineBuffer, 0);
+	 getMonText(29,1);
+	 strcat(lineBuffer, rest[i].RES_appr);
+	 @call IIDispText::MSG_VIS_TEXT_APPEND_PTR(
+		lineBuffer, 0);
+	 getMonText(30,1);
+	 strcat(lineBuffer, rest[i].RES_basis);
+	 @call IIDispText::MSG_VIS_TEXT_APPEND_PTR(
+		lineBuffer, 0);
+	 getMonText(31,1);
+	 strcat(lineBuffer, rest[i].RES_assmt);
+	 @call IIDispText::MSG_VIS_TEXT_APPEND_PTR(
+		lineBuffer, 0);
+	 getMonText(32,1);
+	 strcat(lineBuffer, rest[i].RES_tax);
+	 strcat(lineBuffer, "\r\r");
+	 @call IIDispText::MSG_VIS_TEXT_APPEND_PTR(
+		lineBuffer, 0);
+	 numLines = numLines + 8;
+      } /* end of for loop */
+      VMUnlock(mh);
+   }  /* end of real estate else */
+
+   /*Insurance*/
+   getMonText(33,0);
+   numLines++;
+
+   /* get insurance info */
+   block = VMGetMapBlock(hmInvFile);
+   houseMemPtr = VMLock(hmInvFile, block, &mh);
+   numItems = houseMemPtr->HS_numIns;
+   VMUnlock(mh);
+
+   if (numItems == 0)
+      ;    /* no policies - so skip it */
+     else {
+      /* get the insurance handle - its id is 5 */
+      block = VMFind(hmInvFile, NullHandle, 5);
+      ins = VMLock(hmInvFile, block, &mh);
+      for (i=0; i<numItems; i++) {
+	 getMonText(34,1);
+	 strcat(lineBuffer, ins[i].IS_type);
+	 @call IIDispText::MSG_VIS_TEXT_APPEND_PTR(
+		lineBuffer, 0);
+	 getMonText(35,1);
+	 strcat(lineBuffer, ins[i].IS_comp);
+	 @call IIDispText::MSG_VIS_TEXT_APPEND_PTR(
+		lineBuffer, 0);
+	 getMonText(36,1);
+	 strcat(lineBuffer, ins[i].IS_pol);
+	 @call IIDispText::MSG_VIS_TEXT_APPEND_PTR(
+		lineBuffer, 0);
+	 getMonText(37,1);
+	 strcat(lineBuffer, ins[i].IS_cov);
+	 @call IIDispText::MSG_VIS_TEXT_APPEND_PTR(
+		lineBuffer, 0);
+	 getMonText(38,1);
+	 strcat(lineBuffer, ins[i].IS_term);
+	 @call IIDispText::MSG_VIS_TEXT_APPEND_PTR(
+		lineBuffer, 0);
+	 getMonText(39,1);
+	 strcat(lineBuffer, ins[i].IS_prem);
+	 @call IIDispText::MSG_VIS_TEXT_APPEND_PTR(
+		lineBuffer, 0);
+	 getMonText(40,1);
+	 strcat(lineBuffer, ins[i].IS_agent);
+	 @call IIDispText::MSG_VIS_TEXT_APPEND_PTR(
+		lineBuffer, 0);
+	 getMonText(41,1);
+	 strcat(lineBuffer, ins[i].IS_phone);
+	 @call IIDispText::MSG_VIS_TEXT_APPEND_PTR(
+		lineBuffer, 0);
+	 getMonText(42,1);
+	 strcat(lineBuffer, ins[i].IS_notes);
+	 strcat(lineBuffer, "\r\r");
+	 @call IIDispText::MSG_VIS_TEXT_APPEND_PTR(
+		lineBuffer, 0);
+	 numLines = numLines + 10;
+      } /* end of for loop */
+      VMUnlock(mh);
+   }  /* end of insurance else */
+
+   /*Investments*/
+   getMonText(43,0);
+   numLines++;
+
+   /* get investment info */
+   block = VMGetMapBlock(hmInvFile);
+   houseMemPtr = VMLock(hmInvFile, block, &mh);
+   numItems = houseMemPtr->HS_numInv;
+   VMUnlock(mh);
+
+   if (numItems == 0)
+      ;    /* no investments - so skip it */
+     else {
+      /* get the investments handle - its id is 6 */
+      block = VMFind(hmInvFile, NullHandle, 6);
+      inv = VMLock(hmInvFile, block, &mh);
+      for (i=0; i<numItems; i++) {
+	 getMonText(44,1);
+	 strcat(lineBuffer, inv[i].InvS_type);
+	 @call IIDispText::MSG_VIS_TEXT_APPEND_PTR(
+		lineBuffer, 0);
+	 getMonText(45,1);
+	 strcat(lineBuffer, inv[i].InvS_name);
+	 @call IIDispText::MSG_VIS_TEXT_APPEND_PTR(
+		lineBuffer, 0);
+	 getMonText(46,1);
+	 strcat(lineBuffer, inv[i].InvS_units);
+	 @call IIDispText::MSG_VIS_TEXT_APPEND_PTR(
+		lineBuffer, 0);
+	 getMonText(47,1);
+	 strcat(lineBuffer, inv[i].InvS_price);
+	 @call IIDispText::MSG_VIS_TEXT_APPEND_PTR(
+		lineBuffer, 0);
+	 getMonText(48,1);
+	 strcat(lineBuffer, inv[i].InvS_date);
+	 @call IIDispText::MSG_VIS_TEXT_APPEND_PTR(
+		lineBuffer, 0);
+	 getMonText(49,1);
+	 strcat(lineBuffer, inv[i].InvS_from);
+	 @call IIDispText::MSG_VIS_TEXT_APPEND_PTR(
+		lineBuffer, 0);
+	 getMonText(50,1);
+	 strcat(lineBuffer, inv[i].InvS_div);
+	 @call IIDispText::MSG_VIS_TEXT_APPEND_PTR(
+		lineBuffer, 0);
+	 getMonText(51,1);
+	 strcat(lineBuffer, inv[i].InvS_doc);
+	 @call IIDispText::MSG_VIS_TEXT_APPEND_PTR(
+		lineBuffer, 0);
+	 getMonText(52,1);
+	 strcat(lineBuffer, inv[i].InvS_notes);
+	 strcat(lineBuffer, "\r\r");
+	 @call IIDispText::MSG_VIS_TEXT_APPEND_PTR(
+		lineBuffer, 0);
+	 numLines = numLines + 10;
+      } /* end of for loop */
+      VMUnlock(mh);
+   }  /* end of investments else */
+
+   /*Family*/
+   getMonText(53,0);
+   numLines++;
+
+   /* get family info */
+   block = VMGetMapBlock(hmInvFile);
+   houseMemPtr = VMLock(hmInvFile, block, &mh);
+   numItems = houseMemPtr->HS_numFam;
+   VMUnlock(mh);
+
+   if (numItems == 0)
+      ;    /* no names - so skip it */
+     else {
+      /* get the family handle - its id is 7 */
+      block = VMFind(hmInvFile, NullHandle, 7);
+      fam = VMLock(hmInvFile, block, &mh);
+      for (i=0; i<numItems; i++) {
+	 getMonText(54,1);
+	 strcat(lineBuffer, fam[i].FS_name);
+	 @call IIDispText::MSG_VIS_TEXT_APPEND_PTR(
+		lineBuffer, 0);
+	 getMonText(55,1);
+	 strcat(lineBuffer, fam[i].FS_SSAN);
+	 @call IIDispText::MSG_VIS_TEXT_APPEND_PTR(
+		lineBuffer, 0);
+	 getMonText(56,1);
+	 strcat(lineBuffer, fam[i].FS_driv);
+	 @call IIDispText::MSG_VIS_TEXT_APPEND_PTR(
+		lineBuffer, 0);
+	 getMonText(57,1);
+	 strcat(lineBuffer, fam[i].FS_dexp);
+	 @call IIDispText::MSG_VIS_TEXT_APPEND_PTR(
+		lineBuffer, 0);
+	 getMonText(58,1);
+	 strcat(lineBuffer, fam[i].FS_DOB);
+	 @call IIDispText::MSG_VIS_TEXT_APPEND_PTR(
+		lineBuffer, 0);
+	 getMonText(59,1);
+	 strcat(lineBuffer, fam[i].FS_hosp);
+	 @call IIDispText::MSG_VIS_TEXT_APPEND_PTR(
+		lineBuffer, 0);
+	 getMonText(60,1);
+	 strcat(lineBuffer, fam[i].FS_doc);
+	 @call IIDispText::MSG_VIS_TEXT_APPEND_PTR(
+		lineBuffer, 0);
+	 getMonText(61,1);
+	 strcat(lineBuffer, fam[i].FS_city);
+	 @call IIDispText::MSG_VIS_TEXT_APPEND_PTR(
+		lineBuffer, 0);
+	 getMonText(62,1);
+	 strcat(lineBuffer, fam[i].FS_loc);
+	 @call IIDispText::MSG_VIS_TEXT_APPEND_PTR(
+		lineBuffer, 0);
+	 getMonText(63,1);
+	 strcat(lineBuffer, fam[i].FS_will);
+	 @call IIDispText::MSG_VIS_TEXT_APPEND_PTR(
+		lineBuffer, 0);
+	 getMonText(64,1);
+	 strcat(lineBuffer, fam[i].FS_exec);
+	 strcat(lineBuffer, "\r\r");
+	 @call IIDispText::MSG_VIS_TEXT_APPEND_PTR(
+		lineBuffer, 0);
+	 numLines = numLines + 12;
+      } /* end of for loop */
+      VMUnlock(mh);
+   }  /* end of family else */
+
+   /*Other Data*/
+   getMonText(65,0);
+   numLines++;
+
+   /* get the safe/box info */
+   /* get the block handle - it's id is 8 */
+   block = VMFind(hmInvFile, NullHandle, 8);
+   /* and lock it */
+   sbBaseAddr = VMLock(hmInvFile, block, &mh);
+
+   /* safe deposit box data */
+   strcpy(fld1, sbBaseAddr->SB_SDBnum);
+   if ( *fld1 == NULL)
+      ;        /* don't print safe deposit box - not listed */
+     else {
+      getMonText(66,0);
+      getMonText(67,1);
+      strcat(lineBuffer, sbBaseAddr->SB_SDBnum);
+      @call IIDispText::MSG_VIS_TEXT_APPEND_PTR(
+		lineBuffer, 0);
+      getMonText(68,1);
+      strcat(lineBuffer, sbBaseAddr->SB_SDBloc);
+      @call IIDispText::MSG_VIS_TEXT_APPEND_PTR(
+		lineBuffer, 0);
+      getMonText(69,1);
+      strcat(lineBuffer, sbBaseAddr->SB_SDBrent);
+      @call IIDispText::MSG_VIS_TEXT_APPEND_PTR(
+		lineBuffer, 0);
+      getMonText(70,1);
+      strcat(lineBuffer, sbBaseAddr->SB_SDBdue);
+      strcat(lineBuffer, "\r\r");
+      @call IIDispText::MSG_VIS_TEXT_APPEND_PTR(
+		lineBuffer, 0);
+      numLines = numLines + 7;
+   } /* end of sdb else */
+
+   /* po box data */
+   strcpy(fld1, sbBaseAddr->SB_POBnum);
+   if ( *fld1 == NULL)
+      ;        /* don't print post office box - not listed */
+     else {
+      getMonText(71,0);
+      getMonText(67,1);
+      strcat(lineBuffer, sbBaseAddr->SB_POBnum);
+      @call IIDispText::MSG_VIS_TEXT_APPEND_PTR(
+		lineBuffer, 0);
+      getMonText(68,1);
+      strcat(lineBuffer, sbBaseAddr->SB_POBloc);
+      @call IIDispText::MSG_VIS_TEXT_APPEND_PTR(
+		lineBuffer, 0);
+      getMonText(69,1);
+      strcat(lineBuffer, sbBaseAddr->SB_POBrent);
+      @call IIDispText::MSG_VIS_TEXT_APPEND_PTR(
+		lineBuffer, 0);
+      getMonText(70,1);
+      strcat(lineBuffer, sbBaseAddr->SB_POBdue);
+      strcat(lineBuffer, "\r\r");
+      @call IIDispText::MSG_VIS_TEXT_APPEND_PTR(
+		lineBuffer, 0);
+      numLines = numLines + 7;
+   } /* end of pob else */
+
+   /* safe data */
+   strcpy(fld1, sbBaseAddr->SB_safeloc);
+   if ( *fld1 == NULL)
+      ;        /* don't print safe - not listed */
+     else {
+      getMonText(72,0);
+      getMonText(68,1);
+      strcat(lineBuffer, sbBaseAddr->SB_safeloc);
+      @call IIDispText::MSG_VIS_TEXT_APPEND_PTR(
+		lineBuffer, 0);
+      getMonText(73,1);
+      strcat(lineBuffer, sbBaseAddr->SB_safecombo);
+      strcat(lineBuffer, "\r\r");
+      @call IIDispText::MSG_VIS_TEXT_APPEND_PTR(
+		lineBuffer, 0);
+      numLines = numLines + 4;
+   } /* end of safe else */
+   VMUnlock(mh);
+
+   /* tell print controller how many pages */
+   numPages = 1 + (numLines / 54); /* six lines per inch */
+   @call IIPrintControl::MSG_PRINT_CONTROL_SET_TOTAL_PAGE_RANGE(1, numPages);
+}
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_IMPINFO_DISPLAY for HInvProcessClass
+ *
+ * DESCRIPTION:	Fills and calls the impinfo box when the menu
+ *               is clicked.
+ *     
+ *              
+ *
+ ***********************************************************************/
+
+@extern method HInvProcessClass, MSG_IMPINFO_DISPLAY
+{
+    /* LES:  You can put data in a GenText even though it is not visible */
+    /* on the screen.  Go ahead and do it.  Also, oself = process. */
+    @call oself::MSG_SHOW_IMPINFO() ;
+
+    @call ImpInfoDisplay::MSG_GEN_INTERACTION_INITIATE();
+}
+
+/************************************************************************/
+@extern method IPrintGenTextClass, MSG_PRINT_START_PRINTING
+{
+    word curPage;
+
+    for (curPage=0; curPage < numPages; curPage++)
+    {
+       GrSaveState(gstate);
+
+       /* Translate the gstate down a page */
+       GrApplyTranslation(gstate, 0,
+		   -MakeWWFixed(curPage *(
+		   (sdword)(9*72))));
+
+       /* Clip it to match translation and margins */
+       GrSetClipRect(gstate, PCT_REPLACE,
+                             0,                     /* left */
+                             curPage * (9*72),      /* top */
+                             (6.5*72),                 /* right */
+			     (curPage +1) * (9*72) - 1);   /* bottom */
+			     /* The -1 is to keep an extra line from printing
+                              * when in text only mode.  Doesn't effect
+                              * graphic printing */
+
+	/* Draw current page */
+       @call self::MSG_VIS_DRAW(DF_PRINT, gstate);
+
+       GrRestoreState(gstate);
+       GrNewPage(gstate, PEC_FORM_FEED);
+    }
+
+    @send IIPrintControl::MSG_PRINT_CONTROL_PRINTING_COMPLETED();
+}
+
+/*---------------------------------------------------------------------
+ * FUNCTION  getMonText
+ *
+ * DESCRIPTION  extract text string from given moniker
+ *
+ *--------------------------------------------------------------------
+ */
+ void getMonText(int number, int copy) {
+
+      ChunkHandle  iimonikers[] = {
+      OptrToChunk(@IIAMonText),
+      OptrToChunk(@IIBMonText),
+      OptrToChunk(@IICMonText),
+      OptrToChunk(@IIDMonText),
+      OptrToChunk(@IIEMonText),
+      OptrToChunk(@IIFMonText),
+      OptrToChunk(@IIGMonText),
+      OptrToChunk(@IIHMonText),
+      OptrToChunk(@IIIMonText),
+      OptrToChunk(@IIJMonText),
+      OptrToChunk(@IIKMonText),
+      OptrToChunk(@IILMonText),
+      OptrToChunk(@IIMMonText),
+      OptrToChunk(@IINMonText),
+      OptrToChunk(@IIOMonText),
+      OptrToChunk(@IIPMonText),
+      OptrToChunk(@IIQMonText),
+      OptrToChunk(@IIRMonText),
+      OptrToChunk(@IISMonText),
+      OptrToChunk(@IITMonText),
+      OptrToChunk(@IIUMonText),
+      OptrToChunk(@IIVMonText),
+      OptrToChunk(@IIWMonText),
+      OptrToChunk(@IIXMonText),
+      OptrToChunk(@IIYMonText),
+      OptrToChunk(@IIZMonText),
+      OptrToChunk(@IIAAMonText),
+      OptrToChunk(@IIABMonText),
+      OptrToChunk(@IIACMonText),
+      OptrToChunk(@IIADMonText),
+      OptrToChunk(@IIAEMonText),
+      OptrToChunk(@IIAFMonText),
+      OptrToChunk(@IIAGMonText),
+      OptrToChunk(@IIAHMonText),
+      OptrToChunk(@IIAIMonText),
+      OptrToChunk(@IIAJMonText),
+      OptrToChunk(@IIAKMonText),
+      OptrToChunk(@IIALMonText),
+      OptrToChunk(@IIAMMonText),
+      OptrToChunk(@IIANMonText),
+      OptrToChunk(@IIAOMonText),
+      OptrToChunk(@IIAPMonText),
+      OptrToChunk(@IIAQMonText),
+      OptrToChunk(@IIARMonText),
+      OptrToChunk(@IIASMonText),
+      OptrToChunk(@IIATMonText),
+      OptrToChunk(@IIAUMonText),
+      OptrToChunk(@IIAVMonText),
+      OptrToChunk(@IIAWMonText),
+      OptrToChunk(@IIAXMonText),
+      OptrToChunk(@IIAYMonText),
+      OptrToChunk(@IIAZMonText),
+      OptrToChunk(@IIBAMonText),
+      OptrToChunk(@IIBBMonText),
+      OptrToChunk(@IIBCMonText),
+      OptrToChunk(@IIBDMonText),
+      OptrToChunk(@IIBEMonText),
+      OptrToChunk(@IIBFMonText),
+      OptrToChunk(@IIBGMonText),
+      OptrToChunk(@IIBHMonText),
+      OptrToChunk(@IIBIMonText),
+      OptrToChunk(@IIBJMonText),
+      OptrToChunk(@IIBKMonText),
+      OptrToChunk(@IIBLMonText),
+      OptrToChunk(@IIBMMonText),
+      OptrToChunk(@IIBNMonText),
+      OptrToChunk(@IIBOMonText),
+      OptrToChunk(@IIBPMonText),
+      OptrToChunk(@IIBQMonText),
+      OptrToChunk(@IIBRMonText),
+      OptrToChunk(@IIBSMonText),
+      OptrToChunk(@IIBTMonText),
+      OptrToChunk(@IIBUMonText),
+	 OptrToChunk(@IIBVMonText)/*,
+	 OptrToChunk(@IIBWMonText)*/
+    };
+    VisMonikerWithText   *monStru;
+
+    MemLock(HandleOf(@IIAMonText));
+
+    monStru = LMemDerefHandles(HandleOf(@IIAMonText),iimonikers[number]);
+
+    if (copy == 0)
+	@call IIDispText::MSG_VIS_TEXT_APPEND_PTR((char *)monStru+VMWT_text, 0);
+      else {
+	*lineBuffer = NULL;
+	strcat(lineBuffer, (char *)monStru+VMWT_text);
+        }
+    MemUnlock(HandleOf(@IIAMonText));
+}
