@@ -10,6 +10,8 @@ REVISION HISTORY:
 	Name	Date		Description
 	----	----		-----------
 	Tony	3/92		Initial version
+	RainerB	12/2023		Renamed from Writer to GeoWrite
+
 
 DESCRIPTION:
 	This file contains the document open/close related code for
@@ -1014,13 +1016,13 @@ COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 		CheckIfNativeFile
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-SYNOPSIS:	Checks to see if this is a native Writer file
+SYNOPSIS:	Checks to see if this is a native GeoWrite file
 
 CALLED BY:	WriteDocumentOpen()
 
 PASS:		ss:bp	= DocumentCommonParams
 
-RETURN:		carry	= clear if it is a native Writer file
+RETURN:		carry	= clear if it is a native GeoWrite file
 			- or -
 		carry	= set if it is not (i.e. a DOS file)
 
