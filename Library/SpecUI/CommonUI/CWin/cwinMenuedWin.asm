@@ -1130,7 +1130,15 @@ bail:	;forget it!
 
 	call	WinClasses_CallSelf_SET_VIS_SPEC_ATTR_VUM_NOW
 
-if not _NO_WIN_ICONS	;------------------------------------------------------
+	;
+	; TOOL_AREA_IS_TASKBAR
+	;
+	push	ds
+	segmov	ds, dgroup
+	tst	ds:[taskBarEnabled] ; if taskbar == on, ZF == 1
+	pop	ds
+	jnz	afterNoIconsBecauseOfTaskbar ; if ZF == 1 == TaskBar => show no Win Icons => jump
+;if not _NO_WIN_ICONS	;------------------------------------------------------
 
 	;See if there is an OLWinIcon object associated with this window
 
@@ -1252,7 +1260,8 @@ OMWGSM_50: ;make the Icon SA_REALIZABLE so will appear on-screen.
 	mov	ax, MSG_META_GRAB_FOCUS_EXCL
 	call	OLMenuedWinCallIconObject
 
-endif	; if not _NO_WIN_ICONS ------------------------------------------------
+;endif	; if not _NO_WIN_ICONS ------------------------------------------------
+afterNoIconsBecauseOfTaskbar:
 
 ;	;release input
 ;

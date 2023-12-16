@@ -416,7 +416,7 @@ REVISION HISTORY:
 	Joon	9/ 2/92		Initial version
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
-
+if _ISUI
 GetSystemMenuBlockHandle	proc	far
 
 	cmp	ds:[di].OLWI_type, MOWT_PRIMARY_WINDOW
@@ -431,6 +431,7 @@ haveMenu:
 	ret
 
 GetSystemMenuBlockHandle	endp
+endif
 
 
 
