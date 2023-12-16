@@ -60,7 +60,7 @@ static void AdjustFontBuf( TransformMatrix*     transMatrix,
                         TransFlags              flags );
 
 static Boolean IsRegionNeeded( TransformMatrix* transMatrix, 
-                        FontMatrix* fontMatrix, FontBuf* fontBuf );
+                        FontBuf*                fontBuf );
 
 
 #define ROUND_WWFIXED( value )    ( value & 0xffff ? ( value >> 16 ) + 1 : value >> 16 )
@@ -192,7 +192,7 @@ EC(     ECCheckBounds( (void*)transMatrix ) );
         AdjustFontBuf( transMatrix, fontBuf, fontMatrix->FM_flags );
 
         /* Are the glyphs rendered as regions? */
-        if( IsRegionNeeded( transMatrix, fontMatrix, fontBuf ) )
+        if( IsRegionNeeded( transMatrix, fontBuf ) )
                 fontBuf->FB_flags |= FBF_IS_REGION;
 
         TrueType_Unlock_Face( trueTypeVars );
@@ -470,10 +470,12 @@ EC(     ECCheckBounds( (void*)fontMatrix ) );
 
                 if( stylesToImplement & TS_SUBSCRIPT )
                 {
+                        //TODO: Is rounding necessary here?
                         transMatrix->TM_scriptY = GrMulWWFixed( scriptOffset, SUBSCRIPT_OFFSET ) >> 16;
                 }
                 else
                 {
+                        //TODO: Is rounding necessary here?
                         transMatrix->TM_scriptY = ( GrMulWWFixed( scriptOffset, SUPERSCRIPT_OFFSET) -
                                                 WBFIXED_TO_WWFIXEDASDWORD( fontBuf->FB_baselinePos ) -
                                                 WBFIXED_TO_WWFIXEDASDWORD( fontBuf->FB_baseAdjust ) ) >> 16;
@@ -671,7 +673,7 @@ static void AdjustFontBuf( TransformMatrix* transMatrix,
         /* further transformation if rotated or scaled */
         if( flags & TF_COMPLEX )
         {
-                sword savedHeightY = transMatrix->TM_heightY;
+                sword savedScriptY = transMatrix->TM_scriptY;
 
 
                 fontBuf->FB_flags     |= FBF_IS_COMPLEX;
@@ -718,7 +720,6 @@ static void AdjustFontBuf( TransformMatrix* transMatrix,
  *                region.
  * 
  * PARAMETERS:    *transMatrix          Ptr to tranfomation matrix.
- *                *fontMatrix           Ptr to systems font matrix.
  *                *fontBuf              Ptr to FontBuf structure.
  * 
  * RETURNS:       Boolean
@@ -731,19 +732,19 @@ static void AdjustFontBuf( TransformMatrix* transMatrix,
  *      22/07/23  JK        Initial Revision
  *******************************************************************/
 
-static Boolean IsRegionNeeded( TransformMatrix* transMatrix, FontMatrix* fontMatrix, FontBuf* fontBuf )
+static Boolean IsRegionNeeded( TransformMatrix* transMatrix, FontBuf* fontBuf )
 {
         sword param1;
         sword param2;
 
 
-        param1 = IntegerOf( GrMulWWFixed( fontMatrix->FM_11, ( (WWFixedAsDWord)fontBuf->FB_pixHeight ) >> 16 ) );
-        param2 = IntegerOf( GrMulWWFixed( fontMatrix->FM_21, WORD_TO_WWFIXEDASDWORD( fontBuf->FB_pixHeight ) ) );
+        param1 = IntegerOf( GrMulWWFixed( transMatrix->TM_matrix.xx, WORD_TO_WWFIXEDASDWORD( fontBuf->FB_pixHeight ) ) );
+        param2 = IntegerOf( GrMulWWFixed( transMatrix->TM_matrix.yx, WORD_TO_WWFIXEDASDWORD( fontBuf->FB_pixHeight ) ) );
         if( ( ABS( param1 ) + ABS( param2 ) ) > MAX_BITMAP_SIZE )
                 return TRUE;
 
-        param1 = IntegerOf( GrMulWWFixed( fontMatrix->FM_12, WORD_TO_WWFIXEDASDWORD( fontBuf->FB_pixHeight ) ) );
-        param2 = IntegerOf( GrMulWWFixed( fontMatrix->FM_22, WORD_TO_WWFIXEDASDWORD( fontBuf->FB_pixHeight ) ) );
+        param1 = IntegerOf( GrMulWWFixed( transMatrix->TM_matrix.xy, WORD_TO_WWFIXEDASDWORD( fontBuf->FB_pixHeight ) ) );
+        param2 = IntegerOf( GrMulWWFixed( transMatrix->TM_matrix.yy, WORD_TO_WWFIXEDASDWORD( fontBuf->FB_pixHeight ) ) );
         if( ( ABS( param1 ) + ABS( param2 ) ) > MAX_BITMAP_SIZE )
                 return TRUE;
 
