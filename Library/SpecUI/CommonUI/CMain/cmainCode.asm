@@ -1605,12 +1605,12 @@ pdaKeyString	char	"pda",0
 inputCat		char	"input",0
 floatingKbdKey		char	"floatingKbd",0
 
-if	TOOL_AREA_IS_TASK_BAR
+;if	TOOL_AREA_IS_TASK_BAR
 taskBarEnabledString	char	"taskBarEnabled",0
 taskBarPositionString	char	"taskBarPosition",0
 taskBarAutoHideString	char	"taskBarAutoHide",0
 taskBarMovableString	char	"taskBarMovable",0
-endif
+;endif
 
 if _ISUI
 rightClickHelpString	char	"rightClickHelp",0
