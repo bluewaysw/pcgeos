@@ -6,8 +6,11 @@
 # MODULE:	GeoCalc
 # FILE:		geocalc.gp
 #
-# AUTHOR:	Gene, 2/91
-#
+# REVISION HISTORY:
+#	Name	Date		Description
+#	----	----		-----------
+#	Gene	2/91		Initial version
+#	RainerB	12/2023		Renamed to GeoCalc
 #
 # Parameters file for: geocalc.gp
 #
@@ -21,7 +24,7 @@ name geocalc.app
 #
 # Long name
 #
-longname "Spreadsheet"
+longname "GeoCalc"
 
 #
 # DB Token

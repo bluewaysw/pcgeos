@@ -7,7 +7,12 @@ PROJECT:	GlobalPC
 MODULE:		GeoWrite
 FILE:		uiWriteDC.asm
 
-AUTHOR:		Steve Yegge, Oct 16, 1998
+AUTHOR:		
+REVISION HISTORY:
+	Date	      Name	    Description
+	----	      ----	    -----------
+	10/16/1998    Steve Yegge   Initial version
+	12/2023	      RainerB       Renamed from Writer to GeoWrite
 
 ROUTINES:
 	Name			Description
@@ -133,7 +138,7 @@ GeoWriteDCConfigureFileSelector	method	WriteDocumentCtrlClass,
 
 
 	;
-	; Determine whether Writer is in Help Editor Mode.  If it is,
+	; Determine whether GeoWrite is in Help Editor Mode.  If it is,
 	; we want to change our default directory to USERDATA/Help/Source.
 	;
 
