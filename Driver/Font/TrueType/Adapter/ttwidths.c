@@ -56,6 +56,7 @@ static void CalcTransform(
                         TextStyle               stylesToImplement );
 
 static void AdjustFontBuf( TransformMatrix*     transMatrix, 
+                        FontMatrix*             fontMatrix, 
                         FontBuf*                fontBuf,
                         TransFlags              flags );
 
@@ -189,7 +190,7 @@ EC(     ECCheckBounds( (void*)transMatrix ) );
         CalcTransform( transMatrix, fontMatrix, fontBuf, stylesToImplement );
 
         //TODO: adjust FB_height, FB_minTSB, FB_pixHeight and FB_baselinePos
-        AdjustFontBuf( transMatrix, fontBuf, fontMatrix->FM_flags );
+        AdjustFontBuf( transMatrix, fontMatrix, fontBuf, fontMatrix->FM_flags );
 
         /* Are the glyphs rendered as regions? */
         if( IsRegionNeeded( transMatrix, fontBuf ) )
@@ -482,6 +483,8 @@ EC(     ECCheckBounds( (void*)fontMatrix ) );
                 }
         }
 
+        //TODO: width and weight
+
         /* integrate fontMatrix */
         transMatrix->TM_matrix.xx = GrMulWWFixed( tempMatrix.xx, fontMatrix->FM_11 );
         transMatrix->TM_matrix.xy = - ( GrMulWWFixed( tempMatrix.yx, fontMatrix->FM_11 ) +
@@ -665,12 +668,13 @@ static void ConvertHeader( TRUETYPE_VARS, FontHeader* fontHeader, FontBuf* fontB
  *******************************************************************/
 
 static void AdjustFontBuf( TransformMatrix* transMatrix, 
+                           FontMatrix*      fontMatrix,         
                            FontBuf*         fontBuf,
                            TransFlags       flags )
 {
         transMatrix->TM_heightY = fontBuf->FB_baselinePos.WBF_int + BASELINE_CORRECTION;
 
-        /* further transformation if rotated or scaled */
+        /* transformation if rotated or scaled */
         if( flags & TF_COMPLEX )
         {
                 sword savedScriptY = transMatrix->TM_scriptY;
@@ -679,31 +683,28 @@ static void AdjustFontBuf( TransformMatrix* transMatrix,
                 fontBuf->FB_flags     |= FBF_IS_COMPLEX;
 
                 transMatrix->TM_heightY = INTEGER_OF_WWFIXEDASDWORD( GrMulWWFixed( 
-                                        WORD_TO_WWFIXEDASDWORD( fontBuf->FB_baselinePos.WBF_int ), transMatrix->TM_matrix.yy ) ) + BASELINE_CORRECTION;
+                                        WORD_TO_WWFIXEDASDWORD( transMatrix->TM_heightY ), fontMatrix->FM_22 ) );
                 transMatrix->TM_scriptY = INTEGER_OF_WWFIXEDASDWORD( GrMulWWFixed( 
-                                        WORD_TO_WWFIXEDASDWORD( transMatrix->TM_scriptY ), transMatrix->TM_matrix.yy ) );
+                                        WORD_TO_WWFIXEDASDWORD( transMatrix->TM_scriptY ), fontMatrix->FM_22 ) );
                             
                 /* adjust FB_pixHeight, FB_minTSB */
                 fontBuf->FB_pixHeight = INTEGER_OF_WWFIXEDASDWORD( GrMulWWFixed( 
-                                                WORD_TO_WWFIXEDASDWORD( fontBuf->FB_height.WBF_int ), transMatrix->TM_matrix.yy ) );
+                                                WORD_TO_WWFIXEDASDWORD( fontBuf->FB_height.WBF_int ), fontMatrix->FM_22 ) );
                 fontBuf->FB_minTSB    = INTEGER_OF_WWFIXEDASDWORD( GrMulWWFixed( 
-                                                WORD_TO_WWFIXEDASDWORD( fontBuf->FB_minTSB ), transMatrix->TM_matrix.yy ) );
+                                                WORD_TO_WWFIXEDASDWORD( fontBuf->FB_minTSB ), fontMatrix->FM_22 ) );
                 fontBuf->FB_pixHeight += fontBuf->FB_minTSB;
 
                 if( flags & TF_ROTATED )
                 {
+                        /* adjust scriptX and heightX */
 
-                        /* adjust script and height */
-                        transMatrix->TM_heightY = INTEGER_OF_WWFIXEDASDWORD( GrMulWWFixed( 
-                                                        WORD_TO_WWFIXEDASDWORD( fontBuf->FB_baselinePos.WBF_int ), transMatrix->TM_matrix.yy ) );
+                        //das geht noch nicht
+                        transMatrix->TM_scriptX = 0; //INTEGER_OF_WWFIXEDASDWORD( GrMulWWFixed( 
+                                                     //   WORD_TO_WWFIXEDASDWORD( savedScriptY /*transMatrix->TM_scriptY*/ ), /*transMatrix->TM_matrix.xy*/fontMatrix->FM_21 ) );
+
                         transMatrix->TM_heightX = -INTEGER_OF_WWFIXEDASDWORD( GrMulWWFixed( 
                                                         WORD_TO_WWFIXEDASDWORD( fontBuf->FB_baselinePos.WBF_int ), transMatrix->TM_matrix.xy ) );
-                        
-                        transMatrix->TM_scriptX = 0; /*-INTEGER_OF_WWFIXEDASDWORD( GrMulWWFixed( 
-                                                        WORD_TO_WWFIXEDASDWORD( savedHeightY ), transMatrix->TM_matrix.xy ) );*/
 
-                        transMatrix->TM_scriptY = 0; /* INTEGER_OF_WWFIXEDASDWORD( GrMulWWFixed( 
-                                                        WORD_TO_WWFIXEDASDWORD( savedHeightY - transMatrix->TM_heightY + transMatrix->TM_scriptY ), -transMatrix->TM_matrix.yx ) );*/
                 }
         }
 }
