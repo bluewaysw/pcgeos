@@ -57,6 +57,7 @@ resource ItemsMonText data object
 resource HouseMonText data object
 resource ImpInfMonText data object
 resource QTipsResource ui-object
+resource Strings data object
 
 # classes
 export HInvProcessClass

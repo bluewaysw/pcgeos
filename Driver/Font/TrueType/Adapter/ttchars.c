@@ -94,6 +94,7 @@ EC(     ECCheckBounds( (void*)trueTypeVars ) );
 
         trueTypeOutline = LMemDerefHandles( MemPtrToHandle( (void*)fontInfo ), outlineEntry->OE_handle );
 EC(     ECCheckBounds( (void*)trueTypeOutline ) );
+EC(     ECCheckBounds( (void*)trueTypeOutline ) );
 
         /* open face, create instance and glyph */
         if( TrueType_Lock_Face(trueTypeVars, trueTypeOutline) )
@@ -111,8 +112,9 @@ EC(     ECCheckBounds( (void*)trueTypeOutline ) );
         TT_Load_Glyph( INSTANCE, GLYPH, charIndex, TTLOAD_DEFAULT );
         TT_Get_Glyph_Outline( GLYPH, &OUTLINE );
 
-        // TODO: Transformationsmatrix anwenden
+        /* get transformmatrix */
         transformMatrix = (TransformMatrix*)(((byte*)fontBuf) + sizeof( FontBuf ) + ( fontBuf->FB_lastChar - fontBuf->FB_firstChar + 1 ) * sizeof( CharTableEntry ));
+EC(     ECCheckBounds( (void*)transformMatrix ) );
         TT_Transform_Outline( &OUTLINE, &transformMatrix->TM_matrix );
 
         /* get glyphs boundig box */
@@ -168,7 +170,7 @@ EC_ERROR_IF(    size < RASTER_MAP.size, -1 );
         }
         else
         {      
-                size = height * ( ( width + 7 ) / 8 ) + SIZE_CHAR_HEADER;
+                size = height * ( ( width + 7 ) >> 3 ) + SIZE_CHAR_HEADER;
 
                 /* get pointer to bitmapBlock */
                 charData = EnsureBitmapBlock( bitmapHandle, size );
@@ -177,7 +179,7 @@ EC(             ECCheckBounds( (void*)charData ) );
                 /* init rasterMap */
                 RASTER_MAP.rows   = height;
                 RASTER_MAP.width  = width;
-                RASTER_MAP.cols   = (width + 7) / 8;
+                RASTER_MAP.cols   = (width + 7) >> 3;
                 RASTER_MAP.size   = RASTER_MAP.rows * RASTER_MAP.cols;
                 RASTER_MAP.bitmap = ((byte*)charData) + SIZE_CHAR_HEADER;
 
@@ -203,15 +205,17 @@ EC_ERROR_IF(    size < RASTER_MAP.size, -1 );
 
         /* realloc FontBuf if necessary */
         fontBufHandle = MemPtrToHandle( fontBuf );
+EC(     ECCheckMemHandle( fontBufHandle ) );
         if( MemGetInfo( fontBufHandle, MGIT_SIZE ) < fontBuf->FB_dataSize + size )
         {
                 MemReAlloc( fontBufHandle, fontBuf->FB_dataSize + size, HAF_STANDARD_NO_ERR );
+EC(             ECCheckMemHandle( fontBufHandle) );
                 fontBuf = MemDeref( fontBufHandle );
 EC(             ECCheckBounds( (void*)fontBuf ) );
         }
 
         /* add rendered glyph to fontbuf */
-        CopyChar( fontBuf, character, charData ,size );
+        CopyChar( fontBuf, character, charData, size );
 
         /* cleanup */
         MemUnlock( bitmapHandle );
@@ -251,10 +255,8 @@ static void CopyChar( FontBuf* fontBuf, word geosChar, void* charData, word char
 
 
 EC(     ECCheckBounds( (void*)charData ) );
-EC(     ECCheckBounds( (void*)(((byte*)charData) + charDataSize ) ) );
-EC(     ECCheckBounds( (void*)charTableEntries ) );
 EC(     ECCheckBounds( (void*)(((byte*)fontBuf) + fontBuf->FB_dataSize ) ) );
-
+EC(     ECCheckBounds( (void*)(((byte*)fontBuf) + fontBuf->FB_dataSize + charDataSize ) ) );
 
         /* copy rendered Glyph to fontBuf */
         memmove( ((byte*)fontBuf) + fontBuf->FB_dataSize, charData, charDataSize );
@@ -298,11 +300,11 @@ EC(     ECCheckBounds( (void*)charTableEntries ) );
                 void* charData = ((byte*)fontBuf) + charTableEntries[indexLRUChar].CTE_dataOffset;
 
 
-EC(     ECCheckBounds( (void*)charData ) );
-
                 /* ensure that we have a char to remove */
                 if( indexLRUChar == -1 )
                         return;
+
+EC(             ECCheckBounds( (void*)charData ) );
 
                 /* remove CharData of lru char */
                 if( fontBuf->FB_flags & FBF_IS_REGION )
@@ -351,6 +353,9 @@ static int FindLRUChar( FontBuf* fontBuf, int numOfChars )
 
         for( i = 0; i < numOfChars; ++i, ++charTableEntry )
         {
+
+EC(             ECCheckBounds( (void*)charTableEntry ) );
+
                 /* if no data, go to next char */
                 if( charTableEntry->CTE_dataOffset <= CHAR_MISSING )
                         continue;
@@ -360,7 +365,6 @@ static int FindLRUChar( FontBuf* fontBuf, int numOfChars )
                         lru = charTableEntry->CTE_usage;
                         indexLRUChar = i;
                 }
-
         }
 
         return indexLRUChar;
@@ -423,8 +427,12 @@ static void AdjustPointers( CharTableEntry* charTableEntries,
 
 static word ShiftCharData( FontBuf* fontBuf, CharData* charData )
 {
-        word  size = charData->CD_pictureWidth * 
-                     ( ( charData->CD_numRows + 7 ) / 8 ) + SIZE_CHAR_HEADER;
+        word  size = ( ( charData->CD_pictureWidth + 7 ) >> 3 ) * 
+                     charData->CD_numRows + SIZE_CHAR_HEADER;
+
+
+EC(     ECCheckBounds( (void*)charData ) );
+EC(     ECCheckBounds( (void*)(((byte*)charData) + size ) ) );
  
         memmove( charData, 
                 ((byte*)charData) + size, 
