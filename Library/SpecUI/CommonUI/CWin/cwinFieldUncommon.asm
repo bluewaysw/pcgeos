@@ -1918,18 +1918,24 @@ TaskBarListAddChild	method dynamic TaskBarListClass,
 	movdw	bxsi, cxdx
 	call	ObjSwapLock
 	push	bx
+
 	clr	cx
+
 	mov	ax, HINT_CAN_CLIP_MONIKER_WIDTH
 	call	ObjVarAddData
+
 	mov	ax, HINT_EXPAND_WIDTH_TO_FIT_PARENT
 	call	ObjVarAddData
+
 	mov	ax, HINT_EXPAND_HEIGHT_TO_FIT_PARENT
 	call	ObjVarAddData
+
 	mov	ax, HINT_MAXIMUM_SIZE
 	mov	cx, size GadgetSizeHintArgs
 	call	ObjVarAddData
 	mov	ds:[bx].GSHA_width, SpecWidth <SST_AVG_CHAR_WIDTHS, 20>
 	mov	ds:[bx].GSHA_height, 0
+
 	pop	bx
 	call	ObjSwapUnlock
 	jmp	done
@@ -1944,6 +1950,87 @@ callSuper:
 done:
 	ret
 TaskBarListAddChild	endm
+
+
+
+
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		FloatingToolAreaVisDraw
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	Draw border
+
+CALLED BY:	MSG_VIS_DRAW
+PASS:		*ds:si	= ToolAreaClass object
+		ds:di	= ToolAreaClass instance data
+		ds:bx	= ToolAreaClass object (same as *ds:si)
+		es 	= segment of ToolAreaClass
+		ax	= message #
+		cl	- DrawFlags:  DF_EXPOSED set if GState is set to update window
+		^hbp	- GState to draw through.
+
+RETURN:		nothing
+DESTROYED:	ax, cx, dx, bp
+SIDE EFFECTS:
+
+PSEUDO CODE/STRATEGY:
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	Joon	3/5/92		Initial version
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+ToolAreaDraw	method dynamic ToolAreaClass, MSG_VIS_DRAW
+	;
+	; if TOOL_AREA_IS_TASK_BAR_MOTIF
+	;
+	;push	ds
+	;segmov	ds, dgroup
+	;tst	ds:[taskBarEnabled] ; if taskbar == on, ZF == 1
+	;pop	ds
+	;jz	callSuper ; if ZF==0 skip the following code
+
+	;push	bp
+	;mov	di, offset ToolAreaClass
+	;call	ObjCallSuperNoLock
+	;pop	di			; di = gstate
+
+	push	bp
+	mov	di, segment VisCompClass
+	mov	es, di
+	mov	di, offset VisCompClass
+	call	ObjCallClassNoLock
+	pop	di
+
+	test	cl, mask DF_EXPOSED
+	jz	notExposed
+
+	call	VisGetBounds
+	push	ax
+	call	GetDarkColor		;al <- dark color
+	mov	ah, C_RED		;ah <- light color
+	mov	bp, ax
+	pop	ax
+	jmp	done
+
+notExposed:
+	call	VisGetBounds
+	call	OpenSetInsetRectColors		;get inset rect colors
+
+done:
+	call	OpenDrawRect			;OpenDrawAndFillRect		;GrFillRect	;OpenDrawRect
+
+	ret
+
+ToolAreaDraw	endm
+
+
+
+
+
+
 
 
 
@@ -2475,11 +2562,12 @@ setPosition:
 	mov	ax, MSG_GEN_FIND_CHILD_AT_POSITION
 	clr	cx				; find first child = 0
 	call	ObjCallInstanceNoLock
-	jc	done				; abort if child not found
+	jc	afterTaskBarCheck		; abort if child not found
 	mov 	si, dx				; *ds:si <- TaskBar
 	mov	ax, MSG_GEN_SET_USABLE
-	mov	dl, VUM_DELAYED_VIA_APP_QUEUE	; dl <- VisUpdateMode
+	mov	dl, VUM_NOW			;VUM_DELAYED_VIA_APP_QUEUE	; dl <- VisUpdateMode
 	call	ObjCallInstanceNoLock
+afterTaskBarCheck:
 	pop	ax, ds, cx, dx, si, bp
 
 	;
@@ -2489,11 +2577,12 @@ setPosition:
 	mov	ax, MSG_GEN_FIND_CHILD_AT_POSITION
 	mov	cx, 1				; second child = 1
 	call	ObjCallInstanceNoLock
-	jc	done				; abort if child not found
+	jc	afterTrayCheck				; abort if child not found
 	mov 	si, dx				; *ds:si <- TaskBar
 	mov	ax, MSG_GEN_SET_USABLE
-	mov	dl, VUM_DELAYED_VIA_APP_QUEUE	; dl <- VisUpdateMode
+	mov	dl, VUM_NOW			;VUM_DELAYED_VIA_APP_QUEUE	; dl <- VisUpdateMode
 	call	ObjCallInstanceNoLock
+afterTrayCheck:
 	pop	ax, ds, cx, dx, si, bp
 
 done:
@@ -2781,8 +2870,8 @@ PASS:		*ds:si	= ToolAreaClass object
 		ds:bx	= ToolAreaClass object (same as *ds:si)
 		es 	= segment of ToolAreaClass
 		ax	= message #
-	cl	- DrawFlags:  DF_EXPOSED set if GState is set to update window
-	^hbp	- GState to draw through.
+		cl	- DrawFlags:  DF_EXPOSED set if GState is set to update window
+		^hbp	- GState to draw through.
 RETURN:
 DESTROYED:
 SIDE EFFECTS:
