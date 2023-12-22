@@ -2225,7 +2225,7 @@ CALLED BY:	Calendar
 PASS:		cx - length of string to search for
 		dx - handle of data block that contains the string
 
-RETURN:		Address Book will grab the focus
+RETURN:		Contacts will grab the focus
 
 DESTROYED:	ax, bx, cx, dx, es, si, di, bp
 
@@ -2264,7 +2264,7 @@ RespondCalendarRequest	method	GeoDexClass, MSG_ROLODEX_REQUEST_SEARCH
 
 	; if INTRODUCTORY level, there is no search feature
 
-ifndef GPC  ; allow to all levels to avoid problems where Address Book and
+ifndef GPC  ; allow to all levels to avoid problems where Contacts and
 	; Calendar are at different levels
 	cmp	dx, UIIL_INTRODUCTORY
 	LONG	je	error		; just exit
@@ -2567,7 +2567,7 @@ CALLED BY:	EXTERNAL
 
 PASS:		cx - handle of data block
 
-RETURN:		Address Book will grab the focus
+RETURN:		Contacts will grab the focus
 
 DESTROYED:	ax, bx, cx, dx, es, si, di, bp
 
