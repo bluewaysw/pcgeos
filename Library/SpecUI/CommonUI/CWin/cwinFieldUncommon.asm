@@ -2639,6 +2639,7 @@ noHide:
 
 	;
 	; if (not TOOL_AREA_IS_TASK_BAR)
+	; MUST stay
 	;
 	push	ds
 	segmov	ds, dgroup

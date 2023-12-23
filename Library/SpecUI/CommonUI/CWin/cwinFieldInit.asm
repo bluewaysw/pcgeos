@@ -992,9 +992,9 @@ endIfTaskbar:
 	jz	hasNoTaskbar ; if ZF==0 skip the following code
 
 	; init position
-	mov	ax, MSG_TOOL_AREA_INIT_POSITION
-	mov	di, mask MF_CALL or mask MF_FIXUP_DS
-	call	ObjMessage
+	;mov	ax, MSG_TOOL_AREA_INIT_POSITION
+	;mov	di, mask MF_CALL or mask MF_FIXUP_DS
+	;call	ObjMessage
 
 hasNoTaskbar:
 	mov	ax, MSG_GEN_INTERACTION_INITIATE

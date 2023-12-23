@@ -562,11 +562,11 @@ EC<	call	ECCheckODCXDX						>
 	;
 	; if (not TOOL_AREA_IS_TASK_BAR)
 	;
-	push	ds
-	segmov	ds, dgroup
-	tst	ds:[taskBarEnabled] ; if taskbar == on, ZF == 1
-	pop	ds
-	jnz	afterNoTarget ; if ZF==1 skip the following code
+	;push	ds
+	;segmov	ds, dgroup
+	;tst	ds:[taskBarEnabled] ; if taskbar == on, ZF == 1
+	;pop	ds
+	;jnz	afterNoTarget ; if ZF==1 skip the following code
 
 	tst	ax
 	jz	afterNoTarget
@@ -983,11 +983,11 @@ OLFieldMoveToolArea	method	dynamic OLFieldClass, \
 	; FIXME!!! - should this be skipping everything or only something in between?
 	; if (not TOOL_AREA_IS_TASK_BAR)
 	;
-	push	ds
-	segmov	ds, dgroup
-	tst	ds:[taskBarEnabled] ; if taskbar == on, ZF == 1
-	pop	ds
-	LONG	jnz done	;afterHasTaskbar1 ; if ZF==1 skip the following code
+	;push	ds
+	;segmov	ds, dgroup
+	;tst	ds:[taskBarEnabled] ; if taskbar == on, ZF == 1
+	;pop	ds
+	;LONG	jnz done	;afterHasTaskbar1 ; if ZF==1 skip the following code
 
 if EVENT_MENU
 	;
@@ -1025,11 +1025,11 @@ endif
 	;
 	; if (not TOOL_AREA_IS_TASK_BAR)
 	;
-	push	ds
-	segmov	ds, dgroup
-	tst	ds:[taskBarEnabled] ; if taskbar == on, ZF == 1
-	pop	ds
-	jnz	realGeode ; if ZF==1 skip the following code
+	;push	ds
+	;segmov	ds, dgroup
+	;tst	ds:[taskBarEnabled] ; if taskbar == on, ZF == 1
+	;pop	ds
+	;jnz	realGeode ; if ZF==1 skip the following code
 
 	;
 	; First, mark the position flags in the window as WPF_AS_REQUIRED
@@ -1104,11 +1104,11 @@ doIt:
 	;
 	; if (not TOOL_AREA_IS_TASK_BAR)
 	;
-	push	ds
-	segmov	ds, dgroup
-	tst	ds:[taskBarEnabled] ; if taskbar == on, ZF == 1
-	pop	ds
-	jnz	afterHasTaskbar2 ; if ZF==1 skip the following code
+	;push	ds
+	;segmov	ds, dgroup
+	;tst	ds:[taskBarEnabled] ; if taskbar == on, ZF == 1
+	;pop	ds
+	;jnz	afterHasTaskbar2 ; if ZF==1 skip the following code
 
 	;
 	; Convert coordinates from screen-absolute to parent-relative
@@ -1184,6 +1184,7 @@ OLFieldSizeToolArea	method dynamic	OLFieldClass, \
 
 	;
 	; if (not TOOL_AREA_IS_TASK_BAR)
+	; MUST stay
 	;
 	push	ds
 	segmov	ds, dgroup

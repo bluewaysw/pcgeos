@@ -3785,11 +3785,11 @@ if PLACE_EXPRESS_MENU_ON_PRIMARY
 	;
 	; if (not TOOL_AREA_IS_TASK_BAR)
 	;
-	push	ds
-	segmov	ds, dgroup
-	tst	ds:[taskBarEnabled] ; if taskbar == on, ZF == 1
-	pop	ds
-	jnz	hasTaskbar1 ; if ZF==1 skip the following code
+	;push	ds
+	;segmov	ds, dgroup
+	;tst	ds:[taskBarEnabled] ; if taskbar == on, ZF == 1
+	;pop	ds
+	;jnz	hasTaskbar1 ; if ZF==1 skip the following code
 
 	call	OLBaseWinHideExpressToolArea
 
@@ -3814,11 +3814,11 @@ if PLACE_EXPRESS_MENU_ON_PRIMARY ;and (not TOOL_AREA_IS_TASK_BAR)
 	;
 	; if (not TOOL_AREA_IS_TASK_BAR)
 	;
-	push	ds
-	segmov	ds, dgroup
-	tst	ds:[taskBarEnabled] ; if taskbar == on, ZF == 1
-	pop	ds
-	jnz	hasTaskbar2 ; if ZF==1 skip the following code
+	;push	ds
+	;segmov	ds, dgroup
+	;tst	ds:[taskBarEnabled] ; if taskbar == on, ZF == 1
+	;pop	ds
+	;jnz	hasTaskbar2 ; if ZF==1 skip the following code
 
 	; Cheat -- instead of doing full geometry, just update
 	; OLWI_titleBarBounds to reflect the addition of the express tool area.
@@ -3935,11 +3935,11 @@ OLBaseWinHideExpressToolArea	proc	near
 	;
 	; if (not TOOL_AREA_IS_TASK_BAR)
 	;
-	push	ds
-	segmov	ds, dgroup
-	tst	ds:[taskBarEnabled] ; if taskbar == on, ZF == 1
-	pop	ds
-	jnz	done ; if ZF==1 skip the following code
+	;push	ds
+	;segmov	ds, dgroup
+	;tst	ds:[taskBarEnabled] ; if taskbar == on, ZF == 1
+	;pop	ds
+	;jnz	done ; if ZF==1 skip the following code
 
 	push	si
 	mov	bx, segment OLFieldClass
@@ -4002,11 +4002,11 @@ OLBaseWinAdjustTitleBoundsForExpressToolArea	proc	far
 	;
 	; if (not TOOL_AREA_IS_TASK_BAR)
 	;
-	push	ds
-	segmov	ds, dgroup
-	tst	ds:[taskBarEnabled] ; if taskbar == on, ZF == 1
-	pop	ds
-	jnz	done ; if ZF==1 skip the following code
+	;push	ds
+	;segmov	ds, dgroup
+	;tst	ds:[taskBarEnabled] ; if taskbar == on, ZF == 1
+	;pop	ds
+	;jnz	done ; if ZF==1 skip the following code
 
 	; If doesn't have Express tool area, then nothing to adjust.
 	;
@@ -4097,11 +4097,11 @@ if PLACE_EXPRESS_MENU_ON_PRIMARY
 	;
 	; if (not TOOL_AREA_IS_TASK_BAR)
 	;
-	push	ds
-	segmov	ds, dgroup
-	tst	ds:[taskBarEnabled] ; if taskbar == on, ZF == 1
-	pop	ds
-	jnz	afterExpressMenu ; if ZF==1 skip the following code
+	;push	ds
+	;segmov	ds, dgroup
+	;tst	ds:[taskBarEnabled] ; if taskbar == on, ZF == 1
+	;pop	ds
+	;jnz	afterExpressMenu ; if ZF==1 skip the following code
 
 	; Adjust left edge of title area
 	;
@@ -5131,11 +5131,11 @@ endif
 	;
 	; if (not TOOL_AREA_IS_TASK_BAR)
 	;
-	push	ds
-	segmov	ds, dgroup
-	tst	ds:[taskBarEnabled] ; if taskbar == on, ZF == 1
-	pop	ds
-	jnz	done ; if ZF==1 skip the following code
+	;push	ds
+	;segmov	ds, dgroup
+	;tst	ds:[taskBarEnabled] ; if taskbar == on, ZF == 1
+	;pop	ds
+	;jnz	done ; if ZF==1 skip the following code
 
 	call	WinClasses_DerefVisSpec_DI
 	mov	cx, ds:[di].OLWI_titleBarBounds.R_bottom
