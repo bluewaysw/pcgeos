@@ -1997,39 +1997,54 @@ ToolAreaDraw	method dynamic ToolAreaClass, MSG_VIS_DRAW
 	;call	ObjCallSuperNoLock
 	;pop	di			; di = gstate
 
-	push	bp
+	push	di
 	mov	di, segment VisCompClass
 	mov	es, di
 	mov	di, offset VisCompClass
 	call	ObjCallClassNoLock
 	pop	di
 
-	test	cl, mask DF_EXPOSED
-	jz	notExposed
+	mov	di, bp
 
 	call	VisGetBounds
-	push	ax
-	call	GetDarkColor		;al <- dark color
-	mov	ah, C_RED		;ah <- light color
-	mov	bp, ax
-	pop	ax
-	jmp	done
+				;ax, ds:[bx].VI_bounds.R_left	;add in real bounds
+				;cx, ds:[bx].VI_bounds.R_right
+				;dx, ds:[bx].VI_bounds.R_bottom
+				;bx, ds:[bx].VI_bounds.R_top
 
-notExposed:
-	call	VisGetBounds
-	call	OpenSetInsetRectColors		;get inset rect colors
+	push	ds
+	segmov	ds, dgroup
+	tst	ds:[taskBarPosition]
+	pop	ds
+	jg	atBottom
 
-done:
-	call	OpenDrawRect			;OpenDrawAndFillRect		;GrFillRect	;OpenDrawRect
+;atTop:
+	mov	ax, (CF_INDEX shl 8) or C_DARK_GREY
+	call	GrSetLineColor
+
+	mov	ax, 0 				;x1
+	mov	bx, dx				;y1
+	sub	bx, 1
+	sub	dx, 1
+	;mov	cx, 				;x2
+	;mov	dx, 0				;y2
+	jmp	draw
+
+atBottom:
+	clr	ax
+	mov	ax, (CF_INDEX shl 8) or C_WHITE
+	call	GrSetLineColor
+
+	mov	ax, 0 				;x1
+	mov	bx, 0				;y1
+	;mov	cx, 				;x2
+	mov	dx, 0				;y2
+
+draw:
+	call	GrDrawLine
 
 	ret
-
 ToolAreaDraw	endm
-
-
-
-
-
 
 
 
