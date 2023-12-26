@@ -36,6 +36,8 @@ static void ProcessFont(        TRUETYPE_VARS,
                                 const char*  file, 
                                 MemHandle    fontInfoBlock );
 
+static Boolean isResourceSaving( TRUETYPE_VARS );
+
 static sword getFontIDAvailIndex( 
                                 FontID     fontID, 
                                 MemHandle  fontInfoBlock );
@@ -289,6 +291,9 @@ EC(     ECCheckFileHandle( truetypeFile ) );
         if ( TT_Get_Face_Properties( FACE, &FACE_PROPERTIES ) )
                 goto Fail;
 
+        if ( !isResourceSaving( trueTypeVars ) )
+                goto Fail;
+
         if ( getCharMap( trueTypeVars, &CHAR_MAP ) )
                 goto Fail;
 
@@ -442,6 +447,33 @@ Fail:
         TT_Close_Face( FACE );
 Fin:        
         FileClose( truetypeFile, FALSE );
+}
+
+
+/********************************************************************
+ *                      isResourceSaving
+ ********************************************************************
+ * SYNOPSIS:	  Checks if Face can manage with few resources.
+ * 
+ * PARAMETERS:    face            FreeType face.
+ * 
+ * RETURNS:       Boolean         TRUE if Face manages with few resources.
+ * 
+ * SIDE EFFECTS:  none
+ * 
+ * STRATEGY:      
+ * 
+ * REVISION HISTORY:
+ *      Date      Name      Description
+ *      ----      ----      -----------
+ *      19/12/23  JK        Initial Revision
+ *******************************************************************/
+static Boolean isResourceSaving( TRUETYPE_VARS )
+{
+        /* At the moment we are only checking the number of glyphs */
+        /* in the font. Further checks can be implemented here.    */
+
+        return FACE_PROPERTIES.num_Glyphs < MAX_NUM_GLYPHS;
 }
 
 

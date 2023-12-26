@@ -69,6 +69,7 @@ extern TEngine_Instance engineInstance;
 #define MAX_KERN_TABLE_LENGTH               6000
 
 #define STANDARD_GRIDSIZE                   1000
+#define MAX_NUM_GLYPHS                      2000
 
 
 /***********************************************************************
