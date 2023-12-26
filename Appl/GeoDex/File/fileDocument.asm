@@ -48,7 +48,7 @@ COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 		FileInitialize 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-SYNOPSIS:	Initialize a new database file for address book.
+SYNOPSIS:	Initialize a new database file for contacts.
 
 CALLED BY:	(GLOBAL) MSG_META_DOC_OUTPUT_INITIALIZE_DOCUMENT_FILE
 
