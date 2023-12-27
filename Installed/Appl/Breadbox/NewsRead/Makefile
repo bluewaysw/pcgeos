@@ -4,42 +4,42 @@
 # If you edit it, you will lose your changes, should it be regenerated.
 #
 GEODE           = newsread
-ART             = ActnBarM.goc NaviBarM.goc MListM.goc GI020G_8.goh\
-                  mkrComposeSign.goh GI020H_8.goh NR018_8.goh NR017_8.goh\
-                  NR009_8.goh GI020J_8.goh Token.goh NR001_8.goh\
-                  NR010_8.goh NR004_8.goh GI020I_8.goh GI020F_8.goh\
-                  GI020B_8.goh GI020K_8.goh NR002_8.goh NR003_8.goh\
-                  bbxreg.goh NR015_8.goh GI020C_8.goh GI020D_8.goh\
-                  GI020L_8.goh GI020A_8.goh GI020N_8.goh NR005_8.goh\
-                  NR006_8.goh NR000_8.goh NR007_8.goh GI020M_8.goh\
-                  GI020E_8.goh NR016_8.goh GI020O_8.goh NR008_8.goh
-UI              = APPUI.goc
-MAIN            = BUCKETHA.c utils.goc newsdata.goc NData3.goc NDATA2.goc
-SOCKETS         = sockGet.goc sockGrps.goc sockMain.goc sockPost.goc
-PROCESS         = AtrList.goc MainView.goc SaveFile.goc PostWin.goc\
-                  ActnBar.goc NaviBar.goc PickList.goc MainList.goc\
-                  procMain.goc
+ART             = ActnBarM.goc MListM.goc NaviBarM.goc GI020A_8.goh\
+                  GI020B_8.goh GI020C_8.goh GI020D_8.goh GI020E_8.goh\
+                  GI020F_8.goh GI020G_8.goh GI020H_8.goh GI020I_8.goh\
+                  GI020J_8.goh GI020K_8.goh GI020L_8.goh GI020M_8.goh\
+                  GI020N_8.goh GI020O_8.goh mkrComposeSign.goh NR000_8.goh\
+                  NR001_8.goh NR002_8.goh NR003_8.goh NR004_8.goh\
+                  NR005_8.goh NR006_8.goh NR007_8.goh NR008_8.goh\
+                  NR009_8.goh NR010_8.goh NR015_8.goh NR016_8.goh\
+                  NR017_8.goh NR018_8.goh Token.goh
 LOCALIZE        = strings.goc strings.goh
-UICLASS         = NewGrpC.goc TitlMkrC.goc NCONTENT.goc gTxtChgC.goc\
-                  SettDlgC.goc AddDlgC.goc statdiag.goc NTEXT.goc\
-                  ReszeLst.goc HddnBtn.goc glbanim.goc shToolBr.goc\
-                  NApp.goc statdiag.goh TitlMkrC.goh glbanim.goh NApp.goh\
-                  shToolBr.goh ReszeLst.goh HddnBtn.goh
+MAIN            = BUCKETHA.c NDATA2.goc NData3.goc newsdata.goc utils.goc
+PROCESS         = ActnBar.goc AtrList.goc MainList.goc MainView.goc\
+                  NaviBar.goc PickList.goc PostWin.goc procMain.goc\
+                  SaveFile.goc
+SOCKETS         = sockGet.goc sockGrps.goc sockMain.goc sockPost.goc
+UI              = APPUI.goc
+UICLASS         = AddDlgC.goc glbanim.goc gTxtChgC.goc HddnBtn.goc NApp.goc\
+                  NCONTENT.goc NewGrpC.goc NTEXT.goc ReszeLst.goc\
+                  SettDlgC.goc shToolBr.goc statdiag.goc TitlMkrC.goc\
+                  glbanim.goh HddnBtn.goh NApp.goh ReszeLst.goh\
+                  shToolBr.goh statdiag.goh TitlMkrC.goh
 UI_TO_RDFS      =
-OBJS            = ActnBarM.obj NaviBarM.obj MListM.obj APPUI.obj\
-                  BUCKETHA.obj utils.obj newsdata.obj NData3.obj NDATA2.obj\
-                  sockGet.obj sockGrps.obj sockMain.obj sockPost.obj\
-                  AtrList.obj MainView.obj SaveFile.obj PostWin.obj\
-                  ActnBar.obj NaviBar.obj PickList.obj MainList.obj\
-                  procMain.obj strings.obj NewGrpC.obj TitlMkrC.obj\
-                  NCONTENT.obj gTxtChgC.obj SettDlgC.obj AddDlgC.obj\
-                  statdiag.obj NTEXT.obj ReszeLst.obj HddnBtn.obj\
-                  glbanim.obj shToolBr.obj NApp.obj
-COMMON          = newssock.h utils.goh extern.goh news.h options.goh\
-                  bucketha.h newsread.goh newsdata.goh errors.goh
+OBJS            = ActnBarM.obj MListM.obj NaviBarM.obj strings.obj\
+                  BUCKETHA.obj NDATA2.obj NData3.obj newsdata.obj utils.obj\
+                  ActnBar.obj AtrList.obj MainList.obj MainView.obj\
+                  NaviBar.obj PickList.obj PostWin.obj procMain.obj\
+                  SaveFile.obj sockGet.obj sockGrps.obj sockMain.obj\
+                  sockPost.obj APPUI.obj AddDlgC.obj glbanim.obj\
+                  gTxtChgC.obj HddnBtn.obj NApp.obj NCONTENT.obj\
+                  NewGrpC.obj NTEXT.obj ReszeLst.obj SettDlgC.obj\
+                  shToolBr.obj statdiag.obj TitlMkrC.obj
+COMMON          = bucketha.h errors.goh extern.goh news.h newsdata.goh\
+                  newsread.goh newssock.h options.goh utils.goh
 MODULES         =
-CMODULES        = Art UI Main Sockets Process Localize UIClass
-SRCS            = $(ART) $(UI) $(MAIN) $(SOCKETS) $(PROCESS) $(LOCALIZE)\
+CMODULES        = Art Localize Main Process Sockets UI UIClass
+SRCS            = $(ART) $(LOCALIZE) $(MAIN) $(PROCESS) $(SOCKETS) $(UI)\
                   $(UICLASS) $(COMMON)
 LOBJS           =
 
