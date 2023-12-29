@@ -6,7 +6,7 @@
 GEODE           = dirlist
 ASM_TO_OBJS     =
 UI_TO_RDFS      =
-SRCS            = dirlist.goc bbxreg.goh dirlistIcon.goh
+SRCS            = dirlist.goc dirlistIcon.goh
 OBJS            = dirlist.obj
 LOBJS           =
 
