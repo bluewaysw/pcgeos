@@ -46,6 +46,7 @@ resource AppResource ui-object
 resource Interface ui-object
 resource Menu ui-object
 resource DocumentUI object
+resource Strings data object
 #resource BREADBOXMONIKERRESOURCE2 data object
 resource RBAppIcons data object
 resource RBDocIcons data object
