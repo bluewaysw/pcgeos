@@ -427,18 +427,20 @@ static void AdjustPointers( CharTableEntry* charTableEntries,
 
 static word ShiftCharData( FontBuf* fontBuf, CharData* charData )
 {
-        word  size = ( ( charData->CD_pictureWidth + 7 ) >> 3 ) * 
-                     charData->CD_numRows + SIZE_CHAR_HEADER;
+        word    dataSize = ( ( charData->CD_pictureWidth + 7 ) >> 3 ) * charData->CD_numRows + SIZE_CHAR_HEADER;
+        word    bytesToMove = fontBuf->FB_dataSize - PtrToOffset( charData ) - dataSize;
 
+
+        if( bytesToMove == 0 )
+                return dataSize;
 
 EC(     ECCheckBounds( (void*)charData ) );
-EC(     ECCheckBounds( (void*)(((byte*)charData) + size ) ) );
+EC(     ECCheckBounds( (void*)(((byte*)charData) + dataSize ) ) );
+EC(     ECCheckBounds( (void*)(((byte*)charData) + dataSize + bytesToMove ) ) );
  
-        memmove( charData, 
-                ((byte*)charData) + size, 
-                (((byte*)fontBuf) + fontBuf->FB_dataSize) - ((byte*)charData) + size );
+        memmove( charData, ((byte*)charData) + dataSize, bytesToMove );
 
-        return size;
+        return dataSize;
 }
 
 /********************************************************************
@@ -462,17 +464,20 @@ EC(     ECCheckBounds( (void*)(((byte*)charData) + size ) ) );
  *******************************************************************/
 static word ShiftRegionCharData( FontBuf* fontBuf, RegionCharData* charData )
 {
-        word size = charData->RCD_size + SIZE_REGION_HEADER;
+        word    dataSize = charData->RCD_size + SIZE_REGION_HEADER;
+        word    bytesToMove = fontBuf->FB_dataSize - PtrToOffset( charData ) - dataSize;
 
+
+        if( bytesToMove == 0 )
+                return dataSize;
 
 EC(     ECCheckBounds( (void*)charData ) );
-EC(     ECCheckBounds( (void*)((((byte*)fontBuf) + fontBuf->FB_dataSize) - ((byte*)charData) + size )) );
+EC(     ECCheckBounds( (void*)(((byte*)charData) + dataSize ) ) );
+EC(     ECCheckBounds( (void*)(((byte*)charData) + dataSize + bytesToMove ) ) );
 
-        memmove( charData, 
-                ((byte*)charData) + size, 
-                (((byte*)fontBuf) + fontBuf->FB_dataSize) - ((byte*)charData) + size );
+        memmove( charData, ((byte*)charData) + dataSize, bytesToMove );
 
-        return size;
+        return dataSize;
 }
 
 
