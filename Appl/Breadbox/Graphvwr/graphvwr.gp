@@ -43,9 +43,9 @@ resource FileSelUI ui-object
 resource ObjBlTemplateResource ui-object read-only
 
 # this resources are Graphics Viewer specific
-resource BREADBOXMONIKERRESOURCE lmem read-only shared
-resource BREADBOXMONIKERRESOURCE2 lmem read-only shared
-resource InfoResource ui-object
+#resource BREADBOXMONIKERRESOURCE lmem read-only shared
+#resource BREADBOXMONIKERRESOURCE2 lmem read-only shared
+#resource InfoResource ui-object
 
 export BVDocumentClass
 export BVDocCtrlClass
