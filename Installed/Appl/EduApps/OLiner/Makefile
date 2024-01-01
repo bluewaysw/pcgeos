@@ -6,10 +6,10 @@
 GEODE           = oliner
 ASM_TO_OBJS     =
 UI_TO_RDFS      =
-SRCS            = ui.goc strings.goc pprev.goc doc.goc move.goc find.goc\
-                  proc.goc functs.goc ecall.goc oliner.goh
-OBJS            = ui.obj strings.obj pprev.obj doc.obj move.obj find.obj\
-                  proc.obj functs.obj ecall.obj
+SRCS            = doc.goc ecall.goc find.goc functs.goc move.goc pprev.goc\
+                  proc.goc strings.goc ui.goc oliner.goh
+OBJS            = doc.obj ecall.obj find.obj functs.obj move.obj pprev.obj\
+                  proc.obj strings.obj ui.obj
 LOBJS           =
 
 SYSMAKEFILE     = geode.mk

@@ -6,12 +6,12 @@
 GEODE           = geozip
 ASM_TO_OBJS     =
 UI_TO_RDFS      =
-SRCS            = apptools.goc dialogs.goc view.goc newdoc.goc zipui.goc\
-                  Strings.goc extract.goc compress.goc process.goc\
-                  compress.goh zipui.goh process.goh view.goh geozip.goh\
-                  extract.goh
-OBJS            = apptools.obj dialogs.obj view.obj newdoc.obj zipui.obj\
-                  Strings.obj extract.obj compress.obj process.obj
+SRCS            = apptools.goc compress.goc dialogs.goc extract.goc\
+                  newdoc.goc process.goc Strings.goc view.goc zipui.goc\
+                  compress.goh extract.goh geozip.goh process.goh view.goh\
+                  zipui.goh
+OBJS            = apptools.obj compress.obj dialogs.obj extract.obj\
+                  newdoc.obj process.obj Strings.obj view.obj zipui.obj
 LOBJS           =
 
 SYSMAKEFILE     = geode.mk
