@@ -203,7 +203,7 @@ EC_ERROR_IF(    size < RASTER_MAP.size, -1 );
         /* realloc FontBuf if necessary */
         fontBufHandle = MemPtrToHandle( fontBuf );
 EC(     ECCheckMemHandle( fontBufHandle ) );
-        if( MemGetInfo( fontBufHandle, MGIT_SIZE ) <= fontBuf->FB_dataSize + size )
+        if( MemGetInfo( fontBufHandle, MGIT_SIZE ) < fontBuf->FB_dataSize + size )
         {
                 MemReAlloc( fontBufHandle, fontBuf->FB_dataSize + size, HAF_STANDARD_NO_ERR );
 EC(             ECCheckMemHandle( fontBufHandle) );
@@ -432,7 +432,6 @@ static word ShiftCharData( FontBuf* fontBuf, CharData* charData )
 
 EC(     ECCheckBounds( (void*)charData ) );
 EC(     ECCheckBounds( (void*)(((byte*)charData) + dataSize ) ) );
-EC(     ECCheckBounds( (void*)(((byte*)charData) + dataSize + bytesToMove ) ) );
  
         memmove( charData, ((byte*)charData) + dataSize, bytesToMove );
 
@@ -469,7 +468,6 @@ static word ShiftRegionCharData( FontBuf* fontBuf, RegionCharData* charData )
 
 EC(     ECCheckBounds( (void*)charData ) );
 EC(     ECCheckBounds( (void*)(((byte*)charData) + dataSize ) ) );
-EC(     ECCheckBounds( (void*)(((byte*)charData) + dataSize + bytesToMove ) ) );
 
         memmove( charData, ((byte*)charData) + dataSize, bytesToMove );
 
