@@ -38,7 +38,7 @@ SRCS            = $(JS) $(URLFRAME) $(URLTEXT) $(ASMTOOLS) $(INIT)\
                   $(COMMON)
 LOBJS           =
 
-PRODUCTS        = AB JSAB 
+PRODUCTS        = 
 
 SYSMAKEFILE     = geode.mk
 
