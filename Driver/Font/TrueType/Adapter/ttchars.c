@@ -164,9 +164,7 @@ EC_ERROR_IF(    size < RASTER_MAP.size, -1 );
                 ((RegionCharData*)charData)->RCD_bounds.R_top    = 0;
                 ((RegionCharData*)charData)->RCD_bounds.R_bottom = height;
 
-
                 size = RASTER_MAP.size + SIZE_REGION_HEADER;
-
         }
         else
         {      
@@ -195,7 +193,6 @@ EC_ERROR_IF(    size < RASTER_MAP.size, -1 );
                                                          transformMatrix->TM_heightX + ( GLYPH_BBOX.xMin >> 6 );
                 ((CharData*)charData)->CD_yoff         = transformMatrix->TM_scriptY + 
                                                          transformMatrix->TM_heightY - ( GLYPH_BBOX.yMax >> 6 );
-
         }
 
         TT_Done_Glyph( GLYPH );
@@ -206,7 +203,7 @@ EC_ERROR_IF(    size < RASTER_MAP.size, -1 );
         /* realloc FontBuf if necessary */
         fontBufHandle = MemPtrToHandle( fontBuf );
 EC(     ECCheckMemHandle( fontBufHandle ) );
-        if( MemGetInfo( fontBufHandle, MGIT_SIZE ) < fontBuf->FB_dataSize + size )
+        if( MemGetInfo( fontBufHandle, MGIT_SIZE ) <= fontBuf->FB_dataSize + size )
         {
                 MemReAlloc( fontBufHandle, fontBuf->FB_dataSize + size, HAF_STANDARD_NO_ERR );
 EC(             ECCheckMemHandle( fontBufHandle) );
@@ -253,10 +250,9 @@ static void CopyChar( FontBuf* fontBuf, word geosChar, void* charData, word char
         word  indexGeosChar = geosChar - fontBuf->FB_firstChar;
         CharTableEntry*  charTableEntries = (CharTableEntry*) (((byte*)fontBuf) + sizeof( FontBuf ));
 
-
+ 
 EC(     ECCheckBounds( (void*)charData ) );
 EC(     ECCheckBounds( (void*)(((byte*)fontBuf) + fontBuf->FB_dataSize ) ) );
-EC(     ECCheckBounds( (void*)(((byte*)fontBuf) + fontBuf->FB_dataSize + charDataSize ) ) );
 
         /* copy rendered Glyph to fontBuf */
         memmove( ((byte*)fontBuf) + fontBuf->FB_dataSize, charData, charDataSize );
