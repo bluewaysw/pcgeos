@@ -111,7 +111,7 @@ registerMessage::
 		movdw	ss:[rma].MSCRMA_startBound, MAILBOX_NOW
 		movdw	ss:[rma].MSCRMA_endBound, MAILBOX_ETERNITY
 	    ;
-	    ; For now, we send the message to the generic address book appli-
+	    ; For now, we send the message to the generic contacts appli-
 	    ; cation. Might want to make this GeoDex-specific at some point.
 	    ; 
 		mov	{word}ss:[rma].MSCRMA_destApp.GT_chars[0], 

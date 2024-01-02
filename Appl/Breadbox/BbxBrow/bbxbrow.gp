@@ -21,7 +21,8 @@ name bbxbrow.app
 #longname   "Skipper Pro"
 #longname   "Web Magick 2"
 #longname   "Global Internet"
-longname   "WebMagick 3.0"
+#longname   "WebMagick 3.0"
+longname   "WebMagick"
 endif
 
 type       appl, process, single
