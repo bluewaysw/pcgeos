@@ -1633,7 +1633,7 @@ Any line may be continued over multiple lines by ending it with a backslash
 following line are compressed into a single space before the input line is 
 examined by pmake.
 
-#####10.13.4.1 Dependency Lines
+##### 10.13.4.1 Dependency Lines
 
 In any system, there are dependencies between the files that make up the 
 system. For instance, in a program made up of several C source files and one 
@@ -2465,7 +2465,7 @@ by the shell, where * means zero or more characters of any sort;
 that is one of "a", "b", "c" or "d" (there may be any number of 
 characters between the brackets); [0-9] matches any single 
 character that is between "0" and "9" (i.e. any digit. This form 
-may be freely mixed with the other bracket form), and `\' is 
+may be freely mixed with the other bracket form), and `\\' is 
 used to escape any of the characters "*", "?", "[" or ":", leaving 
 them as regular characters to match themselves in a word. 
 
