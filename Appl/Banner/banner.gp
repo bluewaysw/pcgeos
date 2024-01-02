@@ -21,7 +21,7 @@ name banner.app
 #
 # Long name
 #
-longname "Banner Maker"
+longname "GeoBanner"
 #
 # DB Token
 #
