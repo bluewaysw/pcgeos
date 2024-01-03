@@ -150,6 +150,7 @@ EC(             ECCheckBounds( (void*)charData ) );
                 TT_Transform_Outline( &OUTLINE, &flipmatrix );
                 TT_Translate_Outline( &OUTLINE, -GLYPH_BBOX.xMin, GLYPH_BBOX.yMax );
                 TT_Get_Outline_Region( &OUTLINE, &RASTER_MAP );
+EC_ERROR_IF(    size < RASTER_MAP.size, -1 );
 
                 /* fill header of charData */
                 ((RegionCharData*)charData)->RCD_xoff = transformMatrix->TM_scriptX + 
@@ -162,10 +163,7 @@ EC(             ECCheckBounds( (void*)charData ) );
                 ((RegionCharData*)charData)->RCD_bounds.R_top    = 0;
                 ((RegionCharData*)charData)->RCD_bounds.R_bottom = height;
 
-EC_ERROR_IF(    size < RASTER_MAP.size, -1 );
-
                 size = RASTER_MAP.size + SIZE_REGION_HEADER;
-
         }
         else
         {      
@@ -185,6 +183,7 @@ EC(             ECCheckBounds( (void*)charData ) );
                 /* translate outline and render it */
                 TT_Translate_Outline( &OUTLINE, -GLYPH_BBOX.xMin, -GLYPH_BBOX.yMin );
                 TT_Get_Outline_Bitmap( &OUTLINE, &RASTER_MAP );
+EC_ERROR_IF(    size < RASTER_MAP.size, -1 );
 
                 /* fill header of charData */
                 ((CharData*)charData)->CD_pictureWidth = width;
@@ -250,10 +249,9 @@ static void CopyChar( FontBuf* fontBuf, word geosChar, void* charData, word char
         word  indexGeosChar = geosChar - fontBuf->FB_firstChar;
         CharTableEntry*  charTableEntries = (CharTableEntry*) (((byte*)fontBuf) + sizeof( FontBuf ));
 
-
+ 
 EC(     ECCheckBounds( (void*)charData ) );
 EC(     ECCheckBounds( (void*)(((byte*)fontBuf) + fontBuf->FB_dataSize ) ) );
-EC(     ECCheckBounds( (void*)(((byte*)fontBuf) + fontBuf->FB_dataSize + charDataSize ) ) );
 
         /* copy rendered Glyph to fontBuf */
         memmove( ((byte*)fontBuf) + fontBuf->FB_dataSize, charData, charDataSize );
@@ -424,18 +422,19 @@ static void AdjustPointers( CharTableEntry* charTableEntries,
 
 static word ShiftCharData( FontBuf* fontBuf, CharData* charData )
 {
-        word  size = ( ( charData->CD_pictureWidth + 7 ) >> 3 ) * 
-                     charData->CD_numRows + SIZE_CHAR_HEADER;
+        word    dataSize = ( ( charData->CD_pictureWidth + 7 ) >> 3 ) * charData->CD_numRows + SIZE_CHAR_HEADER;
+        word    bytesToMove = fontBuf->FB_dataSize - PtrToOffset( charData ) - dataSize;
 
+
+        if( bytesToMove == 0 )
+                return dataSize;
 
 EC(     ECCheckBounds( (void*)charData ) );
-EC(     ECCheckBounds( (void*)(((byte*)charData) + size ) ) );
+EC(     ECCheckBounds( (void*)(((byte*)charData) + dataSize ) ) );
  
-        memmove( charData, 
-                ((byte*)charData) + size, 
-                (((byte*)fontBuf) + fontBuf->FB_dataSize) - ((byte*)charData) + size );
+        memmove( charData, ((byte*)charData) + dataSize, bytesToMove );
 
-        return size;
+        return dataSize;
 }
 
 /********************************************************************
@@ -459,14 +458,19 @@ EC(     ECCheckBounds( (void*)(((byte*)charData) + size ) ) );
  *******************************************************************/
 static word ShiftRegionCharData( FontBuf* fontBuf, RegionCharData* charData )
 {
-        word size = charData->RCD_size + SIZE_REGION_HEADER;
+        word    dataSize = charData->RCD_size + SIZE_REGION_HEADER;
+        word    bytesToMove = fontBuf->FB_dataSize - PtrToOffset( charData ) - dataSize;
 
 
-        memmove( charData, 
-                ((byte*)charData) + size, 
-                (((byte*)fontBuf) + fontBuf->FB_dataSize) - ((byte*)charData) + size );
+        if( bytesToMove == 0 )
+                return dataSize;
 
-        return size;
+EC(     ECCheckBounds( (void*)charData ) );
+EC(     ECCheckBounds( (void*)(((byte*)charData) + dataSize ) ) );
+
+        memmove( charData, ((byte*)charData) + dataSize, bytesToMove );
+
+        return dataSize;
 }
 
 
