@@ -1013,7 +1013,7 @@ endif
 	pop	es
 	LONG jz	done
 
-afterHasTaskbar1:
+afterHasTaskbar1: ; endif ;(not TOOL_AREA_IS_TASK_BAR)
 
 	mov	si, ds:[di].OLFI_toolArea	; get *ds:si = tool area
 if EVENT_MENU
@@ -1077,6 +1077,7 @@ doItInUILayer:
 	mov	ax, handle ui		; Move to UI's layer
 	jmp	short doIt
 
+; endif ; (not TOOL_AREA_IS_TASK_BAR)
 realGeode:
 	; Ignore request if not from geode owning current target
 	;
@@ -1131,7 +1132,8 @@ doIt:
 	mov	si, mask WPF_ABS	; move to new absolute position
 	call	WinMove
 
-afterHasTaskbar2:
+afterHasTaskbar2: ; endif ; (not TOOL_AREA_IS_TASK_BAR)
+
 	pop	dx			; Pass handle of Geode as
 					; new LayerID
 	mov	si, WIT_PRIORITY
@@ -1147,7 +1149,7 @@ afterHasTaskbar2:
 done:
 	ret
 OLFieldMoveToolArea	endm
-
+; endif ; (not TOOL_AREA_IS_TASK_BAR)
 
 COMMENT @----------------------------------------------------------------------
 
@@ -1186,20 +1188,20 @@ OLFieldSizeToolArea	method dynamic	OLFieldClass, \
 	; if (not TOOL_AREA_IS_TASK_BAR)
 	; MUST stay
 	;
-	push	ds
-	segmov	ds, dgroup
-	tst	ds:[taskBarEnabled] ; if taskbar == on, ZF == 1
-	pop	ds
-	jnz	done ; if ZF==1 skip the following code
+	; push	ds
+	; segmov	ds, dgroup
+	; tst	ds:[taskBarEnabled] ; if taskbar == on, ZF == 1
+	; pop	ds
+	; jnz	done ; if ZF==1 skip the following code
 
 if EVENT_MENU
-	push	cx, si				; save size
-	mov	si, ds:[di].OLFI_eventToolArea
-	call	sizeToolArea			; size event tool area
-	pop	cx, si				; cx = size
-	mov	di, ds:[si]			; re-derefence to handle
-	add	di, ds:[di].Vis_offset		;	lmem movement
-						; fall thru to size tool area
+ 	push	cx, si				; save size
+ 	mov	si, ds:[di].OLFI_eventToolArea
+ 	call	sizeToolArea			; size event tool area
+ 	pop	cx, si				; cx = size
+ 	mov	di, ds:[si]			; re-derefence to handle
+ 	add	di, ds:[di].Vis_offset		;	lmem movement
+ 						; fall thru to size tool area
 endif
 	mov	si, ds:[di].OLFI_toolArea	; get *ds:si = tool area
 if EVENT_MENU
@@ -1222,6 +1224,7 @@ endif
 	mov	cl, mask VOF_GEOMETRY_INVALID or mask VOF_WINDOW_INVALID
 	mov	dl, VUM_NOW
 	call	ObjCallInstanceNoLock
+
 done:
 	ret
 OLFieldSizeToolArea	endm

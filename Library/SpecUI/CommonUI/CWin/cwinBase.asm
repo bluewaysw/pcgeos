@@ -3664,11 +3664,11 @@ OLBaseWinDisplaySetNotMinimized	method dynamic OLBaseWinClass,
 	;
 	; if (not TOOL_AREA_IS_TASK_BAR)
 	;
-	push	ds
-	segmov	ds, dgroup
-	tst	ds:[taskBarEnabled] ; if taskbar == on, ZF == 1
-	pop	ds
-	jnz	done ; if ZF==1 skip the following code
+	; push	ds
+	; segmov	ds, dgroup
+	; tst	ds:[taskBarEnabled] ; if taskbar == on, ZF == 1
+	; pop	ds
+	; jnz	done ; if ZF==1 skip the following code
 
 	call	OLBaseWinUpdateExpressToolArea
 
@@ -3785,11 +3785,11 @@ if PLACE_EXPRESS_MENU_ON_PRIMARY
 	;
 	; if (not TOOL_AREA_IS_TASK_BAR)
 	;
-	;push	ds
-	;segmov	ds, dgroup
-	;tst	ds:[taskBarEnabled] ; if taskbar == on, ZF == 1
-	;pop	ds
-	;jnz	hasTaskbar1 ; if ZF==1 skip the following code
+	; push	ds
+	; segmov	ds, dgroup
+	; tst	ds:[taskBarEnabled] ; if taskbar == on, ZF == 1
+	; pop	ds
+	; jnz	hasTaskbar1 ; if ZF==1 skip the following code
 
 	call	OLBaseWinHideExpressToolArea
 
@@ -3831,9 +3831,10 @@ if REDO_GEOMETRY_FOR_EXPRESS_MENU
 	;
 	call	OLRedoMenuBarGeometryIfMenusInHeader
 endif
+hasTaskbar2:
 endif ; PLACE_EXPRESS_MENU_ON_PRIMARY
 
-hasTaskbar2:
+
 if PLACE_EXPRESS_MENU_ON_PRIMARY ;or TOOL_AREA_IS_TASK_BAR
 	; Now that the new title bounds have been determined, ask the field
 	; to position the little tool area over the edge of it.
@@ -3935,11 +3936,11 @@ OLBaseWinHideExpressToolArea	proc	near
 	;
 	; if (not TOOL_AREA_IS_TASK_BAR)
 	;
-	;push	ds
-	;segmov	ds, dgroup
-	;tst	ds:[taskBarEnabled] ; if taskbar == on, ZF == 1
-	;pop	ds
-	;jnz	done ; if ZF==1 skip the following code
+	; push	ds
+	; segmov	ds, dgroup
+	; tst	ds:[taskBarEnabled] ; if taskbar == on, ZF == 1
+	; pop	ds
+	; jnz	done ; if ZF==1 skip the following code
 
 	push	si
 	mov	bx, segment OLFieldClass
@@ -5131,11 +5132,11 @@ endif
 	;
 	; if (not TOOL_AREA_IS_TASK_BAR)
 	;
-	;push	ds
-	;segmov	ds, dgroup
-	;tst	ds:[taskBarEnabled] ; if taskbar == on, ZF == 1
-	;pop	ds
-	;jnz	done ; if ZF==1 skip the following code
+	; push	ds
+	; segmov	ds, dgroup
+	; tst	ds:[taskBarEnabled] ; if taskbar == on, ZF == 1
+	; pop	ds
+	; jnz	done ; if ZF==1 skip the following code
 
 	call	WinClasses_DerefVisSpec_DI
 	mov	cx, ds:[di].OLWI_titleBarBounds.R_bottom

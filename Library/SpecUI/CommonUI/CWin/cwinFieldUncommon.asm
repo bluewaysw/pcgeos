@@ -1983,8 +1983,10 @@ REVISION HISTORY:
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
 ToolAreaDraw	method dynamic ToolAreaClass, MSG_VIS_DRAW
+
 	;
-	; if TOOL_AREA_IS_TASK_BAR_MOTIF
+	; if TOOL_AREA_IS_TASK_BAR
+	; FIXME!!! add proper 3D frame or something
 	;
 	;push	ds
 	;segmov	ds, dgroup
@@ -2637,15 +2639,16 @@ ToolAreaInteractionInitiate	method dynamic ToolAreaClass,
 	pop	ax
 noHide:
 
+; endif ; TOOL_AREA_IS_TASK_BAR
 	;
 	; if (not TOOL_AREA_IS_TASK_BAR)
 	; MUST stay
 	;
-	push	ds
-	segmov	ds, dgroup
-	tst	ds:[taskBarEnabled] ; if taskbar == on, ZF == 1
-	pop	ds
-	jnz	done ; if ZF==1 skip the following code
+	; push	ds
+	; segmov	ds, dgroup
+	; tst	ds:[taskBarEnabled] ; if taskbar == on, ZF == 1
+	; pop	ds
+	; jnz	done ; if ZF==1 skip the following code
 
 	;
 	; if UIEP_LOWER_LEFT, force a move so that it'll be position at
@@ -2672,6 +2675,7 @@ if EVENT_MENU
 	mov	ss:[bp].OLFMTAP_eventPos, 0
 endif
 					; not needed for parking off-screen
+
 	mov	ss:[bp].OLFMTAP_layerPriority, 0
 	mov	ax, MSG_OL_FIELD_MOVE_TOOL_AREA
 	mov	di, mask MF_RECORD or mask MF_STACK
@@ -2681,7 +2685,7 @@ endif
 	mov	cx, di
 	mov	ax, MSG_GEN_GUP_CALL_OBJECT_OF_CLASS
 	call	GenCallParent
-
+; endif	; (not TOOL_AREA_IS_TASK_BAR)
 done:
 	ret
 ToolAreaInteractionInitiate	endm
