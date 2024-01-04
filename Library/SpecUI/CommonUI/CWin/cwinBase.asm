@@ -3670,7 +3670,7 @@ OLBaseWinDisplaySetNotMinimized	method dynamic OLBaseWinClass,
 	; pop	ds
 	; jnz	done ; if ZF==1 skip the following code
 
-	call	OLBaseWinUpdateExpressToolArea
+	; call	OLBaseWinUpdateExpressToolArea
 
 done:
 	ret

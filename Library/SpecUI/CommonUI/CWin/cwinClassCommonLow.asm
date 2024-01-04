@@ -4816,7 +4816,7 @@ if PLACE_EXPRESS_MENU_ON_PRIMARY
 	call	WinCommon_DerefVisSpec_DI
 CUAS <	cmp	ds:[di].OLWI_type, MOWT_PRIMARY_WINDOW			>
 	jne	afterExpressToolArea
-	call	OLBaseWinUpdateExpressToolArea
+	; call	OLBaseWinUpdateExpressToolArea
 afterExpressToolArea:
 endif ; PLACE_EXPRESS_MENU_ON_PRIMARY
 

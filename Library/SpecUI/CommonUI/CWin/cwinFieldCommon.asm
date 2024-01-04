@@ -1220,10 +1220,10 @@ endif
 	mov	ax, MSG_VIS_SET_SIZE
 	call	ObjCallInstanceNoLock		;force new size of window
 
-	mov	ax, MSG_VIS_MARK_INVALID	;hope it trickles down to kid
-	mov	cl, mask VOF_GEOMETRY_INVALID or mask VOF_WINDOW_INVALID
-	mov	dl, VUM_NOW
-	call	ObjCallInstanceNoLock
+	; mov	ax, MSG_VIS_MARK_INVALID	;hope it trickles down to kid
+	; mov	cl, mask VOF_GEOMETRY_INVALID or mask VOF_WINDOW_INVALID
+	; mov	dl, VUM_NOW
+	; call	ObjCallInstanceNoLock
 
 done:
 	ret
