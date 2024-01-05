@@ -277,7 +277,10 @@ static void ConvertOutline( GStateHandle gstate, TT_Outline* outline )
         TT_Int   first;
         TT_Int   last;
 
- 
+
+EC(     ECCheckBounds( (void*)outline ) );
+EC(     ECCheckGStateHandle( gstate ) );
+
         last = -1;
         for ( n = 0; n < outline->n_contours; ++n )
         {
@@ -595,11 +598,9 @@ static void WriteComment( TRUETYPE_VARS, GStateHandle gstate )
 static void ScaleOutline( TRUETYPE_VARS )
 {
         TT_Matrix      scaleMatrix = { 0, 0, 0, 0 };
-        WWFixedAsDWord scale       = GrUDivWWFixed( STANDARD_GRIDSIZE, UNITS_PER_EM );
 
 
-        scaleMatrix.xx = scale;
-        scaleMatrix.yy = scale;
+        scaleMatrix.xx = scaleMatrix.yy = GrUDivWWFixed( STANDARD_GRIDSIZE, UNITS_PER_EM );
 
         TT_Transform_Outline( &OUTLINE, &scaleMatrix );
 }

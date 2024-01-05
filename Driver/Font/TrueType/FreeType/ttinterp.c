@@ -3885,19 +3885,19 @@
     if ( (args[0] & 0x100) != 0 && CUR.metrics.pointSize <= A )
       CUR.GS.scan_control = TRUE;
 
-    if ( (args[0] & 0x200) != 0 && CUR.metrics.rotated )
+    if ( (args[0] & 0x200) != 0 && FALSE ) //rotated
       CUR.GS.scan_control = TRUE;
 
-    if ( (args[0] & 0x400) != 0 && CUR.metrics.stretched )
+    if ( (args[0] & 0x400) != 0 && FALSE ) //stetched
       CUR.GS.scan_control = TRUE;
 
     if ( (args[0] & 0x800) != 0 && CUR.metrics.pointSize > A )
       CUR.GS.scan_control = FALSE;
 
-    if ( (args[0] & 0x1000) != 0 && CUR.metrics.rotated )
+    if ( (args[0] & 0x1000) != 0 && FALSE ) //rotated
       CUR.GS.scan_control = FALSE;
 
-    if ( (args[0] & 0x2000) != 0 && CUR.metrics.stretched )
+    if ( (args[0] & 0x2000) != 0 && FALSE ) //stretched
       CUR.GS.scan_control = FALSE;
 }
 
@@ -5125,7 +5125,7 @@
     nump = (ULong)args[0];      /* some points theoretically may occur more
                                    than once, thus UShort isn't enough */
 
-    for ( k = 1; k <= nump; k++ )
+    for ( k = 1; k <= nump; ++k )
     {
       if ( CUR.args < 2 )
       {
@@ -5197,7 +5197,7 @@
 
     nump = (ULong)args[0];
 
-    for ( k = 1; k <= nump; k++ )
+    for ( k = 1; k <= nump; ++k )
     {
       if ( CUR.args < 2 )
       {
@@ -5283,12 +5283,12 @@
       K = 3;
 
     /* Has the glyph been rotated ? */
-    if ( CUR.metrics.rotated )
-      K |= 0x80;
+/*    if ( CUR.metrics.rotated )
+      K |= 0x80; */
 
     /* Has the glyph been stretched ? */
-    if ( CUR.metrics.stretched )
-      K |= 0x100;
+ /*   if ( CUR.metrics.stretched )
+      K |= 0x100; */
 
     args[0] = K;
   }

@@ -49,6 +49,7 @@ extern TEngine_Instance engineInstance;
 #define WWFIXED_1_POINR_1                   0x00012000
 
 #define ITALIC_FACTOR                       0x0000366A
+#define NEGATVE_ITALIC_FACTOR               0xffffc996
 #define BOLD_FACTOR                         0x00012000 
 #define SCRIPT_FACTOR                       0x00008000
 #define SCRIPT_SHIFT_FACTOR                 0x00015000
@@ -68,6 +69,7 @@ extern TEngine_Instance engineInstance;
 #define MAX_KERN_TABLE_LENGTH               6000
 
 #define STANDARD_GRIDSIZE                   1000
+#define MAX_NUM_GLYPHS                      2000
 
 
 /***********************************************************************

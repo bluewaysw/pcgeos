@@ -1,0 +1,718 @@
+/*
+ **************************************************************************
+ *  FILE:		lst_mtds.goc
+ *  PROJECT:		Breadbox Gourmet
+ *  DESCRIPTION:	This file has methods for the shopping list
+ *			functions
+ **************************************************************************
+ */
+/*
+ ***************************************************************************
+ *		Include files
+ ***************************************************************************
+ */
+
+@include "rbox.goh"
+
+/*
+ ***************************************************************************
+ *		Class & Message Definitions
+ ***************************************************************************
+ */
+
+/* Declare UI object references to those in rboxui.GOC */
+@extern object ListButton;
+@extern object TextWindow;
+@extern object SListMenu;
+@extern object ServingsRecalcBox;
+@extern object RBPrintControl;
+@extern object ServingsRecalcValue;
+@extern object CopyTrigger;
+@extern object PasteMenuTrigger;
+@extern chunk RBTextCharAttrs;
+@extern object addrec;
+
+/****************************************************************************
+ *		Code for RBoxProcessClass Adjust Servings
+ ***************************************************************************
+ */
+
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_ADD_TO_LIST for RBoxProcessClass
+ *
+ * DESCRIPTION:	marks the current recipe for addition to shopping list
+ *
+ ***********************************************************************/
+
+@extern method RBoxProcessClass, MSG_ADD_TO_LIST
+{
+    RecipeStruct      *recipe;
+    DBGroupAndItem  mapitem;
+    DBMapStruct*    mapPtr;
+    ListChunkStruct	*listElement;
+    IngredRecalcStruct	*ingredElement;
+    ListArrayHeaderStruct	*headerInfo;
+    word		numElements, i;
+
+    /* standard set-up */
+    mapitem = DBGetMap(rBoxFile);
+    mapPtr = DBLockUngrouped(rBoxFile, mapitem);
+    recipe = (RecipeStruct *) (mapPtr + sizeof(DBMapStruct));
+
+    /* and add the stuff to the list right now!!! */
+    MemLock(ingredHeapHandle);
+    MemLock(listHeapHandle);
+
+    /* retrieve the number of elements in the list */
+    headerInfo = LMemDerefHandles(listHeapHandle, listChunkArray);
+    numElements = headerInfo->LAH_numElements;
+
+    /* First put the recipe name in the array */
+    listElement = ChunkArrayAppendHandles(
+            listHeapHandle,
+	    listChunkArray,
+	    0);
+    strcpy(listElement->LCS_name, recipe[currentRecipe].RS_name);
+    numElements++;
+
+    /* then the ingredients info */
+    for(i=0; i<recipe[currentRecipe].RS_size; i++) {
+       /* read ingred chunk array */
+       ingredElement = ChunkArrayElementToPtrHandles(
+                ingredHeapHandle,
+		ingredChunkArray,
+		i,
+		0);
+       /* append new element of list array */
+       listElement = ChunkArrayAppendHandles(
+		listHeapHandle,
+		listChunkArray,
+		0);
+       numElements++;
+
+       /* copy the data */
+       strcpy(listElement->LCS_name, "\0"); /* null out the recipe name */
+       strcpy(listElement->LCS_ingred, ingredElement->IRS_ingred);
+       strcpy(listElement->LCS_quant, ingredElement->IRS_newQuant);
+       listElement->LCS_units = ingredElement->IRS_units;
+       listElement->LCS_system = recipe[currentRecipe].RS_system;
+      }
+
+    /* update the number of elements */
+    headerInfo = LMemDerefHandles(listHeapHandle, listChunkArray);
+    headerInfo->LAH_numElements = numElements;
+
+    /* unlock ingred and list heaps */
+    MemUnlock(ingredHeapHandle);
+    MemUnlock(listHeapHandle);
+
+    /* unlock recipe*/
+    DBUnlock(mapPtr);
+
+    /* disable the add to button... */
+    @send ListButton::MSG_GEN_SET_NOT_ENABLED(VUM_NOW);
+    /* enable the shopping list menu */
+    @send SListMenu::MSG_GEN_SET_ENABLED(VUM_NOW);
+
+}
+
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_DISPLAY_SHOPPING_LIST for RBoxProcessClass
+ *
+ * DESCRIPTION:	Displays the selected shopping list
+ *              (int whichList)
+ *              
+ *              
+ *
+ ***********************************************************************/
+
+@extern method RBoxProcessClass, MSG_DISPLAY_SHOPPING_LIST
+{
+    ListChunkStruct	*listElement;
+    ListArrayHeaderStruct	*headerInfo;
+    word		numElements, i;
+    int			units;
+    char	    ingredBuffer[80];   /* holds ingred info */
+    VisTextCharAttr     *attr;
+    MemHandle		textHeapHandle;
+    WWFixed	PtSize;
+    Tab RB1Tab = {  /* 1 inch */
+	  8 * 1 * PIXELS_PER_INCH, 
+	  TL_NONE | TT_LEFT,
+	  SDM_100,
+	  0,
+	  0,
+	  NULL
+	};
+    Tab RB2Tab = {  /* 2 inch */
+	  8 * 2 * PIXELS_PER_INCH,
+	  TL_NONE | TT_LEFT,
+	  SDM_100,
+	  0,
+	  0,
+	  NULL
+	};
+
+    /* set content's on screen variable */
+    if (whichList == 0)
+      onScreen = LIST0;
+     else
+      onScreen = LIST1;
+
+    /* zap the display */
+    @call TextWindow::MSG_VIS_TEXT_DELETE_ALL();
+
+    /* set font to normal */
+    textHeapHandle = OptrToHandle(@RBTextCharAttrs);
+    MemLock(textHeapHandle);
+    attr = LMemDeref(@RBTextCharAttrs);
+    @call TextWindow::MSG_VIS_TEXT_SET_CHAR_ATTR(
+		      attr,
+		      TEXT_ADDRESS_PAST_END,
+		      0);
+    MemUnlock(textHeapHandle);
+
+    /* restore any changed point size */
+    PtSize.WWF_int  = pointSize;
+    PtSize.WWF_frac = 0;
+    @send TextWindow::MSG_VIS_TEXT_SET_POINT_SIZE(
+	       PtSize, TEXT_ADDRESS_PAST_END, 0);
+
+    /* Set the tabs */
+    @call TextWindow::MSG_VIS_TEXT_SET_TAB(
+                        RB1Tab, TEXT_ADDRESS_PAST_END, 0);
+    @call TextWindow::MSG_VIS_TEXT_SET_TAB(
+                        RB2Tab, TEXT_ADDRESS_PAST_END, 0);
+
+    /* start the display */
+    @call TextWindow::MSG_VIS_TEXT_REPLACE_ALL_PTR(
+		      "          Grocery List\0", 0);
+
+    /* lock the chunks */
+    MemLock(ingredHeapHandle);
+    MemLock(listHeapHandle);
+
+    /* retrieve the number of elements in the list */
+    headerInfo = LMemDerefHandles(listHeapHandle, listChunkArray);
+    numElements = headerInfo->LAH_numElements;
+
+    /* then the recipe & ingredients info */
+    for(i=0; i<numElements; i++) {
+       /* initialize the ingred buffer */
+       *ingredBuffer = NULL;
+
+       /* Get the arrayed info */
+       listElement = ChunkArrayElementToPtrHandles(
+		   listHeapHandle,
+		   listChunkArray,
+		   i,
+		   0);
+
+       if (*listElement->LCS_name == 0) {  /* its an ingred */
+          if (whichList == 1) { /* list the ingreds */
+          /* buffer the ingredient data */
+	  strcat(ingredBuffer, "\r ");
+	  strcat(ingredBuffer, listElement->LCS_quant);
+	  strcat(ingredBuffer, "\t");
+
+	  units = (int) listElement->LCS_units;
+	  if (listElement->LCS_system == USA) {
+            switch (units) {
+	      case USUN:
+              strcat(ingredBuffer,"    ");
+              break;
+	      case PNCH:
+              strcat(ingredBuffer,"pinch(es)");
+              break;
+	      case TSP:
+              strcat(ingredBuffer,"tsp");
+              break;
+	      case TBSP:
+              strcat(ingredBuffer,"tbsp");
+              break;
+	      case CUP:
+              strcat(ingredBuffer,"cup(s)");
+              break;
+	      case FLOZ:
+              strcat(ingredBuffer,"fl oz");
+              break;
+	      case PINT:
+              strcat(ingredBuffer,"pint(s)");
+              break;
+	      case QT:
+              strcat(ingredBuffer,"qt");
+              break;
+	      case GAL:
+              strcat(ingredBuffer,"gal");
+              break;
+	      case OZ:
+              strcat(ingredBuffer,"oz");
+              break;
+	      case LB:
+              strcat(ingredBuffer,"lb");
+              break;
+	      case EACH:
+	      strcat(ingredBuffer,"each");
+              break;
+	      case CAN:
+              strcat(ingredBuffer,"can(s)");
+              break;
+	      case PKG:
+	      strcat(ingredBuffer,"pkg");
+              break;
+	      case STK:
+	      strcat(ingredBuffer,"stick(s)");
+              break;
+	     }
+	    }
+	  else {
+	    switch (units) {
+	      case MUN:
+              strcat(ingredBuffer,"    ");
+              break;
+	      case MPNCH:
+              strcat(ingredBuffer,"pinch(es)");
+              break;
+	      case MTSP:
+              strcat(ingredBuffer,"tsp");
+              break;
+	      case MTBSP:
+              strcat(ingredBuffer,"tbsp");
+              break;
+	      case MLS:
+              strcat(ingredBuffer,"ml");
+              break;
+	      case DLS:
+              strcat(ingredBuffer,"dl");
+              break;
+	      case LTRS:
+              strcat(ingredBuffer,"liter(s)");
+              break;
+	      case GRMS:
+              strcat(ingredBuffer,"gram(s)");
+              break;
+	      case KILO:
+	      strcat(ingredBuffer,"kilo(s)");
+              break;
+	      case MEACH:
+	      strcat(ingredBuffer,"each");
+              break;
+	      case MCAN:
+	      strcat(ingredBuffer,"can(s)");
+              break;
+	      case MPKG:
+	      strcat(ingredBuffer,"pkg");
+              break;
+	     }
+	    }
+
+	  strcat(ingredBuffer, "\t");
+	  strcat(ingredBuffer, listElement->LCS_ingred);
+          /* send the ingredient to the screen/printer */
+	  @call TextWindow::MSG_VIS_TEXT_APPEND_PTR(
+		               ingredBuffer, 0);
+	  } /* end of whichList if */
+	 } /* end of ingreds if */
+       else {
+	  /* buffer the recipe name */
+	  strcat(ingredBuffer, "\r\r");
+	  strcat(ingredBuffer, listElement->LCS_name);
+	  /* send the it to the screen/printer */
+	  @call TextWindow::MSG_VIS_TEXT_APPEND_PTR(
+			       ingredBuffer, 0);
+         }
+      } /* end of display for loop */
+
+    /* unlock ingred and list heaps */
+    MemUnlock(ingredHeapHandle);
+    MemUnlock(listHeapHandle);
+
+    /* disable the add to button... */
+    @send ListButton::MSG_GEN_SET_NOT_ENABLED(VUM_NOW);
+
+    /* disable the recalc button */
+    @send ServingsRecalcBox::MSG_GEN_SET_NOT_ENABLED(VUM_NOW);
+    /* and reset it */
+    @call ServingsRecalcValue::MSG_GEN_VALUE_SET_INTEGER_VALUE(
+              4, FALSE);
+
+}
+
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_CLEAR_SHOPPING_LIST for RBoxProcessClass
+ *
+ * DESCRIPTION:	Clears the shopping list
+ *              
+ *              
+ *              
+ *
+ ***********************************************************************/
+
+@extern method RBoxProcessClass, MSG_CLEAR_SHOPPING_LIST
+{
+    ListArrayHeaderStruct	*headerInfo;
+
+
+    @call TextWindow::MSG_VIS_TEXT_DELETE_ALL();
+
+    MemLock(listHeapHandle);
+
+    ChunkArrayDeleteRange(
+	      ConstructOptr(listHeapHandle, listChunkArray),
+	      0,   /* from the beginning... */
+	      -1);    /* to the end */
+
+    /* reset the number of elements in the list to 0 */
+    headerInfo = LMemDerefHandles(listHeapHandle, listChunkArray);
+    headerInfo->LAH_numElements = 0;
+
+    MemUnlock(listHeapHandle);
+
+    /* disable the shopping list menu */
+    @send SListMenu::MSG_GEN_SET_NOT_ENABLED(VUM_NOW);
+}
+
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_COPY_RECIPE for RBoxProcessClass
+ *
+ * DESCRIPTION:	copies a recipe to vm file
+ *              
+ *              
+ *              
+ *
+ ***********************************************************************/
+
+@extern method RBoxProcessClass, MSG_COPY_RECIPE
+{
+    RecipeStruct      *recipe, *clip;
+    IngredStruct	*ingred, *clipIngred, *tmp;
+ //   DBItem            ingreditem, previtem;
+    DBGroup           recipegroup;
+    DBGroupAndItem  mapitem;
+    DBMapStruct*    mapPtr;
+    VMBlockHandle	clipBlkHandle, ingredBlkHandle;
+    VMBlockHandle   dirBlkHandle, clipDirBlkHandle;
+    MemHandle		mh;
+    word	numIngreds, j;
+
+    /* standard set-up */
+    mapitem = DBGetMap(rBoxFile);
+    mapPtr = DBLockUngrouped(rBoxFile, mapitem);
+    recipe = (RecipeStruct *) (mapPtr + sizeof(DBMapStruct));
+
+    /* Open the clip file */
+    clipfile = VMOpen(CLIP_FILENAME, 0, VMO_CREATE_TRUNCATE, 0);
+
+    /* allocate a block */
+    clipBlkHandle = VMAlloc(clipfile, sizeof(RecipeStruct), 1);
+
+    /* and lock it */
+    clip = VMLock(clipfile, clipBlkHandle, &mh);
+
+   /* copy recipe info to it */
+    clip->RS_group = NULL;
+    clip->RS_head = NULL;
+    clip->RS_size = recipe[currentRecipe].RS_size;
+    numIngreds = recipe[currentRecipe].RS_size;
+    strcpy(clip->RS_name, recipe[currentRecipe].RS_name);
+    clip->RS_cat = recipe[currentRecipe].RS_cat;
+    clip->RS_serves = recipe[currentRecipe].RS_serves;
+    strcpy(clip->RS_mainIngred, recipe[currentRecipe].RS_mainIngred);
+    strcpy(clip->RS_author, recipe[currentRecipe].RS_author);
+    strcpy(clip->RS_prepTime, recipe[currentRecipe].RS_prepTime);
+    clip->RS_index = 0;
+    clip->RS_system = recipe[currentRecipe].RS_system;
+    clip->RS_list = recipe[currentRecipe].RS_list;
+    clip->RS_spare = 0;
+
+    VMDirty(mh);
+    VMUnlock(mh);
+
+
+   /* Copy the ingredient info */
+    /* allocate a block */
+    ingredBlkHandle = VMAlloc(clipfile,
+		      (numIngreds * sizeof(IngredStruct)),
+		      2);
+    /* and lock it */
+    clipIngred = VMLock(clipfile, ingredBlkHandle, &mh);
+
+
+    /* put the ingreds into the block */
+    if (numIngreds == 0)
+       ;   /* hard to imagine but... */
+      else {
+       recipegroup = recipe[currentRecipe].RS_group;
+       ingred = DBLock(rBoxFile, recipegroup, recipe[currentRecipe].RS_head);
+
+       /* by following the linked list.*/
+       for (j = 0; j < numIngreds; j++) {
+
+	  clipIngred[j].IS_units = (int) ingred->IS_units;
+	  strcpy(clipIngred[j].IS_ingred, ingred->IS_ingred);
+	  strcpy(clipIngred[j].IS_quant, ingred->IS_quant);
+
+
+	  if (j == (numIngreds - 1)) /* if the last piece... */
+	     ;                    /* don't try to get next piece...*/
+	    else {
+             /* get next piece from link */
+		tmp = DBLock(rBoxFile, recipegroup, ingred->IS_next);
+	        DBUnlock(ingred);
+		ingred = tmp;
+            }  /* end of next ingred else */
+
+       } /* end of ingreds for */
+
+       DBUnlock(ingred);
+
+    } /* end of ingreds else */
+
+    VMDirty(mh);
+    VMUnlock(mh);
+    DBUnlock(mapPtr);
+
+
+   /* Copy the directions VM block*/
+    /* get the directions text handle - its id is currentRecipe */
+    dirBlkHandle = VMFind(rBoxFile, NullHandle, currentRecipe);
+    clipDirBlkHandle = VMCopyVMBlock(rBoxFile, dirBlkHandle, clipfile);
+
+    /* and give it a new userID so we can retrieve it */
+    VMModifyUserID(clipfile, clipDirBlkHandle, 3);
+
+    /* and save our clip file */
+    VMSave(clipfile);
+    VMClose(clipfile, FALSE);
+
+    /* disable the button so no more copy */
+    @send CopyTrigger::MSG_GEN_SET_NOT_ENABLED(VUM_NOW);
+    /* and enable the paste trigger */
+    @send PasteMenuTrigger::MSG_GEN_SET_ENABLED(VUM_NOW);
+
+}
+
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_PASTE_RECIPE for RBoxProcessClass
+ *
+ * DESCRIPTION:	pastes in a recipe from vm file
+ *              
+ *              
+ *              
+ *
+ ***********************************************************************/
+
+@extern method RBoxProcessClass, MSG_PASTE_RECIPE
+{
+    RecipeStruct      *recipe, *clip;
+    DBGroupAndItem  mapitem;
+    DBMapStruct*    mapPtr;
+    IngredStruct       *ingred, *clipIngred, *tmp;
+    DBItem            ingreditem, previtem;
+    DBGroup           recipegroup;
+    VMBlockHandle	clipBlkHandle, ingredBlkHandle;
+    VMBlockHandle   dirBlkHandle/*, clipDirBlkHandle*/;
+    MemHandle		mh;
+    word              numRecipes, i, j;
+    char              name[NAME_SIZE];
+
+
+    /* Open the clip file */
+/*    FileSetCurrentPath(SP_TOP, NULL);  */
+    clipfile = VMOpen(CLIP_FILENAME, 0, VMO_OPEN, 0);
+    /* Check for error */
+    if (clipfile == NullHandle) {  /* no file there */
+       @send PasteMenuTrigger::MSG_GEN_SET_NOT_ENABLED(VUM_NOW);
+
+       /* put up error message */
+
+       /* -------------------- error message here ------------ */
+
+       /* and bail out */
+       return;
+      }
+
+    /* get the recipe name */
+    clipBlkHandle = VMFind(clipfile, NullHandle, 1);
+    clip = VMLock(clipfile, clipBlkHandle, &mh);
+    strcpy(name, clip->RS_name);
+
+    /* put up do you wanna box */
+       if 	((UserStandardDialogOptr(
+			    NullOptr,
+			    NullOptr,
+			    NullOptr,
+			    NullOptr,
+			    @addrec,
+			    ((CDT_WARNING << CDBF_DIALOG_TYPE_OFFSET) |
+			    (GIT_AFFIRMATION << CDBF_INTERACTION_TYPE_OFFSET))
+                            ) == IC_YES))  {
+
+       /* BASICALLY THE CREATE A RECIPE CODE ----------------------- */
+       /* standard opening */
+       mapitem = DBGetMap(rBoxFile);
+       mapPtr = DBLockUngrouped(rBoxFile, mapitem);
+       numRecipes = mapPtr->MS_numRecipes;
+       DBUnlock(mapPtr);
+
+       /* expand the map item */
+       DBReAllocUngrouped(rBoxFile, mapitem,
+		sizeof(DBMapStruct) + ((numRecipes + 1) * sizeof(RecipeStruct)));
+       /* Lock the map again */
+       mapPtr = DBLockUngrouped(rBoxFile, mapitem);
+       /* Get the beginning of the array of recipe structures */
+       recipe = (RecipeStruct *) (mapPtr + sizeof(DBMapStruct));
+       /* Initialize the new structure (remember numRecipes is old array size) */
+       strcpy(recipe[numRecipes].RS_name, name);
+       recipe[numRecipes].RS_head = NULL;
+       recipe[numRecipes].RS_size = 0;
+       /* Create the new DB group */
+       recipe[numRecipes].RS_group = DBGroupAlloc(rBoxFile);
+       /* Increase the array size (number of recipes)*/
+       (mapPtr->MS_numRecipes)++;
+       numRecipes++;
+       /* and set the current recipe variable */
+       currentRecipe = numRecipes-1;
+
+       /* MORE OR LESS THE ENTER RECIPE CODE ----------------------- */
+       /* enter the info */
+       recipe[currentRecipe].RS_size = clip->RS_size;
+       recipe[currentRecipe].RS_serves = clip->RS_serves;
+       recipe[currentRecipe].RS_cat = clip->RS_cat;
+       strcpy(recipe[currentRecipe].RS_author, clip->RS_author);
+       strcpy(recipe[currentRecipe].RS_prepTime, clip->RS_prepTime);
+       recipe[currentRecipe].RS_system = clip->RS_system;
+       /* add the index number... */
+       recipe[currentRecipe].RS_index = currentRecipe;
+       /* the shopping list marker... */
+       recipe[currentRecipe].RS_list = FALSE;
+       /* and the main ingredient. */
+       strcpy(recipe[currentRecipe].RS_mainIngred, " ");
+
+       /* unlock */
+       VMUnlock(mh);
+
+       /* NOW THE INGREDIENTS (ADD INGRED CODE) -------------------- */
+       /* Get the recipe's DBGroup */
+       recipegroup = recipe[currentRecipe].RS_group;
+
+       /* find the ingred VMBlock */
+       ingredBlkHandle = VMFind(clipfile, NullHandle, 2);
+       /* and lock it */
+       clipIngred = VMLock(clipfile, ingredBlkHandle, &mh);
+
+       /* start the loop */
+       for( i = 0; i < recipe[currentRecipe].RS_size; i++) {
+
+       /* if first ingred - put at head */
+       if (i == 0) {
+       
+         /* create the new ingred DBItem */
+         ingreditem = DBAlloc(rBoxFile, recipegroup, sizeof(IngredStruct));
+
+         /* Lock new ingred DBItem */
+         ingred = DBLock(rBoxFile, recipegroup, ingreditem);
+
+         /* put it in... */
+         ingred->IS_next = recipe[currentRecipe].RS_head;
+         recipe[currentRecipe].RS_head = ingreditem;
+
+         /* Mark the ingred item as dirty and unlock it. */
+         DBDirty(ingred);
+         DBUnlock(ingred);
+
+         }  /* end of i = 0 if */
+
+        else {  /* otherwise at the end */
+
+         /* if second ingredient */
+         if (i == 1) {
+
+           /* get the first ingred record */
+           previtem = recipe[currentRecipe].RS_head;
+
+           }
+
+          else {   /* third or greater */
+
+	    /* find the last ingred record */
+            ingreditem = recipe[currentRecipe].RS_head;
+	    ingred = DBLock(rBoxFile, recipegroup, ingreditem);
+
+	    /* loop into linked list */
+	    for (j = 0; j < (i-1); j++) {
+
+	      ingreditem = ingred->IS_next;
+	      tmp = DBLock(rBoxFile, recipegroup, ingreditem);
+	      DBUnlock(ingred);
+	      ingred = tmp;
+	      previtem = ingreditem;
+	      }
+          }  /* end looping else */
+
+         /* create the new ingred DBItem */
+         ingreditem = DBAlloc(rBoxFile, recipegroup, sizeof(IngredStruct));
+
+         /* Lock new ingred DBItem */
+         ingred = DBLock(rBoxFile, recipegroup, ingreditem);
+
+         /* Relock previous (in previtem) */
+         tmp = DBLock(rBoxFile, recipegroup, previtem);
+
+         /* fix next pointer */
+         tmp->IS_next = ingreditem;
+
+         /* mark previous item as dirty and unlock it */
+         DBDirty(tmp);
+         DBUnlock(tmp);
+      
+         /* Mark the ingred item as dirty and unlock it. */
+         DBDirty(ingred);
+         DBUnlock(ingred);
+
+       }  /* end of "otherwise at the end" else */
+
+       /* Mark the map item as dirty */
+       DBDirty(mapPtr);
+       DBUnlock(mapPtr);
+
+       /* Get the ingred info */
+       /* Lock new ingred DBItem */
+       ingred = DBLock(rBoxFile, recipegroup, ingreditem);
+
+       /* put ingred info into database*/
+       strcpy(ingred->IS_ingred, clipIngred[i].IS_ingred);
+       strcpy(ingred->IS_quant, clipIngred[i].IS_quant);
+       ingred->IS_units = clipIngred[i].IS_units;
+
+       /* Mark the ingred item as dirty and unlock it. */
+       DBDirty(ingred);
+       DBUnlock(ingred);
+
+       } /* end of ingred for loop */
+       VMUnlock(mh);
+
+
+       /* AND LASTLY THE DIRECTIONS ------------------------------  */
+       /* Copy the directions VM block*/
+       clipBlkHandle = VMFind(clipfile, NullHandle, 3);
+       dirBlkHandle = VMCopyVMBlock(clipfile, clipBlkHandle, rBoxFile);
+
+       /* and give it a new userID so we can retrieve it */
+       VMModifyUserID(rBoxFile, dirBlkHandle, currentRecipe);
+
+
+
+    } /* end of do you wanna paste if */
+
+    VMClose(clipfile, FALSE);
+
+    /* and display the pasted recipe */
+    @send process::MSG_DISPLAY_RECIPE();
+
+}

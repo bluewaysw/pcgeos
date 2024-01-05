@@ -43,14 +43,14 @@ DEFTARGET	= linux
 DEFTARGET	= win32
 #endif
 
-MISRCS          = fileargs.c makedpnd.c
+MISRCS          = makedpnd.c
 
 win32SRCS       = $(MISRCS) win32.md/
-win32OBJS       = win32.md/fileargs.obj win32.md/makedpnd.obj
+win32OBJS       = win32.md/makedpnd.obj
 win32LIBS       =
 
 linuxSRCS       = $(MISRCS) linux.md/
-linuxOBJS       = linux.md/fileargs.o linux.md/makedpnd.o
+linuxOBJS       = linux.md/makedpnd.o
 linuxLIBS       =
 
 SUBDIRS         = 
