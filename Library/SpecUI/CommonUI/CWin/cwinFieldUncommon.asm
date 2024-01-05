@@ -1903,6 +1903,8 @@ TaskBarListAddChild	method dynamic TaskBarListClass,
 					MSG_GEN_ADD_CHILD
 	;
 	; if TOOL_AREA_IS_TASK_BAR
+	; RUNTIME
+	; FIXME!!! - do we really need to call super here?
 	;
 	push	ds
 	segmov	ds, dgroup
@@ -1986,6 +1988,7 @@ ToolAreaDraw	method dynamic ToolAreaClass, MSG_VIS_DRAW
 
 	;
 	; if TOOL_AREA_IS_TASK_BAR
+	; RUNTIME
 	; FIXME!!! add proper 3D frame or something
 	;
 	;push	ds
@@ -2079,6 +2082,7 @@ SysTrayInteractionVisDraw	method dynamic SysTrayInteractionClass,
 				MSG_VIS_DRAW
 	;
 	; if TOOL_AREA_IS_TASK_BAR
+	; RUNTIME
 	;
 	push	ds
 	segmov	ds, dgroup
@@ -2144,6 +2148,7 @@ ToolAreaRawUnivEnter	method dynamic ToolAreaClass,
 
 	;
 	; if TOOL_AREA_IS_TASK_BAR
+	; RUNTIME
 	;
 	push	ds
 	segmov	ds, dgroup
@@ -2202,6 +2207,7 @@ ToolAreaRawUnivLeave	method dynamic ToolAreaClass,
 
 	;
 	; if TOOL_AREA_IS_TASK_BAR
+	; RUNTIME
 	;
 	push	ds
 	segmov	ds, dgroup
@@ -2259,6 +2265,7 @@ ToolAreaAutoHide	method dynamic ToolAreaClass,
 					MSG_TOOL_AREA_AUTO_HIDE
 	;
 	; if TOOL_AREA_IS_TASK_BAR
+	; RUNTIME
 	;
 	push	ds
 	segmov	ds, dgroup
@@ -2338,6 +2345,7 @@ ToolAreaStartSelect	method dynamic ToolAreaClass,
 					MSG_META_START_SELECT
 	;
 	; if TOOL_AREA_IS_TASK_BAR
+	; RUNTIME
 	;
 	push	ds
 	segmov	ds, dgroup
@@ -2409,14 +2417,17 @@ DESTROYED:	ax, cx, dx, bp
 
 ToolAreaVisMoveResizeWin	method dynamic ToolAreaClass,
 					MSG_VIS_MOVE_RESIZE_WIN
+
 	;
 	; if TOOL_AREA_IS_TASK_BAR
+	; RUNTIME
 	;
 	push	ds
 	segmov	ds, dgroup
 	tst	ds:[taskBarEnabled] ; if taskbar == on, ZF == 1
 	pop	ds
-	LONG	jz callSuper ; if ZF==0 skip the following code
+	;LONG	jz callSuper ; if ZF==0 skip the following code
+	LONG 	jmp callSuper
 
 	mov	bl, ds:[di].TAI_state
 
@@ -2500,6 +2511,9 @@ callSuper:
 	mov	di, offset ToolAreaClass
 	GOTO	ObjCallSuperNoLock
 
+skip:
+	ret
+
 ToolAreaVisMoveResizeWin	endm
 
 taskBarPositionCategory	char	"motif options",0
@@ -2534,6 +2548,7 @@ REVISION HISTORY:
 ; this used to be MSG_GEN_INTERACTION_INITIATE, but that is too late
 ;
 ToolAreaInitPosition	method	dynamic	ToolAreaClass, MSG_TOOL_AREA_INIT_POSITION
+
 	;
 	; if TOOL_AREA_IS_TASK_BAR
 	;
@@ -2642,7 +2657,6 @@ noHide:
 ; endif ; TOOL_AREA_IS_TASK_BAR
 	;
 	; if (not TOOL_AREA_IS_TASK_BAR)
-	; MUST stay
 	;
 	; push	ds
 	; segmov	ds, dgroup

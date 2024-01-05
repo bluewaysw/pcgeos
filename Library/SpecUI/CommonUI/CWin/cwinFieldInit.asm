@@ -930,6 +930,7 @@ OLFieldEnsureToolArea	proc	far
 
 	;
 	; if TOOL_AREA_IS_TASK_BAR
+	; RUNTIME
 	;
 	push	ds
 	segmov	ds, dgroup
@@ -977,6 +978,7 @@ EC <	pop	es							>
 NEC < cantFindSysTray:							>
 	pop	cx, dx
 endIfTaskbar:
+
 	; Get it up on screen (a queue delay later)
 	;
 	mov	bx, cx
@@ -984,17 +986,18 @@ endIfTaskbar:
 
 	;
 	; if TOOL_AREA_IS_TASK_BAR
+	; RUNTIME
 	;
-	push	ds
-	segmov	ds, dgroup
-	tst	ds:[taskBarEnabled] ; if taskbar == on, ZF == 1
-	pop	ds
-	jz	hasNoTaskbar ; if ZF==0 skip the following code
+	; push	ds
+	; segmov	ds, dgroup
+	; tst	ds:[taskBarEnabled] ; if taskbar == on, ZF == 1
+	; pop	ds
+	; jz	hasNoTaskbar ; if ZF==0 skip the following code
 
 	; init position
-	;mov	ax, MSG_TOOL_AREA_INIT_POSITION
-	;mov	di, mask MF_CALL or mask MF_FIXUP_DS
-	;call	ObjMessage
+	; mov	ax, MSG_TOOL_AREA_INIT_POSITION
+	; mov	di, mask MF_CALL or mask MF_FIXUP_DS
+	; call	ObjMessage
 
 hasNoTaskbar:
 	mov	ax, MSG_GEN_INTERACTION_INITIATE

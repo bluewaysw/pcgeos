@@ -2088,17 +2088,17 @@ EC <	ERROR_NZ	OPEN_WIN_ON_OPEN_WINDOW				>
 	;
 	; if TOOL_AREA_IS_TASK_BAR
 	;
-	push	ds
-	segmov	ds, dgroup
-	tst	ds:[taskBarEnabled] ; if taskbar == on, ZF == 1
-	pop	ds
-	jz	hasNoTaskbar ; if ZF==0 skip the following code
+	; push	ds
+	; segmov	ds, dgroup
+	; tst	ds:[taskBarEnabled] ; if taskbar == on, ZF == 1
+	; pop	ds
+	; jz	hasNoTaskbar ; if ZF==0 skip the following code
 
 	; If taskbar is at the bottom of the screen, subtract off the
 	; height of the tool area (taskbar) from parent window size so
 	; maximized windows don't extend below the taskbar.
-	call	GetTaskBarSizeAdjustment
-	sub	dx, di			; subtract off taskbar adjustment
+	; call	GetTaskBarSizeAdjustment
+	; sub	dx, di			; subtract off taskbar adjustment
 
 hasNoTaskbar:
 	movdw	axbp, cxdx		 ;put size values in weird places

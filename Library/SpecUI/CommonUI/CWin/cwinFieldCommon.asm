@@ -561,12 +561,13 @@ EC<	call	ECCheckODCXDX						>
 
 	;
 	; if (not TOOL_AREA_IS_TASK_BAR)
+	; RUNTIME
 	;
-	;push	ds
-	;segmov	ds, dgroup
-	;tst	ds:[taskBarEnabled] ; if taskbar == on, ZF == 1
-	;pop	ds
-	;jnz	afterNoTarget ; if ZF==1 skip the following code
+	; push	ds
+	; segmov	ds, dgroup
+	; tst	ds:[taskBarEnabled] ; if taskbar == on, ZF == 1
+	; pop	ds
+	; jnz	afterNoTarget ; if ZF==1 skip the following code
 
 	tst	ax
 	jz	afterNoTarget
@@ -973,8 +974,9 @@ REVISION HISTORY:
 	Doug	6/92		Initial version
 ------------------------------------------------------------------------------@
 
-;never change priority of task bar -- brianc 11/12/99
-;if (not TOOL_AREA_IS_TASK_BAR)
+; never change priority of task bar -- brianc 11/12/99
+; if (not TOOL_AREA_IS_TASK_BAR)
+; RUNTIME
 
 OLFieldMoveToolArea	method	dynamic OLFieldClass, \
 					MSG_OL_FIELD_MOVE_TOOL_AREA
@@ -982,12 +984,13 @@ OLFieldMoveToolArea	method	dynamic OLFieldClass, \
 	;
 	; FIXME!!! - should this be skipping everything or only something in between?
 	; if (not TOOL_AREA_IS_TASK_BAR)
+	; RUNTIME
 	;
-	;push	ds
-	;segmov	ds, dgroup
-	;tst	ds:[taskBarEnabled] ; if taskbar == on, ZF == 1
-	;pop	ds
-	;LONG	jnz done	;afterHasTaskbar1 ; if ZF==1 skip the following code
+	; push	ds
+	; segmov	ds, dgroup
+	; tst	ds:[taskBarEnabled] ; if taskbar == on, ZF == 1
+	; pop	ds
+	; LONG	jnz done	;afterHasTaskbar1 ; if ZF==1 skip the following code
 
 if EVENT_MENU
 	;
@@ -1024,12 +1027,13 @@ endif
 
 	;
 	; if (not TOOL_AREA_IS_TASK_BAR)
+	; RUNTIME
 	;
-	;push	ds
-	;segmov	ds, dgroup
-	;tst	ds:[taskBarEnabled] ; if taskbar == on, ZF == 1
-	;pop	ds
-	;jnz	realGeode ; if ZF==1 skip the following code
+	; push	ds
+	; segmov	ds, dgroup
+	; tst	ds:[taskBarEnabled] ; if taskbar == on, ZF == 1
+	; pop	ds
+	; jnz	realGeode ; if ZF==1 skip the following code
 
 	;
 	; First, mark the position flags in the window as WPF_AS_REQUIRED
@@ -1104,12 +1108,13 @@ doIt:
 
 	;
 	; if (not TOOL_AREA_IS_TASK_BAR)
+	; RUNTIME
 	;
-	;push	ds
-	;segmov	ds, dgroup
-	;tst	ds:[taskBarEnabled] ; if taskbar == on, ZF == 1
-	;pop	ds
-	;jnz	afterHasTaskbar2 ; if ZF==1 skip the following code
+	; push	ds
+	; segmov	ds, dgroup
+	; tst	ds:[taskBarEnabled] ; if taskbar == on, ZF == 1
+	; pop	ds
+	; jnz	afterHasTaskbar2 ; if ZF==1 skip the following code
 
 	;
 	; Convert coordinates from screen-absolute to parent-relative
@@ -1186,7 +1191,7 @@ OLFieldSizeToolArea	method dynamic	OLFieldClass, \
 
 	;
 	; if (not TOOL_AREA_IS_TASK_BAR)
-	; MUST stay
+	; RUNTIME
 	;
 	; push	ds
 	; segmov	ds, dgroup
@@ -1220,10 +1225,10 @@ endif
 	mov	ax, MSG_VIS_SET_SIZE
 	call	ObjCallInstanceNoLock		;force new size of window
 
-	; mov	ax, MSG_VIS_MARK_INVALID	;hope it trickles down to kid
-	; mov	cl, mask VOF_GEOMETRY_INVALID or mask VOF_WINDOW_INVALID
-	; mov	dl, VUM_NOW
-	; call	ObjCallInstanceNoLock
+	mov	ax, MSG_VIS_MARK_INVALID	;hope it trickles down to kid
+	mov	cl, mask VOF_GEOMETRY_INVALID or mask VOF_WINDOW_INVALID
+	mov	dl, VUM_NOW
+	call	ObjCallInstanceNoLock
 
 done:
 	ret

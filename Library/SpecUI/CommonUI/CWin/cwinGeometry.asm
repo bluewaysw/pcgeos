@@ -1506,7 +1506,8 @@ OLWinUpdatePositionForTaskBar	method dynamic OLWinClass,
 	segmov	ds, dgroup
 	tst	ds:[taskBarEnabled] ; if taskbar == on, ZF == 1
 	pop	ds
-	jz	done ; if ZF==0 skip the following code
+	; jz	done ; if ZF==0 skip the following code
+	jmp	done
 
 	jcxz	doUpdate
 

@@ -1383,7 +1383,7 @@ EnsureItemAddedToWindowList	proc	near
 	segmov	ds, dgroup
 	tst	ds:[taskBarEnabled] ; if taskbar == on, ZF == 1
 	pop	ds
-	LONG	jz	done ; if ZF==0 skip the following code
+	LONG	jz done ; if ZF==0 skip the following code
 
 	mov	di, ds:[si]
 	add	di, ds:[di].Gen_offset
@@ -3664,13 +3664,13 @@ OLBaseWinDisplaySetNotMinimized	method dynamic OLBaseWinClass,
 	;
 	; if (not TOOL_AREA_IS_TASK_BAR)
 	;
-	; push	ds
-	; segmov	ds, dgroup
-	; tst	ds:[taskBarEnabled] ; if taskbar == on, ZF == 1
-	; pop	ds
-	; jnz	done ; if ZF==1 skip the following code
+	push	ds
+	segmov	ds, dgroup
+	tst	ds:[taskBarEnabled] ; if taskbar == on, ZF == 1
+	pop	ds
+	jnz	done ; if ZF==1 skip the following code
 
-	; call	OLBaseWinUpdateExpressToolArea
+	call	OLBaseWinUpdateExpressToolArea
 
 done:
 	ret
@@ -3784,6 +3784,7 @@ if PLACE_EXPRESS_MENU_ON_PRIMARY
 
 	;
 	; if (not TOOL_AREA_IS_TASK_BAR)
+	; RUNTIME
 	;
 	; push	ds
 	; segmov	ds, dgroup
@@ -3813,12 +3814,13 @@ if PLACE_EXPRESS_MENU_ON_PRIMARY ;and (not TOOL_AREA_IS_TASK_BAR)
 
 	;
 	; if (not TOOL_AREA_IS_TASK_BAR)
+	; RUNTIME
 	;
-	;push	ds
-	;segmov	ds, dgroup
-	;tst	ds:[taskBarEnabled] ; if taskbar == on, ZF == 1
-	;pop	ds
-	;jnz	hasTaskbar2 ; if ZF==1 skip the following code
+	; push	ds
+	; segmov	ds, dgroup
+	; tst	ds:[taskBarEnabled] ; if taskbar == on, ZF == 1
+	; pop	ds
+	; jnz	hasTaskbar2 ; if ZF==1 skip the following code
 
 	; Cheat -- instead of doing full geometry, just update
 	; OLWI_titleBarBounds to reflect the addition of the express tool area.
@@ -3863,6 +3865,7 @@ OLBaseWinGainedSystemTargetExcl	endp
 
 
 UpdateAppMenuItemCommon	proc	far
+
 	;
 	; if TOOL_AREA_IS_TASK_BAR
 	;
@@ -3935,6 +3938,7 @@ OLBaseWinHideExpressToolArea	proc	near
 
 	;
 	; if (not TOOL_AREA_IS_TASK_BAR)
+	; RUNTIME
 	;
 	; push	ds
 	; segmov	ds, dgroup
@@ -4002,12 +4006,13 @@ OLBaseWinAdjustTitleBoundsForExpressToolArea	proc	far
 
 	;
 	; if (not TOOL_AREA_IS_TASK_BAR)
+	; RUNTIME
 	;
-	;push	ds
-	;segmov	ds, dgroup
-	;tst	ds:[taskBarEnabled] ; if taskbar == on, ZF == 1
-	;pop	ds
-	;jnz	done ; if ZF==1 skip the following code
+	; push	ds
+	; segmov	ds, dgroup
+	; tst	ds:[taskBarEnabled] ; if taskbar == on, ZF == 1
+	; pop	ds
+	; jnz	done ; if ZF==1 skip the following code
 
 	; If doesn't have Express tool area, then nothing to adjust.
 	;
@@ -4097,12 +4102,13 @@ if PLACE_EXPRESS_MENU_ON_PRIMARY
 
 	;
 	; if (not TOOL_AREA_IS_TASK_BAR)
+	; RUNTIME
 	;
-	;push	ds
-	;segmov	ds, dgroup
-	;tst	ds:[taskBarEnabled] ; if taskbar == on, ZF == 1
-	;pop	ds
-	;jnz	afterExpressMenu ; if ZF==1 skip the following code
+	; push	ds
+	; segmov	ds, dgroup
+	; tst	ds:[taskBarEnabled] ; if taskbar == on, ZF == 1
+	; pop	ds
+	; jnz	afterExpressMenu ; if ZF==1 skip the following code
 
 	; Adjust left edge of title area
 	;
@@ -5131,6 +5137,7 @@ endif
 
 	;
 	; if (not TOOL_AREA_IS_TASK_BAR)
+	; RUNTIME
 	;
 	; push	ds
 	; segmov	ds, dgroup

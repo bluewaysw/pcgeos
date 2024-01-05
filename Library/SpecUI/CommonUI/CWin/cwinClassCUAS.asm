@@ -1682,8 +1682,10 @@ notSysMenuButton:
 afterAdjustment:
 endif
 
-	;Fairly bad hack to match menu bar height.  -cbh 5/12/92
-	;Must match similar hack in OLBaseWinUpdateExpressToolArea.
+	;
+	; Fairly bad hack to match menu bar height.  -cbh 5/12/92
+	; Must match similar hack in OLBaseWinUpdateExpressToolArea.
+	;
 
 	call	OpenWinCheckIfSquished		; running CGA?
 	jc	5$				; yes, skip this
