@@ -1,0 +1,285 @@
+/********************************************************************
+ *
+ * PROJECT:     Character Map
+ * MODULE:      Text Methods
+ * FILE:        text.goc
+ *
+ * AUTHOR:      Nathan Fiedler
+ *
+ * REVISION HISTORY:
+ *      Name    Date            Description
+ *      ----    ----            -----------
+ *      NF      9/30/96         Initial version
+ *	RainerB	11/11/2023	Add some new features, in particular 
+ *				allow different character box sizes.
+ *
+ * DESCRIPTION:
+ *      This file contains all the text object methods and functions
+ *      for the CMCharsToCopyText object. It handles the copying
+ *      of the text to the clipboard.
+ *
+ *******************************************************************/
+
+/********************************************************************
+ *              Headers
+ *******************************************************************/
+    @include <stdapp.goh>
+    @include "app.goh"
+    @include "global.goh"
+
+/********************************************************************
+ *              Local Function Definitions
+ *******************************************************************/
+
+/********************************************************************
+ *              CMGetCopyTextPointSize
+ ********************************************************************
+ * SYNOPSIS:     Read the point size from CMCharsToCopyText
+ * PARAMETERS:   void
+ * RETURNS:      point size
+ * SIDE EFFECTS: none
+ * STRATEGY:     
+ * REVISION HISTORY:
+ *      Name   	Date             Description
+ *      ----   	----             -----------
+ *	RainerB	11/11/2023	 Initial Version
+ *******************************************************************/
+int CMGetCopyTextPointSize(void) {
+	/*
+	 * Structures needed to find out text point size
+	 */
+    VisTextCharAttr charAttrs;
+    VisTextCharAttrDiffs diffs;
+    int ptSize;
+     
+    @call CMCharsToCopyText::MSG_VIS_TEXT_GET_CHAR_ATTR(0, &diffs, &charAttrs, 0xffff, 0);
+    ptSize = charAttrs.VTCA_pointSize.WBF_int;
+    
+    return ptSize;
+}
+
+
+
+/********************************************************************
+ *              CMSetCopyTextPointSize
+ ********************************************************************
+ * SYNOPSIS:     Set a point size for CMCharsToCopyText
+ * PARAMETERS:   
+ * RETURNS:      
+ * SIDE EFFECTS: none
+ * STRATEGY:     
+ * REVISION HISTORY:
+ *      Name   	Date		Description
+ *      ----   	---- 		-----------
+ *      RainerB	11/1/2023      Initial Version
+ *******************************************************************/
+void CMSetCopyTextPointSize(word size) {
+WWFixed	ptSize;
+
+    ptSize.WWF_int  = size;
+    ptSize.WWF_frac = 0;
+    
+    @send CMCharsToCopyText::MSG_VIS_TEXT_SET_POINT_SIZE(ptSize, TEXT_ADDRESS_PAST_END, 0);
+    @send CMCharsToCopyText::MSG_META_GRAB_TARGET_EXCL();
+}
+
+
+/********************************************************************
+ *              BuildTextTransferItem
+ ********************************************************************
+ * SYNOPSIS:     Build a CIF_TEXT transfer item for storage in the
+ *               clipboard.
+ * RETURN:       TransferBlockID of item to register with UI.
+ * SIDE EFFECTS: none
+ * STRATEGY:     Use the VisText object to create a VM file in the
+ *               clipboard format.
+ * REVISION HISTORY:
+ *      Name    Date            Description
+ *      ----    ----            -----------
+ *      brianc  7/91            Initial Revision
+ *	RainerB	11/11/2023	Add 'Copy always in 12pt' feature
+ *******************************************************************/
+TransferBlockID
+BuildTextTransferItem( MemHandle hmemText_p )
+  /*
+   * hmemText_p - Handle of block containing multi-line,
+   *              null-terminated text. (in)
+   */
+{
+      /*
+       * hfilTransfer    - VM file for text transfer.
+       * odText          - New text object in VM file.
+       * hvmTransferItem - The transfer item.
+       */
+    VMFileHandle  hfilTransfer;
+    optr          odText;
+    VMBlockHandle hvmTransferItem;
+    FontID        fid;
+    WWFixed	  ptSize = {0, 0};
+
+      /*
+       * Create a temporary text object to build CIF_TEXT
+       * data block.
+       * Set the text in the text object (we have the
+       * null-terminated text in hmemText_p).
+       */
+EC( ECCheckMemHandle( hmemText_p ); )
+    hfilTransfer = ClipboardGetClipboardFile();
+EC( ECVMCheckVMFile( hfilTransfer ); )
+    odText = TextAllocClipboardObject( hfilTransfer,
+    	VTSF_MULTIPLE_CHAR_ATTRS, /* if you want to transfer Font info, etc. */
+    	0 );
+EC( ECCheckLMemOD( odText ); )
+
+	/*
+	 * Set text, font ID and point size for text to copy.
+	 */
+    @call odText::MSG_VIS_TEXT_REPLACE_ALL_BLOCK( hmemText_p, 0 );
+    fid = @call CMMap::MSG_CM_MAP_GET_CUR_FONT();
+    @call odText::MSG_VIS_TEXT_SET_FONT_ID(fid, TEXT_ADDRESS_PAST_END, 0);
+    
+    if (settings_g & CHARM_COPY_ALWAYS_12PT) {
+    	ptSize.WWF_int = 12;
+    } else {
+    	ptSize.WWF_int = CMGetCopyTextPointSize();
+    }
+    @call odText::MSG_VIS_TEXT_SET_POINT_SIZE(ptSize, TEXT_ADDRESS_PAST_END, 0);    
+    
+      /*
+       * Tell the text object that we are done with it. It will
+       * destroy itself after it has converted all its text into
+       * a transfer item with just one format:
+       * MANUFACTURER_ID_GEOWORKS::CIF_TEXT. It returns us the
+       * VM block handle of the item.
+       */
+    hvmTransferItem = TextFinishWithClipboardObject(
+                          odText,
+                          TCO_RETURN_TRANSFER_ITEM,
+                          HandleToOptr( GeodeGetProcessHandle() ),
+                          "Charm text" );
+EC( ECVMCheckVMBlockHandle( hfilTransfer, hvmTransferItem ); )
+
+      /*
+       * While we've got the clipboard file so conveniently
+       * stored away, merge it with the VM block handle of the
+       * item to form the 32-bit ID ClipboardRegisterItem uses,
+       * returning that ID.
+       */
+    return( BlockIDFromFileAndBlock( hfilTransfer, hvmTransferItem ) );
+} /* BuildTextTransferItem */
+
+
+/********************************************************************
+ *              Global Function Definitions
+ *******************************************************************/
+
+/********************************************************************
+ *              CopyCommon
+ ********************************************************************
+ * SYNOPSIS:     Common code to store the current item in the
+ *               clipboard, as either the normal transfer item
+ *               or the quick transfer item.
+ * RETURN:       TRUE if successful
+ * SIDE EFFECTS: The indicated transfer item is replaced with one
+ *               manufactured from our text block, if we've got one.
+ * STRATEGY:     Call BuildTextTransferItem to convert our text block
+ *               to a transfer item in the clipboard, then register
+ *               that item as the appropriate transfer item.
+ * REVISION HISTORY:
+ *      Name    Date            Description
+ *      ----    ----            -----------
+ *      brianc  7/91            Initial Revision
+ *******************************************************************/
+Boolean
+CopyCommon( ClipboardItemFlags transferFlags_p,
+            MemHandle          hmemText_p )
+  /*
+   * transferFlags_p - Which item should it become, quick or normal?
+   * hmemText_p        - Text block to copy.
+   */
+{
+      /*
+       * transferItem - Temporary transfer item.
+       */
+    TransferBlockID transferItem;
+
+      /*
+       * Build us a transfer item from the text.
+       * Then place it as the designated item, returning the
+       * success or failure of ClipboardRegisterItem.
+       * If no text to copy, return false.
+       */
+EC( ECCheckMemHandle( hmemText_p ); )
+    transferItem = BuildTextTransferItem( hmemText_p );
+    return( ClipboardRegisterItem( transferItem, transferFlags_p ) );
+} /* CopyCommon */
+
+
+/********************************************************************
+ *              Code for CMTextClass
+ *******************************************************************/
+
+/********************************************************************
+ *              MSG_VIS_TEXT_SET_FONT_ID
+ ********************************************************************
+ * SYNOPSIS:     Someone wants us to change are font. We're going
+ *               to relay a message to the map object, as well.
+ * PARAMETERS:   FontID fid
+ *               dword  rangeEnd
+ *               dword  rangeStart
+ * RETURNS:      void
+ * SIDE EFFECTS: none
+ * STRATEGY:     Call the superclass. Relay a message to the map
+ *               object so it can change its font, too.
+ * REVISION HISTORY:
+ *      Name   Date             Description
+ *      ----   ----             -----------
+ *      NF     9/30/96          Initial Version
+ *******************************************************************/
+@extern method CMTextClass, MSG_VIS_TEXT_SET_FONT_ID {
+
+    @send self::MSG_VIS_TEXT_SELECT_ALL();
+    @callsuper();
+
+    @send CMMap::MSG_CM_MAP_CHANGE_FONT( fid );
+} /* MSG_VIS_TEXT_SET_FONT_ID */
+
+/********************************************************************
+ *              MSG_CM_TEXT_COPY_TEXT
+ ********************************************************************
+ * SYNOPSIS:     User wants to copy the text in the CMCharsToCopyText
+ *               object to the clipboard.
+ * PARAMETERS:   void
+ * RETURNS:      void
+ * SIDE EFFECTS: none
+ * STRATEGY:     Grab the text from the CMCharsToCopyText into a
+ *               block and send that to the copy routine. It will
+ *               make a clipboard item out of it. 
+ *		 If appropriate, set the point size temporary to 12 point.
+ * REVISION HISTORY:
+ *      Name   	Date             Description
+ *      ----   	----             -----------
+ *      NF     	10/14/96         Initial Version
+ *	RainerB	11/11/2023	 Add 'Copy always in 12pt' feature
+ *******************************************************************/
+@extern method CMTextClass, MSG_CM_TEXT_COPY_TEXT {
+
+    int ptSize;
+
+    if (settings_g & CHARM_COPY_ALWAYS_12PT) {
+    	/* Find out current point size an set it to 12 point */
+    	ptSize = CMGetCopyTextPointSize();
+    	CMSetCopyTextPointSize(12);
+    }
+
+    @send CMCharsToCopyText::MSG_VIS_TEXT_SELECT_ALL();
+    @send CMCharsToCopyText::MSG_META_CLIPBOARD_COPY();
+    @send CMCharsToCopyText::MSG_VIS_TEXT_SELECT_END();
+    
+    if (settings_g & CHARM_COPY_ALWAYS_12PT) {
+    	/* reset to old size */
+    	CMSetCopyTextPointSize(ptSize);
+    }
+
+} /* MSG_CM_TEXT_COPY_TEXT */
+

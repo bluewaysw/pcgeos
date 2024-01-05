@@ -1,0 +1,1883 @@
+/***********************************************************************
+ *
+ *
+ * PROJECT:	Breadbox Gourmet
+ * FILE:	rboxui.goc     
+ * AUTHOR:	John F. Howard    12/95
+ *
+ * DESCRIPTION:
+ *	This is the UI code for the Gourmet application.
+ *
+ * WHATS NEW:
+ *      Release V1.0
+ *      Added stick to units
+ *      Added Pot Pourri to category
+ *      Inc servings limit to 100
+ *      Added (s) to unit(s)
+ *      Ingred cursor to quant vs name
+ *      
+ *      
+ *
+ *
+ ***********************************************************************/
+
+/*
+ ***************************************************************************
+ *		Include files
+ ***************************************************************************
+ */
+
+@include "rbox.goh"
+@include "rba_icon.goh"
+@include "rbd_icon.goh"
+//@include "bbtest.goh"
+
+/*
+ ***************************************************************************
+ *		Strings
+ ***************************************************************************
+ */
+
+@start Strings, data;
+@chunk char  canrec[] = "Are you sure you want to Cancel this Recipe?";
+@chunk char  chaing[] = "Are you sure you want to change this Ingredient?";
+@chunk char  deling[] = "Are you sure you want to Delete this Ingredient?";
+@chunk char  charec[] = "Are you sure you want to modify this Recipe?";
+@chunk char  delrec[] = "Are you sure you want to Delete this Recipe?";
+@chunk char  addrec[] = "Are you sure you want to add \001 to the file?";
+@end Strings;
+
+/*
+ ***************************************************************************
+ *		Class & Method Declarations
+ ***************************************************************************
+ */
+
+/* The Content & VLTextClass have to be defined here to avoid a
+   glue error.  And all the objects and methods of these two
+   classes have to be in the same source file!!*/
+
+/* This does the initialization work for the text object */
+@class RBoxContentClass, GenContentClass;
+@endc
+@classdecl	RBoxContentClass;
+
+/* This is needed to intercept and initialize for LargeText model
+ * and for printing   */
+@class RBoxVLTextClass, VisLargeTextClass;
+@endc
+@classdecl	RBoxVLTextClass;
+
+@classdecl	RBoxProcessClass, neverSaved ;
+/* since the classes are declared above and their methods are
+ * in separate .goc files methods must be extern'd here. */
+
+/* methods in the doc methods .goc file*/
+@extern method RBoxProcessClass, MSG_META_DOC_OUTPUT_INITIALIZE_DOCUMENT_FILE;
+@extern method RBoxProcessClass, MSG_META_DOC_OUTPUT_ATTACH_UI_TO_DOCUMENT;
+@extern method RBoxProcessClass, MSG_META_DOC_OUTPUT_DETACH_UI_FROM_DOCUMENT;
+@extern method RBoxProcessClass, MSG_META_DOC_OUTPUT_SAVE_AS_COMPLETED;
+@extern method RBoxProcessClass, MSG_GEN_PROCESS_OPEN_APPLICATION;
+@extern method RBoxProcessClass, MSG_SYST_ILIST_APPLY;
+@extern method RBoxProcessClass, MSG_POINT_SIZE_APPLY;
+@extern method RBoxProcessClass, MSG_SAVE_MEAS_OPTS;
+@extern method RBoxProcessClass, MSG_GEN_PROCESS_INSTALL_TOKEN;
+@extern method RBoxProcessClass, MSG_GOURMET_SCREEN;
+
+/* methods in the create and select methods .goc file */
+@extern method RBoxProcessClass, MSG_OPEN_CREATE_RECIPE;
+@extern method RBoxProcessClass, MSG_OPEN_SELECT_RECIPE;
+@extern method RBoxProcessClass, MSG_ENTER_RECIPE;
+@extern method RBoxProcessClass, MSG_CANCEL_RECIPE;
+@extern method RBoxProcessClass, MSG_DELETE_RECIPE;
+@extern method RBoxProcessClass, MSG_CANCEL_SELECT;
+@extern method RBoxProcessClass, MSG_CREATE_RECIPE;
+@extern method RBoxProcessClass, MSG_MODIFY_RECIPE;
+@extern method RBoxProcessClass, MSG_DISPLAY_RECIPE;
+@extern method RBoxProcessClass, MSG_SELECT_MODIFY_RECIPE;
+@extern method RBoxProcessClass, MSG_CANCEL_MODIFY_RECIPE;
+@extern method RBoxProcessClass, MSG_ADD_INGRED;
+@extern method RBoxProcessClass, MSG_EDIT_INGRED;
+@extern method RBoxProcessClass, MSG_DELETE_INGRED;
+@extern method RBoxProcessClass, MSG_RECIPE_DLIST_MONIKER_QUERY;
+@extern method RBoxProcessClass, MSG_INGRED_DLIST_MONIKER_QUERY;
+@extern method RBoxProcessClass, MSG_RECIPE_DLIST_APPLY;
+@extern method RBoxProcessClass, MSG_INGRED_DLIST_APPLY;
+@extern method RBoxProcessClass, MSG_CAT_ILIST_APPLY;
+
+/* methods in the servings methods .goc file*/
+@extern method RBoxProcessClass, MSG_INGRED_TO_ARRAY;
+@extern method RBoxProcessClass, MSG_RECALC_SERVINGS;
+
+/* methods in the list methods .goc file*/
+@extern method RBoxProcessClass, MSG_ADD_TO_LIST;
+@extern method RBoxProcessClass, MSG_DISPLAY_SHOPPING_LIST;
+@extern method RBoxProcessClass, MSG_CLEAR_SHOPPING_LIST;
+@extern method RBoxProcessClass, MSG_COPY_RECIPE;
+@extern method RBoxProcessClass, MSG_PASTE_RECIPE;
+
+/*
+ ***************************************************************************
+ *		UI Objects
+ ***************************************************************************
+ */
+
+@start  AppResource;
+@object GenApplicationClass RBoxApp = {
+    GI_visMoniker = list {
+	 @RBoxTextMoniker,
+	 @RBLCAppMoniker,     /* color VGA */
+	 @RBLMAppMoniker,     /* mono VGA */
+	 @RBTinyAppMoniker
+	 }
+
+    GI_comp = @RBoxPrimary;
+    gcnList(MANUFACTURER_ID_GEOWORKS,GAGCNLT_WINDOWS) = @RBoxPrimary;
+    gcnList(MANUFACTURER_ID_GEOWORKS,MGCNLT_ACTIVE_LIST) = @RBoxDocumentControl;
+    gcnList(MANUFACTURER_ID_GEOWORKS,MGCNLT_APP_STARTUP) = @RBoxDocumentControl;
+    gcnList(MANUFACTURER_ID_GEOWORKS,GAGCNLT_SELF_LOAD_OPTIONS) =
+			 @RBoxDocumentControl, @RBPrintControl,
+			 @TextSizeControl;
+
+    ATTR_GEN_APPLICATION_PRINT_CONTROL = @RBPrintControl;
+
+}
+
+@visMoniker RBoxTextMoniker = "Gourmet";
+
+@end AppResource
+
+
+@start	Interface;
+@object GenPrimaryClass RBoxPrimary = {
+    GI_comp = @RBFileMenu, @OptionsMenu, @RecipeMenu, @SListMenu,
+	      @MeasuresMenu, @TextGroup, @RBoxDialogs;
+    ATTR_GEN_HELP_CONTEXT = "TOC";    /* the help file Entry Point */
+}
+
+@object GenInteractionClass TextGroup = {
+    GI_comp = @TextView, @TextButtons;
+    HINT_EXPAND_WIDTH_TO_FIT_PARENT ;
+    HINT_EXPAND_HEIGHT_TO_FIT_PARENT ;
+    HINT_ORIENT_CHILDREN_VERTICALLY;
+}
+
+@object GenViewClass TextView = {
+    GVI_vertAttrs  = @default | GVDA_SCROLLABLE;
+    GVI_attrs = @default | GVA_DRAG_SCROLLING
+	    	    	 | GVA_WINDOW_COORDINATE_MOUSE_EVENTS
+			 | GVA_DONT_SEND_KBD_RELEASES | GVA_FOCUSABLE;
+    GVI_content = @TextContent;
+    HINT_DEFAULT_FOCUS;
+    ATTR_GEN_VIEW_DOES_NOT_ACCEPT_TEXT_INPUT;
+}
+
+@object RBoxContentClass TextContent = {
+    GCI_genView = @TextView;
+    GCI_attrs = @default | VCNA_LARGE_DOCUMENT_MODEL
+	    	    	 | VCNA_WINDOW_COORDINATE_MOUSE_EVENTS
+		    	 | VCNA_SAME_WIDTH_AS_VIEW;
+}
+
+@object RBoxVLTextClass TextWindow = {
+    VTI_state = @default | VTS_SELECTABLE
+			 | VTS_EDITABLE
+			 | VTS_TARGETABLE;
+    VTI_output = process;
+    VLTI_displayMode = VLTDM_DRAFT_WITH_STYLES;
+    VLTI_attrs = VLTA_EXACT_HEIGHT;
+    VLTI_regionArray = @RBVLTextRegionArray;
+    VTI_charAttrRuns = ((VTDS_10 << VTDCA_SIZE_OFFSET) || VTDF_BERKELEY);
+}
+
+@chunk ChunkArrayHeader RBVLTextRegionArray = {
+    0,
+    sizeof(VisLargeTextRegionArrayElement),
+    0,
+    sizeof(ChunkArrayHeader)
+};
+
+@chunk VisTextCharAttr RBIntroCharAttrs =
+	CHAR_ATTR_STYLE_FONT_SIZE_STYLE_COLOR(
+	     2, CA_NULL_ELEMENT, FID_DTC_URW_SANS, 48, 0, C_BLUE);
+
+@chunk VisTextCharAttr RBTextCharAttrs =
+	CHAR_ATTR_STYLE_FONT_SIZE_STYLE_COLOR(
+	     2, CA_NULL_ELEMENT, FID_BERKELEY, 10, 0, C_BLACK);
+
+@object GenInteractionClass TextButtons = {
+    GI_comp = @TextSizeControl, @ServingsRecalcBox, @ShopList;
+    HINT_EXPAND_WIDTH_TO_FIT_PARENT ;
+    HINT_ORIENT_CHILDREN_HORIZONTALLY;
+    HINT_CENTER_CHILDREN_VERTICALLY;
+    HINT_CENTER_CHILDREN_HORIZONTALLY;
+    HINT_FULL_JUSTIFY_CHILDREN_HORIZONTALLY;
+    HINT_INCLUDE_ENDS_IN_CHILD_SPACING;
+}
+
+@object GenItemGroupClass TextSizeControl = {
+    GI_visMoniker = "Text Size:";
+    GI_comp = @Ten, @Twelve, @Fourteen;
+    GIGI_applyMsg = MSG_POINT_SIZE_APPLY;
+    GIGI_selection = TEN;
+    GIGI_destination = process;
+    HINT_ITEM_GROUP_MINIMIZE_SIZE;
+    HINT_ITEM_GROUP_DISPLAY_CURRENT_SELECTION;
+}
+
+@object GenItemClass Ten = {
+    GI_visMoniker = "10 point";
+    GII_identifier = TEN;
+}
+
+@object GenItemClass Twelve = {
+    GI_visMoniker = "12 point";
+    GII_identifier = TWL;
+}
+
+@object GenItemClass Fourteen = {
+    GI_visMoniker = "14 point";
+    GII_identifier = FRT;
+}
+
+@object GenInteractionClass ServingsRecalcBox = {
+    GI_comp = @ServingsRecalcValue, @RecalcApply;
+    GI_states = @default & ~ GS_ENABLED;
+    HINT_DRAW_IN_BOX;
+    HINT_ORIENT_CHILDREN_HORIZONTALLY;
+    HINT_CENTER_CHILDREN_VERTICALLY;
+    HINT_FULL_JUSTIFY_CHILDREN_HORIZONTALLY;
+    HINT_INCLUDE_ENDS_IN_CHILD_SPACING;
+}
+
+@object GenValueClass ServingsRecalcValue = {
+    GI_visMoniker = "Servings:";
+    GVLI_minimum = MakeWWFixed(1.0);
+    GVLI_maximum = MakeWWFixed(100.0);
+    GVLI_value = MakeWWFixed(4.0);
+}
+
+@object GenTriggerClass RecalcApply = {
+    GI_visMoniker = "Recalculate";
+    GTI_destination = process ;
+    GTI_actionMsg = MSG_RECALC_SERVINGS;
+}
+
+@object GenInteractionClass ShopList = {
+    GI_visMoniker = "Shopping List";
+    GI_comp = @ListButton;
+    HINT_PLACE_MONIKER_TO_RIGHT;
+}
+
+@object GenTriggerClass ListButton = {
+    GI_states = @default & ~GS_ENABLED;
+    GI_visMoniker = "Add to";
+    GTI_destination = process ;
+    GTI_actionMsg = MSG_ADD_TO_LIST;
+}
+
+@end Interface;
+
+
+@start Menu;
+
+@object GenInteractionClass RBFileMenu = {
+    GI_comp = @RBoxDocumentControl, @RBPrintControl;
+    GII_visibility = GIV_POPUP;
+    ATTR_GEN_INTERACTION_GROUP_TYPE = (GIGT_FILE_MENU);
+}
+
+@object GenDocumentControlClass RBoxDocumentControl = {
+    GDCI_features = @default & ~GDCF_SUPPORTS_TEMPLATES;
+    GDCI_documentToken = {"BGd1", 16431};
+    GDCI_noNameText = "No Recipe File";
+    GDCI_dialogNewText = "New:\rCreate a new, empty Recipe File";
+    GDCI_dialogOpenText = "Open:\rOpen an existing Recipe File";
+    GDCI_documentGroup = RBoxDocumentGroup;
+}
+
+@object PrintControlClass RBPrintControl = {
+    GI_states = (@default | GS_ENABLED);
+    PCI_attrs = (@default & ~ PCA_PAGE_CONTROLS
+			  | PCA_MARK_APP_BUSY);
+    PCI_output = @TextWindow;
+    PCI_docNameOutput = @RBoxDocumentGroup;
+    PCI_docSizeInfo   = {(6.5*72),   /* width less margins */
+			 (9*72),    /* height less margins */
+			 PT_PAPER,    /* layout */
+			 {(1*72), (1)*72, (1)*72, (1)*72}}; /* L,T,R,B margins */
+    ATTR_GEN_INTERACTION_GROUP_TYPE = GIGT_PRINT_GROUP;
+}
+
+@object GenInteractionClass OptionsMenu = {
+    GI_visMoniker = 'O', "Options";
+    GI_comp = @MeasSystem, @SaveOpts;
+    GII_visibility = GIV_POPUP;
+}
+
+@object GenInteractionClass MeasSystem = {
+    GI_visMoniker = "Measurement System";
+    GI_comp = @SystMenuList;
+    GII_visibility = GIV_SUB_GROUP;
+    GII_type = GIT_PROPERTIES;
+}
+
+@object GenItemGroupClass SystMenuList = {
+    GI_comp = @SysUS, @SysMetric;
+    GIGI_destination = process;
+    GIGI_applyMsg = MSG_SYST_ILIST_APPLY;
+}
+
+@object GenItemClass SysUS = {
+    GI_visMoniker = "U. S.";
+    GII_identifier = USA;
+}
+
+@object GenItemClass SysMetric = {
+    GI_visMoniker = "Metric";
+    GII_identifier = MET;
+}
+
+@object GenTriggerClass SaveOpts = {
+    GI_visMoniker = 'S', "Save Options";
+    GTI_destination = process ;
+    GTI_actionMsg = MSG_SAVE_MEAS_OPTS;
+}
+
+@object GenInteractionClass RecipeMenu = {
+    GI_visMoniker = 'R', "Recipe";
+    GI_comp = @CreateMenuTrigger, @PasteMenuTrigger, @SelectSubGroup;
+    GII_visibility = GIV_POPUP;
+}
+
+@object GenTriggerClass CreateMenuTrigger = {
+    GI_visMoniker = 'R', "Create a Recipe";
+    GTI_destination = process ;
+    GTI_actionMsg = MSG_OPEN_CREATE_RECIPE ;
+}
+
+@object GenTriggerClass PasteMenuTrigger = {
+    GI_visMoniker = 'P', "Paste a Recipe";
+    GTI_destination = process ;
+    GTI_actionMsg = MSG_PASTE_RECIPE ;
+}
+
+@object GenInteractionClass SelectSubGroup = {
+    GI_visMoniker = "Select Options";
+    GI_comp = @SelectByName, @SelectByCat;
+    GII_visibility = GIV_SUB_GROUP;
+}
+
+@object GenTriggerClass SelectByName = {
+    GI_visMoniker = 'N', "Select by Recipe Name";
+    GTI_destination = process ;
+    GTI_actionMsg = MSG_OPEN_SELECT_RECIPE;
+    ATTR_GEN_TRIGGER_ACTION_DATA = 0;
+}
+
+@object GenInteractionClass SelectByCat = {
+    GI_visMoniker = 'C', "Select by Recipe Category";
+    GI_comp = @CatMenuList;
+    GII_visibility = GIV_POPUP;
+    GII_type = GIT_PROPERTIES;
+}
+
+@object GenItemGroupClass CatMenuList = {
+    GI_comp = @MAppetizers, @MBeverages, @MBreads,
+	      @MCandies, @MDesserts, @MEggs, @MFish,
+	      @MFruitsVegs, @MMeats, @MPasta, @MPoultry,
+	      @MSalads, @MSauces, @MSoups, @MPotP;
+    GIGI_behaviorType = GIGBT_EXCLUSIVE_NONE;
+    GIGI_destination = process;
+    GIGI_applyMsg = MSG_CAT_ILIST_APPLY;
+}
+
+@object GenItemClass MAppetizers = {
+    GI_visMoniker = "Appetizers";
+    GII_identifier = APTZ;
+}
+
+@object GenItemClass MBeverages = {
+    GI_visMoniker = "Beverages";
+    GII_identifier = BEVG;
+}
+
+@object GenItemClass MBreads = {
+    GI_visMoniker = "Breads";
+    GII_identifier = BRED;
+}
+
+@object GenItemClass MCandies = {
+    GI_visMoniker = "Candies";
+    GII_identifier = CNDY;
+}
+
+@object GenItemClass MDesserts = {
+    GI_visMoniker = "Desserts";
+    GII_identifier = DSRT;
+}
+
+@object GenItemClass MEggs = {
+    GI_visMoniker = "Eggs";
+    GII_identifier = EGGS;
+}
+
+@object GenItemClass MFish = {
+    GI_visMoniker = "Fish";
+    GII_identifier = FISH;
+}
+
+@object GenItemClass MFruitsVegs = {
+    GI_visMoniker = "Fruits & Vegetables";
+    GII_identifier = FRVG;
+}
+
+@object GenItemClass MMeats = {
+    GI_visMoniker = "Meats";
+    GII_identifier = MEAT;
+}
+
+@object GenItemClass MPoultry = {
+    GI_visMoniker = "Poultry";
+    GII_identifier = PLTY;
+}
+
+@object GenItemClass MPasta = {
+    GI_visMoniker = "Pasta";
+    GII_identifier = PSTA;
+}
+
+@object GenItemClass MSalads = {
+    GI_visMoniker = "Salads";
+    GII_identifier = SALD;
+}
+
+@object GenItemClass MSauces = {
+    GI_visMoniker = "Sauces";
+    GII_identifier = SAUC;
+}
+
+@object GenItemClass MSoups = {
+    GI_visMoniker = "Soups";
+    GII_identifier = SOUP;
+}
+
+@object GenItemClass MPotP = {
+    GI_visMoniker = "Pot Pourri";
+    GII_identifier = POTP;
+}
+
+@object GenInteractionClass SListMenu = {
+    GI_states = @default & ~GS_ENABLED;  /* disabled until there is a list */
+    GI_visMoniker = 'S', "Shopping List";
+    GI_comp = @NameListTrigger, @IngredListTrigger,
+	      @ClearListTrigger;
+    GII_visibility = GIV_POPUP;
+}
+
+@object GenTriggerClass NameListTrigger = {
+    GI_visMoniker = 'R', "Display Recipe Names Only";
+    GTI_destination = process ;
+    GTI_actionMsg = MSG_DISPLAY_SHOPPING_LIST ;
+    ATTR_GEN_TRIGGER_ACTION_DATA = 0;
+}
+
+@object GenTriggerClass IngredListTrigger = {
+    GI_visMoniker = 'F', "Display Full List";
+    GTI_destination = process ;
+    GTI_actionMsg = MSG_DISPLAY_SHOPPING_LIST ;
+    ATTR_GEN_TRIGGER_ACTION_DATA = 1;
+}
+
+@object GenTriggerClass ClearListTrigger = {
+    GI_visMoniker = 'C', "Clear Shopping List";
+    GTI_destination = process ;
+    GTI_actionMsg = MSG_CLEAR_SHOPPING_LIST ;
+}
+
+@object GenInteractionClass MeasuresMenu = {
+    GI_visMoniker = 'M', "Measures";
+    GI_comp = @USMeasuresBox, @MetMeasuresBox, @ConvertsBox;
+    GII_visibility = GIV_POPUP;
+}
+
+@object GenInteractionClass USMeasuresBox = {
+    GI_visMoniker = 'U', "U. S. Measures";
+    GI_comp = @Meas1Glyph, @Meas2Glyph, @Meas3Glyph,
+	      @Meas4Glyph, @Meas5Glyph, @Meas6Glyph,
+	      @Meas7Glyph, @Meas8Glyph, @Meas9Glyph,
+	      @Meas10Glyph, @Meas11Glyph, @Meas12Glyph,
+	      @Meas13Glyph, @Meas14Glyph;
+    GII_visibility = GIV_DIALOG;
+    HINT_ORIENT_CHILDREN_VERTICALLY;
+}
+
+@object GenGlyphClass Meas1Glyph = {
+    GI_visMoniker = " 3 tsp = 1 tbsp ";
+    HINT_CENTER_MONIKER;
+}
+
+@object GenGlyphClass Meas2Glyph = {
+    GI_visMoniker = " 2 tbsp = 1 floz ";
+    HINT_CENTER_MONIKER;
+}
+
+@object GenGlyphClass Meas3Glyph = {
+    GI_visMoniker = " 4 tbsp = 1/4 cup ";
+    HINT_CENTER_MONIKER;
+}
+
+@object GenGlyphClass Meas4Glyph = {
+    GI_visMoniker = " 5 1/3 tbsp = 1/3 cup ";
+    HINT_CENTER_MONIKER;
+}
+
+@object GenGlyphClass Meas5Glyph = {
+    GI_visMoniker = " 8 tbsp = 1/2 cup ";
+    HINT_CENTER_MONIKER;
+}
+
+@object GenGlyphClass Meas6Glyph = {
+    GI_visMoniker = " 10 2/3 tbsp= 2/3 cup ";
+    HINT_CENTER_MONIKER;
+}
+
+@object GenGlyphClass Meas7Glyph = {
+    GI_visMoniker = " 12 tbsp = 3/4 cup ";
+    HINT_CENTER_MONIKER;
+}
+
+@object GenGlyphClass Meas8Glyph = {
+    GI_visMoniker = " 16 tbsp = 1 cup ";
+    HINT_CENTER_MONIKER;
+}
+
+@object GenGlyphClass Meas9Glyph = {
+    GI_visMoniker = " 1 cup = 8 floz ";
+    HINT_CENTER_MONIKER;
+}
+
+@object GenGlyphClass Meas10Glyph = {
+    GI_visMoniker = " 1 cup = 1/2 pint ";
+    HINT_CENTER_MONIKER;
+}
+
+@object GenGlyphClass Meas11Glyph = {
+    GI_visMoniker = " 2 cups = 1 pint ";
+    HINT_CENTER_MONIKER;
+}
+
+@object GenGlyphClass Meas12Glyph = {
+    GI_visMoniker = " 4 cups = 1 qt ";
+    HINT_CENTER_MONIKER;
+}
+
+@object GenGlyphClass Meas13Glyph = {
+    GI_visMoniker = " 4 qts = 1 gal ";
+    HINT_CENTER_MONIKER;
+}
+
+@object GenGlyphClass Meas14Glyph = {
+    GI_visMoniker = " 16 oz = 1 lb ";
+    HINT_CENTER_MONIKER;
+}
+
+@object GenInteractionClass MetMeasuresBox = {
+    GI_visMoniker = 'M', "Metric Measures";
+    GI_comp = @MMeas1Glyph, @MMeas2Glyph, @MMeas3Glyph,
+	      @MMeas4Glyph, @MMeas5Glyph, @MMeas6Glyph,
+	      @MMeas7Glyph;
+    GII_visibility = GIV_DIALOG;
+    HINT_POSITION_WINDOW_AT_RATIO_OF_PARENT = {
+	SWSS_RATIO | PCT_15, SWSS_RATIO | PCT_40};
+    HINT_ORIENT_CHILDREN_VERTICALLY;
+}
+
+@object GenGlyphClass MMeas1Glyph = {
+    GI_visMoniker = " 3 tsp = 1 tbsp ";
+    HINT_CENTER_MONIKER;
+}
+
+@object GenGlyphClass MMeas2Glyph = {
+    GI_visMoniker = " 8 tbsp = 1/2 cup ";
+    HINT_CENTER_MONIKER;
+}
+
+@object GenGlyphClass MMeas3Glyph = {
+    GI_visMoniker = " 16 tbsp = 1 cup ";
+    HINT_CENTER_MONIKER;
+}
+
+@object GenGlyphClass MMeas4Glyph = {
+    GI_visMoniker = " 1 cc = 1 ml ";
+    HINT_CENTER_MONIKER;
+}
+
+@object GenGlyphClass MMeas5Glyph = {
+    GI_visMoniker = " 100 cc = 1 dl ";
+    HINT_CENTER_MONIKER;
+}
+
+@object GenGlyphClass MMeas6Glyph = {
+    GI_visMoniker = " 1000 cc = 1 liter ";
+    HINT_CENTER_MONIKER;
+}
+
+@object GenGlyphClass MMeas7Glyph = {
+    GI_visMoniker = " 1000 grams = 1 kg ";
+    HINT_CENTER_MONIKER;
+}
+
+@object GenInteractionClass ConvertsBox = {
+    GI_visMoniker = 'C', "Conversions";
+    GI_comp = @Conv1Glyph, @Conv2Glyph, @Conv3Glyph,
+	      @Conv4Glyph, @Conv5Glyph, @Conv6Glyph,
+	      @Conv7Glyph, @Conv8Glyph, @Conv9Glyph,
+	      @Conv10Glyph, @Conv11Glyph, @Conv12Glyph,
+	      @Conv13Glyph;
+    GII_visibility = GIV_DIALOG;
+    HINT_POSITION_WINDOW_AT_RATIO_OF_PARENT = {
+	SWSS_RATIO | PCT_60, SWSS_RATIO | PCT_30};
+    HINT_ORIENT_CHILDREN_VERTICALLY;
+}
+
+@object GenGlyphClass Conv1Glyph = {
+    GI_visMoniker = " 1 tsp = 5 ml ";
+    HINT_CENTER_MONIKER;
+}
+
+@object GenGlyphClass Conv2Glyph = {
+    GI_visMoniker = " 1 tbsp = 15 ml ";
+    HINT_CENTER_MONIKER;
+}
+
+@object GenGlyphClass Conv3Glyph = {
+    GI_visMoniker = " 1 cup = 240 ml ";
+    HINT_CENTER_MONIKER;
+}
+
+@object GenGlyphClass Conv4Glyph = {
+    GI_visMoniker = " 1 pint = 473 ml ";
+    HINT_CENTER_MONIKER;
+}
+
+@object GenGlyphClass Conv5Glyph = {
+    GI_visMoniker = " 1 qt = 946 ml ";
+    HINT_CENTER_MONIKER;
+}
+
+@object GenGlyphClass Conv6Glyph = {
+    GI_visMoniker = " 1 gal = 3.785 l ";
+    HINT_CENTER_MONIKER;
+}
+
+@object GenGlyphClass Conv7Glyph = {
+    GI_visMoniker = " 1 l = 1.05 qt ";
+    HINT_CENTER_MONIKER;
+}
+
+@object GenGlyphClass Conv8Glyph = {
+    GI_visMoniker = " 1 l = .264 gal ";
+    HINT_CENTER_MONIKER;
+}
+
+@object GenGlyphClass Conv9Glyph = {
+    GI_visMoniker = " 1 oz = 28 grams ";
+    HINT_CENTER_MONIKER;
+}
+
+@object GenGlyphClass Conv10Glyph = {
+    GI_visMoniker = " 1 lb = 454 grams ";
+    HINT_CENTER_MONIKER;
+}
+
+@object GenGlyphClass Conv11Glyph = {
+    GI_visMoniker = " 1 kilo = 2.2 lbs ";
+    HINT_CENTER_MONIKER;
+}
+
+@object GenGlyphClass Conv12Glyph = {
+    GI_visMoniker = " Celsius = 5/9(F-32) ";
+    HINT_CENTER_MONIKER;
+}
+
+@object GenGlyphClass Conv13Glyph = {
+    GI_visMoniker = " Fahrenheit = 9/5C + 32 ";
+    HINT_CENTER_MONIKER;
+}
+
+@end Menu;
+
+@start DocumentUI;
+@object GenDocumentGroupClass RBoxDocumentGroup ={
+    GDGI_untitledName = "Recipe Box untitled";
+    GDGI_protocolMajor = 1;
+    GDGI_protocolMinor = 0;
+    GDGI_output = process;
+    GDGI_documentControl = RBoxDocumentControl;
+}
+@end DocumentUI;
+
+@start Interface;
+
+/*---------------------------------------------------------------------*/
+/* Since we have dialogs that are not DIRECTLY placed in the UI, */
+/* we have to attach them somewhere.  This fake section of the UI */
+/* links the dialogs to the tree, but does not build (nor give the user */
+/* a way to react with them).  Only a GEN_INTERACTION_INITIATE message */
+/* will pull them up.   Add any other dialogs that are not directly USER */
+/* initiated to this list. */
+
+@object GenInteractionClass RBoxDialogs = {
+    GI_comp = @CreateDialogBoxGroup, @SelectDialogBoxGroup;
+    GII_type = GIT_ORGANIZATIONAL;
+    GII_visibility = GIV_DIALOG;
+    GII_attrs = @default | GIA_NOT_USER_INITIATABLE;
+}
+
+/*------------------------------------------------------------*/
+/* The Create/Modify Dialog Box */
+@object GenInteractionClass CreateDialogBoxGroup = {
+    GI_visMoniker = " "; /* fill in when called */
+    GI_comp = @LeftGroup, @RightGroup;
+    GII_visibility = GIV_DIALOG;
+    HINT_ORIENT_CHILDREN_HORIZONTALLY;
+    HINT_CENTER_CHILDREN_VERTICALLY;
+    HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+    HINT_DIVIDE_WIDTH_EQUALLY;
+    HINT_INTERACTION_MODAL;
+    HINT_WINDOW_NO_SYS_MENU;  /* to keep from quitting a partial */
+                              /* db entry without cleaning up!  */
+}
+
+@visMoniker CreateMoniker = "Create A Recipe";
+@visMoniker ModifyMoniker = "Modify A Recipe";
+
+@object GenInteractionClass LeftGroup = {
+    GI_comp = @RecipeNameGroup, @GenInfoGroup, @IngredGroup;
+    HINT_ORIENT_CHILDREN_VERTICALLY;
+    HINT_CENTER_CHILDREN_HORIZONTALLY;
+    HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+}
+
+@object GenInteractionClass RecipeNameGroup = {
+    GI_comp = @RecipeName, @RNameButtonsGroup;
+    HINT_ORIENT_CHILDREN_VERTICALLY;
+    HINT_CENTER_CHILDREN_HORIZONTALLY;
+    HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+    HINT_DRAW_IN_BOX;
+}
+
+@object GenTextClass RecipeName = {
+    GI_visMoniker = "Name:"/*list {@RNMoniker}*/;
+    GTXI_attrs = @default | GTA_SINGLE_LINE_TEXT;
+    GTXI_maxLength = (NAME_SIZE - 1);
+    HINT_TEXT_WHITE_WASH_COLOR ;
+}
+
+/* This (and the rest) moniker is set to 10 point to keep the
+ * Create/Modify dialog box totally visable on systems with
+ * 640x480 resolution and system default text size set to medium.
+ * There is no visable effect on systems where default text size
+ * is set to small. */
+/*@visMoniker RNMoniker = {
+    gstring {
+	GSSaveTransform(),
+	GSSetFont(FID_BERKELEY, 10), 
+	GSDrawText(2,2),
+	"Name:",
+	GSRestoreTransform(),
+	GSEndString()
+    }
+} */
+
+@object GenInteractionClass RNameButtonsGroup = {
+    GI_comp = @RCreateTrigger, @RCancelTrigger;
+    HINT_ORIENT_CHILDREN_HORIZONTALLY;
+    HINT_EXPAND_WIDTH_TO_FIT_PARENT ;
+    HINT_FULL_JUSTIFY_CHILDREN_HORIZONTALLY;
+    HINT_INCLUDE_ENDS_IN_CHILD_SPACING;  
+    HINT_CENTER_CHILDREN_VERTICALLY;
+}
+
+@object GenTriggerClass RCreateTrigger = {
+    GI_visMoniker = "Create Recipe";
+    GTI_destination = process;
+    GTI_actionMsg = MSG_CREATE_RECIPE;
+}
+
+@object GenTriggerClass RCancelTrigger = {
+    GI_visMoniker = "Cancel";
+    GI_attrs = @default | GA_SIGNAL_INTERACTION_COMPLETE;
+}
+
+@object GenInteractionClass GenInfoGroup = {
+    GI_comp = @Author, @ServCatGroup, @PrepTime;
+    HINT_ORIENT_CHILDREN_VERTICALLY;
+    HINT_EXPAND_WIDTH_TO_FIT_PARENT ;
+    HINT_CENTER_CHILDREN_HORIZONTALLY;
+    HINT_DRAW_IN_BOX;
+}
+
+@object GenTextClass Author = {
+    GI_visMoniker = "From the kitchen of:";
+    GTXI_attrs = @default | GTA_SINGLE_LINE_TEXT;
+    GTXI_maxLength = (NAME_SIZE - 1);
+    HINT_TEXT_WHITE_WASH_COLOR ;
+    HINT_PLACE_MONIKER_ABOVE;
+    HINT_CENTER_MONIKER;
+    HINT_DEFAULT_FOCUS;
+}
+
+@object GenInteractionClass ServCatGroup = {
+    GI_comp = @ServingsValue, @CatList;
+    HINT_ORIENT_CHILDREN_HORIZONTALLY;
+    HINT_EXPAND_WIDTH_TO_FIT_PARENT ;
+    HINT_FULL_JUSTIFY_CHILDREN_HORIZONTALLY;
+    HINT_INCLUDE_ENDS_IN_CHILD_SPACING;
+    HINT_CENTER_CHILDREN_VERTICALLY;
+}
+
+@object GenValueClass ServingsValue = {
+    GI_visMoniker = "Servings:"/*list {@ServMoniker}*/;
+    GVLI_minimum = MakeWWFixed(1.0);
+    GVLI_maximum = MakeWWFixed(100.0);
+    GVLI_value = MakeWWFixed(4.0);
+}
+
+/*@visMoniker ServMoniker = {
+    gstring {
+	GSSaveTransform(),
+	GSSetFont(FID_BERKELEY, 10), 
+	GSDrawText(2,2),
+	"Servings:",
+	GSRestoreTransform(),
+	GSEndString()
+    }
+} */
+
+@object GenItemGroupClass CatList = {
+    GI_comp = @Appetizers, @Beverages, @Breads,
+	      @Candies, @Desserts, @Eggs, @Fish,
+	      @FruitsVegs, @Meats, @Pasta, @Poultry,
+	      @Salads, @Sauces, @Soups, @PotP;
+    GIGI_selection = APTZ;
+    HINT_ITEM_GROUP_MINIMIZE_SIZE;
+    HINT_ITEM_GROUP_DISPLAY_CURRENT_SELECTION;
+}
+
+@object GenItemClass Appetizers = {
+    GI_visMoniker = "Appetizers";
+    GII_identifier = APTZ;
+}
+
+@object GenItemClass Beverages = {
+    GI_visMoniker = "Beverages";
+    GII_identifier = BEVG;
+}
+
+@object GenItemClass Breads = {
+    GI_visMoniker = "Breads";
+    GII_identifier = BRED;
+}
+
+@object GenItemClass Candies = {
+    GI_visMoniker = "Candies";
+    GII_identifier = CNDY;
+}
+
+@object GenItemClass Desserts = {
+    GI_visMoniker = "Desserts";
+    GII_identifier = DSRT;
+}
+
+@object GenItemClass Eggs = {
+    GI_visMoniker = "Eggs";
+    GII_identifier = EGGS;
+}
+
+@object GenItemClass Fish = {
+    GI_visMoniker = "Fish";
+    GII_identifier = FISH;
+}
+
+@object GenItemClass FruitsVegs = {
+    GI_visMoniker = "Fruits & Vegs";
+    GII_identifier = FRVG;
+}
+
+@object GenItemClass Meats = {
+    GI_visMoniker = "Meats";
+    GII_identifier = MEAT;
+}
+
+@object GenItemClass Pasta = {
+    GI_visMoniker = "Pasta";
+    GII_identifier = PSTA;
+}
+
+@object GenItemClass Poultry = {
+    GI_visMoniker = "Poultry";
+    GII_identifier = PLTY;
+}
+
+@object GenItemClass Salads = {
+    GI_visMoniker = "Salads";
+    GII_identifier = SALD;
+}
+
+@object GenItemClass Sauces = {
+    GI_visMoniker = "Sauces";
+    GII_identifier = SAUC;
+}
+
+@object GenItemClass Soups = {
+    GI_visMoniker = "Soups";
+    GII_identifier = SOUP;
+}
+
+@object GenItemClass PotP = {
+    GI_visMoniker = "Pot Pourri";
+    GII_identifier = POTP;
+}
+
+@object GenTextClass PrepTime = {
+    GI_visMoniker = "Preparation Time:"/*list {@PrepMoniker}*/;
+    GTXI_attrs = @default | GTA_SINGLE_LINE_TEXT;
+    GTXI_maxLength = (NUM_DATA_SIZE - 1);
+    HINT_MAXIMUM_SIZE = {
+	   SST_AVG_CHAR_WIDTHS | (NUM_DATA_SIZE - 1),
+	   0,    /* leave height alone */
+           0};
+    HINT_TEXT_WHITE_WASH_COLOR ;
+}
+
+/*@visMoniker PrepMoniker = {
+    gstring {
+	GSSaveTransform(),
+	GSSetFont(FID_BERKELEY, 10), 
+	GSDrawText(2,2),
+	"Preparation Time:",
+	GSRestoreTransform(),
+	GSEndString()
+    }
+} */
+
+@object GenInteractionClass IngredGroup = {
+    GI_visMoniker = "Ingredients";
+    GI_comp = @AmountGroup, @IngredName, @IngredDList, @IButtonGroup;
+    HINT_PLACE_MONIKER_ABOVE;
+    HINT_CENTER_MONIKER;
+    HINT_EXPAND_WIDTH_TO_FIT_PARENT ;
+    HINT_DRAW_IN_BOX;
+}
+
+@object GenDynamicListClass IngredDList = {
+    GDLI_numItems = 0;
+    GIGI_destination = process;
+    GIGI_applyMsg = MSG_INGRED_DLIST_APPLY;
+    GDLI_queryMsg = MSG_INGRED_DLIST_MONIKER_QUERY;
+    HINT_ITEM_GROUP_SCROLLABLE;
+    HINT_ITEM_GROUP_DISPLAY_CURRENT_SELECTION;
+    HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+    HINT_INITIAL_SIZE = {0, SST_LINES_OF_TEXT | 4, 4};
+}
+
+@object GenTextClass IngredName = {
+    GI_visMoniker = "Ingredient:"/*list {@IngredMoniker}*/;
+    GTXI_attrs = @default | GTA_SINGLE_LINE_TEXT;
+    GTXI_maxLength = (NAME_SIZE - 1);
+    GTXI_destination = process;
+    GTXI_applyMsg = MSG_ADD_INGRED;
+    HINT_TEXT_WHITE_WASH_COLOR ;
+}
+
+/*@visMoniker IngredMoniker = {
+    gstring {
+	GSSaveTransform(),
+	GSSetFont(FID_BERKELEY, 10), 
+	GSDrawText(2,2),
+	"Ingredient:",
+	GSRestoreTransform(),
+	GSEndString()
+    }
+} */
+
+@object GenInteractionClass AmountGroup = {
+    GI_comp = @IUSQuantity, @IMetQuantity, @IUSUnits, @IMUnits;
+    HINT_ORIENT_CHILDREN_HORIZONTALLY;
+    HINT_EXPAND_WIDTH_TO_FIT_PARENT ;
+    HINT_FULL_JUSTIFY_CHILDREN_HORIZONTALLY;
+    HINT_INCLUDE_ENDS_IN_CHILD_SPACING;
+    HINT_CENTER_CHILDREN_VERTICALLY;
+}
+
+@object GenTextClass IUSQuantity = {
+    GI_visMoniker = "Quantity:"/*list {@QuantMoniker}*/;
+    GTXI_attrs = @default | GTA_SINGLE_LINE_TEXT;
+    GTXI_maxLength = (NUM_DATA_SIZE - 1);
+    ATTR_GEN_TEXT_CUSTOM_FILTER = (ChunkHandle) @RBUSQuantFilter;
+    HINT_MAXIMUM_SIZE = {
+	   SST_AVG_CHAR_WIDTHS | (NUM_DATA_SIZE - 1),
+	   0,
+           0};
+    HINT_TEXT_WHITE_WASH_COLOR ;
+}
+
+/*@visMoniker QuantMoniker = {
+    gstring {
+	GSSaveTransform(),
+	GSSetFont(FID_BERKELEY, 10), 
+	GSDrawText(2,2),
+	"Quantity:",
+	GSRestoreTransform(),
+	GSEndString()
+    }
+}   */
+
+/* allows only 1234567890 / */
+@chunkArray VisTextCustomFilterData RBUSQuantFilter = {
+	C_EXCLAMATION, C_PERIOD,    
+	C_COLON, C_CARON
+	};
+
+@object GenTextClass IMetQuantity = {
+    GI_visMoniker = "Quantity:"/*list {@QuantMoniker}*/;
+    GTXI_attrs = @default | GTA_SINGLE_LINE_TEXT;
+    GTXI_maxLength = (NUM_DATA_SIZE - 1);
+    ATTR_GEN_TEXT_CUSTOM_FILTER = (ChunkHandle) @RBMetQuantFilter;
+    HINT_MAXIMUM_SIZE = {
+	   SST_AVG_CHAR_WIDTHS | (NUM_DATA_SIZE - 1),
+	   0,
+           0};
+    HINT_TEXT_WHITE_WASH_COLOR ;
+}
+
+/* allows only 1234567890 ,./ */
+@chunkArray VisTextCustomFilterData RBMetQuantFilter = {
+	C_EXCLAMATION, C_PLUS,
+	C_MINUS, C_MINUS,    
+	C_COLON, C_CARON          
+	};
+
+@object GenItemGroupClass IUSUnits = {
+    GI_comp = @usunits, @pnch, @tsp, @tbsp, @cup,
+		 @floz, @pint, @qt, @gal,
+	      @oz, @lb, @each,
+	      @can, @pkg, @stick;
+    GIGI_selection = USUN;
+    HINT_ITEM_GROUP_MINIMIZE_SIZE;
+    HINT_ITEM_GROUP_DISPLAY_CURRENT_SELECTION;
+}
+
+@object GenItemClass usunits = {
+    GI_visMoniker = "US Units"/*list {@USUMoniker}*/;
+    GII_identifier = USUN;
+}
+
+/*@visMoniker USUMoniker = {
+    gstring {
+	GSSaveTransform(),
+	GSSetFont(FID_BERKELEY, 10),
+	GSDrawText(2,2),
+	"US Units",
+	GSRestoreTransform(),
+	GSEndString()
+    }
+} */
+
+@object GenItemClass pnch = {
+    GI_visMoniker = "pinch(es)"/*list {@pnchMoniker}*/;
+    GII_identifier = PNCH;
+}
+
+/*@visMoniker pnchMoniker = {
+    gstring {
+	GSSaveTransform(),
+	GSSetFont(FID_BERKELEY, 10),
+	GSDrawText(2,2),
+	"pinch(es)",
+	GSRestoreTransform(),
+	GSEndString()
+    }
+}  */
+
+@object GenItemClass tsp = {
+    GI_visMoniker = "tsp"/*list {@tspMoniker}*/;
+    GII_identifier = TSP;
+}
+
+/*@visMoniker tspMoniker = {
+    gstring {
+	GSSaveTransform(),
+	GSSetFont(FID_BERKELEY, 10),
+	GSDrawText(2,2),
+	"tsp",
+	GSRestoreTransform(),
+	GSEndString()
+    }
+} */
+
+@object GenItemClass tbsp = {
+    GI_visMoniker = "tbsp"/*list {@tbspMoniker}*/;
+    GII_identifier = TBSP;
+}
+
+/*@visMoniker tbspMoniker = {
+    gstring {
+	GSSaveTransform(),
+	GSSetFont(FID_BERKELEY, 10),
+	GSDrawText(2,2),
+	"tbsp",
+	GSRestoreTransform(),
+	GSEndString()
+    }
+} */
+
+@object GenItemClass cup = {
+    GI_visMoniker = "cup(s)"/*list {@cupMoniker}*/;
+    GII_identifier = CUP;
+}
+
+/*@visMoniker cupMoniker = {
+    gstring {
+	GSSaveTransform(),
+	GSSetFont(FID_BERKELEY, 10),
+	GSDrawText(2,2),
+	"cup(s)",
+	GSRestoreTransform(),
+	GSEndString()
+    }
+} */
+
+@object GenItemClass floz = {
+    GI_visMoniker = "fl oz"/*list {@flozMoniker}*/;
+    GII_identifier = FLOZ;
+}
+
+/*@visMoniker flozMoniker = {
+    gstring {
+	GSSaveTransform(),
+	GSSetFont(FID_BERKELEY, 10),
+	GSDrawText(2,2),
+	"fl oz",
+	GSRestoreTransform(),
+	GSEndString()
+    }
+}  */
+
+@object GenItemClass pint = {
+    GI_visMoniker = "pint(s)"/*list {@pintMoniker}*/;
+    GII_identifier = PINT;
+}
+
+/*@visMoniker pintMoniker = {
+    gstring {
+	GSSaveTransform(),
+	GSSetFont(FID_BERKELEY, 10),
+	GSDrawText(2,2),
+	"pint(s)",
+	GSRestoreTransform(),
+	GSEndString()
+    }
+}  */
+
+@object GenItemClass qt = {
+    GI_visMoniker = "qt"/*list {@qtMoniker}*/;
+    GII_identifier = QT;
+}
+
+/*@visMoniker qtMoniker = {
+    gstring {
+	GSSaveTransform(),
+	GSSetFont(FID_BERKELEY, 10),
+	GSDrawText(2,2),
+	"qt",
+	GSRestoreTransform(),
+	GSEndString()
+    }
+} */
+
+@object GenItemClass gal = {
+    GI_visMoniker = "gal"/*list {@galMoniker}*/;
+    GII_identifier = GAL;
+}
+
+/*@visMoniker galMoniker = {
+    gstring {
+	GSSaveTransform(),
+	GSSetFont(FID_BERKELEY, 10),
+	GSDrawText(2,2),
+	"gal",
+	GSRestoreTransform(),
+	GSEndString()
+    }
+} */
+
+@object GenItemClass oz = {
+    GI_visMoniker = "oz"/*list {@ozMoniker}*/;
+    GII_identifier = OZ;
+}
+
+/*@visMoniker ozMoniker = {
+    gstring {
+	GSSaveTransform(),
+	GSSetFont(FID_BERKELEY, 10),
+	GSDrawText(2,2),
+	"oz",
+	GSRestoreTransform(),
+	GSEndString()
+    }
+} */
+
+@object GenItemClass lb = {
+    GI_visMoniker = "lb"/*list {@lbMoniker}*/;
+    GII_identifier = LB;
+}
+
+/*@visMoniker lbMoniker = {
+    gstring {
+	GSSaveTransform(),
+	GSSetFont(FID_BERKELEY, 10),
+	GSDrawText(2,2),
+	"lb",
+	GSRestoreTransform(),
+	GSEndString()
+    }
+} */
+
+@object GenItemClass each = {
+    GI_visMoniker = "each"/*list {@eachMoniker}*/;
+    GII_identifier = EACH;
+}
+
+/*@visMoniker eachMoniker = {
+    gstring {
+	GSSaveTransform(),
+	GSSetFont(FID_BERKELEY, 10), 
+	GSDrawText(2,2),
+	"each",
+	GSRestoreTransform(),
+	GSEndString()
+    }
+}  */
+
+@object GenItemClass can = {
+    GI_visMoniker = "can(s)"/*list {@canMoniker}*/;
+    GII_identifier = CAN;
+}
+
+/*@visMoniker canMoniker = {
+    gstring {
+	GSSaveTransform(),
+	GSSetFont(FID_BERKELEY, 10), 
+	GSDrawText(2,2),
+	"can(s)",
+	GSRestoreTransform(),
+	GSEndString()
+    }
+} */
+
+@object GenItemClass pkg = {
+    GI_visMoniker = "pkg"/*list {@pkgMoniker}*/;
+    GII_identifier = PKG;
+}
+
+/*@visMoniker pkgMoniker = {
+    gstring {
+	GSSaveTransform(),
+	GSSetFont(FID_BERKELEY, 10), 
+	GSDrawText(2,2),
+	"pkg",
+	GSRestoreTransform(),
+	GSEndString()
+    }
+}  */
+
+@object GenItemClass stick = {
+    GI_visMoniker = "stick(s)"/*list {@stickMoniker}*/;
+    GII_identifier = STK;
+}
+
+/*@visMoniker stickMoniker = {
+    gstring {
+	GSSaveTransform(),
+	GSSetFont(FID_BERKELEY, 10), 
+	GSDrawText(2,2),
+	"stick(s)",
+	GSRestoreTransform(),
+	GSEndString()
+    }
+} */
+
+@object GenItemGroupClass IMUnits = {
+    GI_comp = @munits, @mpnch, @mtsp, @mtbsp, @mls,
+              @dls, @ltrs, @grms, @kilo, @meach,
+	      @mcan, @mpkg;
+    GIGI_selection = MUN;
+    HINT_ITEM_GROUP_MINIMIZE_SIZE;
+    HINT_ITEM_GROUP_DISPLAY_CURRENT_SELECTION;
+}
+
+@object GenItemClass munits = {
+    GI_visMoniker = "Met Units"/*list {@MUMoniker}*/;
+    GII_identifier = MUN;
+}
+
+/*@visMoniker MUMoniker = {
+    gstring {
+	GSSaveTransform(),
+	GSSetFont(FID_BERKELEY, 10), 
+	GSDrawText(2,2),
+	"Met Units",
+	GSRestoreTransform(),
+	GSEndString()
+    }
+} */
+
+@object GenItemClass mpnch = {
+    GI_visMoniker = "pinch(es)"/*list {@pnchMoniker}*/;
+    GII_identifier = MPNCH;
+}
+
+@object GenItemClass mtsp = {
+    GI_visMoniker = "tsp"/*list {@tspMoniker}*/;
+    GII_identifier = MTSP;
+}
+
+@object GenItemClass mtbsp = {
+    GI_visMoniker = "tbsp"/*list {@tbspMoniker}*/;
+    GII_identifier = MTBSP;
+}
+
+@object GenItemClass mls = {
+    GI_visMoniker = "ml"/*list {@mlsMoniker}*/;
+    GII_identifier = MLS;
+}
+
+/*@visMoniker mlsMoniker = {
+    gstring {
+	GSSaveTransform(),
+	GSSetFont(FID_BERKELEY, 10), 
+	GSDrawText(2,2),
+	"ml",
+	GSRestoreTransform(),
+	GSEndString()
+    }
+} */
+
+@object GenItemClass dls = {
+    GI_visMoniker = "dl"/*list {@dlsMoniker}*/;
+    GII_identifier = DLS;
+}
+
+/*@visMoniker dlsMoniker = {
+    gstring {
+	GSSaveTransform(),
+	GSSetFont(FID_BERKELEY, 10), 
+	GSDrawText(2,2),
+	"dl",
+	GSRestoreTransform(),
+	GSEndString()
+    }
+}   */
+
+@object GenItemClass ltrs = {
+    GI_visMoniker = "liter(s)"/*list {@ltrsMoniker}*/;
+    GII_identifier = LTRS;
+}
+
+/*@visMoniker ltrsMoniker = {
+    gstring {
+	GSSaveTransform(),
+	GSSetFont(FID_BERKELEY, 10), 
+	GSDrawText(2,2),
+	"liter(s)",
+	GSRestoreTransform(),
+	GSEndString()
+    }
+} */
+
+@object GenItemClass grms = {
+    GI_visMoniker = "gram(s)"/*list {@grmsMoniker}*/;
+    GII_identifier = GRMS;
+}
+
+/*@visMoniker grmsMoniker = {
+    gstring {
+	GSSaveTransform(),
+	GSSetFont(FID_BERKELEY, 10), 
+	GSDrawText(2,2),
+	"gram(s)",
+	GSRestoreTransform(),
+	GSEndString()
+    }
+} */
+
+@object GenItemClass kilo = {
+    GI_visMoniker = "kilo(s)"/*list {@kiloMoniker}*/;
+    GII_identifier = KILO;
+}
+
+/*@visMoniker kiloMoniker = {
+    gstring {
+	GSSaveTransform(),
+	GSSetFont(FID_BERKELEY, 10), 
+	GSDrawText(2,2),
+	"kilo(s)",
+	GSRestoreTransform(),
+	GSEndString()
+    }
+}  */
+
+@object GenItemClass meach = {
+    GI_visMoniker = "each"/*list {@eachMoniker}*/;
+    GII_identifier = MEACH;
+}
+
+@object GenItemClass mcan = {
+    GI_visMoniker = "can(s)"/*list {@canMoniker}*/;
+    GII_identifier = MCAN;
+}
+
+@object GenItemClass mpkg = {
+    GI_visMoniker = "pkg"/*list {@pkgMoniker}*/;
+    GII_identifier = MPKG;
+}
+
+@object GenInteractionClass IButtonGroup = {
+    GI_comp = @IAddTrigger, @IEditTrigger, @IDeleteTrigger;
+    HINT_ORIENT_CHILDREN_HORIZONTALLY;
+    HINT_EXPAND_WIDTH_TO_FIT_PARENT ;
+    HINT_FULL_JUSTIFY_CHILDREN_HORIZONTALLY;
+    HINT_INCLUDE_ENDS_IN_CHILD_SPACING;
+    HINT_CENTER_CHILDREN_VERTICALLY;
+    HINT_DRAW_IN_BOX;
+}
+
+@object GenTriggerClass IAddTrigger = {
+    GI_visMoniker = "Add";
+    GTI_destination = process;
+    GTI_actionMsg = MSG_ADD_INGRED;
+}
+
+@object GenTriggerClass IEditTrigger = {
+    GI_visMoniker = "Edit";
+    GTI_destination = process;
+    GTI_actionMsg = MSG_EDIT_INGRED;
+}
+
+@object GenTriggerClass IDeleteTrigger = {
+    GI_visMoniker = "Delete";
+    GTI_destination = process;
+    GTI_actionMsg = MSG_DELETE_INGRED;
+}
+
+@object GenInteractionClass RightGroup = {
+    GI_comp = @DirectionsGroup, @ReplyGroup;
+    HINT_ORIENT_CHILDREN_VERTICALLY;
+    HINT_CENTER_CHILDREN_HORIZONTALLY;
+    HINT_EXPAND_HEIGHT_TO_FIT_PARENT ;
+    HINT_EXPAND_WIDTH_TO_FIT_PARENT ;
+}
+
+@object GenInteractionClass DirectionsGroup = {
+    GI_comp = @DirectionsBox;
+    HINT_EXPAND_HEIGHT_TO_FIT_PARENT ;
+    HINT_EXPAND_WIDTH_TO_FIT_PARENT ;
+    HINT_DRAW_IN_BOX;
+}
+
+@object GenTextClass DirectionsBox = {
+    GI_visMoniker = "Directions";
+    GTXI_attrs = @default | GTA_INIT_SCROLLING;
+    HINT_PLACE_MONIKER_ABOVE;
+    HINT_CENTER_MONIKER;
+    HINT_EXPAND_WIDTH_TO_FIT_PARENT ;
+    HINT_EXPAND_HEIGHT_TO_FIT_PARENT ;
+    HINT_TEXT_WHITE_WASH_COLOR ;
+}
+
+/* Which triggers are displayed depends on whether the entire
+ * dialog box was called for Create/Enter Recipe or for Edit
+ * Recipe
+ */
+@object GenInteractionClass ReplyGroup = {
+    GI_comp = /*@BboxGroup, */@EnterRecipeTrigger, @ModifyRecipeTrigger,
+	      @CancelRecipeTrigger, @CancelModifyTrigger;
+    HINT_ORIENT_CHILDREN_HORIZONTALLY;
+    HINT_CENTER_CHILDREN_VERTICALLY;
+    HINT_FULL_JUSTIFY_CHILDREN_HORIZONTALLY;
+    HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+    HINT_DRAW_IN_BOX;
+}
+
+/*@object GenInteractionClass BboxGroup = {
+    GI_comp = @BboxIcon;
+    HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+    HINT_CENTER_CHILDREN_VERTICALLY;
+    HINT_CENTER_CHILDREN_HORIZONTALLY;
+}
+
+/* this was put into a GenInt for allignment with hints */
+/*@object GenInteractionClass BboxIcon = {
+    GI_visMoniker = list {@BreadboxmonikerColor};
+}
+
+/* This trigger is for Create/Enter mode only */
+@object GenTriggerClass EnterRecipeTrigger = {
+    GI_visMoniker = "Enter Recipe"/*list {@ERMoniker}*/;
+    GTI_destination = process;
+    GTI_actionMsg = MSG_ENTER_RECIPE;
+}
+
+/*@visMoniker ERMoniker = {
+    gstring {
+	GSSaveTransform(),
+	GSSetFont(FID_BERKELEY, 10), 
+	GSDrawText(2,2),
+	"Enter Recipe",
+	GSRestoreTransform(),
+	GSEndString()
+    }
+} */
+
+/* This trigger is for Create/Enter mode only */
+@object GenTriggerClass CancelRecipeTrigger = {
+    GI_visMoniker = "Cancel Recipe"/*list {@CRMoniker}*/;
+    GTI_destination = process;
+    GTI_actionMsg = MSG_CANCEL_RECIPE;
+}
+
+/*@visMoniker CRMoniker = {
+    gstring {
+	GSSaveTransform(),
+	GSSetFont(FID_BERKELEY, 10), 
+	GSDrawText(2,2),
+	"Cancel Recipe",
+	GSRestoreTransform(),
+	GSEndString()
+    }
+} */
+
+/* This trigger is for Modify mode only */
+@object GenTriggerClass ModifyRecipeTrigger = {
+    GI_visMoniker = "Modify Recipe"/*list {@MRMoniker}*/;
+    GTI_destination = process;
+    GTI_actionMsg = MSG_MODIFY_RECIPE;
+}
+
+/*@visMoniker MRMoniker = {
+    gstring {
+	GSSaveTransform(),
+	GSSetFont(FID_BERKELEY, 10), 
+	GSDrawText(2,2),
+	"Modify Recipe",
+	GSRestoreTransform(),
+	GSEndString()
+    }
+} */
+
+/* This trigger is for Modify mode only */
+@object GenTriggerClass CancelModifyTrigger = {
+    GI_visMoniker = "Cancel Modify"/*list {@CMMoniker}*/;
+    GI_attrs = @default | GA_SIGNAL_INTERACTION_COMPLETE;
+    GTI_destination = process;
+    GTI_actionMsg = MSG_CANCEL_MODIFY_RECIPE;
+}
+
+/*@visMoniker CMMoniker = {
+    gstring {
+	GSSaveTransform(),
+	GSSetFont(FID_BERKELEY, 10), 
+	GSDrawText(2,2),
+	"Cancel Modify",
+	GSRestoreTransform(),
+	GSEndString()
+    }
+} */
+
+/*------------------------------------------------------------*/
+/* The Select Dialog Box */
+@object GenInteractionClass SelectDialogBoxGroup = {
+    GI_visMoniker = "Select A Recipe";
+    GI_comp = @RecipeDList, @RecipeReplyGroup;
+    GII_visibility = GIV_DIALOG;
+    HINT_ORIENT_CHILDREN_VERTICALLY;
+    HINT_WINDOW_NO_SYS_MENU;  /* to keep from quitting  */
+			      /* without cleaning up memory!  */
+}
+
+@object GenDynamicListClass RecipeDList = {
+    GI_visMoniker = " "; /* fill in when called */
+    HINT_ITEM_GROUP_SCROLLABLE;
+    HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+    GDLI_numItems = 0;
+    GIGI_applyMsg = MSG_RECIPE_DLIST_APPLY;
+    GIGI_destination = process;
+    GDLI_queryMsg = MSG_RECIPE_DLIST_MONIKER_QUERY;
+    HINT_PLACE_MONIKER_ABOVE;
+    HINT_CENTER_MONIKER;
+}
+
+@visMoniker AllMoniker = "All Recipes";
+@visMoniker Cat1Moniker = "Appetizers";
+@visMoniker Cat2Moniker = "Beverages";
+@visMoniker Cat3Moniker = "Breads";
+@visMoniker Cat4Moniker = "Candies";
+@visMoniker Cat5Moniker = "Desserts";
+@visMoniker Cat6Moniker = "Eggs";
+@visMoniker Cat7Moniker = "Fish";
+@visMoniker Cat8Moniker = "Fruits & Vegetables";
+@visMoniker Cat9Moniker = "Meats";
+@visMoniker Cat10Moniker = "Pasta";
+@visMoniker Cat11Moniker = "Poultry";
+@visMoniker Cat12Moniker = "Salads";
+@visMoniker Cat13Moniker = "Sauces";
+@visMoniker Cat14Moniker = "Soups";
+@visMoniker Cat15Moniker = "Pot Pourri";
+
+
+@object GenInteractionClass RecipeReplyGroup = {
+    GI_comp = @SelectTrigger, @ModifyTrigger,
+	      @DeleteTrigger, @CopyTrigger,
+	      @SCancelTrigger;
+    HINT_ORIENT_CHILDREN_HORIZONTALLY;
+    HINT_CENTER_CHILDREN_VERTICALLY;
+    HINT_EXPAND_WIDTH_TO_FIT_PARENT ;
+    HINT_FULL_JUSTIFY_CHILDREN_HORIZONTALLY;
+    HINT_INCLUDE_ENDS_IN_CHILD_SPACING;
+}
+
+@object GenTriggerClass SelectTrigger = {
+    GI_visMoniker = "Display";
+    GI_attrs = @default | GA_SIGNAL_INTERACTION_COMPLETE;
+    GTI_destination = process;
+    GTI_actionMsg = MSG_DISPLAY_RECIPE;
+    HINT_DEFAULT_DEFAULT_ACTION;
+}
+
+@object GenTriggerClass ModifyTrigger = {
+    GI_visMoniker = "Modify";
+    GI_attrs = @default | GA_SIGNAL_INTERACTION_COMPLETE;
+    GTI_destination = process;
+    GTI_actionMsg = MSG_SELECT_MODIFY_RECIPE;
+}
+
+@object GenTriggerClass DeleteTrigger = {
+    GI_visMoniker = "Delete";
+    GI_attrs = @default | GA_SIGNAL_INTERACTION_COMPLETE;
+    GTI_destination = process;
+    GTI_actionMsg = MSG_DELETE_RECIPE;
+}
+
+@object GenTriggerClass CopyTrigger = {
+    GI_visMoniker = "Copy";
+    GTI_destination = process;
+    GTI_actionMsg = MSG_COPY_RECIPE;
+}
+
+@object GenTriggerClass SCancelTrigger = {
+    GI_visMoniker = "Cancel";
+    GI_attrs = @default | GA_SIGNAL_INTERACTION_COMPLETE;
+    GTI_destination = process;
+    GTI_actionMsg = MSG_CANCEL_SELECT;
+
+}
+
+@end Interface;
+
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_PRINT_START_PRINTING for RBoxVLTextClass
+ *
+ * DESCRIPTION:	Does the display printing
+ *              Has to stay in this source file!!!!!
+ *
+ ***********************************************************************/
+@method RBoxVLTextClass, MSG_PRINT_START_PRINTING
+{
+    word		curPage, numPages;
+    XYValueAsDWord	textSize;     /* Image size of text. */
+    WWFixed		savedSize;    /* Previous point size. */
+    WWFixed		newPtSize;    /* Used to set text to printing */
+    VisLargeTextGetRegionPosReturnStruct    regPos;
+
+    /* save region size */
+    textSize = @call self::MSG_VIS_LARGE_TEXT_GET_DRAFT_REGION_SIZE(0);
+
+    /* set point size, font and region size for printing */
+    newPtSize.WWF_int  = 12;
+    newPtSize.WWF_frac = 0;
+    @send self::MSG_VIS_TEXT_SET_POINT_SIZE(
+                newPtSize, TEXT_ADDRESS_PAST_END, 0);
+    @send self::MSG_VIS_TEXT_SET_FONT_ID(
+                FID_DTC_URW_MONO, TEXT_ADDRESS_PAST_END, 0);
+    @send self::MSG_VIS_LARGE_TEXT_SET_DRAFT_REGION_SIZE(
+                (6.5*72), (9*72));
+
+    /* set number of pages to print */
+    numPages = @call self::MSG_VIS_LARGE_TEXT_GET_REGION_COUNT();
+
+    /* now do the printing */
+    for (curPage=0; curPage < numPages; curPage++)
+    {
+       GrSaveState(gstate);
+       @call self::MSG_VIS_LARGE_TEXT_GET_REGION_POS( &regPos, curPage );
+
+       /* Clip it to match translation and margins */
+       GrSetClipRect(gstate, PCT_REPLACE,
+                             0,                     /* left */
+                             0,      /* top */
+                             (6.5*72),                 /* right */
+			     ((9*72) - 6));   /* bottom */
+                         /* the -6 is a half line offset to prevent
+                            an extra line from printing at the bottom
+                            of a page */
+
+       /* Translate the gstate to selected page */
+       GrApplyTranslationDWord(gstate, 0,
+		   -(regPos.VLTGRPRS_yPosition));
+       GrInitDefaultTransform(gstate);
+	 /* Draw current page */
+       @call self::MSG_VIS_DRAW(DF_PRINT, gstate);
+
+       GrRestoreState(gstate);
+       GrNewPage(gstate, PEC_FORM_FEED);
+    }
+
+   @send RBPrintControl::MSG_PRINT_CONTROL_PRINTING_COMPLETED();
+
+   /* reset things back to where the user had them */
+   @send self::MSG_VIS_TEXT_SET_FONT_ID(
+	       FID_BERKELEY, TEXT_ADDRESS_PAST_END, 0);
+   savedSize.WWF_int  = pointSize;
+   savedSize.WWF_frac = 0;
+   @send self::MSG_VIS_TEXT_SET_POINT_SIZE(
+	       savedSize, TEXT_ADDRESS_PAST_END, 0);
+   @send self::MSG_VIS_LARGE_TEXT_SET_DRAFT_REGION_SIZE(
+                  DWORD_X(textSize), DWORD_Y(textSize));
+
+
+}
+
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_META_CONTENT_VIEW_OPENING for RBoxContentClass
+ *
+ * DESCRIPTION:	good place to initialize stuff
+ *              Most of this from vtext sample file
+ *              Has to stay in this source file!!!!!
+ *
+ ***********************************************************************/
+
+ @method RBoxContentClass, MSG_META_CONTENT_VIEW_OPENING
+{
+    VisContentInstance *vself;
+    VMFileHandle fileHan;
+
+
+    @callsuper();
+
+    /*
+     * Set up the geometry for the content so that the geometry manager
+     * is not used.
+     */
+
+    vself = ObjDerefVis(oself);
+    vself->VI_attrs &= ~VA_MANAGED;
+    vself->VI_optFlags &= ~(VOF_GEOMETRY_INVALID | VOF_GEO_UPDATE_PATH);
+    vself->VI_geoAttrs |= VCGA_CUSTOM_MANAGE_CHILDREN;
+
+    /*
+     * Add the text object as a child of the content.  This must be done
+     * dynamically because the text object is a visual child, not a generic
+     * one.
+     */
+
+    @call TextContent::MSG_VIS_ADD_CHILD(@TextWindow, CCO_FIRST);
+
+    /*
+     * Set up the text object to be large
+     */
+
+    fileHan = ClipboardGetClipboardFile();
+    @call TextWindow::MSG_VIS_TEXT_SET_VM_FILE(fileHan);
+    @call TextWindow::MSG_VIS_LARGE_TEXT_CREATE_DATA_STRUCTURES();
+    @call TextWindow::MSG_VIS_NOTIFY_GEOMETRY_VALID();
+
+    /* put the proper stuff on the screen */
+    switch ((int) onScreen) {
+       case TITLE:
+       /* put the title in the text window */
+       @send process::MSG_GOURMET_SCREEN();
+       break;
+       case RECIPE:
+       /* put the recipe in the text window */
+       @send process::MSG_DISPLAY_RECIPE();
+       break;
+       case LIST0:
+       /* put the list in the text window */
+       @send process::MSG_DISPLAY_SHOPPING_LIST(0);
+       break;
+       case LIST1:
+       /* put the list in the text window */
+       @send process::MSG_DISPLAY_SHOPPING_LIST(1);
+       break;
+    }
+
+
+}
+
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_META_CONTENT_VIEW_CLOSING for RBoxContentClass
+ *
+ * DESCRIPTION:	good place to UNDO initialize stuff
+ *              Most of this from vtext sample file
+ *              Has to stay in this source file!!!!!
+ *
+ ***********************************************************************/
+
+ @method RBoxContentClass, MSG_META_CONTENT_VIEW_CLOSING
+ {
+     @callsuper();
+    /*
+     * Free the large text data structures and make the text object small
+     * again.
+     */
+
+    @call TextWindow::MSG_VIS_TEXT_FREE_ALL_STORAGE(TRUE);
+
+    @call TextWindow::MSG_VIS_TEXT_SET_VM_FILE(NullHandle);
+
+    @call TextContent::MSG_VIS_REMOVE_CHILD(@TextWindow, CCO_FIRST);
+}
+
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_VIS_TEXT_FREE_ALL_STORAGE for RBoxVLTextClass
+ *
+ * DESCRIPTION: We must intercept FREE_STORAGE to do a little more work so that the
+ *		text object is left in the correct state
+ *              Most of this from vtext sample file
+ *              Has to stay in this source file!!!!!
+ *
+ ***********************************************************************/
+@method RBoxVLTextClass, MSG_VIS_TEXT_FREE_ALL_STORAGE
+{
+    ChunkArrayHeader *cahp;
+    VisLargeTextInstance *vself;
+
+    @callsuper();
+    LMemReAlloc(@RBVLTextRegionArray, sizeof(ChunkArrayHeader));
+    cahp = LMemDeref(@RBVLTextRegionArray);
+    cahp->CAH_count = 0;
+    cahp->CAH_elementSize = sizeof(VisLargeTextRegionArrayElement);
+    cahp->CAH_curOffset = 0;
+    cahp->CAH_offset = sizeof(ChunkArrayHeader);
+
+    vself = ObjDerefVis(oself);
+    vself->VTI_storageFlags &= ~VTSF_LARGE;
+    vself->VI_optFlags |= VOF_GEOMETRY_INVALID;
+}

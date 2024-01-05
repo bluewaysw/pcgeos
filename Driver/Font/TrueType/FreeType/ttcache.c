@@ -35,14 +35,6 @@
 /* free list_elements recycle list.                              */
 #define FREE_Elements  ( engine->list_free_elements )
 
-/* Redefinition of LOCK and UNLOCK macros for New_Element and Done_Element */
-/* Note: The macros are redefined below for the cache functions            */
-
-#undef  LOCK
-#define LOCK()    MUTEX_Lock   ( engine->lock )
-
-#undef  UNLOCK
-#define UNLOCK()  MUTEX_Release( engine->lock )
 
 /*******************************************************************
  *
@@ -63,7 +55,6 @@
     PList_Element  element;
 
 
-    LOCK();
     if ( FREE_Elements )
     {
       element       = (PList_Element)FREE_Elements;
@@ -77,9 +68,6 @@
         element->data = NULL;
       }
     }
-
-    /* Note: in case of failure, Alloc sets the pointer to NULL */
-    UNLOCK();
 
     return element;
   }
@@ -103,22 +91,10 @@
   void  Element_Done( PEngine_Instance  engine,
                       PList_Element     element )
   {
-    LOCK();
     /* Simply add the list element to the recycle list */
     element->next = (PList_Element)FREE_Elements;
     FREE_Elements = element;
-    UNLOCK();
   }
-
-
-/* Redefinition of LOCK and UNLOCK macros for the cache functions          */
-/* Note: The macros are defined above for the list element functions       */
-
-#undef  LOCK
-#define LOCK()    MUTEX_Lock( *cache->lock )
-
-#undef  UNLOCK
-#define UNLOCK()  MUTEX_Release( *cache->lock )
 
 
 /*******************************************************************
@@ -135,11 +111,6 @@
  *
  *            cache       address of cache to create
  *
- *            lock        address of the mutex to use for this
- *                        cache.  The mutex will be used to protect
- *                        the cache's lists.  Use NULL for unprotected
- *                        cache.
- *
  *  Output :  Error code.
  *
  ******************************************************************/
@@ -147,12 +118,10 @@
   LOCAL_FUNC
   TT_Error  Cache_Create( PEngine_Instance  engine,
                           PCache_Class      clazz,
-                          TCache*           cache,
-                          TMutex*           lock )
+                          TCache*           cache )
   {
     cache->engine     = engine;
     cache->clazz      = clazz;
-    cache->lock       = lock;
     cache->idle_count = 0;
 
     ZERO_List( cache->active );
@@ -270,14 +239,12 @@
     void*          object;
 
 
-    LOCK();
     current = cache->idle;
     if ( current )
     {
       cache->idle = current->next;
       cache->idle_count--;
     }
-    UNLOCK();
 
     if ( current )
     {
@@ -292,11 +259,9 @@
 #endif  /* __GEOS__ */
         if ( error )
         {
-          LOCK();
           current->next = cache->idle;
           cache->idle   = current;
           cache->idle_count++;
-          UNLOCK();
           goto Exit;
         }
       }
@@ -327,10 +292,8 @@
       }
     }
 
-    LOCK();
     current->next = cache->active;
     cache->active = current;
-    UNLOCK();
 
     *new_object = current->data;
     return TT_Err_Ok;
@@ -378,9 +341,6 @@
     Bool           destroy;
 
 
-    /* Look for object in active list */
-    LOCK();
-
     element = cache->active;
     prev = NULL;
     while ( element )
@@ -397,14 +357,12 @@
       element = element->next;
     }
 
-    UNLOCK();
     return TT_Err_Unlisted_Object;
 
   Suite:
 
     limit   = cache->clazz->idle_limit;
     destroy = (cache->idle_count >= limit);
-    UNLOCK();
 
     if ( destroy )
     {
@@ -440,11 +398,9 @@
         /*       problems easily.                                  */
       }
 
-      LOCK();
       element->next = cache->idle;
       cache->idle   = element;
       cache->idle_count++;
-      UNLOCK();
     }
 
     error = TT_Err_Ok;

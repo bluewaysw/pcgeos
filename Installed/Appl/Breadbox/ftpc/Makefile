@@ -8,8 +8,8 @@ CLASSES         = FTPPROC.goc
 UI              = EXPIRE.goc FTPUI.goc ftpui.goh
 UI_TO_RDFS      =
 OBJS            = FTPPROC.obj EXPIRE.obj FTPUI.obj
-COMMON          = expire.goh expireui.goh itextlim.goh ctextlim.goh\
-                  options.goh internal.goh resource.goh
+COMMON          = ctextlim.goh expire.goh expireui.goh internal.goh\
+                  itextlim.goh options.goh resource.goh
 MODULES         =
 CMODULES        = Classes UI
 SRCS            = $(CLASSES) $(UI) $(COMMON)

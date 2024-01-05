@@ -1,0 +1,804 @@
+/*
+ **************************************************************************
+ *  FILE:		i2mthds.goc
+ *  PROJECT:	Breadbox Home Inventory
+ *  DESCRIPTION:	This file has methods for important info section
+ *			
+ **************************************************************************
+ */
+/*
+ ***************************************************************************
+ *		Include files
+ ***************************************************************************
+ */
+
+@include <stdapp.goh>
+@include "hivar.goh"
+@include <gstring.h>
+#include <string.h>
+
+/* Prototypes */
+void ISclearFields(void);
+void IVclearFields(void);
+
+/*
+ ***************************************************************************
+ *		Class & Message Definitions
+ ***************************************************************************
+ */
+
+/* Declare UI object references to those in hinv0s.GOC */
+@extern object InsBox;
+@extern object InsDList;
+@extern object InsTypeField;
+@extern object InsCompField;
+@extern object InsPolField;
+@extern object InsCovField;
+@extern object InsTermField;
+@extern object InsPremField;
+@extern object InsAgentField;
+@extern object InsPhoneField;
+@extern object InsNotesField;
+@extern object InvBox;
+@extern object InvDList;
+@extern object InvTypeField;
+@extern object InvNameField;
+@extern object InvUnitsField;
+@extern object InvPriceField;
+@extern object InvDateField;
+@extern object InvFromField;
+@extern object InvDivField;
+@extern object InvDocField;
+@extern object InvNotesField;
+@extern object chapol;
+@extern object delpol;
+@extern object chainv;
+@extern object delinv;
+
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_OPEN_INS_DB for HInvProcessClass
+ *
+ * DESCRIPTION:	calls the dialog box when INS button
+ *               is clicked.  
+ *              Done so that buttons would expand to full width
+ *               which doesn't work w/GenInters
+ *     
+ ***********************************************************************/
+
+@extern method HInvProcessClass, MSG_OPEN_INS_DB
+{
+
+    /* set to no selections */
+    @call InsDList::MSG_GEN_ITEM_GROUP_SET_NONE_SELECTED(FALSE);
+		/* This is to keep old data (from the entry fields)
+		 * from cluttering things up
+                 */
+    /* Now we clear the fields */
+    ISclearFields();
+
+    @call InsBox::MSG_GEN_INTERACTION_INITIATE();
+}
+
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_NEW_INS for HInvProcessClass
+ *
+ * DESCRIPTION:	Creates a new insurance entry
+ *              
+ ***********************************************************************/
+
+@extern method HInvProcessClass, MSG_NEW_INS
+{
+    InsStruct         *mins;
+    VMBlockHandle     houseblock;
+    HouseStruct *     houseMemPtr ;
+    word              numIns;
+    char              field1[50];
+    VMBlockHandle     block;
+    MemHandle         mh, newmh;
+
+    /*
+     * Retrieve the name of the new insurance from the type field.
+     */
+    @call InsTypeField::MSG_VIS_TEXT_GET_ALL_PTR(field1);
+
+    /* Exit if insurance is blank. */
+    if (*field1 == 0)
+        return;
+
+    /* Lock the map item, get number of policies, increment and unlock it */
+    houseblock = VMGetMapBlock(hmInvFile);
+    houseMemPtr = VMLock(hmInvFile, houseblock, &mh);
+    numIns = houseMemPtr->HS_numIns;
+    numIns++;                         /* remember this new num is used */
+    houseMemPtr->HS_numIns = numIns;    /* in the rest of the method!!! */
+    VMDirty(mh);
+    VMUnlock(mh);
+
+    /* get the ins handle - its id is 5 */
+    block = VMFind(hmInvFile, NullHandle, 5);
+
+    /* and lock the block */
+    VMLock(hmInvFile, block, &mh);
+
+    /* resize and lock the associated mem block */
+    newmh = MemReAlloc(mh,(numIns *(sizeof(InsStruct))), HAF_LOCK);
+
+    /* get its address */
+    mins = MemDeref(newmh);
+
+    /* add the new insurance info */
+    @call InsTypeField::MSG_VIS_TEXT_GET_ALL_PTR(
+                 mins[(numIns - 1)].IS_type);
+    @call InsCompField::MSG_VIS_TEXT_GET_ALL_PTR(
+                 mins[(numIns - 1)].IS_comp);
+    @call InsPolField::MSG_VIS_TEXT_GET_ALL_PTR(
+                 mins[(numIns - 1)].IS_pol);
+    @call InsCovField::MSG_VIS_TEXT_GET_ALL_PTR(
+                 mins[(numIns - 1)].IS_cov);
+    @call InsTermField::MSG_VIS_TEXT_GET_ALL_PTR(
+                 mins[(numIns - 1)].IS_term);
+    @call InsPremField::MSG_VIS_TEXT_GET_ALL_PTR(
+                 mins[(numIns - 1)].IS_prem);
+    @call InsAgentField::MSG_VIS_TEXT_GET_ALL_PTR(
+                 mins[(numIns - 1)].IS_agent);
+    @call InsPhoneField::MSG_VIS_TEXT_GET_ALL_PTR(
+                 mins[(numIns - 1)].IS_phone);
+    @call InsNotesField::MSG_VIS_TEXT_GET_ALL_PTR(
+                 mins[(numIns - 1)].IS_notes);
+
+    VMDirty(mh);
+    VMUnlock(mh);
+    MemUnlock(mh);
+    MemUnlock(newmh);
+
+    /* Now we clear the fields */
+    ISclearFields();
+
+    /* Tell the list */
+    @send InsDList::MSG_GEN_DYNAMIC_LIST_ADD_ITEMS((numIns - 1), 1);
+
+}
+
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_EDIT_INS_NAME for HInvProcessClass
+ *
+ * DESCRIPTION:	Edits an insurance entry
+ *              
+ ***********************************************************************/
+
+@extern method HInvProcessClass, MSG_EDIT_INS_NAME
+{
+    InsStruct      *ins;
+    VMBlockHandle    block;
+    MemHandle        mh;
+
+    /* first check to see if a policy is selected */
+    if ( currentIns != GIGS_NONE ) {
+
+       /* OK - put up are you sure you want to change box */
+       if 	((UserStandardDialogOptr(
+			    NullOptr,
+			    NullOptr,
+			    NullOptr,
+			    NullOptr,
+			    @chapol,
+			    ((CDT_WARNING << CDBF_DIALOG_TYPE_OFFSET) |
+			    (GIT_AFFIRMATION << CDBF_INTERACTION_TYPE_OFFSET))
+                            ) == IC_YES))  {
+
+       /* get the ins handle - its id is 5 */
+       block = VMFind(hmInvFile, NullHandle, 5);
+
+       /* and lock the block */
+       ins = VMLock(hmInvFile, block, &mh);
+
+       /* change the data */
+       @call InsTypeField::MSG_VIS_TEXT_GET_ALL_PTR(
+                     ins[currentIns].IS_type);
+       @call InsCompField::MSG_VIS_TEXT_GET_ALL_PTR(
+                     ins[currentIns].IS_comp);
+       @call InsPolField::MSG_VIS_TEXT_GET_ALL_PTR(
+                     ins[currentIns].IS_pol);
+       @call InsCovField::MSG_VIS_TEXT_GET_ALL_PTR(
+                     ins[currentIns].IS_cov);
+       @call InsTermField::MSG_VIS_TEXT_GET_ALL_PTR(
+                     ins[currentIns].IS_term);
+       @call InsPremField::MSG_VIS_TEXT_GET_ALL_PTR(
+                     ins[currentIns].IS_prem);
+       @call InsAgentField::MSG_VIS_TEXT_GET_ALL_PTR(
+                     ins[currentIns].IS_agent);
+       @call InsPhoneField::MSG_VIS_TEXT_GET_ALL_PTR(
+                     ins[currentIns].IS_phone);
+       @call InsNotesField::MSG_VIS_TEXT_GET_ALL_PTR(
+                     ins[currentIns].IS_notes);
+
+       VMDirty(mh);
+       VMUnlock(mh);
+
+       /* Now we clear the fields */
+       ISclearFields();
+
+       /* change the list */
+       @send InsDList::MSG_GEN_DYNAMIC_LIST_INITIALIZE(GDLI_NO_CHANGE);
+
+       }  /* end of are you sure if */
+
+    }  /* end of selection check if */
+
+
+}
+
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_DELETE_INS for HInvProcessClass
+ *
+ * DESCRIPTION:	Deletes an insurance entry
+ *              
+ ***********************************************************************/
+
+@extern method HInvProcessClass, MSG_DELETE_INS
+{
+    InsStruct       *mins;
+    VMBlockHandle     houseblock;
+    HouseStruct *     houseMemPtr ;
+    word              numIns, i;
+    VMBlockHandle     block;
+    MemHandle         mh, newmh;
+
+    /* Exit if no policy selected */
+    if (currentIns == GIGS_NONE)
+        return;
+    /* put up an Are you sure box */
+       if 	((UserStandardDialogOptr(
+			    NullOptr,
+			    NullOptr,
+			    NullOptr,
+			    NullOptr,
+			    @delpol,
+			    ((CDT_WARNING << CDBF_DIALOG_TYPE_OFFSET) |
+			    (GIT_AFFIRMATION << CDBF_INTERACTION_TYPE_OFFSET))
+                            ) == IC_YES))  {
+
+    /* Lock the map item, get number of policies, decrement and unlock it */
+    houseblock = VMGetMapBlock(hmInvFile);
+    houseMemPtr = VMLock(hmInvFile, houseblock, &mh);
+    numIns = houseMemPtr->HS_numIns;
+    numIns--;                         /* remember this new num is used */
+    houseMemPtr->HS_numIns = numIns;    /* in the rest of the method!!! */
+    VMDirty(mh);
+    VMUnlock(mh);
+
+    /* get the acct handle - its id is 5 */
+    block = VMFind(hmInvFile, NullHandle, 5);
+
+    /* and lock the block */
+    VMLock(hmInvFile, block, &mh);
+
+    /* get the address of the associated mem block */
+    mins = MemLock(mh);
+
+    /* loop thru to delete policy & info 
+     * unless only policy deleted...
+     * Still want to keep an empty structure so there'll
+     * always be a mem block assoc with the VM block
+     * just as at initialization of new file */
+    if (numIns == 0) {
+       strcpy(mins[0].IS_type, "");
+       strcpy(mins[0].IS_comp, "");
+       strcpy(mins[0].IS_pol, "");
+       strcpy(mins[0].IS_cov, "");
+       strcpy(mins[0].IS_term, "");
+       strcpy(mins[0].IS_prem, "");
+       strcpy(mins[0].IS_agent, "");
+       strcpy(mins[0].IS_phone, "");
+       strcpy(mins[0].IS_notes, "");
+       }
+
+    for (i = currentIns; i < numIns; i++) {
+       strcpy(mins[i].IS_type, mins[i+1].IS_type);
+       strcpy(mins[i].IS_comp, mins[i+1].IS_comp);
+       strcpy(mins[i].IS_pol, mins[i+1].IS_pol);
+       strcpy(mins[i].IS_cov, mins[i+1].IS_cov);
+       strcpy(mins[i].IS_term, mins[i+1].IS_term);
+       strcpy(mins[i].IS_prem, mins[i+1].IS_prem);
+       strcpy(mins[i].IS_agent, mins[i+1].IS_agent);
+       strcpy(mins[i].IS_phone, mins[i+1].IS_phone);
+       strcpy(mins[i].IS_notes, mins[i+1].IS_notes);
+       }
+
+    /* resize the associated mem block
+     * if not the only remaining struct */
+    if (numIns != 0) {
+       newmh = MemReAlloc(mh,((numIns+1)*(sizeof(InsStruct))), HAF_LOCK);
+       MemUnlock(newmh);
+       }
+
+    VMDirty(mh);
+    VMUnlock(mh);
+    MemUnlock(mh);
+    
+    /* Now we clear the fields */
+    ISclearFields();
+
+    /* Tell the list */
+    @send InsDList::MSG_GEN_DYNAMIC_LIST_REMOVE_ITEMS(currentIns, 1);
+
+    } /* end of are you sure if */
+}
+
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_INS_LIST_MONIKER_QUERY for HInvProcessClass
+ *
+ * DESCRIPTION:	Queries for monikers for insurance list.
+ *
+ * PARAMETERS:  void (optr list, word item)
+ *
+ *
+ ***********************************************************************/
+
+@extern method HInvProcessClass, MSG_INS_LIST_MONIKER_QUERY
+{
+    InsStruct       *ins;
+    VMBlockHandle    block;
+    MemHandle        mh;
+
+    /* get the ins handle - its id is 5 */
+    block = VMFind(hmInvFile, NullHandle, 5);
+
+    /* and lock the block */
+    ins = VMLock(hmInvFile, block, &mh);
+
+    /* Set the text in the list item. */
+    @call list::MSG_GEN_DYNAMIC_LIST_REPLACE_ITEM_TEXT(item, ins[item].IS_type);
+
+    /* Unlock the block. */
+    VMUnlock(mh);
+}
+
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_INS_LIST_APPLY for HInvProcessClass
+ *
+ * DESCRIPTION:	Handles an apply of user changes to the insurance list.
+ *
+ * PARAMETERS:  void (word selection, numSelections, flags)
+ *
+ ***********************************************************************/
+
+@extern method HInvProcessClass, MSG_INS_LIST_APPLY
+{
+    InsStruct       *ins;
+    VMBlockHandle    block;
+    MemHandle        mh;
+
+    /* Set the current insurance global variable */
+    currentIns = selection;
+
+    /* get the ins handle - its id is 5 */
+    block = VMFind(hmInvFile, NullHandle, 5);
+
+    /* and lock the block */
+    ins = VMLock(hmInvFile, block, &mh);
+
+    /* Now we set up fields based on new policy. */
+    @call InsTypeField::MSG_VIS_TEXT_REPLACE_ALL_PTR(
+		ins[currentIns].IS_type, 0);
+    @call InsCompField::MSG_VIS_TEXT_REPLACE_ALL_PTR(
+		ins[currentIns].IS_comp, 0);
+    @call InsPolField::MSG_VIS_TEXT_REPLACE_ALL_PTR(
+		ins[currentIns].IS_pol, 0);
+    @call InsCovField::MSG_VIS_TEXT_REPLACE_ALL_PTR(
+		ins[currentIns].IS_cov, 0);
+    @call InsTermField::MSG_VIS_TEXT_REPLACE_ALL_PTR(
+		ins[currentIns].IS_term, 0);
+    @call InsPremField::MSG_VIS_TEXT_REPLACE_ALL_PTR(
+		ins[currentIns].IS_prem, 0);
+    @call InsAgentField::MSG_VIS_TEXT_REPLACE_ALL_PTR(
+		ins[currentIns].IS_agent, 0);
+    @call InsPhoneField::MSG_VIS_TEXT_REPLACE_ALL_PTR(
+		ins[currentIns].IS_phone, 0);
+    @call InsNotesField::MSG_VIS_TEXT_REPLACE_ALL_PTR(
+		ins[currentIns].IS_notes, 0);
+
+    /* Unlock the block. */
+    VMUnlock(mh);
+
+}
+
+/*------------------------------------------------------------------
+ *  FUNCTION	ISclearFields
+ *-------------------------------------------------------------------
+ */
+ void ISclearFields() {
+
+    /* Now we clear the fields */
+    @call InsTypeField::MSG_VIS_TEXT_REPLACE_ALL_PTR("", 0);
+    @call InsCompField::MSG_VIS_TEXT_REPLACE_ALL_PTR("", 0);
+    @call InsPolField::MSG_VIS_TEXT_REPLACE_ALL_PTR("", 0);
+    @call InsCovField::MSG_VIS_TEXT_REPLACE_ALL_PTR("", 0);
+    @call InsTermField::MSG_VIS_TEXT_REPLACE_ALL_PTR("", 0);
+    @call InsPremField::MSG_VIS_TEXT_REPLACE_ALL_PTR("", 0);
+    @call InsAgentField::MSG_VIS_TEXT_REPLACE_ALL_PTR("", 0);
+    @call InsPhoneField::MSG_VIS_TEXT_REPLACE_ALL_PTR("", 0);
+    @call InsNotesField::MSG_VIS_TEXT_REPLACE_ALL_PTR("", 0);
+
+}
+
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_OPEN_INV_DB for HInvProcessClass
+ *
+ * DESCRIPTION:	calls the dialog box when INV button
+ *               is clicked.  
+ *              Done so that buttons would expand to full width
+ *               which doesn't work w/GenInters
+ *     
+ ***********************************************************************/
+
+@extern method HInvProcessClass, MSG_OPEN_INV_DB
+{
+
+    /* set to no selections */
+    @call InvDList::MSG_GEN_ITEM_GROUP_SET_NONE_SELECTED(FALSE);
+		/* This is to keep old data (from the entry fields)
+		 * from cluttering things up
+                 */
+    /* Now we clear the fields */
+    IVclearFields();
+
+    @call InvBox::MSG_GEN_INTERACTION_INITIATE();
+}
+
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_NEW_INV for HInvProcessClass
+ *
+ * DESCRIPTION:	Creates a new investment entry
+ *              
+ ***********************************************************************/
+
+@extern method HInvProcessClass, MSG_NEW_INV
+{
+    InvStruct         *minv;
+    VMBlockHandle     houseblock;
+    HouseStruct *     houseMemPtr ;
+    word              numInv;
+    char              field1[50];
+    VMBlockHandle     block;
+    MemHandle         mh, newmh;
+
+    /*
+     * Retrieve the name of the new investment from the type field.
+     */
+    @call InvTypeField::MSG_VIS_TEXT_GET_ALL_PTR(field1);
+
+    /* Exit if investment is blank. */
+    if (*field1 == 0)
+        return;
+
+    /* Lock the map item, get number of investments, increment and unlock it */
+    houseblock = VMGetMapBlock(hmInvFile);
+    houseMemPtr = VMLock(hmInvFile, houseblock, &mh);
+    numInv = houseMemPtr->HS_numInv;
+    numInv++;                         /* remember this new num is used */
+    houseMemPtr->HS_numInv = numInv;    /* in the rest of the method!!! */
+    VMDirty(mh);
+    VMUnlock(mh);
+
+    /* get the inv handle - its id is 6 */
+    block = VMFind(hmInvFile, NullHandle, 6);
+
+    /* and lock the block */
+    VMLock(hmInvFile, block, &mh);
+
+    /* resize and lock the associated mem block */
+    newmh = MemReAlloc(mh,(numInv *(sizeof(InvStruct))), HAF_LOCK);
+
+    /* get its address */
+    minv = MemDeref(newmh);
+
+    /* add the new investment info */
+    @call InvTypeField::MSG_VIS_TEXT_GET_ALL_PTR(
+                  minv[(numInv - 1)].InvS_type);
+    @call InvNameField::MSG_VIS_TEXT_GET_ALL_PTR(
+                  minv[(numInv - 1)].InvS_name);
+    @call InvUnitsField::MSG_VIS_TEXT_GET_ALL_PTR(
+                  minv[(numInv - 1)].InvS_units);
+    @call InvPriceField::MSG_VIS_TEXT_GET_ALL_PTR(
+                  minv[(numInv - 1)].InvS_price);
+    @call InvDateField::MSG_VIS_TEXT_GET_ALL_PTR(
+                  minv[(numInv - 1)].InvS_date);
+    @call InvFromField::MSG_VIS_TEXT_GET_ALL_PTR(
+                  minv[(numInv - 1)].InvS_from);
+    @call InvDivField::MSG_VIS_TEXT_GET_ALL_PTR(
+                  minv[(numInv - 1)].InvS_div);
+    @call InvDocField::MSG_VIS_TEXT_GET_ALL_PTR(
+                  minv[(numInv - 1)].InvS_doc);
+    @call InvNotesField::MSG_VIS_TEXT_GET_ALL_PTR(
+                  minv[(numInv - 1)].InvS_notes);
+
+    VMDirty(mh);
+    VMUnlock(mh);
+    MemUnlock(mh);
+    MemUnlock(newmh);
+
+    /* Now we clear the fields */
+    IVclearFields();
+
+    /* Tell the list */
+    @send InvDList::MSG_GEN_DYNAMIC_LIST_ADD_ITEMS((numInv - 1), 1);
+
+}
+
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_EDIT_INV_NAME for HInvProcessClass
+ *
+ * DESCRIPTION:	Edits an investment entry
+ *              
+ ***********************************************************************/
+
+@extern method HInvProcessClass, MSG_EDIT_INV_NAME
+{
+    InvStruct      *inv;
+    VMBlockHandle    block;
+    MemHandle        mh;
+
+    /* first check to see if an investment is selected */
+    if ( currentInv != GIGS_NONE ) {
+       /* OK - put up are you sure you want to change box */
+       if 	((UserStandardDialogOptr(
+			    NullOptr,
+			    NullOptr,
+			    NullOptr,
+			    NullOptr,
+			    @chainv,
+			    ((CDT_WARNING << CDBF_DIALOG_TYPE_OFFSET) |
+			    (GIT_AFFIRMATION << CDBF_INTERACTION_TYPE_OFFSET))
+                            ) == IC_YES))  {
+
+       /* get the inv handle - its id is 6 */
+       block = VMFind(hmInvFile, NullHandle, 6);
+
+       /* and lock the block */
+       inv = VMLock(hmInvFile, block, &mh);
+   
+       /* change the data */
+       @call InvTypeField::MSG_VIS_TEXT_GET_ALL_PTR(
+                     inv[currentInv].InvS_type);
+       @call InvNameField::MSG_VIS_TEXT_GET_ALL_PTR(
+                     inv[currentInv].InvS_name);
+       @call InvUnitsField::MSG_VIS_TEXT_GET_ALL_PTR(
+                     inv[currentInv].InvS_units);
+       @call InvPriceField::MSG_VIS_TEXT_GET_ALL_PTR(
+                     inv[currentInv].InvS_price);
+       @call InvDateField::MSG_VIS_TEXT_GET_ALL_PTR(
+                     inv[currentInv].InvS_date);
+       @call InvFromField::MSG_VIS_TEXT_GET_ALL_PTR(
+                     inv[currentInv].InvS_from);
+       @call InvDivField::MSG_VIS_TEXT_GET_ALL_PTR(
+                     inv[currentInv].InvS_div);
+       @call InvDocField::MSG_VIS_TEXT_GET_ALL_PTR(
+                     inv[currentInv].InvS_doc);
+       @call InvNotesField::MSG_VIS_TEXT_GET_ALL_PTR(
+                     inv[currentInv].InvS_notes);
+
+       VMDirty(mh);
+       VMUnlock(mh);
+
+       /* Now we clear the fields */
+       IVclearFields();
+
+       /* change the list */
+       @send InvDList::MSG_GEN_DYNAMIC_LIST_INITIALIZE(GDLI_NO_CHANGE);
+
+       }  /* end of are you sure if */
+
+    }  /* end of selection check if */
+
+
+}
+
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_DELETE_INV for HInvProcessClass
+ *
+ * DESCRIPTION:	Deletes an investment entry
+ *              
+ ***********************************************************************/
+
+@extern method HInvProcessClass, MSG_DELETE_INV
+{
+    InvStruct       *minv;
+    VMBlockHandle     houseblock;
+    HouseStruct *     houseMemPtr ;
+    word              numInv, i;
+    VMBlockHandle     block;
+    MemHandle         mh, newmh;
+
+    /* Exit if no investment selected */
+    if (currentInv == GIGS_NONE)
+        return;
+    /* put up an Are you sure box */
+       if 	((UserStandardDialogOptr(
+			    NullOptr,
+			    NullOptr,
+			    NullOptr,
+			    NullOptr,
+			    @delinv,
+			    ((CDT_WARNING << CDBF_DIALOG_TYPE_OFFSET) |
+			    (GIT_AFFIRMATION << CDBF_INTERACTION_TYPE_OFFSET))
+                            ) == IC_YES))  {
+
+    /* Lock the map item, get number of investments, decrement and unlock it */
+    houseblock = VMGetMapBlock(hmInvFile);
+    houseMemPtr = VMLock(hmInvFile, houseblock, &mh);
+    numInv = houseMemPtr->HS_numInv;
+    numInv--;                         /* remember this new num is used */
+    houseMemPtr->HS_numInv = numInv;    /* in the rest of the method!!! */
+    VMDirty(mh);
+    VMUnlock(mh);
+
+    /* get the inv handle - its id is 6 */
+    block = VMFind(hmInvFile, NullHandle, 6);
+
+    /* and lock the block */
+    VMLock(hmInvFile, block, &mh);
+
+    /* get the address of the associated mem block */
+    minv = MemLock(mh);
+
+    /* loop thru to delete inv & info 
+     * unless only investment deleted...
+     * Still want to keep an empty structure so there'll
+     * always be a mem block assoc with the VM block
+     * just as at initialization of new file */
+    if (numInv == 0) {
+       strcpy(minv[0].InvS_type, "");
+       strcpy(minv[0].InvS_name, "");
+       strcpy(minv[0].InvS_units, "");
+       strcpy(minv[0].InvS_price, "");
+       strcpy(minv[0].InvS_date, "");
+       strcpy(minv[0].InvS_from, "");
+       strcpy(minv[0].InvS_div, "");
+       strcpy(minv[0].InvS_doc, "");
+       strcpy(minv[0].InvS_notes, "");
+       }
+
+    for (i = currentInv; i < numInv; i++) {
+       strcpy(minv[i].InvS_type, minv[i+1].InvS_type);
+       strcpy(minv[i].InvS_name, minv[i+1].InvS_name);
+       strcpy(minv[i].InvS_units, minv[i+1].InvS_units);
+       strcpy(minv[i].InvS_price, minv[i+1].InvS_price);
+       strcpy(minv[i].InvS_date, minv[i+1].InvS_date);
+       strcpy(minv[i].InvS_from, minv[i+1].InvS_from);
+       strcpy(minv[i].InvS_div, minv[i+1].InvS_div);
+       strcpy(minv[i].InvS_doc, minv[i+1].InvS_doc);
+       strcpy(minv[i].InvS_notes, minv[i+1].InvS_notes);
+       }
+
+    /* resize the associated mem block
+     * if not the only remaining struct */
+    if (numInv != 0) {
+       newmh = MemReAlloc(mh,((numInv+1)*(sizeof(InvStruct))), HAF_LOCK);
+       MemUnlock(newmh);
+       }
+
+    VMDirty(mh);
+    VMUnlock(mh);
+    MemUnlock(mh);
+    
+    /* Now we clear the fields */
+    IVclearFields();
+
+    /* Tell the list */
+    @send InvDList::MSG_GEN_DYNAMIC_LIST_REMOVE_ITEMS(currentInv, 1);
+
+    } /* end of are you sure if */
+}
+
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_INV_LIST_MONIKER_QUERY for HInvProcessClass
+ *
+ * DESCRIPTION:	Queries for monikers for inventory list.
+ *
+ * PARAMETERS:  void (optr list, word item)
+ *
+ *
+ ***********************************************************************/
+
+@extern method HInvProcessClass, MSG_INV_LIST_MONIKER_QUERY
+{
+    InvStruct       *inv;
+    VMBlockHandle    block;
+    MemHandle        mh;
+
+    /* get the inv handle - its id is 6 */
+    block = VMFind(hmInvFile, NullHandle, 6);
+
+    /* and lock the block */
+    inv = VMLock(hmInvFile, block, &mh);
+
+    /* Set the text in the list item. */
+    @call list::MSG_GEN_DYNAMIC_LIST_REPLACE_ITEM_TEXT(item, inv[item].InvS_type);
+
+    /* Unlock the block. */
+    VMUnlock(mh);
+}
+
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_INV_LIST_APPLY for HInvProcessClass
+ *
+ * DESCRIPTION:	Handles an apply of user changes to the inventory list.
+ *
+ * PARAMETERS:  void (word selection, numSelections, flags)
+ *
+ * 
+ *
+ ***********************************************************************/
+
+@extern method HInvProcessClass, MSG_INV_LIST_APPLY
+{
+    InvStruct       *inv;
+    VMBlockHandle    block;
+    MemHandle        mh;
+
+    /* Set the current insurance global variable */
+    currentInv = selection;
+
+    /* get the inv handle - its id is 6 */
+    block = VMFind(hmInvFile, NullHandle, 6);
+
+    /* and lock the block */
+    inv = VMLock(hmInvFile, block, &mh);
+
+    /* Now we set up fields based on new investment. */
+    @call InvTypeField::MSG_VIS_TEXT_REPLACE_ALL_PTR(
+		inv[currentInv].InvS_type, 0);
+    @call InvNameField::MSG_VIS_TEXT_REPLACE_ALL_PTR(
+		inv[currentInv].InvS_name, 0);
+    @call InvUnitsField::MSG_VIS_TEXT_REPLACE_ALL_PTR(
+		inv[currentInv].InvS_units, 0);
+    @call InvPriceField::MSG_VIS_TEXT_REPLACE_ALL_PTR(
+		inv[currentInv].InvS_price, 0);
+    @call InvDateField::MSG_VIS_TEXT_REPLACE_ALL_PTR(
+		inv[currentInv].InvS_date, 0);
+    @call InvFromField::MSG_VIS_TEXT_REPLACE_ALL_PTR(
+		inv[currentInv].InvS_from, 0);
+    @call InvDivField::MSG_VIS_TEXT_REPLACE_ALL_PTR(
+		inv[currentInv].InvS_div, 0);
+    @call InvDocField::MSG_VIS_TEXT_REPLACE_ALL_PTR(
+		inv[currentInv].InvS_doc, 0);
+    @call InvNotesField::MSG_VIS_TEXT_REPLACE_ALL_PTR(
+		inv[currentInv].InvS_notes, 0);
+
+    /* Unlock the block. */
+    VMUnlock(mh);
+
+}
+
+/*------------------------------------------------------------------
+ *  FUNCTION	IVclearFields
+ *-------------------------------------------------------------------
+ */
+ void IVclearFields() {
+
+    /* Now we clear the fields */
+    @call InvTypeField::MSG_VIS_TEXT_REPLACE_ALL_PTR("", 0);
+    @call InvNameField::MSG_VIS_TEXT_REPLACE_ALL_PTR("", 0);
+    @call InvUnitsField::MSG_VIS_TEXT_REPLACE_ALL_PTR("", 0);
+    @call InvPriceField::MSG_VIS_TEXT_REPLACE_ALL_PTR("", 0);
+    @call InvDateField::MSG_VIS_TEXT_REPLACE_ALL_PTR("", 0);
+    @call InvFromField::MSG_VIS_TEXT_REPLACE_ALL_PTR("", 0);
+    @call InvDivField::MSG_VIS_TEXT_REPLACE_ALL_PTR("", 0);
+    @call InvDocField::MSG_VIS_TEXT_REPLACE_ALL_PTR("", 0);
+    @call InvNotesField::MSG_VIS_TEXT_REPLACE_ALL_PTR("", 0);
+
+}
+

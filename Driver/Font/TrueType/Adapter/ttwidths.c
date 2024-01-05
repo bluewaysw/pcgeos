@@ -49,19 +49,18 @@ static void CalcScaleForWidths( TRUETYPE_VARS,
                         WWFixedAsDWord          pointSize,
                         TextStyle               styleToImplement );
 
-static void CalcTransform( TRUETYPE_VARS,
+static void CalcTransform( 
                         TransformMatrix*        transMatrix,
                         FontMatrix*             fontMatrix, 
-                        WWFixedAsDWord          pointSize,
+                        FontBuf*                fontBuf,
                         TextStyle               stylesToImplement );
 
 static void AdjustFontBuf( TransformMatrix*     transMatrix, 
                         FontMatrix*             fontMatrix, 
-                        TextStyle               stylesToImplement, 
                         FontBuf*                fontBuf );
 
 static Boolean IsRegionNeeded( TransformMatrix* transMatrix, 
-                        FontMatrix* fontMatrix, FontBuf* fontBuf );
+                        FontBuf*                fontBuf );
 
 
 #define ROUND_WWFIXED( value )    ( value & 0xffff ? ( value >> 16 ) + 1 : value >> 16 )
@@ -141,9 +140,11 @@ EC(     ECCheckBounds( (void*)trueTypeVars ) );
 
         // get filename an load ttf file 
         trueTypeOutline = LMemDerefHandles( MemPtrToHandle( (void*)fontInfo ), headerEntry->OE_handle );
+EC(     ECCheckBounds( (void*)trueTypeOutline ) );
 
         // get pointer to FontHeader
         fontHeader = LMemDerefHandles( MemPtrToHandle( (void*)fontInfo ), firstEntry->OE_handle );
+EC(     ECCheckBounds( (void*)fontHeader ) );
 
         if( TrueType_Lock_Face(trueTypeVars, trueTypeOutline) )
                 goto Fail;
@@ -154,6 +155,7 @@ EC(     ECCheckBounds( (void*)trueTypeVars ) );
                                fontHeader->FH_kernCount, 
                                &fontHandle );
         fontBuf = (FontBuf*)MemDeref( fontHandle );
+EC(     ECCheckBounds( (void*) fontBuf ) );
 
         /* initialize fields in FontBuf that do not have to be scaled */
         fontBuf->FB_dataSize     = size;
@@ -183,13 +185,14 @@ EC(     ECCheckBounds( (void*)trueTypeVars ) );
 
         /* calculate the transformation matrix and copy it into the FontBlock */
         transMatrix = (TransformMatrix*)(((byte*)fontBuf) + sizeof( FontBuf ) + fontHeader->FH_numChars * sizeof( CharTableEntry ));
-        CalcTransform( trueTypeVars, transMatrix, fontMatrix, pointSize, stylesToImplement );
+EC(     ECCheckBounds( (void*)transMatrix ) );
+        CalcTransform( transMatrix, fontMatrix, fontBuf, stylesToImplement );
 
-        //TODO: adjust FB_height, FB_minTSB, FB_pixHeight and FB_baselinePos
-        AdjustFontBuf( transMatrix, fontMatrix, stylesToImplement, fontBuf );
+        /* adjust FB_height, FB_minTSB, FB_pixHeight and FB_baselinePos */
+        AdjustFontBuf( transMatrix, fontMatrix, fontBuf );
 
         /* Are the glyphs rendered as regions? */
-        if( IsRegionNeeded( transMatrix, fontMatrix, fontBuf ) )
+        if( IsRegionNeeded( transMatrix, fontBuf ) )
                 fontBuf->FB_flags |= FBF_IS_REGION;
 
         TrueType_Unlock_Face( trueTypeVars );
@@ -329,6 +332,9 @@ static void ConvertKernPairs( TRUETYPE_VARS, FontBuf* fontBuf )
         BBFixed*   kernValue = (BBFixed*) ( ( (byte*)fontBuf ) + fontBuf->FB_kernValues );
 
 
+EC(     ECCheckBounds( (void*)kernPair ) );
+EC(     ECCheckBounds( (void*)kernValue ) );
+
         /* load kerning directory */
         if( TT_Get_Kerning_Directory( FACE, &kerningDir ) )
                 return;
@@ -413,8 +419,7 @@ static void CalcScaleForWidths( TRUETYPE_VARS, WWFixedAsDWord pointSize,
  * SYNOPSIS:	  Calculates the transformation matrix for missing
  *                style attributes and weights.
  * 
- * PARAMETERS:    TRUETYPE_VARS         Cached variables needed by driver.
- *                *transMatrix          Pointer to TransformMatrix.
+ * PARAMETERS:    *transMatrix          Pointer to TransformMatrix.
  *                *fontMatrix           Systems transformation matrix.
  *                styleToImplement      Styles that must be added.
  *                      
@@ -428,24 +433,18 @@ static void CalcScaleForWidths( TRUETYPE_VARS, WWFixedAsDWord pointSize,
  *      20/12/22  JK        Initial Revision
  *******************************************************************/
 
-static void CalcTransform( TRUETYPE_VARS,
-                           TransformMatrix*  transMatrix, 
+static void CalcTransform( TransformMatrix*  transMatrix, 
                            FontMatrix*       fontMatrix, 
-                           WWFixedAsDWord    pointSize,
+                           FontBuf*          fontBuf,
                            TextStyle         stylesToImplement )
 {
-        TT_Matrix  tempMatrix;
+        TT_Matrix  tempMatrix = { 1L << 16, 0, 0, 1L << 16 };
  
 
 EC(     ECCheckBounds( (void*)transMatrix ) );
 EC(     ECCheckBounds( (void*)fontMatrix ) );
 
-        /* copy fontMatrix into transMatrix */
-        tempMatrix.xx           = 1L << 16;
-        tempMatrix.xy           = 0;
-        tempMatrix.yx           = 0;
-        tempMatrix.yy           = 1L << 16;
-
+        /* initialize transMatrix */
         transMatrix->TM_heightX = 0;
         transMatrix->TM_scriptX = 0;
         transMatrix->TM_heightY = 0;
@@ -457,33 +456,41 @@ EC(     ECCheckBounds( (void*)fontMatrix ) );
 
         /* fake italic style       */
         if( stylesToImplement & TS_ITALIC )
-                tempMatrix.xy = ITALIC_FACTOR;
+                tempMatrix.yx = NEGATVE_ITALIC_FACTOR;
 
         /* fake script style      */
         if( stylesToImplement & ( TS_SUBSCRIPT | TS_SUPERSCRIPT ) )
         {      
+                WWFixedAsDWord scriptOffset = WBFIXED_TO_WWFIXEDASDWORD( fontBuf->FB_height ) + 
+                                              WBFIXED_TO_WWFIXEDASDWORD( fontBuf->FB_heightAdjust );
+
+
                 tempMatrix.xx = GrMulWWFixed( tempMatrix.xx, SCRIPT_FACTOR );
                 tempMatrix.yy = GrMulWWFixed( tempMatrix.yy, SCRIPT_FACTOR );
 
                 if( stylesToImplement & TS_SUBSCRIPT )
                 {
-                        transMatrix->TM_scriptY = GrMulWWFixed( SUBSCRIPT_OFFSET, pointSize ) >> 16;
+                        //TODO: Is rounding necessary here?
+                        transMatrix->TM_scriptY = GrMulWWFixed( scriptOffset, SUBSCRIPT_OFFSET ) >> 16;
                 }
                 else
                 {
-                        transMatrix->TM_scriptY = -( GrMulWWFixed( SUPERSCRIPT_OFFSET, pointSize ) ) >> 16;
+                        //TODO: Is rounding necessary here?
+                        transMatrix->TM_scriptY = ( GrMulWWFixed( scriptOffset, SUPERSCRIPT_OFFSET) -
+                                                WBFIXED_TO_WWFIXEDASDWORD( fontBuf->FB_baselinePos ) -
+                                                WBFIXED_TO_WWFIXEDASDWORD( fontBuf->FB_baseAdjust ) ) >> 16;
                 }
         }
 
+        //TODO: width and weight
+
         /* integrate fontMatrix */
-        transMatrix->TM_matrix.xx = GrMulWWFixed( tempMatrix.xx, fontMatrix->FM_11 ) +
-                                    GrMulWWFixed( tempMatrix.xy, fontMatrix->FM_21 );
-        transMatrix->TM_matrix.xy = GrMulWWFixed( tempMatrix.xx, fontMatrix->FM_12 ) +
-                                    GrMulWWFixed( tempMatrix.xy, fontMatrix->FM_22 );
-        transMatrix->TM_matrix.yx = GrMulWWFixed( tempMatrix.yx, fontMatrix->FM_11 ) +
-                                    GrMulWWFixed( tempMatrix.yy, fontMatrix->FM_21 );
-        transMatrix->TM_matrix.yy = GrMulWWFixed( tempMatrix.yx, fontMatrix->FM_12 ) +
-                                    GrMulWWFixed( tempMatrix.yy, fontMatrix->FM_22 );
+        transMatrix->TM_matrix.xx = GrMulWWFixed( tempMatrix.xx, fontMatrix->FM_11 );
+        transMatrix->TM_matrix.xy = - ( GrMulWWFixed( tempMatrix.yx, fontMatrix->FM_11 ) +
+                                    GrMulWWFixed( tempMatrix.yy, fontMatrix->FM_21 ) );
+        transMatrix->TM_matrix.yx = - ( GrMulWWFixed( tempMatrix.xx, fontMatrix->FM_12 ) +
+                                    GrMulWWFixed( tempMatrix.xy, fontMatrix->FM_22 ) );
+        transMatrix->TM_matrix.yy = GrMulWWFixed( tempMatrix.yy, fontMatrix->FM_22 );
 }
 
 
@@ -523,11 +530,13 @@ static word AllocFontBlock( word        additionalSpace,
                 *fontHandle = MemAllocSetOwner( FONT_MAN_ID, MAX_FONTBUF_SIZE, 
                         HF_SWAPABLE | HF_SHARABLE | HF_DISCARDABLE,
                         HAF_NO_ERR | HAF_LOCK | HAF_ZERO_INIT );
+EC(             ECCheckMemHandle( *fontHandle ) );
                 HandleP( *fontHandle );
         }
         else
         {
                 MemReAlloc( *fontHandle, MAX_FONTBUF_SIZE, HAF_NO_ERR | HAF_LOCK );
+EC(             ECCheckMemHandle( *fontHandle ) );
         }
 
         return size;
@@ -658,51 +667,40 @@ static void ConvertHeader( TRUETYPE_VARS, FontHeader* fontHeader, FontBuf* fontB
  *******************************************************************/
 
 static void AdjustFontBuf( TransformMatrix* transMatrix, 
-                           FontMatrix*      fontMatrix, 
-                           TextStyle        stylesToImplement, 
+                           FontMatrix*      fontMatrix,         
                            FontBuf*         fontBuf )
 {
-        sword savedHeightY = transMatrix->TM_heightY;
+        transMatrix->TM_heightY = fontBuf->FB_baselinePos.WBF_int + BASELINE_CORRECTION;
 
-
-        transMatrix->TM_heightY = INTEGER_OF_WWFIXEDASDWORD( GrMulWWFixed( WORD_TO_WWFIXEDASDWORD( fontBuf->FB_baselinePos.WBF_int ), fontMatrix->FM_22 ) ) + BASELINE_CORRECTION;
-        transMatrix->TM_scriptY = INTEGER_OF_WWFIXEDASDWORD( GrMulWWFixed( WORD_TO_WWFIXEDASDWORD( transMatrix->TM_scriptY ), fontMatrix->FM_22 ) );
-
+        /* transformation if rotated or scaled */
         if( fontMatrix->FM_flags & TF_COMPLEX )
         {
+                sword savedScriptY = transMatrix->TM_scriptY;
+
+
                 fontBuf->FB_flags     |= FBF_IS_COMPLEX;
 
+                transMatrix->TM_heightY = INTEGER_OF_WWFIXEDASDWORD( GrMulWWFixed( 
+                                                WORD_TO_WWFIXEDASDWORD( transMatrix->TM_heightY ), fontMatrix->FM_22 ) );
+                transMatrix->TM_scriptY = INTEGER_OF_WWFIXEDASDWORD( GrMulWWFixed( 
+                                                WORD_TO_WWFIXEDASDWORD( transMatrix->TM_scriptY ), fontMatrix->FM_22 ) );
+                            
                 /* adjust FB_pixHeight, FB_minTSB */
                 fontBuf->FB_pixHeight = INTEGER_OF_WWFIXEDASDWORD( GrMulWWFixed( 
-                                                WORD_TO_WWFIXEDASDWORD( fontBuf->FB_pixHeight ), fontMatrix->FM_22 ) );
+                                                WORD_TO_WWFIXEDASDWORD( fontBuf->FB_height.WBF_int ), fontMatrix->FM_22 ) );
                 fontBuf->FB_minTSB    = INTEGER_OF_WWFIXEDASDWORD( GrMulWWFixed( 
                                                 WORD_TO_WWFIXEDASDWORD( fontBuf->FB_minTSB ), fontMatrix->FM_22 ) );
+                fontBuf->FB_pixHeight += fontBuf->FB_minTSB;
 
                 if( fontMatrix->FM_flags & TF_ROTATED )
                 {
-                        /* adjust FB_pixHeight, FB_minTSB */
-                        fontBuf->FB_pixHeight = INTEGER_OF_WWFIXEDASDWORD( GrMulWWFixed( 
-                                                        WORD_TO_WWFIXEDASDWORD( fontBuf->FB_height.WBF_int ), transMatrix->TM_matrix.yy ) );
-                        fontBuf->FB_minTSB    = INTEGER_OF_WWFIXEDASDWORD( GrMulWWFixed( 
-                                                        WORD_TO_WWFIXEDASDWORD( fontBuf->FB_minTSB ), transMatrix->TM_matrix.xy ) );
-
-                        /* adjust script and height */
-                        transMatrix->TM_heightY = INTEGER_OF_WWFIXEDASDWORD( GrMulWWFixed( 
-                                                        WORD_TO_WWFIXEDASDWORD( fontBuf->FB_baselinePos.WBF_int ), transMatrix->TM_matrix.yy ) );
+                        /* adjust scriptX and heightX */
+                        transMatrix->TM_scriptX = -INTEGER_OF_WWFIXEDASDWORD( GrMulWWFixed( 
+                                                        WORD_TO_WWFIXEDASDWORD( savedScriptY ), transMatrix->TM_matrix.xy ) );
                         transMatrix->TM_heightX = -INTEGER_OF_WWFIXEDASDWORD( GrMulWWFixed( 
                                                         WORD_TO_WWFIXEDASDWORD( fontBuf->FB_baselinePos.WBF_int ), transMatrix->TM_matrix.xy ) );
-                        
-                        transMatrix->TM_scriptX = 0; /*-INTEGER_OF_WWFIXEDASDWORD( GrMulWWFixed( 
-                                                        WORD_TO_WWFIXEDASDWORD( savedHeightY ), transMatrix->TM_matrix.xy ) );*/
-
-                        transMatrix->TM_scriptY = 0; /* INTEGER_OF_WWFIXEDASDWORD( GrMulWWFixed( 
-                                                        WORD_TO_WWFIXEDASDWORD( savedHeightY - transMatrix->TM_heightY + transMatrix->TM_scriptY ), -transMatrix->TM_matrix.yx ) );*/
                 }
-
-                fontMatrix->FM_12 = -fontMatrix->FM_12;
-                fontMatrix->FM_21 = -fontMatrix->FM_21;
         }
-
 }
 
 
@@ -713,7 +711,6 @@ static void AdjustFontBuf( TransformMatrix* transMatrix,
  *                region.
  * 
  * PARAMETERS:    *transMatrix          Ptr to tranfomation matrix.
- *                *fontMatrix           Ptr to systems font matrix.
  *                *fontBuf              Ptr to FontBuf structure.
  * 
  * RETURNS:       Boolean
@@ -726,20 +723,20 @@ static void AdjustFontBuf( TransformMatrix* transMatrix,
  *      22/07/23  JK        Initial Revision
  *******************************************************************/
 
-static Boolean IsRegionNeeded( TransformMatrix* transMatrix, FontMatrix* fontMatrix, FontBuf* fontBuf )
+static Boolean IsRegionNeeded( TransformMatrix* transMatrix, FontBuf* fontBuf )
 {
-        word param1;
-        word param2;
+        sword param1;
+        sword param2;
 
 
-        param1 = ABS( GrMulWWFixed( fontMatrix->FM_11, WORD_TO_WWFIXEDASDWORD( fontBuf->FB_pixHeight ) ) >> 16 );
-        param2 = ABS( GrMulWWFixed( fontMatrix->FM_21, WORD_TO_WWFIXEDASDWORD( fontBuf->FB_pixHeight ) ) >> 16 );
-        if( param1 + param2 > MAX_BITMAP_SIZE )
+        param1 = IntegerOf( GrMulWWFixed( transMatrix->TM_matrix.xx, WORD_TO_WWFIXEDASDWORD( fontBuf->FB_pixHeight ) ) );
+        param2 = IntegerOf( GrMulWWFixed( transMatrix->TM_matrix.yx, WORD_TO_WWFIXEDASDWORD( fontBuf->FB_pixHeight ) ) );
+        if( ( ABS( param1 ) + ABS( param2 ) ) > MAX_BITMAP_SIZE )
                 return TRUE;
 
-        param1 = ABS( GrMulWWFixed( fontMatrix->FM_12, WORD_TO_WWFIXEDASDWORD( fontBuf->FB_pixHeight ) ) >> 16 );
-        param2 = ABS( GrMulWWFixed( fontMatrix->FM_22, WORD_TO_WWFIXEDASDWORD( fontBuf->FB_pixHeight ) ) >> 16 );
-        if( param1 + param2 > MAX_BITMAP_SIZE )
+        param1 = IntegerOf( GrMulWWFixed( transMatrix->TM_matrix.xy, WORD_TO_WWFIXEDASDWORD( fontBuf->FB_pixHeight ) ) );
+        param2 = IntegerOf( GrMulWWFixed( transMatrix->TM_matrix.yy, WORD_TO_WWFIXEDASDWORD( fontBuf->FB_pixHeight ) ) );
+        if( ( ABS( param1 ) + ABS( param2 ) ) > MAX_BITMAP_SIZE )
                 return TRUE;
 
         if( transMatrix->TM_heightX + transMatrix->TM_scriptX > MAX_BITMAP_SIZE )

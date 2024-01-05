@@ -277,7 +277,10 @@ static void ConvertOutline( GStateHandle gstate, TT_Outline* outline )
         TT_Int   first;
         TT_Int   last;
 
- 
+
+EC(     ECCheckBounds( (void*)outline ) );
+EC(     ECCheckGStateHandle( gstate ) );
+
         last = -1;
         for ( n = 0; n < outline->n_contours; ++n )
         {
@@ -479,47 +482,39 @@ static void CalcTransformMatrix( TransMatrix*    transMatrix,
                                  WWFixedAsDWord  pointSize, 
                                  TextStyle       stylesToImplement )
 {
-        WWFixedAsDWord scalePointSize = GrUDivWWFixed( pointSize, MakeWWFixed( STANDARD_GRIDSIZE ) );
+        WWFixedAsDWord scaleFactor = GrUDivWWFixed( pointSize, MakeWWFixed( STANDARD_GRIDSIZE ) );
 
-        transMatrix->TM_e11.WWF_frac = FractionOf( scalePointSize );
-        transMatrix->TM_e11.WWF_int  = IntegerOf( scalePointSize );
+        transMatrix->TM_e11.WWF_frac = FractionOf( scaleFactor );
+        transMatrix->TM_e11.WWF_int  = IntegerOf( scaleFactor );
         transMatrix->TM_e12.WWF_frac = 0;
         transMatrix->TM_e12.WWF_int  = 0;
         transMatrix->TM_e21.WWF_frac = 0;
         transMatrix->TM_e21.WWF_int  = 0;
-        transMatrix->TM_e22.WWF_frac = FractionOf( scalePointSize );
-        transMatrix->TM_e22.WWF_int  = IntegerOf( scalePointSize );
+        transMatrix->TM_e22.WWF_frac = FractionOf( scaleFactor );
+        transMatrix->TM_e22.WWF_int  = IntegerOf( scaleFactor );
         transMatrix->TM_e31.DWF_frac = 0;
         transMatrix->TM_e31.DWF_int  = 0;
         transMatrix->TM_e32.DWF_frac = 0;
         transMatrix->TM_e32.DWF_int  = 0;
 
-        /* add styles if needed */
+        /* add styles if needed (order of processed styles is important) */
         if( stylesToImplement & TS_BOLD )
         {
-                WWFixedAsDWord scaleScript = GrMulWWFixed( scalePointSize, BOLD_FACTOR );
+                scaleFactor = GrMulWWFixed( scaleFactor, BOLD_FACTOR );
 
-
-                transMatrix->TM_e11.WWF_frac = FractionOf( scaleScript );
-                transMatrix->TM_e11.WWF_int  = IntegerOf( scaleScript );
-        }
-
-        if( stylesToImplement & TS_ITALIC )
-        {
-                transMatrix->TM_e12.WWF_frac = FractionOf( ITALIC_FACTOR );
-                transMatrix->TM_e12.WWF_int  = IntegerOf( ITALIC_FACTOR );
+                transMatrix->TM_e11.WWF_frac = FractionOf( scaleFactor );
+                transMatrix->TM_e11.WWF_int  = IntegerOf( scaleFactor );
         }
 
         if( stylesToImplement & ( TS_SUBSCRIPT | TS_SUPERSCRIPT ) )
         {
                 WWFixedAsDWord translation;
-              
 
-                transMatrix->TM_e11.WWF_frac = FractionOf( SCRIPT_FACTOR );
-                transMatrix->TM_e11.WWF_int  = IntegerOf( SCRIPT_FACTOR );
 
-                transMatrix->TM_e22.WWF_frac = FractionOf( SCRIPT_FACTOR );
-                transMatrix->TM_e22.WWF_int  = IntegerOf( SCRIPT_FACTOR );
+                scaleFactor = GrMulWWFixed( scaleFactor, SCRIPT_FACTOR );
+
+                transMatrix->TM_e11.WWF_frac = transMatrix->TM_e22.WWF_frac = FractionOf( scaleFactor );
+                transMatrix->TM_e11.WWF_int  = transMatrix->TM_e22.WWF_int  = IntegerOf( scaleFactor );
 
                 if( stylesToImplement & TS_SUPERSCRIPT )
                         translation = GrMulWWFixed( SUPERSCRIPT_OFFSET, (dword)STANDARD_GRIDSIZE << 16 );
@@ -529,6 +524,15 @@ static void CalcTransformMatrix( TransMatrix*    transMatrix,
 
                 transMatrix->TM_e32.DWF_frac = FractionOf( translation );
                 transMatrix->TM_e32.DWF_int  = IntegerOf( translation );
+        }
+
+        if( stylesToImplement & TS_ITALIC )
+        {
+                WWFixedAsDWord shearFactor = GrMulWWFixed( scaleFactor, ITALIC_FACTOR );
+
+
+                transMatrix->TM_e21.WWF_frac = FractionOf( shearFactor );
+                transMatrix->TM_e21.WWF_int  = IntegerOf( shearFactor );
         }
 
         //TODO:
@@ -563,14 +567,14 @@ static void WriteComment( TRUETYPE_VARS, GStateHandle gstate )
 
         TT_Get_Glyph_Metrics( GLYPH, &GLYPH_METRICS );
 
-        params[0] = GLYPH_METRICS.advance >> 6;
+        params[0] = GLYPH_METRICS.advance;
         params[1] = 0;
-        params[2] = GLYPH_BBOX.xMin >> 6;
-        params[3] = GLYPH_BBOX.yMin >> 6;
-        params[4] = GLYPH_BBOX.xMax >> 6;
-        params[5] = GLYPH_BBOX.yMax >> 6;
+        params[2] = GLYPH_BBOX.xMin;
+        params[3] = GLYPH_BBOX.yMin;
+        params[4] = GLYPH_BBOX.xMax;
+        params[5] = GLYPH_BBOX.yMax;
 
-        GrComment( gstate, &params, NUM_PARAMS );
+        GrComment( gstate, params, NUM_PARAMS * sizeof( word ) );
 }
 
 
@@ -594,11 +598,9 @@ static void WriteComment( TRUETYPE_VARS, GStateHandle gstate )
 static void ScaleOutline( TRUETYPE_VARS )
 {
         TT_Matrix      scaleMatrix = { 0, 0, 0, 0 };
-        WWFixedAsDWord scale       = GrUDivWWFixed( STANDARD_GRIDSIZE, UNITS_PER_EM );
 
 
-        scaleMatrix.xx = scale;
-        scaleMatrix.yy = scale;
+        scaleMatrix.xx = scaleMatrix.yy = GrUDivWWFixed( STANDARD_GRIDSIZE, UNITS_PER_EM );
 
         TT_Transform_Outline( &OUTLINE, &scaleMatrix );
 }

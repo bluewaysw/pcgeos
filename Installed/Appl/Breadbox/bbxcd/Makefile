@@ -4,14 +4,14 @@
 # If you edit it, you will lose your changes, should it be regenerated.
 #
 GEODE           = bbxcd
-MAIN            = pcode.h timevent.h subcode.h display.h key.h subcode.goc\
-                  txt_strs.goc pcode.goc display.goc process.goc\
-                  timevent.goc key.goc bbxcd.goc timevent.goh display.goh\
-                  pcode.goh process.goh subcode.goh
-UI              = uimain.goc uimax.goc uimain.goh uimax.goh define.goh
+MAIN            = display.h key.h pcode.h subcode.h timevent.h bbxcd.goc\
+                  display.goc key.goc pcode.goc process.goc subcode.goc\
+                  timevent.goc txt_strs.goc display.goh pcode.goh\
+                  process.goh subcode.goh timevent.goh
+UI              = uimain.goc uimax.goc define.goh uimain.goh uimax.goh
 UI_TO_RDFS      =
-OBJS            = subcode.obj txt_strs.obj pcode.obj display.obj\
-                  process.obj timevent.obj key.obj bbxcd.obj uimain.obj\
+OBJS            = bbxcd.obj display.obj key.obj pcode.obj process.obj\
+                  subcode.obj timevent.obj txt_strs.obj uimain.obj\
                   uimax.obj
 COMMON          = bbxcd.h
 MODULES         =

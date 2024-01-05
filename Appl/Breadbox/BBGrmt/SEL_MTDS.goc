@@ -1,0 +1,1109 @@
+/*
+ **************************************************************************
+ *  FILE:		sel_mtds.goc
+ *  PROJECT:		Breadbox Gourmet
+ *  DESCRIPTION:	This file has methods for the create...
+ *			dialog box
+ **************************************************************************
+ */
+/*
+ ***************************************************************************
+ *		Include files
+ ***************************************************************************
+ */
+
+@include "rbox.goh"
+
+/*
+ ***************************************************************************
+ *		Class & Message Definitions
+ ***************************************************************************
+ */
+
+/* Declare UI object references to those in rboxui.GOC */
+@extern object SelectDialogBoxGroup ;
+@extern visMoniker ModifyMoniker;
+@extern visMoniker AllMoniker;
+@extern visMoniker Cat1Moniker;
+@extern visMoniker Cat2Moniker;
+@extern visMoniker Cat3Moniker;
+@extern visMoniker Cat4Moniker;
+@extern visMoniker Cat5Moniker;
+@extern visMoniker Cat6Moniker;
+@extern visMoniker Cat7Moniker;
+@extern visMoniker Cat8Moniker;
+@extern visMoniker Cat9Moniker;
+@extern visMoniker Cat10Moniker;
+@extern visMoniker Cat11Moniker;
+@extern visMoniker Cat12Moniker;
+@extern visMoniker Cat13Moniker;
+@extern visMoniker Cat14Moniker;
+@extern visMoniker Cat15Moniker;
+@extern object RecipeDList ;
+@extern object IngredDList;
+@extern object TextWindow ;
+@extern object SelectTrigger ;
+@extern object ModifyTrigger ;
+@extern object DeleteTrigger ;
+@extern object CopyTrigger ;
+@extern object CreateDialogBoxGroup ;
+@extern object RecipeNameGroup ;
+@extern object RecipeName;
+@extern object GenInfoGroup ;
+@extern object IngredGroup ;
+@extern object DirectionsGroup ;
+@extern object ReplyGroup ;
+@extern object EnterRecipeTrigger;
+@extern object CancelRecipeTrigger;
+@extern object RCreateTrigger;
+@extern object RCancelTrigger;
+@extern object ModifyRecipeTrigger;
+@extern object CancelModifyTrigger;
+@extern object IngredName;
+@extern object IUSQuantity;
+@extern object IMetQuantity;
+@extern object Author;
+@extern object PrepTime;
+@extern object DirectionsBox;
+@extern object ServingsValue;
+@extern object CatList;
+@extern object CatMenuList;
+@extern object IUSUnits;
+@extern object IMUnits;
+@extern object IAddTrigger ;
+@extern object IEditTrigger ;
+@extern object IDeleteTrigger;
+@extern object ServingsRecalcValue;
+@extern object ServingsRecalcBox;
+@extern object ListButton;
+@extern chunk RBTextCharAttrs;
+@extern object charec;
+@extern object delrec;
+
+/****************************************************************************
+ *		Code for RBoxProcessClass Select Recipe
+ ***************************************************************************
+ */
+
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_CAT_ILIST_APPLY for RBoxProcessClass
+ *
+ * DESCRIPTION:	Gets the category selected for the Select 
+ *              Recipe Dialog Box
+ *              void (word selection, numSelections, flags)
+ *              
+ *
+ ***********************************************************************/
+
+@extern method RBoxProcessClass, MSG_CAT_ILIST_APPLY
+{
+    currentCat = selection;
+
+    @call process::MSG_OPEN_SELECT_RECIPE(1);
+
+}
+
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_OPEN_SELECT_RECIPE for RBoxProcessClass
+ *
+ * DESCRIPTION:	Calls the dialog box when the menu
+ *              item is selected 
+ *              (int whichSelect)
+ *              
+ *
+ ***********************************************************************/
+
+@extern method RBoxProcessClass, MSG_OPEN_SELECT_RECIPE
+{
+    RecipeStruct	*recipe;
+    DBGroupAndItem	mapitem;
+    DBMapStruct*	mapPtr;
+    word		numRecipes, i, j, numInCat;
+    AlfaSortStruct	*sortElement;
+    AlfaSortStruct	*sortElementComp;
+    word	index1, index2;        /* for the sort routine */
+    char	name1[NAME_SIZE], name2[NAME_SIZE];
+
+
+    @send self::MSG_GOURMET_SCREEN();
+
+    @send ServingsRecalcBox::MSG_GEN_SET_NOT_ENABLED(VUM_NOW);
+    @send ListButton::MSG_GEN_SET_NOT_ENABLED(VUM_NOW);
+
+    sortHeapHandle = MemAlloc(
+		   2048,
+		   HF_SWAPABLE,
+		   HAF_LOCK);
+
+    LMemInitHeap(sortHeapHandle,
+                   LMEM_TYPE_GENERAL,
+		   0,
+		   sizeof(LMemBlockHeader),
+                   STD_INIT_HANDLES,
+                   STD_INIT_HEAP);
+
+    /* create the chunk array  */
+    sortChunkArray = ChunkArrayCreate(
+		       sortHeapHandle,
+		       sizeof(AlfaSortStruct),
+		       0,   /* standard header */
+		       0);  /* ObjChunkFlags */
+
+    /* now fill array with recipe names and index #s */
+    /* standard set-up */
+    mapitem = DBGetMap(rBoxFile);
+    mapPtr = DBLockUngrouped(rBoxFile, mapitem);
+    recipe = (RecipeStruct *) (mapPtr + sizeof(DBMapStruct));
+
+    numRecipes = mapPtr->MS_numRecipes;
+
+    if (whichSelect == 1) { /* selected by category */
+	  /* put the right moniker up */
+	  switch ((int) currentCat) {
+		case 1:
+		@call RecipeDList::MSG_GEN_USE_VIS_MONIKER(
+			OptrToChunk(@Cat1Moniker), VUM_NOW);
+		break;
+		case 2:
+		@call RecipeDList::MSG_GEN_USE_VIS_MONIKER(
+		        OptrToChunk(@Cat2Moniker), VUM_NOW);
+		break;
+		case 3:
+		@call RecipeDList::MSG_GEN_USE_VIS_MONIKER(
+		        OptrToChunk(@Cat3Moniker), VUM_NOW);
+		break;
+		case 4:
+		@call RecipeDList::MSG_GEN_USE_VIS_MONIKER(
+		        OptrToChunk(@Cat4Moniker), VUM_NOW);
+		break;
+		case 5:
+		@call RecipeDList::MSG_GEN_USE_VIS_MONIKER(
+		        OptrToChunk(@Cat5Moniker), VUM_NOW);
+		break;
+		case 6:
+		@call RecipeDList::MSG_GEN_USE_VIS_MONIKER(
+		        OptrToChunk(@Cat6Moniker), VUM_NOW);
+		break;
+		case 7:
+		@call RecipeDList::MSG_GEN_USE_VIS_MONIKER(
+		        OptrToChunk(@Cat7Moniker), VUM_NOW);
+		break;
+		case 8:
+		@call RecipeDList::MSG_GEN_USE_VIS_MONIKER(
+		        OptrToChunk(@Cat8Moniker), VUM_NOW);
+		break;
+		case 9:
+		@call RecipeDList::MSG_GEN_USE_VIS_MONIKER(
+		        OptrToChunk(@Cat9Moniker), VUM_NOW);
+		break;
+		case 10:
+		@call RecipeDList::MSG_GEN_USE_VIS_MONIKER(
+		        OptrToChunk(@Cat10Moniker), VUM_NOW);
+		break;
+		case 11:
+		@call RecipeDList::MSG_GEN_USE_VIS_MONIKER(
+		        OptrToChunk(@Cat11Moniker), VUM_NOW);
+		break;
+		case 12:
+		@call RecipeDList::MSG_GEN_USE_VIS_MONIKER(
+		        OptrToChunk(@Cat12Moniker), VUM_NOW);
+		break;
+		case 13:
+		@call RecipeDList::MSG_GEN_USE_VIS_MONIKER(
+		        OptrToChunk(@Cat13Moniker), VUM_NOW);
+		break;
+		case 14:
+		@call RecipeDList::MSG_GEN_USE_VIS_MONIKER(
+		        OptrToChunk(@Cat14Moniker), VUM_NOW);
+		break;
+		case 15:
+		@call RecipeDList::MSG_GEN_USE_VIS_MONIKER(
+		        OptrToChunk(@Cat15Moniker), VUM_NOW);
+		break;
+		} /* end switch */
+	  numInCat = 0;         /* initialize found count */
+       for (i = 0; i < numRecipes; i++) {
+		if (recipe[i].RS_cat == currentCat) {
+	     numInCat++;     /* found one - increment count... */
+
+		/* and put it in the array */
+		sortElement = ChunkArrayAppendHandles(
+		      sortHeapHandle,
+		      sortChunkArray,
+		      0);
+		sortElement->ASS_index = recipe[i].RS_index;
+	     strcpy(sortElement->ASS_name, recipe[i].RS_name);
+		}  /* end if */
+       }  /* end for */
+
+       /* make sure the dlist gets the num of recipes in this cat */
+       numRecipes = numInCat;
+
+     }  /* end if select by cat */
+
+     else {   /* selected by name */
+       /* put All moniker up */
+       @call RecipeDList::MSG_GEN_USE_VIS_MONIKER(
+		   OptrToChunk(@AllMoniker), VUM_NOW);
+
+       for (i = 0; i < numRecipes; i++) {
+          sortElement = ChunkArrayAppendHandles(
+		      sortHeapHandle,
+		      sortChunkArray,
+		      0);
+          sortElement->ASS_index = recipe[i].RS_index;
+          strcpy(sortElement->ASS_name, recipe[i].RS_name);
+       }
+     }  /* end of else */
+
+    /* unlock the array and db */
+    MemUnlock(sortHeapHandle);
+    DBUnlock(mapPtr);
+
+    /* Sort it using standard C bubble sort ----------------- */
+    MemLock(sortHeapHandle);
+
+    for (i = 0; i < (numRecipes - 1); i++)  {
+
+       for (j = i + 1; j < numRecipes; j++)  {
+
+	  /* Get the first element info... */
+	  sortElement = ChunkArrayElementToPtrHandles(
+		   sortHeapHandle,
+		   sortChunkArray,
+		   i,
+		   0);
+
+	  /* and the second element info */
+	  sortElementComp = ChunkArrayElementToPtrHandles(
+		   sortHeapHandle,
+		   sortChunkArray,
+		   j,
+		   0);
+
+	  if (LocalCmpStringsNoCase(
+	              sortElement->ASS_name,
+		      sortElementComp->ASS_name,
+		      NAME_SIZE) > 0)  {
+             /* get the first element data */
+	     index1 = sortElement->ASS_index;
+	     strcpy(name1, sortElement->ASS_name);
+
+	     /* and the second element data */
+	     index2 = sortElementComp->ASS_index;
+	     strcpy(name2, sortElementComp->ASS_name);
+
+	     /* put the second element data where the first was */
+	     sortElement->ASS_index = index2;
+	     strcpy(sortElement->ASS_name, name2);
+
+	     /* and the first where the second was */
+	     sortElementComp->ASS_index = index1;
+	     strcpy(sortElementComp->ASS_name, name1);
+	     }   
+
+       }  /* end of j for */
+
+    } /* end of i for */
+
+    MemUnlock(sortHeapHandle);
+    /* end of C bubble sort ------------------------------------ */
+
+    /* tell the list how many recipes */
+    @send RecipeDList::MSG_GEN_DYNAMIC_LIST_INITIALIZE(numRecipes);
+
+    /* disable reply group (except cancel) until something is selected */
+    @send SelectTrigger::MSG_GEN_SET_NOT_ENABLED(VUM_NOW);
+    @send ModifyTrigger::MSG_GEN_SET_NOT_ENABLED(VUM_NOW);
+    @send DeleteTrigger::MSG_GEN_SET_NOT_ENABLED(VUM_NOW);
+    @send CopyTrigger::MSG_GEN_SET_NOT_ENABLED(VUM_NOW);
+
+    @call SelectDialogBoxGroup::MSG_GEN_INTERACTION_INITIATE();
+}
+
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_DISPLAY_RECIPE for RBoxProcessClass
+ *
+ * DESCRIPTION:	Displays the current recipe.
+ *
+ ***********************************************************************/
+
+@extern method RBoxProcessClass, MSG_DISPLAY_RECIPE
+{
+    RecipeStruct      *recipe;
+    IngredRecalcStruct	*sortElement;
+    IngredChunkArrayHeaderStruct	*headerInfo;
+    DBGroup	    recipegroup;
+    DBGroupAndItem  mapitem;
+    DBMapStruct*    mapPtr;
+    word            numIngreds, serves;
+    int             category, j, units;
+    char	    recipeBuffer[250];
+    char	    ingredBuffer[80];   /* holds ingred info */
+    char	    servesBuf[11];
+    VMBlockHandle   dirBlkHandle;
+    MemHandle		mh;
+    char		*textStart;
+    VisTextCharAttr     *attr;
+    MemHandle		textHeapHandle;
+    WWFixed	PtSize;
+    Tab RB1Tab = {  /* 1 inch */
+	  8 * 1 * PIXELS_PER_INCH, /* not sure why mpy by 8 but it works! */
+	  TL_NONE | TT_LEFT,
+	  SDM_100,
+	  0,
+	  0,
+	  NULL
+	};
+    Tab RB2Tab = {  /* 2 inch */
+	  8 * 2 * PIXELS_PER_INCH,
+	  TL_NONE | TT_LEFT,
+	  SDM_100,
+	  0,
+	  0,
+	  NULL
+	};
+
+    /* clear the window */
+    @call TextWindow::MSG_VIS_TEXT_DELETE_ALL();
+    /* set content's on screen variable */
+    onScreen = RECIPE;
+    /* set font to normal */
+    textHeapHandle = OptrToHandle(@RBTextCharAttrs);
+    MemLock(textHeapHandle);
+    attr = LMemDeref(@RBTextCharAttrs);
+    @call TextWindow::MSG_VIS_TEXT_SET_CHAR_ATTR(
+		      attr,
+		      TEXT_ADDRESS_PAST_END,
+		      0);
+    MemUnlock(textHeapHandle);
+
+    /* reset any point size chages */
+    PtSize.WWF_int  = pointSize;
+    PtSize.WWF_frac = 0;
+    @send TextWindow::MSG_VIS_TEXT_SET_POINT_SIZE(
+	       PtSize, TEXT_ADDRESS_PAST_END, 0);
+
+    /* call the ingred to array routine
+     * if display wasn't called by the servings
+     * recalc routine
+     */
+    if (calledByRecalc == FALSE) {
+       @call process::MSG_INGRED_TO_ARRAY();
+       }
+
+    /* reset flag if called by recalc routine */
+    if (calledByRecalc == TRUE) {
+       calledByRecalc = FALSE;
+       }
+
+    /* Set the tabs */
+    @call TextWindow::MSG_VIS_TEXT_SET_TAB(
+			RB1Tab, TEXT_ADDRESS_PAST_END, 0);
+    @call TextWindow::MSG_VIS_TEXT_SET_TAB(
+                        RB2Tab, TEXT_ADDRESS_PAST_END, 0);
+
+    /* start the display */
+    strcpy(recipeBuffer, "Recipe Name:  ");
+
+    /* standard set-up */
+    mapitem = DBGetMap(rBoxFile);
+    mapPtr = DBLockUngrouped(rBoxFile, mapitem);
+    recipe = (RecipeStruct *) (mapPtr + sizeof(DBMapStruct));
+
+    /* display the recipe name... */
+    strcat(recipeBuffer, recipe[currentRecipe].RS_name);
+    strcat(recipeBuffer, "\r");
+
+    /* the author... */
+    strcat(recipeBuffer, "\rFrom the kitchen of:\r   ");
+    strcat(recipeBuffer, recipe[currentRecipe].RS_author);
+    strcat(recipeBuffer, "\r");
+
+    /* its category... */
+    strcat(recipeBuffer, "\rCategory:  ");
+    category = (int) recipe[currentRecipe].RS_cat;
+
+    switch (category) {
+       case APTZ:
+       strcat(recipeBuffer, "Appetizers\r");
+       break;
+       case BEVG:
+       strcat(recipeBuffer, "Beverages\r");
+       break;
+       case BRED:
+       strcat(recipeBuffer, "Breads\r");
+       break;
+       case CNDY:
+       strcat(recipeBuffer, "Candies\r");
+       break;
+       case DSRT:
+       strcat(recipeBuffer, "Desserts\r");
+       break;
+       case EGGS:
+       strcat(recipeBuffer, "Eggs\r");
+       break;
+       case FISH:
+       strcat(recipeBuffer, "Fish\r");
+       break;
+       case FRVG:
+       strcat(recipeBuffer, "Fruits & Vegetables\r");
+       break;
+       case MEAT:
+       strcat(recipeBuffer, "Meats\r");
+       break;
+       case PSTA:
+       strcat(recipeBuffer, "Pasta\r");
+       break;
+       case PLTY:
+       strcat(recipeBuffer, "Poultry\r");
+       break;
+       case SALD:
+       strcat(recipeBuffer, "Salads\r");
+       break;
+       case SAUC:
+       strcat(recipeBuffer, "Sauces\r");
+       break;
+       case SOUP:
+       strcat(recipeBuffer, "Soups\r");
+       break;
+       case POTP:
+       strcat(recipeBuffer, "Pot Pourri\r");
+       break;
+    }
+
+    /* number served... */
+    strcat(recipeBuffer, "\rServes:     ");
+
+    /* get it from the chunkarrayheader */
+    MemLock(ingredHeapHandle);
+    headerInfo = LMemDerefHandles(ingredHeapHandle, ingredChunkArray);
+    serves = headerInfo->CAH_newServes;
+    UtilHex32ToAscii(
+	    servesBuf, (sdword) serves, 0 | UHTAF_NULL_TERMINATE);
+    strcat(recipeBuffer, servesBuf);
+
+    /* put it in the recalc value obj too */
+    @call ServingsRecalcValue::MSG_GEN_VALUE_SET_INTEGER_VALUE(
+              serves, FALSE);
+
+    /* and the prep time */
+    strcat(recipeBuffer, "\r\rPrep Time:\t");
+    strcat(recipeBuffer, recipe[currentRecipe].RS_prepTime);
+
+    /* now the ingredients */
+    strcat(recipeBuffer, "\r\rIngredients:\r\0");
+    @call TextWindow::MSG_VIS_TEXT_REPLACE_ALL_PTR(recipeBuffer, 0);
+
+    /* Get number of ingreds... */
+    numIngreds = recipe[currentRecipe].RS_size;
+
+    if (numIngreds == 0)
+       ;   /* hard to imagine but... */
+      else {
+       /* by accessing the array.*/
+       for (j = 0; j < numIngreds; j++) {
+
+          /* initialize the ingred buffer */
+          *ingredBuffer = NULL;
+
+          /* Get the ingred info */
+	  sortElement = ChunkArrayElementToPtrHandles(
+		   ingredHeapHandle,
+		   ingredChunkArray,
+		   j,
+		   0);
+
+	  strcat(ingredBuffer, "\r ");
+	  strcat(ingredBuffer, sortElement->IRS_newQuant);
+	  strcat(ingredBuffer, "\t");
+
+	  units = (int) sortElement->IRS_units;
+	  if (recipe[currentRecipe].RS_system == USA) {
+            switch (units) {
+	      case USUN:
+              strcat(ingredBuffer,"    ");
+              break;
+	      case PNCH:
+              strcat(ingredBuffer,"pinch(es)");
+              break;
+	      case TSP:
+              strcat(ingredBuffer,"tsp");
+              break;
+	      case TBSP:
+              strcat(ingredBuffer,"tbsp");
+              break;
+	      case CUP:
+              strcat(ingredBuffer,"cup(s)");
+              break;
+	      case FLOZ:
+              strcat(ingredBuffer,"fl oz");
+              break;
+	      case PINT:
+              strcat(ingredBuffer,"pint(s)");
+              break;
+	      case QT:
+              strcat(ingredBuffer,"qt");
+              break;
+	      case GAL:
+              strcat(ingredBuffer,"gal");
+              break;
+	      case OZ:
+              strcat(ingredBuffer,"oz");
+              break;
+	      case LB:
+              strcat(ingredBuffer,"lb");
+              break;
+	      case EACH:
+	      strcat(ingredBuffer,"each");
+              break;
+	      case CAN:
+              strcat(ingredBuffer,"can(s)");
+              break;
+	      case PKG:
+	      strcat(ingredBuffer,"pkg");
+              break;
+	      case STK:
+	      strcat(ingredBuffer,"stick(s)");
+              break;
+	     }
+	    }
+	  else {
+	    switch (units) {
+	      case MUN:
+              strcat(ingredBuffer,"    ");
+              break;
+	      case MPNCH:
+              strcat(ingredBuffer,"pinch(es)");
+              break;
+	      case MTSP:
+              strcat(ingredBuffer,"tsp");
+              break;
+	      case MTBSP:
+              strcat(ingredBuffer,"tbsp");
+              break;
+	      case MLS:
+              strcat(ingredBuffer,"ml");
+              break;
+	      case DLS:
+              strcat(ingredBuffer,"dl");
+              break;
+	      case LTRS:
+              strcat(ingredBuffer,"liter(s)");
+              break;
+	      case GRMS:
+              strcat(ingredBuffer,"gram(s)");
+              break;
+	      case KILO:
+	      strcat(ingredBuffer,"kilo(s)");
+              break;
+	      case MEACH:
+	      strcat(ingredBuffer,"each");
+              break;
+	      case MCAN:
+	      strcat(ingredBuffer,"can(s)");
+              break;
+	      case MPKG:
+	      strcat(ingredBuffer,"pkg");
+              break;
+	     }
+	    }
+
+	  strcat(ingredBuffer, "\t");
+	  strcat(ingredBuffer, sortElement->IRS_ingred);
+          /* send the ingredient to the screen/printer */
+	  @call TextWindow::MSG_VIS_TEXT_APPEND_PTR(
+		               ingredBuffer, 0);
+
+       } /* end of ingreds for */
+
+    } /* end of ingreds else */
+
+    MemUnlock(ingredHeapHandle);
+    DBUnlock(mapPtr);
+
+    /* and finally the directions */
+    @call TextWindow::MSG_VIS_TEXT_APPEND_PTR("\r\rDirections:\r",14);
+
+    /* get the directions text handle - its id is currentRecipe */
+    dirBlkHandle = VMFind(rBoxFile, NullHandle, currentRecipe);
+
+    /* and lock the block */
+    textStart = VMLock(rBoxFile, dirBlkHandle, &mh);
+
+    /* and spit out the text  -  for some unknown reason I
+     * can't get the APPEND_VM_BLOCK routine to work here... */
+    @call TextWindow::MSG_VIS_TEXT_APPEND_PTR(
+			textStart,
+			0);
+
+    VMUnlock(mh);
+
+
+    /* init the cat list */
+    @send CatMenuList::MSG_GEN_ITEM_GROUP_SET_NONE_SELECTED(FALSE);
+
+    /* bring the recalc and shopping list buttons to life */
+    @send ServingsRecalcBox::MSG_GEN_SET_ENABLED(VUM_NOW);
+    @send ListButton::MSG_GEN_SET_ENABLED(VUM_NOW);
+}
+
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_SELECT_MODIFY_RECIPE for RBoxProcessClass
+ *
+ * DESCRIPTION:	Sets up modification of the selected recipe.
+ *
+ ***********************************************************************/
+
+@extern method RBoxProcessClass, MSG_SELECT_MODIFY_RECIPE
+{
+    RecipeStruct        *recipe;
+    DBGroupAndItem    mapitem;
+    DBMapStruct*      mapPtr;
+    VMBlockHandle   dirBlkHandle;
+    MemHandle		mh;
+    char		*textStart;
+
+    /* Do our standard setup */
+    mapitem = DBGetMap(rBoxFile);
+    mapPtr = DBLockUngrouped(rBoxFile, mapitem);
+    recipe = (RecipeStruct *) (mapPtr + sizeof(DBMapStruct));
+
+    /* Fill in recipe name... */
+    @call RecipeName::MSG_VIS_TEXT_REPLACE_ALL_PTR(
+			recipe[currentRecipe].RS_name, 0);
+
+    /* author... */
+    @call Author::MSG_VIS_TEXT_REPLACE_ALL_PTR(
+			recipe[currentRecipe].RS_author, 0);
+
+    /* servings... */
+    @call ServingsValue::MSG_GEN_VALUE_SET_INTEGER_VALUE(
+	     (int) recipe[currentRecipe].RS_serves, FALSE);
+
+    /* category... */
+    @call CatList::MSG_GEN_ITEM_GROUP_SET_SINGLE_SELECTION(
+	     (int) recipe[currentRecipe].RS_cat, FALSE);
+
+    /* prep time... */
+    @call PrepTime::MSG_VIS_TEXT_REPLACE_ALL_PTR(
+			recipe[currentRecipe].RS_prepTime, 0);
+
+    /* ingredients... */
+    @send IngredDList::MSG_GEN_DYNAMIC_LIST_INITIALIZE(
+		   recipe[currentRecipe].RS_size);
+
+    /* set quantity filters & measurement system drop down list... */
+    if (recipe[currentRecipe].RS_system == USA) {
+       @call IMetQuantity::MSG_GEN_SET_NOT_USABLE(VUM_NOW);
+       @call IUSQuantity::MSG_GEN_SET_USABLE(VUM_NOW);
+       @call IMUnits::MSG_GEN_SET_NOT_USABLE(VUM_NOW);
+       @call IUSUnits::MSG_GEN_SET_USABLE(VUM_NOW);
+      }
+    else {
+       @call IUSQuantity::MSG_GEN_SET_NOT_USABLE(VUM_NOW);
+       @call IMetQuantity::MSG_GEN_SET_USABLE(VUM_NOW);
+       @call IUSUnits::MSG_GEN_SET_NOT_USABLE(VUM_NOW);
+       @call IMUnits::MSG_GEN_SET_USABLE(VUM_NOW);
+      }
+
+    /* unlock the map... */
+    DBUnlock(mapPtr);
+
+    /* Now for the directions... */
+    /* get the directions text handle - its id is currentRecipe */
+    dirBlkHandle = VMFind(rBoxFile, NullHandle, currentRecipe);
+
+    /* and lock the block */
+    textStart = VMLock(rBoxFile, dirBlkHandle, &mh);
+
+    /* and spit out the text  -  for some unknown reason I
+     * can't get the APPEND_VM_BLOCK routine to work here... */
+    @call DirectionsBox::MSG_VIS_TEXT_REPLACE_ALL_PTR(
+			textStart,
+			0);
+
+    VMUnlock(mh);
+
+    /* enable the whole magilla... */
+    @send RecipeNameGroup::MSG_GEN_SET_ENABLED(VUM_NOW);
+    @send GenInfoGroup::MSG_GEN_SET_ENABLED(VUM_NOW);
+    @send IngredGroup::MSG_GEN_SET_ENABLED(VUM_NOW);
+    @send DirectionsGroup::MSG_GEN_SET_ENABLED(VUM_NOW);
+    @send ReplyGroup::MSG_GEN_SET_ENABLED(VUM_NOW);
+    /* except the ingred edit & delete triggers */
+    @send IEditTrigger::MSG_GEN_SET_NOT_ENABLED(VUM_NOW);
+    @send IDeleteTrigger::MSG_GEN_SET_NOT_ENABLED(VUM_NOW);
+
+    /* except the create & cancel create triggers */
+    @send RCreateTrigger::MSG_GEN_SET_NOT_ENABLED(VUM_NOW);
+    @send RCancelTrigger::MSG_GEN_SET_NOT_ENABLED(VUM_NOW);
+
+    /* dump the Enter & Cancel triggers... */
+    @send EnterRecipeTrigger::MSG_GEN_SET_NOT_USABLE(VUM_NOW);
+    @send CancelRecipeTrigger::MSG_GEN_SET_NOT_USABLE(VUM_NOW);
+
+    /* activate the modify and mod cancel triggers... */
+    @send ModifyRecipeTrigger::MSG_GEN_SET_USABLE(VUM_NOW);
+    @send CancelModifyTrigger::MSG_GEN_SET_USABLE(VUM_NOW);
+
+    /* send the focus to recipe name... */
+    @send RecipeName::MSG_META_GRAB_FOCUS_EXCL();
+
+    /* put the right moniker up */
+    @call CreateDialogBoxGroup::MSG_GEN_USE_VIS_MONIKER(
+		OptrToChunk(@ModifyMoniker), VUM_NOW);
+
+    /* And display the dialog box */
+    @call CreateDialogBoxGroup::MSG_GEN_INTERACTION_INITIATE();
+
+}
+
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_MODIFY_RECIPE for RBoxProcessClass
+ *
+ * DESCRIPTION:	Modifies the current recipe.
+ *
+ ***********************************************************************/
+
+@extern method RBoxProcessClass, MSG_MODIFY_RECIPE
+{
+
+    RecipeStruct        *recipe;
+    DBGroupAndItem    mapitem;
+    DBMapStruct*      mapPtr;
+    char              name[NAME_SIZE], author[NAME_SIZE], prep[NUM_DATA_SIZE];
+    word		servings, category;
+    VMBlockHandle   dirBlkHandle;
+    MemHandle		mh, newmh;
+    dword		dirsSize;
+
+    /* put up an Are you sure box */
+       if 	((UserStandardDialogOptr(
+			    NullOptr,
+			    NullOptr,
+			    NullOptr,
+			    NullOptr,
+			    @charec,
+			    ((CDT_WARNING << CDBF_DIALOG_TYPE_OFFSET) |
+			    (GIT_AFFIRMATION << CDBF_INTERACTION_TYPE_OFFSET))
+                            ) == IC_YES))  {
+
+       /* get non-ingredient info */
+       @call RecipeName::MSG_VIS_TEXT_GET_ALL_PTR(name);
+       servings = @call ServingsValue::MSG_GEN_VALUE_GET_INTEGER_VALUE();
+       category = @call CatList::MSG_GEN_ITEM_GROUP_GET_SELECTION();
+       @call Author::MSG_VIS_TEXT_GET_ALL_PTR(author);
+       @call PrepTime::MSG_VIS_TEXT_GET_ALL_PTR(prep);
+
+       /* Do our standard setup */
+       mapitem = DBGetMap(rBoxFile);
+       mapPtr = DBLockUngrouped(rBoxFile, mapitem);
+       recipe = (RecipeStruct *) (mapPtr + sizeof(DBMapStruct));
+
+       /* enter the info */
+       strcpy(recipe[currentRecipe].RS_name, name);
+       recipe[currentRecipe].RS_serves = servings;
+       recipe[currentRecipe].RS_cat = category;
+       strcpy(recipe[currentRecipe].RS_author, author);
+       strcpy(recipe[currentRecipe].RS_prepTime, prep);
+
+       /* mark recipe dirty and unlock */
+       DBDirty(mapPtr);
+       DBUnlock(mapPtr);
+
+       /* git and spit the new directions */
+       /* get the (new) number of chars in the directions */
+       dirsSize = @call DirectionsBox::MSG_VIS_TEXT_GET_TEXT_SIZE();
+       dirsSize++;  /* inc for null term */
+
+       /* get the directions text handle - its id is currentRecipe */
+       dirBlkHandle = VMFind(rBoxFile, NullHandle, currentRecipe);
+
+       /* and lock the block */
+       VMLock(rBoxFile, dirBlkHandle, &mh);
+
+       /* resize and lock the associated mem block */
+       newmh = MemReAlloc(mh, (word) dirsSize, HAF_LOCK);
+
+       /* and store the text */
+       @call DirectionsBox::MSG_VIS_TEXT_GET_ALL_BLOCK(
+			 newmh);
+
+       VMDirty(mh);
+       VMUnlock(mh);
+       MemUnlock(mh);
+       MemUnlock(newmh);
+
+
+       /* clean things out... */
+       @call RecipeName::MSG_VIS_TEXT_DELETE_ALL();
+       @call IngredName::MSG_VIS_TEXT_DELETE_ALL();
+       @call IUSQuantity::MSG_VIS_TEXT_DELETE_ALL();
+       @call IMetQuantity::MSG_VIS_TEXT_DELETE_ALL();
+       @call Author::MSG_VIS_TEXT_DELETE_ALL();
+       @call PrepTime::MSG_VIS_TEXT_DELETE_ALL();
+       @call DirectionsBox::MSG_VIS_TEXT_DELETE_ALL();
+
+       /* reset the servings, units and category... */
+       @call ServingsValue::MSG_GEN_VALUE_SET_INTEGER_VALUE(4, FALSE);
+       @call CatList::MSG_GEN_ITEM_GROUP_SET_SINGLE_SELECTION(
+			APTZ, FALSE);
+       if (measSystem == USA) {
+          @call IUSUnits::MSG_GEN_ITEM_GROUP_SET_SINGLE_SELECTION(
+                        USUN, FALSE);
+         }
+       else {
+          @call IMUnits::MSG_GEN_ITEM_GROUP_SET_SINGLE_SELECTION(
+                        MUN, FALSE);
+         }
+
+       /* reset the ingred dlist... */
+       @send IngredDList::MSG_GEN_DYNAMIC_LIST_INITIALIZE(0);
+
+       /* Close the create (modify mode) box... */
+       @call CreateDialogBoxGroup::MSG_GEN_GUP_INTERACTION_COMMAND(IC_DISMISS);
+
+       /* and re-enable the create & cancel create triggers... */
+       @send RCreateTrigger::MSG_GEN_SET_ENABLED(VUM_NOW);
+       @send RCancelTrigger::MSG_GEN_SET_ENABLED(VUM_NOW);
+
+       /* and activate the Enter & Cancel triggers */
+       @send EnterRecipeTrigger::MSG_GEN_SET_USABLE(VUM_NOW);
+       @send CancelRecipeTrigger::MSG_GEN_SET_USABLE(VUM_NOW);
+
+       /* put the recipe in the text window */
+       @send process::MSG_DISPLAY_RECIPE();
+
+       } /* end of are you sure if */
+
+    /* init cat the list */
+    @send CatMenuList::MSG_GEN_ITEM_GROUP_SET_NONE_SELECTED(FALSE);
+
+}
+
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_CANCEL_MODIFY_RECIPE for RBoxProcessClass
+ *
+ * DESCRIPTION:	Resets from cancelling the modify.
+ *
+ ***********************************************************************/
+
+@extern method RBoxProcessClass, MSG_CANCEL_MODIFY_RECIPE
+{
+
+    /* clean things out... */
+    @call RecipeName::MSG_VIS_TEXT_DELETE_ALL();
+    @call IngredName::MSG_VIS_TEXT_DELETE_ALL();
+    @call IUSQuantity::MSG_VIS_TEXT_DELETE_ALL();
+    @call IMetQuantity::MSG_VIS_TEXT_DELETE_ALL();
+    @call Author::MSG_VIS_TEXT_DELETE_ALL();
+    @call PrepTime::MSG_VIS_TEXT_DELETE_ALL();
+    @call DirectionsBox::MSG_VIS_TEXT_DELETE_ALL();
+
+    /* reset the servings, units and category... */
+    @call ServingsValue::MSG_GEN_VALUE_SET_INTEGER_VALUE(4, FALSE);
+    @call CatList::MSG_GEN_ITEM_GROUP_SET_SINGLE_SELECTION(
+			APTZ, FALSE);
+    if (measSystem == USA) {
+       @call IUSUnits::MSG_GEN_ITEM_GROUP_SET_SINGLE_SELECTION(
+                        USUN, FALSE);
+      }
+    else {
+       @call IMUnits::MSG_GEN_ITEM_GROUP_SET_SINGLE_SELECTION(
+			MUN, FALSE);
+      }
+
+    /* reset the ingred dlist... */
+    @send IngredDList::MSG_GEN_DYNAMIC_LIST_INITIALIZE(0);
+
+    /* re-enable the create & cancel create triggers */
+    @send RCreateTrigger::MSG_GEN_SET_ENABLED(VUM_NOW);
+    @send RCancelTrigger::MSG_GEN_SET_ENABLED(VUM_NOW);
+
+    /* Activate the Enter & Cancel triggers */
+    @send EnterRecipeTrigger::MSG_GEN_SET_USABLE(VUM_NOW);
+    @send CancelRecipeTrigger::MSG_GEN_SET_USABLE(VUM_NOW);
+
+    /* init cat the list */
+    @send CatMenuList::MSG_GEN_ITEM_GROUP_SET_NONE_SELECTED(FALSE);
+
+}
+
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_DELETE_RECIPE for RBoxProcessClass
+ *
+ * DESCRIPTION:	Deletes the current recipe.
+ *
+ ***********************************************************************/
+
+@extern method RBoxProcessClass, MSG_DELETE_RECIPE
+{
+    RecipeStruct        *recipe;
+    DBGroupAndItem    mapitem;
+    DBMapStruct*      mapPtr;
+    word		numRecipes, i;
+    VMBlockHandle   dirBlkHandle;
+
+    /* If we have no selected recipe, we exit */
+    if (currentRecipe == GIGS_NONE)
+        return;
+
+
+    /* put up an Are you sure box */
+       if 	((UserStandardDialogOptr(
+			    NullOptr,
+			    NullOptr,
+			    NullOptr,
+			    NullOptr,
+			    @delrec,
+			    ((CDT_WARNING << CDBF_DIALOG_TYPE_OFFSET) |
+			    (GIT_AFFIRMATION << CDBF_INTERACTION_TYPE_OFFSET))
+                            ) == IC_YES))  {
+
+    /* Do our standard setup */
+    mapitem = DBGetMap(rBoxFile);
+    mapPtr = DBLockUngrouped(rBoxFile, mapitem);
+    recipe = (RecipeStruct *) (mapPtr + sizeof(DBMapStruct));
+
+    /* delete the current recipe's DBGroup */
+    DBGroupFree(rBoxFile, recipe[currentRecipe].RS_group);
+
+    /* Now decrement size of map array */
+    --(mapPtr->MS_numRecipes);
+    numRecipes = mapPtr->MS_numRecipes;
+
+    /* and adjust the index numbers */
+    for (i = currentRecipe; i <= numRecipes; i++) {
+       --(recipe[i].RS_index);
+    }
+
+    DBDirty(mapPtr);
+    DBUnlock(mapPtr);
+
+    /* get the directions text handle - its id is currentRecipe */
+    dirBlkHandle = VMFind(rBoxFile, NullHandle, currentRecipe);
+
+    /* now free the VMBlock */
+    VMFree(rBoxFile, dirBlkHandle);
+
+    /* and adjust the remaining ID numbers */
+    for (i = currentRecipe + 1; i <= numRecipes; i++) {
+       dirBlkHandle = VMFind(rBoxFile, NullHandle, i);
+       VMModifyUserID(rBoxFile, dirBlkHandle, (i - 1));
+    }
+
+    /* Now we contract the map item.  DBDeleteAt removes bytes from
+       within the specified item, moving bytes after it downwards. */
+    DBDeleteAtUngrouped(rBoxFile, mapitem,
+	 sizeof(word) + (currentRecipe * sizeof(RecipeStruct)),
+	 sizeof(RecipeStruct));
+
+    /* reset recipe selection */
+    currentRecipe = GIGS_NONE;
+
+    } /* end of Are you sure if stmt */
+
+    /* init the cat list */
+    @send CatMenuList::MSG_GEN_ITEM_GROUP_SET_NONE_SELECTED(FALSE);
+}
+
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_CANCEL_SELECT for RBoxProcessClass
+ *
+ * DESCRIPTION:	Cancels the Select Recipe DB  BUT we need to free
+ *              the chunk array created when the box opened.
+ *
+ ***********************************************************************/
+
+@extern method RBoxProcessClass, MSG_CANCEL_SELECT
+{
+
+    /* init cat the list */
+    @send CatMenuList::MSG_GEN_ITEM_GROUP_SET_NONE_SELECTED(FALSE);
+}
+
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_RECIPE_DLIST_MONIKER_QUERY for RBoxProcessClass
+ *
+ * DESCRIPTION:	Queries for monikers for recipe list.
+ *
+ * PARAMETERS:  void (optr list, word item)
+ *
+ * STRATEGY:
+ *
+ ***********************************************************************/
+
+@extern method RBoxProcessClass, MSG_RECIPE_DLIST_MONIKER_QUERY
+{
+
+    AlfaSortStruct	*sortElement;
+
+
+    MemLock(sortHeapHandle);
+
+    sortElement = ChunkArrayElementToPtrHandles(
+		   sortHeapHandle,
+		   sortChunkArray,
+		   item,
+		   0);
+
+    @call list::MSG_GEN_DYNAMIC_LIST_REPLACE_ITEM_TEXT(
+		 item,
+		 sortElement->ASS_name);
+
+    MemUnlock(sortHeapHandle);
+
+}
+
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_RECIPE_DLIST_APPLY for RBoxProcessClass
+ *
+ * DESCRIPTION:	Handles an apply of user changes to the recipe list.
+ *
+ * PARAMETERS:  void (word selection, numSelections, flags)
+ *
+ * STRATEGY:    Enable various UI objects and setup the item list.
+ *
+ ***********************************************************************/
+
+@extern method RBoxProcessClass, MSG_RECIPE_DLIST_APPLY
+{
+    AlfaSortStruct	*sortElement;
+
+    /* Get the index # */
+    MemLock(sortHeapHandle);
+
+    sortElement = ChunkArrayElementToPtrHandles(
+		   sortHeapHandle,
+		   sortChunkArray,
+		   selection,
+		   0);
+
+    /* index # is recipe's place in db */
+    currentRecipe = sortElement->ASS_index;
+
+    MemUnlock(sortHeapHandle);
+
+    /* once the curRecip is ID'd we don't need the heap
+       OH YES WE DO - if a second item is selected  */
+/*    MemFree(sortHeapHandle);  */
+
+    /* enable reply group now that something is selected */
+    @send SelectTrigger::MSG_GEN_SET_ENABLED(VUM_NOW);
+    @send ModifyTrigger::MSG_GEN_SET_ENABLED(VUM_NOW);
+    @send DeleteTrigger::MSG_GEN_SET_ENABLED(VUM_NOW);
+    @send CopyTrigger::MSG_GEN_SET_ENABLED(VUM_NOW);
+
+}
+

@@ -675,9 +675,9 @@ i_vfprintf(FILE *stream,		/* Where to output formatted results. */
 	     * automatically.
 	     */
 #if defined(__HIGHC__) || defined(_MSC_VER) || defined(__WATCOMC__)
-	    if ((c == '\n') && (stream->_flag & _O_BINARY)) {
+	    if (isstrm && (c == '\n') && (stream->_flag & _O_BINARY)) {
 #else
-	    if ((c == '\n') && (stream->flags & _F_BIN)) {
+	    if (isstrm && (c == '\n') && (stream->flags & _F_BIN)) {
 #endif
 		i_putc('\r', stream);
 	    }

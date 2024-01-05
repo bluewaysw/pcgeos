@@ -149,8 +149,8 @@ argument if the user gives it a particular address to look at.
 + `* +`  
 An asterisk following any of the previous constructs indicates zero or 
 more repetitions of the construct may be typed. A plus sign indicates one 
-or more repetitions of the construct may be used. For example, `unalias 
-<word>*` can be the `unalias` command by itself, or it can be followed by 
+or more repetitions of the construct may be used. For example, `unalias <word>*`
+can be the `unalias` command by itself, or it can be followed by 
 a list of words to be unaliased.
 
 ### 3.3 Address Expressions
@@ -280,7 +280,7 @@ To get information about a GEOS topic, use the doc functions.
 	apropos [<string>]
 
 The **apropos** command searches the list of commands and command help for 
-all entries containing <string>. It lists each command and its synopsis. The string may actually be a partial word.
+all entries containing `<string>`. It lists each command and its synopsis. The string may actually be a partial word.
 
 ----------
 #### doc, doc-next, doc-previous
@@ -626,7 +626,7 @@ This is the main command to use when setting breakpoints in C programs.
 The "stop in" command will set a breakpoint at the beginning of a procedure, 
 immediately after the procedure's stack frame has been set up. The "stop at" 
 command will set a breakpoint at the first instruction of the given source 
-line. If no <file> is specified, the source file for the current stack frame is 
+line. If no `<file>` is specified, the source file for the current stack frame is 
 used. If a condition is specified by means of an "if <expr>" clause, you should 
 enclose the expression in curly braces to prevent any nested commands, such 
 as a "value fetch" command, from being evaluated until the breakpoint is hit.
@@ -1506,7 +1506,7 @@ are being sent to the object at addr. If no argument is given, then any current
 
 **Swat Display 3-13 The objwatch Command**
 
-	mess1:0) 2 => objwatch Mess1View
+	(mess1:0) 2 => objwatch Mess1View
 	brk5
 	(mess1:0) 3 => c
 	MSG_META_MOUSE_PTR, ^l44a0h:0020h, GenViewClass
@@ -1640,7 +1640,7 @@ the previous command.
 + Address History
 Swat has an address history which is composed of tokens for address 
 expressions previously used by commands such as print or pobj. The 
-elements in the history can be accessed by typing @<number> where the 
+elements in the history can be accessed by typing `@<number>` where the 
 number argument is the number of the item in the history. These 
 elements can replace a full address expression (except constants) and are 
 often used when traversing through fields of a previously printed 
@@ -1729,8 +1729,8 @@ HOME environment variable
 	patient-default mess1
 	run
 	
-	This example shows a sample initialization file which sets up windows to display the source code 
-	and current register values, set the length of the save buffer to 500 lines, and continue running swat 
-	until the mess1 application has been loaded, at which point execution will automatically stop.
+This example shows a sample initialization file which sets up windows to display the source code 
+and current register values, set the length of the save buffer to 500 lines, and continue running swat 
+until the mess1 application has been loaded, at which point execution will automatically stop.
 
 [System Configuration](tconfig.md) <-- &nbsp;&nbsp; [Table of Contents](../tools.md) &nbsp;&nbsp; --> [Swat Reference](tswta_i.md)

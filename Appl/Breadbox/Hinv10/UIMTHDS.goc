@@ -1,0 +1,708 @@
+/*
+ **************************************************************************
+ *  FILE:		uimthds.goc
+ *  PROJECT:	Breadbox Home Inventory
+ *  DESCRIPTION:	This file has methods for document, house info
+ *			and text display
+ **************************************************************************
+ */
+/*
+ ***************************************************************************
+ *		Include files
+ ***************************************************************************
+ */
+
+@include "hivar.goh"
+#include <token.h>	/* for assigning doc token */
+
+/* Prototypes */
+void getHMonText(int number);
+/*
+ ***************************************************************************
+ *		Class & Message Definitions
+ ***************************************************************************
+ */
+
+/* Declare UI object references to those in hinvxx.GOC */
+@extern object HInvApp;
+@extern object HouseDisplay ;
+@extern object AddressField ;
+@extern object CityField ;
+@extern object InsField ;
+@extern object PolicyField ;
+@extern object AgentField ;
+@extern object AgentNumField ;
+@extern object ClaimNumField ;
+@extern object DataDisplay ;
+@extern object HIPrintControl ;
+@extern object HIEditControl ;
+@extern object DataText ;
+@extern object DBGroupDList ;
+@extern object CCDList ;
+@extern object BADList ;
+@extern object REDList ;
+@extern object InsDList ;
+@extern object InvDList ;
+@extern object FamDList ;
+@extern object ShowOnStartupGroup;
+@extern object QTipsDialogBox;
+
+@extern visMoniker HIDocIconMonikerList ;
+
+/*********************************************************************
+ *  All the globals declared as extern in .goh
+ ********************************************************************
+*/
+FileHandle  hmInvFile = NullHandle;  /* handle to the hminv file that's open. */
+
+word  currentRoom = GIGS_NONE;      /* the currently selected room */
+
+word  currentPiece = GIGS_NONE;  /* the currently selected piece */
+
+word  currentCCard = GIGS_NONE;  /* the currently selected credit card */
+
+word  currentBAcct = GIGS_NONE;  /* the currently selected bank account */
+
+word  currentREst = GIGS_NONE;  /* the currently selected real estate */
+
+word  currentIns = GIGS_NONE;  /* the currently selected insurance */
+
+word  currentInv = GIGS_NONE;  /* the currently selected investment */
+
+word  currentFam = GIGS_NONE;  /* the currently selected fam member */
+
+word  numPages;		/* the number of printed pages in the inv display */
+
+char *roomString;    /* declared here so it can move between objects */
+
+char *pieceString;  /* declared here so it can move between objects */
+
+
+@start HouseMonText, data;
+
+//@visMoniker HJMonText = "                      Breadbox Computer's\r";
+@visMoniker HAMonText = "                       Home Inventory Plus\r";
+@visMoniker HBMonText = "\rAddress:\t";
+@visMoniker HCMonText = "\r\t";
+@visMoniker HDMonText = "\rInsurance Company:\t";
+@visMoniker HEMonText = "\rPolicy Number:\t";
+@visMoniker HFMonText = "\rInsurance Agent:\t";
+@visMoniker HGMonText = "\rAgent's Phone:\t";
+@visMoniker HHMonText = "\rClaims Phone:\t";
+@visMoniker HIMonText = "\r\rInventory by Room...";
+
+@end HouseMonText;
+
+/*
+ ***************************************************************************
+ *		Code for HInvProcessClass   the UI & display
+ ***************************************************************************
+ */
+
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_GEN_PROCESS_OPEN_APPLICATION for HInvProcessClass
+ *
+ * DESCRIPTION:	 do some opening stuff
+ *
+ *
+ ***********************************************************************/
+@extern method HInvProcessClass, MSG_GEN_PROCESS_OPEN_APPLICATION
+{
+ Boolean		initError, tips;
+
+
+    @callsuper();
+
+    @call HInvApp::MSG_GEN_APPLICATION_INSTALL_TOKEN();
+
+	 /* check for quick tips */
+	 initError = InitFileReadBoolean("HInv", "showTips", &tips);
+	 if (initError) tips = TRUE;
+	 if (tips) {
+		 @send ShowOnStartupGroup::MSG_GEN_BOOLEAN_GROUP_SET_BOOLEAN_STATE(
+														 SHOW_ON_STARTUP,
+														 TRUE);
+		 @send QTipsDialogBox::MSG_GEN_INTERACTION_INITIATE();
+		 }
+	 else
+		 @send ShowOnStartupGroup::MSG_GEN_BOOLEAN_GROUP_SET_BOOLEAN_STATE(
+														 SHOW_ON_STARTUP,
+														 FALSE);
+
+}
+
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_GEN_PROCESS_CLOSE_APPLICATION for HInvProcessClass
+ *
+ * DESCRIPTION:	 do some closing stuff
+ *
+ *
+ ***********************************************************************/
+@extern method HInvProcessClass, MSG_GEN_PROCESS_CLOSE_APPLICATION
+{
+ Boolean		tips;
+
+	 /* set the quick tips if not default */
+	 tips = @call ShowOnStartupGroup::MSG_GEN_BOOLEAN_GROUP_IS_BOOLEAN_SELECTED(
+																	 SHOW_ON_STARTUP);
+	 InitFileWriteBoolean("hiNV", "showTips", tips);
+
+	 return (@callsuper()) ;
+}
+
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_META_DOC_OUTPUT_INITIALIZE_DOCUMENT_FILE for HInvProcessClass
+ *
+ * DESCRIPTION:	Called to initialize a newly opened document.
+ *              Modified from ProcUI Document Sample app
+ *
+ ***********************************************************************/
+@extern method HInvProcessClass, MSG_META_DOC_OUTPUT_INITIALIZE_DOCUMENT_FILE
+{
+    DBGroupAndItem   mapitem;
+    DBMapStruct*     mapPtr;
+
+    VMBlockHandle    houseblock;
+    HouseStruct*     houseMemPtr;
+    MemHandle	     mh;
+
+    /* Create an ungrouped item to use for map item */
+    mapitem = DBAllocUngrouped(file, sizeof(DBMapStruct));
+
+    /* Set the map item to our new item */
+    DBSetMapUngrouped(file, mapitem);
+    /*
+     * Now initialize the map item.  In this app, our map item is
+     * a struct specifying the number of DB groups (rooms), etc followed
+     * by an array of RoomStruct structures, one for each DB room Group.
+     */
+    mapPtr = (DBMapStruct *) DBLockUngrouped(file, mapitem);
+    mapPtr->MS_numRooms = 0;
+
+    /* Mark the map item as dirty */
+    DBDirty(mapPtr);
+    DBUnlock(mapPtr);
+
+    /* Create a VM block for the house info */
+    houseblock = VMAlloc(file, sizeof(HouseStruct), 0);
+
+    /* Make the house info block our VMMapBlock to make access easy */
+    VMSetMapBlock(file, houseblock);
+
+    /* lock the block */
+    houseMemPtr = VMLock(file, houseblock, &mh);
+
+    /* Initialize the Imp Info sections */
+    houseMemPtr->HS_numCCards = 0;
+    houseMemPtr->HS_numBAccts = 0;
+    houseMemPtr->HS_numREst = 0;
+    houseMemPtr->HS_numIns = 0;
+    houseMemPtr->HS_numInv = 0;
+    houseMemPtr->HS_numFam = 0;
+
+    VMDirty(mh);
+    VMUnlock(mh);
+
+    /* Create a VM block for the professional info */
+    /* Six professionals allowed for */
+    VMAlloc(file, (6 * (sizeof(ProStruct))), 1);
+
+    /* Create a VM block for the credit card info */
+    VMAlloc(file, (sizeof(CCardStruct)), 2);
+
+    /* Create a VM block for the bank account info */
+    VMAlloc(file, (sizeof(BAcctStruct)), 3);
+
+    /* Create a VM block for the real estate info */
+    VMAlloc(file, (sizeof(REstStruct)), 4);
+
+    /* Create a VM block for the insurance info */
+    VMAlloc(file, (sizeof(InsStruct)), 5);
+
+    /* Create a VM block for the investment info */
+    VMAlloc(file, (sizeof(InvStruct)), 6);
+
+    /* Create a VM block for the family info */
+    VMAlloc(file, (sizeof(FamStruct)), 7);
+
+    /* Create a VM block for the SAFE/BOX info */
+    VMAlloc(file, (sizeof(SafBoxStruct)), 8);
+
+    return(FALSE);
+}
+
+
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_META_DOC_OUTPUT_ATTACH_UI_TO_DOCUMENT for HInvProcessClass
+ *
+ * DESCRIPTION:	Put the file data into the various boxes.
+ *              Modified from ProcUI Document Sample app
+ *
+ ***********************************************************************/
+@extern method HInvProcessClass, MSG_META_DOC_OUTPUT_ATTACH_UI_TO_DOCUMENT
+{
+    DBMapStruct*       mapPtr;
+
+    VMBlockHandle     houseblock;
+    MemHandle         mh;
+    HouseStruct *     houseMemPtr ;
+
+    /* assign our Home Inv file handle */
+    hmInvFile = file;
+
+    /* Just lock the map item */
+    mapPtr = (DBMapStruct *) DBLockMap(hmInvFile);
+
+    /* Set the number of items in the room list */
+    @send DBGroupDList::MSG_GEN_DYNAMIC_LIST_INITIALIZE(mapPtr->MS_numRooms);
+
+    DBUnlock(mapPtr);
+
+    houseblock = VMGetMapBlock(hmInvFile);
+    houseMemPtr = VMLock(hmInvFile, houseblock, &mh);
+
+    /* Set the number of credit cards */
+    @send CCDList::MSG_GEN_DYNAMIC_LIST_INITIALIZE(houseMemPtr->HS_numCCards);
+
+    /* Set the number of bank accts */
+    @send BADList::MSG_GEN_DYNAMIC_LIST_INITIALIZE(houseMemPtr->HS_numBAccts);
+
+    /* Set the number of real estate properties*/
+    @send REDList::MSG_GEN_DYNAMIC_LIST_INITIALIZE(houseMemPtr->HS_numREst);
+
+    /* Set the number of insurance policies */
+    @send InsDList::MSG_GEN_DYNAMIC_LIST_INITIALIZE(houseMemPtr->HS_numIns);
+
+    /* Set the number of investments */
+    @send InvDList::MSG_GEN_DYNAMIC_LIST_INITIALIZE(houseMemPtr->HS_numInv);
+
+    /* Set the number of family members */
+    @send FamDList::MSG_GEN_DYNAMIC_LIST_INITIALIZE(houseMemPtr->HS_numFam);
+
+    VMUnlock(mh);
+ 
+}
+
+
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_META_DOC_OUTPUT_DETACH_UI_FROM_DOCUMENT for HInvProcessClass
+ *
+ * DESCRIPTION:	Called when the app is shut down.
+ *              Modified from ProcUI Document Sample app
+ *
+ ***********************************************************************/
+
+@extern method HInvProcessClass, MSG_META_DOC_OUTPUT_DETACH_UI_FROM_DOCUMENT
+{
+    hmInvFile = NullHandle;
+
+}
+
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_META_DOC_OUTPUT_SAVE_AS_COMPLETED for HInvProcessClass
+ *
+ * DESCRIPTION:	Called on Save As.
+ *              Modified from ProcUI Document Sample app
+ *
+ ***********************************************************************/
+
+@extern method HInvProcessClass, MSG_META_DOC_OUTPUT_SAVE_AS_COMPLETED
+{
+    hmInvFile = file;
+
+}
+
+
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_GEN_PROCESS_INSTALL_TOKEN for HInvProcessClass
+ *
+ * DESCRIPTION:	Associates HId1 token with HInv docs
+ *
+ *              needs token.h include
+ ***********************************************************************/
+
+@extern method HInvProcessClass, MSG_GEN_PROCESS_INSTALL_TOKEN
+{
+    dword	HITokenChars;
+    TokenFlags	HITokenFlags;
+
+    @callsuper();
+
+    HITokenChars = TOKEN_CHARS('H', 'I', (dword) 'P', (dword) 'd');
+    if (!TokenGetTokenInfo(HITokenChars, 16423, &HITokenFlags)) {
+
+       TokenDefineToken(HITokenChars,
+		16423,
+		@HIDocIconMonikerList,
+		0);
+    }
+}
+
+
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_ENTER_INFO_DATA for HInvProcessClass
+ *
+ * DESCRIPTION:	Creates new household info.
+ *
+ * STRATEGY:    Creates the new group and writes out the appropriate
+ *              data structure.  Cleaned up by LES
+ *
+ ***********************************************************************/
+@extern method HInvProcessClass, MSG_ENTER_INFO_DATA
+{
+    VMBlockHandle     houseblock;
+    MemHandle         mh;
+    HouseStruct *     houseMemPtr ;
+
+    houseblock = VMGetMapBlock(hmInvFile);
+    houseMemPtr = VMLock(hmInvFile, houseblock, &mh);
+
+    /* Copy the info to the data structure */
+    @call AddressField::MSG_VIS_TEXT_GET_ALL_PTR(
+                   houseMemPtr->HS_strAddress);
+    @call CityField::MSG_VIS_TEXT_GET_ALL_PTR(
+                   houseMemPtr->HS_cityStZip);
+    @call InsField::MSG_VIS_TEXT_GET_ALL_PTR(
+                   houseMemPtr->HS_insComp);
+    @call PolicyField::MSG_VIS_TEXT_GET_ALL_PTR(
+                   houseMemPtr->HS_insPolicy);
+    @call AgentField::MSG_VIS_TEXT_GET_ALL_PTR(
+                   houseMemPtr->HS_insAgent);
+    @call AgentNumField::MSG_VIS_TEXT_GET_ALL_PTR(
+                   houseMemPtr->HS_insAgentNum);
+    @call ClaimNumField::MSG_VIS_TEXT_GET_ALL_PTR(
+                   houseMemPtr->HS_insClaimNum);
+
+    VMDirty(mh);
+    VMUnlock(mh);
+
+}
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_SHOW_HOUSE_INFO for HInvProcessClass
+ *
+ * DESCRIPTION:	Put any household info in to place when DB draws.
+ *              This was cleaned up by LES
+ *
+ ***********************************************************************/
+@extern method HInvProcessClass, MSG_SHOW_HOUSE_INFO
+{
+    VMBlockHandle    houseblock;
+    MemHandle 	     mh;
+    /* LES:  Point to the house structure, not to a mem block. */
+    HouseStruct*     houseMemPtr;
+
+    // This extracts the VMBlockHandle
+    houseblock = VMGetMapBlock(hmInvFile);
+
+    // This extracts the MemHandle
+    houseMemPtr = VMLock(hmInvFile, houseblock, &mh);
+
+    // Now we set up fields based on the info.
+    @call AddressField::MSG_VIS_TEXT_REPLACE_ALL_PTR(
+		houseMemPtr->HS_strAddress, 0);
+    @call CityField::MSG_VIS_TEXT_REPLACE_ALL_PTR(
+		houseMemPtr->HS_cityStZip, 0);
+    @call InsField::MSG_VIS_TEXT_REPLACE_ALL_PTR(
+		houseMemPtr->HS_insComp, 0);
+    @call PolicyField::MSG_VIS_TEXT_REPLACE_ALL_PTR(
+		houseMemPtr->HS_insPolicy, 0);
+    @call AgentField::MSG_VIS_TEXT_REPLACE_ALL_PTR(
+		houseMemPtr->HS_insAgent, 0);
+    @call AgentNumField::MSG_VIS_TEXT_REPLACE_ALL_PTR(
+		houseMemPtr->HS_insAgentNum, 0);
+    @call ClaimNumField::MSG_VIS_TEXT_REPLACE_ALL_PTR(
+		houseMemPtr->HS_insClaimNum, 0);
+
+    VMUnlock(mh);
+}
+
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_HOUSE_DISPLAY for HInvProcessClass
+ *
+ * DESCRIPTION:	Fills and calls the dialog box when the house icon
+ *               is clicked.  LES set this up
+ *     
+ *              
+ *
+ ***********************************************************************/
+
+@extern method HInvProcessClass, MSG_HOUSE_DISPLAY
+{
+    /* LES:  You can put data in a GenText even though it is not visible */
+    /* on the screen.  Go ahead and do it.  Also, oself = process. */
+    @call oself::MSG_SHOW_HOUSE_INFO() ;
+
+    @call HouseDisplay::MSG_GEN_INTERACTION_INITIATE();
+}
+
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_SHOW_DATA for HInvProcessClass
+ *
+ * DESCRIPTION:	Put any household info and inventory data into 
+ *                GenText for printing.
+ *                (int whichDisp)
+ ***********************************************************************/
+@extern method HInvProcessClass, MSG_SHOW_DATA
+{
+    VMBlockHandle    houseblock;
+    MemHandle 	     mh;
+    HouseStruct*     houseMemPtr;
+
+    RoomStruct      *room;
+    PieceStruct     *piece, *temp;
+    DBGroup	    roomgroup;
+    DBGroupAndItem  mapitem;
+    DBMapStruct*    mapPtr;
+    word            numRooms, numPieces, i, j, numLines;
+    char	    pieceBuffer[200];   /* holds an item & its notes */
+
+    /* the 2" left tab - where */
+    Tab HI1Tab = {
+	  8 * 2 * PIXELS_PER_INCH, /* not sure why mpy by 8 but it works! */
+	  TL_NONE | TT_LEFT,
+	  SDM_100,
+	  0,
+	  0,
+	  NULL
+	};
+
+    /* the 4" left tab - when */
+    Tab HI2Tab = {
+	  8 * 4 * PIXELS_PER_INCH, /* not sure why mpy by 8 but it works! */
+	  TL_NONE | TT_LEFT,
+	  SDM_100,
+	  0,
+	  0,
+	  NULL
+	};
+
+    /* the 6.25" decimal tab - $$$ */
+    Tab HI3Tab = {
+	  8 * 6.25 * PIXELS_PER_INCH, /* not sure why mpy by 8 but it works! */
+	  TL_NONE | TT_ANCHORED,
+	  SDM_100,
+	  0,
+	  0,
+	  NULL
+	};
+
+    /* Sets the first tab */
+    @call DataText::MSG_VIS_TEXT_SET_TAB(HI1Tab, TEXT_ADDRESS_PAST_END, 0);
+
+    /* Sets the second tab */
+    @call DataText::MSG_VIS_TEXT_SET_TAB(HI2Tab, TEXT_ADDRESS_PAST_END, 0);
+
+    /* Sets the third tab */
+    @call DataText::MSG_VIS_TEXT_SET_TAB(HI3Tab, TEXT_ADDRESS_PAST_END, 0);
+
+    // This extracts the VMBlockHandle
+    houseblock = VMGetMapBlock(hmInvFile);
+
+    // This extracts the MemHandle
+    houseMemPtr = VMLock(hmInvFile, houseblock, &mh);
+
+    /* clear the GenText */
+    @call DataText::MSG_VIS_TEXT_REPLACE_ALL_PTR(" ", 1);
+
+    /* dump the info to the GenText */
+//    getHMonText(9);  /* bbox */
+    getHMonText(0);  /* Title */
+    getHMonText(1);
+    @call DataText::MSG_VIS_TEXT_APPEND_PTR(houseMemPtr->HS_strAddress, 0);
+    getHMonText(2);
+    @call DataText::MSG_VIS_TEXT_APPEND_PTR(houseMemPtr->HS_cityStZip, 0);
+    getHMonText(3);
+    @call DataText::MSG_VIS_TEXT_APPEND_PTR(houseMemPtr->HS_insComp, 0);
+    getHMonText(4);
+    @call DataText::MSG_VIS_TEXT_APPEND_PTR(houseMemPtr->HS_insPolicy, 0);
+    getHMonText(5);
+    @call DataText::MSG_VIS_TEXT_APPEND_PTR(houseMemPtr->HS_insAgent, 0);
+    getHMonText(6);
+    @call DataText::MSG_VIS_TEXT_APPEND_PTR(houseMemPtr->HS_insAgentNum, 0);
+    getHMonText(7);
+    @call DataText::MSG_VIS_TEXT_APPEND_PTR(houseMemPtr->HS_insClaimNum, 0);
+    getHMonText(8);
+
+    VMUnlock(mh);
+
+    numLines = 12;   /* all the header stuff */
+
+    /* Lock the map item */
+    mapitem = DBGetMap(hmInvFile);
+    mapPtr = DBLockUngrouped(hmInvFile, mapitem);
+
+    /* How many rooms? */
+    numRooms = mapPtr->MS_numRooms;
+
+    /* Get the beginning of the array of rooms... */
+    room = (RoomStruct *) (mapPtr + sizeof(DBMapStruct));
+
+    /* and cycle through the rooms. */
+    for (i = 0; i < numRooms; i++) {
+
+       @call DataText::MSG_VIS_TEXT_APPEND_PTR("\r", 1);
+       numLines++;
+       @call DataText::MSG_VIS_TEXT_APPEND_PTR(
+		   room[i].RS_name, strlen(room[i].RS_name));
+
+       /* Get the pieces in this room... */
+       numPieces = room[i].RS_size;
+
+       if (numPieces == 0)
+	   ;        /* then don't bother with getting any pieces */
+       else {
+          roomgroup = room[i].RS_group;
+          piece = DBLock(hmInvFile, roomgroup, room[i].RS_head);
+
+          /* by following the linked list.*/
+          for (j = 0; j < numPieces; j++) {
+
+	     /* initialize the piece buffer */
+	     *pieceBuffer = NULL;
+
+	     strcat(pieceBuffer, "\r ");
+	     numLines++;
+	     strcat(pieceBuffer, piece->PS_name);
+
+ 	     /* get any notes for that piece */
+	     strcat(pieceBuffer, "\t");
+	     strcat(pieceBuffer, piece->PS_loc);
+	     strcat(pieceBuffer, "\t");
+	     strcat(pieceBuffer, piece->PS_date);
+	     strcat(pieceBuffer, "\t");
+	     strcat(pieceBuffer, piece->PS_price);
+	     if (whichDisp == 0) {
+             strcat(pieceBuffer, "\r   ");
+	       numLines++;
+	       strcat(pieceBuffer, piece->PS_descrip);
+	       strcat(pieceBuffer, "\r   ");
+	       numLines++;
+	       strcat(pieceBuffer, piece->PS_wrnty);
+           }
+	     /* send the piece & info to the screen/printer */
+	     @call DataText::MSG_VIS_TEXT_APPEND_PTR(
+		   pieceBuffer, 0);
+
+	     if (j == (numPieces - 1)) /* if the last piece... */
+	        ;                      /* don't try to get next piece...
+				     * the app crashes if you do, so
+				     * this is a work-around
+                                     * not a horrible hack ;-) */
+
+             else {
+                /* get next piece from link */
+	        temp = DBLock(hmInvFile, roomgroup, piece->PS_next);
+	        DBUnlock(piece);
+	        piece = temp;
+             }  /* end of last piece else */
+
+          } /* end of pieces for */
+
+          DBUnlock(piece);
+       } /* end of pieces else */
+    }  /* end of rooms for */
+
+    DBUnlock(mapPtr);
+
+  /* tell print controller how many pages */
+  numPages = 1 + (numLines / 54); /* six lines per inch */
+  @call HIPrintControl::MSG_PRINT_CONTROL_SET_TOTAL_PAGE_RANGE(1, numPages);
+
+}
+
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_DATA_DISPLAY for HInvProcessClass
+ *
+ * DESCRIPTION:	Fills and calls the data box when the menu
+ *               is clicked.
+ *                 (int whichDisp)
+ ***********************************************************************/
+
+@extern method HInvProcessClass, MSG_DATA_DISPLAY
+{
+    /* LES:  You can put data in a GenText even though it is not visible */
+    /* on the screen.  Go ahead and do it.  Also, oself = process. */
+    @call oself::MSG_SHOW_DATA(whichDisp) ;
+
+    @call DataDisplay::MSG_GEN_INTERACTION_INITIATE();
+}
+
+/************************************************************************/
+@extern method PrintGenTextClass, MSG_PRINT_START_PRINTING
+{
+    word curPage;
+
+    for (curPage=0; curPage < numPages; curPage++)
+    {
+       GrSaveState(gstate);
+
+       /* Translate the gstate down a page */
+       GrApplyTranslation(gstate, 0,
+		   -MakeWWFixed(curPage *(
+		   (sdword)(9*72))));
+
+       /* Clip it to match translation and margins */
+       GrSetClipRect(gstate, PCT_REPLACE,
+                             0,                     /* left */
+                             curPage * (9*72),      /* top */
+                             (6.5*72),                 /* right */
+			     (curPage +1) * (9*72) - 1);   /* bottom */
+			     /* The -1 is to keep an extra line from printing
+                              * when in text only mode.  Doesn't effect
+                              * graphic printing */
+
+	/* Draw current page */
+       @call self::MSG_VIS_DRAW(DF_PRINT, gstate);
+
+       GrRestoreState(gstate);
+       GrNewPage(gstate, PEC_FORM_FEED);
+    }
+
+    @send HIPrintControl::MSG_PRINT_CONTROL_PRINTING_COMPLETED();
+}
+
+/*---------------------------------------------------------------------
+ * FUNCTION  getHMonText
+ *
+ * DESCRIPTION  extract text string from given moniker
+ *
+ *--------------------------------------------------------------------
+ */
+ void getHMonText(int number) {
+
+    ChunkHandle  hmonikers[] = {
+      OptrToChunk(@HAMonText),
+      OptrToChunk(@HBMonText),
+      OptrToChunk(@HCMonText),
+      OptrToChunk(@HDMonText),
+      OptrToChunk(@HEMonText),
+      OptrToChunk(@HFMonText),
+      OptrToChunk(@HGMonText),
+      OptrToChunk(@HHMonText),
+	 OptrToChunk(@HIMonText)/*,
+	 OptrToChunk(@HJMonText)*/
+   };
+    VisMonikerWithText   *monStru;
+
+
+    MemLock(HandleOf(@HAMonText));
+
+    monStru = LMemDerefHandles(HandleOf(@HAMonText),hmonikers[number]);
+
+    @call DataText::MSG_VIS_TEXT_APPEND_PTR((char *)monStru+VMWT_text, 0);
+
+    MemUnlock(HandleOf(@HAMonText));
+}
+

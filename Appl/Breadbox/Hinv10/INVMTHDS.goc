@@ -1,0 +1,1031 @@
+/*
+ **************************************************************************
+ *  FILE:		invmthds.goc
+ *  PROJECT:	Breadbox Home Inventory
+ *  DESCRIPTION:	This file has methods for inventory data, dlists
+ *			and pick lists
+ **************************************************************************
+ */
+/*
+ ***************************************************************************
+ *		Include files
+ ***************************************************************************
+ */
+
+@include <stdapp.goh>
+@include "hivar.goh"
+@include "txtstrs.goh"
+@include <gstring.h>
+#include <string.h>
+
+/*
+ ***************************************************************************
+ *		Class & Message Definitions
+ ***************************************************************************
+ */
+
+/* Declare UI object references to those in hinv0s.GOC */
+@extern object RoomDisplay ;
+@extern object PieceDisplay ;
+@extern object DBGroupDList ;
+@extern object NewRoomTrigger ;
+@extern object RNameField ;
+@extern object DBItemDList ;
+@extern object NewPieceTrigger ;
+@extern object NameField ;
+@extern object PieceNotesBox ;
+@extern object DescrField ;
+@extern object PriceField ;
+@extern object DateField ;
+@extern object PLocField ;
+@extern object WrntyField ;
+@extern object delroo ;
+@extern object renroo ;
+@extern object selroo ;
+@extern object delite ;
+@extern object selite ;
+
+/****************************************************************************
+ *		Code for HInvProcessClass inv & lists
+ ***************************************************************************
+ */
+
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_NEW_ROOM for HInvProcessClass
+ *
+ * DESCRIPTION:	Creates a new DB group.
+ *
+ * STRATEGY:    Creates the new group and writes out the appropriate
+ *              data structures.
+ *
+ ***********************************************************************/
+
+@extern method HInvProcessClass, MSG_NEW_ROOM
+{
+    RoomStruct        *room;
+    DBGroupAndItem    mapitem;
+    DBMapStruct*      mapPtr;
+    word              numRooms;
+    char              name[MAX_NAME_LEN+1];
+
+    /*
+     * Retrieve the name of the new room from the name field.
+     */
+    @call RNameField::MSG_VIS_TEXT_GET_ALL_PTR(name);
+
+    /* Exit if room is unnamed. */
+    if (*name == 0)
+        return;
+
+    /* Lock the map item, read the array size, and unlock it */
+    mapitem = DBGetMap(hmInvFile);
+    mapPtr = DBLockUngrouped(hmInvFile, mapitem);
+    numRooms = mapPtr->MS_numRooms;
+    DBUnlock(mapPtr);
+
+    /* expand the map item */
+    DBReAllocUngrouped(hmInvFile, mapitem,
+                sizeof(DBMapStruct) + ((numRooms + 1) * sizeof(RoomStruct)));
+
+    /* Lock the map again */
+    mapPtr = DBLockUngrouped(hmInvFile, mapitem);
+
+    /* Get the beginning of the array of room structures */
+    room = (RoomStruct *) (mapPtr + sizeof(DBMapStruct));
+
+    /* Initialize the new structure (remember mapsize is old array size) */
+    strcpy(room[numRooms].RS_name, name);
+    room[numRooms].RS_head = NULL;
+    room[numRooms].RS_size = 0;
+
+    /* Create the new DB group */
+    room[numRooms].RS_group = DBGroupAlloc(hmInvFile);
+
+    /* Increase the array size (number of rooms)*/
+    (mapPtr->MS_numRooms)++;
+    numRooms++;
+
+    /* Mark the map item as dirty */
+    DBDirty(mapPtr);
+    DBUnlock(mapPtr);
+
+    /* Let the list in on the whole affair */
+    @send DBGroupDList::MSG_GEN_DYNAMIC_LIST_ADD_ITEMS(numRooms,1);
+
+    @call RNameField::MSG_VIS_TEXT_DELETE_ALL();
+    @call NameField::MSG_VIS_TEXT_DELETE_ALL();
+    @call DescrField::MSG_VIS_TEXT_DELETE_ALL();
+    @call PriceField::MSG_VIS_TEXT_DELETE_ALL();
+    @call DateField::MSG_VIS_TEXT_DELETE_ALL();
+    @call PLocField::MSG_VIS_TEXT_DELETE_ALL();
+
+    /* set the newly added room selected
+     * sel is hilighted but something else isn't happening */
+    /*@call DBGroupDList::MSG_GEN_ITEM_GROUP_SET_SINGLE_SELECTION(mapsize, FALSE); */
+
+}
+
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_DELETE_ROOM for HInvProcessClass
+ *
+ * DESCRIPTION:	Deletes the current room.
+ *
+ ***********************************************************************/
+
+@extern method HInvProcessClass, MSG_DELETE_ROOM
+{
+    RoomStruct        *room;
+    DBGroupAndItem    mapitem;
+    DBMapStruct*      mapPtr;
+
+    /* If we have no selected room, we exit */
+    if (currentRoom == GIGS_NONE)
+        return;
+
+
+    /* put up an Are you sure box */
+       if 	((UserStandardDialogOptr(
+			    NullOptr,
+			    NullOptr,
+			    NullOptr,
+			    NullOptr,
+			    @delroo,
+			    ((CDT_WARNING << CDBF_DIALOG_TYPE_OFFSET) |
+			    (GIT_AFFIRMATION << CDBF_INTERACTION_TYPE_OFFSET))
+                            ) == IC_YES))  {
+
+    /* Do our standard setup */
+    mapitem = DBGetMap(hmInvFile);
+    mapPtr = DBLockUngrouped(hmInvFile, mapitem);
+    room = (RoomStruct *) (mapPtr + sizeof(DBMapStruct));
+
+    /* delete the current room's DBGroup */
+    DBGroupFree(hmInvFile, room[currentRoom].RS_group);
+
+    /* Now decrement size of map array */
+    --(mapPtr->MS_numRooms);
+
+    DBDirty(mapPtr);
+    DBUnlock(mapPtr);
+
+    /* Now we contract the map item.  DBDeleteAt removes bytes from
+       within the specified item, moving bytes after it downwards. */
+    DBDeleteAtUngrouped(hmInvFile, mapitem,
+         sizeof(word) + (currentRoom * sizeof(RoomStruct)),
+         sizeof(RoomStruct));
+
+    /* Let the lists in on what's going on */
+    @send DBGroupDList::MSG_GEN_DYNAMIC_LIST_REMOVE_ITEMS(currentRoom,1);
+    @send DBItemDList::MSG_GEN_DYNAMIC_LIST_INITIALIZE(0);
+
+    currentRoom = GIGS_NONE;
+
+    @call RNameField::MSG_VIS_TEXT_DELETE_ALL();
+    @call NameField::MSG_VIS_TEXT_DELETE_ALL();
+    @call DescrField::MSG_VIS_TEXT_DELETE_ALL();
+    @call PriceField::MSG_VIS_TEXT_DELETE_ALL();
+    @call DateField::MSG_VIS_TEXT_DELETE_ALL();
+    @call PLocField::MSG_VIS_TEXT_DELETE_ALL();
+
+    } /* end of Are you sure if stmt */
+}
+
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_EDIT_ROOM_NAME for HInvProcessClass
+ *
+ * DESCRIPTION:	Allows for changing a room's name
+ *               
+ *     
+ *              
+ *
+ ***********************************************************************/
+
+@extern method HInvProcessClass, MSG_EDIT_ROOM_NAME
+{
+    RoomStruct        *room;
+    DBGroupAndItem    mapitem;
+    DBMapStruct*      mapPtr;
+    char              name[MAX_NAME_LEN+1];
+
+    /* first check to see if a room is selected */
+    if ( currentRoom != GIGS_NONE ) {
+
+       /* OK - put up are you sure you want to change box */
+       if 	((UserStandardDialogOptr(
+			    NullOptr,
+			    NullOptr,
+			    NullOptr,
+			    NullOptr,
+			    @renroo,
+			    ((CDT_WARNING << CDBF_DIALOG_TYPE_OFFSET) |
+			    (GIT_AFFIRMATION << CDBF_INTERACTION_TYPE_OFFSET))
+                            ) == IC_YES))  {
+
+
+       /* OK - get the new name */
+       @call RNameField::MSG_VIS_TEXT_GET_ALL_PTR(name);
+
+       /* Do our standard setup */
+       mapitem = DBGetMap(hmInvFile);
+       mapPtr = DBLockUngrouped(hmInvFile, mapitem);
+       room = (RoomStruct *) (mapPtr + sizeof(DBMapStruct));
+       DBUnlock(mapPtr);
+
+       /* change the name */
+       strcpy(room[currentRoom].RS_name, name);
+
+       /* change the list */
+       @send DBGroupDList::MSG_GEN_DYNAMIC_LIST_INITIALIZE(GDLI_NO_CHANGE);
+
+       }  /* end of are you sure if */
+
+    }  /* end of selecteion check if */
+
+}
+
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_NEW_PIECE for HInvProcessClass
+ *
+ * DESCRIPTION:	Creates a new DB item.
+ *
+ * STRATEGY:    Allocate the new item and fill it in with an PieceStruct.
+ *
+ ***********************************************************************/
+
+@extern method HInvProcessClass, MSG_NEW_PIECE
+{
+    RoomStruct        *room;
+    PieceStruct       *piece;
+    DBItem            pieceitem;
+    DBGroup           roomgroup;
+    DBMapStruct*      mapPtr;
+    char              name[MAX_NAME_LEN+1];
+
+    /* If we have no selected room, exit. */
+    if ( currentRoom == GIGS_NONE ) {
+
+    /* nope - put up a you gotta select a room box */
+              UserStandardDialogOptr(
+			    NullOptr,
+			    NullOptr,
+			    NullOptr,
+			    NullOptr,
+			    @selroo,
+			((CDT_WARNING << CDBF_DIALOG_TYPE_OFFSET) |
+			(GIT_NOTIFICATION << CDBF_INTERACTION_TYPE_OFFSET)));
+
+	return;
+	}
+
+    /* Retrieve the name of the new item */
+    @call NameField::MSG_VIS_TEXT_GET_ALL_PTR(name);
+
+    /* Exit if piece is unnamed. */
+    if (*name == 0)
+        return;
+
+    /* Lock the map item */
+    mapPtr = DBLockMap(hmInvFile);
+
+    /* Get the room's DBGroup */
+    room = (RoomStruct *) (mapPtr + sizeof(DBMapStruct));
+    roomgroup = room[currentRoom].RS_group;
+
+    /* create the new Piece DBItem */
+    pieceitem = DBAlloc(hmInvFile, roomgroup, sizeof(PieceStruct));
+
+    /* Lock new piece DBItem */
+    piece = DBLock(hmInvFile, roomgroup, pieceitem);
+
+    /* Now, because we've DBAlloc'd a new item, other things may have
+     * moved.  However, the map item is "ungrouped", which means it is
+     * in a separate item block from any "grouped" items.  Only items
+     * within the same group (or fellow ungrouped items) can reside in
+     * the same physical item block.  A DBAlloc in one block cannot
+     * affect the location of another LOCKED block.  In this case, the
+     * map item is locked, so it is safe and does not need to be
+     * dereferenced.
+     */
+
+    /* Insert new piece into the piece list (at head, which is easiest) */
+    piece->PS_next = room[currentRoom].RS_head;
+    room[currentRoom].RS_head = pieceitem;
+
+    /* Increase the room size (number of pieces) */
+    room[currentRoom].RS_size++;
+
+    /* Mark the map item as dirty */
+    DBDirty(mapPtr);
+    DBUnlock(mapPtr);
+
+    /* Initialize piece */
+    strcpy(piece->PS_name, name);
+    piece->PS_descrip[0] = 0;
+    piece->PS_price[0] = 0;
+    piece->PS_date[0] = 0;
+    piece->PS_loc[0] = 0;
+    piece->PS_wrnty[0] = 0;
+
+    /* Let the list know about the whole deal */
+    @send DBItemDList::MSG_GEN_DYNAMIC_LIST_ADD_ITEMS(0,1);
+
+    /* Mark the piece item as dirty and unlock it. */
+    DBDirty(piece);
+    DBUnlock(piece);
+
+    /* clear the text from the field when done */
+    @call NameField::MSG_VIS_TEXT_DELETE_ALL();
+    @call DescrField::MSG_VIS_TEXT_DELETE_ALL();
+    @call PriceField::MSG_VIS_TEXT_DELETE_ALL();
+    @call DateField::MSG_VIS_TEXT_DELETE_ALL();
+    @call PLocField::MSG_VIS_TEXT_DELETE_ALL();
+    @call WrntyField::MSG_VIS_TEXT_DELETE_ALL();
+
+    /* set the newly added piece selected - not working right*/
+    /*@call DBItemDList::MSG_GEN_ITEM_GROUP_SET_SINGLE_SELECTION(0, FALSE);*/
+}
+
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_SET_PIECE_DATA for HInvProcessClass
+ *
+ * DESCRIPTION:	Updates current piece record based on text fields.
+ *
+ * PARAMETERS:  void (otpr trigger)
+ *
+ * STRATEGY:
+ *
+ ***********************************************************************/
+
+@extern method HInvProcessClass, MSG_SET_PIECE_DATA
+{
+    RoomStruct        *room;
+    PieceStruct       *piece, *tmp;
+    DBGroup           roomgroup;
+    DBMapStruct*      mapPtr;
+    word              i;
+
+    /* Do nothing if no piece selected. */
+    if ( currentPiece == GIGS_NONE )
+        return;
+
+    /* (Perform the same setup procedure as above) */
+    mapPtr = DBLockMap(hmInvFile);
+    room = (RoomStruct *) (mapPtr + sizeof(DBMapStruct));
+    roomgroup = room[currentRoom].RS_group;
+    piece = DBLock(hmInvFile, roomgroup, room[currentRoom].RS_head);
+    DBUnlock(mapPtr);
+
+    /* Scan forward to selected piece */
+    for ( i=0; i < currentPiece; i++ ) {
+	tmp = DBLock(hmInvFile, roomgroup, piece->PS_next);
+        DBUnlock(piece);
+        piece = tmp;
+    }
+
+    /* Now we set piece statistic(s) based on fields */
+    @call PriceField::MSG_VIS_TEXT_GET_ALL_PTR(piece->PS_price);
+    @call DescrField::MSG_VIS_TEXT_GET_ALL_PTR(piece->PS_descrip);
+    @call NameField::MSG_VIS_TEXT_GET_ALL_PTR(piece->PS_name);
+    @call DateField::MSG_VIS_TEXT_GET_ALL_PTR(piece->PS_date);
+    @call PLocField::MSG_VIS_TEXT_GET_ALL_PTR(piece->PS_loc);
+    @call WrntyField::MSG_VIS_TEXT_GET_ALL_PTR(piece->PS_wrnty);
+
+    @call DBItemDList::
+     MSG_GEN_DYNAMIC_LIST_REPLACE_ITEM_TEXT(currentPiece, piece->PS_name);
+
+    /* Mark as dirty and unlock changed piece record. */
+    DBDirty(piece);
+    DBUnlock(piece);
+
+    /*@call PriceField::MSG_VIS_TEXT_DELETE_ALL();
+    @call DescrField::MSG_VIS_TEXT_DELETE_ALL();
+    @call NameField::MSG_VIS_TEXT_DELETE_ALL(); */
+
+}
+
+
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_DELETE_PIECE for HInvProcessClass
+ *
+ * DESCRIPTION:	Deletes selected piece (DBItem).
+ *
+ * PARAMETERS:  void (otpr trigger)
+ *
+ * STRATEGY:    Since the piece DBItems are in a linked list, the
+ *              list must be traversed to remove the item.
+ *
+ ***********************************************************************/
+
+@extern method HInvProcessClass, MSG_DELETE_PIECE
+{
+    RoomStruct        *room;
+    PieceStruct       *piece, *tmp;
+    DBItem            pieceitem, previtem;
+    DBGroup           roomgroup;
+    DBMapStruct*      mapPtr;
+    word              i;
+
+    /* Exit if no piece selected */
+    if (currentPiece == GIGS_NONE)
+        return;
+
+
+    /* put up an Are you sure box */
+       if 	((UserStandardDialogOptr(
+			    NullOptr,
+			    NullOptr,
+			    NullOptr,
+			    NullOptr,
+			    @delite,
+			    ((CDT_WARNING << CDBF_DIALOG_TYPE_OFFSET) |
+			    (GIT_AFFIRMATION << CDBF_INTERACTION_TYPE_OFFSET))
+                            ) == IC_YES))  {
+
+    /* Standard setup */
+    mapPtr = DBLockMap(hmInvFile);
+    room = (RoomStruct *) (mapPtr + sizeof(DBMapStruct));
+    roomgroup = room[currentRoom].RS_group;
+
+    /* Find the piece record, starting with head of list */
+    pieceitem = room[currentRoom].RS_head;
+    piece = DBLock(hmInvFile, roomgroup, pieceitem);
+
+    /* If item is first, room record must be modified (new list head) */
+    if (currentPiece == 0) {
+        room[currentRoom].RS_head = piece->PS_next;
+    }
+    else {
+        /* Loop into linked list */
+        for (i=0; i < currentPiece; i++) {
+            previtem = pieceitem;
+            pieceitem = piece->PS_next;
+	    tmp = DBLock(hmInvFile, roomgroup, pieceitem);
+            DBUnlock(piece);
+            piece = tmp;
+        }
+        /* Relock previous (in previtem) */
+	tmp = DBLock(hmInvFile, roomgroup, previtem);
+
+        /* Fix next pointer in previous item */
+        tmp->PS_next = piece->PS_next;
+
+        /* Mark previous item as dirty and unlock */
+        DBDirty(tmp);
+        DBUnlock(tmp);
+    }
+
+    /* We no longer need access to the item to be deleted */
+    DBUnlock(piece);
+
+    /* Now linked list is patched up, we merely need to delete item */
+    DBFree(hmInvFile, roomgroup, pieceitem);
+
+    /* Decrease the room size (number of pieces) */
+    room[currentRoom].RS_size--;
+
+    /* Unlock map item */
+    DBDirty(mapPtr);
+    DBUnlock(mapPtr);
+
+    /* Inform the list of changes. */
+    @send DBItemDList::MSG_GEN_DYNAMIC_LIST_REMOVE_ITEMS(currentPiece,1);
+
+    currentPiece = GIGS_NONE;
+
+    @call NameField::MSG_VIS_TEXT_DELETE_ALL();
+    @call DescrField::MSG_VIS_TEXT_DELETE_ALL();
+    @call PriceField::MSG_VIS_TEXT_DELETE_ALL();
+    @call DateField::MSG_VIS_TEXT_DELETE_ALL();
+    @call PLocField::MSG_VIS_TEXT_DELETE_ALL();
+    @call WrntyField::MSG_VIS_TEXT_DELETE_ALL();
+
+    } /* end of Are You sure if stmt */
+}
+
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_ROOM_LIST_MONIKER_QUERY for HInvProcessClass
+ *
+ * DESCRIPTION:	Queries for monikers for room list.
+ *
+ * PARAMETERS:  void (optr list, word item)
+ *
+ * STRATEGY:
+ *
+ ***********************************************************************/
+
+@extern method HInvProcessClass, MSG_ROOM_LIST_MONIKER_QUERY
+{
+    RoomStruct    *room;
+    DBMapStruct*  mapPtr;
+
+    /* Lock the map item */
+    mapPtr = DBLockMap(hmInvFile);
+
+    /* Get the beginning of the array of structures */
+    room = (RoomStruct *) (mapPtr + sizeof(DBMapStruct));
+
+    /* Set the text in the list item. */
+    @call list::MSG_GEN_DYNAMIC_LIST_REPLACE_ITEM_TEXT(item,room[item].RS_name);
+
+    /* Unlock the map item. */
+    DBUnlock(mapPtr);
+}
+
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_PIECE_LIST_MONIKER_QUERY for HInvProcessClass
+ *
+ * DESCRIPTION:	Queries for monikers for piece list.
+ *
+ * PARAMETERS:  void (optr list, word item)
+ *
+ * STRATEGY:
+ *
+ ***********************************************************************/
+
+@extern method HInvProcessClass, MSG_PIECE_LIST_MONIKER_QUERY
+{
+    RoomStruct        *room;
+    PieceStruct       *piece, *tmp;
+    DBGroup            roomgroup;
+    word               i;
+    DBMapStruct*       mapPtr;
+    DBItem             head;
+
+    /* If no room has been selected, exit */
+    if (currentRoom == GIGS_NONE)
+        return;
+
+    /* Lock the map item. */
+    mapPtr = DBLockMap(hmInvFile);
+
+    /* Get the beginning of the array of structures. */
+    room = (RoomStruct *) (mapPtr + sizeof(DBMapStruct));
+    roomgroup = room[currentRoom].RS_group;
+
+    /* We merely need to extract the iem handle for the first piece. */
+    head = room[currentRoom].RS_head;
+
+    /* Now we are done with the map item. */
+    DBUnlock(mapPtr);
+
+    /* Lock down the head of the item list. */
+    piece = DBLock(hmInvFile, roomgroup, head);
+
+    /* Loop over linked list of pieces to get to item'th one.
+     * We are assuming it is impossible to have an illegal index.
+     */
+
+    for (i=0; i < item; i++) {
+
+        /* Lock next piece and unlock current one. */
+	tmp = DBLock(hmInvFile, roomgroup, piece->PS_next);
+        DBUnlock(piece);
+        piece = tmp;
+    }
+
+    /* Set the text in the list item. */
+    @call list::MSG_GEN_DYNAMIC_LIST_REPLACE_ITEM_TEXT(item, piece->PS_name);
+
+    DBUnlock(piece);
+}
+
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_ROOM_LIST_APPLY for HInvProcessClass
+ *
+ * DESCRIPTION:	Handles an apply of user changes to the room list.
+ *
+ * PARAMETERS:  void (word selection, numSelections, flags)
+ *
+ * STRATEGY:    Enable various UI objects and setup the piece list.
+ *
+ ***********************************************************************/
+
+@extern method HInvProcessClass, MSG_ROOM_LIST_APPLY
+{
+    RoomStruct    *room;
+    DBMapStruct*   mapPtr;
+
+    /* Set the current room global variable */
+    currentRoom = selection;
+    currentPiece = GIGS_NONE;
+
+    /* (Perform the same setup procedure as above) */
+    mapPtr = DBLockMap(hmInvFile);
+    room = (RoomStruct *) (mapPtr + sizeof(DBMapStruct));
+
+    /* now set the number of items in the item list */
+    @send DBItemDList::MSG_GEN_DYNAMIC_LIST_INITIALIZE(room[selection].RS_size);
+
+    /* Now we set up field based on new room. */
+    @call RNameField::MSG_VIS_TEXT_REPLACE_ALL_PTR(
+		room[selection].RS_name, strlen(room[selection].RS_name));
+
+    DBUnlock(mapPtr);
+
+    /* Get rid of peice info from any previous room */
+    @call NameField::MSG_VIS_TEXT_DELETE_ALL();
+    @call DescrField::MSG_VIS_TEXT_DELETE_ALL();
+    @call PriceField::MSG_VIS_TEXT_DELETE_ALL();
+    @call DateField::MSG_VIS_TEXT_DELETE_ALL();
+    @call PLocField::MSG_VIS_TEXT_DELETE_ALL();
+    @call WrntyField::MSG_VIS_TEXT_DELETE_ALL();
+
+}
+
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_PIECE_LIST_APPLY for HInvProcessClass
+ *
+ * DESCRIPTION:	Handles an apply of user changes to the piece list.
+ *
+ * PARAMETERS:  void (word selection, numSelections, flags)
+ *
+ * STRATEGY:    Enable various UI items and set values in the text fields.
+ *
+ ***********************************************************************/
+
+@extern method HInvProcessClass, MSG_PIECE_LIST_APPLY
+{
+    RoomStruct        *room;
+    PieceStruct       *piece, *tmp;
+    DBGroup           roomgroup;
+    DBMapStruct*      mapPtr;
+    word              i;
+
+    /* (Perform the same setup procedure as above.) */
+    mapPtr = DBLockMap(hmInvFile);
+    room = (RoomStruct *) (mapPtr + sizeof(DBMapStruct));
+    roomgroup = room[currentRoom].RS_group;
+    piece = DBLock(hmInvFile, roomgroup, room[currentRoom].RS_head);
+    DBUnlock(mapPtr);
+
+    /* Set the current piece global variable. */
+    currentPiece = selection;
+
+    /* Scan to new item, starting from list head. */
+    for ( i=0; i < currentPiece; i++ ) {
+	tmp = DBLock(hmInvFile, roomgroup, piece->PS_next);
+        DBUnlock(piece);
+        piece = tmp;
+    }
+
+    /* Now we set up fields based on new piece. */
+    @call PriceField::MSG_VIS_TEXT_REPLACE_ALL_PTR(
+		piece->PS_price, strlen(piece->PS_price));
+
+    @call DescrField::MSG_VIS_TEXT_REPLACE_ALL_PTR(
+		piece->PS_descrip, strlen(piece->PS_descrip));
+
+    @call NameField::MSG_VIS_TEXT_REPLACE_ALL_PTR(
+		piece->PS_name, strlen(piece->PS_name));
+
+    @call DateField::MSG_VIS_TEXT_REPLACE_ALL_PTR(
+		piece->PS_date, strlen(piece->PS_date));
+
+    @call PLocField::MSG_VIS_TEXT_REPLACE_ALL_PTR(
+		piece->PS_loc, strlen(piece->PS_loc));
+
+    @call WrntyField::MSG_VIS_TEXT_REPLACE_ALL_PTR(
+		piece->PS_wrnty, strlen(piece->PS_wrnty));
+
+   DBUnlock(piece);
+}
+
+
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_ROOM_PICKLIST_MONIKER_QUERY for HInvProcessClass
+ *
+ * DESCRIPTION:	Queries for monikers for room pick list.
+ *
+ * PARAMETERS:  void (optr list, word item)
+ *
+ ***********************************************************************/
+@extern method HInvProcessClass, MSG_ROOM_PICKLIST_MONIKER_QUERY
+{
+    ChunkHandle  rqmonikers[] = {
+      OptrToChunk(@RAText),
+      OptrToChunk(@RBText),
+      OptrToChunk(@RCText),
+      OptrToChunk(@RDText),
+      OptrToChunk(@REText),
+      OptrToChunk(@RFText),
+      OptrToChunk(@RGText),
+      OptrToChunk(@RHText),
+      OptrToChunk(@RIText),
+      OptrToChunk(@RJText),
+      OptrToChunk(@RKText),
+      OptrToChunk(@RLText),
+      OptrToChunk(@RMText),
+      OptrToChunk(@RNText),
+      OptrToChunk(@ROText),
+      OptrToChunk(@RPText),
+      OptrToChunk(@RQText),
+      OptrToChunk(@RRText),
+      OptrToChunk(@RSText),
+      OptrToChunk(@RTText),
+      OptrToChunk(@RUText),
+      OptrToChunk(@RVText),
+      OptrToChunk(@RWText),
+      OptrToChunk(@RXText),
+      OptrToChunk(@RYText),
+      OptrToChunk(@RZText),
+      OptrToChunk(@RAAText),
+      OptrToChunk(@RABText)
+    };
+
+    optr	moniker;
+
+    MemLock(HandleOf(@RAText));
+
+    moniker = ConstructOptr(HandleOf(@RAText),rqmonikers[item]);
+
+    @call list::MSG_GEN_DYNAMIC_LIST_REPLACE_ITEM_MONIKER_OPTR(
+                item, moniker);
+    MemUnlock(HandleOf(@RAText));
+}
+
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_PIECE_PICKLIST_MONIKER_QUERY for HInvProcessClass
+ *
+ * DESCRIPTION:	Queries for monikers for room pick list.
+ *
+ * PARAMETERS:  void (optr list, word item)
+ *
+ ***********************************************************************/
+
+@extern method HInvProcessClass, MSG_PIECE_PICKLIST_MONIKER_QUERY
+{
+    ChunkHandle  iqmonikers[] = {
+      OptrToChunk(@IAText),
+      OptrToChunk(@IBText),
+      OptrToChunk(@ICText),
+      OptrToChunk(@IDText),
+      OptrToChunk(@IEText),
+      OptrToChunk(@IFText),
+      OptrToChunk(@IGText),
+      OptrToChunk(@IHText),
+      OptrToChunk(@IIText),
+      OptrToChunk(@IJText),
+      OptrToChunk(@IKText),
+      OptrToChunk(@ILText),
+      OptrToChunk(@IMText),
+      OptrToChunk(@INText),
+      OptrToChunk(@IOText),
+      OptrToChunk(@IPText),
+      OptrToChunk(@IQText),
+      OptrToChunk(@IRText),
+      OptrToChunk(@ISText),
+      OptrToChunk(@ITText),
+      OptrToChunk(@IUText),
+      OptrToChunk(@IVText),
+      OptrToChunk(@IWText),
+      OptrToChunk(@IXText),
+      OptrToChunk(@IYText),
+      OptrToChunk(@IZText),
+      OptrToChunk(@IAAText),
+      OptrToChunk(@IABText),
+      OptrToChunk(@IACText),
+      OptrToChunk(@IADText)
+    };
+
+    optr	moniker;
+
+    MemLock(HandleOf(@IAText));
+    moniker = ConstructOptr(HandleOf(@IAText),iqmonikers[item]);
+
+    @call list::MSG_GEN_DYNAMIC_LIST_REPLACE_ITEM_MONIKER_OPTR(
+                item, moniker);
+    MemUnlock(HandleOf(@IAText));
+}
+
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_ROOM_PICKLIST_APPLY for HInvProcessClass
+ *
+ * DESCRIPTION:	Handles an apply of user room PICK list.
+ *
+ * PARAMETERS:  void (word selection, numSelections, flags)
+ *
+ ***********************************************************************/
+
+@extern method HInvProcessClass, MSG_ROOM_PICKLIST_APPLY
+{
+    ChunkHandle  ramonikers[] = {
+      OptrToChunk(@RAText),
+      OptrToChunk(@RBText),
+      OptrToChunk(@RCText),
+      OptrToChunk(@RDText),
+      OptrToChunk(@REText),
+      OptrToChunk(@RFText),
+      OptrToChunk(@RGText),
+      OptrToChunk(@RHText),
+      OptrToChunk(@RIText),
+      OptrToChunk(@RJText),
+      OptrToChunk(@RKText),
+      OptrToChunk(@RLText),
+      OptrToChunk(@RMText),
+      OptrToChunk(@RNText),
+      OptrToChunk(@ROText),
+      OptrToChunk(@RPText),
+      OptrToChunk(@RQText),
+      OptrToChunk(@RRText),
+      OptrToChunk(@RSText),
+      OptrToChunk(@RTText),
+      OptrToChunk(@RUText),
+      OptrToChunk(@RVText),
+      OptrToChunk(@RWText),
+      OptrToChunk(@RXText),
+      OptrToChunk(@RYText),
+      OptrToChunk(@RZText),
+      OptrToChunk(@RAAText),
+      OptrToChunk(@RABText)
+    };
+
+    VisMonikerWithText   *monStru;
+
+    MemLock(HandleOf(@RAText));
+    monStru = LMemDerefHandles(HandleOf(@RAText),ramonikers[selection]);
+
+    strcpy(roomString, ((char *)monStru+VMWT_text));
+    MemUnlock(HandleOf(@RAText));
+
+}
+
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_USE_PICKED_ROOM for HInvProcessClass
+ *
+ * DESCRIPTION:	Moves name of picked room to Rooms name field.
+ *
+ * PARAMETERS:  void (word selection, numSelections, flags)
+ *
+ ***********************************************************************/
+
+@extern method HInvProcessClass, MSG_USE_PICKED_ROOM
+{
+    /* Now we set up field based on new room. */
+    @call RNameField::MSG_VIS_TEXT_REPLACE_ALL_PTR(
+		roomString, strlen(roomString));
+
+    /* Automatically "Add" the room to the DList */
+    @call NewRoomTrigger::MSG_GEN_TRIGGER_SEND_ACTION(FALSE);
+}
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_PIECE_PICKLIST_APPLY for HInvProcessClass
+ *
+ * DESCRIPTION:	Handles an apply of user piece PICK list.
+ *
+ * PARAMETERS:  void (word selection, numSelections, flags)
+ *
+ ***********************************************************************/
+
+@extern method HInvProcessClass, MSG_PIECE_PICKLIST_APPLY
+{
+    ChunkHandle  iamonikers[] = {
+      OptrToChunk(@IAText),
+      OptrToChunk(@IBText),
+      OptrToChunk(@ICText),
+      OptrToChunk(@IDText),
+      OptrToChunk(@IEText),
+      OptrToChunk(@IFText),
+      OptrToChunk(@IGText),
+      OptrToChunk(@IHText),
+      OptrToChunk(@IIText),
+      OptrToChunk(@IJText),
+      OptrToChunk(@IKText),
+      OptrToChunk(@ILText),
+      OptrToChunk(@IMText),
+      OptrToChunk(@INText),
+      OptrToChunk(@IOText),
+      OptrToChunk(@IPText),
+      OptrToChunk(@IQText),
+      OptrToChunk(@IIText),
+      OptrToChunk(@ISText),
+      OptrToChunk(@ITText),
+      OptrToChunk(@IUText),
+      OptrToChunk(@IVText),
+      OptrToChunk(@IWText),
+      OptrToChunk(@IXText),
+      OptrToChunk(@IYText),
+      OptrToChunk(@IZText),
+      OptrToChunk(@IAAText),
+      OptrToChunk(@IABText),
+      OptrToChunk(@IACText),
+      OptrToChunk(@IADText)
+    };
+
+    VisMonikerWithText   *monStru;
+
+    MemLock(HandleOf(@IAText));
+    monStru = LMemDerefHandles(HandleOf(@IAText),iamonikers[selection]);
+
+    strcpy(pieceString, ((char *)monStru+VMWT_text));
+    MemUnlock(HandleOf(@IAText));
+
+}
+
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_USE_PICKED_PIECE for HInvProcessClass
+ *
+ * DESCRIPTION:	Moves name of picked piece to piece name field.
+ *
+ * PARAMETERS:  void (word selection, numSelections, flags)
+ *
+ ***********************************************************************/
+
+@extern method HInvProcessClass, MSG_USE_PICKED_PIECE
+{
+    /* Now we set up field based on new piece. */
+    @call NameField::MSG_VIS_TEXT_REPLACE_ALL_PTR(
+		pieceString, strlen(pieceString));
+
+    /* Clear any entry in the description field */
+    @call DescrField::MSG_VIS_TEXT_DELETE_ALL();
+    @call PriceField::MSG_VIS_TEXT_DELETE_ALL();
+    @call DateField::MSG_VIS_TEXT_DELETE_ALL();
+    @call PLocField::MSG_VIS_TEXT_DELETE_ALL();
+    @call WrntyField::MSG_VIS_TEXT_DELETE_ALL();
+
+    /* Automatically "Add" the piece to the DList */
+    @call NewPieceTrigger::MSG_GEN_TRIGGER_SEND_ACTION(FALSE);
+}
+
+
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_PICK_ROOM for HInvProcessClass
+ *
+ * DESCRIPTION:	Calls the dialog box when the botton
+ *               is clicked.
+ *     
+ *              
+ *
+ ***********************************************************************/
+
+@extern method HInvProcessClass, MSG_PICK_ROOM
+{
+
+    @call RoomDisplay::MSG_GEN_INTERACTION_INITIATE();
+}
+
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_PICK_PIECE for HInvProcessClass
+ *
+ * DESCRIPTION:	Calls the dialog box when the botton
+ *               is clicked.
+ *     
+ *              
+ *
+ ***********************************************************************/
+
+@extern method HInvProcessClass, MSG_PICK_PIECE
+{
+
+    @call PieceDisplay::MSG_GEN_INTERACTION_INITIATE();
+}
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_SHOW_PIECE_NOTES_DB for HInvProcessClass
+ *
+ * DESCRIPTION:	Calls the dialog box when the botton
+ *               is clicked.
+ *     
+ *              
+ *
+ ***********************************************************************/
+
+@extern method HInvProcessClass, MSG_SHOW_PIECE_NOTES_DB
+{
+
+    /* first check to see if an item is selected */
+    if ( currentPiece == GIGS_NONE ) {
+
+    /* nope - put up a you gotta select an item box */
+       UserStandardDialogOptr(
+			    NullOptr,
+			    NullOptr,
+			    NullOptr,
+			    NullOptr,
+			    @selite,
+			((CDT_WARNING << CDBF_DIALOG_TYPE_OFFSET) |
+			(GIT_NOTIFICATION << CDBF_INTERACTION_TYPE_OFFSET)));
+       return;
+       }
+
+    /* OK call the DB */
+    @call PieceNotesBox::MSG_GEN_INTERACTION_INITIATE();
+}

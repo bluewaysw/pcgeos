@@ -1038,10 +1038,6 @@
     if ( !face )
       return TT_Err_Ok;
 
-    /* well, we assume that no other thread is using the face */
-    /* at this moment, but one is never sure enough.          */
-    MUTEX_Lock( face->lock );
-
     /* first of all, destroys the cached sub-objects */
     Cache_Destroy( &face->instances );
     Cache_Destroy( &face->glyphs );
@@ -1100,9 +1096,6 @@
 
     /* TT_Close_Stream( &face->stream ); -- this is performed by the API */
 
-    /* destroy the mutex */
-    MUTEX_Destroy(face->lock);
-
     return TT_Err_Ok;
   }
 
@@ -1144,17 +1137,13 @@
 
     engine = face->engine;
 
-    MUTEX_Create( face->lock );
-
     Cache_Create( engine,
                   engine->objs_instance_class,
-                  &face->instances,
-                  &face->lock );
+                  &face->instances );
 
     Cache_Create( engine,
                   engine->objs_glyph_class,
-                  &face->glyphs,
-                  &face->lock );
+                  &face->glyphs );
 
     /* Load collection directory if present, then font directory */
 
@@ -1383,16 +1372,14 @@
          ALLOC( exec_cache, sizeof ( TCache ) ) )
       goto Fail;
 
-      /* create face cache */
-    error = Cache_Create( engine, (PCache_Class)&objs_face_class,
-                          face_cache, &engine->lock );
+    /* create face cache */
+    error = Cache_Create( engine, (PCache_Class)&objs_face_class, face_cache );
     if ( error )
       goto Fail;
 
     engine->objs_face_cache = face_cache;
 
-    error = Cache_Create( engine, (PCache_Class)&objs_exec_class,
-                          exec_cache, &engine->lock );
+    error = Cache_Create( engine, (PCache_Class)&objs_exec_class, exec_cache );
     if ( error )
       goto Fail;
 
