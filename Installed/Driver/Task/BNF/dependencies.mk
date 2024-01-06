@@ -1,5 +1,5 @@
 bnf.rdef: generic.uih product.uih \
-                /home/konstantinmeyer/github/pcgeos/Driver/Task/Common/task.ui
+                ../Common/task.ui
 bnfManager.obj \
 bnfManager.eobj: taskGeode.def geos.def heap.def geode.def resource.def \
                 ec.def lmem.def system.def localize.def sllang.def \
