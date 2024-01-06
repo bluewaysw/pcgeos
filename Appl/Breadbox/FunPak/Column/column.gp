@@ -6,7 +6,7 @@ type appl, process, single
 class ColumnsProcessClass
 appobj ColumnsApp
 
-tokenchars "COL2"
+tokenchars "COLU"
 tokenid 16431
 
 library geos
@@ -14,10 +14,10 @@ library ui
 library game
 library sound
 
-resource APPRESOURCE ui-object
-resource INTERFACE ui-object
+resource AppResource ui-object
+resource Interface ui-object
 resource APPICONS data object
-resource QTIPSRESOURCE ui-object
+resource QTipsResource ui-object
 
 export ColumnsBoardViewClass
 export ColumnsBoardClass

@@ -128,14 +128,16 @@ minimalAppl	: minimalGame minimalUtils minimalTools minimalSavers \
 		  bbxchat bbxmail \
 		  newsread geozip sclock\
  	  	  hmbase pdfvu  bnkr30 ftpc \
- 	  	  instc instf
+ 	  	  instc instf 
 
 minimalUtils	: prefmgr
 
 minimalTools    : resedit
 
 minimalGame	: solitaire cword amateur bjack hearts gwpoker \
-                  pyramid sokoban taipei uki mine column
+                  pyramid sokoban taipei uki mine column2 \
+                  battle column
+                   
 
 minimalEdu	: flash fontmgck hangman laserl mflash numbers pvault \
                   oliner taide thinker wsm wsplay xwm
@@ -1013,8 +1015,14 @@ Installed/Appl/Games/Taipei:	ui game MAKEAPPL
 uki	: Installed/Appl/Games/Uki
 Installed/Appl/Games/Uki:	ui sound text MAKEAPPL
 
-column	: Installed/Appl/Breadbox/Column
+column2	: Installed/Appl/Breadbox/Column
 Installed/Appl/Breadbox/Column:	ui game MAKEAPPL
+
+column	: Installed/Appl/Breadbox/FunPak/Column
+Installed/Appl/Breadbox/FunPak/Column:	ui game sound MAKEAPPL
+
+battle	: Installed/Appl/Breadbox/FunPak/Battle
+Installed/Appl/Breadbox/FunPak/Battle: ui math sound ansic MAKEAPPL
 
 
 
