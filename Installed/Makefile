@@ -136,7 +136,7 @@ minimalTools    : resedit
 
 minimalGame	: solitaire cword amateur bjack hearts gwpoker \
                   pyramid sokoban taipei uki mine column2 \
-                  battle column
+                  battle column follow
                    
 
 minimalEdu	: flash fontmgck hangman laserl mflash numbers pvault \
@@ -1024,6 +1024,8 @@ Installed/Appl/Breadbox/FunPak/Column:	ui game sound MAKEAPPL
 battle	: Installed/Appl/Breadbox/FunPak/Battle
 Installed/Appl/Breadbox/FunPak/Battle: ui math sound ansic MAKEAPPL
 
+follow	: Installed/Appl/Breadbox/FunPak/Follow
+Installed/Appl/Breadbox/FunPak/Follow: ui ansic game sound MAKEAPPL
 
 
 
