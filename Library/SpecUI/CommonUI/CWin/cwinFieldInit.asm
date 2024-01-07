@@ -369,18 +369,19 @@ if EVENT_MENU
 	call	OLFieldEnsureEventMenu
 endif
 
+if TOOL_AREA_IS_TASK_BAR or WINDOW_LIST_ACTIVE
 	;
 	; if TOOL_AREA_IS_TASK_BAR
 	;
-	push	ds
-	segmov	ds, dgroup
-	tst	ds:[taskBarEnabled] ; if taskbar == on, ZF == 1
-	pop	ds
-	jz	done ; if ZF==0 skip the following code
+	; push	ds
+	; segmov	ds, dgroup
+	; tst	ds:[taskBarEnabled] ; if taskbar == on, ZF == 1
+	; pop	ds
+	; jz	done ; if ZF==0 skip the following code
 
 	call	OLFieldEnsureWindowListDialog
-
 done:
+endif
 	ret
 
 OLFieldSpecBuild	endm
@@ -773,17 +774,17 @@ REVISION HISTORY:
 	Joon	11/92		changed to create a Window List
 
 ------------------------------------------------------------------------------@
-
+if (TOOL_AREA_IS_TASK_BAR or WINDOW_LIST_ACTIVE)
 OLFieldEnsureWindowListDialog	proc	far
 
 	;
 	; if TOOL_AREA_IS_TASK_BAR
 	;
-	push	ds
-	segmov	ds, dgroup
-	tst	ds:[taskBarEnabled] ; if taskbar == on, ZF == 1
-	pop	ds
-	jz	done ; if ZF==0 skip the following code
+	; push	ds
+	; segmov	ds, dgroup
+	; tst	ds:[taskBarEnabled] ; if taskbar == on, ZF == 1
+	; pop	ds
+	; jz	done ; if ZF==0 skip the following code
 
 	mov	di, ds:[si]
 	mov	bp, di
@@ -860,7 +861,7 @@ EC <	ERROR_NE	OL_ERROR					>
 done:
 	ret
 OLFieldEnsureWindowListDialog	endp
-
+endif
 
 COMMENT @----------------------------------------------------------------------
 
@@ -928,6 +929,7 @@ OLFieldEnsureToolArea	proc	far
 
 	push	cx, dx, si
 
+if TOOL_AREA_IS_TASK_BAR
 	;
 	; if TOOL_AREA_IS_TASK_BAR
 	; RUNTIME
@@ -978,28 +980,31 @@ EC <	pop	es							>
 NEC < cantFindSysTray:							>
 	pop	cx, dx
 endIfTaskbar:
+endif
 
 	; Get it up on screen (a queue delay later)
 	;
 	mov	bx, cx
 	mov	si, dx
 
+if TOOL_AREA_IS_TASK_BAR
 	;
 	; if TOOL_AREA_IS_TASK_BAR
 	; RUNTIME
 	;
-	; push	ds
-	; segmov	ds, dgroup
-	; tst	ds:[taskBarEnabled] ; if taskbar == on, ZF == 1
-	; pop	ds
-	; jz	hasNoTaskbar ; if ZF==0 skip the following code
+	push	ds
+	segmov	ds, dgroup
+	tst	ds:[taskBarEnabled] ; if taskbar == on, ZF == 1
+	pop	ds
+	jz	hasNoTaskbar ; if ZF==0 skip the following code
 
 	; init position
-	; mov	ax, MSG_TOOL_AREA_INIT_POSITION
-	; mov	di, mask MF_CALL or mask MF_FIXUP_DS
-	; call	ObjMessage
+	mov	ax, MSG_TOOL_AREA_INIT_POSITION
+	mov	di, mask MF_CALL or mask MF_FIXUP_DS
+	call	ObjMessage
 
 hasNoTaskbar:
+endif
 	mov	ax, MSG_GEN_INTERACTION_INITIATE
 	mov	di, mask MF_FORCE_QUEUE
 	call	ObjMessage

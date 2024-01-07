@@ -2177,6 +2177,7 @@ requestSlot:
 					;returns bp = slot #, (cx,dx) position
 EC <	ERROR_NC OL_ERROR		;parent MUST answer!		>
 
+if TOOL_AREA_IS_TASK_BAR
 	;
 	; if TOOL_AREA_IS_TASK_BAR
 	;
@@ -2194,7 +2195,7 @@ EC <	ERROR_NC OL_ERROR		;parent MUST answer!		>
 	add	dx, di			; add adjustment for taskbar
 
 hasNoTaskbar:
-
+endif
 	pop	bx			;get WinPosSizeState
 	mov	ax, bp
 	or	bh, al			;set previously assigned stagger slot#
@@ -2527,6 +2528,7 @@ checkSizeRequest2:
 					;(returns bp = x and y margins)
 	jc	UWS_end			;skip if parent size invalid...
 
+if TOOL_AREA_IS_TASK_BAR
 	;
 	; if TOOL_AREA_IS_TASK_BAR
 	;
@@ -2544,6 +2546,7 @@ checkSizeRequest2:
 	sub	dx, di			; subtract off taskbar adjustment
 
 hasNoTaskbar:
+endif
 
 	;
 	; We're going to add some code for B/W that allows the edges of windows
@@ -2603,6 +2606,7 @@ EC <	ERROR_NZ OL_ILLEGAL_WIN_SIZE_FLAG				   >
 					;(returns bp = x and y margins)
 	jc	UWS_end
 
+if TOOL_AREA_IS_TASK_BAR
 	;
 	; if TOOL_AREA_IS_TASK_BAR
 	;
@@ -2619,6 +2623,7 @@ EC <	ERROR_NZ OL_ILLEGAL_WIN_SIZE_FLAG				   >
 	sub	bp, di			; subtract off taskbar adjustment
 
 hasNoTaskbar2:
+endif
 
 	;
 	; We're going to add some code for B/W that allows the edges of windows
@@ -3037,6 +3042,7 @@ ConvertSpecWinSizePairsToPixels	proc	far
 	clr	cx			;get size of parent window
 	call	VisConvertRatioToCoords ;returns SpecWinSizePair in ax, bx
 
+if TOOL_AREA_IS_TASK_BAR
 	;
 	; if TOOL_AREA_IS_TASK_BAR
 	;
@@ -3053,6 +3059,7 @@ ConvertSpecWinSizePairsToPixels	proc	far
 	add	bx, di			;add adjustment to position
 
 hasNoTaskbar:
+endif
 
 	;
 	; We're going to add some code for B/W that allows the edges of windows
@@ -3134,6 +3141,7 @@ RETURN:		di	= position/size adjustment
 DESTROYED:	nothing
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+if TOOL_AREA_IS_TASK_BAR
 GetTaskBarPositionAdjustment	proc	far
 
 	;
@@ -3227,6 +3235,7 @@ GetTaskBarSizeAdjustment	proc	far
 done:
 	ret
 GetTaskBarSizeAdjustment	endp
+endif
 
 WinCommon	ends
 WinCommon	segment resource

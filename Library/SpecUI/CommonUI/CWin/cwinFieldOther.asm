@@ -165,12 +165,15 @@ CommonUIClassStructures segment resource
 
 	ToolAreaClass		0
 
+if (TOOL_AREA_IS_TASK_BAR or WINDOW_LIST_ACTIVE)
 	WindowListDialogClass	mask CLASSF_DISCARD_ON_SAVE
 	WindowListListClass	mask CLASSF_DISCARD_ON_SAVE
+endif
+
+if TOOL_AREA_IS_TASK_BAR
 	TaskBarListClass	mask CLASSF_DISCARD_ON_SAVE
-
 	SysTrayInteractionClass	mask CLASSF_DISCARD_ON_SAVE
-
+endif
 
 if EVENT_MENU
 	EventMenuClass		mask CLASSF_DISCARD_ON_SAVE
@@ -398,6 +401,7 @@ noExpressMenu:
 	clr	ax
 	xchg	ax, ds:[di].OLFI_toolArea
 
+if TOOL_AREA_IS_TASK_BAR
 	;
 	; if TOOL_AREA_IS_TASK_BAR
 	;
@@ -409,6 +413,7 @@ noExpressMenu:
 
 	clr	ds:[di].OLFI_systemTray
 hasNoTaskbar:
+endif
 	tst	ax
 	jz	noSystemTray
 	call	clobber
@@ -433,14 +438,15 @@ noEventMenu:
 noToolArea2:
 endif
 
+if TOOL_AREA_IS_TASK_BAR or WINDOW_LIST_ACTIVE
 	;
 	; if TOOL_AREA_IS_TASK_BAR
 	;
-	push	ds
-	segmov	ds, dgroup
-	tst	ds:[taskBarEnabled] ; if taskbar == on, ZF == 1
-	pop	ds
-	jz	noWindowListDialog ; if ZF==0 skip the following code
+	; push	ds
+	; segmov	ds, dgroup
+	; tst	ds:[taskBarEnabled] ; if taskbar == on, ZF == 1
+	; pop	ds
+	; jz	noWindowListDialog ; if ZF==0 skip the following code
 
 	;
 	; clobber window list dialog
@@ -454,6 +460,7 @@ endif
 	call	clobber
 
 noWindowListDialog:
+endif
 
 	ret
 
@@ -606,6 +613,7 @@ OLFieldDetach	method dynamic OLFieldClass, MSG_META_DETACH
 		pop	ax, cx, dx, bp, si
 
 passItUp:
+if TOOL_AREA_IS_TASK_BAR
 	;
 	; if TOOL_AREA_IS_TASK_BAR
 	;
@@ -642,7 +650,7 @@ passItUp:
 		pop	ax, cx, dx, bp, si
 
 reallyPassItUp:
-
+endif
 	;
 	; Let our superclass know.
 	;
@@ -1017,14 +1025,15 @@ if EVENT_MENU
 	jc	done
 endif
 
+if TOOL_AREA_IS_TASK_BAR or WINDOW_LIST_ACTIVE
 	;
 	; if TOOL_AREA_IS_TASK_BAR
 	;
-	push	ds
-	segmov	ds, dgroup
-	tst	ds:[taskBarEnabled] ; if taskbar == on, ZF == 1
-	pop	ds
-	jz	callSuper ; if ZF==0 skip the following code
+	; push	ds
+	; segmov	ds, dgroup
+	; tst	ds:[taskBarEnabled] ; if taskbar == on, ZF == 1
+	; pop	ds
+	; jz	callSuper ; if ZF==0 skip the following code
 
 	push	si				;save our handle
 	mov	di, ds:[si]
@@ -1044,6 +1053,7 @@ endif
 20$:
 	pop	si
 	jc	done
+endif
 
 callSuper:
 	mov	di, offset OLFieldClass

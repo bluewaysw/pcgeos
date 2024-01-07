@@ -4319,6 +4319,7 @@ menuWin		local	hptr
 	mov	ss:[parent].R_bottom, dx
 	mov	ss:[parentWin], di
 
+if TOOL_AREA_IS_TASK_BAR
 	;
 	; if TOOL_AREA_IS_TASK_BAR
 	;
@@ -4341,8 +4342,8 @@ atBottom:
 	sub	ss:[parent].R_bottom, dx
 doneTaskBar:
 	pop	ds
-
 hasNoTaskbar:
+endif
 
 	call	VisQueryWindow			; di = window handle
 	tst	di
@@ -4985,6 +4986,7 @@ MenuWinScrollerScrollOnly	proc	near
 	jz	update
 	call	WinGetWinScreenBounds
 
+if TOOL_AREA_IS_TASK_BAR
 	;
 	; if TOOL_AREA_IS_TASK_BAR
 	;
@@ -4992,7 +4994,7 @@ MenuWinScrollerScrollOnly	proc	near
 	segmov	ds, dgroup
 	tst	ds:[taskBarEnabled] ; if taskbar == on, ZF == 1
 	pop	ds
-	jz	hasNoTaskbar ; if ZF==0 skip the following code
+	jz	endIfTaskbar ; if ZF==0 skip the following code
 
 	; bx = top, dx = bottom
 	mov	ax, dx				; ax = bottom
@@ -5010,10 +5012,11 @@ atBottom:
 doneTaskBar:
 	pop	ds
 	push	bx, ax				; save top, bottom
-	jmp	endIfTaskbar
-hasNoTaskbar:
-	push	bx, dx				; save top, bottom
 endIfTaskbar:
+else
+	push	bx, dx				; save top, bottom
+endif
+
 	call	VisQueryWindow			; di = window handle
 	tst	di
 	jz	update

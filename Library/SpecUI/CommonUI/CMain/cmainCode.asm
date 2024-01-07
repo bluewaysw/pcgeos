@@ -495,6 +495,7 @@ if _ISUI
 			mask UIEO_UTILITIES_PANEL
 endif
 
+if TOOL_AREA_IS_TASK_BAR
 	;
 	; if TOOL_AREA_IS_TASK_BAR
 	;
@@ -507,6 +508,7 @@ endif
 	andnf	ax, not (mask UIEO_GEOS_TASKS_LIST)
 
 hasNoTaskbar:
+endif
 
 	mov	bx, ax			; just copy from .ini file
 
@@ -1516,6 +1518,12 @@ afterInvertDelay:
 	call	InitFileReadInteger
 	mov	es:[olExtWinAttrs], ax
 
+if TOOL_AREA_IS_TASK_BAR
+
+	;
+	; FIXME!!! Convert all these flags to bitflags
+	;
+
 	;
 	; init taskBar
 	;
@@ -1551,7 +1559,7 @@ afterInvertDelay:
 	mov	ax, FALSE			;default = no moving
 	call	InitFileReadBoolean
 	mov	es:[taskBarMovable], ax
-
+endif
 if _ISUI
 	mov	si, offset optionsCatString
 	mov	dx, offset rightClickHelpString
@@ -1605,12 +1613,12 @@ pdaKeyString	char	"pda",0
 inputCat		char	"input",0
 floatingKbdKey		char	"floatingKbd",0
 
-;if	TOOL_AREA_IS_TASK_BAR
+if	TOOL_AREA_IS_TASK_BAR
 taskBarEnabledString	char	"taskBarEnabled",0
 taskBarPositionString	char	"taskBarPosition",0
 taskBarAutoHideString	char	"taskBarAutoHide",0
 taskBarMovableString	char	"taskBarMovable",0
-;endif
+endif
 
 if _ISUI
 rightClickHelpString	char	"rightClickHelp",0

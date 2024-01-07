@@ -559,15 +559,16 @@ EC<	call	ECCheckODCXDX						>
 
 	pop	ax
 
+if TOOL_AREA_IS_TASK_BAR
 	;
 	; if (not TOOL_AREA_IS_TASK_BAR)
 	; RUNTIME
 	;
-	; push	ds
-	; segmov	ds, dgroup
-	; tst	ds:[taskBarEnabled] ; if taskbar == on, ZF == 1
-	; pop	ds
-	; jnz	afterNoTarget ; if ZF==1 skip the following code
+	push	ds
+	segmov	ds, dgroup
+	tst	ds:[taskBarEnabled] ; if taskbar == on, ZF == 1
+	pop	ds
+	jnz	afterNoTarget ; if ZF==1 skip the following code
 
 	tst	ax
 	jz	afterNoTarget
@@ -593,6 +594,7 @@ endif
 	call	ObjCallInstanceNoLock
 	add	sp, size OLFieldMoveToolAreaParams
 afterNoTarget:
+endif
 
 	Destroy	ax, cx, dx, bp
 	ret
@@ -889,10 +891,11 @@ REVISION HISTORY:
 	brianc	11/9/92		Initial version
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
-
+if TOOL_AREA_IS_TASK_BAR or WINDOW_LIST_ACTIVE
 OLFieldCreateWindowListEntry method dynamic OLFieldClass,
 					MSG_OL_FIELD_CREATE_WINDOW_LIST_ENTRY
 
+if TOOL_AREA_IS_TASK_BAR
 	;
 	; if TOOL_AREA_IS_TASK_BAR
 	;
@@ -901,6 +904,7 @@ OLFieldCreateWindowListEntry method dynamic OLFieldClass,
 	tst	ds:[taskBarEnabled] ; if taskbar == on, ZF == 1
 	pop	ds
 	jz	done ; if ZF==0 skip the following code
+endif
 
 	clr	cx			; assume no window list dialog
 	tst	ds:[di].OLFI_windowListDialog
@@ -940,6 +944,7 @@ OLFieldCreateWindowListEntry method dynamic OLFieldClass,
 done:
 	ret
 OLFieldCreateWindowListEntry endm
+endif
 
 HighCommon ends
 HighCommon segment resource
@@ -975,22 +980,24 @@ REVISION HISTORY:
 ------------------------------------------------------------------------------@
 
 ; never change priority of task bar -- brianc 11/12/99
+; FIXME!!! - is this still true?
 ; if (not TOOL_AREA_IS_TASK_BAR)
 ; RUNTIME
 
 OLFieldMoveToolArea	method	dynamic OLFieldClass, \
 					MSG_OL_FIELD_MOVE_TOOL_AREA
 
+if TOOL_AREA_IS_TASK_BAR
 	;
-	; FIXME!!! - should this be skipping everything or only something in between?
 	; if (not TOOL_AREA_IS_TASK_BAR)
 	; RUNTIME
 	;
-	; push	ds
-	; segmov	ds, dgroup
-	; tst	ds:[taskBarEnabled] ; if taskbar == on, ZF == 1
-	; pop	ds
-	; LONG	jnz done	;afterHasTaskbar1 ; if ZF==1 skip the following code
+	push	ds
+	segmov	ds, dgroup
+	tst	ds:[taskBarEnabled] ; if taskbar == on, ZF == 1
+	pop	ds
+	LONG	jnz afterHasTaskbar1 ;done ;afterHasTaskbar1 ; if ZF==1 skip the following code
+endif
 
 if EVENT_MENU
 	;
@@ -1016,7 +1023,8 @@ endif
 	pop	es
 	LONG jz	done
 
-afterHasTaskbar1: ; endif ;(not TOOL_AREA_IS_TASK_BAR)
+afterHasTaskbar1:
+
 
 	mov	si, ds:[di].OLFI_toolArea	; get *ds:si = tool area
 if EVENT_MENU
@@ -1025,16 +1033,17 @@ endif
 	tst	si
 	LONG 	jz done
 
+if TOOL_AREA_IS_TASK_BAR
 	;
 	; if (not TOOL_AREA_IS_TASK_BAR)
 	; RUNTIME
 	;
-	; push	ds
-	; segmov	ds, dgroup
-	; tst	ds:[taskBarEnabled] ; if taskbar == on, ZF == 1
-	; pop	ds
-	; jnz	realGeode ; if ZF==1 skip the following code
-
+	push	ds
+	segmov	ds, dgroup
+	tst	ds:[taskBarEnabled] ; if taskbar == on, ZF == 1
+	pop	ds
+	jnz	realGeode ; if ZF==1 skip the following code
+endif
 	;
 	; First, mark the position flags in the window as WPF_AS_REQUIRED
 	; so that it will keep its new position when messed with.
@@ -1081,7 +1090,8 @@ doItInUILayer:
 	mov	ax, handle ui		; Move to UI's layer
 	jmp	short doIt
 
-; endif ; (not TOOL_AREA_IS_TASK_BAR)
+
+
 realGeode:
 	; Ignore request if not from geode owning current target
 	;
@@ -1106,16 +1116,17 @@ doIt:
 
 	push	ax			; save layerID
 
+if TOOL_AREA_IS_TASK_BAR
 	;
 	; if (not TOOL_AREA_IS_TASK_BAR)
 	; RUNTIME
 	;
-	; push	ds
-	; segmov	ds, dgroup
-	; tst	ds:[taskBarEnabled] ; if taskbar == on, ZF == 1
-	; pop	ds
-	; jnz	afterHasTaskbar2 ; if ZF==1 skip the following code
-
+	push	ds
+	segmov	ds, dgroup
+	tst	ds:[taskBarEnabled] ; if taskbar == on, ZF == 1
+	pop	ds
+	jnz	afterHasTaskbar2 ; if ZF==1 skip the following code
+endif
 	;
 	; Convert coordinates from screen-absolute to parent-relative
 	;
@@ -1137,7 +1148,8 @@ doIt:
 	mov	si, mask WPF_ABS	; move to new absolute position
 	call	WinMove
 
-afterHasTaskbar2: ; endif ; (not TOOL_AREA_IS_TASK_BAR)
+afterHasTaskbar2:
+
 
 	pop	dx			; Pass handle of Geode as
 					; new LayerID
@@ -1189,15 +1201,17 @@ REVISION HISTORY:
 OLFieldSizeToolArea	method dynamic	OLFieldClass, \
 				MSG_OL_FIELD_SIZE_TOOL_AREA
 
+if TOOL_AREA_IS_TASK_BAR
 	;
 	; if (not TOOL_AREA_IS_TASK_BAR)
 	; RUNTIME
 	;
-	; push	ds
-	; segmov	ds, dgroup
-	; tst	ds:[taskBarEnabled] ; if taskbar == on, ZF == 1
-	; pop	ds
-	; jnz	done ; if ZF==1 skip the following code
+	push	ds
+	segmov	ds, dgroup
+	tst	ds:[taskBarEnabled] ; if taskbar == on, ZF == 1
+	pop	ds
+	jnz	done ; if ZF==1 skip the following code
+endif
 
 if EVENT_MENU
  	push	cx, si				; save size

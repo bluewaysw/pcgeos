@@ -921,6 +921,7 @@ CUAS <	push	bx				;save width		>
 
 	call	OpenGetParentWinSize		;window is on
 
+if TOOL_AREA_IS_TASK_BAR
 	;
 	; if TOOL_AREA_IS_TASK_BAR
 	;
@@ -935,8 +936,8 @@ CUAS <	push	bx				;save width		>
 	; maximized windows don't extend below the taskbar.
 	call	GetTaskBarSizeAdjustment
 	sub	dx, di			; subtract off taskbar adjustment
-
 hasNoTaskbar:
+endif
 
 CUAS <	pop	bx				;get previous width	>
 	popf					;restore invalid flags
@@ -1497,6 +1498,7 @@ REVISION HISTORY:
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
 
+if TOOL_AREA_IS_TASK_BAR
 OLWinUpdatePositionForTaskBar	method dynamic OLWinClass,
 					MSG_OL_WIN_UPDATE_POSITION_FOR_TASK_BAR
 	;
@@ -1506,8 +1508,7 @@ OLWinUpdatePositionForTaskBar	method dynamic OLWinClass,
 	segmov	ds, dgroup
 	tst	ds:[taskBarEnabled] ; if taskbar == on, ZF == 1
 	pop	ds
-	; jz	done ; if ZF==0 skip the following code
-	jmp	done
+	jz	done ; if ZF==0 skip the following code
 
 	jcxz	doUpdate
 
@@ -1545,6 +1546,7 @@ update:
 done:
 	ret
 OLWinUpdatePositionForTaskBar	endm
+endif
 
 Geometry	ends
 

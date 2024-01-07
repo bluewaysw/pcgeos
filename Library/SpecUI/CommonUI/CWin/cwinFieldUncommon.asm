@@ -1242,7 +1242,7 @@ REVISION HISTORY:
 	Joon	9/92		initial version
 
 ------------------------------------------------------------------------------@
-
+if TOOL_AREA_IS_TASK_BAR
 OLFieldUpdateTaskBarList	method	dynamic OLFieldClass,
 					MSG_OL_FIELD_UPDATE_TASK_BAR_LIST
 	;
@@ -1324,6 +1324,7 @@ setSelection:
 done:
 	ret
 OLFieldUpdateTaskBarList	endm
+endif
 
 
 
@@ -1348,17 +1349,17 @@ REVISION HISTORY:
 	Joon	9/92		initial version
 
 ------------------------------------------------------------------------------@
-
+if TOOL_AREA_IS_TASK_BAR or WINDOW_LIST_ACTIVE
 OLFieldSelectWindowListEntry	method	dynamic OLFieldClass,
 					MSG_OL_FIELD_SELECT_WINDOW_LIST_ENTRY
 	;
 	; if TOOL_AREA_IS_TASK_BAR
 	;
-	push	ds
-	segmov	ds, dgroup
-	tst	ds:[taskBarEnabled] ; if taskbar == on, ZF == 1
-	pop	ds
-	jz	done ; if ZF==0 skip the following code
+	; push	ds
+	; segmov	ds, dgroup
+	; tst	ds:[taskBarEnabled] ; if taskbar == on, ZF == 1
+	; pop	ds
+	; jz	done ; if ZF==0 skip the following code
 
 	;
 	; Get current selection
@@ -1380,6 +1381,7 @@ done:
 	ret
 OLFieldSelectWindowListEntry	endm
 
+endif
 
 
 COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -1406,17 +1408,17 @@ REVISION HISTORY:
 	JS	9/18/92   	Initial version
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
-
+if TOOL_AREA_IS_TASK_BAR or WINDOW_LIST_ACTIVE
 OLFieldWindowListCloseWindow	method dynamic OLFieldClass,
 					MSG_OL_FIELD_WINDOW_LIST_CLOSE_WINDOW
 	;
 	; if TOOL_AREA_IS_TASK_BAR
 	;
-	push	ds
-	segmov	ds, dgroup
-	tst	ds:[taskBarEnabled] ; if taskbar == on, ZF == 1
-	pop	ds
-	jz	done ; if ZF==0 skip the following code
+	; push	ds
+	; segmov	ds, dgroup
+	; tst	ds:[taskBarEnabled] ; if taskbar == on, ZF == 1
+	; pop	ds
+	; jz	done ; if ZF==0 skip the following code
 
 	mov	ax, MSG_OL_FIELD_SELECT_WINDOW_LIST_ENTRY
 	call	ObjCallInstanceNoLock
@@ -1429,6 +1431,7 @@ done:
 	ret
 OLFieldWindowListCloseWindow	endm
 
+endif
 
 
 COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -1455,17 +1458,17 @@ REVISION HISTORY:
 	JS	1/25/93   	Initial version
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
-
+if TOOL_AREA_IS_TASK_BAR or WINDOW_LIST_ACTIVE
 OLFieldOpenWindowList	method dynamic OLFieldClass,
 					MSG_GEN_FIELD_OPEN_WINDOW_LIST
 	;
 	; if TOOL_AREA_IS_TASK_BAR
 	;
-	push	ds
-	segmov	ds, dgroup
-	tst	ds:[taskBarEnabled] ; if taskbar == on, ZF == 1
-	pop	ds
-	jz	done ; if ZF==0 skip the following code
+	; push	ds
+	; segmov	ds, dgroup
+	; tst	ds:[taskBarEnabled] ; if taskbar == on, ZF == 1
+	; pop	ds
+	; jz	done ; if ZF==0 skip the following code
 
 	mov     si, ds:[di].OLFI_windowListDialog
 	tst     si
@@ -1477,6 +1480,7 @@ done:
 	ret
 OLFieldOpenWindowList	endm
 
+endif
 
 COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 		WindowListClose
@@ -1503,25 +1507,26 @@ REVISION HISTORY:
 	JS	11/16/92   	Initial version
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
-
+if TOOL_AREA_IS_TASK_BAR || WINDOW_LIST_ACTIVE
 WindowListClose	method dynamic WindowListDialogClass, MSG_OL_WIN_CLOSE
 
 	;
 	; if TOOL_AREA_IS_TASK_BAR
 	;
-	push	ds
-	segmov	ds, dgroup
-	tst	ds:[taskBarEnabled] ; if taskbar == on, ZF == 1
-	pop	ds
-	jz	done ; if ZF==0 skip the following code
+	; push	ds
+	; segmov	ds, dgroup
+	; tst	ds:[taskBarEnabled] ; if taskbar == on, ZF == 1
+	; pop	ds
+	; jz	done ; if ZF==0 skip the following code
 
 	mov	ax, MSG_META_RELEASE_TARGET_EXCL
 	GOTO	ObjCallInstanceNoLock
-done:
-	mov	di, offset WindowListDialogClass
-	GOTO	ObjCallSuperNoLock
+;done:
+;	mov	di, offset WindowListDialogClass
+;	GOTO	ObjCallSuperNoLock
 
 WindowListClose	endm
+endif
 
 
 
@@ -1551,18 +1556,18 @@ REVISION HISTORY:
 	JS	10/23/92   	Initial version
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
-
+if TOOL_AREA_IS_TASK_BAR || WINDOW_LIST_ACTIVE
 WindowListKeyboard	method dynamic WindowListDialogClass,
 					MSG_META_FUP_KBD_CHAR
 	;
 	; if TOOL_AREA_IS_TASK_BAR
 	; FIXME!!! - do we need to callSuper here?
 	;
-	push	ds
-	segmov	ds, dgroup
-	tst	ds:[taskBarEnabled] ; if taskbar == on, ZF == 1
-	pop	ds
-	jz	callSuper ; if ZF==0 skip the following code
+	; push	ds
+	; segmov	ds, dgroup
+	; tst	ds:[taskBarEnabled] ; if taskbar == on, ZF == 1
+	; pop	ds
+	; jz	callSuper ; if ZF==0 skip the following code
 
 	test	dl, mask CF_FIRST_PRESS
 	jz	done				; ignore if not first press
@@ -1595,6 +1600,7 @@ callSuper:
 done:
 	ret
 WindowListKeyboard	endm
+endif
 
 
 
@@ -1623,17 +1629,17 @@ REVISION HISTORY:
 	JS	10/20/92   	Initial version
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
-
+if TOOL_AREA_IS_TASK_BAR || WINDOW_LIST_ACTIVE
 WindowListLostTargetExcl	method dynamic WindowListDialogClass,
 					MSG_META_LOST_TARGET_EXCL
 	;
 	; if TOOL_AREA_IS_TASK_BAR
 	;
-	push	ds
-	segmov	ds, dgroup
-	tst	ds:[taskBarEnabled] ; if taskbar == on, ZF == 1
-	pop	ds
-	jz	done ; if ZF==0 skip the following code
+	; push	ds
+	; segmov	ds, dgroup
+	; tst	ds:[taskBarEnabled] ; if taskbar == on, ZF == 1
+	; pop	ds
+	; jz	done ; if ZF==0 skip the following code
 
 	mov	di, offset WindowListDialogClass
 	call	ObjCallSuperNoLock
@@ -1646,14 +1652,15 @@ WindowListLostTargetExcl	method dynamic WindowListDialogClass,
 	mov	bx, ds:[LMBH_handle]
 	mov	di, mask MF_FORCE_QUEUE
 	GOTO	ObjMessage
-done:
+;done:
 	;
 	; if no Taskbar/WindowList, just callSuper
 	;
-	mov	di, offset WindowListDialogClass
-	GOTO	ObjCallSuperNoLock
+;	mov	di, offset WindowListDialogClass
+;	GOTO	ObjCallSuperNoLock
 
 WindowListLostTargetExcl	endm
+endif
 
 
 
@@ -1681,17 +1688,17 @@ REVISION HISTORY:
 	JS	3/26/93   	Initial version
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
-
+if TOOL_AREA_IS_TASK_BAR || WINDOW_LIST_ACTIVE
 WindowListInteractionCommand	method dynamic WindowListDialogClass,
 					MSG_GEN_GUP_INTERACTION_COMMAND
 	;
 	; if TOOL_AREA_IS_TASK_BAR
 	;
-	push	ds
-	segmov	ds, dgroup
-	tst	ds:[taskBarEnabled] ; if taskbar == on, ZF == 1
-	pop	ds
-	jz	done ; if ZF==0 skip the following code
+	; push	ds
+	; segmov	ds, dgroup
+	; tst	ds:[taskBarEnabled] ; if taskbar == on, ZF == 1
+	; pop	ds
+	; jz	done ; if ZF==0 skip the following code
 
 	push	cx
 	mov	di, offset WindowListDialogClass
@@ -1712,11 +1719,11 @@ done:
 	;
 	; if no Taskbar/WindowList, just callSuper
 	;
-	mov	di, offset WindowListDialogClass
-	GOTO	ObjCallSuperNoLock
+	; mov	di, offset WindowListDialogClass
+	; GOTO	ObjCallSuperNoLock
 
 WindowListInteractionCommand	endm
-
+endif
 
 COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 		WindowListVisVupBumpMouse
@@ -1743,7 +1750,7 @@ REVISION HISTORY:
 	JS	6/17/93   	Initial version copied from OLAppSendToFlow
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
-
+if TOOL_AREA_IS_TASK_BAR || WINDOW_LIST_ACTIVE
 WindowListSendToFlow	method dynamic WindowListDialogClass,
 			MSG_VIS_VUP_TERMINATE_ACTIVE_MOUSE_FUNCTION, \
 			MSG_VIS_VUP_GET_MOUSE_STATUS, \
@@ -1751,23 +1758,23 @@ WindowListSendToFlow	method dynamic WindowListDialogClass,
 	;
 	; if TOOL_AREA_IS_TASK_BAR
 	;
-	push	ds
-	segmov	ds, dgroup
-	tst	ds:[taskBarEnabled] ; if taskbar == on, ZF == 1
-	pop	ds
-	jz	done ; if ZF==0 skip the following code
+	; push	ds
+	; segmov	ds, dgroup
+	; tst	ds:[taskBarEnabled] ; if taskbar == on, ZF == 1
+	; pop	ds
+	; jz	done ; if ZF==0 skip the following code
 
 	mov	di, mask MF_CALL
 	GOTO	UserCallFlow
-done:
+;done:
 	;
 	; if no Taskbar/WindowList, just callSuper
 	;
-	mov	di, offset WindowListDialogClass
-	GOTO	ObjCallSuperNoLock
+;	mov	di, offset WindowListDialogClass
+;	GOTO	ObjCallSuperNoLock
 
 WindowListSendToFlow	endm
-
+endif
 
 COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 		WindowListListQueryTaskBarItemMoniker
@@ -1787,7 +1794,7 @@ RETURN:		nothing
 DESTROYED:	ax, cx, dx, bp
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
-
+if TOOL_AREA_IS_TASK_BAR
 WindowListListQueryTaskBarItemMoniker	method dynamic WindowListListClass,
 			MSG_WINDOW_LIST_LIST_QUERY_TASK_BAR_ITEM_MONIKER
 	;
@@ -1826,6 +1833,8 @@ done:
 	ret
 WindowListListQueryTaskBarItemMoniker	endm
 
+endif
+
 
 
 COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -1847,17 +1856,17 @@ RETURN:		none
 DESTROYED:	ax, cx, dx, bp
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
-
+if TOOL_AREA_IS_TASK_BAR || WINDOW_LIST_ACTIVE
 WindowListListSelectItem	method dynamic WindowListListClass,
 					MSG_WINDOW_LIST_LIST_SELECT_ITEM
 	;
 	; if TOOL_AREA_IS_TASK_BAR
 	;
-	push	ds
-	segmov	ds, dgroup
-	tst	ds:[taskBarEnabled] ; if taskbar == on, ZF == 1
-	pop	ds
-	jz	done ; if ZF==0 skip the following code
+	; push	ds
+	; segmov	ds, dgroup
+	; tst	ds:[taskBarEnabled] ; if taskbar == on, ZF == 1
+	; pop	ds
+	; jz	done ; if ZF==0 skip the following code
 
 	mov	ax, MSG_GEN_FIND_CHILD_AT_POSITION
 	call	ObjCallInstanceNoLock		; ^lcx:dx = item
@@ -1869,7 +1878,7 @@ WindowListListSelectItem	method dynamic WindowListListClass,
 done:
 	ret
 WindowListListSelectItem	endm
-
+endif
 
 
 COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -1898,7 +1907,7 @@ REVISION HISTORY:
 	Joon	3/11/92		Initial version
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
-
+if TOOL_AREA_IS_TASK_BAR
 TaskBarListAddChild	method dynamic TaskBarListClass,
 					MSG_GEN_ADD_CHILD
 	;
@@ -1944,7 +1953,7 @@ TaskBarListAddChild	method dynamic TaskBarListClass,
 
 callSuper:
 	;
-	; if no Taskbar/WindowList, just callSuper
+	; if no Taskbar, just callSuper
 	;
 	mov	di, offset TaskBarListClass
 	call	ObjCallSuperNoLock
@@ -1953,15 +1962,13 @@ done:
 	ret
 TaskBarListAddChild	endm
 
-
-
-
+endif
 
 COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-		FloatingToolAreaVisDraw
+		ToolAreaDraw
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-SYNOPSIS:	Draw border
+SYNOPSIS:	Draw border for TaskBar in MOTIF
 
 CALLED BY:	MSG_VIS_DRAW
 PASS:		*ds:si	= ToolAreaClass object
@@ -1981,26 +1988,26 @@ PSEUDO CODE/STRATEGY:
 REVISION HISTORY:
 	Name	Date		Description
 	----	----		-----------
-	Joon	3/5/92		Initial version
+	MeyerK	7/1/24		Initial version
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+if _MOTIF and TOOL_AREA_IS_TASK_BAR
 ToolAreaDraw	method dynamic ToolAreaClass, MSG_VIS_DRAW
+
+	push	bp
+	mov	di, offset ToolAreaClass
+	call	ObjCallSuperNoLock
+	pop	di			; di = gstate
 
 	;
 	; if TOOL_AREA_IS_TASK_BAR
 	; RUNTIME
-	; FIXME!!! add proper 3D frame or something
 	;
-	;push	ds
-	;segmov	ds, dgroup
-	;tst	ds:[taskBarEnabled] ; if taskbar == on, ZF == 1
-	;pop	ds
-	;jz	callSuper ; if ZF==0 skip the following code
-
-	;push	bp
-	;mov	di, offset ToolAreaClass
-	;call	ObjCallSuperNoLock
-	;pop	di			; di = gstate
+	push	ds
+	segmov	ds, dgroup
+	tst	ds:[taskBarEnabled] ; if taskbar == on, ZF == 1
+	pop	ds
+	jz	done ; if ZF==0 skip the following code
 
 	push	di
 	mov	di, segment VisCompClass
@@ -2012,10 +2019,10 @@ ToolAreaDraw	method dynamic ToolAreaClass, MSG_VIS_DRAW
 	mov	di, bp
 
 	call	VisGetBounds
-				;ax, ds:[bx].VI_bounds.R_left	;add in real bounds
-				;cx, ds:[bx].VI_bounds.R_right
-				;dx, ds:[bx].VI_bounds.R_bottom
-				;bx, ds:[bx].VI_bounds.R_top
+				;ax, VI_bounds.R_left
+				;cx, VI_bounds.R_right
+				;dx, VI_bounds.R_bottom
+				;bx, VI_bounds.R_top
 
 	push	ds
 	segmov	ds, dgroup
@@ -2048,9 +2055,11 @@ atBottom:
 draw:
 	call	GrDrawLine
 
+done:
+
 	ret
 ToolAreaDraw	endm
-
+endif
 
 
 
@@ -2078,6 +2087,7 @@ REVISION HISTORY:
 	Joon	3/5/92		Initial version
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+if TOOL_AREA_IS_TASK_BAR
 SysTrayInteractionVisDraw	method dynamic SysTrayInteractionClass,
 				MSG_VIS_DRAW
 	;
@@ -2111,6 +2121,7 @@ callSuper:
 done:
 	ret
 SysTrayInteractionVisDraw	endm
+endif
 
 
 
@@ -2141,6 +2152,7 @@ REVISION HISTORY:
 	joon	1/31/92   	Initial version
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+if TOOL_AREA_IS_TASK_BAR
 ToolAreaRawUnivEnter	method dynamic ToolAreaClass,
 					MSG_META_RAW_UNIV_ENTER
 	mov	di, offset ToolAreaClass
@@ -2178,6 +2190,7 @@ ToolAreaRawUnivEnter	method dynamic ToolAreaClass,
 done:
 	ret
 ToolAreaRawUnivEnter	endm
+endif
 
 
 COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -2200,6 +2213,7 @@ DESTROYED:	ax, cx, dx, bp
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
 
+if TOOL_AREA_IS_TASK_BAR
 ToolAreaRawUnivLeave	method dynamic ToolAreaClass,
 					MSG_META_RAW_UNIV_LEAVE
 	mov	di, offset ToolAreaClass
@@ -2242,6 +2256,7 @@ StartAutoHideTimer	label	far
 done:
 	ret
 ToolAreaRawUnivLeave	endm
+endif
 
 
 COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -2261,6 +2276,7 @@ RETURN:		none
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
 
+if TOOL_AREA_IS_TASK_BAR
 ToolAreaAutoHide	method dynamic ToolAreaClass,
 					MSG_TOOL_AREA_AUTO_HIDE
 	;
@@ -2324,6 +2340,7 @@ waitMore:
 done:
 	ret
 ToolAreaAutoHide	endm
+endif
 
 
 COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -2341,6 +2358,7 @@ DESTROYED:	ax, cx, dx, bp
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
 
+if TOOL_AREA_IS_TASK_BAR
 ToolAreaStartSelect	method dynamic ToolAreaClass,
 					MSG_META_START_SELECT
 	;
@@ -2396,6 +2414,7 @@ callSuper:
 done:
 	ret
 ToolAreaStartSelect	endm
+endif
 
 
 
@@ -2415,6 +2434,7 @@ DESTROYED:	ax, cx, dx, bp
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
 
+if TOOL_AREA_IS_TASK_BAR
 ToolAreaVisMoveResizeWin	method dynamic ToolAreaClass,
 					MSG_VIS_MOVE_RESIZE_WIN
 
@@ -2426,8 +2446,7 @@ ToolAreaVisMoveResizeWin	method dynamic ToolAreaClass,
 	segmov	ds, dgroup
 	tst	ds:[taskBarEnabled] ; if taskbar == on, ZF == 1
 	pop	ds
-	;LONG	jz callSuper ; if ZF==0 skip the following code
-	LONG 	jmp callSuper
+	LONG	jz callSuper ; if ZF==0 skip the following code
 
 	mov	bl, ds:[di].TAI_state
 
@@ -2511,13 +2530,13 @@ callSuper:
 	mov	di, offset ToolAreaClass
 	GOTO	ObjCallSuperNoLock
 
-skip:
-	ret
 
 ToolAreaVisMoveResizeWin	endm
 
 taskBarPositionCategory	char	"motif options",0
 taskBarPositionKey	char	"taskBarPosition",0
+
+endif
 
 
 
@@ -2544,6 +2563,7 @@ REVISION HISTORY:
 	brianc	11/30/92	updated for UIEP_LOWER_LEFT
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+if TOOL_AREA_IS_TASK_BAR
 ;
 ; this used to be MSG_GEN_INTERACTION_INITIATE, but that is too late
 ;
@@ -2620,6 +2640,7 @@ afterTrayCheck:
 done:
 	ret
 ToolAreaInitPosition	endm
+endif
 
 
 ToolAreaInteractionInitiate	method dynamic ToolAreaClass,
@@ -2627,6 +2648,7 @@ ToolAreaInteractionInitiate	method dynamic ToolAreaClass,
 	mov	di, offset ToolAreaClass
 	call	ObjCallSuperNoLock
 
+if TOOL_AREA_IS_TASK_BAR
 	;
 	; if TOOL_AREA_IS_TASK_BAR
 	;
@@ -2653,17 +2675,18 @@ ToolAreaInteractionInitiate	method dynamic ToolAreaClass,
 	call	ObjCallInstanceNoLock
 	pop	ax
 noHide:
+endif
 
-; endif ; TOOL_AREA_IS_TASK_BAR
-	;
+if TOOL_AREA_IS_TASK_BAR
+
 	; if (not TOOL_AREA_IS_TASK_BAR)
 	;
-	; push	ds
-	; segmov	ds, dgroup
-	; tst	ds:[taskBarEnabled] ; if taskbar == on, ZF == 1
-	; pop	ds
-	; jnz	done ; if ZF==1 skip the following code
-
+	push	ds
+	segmov	ds, dgroup
+	tst	ds:[taskBarEnabled] ; if taskbar == on, ZF == 1
+	pop	ds
+	jnz	done ; if ZF==1 skip the following code
+endif
 	;
 	; if UIEP_LOWER_LEFT, force a move so that it'll be position at
 	; the lower left
@@ -2699,7 +2722,7 @@ endif
 	mov	cx, di
 	mov	ax, MSG_GEN_GUP_CALL_OBJECT_OF_CLASS
 	call	GenCallParent
-; endif	; (not TOOL_AREA_IS_TASK_BAR)
+
 done:
 	ret
 ToolAreaInteractionInitiate	endm
@@ -3213,16 +3236,17 @@ DESTROYED:	ax, cx, dx, bp
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
 
+if TOOL_AREA_IS_TASK_BAR
 OLFieldSendToGenApplications	method dynamic OLFieldClass,
 					MSG_OL_FIELD_SEND_TO_GEN_APPLICATIONS
 	;
 	; if TOOL_AREA_IS_TASK_BAR
 	;
-	push	ds
-	segmov	ds, dgroup
-	tst	ds:[taskBarEnabled] ; if taskbar == on, ZF == 1
-	pop	ds
-	jz	done ; if ZF==0 skip the following code
+	; push	ds
+	; segmov	ds, dgroup
+	; tst	ds:[taskBarEnabled] ; if taskbar == on, ZF == 1
+	; pop	ds
+	; jz	done ; if ZF==0 skip the following code
 
 	mov	bp, ds:[si]
 	add	bp, ds:[bp].Gen_offset
@@ -3251,5 +3275,6 @@ genAppLoop:
 done:
 	ret
 OLFieldSendToGenApplications	endm
+endif
 
 HighUncommon	ends

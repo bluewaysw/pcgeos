@@ -4812,6 +4812,7 @@ if PLACE_EXPRESS_MENU_ON_PRIMARY
 	;
 	; Then, update the express tool area location, to match new window
 	; location & size.
+	; RUNTIME
 	;
 	call	WinCommon_DerefVisSpec_DI
 CUAS <	cmp	ds:[di].OLWI_type, MOWT_PRIMARY_WINDOW			>
@@ -5243,6 +5244,7 @@ KeepMenuOnscreen	proc	near
 EC <	call	ECCheckLMemObject					>
 	call	OpenGetParentWinSize
 
+if TOOL_AREA_IS_TASK_BAR
 	;
 	; if TOOL_AREA_IS_TASK_BAR
 	;
@@ -5259,6 +5261,7 @@ EC <	call	ECCheckLMemObject					>
 	sub	dx, di			; subtract off taskbar adjustment
 
 hasNoTaskbar:
+endif
 	movdw	axbp, cxdx		;put size values in weird places
 	call	MoveWindowToKeepOnscreen
 	pop	bx, di, cx

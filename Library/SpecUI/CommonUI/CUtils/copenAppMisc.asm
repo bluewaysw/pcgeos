@@ -3138,7 +3138,7 @@ REVISION HISTORY:
 	joon	7/8/98   	Initial version
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
-
+if TOOL_AREA_IS_TASK_BAR
 OLAppUpdateWindowsForTaskBar	method dynamic OLApplicationClass,
 					MSG_OL_APP_UPDATE_WINDOWS_FOR_TASK_BAR
 	; close menus
@@ -3185,6 +3185,6 @@ done:
 	ret
 
 OLAppUpdateWindowsForTaskBar	endm
-
+endif
 
 ActionObscure	ends

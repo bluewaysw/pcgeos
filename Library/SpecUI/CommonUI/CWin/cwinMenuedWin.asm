@@ -1130,15 +1130,18 @@ bail:	;forget it!
 
 	call	WinClasses_CallSelf_SET_VIS_SPEC_ATTR_VUM_NOW
 
+
+if not _NO_WIN_ICONS	;------------------------------------------------------
+
+if TOOL_AREA_IS_TASK_BAR
 	;
-	; TOOL_AREA_IS_TASKBAR
+	; if TOOL_AREA_IS_TASK_BAR
 	;
 	push	ds
 	segmov	ds, dgroup
 	tst	ds:[taskBarEnabled] ; if taskbar == on, ZF == 1
 	pop	ds
 	LONG	jnz afterNoIconsBecauseOfTaskbar ; if ZF == 1 == TaskBar => show no Win Icons => jump
-;if not _NO_WIN_ICONS	;------------------------------------------------------
 
 	;See if there is an OLWinIcon object associated with this window
 
@@ -1260,8 +1263,9 @@ OMWGSM_50: ;make the Icon SA_REALIZABLE so will appear on-screen.
 	mov	ax, MSG_META_GRAB_FOCUS_EXCL
 	call	OLMenuedWinCallIconObject
 
-;endif	; if not _NO_WIN_ICONS ------------------------------------------------
-afterNoIconsBecauseOfTaskbar:
+afterNoIconsBecauseOfTaskbar: ;if TOOL_AREA_IS_TASK_BAR
+endif	; if not _NO_WIN_ICONS ------------------------------------------------
+endif
 
 ;	;release input
 ;
@@ -1553,6 +1557,7 @@ else
 	mov	ds:[di].VI_bounds.R_bottom, ax
 endif
 
+if TOOL_AREA_IS_TASK_BAR
 	;
 	; if TOOL_AREA_IS_TASK_BAR
 	;
@@ -1573,6 +1578,7 @@ endif
 	add	ds:[di].VI_bounds.R_top, dx
 	add	ds:[di].VI_bounds.R_bottom, dx
 endIfTaskbar:
+endif
 
 	call	UpdateWinPosSize	;update window position and size if
 					;have enough info. If not, then wait

@@ -2085,6 +2085,7 @@ EC <	ERROR_NZ	OPEN_WIN_ON_OPEN_WINDOW				>
 	push	bx
 	call	OpenGetParentWinSize
 
+if TOOL_AREA_IS_TASK_BAR
 	;
 	; if TOOL_AREA_IS_TASK_BAR
 	;
@@ -2097,10 +2098,12 @@ EC <	ERROR_NZ	OPEN_WIN_ON_OPEN_WINDOW				>
 	; If taskbar is at the bottom of the screen, subtract off the
 	; height of the tool area (taskbar) from parent window size so
 	; maximized windows don't extend below the taskbar.
-	; call	GetTaskBarSizeAdjustment
-	; sub	dx, di			; subtract off taskbar adjustment
+
+	call	GetTaskBarSizeAdjustment
+	sub	dx, di			; subtract off taskbar adjustment
 
 hasNoTaskbar:
+endif ; TOOL_AREA_IS_TASK_BAR
 	movdw	axbp, cxdx		 ;put size values in weird places
 	call	MoveWindowToKeepOnscreen ;try to move the window onscreen
 	pop	bx

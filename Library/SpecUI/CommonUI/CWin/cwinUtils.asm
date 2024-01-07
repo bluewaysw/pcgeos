@@ -611,6 +611,8 @@ EnsureWindowInParentWin	proc	far
 	call	OpenGetParentWinSize
 	pop	bp, bx				;bp = min width, bx = min height
 	jnc	EWIPW_90			;If no response, don't care...
+
+if TOOL_AREA_IS_TASK_BAR
 	;
 	; if TOOL_AREA_IS_TASK_BAR
 	;
@@ -625,8 +627,8 @@ EnsureWindowInParentWin	proc	far
 	; maximized windows don't extend below the taskbar.
 	call	GetTaskBarSizeAdjustment
 	sub	dx, di			; subtract off taskbar adjustment
-
 endIfTaskbar:
+endif
 	;FIRST CHECK X POSITION
 
 	push	bx				;save min height to keep visible
@@ -777,6 +779,7 @@ EnsureTitleBarInParentWin	proc	near
 	call	OpenGetParentWinSize		;get size of window we're on
 	jnc	ETBIPW_90			;If no response, don't care...
 
+if TOOL_AREA_IS_TASK_BAR
 	;
 	; if TOOL_AREA_IS_TASK_BAR
 	;
@@ -791,8 +794,8 @@ EnsureTitleBarInParentWin	proc	near
 	; maximized windows don't extend below the taskbar.
 	call	GetTaskBarSizeAdjustment
 	sub	dx, di			; subtract off taskbar adjustment
-
 endIfTaskbar:
+endif
 
 	;FIRST CHECK X POSITION
 
