@@ -6,8 +6,8 @@
 GEODE           = mine
 ASM_TO_OBJS     =
 UI_TO_RDFS      =
-SRCS            = mine2.goc mine.goc mine.goh
-OBJS            = mine2.obj mine.obj
+SRCS            = mine.goc mine2.goc mine.goh
+OBJS            = mine.obj mine2.obj
 LOBJS           =
 
 SYSMAKEFILE     = geode.mk
