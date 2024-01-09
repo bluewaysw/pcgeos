@@ -569,6 +569,7 @@ if TOOL_AREA_IS_TASK_BAR
 	tst	ds:[taskBarEnabled] ; if taskbar == on, ZF == 1
 	pop	ds
 	jnz	afterNoTarget ; if ZF==1 skip the following code
+endif
 
 	tst	ax
 	jz	afterNoTarget
@@ -594,7 +595,7 @@ endif
 	call	ObjCallInstanceNoLock
 	add	sp, size OLFieldMoveToolAreaParams
 afterNoTarget:
-endif
+; endif	; (not TOOL_AREA_IS_TASK_BAR)
 
 	Destroy	ax, cx, dx, bp
 	ret
@@ -996,7 +997,7 @@ if TOOL_AREA_IS_TASK_BAR
 	segmov	ds, dgroup
 	tst	ds:[taskBarEnabled] ; if taskbar == on, ZF == 1
 	pop	ds
-	LONG	jnz afterHasTaskbar1 ;done ;afterHasTaskbar1 ; if ZF==1 skip the following code
+	LONG	jnz done ;afterHasTaskbar1 ;done ;afterHasTaskbar1 ; if ZF==1 skip the following code
 endif
 
 if EVENT_MENU

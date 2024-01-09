@@ -5177,7 +5177,7 @@ if TOOL_AREA_IS_TASK_BAR
 	tst	ds:[taskBarEnabled] ; if taskbar == on, ZF == 1
 	pop	ds
 	jnz	done ; if ZF==1 skip the following code
-
+endif
 	call	WinClasses_DerefVisSpec_DI
 	mov	cx, ds:[di].OLWI_titleBarBounds.R_bottom
 	sub	cx, ds:[di].OLWI_titleBarBounds.R_top
@@ -5219,7 +5219,7 @@ ISU <20$:					;   display		   >
 	mov	cx, di
 	mov	ax, MSG_GEN_GUP_CALL_OBJECT_OF_CLASS
 	call	GenCallParent
-endif
+; endif ; (not TOOL_AREA_IS_TASK_BAR)
 
 done:
 	.leave

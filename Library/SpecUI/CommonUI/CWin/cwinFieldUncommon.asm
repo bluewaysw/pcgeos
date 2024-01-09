@@ -1507,7 +1507,7 @@ REVISION HISTORY:
 	JS	11/16/92   	Initial version
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
-if TOOL_AREA_IS_TASK_BAR || WINDOW_LIST_ACTIVE
+if TOOL_AREA_IS_TASK_BAR or WINDOW_LIST_ACTIVE
 WindowListClose	method dynamic WindowListDialogClass, MSG_OL_WIN_CLOSE
 
 	;
@@ -1556,7 +1556,7 @@ REVISION HISTORY:
 	JS	10/23/92   	Initial version
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
-if TOOL_AREA_IS_TASK_BAR || WINDOW_LIST_ACTIVE
+if TOOL_AREA_IS_TASK_BAR or WINDOW_LIST_ACTIVE
 WindowListKeyboard	method dynamic WindowListDialogClass,
 					MSG_META_FUP_KBD_CHAR
 	;
@@ -1629,7 +1629,7 @@ REVISION HISTORY:
 	JS	10/20/92   	Initial version
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
-if TOOL_AREA_IS_TASK_BAR || WINDOW_LIST_ACTIVE
+if TOOL_AREA_IS_TASK_BAR or WINDOW_LIST_ACTIVE
 WindowListLostTargetExcl	method dynamic WindowListDialogClass,
 					MSG_META_LOST_TARGET_EXCL
 	;
@@ -1688,7 +1688,7 @@ REVISION HISTORY:
 	JS	3/26/93   	Initial version
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
-if TOOL_AREA_IS_TASK_BAR || WINDOW_LIST_ACTIVE
+if TOOL_AREA_IS_TASK_BAR or WINDOW_LIST_ACTIVE
 WindowListInteractionCommand	method dynamic WindowListDialogClass,
 					MSG_GEN_GUP_INTERACTION_COMMAND
 	;
@@ -1750,7 +1750,7 @@ REVISION HISTORY:
 	JS	6/17/93   	Initial version copied from OLAppSendToFlow
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
-if TOOL_AREA_IS_TASK_BAR || WINDOW_LIST_ACTIVE
+if TOOL_AREA_IS_TASK_BAR or WINDOW_LIST_ACTIVE
 WindowListSendToFlow	method dynamic WindowListDialogClass,
 			MSG_VIS_VUP_TERMINATE_ACTIVE_MOUSE_FUNCTION, \
 			MSG_VIS_VUP_GET_MOUSE_STATUS, \
@@ -1856,7 +1856,7 @@ RETURN:		none
 DESTROYED:	ax, cx, dx, bp
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
-if TOOL_AREA_IS_TASK_BAR || WINDOW_LIST_ACTIVE
+if TOOL_AREA_IS_TASK_BAR or WINDOW_LIST_ACTIVE
 WindowListListSelectItem	method dynamic WindowListListClass,
 					MSG_WINDOW_LIST_LIST_SELECT_ITEM
 	;

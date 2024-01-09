@@ -243,8 +243,8 @@ export VisHWRGridClass
 export HWRGridContextTextClass
 skip 1
 export WindowListListClass
-#export TaskBarListClass
-#export SysTrayInteractionClass
+export TaskBarListClass
+export SysTrayInteractionClass
 
 #
 # READ ME:
