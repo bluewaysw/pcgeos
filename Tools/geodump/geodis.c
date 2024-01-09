@@ -260,16 +260,16 @@ char *test_fixup(unsigned ofs,int type,char *buf,int addinfo)
                                         // has already been removed, so ignore
                                         // missing fixup)
       sprintf(buffer,(type==4)?"%s":"offset %s",
-         create_label(*(unsigned *)(buf+dist),*(unsigned *)buf,'H'));
+         create_label(*(unsigned short *)(buf+dist),*(unsigned short *)buf,'H'));
                                         // successive segment/offset is as
                                         // good as a seg/ofs single fixup
-      add_global_jmp(*(unsigned *)(buf+dist),*(unsigned *)buf,NULL,0);
+      add_global_jmp(*(unsigned short *)(buf+dist),*(unsigned short *)buf,NULL,0);
       if((dist<0 || type==4) && j<code_fixlen) code_fixup[j].ofs=0xFFFF;
                                         // segment fixup has been handled
     }
     else if(type==2 && addinfo==0xFFFF) {
-      strcpy(buffer, create_label(0xFFFF,*(unsigned *)buf,'H') );
-      add_global_jmp(this_seg,*(unsigned *)buf,NULL,0);
+      strcpy(buffer, create_label(0xFFFF,*(unsigned short *)buf,'H') );
+      add_global_jmp(this_seg,*(unsigned short *)buf,NULL,0);
     }
     else
       return NULL;
@@ -283,8 +283,8 @@ char *test_fixup(unsigned ofs,int type,char *buf,int addinfo)
     if((code_fixup[i].type & 0xFE)==0x22) {
       dist = (addinfo & 0x0FFF)-0x800;  // extract distance
       sprintf(buffer,"seg %s",
-         create_label(*(unsigned *)buf,*(unsigned *)(buf+dist),'H'));
-      add_global_jmp(*(unsigned *)buf,*(unsigned *)(buf+dist),NULL,0);
+         create_label(*(unsigned short *)buf,*(unsigned short *)(buf+dist),'H'));
+      add_global_jmp(*(unsigned short *)buf,*(unsigned short *)(buf+dist),NULL,0);
     }
   }
 
@@ -309,24 +309,24 @@ char *test_fixup(unsigned ofs,int type,char *buf,int addinfo)
       switch(code_fixup[i].type & 0xFF) {
       case 0x11:                        // offset of library entry
         strcpy(buffer,"offset ");
-        create_libref(buffer+strlen(buffer),buf2,*(unsigned *)buf);
+        create_libref(buffer+strlen(buffer),buf2,*(unsigned short *)buf);
         break;
       case 0x12:                        // segment of library entry
         strcpy(buffer,"segment ");
-        create_libref(buffer+strlen(buffer),buf2,*(unsigned *)buf);
+        create_libref(buffer+strlen(buffer),buf2,*(unsigned short *)buf);
         break;
       case 0x13:                        // handle of library
         sprintf(buffer,"handle %s",buf2);
         break;
       case 0x22:                        // fixup program segments
-        if(*(unsigned *)buf!=1)
-          sprintf(buffer,"SEG%u",*(unsigned *)buf);
+        if(*(unsigned short *)buf!=1)
+          sprintf(buffer,"SEG%u",*(unsigned short *)buf);
         else
           strcpy(buffer,"dgroup");      // special case for default data segment
         break;
       case 0x23:                        // fixup handles of program segments
-        if(*(unsigned *)buf)
-          sprintf(buffer,"handle SEG%u",*(unsigned *)buf);
+        if(*(unsigned short *)buf)
+          sprintf(buffer,"handle SEG%u",*(unsigned short *)buf);
         else
           strcpy(buffer,"handle 0");    // special case for CoreBlock
         break;
@@ -337,7 +337,7 @@ char *test_fixup(unsigned ofs,int type,char *buf,int addinfo)
     case 4:
       switch(code_fixup[i].type & 0xFF) {
       case 0x00:
-        create_libref(buffer,"geos",*(unsigned *)buf);
+        create_libref(buffer,"geos",*(unsigned short *)buf);
         break;
       case 0x11:                        // offset of library entry
                                         // segment might follow...
@@ -347,17 +347,17 @@ char *test_fixup(unsigned ofs,int type,char *buf,int addinfo)
             j++)
           ;
         if(j==code_fixlen) return NULL;
-        create_libref(buffer,buf2,*(unsigned *)buf);
+        create_libref(buffer,buf2,*(unsigned short *)buf);
                                         // successive segment/offset is as
                                         // good as a seg/ofs single fixup
         code_fixup[j].ofs=0xFFFF;       // segment fixup has been handled
         break;
       case 0x14:
-        create_libref(buffer,buf2,*(unsigned *)buf);
+        create_libref(buffer,buf2,*(unsigned short *)buf);
         break;
       case 0x24:
-        strcpy(buffer,create_label(*(unsigned *)buf,*(unsigned *)(buf+2),'H'));
-        add_global_jmp(*(unsigned *)buf,*(unsigned *)(buf+2),NULL,0);
+        strcpy(buffer,create_label(*(unsigned short *)buf,*(unsigned short *)(buf+2),'H'));
+        add_global_jmp(*(unsigned short *)buf,*(unsigned short *)(buf+2),NULL,0);
         break;
       default: return NULL;
       }
