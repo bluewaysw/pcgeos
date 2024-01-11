@@ -1335,11 +1335,11 @@ OLBaseWinSpecBuild	method dynamic OLBaseWinClass, MSG_SPEC_BUILD
 	;
 	; if TOOL_AREA_IS_TASK_BAR ; We will be adding this window to the window list ------------------
 	;
-	push	ds
-	segmov	ds, dgroup
-	tst	ds:[taskBarEnabled] ; if taskbar == on, ZF == 1
-	pop	ds
-	jz	done ; if ZF==0 skip the following code
+	; push	ds
+	; segmov	ds, dgroup
+	; tst	ds:[taskBarEnabled] ; if taskbar == on, ZF == 1
+	; pop	ds
+	; jz	done ; if ZF==0 skip the following code
 
 	; Create a GenItem to represent this primary in the GenField's
 	; WindowList.
@@ -3095,11 +3095,11 @@ if TOOL_AREA_IS_TASK_BAR or WINDOW_LIST_ACTIVE
 	;
 	; if TOOL_AREA_IS_TASK_BAR
 	;
-	push	ds
-	segmov	ds, dgroup
-	tst	ds:[taskBarEnabled] ; if taskbar == on, ZF == 1
-	pop	ds
-	jz	done ; if ZF==0 skip the following code
+	; push	ds
+	; segmov	ds, dgroup
+	; tst	ds:[taskBarEnabled] ; if taskbar == on, ZF == 1
+	; pop	ds
+	; jz	done ; if ZF==0 skip the following code
 
 	test	cx, mask UWF_ATTACHING
 	jz	done

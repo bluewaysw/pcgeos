@@ -401,25 +401,25 @@ noExpressMenu:
 	clr	ax
 	xchg	ax, ds:[di].OLFI_toolArea
 
-;if TOOL_AREA_IS_TASK_BAR
+if TOOL_AREA_IS_TASK_BAR
 	;
 	; if TOOL_AREA_IS_TASK_BAR
 	;
-	; push	ds
-	; segmov	ds, dgroup
-	; tst	ds:[taskBarEnabled] ; if taskbar == on, ZF == 1
-	; pop	ds
-	; jz	hasNoTaskbar ; if ZF==0 skip the following code
+	push	ds
+	segmov	ds, dgroup
+	tst	ds:[taskBarEnabled] ; if taskbar == on, ZF == 1
+	pop	ds
+	jz	hasNoTaskbar ; if ZF==0 skip the following code
 
 	clr	ds:[di].OLFI_systemTray
-
-;hasNoTaskbar:
+hasNoTaskbar:
 
 	tst	ax
 	jz	noSystemTray
 	call	clobber
+
 noSystemTray:
-;endif
+endif
 
 if EVENT_MENU
 	mov	di, ds:[si]
