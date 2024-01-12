@@ -100,7 +100,7 @@ minimalLibrary	: kernel swap sound net ui isui motif spool text mailbox \
 		  basicdb gridlib gsol treplib
 #ascii
 
-prefLibs	: prefvid preftd \
+prefLibs	: prefvid prefts preftd \
 		  prefsnd prefos prefmous preflo preflf prefkbd \
 		  prefintl prefcomp prefbg prefpntc preffont configui
 
@@ -128,14 +128,16 @@ minimalAppl	: minimalGame minimalUtils minimalTools minimalSavers \
 		  bbxchat bbxmail \
 		  newsread geozip sclock\
  	  	  hmbase pdfvu  bnkr30 ftpc \
- 	  	  instc instf
+ 	  	  instc instf 
 
 minimalUtils	: prefmgr
 
 minimalTools    : resedit
 
 minimalGame	: solitaire cword amateur bjack hearts gwpoker \
-                  pyramid sokoban taipei uki mine column
+                  pyramid sokoban taipei uki mine column2 \
+                  battle column follow mine2
+                   
 
 minimalEdu	: flash fontmgck hangman laserl mflash numbers pvault \
                   oliner taide thinker wsm wsplay xwm
@@ -167,7 +169,7 @@ minimalDriver	: nimbus ms4 ntfat os2 cdrom stream dri gdi keyboard modem gdipoin
 		  vga vga8 vga15 vga16 vga24 ega cga mcga hgc att6300 dscga \
 		  printerDriver ctm ctmabs imps2 \
 		  ps2 msys msser msbus kbmouse absgen genmouse emm extmem \
-		  xms filestr nonts sblaster comm spooltd \
+		  xms filestr nonts taskmax bnf sblaster comm spooltd \
 		  vmtree filedd logibus logiser dma mslf kbd_drivers \
 		  etherodi etherpkt msnet cdados truetype
 
@@ -540,8 +542,8 @@ Installed/Library/Pref/Prefsnd:		ui config MAKELIB
 preftd	: Installed/Library/Pref/Preftd
 Installed/Library/Pref/Preftd:		ui config MAKELIB
 
-#prefts	: Installed/Library/Pref/Prefts
-#Installed/Library/Pref/Prefts:		ui config MAKELIB
+prefts	: Installed/Library/Pref/Prefts
+Installed/Library/Pref/Prefts:		ui config MAKELIB
 
 #prefui	: Installed/Library/Pref/Prefui
 #Installed/Library7Pref/Prefui:		ui config MAKELIB
@@ -1013,9 +1015,20 @@ Installed/Appl/Games/Taipei:	ui game MAKEAPPL
 uki	: Installed/Appl/Games/Uki
 Installed/Appl/Games/Uki:	ui sound text MAKEAPPL
 
-column	: Installed/Appl/Breadbox/Column
+column2	: Installed/Appl/Breadbox/Column
 Installed/Appl/Breadbox/Column:	ui game MAKEAPPL
 
+column	: Installed/Appl/Breadbox/FunPak/Column
+Installed/Appl/Breadbox/FunPak/Column:	ui game sound MAKEAPPL
+
+battle	: Installed/Appl/Breadbox/FunPak/Battle
+Installed/Appl/Breadbox/FunPak/Battle: ui math sound ansic MAKEAPPL
+
+follow	: Installed/Appl/Breadbox/FunPak/Follow
+Installed/Appl/Breadbox/FunPak/Follow: ui ansic game sound MAKEAPPL
+
+mine2	: Installed/Appl/Breadbox/FunPak/Mine
+Installed/Appl/Breadbox/FunPak/Mine: ui ansic MAKEAPPL
 
 
 
@@ -1607,6 +1620,9 @@ Installed/Library/CoProcessor/Intx87:		kernel math MAKELIB
 
 taskmax	: Installed/Driver/Task/Taskmax
 Installed/Driver/Task/Taskmax:			ui text MAKEDRV
+
+bnf : Installed/Driver/Task/BNF
+Installed/Driver/Task/BNF:				ui text MAKEDRV
 
 cvttool	: Installed/Library/FMTools/CvtTool
 Installed/Library/FMTools/CvtTool:		ui convert MAKELIB

@@ -27,7 +27,7 @@
 name bnkr30.app
 #
 # Long filename:
-longname "Banker 3.0"
+longname "Banker"
 #
 # Specify geode type:
 type	appl, process, single
