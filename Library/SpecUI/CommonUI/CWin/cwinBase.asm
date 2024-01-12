@@ -1333,7 +1333,8 @@ OLBaseWinSpecBuild	method dynamic OLBaseWinClass, MSG_SPEC_BUILD
 	call	ObjCallSuperNoLock
 
 	;
-	; if TOOL_AREA_IS_TASK_BAR ; We will be adding this window to the window list ------------------
+	; We will be adding this window to the window list ------------------
+	; if TOOL_AREA_IS_TASK_BAR
 	;
 	; push	ds
 	; segmov	ds, dgroup
@@ -1378,7 +1379,7 @@ if TOOL_AREA_IS_TASK_BAR or WINDOW_LIST_ACTIVE
 EnsureItemAddedToWindowList	proc	near
 
 	;
-	; if TOOL_AREA_IS_TASK_BAR
+	; if TaskBar == on
 	;
 	; push	ds
 	; segmov	ds, dgroup
@@ -1495,7 +1496,7 @@ UpdateTaskBarList	proc	far
 	.enter
 
 	;
-	; if TOOL_AREA_IS_TASK_BAR
+	; if TaskBar == on
 	;
 	push	ds
 	segmov	ds, dgroup
@@ -1553,7 +1554,7 @@ OLBaseWinUpdateVisMoniker	method dynamic OLBaseWinClass,
 	call	ObjCallSuperNoLock
 
 	;
-	; if TOOL_AREA_IS_TASK_BAR
+	; if TaskBar == on
 	;
 	; push	ds
 	; segmov	ds, dgroup
@@ -1673,9 +1674,8 @@ free:
 if TOOL_AREA_IS_TASK_BAR
 	;
 	; Update task bar list
-	;
-	;
-	; if TOOL_AREA_IS_TASK_BAR
+	; if TaskBar == on
+	; RUNTIME
 	;
 	push	ds
 	segmov	ds, dgroup
@@ -1725,7 +1725,7 @@ iconHeight	local	word
 	.enter
 
 	;
-	; if TOOL_AREA_IS_TASK_BAR
+	; if TaskBar == on
 	;
 	; push	ds
 	; segmov	ds, dgroup
@@ -1919,7 +1919,7 @@ updateTaskBar:
 
 if TOOL_AREA_IS_TASK_BAR
 	;
-	; if TOOL_AREA_IS_TASK_BAR
+	; if TaskBar == on
 	;
 	push	ds
 	segmov	ds, dgroup
@@ -1982,7 +1982,7 @@ OLBaseWinNotifyWindowSelected	method dynamic OLBaseWinClass,
 					MSG_META_NOTIFY_TASK_SELECTED
 
 	;
-	; if TOOL_AREA_IS_TASK_BAR
+	; if TaskBar == on
 	;
 	; push	ds
 	; segmov	ds, dgroup
@@ -2042,7 +2042,7 @@ OLWindowListItemNotifyWindowSelected	method dynamic OLWindowListItemClass,
 					MSG_META_NOTIFY_TASK_SELECTED
 
 	;
-	; if TOOL_AREA_IS_TASK_BAR
+	; if TaskBar == on
 	; FIXME!!! do we really need to callSuper here?
 	;
 	; push	ds
@@ -2118,7 +2118,7 @@ if TOOL_AREA_IS_TASK_BAR or WINDOW_LIST_ACTIVE
 OLWindowListItemSetOperatingParams	method dynamic OLWindowListItemClass,
 				MSG_OL_WINDOW_LIST_ITEM_SET_OPERATING_PARAMS
 	;
-	; if TOOL_AREA_IS_TASK_BAR
+	; if TaskBar == on
 	;
 	; push	ds
 	; segmov	ds, dgroup
@@ -2165,7 +2165,7 @@ if TOOL_AREA_IS_TASK_BAR or WINDOW_LIST_ACTIVE
 OLWindowListItemCloseWindow	method dynamic OLWindowListItemClass,
 					MSG_OL_WINDOW_LIST_ITEM_CLOSE_WINDOW
 	;
-	; if TOOL_AREA_IS_TASK_BAR
+	; if TaskBar == on
 	;
 	; push	ds
 	; segmov	ds, dgroup
@@ -2224,7 +2224,7 @@ OLWindowListItemKeyboardChar	method dynamic OLWindowListItemClass,
 					MSG_META_KBD_CHAR
 
 	;
-	; if TOOL_AREA_IS_TASK_BAR
+	; if TaskBar == on
 	;
 	; push	ds
 	; segmov	ds, dgroup
@@ -3075,7 +3075,7 @@ endif
 
 if TOOL_AREA_IS_TASK_BAR or WINDOW_LIST_ACTIVE
 	;
-	; if TOOL_AREA_IS_TASK_BAR
+	; if TaskBar == on
 	;
 	; push	ds
 	; segmov	ds, dgroup
@@ -3093,7 +3093,7 @@ notDetaching:
 
 if TOOL_AREA_IS_TASK_BAR or WINDOW_LIST_ACTIVE
 	;
-	; if TOOL_AREA_IS_TASK_BAR
+	; if TaskBar == on
 	;
 	; push	ds
 	; segmov	ds, dgroup
@@ -3368,7 +3368,7 @@ endif
 
 if TOOL_AREA_IS_TASK_BAR or WINDOW_LIST_ACTIVE
 	;
-	; if TOOL_AREA_IS_TASK_BAR
+	; if TaskBar == on
 	;
 	; push	ds
 	; segmov	ds, dgroup
@@ -3504,7 +3504,7 @@ EnsureItemRemovedFromWindowList	proc	far
 
 if TOOL_AREA_IS_TASK_BAR
 	;
-	; if TOOL_AREA_IS_TASK_BAR
+	; if TaskBar == on
 	;
 	push	ds
 	segmov	ds, dgroup
@@ -3683,7 +3683,7 @@ OLBaseWinDisplaySetNotMinimized	method dynamic OLBaseWinClass,
 
 if TOOL_AREA_IS_TASK_BAR
 	;
-	; if (not TOOL_AREA_IS_TASK_BAR)
+	; if TaskBar == off
 	; RUNTIME
 	;
 	push	ds
@@ -3696,7 +3696,7 @@ endif
 done:
 	ret
 OLBaseWinDisplaySetNotMinimized	endm
-endif ; PLACE_EXPRESS_MENU_ON_PRIMARY and (not TOOL_AREA_IS_TASK_BAR)
+endif
 
 
 COMMENT @----------------------------------------------------------------------
@@ -3805,7 +3805,7 @@ if PLACE_EXPRESS_MENU_ON_PRIMARY
 
 if TOOL_AREA_IS_TASK_BAR
 	;
-	; if (not TOOL_AREA_IS_TASK_BAR)
+	; if TaskBar == off
 	; RUNTIME
 	;
 	push	ds
@@ -3836,7 +3836,7 @@ endif ; PLACE_EXPRESS_MENU_ON_PRIMARY or TOOL_AREA_IS_TASK_BAR
 if PLACE_EXPRESS_MENU_ON_PRIMARY
 if TOOL_AREA_IS_TASK_BAR
 	;
-	; if (not TOOL_AREA_IS_TASK_BAR)
+	; if TaskBar == off
 	; RUNTIME
 	;
 	push	ds
@@ -3893,7 +3893,7 @@ UpdateAppMenuItemCommon	proc	far
 
 if TOOL_AREA_IS_TASK_BAR or WINDOW_LIST_ACTIVE
 	;
-	; if TOOL_AREA_IS_TASK_BAR
+	; if TaskBar == on
 	;
 	; push	ds
 	; segmov	ds, dgroup
@@ -3965,7 +3965,7 @@ OLBaseWinHideExpressToolArea	proc	near
 
 if TOOL_AREA_IS_TASK_BAR
 	;
-	; if (not TOOL_AREA_IS_TASK_BAR)
+	; if TaskBar == off
 	; RUNTIME
 	;
 	push	ds
@@ -4035,7 +4035,7 @@ OLBaseWinAdjustTitleBoundsForExpressToolArea	proc	far
 
 if TOOL_AREA_IS_TASK_BAR
 	;
-	; if (not TOOL_AREA_IS_TASK_BAR)
+	; if TaskBar == off
 	; RUNTIME
 	;
 	push	ds
@@ -4132,7 +4132,7 @@ endif ; PLACE_EXPRESS_MENU_ON_PRIMARY or TOOL_AREA_IS_TASK_BAR
 if PLACE_EXPRESS_MENU_ON_PRIMARY
 if TOOL_AREA_IS_TASK_BAR
 	;
-	; if (not TOOL_AREA_IS_TASK_BAR)
+	; if TaskBar == off
 	; RUNTIME
 	;
 	push	ds
@@ -4152,7 +4152,7 @@ endif
 	;
 if REDO_GEOMETRY_FOR_EXPRESS_MENU
 	call	OLRedoMenuBarGeometryIfMenusInHeader
-endif
+endif ; TOOL_AREA_IS_TASK_BAR
 endif ; PLACE_EXPRESS_MENU_ON_PRIMARY
 
 afterExpressMenu:
@@ -4170,7 +4170,7 @@ endif
 
 if TOOL_AREA_IS_TASK_BAR or WINDOW_LIST_ACTIVE
 	;
-	; if TOOL_AREA_IS_TASK_BAR
+	; if TaskBar == on
 	;
 	; push	ds
 	; segmov	ds, dgroup
@@ -5169,7 +5169,7 @@ endif
 
 if TOOL_AREA_IS_TASK_BAR
 	;
-	; if (not TOOL_AREA_IS_TASK_BAR)
+	; if TaskBar == off
 	; RUNTIME
 	;
 	push	ds
@@ -5641,7 +5641,7 @@ OLWinGetToolAreaSize	proc	far
 	.enter
 
 	;
-	; if TOOL_AREA_IS_TASK_BAR
+	; if TaskBar == on
 	;
 	; push	ds
 	; segmov	ds, dgroup

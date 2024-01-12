@@ -3144,7 +3144,7 @@ OLAppUpdateWindowsForTaskBar	method dynamic OLApplicationClass,
 	; close menus
 
 	;
-	; if TOOL_AREA_IS_TASK_BAR
+	; if TaskBar == on
 	;
 	push	ds
 	segmov	ds, dgroup

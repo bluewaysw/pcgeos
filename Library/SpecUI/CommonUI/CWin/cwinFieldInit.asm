@@ -371,7 +371,7 @@ endif
 
 if TOOL_AREA_IS_TASK_BAR or WINDOW_LIST_ACTIVE
 	;
-	; if TOOL_AREA_IS_TASK_BAR
+	; if TaskBar == on
 	;
 	; push	ds
 	; segmov	ds, dgroup
@@ -778,7 +778,7 @@ if (TOOL_AREA_IS_TASK_BAR or WINDOW_LIST_ACTIVE)
 OLFieldEnsureWindowListDialog	proc	far
 
 	;
-	; if TOOL_AREA_IS_TASK_BAR
+	; if TaskBar == on
 	;
 	; push	ds
 	; segmov	ds, dgroup
@@ -931,7 +931,7 @@ OLFieldEnsureToolArea	proc	far
 
 if TOOL_AREA_IS_TASK_BAR
 	;
-	; if TOOL_AREA_IS_TASK_BAR
+	; if TaskBar == on
 	; RUNTIME
 	;
 	push	ds
@@ -989,7 +989,7 @@ endif
 
 if TOOL_AREA_IS_TASK_BAR
 	;
-	; if TOOL_AREA_IS_TASK_BAR
+	; if TaskBar == on
 	; RUNTIME
 	;
 	push	ds

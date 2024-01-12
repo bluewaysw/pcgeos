@@ -1135,13 +1135,14 @@ if not _NO_WIN_ICONS	;------------------------------------------------------
 
 if TOOL_AREA_IS_TASK_BAR
 	;
-	; if TOOL_AREA_IS_TASK_BAR
+	; if TaskBar == on
 	;
 	push	ds
 	segmov	ds, dgroup
 	tst	ds:[taskBarEnabled] ; if taskbar == on, ZF == 1
 	pop	ds
 	LONG	jnz afterNoIconsBecauseOfTaskbar ; if ZF == 1 == TaskBar => show no Win Icons => jump
+endif
 
 	;See if there is an OLWinIcon object associated with this window
 
@@ -1265,7 +1266,7 @@ OMWGSM_50: ;make the Icon SA_REALIZABLE so will appear on-screen.
 
 afterNoIconsBecauseOfTaskbar: ;if TOOL_AREA_IS_TASK_BAR
 endif	; if not _NO_WIN_ICONS ------------------------------------------------
-endif
+
 
 ;	;release input
 ;
@@ -1559,7 +1560,7 @@ endif
 
 if TOOL_AREA_IS_TASK_BAR
 	;
-	; if TOOL_AREA_IS_TASK_BAR
+	; if TaskBar == on
 	;
 	push	ds
 	segmov	ds, dgroup

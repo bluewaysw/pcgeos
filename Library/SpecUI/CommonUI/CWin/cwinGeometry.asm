@@ -923,7 +923,7 @@ CUAS <	push	bx				;save width		>
 
 if TOOL_AREA_IS_TASK_BAR
 	;
-	; if TOOL_AREA_IS_TASK_BAR
+	; if TaskBar == on
 	;
 	push	ds
 	segmov	ds, dgroup
@@ -1502,7 +1502,7 @@ if TOOL_AREA_IS_TASK_BAR
 OLWinUpdatePositionForTaskBar	method dynamic OLWinClass,
 					MSG_OL_WIN_UPDATE_POSITION_FOR_TASK_BAR
 	;
-	; if TOOL_AREA_IS_TASK_BAR
+	; if TaskBar == on
 	;
 	push	ds
 	segmov	ds, dgroup

@@ -561,7 +561,7 @@ EC<	call	ECCheckODCXDX						>
 
 if TOOL_AREA_IS_TASK_BAR
 	;
-	; if (not TOOL_AREA_IS_TASK_BAR)
+	; if TaskBar == off
 	; RUNTIME
 	;
 	push	ds
@@ -595,7 +595,7 @@ endif
 	call	ObjCallInstanceNoLock
 	add	sp, size OLFieldMoveToolAreaParams
 afterNoTarget:
-; endif	; (not TOOL_AREA_IS_TASK_BAR)
+; endif
 
 	Destroy	ax, cx, dx, bp
 	ret
@@ -898,7 +898,7 @@ OLFieldCreateWindowListEntry method dynamic OLFieldClass,
 
 if TOOL_AREA_IS_TASK_BAR
 	;
-	; if TOOL_AREA_IS_TASK_BAR
+	; if TaskBar == on
 	;
 	; push	ds
 	; segmov	ds, dgroup
@@ -980,24 +980,22 @@ REVISION HISTORY:
 	Doug	6/92		Initial version
 ------------------------------------------------------------------------------@
 
-; never change priority of task bar -- brianc 11/12/99
-; FIXME!!! - is this still true?
 ; if (not TOOL_AREA_IS_TASK_BAR)
 ; RUNTIME
-
 OLFieldMoveToolArea	method	dynamic OLFieldClass, \
 					MSG_OL_FIELD_MOVE_TOOL_AREA
 
 if TOOL_AREA_IS_TASK_BAR
 	;
-	; if (not TOOL_AREA_IS_TASK_BAR)
+	; if TaskBar == off
+	; never change priority of task bar -- brianc 11/12/99
 	; RUNTIME
 	;
 	push	ds
 	segmov	ds, dgroup
 	tst	ds:[taskBarEnabled] ; if taskbar == on, ZF == 1
 	pop	ds
-	LONG	jnz done ;afterHasTaskbar1 ;done ;afterHasTaskbar1 ; if ZF==1 skip the following code
+	LONG	jnz done ; if ZF==1 skip the following code
 endif
 
 if EVENT_MENU
@@ -1036,7 +1034,7 @@ endif
 
 if TOOL_AREA_IS_TASK_BAR
 	;
-	; if (not TOOL_AREA_IS_TASK_BAR)
+	; if TaskBar == off
 	; RUNTIME
 	;
 	push	ds
@@ -1091,8 +1089,6 @@ doItInUILayer:
 	mov	ax, handle ui		; Move to UI's layer
 	jmp	short doIt
 
-
-
 realGeode:
 	; Ignore request if not from geode owning current target
 	;
@@ -1119,7 +1115,7 @@ doIt:
 
 if TOOL_AREA_IS_TASK_BAR
 	;
-	; if (not TOOL_AREA_IS_TASK_BAR)
+	; if TaskBar == off
 	; RUNTIME
 	;
 	push	ds
@@ -1150,8 +1146,6 @@ endif
 	call	WinMove
 
 afterHasTaskbar2:
-
-
 	pop	dx			; Pass handle of Geode as
 					; new LayerID
 	mov	si, WIT_PRIORITY
@@ -1167,7 +1161,7 @@ afterHasTaskbar2:
 done:
 	ret
 OLFieldMoveToolArea	endm
-; endif ; (not TOOL_AREA_IS_TASK_BAR)
+; endif
 
 COMMENT @----------------------------------------------------------------------
 
@@ -1204,7 +1198,7 @@ OLFieldSizeToolArea	method dynamic	OLFieldClass, \
 
 if TOOL_AREA_IS_TASK_BAR
 	;
-	; if (not TOOL_AREA_IS_TASK_BAR)
+	; if TaskBar == off
 	; RUNTIME
 	;
 	push	ds

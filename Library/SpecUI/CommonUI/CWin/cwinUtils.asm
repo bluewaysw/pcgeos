@@ -614,7 +614,7 @@ EnsureWindowInParentWin	proc	far
 
 if TOOL_AREA_IS_TASK_BAR
 	;
-	; if TOOL_AREA_IS_TASK_BAR
+	; if TaskBar == on
 	;
 	push	ds
 	segmov	ds, dgroup
@@ -781,7 +781,7 @@ EnsureTitleBarInParentWin	proc	near
 
 if TOOL_AREA_IS_TASK_BAR
 	;
-	; if TOOL_AREA_IS_TASK_BAR
+	; if TaskBar == on
 	;
 	push	ds
 	segmov	ds, dgroup

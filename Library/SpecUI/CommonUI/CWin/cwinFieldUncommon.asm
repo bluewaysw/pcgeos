@@ -1246,7 +1246,7 @@ if TOOL_AREA_IS_TASK_BAR
 OLFieldUpdateTaskBarList	method	dynamic OLFieldClass,
 					MSG_OL_FIELD_UPDATE_TASK_BAR_LIST
 	;
-	; if TOOL_AREA_IS_TASK_BAR
+	; if TaskBar == on
 	;
 	push	ds
 	segmov	ds, dgroup
@@ -1353,7 +1353,7 @@ if TOOL_AREA_IS_TASK_BAR or WINDOW_LIST_ACTIVE
 OLFieldSelectWindowListEntry	method	dynamic OLFieldClass,
 					MSG_OL_FIELD_SELECT_WINDOW_LIST_ENTRY
 	;
-	; if TOOL_AREA_IS_TASK_BAR
+	; if TaskBar == on
 	;
 	; push	ds
 	; segmov	ds, dgroup
@@ -1412,7 +1412,7 @@ if TOOL_AREA_IS_TASK_BAR or WINDOW_LIST_ACTIVE
 OLFieldWindowListCloseWindow	method dynamic OLFieldClass,
 					MSG_OL_FIELD_WINDOW_LIST_CLOSE_WINDOW
 	;
-	; if TOOL_AREA_IS_TASK_BAR
+	; if TaskBar == on
 	;
 	; push	ds
 	; segmov	ds, dgroup
@@ -1462,7 +1462,7 @@ if TOOL_AREA_IS_TASK_BAR or WINDOW_LIST_ACTIVE
 OLFieldOpenWindowList	method dynamic OLFieldClass,
 					MSG_GEN_FIELD_OPEN_WINDOW_LIST
 	;
-	; if TOOL_AREA_IS_TASK_BAR
+	; if TaskBar == on
 	;
 	; push	ds
 	; segmov	ds, dgroup
@@ -1511,7 +1511,7 @@ if TOOL_AREA_IS_TASK_BAR or WINDOW_LIST_ACTIVE
 WindowListClose	method dynamic WindowListDialogClass, MSG_OL_WIN_CLOSE
 
 	;
-	; if TOOL_AREA_IS_TASK_BAR
+	; if TaskBar == on
 	;
 	; push	ds
 	; segmov	ds, dgroup
@@ -1560,8 +1560,7 @@ if TOOL_AREA_IS_TASK_BAR or WINDOW_LIST_ACTIVE
 WindowListKeyboard	method dynamic WindowListDialogClass,
 					MSG_META_FUP_KBD_CHAR
 	;
-	; if TOOL_AREA_IS_TASK_BAR
-	; FIXME!!! - do we need to callSuper here?
+	; if TaskBar == on
 	;
 	; push	ds
 	; segmov	ds, dgroup
@@ -1633,7 +1632,7 @@ if TOOL_AREA_IS_TASK_BAR or WINDOW_LIST_ACTIVE
 WindowListLostTargetExcl	method dynamic WindowListDialogClass,
 					MSG_META_LOST_TARGET_EXCL
 	;
-	; if TOOL_AREA_IS_TASK_BAR
+	; if TaskBar == on
 	;
 	; push	ds
 	; segmov	ds, dgroup
@@ -1692,7 +1691,7 @@ if TOOL_AREA_IS_TASK_BAR or WINDOW_LIST_ACTIVE
 WindowListInteractionCommand	method dynamic WindowListDialogClass,
 					MSG_GEN_GUP_INTERACTION_COMMAND
 	;
-	; if TOOL_AREA_IS_TASK_BAR
+	; if TaskBar == on
 	;
 	; push	ds
 	; segmov	ds, dgroup
@@ -1756,7 +1755,7 @@ WindowListSendToFlow	method dynamic WindowListDialogClass,
 			MSG_VIS_VUP_GET_MOUSE_STATUS, \
 			MSG_VIS_VUP_BUMP_MOUSE
 	;
-	; if TOOL_AREA_IS_TASK_BAR
+	; if TaskBar == on
 	;
 	; push	ds
 	; segmov	ds, dgroup
@@ -1798,7 +1797,7 @@ if TOOL_AREA_IS_TASK_BAR
 WindowListListQueryTaskBarItemMoniker	method dynamic WindowListListClass,
 			MSG_WINDOW_LIST_LIST_QUERY_TASK_BAR_ITEM_MONIKER
 	;
-	; if TOOL_AREA_IS_TASK_BAR
+	; if TaskBar == on
 	;
 	push	ds
 	segmov	ds, dgroup
@@ -1860,7 +1859,7 @@ if TOOL_AREA_IS_TASK_BAR or WINDOW_LIST_ACTIVE
 WindowListListSelectItem	method dynamic WindowListListClass,
 					MSG_WINDOW_LIST_LIST_SELECT_ITEM
 	;
-	; if TOOL_AREA_IS_TASK_BAR
+	; if TaskBar == on
 	;
 	; push	ds
 	; segmov	ds, dgroup
@@ -1911,7 +1910,7 @@ if TOOL_AREA_IS_TASK_BAR
 TaskBarListAddChild	method dynamic TaskBarListClass,
 					MSG_GEN_ADD_CHILD
 	;
-	; if TOOL_AREA_IS_TASK_BAR
+	; if TaskBar == on
 	; RUNTIME
 	; FIXME!!! - do we really need to call super here?
 	;
@@ -2000,7 +1999,7 @@ ToolAreaDraw	method dynamic ToolAreaClass, MSG_VIS_DRAW
 	pop	di			; di = gstate
 
 	;
-	; if TOOL_AREA_IS_TASK_BAR
+	; if TaskBar == on
 	; RUNTIME
 	;
 	push	ds
@@ -2056,7 +2055,6 @@ draw:
 	call	GrDrawLine
 
 done:
-
 	ret
 ToolAreaDraw	endm
 endif
@@ -2091,7 +2089,7 @@ if TOOL_AREA_IS_TASK_BAR
 SysTrayInteractionVisDraw	method dynamic SysTrayInteractionClass,
 				MSG_VIS_DRAW
 	;
-	; if TOOL_AREA_IS_TASK_BAR
+	; if TaskBar == on
 	; RUNTIME
 	;
 	push	ds
@@ -2159,7 +2157,7 @@ ToolAreaRawUnivEnter	method dynamic ToolAreaClass,
 	call	ObjCallSuperNoLock
 
 	;
-	; if TOOL_AREA_IS_TASK_BAR
+	; if TaskBar == on
 	; RUNTIME
 	;
 	push	ds
@@ -2220,7 +2218,7 @@ ToolAreaRawUnivLeave	method dynamic ToolAreaClass,
 	call	ObjCallSuperNoLock
 
 	;
-	; if TOOL_AREA_IS_TASK_BAR
+	; if TaskBar == on
 	; RUNTIME
 	;
 	push	ds
@@ -2280,7 +2278,7 @@ if TOOL_AREA_IS_TASK_BAR
 ToolAreaAutoHide	method dynamic ToolAreaClass,
 					MSG_TOOL_AREA_AUTO_HIDE
 	;
-	; if TOOL_AREA_IS_TASK_BAR
+	; if TaskBar == on
 	; RUNTIME
 	;
 	push	ds
@@ -2362,7 +2360,7 @@ if TOOL_AREA_IS_TASK_BAR
 ToolAreaStartSelect	method dynamic ToolAreaClass,
 					MSG_META_START_SELECT
 	;
-	; if TOOL_AREA_IS_TASK_BAR
+	; if TaskBar == on
 	; RUNTIME
 	;
 	push	ds
@@ -2371,14 +2369,18 @@ ToolAreaStartSelect	method dynamic ToolAreaClass,
 	pop	ds
 	jz	callSuper ; if ZF==0 skip the following code
 
+	;
 	; update the mouse pointer image, in case we have not received a
 	; MSG_META_PTR event recently
+	;
 
 	mov	di, ds:[si]
 	add	di, ds:[di].Vis_offset
 	call	OpenWinUpdatePtrImage
 
+	;
 	; startup SMCO mechanism, and send event on to children
+	;
 
 	push	cx, dx
 	call	OpenWinStartButton
@@ -2387,7 +2389,9 @@ ToolAreaStartSelect	method dynamic ToolAreaClass,
 	test	ax, mask MRF_PROCESSED
 	jnz	done
 
+	;
 	; set MOVING or RESIZING flags
+	;
 
 	segmov	es, dgroup, ax
 	tst	es:[taskBarMovable]
@@ -2439,7 +2443,7 @@ ToolAreaVisMoveResizeWin	method dynamic ToolAreaClass,
 					MSG_VIS_MOVE_RESIZE_WIN
 
 	;
-	; if TOOL_AREA_IS_TASK_BAR
+	; if TaskBar == on
 	; RUNTIME
 	;
 	push	ds
@@ -2570,7 +2574,7 @@ if TOOL_AREA_IS_TASK_BAR
 ToolAreaInitPosition	method	dynamic	ToolAreaClass, MSG_TOOL_AREA_INIT_POSITION
 
 	;
-	; if TOOL_AREA_IS_TASK_BAR
+	; if TaskBar == on
 	;
 	push	ds
 	segmov	ds, dgroup
@@ -2650,7 +2654,7 @@ ToolAreaInteractionInitiate	method dynamic ToolAreaClass,
 
 if TOOL_AREA_IS_TASK_BAR
 	;
-	; if TOOL_AREA_IS_TASK_BAR
+	; if TaskBar == on
 	;
 	push	ds
 	segmov	ds, dgroup
@@ -2678,8 +2682,8 @@ noHide:
 endif
 
 if TOOL_AREA_IS_TASK_BAR
-
-	; if (not TOOL_AREA_IS_TASK_BAR)
+	;
+	; if TaskBar == off
 	;
 	push	ds
 	segmov	ds, dgroup
@@ -3240,7 +3244,7 @@ if TOOL_AREA_IS_TASK_BAR
 OLFieldSendToGenApplications	method dynamic OLFieldClass,
 					MSG_OL_FIELD_SEND_TO_GEN_APPLICATIONS
 	;
-	; if TOOL_AREA_IS_TASK_BAR
+	; if TaskBar == on
 	;
 	; push	ds
 	; segmov	ds, dgroup

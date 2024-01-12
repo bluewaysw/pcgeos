@@ -2087,7 +2087,7 @@ EC <	ERROR_NZ	OPEN_WIN_ON_OPEN_WINDOW				>
 
 if TOOL_AREA_IS_TASK_BAR
 	;
-	; if TOOL_AREA_IS_TASK_BAR
+	; if TaskBar == on
 	;
 	; push	ds
 	; segmov	ds, dgroup
@@ -2103,7 +2103,7 @@ if TOOL_AREA_IS_TASK_BAR
 	sub	dx, di			; subtract off taskbar adjustment
 
 hasNoTaskbar:
-endif ; TOOL_AREA_IS_TASK_BAR
+endif
 	movdw	axbp, cxdx		 ;put size values in weird places
 	call	MoveWindowToKeepOnscreen ;try to move the window onscreen
 	pop	bx

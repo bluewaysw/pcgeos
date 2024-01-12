@@ -403,7 +403,7 @@ noExpressMenu:
 
 if TOOL_AREA_IS_TASK_BAR
 	;
-	; if TOOL_AREA_IS_TASK_BAR
+	; if TaskBar == on
 	;
 	push	ds
 	segmov	ds, dgroup
@@ -442,7 +442,7 @@ endif
 
 if TOOL_AREA_IS_TASK_BAR or WINDOW_LIST_ACTIVE
 	;
-	; if TOOL_AREA_IS_TASK_BAR
+	; if TaskBar == on
 	;
 	; push	ds
 	; segmov	ds, dgroup
@@ -616,7 +616,7 @@ OLFieldDetach	method dynamic OLFieldClass, MSG_META_DETACH
 passItUp:
 if TOOL_AREA_IS_TASK_BAR
 	;
-	; if TOOL_AREA_IS_TASK_BAR
+	; if TaskBar == on
 	;
 		push	ds
 		segmov	ds, dgroup
@@ -1028,7 +1028,7 @@ endif
 
 if TOOL_AREA_IS_TASK_BAR or WINDOW_LIST_ACTIVE
 	;
-	; if TOOL_AREA_IS_TASK_BAR
+	; if TaskBar == on
 	;
 	; push	ds
 	; segmov	ds, dgroup

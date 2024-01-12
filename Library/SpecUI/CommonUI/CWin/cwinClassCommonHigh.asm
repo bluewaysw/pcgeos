@@ -2179,7 +2179,7 @@ EC <	ERROR_NC OL_ERROR		;parent MUST answer!		>
 
 if TOOL_AREA_IS_TASK_BAR
 	;
-	; if TOOL_AREA_IS_TASK_BAR
+	; if TaskBar == on
 	;
 	push	ds
 	segmov	ds, dgroup
@@ -2530,7 +2530,7 @@ checkSizeRequest2:
 
 if TOOL_AREA_IS_TASK_BAR
 	;
-	; if TOOL_AREA_IS_TASK_BAR
+	; if TaskBar == on
 	;
 	push	ds
 	segmov	ds, dgroup
@@ -2608,7 +2608,7 @@ EC <	ERROR_NZ OL_ILLEGAL_WIN_SIZE_FLAG				   >
 
 if TOOL_AREA_IS_TASK_BAR
 	;
-	; if TOOL_AREA_IS_TASK_BAR
+	; if TaskBar == on
 	;
 	push	ds
 	segmov	ds, dgroup
@@ -3044,7 +3044,7 @@ ConvertSpecWinSizePairsToPixels	proc	far
 
 if TOOL_AREA_IS_TASK_BAR
 	;
-	; if TOOL_AREA_IS_TASK_BAR
+	; if TaskBar == on
 	;
 	push	ds
 	segmov	ds, dgroup
@@ -3146,6 +3146,7 @@ GetTaskBarPositionAdjustment	proc	far
 
 	;
 	; if TOOL_AREA_IS_TASK_BAR
+	; if TaskBar == on
 	;
 	push	ds
 	segmov	ds, dgroup
@@ -3153,7 +3154,9 @@ GetTaskBarPositionAdjustment	proc	far
 	pop	ds
 	jz	done ; if ZF==0 skip the following code
 
+	;
 	; No adjustment for GenDisplay.
+	;
 
 	mov	di, ds:[si]
 	add	di, ds:[di].Vis_offset
@@ -3161,8 +3164,10 @@ GetTaskBarPositionAdjustment	proc	far
 	mov	di, 0			; assume no adjustment (di = 0)
 	je	done
 
+	;
 	; If taskbar is at the top of the screen, adjust position to
 	; account for taskbar.
+	;
 
 	push	ds
 	segmov	ds, dgroup
@@ -3170,7 +3175,9 @@ GetTaskBarPositionAdjustment	proc	far
 	pop	ds
 	jg	done			; no adjustment (di = 0)
 
+	;
 	; If auto-hide is on, then the adjustment is one pixel.
+	;
 
 	push	ds
 	segmov	ds, dgroup
@@ -3179,7 +3186,9 @@ GetTaskBarPositionAdjustment	proc	far
 	mov	di, 1			; assume auto-hide is on (di = 1)
 	jnz	done
 
+	;
 	; Else use tool area height.
+	;
 
 	push	cx, dx
 	call	OLWinGetToolAreaSize
@@ -3193,6 +3202,7 @@ GetTaskBarSizeAdjustment	proc	far
 
 	;
 	; if TOOL_AREA_IS_TASK_BAR
+	; if TaskBar == on
 	;
 	push	ds
 	segmov	ds, dgroup
@@ -3200,7 +3210,9 @@ GetTaskBarSizeAdjustment	proc	far
 	pop	ds
 	jz	done ; if ZF==0 skip the following code
 
+	;
 	; No adjustment for GenDisplay.
+	;
 
 	mov	di, ds:[si]
 	add	di, ds:[di].Vis_offset
@@ -3208,8 +3220,10 @@ GetTaskBarSizeAdjustment	proc	far
 	mov	di, 0			; assume no adjustment (di = 0)
 	je	done
 
+	;
 	; If taskbar is at the bottom of the screen, adjust size to
 	; account for taskbar.
+	;
 
 	push	ds
 	segmov	ds, dgroup
@@ -3217,7 +3231,9 @@ GetTaskBarSizeAdjustment	proc	far
 	pop	ds
 	jle	done			; no adjustment (di = 0)
 
+	;
 	; If auto-hide is on, then the adjustment is one pixel.
+	;
 
 	push	ds
 	segmov	ds, dgroup
@@ -3226,7 +3242,9 @@ GetTaskBarSizeAdjustment	proc	far
 	mov	di, 1			; assume auto-hide is on (di = 1)
 	jnz	done
 
+	;
 	; Else use tool area height.
+	;
 
 	push	cx, dx
 	call	OLWinGetToolAreaSize
