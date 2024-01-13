@@ -2168,7 +2168,7 @@ ToolAreaRawUnivEnter	method dynamic ToolAreaClass,
 
 	push	ds
 	segmov	ds, dgroup
-	tst	ds:[taskBarAutoHide]
+	test	ds:[taskBarPrefs], mask TBF_AUTO_HIDE
 	pop	ds
 	jz	done
 
@@ -2229,7 +2229,7 @@ ToolAreaRawUnivLeave	method dynamic ToolAreaClass,
 
 	push	ds
 	segmov	ds, dgroup
-	tst	ds:[taskBarAutoHide]
+	test	ds:[taskBarPrefs], mask TBF_AUTO_HIDE
 	pop	ds
 	jz	done
 
@@ -2289,7 +2289,7 @@ ToolAreaAutoHide	method dynamic ToolAreaClass,
 
 	push	ds
 	segmov	ds, dgroup
-	tst	ds:[taskBarAutoHide]
+	test	ds:[taskBarPrefs], mask TBF_AUTO_HIDE
 	pop	ds
 	jz	done
 
@@ -2394,7 +2394,7 @@ ToolAreaStartSelect	method dynamic ToolAreaClass,
 	;
 
 	segmov	es, dgroup, ax
-	tst	es:[taskBarMovable]
+	test	es:[taskBarPrefs], mask TBF_MOVABLE
 	jz	noMove				; not supported
 
 	mov	di, ds:[si]
@@ -2512,16 +2512,16 @@ bottomHide:
 	jg	callSuper		; skip update if already at bottom
 
 updatePosition:
-	push	ds, si
-	mov	bp, ds:[di].VI_bounds.R_top
-	segmov	ds, dgroup, cx
-	mov	ds:[taskBarPosition], bp
-	mov	cx, cs
-	mov	ds, cx
-	mov	dx, offset taskBarPositionKey
-	mov	si, offset taskBarPositionCategory
-	call	InitFileWriteInteger
-	pop	ds, si
+	; push	ds, si
+	; mov	bp, ds:[di].VI_bounds.R_top
+	; segmov	ds, dgroup, cx
+	; mov	ds:[taskBarPosition], bp
+	; mov	cx, cs
+	; mov	ds, cx
+	; mov	dx, offset taskBarPositionKey
+	; mov	si, offset taskBarPositionCategory
+	; call	InitFileWriteInteger
+	; pop	ds, si
 
 	; fixup window positions
 
@@ -2593,18 +2593,30 @@ ToolAreaInitPosition	method	dynamic	ToolAreaClass, MSG_TOOL_AREA_INIT_POSITION
 
 	;
 	; set position of taskbar
+	; at the moment we only support top and bottom positions of
+	; the taskbar: 0 = top, everything greater than 0 becomes
+	; bottom
 	;
 	mov	ax, HINT_POSITION_WINDOW_AT_RATIO_OF_PARENT
 	mov	cx, size SpecWinSizePair
 	call	ObjVarAddData
 
 	clr	cx
-	mov	dx, 0		; assume top of screen
-	push	ds
-	segmov	ds, dgroup
-	tst	ds:[taskBarPosition]
-	pop	ds
-	jle	setPosition
+	mov	dx, 0					; assume top of screen
+
+	push	ds					; save ds
+	segmov	ds, dgroup				; get dgroup
+	mov	dx, ds:[taskBarPrefs]			; load taskBarPrefs in dx
+	and	dx, mask TBF_POSITION			; mask out everything but the position bits
+	cmp	dx, (TBP_TOP) shl offset TBF_POSITION	; compare position bits with TBP_TOP
+	pop	ds					; restore ds
+	je	setPosition				; jump if not top position
+
+	; push	ds
+	; segmov	ds, dgroup
+	; tst	ds:[taskBarPosition]
+	; pop	ds
+	; jle	setPosition
 	mov	dx, mask SWSS_RATIO or PCT_95 ; PCT_100 apparently produces a wrap-around somewhere - and the taskbar appears on top again!
 
 setPosition:
@@ -2667,7 +2679,7 @@ if TOOL_AREA_IS_TASK_BAR
 	;
 	push	ds
 	segmov	ds, dgroup
-	tst	ds:[taskBarAutoHide]
+	test	ds:[taskBarPrefs], mask TBF_AUTO_HIDE
 	pop	ds
 	jz	noHide
 

@@ -3181,7 +3181,8 @@ GetTaskBarPositionAdjustment	proc	far
 
 	push	ds
 	segmov	ds, dgroup
-	tst	ds:[taskBarAutoHide]
+	test	ds:[taskBarPrefs], mask TBF_AUTO_HIDE
+
 	pop	ds
 	mov	di, 1			; assume auto-hide is on (di = 1)
 	jnz	done
@@ -3237,7 +3238,8 @@ GetTaskBarSizeAdjustment	proc	far
 
 	push	ds
 	segmov	ds, dgroup
-	tst	ds:[taskBarAutoHide]
+	test	ds:[taskBarPrefs], mask TBF_AUTO_HIDE
+
 	pop	ds
 	mov	di, 1			; assume auto-hide is on (di = 1)
 	jnz	done

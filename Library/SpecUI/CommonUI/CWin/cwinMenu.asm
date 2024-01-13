@@ -4332,7 +4332,7 @@ if TOOL_AREA_IS_TASK_BAR
 	call	OLWinGetToolAreaSize		; dx = height
 	push	ds
 	segmov	ds, dgroup
-	tst	ds:[taskBarAutoHide]
+	test	ds:[taskBarPrefs], mask TBF_AUTO_HIDE
 	jnz	doneTaskBar
 	tst	ds:[taskBarPosition]
 	jg	atBottom
@@ -5001,7 +5001,7 @@ if TOOL_AREA_IS_TASK_BAR
 	call	OLWinGetToolAreaSize		; cx = width, dx = height
 	push	ds
 	segmov	ds, dgroup
-	tst	ds:[taskBarAutoHide]
+	test	ds:[taskBarPrefs], mask TBF_AUTO_HIDE
 	jnz	doneTaskBar
 	tst	ds:[taskBarPosition]
 	jg	atBottom

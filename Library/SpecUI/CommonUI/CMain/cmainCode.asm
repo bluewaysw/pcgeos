@@ -497,7 +497,7 @@ endif
 
 if TOOL_AREA_IS_TASK_BAR
 	;
-	; if TaskBar == on
+	; if TaskBar == on, have no Task-List in E-Menu
 	;
 	push	ds
 	segmov	ds, dgroup
@@ -1536,30 +1536,81 @@ if TOOL_AREA_IS_TASK_BAR
 	;
 	; init taskBarPosition
 	;
-	mov	dx, offset taskBarPositionString
-	mov	si, offset optionsCatString
-	mov	ax, MAX_COORD			;0 = on top, > 0 (positive) = at bottom
-	call	InitFileReadInteger
-	mov	es:[taskBarPosition], ax
+	; mov	dx, offset taskBarPositionString
+	; mov	si, offset optionsCatString
+	; mov	ax, MAX_COORD			;0 = on top, > 0 (positive) = at bottom
+	; call	InitFileReadInteger
+	; mov	es:[taskBarPosition], ax
 
 	;
 	; init taskBarAutoHide
 	;
-	mov	dx, offset taskBarAutoHideString
-	mov	si, offset optionsCatString
-	mov	ax, FALSE			;default = no auto hide
-	call	InitFileReadBoolean
-	mov	es:[taskBarAutoHide], ax
+	; mov	dx, offset taskBarAutoHideString
+	; mov	si, offset optionsCatString
+	; mov	ax, FALSE			;default = no auto hide
+	; call	InitFileReadBoolean
+	; mov	es:[taskBarAutoHide], ax
+
+	;
+	; init taskBarMovable
+	;
+	; mov	dx, offset taskBarMovableString
+	; mov	si, offset optionsCatString
+	; mov	ax, FALSE			;default = no moving
+	; call	InitFileReadBoolean
+	; mov	es:[taskBarMovable], ax
+
+	;
+	; init taskBar
+	;
+	; mov	dx, offset taskBarEnabledString
+	; mov	si, offset optionsCatString
+	; andnf	es:[taskBarPrefs], mask TBF_ENABLED
+	; call	InitFileReadBoolean
+	; cmp	ax, FALSE
+	; jz	afterEnabled
+	; ornf	es:[taskBarPrefs], mask TBF_ENABLED
+; afterEnabled:
 
 	;
 	; init taskBarMovable
 	;
 	mov	dx, offset taskBarMovableString
 	mov	si, offset optionsCatString
-	mov	ax, FALSE			;default = no moving
+	andnf	es:[taskBarPrefs], mask TBF_MOVABLE
 	call	InitFileReadBoolean
-	mov	es:[taskBarMovable], ax
+	cmp	ax, FALSE
+	jz	afterMovable
+	ornf	es:[taskBarPrefs], mask TBF_MOVABLE
+afterMovable:
+
+	;
+	; init taskBarAutoHide
+	;
+	mov	dx, offset taskBarAutoHideString
+	mov	si, offset optionsCatString
+	andnf	es:[taskBarPrefs], mask TBF_AUTO_HIDE
+	call	InitFileReadBoolean
+	cmp	ax, FALSE
+	jz	afterAutoHide
+	ornf	es:[taskBarPrefs], mask TBF_AUTO_HIDE
+
+afterAutoHide:
+
+	;
+	; init taskBarPosition
+	;
+	mov	dx, offset taskBarPositionString
+	mov	si, offset optionsCatString
+	call	InitFileReadInteger
+	cmp	ax, 3					; we have 4 (zero-based) position values
+	jbe	setTaskbarPosVal			; jump if below or equal
+	mov	ax, TBP_BOTTOM				; if value is out of bounds, set to bottom
+setTaskbarPosVal:
+	shl	ax, offset TBF_POSITION			; shift position value to index of TBF_POSITION
+	ornf	es:[taskBarPrefs], ax
 endif
+
 if _ISUI
 	mov	si, offset optionsCatString
 	mov	dx, offset rightClickHelpString

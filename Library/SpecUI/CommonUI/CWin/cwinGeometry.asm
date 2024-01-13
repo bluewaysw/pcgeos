@@ -1520,7 +1520,7 @@ OLWinUpdatePositionForTaskBar	method dynamic OLWinClass,
 doUpdate:
 	push	ds
 	segmov	ds, dgroup
-	tst	ds:[taskBarAutoHide]
+	test	ds:[taskBarPrefs], mask TBF_AUTO_HIDE
 	pop	ds
 	mov	dx, 1			; assume auto-hide is on (dx = 1)
 	jnz	gotSize
