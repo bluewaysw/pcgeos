@@ -2023,11 +2023,13 @@ ToolAreaDraw	method dynamic ToolAreaClass, MSG_VIS_DRAW
 				;dx, VI_bounds.R_bottom
 				;bx, VI_bounds.R_top
 
-	push	ds
-	segmov	ds, dgroup
-	tst	ds:[taskBarPosition]
-	pop	ds
-	jg	atBottom
+	push	ds, ax					; save ds
+	segmov	ds, dgroup				; get dgroup
+	mov	ax, ds:[taskBarPrefs]			; load taskBarPrefs in dx
+	and	ax, mask TBF_POSITION			; mask out everything but the position bits
+	cmp	ax, (TBP_TOP) shl offset TBF_POSITION	; compare position bits with TBP_TOP
+	pop	ds, ax					; restore ds
+	jne	atBottom				; jump if not top position
 
 ;atTop:
 	mov	ax, (CF_INDEX shl 8) or C_DARK_GREY
@@ -2454,10 +2456,16 @@ ToolAreaVisMoveResizeWin	method dynamic ToolAreaClass,
 
 	mov	bl, ds:[di].TAI_state
 
-	push	ds
-	segmov	ds, dgroup, ax
-	mov	ax, ds:[taskBarPosition]
-	pop	ds
+	; push	ds
+	; segmov	ds, dgroup, ax
+	; mov	ax, ds:[taskBarPosition]
+	; pop	ds
+
+	push	ds					; save ds
+	segmov	ds, dgroup				; get dgroup
+	mov	ax, ds:[taskBarPrefs]			; load taskBarPrefs in ax
+	and	ax, mask TBF_POSITION			; mask out everything but the position bits
+	pop	ds					; restore ds
 
 	mov	di, ds:[si]
 	add	di, ds:[di].Vis_offset
@@ -2479,8 +2487,10 @@ ToolAreaVisMoveResizeWin	method dynamic ToolAreaClass,
 	clr	cx
 	xchg	cx, ds:[di].VI_bounds.R_top
 	sub	ds:[di].VI_bounds.R_bottom, cx
-	tst	ax
-	jle	callSuper		; skip update if already at top
+	; tst	ax
+	; jle	callSuper		; skip update if already at top
+	cmp	ax, (TBP_TOP) shl offset TBF_POSITION	; compare position bits with TBP_TOP
+	je	callSuper				; jump if already top position
 	jmp	updatePosition
 
 topHide:
@@ -2488,8 +2498,10 @@ topHide:
 	xchg	cx, ds:[di].VI_bounds.R_bottom
 	dec	cx			; need one pixel on-screen
 	sub	ds:[di].VI_bounds.R_top, cx
-	tst	ax
-	jle	callSuper
+	; tst	ax
+	; jle	callSuper
+	cmp	ax, (TBP_TOP) shl offset TBF_POSITION	; compare position bits with TBP_TOP
+	je	callSuper				; jump if already top position
 	jmp	updatePosition
 
 bottom:
@@ -2499,8 +2511,10 @@ bottom:
 	sub	dx, ds:[di].VI_bounds.R_bottom
 	add	ds:[di].VI_bounds.R_top, dx
 	add	ds:[di].VI_bounds.R_bottom, dx
-	tst	ax
-	jg	callSuper		; skip update if already at bottom
+	; tst	ax
+	; jg	callSuper		; skip update if already at bottom
+	cmp	ax, (TBP_TOP) shl offset TBF_POSITION	; compare position bits with TBP_TOP
+	jne	callSuper				; jump if already at bottom position
 	jmp	updatePosition
 
 bottomHide:
@@ -2508,8 +2522,10 @@ bottomHide:
 	sub	dx, ds:[di].VI_bounds.R_top
 	add	ds:[di].VI_bounds.R_top, dx
 	add	ds:[di].VI_bounds.R_bottom, dx
-	tst	ax
-	jg	callSuper		; skip update if already at bottom
+	; tst	ax
+	; jg	callSuper		; skip update if already at bottom
+	cmp	ax, (TBP_TOP) shl offset TBF_POSITION	; compare position bits with TBP_TOP
+	jne	callSuper				; jump if already at bottom position
 
 updatePosition:
 	; push	ds, si
@@ -2523,7 +2539,33 @@ updatePosition:
 	; call	InitFileWriteInteger
 	; pop	ds, si
 
+	push	ds, si
+	segmov	ds, dgroup
+
+	mov	ax, ds:[di].VI_bounds.R_top
+
+	mov	bp, TBP_TOP
+	shl	bp, offset TBF_POSITION
+	ornf	ds:[taskBarPrefs], bp
+
+	cmp	ax, TBP_TOP
+	je	doWrite
+
+	mov	bp, TBP_BOTTOM
+	shl	bp, offset TBF_POSITION
+	ornf	ds:[taskBarPrefs], bp
+
+doWrite:
+	mov	cx, cs
+	mov	ds, cx
+	mov	dx, offset taskBarPositionKey
+	mov	si, offset taskBarPositionCategory
+	call	InitFileWriteInteger
+	pop	ds, si
+
+	;
 	; fixup window positions
+	;
 
 	mov	ax, MSG_OL_FIELD_SEND_TO_GEN_APPLICATIONS
 	mov	dx, MSG_OL_APP_UPDATE_WINDOWS_FOR_TASK_BAR
@@ -2610,7 +2652,7 @@ ToolAreaInitPosition	method	dynamic	ToolAreaClass, MSG_TOOL_AREA_INIT_POSITION
 	and	dx, mask TBF_POSITION			; mask out everything but the position bits
 	cmp	dx, (TBP_TOP) shl offset TBF_POSITION	; compare position bits with TBP_TOP
 	pop	ds					; restore ds
-	je	setPosition				; jump if not top position
+	je	setPosition				; jump if top position
 
 	; push	ds
 	; segmov	ds, dgroup

@@ -3169,11 +3169,13 @@ GetTaskBarPositionAdjustment	proc	far
 	; account for taskbar.
 	;
 
-	push	ds
-	segmov	ds, dgroup
-	tst	ds:[taskBarPosition]
-	pop	ds
-	jg	done			; no adjustment (di = 0)
+	push	ds					; save ds
+	segmov	ds, dgroup				; get dgroup
+	mov	di, ds:[taskBarPrefs]			; load taskBarPrefs in dx
+	and	di, mask TBF_POSITION			; mask out everything but the position bits
+	cmp	di, (TBP_TOP) shl offset TBF_POSITION	; compare position bits with TBP_TOP
+	pop	ds					; restore ds
+	jne	done					; jump if not top position, no adjustment (di = 0)
 
 	;
 	; If auto-hide is on, then the adjustment is one pixel.
@@ -3226,11 +3228,19 @@ GetTaskBarSizeAdjustment	proc	far
 	; account for taskbar.
 	;
 
-	push	ds
-	segmov	ds, dgroup
-	tst	ds:[taskBarPosition]
-	pop	ds
-	jle	done			; no adjustment (di = 0)
+	; push	ds
+	; segmov	ds, dgroup
+	; tst	ds:[taskBarPosition]
+	; pop	ds
+	; jle	done			; no adjustment (di = 0)
+
+	push	ds					; save ds
+	segmov	ds, dgroup				; get dgroup
+	mov	di, ds:[taskBarPrefs]			; load taskBarPrefs in dx
+	and	di, mask TBF_POSITION			; mask out everything but the position bits
+	cmp	di, (TBP_TOP) shl offset TBF_POSITION	; compare position bits with TBP_TOP
+	pop	ds					; restore ds
+	je	done					; jump if top position, no adjustment (di = 0)
 
 	;
 	; If auto-hide is on, then the adjustment is one pixel.

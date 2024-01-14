@@ -1565,7 +1565,7 @@ if TOOL_AREA_IS_TASK_BAR
 	;
 	; mov	dx, offset taskBarEnabledString
 	; mov	si, offset optionsCatString
-	; andnf	es:[taskBarPrefs], mask TBF_ENABLED
+	; andnf	es:[taskBarPrefs], not (mask TBF_ENABLED)
 	; call	InitFileReadBoolean
 	; cmp	ax, FALSE
 	; jz	afterEnabled
@@ -1577,7 +1577,7 @@ if TOOL_AREA_IS_TASK_BAR
 	;
 	mov	dx, offset taskBarMovableString
 	mov	si, offset optionsCatString
-	andnf	es:[taskBarPrefs], mask TBF_MOVABLE
+	andnf	es:[taskBarPrefs], not (mask TBF_MOVABLE)
 	call	InitFileReadBoolean
 	cmp	ax, FALSE
 	jz	afterMovable
@@ -1589,7 +1589,7 @@ afterMovable:
 	;
 	mov	dx, offset taskBarAutoHideString
 	mov	si, offset optionsCatString
-	andnf	es:[taskBarPrefs], mask TBF_AUTO_HIDE
+	andnf	es:[taskBarPrefs], not (mask TBF_AUTO_HIDE)
 	call	InitFileReadBoolean
 	cmp	ax, FALSE
 	jz	afterAutoHide
