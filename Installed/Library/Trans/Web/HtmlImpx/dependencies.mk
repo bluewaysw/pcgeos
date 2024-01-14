@@ -56,7 +56,7 @@ exptproc.eobj: geos.h heap.h geode.h resource.h ec.h object.h lmem.h \
                 Objects/gInterC.h Objects/Text/tCommon.h stylesh.h \
                 driver.h thread.h print.h Internal/spoolInt.h serialDr.h \
                 parallDr.h hugearr.h fileEnum.h ieCommon.h xlatLib.h \
-                Ansi/string.h Ansi/stdio.h fixes.h _impex.h htmlopt.h
+                Ansi/string.h Ansi/stdio.h htmlopt.h
 imptproc.obj \
 imptproc.eobj: stdapp.goh object.goh ui.goh Objects/metaC.goh \
                 Objects/inputC.goh Objects/clipbrd.goh \
@@ -86,7 +86,7 @@ imptproc.eobj: geos.h heap.h geode.h resource.h ec.h object.h lmem.h \
                 Objects/gInterC.h Objects/Text/tCommon.h stylesh.h \
                 driver.h thread.h print.h Internal/spoolInt.h serialDr.h \
                 parallDr.h hugearr.h fileEnum.h ieCommon.h xlatLib.h \
-                Ansi/string.h fixes.h _impex.h htmlopt.h
+                Ansi/string.h htmlopt.h
 htmlimpt.rdef: generic.uih product.uih
 
 htmlimpxEC.geo htmlimpx.geo : geos.ldf ui.ldf impex.ldf text.ldf ansic.ldf htmlpars.ldf 

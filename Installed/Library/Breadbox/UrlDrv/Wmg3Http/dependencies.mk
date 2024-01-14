@@ -29,7 +29,7 @@ cookies.eobj: geos.h heap.h geode.h resource.h ec.h object.h lmem.h \
                 parallDr.h hugearr.h fileEnum.h Internal/netutils.h \
                 Ansi/string.h Ansi/stdlib.h product.h medium.h sockmisc.h \
                 Ansi/stdio.h geoMisc.h initfile.h htmldrv.h math.h \
-                fixes.h htmlfstr.h awatcher.h htmlprog.h ssl.h
+                htmlfstr.h awatcher.h htmlprog.h ssl.h
 WMG3CON.obj \
 WMG3CON.eobj: stdapp.goh object.goh ui.goh Objects/metaC.goh \
                 Objects/inputC.goh Objects/clipbrd.goh \
@@ -60,7 +60,7 @@ WMG3CON.eobj: geos.h heap.h geode.h resource.h ec.h object.h lmem.h \
                 driver.h thread.h print.h Internal/spoolInt.h serialDr.h \
                 parallDr.h hugearr.h fileEnum.h product.h medium.h \
                 sockmisc.h Ansi/string.h Ansi/stdio.h Ansi/stdlib.h \
-                geoMisc.h initfile.h htmldrv.h math.h fixes.h htmlfstr.h \
+                geoMisc.h initfile.h htmldrv.h math.h htmlfstr.h \
                 awatcher.h htmlprog.h ssl.h
 WMG3HTTP.obj \
 WMG3HTTP.eobj: stdapp.goh object.goh ui.goh Objects/metaC.goh \
@@ -92,7 +92,7 @@ WMG3HTTP.eobj: geos.h heap.h geode.h resource.h ec.h object.h lmem.h \
                 driver.h thread.h print.h Internal/spoolInt.h serialDr.h \
                 parallDr.h hugearr.h fileEnum.h Ansi/string.h \
                 Ansi/stdio.h Ansi/stdlib.h product.h medium.h sockmisc.h \
-                geoMisc.h initfile.h htmldrv.h math.h fixes.h htmlfstr.h \
+                geoMisc.h initfile.h htmldrv.h math.h htmlfstr.h \
                 awatcher.h htmlprog.h ssl.h Internal/netutils.h cookies.h
 asmtools.obj \
 asmtools.eobj: stdapp.def geos.def geode.def resource.def ec.def lmem.def \
