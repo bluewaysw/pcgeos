@@ -3146,11 +3146,11 @@ OLAppUpdateWindowsForTaskBar	method dynamic OLApplicationClass,
 	;
 	; if TaskBar == on
 	;
-	push	ds
-	segmov	ds, dgroup
-	tst	ds:[taskBarEnabled] ; if taskbar == on, ZF == 1
-	pop	ds
-	jz	done ; if ZF==0 skip the following code
+	push	ds					; save ds
+	segmov	ds, dgroup				; load dgroup
+	test	ds:[taskBarPrefs], mask TBF_ENABLED	; test if TBF_ENABLED is set
+	pop	ds					; restore ds
+	jz	done					; skip if no taskbar
 
 	call	OLReleaseAllStayUpModeMenus
 

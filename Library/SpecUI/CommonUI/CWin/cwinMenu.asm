@@ -4310,7 +4310,7 @@ menuWin		local	hptr
 
 	; first figure out what needs to be updated
 
-	call	VisQueryParentWin		; di = window handle
+	call	VisQueryParentWin			; di = window handle
 	tst	di
 	jz	checkUpdate
 
@@ -4323,26 +4323,28 @@ if TOOL_AREA_IS_TASK_BAR
 	;
 	; if TaskBar == on
 	;
-	push	ds
-	segmov	ds, dgroup
-	tst	ds:[taskBarEnabled] ; if taskbar == on, ZF == 1
-	pop	ds
-	jz	hasNoTaskbar ; if ZF==0 skip the following code
+	push	ds					; save ds
+	segmov	ds, dgroup				; load dgroup
+	test	ds:[taskBarPrefs], mask TBF_ENABLED	; test if TBF_ENABLED is set
+	jz	doneTaskBar				; skip if no taskbar
 
-	call	OLWinGetToolAreaSize		; dx = height
-	push	ds
-	segmov	ds, dgroup
+	call	OLWinGetToolAreaSize			; dx = height
 	test	ds:[taskBarPrefs], mask TBF_AUTO_HIDE
 	jnz	doneTaskBar
-	tst	ds:[taskBarPosition]
-	jg	atBottom
+
+	push 	ax
+	mov	ax, ds:[taskBarPrefs]			; load taskBarPrefs in ax
+	and	ax, mask TBF_POSITION			; mask out everything but the position bits
+	cmp	ax, (TBP_TOP) shl offset TBF_POSITION	; compare position bits with TBP_TOP
+	pop	ax					; restore ax
+	jne	atBottom				; is not top => bottom position
+
 	add	ss:[parent].R_top, dx
 	jmp	short doneTaskBar
 atBottom:
 	sub	ss:[parent].R_bottom, dx
 doneTaskBar:
 	pop	ds
-hasNoTaskbar:
 endif
 
 	call	VisQueryWindow			; di = window handle
@@ -4911,9 +4913,9 @@ OLMenuWinResetSizeToStayOnscreen	method dynamic	OLMenuWinClass, \
 	mov	di, offset OLMenuWinClass
 	call	ObjCallSuperNoLock
 
-	call	OLMenuCalcCenters		;this needs to be redone now,
-						;  mainly so that the ONE_PASS
-						;  OPTIMIZATION flag is cleared.
+	call	OLMenuCalcCenters		; this needs to be redone now,
+						; mainly so that the ONE_PASS
+						; OPTIMIZATION flag is cleared.
 	ret
 
 OLMenuWinResetSizeToStayOnscreen	endm
@@ -4981,7 +4983,7 @@ MenuWinScrollerScrollOnly	proc	near
 	;
 	; check if already at top or bottom
 	;
-	call	VisQueryParentWin		; di = window handle
+	call	VisQueryParentWin			; di = window handle
 	tst	di
 	jz	update
 	call	WinGetWinScreenBounds
@@ -4990,38 +4992,44 @@ if TOOL_AREA_IS_TASK_BAR
 	;
 	; if TaskBar == on
 	;
-	push	ds
-	segmov	ds, dgroup
-	tst	ds:[taskBarEnabled] ; if taskbar == on, ZF == 1
-	pop	ds
-	jz	endIfTaskbar ; if ZF==0 skip the following code
+	push	ds					; save ds
+	segmov	ds, dgroup				; load dgroup
+	test	ds:[taskBarPrefs], mask TBF_ENABLED	; test if TBF_ENABLED is set
+	pop	ds					; restore ds
+	jz	endIfTaskbar				; skip if no taskbar
+							; bx = top, dx = bottom
+	mov	ax, dx					; ax = bottom
+	call	OLWinGetToolAreaSize			; cx = width, dx = height
 
-	; bx = top, dx = bottom
-	mov	ax, dx				; ax = bottom
-	call	OLWinGetToolAreaSize		; cx = width, dx = height
 	push	ds
 	segmov	ds, dgroup
 	test	ds:[taskBarPrefs], mask TBF_AUTO_HIDE
 	jnz	doneTaskBar
-	tst	ds:[taskBarPosition]
-	jg	atBottom
+
+	push 	ax
+	mov	ax, ds:[taskBarPrefs]			; load taskBarPrefs in ax
+	and	ax, mask TBF_POSITION			; mask out everything but the position bits
+	cmp	ax, (TBP_TOP) shl offset TBF_POSITION	; compare position bits with TBP_TOP
+	pop	ax					; restore ax
+	jne	atBottom				; is not top => bottom position
+
 	add	bx, dx
 	jmp	short doneTaskBar
 atBottom:
 	sub	ax, dx
 doneTaskBar:
 	pop	ds
-	push	bx, ax				; save top, bottom
+	push	bx, ax					; save top, bottom
 endIfTaskbar:
 else
-	push	bx, dx				; save top, bottom
+	push	bx, dx					; save top, bottom
 endif
 
-	call	VisQueryWindow			; di = window handle
+	call	VisQueryWindow				; di = window handle
 	tst	di
 	jz	update
 	call	WinGetWinScreenBounds
-	pop	ax, cx				; ax = scrn top, cx = scrn bot
+	pop	ax, cx					; ax = scrn top, cx = scrn bot
 	tst	bp
 	jns	scrollDown
 	cmp	dx, cx

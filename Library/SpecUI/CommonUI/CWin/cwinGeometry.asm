@@ -925,11 +925,11 @@ if TOOL_AREA_IS_TASK_BAR
 	;
 	; if TaskBar == on
 	;
-	push	ds
-	segmov	ds, dgroup
-	tst	ds:[taskBarEnabled] ; if taskbar == on, ZF == 1
-	pop	ds
-	jz	hasNoTaskbar ; if ZF==0 skip the following code
+	push	ds					; save ds
+	segmov	ds, dgroup				; load dgroup
+	test	ds:[taskBarPrefs], mask TBF_ENABLED	; test if TBF_ENABLED is set
+	pop	ds					; restore ds
+	jz	hasNoTaskbar				; skip if no taskbar
 
 	; If taskbar is at the bottom of the screen, subtract off the
 	; height of the tool area (taskbar) from parent window size so
@@ -1504,11 +1504,11 @@ OLWinUpdatePositionForTaskBar	method dynamic OLWinClass,
 	;
 	; if TaskBar == on
 	;
-	push	ds
-	segmov	ds, dgroup
-	tst	ds:[taskBarEnabled] ; if taskbar == on, ZF == 1
-	pop	ds
-	jz	done ; if ZF==0 skip the following code
+	push	ds					; save ds
+	segmov	ds, dgroup				; load dgroup
+	test	ds:[taskBarPrefs], mask TBF_ENABLED	; test if TBF_ENABLED is set
+	pop	ds					; restore ds
+	jz	done					; skip if no taskbar
 
 	jcxz	doUpdate
 
@@ -1527,11 +1527,13 @@ doUpdate:
 	call	OLWinGetToolAreaSize
 
 gotSize:
-	push	ds
-	segmov	ds, dgroup, ax
-	tst	ds:[taskBarPosition]
-	pop	ds
-	jle	update
+	push	ds, ax					; save ds
+	segmov	ds, dgroup				; get dgroup
+	mov	ax, ds:[taskBarPrefs]			; load taskBarPrefs in ax
+	and	ax, mask TBF_POSITION			; mask out everything but the position bits
+	cmp	ax, (TBP_TOP) shl offset TBF_POSITION	; compare position bits with TBP_TOP
+	pop	ds, ax					; restore ds
+	jne	update					; update if not top position
 
 	neg	dx
 update:

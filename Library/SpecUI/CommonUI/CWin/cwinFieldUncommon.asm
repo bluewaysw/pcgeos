@@ -1248,11 +1248,11 @@ OLFieldUpdateTaskBarList	method	dynamic OLFieldClass,
 	;
 	; if TaskBar == on
 	;
-	push	ds
-	segmov	ds, dgroup
-	tst	ds:[taskBarEnabled] ; if taskbar == on, ZF == 1
-	pop	ds
-	jz	done ; if ZF==0 skip the following code
+	push	ds					; save ds
+	segmov	ds, dgroup				; load dgroup
+	test	ds:[taskBarPrefs], mask TBF_ENABLED	; test if TBF_ENABLED is set
+	pop	ds					; restore ds
+	jz	done					; skip if no taskbar
 
 	mov	bx, ds:[di].OLFI_windowListList
 	tst	bx
@@ -1799,11 +1799,11 @@ WindowListListQueryTaskBarItemMoniker	method dynamic WindowListListClass,
 	;
 	; if TaskBar == on
 	;
-	push	ds
-	segmov	ds, dgroup
-	tst	ds:[taskBarEnabled] ; if taskbar == on, ZF == 1
-	pop	ds
-	jz	done ; if ZF==0 skip the following code
+	push	ds					; save ds
+	segmov	ds, dgroup				; load dgroup
+	test	ds:[taskBarPrefs], mask TBF_ENABLED	; test if TBF_ENABLED is set
+	pop	ds					; restore ds
+	jz	done					; skip if no taskbar
 
 	movdw	bxdi, cxdx			; ^lbx:di = taskbar list
 
@@ -1914,11 +1914,11 @@ TaskBarListAddChild	method dynamic TaskBarListClass,
 	; RUNTIME
 	; FIXME!!! - do we really need to call super here?
 	;
-	push	ds
-	segmov	ds, dgroup
-	tst	ds:[taskBarEnabled] ; if taskbar == on, ZF == 1
-	pop	ds
-	jz	callSuper ; if ZF==0 skip the following code
+	push	ds					; save ds
+	segmov	ds, dgroup				; load dgroup
+	test	ds:[taskBarPrefs], mask TBF_ENABLED	; test if TBF_ENABLED is set
+	pop	ds					; restore ds
+	jz	callSuper				; skip if no taskbar
 
 	push	cx, dx
 	mov	di, offset TaskBarListClass
@@ -2002,11 +2002,11 @@ ToolAreaDraw	method dynamic ToolAreaClass, MSG_VIS_DRAW
 	; if TaskBar == on
 	; RUNTIME
 	;
-	push	ds
-	segmov	ds, dgroup
-	tst	ds:[taskBarEnabled] ; if taskbar == on, ZF == 1
-	pop	ds
-	jz	done ; if ZF==0 skip the following code
+	push	ds					; save ds
+	segmov	ds, dgroup				; load dgroup
+	test	ds:[taskBarPrefs], mask TBF_ENABLED	; test if TBF_ENABLED is set
+	pop	ds					; restore ds
+	jz	done					; skip if no taskbar
 
 	push	di
 	mov	di, segment VisCompClass
@@ -2094,11 +2094,11 @@ SysTrayInteractionVisDraw	method dynamic SysTrayInteractionClass,
 	; if TaskBar == on
 	; RUNTIME
 	;
-	push	ds
-	segmov	ds, dgroup
-	tst	ds:[taskBarEnabled] ; if taskbar == on, ZF == 1
-	pop	ds
-	jz	callSuper ; if ZF==0 skip the following code
+	push	ds					; save ds
+	segmov	ds, dgroup				; load dgroup
+	test	ds:[taskBarPrefs], mask TBF_ENABLED	; test if TBF_ENABLED is set
+	pop	ds					; restore ds
+	jz	callSuper				; skip if no taskbar
 
 	push	bp
 	mov	di, offset SysTrayInteractionClass
@@ -2162,11 +2162,11 @@ ToolAreaRawUnivEnter	method dynamic ToolAreaClass,
 	; if TaskBar == on
 	; RUNTIME
 	;
-	push	ds
-	segmov	ds, dgroup
-	tst	ds:[taskBarEnabled] ; if taskbar == on, ZF == 1
-	pop	ds
-	jz	done ; if ZF==0 skip the following code
+	push	ds					; save ds
+	segmov	ds, dgroup				; load dgroup
+	test	ds:[taskBarPrefs], mask TBF_ENABLED	; test if TBF_ENABLED is set
+	pop	ds					; restore ds
+	jz	done					; skip if no taskbar
 
 	push	ds
 	segmov	ds, dgroup
@@ -2223,11 +2223,11 @@ ToolAreaRawUnivLeave	method dynamic ToolAreaClass,
 	; if TaskBar == on
 	; RUNTIME
 	;
-	push	ds
-	segmov	ds, dgroup
-	tst	ds:[taskBarEnabled] ; if taskbar == on, ZF == 1
-	pop	ds
-	jz	done ; if ZF==0 skip the following code
+	push	ds					; save ds
+	segmov	ds, dgroup				; load dgroup
+	test	ds:[taskBarPrefs], mask TBF_ENABLED	; test if TBF_ENABLED is set
+	pop	ds					; restore ds
+	jz	done					; skip if no taskbar
 
 	push	ds
 	segmov	ds, dgroup
@@ -2283,11 +2283,11 @@ ToolAreaAutoHide	method dynamic ToolAreaClass,
 	; if TaskBar == on
 	; RUNTIME
 	;
-	push	ds
-	segmov	ds, dgroup
-	tst	ds:[taskBarEnabled] ; if taskbar == on, ZF == 1
-	pop	ds
-	jz	done ; if ZF==0 skip the following code
+	push	ds					; save ds
+	segmov	ds, dgroup				; load dgroup
+	test	ds:[taskBarPrefs], mask TBF_ENABLED	; test if TBF_ENABLED is set
+	pop	ds					; restore ds
+	jz	done					; skip if no taskbar
 
 	push	ds
 	segmov	ds, dgroup
@@ -2365,11 +2365,11 @@ ToolAreaStartSelect	method dynamic ToolAreaClass,
 	; if TaskBar == on
 	; RUNTIME
 	;
-	push	ds
-	segmov	ds, dgroup
-	tst	ds:[taskBarEnabled] ; if taskbar == on, ZF == 1
-	pop	ds
-	jz	callSuper ; if ZF==0 skip the following code
+	push	ds					; save ds
+	segmov	ds, dgroup				; load dgroup
+	test	ds:[taskBarPrefs], mask TBF_ENABLED	; test if TBF_ENABLED is set
+	pop	ds					; restore ds
+	jz	callSuper				; skip if no taskbar
 
 	;
 	; update the mouse pointer image, in case we have not received a
@@ -2448,11 +2448,11 @@ ToolAreaVisMoveResizeWin	method dynamic ToolAreaClass,
 	; if TaskBar == on
 	; RUNTIME
 	;
-	push	ds
-	segmov	ds, dgroup
-	tst	ds:[taskBarEnabled] ; if taskbar == on, ZF == 1
-	pop	ds
-	LONG	jz callSuper ; if ZF==0 skip the following code
+	push	ds					; save ds
+	segmov	ds, dgroup				; load dgroup
+	test	ds:[taskBarPrefs], mask TBF_ENABLED	; test if TBF_ENABLED is set
+	pop	ds					; restore ds
+	LONG	jz callSuper				; skip if no taskbar
 
 	mov	bl, ds:[di].TAI_state
 
@@ -2528,7 +2528,6 @@ bottomHide:
 
 updatePosition:
 	push	ds, si
-	segmov	ds, dgroup
 
 	mov	cx, cs
 	mov	ds, cx
@@ -2536,6 +2535,7 @@ updatePosition:
 	mov	si, offset taskBarPositionCategory
 	call	InitFileWriteInteger				; update GEOS.INI
 
+	segmov	ds, dgroup
 	shl	bp, offset TBF_POSITION
 	ornf	ds:[taskBarPrefs], bp				; update Taskbar Position flag
 
@@ -2596,11 +2596,11 @@ ToolAreaInitPosition	method	dynamic	ToolAreaClass, MSG_TOOL_AREA_INIT_POSITION
 	;
 	; if TaskBar == on
 	;
-	push	ds
-	segmov	ds, dgroup
-	tst	ds:[taskBarEnabled] ; if taskbar == on, ZF == 1
-	pop	ds
-	LONG	jz done ; if ZF==0 skip the following code
+	push	ds					; save ds
+	segmov	ds, dgroup				; load dgroup
+	test	ds:[taskBarPrefs], mask TBF_ENABLED	; test if TBF_ENABLED is set
+	pop	ds					; restore ds
+	LONG	jz done					; skip if no taskbar
 
 	;
 	; set size of taskbar
@@ -2632,12 +2632,8 @@ ToolAreaInitPosition	method	dynamic	ToolAreaClass, MSG_TOOL_AREA_INIT_POSITION
 	pop	ds					; restore ds
 	je	setPosition				; jump if top position
 
-	; push	ds
-	; segmov	ds, dgroup
-	; tst	ds:[taskBarPosition]
-	; pop	ds
-	; jle	setPosition
-	mov	dx, mask SWSS_RATIO or PCT_95 ; PCT_100 apparently produces a wrap-around somewhere - and the taskbar appears on top again!
+	mov	dx, mask SWSS_RATIO or PCT_95 		; PCT_100 apparently produces a wrap-around somewhere
+							; and makes the taskbar appears on top...
 
 setPosition:
 	mov	ds:[bx].SWSP_x, cx
@@ -2648,12 +2644,12 @@ setPosition:
 	;
 	push 	ax, ds, cx, dx, si, bp
 	mov	ax, MSG_GEN_FIND_CHILD_AT_POSITION
-	clr	cx				; find first child = 0
+	clr	cx					; find first child = 0
 	call	ObjCallInstanceNoLock
-	jc	afterTaskBarCheck		; abort if child not found
-	mov 	si, dx				; *ds:si <- TaskBar
+	jc	afterTaskBarCheck			; abort if child not found
+	mov 	si, dx					; *ds:si <- TaskBar
 	mov	ax, MSG_GEN_SET_USABLE
-	mov	dl, VUM_NOW			;VUM_DELAYED_VIA_APP_QUEUE	; dl <- VisUpdateMode
+	mov	dl, VUM_NOW				;VUM_DELAYED_VIA_APP_QUEUE ; dl <- VisUpdateMode
 	call	ObjCallInstanceNoLock
 afterTaskBarCheck:
 	pop	ax, ds, cx, dx, si, bp
@@ -2663,12 +2659,12 @@ afterTaskBarCheck:
 	;
 	push 	ax, ds, cx, dx, si, bp
 	mov	ax, MSG_GEN_FIND_CHILD_AT_POSITION
-	mov	cx, 1				; second child = 1
+	mov	cx, 1					; second child = 1
 	call	ObjCallInstanceNoLock
 	jc	afterTrayCheck				; abort if child not found
-	mov 	si, dx				; *ds:si <- TaskBar
+	mov 	si, dx					; *ds:si <- TaskBar
 	mov	ax, MSG_GEN_SET_USABLE
-	mov	dl, VUM_NOW			;VUM_DELAYED_VIA_APP_QUEUE	; dl <- VisUpdateMode
+	mov	dl, VUM_NOW				;VUM_DELAYED_VIA_APP_QUEUE ; dl <- VisUpdateMode
 	call	ObjCallInstanceNoLock
 afterTrayCheck:
 	pop	ax, ds, cx, dx, si, bp
@@ -2688,11 +2684,11 @@ if TOOL_AREA_IS_TASK_BAR
 	;
 	; if TaskBar == on
 	;
-	push	ds
-	segmov	ds, dgroup
-	tst	ds:[taskBarEnabled] ; if taskbar == on, ZF == 1
-	pop	ds
-	jz	noHide ; if ZF==0 skip the following code
+	push	ds					; save ds
+	segmov	ds, dgroup				; load dgroup
+	test	ds:[taskBarPrefs], mask TBF_ENABLED	; test if TBF_ENABLED is set
+	pop	ds					; restore ds
+	jz	noHide					; skip if no taskbar
 
 	;
 	; handle hiding
@@ -2717,12 +2713,13 @@ if TOOL_AREA_IS_TASK_BAR
 	;
 	; if TaskBar == off
 	;
-	push	ds
-	segmov	ds, dgroup
-	tst	ds:[taskBarEnabled] ; if taskbar == on, ZF == 1
-	pop	ds
-	jnz	done ; if ZF==1 skip the following code
+	push	ds					; save ds
+	segmov	ds, dgroup				; load dgroup
+	test	ds:[taskBarPrefs], mask TBF_ENABLED	; test if TBF_ENABLED is set
+	pop	ds					; restore ds
+	jnz	done					; skip if taskbar
 endif
+
 	;
 	; if UIEP_LOWER_LEFT, force a move so that it'll be position at
 	; the lower left

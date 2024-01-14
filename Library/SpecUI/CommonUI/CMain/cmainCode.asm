@@ -499,11 +499,11 @@ if TOOL_AREA_IS_TASK_BAR
 	;
 	; if TaskBar == on, have no Task-List in E-Menu
 	;
-	push	ds
-	segmov	ds, dgroup
-	tst	ds:[taskBarEnabled] ; if taskbar == on, ZF == 1
-	pop	ds
-	jz	hasNoTaskbar ; if ZF==0 skip the following code
+	push	ds					; save ds
+	segmov	ds, dgroup				; load dgroup
+	test	ds:[taskBarPrefs], mask TBF_ENABLED	; test if TB_ENABLED is set
+	pop	ds					; restore ds
+	jz	hasNoTaskbar				; skip if no taskbar
 
 	andnf	ax, not (mask UIEO_GEOS_TASKS_LIST)
 
@@ -1527,11 +1527,11 @@ if TOOL_AREA_IS_TASK_BAR
 	;
 	; init taskBar
 	;
-	mov	dx, offset taskBarEnabledString
-	mov	si, offset optionsCatString
-	mov	ax, FALSE			;default = no taskbar
-	call	InitFileReadBoolean
-	mov	es:[taskBarEnabled], ax
+	; mov	dx, offset taskBarEnabledString
+	; mov	si, offset optionsCatString
+	; mov	ax, FALSE			;default = no taskbar
+	; call	InitFileReadBoolean
+	; mov	es:[taskBarEnabled], ax
 
 	;
 	; init taskBarPosition
@@ -1563,14 +1563,14 @@ if TOOL_AREA_IS_TASK_BAR
 	;
 	; init taskBar
 	;
-	; mov	dx, offset taskBarEnabledString
-	; mov	si, offset optionsCatString
-	; andnf	es:[taskBarPrefs], not (mask TBF_ENABLED)
-	; call	InitFileReadBoolean
-	; cmp	ax, FALSE
-	; jz	afterEnabled
-	; ornf	es:[taskBarPrefs], mask TBF_ENABLED
-; afterEnabled:
+	mov	dx, offset taskBarEnabledString
+	mov	si, offset optionsCatString
+	andnf	es:[taskBarPrefs], not (mask TBF_ENABLED)
+	call	InitFileReadBoolean
+	cmp	ax, FALSE
+	jz	afterEnabled
+	ornf	es:[taskBarPrefs], mask TBF_ENABLED
+afterEnabled:
 
 	;
 	; init taskBarMovable

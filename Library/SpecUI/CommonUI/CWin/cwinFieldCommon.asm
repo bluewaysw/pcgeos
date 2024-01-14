@@ -564,11 +564,11 @@ if TOOL_AREA_IS_TASK_BAR
 	; if TaskBar == off
 	; RUNTIME
 	;
-	push	ds
-	segmov	ds, dgroup
-	tst	ds:[taskBarEnabled] ; if taskbar == on, ZF == 1
-	pop	ds
-	jnz	afterNoTarget ; if ZF==1 skip the following code
+	push	ds					; save ds
+	segmov	ds, dgroup				; load dgroup
+	test	ds:[taskBarPrefs], mask TBF_ENABLED	; test if TBF_ENABLED is set
+	pop	ds					; restore ds
+	jnz	afterNoTarget				; skip if no taskbar
 endif
 
 	tst	ax
@@ -595,7 +595,7 @@ endif
 	call	ObjCallInstanceNoLock
 	add	sp, size OLFieldMoveToolAreaParams
 afterNoTarget:
-; endif
+; endif ;TOOL_AREA_IS_TASK_BAR
 
 	Destroy	ax, cx, dx, bp
 	ret
@@ -991,11 +991,11 @@ if TOOL_AREA_IS_TASK_BAR
 	; never change priority of task bar -- brianc 11/12/99
 	; RUNTIME
 	;
-	push	ds
-	segmov	ds, dgroup
-	tst	ds:[taskBarEnabled] ; if taskbar == on, ZF == 1
-	pop	ds
-	LONG	jnz done ; if ZF==1 skip the following code
+	push	ds					; save ds
+	segmov	ds, dgroup				; load dgroup
+	test	ds:[taskBarPrefs], mask TBF_ENABLED	; test if TBF_ENABLED is set
+	pop	ds					; restore ds
+	LONG	jnz done				; skip if taskbar
 endif
 
 if EVENT_MENU
@@ -1037,11 +1037,11 @@ if TOOL_AREA_IS_TASK_BAR
 	; if TaskBar == off
 	; RUNTIME
 	;
-	push	ds
-	segmov	ds, dgroup
-	tst	ds:[taskBarEnabled] ; if taskbar == on, ZF == 1
-	pop	ds
-	jnz	realGeode ; if ZF==1 skip the following code
+	push	ds					; save ds
+	segmov	ds, dgroup				; load dgroup
+	test	ds:[taskBarPrefs], mask TBF_ENABLED	; test if TBF_ENABLED is set
+	pop	ds					; restore ds
+	jnz	realGeode				; skip if taskbar
 endif
 	;
 	; First, mark the position flags in the window as WPF_AS_REQUIRED
@@ -1118,11 +1118,11 @@ if TOOL_AREA_IS_TASK_BAR
 	; if TaskBar == off
 	; RUNTIME
 	;
-	push	ds
-	segmov	ds, dgroup
-	tst	ds:[taskBarEnabled] ; if taskbar == on, ZF == 1
-	pop	ds
-	jnz	afterHasTaskbar2 ; if ZF==1 skip the following code
+	push	ds					; save ds
+	segmov	ds, dgroup				; load dgroup
+	test	ds:[taskBarPrefs], mask TBF_ENABLED	; test if TBF_ENABLED is set
+	pop	ds					; restore ds
+	jnz	afterHasTaskbar2			; skip if taskbar
 endif
 	;
 	; Convert coordinates from screen-absolute to parent-relative
@@ -1201,11 +1201,11 @@ if TOOL_AREA_IS_TASK_BAR
 	; if TaskBar == off
 	; RUNTIME
 	;
-	push	ds
-	segmov	ds, dgroup
-	tst	ds:[taskBarEnabled] ; if taskbar == on, ZF == 1
-	pop	ds
-	jnz	done ; if ZF==1 skip the following code
+	push	ds					; save ds
+	segmov	ds, dgroup				; load dgroup
+	test	ds:[taskBarPrefs], mask TBF_ENABLED	; test if TBF_ENABLED is set
+	pop	ds					; restore ds
+	jnz	done					; skip if taskbar
 endif
 
 if EVENT_MENU

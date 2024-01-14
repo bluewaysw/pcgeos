@@ -2181,11 +2181,11 @@ if TOOL_AREA_IS_TASK_BAR
 	;
 	; if TaskBar == on
 	;
-	push	ds
-	segmov	ds, dgroup
-	tst	ds:[taskBarEnabled] ; if taskbar == on, ZF == 1
-	pop	ds
-	jz	hasNoTaskbar ; if ZF==0 skip the following code
+	push	ds					; save ds
+	segmov	ds, dgroup				; load dgroup
+	test	ds:[taskBarPrefs], mask TBF_ENABLED	; test if TBF_ENABLED is set
+	pop	ds					; restore ds
+	jz	hasNoTaskbar				; skip if no taskbar
 
 	;
 	; If taskbar is at the top of the screen, adjust position to
@@ -2212,7 +2212,7 @@ checkPosRequest2:
 	; WPT_TILED:
 	;	Position this window at right bound of previous child.
 	;	If this window is not fully visible within parent,
-	;		position at bottom bound of previous child.
+	;	position at bottom bound of previous child.
 	;
 	test	bx, mask WPSS_SIZE_INVALID	;do we have size yet?
 	LONG	jnz UWP_end			;skip if not...
@@ -2532,18 +2532,18 @@ if TOOL_AREA_IS_TASK_BAR
 	;
 	; if TaskBar == on
 	;
-	push	ds
-	segmov	ds, dgroup
-	tst	ds:[taskBarEnabled] ; if taskbar == on, ZF == 1
-	pop	ds
-	jz	hasNoTaskbar ; if ZF==0 skip the following code
+	push	ds					; save ds
+	segmov	ds, dgroup				; load dgroup
+	test	ds:[taskBarPrefs], mask TBF_ENABLED	; test if TBF_ENABLED is set
+	pop	ds					; restore ds
+	jz	hasNoTaskbar				; skip if no taskbar
 
 	; If taskbar is at the bottom of the screen, subtract off the
 	; height of the tool area (taskbar) from parent window size so
 	; maximized windows don't extend below the taskbar.
 
 	call	GetTaskBarSizeAdjustment
-	sub	dx, di			; subtract off taskbar adjustment
+	sub	dx, di					; subtract off taskbar adjustment
 
 hasNoTaskbar:
 endif
@@ -2610,11 +2610,11 @@ if TOOL_AREA_IS_TASK_BAR
 	;
 	; if TaskBar == on
 	;
-	push	ds
-	segmov	ds, dgroup
-	tst	ds:[taskBarEnabled] ; if taskbar == on, ZF == 1
-	pop	ds
-	jz	hasNoTaskbar2 ; if ZF==0 skip the following code
+	push	ds					; save ds
+	segmov	ds, dgroup				; load dgroup
+	test	ds:[taskBarPrefs], mask TBF_ENABLED	; test if TBF_ENABLED is set
+	pop	ds					; restore ds
+	jz	hasNoTaskbar2				; skip if no taskbar
 
 	; If taskbar is at the top of the screen, subtract off the
 	; height of the tool area (taskbar) from y margin.
@@ -3046,11 +3046,11 @@ if TOOL_AREA_IS_TASK_BAR
 	;
 	; if TaskBar == on
 	;
-	push	ds
-	segmov	ds, dgroup
-	tst	ds:[taskBarEnabled] ; if taskbar == on, ZF == 1
-	pop	ds
-	jz	hasNoTaskbar ; if ZF==0 skip the following code
+	push	ds					; save ds
+	segmov	ds, dgroup				; load dgroup
+	test	ds:[taskBarPrefs], mask TBF_ENABLED	; test if TBF_ENABLED is set
+	pop	ds					; restore ds
+	jz	hasNoTaskbar				; skip if no taskbar
 
 	; If taskbar is at the top of the screen, adjust position
 	; so window is below taskbar.
@@ -3148,11 +3148,11 @@ GetTaskBarPositionAdjustment	proc	far
 	; if TOOL_AREA_IS_TASK_BAR
 	; if TaskBar == on
 	;
-	push	ds
-	segmov	ds, dgroup
-	tst	ds:[taskBarEnabled] ; if taskbar == on, ZF == 1
-	pop	ds
-	jz	done ; if ZF==0 skip the following code
+	push	ds					; save ds
+	segmov	ds, dgroup				; load dgroup
+	test	ds:[taskBarPrefs], mask TBF_ENABLED	; test if TBF_ENABLED is set
+	pop	ds					; restore ds
+	jz	done					; skip if no taskbar
 
 	;
 	; No adjustment for GenDisplay.
@@ -3169,12 +3169,12 @@ GetTaskBarPositionAdjustment	proc	far
 	; account for taskbar.
 	;
 
-	push	ds					; save ds
+	push	ds, ax					; save ds
 	segmov	ds, dgroup				; get dgroup
-	mov	di, ds:[taskBarPrefs]			; load taskBarPrefs in dx
-	and	di, mask TBF_POSITION			; mask out everything but the position bits
-	cmp	di, (TBP_TOP) shl offset TBF_POSITION	; compare position bits with TBP_TOP
-	pop	ds					; restore ds
+	mov	ax, ds:[taskBarPrefs]			; load taskBarPrefs in dx
+	and	ax, mask TBF_POSITION			; mask out everything but the position bits
+	cmp	ax, (TBP_TOP) shl offset TBF_POSITION	; compare position bits with TBP_TOP
+	pop	ds, ax					; restore ds, ax
 	jne	done					; jump if not top position, no adjustment (di = 0)
 
 	;
@@ -3207,11 +3207,11 @@ GetTaskBarSizeAdjustment	proc	far
 	; if TOOL_AREA_IS_TASK_BAR
 	; if TaskBar == on
 	;
-	push	ds
-	segmov	ds, dgroup
-	tst	ds:[taskBarEnabled] ; if taskbar == on, ZF == 1
-	pop	ds
-	jz	done ; if ZF==0 skip the following code
+	push	ds					; save ds
+	segmov	ds, dgroup				; load dgroup
+	test	ds:[taskBarPrefs], mask TBF_ENABLED	; test if TBF_ENABLED is set
+	pop	ds					; restore ds
+	jz	done					; skip if no taskbar
 
 	;
 	; No adjustment for GenDisplay.
@@ -3228,18 +3228,12 @@ GetTaskBarSizeAdjustment	proc	far
 	; account for taskbar.
 	;
 
-	; push	ds
-	; segmov	ds, dgroup
-	; tst	ds:[taskBarPosition]
-	; pop	ds
-	; jle	done			; no adjustment (di = 0)
-
-	push	ds					; save ds
+	push	ds, ax					; save ds
 	segmov	ds, dgroup				; get dgroup
-	mov	di, ds:[taskBarPrefs]			; load taskBarPrefs in dx
-	and	di, mask TBF_POSITION			; mask out everything but the position bits
-	cmp	di, (TBP_TOP) shl offset TBF_POSITION	; compare position bits with TBP_TOP
-	pop	ds					; restore ds
+	mov	ax, ds:[taskBarPrefs]			; load taskBarPrefs in dx
+	and	ax, mask TBF_POSITION			; mask out everything but the position bits
+	cmp	ax, (TBP_TOP) shl offset TBF_POSITION	; compare position bits with TBP_TOP
+	pop	ds, ax					; restore ds
 	je	done					; jump if top position, no adjustment (di = 0)
 
 	;
@@ -3249,7 +3243,6 @@ GetTaskBarSizeAdjustment	proc	far
 	push	ds
 	segmov	ds, dgroup
 	test	ds:[taskBarPrefs], mask TBF_AUTO_HIDE
-
 	pop	ds
 	mov	di, 1			; assume auto-hide is on (di = 1)
 	jnz	done

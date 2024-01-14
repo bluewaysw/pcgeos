@@ -1137,11 +1137,11 @@ if TOOL_AREA_IS_TASK_BAR
 	;
 	; if TaskBar == on
 	;
-	push	ds
-	segmov	ds, dgroup
-	tst	ds:[taskBarEnabled] ; if taskbar == on, ZF == 1
-	pop	ds
-	LONG	jnz afterNoIconsBecauseOfTaskbar ; if ZF == 1 == TaskBar => show no Win Icons => jump
+	push	ds					; save ds
+	segmov	ds, dgroup				; load dgroup
+	test	ds:[taskBarPrefs], mask TBF_ENABLED	; test if TBF_ENABLED is set
+	pop	ds					; restore ds
+	LONG	jnz afterNoIconsBecauseOfTaskbar	; if TaskBar => show no Win Icons => jump
 endif
 
 	;See if there is an OLWinIcon object associated with this window
@@ -1562,11 +1562,11 @@ if TOOL_AREA_IS_TASK_BAR
 	;
 	; if TaskBar == on
 	;
-	push	ds
-	segmov	ds, dgroup
-	tst	ds:[taskBarEnabled] ; if taskbar == on, ZF == 1
-	pop	ds
-	jz	endIfTaskbar ; if ZF==0 skip the following code
+	push	ds					; save ds
+	segmov	ds, dgroup				; load dgroup
+	test	ds:[taskBarPrefs], mask TBF_ENABLED	; test if TBF_ENABLED is set
+	pop	ds					; restore ds
+	jz	endIfTaskbar				; skip if no taskbar
 
 	; If the taskbar is at the top of the screen, then move maximized
 	; windows down below the taskbar.

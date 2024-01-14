@@ -934,11 +934,11 @@ if TOOL_AREA_IS_TASK_BAR
 	; if TaskBar == on
 	; RUNTIME
 	;
-	push	ds
-	segmov	ds, dgroup
-	tst	ds:[taskBarEnabled] ; if taskbar == on, ZF == 1
-	pop	ds
-	jz	endIfTaskbar ; if ZF==0 skip the following code
+	push	ds					; save ds
+	segmov	ds, dgroup				; load dgroup
+	test	ds:[taskBarPrefs], mask TBF_ENABLED	; test if TBF_ENABLED is set
+	pop	ds					; restore ds
+	jz	endIfTaskbar				; skip if no taskbar
 
 	;
 	; Find the system tray. Since it's copied during via COPY_TREE, we
@@ -992,11 +992,11 @@ if TOOL_AREA_IS_TASK_BAR
 	; if TaskBar == on
 	; RUNTIME
 	;
-	push	ds
-	segmov	ds, dgroup
-	tst	ds:[taskBarEnabled] ; if taskbar == on, ZF == 1
-	pop	ds
-	jz	hasNoTaskbar ; if ZF==0 skip the following code
+	push	ds					; save ds
+	segmov	ds, dgroup				; load dgroup
+	test	ds:[taskBarPrefs], mask TBF_ENABLED	; test if TBF_ENABLED is set
+	pop	ds					; restore ds
+	jz	hasNoTaskbar				; skip if no taskbar
 
 	; init position
 	mov	ax, MSG_TOOL_AREA_INIT_POSITION

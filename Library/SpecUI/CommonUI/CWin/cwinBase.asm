@@ -1334,13 +1334,8 @@ OLBaseWinSpecBuild	method dynamic OLBaseWinClass, MSG_SPEC_BUILD
 
 	;
 	; We will be adding this window to the window list ------------------
-	; if TOOL_AREA_IS_TASK_BAR
+	; if TOOL_AREA_IS_TASK_BAR?
 	;
-	; push	ds
-	; segmov	ds, dgroup
-	; tst	ds:[taskBarEnabled] ; if taskbar == on, ZF == 1
-	; pop	ds
-	; jz	done ; if ZF==0 skip the following code
 
 	; Create a GenItem to represent this primary in the GenField's
 	; WindowList.
@@ -1379,7 +1374,7 @@ if TOOL_AREA_IS_TASK_BAR or WINDOW_LIST_ACTIVE
 EnsureItemAddedToWindowList	proc	near
 
 	;
-	; if TaskBar == on
+	; if TaskBar == on?
 	;
 	; push	ds
 	; segmov	ds, dgroup
@@ -1498,11 +1493,11 @@ UpdateTaskBarList	proc	far
 	;
 	; if TaskBar == on
 	;
-	push	ds
-	segmov	ds, dgroup
-	tst	ds:[taskBarEnabled] ; if taskbar == on, ZF == 1
-	pop	ds
-	jz	done ; if ZF==0 skip the following code
+	push	ds					; save ds
+	segmov	ds, dgroup				; load dgroup
+	test	ds:[taskBarPrefs], mask TBF_ENABLED	; test if TBF_ENABLED is set
+	pop	ds					; restore ds
+	jz	done					; skip if no taskbar
 
 	mov	bx, segment OLFieldClass
 	mov	si, offset OLFieldClass
@@ -1677,11 +1672,11 @@ if TOOL_AREA_IS_TASK_BAR
 	; if TaskBar == on
 	; RUNTIME
 	;
-	push	ds
-	segmov	ds, dgroup
-	tst	ds:[taskBarEnabled] ; if taskbar == on, ZF == 1
-	pop	ds
-	jz 	done ; if ZF==0 skip the following code
+	push	ds					; save ds
+	segmov	ds, dgroup				; load dgroup
+	test	ds:[taskBarPrefs], mask TBF_ENABLED	; test if TBF_ENABLED is set
+	pop	ds					; restore ds
+	jz	done					; skip if no taskbar
 
 	mov	cx, TRUE		; re-initialize list
 	call	UpdateTaskBarList
@@ -1921,13 +1916,13 @@ if TOOL_AREA_IS_TASK_BAR
 	;
 	; if TaskBar == on
 	;
-	push	ds
-	segmov	ds, dgroup
-	tst	ds:[taskBarEnabled] ; if taskbar == on, ZF == 1
-	pop	ds
-	jz	done ; if ZF==0 skip the following code
+	push	ds					; save ds
+	segmov	ds, dgroup				; load dgroup
+	test	ds:[taskBarPrefs], mask TBF_ENABLED	; test if TBF_ENABLED is set
+	pop	ds					; restore ds
+	jz	done					; skip if no taskbar
 
-	mov	cx, FALSE		; just update selection
+	mov	cx, FALSE				; just update selection
 	call	UpdateTaskBarList
 endif
 done:
@@ -2042,7 +2037,7 @@ OLWindowListItemNotifyWindowSelected	method dynamic OLWindowListItemClass,
 					MSG_META_NOTIFY_TASK_SELECTED
 
 	;
-	; if TaskBar == on
+	; if TaskBar == on?
 	; FIXME!!! do we really need to callSuper here?
 	;
 	; push	ds
@@ -2118,7 +2113,7 @@ if TOOL_AREA_IS_TASK_BAR or WINDOW_LIST_ACTIVE
 OLWindowListItemSetOperatingParams	method dynamic OLWindowListItemClass,
 				MSG_OL_WINDOW_LIST_ITEM_SET_OPERATING_PARAMS
 	;
-	; if TaskBar == on
+	; if TaskBar == on?
 	;
 	; push	ds
 	; segmov	ds, dgroup
@@ -2165,7 +2160,7 @@ if TOOL_AREA_IS_TASK_BAR or WINDOW_LIST_ACTIVE
 OLWindowListItemCloseWindow	method dynamic OLWindowListItemClass,
 					MSG_OL_WINDOW_LIST_ITEM_CLOSE_WINDOW
 	;
-	; if TaskBar == on
+	; if TaskBar == on?
 	;
 	; push	ds
 	; segmov	ds, dgroup
@@ -2224,7 +2219,7 @@ OLWindowListItemKeyboardChar	method dynamic OLWindowListItemClass,
 					MSG_META_KBD_CHAR
 
 	;
-	; if TaskBar == on
+	; if TaskBar == on?
 	;
 	; push	ds
 	; segmov	ds, dgroup
@@ -3075,7 +3070,7 @@ endif
 
 if TOOL_AREA_IS_TASK_BAR or WINDOW_LIST_ACTIVE
 	;
-	; if TaskBar == on
+	; if TaskBar == on?
 	;
 	; push	ds
 	; segmov	ds, dgroup
@@ -3093,7 +3088,7 @@ notDetaching:
 
 if TOOL_AREA_IS_TASK_BAR or WINDOW_LIST_ACTIVE
 	;
-	; if TaskBar == on
+	; if TaskBar == on?
 	;
 	; push	ds
 	; segmov	ds, dgroup
@@ -3368,7 +3363,7 @@ endif
 
 if TOOL_AREA_IS_TASK_BAR or WINDOW_LIST_ACTIVE
 	;
-	; if TaskBar == on
+	; if TaskBar == on?
 	;
 	; push	ds
 	; segmov	ds, dgroup
@@ -3506,13 +3501,13 @@ if TOOL_AREA_IS_TASK_BAR
 	;
 	; if TaskBar == on
 	;
-	push	ds
-	segmov	ds, dgroup
-	tst	ds:[taskBarEnabled] ; if taskbar == on, ZF == 1
-	pop	ds
-	jz	done ; if ZF==0 skip the following code
+	push	ds					; save ds
+	segmov	ds, dgroup				; load dgroup
+	test	ds:[taskBarPrefs], mask TBF_ENABLED	; test if TBF_ENABLED is set
+	pop	ds					; restore ds
+	jz	done					; skip if no taskbar
 
-	mov	cx, TRUE		; re-initialize list
+	mov	cx, TRUE				; re-initialize list
 	call	UpdateTaskBarList
 endif
 done:
@@ -3686,11 +3681,11 @@ if TOOL_AREA_IS_TASK_BAR
 	; if TaskBar == off
 	; RUNTIME
 	;
-	push	ds
-	segmov	ds, dgroup
-	tst	ds:[taskBarEnabled] ; if taskbar == on, ZF == 1
-	pop	ds
-	jnz	done ; if ZF==1 skip the following code
+	push	ds					; save ds
+	segmov	ds, dgroup				; load dgroup
+	test	ds:[taskBarPrefs], mask TBF_ENABLED	; test if TBF_ENABLED is set
+	pop	ds					; restore ds
+	jnz	done					; skip if taskbar
 endif
 	call	OLBaseWinUpdateExpressToolArea
 done:
@@ -3808,11 +3803,12 @@ if TOOL_AREA_IS_TASK_BAR
 	; if TaskBar == off
 	; RUNTIME
 	;
-	push	ds
-	segmov	ds, dgroup
-	tst	ds:[taskBarEnabled] ; if taskbar == on, ZF == 1
-	pop	ds
-	jnz	afterTaskbarCheck1 ; if ZF==1 skip the following code
+	push	ds					; save ds
+	segmov	ds, dgroup				; load dgroup
+	test	ds:[taskBarPrefs], mask TBF_ENABLED	; test if TBF_ENABLED is set
+	pop	ds					; restore ds
+	jnz	afterTaskbarCheck1			; skip if taskbar
+
 endif
 	call	OLBaseWinHideExpressToolArea
 afterTaskbarCheck1:
@@ -3839,11 +3835,11 @@ if TOOL_AREA_IS_TASK_BAR
 	; if TaskBar == off
 	; RUNTIME
 	;
-	push	ds
-	segmov	ds, dgroup
-	tst	ds:[taskBarEnabled] ; if taskbar == on, ZF == 1
-	pop	ds
-	jnz	afterTaskbarCheck2 ; if ZF==1 skip the following code
+	push	ds					; save ds
+	segmov	ds, dgroup				; load dgroup
+	test	ds:[taskBarPrefs], mask TBF_ENABLED	; test if TBF_ENABLED is set
+	pop	ds					; restore ds
+	jnz	afterTaskbarCheck2			; skip if taskbar
 endif
 	;
 	; Cheat -- instead of doing full geometry, just update
@@ -3893,7 +3889,7 @@ UpdateAppMenuItemCommon	proc	far
 
 if TOOL_AREA_IS_TASK_BAR or WINDOW_LIST_ACTIVE
 	;
-	; if TaskBar == on
+	; if TaskBar == on?
 	;
 	; push	ds
 	; segmov	ds, dgroup
@@ -3968,11 +3964,11 @@ if TOOL_AREA_IS_TASK_BAR
 	; if TaskBar == off
 	; RUNTIME
 	;
-	push	ds
-	segmov	ds, dgroup
-	tst	ds:[taskBarEnabled] ; if taskbar == on, ZF == 1
-	pop	ds
-	jnz	done ; if ZF==1 skip the following code
+	push	ds					; save ds
+	segmov	ds, dgroup				; load dgroup
+	test	ds:[taskBarPrefs], mask TBF_ENABLED	; test if TBF_ENABLED is set
+	pop	ds					; restore ds
+	jnz	done					; skip if taskbar
 endif
 
 	push	si
@@ -4038,11 +4034,11 @@ if TOOL_AREA_IS_TASK_BAR
 	; if TaskBar == off
 	; RUNTIME
 	;
-	push	ds
-	segmov	ds, dgroup
-	tst	ds:[taskBarEnabled] ; if taskbar == on, ZF == 1
-	pop	ds
-	jnz	done ; if ZF==1 skip the following code
+	push	ds					; save ds
+	segmov	ds, dgroup				; load dgroup
+	test	ds:[taskBarPrefs], mask TBF_ENABLED	; test if TBF_ENABLED is set
+	pop	ds					; restore ds
+	jnz	done					; skip if taskbar
 endif
 
 	; If doesn't have Express tool area, then nothing to adjust.
@@ -4135,11 +4131,11 @@ if TOOL_AREA_IS_TASK_BAR
 	; if TaskBar == off
 	; RUNTIME
 	;
-	push	ds
-	segmov	ds, dgroup
-	tst	ds:[taskBarEnabled] ; if taskbar == on, ZF == 1
-	pop	ds
-	jnz	afterExpressMenu ; if ZF==1 skip the following code
+	push	ds					; save ds
+	segmov	ds, dgroup				; load dgroup
+	test	ds:[taskBarPrefs], mask TBF_ENABLED	; test if TBF_ENABLED is set
+	pop	ds					; restore ds
+	jnz	afterExpressMenu			; skip if taskbar
 endif
 	; Adjust left edge of title area
 	;
@@ -5172,11 +5168,11 @@ if TOOL_AREA_IS_TASK_BAR
 	; if TaskBar == off
 	; RUNTIME
 	;
-	push	ds
-	segmov	ds, dgroup
-	tst	ds:[taskBarEnabled] ; if taskbar == on, ZF == 1
-	pop	ds
-	jnz	done ; if ZF==1 skip the following code
+	push	ds					; save ds
+	segmov	ds, dgroup				; load dgroup
+	test	ds:[taskBarPrefs], mask TBF_ENABLED	; test if TBF_ENABLED is set
+	pop	ds					; restore ds
+	jnz	done					; skip if taskbar
 endif
 	call	WinClasses_DerefVisSpec_DI
 	mov	cx, ds:[di].OLWI_titleBarBounds.R_bottom
