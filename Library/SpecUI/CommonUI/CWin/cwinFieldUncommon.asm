@@ -2479,6 +2479,7 @@ ToolAreaVisMoveResizeWin	method dynamic ToolAreaClass,
 
 	cmp	ds:[di].VI_bounds.R_top, bp	; compare taskbar y position with half of screen
 	jg	bottom				; if greater than half of screen, position taskbar at bottom
+						; otherwise, on top
 
 	test	bl, mask TASF_AUTO_HIDE
 	jnz	topHide
@@ -2540,22 +2541,24 @@ updatePosition:
 	; pop	ds, si
 
 	push	ds, si
+	mov	cx, ds:[di].VI_bounds.R_top
 	segmov	ds, dgroup
 
-	mov	ax, ds:[di].VI_bounds.R_top
-
+	clr	bp
 	mov	bp, TBP_TOP
 	shl	bp, offset TBF_POSITION
 	ornf	ds:[taskBarPrefs], bp
 
-	cmp	ax, TBP_TOP
+	cmp	cx, TBP_TOP
 	je	doWrite
 
+	clr	bp
 	mov	bp, TBP_BOTTOM
 	shl	bp, offset TBF_POSITION
 	ornf	ds:[taskBarPrefs], bp
 
 doWrite:
+	shr	bp, offset TBF_POSITION
 	mov	cx, cs
 	mov	ds, cx
 	mov	dx, offset taskBarPositionKey
