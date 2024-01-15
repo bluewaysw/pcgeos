@@ -8,5 +8,6 @@
 UICFLAGS	+= -I../Common -I$(INSTALL_DIR:H)/Common
 
 PROTOCONST	= TASK
+LIBNAME		= task
 
 #include    <$(SYSMAKEFILE)>
