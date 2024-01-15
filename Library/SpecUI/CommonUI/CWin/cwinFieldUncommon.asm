@@ -2026,7 +2026,7 @@ ToolAreaDraw	method dynamic ToolAreaClass, MSG_VIS_DRAW
 	push	ds, ax					; save ds
 	segmov	ds, dgroup				; get dgroup
 	mov	ax, ds:[taskBarPrefs]			; load taskBarPrefs in dx
-	and	ax, mask TBF_POSITION			; mask out everything but the position bits
+	andnf	ax, mask TBF_POSITION			; mask out everything but the position bits
 	cmp	ax, (TBP_TOP) shl offset TBF_POSITION	; compare position bits with TBP_TOP
 	pop	ds, ax					; restore ds
 	jne	atBottom				; jump if not top position
@@ -2462,7 +2462,7 @@ ToolAreaVisMoveResizeWin	method dynamic ToolAreaClass,
 	push	ds					; save ds
 	segmov	ds, dgroup				; get dgroup
 	mov	ax, ds:[taskBarPrefs]			; load taskBarPrefs in ax
-	and	ax, mask TBF_POSITION			; mask out everything but the position bits
+	andnf	ax, mask TBF_POSITION			; mask out everything but the position bits
 	shr	ax, offset TBF_POSITION			; retrieve position value
 	pop	ds					; restore ds
 
@@ -2483,10 +2483,10 @@ ToolAreaVisMoveResizeWin	method dynamic ToolAreaClass,
 	jg	bottom					; if greater than half of screen, position taskbar at bottom
 							; otherwise, on top
 
+;top:
 	test	bl, mask TASF_AUTO_HIDE
 	jnz	topHide
 
-;top:
 	clr	cx
 	xchg	cx, ds:[di].VI_bounds.R_top
 	sub	ds:[di].VI_bounds.R_bottom, cx
@@ -2501,7 +2501,7 @@ topHide:
 	dec	cx					; need one pixel on-screen
 	sub	ds:[di].VI_bounds.R_top, cx
 	mov	bp, TBP_TOP
-	cmp	ax, bp					; compare old an new position
+	cmp	ax, bp					; compare old and new position
 	je	callSuper				; jump if already top position
 	jmp	updatePosition				; otherwise, update
 
@@ -2513,7 +2513,7 @@ bottom:
 	add	ds:[di].VI_bounds.R_top, dx
 	add	ds:[di].VI_bounds.R_bottom, dx
 	mov	bp, TBP_BOTTOM
-	cmp	ax, bp					; compare old an new position
+	cmp	ax, bp					; compare old and new position
 	je	callSuper				; jump if already at bottom position
 	jmp	updatePosition				; otherwise, update
 
@@ -2528,23 +2528,21 @@ bottomHide:
 
 updatePosition:
 	push	ds, si
-
 	mov	cx, cs
 	mov	ds, cx
 	mov	dx, offset taskBarPositionKey
 	mov	si, offset taskBarPositionCategory
-	call	InitFileWriteInteger				; update GEOS.INI
+	call	InitFileWriteInteger			; update GEOS.INI
 
 	segmov	ds, dgroup
+	andnf	ds:[taskBarPrefs], not mask TBF_POSITION
 	shl	bp, offset TBF_POSITION
-	ornf	ds:[taskBarPrefs], bp				; update Taskbar Position flag
-
+	ornf	ds:[taskBarPrefs], bp			; update Taskbar Position flag
 	pop	ds, si
 
 	;
 	; fixup window positions
 	;
-
 	mov	ax, MSG_OL_FIELD_SEND_TO_GEN_APPLICATIONS
 	mov	dx, MSG_OL_APP_UPDATE_WINDOWS_FOR_TASK_BAR
 	call	VisCallParent
@@ -2627,7 +2625,7 @@ ToolAreaInitPosition	method	dynamic	ToolAreaClass, MSG_TOOL_AREA_INIT_POSITION
 	push	ds					; save ds
 	segmov	ds, dgroup				; get dgroup
 	mov	dx, ds:[taskBarPrefs]			; load taskBarPrefs in dx
-	and	dx, mask TBF_POSITION			; mask out everything but the position bits
+	andnf	dx, mask TBF_POSITION			; mask out everything but the position bits
 	cmp	dx, (TBP_TOP) shl offset TBF_POSITION	; compare position bits with TBP_TOP
 	pop	ds					; restore ds
 	je	setPosition				; jump if top position

@@ -4334,7 +4334,7 @@ if TOOL_AREA_IS_TASK_BAR
 
 	push 	ax
 	mov	ax, ds:[taskBarPrefs]			; load taskBarPrefs in ax
-	and	ax, mask TBF_POSITION			; mask out everything but the position bits
+	andnf	ax, mask TBF_POSITION			; mask out everything but the position bits
 	cmp	ax, (TBP_TOP) shl offset TBF_POSITION	; compare position bits with TBP_TOP
 	pop	ax					; restore ax
 	jne	atBottom				; is not top => bottom position
@@ -5008,7 +5008,7 @@ if TOOL_AREA_IS_TASK_BAR
 
 	push 	ax
 	mov	ax, ds:[taskBarPrefs]			; load taskBarPrefs in ax
-	and	ax, mask TBF_POSITION			; mask out everything but the position bits
+	andnf	ax, mask TBF_POSITION			; mask out everything but the position bits
 	cmp	ax, (TBP_TOP) shl offset TBF_POSITION	; compare position bits with TBP_TOP
 	pop	ax					; restore ax
 	jne	atBottom				; is not top => bottom position

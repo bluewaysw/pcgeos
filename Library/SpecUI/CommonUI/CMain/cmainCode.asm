@@ -1603,12 +1603,13 @@ afterAutoHide:
 	mov	dx, offset taskBarPositionString
 	mov	si, offset optionsCatString
 	call	InitFileReadInteger
-	cmp	ax, 3					; we have 4 (zero-based) position values
-	jbe	setTaskbarPosVal			; jump if below or equal
-	mov	ax, TBP_BOTTOM				; if value is out of bounds, set to bottom
+	cmp	ax, 3						; we have 4 (zero-based) position values
+	jbe	setTaskbarPosVal				; jump if below or equal
+	mov	ax, TBP_BOTTOM					; if value is out of bounds, set to bottom
 setTaskbarPosVal:
-	shl	ax, offset TBF_POSITION			; shift position value to index of TBF_POSITION
-	ornf	es:[taskBarPrefs], ax
+	andnf	es:[taskBarPrefs], not mask TBF_POSITION	; make sure bits are clear
+	shl	ax, offset TBF_POSITION				; shift position bits to index of TBF_POSITION
+	ornf	es:[taskBarPrefs], ax				; set position bits
 endif
 
 if _ISUI

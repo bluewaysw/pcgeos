@@ -3172,7 +3172,7 @@ GetTaskBarPositionAdjustment	proc	far
 	push	ds, ax					; save ds
 	segmov	ds, dgroup				; get dgroup
 	mov	ax, ds:[taskBarPrefs]			; load taskBarPrefs in dx
-	and	ax, mask TBF_POSITION			; mask out everything but the position bits
+	andnf	ax, mask TBF_POSITION			; mask out everything but the position bits
 	cmp	ax, (TBP_TOP) shl offset TBF_POSITION	; compare position bits with TBP_TOP
 	pop	ds, ax					; restore ds, ax
 	jne	done					; jump if not top position, no adjustment (di = 0)
@@ -3231,7 +3231,7 @@ GetTaskBarSizeAdjustment	proc	far
 	push	ds, ax					; save ds
 	segmov	ds, dgroup				; get dgroup
 	mov	ax, ds:[taskBarPrefs]			; load taskBarPrefs in dx
-	and	ax, mask TBF_POSITION			; mask out everything but the position bits
+	andnf	ax, mask TBF_POSITION			; mask out everything but the position bits
 	cmp	ax, (TBP_TOP) shl offset TBF_POSITION	; compare position bits with TBP_TOP
 	pop	ds, ax					; restore ds
 	je	done					; jump if top position, no adjustment (di = 0)

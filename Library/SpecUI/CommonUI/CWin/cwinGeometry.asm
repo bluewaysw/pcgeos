@@ -1527,13 +1527,14 @@ doUpdate:
 	call	OLWinGetToolAreaSize
 
 gotSize:
-	push	ds, ax					; save ds
+	push	ds, bx					; save ds
 	segmov	ds, dgroup				; get dgroup
-	mov	ax, ds:[taskBarPrefs]			; load taskBarPrefs in ax
-	and	ax, mask TBF_POSITION			; mask out everything but the position bits
-	cmp	ax, (TBP_TOP) shl offset TBF_POSITION	; compare position bits with TBP_TOP
-	pop	ds, ax					; restore ds
-	jne	update					; update if not top position
+	mov	bx, ds:[taskBarPrefs]			; load taskBarPrefs in ax
+	andnf	bx, mask TBF_POSITION			; mask out everything but the position bits
+	shr	bx, offset TBF_POSITION
+	cmp	bx, TBP_TOP
+	pop	ds, bx					; restore ds
+	je	update					; update if not top position
 
 	neg	dx
 update:
