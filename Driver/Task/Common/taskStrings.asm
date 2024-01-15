@@ -29,6 +29,6 @@ DESCRIPTION:
 
 TaskStrings	segment	lmem	LMEM_TYPE_GENERAL
 
-unableToSuspendMsg	chunk.char "Unable to suspend NewDeal: \1", 0
+unableToSuspendMsg	chunk.char "Unable to suspend PC/GEOS: \1", 0
 
 TaskStrings	ends

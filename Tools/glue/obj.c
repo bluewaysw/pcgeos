@@ -2384,12 +2384,12 @@ Obj_EnterTypeSyms(const char   	*file,	/* File name */
 
 	data.types = osh->types;
 	data.nextType = (ObjType *)VMLock(symbols, data.types, &data.tmem);
+	MemInfo(data.tmem, (genptr *)NULL, &n);
 	data.typeSize = n;
 	data.typeOff = sd->typeNext;
 	data.nextType = (ObjType *)((genptr)data.nextType + data.typeOff);
 
 	VMUnlock(symbols, sd->symT);
-	MemInfo(data.tmem, (genptr *)NULL, &n);
     } else {
 	/*
 	 * Neither symbol block nor type block can we use -- record this.
