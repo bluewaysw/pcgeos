@@ -891,6 +891,7 @@ Pass2MSProcessRels(const char 	*file,	    /* Object file being read */
 	unsigned    len = (genptr)nextRel - (genptr)rbase;
 
 	assert(((byte *)rbase)[0] != 0);
+	assert(len <= (unsigned)(sd->nrel * fileOps->rtrelsize));
 
 	Out_Block(sd->roff, rbase, len);
 	sd->roff += len;
