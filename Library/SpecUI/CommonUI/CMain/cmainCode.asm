@@ -1519,47 +1519,6 @@ afterInvertDelay:
 	mov	es:[olExtWinAttrs], ax
 
 if TOOL_AREA_IS_TASK_BAR
-
-	;
-	; FIXME!!! Convert all these flags to bitflags
-	;
-
-	;
-	; init taskBar
-	;
-	; mov	dx, offset taskBarEnabledString
-	; mov	si, offset optionsCatString
-	; mov	ax, FALSE			;default = no taskbar
-	; call	InitFileReadBoolean
-	; mov	es:[taskBarEnabled], ax
-
-	;
-	; init taskBarPosition
-	;
-	; mov	dx, offset taskBarPositionString
-	; mov	si, offset optionsCatString
-	; mov	ax, MAX_COORD			;0 = on top, > 0 (positive) = at bottom
-	; call	InitFileReadInteger
-	; mov	es:[taskBarPosition], ax
-
-	;
-	; init taskBarAutoHide
-	;
-	; mov	dx, offset taskBarAutoHideString
-	; mov	si, offset optionsCatString
-	; mov	ax, FALSE			;default = no auto hide
-	; call	InitFileReadBoolean
-	; mov	es:[taskBarAutoHide], ax
-
-	;
-	; init taskBarMovable
-	;
-	; mov	dx, offset taskBarMovableString
-	; mov	si, offset optionsCatString
-	; mov	ax, FALSE			;default = no moving
-	; call	InitFileReadBoolean
-	; mov	es:[taskBarMovable], ax
-
 	;
 	; init taskBar
 	;

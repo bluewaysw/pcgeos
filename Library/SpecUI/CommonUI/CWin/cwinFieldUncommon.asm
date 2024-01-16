@@ -1993,10 +1993,11 @@ REVISION HISTORY:
 if _MOTIF and TOOL_AREA_IS_TASK_BAR
 ToolAreaDraw	method dynamic ToolAreaClass, MSG_VIS_DRAW
 
-	push	bp
-	mov	di, offset ToolAreaClass
-	call	ObjCallSuperNoLock
-	pop	di			; di = gstate
+
+	; push	bp
+	; mov	di, offset ToolAreaClass
+	; call	ObjCallSuperNoLock
+	; pop	di			; di = gstate
 
 	;
 	; if TaskBar == on
@@ -2008,12 +2009,12 @@ ToolAreaDraw	method dynamic ToolAreaClass, MSG_VIS_DRAW
 	pop	ds					; restore ds
 	jz	done					; skip if no taskbar
 
-	push	di
-	mov	di, segment VisCompClass
-	mov	es, di
-	mov	di, offset VisCompClass
-	call	ObjCallClassNoLock
-	pop	di
+	; push	di
+	; mov	di, segment VisCompClass
+	; mov	es, di
+	; mov	di, offset VisCompClass
+	; call	ObjCallClassNoLock
+	; pop	di
 
 	mov	di, bp
 
@@ -2057,8 +2058,10 @@ draw:
 	call	GrDrawLine
 
 done:
+
 	ret
 ToolAreaDraw	endm
+
 endif
 
 
