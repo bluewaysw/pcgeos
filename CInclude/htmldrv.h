@@ -13,7 +13,6 @@
 #include <math.h>
 #include <timedate.h>
 
-#include "fixes.h"
 #include <htmlfstr.h>
 #include <awatcher.h>
 
