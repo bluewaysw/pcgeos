@@ -167,7 +167,7 @@ extern dword /*XXX*/
  * Use this macro to pass the tokenChars to the above routines
  */
 #define TOKEN_CHARS(A, B, C, D) \
-    ((A) | ((B) << 8) | ((C) << 16) | ((D) << 24))
+    (((dword)(A)) | (((dword)(B)) << 8) | (((dword)(C)) << 16) | (((dword)(D)) << 24))
 
 #ifdef __HIGHC__
 pragma Alias(TokenOpenLocalTokenDB, "TOKENOPENLOCALTOKENDB");

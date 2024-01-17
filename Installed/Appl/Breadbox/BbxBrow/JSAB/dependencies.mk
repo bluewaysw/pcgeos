@@ -64,17 +64,17 @@ JSAB/browser.eobj: geos.h heap.h geode.h resource.h ec.h object.h lmem.h \
                 driver.h thread.h print.h Internal/spoolInt.h serialDr.h \
                 parallDr.h hugearr.h fileEnum.h Ansi/stdlib.h \
                 Ansi/string.h product.h htmlfstr.h awatcher.h htmlopt.h \
-                htmldrv.h math.h fixes.h htmlprog.h hwlib.h medium.h \
-                javascr.h JS/jseopt.h JS/seall.h JS/jsedef.h \
-                JS/sesyshdr.h Ansi/stdio.h Ansi/assert.h geoMisc.h \
-                JS/jsetypes.h JS/seuni.h JS/sefp.h JS/fp_emul.h \
-                JS/jselib.h JS/selibdef.h JS/selink.h JS/cmdline.h \
-                JS/dbgprntf.h JS/dirparts.h JS/findfile.h JS/globldat.h \
-                JS/utilhuge.h JS/jsemem.h JS/seappsrv.h JS/utilstr.h \
-                JS/varcall.h JS/fsearch.h JS/getsourc.h JS/printerr.h \
-                JS/seliball.h JS/seecma.h JS/regex.h JS/selibcom.h \
-                JS/setxtlib.h JS/seobjfun.h sebrowse.h \
-                Internal/netutils.h cookies.h initfile.h
+                htmldrv.h math.h htmlprog.h hwlib.h medium.h javascr.h \
+                JS/jseopt.h JS/seall.h JS/jsedef.h JS/sesyshdr.h \
+                Ansi/stdio.h Ansi/assert.h geoMisc.h JS/jsetypes.h \
+                JS/seuni.h JS/sefp.h JS/fp_emul.h JS/jselib.h \
+                JS/selibdef.h JS/selink.h JS/cmdline.h JS/dbgprntf.h \
+                JS/dirparts.h JS/findfile.h JS/globldat.h JS/utilhuge.h \
+                JS/jsemem.h JS/seappsrv.h JS/utilstr.h JS/varcall.h \
+                JS/fsearch.h JS/getsourc.h JS/printerr.h JS/seliball.h \
+                JS/seecma.h JS/regex.h JS/selibcom.h JS/setxtlib.h \
+                JS/seobjfun.h sebrowse.h Internal/netutils.h cookies.h \
+                initfile.h
 JSAB/sebrowse.obj \
 JSAB/sebrowse.eobj: stdapp.goh object.goh ui.goh Objects/metaC.goh \
                 Objects/inputC.goh Objects/clipbrd.goh \
@@ -109,16 +109,16 @@ JSAB/sebrowse.eobj: geos.h heap.h geode.h resource.h ec.h object.h lmem.h \
                 driver.h thread.h print.h Internal/spoolInt.h serialDr.h \
                 parallDr.h hugearr.h fileEnum.h Ansi/stdlib.h \
                 Ansi/assert.h product.h htmlfstr.h awatcher.h htmlopt.h \
-                htmldrv.h math.h fixes.h htmlprog.h hwlib.h medium.h \
-                javascr.h JS/jseopt.h JS/seall.h JS/jsedef.h \
-                JS/sesyshdr.h Ansi/stdio.h Ansi/string.h geoMisc.h \
-                JS/jsetypes.h JS/seuni.h JS/sefp.h JS/fp_emul.h \
-                JS/jselib.h JS/selibdef.h JS/selink.h JS/cmdline.h \
-                JS/dbgprntf.h JS/dirparts.h JS/findfile.h JS/globldat.h \
-                JS/utilhuge.h JS/jsemem.h JS/seappsrv.h JS/utilstr.h \
-                JS/varcall.h JS/fsearch.h JS/getsourc.h JS/printerr.h \
-                JS/seliball.h JS/seecma.h JS/regex.h JS/selibcom.h \
-                JS/setxtlib.h JS/seobjfun.h sebrowse.h
+                htmldrv.h math.h htmlprog.h hwlib.h medium.h javascr.h \
+                JS/jseopt.h JS/seall.h JS/jsedef.h JS/sesyshdr.h \
+                Ansi/stdio.h Ansi/string.h geoMisc.h JS/jsetypes.h \
+                JS/seuni.h JS/sefp.h JS/fp_emul.h JS/jselib.h \
+                JS/selibdef.h JS/selink.h JS/cmdline.h JS/dbgprntf.h \
+                JS/dirparts.h JS/findfile.h JS/globldat.h JS/utilhuge.h \
+                JS/jsemem.h JS/seappsrv.h JS/utilstr.h JS/varcall.h \
+                JS/fsearch.h JS/getsourc.h JS/printerr.h JS/seliball.h \
+                JS/seecma.h JS/regex.h JS/selibcom.h JS/setxtlib.h \
+                JS/seobjfun.h sebrowse.h
 JSAB/FRFETCH.obj \
 JSAB/FRFETCH.eobj: stdapp.goh object.goh ui.goh Objects/metaC.goh \
                 Objects/inputC.goh Objects/clipbrd.goh \
@@ -137,7 +137,7 @@ JSAB/FRFETCH.eobj: stdapp.goh object.goh ui.goh Objects/metaC.goh \
                 Objects/gItemC.goh Objects/gBoolC.goh \
                 Objects/gGadgetC.goh Objects/gToolCC.goh \
                 Objects/gValueC.goh Objects/gToolGC.goh \
-                Objects/helpCC.goh fixes.goh htmlview.goh product.goh \
+                Objects/helpCC.goh htmlview.goh product.goh \
                 Objects/gViewCC.goh options.goh prodgpc.goh html4par.goh \
                 Objects/vLTextC.goh htmlstat.goh stattext.goh \
                 urlfetch.goh mailhub.goh socket.goh sockmisc.h \
@@ -152,9 +152,9 @@ JSAB/FRFETCH.eobj: geos.h heap.h geode.h resource.h ec.h object.h lmem.h \
                 Objects/gInterC.h Objects/Text/tCommon.h stylesh.h \
                 driver.h thread.h print.h Internal/spoolInt.h serialDr.h \
                 parallDr.h hugearr.h fileEnum.h geoMisc.h initfile.h \
-                Ansi/string.h Ansi/stdio.h Ansi/stdlib.h fixes.h \
-                product.h htmlfstr.h awatcher.h htmlopt.h htmldrv.h \
-                math.h htmlprog.h hwlib.h medium.h javascr.h JS/jseopt.h \
+                Ansi/string.h Ansi/stdio.h Ansi/stdlib.h product.h \
+                htmlfstr.h awatcher.h htmlopt.h htmldrv.h math.h \
+                htmlprog.h hwlib.h medium.h javascr.h JS/jseopt.h \
                 JS/seall.h JS/jsedef.h JS/sesyshdr.h Ansi/assert.h \
                 JS/jsetypes.h JS/seuni.h JS/sefp.h JS/fp_emul.h \
                 JS/jselib.h JS/selibdef.h JS/selink.h JS/cmdline.h \
@@ -181,7 +181,7 @@ JSAB/URLFRAME.eobj: stdapp.goh object.goh ui.goh Objects/metaC.goh \
                 Objects/gItemC.goh Objects/gBoolC.goh \
                 Objects/gGadgetC.goh Objects/gToolCC.goh \
                 Objects/gValueC.goh Objects/gToolGC.goh \
-                Objects/helpCC.goh fixes.goh htmlview.goh product.goh \
+                Objects/helpCC.goh htmlview.goh product.goh \
                 Objects/gViewCC.goh options.goh prodgpc.goh html4par.goh \
                 Objects/vLTextC.goh htmlstat.goh stattext.goh \
                 urlfetch.goh mailhub.goh socket.goh sockmisc.h \
@@ -196,9 +196,9 @@ JSAB/URLFRAME.eobj: geos.h heap.h geode.h resource.h ec.h object.h lmem.h \
                 Objects/gInterC.h Objects/Text/tCommon.h stylesh.h \
                 driver.h thread.h print.h Internal/spoolInt.h serialDr.h \
                 parallDr.h hugearr.h fileEnum.h geoMisc.h initfile.h \
-                Ansi/string.h Ansi/stdio.h Ansi/stdlib.h fixes.h \
-                product.h htmlfstr.h awatcher.h htmlopt.h htmldrv.h \
-                math.h htmlprog.h hwlib.h medium.h javascr.h JS/jseopt.h \
+                Ansi/string.h Ansi/stdio.h Ansi/stdlib.h product.h \
+                htmlfstr.h awatcher.h htmlopt.h htmldrv.h math.h \
+                htmlprog.h hwlib.h medium.h javascr.h JS/jseopt.h \
                 JS/seall.h JS/jsedef.h JS/sesyshdr.h Ansi/assert.h \
                 JS/jsetypes.h JS/seuni.h JS/sefp.h JS/fp_emul.h \
                 JS/jselib.h JS/selibdef.h JS/selink.h JS/cmdline.h \
@@ -225,7 +225,7 @@ JSAB/URLTEXT2.eobj: stdapp.goh object.goh ui.goh Objects/metaC.goh \
                 Objects/gItemC.goh Objects/gBoolC.goh \
                 Objects/gGadgetC.goh Objects/gToolCC.goh \
                 Objects/gValueC.goh Objects/gToolGC.goh \
-                Objects/helpCC.goh fixes.goh htmlview.goh product.goh \
+                Objects/helpCC.goh htmlview.goh product.goh \
                 Objects/gViewCC.goh options.goh prodgpc.goh html4par.goh \
                 Objects/vLTextC.goh htmlstat.goh stattext.goh \
                 urlfetch.goh mailhub.goh socket.goh sockmisc.h \
@@ -240,7 +240,7 @@ JSAB/URLTEXT2.eobj: geos.h heap.h geode.h resource.h ec.h object.h lmem.h \
                 Objects/gInterC.h Objects/Text/tCommon.h stylesh.h \
                 driver.h thread.h print.h Internal/spoolInt.h serialDr.h \
                 parallDr.h hugearr.h fileEnum.h geoMisc.h Ansi/string.h \
-                Ansi/stdio.h Ansi/stdlib.h fixes.h product.h htmlfstr.h \
+                Ansi/stdio.h Ansi/stdlib.h product.h htmlfstr.h \
                 awatcher.h htmlopt.h htmldrv.h math.h htmlprog.h hwlib.h \
                 medium.h
 JSAB/URLTEXT.obj \
@@ -261,7 +261,7 @@ JSAB/URLTEXT.eobj: stdapp.goh object.goh ui.goh Objects/metaC.goh \
                 Objects/gItemC.goh Objects/gBoolC.goh \
                 Objects/gGadgetC.goh Objects/gToolCC.goh \
                 Objects/gValueC.goh Objects/gToolGC.goh \
-                Objects/helpCC.goh fixes.goh htmlview.goh product.goh \
+                Objects/helpCC.goh htmlview.goh product.goh \
                 Objects/gViewCC.goh options.goh prodgpc.goh html4par.goh \
                 Objects/vLTextC.goh htmlstat.goh stattext.goh \
                 urlfetch.goh mailhub.goh socket.goh sockmisc.h \
@@ -276,7 +276,7 @@ JSAB/URLTEXT.eobj: geos.h heap.h geode.h resource.h ec.h object.h lmem.h \
                 Objects/gInterC.h Objects/Text/tCommon.h stylesh.h \
                 driver.h thread.h print.h Internal/spoolInt.h serialDr.h \
                 parallDr.h hugearr.h fileEnum.h geoMisc.h Ansi/string.h \
-                Ansi/stdio.h Ansi/stdlib.h fixes.h product.h htmlfstr.h \
+                Ansi/stdio.h Ansi/stdlib.h product.h htmlfstr.h \
                 awatcher.h htmlopt.h htmldrv.h math.h htmlprog.h hwlib.h \
                 medium.h sem.h
 JSAB/EXPIRE.obj \
@@ -326,12 +326,12 @@ JSAB/INIT.eobj: stdapp.goh object.goh ui.goh Objects/metaC.goh \
                 Objects/gItemC.goh Objects/gBoolC.goh \
                 Objects/gGadgetC.goh Objects/gToolCC.goh \
                 Objects/gValueC.goh Objects/gToolGC.goh \
-                Objects/helpCC.goh sem.h fixes.goh htmlview.goh \
-                product.goh Objects/gViewCC.goh options.goh prodgpc.goh \
-                html4par.goh Objects/vLTextC.goh htmlstat.goh \
-                stattext.goh urlfetch.goh mailhub.goh socket.goh \
-                sockmisc.h Objects/Text/tCtrlC.goh ruler.goh \
-                Objects/colorC.goh Objects/styles.goh parentc.goh
+                Objects/helpCC.goh sem.h htmlview.goh product.goh \
+                Objects/gViewCC.goh options.goh prodgpc.goh html4par.goh \
+                Objects/vLTextC.goh htmlstat.goh stattext.goh \
+                urlfetch.goh mailhub.goh socket.goh sockmisc.h \
+                Objects/Text/tCtrlC.goh ruler.goh Objects/colorC.goh \
+                Objects/styles.goh parentc.goh
 JSAB/INIT.obj \
 JSAB/INIT.eobj: geos.h heap.h geode.h resource.h ec.h object.h lmem.h \
                 graphics.h fontID.h font.h color.h gstring.h timer.h vm.h \
@@ -341,9 +341,9 @@ JSAB/INIT.eobj: geos.h heap.h geode.h resource.h ec.h object.h lmem.h \
                 Objects/gInterC.h Objects/Text/tCommon.h stylesh.h \
                 driver.h thread.h print.h Internal/spoolInt.h serialDr.h \
                 parallDr.h hugearr.h fileEnum.h library.h initfile.h \
-                Ansi/string.h Ansi/stdio.h Ansi/stdlib.h fixes.h \
-                product.h htmlfstr.h awatcher.h htmlopt.h htmldrv.h \
-                math.h htmlprog.h hwlib.h medium.h javascr.h JS/jseopt.h \
+                Ansi/string.h Ansi/stdio.h Ansi/stdlib.h product.h \
+                htmlfstr.h awatcher.h htmlopt.h htmldrv.h math.h \
+                htmlprog.h hwlib.h medium.h javascr.h JS/jseopt.h \
                 JS/seall.h JS/jsedef.h JS/sesyshdr.h Ansi/assert.h \
                 geoMisc.h JS/jsetypes.h JS/seuni.h JS/sefp.h JS/fp_emul.h \
                 JS/jselib.h JS/selibdef.h JS/selink.h JS/cmdline.h \
@@ -386,7 +386,7 @@ JSAB/URLFETCH.eobj: geos.h heap.h geode.h resource.h ec.h object.h lmem.h \
                 driver.h thread.h print.h Internal/spoolInt.h serialDr.h \
                 parallDr.h hugearr.h fileEnum.h product.h library.h \
                 Ansi/stdio.h htmlfstr.h awatcher.h htmlopt.h htmldrv.h \
-                math.h fixes.h htmlprog.h hwlib.h medium.h
+                math.h htmlprog.h hwlib.h medium.h
 JSAB/URLDOCCT.obj \
 JSAB/URLDOCCT.eobj: stdapp.goh object.goh ui.goh Objects/metaC.goh \
                 Objects/inputC.goh Objects/clipbrd.goh \
@@ -405,7 +405,7 @@ JSAB/URLDOCCT.eobj: stdapp.goh object.goh ui.goh Objects/metaC.goh \
                 Objects/gItemC.goh Objects/gBoolC.goh \
                 Objects/gGadgetC.goh Objects/gToolCC.goh \
                 Objects/gValueC.goh Objects/gToolGC.goh \
-                Objects/helpCC.goh fixes.goh htmlview.goh product.goh \
+                Objects/helpCC.goh htmlview.goh product.goh \
                 Objects/gViewCC.goh options.goh prodgpc.goh html4par.goh \
                 Objects/vLTextC.goh htmlstat.goh stattext.goh \
                 urlfetch.goh mailhub.goh socket.goh sockmisc.h \
@@ -420,9 +420,9 @@ JSAB/URLDOCCT.eobj: geos.h heap.h geode.h resource.h ec.h object.h lmem.h \
                 Objects/gInterC.h Objects/Text/tCommon.h stylesh.h \
                 driver.h thread.h print.h Internal/spoolInt.h serialDr.h \
                 parallDr.h hugearr.h fileEnum.h geoMisc.h initfile.h \
-                Ansi/string.h Ansi/stdio.h Ansi/stdlib.h fixes.h \
-                product.h htmlfstr.h awatcher.h htmlopt.h htmldrv.h \
-                math.h htmlprog.h hwlib.h medium.h
+                Ansi/string.h Ansi/stdio.h Ansi/stdlib.h product.h \
+                htmlfstr.h awatcher.h htmlopt.h htmldrv.h math.h \
+                htmlprog.h hwlib.h medium.h
 JSAB/NAVIGATE.obj \
 JSAB/NAVIGATE.eobj: stdapp.goh object.goh ui.goh Objects/metaC.goh \
                 Objects/inputC.goh Objects/clipbrd.goh \
@@ -441,7 +441,7 @@ JSAB/NAVIGATE.eobj: stdapp.goh object.goh ui.goh Objects/metaC.goh \
                 Objects/gItemC.goh Objects/gBoolC.goh \
                 Objects/gGadgetC.goh Objects/gToolCC.goh \
                 Objects/gValueC.goh Objects/gToolGC.goh \
-                Objects/helpCC.goh fixes.goh htmlview.goh product.goh \
+                Objects/helpCC.goh htmlview.goh product.goh \
                 Objects/gViewCC.goh options.goh prodgpc.goh html4par.goh \
                 Objects/vLTextC.goh htmlstat.goh stattext.goh \
                 urlfetch.goh mailhub.goh socket.goh sockmisc.h \
@@ -457,9 +457,9 @@ JSAB/NAVIGATE.eobj: geos.h heap.h geode.h resource.h ec.h object.h lmem.h \
                 Objects/gInterC.h Objects/Text/tCommon.h stylesh.h \
                 driver.h thread.h print.h Internal/spoolInt.h serialDr.h \
                 parallDr.h hugearr.h fileEnum.h library.h Ansi/string.h \
-                Ansi/stdio.h Ansi/stdlib.h geoMisc.h fixes.h product.h \
-                htmlfstr.h awatcher.h htmlopt.h htmldrv.h math.h \
-                htmlprog.h hwlib.h medium.h initfile.h
+                Ansi/stdio.h Ansi/stdlib.h geoMisc.h product.h htmlfstr.h \
+                awatcher.h htmlopt.h htmldrv.h math.h htmlprog.h hwlib.h \
+                medium.h initfile.h
 JSAB/FAVORCLS.obj \
 JSAB/FAVORCLS.eobj: stdapp.goh object.goh ui.goh Objects/metaC.goh \
                 Objects/inputC.goh Objects/clipbrd.goh \
@@ -493,8 +493,8 @@ JSAB/FAVORCLS.eobj: geos.h heap.h geode.h resource.h ec.h object.h lmem.h \
                 Objects/gInterC.h Objects/Text/tCommon.h stylesh.h \
                 driver.h thread.h print.h Internal/spoolInt.h serialDr.h \
                 parallDr.h hugearr.h fileEnum.h product.h htmlfstr.h \
-                awatcher.h htmlopt.h htmldrv.h math.h fixes.h htmlprog.h \
-                hwlib.h medium.h
+                awatcher.h htmlopt.h htmldrv.h math.h htmlprog.h hwlib.h \
+                medium.h
 JSAB/FAVORITE.obj \
 JSAB/FAVORITE.eobj: stdapp.goh object.goh ui.goh Objects/metaC.goh \
                 Objects/inputC.goh Objects/clipbrd.goh \
@@ -572,7 +572,7 @@ JSAB/NAVCACHE.eobj: stdapp.goh object.goh ui.goh Objects/metaC.goh \
                 Objects/gItemC.goh Objects/gBoolC.goh \
                 Objects/gGadgetC.goh Objects/gToolCC.goh \
                 Objects/gValueC.goh Objects/gToolGC.goh \
-                Objects/helpCC.goh fixes.goh htmlview.goh product.goh \
+                Objects/helpCC.goh htmlview.goh product.goh \
                 Objects/gViewCC.goh options.goh prodgpc.goh html4par.goh \
                 Objects/vLTextC.goh htmlstat.goh stattext.goh \
                 urlfetch.goh mailhub.goh socket.goh sockmisc.h \
@@ -588,9 +588,9 @@ JSAB/NAVCACHE.eobj: geos.h heap.h geode.h resource.h ec.h object.h lmem.h \
                 Objects/gInterC.h Objects/Text/tCommon.h stylesh.h \
                 driver.h thread.h print.h Internal/spoolInt.h serialDr.h \
                 parallDr.h hugearr.h fileEnum.h library.h Ansi/string.h \
-                Ansi/stdio.h Ansi/stdlib.h geoMisc.h initfile.h fixes.h \
-                product.h htmlfstr.h awatcher.h htmlopt.h htmldrv.h \
-                math.h htmlprog.h hwlib.h medium.h sysstats.h
+                Ansi/stdio.h Ansi/stdlib.h geoMisc.h initfile.h product.h \
+                htmlfstr.h awatcher.h htmlopt.h htmldrv.h math.h \
+                htmlprog.h hwlib.h medium.h sysstats.h
 JSAB/BOOKCLAS.obj \
 JSAB/BOOKCLAS.eobj: stdapp.goh object.goh ui.goh Objects/metaC.goh \
                 Objects/inputC.goh Objects/clipbrd.goh \
@@ -637,7 +637,7 @@ JSAB/LOCALPAG.eobj: stdapp.goh object.goh ui.goh Objects/metaC.goh \
                 Objects/gItemC.goh Objects/gBoolC.goh \
                 Objects/gGadgetC.goh Objects/gToolCC.goh \
                 Objects/gValueC.goh Objects/gToolGC.goh \
-                Objects/helpCC.goh fixes.goh htmlview.goh product.goh \
+                Objects/helpCC.goh htmlview.goh product.goh \
                 Objects/gViewCC.goh options.goh prodgpc.goh html4par.goh \
                 Objects/vLTextC.goh htmlstat.goh stattext.goh \
                 urlfetch.goh mailhub.goh socket.goh sockmisc.h \
@@ -652,7 +652,7 @@ JSAB/LOCALPAG.eobj: geos.h heap.h geode.h resource.h ec.h object.h lmem.h \
                 Objects/gInterC.h Objects/Text/tCommon.h stylesh.h \
                 driver.h thread.h print.h Internal/spoolInt.h serialDr.h \
                 parallDr.h hugearr.h fileEnum.h Ansi/string.h \
-                Ansi/stdio.h Ansi/stdlib.h fixes.h product.h htmlfstr.h \
+                Ansi/stdio.h Ansi/stdlib.h product.h htmlfstr.h \
                 awatcher.h htmlopt.h htmldrv.h math.h htmlprog.h hwlib.h \
                 medium.h
 JSAB/URLDOC.obj \
@@ -673,7 +673,7 @@ JSAB/URLDOC.eobj: stdapp.goh object.goh ui.goh Objects/metaC.goh \
                 Objects/gItemC.goh Objects/gBoolC.goh \
                 Objects/gGadgetC.goh Objects/gToolCC.goh \
                 Objects/gValueC.goh Objects/gToolGC.goh \
-                Objects/helpCC.goh fixes.goh htmlview.goh product.goh \
+                Objects/helpCC.goh htmlview.goh product.goh \
                 Objects/gViewCC.goh options.goh prodgpc.goh html4par.goh \
                 Objects/vLTextC.goh htmlstat.goh stattext.goh \
                 urlfetch.goh mailhub.goh socket.goh sockmisc.h \
@@ -688,9 +688,9 @@ JSAB/URLDOC.eobj: geos.h heap.h geode.h resource.h ec.h object.h lmem.h \
                 Objects/gInterC.h Objects/Text/tCommon.h stylesh.h \
                 driver.h thread.h print.h Internal/spoolInt.h serialDr.h \
                 parallDr.h hugearr.h fileEnum.h geoMisc.h initfile.h \
-                Ansi/string.h Ansi/stdio.h Ansi/stdlib.h fixes.h \
-                product.h htmlfstr.h awatcher.h htmlopt.h htmldrv.h \
-                math.h htmlprog.h hwlib.h medium.h
+                Ansi/string.h Ansi/stdio.h Ansi/stdlib.h product.h \
+                htmlfstr.h awatcher.h htmlopt.h htmldrv.h math.h \
+                htmlprog.h hwlib.h medium.h
 JSAB/scrapbk.obj \
 JSAB/scrapbk.eobj: stdapp.goh object.goh ui.goh Objects/metaC.goh \
                 Objects/inputC.goh Objects/clipbrd.goh \
@@ -710,9 +710,9 @@ JSAB/scrapbk.eobj: stdapp.goh object.goh ui.goh Objects/metaC.goh \
                 Objects/gGadgetC.goh Objects/gToolCC.goh \
                 Objects/gValueC.goh Objects/gToolGC.goh \
                 Objects/helpCC.goh Objects/Text/tCtrlC.goh ruler.goh \
-                Objects/colorC.goh Objects/styles.goh fixes.goh \
-                htmlview.goh product.goh Objects/gViewCC.goh options.goh \
-                prodgpc.goh html4par.goh Objects/vLTextC.goh htmlstat.goh \
+                Objects/colorC.goh Objects/styles.goh htmlview.goh \
+                product.goh Objects/gViewCC.goh options.goh prodgpc.goh \
+                html4par.goh Objects/vLTextC.goh htmlstat.goh \
                 stattext.goh urlfetch.goh mailhub.goh socket.goh \
                 sockmisc.h parentc.goh favorite.goh importg.goh \
                 expire.goh
@@ -726,8 +726,8 @@ JSAB/scrapbk.eobj: geos.h heap.h geode.h resource.h ec.h object.h lmem.h \
                 driver.h thread.h print.h Internal/spoolInt.h serialDr.h \
                 parallDr.h hugearr.h fileEnum.h initfile.h sysstats.h \
                 sem.h Ansi/string.h Ansi/stdio.h Ansi/stdlib.h geoMisc.h \
-                fixes.h product.h htmlfstr.h awatcher.h htmlopt.h \
-                htmldrv.h math.h htmlprog.h hwlib.h medium.h
+                product.h htmlfstr.h awatcher.h htmlopt.h htmldrv.h \
+                math.h htmlprog.h hwlib.h medium.h
 JSAB/StatText.obj \
 JSAB/StatText.eobj: stdapp.goh object.goh ui.goh Objects/metaC.goh \
                 Objects/inputC.goh Objects/clipbrd.goh \
@@ -761,8 +761,8 @@ JSAB/StatText.eobj: geos.h heap.h geode.h resource.h ec.h object.h lmem.h \
                 Objects/gInterC.h Objects/Text/tCommon.h stylesh.h \
                 driver.h thread.h print.h Internal/spoolInt.h serialDr.h \
                 parallDr.h hugearr.h fileEnum.h product.h htmlfstr.h \
-                awatcher.h htmlopt.h htmldrv.h math.h fixes.h htmlprog.h \
-                hwlib.h medium.h
+                awatcher.h htmlopt.h htmldrv.h math.h htmlprog.h hwlib.h \
+                medium.h
 JSAB/UIRare.obj \
 JSAB/UIRare.eobj: stdapp.goh object.goh ui.goh Objects/metaC.goh \
                 Objects/inputC.goh Objects/clipbrd.goh \
@@ -782,9 +782,9 @@ JSAB/UIRare.eobj: stdapp.goh object.goh ui.goh Objects/metaC.goh \
                 Objects/gGadgetC.goh Objects/gToolCC.goh \
                 Objects/gValueC.goh Objects/gToolGC.goh \
                 Objects/helpCC.goh Objects/Text/tCtrlC.goh ruler.goh \
-                Objects/colorC.goh Objects/styles.goh fixes.goh \
-                htmlview.goh product.goh Objects/gViewCC.goh options.goh \
-                prodgpc.goh html4par.goh Objects/vLTextC.goh htmlstat.goh \
+                Objects/colorC.goh Objects/styles.goh htmlview.goh \
+                product.goh Objects/gViewCC.goh options.goh prodgpc.goh \
+                html4par.goh Objects/vLTextC.goh htmlstat.goh \
                 stattext.goh urlfetch.goh mailhub.goh socket.goh \
                 sockmisc.h parentc.goh favorite.goh importg.goh \
                 expire.goh glbanim.goh Objects/gSysC.goh
@@ -798,8 +798,8 @@ JSAB/UIRare.eobj: geos.h heap.h geode.h resource.h ec.h object.h lmem.h \
                 driver.h thread.h print.h Internal/spoolInt.h serialDr.h \
                 parallDr.h hugearr.h fileEnum.h initfile.h sysstats.h \
                 sem.h Ansi/string.h Ansi/stdio.h Ansi/stdlib.h geoMisc.h \
-                fixes.h product.h htmlfstr.h awatcher.h htmlopt.h \
-                htmldrv.h math.h htmlprog.h hwlib.h medium.h
+                product.h htmlfstr.h awatcher.h htmlopt.h htmldrv.h \
+                math.h htmlprog.h hwlib.h medium.h
 JSAB/GLBANIM.obj \
 JSAB/GLBANIM.eobj: stdapp.goh object.goh ui.goh Objects/metaC.goh \
                 Objects/inputC.goh Objects/clipbrd.goh \
@@ -883,9 +883,9 @@ JSAB/HTMLVIEW.eobj: stdapp.goh object.goh ui.goh Objects/metaC.goh \
                 Objects/gGadgetC.goh Objects/gToolCC.goh \
                 Objects/gValueC.goh Objects/gToolGC.goh \
                 Objects/helpCC.goh Objects/Text/tCtrlC.goh ruler.goh \
-                Objects/colorC.goh Objects/styles.goh fixes.goh \
-                htmlview.goh product.goh Objects/gViewCC.goh options.goh \
-                prodgpc.goh html4par.goh Objects/vLTextC.goh htmlstat.goh \
+                Objects/colorC.goh Objects/styles.goh htmlview.goh \
+                product.goh Objects/gViewCC.goh options.goh prodgpc.goh \
+                html4par.goh Objects/vLTextC.goh htmlstat.goh \
                 stattext.goh urlfetch.goh mailhub.goh socket.goh \
                 sockmisc.h parentc.goh favorite.goh importg.goh \
                 expire.goh htmlv_ui.goh glbanim.goh Objects/iDialCC.goh \
@@ -908,16 +908,16 @@ JSAB/HTMLVIEW.eobj: geos.h heap.h geode.h resource.h ec.h object.h lmem.h \
                 driver.h thread.h print.h Internal/spoolInt.h serialDr.h \
                 parallDr.h hugearr.h fileEnum.h initfile.h sysstats.h \
                 sem.h Ansi/string.h Ansi/stdio.h Ansi/stdlib.h geoMisc.h \
-                fixes.h product.h htmlfstr.h awatcher.h htmlopt.h \
-                htmldrv.h math.h htmlprog.h hwlib.h medium.h javascr.h \
-                JS/jseopt.h JS/seall.h JS/jsedef.h JS/sesyshdr.h \
-                Ansi/assert.h JS/jsetypes.h JS/seuni.h JS/sefp.h \
-                JS/fp_emul.h JS/jselib.h JS/selibdef.h JS/selink.h \
-                JS/cmdline.h JS/dbgprntf.h JS/dirparts.h JS/findfile.h \
-                JS/globldat.h JS/utilhuge.h JS/jsemem.h JS/seappsrv.h \
-                JS/utilstr.h JS/varcall.h JS/fsearch.h JS/getsourc.h \
-                JS/printerr.h JS/seliball.h JS/seecma.h JS/regex.h \
-                JS/selibcom.h JS/setxtlib.h JS/seobjfun.h sebrowse.h
+                product.h htmlfstr.h awatcher.h htmlopt.h htmldrv.h \
+                math.h htmlprog.h hwlib.h medium.h javascr.h JS/jseopt.h \
+                JS/seall.h JS/jsedef.h JS/sesyshdr.h Ansi/assert.h \
+                JS/jsetypes.h JS/seuni.h JS/sefp.h JS/fp_emul.h \
+                JS/jselib.h JS/selibdef.h JS/selink.h JS/cmdline.h \
+                JS/dbgprntf.h JS/dirparts.h JS/findfile.h JS/globldat.h \
+                JS/utilhuge.h JS/jsemem.h JS/seappsrv.h JS/utilstr.h \
+                JS/varcall.h JS/fsearch.h JS/getsourc.h JS/printerr.h \
+                JS/seliball.h JS/seecma.h JS/regex.h JS/selibcom.h \
+                JS/setxtlib.h JS/seobjfun.h sebrowse.h
 JSAB/ImportG.obj \
 JSAB/ImportG.eobj: stdapp.goh object.goh ui.goh Objects/metaC.goh \
                 Objects/inputC.goh Objects/clipbrd.goh \
@@ -951,7 +951,7 @@ JSAB/ImportG.eobj: geos.h heap.h geode.h resource.h ec.h object.h lmem.h \
                 Objects/gInterC.h Objects/Text/tCommon.h stylesh.h \
                 driver.h thread.h print.h Internal/spoolInt.h serialDr.h \
                 parallDr.h hugearr.h fileEnum.h library.h product.h \
-                htmlfstr.h awatcher.h htmlopt.h htmldrv.h math.h fixes.h \
+                htmlfstr.h awatcher.h htmlopt.h htmldrv.h math.h \
                 htmlprog.h hwlib.h medium.h Ansi/stdio.h sem.h
 JSAB/UIAction.obj \
 JSAB/UIAction.eobj: stdapp.goh object.goh ui.goh Objects/metaC.goh \
@@ -972,9 +972,9 @@ JSAB/UIAction.eobj: stdapp.goh object.goh ui.goh Objects/metaC.goh \
                 Objects/gGadgetC.goh Objects/gToolCC.goh \
                 Objects/gValueC.goh Objects/gToolGC.goh \
                 Objects/helpCC.goh Objects/Text/tCtrlC.goh ruler.goh \
-                Objects/colorC.goh Objects/styles.goh fixes.goh \
-                htmlview.goh product.goh Objects/gViewCC.goh options.goh \
-                prodgpc.goh html4par.goh Objects/vLTextC.goh htmlstat.goh \
+                Objects/colorC.goh Objects/styles.goh htmlview.goh \
+                product.goh Objects/gViewCC.goh options.goh prodgpc.goh \
+                html4par.goh Objects/vLTextC.goh htmlstat.goh \
                 stattext.goh urlfetch.goh mailhub.goh socket.goh \
                 sockmisc.h parentc.goh favorite.goh importg.goh \
                 expire.goh
@@ -988,8 +988,8 @@ JSAB/UIAction.eobj: geos.h heap.h geode.h resource.h ec.h object.h lmem.h \
                 driver.h thread.h print.h Internal/spoolInt.h serialDr.h \
                 parallDr.h hugearr.h fileEnum.h initfile.h sysstats.h \
                 sem.h Ansi/string.h Ansi/stdio.h Ansi/stdlib.h geoMisc.h \
-                fixes.h product.h htmlfstr.h awatcher.h htmlopt.h \
-                htmldrv.h math.h htmlprog.h hwlib.h medium.h
+                product.h htmlfstr.h awatcher.h htmlopt.h htmldrv.h \
+                math.h htmlprog.h hwlib.h medium.h
 JSAB/LoadURL.obj \
 JSAB/LoadURL.eobj: stdapp.goh object.goh ui.goh Objects/metaC.goh \
                 Objects/inputC.goh Objects/clipbrd.goh \
@@ -1008,7 +1008,7 @@ JSAB/LoadURL.eobj: stdapp.goh object.goh ui.goh Objects/metaC.goh \
                 Objects/gItemC.goh Objects/gBoolC.goh \
                 Objects/gGadgetC.goh Objects/gToolCC.goh \
                 Objects/gValueC.goh Objects/gToolGC.goh \
-                Objects/helpCC.goh fixes.goh htmlview.goh product.goh \
+                Objects/helpCC.goh htmlview.goh product.goh \
                 Objects/gViewCC.goh options.goh prodgpc.goh html4par.goh \
                 Objects/vLTextC.goh htmlstat.goh stattext.goh \
                 urlfetch.goh mailhub.goh socket.goh sockmisc.h \
@@ -1024,9 +1024,9 @@ JSAB/LoadURL.eobj: geos.h heap.h geode.h resource.h ec.h object.h lmem.h \
                 Objects/gInterC.h Objects/Text/tCommon.h stylesh.h \
                 driver.h thread.h print.h Internal/spoolInt.h serialDr.h \
                 parallDr.h hugearr.h fileEnum.h library.h Ansi/string.h \
-                Ansi/stdio.h Ansi/stdlib.h geoMisc.h fixes.h product.h \
-                htmlfstr.h awatcher.h htmlopt.h htmldrv.h math.h \
-                htmlprog.h hwlib.h medium.h initfile.h
+                Ansi/stdio.h Ansi/stdlib.h geoMisc.h product.h htmlfstr.h \
+                awatcher.h htmlopt.h htmldrv.h math.h htmlprog.h hwlib.h \
+                medium.h initfile.h
 JSAB/OpenClos.obj \
 JSAB/OpenClos.eobj: stdapp.goh object.goh ui.goh Objects/metaC.goh \
                 Objects/inputC.goh Objects/clipbrd.goh \
@@ -1046,9 +1046,9 @@ JSAB/OpenClos.eobj: stdapp.goh object.goh ui.goh Objects/metaC.goh \
                 Objects/gGadgetC.goh Objects/gToolCC.goh \
                 Objects/gValueC.goh Objects/gToolGC.goh \
                 Objects/helpCC.goh Objects/Text/tCtrlC.goh ruler.goh \
-                Objects/colorC.goh Objects/styles.goh fixes.goh \
-                htmlview.goh product.goh Objects/gViewCC.goh options.goh \
-                prodgpc.goh html4par.goh Objects/vLTextC.goh htmlstat.goh \
+                Objects/colorC.goh Objects/styles.goh htmlview.goh \
+                product.goh Objects/gViewCC.goh options.goh prodgpc.goh \
+                html4par.goh Objects/vLTextC.goh htmlstat.goh \
                 stattext.goh urlfetch.goh mailhub.goh socket.goh \
                 sockmisc.h parentc.goh favorite.goh importg.goh \
                 expire.goh iapp.h Objects/gSysC.goh
@@ -1062,8 +1062,8 @@ JSAB/OpenClos.eobj: geos.h heap.h geode.h resource.h ec.h object.h lmem.h \
                 driver.h thread.h print.h Internal/spoolInt.h serialDr.h \
                 parallDr.h hugearr.h fileEnum.h initfile.h sysstats.h \
                 sem.h Ansi/string.h Ansi/stdio.h Ansi/stdlib.h geoMisc.h \
-                fixes.h product.h htmlfstr.h awatcher.h htmlopt.h \
-                htmldrv.h math.h htmlprog.h hwlib.h medium.h
+                product.h htmlfstr.h awatcher.h htmlopt.h htmldrv.h \
+                math.h htmlprog.h hwlib.h medium.h
 JSAB/UIOften.obj \
 JSAB/UIOften.eobj: stdapp.goh object.goh ui.goh Objects/metaC.goh \
                 Objects/inputC.goh Objects/clipbrd.goh \
@@ -1083,9 +1083,9 @@ JSAB/UIOften.eobj: stdapp.goh object.goh ui.goh Objects/metaC.goh \
                 Objects/gGadgetC.goh Objects/gToolCC.goh \
                 Objects/gValueC.goh Objects/gToolGC.goh \
                 Objects/helpCC.goh Objects/Text/tCtrlC.goh ruler.goh \
-                Objects/colorC.goh Objects/styles.goh fixes.goh \
-                htmlview.goh product.goh Objects/gViewCC.goh options.goh \
-                prodgpc.goh html4par.goh Objects/vLTextC.goh htmlstat.goh \
+                Objects/colorC.goh Objects/styles.goh htmlview.goh \
+                product.goh Objects/gViewCC.goh options.goh prodgpc.goh \
+                html4par.goh Objects/vLTextC.goh htmlstat.goh \
                 stattext.goh urlfetch.goh mailhub.goh socket.goh \
                 sockmisc.h parentc.goh favorite.goh importg.goh \
                 expire.goh Objects/gSysC.goh
@@ -1099,7 +1099,7 @@ JSAB/UIOften.eobj: geos.h heap.h geode.h resource.h ec.h object.h lmem.h \
                 driver.h thread.h print.h Internal/spoolInt.h serialDr.h \
                 parallDr.h hugearr.h fileEnum.h initfile.h sysstats.h \
                 sem.h Ansi/string.h Ansi/stdio.h Ansi/stdlib.h geoMisc.h \
-                fixes.h product.h htmlfstr.h awatcher.h htmlopt.h \
-                htmldrv.h math.h htmlprog.h hwlib.h medium.h
+                product.h htmlfstr.h awatcher.h htmlopt.h htmldrv.h \
+                math.h htmlprog.h hwlib.h medium.h
 
 JSAB/bbxbrowEC.geo JSAB/bbxbrow.geo : geos.ldf ui.ldf ansic.ldf text.ldf spool.ldf html4par.ldf ibms.ldf netutils.ldf cookies.ldf js.ldf parentc.ldf idialc.ldf wav.ldf mailhub.ldf socket.ldf profpnt.ldf 
