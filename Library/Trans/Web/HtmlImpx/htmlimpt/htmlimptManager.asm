@@ -7,7 +7,7 @@ include Objects/gCtrlC.def
 ; properly with the C segment of the same name.
 
 imptproc_TEXT   segment byte public 'CODE'
-  extrn  IMPROTPROCEDURE: far
+  extrn  IMPORTPROCEDURE: far
   extrn  GETFORMAT: far
 imptproc_TEXT   ends
 
@@ -68,7 +68,7 @@ _vmc    local   dword
           push    ss                    ; arg 2: pointer to vm chain return buf
           lea     ax,_vmc
           push    ax
-          call    EXPORTPROCEDURE       ; Call high-level procedure to do work
+          call    IMPORTPROCEDURE       ; Call high-level procedure to do work
           mov     bx,dx                 ; BX:AX returns error code or format ID
           movdw   dxcx,_vmc             ; VMChain of object returned in DX:CX
         .leave

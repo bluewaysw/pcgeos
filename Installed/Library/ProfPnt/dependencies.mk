@@ -1,5 +1,5 @@
-wmg3ext.obj \
-wmg3ext.eobj: stdapp.goh object.goh ui.goh Objects/metaC.goh \
+ProfPnt.obj \
+ProfPnt.eobj: stdapp.goh object.goh ui.goh Objects/metaC.goh \
                 Objects/inputC.goh Objects/clipbrd.goh \
                 Objects/uiInputC.goh iacp.goh Objects/winC.goh \
                 Objects/gProcC.goh alb.goh Objects/processC.goh \
@@ -16,17 +16,16 @@ wmg3ext.eobj: stdapp.goh object.goh ui.goh Objects/metaC.goh \
                 Objects/gItemC.goh Objects/gBoolC.goh \
                 Objects/gGadgetC.goh Objects/gToolCC.goh \
                 Objects/gValueC.goh Objects/gToolGC.goh \
-                Objects/helpCC.goh library.h iapp.h
-wmg3ext.obj \
-wmg3ext.eobj: geos.h heap.h geode.h resource.h ec.h object.h lmem.h \
+                Objects/helpCC.goh
+ProfPnt.obj \
+ProfPnt.eobj: geos.h heap.h geode.h resource.h ec.h object.h lmem.h \
                 graphics.h fontID.h font.h color.h gstring.h timer.h vm.h \
                 dbase.h localize.h Ansi/ctype.h timedate.h file.h \
                 sllang.h system.h geoworks.h chunkarr.h Objects/helpCC.h \
                 disk.h drive.h input.h char.h hwr.h win.h uDialog.h \
                 Objects/gInterC.h Objects/Text/tCommon.h stylesh.h \
                 driver.h thread.h print.h Internal/spoolInt.h serialDr.h \
-                parallDr.h hugearr.h fileEnum.h geoMisc.h Ansi/string.h \
-                Ansi/stdio.h Ansi/stdlib.h initfile.h htmldrv.h product.h \
-                math.h htmlfstr.h awatcher.h htmlprog.h
+                parallDr.h hugearr.h fileEnum.h Ansi/stdio.h \
+                Ansi/string.h sem.h library.h
 
-wmg3extEC.geo wmg3ext.geo : geos.ldf ansic.ldf ui.ldf 
+profpntEC.geo profpnt.geo : geos.ldf ansic.ldf 

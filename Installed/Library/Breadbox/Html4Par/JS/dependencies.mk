@@ -46,8 +46,8 @@ JS/htmltpos.eobj: stdapp.goh object.goh ui.goh Objects/metaC.goh \
                 Objects/gGadgetC.goh Objects/gToolCC.goh \
                 Objects/gValueC.goh Objects/gToolGC.goh \
                 Objects/helpCC.goh Objects/Text/tCtrlC.goh ruler.goh \
-                Objects/colorC.goh Objects/styles.goh fixes.goh \
-                options.goh html4par.goh product.goh Objects/vLTextC.goh
+                Objects/colorC.goh Objects/styles.goh options.goh \
+                html4par.goh product.goh Objects/vLTextC.goh
 JS/htmltpos.obj \
 JS/htmltpos.eobj: geos.h heap.h geode.h resource.h ec.h object.h lmem.h \
                 graphics.h fontID.h font.h color.h gstring.h timer.h vm.h \
@@ -57,7 +57,7 @@ JS/htmltpos.eobj: geos.h heap.h geode.h resource.h ec.h object.h lmem.h \
                 Objects/gInterC.h Objects/Text/tCommon.h stylesh.h \
                 driver.h thread.h print.h Internal/spoolInt.h serialDr.h \
                 parallDr.h hugearr.h fileEnum.h Ansi/string.h \
-                Ansi/stdio.h Ansi/stdlib.h fixes.h product.h htmlfstr.h \
+                Ansi/stdio.h Ansi/stdlib.h product.h htmlfstr.h \
                 awatcher.h htmlopt.h regiont.h internal.h hwlib.h \
                 errors.h tableint.h
 JS/htmlfdrw.obj \
@@ -79,9 +79,9 @@ JS/htmlfdrw.eobj: stdapp.goh object.goh ui.goh Objects/metaC.goh \
                 Objects/gGadgetC.goh Objects/gToolCC.goh \
                 Objects/gValueC.goh Objects/gToolGC.goh \
                 Objects/helpCC.goh Objects/Text/tCtrlC.goh ruler.goh \
-                Objects/colorC.goh Objects/styles.goh fixes.goh \
-                options.goh html4par.goh product.goh Objects/vLTextC.goh \
-                extgraph.goh radio0.goh radio1.goh
+                Objects/colorC.goh Objects/styles.goh options.goh \
+                html4par.goh product.goh Objects/vLTextC.goh extgraph.goh \
+                radio0.goh radio1.goh
 JS/htmlfdrw.obj \
 JS/htmlfdrw.eobj: geos.h heap.h geode.h resource.h ec.h object.h lmem.h \
                 graphics.h fontID.h font.h color.h gstring.h timer.h vm.h \
@@ -91,7 +91,7 @@ JS/htmlfdrw.eobj: geos.h heap.h geode.h resource.h ec.h object.h lmem.h \
                 Objects/gInterC.h Objects/Text/tCommon.h stylesh.h \
                 driver.h thread.h print.h Internal/spoolInt.h serialDr.h \
                 parallDr.h hugearr.h fileEnum.h Ansi/string.h \
-                Ansi/stdio.h Ansi/stdlib.h fixes.h product.h htmlfstr.h \
+                Ansi/stdio.h Ansi/stdlib.h product.h htmlfstr.h \
                 awatcher.h htmlopt.h regiont.h internal.h hwlib.h \
                 tableint.h htmlclas/formset.h htmldrv.h math.h htmlprog.h
 JS/htmlclas.obj \
@@ -113,8 +113,8 @@ JS/htmlclas.eobj: stdapp.goh object.goh ui.goh Objects/metaC.goh \
                 Objects/gGadgetC.goh Objects/gToolCC.goh \
                 Objects/gValueC.goh Objects/gToolGC.goh \
                 Objects/helpCC.goh Objects/Text/tCtrlC.goh ruler.goh \
-                Objects/colorC.goh Objects/styles.goh fixes.goh \
-                options.goh html4par.goh product.goh Objects/vLTextC.goh
+                Objects/colorC.goh Objects/styles.goh options.goh \
+                html4par.goh product.goh Objects/vLTextC.goh
 JS/htmlclas.obj \
 JS/htmlclas.eobj: geos.h heap.h geode.h resource.h ec.h object.h lmem.h \
                 graphics.h fontID.h font.h color.h gstring.h timer.h vm.h \
@@ -124,7 +124,7 @@ JS/htmlclas.eobj: geos.h heap.h geode.h resource.h ec.h object.h lmem.h \
                 Objects/gInterC.h Objects/Text/tCommon.h stylesh.h \
                 driver.h thread.h print.h Internal/spoolInt.h serialDr.h \
                 parallDr.h hugearr.h fileEnum.h Ansi/string.h \
-                Ansi/stdio.h Ansi/stdlib.h fixes.h product.h htmlfstr.h \
+                Ansi/stdio.h Ansi/stdlib.h product.h htmlfstr.h \
                 awatcher.h htmlopt.h htmldrv.h math.h htmlprog.h hwlib.h \
                 regiont.h internal.h tableint.h errors.h
 JS/htmltdrw.obj \
@@ -146,9 +146,8 @@ JS/htmltdrw.eobj: stdapp.goh object.goh ui.goh Objects/metaC.goh \
                 Objects/gGadgetC.goh Objects/gToolCC.goh \
                 Objects/gValueC.goh Objects/gToolGC.goh \
                 Objects/helpCC.goh Objects/Text/tCtrlC.goh ruler.goh \
-                Objects/colorC.goh Objects/styles.goh fixes.goh \
-                options.goh html4par.goh product.goh Objects/vLTextC.goh \
-                extgraph.goh
+                Objects/colorC.goh Objects/styles.goh options.goh \
+                html4par.goh product.goh Objects/vLTextC.goh extgraph.goh
 JS/htmltdrw.obj \
 JS/htmltdrw.eobj: geos.h heap.h geode.h resource.h ec.h object.h lmem.h \
                 graphics.h fontID.h font.h color.h gstring.h timer.h vm.h \
@@ -158,7 +157,7 @@ JS/htmltdrw.eobj: geos.h heap.h geode.h resource.h ec.h object.h lmem.h \
                 Objects/gInterC.h Objects/Text/tCommon.h stylesh.h \
                 driver.h thread.h print.h Internal/spoolInt.h serialDr.h \
                 parallDr.h hugearr.h fileEnum.h Ansi/string.h \
-                Ansi/stdio.h Ansi/stdlib.h fixes.h product.h htmlfstr.h \
+                Ansi/stdio.h Ansi/stdlib.h product.h htmlfstr.h \
                 awatcher.h htmlopt.h htmldrv.h math.h htmlprog.h \
                 regiont.h internal.h hwlib.h tableint.h
 JS/htmlcol.obj \
@@ -180,8 +179,8 @@ JS/htmlcol.eobj: stdapp.goh object.goh ui.goh Objects/metaC.goh \
                 Objects/gGadgetC.goh Objects/gToolCC.goh \
                 Objects/gValueC.goh Objects/gToolGC.goh \
                 Objects/helpCC.goh Objects/Text/tCtrlC.goh ruler.goh \
-                Objects/colorC.goh Objects/styles.goh fixes.goh \
-                options.goh html4par.goh product.goh Objects/vLTextC.goh
+                Objects/colorC.goh Objects/styles.goh options.goh \
+                html4par.goh product.goh Objects/vLTextC.goh
 JS/htmlcol.obj \
 JS/htmlcol.eobj: geos.h heap.h geode.h resource.h ec.h object.h lmem.h \
                 graphics.h fontID.h font.h color.h gstring.h timer.h vm.h \
@@ -191,7 +190,7 @@ JS/htmlcol.eobj: geos.h heap.h geode.h resource.h ec.h object.h lmem.h \
                 Objects/gInterC.h Objects/Text/tCommon.h stylesh.h \
                 driver.h thread.h print.h Internal/spoolInt.h serialDr.h \
                 parallDr.h hugearr.h fileEnum.h Ansi/string.h \
-                Ansi/stdio.h Ansi/stdlib.h fixes.h product.h htmlfstr.h \
+                Ansi/stdio.h Ansi/stdlib.h product.h htmlfstr.h \
                 awatcher.h htmlopt.h regiont.h internal.h hwlib.h \
                 tableint.h errors.h
 JS/htmltabl.obj \
@@ -213,8 +212,8 @@ JS/htmltabl.eobj: stdapp.goh object.goh ui.goh Objects/metaC.goh \
                 Objects/gGadgetC.goh Objects/gToolCC.goh \
                 Objects/gValueC.goh Objects/gToolGC.goh \
                 Objects/helpCC.goh Objects/Text/tCtrlC.goh ruler.goh \
-                Objects/colorC.goh Objects/styles.goh ec.h fixes.goh \
-                options.goh html4par.goh product.goh Objects/vLTextC.goh
+                Objects/colorC.goh Objects/styles.goh ec.h options.goh \
+                html4par.goh product.goh Objects/vLTextC.goh
 JS/htmltabl.obj \
 JS/htmltabl.eobj: geos.h heap.h geode.h resource.h ec.h object.h lmem.h \
                 graphics.h fontID.h font.h color.h gstring.h timer.h vm.h \
@@ -224,7 +223,7 @@ JS/htmltabl.eobj: geos.h heap.h geode.h resource.h ec.h object.h lmem.h \
                 Objects/gInterC.h Objects/Text/tCommon.h stylesh.h \
                 driver.h thread.h print.h Internal/spoolInt.h serialDr.h \
                 parallDr.h hugearr.h fileEnum.h Ansi/string.h \
-                Ansi/stdio.h Ansi/stdlib.h fixes.h product.h htmlfstr.h \
+                Ansi/stdio.h Ansi/stdlib.h product.h htmlfstr.h \
                 awatcher.h htmlopt.h regiont.h internal.h hwlib.h \
                 errors.h tableint.h
 JS/htmlclrt.obj \
@@ -246,9 +245,8 @@ JS/htmlclrt.eobj: stdapp.goh object.goh ui.goh Objects/metaC.goh \
                 Objects/gGadgetC.goh Objects/gToolCC.goh \
                 Objects/gValueC.goh Objects/gToolGC.goh \
                 Objects/helpCC.goh Objects/Text/tCtrlC.goh ruler.goh \
-                Objects/colorC.goh Objects/styles.goh fixes.goh \
-                options.goh html4par.goh product.goh Objects/vLTextC.goh \
-                extgraph.goh
+                Objects/colorC.goh Objects/styles.goh options.goh \
+                html4par.goh product.goh Objects/vLTextC.goh extgraph.goh
 JS/htmlclrt.obj \
 JS/htmlclrt.eobj: geos.h heap.h geode.h resource.h ec.h object.h lmem.h \
                 graphics.h fontID.h font.h color.h gstring.h timer.h vm.h \
@@ -258,7 +256,7 @@ JS/htmlclrt.eobj: geos.h heap.h geode.h resource.h ec.h object.h lmem.h \
                 Objects/gInterC.h Objects/Text/tCommon.h stylesh.h \
                 driver.h thread.h print.h Internal/spoolInt.h serialDr.h \
                 parallDr.h hugearr.h fileEnum.h Ansi/string.h \
-                Ansi/stdio.h Ansi/stdlib.h fixes.h product.h htmlfstr.h \
+                Ansi/stdio.h Ansi/stdlib.h product.h htmlfstr.h \
                 awatcher.h htmlopt.h regiont.h internal.h hwlib.h
 JS/htmltcel.obj \
 JS/htmltcel.eobj: stdapp.goh object.goh ui.goh Objects/metaC.goh \
@@ -279,9 +277,8 @@ JS/htmltcel.eobj: stdapp.goh object.goh ui.goh Objects/metaC.goh \
                 Objects/gGadgetC.goh Objects/gToolCC.goh \
                 Objects/gValueC.goh Objects/gToolGC.goh \
                 Objects/helpCC.goh Objects/Text/tCtrlC.goh ruler.goh \
-                Objects/colorC.goh Objects/styles.goh fixes.goh \
-                options.goh html4par.goh product.goh Objects/vLTextC.goh \
-                initfile.h
+                Objects/colorC.goh Objects/styles.goh options.goh \
+                html4par.goh product.goh Objects/vLTextC.goh initfile.h
 JS/htmltcel.obj \
 JS/htmltcel.eobj: geos.h heap.h geode.h resource.h ec.h object.h lmem.h \
                 graphics.h fontID.h font.h color.h gstring.h timer.h vm.h \
@@ -291,7 +288,7 @@ JS/htmltcel.eobj: geos.h heap.h geode.h resource.h ec.h object.h lmem.h \
                 Objects/gInterC.h Objects/Text/tCommon.h stylesh.h \
                 driver.h thread.h print.h Internal/spoolInt.h serialDr.h \
                 parallDr.h hugearr.h fileEnum.h Ansi/string.h \
-                Ansi/stdio.h Ansi/stdlib.h fixes.h product.h htmlfstr.h \
+                Ansi/stdio.h Ansi/stdlib.h product.h htmlfstr.h \
                 awatcher.h htmlopt.h regiont.h internal.h hwlib.h \
                 errors.h tableint.h
 JS/htmlfedi.obj \
@@ -313,9 +310,8 @@ JS/htmlfedi.eobj: stdapp.goh object.goh ui.goh Objects/metaC.goh \
                 Objects/gGadgetC.goh Objects/gToolCC.goh \
                 Objects/gValueC.goh Objects/gToolGC.goh \
                 Objects/helpCC.goh Objects/Text/tCtrlC.goh ruler.goh \
-                Objects/colorC.goh Objects/styles.goh fixes.goh \
-                options.goh html4par.goh product.goh Objects/vLTextC.goh \
-                extgraph.goh
+                Objects/colorC.goh Objects/styles.goh options.goh \
+                html4par.goh product.goh Objects/vLTextC.goh extgraph.goh
 JS/htmlfedi.obj \
 JS/htmlfedi.eobj: geos.h heap.h geode.h resource.h ec.h object.h lmem.h \
                 graphics.h fontID.h font.h color.h gstring.h timer.h vm.h \
@@ -325,7 +321,7 @@ JS/htmlfedi.eobj: geos.h heap.h geode.h resource.h ec.h object.h lmem.h \
                 Objects/gInterC.h Objects/Text/tCommon.h stylesh.h \
                 driver.h thread.h print.h Internal/spoolInt.h serialDr.h \
                 parallDr.h hugearr.h fileEnum.h Ansi/string.h \
-                Ansi/stdio.h Ansi/stdlib.h fixes.h product.h htmlfstr.h \
+                Ansi/stdio.h Ansi/stdlib.h product.h htmlfstr.h \
                 awatcher.h htmlopt.h regiont.h internal.h hwlib.h \
                 htmlclas/formset.h
 JS/htmltpre.obj \
@@ -347,8 +343,8 @@ JS/htmltpre.eobj: stdapp.goh object.goh ui.goh Objects/metaC.goh \
                 Objects/gGadgetC.goh Objects/gToolCC.goh \
                 Objects/gValueC.goh Objects/gToolGC.goh \
                 Objects/helpCC.goh Objects/Text/tCtrlC.goh ruler.goh \
-                Objects/colorC.goh Objects/styles.goh fixes.goh \
-                options.goh html4par.goh product.goh Objects/vLTextC.goh
+                Objects/colorC.goh Objects/styles.goh options.goh \
+                html4par.goh product.goh Objects/vLTextC.goh
 JS/htmltpre.obj \
 JS/htmltpre.eobj: geos.h heap.h geode.h resource.h ec.h object.h lmem.h \
                 graphics.h fontID.h font.h color.h gstring.h timer.h vm.h \
@@ -358,7 +354,7 @@ JS/htmltpre.eobj: geos.h heap.h geode.h resource.h ec.h object.h lmem.h \
                 Objects/gInterC.h Objects/Text/tCommon.h stylesh.h \
                 driver.h thread.h print.h Internal/spoolInt.h serialDr.h \
                 parallDr.h hugearr.h fileEnum.h Ansi/string.h \
-                Ansi/stdio.h Ansi/stdlib.h fixes.h product.h htmlfstr.h \
+                Ansi/stdio.h Ansi/stdlib.h product.h htmlfstr.h \
                 awatcher.h htmlopt.h regiont.h internal.h hwlib.h \
                 errors.h tableint.h
 JS/htmlform.obj \
@@ -380,8 +376,8 @@ JS/htmlform.eobj: stdapp.goh object.goh ui.goh Objects/metaC.goh \
                 Objects/gGadgetC.goh Objects/gToolCC.goh \
                 Objects/gValueC.goh Objects/gToolGC.goh \
                 Objects/helpCC.goh Objects/Text/tCtrlC.goh ruler.goh \
-                Objects/colorC.goh Objects/styles.goh fixes.goh \
-                options.goh html4par.goh product.goh Objects/vLTextC.goh
+                Objects/colorC.goh Objects/styles.goh options.goh \
+                html4par.goh product.goh Objects/vLTextC.goh
 JS/htmlform.obj \
 JS/htmlform.eobj: geos.h heap.h geode.h resource.h ec.h object.h lmem.h \
                 graphics.h fontID.h font.h color.h gstring.h timer.h vm.h \
@@ -391,9 +387,9 @@ JS/htmlform.eobj: geos.h heap.h geode.h resource.h ec.h object.h lmem.h \
                 Objects/gInterC.h Objects/Text/tCommon.h stylesh.h \
                 driver.h thread.h print.h Internal/spoolInt.h serialDr.h \
                 parallDr.h hugearr.h fileEnum.h Ansi/string.h \
-                Ansi/stdio.h Ansi/stdlib.h geoMisc.h fixes.h product.h \
-                htmlfstr.h awatcher.h htmlopt.h regiont.h internal.h \
-                hwlib.h errors.h htmlclas/formset.h
+                Ansi/stdio.h Ansi/stdlib.h geoMisc.h product.h htmlfstr.h \
+                awatcher.h htmlopt.h regiont.h internal.h hwlib.h \
+                errors.h htmlclas/formset.h
 JS/htmlfsiz.obj \
 JS/htmlfsiz.eobj: stdapp.goh object.goh ui.goh Objects/metaC.goh \
                 Objects/inputC.goh Objects/clipbrd.goh \
@@ -413,9 +409,8 @@ JS/htmlfsiz.eobj: stdapp.goh object.goh ui.goh Objects/metaC.goh \
                 Objects/gGadgetC.goh Objects/gToolCC.goh \
                 Objects/gValueC.goh Objects/gToolGC.goh \
                 Objects/helpCC.goh Objects/Text/tCtrlC.goh ruler.goh \
-                Objects/colorC.goh Objects/styles.goh fixes.goh \
-                options.goh html4par.goh product.goh Objects/vLTextC.goh \
-                extgraph.goh
+                Objects/colorC.goh Objects/styles.goh options.goh \
+                html4par.goh product.goh Objects/vLTextC.goh extgraph.goh
 JS/htmlfsiz.obj \
 JS/htmlfsiz.eobj: geos.h heap.h geode.h resource.h ec.h object.h lmem.h \
                 graphics.h fontID.h font.h color.h gstring.h timer.h vm.h \
@@ -425,7 +420,7 @@ JS/htmlfsiz.eobj: geos.h heap.h geode.h resource.h ec.h object.h lmem.h \
                 Objects/gInterC.h Objects/Text/tCommon.h stylesh.h \
                 driver.h thread.h print.h Internal/spoolInt.h serialDr.h \
                 parallDr.h hugearr.h fileEnum.h Ansi/string.h \
-                Ansi/stdio.h Ansi/stdlib.h fixes.h product.h htmlfstr.h \
+                Ansi/stdio.h Ansi/stdlib.h product.h htmlfstr.h \
                 awatcher.h htmlopt.h regiont.h internal.h hwlib.h \
                 htmlclas/formset.h
 JS/dialogt.obj \
@@ -474,7 +469,7 @@ JS/wwwtools.eobj: stdapp.goh object.goh ui.goh Objects/metaC.goh \
                 Objects/gItemC.goh Objects/gBoolC.goh \
                 Objects/gGadgetC.goh Objects/gToolCC.goh \
                 Objects/gValueC.goh Objects/gToolGC.goh \
-                Objects/helpCC.goh fixes.goh html4par.goh product.goh \
+                Objects/helpCC.goh html4par.goh product.goh \
                 Objects/vLTextC.goh options.goh
 JS/wwwtools.obj \
 JS/wwwtools.eobj: geos.h heap.h geode.h resource.h ec.h object.h lmem.h \
@@ -486,8 +481,8 @@ JS/wwwtools.eobj: geos.h heap.h geode.h resource.h ec.h object.h lmem.h \
                 driver.h thread.h print.h Internal/spoolInt.h serialDr.h \
                 parallDr.h hugearr.h fileEnum.h initfile.h library.h \
                 geoMisc.h Ansi/string.h Ansi/stdio.h Ansi/stdlib.h \
-                fixes.h product.h htmlfstr.h awatcher.h htmlopt.h \
-                internal.h hwlib.h regiont.h
+                product.h htmlfstr.h awatcher.h htmlopt.h internal.h \
+                hwlib.h regiont.h
 JS/namepool.obj \
 JS/namepool.eobj: stdapp.goh object.goh ui.goh Objects/metaC.goh \
                 Objects/inputC.goh Objects/clipbrd.goh \
@@ -506,7 +501,7 @@ JS/namepool.eobj: stdapp.goh object.goh ui.goh Objects/metaC.goh \
                 Objects/gItemC.goh Objects/gBoolC.goh \
                 Objects/gGadgetC.goh Objects/gToolCC.goh \
                 Objects/gValueC.goh Objects/gToolGC.goh \
-                Objects/helpCC.goh fixes.goh html4par.goh product.goh \
+                Objects/helpCC.goh html4par.goh product.goh \
                 Objects/vLTextC.goh options.goh
 JS/namepool.obj \
 JS/namepool.eobj: geos.h heap.h geode.h resource.h ec.h object.h lmem.h \
@@ -518,8 +513,8 @@ JS/namepool.eobj: geos.h heap.h geode.h resource.h ec.h object.h lmem.h \
                 driver.h thread.h print.h Internal/spoolInt.h serialDr.h \
                 parallDr.h hugearr.h fileEnum.h initfile.h library.h \
                 geoMisc.h Ansi/string.h Ansi/stdio.h Ansi/stdlib.h \
-                fixes.h product.h htmlfstr.h awatcher.h htmlopt.h \
-                internal.h hwlib.h regiont.h
+                product.h htmlfstr.h awatcher.h htmlopt.h internal.h \
+                hwlib.h regiont.h
 JS/htmlexpt.obj \
 JS/htmlexpt.eobj: stdapp.goh object.goh ui.goh Objects/metaC.goh \
                 Objects/inputC.goh Objects/clipbrd.goh \
@@ -538,7 +533,7 @@ JS/htmlexpt.eobj: stdapp.goh object.goh ui.goh Objects/metaC.goh \
                 Objects/gItemC.goh Objects/gBoolC.goh \
                 Objects/gGadgetC.goh Objects/gToolCC.goh \
                 Objects/gValueC.goh Objects/gToolGC.goh \
-                Objects/helpCC.goh fixes.goh html4par.goh product.goh \
+                Objects/helpCC.goh html4par.goh product.goh \
                 Objects/vLTextC.goh
 JS/htmlexpt.obj \
 JS/htmlexpt.eobj: geos.h heap.h geode.h resource.h ec.h object.h lmem.h \
@@ -549,9 +544,9 @@ JS/htmlexpt.eobj: geos.h heap.h geode.h resource.h ec.h object.h lmem.h \
                 Objects/gInterC.h Objects/Text/tCommon.h stylesh.h \
                 driver.h thread.h print.h Internal/spoolInt.h serialDr.h \
                 parallDr.h hugearr.h fileEnum.h Ansi/string.h \
-                Ansi/stdio.h Ansi/stdlib.h geoMisc.h xlatLib.h fixes.h \
-                product.h htmlfstr.h awatcher.h htmlopt.h internal.h \
-                hwlib.h regiont.h
+                Ansi/stdio.h Ansi/stdlib.h geoMisc.h xlatLib.h product.h \
+                htmlfstr.h awatcher.h htmlopt.h internal.h hwlib.h \
+                regiont.h
 JS/awatcher.obj \
 JS/awatcher.eobj: stdapp.goh object.goh ui.goh Objects/metaC.goh \
                 Objects/inputC.goh Objects/clipbrd.goh \
@@ -629,8 +624,8 @@ JS/opentags.eobj: stdapp.goh object.goh ui.goh Objects/metaC.goh \
                 Objects/gItemC.goh Objects/gBoolC.goh \
                 Objects/gGadgetC.goh Objects/gToolCC.goh \
                 Objects/gValueC.goh Objects/gToolGC.goh \
-                Objects/helpCC.goh initfile.h fixes.goh html4par.goh \
-                product.goh Objects/vLTextC.goh options.goh
+                Objects/helpCC.goh initfile.h html4par.goh product.goh \
+                Objects/vLTextC.goh options.goh
 JS/opentags.obj \
 JS/opentags.eobj: geos.h heap.h geode.h resource.h ec.h object.h lmem.h \
                 graphics.h fontID.h font.h color.h gstring.h timer.h vm.h \
@@ -640,9 +635,8 @@ JS/opentags.eobj: geos.h heap.h geode.h resource.h ec.h object.h lmem.h \
                 Objects/gInterC.h Objects/Text/tCommon.h stylesh.h \
                 driver.h thread.h print.h Internal/spoolInt.h serialDr.h \
                 parallDr.h hugearr.h fileEnum.h Ansi/string.h \
-                Ansi/stdio.h Ansi/stdlib.h geoMisc.h fixes.h product.h \
-                htmlfstr.h awatcher.h htmlopt.h internal.h hwlib.h \
-                regiont.h
+                Ansi/stdio.h Ansi/stdlib.h geoMisc.h product.h htmlfstr.h \
+                awatcher.h htmlopt.h internal.h hwlib.h regiont.h
 JS/parstags.obj \
 JS/parstags.eobj: stdapp.goh object.goh ui.goh Objects/metaC.goh \
                 Objects/inputC.goh Objects/clipbrd.goh \
@@ -661,8 +655,8 @@ JS/parstags.eobj: stdapp.goh object.goh ui.goh Objects/metaC.goh \
                 Objects/gItemC.goh Objects/gBoolC.goh \
                 Objects/gGadgetC.goh Objects/gToolCC.goh \
                 Objects/gValueC.goh Objects/gToolGC.goh \
-                Objects/helpCC.goh initfile.h fixes.goh options.goh \
-                html4par.goh product.goh Objects/vLTextC.goh
+                Objects/helpCC.goh initfile.h options.goh html4par.goh \
+                product.goh Objects/vLTextC.goh
 JS/parstags.obj \
 JS/parstags.eobj: geos.h heap.h geode.h resource.h ec.h object.h lmem.h \
                 graphics.h fontID.h font.h color.h gstring.h timer.h vm.h \
@@ -672,9 +666,8 @@ JS/parstags.eobj: geos.h heap.h geode.h resource.h ec.h object.h lmem.h \
                 Objects/gInterC.h Objects/Text/tCommon.h stylesh.h \
                 driver.h thread.h print.h Internal/spoolInt.h serialDr.h \
                 parallDr.h hugearr.h fileEnum.h Ansi/string.h \
-                Ansi/stdio.h Ansi/stdlib.h geoMisc.h fixes.h product.h \
-                htmlfstr.h awatcher.h htmlopt.h internal.h hwlib.h \
-                regiont.h
+                Ansi/stdio.h Ansi/stdlib.h geoMisc.h product.h htmlfstr.h \
+                awatcher.h htmlopt.h internal.h hwlib.h regiont.h
 JS/htmlpars.obj \
 JS/htmlpars.eobj: stdapp.goh object.goh ui.goh Objects/metaC.goh \
                 Objects/inputC.goh Objects/clipbrd.goh \
@@ -693,7 +686,7 @@ JS/htmlpars.eobj: stdapp.goh object.goh ui.goh Objects/metaC.goh \
                 Objects/gItemC.goh Objects/gBoolC.goh \
                 Objects/gGadgetC.goh Objects/gToolCC.goh \
                 Objects/gValueC.goh Objects/gToolGC.goh \
-                Objects/helpCC.goh fixes.goh html4par.goh product.goh \
+                Objects/helpCC.goh html4par.goh product.goh \
                 Objects/vLTextC.goh options.goh initfile.h htmlsty.goh
 JS/htmlpars.obj \
 JS/htmlpars.eobj: geos.h heap.h geode.h resource.h ec.h object.h lmem.h \
@@ -704,9 +697,9 @@ JS/htmlpars.eobj: geos.h heap.h geode.h resource.h ec.h object.h lmem.h \
                 Objects/gInterC.h Objects/Text/tCommon.h stylesh.h \
                 driver.h thread.h print.h Internal/spoolInt.h serialDr.h \
                 parallDr.h hugearr.h fileEnum.h Ansi/string.h \
-                Ansi/stdio.h Ansi/stdlib.h geoMisc.h fixes.h product.h \
-                htmlfstr.h awatcher.h htmlopt.h internal.h hwlib.h \
-                regiont.h errors.h
+                Ansi/stdio.h Ansi/stdlib.h geoMisc.h product.h htmlfstr.h \
+                awatcher.h htmlopt.h internal.h hwlib.h regiont.h \
+                errors.h
 JS/parsinit.obj \
 JS/parsinit.eobj: stdapp.goh object.goh ui.goh Objects/metaC.goh \
                 Objects/inputC.goh Objects/clipbrd.goh \
@@ -725,7 +718,7 @@ JS/parsinit.eobj: stdapp.goh object.goh ui.goh Objects/metaC.goh \
                 Objects/gItemC.goh Objects/gBoolC.goh \
                 Objects/gGadgetC.goh Objects/gToolCC.goh \
                 Objects/gValueC.goh Objects/gToolGC.goh \
-                Objects/helpCC.goh fixes.goh html4par.goh product.goh \
+                Objects/helpCC.goh html4par.goh product.goh \
                 Objects/vLTextC.goh options.goh
 JS/parsinit.obj \
 JS/parsinit.eobj: geos.h heap.h geode.h resource.h ec.h object.h lmem.h \
@@ -736,8 +729,8 @@ JS/parsinit.eobj: geos.h heap.h geode.h resource.h ec.h object.h lmem.h \
                 Objects/gInterC.h Objects/Text/tCommon.h stylesh.h \
                 driver.h thread.h print.h Internal/spoolInt.h serialDr.h \
                 parallDr.h hugearr.h fileEnum.h Ansi/string.h \
-                Ansi/stdio.h Ansi/stdlib.h geoMisc.h fixes.h product.h \
-                htmlfstr.h awatcher.h htmlopt.h internal.h hwlib.h \
-                regiont.h errors.h
+                Ansi/stdio.h Ansi/stdlib.h geoMisc.h product.h htmlfstr.h \
+                awatcher.h htmlopt.h internal.h hwlib.h regiont.h \
+                errors.h
 
 JS/html4parEC.geo JS/html4par.geo : geos.ldf ui.ldf ansic.ldf extgraph.ldf text.ldf 
