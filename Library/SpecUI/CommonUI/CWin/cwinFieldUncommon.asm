@@ -1993,12 +1993,6 @@ REVISION HISTORY:
 if _MOTIF and TOOL_AREA_IS_TASK_BAR
 ToolAreaDraw	method dynamic ToolAreaClass, MSG_VIS_DRAW
 
-
-	; push	bp
-	; mov	di, offset ToolAreaClass
-	; call	ObjCallSuperNoLock
-	; pop	di			; di = gstate
-
 	;
 	; if TaskBar == on
 	; RUNTIME
@@ -2009,14 +2003,8 @@ ToolAreaDraw	method dynamic ToolAreaClass, MSG_VIS_DRAW
 	pop	ds					; restore ds
 	jz	done					; skip if no taskbar
 
-	; push	di
-	; mov	di, segment VisCompClass
-	; mov	es, di
-	; mov	di, offset VisCompClass
-	; call	ObjCallClassNoLock
-	; pop	di
-
 	mov	di, bp
+
 
 	call	VisGetBounds
 				;ax, VI_bounds.R_left
@@ -2059,6 +2047,14 @@ draw:
 
 done:
 
+	push	di
+	mov	ax, MSG_VIS_DRAW
+	mov	di, segment VisCompClass
+	mov	es, di
+	mov	di, offset VisCompClass
+	call	ObjCallClassNoLock
+	pop	di
+
 	ret
 ToolAreaDraw	endm
 
@@ -2093,6 +2089,10 @@ REVISION HISTORY:
 if TOOL_AREA_IS_TASK_BAR
 SysTrayInteractionVisDraw	method dynamic SysTrayInteractionClass,
 				MSG_VIS_DRAW
+
+	mov	di, offset SysTrayInteractionClass
+	call	ObjCallSuperNoLock
+
 	;
 	; if TaskBar == on
 	; RUNTIME
@@ -2101,7 +2101,7 @@ SysTrayInteractionVisDraw	method dynamic SysTrayInteractionClass,
 	segmov	ds, dgroup				; load dgroup
 	test	ds:[taskBarPrefs], mask TBF_ENABLED	; test if TBF_ENABLED is set
 	pop	ds					; restore ds
-	jz	callSuper				; skip if no taskbar
+	jz	done				; skip if no taskbar
 
 	push	bp
 	mov	di, offset SysTrayInteractionClass
@@ -2110,16 +2110,13 @@ SysTrayInteractionVisDraw	method dynamic SysTrayInteractionClass,
 
 	call	VisGetBounds
 	push	ax
+
 	call	GetDarkColor		;al <- dark color
 	mov	ah, C_WHITE		;ah <- light color
+
 	mov	bp, ax
 	pop	ax
 	call	OpenDrawRect
-	jmp	done
-
-callSuper:
-	mov	di, offset SysTrayInteractionClass
-	call	ObjCallSuperNoLock
 
 done:
 	ret
