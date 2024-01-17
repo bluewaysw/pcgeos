@@ -27,6 +27,6 @@ DBCS/impdoc.eobj: geos.h heap.h geode.h resource.h ec.h object.h lmem.h \
                 driver.h thread.h print.h Internal/spoolInt.h serialDr.h \
                 parallDr.h hugearr.h fileEnum.h initfile.h library.h \
                 Ansi/string.h geoMisc.h htmldrv.h product.h math.h \
-                fixes.h htmlfstr.h awatcher.h htmlprog.h
+                htmlfstr.h awatcher.h htmlprog.h
 
 DBCS/impdocEC.geo DBCS/impdoc.geo : geos.ldf ansic.ldf ui.ldf 
