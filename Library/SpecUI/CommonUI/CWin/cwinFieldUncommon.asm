@@ -2058,6 +2058,40 @@ done:
 	ret
 ToolAreaDraw	endm
 
+
+ToolAreaMarginer	method dynamic ToolAreaClass, MSG_VIS_COMP_GET_MARGINS
+; MSG_VIS_RECALC_SIZE
+;
+
+;	mov	di, offset ToolAreaClass	;do normal button stuff
+;	CallSuper	MSG_VIS_RECALC_SIZE
+;	call	VisGetBounds
+				;ax, VI_bounds.R_left
+				;cx, VI_bounds.R_right
+				;dx, VI_bounds.R_bottom
+				;bx, VI_bounds.R_top
+;	sub	cx, ax
+;	sub	dx, bx
+;	add	cx, 1
+;	add	dx, 5
+;	ret
+
+
+;RETURN:
+;		ax 	- left margin
+;		bp	- top margin
+;		cx	- right margin
+;		dx	- bottom margin
+
+	mov	ax, 0
+	mov	bp, 20
+	mov	cx, 0
+	mov	dx, 0
+
+	ret
+
+ToolAreaMarginer	endp
+
 endif
 
 
