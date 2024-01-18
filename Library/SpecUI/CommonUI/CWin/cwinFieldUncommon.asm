@@ -2057,34 +2057,6 @@ done:
 
 	ret
 ToolAreaDraw	endm
-
-
-ToolAreaMarginer	method dynamic ToolAreaClass, MSG_VIS_COMP_GET_MARGINS
-
-	mov	ax, 0					; left margin
-	mov	cx, 0					; right margin
-	mov	dx, 0					; bottom margin
-
-	;
-	; if TaskBar == on
-	; RUNTIME
-	;
-	push	ds					; save ds
-	segmov	ds, dgroup				; load dgroup
-	test	ds:[taskBarPrefs], mask TBF_ENABLED	; test if TBF_ENABLED is set
-	pop	ds					; restore ds
-	jz	noTaskbar				; skip if no taskbar
-
-	mov	bp, 20					; top margin
-	jmp	done
-
-noTaskbar:
-	mov	bp, 0
-done:
-	ret
-
-ToolAreaMarginer	endp
-
 endif
 
 
@@ -2113,9 +2085,8 @@ REVISION HISTORY:
 	Joon	3/5/92		Initial version
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
-if TOOL_AREA_IS_TASK_BAR
-SysTrayInteractionVisDraw	method dynamic SysTrayInteractionClass,
-				MSG_VIS_DRAW
+if TOOL_AREA_IS_TASK_BAR and _ISUI
+SysTrayInteractionVisDraw	method dynamic SysTrayInteractionClass, MSG_VIS_DRAW
 
 	mov	di, offset SysTrayInteractionClass
 	call	ObjCallSuperNoLock
@@ -2128,7 +2099,7 @@ SysTrayInteractionVisDraw	method dynamic SysTrayInteractionClass,
 	segmov	ds, dgroup				; load dgroup
 	test	ds:[taskBarPrefs], mask TBF_ENABLED	; test if TBF_ENABLED is set
 	pop	ds					; restore ds
-	jz	done				; skip if no taskbar
+	jz	done					; skip if no taskbar
 
 	push	bp
 	mov	di, offset SysTrayInteractionClass
@@ -2136,20 +2107,20 @@ SysTrayInteractionVisDraw	method dynamic SysTrayInteractionClass,
 	pop	di			; di = gstate
 
 	call	VisGetBounds
-	push	ax
 
+	push	ax
 	call	GetDarkColor		;al <- dark color
 	mov	ah, C_WHITE		;ah <- light color
-
 	mov	bp, ax
 	pop	ax
+
 	call	OpenDrawRect
 
 done:
 	ret
 SysTrayInteractionVisDraw	endm
-endif
 
+endif
 
 
 COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
