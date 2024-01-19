@@ -1527,9 +1527,8 @@ if TOOL_AREA_IS_TASK_BAR
 	andnf	es:[taskBarPrefs], not (mask TBF_ENABLED)
 	call	InitFileReadBoolean
 	cmp	ax, FALSE
-	jz	afterEnabled
-	ornf	es:[taskBarPrefs], mask TBF_ENABLED
-afterEnabled:
+	jz	done						; skip initiating taskBar prefs, if TaskBar is off
+	ornf	es:[taskBarPrefs], mask TBF_ENABLED		; otherwise, set to enabled
 
 	;
 	; init taskBarMovable
@@ -1553,7 +1552,6 @@ afterMovable:
 	cmp	ax, FALSE
 	jz	afterAutoHide
 	ornf	es:[taskBarPrefs], mask TBF_AUTO_HIDE
-
 afterAutoHide:
 
 	;
@@ -1569,6 +1567,8 @@ setTaskbarPosVal:
 	andnf	es:[taskBarPrefs], not mask TBF_POSITION	; make sure bits are clear
 	shl	ax, offset TBF_POSITION				; shift position bits to index of TBF_POSITION
 	ornf	es:[taskBarPrefs], ax				; set position bits
+
+done:
 endif
 
 if _ISUI
