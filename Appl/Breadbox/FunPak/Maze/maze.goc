@@ -2,6 +2,12 @@
  *                                                                         *
  *  MAZE                                                                   *
  *                                                                         *
+ *  REVISION HISTORY:                                                      *										
+ * 	Name    Date            Description                                *
+ * 	----    ----            -----------                                *
+ * 			        Initial version.                           *
+ * 	RainerB 01/20/2024	Updated for Free PC/GEOS 6                 *
+ *                                                                         *
  ***************************************************************************/
 
 
@@ -21,6 +27,7 @@
 #include <initfile.h>
 @include <game.goh>
 #include <sound.h>
+#include <stdlib.h>
 
 #define MAZE_BIT_ONCE      0x01
 #define MAZE_BIT_TWICE     0x02
@@ -34,7 +41,16 @@
 #define MAZE_COLOR_SOLUTION         3
 #define MAZE_COLOR_PLAYER_PIECE     4
 
+/* The size of the maze. Be careful, a fixed block of MAZE_BUFFER_SIZE will be allocated */
+/* In a further version, it should be moved into a movable block. */
 #define INITIAL_SIZE 18
+#define MINIMUM_SIZE 5
+
+#define MAX_SIZE_X		70
+#define MAX_SIZE_Y		50
+#define MAZE_BUFFER_SIZE	( 4*(MAX_SIZE_X)*(MAX_SIZE_Y) )		/* about 14 kB */
+
+#define STATE_FILE_MAGIC	(dword)( ((dword)'M' << 0) | ((dword)'S' << 8) | ((dword)'F' << 16) | ((dword)(01) << 24) )
 
 #define DOC_WIDTH             ((INITIAL_SIZE)*12)
 #define DOC_HEIGHT            DOC_WIDTH
@@ -128,7 +144,7 @@ const word loseSoundBuf[] = {     /* from blackjack lose sound */
 MemHandle	winSound, loseSound;
 word	g_sound;
 
-byte maze[40000] ;
+byte *maze;	/* a fixed buffer of MAZE_BUFFER_SIZE bytes */
 word size_x = (INITIAL_SIZE*2)-1 ;
 word size_y = (INITIAL_SIZE*2)-1 ;
 word pos_start = 0 ;
@@ -244,7 +260,7 @@ void MazeDraw2(GStateHandle gstate,
 
 /*=========================================================================*/
 
-@start Mouse_Picture ;
+@start Mouse_Picture, data ;
 @include "Mouse.goh"
 @end Mouse_Picture
 
@@ -433,11 +449,11 @@ void MazeDraw2(GStateHandle gstate,
     }
     /*---------------------------------------------------------------------*/
     @object GenGlyphClass MazeLostFocusGlyph1 = {
-        GI_visMoniker = "Game" ;
+        GI_visMoniker = " Game " ;
     }
     /*---------------------------------------------------------------------*/
     @object GenGlyphClass MazeLostFocusGlyph2 = {
-        GI_visMoniker = "Paused" ;
+        GI_visMoniker = " Paused " ;
     }
 
 	 /*---------------------------------------------------------------------*/
@@ -614,15 +630,15 @@ void MazeDraw2(GStateHandle gstate,
     @object GenValueClass MazeSizeXGenValue = {
         GI_visMoniker   = 'X', "X Size" ;
         GVLI_value      = MakeWWFixed(INITIAL_SIZE) ;
-        GVLI_minimum    = MakeWWFixed(5.0) ;
-		  GVLI_maximum    = MakeWWFixed(50.0) ;
+        GVLI_minimum    = MakeWWFixed(MINIMUM_SIZE) ;
+	GVLI_maximum    = MakeWWFixed(MAX_SIZE_X) ;
     }
     /*---------------------------------------------------------------------*/
     @object GenValueClass MazeSizeYGenValue = {
         GI_visMoniker   = 'Y', "Y Size" ;
         GVLI_value      = MakeWWFixed(INITIAL_SIZE) ;
-        GVLI_minimum    = MakeWWFixed(5.0) ;
-        GVLI_maximum    = MakeWWFixed(35.0) ;
+        GVLI_minimum    = MakeWWFixed(MINIMUM_SIZE) ;
+	GVLI_maximum    = MakeWWFixed(MAX_SIZE_Y) ;
     }
 
 	 /*---------------------------------------------------------------------*/
@@ -1072,7 +1088,7 @@ void MazeMake(byte* maze, word size_x, word size_y)
     pos = quick_maze(size_x-1, pos_y) ;
     maze[pos] = MAZE_BIT_ONCE|MAZE_BIT_TWICE ;
 
-    for (pos=0; pos<40000; pos++)
+    for (pos=0; pos<MAZE_BUFFER_SIZE; pos++)
         maze[pos] &= (~MAZE_BIT_TWICE) ;
     @send MazeApp::MSG_GEN_APPLICATION_MARK_NOT_BUSY() ;
 }
@@ -1088,7 +1104,7 @@ void SolveMaze()
     int dir_step ;
     int count ;
 
-    for (pos=0; pos<40000; pos++)
+    for (pos=0; pos<MAZE_BUFFER_SIZE; pos++)
         maze[pos] &= (~(MAZE_BIT_SOL_TWICE|MAZE_BIT_SOL_ONCE)) ;
 
     dirs[2] = -(dirs[1] = size_x) ;
@@ -1140,7 +1156,7 @@ void SolveMaze()
 
     maze[pos] |= MAZE_BIT_SOL_ONCE ;
 
-    for (pos=0; pos<40000; pos++)
+    for (pos=0; pos<MAZE_BUFFER_SIZE; pos++)
         if (maze[pos]&MAZE_BIT_SOL_TWICE)
             maze[pos] &= (~(MAZE_BIT_SOL_TWICE|MAZE_BIT_SOL_ONCE)) ;
 }
@@ -1152,7 +1168,7 @@ word ClearPlayerTrail()
     word i ;
     word r = 0;
 
-    for (i=0; i<40000; i++)
+    for (i=0; i<MAZE_BUFFER_SIZE; i++)
         if (maze[i] & MAZE_BIT_TRAVELED)  {
             r |= 1 ;
             maze[i] &= (~MAZE_BIT_TRAVELED) ;
@@ -1447,10 +1463,12 @@ void MazePlaySound(MemHandle soundHandle)
 @method MazeProcessClass, MSG_GEN_PROCESS_OPEN_APPLICATION
 {
  FileHandle fhandle ;
- Boolean		initError, tips, standard = FALSE;
+ Boolean		initError, tips;
  word		i;
- DisplayScheme scheme ;
-
+ dword 		magic;
+ 
+    maze=malloc(MAZE_BUFFER_SIZE);	/* alloc the game board */
+    memset(maze, 0, MAZE_BUFFER_SIZE);
 
     @callsuper() ;
 
@@ -1488,36 +1506,30 @@ void MazePlaySound(MemHandle soundHandle)
     if (fhandle!=NullHandle)  {
         /* Make sure file at beginning */
         FilePos(fhandle, 0, FILE_POS_START) ;
-        FileRead(fhandle, &size_x, sizeof(word), FALSE) ;
-        FileRead(fhandle, &size_y, sizeof(word), FALSE) ;
-        FileRead(fhandle, maze, sizeof(byte)*size_x*size_y, FALSE) ;
-        FileRead(fhandle, &pos_start, sizeof(word), FALSE) ;
-        FileRead(fhandle, &draw_mode, sizeof(word), FALSE) ;
-        FileRead(fhandle, &pos_x, sizeof(sword), FALSE) ;
-        FileRead(fhandle, &pos_y, sizeof(sword), FALSE) ;
-        FileRead(fhandle, &game_mode, sizeof(byte), FALSE) ;
-		  FileRead(fhandle, &time_sec, sizeof(byte), FALSE) ;
-        FileRead(fhandle, &time_min, sizeof(byte), FALSE) ;
-        FileRead(fhandle, &time_hour, sizeof(byte), FALSE) ;
+	FileRead(fhandle, &magic, sizeof(dword), FALSE) ;
+        if (STATE_FILE_MAGIC == magic) {
+            FileRead(fhandle, &size_x, sizeof(word), FALSE) ;
+            FileRead(fhandle, &size_y, sizeof(word), FALSE) ;
+            FileRead(fhandle, maze, sizeof(byte)*size_x*size_y, FALSE) ;
+            FileRead(fhandle, &pos_start, sizeof(word), FALSE) ;
+            FileRead(fhandle, &draw_mode, sizeof(word), FALSE) ;
+            FileRead(fhandle, &pos_x, sizeof(sword), FALSE) ;
+            FileRead(fhandle, &pos_y, sizeof(sword), FALSE) ;
+            FileRead(fhandle, &game_mode, sizeof(byte), FALSE) ;
+            FileRead(fhandle, &time_sec, sizeof(byte), FALSE) ;
+            FileRead(fhandle, &time_min, sizeof(byte), FALSE) ;
+            FileRead(fhandle, &time_hour, sizeof(byte), FALSE) ;
 
-        FileRead(fhandle, &player_score, sizeof(word), FALSE) ;
-		  FileRead(fhandle, &solved, sizeof(Boolean), FALSE) ;
-        FileRead(fhandle, colors, sizeof(ColorQuad)*5, FALSE) ;
-		  FileClose(fhandle, FALSE) ;
-	 }
-
-	 /* set the max size depending on screen res */
-	 @call MazeApp::MSG_GEN_APPLICATION_GET_DISPLAY_SCHEME(&scheme) ;
-	 if (((scheme.DS_displayType&DT_DISP_SIZE)>>DT_DISP_SIZE_OFFSET) == DS_STANDARD) {
-		 @send MazeSizeYGenValue::MSG_GEN_VALUE_SET_MAXIMUM(MakeWWFixed(28.0)) ;
-		 standard = TRUE;
-		 }
+            FileRead(fhandle, &player_score, sizeof(word), FALSE) ;
+            FileRead(fhandle, &solved, sizeof(Boolean), FALSE) ;
+            FileRead(fhandle, colors, sizeof(ColorQuad)*5, FALSE) ;
+            }
+            
+	FileClose(fhandle, FALSE) ;
+	}
 
 	 @send MazeSizeXGenValue::MSG_GEN_VALUE_SET_INTEGER_VALUE((1+size_x)>>1, FALSE) ;
-	 if (standard && (((1+size_y)>>1) > 28))
-		 @send MazeSizeYGenValue::MSG_GEN_VALUE_SET_INTEGER_VALUE(28, FALSE) ;
-	 else
-		 @send MazeSizeYGenValue::MSG_GEN_VALUE_SET_INTEGER_VALUE((1+size_y)>>1, FALSE) ;
+	 @send MazeSizeYGenValue::MSG_GEN_VALUE_SET_INTEGER_VALUE((1+size_y)>>1, FALSE) ;
 
 	 @send MazeView::MSG_GEN_VIEW_SET_DOC_BOUNDS(
 									 6+(size_y*6),
@@ -1542,6 +1554,7 @@ void MazePlaySound(MemHandle soundHandle)
 {
 	 FileHandle fhandle ;
 	 Boolean		tips;
+	 dword 			magic;
 
 
     if (timer_going)
@@ -1568,6 +1581,8 @@ void MazePlaySound(MemHandle soundHandle)
     if (fhandle!=NullHandle)  {
         /* Make sure file at beginning */
         FilePos(fhandle, 0, FILE_POS_START) ;
+        magic = STATE_FILE_MAGIC;
+        FileWrite(fhandle, &magic, sizeof(dword), FALSE) ;
         FileWrite(fhandle, &size_x, sizeof(word), FALSE) ;
         FileWrite(fhandle, &size_y, sizeof(word), FALSE) ;
         FileWrite(fhandle, maze, sizeof(byte)*size_x*size_y, FALSE) ;
@@ -1593,6 +1608,8 @@ void MazePlaySound(MemHandle soundHandle)
 																	 SHOW_ON_STARTUP);
 	 InitFileWriteBoolean("Maze", "showTips", tips);
 	 InitFileWriteInteger("Maze", "sound", g_sound);
+
+    free (maze); 		/* free the game board */
 
 	 return (@callsuper()) ;
 }
@@ -1661,12 +1678,12 @@ void MazePlaySound(MemHandle soundHandle)
 @method MazeProcessClass, MSG_VIEW_MAZE_NEW_AND_PLAY
 {
 
-	 if (gray_screen)  /* unpause the game forst if it was paused */
+    if (gray_screen)  /* unpause the game forst if it was paused */
 		@call oself::MSG_MAZE_CONT();
-	 @call oself::MSG_VIEW_MAZE_NEW() ;
+    @call oself::MSG_VIEW_MAZE_NEW() ;
     @call oself::MSG_MAZE_PLAY_GAME() ;
-	 @send MazePauseTrigger::MSG_GEN_SET_ENABLED(VUM_NOW) ;
-	 @send MazeContTrigger::MSG_GEN_SET_NOT_ENABLED(VUM_NOW) ;
+    @send MazePauseTrigger::MSG_GEN_SET_ENABLED(VUM_NOW) ;
+    @send MazeContTrigger::MSG_GEN_SET_NOT_ENABLED(VUM_NOW) ;
 }
 /*-------------------------------------------------------------------------*/
 @method MazeProcessClass, MSG_MAZE_VIEW_MODE_1
