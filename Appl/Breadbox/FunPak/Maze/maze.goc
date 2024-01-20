@@ -191,7 +191,7 @@ void MazeDraw2(GStateHandle gstate,
     @class MazeProcessClass, GenProcessClass ;
         @message void MSG_VIEW_INVALIDATE() ;
         @message void MSG_VIEW_MAZE_NEW() ;
-        @message void MSG_VIEW_MAZE_NEW_AND_PLAY() ;
+        @message void MSG_VIEW_MAZE_NEW_AND_PLAY(Boolean playOnly) ;
         @message void MSG_MAZE_VIEW_MODE_1() ;
         @message void MSG_MAZE_VIEW_MODE_2() ;
         @message void MSG_MAZE_SIZE_CHANGED() ;
@@ -326,12 +326,12 @@ void MazeDraw2(GStateHandle gstate,
 		  HINT_MINIMUM_SIZE = {SST_PIXELS | DOC_WIDTH + 60,
 									  SST_PIXELS | DOC_WIDTH + 60, 0};
 	 //	  HINT_EXPAND_WIDTH_TO_FIT_PARENT ;
-	 //	  HINT_EXPAND_HEIGHT_TO_FIT_PARENT ;
+	 	  HINT_EXPAND_HEIGHT_TO_FIT_PARENT ;
 	//	  HINT_DRAW_IN_BOX;
 	 }
 	 /*---------------------------------------------------------------------*/
 	 @object GenInteractionClass MazeTopGroup = {
-		  GI_comp = @MazeNewTrigger, @MazeSpacer, @MazeRightGroup ;
+		  GI_comp = @MazeNewTrigger, @MazeRunTrigger, @MazeSpacer, @MazeRightGroup ;
 		  HINT_ORIENT_CHILDREN_HORIZONTALLY ;
 		  HINT_CENTER_CHILDREN_VERTICALLY ;
 		  HINT_EXPAND_WIDTH_TO_FIT_PARENT ;
@@ -339,9 +339,15 @@ void MazeDraw2(GStateHandle gstate,
 	 }
 	 /*---------------------------------------------------------------------*/
 	 @object GenTriggerClass MazeNewTrigger = {
-		  GI_visMoniker   = 'N', "Start New" ;
+		  GI_visMoniker   = 'N', "New Maze" ;
+		  GTI_destination = process ;
+		  GTI_actionMsg   = MSG_VIEW_MAZE_NEW ;
+	 }
+	 @object GenTriggerClass MazeRunTrigger = {
+		  GI_visMoniker   = 'R', "Run" ;
 		  GTI_destination = process ;
 		  GTI_actionMsg   = MSG_VIEW_MAZE_NEW_AND_PLAY ;
+		  ATTR_GEN_TRIGGER_ACTION_DATA = TRUE;		/* only run */
 	 }
 	 /*---------------------------------------------------------------------*/
 	 @object GenInteractionClass MazeSpacer = {
@@ -431,11 +437,11 @@ void MazeDraw2(GStateHandle gstate,
 									 VCNA_LARGE_DOCUMENT_MODEL |
 									 VCNA_ACTIVE_MOUSE_GRAB_REQUIRES_LARGE_EVENTS ;
 	 }
-	 /*---------------------------------------------------------------------*/
+    /*---------------------------------------------------------------------*/
     @object GenInteractionClass MazeLostFocusGlyph = {
         GI_comp = @MazeLostFocusGroup ;
 	   GI_states = @default & (~GS_USABLE) ;
-	   HINT_EXPAND_WIDTH_TO_FIT_PARENT ;
+   	HINT_EXPAND_WIDTH_TO_FIT_PARENT ;
         HINT_EXPAND_HEIGHT_TO_FIT_PARENT ;
         HINT_CENTER_CHILDREN_HORIZONTALLY ;
         HINT_CENTER_CHILDREN_VERTICALLY ;
@@ -476,6 +482,7 @@ void MazeDraw2(GStateHandle gstate,
 		  GI_visMoniker   = 'M', "Start New Maze" ;
 		  GTI_destination = process ;
 		  GTI_actionMsg   = MSG_VIEW_MAZE_NEW_AND_PLAY ;
+		  ATTR_GEN_TRIGGER_ACTION_DATA = FALSE;		/* new maze and then run */
 	 }
 	 /*---------------------------------------------------------------------*/
 /*	 @object GenTriggerClass MazeNewOption = {
@@ -1678,9 +1685,10 @@ void MazePlaySound(MemHandle soundHandle)
 @method MazeProcessClass, MSG_VIEW_MAZE_NEW_AND_PLAY
 {
 
-    if (gray_screen)  /* unpause the game forst if it was paused */
+    if (gray_screen)  /* unpause the game first if it was paused */
 		@call oself::MSG_MAZE_CONT();
-    @call oself::MSG_VIEW_MAZE_NEW() ;
+    if (FALSE==playOnly)
+    		@call oself::MSG_VIEW_MAZE_NEW() ;
     @call oself::MSG_MAZE_PLAY_GAME() ;
     @send MazePauseTrigger::MSG_GEN_SET_ENABLED(VUM_NOW) ;
     @send MazeContTrigger::MSG_GEN_SET_NOT_ENABLED(VUM_NOW) ;
