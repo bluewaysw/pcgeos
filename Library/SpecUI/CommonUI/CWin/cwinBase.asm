@@ -1607,26 +1607,15 @@ getTextMoniker:
 getIconMoniker:
 
 if _MOTIF
-
-	; in Motif, get icon moniker from app monikers
-
+	;
+	; in Motif, get tool icon moniker from app monikers
+	;
 	push	cx, dx
-	mov	bp, mask VMSF_GSTRING or (VMS_TOOL shl offset VMSF_STYLE)
-	stc				; check app's moniker list
-	call	GenFindMoniker		; result: ^lcx:dx = moniker...
-	tst	cx
-	jz 	clear
+	call	SearchForVMSTinyGstringAppMoniker	;returns carry set if found
+							; ^lcx:dx = moniker
+	jnc	clear					; didn't find what we're looking for
 
-	mov	di, dx
-	mov	di, ds:[di]
-	test	ds:[di].VM_type, mask VMT_GSTRING
-	jz	clear
-	cmp	ds:[di].VM_width, 16
-	ja	clear
-	cmp	({VisMonikerGString}(ds:[di].VM_data)).VMGS_height, 16
-	ja	clear
-
-	mov	bx, cx			; ...but we need the icon moniker in ^lbx:di
+	mov	bx, cx					; we need the icon moniker in ^lbx:di
 	mov 	di, dx
 	jmp	restore
 clear:
@@ -1634,10 +1623,10 @@ clear:
 	clr	di
 restore:
 	pop	cx, dx
-	jmp 	haveMonikers
 else
+	;
 	; in others, get system menu button icon moniker from window
-
+	;
 	mov	di, ds:[si]
 	add	di, ds:[di].Vis_offset
 	mov	bx, ds:[di].OLWI_sysMenu
@@ -1654,6 +1643,7 @@ else
 	mov	di, ds:[di].GI_visMoniker
 	call	ObjSwapUnlock
 endif
+
 haveMonikers:
 	push	bx, cx
 	mov	ax, LMEM_TYPE_GENERAL
@@ -1699,6 +1689,34 @@ endif
 done:
 	ret
 OLBaseWinSetWindowEntryMoniker	endm
+
+SearchForVMSTinyGstringAppMoniker	proc	near
+
+	stc				; use moniker list from GenApp object
+	mov	bp, mask VMSF_GSTRING or (VMS_TOOL shl offset VMSF_STYLE)
+	call	GenFindMoniker		; ^lcx:dx = moniker
+
+	tst	cx			; any moniker found?
+	jz	done			; if zero then not carry
+	push	es
+	mov	bx, cx			; bx = moniker resource
+	call	ObjLockObjBlock
+	mov	es, ax
+	mov	di, dx			; *es:di = moniker
+	mov	di, es:[di]		; es:di = moniker
+	cmp	es:[di].VM_width, 16
+	jg	notFound		; if greater then not carry
+	test	es:[di].VM_type, mask VMT_GSTRING
+	jz	notFound		; if zero then not carry
+found:
+	stc				; set carry to indicate that we
+notFound:				; have found a suitable moniker
+	call	MemUnlock		; preserves flags
+	pop	es
+done:
+	ret
+SearchForVMSTinyGstringAppMoniker	endp
+
 endif
 
 COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
