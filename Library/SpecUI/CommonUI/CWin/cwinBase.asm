@@ -1615,9 +1615,24 @@ if _MOTIF
 	stc				; check app's moniker list
 	call	GenFindMoniker		; result: ^lcx:dx = moniker...
 	tst	cx
-	LONG	jz done
+	jz 	clear
+
+	mov	di, dx
+	mov	di, ds:[di]
+	test	ds:[di].VM_type, mask VMT_GSTRING
+	jz	clear
+	cmp	ds:[di].VM_width, 16
+	ja	clear
+	cmp	({VisMonikerGString}(ds:[di].VM_data)).VMGS_height, 16
+	ja	clear
+
 	mov	bx, cx			; ...but we need the icon moniker in ^lbx:di
 	mov 	di, dx
+	jmp	restore
+clear:
+	clr	bx
+	clr	di
+restore:
 	pop	cx, dx
 	jmp 	haveMonikers
 else
