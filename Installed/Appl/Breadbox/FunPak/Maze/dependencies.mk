@@ -28,6 +28,6 @@ maze.eobj: geos.h heap.h geode.h resource.h ec.h object.h lmem.h \
                 Objects/gInterC.h Objects/Text/tCommon.h stylesh.h \
                 driver.h thread.h print.h Internal/spoolInt.h serialDr.h \
                 parallDr.h hugearr.h fileEnum.h Ansi/string.h \
-                Ansi/stdio.h initfile.h sound.h
+                Ansi/stdio.h initfile.h sound.h Ansi/stdlib.h
 
 mazeEC.geo maze.geo : geos.ldf ui.ldf ansic.ldf color.ldf game.ldf sound.ldf 
