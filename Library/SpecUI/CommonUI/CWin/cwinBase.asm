@@ -1607,17 +1607,25 @@ getTextMoniker:
 getIconMoniker:
 
 if _MOTIF
-	;
-	; in Motif, get tool icon moniker from app monikers
-	;
 	push	cx, dx
-	call	SearchForVMSTinyGstringAppMoniker	;returns carry set if found
-							; ^lcx:dx = moniker
-	jnc	clear					; didn't find what we're looking for
-
-	mov	bx, cx					; we need the icon moniker in ^lbx:di
+;searchInWindow:				; check this window for a VMS_TOOL gstring moniker
+	clc					; use window's moniker list
+	call	SearchForToolIconMoniker	; returns carry set if found
+						; cx:dx = moniker
+	jnc	searchInApp			; skip if no moniker found
+	mov	bx, cx				; we need the icon moniker in bx:di
 	mov 	di, dx
 	jmp	restore
+
+searchInApp:					; check the app for a VMS_TOOL gstring moniker
+	stc					; use moniker list from GenApp object
+	call	SearchForToolIconMoniker	; returns carry set if found
+						; cx:dx = moniker
+	jnc	clear				; didn't find what we're looking for
+	mov	bx, cx				; we need the icon moniker in ^lbx:di
+	mov 	di, dx
+	jmp	restore
+
 clear:
 	clr	bx
 	clr	di
@@ -1690,9 +1698,8 @@ done:
 	ret
 OLBaseWinSetWindowEntryMoniker	endm
 
-SearchForVMSTinyGstringAppMoniker	proc	near
+SearchForToolIconMoniker	proc	near
 
-	stc				; use moniker list from GenApp object
 	mov	bp, mask VMSF_GSTRING or (VMS_TOOL shl offset VMSF_STYLE)
 	call	GenFindMoniker		; ^lcx:dx = moniker
 
@@ -1704,7 +1711,7 @@ SearchForVMSTinyGstringAppMoniker	proc	near
 	mov	es, ax
 	mov	di, dx			; *es:di = moniker
 	mov	di, es:[di]		; es:di = moniker
-	cmp	es:[di].VM_width, 16
+	cmp	es:[di].VM_width, CUAS_WIN_ICON_WIDTH
 	jg	notFound		; if greater then not carry
 	test	es:[di].VM_type, mask VMT_GSTRING
 	jz	notFound		; if zero then not carry
@@ -1715,7 +1722,7 @@ notFound:				; have found a suitable moniker
 	pop	es
 done:
 	ret
-SearchForVMSTinyGstringAppMoniker	endp
+SearchForToolIconMoniker	endp
 
 endif
 
