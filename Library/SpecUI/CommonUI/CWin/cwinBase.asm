@@ -1608,16 +1608,10 @@ getIconMoniker:
 
 if _MOTIF
 	push	cx, dx
-;searchInWindow:				; check this window for a VMS_TOOL gstring moniker
-	clc					; use window's moniker list
-	call	SearchForToolIconMoniker	; returns carry set if found
-						; cx:dx = moniker
-	jnc	searchInApp			; skip if no moniker found
-	mov	bx, cx				; we need the icon moniker in bx:di
-	mov 	di, dx
-	jmp	restore
 
-searchInApp:					; check the app for a VMS_TOOL gstring moniker
+	;
+	; check the app for a VMS_TOOL gstring moniker
+	;
 	stc					; use moniker list from GenApp object
 	call	SearchForToolIconMoniker	; returns carry set if found
 						; cx:dx = moniker
@@ -1633,7 +1627,7 @@ restore:
 	pop	cx, dx
 else
 	;
-	; in others, get system menu button icon moniker from window
+	; in ISUI (or PM?), get icon from system menu button icon moniker
 	;
 	mov	di, ds:[si]
 	add	di, ds:[di].Vis_offset
