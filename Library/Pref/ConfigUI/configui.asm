@@ -304,11 +304,16 @@ ISUIDisableList	lptr \
 
 motifDisableList	lptr \
 	EO2SmallIcons,
-	UIO3AutohideTaskbar,
 	UIO3RightClickHelp
+
+taskbarDisabledDisableList	lptr \
+	UIO3AutohideTaskbar,
+	UIO3TaskbarMovable
 
 EC < LocalDefNLString ISUIGeode <"isuiec.geo", 0>
 NEC < LocalDefNLString ISUIGeode <"isui.geo", 0>
+optionsCatString		char	"motif options",0
+taskBarEnabledKeyString		char	"taskBarEnabled",0
 
 DisableSpecificUIItems	proc	near
 		uses	es
@@ -340,7 +345,40 @@ disableLoop:
 		add	di, (size lptr)
 		loop	disableLoop
 		pop	bp
-done::
+
+	;
+	; Disable items that are not available when the TaskBar is off
+	;
+		push	ds, es
+		mov	ax, segment dgroup
+		mov	es, ax
+		mov	cx, cs
+		mov	ds, cx
+		mov	si, offset optionsCatString	;ds:si <- category
+		mov	dx, offset taskBarEnabledKeyString ;cx:dx <- key
+		mov	ax, TRUE
+		call	InitFileReadBoolean
+		tst	ax
+		pop	ds, es
+		jnz	done
+
+		mov	cx, length taskbarDisabledDisableList
+		mov	bx, offset taskbarDisabledDisableList
+		push	bp
+		clr	di
+
+taskbarDisableLoop:
+		push	cx
+		mov	si, cs:[bx][di]
+		mov	ax, MSG_GEN_SET_NOT_ENABLED
+		mov	dl, VUM_DELAYED_VIA_APP_QUEUE
+		call	ObjCallInstanceNoLock
+		pop	cx
+		add	di, (size lptr)
+		loop	taskbarDisableLoop
+		pop	bp
+
+done:
 	;
 	; set the ini category for objects that need to	store settings
 	; in different sections for different SpUIs
