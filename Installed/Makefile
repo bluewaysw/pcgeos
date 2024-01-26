@@ -120,6 +120,7 @@ extraPrefLibs	: prefpag prefjfep
 # Applications
 #
 minimalAppl	: minimalGame minimalUtils minimalTools minimalSavers \
+ 	  	  extraGame \
 		  minimalEdu calendar geodex geocalc geodraw geowrite \
 		  scrapbk clock bigcalc geopoint \
 		  email manager isdesk linktool setup \
@@ -135,9 +136,11 @@ minimalUtils	: prefmgr
 minimalTools    : resedit
 
 minimalGame	: solitaire cword amateur bjack hearts gwpoker \
-                  pyramid sokoban taipei uki mine column2 \
-                  battle column follow mine2 treas mazerun
-                   
+                  pyramid sokoban uki mine column2 battle \
+                  row4
+                  
+extraGame	: taipei column mine2 follow treas mazerun \
+		  blkbox hiho magicboard  scode
 
 minimalEdu	: flash fontmgck hangman laserl mflash numbers pvault \
                   oliner taide thinker wsm wsplay xwm
@@ -1036,6 +1039,20 @@ Installed/Appl/Breadbox/FunPak/Treas: ui math ansic sound MAKEAPPL
 mazerun	: Installed/Appl/Breadbox/FunPak/Maze
 Installed/Appl/Breadbox/FunPak/Maze: ui ansic color game sound MAKEAPPL
 
+blkbox : Installed\Appl\Breadbox\EntPak\BlkBox
+Installed\Appl\Breadbox\EntPak\BlkBox: ui ansic game sound MAKEAPPL
+
+hiho : Installed\Appl\Breadbox\EntPak\Hiho
+Installed\Appl\Breadbox\EntPak\Hiho: ui ansic game sound MAKEAPPL
+
+magicboard : Installed\Appl\Breadbox\EntPak\Magic
+Installed\Appl\Breadbox\EntPak\Magic: ui ansic math game sound MAKEAPPL
+
+row4 : Installed\Appl\Breadbox\EntPak\Row4
+Installed\Appl\Breadbox\EntPak\Row4: ui ansic sound MAKEAPPL
+
+scode : Installed\Appl\Breadbox\EntPak\SCode
+Installed\Appl\Breadbox\EntPak\SCode: ui ansic game sound MAKEAPPL
 
 
 idialup : Installed/Appl/IDialup
