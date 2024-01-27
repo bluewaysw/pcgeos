@@ -349,17 +349,15 @@ disableLoop:
 	;
 	; Disable items that are not available when the TaskBar is off
 	;
-		push	ds, es
-		mov	ax, segment dgroup
-		mov	es, ax
+		push	ds
+		segmov	ds, cs
 		mov	cx, cs
-		mov	ds, cx
 		mov	si, offset optionsCatString	;ds:si <- category
 		mov	dx, offset taskBarEnabledKeyString ;cx:dx <- key
 		mov	ax, TRUE
 		call	InitFileReadBoolean
 		tst	ax
-		pop	ds, es
+		pop	ds
 		jnz	done
 
 		mov	cx, length taskbarDisabledDisableList
