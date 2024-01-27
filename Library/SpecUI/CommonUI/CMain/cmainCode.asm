@@ -489,11 +489,21 @@ haveDefaultExpressPrefs:
 	; require some things for ISUI, don't allow others
 	;
 if _ISUI
-	ornf	ax, mask UIEO_DOCUMENTS_LIST or \
+	ornf	ax, 	mask UIEO_DOCUMENTS_LIST or \
 			mask UIEO_EXIT_TO_DOS or \
 			mask UIEO_CONTROL_PANEL or \
 			mask UIEO_UTILITIES_PANEL
 endif
+
+	;
+	; remove "Go to <defaultLauncher>" entry if ISDesk
+	;
+	call	SpecInitIsISDesk
+	jne	notISDesk
+
+	andnf	ax, (not mask UIEO_RETURN_TO_DEFAULT_LAUNCHER)
+
+notISDesk:
 
 if TOOL_AREA_IS_TASK_BAR
 	;
@@ -523,6 +533,39 @@ haveDecision:
 
 SpecInitExpressPreferences	endp
 
+
+SpecInitIsISDesk	proc	near
+launcherBuf		local	FileLongName
+
+		.enter
+	;
+	; See which launcher we're running
+	;
+		push	bp
+		segmov	ds, cs, cx
+		mov	si, offset uiFeaturesCatString
+		mov	dx, offset defaultLauncherString
+		segmov	es, ss
+		lea	di, ss:launcherBuf
+		mov	bp, InitFileReadFlags <IFCC_INTACT, 0, 0, (size launcherBuf)>
+		call	InitFileReadString		; es:di - Pointer to string2 for compare
+		pop	bp
+
+		clr	cx				; cx - Maximum number of characters to compare (0 for NULL terminated).
+		push	ds
+		segmov	ds, cs
+		mov	si, offset ISDeskString		; ds:si - Pointer to string1 for compare.
+		call	LocalCmpStrings			; check long name of App: ISDesk
+							; **Returns:** ZF - Set if strings were equal.
+		pop	ds
+
+		.leave
+		ret
+SpecInitIsISDesk	endp
+
+ISDeskString		char	"ISDesk", 0
+uiFeaturesCatString	char	"uiFeatures", 0
+defaultLauncherString	char	"defaultLauncher", 0
 expressOptionsString	char	"expressOptions", 0
 
 
