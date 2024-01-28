@@ -282,7 +282,7 @@ afterFloatingKbd:
 	call	CheckIfRunningISUI
 	LONG jnz noReturnToDefault
 
-	;	
+	;
 	; create "Return to <default launcher>" item if hint specifies it
 	;	ax = features
 	;	bx = block
@@ -291,7 +291,7 @@ afterFloatingKbd:
 	push	ax, bx, si
 	mov	di, bx				; di = child block
 	mov	ax, TEMP_EMC_HAS_RETURN_TO_DEFAULT_LAUNCHER
-	call	ObjVarFindData			; carry set if found 
+	call	ObjVarFindData			; carry set if found
 						; ds:bx = launcher name/path
 	LONG jnc	afterReturn
 	;
@@ -642,9 +642,16 @@ afterMainAppsList:
 	mov	ax, MSG_GEN_SET_NOT_USABLE
 	mov	dl, VUM_DELAYED_VIA_UI_QUEUE
 	call	ObjCallInstanceNoLock
+
 	mov	ax, MSG_GEN_INTERACTION_SET_VISIBILITY
 	mov	cl, GIV_POPUP
 	call	ObjCallInstanceNoLock
+
+	mov	cx, offset OtherAppsListMoniker
+	mov	ax, MSG_GEN_USE_VIS_MONIKER
+	mov	dl, VUM_DELAYED_VIA_UI_QUEUE
+	call	ObjCallInstanceNoLock
+
 	mov	ax, MSG_GEN_SET_USABLE
 	mov	dl, VUM_DELAYED_VIA_UI_QUEUE
 	call	ObjCallInstanceNoLock
@@ -736,7 +743,7 @@ setDocListUsable:
 	mov	dl, VUM_DELAYED_VIA_UI_QUEUE
 	mov	di, mask MF_CALL or mask MF_FIXUP_DS
 	call	ObjMessage
-	pop	ax 
+	pop	ax
 
 afterDocumentList:
 
@@ -1221,11 +1228,11 @@ PASS:		*ds:si	= ExpressMenuControlClass object
 
 RETURN:		nothing
 
-ALLOWED TO DESTROY:	
+ALLOWED TO DESTROY:
 		ax, cx, dx, bp
 		bx, si, di, ds, es
 
-SIDE EFFECTS:	
+SIDE EFFECTS:
 
 PSEUDO CODE/STRATEGY:
 
@@ -1370,7 +1377,7 @@ DESTROYED:	ax, cx, dx, bp
 
 finderKey char "finder", 0
 
-ExpressMenuControlTweakDuplicatedUI method dynamic ExpressMenuControlClass, 
+ExpressMenuControlTweakDuplicatedUI method dynamic ExpressMenuControlClass,
 					MSG_GEN_CONTROL_TWEAK_DUPLICATED_UI
 	;
 	; check if ISUI is loaded
@@ -1472,7 +1479,7 @@ afterRunSubMenu:
 	call	useVisMoniker
 	pop	dx
 afterDocumentsList:
-	
+
 	test	dx, mask EMCF_CONTROL_PANEL or mask EMCF_UTILITIES_PANEL
 	LONG jz	afterControlPanel
 
@@ -1488,7 +1495,7 @@ afterDocumentsList:
 
 	mov	si, offset SettingsGroup
 	call	useVisMoniker
-	
+
 	push	bx
 	mov	bp, bx
 	mov	ax, SMMT_PREFERENCES_TOOL_MONIKER
@@ -1585,7 +1592,7 @@ afterControlPanel::
 	pop	dx
 afterExitToDOS:
 
-done:	
+done:
 	ret
 
 useVisMoniker:
@@ -1593,7 +1600,7 @@ useVisMoniker:
 	mov	dl, VUM_MANUAL
 	mov	di, mask MF_CALL or mask MF_FIXUP_DS
 	call	ObjMessage
-	retn	
+	retn
 
 addHintNoData:
 	sub	sp, size AddVarDataParams
@@ -1605,9 +1612,9 @@ addHintNoData:
 	mov	dx, size AddVarDataParams
 	mov	di, mask MF_CALL or mask MF_STACK or mask MF_FIXUP_DS
 	call	ObjMessage
-	add	sp, size AddVarDataParams	
+	add	sp, size AddVarDataParams
 	retn
-	
+
 ExpressMenuControlTweakDuplicatedUI endm
 
 helpOptionsCategory	char	"motifOptions",0
@@ -1702,7 +1709,7 @@ dialupMonikerList StartMenuMonikerStruct <
 	DialUpTCMoniker,
 	DialUpTCMoniker
 >
-	
+
 StartMenuGetIconMoniker	proc	near
 
 	CheckHack <length startMenuMonikerTable eq StartMenuMonikerType>
@@ -1832,7 +1839,7 @@ CheckIfPathIsUnderSP_DOCUMENT	proc	near
 	stc				;carry <- set if SP_DOCUMENT
 	je	done
 	clc				;carry <- clear: not SP_DOCUMENT
-done:	
+done:
 	.leave
 	ret
 CheckIfPathIsUnderSP_DOCUMENT	endp
@@ -1923,7 +1930,7 @@ CreateMonikerFromFilenameAndToken	proc	near
 
 	call	UserGetDisplayType	; ah = DisplayType
 	call	UserLimitDisplayTypeToStandard
-	mov	dh, ah	
+	mov	dh, ah
 
 	push	ds:[LMBH_handle], di
 	mov	ax, {word}es:[di+size FileLongName+size FileID].GT_chars[0]
@@ -1961,7 +1968,7 @@ search:
 	call	LMemFree
 	jmp	unlock
 
-freeAndUseDefault:		
+freeAndUseDefault:
 	mov	ax, di
 	call	LMemFree
 useDefault:
@@ -2228,12 +2235,12 @@ PASS:		*ds:si	= ExpressMenuControl object
 		^ldx:bp	= ack OD
 RETURN:		nothing
 DESTROYED:	ax, cx, dx, bp
-SIDE EFFECTS:	child block is nuked once everyone on the 
+SIDE EFFECTS:	child block is nuked once everyone on the
 		GCNSLT_EXPRESS_MENU_CHANGE list has responded to the
 		GCNEMNT_DESTROYED list.
 
 PSEUDO CODE/STRATEGY:
-		
+
 
 REVISION HISTORY:
 	Name	Date		Description
@@ -2245,18 +2252,18 @@ ExpressMenuDetach method dynamic ExpressMenuControlClass, MSG_META_DETACH
 	.enter
 	;
 	; Prepare for delayed detach.
-	; 
+	;
 	call	ObjInitDetach
 	push	ax, cx, dx, bp
 	;
 	; Remove ourselves from the GCN list of all express menu objects, and
 	; notify all interested parties that we're history.
-	; 
+	;
 	call	ExpressMenuControlRemoveFromLists
 	;
 	; Record a MSG_META_ACK to be sent back by everyone on the list of
 	; interested parties.
-	; 
+	;
 	movdw	bxsi, cxdx
 	mov	ax, MSG_META_ACK
 	clr	dx, bp
@@ -2266,7 +2273,7 @@ ExpressMenuDetach method dynamic ExpressMenuControlClass, MSG_META_DETACH
 	;
 	; Save that handle and the child block's handle in vardata for nuking
 	; when DETACH_COMPLETE is received.
-	; 
+	;
 	call	EMGetFeaturesAndChildBlock
 	mov	dx, bx
 	mov	ax, TEMP_EXPRESS_MENU_CONTROL_DETACH_DATA
@@ -2276,7 +2283,7 @@ ExpressMenuDetach method dynamic ExpressMenuControlClass, MSG_META_DETACH
 	mov	ds:[bx].EMCDD_ackEvent, di
 	;
 	; Tell all interested parties to send a MSG_META_ACK back to us.
-	; 
+	;
 	push	si
 	mov	cx, di
 	mov	dx, mask MF_FORCE_QUEUE or mask MF_RECORD
@@ -2289,7 +2296,7 @@ ExpressMenuDetach method dynamic ExpressMenuControlClass, MSG_META_DETACH
 	;
 	; Now up our detach count by the number of those messages actually
 	; sent out, so our final detach is delayed until all have responded.
-	; 
+	;
 	jcxz	passItUp
 incLoop:
 	call	ObjIncDetach
@@ -2298,13 +2305,13 @@ passItUp:
 	;
 	; Skip over GenControl handling of MSG_META_DETACH, we wait until
 	; we get MSG_META_DETACH_COMPLETE for that.
-	; 
+	;
 	pop	ax, cx, dx, bp
 	mov	di, offset GenControlClass
 	call	ObjCallSuperNoLock
 	;
 	; And let the detach proceed.
-	; 
+	;
 	call	ObjEnableDetach
 	.leave
 	ret
@@ -2324,10 +2331,10 @@ PASS:		*ds:si	= ExpressMenuControl object
 		^ldx:bp	= ack OD
 RETURN:		nothing
 DESTROYED:	ax, cx, dx, bp
-SIDE EFFECTS:	
+SIDE EFFECTS:
 
 PSEUDO CODE/STRATEGY:
-		
+
 
 REVISION HISTORY:
 	Name	Date		Description
@@ -2363,16 +2370,16 @@ dontSetNotUsable:
 	jnc	done
 	;
 	; Fetch the two handles out.
-	; 
+	;
 	mov	ax, ds:[bx].EMCDD_childBlock
 	mov	cx, ds:[bx].EMCDD_ackEvent
 	;
 	; Nuke the vardata record.
-	; 
+	;
 	call	ObjVarDeleteDataAt
 	;
 	; Free the recorded ACK event.
-	; 
+	;
 	mov	bx, cx
 	call	ObjFreeMessage
 	;
@@ -2482,7 +2489,7 @@ if FULL_EXECUTE_IN_PLACE
 		mov	cx, ds
 		xchg	dx, si			;cx:dx = pathname in stack
 		mov	ds, ax			;restore ds
-endif		
+endif
 	;
 	; set path of passed object to be passed path (used when running
 	; applications in list)
@@ -2495,7 +2502,7 @@ endif
 	; Restore the stack
 	;
 FXIP <		call	SysRemoveFromStack				>
-		
+
 	.leave
 	ret
 StorePathInAppList	endp
@@ -2592,7 +2599,7 @@ if FULL_EXECUTE_IN_PLACE
 	mov	cx, (size FileExtAttrDesc) * (length calMatchAttrs)
 	call	SysCopyToStackDSSI		;ds:si = calMatchAttrs
 endif
-		
+
 	sub	sp, size FileEnumParams
 	mov	bp, sp		; ss:bp points at structure
 				; Setup params for search
@@ -2622,7 +2629,7 @@ if FULL_EXECUTE_IN_PLACE
 	call	SysRemoveFromStack
 	sahf
 endif
-		
+
 	pop	bp
 	jc	done			; if error, no apps
 	call	BuildEmptyList
@@ -2679,11 +2686,11 @@ CALLED BY:	CreateAppList, CreateOtherAppsList
 
 PASS:		*ds:si - EMCInteractionClass object
 
-RETURN:		nothing 
+RETURN:		nothing
 
 DESTROYED:	ax,bx,cx
 
-PSEUDO CODE/STRATEGY:	
+PSEUDO CODE/STRATEGY:
 
 KNOWN BUGS/SIDE EFFECTS/IDEAS:
 
@@ -2952,7 +2959,7 @@ endif
 	popdw	esdi			; esdi = filename + fileID + GeodeToken
 
 	; Save the filename as vardata
-	
+
 	call	ObjSwapLock
 	push	bx, di
 
@@ -2967,12 +2974,12 @@ DBCS <	mov	ds:[bx].GFP_path, ax					>
 	LocalNextChar	dsbx
 	LocalIsNull	ax
 	jnz	10$
-	
+
 	pop	bx, di
 	call	ObjSwapUnlock
 
 	; create moniker for item
-	
+
 	mov	ax, es:[di][size FileLongName + size FileID]
 	and	ax, es:[di][size FileLongName + size FileID + 2]
 	and	ax, es:[di][size FileLongName + size FileID + 4]
@@ -3126,7 +3133,7 @@ createMoniker:
 	mov	dl, VUM_MANUAL
 	call	EMCObjMessageCallFixupDS
 	jmp	setVisibility
-	
+
 notISUI:
 	mov	ax, MSG_GEN_REPLACE_VIS_MONIKER_TEXT
 	mov	bp, VUM_MANUAL
@@ -3364,7 +3371,7 @@ continue:
 gotToken:
 
 	; Save the filename as vardata
-	
+
 	call	ObjSwapLock
 	push	bx, di
 
@@ -3379,12 +3386,12 @@ DBCS <	mov	ds:[bx].GFP_path, ax					>
 	LocalNextChar	dsbx
 	LocalIsNull	ax
 	jnz	10$
-	
+
 	pop	bx, di
 	call	ObjSwapUnlock
 
 	; create moniker for item
-	
+
 	mov	ax, es:[di][size FileLongName + size FileID]
 	and	ax, es:[di][size FileLongName + size FileID + 2]
 	and	ax, es:[di][size FileLongName + size FileID + 4]
@@ -3480,7 +3487,7 @@ PASS:		ds:si - first array element
 RETURN:		flags set so caller can jl, je, or jg if first element is
 		less than, equal, or greater than second element.
 DESTROYED:	nada
- 
+
 PSEUDO CODE/STRATEGY:
 
 KNOWN BUGS/SIDE EFFECTS/IDEAS:
@@ -3512,7 +3519,7 @@ endif
 	jb	doCompareExit
 	xchg	ax, bx
 doCompareExit:
-	cmp	ax, bx	
+	cmp	ax, bx
 exit:
 	ret
 CompareFileLongName	endp
@@ -3529,7 +3536,7 @@ PASS:		es:0 - ptr to block
 		cx - # files in block
 RETURN:		nada
 DESTROYED:	si, di, cx, bx, ax
- 
+
 PSEUDO CODE/STRATEGY:
 
 KNOWN BUGS/SIDE EFFECTS/IDEAS:
@@ -3606,7 +3613,7 @@ currentPath	local	GenFilePath
 currentPathEnd	local	word		; offset to end of currentPath
 
 	.enter
-		
+
 	call	FilePushDir
 
 	;
@@ -3640,7 +3647,7 @@ if FULL_EXECUTE_IN_PLACE
 	mov	cx, (size FileExtAttrDesc) * (length coalReturnAttrs)
 	call	SysCopyToStackDSSI		;ds:si = data on stack
 endif
-		
+
 	sub	sp, size FileEnumParams
 	mov	bp, sp		; ss:bp points at structure
 				; Setup params for search
@@ -3704,7 +3711,7 @@ dirLoop:
 	;
 	push	ds, di
 	call	LockDAPathname		; cx:dx = desk accessory pathname
-	mov	ds, cx			
+	mov	ds, cx
 	mov	si, dx			; ds:si = desk accessory pathname
 	ChunkSizePtr	ds, si, cx	; cx = length
 	repe cmpsb
@@ -3854,7 +3861,7 @@ if FULL_EXECUTE_IN_PLACE
 	mov	cx, (size FileExtAttrDesc) * (length cdlMatchAttrs)
 	call	SysCopyToStackDSSI		;ds:si = cdlMatchAttrs
 endif
-		
+
 	sub	sp, size FileEnumParams
 	mov	bp, sp		; ss:bp points at structure
 				; Setup params for search
@@ -4151,7 +4158,7 @@ PASS:		*ds:si	= EMCPanelInteractionClass object
 		bp	= CreateExpressMenuControlItemPriority
 RETURN:		nothing
 DESTROYED:	ax, bp
-SIDE EFFECTS:	
+SIDE EFFECTS:
 
 PSEUDO CODE/STRATEGY:
 
@@ -4161,12 +4168,12 @@ REVISION HISTORY:
 	JS	3/ 8/93   	Initial version
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
-EMCPanelInteractionAddChild	method dynamic EMCPanelInteractionClass, 
+EMCPanelInteractionAddChild	method dynamic EMCPanelInteractionClass,
 					MSG_EMC_PANEL_ADD_CHILD
 	.assert	(CEMCIP_STANDARD_PRIORITY eq CCO_LAST)
 	cmp	bp, CEMCIP_STANDARD_PRIORITY
 	je	addChild
-	
+
 	; save CreateExpressMenuControlItemPriority in vardata
 
 	push	si, cx
@@ -4179,7 +4186,7 @@ EMCPanelInteractionAddChild	method dynamic EMCPanelInteractionClass,
 	mov	ds:[bx], bp
 	pop	bx
 	call	ObjSwapUnlock
-	pop	si, cx	
+	pop	si, cx
 
 	; process children to find position to add new item
 
@@ -4209,7 +4216,7 @@ findChild:
 	call	ObjCallInstanceNoLock	; returns bp = position of ^lcx:dx
 	pop	cx, dx
 EC <	ERROR_C -1			; this should never happen!!!	>
-	
+
 addChild:
 	mov	ax, MSG_GEN_ADD_CHILD
 	GOTO	ObjCallInstanceNoLock
@@ -4220,7 +4227,7 @@ EMCPanelInteractionAddChild	endm
 ; PASS:		*ds:si = child
 ;		*es:di = composite
 ;		bp - CreateExpressMenuControlItemPriority
-; RETURN:	carry - set to end processing			
+; RETURN:	carry - set to end processing
 ;			ax, cx, dx, bp - data to send to next child
 ;		Destroy: bx, si, di, ds, es
 ;
@@ -4337,11 +4344,11 @@ PASS:		*ds:si	= EMCInteractionClass object
 
 RETURN:		nothing
 
-ALLOWED TO DESTROY:	
+ALLOWED TO DESTROY:
 		ax, cx, dx, bp
 		bx, si, di, ds, es
 
-SIDE EFFECTS:	
+SIDE EFFECTS:
 
 PSEUDO CODE/STRATEGY:
 
@@ -4399,7 +4406,7 @@ RETURN:		none
 DESTROYED:	ax, cx, dx, bp
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
-EMCTriggerLaunchApplication	method	dynamic	EMCTriggerClass, 
+EMCTriggerLaunchApplication	method	dynamic	EMCTriggerClass,
 					MSG_EMC_TRIGGER_LAUNCH_APPLICATION
 token		local	GeodeToken	push	bp, dx, cx
 albHandle	local	hptr		push	0
@@ -4513,7 +4520,7 @@ EMCTriggerLowerToBottom	method	dynamic EMCTriggerClass,
 	mov	ax, MSG_GEN_GUP_SEND_TO_OBJECT_OF_CLASS
 	mov	cx, di
 	GOTO	GenCallParent
-	
+
 EMCTriggerLowerToBottom	endm
 
 
@@ -4861,7 +4868,7 @@ docTokenBlock	local	word
 
 	clc				; find owner token
 	call	GetDOSDocumentToken
-	
+
 copyToken:
 	;
 	; copy ALB_dataFile for error reporting
@@ -5301,7 +5308,7 @@ IsFieldOkay?	endp
 ;		^lcx:dx = newly created item
 ;		*ds:di = Express Menu Control
 ; return:	nothing
-; destroyed:	
+; destroyed:
 ;
 NotifyOfNewItem	proc	near
 	mov	ax, ss:[bp].CEMCIP_responseMessage
@@ -5394,11 +5401,11 @@ PASS:		*ds:si	= ExpressMenuControl object
 
 RETURN:		nothing
 
-ALLOWED TO DESTROY:	
+ALLOWED TO DESTROY:
 		ax, cx, dx, bp
 		bx, si, di, ds, es
 
-SIDE EFFECTS:	
+SIDE EFFECTS:
 
 PSEUDO CODE/STRATEGY:
 
@@ -5507,11 +5514,11 @@ PASS:		*ds:si	= EMCInteraction object
 
 RETURN:		nothing
 
-ALLOWED TO DESTROY:	
+ALLOWED TO DESTROY:
 		ax, cx, dx, bp
 		bx, si, di, ds, es
 
-SIDE EFFECTS:	
+SIDE EFFECTS:
 
 PSEUDO CODE/STRATEGY:
 
@@ -5677,7 +5684,7 @@ EC <	ERROR_A -1					>
 	je	batchDeleteSPDir
 	clc					; no rebuild needed
 						; offset to next batch item
-gotoNext:	
+gotoNext:
 	mov	ax, size FileChangeBatchNotificationItem
 batchNext:
 	jc	batchDone		; need to rebuild EMCInteraction
@@ -5997,10 +6004,10 @@ RETURN:		carry set if the ID is one of ours
 
 DESTROYED:	di
 
-SIDE EFFECTS:	
+SIDE EFFECTS:
 
 PSEUDO CODE/STRATEGY:
-		
+
 
 REVISION HISTORY:
 	Name	Date		Description
