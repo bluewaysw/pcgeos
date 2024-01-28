@@ -502,7 +502,7 @@ if TOOL_AREA_IS_TASK_BAR
 	; if TaskBar == on, have no Task-List in E-Menu
 	; FIXME: should this be done in User/.../uiExpress.asm =>
 	; ExpressMenuControlGenerateUI? Or should the
-	; "Go to <default launcher>" stuff rather be handled here?
+	; "Go to <default launcher>" stuff from there rather be handled here?
 	;
 	push	ds					; save ds
 	segmov	ds, dgroup				; load dgroup
