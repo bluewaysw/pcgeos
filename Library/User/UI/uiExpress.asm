@@ -279,8 +279,8 @@ afterFloatingKbd:
 
 ;-------------------------------------------------------------------------
 
-	call	CheckIfRunningISUI
-	LONG jnz noReturnToDefault
+	call	CheckIfRunningISDesk
+	LONG je noReturnToDefault
 
 	;
 	; create "Return to <default launcher>" item if hint specifies it
@@ -1811,6 +1811,55 @@ doCheck:
 	.leave
 	ret
 CheckIfRunningISUI	endp
+
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		CheckIfRunningISDesk
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	Check if running ISDesk
+
+CALLED BY:	INTERNAL
+PASS:		none
+RETURN:		z flag set if running ISDesk
+DESTROYED:	none
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+
+CheckIfRunningISDesk	proc	near
+launcherBuf		local	FileLongName
+
+	.enter
+
+	pusha
+	push	ds, es
+	;
+	; See which launcher we're running
+	; we can't check the geode in memory because it hasn't loaded yet...
+	;
+	segmov	ds, cs, cx
+	mov	si, offset uiFeaturesCatString
+	mov	dx, offset defaultLauncherString
+	segmov	es, ss
+	lea	di, ss:launcherBuf
+	mov	bp, InitFileReadFlags <IFCC_INTACT, 0, 0, (size launcherBuf)>
+	call	InitFileReadString		; es:di - Pointer to string2 for compare
+
+	clr	cx				; cx - Maximum number of characters to compare (0 for NULL terminated).
+	segmov	ds, cs
+	mov	si, offset ISDeskString		; ds:si - Pointer to string1 for compare.
+	call	LocalCmpStrings			; check long name of App: ISDesk
+						; **Returns:** ZF - Set if strings were equal.
+	pop	ds, es
+	popa
+
+	.leave
+	ret
+CheckIfRunningISDesk	endp
+
+ISDeskString		char	"ISDesk", 0
+uiFeaturesCatString	char	"uiFeatures", 0
+defaultLauncherString	char	"defaultLauncher", 0
 
 
 COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%

@@ -487,6 +487,8 @@ haveDefaultExpressPrefs:
 
 	;
 	; require some things for ISUI, don't allow others
+	; FIXME: should this be done in User/.../uiExpress.asm =>
+	; ExpressMenuControlGenerateUI?
 	;
 if _ISUI
 	ornf	ax, 	mask UIEO_DOCUMENTS_LIST or \
@@ -495,19 +497,11 @@ if _ISUI
 			mask UIEO_UTILITIES_PANEL
 endif
 
-if _MOTIF
-	;
-	; remove "Go to <defaultLauncher>" entry if ISDesk
-	;
-	call	SpecInitIsISDesk
-	jne	notISDesk
-	andnf	ax, (not mask UIEO_RETURN_TO_DEFAULT_LAUNCHER)
-notISDesk:
-endif
-
 if TOOL_AREA_IS_TASK_BAR
 	;
 	; if TaskBar == on, have no Task-List in E-Menu
+	; FIXME: should this be done in User/.../uiExpress.asm =>
+	; ExpressMenuControlGenerateUI?
 	;
 	push	ds					; save ds
 	segmov	ds, dgroup				; load dgroup
@@ -532,42 +526,6 @@ haveDecision:
 	ret
 
 SpecInitExpressPreferences	endp
-
-if _MOTIF
-SpecInitIsISDesk	proc	near
-launcherBuf		local	FileLongName
-
-		.enter
-	;
-	; See which launcher we're running
-	;
-		push	bp
-		segmov	ds, cs, cx
-		mov	si, offset uiFeaturesCatString
-		mov	dx, offset defaultLauncherString
-		segmov	es, ss
-		lea	di, ss:launcherBuf
-		mov	bp, InitFileReadFlags <IFCC_INTACT, 0, 0, (size launcherBuf)>
-		call	InitFileReadString		; es:di - Pointer to string2 for compare
-		pop	bp
-
-		clr	cx				; cx - Maximum number of characters to compare (0 for NULL terminated).
-		push	ds
-		segmov	ds, cs
-		mov	si, offset ISDeskString		; ds:si - Pointer to string1 for compare.
-		call	LocalCmpStrings			; check long name of App: ISDesk
-							; **Returns:** ZF - Set if strings were equal.
-		pop	ds
-
-		.leave
-		ret
-SpecInitIsISDesk	endp
-
-ISDeskString		char	"ISDesk", 0
-uiFeaturesCatString	char	"uiFeatures", 0
-defaultLauncherString	char	"defaultLauncher", 0
-endif
-
 expressOptionsString	char	"expressOptions", 0
 
 
