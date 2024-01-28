@@ -523,6 +523,28 @@ OLFieldEnsureExpressMenu	proc	far
 	mov	di, ds:[si]
 	add	di, ds:[di].Vis_offset
 	mov	ds:[di].OLFI_expressMenu, dx	; store chunk handle of menu
+
+if _MOTIF
+	;
+	; upscale E-Menu Button width a little in Motif / Taskbar, for aesthetic pleasure
+	; if TaskBar == on
+	; RUNTIME
+	;
+	push	ds					; save ds
+	segmov	ds, dgroup				; load dgroup
+	test	ds:[taskBarPrefs], mask TBF_ENABLED	; test if TBF_ENABLED is set
+	pop	ds					; restore ds
+	jz	done					; skip if no taskbar
+
+	push	si
+	mov	si, ds:[di].OLFI_expressMenu		; set *ds:si = menu
+	mov	ax, HINT_FIXED_SIZE			; ax - Vardata type
+	mov	cx, size SpecWidth + size SpecHeight + size word ; cx - Size of extra data. (cx = zero if no extra data).
+	call	ObjVarAddData				; returns: pointer to extra data in ds:bx
+	mov	ds:[bx].SSA_width, SpecWidth <SST_PIXELS, 30>
+	pop 	si
+endif
+
 done:
 	ret
 OLFieldEnsureExpressMenu	endp
@@ -986,6 +1008,7 @@ endif
 	;
 	mov	bx, cx
 	mov	si, dx
+
 
 if TOOL_AREA_IS_TASK_BAR
 	;
