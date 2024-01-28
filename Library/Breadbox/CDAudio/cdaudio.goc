@@ -45,37 +45,6 @@ void _POPDS();
 #define POPDS   _POPDS();
 #endif
 
-#ifndef PUSHALL
-void _PUSHALL();
-#pragma aux _PUSHALL =  "push ds" \
-                        "push si" \
-                        "push ax" \
-                        "push bx" \
-                        "push cx" \
-                        "push dx" \
-                        "push di"
-#define PUSHALL   _PUSHALL();
-#endif
-
-#ifndef POPALL
-void _POPALL(word segm, word offs);
-#pragma aux _POPALL =	"push  cx" \
-			"push  dx" \
-			"pop si" \
-			"pop ds" \
-			"pop  di" \
-                        "pop  dx" \
-                        "pop  cx" \
-                        "pop  bx" \
-                        "pop  ax" \
-                        "call ds:[si]" \
-			"pop  si" \
-                        "pop  ds" \
-                        parm [cx dx] \
-			modify [di dx cx bx ax si];
-#define POPALL   _POPALL(segm, offs);
-#endif
-
 #endif
 
 
@@ -173,19 +142,10 @@ void _pascal  CDLib_Reset_Valid_Flags (void)
 
 GeodeHandle      cdDriverHandle  = 0;
 
-
-void CallCDDriver (void)
-{
-  DriverInfoStruct * driverInfo;
-  int segm;
-  int offs;
-  PUSHALL;
-  driverInfo = GeodeInfoDriver(cdDriverHandle);
-  segm = FP_SEG(driverInfo) ;
-  offs = FP_OFF(driverInfo) ;
-  POPALL;
-}
-
+extern byte _pascal CDAGetNumberOfDrives(word segm, word offs);
+extern word _pascal CDAGetVersion(word segm, word offs);
+extern word _pascal CDAGetDriveLetters(word segm, word offs, word segmBuf, word offsBuf);
+extern word _pascal CDACallDevice(word segm, word offs, byte driveLetter, word segmTable, word offsTable);
 
 word _pascal  MSCDEX_Get_Version (void)
 /* returns MSCDEX_Version, major in high, minor in low byte; 0= not installed */
@@ -194,31 +154,28 @@ word _pascal  MSCDEX_Get_Version (void)
   PUSHDS;
   GeodeLoadDGroup( GeodeGetCodeProcessHandle() );
   if (MSCDEX_Version==0) {
-#if 0
-    asm {
-      push di
-      mov  di,8         /* get number of drives */
-      } CallCDDriver(); asm {
-      pop  di
-      mov  MSCDEX_CD_Drives,al
-    }
-#endif
+
+    DriverInfoStruct * driverInfo;
+    word segm;
+    word offs;
+    driverInfo = GeodeInfoDriver(cdDriverHandle);
+    segm = FP_SEG(driverInfo) ;
+    offs = FP_OFF(driverInfo) ;
+    MSCDEX_CD_Drives = CDAGetNumberOfDrives(segm, offs);
+
     if (MSCDEX_CD_Drives !=0) {
-      int segm = FP_SEG(MSCDEX_Drive_Letters) ;
-      int offs = FP_OFF(MSCDEX_Drive_Letters) ;
-#if 0
-      asm {
-        push di
-        mov  di, 10          /* get MSCDEX version number */
-        } CallCDDriver(); asm {
-        mov  MSCDEX_Version,ax
-        mov  ax, segm
-        mov  bx, offs
-        mov  di, 12          /* get CD drive letters */
-        } CallCDDriver(); asm {
-        pop  di
-      }
-#endif
+      word segmBuf = FP_SEG(MSCDEX_Drive_Letters) ;
+      word offsBuf = FP_OFF(MSCDEX_Drive_Letters) ;
+
+      DriverInfoStruct * driverInfo;
+      word segm;
+      word offs;
+      driverInfo = GeodeInfoDriver(cdDriverHandle);
+      segm = FP_SEG(driverInfo) ;
+      offs = FP_OFF(driverInfo) ;
+      MSCDEX_Version = CDAGetVersion(segm, offs);
+      CDAGetDriveLetters(segm, offs, segmBuf, offsBuf);
+
       MSCDEX_Drive_Letters[MSCDEX_CD_Drives]=0;
     }
   }
@@ -276,12 +233,13 @@ int try = 0;
 int Call_CD_Driver_X ( byte function)
 /* calls CD driver using MSCDEX function 0x10 , returns <>-1:error, -1:ok */
 {
-  int back, segm, offs;
+  int back, segmTable, offsTable;
   byte driveLetter;
+
   PUSHDS;
   GeodeLoadDGroup( GeodeGetCodeProcessHandle() );
-  segm = FP_SEG(&CD_Driver_Table);
-  offs = FP_OFF(&CD_Driver_Table);
+  segmTable = FP_SEG(&CD_Driver_Table);
+  offsTable = FP_OFF(&CD_Driver_Table);
   driveLetter = MSCDEX_Drive_Letters[CD_Drive_No];
   if (cdDemoMode){
     POPDS;
@@ -289,18 +247,17 @@ int Call_CD_Driver_X ( byte function)
   }
   CD_Driver_Table.size = 0x1a;
   CD_Driver_Table.function =function;
-#if 0
-  asm {
-    push di
-    mov  cl, driveLetter
-    mov  ch,0x00
-    mov  ax, segm
-    mov  bx, offs
-    mov  di, 16         /* device driver function request */
-    } CallCDDriver(); asm {
-    pop  di
+
+  {
+    DriverInfoStruct * driverInfo;
+    word segm;
+    word offs;
+    driverInfo = GeodeInfoDriver(cdDriverHandle);
+    segm = FP_SEG(driverInfo) ;
+    offs = FP_OFF(driverInfo) ;
+
+    CDACallDevice(segm, offs, driveLetter, segmTable, offsTable);
   }
-  #endif
   if (CD_Driver_Table.status & 0x8000) {
     if (try <=3) {
       try++;   /* Fehler */
