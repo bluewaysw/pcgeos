@@ -495,15 +495,15 @@ if _ISUI
 			mask UIEO_UTILITIES_PANEL
 endif
 
+if _MOTIF
 	;
 	; remove "Go to <defaultLauncher>" entry if ISDesk
 	;
 	call	SpecInitIsISDesk
 	jne	notISDesk
-
 	andnf	ax, (not mask UIEO_RETURN_TO_DEFAULT_LAUNCHER)
-
 notISDesk:
+endif
 
 if TOOL_AREA_IS_TASK_BAR
 	;
@@ -533,7 +533,7 @@ haveDecision:
 
 SpecInitExpressPreferences	endp
 
-
+if _MOTIF
 SpecInitIsISDesk	proc	near
 launcherBuf		local	FileLongName
 
@@ -566,6 +566,8 @@ SpecInitIsISDesk	endp
 ISDeskString		char	"ISDesk", 0
 uiFeaturesCatString	char	"uiFeatures", 0
 defaultLauncherString	char	"defaultLauncher", 0
+endif
+
 expressOptionsString	char	"expressOptions", 0
 
 
