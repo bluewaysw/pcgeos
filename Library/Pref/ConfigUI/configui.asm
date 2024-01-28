@@ -286,14 +286,11 @@ DESTROYED:	bx, cx, dx, di, bp
 specificKey	char "specific",0
 
 ISUIDisableList	lptr \
-	EOGotoGeoManager,
-	EORunningApps,
 	EOExitToDOS,
 	EOWorldApps,
 	EOWorldSubdirs,
 	EOControlPanel,
 	EOUtilities,
-	ESORunningApps,
 	ESOWorldAppsSubmenu,
 	ESOOtherSubmenu,
 	AOLConfirmShutdown,
@@ -309,6 +306,11 @@ motifDisableList	lptr \
 taskbarDisabledDisableList	lptr \
 	UIO3AutohideTaskbar,
 	UIO3TaskbarMovable
+
+taskbarEnabledDisableList	lptr \
+	EOGotoGeoManager,
+	ESORunningApps,
+	EORunningApps
 
 EC < LocalDefNLString ISUIGeode <"isuiec.geo", 0>
 NEC < LocalDefNLString ISUIGeode <"isui.geo", 0>
@@ -358,14 +360,14 @@ disableLoop:
 		call	InitFileReadBoolean
 		tst	ax
 		pop	ds
-		jnz	done
+		jnz	taskBarEnabled
 
 		mov	cx, length taskbarDisabledDisableList
 		mov	bx, offset taskbarDisabledDisableList
 		push	bp
 		clr	di
 
-taskbarDisableLoop:
+taskbarDisabledLoop:
 		push	cx
 		mov	si, cs:[bx][di]
 		mov	ax, MSG_GEN_SET_NOT_ENABLED
@@ -373,7 +375,28 @@ taskbarDisableLoop:
 		call	ObjCallInstanceNoLock
 		pop	cx
 		add	di, (size lptr)
-		loop	taskbarDisableLoop
+		loop	taskbarDisabledLoop
+		pop	bp
+		jmp	done
+
+	;
+	; Disable items that are not available when the TaskBar is on
+	;
+taskBarEnabled:
+		mov	cx, length taskbarEnabledDisableList
+		mov	bx, offset taskbarEnabledDisableList
+		push	bp
+		clr	di
+
+taskbarEnabledLoop:
+		push	cx
+		mov	si, cs:[bx][di]
+		mov	ax, MSG_GEN_SET_NOT_ENABLED
+		mov	dl, VUM_DELAYED_VIA_APP_QUEUE
+		call	ObjCallInstanceNoLock
+		pop	cx
+		add	di, (size lptr)
+		loop	taskbarEnabledLoop
 		pop	bp
 
 done:
