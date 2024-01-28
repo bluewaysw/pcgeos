@@ -1912,13 +1912,12 @@ TaskBarListAddChild	method dynamic TaskBarListClass,
 	;
 	; if TaskBar == on
 	; RUNTIME
-	; FIXME!!! - do we really need to call super here?
 	;
 	push	ds					; save ds
 	segmov	ds, dgroup				; load dgroup
 	test	ds:[taskBarPrefs], mask TBF_ENABLED	; test if TBF_ENABLED is set
 	pop	ds					; restore ds
-	jz	callSuper				; skip if no taskbar
+	jz	done					; skip if no taskbar
 
 	push	cx, dx
 	mov	di, offset TaskBarListClass
@@ -1950,13 +1949,12 @@ TaskBarListAddChild	method dynamic TaskBarListClass,
 	call	ObjSwapUnlock
 	jmp	done
 
-callSuper:
+; callSuper:
 	;
 	; if no Taskbar, just callSuper
 	;
-	mov	di, offset TaskBarListClass
-	call	ObjCallSuperNoLock
-
+	; mov	di, offset TaskBarListClass
+	; call	ObjCallSuperNoLock
 done:
 	ret
 TaskBarListAddChild	endm
