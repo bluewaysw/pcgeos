@@ -613,21 +613,14 @@ EnsureWindowInParentWin	proc	far
 	jnc	EWIPW_90			;If no response, don't care...
 
 if TOOL_AREA_IS_TASK_BAR
-	;
-	; if TaskBar == on
-	;
-	push	ds					; save ds
-	segmov	ds, dgroup				; load dgroup
-	test	ds:[taskBarPrefs], mask TBF_ENABLED	; test if TBF_ENABLED is set
-	pop	ds					; restore ds
-	jz	endIfTaskbar				; skip if no taskbar
 
 	; If taskbar is at the bottom of the screen, subtract off the
 	; height of the tool area (taskbar) from parent window size so
 	; maximized windows don't extend below the taskbar.
+
 	call	GetTaskBarSizeAdjustment
 	sub	dx, di			; subtract off taskbar adjustment
-endIfTaskbar:
+
 endif
 	;FIRST CHECK X POSITION
 
@@ -780,23 +773,16 @@ EnsureTitleBarInParentWin	proc	near
 	jnc	ETBIPW_90			;If no response, don't care...
 
 if TOOL_AREA_IS_TASK_BAR
-	;
-	; if TaskBar == on
-	;
-	push	ds					; save ds
-	segmov	ds, dgroup				; load dgroup
-	test	ds:[taskBarPrefs], mask TBF_ENABLED	; test if TBF_ENABLED is set
-	pop	ds					; restore ds
-	jz	endIfTaskbar				; skip if no taskbar
 
 	;
 	; If taskbar is at the bottom of the screen, subtract off the
 	; height of the tool area (taskbar) from parent window size so
 	; maximized windows don't extend below the taskbar.
 	;
+
 	call	GetTaskBarSizeAdjustment
 	sub	dx, di			; subtract off taskbar adjustment
-endIfTaskbar:
+
 endif
 
 	;FIRST CHECK X POSITION

@@ -922,21 +922,14 @@ CUAS <	push	bx				;save width		>
 	call	OpenGetParentWinSize		;window is on
 
 if TOOL_AREA_IS_TASK_BAR
-	;
-	; if TaskBar == on
-	;
-	push	ds					; save ds
-	segmov	ds, dgroup				; load dgroup
-	test	ds:[taskBarPrefs], mask TBF_ENABLED	; test if TBF_ENABLED is set
-	pop	ds					; restore ds
-	jz	hasNoTaskbar				; skip if no taskbar
 
 	; If taskbar is at the bottom of the screen, subtract off the
 	; height of the tool area (taskbar) from parent window size so
 	; maximized windows don't extend below the taskbar.
+
 	call	GetTaskBarSizeAdjustment
 	sub	dx, di			; subtract off taskbar adjustment
-hasNoTaskbar:
+
 endif
 
 CUAS <	pop	bx				;get previous width	>

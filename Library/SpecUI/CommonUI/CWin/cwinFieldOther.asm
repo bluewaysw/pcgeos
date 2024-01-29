@@ -442,15 +442,6 @@ endif
 
 if TOOL_AREA_IS_TASK_BAR or WINDOW_LIST_ACTIVE
 	;
-	; if TaskBar == on
-	;
-	; push	ds
-	; segmov	ds, dgroup
-	; tst	ds:[taskBarEnabled] ; if taskbar == on, ZF == 1
-	; pop	ds
-	; jz	noWindowListDialog ; if ZF==0 skip the following code
-
-	;
 	; clobber window list dialog
 	;
 	mov	di, ds:[si]
@@ -1027,14 +1018,6 @@ if EVENT_MENU
 endif
 
 if TOOL_AREA_IS_TASK_BAR or WINDOW_LIST_ACTIVE
-	;
-	; if TaskBar == on
-	;
-	; push	ds
-	; segmov	ds, dgroup
-	; tst	ds:[taskBarEnabled] ; if taskbar == on, ZF == 1
-	; pop	ds
-	; jz	callSuper ; if ZF==0 skip the following code
 
 	push	si				;save our handle
 	mov	di, ds:[si]

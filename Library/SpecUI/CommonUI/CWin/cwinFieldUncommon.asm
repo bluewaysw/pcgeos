@@ -1353,15 +1353,6 @@ if TOOL_AREA_IS_TASK_BAR or WINDOW_LIST_ACTIVE
 OLFieldSelectWindowListEntry	method	dynamic OLFieldClass,
 					MSG_OL_FIELD_SELECT_WINDOW_LIST_ENTRY
 	;
-	; if TaskBar == on
-	;
-	; push	ds
-	; segmov	ds, dgroup
-	; tst	ds:[taskBarEnabled] ; if taskbar == on, ZF == 1
-	; pop	ds
-	; jz	done ; if ZF==0 skip the following code
-
-	;
 	; Get current selection
 	;
 	mov	si, ds:[di].OLFI_windowListList
@@ -1411,14 +1402,6 @@ REVISION HISTORY:
 if TOOL_AREA_IS_TASK_BAR or WINDOW_LIST_ACTIVE
 OLFieldWindowListCloseWindow	method dynamic OLFieldClass,
 					MSG_OL_FIELD_WINDOW_LIST_CLOSE_WINDOW
-	;
-	; if TaskBar == on
-	;
-	; push	ds
-	; segmov	ds, dgroup
-	; tst	ds:[taskBarEnabled] ; if taskbar == on, ZF == 1
-	; pop	ds
-	; jz	done ; if ZF==0 skip the following code
 
 	mov	ax, MSG_OL_FIELD_SELECT_WINDOW_LIST_ENTRY
 	call	ObjCallInstanceNoLock
@@ -1461,14 +1444,6 @@ REVISION HISTORY:
 if TOOL_AREA_IS_TASK_BAR or WINDOW_LIST_ACTIVE
 OLFieldOpenWindowList	method dynamic OLFieldClass,
 					MSG_GEN_FIELD_OPEN_WINDOW_LIST
-	;
-	; if TaskBar == on
-	;
-	; push	ds
-	; segmov	ds, dgroup
-	; tst	ds:[taskBarEnabled] ; if taskbar == on, ZF == 1
-	; pop	ds
-	; jz	done ; if ZF==0 skip the following code
 
 	mov     si, ds:[di].OLFI_windowListDialog
 	tst     si
@@ -1510,20 +1485,8 @@ REVISION HISTORY:
 if TOOL_AREA_IS_TASK_BAR or WINDOW_LIST_ACTIVE
 WindowListClose	method dynamic WindowListDialogClass, MSG_OL_WIN_CLOSE
 
-	;
-	; if TaskBar == on
-	;
-	; push	ds
-	; segmov	ds, dgroup
-	; tst	ds:[taskBarEnabled] ; if taskbar == on, ZF == 1
-	; pop	ds
-	; jz	done ; if ZF==0 skip the following code
-
 	mov	ax, MSG_META_RELEASE_TARGET_EXCL
 	GOTO	ObjCallInstanceNoLock
-;done:
-;	mov	di, offset WindowListDialogClass
-;	GOTO	ObjCallSuperNoLock
 
 WindowListClose	endm
 endif
@@ -1559,14 +1522,6 @@ REVISION HISTORY:
 if TOOL_AREA_IS_TASK_BAR or WINDOW_LIST_ACTIVE
 WindowListKeyboard	method dynamic WindowListDialogClass,
 					MSG_META_FUP_KBD_CHAR
-	;
-	; if TaskBar == on
-	;
-	; push	ds
-	; segmov	ds, dgroup
-	; tst	ds:[taskBarEnabled] ; if taskbar == on, ZF == 1
-	; pop	ds
-	; jz	callSuper ; if ZF==0 skip the following code
 
 	test	dl, mask CF_FIRST_PRESS
 	jz	done				; ignore if not first press
@@ -1631,14 +1586,6 @@ REVISION HISTORY:
 if TOOL_AREA_IS_TASK_BAR or WINDOW_LIST_ACTIVE
 WindowListLostTargetExcl	method dynamic WindowListDialogClass,
 					MSG_META_LOST_TARGET_EXCL
-	;
-	; if TaskBar == on
-	;
-	; push	ds
-	; segmov	ds, dgroup
-	; tst	ds:[taskBarEnabled] ; if taskbar == on, ZF == 1
-	; pop	ds
-	; jz	done ; if ZF==0 skip the following code
 
 	mov	di, offset WindowListDialogClass
 	call	ObjCallSuperNoLock
@@ -1651,12 +1598,6 @@ WindowListLostTargetExcl	method dynamic WindowListDialogClass,
 	mov	bx, ds:[LMBH_handle]
 	mov	di, mask MF_FORCE_QUEUE
 	GOTO	ObjMessage
-;done:
-	;
-	; if no Taskbar/WindowList, just callSuper
-	;
-;	mov	di, offset WindowListDialogClass
-;	GOTO	ObjCallSuperNoLock
 
 WindowListLostTargetExcl	endm
 endif
@@ -1690,14 +1631,6 @@ REVISION HISTORY:
 if TOOL_AREA_IS_TASK_BAR or WINDOW_LIST_ACTIVE
 WindowListInteractionCommand	method dynamic WindowListDialogClass,
 					MSG_GEN_GUP_INTERACTION_COMMAND
-	;
-	; if TaskBar == on
-	;
-	; push	ds
-	; segmov	ds, dgroup
-	; tst	ds:[taskBarEnabled] ; if taskbar == on, ZF == 1
-	; pop	ds
-	; jz	done ; if ZF==0 skip the following code
 
 	push	cx
 	mov	di, offset WindowListDialogClass
@@ -1715,11 +1648,7 @@ WindowListInteractionCommand	method dynamic WindowListDialogClass,
 	clr	di
 	GOTO	ObjMessage
 done:
-	;
-	; if no Taskbar/WindowList, just callSuper
-	;
-	; mov	di, offset WindowListDialogClass
-	; GOTO	ObjCallSuperNoLock
+	ret
 
 WindowListInteractionCommand	endm
 endif
@@ -1754,23 +1683,9 @@ WindowListSendToFlow	method dynamic WindowListDialogClass,
 			MSG_VIS_VUP_TERMINATE_ACTIVE_MOUSE_FUNCTION, \
 			MSG_VIS_VUP_GET_MOUSE_STATUS, \
 			MSG_VIS_VUP_BUMP_MOUSE
-	;
-	; if TaskBar == on
-	;
-	; push	ds
-	; segmov	ds, dgroup
-	; tst	ds:[taskBarEnabled] ; if taskbar == on, ZF == 1
-	; pop	ds
-	; jz	done ; if ZF==0 skip the following code
 
 	mov	di, mask MF_CALL
 	GOTO	UserCallFlow
-;done:
-	;
-	; if no Taskbar/WindowList, just callSuper
-	;
-;	mov	di, offset WindowListDialogClass
-;	GOTO	ObjCallSuperNoLock
 
 WindowListSendToFlow	endm
 endif
@@ -1858,14 +1773,6 @@ DESTROYED:	ax, cx, dx, bp
 if TOOL_AREA_IS_TASK_BAR or WINDOW_LIST_ACTIVE
 WindowListListSelectItem	method dynamic WindowListListClass,
 					MSG_WINDOW_LIST_LIST_SELECT_ITEM
-	;
-	; if TaskBar == on
-	;
-	; push	ds
-	; segmov	ds, dgroup
-	; tst	ds:[taskBarEnabled] ; if taskbar == on, ZF == 1
-	; pop	ds
-	; jz	done ; if ZF==0 skip the following code
 
 	mov	ax, MSG_GEN_FIND_CHILD_AT_POSITION
 	call	ObjCallInstanceNoLock		; ^lcx:dx = item
@@ -3266,14 +3173,6 @@ DESTROYED:	ax, cx, dx, bp
 if TOOL_AREA_IS_TASK_BAR
 OLFieldSendToGenApplications	method dynamic OLFieldClass,
 					MSG_OL_FIELD_SEND_TO_GEN_APPLICATIONS
-	;
-	; if TaskBar == on
-	;
-	; push	ds
-	; segmov	ds, dgroup
-	; tst	ds:[taskBarEnabled] ; if taskbar == on, ZF == 1
-	; pop	ds
-	; jz	done ; if ZF==0 skip the following code
 
 	mov	bp, ds:[si]
 	add	bp, ds:[bp].Gen_offset

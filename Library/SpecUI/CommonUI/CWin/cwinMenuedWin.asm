@@ -1559,14 +1559,6 @@ else
 endif
 
 if TOOL_AREA_IS_TASK_BAR
-	;
-	; if TaskBar == on
-	;
-	push	ds					; save ds
-	segmov	ds, dgroup				; load dgroup
-	test	ds:[taskBarPrefs], mask TBF_ENABLED	; test if TBF_ENABLED is set
-	pop	ds					; restore ds
-	jz	endIfTaskbar				; skip if no taskbar
 
 	; If the taskbar is at the top of the screen, then move maximized
 	; windows down below the taskbar.
@@ -1578,7 +1570,7 @@ if TOOL_AREA_IS_TASK_BAR
 	add	di, ds:[di].Vis_offset
 	add	ds:[di].VI_bounds.R_top, dx
 	add	ds:[di].VI_bounds.R_bottom, dx
-endIfTaskbar:
+
 endif
 
 	call	UpdateWinPosSize	;update window position and size if

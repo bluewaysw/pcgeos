@@ -896,17 +896,6 @@ if TOOL_AREA_IS_TASK_BAR or WINDOW_LIST_ACTIVE
 OLFieldCreateWindowListEntry method dynamic OLFieldClass,
 					MSG_OL_FIELD_CREATE_WINDOW_LIST_ENTRY
 
-if TOOL_AREA_IS_TASK_BAR
-	;
-	; if TaskBar == on
-	;
-	; push	ds
-	; segmov	ds, dgroup
-	; tst	ds:[taskBarEnabled] ; if taskbar == on, ZF == 1
-	; pop	ds
-	; jz	done ; if ZF==0 skip the following code
-endif
-
 	clr	cx			; assume no window list dialog
 	tst	ds:[di].OLFI_windowListDialog
 	jz	done

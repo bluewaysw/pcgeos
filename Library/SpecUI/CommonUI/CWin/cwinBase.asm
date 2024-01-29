@@ -1373,15 +1373,6 @@ if TOOL_AREA_IS_TASK_BAR or WINDOW_LIST_ACTIVE
 
 EnsureItemAddedToWindowList	proc	near
 
-	;
-	; if TaskBar == on?
-	;
-	; push	ds
-	; segmov	ds, dgroup
-	; tst	ds:[taskBarEnabled] ; if taskbar == on, ZF == 1
-	; pop	ds
-	; LONG	jz done ; if ZF==0 skip the following code
-
 	mov	di, ds:[si]
 	add	di, ds:[di].Gen_offset
 	test	ds:[di].GI_states, mask GS_USABLE
@@ -1548,18 +1539,8 @@ OLBaseWinUpdateVisMoniker	method dynamic OLBaseWinClass,
 	mov	di, offset OLBaseWinClass
 	call	ObjCallSuperNoLock
 
-	;
-	; if TaskBar == on
-	;
-	; push	ds
-	; segmov	ds, dgroup
-	; tst	ds:[taskBarEnabled] ; if taskbar == on, ZF == 1
-	; pop	ds
-	; jz	done ; if ZF==0 skip the following code
-
 	FALL_THRU OLBaseWinSetWindowEntryMoniker
-;done:
-;	ret
+
 OLBaseWinUpdateVisMoniker	endm
 endif
 
@@ -1753,15 +1734,6 @@ iconHeight	local	word
 	uses	ax, bx, si, di, es
 	.enter
 
-	;
-	; if TaskBar == on
-	;
-	; push	ds
-	; segmov	ds, dgroup
-	; tst	ds:[taskBarEnabled] ; if taskbar == on, ZF == 1
-	; pop	ds
-	; LONG	jz totallyDone ; if ZF==0 skip the following code
-
 	movdw	bxdi, ss:[iconMkr]	;^lbx:di = moniker
 	tst	bx
 	jnz	copyMoniker
@@ -1872,7 +1844,6 @@ unlockCombMkr:
 done:
 	movdw	cxdx, ss:[combMkr]
 
-; totallyDone:
 	.leave
 	ret
 OLBaseWinCreateCombinationMoniker	endp
@@ -2010,15 +1981,6 @@ if TOOL_AREA_IS_TASK_BAR or WINDOW_LIST_ACTIVE
 OLBaseWinNotifyWindowSelected	method dynamic OLBaseWinClass,
 					MSG_META_NOTIFY_TASK_SELECTED
 
-	;
-	; if TaskBar == on
-	;
-	; push	ds
-	; segmov	ds, dgroup
-	; tst	ds:[taskBarEnabled] ; if taskbar == on, ZF == 1
-	; pop	ds
-	; jz	callSuper ; if ZF==0 skip the following code
-
 	add	bx, ds:[bx].Gen_offset
 	test	ds:[bx].GI_states, mask GS_USABLE
 	jz	done				; abort if window is not usable
@@ -2028,10 +1990,6 @@ OLBaseWinNotifyWindowSelected	method dynamic OLBaseWinClass,
 
 	mov	ax, MSG_GEN_BRING_TO_TOP
 	GOTO	ObjCallInstanceNoLock
-
-;callSuper:
-;	mov	di, offset OLBaseWinClass
-;	GOTO	ObjCallSuperNoLock
 
 done:
 	ret
@@ -2070,16 +2028,6 @@ if TOOL_AREA_IS_TASK_BAR or WINDOW_LIST_ACTIVE
 OLWindowListItemNotifyWindowSelected	method dynamic OLWindowListItemClass,
 					MSG_META_NOTIFY_TASK_SELECTED
 
-	;
-	; if TaskBar == on?
-	; FIXME!!! do we really need to callSuper here?
-	;
-	; push	ds
-	; segmov	ds, dgroup
-	; tst	ds:[taskBarEnabled] ; if taskbar == on, ZF == 1
-	; pop	ds
-	; jz	callSuper ; if ZF==0 skip the following code
-
 	mov	bx, ds:[di].OLWLI_windowObj.handle
 	push	bx
 	push	ds:[di].OLWLI_windowObj.chunk
@@ -2101,13 +2049,7 @@ OLWindowListItemNotifyWindowSelected	method dynamic OLWindowListItemClass,
 	mov	di, mask MF_FORCE_QUEUE
 	call	ObjMessage
 	stc
-; 	jmp	done
 
-; callSuper:
-; 	mov	di, offset OLWindowListItemClass
-; 	GOTO	ObjCallSuperNoLock
-
-; done:
 	ret
 OLWindowListItemNotifyWindowSelected	endm
 endif
@@ -2146,21 +2088,13 @@ if TOOL_AREA_IS_TASK_BAR or WINDOW_LIST_ACTIVE
 
 OLWindowListItemSetOperatingParams	method dynamic OLWindowListItemClass,
 				MSG_OL_WINDOW_LIST_ITEM_SET_OPERATING_PARAMS
-	;
-	; if TaskBar == on?
-	;
-	; push	ds
-	; segmov	ds, dgroup
-	; tst	ds:[taskBarEnabled] ; if taskbar == on, ZF == 1
-	; pop	ds
-	; jz	done ; if ZF==0 skip the following code
 
 	mov	ds:[di].OLWLI_windowObj.handle, cx
 	mov	ds:[di].OLWLI_windowObj.chunk, dx
 	mov	ds:[di].OLWLI_parentWin, bp
 
-; done:
 	ret
+
 OLWindowListItemSetOperatingParams	endm
 endif
 
@@ -2193,14 +2127,6 @@ REVISION HISTORY:
 if TOOL_AREA_IS_TASK_BAR or WINDOW_LIST_ACTIVE
 OLWindowListItemCloseWindow	method dynamic OLWindowListItemClass,
 					MSG_OL_WINDOW_LIST_ITEM_CLOSE_WINDOW
-	;
-	; if TaskBar == on?
-	;
-	; push	ds
-	; segmov	ds, dgroup
-	; tst	ds:[taskBarEnabled] ; if taskbar == on, ZF == 1
-	; pop	ds
-	; jz	done ; if ZF==0 skip the following code
 
 	mov	bx, ds:[di].OLWLI_windowObj.handle
 	mov	si, ds:[di].OLWLI_windowObj.chunk
@@ -2209,8 +2135,6 @@ OLWindowListItemCloseWindow	method dynamic OLWindowListItemClass,
 	mov	di, mask MF_FORCE_QUEUE
 	GOTO	ObjMessage
 
-; done:
-;	ret
 OLWindowListItemCloseWindow	endm
 endif
 
@@ -2251,15 +2175,6 @@ if TOOL_AREA_IS_TASK_BAR or WINDOW_LIST_ACTIVE
 
 OLWindowListItemKeyboardChar	method dynamic OLWindowListItemClass,
 					MSG_META_KBD_CHAR
-
-	;
-	; if TaskBar == on?
-	;
-	; push	ds
-	; segmov	ds, dgroup
-	; tst	ds:[taskBarEnabled] ; if taskbar == on, ZF == 1
-	; pop	ds
-	; jz	callSuper ; if ZF==0 skip the following code
 
 	test	dl, mask CF_FIRST_PRESS
 	jz	callSuper			; callsuper if not first press
@@ -3103,36 +3018,20 @@ if RADIO_STATUS_ICON_ON_PRIMARY
 endif
 
 if TOOL_AREA_IS_TASK_BAR or WINDOW_LIST_ACTIVE
-	;
-	; if TaskBar == on?
-	;
-	; push	ds
-	; segmov	ds, dgroup
-	; tst	ds:[taskBarEnabled] ; if taskbar == on, ZF == 1
-	; pop	ds
-	; jz	hasNoTaskbar ; if ZF==0 skip the following code
 
 	call	EnsureItemRemovedFromWindowList
 
-; hasNoTaskbar:
 endif
 	jmp	short done
 
 notDetaching:
 
 if TOOL_AREA_IS_TASK_BAR or WINDOW_LIST_ACTIVE
-	;
-	; if TaskBar == on?
-	;
-	; push	ds
-	; segmov	ds, dgroup
-	; tst	ds:[taskBarEnabled] ; if taskbar == on, ZF == 1
-	; pop	ds
-	; jz	done ; if ZF==0 skip the following code
 
 	test	cx, mask UWF_ATTACHING
 	jz	done
 	call	EnsureItemAddedToWindowList
+
 endif
 
 done:
@@ -3396,17 +3295,9 @@ if RADIO_STATUS_ICON_ON_PRIMARY
 endif
 
 if TOOL_AREA_IS_TASK_BAR or WINDOW_LIST_ACTIVE
-	;
-	; if TaskBar == on?
-	;
-	; push	ds
-	; segmov	ds, dgroup
-	; tst	ds:[taskBarEnabled] ; if taskbar == on, ZF == 1
-	; pop	ds
-	; jz	done ; if ZF==0 skip the following code
 
 	call	EnsureItemRemovedFromWindowList
-; done:
+
 endif
 
 	ret
@@ -3922,21 +3813,12 @@ OLBaseWinGainedSystemTargetExcl	endp
 UpdateAppMenuItemCommon	proc	far
 
 if TOOL_AREA_IS_TASK_BAR or WINDOW_LIST_ACTIVE
-	;
-	; if TaskBar == on?
-	;
-	; push	ds
-	; segmov	ds, dgroup
-	; tst	ds:[taskBarEnabled] ; if taskbar == on, ZF == 1
-	; pop	ds
-	; jz	hasNoTaskbar ; if ZF==0 skip the following code
 
 	push	cx
 	mov	ax, MSG_OL_BASE_WIN_UPDATE_WINDOW_ENTRY
 	call	ObjCallInstanceNoLock
 	pop	cx
 
-; hasNoTaskbar:
 endif
 	mov	ax, MSG_OL_APP_UPDATE_TASK_ENTRY
 	call	GenCallApplication
@@ -4199,19 +4081,11 @@ endif
 	call	OpenWinHeaderMarkInvalid
 
 if TOOL_AREA_IS_TASK_BAR or WINDOW_LIST_ACTIVE
-	;
-	; if TaskBar == on
-	;
-	; push	ds
-	; segmov	ds, dgroup
-	; tst	ds:[taskBarEnabled] ; if taskbar == on, ZF == 1
-	; pop	ds
-	; jz	done ; if ZF==0 skip the following code
 
 	mov	ax, MSG_OL_BASE_WIN_UPDATE_WINDOW_ENTRY
 	clr	cx
 	call	ObjCallInstanceNoLock
-; done:
+
 endif
 	ret
 OLBaseWinLostSystemTargetExcl	endp
@@ -5669,15 +5543,6 @@ if TOOL_AREA_IS_TASK_BAR
 OLWinGetToolAreaSize	proc	far
 	uses	ax, bx, di, bp
 	.enter
-
-	;
-	; if TaskBar == on
-	;
-	; push	ds
-	; segmov	ds, dgroup
-	; tst	ds:[taskBarEnabled] ; if taskbar == on, ZF == 1
-	; pop	ds
-	; jz	done ; if ZF==0 skip the following code
 
 	;
 	; doesn't work from UI thread, so return 0 as size

@@ -370,17 +370,9 @@ if EVENT_MENU
 endif
 
 if TOOL_AREA_IS_TASK_BAR or WINDOW_LIST_ACTIVE
-	;
-	; if TaskBar == on
-	;
-	; push	ds
-	; segmov	ds, dgroup
-	; tst	ds:[taskBarEnabled] ; if taskbar == on, ZF == 1
-	; pop	ds
-	; jz	done ; if ZF==0 skip the following code
 
 	call	OLFieldEnsureWindowListDialog
-done:
+
 endif
 	ret
 
@@ -798,15 +790,6 @@ REVISION HISTORY:
 ------------------------------------------------------------------------------@
 if (TOOL_AREA_IS_TASK_BAR or WINDOW_LIST_ACTIVE)
 OLFieldEnsureWindowListDialog	proc	far
-
-	;
-	; if TaskBar == on
-	;
-	; push	ds
-	; segmov	ds, dgroup
-	; tst	ds:[taskBarEnabled] ; if taskbar == on, ZF == 1
-	; pop	ds
-	; jz	done ; if ZF==0 skip the following code
 
 	mov	di, ds:[si]
 	mov	bp, di
