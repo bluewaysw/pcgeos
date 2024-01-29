@@ -1851,7 +1851,7 @@ REVISION HISTORY:
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
 
-if (not _ISUI)	;--------------------------------------------------------------
+if (not WINDOW_LIST_ACTIVE)	;--------------------------------------------
 
 OLFieldNavigateToNextApp	method	dynamic	OLFieldClass,
 					MSG_OL_FIELD_NAVIGATE_TO_NEXT_APP
@@ -1942,10 +1942,10 @@ done:
 	ret
 OLFieldNavigateToNextApp	endm
 
-else	; ISUI ---------------------------------------------------------------
+else	; WINDOW_LIST_ACTIVE ------------------------------------------------
 
 ;
-; ISUI just selects the next item in the window list.
+; if WINDOW_LIST_ACTIVE - just select the next item in the window list.
 ;
 OLFieldNavigateToNextApp	method	dynamic	OLFieldClass,
 					MSG_OL_FIELD_NAVIGATE_TO_NEXT_APP
@@ -1988,7 +1988,7 @@ done:
 	ret
 OLFieldNavigateToNextApp	endm
 
-endif	; if (not _ISUI) -----------------------------------------------------
+endif	; if (not WINDOW_LIST_ACTIVE) ---------------------------------------
 
 
 COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%

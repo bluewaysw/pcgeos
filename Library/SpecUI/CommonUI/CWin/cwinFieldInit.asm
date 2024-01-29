@@ -524,7 +524,7 @@ OLFieldEnsureExpressMenu	proc	far
 	add	di, ds:[di].Vis_offset
 	mov	ds:[di].OLFI_expressMenu, dx	; store chunk handle of menu
 
-if _MOTIF
+if _MOTIF and TOOL_AREA_IS_TASK_BAR
 	;
 	; upscale E-Menu Button width a little in Motif / Taskbar, for aesthetic pleasure
 	; if TaskBar == on
