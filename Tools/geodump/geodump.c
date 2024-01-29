@@ -614,7 +614,7 @@ void DisplayDbHdr(FILE *f,long pos,unsigned size)
 
         GetStructP(dh,pos);             // Get header block
         printf("      Mem Hdl: [%04x]    Map: Group/Item:[%04x]/<%04x>  _x: %04x\n",
-               dh.seg,dh.prim.group,dh.prim.item,dh._x);
+               dh.seg,dh.prim.group,dh.prim.item,dh.x);
 }
 
 void DisplayIdx(FILE *f,long pos,unsigned size)
@@ -641,7 +641,7 @@ void DisplayIdx(FILE *f,long pos,unsigned size)
             i+=sizeof(GEOSdbitemlist)) {
                                         // Dump items
           while(i==nextfree && nextfree) {
-            nextfree = *(unsigned *)(bl+i);
+            nextfree = *(unsigned short *)(bl+i);
                                         // Get pointer to next free entry
             i+=sizeof(GEOSdbitemlist);  // Skip over free entry
           }

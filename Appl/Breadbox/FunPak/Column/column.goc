@@ -1,0 +1,1142 @@
+/***   Wanderer's version of Columns II, as observed.  *********************/
+
+@include <stdapp.goh>
+@include <game.goh>
+@include "appicons.goh"
+#include <initfile.h>
+#include <sound.h>
+
+
+/* Lots and lots of defines... */
+
+#define PIT_VIS_HEIGHT 18                    /* pit (board) dimensions */
+#define PIT_VIS_WIDTH 6                      /* size shown on screen */
+#define PIT_HEIGHT (PIT_VIS_HEIGHT + 1)      /* including borders */
+#define PIT_WIDTH (PIT_VIS_WIDTH + 2)
+
+#define BLOCK_MIN_SIZE 12                    /* minimum block size */
+
+#define BOARD_BOUND_X(blockSize) ( blockSize * PIT_VIS_WIDTH - 1)
+#define BOARD_BOUND_Y(blockSize) ( blockSize * PIT_VIS_HEIGHT - 1)
+
+typedef ByteEnum ColumnsBlockType;           /* defines block type */
+#define NUM_BLOCKS 6
+#define CBT_EMPTY 0
+#define CBT_BORDER 0xff                      /* unseen border block */
+#define CBT_HOLLOW (NUM_BLOCKS + 1)          /* non-filled block */
+#define CBT_BOMB (NUM_BLOCKS + 2)            /* (drawing purposes only) */
+
+typedef ByteEnum ColumnsPieceOrt;            /* piece orientation */
+#define CPO_HORIZ 0                          
+#define CPO_VERT 1
+#define CPO_BOMB 2                           
+
+typedef struct {                             /* piece definition struct */
+     ColumnsBlockType CPT_blocks[3];
+     ColumnsPieceOrt CPT_ort;
+} ColumnsPieceType;
+
+typedef ByteFlags ColumnsPieceStatus;        /* current piece status */
+#define CPS_ACTIVE 01
+
+typedef ByteEnum ColumnsGameStatus;
+#define CGS_IN_PROGRESS 01
+#define CGS_PAUSED 02
+
+#define SHOW_ON_STARTUP   1
+
+#define SOUND_ON 1
+#define SOUND_OFF 2
+#define SOUND_SYSTEM 3
+
+int pieceOrtOffX[2][3] = { {-1, 0, 1}, {0, 0, 0} };    /* offsets for */
+int pieceOrtOffY[2][3] = { {0, 0, 0}, {-1, 0, 1} };    /* piece blocks */
+
+const word horizSoundBuf[] = {
+	SSE_GENERAL,            GE_SET_PRIORITY, SP_GAME,
+	SSE_VOICE_ON,           0, MIDDLE_C, DYNAMIC_F,
+	SSDTT_TICKS,            10,
+	SSE_VOICE_OFF,          0,
+	SSE_GENERAL,            GE_END_OF_SONG};
+
+const word rotateSoundBuf[] = {     /* from solitaire flip card sound */
+	ChangeEnvelope(0, IP_SHAKUHACHI, IT_STANDARD_TABLE),
+ 	SSE_GENERAL,            GE_SET_PRIORITY, SP_GAME,
+	VoiceOn(0, HIGH_B, DYNAMIC_F),
+	DeltaTick(3),
+	VoiceOff(0),
+	General(GE_END_OF_SONG)};
+
+const word bombSoundBuf[] = {     /* from hearts wrong play sound */
+	SSE_CHANGE,             0, IP_CELLO, IT_STANDARD_TABLE,
+	SSE_GENERAL,            GE_SET_PRIORITY, SP_GAME,
+	SSDTT_TICKS,            1,
+	SSE_VOICE_ON,           0, LOW_G, DYNAMIC_MF,
+	SSDTT_TICKS,            10,
+	SSE_VOICE_OFF,          0,
+	SSE_GENERAL,            GE_END_OF_SONG};
+
+const word dropSoundBuf[] = {     /* from hearts broken sound */
+	SSE_CHANGE,             0, IP_TINKLE_BELL, IT_STANDARD_TABLE,
+	SSE_GENERAL,				GE_SET_TEMPO, 16,
+	SSE_GENERAL,            GE_SET_PRIORITY, SP_GAME,
+	SSE_VOICE_ON,           0, LOW_A, DYNAMIC_MF,
+	SSDTT_TICKS,            SIXTEENTH,
+	SSE_VOICE_OFF,          0,
+	SSE_VOICE_ON,           0, MIDDLE_A, DYNAMIC_MF,
+	SSDTT_TICKS,            SIXTEENTH,
+	SSE_VOICE_OFF,          0,
+	SSE_VOICE_ON,           0, HIGH_A, DYNAMIC_MF,
+	SSDTT_TICKS,            SIXTEENTH,
+	SSE_VOICE_OFF,          0,
+	SSE_GENERAL,            GE_END_OF_SONG};
+
+const word matchSoundBuf[] = {     /* from poker lost hand sound */
+	SSE_GENERAL,				GE_SET_TEMPO, 8,
+	SSE_GENERAL,            GE_SET_PRIORITY, SP_GAME,
+	SSE_VOICE_ON,           0, LOW_G/2, DYNAMIC_F,
+	SSDTT_TICKS,            QUARTER,
+	SSE_VOICE_OFF,          0,
+	SSE_VOICE_ON,           0, LOW_G/2, DYNAMIC_F,
+	SSDTT_TICKS,            EIGHTH,
+	SSE_VOICE_OFF,          0,
+	SSE_VOICE_ON,           0, LOW_C, DYNAMIC_F,
+	SSDTT_TICKS,            WHOLE,
+	SSE_VOICE_OFF,          0,
+	SSE_GENERAL,            GE_END_OF_SONG};
+
+MemHandle horizSound, rotateSound, bombSound, dropSound, matchSound;
+
+
+ColumnsBlockType pit[PIT_HEIGHT][PIT_WIDTH];      /* pit data */
+word score = 0;                         /* current score */
+//sword blockSize;                        /* point size of a block */
+sword blockSize = 20;                   /* no longer sizeable - jfh */
+ColumnsGameStatus gameStatus = 0;       /* status of game */
+ColumnsPieceType pieceType = {{0}, 0};  /* current piece type */
+int pieceX, pieceY;                     /* current piece location */
+ColumnsPieceStatus pieceStatus;         /* current piece status */
+word downDelay = 70;                    /* jiffies between piece drops */
+TimerHandle timer = NullHandle;         /* active timer handle (0=inactive) */
+word timerID = 0;                       /* active timer ID */
+Boolean g_starting = TRUE;
+word g_sound = SOUND_SYSTEM;
+
+@class ColumnsProcessClass, GenProcessClass;
+     @message void MSG_COLUMNS_NEW_GAME();        /* game status messages */
+	  @message void MSG_COLUMNS_PAUSE_GAME();
+     @message void MSG_COLUMNS_CONTINUE_GAME();
+	  @message void MSG_COLUMNS_GAME_OVER();
+	  @message void MSG_COLUMNS_SET_GAME_STATUS(ColumnsGameStatus set,
+       ColumnsGameStatus reset);
+	  @message (GEN_ITEM_GROUP_APPLY_MSG) MSG_COLUMNS_SOUND_CHANGED;
+@endc
+
+@class ColumnsApplicationClass, GenApplicationClass;
+@endc
+
+@class ColumnsBoardViewClass, GenViewClass;
+@endc
+
+@class ColumnsBoardClass, VisContentClass;
+     @instance GStateHandle CBCI_gstate = NullHandle;
+     @instance GStateHandle CBCI_cachedState = NullHandle;
+     @instance WindowHandle CBCI_viewWin = NullHandle;
+     
+     @message void MSG_PIECE_DOWN();
+     @message void MSG_PIECE_LEFT();
+     @message void MSG_PIECE_RIGHT();
+     @message void MSG_PIECE_ROT();
+     @message void MSG_PIECE_DROP();
+     @message void MSG_PIECE_NEW();
+     @message void MSG_PIECE_DONE();
+     @message void MSG_PIECE_DRAW();
+     @message void MSG_PIECE_ERASE();
+     @message void MSG_PIECE_START_TIMER();
+     @message void MSG_PIECE_STOP_TIMER();
+     @message void MSG_CB_CLEAR();
+     @message void MSG_CB_PUSH_GSTATE();
+     @message void MSG_CB_POP_GSTATE();
+     @message void MSG_CB_SCORE();
+     @message Point MSG_CB_GET_TEXT_BOX_BOUNDS(GStateHandle gstate,
+	  char *string, Rectangle *box);
+/*     @message void MSG_CB_INVALIDATE_TEXT_BOX(char *string);*/
+     @message void MSG_CB_DRAW_TEXT_BOX(GStateHandle gstate, char *string);
+     @message void MSG_CB_DRAW_GAME_OVER_TEXT_BOX();
+@endc
+
+@classdecl ColumnsProcessClass, neverSaved;
+@classdecl ColumnsApplicationClass;
+@classdecl ColumnsBoardViewClass;
+@classdecl ColumnsBoardClass;
+
+@start AppResource;
+
+@object ColumnsApplicationClass ColumnsApp = {
+	GI_visMoniker = list {
+	   @ColLCMoniker,
+	   @ColTinyMoniker,
+	   @ColumnsTextMoniker
+	   }
+	  GI_comp = @ColumnsPrimary;
+     gcnList(MANUFACTURER_ID_GEOWORKS, GAGCNLT_WINDOWS) = @ColumnsPrimary;
+     gcnList(MANUFACTURER_ID_GEOWORKS, MGCNLT_ACTIVE_LIST) =
+       @ColumnsHighScore;
+}
+
+@visMoniker ColumnsTextMoniker = "Columns";
+
+@end AppResource
+
+
+@start Interface;
+
+@object GenPrimaryClass ColumnsPrimary = {
+	  GI_comp = @ColumnsMainGroup,
+				 /*	@ColumnsTop,
+					@ColumnsBoardHolder,   */
+					@ColumnsGameMenu,
+					@ColumnsOptionsMenu,
+					@QTipsDialogBox;
+	  GI_attrs = @default | GA_KBD_SEARCH_PATH;
+//     ATTR_GEN_DISPLAY_NOT_MINIMIZABLE;
+	   HINT_SIZE_WINDOW_AS_DESIRED ;
+	HINT_CENTER_WINDOW;
+     HINT_CENTER_CHILDREN_HORIZONTALLY;
+	HINT_CENTER_CHILDREN_VERTICALLY;
+/*	HINT_SIZE_WINDOW_AS_RATIO_OF_PARENT = {
+	  SWSS_RATIO | PCT_40, SWSS_RATIO | PCT_90 }; */
+     HINT_PRIMARY_NO_FILE_MENU;
+	ATTR_GEN_HELP_CONTEXT = "TOC";
+}
+
+@object GenInteractionClass ColumnsMainGroup = {
+	  GI_comp = @ColumnsNewButtonGroup, @ColumnsBoardHolder, @ColumnsScore;
+	  HINT_ORIENT_CHILDREN_HORIZONTALLY ;
+}
+
+/*@object GenInteractionClass ColumnsTop = {
+	  GI_comp = @ColumnsNewButtonGroup, @ColumnsScore;
+	  HINT_ORIENT_CHILDREN_HORIZONTALLY ;
+	  HINT_CENTER_CHILDREN_HORIZONTALLY ;
+    /*	  HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+	  HINT_FULL_JUSTIFY_CHILDREN_HORIZONTALLY; */
+/*}
+*/
+@object GenInteractionClass ColumnsNewButtonGroup = {
+	  GI_comp = @ColumnsSpacer1, @ColumnsNewButton, @ColumnsSpacer2;
+	  HINT_ORIENT_CHILDREN_HORIZONTALLY ;
+}
+
+@object GenInteractionClass ColumnsSpacer1 = {
+	  HINT_FIXED_SIZE = {SST_PIXELS | 20, 0,0};
+}
+
+@object GenInteractionClass ColumnsSpacer2 = {
+	  HINT_FIXED_SIZE = {SST_PIXELS | 40, 0,0};
+}
+
+@object GenTriggerClass ColumnsNewButton = {
+	  GI_visMoniker = 'N', "New";
+	  GTI_destination = process;
+	  GTI_actionMsg = MSG_COLUMNS_NEW_GAME;
+}
+
+@object GenValueClass ColumnsScore = {
+     GI_visMoniker = "Score:";
+     GI_attrs = @default | GA_READ_ONLY;
+}
+
+@object GenInteractionClass ColumnsBoardHolder = {
+	  GI_comp = @ColumnsBoardView;
+	  HINT_FIXED_SIZE = {SST_PIXELS | (20 * PIT_VIS_WIDTH+5),
+								  SST_PIXELS | (20 * PIT_VIS_HEIGHT+5),0};
+}
+
+@object ColumnsBoardViewClass ColumnsBoardView = {
+		  GVI_attrs      = @default |
+								 GVA_CONTROLLED;
+        GVI_horizAttrs   = @default |
+					  GVDA_NO_SMALLER_THAN_CONTENT |
+					  GVDA_NO_LARGER_THAN_CONTENT ;
+        GVI_vertAttrs    = @default |
+					  GVDA_NO_SMALLER_THAN_CONTENT |
+					  GVDA_NO_LARGER_THAN_CONTENT ;
+	  GVI_content = ColumnsBoard;
+//     GVI_docBounds = {0, 0, 8.5 * 72, 11 * 72};
+	  GVI_docBounds = {0, 0, (20 * PIT_VIS_WIDTH - 1),
+									 (20 * PIT_VIS_HEIGHT - 1)};
+	  GVI_color = {C_WHITE, 0, 0, 0};
+	  HINT_EXPAND_HEIGHT_TO_FIT_PARENT;
+	  HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+}
+
+@object ColumnsBoardClass ColumnsBoard = {
+	VCNI_attrs = VCNA_SAME_WIDTH_AS_VIEW | VCNA_SAME_HEIGHT_AS_VIEW;
+}
+
+
+@object GenInteractionClass ColumnsGameMenu = {
+	  GI_visMoniker = 'G', "Game";
+	  GI_comp = @ColumnsNewTrigger, @ColumnsQTipsTrigger, @ColumnsPauseTrigger,
+		 @ColumnsContinueTrigger, @ColumnsHighScore;
+	  GI_attrs = @default | GA_KBD_SEARCH_PATH;
+	  GII_visibility = GIV_POPUP;
+	  ATTR_GEN_INTERACTION_GROUP_TYPE = (GIGT_FILE_MENU) ;
+}
+
+	 /*---------------------------------------------------------------------*/
+	 @object GenTriggerClass ColumnsQTipsTrigger = {
+		  GI_visMoniker   = 'Q', "Quick Tips" ;
+		  GTI_destination = @QTipsDialogBox ;
+		  GTI_actionMsg   = MSG_GEN_INTERACTION_INITIATE ;
+		  HINT_TRIGGER_BRINGS_UP_WINDOW;
+	 }
+
+@object GenTriggerClass ColumnsNewTrigger = {
+	  GI_visMoniker = 'N', "New Game";
+	  GI_attrs = @default | GA_KBD_SEARCH_PATH;
+ //	  GI_kbdAccelerator = control 's';
+	  GTI_destination = process;
+	  GTI_actionMsg = MSG_COLUMNS_NEW_GAME;
+}
+
+@object GenTriggerClass ColumnsPauseTrigger = {
+     GI_visMoniker = 'P', "Pause Game";
+	  GI_attrs = @default | GA_KBD_SEARCH_PATH;
+	  GI_kbdAccelerator = control 'p';
+	  GTI_destination = process;
+     GTI_actionMsg = MSG_COLUMNS_PAUSE_GAME;
+}
+
+@object GenTriggerClass ColumnsContinueTrigger = {
+     GI_visMoniker = 'C', "Continue Game";
+	  GI_attrs = @default | GA_KBD_SEARCH_PATH;
+	  GI_kbdAccelerator = control 'c';
+	  GTI_destination = process;
+     GTI_actionMsg = MSG_COLUMNS_CONTINUE_GAME;
+}
+
+@object HighScoreClass ColumnsHighScore = {
+     HSI_fileName = @HighScoreFileName;
+     HSI_creator = { "COL2", 16431 };
+     HSI_highScoreLine1 = "GOOD JOB!";
+     HSI_highScoreLine2 = "(Especially since this game isn't easy)";
+     HSI_highScoreLine3 = "You deserve some recognition.";
+     HSI_highScoreLine4 = "Enter your name to be immortalized forever:";
+}
+
+@chunk char HighScoreFileName[] = "Columns High Score Table";
+
+@object GenInteractionClass ColumnsOptionsMenu = {
+	  GI_comp = @ColumnsSoundOpt;
+	  GII_visibility = GIV_POPUP;
+	  ATTR_GEN_INTERACTION_GROUP_TYPE = (GIGT_OPTIONS_MENU) ;
+}
+
+@object GenInteractionClass ColumnsSoundOpt = {
+	  GI_visMoniker = 'S', "Sound" ;
+	  GI_comp = @SoundGroup;
+	  GII_visibility = GIV_POPUP;
+}
+
+	 /*---------------------------------------------------------------------*/
+	 @object GenItemGroupClass SoundGroup = {
+		  GI_comp          = @SoundOn,
+									@SoundOff,
+									@SystemPref ;
+		  GIGI_selection   = SOUND_SYSTEM ;
+        GIGI_destination = process ;
+		  GIGI_applyMsg = MSG_COLUMNS_SOUND_CHANGED ;
+    }
+    /*---------------------------------------------------------------------*/
+	 @object GenItemClass SoundOn = {
+		  GI_visMoniker = 'S', "Sound On" ;
+		  GII_identifier = SOUND_ON ;
+    }
+	 /*---------------------------------------------------------------------*/
+	 @object GenItemClass SoundOff = {
+		  GI_visMoniker = 'O', "Sound Off" ;
+		  GII_identifier = SOUND_OFF ;
+	 }
+	 /*---------------------------------------------------------------------*/
+	 @object GenItemClass SystemPref = {
+		  GI_visMoniker = 'P', "Use System Preference" ;
+		  GII_identifier = SOUND_SYSTEM ;
+	 }
+	 /*---------------------------------------------------------------------*/
+@end Interface
+
+
+char *readyText = "Ready";
+char *gameOverText = "Game Over";
+char *gamePausedText = "Paused";
+
+
+@start QTipsResource;
+@include "Art/QTip1.goh"
+@include "Art/QTip2.goh"
+@include "Art/QTip3.goh"
+
+	 @object GenInteractionClass QTipsDialogBox = {
+		  GI_visMoniker = "Columns Quick Tips";
+		  GI_comp = @GoalText,
+						@QuickTipsGroup,
+						@ShowOnStartupGroup,
+						@OKTipsButton;
+		  GII_visibility = GIV_DIALOG ;
+		  GII_attrs = @default | GIA_MODAL | GIA_NOT_USER_INITIATABLE;
+		  HINT_CENTER_CHILDREN_HORIZONTALLY ;
+		  ATTR_GEN_HELP_CONTEXT = "TOC";
+	 }
+
+
+	 @object GenTextClass GoalText = {
+		  GI_attrs = @default | GA_READ_ONLY;
+		  GTXI_text = "The goal of the game is to empty the pit of colored blocks as it fills up by lining up three blocks of the same color in any direction.";
+		  ATTR_GEN_TEXT_NEVER_MAKE_SCROLLABLE;
+	 }
+
+	 @object GenBooleanGroupClass ShowOnStartupGroup = {
+		  GI_comp = @ShowOnStartupBoolean;
+	 }
+
+	 @object GenBooleanClass ShowOnStartupBoolean = {
+		  GI_visMoniker = 'S', "Show this Dialog box when Columns starts";
+		  GBI_identifier = SHOW_ON_STARTUP;
+	 }
+
+	 @object GenTriggerClass OKTipsButton = {
+		  GI_visMoniker   = 'O', "OK";
+        GI_attrs = @default | GA_SIGNAL_INTERACTION_COMPLETE ;
+		  HINT_SEEK_REPLY_BAR;
+		  HINT_DEFAULT_DEFAULT_ACTION;
+	 }
+
+
+	 @object GenInteractionClass QuickTipsGroup = {
+		  GI_comp = @QTip1,
+						@QTip2,
+						@QTip3;
+	 }
+
+	 @object GenInteractionClass QTip1 = {
+		  GI_comp = @QTip1GlyphHolder, @QTip1Text ;
+		  HINT_ORIENT_CHILDREN_HORIZONTALLY;
+		  HINT_CENTER_CHILDREN_VERTICALLY;
+	 }
+
+	 @object GenInteractionClass QTip1GlyphHolder = {
+		  GI_comp = @QTip1Glyph;
+		  HINT_CENTER_CHILDREN_HORIZONTALLY;
+		  HINT_CENTER_CHILDREN_VERTICALLY;
+		  HINT_FIXED_SIZE = {SST_PIXELS | 60, 0,0};
+        /* ^^^ is based on the width of the widest icon */
+	 }
+
+	 @object GenGlyphClass QTip1Glyph = {
+		  GI_visMoniker = list { @QTip1Moniker };
+	 }
+
+	 @object GenTextClass QTip1Text = {
+		  GI_attrs = @default | GA_READ_ONLY;
+		  GTXI_text = "Use the right and left arrow keys to move the falling pieces to the right or left.";
+		  ATTR_GEN_TEXT_NEVER_MAKE_SCROLLABLE;
+		  HINT_MINIMUM_SIZE = {SST_PIXELS | 325, 0, 0};
+	 }
+
+	 @object GenInteractionClass QTip2 = {
+		  GI_comp = @QTip2GlyphHolder, @QTip2Text ;
+		  HINT_ORIENT_CHILDREN_HORIZONTALLY;
+		  HINT_CENTER_CHILDREN_VERTICALLY;
+	 }
+
+	 @object GenInteractionClass QTip2GlyphHolder = {
+		  GI_comp = @QTip2Glyph;
+		  HINT_CENTER_CHILDREN_HORIZONTALLY;
+		  HINT_CENTER_CHILDREN_VERTICALLY;
+		  HINT_FIXED_SIZE = {SST_PIXELS | 60, 0,0};
+	 }
+
+	 @object GenGlyphClass QTip2Glyph = {
+		  GI_visMoniker = list { @QTip2Moniker };
+	 }
+
+	 @object GenTextClass QTip2Text = {
+		  GI_attrs = @default | GA_READ_ONLY;
+		  GTXI_text = "Use the down arrow key to drop a piece quickly.";
+		  ATTR_GEN_TEXT_NEVER_MAKE_SCROLLABLE;
+		  HINT_MINIMUM_SIZE = {SST_PIXELS | 325, 0, 0};
+	 }
+
+	 @object GenInteractionClass QTip3 = {
+		  GI_comp = @QTip3GlyphHolder, @QTip3Text ;
+		  HINT_ORIENT_CHILDREN_HORIZONTALLY;
+		  HINT_CENTER_CHILDREN_VERTICALLY;
+	 }
+
+	 @object GenInteractionClass QTip3GlyphHolder = {
+		  GI_comp = @QTip3Glyph;
+		  HINT_CENTER_CHILDREN_HORIZONTALLY;
+		  HINT_CENTER_CHILDREN_VERTICALLY;
+		  HINT_FIXED_SIZE = {SST_PIXELS | 60, 0,0};
+	 }
+
+	 @object GenGlyphClass QTip3Glyph = {
+		  GI_visMoniker = list { @QTip3Moniker };
+	 }
+
+	 @object GenTextClass QTip3Text = {
+		  GI_attrs = @default | GA_READ_ONLY;
+		  GTXI_text = "Use the up arrow key to rotate the colors on a falling piece to make a vertical, horizontal or diagonal line of the colored squares.";
+		  ATTR_GEN_TEXT_NEVER_MAKE_SCROLLABLE;
+		  HINT_MINIMUM_SIZE = {SST_PIXELS | 325, 0, 0};
+	 }
+
+@end QTipsResource
+
+void ColumnsPlaySound(MemHandle soundHandle)
+{
+ word 		tempo = 8;
+
+
+	 if (g_sound == SOUND_SYSTEM)
+		 /* this routine abides by syst sound setting */
+		 UserStandardSound(SST_CUSTOM_SOUND, soundHandle, 1);
+	 else if (g_sound == SOUND_OFF)  return;
+	 else {
+		 if (soundHandle == dropSound) tempo = 16;
+		 /* this routine doesn't check syst sound setting -
+		  * but we need to supply the tempo */
+		 SoundPlayMusic(soundHandle, SP_GAME, tempo, EOSF_UNLOCK);
+		 }
+}
+
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_GEN_PROCESS_OPEN_APPLICATION for ColumnsProcessClass
+ *               (AppAttachFlags	attachFlags,
+ *			  MemHandle		launchBlock,
+ *			  MemHandle 		extraState)
+ * DESCRIPTION:	 do some opening stuff
+ *
+ *
+ ***********************************************************************/
+@method ColumnsProcessClass, MSG_GEN_PROCESS_OPEN_APPLICATION
+{
+ Boolean		initError, tips;
+
+
+    g_starting = TRUE;
+
+    @callsuper();
+
+    /* needed to install app tiny token */
+    @call ColumnsApp::MSG_GEN_APPLICATION_INSTALL_TOKEN();
+
+	 SoundAllocMusic(horizSoundBuf, 1, &horizSound);
+	 SoundAllocMusic(rotateSoundBuf, 1, &rotateSound);
+	 SoundAllocMusic(bombSoundBuf, 1, &bombSound);
+	 SoundAllocMusic(dropSoundBuf, 1, &dropSound);
+	 SoundAllocMusic(matchSoundBuf, 1, &matchSound);
+
+	 /* check for quick tips */
+	 initError = InitFileReadBoolean("Columns", "showTips", &tips);
+	 if (initError) tips = TRUE;
+	 if (tips) {
+		 @send ShowOnStartupGroup::MSG_GEN_BOOLEAN_GROUP_SET_BOOLEAN_STATE(
+														 SHOW_ON_STARTUP,
+														 TRUE);
+		 @send QTipsDialogBox::MSG_GEN_INTERACTION_INITIATE();
+		 }
+	 else
+		 @send ShowOnStartupGroup::MSG_GEN_BOOLEAN_GROUP_SET_BOOLEAN_STATE(
+														 SHOW_ON_STARTUP,
+														 FALSE);
+	 /* check for sound */
+	 initError = InitFileReadInteger("Columns", "sound", &g_sound);
+	 if (initError) g_sound = SOUND_SYSTEM;
+	 @call SoundGroup::MSG_GEN_ITEM_GROUP_SET_SINGLE_SELECTION(g_sound, FALSE) ;
+
+	 @send ColumnsPauseTrigger::MSG_GEN_SET_NOT_ENABLED(VUM_NOW);
+	 @send ColumnsContinueTrigger::MSG_GEN_SET_NOT_ENABLED(VUM_NOW);
+}
+
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_GEN_PROCESS_CLOSE_APPLICATION for ColumnsProcessClass
+ *
+ * DESCRIPTION:	 do some closing stuff
+ *              
+ *
+ ***********************************************************************/
+@method ColumnsProcessClass, MSG_GEN_PROCESS_CLOSE_APPLICATION
+{
+ Boolean		tips;
+
+
+     if (timer) {
+	   TimerStop(timer, timerID);
+	   timer = NullHandle;
+	   }
+	   
+	 SoundStopMusic(horizSound);
+	 SoundFreeMusic(horizSound);
+	 SoundStopMusic(rotateSound);
+	 SoundFreeMusic(rotateSound);
+	 SoundStopMusic(bombSound);
+	 SoundFreeMusic(bombSound);
+	 SoundStopMusic(dropSound);
+	 SoundFreeMusic(dropSound);
+	 SoundStopMusic(matchSound);
+	 SoundFreeMusic(matchSound);
+
+	 /* set the quick tips if not default */
+	 tips = @call ShowOnStartupGroup::MSG_GEN_BOOLEAN_GROUP_IS_BOOLEAN_SELECTED(
+																	 SHOW_ON_STARTUP);
+	 InitFileWriteBoolean("Columns", "showTips", tips);
+	 InitFileWriteInteger("Columns", "sound", g_sound);
+
+	 @callsuper();
+
+    return NULL;
+
+}
+
+@method ColumnsProcessClass, MSG_COLUMNS_SOUND_CHANGED
+{
+	 g_sound = selection ;
+}
+
+@method ColumnsBoardClass, MSG_META_CONTENT_VIEW_WIN_OPENED {
+     pself->CBCI_viewWin = viewWindow;
+     @callsuper();
+}
+
+void DrawBlock(GStateHandle gstate, ColumnsBlockType type, int x, int y) {
+     static int fillColor[] = {C_WHITE, C_YELLOW, C_LIGHT_CYAN, C_LIGHT_GREEN,
+       C_LIGHT_GREY, C_LIGHT_RED, C_LIGHT_BLUE, C_WHITE };
+     register int bs = blockSize - 1;
+     int sx = (x - 1) * blockSize, sy = y * blockSize;
+
+     if (type == CBT_BOMB) {
+          GrSetLineColor(gstate, CF_INDEX, C_BLACK, 0, 0);
+          GrSetAreaColor(gstate, CF_INDEX, C_BLACK, 0, 0);
+          GrFillEllipse(gstate, sx + 1, sy + 1, sx + bs - 2, sy + bs - 2);
+          GrDrawEllipse(gstate, sx + 1, sy + 1, sx + bs - 2, sy + bs - 2);
+     }
+     else if (type == CBT_EMPTY) {
+          GrSetLineColor(gstate, CF_INDEX, C_WHITE, 0, 0);
+          GrSetAreaColor(gstate, CF_INDEX, C_WHITE, 0, 0);
+          GrFillRect(gstate, sx, sy, sx + bs, sy + bs);
+          GrDrawRect(gstate, sx, sy, sx + bs, sy + bs);
+     }
+     else {
+          static Region borderLT[] = {
+               0, 0, PARAM_2 - 1, PARAM_2 - 1,
+               -1, EOREGREC,
+               PARAM_2 - 1, 0, PARAM_2 - 1, EOREGREC,
+               EOREGREC
+          };
+          static Region borderBR[] = {
+               0, 0, PARAM_2 - 1, PARAM_2 - 1,
+               0, EOREGREC,
+               PARAM_2 - 2, PARAM_2 - 1, PARAM_2 - 1, EOREGREC,
+               PARAM_2 - 1, 1, PARAM_2 - 1, EOREGREC,
+               EOREGREC
+          };
+          static Region interior[] = {
+               0, 0, PARAM_2 - 1, PARAM_2 - 1,
+               2, EOREGREC,
+               PARAM_2 - 4, 3, PARAM_2 - 4, EOREGREC,
+               EOREGREC
+          };
+          GrSetAreaColor(gstate, CF_INDEX, C_DARK_GRAY, 0, 0);
+          GrDrawRegion(gstate, sx, sy, borderLT, bs, 0);
+          GrDrawRegion(gstate, sx + 1, sy + 1, borderLT, bs - 2, 0);
+          GrSetAreaColor(gstate, CF_INDEX, C_LIGHT_GRAY, 0, 0);
+          GrDrawRegion(gstate, sx, sy, borderBR, bs, 0);
+          GrDrawRegion(gstate, sx + 1, sy + 1, borderBR, bs - 2, 0);
+          GrSetAreaColor(gstate, CF_INDEX, C_WHITE, 0, 0);
+          GrDrawRegion(gstate, sx + 2, sy + 2, borderLT, bs - 4, 0);
+          GrSetAreaColor(gstate, CF_INDEX, C_BLACK, 0, 0);
+          GrDrawRegion(gstate, sx + 2, sy + 2, borderBR, bs - 4, 0);
+          GrSetAreaColor(gstate, CF_INDEX, fillColor[(int)type], 0, 0);
+          GrDrawRegion(gstate, sx, sy, interior, bs, 0);
+     }
+}
+
+void SetAndDrawBlock(GStateHandle gstate, ColumnsBlockType t, int x, int y) {
+     pit[y][x] = t;
+     DrawBlock(gstate, t, x, y);
+}
+
+@method ColumnsBoardClass, MSG_CB_DRAW_TEXT_BOX {
+     Rectangle box;
+     Point text = @call self::MSG_CB_GET_TEXT_BOX_BOUNDS(gstate, 
+       string, &box);
+
+     GrSetTextColor(gstate, CF_INDEX, C_BLACK, 0, 0);
+     GrSetAreaColor(gstate, CF_INDEX, C_WHITE, 0, 0);
+     GrSetLineColor(gstate, CF_INDEX, C_BLACK, 0, 0);
+     GrFillRect(gstate, box.R_left, box.R_top, box.R_right, box.R_bottom);
+     GrDrawRect(gstate, box.R_left, box.R_top, box.R_right, box.R_bottom);
+     GrDrawText(gstate, text.P_x, text.P_y, string, 0);
+}
+
+
+@method ColumnsBoardClass, MSG_VIS_DRAW {
+     int x, y;
+     
+     pself->CBCI_gstate = gstate;
+     if (gameStatus & CGS_PAUSED)
+          @call self::MSG_CB_DRAW_TEXT_BOX(gstate, gamePausedText);
+     else {
+          for (y = 0; y < PIT_VIS_HEIGHT; y++)
+               for (x = 1; x <= PIT_VIS_WIDTH; x++)
+                    DrawBlock(gstate, pit[y][x], x, y);
+     }
+     if (pieceStatus & CPS_ACTIVE)
+		@call self::MSG_PIECE_DRAW();
+	if (g_starting) {
+		@call self::MSG_CB_DRAW_TEXT_BOX(gstate, readyText);
+//		g_starting = FALSE;
+		}
+	else if (!(gameStatus & CGS_IN_PROGRESS))
+		@call self::MSG_CB_DRAW_TEXT_BOX(gstate, gameOverText);
+	pself->CBCI_gstate = NullHandle;
+}
+
+@method ColumnsBoardViewClass, MSG_GEN_VIEW_CALC_WIN_SIZE {
+     sword newWidth, newHeight;
+     
+     if (width == RSA_CHOOSE_OWN_SIZE && height == RSA_CHOOSE_OWN_SIZE)
+     {
+          newWidth = width;             /* we want some real values! */
+			 newHeight = height;           /* try again when you're ready */
+	  }
+     else
+     {
+/*          sword sizeTestWidth, sizeTestHeight;
+
+          sizeTestWidth = width / PIT_VIS_WIDTH;
+          sizeTestHeight = height / PIT_VIS_HEIGHT;
+          blockSize = sizeTestWidth;
+          if (BOARD_BOUND_Y(sizeTestWidth) > height)
+               blockSize = sizeTestHeight;
+          if (blockSize < BLOCK_MIN_SIZE)
+               blockSize = BLOCK_MIN_SIZE;
+*/			 newWidth = BOARD_BOUND_X(blockSize);
+          newHeight = BOARD_BOUND_Y(blockSize);
+     }
+     return MAKE_SIZE_DWORD(newWidth, newHeight);
+}
+
+Boolean ValidatePiece(ColumnsPieceType piece, int x, int y) {
+     int i;
+
+     if (piece.CPT_ort == CPO_BOMB)
+          return (pit[y][x]) ? FALSE : TRUE;
+     else
+          for (i = 0; i < 3; i++)
+               if (pit[y + pieceOrtOffY[piece.CPT_ort][i]]
+                 [x + pieceOrtOffX[piece.CPT_ort][i]])
+                    return FALSE;
+     return TRUE;
+}
+
+@method ColumnsProcessClass, MSG_COLUMNS_NEW_GAME {
+     score = 0;
+	  g_starting = FALSE;
+	  @send ColumnsScore::MSG_GEN_VALUE_SET_INTEGER_VALUE(0, FALSE);
+     gameStatus = CGS_IN_PROGRESS;
+     @call ColumnsBoard::MSG_CB_CLEAR();     /* pushes GState */
+     @call ColumnsBoard::MSG_PIECE_NEW();    /* pops GState */
+	  @send ColumnsPauseTrigger::MSG_GEN_SET_ENABLED(VUM_NOW);
+	  @send ColumnsContinueTrigger::MSG_GEN_SET_NOT_ENABLED(VUM_NOW);
+}
+
+@method ColumnsBoardClass, MSG_CB_CLEAR
+{
+     int x, y;
+
+     @call self::MSG_CB_PUSH_GSTATE();
+     for (y = 0; y < PIT_HEIGHT; y++)
+          pit[y][0] = pit[y][PIT_WIDTH - 1] = CBT_BORDER;
+     for (x = 0; x < PIT_WIDTH; x++)
+          pit[PIT_HEIGHT - 1][x] = CBT_BORDER;
+     for (y = 0; y < PIT_VIS_HEIGHT; y++)              /* clear board */
+          for (x = 1; x <= PIT_VIS_WIDTH; x++)
+               SetAndDrawBlock(pself->CBCI_gstate, CBT_EMPTY, x, y);
+}
+
+@method ColumnsBoardClass, MSG_PIECE_NEW {
+     EC_ERROR_IF(!pself->CBCI_gstate, -1);    /* Assumes valid gstate */
+     
+     pieceStatus &= ~CPS_ACTIVE;
+     @call self::MSG_PIECE_STOP_TIMER();
+     if (GameRandom(10) == 9)
+          pieceType.CPT_ort = CPO_BOMB;
+     else {
+          int i;
+     
+			 ColumnsPlaySound(dropSound);
+			 for (i = 0; i < 3; i++)
+               pieceType.CPT_blocks[i] = GameRandom(NUM_BLOCKS) + 1;
+          pieceType.CPT_ort = (GameRandom(5) == 4) ? CPO_HORIZ : CPO_VERT;
+     }
+     pieceX = PIT_VIS_WIDTH / 2;
+     pieceY = 1;
+     if (!ValidatePiece(pieceType, pieceX, pieceY))
+          @send process::MSG_COLUMNS_GAME_OVER();
+     else {
+          @call self::MSG_PIECE_DRAW();
+          pieceStatus = CPS_ACTIVE;
+          @call self::MSG_PIECE_START_TIMER();
+     }
+     @call self::MSG_CB_POP_GSTATE();
+}
+
+@method ColumnsBoardClass, MSG_PIECE_DRAW {
+     int i;
+
+     EC_ERROR_IF(!pself->CBCI_gstate, -1);    /* Assumes valid gstate */
+     
+     if (pieceType.CPT_ort == CPO_BOMB)
+          SetAndDrawBlock(pself->CBCI_gstate, CBT_BOMB, pieceX, pieceY);
+     else
+          for (i = 0; i < 3; i++)
+               DrawBlock(pself->CBCI_gstate, pieceType.CPT_blocks[i],
+                 pieceX + pieceOrtOffX[pieceType.CPT_ort][i],
+                 pieceY + pieceOrtOffY[pieceType.CPT_ort][i]);
+}
+
+@method ColumnsBoardClass, MSG_PIECE_ERASE {
+     int i;
+     
+     EC_ERROR_IF(!pself->CBCI_gstate, -1);    /* Assumes valid gstate */
+
+     if (pieceType.CPT_ort == CPO_BOMB)
+          SetAndDrawBlock(pself->CBCI_gstate, CBT_EMPTY, pieceX, pieceY);
+     else
+          for (i = 0; i < 3; i++)
+               DrawBlock(pself->CBCI_gstate, CBT_EMPTY,
+                 pieceX + pieceOrtOffX[pieceType.CPT_ort][i],
+                 pieceY + pieceOrtOffY[pieceType.CPT_ort][i]);
+}
+
+@method ColumnsBoardClass, MSG_PIECE_START_TIMER {
+     @call self::MSG_PIECE_STOP_TIMER();
+     timer = TimerStart(TIMER_EVENT_ONE_SHOT, oself,
+       downDelay, MSG_PIECE_DOWN, 0, &timerID);
+}
+
+@method ColumnsBoardClass, MSG_PIECE_STOP_TIMER {
+     if (timer) {
+          TimerStop(timer, timerID);
+          timer = NullHandle;
+     }
+}
+/* jfh try this */
+@method ColumnsApplicationClass, MSG_META_LOST_TARGET_EXCL {
+	  @send process::MSG_COLUMNS_PAUSE_GAME();
+	  @callsuper();
+}
+@method ColumnsApplicationClass, MSG_META_GAINED_TARGET_EXCL {
+	  @send process::MSG_COLUMNS_CONTINUE_GAME();
+	  @callsuper();
+}
+
+@method ColumnsBoardClass, MSG_PIECE_DOWN {
+     Boolean test;
+     if (!pieceStatus & CPS_ACTIVE)
+          return;
+     test = ValidatePiece(pieceType, pieceX, pieceY + 1);
+     @call self::MSG_CB_PUSH_GSTATE();       /* pushes GState */
+     if (test) {
+			 @call self::MSG_PIECE_ERASE();
+          pieceY++;
+          @call self::MSG_PIECE_DRAW();
+          @call self::MSG_CB_POP_GSTATE();   /* pops GState */
+          @call self::MSG_PIECE_START_TIMER();
+     }
+     else 
+          @send self::MSG_PIECE_DONE();      /* or pops GState */
+}
+
+@method ColumnsBoardClass, MSG_PIECE_LEFT {
+     if (!pieceStatus & CPS_ACTIVE)
+          return;
+     if (ValidatePiece(pieceType, pieceX - 1, pieceY)) {
+			 ColumnsPlaySound(horizSound);
+			 @call self::MSG_CB_PUSH_GSTATE();
+          @call self::MSG_PIECE_ERASE();
+          pieceX--;
+          @call self::MSG_PIECE_DRAW();
+          @call self::MSG_CB_POP_GSTATE();
+     }
+}
+
+@method ColumnsBoardClass, MSG_PIECE_RIGHT {
+     if (!pieceStatus & CPS_ACTIVE)
+          return;
+     if (ValidatePiece(pieceType, pieceX + 1, pieceY)) {
+			 ColumnsPlaySound(horizSound);
+			 @call self::MSG_CB_PUSH_GSTATE();
+          @call self::MSG_PIECE_ERASE();
+          pieceX++;
+          @call self::MSG_PIECE_DRAW();
+          @call self::MSG_CB_POP_GSTATE();
+     }
+}
+
+@method ColumnsBoardClass, MSG_PIECE_ROT {
+     ColumnsBlockType *blocks = pieceType.CPT_blocks;
+     ColumnsBlockType temp;
+     
+     if (!pieceStatus & CPS_ACTIVE)
+          return;
+     if (pieceType.CPT_ort != CPO_BOMB) {
+			 ColumnsPlaySound(rotateSound);
+			 temp = blocks[2];
+          blocks[2] = blocks[1];
+          blocks[1] = blocks[0];
+          blocks[0] = temp;
+          @call self::MSG_CB_PUSH_GSTATE();
+          @call self::MSG_PIECE_DRAW();
+          @call self::MSG_CB_POP_GSTATE();
+     }
+}
+
+@method ColumnsBoardClass, MSG_PIECE_DROP {
+     if (!pieceStatus & CPS_ACTIVE)
+          return;
+     @call self::MSG_CB_PUSH_GSTATE();  /* pushes GState */
+     while (ValidatePiece(pieceType, pieceX, pieceY + 1)) {
+          @call self::MSG_PIECE_ERASE();
+          pieceY++;
+          @call self::MSG_PIECE_DRAW();
+     }
+     @call self::MSG_PIECE_DONE();      /* pops GState */
+}
+
+@method ColumnsBoardClass, MSG_PIECE_DONE {
+     EC_ERROR_IF(!pself->CBCI_gstate, -1);    /* Assumes valid gstate */
+     
+     pieceStatus &= ~CPS_ACTIVE;
+     @call self::MSG_PIECE_STOP_TIMER();
+     if (pieceType.CPT_ort == CPO_BOMB) {
+          int x, y;
+
+			 ColumnsPlaySound(bombSound);
+			 @call self::MSG_PIECE_ERASE();
+          for (y = -1; y < 2; y++)
+               for (x = -1; x < 2; x++) {
+                    ColumnsBlockType b = pit[pieceY + y][pieceX + x];
+                    if (b != CBT_BORDER && b != CBT_EMPTY)
+                         SetAndDrawBlock(pself->CBCI_gstate, 
+                           1 + GameRandom(NUM_BLOCKS),
+                           pieceX + x,
+                           pieceY + y);
+               }
+          TimerSleep(20);
+     }
+     else {
+          int i;
+
+          for (i = 0; i < 3; i++)
+               pit[pieceY + pieceOrtOffY[pieceType.CPT_ort][i]]
+                 [pieceX + pieceOrtOffX[pieceType.CPT_ort][i]] = 
+                 pieceType.CPT_blocks[i];
+     }
+     @call self::MSG_CB_SCORE();
+     @call self::MSG_PIECE_NEW();
+}
+
+void DropColumn(GStateHandle gs, int x, int y) {
+     ColumnsBlockType *cptr = &pit[y][x];
+     ColumnsBlockType *pptr = cptr - PIT_WIDTH;
+
+     EC_ERROR_IF(!gs, -1);               /* Assumes valid gstate */
+     
+     for (; y > 0; y--, cptr -= PIT_WIDTH, pptr -= PIT_WIDTH)
+          if (*cptr != *pptr) {
+               ColumnsBlockType temp = *cptr = *pptr;
+               SetAndDrawBlock(gs, temp, x, y);
+          }
+     if (pit[y][x] != CBT_EMPTY)
+          SetAndDrawBlock(gs, CBT_EMPTY, x, y);
+}
+
+@method ColumnsBoardClass, MSG_CB_SCORE {
+     int series = 1;
+     int m, row, col, numm, mort[15], mrow[15], mcol[15];
+     int curSum, preSum = 1;
+     const int matchArrayX[4] = { 1, 1, 0, 1 };
+     const int matchArrayY[4] = { 1, 0, 1, -1 }; 
+
+     do {
+          numm = curSum = 0;
+          for (row = PIT_VIS_HEIGHT - 1; row > 0; row--)
+               for (col = 1; col <= PIT_VIS_WIDTH; col++) {
+                    ColumnsBlockType b1 = pit[row][col];
+
+                    for (m = 0; m < 4; m++) {
+                         ColumnsBlockType b2 = pit[row - matchArrayY[m]]
+                           [col - matchArrayX[m]];
+                         ColumnsBlockType b3 = pit[row + matchArrayY[m]]
+                           [col + matchArrayX[m]];
+
+                         if (b1 && b2 && b3 && b1 == b2 && b1 == b3) {
+                              int add = 0;
+
+										ColumnsPlaySound(matchSound);
+										mort[numm] = m;
+                              mrow[numm] = row; mcol[numm] = col;
+                              numm++;
+                              add = preSum * series;
+                              score += add;
+                              curSum += add;
+                         }
+                    }
+               }
+          if (numm) {
+               preSum = curSum;
+               for (m = 0; m < numm; m++) {
+                    int ort = mort[m];
+                    int col = mcol[m], row = mrow[m];
+
+                    pit[row][col] = 
+                      pit[row - matchArrayY[ort]][col - matchArrayX[ort]] =
+                      pit[row + matchArrayY[ort]][col + matchArrayX[ort]] =
+                      CBT_HOLLOW;
+               }
+               @call self::MSG_CB_PUSH_GSTATE();
+               for (row = 0; row < PIT_VIS_HEIGHT; row++)
+                    for (col = 1; col <= PIT_VIS_WIDTH; col++) {
+                         ColumnsBlockType *ptr = &pit[row][col];
+
+                         if (*ptr == CBT_HOLLOW)
+                              DrawBlock(pself->CBCI_gstate, CBT_HOLLOW,
+                                col, row);
+                         else if (series == 1 && *ptr == CBT_EMPTY &&
+                           *(ptr - PIT_WIDTH) != CBT_EMPTY)
+                              *ptr = CBT_HOLLOW;
+                    }
+               TimerSleep(20);
+               for (row = 0; row < PIT_VIS_HEIGHT; row++)
+                    for (col = 1; col <= PIT_VIS_WIDTH; col++)
+                         if (pit[row][col] == CBT_HOLLOW)
+                              DropColumn(pself->CBCI_gstate, col, row);
+               @call self::MSG_CB_POP_GSTATE();
+               TimerSleep(20);
+               series++;
+               @send ColumnsScore::MSG_GEN_VALUE_SET_INTEGER_VALUE(score, FALSE);
+          }
+     }
+     while (numm);
+}
+
+@method ColumnsBoardClass, MSG_META_KBD_CHAR {
+	  if (flags & CF_FIRST_PRESS || flags & CF_REPEAT_PRESS) {
+          if ((character >> 8) == CS_CONTROL)
+               switch (character & 0xff) {
+                    case VC_NUMPAD_4:
+                    case VC_LEFT:       @send self::MSG_PIECE_LEFT();
+                                        break;
+                    case VC_NUMPAD_6:
+                    case VC_RIGHT:      @send self::MSG_PIECE_RIGHT();
+                                        break;
+                    case VC_NUMPAD_5:
+                    case VC_UP:         @send self::MSG_PIECE_ROT();
+                                        break;
+                    case VC_NUMPAD_0:
+                    case VC_DOWN:       @send self::MSG_PIECE_DROP();
+                                        break;
+                    default:            @callsuper();
+               }
+          else
+               @callsuper();
+     }
+     else
+          @callsuper();
+}
+
+@method ColumnsProcessClass, MSG_COLUMNS_GAME_OVER {
+     @call self::MSG_COLUMNS_SET_GAME_STATUS(0, CGS_IN_PROGRESS);
+     if (score)
+          @send ColumnsHighScore::MSG_HIGH_SCORE_ADD_SCORE(score * NUM_BLOCKS, NullHandle);
+}
+
+@method ColumnsBoardClass, MSG_CB_DRAW_GAME_OVER_TEXT_BOX {
+     @call ColumnsBoard::MSG_CB_PUSH_GSTATE();
+     @call ColumnsBoard::MSG_CB_DRAW_TEXT_BOX(pself->CBCI_gstate, gameOverText);
+     @call ColumnsBoard::MSG_CB_POP_GSTATE();
+}
+
+@method ColumnsBoardClass, MSG_CB_GET_TEXT_BOX_BOUNDS {
+     word height, width;
+     Point trans;
+
+     height = GrFontMetrics(gstate, GFMI_HEIGHT) >> 16;
+     width = GrTextWidth(gstate, string, 0);
+	  trans.P_x = BOARD_BOUND_X(blockSize) / 2 - width / 2;
+     trans.P_y = BOARD_BOUND_Y(blockSize) / 2 - height / 2;
+     box->R_left = trans.P_x - 4;
+     box->R_top = trans.P_y - 4;
+     box->R_right = trans.P_x + width + 3;
+     box->R_bottom = trans.P_y + height + 3;
+     return trans;
+}
+/*
+@method ColumnsBoardClass, MSG_CB_INVALIDATE_TEXT_BOX {
+     GStateHandle gstate;
+     Rectangle box;
+
+     gstate = GrCreateState(pself->CBCI_viewWin);
+     @call self::MSG_CB_GET_TEXT_BOX_BOUNDS(gstate, string, &box);
+     GrInvalRect(gstate, box.R_left, box.R_top, box.R_right, box.R_bottom);
+     GrDestroyState(gstate);
+}
+*/
+@method ColumnsProcessClass, MSG_COLUMNS_SET_GAME_STATUS {
+     gameStatus &= ~reset;
+     gameStatus |= set;
+     if (reset & CGS_IN_PROGRESS)                    /* game over */
+          @call ColumnsBoard::MSG_CB_DRAW_GAME_OVER_TEXT_BOX();
+     if (set & CGS_PAUSED || reset & CGS_PAUSED)
+          @send ColumnsBoardView::MSG_GEN_VIEW_REDRAW_CONTENT();
+}
+
+@method ColumnsProcessClass, MSG_COLUMNS_PAUSE_GAME {
+     if ((pieceStatus & CPS_ACTIVE) && (gameStatus & CGS_IN_PROGRESS)) {
+          @call ColumnsBoard::MSG_PIECE_STOP_TIMER();
+          pieceStatus &= ~CPS_ACTIVE;
+			 @call self::MSG_COLUMNS_SET_GAME_STATUS(CGS_PAUSED, 0);
+			 @send ColumnsPauseTrigger::MSG_GEN_SET_NOT_ENABLED(VUM_NOW);
+			 @send ColumnsContinueTrigger::MSG_GEN_SET_ENABLED(VUM_NOW);
+	  }
+}
+
+@method ColumnsProcessClass, MSG_COLUMNS_CONTINUE_GAME {
+     if (gameStatus & CGS_PAUSED) {
+          @call self::MSG_COLUMNS_SET_GAME_STATUS(0, CGS_PAUSED);
+          pieceStatus |= CPS_ACTIVE;
+          @call ColumnsBoard::MSG_PIECE_START_TIMER();
+			 @send ColumnsPauseTrigger::MSG_GEN_SET_ENABLED(VUM_NOW);
+			 @send ColumnsContinueTrigger::MSG_GEN_SET_NOT_ENABLED(VUM_NOW);
+	  }
+}
+
+@method ColumnsBoardClass, MSG_CB_PUSH_GSTATE
+{
+     pself->CBCI_cachedState = pself->CBCI_gstate;
+     pself->CBCI_gstate = GrCreateState(pself->CBCI_viewWin);
+}
+
+@method ColumnsBoardClass, MSG_CB_POP_GSTATE
+{
+     GrDestroyState(pself->CBCI_gstate);
+     pself->CBCI_gstate = pself->CBCI_cachedState;
+     pself->CBCI_cachedState = NullHandle;
+}

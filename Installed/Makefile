@@ -100,7 +100,7 @@ minimalLibrary	: kernel swap sound net ui isui motif spool text mailbox \
 		  basicdb gridlib gsol treplib
 #ascii
 
-prefLibs	: prefvid preftd \
+prefLibs	: prefvid prefts preftd \
 		  prefsnd prefos prefmous preflo preflf prefkbd \
 		  prefintl prefcomp prefbg prefpntc preffont configui
 
@@ -120,6 +120,7 @@ extraPrefLibs	: prefpag prefjfep
 # Applications
 #
 minimalAppl	: minimalGame minimalUtils minimalTools minimalSavers \
+ 	  	  extraGame \
 		  minimalEdu calendar geodex geocalc geodraw geowrite \
 		  scrapbk clock bigcalc geopoint \
 		  email manager isdesk linktool setup \
@@ -128,14 +129,18 @@ minimalAppl	: minimalGame minimalUtils minimalTools minimalSavers \
 		  bbxchat bbxmail \
 		  newsread geozip sclock\
  	  	  hmbase pdfvu  bnkr30 ftpc \
- 	  	  instc instf
+ 	  	  instc instf 
 
 minimalUtils	: prefmgr
 
 minimalTools    : resedit
 
 minimalGame	: solitaire cword amateur bjack hearts gwpoker \
-                  pyramid sokoban taipei uki mine column
+                  pyramid sokoban uki mine column2 battle \
+                  row4
+                  
+extraGame	: taipei column mine2 follow treas mazerun \
+		  blkbox hiho magicboard  scode
 
 minimalEdu	: flash fontmgck hangman laserl mflash numbers pvault \
                   oliner taide thinker wsm wsplay xwm
@@ -167,7 +172,7 @@ minimalDriver	: nimbus ms4 ntfat os2 cdrom stream dri gdi keyboard modem gdipoin
 		  vga vga8 vga15 vga16 vga24 ega cga mcga hgc att6300 dscga \
 		  printerDriver ctm ctmabs imps2 \
 		  ps2 msys msser msbus kbmouse absgen genmouse emm extmem \
-		  xms filestr nonts sblaster comm spooltd \
+		  xms filestr nonts taskmax bnf sblaster comm spooltd \
 		  vmtree filedd logibus logiser dma mslf kbd_drivers \
 		  etherodi etherpkt msnet cdados truetype
 
@@ -540,8 +545,8 @@ Installed/Library/Pref/Prefsnd:		ui config MAKELIB
 preftd	: Installed/Library/Pref/Preftd
 Installed/Library/Pref/Preftd:		ui config MAKELIB
 
-#prefts	: Installed/Library/Pref/Prefts
-#Installed/Library/Pref/Prefts:		ui config MAKELIB
+prefts	: Installed/Library/Pref/Prefts
+Installed/Library/Pref/Prefts:		ui config MAKELIB
 
 #prefui	: Installed/Library/Pref/Prefui
 #Installed/Library7Pref/Prefui:		ui config MAKELIB
@@ -1013,10 +1018,41 @@ Installed/Appl/Games/Taipei:	ui game MAKEAPPL
 uki	: Installed/Appl/Games/Uki
 Installed/Appl/Games/Uki:	ui sound text MAKEAPPL
 
-column	: Installed/Appl/Breadbox/Column
+column2	: Installed/Appl/Breadbox/Column
 Installed/Appl/Breadbox/Column:	ui game MAKEAPPL
 
+column	: Installed/Appl/Breadbox/FunPak/Column
+Installed/Appl/Breadbox/FunPak/Column:	ui game sound MAKEAPPL
 
+battle	: Installed/Appl/Breadbox/FunPak/Battle
+Installed/Appl/Breadbox/FunPak/Battle: ui math sound ansic MAKEAPPL
+
+follow	: Installed/Appl/Breadbox/FunPak/Follow
+Installed/Appl/Breadbox/FunPak/Follow: ui ansic game sound MAKEAPPL
+
+mine2	: Installed/Appl/Breadbox/FunPak/Mine
+Installed/Appl/Breadbox/FunPak/Mine: ui ansic MAKEAPPL
+
+treas	: Installed/Appl/Breadbox/FunPak/Treas
+Installed/Appl/Breadbox/FunPak/Treas: ui math ansic sound MAKEAPPL
+
+mazerun	: Installed/Appl/Breadbox/FunPak/Maze
+Installed/Appl/Breadbox/FunPak/Maze: ui ansic color game sound MAKEAPPL
+
+blkbox : Installed\Appl\Breadbox\EntPak\BlkBox
+Installed\Appl\Breadbox\EntPak\BlkBox: ui ansic game sound MAKEAPPL
+
+hiho : Installed\Appl\Breadbox\EntPak\Hiho
+Installed\Appl\Breadbox\EntPak\Hiho: ui ansic game sound MAKEAPPL
+
+magicboard : Installed\Appl\Breadbox\EntPak\Magic
+Installed\Appl\Breadbox\EntPak\Magic: ui ansic math game sound MAKEAPPL
+
+row4 : Installed\Appl\Breadbox\EntPak\Row4
+Installed\Appl\Breadbox\EntPak\Row4: ui ansic sound MAKEAPPL
+
+scode : Installed\Appl\Breadbox\EntPak\SCode
+Installed\Appl\Breadbox\EntPak\SCode: ui ansic game sound MAKEAPPL
 
 
 idialup : Installed/Appl/IDialup
@@ -1607,6 +1643,9 @@ Installed/Library/CoProcessor/Intx87:		kernel math MAKELIB
 
 taskmax	: Installed/Driver/Task/Taskmax
 Installed/Driver/Task/Taskmax:			ui text MAKEDRV
+
+bnf : Installed/Driver/Task/BNF
+Installed/Driver/Task/BNF:				ui text MAKEDRV
 
 cvttool	: Installed/Library/FMTools/CvtTool
 Installed/Library/FMTools/CvtTool:		ui convert MAKELIB

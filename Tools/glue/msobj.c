@@ -2504,7 +2504,8 @@ MSObj_PerformRelocations(const char	*file,	    /* Name of object file */
 				if ((os != NULL) &&
 				    ((os->type == OSYM_PROC) ||
 				     (os->type == OSYM_LABEL) ||
-				     (os->type == OSYM_LOCLABEL)))
+				     (os->type == OSYM_LOCLABEL) ||
+				     (os->type == OSYM_PROTOMINOR)))
 				{
 				    offset += fixme[0] | (fixme[1] << 8);
 
