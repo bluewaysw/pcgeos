@@ -395,12 +395,12 @@ OLFieldAboutToDetachComplete	method	dynamic	OLFieldClass,
 	tst	ax
 	jz	noExpressMenu
 	call	clobber
+
 noExpressMenu:
 	mov	di, ds:[si]
 	add	di, ds:[di].Vis_offset
 	clr	ax
 	xchg	ax, ds:[di].OLFI_toolArea
-
 if TOOL_AREA_IS_TASK_BAR
 	;
 	; if TaskBar == on
@@ -409,17 +409,14 @@ if TOOL_AREA_IS_TASK_BAR
 	segmov	ds, dgroup				; load dgroup
 	test	ds:[taskBarPrefs], mask TBF_ENABLED	; test if TBF_ENABLED is set
 	pop	ds					; restore ds
-	jz	hasNoTaskbar				; skip if no taskbar
-
+	jz	hasNoTaskBar				; skip if no taskbar
 	clr	ds:[di].OLFI_systemTray
-hasNoTaskbar:
-
-	tst	ax
-	jz	noSystemTray
-	call	clobber
-
-noSystemTray:
+hasNoTaskBar:
 endif
+	tst	ax
+	jz	noToolArea
+	call	clobber
+noToolArea:
 
 if EVENT_MENU
 	mov	di, ds:[si]
