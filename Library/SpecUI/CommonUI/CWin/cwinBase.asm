@@ -1657,18 +1657,12 @@ free:
 if TOOL_AREA_IS_TASK_BAR
 	;
 	; Update task bar list
-	; if TaskBar == on
-	; RUNTIME
 	;
-	push	ds					; save ds
-	segmov	ds, dgroup				; load dgroup
-	test	ds:[taskBarPrefs], mask TBF_ENABLED	; test if TBF_ENABLED is set
-	pop	ds					; restore ds
-	jz	done					; skip if no taskbar
 
 	mov	cx, TRUE		; re-initialize list
 	call	UpdateTaskBarList
 endif
+
 done:
 	ret
 OLBaseWinSetWindowEntryMoniker	endm
@@ -1918,18 +1912,11 @@ updateTaskBar:
 	;
 
 if TOOL_AREA_IS_TASK_BAR
-	;
-	; if TaskBar == on
-	;
-	push	ds					; save ds
-	segmov	ds, dgroup				; load dgroup
-	test	ds:[taskBarPrefs], mask TBF_ENABLED	; test if TBF_ENABLED is set
-	pop	ds					; restore ds
-	jz	done					; skip if no taskbar
 
 	mov	cx, FALSE				; just update selection
 	call	UpdateTaskBarList
 endif
+
 done:
 	ret
 
@@ -3423,18 +3410,11 @@ EnsureItemRemovedFromWindowList	proc	far
 	pop	si
 
 if TOOL_AREA_IS_TASK_BAR
-	;
-	; if TaskBar == on
-	;
-	push	ds					; save ds
-	segmov	ds, dgroup				; load dgroup
-	test	ds:[taskBarPrefs], mask TBF_ENABLED	; test if TBF_ENABLED is set
-	pop	ds					; restore ds
-	jz	done					; skip if no taskbar
 
 	mov	cx, TRUE				; re-initialize list
 	call	UpdateTaskBarList
 endif
+
 done:
 	ret
 EnsureItemRemovedFromWindowList	endp
