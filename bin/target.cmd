@@ -10,7 +10,7 @@ cd /D %LOCAL_ROOT%\gbuild\localpc
 del /F %LOCAL_ROOT%\gbuild\localpc\IPX_STAT.txt
 del /F ensemble\init.bat
 IF DEFINED GEOS_CENTRAL_STORAGE (
-   echo mount s: %GEOS_CENTRAL_STORAGE% >> ensemble\init.bat)
+   echo mount s: %GEOS_CENTRAL_STORAGE% >> ensemble\init.bat
 )
 IF DEFINED GEOS_CDROM_DRIVE (
    IF EXIST "%GEOS_CDROM_DRIVE%\" (
