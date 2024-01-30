@@ -1252,7 +1252,7 @@ OLFieldUpdateTaskBarList	method	dynamic OLFieldClass,
 	segmov	ds, dgroup				; load dgroup
 	test	ds:[taskBarPrefs], mask TBF_ENABLED	; test if TBF_ENABLED is set
 	pop	ds					; restore ds
-	jz	done					; skip if no taskbar
+	LONG jz	done					; skip if no taskbar
 
 	mov	bx, ds:[di].OLFI_windowListList
 	tst	bx
@@ -1856,12 +1856,6 @@ TaskBarListAddChild	method dynamic TaskBarListClass,
 	call	ObjSwapUnlock
 	jmp	done
 
-; callSuper:
-	;
-	; if no Taskbar, just callSuper
-	;
-	; mov	di, offset TaskBarListClass
-	; call	ObjCallSuperNoLock
 done:
 	ret
 TaskBarListAddChild	endm

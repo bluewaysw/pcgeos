@@ -4339,6 +4339,7 @@ if TOOL_AREA_IS_TASK_BAR
 	pop	ax					; restore ax
 	jne	atBottom				; is not top => bottom position
 
+;atTop
 	add	ss:[parent].R_top, dx
 	jmp	short doneTaskBar
 atBottom:
@@ -5012,7 +5013,7 @@ if TOOL_AREA_IS_TASK_BAR
 	cmp	ax, (TBP_TOP) shl offset TBF_POSITION	; compare position bits with TBP_TOP
 	pop	ax					; restore ax
 	jne	atBottom				; is not top => bottom position
-
+;atTop
 	add	bx, dx
 	jmp	short doneTaskBar
 atBottom:
