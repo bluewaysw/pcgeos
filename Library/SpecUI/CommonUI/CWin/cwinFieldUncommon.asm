@@ -2543,32 +2543,32 @@ setPosition:
 	;
 	; set TaskBar usable
 	;
-	push 	ax, ds, cx, dx, si, bp
+	push 	ds, si
 	mov	ax, MSG_GEN_FIND_CHILD_AT_POSITION
 	clr	cx					; find first child = 0
 	call	ObjCallInstanceNoLock
 	jc	afterTaskBarCheck			; abort if child not found
 	mov 	si, dx					; *ds:si <- TaskBar
 	mov	ax, MSG_GEN_SET_USABLE
-	mov	dl, VUM_NOW				;VUM_DELAYED_VIA_APP_QUEUE ; dl <- VisUpdateMode
+	mov	dl, VUM_DELAYED_VIA_APP_QUEUE		;VUM_NOW ;VUM_DELAYED_VIA_APP_QUEUE ; dl <- VisUpdateMode
 	call	ObjCallInstanceNoLock
 afterTaskBarCheck:
-	pop	ax, ds, cx, dx, si, bp
+	pop	ds, si
 
 	;
 	; set Tray usable
 	;
-	push 	ax, ds, cx, dx, si, bp
+	push 	ds, si
 	mov	ax, MSG_GEN_FIND_CHILD_AT_POSITION
 	mov	cx, 1					; second child = 1
 	call	ObjCallInstanceNoLock
 	jc	afterTrayCheck				; abort if child not found
 	mov 	si, dx					; *ds:si <- TaskBar
 	mov	ax, MSG_GEN_SET_USABLE
-	mov	dl, VUM_NOW				;VUM_DELAYED_VIA_APP_QUEUE ; dl <- VisUpdateMode
+	mov	dl, VUM_DELAYED_VIA_APP_QUEUE		; VUM_NOW ;VUM_DELAYED_VIA_APP_QUEUE ; dl <- VisUpdateMode
 	call	ObjCallInstanceNoLock
 afterTrayCheck:
-	pop	ax, ds, cx, dx, si, bp
+	pop	ds, si
 
 done:
 	ret
