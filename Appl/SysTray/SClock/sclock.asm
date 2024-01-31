@@ -598,37 +598,29 @@ ClockStartSelect method dynamic ClockClass, MSG_META_START_SELECT
 		.enter
 
 	;
-	; bring up or close our menu
+	; bring up or close the menu
 	;
-		push	di
 		mov	di, ds:[si]
 		add	di, ds:[di].Gen_offset
 		cmp	ds:[di].CI_isMenuOpen, FALSE
-		pop	di
+		mov	bx, handle 0
 		je	doOpen
 
-doClose:
-		mov	bx, handle 0
+doClose::
 		mov	ax, MSG_CLOCK_PROCESS_BRING_DOWN_MENU
+		push	di
 		clr	di
 		call	ObjMessage
-
-		mov	di, ds:[si]
-		add	di, ds:[di].Gen_offset
+		pop	di
 		mov	ds:[di].CI_isMenuOpen, FALSE
-
 		jmp	done
-
 doOpen:
-		mov	bx, handle 0
 		mov	ax, MSG_CLOCK_PROCESS_BRING_UP_MENU
+		push	di
 		clr	di
 		call	ObjMessage
-
-		mov	di, ds:[si]
-		add	di, ds:[di].Gen_offset
+		pop	di
 		mov	ds:[di].CI_isMenuOpen, TRUE
-
 done:
 		mov	ax, mask MRF_PROCESSED
 
