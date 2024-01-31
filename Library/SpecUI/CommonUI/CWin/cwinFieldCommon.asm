@@ -976,15 +976,18 @@ OLFieldMoveToolArea	method	dynamic OLFieldClass, \
 
 if TOOL_AREA_IS_TASK_BAR
 	;
-	; if TaskBar == off
-	; never change priority of task bar -- brianc 11/12/99
+	; if TaskBar == off...
+	; never change priority of task bar, skip all of this -- brianc 11/12/99
+	; if we don't change the priority of the taskbar, GeoPoint can't hide
+	; the Taskbar when running presentations full-screen, so we now DO change
+	; the priority. -- meyerk 31.01.2024
 	; RUNTIME
 	;
 	push	ds					; save ds
 	segmov	ds, dgroup				; load dgroup
 	test	ds:[taskBarPrefs], mask TBF_ENABLED	; test if TBF_ENABLED is set
 	pop	ds					; restore ds
-	LONG	jnz done				; skip if taskbar
+	LONG	jnz afterHasTaskbar1			; skip if taskbar
 endif
 
 if EVENT_MENU
@@ -1012,7 +1015,6 @@ endif
 	LONG jz	done
 
 afterHasTaskbar1:
-
 
 	mov	si, ds:[di].OLFI_toolArea	; get *ds:si = tool area
 if EVENT_MENU
