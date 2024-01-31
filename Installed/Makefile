@@ -137,10 +137,10 @@ minimalTools    : resedit
 
 minimalGame	: solitaire cword amateur bjack hearts gwpoker \
                   pyramid sokoban uki mine column2 battle \
-                  row4
+                  row4 munchers vacman
                   
 extraGame	: taipei column mine2 follow treas mazerun \
-		  blkbox hiho magicboard  scode
+		  blkbox hiho magicboard  scode noid paddle 
 
 minimalEdu	: flash fontmgck hangman laserl mflash numbers pvault \
                   oliner taide thinker wsm wsplay xwm
@@ -1053,6 +1053,19 @@ Installed\Appl\Breadbox\EntPak\Row4: ui ansic sound MAKEAPPL
 
 scode : Installed\Appl\Breadbox\EntPak\SCode
 Installed\Appl\Breadbox\EntPak\SCode: ui ansic game sound MAKEAPPL
+
+munchers : Installed\Appl\Breadbox\Arcade\munch
+Installed\Appl\Breadbox\Arcade\munch: ui math sound color game ansic MAKEAPPL
+
+vacman	: Installed\Appl\Breadbox\Arcade\vacman
+Installed\Appl\Breadbox\Arcade\vacman: ui game ansic wav sound MAKEAPPL
+
+noid	: Installed\Appl\Breadbox\Arcade\noid
+Installed\Appl\Breadbox\Arcade\noid: ui sound game color ansic MAKEAPPL
+
+paddle	: Installed\Appl\Breadbox\Arcade\paddle
+Installed\Appl\Breadbox\Arcade\paddle: ui ansic color game sound MAKEAPPL
+
 
 
 idialup : Installed/Appl/IDialup
