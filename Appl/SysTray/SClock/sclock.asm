@@ -168,9 +168,9 @@ COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 		ClockProcessBringUpMenu
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-SYNOPSIS:	Bring up our menu
+SYNOPSIS:	Bring up / close dowwn our menu
 
-CALLED BY:	MSG_CLOCK_PROCESS_BRING_UP_MENU
+CALLED BY:	MSG_CLOCK_PROCESS_BRING_UP_MENU / MSG_CLOCK_PROCESS_BRING_DOWN_MENU
 PASS:		ds - dgroup
 RETURN:		none
 DESTROYED:	ax, cx, dx, bp
@@ -213,7 +213,6 @@ ClockProcessBringDownMenu method dynamic ClockProcessClass,
 		ret
 
 ClockProcessBringDownMenu	endm
-
 
 
 ;------------------------------------------------------------------------------
@@ -606,7 +605,7 @@ ClockStartSelect method dynamic ClockClass, MSG_META_START_SELECT
 		mov	bx, handle 0
 		je	doOpen
 
-doClose::
+;doClose:
 		mov	ax, MSG_CLOCK_PROCESS_BRING_DOWN_MENU
 		push	di
 		clr	di
