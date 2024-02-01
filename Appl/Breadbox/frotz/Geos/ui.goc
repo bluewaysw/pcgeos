@@ -21,6 +21,7 @@
     98-06-12  GerdB     Added Desktop version.
 	 02-09-17  jfh			Pulled Nokia ifdefs (for clarity)
 									and did a few updates & tewaks
+    2024-01-02 RainerB	Fix a lot of compiler warnings. Make it compiling with watcom.
 ***********************************************************************/
 
 @include <stdapp.goh>
@@ -33,7 +34,6 @@
 /*@include <Geos/iexpire.goh>   */
 
 @include "gfzicons.goh"
-@include "bboxreg.goh"
 
 
 @classdecl FrotzProcessClass;
@@ -112,25 +112,29 @@ FILE* debug_fp;
 						@FrotzText,
 						@FrotzInput;
 		  /* jfh - take away user dismissability */
-		  GDI_attributes = 0;
+		  /*GDI_attributes = 0;*/	/* re-enabled for constent handling of all progams */
 		  HINT_PRIMARY_NO_FILE_MENU;
 		  HINT_DEFAULT_FOCUS;
         HINT_DEFAULT_TARGET;
-		  ATTR_GEN_HELP_CONTEXT = "TOC";
+		  /*ATTR_GEN_HELP_CONTEXT = "TOC";*/	// <- disabled for now
+		  HINT_PRIMARY_NO_HELP_BUTTON;
     }
 
 	 /* jfh - this isn't a real file menu, it just looks sorta like it.
-	  * the user can't quit the app from here - needs to wuit from game.*/
+	  * the user can't quit the app from here - needs to quit from game.*/
 	 @object GenInteractionClass FrotzFileMenu = {
 		  GI_visMoniker = 'F', "File";
 		  GI_comp = @FrotzOpenStoryDialog,
-						@AboutDBox,
-						@FrotzExitTrigger;
+						/*@FrotzAboutDialog,*/
+						@FrotzExitTriggerGroup;
         GII_visibility = GIV_POPUP;
 //		  ATTR_GEN_INTERACTION_GROUP_TYPE = ( GIGT_FILE_MENU );
     }
 
 	 /* jfh - we need a way to exit if there is no game going... */
+	 @object GenInteractionClass FrotzExitTriggerGroup = {
+	 	GI_comp =@FrotzExitTrigger;
+	 }	 
 	 @object GenTriggerClass FrotzExitTrigger = {
 		  GI_visMoniker   = 'E', "Exit GeoFrotz";
 		  GTI_destination = FrotzApp;
@@ -169,7 +173,7 @@ FILE* debug_fp;
 				CF_INDEX,
 				0, 0
 		  };
-		  ATTR_GEN_TEXT_CHAR_ATTR = @FrotzStatusCharAttr;
+		  ATTR_GEN_TEXT_CHAR_ATTR = (ChunkHandle) @FrotzStatusCharAttr;
 	 }
 
     @chunk VisTextCharAttr FrotzMainCharAttr =
@@ -187,7 +191,7 @@ FILE* debug_fp;
 				CF_INDEX,
 				0, 0
 		  };
-		  ATTR_GEN_TEXT_CHAR_ATTR = @FrotzMainCharAttr;
+		  ATTR_GEN_TEXT_CHAR_ATTR = (ChunkHandle) @FrotzMainCharAttr;
     }
 
     @object FrotzInputTextClass FrotzInput = {
@@ -222,7 +226,7 @@ FILE* debug_fp;
 		  GII_attrs = @default | GIA_MODAL;
 		  HINT_EXPAND_WIDTH_TO_FIT_PARENT;
         HINT_EXPAND_HEIGHT_TO_FIT_PARENT;
-		  ATTR_GEN_HELP_CONTEXT = "Select";
+		  /*ATTR_GEN_HELP_CONTEXT = "Select";*/		// <- no help file for now
 	 }
 
 	 @object GenFileSelectorClass FrotzStoryFileSelector = {
@@ -263,7 +267,7 @@ FILE* debug_fp;
                              | GIA_INITIATED_VIA_USER_DO_DIALOG;
 		  HINT_EXPAND_WIDTH_TO_FIT_PARENT;
         HINT_EXPAND_HEIGHT_TO_FIT_PARENT;
-		  ATTR_GEN_HELP_CONTEXT = "Save/Restore";
+		  //ATTR_GEN_HELP_CONTEXT = "Save/Restore";*/		// <- no help file for now
 	 }
 
 	 @object GenInteractionClass FrotzFileNameGroup = {
@@ -357,10 +361,11 @@ FILE* debug_fp;
 
 */
 
+@if 1
     /*
 	  * FrotzAboutDialog
      */
-/*	 @object GenInteractionClass FrotzAboutDialog = {
+	 @object GenInteractionClass FrotzAboutDialog = {
         GI_visMoniker  = 'A', "About";
         @localize { "Name of dialog containing author and copyright information." };
         GI_comp = @FrotzAboutGroup;
@@ -373,9 +378,8 @@ FILE* debug_fp;
                   @FrotzAboutLine2,
                   @FrotzAboutLine3,
                   @FrotzAboutLine4,
-                  @FrotzAboutLine5,
-                  @FrotzAboutLine6;
-		  ATTR_GEN_HELP_CONTEXT = "Copyright";
+                  @FrotzAboutLine5;
+		  /*ATTR_GEN_HELP_CONTEXT = "Copyright";*/		// <- no help file for now
         HINT_ORIENT_CHILDREN_VERTICALLY;
         HINT_CENTER_CHILDREN_HORIZONTALLY;
         HINT_FULL_JUSTIFY_CHILDREN_VERTICALLY;
@@ -398,62 +402,14 @@ FILE* debug_fp;
     }
 
     @object GenGlyphClass FrotzAboutLine5 = {
-    //    GI_visMoniker = list { @CompanyTextMoniker };
+          GI_visMoniker = list { @CompanyTextMoniker };
     //    GI_visMoniker = list { @CompanyTextMoniker,
     //                           @CompanyMoniker
     //    };
 	 }
 
-    @object GenGlyphClass FrotzAboutLine6 = {
-        GI_visMoniker = "Copyright \xA9 1998 Breadbox Computer Company";
-        @localize { "Copyright." };
-    }
-
-    @visMoniker CompanyTextMoniker = "Breadbox Computer Company";
-*/
-@object GenInteractionClass AboutDBox = {
-    GI_visMoniker = 'A', "About";
-    GI_comp = @AppName, @Beta, @By, @BreadBoxLogo, @Visit,
-		    @Web, @Copyright;
-    GII_visibility = GIV_DIALOG;
-    GII_type = GIT_NOTIFICATION;
-    HINT_CENTER_CHILDREN_HORIZONTALLY;
-}
-
-@object GenTextClass AppName = {
-    GI_attrs = @default | GA_READ_ONLY;
-    GTXI_attrs = @default | GTA_SINGLE_LINE_TEXT;
-	 GTXI_text = "GeoFrotz";
-    ATTR_GEN_TEXT_CHAR_ATTR = (ChunkHandle) @AppNameCharAttrs;
-}
-
-@chunk VisTextCharAttr AppNameCharAttrs =
-	CHAR_ATTR_FONT_SIZE_STYLE(
-		FID_DTC_URW_SANS, 24, TS_BOLD);
-
-@object GenGlyphClass Beta = {
-  GI_visMoniker = "An Infocom Game Interpreter";
-}
-
-@object GenGlyphClass By = {
-  GI_visMoniker = "from";
-}
-
-@object GenGlyphClass BreadBoxLogo = {
-  GI_visMoniker = list { @BreadboxLogoMoniker}
-}
-
-@object GenGlyphClass Copyright = {
-  GI_visMoniker = "Copyright 1994-2002 Breadbox Computer Company LLC";
-}
-
-@object GenGlyphClass Visit = {
-  GI_visMoniker = "Visit us at...";
-}
-
-@object GenGlyphClass Web = {
-  GI_visMoniker = "www.breadbox.com";
-}
+    @visMoniker CompanyTextMoniker = "Free PC/GEOS Ensemble Project 2024";
+@endif
 
 @end MenuResource;
 
@@ -485,7 +441,7 @@ FILE* debug_fp;
 	 FileSetCurrentPath( story_disk_handle, story_path );
 
     zmachineThread = ThreadCreate(
-		  PRIORITY_HIGH, 0, main,
+		  PRIORITY_HIGH, 0, frotz_main,
         4096, GeodeGetProcessHandle() );
 
     if ( zmachineThread == NullHandle ) {
@@ -730,7 +686,7 @@ REVISION HISTORY:
 ***********************************************************************/
 void
 os_fatal (
-    const char *str
+    /*const */char *str
     )
 {
 

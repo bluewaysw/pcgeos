@@ -11,7 +11,7 @@
 
 extern zword get_max_width (zword);
 
-static depth = -1;
+static int depth = -1;
 
 static struct {
     zword xsize;

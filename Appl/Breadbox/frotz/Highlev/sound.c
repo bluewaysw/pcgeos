@@ -16,8 +16,8 @@ extern int direct_call (zword);
 
 static zword routine = 0;
 
-static next_sample = 0;
-static next_volume = 0;
+static int next_sample = 0;
+static int next_volume = 0;
 
 static bool locked = FALSE;
 static bool playing = FALSE;

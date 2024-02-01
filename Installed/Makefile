@@ -140,7 +140,8 @@ minimalGame	: solitaire cword amateur bjack hearts gwpoker \
                   row4 munchers vacman
                   
 extraGame	: taipei column mine2 follow treas mazerun \
-		  blkbox hiho magicboard  scode noid paddle 
+		  blkbox hiho magicboard  scode noid paddle \
+		  frotz
 
 minimalEdu	: flash fontmgck hangman laserl mflash numbers pvault \
                   oliner taide thinker wsm wsplay xwm
@@ -1065,6 +1066,9 @@ Installed\Appl\Breadbox\Arcade\noid: ui sound game color ansic MAKEAPPL
 
 paddle	: Installed\Appl\Breadbox\Arcade\paddle
 Installed\Appl\Breadbox\Arcade\paddle: ui ansic color game sound MAKEAPPL
+
+frotz	: Installed\Appl\Breadbox\frotz
+Installed\Appl\Breadbox\frotz: ui ansic text MAKEAPPL
 
 
 

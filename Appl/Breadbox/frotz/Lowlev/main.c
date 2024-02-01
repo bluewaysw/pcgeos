@@ -11,6 +11,7 @@
  * Frotz is freeware. It may be used and distributed freely provided
  * no commercial profit is involved. (c) 1995-1997 Stefan Jokisch
  *
+ *    2024-01-02 RainerB	Fix some compiler warnings. 
  */
 
 #include "frotz.h"
@@ -136,7 +137,7 @@ long reserve_mem = 0;
  *
  */
 
-void runtime_error (const char *s)
+void runtime_error (char *s)
 {
 
     if (!option_ignore_errors)
@@ -166,9 +167,10 @@ void z_piracy (void)
  */
 #ifdef __GEOS__
 
-word main ( word valueToPass )
+word frotz_main ( word valueToPass )	/* I don't no why, but the name 'main' causes an
+					 * error in MSG_FROTZ_START_GAME (process.c) */
 {
-
+valueToPass=valueToPass;	/* currently unused: avoid compiler warnung */
 #else
 
 int cdecl main (int argc, char *argv[])
@@ -206,4 +208,4 @@ int cdecl main (int argc, char *argv[])
 
 	 return 0;
 
-}/* main */
+}/* frotz_main */
