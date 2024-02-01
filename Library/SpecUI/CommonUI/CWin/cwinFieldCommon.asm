@@ -978,16 +978,18 @@ if TOOL_AREA_IS_TASK_BAR
 	;
 	; if TaskBar == off...
 	; never change priority of task bar, skip all of this -- brianc 11/12/99
-	; if we don't change the priority of the taskbar, GeoPoint can't hide
-	; the Taskbar when running presentations full-screen, so we now DO change
-	; the priority. -- meyerk 31.01.2024
+	; however: if we don't change the priority of the taskbar, GeoPoint can't hide
+	; the Taskbar when running presentations full-screen. But this also results in
+	; Desktop primaries overlapping the Taskbar from time to time... how do we fix
+	; this properly? For now, keep the previous state and disable changing priority
+	; at all. - meyerk 2024-02-01
 	; RUNTIME
 	;
 	push	ds					; save ds
 	segmov	ds, dgroup				; load dgroup
 	test	ds:[taskBarPrefs], mask TBF_ENABLED	; test if TBF_ENABLED is set
 	pop	ds					; restore ds
-	LONG	jnz afterHasTaskbar1			; skip if taskbar
+	LONG	jnz done ;afterHasTaskbar1		; skip if taskbar
 endif
 
 if EVENT_MENU
