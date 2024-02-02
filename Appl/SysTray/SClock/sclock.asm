@@ -2,8 +2,8 @@ COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 	Copyright (c) Designs in Light 2002 -- All Rights Reserved
 
-PROJECT:	
-MODULE:		
+PROJECT:
+MODULE:
 FILE:		sclock.asm
 
 DESCRIPTION:
@@ -54,17 +54,17 @@ RecordCreateMessage proc	near
 		mov	bp, sp
 	;
 	; put in the sys tray
-	; 
+	;
 		mov	ss:[bp].CEMCIP_feature, CEMCIF_SYSTEM_TRAY
 		mov	ss:[bp].CEMCIP_class.segment, ds
 		mov	ss:[bp].CEMCIP_class.offset, offset ClockClass
 	;
 	; standard priority
-	; 
+	;
 		mov	ss:[bp].CEMCIP_itemPriority, CEMCIP_STANDARD_PRIORITY
 	;
 	; tell us when thing is created so we can destroy it later
-	; 
+	;
 		mov	ss:[bp].CEMCIP_responseMessage, MSG_CLOCK_APP_CLOCK_CREATED
 		clr	bx
 		call	GeodeGetAppObject
@@ -75,7 +75,7 @@ RecordCreateMessage proc	near
 		mov	ax, MSG_EXPRESS_MENU_CONTROL_CREATE_ITEM
 	;
 	; record the message
-	; 
+	;
 		clr	bx, si
 		mov	di, mask MF_RECORD or mask MF_STACK
 		mov	dx, size CreateExpressMenuControlItemParams
@@ -128,7 +128,7 @@ RETURN:		none
 DESTROYED:	ax, cx, dx, bp
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
-ClockOpenApplication method dynamic ClockProcessClass, 
+ClockOpenApplication method dynamic ClockProcessClass,
 		  		MSG_GEN_PROCESS_OPEN_APPLICATION
 		uses	ax, cx, dx, bp
 		.enter
@@ -162,7 +162,7 @@ ClockCreateStateFile method dynamic ClockProcessClass,
 		ret
 ClockCreateStateFile endm
 
-		
+
 
 COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 		ClockProcessBringUpMenu
@@ -222,7 +222,7 @@ ClockAppClockCreated	method dynamic ClockApplicationClass,
 	;
 	; Set the new clock usable -- it has set itself up without any help
 	; from us.
-	; 
+	;
 		movdw	bxsi, ss:[bp].CEMCIRP_newItem
 		mov	ax, MSG_GEN_SET_USABLE
 		mov	dl, VUM_NOW
@@ -372,12 +372,12 @@ ClockInitialize	method dynamic ClockClass, MSG_META_INITIALIZE
 		.enter
 	;
 	; let our superclass initialize its data
-	; 
+	;
 		mov	di, offset ClockClass
 		call	ObjCallSuperNoLock
 	;
 	; forcibly set the GA_NOTIFY_VISIBILITY attribute.
-	; 
+	;
 		mov	di, ds:[si]
 		add	di, ds:[di].Gen_offset
 		ornf	ds:[di].GI_attrs, mask GA_NOTIFY_VISIBILITY
@@ -407,14 +407,14 @@ ClockSpecBuild	method dynamic ClockClass, MSG_SPEC_BUILD
 		.enter
 	;
 	; set the message to send when we become visible/non-visible
-	; 
+	;
 		mov	ax, ATTR_GEN_VISIBILITY_MESSAGE
 		mov	cx, 2
 		call	ObjVarAddData
 		mov	{word}ds:[bx], MSG_CLOCK_NOTIFY_VISIBILITY
 	;
 	; send the notification to us
-	; 
+	;
 		mov	ax, ATTR_GEN_VISIBILITY_DESTINATION
 		mov	cx, size optr
 		call	ObjVarAddData
@@ -449,9 +449,9 @@ ClockNotifyVisibility method dynamic ClockClass, MSG_CLOCK_NOTIFY_VISIBILITY
 	; We're becoming visible. Set up a continual timer to fire
 	; every minute on the minute, sending us a message to update our
 	; display.
-	; 
+	;
 		push	di
-		call	TimerGetDateAndTime	
+		call	TimerGetDateAndTime
 		sub	dh, 60
 		neg	dh			;dh <- seconds until next
 		mov	al, 60
@@ -465,12 +465,12 @@ ClockNotifyVisibility method dynamic ClockClass, MSG_CLOCK_NOTIFY_VISIBILITY
 		pop	di
 	;
 	; record the timer handle and ID
-	; 
+	;
 		mov	ds:[di].CI_timerHan, bx
 		mov	ds:[di].CI_timerID, ax
 	;
 	; display the current time
-	; 
+	;
 		mov	ax, MSG_CLOCK_UPDATE_TIME
 		mov	bx, ds:[LMBH_handle]
 		mov	di, mask MF_FORCE_QUEUE or mask MF_FIXUP_DS
@@ -489,7 +489,7 @@ done:
 stopTimer:
 	;
 	; We're becoming invisible.
-	; 
+	;
 		clr	bx
 		xchg	bx, ds:[di].CI_timerHan
 		mov	ax, ds:[di].CI_timerID
@@ -521,38 +521,71 @@ DESTROYED:	ax, cx, dx, bp
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
 ClockUpdateTime	method dynamic ClockClass, MSG_CLOCK_UPDATE_TIME,
 					MSG_NOTIFY_DATE_TIME_CHANGE
+
+dateBuf	local	DATE_TIME_BUFFER_SIZE	dup (Chars)
+
 		.enter
-		mov	bp, si		; preserve object chunk
+		;mov	bp, si		; preserve object chunk
 
 	;
 	; get and format the current time (H:M)
-	; 
-		mov	si, DTF_HM
-		call	TimerGetDateAndTime
-		
-		sub	sp, DATE_TIME_BUFFER_SIZE
-		mov	di, sp
-		segmov	es, ss
-		push	ax
-		pop	ax
-		call	LocalFormatDateTime
-DBCS <		shl	cx, 1						>
-		add	di, cx			;di <- offset past text
-		clr	ax
-		LocalPutChar esdi, ax
+	;
+		; mov	si, DTF_HM
+		; call	TimerGetDateAndTime
+		; sub	sp, DATE_TIME_BUFFER_SIZE
+		; mov	di, sp
+		; segmov	es, ss
+		; push	ax
+		; pop	ax
+		; call	LocalFormatDateTime
+;DBCS <		; shl	cx, 1						>
+		; add	di, cx			;di <- offset past text
+		; clr	ax
+		; LocalPutChar esdi, ax
 	;
 	; set that time as our moniker
-	; 
-		mov	si, bp
-		mov	cx, ss
-		mov	dx, sp
-		mov	bp, VUM_NOW
-		mov	ax, MSG_GEN_REPLACE_VIS_MONIKER_TEXT
-		call	ObjCallInstanceNoLock
+	;
+		; mov	si, bp
+		; mov	cx, ss
+		; mov	dx, sp
+		; mov	bp, VUM_NOW
+		; mov	ax, MSG_GEN_REPLACE_VIS_MONIKER_TEXT
+		; call	ObjCallInstanceNoLock
 	;
 	; clean up
-	; 
-		add	sp, DATE_TIME_BUFFER_SIZE
+	;
+		;add	sp, DATE_TIME_BUFFER_SIZE
+
+
+
+	;
+	; our attempt
+	;
+	; dateBuf	local	DATE_TIME_BUFFER_SIZE dup (Chars)
+
+
+		;mov	bp, si		; preserve object chunk
+		push	si
+
+		segmov	es, ss
+		lea	di, ss:[dateBuf]	; es:di <- buffer into which to format
+		mov	si, DTF_HM		; si <- format enum
+		call	TimerGetDateAndTime	; fetch current time
+		call	LocalFormatDateTime	; and format it (cx <- # chars w/o null)
+		; add	di, cx			; di <- offset past text
+		; clr	ax
+		; LocalPutChar esdi, ax
+
+		;mov	si, bp
+		pop	si
+
+		push	bp
+		mov	ax, MSG_GEN_REPLACE_VIS_MONIKER_TEXT
+		mov	cx, ss
+		lea	dx, ss:[dateBuf]
+		mov	bp, VUM_DELAYED_VIA_UI_QUEUE
+		call	ObjCallInstanceNoLock
+		pop	bp
 
 		.leave
 		ret
