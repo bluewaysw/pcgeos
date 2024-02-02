@@ -178,14 +178,40 @@ DESTROYED:	ax, cx, dx, bp
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
 ClockProcessBringUpMenu method dynamic ClockProcessClass,
 					MSG_CLOCK_PROCESS_BRING_UP_MENU
+
+dateBuf	local	DATE_TIME_BUFFER_SIZE dup (Chars)
+
+		.enter
+	;
+	; update menu date moniker with date (surprise!)
+	;
+		segmov	es, ss
+		lea	di, ss:[dateBuf]	; es:di <- buffer into which to format
+		mov	si, DTF_LONG		; si <- format enum
+		call	TimerGetDateAndTime	; fetch current time
+		call	LocalFormatDateTime	; and format it (cx <- # chars w/o null)
+		movdw	cxdx, esdi		; put dateBuf in cx:dx
+
+		push	bp
+		mov	ax, MSG_GEN_REPLACE_VIS_MONIKER_TEXT
+		mov	bp, VUM_NOW
+		mov	bx, handle AdjustTime
+		mov	si, offset AdjustTime
+		mov	di, mask MF_CALL
+		call	ObjMessage
+		pop	bp
+
 	;
 	; bring up our menu
 	;
+		push	bp
 		mov	si, offset ClockMenu
 		mov	bx, handle ClockMenu
 		mov	ax, MSG_GEN_INTERACTION_INITIATE
 		clr	di
 		call	ObjMessage
+		pop 	bp
+
 	;
 	; make sure we get the focus
 	;
@@ -193,7 +219,11 @@ ClockProcessBringUpMenu method dynamic ClockProcessClass,
 		mov	bx, handle ClockApp
 		mov	ax, MSG_META_GRAB_FOCUS_EXCL
 		clr	di
-		GOTO	ObjMessage
+		call	ObjMessage
+
+		.leave
+		ret
+
 ClockProcessBringUpMenu	endm
 
 ;------------------------------------------------------------------------------
@@ -522,70 +552,37 @@ DESTROYED:	ax, cx, dx, bp
 ClockUpdateTime	method dynamic ClockClass, MSG_CLOCK_UPDATE_TIME,
 					MSG_NOTIFY_DATE_TIME_CHANGE
 
-dateBuf	local	DATE_TIME_BUFFER_SIZE	dup (Chars)
-
 		.enter
-		;mov	bp, si		; preserve object chunk
+		mov	bp, si		; preserve object chunk
 
 	;
 	; get and format the current time (H:M)
 	;
-		; mov	si, DTF_HM
-		; call	TimerGetDateAndTime
-		; sub	sp, DATE_TIME_BUFFER_SIZE
-		; mov	di, sp
-		; segmov	es, ss
-		; push	ax
-		; pop	ax
-		; call	LocalFormatDateTime
-;DBCS <		; shl	cx, 1						>
-		; add	di, cx			;di <- offset past text
-		; clr	ax
-		; LocalPutChar esdi, ax
+		mov	si, DTF_HM
+		call	TimerGetDateAndTime
+		sub	sp, DATE_TIME_BUFFER_SIZE
+		mov	di, sp
+		segmov	es, ss
+		push	ax
+		pop	ax
+		call	LocalFormatDateTime
+DBCS <		shl	cx, 1						>
+		add	di, cx			;di <- offset past text
+		clr	ax
+		LocalPutChar esdi, ax
 	;
 	; set that time as our moniker
 	;
-		; mov	si, bp
-		; mov	cx, ss
-		; mov	dx, sp
-		; mov	bp, VUM_NOW
-		; mov	ax, MSG_GEN_REPLACE_VIS_MONIKER_TEXT
-		; call	ObjCallInstanceNoLock
+		mov	si, bp
+		mov	cx, ss
+		mov	dx, sp
+		mov	bp, VUM_NOW
+		mov	ax, MSG_GEN_REPLACE_VIS_MONIKER_TEXT
+		call	ObjCallInstanceNoLock
 	;
 	; clean up
 	;
-		;add	sp, DATE_TIME_BUFFER_SIZE
-
-
-
-	;
-	; our attempt
-	;
-	; dateBuf	local	DATE_TIME_BUFFER_SIZE dup (Chars)
-
-
-		;mov	bp, si		; preserve object chunk
-		push	si
-
-		segmov	es, ss
-		lea	di, ss:[dateBuf]	; es:di <- buffer into which to format
-		mov	si, DTF_HM		; si <- format enum
-		call	TimerGetDateAndTime	; fetch current time
-		call	LocalFormatDateTime	; and format it (cx <- # chars w/o null)
-		; add	di, cx			; di <- offset past text
-		; clr	ax
-		; LocalPutChar esdi, ax
-
-		;mov	si, bp
-		pop	si
-
-		push	bp
-		mov	ax, MSG_GEN_REPLACE_VIS_MONIKER_TEXT
-		mov	cx, ss
-		lea	dx, ss:[dateBuf]
-		mov	bp, VUM_DELAYED_VIA_UI_QUEUE
-		call	ObjCallInstanceNoLock
-		pop	bp
+		add	sp, DATE_TIME_BUFFER_SIZE
 
 		.leave
 		ret
