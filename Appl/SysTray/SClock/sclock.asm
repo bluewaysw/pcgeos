@@ -195,8 +195,8 @@ dateBuf	local	DATE_TIME_BUFFER_SIZE dup (Chars)
 		push	bp
 		mov	ax, MSG_GEN_REPLACE_VIS_MONIKER_TEXT
 		mov	bp, VUM_NOW
-		mov	bx, handle AdjustTime
-		mov	si, offset AdjustTime
+		mov	bx, handle CalendarTrigger
+		mov	si, offset CalendarTrigger
 		mov	di, mask MF_CALL
 		call	ObjMessage
 		pop	bp
@@ -308,7 +308,7 @@ DESTROYED:	ax, cx, dx, bp
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
 
-pmgrToken GeodeToken <'PMGR', 0>
+pmgrToken GeodeToken <'PMGR', MANUFACTURER_ID_GEOWORKS>
 
 ClockAppAdjustTimeDate method dynamic ClockApplicationClass,
 					MSG_CLOCK_APP_ADJUST_TIME_DATE
@@ -354,6 +354,51 @@ donePop:
 done:
 		ret
 ClockAppAdjustTimeDate	endm
+
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		ClockAppLaunchCalendar
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	MSG_CLOCK_APP_LAUNCH_CALENDAR
+
+CALLED BY:	UI
+PASS:		ds - dgroup
+RETURN:		none
+DESTROYED:	ax, cx, dx, bp
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+
+cldrToken GeodeToken <'PLNR', MANUFACTURER_ID_GEOWORKS>
+ClockAppLaunchCalendar	method	dynamic ClockApplicationClass,
+					MSG_CLOCK_APP_LAUNCH_CALENDAR
+	;
+	; Create an AppLaunchBlock and fill it in
+	;
+		mov	dx, MSG_GEN_PROCESS_OPEN_APPLICATION
+		call	IACPCreateDefaultLaunchBlock
+		LONG jc	done				;branch if error
+		mov	bx, dx				;bx <- handle of ALB
+
+		push	bp, bx
+		segmov	es, cs
+		mov	di, offset cldrToken
+		mov	ax, mask IACPCF_FIRST_ONLY or \
+				IACPSM_USER_INTERACTIBLE shl offset IACPCF_SERVER_MODE
+		clr	cx, dx
+		call	IACPConnect
+		jc	donePop
+	;
+	; Close the connection we opened
+	;
+		clr	cx, dx
+		call	IACPShutdown
+donePop:
+		pop	bp, bx
+done:
+		ret
+
+ClockAppLaunchCalendar	endm
 
 
 
