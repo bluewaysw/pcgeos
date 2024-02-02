@@ -62,10 +62,11 @@ exempt color
 # Standard discardable code resources do not need to be mentioned.
 #
 resource AppResource		object
-resource Interface			object
+resource Interface		object
 resource OptionsInterface	object
-resource AppMonikerResource object
-resource BallResource		object
-resource OpponentResource	object
-resource ScoreBrickResource	object
-resource FeatureBrickResource	object
+resource AppMonikerResource	object
+resource BallResource		data read-only
+resource OpponentResource	data read-only
+resource ScoreBrickResource	data read-only
+resource FeatureBrickResource	data read-only
+resource StringResource		data read-only
