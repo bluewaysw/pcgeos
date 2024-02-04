@@ -12,7 +12,7 @@ extern void stream_word (const zchar *);
 extern void stream_new_line (void);
 
 static zchar buffer[TEXT_BUFFER_SIZE];
-static bufpos = 0;
+static int bufpos = 0;
 
 static zchar prev_c = 0;
 

@@ -16,7 +16,7 @@
 #define _EGA_   4
 #define _AMIGA_ 5
 
-
+#define __GEOS__	1
 
 typedef int bool;
 
@@ -445,7 +445,7 @@ extern zword *sp;
 extern zword *fp;
 
 extern zword zargs[8];
-extern zargc;
+extern int zargc;
 
 extern bool ostream_screen;
 extern bool ostream_script;
@@ -454,29 +454,29 @@ extern bool ostream_record;
 extern bool istream_replay;
 extern bool message;
 
-extern cwin;
-extern mwin;
+extern int cwin;
+extern int mwin;
 
-extern mouse_x;
-extern mouse_y;
+extern int mouse_x;
+extern int mouse_y;
 
 extern bool enable_wrapping;
 extern bool enable_scripting;
 extern bool enable_scrolling;
 extern bool enable_buffering;
 
-extern option_attribute_assignment;
-extern option_attribute_testing;
-extern option_object_locating;
-extern option_object_movement;
-extern option_context_lines;
-extern option_left_margin;
-extern option_right_margin;
-extern option_ignore_errors;
-extern option_piracy;
-extern option_undo_slots;
-extern option_expand_abbreviations;
-extern option_script_cols;
+extern int option_attribute_assignment;
+extern int option_attribute_testing;
+extern int option_object_locating;
+extern int option_object_movement;
+extern int option_context_lines;
+extern int option_left_margin;
+extern int option_right_margin;
+extern int option_ignore_errors;
+extern int option_piracy;
+extern int option_undo_slots;
+extern int option_expand_abbreviations;
+extern int option_script_cols;
 
 extern long reserve_mem;
 
@@ -608,7 +608,7 @@ void    print_string (const char *);
 void    stream_mssg_on (void);
 void    stream_mssg_off (void);
 
-void    runtime_error (const char *);
+void    runtime_error (char *);
 
 void    ret (zword);
 void    store (zword);
@@ -625,7 +625,7 @@ void    os_display_char (zchar);
 void    os_display_string (const zchar *);
 void    os_draw_picture (int, int, int);
 void    os_erase_area (int, int, int, int);
-void    os_fatal (const char *);
+void    os_fatal (/*const*/ char *);
 void    os_finish_with_sample (void);
 int     os_font_data (int, int *, int *);
 void    os_init_screen (void);
@@ -685,7 +685,7 @@ InitGeosWindow( void );
 void
 SetGeosWindow( zword window );
 
-word main ( word valueToPass );
+word frotz_main ( word valueToPass );
 
 #endif /* __GEOS__ */
 

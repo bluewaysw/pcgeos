@@ -78,9 +78,9 @@ FILE *story_fp = NULL;
 
 static zbyte far *undo[MAX_UNDO_SLOTS];
 
-static undo_slots = 0;
-static undo_count = 0;
-static undo_valid = 0;
+static int undo_slots = 0;
+static int undo_count = 0;
+static int undo_valid = 0;
 
 /*
  * get_header_extension
@@ -192,9 +192,9 @@ void restart_header (void)
 
 Boolean init_memory (void)
 {
-    long size;
+    //long size;
     zword addr;
-    unsigned n;
+    //unsigned n;
     int i, j;
 
     static struct {
@@ -496,7 +496,7 @@ void storew (zword addr, zword value)
 
 void z_restart (void)
 {
-    static bool first_restart = TRUE;
+    //static bool first_restart = TRUE;
 
     flush_buffer ();
 
