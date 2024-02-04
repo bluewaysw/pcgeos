@@ -137,7 +137,7 @@ minimalTools    : resedit
 
 minimalGame	: solitaire cword amateur bjack hearts gwpoker \
                   pyramid sokoban uki mine column2 battle \
-                  row4 munchers vacman
+                  row4 munchers vacman snake
                   
 extraGame	: taipei column mine2 follow treas mazerun \
 		  blkbox hiho magicboard  scode noid paddle \
@@ -1069,6 +1069,9 @@ Installed\Appl\Breadbox\Arcade\paddle: ui ansic color game sound MAKEAPPL
 
 frotz	: Installed\Appl\Breadbox\frotz
 Installed\Appl\Breadbox\frotz: ui ansic text MAKEAPPL
+
+snake	: Installed\Appl\Breadbox\snake
+Installed\Appl\Breadbox\snake: ui game ansic MAKEAPPL
 
 
 
