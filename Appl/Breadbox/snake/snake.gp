@@ -29,7 +29,7 @@ library ansic
 resource AppResource ui-object
 resource Interface ui-object
 resource AppIcons data object
-resource StringsResource data object
+resource StringsResource data 
 
 export SnakeApplicationClass
 export SnakePrimaryClass
