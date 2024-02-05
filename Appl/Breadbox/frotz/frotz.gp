@@ -55,7 +55,6 @@ resource MenuResource                   ui-object
 
 resource MONIKERRESOURCE  data object
 resource StringResource  data object
-resource LOGORESOURCE  data object
 
 #export FrotzViewClass
 export FrotzInputTextClass

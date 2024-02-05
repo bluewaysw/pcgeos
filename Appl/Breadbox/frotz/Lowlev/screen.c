@@ -2,6 +2,7 @@
  * screen.c
  *
  * Generic screen manipulation
+ *    2024-01-02 RainerB	Fix some compiler warnings. 
  *
  */
 
@@ -32,15 +33,19 @@ static struct {
     {   UNKNOWN,  0,   0,   0 }
 };
 
-static font_height = 1;
-static font_width = 1;
+static int font_height = 1;
+static int font_width = 1;
 
+#ifdef __GEOS__
+#else
 static bool input_redraw = FALSE;
+static int input_window = 0;
+#endif
+
 static bool more_prompts = TRUE;
 static bool discarding = FALSE;
 static bool cursor = TRUE;
 
-static input_window = 0;
 
 static struct {
     zword y_pos;
@@ -304,7 +309,9 @@ void screen_new_line (void)
 
 void screen_char (zchar c)
 {
-    int width;
+    // int width;		<-- original: NOT initilized R.B.
+    int width=0;		// <-- initilized to avoid compiler warnings R.B.
+    				// looks unfinished
 
     if (discarding) return;
 
@@ -312,7 +319,7 @@ void screen_char (zchar c)
         c = ' ';
 
 #ifndef __GEOS__
-    if (units_left () < (width = os_char_width (c))) {
+    if (units_left () < (width = os_char_width (c))) {	// <- looks wrong, with is not yet initialized properly R.B.
 
         if (!enable_wrapping) {
             cwp->x_cursor = cwp->x_size - cwp->right;
@@ -339,7 +346,9 @@ void screen_char (zchar c)
 
 void screen_word (const zchar *s)
 {
-    int width;
+    // int width;		<-- original: NOT initilized R.B.
+    int width=0;		// <-- initilized to avoid compiler warnings R.B.
+    				// looks unfinished
 
     if (discarding) return;
 
@@ -347,7 +356,7 @@ void screen_word (const zchar *s)
         screen_char (*s++);
 
 #ifndef __GEOS__
-    if (units_left () < (width = os_string_width (s))) {
+    if (units_left () < (width = os_string_width (s))) { // <- looks wrong, with is not yet initialized properly R.B.
 
         if (!enable_wrapping) {
 
