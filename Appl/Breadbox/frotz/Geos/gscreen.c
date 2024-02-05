@@ -15,15 +15,17 @@
     This file contains the GEOS front end, screen manipulation.
 
   REVISION HISTORY:
-    Date      Name      Description
-    --------  --------  -----------
-    98-06-06  GerdB     Initial Version.
+    Date       Name      Description
+    --------   --------  -----------
+    98-06-06   GerdB     Initial Version.
+    2024-01-02 RainerB	Fix a lot of compiler warnings.
 
 ***********************************************************************/
 
 
 #include "frotz.h"
 #include <color.h>
+#include <timer.h>
 
 void FrotzResetGeos( void );
 
@@ -49,7 +51,7 @@ int user_font = 1;
 
 static void clear_line (int y, int left, int right)
 {
-
+y=y; left=left; right=right;	// <-- dummy to avoid compiler warning
 }/* clear_line */
 
 /*
@@ -62,7 +64,8 @@ static void clear_line (int y, int left, int right)
 
 void os_erase_area (int top, int left, int bottom, int right)
 {
-
+top=top; left=left; bottom=bottom; right=right; // <-- dummy to avoid compiler warning
+clear_line(0,0,0);				// <-- dummy to avoid compiler warning
 }/* os_erase_area */
 
 /*
@@ -70,11 +73,10 @@ void os_erase_area (int top, int left, int bottom, int right)
  *
  * Helper function for copy_line.
  *
- */
+ * /		<-- commented out to avoid compiler warning
 static void copy_byte (byte far *scrn1, byte far *scrn2, byte mask)
 {
-
-}/* copy_byte */
+}*//* copy_byte */
 
 /*
  * copy_line
@@ -84,7 +86,7 @@ static void copy_byte (byte far *scrn1, byte far *scrn2, byte mask)
  */
 static void copy_line (int y1, int y2, int left, int right)
 {
-
+y1=y1; y2=y2; left=left; right=right; // <-- dummy to avoid compiler warning
 }/* copy_line */
 
 /*
@@ -97,7 +99,8 @@ static void copy_line (int y1, int y2, int left, int right)
  */
 void os_scroll_area (int top, int left, int bottom, int right, int units)
 {
-
+top=top; left=left; bottom=bottom; right=right; units=units;	// <-- dummy to avoid compiler warning
+copy_line(0,0,0,0);						// <-- dummy to avoid compiler warning
 }/* os_scroll_area */
 
 
@@ -207,6 +210,7 @@ void os_init_screen (void)
     C_WHITE
     };
 
+#if 0		// currently unused:
     static struct { /* information on modes 0 to 5 */
     byte vmode;
     word width;
@@ -223,6 +227,7 @@ void os_init_screen (void)
     { 0x0e, 640, 200,  8,  8, C_WHITE,           C_BLUE      }, /* EGA   */
     { 0x12, 640, 400,  8, 16, C_WHITE,           C_BLACK     }  /* AMIGA */
     };
+#endif
 
 #if 0
     static struct { /* information on modes A to E */
