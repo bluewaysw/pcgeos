@@ -410,6 +410,8 @@ static void CalcScaleForWidths( TRUETYPE_VARS, WWFixedAsDWord pointSize,
 
         if( stylesToImplement & ( TS_SUBSCRIPT | TS_SUPERSCRIPT ) )     
                 SCALE_WIDTH = GrMulWWFixed( SCALE_WIDTH, WWFIXED_0_POINT_5 );
+
+        //TODO implement widths and weight
 }
 
 
@@ -482,7 +484,7 @@ EC(     ECCheckBounds( (void*)fontMatrix ) );
                 }
         }
 
-        //TODO: width and weight
+        //TODO: implement width and weight
 
         /* integrate fontMatrix */
         transMatrix->TM_matrix.xx = GrMulWWFixed( tempMatrix.xx, fontMatrix->FM_11 );
