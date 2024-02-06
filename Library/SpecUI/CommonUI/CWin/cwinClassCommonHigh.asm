@@ -3116,6 +3116,7 @@ GetTaskBarPositionAdjustment	proc	far
 	segmov	ds, dgroup				; load dgroup
 	test	ds:[taskBarPrefs], mask TBF_ENABLED	; test if TBF_ENABLED is set
 	pop	ds					; restore ds
+
 	mov	di, 0					; assume no adjustment (di = 0)
 	jz	done					; skip if no taskbar
 
@@ -3126,6 +3127,7 @@ GetTaskBarPositionAdjustment	proc	far
 	mov	di, ds:[si]
 	add	di, ds:[di].Vis_offset
 	cmp	ds:[di].OLWI_type, MOWT_DISPLAY_WINDOW
+
 	mov	di, 0			; assume no adjustment (di = 0)
 	je	done
 
@@ -3140,6 +3142,7 @@ GetTaskBarPositionAdjustment	proc	far
 	andnf	ax, mask TBF_POSITION			; mask out everything but the position bits
 	cmp	ax, (TBP_TOP) shl offset TBF_POSITION	; compare position bits with TBP_TOP
 	pop	ds, ax					; restore ds, ax
+
 	jne	done					; jump if not top position, no adjustment (di = 0)
 
 	;
@@ -3149,8 +3152,8 @@ GetTaskBarPositionAdjustment	proc	far
 	push	ds
 	segmov	ds, dgroup
 	test	ds:[taskBarPrefs], mask TBF_AUTO_HIDE
-
 	pop	ds
+
 	mov	di, 1			; assume auto-hide is on (di = 1)
 	jnz	done
 
@@ -3176,6 +3179,7 @@ GetTaskBarSizeAdjustment	proc	far
 	segmov	ds, dgroup				; load dgroup
 	test	ds:[taskBarPrefs], mask TBF_ENABLED	; test if TBF_ENABLED is set
 	pop	ds					; restore ds
+
 	mov	di, 0					; assume no adjustment (di = 0)
 	jz	done					; skip if no taskbar
 
@@ -3186,6 +3190,7 @@ GetTaskBarSizeAdjustment	proc	far
 	mov	di, ds:[si]
 	add	di, ds:[di].Vis_offset
 	cmp	ds:[di].OLWI_type, MOWT_DISPLAY_WINDOW
+
 	mov	di, 0			; assume no adjustment (di = 0)
 	je	done
 
@@ -3200,6 +3205,7 @@ GetTaskBarSizeAdjustment	proc	far
 	andnf	ax, mask TBF_POSITION			; mask out everything but the position bits
 	cmp	ax, (TBP_TOP) shl offset TBF_POSITION	; compare position bits with TBP_TOP
 	pop	ds, ax					; restore ds
+
 	je	done					; jump if top position, no adjustment (di = 0)
 
 	;
@@ -3210,6 +3216,7 @@ GetTaskBarSizeAdjustment	proc	far
 	segmov	ds, dgroup
 	test	ds:[taskBarPrefs], mask TBF_AUTO_HIDE
 	pop	ds
+
 	mov	di, 1			; assume auto-hide is on (di = 1)
 	jnz	done
 

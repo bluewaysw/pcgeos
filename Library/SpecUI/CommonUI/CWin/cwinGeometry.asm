@@ -1527,7 +1527,7 @@ gotSize:
 	shr	bx, offset TBF_POSITION
 	cmp	bx, TBP_TOP
 	pop	ds, bx					; restore ds
-	je	update					; update if not top position
+	je	update					; skip if top position
 
 	neg	dx
 update:

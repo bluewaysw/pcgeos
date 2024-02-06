@@ -2528,7 +2528,7 @@ ToolAreaInitPosition	method	dynamic	ToolAreaClass, MSG_TOOL_AREA_INIT_POSITION
 	je	setPosition				; jump if top position
 
 	mov	dx, mask SWSS_RATIO or PCT_95 		; PCT_100 apparently produces a wrap-around somewhere
-							; and makes the taskbar appears on top...
+							; and makes the taskbar appear on top...
 
 setPosition:
 	mov	ds:[bx].SWSP_x, cx
