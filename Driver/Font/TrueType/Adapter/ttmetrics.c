@@ -220,4 +220,6 @@ static void CalcTransformMatrix( TextStyle         stylesToImplement,
                 else
                         transMatrix->TM_scriptY = SCRIPT_SHIFT_FACTOR;
         }
+
+        //TODO: implement width and weight
 }
