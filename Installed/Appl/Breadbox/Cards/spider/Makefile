@@ -6,8 +6,8 @@
 GEODE           = spider
 ASM_TO_OBJS     =
 UI_TO_RDFS      =
-SRCS            = spidui.goc spGame.goc spproc.goc spider.goh
-OBJS            = spidui.obj spGame.obj spproc.obj
+SRCS            = spGame.goc spidui.goc spproc.goc spider.goh
+OBJS            = spGame.obj spidui.obj spproc.obj
 LOBJS           =
 
 SYSMAKEFILE     = geode.mk

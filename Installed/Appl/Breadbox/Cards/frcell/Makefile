@@ -6,8 +6,8 @@
 GEODE           = frcell
 ASM_TO_OBJS     =
 UI_TO_RDFS      =
-SRCS            = fcellui.goc fcellproc.goc fcellGm.goc frcell.goh
-OBJS            = fcellui.obj fcellproc.obj fcellGm.obj
+SRCS            = fcellGm.goc fcellproc.goc fcellui.goc frcell.goh
+OBJS            = fcellGm.obj fcellproc.obj fcellui.obj
 LOBJS           =
 
 SYSMAKEFILE     = geode.mk

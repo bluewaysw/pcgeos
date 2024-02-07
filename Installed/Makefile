@@ -137,11 +137,11 @@ minimalTools    : resedit
 
 minimalGame	: solitaire cword amateur bjack hearts gwpoker \
                   pyramid sokoban uki mine column2 battle \
-                  row4 munchers vacman snake
+                  row4 munchers vacman snake frcell
                   
 extraGame	: taipei column mine2 follow treas mazerun \
 		  blkbox hiho magicboard  scode noid paddle \
-		  frotz
+		  frotz spider
 
 minimalEdu	: flash fontmgck hangman laserl mflash numbers pvault \
                   oliner taide thinker wsm wsplay xwm
@@ -1072,6 +1072,12 @@ Installed\Appl\Breadbox\frotz: ui ansic text MAKEAPPL
 
 snake	: Installed\Appl\Breadbox\snake
 Installed\Appl\Breadbox\snake: ui game ansic MAKEAPPL
+
+frcell	: Installed\Appl\Breadbox\Cards\frcell
+Installed\Appl\Breadbox\Cards\frcell: ui ansic cards color MAKEAPPL
+
+spider	: Installed\Appl\Breadbox\Cards\spider
+Installed\Appl\Breadbox\Cards\spider: ui cards color sound MAKEAPPL
 
 
 
