@@ -5021,11 +5021,12 @@ atBottom:
 doneTaskBar:
 	pop	ds
 	push	bx, ax					; save top, bottom
+	jmp	afterTaskbar
 endIfTaskbar:
 else
 	push	bx, dx					; save top, bottom
 endif
-
+afterTaskbar:
 	call	VisQueryWindow				; di = window handle
 	tst	di
 	jz	update
