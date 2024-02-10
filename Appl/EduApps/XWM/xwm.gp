@@ -14,7 +14,6 @@ resource Interface ui-object
 resource Strings data object
 resource XWMAPPMONIKERRESOURCE data
 resource XWMDOCMONIKERRESOURCE data
-resource LOGORESOURCE data object
 
 # platform
 platform geos201
