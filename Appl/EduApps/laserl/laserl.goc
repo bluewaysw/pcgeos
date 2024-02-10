@@ -3,17 +3,17 @@
  ***************************************************************************/
 
 /*-------------------------------------------------------------------------
- | Program:  Sound Maker
+ | Program:  Laser Letter
  *-------------------------------------------------------------------------
  |
  | Objective:
- |    Allows the user to create simple sound effects to be played through
- |    the PC speaker.  Not intended for MIDI, but may work there too.
+ |    Allows the user to learn faster writing on the keyboard.
  |
  | Revision History:
  |    Who  Date:     Comments:
  |    ---  --------  ---------
  |    LES  03/26/99  Created
+ |    RB   02/06/24  QuickTips added	
  |
  *-----------------------------------------------------------------------*/
 
@@ -26,6 +26,7 @@
 @include <Ansi/string.h>
 @include <Ansi/stdio.h>
 @include <Ansi/ctype.h>
+@include <initfile.h>
 @include "laserdb.goh"
 
 /***************************************************************************
@@ -128,6 +129,9 @@ typedef byte GameDensity ;
 
 #define GAME_FONT_ID            (G_fontID)
 #define GAME_FONT_SIZE          (G_fontSize)
+
+/* Present Quick Tips on startup */
+#define	SHOW_ON_STARTUP		1
 
 /***************************************************************************
  *		Custom types:
@@ -400,7 +404,6 @@ void UpdateSound(void) ;
     @include "Art/iconcga.goh"
     @include "Art/iconsvga.goh"
 	 @include "Art/iconshgc.goh"
-	 @include "Art/bboxreg.goh"
 
     /*---------------------------------------------------------------------*/
 @end IconResource ;
@@ -413,7 +416,7 @@ void UpdateSound(void) ;
     /*---------------------------------------------------------------------*/
     @object GenPrimaryClass LaserLettersPrimary  = {
 		  GI_comp = @LaserLettersGameMenu, @LaserLettersOptionsMenu,
-		            @LaserLettersView ;
+		            @LaserLettersView, @QTipsDialogBox;
         HINT_SIZE_WINDOW_AS_DESIRED ;
         HINT_CENTER_CHILDREN_HORIZONTALLY ;
         HINT_CENTER_CHILDREN_VERTICALLY ;
@@ -421,17 +424,22 @@ void UpdateSound(void) ;
         HINT_KEEP_ENTIRELY_ONSCREEN;
 
         HINT_PRIMARY_NO_FILE_MENU ;
-		  ATTR_GEN_HELP_CONTEXT = "TOC" ;
+		  /*ATTR_GEN_HELP_CONTEXT = "TOC" ;*/
+	HINT_PRIMARY_NO_HELP_BUTTON;
 	 }
 	 /*---------------------------------------------------------------------*/
 	 @object GenInteractionClass LaserLettersGameMenu = {
 		  GI_visMoniker = 'G', "Game" ;
 		  GI_comp =
-				@LaserLettersStartTrigger,
-				@LaserLettersSkip,
-				@AboutDBox;
+				@LaserLettersGameGroup;
 		  GII_visibility = GIV_POPUP ;
 		  ATTR_GEN_INTERACTION_GROUP_TYPE = (GIGT_FILE_MENU) ;
+	 }
+	 /*---------------------------------------------------------------------*/
+	 @object GenInteractionClass LaserLettersGameGroup = {
+		  GI_comp =	@LaserLettersStartTrigger,
+				@LaserLettersSkip,
+				@LaserLettersQTipsTrigger;
 	 }
 	 /*---------------------------------------------------------------------*/
     @object GenTriggerClass LaserLettersStartTrigger = {
@@ -445,51 +453,13 @@ void UpdateSound(void) ;
 		  GTI_destination = process ;
 		  GTI_actionMsg = MSG_GAME_SKIP_LEVEL ;
 	 }
-
 	 /*---------------------------------------------------------------------*/
-@object GenInteractionClass AboutDBox = {
-	 GI_visMoniker = 'b', "About";
-	 GI_comp = @AppName, @Beta, @By, @BreadBoxLogo, @Visit,
-			 @Web, @Copyright;
-	 GII_visibility = GIV_DIALOG;
-	 GII_type = GIT_NOTIFICATION;
-	 HINT_CENTER_CHILDREN_HORIZONTALLY;
-}
-
-@object GenTextClass AppName = {
-    GI_attrs = @default | GA_READ_ONLY;
-    GTXI_attrs = @default | GTA_SINGLE_LINE_TEXT;
-	 GTXI_text = "Laser Letters";
-    ATTR_GEN_TEXT_CHAR_ATTR = (ChunkHandle) @AppNameCharAttrs;
-}
-
-@chunk VisTextCharAttr AppNameCharAttrs =
-	CHAR_ATTR_FONT_SIZE_STYLE(
-		FID_DTC_URW_SANS, 24, TS_BOLD);
-
-@object GenGlyphClass Beta = {
-  GI_visMoniker = "An Educational Product";
-}
-
-@object GenGlyphClass By = {
-  GI_visMoniker = "from";
-}
-
-@object GenGlyphClass BreadBoxLogo = {
-  GI_visMoniker = list { @BreadboxLogoMoniker}
-}
-
-@object GenGlyphClass Copyright = {
-  GI_visMoniker = "Copyright 1994-2001 Breadbox Computer Company LLC";
-}
-
-@object GenGlyphClass Visit = {
-  GI_visMoniker = "Visit us at...";
-}
-
-@object GenGlyphClass Web = {
-  GI_visMoniker = "www.breadbox.com";
-}
+	 @object GenTriggerClass LaserLettersQTipsTrigger = {
+		  GI_visMoniker   = 'Q', "Quick Tips" ;
+		  GTI_destination = @QTipsDialogBox ;
+		  GTI_actionMsg   = MSG_GEN_INTERACTION_INITIATE ;
+		  HINT_TRIGGER_BRINGS_UP_WINDOW;
+	 }
 
 	 /*---------------------------------------------------------------------*/
 	 @object GenInteractionClass LaserLettersOptionsMenu = {
@@ -572,6 +542,63 @@ void UpdateSound(void) ;
         HINT_EXPAND_HEIGHT_TO_FIT_PARENT ;
     }
     /*---------------------------------------------------------------------*/
+	 @object GenInteractionClass QTipsDialogBox = {
+		  GI_visMoniker = "Laser Letters Quick Tips";
+		  GI_comp = @GoalText, @InfoGroup, @LearnText,
+				@ShowOnStartupGroup,
+				@OKTipsButton;
+		  GII_visibility = GIV_DIALOG ;
+		  GII_attrs = @default | GIA_MODAL | GIA_NOT_USER_INITIATABLE;
+		  HINT_CENTER_CHILDREN_HORIZONTALLY ;
+		  /*ATTR_GEN_HELP_CONTEXT = "TOC";*/
+	 }
+
+	 @object GenTextClass GoalText = {
+		  GI_attrs = @default | GA_READ_ONLY;
+		  GI_visMoniker = " ";
+		  HINT_PLACE_MONIKER_TO_LEFT;
+		  GTXI_text = "The goal of the game is to protect the city!";
+		  ATTR_GEN_TEXT_NEVER_MAKE_SCROLLABLE;
+	 }
+	 @object GenInteractionClass InfoGroup = {
+		  GI_visMoniker = " ";
+		  HINT_PLACE_MONIKER_TO_LEFT;
+		  HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+		  GI_comp = @InfoText;
+		  }
+	 @object GenTextClass InfoText = {
+		  GI_attrs = @default | GA_READ_ONLY;
+		  GI_visMoniker = list { @VisMonColorShieldedCityBitmap, @VisMonMonoShieldedCityBitmap };
+		  HINT_PLACE_MONIKER_TO_LEFT;
+		  GTXI_text = "Falling letters destroy the buildings. Use the laser guns on both sides to destroy the letters. To do this, simply press the corresponding key on the keyboard.";
+		  ATTR_GEN_TEXT_NEVER_MAKE_SCROLLABLE;
+	 }
+
+
+	 @object GenTextClass LearnText = {
+		  GI_attrs = @default | GA_READ_ONLY;
+		  GI_visMoniker = " ";
+		  HINT_PLACE_MONIKER_TO_LEFT;
+		  GTXI_text = "This game offers various levels of increasing difficulty. This also allows you to learn to write faster with the keyboard.";
+		  ATTR_GEN_TEXT_NEVER_MAKE_SCROLLABLE;
+	 }
+
+	 @object GenBooleanGroupClass ShowOnStartupGroup = {
+		  GI_comp = @ShowOnStartupBoolean;
+	 }
+
+	 @object GenBooleanClass ShowOnStartupBoolean = {
+		  GI_visMoniker = 'S', "Show this Dialog box when Laser Letters starts";
+		  GBI_identifier = SHOW_ON_STARTUP;
+	 }
+
+	 @object GenTriggerClass OKTipsButton = {
+		  GI_visMoniker   = 'O', "OK";
+		  GI_attrs = @default | GA_SIGNAL_INTERACTION_COMPLETE ;
+		  HINT_SEEK_REPLY_BAR;
+		  HINT_DEFAULT_DEFAULT_ACTION;
+	 }
+
 @end Interface
 
 
@@ -583,16 +610,16 @@ void UpdateSound(void) ;
 @chunk char ComplText[] = "Level completed!  On to level \01";
 @localize "do not localize the @1";
 @chunk char LeftKeys[] = "`12345qwert~!@#$%asdfgQWERTASDFGzxcvbZXCVB" ;
-@localize "the keyboard's left hand keys";
+@localize "the keyboard's left hand keys - MUST fit to the keyboard layout of the target language";
 @chunk char RightKeys[] = "67890^&*()yuiopYUIOPhjkl;HJKL:nm,./NM<>?'\"[]{}\\|-=_+" ;
-@localize "the keyboard's right hand keys";
+@localize "the keyboard's right hand keys - MUST fit to the keyboard layout of the target language";
 @chunk char NoExerciseFile[] = "No Typing Tutor exercise file found.  Using sample letters file (3 Levels).";
 @chunk char Level1Samp[] = "jjjjffffjjjjffffddddkkkkddddkkkk";
 @localize "the first sample level";
 @chunk char Level2Samp[] = "jjjjffffjjjjffffddddkkkkddddkkkkssssllllssssllll";
 @localize "the second sample level";
 @chunk char Level3Samp[] = "jjjjffffjjjjffffddddkkkkddddkkkkssssllllssssllllaaaa;;;;aaaa;;;;";
-@localize "the third & last sample level";
+@localize "the third & last sample level - respect the keyboard layout of the target language";
 
 @end Strings;
 
@@ -631,6 +658,7 @@ void UpdateSound(void) ;
  |    Who  Date:     Comments:
  |    ---  --------  ---------
  |    LES  03/30/99  Created
+ |    RB   02/06/24  QuickTips added	
  |
  *-----------------------------------------------------------------------*/
 
@@ -640,6 +668,7 @@ void UpdateSound(void) ;
     AppLaunchBlock *p_launch ;
     char buffer[200] ;
     char *p_buffer = buffer ;
+    Boolean initError, tips;
 
     /* Determine where the application's directory is really located */
     p_launch = MemLock(launchBlock) ;
@@ -691,6 +720,22 @@ void UpdateSound(void) ;
     @callsuper() ;
     LoadSounds() ;
     SoundStart() ;
+    
+    /* check for quick tips */
+    initError = InitFileReadBoolean("LaserL", "showTips", &tips);
+    if (initError) tips = TRUE;
+	if (tips) {
+	    @send ShowOnStartupGroup::MSG_GEN_BOOLEAN_GROUP_SET_BOOLEAN_STATE(
+			SHOW_ON_STARTUP,
+			TRUE);
+	    @send QTipsDialogBox::MSG_GEN_INTERACTION_INITIATE();
+    	}
+    	else {
+    	    @send ShowOnStartupGroup::MSG_GEN_BOOLEAN_GROUP_SET_BOOLEAN_STATE(
+    			SHOW_ON_STARTUP,
+    			FALSE);
+	}
+    							
 }
 
 /*-------------------------------------------------------------------------
@@ -704,14 +749,22 @@ void UpdateSound(void) ;
  |    Who  Date:     Comments:
  |    ---  --------  ---------
  |    LES  03/26/99  Created
+ |    RB   02/06/24  QuickTips added	
  |
  *-----------------------------------------------------------------------*/
 
 @method LaserLettersProcessClass, MSG_GEN_PROCESS_CLOSE_APPLICATION
 {
+    Boolean tips;
+    
     @call oself::MSG_GAME_STOP() ;
     SoundStop() ;
     LaserExerciseDBClose() ;
+    
+    /* set the quick tips */
+    tips = @call ShowOnStartupGroup::MSG_GEN_BOOLEAN_GROUP_IS_BOOLEAN_SELECTED(SHOW_ON_STARTUP);
+    InitFileWriteBoolean("LaserL", "showTips", tips);
+    
     return @callsuper() ;
 }
 
