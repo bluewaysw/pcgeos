@@ -1892,6 +1892,9 @@ REVISION HISTORY:
 if _MOTIF and TOOL_AREA_IS_TASK_BAR
 ToolAreaDraw	method dynamic ToolAreaClass, MSG_VIS_DRAW
 
+	mov	di, offset ToolAreaClass
+	call	ObjCallSuperNoLock
+
 	;
 	; if TaskBar == on
 	; RUNTIME
@@ -1904,56 +1907,32 @@ ToolAreaDraw	method dynamic ToolAreaClass, MSG_VIS_DRAW
 
 	mov	di, bp
 
-
 	call	VisGetBounds
-				;ax, VI_bounds.R_left
-				;cx, VI_bounds.R_right
-				;dx, VI_bounds.R_bottom
-				;bx, VI_bounds.R_top
+					;ax, VI_bounds.R_left
+					;cx, VI_bounds.R_right
+					;dx, VI_bounds.R_bottom
+					;bx, VI_bounds.R_top
 
-	push	ds, ax					; save ds
-	segmov	ds, dgroup				; get dgroup
-	mov	ax, ds:[taskBarPrefs]			; load taskBarPrefs in dx
-	andnf	ax, mask TBF_POSITION			; mask out everything but the position bits
-	cmp	ax, (TBP_TOP) shl offset TBF_POSITION	; compare position bits with TBP_TOP
-	pop	ds, ax					; restore ds
-	jne	atBottom				; jump if not top position
+	push	ax
+	call	GetDarkColor		; al <- dark color
+	mov	ah, C_WHITE		; ah <- light color
+	xchg	ah, al			; swap colors, as we want an "outset" look
+	mov	bp, ax
+	pop	ax
 
-;atTop:
-	mov	ax, (CF_INDEX shl 8) or C_DARK_GREY
-	call	GrSetLineColor
+; VisBounds ist die Position des Vis-Object innerhalb des Parent
+; Da die Tool Area ein eigenes Windows mitbringt, startet das Koordinatensystem wieder bei 0,0 innerhalb des ToolArea (bearbeitet)
+; am oberen Bildschirmrand ist das zufällig gleich unten eben nicht
+; problem ist doch ,das visbound y1 ja unten irgendwas wie 600-24 ist, jetzt aber 0
+; Also geht die Box von 0 - 800 und von 0 - 24.
+; Es ist nicht die Position des Fensters auf dem Screen sondern schon innerhalb des Fensters
+; ja, drawing area der ToolArea ist 0-800,0-24, weil er ein neues Windows aufspannt
 
-	mov	ax, 0 				;x1
-	mov	bx, dx				;y1
-	sub	bx, 1
-	sub	dx, 1
-	;mov	cx, 				;x2
-	;mov	dx, 0				;y2
-	jmp	draw
+	sub	dx, bx			;result in dx
+	mov	bx, 0
 
-atBottom:
-	clr	ax
-	mov	ax, (CF_INDEX shl 8) or C_WHITE
-	call	GrSetLineColor
-
-	mov	ax, 0 				;x1
-	mov	bx, 0				;y1
-	;mov	cx, 				;x2
-	mov	dx, 0				;y2
-
-draw:
-	call	GrDrawLine
-
+	call	OpenDrawRect
 done:
-
-	push	di
-	mov	ax, MSG_VIS_DRAW
-	mov	di, segment VisCompClass
-	mov	es, di
-	mov	di, offset VisCompClass
-	call	ObjCallClassNoLock
-	pop	di
-
 	ret
 ToolAreaDraw	endm
 endif
