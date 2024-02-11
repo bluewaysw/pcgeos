@@ -48,6 +48,8 @@ static void CalcScaleForWidths( TRUETYPE_VARS,
  *                                      TrueTypeOutlineEntry.
  *                stylesToImplement     Desired text style.
  *                pointSize             Desired point size.
+ *                width                 Desired glyph width.
+ *                weight                Desired glyph weight.
  *                result                Pointer in wich the result will 
  *                                      stored.
  *                varBlock              Memory handle to var block.
@@ -62,6 +64,7 @@ static void CalcScaleForWidths( TRUETYPE_VARS,
  *      Date      Name      Description
  *      ----      ----      -----------
  *      23/12/22  JK        Initial Revision
+ *      10/02/24  JK        width and weight implemented
  *******************************************************************/
 
 void _pascal TrueType_Char_Metrics( 
@@ -152,6 +155,8 @@ Fail:
  * PARAMETERS:    TRUETYPE_VARS         Cached variables needed by driver.
  *                pointSize             Desired point size.
  *                stylesToImplement     Desired text style.
+ *                width                 Desired glyph width.
+ *                weight                Desired glyph weight.
  * 
  * RETURNS:       void
  * 
@@ -161,6 +166,7 @@ Fail:
  *      Date      Name      Description
  *      ----      ----      -----------
  *      20/07/23  JK        Initial Revision
+ *      10702724  JK        width and weight implemented
  *******************************************************************/
 
 static void CalcScaleForWidths( TRUETYPE_VARS, 
@@ -193,6 +199,8 @@ static void CalcScaleForWidths( TRUETYPE_VARS,
  *                style attributes and weights.
  * 
  * PARAMETERS:    styleToImplement      Styles that must be added.
+ *                width                 Desired glyph width.
+ *                weight                Desired glyph weight.
  *                *transMatrix          Pointer to TransformMatrix.
  *                      
  * RETURNS:       void
@@ -203,6 +211,7 @@ static void CalcScaleForWidths( TRUETYPE_VARS,
  *      Date      Name      Description
  *      ----      ----      -----------
  *      20/12/22  JK        Initial Revision
+ *      10/02/24  JK        width and weight implemented
  *******************************************************************/
 
 static void CalcTransformMatrix( TextStyle         stylesToImplement,

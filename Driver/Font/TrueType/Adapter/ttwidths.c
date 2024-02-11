@@ -397,6 +397,8 @@ EC(     ECCheckBounds( (void*)kernValue ) );
  * PARAMETERS:    TRUETYPE_VARS         Cached variables needed by driver.
  *                pointSize             Desired point size.
  *                stylesToImplement     Desired text style.
+ *                width                 Desired glyph width.
+ *                weight                Desired glyph weight.
  * 
  * RETURNS:       void
  * 
@@ -406,6 +408,7 @@ EC(     ECCheckBounds( (void*)kernValue ) );
  *      Date      Name      Description
  *      ----      ----      -----------
  *      20/07/23  JK        Initial Revision
+ *      10/02/23  JK        width and weight implemented
  *******************************************************************/
 
 static void CalcScaleForWidths( TRUETYPE_VARS, 
@@ -441,6 +444,8 @@ static void CalcScaleForWidths( TRUETYPE_VARS,
  * PARAMETERS:    *transMatrix          Pointer to TransformMatrix.
  *                *fontMatrix           Systems transformation matrix.
  *                styleToImplement      Styles that must be added.
+ *                width                 Desired glyph width.
+ *                weight                Desired glyph weight.
  *                      
  * RETURNS:       void
  * 
@@ -450,6 +455,7 @@ static void CalcScaleForWidths( TRUETYPE_VARS,
  *      Date      Name      Description
  *      ----      ----      -----------
  *      20/12/22  JK        Initial Revision
+ *      10/02/24  JK        width and weight implemented
  *******************************************************************/
 
 static void CalcTransform( TransformMatrix*  transMatrix, 
