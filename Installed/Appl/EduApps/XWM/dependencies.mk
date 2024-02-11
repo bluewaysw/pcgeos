@@ -103,7 +103,7 @@ xwmui.eobj: xwm.goh stdapp.goh object.goh ui.goh Objects/metaC.goh \
                 Objects/gItemC.goh Objects/gBoolC.goh \
                 Objects/gGadgetC.goh Objects/gToolCC.goh \
                 Objects/gValueC.goh Objects/gToolGC.goh \
-                Objects/helpCC.goh bboxreg.goh appicon.goh docicon.goh
+                Objects/helpCC.goh appicon.goh docicon.goh
 xwmui.obj \
 xwmui.eobj: geos.h heap.h geode.h resource.h ec.h object.h lmem.h \
                 graphics.h fontID.h font.h color.h gstring.h timer.h vm.h \
