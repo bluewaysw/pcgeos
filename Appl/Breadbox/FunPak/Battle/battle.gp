@@ -72,6 +72,7 @@ resource AppResource ui-object
 resource Interface ui-object
 resource BoardBlock object
 resource AppMonikerResource lmem read-only shared
+resource QTipsResource ui-object
 
 #
 # Other classes
