@@ -47,13 +47,17 @@ static void ConvertKernPairs( TRUETYPE_VARS, FontBuf* fontBuf );
 
 static void CalcScaleForWidths( TRUETYPE_VARS,
                         WWFixedAsDWord          pointSize,
-                        TextStyle               styleToImplement );
+                        TextStyle               styleToImplement,
+                        Byte                    width,
+                        Byte                    weight );
 
 static void CalcTransform( 
                         TransformMatrix*        transMatrix,
                         FontMatrix*             fontMatrix, 
                         FontBuf*                fontBuf,
-                        TextStyle               stylesToImplement );
+                        TextStyle               stylesToImplement,
+                        Byte                    width,
+                        Byte                    weight );
 
 static void AdjustFontBuf( TransformMatrix*     transMatrix, 
                         FontMatrix*             fontMatrix, 
@@ -88,6 +92,8 @@ static Boolean IsRegionNeeded( TransformMatrix* transMatrix,
  * PARAMETERS:    fontHandle            Memory handle to font block.
  *                *fontMatrix           Ptr. to tranformation matrix.
  *                pointSize             Desired point size.
+ *                width                 Desired glyph width.
+ *                weight                Desired glyph weight.
  *                *fontInfo             Ptr. to font info structure.
  *                *headerEntry          Ptr. to outline entry containing 
  *                                      TrueTypeOutlineEntry.
@@ -106,12 +112,15 @@ static Boolean IsRegionNeeded( TransformMatrix* transMatrix,
  *      Date      Name      Description
  *      ----      ----      -----------
  *      20/12/22  JK        Initial Revision
+ *      11/02/24  JK        width and weight implemented
  *******************************************************************/
 
 MemHandle _pascal TrueType_Gen_Widths(
                         MemHandle            fontHandle,
                         FontMatrix*          fontMatrix,
                         WWFixedAsDWord       pointSize,
+                        Byte                 width,
+                        Byte                 weight,
 			const FontInfo*      fontInfo, 
                         const OutlineEntry*  headerEntry,
                         const OutlineEntry*  firstEntry,
@@ -172,7 +181,7 @@ EC(     ECCheckBounds( (void*) fontBuf ) );
         fontBuf->FB_kernValues   = fontHeader->FH_kernCount ? OFFSET_KERN_VALUES : 0;
 
         /* calculate scale factor */
-        CalcScaleForWidths( trueTypeVars, pointSize, stylesToImplement );
+        CalcScaleForWidths( trueTypeVars, pointSize, stylesToImplement, width, weight );
 
         /* convert FontHeader and fill FontBuf structure */
         ConvertHeader( trueTypeVars, fontHeader, fontBuf );
@@ -186,7 +195,7 @@ EC(     ECCheckBounds( (void*) fontBuf ) );
         /* calculate the transformation matrix and copy it into the FontBlock */
         transMatrix = (TransformMatrix*)(((byte*)fontBuf) + sizeof( FontBuf ) + fontHeader->FH_numChars * sizeof( CharTableEntry ));
 EC(     ECCheckBounds( (void*)transMatrix ) );
-        CalcTransform( transMatrix, fontMatrix, fontBuf, stylesToImplement );
+        CalcTransform( transMatrix, fontMatrix, fontBuf, stylesToImplement, width, weight );
 
         /* adjust FB_height, FB_minTSB, FB_pixHeight and FB_baselinePos */
         AdjustFontBuf( transMatrix, fontMatrix, fontBuf );
@@ -399,8 +408,11 @@ EC(     ECCheckBounds( (void*)kernValue ) );
  *      20/07/23  JK        Initial Revision
  *******************************************************************/
 
-static void CalcScaleForWidths( TRUETYPE_VARS, WWFixedAsDWord pointSize, 
-                                TextStyle stylesToImplement )
+static void CalcScaleForWidths( TRUETYPE_VARS, 
+                                WWFixedAsDWord  pointSize, 
+                                TextStyle       stylesToImplement,
+                                Byte            width,
+                                Byte            weight )
 {
         SCALE_HEIGHT = GrUDivWWFixed( pointSize, MakeWWFixed( FACE_PROPERTIES.header->Units_Per_EM ) );
         SCALE_WIDTH  = SCALE_HEIGHT;
@@ -411,7 +423,12 @@ static void CalcScaleForWidths( TRUETYPE_VARS, WWFixedAsDWord pointSize,
         if( stylesToImplement & ( TS_SUBSCRIPT | TS_SUPERSCRIPT ) )     
                 SCALE_WIDTH = GrMulWWFixed( SCALE_WIDTH, WWFIXED_0_POINT_5 );
 
-        //TODO implement widths and weight
+        /* implement width and weight */
+        if( width != FWI_MEDIUM )
+                SCALE_WIDTH = MUL_100_WWFIXED( SCALE_WIDTH, width );
+
+        if( weight != FW_NORMAL )
+                SCALE_WIDTH = MUL_100_WWFIXED( SCALE_WIDTH, weight );
 }
 
 
@@ -438,7 +455,9 @@ static void CalcScaleForWidths( TRUETYPE_VARS, WWFixedAsDWord pointSize,
 static void CalcTransform( TransformMatrix*  transMatrix, 
                            FontMatrix*       fontMatrix, 
                            FontBuf*          fontBuf,
-                           TextStyle         stylesToImplement )
+                           TextStyle         stylesToImplement,
+                           Byte              width,
+                           Byte              weight )
 {
         TT_Matrix  tempMatrix = { 1L << 16, 0, 0, 1L << 16 };
  
@@ -459,6 +478,13 @@ EC(     ECCheckBounds( (void*)fontMatrix ) );
         /* fake italic style       */
         if( stylesToImplement & TS_ITALIC )
                 tempMatrix.yx = NEGATVE_ITALIC_FACTOR;
+
+        /* width and weight */
+        if( width != FWI_MEDIUM )
+                tempMatrix.xx = MUL_100_WWFIXED( tempMatrix.xx, width );
+
+        if( weight != FW_NORMAL )
+                tempMatrix.xx = MUL_100_WWFIXED( tempMatrix.xx, weight );
 
         /* fake script style      */
         if( stylesToImplement & ( TS_SUBSCRIPT | TS_SUPERSCRIPT ) )
@@ -483,8 +509,6 @@ EC(     ECCheckBounds( (void*)fontMatrix ) );
                                                 WBFIXED_TO_WWFIXEDASDWORD( fontBuf->FB_baseAdjust ) ) >> 16;
                 }
         }
-
-        //TODO: implement width and weight
 
         /* integrate fontMatrix */
         transMatrix->TM_matrix.xx = GrMulWWFixed( tempMatrix.xx, fontMatrix->FM_11 );
