@@ -6,7 +6,7 @@
 GEODE           = laserl
 ASM_TO_OBJS     =
 UI_TO_RDFS      =
-SRCS            = laserdb.goc laserl.goc options.goh laserdb.goh
+SRCS            = laserdb.goc laserl.goc laserdb.goh options.goh
 OBJS            = laserdb.obj laserl.obj
 LOBJS           =
 
