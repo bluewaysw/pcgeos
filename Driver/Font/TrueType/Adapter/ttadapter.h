@@ -478,6 +478,9 @@ typedef struct
         ( (long) ( ( (long)(value.WBF_int) ) * 0x00010000 ) | ( ( (long)value.WBF_frac) << 8 ) )
 
 
+#define MUL_100_WWFIXED( factor, percentage )   \
+        GrMulWWFixed( factor, GrUDivWWFixed( ((long)percentage ) << 16, 100L << 16))
+
 /***********************************************************************
  *      functions
  ***********************************************************************/

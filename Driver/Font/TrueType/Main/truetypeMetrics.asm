@@ -51,6 +51,7 @@ REVISION HISTORY:
 	Name	Date		Description
 	----	----		-----------
 	FR	29/ 1/21	Initial version
+	JK	09/02/24	width and weight implement
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
 
@@ -82,6 +83,12 @@ resultDXAX	local	dword
 	movwbf	dxah, es:GS_fontAttr.FCA_pointsize
 	push	dx		; pass point size
 	push 	ax
+
+	clr		ch
+	mov		cl, es:GS_fontAttr.FCA_width
+	push	cx		; pass width
+	mov		cl, es:GS_fontAttr.FCA_weight
+	push	cx		; pass wieght
 
 	push 	ss		; pass ptr to result dword in ss
 	lea		cx, resultDXAX
