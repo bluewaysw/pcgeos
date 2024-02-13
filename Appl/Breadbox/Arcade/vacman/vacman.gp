@@ -38,7 +38,7 @@ resource BunBagResource data
 resource BoardResource data
 resource CurrentBoardResource data
 #resource STRINGSRESOURCE lmem read-only shared
-resource StringsResource data
+resource StringsResource lmem read-only shared
 #resource BREADBOXMONIKERRESOURCE ui-object lmem read-only shared
 #resource BREADBOXMONIKERRESOURCE2 ui-object lmem read-only shared
 #resource OPENINGLOGO1RESOURCE ui-object lmem read-only shared

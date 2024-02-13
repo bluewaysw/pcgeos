@@ -69,4 +69,4 @@ resource BallResource		data read-only
 resource OpponentResource	data read-only
 resource ScoreBrickResource	data read-only
 resource FeatureBrickResource	data read-only
-resource StringResource		data read-only
+resource StringResource		lmem read-only shared
