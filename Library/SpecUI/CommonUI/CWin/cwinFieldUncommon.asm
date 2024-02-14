@@ -1920,15 +1920,19 @@ ToolAreaDraw	method dynamic ToolAreaClass, MSG_VIS_DRAW
 	mov	bp, ax
 	pop	ax
 
-; VisBounds ist die Position des Vis-Object innerhalb des Parent
-; Da die Tool Area ein eigenes Windows mitbringt, startet das Koordinatensystem wieder bei 0,0 innerhalb des ToolArea (bearbeitet)
-; am oberen Bildschirmrand ist das zufällig gleich unten eben nicht
-; problem ist doch ,das visbound y1 ja unten irgendwas wie 600-24 ist, jetzt aber 0
-; Also geht die Box von 0 - 800 und von 0 - 24.
-; Es ist nicht die Position des Fensters auf dem Screen sondern schon innerhalb des Fensters
-; ja, drawing area der ToolArea ist 0-800,0-24, weil er ein neues Windows aufspannt
+	;
+	; calculate the lower right corner value of the new rect to draw around our window.
+	; Y value is VI_bounds.R_bottom - VI_bounds.R_top (= height) and lands in DX
+	; X value is already in CX and should always be equal to the width of the window.
+	;
 
 	sub	dx, bx			;result in dx
+
+	;
+	; set our new Y-Value for the upper left corner in BX
+	; X value should alsways be 0 and is already in AX
+	;
+
 	mov	bx, 0
 
 	call	OpenDrawRect
@@ -2523,7 +2527,7 @@ setPosition:
 	jc	afterTaskBarCheck			; abort if child not found
 	mov 	si, dx					; *ds:si <- TaskBar
 	mov	ax, MSG_GEN_SET_USABLE
-	mov	dl, VUM_DELAYED_VIA_APP_QUEUE		;VUM_NOW ;VUM_DELAYED_VIA_APP_QUEUE ; dl <- VisUpdateMode
+	mov	dl, VUM_DELAYED_VIA_APP_QUEUE		; dl <- VisUpdateMode
 	call	ObjCallInstanceNoLock
 afterTaskBarCheck:
 	pop	ds, si
@@ -2538,7 +2542,7 @@ afterTaskBarCheck:
 	jc	afterTrayCheck				; abort if child not found
 	mov 	si, dx					; *ds:si <- TaskBar
 	mov	ax, MSG_GEN_SET_USABLE
-	mov	dl, VUM_DELAYED_VIA_APP_QUEUE		; VUM_NOW ;VUM_DELAYED_VIA_APP_QUEUE ; dl <- VisUpdateMode
+	mov	dl, VUM_DELAYED_VIA_APP_QUEUE		; dl <- VisUpdateMode
 	call	ObjCallInstanceNoLock
 afterTrayCheck:
 	pop	ds, si

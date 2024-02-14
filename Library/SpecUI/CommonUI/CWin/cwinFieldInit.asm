@@ -533,8 +533,8 @@ if _MOTIF and TOOL_AREA_IS_TASK_BAR
 	mov	ax, HINT_FIXED_SIZE			; ax - Vardata type
 	mov	cx, size SpecWidth + size SpecHeight + size word ; cx - Size of extra data. (cx = zero if no extra data).
 	call	ObjVarAddData				; returns: pointer to extra data in ds:bx
-	mov	ds:[bx].SSA_width, SpecWidth <SST_PIXELS, 30>
-	mov	ds:[bx].SSA_height, SpecHeight <SST_PIXELS, 20>
+	mov	ds:[bx].SSA_width, SpecWidth <SST_PCT_OF_FIELD_WIDTH, (PCT_0 + 4*PCT_5/5)>
+	mov	ds:[bx].SSA_height, SpecHeight <SST_PIXELS, 20> ; should match HINT_MINIMUM_SIZE height value for TaskList
 	pop 	si
 
 endif

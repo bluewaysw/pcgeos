@@ -1399,11 +1399,9 @@ continue:
 	mov	ax, HINT_AVOID_MENU_BAR
 	call	ObjVarFindData
 	jc	done
-;if EXTENDIBLE_SYSTEM_TRAY ; - this flag is dead. Taskbar also means Systray.
-	mov	ax, HINT_PRIMARY_AVOID_MENU_BAR_IF_EXTENDIBLE_SYSTRAY
+	mov	ax, HINT_PRIMARY_AVOID_MENU_BAR_IF_EXTENDIBLE_SYSTRAY	; unclear if this is still needed, can't find enough code/documentation - meyerk 02/2024
 	call	ObjVarFindData
 	jc	done
-;endif
 
 	; Get default field window (presume only one), where most all windows
 	; of the app will be placed.
