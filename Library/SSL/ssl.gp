@@ -32,6 +32,7 @@ entry SSLLIBRARYENTRY
 library geos
 library ansic
 library socket
+library hostif
 
 ifdef COMPILE_OPTION_MAP_HEAP
 #library mapheap

@@ -97,7 +97,7 @@ minimalLibrary	: kernel swap sound net ui isui motif spool text mailbox \
 		  jpeg giflib gif htmlimpx n2txt inetmsg extui \
 		  winword8 zlib dirlist minizip idialc eps impex_libs \
 		  thumbdb ftplib flllib sitelist int8087 intx87\
-		  basicdb gridlib gsol treplib
+		  basicdb gridlib gsol treplib hostif
 #ascii
 
 prefLibs	: prefvid prefts preftd \
@@ -338,6 +338,9 @@ Installed/Library/Spline:	ui MAKELIB
 
 ssmeta	: Installed/Library/SSMeta
 Installed/Library/SSMeta:	ui math MAKELIB
+
+hostif	: Installed/Library/HostIf
+Installed/Library/HostIf:	kernel MAKELIB
 
 # bsnwav will only be compiled (and is only referenced in WAV) if PRODUCT==NDO2000
 wav	: Installed/Library/Wav
