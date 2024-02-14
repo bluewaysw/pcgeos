@@ -4,6 +4,8 @@ include geode.def
 include ec.def
 include file.def
 
+UseLib hostif.def
+
 include Internal/host.def
 
 global SSLCALLHOST:far
@@ -72,15 +74,21 @@ REVISION HISTORY:
 	mzhu	11/30/98	initial version
 -------------------------------------------------------------------------@
 	SetGeosConvention
+
 SSLCHECKHOST		proc	far	
 
 	;	
 	; Check host call if SSL interface is available
 	;
-		uses	cx
+		uses	cx, dx, si
 
 		.enter
 
+		call	HostIfDetect
+		cmp	ax, 0
+		je	error
+
+		; matched 8 chars
 		mov	ax, 1 
 		mov	cx, 2
 		int	0xA0
@@ -95,7 +103,6 @@ done:
 		
 error:
 		mov	ax, 0
-
 		jmp     done
 
 SSLCHECKHOST		endp

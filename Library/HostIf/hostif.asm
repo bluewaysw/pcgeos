@@ -42,20 +42,58 @@ include Objects/inputC.def
 
 include Objects/winC.def
 
+
 DefLib hostif.def
 
-HOST_API_INTERRUPT 	equ 	0xA0
+COORDINATE_OVERFLOW				enum FatalErrors
+; Some internal error in TransformInkBlock
 
+udata	segment
+udata	ends
+
+idata	segment
+idata	ends
 
 Code	segment	resource
+
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		HostIfEntry
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	Determine what the protocol # of the pen library is, so we
+		know if we need to add our workarounds.
+
+CALLED BY:	GLOBAL
+PASS:		di - LibraryCallType
+RETURN:		nada
+DESTROYED:	nada
+ 
+PSEUDO CODE/STRATEGY:
+
+KNOWN BUGS/SIDE EFFECTS/IDEAS:
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	atw	10/22/93   	Initial version
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+
+HostIfEntry	proc	far
+	.enter
+	clc
+	.leave
+	ret
+HostIfEntry	endp
 
 
 COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 		HostIfDetect
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-SYNOPSIS:	Determine if host side API is available and in case it is
-		what version is supported.
+SYNOPSIS:	Determine what the protocol # of the pen library is, so we
+		know if we need to add our workarounds.
 
 CALLED BY:	GLOBAL
 PASS:		nada
@@ -74,8 +112,6 @@ REVISION HISTORY:
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
 
 .ioenable
-
-	SetGeosConvention
 
 baseboxID	byte 	"XOBESAB1"
 
@@ -128,64 +164,9 @@ error:
 
 HostIfDetect	endp
 
-
-COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-		HostIfCall
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-
-SYNOPSIS:	Determine if host side API is available and in case it is
-		what version is supported.
-
-CALLED BY:	GLOBAL
-PASS:		nada
-RETURN:		ax - interface version, 0 mean no host interface found
-DESTROYED:	nada
- 
-PSEUDO CODE/STRATEGY:
-
-KNOWN BUGS/SIDE EFFECTS/IDEAS:
-
-REVISION HISTORY:
-	Name	Date		Description
-	----	----		-----------
-	FR	12/21/23   	Initial version
-
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
-
 HOSTIFDETECT	proc	far
 		GOTO	HostIfDetect
 HOSTIFDETECT	endp
-
-HostIfCall	proc	far
-		int	HOST_API_INTERRUPT
-		ret
-HostIfCall	endp
-
-HOSTIFCALL		proc	far	func:word, 
-					data1:dword, 
-					data2:dword, 
-					data3:word	
-		uses	di, si, cx, bx
-
-		.enter
-		
-		mov	di, data3
-		mov	dx, data2.high
-		mov	cx, data2.low
-		mov	bx, data1.high
-		mov	si, data1.low
-
-		mov	ax, func
-		
-		int	HOST_API_INTERRUPT
-
-		.leave
-		
-		ret
-
-HOSTIFCALL		endp
-
-	SetDefaultConvention
 
 Code	ends
 

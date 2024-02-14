@@ -10,7 +10,7 @@
 #
 # Parameters file for: hostif
 #
-#	$Id: hostif.gp,v 1.1 23/12/05 01:06:35 bluewaysw Exp $
+#	$Id: inkfix.gp,v 1.1 97/04/05 01:06:35 newdeal Exp $
 #
 ##############################################################################
 #
@@ -27,6 +27,8 @@ longname "Host Interface Library"
 tokenchars "HSTI"
 tokenid 0
 
+entry	HostIfEntry
+
 #
 # Specify geode type
 #
@@ -42,5 +44,3 @@ library	geos
 #
 export HostIfDetect
 export HOSTIFDETECT
-export HostIfCall
-export HOSTIFCALL
