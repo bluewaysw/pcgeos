@@ -119,7 +119,7 @@ endif
 	jnc	notInTitleBar
 
 inTitleBar:
-	mov	di, ds:[si]			
+	mov	di, ds:[si]
 	add	di, ds:[di].Vis_offset
 	ornf	ds:[di].OLBI_specState, mask OLBSS_SYS_ICON
 
@@ -190,7 +190,7 @@ endif
 OLButtonDrawShortcutBelow	proc	far
 	class	OLButtonClass
 	mov	si, cx
-	mov	di, ds:[si]			
+	mov	di, ds:[si]
 	add	di, ds:[di].Vis_offset
 	ORNF	ds:[di].OLBI_moreAttrs, mask OLBMA_DRAW_SHORTCUT_BELOW
 	ret
@@ -204,7 +204,7 @@ OLButtonDrawShortcutBelow	endp
 OLButtonShowShortcut	proc	far
 	class	OLButtonClass
 	mov	si, cx
-	mov	di, ds:[si]			
+	mov	di, ds:[si]
 	add	di, ds:[di].Vis_offset
 	ORNF	ds:[di].OLBI_fixedAttrs, mask OLBFA_FORCE_SHORTCUT
 done:
@@ -218,7 +218,7 @@ OLButtonShowShortcut	endp
 OLButtonDontShowShortcut	proc	far
 	class	OLButtonClass
 	mov	si, cx
-	mov	di, ds:[si]			
+	mov	di, ds:[si]
 	add	di, ds:[di].Vis_offset
 	ORNF	ds:[di].OLBI_fixedAttrs, mask OLBFA_FORCE_NO_SHORTCUT
 done:
@@ -228,7 +228,7 @@ OLButtonDontShowShortcut	endp
 OLButtonSetIsDefault	proc	far
 	class	OLButtonClass
 	mov	si, cx
-	mov	di, ds:[si]			
+	mov	di, ds:[si]
 	add	di, ds:[di].Vis_offset
 	ORNF	ds:[di].OLBI_fixedAttrs, mask OLBFA_MASTER_DEFAULT_TRIGGER
 	ret
@@ -237,7 +237,7 @@ OLButtonSetIsDefault	endp
 OLButtonSetImmediateAction	proc	far
 	class	OLButtonClass
 	mov	si, cx
-	mov	di, ds:[si]			
+	mov	di, ds:[si]
 	add	di, ds:[di].Vis_offset
 	ORNF	ds:[di].OLBI_fixedAttrs, mask OLBFA_IMMEDIATE_ACTION
 						;Update flags based on new
@@ -248,7 +248,7 @@ OLButtonSetImmediateAction	endp
 OLButtonHintMakeDefaultFocus	proc	far
 	class	OLButtonClass
 	mov	si, cx
-	mov	di, ds:[si]			
+	mov	di, ds:[si]
 	add	di, ds:[di].Vis_offset
 	ORNF	ds:[di].OLBI_fixedAttrs, mask OLBFA_DEFAULT_FOCUS
 	ret
@@ -278,7 +278,7 @@ OLButtonIsMDIListEntry	proc	far
 
 	push	cx
 	mov	si, cx
-	mov	di, ds:[si]			
+	mov	di, ds:[si]
 	add	di, ds:[di].Vis_offset
 CUAS <	ORNF	ds:[di].OLBI_specState, mask OLBSS_IN_MENU		>
 	ANDNF	ds:[di].OLBI_specState, not mask OLBSS_BORDERED
@@ -307,7 +307,7 @@ OLButtonIsMDIListEntry	endp
 
 COMMENT @----------------------------------------------------------------------
 
-METHOD:		OLButtonScanGeometryHints -- 
+METHOD:		OLButtonScanGeometryHints --
 		MSG_SPEC_SCAN_GEOMETRY_HINTS for OLButtonClass
 
 DESCRIPTION:	Scans geometry hints.
@@ -316,10 +316,10 @@ PASS:		*ds:si 	- instance data
 		es     	- segment of MetaClass
 		ax 	- MSG_SPEC_SCAN_GEOMETRY_HINTS
 
-RETURN:		
+RETURN:
 		ax, cx, dx, bp - destroyed
 
-ALLOWED TO DESTROY:	
+ALLOWED TO DESTROY:
 		bx, si, di, ds, es
 
 REGISTER/STACK USAGE:
@@ -341,7 +341,7 @@ OLButtonScanGeometryHints	method static OLButtonClass, \
 	.enter				; that bx, si, di, & es are preserved.
 					; NOTE that es is NOT segment of class
 
-	; If this OLButton has generic hints, then scan them.  (Use the 
+	; If this OLButton has generic hints, then scan them.  (Use the
 	; gen part of the button, though.  -cbh 6/29/92)
 
 	push	si
@@ -351,9 +351,9 @@ OLButtonScanGeometryHints	method static OLButtonClass, \
 	mov	si, ds:[di].OLBI_genChunk
 	tst	si
 	jz	5$
-	mov	di, ds:[si]			
+	mov	di, ds:[si]
 	add	di, ds:[di].Vis_offset
-	test	ds:[di].VI_typeFlags, mask VTF_IS_GEN	
+	test	ds:[di].VI_typeFlags, mask VTF_IS_GEN
 	jz	5$			; skip if not...
 					;Otherwise, handle hints:
 	segmov	es, cs			; setup es:di to be ptr to
@@ -362,18 +362,18 @@ OLButtonScanGeometryHints	method static OLButtonClass, \
 	mov	di, offset cs:OLButtonHintHandlers
 	mov	ax, length (cs:OLButtonHintHandlers)
 	call	ObjVarScanData
-5$:					 
+5$:
 	pop	si
 
 	;parent doesn't care about size: set flag for Geometry Manager:
-	mov	di, ds:[si]			
-	add	di, ds:[di].Vis_offset		
+	mov	di, ds:[si]
+	add	di, ds:[di].Vis_offset
 	ORNF	ds:[di].VI_geoAttrs, mask VGA_ONLY_RECALC_SIZE_WHEN_INVALID or \
 				     mask VGA_USE_VIS_CENTER or \
 				     mask VGA_USE_VIS_SET_POSITION
 	;
 	; Assume these hints aren't around.
-	; 
+	;
 	ANDNF	ds:[di].OLBI_moreAttrs, not \
 			(mask OLBMA_EXPAND_WIDTH_TO_FIT_PARENT or \
 			 mask OLBMA_EXPAND_HEIGHT_TO_FIT_PARENT or \
@@ -388,9 +388,9 @@ OLButtonScanGeometryHints	method static OLButtonClass, \
 	jz	10$
 
 	push	di
-	mov	di, ds:[si]			
+	mov	di, ds:[si]
 	add	di, ds:[di].Vis_offset
-	test	ds:[di].VI_typeFlags, mask VTF_IS_GEN	
+	test	ds:[di].VI_typeFlags, mask VTF_IS_GEN
 	pop	di
 	jz	10$				; skip if gen chunk is not gen
 
@@ -452,7 +452,7 @@ OLButtonSetWinFlagHint	proc	far
 OLButtonSetWinFlagHint	endp
 
 OLButtonSetWinFlag	method	OLButtonClass, MSG_OL_BUTTON_SET_WIN_FLAG
-	mov	di, ds:[si]			
+	mov	di, ds:[si]
 	add	di, ds:[di].Vis_offset
 	ORNF	ds:[di].OLBI_specState, mask OLBSS_WINDOW_MARK
 	ret
@@ -496,7 +496,7 @@ REVISION HISTORY:
 
 OLButtonHintSysIcon	proc	far
 	class	OLButtonClass
-	
+
 	;Note that this is a system icon
 
 	call	OLButtonSetAsSysIcon
@@ -509,11 +509,19 @@ OLButtonHintSysIcon	endp
 
 OLButtonHintExpressMenu	proc	far
 	class	OLButtonClass
-if _ISUI
+
+if TOOL_AREA_IS_TASK_BAR
+
+	push	ds					; save ds
+	segmov	ds, dgroup				; load dgroup
+	test	ds:[taskBarPrefs], mask TBF_ENABLED	; test if TBF_ENABLED is set
+	pop	ds					; restore ds
+	jz	done					; skip if no taskbar
+
 	ret
-else
-	FALL_THRU 	OLButtonSetAsSysIcon
+done:
 endif
+	FALL_THRU 	OLButtonSetAsSysIcon
 OLButtonHintExpressMenu	endp
 
 OLButtonSetAsSysIcon	proc	far
@@ -521,7 +529,7 @@ OLButtonSetAsSysIcon	proc	far
 
 	push	si
 	mov	si, cx
-	mov	di, ds:[si]			
+	mov	di, ds:[si]
 	add	di, ds:[di].Vis_offset
 	ORNF	ds:[di].OLBI_specState, mask OLBSS_SYS_ICON
 	pop	si
@@ -587,9 +595,9 @@ EC <	call	VisCheckVisAssumption					>
 	CallMod	UpdateButtonState	; copy generic state data from
 					; GenTrigger object, set
 					; DRAW_STATE_KNOWN
-	
+
 	; returns ds:di = VisInstance
-	
+
 	; If in B&W, force the first draw of the button to erase the
 	; background in case the button is drawn on a non-white background.
 	; -- JimG (4/11/94)
@@ -625,7 +633,7 @@ usingColor:
 	; First check if this is a system menu icon.  If so, skip the
 	; query -- just use generic parent (GenDisplay/Primary) as vis parent.
 	;
-	test	ds:[di].OLBI_specState, mask OLBSS_SYS_ICON 
+	test	ds:[di].OLBI_specState, mask OLBSS_SYS_ICON
 	jz	afterSysIcon		;skip if not...
 
 	push	bx, si			;if so, always place visibly on
@@ -705,10 +713,10 @@ haveParent:
 	;regular gen parent.  Vis class will call the gen parent with MSG_SPEC_
 	;DETERMINE_VIS_PARENT_FOR_CHILD in case the parent has a generally
 	;different idea about where its children go.
-	
+
 	pop	bp				;get SpecBuildFlags
 	jnc	exit				;definitely not handled, exit
-	
+
 	push	si
 	call	GenFindParent
 	cmp	si, dx				;if something other than gen
@@ -716,7 +724,7 @@ haveParent:
 	jne	exitCarrySet
 	cmp	bx, cx
 	je	exit				;(carry is clear)
-	
+
 exitCarrySet:
 	stc
 exit:
@@ -731,7 +739,7 @@ COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 SYNOPSIS:	Update draw flags if button according to where
-		this button (or menu button has been placed), 
+		this button (or menu button has been placed),
 		so OLButtonClass draw handler will draw ok.
 
 CALLED BY:	OLButtonGetVisParent, OLButtonSetup
@@ -739,10 +747,10 @@ PASS:		*ds:si	= OLButtonObject
 		bp	= OLBuildFlags
 RETURN:		*ds:di	= VisSpec Instance data of object
 DESTROYED:	ax, bx, cx
-SIDE EFFECTS:	
+SIDE EFFECTS:
 
 PSEUDO CODE/STRATEGY:
-		
+
 
 REVISION HISTORY:
 	Name	Date		Description
@@ -790,7 +798,7 @@ else
 	ORNF	ds:[di].OLBI_moreAttrs, mask OLBMA_CENTER_MONIKER ;or \
 ;					mask OLBMA_CAN_CLIP_MONIKER_WIDTH
 endif	;----------------------------------------------------------------------
-	
+
 	ORNF	ds:[di].OLBI_specState, mask OLBSS_BORDERED or \
 					mask OLBSS_WAS_BORDERED
 
@@ -815,7 +823,7 @@ if	(_MOTIF or _ISUI) and not _DETACHED_MENUS_DRAW_AS_NORMAL_BUTTONS
 	mov	si, ds:[di].OLBI_genChunk
 	tst	si
 	jz	10$
-	mov	bx, ds:[si]			
+	mov	bx, ds:[si]
 	add	bx, ds:[bx].Vis_offset
 	test	ds:[bx].VI_typeFlags, mask VTF_IS_GEN
 	jz	10$
@@ -835,7 +843,7 @@ else
 	ORNF	ds:[di].OLBI_specState, mask OLBSS_BORDERED
 endif
 	ret
-	
+
 checkForInMenuBar:
 
 	mov	bx, bp
@@ -899,7 +907,7 @@ OLButtonSpecBuild	method private static	OLButtonClass, MSG_SPEC_BUILD
 					; NOTE that es is NOT segment of class
 
 
-if	ALLOW_ACTIVATION_OF_DISABLED_MENUS 
+if	ALLOW_ACTIVATION_OF_DISABLED_MENUS
 
 if	_MENUS_PINNABLE
 	call	CheckIfPushpin
@@ -944,10 +952,10 @@ endif
 	;Check to see if we're in a menu, and set an optimization flag if so.
 	;This is also done in UseQueryResultsToSetButtonAttributes, but it
 	;doesn't always work there (our visible parent may not have had a
-	;MENU hint in it.)  Some of that code probably could go away.  
+	;MENU hint in it.)  Some of that code probably could go away.
 	;-cbh 12/13/91
 
-	mov	di, ds:[si]			
+	mov	di, ds:[si]
 	add	di, ds:[di].Vis_offset
 	test	ds:[di].OLBI_specState, mask OLBSS_SYS_ICON
 
@@ -974,7 +982,7 @@ endif
 	pop     di, es
 	jnc	visPart
 	call	GenFindParent		;This item is inside a scrollable list.
-	call	ObjSwapLock		;Set OLBSS_IN_MENU flag based on 
+	call	ObjSwapLock		;Set OLBSS_IN_MENU flag based on
 	mov	di, ds:[si]		;whether the gen parent is a popup list
 	add	di, ds:[di].Vis_offset
 	test	ds:[di].OLIGI_moreState, mask OLIGMS_POPUP_LIST
@@ -993,7 +1001,7 @@ visPart:
 					;  no window
 
 	push	si
-	mov	di, ds:[di]			
+	mov	di, ds:[di]
 
 	add	di, ds:[di].Vis_offset
 	test	ds:[di].OLWI_fixedAttr, mask OWFA_IS_MENU
@@ -1001,7 +1009,7 @@ visPart:
 	pop	si
 	jz	notInMenu		;skip if not in menu...
 inMenu:
-	mov	di, ds:[si]			
+	mov	di, ds:[si]
 	add	di, ds:[di].Vis_offset
 	ORNF	ds:[di].OLBI_specState, mask OLBSS_IN_MENU
 
@@ -1010,7 +1018,7 @@ ISU  <	ANDNF	ds:[di].OLBI_specState, not mask OLBSS_BORDERED		>
 OLS  <	ANDNF	ds:[di].OLBI_specState, not mask OLBSS_BORDERED		>
 
 notInMenu:
-	
+
 	push	bp
 
 	;if this is a GenTrigger within a pinned menu, then set BORDERED
@@ -1077,7 +1085,7 @@ EC <	ERROR_Z	OL_ERROR_ATTR_GEN_TRIGGER_INTERACTION_COMMAND_WITHOUT_DATA >
 	call	CallOLWin		; only go up to first OLWin
 	add	sp, size NotifyOfInteractionCommandStruct
 noInteractionCommand:
-	
+
 	call	HandleGenericButtonHints
 
 	;if this GenTrigger is marked as the DEFAULT trigger (via a hint)
@@ -1119,7 +1127,7 @@ SYNOPSIS:	The legos look is stored in instance data, so when
 		*** Note ***
 		This code is pretty much identical to code in Window, Item
 		and CComp (Ctrl).  There should only be one routine that is
-		called with the table to check against and the offset to 
+		called with the table to check against and the offset to
 		the legos look instance data passed in.  I just don't have
 		time to do it right now.
 
@@ -1127,10 +1135,10 @@ CALLED BY:	OLButtonSpecBuild
 PASS:		*ds:si	= object
 RETURN:		nothing
 DESTROYED:	nothing
-SIDE EFFECTS:	
+SIDE EFFECTS:
 
 PSEUDO CODE/STRATEGY:
-		
+
 
 REVISION HISTORY:
 	Name	Date		Description
@@ -1378,7 +1386,7 @@ OLButtonInitFixedAttrs	proc	near
 
 	;set expand-to-fit on all menu buttons.  (Not needed anymore -- buttons
 	;get correct width from OLMenuWin's now.)
-	
+
 ;	test	ds:[di].OLBI_specState, mask OLBSS_IN_MENU
 ;	jz	20$			;move along if not a menu button
 ;	ORNF	ds:[di].OLBI_fixedAttrs, mask OLBFA_EXPAND_WIDTH_TO_FIT_PARENT
@@ -1423,7 +1431,7 @@ COMMENT @----------------------------------------------------------------------
 ROUTINE:	SetToolboxBasedOnParent
 
 SYNOPSIS:	Sets toolbox flag.  Also forces the thing to expand its height
-		to fit the parent when necessary, to make toolboxes look nice 
+		to fit the parent when necessary, to make toolboxes look nice
 		onscreen.
 
 CALLED BY:	OLButtonInitFixedAttrs, OLMenuButtonSetup
@@ -1432,7 +1440,7 @@ PASS:		*ds:si -- button
 
 RETURN:		nothing
 
-DESTROYED:	
+DESTROYED:
 
 PSEUDO CODE/STRATEGY:
 
@@ -1462,7 +1470,7 @@ SetToolboxBasedOnParent	proc	near
 
 
 	push	si
-	mov	di, ds:[si]			
+	mov	di, ds:[si]
 	add	di, ds:[di].Vis_offset
 	mov	si, ds:[di].OLBI_genChunk
 	call	GenSwapLockParent
@@ -1497,7 +1505,7 @@ notInTitleBar:
 	; If we're a toolbox button, expand our height to fill a horizontal
 	; toolbox, and expand our width to fill a vertical one.  Also, for now,
 	; let's forget about menu arrows on popups in vertical lists.
-	; (Forget about expand width to fit -- it's so ugly when the font 
+	; (Forget about expand width to fit -- it's so ugly when the font
 	;  menu is there...)  (Also, no expand if we're in a menu. -cbh 1/29/93)
 	; (Changed to re-allow menu marks in vertical toolboxes.  -cbh 3/18/93)
 	;
@@ -1513,7 +1521,7 @@ if _STYLUS
 	call	ObjVarFindData
 	jc	noToolboxForClose
 endif
-	or	ds:[di].OLBI_moreAttrs, mask OLBMA_IN_TOOLBOX 
+	or	ds:[di].OLBI_moreAttrs, mask OLBMA_IN_TOOLBOX
 noToolboxForClose::
 	test	ds:[di].OLBI_specState, mask OLBSS_IN_MENU
 	jnz	7$			;don't expand height if in menu
@@ -1559,7 +1567,7 @@ DESCRIPTION:	We intercept this to release some exclusives we might have.
 
 PASS:		*ds:si - instance data
 		es - segment of OLButtonClass
-		
+
 		ax - MSG_SPEC_UNBUILD_BRANCH
 		bp	- SpecBuildFlags
 
@@ -1660,10 +1668,10 @@ noInteractionCommand:
 	jz	doNormalButtonStuff
 	cmp	si, di			; gen part not different, branch
 	je	doNormalButtonStuff
-	
+
 	push	si
 	mov	si, di			; else delve into gen part
-	
+
 if	ERROR_CHECK
 	push	es
 					; Make DAMN SURE that what we're
@@ -1732,7 +1740,7 @@ DESCRIPTION:	Set some vars in an OLButton object -- one which we are
 		menus - see OLMenuButtonSetup handler.
 
 		NOTE that this method may NOT be used to set up generic objects,
-		as the specific instance data will dissappear when the 
+		as the specific instance data will dissappear when the
 		object is set USABLE.
 
 PASS:		*ds:si - instance data
