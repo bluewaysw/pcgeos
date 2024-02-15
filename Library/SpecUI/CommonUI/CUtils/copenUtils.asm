@@ -107,7 +107,7 @@ CheckHack <CF_INDEX eq 0>
 	ret
 GetLightColor	endp
 
-
+				
 
 COMMENT @----------------------------------------------------------------------
 
@@ -217,7 +217,7 @@ PASS:
 	none
 
 RETURN:
-	al - DS_colorScheme
+	al - DS_colorScheme	
 	ah - DS_displayType
 	bl - DS_lightColor
 	bh - DS_darkColor
@@ -356,7 +356,7 @@ ObjCallSpecNoLock	proc	far
 
 oldWay:
 	call	ObjCallInstanceNoLock	; Do it the slow way, since not generic,
-					; probably doesn't even have other
+					; probably doesn't even have other 
 					; master parts
 done:
 	.leave
@@ -402,7 +402,7 @@ RETURN:
 		  Note that in all cases a GState is created, & therefore will
 		  have to be destroyed (Using GrDestroyState)
 
-DESTROYED:
+DESTROYED:	
 	ax, bx, cx, dx, si, di, ds, es
 
 REGISTER/STACK USAGE:
@@ -614,7 +614,7 @@ DESCRIPTION:	This routine is called when a UI component decides that
 		active list, but the primary's active list, this routine has
 		been changed accordingly.
 
-CALLED BY:
+CALLED BY:	
 
 PASS:		*ds:si	= instance data for object
 
@@ -665,7 +665,7 @@ DESCRIPTION:	This routine is called when a UI component decides that
 		active list, but the primary's active list, this routine has
 		been changed accordingly.
 
-CALLED BY:
+CALLED BY:	
 
 PASS:		*ds:si	= instance data for object
 
@@ -706,7 +706,7 @@ DESCRIPTION:	This routine is called when a UI component decides that
 		active list, but the primary's active list, this routine has
 		been changed accordingly.
 
-CALLED BY:
+CALLED BY:	
 
 PASS:		*ds:si	= instance data for object
 		cx:dx = buffer to pass if counting, or null if not counting.
@@ -900,7 +900,7 @@ COMMENT @----------------------------------------------------------------------
 ROUTINE:	OpenCheckIfCGA
 
 SYNOPSIS:	Checks to see if we're on a CGA without minimizing AX.
-		Actually, it's not really CGA, it's both squished and tiny
+		Actually, it's not really CGA, it's both squished and tiny 
 		screens.  (See side effects comment below).
 
 CALLED BY:	utility
@@ -1015,7 +1015,7 @@ REVISION HISTORY:
 OpenCheckIfLimitedLength	proc	far
 	uses ax, ds, bx
 	.enter
-	mov	bx, ds:[si]
+	mov	bx, ds:[si]			
 	add	bx, ds:[bx].Vis_offset
 	mov	bl, ds:[bx].VCI_geoAttrs
 
@@ -1126,8 +1126,8 @@ REVISION HISTORY:
 ------------------------------------------------------------------------------@
 
 OpenCheckDefaultRings	proc	far
-	push	ds, ax
-	mov	ax, segment olNoDefaultRing
+	push	ds, ax	   
+	mov	ax, segment olNoDefaultRing 
 	mov	ds, ax
 	tst	ds:olNoDefaultRing		;sets c=0
 	pop	ds, ax
@@ -1172,13 +1172,13 @@ OpenCheckIfMenusTakeFocus	proc	far		uses	ax
 if	PRESERVE_FOCUS_IF_PEN_ONLY
 	call	SysGetPenMode
 	tst	ax
-	stc
+	stc					
 	jz	exit				;not penBased, branch
 
 	call	FlowGetUIButtonFlags
 	test	al, mask UIBF_KEYBOARD_ONLY
 	jnz	canTakeFocus			;kbdOnly, can take focus
-	test	al, mask UIBF_NO_KEYBOARD
+	test	al, mask UIBF_NO_KEYBOARD	
 	jnz	exit				;noKeyboard set, branch, c=0
 
 canTakeFocus:
@@ -1225,7 +1225,7 @@ OpenCheckIfKeyboard	proc	far
 	call	FlowGetUIButtonFlags
 	test	al, mask UIBF_KEYBOARD_ONLY
 	jnz	canTakeFocus			;kbdOnly, can take focus
-	test	al, mask UIBF_NO_KEYBOARD
+	test	al, mask UIBF_NO_KEYBOARD	
 	jnz	exit				;noKeyboard set, branch, c=0
 
 canTakeFocus:
@@ -1462,8 +1462,8 @@ REVISION HISTORY:
 ------------------------------------------------------------------------------@
 
 OpenCheckIfPDA	proc	far
-	push	ds, ax
-	mov	ax, segment olPDA
+	push	ds, ax	   
+	mov	ax, segment olPDA 
 	mov	ds, ax
 	tst_clc	ds:olPDA		;sets c=0
 	pop	ds, ax
@@ -1540,8 +1540,8 @@ OpenDoClickSound	proc	far
 	mov	ds, ax
 	tst	ds:specDoClickSound
 	jz	exit
-	mov	ax, SST_KEY_CLICK
-	call	UserStandardSound
+	mov	ax, SST_KEY_CLICK		
+	call	UserStandardSound		
 exit:
 	.leave
 	ret
@@ -1684,8 +1684,8 @@ COMMENT @----------------------------------------------------------------------
 
 ROUTINE:	VisCheckIfFullyEnabled
 
-SYNOPSIS:	Looks at some things to figure out if an object is fully
-		enabled. If the object is specifically built, the routine will
+SYNOPSIS:	Looks at some things to figure out if an object is fully 
+		enabled. If the object is specifically built, the routine will 
 		return the state of the VA_FULLY_ENABLED flag.
 		Otherwise it calls the generic routine to look up the entire
 		linkage.
@@ -1841,7 +1841,7 @@ COMMENT @----------------------------------------------------------------------
 
 ROUTINE:	SpecSetFlagsOnAllCtrlParents
 
-SYNOPSIS:	Goes up the visual tree, setting the OLCOF_CANT_OVERLAP_KIDS
+SYNOPSIS:	Goes up the visual tree, setting the OLCOF_CANT_OVERLAP_KIDS 
 		flag in all OLCtrl parents until a win group is hit or the
 		flag is found already set.  Could be easily made more general.
 
@@ -1875,29 +1875,29 @@ SpecSetFlagsOnAllCtrlParents	proc	far
 
 	call	VisSwapLockParent
 	push	bx
-
+	
 	mov	di, segment OLCtrlClass
 	mov	es, di
 	mov	di, offset OLCtrlClass
 	call	ObjIsObjectInClass
 	jnc	done
 
-	mov	di, ds:[si]
+	mov	di, ds:[si]			
 	add	di, ds:[di].Vis_offset
 	test	ds:[di].OLCI_moreFlags, mask OLCOF_CANT_OVERLAP_KIDS
 	jnz	done				;already set, done us and parent
 						;  already, exit
-
+	
 	test	ds:[di].VI_typeFlags, mask VTF_IS_WIN_GROUP
 	jnz	done				;at win group, done
 
 	ornf	ds:[di].OLCI_moreFlags, mask OLCOF_CANT_OVERLAP_KIDS
 	call	SpecSetFlagsOnAllCtrlParents	;call on parent
-
+	
 done:
 	pop	bx
 	call	ObjSwapUnlock
-
+	
 	pop	di
 	call	ThreadReturnStackSpace
 	pop	si
@@ -1932,7 +1932,7 @@ KNOWN BUGS/SIDE EFFECTS/CAVEATS/IDEAS:
 
 REVISION HISTORY:
 	Name	Date		Description
-	----	----		-----------
+	----	----		----------- 
 	Doug	9/91		Initial version
 	brianc	1/8/93		only grab focus/target if fully enabled,
 					still return cx, though
@@ -2337,7 +2337,7 @@ CALLED BY:	OLButtonMouse, etc.
 
 PASS:		*ds:si	= instance data for object
 
-RETURN:		carry set if not on text object, and gadget can request the
+RETURN:		carry set if not on text object, and gadget can request the 
 		focus.
 
 DESTROYED:	ax, cx, dx, bp, di
@@ -2351,7 +2351,7 @@ REVISION HISTORY:
 
 ------------------------------------------------------------------------------@
 
-OpenTestIfFocusOnTextEditObject	proc	far
+OpenTestIfFocusOnTextEditObject	proc	far	
 if TAKE_FOCUS_FROM_TEXT_OBJECT
 	;
 	; indicate that we can take focus
@@ -2394,7 +2394,7 @@ EC <	ERROR_NC OL_ERROR		;abort if query not answered	>
 	call	ObjIsObjectInClass
 	jnc	returnComplementedCarryAndUnlock    ;not a view, branch, is OK
 
-	mov	di, ds:[si]
+	mov	di, ds:[si]			
 	add	di, ds:[di].Gen_offset
 	test	ds:[di].GVI_attrs, mask GVA_GENERIC_CONTENTS
 ;	stc
@@ -2439,9 +2439,9 @@ endif	; TAKE_FOCUS_FROM_TEXT_OBJECT
 	ret
 OpenTestIfFocusOnTextEditObject	endp
 
-
-
-
+				
+				
+			
 
 
 COMMENT @----------------------------------------------------------------------
@@ -2472,7 +2472,7 @@ REVISION HISTORY:
 ------------------------------------------------------------------------------@
 
 if	_MOTIF or _ISUI		;currently only used by motif and isui
-
+	
 OpenSetInsetRectColors	proc	far		uses ax, es
 	.enter
 	mov	bp, segment moCS_flags
@@ -2484,10 +2484,10 @@ OpenSetInsetRectColors	proc	far		uses ax, es
 	mov	ah, C_WHITE			; right/bottom color
 	mov	al, es:[moCS_dsDarkColor]	; right/bottom color
 	mov	bp, ax
-
+	
 	clr	ax				; assume we want to clear out
 	mov	al, es:[moCS_dsLightColor]	;   the inside of the text with
-
+	
 setFillColor:
 	call	GrSetAreaColor			;   the background color
 	.leave
@@ -2495,7 +2495,7 @@ setFillColor:
 OpenSetInsetRectColors	endp
 
 endif
-
+			
 
 COMMENT @----------------------------------------------------------------------
 
@@ -2531,7 +2531,7 @@ REVISION HISTORY:
 ------------------------------------------------------------------------------@
 
 if	_MOTIF or _ISUI
-
+	
 OpenDrawRect	proc	far		uses	ax, bx, si, bp
 	.enter
 	call 	SetupDraw
@@ -2539,9 +2539,9 @@ OpenDrawRect	proc	far		uses	ax, bx, si, bp
 	.leave
 	ret
 OpenDrawRect	endp
-
+	
 endif
-
+	
 
 COMMENT @----------------------------------------------------------------------
 
@@ -2579,7 +2579,7 @@ REVISION HISTORY:
 ------------------------------------------------------------------------------@
 
 if	_MOTIF or _ISUI
-
+	
 OpenDrawAndFillRect	proc	far	uses	si
 	.enter
 	call	SetupDraw			;sets up 50% pattern, etc.
@@ -2588,10 +2588,10 @@ OpenDrawAndFillRect	proc	far	uses	si
 	.leave
 	ret
 OpenDrawAndFillRect	endp
-
+				
 endif
 
-
+				
 
 COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 		OpenDrawInsetAndFrame
@@ -2612,10 +2612,10 @@ PASS:		*ds:si = object
 		wash color set in gstate
 RETURN:		nothing
 DESTROYED:	ax, bx, cx, dx
-SIDE EFFECTS:
+SIDE EFFECTS:	
 
 PSEUDO CODE/STRATEGY:
-
+		
 
 REVISION HISTORY:
 	Name	Date		Description
@@ -2752,7 +2752,7 @@ REVISION HISTORY:
 ------------------------------------------------------------------------------@
 
 if	_MOTIF or _ISUI
-
+	
 SetupDraw	proc	near
 	mov	si, ds:[si]
 	add	si, ds:[si].Vis_offset
@@ -2776,7 +2776,7 @@ SetupDraw	proc	near
 	dec	cx				; adjust for line drawing
 	dec	dx
 	call	GrDrawRect			; clear frame around the outside
-	inc	cx				; restore
+	inc	cx				; restore 
 	inc	dx
 	;
 	; The new lines will be drawn in a 50% pattern.
@@ -2794,7 +2794,7 @@ SetupDraw	proc	near
 	ret
 SetupDraw	endp
 
-endif
+endif				
 
 
 COMMENT @----------------------------------------------------------------------
@@ -2827,15 +2827,15 @@ REVISION HISTORY:
 
 
 ------------------------------------------------------------------------------@
-
+	
 if	_MOTIF	;---------------------------------------------------------------
 
 DrawFrame	proc	near
 	dec	cx				; adjust for line drawing
-	dec	dx
+	dec	dx		
 	call	GrDrawVLine			; draws left line
 	call	GrDrawHLine			; draws top line
-
+	
 	push	ax				; save left edge
 	mov	ax, bp				; get right/bottom color
 	mov	al, ah
@@ -2847,14 +2847,14 @@ DrawFrame	proc	near
 	jne	20$				; no, branch
 	inc	bx				; else back off at top
 	pop	bp				;   and left edge
-	inc	bp				;   to prevent excessive
+	inc	bp				;   to prevent excessive 
 	push	bp				;   bleeding
 20$:
 	call	GrDrawVLine
 	pop	ax				; restore left edge
 	mov	bx, dx				; doing bottom  line
 	call	GrDrawHLine			;
-
+	
 	push	ax
 	mov	al, SDM_100			; fix up everything
 	call	GrSetLineMask
@@ -2865,15 +2865,15 @@ DrawFrame	proc	near
 DrawFrame	endp
 
 endif		; if _MOTIF ---------------------------------------------------
-
+	
 if _ISUI	;--------------------------------------------------------------
 
 DrawFrame	proc	near
 	dec	cx				; adjust for line drawing
-	dec	dx
+	dec	dx		
 	call	GrDrawVLine			; draws left line
 	call	GrDrawHLine			; draws top line
-
+	
 	push	ax				; save left edge
 	mov	ax, bp				; get right/bottom color
 	mov	al, ah
@@ -3078,7 +3078,7 @@ Build_CallSpecBuild	proc	near
 	GOTO	Build_ObjCallInstanceNoLock
 Build_CallSpecBuild	endp
 
-
+			
 
 
 
@@ -3087,14 +3087,14 @@ COMMENT @----------------------------------------------------------------------
 ROUTINE:	OpenAddScrollbar
 
 SYNOPSIS:	Adds a scrollbar to the passed object.  Adds it visually
-		below this object, at the end of the tree, with an upward
-		generic link.  Attaches its OD to the passed object.  Sets
+		below this object, at the end of the tree, with an upward 
+		generic link.  Attaches its OD to the passed object.  Sets 
 		enabled flag appropriately.
 
 CALLED BY:	utility
 
 PASS:		*ds:si -- object to add to
-
+		
 		on stack (pushed in this order):
 			(word) hint to add
 			(word) action method
@@ -3106,11 +3106,11 @@ PASS:		*ds:si -- object to add to
 			(word) low word of initial value
 			(word) high word of increment
 			(word) low word of increment
-		al     -- inGenTreeFlag:  zero if we want just an upward link,
+		al     -- inGenTreeFlag:  zero if we want just an upward link, 
 					  non-zero if it should be in gentree
 		ah     -- immediateUpdateFlag: zero if we want delayed updates
 					  on drags, non-zero for immediate
-
+			
 RETURN:		dx     -- handle of new scrollbar
 
 DESTROYED:	ax, bx, cx, bp, di
@@ -3128,19 +3128,19 @@ REVISION HISTORY:
 
 OpenAddScrollbar	proc	far	increment:dword, value:dword,
 					maximum:dword, minimum:dword,
-					actionMethod:word,
+					actionMethod:word, 
 					hintToAdd:word
 	class	GenValueClass
-	.enter
-
+	.enter	
+	
 	push	si				; save parent
 	mov	dx, si				; cx:dx <- parent to add to
-	mov	cx, ds:[LMBH_handle]		;
+	mov	cx, ds:[LMBH_handle]		; 
 	mov	di, segment GenValueClass
 	mov	es, di
 	mov	di, offset GenValueClass
 
-
+						
 	mov	bx, hintToAdd
 	ornf	bx, mask VDF_SAVE_TO_STATE	; Dirty first hint
 
@@ -3167,7 +3167,7 @@ OpenAddScrollbar	proc	far	increment:dword, value:dword,
 	;
 	; If we need immediate updates on drags, add the appropriate vardata.
 	;
-	tst	ah
+	tst	ah				
 	jz	3$
 	push	ax
 	mov	ax, HINT_VALUE_IMMEDIATE_DRAG_NOTIFICATION
@@ -3208,11 +3208,11 @@ endif
 ;
 	tst	al				; do we want in generic tree?
 	jnz	4$				; yes, branch
-
+	
 	;
 	; If removing a downward link, we'll clear the dirty bit (for the
 	; hell of it) and set the OCF_IGNORE_DIRTY bit, so the object doesn't
-	; get saved out to state.  (Fixed 2/19/93 cbh to do this to the
+	; get saved out to state.  (Fixed 2/19/93 cbh to do this to the 
 	; correct object.)
 	;
 	mov	ax, si				; object in ds:ax
@@ -3250,13 +3250,13 @@ endif
 OpenAddScrollbar	endp
 
 
-
+			
 
 COMMENT @----------------------------------------------------------------------
 
 ROUTINE:	OpenSetScrollbarAttrs
 
-SYNOPSIS:	Sets various scrollbar attributes, without actually building
+SYNOPSIS:	Sets various scrollbar attributes, without actually building 
 		the thing.
 
 CALLED BY:	utility
@@ -3266,7 +3266,7 @@ PASS:		*ds:si -- scrollbar
 		bx     -- create flag -- set if creating a scrollbar, and thus
 					 can avoid sending messages to set
 					 attributes to zero.
-
+		
 		on stack (pushed in this order):
 			(word) orientation:
 				-1 if vertical, 0 if horizontal
@@ -3279,7 +3279,7 @@ PASS:		*ds:si -- scrollbar
 			(word) low word of initial value
 			(word) high word of increment
 			(word) low word of increment
-
+			
 RETURN:		dx     -- handle of new scrollbar
 
 DESTROYED:	ax, bx, cx, bp, di
@@ -3297,14 +3297,14 @@ REVISION HISTORY:
 
 OpenSetScrollbarAttrs	proc	far	increment:dword, value:dword,
 					maximum:dword, minimum:dword,
-					actionMethod:word,
+					actionMethod:word, 
 					orientation:word
-	.enter
+	.enter	
 
 	mov	cx, ds:[LMBH_handle]		; set OD to parent
 	mov	ax, MSG_GEN_VALUE_SET_DESTINATION
 	call	ObjCallInstanceSaveDxBp
-
+	
 	push	bp
 	mov	cx, actionMethod
 	mov	ax, MSG_GEN_VALUE_SET_APPLY_MSG
@@ -3314,12 +3314,12 @@ OpenSetScrollbarAttrs	proc	far	increment:dword, value:dword,
 	mov	cx, orientation			; get vertical flag
 	mov	ax, MSG_SET_ORIENTATION	; set orientation
 	call	ObjCallInstanceSaveDxBp
-
+	
 	push	dx
 	movdw	dxcx, maximum
 	mov	ax, MSG_GEN_VALUE_SET_MAXIMUM
 	call	ObjCallInstanceSaveDxBpNotIfZero
-
+	
 	movdw	dxcx, minimum
 	mov	ax, MSG_GEN_VALUE_SET_MINIMUM
 	call	ObjCallInstanceSaveDxBpNotIfZero
@@ -3335,7 +3335,7 @@ OpenSetScrollbarAttrs	proc	far	increment:dword, value:dword,
 	mov	dx, increment.high
 	mov	ax, MSG_GEN_VALUE_SET_INCREMENT
 	call	ObjCallInstanceSaveDxBpNotIfZero ; send to the scrollbar
-
+	
 	mov	di, ds:[si]			 ; VisAttrs already set, skip
 	add	di, ds:[di].Vis_offset		 ;  sending message 5/17/93 cbh
 	mov	dl, ds:[di].VI_attrs
@@ -3352,11 +3352,11 @@ OpenSetScrollbarAttrs	proc	far	increment:dword, value:dword,
 	xchg	si, dx				; return scrollbar in dx
 	.leave
 	ret	@ArgSize
-
+	
 OpenSetScrollbarAttrs	endp
 
-
-
+			
+			
 ObjCallInstanceSaveDxBpNotIfZero	proc	near
 	;
 	; Pass cx:dx -- value to set if not zero
@@ -3373,7 +3373,7 @@ exit:
 	ret
 ObjCallInstanceSaveDxBpNotIfZero endp
 
-
+			
 ObjCallInstanceSaveDxBp	proc	near
 	push	dx, bp
 	call	ObjCallInstanceNoLock
@@ -3387,7 +3387,7 @@ COMMENT @----------------------------------------------------------------------
 ROUTINE:	OpenBuildNewParentObject
 
 SYNOPSIS:	Called this after OpenCreateNewParentObject to place your object
-		underneath it in the generic tree, building as necessary.  An
+		underneath it in the generic tree, building as necessary.  An 
 		upward-only link is created for the new object.  If a GenView
 		is specified as the object, we will create a GenContent, make
 		it the output of the view, and place ourselves under the
@@ -3440,15 +3440,15 @@ OpenBuildNewParentObject	proc	far
 ; 	Store handles of newly created generic objects in local variables
 ; 	so we can access them later.
 ;------------------------------------------------------------------------------
-
+	
 	;
 	; Clear GS_ENABLED flag in parent based on child.  Also the GA_
 	; TARGETABLE bit.
 	;
-	mov	bx, ds:[di]
+	mov	bx, ds:[di]			
 	add	bx, ds:[bx].Gen_offset
 
-	mov	di, ds:[si]
+	mov	di, ds:[si]			
 	add	di, ds:[di].Gen_offset
 	test	ds:[di].GI_states, mask GS_ENABLED
 	jnz	enabled				; text enabled, branch
@@ -3477,7 +3477,7 @@ notTargetable:
 						;  in local var.
 	mov	bx, offset Gen_offset		;
 	call	ObjInitializePart		; Initialize generic part.
-
+	
 	mov	bx, offset Vis_offset		;
 	call	ObjInitializePart		; Initialize specific part.
 
@@ -3498,15 +3498,15 @@ notTargetable:
 	pop	si				; parent handle
 
 	mov	ax, ds:LMBH_handle		; Store OD of content object
-	mov	di, ds:[si]
+	mov	di, ds:[si]			
 	add	di, ds:[di].Gen_offset
 	mov	ds:[di].GVI_content.handle, ax
 	mov	ax, content
 	mov	ds:[di].GVI_content.chunk, ax
-
+	
 	mov	si, child			; get desired width of child
 	call	VisMarkFullyInvalid		; mark invalid (needs updating)
-
+	
 	push	cx, dx
 	call	VisGetSize
 	mov_tr	ax, cx				; keep old width in cx
@@ -3515,10 +3515,10 @@ notTargetable:
 	cmp	ax, mask SSS_DATA		; Make sure not too big for
 	jbe	setHorizSize			;   SpecSizeSpec
 	mov	ax, mask SSS_DATA
-
+	
 setHorizSize:
 	mov	si, parent
-	mov	di, ds:[si]
+	mov	di, ds:[si]			
 	add	di, ds:[di].Gen_offset
 	mov	ds:[di].GVI_docBounds.RD_right.low, ax
 						; Set doc width to desired
@@ -3531,11 +3531,11 @@ setHorizSize:
 	mov	di, ds:[si]			; point to instance
 	add	di, ds:[di].Gen_offset		; ds:[di] -- GenInstance
 	ornf	ds:[di].GI_states, mask GS_USABLE	;set usable
-	mov	di, ds:[si]
+	mov	di, ds:[si]			
 	add	di, ds:[di].Vis_offset
-	ornf	ds:[di].VCNI_attrs, mask VCNA_SAME_WIDTH_AS_VIEW
+	ornf	ds:[di].VCNI_attrs, mask VCNA_SAME_WIDTH_AS_VIEW	
 
-noContent:
+noContent:	
 
 	;
 	; Time to start vis building now.
@@ -3558,7 +3558,7 @@ noContent:
 	call	GenSwapLockParent		; set *ds:si = parent
 	push	bx				; save bx (handle
 						; of child's block)
-
+						
 	pop	cx				; get handle of child
 	pop	bp
 	mov	dx, child			; find generic position of child
@@ -3568,8 +3568,8 @@ noContent:
 	mov	bx, offset Gen_offset
 	mov	di, offset GI_comp
 	call	ObjCompFindChild		; get position of child in bp
-	xchg	ax, bp				; put position in ax
-	inc	ax				;
+	xchg	ax, bp				; put position in ax 
+	inc	ax				; 
 	pop	cx				; handle of parent
 	pop	bp
 	mov	dx, parent			; adding parent
@@ -3581,12 +3581,12 @@ noContent:
 	pop	bx				; restore bx
 	call	ObjSwapUnlock
 	pop	bp				;
-
+	
 	mov	si, parent			; set the parent usable.
 	mov	di, ds:[si]			; point to instance
 	add	di, ds:[di].Gen_offset		; ds:[di] -- GenInstance
 	or	ds:[di].GI_states, mask GS_USABLE	;set usable
-
+	
 ;------------------------------------------------------------------------------
 ;	Visibly add child object to the content object (a little early)
 ;------------------------------------------------------------------------------
@@ -3600,7 +3600,7 @@ dontAddToContent:
 	call	VisCheckIfSpecBuilt		; Check for already done.
 	pop	ax				; assume so
 	jc	OLTDVBV_Done			;
-
+	
 	push	ax				; put ax back on stack
 	mov	cx, ds:LMBH_handle		;
 	mov	dx, child			; ^lcx:dx is child object
@@ -3629,11 +3629,11 @@ dontAddToContent:
 	clr	bp
 	call	GenRemoveDownwardLink		;   generic link
 	pop	bp
-
+	
 OLTDVBV_Done:					;
 	mov	si, child			; return *ds:si is child obj
 	mov	ax, parent			; and *ds:ax as parent
-exit:
+exit:					
 	.leave
 	ret
 OpenBuildNewParentObject	endp
@@ -3644,7 +3644,7 @@ COMMENT @----------------------------------------------------------------------
 ROUTINE:	OpenCreateNewParentObject
 
 SYNOPSIS:	Creates an object and copies moniker and hint over.
-		Used with OpenBuildNewParentObject for creating a parent
+		Used with OpenBuildNewParentObject for creating a parent 
 		view or composite for an object.  See that routine for more
 		details.
 
@@ -3675,7 +3675,7 @@ OpenCreateNewParentObject	proc	far
 	mov	bx, ds:[si]			; point to instance
 	add	bx, ds:[bx].Gen_offset		; ds:[di] -- GenInstance
 	push	ds:[bx].GI_visMoniker		; also save moniker ptr
-
+	
 	mov	bx, ds:LMBH_handle
 	push	si				; save source chunk
 						; Get address of class
@@ -3702,7 +3702,7 @@ OpenCreateNewParentObject	proc	far
 	;
 	; Copy a new moniker up to the parent (don't just use the same moniker
 	; chunk, causes update problems!) -cbh 11/ 5/92
-	;
+	;	
 	mov	cx, ds:[LMBH_handle]
 	pop	dx				; restore child vis moniker
 	tst	dx
@@ -3722,7 +3722,7 @@ COMMENT @----------------------------------------------------------------------
 FUNCTION:	OpenCreateChildTrigger
 
 DESCRIPTION:	Instantiate a GenTrigger class object for the specific UI
-		in the same block we're in, marked IGNORE_DIRTY, with a
+		in the same block we're in, marked IGNORE_DIRTY, with a 
 		one-way link to the parent (optional), and SPEC_BUILD it.
 
 CALLED BY:	INTERNAL
@@ -3832,11 +3832,11 @@ COMMENT @----------------------------------------------------------------------
 
 ROUTINE:	OpenUnbuildCreatedParent
 
-SYNOPSIS:	Will unbuild an object and its created generic parent,
+SYNOPSIS:	Will unbuild an object and its created generic parent, 
 		previously added in OpenBuildNewParentObject.  The generic
-		parent (and its content, if it's a view) will be destroyed,
+		parent (and its content, if it's a view) will be destroyed, 
 		and the child will be readded visually to its old generic
-		parent before being unbuilt itself, to make everything work
+		parent before being unbuilt itself, to make everything work	
 		nicely.
 
 CALLED BY:	utility
@@ -3885,7 +3885,7 @@ OpenUnbuildCreatedParent	proc	far
 	push	si				; Preserve chunk of child
 
 	; See if it is our VIS parent that is unbuilding, & not the generic
-	; text object itself.  If this is the case, then we don't want to
+	; text object itself.  If this is the case, then we don't want to 
 	; set the objects we've created (a possible View & Content arrangement)
 	; UNUSABLE at this time, since the Content itself might be being
 	; unbuilt at this very moment, & we want to leave it alone until
@@ -3905,7 +3905,7 @@ OpenUnbuildCreatedParent	proc	far
 	push	bp, ax				; save SpecBuildFlags, mkr flag
 	mov	ax, MSG_GEN_VIEW_GET_CONTENT
 	call	ObjCallInstanceNoLock
-	pop	bp, ax
+	pop	bp, ax				
 	push	dx				; save chunk handle of content
 	push	ax
 	call	OpenDestroyGenericBranch	; Destroy the GenView
@@ -3931,7 +3931,7 @@ ForceTextObjectToBeVisuallyUnderGenericParent:
 	mov	ax, MSG_VIS_ADD_CHILD
 	call	GenCallParent			; Add to our generic parent
 	pop	bp				; & fall through to be closed
-						; down, visually
+						; down, visually 
 						; removed from parent.  On
 						; return to UpdateVisUnbuild,
 						; instance data for Vis & Spec
@@ -3951,7 +3951,7 @@ ForceTextObjectToBeVisuallyUnderGenericParent:
 	call	VisSetSize			;  the parent was, especially
 						;  if the child was in a view
 						;  (it will get it's zero-origin
-						;  bounds invalidated in the
+						;  bounds invalidated in the 
 						;  primary, which is horrible)
 
 	mov	dx, bp				; Pass vis update mode desired
@@ -3980,7 +3980,7 @@ PASS:		*ds:dx	- parent object (or dx = NULL if object should not
 			  be added into any tree)
 		es:di  - class of object to create
 		al	- non-zero if object should be created and added into
-			  tree w/USABLE bit set (as might be needed if
+			  tree w/USABLE bit set (as might be needed if 
 			  constructing before SPEC_BUILD, or if SPEC_BUILD is
 			  going to be sent directly)
 		ah	- non-zero to make link to parent a one-way upward link
@@ -4110,7 +4110,7 @@ afterLinkage:
 	ornf	ds:[di].GI_states, mask GS_USABLE
 	call	ObjSwapUnlock
 afterUsable:
-
+	
 	.leave
 	ret
 OpenCreateChildObject	endp
@@ -4121,7 +4121,7 @@ COMMENT @----------------------------------------------------------------------
 
 ROUTINE:	OpenScanVarData
 
-SYNOPSIS:	Calls ObjVarScanData, but first remove hints under
+SYNOPSIS:	Calls ObjVarScanData, but first remove hints under 
 		HINT_IF_SYSTEM_ATTRS if conditions are not met.
 
 CALLED BY:	utility
@@ -4220,7 +4220,7 @@ EC <	pop	ax						>
 	mov	bx, dx				;  "else" branch
 10$:
 	tst	ax				;ax zero, nothing to be done.
-	jz	15$
+	jz	15$				
 	;
 	; Delete hints between ds:ax and ds:bx.
 	;
@@ -4334,14 +4334,14 @@ FindConditionalHints	proc	near		uses	si
 	;
 	; Have ds:si point to end of chunk (and hence end of vardata)
 	;
-	mov	di, ds:[si]
-	ChunkSizePtr	ds, di, si
-	add	si, di
+	mov	di, ds:[si]			
+	ChunkSizePtr	ds, di, si		
+	add	si, di				
 
 	;
 	; Point at start of HINT_IF.
 	;
-	sub	bx, offset VDE_extraData
+	sub	bx, offset VDE_extraData	
 
 	;
 	; Set up registers:
@@ -4377,7 +4377,7 @@ loopEm:
 
 	cmp	di, HINT_ELSE			;else encountered?
 	jne	checkEndif			;nope, move along
-
+	
 	mov	cx, bp				;mark start of else
 	call	AdvanceToNextHint		;move to next hint
 	mov	bx, bp				;include HINT_ELSE in "if" end
@@ -4399,7 +4399,7 @@ terminatingIf:
 endEndif:
 	stc					;found an ENDIF
 	jmp	short done			;we're done
-
+	
 advanceAndLoop:
 	call	AdvanceToNextHint		;move to next hint
 	jmp	short loopEm			;and loop
@@ -4752,7 +4752,7 @@ OpenGetFlagsIfCtrl	proc	far
 	uses	dx, bp, si
 	.enter
 
-	mov	di, ds:[si]
+	mov	di, ds:[si]			
 	add	di, ds:[di].Vis_offset
 	test	ds:[di].VI_typeFlags, mask VTF_IS_WIN_GROUP
 	jnz	doNothing			;a win group, return nothing
@@ -4773,7 +4773,7 @@ OpenGetFlagsIfCtrl	proc	far
 	call	ObjCallInstanceNoLock		; send message to self
 	jmp	short done
 isCtrl:
-	mov	di, ds:[si]
+	mov	di, ds:[si]			
 	add	di, ds:[di].Vis_offset
 	add	di, cx
 	mov	cx, ds:[di]			; Get the flags
@@ -4783,7 +4783,7 @@ done:
 	jmp	short exit			; handled, exit
 
 doNothing:
-	mov	cx, 0
+	mov	cx, 0				
 exit:
 	.leave
 	ret
@@ -4793,13 +4793,13 @@ Resident ends
 
 
 CommonFunctional	segment resource
-
+			
 
 COMMENT @----------------------------------------------------------------------
 
 ROUTINE:	OpenCallGenWinGroup
 
-SYNOPSIS:	Calls the generic win group this object is under, if any,
+SYNOPSIS:	Calls the generic win group this object is under, if any, 
 		with the message specified.
 
 CALLED BY:	utility
@@ -4827,18 +4827,18 @@ if	(0)		; Use quicker CallWinGroup instead!
 OpenCallGenWinGroup	proc	far
 	push	si
 	mov	bx, segment GenClass	;win group must be a generic object
-	mov	si, offset GenClass
-	mov	di, mask MF_RECORD
+	mov	si, offset GenClass	
+	mov	di, mask MF_RECORD 
 	call	ObjMessage
 	mov	cx, di		; Get handle to ClassedEvent in cx
-	pop	si		; Get object
+	pop	si		; Get object 
 	mov	ax, MSG_VIS_VUP_CALL_WIN_GROUP
 	GOTO	VisCallParent
-
+	
 OpenCallGenWinGroup	endp
 endif
 
-
+			
 
 COMMENT @----------------------------------------------------------------------
 
@@ -4879,7 +4879,7 @@ OpenGetParentWinSize	proc	far
 	jz	exit
 	stc					;say window found
 exit:
-	ret
+	ret					
 OpenGetParentWinSize	endp
 
 
@@ -4931,7 +4931,7 @@ CF_ObjCallInstanceNoLock	proc	near
 	ret
 CF_ObjCallInstanceNoLock	endp
 
-
+				
 
 if	(0)	; no one using this optimization yet
 
@@ -5042,8 +5042,8 @@ PASS:		*ds:si 	- instance data
 			CF_STATE - set if shift, ctrl, etc.
 			CF_TEMP_ACCENT - set if accented char pending
 		dh = ShiftState
-		bp low = ToggleState
-		bp high = scan code
+		bp low = ToggleState 
+		bp high = scan code 
 
 RETURN:		carry set if special character
 
@@ -5143,11 +5143,11 @@ notKeypad:
 	;
 	call	UserCheckAcceleratorChar	;a shortcut, perhaps?
 	jnc	notSpecialUIChar		;nope, send to OD
-
+	
 	call	UserCheckInsertableCtrlChar	;if insertable ctrl char,
 	jc	notSpecialUIChar		;  send to application
-
-checkShortcuts:
+	
+checkShortcuts:	
 	;
 	; Reserved text shortcuts are NOT special UI chars.
 	;
@@ -5156,29 +5156,29 @@ checkShortcuts:
 	mov	ds, si
 	mov	si, offset textKbdBindings	;ds:si <- text bindings
 	lodsw				 	;ax, bx <- # of entries.
-	;
-	; Pass:
+	;				
+	; Pass:				
 	;  ax	= # of shortcuts in the table.
 	;  ds:si	= pointer to the list of shortcuts.
-	; Return:
+	; Return:			
 	;  si	= pointer to the matching shortcut
 	;  carry clear if there was no matching shortcut.
-	;
+	;				
 	mov	bx, ax				;Save # of entries in bx.
 	mov	di, si				;Save ptr to table start in di.
 						;
 	call	FlowCheckKbdShortcut		;See if a text shortcut
 	DoPop	si, ds
 	jnc	specialUIChar			;No, branch
-
+	
 notSpecialUIChar:
 	clc
 	ret
-
+	
 specialUIChar:
 	stc
 	ret
-
+	
 SpecCheckIfSpecialUIChar	endp
 
 
@@ -5199,7 +5199,7 @@ RETURN:		carry:	SET if point IS within bounds
 
 DESTROYED:	cx, dx, bp
 
-SIDE EFFECTS:
+SIDE EFFECTS:	
 
 PSEUDO CODE/STRATEGY:
 	The idea here is for objects, when returning their "activator
@@ -5219,10 +5219,10 @@ if	 BUBBLE_DIALOGS
 CheckIfPointInWinBounds	proc	far
 	uses	ax, bx, si
 	.enter
-
+	
 	mov_tr	bp, ax		; bp, si = X, Y
 	mov_tr	si, bx
-
+	
 	call	GrGetWinBounds	; AX, BX, CX, DX = win bounds
 	cmp	bp, ax		; Ensure Left >= X
 	jl	noBounds
@@ -5232,7 +5232,7 @@ CheckIfPointInWinBounds	proc	far
 	jl	noBounds
 	cmp	si, dx		; Ensure Y < Bottom
 	jg	noBounds
-
+	
 	stc
 done:
 	.leave
@@ -5299,7 +5299,7 @@ OpenClearToggleMenuNavPending	proc	far
 	.leave
 	ret
 OpenClearToggleMenuNavPending	endp
-
+				
 CommonFunctional	ends
 
 
@@ -5322,10 +5322,10 @@ ListGadgetCommon ends
 
 ;==============================================================================
 
-
+	
 Geometry	segment	resource
-
-
+	
+				
 
 COMMENT @----------------------------------------------------------------------
 
@@ -5374,7 +5374,7 @@ Geo_ObjCallInstanceNoLock	proc	near
 	ret
 Geo_ObjCallInstanceNoLock	endp
 
-
+	
 
 
 COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -5439,7 +5439,7 @@ PASS:		ds:*si -- instance data of object
 		; Passed into the object's GET_SIZE message:
 		cx     -- passed resize width
 		dx     -- passed resize height
-
+		
 		; Set up by the message handler:
 		ax     -- minimum width
 		bx     -- minimum height
@@ -5462,7 +5462,7 @@ REVISION HISTORY:
 VisHandleMinResize	proc	far
 	andnf	cx, not mask RSA_CHOOSE_OWN_SIZE	; ignore des. size bit
 	andnf	dx, not mask RSA_CHOOSE_OWN_SIZE	; (will force minimum)
-
+	
 	cmp	cx, ax			; bigger than minimum?
 	jae	10$			; yes, branch
 	mov	cx, ax			; else use minimum
@@ -5475,7 +5475,7 @@ VisHandleMinResize	proc	far
 
 VisHandleMinResize	endp
 
-
+	
 COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 		VisHandleMaxResize
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -5489,7 +5489,7 @@ PASS:		ds:*si -- instance data of object
 		; Passed into the object's GET_SIZE message:
 		cx     -- passed resize width
 		dx     -- passed resize height
-
+		
 		; Set up by the message handler
 		ax     -- maximum width
 		bx     -- maximum height
@@ -5553,10 +5553,10 @@ PASS:		OpenSetCursorColorFlags:
 RETURN:		cx = OLMonikerAttrs with background color flags set
 			for appropriate cursor color
 DESTROYED:	nothing
-SIDE EFFECTS:
+SIDE EFFECTS:	
 
 PSEUDO CODE/STRATEGY:
-
+		
 
 REVISION HISTORY:
 	Name	Date		Description
@@ -5640,10 +5640,10 @@ PASS:		*ds:si = object to get wash color for
 RETURN:		al = main wash color
 		ah = mask wash color
 DESTROYED:	nothing
-SIDE EFFECTS:
+SIDE EFFECTS:	
 
 PSEUDO CODE/STRATEGY:
-
+		
 
 REVISION HISTORY:
 	Name	Date		Description
@@ -5658,7 +5658,7 @@ OpenGetWashColorsFromGenParent	proc	far
 	push	es, di, si, bx, cx, dx, bp
 	call	GenSwapLockParent
 	jmp	short washColorsCommon
-
+	
 OpenGetWashColorsFromGenParent	endp
 
 OpenGetWashColors	proc	far
@@ -5766,7 +5766,7 @@ CALLED BY:	utility
 PASS:		*ds:si -- object being drawn
 		al     -- non-zero to get selected color, zero for unselected
 		ah     -- non-zero if we're a toolbox, and should get the
-			  selBkgdColor rather than the dsDarkColor.
+			  selBkgdColor rather than the dsDarkColor.	  
 
 RETURN:		carry set if non-standard colors found.
 		al     -- color drawn at reverse 50% pattern
@@ -5822,7 +5822,7 @@ defaultColors:
 	mov	dl, es:[moCS_selBkgdColor]	;dx <- default dark color
 	mov	dh, dl
 
-	;
+	;	
 	; Not a toolbox, use dsDarkColor as the default selected color.
 	; (Moved from after gotColors, so hint-defined colors are still used.
 	;  -cbh 12/22/92)
@@ -5868,7 +5868,7 @@ RETURN:		carry set if custom colors found.
 		ah     -- color to draw at 50% pattern
 
 DESTROYED:	nothing
-SIDE EFFECTS:
+SIDE EFFECTS:	
 PSEUDO CODE/STRATEGY:
 
 REVISION HISTORY:
@@ -5902,15 +5902,15 @@ OpenGetExtraBackgroundColor	proc	near
 	VarDataSizePtr	ds, bx, cx	; get size of extra data into cx
 	mov	al, dl			; al = # of background color to get
 	clr	ah			; ax = # of background color to get
-	CheckHack< (size BackgroundColors) eq 4 >
+	CheckHack< (size BackgroundColors) eq 4 >	
 	shl	ax, 1
 	shl	ax, 1			; ax = # of bytes needed
-	cmp	cx, ax			; does this hint hold the desired
+	cmp	cx, ax			; does this hint hold the desired 
 					;   BC struct?
 	jb	noColors		; nope -> no custom colors
 
 	sub	ax, size BackgroundColors ; ax = offset to desired BC struct
-	add	bx, ax			; ds:bx - pointer to desired BC struct
+	add	bx, ax			; ds:bx - pointer to desired BC struct 
 
 	mov	ax, {word} ds:[bx].BC_unselectedColor1
 	tst	dh			; use selected color?
@@ -5935,7 +5935,7 @@ COMMENT @----------------------------------------------------------------------
 
 ROUTINE:	OpenGetTextColor
 
-SYNOPSIS:	Returns text color to use.
+SYNOPSIS:	Returns text color to use.    
 
 CALLED BY:	utility
 
@@ -5957,7 +5957,7 @@ REVISION HISTORY:
 	Chris	6/16/92		Initial version
 
 ------------------------------------------------------------------------------@
-OpenGetTextColor	proc	near
+OpenGetTextColor	proc	near	
 	push	bx, si
 	mov	ax, HINT_GADGET_TEXT_COLOR
 	call	ObjVarFindData			;see if hint exists
@@ -5980,7 +5980,7 @@ unlock:
 	call	ObjSwapUnlock			;returns unselected color in cx
 
 exit:
-	pop	bx, si
+	pop	bx, si	
 	ret
 OpenGetTextColor	endp
 
@@ -6033,7 +6033,7 @@ GetCtrlColors	proc	near
 	; parent of the originating object for the hint in non-toolboxes,
 	; but no further than that.  -cbh 2/15/93
 	;
-	mov	di, ds:[si]
+	mov	di, ds:[si]			
 	add	di, ds:[di].Vis_offset
 	test	ds:[di].OLCI_buildFlags, mask OLBF_TOOLBOX
 	jz	done				;not in toolbox, check no more.
@@ -6086,7 +6086,7 @@ REVISION HISTORY:
 
 ------------------------------------------------------------------------------@
 LUG_DerefVisDI	proc	near
-	mov	di, ds:[si]
+	mov	di, ds:[si]			
 	add	di, ds:[di].Vis_offset
 	ret
 LUG_DerefVisDI	endp
@@ -6117,7 +6117,7 @@ DESTROYED:	es
 SIDE EFFECTS:	BubbleHelpData vardata added if successful
 
 PSEUDO CODE/STRATEGY:
-
+		
 
 REVISION HISTORY:
 	Name	Date		Description
@@ -6163,7 +6163,7 @@ bubbleColor	local	ColorQuad
 	mov	bubbleColor.CQ_green, 250
 	mov	bubbleColor.CQ_blue, 240
 haveColor:
-
+	
 	; calculate size of text
 
 	push	ds, si
@@ -6175,7 +6175,7 @@ haveColor:
 	call	GrGetTextBounds		; cx = width, dx = height
 	call	GrDestroyState
 	pop	ds, si
-
+	
 	add	cx, BUBBLE_HELP_TEXT_X_MARGIN * 2
 	add	dx, BUBBLE_HELP_TEXT_Y_MARGIN * 2
 	mov	ss:[textSize].P_x, cx
@@ -6211,7 +6211,7 @@ haveColor:
 	mov	ss:[bubbleOrigin].P_y, BUBBLE_HELP_WEDGE_SIZE
 
 leftRight:
-	; figure out the xpos of the bubble help window
+	; figure out the xpos of the bubble help window 
 
 	mov	ax, ss:[bubbleOrigin].P_x
 	mov	cx, ss:[textSize].P_x
@@ -6360,7 +6360,7 @@ DESTROYED:	nothing
 SIDE EFFECTS:	nothing
 
 PSEUDO CODE/STRATEGY:
-
+		
 
 REVISION HISTORY:
 	Name	Date		Description
@@ -6411,10 +6411,10 @@ RETURN:		ax	= left
 		cx	= right
 		dx	= bottom
 DESTROYED:	nothing
-SIDE EFFECTS:
+SIDE EFFECTS:	
 
 PSEUDO CODE/STRATEGY:
-
+		
 
 REVISION HISTORY:
 	Name	Date		Description
@@ -6465,13 +6465,13 @@ PASS:		ds	= segment of lmem block
 		bp	= param4
 RETURN:		ax	= region chunk
 DESTROYED:	nothing
-SIDE EFFECTS:
+SIDE EFFECTS:	
 	WARNING:  This routine MAY resize the LMem block, moving it on the
 		  heap and invalidating stored segment pointers and current
 		  register or stored offsets to it.
 
 PSEUDO CODE/STRATEGY:
-
+		
 
 REVISION HISTORY:
 	Name	Date		Description
@@ -6703,10 +6703,10 @@ PASS:		*ds:si = object with bubble help
 		ax = BubbleHelpData vardata
 RETURN:		nothing
 DESTROYED:	nothing
-SIDE EFFECTS:
+SIDE EFFECTS:	
 
 PSEUDO CODE/STRATEGY:
-
+		
 
 REVISION HISTORY:
 	Name	Date		Description
@@ -6760,10 +6760,10 @@ CALLED BY:	INTERNAL
 PASS:		*ds:si	= object
 RETURN:		carry set if started short/long touch
 DESTROYED:	nothing
-SIDE EFFECTS:
+SIDE EFFECTS:	
 
 PSEUDO CODE/STRATEGY:
-
+		
 
 REVISION HISTORY:
 	Name	Date		Description
@@ -6812,10 +6812,10 @@ CALLED BY:	INTERNAL
 PASS:		*ds:si	= object
 RETURN:		nothing
 DESTROYED:	nothing
-SIDE EFFECTS:
+SIDE EFFECTS:	
 
 PSEUDO CODE/STRATEGY:
-
+		
 
 REVISION HISTORY:
 	Name	Date		Description
@@ -6883,10 +6883,10 @@ CALLED BY:	INTERNAL
 PASS:		*ds:si = object
 RETURN:		nothing
 DESTROYED:	nothing
-SIDE EFFECTS:
+SIDE EFFECTS:	
 
 PSEUDO CODE/STRATEGY:
-
+		
 
 REVISION HISTORY:
 	Name	Date		Description
@@ -6945,10 +6945,10 @@ PASS:		*ds:si = object
 			 (relative to object's window)
 RETURN:		ds = update segment
 DESTROYED:	nothing
-SIDE EFFECTS:
+SIDE EFFECTS:	
 
 PSEUDO CODE/STRATEGY:
-
+		
 
 REVISION HISTORY:
 	Name	Date		Description
@@ -7001,7 +7001,7 @@ RETURN:		none
 		none
 DESTROYED:	ax, bx, cx, dx
 
-PSEUDO CODE/STRATEGY:
+PSEUDO CODE/STRATEGY:	
 
 KNOWN BUGS/SIDE EFFECTS/IDEAS:
 
@@ -7102,7 +7102,7 @@ RETURN:		none
 		none
 DESTROYED:	none
 
-PSEUDO CODE/STRATEGY:
+PSEUDO CODE/STRATEGY:	
 
 KNOWN BUGS/SIDE EFFECTS/IDEAS:
 
