@@ -144,8 +144,7 @@ extraGame	: taipei column mine2 follow treas mazerun \
 		  frotz spider
 
 minimalEdu	: flash fontmgck hangman laserl mflash numbers pvault \
-                  oliner taide thinker wsm wsplay xwm
-# ttype
+                  oliner taide thinker wsm wsplay xwm ttype
 
 minimalSavers	: lol blackhole blank bobbin circles dribble dust \
 		  fades flame hopalong letter logo maze lastwords \
