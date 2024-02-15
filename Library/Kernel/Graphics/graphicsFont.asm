@@ -1290,6 +1290,8 @@ useDefaultFont:
 	;mov	es:GS_fontAttr.FCA_fontID, cx
 DBCS <	mov	bh, FCS_ASCII			;bh <- FontCharSet of default>
 bitmapFontFound:
+	mov	es:GS_fontAttr.FCA_weight, FW_NORMAL
+	mov	es:GS_fontAttr.FCA_width, FWI_MEDIUM
 	clc					;carry <- no outline subst.
 foundFont:
 	mov	es:GS_fontAttr.FCA_fontID, cx
@@ -1299,12 +1301,12 @@ DBCS <	mov	es:GS_fontAttr.FCA_charSet, bh				>
 	ornf	al, bl
 	mov	es:GS_fontAttr.FCA_textStyle, al
 	movwbf	es:GS_fontAttr.FCA_pointsize, dxah
-	mov	es:GS_fontAttr.FCA_weight, FW_NORMAL
-	mov	es:GS_fontAttr.FCA_width, FWI_MEDIUM
-	mov	es:GS_fontAttr.FCA_superPos, SPP_DEFAULT
-	mov	es:GS_fontAttr.FCA_superSize, SPS_DEFAULT
-	mov	es:GS_fontAttr.FCA_subPos, SBP_DEFAULT
-	mov	es:GS_fontAttr.FCA_subSize, SBS_DEFAULT
+	;mov	es:GS_fontAttr.FCA_weight, FW_NORMAL
+	;mov	es:GS_fontAttr.FCA_width, FWI_MEDIUM
+	;mov	es:GS_fontAttr.FCA_superPos, SPP_DEFAULT
+	;mov	es:GS_fontAttr.FCA_superSize, SPS_DEFAULT
+	;mov	es:GS_fontAttr.FCA_subPos, SBP_DEFAULT
+	;mov	es:GS_fontAttr.FCA_subSize, SBS_DEFAULT
 	ornf	es:GS_fontFlags, mask FBF_MAPPED_FONT
 	popf
 	.leave

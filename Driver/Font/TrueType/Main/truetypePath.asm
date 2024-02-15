@@ -150,6 +150,14 @@ TrueTypeGenInRegion	proc	far
 	uses	ax, bx, ds, es
 	.enter
 
+	push	di
+	mov	di, FONT_C_CODE_STACK_SPACE
+	call	ThreadBorrowStackSpace
+        pop     bx
+	push	di
+        mov     di, bx
+
+        ; building parameter stack
 	push 	di					;pass gstate handle
 	push	cx					;pass regionpath handle
 	push	dx					;pass character code	
@@ -174,6 +182,9 @@ TrueTypeGenInRegion	proc	far
 	segmov	ds, dgroup, ax
 	push	ds:variableHandle	;pass handle to truetype block
 	call	TRUETYPE_GEN_IN_REGION
+
+	pop	di
+	call	ThreadReturnStackSpace
 
 	.leave
 	ret
