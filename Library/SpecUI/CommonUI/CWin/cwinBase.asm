@@ -3531,16 +3531,24 @@ OLBaseWinMoveOffScreen	method dynamic	OLBaseWinClass, \
 	mov	di, offset OLBaseWinClass
 	call	ObjCallSuperNoLock
 
-if _NO_WIN_ICONS
+if _NO_WIN_ICONS or TOOL_AREA_IS_TASK_BAR
+if TOOL_AREA_IS_TASK_BAR
+	push	ds					; save ds
+	segmov	ds, dgroup				; load dgroup
+	test	ds:[taskBarPrefs], mask TBF_ENABLED	; test if TBF_ENABLED is set
+	pop	ds					; restore ds
+	jz	done					; skip if no taskbar
+endif ;TOOL_AREA_IS_TASK_BAR
+	;
 	; Since we do not create an icon when we minimize, we need to make
 	; sure that some other object has the active focus/target.
-
+	;
 	clr	bx
 	call	GeodeGetAppObject
 	mov	ax, MSG_GEN_LOWER_TO_BOTTOM
 	mov	di, mask MF_FORCE_QUEUE		; (but do this after the window
 	call	ObjMessage			; is actually up on screen)
-endif
+endif ;_NO_WIN_ICONS or TOOL_AREA_IS_TASK_BAR
 
 done:
 	ret
