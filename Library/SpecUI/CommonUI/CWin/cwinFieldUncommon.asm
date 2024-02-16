@@ -1892,26 +1892,40 @@ REVISION HISTORY:
 if _MOTIF and TOOL_AREA_IS_TASK_BAR
 ToolAreaDraw	method dynamic ToolAreaClass, MSG_VIS_DRAW
 
+	;
+	; call superclass
+	;
+
+	push	bp
 	mov	di, offset ToolAreaClass
 	call	ObjCallSuperNoLock
+	pop	di
 
 	;
 	; if TaskBar == on
 	; RUNTIME
 	;
+
 	push	ds					; save ds
 	segmov	ds, dgroup				; load dgroup
 	test	ds:[taskBarPrefs], mask TBF_ENABLED	; test if TBF_ENABLED is set
 	pop	ds					; restore ds
 	jz	done					; skip if no taskbar
 
-	mov	di, bp
+	;
+	; get bounds
+	;
+	; ax = VI_bounds.R_left
+	; cx = VI_bounds.R_right
+	; dx = VI_bounds.R_bottom
+	; bx = VI_bounds.R_top
+	;
 
 	call	VisGetBounds
-					;ax, VI_bounds.R_left
-					;cx, VI_bounds.R_right
-					;dx, VI_bounds.R_bottom
-					;bx, VI_bounds.R_top
+
+	;
+	; colors
+	;
 
 	push	ax
 	call	GetDarkColor		; al <- dark color
@@ -1926,17 +1940,21 @@ ToolAreaDraw	method dynamic ToolAreaClass, MSG_VIS_DRAW
 	; X value is already in CX and should always be equal to the width of the window.
 	;
 
-	sub	dx, bx			;result in dx
+	sub	dx, bx			; result in dx
 
 	;
 	; set our new Y-Value for the upper left corner in BX
-	; X value should alsways be 0 and is already in AX
+	; X value should always be 0 and is already in AX
 	;
 
 	mov	bx, 0
 
+	;
+	; draw rect
+	;
 	call	OpenDrawRect
 done:
+
 	ret
 ToolAreaDraw	endm
 endif
@@ -1970,32 +1988,49 @@ REVISION HISTORY:
 if TOOL_AREA_IS_TASK_BAR and _ISUI
 SysTrayInteractionVisDraw	method dynamic SysTrayInteractionClass, MSG_VIS_DRAW
 
+	;
+	; call superclass
+	;
+
+	push	bp
 	mov	di, offset SysTrayInteractionClass
 	call	ObjCallSuperNoLock
+	pop	di					; di = gstate
 
 	;
 	; if TaskBar == on
 	; RUNTIME
 	;
+
 	push	ds					; save ds
 	segmov	ds, dgroup				; load dgroup
 	test	ds:[taskBarPrefs], mask TBF_ENABLED	; test if TBF_ENABLED is set
 	pop	ds					; restore ds
 	jz	done					; skip if no taskbar
 
-	push	bp
-	mov	di, offset SysTrayInteractionClass
-	call	ObjCallSuperNoLock
-	pop	di			; di = gstate
+	;
+	; get bounds
+	;
+	; ax = VI_bounds.R_left
+	; cx = VI_bounds.R_right
+	; dx = VI_bounds.R_bottom
+	; bx = VI_bounds.R_top
+	;
 
 	call	VisGetBounds
 
+	;
+	; colors
+	;
 	push	ax
 	call	GetDarkColor		;al <- dark color
 	mov	ah, C_WHITE		;ah <- light color
 	mov	bp, ax
 	pop	ax
 
+	;
+	; draw rect
+	;
 	call	OpenDrawRect
 
 done:
