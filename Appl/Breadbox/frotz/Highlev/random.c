@@ -9,8 +9,8 @@
 
 static long A = 1;
 
-static interval = 0;
-static counter = 0;
+static int interval = 0;
+static int counter = 0;
 
 /*
  * seed_random

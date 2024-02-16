@@ -37,7 +37,7 @@ char command_name[MAX_FILE_NAME + 1] = DEFAULT_COMMAND_NAME;
 extern char latin1_to_ibm[];
 #endif
 
-static script_width = 0;
+static int script_width = 0;
 
 #ifdef __GEOS__
 static FileHandle sfp = NullHandle;

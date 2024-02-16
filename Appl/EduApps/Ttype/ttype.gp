@@ -20,19 +20,20 @@ library ansic
 library treplib
 exempt treplib
 
-resource APPRESOURCE ui-object
-resource INTERFACE ui-object
-resource KEYBOARDRESOURCE ui-object
-resource RESULTSRESOURCE ui-object
-resource TTSTRINGS lmem read-only shared
-resource ICONRESOURCE lmem read-only shared
-resource WELCOMEDIALOGRESOURCE ui-object
-resource RESULTSDIALOGRESOURCE ui-object
-resource OPTIONSMENURESOURCE ui-object
-resource ASKPASSWORDRESOURCE ui-object
-resource MAININTERACTIONRESOURCE ui-object
-resource EDITPREFSRESOURCE ui-object
+resource AppResource ui-object
+resource Interface ui-object
+resource KeyboardResource ui-object
+resource ResultsResource ui-object
+resource TTStrings lmem read-only shared
+resource IconResource lmem read-only shared
+resource WelcomeDialogResource ui-object
+resource ResultsDialogResource ui-object
+resource OptionsMenuResource ui-object
+resource AskPasswordResource ui-object
+resource MainInteractionResource ui-object
+resource EditPrefsResource ui-object
 resource LOGORESOURCE  data object
+resource TabAndStyleResource lmem read-only shared
 
 export Step1EntryTextClass
 export Step2EntryTextClass

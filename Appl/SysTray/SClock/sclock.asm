@@ -178,14 +178,40 @@ DESTROYED:	ax, cx, dx, bp
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
 ClockProcessBringUpMenu method dynamic ClockProcessClass,
 					MSG_CLOCK_PROCESS_BRING_UP_MENU
+
+dateBuf	local	DATE_TIME_BUFFER_SIZE dup (Chars)
+
+		.enter
+	;
+	; update menu date moniker with date (surprise!)
+	;
+		segmov	es, ss
+		lea	di, ss:[dateBuf]	; es:di <- buffer into which to format
+		mov	si, DTF_LONG		; si <- format enum
+		call	TimerGetDateAndTime	; fetch current time
+		call	LocalFormatDateTime	; and format it (cx <- # chars w/o null)
+		movdw	cxdx, esdi		; put dateBuf in cx:dx
+
+		push	bp
+		mov	ax, MSG_GEN_REPLACE_VIS_MONIKER_TEXT
+		mov	bp, VUM_NOW
+		mov	bx, handle CalendarTrigger
+		mov	si, offset CalendarTrigger
+		mov	di, mask MF_CALL
+		call	ObjMessage
+		pop	bp
+
 	;
 	; bring up our menu
 	;
+		push	bp
 		mov	si, offset ClockMenu
 		mov	bx, handle ClockMenu
 		mov	ax, MSG_GEN_INTERACTION_INITIATE
 		clr	di
 		call	ObjMessage
+		pop 	bp
+
 	;
 	; make sure we get the focus
 	;
@@ -195,6 +221,7 @@ ClockProcessBringUpMenu method dynamic ClockProcessClass,
 		clr	di
 		call	ObjMessage
 
+		.leave
 		ret
 
 ClockProcessBringUpMenu	endm
@@ -297,7 +324,7 @@ DESTROYED:	ax, cx, dx, bp
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
 
-pmgrToken GeodeToken <'PMGR', 0>
+pmgrToken GeodeToken <'PMGR', MANUFACTURER_ID_GEOWORKS>
 
 ClockAppAdjustTimeDate method dynamic ClockApplicationClass,
 					MSG_CLOCK_APP_ADJUST_TIME_DATE
@@ -343,6 +370,51 @@ donePop:
 done:
 		ret
 ClockAppAdjustTimeDate	endm
+
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		ClockAppLaunchCalendar
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	MSG_CLOCK_APP_LAUNCH_CALENDAR
+
+CALLED BY:	UI
+PASS:		ds - dgroup
+RETURN:		none
+DESTROYED:	ax, cx, dx, bp
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+
+cldrToken GeodeToken <'PLNR', MANUFACTURER_ID_GEOWORKS>
+ClockAppLaunchCalendar	method	dynamic ClockApplicationClass,
+					MSG_CLOCK_APP_LAUNCH_CALENDAR
+	;
+	; Create an AppLaunchBlock and fill it in
+	;
+		mov	dx, MSG_GEN_PROCESS_OPEN_APPLICATION
+		call	IACPCreateDefaultLaunchBlock
+		LONG jc	done				;branch if error
+		mov	bx, dx				;bx <- handle of ALB
+
+		push	bp, bx
+		segmov	es, cs
+		mov	di, offset cldrToken
+		mov	ax, mask IACPCF_FIRST_ONLY or \
+				IACPSM_USER_INTERACTIBLE shl offset IACPCF_SERVER_MODE
+		clr	cx, dx
+		call	IACPConnect
+		jc	donePop
+	;
+	; Close the connection we opened
+	;
+		clr	cx, dx
+		call	IACPShutdown
+donePop:
+		pop	bp, bx
+done:
+		ret
+
+ClockAppLaunchCalendar	endm
 
 
 
@@ -540,6 +612,7 @@ DESTROYED:	ax, cx, dx, bp
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
 ClockUpdateTime	method dynamic ClockClass, MSG_CLOCK_UPDATE_TIME,
 					MSG_NOTIFY_DATE_TIME_CHANGE
+
 		.enter
 		mov	bp, si		; preserve object chunk
 

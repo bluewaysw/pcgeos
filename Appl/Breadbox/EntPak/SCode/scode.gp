@@ -25,8 +25,9 @@ resource InterfaceOptions object
 #resource InterfaceView object
 resource InterfaceWin object
 resource InterfaceLose object
-resource StringsResource data
+resource StringsResource lmem read-only shared
 resource QTipsResource object
+resource ResourcePictures lmem read-only shared
 
 export SecretCodeProcessClass
 export SecretCodeViewClass

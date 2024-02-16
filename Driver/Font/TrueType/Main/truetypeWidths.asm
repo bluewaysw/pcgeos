@@ -53,6 +53,7 @@ REVISION HISTORY:
 	Name	Date		Description
 	----	----		-----------
 	FR	29/1/21		Initial version
+	JK	10/02/24	width and weight implement
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
 
@@ -75,6 +76,12 @@ TrueTypeGenWidths	proc	far
 	movwbf	dxah, es:GS_fontAttr.FCA_pointsize
 	push	dx			; pass point size
 	push 	ax
+
+	clr		ah
+	mov		al, es:GS_fontAttr.FCA_width
+	push	ax			; pass width
+	mov		al, es:GS_fontAttr.FCA_weight
+	push	ax			; pass wieght
 		
 	mov	cx, es:GS_fontAttr.FCA_fontID
 	call	FontDrFindFontInfo

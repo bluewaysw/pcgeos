@@ -16,7 +16,7 @@ library game
 resource AppResource ui-object
 resource Interface ui-object
 resource MONIKERRESOURCE  data object
-resource StringsResource  data object
+resource StringsResource  lmem read-only shared 
 
 export ColumnsBoardViewClass
 export ColumnsBoardClass

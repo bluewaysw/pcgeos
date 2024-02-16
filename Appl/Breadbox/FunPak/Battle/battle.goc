@@ -34,6 +34,7 @@ DESCRIPTION:    This application is a game similar to Battle Ship.
 @include <math.goh>     /* need for random numbers */
 #include <gstring.h>    /* needed for the icons */
 #include <sound.h>      /* needed for custom notes */
+#include <initfile.h>   /* needed for saving QTips state */
 @include "battle.goh"   /* the icons for the application */
 
 /***********************************************************************
@@ -92,6 +93,8 @@ DESCRIPTION:    This application is a game similar to Battle Ship.
 /* Skill Levels */
 #define BATTLE_LEVEL_BEGINNER           1
 #define BATTLE_LEVEL_INTERMEDIATE       2
+
+#define SHOW_ON_STARTUP   1	/* Show QuickTips on startup */
 
   int gridSize = BATTLE_GRID_START;
   int battleStarted = BR_GAME_OVER;
@@ -351,12 +354,15 @@ DESCRIPTION:    This application is a game similar to Battle Ship.
 	    @BattleOptionsMenu, 
 	    @PlayerBattleView, 
 	    @ComputerBattleView,
-	    @BRGameOver;
+	    @BRGameOver,
+	    @QTipsDialogBox;
   HINT_ORIENT_CHILDREN_HORIZONTALLY;
   HINT_CENTER_CHILDREN_HORIZONTALLY;
   HINT_CENTER_CHILDREN_VERTICALLY;
   HINT_DIVIDE_WIDTH_EQUALLY;
-  ATTR_GEN_HELP_CONTEXT = "Title Page";   
+  HINT_SIZE_WINDOW_AS_DESIRED;
+  /*ATTR_GEN_HELP_CONTEXT = "Title Page";   */
+  HINT_PRIMARY_NO_HELP_BUTTON;
     /* Bring up help at Battle Raft Title Page */
     /* See the end of the file for help on making Help Files */
 }
@@ -387,6 +393,7 @@ DESCRIPTION:    This application is a game similar to Battle Ship.
     /* The background color of  this view should be light cyan. */
 
   GVI_horizAttrs = @default   | GVDA_NO_LARGER_THAN_CONTENT
+			      | GVDA_NO_SMALLER_THAN_CONTENT
 			      | GVDA_SCROLLABLE;
     /* 
      * The horizontal attributes of this view set it to the same
@@ -394,6 +401,7 @@ DESCRIPTION:    This application is a game similar to Battle Ship.
      */
 
   GVI_vertAttrs = @default    | GVDA_NO_LARGER_THAN_CONTENT
+			      | GVDA_NO_SMALLER_THAN_CONTENT
 			      | GVDA_SCROLLABLE;
     /* 
      * The vertical attributes of this view set it to the same
@@ -411,9 +419,11 @@ DESCRIPTION:    This application is a game similar to Battle Ship.
   GVI_color = { C_LIGHT_CYAN, 0, 0, 0 };    
 
   GVI_horizAttrs = @default   | GVDA_NO_LARGER_THAN_CONTENT
+			      | GVDA_NO_SMALLER_THAN_CONTENT
 			      | GVDA_SCROLLABLE;
 
   GVI_vertAttrs = @default    | GVDA_NO_LARGER_THAN_CONTENT
+			      | GVDA_NO_SMALLER_THAN_CONTENT
 			      | GVDA_SCROLLABLE;
   HINT_VIEW_REMOVE_SCROLLERS_WHEN_NOT_SCROLLABLE;
 }
@@ -433,13 +443,20 @@ DESCRIPTION:    This application is a game similar to Battle Ship.
 }
 
 @object GenInteractionClass BattleNewTriggerGroup = {
-  GI_comp = @BattleNewTrigger;
+  GI_comp = @BattleNewTrigger, @BattleQTipsTrigger;
 }
 @object GenTriggerClass BattleNewTrigger = {
   GI_visMoniker = 'N', "New Game";
   GTI_destination = process;      
   GTI_actionMsg = MSG_NEW_GAME;
 }
+@object GenTriggerClass BattleQTipsTrigger = {
+    GI_visMoniker   = 'Q', "Quick Tips" ;
+    GTI_destination = @QTipsDialogBox ; 
+    GTI_actionMsg   = MSG_GEN_INTERACTION_INITIATE ;
+    HINT_TRIGGER_BRINGS_UP_WINDOW;
+    }
+/*---------------------------------------------------------------------*/
 
 @object GenInteractionClass BattleOptionsMenu = {
   /* Put a menu item 'Options' on menu bar */
@@ -474,22 +491,17 @@ DESCRIPTION:    This application is a game similar to Battle Ship.
 }
 
 @object GenInteractionClass BattleOptionsLevelGroup = {
+  GI_visMoniker = "Computer Level";
   GI_comp = @BattleOptionsLevel;
+  GII_visibility = GIV_POPUP;
 }
 
 @object GenItemGroupClass BattleOptionsLevel = {          
-  GI_comp = @BattleOptionsLevelHeading,
-	    @BattleOptionsLevelBeginner,
+  GI_comp = @BattleOptionsLevelBeginner,
 	    @BattleOptionsLevelIntermediate;
   GIGI_applyMsg = MSG_BATTLE_CHANGE_LEVEL;
   GIGI_destination = process;
   GIGI_selection = BATTLE_LEVEL_INTERMEDIATE;
-}
-
-@object GenGlyphClass BattleOptionsLevelHeading = {
-  /* This will put a Skill Level Heading in the options subgroup */
-  GI_visMoniker = "   - Skill Level -";
-  HINT_CENTER_MONIKER;
 }
 
 @object GenItemClass BattleOptionsLevelBeginner = { 
@@ -507,9 +519,11 @@ DESCRIPTION:    This application is a game similar to Battle Ship.
   GI_comp = @BattleSize;
   GII_visibility = GIV_DIALOG;
   GII_type = GIT_PROPERTIES;
+  HINT_CENTER_CHILDREN_HORIZONTALLY;
 }
 
 @object GenValueClass BattleSize = {
+  GI_visMoniker = 'S', "Set Grid Size to:";
   GVLI_minimum = MakeWWFixed(BATTLE_GRID_MINIMUM);
   GVLI_maximum = MakeWWFixed(BATTLE_GRID_MAXIMUM);
   GVLI_value = MakeWWFixed(BATTLE_GRID_START);
@@ -609,6 +623,109 @@ DESCRIPTION:    This application is a game similar to Battle Ship.
 @end BoardBlock         /*  End of the BoardBlock resource block. */
 
 
+@start QTipsResource;
+@include "Art/QTip1.goh"
+//include "art/QTip2.goh"
+
+	 @object GenInteractionClass QTipsDialogBox = {
+		  GI_visMoniker = "Battle Raft Quick Tips";
+		  GI_comp = @GoalText,
+						@QuickTipsGroup,
+						@ShowOnStartupGroup,
+						@OKTipsButton;
+		  GII_visibility = GIV_DIALOG ;
+		  GII_attrs = @default | GIA_MODAL | GIA_NOT_USER_INITIATABLE;
+		  HINT_CENTER_CHILDREN_HORIZONTALLY ;
+		  /*ATTR_GEN_HELP_CONTEXT = "TOC";*/
+	 }
+
+
+	 @object GenTextClass GoalText = {
+		GI_visMoniker = " ";	 	
+		HINT_PLACE_MONIKER_TO_LEFT;
+		GI_attrs = @default | GA_READ_ONLY;
+		GTXI_text = "The goal of the game is to find all the rafts that your opponent (the computer) has hidden before your opponent can find yours.";
+		ATTR_GEN_TEXT_NEVER_MAKE_SCROLLABLE;
+	 }
+
+	 @object GenBooleanGroupClass ShowOnStartupGroup = {
+		  GI_comp = @ShowOnStartupBoolean;
+	 }
+
+	 @object GenBooleanClass ShowOnStartupBoolean = {
+		  GI_visMoniker = 'S', "Show this Dialog box when Battle Raft starts";
+		  GBI_identifier = SHOW_ON_STARTUP;
+	 }
+
+	 @object GenTriggerClass OKTipsButton = {
+		  GI_visMoniker   = 'O', "OK";
+        	GI_attrs = @default | GA_SIGNAL_INTERACTION_COMPLETE ;
+		  HINT_SEEK_REPLY_BAR;
+		  HINT_DEFAULT_DEFAULT_ACTION;
+	 }
+
+
+	 @object GenInteractionClass QuickTipsGroup = {
+		  GI_comp = @QTip1, @QTip2Text;
+	 }
+
+	 @object GenInteractionClass QTip1 = {
+		  GI_comp = @QTip1GlyphHolder, @QTip1Text ;
+		  HINT_ORIENT_CHILDREN_HORIZONTALLY;
+		  HINT_CENTER_CHILDREN_VERTICALLY;
+	 }
+
+	 @object GenInteractionClass QTip1GlyphHolder = {
+		  GI_comp = @QTip1Glyph;
+		  HINT_CENTER_CHILDREN_HORIZONTALLY;
+		  HINT_CENTER_CHILDREN_VERTICALLY;
+		  HINT_FIXED_SIZE = {SST_PIXELS | 105, 0,0};
+        /* ^^^ is based on the width of the widest icon */
+	 }
+
+	 @object GenGlyphClass QTip1Glyph = {
+		  GI_visMoniker = @QTip1Moniker;
+	 }
+
+	 @object GenTextClass QTip1Text = {
+		GI_visMoniker = " ";	 	
+		HINT_PLACE_MONIKER_TO_LEFT;
+		GI_attrs = @default | GA_READ_ONLY;
+		GTXI_text = "You have 5 rafts. To move a raft, click and hold down the mouse button and slide the raft to a new spot on your grid.  To rotate a raft click once on the raft with the right mouse button.";
+		ATTR_GEN_TEXT_NEVER_MAKE_SCROLLABLE;
+		HINT_MINIMUM_SIZE = {SST_PIXELS | 325, 0, 0};
+		HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+	 }
+@if 0
+	 @object GenInteractionClass QTip2 = {
+		  GI_comp = /*@QTip2GlyphHolder, * /@QTip2Text ;
+		  HINT_ORIENT_CHILDREN_HORIZONTALLY;
+		  HINT_CENTER_CHILDREN_VERTICALLY;
+	 }
+
+/*
+	 @object GenInteractionClass QTip2GlyphHolder = {
+		  GI_comp = @QTip2Glyph;
+		  HINT_CENTER_CHILDREN_HORIZONTALLY;
+		  HINT_CENTER_CHILDREN_VERTICALLY;
+		  HINT_FIXED_SIZE = {SST_PIXELS | 105, 0,0};
+	 }
+	 @object GenGlyphClass QTip2Glyph = {
+		  GI_visMoniker = "-mon2"; /*list { @QTip2Moniker };* /
+	 }
+*/
+@endif
+	 @object GenTextClass QTip2Text = {
+		GI_visMoniker = " ";	 	
+		HINT_PLACE_MONIKER_TO_LEFT;
+		GI_attrs = @default | GA_READ_ONLY;
+		GTXI_text = "To start the game move your mouse to the computer's area (the right grid) and click on a square.  Keep clicking on different squares of the grid to find the computer's hidden rafts.";
+		ATTR_GEN_TEXT_NEVER_MAKE_SCROLLABLE;
+		HINT_MINIMUM_SIZE = {SST_PIXELS | 325, 0, 0};
+		HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+	 }
+
+@end QTipsResource
 
 /****************************************************************
  *              CODE FOR BattleProcessClass                 *
@@ -628,16 +745,39 @@ DESCRIPTION:    This application is a game similar to Battle Ship.
  *   Name               Date           Description
  *   Derrick Renaud     01/01/97       Initial .1 beta
  *****************************************************************************/
-@extern method BattleProcessClass, MSG_GEN_PROCESS_OPEN_APPLICATION {
-
+@method BattleProcessClass, MSG_GEN_PROCESS_OPEN_APPLICATION {
+ 	Boolean		initError, tips;
 
 	@call BattleApp::MSG_GEN_APPLICATION_INSTALL_TOKEN();
-
 	@callsuper();
 
+	 /* check for quick tips */
+	 initError = InitFileReadBoolean("BattleRaft", "showTips", &tips);
+	 if (initError) tips = TRUE;
+	 if (tips) {
+		 @send ShowOnStartupGroup::MSG_GEN_BOOLEAN_GROUP_SET_BOOLEAN_STATE(
+		 		SHOW_ON_STARTUP,
+		 		TRUE);
+		 @send QTipsDialogBox::MSG_GEN_INTERACTION_INITIATE();
+		 }
+	 else	{
+		 @send ShowOnStartupGroup::MSG_GEN_BOOLEAN_GROUP_SET_BOOLEAN_STATE(
+				SHOW_ON_STARTUP,
+				FALSE);
+		}
 
 }
+/*-------------------------------------------------------------------------*/
+@method BattleProcessClass, MSG_GEN_PROCESS_CLOSE_APPLICATION
+{
+	 Boolean tips;
 
+	 /* set the quick tips if not default */
+	 tips = @call ShowOnStartupGroup::MSG_GEN_BOOLEAN_GROUP_IS_BOOLEAN_SELECTED(SHOW_ON_STARTUP);
+	 InitFileWriteBoolean("BattleRaft", "showTips", tips);
+
+	 return (@callsuper()) ;
+}
 
 /***********************************************************************
  *              MSG_NEW_GAME for BattleProcessClass
