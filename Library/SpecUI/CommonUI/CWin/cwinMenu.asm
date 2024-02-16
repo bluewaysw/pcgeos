@@ -4326,26 +4326,31 @@ if TOOL_AREA_IS_TASK_BAR
 	push	ds					; save ds
 	segmov	ds, dgroup				; load dgroup
 	test	ds:[taskBarPrefs], mask TBF_ENABLED	; test if TBF_ENABLED is set
+	pop	ds					; restore ds
 	jz	doneTaskBar				; skip if no taskbar
 
 	call	OLWinGetToolAreaSize			; dx = height
-	test	ds:[taskBarPrefs], mask TBF_AUTO_HIDE
-	jnz	doneTaskBar
 
-	push 	ax
+	push	ds					; push ds
+	segmov	ds, dgroup				; load dgroup
+	test	ds:[taskBarPrefs], mask TBF_AUTO_HIDE	; get TBF_AUTO_HIDE
+	pop	ds					; restore ds
+	jnz	doneTaskBar				; skip if taskbar hidden
+
+	push 	ax, ds
+	segmov	ds, dgroup				; load dgroup
 	mov	ax, ds:[taskBarPrefs]			; load taskBarPrefs in ax
 	andnf	ax, mask TBF_POSITION			; mask out everything but the position bits
 	cmp	ax, (TBP_TOP) shl offset TBF_POSITION	; compare position bits with TBP_TOP
-	pop	ax					; restore ax
+	pop	ax, ds					; restore ax
 	jne	atBottom				; is not top => bottom position
 
 ;atTop
 	add	ss:[parent].R_top, dx
-	jmp	short doneTaskBar
+	jmp	doneTaskBar
 atBottom:
 	sub	ss:[parent].R_bottom, dx
 doneTaskBar:
-	pop	ds
 endif
 
 	call	VisQueryWindow			; di = window handle
