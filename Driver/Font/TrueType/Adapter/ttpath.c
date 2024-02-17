@@ -184,9 +184,9 @@ Fin:
  * 
  * PARAMETERS:    
  * 
- * RETURNS:       
+ * RETURNS:       void
  * 
- * STRATEGY:      
+ * STRATEGY:
  * 
  * REVISION HISTORY:
  *      Date      Name      Description
@@ -206,6 +206,7 @@ void _pascal TrueType_Gen_In_Region(
         TrueTypeVars*          trueTypeVars;
         TrueTypeOutlineEntry*  trueTypeOutline;
         TT_UShort              charIndex;
+        XYValueAsDWord         cursorPos;
 
 
 EC(     ECCheckGStateHandle( gstate ) );
@@ -231,6 +232,13 @@ EC(     ECCheckBounds( (void*)trueTypeOutline ) );
 
         /* get TT char index */
         charIndex = TT_Char_Index( CHAR_MAP, GeosCharToUnicode( character ) );
+
+        //TODO: store font matrix
+        //PathStoreFontMatrix( ttMatrix, fontMatrix );
+
+        /* translate by current cursor position */
+        cursorPos = GrGetCurPos( gstate );
+        GrApplyTranslationDWord( gstate, DWORD_X( cursorPos ), DWORD_Y( cursorPos ) );
 
         //TODO: render glyph as regionpath
 
@@ -534,9 +542,6 @@ static void CalcTransformMatrix( TransMatrix*    transMatrix,
                 transMatrix->TM_e21.WWF_frac = FractionOf( shearFactor );
                 transMatrix->TM_e21.WWF_int  = IntegerOf( shearFactor );
         }
-
-        //TODO:
-        //width & weight einarbeiten
 }
 
 
