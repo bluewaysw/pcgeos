@@ -1857,7 +1857,12 @@ launcherBuf		local	FileLongName
 	ret
 CheckIfRunningISDesk	endp
 
-ISDeskString		char	"ISDesk", 0
+if ERROR_CHECK
+LocalDefNLString ISDeskString <"EC ISDesk", 0>
+else
+LocalDefNLString ISDeskString <"ISDesk", 0>
+endif
+
 uiFeaturesCatString	char	"uiFeatures", 0
 defaultLauncherString	char	"defaultLauncher", 0
 
