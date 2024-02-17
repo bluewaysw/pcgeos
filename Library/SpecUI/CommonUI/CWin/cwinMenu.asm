@@ -5002,7 +5002,7 @@ if TOOL_AREA_IS_TASK_BAR
 	segmov	ds, dgroup				; load dgroup
 	test	ds:[taskBarPrefs], mask TBF_ENABLED	; test if TBF_ENABLED is set
 	pop	ds					; restore ds
-	jz	endIfTaskbar				; skip if no taskbar
+	jz	noTaskbar				; skip if no taskbar
 							; bx = top, dx = bottom
 	mov	ax, dx					; ax = bottom
 	call	OLWinGetToolAreaSize			; cx = width, dx = height
@@ -5026,6 +5026,9 @@ atBottom:
 doneTaskBar:
 	pop	ds
 	push	bx, ax					; save top, bottom
+	jmp	endIfTaskbar
+noTaskbar:
+	push	bx, dx					; save top, bottom
 endIfTaskbar:
 else
 	push	bx, dx					; save top, bottom
