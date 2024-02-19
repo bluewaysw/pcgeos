@@ -1282,7 +1282,8 @@ DBCS <	mov	cl, es:GS_fontAttr.FCA_charSet	;cl <- FontCharSet	>
 	pop	cx
 	jc	bitmapFontFound			;branch if bitmap found
 	tst	ds:[si].FI_outlineEnd
-	jnz	foundFont			;if so, done
+	stc
+        jnz	foundFont			;if so, done
 	;call	FindNearestOutline		;see if an outline available
 	;jc	foundFont			;if so, done
 
