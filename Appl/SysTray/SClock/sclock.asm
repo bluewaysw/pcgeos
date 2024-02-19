@@ -432,14 +432,37 @@ DESTROYED:	ax, cx, dx, bp
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
 ClockAppLostFocus	method dynamic ClockApplicationClass,
 						MSG_META_LOST_FOCUS_EXCL
+
+		push	di, ds
+
 		mov	di, offset ClockApplicationClass
 		call	ObjCallSuperNoLock
-		mov	si, offset ClockMenu
-		mov	bx, handle ClockMenu
+
+		mov	bx, handle 0
+		mov	ax, MSG_CLOCK_PROCESS_BRING_DOWN_MENU
+		clr	di
+		call	ObjMessage
+
+		; mov	si, offset ClockMenu
+		; mov	bx, handle ClockMenu
+		; mov	di, mask MF_FIXUP_DS
+		; mov	cx, IC_INTERACTION_COMPLETE
+		; mov	ax, MSG_GEN_GUP_INTERACTION_COMMAND
+		; call	ObjMessage
+
+		pop	di, ds
+
+		tst	{word}ds:[di].CAI_clock
+		jz	done
+		movdw	bxsi, ds:[di].CAI_clock
+		mov	cx, FALSE
 		mov	di, mask MF_FIXUP_DS
-		mov	cx, IC_INTERACTION_COMPLETE
-		mov	ax, MSG_GEN_GUP_INTERACTION_COMMAND
-		GOTO	ObjMessage
+		mov	ax, MSG_CLOCK_MENU_STATE
+		call	ObjMessage
+
+done:
+		ret
+
 ClockAppLostFocus	endm
 
 ;------------------------------------------------------------------------------
@@ -674,30 +697,44 @@ ClockStartSelect method dynamic ClockClass, MSG_META_START_SELECT
 	;
 		mov	di, ds:[si]
 		add	di, ds:[di].Gen_offset
-		cmp	ds:[di].CI_isMenuOpen, FALSE
-		mov	bx, handle 0
-		je	doOpen
+		cmp	ds:[di].CI_isMenuOpen, TRUE
+		je	doClose
 
-;doClose:
-		mov	ax, MSG_CLOCK_PROCESS_BRING_DOWN_MENU
-		push	di
-		clr	di
-		call	ObjMessage
-		pop	di
-		mov	ds:[di].CI_isMenuOpen, FALSE
-		jmp	done
-doOpen:
+;doOpen:
+		mov	bx, handle 0
 		mov	ax, MSG_CLOCK_PROCESS_BRING_UP_MENU
-		push	di
 		clr	di
 		call	ObjMessage
-		pop	di
-		mov	ds:[di].CI_isMenuOpen, TRUE
-done:
+
+		mov	cx, TRUE	; new state of menu
+		jmp	setMenuState
+doClose:
+		mov	bx, handle 0
+		mov	ax, MSG_CLOCK_PROCESS_BRING_DOWN_MENU
+		clr	di
+		call	ObjMessage
+
+		mov	cx, FALSE	; new state of menu
+setMenuState:
+		mov	ax, MSG_CLOCK_MENU_STATE
+		call	ObjCallInstanceNoLock
+;done:
 		mov	ax, mask MRF_PROCESSED
 
 		.leave
 		ret
 ClockStartSelect	endm
+
+
+ClockMenuState method dynamic ClockClass, MSG_CLOCK_MENU_STATE
+
+		mov	di, ds:[si]
+		add	di, ds:[di].Gen_offset
+		mov	ds:[di].CI_isMenuOpen, cx
+
+		ret
+ClockMenuState	endm
+
+
 
 Code	ends
