@@ -168,7 +168,7 @@ COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 		ClockProcessBringUpMenu
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-SYNOPSIS:	Bring up / close dowwn our menu
+SYNOPSIS:	Bring up / close down our menu
 
 CALLED BY:	MSG_CLOCK_PROCESS_BRING_UP_MENU / MSG_CLOCK_PROCESS_BRING_DOWN_MENU
 PASS:		ds - dgroup
@@ -230,6 +230,9 @@ ClockProcessBringUpMenu	endm
 ClockProcessBringDownMenu method dynamic ClockProcessClass,
 					MSG_CLOCK_PROCESS_BRING_DOWN_MENU
 
+	;
+	; bring down our menu
+	;
 		mov	si, offset ClockMenu
 		mov	bx, handle ClockMenu
 		mov	di, mask MF_FIXUP_DS
@@ -274,6 +277,7 @@ ClockAppClockCreated	method dynamic ClockApplicationClass,
 		mov	dl, VUM_NOW
 		mov	di, mask MF_FIXUP_DS
 		GOTO	ObjMessage
+
 ClockAppClockCreated	endm
 
 
@@ -433,6 +437,9 @@ DESTROYED:	ax, cx, dx, bp
 ClockAppLostFocus	method dynamic ClockApplicationClass,
 						MSG_META_LOST_FOCUS_EXCL
 
+	;
+	; bring down menu
+	;
 		push	di, ds
 
 		mov	di, offset ClockApplicationClass
@@ -443,21 +450,18 @@ ClockAppLostFocus	method dynamic ClockApplicationClass,
 		clr	di
 		call	ObjMessage
 
-		; mov	si, offset ClockMenu
-		; mov	bx, handle ClockMenu
-		; mov	di, mask MF_FIXUP_DS
-		; mov	cx, IC_INTERACTION_COMPLETE
-		; mov	ax, MSG_GEN_GUP_INTERACTION_COMMAND
-		; call	ObjMessage
-
 		pop	di, ds
 
+	;
+	; store new state of menu in ClockGlyph object
+	; the glyph object can be easily reached from here...
+	;
 		tst	{word}ds:[di].CAI_clock
 		jz	done
 		movdw	bxsi, ds:[di].CAI_clock
 		mov	cx, FALSE
 		mov	di, mask MF_FIXUP_DS
-		mov	ax, MSG_CLOCK_MENU_STATE
+		mov	ax, MSG_CLOCK_SET_MENU_STATE
 		call	ObjMessage
 
 done:
@@ -693,13 +697,16 @@ ClockStartSelect method dynamic ClockClass, MSG_META_START_SELECT
 		.enter
 
 	;
-	; bring up or close the menu
+	; get current state of menu
 	;
 		mov	di, ds:[si]
 		add	di, ds:[di].Gen_offset
 		cmp	ds:[di].CI_isMenuOpen, TRUE
 		je	doClose
 
+	;
+	; open menu
+	;
 ;doOpen:
 		mov	bx, handle 0
 		mov	ax, MSG_CLOCK_PROCESS_BRING_UP_MENU
@@ -708,6 +715,10 @@ ClockStartSelect method dynamic ClockClass, MSG_META_START_SELECT
 
 		mov	cx, TRUE	; new state of menu
 		jmp	setMenuState
+
+	;
+	; close menu
+	;
 doClose:
 		mov	bx, handle 0
 		mov	ax, MSG_CLOCK_PROCESS_BRING_DOWN_MENU
@@ -715,9 +726,17 @@ doClose:
 		call	ObjMessage
 
 		mov	cx, FALSE	; new state of menu
+
+	;
+	; set menu state
+	;
 setMenuState:
-		mov	ax, MSG_CLOCK_MENU_STATE
+		mov	ax, MSG_CLOCK_SET_MENU_STATE
 		call	ObjCallInstanceNoLock
+
+	;
+	; mark as processed
+	;
 ;done:
 		mov	ax, mask MRF_PROCESSED
 
@@ -726,15 +745,30 @@ setMenuState:
 ClockStartSelect	endm
 
 
-ClockMenuState method dynamic ClockClass, MSG_CLOCK_MENU_STATE
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		ClockMenuState
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
+SYNOPSIS:	Set menu state (CI_isMenuOpen) to value in CX
+
+CALLED BY:	MSG_META_START_SELECT
+PASS:		*ds:si	= Clock object
+		cx = new menu state (TRUE/FALSE)
+RETURN:		'nuthin
+DESTROYED:	?
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+ClockMenuState method dynamic ClockClass, MSG_CLOCK_SET_MENU_STATE
+
+	;
+	; set menu state
+	;
 		mov	di, ds:[si]
 		add	di, ds:[di].Gen_offset
 		mov	ds:[di].CI_isMenuOpen, cx
 
 		ret
+
 ClockMenuState	endm
-
-
 
 Code	ends
