@@ -1,0 +1,300 @@
+/*
+***************************************************************************
+*              Include files
+***************************************************************************
+*/
+@include <stdapp.goh>
+@include <Objects/eMenuC.goh>
+@include <Objects/gFieldC.goh>
+@include <utils.goh>
+@include <globals.goh>
+#include <Ansi/stdio.h>
+#include <Ansi/string.h>
+#include <token.h>
+
+word        launcherNr     = NULL;
+word        numFiles       = 0;
+MemHandle   filesHan       = 0;
+char*       filesPtr       = 0;
+optr        triggers[25];
+optr        minimTrigger = NullOptr;
+
+
+#define MAX_TRIGGERS 24   /* it's 25 actually */
+
+/*
+***************************************************************************
+*              Class & Message Definitions
+***************************************************************************
+*/
+
+@class  TrayAppsProcessClass, GenProcessClass;
+    @message void MSG_ADD_LAUNCHER();
+    @message void MSG_ADD_MINIMIZE_TRIGGER();
+    @message (GEN_TRIGGER_ACTION) MSG_SOFT_LAUNCHER_PRESSED;
+    @message void MSG_EMC_TRIGGER_CREATED(CreateExpressMenuControlItemResponseParams *response = ss:bp);
+    @message void MSG_EMC_MINIMIZE_TRIGGER_CREATED(CreateExpressMenuControlItemResponseParams *response = ss:bp);
+    @message void MSG_START_MINIMIZING();
+@endc   /* end of class definition */
+
+@class GenGeodeTokenTriggerClass, GenTriggerClass;
+    @vardata GeodeToken ATTR_GEODE_TOKEN_TO_PASS;
+@endc;
+
+@classdecl   TrayAppsProcessClass, neverSaved;
+@classdecl   GenGeodeTokenTriggerClass, neverSaved;
+/*
+***************************************************************************
+*              UI Objects
+***************************************************************************
+*/
+
+@start  AppResource;
+    @object GenApplicationClass TrayAppsApp =
+    {
+        GAI_states = (((@default) | (AS_NOT_USER_INTERACTABLE) | (AS_AVOID_TRANSPARENT_DETACH)) & ((~AS_FOCUSABLE) & (~AS_MODELABLE)));
+        GI_attrs = ((@default) & (~GA_TARGETABLE));
+
+        GI_visMoniker = list {@TrayAppsAppTextMoniker};
+    }
+    @visMoniker TrayAppsAppTextMoniker = "Tray Apps";
+@end    AppResource;
+
+@start ArtResource;
+    @include <minimart.goh>
+@end ArtResource;
+
+@start Strings, data;
+    @chunk char MinimHelp[] = "Minimize All Open Windows";
+@end Strings;
+
+/***********************************************************************
+CODE
+/*********************************************************************
+* Beim Starten der Applikation Trigger anlegen.
+*********************************************************************/
+@method TrayAppsProcessClass, MSG_GEN_PROCESS_OPEN_APPLICATION
+{
+    @callsuper();
+
+    if (FileSetCurrentPath(SP_SYS_APPLICATION, "TRAY"))
+    {
+        numFiles = ListFiles(&filesHan, FESF_GEOS_EXECS);
+
+        if (numFiles)
+        {
+            numFiles--;
+            if (numFiles > MAX_TRIGGERS) numFiles = MAX_TRIGGERS;
+            @call process::MSG_ADD_LAUNCHER();
+        }
+        else
+        {
+            @call process::MSG_ADD_MINIMIZE_TRIGGER();
+        }
+    }
+    else
+    {
+        @call process::MSG_ADD_MINIMIZE_TRIGGER();
+    }
+}
+
+
+/*********************************************************************
+* Beim Starten der Applikation Trigger anlegen.
+*********************************************************************/
+@method TrayAppsProcessClass, MSG_ADD_LAUNCHER
+{
+    CreateExpressMenuControlItemParams cemcip;
+    EventHandle    event;
+
+    if (launcherNr <= numFiles)
+    {
+        /*cemcip.CEMCIP_feature = CEMCIF_UTILITIES_PANEL;*/
+        cemcip.CEMCIP_feature = CEMCIF_SYSTEM_TRAY;
+        cemcip.CEMCIP_class = &GenGeodeTokenTriggerClass;
+        cemcip.CEMCIP_itemPriority = CEMCIP_STANDARD_PRIORITY;
+        cemcip.CEMCIP_responseMessage = MSG_EMC_TRIGGER_CREATED;
+        cemcip.CEMCIP_responseDestination = oself;
+        cemcip.CEMCIP_field = NullOptr;
+
+        event = @record ExpressMenuControlClass::MSG_EXPRESS_MENU_CONTROL_CREATE_ITEM(cemcip);
+        GCNListSend(MANUFACTURER_ID_GEOWORKS, GCNSLT_EXPRESS_MENU_OBJECTS, event, 0, 0);
+    }
+    else
+    {
+        /* Keine weiteren Launcher */
+        if (filesHan) MemFree(filesHan);
+
+        @call process::MSG_ADD_MINIMIZE_TRIGGER();
+    }
+}
+
+/***********************************************************************
+*    Initializes the newly created Express menu trigger
+***********************************************************************/
+@method TrayAppsProcessClass, MSG_EMC_TRIGGER_CREATED
+{
+    optr           obj = NULL;
+    Boolean        isGMoniker = FALSE;
+    ChunkHandle    newMoniker = NULL;
+    word           chunkSize = 0;
+    GeodeToken     tok;
+    optr*          fh  = NULL;
+    ChunkHandle    helpChunk = NULL;
+    char*          helpChunkPtr = NULL;
+
+    filesPtr = MemLock(filesHan);
+    filesPtr = filesPtr + (launcherNr * FILE_LONGNAME_BUFFER_SIZE);
+    FileGetPathExtAttributes(filesPtr, FEA_TOKEN, (&tok), sizeof(GeodeToken));
+    MemLock(OptrToHandle(@MinimHelp));
+    helpChunk = LMemAlloc(OptrToHandle(@MinimHelp), FILE_LONGNAME_BUFFER_SIZE);
+    helpChunkPtr = LMemDerefHandles(OptrToHandle(@MinimHelp), helpChunk);
+    strcpy(helpChunkPtr, filesPtr);
+    MemUnlock(OptrToHandle(@MinimHelp));
+    MemUnlock(filesHan);
+
+    obj = response->CEMCIRP_newItem;
+    MemLock(OptrToHandle(obj));
+
+    isGMoniker = TokenLoadMonikerChunk(
+                        TOKEN_CHARS_fixed(tok.GT_chars[0],tok.GT_chars[1],tok.GT_chars[2],tok.GT_chars[3]),
+                        tok.GT_manufID,
+                        (DT_DISP_SIZE | DT_DISP_ASPECT_RATIO | DT_DISP_CLASS),
+                        ((VMSF_GSTRING | VMSF_COPY_CHUNK) | (VMS_TOOL << VMSF_STYLE_OFFSET)),
+                        OptrToHandle(obj),
+                        &chunkSize,
+                        &newMoniker);
+
+    if (isGMoniker)
+    {
+        @call obj::MSG_GEN_USE_VIS_MONIKER(newMoniker, VUM_NOW);
+    }
+
+    @call obj::MSG_GEN_TRIGGER_SET_ACTION_MSG(MSG_SOFT_LAUNCHER_PRESSED);
+    @call obj::MSG_GEN_TRIGGER_SET_DESTINATION(oself);
+    @call obj::MSG_META_ADD_VAR_DATA(HINT_NO_BORDERS_ON_MONIKERS, 0, (void*) 0);
+    @call obj::MSG_META_ADD_VAR_DATA((ATTR_GEODE_TOKEN_TO_PASS & (~VDF_SAVE_TO_STATE)), sizeof(GeodeToken), &tok);
+    fh = (optr*) ObjVarAddData(obj, (ATTR_GEN_FOCUS_HELP & (~VDF_SAVE_TO_STATE)), sizeof(optr));
+    (*fh) = ConstructOptr(OptrToHandle(@MinimHelp), helpChunk);
+    ObjSetFlags(obj, OCF_VARDATA_RELOC, 0);
+
+    MemUnlock(OptrToHandle(obj));
+
+    @call obj::MSG_GEN_SET_USABLE(VUM_NOW);
+    triggers[launcherNr] = obj;
+
+    launcherNr++;
+    @call process::MSG_ADD_LAUNCHER();
+}
+
+/*********************************************************************
+* Beim Starten der Applikation Trigger anlegen.
+*********************************************************************/
+@method TrayAppsProcessClass, MSG_ADD_MINIMIZE_TRIGGER
+{
+    CreateExpressMenuControlItemParams cemcip;
+    EventHandle    event;
+
+    /* Minimize Trigger hinter alle anderen legen */
+    /*cemcip.CEMCIP_feature = CEMCIF_UTILITIES_PANEL;*/
+    cemcip.CEMCIP_feature = CEMCIF_SYSTEM_TRAY;
+    cemcip.CEMCIP_class = &GenTriggerClass;
+    cemcip.CEMCIP_itemPriority = CEMCIP_STANDARD_PRIORITY;
+    cemcip.CEMCIP_responseMessage = MSG_EMC_MINIMIZE_TRIGGER_CREATED;
+    cemcip.CEMCIP_responseDestination = oself;
+    cemcip.CEMCIP_field = NullOptr;
+
+    event = @record ExpressMenuControlClass::MSG_EXPRESS_MENU_CONTROL_CREATE_ITEM(cemcip);
+    GCNListSend(MANUFACTURER_ID_GEOWORKS, GCNSLT_EXPRESS_MENU_OBJECTS, event, 0, 0);
+}
+
+/***********************************************************************
+*    Initialisiert den Minimize Trigger
+***********************************************************************/
+@method TrayAppsProcessClass, MSG_EMC_MINIMIZE_TRIGGER_CREATED
+{
+    optr           obj = NULL;
+    optr*          fh  = NULL;
+
+    obj = response->CEMCIRP_newItem;
+
+    MemLock(OptrToHandle(obj));
+
+    @call obj::MSG_GEN_REPLACE_VIS_MONIKER_OPTR(@MinimButtonMoniker, VUM_NOW);
+
+    @call obj::MSG_GEN_TRIGGER_SET_ACTION_MSG(MSG_START_MINIMIZING);
+    @call obj::MSG_GEN_TRIGGER_SET_DESTINATION(oself);
+    @call obj::MSG_META_ADD_VAR_DATA(HINT_NO_BORDERS_ON_MONIKERS, 0, (void*) 0);
+
+    fh = (optr*) ObjVarAddData(obj, (ATTR_GEN_FOCUS_HELP & (~VDF_SAVE_TO_STATE)), sizeof(optr));
+    (*fh) = @MinimHelp;
+    ObjSetFlags(obj, OCF_VARDATA_RELOC, 0);
+
+    MemUnlock(OptrToHandle(obj));
+
+    @call obj::MSG_GEN_SET_USABLE(VUM_NOW);
+    minimTrigger = obj;
+}
+
+/***********************************************************************
+*
+***********************************************************************/
+@method TrayAppsProcessClass, MSG_SOFT_LAUNCHER_PRESSED
+{
+    GeodeToken gt;
+
+    @call trigger::MSG_META_GET_VAR_DATA(ATTR_GEODE_TOKEN_TO_PASS, sizeof(GeodeToken), &gt);
+    LaunchApp(gt);
+}
+
+/***********************************************************************
+*    Start Minimizing Process
+***********************************************************************/
+@method TrayAppsProcessClass, MSG_START_MINIMIZING
+{
+    optr              gfield   = NULL;
+    optr              tapp     = NULL;
+    optr              oldtapp  = NULL;
+    EventHandle       minimEv;
+
+    gfield = @call TrayAppsApp::MSG_GEN_FIND_PARENT();
+
+    do
+    {
+        oldtapp = tapp;
+        tapp = @call gfield::MSG_GEN_FIELD_GET_TOP_GEN_APPLICATION();
+
+        minimEv = @record GenDisplayClass::MSG_GEN_DISPLAY_SET_MINIMIZED();
+        @call tapp::MSG_GEN_SEND_TO_CHILDREN(minimEv);
+    }
+    while ((tapp) && (tapp != oldtapp));
+}
+
+/***********************************************************************
+*
+***********************************************************************/
+@method TrayAppsProcessClass, MSG_GEN_PROCESS_CLOSE_APPLICATION
+{
+    EventHandle    event;
+
+    while(launcherNr--)
+    {
+        event = @record ExpressMenuControlClass::MSG_EXPRESS_MENU_CONTROL_DESTROY_CREATED_ITEM(triggers[launcherNr], VUM_NOW);
+        GCNListSend(MANUFACTURER_ID_GEOWORKS, GCNSLT_EXPRESS_MENU_OBJECTS, event, 0, 0);
+    }
+
+    event = @record ExpressMenuControlClass::MSG_EXPRESS_MENU_CONTROL_DESTROY_CREATED_ITEM(minimTrigger, VUM_NOW);
+    GCNListSend(MANUFACTURER_ID_GEOWORKS, GCNSLT_EXPRESS_MENU_OBJECTS, event, 0, 0);
+
+    return @callsuper();
+}
+
+/*------------------------------------------------------------------
+This is called by MSG_META_DETACH and allows for changing the
+name of the state file which should be created for the application.
+We don't want no state file, so we just return 0.
+------------------------------------------------------------------*/
+@method TrayAppsProcessClass, MSG_GEN_PROCESS_CREATE_NEW_STATE_FILE
+{
+    return 0;
+}

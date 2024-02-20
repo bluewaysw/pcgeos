@@ -1,0 +1,158 @@
+/* Benoetigt... */
+@include <globals.goh>
+
+/************************************************************************
+Dummy
+fuer Swat: allows for setting breakpoints in front of critical code.
+*************************************************************************/
+void Dummy(void){}
+
+/* Msg Box -------------------------------------------------------------*/
+/*fuer msg_type:  CDT_ERROR, CDT_WARNING, CDT_NOTIFICATION */
+void MsgBox(CustomDialogType msg_type, optr format)
+{
+   UserStandardDialog(NULL, NULL, NULL, NULL,
+                               LOCK(format),
+                               (msg_type << CDBF_DIALOG_TYPE_OFFSET) |
+                               (GIT_NOTIFICATION << CDBF_INTERACTION_TYPE_OFFSET)
+                               );
+   UNLOCK(format);
+}
+
+/* Ja/Nein Box -----------------------------------------------------------*/
+Boolean DecideBox(optr format)
+{
+   if (UserStandardDialog(NULL, NULL, NULL, NULL,
+                                     LOCK(format),
+                                     (CDT_QUESTION << CDBF_DIALOG_TYPE_OFFSET) |
+                                     (GIT_AFFIRMATION << CDBF_INTERACTION_TYPE_OFFSET)
+                                    ) == IC_YES)
+       {
+            UNLOCK(format);
+            return TRUE;         /* Ja Antwort */
+       }
+       else
+       {
+            UNLOCK(format);
+            return FALSE;        /* Nein Antwort */
+       }
+}
+
+/***********************************************************************
+FileParsePath
+************************************************************************/
+void FileParsePath(char *fpath, DiskHandle *dh, char *fdir, char *fnam)
+{
+   word            test = 0;
+   FileAttrs       *attrs = 0;
+   char            *pb     = 0;
+   /* Variablen zuruecksetzen */
+   pb       = 0;
+   (*dh) = 0;
+   memset(fdir, 0, sizeof(fdir));
+   memset(fnam, 0, sizeof(fnam));
+
+   /* pb auf vollen Pfad setzen */
+   pb = fpath;
+   (*dh) = FileResolveStandardPath(&pb,
+                                                 256,
+                                                 fpath,
+                                                 (~FRSPF_ADD_DRIVE_NAME) | FRSPF_RETURN_FIRST_DIR,
+                                                 attrs);
+
+   /* Fhrenden Backslash entfernen */
+   fpath = fpath + 1;
+
+   /* Dateinamen ermitteln */
+   strncpy(fnam, strrchr(fpath, '\\') + 1, (strlen(fpath) - test));
+   strcat(fnam, "\0");
+
+   /* L„nge ohne Dateinamen ermitteln */
+   test = ((int) (strrchr(fpath, '\\')) + 1) - ((int) fpath) - 1;
+
+   /* Pfad ohne Dateinamen erzeugen */
+   strncpy(fdir, fpath, test);
+   strcat(fdir, "\0");
+}
+
+/***********************************************************************
+Applikation via IACP starten....
+************************************************************************/
+void LaunchApp(GeodeToken tok)
+{
+IACPConnection       iacpConnectionToken = IACP_NO_CONNECTION;
+word                 connectionFlags   = IACPSM_USER_INTERACTIBLE;
+word                 serverCount;
+MemHandle            hLaunchBlock;
+
+   hLaunchBlock = IACPCreateDefaultLaunchBlock(MSG_GEN_PROCESS_OPEN_APPLICATION);
+
+   iacpConnectionToken = IACPConnect(&tok, connectionFlags,
+                                     hLaunchBlock, NullOptr, &serverCount);
+
+   if(iacpConnectionToken != IACP_NO_CONNECTION)
+   {
+      IACPShutdown(iacpConnectionToken, NullOptr);
+   }
+}
+
+/***********************************************************************
+ ListFiles
+ whatFiles: FESF_NON_GEOS
+                  FESF_GEOS_EXECS
+                  FESF_GEOS_NON_EXECS
+                  FESF_DIRS
+                  FILE_ENUM_ALL_FILE_TYPES (but no directories)
+ ***********************************************************************/
+word ListFiles(MemHandle* FilesToReturn, FileEnumSearchFlags whatFiles)  /*numOfFiles returned*/
+{
+   FileEnumParams       fileEnumParams;
+   word                 filesNotHandled = NULL;
+   word                 numOfFiles = NULL;
+
+   fileEnumParams.FEP_searchFlags = whatFiles;
+
+   fileEnumParams.FEP_returnAttrs = (void*) FESRT_NAME;  /*Return the file's Geos filename.*/
+
+   fileEnumParams.FEP_returnSize = FILE_LONGNAME_BUFFER_SIZE;
+   fileEnumParams.FEP_bufSize = FE_BUFSIZE_UNLIMITED;    /* FE_BUFSIZE_UNLIMITED allows the return buffer size to be as large as necessary.*/
+
+   fileEnumParams.FEP_matchAttrs = 0;  /* Set matchAttrs to zero so it will match anything.*/
+   fileEnumParams.FEP_skipCount = 0;   /* Don't skip any files*/
+   fileEnumParams.FEP_callback = 0;   /* Don't need no callback. */
+
+   numOfFiles = FileEnum( &fileEnumParams,
+                          FilesToReturn,
+                          &filesNotHandled);
+
+   if (numOfFiles && (*FilesToReturn))
+   {
+      return(numOfFiles);
+   }
+   else
+   {
+      return(0);
+   }
+}
+
+/***********************************************************************
+ strident = vergleicht Strings bezueglich Laenge und Inhalt
+ returns TRUE if equal, FALSE if not
+ ***********************************************************************/
+Boolean strident(char* str1, char* str2)
+{
+   if (
+          (strstr(str1, str2) != 0)
+       && (strcmp(str1, str2) == 0)
+      )
+   {
+      return(TRUE);
+   }
+   else
+   {
+      return(FALSE);
+   }
+}
+/***********************************************************************
+ EOF
+ ***********************************************************************/
