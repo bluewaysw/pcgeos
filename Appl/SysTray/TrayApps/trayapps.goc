@@ -89,12 +89,12 @@ CODE
         }
         else
         {
-            @call process::MSG_ADD_MINIMIZE_TRIGGER();
+            //@call process::MSG_ADD_MINIMIZE_TRIGGER();
         }
     }
     else
     {
-        @call process::MSG_ADD_MINIMIZE_TRIGGER();
+        //@call process::MSG_ADD_MINIMIZE_TRIGGER();
     }
 }
 
@@ -125,7 +125,7 @@ CODE
         /* Keine weiteren Launcher */
         if (filesHan) MemFree(filesHan);
 
-        @call process::MSG_ADD_MINIMIZE_TRIGGER();
+        //@call process::MSG_ADD_MINIMIZE_TRIGGER();
     }
 }
 
@@ -136,8 +136,8 @@ CODE
 {
     optr           obj = NULL;
     Boolean        isGMoniker = FALSE;
-    ChunkHandle    newMoniker = NULL;
-    word           chunkSize = 0;
+    MemHandle      newMoniker = NULL;
+    word           monikerSize = 0;
     GeodeToken     tok;
     optr*          fh  = NULL;
     ChunkHandle    helpChunk = NULL;
@@ -154,31 +154,35 @@ CODE
     MemUnlock(filesHan);
 
     obj = response->CEMCIRP_newItem;
-    MemLock(OptrToHandle(obj));
 
-    isGMoniker = TokenLoadMonikerChunk(
+    isGMoniker = TokenLoadMonikerBlock(
                         TOKEN_CHARS_fixed(tok.GT_chars[0],tok.GT_chars[1],tok.GT_chars[2],tok.GT_chars[3]),
                         tok.GT_manufID,
                         (DT_DISP_SIZE | DT_DISP_ASPECT_RATIO | DT_DISP_CLASS),
                         ((VMSF_GSTRING | VMSF_COPY_CHUNK) | (VMS_TOOL << VMSF_STYLE_OFFSET)),
-                        OptrToHandle(obj),
-                        &chunkSize,
+                        &monikerSize,
                         &newMoniker);
 
     if (isGMoniker)
     {
-        @call obj::MSG_GEN_USE_VIS_MONIKER(newMoniker, VUM_NOW);
+        @call obj::MSG_GEN_REPLACE_VIS_MONIKER(
+            VUM_NOW,
+            0, 0, monikerSize,
+            VMDT_VIS_MONIKER, VMST_HPTR,
+            (dword)(ConstructOptr(newMoniker, 0))
+        );
     }
 
     @call obj::MSG_GEN_TRIGGER_SET_ACTION_MSG(MSG_SOFT_LAUNCHER_PRESSED);
     @call obj::MSG_GEN_TRIGGER_SET_DESTINATION(oself);
     @call obj::MSG_META_ADD_VAR_DATA(HINT_NO_BORDERS_ON_MONIKERS, 0, (void*) 0);
     @call obj::MSG_META_ADD_VAR_DATA((ATTR_GEODE_TOKEN_TO_PASS & (~VDF_SAVE_TO_STATE)), sizeof(GeodeToken), &tok);
-    fh = (optr*) ObjVarAddData(obj, (ATTR_GEN_FOCUS_HELP & (~VDF_SAVE_TO_STATE)), sizeof(optr));
-    (*fh) = ConstructOptr(OptrToHandle(@MinimHelp), helpChunk);
-    ObjSetFlags(obj, OCF_VARDATA_RELOC, 0);
 
-    MemUnlock(OptrToHandle(obj));
+    // MemLock(HandleOf(obj));
+    // fh = (optr*) ObjVarAddData(obj, (ATTR_GEN_FOCUS_HELP & (~VDF_SAVE_TO_STATE)), sizeof(optr));
+    // (*fh) = ConstructOptr(OptrToHandle(@MinimHelp), helpChunk);
+    // ObjSetFlags(obj, OCF_VARDATA_RELOC, 0);
+    // MemUnlock(HandleOf(obj));
 
     @call obj::MSG_GEN_SET_USABLE(VUM_NOW);
     triggers[launcherNr] = obj;
