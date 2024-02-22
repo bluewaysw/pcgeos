@@ -12,15 +12,15 @@
 #include <Ansi/string.h>
 #include <token.h>
 
-word        launcherNr     = NULL;
-word        numFiles       = 0;
-MemHandle   filesHan       = 0;
-char*       filesPtr       = 0;
+word        launcherNr      = NULL;
+word        numFiles        = 0;
+MemHandle   filesHan        = 0;
+char*       filesPtr        = 0;
 optr        triggers[25];
-optr        minimTrigger = NullOptr;
+optr        minimTrigger    = NullOptr;
 
 
-#define MAX_TRIGGERS 24   /* it's 25 actually */
+#define MAX_TRIGGERS 24   /* 0-based, it's 25 actually */
 
 /*
 ***************************************************************************
@@ -32,7 +32,7 @@ optr        minimTrigger = NullOptr;
     @message void MSG_ADD_LAUNCHER();
     @message void MSG_ADD_MINIMIZE_TRIGGER();
     @message (GEN_TRIGGER_ACTION) MSG_SOFT_LAUNCHER_PRESSED;
-    @message void MSG_EMC_TRIGGER_CREATED(CreateExpressMenuControlItemResponseParams *response = ss:bp);
+    @message void MSG_EMC_LAUNCHER_TRIGGER_CREATED(CreateExpressMenuControlItemResponseParams *response = ss:bp);
     @message void MSG_EMC_MINIMIZE_TRIGGER_CREATED(CreateExpressMenuControlItemResponseParams *response = ss:bp);
     @message void MSG_START_MINIMIZING();
 @endc   /* end of class definition */
@@ -57,7 +57,7 @@ optr        minimTrigger = NullOptr;
 
         GI_visMoniker = list {@TrayAppsAppTextMoniker};
     }
-    @visMoniker TrayAppsAppTextMoniker = "Tray Apps";
+    @visMoniker TrayAppsAppTextMoniker = "TrayApps";
 @end    AppResource;
 
 @start ArtResource;
@@ -67,6 +67,7 @@ optr        minimTrigger = NullOptr;
 @start Strings, data;
     @chunk char MinimHelp[] = "Minimize All Open Windows";
 @end Strings;
+
 
 /***********************************************************************
 CODE
@@ -87,14 +88,6 @@ CODE
             if (numFiles > MAX_TRIGGERS) numFiles = MAX_TRIGGERS;
             @call process::MSG_ADD_LAUNCHER();
         }
-        else
-        {
-            //@call process::MSG_ADD_MINIMIZE_TRIGGER();
-        }
-    }
-    else
-    {
-        //@call process::MSG_ADD_MINIMIZE_TRIGGER();
     }
 }
 
@@ -113,7 +106,7 @@ CODE
         cemcip.CEMCIP_feature = CEMCIF_SYSTEM_TRAY;
         cemcip.CEMCIP_class = &GenGeodeTokenTriggerClass;
         cemcip.CEMCIP_itemPriority = CEMCIP_STANDARD_PRIORITY;
-        cemcip.CEMCIP_responseMessage = MSG_EMC_TRIGGER_CREATED;
+        cemcip.CEMCIP_responseMessage = MSG_EMC_LAUNCHER_TRIGGER_CREATED;
         cemcip.CEMCIP_responseDestination = oself;
         cemcip.CEMCIP_field = NullOptr;
 
@@ -122,44 +115,45 @@ CODE
     }
     else
     {
-        /* Keine weiteren Launcher */
+        // no more launcher buttons
         if (filesHan) MemFree(filesHan);
 
-        //@call process::MSG_ADD_MINIMIZE_TRIGGER();
+        // add minimize trigger last
+        @call process::MSG_ADD_MINIMIZE_TRIGGER();
     }
 }
 
 /***********************************************************************
 *    Initializes the newly created Express menu trigger
 ***********************************************************************/
-@method TrayAppsProcessClass, MSG_EMC_TRIGGER_CREATED
+@method TrayAppsProcessClass, MSG_EMC_LAUNCHER_TRIGGER_CREATED
 {
     optr           obj = NULL;
     Boolean        isGMoniker = FALSE;
     MemHandle      newMoniker = NULL;
     word           monikerSize = 0;
     GeodeToken     tok;
-    optr*          fh  = NULL;
-    ChunkHandle    helpChunk = NULL;
-    char*          helpChunkPtr = NULL;
+    //optr*          fh  = NULL;
+    //ChunkHandle    helpChunk = NULL;
+    //char*          helpChunkPtr = NULL;
 
     filesPtr = MemLock(filesHan);
     filesPtr = filesPtr + (launcherNr * FILE_LONGNAME_BUFFER_SIZE);
     FileGetPathExtAttributes(filesPtr, FEA_TOKEN, (&tok), sizeof(GeodeToken));
-    MemLock(OptrToHandle(@MinimHelp));
-    helpChunk = LMemAlloc(OptrToHandle(@MinimHelp), FILE_LONGNAME_BUFFER_SIZE);
-    helpChunkPtr = LMemDerefHandles(OptrToHandle(@MinimHelp), helpChunk);
-    strcpy(helpChunkPtr, filesPtr);
-    MemUnlock(OptrToHandle(@MinimHelp));
+    // MemLock(OptrToHandle(@MinimHelp));
+    // helpChunk = LMemAlloc(OptrToHandle(@MinimHelp), FILE_LONGNAME_BUFFER_SIZE);
+    // helpChunkPtr = LMemDerefHandles(OptrToHandle(@MinimHelp), helpChunk);
+    // strcpy(helpChunkPtr, filesPtr);
+    // MemUnlock(OptrToHandle(@MinimHelp));
     MemUnlock(filesHan);
 
     obj = response->CEMCIRP_newItem;
 
     isGMoniker = TokenLoadMonikerBlock(
-                        TOKEN_CHARS_fixed(tok.GT_chars[0],tok.GT_chars[1],tok.GT_chars[2],tok.GT_chars[3]),
+                        TOKEN_CHARS(tok.GT_chars[0],tok.GT_chars[1],tok.GT_chars[2],tok.GT_chars[3]),
                         tok.GT_manufID,
                         (DT_DISP_SIZE | DT_DISP_ASPECT_RATIO | DT_DISP_CLASS),
-                        ((VMSF_GSTRING | VMSF_COPY_CHUNK) | (VMS_TOOL << VMSF_STYLE_OFFSET)),
+                        ((VMSF_GSTRING) | (VMS_TOOL << VMSF_STYLE_OFFSET)),
                         &monikerSize,
                         &newMoniker);
 
@@ -168,14 +162,15 @@ CODE
         @call obj::MSG_GEN_REPLACE_VIS_MONIKER(
             VUM_NOW,
             0, 0, monikerSize,
-            VMDT_VIS_MONIKER, VMST_HPTR,
+            VMDT_VIS_MONIKER,
+            VMST_HPTR,
             (dword)(ConstructOptr(newMoniker, 0))
         );
     }
 
     @call obj::MSG_GEN_TRIGGER_SET_ACTION_MSG(MSG_SOFT_LAUNCHER_PRESSED);
     @call obj::MSG_GEN_TRIGGER_SET_DESTINATION(oself);
-    @call obj::MSG_META_ADD_VAR_DATA(HINT_NO_BORDERS_ON_MONIKERS, 0, (void*) 0);
+    //@call obj::MSG_META_ADD_VAR_DATA(HINT_NO_BORDERS_ON_MONIKERS, 0, (void*) 0);
     @call obj::MSG_META_ADD_VAR_DATA((ATTR_GEODE_TOKEN_TO_PASS & (~VDF_SAVE_TO_STATE)), sizeof(GeodeToken), &tok);
 
     // MemLock(HandleOf(obj));
@@ -196,8 +191,8 @@ CODE
 *********************************************************************/
 @method TrayAppsProcessClass, MSG_ADD_MINIMIZE_TRIGGER
 {
-    CreateExpressMenuControlItemParams cemcip;
-    EventHandle    event;
+    CreateExpressMenuControlItemParams  cemcip;
+    EventHandle                         event;
 
     /* Minimize Trigger hinter alle anderen legen */
     /*cemcip.CEMCIP_feature = CEMCIF_UTILITIES_PANEL;*/
@@ -218,23 +213,34 @@ CODE
 @method TrayAppsProcessClass, MSG_EMC_MINIMIZE_TRIGGER_CREATED
 {
     optr           obj = NULL;
-    optr*          fh  = NULL;
+    //optr*          fh  = NULL;
+    //MemHandle      newMoniker = NULL;
+    //word           monikerSize = 0;
 
     obj = response->CEMCIRP_newItem;
 
-    MemLock(OptrToHandle(obj));
+    //@call obj::MSG_GEN_REPLACE_VIS_MONIKER_OPTR(@MinimButtonMoniker, VUM_NOW);
+    @call obj::MSG_GEN_REPLACE_VIS_MONIKER(
+        VUM_NOW,
+        0, 0, 0,
+        VMDT_VIS_MONIKER,
+        VMST_OPTR,
+        (dword) (@MinimButtonMoniker)
+    );
 
-    @call obj::MSG_GEN_REPLACE_VIS_MONIKER_OPTR(@MinimButtonMoniker, VUM_NOW);
+
+
+    //@send obj::MSG_GEN_REPLACE_VIS_MONIKER_TEXT("Minimize!", VUM_NOW);
 
     @call obj::MSG_GEN_TRIGGER_SET_ACTION_MSG(MSG_START_MINIMIZING);
     @call obj::MSG_GEN_TRIGGER_SET_DESTINATION(oself);
-    @call obj::MSG_META_ADD_VAR_DATA(HINT_NO_BORDERS_ON_MONIKERS, 0, (void*) 0);
+    //@call obj::MSG_META_ADD_VAR_DATA(HINT_NO_BORDERS_ON_MONIKERS, 0, (void*) 0);
 
-    fh = (optr*) ObjVarAddData(obj, (ATTR_GEN_FOCUS_HELP & (~VDF_SAVE_TO_STATE)), sizeof(optr));
-    (*fh) = @MinimHelp;
-    ObjSetFlags(obj, OCF_VARDATA_RELOC, 0);
-
-    MemUnlock(OptrToHandle(obj));
+    //MemLock(OptrToHandle(obj));
+    //fh = (optr*) ObjVarAddData(obj, (ATTR_GEN_FOCUS_HELP & (~VDF_SAVE_TO_STATE)), sizeof(optr));
+    //(*fh) = @MinimHelp;
+    //ObjSetFlags(obj, OCF_VARDATA_RELOC, 0);
+    //MemUnlock(OptrToHandle(obj));
 
     @call obj::MSG_GEN_SET_USABLE(VUM_NOW);
     minimTrigger = obj;
