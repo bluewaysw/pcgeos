@@ -54,7 +54,7 @@ resource MenuResource                   ui-object
 # resource DOCUMENTUI                     object
 
 resource MONIKERRESOURCE  data object
-resource StringResource  data object
+resource StringResource  lmem read-only shared
 
 #export FrotzViewClass
 export FrotzInputTextClass

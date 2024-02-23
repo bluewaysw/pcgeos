@@ -35,6 +35,7 @@ resource InterfaceOptions object
 #resource InterfaceView object
 resource StringsResource data lmem read-only shared discardable
 resource QTipsResource object
+resource ResourcePictures lmem read-only shared discardable
 
 # exports
 
