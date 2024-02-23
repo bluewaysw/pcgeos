@@ -187,14 +187,13 @@ CODE
 }
 
 /*********************************************************************
-* Beim Starten der Applikation Trigger anlegen.
+* add minimize trigger behind all the other triggers
 *********************************************************************/
 @method TrayAppsProcessClass, MSG_ADD_MINIMIZE_TRIGGER
 {
     CreateExpressMenuControlItemParams  cemcip;
     EventHandle                         event;
 
-    /* Minimize Trigger hinter alle anderen legen */
     /*cemcip.CEMCIP_feature = CEMCIF_UTILITIES_PANEL;*/
     cemcip.CEMCIP_feature = CEMCIF_SYSTEM_TRAY;
     cemcip.CEMCIP_class = &GenTriggerClass;
@@ -208,7 +207,7 @@ CODE
 }
 
 /***********************************************************************
-*    Initialisiert den Minimize Trigger
+*    initialize the minimize trigger
 ***********************************************************************/
 @method TrayAppsProcessClass, MSG_EMC_MINIMIZE_TRIGGER_CREATED
 {
@@ -216,10 +215,29 @@ CODE
     //optr*          fh  = NULL;
     //MemHandle      newMoniker = NULL;
     //word           monikerSize = 0;
+    Boolean        isGMoniker = FALSE;
+    MemHandle      newMoniker = NULL;
+    word           monikerSize = 0;
+
+
+    /*
+    Rectangle   trigMargins;
+    trigMargins.R_left = 5;
+    trigMargins.R_top = 0;
+    trigMargins.R_right = 5;
+    trigMargins.R_bottom = 0;
+    */
 
     obj = response->CEMCIRP_newItem;
 
+    //, GeodeGetCodeProcessHandle()
+    // MemOwner(OptrToHandle(obj))
+    //MemThreadGrab(OptrToHandle(obj));
+    //HandleModifyOwner(HandleOf(@MinimButtonMoniker), GeodeGetCodeProcessHandle());
     //@call obj::MSG_GEN_REPLACE_VIS_MONIKER_OPTR(@MinimButtonMoniker, VUM_NOW);
+    //MemThreadRelease(OptrToHandle(obj));
+
+    /*
     @call obj::MSG_GEN_REPLACE_VIS_MONIKER(
         VUM_NOW,
         0, 0, 0,
@@ -227,10 +245,41 @@ CODE
         VMST_OPTR,
         (dword) (@MinimButtonMoniker)
     );
+    */
+
+    /*
+    isGMoniker = TokenLoadMonikerBlock(
+                        TOKEN_CHARS('T','R','A','P'),
+                        0,
+                        (DT_DISP_SIZE | DT_DISP_ASPECT_RATIO | DT_DISP_CLASS),
+                        ((VMSF_GSTRING) | (VMS_TOOL << VMSF_STYLE_OFFSET)),
+                        &monikerSize,
+                        &newMoniker);
+    */
+    //if (isGMoniker)
+    {
+        MemThreadGrab(OptrToHandle(@MinimButtonMoniker));
+        ObjLockObjBlock(OptrToHandle(@MinimButtonMoniker));
+
+        @call obj::MSG_GEN_REPLACE_VIS_MONIKER(
+            VUM_NOW,
+            0, 0, LMemGetChunkSize(@MinimButtonMoniker),
+            VMDT_VIS_MONIKER,
+            VMST_HPTR,
+            (dword)(ConstructOptr(HandleOf(@MinimButtonMoniker), 0))
+        );
+
+        MemUnlock(OptrToHandle(@MinimButtonMoniker));
+        MemThreadRelease(OptrToHandle(@MinimButtonMoniker));
+    }
 
 
 
-    //@send obj::MSG_GEN_REPLACE_VIS_MONIKER_TEXT("Minimize!", VUM_NOW);
+
+
+    //@call obj::MSG_GEN_REPLACE_VIS_MONIKER_TEXT(" _ ", VUM_NOW);
+    //@call obj::MSG_META_ADD_VAR_DATA(HINT_CUSTOM_EXTRA_MARGINS, sizeof(Rectangle), &trigMargins);
+
 
     @call obj::MSG_GEN_TRIGGER_SET_ACTION_MSG(MSG_START_MINIMIZING);
     @call obj::MSG_GEN_TRIGGER_SET_DESTINATION(oself);
