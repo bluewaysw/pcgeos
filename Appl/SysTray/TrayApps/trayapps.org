@@ -18,6 +18,8 @@ word        numFiles        = 0;
 MemHandle   filesHan        = 0;
 char*       filesPtr        = 0;
 optr        triggers[25];
+optr        minimTrigger    = NullOptr;
+
 
 #define MAX_TRIGGERS 24   /* 0-based, it's 25 actually */
 
@@ -29,8 +31,11 @@ optr        triggers[25];
 
 @class  TrayAppsProcessClass, GenProcessClass;
     @message void MSG_ADD_LAUNCHER();
-    @message void MSG_EMC_LAUNCHER_TRIGGER_CREATED(CreateExpressMenuControlItemResponseParams *response = ss:bp);
+    @message void MSG_ADD_MINIMIZE_TRIGGER();
     @message (GEN_TRIGGER_ACTION) MSG_SOFT_LAUNCHER_PRESSED;
+    @message void MSG_EMC_LAUNCHER_TRIGGER_CREATED(CreateExpressMenuControlItemResponseParams *response = ss:bp);
+    @message void MSG_EMC_MINIMIZE_TRIGGER_CREATED(CreateExpressMenuControlItemResponseParams *response = ss:bp);
+    @message void MSG_START_MINIMIZING();
 @endc   /* end of class definition */
 
 @class GenGeodeTokenTriggerClass, GenTriggerClass;
@@ -46,7 +51,6 @@ optr        triggers[25];
 */
 
 @start  AppResource;
-
     @object GenApplicationClass TrayAppsApp =
     {
         GAI_states = (((@default) | (AS_NOT_USER_INTERACTABLE) | (AS_AVOID_TRANSPARENT_DETACH)) & ((~AS_FOCUSABLE) & (~AS_MODELABLE)));
@@ -54,10 +58,16 @@ optr        triggers[25];
 
         GI_visMoniker = list {@TrayAppsAppTextMoniker};
     }
-
     @visMoniker TrayAppsAppTextMoniker = "TrayApps";
-
 @end    AppResource;
+
+@start ArtResource;
+    @include <minimart.goh>
+@end ArtResource;
+
+@start Strings, data;
+    @chunk char MinimHelp[] = "Minimize All Open Windows";
+@end Strings;
 
 
 /***********************************************************************
@@ -108,6 +118,9 @@ CODE
     {
         // no more launcher buttons
         if (filesHan) MemFree(filesHan);
+
+        // add minimize trigger last
+        @call process::MSG_ADD_MINIMIZE_TRIGGER();
     }
 }
 
@@ -176,6 +189,63 @@ CODE
     @call process::MSG_ADD_LAUNCHER();
 }
 
+/*********************************************************************
+* add minimize trigger behind all the other triggers
+*********************************************************************/
+@method TrayAppsProcessClass, MSG_ADD_MINIMIZE_TRIGGER
+{
+    CreateExpressMenuControlItemParams  cemcip;
+    EventHandle                         event;
+
+    /*cemcip.CEMCIP_feature = CEMCIF_UTILITIES_PANEL;*/
+    cemcip.CEMCIP_feature = CEMCIF_SYSTEM_TRAY;
+    cemcip.CEMCIP_class = &GenTriggerClass;
+    cemcip.CEMCIP_itemPriority = CEMCIP_STANDARD_PRIORITY;
+    cemcip.CEMCIP_responseMessage = MSG_EMC_MINIMIZE_TRIGGER_CREATED;
+    cemcip.CEMCIP_responseDestination = oself;
+    cemcip.CEMCIP_field = NullOptr;
+
+    event = @record ExpressMenuControlClass::MSG_EXPRESS_MENU_CONTROL_CREATE_ITEM(cemcip);
+    GCNListSend(MANUFACTURER_ID_GEOWORKS, GCNSLT_EXPRESS_MENU_OBJECTS, event, 0, 0);
+}
+
+/***********************************************************************
+*    initialize the minimize trigger
+***********************************************************************/
+@method TrayAppsProcessClass, MSG_EMC_MINIMIZE_TRIGGER_CREATED
+{
+    optr           obj = NULL;
+    MemHandle      newMoniker = NULL;
+
+    obj = response->CEMCIRP_newItem;
+
+	newMoniker = ObjDuplicateResource(
+        HandleOf(@MinimButtonMoniker),  // MemHandle of resource; must not be loaded
+        MemOwner(HandleOf(obj)),        // GeodeHandle - owner of duplicate
+        MemGetInfo(HandleOf(obj), MGIT_EXEC_THREAD) // ThreadHandle - burden thread of duplicate
+    );
+
+    @call obj::MSG_GEN_REPLACE_VIS_MONIKER_OPTR(
+                ConstructOptr(newMoniker, ChunkOf(@MinimButtonMoniker)),
+                VUM_NOW
+    );
+
+    @call obj::MSG_GEN_TRIGGER_SET_ACTION_MSG(MSG_START_MINIMIZING);
+    @call obj::MSG_GEN_TRIGGER_SET_DESTINATION(oself);
+    //@call obj::MSG_META_ADD_VAR_DATA(HINT_NO_BORDERS_ON_MONIKERS, 0, (void*) 0);
+
+    //MemLock(OptrToHandle(obj));
+    //fh = (optr*) ObjVarAddData(obj, (ATTR_GEN_FOCUS_HELP & (~VDF_SAVE_TO_STATE)), sizeof(optr));
+    //(*fh) = @MinimHelp;
+    //ObjSetFlags(obj, OCF_VARDATA_RELOC, 0);
+    //MemUnlock(OptrToHandle(obj));
+
+    @call obj::MSG_GEN_SET_USABLE(VUM_NOW);
+    minimTrigger = obj;
+
+    //MemFree(newMoniker);
+}
+
 /***********************************************************************
 *
 ***********************************************************************/
@@ -185,6 +255,29 @@ CODE
 
     @call trigger::MSG_META_GET_VAR_DATA(ATTR_GEODE_TOKEN_TO_PASS, sizeof(GeodeToken), &gt);
     LaunchApp(gt);
+}
+
+/***********************************************************************
+*    Start Minimizing Process
+***********************************************************************/
+@method TrayAppsProcessClass, MSG_START_MINIMIZING
+{
+    optr              gfield   = NULL;
+    optr              tapp     = NULL;
+    optr              oldtapp  = NULL;
+    EventHandle       minimEv;
+
+    gfield = @call TrayAppsApp::MSG_GEN_FIND_PARENT();
+
+    do
+    {
+        oldtapp = tapp;
+        tapp = @call gfield::MSG_GEN_FIELD_GET_TOP_GEN_APPLICATION();
+
+        minimEv = @record GenDisplayClass::MSG_GEN_DISPLAY_SET_MINIMIZED();
+        @call tapp::MSG_GEN_SEND_TO_CHILDREN(minimEv);
+    }
+    while ((tapp) && (tapp != oldtapp));
 }
 
 /***********************************************************************
@@ -199,6 +292,9 @@ CODE
         event = @record ExpressMenuControlClass::MSG_EXPRESS_MENU_CONTROL_DESTROY_CREATED_ITEM(triggers[launcherNr], VUM_NOW);
         GCNListSend(MANUFACTURER_ID_GEOWORKS, GCNSLT_EXPRESS_MENU_OBJECTS, event, 0, 0);
     }
+
+    event = @record ExpressMenuControlClass::MSG_EXPRESS_MENU_CONTROL_DESTROY_CREATED_ITEM(minimTrigger, VUM_NOW);
+    GCNListSend(MANUFACTURER_ID_GEOWORKS, GCNSLT_EXPRESS_MENU_OBJECTS, event, 0, 0);
 
     return @callsuper();
 }

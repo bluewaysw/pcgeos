@@ -3,10 +3,11 @@
 #	Copyright (c) Geoworks 1990 -- All Rights Reserved
 #
 # PROJECT:	GEOS
-# MODULE:	Minim
-# FILE:		minim.gp
+# MODULE:	TrayApps
+# FILE:		trayapps.gp
 #
 # AUTHOR:	Konstantin Meyer, 02/01
+# reworked in 02/2024ff for the FreeGEOS project
 ##############################################################################
 #
 name trayapps.app
@@ -56,5 +57,3 @@ library ansic
 # Standard discardable code resources do not need to be mentioned.
 #
 resource AppResource ui-object
-resource ArtResource ui-object
-resource Strings lmem, shared, swap-only
