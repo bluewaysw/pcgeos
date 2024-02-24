@@ -716,8 +716,11 @@ noLogFile:
 		cmp	al, BB_TRUE
 		jnz	noExit
 
-		mov	ax, SST_PANIC
-		call	SysShutdown
+		mov	ax, SST_DIRTY
+		mov 	si, (-1)			
+			;	ds:si	= reason for the shutdown (null-terminated string).
+			;	si = -1 if no reason to give the user.		
+		call	SysShutdown		
 noExit:
 		jmp	done
 
