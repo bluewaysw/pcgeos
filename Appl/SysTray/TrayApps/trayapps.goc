@@ -69,6 +69,12 @@ CODE
 {
     @callsuper();
 
+	(void)	GCNListAdd(
+        oself,			                // optr to add to list
+        MANUFACTURER_ID_GEOWORKS,	    // manufacturer ID of list
+        GCNSLT_FILE_SYSTEM
+    );
+
     if (FileSetCurrentPath(SP_APPLICATION, "TrayApps"))
     {
         numFiles = ListFiles(&filesHan, FESF_GEOS_EXECS);
@@ -78,6 +84,93 @@ CODE
             numFiles--;
             if (numFiles > MAX_TRIGGERS) numFiles = MAX_TRIGGERS;
             @call process::MSG_ADD_LAUNCHER();
+        }
+    }
+}
+
+/*
+    FileChangeNotificationType notifyType
+    MemHandle data)
+*/
+/*
+@method TrayAppsProcessClass, MSG_NOTIFY_FILE_CHANGE
+{
+    FileChangeBatchNotificationData     *batch;
+    FileChangeBatchNotificationItem     *item;
+    word                                i = 0;
+
+    if (notifyType == FCNT_BATCH)
+    {
+        batch = MemLock(data);
+        item = batch->FCBND_notifications;
+
+        while (item < batch->FCBND_end)
+        {
+            if (
+                (item->FCBNI_type == FCNT_CREATE) ||
+                (item->FCBNI_type == FCNT_RENAME) ||
+                (item->FCBNI_type == FCNT_DELETE)
+            )
+            {
+
+                // FileGetCurrentPathIDs
+
+
+                //if (strstr(item->FCBNI_name, "TrayApps"))
+                //if (item->FCBNI_type == FCNT_CREATE)
+                //if (LocalCmpStrings(item->FCBNI_name, "EC Preferences", 0));
+                {
+                    //item->FCBNI_name[14] = '\0';
+                    MsgBox(CDT_NOTIFICATION, (char*) item->FCBNI_id);
+                    break;
+                }
+            }
+
+            item++;
+
+            //break;
+        }
+
+        //MemFree(data);
+    }
+}
+*/
+
+@method TrayAppsProcessClass, MSG_NOTIFY_FILE_CHANGE
+{
+    FileChangeBatchNotificationData *notificationData;
+    FileChangeBatchNotificationItem *notificationItem = 0;
+
+    if (notifyType == FCNT_BATCH)
+    {
+        notificationData = (FileChangeBatchNotificationData*) MemLock(data);
+        notificationItem = &notificationData->FCBND_notifications[0];
+
+        while(notificationItem != notificationData->FCBND_end)
+        {
+            word itemSize;
+
+            /* operate on notificationItem strukture data here */
+            //notificationItem->FCBNI_disk ....
+
+            if (notificationItem->FCBNI_type == FCNT_CREATE)
+            //if (LocalCmpStrings(item->FCBNI_name, "EC Preferences", 0));
+            {
+                //item->FCBNI_name[14] = '\0';
+                MsgBox(CDT_NOTIFICATION, (char*) notificationItem->FCBNI_name);
+                break;
+            }
+
+
+            /* next item */
+            if(notificationItem->FCBNI_type == something) {
+                /* skip large item for next */
+                itemSize = sizeof(FileChangeBatchNoficicationItem);
+            } else {
+                /* skip small item for next */
+                itemSize = offsetof(FileChangeBatchNoficicationItem, FCBNI_name);
+            }
+            notificationItem = (FileChangeBatchNoficicationItem*) ((byte*) notificationItem) + itemSize);
         }
     }
 }
