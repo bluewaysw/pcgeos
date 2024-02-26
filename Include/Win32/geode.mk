@@ -335,10 +335,10 @@ SETLIBFLAG	= -l
 # script or something, say, called "diffcopy".  For now, we just
 # copy the file over.
 #
-$(LIBOBJ:S/:/\\:/g)       : $(LIBOBJ:T) .NOEXPORT .IGNORE
+$(LIBOBJ:S/:/\\:/g)       : $(LIBOBJ:T) .NOEXPORT
 	$(COPY_IF_DIFF) $(LIBOBJ:T) $(.TARGET)
 #  ifdef PRODUCT_LDFS
-$(LIBOBJ:H:S/:/\\:/g)/$(_COMMALDFS)/$(LIBOBJ:T)	: $(.TARGET:H:T)/$(LIBOBJ:T) .NOEXPORT .IGNORE
+$(LIBOBJ:H:S/:/\\:/g)/$(_COMMALDFS)/$(LIBOBJ:T)	: $(.TARGET:H:T)/$(LIBOBJ:T) .NOEXPORT
 	$(COPY_IF_DIFF) $(.TARGET:H:T)/$(LIBOBJ:T) $(.TARGET)
 #  endif
 
