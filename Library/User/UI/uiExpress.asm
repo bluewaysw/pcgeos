@@ -279,6 +279,34 @@ afterFloatingKbd:
 
 ;-------------------------------------------------------------------------
 
+	;
+	; add "Go to GeoManager" in Motif Redux
+	;	bx = child block
+	;	*ds:si  = EMC
+	;
+
+	push	ax, si
+
+	mov	cx, bx				; ^lcx:dx = "Exit to DOS" item
+	mov	dx, offset ExitToDOS
+	mov	ax, MSG_GEN_FIND_CHILD
+	call	ObjCallInstanceNoLock		; bp = position, not dirty
+	jnc	havePosition2
+	mov	bp, CCO_LAST			; no "Exit to DOS", add at end
+						; not dirty
+havePosition2:
+	mov	cx, bx				; ^lcx:dx = Go to GeoManager item
+	mov	dx, offset GoToGeoManager
+	mov	ax, MSG_GEN_ADD_CHILD
+	call	ObjCallInstanceNoLock
+	movdw	bxsi, cxdx			; ^lbx:si = "Go to GeoManager"
+						; bx = still child block
+	call	emcGUISetUsable
+
+	pop	ax, si				; ax = features, EMC chunk
+
+;-------------------------------------------------------------------------
+
 	call	CheckIfRunningISDesk
 	LONG je noReturnToDefault
 
