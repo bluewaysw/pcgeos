@@ -67,6 +67,7 @@ UserClassStructures	ends
 
 idata	segment
 	runningISUI		byte	0x80
+	runningMotif		byte	0x80
 	forceSmallIcons		byte	0x80
 idata	ends
 
@@ -287,6 +288,9 @@ afterFloatingKbd:
 
 	push	ax, si
 
+	call	CheckIfRunningMotif95
+	jnz	afterMotif95			; jump if zero flag is not set, no Motif Redux
+
 	mov	cx, bx				; ^lcx:dx = "Exit to DOS" item
 	mov	dx, offset ExitToDOS
 	mov	ax, MSG_GEN_FIND_CHILD
@@ -302,6 +306,8 @@ havePosition2:
 	movdw	bxsi, cxdx			; ^lbx:si = "Go to GeoManager"
 						; bx = still child block
 	call	emcGUISetUsable
+
+afterMotif95:
 
 	pop	ax, si				; ax = features, EMC chunk
 
@@ -1803,19 +1809,17 @@ CheckIfForceSmallIcons	endp
 
 
 COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-		CheckIfRunningISUI
+		CheckIfRunningISUI / CheckIfRunningMotif
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-SYNOPSIS:	Check if running ISUI
+SYNOPSIS:	Check if running ISUI / Motif
 
 CALLED BY:	INTERNAL
 PASS:		none
-RETURN:		z flag - clear (jnz) if running ISUI
+RETURN:		z flag set if running ISUI / Motif
 DESTROYED:	none
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
-
-isuiName char "isui    ", 0
 
 CheckIfRunningISUI	proc	near
 	uses	ax, bx, cx, dx, si, di, ds, es
@@ -1834,12 +1838,34 @@ CheckIfRunningISUI	proc	near
 
 	rcl	ds:[runningISUI], 1
 doCheck:
-	tst	ds:[runningISUI]			;z flag - clear if ISUI
+	tst	ds:[runningISUI]			;z flag set if ISUI
 
 	.leave
 	ret
 CheckIfRunningISUI	endp
 
+CheckIfRunningMotif	proc	near
+	uses	ax, bx, cx, dx, si, di, ds, es
+	.enter
+
+	segmov	ds, dgroup, ax
+	cmp	ds:[runningMotif], 0x80
+	jne	doCheck
+
+	segmov	es, cs
+	mov	di, offset motifName
+	mov	ax, 8
+	mov	cx, mask GA_LIBRARY
+	mov	dx, mask GA_PROCESS or mask GA_DRIVER or mask GA_APPLICATION
+	call	GeodeFind
+
+	rcl	ds:[runningMotif], 1
+doCheck:
+	tst	ds:[runningMotif]			;z flag set if Motif
+
+	.leave
+	ret
+CheckIfRunningMotif	endp
 
 COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 		CheckIfRunningISDesk
@@ -1885,14 +1911,102 @@ launcherBuf		local	FileLongName
 	ret
 CheckIfRunningISDesk	endp
 
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		CheckIfRunningTaskBar
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	Check if running TaskBar
+
+CALLED BY:	INTERNAL
+PASS:		none
+RETURN:		ZF if running Taskbar
+DESTROYED:	none
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+
+CheckIfRunningTaskBar	proc	near
+
+	.enter
+	pusha
+
+	;
+	; is Taskbar running?
+	;
+
+	mov	cx, cs
+	mov	ds, cx
+
+	; **Pass:**
+	; ds:si - Category (null-terminated ASCII string) of data within the
+	; GEOS.INI file.
+	; cx:dx - Key (null-terminated ASCII string) of data within the
+	; GEOS.INI file.
+
+	clr	ax
+	mov	dx, offset taskBarEnabledString
+	mov	si, offset optionsCatString
+	call	InitFileReadBoolean
+	jc	failed				; if read-in was successful, carry flag is clear
+	cmp	ax, TRUE
+	jmp	done				; if option is TRUE => ZF is set (= not zero => jnz)
+
+failed:
+	test	dx, dx				; sets ZF to zero - we assume taskbar is off
+
+done:
+	popa
+	.leave
+	ret
+
+CheckIfRunningTaskBar	endp
+
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		CheckIfRunningMotif95
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	Check if running Motif95
+
+CALLED BY:	INTERNAL
+PASS:		none
+RETURN:		ZF=1 if running Motif95
+DESTROYED:	none
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+
+CheckIfRunningMotif95	proc	near
+
+	.enter
+	pusha
+
+	call	CheckIfRunningMotif
+	jnz	done				; jump if zero flag is not set
+	call	CheckIfRunningISDesk
+	jnz	done				; jump if zero flag is not set
+	call	CheckIfRunningTaskBar
+
+done:
+
+	popa
+	.leave
+	ret
+
+CheckIfRunningMotif95	endp
+
 if ERROR_CHECK
 LocalDefNLString ISDeskString <"EC ISDesk", 0>
 else
 LocalDefNLString ISDeskString <"ISDesk", 0>
 endif
 
+optionsCatString	char	"motif options", 0
+taskBarEnabledString	char	"taskBarEnabled", 0
 uiFeaturesCatString	char	"uiFeatures", 0
 defaultLauncherString	char	"defaultLauncher", 0
+isuiName 		char 	"isui    ", 0
+motifName 		char 	"motif   ", 0
+
 
 
 COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
