@@ -28,7 +28,7 @@ longname "ResEdit"
 # and is multi-launchable.
 #
 type	appl, process
-stack	3000
+stack	3500
 #
 # Specify class name for application process. Methods sent to the Application's
 # process will be handled by the ResEditProcessClass, which is defined in
