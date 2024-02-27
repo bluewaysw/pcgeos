@@ -1928,12 +1928,12 @@ DESTROYED:	none
 CheckIfRunningTaskBar	proc	near
 
 	.enter
-	pusha
 
 	;
 	; is Taskbar running?
 	;
 
+	push	cx, ds, ax, dx, si
 	mov	cx, cs
 	mov	ds, cx
 
@@ -1955,7 +1955,8 @@ failed:
 	test	dx, dx				; sets ZF to zero - we assume taskbar is off
 
 done:
-	popa
+	pop	cx, ds, ax, dx, si
+
 	.leave
 	ret
 
