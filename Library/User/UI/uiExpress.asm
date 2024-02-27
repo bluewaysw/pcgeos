@@ -1933,7 +1933,8 @@ CheckIfRunningTaskBar	proc	near
 	; is Taskbar running?
 	;
 
-	push	cx, ds, ax, dx, si
+	;push	cx, ds, ax, dx, si
+	push	ds, si
 	mov	cx, cs
 	mov	ds, cx
 
@@ -1955,7 +1956,7 @@ failed:
 	test	dx, dx				; sets ZF to zero - we assume taskbar is off
 
 done:
-	pop	cx, ds, ax, dx, si
+	pop	ds, si
 
 	.leave
 	ret
@@ -1979,7 +1980,7 @@ DESTROYED:	none
 CheckIfRunningMotif95	proc	near
 
 	.enter
-	pusha
+	;pusha
 
 	call	CheckIfRunningMotif
 	jnz	done				; jump if zero flag is not set
@@ -1989,7 +1990,7 @@ CheckIfRunningMotif95	proc	near
 
 done:
 
-	popa
+	;popa
 	.leave
 	ret
 
