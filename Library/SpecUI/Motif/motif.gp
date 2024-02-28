@@ -220,9 +220,10 @@ export SpecGetWindowOptions
 # Other things the specific UI needs to export
 #
 export ToolAreaClass
+export WindowListDialogClass
 export OLFSDynamicListClass
 # see /staff/pcgeos/Include/Internal/specUI.def for why this skip is here
-skip 2
+skip 1
 
 #
 # This comes after four classes are exported, so the SpecificUIRoutine enum
@@ -240,10 +241,10 @@ export VisKeyboardClass
 export VisCharTableClass
 export VisHWRGridClass
 export HWRGridContextTextClass
-
 skip 1
-#export SysTrayInteractionClass
-skip 1
+export WindowListListClass
+export TaskBarListClass
+export SysTrayInteractionClass
 
 #
 # READ ME:
