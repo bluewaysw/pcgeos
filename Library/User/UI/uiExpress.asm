@@ -308,7 +308,6 @@ havePosition2:
 	call	emcGUISetUsable
 
 afterMotif95:
-
 	pop	ax, si				; ax = features, EMC chunk
 
 ;-------------------------------------------------------------------------
@@ -1299,6 +1298,27 @@ ExpressMenuControlDestroyUI	method	dynamic	ExpressMenuControlClass,
 	mov	ax, MSG_GEN_REMOVE_CHILD
 	call	ObjCallInstanceNoLock
 noKeyboard:
+	;
+	; free up "Go to GeoManager" (NOT defaultLauncher!), if any
+	;
+	call	EMGetFeaturesAndChildBlock	; bx = child block
+	mov	cx, bx				; ^lcx:dx = GoToGeoManager
+	mov	dx, offset GoToGeoManager
+	mov	ax, MSG_GEN_FIND_CHILD
+	call	ObjCallInstanceNoLock		; carry set if not found
+	jc	noGoToGeoManager
+	push	si
+	movdw	bxsi, cxdx			; ^lcx:dx preserved above
+	mov	ax, MSG_GEN_SET_NOT_USABLE
+	mov	dl, VUM_NOW
+	mov	di, mask MF_CALL or mask MF_FIXUP_DS
+	call	ObjMessage
+	movdw	cxdx, bxsi
+	pop	si				; *ds:si = EMC
+	clr	bp				; not dirty
+	mov	ax, MSG_GEN_REMOVE_CHILD
+	call	ObjCallInstanceNoLock
+noGoToGeoManager:
 	;
 	; free up "Return to <default launcher>", if any
 	;
