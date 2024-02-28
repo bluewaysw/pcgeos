@@ -288,8 +288,8 @@ afterFloatingKbd:
 
 	push	ax, si
 
-	call	CheckIfRunningMotif95
-	jnz	afterMotif95			; jump if zero flag is not set, no Motif Redux
+	call	CheckIfRunningMotifRedux
+	jnz	afterMotifRedux			; jump if zero flag is not set, no Motif Redux
 
 	mov	cx, bx				; ^lcx:dx = "Exit to DOS" item
 	mov	dx, offset ExitToDOS
@@ -307,7 +307,7 @@ havePosition2:
 						; bx = still child block
 	call	emcGUISetUsable
 
-afterMotif95:
+afterMotifRedux:
 	pop	ax, si				; ax = features, EMC chunk
 
 ;-------------------------------------------------------------------------
@@ -1979,19 +1979,19 @@ CheckIfRunningTaskBar	endp
 
 
 COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-		CheckIfRunningMotif95
+		CheckIfRunningMotifRedux
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-SYNOPSIS:	Check if running Motif95
+SYNOPSIS:	Check if running Motif Redux
 
 CALLED BY:	INTERNAL
 PASS:		none
-RETURN:		ZF=1 if running Motif95
+RETURN:		ZF=1 if running Motif Redux
 DESTROYED:	none
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
 
-CheckIfRunningMotif95	proc	near
+CheckIfRunningMotifRedux	proc	near
 
 	.enter
 
@@ -2014,7 +2014,7 @@ done:
 	.leave
 	ret
 
-CheckIfRunningMotif95	endp
+CheckIfRunningMotifRedux	endp
 
 if ERROR_CHECK
 LocalDefNLString ISDeskString <"EC ISDesk", 0>
