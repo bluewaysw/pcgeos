@@ -27,7 +27,7 @@ name mine.app
 # Long filename: this name can displayed by geoManager, and is used to identify
 # the application for inter-application communication.
 #
-longname "MineSweeper"
+longname "Mine Sweeper"
 #
 # Specify geode type: is an application, will have its own process (thread),
 # and is not multi-launchable.
