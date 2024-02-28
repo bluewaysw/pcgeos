@@ -1816,7 +1816,7 @@ SYNOPSIS:	Check if running ISUI / Motif
 
 CALLED BY:	INTERNAL
 PASS:		none
-RETURN:		z flag set if running ISUI / Motif
+RETURN:		z flag - clear(!) (jnz) if running ISUI / Motif
 DESTROYED:	none
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
@@ -1838,7 +1838,7 @@ CheckIfRunningISUI	proc	near
 
 	rcl	ds:[runningISUI], 1
 doCheck:
-	tst	ds:[runningISUI]			;z flag set if ISUI
+	tst	ds:[runningISUI]			;z flag - clear if ISUI
 
 	.leave
 	ret
@@ -1861,7 +1861,7 @@ CheckIfRunningMotif	proc	near
 
 	rcl	ds:[runningMotif], 1
 doCheck:
-	tst	ds:[runningMotif]			;z flag set if Motif
+	tst	ds:[runningMotif]			;z flag - clear if Motif
 
 	.leave
 	ret
@@ -1927,16 +1927,9 @@ DESTROYED:	none
 
 CheckIfRunningTaskBar	proc	near
 
+	uses cx, ds, ax, dx, si
+
 	.enter
-
-	;
-	; is Taskbar running?
-	;
-
-	;push	cx, ds, ax, dx, si
-	push	ds, si
-	mov	cx, cs
-	mov	ds, cx
 
 	; **Pass:**
 	; ds:si - Category (null-terminated ASCII string) of data within the
@@ -1944,21 +1937,22 @@ CheckIfRunningTaskBar	proc	near
 	; cx:dx - Key (null-terminated ASCII string) of data within the
 	; GEOS.INI file.
 
+	mov	cx, cs
+	mov	ds, cx
 	clr	ax
 	mov	dx, offset taskBarEnabledString
 	mov	si, offset optionsCatString
 	call	InitFileReadBoolean
-	jc	failed				; if read-in was successful, carry flag is clear
+	jc	failed				; skip if carry flag is not clear
 	cmp	ax, TRUE
-	jmp	done				; if option is TRUE => ZF is set (= not zero => jnz)
+	jmp	done				; if option is TRUE => ZF is set
 
 failed:
 	test	dx, dx				; sets ZF to zero - we assume taskbar is off
 
 done:
-	pop	ds, si
-
 	.leave
+
 	ret
 
 CheckIfRunningTaskBar	endp
@@ -1981,9 +1975,10 @@ CheckIfRunningMotif95	proc	near
 
 	.enter
 
-	call	CheckIfRunningMotif
+	call	CheckIfRunningMotif		; z-flag CLEAR if Motif
+						; but we need it SET for our result, so...
 
-	push	ax
+	push	ax				; ...let's invert the result
 	lahf					; Load lower 8 bits from Flags into AH
 	xor 	AH, 40h				; Invert the 6th bit (ZF) in AH
 	sahf					; Store AH back to Flags, effectively inverting ZF
