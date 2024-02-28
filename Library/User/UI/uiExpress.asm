@@ -1975,19 +1975,19 @@ CheckIfRunningMotif95	proc	near
 
 	.enter
 
-	call	CheckIfRunningMotif		; z-flag CLEAR if Motif
+	call	CheckIfRunningMotif		; z-flag CLEAR if Motif,
 						; but we need it SET for our result, so...
-
 	push	ax				; ...let's invert the result
 	lahf					; Load lower 8 bits from Flags into AH
 	xor 	AH, 40h				; Invert the 6th bit (ZF) in AH
 	sahf					; Store AH back to Flags, effectively inverting ZF
 	pop	ax
+	jnz	done				; now jump if zero flag is not set
 
-	jnz	done				; jump if zero flag is not set
 	call	CheckIfRunningISDesk
 	jnz	done				; jump if zero flag is not set
-	call	CheckIfRunningTaskBar
+
+	call	CheckIfRunningTaskBar		; taskbar == off => z-flag not set
 
 done:
 
