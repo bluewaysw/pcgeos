@@ -78,9 +78,9 @@ FILE *story_fp = NULL;
 
 static zbyte far *undo[MAX_UNDO_SLOTS];
 
-static int undo_slots = 0;
-static int undo_count = 0;
-static int undo_valid = 0;
+static undo_slots = 0;
+static undo_count = 0;
+static undo_valid = 0;
 
 /*
  * get_header_extension
@@ -93,8 +93,15 @@ zword get_header_extension (int entry)
 {
     zword addr;
     zword val;
+    char mystr[5];
 
-    if (h_extension_table == 0 || entry > hx_table_size)
+   /* if (h_extension_table == 0 || entry > hx_table_size) */
+
+   /* 29.02.24 Bariossimo:
+      Reading of h_extension_table-Entries fails in GEOS
+      LOW_WORD (addr, val) reads wrong Value to val
+      Because of that, use of extension_table was disabled */
+
     return 0;
 
     addr = h_extension_table + 2 * entry;
@@ -192,11 +199,10 @@ void restart_header (void)
 
 Boolean init_memory (void)
 {
-    //long size;
+    long size;
     zword addr;
-    //unsigned n;
+    unsigned n;
     int i, j;
-
     static struct {
     enum story story_id;
     zword release;
@@ -352,10 +358,10 @@ Boolean init_memory (void)
     /* Allocate memory for story data */
 
 #ifdef __GEOS__
-	 if ((zmp = (zbyte far *) realloc (zmp, h_dynamic_size)) == NULL) {
-		  os_fatal ("Out of memory");
-		  return (FALSE);
-	 }
+  if ((zmp = (zbyte far *) realloc (zmp, h_dynamic_size)) == NULL) {
+    os_fatal ("Out of memory");
+    return (FALSE);
+  }
 
 #else
     if ((zmp = (zbyte far *) realloc (zmp, story_size)) == NULL)
@@ -380,8 +386,7 @@ Boolean init_memory (void)
     /* Read header extension table */
 
     hx_table_size = get_header_extension (HX_TABLE_SIZE);
-	 hx_unicode_table = get_header_extension (HX_UNICODE_TABLE);
-
+    hx_unicode_table = get_header_extension (HX_UNICODE_TABLE);
     return(TRUE);
 
 }/* init_memory */
@@ -496,7 +501,7 @@ void storew (zword addr, zword value)
 
 void z_restart (void)
 {
-    //static bool first_restart = TRUE;
+    static bool first_restart = TRUE;
 
     flush_buffer ();
 
