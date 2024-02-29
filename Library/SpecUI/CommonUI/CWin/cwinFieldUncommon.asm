@@ -10,62 +10,62 @@ FILE:		cwinFieldUncommon.asm
 ROUTINES:
 	Name			Description
 	----			-----------
-    MTD MSG_GEN_FIELD_GET_TOP_GEN_APPLICATION 
+    MTD MSG_GEN_FIELD_GET_TOP_GEN_APPLICATION
 				Look through windows on field, & find top
 				app
 
-    INT FieldCreateAppArrayFromWindows 
+    INT FieldCreateAppArrayFromWindows
 				Create an array of GenApplication object
 				optrs based on the ordering of
 				standard-priority windows on the field.
 
-    INT FieldCreateAppArrayFromWindowsCallback 
+    INT FieldCreateAppArrayFromWindowsCallback
 				Code largely stolen from
 				CreateChunkArrayOnWindowsInLayerCallback to
 				perform additional work necessary to yield
 				an array of application objects.
 
-    MTD MSG_META_GAINED_FOCUS_EXCL 
+    MTD MSG_META_GAINED_FOCUS_EXCL
 				Handler for gaining of field exclusive;
 				i.e. focus field in system
 
-    MTD MSG_META_LOST_FOCUS_EXCL 
+    MTD MSG_META_LOST_FOCUS_EXCL
 				Handler for when field has lost the target
 				exclusive, & must force active app to no
 				longer be active as well
 
-    INT OLFieldUpdateFocusCommon 
+    INT OLFieldUpdateFocusCommon
 				Handler for when field has lost the target
 				exclusive, & must force active app to no
 				longer be active as well
 
-    MTD MSG_META_GAINED_TARGET_EXCL 
+    MTD MSG_META_GAINED_TARGET_EXCL
 				Handler for gaining of field exclusive;
 				i.e. focus field in system
 
-    MTD MSG_META_LOST_TARGET_EXCL 
+    MTD MSG_META_LOST_TARGET_EXCL
 				Handler for when field has lost the target
 				exclusive, & must force active app to no
 				longer be active as well
 
-    INT OLFieldUpdateTargetCommon 
+    INT OLFieldUpdateTargetCommon
 				Handler for when field has lost the target
 				exclusive, & must force active app to no
 				longer be active as well
 
-    MTD MSG_META_GAINED_FULL_SCREEN_EXCL 
+    MTD MSG_META_GAINED_FULL_SCREEN_EXCL
 				Handler for gaining of full screen
 				exclusive
 
-    MTD MSG_META_LOST_FULL_SCREEN_EXCL 
+    MTD MSG_META_LOST_FULL_SCREEN_EXCL
 				Handler for when field has lost the full
 				screen exclusive
 
-    INT OLFieldUpdateFullScreenCommon 
+    INT OLFieldUpdateFullScreenCommon
 				Handler for when field has lost the full
 				screen exclusive
 
-    MTD MSG_META_GET_TARGET_AT_TARGET_LEVEL 
+    MTD MSG_META_GET_TARGET_AT_TARGET_LEVEL
 				Returns current target object within this
 				branch of the hierarchical target
 				exclusive, at level requested
@@ -76,24 +76,24 @@ ROUTINES:
     MTD MSG_META_START_SELECT   Process case of menu button being pressed
 				in workspace area.
 
-    MTD MSG_OL_FIELD_POPUP_EXPRESS_MENU 
+    MTD MSG_OL_FIELD_POPUP_EXPRESS_MENU
 				Pop up the workspace menu, at the specified
 				location
 
-    MTD MSG_OL_FIELD_TOGGLE_EXPRESS_MENU 
+    MTD MSG_OL_FIELD_TOGGLE_EXPRESS_MENU
 				Open/close field's express menu.
 
-    MTD MSG_OL_FIELD_SELECT_WINDOW_LIST_ENTRY 
+    MTD MSG_OL_FIELD_SELECT_WINDOW_LIST_ENTRY
 				Brings window to front
 
-    MTD MSG_OL_FIELD_WINDOW_LIST_CLOSE_WINDOW 
+    MTD MSG_OL_FIELD_WINDOW_LIST_CLOSE_WINDOW
 				Close the window currently selected in the
 				window list.
 
-    MTD MSG_GEN_FIELD_OPEN_WINDOW_LIST 
+    MTD MSG_GEN_FIELD_OPEN_WINDOW_LIST
 				Bring up the window list dialog
 
-    MTD MSG_OL_FIELD_CLOSE_WINDOW_LIST 
+    MTD MSG_OL_FIELD_CLOSE_WINDOW_LIST
 				Close the window list.
 
     MTD MSG_OL_WIN_CLOSE        Handle specific UI close message releasing
@@ -102,29 +102,29 @@ ROUTINES:
     MTD MSG_META_FUP_KBD_CHAR   On a DELETE keypress, we want to close the
 				currently selected window.
 
-    MTD MSG_META_GAINED_TARGET_EXCL 
+    MTD MSG_META_GAINED_TARGET_EXCL
 				Make sure the Express Menu is hidden when
 				the window list come up.
 
-    MTD MSG_META_LOST_TARGET_EXCL 
+    MTD MSG_META_LOST_TARGET_EXCL
 				Since we do not have a GenApplication above
 				us, we need to provide some extra code to
 				make we lose sys target.
 
-    MTD MSG_GEN_GUP_INTERACTION_COMMAND 
+    MTD MSG_GEN_GUP_INTERACTION_COMMAND
 				Make sure target goes somewhere when the
 				window list is closed.
 
-    MTD MSG_VIS_VUP_TERMINATE_ACTIVE_MOUSE_FUNCTION 
+    MTD MSG_VIS_VUP_TERMINATE_ACTIVE_MOUSE_FUNCTION
 				Copied from OLAppSendToFlow because
 				WindowListDialog is not under an
 				OLApplication.
 
-    MTD MSG_GEN_INTERACTION_INITIATE 
+    MTD MSG_GEN_INTERACTION_INITIATE
 				Hide the tool area immediately after it is
 				initiated.
 
-    MTD MSG_META_MUP_ALTER_FTVMC_EXCL 
+    MTD MSG_META_MUP_ALTER_FTVMC_EXCL
 				Intercept change of focus within tool area
 				to give this app & window the focus, as
 				long as a child has the focus within the
@@ -136,7 +136,7 @@ ROUTINES:
 				FTVMCExcl, and there seems to be a problem
 				doing it in both places.
 
-    MTD MSG_SPEC_GUP_QUERY_VIS_PARENT 
+    MTD MSG_SPEC_GUP_QUERY_VIS_PARENT
 				direct requests for vis parent to UIApp
 
 REVISION HISTORY:
@@ -170,11 +170,11 @@ PASS:		*ds:si	= OLFieldClass object
 RETURN:		^lcx:dx	= top GenApplication
 			0 if none
 
-ALLOWED TO DESTROY:	
+ALLOWED TO DESTROY:
 		ax, cx, dx, bp
 		bx, si, di, ds, es
 
-SIDE EFFECTS:	
+SIDE EFFECTS:
 
 PSEUDO CODE/STRATEGY:
 
@@ -200,14 +200,14 @@ OLFieldGetTopGenApplication	method dynamic	OLFieldClass,
 
 	; *ds:si is now a chunk array of application object optrs in the
 	; order in which they should be. Use this ordering to find top one.
-	; 
+	;
 
 	mov	ax, 0				; get first one
 	call	ChunkArrayElementToPtr
 	mov	cx, 0				; in case out of bounds
 	jc	done				; out of bounds
 	movdw	cxdx, ({optr}ds:[di])
-	
+
 done:
 	pop	ax				; free app list chunk
 	call	LMemFree
@@ -228,10 +228,10 @@ PASS:		di	= field window
 		*ds:bp	= GenField object
 RETURN:		*ds:si	= chunk array of optrs
 DESTROYED:	ax, bx, cx, dx, di
-SIDE EFFECTS:	
+SIDE EFFECTS:
 
 PSEUDO CODE/STRATEGY:
-		
+
 
 REVISION HISTORY:
 	Name	Date		Description
@@ -269,7 +269,7 @@ COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 		FieldCreateAppArrayFromWindowsCallback
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-SYNOPSIS:	Code largely stolen from 
+SYNOPSIS:	Code largely stolen from
 		CreateChunkArrayOnWindowsInLayerCallback to perform additional
 		work necessary to yield an array of application objects.
 
@@ -283,10 +283,10 @@ RETURN:		carry set if done
 		cx	= non-zero
 DESTROYED:	bx, si
 		ax, dx
-SIDE EFFECTS:	
+SIDE EFFECTS:
 
 PSEUDO CODE/STRATEGY:
-		
+
 
 REVISION HISTORY:
 	Name	Date		Description
@@ -303,7 +303,7 @@ FieldCreateAppArrayFromWindowsCallback proc	far
 	; Fetch window priority and ensure its layer is at the standard
 	; priority. We only order applications based on standard priority layers
 	; (anything non-standard will come up to the right place all by itself)
-	; 
+	;
 	mov	si, WIT_PRIORITY	; Check only standard priority layers
 	call	WinGetInfo
 	andnf	al, mask WPD_LAYER
@@ -312,7 +312,7 @@ FieldCreateAppArrayFromWindowsCallback proc	far
 
 	;
 	; Make sure the UI doesn't own the thing, as it can take care of itself.
-	; 
+	;
 	mov	bx, di
 	call	MemOwner		; get owning geode
 	cmp	bx, handle ui		; if owned by the UI, skip out -- must
@@ -324,23 +324,23 @@ FieldCreateAppArrayFromWindowsCallback proc	far
 
 	;
 	; Make sure the geode that owns the thing is focusable.
-	; 
+	;
 	call	WinGeodeGetFlags
 	test	ax, mask GWF_FOCUSABLE
 	jz	getNextSib
 
 	;
 	; Make sure the owner has an application object to be ordered.
-	; 
+	;
 	call	GeodeGetAppObject	; fetch application object
 	tst	bx
 	jz	getNextSib		; if no app object, nothing to move
-	
+
 	;
 	; Now see if the beast is already in our array (might have two different
 	; window layers with something else mixed in, you know, or just two
 	; different windows in the same layer below the field...)
-	; 
+	;
 	mov	dx, si			; ^lbx:dx <- app object for which to
 					;  search
 	mov	si, ds:[bp]
@@ -360,7 +360,7 @@ checkNext:
 append:
 	;
 	; Not already in the array, so put it at the end.
-	; 
+	;
 	push	di			; preserve window handle
 	xchg	si, bp
 	call	ChunkArrayAppend
@@ -372,7 +372,7 @@ append:
 getNextSib:
 	mov	si, WIT_NEXT_SIBLING_WIN
 
-getNextWindow:	
+getNextWindow:
 	call	WinGetInfo		; ax <- window handle
 	mov_tr	di, ax
 	ornf	cx, -1			; this one ain't the field, and
@@ -575,7 +575,7 @@ OLFieldConsumeMessage	method	OLFieldClass,	MSG_META_FORCE_GRAB_KBD,
 						MSG_META_RELEASE_KBD,
 						MSG_VIS_RELEASE_MOUSE
 	ret
-	
+
 OLFieldConsumeMessage	endm
 
 
@@ -616,7 +616,7 @@ REVISION HISTORY:
 ------------------------------------------------------------------------------@
 
 
-OLFieldGainedFocusExcl	method	dynamic OLFieldClass, 
+OLFieldGainedFocusExcl	method	dynamic OLFieldClass,
 					MSG_META_GAINED_FOCUS_EXCL
 				; Start up any detached apps - we're coming
 				; to the front!  (It is illegal to be at
@@ -675,7 +675,7 @@ REVISION HISTORY:
 	Doug	9/91		Initial version
 
 ------------------------------------------------------------------------------@
-
+
 
 OLFieldLostFocusExcl	method	dynamic OLFieldClass,
 					MSG_META_LOST_FOCUS_EXCL
@@ -739,9 +739,9 @@ REVISION HISTORY:
 	Doug	9/91		Initial version
 
 ------------------------------------------------------------------------------@
-
 
-OLFieldGainedTargetExcl	method	dynamic OLFieldClass, 
+
+OLFieldGainedTargetExcl	method	dynamic OLFieldClass,
 					MSG_META_GAINED_TARGET_EXCL
 	push	ax
 
@@ -763,7 +763,7 @@ OLFieldGainedTargetExcl	method	dynamic OLFieldClass,
 
 OLFieldGainedTargetExcl	endm
 
-
+
 COMMENT @----------------------------------------------------------------------
 
 METHOD:		OLFieldLostTargetExcl
@@ -871,14 +871,14 @@ REVISION HISTORY:
 	Doug	4/93		Initial version
 
 ------------------------------------------------------------------------------@
-
 
-OLFieldGainedFullScreenExcl	method	dynamic OLFieldClass, 
+
+OLFieldGainedFullScreenExcl	method	dynamic OLFieldClass,
 					MSG_META_GAINED_FULL_SCREEN_EXCL
 	GOTO	OLFieldUpdateFullScreenCommon
 OLFieldGainedFullScreenExcl	endm
 
-
+
 COMMENT @----------------------------------------------------------------------
 
 METHOD:		OLFieldLostFullScreenExcl
@@ -912,7 +912,7 @@ REVISION HISTORY:
 	Doug	4/93		Initial version
 
 ------------------------------------------------------------------------------@
-
+
 
 OLFieldLostFullScreenExcl	method	dynamic OLFieldClass,
 					MSG_META_LOST_FULL_SCREEN_EXCL
@@ -1037,7 +1037,7 @@ OLFieldStartMenu	endm
 endif
 
 if	(0)	; didn't work.
-; A test -- let's see if we can remotely get express menu up as a stay-up menu. 
+; A test -- let's see if we can remotely get express menu up as a stay-up menu.
 ;
 OLFieldPutExpressMenuUpInStayUpMode	method	dynamic OLFieldClass, \
 					MSG_META_START_SELECT
@@ -1155,11 +1155,11 @@ PASS:		*ds:si	= OLFieldClass object
 
 RETURN:		nothing
 
-ALLOWED TO DESTROY:	
+ALLOWED TO DESTROY:
 		ax, cx, dx, bp
 		bx, si, di, ds, es
 
-SIDE EFFECTS:	
+SIDE EFFECTS:
 
 PSEUDO CODE/STRATEGY:
 
@@ -1242,11 +1242,18 @@ REVISION HISTORY:
 	Joon	9/92		initial version
 
 ------------------------------------------------------------------------------@
-
-if _ISUI ;_-------------------------------------------------------------------
-
+if TOOL_AREA_IS_TASK_BAR
 OLFieldUpdateTaskBarList	method	dynamic OLFieldClass,
 					MSG_OL_FIELD_UPDATE_TASK_BAR_LIST
+	;
+	; if TaskBar == on
+	;
+	push	ds					; save ds
+	segmov	ds, dgroup				; load dgroup
+	test	ds:[taskBarPrefs], mask TBF_ENABLED	; test if TBF_ENABLED is set
+	pop	ds					; restore ds
+	LONG jz	done					; skip if no taskbar
+
 	mov	bx, ds:[di].OLFI_windowListList
 	tst	bx
 	LONG jz	done
@@ -1284,7 +1291,7 @@ EC <	pop	es, di							>
 	mov	ds:[di].GIGI_destination.offset, bx
 	mov	ax, ds:[LMBH_handle]
 	mov	ds:[di].GIGI_destination.handle, ax
-	
+
 	mov	ax, MSG_GEN_DYNAMIC_LIST_INITIALIZE
 	mov	cx, dx
 	call	ObjCallInstanceNoLock
@@ -1317,10 +1324,10 @@ setSelection:
 done:
 	ret
 OLFieldUpdateTaskBarList	endm
+endif
 
-endif	;----------------------------------------------------------------------
-	
-
+
+
 COMMENT @----------------------------------------------------------------------
 
 FUNCTION:	OLFieldSelectWindowListEntry
@@ -1342,9 +1349,7 @@ REVISION HISTORY:
 	Joon	9/92		initial version
 
 ------------------------------------------------------------------------------@
-
-if _ISUI ;--------------------------------------------------------------------
-
+if TOOL_AREA_IS_TASK_BAR or WINDOW_LIST_ACTIVE
 OLFieldSelectWindowListEntry	method	dynamic OLFieldClass,
 					MSG_OL_FIELD_SELECT_WINDOW_LIST_ENTRY
 	;
@@ -1367,10 +1372,9 @@ done:
 	ret
 OLFieldSelectWindowListEntry	endm
 
-endif	;----------------------------------------------------------------------
+endif
 
 
-
 COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 		OLFieldWindowListCloseWindow
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -1385,7 +1389,7 @@ PASS:		*ds:si	= OLFieldClass object
 		ax	= message #
 RETURN:		nothing
 DESTROYED:	ax, cx, dx, bp
-SIDE EFFECTS:	
+SIDE EFFECTS:
 
 PSEUDO CODE/STRATEGY:
 
@@ -1395,14 +1399,13 @@ REVISION HISTORY:
 	JS	9/18/92   	Initial version
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
-
-if _ISUI ;--------------------------------------------------------------------
-
+if TOOL_AREA_IS_TASK_BAR or WINDOW_LIST_ACTIVE
 OLFieldWindowListCloseWindow	method dynamic OLFieldClass,
 					MSG_OL_FIELD_WINDOW_LIST_CLOSE_WINDOW
+
 	mov	ax, MSG_OL_FIELD_SELECT_WINDOW_LIST_ENTRY
 	call	ObjCallInstanceNoLock
-	jc	done		
+	jc	done
 
 	mov	si, ax
 	mov	ax, MSG_OL_WINDOW_LIST_ITEM_CLOSE_WINDOW
@@ -1411,10 +1414,9 @@ done:
 	ret
 OLFieldWindowListCloseWindow	endm
 
-endif	;----------------------------------------------------------------------
+endif
 
 
-
 COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 		OLFieldOpenWindowList
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -1429,7 +1431,7 @@ PASS:		*ds:si	= OLFieldClass object
 		ax	= message #
 RETURN:		nothing
 DESTROYED:	ax, cx, dx, bp
-SIDE EFFECTS:	
+SIDE EFFECTS:
 
 PSEUDO CODE/STRATEGY:
 
@@ -1439,11 +1441,10 @@ REVISION HISTORY:
 	JS	1/25/93   	Initial version
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
-
-if _ISUI ;--------------------------------------------------------------------
-
-OLFieldOpenWindowList	method dynamic OLFieldClass, 
+if TOOL_AREA_IS_TASK_BAR or WINDOW_LIST_ACTIVE
+OLFieldOpenWindowList	method dynamic OLFieldClass,
 					MSG_GEN_FIELD_OPEN_WINDOW_LIST
+
 	mov     si, ds:[di].OLFI_windowListDialog
 	tst     si
 	jz      done
@@ -1454,9 +1455,8 @@ done:
 	ret
 OLFieldOpenWindowList	endm
 
-endif	;----------------------------------------------------------------------
+endif
 
-
 COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 		WindowListClose
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -1472,7 +1472,7 @@ PASS:		*ds:si	= WindowListDialogClass object
 		ax	= message #
 RETURN:		nothing
 DESTROYED:	ax, cx, dx, bp
-SIDE EFFECTS:	
+SIDE EFFECTS:
 
 PSEUDO CODE/STRATEGY:
 
@@ -1482,20 +1482,17 @@ REVISION HISTORY:
 	JS	11/16/92   	Initial version
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
-
-if _ISUI ;--------------------------------------------------------------------
-
+if TOOL_AREA_IS_TASK_BAR or WINDOW_LIST_ACTIVE
 WindowListClose	method dynamic WindowListDialogClass, MSG_OL_WIN_CLOSE
 
 	mov	ax, MSG_META_RELEASE_TARGET_EXCL
 	GOTO	ObjCallInstanceNoLock
 
 WindowListClose	endm
+endif
 
-endif	;----------------------------------------------------------------------
 
 
-
 COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 		WindowListKeyboard
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -1512,7 +1509,7 @@ PASS:		*ds:si	= WindowListDialogClass object
 RETURN:		carry set if character was handled by someone (and should
 		not be used elsewhere).
 DESTROYED:	ax, cx, dx, bp
-SIDE EFFECTS:	
+SIDE EFFECTS:
 
 PSEUDO CODE/STRATEGY:
 
@@ -1522,11 +1519,10 @@ REVISION HISTORY:
 	JS	10/23/92   	Initial version
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
-
-if _ISUI ;--------------------------------------------------------------------
-
-WindowListKeyboard	method dynamic WindowListDialogClass, 
+if TOOL_AREA_IS_TASK_BAR or WINDOW_LIST_ACTIVE
+WindowListKeyboard	method dynamic WindowListDialogClass,
 					MSG_META_FUP_KBD_CHAR
+
 	test	dl, mask CF_FIRST_PRESS
 	jz	done				; ignore if not first press
 
@@ -1558,10 +1554,10 @@ callSuper:
 done:
 	ret
 WindowListKeyboard	endm
+endif
 
-endif	;----------------------------------------------------------------------
 
-
+
 COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 		WindowListLostTargetExcl
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -1577,7 +1573,7 @@ PASS:		*ds:si	= WindowListDialogClass object
 		ax	= message #
 RETURN:		nothing
 DESTROYED:	ax, cx, dx, bp
-SIDE EFFECTS:	
+SIDE EFFECTS:
 
 PSEUDO CODE/STRATEGY:
 
@@ -1587,14 +1583,13 @@ REVISION HISTORY:
 	JS	10/20/92   	Initial version
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
-
-if _ISUI ;--------------------------------------------------------------------
-
-
-WindowListLostTargetExcl	method dynamic WindowListDialogClass, 
+if TOOL_AREA_IS_TASK_BAR or WINDOW_LIST_ACTIVE
+WindowListLostTargetExcl	method dynamic WindowListDialogClass,
 					MSG_META_LOST_TARGET_EXCL
+
 	mov	di, offset WindowListDialogClass
 	call	ObjCallSuperNoLock
+
 	;
 	; Close window list dialog.
 	;
@@ -1605,11 +1600,10 @@ WindowListLostTargetExcl	method dynamic WindowListDialogClass,
 	GOTO	ObjMessage
 
 WindowListLostTargetExcl	endm
+endif
 
-endif	;----------------------------------------------------------------------
 
 
-
 COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 		WindowListInteractionCommand
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -1624,7 +1618,7 @@ PASS:		*ds:si	= WindowListDialogClass object
 		ax	= message #
 RETURN:		nothing
 DESTROYED:	ax, cx, dx, bp
-SIDE EFFECTS:	
+SIDE EFFECTS:
 
 PSEUDO CODE/STRATEGY:
 
@@ -1634,11 +1628,10 @@ REVISION HISTORY:
 	JS	3/26/93   	Initial version
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
-
-if _ISUI ;--------------------------------------------------------------------
-
-WindowListInteractionCommand	method dynamic WindowListDialogClass, 
+if TOOL_AREA_IS_TASK_BAR or WINDOW_LIST_ACTIVE
+WindowListInteractionCommand	method dynamic WindowListDialogClass,
 					MSG_GEN_GUP_INTERACTION_COMMAND
+
 	push	cx
 	mov	di, offset WindowListDialogClass
 	call	ObjCallSuperNoLock
@@ -1656,12 +1649,10 @@ WindowListInteractionCommand	method dynamic WindowListDialogClass,
 	GOTO	ObjMessage
 done:
 	ret
+
 WindowListInteractionCommand	endm
+endif
 
-endif	;----------------------------------------------------------------------
-
-
-
 COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 		WindowListVisVupBumpMouse
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -1677,7 +1668,7 @@ PASS:		*ds:si	= WindowListDialogClass object
 		ax	= message #
 RETURN:		nothing
 DESTROYED:	ax, cx, dx, bp
-SIDE EFFECTS:	
+SIDE EFFECTS:
 
 PSEUDO CODE/STRATEGY:
 
@@ -1687,21 +1678,18 @@ REVISION HISTORY:
 	JS	6/17/93   	Initial version copied from OLAppSendToFlow
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
-
-if _ISUI ;--------------------------------------------------------------------
-
-WindowListSendToFlow	method dynamic WindowListDialogClass, 
+if TOOL_AREA_IS_TASK_BAR or WINDOW_LIST_ACTIVE
+WindowListSendToFlow	method dynamic WindowListDialogClass,
 			MSG_VIS_VUP_TERMINATE_ACTIVE_MOUSE_FUNCTION, \
 			MSG_VIS_VUP_GET_MOUSE_STATUS, \
 			MSG_VIS_VUP_BUMP_MOUSE
+
 	mov	di, mask MF_CALL
 	GOTO	UserCallFlow
 
 WindowListSendToFlow	endm
+endif
 
-endif	;----------------------------------------------------------------------
-
-
 COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 		WindowListListQueryTaskBarItemMoniker
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -1720,11 +1708,18 @@ RETURN:		nothing
 DESTROYED:	ax, cx, dx, bp
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
-
-if _ISUI ;--------------------------------------------------------------------
-
-WindowListListQueryTaskBarItemMoniker	method dynamic WindowListListClass, 
+if TOOL_AREA_IS_TASK_BAR
+WindowListListQueryTaskBarItemMoniker	method dynamic WindowListListClass,
 			MSG_WINDOW_LIST_LIST_QUERY_TASK_BAR_ITEM_MONIKER
+	;
+	; if TaskBar == on
+	;
+	push	ds					; save ds
+	segmov	ds, dgroup				; load dgroup
+	test	ds:[taskBarPrefs], mask TBF_ENABLED	; test if TBF_ENABLED is set
+	pop	ds					; restore ds
+	jz	done					; skip if no taskbar
+
 	movdw	bxdi, cxdx			; ^lbx:di = taskbar list
 
 	push	bp
@@ -1752,9 +1747,10 @@ done:
 	ret
 WindowListListQueryTaskBarItemMoniker	endm
 
-endif	;----------------------------------------------------------------------
+endif
 
-
+
+
 COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 		WindowListListSelectItem
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -1774,11 +1770,10 @@ RETURN:		none
 DESTROYED:	ax, cx, dx, bp
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
-
-if _ISUI ;--------------------------------------------------------------------
-
-WindowListListSelectItem	method dynamic WindowListListClass, 
+if TOOL_AREA_IS_TASK_BAR or WINDOW_LIST_ACTIVE
+WindowListListSelectItem	method dynamic WindowListListClass,
 					MSG_WINDOW_LIST_LIST_SELECT_ITEM
+
 	mov	ax, MSG_GEN_FIND_CHILD_AT_POSITION
 	call	ObjCallInstanceNoLock		; ^lcx:dx = item
 	jcxz	done				; dx = identifier
@@ -1789,10 +1784,9 @@ WindowListListSelectItem	method dynamic WindowListListClass,
 done:
 	ret
 WindowListListSelectItem	endm
+endif
 
-endif	;----------------------------------------------------------------------
 
-
 COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 		TaskBarListAddChild
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -1809,7 +1803,7 @@ PASS:		*ds:si	= TaskBarListClass object
 		bp	= flags for how to add child (CompChildFlags)
 RETURN:		nothing
 DESTROYED:	ax, cx, dx, bp
-SIDE EFFECTS:	
+SIDE EFFECTS:
 
 PSEUDO CODE/STRATEGY:
 
@@ -1819,11 +1813,19 @@ REVISION HISTORY:
 	Joon	3/11/92		Initial version
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
-
-if _ISUI ;--------------------------------------------------------------------
-
-TaskBarListAddChild	method dynamic TaskBarListClass, 
+if TOOL_AREA_IS_TASK_BAR
+TaskBarListAddChild	method dynamic TaskBarListClass,
 					MSG_GEN_ADD_CHILD
+	;
+	; if TaskBar == on
+	; RUNTIME
+	;
+	push	ds					; save ds
+	segmov	ds, dgroup				; load dgroup
+	test	ds:[taskBarPrefs], mask TBF_ENABLED	; test if TBF_ENABLED is set
+	pop	ds					; restore ds
+	jz	done					; skip if no taskbar
+
 	push	cx, dx
 	mov	di, offset TaskBarListClass
 	call	ObjCallSuperNoLock
@@ -1832,26 +1834,133 @@ TaskBarListAddChild	method dynamic TaskBarListClass,
 	movdw	bxsi, cxdx
 	call	ObjSwapLock
 	push	bx
+
 	clr	cx
+
 	mov	ax, HINT_CAN_CLIP_MONIKER_WIDTH
 	call	ObjVarAddData
+
 	mov	ax, HINT_EXPAND_WIDTH_TO_FIT_PARENT
 	call	ObjVarAddData
+
 	mov	ax, HINT_EXPAND_HEIGHT_TO_FIT_PARENT
 	call	ObjVarAddData
+
 	mov	ax, HINT_MAXIMUM_SIZE
 	mov	cx, size GadgetSizeHintArgs
 	call	ObjVarAddData
 	mov	ds:[bx].GSHA_width, SpecWidth <SST_AVG_CHAR_WIDTHS, 20>
 	mov	ds:[bx].GSHA_height, 0
+
 	pop	bx
 	call	ObjSwapUnlock
+	jmp	done
+
+done:
 	ret
 TaskBarListAddChild	endm
 
-endif	;----------------------------------------------------------------------
+endif
 
-
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		ToolAreaDraw
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	Draw border for TaskBar in MOTIF
+
+CALLED BY:	MSG_VIS_DRAW
+PASS:		*ds:si	= ToolAreaClass object
+		ds:di	= ToolAreaClass instance data
+		ds:bx	= ToolAreaClass object (same as *ds:si)
+		es 	= segment of ToolAreaClass
+		ax	= message #
+		cl	- DrawFlags:  DF_EXPOSED set if GState is set to update window
+		^hbp	- GState to draw through.
+
+RETURN:		nothing
+DESTROYED:	ax, cx, dx, bp
+SIDE EFFECTS:
+
+PSEUDO CODE/STRATEGY:
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	MeyerK	7/1/24		Initial version
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+if _MOTIF and TOOL_AREA_IS_TASK_BAR
+ToolAreaDraw	method dynamic ToolAreaClass, MSG_VIS_DRAW
+
+	;
+	; call superclass
+	;
+
+	push	bp
+	mov	di, offset ToolAreaClass
+	call	ObjCallSuperNoLock
+	pop	di
+
+	;
+	; if TaskBar == on
+	; RUNTIME
+	;
+
+	push	ds					; save ds
+	segmov	ds, dgroup				; load dgroup
+	test	ds:[taskBarPrefs], mask TBF_ENABLED	; test if TBF_ENABLED is set
+	pop	ds					; restore ds
+	jz	done					; skip if no taskbar
+
+	;
+	; get bounds
+	;
+	; ax = VI_bounds.R_left
+	; cx = VI_bounds.R_right
+	; dx = VI_bounds.R_bottom
+	; bx = VI_bounds.R_top
+	;
+
+	call	VisGetBounds
+
+	;
+	; colors
+	;
+
+	push	ax
+	call	GetDarkColor		; al <- dark color
+	mov	ah, C_WHITE		; ah <- light color
+	xchg	ah, al			; swap colors, as we want an "outset" look
+	mov	bp, ax
+	pop	ax
+
+	;
+	; calculate the lower right corner value of the new rect to draw around our window.
+	; Y value is VI_bounds.R_bottom - VI_bounds.R_top (= height) and lands in DX
+	; X value is already in CX and should always be equal to the width of the window.
+	;
+
+	sub	dx, bx			; result in dx
+
+	;
+	; set our new Y-Value for the upper left corner in BX
+	; X value should always be 0 and is already in AX
+	;
+
+	mov	bx, 0
+
+	;
+	; draw rect
+	;
+	call	OpenDrawRect
+done:
+
+	ret
+ToolAreaDraw	endm
+endif
+
+
+
 COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 		SysTrayInteractionVisDraw
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -1866,7 +1975,7 @@ PASS:		*ds:si	= SysTrayInteractionClass object
 		ax	= message #
 RETURN:		nothing
 DESTROYED:	ax, cx, dx, bp
-SIDE EFFECTS:	
+SIDE EFFECTS:
 
 PSEUDO CODE/STRATEGY:
 
@@ -1876,26 +1985,61 @@ REVISION HISTORY:
 	Joon	3/5/92		Initial version
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
-if _ISUI or (_MOTIF and EXTENDIBLE_SYSTEM_TRAY)
-SysTrayInteractionVisDraw	method dynamic SysTrayInteractionClass,
-				MSG_VIS_DRAW
+if TOOL_AREA_IS_TASK_BAR and _ISUI
+SysTrayInteractionVisDraw	method dynamic SysTrayInteractionClass, MSG_VIS_DRAW
+
+	;
+	; call superclass
+	;
+
 	push	bp
 	mov	di, offset SysTrayInteractionClass
 	call	ObjCallSuperNoLock
-	pop	di			; di = gstate
+	pop	di					; di = gstate
+
+	;
+	; if TaskBar == on
+	; RUNTIME
+	;
+
+	push	ds					; save ds
+	segmov	ds, dgroup				; load dgroup
+	test	ds:[taskBarPrefs], mask TBF_ENABLED	; test if TBF_ENABLED is set
+	pop	ds					; restore ds
+	jz	done					; skip if no taskbar
+
+	;
+	; get bounds
+	;
+	; ax = VI_bounds.R_left
+	; cx = VI_bounds.R_right
+	; dx = VI_bounds.R_bottom
+	; bx = VI_bounds.R_top
+	;
 
 	call	VisGetBounds
+
+	;
+	; colors
+	;
 	push	ax
 	call	GetDarkColor		;al <- dark color
 	mov	ah, C_WHITE		;ah <- light color
 	mov	bp, ax
 	pop	ax
+
+	;
+	; draw rect
+	;
 	call	OpenDrawRect
+
+done:
 	ret
 SysTrayInteractionVisDraw	endm
-endif ; _ISUI
 
-
+endif
+
+
 COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 		ToolAreaRawUnivEnter
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -1913,7 +2057,7 @@ PASS:		*ds:si	= ToolAreaClass object
 		^hbp	= Window that method refers to
 RETURN:		nothing
 DESTROYED:	ax, cx, dx, bp
-SIDE EFFECTS:	
+SIDE EFFECTS:
 
 PSEUDO CODE/STRATEGY:
 
@@ -1924,14 +2068,24 @@ REVISION HISTORY:
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
 if TOOL_AREA_IS_TASK_BAR
-ToolAreaRawUnivEnter	method dynamic ToolAreaClass, 
+ToolAreaRawUnivEnter	method dynamic ToolAreaClass,
 					MSG_META_RAW_UNIV_ENTER
 	mov	di, offset ToolAreaClass
 	call	ObjCallSuperNoLock
 
+	;
+	; if TaskBar == on
+	; RUNTIME
+	;
+	push	ds					; save ds
+	segmov	ds, dgroup				; load dgroup
+	test	ds:[taskBarPrefs], mask TBF_ENABLED	; test if TBF_ENABLED is set
+	pop	ds					; restore ds
+	jz	done					; skip if no taskbar
+
 	push	ds
 	segmov	ds, dgroup
-	tst	ds:[taskBarAutoHide]
+	test	ds:[taskBarPrefs], mask TBF_AUTO_HIDE
 	pop	ds
 	jz	done
 
@@ -1951,9 +2105,9 @@ ToolAreaRawUnivEnter	method dynamic ToolAreaClass,
 done:
 	ret
 ToolAreaRawUnivEnter	endm
-endif ; TOOL_AREA_IS_TASK_BAR
+endif
 
-
+
 COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 		ToolAreaRawUnivLeave
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -1975,14 +2129,24 @@ DESTROYED:	ax, cx, dx, bp
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
 
 if TOOL_AREA_IS_TASK_BAR
-ToolAreaRawUnivLeave	method dynamic ToolAreaClass, 
+ToolAreaRawUnivLeave	method dynamic ToolAreaClass,
 					MSG_META_RAW_UNIV_LEAVE
 	mov	di, offset ToolAreaClass
 	call	ObjCallSuperNoLock
 
+	;
+	; if TaskBar == on
+	; RUNTIME
+	;
+	push	ds					; save ds
+	segmov	ds, dgroup				; load dgroup
+	test	ds:[taskBarPrefs], mask TBF_ENABLED	; test if TBF_ENABLED is set
+	pop	ds					; restore ds
+	jz	done					; skip if no taskbar
+
 	push	ds
 	segmov	ds, dgroup
-	tst	ds:[taskBarAutoHide]
+	test	ds:[taskBarPrefs], mask TBF_AUTO_HIDE
 	pop	ds
 	jz	done
 
@@ -2007,9 +2171,9 @@ StartAutoHideTimer	label	far
 done:
 	ret
 ToolAreaRawUnivLeave	endm
-endif ; TOOL_AREA_IS_TASK_BAR
+endif
 
-
+
 COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 		ToolAreaAutoHide
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -2026,12 +2190,23 @@ PASS:		*ds:si	= ToolAreaClass object
 RETURN:		none
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+
 if TOOL_AREA_IS_TASK_BAR
-ToolAreaAutoHide	method dynamic ToolAreaClass, 
+ToolAreaAutoHide	method dynamic ToolAreaClass,
 					MSG_TOOL_AREA_AUTO_HIDE
+	;
+	; if TaskBar == on
+	; RUNTIME
+	;
+	push	ds					; save ds
+	segmov	ds, dgroup				; load dgroup
+	test	ds:[taskBarPrefs], mask TBF_ENABLED	; test if TBF_ENABLED is set
+	pop	ds					; restore ds
+	jz	done					; skip if no taskbar
+
 	push	ds
 	segmov	ds, dgroup
-	tst	ds:[taskBarAutoHide]
+	test	ds:[taskBarPrefs], mask TBF_AUTO_HIDE
 	pop	ds
 	jz	done
 
@@ -2080,9 +2255,9 @@ waitMore:
 done:
 	ret
 ToolAreaAutoHide	endm
-endif ; TOOL_AREA_IS_TASK_BAR
+endif
 
-
+
 COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 		ToolAreaStartSelect
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -2098,17 +2273,31 @@ DESTROYED:	ax, cx, dx, bp
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
 
-if TOOL_AREA_IS_TASK_BAR or (_MOTIF and EXTENDIBLE_SYSTEM_TRAY)
-ToolAreaStartSelect	method dynamic ToolAreaClass, 
+if TOOL_AREA_IS_TASK_BAR
+ToolAreaStartSelect	method dynamic ToolAreaClass,
 					MSG_META_START_SELECT
+	;
+	; if TaskBar == on
+	; RUNTIME
+	;
+	push	ds					; save ds
+	segmov	ds, dgroup				; load dgroup
+	test	ds:[taskBarPrefs], mask TBF_ENABLED	; test if TBF_ENABLED is set
+	pop	ds					; restore ds
+	jz	callSuper				; skip if no taskbar
+
+	;
 	; update the mouse pointer image, in case we have not received a
 	; MSG_META_PTR event recently
+	;
 
 	mov	di, ds:[si]
 	add	di, ds:[di].Vis_offset
 	call	OpenWinUpdatePtrImage
 
+	;
 	; startup SMCO mechanism, and send event on to children
+	;
 
 	push	cx, dx
 	call	OpenWinStartButton
@@ -2117,18 +2306,13 @@ ToolAreaStartSelect	method dynamic ToolAreaClass,
 	test	ax, mask MRF_PROCESSED
 	jnz	done
 
+	;
 	; set MOVING or RESIZING flags
+	;
 
 	segmov	es, dgroup, ax
-if TOOL_AREA_IS_TASK_BAR
-	tst	es:[taskBarMovable]
+	test	es:[taskBarPrefs], mask TBF_MOVABLE
 	jz	noMove				; not supported
-else
-	mov	di, ds:[si]
-	add	di, ds:[di].Gen_offset
-	test	ds:[di].TAI_state, mask TASF_FLOATING_TRAY
-	jz	noMove
-endif
 
 	mov	di, ds:[si]
 	add	di, ds:[di].Vis_offset
@@ -2141,12 +2325,20 @@ endif
 	call	VisGrabMouse
 noMove:
 	mov	ax, mask MRF_PROCESSED
+
+	jmp	done
+
+callSuper:
+	mov	di, offset ToolAreaClass
+	GOTO	ObjCallSuperNoLock
+
 done:
 	ret
 ToolAreaStartSelect	endm
-endif ; TOOL_AREA_IS_TASK_BAR or (_MOTIF and EXTENDIBLE_SYSTEM_TRAY)
+endif
 
-
+
+
 COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 		ToolAreaVisMoveResizeWin
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -2164,46 +2356,69 @@ DESTROYED:	ax, cx, dx, bp
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
 
 if TOOL_AREA_IS_TASK_BAR
-ToolAreaVisMoveResizeWin	method dynamic ToolAreaClass, 
+ToolAreaVisMoveResizeWin	method dynamic ToolAreaClass,
 					MSG_VIS_MOVE_RESIZE_WIN
+
+	;
+	; if TaskBar == on
+	; RUNTIME
+	;
+	push	ds					; save ds
+	segmov	ds, dgroup				; load dgroup
+	test	ds:[taskBarPrefs], mask TBF_ENABLED	; test if TBF_ENABLED is set
+	pop	ds					; restore ds
+	LONG	jz callSuper				; skip if no taskbar
+
 	mov	bl, ds:[di].TAI_state
 
-	push	ds
-	segmov	ds, dgroup, ax
-	mov	ax, ds:[taskBarPosition]
-	pop	ds
+	;
+	; store old position of TaskBar (in AX)
+	;
+	push	ds					; save ds
+	segmov	ds, dgroup				; get dgroup
+	mov	ax, ds:[taskBarPrefs]			; load taskBarPrefs in ax
+	andnf	ax, mask TBF_POSITION			; mask out everything but the position bits
+	shr	ax, offset TBF_POSITION			; retrieve position value
+	pop	ds					; restore ds
 
+	;
+	; get new position
+	;
 	mov	di, ds:[si]
 	add	di, ds:[di].Vis_offset
 	mov	cx, ds:[di].VI_bounds.R_left
 	sub	ds:[di].VI_bounds.R_left, cx
 	sub	ds:[di].VI_bounds.R_right, cx
 
-	call	OpenGetScreenDimensions
+	call	OpenGetScreenDimensions 		; get field dimensions in cx = width, dx = height
 	mov	bp, dx
-	shr	bp, 1
+	shr	bp, 1					; shr 1 = divide height by two => upper and lower half of screen?
 
-	cmp	ds:[di].VI_bounds.R_top, bp
-	jg	bottom
+	cmp	ds:[di].VI_bounds.R_top, bp		; compare taskbar y position with half of screen
+	jg	bottom					; if greater than half of screen, position taskbar at bottom
+							; otherwise, on top
 
+;top:
 	test	bl, mask TASF_AUTO_HIDE
 	jnz	topHide
 
 	clr	cx
 	xchg	cx, ds:[di].VI_bounds.R_top
 	sub	ds:[di].VI_bounds.R_bottom, cx
-	tst	ax
-	jle	callSuper		; skip update if already at top
-	jmp	updatePosition
+	mov	bp, TBP_TOP
+	cmp	ax, bp					; compare old and new position
+	je	callSuper				; jump if already top position
+	jmp	updatePosition				; otherwise, update
 
 topHide:
-	mov	cx, 1			; need one pixel on-screen
+	mov	cx, 1					; need one pixel on-screen
 	xchg	cx, ds:[di].VI_bounds.R_bottom
-	dec	cx			; need one pixel on-screen
+	dec	cx					; need one pixel on-screen
 	sub	ds:[di].VI_bounds.R_top, cx
-	tst	ax
-	jle	callSuper
-	jmp	updatePosition	
+	mov	bp, TBP_TOP
+	cmp	ax, bp					; compare old and new position
+	je	callSuper				; jump if already top position
+	jmp	updatePosition				; otherwise, update
 
 bottom:
 	test	bl, mask TASF_AUTO_HIDE
@@ -2212,32 +2427,37 @@ bottom:
 	sub	dx, ds:[di].VI_bounds.R_bottom
 	add	ds:[di].VI_bounds.R_top, dx
 	add	ds:[di].VI_bounds.R_bottom, dx
-	tst	ax
-	jg	callSuper		; skip update if already at bottom
-	jmp	updatePosition
+	mov	bp, TBP_BOTTOM
+	cmp	ax, bp					; compare old and new position
+	je	callSuper				; jump if already at bottom position
+	jmp	updatePosition				; otherwise, update
 
 bottomHide:
-	dec	dx				; need one pixel on-screen
+	dec	dx					; need one pixel on-screen
 	sub	dx, ds:[di].VI_bounds.R_top
 	add	ds:[di].VI_bounds.R_top, dx
 	add	ds:[di].VI_bounds.R_bottom, dx
-	tst	ax
-	jg	callSuper		; skip update if already at bottom
+	mov	bp, TBP_BOTTOM
+	cmp	ax, bp					; compare old and new position
+	je	callSuper				; jump if already at bottom position
 
 updatePosition:
 	push	ds, si
-	mov	bp, ds:[di].VI_bounds.R_top
-	segmov	ds, dgroup, cx
-	mov	ds:[taskBarPosition], bp	
 	mov	cx, cs
 	mov	ds, cx
 	mov	dx, offset taskBarPositionKey
 	mov	si, offset taskBarPositionCategory
-	call	InitFileWriteInteger
+	call	InitFileWriteInteger			; update GEOS.INI
+
+	segmov	ds, dgroup
+	andnf	ds:[taskBarPrefs], not mask TBF_POSITION
+	shl	bp, offset TBF_POSITION
+	ornf	ds:[taskBarPrefs], bp			; update Taskbar Position flag
 	pop	ds, si
 
+	;
 	; fixup window positions
-
+	;
 	mov	ax, MSG_OL_FIELD_SEND_TO_GEN_APPLICATIONS
 	mov	dx, MSG_OL_APP_UPDATE_WINDOWS_FOR_TASK_BAR
 	call	VisCallParent
@@ -2247,14 +2467,16 @@ callSuper:
 	mov	di, offset ToolAreaClass
 	GOTO	ObjCallSuperNoLock
 
+
 ToolAreaVisMoveResizeWin	endm
 
 taskBarPositionCategory	char	"motif options",0
 taskBarPositionKey	char	"taskBarPosition",0
 
-endif ; TOOL_AREA_IS_TASK_BAR
+endif
 
-
+
+
 COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 		ToolAreaInteractionInitiate
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -2284,37 +2506,109 @@ if TOOL_AREA_IS_TASK_BAR
 ;
 ToolAreaInitPosition	method	dynamic	ToolAreaClass, MSG_TOOL_AREA_INIT_POSITION
 
+	;
+	; if TaskBar == on
+	;
+	push	ds					; save ds
+	segmov	ds, dgroup				; load dgroup
+	test	ds:[taskBarPrefs], mask TBF_ENABLED	; test if TBF_ENABLED is set
+	pop	ds					; restore ds
+	LONG	jz done					; skip if no taskbar
+
+	;
+	; set size of taskbar
+	;
+	mov	ax, HINT_SIZE_WINDOW_AS_RATIO_OF_PARENT
+	mov	cx, size SpecWinSizePair
+	call	ObjVarAddData
+	mov	ds:[bx].SWSP_x, mask SWSS_RATIO or PCT_100
+	mov	ds:[bx].SWSP_y, mask SWSS_RATIO or PCT_0
+
+	;
+	; set position of taskbar
+	; at the moment we only support top and bottom positions of
+	; the taskbar: 0 = top, everything greater than 0 becomes
+	; bottom
+	;
 	mov	ax, HINT_POSITION_WINDOW_AT_RATIO_OF_PARENT
 	mov	cx, size SpecWinSizePair
 	call	ObjVarAddData
 
 	clr	cx
-	mov	dx, 0		; assume top of screen
-	push	ds
-	segmov	ds, dgroup
-	tst	ds:[taskBarPosition]
-	pop	ds
-	jle	setPosition
-	mov	dx, mask SWSS_RATIO or PCT_100
+	mov	dx, 0					; assume top of screen
+
+	push	ds					; save ds
+	segmov	ds, dgroup				; get dgroup
+	mov	dx, ds:[taskBarPrefs]			; load taskBarPrefs in dx
+	andnf	dx, mask TBF_POSITION			; mask out everything but the position bits
+	cmp	dx, (TBP_TOP) shl offset TBF_POSITION	; compare position bits with TBP_TOP
+	pop	ds					; restore ds
+	je	setPosition				; jump if top position
+
+	mov	dx, mask SWSS_RATIO or PCT_95 		; PCT_100 apparently produces a wrap-around somewhere
+							; and makes the taskbar appear on top...
 
 setPosition:
 	mov	ds:[bx].SWSP_x, cx
 	mov	ds:[bx].SWSP_y, dx
+
+	;
+	; set TaskBar usable
+	;
+	push 	ds, si
+	mov	ax, MSG_GEN_FIND_CHILD_AT_POSITION
+	clr	cx					; find first child = 0
+	call	ObjCallInstanceNoLock
+	jc	afterTaskBarCheck			; abort if child not found
+	mov 	si, dx					; *ds:si <- TaskBar
+	mov	ax, MSG_GEN_SET_USABLE
+	mov	dl, VUM_DELAYED_VIA_APP_QUEUE		; dl <- VisUpdateMode
+	call	ObjCallInstanceNoLock
+afterTaskBarCheck:
+	pop	ds, si
+
+	;
+	; set Tray usable
+	;
+	push 	ds, si
+	mov	ax, MSG_GEN_FIND_CHILD_AT_POSITION
+	mov	cx, 1					; second child = 1
+	call	ObjCallInstanceNoLock
+	jc	afterTrayCheck				; abort if child not found
+	mov 	si, dx					; *ds:si <- TaskBar
+	mov	ax, MSG_GEN_SET_USABLE
+	mov	dl, VUM_DELAYED_VIA_APP_QUEUE		; dl <- VisUpdateMode
+	call	ObjCallInstanceNoLock
+afterTrayCheck:
+	pop	ds, si
+
+done:
 	ret
 ToolAreaInitPosition	endm
-endif ; TOOL_AREA_IS_TASK_BAR
-		
-ToolAreaInteractionInitiate	method dynamic ToolAreaClass, 
-					MSG_GEN_INTERACTION_INITIATE
+endif
 
+
+ToolAreaInteractionInitiate	method dynamic ToolAreaClass,
+						MSG_GEN_INTERACTION_INITIATE
 	mov	di, offset ToolAreaClass
 	call	ObjCallSuperNoLock
 
 if TOOL_AREA_IS_TASK_BAR
+	;
+	; if TaskBar == on
+	;
+	push	ds					; save ds
+	segmov	ds, dgroup				; load dgroup
+	test	ds:[taskBarPrefs], mask TBF_ENABLED	; test if TBF_ENABLED is set
+	pop	ds					; restore ds
+	jz	noHide					; skip if no taskbar
 
+	;
+	; handle hiding
+	;
 	push	ds
 	segmov	ds, dgroup
-	tst	ds:[taskBarAutoHide]
+	test	ds:[taskBarPrefs], mask TBF_AUTO_HIDE
 	pop	ds
 	jz	noHide
 
@@ -2326,10 +2620,18 @@ if TOOL_AREA_IS_TASK_BAR
 	call	ObjCallInstanceNoLock
 	pop	ax
 noHide:
+endif
 
-endif ; TOOL_AREA_IS_TASK_BAR
-
-if (not TOOL_AREA_IS_TASK_BAR)
+if TOOL_AREA_IS_TASK_BAR
+	;
+	; if TaskBar == off
+	;
+	push	ds					; save ds
+	segmov	ds, dgroup				; load dgroup
+	test	ds:[taskBarPrefs], mask TBF_ENABLED	; test if TBF_ENABLED is set
+	pop	ds					; restore ds
+	jnz	done					; skip if taskbar
+endif
 
 	;
 	; if UIEP_LOWER_LEFT, force a move so that it'll be position at
@@ -2356,6 +2658,7 @@ if EVENT_MENU
 	mov	ss:[bp].OLFMTAP_eventPos, 0
 endif
 					; not needed for parking off-screen
+
 	mov	ss:[bp].OLFMTAP_layerPriority, 0
 	mov	ax, MSG_OL_FIELD_MOVE_TOOL_AREA
 	mov	di, mask MF_RECORD or mask MF_STACK
@@ -2365,8 +2668,6 @@ endif
 	mov	cx, di
 	mov	ax, MSG_GEN_GUP_CALL_OBJECT_OF_CLASS
 	call	GenCallParent
-
-endif	; (not TOOL_AREA_IS_TASK_BAR)
 
 done:
 	ret
@@ -2410,11 +2711,9 @@ REVISION HISTORY:
 	doug	6/92		Initial version
 
 ------------------------------------------------------------------------------@
-
 
-ToolAreaAlterFTVMCExcl method dynamic ToolAreaClass, 
+ToolAreaAlterFTVMCExcl method dynamic ToolAreaClass,
 					MSG_META_MUP_ALTER_FTVMC_EXCL
-
 	;
 	; redirect requests to UIApp, if a OLWin object
 	;
@@ -2455,7 +2754,7 @@ ToolAreaAlterFTVMCExcl endm
 
 COMMENT @----------------------------------------------------------------------
 
-METHOD:		ToolAreaBringToTop -- 
+METHOD:		ToolAreaBringToTop --
 		MSG_GEN_BRING_TO_TOP for ToolAreaClass
 
 DESCRIPTION:	Brings tool area to the top.  We subclass this merely to
@@ -2467,10 +2766,10 @@ PASS:		*ds:si 	- instance data
 		es     	- segment of MetaClass
 		ax 	- MSG_GEN_BRING_TO_TOP
 
-RETURN:		
+RETURN:
 		ax, cx, dx, bp - destroyed
 
-ALLOWED TO DESTROY:	
+ALLOWED TO DESTROY:
 		bx, si, di, ds, es
 
 REGISTER/STACK USAGE:
@@ -2500,7 +2799,7 @@ ToolAreaBringToTop	method dynamic	ToolAreaClass, \
 	mov	di, offset ToolAreaClass
 	call	ObjCallSuperNoLock
 
-	mov	di, ds:[si]			
+	mov	di, ds:[si]
 	add	di, ds:[di].Vis_offset
 	and	ds:[di].OLCI_buildFlags, not mask OLBF_TOOLBOX
 	ret
@@ -2526,11 +2825,11 @@ RETURN:		carry	= set if data found & returned, clear if no object
 				responded
 		^lcx:dx	= object suitable to be visible parent
 
-ALLOWED TO DESTROY:	
+ALLOWED TO DESTROY:
 		ax, bp
 		bx, si, di, ds, es
 
-SIDE EFFECTS:	
+SIDE EFFECTS:
 
 PSEUDO CODE/STRATEGY:
 
@@ -2574,11 +2873,11 @@ PASS:		*ds:si	= ToolAreaClass object
 		ds:bx	= ToolAreaClass object (same as *ds:si)
 		es 	= segment of ToolAreaClass
 		ax	= message #
-	cl	- DrawFlags:  DF_EXPOSED set if GState is set to update window
-	^hbp	- GState to draw through.
-RETURN:		
-DESTROYED:	
-SIDE EFFECTS:	
+		cl	- DrawFlags:  DF_EXPOSED set if GState is set to update window
+		^hbp	- GState to draw through.
+RETURN:
+DESTROYED:
+SIDE EFFECTS:
 
 PSEUDO CODE/STRATEGY:
 
@@ -2589,7 +2888,7 @@ REVISION HISTORY:
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
 if EVENT_MENU
-ToolAreaDraw	method dynamic ToolAreaClass, 
+ToolAreaDraw	method dynamic ToolAreaClass,
 					MSG_VIS_DRAW
 	mov	di, segment VisCompClass
 	mov	es, di
@@ -2614,8 +2913,8 @@ PASS:		*ds:si	= ToolAreaClass object
 		ax	= message #
 		cx, dx	= suggested size
 RETURN:		cx, dx	= desired size
-DESTROYED:	
-SIDE EFFECTS:	
+DESTROYED:
+SIDE EFFECTS:
 
 PSEUDO CODE/STRATEGY:
 
@@ -2626,7 +2925,7 @@ REVISION HISTORY:
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
 if EVENT_MENU
-ToolAreaRecalcSize	method dynamic ToolAreaClass, 
+ToolAreaRecalcSize	method dynamic ToolAreaClass,
 					MSG_VIS_RECALC_SIZE
 
 	mov	cx, mask RSA_CHOOSE_OWN_SIZE	; allow minimal width
@@ -2650,8 +2949,8 @@ PASS:		*ds:si	= ToolAreaClass object
 		es 	= segment of ToolAreaClass
 		ax	= message #
 RETURN:		cx, dx	= minimum size
-DESTROYED:	
-SIDE EFFECTS:	
+DESTROYED:
+SIDE EFFECTS:
 
 PSEUDO CODE/STRATEGY:
 
@@ -2662,7 +2961,7 @@ REVISION HISTORY:
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
 if EVENT_MENU
-ToolAreaGetMinimumSize	method dynamic ToolAreaClass, 
+ToolAreaGetMinimumSize	method dynamic ToolAreaClass,
 					MSG_VIS_COMP_GET_MINIMUM_SIZE
 	mov	di, offset ToolAreaClass
 	call	ObjCallSuperNoLock
@@ -2771,7 +3070,7 @@ ResizeFieldWindow	proc	near
 		mov_tr	cx, bx		; cx = height
 		mov	bx, mask WPF_ABS; move in absolute screen coordinates
 		push	bx		; put WinPassFlags on stack
-		clr	ax, bx, bp, si		; top, left, & 
+		clr	ax, bx, bp, si		; top, left, &
 						; associated region (none)
 		call	WinResize
 	;
@@ -2884,8 +3183,9 @@ DESTROYED:	ax, cx, dx, bp
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
 
 if TOOL_AREA_IS_TASK_BAR
-OLFieldSendToGenApplications	method dynamic OLFieldClass, 
+OLFieldSendToGenApplications	method dynamic OLFieldClass,
 					MSG_OL_FIELD_SEND_TO_GEN_APPLICATIONS
+
 	mov	bp, ds:[si]
 	add	bp, ds:[bp].Gen_offset
 	mov	bp, ds:[bp].GFI_genApplications
@@ -2911,8 +3211,8 @@ genAppLoop:
 	add	bp, size optr
 	loop	genAppLoop
 done:
-	ret	
+	ret
 OLFieldSendToGenApplications	endm
-endif ; TOOL_AREA_IS_TASK_BAR
+endif
 
 HighUncommon	ends
