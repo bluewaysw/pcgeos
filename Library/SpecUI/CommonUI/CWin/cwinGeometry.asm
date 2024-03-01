@@ -18,7 +18,7 @@ ROUTINES:
 
     INT ReturnAxBpCxDx          Returns margins a certain way.
 
-    MTD MSG_VIS_COMP_GET_MINIMUM_SIZE 
+    MTD MSG_VIS_COMP_GET_MINIMUM_SIZE
 				Returns the minimum size for a window.
 				IMPORTANT: OLBaseWinClass subclasses this
 				method to add spacing for the Workspace and
@@ -39,7 +39,7 @@ ROUTINES:
 				then attemps to keep the thing on-screen,
 				first by resizing it, then by moving it.
 
-    MTD MSG_OL_GET_CHILDS_TREE_POS 
+    MTD MSG_OL_GET_CHILDS_TREE_POS
 				Returns true if object passed is child of
 				non-menu window. Also returns whether the
 				child is the first child of the window
@@ -54,7 +54,7 @@ ROUTINES:
     INT OpenWinCalcMinWidth     Calculate the minimum size for an OpenLook
 				window.
 
-    MTD MSG_VIS_RESET_TO_INITIAL_SIZE 
+    MTD MSG_VIS_RESET_TO_INITIAL_SIZE
 				Resets a window to its initial size.  For
 				most windows, we'll zap the size back to
 				RS_CHOOSE_OWN_SIZE so the window will
@@ -62,7 +62,7 @@ ROUTINES:
 				its maximized, in which case we'll leave
 				the window size alone.
 
-    MTD MSG_OL_WIN_RECALC_DISPLAY_SIZE 
+    MTD MSG_OL_WIN_RECALC_DISPLAY_SIZE
 				Returns size of window, after making sure
 				geometry's up-to-date.
 
@@ -74,7 +74,7 @@ ROUTINES:
     INT GetDividerStrLen        Gets the length of the divider before the
 				long term moniker.
 
-    INT MoveWindowToKeepOnscreen 
+    INT MoveWindowToKeepOnscreen
 				Moves window bounds to try to keep it
 				onscreen.
 
@@ -154,7 +154,7 @@ REVISION HISTORY:
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
 OLWinVisPositionBranch	method dynamic OLWinClass, MSG_VIS_POSITION_BRANCH
 
-	call	WinPassMarginInfo	
+	call	WinPassMarginInfo
 	call	VisCompPosition
 	ret
 OLWinVisPositionBranch	endm
@@ -232,13 +232,13 @@ if	_CUA_STYLE		;START of MOTIF/CUA specific code ----
 
 OpenWinGetSpacing	method OLWinClass, MSG_VIS_COMP_GET_CHILD_SPACING
 					; bp = pointSize
-	
+
 	;top and bottom of other window types.
-	
-MO <	mov	cx, MO_BASE_WIN_CHILD_SPACING			
+
+MO <	mov	cx, MO_BASE_WIN_CHILD_SPACING
 MO <	mov	dx, MO_WIN_CHILD_WRAP_SPACING
-   
-ISU <	mov	cx, MO_BASE_WIN_CHILD_SPACING			
+
+ISU <	mov	cx, MO_BASE_WIN_CHILD_SPACING
 ISU <	mov	dx, MO_WIN_CHILD_WRAP_SPACING
 
 if	(not _MOTIF)   	;spacing provided other ways now -12/ 4/92 cbh
@@ -254,10 +254,10 @@ if	(not _MOTIF)   	;spacing provided other ways now -12/ 4/92 cbh
 
 MO  <	mov	cx, MO_WIN_CHILD_SPACING	;		            >
 ISU <	mov	cx, MO_WIN_CHILD_SPACING	;		            >
-	
+
 OWGS_doneWithSpacing:
 endif
-	
+
 	test	ds:[di].OLCI_buildFlags, mask OLBF_TOOLBOX
 	jz	notToolbox
 	mov	cx, TOOLBOX_SPACING		;toolboxes use larger spacing
@@ -266,7 +266,7 @@ notToolbox:
 	;
 	; Check for custom spacing, unless we're a OLDialogWin or OLMenuedWin,
 	; in which case the gadget area will handle the hint.
-	; 
+	;
 	mov	di, segment OLDialogWinClass
 	mov	es, di
 	mov	di, offset OLDialogWinClass
@@ -276,9 +276,9 @@ notToolbox:
 	mov	di, offset OLMenuedWinClass
 	call	ObjIsObjectInClass
 	jc	5$
-	
+
 	call	OpenCtrlCheckCustomSpacing
-5$:	
+5$:
 	mov	di, ds:[si]
 	add	di, ds:[di].Vis_offset
 	test	ds:[di].VCI_geoAttrs, mask VCGA_ORIENT_CHILDREN_VERTICALLY
@@ -342,9 +342,9 @@ OpenWinGetMargins	method OLWinClass, MSG_VIS_COMP_GET_MARGINS
 	push	es
 	segmov	es, dgroup, bp		; es = dgroup
 					; bp = pointSize
-	mov	bp, es:[specDisplayScheme.DS_pointSize]	
+	mov	bp, es:[specDisplayScheme.DS_pointSize]
 	pop	es
-	
+
 	mov	di,ds:[si]		;ds:si = instance
 	add	di,ds:[di].Vis_offset	;ds:si = SpecificInstance
 
@@ -398,7 +398,7 @@ endif
 	jz	afterCustomWindow
 	clr	cx, dx
 afterCustomWindow:
-	
+
 	mov	bx, ds:[di].OLWI_attrs	;get attributes for window
 	;
 	; If RESIZABLE then add size of resize border
@@ -434,7 +434,7 @@ endif
 	push	es
 	segmov	es, dgroup, ax
 	mov	al, es:[resizeBarHeight].low
-	mov	ah, al	
+	mov	ah, al
 	pop	es
 if _ISUI
 	mov	cx, ax
@@ -489,7 +489,7 @@ if	 _TITLE_BARS_HAVE_WHITE_BORDER
 	; up two pixels, we just want to make sure there is enough room for
 	; descenders in the the title bar.  There is already enough space
 	; above the moniker, even with the white space.
-	inc	cx	
+	inc	cx
 endif	;_TITLE_BARS_HAVE_WHITE_BORDER
 
 if	_MOTIF and not _ASSUME_BW_ONLY
@@ -507,7 +507,7 @@ endif
 	jmp	OWGS_noHeader
 
 OWGS_noHeader:
-	; if this window wants its children to be physically inside 
+	; if this window wants its children to be physically inside
 	; the frame border (instead of on it), inset them some.
 
 if	_MOTIF
@@ -522,7 +522,7 @@ endif
 
 	;if this window wants its children to be physically inside the frame
 	;border (instead of on it), inset them some.
-	
+
 OWGS_80:
 
 if (not _MOTIF)
@@ -532,16 +532,16 @@ if (not _MOTIF)
 	add	cx, (CUAS_REAL_MARGIN_SIZE shl 8) + CUAS_REAL_MARGIN_SIZE
 	add	dx, (CUAS_REAL_MARGIN_SIZE shl 8) + CUAS_REAL_MARGIN_SIZE
 
-	; Use less of a margin in CGA.	
+	; Use less of a margin in CGA.
 	call	OpenCheckIfCGA
 	jz	OWGS_90
 	sub	cx, (CUAS_REAL_MARGIN_CGA_DIFF shl 8)+CUAS_REAL_MARGIN_CGA_DIFF
-OWGS_90:	
+OWGS_90:
 
 	call	OpenCheckIfNarrow
 	jz	OWGS_92
 	sub	dx, (CUAS_REAL_MARGIN_CGA_DIFF shl 8)+CUAS_REAL_MARGIN_CGA_DIFF
-OWGS_92:	
+OWGS_92:
 endif	; (not _MOTIF)
 
 if (not _MOTIF)
@@ -604,7 +604,7 @@ if DIALOGS_WITH_FOLDER_TABS
 	add	cx, 2 * TAB_SHADOW_SIZE
 notTabbed:
 endif
-	
+
 
 if	DRAW_SHADOWS_ON_BW_GADGETS
 	test	ds:[di].OLWI_moreFixedAttr, mask OWMFA_CUSTOM_WINDOW
@@ -613,7 +613,7 @@ if	DRAW_SHADOWS_ON_BW_GADGETS
 	jnc	exit
 	inc	cx			;leave room for shadow
 	inc	dx
-exit:		
+exit:
 endif
 
 if	_ROUND_THICK_DIALOGS
@@ -641,8 +641,8 @@ if	 BUBBLE_DIALOGS
 
 	test	ds:[di].OLWI_moreFixedAttr, mask OWMFA_IS_POPUP
 	jz	doneWithBubbleMargin
-	
-	push	ax, bx	
+
+	push	ax, bx
 	mov	ax, TEMP_OL_WIN_BUBBLE_MARGIN
 	call	ObjVarFindData
 	mov	di, bx
@@ -653,8 +653,8 @@ if	 BUBBLE_DIALOGS
 if _DUI
 	add	bp, ds:[di].P_y
 endif
-	
-doneWithBubbleMargin:	
+
+doneWithBubbleMargin:
 endif	;BUBBLE_DIALOGS
 
 	ret
@@ -699,7 +699,7 @@ ReturnAxBpCxDx	proc	near
 	dec	ah
 1$:
 	mov	bp, ax
-	
+
 	mov	dl, dh
 	clr	dh
 	tst	dl
@@ -736,7 +736,7 @@ PASS:		*ds:si -- object
 RETURN:		cx -- minimum width
 		dx -- minimum height
 
-DESTROYED:	
+DESTROYED:
 
 PSEUDO CODE/STRATEGY:
 
@@ -749,19 +749,19 @@ REVISION HISTORY:
 
 ------------------------------------------------------------------------------@
 
-OpenWinGetMinSize	method dynamic	OLWinClass, 
+OpenWinGetMinSize	method dynamic	OLWinClass,
 			MSG_VIS_COMP_GET_MINIMUM_SIZE
-			
+
 	mov	di, offset OLWinClass		;call superclass for desired
 	call	ObjCallSuperNoLock		;   size stuff
 	push	dx				;save return height
 	push	cx				;save returned width
-	
-	call	OpenWinCalcMinWidth	;cx <- minimum allowable width for   
+
+	call	OpenWinCalcMinWidth	;cx <- minimum allowable width for
 					;this window, taking into account the
 					;header area if any.
 
-	mov	di, ds:[si]			
+	mov	di, ds:[si]
 	add	di, ds:[di].Vis_offset
 	test	ds:[di].OLWI_attrs, mask OWA_RESIZABLE
 	jnz	10$				;resizable, don't add moniker
@@ -780,7 +780,7 @@ endif
 	jz	addMoniker			;not a menu, use moniker...
 	test	ds:[di].OLWI_specState, mask OLWSS_PINNED
 	jz	10$				;not pinned, don't use moniker
-	
+
 addMoniker:
 	push	cx				;save width so far
 
@@ -796,7 +796,7 @@ CUAS <	add	cx, CUAS_TITLE_TEXT_MARGIN*2	;add in title margins      >
 10$:
 	pop	ax				;extra width from superclass
 	pop	dx				;extra height from superclass
-	
+
 	cmp	ax, cx				;larger than window's result?
 	jb	20$				;no, exit
 	mov	cx, ax				;else use it instead
@@ -842,36 +842,36 @@ PSEUDO CODE/STRATEGY:
 		; If window is coming up for the first time, first resize to
 		; try to keep it onscreen.  If that fails, try moving it.
 		;
-		if originally passed mask RSA_CHOOSE_OWN_SIZE for either 
+		if originally passed mask RSA_CHOOSE_OWN_SIZE for either
 		dimension...
-		
+
 		    ; Try to do easy things to keep onscreen.
-		    
+
 		    ;save original left, top edge
-		    
+
 		    get current window origin in cx, dx
 		    if right > parentWidth, cx = cx - (right - parentWidth)
 		    if bottom > parentBottom, dx = dx - (bottom - parentBottom)
 		    if cx negative, cx = 0
 		    if dx negative, dx = 0
 		    call VisSetPosition
-		    
+
 		    ; Now, bring in right or bottom edge and do new geometry
 		    ; stuff to keep onscreen.
-		    
+
 		    if right > parentWidth, right = parentWidth
 		    if bottom > parentHeight, bottom = parentHeight
-		    
+
 		    update window's geometry
-		    
+
 		    ; Move the object back to its original position, in case
 		    ; it can be there again with the new geometry.
-		    
+
 		    ;restore original left, top edge
 		    ;call VisSetPosition
-		    
+
 		    ; Now, one last feeble attempt to move the window onscreen.
-		    
+
 		    if right > parentWidth, cx = cx - (right - parentWidth)
 		    if bottom > parentBottom, dx = dx - (bottom - parentBottom)
 		    if cx negative, cx = 0
@@ -920,13 +920,17 @@ CUAS <	push	bx				;save width		>
 	pop	es
 
 	call	OpenGetParentWinSize		;window is on
+
 if TOOL_AREA_IS_TASK_BAR
+
 	; If taskbar is at the bottom of the screen, subtract off the
 	; height of the tool area (taskbar) from parent window size so
 	; maximized windows don't extend below the taskbar.
+
 	call	GetTaskBarSizeAdjustment
 	sub	dx, di			; subtract off taskbar adjustment
-endif ; TOOL_AREA_IS_TASK_BAR
+
+endif
 
 CUAS <	pop	bx				;get previous width	>
 	popf					;restore invalid flags
@@ -1001,12 +1005,12 @@ OpenWinRefitToParent	proc	near		;cx, dx are parent width & ht
 	inc	bx				;mark as needing geometry
 20$:
 	tst	bx				;no size changed needed, branch
-	jz	checkPosition			
-	call	VisSetSize			;else try out new size for 
+	jz	checkPosition
+	call	VisSetSize			;else try out new size for
 						;  the window
 	;
 	; If the window is bigger than the screen, we'll first try redoing
-	; geometry so the thing will fit.  In popup list cases, we'll try 
+	; geometry so the thing will fit.  In popup list cases, we'll try
 	; reorienting the menu, and all of its visible children.
 	;
 	push	ax, bp
@@ -1014,21 +1018,21 @@ OpenWinRefitToParent	proc	near		;cx, dx are parent width & ht
 	and	ax, mask OLBF_TARGET
 	cmp	ax, OLBT_IS_POPUP_LIST shl offset OLBF_TARGET
 	jne	stayOnscreen			;not popup list, too dangerous
-	
+
 	;
 	; Already vertical, don't try making as such, because we will want to
 	; try to wrap instead.  -cbh 3/26/93
 	;
 	test	ds:[di].VCI_geoAttrs, mask VCGA_ORIENT_CHILDREN_VERTICALLY
 	jnz	stayOnscreen
-	
+
 	or	ds:[di].VCI_geoAttrs, mask VCGA_ORIENT_CHILDREN_VERTICALLY
 
 	mov	cx, mask VCGA_ORIENT_CHILDREN_VERTICALLY
 	clr	dx
 	mov	ax, MSG_VIS_COMP_SET_GEO_ATTRS
 	call	VisSendToChildren
-	
+
 	mov	dl, VUM_MANUAL
 	mov	ax, MSG_VIS_RESET_TO_INITIAL_SIZE
 	call	ObjCallInstanceNoLock
@@ -1049,7 +1053,7 @@ update:
 
 checkPosition:
 	call	MoveWindowToKeepOnscreen	;try to move the window onscreen
-	
+
 	;update title bar size and icon positions also
 
 	tst	bx
@@ -1064,13 +1068,13 @@ OpenWinRefitToParent	endp
 
 COMMENT @----------------------------------------------------------------------
 
-METHOD:		OLWinGetChildsTreePos -- 
+METHOD:		OLWinGetChildsTreePos --
 		MSG_OL_GET_CHILDS_TREE_POS for OLWinClass
 
 DESCRIPTION:	Returns true if object passed is child of non-menu window.
 		Also returns whether the child is the first child
 		of the window either generically or visually (depending on
-		what is passed).  This generic-or-specific stuff is 
+		what is passed).  This generic-or-specific stuff is
 		extremely dubious.
 
 PASS:		*ds:si 	- instance data
@@ -1094,23 +1098,23 @@ KNOWN BUGS/SIDE EFFECTS/CAVEATS/IDEAS:
 		this object.
 
 		This is all kind of hacked.  This problem is that composites
-		need to find out if they're the immediate children of a 
+		need to find out if they're the immediate children of a
 		window, and if they are, if they're the first or last item in
 		the window.  The problem is that we have objects that are
 		only in the visual linkage, so we can't use the generic;  we
 		have the text object calling this when being vis built that
 		can't use the visual;  and we have objects that are the last
 		children in the visual tree, but don't really show up there,
-		meaning some object before them is actually at the bottom, 
+		meaning some object before them is actually at the bottom,
 		in which case we check generic linkage.  So we have:
-		
+
 			  Parent linkage    First child	   Last child
-			  
+
 		Ctrls	  Visual	    Visual 	   Generic
 		Text	  Generic	    Generic 	   Generic
-		
+
 		Pretty bad, eh?
-		
+
 REVISION HISTORY:
 	Name	Date		Description
 	----	----		-----------
@@ -1130,7 +1134,7 @@ OLWinGetChildsTreePos	method dynamic	OLWinClass,
 	jne	GCTP_visual			;no, branch
 	add	di, GI_comp			;else get offset to comp part
 	jmp	short GCTP_checkFirst
-	
+
 GCTP_visual:
 	add	di, VCI_comp			;get offset to comp part
 
@@ -1141,10 +1145,10 @@ GCTP_checkFirst:
 	cmp	dx, ds:[di].CP_firstChild.chunk
 	jne	GCTP_returnCarrySet		;chunk doesn't match, exit
 	dec	cx				;else set cx true
-	
+
 GCTP_returnCarrySet:
 	stc					;return parent is non-menu win
-	
+
 GCTP_exit:
 	ret
 OLWinGetChildsTreePos	endp
@@ -1174,7 +1178,7 @@ REVISION HISTORY:
 	?	1/90		initial version
 
 ------------------------------------------------------------------------------@
-	 
+
 if 	_CUA_STYLE	;START of MOTIF specific code -------------------------
 
 OpenWinCalcMinWidth	proc	near
@@ -1186,7 +1190,7 @@ NOT_MO<	clr	cx				;objects touch edges in CUA  >
 MO<	mov	cx, CUAS_WIN_LINE_BORDER_SIZE*2	;start with thin line borders>
 ISU<	mov	cx, CUAS_WIN_LINE_BORDER_SIZE*2	;start with thin line borders>
 ISU<	add	cx, 4				;it seems we have extra border>
-	
+
 	mov	di, ds:[si]			;point to specific instance
 	add	di, ds:[di].Vis_offset
 
@@ -1216,8 +1220,8 @@ if	 BUBBLE_DIALOGS
 
 	test	ds:[di].OLWI_moreFixedAttr, mask OWMFA_IS_POPUP
 	jz	doneWithBubbleMargin
-	
-	push	bx	
+
+	push	bx
 	mov	ax, TEMP_OL_WIN_BUBBLE_MARGIN
 	call	ObjVarFindData
 	mov	ax, ds:[bx]			; ax = left margin
@@ -1290,7 +1294,7 @@ endif		;END of MOTIF specific code -----------------------------------
 
 COMMENT @----------------------------------------------------------------------
 
-METHOD:		OLWinResetToInitialSize -- 
+METHOD:		OLWinResetToInitialSize --
 		MSG_VIS_RESET_TO_INITIAL_SIZE for OLWinClass
 
 DESCRIPTION:	Resets a window to its initial size.   For most windows,
@@ -1306,7 +1310,7 @@ PASS:		*ds:si 	- instance data
 RETURN:		nothing
 		ax, cx, dx, bp - destroyed
 
-ALLOWED TO DESTROY:	
+ALLOWED TO DESTROY:
 		bx, si, di, ds, es
 
 REGISTER/STACK USAGE:
@@ -1322,11 +1326,11 @@ REVISION HISTORY:
 
 ------------------------------------------------------------------------------@
 
-OLWinResetToInitialSize	method dynamic	OLWinClass, 
+OLWinResetToInitialSize	method dynamic	OLWinClass,
 				MSG_VIS_RESET_TO_INITIAL_SIZE
 
 	;
-	; Hopefully, this will allow max'ed windows that are too large to 
+	; Hopefully, this will allow max'ed windows that are too large to
 	; shrink.
 	;
 	ORNF	ds:[di].OLWI_winPosSizeState, mask WPSS_POSITION_INVALID \
@@ -1339,7 +1343,7 @@ OLWinResetToInitialSize	method dynamic	OLWinClass,
 
 nukeSize:
 	push	dx
-	mov	cx, mask RSA_CHOOSE_OWN_SIZE	
+	mov	cx, mask RSA_CHOOSE_OWN_SIZE
 	mov	dx, cx
 	call	VisSetSize
 	pop	dx
@@ -1352,14 +1356,14 @@ finishSize:
 					;(VisSetSize call will set window
 					;invalid)
 	mov	di, offset OLWinClass
-	GOTO	ObjCallSuperNoLock	
+	GOTO	ObjCallSuperNoLock
 
 OLWinResetToInitialSize	endm
 
 
 COMMENT @----------------------------------------------------------------------
 
-METHOD:		OLWinRecalcDisplaySize -- 
+METHOD:		OLWinRecalcDisplaySize --
 		MSG_OL_WIN_RECALC_DISPLAY_SIZE for OLWinClass
 
 DESCRIPTION:	Returns size of window, after making sure geometry's up-to-date.
@@ -1374,7 +1378,7 @@ RETURN:		carry	- set (size returned)
 		carry	- clear (no size returned)
 		ax, bp - destroyed
 
-ALLOWED TO DESTROY:	
+ALLOWED TO DESTROY:
 		bx, si, di, ds, es
 
 REGISTER/STACK USAGE:
@@ -1427,7 +1431,7 @@ OLWinRecalcDisplaySize	method dynamic	OLWinClass,
 	; VOF_UPDATING flag set so any resulting image invalidations are
 	; saved in a region, rather than immediate VisInvalRects. -cbh 3/ 7/93)
 	;
-	mov	di, ds:[si]			
+	mov	di, ds:[si]
 	add	di, ds:[di].Vis_offset
 	test	ds:[di].VI_optFlags, mask VOF_UPDATING
 	pushf
@@ -1437,22 +1441,22 @@ OLWinRecalcDisplaySize	method dynamic	OLWinClass,
 	call	ObjCallInstanceNoLock
 	call	VisGetSize			;get size in cx, dx
 
-	mov	di, ds:[si]			
+	mov	di, ds:[si]
 	add	di, ds:[di].Vis_offset
 
 	;
 	; We want to clear the VOF_UPDATING flag if it wasn't set coming in.
 	; -cbh 3/ 7/93
-	;	
+	;
 	popf
 	jnz	10$
 	and	ds:[di].VI_optFlags, not mask VOF_UPDATING
-10$:	
+10$:
 	;
-	; Clear this flag -- we don't want to be visible if we weren't coming 
+	; Clear this flag -- we don't want to be visible if we weren't coming
 	; in.
 	;
-	popf	
+	popf
 	jnz	done				;was already VA_VISIBLE, done
 	and	ds:[di].VI_attrs, not mask VA_VISIBLE
 done:
@@ -1486,31 +1490,44 @@ REVISION HISTORY:
 	joon	7/8/98   	Initial version
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+
 if TOOL_AREA_IS_TASK_BAR
-OLWinUpdatePositionForTaskBar	method dynamic OLWinClass, 
+OLWinUpdatePositionForTaskBar	method dynamic OLWinClass,
 					MSG_OL_WIN_UPDATE_POSITION_FOR_TASK_BAR
+	;
+	; if TaskBar == on
+	;
+	push	ds					; save ds
+	segmov	ds, dgroup				; load dgroup
+	test	ds:[taskBarPrefs], mask TBF_ENABLED	; test if TBF_ENABLED is set
+	pop	ds					; restore ds
+	jz	done					; skip if no taskbar
+
 	jcxz	doUpdate
 
 	; check if window is minimized
 
 	test	ds:[di].OLWI_specState, mask OLWSS_MINIMIZED
 	jz	done			; skip if not minimized
-	
+
 doUpdate:
 	push	ds
 	segmov	ds, dgroup
-	tst	ds:[taskBarAutoHide]
+	test	ds:[taskBarPrefs], mask TBF_AUTO_HIDE
 	pop	ds
 	mov	dx, 1			; assume auto-hide is on (dx = 1)
 	jnz	gotSize
 	call	OLWinGetToolAreaSize
 
 gotSize:
-	push	ds
-	segmov	ds, dgroup, ax
-	tst	ds:[taskBarPosition]
-	pop	ds
-	jle	update
+	push	ds, bx					; save ds
+	segmov	ds, dgroup				; get dgroup
+	mov	bx, ds:[taskBarPrefs]			; load taskBarPrefs in ax
+	andnf	bx, mask TBF_POSITION			; mask out everything but the position bits
+	shr	bx, offset TBF_POSITION
+	cmp	bx, TBP_TOP
+	pop	ds, bx					; restore ds
+	je	update					; skip if top position
 
 	neg	dx
 update:
@@ -1523,9 +1540,9 @@ update:
 	mov	dl, VUM_DELAYED_VIA_UI_QUEUE
 	call	VisMarkInvalid
 done:
-	ret	
+	ret
 OLWinUpdatePositionForTaskBar	endm
-endif ; TOOL_AREA_IS_TASK_BAR
+endif
 
 Geometry	ends
 
@@ -1572,7 +1589,7 @@ OpenWinGetMonikerSize	proc	far		uses bx, di, bp, ax
 	mov	di, ds:[di].GI_visMoniker 	;fetch moniker
 	segmov	es, ds				;es:di = moniker
 	call	SpecGetMonikerSize		;get size of moniker in cx, dx
-	
+
 	;
 	; If not a base window, we're done.
 	;
@@ -1624,7 +1641,7 @@ normalDraw:
 	call	GetDividerStrLen		;returns length of " - " in dx
 	add	cx, dx				;add the total to visMkr size
 	push	cx				;save width that comes back
-	
+
 	xchg	di, bp				;es:di holds mkr, bp <- gstate
 	call	SpecGetMonikerSize		;get its size in cx
 	mov	bx, dx				;keep height in bx
@@ -1718,24 +1735,24 @@ REVISION HISTORY:
 MoveWindowToKeepOnscreen	proc	far	uses	ax, bp
 	.enter
 EC <	call	ECCheckLMemObject					>
-	mov	di, ds:[si]			
+	mov	di, ds:[si]
 	add	di, ds:[di].Vis_offset
-	
-	mov	cx, ds:[di].VI_bounds.R_left	
+
+	mov	cx, ds:[di].VI_bounds.R_left
 	mov	dx, ds:[di].VI_bounds.R_top
 	sub	ax, ds:[di].VI_bounds.R_right	;see if past right edge
 	jae	10$				;no, branch
 	add	cx, ax				;else try to move window left
 	inc	bx				;say an update necessary
-10$:						;   
+10$:						;
 	sub	bp, ds:[di].VI_bounds.R_bottom	;see if past bottom edge
 	jae	20$				;no, branch
 	add	dx, bp				;else try to move window up
 	inc	bx				;say an update necessary
-20$:						;   
+20$:						;
 	tst	cx				;keep left edge positive
 	jns	30$
-	clr	cx				
+	clr	cx
 29$::
 	inc	bx				;say an update necessary
 30$:
@@ -1745,9 +1762,9 @@ EC <	call	ECCheckLMemObject					>
 39$:
 	inc	bx				;say an update necessary
 40$:
-	
+
 	call	VisSetPosition			;affect change in window origin
-	
+
 	.leave
 	ret
 MoveWindowToKeepOnscreen	endp
@@ -1783,7 +1800,7 @@ OpenWinCheckIfSquished	proc	far	uses ax, ds
 
 	mov	ax, segment idata		;get segment of core blk
 	mov	ds, ax
-	test	ds:[moCS_flags], mask CSF_VERY_SQUISHED	
+	test	ds:[moCS_flags], mask CSF_VERY_SQUISHED
 	jz	exit				;no, exit with carry clear
 	stc
 exit:
@@ -1831,7 +1848,7 @@ OpenWinHasResizeBorder	proc	far		uses	bx, di
 	call	OpenCheckIfCGA			;CGA is based on resizable only
 	jc	checkResizable
 	call	OpenCheckIfNarrow		;so is tiny
-	jc	checkResizable			
+	jc	checkResizable
 
 	test	bx, mask OWA_TITLED
 	jz	exit				;skip if not titled (c=0)
