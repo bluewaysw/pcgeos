@@ -136,10 +136,10 @@ minimalUtils	: prefmgr
 minimalTools    : resedit
 
 minimalGame	: solitaire cword amateur bjack hearts gwpoker \
-                  pyramid sokoban uki mine column2 battle \
+                  pyramid sokoban uki mine column battle \
                   row4 munchers vacman snake frcell
                   
-extraGame	: taipei column mine2 follow treas mazerun \
+extraGame	: taipei column2 mine2 follow treas mazerun \
 		  blkbox hiho magicboard  scode noid paddle \
 		  frotz spider
 

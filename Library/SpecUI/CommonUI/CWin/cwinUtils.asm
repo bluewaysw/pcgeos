@@ -249,7 +249,7 @@ COMMENT @----------------------------------------------------------------------
 
 FUNCTION:	FindOLWin
 
-DESCRIPTION:	Searches up visible tree for first OLWinClass object, & 
+DESCRIPTION:	Searches up visible tree for first OLWinClass object, &
 		returns it.  Will return NULL if a thread boundary encountered.
 
 CALLED BY:	INTERNAL
@@ -280,9 +280,9 @@ FindOLWin	proc	far
 	pop	di
 	jz	goUp
 	push	di, es
-	mov	di, segment OLWinClass 
+	mov	di, segment OLWinClass
 	mov	es, di
-	mov	di, offset OLWinClass 
+	mov	di, offset OLWinClass
 	call	ObjIsObjectInClass
 	pop	di, es
 	jnc	goUp
@@ -360,7 +360,7 @@ notFound:
 	clr	si
 	clc
 	ret
-	
+
 SwapLockOLWin	endp
 
 
@@ -426,11 +426,11 @@ DESCRIPTION:	This procedure duplicates an entire UI template block of the
 		w/one-way link only, they will need to be directly vis built,
 		or set USABLE, so that they become visible.
 
-		This routine is being used to create all the CUA title 
+		This routine is being used to create all the CUA title
 		bar stuff, such as system-menu items, minimize, maximize,
 		popup-menus for primary & command windows, & even
 		EXIT & HELP icons for GCM.
-		
+
 PASS:		*ds:si = OLWinClass object
 		ax = offset to field in OLWinInstance structure, where the
 			handle of the new UI block will be stored.
@@ -495,7 +495,7 @@ COMMENT @----------------------------------------------------------------------
 
 FUNCTION:	GetVisParentForDialog
 
-DESCRIPTION:	Returns visible parent to use for the WIN_GROUP part of 
+DESCRIPTION:	Returns visible parent to use for the WIN_GROUP part of
 		a dialog box (independently displayable interaction or
 		GenSummons)
 
@@ -611,14 +611,17 @@ EnsureWindowInParentWin	proc	far
 	call	OpenGetParentWinSize
 	pop	bp, bx				;bp = min width, bx = min height
 	jnc	EWIPW_90			;If no response, don't care...
+
 if TOOL_AREA_IS_TASK_BAR
+
 	; If taskbar is at the bottom of the screen, subtract off the
 	; height of the tool area (taskbar) from parent window size so
 	; maximized windows don't extend below the taskbar.
+
 	call	GetTaskBarSizeAdjustment
 	sub	dx, di			; subtract off taskbar adjustment
-endif ; TOOL_AREA_IS_TASK_BAR
 
+endif
 	;FIRST CHECK X POSITION
 
 	push	bx				;save min height to keep visible
@@ -725,7 +728,7 @@ CALLED BY:	OpenWinMoveResizeWin
 
 PASS:		ds:*si	- instance data for windowed object
 
-RETURN:		
+RETURN:
 
 DESTROYED:	di, bp, ax, bx, cx, dx
 
@@ -768,13 +771,19 @@ EnsureTitleBarInParentWin	proc	near
 
 	call	OpenGetParentWinSize		;get size of window we're on
 	jnc	ETBIPW_90			;If no response, don't care...
+
 if TOOL_AREA_IS_TASK_BAR
+
+	;
 	; If taskbar is at the bottom of the screen, subtract off the
 	; height of the tool area (taskbar) from parent window size so
 	; maximized windows don't extend below the taskbar.
+	;
+
 	call	GetTaskBarSizeAdjustment
 	sub	dx, di			; subtract off taskbar adjustment
-endif ; TOOL_AREA_IS_TASK_BAR
+
+endif
 
 	;FIRST CHECK X POSITION
 

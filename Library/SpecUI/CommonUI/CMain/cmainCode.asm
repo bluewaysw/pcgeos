@@ -11,12 +11,12 @@ ROUTINES:
 	----			-----------
     GLB LibraryEntry		Entry point for this library.
 
-    INT SpecInitWindowPreferences 
+    INT SpecInitWindowPreferences
 				Fetches WindowOptions .ini settings,
 				interprets, & stores results in
 				olWindowOptions.
 
-    INT GetDefaultWindowPreferences 
+    INT GetDefaultWindowPreferences
 				Returns default window option preferences,
 				as determined by the specific UI (before
 				user overrides)
@@ -25,13 +25,13 @@ ROUTINES:
 
     INT SpecGetExpressOptions	Get the express options
 
-    INT SpecInitExpressPreferences 
+    INT SpecInitExpressPreferences
 				Fetches Express menu .ini settings,
 				interprets
 
     INT SpecInitHelpPreferences Initialize help preferences for a field
 
-    INT SpecInitDefaultDisplayScheme 
+    INT SpecInitDefaultDisplayScheme
 				If the first UI screen has been set up yet,
 				fetch its displayType, initialize
 				DisplayScheme DisplayType, Font &
@@ -58,7 +58,7 @@ ROUTINES:
 				using the colors & info stored in these
 				tables.
 
-    INT SpecInitGadgetPreferences 
+    INT SpecInitGadgetPreferences
 				If there is a default video driver, init
 				the variable defaultDisplayScheme
 
@@ -90,10 +90,10 @@ CALLED BY:	GLOBAL
 PASS:		di = LibraryCallType
 RETURN:		carry set on error
 DESTROYED:	everything
-SIDE EFFECTS:	
+SIDE EFFECTS:
 
 PSEUDO CODE/STRATEGY:
-		
+
 
 REVISION HISTORY:
 	Name	Date		Description
@@ -190,7 +190,7 @@ DESCRIPTION:	Returns default window option preferences, as determined by
 	regarding Eric's implementation of this for the V1.2 Intermediate
 	room:  he decided to maximize EVERYTHING, even things
 	not maximizable, such as the calculator, as it is a pain to lose
-	these little apps when the larger, maximized app behind them is 
+	these little apps when the larger, maximized app behind them is
 	clicked on.   Because this was the Intermediate room, he at the
 	same time disable the ability to restore or minimize.  I don't
 	think we want to go that far in the professional room, though not
@@ -301,7 +301,7 @@ popoutMenuBar:
 	or	bl, mask UIWO_POPOUT_MENU_BAR
 havePopoutMenuBar:
 
-; Determine default for UIWO_PRIMARY_MIN_MAX_RESTORE_CONTROLS:1, 
+; Determine default for UIWO_PRIMARY_MIN_MAX_RESTORE_CONTROLS:1,
 ; UIWO_DISPLAY_MIN_MAX_RESTORE_CONTROLS:1 and UIWO_PINNABLE_MENUS:1
 ; Set UIWO_KBD_NAVIGATION true if advanced intermediate.
 
@@ -466,7 +466,7 @@ SpecInitExpressPreferences	proc	near	uses ds
 			mask UIEO_UTILITIES_PANEL or \
 			mask UIEO_EXIT_TO_DOS or \
 			mask UIEO_DOCUMENTS_LIST or \
-			UIEP_TOP_PRIMARY shl offset UIEO_POSITION
+			UIEP_TOP_PRIMARY shl offset UIEO_POSITION ;
 	cmp	ax, UIIL_BEGINNING		; intro and beginning use this
 	jbe	haveDefaultExpressPrefs
 	mov	bx, mask UIEO_DESK_ACCESSORY_LIST or \
@@ -477,7 +477,7 @@ SpecInitExpressPreferences	proc	near	uses ds
 			mask UIEO_UTILITIES_PANEL or \
 			mask UIEO_EXIT_TO_DOS or \
 			mask UIEO_DOCUMENTS_LIST or \
-			UIEP_TOP_PRIMARY shl offset UIEO_POSITION
+			UIEP_TOP_PRIMARY shl offset UIEO_POSITION ; UIEP_TOP_PRIMARY
 
 haveDefaultExpressPrefs:
 	mov	cx, cs
@@ -487,14 +487,34 @@ haveDefaultExpressPrefs:
 
 	;
 	; require some things for ISUI, don't allow others
+	; FIXME: should this be done in User/.../uiExpress.asm =>
+	; ExpressMenuControlGenerateUI?
 	;
 if _ISUI
-	ornf	ax, mask UIEO_DOCUMENTS_LIST or \
+	ornf	ax, 	mask UIEO_DOCUMENTS_LIST or \
 			mask UIEO_EXIT_TO_DOS or \
 			mask UIEO_CONTROL_PANEL or \
 			mask UIEO_UTILITIES_PANEL
-	andnf	ax, not (mask UIEO_GEOS_TASKS_LIST)
 endif
+
+if TOOL_AREA_IS_TASK_BAR
+	;
+	; if TaskBar == on, have no Task-List in E-Menu
+	; FIXME: should this be done in User/.../uiExpress.asm =>
+	; ExpressMenuControlGenerateUI? Or should the
+	; "Go to <default launcher>" stuff from there rather be handled here?
+	;
+	push	ds					; save ds
+	segmov	ds, dgroup				; load dgroup
+	test	ds:[taskBarPrefs], mask TBF_ENABLED	; test if TB_ENABLED is set
+	pop	ds					; restore ds
+	jz	hasNoTaskbar				; skip if no taskbar
+
+	andnf	ax, not (mask UIEO_GEOS_TASKS_LIST)
+
+hasNoTaskbar:
+endif
+
 	mov	bx, ax			; just copy from .ini file
 
 haveDecision:
@@ -507,7 +527,6 @@ haveDecision:
 	ret
 
 SpecInitExpressPreferences	endp
-
 expressOptionsString	char	"expressOptions", 0
 
 
@@ -677,18 +696,18 @@ if _ASSUME_BW_ONLY
 	andnf	ah, not mask DT_DISP_CLASS
 	ornf	ah, DC_GRAY_1 shl offset DT_DISP_CLASS
 endif
-	
+
 	mov	bp, ax				; save DisplayType
-	
+
 	call	GrGetDefFontID			; returns: cx = default FontID
 						;     dx.ah = default pointsize
 						;     bx = default data handle
-						
+
 	mov	ax, offset fontidString
 	mov	bx, offset fontsizeString
-	
+
 	call	GetFontFromInitFile		; destroys ax, bx
-	
+
 	mov	ax, segment specDisplayScheme
 	mov	ds, ax				;setup ds to be dgroup
 
@@ -697,7 +716,7 @@ endif
 	mov	ds:[specDisplayScheme].DS_pointSize, dx
 
 	push	cx, dx				; preserve font info
-	
+
 	mov	ax, bp				;restore DisplayType in ah
 	call	AdjustForDisplayType
 
@@ -719,25 +738,25 @@ endif
 	mov	bx, offset editableTextFontsizeString
 	; cx, dx = fontid, fontsize of defaults
 	call	GetFontFromInitFile			; destroy ax, bx
-	
+
 	pop	ax, bx					; UI font and size
-	
+
 	; Only bother to store the font & size if they are different than the
 	; default font & size for the UI.
-	
+
 	mov	ds:[editableTextFontID], FID_INVALID
-	
+
 	cmp	ax, cx
 	jne	storeEditableText
 	cmp	bx, dx
 	je	done
-	
+
 storeEditableText:
 	; Store editableText font information in dgroup.
 	; ds = dgroup, still
 	mov	ds:[editableTextFontID], cx
 	mov	ds:[editableTextFontsize], dx
-	
+
 done:
 
 	.leave
@@ -759,12 +778,12 @@ COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 SYNOPSIS:	Returns the FontID and integer part of the FontSize
 		from the init file from given key strings.
 
-CALLED BY:	SpecInitDefaultDisplayScheme	
+CALLED BY:	SpecInitDefaultDisplayScheme
 PASS:		cs:ax	- fontID key string ptr
 		cs:bx	- font size key string ptr
 		cx	- default FontID
 		dx	- default point size
-		
+
 RETURN:		cx	- FontID
 		dx	- point size
 
@@ -786,7 +805,7 @@ defaultFontID		local	FontID		push cx
 defaultPointSize	local	word		push dx
 	uses	si,di,ds			; returns cx, dx
 	.enter
-	
+
 	;
 	; get font id
 	;
@@ -813,7 +832,7 @@ defaultPointSize	local	word		push dx
 						; Returns cx = FontID
 	call	MemFree				; dispose font name buffer
 	jcxz	fontNotFound			; jumps back to getPointSize
-	
+
 	;
 	; get pointsize from .ini file
 	;
@@ -856,7 +875,7 @@ sizeNotFound:
 	jmp	done				; move on to next thing
 GetFontFromInitFile	endp
 
-				
+
 categoryString		char	"ui",0
 
 
@@ -888,12 +907,12 @@ REVISION HISTORY:
 
 ------------------------------------------------------------------------------@
 
-CalcSystemAttrs	proc	near		
+CalcSystemAttrs	proc	near
 	call	SysGetPenMode			;get pen mode
 	tst	ax
 	jz	10$				;no pen mode, branch
 	mov	ax, mask SA_PEN_BASED		;else set this
-10$:	
+10$:
 	mov	dx, idata
 	mov	ds, dx
 	mov	bh, ds:[moCS_flags]
@@ -910,17 +929,17 @@ CalcSystemAttrs	proc	near
 ;	BX <- SystemAttrs
 ;	(CSF_VERY_NARROW/SQUSHED map to the same positions as
 ;		SA_HORIZONTALLY_TINY and SA_VERTICALLY_TINY)
-;	      
+;
 
 	ANDNF	bx, (mask CSF_VERY_NARROW or mask CSF_VERY_SQUISHED) shl 8
 	ORNF	bx, ax
 
 	call	FlowGetUIButtonFlags
 	test	al, mask UIBF_KEYBOARD_ONLY
-	jz	30$	
+	jz	30$
 	ORNF	bx, mask SA_KEYBOARD_ONLY
 30$:
-	test	al, mask UIBF_NO_KEYBOARD	
+	test	al, mask UIBF_NO_KEYBOARD
 	jz	40$				;noKeyboard set, branch, c=0
 	ORNF	bx, mask SA_NO_KEYBOARD
 40$:
@@ -965,7 +984,7 @@ DESTROYED:	nothing
 SIDE EFFECTS:	none
 
 PSEUDO CODE/STRATEGY:
-		
+
 
 REVISION HISTORY:
 	Name	Date		Description
@@ -1026,7 +1045,7 @@ DESTROYED:	nothing
 SIDE EFFECTS:	none
 
 PSEUDO CODE/STRATEGY:
-		
+
 
 REVISION HISTORY:
 	Name	Date		Description
@@ -1100,10 +1119,10 @@ ifdef	USER_CAN_CHOOSE_COLORS
 SetLightColors	proc	near
 EC <	call	ECCheckESDGroup					>
 	mov	es:[moCS_dsLightColor], al	;else store a bunch of values
-	mov	es:[moCS_windowBG], al		
-	mov	es:[moCS_menuBar], al	
-	mov	es:[moCS_activeBorder], al	
-	mov	es:[moCS_inactiveBorder], al	
+	mov	es:[moCS_windowBG], al
+	mov	es:[moCS_menuBar], al
+	mov	es:[moCS_activeBorder], al
+	mov	es:[moCS_inactiveBorder], al
 	ret
 SetLightColors	endp
 endif
@@ -1150,7 +1169,7 @@ SetDarkColors	endp
 endif
 
 
-			
+
 
 COMMENT @----------------------------------------------------------------------
 
@@ -1222,7 +1241,7 @@ afterBWAdjust:
 	cmp	ah, DS_TINY shl offset DT_DISP_SIZE
 	pop	ax
 	jne	afterTinyAdjustments		; skip if not
-	or	ds:[moCS_flags], mask CSF_TINY 
+	or	ds:[moCS_flags], mask CSF_TINY
 afterTinyAdjustments:
 	push	ax
 	andnf	ah, mask DT_DISP_ASPECT_RATIO
@@ -1257,7 +1276,7 @@ afterVerySquishedAdjustments:
 	; size of the UI's application object...
 	clr	bx
 	call	GeodeGetAppObject
-	
+
 	mov	ax, MSG_VIS_GET_SIZE
 	mov	di, mask MF_CALL
 	call	ObjMessage
@@ -1363,13 +1382,13 @@ ifdef	USER_CAN_CHOOSE_COLORS
 	call	InitFileReadInteger
 	jc	tryDarkColor			;branch if not in .ini file
 	call	SetLightColors
-	
+
 tryDarkColor:
 	mov	dx, offset darkColorString
 	call	InitFileReadInteger
 	jc	afterDarkColor
 	call	SetDarkColors
-	
+
 afterDarkColor:
 	mov	dx, offset activeTitleBarColorString
 	call	InitFileReadInteger
@@ -1392,7 +1411,7 @@ afterSelectColor:
 endif
 
 if	_MOTIF
-	;	
+	;
 	; Set up scroller arrow widths and heights.
 	;
 	mov	dx, offset scrollerSizeString   ;cx:dx = key
@@ -1416,7 +1435,7 @@ noSize:
 endif
 
 if	_MOTIF
-	;	
+	;
 	; Set up resize border thicknesses.
 	;
 	mov	dx, offset tbResizeBorderThicknessString   ;cx:dx = key
@@ -1505,32 +1524,57 @@ afterInvertDelay:
 
 if TOOL_AREA_IS_TASK_BAR
 	;
-	; init taskBarPosition
+	; init taskBar
 	;
-	mov	dx, offset taskBarPositionString
+	mov	dx, offset taskBarEnabledString
 	mov	si, offset optionsCatString
-	mov	ax, MAX_COORD			;positive = at bottom
-	call	InitFileReadInteger
-	mov	es:[taskBarPosition], ax
-
-	;
-	; init taskBarAutoHide
-	;
-	mov	dx, offset taskBarAutoHideString
-	mov	si, offset optionsCatString
-	mov	ax, FALSE			;default = no auto hide
+	andnf	es:[taskBarPrefs], not (mask TBF_ENABLED)
 	call	InitFileReadBoolean
-	mov	es:[taskBarAutoHide], ax
+	cmp	ax, FALSE
+	jz	done						; skip initiating taskBar prefs, if TaskBar is off
+	ornf	es:[taskBarPrefs], mask TBF_ENABLED		; otherwise, set to enabled
 
 	;
 	; init taskBarMovable
 	;
 	mov	dx, offset taskBarMovableString
 	mov	si, offset optionsCatString
-	mov	ax, FALSE			;default = no moving
+	andnf	es:[taskBarPrefs], not (mask TBF_MOVABLE)
 	call	InitFileReadBoolean
-	mov	es:[taskBarMovable], ax
+	cmp	ax, FALSE
+	jz	afterMovable
+	ornf	es:[taskBarPrefs], mask TBF_MOVABLE
+afterMovable:
+
+	;
+	; init taskBarAutoHide
+	;
+	mov	dx, offset taskBarAutoHideString
+	mov	si, offset optionsCatString
+	andnf	es:[taskBarPrefs], not (mask TBF_AUTO_HIDE)
+	call	InitFileReadBoolean
+	cmp	ax, FALSE
+	jz	afterAutoHide
+	ornf	es:[taskBarPrefs], mask TBF_AUTO_HIDE
+afterAutoHide:
+
+	;
+	; init taskBarPosition
+	;
+	mov	dx, offset taskBarPositionString
+	mov	si, offset optionsCatString
+	call	InitFileReadInteger
+	cmp	ax, 3						; we have 4 (zero-based) position values
+	jbe	setTaskbarPosVal				; jump if below or equal
+	mov	ax, TBP_BOTTOM					; if value is out of bounds, set to bottom
+setTaskbarPosVal:
+	andnf	es:[taskBarPrefs], not mask TBF_POSITION	; make sure bits are clear
+	shl	ax, offset TBF_POSITION				; shift position bits to index of TBF_POSITION
+	ornf	es:[taskBarPrefs], ax				; set position bits
+
+done:
 endif
+
 if _ISUI
 	mov	si, offset optionsCatString
 	mov	dx, offset rightClickHelpString
@@ -1584,7 +1628,8 @@ pdaKeyString	char	"pda",0
 inputCat		char	"input",0
 floatingKbdKey		char	"floatingKbd",0
 
-if	TOOL_AREA_IS_TASK_BAR
+if TOOL_AREA_IS_TASK_BAR
+taskBarEnabledString	char	"taskBarEnabled",0
 taskBarPositionString	char	"taskBarPosition",0
 taskBarAutoHideString	char	"taskBarAutoHide",0
 taskBarMovableString	char	"taskBarMovable",0
