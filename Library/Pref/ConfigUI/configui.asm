@@ -30,23 +30,23 @@ include initfile.def
 include Internal/specUI.def
 
 ;-----------------------------------------------------------------------------
-;	Libraries used		
+;	Libraries used
 ;-----------------------------------------------------------------------------
- 
+
 UseLib	ui.def
 UseLib	config.def
 UseLib  Objects/vTextC.def
 UseLib	Objects/colorC.def
 
 ;-----------------------------------------------------------------------------
-;	DEF FILES		
+;	DEF FILES
 ;-----------------------------------------------------------------------------
- 
+
 include configui.def
 include configui.rdef
 
 ;-----------------------------------------------------------------------------
-;	VARIABLES		
+;	VARIABLES
 ;-----------------------------------------------------------------------------
 
 idata segment
@@ -54,13 +54,13 @@ idata segment
 idata ends
 
 ;-----------------------------------------------------------------------------
-;	CODE		
+;	CODE
 ;-----------------------------------------------------------------------------
 
 include configuiProgList.asm
 include configuiFileAssoc.asm
 include prefMinuteValue.asm
- 
+
 ConfigUICode	segment resource
 
 
@@ -96,9 +96,9 @@ CALLED BY:	PrefMgr
 PASS:		ds:si - PrefModuleInfo structure to be filled in
 RETURN:		ds:si - buffer filled in
 
-DESTROYED:	ax,bx 
+DESTROYED:	ax,bx
 
-PSEUDO CODE/STRATEGY:	
+PSEUDO CODE/STRATEGY:
 
 KNOWN BUGS/SIDE EFFECSnd/IDEAS:
 
@@ -121,7 +121,7 @@ ConfigUIGetModuleInfo	proc far
 	mov	ds:[si].PMI_monikerList.offset, offset ConfigUIMonikerList
 	mov	{word} ds:[si].PMI_monikerToken,  'P' or ('F' shl 8)
 	mov	{word} ds:[si].PMI_monikerToken+2, 'T' or ('w' shl 8)
-	mov	{word} ds:[si].PMI_monikerToken+4, MANUFACTURER_ID_APP_LOCAL 
+	mov	{word} ds:[si].PMI_monikerToken+4, MANUFACTURER_ID_APP_LOCAL
 
 	.leave
 	ret
@@ -140,7 +140,7 @@ PASS:		none
 RETURN:		none
 DESTROYED:	bx, cx, dx, di, bp
 
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@	
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
 
 ConfigUIDialogInitiate	method	dynamic	ConfigUIDialogClass,
 						MSG_GEN_INTERACTION_INITIATE
@@ -150,7 +150,7 @@ ConfigUIDialogInitiate	method	dynamic	ConfigUIDialogClass,
 	; Check what ui we're using, and configure the UI for it.
 	;
 		call	DisableSpecificUIItems
-	
+
 	;
 	; if on 16 color, disable the 256 color selector
 	;
@@ -257,10 +257,10 @@ spuiBuf		local	FileLongName
 		call	LocalCmpStrings
 		call	MemUnlock
 
-		je	yesISUI				;check long filename 
+		je	yesISUI				;check long filename
 		push	ds
 		segmov	ds, cs
-		mov	si, offset ISUIGeode		;check DOS filename 
+		mov	si, offset ISUIGeode		;check DOS filename
 		call	LocalCmpStringsNoCase
 		pop	ds
 yesISUI:
@@ -281,19 +281,16 @@ PASS:		ds - object block
 RETURN:		ds - fixed up
 DESTROYED:	bx, cx, dx, di, bp
 
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@	
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
 
 specificKey	char "specific",0
 
 ISUIDisableList	lptr \
-	EOGotoGeoManager,
-	EORunningApps,
 	EOExitToDOS,
 	EOWorldApps,
 	EOWorldSubdirs,
 	EOControlPanel,
 	EOUtilities,
-	ESORunningApps,
 	ESOWorldAppsSubmenu,
 	ESOOtherSubmenu,
 	AOLConfirmShutdown,
@@ -304,11 +301,21 @@ ISUIDisableList	lptr \
 
 motifDisableList	lptr \
 	EO2SmallIcons,
-	UIO3AutohideTaskbar,
 	UIO3RightClickHelp
+
+taskbarDisabledDisableList	lptr \
+	UIO3AutohideTaskbar,
+	UIO3TaskbarMovable
+
+taskbarEnabledDisableList	lptr \
+	EOGotoGeoManager,
+	ESORunningApps,
+	EORunningApps
 
 EC < LocalDefNLString ISUIGeode <"isuiec.geo", 0>
 NEC < LocalDefNLString ISUIGeode <"isui.geo", 0>
+optionsCatString		char	"motif options",0
+taskBarEnabledKeyString		char	"taskBarEnabled",0
 
 DisableSpecificUIItems	proc	near
 		uses	es
@@ -340,7 +347,59 @@ disableLoop:
 		add	di, (size lptr)
 		loop	disableLoop
 		pop	bp
-done::
+
+	;
+	; Disable items that are not available when the TaskBar is off
+	;
+		push	ds
+		segmov	ds, cs
+		mov	cx, cs
+		mov	si, offset optionsCatString	;ds:si <- category
+		mov	dx, offset taskBarEnabledKeyString ;cx:dx <- key
+		mov	ax, TRUE
+		call	InitFileReadBoolean
+		tst	ax
+		pop	ds
+		jnz	taskBarEnabled
+
+		mov	cx, length taskbarDisabledDisableList
+		mov	bx, offset taskbarDisabledDisableList
+		push	bp
+		clr	di
+
+taskbarDisabledLoop:
+		push	cx
+		mov	si, cs:[bx][di]
+		mov	ax, MSG_GEN_SET_NOT_ENABLED
+		mov	dl, VUM_DELAYED_VIA_APP_QUEUE
+		call	ObjCallInstanceNoLock
+		pop	cx
+		add	di, (size lptr)
+		loop	taskbarDisabledLoop
+		pop	bp
+		jmp	done
+
+	;
+	; Disable items that are not available when the TaskBar is on
+	;
+taskBarEnabled:
+		mov	cx, length taskbarEnabledDisableList
+		mov	bx, offset taskbarEnabledDisableList
+		push	bp
+		clr	di
+
+taskbarEnabledLoop:
+		push	cx
+		mov	si, cs:[bx][di]
+		mov	ax, MSG_GEN_SET_NOT_ENABLED
+		mov	dl, VUM_DELAYED_VIA_APP_QUEUE
+		call	ObjCallInstanceNoLock
+		pop	cx
+		add	di, (size lptr)
+		loop	taskbarEnabledLoop
+		pop	bp
+
+done:
 	;
 	; set the ini category for objects that need to	store settings
 	; in different sections for different SpUIs
@@ -373,7 +432,7 @@ PASS:		none
 RETURN:		none
 DESTROYED:	bx, cx, dx, di, bp
 
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@	
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
 
 ConfigUIDialogApply	method	dynamic	ConfigUIDialogClass,
 						MSG_GEN_APPLY
@@ -500,7 +559,7 @@ PASS:		none
 RETURN:		none
 DESTROYED:	bx, cx, dx, di, bp
 
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@	
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
 
 PrefUICDialogPostApply	method dynamic ConfigUIDialogClass,
 						MSG_GEN_POST_APPLY
@@ -595,7 +654,7 @@ PASS:		cx - current selection (PrefUIColor)
 RETURN:		none
 DESTROYED:	none
 
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@	
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
 
 PrefUICDialogAreaChanged	method	dynamic	ConfigUIDialogClass,
 						MSG_CUID_AREA_CHANGED
@@ -622,7 +681,7 @@ PASS:		cx - current selection (PrefUICombo)
 RETURN:		none
 DESTROYED:	none
 
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@	
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
 
 PrefUICDialogSPUIChanged	method	dynamic	ConfigUIDialogClass,
 						MSG_CUID_SPUI_CHANGED
@@ -893,7 +952,7 @@ PASS:		none
 RETURN:		none
 DESTROYED:	bx, cx, dx, di, bp
 
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@	
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
 
 PrefUICDialogInit	method	dynamic	ConfigUIDialogClass, MSG_PREF_INIT
 
@@ -958,23 +1017,32 @@ UICombo	struct
 	UIC_specific	nptr.TCHAR
 	UIC_launcher	nptr.TCHAR
 	UIC_font	FontID
+	UIC_hasTaskbar	word
 UICombo ends
 
 uicombos UICombo <
 	offset MotifStr,
 	offset GeoManagerStr,
-	offset BerkeleyStr
+	offset BerkeleyStr,
+	FALSE
 >,<
 	offset ISUIStr,
 	offset ISDeskStr,
-	offset EsquireStr
+	offset EsquireStr,
+	TRUE
+>,<
+	offset MotifStr,
+	offset ISDeskStr,
+	offset BerkeleyStr,
+	TRUE
 >
 
-defaultLauncherKey char "defaultLauncher", 0
-uiFeaturesCat char "uiFeatures", 0
-fontIDKey char "fontid", 0
-systemCat char "system", 0
-editableTextFontIDKey char "editableTextFontID", 0
+defaultLauncherKey 	char "defaultLauncher", 0
+uiFeaturesCat 		char "uiFeatures", 0
+fontIDKey 		char "fontid", 0
+systemCat 		char "system", 0
+editableTextFontIDKey 	char "editableTextFontID", 0
+taskBarEnabledKey 	char "taskBarEnabled", 0
 
 if ERROR_CHECK
 LocalDefNLString MotifStr <"motifec.geo", 0>
@@ -1036,6 +1104,16 @@ SetUIOptions	proc	near
 		call	InitFileWriteString
 		pop	di
 
+	;
+	; handle taskBarEnabled
+	;
+		push	di, ax
+		mov	si, offset motifOptsCategory	;ds:si <- category
+		mov	dx, offset taskBarEnabledKey	;cx:dx <- key
+		mov	ax, cs:uicombos[di].UIC_hasTaskbar
+		call	InitFileWriteBoolean
+		pop	di, ax
+
 		.leave
 		ret
 SetUIOptions	endp
@@ -1053,7 +1131,7 @@ PASS:		di - PrefUIColor for which color to get
 RETURN:		al - Color
 DESTROYED:	none
 
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@	
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
 
 GetINIColor	proc	near
 		uses	ds, si, di, dx, cx
@@ -1109,7 +1187,7 @@ PASS:		none
 RETURN:		carry - set if the state has changed
 DESTROYED:	di, ax
 
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@	
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
 
 ConfigUICColorSelectorStateChanged method dynamic ConfigUICColorSelectorClass,
 					MSG_PREF_HAS_STATE_CHANGED
@@ -1152,7 +1230,7 @@ PASS:		none
 RETURN:		none
 DESTROYED:	none
 
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@	
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
 
 ConfigUICColorSelectorReset method dynamic ConfigUICColorSelectorClass,
 					MSG_GEN_RESET
@@ -1546,7 +1624,7 @@ drawGradientTitle:
 		xchg	al, dh
 		call	DrawGradient
 		jmp	finishTitleBar
-		
+
 PrefColorsSampleDraw	endm
 
 ISUISelected	proc	near
@@ -1954,7 +2032,7 @@ PASS:		none
 RETURN:		none
 DESTROYED:	none
 
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@	
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
 
 ConfigUIFontAreaReset	method dynamic ConfigUIFontAreaClass,
 						MSG_GEN_RESET
@@ -1973,7 +2051,7 @@ ConfigUIFontAreaReset	method dynamic ConfigUIFontAreaClass,
 		mov	ds:editableFont, ax
 		mov	ds:folderFont, ax
 		pop	ds
-		
+
 		mov	ax, MSG_GEN_ITEM_GROUP_SEND_STATUS_MSG
 		GOTO	ObjCallInstanceNoLock
 ConfigUIFontAreaReset	endp
@@ -1992,7 +2070,7 @@ PASS:		none
 RETURN:		none
 DESTROYED:	none
 
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@	
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
 
 ConfigUIFontAreaApply	method dynamic ConfigUIFontAreaClass,
 						MSG_GEN_APPLY
@@ -2044,7 +2122,7 @@ PASS:		none
 RETURN:		none
 DESTROYED:	none
 
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@	
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
 
 ConfigUIFontAreaGetRebootInfo	method dynamic ConfigUIFontAreaClass,
 						MSG_PREF_GET_REBOOT_INFO
@@ -2365,7 +2443,7 @@ PASS:		none
 RETURN:		carry - set if the state has changed
 DESTROYED:	di, ax
 
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@	
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
 
 SectionsPrefChanged method dynamic SectionsPrefClass,
 					MSG_PREF_HAS_STATE_CHANGED
@@ -2389,7 +2467,7 @@ PASS:		cx - current selection (ConfigUISection)
 RETURN:		none
 DESTROYED:	bx, cx, dx, di, bp
 
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@	
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
 
 SectionsPrefSectionChanged	method	dynamic	SectionsPrefClass,
 						MSG_SP_SECTION_CHANGED
@@ -2462,7 +2540,7 @@ PASS:		ds:di - SectionsPref instance
 RETURN:		none
 DESTROYED:	bx, cx, dx, di, bp
 
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@	
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
 
 SectionsPrefReset	method	dynamic	SectionsPrefClass,
 						MSG_GEN_RESET
