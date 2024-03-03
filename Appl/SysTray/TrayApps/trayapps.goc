@@ -213,7 +213,7 @@ initializes the newly created Express menu trigger
     // MemLock(OptrToHandle(@MinimHelp));
     // helpChunk = LMemAlloc(OptrToHandle(@MinimHelp), FILE_LONGNAME_BUFFER_SIZE);
     // helpChunkPtr = LMemDerefHandles(OptrToHandle(@MinimHelp), helpChunk);
-    // strcpy(helpChunkPtr, filesPtr);
+    // strcpy(helpChunkPtr, filePtr);
     // MemUnlock(OptrToHandle(@MinimHelp));
     MemUnlock(G_trayFilesHan);
 
@@ -263,10 +263,27 @@ one of our triggers has been pressed, launch app
 -------------------------------------------------------------------*/
 @method TrayAppsProcessClass, MSG_APP_TRIGGER_PRESSED
 {
-    GeodeToken gt;
+    GeodeToken           gt;
+    IACPConnection       iacpConnectionToken = IACP_NO_CONNECTION;
+    word                 connectionFlags = IACPSM_USER_INTERACTIBLE;
+    word                 serverCount;
+    MemHandle            hLaunchBlock;
 
     @call trigger::MSG_META_GET_VAR_DATA(ATTR_GEODE_TOKEN_TO_PASS, sizeof(GeodeToken), &gt);
-    LaunchApp(gt);
+
+    hLaunchBlock = IACPCreateDefaultLaunchBlock(MSG_GEN_PROCESS_OPEN_APPLICATION);
+    iacpConnectionToken = IACPConnect(
+        &gt,
+        connectionFlags,
+        hLaunchBlock,
+        NullOptr,
+        &serverCount
+    );
+
+    if(iacpConnectionToken != IACP_NO_CONNECTION)
+    {
+        IACPShutdown(iacpConnectionToken, NullOptr);
+    }
 }
 
 /*-------------------------------------------------------------------
@@ -274,7 +291,7 @@ prepare our demise
 -------------------------------------------------------------------*/
 @method TrayAppsProcessClass, MSG_GEN_PROCESS_CLOSE_APPLICATION
 {
-    // take us of notification list
+    // take us off of notification list
     (void) GCNListRemove(
         ConstructOptr(GeodeGetProcessHandle(), 0),  // optr of thread to remove from list
         MANUFACTURER_ID_GEOWORKS,                   // manufacturer ID of list
