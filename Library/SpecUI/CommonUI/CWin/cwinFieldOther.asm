@@ -10,7 +10,7 @@ FILE:		cwinFieldOther.asm
 ROUTINES:
 	Name			Description
 	----			-----------
-    MTD MSG_GEN_FIELD_ORDER_GEN_APPLICATION_LIST 
+    MTD MSG_GEN_FIELD_ORDER_GEN_APPLICATION_LIST
 				Look through windows on field, & rearrange
 				our list of apps into the order that the
 				appear on screen, top application first.
@@ -19,7 +19,7 @@ ROUTINES:
 
     MTD MSG_VIS_CLOSE           This routine closes any opened BG files.
 
-    MTD MSG_GEN_FIELD_ABOUT_TO_DETACH_COMPLETE 
+    MTD MSG_GEN_FIELD_ABOUT_TO_DETACH_COMPLETE
 				clobber express menu and tool area
 
     GLB CloseBGFile             Closes any active BG file
@@ -27,7 +27,7 @@ ROUTINES:
     MTD MSG_META_DETACH         Pass the detach on to the express menu, if
 				any, so it can shut down gracefully.
 
-    MTD MSG_GEN_FIELD_APP_NO_LONGER_EXITING 
+    MTD MSG_GEN_FIELD_APP_NO_LONGER_EXITING
 				Message sent by an app indicating that it
 				has aborted quit.
 
@@ -49,20 +49,20 @@ ROUTINES:
 				parent (if this is a Display) or
 				GenApplication object.
 
-    MTD MSG_OL_FIELD_UPDATE_KBD_STATUS_BUTTONS 
+    MTD MSG_OL_FIELD_UPDATE_KBD_STATUS_BUTTONS
 				Update the keyboard status buttons:
 				CapsLock, NumLock, Ins/Over
 
-    MTD MSG_OL_FIELD_TOGGLE_KBD_STATUS_BUTTON 
+    MTD MSG_OL_FIELD_TOGGLE_KBD_STATUS_BUTTON
 				Toggle one of the keyboard status buttons
 
     GLB OLFieldDrawBG           Draws the background of the field.
 
-    GLB GetBackgroundColorFromFile 
+    GLB GetBackgroundColorFromFile
 				Gets the background color from the .ini
 				file.
 
-    GLB GetBackgroundColorNoPict 
+    GLB GetBackgroundColorNoPict
 				Returns background washout (grey) color in
 				AX
 
@@ -79,18 +79,18 @@ ROUTINES:
 				the handle of this block in the instance
 				data of the passed object
 
-    MTD MSG_OL_FIELD_NAVIGATE_TO_NEXT_APP 
+    MTD MSG_OL_FIELD_NAVIGATE_TO_NEXT_APP
 				navigate to next navigatable app
 
-    MTD MSG_OL_FIELD_NAVIGATE_TO_NEXT_APP 
+    MTD MSG_OL_FIELD_NAVIGATE_TO_NEXT_APP
 				navigate to next navigatable app
 
-    MTD MSG_GEN_FIELD_ABOUT_TO_CLOSE 
+    MTD MSG_GEN_FIELD_ABOUT_TO_CLOSE
 				Called when app field is about to close.
 				In Redwood, we'll try to ensure that
 				geoWrite is at the front.
 
-    MTD MSG_META_QUERY_SAVE_DOCUMENTS 
+    MTD MSG_META_QUERY_SAVE_DOCUMENTS
 				Tells the application with the full screen
 				exclusive to save its documents.
 
@@ -98,15 +98,15 @@ ROUTINES:
 
     INT LaunchApplication       Launches app given the token
 
-    MTD MSG_META_LOST_SYS_FOCUS_EXCL 
+    MTD MSG_META_LOST_SYS_FOCUS_EXCL
 				Losing system focus excl.  Stuck in here so
 				that express menus go away if they've lost
 				the system focus.
 
-    MTD MSG_LAUNCH_THREAD_LAUNCH_APPLICATION 
+    MTD MSG_LAUNCH_THREAD_LAUNCH_APPLICATION
 				Runs an application given its token
 
-    GLB MyCreateDefaultLaunchBlock 
+    GLB MyCreateDefaultLaunchBlock
 				Create an AppLaunchBlock one can pass to
 				IACPConnect presuming the following
 				defaults: - IACP will locate the app, given
@@ -116,31 +116,31 @@ ROUTINES:
 				for itself - no one to notify in event of
 				an error - no extra data
 
-    MTD MSG_LAUNCHER_LAUNCH_WRITE 
+    MTD MSG_LAUNCHER_LAUNCH_WRITE
 				Launches GeoWrite
 
-    MTD MSG_LAUNCHER_LAUNCH_TYPE 
+    MTD MSG_LAUNCHER_LAUNCH_TYPE
 				Launches GeoWrite
 
-    MTD MSG_LAUNCHER_LAUNCH_GEODEX 
+    MTD MSG_LAUNCHER_LAUNCH_GEODEX
 				Launches GeoWrite
 
-    MTD MSG_LAUNCHER_LAUNCH_BIGCALC 
+    MTD MSG_LAUNCHER_LAUNCH_BIGCALC
 				Launches GeoWrite
 
-    MTD MSG_LAUNCHER_LAUNCH_PLANNER 
+    MTD MSG_LAUNCHER_LAUNCH_PLANNER
 				Launches GeoWrite
 
-    MTD MSG_LAUNCHER_LAUNCH_SCRAPBOOK 
+    MTD MSG_LAUNCHER_LAUNCH_SCRAPBOOK
 				Launches GeoWrite
 
-    MTD MSG_LAUNCHER_LAUNCH_GEOMANAGER 
+    MTD MSG_LAUNCHER_LAUNCH_GEOMANAGER
 				Launches GeoWrite
 
-    MTD MSG_LAUNCHER_LAUNCH_GEOCALC 
+    MTD MSG_LAUNCHER_LAUNCH_GEOCALC
 				Launches GeoWrite
 
-    MTD MSG_LAUNCHER_LAUNCH_DRAW 
+    MTD MSG_LAUNCHER_LAUNCH_DRAW
 				Launches GeoWrite
 
 REVISION HISTORY:
@@ -165,12 +165,13 @@ CommonUIClassStructures segment resource
 
 	ToolAreaClass		0
 
-if _ISUI
+if (TOOL_AREA_IS_TASK_BAR or WINDOW_LIST_ACTIVE)
 	WindowListDialogClass	mask CLASSF_DISCARD_ON_SAVE
 	WindowListListClass	mask CLASSF_DISCARD_ON_SAVE
-	TaskBarListClass	mask CLASSF_DISCARD_ON_SAVE
 endif
-if _ISUI or (_MOTIF and EXTENDIBLE_SYSTEM_TRAY)
+
+if TOOL_AREA_IS_TASK_BAR
+	TaskBarListClass	mask CLASSF_DISCARD_ON_SAVE
 	SysTrayInteractionClass	mask CLASSF_DISCARD_ON_SAVE
 endif
 
@@ -235,14 +236,14 @@ OLFieldOrderGenApplicationList	method dynamic	OLFieldClass,
 	; order in which they should be. Use this ordering to adjust the one
 	; stored with the field so all the focusable apps are in the order
 	; dictated by the array, and everything else comes after.
-	; 
+	;
 
 	mov	bx, cs
 	mov	di, offset FieldOrderCallBack
 	mov	ax, CCO_FIRST		; first thing in array becomes first
 					;  in GenField's array...
 	call	ChunkArrayEnum
-	
+
 	pop	ax
 	call	LMemFree
 	ret
@@ -253,7 +254,7 @@ COMMENT @----------------------------------------------------------------------
 
 FUNCTION:	FieldOrderCallBack
 
-DESCRIPTION:	
+DESCRIPTION:
 
 CALLED BY:	INTERNAL
 
@@ -309,7 +310,7 @@ CALLED BY:	GLOBAL
 PASS:		standard object junk (*ds:si, ds:bx, ds:di, etc).
 RETURN:		nada
 DESTROYED:	various important but undocumented things
- 
+
 PSEUDO CODE/STRATEGY:
 		This page intentionally left blank
 
@@ -341,11 +342,11 @@ OLFieldVisClose	method	dynamic OLFieldClass, MSG_VIS_CLOSE
 
 ife	TRANSPARENT_FIELDS
 	mov	di, ds:[si]
-	add	di, ds:[di].Vis_offset	
+	add	di, ds:[di].Vis_offset
 	tst	ds:[di].OLFI_BGFile		;BX <- VM file handle
 	jz	afterBG
 	CallMod	CloseBGFile
-afterBG:	
+afterBG:
 endif
 
 	mov	ax, MSG_META_ENSURE_ACTIVE_FT
@@ -370,11 +371,11 @@ PASS:		*ds:si	= OLFieldClass object
 
 RETURN:		nothing
 
-ALLOWED TO DESTROY:	
+ALLOWED TO DESTROY:
 		ax, cx, dx, bp
 		bx, si, di, ds, es
 
-SIDE EFFECTS:	
+SIDE EFFECTS:
 
 PSEUDO CODE/STRATEGY:
 
@@ -394,29 +395,28 @@ OLFieldAboutToDetachComplete	method	dynamic	OLFieldClass,
 	tst	ax
 	jz	noExpressMenu
 	call	clobber
+
 noExpressMenu:
 	mov	di, ds:[si]
-	add	di, ds:[di].Vis_offset	
+	add	di, ds:[di].Vis_offset
 	clr	ax
 	xchg	ax, ds:[di].OLFI_toolArea
-if _ISUI and EXTENDIBLE_SYSTEM_TRAY
+if TOOL_AREA_IS_TASK_BAR
+	;
+	; if TaskBar == on
+	;
+	push	ds					; save ds
+	segmov	ds, dgroup				; load dgroup
+	test	ds:[taskBarPrefs], mask TBF_ENABLED	; test if TBF_ENABLED is set
+	pop	ds					; restore ds
+	jz	hasNoTaskBar				; skip if no taskbar
 	clr	ds:[di].OLFI_systemTray
+hasNoTaskBar:
 endif
 	tst	ax
 	jz	noToolArea
 	call	clobber
 noToolArea:
-if _MOTIF and EXTENDIBLE_SYSTEM_TRAY
-	mov	di, ds:[si]
-	add	di, ds:[di].Vis_offset
-	clr	ax
-	xchg	ax, ds:[di].OLFI_floatingSystemTray
-	clr	ds:[di].OLFI_systemTray
-	tst	ax
-	jz	noSystemTray
-	call	clobber
-noSystemTray:
-endif
 
 if EVENT_MENU
 	mov	di, ds:[si]
@@ -428,7 +428,7 @@ if EVENT_MENU
 	call	clobber
 noEventMenu:
 	mov	di, ds:[si]
-	add	di, ds:[di].Vis_offset	
+	add	di, ds:[di].Vis_offset
 	clr	ax
 	xchg	ax, ds:[di].OLFI_eventToolArea
 	tst	ax
@@ -437,17 +437,18 @@ noEventMenu:
 noToolArea2:
 endif
 
-if _ISUI
+if TOOL_AREA_IS_TASK_BAR or WINDOW_LIST_ACTIVE
 	;
 	; clobber window list dialog
 	;
 	mov	di, ds:[si]
-	add	di, ds:[di].Vis_offset	
+	add	di, ds:[di].Vis_offset
 	clr	ax
 	xchg	ax, ds:[di].OLFI_windowListDialog
 	tst	ax
 	jz	noWindowListDialog
 	call	clobber
+
 noWindowListDialog:
 endif
 	ret
@@ -501,7 +502,7 @@ CALLED BY:	GLOBAL
 PASS: 		ds:di - OLFieldInstance data
 RETURN:		nada
 DESTROYED:	various important but undocumented things
- 
+
 PSEUDO CODE/STRATEGY:
 		This page intentionally left blank
 
@@ -556,10 +557,10 @@ PASS:		*ds:si	= OLField object
 		^ldx:bp	= ack OD
 RETURN:		nothing
 DESTROYED:	ax, cx, dx, bp
-SIDE EFFECTS:	
+SIDE EFFECTS:
 
 PSEUDO CODE/STRATEGY:
-		
+
 
 REVISION HISTORY:
 	Name	Date		Description
@@ -571,12 +572,12 @@ OLFieldDetach	method dynamic OLFieldClass, MSG_META_DETACH
 		.enter
 	;
 	; Prepare for delayed detach.
-	; 
+	;
 		call	ObjInitDetach
 	;
 	; If no express menu for this field, just pass the message to our
 	; superclass.
-	; 
+	;
 		mov	di, ds:[si]
 		add	di, ds:[di].OLField_offset
 		tst	ds:[di].OLFI_expressMenu
@@ -584,12 +585,12 @@ OLFieldDetach	method dynamic OLFieldClass, MSG_META_DETACH
 	;
 	; We'll be sending a MSG_META_DETACH to the express menu, so record
 	; an ACK as needing to come in before we finish detaching.
-	; 
+	;
 		push	ax, cx, dx, bp, si
 		call	ObjIncDetach
 	;
 	; Send the MSG_META_DETACH to the express menu.
-	; 
+	;
 		mov	dx, ds:[LMBH_handle]
 		mov	bp, si
 		mov	di, ds:[si]
@@ -601,7 +602,16 @@ OLFieldDetach	method dynamic OLFieldClass, MSG_META_DETACH
 		pop	ax, cx, dx, bp, si
 
 passItUp:
-if EXTENDIBLE_SYSTEM_TRAY
+if TOOL_AREA_IS_TASK_BAR
+	;
+	; if TaskBar == on
+	;
+		push	ds					; save ds
+		segmov	ds, dgroup				; load dgroup
+		test	ds:[taskBarPrefs], mask TBF_ENABLED	; test if TBF_ENABLED is set
+		pop	ds					; restore ds
+		jz	reallyPassItUp				; skip if no taskbar
+
 	;
 	; Check for system tray, and send it a detach
 	;
@@ -612,12 +622,12 @@ if EXTENDIBLE_SYSTEM_TRAY
 	;
 	; We'll be sending a MSG_META_DETACH to the system tray, so record
 	; an ACK as needing to come in before we finish detaching.
-	; 
+	;
 		push	ax, cx, dx, bp, si
 		call	ObjIncDetach
 	;
 	; Send the MSG_META_DETACH to the system tray.
-	; 
+	;
 		mov	dx, ds:[LMBH_handle]
 		mov	bp, si
 		mov	di, ds:[si]
@@ -632,12 +642,12 @@ reallyPassItUp:
 endif
 	;
 	; Let our superclass know.
-	; 
+	;
 		mov	di, offset OLFieldClass
 		call	ObjCallSuperNoLock
 	;
 	; And allow the detach complete, now that that's done.
-	; 
+	;
 		call	ObjEnableDetach
 		.leave
 		ret
@@ -658,7 +668,7 @@ PASS:		*ds:si	= OLFieldClass object
 		ax	= message #
 RETURN:		carry set if handled "Exit To DOS"
 DESTROYED:	ax,cx,dx,bp
-SIDE EFFECTS:	
+SIDE EFFECTS:
 
 PSEUDO CODE/STRATEGY:
 
@@ -704,7 +714,7 @@ EC <	xchg	ax, bx							>
 	mov	di, mask MF_CALL or mask MF_FIXUP_DS
 	call	ObjMessage
 	pop	si
-		
+
 notUnderWindows:
 EC <	push	ds:[LMBH_handle]				>
 	call	UserDoDialog
@@ -733,7 +743,7 @@ shutdown:
 	clr	cx, dx, bp
 	call	SysShutdown
 	pop	bx, si
-	
+
 destroyDialog:
 	call	UserDestroyDialog
 	stc			;carry <- set to indicate "Exit To DOS" handled
@@ -788,7 +798,7 @@ notNT:
 CheckForWindows	endp
 
 endif ; _ISUI
-	
+
 
 COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 		OLFieldAppNoLongerExiting
@@ -804,7 +814,7 @@ PASS:		*ds:si	= OLFieldClass object
 		ax	= message #
 RETURN:		nothing
 DESTROYED:	ax,cx,dx,bp
-SIDE EFFECTS:	
+SIDE EFFECTS:
 
 PSEUDO CODE/STRATEGY:
 
@@ -814,7 +824,7 @@ REVISION HISTORY:
 	JS	5/20/93   	Initial version
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
-OLFieldAppNoLongerExiting	method dynamic OLFieldClass, 
+OLFieldAppNoLongerExiting	method dynamic OLFieldClass,
 					MSG_GEN_FIELD_APP_NO_LONGER_EXITING
 	add	bx, ds:[bx].Gen_offset
 	test	ds:[bx].GFI_flags, mask GFF_QUIT_ON_CLOSE
@@ -918,7 +928,7 @@ DESCRIPTION:	This method is sent by child which 1) is the focused object
 		parent in the focus hierarchy.
 
 		At this class level, the parent in the focus hierarchy is
-		either the generic parent (if this is a Display) or 
+		either the generic parent (if this is a Display) or
 		GenApplication object.
 
 PASS:		*ds:si	= instance data for object
@@ -971,7 +981,7 @@ DBCS <	cmp	cx, C_SYS_LWIN						>
 	je	8$
 SBCS <	cmp	cx, (CS_CONTROL shl 8) or VC_RWIN			>
 DBCS <	cmp	cx, C_SYS_RWIN						>
-	jne	9$		
+	jne	9$
 8$:
 	pop	si				;*ds:si = field
 	mov	ax, MSG_OL_FIELD_TOGGLE_EXPRESS_MENU
@@ -1004,7 +1014,8 @@ if EVENT_MENU
 	jc	done
 endif
 
-if _ISUI ;--------------------------------------------------------------------
+if TOOL_AREA_IS_TASK_BAR or WINDOW_LIST_ACTIVE
+
 	push	si				;save our handle
 	mov	di, ds:[si]
 	add	di, ds:[di].Gen_offset
@@ -1023,7 +1034,7 @@ if _ISUI ;--------------------------------------------------------------------
 20$:
 	pop	si
 	jc	done
-endif ;---------------------------------------------------------------------
+endif
 
 callSuper:
 	mov	di, offset OLFieldClass
@@ -1052,10 +1063,10 @@ CALLED BY:	GLOBAL
 PASS:		*ds:si - field object
 		di - gstate to draw to
 
-RETURN:		nothing 
+RETURN:		nothing
 
-DESTROYED:	ax, bx, cx, dx, bp, si, di, ds 
- 
+DESTROYED:	ax, bx, cx, dx, bp, si, di, ds
+
 PSEUDO CODE/STRATEGY:
 
 KNOWN BUGS/SIDE EFFECTS/IDEAS:
@@ -1075,7 +1086,7 @@ OLFieldDrawBG	proc	far
 	xoff		local	word
 	yoff		local	word
 	flags		local	FieldBGFlags
-	gstate		local	hptr.GState	
+	gstate		local	hptr.GState
 	notinvert	local	byte
 	bltSrcX		local	word
 	bltSrcY		local	word
@@ -1093,7 +1104,7 @@ EC <	call	ECCheckObject						>
 EC <	test	dl, not mask FieldBGFlags				>
 EC <	ERROR_NZ OL_FIELD_BAD_BG_FLAGS					>
 	mov	flags, dl
-	mov	bx, ds:[di].OLFI_BGFile		;BX <- handle of BG file 
+	mov	bx, ds:[di].OLFI_BGFile		;BX <- handle of BG file
 	mov	si, ds:[di].OLFI_BGData		;SI <- extra data
 						; (GString handle)
 
@@ -1117,7 +1128,7 @@ EC <	ERROR_NZ OL_FIELD_BAD_BG_FILE_TYPE				>
 	mov	ax, ds:[FBGMB_yOffset]
 	neg	ax
 	mov	yoff, ax
-	xchg	dx, bp				;DX <- ptr to locals 
+	xchg	dx, bp				;DX <- ptr to locals
 						;BP <- mem handle
 	call	VMUnlock
 	mov	bp, dx				;BP <- ptr to locals
@@ -1395,9 +1406,9 @@ SYNOPSIS:	Gets the background color from the .ini file.
 CALLED BY:	GLOBAL
 PASS:		nada
 RETURN:		carry set if couldn't find color in .ini file
-		      else carry clear, AL = BG color 
+		      else carry clear, AL = BG color
 DESTROYED:	nada
- 
+
 PSEUDO CODE/STRATEGY:
 		This page intentionally left blank
 
@@ -1515,7 +1526,7 @@ GetBackgroundColorPict		proc	far	uses es
 	jnc	exit			;Branch if color specified in .ini file
 80$:
 	;If drawing picture, do not wash with grey pattern on B/W screen, but
-	; instead wash with a solid (e.g. white) pattern	
+	; instead wash with a solid (e.g. white) pattern
 
 	;OpenLook: grab "light/dark" color scheme from Field object
 OLS <	mov	al, es:[moCS_dsLightColor]				>
@@ -1643,7 +1654,7 @@ EC <	call	ECCheckObject						>
 	lea	di, attrStr			;
 SBCS <	mov	bp,INITFILE_DOWNCASE_CHARS or 2	;Only get first char+null>
 DBCS <	mov	bp,INITFILE_DOWNCASE_CHARS or (2 * size TCHAR)	;Space for 1st>
-DBCS <								; char + null> 
+DBCS <								; char + null>
 	call	InitFileReadString		;
 	pop	ds, si				;Restore and save ptr to object
 	push	ds, si				;
@@ -1804,11 +1815,11 @@ PASS:		*ds:si	= OLFieldClass object
 
 RETURN:		nothing
 
-ALLOWED TO DESTROY:	
+ALLOWED TO DESTROY:
 		ax, cx, dx, bp
 		bx, si, di, ds, es
 
-SIDE EFFECTS:	
+SIDE EFFECTS:
 
 PSEUDO CODE/STRATEGY:
 
@@ -1820,7 +1831,7 @@ REVISION HISTORY:
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
 
-if (not _ISUI)	;--------------------------------------------------------------
+if (not WINDOW_LIST_ACTIVE)	;--------------------------------------------
 
 OLFieldNavigateToNextApp	method	dynamic	OLFieldClass,
 					MSG_OL_FIELD_NAVIGATE_TO_NEXT_APP
@@ -1911,12 +1922,12 @@ done:
 	ret
 OLFieldNavigateToNextApp	endm
 
-else	; ISUI ---------------------------------------------------------------
+else	; WINDOW_LIST_ACTIVE ------------------------------------------------
 
 ;
-; ISUI just selects the next item in the window list.
+; if WINDOW_LIST_ACTIVE - just select the next item in the window list.
 ;
-OLFieldNavigateToNextApp	method	dynamic	OLFieldClass, 
+OLFieldNavigateToNextApp	method	dynamic	OLFieldClass,
 					MSG_OL_FIELD_NAVIGATE_TO_NEXT_APP
 	;
 	; Get current selection
@@ -1957,11 +1968,11 @@ done:
 	ret
 OLFieldNavigateToNextApp	endm
 
-endif	; if (not _ISUI) -----------------------------------------------------
+endif	; if (not WINDOW_LIST_ACTIVE) ---------------------------------------
 
 
 COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-		OLFieldQuerySaveDocuments -- 
+		OLFieldQuerySaveDocuments --
 		MSG_META_QUERY_SAVE_DOCUMENTS for OLFieldClass
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
@@ -1976,7 +1987,7 @@ PASS:		*ds:si 	- instance data
 RETURN:		nothing
 		ax, cx, dx, bp - destroyed
 
-ALLOWED TO DESTROY:	
+ALLOWED TO DESTROY:
 		bx, si, di, ds, es
 
 REGISTER/STACK USAGE:
@@ -1998,7 +2009,7 @@ OLFieldQuerySaveDocuments	method dynamic	OLFieldClass, \
 				MSG_META_QUERY_SAVE_DOCUMENTS
 	.enter
 	movdw	bxsi, ds:[di].OLFI_fullScreenExcl.FTVMC_OD
-	tst	si	
+	tst	si
 	jz	exit
 	clr	di
 	call	ObjMessage
