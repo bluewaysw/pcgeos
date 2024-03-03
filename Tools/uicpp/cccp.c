@@ -1006,15 +1006,23 @@ main (argc, argv)
 
 	{
 		int a= 0;
+                int b= 0;
 		while(fp->buf[a]) {
 			if(fp->buf[a] == '\r') {
-				fp->buf[a] = '\n';
+				fp->buf[b] = '\n';
+                                b++;
 				if(fp->buf[a+1] == '\n') {
-					fp->buf[a+1] = ' ';
+					a++;
 				}
 			}
+                        else {
+                                fp->buf[b] = fp->buf[a];
+                                b++;
+                        }
 			a++;
 		}
+                fp->buf[b] = 0;
+                fp->length = strlen(fp->buf);
 	}
 
   /* Now that we know the input file is valid, open the output.  */
@@ -2752,15 +2760,23 @@ finclude (f, fname, op)
 
 	{
 		int a= 0;
+                int b= 0;
 		while(fp->buf[a]) {
 			if(fp->buf[a] == '\r') {
-				fp->buf[a] = '\n';
+				fp->buf[b] = '\n';
+                                b++;
 				if(fp->buf[a+1] == '\n') {
-					fp->buf[a+1] = ' ';
+					a++;
 				}
 			}
+                        else {
+                                fp->buf[b] = fp->buf[a];
+                                b++;
+                        }
 			a++;
 		}
+                fp->buf[b] = 0;
+                fp->length = strlen(fp->buf);
 	}
 
   success = 1;
