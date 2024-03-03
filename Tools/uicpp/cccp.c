@@ -1022,7 +1022,7 @@ main (argc, argv)
 			a++;
 		}
                 fp->buf[b] = 0;
-                fp-length = strlen(fp->buf);
+                fp->length = strlen(fp->buf);
 	}
 
   /* Now that we know the input file is valid, open the output.  */
@@ -2776,7 +2776,7 @@ finclude (f, fname, op)
 			a++;
 		}
                 fp->buf[b] = 0;
-                fp-length = strlen(fp->buf);
+                fp->length = strlen(fp->buf);
 	}
 
   success = 1;
