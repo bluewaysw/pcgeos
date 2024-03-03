@@ -13,18 +13,13 @@
 #include <token.h>
 #include <object.h>
 
-word        launcherNr          = NULL;
-word        numFiles            = 0;
-MemHandle   filesHan            = 0;
-char*       filesPtr            = 0;
+dword       G_trayAppsFolderID      = 0;
+word        G_triggerNo             = 0;
+MemHandle   G_trayFilesHan          = 0;
+word        G_trayAppsFilesCount    = 0;
+optr        G_trayTriggersArr[25];
 
-MemHandle   trayAppsFolderIDBlock   = 0;
-ChunkHandle trayAppsFolderIDChunk   = 0;
-dword       trayAppsFolderID        = 0;
-word        trayAppsFolderCount     = 0;
-optr        triggers[25];
-
-#define MAX_TRIGGERS 24   /* 0-based, it's 25 actually */
+#define MAX_TRAY_TRIGGERS_COUNT 25
 
 /*
 ***************************************************************************
@@ -33,9 +28,11 @@ optr        triggers[25];
 */
 
 @class  TrayAppsProcessClass, GenProcessClass;
+    @message void MSG_ADD_OR_READD_LAUNCHERS();
     @message void MSG_ADD_LAUNCHER();
     @message void MSG_EMC_LAUNCHER_TRIGGER_CREATED(CreateExpressMenuControlItemResponseParams *response = ss:bp);
     @message (GEN_TRIGGER_ACTION) MSG_SOFT_LAUNCHER_PRESSED;
+    @message void MSG_REMOVE_LAUNCHERS();
 @endc   /* end of class definition */
 
 @class GenGeodeTokenTriggerClass, GenTriggerClass;
@@ -72,8 +69,10 @@ CODE
 *********************************************************************/
 @method TrayAppsProcessClass, MSG_GEN_PROCESS_OPEN_APPLICATION
 {
-    FilePathID  *idArr = 0;
-    dword       no = 0;
+    MemHandle   trayAppsFolderIDBlock   = 0;
+    ChunkHandle trayAppsFolderIDChunk   = 0;
+    FilePathID  *idArr                  = 0;
+    //dword       no = 0;
 
     @callsuper();
 
@@ -83,19 +82,11 @@ CODE
         trayAppsFolderIDChunk = FileGetCurrentPathIDs(trayAppsFolderIDBlock);
         (void) MemLock(trayAppsFolderIDBlock);
         idArr = (FilePathID*) LMemDerefHandles(trayAppsFolderIDBlock, trayAppsFolderIDChunk);
-        no = LMemGetChunkSizeHandles(trayAppsFolderIDBlock, trayAppsFolderIDChunk) / sizeof(FilePathID);
-        MsgBoxNo(no);
-        trayAppsFolderID = idArr->FPID_id;
+        //no = LMemGetChunkSizeHandles(trayAppsFolderIDBlock, trayAppsFolderIDChunk) / sizeof(FilePathID);
+        G_trayAppsFolderID = idArr->FPID_id;
         MemUnlock(trayAppsFolderIDBlock);
 
-        trayAppsFolderCount = ListFiles(&filesHan, FESF_GEOS_EXECS);
-
-        if (trayAppsFolderCount)
-        {
-            trayAppsFolderCount--;
-            if (trayAppsFolderCount > MAX_TRIGGERS) trayAppsFolderCount = MAX_TRIGGERS;
-            @call process::MSG_ADD_LAUNCHER();
-        }
+        @call process::MSG_ADD_OR_READD_LAUNCHERS();
     }
 
     (void) GCNListAdd(
@@ -103,7 +94,6 @@ CODE
         MANUFACTURER_ID_GEOWORKS,       // manufacturer ID of list
         GCNSLT_FILE_SYSTEM
     );
-
 }
 
 @method TrayAppsProcessClass, MSG_NOTIFY_FILE_CHANGE
@@ -122,20 +112,21 @@ CODE
             word itemSize;
 
             if ((notificationItem->FCBNI_type == FCNT_CREATE) &&
-                (trayAppsFolderID == notificationItem->FCBNI_id))
+                (G_trayAppsFolderID == notificationItem->FCBNI_id))
             {
-                MsgBox("File created in TrayApps folder.");
-                trayAppsFolderCount = CountFiles(FESF_GEOS_EXECS);
+                G_trayAppsFilesCount = CountFiles(FESF_GEOS_EXECS);
+                @call process::MSG_ADD_OR_READD_LAUNCHERS();
+                break;
             }
 
             if (notificationItem->FCBNI_type == FCNT_DELETE)
             {
                 numFiles = CountFiles(FESF_GEOS_EXECS);
-                MsgBoxNo(numFiles);
-                if (numFiles < trayAppsFolderCount)
+                if (numFiles < G_trayAppsFilesCount)
                 {
-                    MsgBox("File removed from TrayApps folder?");
-                    trayAppsFolderCount = CountFiles(FESF_GEOS_EXECS);
+                    G_trayAppsFilesCount = numFiles;
+                    @call process::MSG_ADD_OR_READD_LAUNCHERS();
+                    break;
                 }
             }
 
@@ -154,13 +145,26 @@ CODE
             }
 
             notificationItem = (FileChangeBatchNotificationItem*) (((byte*) notificationItem) + itemSize);
-            //if (((word) notificationItem) > notificationData->FCBND_end) break;
         }
 
         MemUnlock(data);
     }
 
     @callsuper();
+}
+
+/*********************************************************************
+* Add, (remove), re-add launchers
+*********************************************************************/
+@method TrayAppsProcessClass, MSG_ADD_OR_READD_LAUNCHERS
+{
+    @call process::MSG_REMOVE_LAUNCHERS();
+
+    G_trayAppsFilesCount = ListFiles(&G_trayFilesHan, FESF_GEOS_EXECS);
+    if (G_trayAppsFilesCount > 0)
+    {
+        @call process::MSG_ADD_LAUNCHER();
+    }
 }
 
 
@@ -172,7 +176,8 @@ CODE
     CreateExpressMenuControlItemParams  cemcip;
     EventHandle                         event;
 
-    if (launcherNr <= numFiles)
+    if ((G_triggerNo < G_trayAppsFilesCount) &&
+        (G_triggerNo < MAX_TRAY_TRIGGERS_COUNT))
     {
         /*cemcip.CEMCIP_feature = CEMCIF_UTILITIES_PANEL;*/
         cemcip.CEMCIP_feature = CEMCIF_SYSTEM_TRAY;
@@ -184,11 +189,6 @@ CODE
 
         event = @record ExpressMenuControlClass::MSG_EXPRESS_MENU_CONTROL_CREATE_ITEM(cemcip);
         GCNListSend(MANUFACTURER_ID_GEOWORKS, GCNSLT_EXPRESS_MENU_OBJECTS, event, 0, 0);
-    }
-    else
-    {
-        // no more launcher buttons
-        if (filesHan) MemFree(filesHan);
     }
 }
 
@@ -202,19 +202,21 @@ CODE
     MemHandle      newMoniker = NULL;
     word           monikerSize = 0;
     GeodeToken     tok;
+    char*          filePtr = (void*) 0;
+
     //optr*          fh  = NULL;
     //ChunkHandle    helpChunk = NULL;
     //char*          helpChunkPtr = NULL;
 
-    filesPtr = MemLock(filesHan);
-    filesPtr = filesPtr + (launcherNr * FILE_LONGNAME_BUFFER_SIZE);
-    FileGetPathExtAttributes(filesPtr, FEA_TOKEN, (&tok), sizeof(GeodeToken));
+    filePtr = MemLock(G_trayFilesHan);
+    filePtr = filePtr + (G_triggerNo * FILE_LONGNAME_BUFFER_SIZE);
+    FileGetPathExtAttributes(filePtr, FEA_TOKEN, (&tok), sizeof(GeodeToken));
     // MemLock(OptrToHandle(@MinimHelp));
     // helpChunk = LMemAlloc(OptrToHandle(@MinimHelp), FILE_LONGNAME_BUFFER_SIZE);
     // helpChunkPtr = LMemDerefHandles(OptrToHandle(@MinimHelp), helpChunk);
     // strcpy(helpChunkPtr, filesPtr);
     // MemUnlock(OptrToHandle(@MinimHelp));
-    MemUnlock(filesHan);
+    MemUnlock(G_trayFilesHan);
 
     obj = response->CEMCIRP_newItem;
 
@@ -249,9 +251,9 @@ CODE
     // MemUnlock(HandleOf(obj));
 
     @call obj::MSG_GEN_SET_USABLE(VUM_NOW);
-    triggers[launcherNr] = obj;
+    G_trayTriggersArr[G_triggerNo] = obj;
 
-    launcherNr++;
+    G_triggerNo++;
     //MemFree(newMoniker);
 
     @call process::MSG_ADD_LAUNCHER();
@@ -273,16 +275,39 @@ CODE
 ***********************************************************************/
 @method TrayAppsProcessClass, MSG_GEN_PROCESS_CLOSE_APPLICATION
 {
+
+    (void) GCNListRemove(
+        oself,                          // optr of thread to remove from list
+        MANUFACTURER_ID_GEOWORKS,       // manufacturer ID of list
+        GCNSLT_FILE_SYSTEM
+    );
+
+    @call process::MSG_REMOVE_LAUNCHERS();
+
+    // no more launcher buttons
+    if (G_trayFilesHan) MemFree(G_trayFilesHan);
+
+    return(@callsuper());
+}
+
+/***********************************************************************
+*
+***********************************************************************/
+@method TrayAppsProcessClass, MSG_REMOVE_LAUNCHERS
+{
     EventHandle    event;
 
-    while(launcherNr--)
+    if (G_triggerNo > 0)
     {
-        event = @record ExpressMenuControlClass::MSG_EXPRESS_MENU_CONTROL_DESTROY_CREATED_ITEM(triggers[launcherNr], VUM_NOW);
-        GCNListSend(MANUFACTURER_ID_GEOWORKS, GCNSLT_EXPRESS_MENU_OBJECTS, event, 0, 0);
+        while(G_triggerNo--)
+        {
+            event = @record ExpressMenuControlClass::MSG_EXPRESS_MENU_CONTROL_DESTROY_CREATED_ITEM(G_trayTriggersArr[G_triggerNo], VUM_NOW);
+            GCNListSend(MANUFACTURER_ID_GEOWORKS, GCNSLT_EXPRESS_MENU_OBJECTS, event, 0, 0);
+        }
     }
-
-    return @callsuper();
+    G_triggerNo = 0;
 }
+
 
 /*------------------------------------------------------------------
 This is called by MSG_META_DETACH and allows for changing the

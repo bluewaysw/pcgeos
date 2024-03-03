@@ -6,8 +6,8 @@
 GEODE           = trayapps
 ASM_TO_OBJS     =
 UI_TO_RDFS      =
-SRCS            = trayapps.goc utils.goc globals.goh utils.goh
-OBJS            = trayapps.obj utils.obj
+SRCS            = utils.goc trayapps.goc globals.goh utils.goh
+OBJS            = utils.obj trayapps.obj
 LOBJS           =
 
 SYSMAKEFILE     = geode.mk
