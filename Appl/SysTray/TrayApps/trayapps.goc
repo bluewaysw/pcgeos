@@ -4,8 +4,8 @@ include files
 @include <stdapp.goh>
 @include <Objects/eMenuC.goh>
 @include <Objects/gFieldC.goh>
-@include <utils.goh>
-@include <globals.goh>
+@include <iacp.goh>
+
 #include <Ansi/stdio.h>
 #include <Ansi/string.h>
 #include <token.h>
@@ -33,6 +33,8 @@ class & message definitions
     @message void MSG_EMC_APP_TRIGGER_CREATED(CreateExpressMenuControlItemResponseParams *response = ss:bp);
     @message (GEN_TRIGGER_ACTION) MSG_APP_TRIGGER_PRESSED;
     @message void MSG_REMOVE_ALL_APP_TRIGGERS();
+    @message word MSG_READ_APPS_IN_FOLDER(MemHandle* FilesToReturn);
+    @message word MSG_COUNT_APPS_IN_FOLDER();
 @endc   /* end of class definition */
 
 @class GenGeodeTokenTriggerClass, GenTriggerClass;
@@ -114,14 +116,14 @@ let's see if someone put something in/out of our folder
             if ((notificationItem->FCBNI_type == FCNT_CREATE) &&
                 (G_trayAppsFolderID == notificationItem->FCBNI_id))
             {
-                G_trayAppsFilesCount = CountFiles(FESF_GEOS_EXECS);
+                G_trayAppsFilesCount = @call process::MSG_COUNT_APPS_IN_FOLDER();
                 @call process::MSG_INIT_APP_TRIGGERS();
                 break;
             }
 
             if (notificationItem->FCBNI_type == FCNT_DELETE)
             {
-                numFiles = CountFiles(FESF_GEOS_EXECS);
+                numFiles = @call process::MSG_COUNT_APPS_IN_FOLDER();
                 if (numFiles < G_trayAppsFilesCount)
                 {
                     G_trayAppsFilesCount = numFiles;
@@ -160,7 +162,7 @@ add / remove / re-add launchers
 {
     @call process::MSG_REMOVE_ALL_APP_TRIGGERS();
 
-    G_trayAppsFilesCount = ListFiles(&G_trayFilesHan, FESF_GEOS_EXECS);
+    G_trayAppsFilesCount = @call process::MSG_READ_APPS_IN_FOLDER(&G_trayFilesHan);
     if (G_trayAppsFilesCount > 0)
     {
         @call process::MSG_ADD_APP_TRIGGER();
@@ -324,6 +326,59 @@ remove all our triggers from SysTray
     }
 
     G_triggerNo = 0;
+}
+
+/*-------------------------------------------------------------------
+read apps in folder into MemHandle
+numOfFiles returned
+-------------------------------------------------------------------*/
+@method TrayAppsProcessClass, MSG_READ_APPS_IN_FOLDER
+{
+    FileEnumParams       fileEnumParams;
+    word                 filesNotHandled = NULL;
+    word                 numOfFiles = NULL;
+
+    fileEnumParams.FEP_searchFlags = FESF_GEOS_EXECS;
+    fileEnumParams.FEP_returnAttrs = (void*) FESRT_NAME;  /*Return the file's Geos filename.*/
+    fileEnumParams.FEP_returnSize = FILE_LONGNAME_BUFFER_SIZE;
+    fileEnumParams.FEP_bufSize = FE_BUFSIZE_UNLIMITED;    /* FE_BUFSIZE_UNLIMITED allows the return buffer size to be as large as necessary.*/
+    fileEnumParams.FEP_matchAttrs = 0;  /* Set matchAttrs to zero so it will match anything.*/
+    fileEnumParams.FEP_skipCount = 0;   /* Don't skip any files*/
+    fileEnumParams.FEP_callback = 0;   /* Don't need no callback. */
+
+    numOfFiles = FileEnum(
+        &fileEnumParams,
+        FilesToReturn,
+        &filesNotHandled
+    );
+
+    if (numOfFiles && (*FilesToReturn))
+    {
+        return(numOfFiles);
+    }
+
+    return(0);
+}
+
+/*-------------------------------------------------------------------
+count app in folder
+numOfFiles returned
+-------------------------------------------------------------------*/
+@method TrayAppsProcessClass, MSG_COUNT_APPS_IN_FOLDER
+{
+    FileEnumParams       fileEnumParams;
+    word                 numOfFiles = NULL;
+
+    fileEnumParams.FEP_searchFlags = FESF_GEOS_EXECS;
+    fileEnumParams.FEP_returnAttrs = (void*) FESRT_COUNT_ONLY;  /*Return the file's Geos filename.*/
+    fileEnumParams.FEP_returnSize = 0;
+    fileEnumParams.FEP_bufSize = FE_BUFSIZE_UNLIMITED;    /* FE_BUFSIZE_UNLIMITED allows the return buffer size to be as large as necessary.*/
+    fileEnumParams.FEP_matchAttrs = 0;  /* Set matchAttrs to zero so it will match anything.*/
+    fileEnumParams.FEP_skipCount = 0;   /* Don't skip any files*/
+    fileEnumParams.FEP_callback = 0;   /* Don't need no callback. */
+
+    (void) FileEnum(&fileEnumParams, NullHandle, &numOfFiles);
+    return numOfFiles;
 }
 
 
