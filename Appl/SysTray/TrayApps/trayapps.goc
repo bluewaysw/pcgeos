@@ -1,8 +1,6 @@
-/*
-***************************************************************************
-*              Include files
-***************************************************************************
-*/
+/*-------------------------------------------------------------------
+include files
+-------------------------------------------------------------------*/
 @include <stdapp.goh>
 @include <Objects/eMenuC.goh>
 @include <Objects/gFieldC.goh>
@@ -13,6 +11,10 @@
 #include <token.h>
 #include <object.h>
 
+/*-------------------------------------------------------------------
+globals & constants
+-------------------------------------------------------------------*/
+
 dword       G_trayAppsFolderID      = 0;
 word        G_triggerNo             = 0;
 MemHandle   G_trayFilesHan          = 0;
@@ -21,18 +23,16 @@ optr        G_trayTriggersArr[25];
 
 #define MAX_TRAY_TRIGGERS_COUNT 25
 
-/*
-***************************************************************************
-*              Class & Message Definitions
-***************************************************************************
-*/
+/*-------------------------------------------------------------------
+class & message definitions
+-------------------------------------------------------------------*/
 
 @class  TrayAppsProcessClass, GenProcessClass;
-    @message void MSG_ADD_OR_READD_LAUNCHERS();
-    @message void MSG_ADD_LAUNCHER();
-    @message void MSG_EMC_LAUNCHER_TRIGGER_CREATED(CreateExpressMenuControlItemResponseParams *response = ss:bp);
-    @message (GEN_TRIGGER_ACTION) MSG_SOFT_LAUNCHER_PRESSED;
-    @message void MSG_REMOVE_LAUNCHERS();
+    @message void MSG_INIT_APP_TRIGGERS();
+    @message void MSG_ADD_APP_TRIGGER();
+    @message void MSG_EMC_APP_TRIGGER_CREATED(CreateExpressMenuControlItemResponseParams *response = ss:bp);
+    @message (GEN_TRIGGER_ACTION) MSG_APP_TRIGGER_PRESSED;
+    @message void MSG_REMOVE_ALL_APP_TRIGGERS();
 @endc   /* end of class definition */
 
 @class GenGeodeTokenTriggerClass, GenTriggerClass;
@@ -41,11 +41,10 @@ optr        G_trayTriggersArr[25];
 
 @classdecl   TrayAppsProcessClass, neverSaved;
 @classdecl   GenGeodeTokenTriggerClass, neverSaved;
-/*
-***************************************************************************
-*              UI Objects
-***************************************************************************
-*/
+
+/*-------------------------------------------------------------------
+UI Objects
+-------------------------------------------------------------------*/
 
 @start  AppResource;
 
@@ -62,11 +61,9 @@ optr        G_trayTriggersArr[25];
 @end    AppResource;
 
 
-/***********************************************************************
-CODE
-/*********************************************************************
-* Beim Starten der Applikation Trigger anlegen.
-*********************************************************************/
+/*-------------------------------------------------------------------
+we're born!
+-------------------------------------------------------------------*/
 @method TrayAppsProcessClass, MSG_GEN_PROCESS_OPEN_APPLICATION
 {
     MemHandle   trayAppsFolderIDBlock   = 0;
@@ -86,16 +83,19 @@ CODE
         G_trayAppsFolderID = idArr->FPID_id;
         MemUnlock(trayAppsFolderIDBlock);
 
-        @call process::MSG_ADD_OR_READD_LAUNCHERS();
+        @call process::MSG_INIT_APP_TRIGGERS();
     }
 
     (void) GCNListAdd(
-        oself,                          // optr to add to list
-        MANUFACTURER_ID_GEOWORKS,       // manufacturer ID of list
+        ConstructOptr(GeodeGetProcessHandle(), 0),  // optr to add to list
+        MANUFACTURER_ID_GEOWORKS,                   // manufacturer ID of list
         GCNSLT_FILE_SYSTEM
     );
 }
 
+/*-------------------------------------------------------------------
+let's see if someone put something in/out of our folder
+-------------------------------------------------------------------*/
 @method TrayAppsProcessClass, MSG_NOTIFY_FILE_CHANGE
 {
     FileChangeBatchNotificationData *notificationData;
@@ -115,7 +115,7 @@ CODE
                 (G_trayAppsFolderID == notificationItem->FCBNI_id))
             {
                 G_trayAppsFilesCount = CountFiles(FESF_GEOS_EXECS);
-                @call process::MSG_ADD_OR_READD_LAUNCHERS();
+                @call process::MSG_INIT_APP_TRIGGERS();
                 break;
             }
 
@@ -125,7 +125,7 @@ CODE
                 if (numFiles < G_trayAppsFilesCount)
                 {
                     G_trayAppsFilesCount = numFiles;
-                    @call process::MSG_ADD_OR_READD_LAUNCHERS();
+                    @call process::MSG_INIT_APP_TRIGGERS();
                     break;
                 }
             }
@@ -153,25 +153,24 @@ CODE
     @callsuper();
 }
 
-/*********************************************************************
-* Add, (remove), re-add launchers
-*********************************************************************/
-@method TrayAppsProcessClass, MSG_ADD_OR_READD_LAUNCHERS
+/*-------------------------------------------------------------------
+add / remove / re-add launchers
+-------------------------------------------------------------------*/
+@method TrayAppsProcessClass, MSG_INIT_APP_TRIGGERS
 {
-    @call process::MSG_REMOVE_LAUNCHERS();
+    @call process::MSG_REMOVE_ALL_APP_TRIGGERS();
 
     G_trayAppsFilesCount = ListFiles(&G_trayFilesHan, FESF_GEOS_EXECS);
     if (G_trayAppsFilesCount > 0)
     {
-        @call process::MSG_ADD_LAUNCHER();
+        @call process::MSG_ADD_APP_TRIGGER();
     }
 }
 
-
-/*********************************************************************
-* Beim Starten der Applikation Trigger anlegen.
-*********************************************************************/
-@method TrayAppsProcessClass, MSG_ADD_LAUNCHER
+/*-------------------------------------------------------------------
+add another app trigger
+-------------------------------------------------------------------*/
+@method TrayAppsProcessClass, MSG_ADD_APP_TRIGGER
 {
     CreateExpressMenuControlItemParams  cemcip;
     EventHandle                         event;
@@ -183,7 +182,7 @@ CODE
         cemcip.CEMCIP_feature = CEMCIF_SYSTEM_TRAY;
         cemcip.CEMCIP_class = &GenGeodeTokenTriggerClass;
         cemcip.CEMCIP_itemPriority = CEMCIP_STANDARD_PRIORITY;
-        cemcip.CEMCIP_responseMessage = MSG_EMC_LAUNCHER_TRIGGER_CREATED;
+        cemcip.CEMCIP_responseMessage = MSG_EMC_APP_TRIGGER_CREATED;
         cemcip.CEMCIP_responseDestination = oself;
         cemcip.CEMCIP_field = NullOptr;
 
@@ -192,10 +191,10 @@ CODE
     }
 }
 
-/***********************************************************************
-*    Initializes the newly created Express menu trigger
-***********************************************************************/
-@method TrayAppsProcessClass, MSG_EMC_LAUNCHER_TRIGGER_CREATED
+/*-------------------------------------------------------------------
+initializes the newly created Express menu trigger
+-------------------------------------------------------------------*/
+@method TrayAppsProcessClass, MSG_EMC_APP_TRIGGER_CREATED
 {
     optr           obj = NULL;
     Boolean        isGMoniker = FALSE;
@@ -239,7 +238,7 @@ CODE
         );
     }
 
-    @call obj::MSG_GEN_TRIGGER_SET_ACTION_MSG(MSG_SOFT_LAUNCHER_PRESSED);
+    @call obj::MSG_GEN_TRIGGER_SET_ACTION_MSG(MSG_APP_TRIGGER_PRESSED);
     @call obj::MSG_GEN_TRIGGER_SET_DESTINATION(oself);
     //@call obj::MSG_META_ADD_VAR_DATA(HINT_NO_BORDERS_ON_MONIKERS, 0, (void*) 0);
     @call obj::MSG_META_ADD_VAR_DATA((ATTR_GEODE_TOKEN_TO_PASS & (~VDF_SAVE_TO_STATE)), sizeof(GeodeToken), &tok);
@@ -254,15 +253,15 @@ CODE
     G_trayTriggersArr[G_triggerNo] = obj;
 
     G_triggerNo++;
-    //MemFree(newMoniker);
+    MemFree(newMoniker);
 
-    @call process::MSG_ADD_LAUNCHER();
+    @call process::MSG_ADD_APP_TRIGGER();
 }
 
-/***********************************************************************
-*
-***********************************************************************/
-@method TrayAppsProcessClass, MSG_SOFT_LAUNCHER_PRESSED
+/*-------------------------------------------------------------------
+one of our triggers has been pressed, launch app
+-------------------------------------------------------------------*/
+@method TrayAppsProcessClass, MSG_APP_TRIGGER_PRESSED
 {
     GeodeToken gt;
 
@@ -270,30 +269,31 @@ CODE
     LaunchApp(gt);
 }
 
-/***********************************************************************
-*
-***********************************************************************/
+/*-------------------------------------------------------------------
+prepare our demise
+-------------------------------------------------------------------*/
 @method TrayAppsProcessClass, MSG_GEN_PROCESS_CLOSE_APPLICATION
 {
-
+    // take us of notification list
     (void) GCNListRemove(
-        oself,                          // optr of thread to remove from list
-        MANUFACTURER_ID_GEOWORKS,       // manufacturer ID of list
+        ConstructOptr(GeodeGetProcessHandle(), 0),  // optr of thread to remove from list
+        MANUFACTURER_ID_GEOWORKS,                   // manufacturer ID of list
         GCNSLT_FILE_SYSTEM
     );
 
-    @call process::MSG_REMOVE_LAUNCHERS();
-
-    // no more launcher buttons
+    // clean up handle
     if (G_trayFilesHan) MemFree(G_trayFilesHan);
+
+    // remove triggers
+    @call process::MSG_REMOVE_ALL_APP_TRIGGERS();
 
     return(@callsuper());
 }
 
-/***********************************************************************
-*
-***********************************************************************/
-@method TrayAppsProcessClass, MSG_REMOVE_LAUNCHERS
+/*-------------------------------------------------------------------
+remove all our triggers from SysTray
+-------------------------------------------------------------------*/
+@method TrayAppsProcessClass, MSG_REMOVE_ALL_APP_TRIGGERS
 {
     EventHandle    event;
 
@@ -305,6 +305,7 @@ CODE
             GCNListSend(MANUFACTURER_ID_GEOWORKS, GCNSLT_EXPRESS_MENU_OBJECTS, event, 0, 0);
         }
     }
+
     G_triggerNo = 0;
 }
 
