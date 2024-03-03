@@ -13,10 +13,15 @@
 #include <token.h>
 #include <object.h>
 
-word        launcherNr      = NULL;
-word        numFiles        = 0;
-MemHandle   filesHan        = 0;
-char*       filesPtr        = 0;
+word        launcherNr          = NULL;
+word        numFiles            = 0;
+MemHandle   filesHan            = 0;
+char*       filesPtr            = 0;
+
+MemHandle   trayAppsFolderIDBlock   = 0;
+ChunkHandle trayAppsFolderIDChunk   = 0;
+dword       trayAppsFolderID        = 0;
+word        trayAppsFolderCount     = 0;
 optr        triggers[25];
 
 #define MAX_TRIGGERS 24   /* 0-based, it's 25 actually */
@@ -67,79 +72,45 @@ CODE
 *********************************************************************/
 @method TrayAppsProcessClass, MSG_GEN_PROCESS_OPEN_APPLICATION
 {
-    @callsuper();
+    FilePathID  *idArr = 0;
+    dword       no = 0;
 
-	(void)	GCNListAdd(
-        oself,			                // optr to add to list
-        MANUFACTURER_ID_GEOWORKS,	    // manufacturer ID of list
-        GCNSLT_FILE_SYSTEM
-    );
+    @callsuper();
 
     if (FileSetCurrentPath(SP_APPLICATION, "TrayApps"))
     {
-        numFiles = ListFiles(&filesHan, FESF_GEOS_EXECS);
+        trayAppsFolderIDBlock = MemAllocLMem(LMEM_TYPE_GENERAL, 0);
+        trayAppsFolderIDChunk = FileGetCurrentPathIDs(trayAppsFolderIDBlock);
+        (void) MemLock(trayAppsFolderIDBlock);
+        idArr = (FilePathID*) LMemDerefHandles(trayAppsFolderIDBlock, trayAppsFolderIDChunk);
+        no = LMemGetChunkSizeHandles(trayAppsFolderIDBlock, trayAppsFolderIDChunk) / sizeof(FilePathID);
+        MsgBoxNo(no);
+        trayAppsFolderID = idArr->FPID_id;
+        MemUnlock(trayAppsFolderIDBlock);
 
-        if (numFiles)
+        trayAppsFolderCount = ListFiles(&filesHan, FESF_GEOS_EXECS);
+
+        if (trayAppsFolderCount)
         {
-            numFiles--;
-            if (numFiles > MAX_TRIGGERS) numFiles = MAX_TRIGGERS;
+            trayAppsFolderCount--;
+            if (trayAppsFolderCount > MAX_TRIGGERS) trayAppsFolderCount = MAX_TRIGGERS;
             @call process::MSG_ADD_LAUNCHER();
         }
     }
+
+    (void) GCNListAdd(
+        oself,                          // optr to add to list
+        MANUFACTURER_ID_GEOWORKS,       // manufacturer ID of list
+        GCNSLT_FILE_SYSTEM
+    );
+
 }
-
-/*
-    FileChangeNotificationType notifyType
-    MemHandle data)
-*/
-/*
-@method TrayAppsProcessClass, MSG_NOTIFY_FILE_CHANGE
-{
-    FileChangeBatchNotificationData     *batch;
-    FileChangeBatchNotificationItem     *item;
-    word                                i = 0;
-
-    if (notifyType == FCNT_BATCH)
-    {
-        batch = MemLock(data);
-        item = batch->FCBND_notifications;
-
-        while (item < batch->FCBND_end)
-        {
-            if (
-                (item->FCBNI_type == FCNT_CREATE) ||
-                (item->FCBNI_type == FCNT_RENAME) ||
-                (item->FCBNI_type == FCNT_DELETE)
-            )
-            {
-
-                // FileGetCurrentPathIDs
-
-
-                //if (strstr(item->FCBNI_name, "TrayApps"))
-                //if (item->FCBNI_type == FCNT_CREATE)
-                //if (LocalCmpStrings(item->FCBNI_name, "EC Preferences", 0));
-                {
-                    //item->FCBNI_name[14] = '\0';
-                    MsgBox(CDT_NOTIFICATION, (char*) item->FCBNI_id);
-                    break;
-                }
-            }
-
-            item++;
-
-            //break;
-        }
-
-        //MemFree(data);
-    }
-}
-*/
 
 @method TrayAppsProcessClass, MSG_NOTIFY_FILE_CHANGE
 {
     FileChangeBatchNotificationData *notificationData;
     FileChangeBatchNotificationItem *notificationItem = 0;
+    word                            numFiles = 0;
 
     if (notifyType == FCNT_BATCH)
     {
@@ -150,10 +121,29 @@ CODE
         {
             word itemSize;
 
-            if ((notificationItem->FCBNI_type == FCNT_CREATE) ||
-                (notificationItem->FCBNI_type == FCNT_RENAME))
+            if ((notificationItem->FCBNI_type == FCNT_CREATE) &&
+                (trayAppsFolderID == notificationItem->FCBNI_id))
             {
-                MsgBox(CDT_NOTIFICATION, (char*) notificationItem->FCBNI_name);
+                MsgBox("File created in TrayApps folder.");
+                trayAppsFolderCount = CountFiles(FESF_GEOS_EXECS);
+            }
+
+            if (notificationItem->FCBNI_type == FCNT_DELETE)
+            {
+                numFiles = CountFiles(FESF_GEOS_EXECS);
+                MsgBoxNo(numFiles);
+                if (numFiles < trayAppsFolderCount)
+                {
+                    MsgBox("File removed from TrayApps folder?");
+                    trayAppsFolderCount = CountFiles(FESF_GEOS_EXECS);
+                }
+            }
+
+            if (
+                 (notificationItem->FCBNI_type == FCNT_CREATE) ||
+                 (notificationItem->FCBNI_type == FCNT_RENAME)
+               )
+            {
                 /* skip large item for next */
                 itemSize = sizeof(FileChangeBatchNotificationItem);
             }
@@ -164,9 +154,13 @@ CODE
             }
 
             notificationItem = (FileChangeBatchNotificationItem*) (((byte*) notificationItem) + itemSize);
-            if (((word) notificationItem) > notificationData->FCBND_end) break;
+            //if (((word) notificationItem) > notificationData->FCBND_end) break;
         }
+
+        MemUnlock(data);
     }
+
+    @callsuper();
 }
 
 

@@ -5,19 +5,30 @@
 Dummy
 fuer Swat: allows for setting breakpoints in front of critical code.
 *************************************************************************/
-void Dummy(void){}
 
 /* Msg Box -------------------------------------------------------------*/
-/*fuer msg_type:  CDT_ERROR, CDT_WARNING, CDT_NOTIFICATION */
-void MsgBox(CustomDialogType msg_type, char *str)
+void MsgBox(char *str)
 {
    UserStandardDialog(NULL, NULL, NULL, NULL,
-                               str,
-                               (msg_type << CDBF_DIALOG_TYPE_OFFSET) |
-                               (GIT_NOTIFICATION << CDBF_INTERACTION_TYPE_OFFSET)
-                               );
+                        str,
+                        (CDT_NOTIFICATION << CDBF_DIALOG_TYPE_OFFSET) |
+                        (GIT_NOTIFICATION << CDBF_INTERACTION_TYPE_OFFSET)
+                     );
    /*UNLOCK(format);*/
 }
+
+void MsgBoxNo(dword val)
+{
+   char valStr[5];
+	sprintf(valStr, _TEXT("%d"), val);
+
+   UserStandardDialog(NULL, NULL, NULL, NULL,
+                        valStr,
+                        (CDT_NOTIFICATION << CDBF_DIALOG_TYPE_OFFSET) |
+                        (GIT_NOTIFICATION << CDBF_INTERACTION_TYPE_OFFSET)
+                     );
+}
+
 
 /* Ja/Nein Box -----------------------------------------------------------*/
 Boolean DecideBox(optr format)
@@ -134,6 +145,24 @@ word ListFiles(MemHandle* FilesToReturn, FileEnumSearchFlags whatFiles)  /*numOf
       return(0);
    }
 }
+
+word CountFiles(FileEnumSearchFlags whatFiles)  /* numOfFiles returned */
+{
+   FileEnumParams       fileEnumParams;
+   word                 numOfFiles = NULL;
+
+   fileEnumParams.FEP_searchFlags = whatFiles;
+   fileEnumParams.FEP_returnAttrs = (void*) FESRT_COUNT_ONLY;  /*Return the file's Geos filename.*/
+   fileEnumParams.FEP_returnSize = 0;
+   fileEnumParams.FEP_bufSize = FE_BUFSIZE_UNLIMITED;    /* FE_BUFSIZE_UNLIMITED allows the return buffer size to be as large as necessary.*/
+   fileEnumParams.FEP_matchAttrs = 0;  /* Set matchAttrs to zero so it will match anything.*/
+   fileEnumParams.FEP_skipCount = 0;   /* Don't skip any files*/
+   fileEnumParams.FEP_callback = 0;   /* Don't need no callback. */
+
+	(void) FileEnum(&fileEnumParams, NullHandle, &numOfFiles);
+   return numOfFiles;
+}
+
 
 /***********************************************************************
  strident = vergleicht Strings bezueglich Laenge und Inhalt
