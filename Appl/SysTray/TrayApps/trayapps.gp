@@ -1,8 +1,6 @@
 ##############################################################################
 #
-#	Copyright (c) Geoworks 1990 -- All Rights Reserved
-#
-# PROJECT:	GEOS
+# PROJECT:	PC/GEOS Ensemble
 # MODULE:	TrayApps
 # FILE:		trayapps.gp
 #
@@ -28,6 +26,9 @@ tokenid 0
 #
 type	appl, process, single
 #
+# we don't need much...
+stack 1000
+#
 # Specify class name for application thread. Messages sent to the application
 # thread (aka "process" when specified as the output of a UI object) will be
 # handled by the WavyProcessClass, which is defined in wavy.goc.
@@ -49,7 +50,7 @@ appobj	TrayAppsApp
 #
 library	geos
 library	ui
-library ansic
+
 #
 # Resources: list all resource blocks which are used by the application whose
 # allocation flags can't be inferred by Glue. Usually this is needed only for

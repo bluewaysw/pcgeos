@@ -6,18 +6,15 @@ include files
 @include <Objects/gFieldC.goh>
 @include <iacp.goh>
 
-#include <Ansi/stdio.h>
-#include <Ansi/string.h>
 #include <token.h>
 #include <object.h>
 
 /*-------------------------------------------------------------------
 globals & constants
 -------------------------------------------------------------------*/
-
 dword       G_trayAppsFolderID      = 0;
 word        G_triggerNo             = 0;
-MemHandle   G_trayFilesHan          = 0;
+MemHandle   G_trayFilesHan          = NullHandle;
 word        G_trayAppsFilesCount    = 0;
 optr        G_trayTriggersArr[25];
 
@@ -26,14 +23,13 @@ optr        G_trayTriggersArr[25];
 /*-------------------------------------------------------------------
 class & message definitions
 -------------------------------------------------------------------*/
-
 @class  TrayAppsProcessClass, GenProcessClass;
     @message void MSG_INIT_APP_TRIGGERS();
     @message void MSG_ADD_APP_TRIGGER();
     @message void MSG_EMC_APP_TRIGGER_CREATED(CreateExpressMenuControlItemResponseParams *response = ss:bp);
     @message (GEN_TRIGGER_ACTION) MSG_APP_TRIGGER_PRESSED;
     @message void MSG_REMOVE_ALL_APP_TRIGGERS();
-    @message word MSG_READ_APPS_IN_FOLDER(MemHandle* FilesToReturn);
+    @message word MSG_READ_APPS_IN_FOLDER();
     @message word MSG_COUNT_APPS_IN_FOLDER();
 @endc   /* end of class definition */
 
@@ -47,7 +43,6 @@ class & message definitions
 /*-------------------------------------------------------------------
 UI Objects
 -------------------------------------------------------------------*/
-
 @start  AppResource;
 
     @object GenApplicationClass TrayAppsApp =
@@ -162,7 +157,7 @@ add / remove / re-add launchers
 {
     @call process::MSG_REMOVE_ALL_APP_TRIGGERS();
 
-    G_trayAppsFilesCount = @call process::MSG_READ_APPS_IN_FOLDER(&G_trayFilesHan);
+    G_trayAppsFilesCount = @call process::MSG_READ_APPS_IN_FOLDER();
     if (G_trayAppsFilesCount > 0)
     {
         @call process::MSG_ADD_APP_TRIGGER();
@@ -205,18 +200,9 @@ initializes the newly created Express menu trigger
     GeodeToken     tok;
     char*          filePtr = (void*) 0;
 
-    //optr*          fh  = NULL;
-    //ChunkHandle    helpChunk = NULL;
-    //char*          helpChunkPtr = NULL;
-
     filePtr = MemLock(G_trayFilesHan);
     filePtr = filePtr + (G_triggerNo * FILE_LONGNAME_BUFFER_SIZE);
     FileGetPathExtAttributes(filePtr, FEA_TOKEN, (&tok), sizeof(GeodeToken));
-    // MemLock(OptrToHandle(@MinimHelp));
-    // helpChunk = LMemAlloc(OptrToHandle(@MinimHelp), FILE_LONGNAME_BUFFER_SIZE);
-    // helpChunkPtr = LMemDerefHandles(OptrToHandle(@MinimHelp), helpChunk);
-    // strcpy(helpChunkPtr, filePtr);
-    // MemUnlock(OptrToHandle(@MinimHelp));
     MemUnlock(G_trayFilesHan);
 
     obj = response->CEMCIRP_newItem;
@@ -244,17 +230,11 @@ initializes the newly created Express menu trigger
     @call obj::MSG_GEN_TRIGGER_SET_DESTINATION(oself);
     //@call obj::MSG_META_ADD_VAR_DATA(HINT_NO_BORDERS_ON_MONIKERS, 0, (void*) 0);
     @call obj::MSG_META_ADD_VAR_DATA((ATTR_GEODE_TOKEN_TO_PASS & (~VDF_SAVE_TO_STATE)), sizeof(GeodeToken), &tok);
-
-    // MemLock(HandleOf(obj));
-    // fh = (optr*) ObjVarAddData(obj, (ATTR_GEN_FOCUS_HELP & (~VDF_SAVE_TO_STATE)), sizeof(optr));
-    // (*fh) = ConstructOptr(OptrToHandle(@MinimHelp), helpChunk);
-    // ObjSetFlags(obj, OCF_VARDATA_RELOC, 0);
-    // MemUnlock(HandleOf(obj));
-
     @call obj::MSG_GEN_SET_USABLE(VUM_NOW);
-    G_trayTriggersArr[G_triggerNo] = obj;
 
+    G_trayTriggersArr[G_triggerNo] = obj;
     G_triggerNo++;
+
     MemFree(newMoniker);
 
     @call process::MSG_ADD_APP_TRIGGER();
@@ -329,7 +309,7 @@ remove all our triggers from SysTray
 }
 
 /*-------------------------------------------------------------------
-read apps in folder into MemHandle
+read apps in folder into global variable G_trayFilesHan!!!
 numOfFiles returned
 -------------------------------------------------------------------*/
 @method TrayAppsProcessClass, MSG_READ_APPS_IN_FOLDER
@@ -339,25 +319,25 @@ numOfFiles returned
     word                 numOfFiles = NULL;
 
     fileEnumParams.FEP_searchFlags = FESF_GEOS_EXECS;
-    fileEnumParams.FEP_returnAttrs = (void*) FESRT_NAME;  /*Return the file's Geos filename.*/
+    fileEnumParams.FEP_returnAttrs = (void*) FESRT_NAME;  /* Return the file's Geos filename.*/
     fileEnumParams.FEP_returnSize = FILE_LONGNAME_BUFFER_SIZE;
     fileEnumParams.FEP_bufSize = FE_BUFSIZE_UNLIMITED;    /* FE_BUFSIZE_UNLIMITED allows the return buffer size to be as large as necessary.*/
     fileEnumParams.FEP_matchAttrs = 0;  /* Set matchAttrs to zero so it will match anything.*/
     fileEnumParams.FEP_skipCount = 0;   /* Don't skip any files*/
     fileEnumParams.FEP_callback = 0;   /* Don't need no callback. */
 
+    if (G_trayFilesHan != NullHandle)
+    {
+        MemFree(G_trayFilesHan);
+    }
+
     numOfFiles = FileEnum(
         &fileEnumParams,
-        FilesToReturn,
+        &G_trayFilesHan,
         &filesNotHandled
     );
 
-    if (numOfFiles && (*FilesToReturn))
-    {
-        return(numOfFiles);
-    }
-
-    return(0);
+    return(numOfFiles);
 }
 
 /*-------------------------------------------------------------------
