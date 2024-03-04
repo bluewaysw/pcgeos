@@ -12,6 +12,7 @@ include files
 /*-------------------------------------------------------------------
 globals & constants
 -------------------------------------------------------------------*/
+optr        G_spacer                = NullOptr;
 dword       G_trayAppsFolderID      = 0;
 word        G_triggerNo             = 0;
 MemHandle   G_trayFilesHan          = NullHandle;
@@ -24,6 +25,9 @@ optr        G_trayTriggersArr[25];
 class & message definitions
 -------------------------------------------------------------------*/
 @class  TrayAppsProcessClass, GenProcessClass;
+
+    @message void MSG_ADD_SPACER();
+    @message void MSG_EMC_SPACER_CREATED(CreateExpressMenuControlItemResponseParams *response = ss:bp);
     @message void MSG_INIT_APP_TRIGGERS();
     @message void MSG_ADD_APP_TRIGGER();
     @message void MSG_EMC_APP_TRIGGER_CREATED(CreateExpressMenuControlItemResponseParams *response = ss:bp);
@@ -31,6 +35,7 @@ class & message definitions
     @message void MSG_REMOVE_ALL_APP_TRIGGERS();
     @message word MSG_READ_APPS_IN_FOLDER();
     @message word MSG_COUNT_APPS_IN_FOLDER();
+    @message void MSG_REMOVE_SPACER();
 @endc   /* end of class definition */
 
 @class GenGeodeTokenTriggerClass, GenTriggerClass;
@@ -70,7 +75,7 @@ we're born!
 
     @callsuper();
 
-    if (FileSetCurrentPath(SP_APPLICATION, "TrayApps"))
+    if (FileSetCurrentPath(SP_USER_DATA, "TRAYAPPS"))
     {
         trayAppsFolderIDBlock = MemAllocLMem(LMEM_TYPE_GENERAL, 0);
         trayAppsFolderIDChunk = FileGetCurrentPathIDs(trayAppsFolderIDBlock);
@@ -80,14 +85,15 @@ we're born!
         G_trayAppsFolderID = idArr->FPID_id;
         MemUnlock(trayAppsFolderIDBlock);
 
+        @call process::MSG_ADD_SPACER();
         @call process::MSG_INIT_APP_TRIGGERS();
-    }
 
-    (void) GCNListAdd(
-        ConstructOptr(GeodeGetProcessHandle(), 0),  // optr to add to list
-        MANUFACTURER_ID_GEOWORKS,                   // manufacturer ID of list
-        GCNSLT_FILE_SYSTEM
-    );
+        (void) GCNListAdd(
+            ConstructOptr(GeodeGetProcessHandle(), 0),  // optr to add to list
+            MANUFACTURER_ID_GEOWORKS,                   // manufacturer ID of list
+            GCNSLT_FILE_SYSTEM
+        );
+    }
 }
 
 /*-------------------------------------------------------------------
@@ -151,6 +157,42 @@ let's see if someone put something in/out of our folder
 }
 
 /*-------------------------------------------------------------------
+add GenInteraction as "Spacer"
+-------------------------------------------------------------------*/
+@method TrayAppsProcessClass, MSG_ADD_SPACER
+{
+    CreateExpressMenuControlItemParams  cemcip;
+    EventHandle                         event;
+
+    cemcip.CEMCIP_feature = CEMCIF_SYSTEM_TRAY;
+    cemcip.CEMCIP_class = &GenInteractionClass;
+    cemcip.CEMCIP_itemPriority = CEMCIP_STANDARD_PRIORITY;
+    cemcip.CEMCIP_responseMessage = MSG_EMC_SPACER_CREATED;
+    cemcip.CEMCIP_responseDestination = oself;
+    cemcip.CEMCIP_field = NullOptr;
+
+    event = @record ExpressMenuControlClass::MSG_EXPRESS_MENU_CONTROL_CREATE_ITEM(cemcip);
+    GCNListSend(MANUFACTURER_ID_GEOWORKS, GCNSLT_EXPRESS_MENU_OBJECTS, event, 0, 0);
+}
+
+/*-------------------------------------------------------------------
+initializes the newly created Express menu trigger
+-------------------------------------------------------------------*/
+@method TrayAppsProcessClass, MSG_EMC_SPACER_CREATED
+{
+    CompSizeHintArgs    dimensions = {SST_PIXELS | 3, 0, 0};
+
+    G_spacer = response->CEMCIRP_newItem;
+
+    @call G_spacer::MSG_META_ADD_VAR_DATA(
+        (HINT_FIXED_SIZE & (~VDF_SAVE_TO_STATE)),
+        sizeof(CompSizeHintArgs), &dimensions
+    );
+
+    @call G_spacer::MSG_GEN_SET_USABLE(VUM_NOW);
+}
+
+/*-------------------------------------------------------------------
 add / remove / re-add launchers
 -------------------------------------------------------------------*/
 @method TrayAppsProcessClass, MSG_INIT_APP_TRIGGERS
@@ -175,7 +217,6 @@ add another app trigger
     if ((G_triggerNo < G_trayAppsFilesCount) &&
         (G_triggerNo < MAX_TRAY_TRIGGERS_COUNT))
     {
-        /*cemcip.CEMCIP_feature = CEMCIF_UTILITIES_PANEL;*/
         cemcip.CEMCIP_feature = CEMCIF_SYSTEM_TRAY;
         cemcip.CEMCIP_class = &GenGeodeTokenTriggerClass;
         cemcip.CEMCIP_itemPriority = CEMCIP_STANDARD_PRIORITY;
@@ -283,11 +324,29 @@ prepare our demise
     // clean up handle
     if (G_trayFilesHan) MemFree(G_trayFilesHan);
 
+    // remove spacer
+    @call process::MSG_REMOVE_SPACER();
+
     // remove triggers
     @call process::MSG_REMOVE_ALL_APP_TRIGGERS();
 
     return(@callsuper());
 }
+
+/*-------------------------------------------------------------------
+remove spacer
+-------------------------------------------------------------------*/
+@method TrayAppsProcessClass, MSG_REMOVE_SPACER
+{
+    EventHandle    event;
+
+    if (G_spacer != NullOptr)
+    {
+        event = @record ExpressMenuControlClass::MSG_EXPRESS_MENU_CONTROL_DESTROY_CREATED_ITEM(G_spacer, VUM_NOW);
+        GCNListSend(MANUFACTURER_ID_GEOWORKS, GCNSLT_EXPRESS_MENU_OBJECTS, event, 0, 0);
+    }
+}
+
 
 /*-------------------------------------------------------------------
 remove all our triggers from SysTray

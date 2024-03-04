@@ -26,9 +26,6 @@ tokenid 0
 #
 type	appl, process, single
 #
-# we don't need much...
-stack 1000
-#
 # Specify class name for application thread. Messages sent to the application
 # thread (aka "process" when specified as the output of a UI object) will be
 # handled by the WavyProcessClass, which is defined in wavy.goc.
