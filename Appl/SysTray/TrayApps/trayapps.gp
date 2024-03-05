@@ -55,3 +55,4 @@ library	ui
 # Standard discardable code resources do not need to be mentioned.
 #
 resource AppResource ui-object
+resource Templates ui-object

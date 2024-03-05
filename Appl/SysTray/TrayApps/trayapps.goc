@@ -62,6 +62,15 @@ UI Objects
 
 @end    AppResource;
 
+@start  Templates;
+
+    @object GenTriggerClass TriggerTemplate =
+    {
+        GI_states = @default & ~GS_USABLE;
+        GI_visMoniker = "T";
+    }
+
+@end    Templates;
 
 /*-------------------------------------------------------------------
 we're born!
@@ -87,7 +96,7 @@ we're born!
         MemUnlock(trayAppsFolderIDBlock);
 
         @send process::MSG_ADD_SPACER();
-        @send process::MSG_INIT_APP_TRIGGERS();
+        //@send process::MSG_INIT_APP_TRIGGERS();
 
         (void) GCNListAdd(
             ConstructOptr(GeodeGetProcessHandle(), 0),  // optr to add to list
@@ -181,14 +190,94 @@ initializes the newly created Express menu trigger
 -------------------------------------------------------------------*/
 @method TrayAppsProcessClass, MSG_EMC_SPACER_CREATED
 {
-    CompSizeHintArgs    dimensions = {SST_PIXELS | 3, 0, 0};
+    Rectangle           margins = {5, 0, 5, 0};
+    optr                triggerObj = NullOptr;
+    ThreadHandle        thread = NullHandle;
+
+    Boolean        isGMoniker = FALSE;
+    MemHandle      newMoniker = NULL;
+    word           monikerSize = 0;
+    GeodeToken     tok;
+    char*          filePtr = (void*) 0;
 
     G_spacer = response->CEMCIRP_newItem;
+    thread = MemGetInfo(OptrToHandle(G_spacer), MGIT_EXEC_THREAD);
 
     @call G_spacer::MSG_META_ADD_VAR_DATA(
-        (HINT_FIXED_SIZE & (~VDF_SAVE_TO_STATE)),
-        sizeof(CompSizeHintArgs), &dimensions
+        (HINT_CUSTOM_EXTRA_MARGINS & (~VDF_SAVE_TO_STATE)),
+        sizeof(Rectangle),
+        &margins
     );
+
+    @call G_spacer::MSG_META_ADD_VAR_DATA(
+        (HINT_ORIENT_CHILDREN_HORIZONTALLY & (~VDF_SAVE_TO_STATE)),
+        0,
+        (void*) 0
+    );
+
+    @call G_spacer::MSG_META_ADD_VAR_DATA(
+        (HINT_CUSTOM_CHILD_SPACING & (~VDF_SAVE_TO_STATE)),
+        sizeof(word),
+        (void*) 0
+    );
+
+    //@call process::MSG_REMOVE_ALL_APP_TRIGGERS();
+
+    G_trayAppsFilesCount = @call process::MSG_READ_APPS_IN_FOLDER();
+    if (G_trayAppsFilesCount > 0)
+    {
+        for (G_triggerNo=0; G_triggerNo < G_trayAppsFilesCount; G_triggerNo++)
+        {
+            if (G_triggerNo >= MAX_TRAY_TRIGGERS_COUNT) break;
+
+            filePtr = MemLock(G_trayFilesHan);
+            filePtr = filePtr + (G_triggerNo * FILE_LONGNAME_BUFFER_SIZE);
+            FileGetPathExtAttributes(filePtr, FEA_TOKEN, (&tok), sizeof(GeodeToken));
+            MemUnlock(G_trayFilesHan);
+
+            triggerObj = ConstructOptr(
+                ObjDuplicateResource(
+                    OptrToHandle(@TriggerTemplate), 0, thread
+                ),
+                OptrToChunk(@TriggerTemplate)
+            );
+
+            @call G_spacer::MSG_GEN_ADD_CHILD(triggerObj, CCO_LAST);
+
+            isGMoniker = TokenLoadMonikerBlock(
+                TOKEN_CHARS(tok.GT_chars[0],tok.GT_chars[1],tok.GT_chars[2],tok.GT_chars[3]),
+                tok.GT_manufID,
+                (DT_DISP_SIZE | DT_DISP_ASPECT_RATIO | DT_DISP_CLASS),
+                ((VMSF_GSTRING) | (VMS_TOOL << VMSF_STYLE_OFFSET)),
+                &monikerSize,
+                &newMoniker
+            );
+
+            if (isGMoniker)
+            {
+                @call triggerObj::MSG_GEN_REPLACE_VIS_MONIKER(
+                    VUM_NOW,
+                    0, 0, monikerSize,
+                    VMDT_VIS_MONIKER,
+                    VMST_HPTR,
+                    (dword)(ConstructOptr(newMoniker, 0))
+                );
+
+                @call triggerObj::MSG_GEN_TRIGGER_SET_ACTION_MSG(MSG_APP_TRIGGER_PRESSED);
+                @call triggerObj::MSG_GEN_TRIGGER_SET_DESTINATION(oself);
+                //@call obj::MSG_META_ADD_VAR_DATA(HINT_NO_BORDERS_ON_MONIKERS, 0, (void*) 0);
+                @call triggerObj::MSG_META_ADD_VAR_DATA((ATTR_GEODE_TOKEN_TO_PASS & (~VDF_SAVE_TO_STATE)), sizeof(GeodeToken), &tok);
+                @call triggerObj::MSG_GEN_SET_USABLE(VUM_NOW);
+
+                G_trayTriggersArr[G_triggerNo] = triggerObj;
+                //G_triggerNo++;
+
+                MemFree(newMoniker);
+            }
+
+            @call triggerObj::MSG_GEN_SET_USABLE(VUM_NOW);
+        }
+    }
 
     @call G_spacer::MSG_GEN_SET_USABLE(VUM_NOW);
 }
@@ -329,7 +418,7 @@ prepare our demise
     @call process::MSG_REMOVE_SPACER();
 
     // remove triggers
-    @call process::MSG_REMOVE_ALL_APP_TRIGGERS();
+    //@call process::MSG_REMOVE_ALL_APP_TRIGGERS();
 
     return(@callsuper());
 }
