@@ -53,6 +53,7 @@
 #include <print.h>      /* These two for printing  */
 @include <spool.goh>
 @include <dirlistIcon.goh>   /* The icon information  */
+#include <timedate.h>
 
 /*
  ***************************************************************************
@@ -150,7 +151,7 @@
 }
 
 @chunk VisTextCharAttr DLTextCharAttrs =
-	CHAR_ATTR_FONT_SIZE(FID_DTC_URW_MONO, 12);
+	CHAR_ATTR_FONT_SIZE(FID_DTC_URW_SANS, 12);
 
 
 @end Display
@@ -272,7 +273,7 @@
 /* declarations for getting the FileEnum info to the TextObj  */
     char *bufBaseAddress;  /* pointer derived from the MemHandle  */
     word count = 0;
-    char fileSizeString[11];     /* for the UtilHex32ToAscii routine */
+    char fileSizeString[20];     /* for the UtilHex32ToAscii routine */
     dword *fileSizeDWordAddr;
     dword fileSizeDWord;
     char *fileSizePtr;
@@ -283,9 +284,7 @@
     char lineBuffer[80];   /* one line for each dir or file */
 
  /* Declarations to get the file modification date and time   ----------  */
-    dword *modifStuffAddr;
-    dword modifStuff;
-    dword modItem;           /* used for year, month ... min, & sec */
+    FileDateAndTime *modifStuffAddr;
 
 /* declarations to set the file size tab */
 Tab DLTab = {
@@ -486,54 +485,22 @@ dword textSize;
 
   /*  Get the file's modification date and time...   */
 
-	modifStuffAddr = (dword *)((bufBaseAddress + DATE_AND_TIME_OFFSET)+(count * FEDOSINFO_SIZE));
-        modifStuff = *modifStuffAddr;
+	modifStuffAddr = (FileDateAndTime*)((bufBaseAddress + DATE_AND_TIME_OFFSET)+(count * FEDOSINFO_SIZE));
+
+      LocalFormatFileDateTime( fileSizePtr, DTF_ZERO_PADDED_SHORT, modifStuffAddr);
+
+	strcat(lineBuffer, fileSizePtr);
+	strcat(lineBuffer, "\t");
+
+      LocalFormatFileDateTime( fileSizePtr, DTF_HMS_24HOUR, modifStuffAddr);
+	if (fileSizePtr[1] == ':')
+          strcat(lineBuffer, "0");
+       
+	strcat(lineBuffer, fileSizePtr);
+	strcat(lineBuffer, "\t");
 
   /*  Convert to ASCII and put after file size...  */
 
-	modItem = (dword) FDATExtractHour(modifStuff);       /* the hour */
-	UtilHex32ToAscii(fileSizePtr, modItem, flags);
-	if (modItem < 10)
-	    strcat(lineBuffer, "0");
-	strcat(lineBuffer, fileSizePtr);
-	strcat(lineBuffer, ":");
-
-	modItem = (dword) FDATExtractMinute(modifStuff);      /* the minute */
-	UtilHex32ToAscii(fileSizePtr, modItem, flags);
-	if (modItem < 10)
-	    strcat(lineBuffer, "0");
-	strcat(lineBuffer, fileSizePtr);
-	strcat(lineBuffer, ":");
-
-	modItem = (dword) FDATExtractSecond(modifStuff);      /* the second */
-	UtilHex32ToAscii(fileSizePtr, modItem, flags);
-	if (modItem < 10)
-	    strcat(lineBuffer, "0");
-	strcat(lineBuffer, fileSizePtr);
-	strcat(lineBuffer, "  ");
-
-	modItem = (dword) FDATExtractMonth(modifStuff);      /* the month */
-	UtilHex32ToAscii(fileSizePtr, modItem, flags);
-	if (modItem < 10)
-	    strcat(lineBuffer, "0");
-	strcat(lineBuffer, fileSizePtr);
-	strcat(lineBuffer, "/");
-
-	modItem = (dword) FDATExtractDay(modifStuff);          /* the day */
-	UtilHex32ToAscii(fileSizePtr, modItem, flags);
-	if (modItem < 10)
-	    strcat(lineBuffer, "0");
-	strcat(lineBuffer, fileSizePtr);
-	strcat(lineBuffer, "/");
-
-	modItem = 80 + (dword) FDATExtractYear(modifStuff);  /* base year is 1980  */
-	if (modItem > 99)
-	    modItem = modItem - 100;       /* for the years 2000 and later */
-	UtilHex32ToAscii(fileSizePtr, modItem, flags);
-	if (modItem < 10)
-	    strcat(lineBuffer, "0");
-	strcat(lineBuffer, fileSizePtr);
-	strcat(lineBuffer, "  ");
 
   /*  Get the file's DOS attributes (A,S,H,R ...   */
 	if (fileAttribs & FA_ARCHIVE)              /* doess it require back-up? */
