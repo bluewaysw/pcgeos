@@ -12,12 +12,9 @@ include files
 /*-------------------------------------------------------------------
 globals & constants
 -------------------------------------------------------------------*/
-optr        G_wrapper                = NullOptr;
+optr        G_wrapper               = NullOptr;
 dword       G_trayAppsFolderID      = 0;
-word        G_triggerNo             = 0;
-MemHandle   G_trayFilesHan          = NullHandle;
 word        G_trayAppsFilesCount    = 0;
-optr        G_trayTriggersArr[25];
 
 #define MAX_TRAY_TRIGGERS_COUNT 25
 
@@ -31,7 +28,7 @@ class & message definitions
     @message void MSG_INIT_APP_TRIGGERS();
     @message (GEN_TRIGGER_ACTION) MSG_APP_TRIGGER_PRESSED;
     @message void MSG_REMOVE_ALL_APP_TRIGGERS();
-    @message word MSG_READ_APPS_IN_FOLDER();
+    @message word MSG_READ_APPS_IN_FOLDER(MemHandle *trayFilesHan);
     @message word MSG_COUNT_APPS_IN_FOLDER();
     @message void MSG_REMOVE_WRAPPER();
 @endc   /* end of class definition */
@@ -187,7 +184,7 @@ initializes the newly created Express menu trigger
 -------------------------------------------------------------------*/
 @method TrayAppsProcessClass, MSG_EMC_WRAPPER_CREATED
 {
-    Rectangle           margins = {3, 0, 0, 0};
+    Rectangle   margins = {3, 0, 0, 0};
 
     G_wrapper = response->CEMCIRP_newItem;
 
@@ -228,22 +225,24 @@ add / remove / re-add launchers
     word                monikerSize = 0;
     GeodeToken          tok;
     char*               filePtr = (void*) 0;
+    byte                triggerNo = 0;
+    MemHandle           trayFilesHan = NullHandle;
 
     thread = MemGetInfo(OptrToHandle(G_wrapper), MGIT_EXEC_THREAD);
 
     @call process::MSG_REMOVE_ALL_APP_TRIGGERS();
 
-    G_trayAppsFilesCount = @call process::MSG_READ_APPS_IN_FOLDER();
+    G_trayAppsFilesCount = @call process::MSG_READ_APPS_IN_FOLDER(&trayFilesHan);
     if (G_trayAppsFilesCount > 0)
     {
-        for (G_triggerNo=0; G_triggerNo < G_trayAppsFilesCount; G_triggerNo++)
+        for (triggerNo=0; triggerNo < G_trayAppsFilesCount; triggerNo++)
         {
-            if (G_triggerNo >= MAX_TRAY_TRIGGERS_COUNT) break;
+            if (triggerNo >= MAX_TRAY_TRIGGERS_COUNT) break;
 
-            filePtr = MemLock(G_trayFilesHan);
-            filePtr = filePtr + (G_triggerNo * FILE_LONGNAME_BUFFER_SIZE);
+            filePtr = MemLock(trayFilesHan);
+            filePtr = filePtr + (triggerNo * FILE_LONGNAME_BUFFER_SIZE);
             FileGetPathExtAttributes(filePtr, FEA_TOKEN, (&tok), sizeof(GeodeToken));
-            MemUnlock(G_trayFilesHan);
+            MemUnlock(trayFilesHan);
 
             triggerObj = ConstructOptr(
                 ObjDuplicateResource(
@@ -278,8 +277,6 @@ add / remove / re-add launchers
                 //@call obj::MSG_META_ADD_VAR_DATA(HINT_NO_BORDERS_ON_MONIKERS, 0, (void*) 0);
                 @call triggerObj::MSG_META_ADD_VAR_DATA((ATTR_GEODE_TOKEN_TO_PASS & (~VDF_SAVE_TO_STATE)), sizeof(GeodeToken), &tok);
                 @call triggerObj::MSG_GEN_SET_USABLE(VUM_NOW);
-
-                G_trayTriggersArr[G_triggerNo] = triggerObj;
 
                 MemFree(newMoniker);
             }
@@ -330,13 +327,13 @@ prepare our demise
     );
 
     // clean up handle
-    if (G_trayFilesHan) MemFree(G_trayFilesHan);
+    // if (G_trayFilesHan) MemFree(G_trayFilesHan);
 
     // remove triggers
     //@call process::MSG_REMOVE_ALL_APP_TRIGGERS();
 
     // remove spacer
-    @call process::MSG_REMOVE_WRAPPER();
+    @send process::MSG_REMOVE_WRAPPER();
 
     return(@callsuper());
 }
@@ -361,23 +358,19 @@ remove all our triggers from SysTray
 -------------------------------------------------------------------*/
 @method TrayAppsProcessClass, MSG_REMOVE_ALL_APP_TRIGGERS
 {
-    if (G_triggerNo > 0)
-    {
-        while(G_triggerNo--)
-        {
-            if (@call G_wrapper::MSG_GEN_FIND_CHILD(G_trayTriggersArr[G_triggerNo]) != -1)
-            {
-                @call G_trayTriggersArr[G_triggerNo]::MSG_GEN_SET_NOT_USABLE(VUM_NOW);
-                @call G_wrapper::MSG_GEN_REMOVE_CHILD(G_trayTriggersArr[G_triggerNo], CCF_MARK_DIRTY);
-            }
-        }
-    }
+    optr    trigger = NullOptr;
 
-    G_triggerNo = 0;
+    while(TRUE)
+    {
+        trigger = @call G_wrapper::MSG_GEN_FIND_CHILD_AT_POSITION(0);
+        if (trigger == NullOptr) break;
+        @call trigger::MSG_GEN_SET_NOT_USABLE(VUM_NOW);
+        @call G_wrapper::MSG_GEN_REMOVE_CHILD(trigger, CCF_MARK_DIRTY);
+    }
 }
 
 /*-------------------------------------------------------------------
-read apps in folder into global variable G_trayFilesHan!!!
+read apps in folder into passed variable: MemHandle *trayFilesHan
 numOfFiles returned
 -------------------------------------------------------------------*/
 @method TrayAppsProcessClass, MSG_READ_APPS_IN_FOLDER
@@ -394,14 +387,14 @@ numOfFiles returned
     fileEnumParams.FEP_skipCount = 0;   /* Don't skip any files*/
     fileEnumParams.FEP_callback = 0;   /* Don't need no callback. */
 
-    if (G_trayFilesHan != NullHandle)
+    if (*trayFilesHan != NullHandle)
     {
-        MemFree(G_trayFilesHan);
+        MemFree(*trayFilesHan);
     }
 
     numOfFiles = FileEnum(
         &fileEnumParams,
-        &G_trayFilesHan,
+        trayFilesHan,
         &filesNotHandled
     );
 
