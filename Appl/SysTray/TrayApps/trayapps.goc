@@ -320,20 +320,18 @@ prepare our demise
 @method TrayAppsProcessClass, MSG_GEN_PROCESS_CLOSE_APPLICATION
 {
     // take us off of notification list
-    (void) GCNListRemove(
+    if (GCNListRemove(
         ConstructOptr(GeodeGetProcessHandle(), 0),  // optr of thread to remove from list
         MANUFACTURER_ID_GEOWORKS,                   // manufacturer ID of list
         GCNSLT_FILE_SYSTEM
-    );
+    ))
+    {
+        // remove triggers
+        @call process::MSG_REMOVE_ALL_APP_TRIGGERS();
 
-    // clean up handle
-    // if (G_trayFilesHan) MemFree(G_trayFilesHan);
-
-    // remove triggers
-    //@call process::MSG_REMOVE_ALL_APP_TRIGGERS();
-
-    // remove spacer
-    //@call process::MSG_REMOVE_WRAPPER();
+        // remove wrapper
+        @call process::MSG_REMOVE_WRAPPER();
+    }
 
     return(@callsuper());
 }
@@ -366,6 +364,8 @@ remove all our triggers from SysTray
         if (trigger == NullOptr) break;
         @call trigger::MSG_GEN_SET_NOT_USABLE(VUM_NOW);
         @call G_wrapper::MSG_GEN_REMOVE_CHILD(trigger, CCF_MARK_DIRTY);
+        @call trigger::MSG_META_OBJ_FREE();
+        trigger = NullOptr;
     }
 }
 
