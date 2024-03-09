@@ -56,3 +56,7 @@ library	ui
 #
 resource AppResource ui-object
 resource Templates ui-object
+
+export	TrayAppsApplicationClass
+export  GenGeodeTokenTriggerClass
+

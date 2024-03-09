@@ -24,20 +24,27 @@ class & message definitions
 @class  TrayAppsProcessClass, GenProcessClass;
 
     @message void MSG_ADD_WRAPPER();
+    @message word MSG_READ_APPS_IN_FOLDER(MemHandle *trayFilesHan);
+    @message word MSG_COUNT_APPS_IN_FOLDER();
+@endc   /* end of class definition */
+
+
+@class  TrayAppsApplicationClass, GenApplicationClass;
+
     @message void MSG_EMC_WRAPPER_CREATED(CreateExpressMenuControlItemResponseParams *response = ss:bp);
     @message void MSG_INIT_APP_TRIGGERS();
     @message (GEN_TRIGGER_ACTION) MSG_APP_TRIGGER_PRESSED;
     @message void MSG_REMOVE_ALL_APP_TRIGGERS();
-    @message word MSG_READ_APPS_IN_FOLDER(MemHandle *trayFilesHan);
-    @message word MSG_COUNT_APPS_IN_FOLDER();
     @message void MSG_REMOVE_WRAPPER();
 @endc   /* end of class definition */
+
 
 @class GenGeodeTokenTriggerClass, GenTriggerClass;
     @vardata GeodeToken ATTR_GEODE_TOKEN_TO_PASS;
 @endc;
 
 @classdecl   TrayAppsProcessClass, neverSaved;
+@classdecl   TrayAppsApplicationClass;
 @classdecl   GenGeodeTokenTriggerClass, neverSaved;
 
 /*-------------------------------------------------------------------
@@ -45,7 +52,7 @@ UI Objects
 -------------------------------------------------------------------*/
 @start  AppResource;
 
-    @object GenApplicationClass TrayAppsApp =
+    @object TrayAppsApplicationClass TrayAppsApp =
     {
         GAI_states = (((@default) | (AS_NOT_USER_INTERACTABLE) | (AS_AVOID_TRANSPARENT_DETACH)) & ((~AS_FOCUSABLE) & (~AS_MODELABLE)));
         GI_attrs = ((@default) & (~GA_TARGETABLE));
@@ -59,7 +66,7 @@ UI Objects
 
 @start  Templates;
 
-    @object GenTriggerClass TriggerTemplate =
+    @object GenGeodeTokenTriggerClass TriggerTemplate =
     {
         GI_states = @default & ~GS_USABLE;
         GI_visMoniker = "T";
@@ -172,7 +179,7 @@ add GenInteraction as "Spacer"
     cemcip.CEMCIP_class = &GenInteractionClass;
     cemcip.CEMCIP_itemPriority = CEMCIP_STANDARD_PRIORITY;
     cemcip.CEMCIP_responseMessage = MSG_EMC_WRAPPER_CREATED;
-    cemcip.CEMCIP_responseDestination = ConstructOptr(GeodeGetProcessHandle(), 0);
+    cemcip.CEMCIP_responseDestination = GeodeGetAppObject(0); // ConstructOptr(GeodeGetProcessHandle(), 0);
     cemcip.CEMCIP_field = NullOptr;
 
     event = @record ExpressMenuControlClass::MSG_EXPRESS_MENU_CONTROL_CREATE_ITEM(cemcip);
@@ -182,7 +189,7 @@ add GenInteraction as "Spacer"
 /*-------------------------------------------------------------------
 initializes the newly created Express menu trigger
 -------------------------------------------------------------------*/
-@method TrayAppsProcessClass, MSG_EMC_WRAPPER_CREATED
+@method TrayAppsApplicationClass, MSG_EMC_WRAPPER_CREATED
 {
     Rectangle   margins = {3, 0, 0, 0};
 
@@ -208,15 +215,15 @@ initializes the newly created Express menu trigger
 
     @call G_wrapper::MSG_GEN_SET_USABLE(VUM_NOW);
 
-    @call process::MSG_INIT_APP_TRIGGERS();
+    @call oself::MSG_INIT_APP_TRIGGERS();
 
-    @callsuper();
+    //@callsuper();
 }
 
 /*-------------------------------------------------------------------
 add / remove / re-add launchers
 -------------------------------------------------------------------*/
-@method TrayAppsProcessClass, MSG_INIT_APP_TRIGGERS
+@method TrayAppsApplicationClass, MSG_INIT_APP_TRIGGERS
 {
     optr                triggerObj = NullOptr;
     ThreadHandle        thread = NullHandle;
@@ -230,7 +237,7 @@ add / remove / re-add launchers
 
     thread = MemGetInfo(OptrToHandle(G_wrapper), MGIT_EXEC_THREAD);
 
-    @call process::MSG_REMOVE_ALL_APP_TRIGGERS();
+    @call oself::MSG_REMOVE_ALL_APP_TRIGGERS();
 
     G_trayAppsFilesCount = @call process::MSG_READ_APPS_IN_FOLDER(&trayFilesHan);
     if (G_trayAppsFilesCount > 0)
@@ -289,7 +296,7 @@ add / remove / re-add launchers
 /*-------------------------------------------------------------------
 one of our triggers has been pressed, launch app
 -------------------------------------------------------------------*/
-@method TrayAppsProcessClass, MSG_APP_TRIGGER_PRESSED
+@method TrayAppsApplicationClass, MSG_APP_TRIGGER_PRESSED
 {
     GeodeToken           gt;
     IACPConnection       iacpConnectionToken = IACP_NO_CONNECTION;
@@ -317,29 +324,38 @@ one of our triggers has been pressed, launch app
 /*-------------------------------------------------------------------
 prepare our demise
 -------------------------------------------------------------------*/
+@method TrayAppsApplicationClass, MSG_META_DETACH
+{
+    // remove triggers
+    @call oself::MSG_REMOVE_ALL_APP_TRIGGERS();
+
+    // remove wrapper
+    @call oself::MSG_REMOVE_WRAPPER();
+
+    @callsuper();
+}
+
+
+/*-------------------------------------------------------------------
+prepare our demise
+-------------------------------------------------------------------*/
 @method TrayAppsProcessClass, MSG_GEN_PROCESS_CLOSE_APPLICATION
 {
     // take us off of notification list
-    if (GCNListRemove(
+    (void) GCNListRemove(
         ConstructOptr(GeodeGetProcessHandle(), 0),  // optr of thread to remove from list
         MANUFACTURER_ID_GEOWORKS,                   // manufacturer ID of list
         GCNSLT_FILE_SYSTEM
-    ))
-    {
-        // remove triggers
-        @call process::MSG_REMOVE_ALL_APP_TRIGGERS();
-
-        // remove wrapper
-        @call process::MSG_REMOVE_WRAPPER();
-    }
+    );
 
     return(@callsuper());
 }
 
+
 /*-------------------------------------------------------------------
 remove spacer
 -------------------------------------------------------------------*/
-@method TrayAppsProcessClass, MSG_REMOVE_WRAPPER
+@method TrayAppsApplicationClass, MSG_REMOVE_WRAPPER
 {
     EventHandle    event;
 
@@ -354,7 +370,7 @@ remove spacer
 /*-------------------------------------------------------------------
 remove all our triggers from SysTray
 -------------------------------------------------------------------*/
-@method TrayAppsProcessClass, MSG_REMOVE_ALL_APP_TRIGGERS
+@method TrayAppsApplicationClass, MSG_REMOVE_ALL_APP_TRIGGERS
 {
     optr    trigger = NullOptr;
 
