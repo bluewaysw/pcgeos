@@ -54,8 +54,8 @@ library	ui
 # object blocks, fixed code resources, or data resources that are read-only.
 # Standard discardable code resources do not need to be mentioned.
 #
-resource AppResource ui-object
-resource Templates ui-object
+resource AppResource object
+resource Templates object
 
 export	TrayAppsApplicationClass
 export  GenGeodeTokenTriggerClass

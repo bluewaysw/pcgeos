@@ -12,7 +12,6 @@ include files
 /*-------------------------------------------------------------------
 globals & constants
 -------------------------------------------------------------------*/
-optr        G_wrapper               = NullOptr;
 dword       G_trayAppsFolderID      = 0;
 word        G_trayAppsFilesCount    = 0;
 
@@ -28,8 +27,8 @@ class & message definitions
     @message word MSG_COUNT_APPS_IN_FOLDER();
 @endc   /* end of class definition */
 
-
 @class  TrayAppsApplicationClass, GenApplicationClass;
+    @instance   optr  TAAC_box   = NullOptr;
 
     @message void MSG_EMC_WRAPPER_CREATED(CreateExpressMenuControlItemResponseParams *response = ss:bp);
     @message void MSG_INIT_APP_TRIGGERS();
@@ -38,14 +37,13 @@ class & message definitions
     @message void MSG_REMOVE_WRAPPER();
 @endc   /* end of class definition */
 
-
 @class GenGeodeTokenTriggerClass, GenTriggerClass;
     @vardata GeodeToken ATTR_GEODE_TOKEN_TO_PASS;
 @endc;
 
 @classdecl   TrayAppsProcessClass, neverSaved;
 @classdecl   TrayAppsApplicationClass;
-@classdecl   GenGeodeTokenTriggerClass, neverSaved;
+@classdecl   GenGeodeTokenTriggerClass;
 
 /*-------------------------------------------------------------------
 UI Objects
@@ -64,6 +62,10 @@ UI Objects
 
 @end    AppResource;
 
+
+/*-------------------------------------------------------------------
+Templates - must be in a discarded block!
+-------------------------------------------------------------------*/
 @start  Templates;
 
     @object GenGeodeTokenTriggerClass TriggerTemplate =
@@ -74,6 +76,11 @@ UI Objects
 
 @end    Templates;
 
+
+/*-------------------------------------------------------------------
+TrayAppsProcessClass
+-------------------------------------------------------------------*/
+
 /*-------------------------------------------------------------------
 we're born!
 -------------------------------------------------------------------*/
@@ -82,7 +89,6 @@ we're born!
     MemHandle   trayAppsFolderIDBlock   = 0;
     ChunkHandle trayAppsFolderIDChunk   = 0;
     FilePathID  *idArr                  = 0;
-    //dword       no = 0;
 
     @callsuper();
 
@@ -93,7 +99,6 @@ we're born!
         trayAppsFolderIDChunk = FileGetCurrentPathIDs(trayAppsFolderIDBlock);
         (void) MemLock(trayAppsFolderIDBlock);
         idArr = (FilePathID*) LMemDerefHandles(trayAppsFolderIDBlock, trayAppsFolderIDChunk);
-        //no = LMemGetChunkSizeHandles(trayAppsFolderIDBlock, trayAppsFolderIDChunk) / sizeof(FilePathID);
         G_trayAppsFolderID = idArr->FPID_id;
         MemUnlock(trayAppsFolderIDBlock);
 
@@ -129,7 +134,7 @@ let's see if someone put something in/out of our folder
                 (G_trayAppsFolderID == notificationItem->FCBNI_id))
             {
                 G_trayAppsFilesCount = @call process::MSG_COUNT_APPS_IN_FOLDER();
-                @call process::MSG_INIT_APP_TRIGGERS();
+                @call GeodeGetAppObject(0)::MSG_INIT_APP_TRIGGERS();
                 break;
             }
 
@@ -139,7 +144,7 @@ let's see if someone put something in/out of our folder
                 if (numFiles < G_trayAppsFilesCount)
                 {
                     G_trayAppsFilesCount = numFiles;
-                    @call process::MSG_INIT_APP_TRIGGERS();
+                    @call GeodeGetAppObject(0)::MSG_INIT_APP_TRIGGERS();
                     break;
                 }
             }
@@ -187,37 +192,123 @@ add GenInteraction as "Spacer"
 }
 
 /*-------------------------------------------------------------------
+read apps in folder into passed variable: MemHandle *trayFilesHan
+numOfFiles returned
+-------------------------------------------------------------------*/
+@method TrayAppsProcessClass, MSG_READ_APPS_IN_FOLDER
+{
+    FileEnumParams       fileEnumParams;
+    word                 filesNotHandled = NULL;
+    word                 numOfFiles = NULL;
+
+    fileEnumParams.FEP_searchFlags = FESF_GEOS_EXECS;
+    fileEnumParams.FEP_returnAttrs = (void*) FESRT_NAME;  /* Return the file's Geos filename.*/
+    fileEnumParams.FEP_returnSize = FILE_LONGNAME_BUFFER_SIZE;
+    fileEnumParams.FEP_bufSize = FE_BUFSIZE_UNLIMITED;    /* FE_BUFSIZE_UNLIMITED allows the return buffer size to be as large as necessary.*/
+    fileEnumParams.FEP_matchAttrs = 0;  /* Set matchAttrs to zero so it will match anything.*/
+    fileEnumParams.FEP_skipCount = 0;   /* Don't skip any files*/
+    fileEnumParams.FEP_callback = 0;   /* Don't need no callback. */
+
+    if (*trayFilesHan != NullHandle)
+    {
+        MemFree(*trayFilesHan);
+    }
+
+    numOfFiles = FileEnum(
+        &fileEnumParams,
+        trayFilesHan,
+        &filesNotHandled
+    );
+
+    return(numOfFiles);
+}
+
+/*-------------------------------------------------------------------
+count apps in folder
+numOfFiles returned
+-------------------------------------------------------------------*/
+@method TrayAppsProcessClass, MSG_COUNT_APPS_IN_FOLDER
+{
+    FileEnumParams       fileEnumParams;
+    word                 numOfFiles = NULL;
+
+    fileEnumParams.FEP_searchFlags = FESF_GEOS_EXECS;
+    fileEnumParams.FEP_returnAttrs = (void*) FESRT_COUNT_ONLY;  /*Return the file's Geos filename.*/
+    fileEnumParams.FEP_returnSize = 0;
+    fileEnumParams.FEP_bufSize = FE_BUFSIZE_UNLIMITED;    /* FE_BUFSIZE_UNLIMITED allows the return buffer size to be as large as necessary.*/
+    fileEnumParams.FEP_matchAttrs = 0;  /* Set matchAttrs to zero so it will match anything.*/
+    fileEnumParams.FEP_skipCount = 0;   /* Don't skip any files*/
+    fileEnumParams.FEP_callback = 0;   /* Don't need no callback. */
+
+    (void) FileEnum(&fileEnumParams, NullHandle, &numOfFiles);
+    return numOfFiles;
+}
+
+/*-------------------------------------------------------------------
+prepare our demise
+-------------------------------------------------------------------*/
+@method TrayAppsProcessClass, MSG_GEN_PROCESS_CLOSE_APPLICATION
+{
+    // take us off of notification list
+    (void) GCNListRemove(
+        ConstructOptr(GeodeGetProcessHandle(), 0),  // optr of thread to remove from list
+        MANUFACTURER_ID_GEOWORKS,                   // manufacturer ID of list
+        GCNSLT_FILE_SYSTEM
+    );
+
+    return(@callsuper());
+}
+
+/*------------------------------------------------------------------
+This is called by MSG_META_DETACH and allows for changing the
+name of the state file which should be created for the application.
+We don't want no state file, so we just return 0.
+------------------------------------------------------------------*/
+@method TrayAppsProcessClass, MSG_GEN_PROCESS_CREATE_NEW_STATE_FILE
+{
+    return 0;
+}
+
+void ShowStopper()
+{
+    // Dummy for Swatting
+    return;
+}
+
+/*-------------------------------------------------------------------
+TrayAppsApplicationClass
+-------------------------------------------------------------------*/
+
+/*-------------------------------------------------------------------
 initializes the newly created Express menu trigger
 -------------------------------------------------------------------*/
 @method TrayAppsApplicationClass, MSG_EMC_WRAPPER_CREATED
 {
     Rectangle   margins = {3, 0, 0, 0};
 
-    G_wrapper = response->CEMCIRP_newItem;
+    pself->TAAC_box = response->CEMCIRP_newItem;
 
-    @call G_wrapper::MSG_META_ADD_VAR_DATA(
+    @call pself->TAAC_box::MSG_META_ADD_VAR_DATA(
         (HINT_CUSTOM_EXTRA_MARGINS & (~VDF_SAVE_TO_STATE)),
         sizeof(Rectangle),
         &margins
     );
 
-    @call G_wrapper::MSG_META_ADD_VAR_DATA(
+    @call pself->TAAC_box::MSG_META_ADD_VAR_DATA(
         (HINT_ORIENT_CHILDREN_HORIZONTALLY & (~VDF_SAVE_TO_STATE)),
         0,
         (void*) 0
     );
 
-    @call G_wrapper::MSG_META_ADD_VAR_DATA(
+    @call pself->TAAC_box::MSG_META_ADD_VAR_DATA(
         (HINT_CUSTOM_CHILD_SPACING & (~VDF_SAVE_TO_STATE)),
         sizeof(word),
         (void*) 0
     );
 
-    @call G_wrapper::MSG_GEN_SET_USABLE(VUM_NOW);
+    @call pself->TAAC_box::MSG_GEN_SET_USABLE(VUM_NOW);
 
     @call oself::MSG_INIT_APP_TRIGGERS();
-
-    //@callsuper();
 }
 
 /*-------------------------------------------------------------------
@@ -235,7 +326,7 @@ add / remove / re-add launchers
     byte                triggerNo = 0;
     MemHandle           trayFilesHan = NullHandle;
 
-    thread = MemGetInfo(OptrToHandle(G_wrapper), MGIT_EXEC_THREAD);
+    thread = MemGetInfo(OptrToHandle(pself->TAAC_box), MGIT_EXEC_THREAD);
 
     @call oself::MSG_REMOVE_ALL_APP_TRIGGERS();
 
@@ -258,7 +349,7 @@ add / remove / re-add launchers
                 OptrToChunk(@TriggerTemplate)
             );
 
-            @send G_wrapper::MSG_GEN_ADD_CHILD(triggerObj, CCO_LAST);
+            @send pself->TAAC_box::MSG_GEN_ADD_CHILD(triggerObj, CCO_LAST);
 
             isGMoniker = TokenLoadMonikerBlock(
                 TOKEN_CHARS(tok.GT_chars[0],tok.GT_chars[1],tok.GT_chars[2],tok.GT_chars[3]),
@@ -335,38 +426,6 @@ prepare our demise
     @callsuper();
 }
 
-
-/*-------------------------------------------------------------------
-prepare our demise
--------------------------------------------------------------------*/
-@method TrayAppsProcessClass, MSG_GEN_PROCESS_CLOSE_APPLICATION
-{
-    // take us off of notification list
-    (void) GCNListRemove(
-        ConstructOptr(GeodeGetProcessHandle(), 0),  // optr of thread to remove from list
-        MANUFACTURER_ID_GEOWORKS,                   // manufacturer ID of list
-        GCNSLT_FILE_SYSTEM
-    );
-
-    return(@callsuper());
-}
-
-
-/*-------------------------------------------------------------------
-remove spacer
--------------------------------------------------------------------*/
-@method TrayAppsApplicationClass, MSG_REMOVE_WRAPPER
-{
-    EventHandle    event;
-
-    if (G_wrapper != NullOptr)
-    {
-        event = @record ExpressMenuControlClass::MSG_EXPRESS_MENU_CONTROL_DESTROY_CREATED_ITEM(G_wrapper, VUM_NOW);
-        GCNListSend(MANUFACTURER_ID_GEOWORKS, GCNSLT_EXPRESS_MENU_OBJECTS, event, 0, 0);
-    }
-}
-
-
 /*-------------------------------------------------------------------
 remove all our triggers from SysTray
 -------------------------------------------------------------------*/
@@ -376,81 +435,25 @@ remove all our triggers from SysTray
 
     while(TRUE)
     {
-        trigger = @call G_wrapper::MSG_GEN_FIND_CHILD_AT_POSITION(0);
+        trigger = @call pself->TAAC_box::MSG_GEN_FIND_CHILD_AT_POSITION(0);
         if (trigger == NullOptr) break;
         @call trigger::MSG_GEN_SET_NOT_USABLE(VUM_NOW);
-        @call G_wrapper::MSG_GEN_REMOVE_CHILD(trigger, CCF_MARK_DIRTY);
+        @call pself->TAAC_box::MSG_GEN_REMOVE_CHILD(trigger, CCF_MARK_DIRTY);
         @call trigger::MSG_META_OBJ_FREE();
         trigger = NullOptr;
     }
 }
 
 /*-------------------------------------------------------------------
-read apps in folder into passed variable: MemHandle *trayFilesHan
-numOfFiles returned
+remove wrapper
 -------------------------------------------------------------------*/
-@method TrayAppsProcessClass, MSG_READ_APPS_IN_FOLDER
+@method TrayAppsApplicationClass, MSG_REMOVE_WRAPPER
 {
-    FileEnumParams       fileEnumParams;
-    word                 filesNotHandled = NULL;
-    word                 numOfFiles = NULL;
+    EventHandle    event;
 
-    fileEnumParams.FEP_searchFlags = FESF_GEOS_EXECS;
-    fileEnumParams.FEP_returnAttrs = (void*) FESRT_NAME;  /* Return the file's Geos filename.*/
-    fileEnumParams.FEP_returnSize = FILE_LONGNAME_BUFFER_SIZE;
-    fileEnumParams.FEP_bufSize = FE_BUFSIZE_UNLIMITED;    /* FE_BUFSIZE_UNLIMITED allows the return buffer size to be as large as necessary.*/
-    fileEnumParams.FEP_matchAttrs = 0;  /* Set matchAttrs to zero so it will match anything.*/
-    fileEnumParams.FEP_skipCount = 0;   /* Don't skip any files*/
-    fileEnumParams.FEP_callback = 0;   /* Don't need no callback. */
-
-    if (*trayFilesHan != NullHandle)
+    if (pself->TAAC_box != NullOptr)
     {
-        MemFree(*trayFilesHan);
+        event = @record ExpressMenuControlClass::MSG_EXPRESS_MENU_CONTROL_DESTROY_CREATED_ITEM(pself->TAAC_box, VUM_NOW);
+        GCNListSend(MANUFACTURER_ID_GEOWORKS, GCNSLT_EXPRESS_MENU_OBJECTS, event, 0, 0);
     }
-
-    numOfFiles = FileEnum(
-        &fileEnumParams,
-        trayFilesHan,
-        &filesNotHandled
-    );
-
-    return(numOfFiles);
-}
-
-/*-------------------------------------------------------------------
-count apps in folder
-numOfFiles returned
--------------------------------------------------------------------*/
-@method TrayAppsProcessClass, MSG_COUNT_APPS_IN_FOLDER
-{
-    FileEnumParams       fileEnumParams;
-    word                 numOfFiles = NULL;
-
-    fileEnumParams.FEP_searchFlags = FESF_GEOS_EXECS;
-    fileEnumParams.FEP_returnAttrs = (void*) FESRT_COUNT_ONLY;  /*Return the file's Geos filename.*/
-    fileEnumParams.FEP_returnSize = 0;
-    fileEnumParams.FEP_bufSize = FE_BUFSIZE_UNLIMITED;    /* FE_BUFSIZE_UNLIMITED allows the return buffer size to be as large as necessary.*/
-    fileEnumParams.FEP_matchAttrs = 0;  /* Set matchAttrs to zero so it will match anything.*/
-    fileEnumParams.FEP_skipCount = 0;   /* Don't skip any files*/
-    fileEnumParams.FEP_callback = 0;   /* Don't need no callback. */
-
-    (void) FileEnum(&fileEnumParams, NullHandle, &numOfFiles);
-    return numOfFiles;
-}
-
-
-/*------------------------------------------------------------------
-This is called by MSG_META_DETACH and allows for changing the
-name of the state file which should be created for the application.
-We don't want no state file, so we just return 0.
-------------------------------------------------------------------*/
-@method TrayAppsProcessClass, MSG_GEN_PROCESS_CREATE_NEW_STATE_FILE
-{
-    return 0;
-}
-
-void ShowStopper()
-{
-    // Dummy for Swatting
-    return;
 }
