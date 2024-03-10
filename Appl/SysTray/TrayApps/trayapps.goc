@@ -159,27 +159,7 @@ initializes the newly created Express menu trigger
 -------------------------------------------------------------------*/
 @method TrayAppsApplicationClass, MSG_EMC_INTERACTION_CREATED
 {
-    Rectangle   margins = {3, 0, 0, 0};
-
     pself->TAAC_interaction = response->CEMCIRP_newItem;
-
-    @call pself->TAAC_interaction::MSG_META_ADD_VAR_DATA(
-        (HINT_CUSTOM_EXTRA_MARGINS & (~VDF_SAVE_TO_STATE)),
-        sizeof(Rectangle),
-        &margins
-    );
-
-    @call pself->TAAC_interaction::MSG_META_ADD_VAR_DATA(
-        (HINT_ORIENT_CHILDREN_HORIZONTALLY & (~VDF_SAVE_TO_STATE)),
-        0,
-        (void*) 0
-    );
-
-    @call pself->TAAC_interaction::MSG_META_ADD_VAR_DATA(
-        (HINT_CUSTOM_CHILD_SPACING & (~VDF_SAVE_TO_STATE)),
-        sizeof(word),
-        (void*) 0
-    );
 
     @call pself->TAAC_interaction::MSG_GEN_SET_USABLE(VUM_NOW);
 
@@ -189,6 +169,7 @@ initializes the newly created Express menu trigger
         GCNSLT_FILE_SYSTEM
     );
 
+    @callsuper();
 }
 
 /*-------------------------------------------------------------------
@@ -223,7 +204,29 @@ initialize
 -------------------------------------------------------------------*/
 @method TrayAppsInteractionClass, MSG_META_INITIALIZE
 {
+    Rectangle   margins = {3, 0, 0, 0};
+
+    @call oself::MSG_META_ADD_VAR_DATA(
+        (HINT_CUSTOM_EXTRA_MARGINS & (~VDF_SAVE_TO_STATE)),
+        sizeof(Rectangle),
+        &margins
+    );
+
+    @call oself::MSG_META_ADD_VAR_DATA(
+        (HINT_ORIENT_CHILDREN_HORIZONTALLY & (~VDF_SAVE_TO_STATE)),
+        0,
+        (void*) 0
+    );
+
+    @call oself::MSG_META_ADD_VAR_DATA(
+        (HINT_CUSTOM_CHILD_SPACING & (~VDF_SAVE_TO_STATE)),
+        sizeof(word),
+        (void*) 0
+    );
+
     @call oself::MSG_INIT_APP_TRIGGERS();
+
+    @callsuper();
 }
 
 /*-------------------------------------------------------------------
@@ -241,7 +244,7 @@ add / remove / re-add launchers
     byte                triggerNo = 0;
     MemHandle           trayFilesHan = NullHandle;
 
-    //ShowStopper();
+    ShowStopper();
 
     thread = MemGetInfo(OptrToHandle(oself), MGIT_EXEC_THREAD);
 
@@ -261,12 +264,12 @@ add / remove / re-add launchers
 
             triggerObj = ConstructOptr(
                 ObjDuplicateResource(
-                    OptrToHandle(@TriggerTemplate), 0, thread
+                    OptrToHandle(@TriggerTemplate), 0, -1 //thread
                 ),
                 OptrToChunk(@TriggerTemplate)
             );
 
-            @send oself::MSG_GEN_ADD_CHILD(triggerObj, CCO_LAST);
+            @call oself::MSG_GEN_ADD_CHILD(triggerObj, CCO_LAST);
 
             isGMoniker = TokenLoadMonikerBlock(
                 TOKEN_CHARS(tok.GT_chars[0],tok.GT_chars[1],tok.GT_chars[2],tok.GT_chars[3]),
