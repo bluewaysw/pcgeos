@@ -22,7 +22,10 @@ class & message definitions
 @endc   /* end of class definition */
 
 @class  TrayAppsInteractionClass, GenInteractionClass;
+    @instance   dword   G_trayAppsFolderID   = 0;
+    @instance   word    G_trayAppsFilesCount = 0;
     @message void MSG_INIT_APP_TRIGGERS();
+    @message word MSG_SET_TRAY_APPS_FOLDER_ID();
     @message word MSG_READ_APPS_IN_FOLDER(MemHandle *trayFilesHan);
     @message word MSG_COUNT_APPS_IN_FOLDER();
     @message (GEN_TRIGGER_ACTION) MSG_APP_TRIGGER_PRESSED;
@@ -73,9 +76,6 @@ Templates - must be in a discarded block!
 /*-------------------------------------------------------------------
 globals & constants
 -------------------------------------------------------------------*/
-dword       G_trayAppsFolderID      = 0;
-word        G_trayAppsFilesCount    = 0;
-
 #define MAX_TRAY_TRIGGERS_COUNT 25
 
 /*-------------------------------------------------------------------
@@ -87,24 +87,9 @@ we're born!
 -------------------------------------------------------------------*/
 @method TrayAppsProcessClass, MSG_GEN_PROCESS_OPEN_APPLICATION
 {
-    MemHandle   trayAppsFolderIDBlock   = 0;
-    ChunkHandle trayAppsFolderIDChunk   = 0;
-    FilePathID  *idArr                  = 0;
-
     @callsuper();
 
-    //if (FileSetCurrentPath(SP_USER_DATA, "TRAYAPPS"))
-    if (FileSetCurrentPath(SP_APPLICATION, "TRAYAPPS"))
-    {
-        trayAppsFolderIDBlock = MemAllocLMem(LMEM_TYPE_GENERAL, 0);
-        trayAppsFolderIDChunk = FileGetCurrentPathIDs(trayAppsFolderIDBlock);
-        (void) MemLock(trayAppsFolderIDBlock);
-        idArr = (FilePathID*) LMemDerefHandles(trayAppsFolderIDBlock, trayAppsFolderIDChunk);
-        G_trayAppsFolderID = idArr->FPID_id;
-        MemUnlock(trayAppsFolderIDBlock);
-
-        @call process::MSG_ADD_INTERACTION();
-    }
+    @call process::MSG_ADD_INTERACTION();
 }
 
 /*-------------------------------------------------------------------
@@ -144,12 +129,6 @@ We don't want no state file, so we just return 0.
     return 0;
 }
 
-void ShowStopper()
-{
-    // Dummy for Swatting
-    return;
-}
-
 /*-------------------------------------------------------------------
 TrayAppsApplicationClass
 -------------------------------------------------------------------*/
@@ -168,8 +147,6 @@ initializes the newly created Express menu trigger
         MANUFACTURER_ID_GEOWORKS,        // manufacturer ID of list
         GCNSLT_FILE_SYSTEM
     );
-
-    @callsuper();
 }
 
 /*-------------------------------------------------------------------
@@ -206,6 +183,8 @@ initialize
 {
     Rectangle   margins = {3, 0, 0, 0};
 
+    @callsuper();
+
     @call oself::MSG_META_ADD_VAR_DATA(
         (HINT_CUSTOM_EXTRA_MARGINS & (~VDF_SAVE_TO_STATE)),
         sizeof(Rectangle),
@@ -224,9 +203,37 @@ initialize
         (void*) 0
     );
 
-    @call oself::MSG_INIT_APP_TRIGGERS();
+    //if (FileSetCurrentPath(SP_USER_DATA, "TRAYAPPS"))
+    if (@call oself::MSG_SET_TRAY_APPS_FOLDER_ID())
+    {
+        @call oself::MSG_INIT_APP_TRIGGERS();
+    }
+}
 
-    @callsuper();
+/*-------------------------------------------------------------------
+add / remove / re-add launchers
+-------------------------------------------------------------------*/
+@method TrayAppsInteractionClass, MSG_SET_TRAY_APPS_FOLDER_ID
+{
+    MemHandle   trayAppsFolderIDBlock = 0;
+    ChunkHandle trayAppsFolderIDChunk = 0;
+    FilePathID  *idArr = 0;
+
+    FilePushDir();
+    //if (FileSetCurrentPath(SP_USER_DATA, "TRAYAPPS"))
+    if (FileSetCurrentPath(SP_APPLICATION, "TRAYAPPS"))
+    {
+        trayAppsFolderIDBlock = MemAllocLMem(LMEM_TYPE_GENERAL, 0);
+        trayAppsFolderIDChunk = FileGetCurrentPathIDs(trayAppsFolderIDBlock);
+        (void) MemLock(trayAppsFolderIDBlock);
+        idArr = (FilePathID*) LMemDerefHandles(trayAppsFolderIDBlock, trayAppsFolderIDChunk);
+        pself->G_trayAppsFolderID = idArr->FPID_id;
+        MemUnlock(trayAppsFolderIDBlock);
+        return TRUE;
+    }
+    FilePopDir();
+
+    return FALSE;
 }
 
 /*-------------------------------------------------------------------
@@ -244,16 +251,14 @@ add / remove / re-add launchers
     byte                triggerNo = 0;
     MemHandle           trayFilesHan = NullHandle;
 
-    ShowStopper();
-
     thread = MemGetInfo(OptrToHandle(oself), MGIT_EXEC_THREAD);
 
     @call oself::MSG_REMOVE_ALL_APP_TRIGGERS();
 
-    G_trayAppsFilesCount = @call oself::MSG_READ_APPS_IN_FOLDER(&trayFilesHan);
-    if (G_trayAppsFilesCount > 0)
+    pself->G_trayAppsFilesCount = @call oself::MSG_READ_APPS_IN_FOLDER(&trayFilesHan);
+    if (pself->G_trayAppsFilesCount > 0)
     {
-        for (triggerNo=0; triggerNo < G_trayAppsFilesCount; triggerNo++)
+        for (triggerNo=0; triggerNo < pself->G_trayAppsFilesCount; triggerNo++)
         {
             if (triggerNo >= MAX_TRAY_TRIGGERS_COUNT) break;
 
@@ -264,7 +269,7 @@ add / remove / re-add launchers
 
             triggerObj = ConstructOptr(
                 ObjDuplicateResource(
-                    OptrToHandle(@TriggerTemplate), 0, -1 //thread
+                    OptrToHandle(@TriggerTemplate), 0, thread //thread
                 ),
                 OptrToChunk(@TriggerTemplate)
             );
@@ -323,9 +328,9 @@ let's see if someone put something in/out of our folder
             word itemSize;
 
             if ((notificationItem->FCBNI_type == FCNT_CREATE) &&
-                (G_trayAppsFolderID == notificationItem->FCBNI_id))
+                (pself->G_trayAppsFolderID == notificationItem->FCBNI_id))
             {
-                G_trayAppsFilesCount = @call oself::MSG_COUNT_APPS_IN_FOLDER();
+                pself->G_trayAppsFilesCount = @call oself::MSG_COUNT_APPS_IN_FOLDER();
                 @call oself::MSG_INIT_APP_TRIGGERS();
                 break;
             }
@@ -333,9 +338,9 @@ let's see if someone put something in/out of our folder
             if (notificationItem->FCBNI_type == FCNT_DELETE)
             {
                 numFiles = @call oself::MSG_COUNT_APPS_IN_FOLDER();
-                if (numFiles < G_trayAppsFilesCount)
+                if (numFiles < pself->G_trayAppsFilesCount)
                 {
-                    G_trayAppsFilesCount = numFiles;
+                    pself->G_trayAppsFilesCount = numFiles;
                     @call oself::MSG_INIT_APP_TRIGGERS();
                     break;
                 }
@@ -387,11 +392,14 @@ numOfFiles returned
         MemFree(*trayFilesHan);
     }
 
+    FilePushDir();
+    FileSetCurrentPath(SP_APPLICATION, "TRAYAPPS");
     numOfFiles = FileEnum(
         &fileEnumParams,
         trayFilesHan,
         &filesNotHandled
     );
+    FilePopDir();
 
     return(numOfFiles);
 }
@@ -413,7 +421,11 @@ numOfFiles returned
     fileEnumParams.FEP_skipCount = 0;   /* Don't skip any files*/
     fileEnumParams.FEP_callback = 0;   /* Don't need no callback. */
 
+    FilePushDir();
+    FileSetCurrentPath(SP_APPLICATION, "TRAYAPPS");
     (void) FileEnum(&fileEnumParams, NullHandle, &numOfFiles);
+    FilePopDir();
+
     return numOfFiles;
 }
 
@@ -470,4 +482,16 @@ clean up
 @method TrayAppsInteractionClass, MSG_META_DETACH
 {
     @call oself::MSG_REMOVE_ALL_APP_TRIGGERS();
+
+    @callsuper();
+}
+
+
+/*-------------------------------------------------------------------
+Dummy for Swat
+-------------------------------------------------------------------*/
+void ShowStopper()
+{
+    // Dummy for Swatting
+    return;
 }
