@@ -58,5 +58,6 @@ resource AppResource object
 resource Templates object
 
 export	TrayAppsApplicationClass
+export  TrayAppsInteractionClass
 export  GenGeodeTokenTriggerClass
 
