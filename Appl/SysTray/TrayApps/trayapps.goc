@@ -171,7 +171,14 @@ initializes the newly created Express menu trigger
     pself->TAAC_emc = response->CEMCIRP_expressMenuControl;
     pself->TAAC_interaction = response->CEMCIRP_newItem;
 
-    @call pself->TAAC_interaction::MSG_GEN_SET_USABLE(VUM_NOW);}
+    @call pself->TAAC_interaction::MSG_GEN_SET_USABLE(VUM_NOW);
+
+    (void) GCNListAdd(
+        pself->TAAC_interaction,            // ConstructOptr(GeodeGetProcessHandle(), 0),  // optr to add to list
+        MANUFACTURER_ID_GEOWORKS,           // manufacturer ID of list
+        GCNSLT_FILE_SYSTEM
+    );
+}
 
 
 /*-------------------------------------------------------------------
@@ -182,6 +189,13 @@ prepare our demise
     if ((pself->TAAC_interaction != NullOptr) &&
         (pself->TAAC_emc != NullOptr))
     {
+        // take us off of notification list
+        (void) GCNListRemove(
+            pself->TAAC_interaction,            // ConstructOptr(GeodeGetProcessHandle(), 0), // optr of thread to remove from list
+            MANUFACTURER_ID_GEOWORKS,           // manufacturer ID of list
+            GCNSLT_FILE_SYSTEM
+        );
+
         @send pself->TAAC_emc::MSG_EXPRESS_MENU_CONTROL_DESTROY_CREATED_ITEM(pself->TAAC_interaction, VUM_NOW);
     }
 
@@ -222,12 +236,6 @@ initialize
     if (@call oself::MSG_SET_TRAY_APPS_FOLDER_ID())
     {
         @call oself::MSG_INIT_APP_TRIGGERS();
-
-        //(void) GCNListAdd(
-        //    oself,                              // ConstructOptr(GeodeGetProcessHandle(), 0),  // optr to add to list
-        //    MANUFACTURER_ID_GEOWORKS,           // manufacturer ID of list
-        //    GCNSLT_FILE_SYSTEM
-        //);
     }
 }
 
@@ -473,16 +481,8 @@ clean up
 -------------------------------------------------------------------*/
 @method TrayAppsInteractionClass, MSG_META_DETACH
 {
-    // take us off of notification list
-    //if (GCNListRemove(
-    //    oself,                              // ConstructOptr(GeodeGetProcessHandle(), 0), // optr of thread to remove from list
-    //    MANUFACTURER_ID_GEOWORKS,           // manufacturer ID of list
-    //    GCNSLT_FILE_SYSTEM
-    //) == TRUE)
-    {
-        @call oself::MSG_REMOVE_ALL_APP_TRIGGERS();
-        @callsuper();
-    }
+    @call oself::MSG_REMOVE_ALL_APP_TRIGGERS();
+    @callsuper();
 }
 
 
