@@ -19,7 +19,8 @@ class & message definitions
 
 @class  TrayAppsApplicationClass, GenApplicationClass;
     @message void MSG_EMC_INTERACTION_CREATED(CreateExpressMenuControlItemResponseParams *response = ss:bp);
-    @instance   optr  TAAC_interaction   = NullOptr;
+    @instance   optr    TAAC_interaction   = NullOptr;
+    @instance   optr    TAAC_emc           = NullOptr;
 @endc   /* end of class definition */
 
 @class  TrayAppsInteractionClass, GenInteractionClass;
@@ -167,6 +168,7 @@ initializes the newly created Express menu trigger
 -------------------------------------------------------------------*/
 @method TrayAppsApplicationClass, MSG_EMC_INTERACTION_CREATED
 {
+    pself->TAAC_emc = response->CEMCIRP_expressMenuControl;
     pself->TAAC_interaction = response->CEMCIRP_newItem;
 
     @call pself->TAAC_interaction::MSG_GEN_SET_USABLE(VUM_NOW);}
@@ -177,12 +179,10 @@ prepare our demise
 -------------------------------------------------------------------*/
 @method TrayAppsApplicationClass, MSG_META_DETACH
 {
-    EventHandle    event;
-
-    if (pself->TAAC_interaction != NullOptr)
+    if ((pself->TAAC_interaction != NullOptr) &&
+        (pself->TAAC_emc != NullOptr))
     {
-        event = @record ExpressMenuControlClass::MSG_EXPRESS_MENU_CONTROL_DESTROY_CREATED_ITEM(pself->TAAC_interaction, VUM_NOW);
-        GCNListSend(MANUFACTURER_ID_GEOWORKS, GCNSLT_EXPRESS_MENU_OBJECTS, event, 0, 0);
+        @send pself->TAAC_emc::MSG_EXPRESS_MENU_CONTROL_DESTROY_CREATED_ITEM(pself->TAAC_interaction, VUM_NOW);
     }
 
     @callsuper();
@@ -221,11 +221,11 @@ initialize
 
     if (@call oself::MSG_SET_TRAY_APPS_FOLDER_ID())
     {
-        //@call oself::MSG_INIT_APP_TRIGGERS();
+        @call oself::MSG_INIT_APP_TRIGGERS();
 
         //(void) GCNListAdd(
-        //    ConstructOptr(GeodeGetProcessHandle(), 0),  //ConstructOptr(GeodeGetProcessHandle(), 0),  // optr to add to list
-        //    MANUFACTURER_ID_GEOWORKS,                   // manufacturer ID of list
+        //    oself,                              // ConstructOptr(GeodeGetProcessHandle(), 0),  // optr to add to list
+        //    MANUFACTURER_ID_GEOWORKS,           // manufacturer ID of list
         //    GCNSLT_FILE_SYSTEM
         //);
     }
@@ -474,15 +474,15 @@ clean up
 @method TrayAppsInteractionClass, MSG_META_DETACH
 {
     // take us off of notification list
-    //(void) GCNListRemove(
-    //    ConstructOptr(GeodeGetProcessHandle(), 0), // optr of thread to remove from list
+    //if (GCNListRemove(
+    //    oself,                              // ConstructOptr(GeodeGetProcessHandle(), 0), // optr of thread to remove from list
     //    MANUFACTURER_ID_GEOWORKS,           // manufacturer ID of list
     //    GCNSLT_FILE_SYSTEM
-    //);
-
-    //@call oself::MSG_REMOVE_ALL_APP_TRIGGERS();
-
-    @callsuper();
+    //) == TRUE)
+    {
+        @call oself::MSG_REMOVE_ALL_APP_TRIGGERS();
+        @callsuper();
+    }
 }
 
 
