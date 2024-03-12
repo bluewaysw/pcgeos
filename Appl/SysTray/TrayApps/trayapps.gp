@@ -43,7 +43,6 @@ library	ui
 # Standard discardable code resources do not need to be mentioned.
 #
 resource AppResource object
-resource Templates object, read-only, shared
 
 export	TrayAppsApplicationClass
 export  TrayAppsInteractionClass

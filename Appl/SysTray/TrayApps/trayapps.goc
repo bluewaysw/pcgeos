@@ -61,20 +61,6 @@ UI Objects
 
 
 /*-------------------------------------------------------------------
-Templates - must be in a discarded block!
--------------------------------------------------------------------*/
-@start  Templates;
-
-    @object GenGeodeTokenTriggerClass TriggerTemplate =
-    {
-        GI_states = @default & ~GS_USABLE;
-        GI_visMoniker = "T";
-    }
-
-@end    Templates;
-
-
-/*-------------------------------------------------------------------
 globals & constants
 -------------------------------------------------------------------*/
 #define MAX_TRAY_TRIGGERS_COUNT 25
@@ -279,7 +265,6 @@ add / remove / re-add launchers
 @method TrayAppsInteractionClass, MSG_INIT_APP_TRIGGERS
 {
     optr                triggerObj = NullOptr;
-    ThreadHandle        thread = NullHandle;
     Boolean             isGMoniker = FALSE;
     MemHandle           newMoniker = NULL;
     word                monikerSize = 0;
@@ -287,10 +272,11 @@ add / remove / re-add launchers
     char*               filePtr = (void*) 0;
     byte                triggerNo = 0;
     MemHandle           trayFilesHan = NullHandle;
-
-    thread = MemGetInfo(OptrToHandle(oself), MGIT_EXEC_THREAD);
+    MemHandle           triggerBlock = NullHandle;
 
     @call oself::MSG_REMOVE_ALL_APP_TRIGGERS();
+
+    triggerBlock = OptrToHandle(oself);
 
     pself->G_trayAppsFilesCount = @call oself::MSG_READ_APPS_IN_FOLDER(&trayFilesHan);
     if (pself->G_trayAppsFilesCount > 0)
@@ -305,11 +291,9 @@ add / remove / re-add launchers
             MemUnlock(trayFilesHan);
 
             triggerObj = ConstructOptr(
-                ObjDuplicateResource(
-                    OptrToHandle(@TriggerTemplate), 0, thread //thread
-                ),
-                OptrToChunk(@TriggerTemplate)
-            );
+                            triggerBlock,
+                            ObjInstantiate(OptrToHandle(oself), &GenGeodeTokenTriggerClass)
+                        );
 
             @call oself::MSG_GEN_ADD_CHILD(triggerObj, CCO_LAST);
 
@@ -480,8 +464,6 @@ remove all our triggers from SysTray
         @call trigger::MSG_GEN_SET_NOT_USABLE(VUM_NOW);
         @call oself::MSG_GEN_REMOVE_CHILD(trigger, CCF_MARK_DIRTY);
         @call trigger::MSG_META_OBJ_FREE();
-        @call trigger::MSG_META_BLOCK_FREE();
-        trigger = NullOptr;
     }
 }
 
