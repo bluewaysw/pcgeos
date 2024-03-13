@@ -19,8 +19,7 @@ class & message definitions
 
 @class  TrayAppsApplicationClass, GenApplicationClass;
     @message void MSG_EMC_INTERACTION_CREATED(CreateExpressMenuControlItemResponseParams *response = ss:bp);
-    @instance   optr    TAAC_interaction   = NullOptr;
-    @instance   optr    TAAC_emc           = NullOptr;
+    @instance   optr    TAAC_itemList      = NullOptr; // this gonna be a ChunkArray soon
 @endc   /* end of class definition */
 
 @class  TrayAppsInteractionClass, GenInteractionClass;
@@ -65,6 +64,12 @@ globals & constants
 -------------------------------------------------------------------*/
 #define MAX_TRAY_TRIGGERS_COUNT 25
 
+typedef struct
+{
+    optr    emc;            // Express menu
+    optr    interaction;    // interaction for this express menu
+} TaiEmcComboStruct;
+
 /*-------------------------------------------------------------------
 TrayAppsProcessClass
 -------------------------------------------------------------------*/
@@ -96,6 +101,40 @@ add our special GenInteraction to SysTray
 
     event = @record ExpressMenuControlClass::MSG_EXPRESS_MENU_CONTROL_CREATE_ITEM(cemcip);
     GCNListSend(MANUFACTURER_ID_GEOWORKS, GCNSLT_EXPRESS_MENU_OBJECTS, event, 0, 0);
+
+	//
+	// add ourselves to GCNSLT_EXPRESS_MENU_CHANGE list
+	//
+    (void) GCNListAdd(oself, MANUFACTURER_ID_GEOWORKS, GCNSLT_EXPRESS_MENU_CHANGE); // GeodeGetProcessHandle
+}
+
+
+@method TrayAppsProcessClass, MSG_NOTIFY_EXPRESS_MENU_CHANGE
+{
+// **Structures:**
+//
+// 	typedef enum {
+// 		GCNEMNT_CREATED,
+// 		GCNEMNT_DESTROYED
+// 	} GCNExpressMenuNotificationTypes;
+
+// @importMessage	MetaGCNMessages, void MSG_NOTIFY_EXPRESS_MENU_CHANGE(
+// 				GCNExpressMenuNotificationTypes type = bp,
+// 				optr affectedExpressMenuControl = cx:dx);
+
+    CreateExpressMenuControlItemParams  cemcip;
+
+    if (type == GCNEMNT_CREATED)
+    {
+        cemcip.CEMCIP_feature = CEMCIF_SYSTEM_TRAY;
+        cemcip.CEMCIP_class = &TrayAppsInteractionClass;
+        cemcip.CEMCIP_itemPriority = CEMCIP_STANDARD_PRIORITY;
+        cemcip.CEMCIP_responseMessage = MSG_EMC_INTERACTION_CREATED;
+        cemcip.CEMCIP_responseDestination = GeodeGetAppObject(0);
+        cemcip.CEMCIP_field = NullOptr;
+
+        @call affectedExpressMenuControl::MSG_EXPRESS_MENU_CONTROL_CREATE_ITEM(cemcip);
+    }
 }
 
 /*-------------------------------------------------------------------
@@ -132,6 +171,7 @@ prepare our demise
 -------------------------------------------------------------------*/
 @method TrayAppsProcessClass, MSG_GEN_PROCESS_CLOSE_APPLICATION
 {
+    (void) GCNListRemove(oself, MANUFACTURER_ID_GEOWORKS, GCNSLT_EXPRESS_MENU_CHANGE); // GeodeGetProcessHandle
     return(@callsuper());
 }
 
@@ -148,22 +188,48 @@ We don't want no state file, so we just return 0.
 /*-------------------------------------------------------------------
 TrayAppsApplicationClass
 -------------------------------------------------------------------*/
+@method TrayAppsApplicationClass, MSG_META_ATTACH
+{
+    MemHandle   block = NullHandle;
+    ChunkHandle ch = NullChunk;
+
+    @callsuper();
+
+    block = MemAllocLMem(LMEM_TYPE_GENERAL, 0);
+    if (block)
+    {
+        MemLock(block);
+        ch = ChunkArrayCreate(block, sizeof(TaiEmcComboStruct), 0, 0);
+        pself->TAAC_itemList = ConstructOptr(block, ch);
+        MemUnlock(block);
+    }
+}
 
 /*-------------------------------------------------------------------
 initializes the newly created Express menu trigger
 -------------------------------------------------------------------*/
 @method TrayAppsApplicationClass, MSG_EMC_INTERACTION_CREATED
 {
-    pself->TAAC_emc = response->CEMCIRP_expressMenuControl;
-    pself->TAAC_interaction = response->CEMCIRP_newItem;
+    TaiEmcComboStruct *elem = (void*) 0;
 
-    @call pself->TAAC_interaction::MSG_GEN_SET_USABLE(VUM_NOW);
+    if (pself->TAAC_itemList != NullOptr)
+    {
+        MemLock(HandleOf(pself->TAAC_itemList));
 
-    (void) GCNListAdd(
-        pself->TAAC_interaction,            // ConstructOptr(GeodeGetProcessHandle(), 0),  // optr to add to list
-        MANUFACTURER_ID_GEOWORKS,           // manufacturer ID of list
-        GCNSLT_FILE_SYSTEM
-    );
+        elem = (TaiEmcComboStruct*) ChunkArrayAppend(pself->TAAC_itemList, 0);
+        elem->emc = response->CEMCIRP_expressMenuControl;
+        elem->interaction = response->CEMCIRP_newItem;
+
+        @call elem->interaction::MSG_GEN_SET_USABLE(VUM_NOW);
+
+        (void) GCNListAdd(
+            elem->interaction,                  // ConstructOptr(GeodeGetProcessHandle(), 0),  // optr to add to list
+            MANUFACTURER_ID_GEOWORKS,           // manufacturer ID of list
+            GCNSLT_FILE_SYSTEM
+        );
+
+        MemUnlock(HandleOf(pself->TAAC_itemList));
+    }
 }
 
 
@@ -172,18 +238,30 @@ prepare our demise
 -------------------------------------------------------------------*/
 @method TrayAppsApplicationClass, MSG_META_DETACH
 {
-    if ((pself->TAAC_interaction != NullOptr) &&
-        (pself->TAAC_emc != NullOptr))
+    TaiEmcComboStruct   *elem = (void*) 0;
+    word                numElem = 0;
+    word                i = 0;
+
+    if (pself->TAAC_itemList != NullOptr)
     {
-        // take us off of notification list
-        if (GCNListRemove(
-            pself->TAAC_interaction,            // ConstructOptr(GeodeGetProcessHandle(), 0), // optr of thread to remove from list
-            MANUFACTURER_ID_GEOWORKS,           // manufacturer ID of list
-            GCNSLT_FILE_SYSTEM
-        ) == TRUE)
+        MemLock(HandleOf(pself->TAAC_itemList));
+        numElem = ChunkArrayGetCount(pself->TAAC_itemList);
+
+        for (i = 0; i < numElem; i++)
         {
-            @send pself->TAAC_emc::MSG_EXPRESS_MENU_CONTROL_DESTROY_CREATED_ITEM(pself->TAAC_interaction, VUM_NOW);
+            elem = (TaiEmcComboStruct*) ChunkArrayElementToPtr(pself->TAAC_itemList, i,	(void*) 0);
+
+            (void*) GCNListRemove(                  // take us off of notification list
+                elem->interaction,                  // ConstructOptr(GeodeGetProcessHandle(), 0), // optr of thread to remove from list
+                MANUFACTURER_ID_GEOWORKS,           // manufacturer ID of list
+                GCNSLT_FILE_SYSTEM
+            );
+
+            @call elem->emc::MSG_EXPRESS_MENU_CONTROL_DESTROY_CREATED_ITEM(elem->interaction, VUM_NOW);
         }
+
+        MemUnlock(HandleOf(pself->TAAC_itemList));
+        MemFree(HandleOf(pself->TAAC_itemList));
     }
 
     @callsuper();
@@ -222,13 +300,6 @@ initialize
 
     if (@call oself::MSG_SET_TRAY_APPS_FOLDER_ID())
     {
-
-        //(void) GCNListAdd(
-        //    oself,            // ConstructOptr(GeodeGetProcessHandle(), 0),  // optr to add to list
-        //    MANUFACTURER_ID_GEOWORKS,           // manufacturer ID of list
-        //    GCNSLT_FILE_SYSTEM
-        //);
-
         @call oself::MSG_INIT_APP_TRIGGERS();
     }
 }
@@ -243,7 +314,6 @@ add / remove / re-add launchers
     FilePathID  *idArr = 0;
 
     FilePushDir();
-    //if (FileSetCurrentPath(SP_USER_DATA, "TRAYAPPS"))
     if (FileSetCurrentPath(SP_APPLICATION, "TRAYAPPS"))
     {
         trayAppsFolderIDBlock = MemAllocLMem(LMEM_TYPE_GENERAL, 0);
@@ -466,24 +536,6 @@ remove all our triggers from SysTray
         @call trigger::MSG_META_OBJ_FREE();
     }
 }
-
-/*-------------------------------------------------------------------
-clean up
--------------------------------------------------------------------*/
-//@method TrayAppsInteractionClass, MSG_META_DETACH
-//{
-    //@call oself::MSG_REMOVE_ALL_APP_TRIGGERS();
-
-    // take us off of notification list
-    //GCNListRemove(
-    //    oself,                              // ConstructOptr(GeodeGetProcessHandle(), 0), // optr of thread to remove from list
-    //    MANUFACTURER_ID_GEOWORKS,           // manufacturer ID of list
-    //    GCNSLT_FILE_SYSTEM
-    //);
-
-    //@callsuper();
-//}
-
 
 /*-------------------------------------------------------------------
 Dummy for Swat
