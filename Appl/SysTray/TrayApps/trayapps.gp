@@ -36,6 +36,7 @@ appobj	TrayAppsApp
 #
 library	geos
 library	ui
+library ansic
 #
 # Resources: list all resource blocks which are used by the application whose
 # allocation flags can't be inferred by Glue. Usually this is needed only for
