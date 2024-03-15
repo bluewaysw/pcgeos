@@ -1039,44 +1039,44 @@ Installed/Appl/Breadbox/FunPak/Treas: ui math ansic sound MAKEAPPL
 mazerun	: Installed/Appl/Breadbox/FunPak/Maze
 Installed/Appl/Breadbox/FunPak/Maze: ui ansic color game sound MAKEAPPL
 
-blkbox : Installed\Appl\Breadbox\EntPak\BlkBox
-Installed\Appl\Breadbox\EntPak\BlkBox: ui ansic game sound MAKEAPPL
+blkbox : Installed/Appl/Breadbox/EntPak/BlkBox
+Installed/Appl/Breadbox/EntPak/BlkBox: ui ansic game sound MAKEAPPL
 
-hiho : Installed\Appl\Breadbox\EntPak\Hiho
-Installed\Appl\Breadbox\EntPak\Hiho: ui ansic game sound MAKEAPPL
+hiho : Installed/Appl/Breadbox/EntPak/Hiho
+Installed/Appl/Breadbox/EntPak/Hiho: ui ansic game sound MAKEAPPL
 
-magicboard : Installed\Appl\Breadbox\EntPak\Magic
-Installed\Appl\Breadbox\EntPak\Magic: ui ansic math game sound MAKEAPPL
+magicboard : Installed/Appl/Breadbox/EntPak/Magic
+Installed/Appl/Breadbox/EntPak/Magic: ui ansic math game sound MAKEAPPL
 
-row4 : Installed\Appl\Breadbox\EntPak\Row4
-Installed\Appl\Breadbox\EntPak\Row4: ui ansic sound MAKEAPPL
+row4 : Installed/Appl/Breadbox/EntPak/Row4
+Installed/Appl/Breadbox/EntPak/Row4: ui ansic sound MAKEAPPL
 
-scode : Installed\Appl\Breadbox\EntPak\SCode
-Installed\Appl\Breadbox\EntPak\SCode: ui ansic game sound MAKEAPPL
+scode : Installed/Appl/Breadbox/EntPak/SCode
+Installed/Appl/Breadbox/EntPak/SCode: ui ansic game sound MAKEAPPL
 
-munchers : Installed\Appl\Breadbox\Arcade\munch
-Installed\Appl\Breadbox\Arcade\munch: ui math sound color game ansic MAKEAPPL
+munchers : Installed/Appl/Breadbox/Arcade/munch
+Installed/Appl/Breadbox/Arcade/munch: ui math sound color game ansic MAKEAPPL
 
-vacman	: Installed\Appl\Breadbox\Arcade\vacman
-Installed\Appl\Breadbox\Arcade\vacman: ui game ansic wav sound MAKEAPPL
+vacman	: Installed/Appl/Breadbox/Arcade/vacman
+Installed/Appl/Breadbox/Arcade/vacman: ui game ansic wav sound MAKEAPPL
 
-noid	: Installed\Appl\Breadbox\Arcade\noid
-Installed\Appl\Breadbox\Arcade\noid: ui sound game color ansic MAKEAPPL
+noid	: Installed/Appl/Breadbox/Arcade/noid
+Installed/Appl/Breadbox/Arcade/noid: ui sound game color ansic MAKEAPPL
 
-paddle	: Installed\Appl\Breadbox\Arcade\paddle
-Installed\Appl\Breadbox\Arcade\paddle: ui ansic color game sound MAKEAPPL
+paddle	: Installed/Appl/Breadbox/Arcade/paddle
+Installed/Appl/Breadbox/Arcade/paddle: ui ansic color game sound MAKEAPPL
 
-frotz	: Installed\Appl\Breadbox\frotz
-Installed\Appl\Breadbox\frotz: ui ansic text MAKEAPPL
+frotz	: Installed/Appl/Breadbox/frotz
+Installed/Appl/Breadbox/frotz: ui ansic text MAKEAPPL
 
-snake	: Installed\Appl\Breadbox\snake
-Installed\Appl\Breadbox\snake: ui game ansic MAKEAPPL
+snake	: Installed/Appl/Breadbox/snake
+Installed/Appl/Breadbox/snake: ui game ansic MAKEAPPL
 
-frcell	: Installed\Appl\Breadbox\Cards\frcell
-Installed\Appl\Breadbox\Cards\frcell: ui ansic cards color MAKEAPPL
+frcell	: Installed/Appl/Breadbox/Cards/frcell
+Installed/Appl/Breadbox/Cards/frcell: ui ansic cards color MAKEAPPL
 
-spider	: Installed\Appl\Breadbox\Cards\spider
-Installed\Appl\Breadbox\Cards\spider: ui cards color sound MAKEAPPL
+spider	: Installed/Appl/Breadbox/Cards/spider
+Installed/Appl/Breadbox/Cards/spider: ui cards color sound MAKEAPPL
 
 
 

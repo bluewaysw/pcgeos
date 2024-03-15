@@ -1977,7 +1977,11 @@ HeartsDeckDrawPlayerInstructions		proc	far
 	mov	ds,ax
 	pop	si				;string offst
 	mov	si,ds:[si]
-	lodsw					;x pos
+	;lodsw					;was: ax <-- x pos
+			; RB: this value was not really used, see below
+			; So, the corresponding ui code has been changed 
+			; by removing the x-offset value. This primarily
+			; makes the strings localizable.
 	clr	cx				;null terminated string
 	mov	ax, INSTRUCTION_TEXT_X       ; jfh added
 	mov	bx, INSTRUCTION_TEXT_Y
