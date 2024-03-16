@@ -6,7 +6,7 @@
 GEODE           = trayapps
 ASM_TO_OBJS     =
 UI_TO_RDFS      =
-SRCS            = trayapps.goc
+SRCS            = trayapps.goc appicon.goh
 OBJS            = trayapps.obj
 LOBJS           =
 
