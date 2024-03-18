@@ -20,6 +20,7 @@ class & message definitions
 
 @class  TrayAppsApplicationClass, GenApplicationClass;
     @message void MSG_EMC_INTERACTION_CREATED(CreateExpressMenuControlItemResponseParams *response = ss:bp);
+    @message void MSG_REMOVE_EMC_FROM_LIST(optr affectedExpressMenuControl);
     @instance   optr    TAAC_itemList      = NullOptr; // this gonna be a ChunkArray soon
 @endc   /* end of class definition */
 
@@ -123,12 +124,13 @@ add ourselves to a new express menu
 // 		GCNEMNT_CREATED,
 // 		GCNEMNT_DESTROYED
 // 	} GCNExpressMenuNotificationTypes;
-
-// @importMessage	MetaGCNMessages, void MSG_NOTIFY_EXPRESS_MENU_CHANGE(
-// 				GCNExpressMenuNotificationTypes type = bp,
-// 				optr affectedExpressMenuControl = cx:dx);
+//
+//  @importMessage	MetaGCNMessages, void MSG_NOTIFY_EXPRESS_MENU_CHANGE(
+//   				GCNExpressMenuNotificationTypes type = bp,
+//      			optr affectedExpressMenuControl = cx:dx);
 
     CreateExpressMenuControlItemParams  cemcip;
+    TaiEmcComboStruct                   *elem = (void*) 0;
 
     if (type == GCNEMNT_CREATED)
     {
@@ -140,6 +142,11 @@ add ourselves to a new express menu
         cemcip.CEMCIP_field = NullOptr;
 
         @call affectedExpressMenuControl::MSG_EXPRESS_MENU_CONTROL_CREATE_ITEM(cemcip);
+    }
+
+    if (type == GCNEMNT_DESTROYED)
+    {
+        @send GeodeGetAppObject(0)::MSG_REMOVE_EMC_FROM_LIST(affectedExpressMenuControl);
     }
 }
 
@@ -188,7 +195,6 @@ prepare our demise
 -------------------------------------------------------------------*/
 @method TrayAppsProcessClass, MSG_GEN_PROCESS_CLOSE_APPLICATION
 {
-    (void) GCNListRemove(oself, MANUFACTURER_ID_GEOWORKS, GCNSLT_EXPRESS_MENU_CHANGE); // GeodeGetProcessHandle
     return(@callsuper());
 }
 
@@ -249,6 +255,35 @@ initializes the newly created Express menu trigger
     }
 }
 
+/*-------------------------------------------------------------------
+get itemList optr
+-------------------------------------------------------------------*/
+@method TrayAppsApplicationClass, MSG_REMOVE_EMC_FROM_LIST
+{
+    CreateExpressMenuControlItemParams  cemcip;
+    TaiEmcComboStruct                   *elem = (void*) 0;
+    word                                numElem = 0;
+    word                                i = 0;
+
+    MemLock(HandleOf(pself->TAAC_itemList));
+    numElem = ChunkArrayGetCount(pself->TAAC_itemList);
+
+    for (i = 0; i < numElem; i++)
+    {
+        elem = (TaiEmcComboStruct*) ChunkArrayElementToPtr(pself->TAAC_itemList, i,	(void*) 0);
+        if (elem->emc == affectedExpressMenuControl)
+        {
+            (void) ChunkArrayDeleteRange(
+                    pself->TAAC_itemList,           // optr to chunk array
+                    i,	                            // index of first element to delete
+                    1);			                    // # of elements to delete
+            break;
+        }
+    }
+
+    MemUnlock(HandleOf(pself->TAAC_itemList));
+}
+
 
 /*-------------------------------------------------------------------
 prepare our demise
@@ -258,6 +293,9 @@ prepare our demise
     TaiEmcComboStruct   *elem = (void*) 0;
     word                numElem = 0;
     word                i = 0;
+
+    (void) GCNListRemove(GeodeGetProcessHandle(), MANUFACTURER_ID_GEOWORKS, GCNSLT_EXPRESS_MENU_CHANGE); // GeodeGetProcessHandle
+
 
     if (pself->TAAC_itemList != NullOptr)
     {
