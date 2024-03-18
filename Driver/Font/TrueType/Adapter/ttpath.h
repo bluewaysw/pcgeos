@@ -53,4 +53,21 @@ void _pascal TrueType_Gen_In_Region(
                         const OutlineEntry*  outlineEntry,
                         MemHandle            varBlock );
 
+
+/***********************************************************************
+ *      wrapper functions
+ ***********************************************************************/
+
+extern void _pascal GrRegionPathMovePen(
+                        Handle regionHandle, sword x, sword y );
+
+extern void _pascal GrRegionPathLineTo( 
+                        Handle regionHandle, sword x, sword y );
+
+
+#ifdef __HIGHC__
+pragma Alias(GrRegionPathMovePen, "GRREGIONPATHMOVEPEN");
+pragma Alias(GrRegionPathLineTo, "GRREGIONPATHDRAWLINETO");
+#endif
+
 #endif  /* _TTPAHT_H_ */

@@ -31,6 +31,8 @@ static void ConvertOutline( GStateHandle gstate, TT_Outline* outline );
 
 static void MoveTo( GStateHandle gstate, TT_Vector* vec );
 
+static void RegionPathMoveTo( Handle regionHandle, TT_Vector* vec );
+
 static void LineTo( GStateHandle gstate, TT_Vector* vec );
 
 static void ConicTo( GStateHandle gstate, TT_Vector* v_control, TT_Vector* vec );
@@ -38,6 +40,10 @@ static void ConicTo( GStateHandle gstate, TT_Vector* v_control, TT_Vector* vec )
 static void WriteComment( TRUETYPE_VARS, GStateHandle gstate );
 
 static void ScaleOutline( TRUETYPE_VARS );
+
+static void StoreFontMatrix( TRUETYPE_VARS,
+                             TT_Matrix*      transMatrix,
+                             WWFixedAsDWord  pointSize );
 
 
 /********************************************************************
@@ -207,6 +213,7 @@ void _pascal TrueType_Gen_In_Region(
         TrueTypeOutlineEntry*  trueTypeOutline;
         TT_UShort              charIndex;
         XYValueAsDWord         cursorPos;
+        TT_Matrix              transMatrix;
 
 
 EC(     ECCheckGStateHandle( gstate ) );
@@ -233,8 +240,8 @@ EC(     ECCheckBounds( (void*)trueTypeOutline ) );
         /* get TT char index */
         charIndex = TT_Char_Index( CHAR_MAP, GeosCharToUnicode( character ) );
 
-        //TODO: store font matrix
-        //PathStoreFontMatrix( ttMatrix, fontMatrix );
+        /* store font matrix */
+        StoreFontMatrix( trueTypeVars, &transMatrix, pointSize );
 
         /* translate by current cursor position */
         cursorPos = GrGetCurPos( gstate );
@@ -410,6 +417,31 @@ static void MoveTo( GStateHandle gstate, TT_Vector* vec )
 
 
 /********************************************************************
+ *                      RegionPathMoveTo
+ ********************************************************************
+ * SYNOPSIS:	  Change current position.
+ * 
+ * PARAMETERS:    regionHandle          Handle to regionpath in which 
+ *                                      the position is changed.
+ *                *vec                  Ptr to Vector to new position.
+ * 
+ * RETURNS:       void
+ * 
+ * STRATEGY:      
+ * 
+ * REVISION HISTORY:
+ *      Date      Name      Description
+ *      ----      ----      -----------
+ *      14/03/24  JK        Initial Revision
+ *******************************************************************/
+
+static void RegionPathMoveTo( Handle regionHandle, TT_Vector* vec )
+{
+        GrRegionPathMovePen( regionHandle, vec->x, vec->y );
+}
+
+
+/********************************************************************
  *                      LineTo
  ********************************************************************
  * SYNOPSIS:	  Draw line to given position.
@@ -430,6 +462,31 @@ static void MoveTo( GStateHandle gstate, TT_Vector* vec )
 static void LineTo( GStateHandle gstate, TT_Vector* vec )
 {
         GrDrawLineTo( gstate, vec->x, vec->y );
+}
+
+
+/********************************************************************
+ *                      RegionPathLineTo
+ ********************************************************************
+ * SYNOPSIS:	  Draw line to given position.
+ * 
+ * PARAMETERS:    regionHandle          Handle to regionpath in which 
+ *                                      the line is drawed.
+ *                *vec                  Ptr. to Vector of end position.
+ * 
+ * RETURNS:       void
+ * 
+ * STRATEGY:      
+ * 
+ * REVISION HISTORY:
+ *      Date      Name      Description
+ *      ----      ----      -----------
+ *      14/03/24  JK        Initial Revision
+ *******************************************************************/
+
+static void RegionPathLineTo( Handle regionHandle, TT_Vector* vec )
+{
+        GrRegionPathLineTo( regionHandle, vec->x, vec->y );
 }
 
 
@@ -463,6 +520,32 @@ static void ConicTo( GStateHandle gstate, TT_Vector* v_control, TT_Vector* vec )
         p[1].P_y = p[2].P_y = vec->y;
 
         GrDrawCurveTo( gstate, p );
+}
+
+
+/********************************************************************
+ *                      RegionPathConicTo
+ ********************************************************************
+ * SYNOPSIS:	  Draw conic curve to given position.
+ * 
+ * PARAMETERS:    regionHandle          Handle to regionpath in which 
+ *                                      the curve is drawed.
+ *                *v_control            Vector with control point.
+ *                *vec                  Vector of new position.
+ * 
+ * RETURNS:       void
+ * 
+ * STRATEGY:      
+ * 
+ * REVISION HISTORY:
+ *      Date      Name      Description
+ *      ----      ----      -----------
+ *      14/03/24  JK        Initial Revision
+ *******************************************************************/
+
+static void RegionPathConicTo( Handle regionHandle, TT_Vector* v_control, TT_Vector* vec )
+{
+        //TODO
 }
 
 
@@ -608,4 +691,35 @@ static void ScaleOutline( TRUETYPE_VARS )
         scaleMatrix.xx = scaleMatrix.yy = GrUDivWWFixed( STANDARD_GRIDSIZE, UNITS_PER_EM );
 
         TT_Transform_Outline( &OUTLINE, &scaleMatrix );
+}
+
+
+/********************************************************************
+ *                      StoreFontMatrix
+ ********************************************************************
+ * SYNOPSIS:	  
+ * 
+ * PARAMETERS:    
+ * 
+ * RETURNS:       void   
+ * 
+ * STRATEGY:      
+ * 
+ * REVISION HISTORY:
+ *      Date      Name      Description
+ *      ----      ----      -----------
+ *      19/02/23  JK        Initial Revision
+ *******************************************************************/
+
+static void StoreFontMatrix( TRUETYPE_VARS,
+                             TT_Matrix*      transMatrix,
+                             WWFixedAsDWord  pointSize )
+{
+        WWFixedAsDWord scaleFactor = GrUDivWWFixed( pointSize, MakeWWFixed( UNITS_PER_EM ) );
+
+
+        transMatrix->xx = scaleFactor;
+        transMatrix->xy = 0L;
+        transMatrix->yx = 0L;
+        transMatrix->yy = scaleFactor;
 }

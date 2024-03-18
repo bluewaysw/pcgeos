@@ -153,9 +153,11 @@ TrueTypeGenInRegion	proc	far
 	push	di
 	mov	di, FONT_C_CODE_STACK_SPACE
 	call	ThreadBorrowStackSpace
-        pop     bx
+    pop     bx
 	push	di
-        mov     di, bx
+    mov     di, bx
+
+	;TODO: lock gstate
 
         ; building parameter stack
 	push 	di					;pass gstate handle
@@ -183,11 +185,67 @@ TrueTypeGenInRegion	proc	far
 	push	ds:variableHandle	;pass handle to truetype block
 	call	TRUETYPE_GEN_IN_REGION
 
+	;TODO: unlock gstate
+
 	pop	di
 	call	ThreadReturnStackSpace
 
 	.leave
 	ret
 TrueTypeGenInRegion	endp
+
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+C FUNCTION:	GrRegionPathMovePen
+
+C DECLARATION:	extern void
+			_far _pascal GrRegionPathMovePen(regionHandle, sword x, sword y);
+
+KNOWN BUGS/SIDE EFFECTS/CAVEATS/IDEAS:
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	JK		3/14/24		Initial version
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+GRREGIONPATHMOVEPEN		proc	far
+	C_GetThreeWordArgs	ax, cx, dx,  bx		;ax = regionHandle, cx = x, dx = y
+
+	push	es
+	mov		es, ax
+	call	GrRegionPathMovePen
+	pop		es
+	ret
+
+GRREGIONPATHMOVEPEN		endp
+
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+C FUNCTION:	GrRegionPathLineTo
+
+C DECLARATION:	extern void
+			_far _pascal GrRegionPathLineTo(regionHandle, sword x, sword y);
+
+KNOWN BUGS/SIDE EFFECTS/CAVEATS/IDEAS:
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	JK		3/14/24		Initial version
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+GRREGIONPATHDRAWLINETO	proc	far
+	C_GetThreeWordArgs	dx, cx, dx,  bx		;ax = regionHandle, cx = x, dx = y
+
+	push	es
+	mov		es, ax
+	call	GrRegionPathAddLineAtCP
+	pop		es
+	ret
+
+GRREGIONPATHDRAWLINETO	endp
 
 
