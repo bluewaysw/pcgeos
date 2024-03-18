@@ -45,7 +45,6 @@ library ansic
 #
 resource AppResource object
 
-export	TrayAppsApplicationClass
 export  TrayAppsInteractionClass
 export  GenGeodeTokenTriggerClass
 
