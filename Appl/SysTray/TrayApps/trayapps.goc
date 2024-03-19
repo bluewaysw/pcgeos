@@ -17,16 +17,14 @@ class & message definitions
 @class  TrayAppsProcessClass, GenProcessClass;
     @message void MSG_EMC_INTERACTION_CREATED(CreateExpressMenuControlItemResponseParams *response = ss:bp);
     @message (GEN_TRIGGER_ACTION) MSG_APP_TRIGGER_PRESSED;
+    @message word MSG_SET_TRAY_APPS_FOLDER_ID(); // returns Boolean
+    @message word MSG_READ_APPS_IN_FOLDER(MemHandle *trayFilesHan);
+    @message word MSG_COUNT_APPS_IN_FOLDER();
 @endc   /* end of class definition */
 
 @class  TrayAppsInteractionClass, GenInteractionClass;
-    @message void MSG_INIT_APP_TRIGGERS();
-    @message word MSG_SET_TRAY_APPS_FOLDER_ID();
-    @message word MSG_READ_APPS_IN_FOLDER(MemHandle *trayFilesHan);
-    @message word MSG_COUNT_APPS_IN_FOLDER();
+    @message void MSG_INIT_APP_TRIGGERS(MemHandle *trayFilesHan, word *trayFilesCount);
     @message void MSG_REMOVE_ALL_APP_TRIGGERS();
-    @instance   dword   G_trayAppsFolderID   = 0;
-    @instance   word    G_trayAppsFilesCount = 0;
 @endc
 
 @class GenGeodeTokenTriggerClass, GenTriggerClass;
@@ -65,6 +63,7 @@ UI Objects
 
 /*-------------------------------------------------------------------
 globals & constants
+instance data of process class
 -------------------------------------------------------------------*/
 #define MAX_TRAY_TRIGGERS_COUNT 25
 #define TRAYAPPS_STD_PATH       SP_USER_DATA
@@ -75,7 +74,9 @@ typedef struct
     optr    interaction;    // interaction for this express menu
 } TaiEmcComboStruct;
 
-optr    G_itemList      = NullOptr; // this gonna be a ChunkArray soon
+optr    G_itemList              = NullOptr; // this gonna be a ChunkArray soon
+dword   G_trayAppsFolderID      = 0;
+word    G_trayAppsFilesCount    = 0;
 
 
 /*-------------------------------------------------------------------
@@ -190,25 +191,32 @@ initializes the newly created Express menu trigger
 -------------------------------------------------------------------*/
 @method TrayAppsProcessClass, MSG_EMC_INTERACTION_CREATED
 {
-    TaiEmcComboStruct *elem = (void*) 0;
+    TaiEmcComboStruct   *elem = (void*) 0;
+    MemHandle           trayFilesHan = NullHandle;
 
-    if (G_itemList != NullOptr)
+    if (@call oself::MSG_SET_TRAY_APPS_FOLDER_ID())
     {
-        MemLock(HandleOf(G_itemList));
+        G_trayAppsFilesCount = @call oself::MSG_READ_APPS_IN_FOLDER(&trayFilesHan);
 
-        elem = (TaiEmcComboStruct*) ChunkArrayAppend(G_itemList, 0);
-        elem->emc = response->CEMCIRP_expressMenuControl;
-        elem->interaction = response->CEMCIRP_newItem;
+        if (G_itemList != NullOptr)
+        {
+            MemLock(HandleOf(G_itemList));
 
-        @call elem->interaction::MSG_GEN_SET_USABLE(VUM_NOW);
+            elem = (TaiEmcComboStruct*) ChunkArrayAppend(G_itemList, 0);
+            elem->emc = response->CEMCIRP_expressMenuControl;
+            elem->interaction = response->CEMCIRP_newItem;
 
-        (void) GCNListAdd(
-            elem->interaction,                  // optr to add to list
-            MANUFACTURER_ID_GEOWORKS,           // manufacturer ID of list
-            GCNSLT_FILE_SYSTEM
-        );
+            @call elem->interaction::MSG_GEN_SET_USABLE(VUM_NOW);
+            @call elem->interaction::MSG_INIT_APP_TRIGGERS(&trayFilesHan, &G_trayAppsFilesCount);
 
-        MemUnlock(HandleOf(G_itemList));
+            (void) GCNListAdd(
+                elem->interaction,                  // optr to add to list
+                MANUFACTURER_ID_GEOWORKS,           // manufacturer ID of list
+                GCNSLT_FILE_SYSTEM
+            );
+
+            MemUnlock(HandleOf(G_itemList));
+        }
     }
 }
 
@@ -249,6 +257,153 @@ one of our triggers has been pressed, launch app
     {
         IACPShutdown(iacpConnectionToken, NullOptr);
     }
+}
+
+/*-------------------------------------------------------------------
+add / remove / re-add launchers
+-------------------------------------------------------------------*/
+@method TrayAppsProcessClass, MSG_SET_TRAY_APPS_FOLDER_ID
+{
+    MemHandle   trayAppsFolderIDBlock = 0;
+    ChunkHandle trayAppsFolderIDChunk = 0;
+    FilePathID  *idArr = 0;
+
+    FilePushDir();
+    if (FileSetCurrentPath(TRAYAPPS_STD_PATH, _TEXT("TRAYAPPS")))
+    {
+        trayAppsFolderIDBlock = MemAllocLMem(LMEM_TYPE_GENERAL, 0);
+        trayAppsFolderIDChunk = FileGetCurrentPathIDs(trayAppsFolderIDBlock);
+        (void) MemLock(trayAppsFolderIDBlock);
+        idArr = (FilePathID*) LMemDerefHandles(trayAppsFolderIDBlock, trayAppsFolderIDChunk);
+        G_trayAppsFolderID = idArr->FPID_id;
+        MemUnlock(trayAppsFolderIDBlock);
+        return TRUE;
+    }
+    FilePopDir();
+
+    return FALSE;
+}
+
+/*-------------------------------------------------------------------
+let's see if someone put something in/out of our folder
+-------------------------------------------------------------------*/
+@method TrayAppsProcessClass, MSG_NOTIFY_FILE_CHANGE
+{
+    FileChangeBatchNotificationData *notificationData;
+    FileChangeBatchNotificationItem *notificationItem = 0;
+    MemHandle                       trayFilesHan = NullHandle;
+    word                            numFilesCurrent = 0;
+
+    if (notifyType == FCNT_BATCH)
+    {
+        notificationData = (FileChangeBatchNotificationData*) MemLock(data);
+        notificationItem = &notificationData->FCBND_notifications[0];
+
+        while(((word) notificationItem) < notificationData->FCBND_end)
+        {
+            word itemSize;
+
+            if ((notificationItem->FCBNI_type == FCNT_CREATE) &&
+                (G_trayAppsFolderID == notificationItem->FCBNI_id))
+            {
+                G_trayAppsFilesCount = @call oself::MSG_READ_APPS_IN_FOLDER(&trayFilesHan);
+                @call oself::MSG_INIT_APP_TRIGGERS(&trayFilesHan, &G_trayAppsFilesCount);
+                break;
+            }
+
+            if (notificationItem->FCBNI_type == FCNT_DELETE)
+            {
+                numFilesCurrent = @call oself::MSG_COUNT_APPS_IN_FOLDER();
+                if (numFilesCurrent < G_trayAppsFilesCount)
+                {
+                    G_trayAppsFilesCount = numFilesCurrent;
+                    (void) @call oself::MSG_READ_APPS_IN_FOLDER(&trayFilesHan);
+                    @call oself::MSG_INIT_APP_TRIGGERS(&trayFilesHan, &G_trayAppsFilesCount);
+                    break;
+                }
+            }
+
+            if (
+                 (notificationItem->FCBNI_type == FCNT_CREATE) ||
+                 (notificationItem->FCBNI_type == FCNT_RENAME)
+               )
+            {
+                /* skip large item for next */
+                itemSize = sizeof(FileChangeBatchNotificationItem);
+            }
+            else
+            {
+                /* skip small item for next */
+                itemSize = sizeof(offsetof(FileChangeBatchNotificationItem, FCBNI_name));
+            }
+
+            notificationItem = (FileChangeBatchNotificationItem*) (((byte*) notificationItem) + itemSize);
+        }
+
+        MemUnlock(data);
+    }
+
+    @callsuper();
+}
+
+/*-------------------------------------------------------------------
+read apps in folder into passed variable: MemHandle *trayFilesHan
+returns numOfFiles
+-------------------------------------------------------------------*/
+@method TrayAppsProcessClass, MSG_READ_APPS_IN_FOLDER
+{
+    FileEnumParams       fileEnumParams;
+    word                 filesNotHandled = NULL;
+    word                 numOfFiles = NULL;
+
+    fileEnumParams.FEP_searchFlags = FESF_GEOS_EXECS;
+    fileEnumParams.FEP_returnAttrs = (void*) FESRT_NAME;  /* Return the file's Geos filename.*/
+    fileEnumParams.FEP_returnSize = FILE_LONGNAME_BUFFER_SIZE;
+    fileEnumParams.FEP_bufSize = FE_BUFSIZE_UNLIMITED;    /* FE_BUFSIZE_UNLIMITED allows the return buffer size to be as large as necessary.*/
+    fileEnumParams.FEP_matchAttrs = 0;  /* Set matchAttrs to zero so it will match anything.*/
+    fileEnumParams.FEP_skipCount = 0;   /* Don't skip any files*/
+    fileEnumParams.FEP_callback = 0;   /* Don't need no callback. */
+
+    if (*trayFilesHan != NullHandle)
+    {
+        MemFree(*trayFilesHan);
+    }
+
+    FilePushDir();
+    FileSetCurrentPath(TRAYAPPS_STD_PATH, _TEXT("TRAYAPPS"));
+    numOfFiles = FileEnum(
+        &fileEnumParams,
+        trayFilesHan,
+        &filesNotHandled
+    );
+    FilePopDir();
+
+    return numOfFiles;
+}
+
+/*-------------------------------------------------------------------
+count apps in folder
+returns numOfFiles
+-------------------------------------------------------------------*/
+@method TrayAppsProcessClass, MSG_COUNT_APPS_IN_FOLDER
+{
+    FileEnumParams       fileEnumParams;
+    word                 numOfFiles = NULL;
+
+    fileEnumParams.FEP_searchFlags = FESF_GEOS_EXECS;
+    fileEnumParams.FEP_returnAttrs = (void*) FESRT_COUNT_ONLY;  /*Return the file's Geos filename.*/
+    fileEnumParams.FEP_returnSize = 0;
+    fileEnumParams.FEP_bufSize = FE_BUFSIZE_UNLIMITED;    /* FE_BUFSIZE_UNLIMITED allows the return buffer size to be as large as necessary.*/
+    fileEnumParams.FEP_matchAttrs = 0;  /* Set matchAttrs to zero so it will match anything.*/
+    fileEnumParams.FEP_skipCount = 0;   /* Don't skip any files*/
+    fileEnumParams.FEP_callback = 0;   /* Don't need no callback. */
+
+    FilePushDir();
+    FileSetCurrentPath(TRAYAPPS_STD_PATH, _TEXT("TRAYAPPS"));
+    (void) FileEnum(&fileEnumParams, NullHandle, &numOfFiles);
+    FilePopDir();
+
+    return numOfFiles;
 }
 
 /*-------------------------------------------------------------------
@@ -328,36 +483,6 @@ initialize
         sizeof(word),
         (void*) 0
     );
-
-    if (@call oself::MSG_SET_TRAY_APPS_FOLDER_ID())
-    {
-        @call oself::MSG_INIT_APP_TRIGGERS();
-    }
-}
-
-/*-------------------------------------------------------------------
-add / remove / re-add launchers
--------------------------------------------------------------------*/
-@method TrayAppsInteractionClass, MSG_SET_TRAY_APPS_FOLDER_ID
-{
-    MemHandle   trayAppsFolderIDBlock = 0;
-    ChunkHandle trayAppsFolderIDChunk = 0;
-    FilePathID  *idArr = 0;
-
-    FilePushDir();
-    if (FileSetCurrentPath(TRAYAPPS_STD_PATH, _TEXT("TRAYAPPS")))
-    {
-        trayAppsFolderIDBlock = MemAllocLMem(LMEM_TYPE_GENERAL, 0);
-        trayAppsFolderIDChunk = FileGetCurrentPathIDs(trayAppsFolderIDBlock);
-        (void) MemLock(trayAppsFolderIDBlock);
-        idArr = (FilePathID*) LMemDerefHandles(trayAppsFolderIDBlock, trayAppsFolderIDChunk);
-        pself->G_trayAppsFolderID = idArr->FPID_id;
-        MemUnlock(trayAppsFolderIDBlock);
-        return TRUE;
-    }
-    FilePopDir();
-
-    return FALSE;
 }
 
 /*-------------------------------------------------------------------
@@ -372,21 +497,19 @@ add / remove / re-add launchers
     GeodeToken          tok;
     char*               filePtr = (void*) 0;
     byte                triggerNo = 0;
-    MemHandle           trayFilesHan = NullHandle;
     MemHandle           triggerBlock = NullHandle;
 
     @call oself::MSG_REMOVE_ALL_APP_TRIGGERS();
 
     triggerBlock = OptrToHandle(oself);
 
-    pself->G_trayAppsFilesCount = @call oself::MSG_READ_APPS_IN_FOLDER(&trayFilesHan);
-    if (pself->G_trayAppsFilesCount > 0)
+    if (*trayFilesCount > 0)
     {
-        for (triggerNo=0; triggerNo < pself->G_trayAppsFilesCount; triggerNo++)
+        for (triggerNo=0; triggerNo < *trayFilesCount; triggerNo++)
         {
             if (triggerNo >= MAX_TRAY_TRIGGERS_COUNT) break;
 
-            filePtr = MemLock(trayFilesHan);
+            filePtr = MemLock(*trayFilesHan);
             filePtr = filePtr + (triggerNo * FILE_LONGNAME_BUFFER_SIZE);
             FileGetPathExtAttributes(filePtr, FEA_TOKEN, (&tok), sizeof(GeodeToken));
 
@@ -428,129 +551,9 @@ add / remove / re-add launchers
                 @call triggerObj::MSG_GEN_SET_USABLE(VUM_NOW);
             }
 
-            MemUnlock(trayFilesHan);
+            MemUnlock(*trayFilesHan);
         }
     }
-}
-
-/*-------------------------------------------------------------------
-let's see if someone put something in/out of our folder
--------------------------------------------------------------------*/
-@method TrayAppsInteractionClass, MSG_NOTIFY_FILE_CHANGE
-{
-    FileChangeBatchNotificationData *notificationData;
-    FileChangeBatchNotificationItem *notificationItem = 0;
-    word                            numFiles = 0;
-
-    if (notifyType == FCNT_BATCH)
-    {
-        notificationData = (FileChangeBatchNotificationData*) MemLock(data);
-        notificationItem = &notificationData->FCBND_notifications[0];
-
-        while(((word) notificationItem) < notificationData->FCBND_end)
-        {
-            word itemSize;
-
-            if ((notificationItem->FCBNI_type == FCNT_CREATE) &&
-                (pself->G_trayAppsFolderID == notificationItem->FCBNI_id))
-            {
-                pself->G_trayAppsFilesCount = @call oself::MSG_COUNT_APPS_IN_FOLDER();
-                @call oself::MSG_INIT_APP_TRIGGERS();
-                break;
-            }
-
-            if (notificationItem->FCBNI_type == FCNT_DELETE)
-            {
-                numFiles = @call oself::MSG_COUNT_APPS_IN_FOLDER();
-                if (numFiles < pself->G_trayAppsFilesCount)
-                {
-                    pself->G_trayAppsFilesCount = numFiles;
-                    @call oself::MSG_INIT_APP_TRIGGERS();
-                    break;
-                }
-            }
-
-            if (
-                 (notificationItem->FCBNI_type == FCNT_CREATE) ||
-                 (notificationItem->FCBNI_type == FCNT_RENAME)
-               )
-            {
-                /* skip large item for next */
-                itemSize = sizeof(FileChangeBatchNotificationItem);
-            }
-            else
-            {
-                /* skip small item for next */
-                itemSize = sizeof(offsetof(FileChangeBatchNotificationItem, FCBNI_name));
-            }
-
-            notificationItem = (FileChangeBatchNotificationItem*) (((byte*) notificationItem) + itemSize);
-        }
-
-        MemUnlock(data);
-    }
-
-    @callsuper();
-}
-
-/*-------------------------------------------------------------------
-read apps in folder into passed variable: MemHandle *trayFilesHan
-numOfFiles returned
--------------------------------------------------------------------*/
-@method TrayAppsInteractionClass, MSG_READ_APPS_IN_FOLDER
-{
-    FileEnumParams       fileEnumParams;
-    word                 filesNotHandled = NULL;
-    word                 numOfFiles = NULL;
-
-    fileEnumParams.FEP_searchFlags = FESF_GEOS_EXECS;
-    fileEnumParams.FEP_returnAttrs = (void*) FESRT_NAME;  /* Return the file's Geos filename.*/
-    fileEnumParams.FEP_returnSize = FILE_LONGNAME_BUFFER_SIZE;
-    fileEnumParams.FEP_bufSize = FE_BUFSIZE_UNLIMITED;    /* FE_BUFSIZE_UNLIMITED allows the return buffer size to be as large as necessary.*/
-    fileEnumParams.FEP_matchAttrs = 0;  /* Set matchAttrs to zero so it will match anything.*/
-    fileEnumParams.FEP_skipCount = 0;   /* Don't skip any files*/
-    fileEnumParams.FEP_callback = 0;   /* Don't need no callback. */
-
-    if (*trayFilesHan != NullHandle)
-    {
-        MemFree(*trayFilesHan);
-    }
-
-    FilePushDir();
-    FileSetCurrentPath(TRAYAPPS_STD_PATH, _TEXT("TRAYAPPS"));
-    numOfFiles = FileEnum(
-        &fileEnumParams,
-        trayFilesHan,
-        &filesNotHandled
-    );
-    FilePopDir();
-
-    return(numOfFiles);
-}
-
-/*-------------------------------------------------------------------
-count apps in folder
-numOfFiles returned
--------------------------------------------------------------------*/
-@method TrayAppsInteractionClass, MSG_COUNT_APPS_IN_FOLDER
-{
-    FileEnumParams       fileEnumParams;
-    word                 numOfFiles = NULL;
-
-    fileEnumParams.FEP_searchFlags = FESF_GEOS_EXECS;
-    fileEnumParams.FEP_returnAttrs = (void*) FESRT_COUNT_ONLY;  /*Return the file's Geos filename.*/
-    fileEnumParams.FEP_returnSize = 0;
-    fileEnumParams.FEP_bufSize = FE_BUFSIZE_UNLIMITED;    /* FE_BUFSIZE_UNLIMITED allows the return buffer size to be as large as necessary.*/
-    fileEnumParams.FEP_matchAttrs = 0;  /* Set matchAttrs to zero so it will match anything.*/
-    fileEnumParams.FEP_skipCount = 0;   /* Don't skip any files*/
-    fileEnumParams.FEP_callback = 0;   /* Don't need no callback. */
-
-    FilePushDir();
-    FileSetCurrentPath(TRAYAPPS_STD_PATH, _TEXT("TRAYAPPS"));
-    (void) FileEnum(&fileEnumParams, NullHandle, &numOfFiles);
-    FilePopDir();
-
-    return numOfFiles;
 }
 
 /*-------------------------------------------------------------------
