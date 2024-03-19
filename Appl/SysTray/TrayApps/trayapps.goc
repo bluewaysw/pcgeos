@@ -23,7 +23,7 @@ class & message definitions
 @endc   /* end of class definition */
 
 @class  TrayAppsInteractionClass, GenInteractionClass;
-    @message void MSG_INIT_APP_TRIGGERS(MemHandle *trayFilesHan, word *trayFilesCount);
+    @message void MSG_INIT_APP_TRIGGERS(MemHandle trayFilesHan, word trayFilesCount);
     @message void MSG_REMOVE_ALL_APP_TRIGGERS();
 @endc
 
@@ -207,7 +207,7 @@ initializes the newly created Express menu trigger
             elem->interaction = response->CEMCIRP_newItem;
 
             @call elem->interaction::MSG_GEN_SET_USABLE(VUM_NOW);
-            @call elem->interaction::MSG_INIT_APP_TRIGGERS(&trayFilesHan, &G_trayAppsFilesCount);
+            @call elem->interaction::MSG_INIT_APP_TRIGGERS(trayFilesHan, G_trayAppsFilesCount);
 
             (void) GCNListAdd(
                 elem->interaction,                  // optr to add to list
@@ -307,7 +307,7 @@ let's see if someone put something in/out of our folder
                 (G_trayAppsFolderID == notificationItem->FCBNI_id))
             {
                 G_trayAppsFilesCount = @call oself::MSG_READ_APPS_IN_FOLDER(&trayFilesHan);
-                @call oself::MSG_INIT_APP_TRIGGERS(&trayFilesHan, &G_trayAppsFilesCount);
+                @call oself::MSG_INIT_APP_TRIGGERS(trayFilesHan, G_trayAppsFilesCount);
                 break;
             }
 
@@ -318,7 +318,7 @@ let's see if someone put something in/out of our folder
                 {
                     G_trayAppsFilesCount = numFilesCurrent;
                     (void) @call oself::MSG_READ_APPS_IN_FOLDER(&trayFilesHan);
-                    @call oself::MSG_INIT_APP_TRIGGERS(&trayFilesHan, &G_trayAppsFilesCount);
+                    @call oself::MSG_INIT_APP_TRIGGERS(trayFilesHan, G_trayAppsFilesCount);
                     break;
                 }
             }
@@ -503,13 +503,16 @@ add / remove / re-add launchers
 
     triggerBlock = OptrToHandle(oself);
 
-    if (*trayFilesCount > 0)
+    ShowStopper();
+
+
+    if (trayFilesCount > 0)
     {
-        for (triggerNo=0; triggerNo < *trayFilesCount; triggerNo++)
+        for (triggerNo=0; triggerNo < trayFilesCount; triggerNo++)
         {
             if (triggerNo >= MAX_TRAY_TRIGGERS_COUNT) break;
 
-            filePtr = MemLock(*trayFilesHan);
+            filePtr = MemLock(trayFilesHan);
             filePtr = filePtr + (triggerNo * FILE_LONGNAME_BUFFER_SIZE);
             FileGetPathExtAttributes(filePtr, FEA_TOKEN, (&tok), sizeof(GeodeToken));
 
@@ -551,7 +554,7 @@ add / remove / re-add launchers
                 @call triggerObj::MSG_GEN_SET_USABLE(VUM_NOW);
             }
 
-            MemUnlock(*trayFilesHan);
+            MemUnlock(trayFilesHan);
         }
     }
 }
