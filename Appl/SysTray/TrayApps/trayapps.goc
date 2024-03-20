@@ -134,12 +134,32 @@ add our special GenInteraction to SysTray
 }
 
 /*-------------------------------------------------------------------
-add ourselves to a new express menu
+set tray apps folder ID
 -------------------------------------------------------------------*/
-@method TrayAppsProcessClass, MSG_NOTIFY_EXPRESS_MENU_CHANGE
+@method TrayAppsProcessClass, MSG_SET_TRAY_APPS_FOLDER_ID
 {
-// **Structures:**
-//
+    MemHandle   trayAppsFolderIDBlock = 0;
+    ChunkHandle trayAppsFolderIDChunk = 0;
+    FilePathID  *idArr = 0;
+
+    FilePushDir();
+    if (FileSetCurrentPath(TRAYAPPS_STD_PATH, _TEXT("TRAYAPPS")))
+    {
+        trayAppsFolderIDBlock = MemAllocLMem(LMEM_TYPE_GENERAL, 0);
+        trayAppsFolderIDChunk = FileGetCurrentPathIDs(trayAppsFolderIDBlock);
+        (void) MemLock(trayAppsFolderIDBlock);
+        idArr = (FilePathID*) LMemDerefHandles(trayAppsFolderIDBlock, trayAppsFolderIDChunk);
+        TAPC_folderID = idArr->FPID_id;
+        MemUnlock(trayAppsFolderIDBlock);
+        return TRUE;
+    }
+    FilePopDir();
+
+    return FALSE;
+}
+
+/*-------------------------------------------------------------------
+add / remove ourselves to / from a (new) express menu
 // 	typedef enum {
 // 		GCNEMNT_CREATED,
 // 		GCNEMNT_DESTROYED
@@ -148,7 +168,9 @@ add ourselves to a new express menu
 //  @importMessage	MetaGCNMessages, void MSG_NOTIFY_EXPRESS_MENU_CHANGE(
 //   				GCNExpressMenuNotificationTypes type = bp,
 //      			optr affectedExpressMenuControl = cx:dx);
-
+-------------------------------------------------------------------*/
+@method TrayAppsProcessClass, MSG_NOTIFY_EXPRESS_MENU_CHANGE
+{
     CreateExpressMenuControlItemParams  cemcip;
     TaiEmcComboStruct                   *elem = (void*) 0;
     word                                numElem = 0;
@@ -185,7 +207,7 @@ add ourselves to a new express menu
                     }
 
                     (void) ChunkArrayDeleteRange(
-                            TAPC_itemList,                  // optr to chunk array
+                            TAPC_itemList,               // optr to chunk array
                             i,	                         // index of first element to delete
                             1);			                 // # of elements to delete
                     break;
@@ -195,11 +217,10 @@ add ourselves to a new express menu
             MemUnlock(HandleOf(TAPC_itemList));
         }
     }
-
 }
 
 /*-------------------------------------------------------------------
-initializes the newly created Express menu trigger
+initializes a newly created tray apps interaction
 -------------------------------------------------------------------*/
 @method TrayAppsProcessClass, MSG_EMC_INTERACTION_CREATED
 {
@@ -258,31 +279,6 @@ one of our triggers has been pressed, launch app
     {
         IACPShutdown(iacpConnectionToken, NullOptr);
     }
-}
-
-/*-------------------------------------------------------------------
-add / remove / re-add launchers
--------------------------------------------------------------------*/
-@method TrayAppsProcessClass, MSG_SET_TRAY_APPS_FOLDER_ID
-{
-    MemHandle   trayAppsFolderIDBlock = 0;
-    ChunkHandle trayAppsFolderIDChunk = 0;
-    FilePathID  *idArr = 0;
-
-    FilePushDir();
-    if (FileSetCurrentPath(TRAYAPPS_STD_PATH, _TEXT("TRAYAPPS")))
-    {
-        trayAppsFolderIDBlock = MemAllocLMem(LMEM_TYPE_GENERAL, 0);
-        trayAppsFolderIDChunk = FileGetCurrentPathIDs(trayAppsFolderIDBlock);
-        (void) MemLock(trayAppsFolderIDBlock);
-        idArr = (FilePathID*) LMemDerefHandles(trayAppsFolderIDBlock, trayAppsFolderIDChunk);
-        TAPC_folderID = idArr->FPID_id;
-        MemUnlock(trayAppsFolderIDBlock);
-        return TRUE;
-    }
-    FilePopDir();
-
-    return FALSE;
 }
 
 /*-------------------------------------------------------------------
@@ -348,7 +344,7 @@ let's see if someone put something in/out of our folder
 
 
 /*-------------------------------------------------------------------
-update all our GenInteractions in every E-Menu
+update all our GenInteractions in every E-Menu / SysTray
 -------------------------------------------------------------------*/
 @method TrayAppsProcessClass, MSG_UPDATE_EVERY_TRAY_APPS_INTERACTION
 {
