@@ -724,6 +724,10 @@ TcpipInit	proc	far
 	;	
 	; Check host call if network interface is available
 	;
+		call	HostIfDetect
+		cmp	ax, 0
+		je	straightError
+
 		mov	ax, 1 
 		mov cx, 1
 		int	GEOS_HOST_API
@@ -801,6 +805,7 @@ endif
 		jmp	exit
 error:
 		call	TcpipExit
+straightError:
 		stc
 exit:
 		.leave

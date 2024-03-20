@@ -7,9 +7,8 @@ GEODE           = hsttcpip
 ASM_TO_OBJS     = hsttcpipManager.asm
 UI_TO_RDFS      = tcpipStrings.ui tcpipAddrCtrl.ui
 SRCS            = hsttcpipManager.asm tcpipAddrCtrl.asm tcpipEntry.asm\
-                  dhcpConstant.def tcpip.def tcpipAddrCtrl.def\
-                  tcpipGlobal.def tcpipAddrCtrl.ui tcpipStrings.ui tcp.h\
-                  tcpip.h tcpip.goc
+                  tcpip.def tcpipAddrCtrl.def tcpipGlobal.def\
+                  tcpipAddrCtrl.ui tcpipStrings.ui tcpip.goc
 OBJS            = hsttcpipManager.obj tcpip.obj
 LOBJS           =
 
