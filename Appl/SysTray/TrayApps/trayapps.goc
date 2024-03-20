@@ -18,8 +18,9 @@ class & message definitions
     @message void MSG_EMC_INTERACTION_CREATED(CreateExpressMenuControlItemResponseParams *response = ss:bp);
     @message (GEN_TRIGGER_ACTION) MSG_APP_TRIGGER_PRESSED;
     @message word MSG_SET_TRAY_APPS_FOLDER_ID(); // returns Boolean
-    @message word MSG_READ_APPS_IN_FOLDER(MemHandle *trayFilesHan);
+    @message word MSG_READ_APPS_IN_FOLDER();    // reads into TAPC_filesMemHan
     @message word MSG_COUNT_APPS_IN_FOLDER();
+    @message void MSG_UPDATE_EVERY_TRAY_APPS_INTERACTION();
 @endc   /* end of class definition */
 
 @class  TrayAppsInteractionClass, GenInteractionClass;
@@ -35,6 +36,7 @@ class & message definitions
 @classdecl    TrayAppsProcessClass, neverSaved;
 @classdecl    TrayAppsInteractionClass;
 @classdecl    GenGeodeTokenTriggerClass;
+
 
 /*-------------------------------------------------------------------
 UI Objects
@@ -62,8 +64,7 @@ UI Objects
 
 
 /*-------------------------------------------------------------------
-globals & constants
-instance data of process class
+constants & structures
 -------------------------------------------------------------------*/
 #define MAX_TRAY_TRIGGERS_COUNT 25
 #define TRAYAPPS_STD_PATH       SP_USER_DATA
@@ -74,9 +75,14 @@ typedef struct
     optr    interaction;    // interaction for this express menu
 } TaiEmcComboStruct;
 
-optr    G_itemList              = NullOptr; // this gonna be a ChunkArray soon
-dword   G_trayAppsFolderID      = 0;
-word    G_trayAppsFilesCount    = 0;
+
+/*-------------------------------------------------------------------
+globals variables - "instance data" of process class
+-------------------------------------------------------------------*/
+optr        TAPC_itemList       = NullOptr; // this gonna be a ChunkArray soon
+dword       TAPC_folderID       = 0;
+word        TAPC_filesCount     = 0;
+MemHandle   TAPC_filesMemHan    = NullHandle;
 
 
 /*-------------------------------------------------------------------
@@ -101,7 +107,7 @@ add our special GenInteraction to SysTray
     {
         MemLock(block);
         ch = ChunkArrayCreate(block, sizeof(TaiEmcComboStruct), 0, 0);
-        G_itemList = ConstructOptr(block, ch);
+        TAPC_itemList = ConstructOptr(block, ch);
         MemUnlock(block);
     }
 
@@ -115,10 +121,16 @@ add our special GenInteraction to SysTray
     event = @record ExpressMenuControlClass::MSG_EXPRESS_MENU_CONTROL_CREATE_ITEM(cemcip);
     GCNListSend(MANUFACTURER_ID_GEOWORKS, GCNSLT_EXPRESS_MENU_OBJECTS, event, 0, 0);
 
-	//
-	// add ourselves to GCNSLT_EXPRESS_MENU_CHANGE list
-	//
+    // add ourselves to GCNSLT_EXPRESS_MENU_CHANGE list
     (void) GCNListAdd(oself, MANUFACTURER_ID_GEOWORKS, GCNSLT_EXPRESS_MENU_CHANGE); // GeodeGetProcessHandle
+
+    if (@call oself::MSG_SET_TRAY_APPS_FOLDER_ID())
+    {
+        TAPC_filesCount = @call oself::MSG_READ_APPS_IN_FOLDER();
+    }
+
+    // add ourselves to GCNSLT_FILE_SYSTEM list
+    (void) GCNListAdd(oself, MANUFACTURER_ID_GEOWORKS, GCNSLT_FILE_SYSTEM);
 }
 
 /*-------------------------------------------------------------------
@@ -156,31 +168,31 @@ add ourselves to a new express menu
 
     if (type == GCNEMNT_DESTROYED)
     {
-        if (G_itemList != NullOptr)
+        if (TAPC_itemList != NullOptr)
         {
-            MemLock(HandleOf(G_itemList));
-            numElem = ChunkArrayGetCount(G_itemList);
+            MemLock(HandleOf(TAPC_itemList));
+            numElem = ChunkArrayGetCount(TAPC_itemList);
 
             for (i = 0; i < numElem; i++)
             {
-                elem = (TaiEmcComboStruct*) ChunkArrayElementToPtr(G_itemList, i, (void*) 0);
+                elem = (TaiEmcComboStruct*) ChunkArrayElementToPtr(TAPC_itemList, i, (void*) 0);
                 if (elem->emc == affectedExpressMenuControl)
                 {
-                    (void) GCNListRemove(               // take us off of notification list
-                        elem->interaction,              // optr of thread to remove from list
-                        MANUFACTURER_ID_GEOWORKS,       // manufacturer ID of list
-                        GCNSLT_FILE_SYSTEM
-                    );
+                    //if this is the last element, remove ourselves from GCNSLT_FILE_SYSTEM
+                    if (numElem == 1)
+                    {
+                        (void) GCNListRemove(oself, MANUFACTURER_ID_GEOWORKS, GCNSLT_FILE_SYSTEM);
+                    }
 
                     (void) ChunkArrayDeleteRange(
-                            G_itemList,                  // optr to chunk array
+                            TAPC_itemList,                  // optr to chunk array
                             i,	                         // index of first element to delete
                             1);			                 // # of elements to delete
                     break;
                 }
             }
 
-            MemUnlock(HandleOf(G_itemList));
+            MemUnlock(HandleOf(TAPC_itemList));
         }
     }
 
@@ -192,31 +204,20 @@ initializes the newly created Express menu trigger
 @method TrayAppsProcessClass, MSG_EMC_INTERACTION_CREATED
 {
     TaiEmcComboStruct   *elem = (void*) 0;
-    MemHandle           trayFilesHan = NullHandle;
 
-    if (@call oself::MSG_SET_TRAY_APPS_FOLDER_ID())
+    if (TAPC_itemList != NullOptr)
     {
-        G_trayAppsFilesCount = @call oself::MSG_READ_APPS_IN_FOLDER(&trayFilesHan);
+        MemLock(HandleOf(TAPC_itemList));
 
-        if (G_itemList != NullOptr)
-        {
-            MemLock(HandleOf(G_itemList));
+        elem = (TaiEmcComboStruct*) ChunkArrayAppend(TAPC_itemList, 0);
 
-            elem = (TaiEmcComboStruct*) ChunkArrayAppend(G_itemList, 0);
-            elem->emc = response->CEMCIRP_expressMenuControl;
-            elem->interaction = response->CEMCIRP_newItem;
+        elem->emc = response->CEMCIRP_expressMenuControl;
+        elem->interaction = response->CEMCIRP_newItem;
 
-            @call elem->interaction::MSG_GEN_SET_USABLE(VUM_NOW);
-            @call elem->interaction::MSG_INIT_APP_TRIGGERS(trayFilesHan, G_trayAppsFilesCount);
+        @call elem->interaction::MSG_GEN_SET_USABLE(VUM_NOW);
+        @call elem->interaction::MSG_INIT_APP_TRIGGERS(TAPC_filesMemHan, TAPC_filesCount);
 
-            (void) GCNListAdd(
-                elem->interaction,                  // optr to add to list
-                MANUFACTURER_ID_GEOWORKS,           // manufacturer ID of list
-                GCNSLT_FILE_SYSTEM
-            );
-
-            MemUnlock(HandleOf(G_itemList));
-        }
+        MemUnlock(HandleOf(TAPC_itemList));
     }
 }
 
@@ -275,7 +276,7 @@ add / remove / re-add launchers
         trayAppsFolderIDChunk = FileGetCurrentPathIDs(trayAppsFolderIDBlock);
         (void) MemLock(trayAppsFolderIDBlock);
         idArr = (FilePathID*) LMemDerefHandles(trayAppsFolderIDBlock, trayAppsFolderIDChunk);
-        G_trayAppsFolderID = idArr->FPID_id;
+        TAPC_folderID = idArr->FPID_id;
         MemUnlock(trayAppsFolderIDBlock);
         return TRUE;
     }
@@ -291,7 +292,6 @@ let's see if someone put something in/out of our folder
 {
     FileChangeBatchNotificationData *notificationData;
     FileChangeBatchNotificationItem *notificationItem = 0;
-    MemHandle                       trayFilesHan = NullHandle;
     word                            numFilesCurrent = 0;
 
     if (notifyType == FCNT_BATCH)
@@ -304,21 +304,21 @@ let's see if someone put something in/out of our folder
             word itemSize;
 
             if ((notificationItem->FCBNI_type == FCNT_CREATE) &&
-                (G_trayAppsFolderID == notificationItem->FCBNI_id))
+                (TAPC_folderID == notificationItem->FCBNI_id))
             {
-                G_trayAppsFilesCount = @call oself::MSG_READ_APPS_IN_FOLDER(&trayFilesHan);
-                @call oself::MSG_INIT_APP_TRIGGERS(trayFilesHan, G_trayAppsFilesCount);
+                TAPC_filesCount = @call oself::MSG_READ_APPS_IN_FOLDER();
+                @call oself::MSG_UPDATE_EVERY_TRAY_APPS_INTERACTION();
                 break;
             }
 
             if (notificationItem->FCBNI_type == FCNT_DELETE)
             {
                 numFilesCurrent = @call oself::MSG_COUNT_APPS_IN_FOLDER();
-                if (numFilesCurrent < G_trayAppsFilesCount)
+                if (numFilesCurrent < TAPC_filesCount)
                 {
-                    G_trayAppsFilesCount = numFilesCurrent;
-                    (void) @call oself::MSG_READ_APPS_IN_FOLDER(&trayFilesHan);
-                    @call oself::MSG_INIT_APP_TRIGGERS(trayFilesHan, G_trayAppsFilesCount);
+                    TAPC_filesCount = numFilesCurrent;
+                    (void) @call oself::MSG_READ_APPS_IN_FOLDER();
+                    @call oself::MSG_UPDATE_EVERY_TRAY_APPS_INTERACTION();
                     break;
                 }
             }
@@ -346,8 +346,33 @@ let's see if someone put something in/out of our folder
     @callsuper();
 }
 
+
 /*-------------------------------------------------------------------
-read apps in folder into passed variable: MemHandle *trayFilesHan
+update all our GenInteractions in every E-Menu
+-------------------------------------------------------------------*/
+@method TrayAppsProcessClass, MSG_UPDATE_EVERY_TRAY_APPS_INTERACTION
+{
+    word                i = 0;
+    word                numElem = 0;
+    TaiEmcComboStruct   *elem = (void*) 0;
+
+    if (TAPC_itemList != NullOptr)
+    {
+        MemLock(HandleOf(TAPC_itemList));
+        numElem = ChunkArrayGetCount(TAPC_itemList);
+
+        for (i = 0; i < numElem; i++)
+        {
+            elem = (TaiEmcComboStruct*) ChunkArrayElementToPtr(TAPC_itemList, i, (void*) 0);
+            @call elem->interaction::MSG_INIT_APP_TRIGGERS(TAPC_filesMemHan, TAPC_filesCount);
+        }
+
+        MemUnlock(HandleOf(TAPC_itemList));
+    }
+}
+
+/*-------------------------------------------------------------------
+read apps in folder into TAPC_filesMemHan
 returns numOfFiles
 -------------------------------------------------------------------*/
 @method TrayAppsProcessClass, MSG_READ_APPS_IN_FOLDER
@@ -364,16 +389,16 @@ returns numOfFiles
     fileEnumParams.FEP_skipCount = 0;   /* Don't skip any files*/
     fileEnumParams.FEP_callback = 0;   /* Don't need no callback. */
 
-    if (*trayFilesHan != NullHandle)
+    if (TAPC_filesMemHan != NullHandle)
     {
-        MemFree(*trayFilesHan);
+        MemFree(TAPC_filesMemHan);
     }
 
     FilePushDir();
     FileSetCurrentPath(TRAYAPPS_STD_PATH, _TEXT("TRAYAPPS"));
     numOfFiles = FileEnum(
         &fileEnumParams,
-        trayFilesHan,
+        &TAPC_filesMemHan,
         &filesNotHandled
     );
     FilePopDir();
@@ -415,29 +440,30 @@ prepare our demise
     word                numElem = 0;
     word                i = 0;
 
-    (void) GCNListRemove(oself, MANUFACTURER_ID_GEOWORKS, GCNSLT_EXPRESS_MENU_CHANGE); // GeodeGetProcessHandle
+    // this must be done in MSG_NOTIFY_EXPRESS_MENU_CHANGE, otherwise GEOS crashs on shutdown:
+    // (void) GCNListRemove(oself, MANUFACTURER_ID_GEOWORKS, GCNSLT_FILE_SYSTEM);
 
-    if (G_itemList != NullOptr)
+    (void) GCNListRemove(oself, MANUFACTURER_ID_GEOWORKS, GCNSLT_EXPRESS_MENU_CHANGE);
+
+    if (TAPC_itemList != NullOptr)
     {
-        MemLock(HandleOf(G_itemList));
-        numElem = ChunkArrayGetCount(G_itemList);
+        MemLock(HandleOf(TAPC_itemList));
+        numElem = ChunkArrayGetCount(TAPC_itemList);
 
         for (i = 0; i < numElem; i++)
         {
-            elem = (TaiEmcComboStruct*) ChunkArrayElementToPtr(G_itemList, i, (void*) 0);
-
-            (void) GCNListRemove(                   // take us off of notification list
-                elem->interaction,                  // optr of thread to remove from list
-                MANUFACTURER_ID_GEOWORKS,           // manufacturer ID of list
-                GCNSLT_FILE_SYSTEM
-            );
-
+            elem = (TaiEmcComboStruct*) ChunkArrayElementToPtr(TAPC_itemList, i, (void*) 0);
             @call elem->emc::MSG_EXPRESS_MENU_CONTROL_DESTROY_CREATED_ITEM(elem->interaction, VUM_NOW);
         }
 
-        MemUnlock(HandleOf(G_itemList));
-        MemFree(HandleOf(G_itemList));
-        G_itemList = NullOptr;
+        MemUnlock(HandleOf(TAPC_itemList));
+        MemFree(HandleOf(TAPC_itemList));
+        TAPC_itemList = NullOptr;
+    }
+
+    if (TAPC_filesMemHan != NullHandle)
+    {
+        MemFree(TAPC_filesMemHan);
     }
 
     return(@callsuper());
@@ -503,58 +529,60 @@ add / remove / re-add launchers
 
     triggerBlock = OptrToHandle(oself);
 
-    ShowStopper();
-
-
     if (trayFilesCount > 0)
     {
         for (triggerNo=0; triggerNo < trayFilesCount; triggerNo++)
         {
             if (triggerNo >= MAX_TRAY_TRIGGERS_COUNT) break;
 
-            filePtr = MemLock(trayFilesHan);
-            filePtr = filePtr + (triggerNo * FILE_LONGNAME_BUFFER_SIZE);
-            FileGetPathExtAttributes(filePtr, FEA_TOKEN, (&tok), sizeof(GeodeToken));
-
-            triggerObj = ObjInstantiate(triggerBlock, &GenGeodeTokenTriggerClass);
-
-            if (triggerObj != NullOptr)
+            FilePushDir();
+            if (FileSetCurrentPath(TRAYAPPS_STD_PATH, _TEXT("TRAYAPPS")))
             {
-                @call oself::MSG_GEN_ADD_CHILD(triggerObj, CCO_LAST);
+                filePtr = MemLock(trayFilesHan);
+                filePtr = filePtr + (triggerNo * FILE_LONGNAME_BUFFER_SIZE);
+                FileGetPathExtAttributes(filePtr, FEA_TOKEN, (&tok), sizeof(GeodeToken));
 
-                isGMoniker = TokenLoadMonikerBlock(
-                    TOKEN_CHARS(tok.GT_chars[0],tok.GT_chars[1],tok.GT_chars[2],tok.GT_chars[3]),
-                    tok.GT_manufID,
-                    (DT_DISP_SIZE | DT_DISP_ASPECT_RATIO | DT_DISP_CLASS),
-                    ((VMSF_GSTRING) | (VMS_TOOL << VMSF_STYLE_OFFSET)),
-                    &monikerSize,
-                    &newMoniker
-                );
+                triggerObj = ObjInstantiate(triggerBlock, &GenGeodeTokenTriggerClass);
 
-                if (isGMoniker)
+                if (triggerObj != NullOptr)
                 {
-                    @call triggerObj::MSG_GEN_REPLACE_VIS_MONIKER(
-                        VUM_NOW,
-                        0, 0, monikerSize,
-                        VMDT_VIS_MONIKER,
-                        VMST_HPTR,
-                        (dword)(ConstructOptr(newMoniker, 0))
+                    @call oself::MSG_GEN_ADD_CHILD(triggerObj, CCO_LAST);
+
+                    isGMoniker = TokenLoadMonikerBlock(
+                        TOKEN_CHARS(tok.GT_chars[0],tok.GT_chars[1],tok.GT_chars[2],tok.GT_chars[3]),
+                        tok.GT_manufID,
+                        (DT_DISP_SIZE | DT_DISP_ASPECT_RATIO | DT_DISP_CLASS),
+                        ((VMSF_GSTRING) | (VMS_TOOL << VMSF_STYLE_OFFSET)),
+                        &monikerSize,
+                        &newMoniker
                     );
 
-                    @call triggerObj::MSG_GEN_TRIGGER_SET_ACTION_MSG(MSG_APP_TRIGGER_PRESSED);
-                    @call triggerObj::MSG_GEN_TRIGGER_SET_DESTINATION(ConstructOptr(GeodeGetCodeProcessHandle(), 0));
-                    //@call obj::MSG_META_ADD_VAR_DATA(HINT_NO_BORDERS_ON_MONIKERS, 0, (void*) 0);
-                    @call triggerObj::MSG_META_ADD_VAR_DATA((ATTR_GEODE_TOKEN_TO_PASS & (~VDF_SAVE_TO_STATE)), sizeof(GeodeToken), &tok);
-                    @call triggerObj::MSG_META_ADD_VAR_DATA((ATTR_GEODE_FILE_NAME & (~VDF_SAVE_TO_STATE)), sizeof(FileLongName), filePtr);
-                    @call triggerObj::MSG_GEN_SET_USABLE(VUM_NOW);
+                    if (isGMoniker)
+                    {
+                        @call triggerObj::MSG_GEN_REPLACE_VIS_MONIKER(
+                            VUM_NOW,
+                            0, 0, monikerSize,
+                            VMDT_VIS_MONIKER,
+                            VMST_HPTR,
+                            (dword)(ConstructOptr(newMoniker, 0))
+                        );
 
-                    MemFree(newMoniker);
+                        @call triggerObj::MSG_GEN_TRIGGER_SET_ACTION_MSG(MSG_APP_TRIGGER_PRESSED);
+                        @call triggerObj::MSG_GEN_TRIGGER_SET_DESTINATION(ConstructOptr(GeodeGetCodeProcessHandle(), 0));
+                        //@call obj::MSG_META_ADD_VAR_DATA(HINT_NO_BORDERS_ON_MONIKERS, 0, (void*) 0);
+                        @call triggerObj::MSG_META_ADD_VAR_DATA((ATTR_GEODE_TOKEN_TO_PASS & (~VDF_SAVE_TO_STATE)), sizeof(GeodeToken), &tok);
+                        @call triggerObj::MSG_META_ADD_VAR_DATA((ATTR_GEODE_FILE_NAME & (~VDF_SAVE_TO_STATE)), sizeof(FileLongName), filePtr);
+                        @call triggerObj::MSG_GEN_SET_USABLE(VUM_NOW);
+
+                        MemFree(newMoniker);
+                    }
+
+                    @call triggerObj::MSG_GEN_SET_USABLE(VUM_NOW);
                 }
 
-                @call triggerObj::MSG_GEN_SET_USABLE(VUM_NOW);
+                MemUnlock(trayFilesHan);
             }
-
-            MemUnlock(trayFilesHan);
+            FilePopDir();
         }
     }
 }
