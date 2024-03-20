@@ -64,10 +64,18 @@ extern void _pascal GrRegionPathMovePen(
 extern void _pascal GrRegionPathLineTo( 
                         Handle regionHandle, sword x, sword y );
 
+extern void _pascal GrRegionPathCurveTo(
+                        Handle regionHandle, Point *points );
+
+extern void _pascal GrRegionPathInit(
+                        Handle regionHandle, word maxY);                        
+
 
 #ifdef __HIGHC__
 pragma Alias(GrRegionPathMovePen, "GRREGIONPATHMOVEPEN");
 pragma Alias(GrRegionPathLineTo, "GRREGIONPATHDRAWLINETO");
+pragma Alias(GrRegionPathDrawCurve, "GRREGIONPATHDRAWCURVE");
+pragma Alias(GrRegionPathInit, "GRREGIONPATHINIT");
 #endif
 
 #endif  /* _TTPAHT_H_ */

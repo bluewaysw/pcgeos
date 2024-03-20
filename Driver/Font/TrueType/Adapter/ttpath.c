@@ -35,7 +35,13 @@ static void RegionPathMoveTo( Handle regionHandle, TT_Vector* vec );
 
 static void LineTo( GStateHandle gstate, TT_Vector* vec );
 
+static void RegionPathLineTo( Handle regionHandle, TT_Vector* vec );
+
 static void ConicTo( GStateHandle gstate, TT_Vector* v_control, TT_Vector* vec );
+
+static void RegionPathConicTo( GStateHandle gstate, TT_Vector* v_control, TT_Vector* vec );
+
+static void RegionPathInit( Handle regionHandle, word maxY );
 
 static void WriteComment( TRUETYPE_VARS, GStateHandle gstate );
 
@@ -545,7 +551,40 @@ static void ConicTo( GStateHandle gstate, TT_Vector* v_control, TT_Vector* vec )
 
 static void RegionPathConicTo( Handle regionHandle, TT_Vector* v_control, TT_Vector* vec )
 {
-        //TODO
+        Point p[3];
+
+
+        p[0].P_x = v_control->x;
+        p[0].P_y = v_control->y;
+        p[1].P_x = p[2].P_x = vec->x;
+        p[1].P_y = p[2].P_y = vec->y;
+
+        GrRegionPathCurveTo( regionHandle, p );
+}
+
+
+/********************************************************************
+ *                      RegionPathInit
+ ********************************************************************
+ * SYNOPSIS:	  Initialize region path.
+ * 
+ * PARAMETERS:    regionHandle          Handle to regionpath in which 
+ *                                      the curve is drawed.
+ *                maxY                  Max value for y.
+ * 
+ * RETURNS:       void
+ * 
+ * STRATEGY:      
+ * 
+ * REVISION HISTORY:
+ *      Date      Name      Description
+ *      ----      ----      -----------
+ *      14/03/24  JK        Initial Revision
+ *******************************************************************/
+
+static void RegionPathInit( Handle regionHandle, word maxY )
+{
+        GrRegionPathInit( regionHandle, maxY );
 }
 
 

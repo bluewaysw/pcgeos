@@ -80,7 +80,7 @@ TrueTypeGenPath	proc	far
 	mov		cx, ds				;save ptr to FontInfo
 	mov		dx, di
 
-	mov		si, bx				;si <-> handle of GState
+	mov		si, bx				;si <- handle of GState
 	mov		bx, ODF_HEADER
 	call	FontDrFindOutlineData
 	push	ds					;pass ptr to OutlineEntry
@@ -159,7 +159,7 @@ TrueTypeGenInRegion	proc	far
 
 	;TODO: lock gstate
 
-        ; building parameter stack
+    ; building parameter stack
 	push 	di					;pass gstate handle
 	push	cx					;pass regionpath handle
 	push	dx					;pass character code	
@@ -200,7 +200,7 @@ COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 C FUNCTION:	GrRegionPathMovePen
 
 C DECLARATION:	extern void
-			_far _pascal GrRegionPathMovePen(regionHandle, sword x, sword y);
+			_far _pascal GrRegionPathMovePen(Handle regionHandle, sword x, sword y);
 
 KNOWN BUGS/SIDE EFFECTS/CAVEATS/IDEAS:
 
@@ -210,6 +210,7 @@ REVISION HISTORY:
 	JK		3/14/24		Initial version
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+
 GRREGIONPATHMOVEPEN		proc	far
 	C_GetThreeWordArgs	ax, cx, dx,  bx		;ax = regionHandle, cx = x, dx = y
 
@@ -227,7 +228,7 @@ COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 C FUNCTION:	GrRegionPathLineTo
 
 C DECLARATION:	extern void
-			_far _pascal GrRegionPathLineTo(regionHandle, sword x, sword y);
+			_far _pascal GrRegionPathLineTo(Handle regionHandle, sword x, sword y);
 
 KNOWN BUGS/SIDE EFFECTS/CAVEATS/IDEAS:
 
@@ -237,6 +238,7 @@ REVISION HISTORY:
 	JK		3/14/24		Initial version
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+
 GRREGIONPATHDRAWLINETO	proc	far
 	C_GetThreeWordArgs	dx, cx, dx,  bx		;ax = regionHandle, cx = x, dx = y
 
@@ -247,5 +249,61 @@ GRREGIONPATHDRAWLINETO	proc	far
 	ret
 
 GRREGIONPATHDRAWLINETO	endp
+
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+C FUNCTION:	GrRegionPathLineTo
+
+C DECLARATION:	extern void
+			_far _pascal GrRegionPathDrawCurve(Handle regionHandle, Point *points);
+
+KNOWN BUGS/SIDE EFFECTS/CAVEATS/IDEAS:
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	JK		3/19/24		Initial version
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+
+GRREGIONPATHDRAWCURVE	proc	far	regionpath:hptr, points:fptr
+				uses cx, bp, di, ds
+	.enter
+
+	clr		bp
+	mov		cx, REC_BEZIER_STACK
+	lds		di, points
+	call	GrRegionPathAddBezierAtCP
+
+	.leave
+	ret
+
+GRREGIONPATHDRAWCURVE	endp
+
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+C FUNCTION:	GrRegionPathInit
+
+C DECLARATION:	extern void
+			_far _pascal GrRegionPathInit(Handle regionHandle, word maxY);
+
+KNOWN BUGS/SIDE EFFECTS/CAVEATS/IDEAS:
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	JK		3/19/24		Initial version
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+
+GRREGIONPATHINIT	proc	far
+	C_GetTwoWordArgs	ax, bx, cx, dx		;bx = regionHandle, ax = maxY
+
+	;TODO
+
+	ret
+GRREGIONPATHINIT	endp	
 
 
