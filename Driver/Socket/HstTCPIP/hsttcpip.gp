@@ -26,6 +26,7 @@ library netutils
 library socket #noload
 library ansic
 library accpnt
+library hostif
 
 # Allow static linkage for the resolver library.
 ifdef STATIC_LINK_RESOLVER
