@@ -200,16 +200,10 @@ add / remove ourselves to / from a (new) express menu
                 elem = (TaiEmcComboStruct*) ChunkArrayElementToPtr(TAPC_itemList, i, (void*) 0);
                 if (elem->emc == affectedExpressMenuControl)
                 {
-                    //if this is the last element, remove ourselves from GCNSLT_FILE_SYSTEM
-                    if (numElem == 1)
-                    {
-                        (void) GCNListRemove(oself, MANUFACTURER_ID_GEOWORKS, GCNSLT_FILE_SYSTEM);
-                    }
-
                     (void) ChunkArrayDeleteRange(
-                            TAPC_itemList,               // optr to chunk array
-                            i,	                         // index of first element to delete
-                            1);			                 // # of elements to delete
+                                TAPC_itemList,           // optr to chunk array
+                                i,                       // index of first element to delete
+                                1);                      // # of elements to delete
                     break;
                 }
             }
@@ -427,6 +421,19 @@ returns numOfFiles
     return numOfFiles;
 }
 
+/*------------------------------------------------------------------
+take us off of lists
+this used to be done in MSG_GEN_PROCESS_CLOSE_APPLICATION,
+but that turned out to be too late
+------------------------------------------------------------------*/
+@method TrayAppsProcessClass, MSG_META_DETACH
+{
+    (void) GCNListRemove(oself, MANUFACTURER_ID_GEOWORKS, GCNSLT_FILE_SYSTEM);
+    (void) GCNListRemove(oself, MANUFACTURER_ID_GEOWORKS, GCNSLT_EXPRESS_MENU_CHANGE);
+
+    @callsuper();
+}
+
 /*-------------------------------------------------------------------
 prepare our demise
 -------------------------------------------------------------------*/
@@ -435,11 +442,6 @@ prepare our demise
     TaiEmcComboStruct   *elem = (void*) 0;
     word                numElem = 0;
     word                i = 0;
-
-    // this must be done in MSG_NOTIFY_EXPRESS_MENU_CHANGE, otherwise GEOS crashs on shutdown:
-    // (void) GCNListRemove(oself, MANUFACTURER_ID_GEOWORKS, GCNSLT_FILE_SYSTEM);
-
-    (void) GCNListRemove(oself, MANUFACTURER_ID_GEOWORKS, GCNSLT_EXPRESS_MENU_CHANGE);
 
     if (TAPC_itemList != NullOptr)
     {
