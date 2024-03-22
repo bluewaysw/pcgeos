@@ -10,6 +10,7 @@
 #include <Ansi/string.h>
 #include <Ansi/stdio.h>
 @include "options.goh"
+@include "laserdb.goh"
 
 @extern chunk NoExerciseFile;
 @extern chunk Level1Samp;
@@ -18,35 +19,11 @@
 
 /***************************************************************************
  *		Constants and defines:
+ *		See laserdb.goh for more
  ***************************************************************************/
 
 /* Name of database to hold exercises */
 #define EXERCISE_DATABASE_FILENAME        "exercise.vm"
-
-/* Exercise titles are limited in length */
-#define MAX_TITLE_LEN      80
-
-/* Exercises themselves are limited in length */
-#define MAX_EXERCISE_LEN   2048
-
-/* Number of exercises per lesson */
-#define NUM_EXERCISES      3
-
-/***************************************************************************
- *		Custom types:
- ***************************************************************************/
-
-typedef struct {
-    char    ES_title[MAX_TITLE_LEN] ;
-    char    ES_exercise[MAX_EXERCISE_LEN] ;
-} T_exerciseRecord ;
-
-typedef struct
-    {
-    word        MS_number ;
-    #define     MAX_EXERCISES   100
-    VMBlockHandle   MS_exercises[MAX_EXERCISES] ;
-} T_exerciseDatabaseMap ;
 
 /***************************************************************************
  *		Global variables:
@@ -167,8 +144,8 @@ void LaserExerciseDBOpen(void)
         VMSetMapBlock(G_exerciseDBFile, vmbh) ;
 
         /* Put in the dummy exercises */
-		  MemLock (OptrToHandle(@Level1Samp));
-		  for (i=0; i < NUM_EXERCISES; i++)  {
+	MemLock (OptrToHandle(@Level1Samp));
+	for (i=0; i < NUM_EXERCISES; i++)  {
             /* Put default items into the array */
             vmbh = VMGetMapBlock(G_exerciseDBFile) ;
             mapPtr = VMLock(G_exerciseDBFile, vmbh, &mh) ;
@@ -187,9 +164,10 @@ void LaserExerciseDBOpen(void)
 						  strcpy(G_exerciseString, LMemDeref(@Level3Samp)) ;
                     break ;
             } /* end of switch */
+            VMUnlock(mh);
             StoreExercise(i) ;
         } /* end of loop */
-		  MemLock (OptrToHandle(@Level1Samp));
+	MemUnlock (OptrToHandle(@Level1Samp));
 
         VMSave(G_exerciseDBFile) ;
     } else  {
