@@ -132,11 +132,12 @@ add our special GenInteraction to SysTray
     // add ourselves to GCNSLT_FILE_SYSTEM list
     (void) GCNListAdd(oself, MANUFACTURER_ID_GEOWORKS, GCNSLT_FILE_SYSTEM);
 
+    // add ourselves to GCNSLT_SHUTDOWN_CONTROL list
     GCNListAdd(oself, MANUFACTURER_ID_GEOWORKS, GCNSLT_SHUTDOWN_CONTROL);
 }
 
 /*-------------------------------------------------------------------
-set tray apps folder ID
+get and store tray apps folder ID
 -------------------------------------------------------------------*/
 @method TrayAppsProcessClass, MSG_SET_TRAY_APPS_FOLDER_ID
 {
@@ -161,7 +162,7 @@ set tray apps folder ID
 }
 
 /*-------------------------------------------------------------------
-add / remove ourselves to / from a (new) express menu
+react to express menu changes
 // 	typedef enum {
 // 		GCNEMNT_CREATED,
 // 		GCNEMNT_DESTROYED
@@ -178,6 +179,8 @@ add / remove ourselves to / from a (new) express menu
     word                                numElem = 0;
     word                                i = 0;
 
+    // if an express menu is added, add a TrayAppsInteractionClass to it
+    // store the E-Menu/TrayAppsInteractionClass combo
     if (type == GCNEMNT_CREATED)
     {
         cemcip.CEMCIP_feature = CEMCIF_SYSTEM_TRAY;
@@ -190,6 +193,8 @@ add / remove ourselves to / from a (new) express menu
         @call affectedExpressMenuControl::MSG_EXPRESS_MENU_CONTROL_CREATE_ITEM(cemcip);
     }
 
+    // if an express menu is removed, remove the stored reference to it
+    // NO NEED to remove ourselves from the e-menu first!
     if (type == GCNEMNT_DESTROYED)
     {
         if (TAPC_itemList != NullOptr)
@@ -216,7 +221,8 @@ add / remove ourselves to / from a (new) express menu
 }
 
 /*-------------------------------------------------------------------
-initializes a newly created tray apps interaction
+initializes a newly created TrayAppsInteractionClass item once
+it has been created by the e-menu
 -------------------------------------------------------------------*/
 @method TrayAppsProcessClass, MSG_EMC_INTERACTION_CREATED
 {
@@ -278,7 +284,8 @@ one of our triggers has been pressed, launch app
 }
 
 /*-------------------------------------------------------------------
-let's see if someone put something in/out of our folder
+let's see if someone put something in/out of our folder,
+update all our TrayAppsInteractionClasses in all e-menus
 -------------------------------------------------------------------*/
 @method TrayAppsProcessClass, MSG_NOTIFY_FILE_CHANGE
 {
@@ -340,7 +347,7 @@ let's see if someone put something in/out of our folder
 
 
 /*-------------------------------------------------------------------
-update all our GenInteractions in every E-Menu / SysTray
+update all our TrayAppsInteractionClass in every E-Menu / SysTray
 -------------------------------------------------------------------*/
 @method TrayAppsProcessClass, MSG_UPDATE_EVERY_TRAY_APPS_INTERACTION
 {
@@ -364,8 +371,8 @@ update all our GenInteractions in every E-Menu / SysTray
 }
 
 /*-------------------------------------------------------------------
-read apps in folder into TAPC_filesMemHan
-returns numOfFiles
+read apps in TRAYAPPS folder into TAPC_filesMemHan
+return numOfFiles
 -------------------------------------------------------------------*/
 @method TrayAppsProcessClass, MSG_READ_APPS_IN_FOLDER
 {
@@ -399,8 +406,8 @@ returns numOfFiles
 }
 
 /*-------------------------------------------------------------------
-count apps in folder
-returns numOfFiles
+count apps in TRAYAPPS folder
+return numOfFiles
 -------------------------------------------------------------------*/
 @method TrayAppsProcessClass, MSG_COUNT_APPS_IN_FOLDER
 {
@@ -426,7 +433,11 @@ returns numOfFiles
 /*------------------------------------------------------------------
 take us off of lists
 this used to be done in MSG_GEN_PROCESS_CLOSE_APPLICATION or
-MSG_META_DETACH but both turned out to be too late!
+MSG_META_DETACH, but this resulted in unspecific crashes on
+shutdown (synchronisation issues?). As our app only closes on
+system shutdown, we can take us off the lists here. Not ideal
+however - if the shutdown is interrupted, we could be dead in
+the water afterwards.
 ------------------------------------------------------------------*/
 @method TrayAppsProcessClass, MSG_META_CONFIRM_SHUTDOWN
 {
@@ -434,19 +445,23 @@ MSG_META_DETACH but both turned out to be too late!
     {
         (void) GCNListRemove(oself, MANUFACTURER_ID_GEOWORKS, GCNSLT_EXPRESS_MENU_CHANGE);
         (void) GCNListRemove(oself, MANUFACTURER_ID_GEOWORKS, GCNSLT_FILE_SYSTEM);
-
         SysShutdown(SST_CONFIRM_END, TRUE);
     }
 }
 
 /*-------------------------------------------------------------------
 prepare our demise
+destroy all our TrayAppsInteractionClass instances in all e-menus/
+SysTrays
 -------------------------------------------------------------------*/
 @method TrayAppsProcessClass, MSG_GEN_PROCESS_CLOSE_APPLICATION
 {
     TaiEmcComboStruct   *elem = (void*) 0;
     word                numElem = 0;
     word                i = 0;
+
+    (void) GCNListRemove(oself, MANUFACTURER_ID_GEOWORKS, GCNSLT_EXPRESS_MENU_CHANGE);
+    (void) GCNListRemove(oself, MANUFACTURER_ID_GEOWORKS, GCNSLT_FILE_SYSTEM);
 
     if (TAPC_itemList != NullOptr)
     {
@@ -488,6 +503,7 @@ TrayAppsInteractionClass
 
 /*-------------------------------------------------------------------
 initialize
+add some hints and kunz
 -------------------------------------------------------------------*/
 @method TrayAppsInteractionClass, MSG_META_INITIALIZE
 {
@@ -515,7 +531,7 @@ initialize
 }
 
 /*-------------------------------------------------------------------
-add / remove / re-add launchers
+add / remove / re-add our app launching triggers
 -------------------------------------------------------------------*/
 @method TrayAppsInteractionClass, MSG_INIT_APP_TRIGGERS
 {
