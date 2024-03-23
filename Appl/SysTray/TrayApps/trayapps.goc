@@ -110,7 +110,7 @@ add our special GenInteraction to SysTray
     CreateExpressMenuControlItemParams  cemcip;
     EventHandle                         event;
     MemHandle                           block = NullHandle;
-    ChunkHandle                         ch = NullChunk;
+    ChunkHandle                         ch = 0;
 
     @callsuper();
 
@@ -119,9 +119,6 @@ add our special GenInteraction to SysTray
     if (@call oself::MSG_SET_TRAY_APPS_FOLDER_ID())
     {
         TAPC_filesCount = @call oself::MSG_READ_APPS_IN_FOLDER();
-
-        // add ourselves to GCNSLT_FILE_SYSTEM list
-        (void) GCNListAdd(oself, MANUFACTURER_ID_GEOWORKS, GCNSLT_FILE_SYSTEM);
 
         // create our list of e-menu / TrayAppsInteractionClass items
         block = MemAllocLMem(LMEM_TYPE_GENERAL, 0);
@@ -145,10 +142,13 @@ add our special GenInteraction to SysTray
         GCNListSend(MANUFACTURER_ID_GEOWORKS, GCNSLT_EXPRESS_MENU_OBJECTS, event, 0, 0);
 
         // add ourselves to GCNSLT_EXPRESS_MENU_CHANGE list
-        (void) GCNListAdd(oself, MANUFACTURER_ID_GEOWORKS, GCNSLT_EXPRESS_MENU_CHANGE); // GeodeGetProcessHandle
+        (void) GCNListAdd(ConstructOptr(GeodeGetProcessHandle(), 0), MANUFACTURER_ID_GEOWORKS, GCNSLT_EXPRESS_MENU_CHANGE); // GeodeGetProcessHandle
+
+        // add ourselves to GCNSLT_FILE_SYSTEM list
+        (void) GCNListAdd(ConstructOptr(GeodeGetProcessHandle(), 0), MANUFACTURER_ID_GEOWORKS, GCNSLT_FILE_SYSTEM);
 
         // add ourselves to GCNSLT_SHUTDOWN_CONTROL list
-        (void) GCNListAdd(oself, MANUFACTURER_ID_GEOWORKS, GCNSLT_SHUTDOWN_CONTROL);
+        //(void) GCNListAdd(ConstructOptr(GeodeGetProcessHandle(), 0), MANUFACTURER_ID_GEOWORKS, GCNSLT_SHUTDOWN_CONTROL);
     }
     else
     {
@@ -201,7 +201,6 @@ get and store tray apps folder ID
         MemUnlock(trayAppsFolderIDBlock);
     }
 
-
     MemUnlock(HandleOf(@TrayAppsFolderName));
     FilePopDir();
 
@@ -227,7 +226,6 @@ react to express menu changes
     word                                i = 0;
 
     // if an express menu is added, add a TrayAppsInteractionClass to it
-    // store the E-Menu/TrayAppsInteractionClass combo
     if (type == GCNEMNT_CREATED)
     {
         cemcip.CEMCIP_feature = CEMCIF_SYSTEM_TRAY;
@@ -248,21 +246,19 @@ react to express menu changes
         {
             MemLock(HandleOf(TAPC_itemList));
             numElem = ChunkArrayGetCount(TAPC_itemList);
+            MemUnlock(HandleOf(TAPC_itemList));
 
             for (i = 0; i < numElem; i++)
             {
+                MemLock(HandleOf(TAPC_itemList));
                 elem = (TaiEmcComboStruct*) ChunkArrayElementToPtr(TAPC_itemList, i, (void*) 0);
                 if (elem->emc == affectedExpressMenuControl)
                 {
-                    (void) ChunkArrayDeleteRange(
-                                TAPC_itemList,           // optr to chunk array
-                                i,                       // index of first element to delete
-                                1);                      // # of elements to delete
+                    ChunkArrayDelete(TAPC_itemList, elem);
                     break;
                 }
+                MemUnlock(HandleOf(TAPC_itemList));
             }
-
-            MemUnlock(HandleOf(TAPC_itemList));
         }
     }
 }
@@ -270,6 +266,7 @@ react to express menu changes
 /*-------------------------------------------------------------------
 initializes a newly created TrayAppsInteractionClass item once
 it has been created by the e-menu
+store the E-Menu/TrayAppsInteractionClass combo
 -------------------------------------------------------------------*/
 @method TrayAppsProcessClass, MSG_EMC_INTERACTION_CREATED
 {
@@ -491,15 +488,22 @@ system shutdown, we can take us off the lists here. Not ideal
 however - if the shutdown is interrupted, we could be dead in
 the water afterwards.
 ------------------------------------------------------------------*/
-@method TrayAppsProcessClass, MSG_META_CONFIRM_SHUTDOWN
-{
-    if (type == GCNSCT_SHUTDOWN)
-    {
-        (void) GCNListRemove(oself, MANUFACTURER_ID_GEOWORKS, GCNSLT_EXPRESS_MENU_CHANGE);
-        (void) GCNListRemove(oself, MANUFACTURER_ID_GEOWORKS, GCNSLT_FILE_SYSTEM);
-        SysShutdown(SST_CONFIRM_END, TRUE);
-    }
-}
+//@method TrayAppsProcessClass, MSG_META_CONFIRM_SHUTDOWN
+//{
+//    if (type == GCNSCT_SHUTDOWN)
+//    {
+//        (void) GCNListRemove(ConstructOptr(GeodeGetProcessHandle(), 0), MANUFACTURER_ID_GEOWORKS, GCNSLT_EXPRESS_MENU_CHANGE);
+//        (void) GCNListRemove(ConstructOptr(GeodeGetProcessHandle(), 0), MANUFACTURER_ID_GEOWORKS, GCNSLT_FILE_SYSTEM);
+//        SysShutdown(SST_CONFIRM_END, TRUE);
+//    }
+//}
+
+//@method TrayAppsProcessClass, MSG_META_DETACH
+//{
+    //(void) GCNListRemove(ConstructOptr(GeodeGetProcessHandle(), 0), MANUFACTURER_ID_GEOWORKS, GCNSLT_EXPRESS_MENU_CHANGE);
+    //(void) GCNListRemove(ConstructOptr(GeodeGetProcessHandle(), 0), MANUFACTURER_ID_GEOWORKS, GCNSLT_FILE_SYSTEM);
+//}
+
 
 /*-------------------------------------------------------------------
 prepare our demise
@@ -511,6 +515,9 @@ SysTrays
     TaiEmcComboStruct   *elem = (void*) 0;
     word                numElem = 0;
     word                i = 0;
+
+    (void) GCNListRemove(ConstructOptr(GeodeGetProcessHandle(), 0), MANUFACTURER_ID_GEOWORKS, GCNSLT_EXPRESS_MENU_CHANGE);
+    (void) GCNListRemove(ConstructOptr(GeodeGetProcessHandle(), 0), MANUFACTURER_ID_GEOWORKS, GCNSLT_FILE_SYSTEM);
 
     if (TAPC_itemList != NullOptr)
     {
