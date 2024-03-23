@@ -44,6 +44,7 @@ library ansic
 # Standard discardable code resources do not need to be mentioned.
 #
 resource AppResource object
+resource Strings data, lmem, shared, read-only
 
 export  TrayAppsInteractionClass
 export  GenGeodeTokenTriggerClass
