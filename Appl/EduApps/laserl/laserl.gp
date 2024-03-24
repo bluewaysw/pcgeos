@@ -10,6 +10,7 @@ library ui
 library ansic
 resource AppResource ui-object
 resource Interface ui-object
+resource GameUi ui-object
 resource Strings lmem read-only shared
 resource LaserLettersArt1 lmem read-only shared
 resource IconResource ui-object
