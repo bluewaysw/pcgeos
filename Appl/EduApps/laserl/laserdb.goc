@@ -10,43 +10,23 @@
 #include <Ansi/string.h>
 #include <Ansi/stdio.h>
 @include "options.goh"
+@include "laserdb.goh"
 
 @extern chunk NoExerciseFile;
+@extern chunk Title1Samp;
 @extern chunk Level1Samp;
+@extern chunk Title2Samp;
 @extern chunk Level2Samp;
+@extern chunk Title3Samp;
 @extern chunk Level3Samp;
 
 /***************************************************************************
  *		Constants and defines:
+ *		See laserdb.goh for more
  ***************************************************************************/
 
 /* Name of database to hold exercises */
 #define EXERCISE_DATABASE_FILENAME        "exercise.vm"
-
-/* Exercise titles are limited in length */
-#define MAX_TITLE_LEN      80
-
-/* Exercises themselves are limited in length */
-#define MAX_EXERCISE_LEN   2048
-
-/* Number of exercises per lesson */
-#define NUM_EXERCISES      3
-
-/***************************************************************************
- *		Custom types:
- ***************************************************************************/
-
-typedef struct {
-    char    ES_title[MAX_TITLE_LEN] ;
-    char    ES_exercise[MAX_EXERCISE_LEN] ;
-} T_exerciseRecord ;
-
-typedef struct
-    {
-    word        MS_number ;
-    #define     MAX_EXERCISES   100
-    VMBlockHandle   MS_exercises[MAX_EXERCISES] ;
-} T_exerciseDatabaseMap ;
 
 /***************************************************************************
  *		Global variables:
@@ -167,29 +147,30 @@ void LaserExerciseDBOpen(void)
         VMSetMapBlock(G_exerciseDBFile, vmbh) ;
 
         /* Put in the dummy exercises */
-		  MemLock (OptrToHandle(@Level1Samp));
-		  for (i=0; i < NUM_EXERCISES; i++)  {
+	MemLock (OptrToHandle(@Level1Samp));
+	for (i=0; i < NUM_EXERCISES; i++)  {
             /* Put default items into the array */
             vmbh = VMGetMapBlock(G_exerciseDBFile) ;
             mapPtr = VMLock(G_exerciseDBFile, vmbh, &mh) ;
 
             switch (i)  {
                 case 0:
-                    strcpy(G_titleString, "Lesson 1 - Home Row (Step 1)") ;
-						  strcpy(G_exerciseString, LMemDeref(@Level1Samp)) ;
+                    strcpy(G_titleString, LMemDeref(@Title1Samp)) ;
+		    strcpy(G_exerciseString, LMemDeref(@Level1Samp)) ;
                     break ;
                 case 1:
-                    strcpy(G_titleString, "Lesson 1 - Home Row (Step 2)") ;
-						  strcpy(G_exerciseString, LMemDeref(@Level2Samp)) ;
+                    strcpy(G_titleString, LMemDeref(@Title2Samp)) ;
+		    strcpy(G_exerciseString, LMemDeref(@Level2Samp)) ;
                     break ;
                 case 2:
-                    strcpy(G_titleString, "Lesson 1 - Home Rom (Step 3)") ;
-						  strcpy(G_exerciseString, LMemDeref(@Level3Samp)) ;
+                    strcpy(G_titleString, LMemDeref(@Title3Samp)) ;
+		    strcpy(G_exerciseString, LMemDeref(@Level3Samp)) ;
                     break ;
             } /* end of switch */
+            VMUnlock(mh);
             StoreExercise(i) ;
         } /* end of loop */
-		  MemLock (OptrToHandle(@Level1Samp));
+	MemUnlock (OptrToHandle(@Level1Samp));
 
         VMSave(G_exerciseDBFile) ;
     } else  {
@@ -228,7 +209,9 @@ void RetrieveExercise(word index)
         p_map = VMLock(G_exerciseDBFile, mapBlock, &memMap) ;
 
         if (p_map->MS_exercises[index] == NullHandle)  {
-            G_titleString[0] = G_exerciseString[0] = '\0' ;
+            // If this happens, something is really wrong	
+            strcpy(G_titleString, "No exercise found - use numbers") ;
+            strcpy(G_exerciseString, "1234 5678 9012 3456 7890") ;
         } else  {
             p_exercise = VMLock(G_exerciseDBFile, p_map->MS_exercises[index], &mem) ;
             strcpy(G_titleString, p_exercise->ES_title) ;
