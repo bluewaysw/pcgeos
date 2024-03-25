@@ -1052,16 +1052,19 @@ long header(HTTPConnectionHandle conn, long *clret, word *responseCode)
                 contentlength = CL_UNKNOWN;
 #endif
         } else if (LocalCmpStringsNoCaseSBCS(p, strn("Content-Type:")) == 0) {
-            ChunkStrcpySBCS(p_conn->heap, &(p_conn->mimeTypeChunk), s);
+            /* ignore content type for "Not Modified" (WebOne proxy) */
+	    if (*responseCode != 304) {
+              ChunkStrcpySBCS(p_conn->heap, &(p_conn->mimeTypeChunk), s);
 #if PROGRESS_DISPLAY
-            /* get mime type from HTTP header */
-            if (p_conn->loadProgressDataP)
+              /* get mime type from HTTP header */
+              if (p_conn->loadProgressDataP)
 @ifdef DO_DBCS
-                xstrncpysbcstodbcs(p_conn->loadProgressDataP->LPD_mimeType, s, sizeof(p_conn->loadProgressDataP->LPD_mimeType)/sizeof(TCHAR));
+                  xstrncpysbcstodbcs(p_conn->loadProgressDataP->LPD_mimeType, s, sizeof(p_conn->loadProgressDataP->LPD_mimeType)/sizeof(TCHAR));
 @else
-                xstrncpy(p_conn->loadProgressDataP->LPD_mimeType, s, sizeof(p_conn->loadProgressDataP->LPD_mimeType));
+                  xstrncpy(p_conn->loadProgressDataP->LPD_mimeType, s, sizeof(p_conn->loadProgressDataP->LPD_mimeType));
 @endif
 #endif
+	    }
         } else if (LocalCmpStringsNoCaseSBCS(p, strn("Location:")) == 0) {
             if (*responseCode == 301 || *responseCode == 302) {
                 ChunkStrcpySBCS(p_conn->heap, &(p_conn->urlChunk), s);
