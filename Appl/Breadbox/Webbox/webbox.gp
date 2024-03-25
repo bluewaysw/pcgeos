@@ -40,7 +40,6 @@ resource Interface ui-object
 resource ButtonGroup ui-object
 resource SpeedTagRes ui-object
 resource DBRes ui-object
-resource AboutRes ui-object
 resource DocGroupResource object
 resource DisplayResource ui-object discard-only
 resource DocumentResource ui-object discard-only
@@ -77,4 +76,3 @@ export HTMTextClass
 export HTMPrimaryClass
 export SampleColorClass
 export FixedGenValueClass
-#usernotes "WebBox, Copyright 1997 Breadbox Computer"
