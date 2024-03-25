@@ -54,8 +54,8 @@ COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 		HostIfDetect
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-SYNOPSIS:	Determine if host side API is available an and if what
-		version is supported.
+SYNOPSIS:	Determine if host side API is available and in case it is
+		what version is supported.
 
 CALLED BY:	GLOBAL
 PASS:		nada
