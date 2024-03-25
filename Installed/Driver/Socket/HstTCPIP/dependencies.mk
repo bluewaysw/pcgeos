@@ -26,7 +26,7 @@ tcpip.eobj: geos.h heap.h geode.h resource.h ec.h object.h lmem.h \
                 Objects/gInterC.h Objects/Text/tCommon.h stylesh.h \
                 driver.h thread.h print.h Internal/spoolInt.h serialDr.h \
                 parallDr.h hugearr.h fileEnum.h sem.h
-tcpipStrings.rdef: c:/workspace/bluewaysw/pcgeos/Driver/Socket/HstTCPIP/tcpipStrings.ui
+tcpipStrings.rdef: tcpipStrings.ui
 tcpipAddrCtrl.rdef: generic.uih product.uih
 hsttcpipManager.obj \
 hsttcpipManager.eobj: geos.def heap.def geode.def Internal/interrup.def \
