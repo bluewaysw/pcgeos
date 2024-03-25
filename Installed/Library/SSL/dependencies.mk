@@ -1,7 +1,3 @@
-ssl.obj \
-ssl.eobj: ssl/sslManager.asm \
-                geos.def heap.def geode.def ec.def file.def \
-                Internal/host.def
 asn1_lib.obj \
 asn1_lib.eobj: Ansi/stdio.h geos.h crypto/cryptlib.h Ansi/stdlib.h \
                 Ansi/string.h e_os.h resource.h geode.h heap.h ec.h \
@@ -637,7 +633,7 @@ s2_clnt.eobj: geos.h resource.h Ansi/stdio.h rand/rand.h buffer/buffer.h \
                 asn1/errno.h evp/evp.h md5/md5.h sha/sha.h rc4/rc4.h \
                 rsa/rsa.h x509/x509.h x509/x509_vfy.h lhash/lhash.h \
                 asn1/pkcs7.h err/err.h ssl/ssl.h ssl/ssl2.h ssl/ssl3.h \
-                ssl/tls1.h ssl/ssl23.h
+                ssl/tls1.h ssl/ssl23.h hostif.h
 s2_enc.obj \
 s2_enc.eobj: Ansi/stdio.h geos.h ssl/ssl_locl.h Ansi/stdlib.h timer.h \
                 Ansi/string.h asn1/errno.h e_os.h resource.h geode.h \
@@ -736,7 +732,7 @@ ssl_algs.eobj: Ansi/stdio.h geos.h objects/objects.h bio/bio.h \
                 asn1/errno.h buffer/buffer.h evp/evp.h md5/md5.h \
                 sha/sha.h rc4/rc4.h rsa/rsa.h x509/x509.h x509/x509_vfy.h \
                 asn1/pkcs7.h err/err.h ssl/ssl.h ssl/ssl2.h ssl/ssl3.h \
-                ssl/tls1.h ssl/ssl23.h
+                ssl/tls1.h ssl/ssl23.h hostif.h
 ssl_asn1.obj \
 ssl_asn1.eobj: Ansi/stdio.h geos.h Ansi/stdlib.h asn1/asn1_mac.h \
                 asn1/asn1.h timedate.h bn/bn.h e_os.h resource.h geode.h \
@@ -772,7 +768,7 @@ ssl_lib.eobj: Ansi/stdio.h geos.h objects/objects.h bio/bio.h \
                 timer.h asn1/errno.h buffer/buffer.h evp/evp.h md5/md5.h \
                 sha/sha.h rc4/rc4.h rsa/rsa.h x509/x509.h x509/x509_vfy.h \
                 asn1/pkcs7.h err/err.h ssl/ssl.h ssl/ssl2.h ssl/ssl3.h \
-                ssl/tls1.h ssl/ssl23.h
+                ssl/tls1.h ssl/ssl23.h hostif.h
 ssl_rsa.obj \
 ssl_rsa.eobj: Ansi/stdio.h geos.h bio/bio.h crypto/crypto.h \
                 stack/stack.h objects/objects.h asn1/asn1.h timedate.h \
@@ -897,4 +893,4 @@ x_all.eobj: Ansi/stdio.h geos.h stack/stack.h crypto/cryptlib.h \
                 objects/objects.h x509/x509.h x509/x509_vfy.h \
                 lhash/lhash.h asn1/pkcs7.h
 
-sslEC.geo ssl.geo : geos.ldf ansic.ldf socket.ldf 
+sslEC.geo ssl.geo : geos.ldf ansic.ldf socket.ldf hostif.ldf 

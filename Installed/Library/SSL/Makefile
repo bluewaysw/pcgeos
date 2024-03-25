@@ -33,9 +33,9 @@ RC4             = rc4_enc.c rc4_skey.c rc4.h rc4_locl.h
 RSA             = rsa_eay.c rsa_lib.c rsa_none.c rsa_pk1.c rsa_sign.c\
                   rsa_ssl.c rsa.h
 SHA             = sha1dgst.c sha.h sha_locl.h
-SSL             = sslManager.asm s23_clnt.c s23_lib.c s23_meth.c s23_pkt.c\
-                  s2_clnt.c s2_enc.c s2_lib.c s2_meth.c s2_pkt.c s3_both.c\
-                  s3_clnt.c s3_enc.c s3_lib.c s3_meth.c s3_pkt.c ssl_algs.c\
+SSL             = s23_clnt.c s23_lib.c s23_meth.c s23_pkt.c s2_clnt.c\
+                  s2_enc.c s2_lib.c s2_meth.c s2_pkt.c s3_both.c s3_clnt.c\
+                  s3_enc.c s3_lib.c s3_meth.c s3_pkt.c ssl_algs.c\
                   ssl_asn1.c ssl_cert.c ssl_ciph.c ssl_lib.c ssl_rsa.c\
                   ssl_sess.c t1_clnt.c t1_enc.c t1_lib.c t1_meth.c ssl.h\
                   ssl2.h ssl23.h ssl3.h ssl_locl.h tls1.h
@@ -72,8 +72,8 @@ OBJS            = asn1_lib.obj a_bitstr.obj a_bmp.obj a_bool.obj\
                   t1_lib.obj t1_meth.obj stack.obj x509type.obj\
                   x509_cmp.obj x509_ext.obj x509_lu.obj x509_obj.obj\
                   x509_v3.obj x509_vfy.obj x_all.obj
-COMMON          = e_os.h ssl_host.h
-MODULES         = ssl
+COMMON          = e_os.h
+MODULES         =
 CMODULES        = asn1 bio bn buffer crypto err evp hmac lhash md5 objects\
                   rand rc4 rsa sha ssl stack x509
 SRCS            = $(ASN1) $(BIO) $(BN) $(BUFFER) $(CRYPTO) $(ERR) $(EVP)\

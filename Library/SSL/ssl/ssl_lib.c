@@ -70,7 +70,7 @@
 #include <socket.goh>
 #endif
 #include "ssl_locl.h"
-#include "ssl_host.h"
+#include <hostif.h>
 
 #ifndef GEOS_CLIENT
 char *SSL_version_str="SSLeay 0.9.0b 29-Jun-1998";
@@ -80,6 +80,10 @@ static STACK *ssl_meth=NULL;
 static STACK *ssl_ctx_meth=NULL;
 static int ssl_meth_num=0;
 static int ssl_ctx_meth_num=0;
+
+#ifdef COMPILE_OPTION_HOST_SERVICE
+extern Boolean hostApiAvailable;
+#endif
 
 SSL3_ENC_METHOD ssl3_undef_enc_method={
 	ssl_undefined_function,
@@ -164,10 +168,10 @@ SSL_CTX *ctx;
 	SSL *s;
 
 #ifdef COMPILE_OPTION_HOST_SERVICE
-	if(SSLCheckHost())
+	if(hostApiAvailable)
 		{
-		return (SSL *) SSLCallHost(
-			SSLHFN_SSL_NEW, (dword) ctx, (dword) NULL, 0);
+		return (SSL *) HostIfCall(
+			HIF_SSL_NEW, (dword) ctx, (dword) NULL, 0);
 		}
 #endif
         SSLEnter() ;
@@ -239,10 +243,10 @@ SSL *s;
 	int i;
 
 #ifdef COMPILE_OPTION_HOST_SERVICE
-	if(SSLCheckHost())
+	if(hostApiAvailable)
 		{
-		SSLCallHost(
-			SSLHFN_SSL_FREE, (dword) s, (dword) NULL, 0);
+		HostIfCall(
+			HIF_SSL_FREE, (dword) s, (dword) NULL, 0);
 		return;
 		}
 #endif
@@ -374,12 +378,12 @@ int fd;
 	BIO *bio=NULL;
 
 #ifdef COMPILE_OPTION_HOST_SERVICE
-	if(SSLCheckHost())
+	if(hostApiAvailable)
 		{
 		word intHdl = SocketGetIntSocketOption(fd, SO_CONNECTION_HDL);
 			
-		return (int) SSLCallHost(
-			SSLHFN_SSL_SET_FD, (dword) s, (dword)  
+		return (int) HostIfCall(
+			HIF_SSL_SET_FD, (dword) s, (dword)  
 			(dword) NULL, (word) intHdl);
 		}
 #endif
@@ -643,10 +647,10 @@ SSL *s;
         int result ;
 	
 #ifdef COMPILE_OPTION_HOST_SERVICE
-	if(SSLCheckHost())
+	if(hostApiAvailable)
 		{
-		return (int) SSLCallHost(
-			SSLHFN_SSL_CONNECT, (dword) s, (dword) NULL, 0);
+		return (int) HostIfCall(
+			HIF_SSL_CONNECT, (dword) s, (dword) NULL, 0);
 		}
 #endif
 	
@@ -678,10 +682,10 @@ int num;
 	int report ;
 
 #ifdef COMPILE_OPTION_HOST_SERVICE
-	if(SSLCheckHost())
+	if(hostApiAvailable)
 		{
-		return (int) SSLCallHost(
-			SSLHFN_SSL_READ, (dword) s, (dword) buf, num);
+		return (int) HostIfCall(
+			HIF_SSL_READ, (dword) s, (dword) buf, num);
 		}
 #endif
 
@@ -736,10 +740,10 @@ int num;
 	int report ;
 
 #ifdef COMPILE_OPTION_HOST_SERVICE
-	if(SSLCheckHost())
+	if(hostApiAvailable)
 		{
-		return (int) SSLCallHost(
-			SSLHFN_SSL_WRITE, (dword) s, (dword) buf, num);
+		return (int) HostIfCall(
+			HIF_SSL_WRITE, (dword) s, (dword) buf, num);
 		}
 #endif
 
@@ -773,10 +777,10 @@ SSL *s;
 		int report = 1 ;
 
 #ifdef COMPILE_OPTION_HOST_SERVICE
-	if(SSLCheckHost())
+	if(hostApiAvailable)
 		{
-		return (int) SSLCallHost(
-			SSLHFN_SSL_SHUTDOWN, (dword) s, (dword) NULL, 0);
+		return (int) HostIfCall(
+			HIF_SSL_SHUTDOWN, (dword) s, (dword) NULL, 0);
 		}
 #endif
 
@@ -1106,24 +1110,16 @@ SSL_SESSION *b;
 #pragma code_seg()
 #endif
 
-#ifdef COMPILE_OPTION_HOST_SERVICE
-dword SSLHostCallback() {
-	
-}
-#endif
-
 SSL_CTX * _export _pascal SSL_CTX_new(meth)
 SSL_METHOD *meth;
 	{
 	SSL_CTX *ret;
 
 #ifdef COMPILE_OPTION_HOST_SERVICE
-	if(SSLCheckHost())
+	if(hostApiAvailable)
 		{
-		SSLCallHost(
-			SSLHFN_SET_CALLBACK, (dword) SSLHostCallback, (dword) NULL, 0);
-		return (SSL_CTX *) SSLCallHost(
-			SSLHFN_SSL_CTX_NEW, (dword) NULL, (dword) NULL, 0);
+		return (SSL_CTX *) HostIfCall(
+			HIF_SSL_CTX_NEW, (dword) NULL, (dword) NULL, 0);
 		}
 #endif
 
@@ -1254,10 +1250,10 @@ SSL_CTX *a;
 	if (a == NULL) return;
 
 #ifdef COMPILE_OPTION_HOST_SERVICE
-	if(SSLCheckHost())
+	if(hostApiAvailable)
 		{
-		SSLCallHost(
-			SSLHFN_SSL_CTX_FREE, (dword) a, (dword) NULL, 0);
+		HostIfCall(
+			HIF_SSL_CTX_FREE, (dword) a, (dword) NULL, 0);
 		return;
 		}
 #endif
@@ -1558,10 +1554,10 @@ SSL *s;
 	SSL_METHOD *ret;
 
 #ifdef COMPILE_OPTION_HOST_SERVICE
-	if(SSLCheckHost())
+	if(hostApiAvailable)
 		{
-		return (SSL_METHOD *) SSLCallHost(
-			SSLHFN_SSL_GET_SSL_METHOD, (dword) s, (dword) NULL, 0);
+		return (SSL_METHOD *) HostIfCall(
+			HIF_SSL_GET_SSL_METHOD, (dword) s, (dword) NULL, 0);
 		}
 #endif
 	
@@ -1579,10 +1575,10 @@ SSL_METHOD *meth;
 	int ret=1;
 
 	#ifdef COMPILE_OPTION_HOST_SERVICE
-		if(SSLCheckHost())
+		if(hostApiAvailable)
 			{
-			return (SSL_METHOD *) SSLCallHost(
-				SSLHFN_SSL_GET_SSL_METHOD, (dword) s, (dword) NULL, 0);
+			return (SSL_METHOD *) HostIfCall(
+				HIF_SSL_GET_SSL_METHOD, (dword) s, (dword) NULL, 0);
 			}
 	#endif
 
@@ -1621,10 +1617,10 @@ int _pascal _export  SSL_set_tlsext_host_name(SSL *ssl, char *name)
 	int ret=1;
 
 	#ifdef COMPILE_OPTION_HOST_SERVICE
-		if(SSLCheckHost())
+		if(hostApiAvailable)
 			{
-			return (SSL_METHOD *) SSLCallHost(
-				SSLHFN_SSL_SET_TLSEXT_HOST_NAME, (dword) ssl, (dword) name, strlen(name));
+			return (SSL_METHOD *) HostIfCall(
+				HIF_SSL_SET_TLSEXT_HOST_NAME, (dword) ssl, (dword) name, strlen(name));
 			}
 	#endif
 	return(ret);
