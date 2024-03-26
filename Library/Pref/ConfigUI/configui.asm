@@ -379,10 +379,10 @@ taskbarDisabledLoop:
 		pop	bp
 		jmp	done
 
+taskBarEnabled:
 	;
 	; Disable items that are not available when the TaskBar is on
 	;
-taskBarEnabled:
 		mov	cx, length taskbarEnabledDisableList
 		mov	bx, offset taskbarEnabledDisableList
 		push	bp
@@ -491,8 +491,8 @@ noReset:
 		call	saveOptions
 		mov	si, offset InterfaceSettings
 		call	saveOptions
-		mov	si, offset AdvancedSettings
-		call	saveOptions
+		;mov	si, offset AdvancedSettings
+		;call	saveOptions
 		mov	si, offset DriveSettings
 		call	saveOptions
 		mov	si, offset AppearanceSettings
@@ -1049,13 +1049,16 @@ LocalDefNLString MotifStr <"motifec.geo", 0>
 LocalDefNLString ISUIStr <"isuiec.geo", 0>
 LocalDefNLString GeoManagerStr <"EC GeoManager", 0>
 LocalDefNLString ISDeskStr <"EC ISDesk", 0>
+LocalDefNLString clockString <"sclockec.geo", 0>
+LocalDefNLString trayAppsString <"trayapps.geo", 0>
 else
 LocalDefNLString MotifStr <"motif.geo", 0>
 LocalDefNLString ISUIStr <"isui.geo", 0>
 LocalDefNLString GeoManagerStr <"GeoManager", 0>
 LocalDefNLString ISDeskStr <"ISDesk", 0>
+LocalDefNLString clockString <"sclock.geo", 0>
+LocalDefNLString trayAppsString <"trayapps.geo", 0>
 endif
-
 LocalDefNLString BerkeleyStr <"Berkeley", 0>
 LocalDefNLString EsquireStr <"Esquire", 0>
 
@@ -1114,6 +1117,44 @@ SetUIOptions	proc	near
 		call	InitFileWriteBoolean
 		pop	di, ax
 
+		cmp	cs:uicombos[di].UIC_hasTaskbar, TRUE
+		je	taskBarEnabled
+taskBarDisabled::
+	;
+	; remove TrayApps und SClock when Taskbar is off
+	;
+
+		;push	ds
+		;segmov	ds, cs
+		mov	si, offset clockString
+		call	UserRemoveAutoExec
+		;pop	ds
+
+		;push	ds
+		;segmov	ds, cs
+		mov	si, offset trayAppsString
+		call	UserRemoveAutoExec
+		;pop	ds
+
+		jmp	done
+
+taskBarEnabled:
+	;
+	; add TrayApps und SClock when Taskbar is on
+	;
+		;push	ds
+		;segmov	ds, cs
+		mov	si, offset clockString
+		call	UserAddAutoExec
+		;pop	ds
+
+		;push	ds
+		;segmov	ds, cs
+		mov	si, offset trayAppsString
+		call	UserAddAutoExec
+		;pop	ds
+
+done:
 		.leave
 		ret
 SetUIOptions	endp
