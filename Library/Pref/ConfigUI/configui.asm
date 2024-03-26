@@ -491,8 +491,8 @@ noReset:
 		call	saveOptions
 		mov	si, offset InterfaceSettings
 		call	saveOptions
-		;mov	si, offset AdvancedSettings
-		;call	saveOptions
+		mov	si, offset AdvancedSettings
+		call	saveOptions
 		mov	si, offset DriveSettings
 		call	saveOptions
 		mov	si, offset AppearanceSettings
