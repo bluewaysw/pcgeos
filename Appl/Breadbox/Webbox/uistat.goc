@@ -166,11 +166,15 @@
 @object GenInteractionClass HTMFileGroup = {
   GI_attrs = @default | GA_KBD_SEARCH_PATH;
   GI_comp =  @HTMDocumentControl, @HTMSaveTrigger,
-             @HTMPrintControl, @FileBoxToggle;
+             HTMFileSubGroup;
 /*GI_states = @default & ~GS_ENABLED; for demo version*/
   GII_visibility = GIV_POPUP;
   ATTR_GEN_INTERACTION_GROUP_TYPE = (GIGT_FILE_MENU);
   HINT_SEEK_MENU_BAR;
+}
+
+@object GenInteractionClass HTMFileSubGroup = {
+  GI_comp = @HTMPrintControl, @FileBoxToggle;
 }
 
    /**** Document control UI ****/
@@ -218,7 +222,9 @@
 @ifdef D
  GI_visMoniker = 'r', "Speichern";
 @endif
- GI_states = @default & ~GS_ENABLED;/* new in jw96*/
+/* GI_states = @default & ~GS_ENABLED; new in jw96*/
+ GI_states = @default & ~(GS_ENABLED | GS_USABLE); /* RB */
+ 				    /* Trigger obsolete? will never be enabled R.B. */
  GTI_destination = HTMDocumentControl;
  GTI_actionMsg = MSG_GEN_DOCUMENT_CONTROL_INITIATE_SAVE_DOC;
 }
@@ -230,6 +236,7 @@
  PCI_docNameOutput = @HTMDocumentGroup;
  PCI_docSizeInfo = { ( 7.5 * 72 ), ( 10 * 72 ), PT_PAPER,
          { ( 0.5 * 72 ), ( 0.5 * 72 ), ( 0.5 * 72 ), ( 0.5 * 72 ) } };
+ HINT_SAME_CATEGORY_AS_PARENT;
 }
 
 @object GenTriggerClass FileBoxToggle = {
@@ -1141,8 +1148,8 @@ Boolean ReadDataFromFile
   word            numCharsRead;    /* Size returned by FileRead. */
   MemHandle       dataBlockHandle; /* Handle to memory block. */
   unsigned char * dataBlockPtr;    /* Holds string being processed. */
-  word            numCharsLeft;    /* Characters left to process. */
-  word            curCharIndex;    /* Index into character array. */
+/*  word            numCharsLeft;     Characters left to process. */
+/*  word            curCharIndex;     Index into character array. */
      /* Set position to start of file. */
   #ifdef DEBUG
     if ( file_p == NullHandle ) {
@@ -1368,7 +1375,7 @@ Boolean WriteDataToFile
 } /* MSG_GEN_DOCUMENT_INITIALIZE_DOCUMENT_FILE */
 
 @extern method HTMDocumentClass, MSG_GEN_DOCUMENT_ATTACH_UI_TO_DOCUMENT {
-  word *               error;      /* Error value from ReadDataFromFile. */
+  word                 error;      /* Error value from ReadDataFromFile. */
   VMFileHandle         fileHan;    /* Used to set VM file for text. */
   optr                 ourText;    /* Pointer to text object. */
   optr                 textOD;     /* Pointer to HTMText. */
@@ -1422,7 +1429,7 @@ Boolean WriteDataToFile
                                              TEXT_ADDRESS_PAST_END, 0 );
   }
      /* Read in text file by calling read data function.  */
-  ReadDataFromFile( pself->GDI_fileHandle, ourText, error );
+  ReadDataFromFile( pself->GDI_fileHandle, ourText, &error );
 } /* MSG_GEN_DOCUMENT_ATTACH_UI_TO_DOCUMENT */
 
 @extern method HTMDocumentClass, MSG_GEN_DOCUMENT_DETACH_UI_FROM_DOCUMENT {
@@ -1539,4 +1546,4 @@ if (pself->HTMDI_textHandle==NullHandle){}
           @call textOD::MSG_VIS_TEXT_RECALC_AND_DRAW();
           }
 } /* CK */
-
+
