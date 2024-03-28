@@ -151,13 +151,11 @@ TrueTypeGenInRegion	proc	far
 	.enter
 
 	push	di
-	mov	di, FONT_C_CODE_STACK_SPACE
+	mov		di, FONT_C_CODE_STACK_SPACE
 	call	ThreadBorrowStackSpace
     pop     bx
 	push	di
     mov     di, bx
-
-	;TODO: lock gstate
 
     ; building parameter stack
 	push 	di					;pass gstate handle
@@ -184,8 +182,6 @@ TrueTypeGenInRegion	proc	far
 	segmov	ds, dgroup, ax
 	push	ds:variableHandle	;pass handle to truetype block
 	call	TRUETYPE_GEN_IN_REGION
-
-	;TODO: unlock gstate
 
 	pop	di
 	call	ThreadReturnStackSpace
@@ -299,11 +295,17 @@ REVISION HISTORY:
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
 
 GRREGIONPATHINIT	proc	far
-	C_GetTwoWordArgs	ax, bx, cx, dx		;bx = regionHandle, ax = maxY
+	C_GetTwoWordArgs	di, dx, ax, bx		;di = regionHandle, dx = maxY
 
-	;TODO
-
+	push	cx
+	push	bp
+	mov		cx, RFR_ODD_EVEN or (UNUSED_PER_LINE shl 8)
+	clr 	bp
+	call	GrRegionPathInit
+	pop		bp
+	pop		cx
 	ret
+	
 GRREGIONPATHINIT	endp	
 
 

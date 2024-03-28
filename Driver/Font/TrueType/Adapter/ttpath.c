@@ -22,28 +22,56 @@
 #include "ttcharmapper.h"
 #include <ec.h>
 
+/*
+ * types
+ */
+
+typedef void  Function_MoveTo( Handle han, TT_Vector* vec );
+
+typedef void  Function_LineTo( Handle han, TT_Vector* vec );
+
+typedef void  Function_ConicTo( Handle han, TT_Vector* v_control, TT_Vector* vec );
+
+
+/*
+ * structures
+ */
+
+typedef struct 
+{
+      Function_MoveTo  _near * Proc_MoveTo;
+      Function_LineTo  _near * Proc_LineTo;
+      Function_ConicTo _near * Proc_ConicTo;
+} RenderFunctions;
+
+
+/*
+ * prototypes
+ */
 
 static void CalcTransformMatrix( TransMatrix*    transMatrix, 
                                  WWFixedAsDWord  pointSize, 
                                  TextStyle       stylesToImplement );
 
-static void ConvertOutline( GStateHandle gstate, TT_Outline* outline );
+static void ConvertOutline( GStateHandle      gstate, 
+                            TT_Outline*       outline, 
+                            RenderFunctions*  functions );
 
-static void MoveTo( GStateHandle gstate, TT_Vector* vec );
+static void _near MoveTo( GStateHandle gstate, TT_Vector* vec );
 
-static void RegionPathMoveTo( Handle regionHandle, TT_Vector* vec );
+static void _near RegionPathMoveTo( Handle regionHandle, TT_Vector* vec );
 
-static void LineTo( GStateHandle gstate, TT_Vector* vec );
+static void _near LineTo( GStateHandle gstate, TT_Vector* vec );
 
-static void RegionPathLineTo( Handle regionHandle, TT_Vector* vec );
+static void _near RegionPathLineTo( Handle regionHandle, TT_Vector* vec );
 
-static void ConicTo( GStateHandle gstate, TT_Vector* v_control, TT_Vector* vec );
+static void _near ConicTo( GStateHandle gstate, TT_Vector* v_control, TT_Vector* vec );
 
-static void RegionPathConicTo( GStateHandle gstate, TT_Vector* v_control, TT_Vector* vec );
+static void _near RegionPathConicTo( GStateHandle gstate, TT_Vector* v_control, TT_Vector* vec );
 
-static void RegionPathInit( Handle regionHandle, word maxY );
+static void _near RegionPathInit( Handle regionHandle, word maxY );
 
-static void WriteComment( TRUETYPE_VARS, GStateHandle gstate );
+static void _near WriteComment( TRUETYPE_VARS, GStateHandle gstate );
 
 static void ScaleOutline( TRUETYPE_VARS );
 
@@ -96,6 +124,7 @@ void _pascal TrueType_Gen_Path(
         WWFixedAsDWord         pointSize;
         XYValueAsDWord         cursorPos;
         word                   baseline;
+        RenderFunctions        renderFunctions;
 
 
 EC(     ECCheckGStateHandle( gstate ) );
@@ -175,9 +204,14 @@ EC(     ECCheckBounds( (void*)fontHeader ) );
         /* calculate transformation matrix and apply it */
         CalcTransformMatrix( &transMatrix, pointSize, stylesToImplement );
         GrApplyTransform( gstate, &transMatrix );
+
+        /* set render functions */
+        renderFunctions.Proc_MoveTo  = MoveTo;
+        renderFunctions.Proc_LineTo  = LineTo;
+        renderFunctions.Proc_ConicTo = ConicTo;
         
         /* convert outline into GrDraw...() calls */
-        ConvertOutline( gstate, &OUTLINE);
+        ConvertOutline( gstate, &OUTLINE, &renderFunctions );
 
         /* write epilogue */
         if( pathFlags & FGPF_SAVE_STATE )
@@ -239,7 +273,6 @@ EC(     ECCheckBounds( (void*)trueTypeOutline ) );
                 goto Fin;
 
         TT_New_Glyph( FACE, &GLYPH );
-
         TT_Load_Glyph( INSTANCE, GLYPH, charIndex, 0 );
         TT_Get_Glyph_Outline( GLYPH, &OUTLINE );
 
@@ -284,7 +317,7 @@ Fin:
 
 #define CURVE_TAG_ON            0x01
 #define CURVE_TAG_CONIC         0x00
-static void ConvertOutline( GStateHandle gstate, TT_Outline* outline )
+static void ConvertOutline( GStateHandle gstate, TT_Outline* outline, RenderFunctions* functions )
 {
         TT_Vector   v_last;
         TT_Vector   v_control;
@@ -340,7 +373,7 @@ EC(     ECCheckGStateHandle( gstate ) );
                 --tags;
         }
 
-        MoveTo( gstate, &v_start );
+        (*functions->Proc_MoveTo)( gstate, &v_start );
 
         while ( point < limit )
         {
@@ -351,7 +384,7 @@ EC(     ECCheckGStateHandle( gstate ) );
                 {
                         case CURVE_TAG_ON:
                         {
-                                LineTo( gstate, point );
+                                (*functions->Proc_LineTo)( gstate, point );
                                 continue;
                         }
 
@@ -374,26 +407,26 @@ EC(     ECCheckGStateHandle( gstate ) );
 
                                         if (  *tags & CURVE_TAG_ON )
                                         {
-                                                ConicTo( gstate, &v_control, &vec );
+                                                (*functions->Proc_ConicTo)( gstate, &v_control, &vec );
                                                 continue;
                                         }
 
                                         v_middle.x = ( v_control.x + vec.x ) >> 1;
                                         v_middle.y = ( v_control.y + vec.y ) >> 1;
 
-                                        ConicTo( gstate, &v_control, &v_middle );
+                                        (*functions->Proc_ConicTo)( gstate, &v_control, &v_middle );
 
                                         v_control = vec;
                                         goto Do_Conic;
                                 }
 
-                                ConicTo( gstate, &v_control, &v_start );
+                                (*functions->Proc_ConicTo)( gstate, &v_control, &v_start );
                                 break;
                         }
                 }
 
                 /* close the contour with a line segment */
-                LineTo( gstate, &v_start );
+                (*functions->Proc_LineTo)( gstate, &v_start );
         }
 }
 
@@ -416,7 +449,7 @@ EC(     ECCheckGStateHandle( gstate ) );
  *      18/11/23  JK        Initial Revision
  *******************************************************************/
 
-static void MoveTo( GStateHandle gstate, TT_Vector* vec )
+static void _near MoveTo( GStateHandle gstate, TT_Vector* vec )
 {
         GrMoveTo( gstate, vec->x, vec->y );
 }
@@ -441,7 +474,7 @@ static void MoveTo( GStateHandle gstate, TT_Vector* vec )
  *      14/03/24  JK        Initial Revision
  *******************************************************************/
 
-static void RegionPathMoveTo( Handle regionHandle, TT_Vector* vec )
+static void _near RegionPathMoveTo( Handle regionHandle, TT_Vector* vec )
 {
         GrRegionPathMovePen( regionHandle, vec->x, vec->y );
 }
@@ -465,7 +498,7 @@ static void RegionPathMoveTo( Handle regionHandle, TT_Vector* vec )
  *      18/11/23  JK        Initial Revision
  *******************************************************************/
 
-static void LineTo( GStateHandle gstate, TT_Vector* vec )
+static void _near LineTo( GStateHandle gstate, TT_Vector* vec )
 {
         GrDrawLineTo( gstate, vec->x, vec->y );
 }
@@ -490,7 +523,7 @@ static void LineTo( GStateHandle gstate, TT_Vector* vec )
  *      14/03/24  JK        Initial Revision
  *******************************************************************/
 
-static void RegionPathLineTo( Handle regionHandle, TT_Vector* vec )
+static void _near RegionPathLineTo( Handle regionHandle, TT_Vector* vec )
 {
         GrRegionPathLineTo( regionHandle, vec->x, vec->y );
 }
@@ -515,7 +548,7 @@ static void RegionPathLineTo( Handle regionHandle, TT_Vector* vec )
  *      18/11/23  JK        Initial Revision
  *******************************************************************/
 
-static void ConicTo( GStateHandle gstate, TT_Vector* v_control, TT_Vector* vec )
+static void _near ConicTo( GStateHandle gstate, TT_Vector* v_control, TT_Vector* vec )
 {
         Point p[3];
 
@@ -549,7 +582,7 @@ static void ConicTo( GStateHandle gstate, TT_Vector* v_control, TT_Vector* vec )
  *      14/03/24  JK        Initial Revision
  *******************************************************************/
 
-static void RegionPathConicTo( Handle regionHandle, TT_Vector* v_control, TT_Vector* vec )
+static void _near RegionPathConicTo( Handle regionHandle, TT_Vector* v_control, TT_Vector* vec )
 {
         Point p[3];
 
@@ -582,7 +615,7 @@ static void RegionPathConicTo( Handle regionHandle, TT_Vector* v_control, TT_Vec
  *      14/03/24  JK        Initial Revision
  *******************************************************************/
 
-static void RegionPathInit( Handle regionHandle, word maxY )
+static void _near RegionPathInit( Handle regionHandle, word maxY )
 {
         GrRegionPathInit( regionHandle, maxY );
 }
@@ -687,7 +720,7 @@ static void CalcTransformMatrix( TransMatrix*    transMatrix,
  *******************************************************************/
 
 #define NUM_PARAMS              6
-static void WriteComment( TRUETYPE_VARS, GStateHandle gstate )
+static void _near WriteComment( TRUETYPE_VARS, GStateHandle gstate )
 {
         word            params[NUM_PARAMS];
        
