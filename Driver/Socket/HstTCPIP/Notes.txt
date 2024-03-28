@@ -1,0 +1,70 @@
+Ed's notes on the TCPIP driver 6/00
+-----------------------------------
+There isn't any info on how this driver works anywhere, so what little
+bits I figure out I'm going to write down here.
+
+- All info on the link is stored in the LinkControlBlock (LCB)
+- First entry in the LCB is the loopback connection, used for the ip 127.0.0.1
+- Second entry is the main connection, referenced by MAIN_LINK_DOMAIN_HANDLE
+- While there theoretically can be additional link drivers registered,
+  I don't see any way this can happen. Also, a lot of the code assumes there
+  is a main link driver, so even if an additional one was loaded, it wouldn't
+  be used much (if at all).
+- The only connection setting the TCPIP driver keeps track of is the local IP.
+  That means it has no concept of routing. The link driver must handle that.
+- The driver gets its idea of the local IP address from the link driver.
+  TCPIP tells the link driver to open a connection, and then when the
+  connection is open, the link driver calls the TCPIP driver informing it
+  the connection was established. The TCPIP driver then queries the link
+  driver for the IP address and MTU. TCPIP then wakes any clients waiting
+  for the connection to open.
+- Accessing the LCB requires getting exclusive access to the LCB
+  (LinkTableGetEntry). Since the access must be exclusive, keep it locked
+  as short a time as possible, as a large number (probably almost all) of the
+  TCPIP functions require accessing the LCB at some point.
+- TCP Congestion RFC says that TCP packet acknowledgement should be delayed
+  up to 1/2 second, or until a second packet comes in, whichever comes first.
+  Old code used to always delay 1/2 second, which was fast enough for 56k
+  connections, but not not for anything faster. New code works like the RFC
+  says. No performance difference on PPP, but enables ethernet to go as fast
+  as we're able to process the data.
+
+DHCP Implementation Plan
+------------------------
+The problem is DHCP needs to be called after the link is opened, but before
+the semaphore is released. The problem posed here is that a socket send cannot
+occur until the semaphore is released.
+
+- Create a global variable for storing a thread handle. Ensure it is 0 when
+  not attempting to gain an IP.
+- Socket sending (and receiving if it ends up being necessary) will first
+  check this variable to see if the stored thread handle matches the handle
+  of the current thread before attempting to gain any locks. If they match,
+  the code will jump past the attempt to gain the lock, and allow the
+  operation to proceed. Otherwise, the code will proceed to attempt to gain
+  the lock as usual.
+- DHCP will be implemented inside the TCPIP driver. The code will be stored
+  in its own movable resource so as not to use more heap space.
+- Some info on DHCP will be stored by the TCP stack. Stored data includes:
+  session cookie, DHCP server ip, time remaining until the different stages
+  of lease renewal, and timer handle of renew timer.
+- A timer goes off every 15 min to handle DHCP lease renewal. It simply
+  subtracts 15 min from the remaining time. If the remaining time drops below
+  15 min, it sets a timer to go off tn time for the next renewal phase.
+  When this timer goes off, a new thread will be created to handle the renew.
+- No errors are reported via the TCPIP stack, however, GCN notifications are
+  sent out of DHCP progress. This means an app can be written to display
+  error messages appropriately (such as the ipconfig app).
+
+Current Problems with DHCP
+--------------------------
+- If the user specifies DNS servers in the access point, and the DHCP server
+  returns the same DNS servers, the resolver will end up with duplicate
+  entries and will probably query the same server twice.
+- Lease renewal code not tested due to 3 day lease time here. If it needs to
+  be disabled, just search for TimerStartSetOwner and comment it out.
+- Space is left in the DHCP GCN notification for domain name, but currently
+  it isn't queried for, since the resolver doesn't support it.
+- On a related note, support needs to be added to the access point library
+  for the local domain name. If a DNS lookup fails, the resolver should append
+  the domain name to the host name and try again.

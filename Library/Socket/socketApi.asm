@@ -1716,6 +1716,10 @@ done:
 		call	SocketControlEndWrite
 		.leave
 		ret
+		
+connectionHandler:
+		mov	cx, ds:[si].SSI_connection.CE_link
+		jmp	done
 
 getOptionHandlers	nptr \
 		recvHandler,
@@ -1723,7 +1727,8 @@ getOptionHandlers	nptr \
 		inlineHandler,
 		nodelayHandler,
 		ownerHandler,
-		lingerHandler
+		lingerHandler,
+		connectionHandler
 		
 SocketGetSocketOption	endp
 
