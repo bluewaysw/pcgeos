@@ -67,7 +67,6 @@ resource BBXWEBEDRES lmem, read-only shared
 resource BBXWEBEDRES1 lmem, read-only shared
 resource BBXWEBEDRES2 lmem, read-only shared
 resource BBXWEBVURES lmem, read-only shared
-resource BREADBOXRESOURCE2SMALL lmem, read-only shared
 
 #resource HTMICON lmem, read-only shared
 
