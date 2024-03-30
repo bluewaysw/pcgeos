@@ -450,36 +450,55 @@ DESTROYED:	bx, cx, dx, di, bp
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
 
-trayappsAppString		char "trayapps.geo",0
+if ERROR_CHECK
+LocalDefNLString clockString <"EC SysTray Clock", 0>
+LocalDefNLString trayAppsString <"EC TrayApps", 0>
+else
+LocalDefNLString clockString <"SysTray Clock", 0>
+LocalDefNLString trayAppsString <"TrayApps", 0>
+endif
+
 
 StartupListDeleteTaskbarApps	method dynamic StartupListClass,
 					MSG_SL_DELETE_TASKBAR_APPS
 		.enter
 	;
-	; Delete the selected program
+	; Prepare
 	;
-		push	ds, si
+		push	es, di, ds, si
 		call	LockArrayForList
 
+	;
+	; NameArrayFind:
+	; *ds:si - Name array.
+	; es:di - Name to find.
+	; cx - Length of name (0 for null-terminated).
+	; dx:ax - Buffer to return data (or zero to not return data).
+	;
 
-		;**Pass:**
-		;*ds:si - Name array.
-		;es:di - Name to find.
-		;cx - Length of name (0 for null-terminated).
-		;dx:ax - Buffer to return data (or zero to not return data).
-		;**Returns:**
-		;ax - Name token. (CA_NULL_ELEMENT if not found).
-		;CF - Set if name found.
+		segmov	es, cs
+		mov	di, offset trayAppsString	; es:di <- name
+		clr	cx, dx, ax
+		call	NameArrayFind			; return index in ax, CF - set if name found
+		jnc	trayAppsNotFound
+		mov	cx, 1				; cx <- delete 1 item
+		call	ChunkArrayDeleteRange		; uses element #
+trayAppsNotFound:
 
-		mov	di, offset trayappsAppString	;di <- path
-		segmov	es, ss				;es:di <- name
+		segmov	es, cs
+		mov	di, offset clockString		; es:di <- name
+		clr	cx, dx, ax
+		call	NameArrayFind			; return index in ax, CF - set if name found
+		jnc	clockNotFound
+		mov	cx, 1				; cx <- delete 1 item
+		call	ChunkArrayDeleteRange		; uses element #
 
-		call	NameArrayFind
-
-		mov	cx, 1				;cx <- delete 1 item
-		call	ChunkArrayDeleteRange		;uses element #
+clockNotFound:
+	;
+	; finish
+	;
 		call	MemUnlock
-		pop	ds, si
+		pop	es, di, ds, si
 	;
 	; Update the list and mark it dirty
 	;
@@ -493,10 +512,63 @@ StartupListDeleteTaskbarApps	method dynamic StartupListClass,
 		clr	bp				;bp <- no selections
 		mov	ax, MSG_SL_STARTUP_PROGRAM_SELECTED
 		call	ObjCallInstanceNoLock
-noneSelected:
+
 		.leave
 		ret
 StartupListDeleteTaskbarApps	endm
+
+
+StartupListAddTaskbarApps	method dynamic StartupListClass,
+					MSG_SL_ADD_TASKBAR_APPS
+		.enter
+
+		push	es, di, ds, si
+		call	LockArrayForList
+
+		segmov	es, cs
+		mov	di, offset trayAppsString	; es:di <- name
+		push	bx				; must be saved, has handle of block
+		clr	cx				; cx <- NULL terminated
+		clr	bx				; bx <- NameArrayAddFlag
+		clr	dx				; dx:ax extra data
+		clr	ax
+		call	NameArrayAdd
+		pop	bx
+
+		segmov	es, cs
+		mov	di, offset clockString		; es:di <- name
+		push	bx				; must be saved, has handle of block
+		clr	cx				; cx <- NULL terminated
+		clr	bx				; bx <- NameArrayAddFlag
+		clr	dx				; dx:ax extra data
+		clr	ax
+		call	NameArrayAdd
+		pop	bx
+
+		call	MemUnlock
+		pop	es, di, ds, si
+	;
+	; Update the list and mark the list dirty
+	;
+		mov	ax, MSG_CUIL_INIT_UI
+		call	ObjCallInstanceNoLock
+		mov	ax, MSG_CUIL_MARK_DIRTY
+		call	ObjCallInstanceNoLock
+
+	;
+	; Indicate no selections -- disable the Remove trigger
+	;
+		clr	bp				;bp <- no selections
+		mov	ax, MSG_SL_STARTUP_PROGRAM_SELECTED
+		call	ObjCallInstanceNoLock
+
+		.leave
+		ret
+
+StartupListAddTaskbarApps	endm
+
+
+
 
 
 StartupListAddProgram	method dynamic StartupListClass,
@@ -610,6 +682,7 @@ StartupListSaveOptions	method dynamic StartupListClass,
 					MSG_META_SAVE_OPTIONS
 		uses	si
 		.enter
+
 	;
 	; Is there an array?
 	;

@@ -1049,15 +1049,11 @@ LocalDefNLString MotifStr <"motifec.geo", 0>
 LocalDefNLString ISUIStr <"isuiec.geo", 0>
 LocalDefNLString GeoManagerStr <"EC GeoManager", 0>
 LocalDefNLString ISDeskStr <"EC ISDesk", 0>
-LocalDefNLString clockString <"sclockec.geo", 0>
-LocalDefNLString trayAppsString <"trayapps.geo", 0>
 else
 LocalDefNLString MotifStr <"motif.geo", 0>
 LocalDefNLString ISUIStr <"isui.geo", 0>
 LocalDefNLString GeoManagerStr <"GeoManager", 0>
 LocalDefNLString ISDeskStr <"ISDesk", 0>
-LocalDefNLString clockString <"sclock.geo", 0>
-LocalDefNLString trayAppsString <"trayapps.geo", 0>
 endif
 LocalDefNLString BerkeleyStr <"Berkeley", 0>
 LocalDefNLString EsquireStr <"Esquire", 0>
@@ -1123,40 +1119,18 @@ taskBarDisabled::
 	;
 	; remove TrayApps und SClock when Taskbar is off
 	;
-
-
-		mov	ax, MSG_SL_DELETE_TASKBAR_APPS
-		call
-
-		;push	ds
-		;segmov	ds, cs
-		mov	si, offset clockString
-		call	UserRemoveAutoExec
-		;pop	ds
-
-		;push	ds
-		;segmov	ds, cs
-		mov	si, offset trayAppsString
-		call	UserRemoveAutoExec
-		;pop	ds
-
-		jmp	done
+		; mov	bx, segment ProgStartupList
+		; mov	si, offset ProgStartupList
+		; mov	ax, MSG_SL_DELETE_TASKBAR_APPS
+		; mov	di, mask MF_CALL
+		; clr	dx
+		; call	ObjMessage
+		; jmp	done
 
 taskBarEnabled:
 	;
 	; add TrayApps und SClock when Taskbar is on
 	;
-		;push	ds
-		;segmov	ds, cs
-		mov	si, offset clockString
-		call	UserAddAutoExec
-		;pop	ds
-
-		;push	ds
-		;segmov	ds, cs
-		mov	si, offset trayAppsString
-		call	UserAddAutoExec
-		;pop	ds
 
 done:
 		.leave
