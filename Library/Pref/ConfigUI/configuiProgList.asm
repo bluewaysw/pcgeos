@@ -23,7 +23,7 @@ PASS:		*ds:si - ConfigUIListClass object
 RETURN:		none
 DESTROYED:	none
 
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@	
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
 
 LockArrayForList	proc	near
 		class	ConfigUIListClass
@@ -72,7 +72,7 @@ PASS:		*ds:si - ConfigUIListClass object
 RETURN:		none
 DESTROYED:	ax, cx, dx, di
 
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@	
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
 
 ConfigUIListInitUI	method	dynamic	ConfigUIListClass,
 					MSG_CUIL_INIT_UI
@@ -116,7 +116,7 @@ PASS:		*ds:si - ConfigUIListClass object
 RETURN:		none
 DESTROYED:	ax, cx, dx, di
 
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@	
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
 
 ConfigUIListMarkDirty	method	dynamic	ConfigUIListClass,
 						MSG_CUIL_MARK_DIRTY
@@ -144,7 +144,7 @@ PASS:		*ds:si - ConfigUIListClass object
 RETURN:		none
 DESTROYED:	bx, cx, dx, di, bp
 
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@	
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
 
 ConfigUIListReset	method dynamic ConfigUIListClass,
 					MSG_GEN_RESET
@@ -178,7 +178,7 @@ PASS:		*ds:si - ConfigUIStartupListClass object
 RETURN:		carry - set if changed
 DESTROYED:	bx, cx, dx, di, bp
 
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@	
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
 
 ConfigUIListHasStateChanged	method dynamic ConfigUIListClass,
 					MSG_PREF_HAS_STATE_CHANGED
@@ -205,7 +205,7 @@ PASS:		*ds:si - ConfigUIStartupListClass object
 RETURN:		none
 DESTROYED:	bx, cx, dx, di, bp
 
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@	
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
 
 uiCat2		char "ui", 0
 startupKey	char "execOnStartup",0
@@ -311,7 +311,7 @@ PASS:		*ds:si - StartupListClass object
 RETURN:		bp - # of chars returned
 DESTROYED:	bx, cx, dx, di, bp
 
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@	
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
 
 StartupListGetMoniker	method	dynamic	StartupListClass,
 					MSG_PREF_ITEM_GROUP_GET_ITEM_MONIKER
@@ -365,7 +365,7 @@ PASS:		*ds:si - StartupListClass object
 RETURN:		none
 DESTROYED:	bx, cx, dx, di, bp
 
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@	
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
 
 StartupListProgramSelected	method dynamic StartupListClass,
 					MSG_SL_STARTUP_PROGRAM_SELECTED
@@ -396,7 +396,7 @@ PASS:		*ds:si - StartupListClass object
 RETURN:		none
 DESTROYED:	bx, cx, dx, di, bp
 
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@	
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
 
 StartupListDeleteProgram	method dynamic StartupListClass,
 					MSG_SL_DELETE_PROGRAM
@@ -448,7 +448,56 @@ PASS:		*ds:si - StartupListClass object
 RETURN:		none
 DESTROYED:	bx, cx, dx, di, bp
 
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@	
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+
+trayappsAppString		char "trayapps.geo",0
+
+StartupListDeleteTaskbarApps	method dynamic StartupListClass,
+					MSG_SL_DELETE_TASKBAR_APPS
+		.enter
+	;
+	; Delete the selected program
+	;
+		push	ds, si
+		call	LockArrayForList
+
+
+		;**Pass:**
+		;*ds:si - Name array.
+		;es:di - Name to find.
+		;cx - Length of name (0 for null-terminated).
+		;dx:ax - Buffer to return data (or zero to not return data).
+		;**Returns:**
+		;ax - Name token. (CA_NULL_ELEMENT if not found).
+		;CF - Set if name found.
+
+		mov	di, offset trayappsAppString	;di <- path
+		segmov	es, ss				;es:di <- name
+
+		call	NameArrayFind
+
+		mov	cx, 1				;cx <- delete 1 item
+		call	ChunkArrayDeleteRange		;uses element #
+		call	MemUnlock
+		pop	ds, si
+	;
+	; Update the list and mark it dirty
+	;
+		mov	ax, MSG_CUIL_INIT_UI
+		call	ObjCallInstanceNoLock
+		mov	ax, MSG_CUIL_MARK_DIRTY
+		call	ObjCallInstanceNoLock
+	;
+	; Indicate no selections -- disable the Remove trigger
+	;
+		clr	bp				;bp <- no selections
+		mov	ax, MSG_SL_STARTUP_PROGRAM_SELECTED
+		call	ObjCallInstanceNoLock
+noneSelected:
+		.leave
+		ret
+StartupListDeleteTaskbarApps	endm
+
 
 StartupListAddProgram	method dynamic StartupListClass,
 					MSG_SL_ADD_PROGRAM
@@ -555,7 +604,7 @@ PASS:		*ds:si - StartupListClass object
 RETURN:		none
 DESTROYED:	bx, cx, dx, di, bp
 
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@	
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
 
 StartupListSaveOptions	method dynamic StartupListClass,
 					MSG_META_SAVE_OPTIONS

@@ -1124,6 +1124,10 @@ taskBarDisabled::
 	; remove TrayApps und SClock when Taskbar is off
 	;
 
+
+		mov	ax, MSG_SL_DELETE_TASKBAR_APPS
+		call
+
 		;push	ds
 		;segmov	ds, cs
 		mov	si, offset clockString
