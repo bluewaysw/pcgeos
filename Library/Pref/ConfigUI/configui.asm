@@ -453,6 +453,11 @@ ConfigUIDialogApply	method	dynamic	ConfigUIDialogClass,
 		call	ObjCallInstanceNoLock
 		jc	noUISelected
 		call	SetUIOptions
+
+		; mov	si, offset ProgStartupList
+		; mov	ax, MSG_SL_DELETE_TASKBAR_APPS
+		; call	ObjCallInstanceNoLock
+
 noUISelected:
 		jmp	doReset
 
@@ -1069,8 +1074,13 @@ SetUIOptions	proc	near
 		mul	di
 		mov	di, ax				;di <- offset
 
+
+		push	ds
+
+
 		segmov	ds, cs, cx
 		mov	es, cx
+
 	;
 	; handle [ui] specific = key
 	;
@@ -1113,24 +1123,33 @@ SetUIOptions	proc	near
 		call	InitFileWriteBoolean
 		pop	di, ax
 
+
+		pop	ds
+
+
 		cmp	cs:uicombos[di].UIC_hasTaskbar, TRUE
 		je	taskBarEnabled
+
 taskBarDisabled::
 	;
 	; remove TrayApps und SClock when Taskbar is off
 	;
-		; mov	bx, segment ProgStartupList
-		; mov	si, offset ProgStartupList
-		; mov	ax, MSG_SL_DELETE_TASKBAR_APPS
-		; mov	di, mask MF_CALL
-		; clr	dx
-		; call	ObjMessage
+		; push	si, ds, di, es
+		mov	si, offset ProgStartupList
+		mov	ax, MSG_SL_DELETE_TASKBAR_APPS
+		call	ObjCallInstanceNoLock
+		; pop	si, ds, di, es
 		; jmp	done
 
 taskBarEnabled:
 	;
 	; add TrayApps und SClock when Taskbar is on
 	;
+		; push	si, ds, di, es
+		mov	si, offset ProgStartupList
+		mov	ax, MSG_SL_ADD_TASKBAR_APPS
+		call	ObjCallInstanceNoLock
+		; pop	si, ds, di, es
 
 done:
 		.leave
