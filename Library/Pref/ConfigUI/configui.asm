@@ -454,10 +454,6 @@ ConfigUIDialogApply	method	dynamic	ConfigUIDialogClass,
 		jc	noUISelected
 		call	SetUIOptions
 
-		; mov	si, offset ProgStartupList
-		; mov	ax, MSG_SL_DELETE_TASKBAR_APPS
-		; call	ObjCallInstanceNoLock
-
 noUISelected:
 		jmp	doReset
 
