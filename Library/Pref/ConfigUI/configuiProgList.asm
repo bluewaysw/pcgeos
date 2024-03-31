@@ -570,31 +570,31 @@ StartupListAddTaskbarApps	method dynamic StartupListClass,
 					MSG_SL_ADD_TASKBAR_APPS
 		.enter
 
+	;
+	; add app names
+	;
 		push	es, di, ds, si
 		call	LockArrayForList
 
-		segmov	es, cs
+		push	bx				; store handle of block
+		segmov	es, cs				; we need the name in es:di...
+		clr	cx				; cx <- NULL terminated
+		clr	bx				; bx <- NameArrayAddFlag
+		clr	dx				; dx:ax extra data, we don't have any
+		clr	ax
+
 		mov	di, offset trayAppsString	; es:di <- name
-		push	bx				; must be saved, has handle of block
-		clr	cx				; cx <- NULL terminated
-		clr	bx				; bx <- NameArrayAddFlag
-		clr	dx				; dx:ax extra data
-		clr	ax
 		call	NameArrayAdd
-		pop	bx
-
-		segmov	es, cs
+		jnc	next
+		clr	ax
+next:
 		mov	di, offset clockString		; es:di <- name
-		push	bx				; must be saved, has handle of block
-		clr	cx				; cx <- NULL terminated
-		clr	bx				; bx <- NameArrayAddFlag
-		clr	dx				; dx:ax extra data
-		clr	ax
 		call	NameArrayAdd
-		pop	bx
 
+		pop	bx				; restore block handle for MemUnlock
 		call	MemUnlock
 		pop	es, di, ds, si
+
 	;
 	; Update the list and mark the list dirty
 	;
@@ -761,6 +761,8 @@ pathBuffer	local	PATH_BUFFER_SIZE+FILE_LONGNAME_BUFFER_SIZE dup (TCHAR)
 		mov	si, offset uiCat2		;ds:si <- category
 		mov	dx, offset startupKey		;cx:dx <- key
 		call	InitFileWriteStringSection
+
+		clc					;make sure we keep iterating
 
 		.leave
 		ret
