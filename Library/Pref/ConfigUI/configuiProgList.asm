@@ -585,9 +585,6 @@ StartupListAddTaskbarApps	method dynamic StartupListClass,
 
 		mov	di, offset trayAppsString	; es:di <- name
 		call	NameArrayAdd
-		jnc	next
-		clr	ax
-next:
 		mov	di, offset clockString		; es:di <- name
 		call	NameArrayAdd
 
