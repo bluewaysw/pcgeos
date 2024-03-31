@@ -1074,10 +1074,14 @@ SetUIOptions	proc	near
 		mul	di
 		mov	di, ax				;di <- offset
 
-
+	;
+	; save ds, we need it later
+	;
 		push	ds
 
-
+	;
+	; put cs in ds and cx in es
+	;
 		segmov	ds, cs, cx
 		mov	es, cx
 
@@ -1123,33 +1127,33 @@ SetUIOptions	proc	near
 		call	InitFileWriteBoolean
 		pop	di, ax
 
-
+	;
+	; restore ds for the correct object at ds:si
+	;
 		pop	ds
 
-
+	;
+	; check if taskbar enabled / disabled
+	;
 		cmp	cs:uicombos[di].UIC_hasTaskbar, TRUE
 		je	taskBarEnabled
 
 taskBarDisabled::
 	;
-	; remove TrayApps und SClock when Taskbar is off
+	; remove TrayApps und SysTray Clock when Taskbar is off
 	;
-		; push	si, ds, di, es
 		mov	si, offset ProgStartupList
 		mov	ax, MSG_SL_DELETE_TASKBAR_APPS
 		call	ObjCallInstanceNoLock
-		; pop	si, ds, di, es
-		; jmp	done
+		jmp	done
 
 taskBarEnabled:
 	;
 	; add TrayApps und SClock when Taskbar is on
 	;
-		; push	si, ds, di, es
 		mov	si, offset ProgStartupList
 		mov	ax, MSG_SL_ADD_TASKBAR_APPS
 		call	ObjCallInstanceNoLock
-		; pop	si, ds, di, es
 
 done:
 		.leave
