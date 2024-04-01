@@ -67,7 +67,7 @@ Launch the target environment in dosbox:
 
 
 ## Customize target environment
-If you want to customize the target environment settings only for yourself, you should not change the file %ROOT_DIR%/bin/basbox.conf.
+If you want to customize the target environment settings only for yourself, you should not change the file %ROOT_DIR%/bin/basebox.conf.
 - Create a file called basebox_user.conf in %LOCAL_ROOT% folder.
 - Enter the new settings here. These settings overwrite those from basebox.conf. Example:
   - [cpu]
