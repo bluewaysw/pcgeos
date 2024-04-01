@@ -6,7 +6,7 @@
 GEODE           = openwith
 ASM_TO_OBJS     =
 UI_TO_RDFS      =
-SRCS            = openwith.goc
+SRCS            = openwith.goc openwith.goh
 OBJS            = openwith.obj
 LOBJS           =
 LIBOBJ          = $(DEVEL_DIR)/Include/$(GEODE).ldf
