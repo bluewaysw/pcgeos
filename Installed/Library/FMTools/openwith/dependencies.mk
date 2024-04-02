@@ -1,6 +1,6 @@
 openwith.obj \
-openwith.eobj: stdapp.goh object.goh ui.goh Objects/metaC.goh \
-                Objects/inputC.goh Objects/clipbrd.goh \
+openwith.eobj: openwith.goh stdapp.goh object.goh ui.goh \
+                Objects/metaC.goh Objects/inputC.goh Objects/clipbrd.goh \
                 Objects/uiInputC.goh iacp.goh Objects/winC.goh \
                 Objects/gProcC.goh alb.goh Objects/processC.goh \
                 Objects/visC.goh Objects/vCompC.goh Objects/vCntC.goh \
@@ -16,7 +16,7 @@ openwith.eobj: stdapp.goh object.goh ui.goh Objects/metaC.goh \
                 Objects/gItemC.goh Objects/gBoolC.goh \
                 Objects/gGadgetC.goh Objects/gToolCC.goh \
                 Objects/gValueC.goh Objects/gToolGC.goh \
-                Objects/helpCC.goh fmtool.goh openwith.goh
+                Objects/helpCC.goh fmtool.goh
 openwith.obj \
 openwith.eobj: geos.h heap.h geode.h resource.h ec.h object.h lmem.h \
                 graphics.h fontID.h font.h color.h gstring.h timer.h vm.h \

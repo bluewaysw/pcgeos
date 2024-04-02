@@ -1,5 +1,77 @@
-// FMFetchToolsProc   GetThoseTools;
-// FMToolProc         ChangeAttrsEntry;
+/***********************************************************************
+Includes
+***********************************************************************/
+@include <stdapp.goh>
+@include <fmtool.goh>
+#include <Ansi/string.h>
+#include <Ansi/stdio.h>
+
+/***********************************************************************
+Resourcen
+***********************************************************************/
+@start FMUI, data;
+    @visMoniker Moniker1 = "Open With";
+@end FMUI;
+
+@start CAUI, notDetachable;
+    @object GenInteractionClass SelectDialog = {
+        GI_visMoniker = "Open With";
+        GI_comp =
+                    @OpenWithFileSelector,
+                    @SelectReplyBar;
+        GI_states = (@default & (~GS_USABLE));
+        GII_visibility = GIV_DIALOG;
+        GII_attrs = @default | GIA_INITIATED_VIA_USER_DO_DIALOG | GIA_MODAL;
+        HINT_PLACE_MONIKER_ABOVE;
+        HINT_ORIENT_CHILDREN_VERTICALLY;
+    }
+
+    @object GenFileSelectorClass OpenWithFileSelector =
+    {
+        //GFSI_destination = process;
+        //GFSI_notificationMsg = MSG_FILEBROW_SELECTOR_ACTION;
+        GFSI_attrs =           ((FSA_ALLOW_CHANGE_DIRS) & (~FSA_SHOW_FILES_DISABLED) & (~FSA_HAS_OPEN_DIR_BUTTON) & (~FSA_HAS_CHANGE_DIRECTORY_LIST))
+                                | ((FSA_HAS_FILE_LIST) & (~FSA_SHOW_FIXED_DISKS_ONLY) & (~FSA_HAS_CLOSE_DIR_BUTTON) & (~FSA_HAS_DOCUMENT_BUTTON)& (~FSA_HAS_CHANGE_DRIVE_LIST))
+                                | ((FSA_USE_VIRTUAL_ROOT));
+
+        GFSI_fileCriteria =      ((FSFC_DIRS) & (~FSFC_NON_GEOS_FILES))
+                                | ((FSFC_GEOS_EXECUTABLES) & (~FSFC_GEOS_NON_EXECUTABLES));
+
+        ATTR_GEN_FILE_SELECTOR_VIRTUAL_ROOT = {SP_APPLICATION, ""};
+        ATTR_GEN_PATH_DATA = {SP_APPLICATION, ""};
+        HINT_FILE_SELECTOR_FILE_LIST_WIDTH = 40;
+        HINT_FILE_SELECTOR_NUMBER_OF_FILES_TO_SHOW = 20;
+    }
+
+    @object GenInteractionClass SelectReplyBar =
+    {
+        GI_comp =   @SelectOkTrigger,
+                    @SelectCancelTrigger;
+        HINT_MAKE_REPLY_BAR;
+    }
+
+    @object GenTriggerClass SelectOkTrigger =
+    {
+        ATTR_GEN_TRIGGER_INTERACTION_COMMAND = { IC_OK };
+        HINT_SEEK_REPLY_BAR;
+        HINT_DEFAULT_DEFAULT_ACTION;
+    }
+
+    @object GenTriggerClass SelectCancelTrigger =
+    {
+        ATTR_GEN_TRIGGER_INTERACTION_COMMAND = { IC_DISMISS };
+        HINT_SEEK_REPLY_BAR;
+    }
+
+@end CAUI;
+
+/***********************************************************************
+Headers
+***********************************************************************/
+// FMFetchToolsProc GetThoseTools;
 word _pascal _export GetThoseTools(FMToolStruct **tablePtr);
+
+// FMToolProc OpenWithEntryPoint;
 void _pascal _export OpenWithEntryPoint(GeodeHandle filemgr, word toolNum, word entryNum);
+
 void _pascal _export LaunchApp(GeodeToken *tok, DiskHandle appDisk, PathName *appPath, DiskHandle dataDisk, PathName *dataPath, FileLongName *dataFName);
