@@ -61,13 +61,13 @@ TrueTypeGenPath	proc	far
 	call	ThreadBorrowStackSpace
 	push	di
 
-	push 	ax					;pass gstate handle
+	push 	ax					;pass GState handle
 	mov		ch, 0
 	push 	cx					;pass FontGenPathFlags
 	push	dx					;pass characters code
 
 	mov 	bx, ax
-	call 	MemLock				;lock gstate block
+	call 	MemLock				;lock GState block
 	mov		es, ax				;es <- seg addr of gstate		
 	mov		cx, es:GS_fontAttr.FCA_fontID
 	clr		ah		                   
@@ -97,7 +97,7 @@ TrueTypeGenPath	proc	far
 	push	di
 	push	ax					;pass stylesToImplement
 	mov		bx, si				;bx <- handle of GState
-	call	MemUnlock			;unlock gstate block
+	call	MemUnlock			;unlock GState block
 
 	segmov	ds, dgroup, ax
 	push	ds:variableHandle	;pass handle to truetype block
@@ -147,22 +147,24 @@ REVISION HISTORY:
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
 
 TrueTypeGenInRegion	proc	far
-	uses	ax, bx, ds, es
+	uses	ax, bx, si, ds, es
 	.enter
 
-	push	di
+	mov		si,	di				;si <- GState handle
 	mov		di, FONT_C_CODE_STACK_SPACE
 	call	ThreadBorrowStackSpace
-    pop     bx
 	push	di
-    mov     di, bx
 
     ; building parameter stack
-	push 	di					;pass gstate handle
+	push 	si					;pass GState handle
 	push	cx					;pass regionpath handle
 	push	dx					;pass character code	
+
+	mov		bx, si				;bx <- GState handle
+	call 	MemLock				;lock GState block
+	mov		es, ax				;es <- seg addr of GState		
+
 	clr		al
-	mov 	es, di				;es <- seg addr of gstate
 	movwbf	dxah, es:GS_fontAttr.FCA_pointsize
 	push	dx					;pass point size
 	push 	ax		
@@ -183,7 +185,10 @@ TrueTypeGenInRegion	proc	far
 	push	ds:variableHandle	;pass handle to truetype block
 	call	TRUETYPE_GEN_IN_REGION
 
-	pop	di
+	mov		bx, si				;bx <- handle of GState
+	call	MemUnlock			;unlock GState block
+
+	pop		di
 	call	ThreadReturnStackSpace
 
 	.leave

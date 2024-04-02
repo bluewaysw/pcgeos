@@ -254,6 +254,7 @@ void _pascal TrueType_Gen_In_Region(
         TT_UShort              charIndex;
         XYValueAsDWord         cursorPos;
         TT_Matrix              transMatrix;
+        RenderFunctions        renderFunctions;
 
 
 EC(     ECCheckGStateHandle( gstate ) );
@@ -285,6 +286,13 @@ EC(     ECCheckBounds( (void*)trueTypeOutline ) );
         /* translate by current cursor position */
         cursorPos = GrGetCurPos( gstate );
         GrApplyTranslationDWord( gstate, DWORD_X( cursorPos ), DWORD_Y( cursorPos ) );
+
+        /* set render functions */
+        //renderFunctions.Proc_MoveTo  = RegionPathMoveTo;
+        //renderFunctions.Proc_LineTo  = RegionPathLineTo;
+        //renderFunctions.Proc_ConicTo = RegionPathConicTo;
+
+        //TODO: init region path
 
         //TODO: render glyph as regionpath
 
