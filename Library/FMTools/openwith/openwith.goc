@@ -2,30 +2,22 @@
 @include <fmtool.goh>
 #include <Ansi/string.h>
 #include <Ansi/stdio.h>
-// @include <MEYERK\dirtree.goh>
-// @include <MEYERK\macros.goh>
-// @include <MEYERK\debug.goh>
 @include <openwith.goh>
 
-/* @start FMUI;  jfh1 */
 @start FMUI, data;
-    @visMoniker Moniker1 = "Open With...";
+    @visMoniker Moniker1 = "Open With";
 @end FMUI;
 
 
-/* @start CAUI;  jfh1 */
 @start CAUI, notDetachable;
     @object GenInteractionClass SelectDialog = {
         GI_visMoniker = "Open With";
-            /*GI_attrs = (GIA_INITIATED_VIA_USER_DO_DIALOG | GIA_MODAL);  jfh2*/
         GI_comp =
                     @OpenWithFileSelector,
-                    @ToggleGroup,
                     @SelectReplyBar;
         GI_states = (@default & (~GS_USABLE));
         GII_visibility = GIV_DIALOG;
         GII_attrs = @default | GIA_INITIATED_VIA_USER_DO_DIALOG | GIA_MODAL;
-
         HINT_PLACE_MONIKER_ABOVE;
         HINT_ORIENT_CHILDREN_VERTICALLY;
     }
@@ -47,57 +39,16 @@
         HINT_FILE_SELECTOR_NUMBER_OF_FILES_TO_SHOW = 20;
     }
 
-    @object GenBooleanGroupClass ToggleGroup =
-    {
-        GI_comp =
-                @ArchiveToggle,
-                @HiddenToggle,
-                @SystemToggle,
-                @ROToggle;
-
-        GBGI_selectedBooleans = 0;
-        GBGI_indeterminateBooleans = 0;
-        GBGI_modifiedBooleans = 0;
-
-        HINT_ORIENT_CHILDREN_VERTICALLY;
-    }
-
-    @object GenBooleanClass ArchiveToggle =
-    {
-        GI_visMoniker = 'r', "Archive";
-        GBI_identifier = FA_ARCHIVE;
-    }
-
-    @object GenBooleanClass HiddenToggle =
-    {
-        GI_visMoniker = 'i', "Hidden";
-        GBI_identifier = FA_HIDDEN;
-    }
-
-    @object GenBooleanClass SystemToggle =
-    {
-        GI_visMoniker = 's', "System";
-        GBI_identifier = FA_SYSTEM;
-    }
-
-    @object GenBooleanClass ROToggle =
-    {
-        GI_visMoniker = 'e', "Read Only";
-        GBI_identifier = FA_RDONLY;
-    }
-
     @object GenInteractionClass SelectReplyBar =
     {
         GI_comp =	@SelectOkTrigger,
                     @SelectCancelTrigger;
-
         HINT_MAKE_REPLY_BAR;
     }
 
     @object GenTriggerClass SelectOkTrigger =
     {
         ATTR_GEN_TRIGGER_INTERACTION_COMMAND = { IC_OK };
-
         HINT_SEEK_REPLY_BAR;
         HINT_DEFAULT_DEFAULT_ACTION;
     }
@@ -111,60 +62,19 @@
 @end CAUI;
 
 
-/* @start DialogUI; jfh1 */
-@start DIALOGUI, notDetachable;
-    /* Dialog -------------------------------------------------------*/
-    @object GenInteractionClass Dialog = {
-        GI_visMoniker = "Information";
-        /*GI_attrs = (GIA_INITIATED_VIA_USER_DO_DIALOG | GIA_MODAL);  jfh2*/
-        GI_comp =
-                    @DialogText,
-                    @ReplyBar;
-        GI_states = @default & ~GS_USABLE;
-        GII_visibility = GIV_DIALOG;
-        GII_attrs = @default | GIA_INITIATED_VIA_USER_DO_DIALOG | GIA_MODAL;
-
-        HINT_PLACE_MONIKER_ABOVE;
-        HINT_ORIENT_CHILDREN_VERTICALLY;
-    }
-
-    /* Glyph -----------------------------------------------------------*/
-    @object GenTextClass DialogText = {
-        GI_attrs = @default | GA_READ_ONLY;
-
-        HINT_EXPAND_WIDTH_TO_FIT_PARENT;
-        HINT_FIXED_SIZE = {
-        SST_AVG_CHAR_WIDTHS | 30,
-        SST_LINES_OF_TEXT | 2 };
-    }
-
-    /* Reply Bar -----------------------------------------------------------*/
-    @object GenInteractionClass ReplyBar = {
-        GI_comp = @OkTrigger;
-
-        HINT_MAKE_REPLY_BAR;
-    }
-
-    /*- Open Trigger ---------------------------------------------------------*/
-    @object GenTriggerClass OkTrigger = {
-            GI_attrs = @default | GA_SIGNAL_INTERACTION_COMPLETE;
-            ATTR_GEN_TRIGGER_INTERACTION_COMMAND = { IC_DISMISS };
-
-            HINT_SEEK_REPLY_BAR;
-            HINT_DEFAULT_DEFAULT_ACTION;
-    }
-@end DIALOGUI;
-
-/* MUST be global */
-FMToolStruct   FMToolInfo[1] = {
+/*-------------------------------------------------------------
+API Struct
+MUST be global
+-------------------------------------------------------------*/
+FMToolStruct FMToolInfo[1] = {
     {
         @Moniker1, (FMTF_SELECTED_ONLY | FMTT_DIALOG), 1
     }
 };
 
 /*-------------------------------------------------------------
-Fetch Tools
------------------------------------------------------------*/
+FileManager API Function - fetch Tools
+-------------------------------------------------------------*/
 //FMFetchToolsProc GetThoseTools
 word _pascal _export GetThoseTools(FMToolStruct **tablePtr)
 {
@@ -173,172 +83,123 @@ word _pascal _export GetThoseTools(FMToolStruct **tablePtr)
 }
 
 /*-------------------------------------------------------------
-Change Attrs Entry Point
-
-The user has clicked on our Utilities menu item: "Set Attributes"
------------------------------------------------------------*/
-//FMToolProc ChangeAttrsEntry()
-void _pascal _export ChangeAttrsEntry(
-
-                        GeodeHandle filemgr,	/* Process that is
-                                                * subclass of
-                                                * FileManagerClass */
-                        word toolNum,	        /* Entry # of activated tool
-                                                * within table returned by
-                                                * FMTF_FETCH_TOOLS */
-                        word entryNum)
+The user has clicked on our Utilities menu item: "Open With"
+GeodeHandle filemgr => Process that is subclass of FileManagerClass
+word toolNum =>	Entry # of activated tool within table returned by
+                FMTF_FETCH_TOOLS
+word entryNum
+-------------------------------------------------------------*/
+//FMToolProc OpenWithEntryPoint()
+void _pascal _export OpenWithEntryPoint(
+    GeodeHandle filemgr,
+    word toolNum,
+    word entryNum
+)
 {
-    /* jfh3 - you can save some processing by not initializing variables that
-        you know will be initialized (or filled in) later in this routine */
-    MemHandle                  selFiles;
-    MemHandle                  oldBlock;
-    FileQuickTransferHeader*   HeaderPtr;
-    FileQuickTransferHeader*   tempPtr;
-    FileOperationInfoEntry*    EntriesPtr;
-    word                       i;
-    optr                       select;
-    optr                       toggles;
-    optr                       ok_dialog;
-    optr                       ok_text;
-    FileAttrs                  attrs = 0;
-    InteractionCommand         reply = IC_NULL;
-    word                       count = NULL;
-    char                       buffer[10];
+    MemHandle                   selFiles;
+    MemHandle                   oldBlock;
+    FileQuickTransferHeader*    headerPtr;
+    FileOperationInfoEntry*     entriesPtr;
+    word                        i;
+    InteractionCommand          reply = IC_NULL;
+
+    optr                        dialog = NullOptr;
+    optr                        fSelect = NullOptr;
+    dword	    	            flagsAndDisk;	/* entry flags + disk handle returned by file selector */
+    PathName    	            pathname;   	/* Buffer for fetching the complete path of the application */
+    DiskHandle  	            disk;	    	/* Disk on which it resides */
+    GeodeToken  	            token;	    	/* Token for the application, so we can connect to it */
 
 
-    /* put up the SelectDialog box */
-    select = @call ConstructOptr(filemgr, 0)::MSG_FM_DUP_AND_ADD(@SelectDialog, FMP_APPLICATION);
-    @call select::MSG_GEN_SET_USABLE(VUM_NOW);
-    /* and await the user's response */
-    reply = UserDoDialog(select);
+    dialog = @call ConstructOptr(filemgr, 0)::MSG_FM_DUP_AND_ADD(@SelectDialog, FMP_APPLICATION);
+    @call dialog::MSG_GEN_SET_USABLE(VUM_NOW);
 
+    reply = UserDoDialog(dialog);
     if (reply == IC_OK)
     {
-        /* see which attrs the user selected */
-        toggles = @call select::MSG_GEN_FIND_CHILD_AT_POSITION(0);
-        attrs = (FileAttrs) @call toggles::MSG_GEN_BOOLEAN_GROUP_GET_SELECTED_BOOLEANS();
-        /* kill the dialog box */
-        UserDestroyDialog(select);
+        fSelect = @call dialog::MSG_GEN_FIND_CHILD_AT_POSITION(0);
+        flagsAndDisk = @call fSelect::MSG_GEN_FILE_SELECTOR_GET_FULL_SELECTION_PATH(pathname);
 
-        /* call the file manager and get the MemHandle of the list of selected files */
-        selFiles = @call ConstructOptr(filemgr, 0)::MSG_FM_GET_SELECTED_FILES();
+        UserDestroyDialog(dialog); // no more needed
 
-        while (selFiles)
+        if (GFS_GET_ENTRY_TYPE(flagsAndDisk) == GFSET_FILE)
         {
-            // lock the block with the selected files info and get a pointer to
-            // its header
-            HeaderPtr  = (FileQuickTransferHeader*) MemLock(selFiles);
-            // and get a pointer to the first entry (which immediately follows
-            // the header)
-            tempPtr    = HeaderPtr + 1;
-            EntriesPtr = (FileOperationInfoEntry*) tempPtr;
+            disk = GFS_GET_FULL_SELECTION_PATH_DISK_HANDLE(flagsAndDisk); // Extract disk handle
 
-            i = 0;
-            do
+            FilePushDir();
+            if (
+                 (FileSetCurrentPath(disk, _TEXT("\\")) != 0) &&
+                 (FileGetPathExtAttributes(pathname, FEA_TOKEN, &token, sizeof(token)) == 0)
+               )
             {
-                if (TestIfDir(HeaderPtr, EntriesPtr) == TRUE)
-                {
-                    // Change the attrs of the files in the selected folder
-                    // and all sub folders
-                    count += ChangeAttrs(HeaderPtr, EntriesPtr, attrs);
-                }
-                else
-                {
-                    // change the attrs of this file
-                    changeAttrForFile(EntriesPtr->FOIE_name, attrs);
-                    count ++;
-                }
+                selFiles = @call ConstructOptr(filemgr, 0)::MSG_FM_GET_SELECTED_FILES();
 
-                // point to the next entry
-                EntriesPtr = (FileOperationInfoEntry*) EntriesPtr + 1;
-                i++;
+                while (selFiles != 0)
+                {
+                    headerPtr  = (FileQuickTransferHeader*) MemLock(selFiles); // get pointer to it header
+                    entriesPtr = (FileOperationInfoEntry*) (headerPtr + 1); // get pointer to first entry (follows header)
+
+                    for (i=0; i < headerPtr->FQTH_numFiles; i++)
+                    {
+                        if (entriesPtr->FOIE_type == GFT_NOT_GEOS_FILE)
+                        {
+                            LaunchApp(
+                                &token,
+                                disk,
+                                &pathname,
+                                headerPtr->FQTH_diskHandle,
+                                headerPtr->FQTH_pathname,
+                                entriesPtr->FOIE_name
+                            );
+                        }
+
+                        // point to the next entry
+                        entriesPtr = (FileOperationInfoEntry*) entriesPtr + 1;
+                    }
+
+                    // get next block, if any
+                    MemUnlock(selFiles);
+                    oldBlock = selFiles;
+                    selFiles = headerPtr->FQTH_nextBlock; // returns 0 if end, which breaks the loop
+                    MemFree(oldBlock);
+                }
             }
-            while (i <= (HeaderPtr->FQTH_numFiles - 1));
-
-            MemUnlock(selFiles);
-            /* jfh5 - What is happening here? */
-            oldBlock = selFiles;
-            selFiles = HeaderPtr->FQTH_nextBlock;
-            MemFree(oldBlock);
-
-            ok_dialog = @call ConstructOptr(filemgr, 0)::MSG_FM_DUP_AND_ADD(@Dialog, FMP_APPLICATION);
-            ok_text = @call ok_dialog::MSG_GEN_FIND_CHILD_AT_POSITION(0);
-
-            sprintf(buffer, "%u", count);
-
-            @call ok_text::MSG_VIS_TEXT_REPLACE_ALL_PTR("Changed attributes for ", 0);
-            @call ok_text::MSG_VIS_TEXT_APPEND_PTR(buffer, 0);
-            @call ok_text::MSG_VIS_TEXT_APPEND_PTR(" files.", 0);
-            @call ok_dialog::MSG_GEN_SET_USABLE(VUM_NOW);
-            UserDoDialog(ok_dialog);
-            UserDestroyDialog(ok_dialog);
+            FilePopDir();
         }
     }
 }
 
-/*-------------------------------------------------------------
-Test If Dir
------------------------------------------------------------*/
-Boolean _pascal _export TestIfDir(
-    FileQuickTransferHeader* hPtr,
-    FileOperationInfoEntry* ePtr
-)
-{
-    /* jfh3 - you can save some processing by not initializing variables that
-        you know will be initialized (or filled in) later in this routine */
-    DiskHandle  success;
-    char        bufStr[PATH_BUFFER_SIZE + FILE_LONGNAME_BUFFER_SIZE];
 
-    /* check the file type of the passed in selection */
-    if (ePtr->FOIE_type == GFT_NOT_GEOS_FILE)
-    /* jfh4 - Why is this code here?  What is it supposed to do?  AFAIK,
-        all directories have GFT_DIRECTORY set.  This code doesn't hurt
-        anything, and I guess if there were some sort of directory that
-        was not marked GFT_DIRECTORY this would be needed. And if you don't
-        need this 'if' code then there is no reason for this routine since
-        there is now just one line in the routine.  Modular code is nice but
-        one line routines are a bit of overkill. */
+/***********************************************************************
+lauch application with DOS file via IACP...
+***********************************************************************/
+void LaunchApp(
+    GeodeToken *appTok,
+    DiskHandle appDisk,
+    PathName *appPath,
+    DiskHandle dataDisk,
+    PathName *dataPath,
+    FileLongName *dataFName)
+{
+    IACPConnection       iacpConnectionToken = IACP_NO_CONNECTION;
+    word                 connectionFlags   = IACPSM_USER_INTERACTIBLE | IACPCF_FIRST_ONLY;
+    word                 serverCount;
+    MemHandle            albBlock;
+    AppLaunchBlock       *albPtr;
+
+    albBlock = IACPCreateDefaultLaunchBlock(MSG_GEN_PROCESS_OPEN_APPLICATION);
+
+    albPtr = MemLock(albBlock);
+    strcpy(albPtr->ALB_appRef.AIR_fileName, appPath);
+    albPtr->ALB_appRef.AIR_diskHandle = appDisk;
+    albPtr->ALB_diskHandle = dataDisk;
+    strcpy(albPtr->ALB_path, dataPath);
+    strcpy(albPtr->ALB_dataFile, dataFName);
+    MemUnlock(albBlock);
+
+    iacpConnectionToken = IACPConnect(appTok, connectionFlags, albBlock, NullOptr, &serverCount);
+    if(iacpConnectionToken != IACP_NO_CONNECTION)
     {
-        FilePushDir();
-        strcpy(bufStr, hPtr->FQTH_pathname);
-        if (bufStr[strlen(bufStr) - 1] != '\\') strcat(bufStr, "\\");
-        strcat(bufStr, ePtr->FOIE_name);
-        success = FileSetCurrentPath(hPtr->FQTH_diskHandle, bufStr);
-        FilePopDir();
-
-        if (success == 0) /* if FileSetCurrentPath failed */
-        {return FALSE;} /* directory could not be changed - file */
-        else
-        {return TRUE;} /* directory could be changed - folder */
+        IACPShutdown(iacpConnectionToken, NullOptr);
     }
-
-    if ((ePtr->FOIE_type == GFT_DIRECTORY) && (ePtr->FOIE_type != GFT_LINK))
-    {return TRUE;}
-    else
-    {return FALSE;}
-}
-
-/*-------------------------------------------------------------
-Change Attrs of a single file
-called by ChangeAttrs & ChangeAttrsEntry
------------------------------------------------------------*/
-void _pascal _export changeAttrForFile(char* fname, FileAttrs attrs)
-{
-    (void) FileSetAttributes(fname, 0);
-    (void) FileSetAttributes(fname, attrs);
-}
-
-/*-------------------------------------------------------------
-Change Attrs
-
-This routine changes the attributes of this selected folder
-and all sub-folders
------------------------------------------------------------*/
-/* jfh6- you return a dword here but only use words in this and
-    the calling function.  Is there a reason? */
-dword _pascal _export ChangeAttrs(FileQuickTransferHeader* hPtr,
-                                            FileOperationInfoEntry* ePtr,
-                                            FileAttrs attrs)
-{
-    return 0;
 }
