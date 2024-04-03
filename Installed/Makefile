@@ -948,7 +948,7 @@ Installed/Appl/SysTray/SClock:		ui MAKEAPPL
 linktool: Installed/Library/FMTools/Linktool
 Installed/Library/FMTools/Linktool:	ui shell MAKEAPPL
 
-linktool: Installed/Library/FMTools/OpenWith
+openwith: Installed/Library/FMTools/OpenWith
 Installed/Library/FMTools/OpenWith:	ui ansic MAKEAPPL
 
 homebase:
