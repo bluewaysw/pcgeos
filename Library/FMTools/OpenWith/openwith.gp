@@ -1,25 +1,26 @@
+# who are we?
 name openwith.lib
 
+# for FileManager
 longname    "OpenWith"
 tokenchars  "FMTL"
 tokenid     0
 
+#Type
 type    library, single, c-api
 
-#resource FMUI object lmem read-only shared  jfh1
+# Resources
 resource FMUI lmem read-only shared
-#resource CAUI ui-object read-only  jfh1
-resource CAUI ui-object shared
-#resource DIALOGUI ui-object read-only  jfh1
-#resource DIALOGUI ui-object shared
+resource DialogUI ui-object shared
 
-#stack 6000
-
+#Libs
 library geos
 library ui
 library ansic
 
+# API functions
 export GETTHOSETOOLS
 export OPENWITHENTRYPOINT
 
+# Not API
 export OpenWithFileSelectorClass
