@@ -21,3 +21,5 @@ library ansic
 
 export GETTHOSETOOLS
 export OPENWITHENTRYPOINT
+
+export OpenWithFileSelectorClass
