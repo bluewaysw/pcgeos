@@ -127,7 +127,7 @@ minimalAppl	: minimalGame minimalUtils minimalTools minimalSavers \
 		  launcher webmagick idialup \
 		  charm wordmat banner \
 		  bbxchat bbxmail \
-		  newsread geozip sclock\
+		  newsread geozip sclock trayapps\
  	  	  hmbase pdfvu  bnkr30 ftpc \
  	  	  instc instf
 
@@ -944,6 +944,9 @@ Installed/Appl/FileMgrs2/ISDesk:	ui shell spool wav shell MAKEAPPL
 
 sclock:	Installed/Appl/SysTray/SClock
 Installed/Appl/SysTray/SClock:		ui MAKEAPPL
+
+trayapps: Installed/Appl/SysTray/TrayApps
+Installed/Appl/SysTray/TrayApps:	ui ansic MAKEAPPL
 
 linktool: Installed/Library/FMTools/Linktool
 Installed/Library/FMTools/Linktool:	ui shell MAKEAPPL
