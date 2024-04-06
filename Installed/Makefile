@@ -123,13 +123,13 @@ minimalAppl	: minimalGame minimalUtils minimalTools minimalSavers \
  	  	  extraGame \
 		  minimalEdu calendar geodex geocalc geodraw geowrite \
 		  scrapbk clock bigcalc geopoint \
-		  email manager isdesk linktool setup \
+		  email manager isdesk linktool openwith setup \
 		  launcher webmagick idialup \
 		  charm wordmat banner \
 		  bbxchat bbxmail \
-		  newsread geozip sclock\
+		  newsread geozip sclock trayapps\
  	  	  hmbase pdfvu  bnkr30 ftpc \
- 	  	  instc instf 
+ 	  	  instc instf
 
 minimalUtils	: prefmgr
 
@@ -138,7 +138,7 @@ minimalTools    : resedit
 minimalGame	: solitaire cword amateur bjack hearts gwpoker \
                   pyramid sokoban uki mine column battle \
                   row4 munchers vacman snake frcell
-                  
+
 extraGame	: taipei column2 mine2 follow treas mazerun \
 		  blkbox hiho magicboard  scode noid paddle \
 		  frotz spider
@@ -571,7 +571,7 @@ Installed/Driver/Font/Nimbus:		kernel MAKEDRV
 
 truetype : Installed/Driver/Font/TrueType
 Installed/Driver/Font/TrueType:		kernel MAKEDRV
-	
+
 ms4	: Installed/Driver/IFS/DOS/MS4
 Installed/Driver/IFS/DOS/MS4:		kernel MAKEDRV
 
@@ -945,8 +945,14 @@ Installed/Appl/FileMgrs2/ISDesk:	ui shell spool wav shell MAKEAPPL
 sclock:	Installed/Appl/SysTray/SClock
 Installed/Appl/SysTray/SClock:		ui MAKEAPPL
 
+trayapps: Installed/Appl/SysTray/TrayApps
+Installed/Appl/SysTray/TrayApps:	ui ansic MAKEAPPL
+
 linktool: Installed/Library/FMTools/Linktool
 Installed/Library/FMTools/Linktool:	ui shell MAKEAPPL
+
+openwith: Installed/Library/FMTools/OpenWith
+Installed/Library/FMTools/OpenWith:	ui ansic MAKEAPPL
 
 homebase:
 #	No need to do this because this is sync'ed by morning make script.

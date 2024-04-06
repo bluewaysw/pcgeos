@@ -379,10 +379,10 @@ taskbarDisabledLoop:
 		pop	bp
 		jmp	done
 
+taskBarEnabled:
 	;
 	; Disable items that are not available when the TaskBar is on
 	;
-taskBarEnabled:
 		mov	cx, length taskbarEnabledDisableList
 		mov	bx, offset taskbarEnabledDisableList
 		push	bp
@@ -453,6 +453,7 @@ ConfigUIDialogApply	method	dynamic	ConfigUIDialogClass,
 		call	ObjCallInstanceNoLock
 		jc	noUISelected
 		call	SetUIOptions
+
 noUISelected:
 		jmp	doReset
 
@@ -1055,7 +1056,6 @@ LocalDefNLString ISUIStr <"isui.geo", 0>
 LocalDefNLString GeoManagerStr <"GeoManager", 0>
 LocalDefNLString ISDeskStr <"ISDesk", 0>
 endif
-
 LocalDefNLString BerkeleyStr <"Berkeley", 0>
 LocalDefNLString EsquireStr <"Esquire", 0>
 
@@ -1070,8 +1070,17 @@ SetUIOptions	proc	near
 		mul	di
 		mov	di, ax				;di <- offset
 
+	;
+	; save ds, we need it later
+	;
+		push	ds
+
+	;
+	; put cs in ds and cx in es
+	;
 		segmov	ds, cs, cx
 		mov	es, cx
+
 	;
 	; handle [ui] specific = key
 	;
@@ -1114,6 +1123,35 @@ SetUIOptions	proc	near
 		call	InitFileWriteBoolean
 		pop	di, ax
 
+	;
+	; restore ds for the correct object at ds:si
+	;
+		pop	ds
+
+	;
+	; check if taskbar enabled / disabled
+	;
+		cmp	cs:uicombos[di].UIC_hasTaskbar, TRUE
+		je	taskBarEnabled
+
+taskBarDisabled::
+	;
+	; remove TrayApps und SysTray Clock when Taskbar is off
+	;
+		mov	si, offset ProgStartupList
+		mov	ax, MSG_SL_DELETE_TASKBAR_APPS
+		call	ObjCallInstanceNoLock
+		jmp	done
+
+taskBarEnabled:
+	;
+	; add TrayApps und SClock when Taskbar is on
+	;
+		mov	si, offset ProgStartupList
+		mov	ax, MSG_SL_ADD_TASKBAR_APPS
+		call	ObjCallInstanceNoLock
+
+done:
 		.leave
 		ret
 SetUIOptions	endp
