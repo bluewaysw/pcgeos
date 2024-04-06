@@ -438,18 +438,11 @@ ClockAppLostFocus	method dynamic ClockApplicationClass,
 						MSG_META_LOST_FOCUS_EXCL
 
 	;
-	; bring down menu
+	; call superclass
 	;
 		push	di, ds
-
 		mov	di, offset ClockApplicationClass
 		call	ObjCallSuperNoLock
-
-		mov	bx, handle 0
-		mov	ax, MSG_CLOCK_PROCESS_BRING_DOWN_MENU
-		clr	di
-		call	ObjMessage
-
 		pop	di, ds
 
 	;
@@ -463,6 +456,16 @@ ClockAppLostFocus	method dynamic ClockApplicationClass,
 		mov	di, mask MF_FIXUP_DS
 		mov	ax, MSG_CLOCK_SET_MENU_STATE
 		call	ObjMessage
+
+	;
+	; bring down menu
+	;
+		push	di, ds
+		mov	bx, handle 0
+		mov	ax, MSG_CLOCK_PROCESS_BRING_DOWN_MENU
+		clr	di
+		call	ObjMessage
+		pop	di, ds
 
 done:
 		ret
