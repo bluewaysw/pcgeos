@@ -213,11 +213,13 @@ REVISION HISTORY:
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
 
 GRREGIONPATHMOVEPEN		proc	far
-	C_GetThreeWordArgs	ax, cx, dx,  bx		;ax = regionHandle, cx = x, dx = y
+	C_GetThreeWordArgs	bx, cx, dx,  ax		;bx = regionHandle, cx = x, dx = y
 
 	push	es
+	call	MemLock
 	mov		es, ax
 	call	GrRegionPathMovePen
+	call	MemUnlock
 	pop		es
 	ret
 
@@ -226,7 +228,7 @@ GRREGIONPATHMOVEPEN		endp
 
 COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-C FUNCTION:	GrRegionPathLineTo
+C FUNCTION:	GrRegionPathDrawLineTo
 
 C DECLARATION:	extern void
 			_far _pascal GrRegionPathLineTo(Handle regionHandle, sword x, sword y);
@@ -241,11 +243,13 @@ REVISION HISTORY:
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
 
 GRREGIONPATHDRAWLINETO	proc	far
-	C_GetThreeWordArgs	dx, cx, dx,  bx		;ax = regionHandle, cx = x, dx = y
+	C_GetThreeWordArgs	bx, cx, dx,  ax		;bx = regionHandle, cx = x, dx = y
 
 	push	es
+	call	MemLock
 	mov		es, ax
 	call	GrRegionPathAddLineAtCP
+	call	MemUnlock
 	pop		es
 	ret
 
@@ -254,7 +258,7 @@ GRREGIONPATHDRAWLINETO	endp
 
 COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-C FUNCTION:	GrRegionPathLineTo
+C FUNCTION:	GrRegionPathDrawLineTo
 
 C DECLARATION:	extern void
 			_far _pascal GrRegionPathDrawCurve(Handle regionHandle, Point *points);
@@ -268,7 +272,7 @@ REVISION HISTORY:
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
 
-GRREGIONPATHDRAWCURVE	proc	far	regionpath:hptr, points:fptr
+GRREGIONPATHDRAWCURVETO	proc	far	regionpath:hptr, points:fptr
 				uses cx, bp, di, ds
 	.enter
 
@@ -280,7 +284,7 @@ GRREGIONPATHDRAWCURVE	proc	far	regionpath:hptr, points:fptr
 	.leave
 	ret
 
-GRREGIONPATHDRAWCURVE	endp
+GRREGIONPATHDRAWCURVETO	endp
 
 
 COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
