@@ -61,10 +61,10 @@ void _pascal TrueType_Gen_In_Region(
 extern void _pascal GrRegionPathMovePen(
                         Handle regionHandle, sword x, sword y );
 
-extern void _pascal GrRegionPathLineTo( 
+extern void _pascal GrRegionPathDrawLineTo( 
                         Handle regionHandle, sword x, sword y );
 
-extern void _pascal GrRegionPathCurveTo(
+extern void _pascal GrRegionPathDrawCurveTo(
                         Handle regionHandle, Point *points );
 
 extern void _pascal GrRegionPathInit(
@@ -73,8 +73,8 @@ extern void _pascal GrRegionPathInit(
 
 #ifdef __HIGHC__
 pragma Alias(GrRegionPathMovePen, "GRREGIONPATHMOVEPEN");
-pragma Alias(GrRegionPathLineTo, "GRREGIONPATHDRAWLINETO");
-pragma Alias(GrRegionPathDrawCurve, "GRREGIONPATHDRAWCURVE");
+pragma Alias(GrRegionPathDrawLineTo, "GRREGIONPATHDRAWLINETO");
+pragma Alias(GrRegionPathDrawCurveTo, "GRREGIONPATHDRAWCURVE");
 pragma Alias(GrRegionPathInit, "GRREGIONPATHINIT");
 #endif
 

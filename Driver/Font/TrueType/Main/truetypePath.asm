@@ -273,13 +273,17 @@ REVISION HISTORY:
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
 
 GRREGIONPATHDRAWCURVETO	proc	far	regionpath:hptr, points:fptr
-				uses cx, bp, di, ds
+				uses ax, bx, cx, bp, di, ds, es
 	.enter
 
 	clr		bp
 	mov		cx, REC_BEZIER_STACK
 	lds		di, points
+	mov		bx, regionpath
+	call	MemLock
+	mov		es, ax
 	call	GrRegionPathAddBezierAtCP
+	call	MemUnlock
 
 	.leave
 	ret

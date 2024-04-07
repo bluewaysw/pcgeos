@@ -285,16 +285,26 @@ EC(     ECCheckBounds( (void*)trueTypeOutline ) );
 
         /* translate by current cursor position */
         cursorPos = GrGetCurPos( gstate );
-        GrApplyTranslationDWord( gstate, DWORD_X( cursorPos ), DWORD_Y( cursorPos ) );
+        //GrApplyTranslationDWord( gstate, DWORD_X( cursorPos ), DWORD_Y( cursorPos ) );
 
         /* set render functions */
-        //renderFunctions.Proc_MoveTo  = RegionPathMoveTo;
-        //renderFunctions.Proc_LineTo  = RegionPathLineTo;
-        //renderFunctions.Proc_ConicTo = RegionPathConicTo;
+        renderFunctions.Proc_MoveTo  = RegionPathMoveTo;
+        renderFunctions.Proc_LineTo  = RegionPathLineTo;
+        renderFunctions.Proc_ConicTo = RegionPathConicTo;
 
         //TODO: init region path
+        //GrRegionPathInit( regionPath, 20 );
 
         //TODO: render glyph as regionpath
+
+        //TEST: hart verdrahtetes Glyph (Minus)
+        GrRegionPathMovePen( regionPath, 248, 296 );
+
+        GrRegionPathDrawLineTo( regionPath, 248, 308 );
+        GrRegionPathDrawLineTo( regionPath, 284, 308 );
+        GrRegionPathDrawLineTo( regionPath, 284, 296 );
+        GrRegionPathDrawLineTo( regionPath, 248, 296 );
+        //ENDE TEST: hart verdrahtetes Glyph
 
 Fail:
         TT_Done_Glyph( GLYPH );
@@ -533,7 +543,7 @@ static void _near LineTo( GStateHandle gstate, TT_Vector* vec )
 
 static void _near RegionPathLineTo( Handle regionHandle, TT_Vector* vec )
 {
-        GrRegionPathLineTo( regionHandle, vec->x, vec->y );
+        GrRegionPathDrawLineTo( regionHandle, vec->x, vec->y );
 }
 
 
@@ -600,7 +610,7 @@ static void _near RegionPathConicTo( Handle regionHandle, TT_Vector* v_control, 
         p[1].P_x = p[2].P_x = vec->x;
         p[1].P_y = p[2].P_y = vec->y;
 
-        GrRegionPathCurveTo( regionHandle, p );
+        GrRegionPathDrawCurveTo( regionHandle, p );
 }
 
 
