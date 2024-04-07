@@ -152,7 +152,7 @@ Boolean CheckIfFaultyFiles(MemHandle selFiles)
             if ((entriesPtr->FOIE_type == GFT_NOT_GEOS_FILE) &&
                 (entriesPtr->FOIE_type != GFT_DIRECTORY))
             {
-                // for some folders above DOCUMENT/WORLD GFT_DIRECTORY seems not to be set -
+                // for folders above DOCUMENT/WORLD GFT_DIRECTORY seems not to be set (...?) -
                 // so we check again if actually a folder
                 FilePushDir();
                 if (FileSetCurrentPath(headerPtr->FQTH_diskHandle, headerPtr->FQTH_pathname) != NullHandle)
@@ -164,13 +164,16 @@ Boolean CheckIfFaultyFiles(MemHandle selFiles)
                         (fAttrs & FA_HIDDEN) ||
                         (fAttrs & FA_RDONLY))
                     {
+                        FilePopDir();
                         hadError = TRUE;
                         break;
                     }
                 }
                 else
                 {
+                    FilePopDir();
                     hadError = TRUE;
+                    break;
                 }
                 FilePopDir();
             }
@@ -184,11 +187,20 @@ Boolean CheckIfFaultyFiles(MemHandle selFiles)
             entriesPtr = (FileOperationInfoEntry*) entriesPtr + 1;
         }
 
-        // get next block, if any
-        MemUnlock(selFiles);
-        oldBlock = selFiles;
-        selFiles = headerPtr->FQTH_nextBlock; // returns 0 if end, which breaks the loop
-        MemFree(oldBlock);
+        if (hadError)
+        {
+            MemUnlock(selFiles);
+            MemFree(selFiles);
+            break;
+        }
+        else
+        {
+            // get next block, if any
+            MemUnlock(selFiles);
+            oldBlock = selFiles;
+            selFiles = headerPtr->FQTH_nextBlock; // returns 0 if end, which breaks the loop
+            MemFree(oldBlock);
+        }
     }
 
     return hadError;
