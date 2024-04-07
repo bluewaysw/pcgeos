@@ -47,7 +47,7 @@ void _pascal _export OpenWithEntryPoint(
     PathName    	            pathname;   	/* Buffer for fetching the complete path of the application */
     DiskHandle  	            disk;	    	/* Disk on which it resides */
     GeodeToken  	            token;	    	/* Token for the application, so we can connect to it */
-
+    Boolean                     hadError = FALSE;
 
     dialog = @call ConstructOptr(filemgr, 0)::MSG_FM_DUP_AND_ADD(@SelectDialog, FMP_APPLICATION);
     @call dialog::MSG_GEN_SET_USABLE(VUM_NOW);
@@ -90,6 +90,10 @@ void _pascal _export OpenWithEntryPoint(
                                 entriesPtr->FOIE_name
                             );
                         }
+                        else
+                        {
+                            hadError = TRUE;
+                        }
 
                         // point to the next entry
                         entriesPtr = (FileOperationInfoEntry*) entriesPtr + 1;
@@ -100,6 +104,16 @@ void _pascal _export OpenWithEntryPoint(
                     oldBlock = selFiles;
                     selFiles = headerPtr->FQTH_nextBlock; // returns 0 if end, which breaks the loop
                     MemFree(oldBlock);
+                }
+
+                if (hadError)
+                {
+                    UserStandardDialogOptr(
+                        0, 0, 0, 0,
+                        @errorNoDOSFile,
+                        ((CDT_NOTIFICATION << CDBF_DIALOG_TYPE_OFFSET) |
+                         (GIT_NOTIFICATION << CDBF_INTERACTION_TYPE_OFFSET))
+                    );
                 }
             }
             FilePopDir();
