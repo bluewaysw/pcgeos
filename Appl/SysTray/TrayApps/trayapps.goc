@@ -80,6 +80,7 @@ constants & structures
 -------------------------------------------------------------------*/
 #define MAX_TRAY_TRIGGERS_COUNT 25
 #define TRAYAPPS_STD_PATH       SP_USER_DATA
+#define TOOL_ICON_WIDTH         15
 
 typedef struct
 {
@@ -561,6 +562,8 @@ add / remove / re-add our app launching triggers
     char*               filePtr = (void*) 0;
     byte                triggerNo = 0;
     MemHandle           triggerBlock = NullHandle;
+    VisMoniker*         vmp = (void*) 0;
+    word                width = 0;
 
     @call oself::MSG_REMOVE_ALL_APP_TRIGGERS();
 
@@ -591,13 +594,21 @@ add / remove / re-add our app launching triggers
                     isGMoniker = TokenLoadMonikerBlock(
                         TOKEN_CHARS(tok.GT_chars[0],tok.GT_chars[1],tok.GT_chars[2],tok.GT_chars[3]),
                         tok.GT_manufID,
-                        (DT_DISP_SIZE | DT_DISP_ASPECT_RATIO | DT_DISP_CLASS),
+                        0,
                         ((VMSF_GSTRING) | (VMS_TOOL << VMSF_STYLE_OFFSET)),
                         &monikerSize,
                         &newMoniker
                     );
 
                     if (isGMoniker)
+                    {
+                        MemLock(newMoniker);
+                        vmp = (VisMoniker*) MemDeref(newMoniker);
+                        width = vmp->VM_width;
+                        MemUnlock(newMoniker);
+                    }
+
+                    if ((isGMoniker) && (width <= TOOL_ICON_WIDTH))
                     {
                         @call triggerObj::MSG_GEN_REPLACE_VIS_MONIKER(
                             VUM_NOW,
@@ -606,17 +617,18 @@ add / remove / re-add our app launching triggers
                             VMST_HPTR,
                             (dword)(ConstructOptr(newMoniker, 0))
                         );
-
-                        @call triggerObj::MSG_GEN_TRIGGER_SET_ACTION_MSG(MSG_APP_TRIGGER_PRESSED);
-                        @call triggerObj::MSG_GEN_TRIGGER_SET_DESTINATION(ConstructOptr(GeodeGetCodeProcessHandle(), 0));
-                        //@call obj::MSG_META_ADD_VAR_DATA(HINT_NO_BORDERS_ON_MONIKERS, 0, (void*) 0);
-                        @call triggerObj::MSG_META_ADD_VAR_DATA((ATTR_GEODE_TOKEN_TO_PASS & (~VDF_SAVE_TO_STATE)), sizeof(GeodeToken), &tok);
-                        @call triggerObj::MSG_META_ADD_VAR_DATA((ATTR_GEODE_FILE_NAME & (~VDF_SAVE_TO_STATE)), sizeof(FileLongName), filePtr);
-                        @call triggerObj::MSG_GEN_SET_USABLE(VUM_NOW);
-
-                        MemFree(newMoniker);
+                    }
+                    else
+                    {
+                        @call triggerObj::MSG_GEN_REPLACE_VIS_MONIKER_TEXT(filePtr, VUM_NOW);
                     }
 
+                    if (isGMoniker) MemFree(newMoniker);
+
+                    @call triggerObj::MSG_GEN_TRIGGER_SET_ACTION_MSG(MSG_APP_TRIGGER_PRESSED);
+                    @call triggerObj::MSG_GEN_TRIGGER_SET_DESTINATION(ConstructOptr(GeodeGetCodeProcessHandle(), 0));
+                    @call triggerObj::MSG_META_ADD_VAR_DATA((ATTR_GEODE_TOKEN_TO_PASS & (~VDF_SAVE_TO_STATE)), sizeof(GeodeToken), &tok);
+                    @call triggerObj::MSG_META_ADD_VAR_DATA((ATTR_GEODE_FILE_NAME & (~VDF_SAVE_TO_STATE)), sizeof(FileLongName), filePtr);
                     @call triggerObj::MSG_GEN_SET_USABLE(VUM_NOW);
                 }
             }
