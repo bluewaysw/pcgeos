@@ -247,6 +247,7 @@ void _pascal TrueType_Gen_In_Region(
                         WWFixedAsDWord       pointSize,
 			const FontInfo*      fontInfo, 
                         const OutlineEntry*  outlineEntry,
+                        TextStyle            stylesToImplement,
                         MemHandle            varBlock )
 {
         TrueTypeVars*          trueTypeVars;
@@ -285,7 +286,7 @@ EC(     ECCheckBounds( (void*)trueTypeOutline ) );
 
         /* translate by current cursor position */
         cursorPos = GrGetCurPos( gstate );
-        //GrApplyTranslationDWord( gstate, DWORD_X( cursorPos ), DWORD_Y( cursorPos ) );
+        GrApplyTranslationDWord( gstate, DWORD_X( cursorPos ), DWORD_Y( cursorPos ) );
 
         /* set render functions */
         renderFunctions.Proc_MoveTo  = RegionPathMoveTo;

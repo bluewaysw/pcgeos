@@ -51,6 +51,7 @@ void _pascal TrueType_Gen_In_Region(
                         WWFixedAsDWord       pointSize,
 			const FontInfo*      fontInfo, 
                         const OutlineEntry*  outlineEntry,
+                        TextStyle            stylesToImplement,
                         MemHandle            varBlock );
 
 

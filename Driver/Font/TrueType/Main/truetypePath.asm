@@ -180,6 +180,7 @@ TrueTypeGenInRegion	proc	far
 	call	FontDrFindOutlineData
 	push	ds					;pass ptr to OutlineEntry
 	push	di
+	push	ax					;pass stylesToImplement
 
 	segmov	ds, dgroup, ax
 	push	ds:variableHandle	;pass handle to truetype block
