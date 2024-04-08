@@ -43,7 +43,8 @@ void _pascal _export OpenWithEntryPoint(
     optr                        dialog = NullOptr;
     optr                        fSelect = NullOptr;
     dword	    	            flagsAndDisk;	/* entry flags + disk handle returned by file selector */
-    PathName    	            pathname;   	/* Buffer for fetching the complete path of the application */
+    char    	                pathnameAndFile[PATH_BUFFER_SIZE + FILE_LONGNAME_BUFFER_SIZE];   	/* Buffer for fetching the complete path of the application */
+    FileLongName                fname;
     DiskHandle  	            disk;	    	/* Disk on which it resides */
     GeodeToken  	            token;	    	/* Token for the application, so we can connect to it */
 
@@ -68,18 +69,30 @@ void _pascal _export OpenWithEntryPoint(
     if (reply == IC_OK)
     {
         fSelect = @call dialog::MSG_GEN_FIND_CHILD_AT_POSITION(0);
-        flagsAndDisk = @call fSelect::MSG_GEN_FILE_SELECTOR_GET_FULL_SELECTION_PATH(pathname);
+        flagsAndDisk = @call fSelect::MSG_GEN_FILE_SELECTOR_GET_FULL_SELECTION_PATH(&pathnameAndFile);
+        (void) @call fSelect::MSG_GEN_FILE_SELECTOR_GET_SELECTION(&fname);
 
         UserDestroyDialog(dialog); // no more needed
 
         if (GFS_GET_ENTRY_TYPE(flagsAndDisk) == GFSET_FILE)
         {
+            if (IsAppOnBlacklist(&fname))
+            {
+                UserStandardDialogOptr(
+                    0, 0, 0, 0,
+                    @errorNoCompatibleApp,
+                    ((CDT_ERROR << CDBF_DIALOG_TYPE_OFFSET) |
+                    (GIT_NOTIFICATION << CDBF_INTERACTION_TYPE_OFFSET))
+                );
+                return;
+            }
+
             disk = GFS_GET_FULL_SELECTION_PATH_DISK_HANDLE(flagsAndDisk); // Extract disk handle
 
             FilePushDir();
             if (
                  (FileSetCurrentPath(disk, _TEXT("\\")) != 0) &&
-                 (FileGetPathExtAttributes(pathname, FEA_TOKEN, &token, sizeof(token)) == 0)
+                 (FileGetPathExtAttributes(pathnameAndFile, FEA_TOKEN, &token, sizeof(token)) == 0)
                )
             {
                 selFiles = @call ConstructOptr(filemgr, 0)::MSG_FM_GET_SELECTED_FILES();
@@ -94,7 +107,7 @@ void _pascal _export OpenWithEntryPoint(
                         LaunchApp(
                             &token,
                             disk,
-                            &pathname,
+                            &pathnameAndFile,
                             headerPtr->FQTH_diskHandle,
                             headerPtr->FQTH_pathname,
                             entriesPtr->FOIE_name
@@ -207,12 +220,47 @@ Boolean CheckIfFaultyFiles(MemHandle selFiles)
 }
 
 /*-------------------------------------------------------------
+
+-------------------------------------------------------------*/
+Boolean IsAppOnBlacklist(char* appName)
+{
+    word            numApps = 0;
+    FileLongName*   listApp = (void*) 0;
+    word            size = 0;
+    word            i = 0;
+    Boolean         isOnList = FALSE;
+
+    MemLock(HandleOf(@BlacklistArray));
+    numApps = ChunkArrayGetCount(@BlacklistArray);
+
+    for (i = 0; i < numApps; i++)
+    {
+        listApp = ChunkArrayElementToPtr(@BlacklistArray, i, &size);
+
+        // remove leading slash by shifting the whole thing left one char
+        // seems like "size" (3rd paramter) should be "strlen-1",
+        // but let's not forget the trailing 0...
+        memmove(appName, appName + 1, strlen(appName));
+        if (strstr(listApp, appName) != (void*) 0)
+        {
+            isOnList = TRUE;
+            break;
+        }
+    }
+
+    MemUnlock(HandleOf(@BlacklistArray));
+
+    return isOnList;
+}
+
+
+/*-------------------------------------------------------------
 launch application with DOS file via IACP...
 -------------------------------------------------------------*/
 void LaunchApp(
     GeodeToken *appTok,
     DiskHandle appDisk,
-    PathName *appPath,
+    char *appPath,
     DiskHandle dataDisk,
     PathName *dataPath,
     FileLongName *dataFName)
