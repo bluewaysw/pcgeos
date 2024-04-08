@@ -1,0 +1,232 @@
+@include <foldered.goh>
+
+/*
+	To do
+	- GP: XCCOMFLAGS	--> Info an MeyerK
+
+	MeyerK:	OpenWithEntryPoint: Dilaog wird nicht vernichtet, wenn "Abbruch" gewählt
+	
+
+/***********************************************************************
+Resourcen
+***********************************************************************/
+@start FMUI, data;
+    @visMoniker FolderEditMoniker = "Edit Icon";
+@end FMUI;
+
+@start DialogUI, notDetachable;
+    @object GenInteractionClass SelectDialog = {
+        GI_visMoniker = "Edit Icon";
+        GI_comp =
+                    @OpenWithFileSelector,
+                    @SelectReplyBar;
+        GI_states = (@default & (~GS_USABLE));
+        GII_visibility = GIV_DIALOG;
+        GII_attrs = @default | GIA_INITIATED_VIA_USER_DO_DIALOG | GIA_MODAL;
+        HINT_PLACE_MONIKER_ABOVE;
+        HINT_ORIENT_CHILDREN_VERTICALLY;
+    }
+
+    @object OpenWithFileSelectorClass OpenWithFileSelector = {
+        GFSI_destination = OpenWithFileSelector;
+        GFSI_notificationMsg = MSG_FILEBROW_SELECTOR_ACTION;
+        GFSI_attrs =           ((FSA_ALLOW_CHANGE_DIRS) & (~FSA_SHOW_FILES_DISABLED) & (~FSA_HAS_OPEN_DIR_BUTTON) & (~FSA_HAS_CHANGE_DIRECTORY_LIST))
+                                | ((FSA_HAS_FILE_LIST) & (~FSA_SHOW_FIXED_DISKS_ONLY) & (~FSA_HAS_CLOSE_DIR_BUTTON) & (~FSA_HAS_DOCUMENT_BUTTON)& (~FSA_HAS_CHANGE_DRIVE_LIST))
+                                | ((FSA_USE_VIRTUAL_ROOT));
+
+        GFSI_fileCriteria =      ((FSFC_DIRS) & (~FSFC_NON_GEOS_FILES))
+                                | ((FSFC_GEOS_EXECUTABLES) & (~FSFC_GEOS_NON_EXECUTABLES));
+
+        ATTR_GEN_FILE_SELECTOR_VIRTUAL_ROOT = {SP_APPLICATION, ""};
+        ATTR_GEN_PATH_DATA = {SP_APPLICATION, ""};
+        HINT_FILE_SELECTOR_FILE_LIST_WIDTH = 40;
+        HINT_FILE_SELECTOR_NUMBER_OF_FILES_TO_SHOW = 15;
+    }
+
+    @object GenInteractionClass SelectReplyBar ={
+        GI_comp =   @SelectOkTrigger,
+                    @SelectCancelTrigger;
+        HINT_MAKE_REPLY_BAR;
+    }
+
+    @object GenTriggerClass SelectOkTrigger = {
+        ATTR_GEN_TRIGGER_INTERACTION_COMMAND = { IC_OK };
+        HINT_SEEK_REPLY_BAR;
+        HINT_DEFAULT_DEFAULT_ACTION;
+    }
+
+    @object GenTriggerClass SelectCancelTrigger = {
+        ATTR_GEN_TRIGGER_INTERACTION_COMMAND = { IC_DISMISS };
+        HINT_SEEK_REPLY_BAR;
+    }
+
+@end DialogUI;
+
+
+/*-------------------------------------------------------------
+ *	API Struct	- tell the file manager infos about our tools
+ *	MUST be global
+-------------------------------------------------------------*/
+FMToolStruct FMToolInfo[1] = {
+    {
+        @FolderEditMoniker, (FMTF_SELECTED_ONLY | FMTT_DIALOG), 1
+        	/* Moniker for Tool Entry
+        	 * FMTF_SELECTED_ONLY: active, onyl if a file/folder is selected
+        	 * FMTT_DIALOG: a dialog will come up (see FMToolType). 
+        	 * 1: number of the tool in our list (we have only one)
+        	 */
+    }
+};
+
+/*-------------------------------------------------------------
+ *	FMFetchToolsProc GetThoseTools
+ *	FileManager API Function - fetch Tools
+-------------------------------------------------------------*/
+
+word _pascal _export GetThoseTools(FMToolStruct **tablePtr)
+{
+    *tablePtr = (FMToolStruct*) &FMToolInfo;
+    return 1;
+}
+
+/*-------------------------------------------------------------
+ *	FMToolProc FolderEdEntryPoint()
+ *
+ *	GeodeHandle filemgr => Process that is subclass of FileManagerClass
+ *	word toolNum =>	Entry # of activated tool within table returned by
+ *                FMTF_FETCH_TOOLS
+ *	word entryNum
+ *
+ *	The user has clicked on our Utilities menu item: "Edit Icon"
+-------------------------------------------------------------*/
+//
+void _pascal _export FolderEdEntryPoint(
+    GeodeHandle filemgr,
+    word toolNum,
+    word entryNum
+)
+{
+    MemHandle                   selFiles;
+    MemHandle                   oldBlock;
+    FileQuickTransferHeader*    headerPtr;
+    FileOperationInfoEntry*     entriesPtr;
+    word                        i;
+    InteractionCommand          reply = IC_NULL;
+
+    optr                        dialog = NullOptr;
+    optr                        fSelect = NullOptr;
+    dword	    	            flagsAndDisk;	/* entry flags + disk handle returned by file selector */
+    PathName    	            pathname;   	/* Buffer for fetching the complete path of the application */
+    DiskHandle  	            disk;	    	/* Disk on which it resides */
+    GeodeToken  	            token;	    	/* Token for the application, so we can connect to it */
+
+
+    /*
+     * Copy our dialog tempalte and add it to the application object
+     */
+    dialog = @call ConstructOptr(filemgr, 0)::MSG_FM_DUP_AND_ADD(@SelectDialog, FMP_APPLICATION);
+    @call dialog::MSG_GEN_SET_USABLE(VUM_NOW);
+
+    reply = UserDoDialog(dialog);
+    if (reply == IC_OK)
+    {
+        fSelect = @call dialog::MSG_GEN_FIND_CHILD_AT_POSITION(0);
+        flagsAndDisk = @call fSelect::MSG_GEN_FILE_SELECTOR_GET_FULL_SELECTION_PATH(pathname);
+
+        UserDestroyDialog(dialog); // no more needed
+
+        if (GFS_GET_ENTRY_TYPE(flagsAndDisk) == GFSET_FILE)
+        {
+            disk = GFS_GET_FULL_SELECTION_PATH_DISK_HANDLE(flagsAndDisk); // Extract disk handle
+
+            FilePushDir();
+            if (
+                 (FileSetCurrentPath(disk, _TEXT("\\")) != 0) &&
+                 (FileGetPathExtAttributes(pathname, FEA_TOKEN, &token, sizeof(token)) == 0)
+               )
+            {
+                selFiles = @call ConstructOptr(filemgr, 0)::MSG_FM_GET_SELECTED_FILES();
+
+                while (selFiles != 0)
+                {
+                    headerPtr  = (FileQuickTransferHeader*) MemLock(selFiles); // get pointer to it header
+                    entriesPtr = (FileOperationInfoEntry*) (headerPtr + 1); // get pointer to first entry (follows header)
+
+                    for (i=0; i < headerPtr->FQTH_numFiles; i++)
+                    {
+                        if (entriesPtr->FOIE_type == GFT_NOT_GEOS_FILE)
+                        {
+                            LaunchApp(
+                                &token,
+                                disk,
+                                &pathname,
+                                headerPtr->FQTH_diskHandle,
+                                headerPtr->FQTH_pathname,
+                                entriesPtr->FOIE_name
+                            );
+                        }
+
+                        // point to the next entry
+                        entriesPtr = (FileOperationInfoEntry*) entriesPtr + 1;
+                    }
+
+                    // get next block, if any
+                    MemUnlock(selFiles);
+                    oldBlock = selFiles;
+                    selFiles = headerPtr->FQTH_nextBlock; // returns 0 if end, which breaks the loop
+                    MemFree(oldBlock);
+                }
+            }
+            FilePopDir();
+        }
+    }
+}
+
+/*-------------------------------------------------------------
+make sure the dialog gets closed when we double-click on an app
+-------------------------------------------------------------*/
+@method OpenWithFileSelectorClass, MSG_FILEBROW_SELECTOR_ACTION
+{
+    if (GFS_GET_ENTRY_FLAGS(entryFlags) == GFSEF_OPEN) // was it a double click?
+    {
+        if (GFS_GET_ENTRY_TYPE(entryFlags) == GFSET_FILE) // on a file?
+        {
+            @send oself::MSG_GEN_GUP_INTERACTION_COMMAND(IC_OK); // close the dialog
+        }
+    }
+}
+
+/*-------------------------------------------------------------
+launch application with DOS file via IACP...
+-------------------------------------------------------------*/
+void LaunchApp(
+    GeodeToken *appTok,
+    DiskHandle appDisk,
+    PathName *appPath,
+    DiskHandle dataDisk,
+    PathName *dataPath,
+    FileLongName *dataFName)
+{
+    IACPConnection       iacpConnectionToken = IACP_NO_CONNECTION;
+    word                 connectionFlags = IACPSM_USER_INTERACTIBLE | IACPCF_FIRST_ONLY;
+    word                 serverCount;
+    MemHandle            albBlock;
+    AppLaunchBlock       *albPtr;
+
+    albBlock = IACPCreateDefaultLaunchBlock(MSG_GEN_PROCESS_OPEN_APPLICATION);
+
+    albPtr = MemLock(albBlock);
+    strcpy(albPtr->ALB_appRef.AIR_fileName, appPath);
+    albPtr->ALB_appRef.AIR_diskHandle = appDisk;
+    albPtr->ALB_diskHandle = dataDisk;
+    strcpy(albPtr->ALB_path, dataPath);
+    strcpy(albPtr->ALB_dataFile, dataFName);
+    MemUnlock(albBlock);
+
+    iacpConnectionToken = IACPConnect(appTok, connectionFlags, albBlock, NullOptr, &serverCount);
+    if(iacpConnectionToken != IACP_NO_CONNECTION)
+    {
+        IACPShutdown(iacpConnectionToken, NullOptr);
+    }
+}
+
