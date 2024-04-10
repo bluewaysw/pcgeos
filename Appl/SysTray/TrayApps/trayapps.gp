@@ -44,6 +44,7 @@ library ansic
 # Standard discardable code resources do not need to be mentioned.
 #
 resource AppResource object
+resource AppIconMonikersResource lmem read-only shared
 resource Strings data, lmem, shared
 
 export  TrayAppsInteractionClass
