@@ -65,11 +65,11 @@ UI Objects
 
 @start Strings, data;
 
+    @chunk  char    TrayAppsFolderName[] = "TRAYAPPS";
+    @localize {"Folder name - do not translate."};
+
     @chunk  char    FolderError[] = "Folder for TrayApps could not be found or created, quitting.";
     @localize {"Error message if TrayApps folder could not be found or created."};
-
-    chunk   char    TrayAppsFolderName[] = "TRAYAPPS";
-    @localize {"Folder name - do NOT translate."};
 
 @end Strings;
 
@@ -569,6 +569,8 @@ add / remove / re-add our app launching triggers
     VisMonikerWithGString*         vmp = (void*) 0;
     word                width = 0;
     word                height = 0;
+    ChunkHandle         helpChunk = NullHandle;
+    optr                helpOptr = NullOptr;
 
     @call oself::MSG_REMOVE_ALL_APP_TRIGGERS();
 
@@ -592,12 +594,6 @@ add / remove / re-add our app launching triggers
                 filePtr = MemDeref(trayFilesHan);
                 filePtr = filePtr + (triggerNo * FILE_LONGNAME_BUFFER_SIZE);
                 FileGetPathExtAttributes(filePtr, FEA_TOKEN, (&tok), sizeof(GeodeToken));
-
-                // MemLock(OptrToHandle(@MinimHelp));
-                // helpChunk = LMemAlloc(OptrToHandle(@MinimHelp), FILE_LONGNAME_BUFFER_SIZE);
-                // helpChunkPtr = LMemDerefHandles(OptrToHandle(@MinimHelp), helpChunk);
-                // strcpy(helpChunkPtr, filesPtr);
-                // MemUnlock(OptrToHandle(@MinimHelp));
 
                 triggerObj = ObjInstantiate(triggerBlock, &GenGeodeTokenTriggerClass);
 
@@ -643,17 +639,21 @@ add / remove / re-add our app launching triggers
 
                     if (monikerFound) MemFree(newMoniker);
 
+                    // set up some common stuff
                     @call triggerObj::MSG_GEN_TRIGGER_SET_ACTION_MSG(MSG_APP_TRIGGER_PRESSED);
                     @call triggerObj::MSG_GEN_TRIGGER_SET_DESTINATION(ConstructOptr(GeodeGetCodeProcessHandle(), 0));
                     @call triggerObj::MSG_META_ADD_VAR_DATA((ATTR_GEODE_TOKEN_TO_PASS & (~VDF_SAVE_TO_STATE)), sizeof(GeodeToken), &tok);
                     @call triggerObj::MSG_META_ADD_VAR_DATA((ATTR_GEODE_FILE_NAME & (~VDF_SAVE_TO_STATE)), sizeof(FileLongName), filePtr);
 
-                    // MemLock(HandleOf(triggerObj));
-                    // fh = (optr*) ObjVarAddData(triggerObj, (ATTR_GEN_FOCUS_HELP & (~VDF_SAVE_TO_STATE)), sizeof(optr));
-                    // (*fh) = ConstructOptr(OptrToHandle(@MinimHelp), helpChunk);
-                    // ObjSetFlags(obj, OCF_VARDATA_RELOC, 0);
-                    // MemUnlock(HandleOf(obj));
+                    // add bubble help
+                    MemLock(OptrToHandle(@TrayAppsFolderName)); // get handle of STRINGS resource
+                    helpChunk = LMemAlloc(OptrToHandle(@TrayAppsFolderName), FILE_LONGNAME_BUFFER_SIZE); // allocate new chunk in resource
+                    strcpy(LMemDerefHandles(OptrToHandle(@TrayAppsFolderName), helpChunk), filePtr);
+                    MemUnlock(OptrToHandle(@TrayAppsFolderName));
+                    helpOptr = ConstructOptr(OptrToHandle(@TrayAppsFolderName), helpChunk);
+	                @call triggerObj::MSG_META_ADD_VAR_DATA((ATTR_GEN_FOCUS_HELP & (~VDF_SAVE_TO_STATE)), sizeof(optr), &helpOptr);
 
+                    //finally, set usable
                     @call triggerObj::MSG_GEN_SET_USABLE(VUM_NOW);
                 }
             }
