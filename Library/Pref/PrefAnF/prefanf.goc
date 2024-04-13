@@ -698,23 +698,39 @@ void    _export _pascal PrefGetModuleInfo( PrefModuleInfo *modInfo )
 
 }
 
+Boolean _pascal ReadAppsCallback(const char *stringSection, word sectionNum, void* enumData)
+{
+    char* str;
+
+	str = (char*) ChunkArrayAppend(*((optr*) enumData), 0); // convert voidPOINTER to optrPOINTER and deref aftwerwards...
+    strcpy(str, stringSection);
+
+    return FALSE; // no error
+}
 
 @method	PrefAppListClass, MSG_PREF_DYNAMIC_LIST_BUILD_ARRAY
 {
     MemHandle       mh = NullHandle;
     ChunkHandle     ch = NullChunk;
     word            num = 0;
-    char*           str = (void*) 0;
+    // char*           str = (void*) 0;
+    optr            ourList = NullOptr;
 
     mh = MemAllocLMem(LMEM_TYPE_GENERAL, 0);
     MemLock(mh);
 
     ch = ChunkArrayCreate(mh, sizeof(FileLongName), 0, 0);
     pself->appList = ConstructOptr(mh, ch);
+    ourList = pself->appList;
 
-	str = (char*) ChunkArrayAppend(pself->appList, 0);
-    strcpy(str, _TEXT("Oh dummy schlummy"));
-	num = ChunkArrayGetCount(pself->appList);
+    InitFileEnumStringSection(
+        _TEXT("fileManager"),
+        _TEXT("openWithFavoriteApps"),
+        IFRF_READ_ALL,
+        ReadAppsCallback,
+        (void*) &ourList);
+
+    num = ChunkArrayGetCount(pself->appList);
 
     MemUnlock(mh);
 
@@ -723,6 +739,7 @@ void    _export _pascal PrefGetModuleInfo( PrefModuleInfo *modInfo )
 
     @callsuper();
 }
+
 
 /*
     **Parameters:**
