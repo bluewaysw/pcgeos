@@ -58,5 +58,6 @@ export  PREFGETMODULEINFO
 #       These are the classes exported by the library
 #
 export  PrefDialogMMClass
+export  PrefAppListClass
 export	PrefItemGroupMMClass
 

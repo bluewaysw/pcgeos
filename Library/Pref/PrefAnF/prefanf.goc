@@ -22,6 +22,7 @@
 #include <Ansi/stdlib.h>
 #include <Ansi/string.h>
 #include <file.h>
+#include <chunkarr.h>
 
 /****************************************************************/
 
@@ -38,6 +39,7 @@
 /**************************** Classdeclar. **********************/
 
 @classdecl      PrefDialogMMClass;
+@classdecl      PrefAppListClass;
 @classdecl      PrefItemGroupMMClass;
 
 /****************************** dgroup **************************/
@@ -127,7 +129,7 @@ void    _pascal PrefGetModuleInfo( PrefModuleInfo *info );
 
 @object GenTextClass TitleHelpText = {
     GI_attrs = @default | GA_READ_ONLY;
-    GTXI_text = "Choose Apps that appear in the 'Open With' dialogue for common use.";
+    GTXI_text = "Choose frequently used applications that appear in the 'Open With' dialogue.";
 
     HINT_EXPAND_WIDTH_TO_FIT_PARENT;
 }
@@ -175,7 +177,7 @@ void    _pascal PrefGetModuleInfo( PrefModuleInfo *info );
     HINT_EXPAND_HEIGHT_TO_FIT_PARENT;
 }
 
-@object PrefDynamicListClass OpenWithAppList = {
+@object PrefAppListClass OpenWithAppList = {
     // destination = "TO_SELF";
     HINT_ITEM_GROUP_SCROLLABLE;
     HINT_EXPAND_HEIGHT_TO_FIT_PARENT;
@@ -194,7 +196,6 @@ void    _pascal PrefGetModuleInfo( PrefModuleInfo *info );
     GI_visMoniker = "Remove";
     //action = MSG_SL_DELETE_PROGRAM, ProgStartupList;
     HINT_EXPAND_WIDTH_TO_FIT_PARENT;
-    HIN_CENTER_MONIKER
 }
 
 
@@ -579,7 +580,7 @@ void    _export _pascal PrefGetModuleInfo( PrefModuleInfo *modInfo )
     modInfo->PMI_monikerToken.GT_chars[1] = 'F';
     modInfo->PMI_monikerToken.GT_chars[2] = 'A';
     modInfo->PMI_monikerToken.GT_chars[3] = 'F';
-    modInfo->PMI_monikerToken.GT_manufID = MANUFACTURER_ID_APP_LOCAL; /* MANUFACTURER_ID_BSW; */
+    modInfo->PMI_monikerToken.GT_manufID = MANUFACTURER_ID_APP_LOCAL;
 
 }
 
@@ -693,6 +694,48 @@ void    _export _pascal PrefGetModuleInfo( PrefModuleInfo *modInfo )
         @send op::MSG_GEN_ITEM_GROUP_SET_MODIFIED_STATE(TRUE);
 
 }
+
+
+
+
+@method	PrefAppListClass, MSG_PREF_DYNAMIC_LIST_BUILD_ARRAY
+{
+    MemHandle       mh = NullHandle;
+    ChunkHandle     ch = NullChunk;
+
+    mh = MemAllocLMem(LMEM_TYPE_GENERAL, 0);
+    MemLock(mh);
+
+    ch = NameArrayCreate(mh, sizeof(FileLongName), 0, 0);
+    pself->appList = ConstructOptr(mh, ch);
+	NameArrayAdd(pself->appList, _TEXT("Oh dummy schlummy\0"), 0, 0, (void*) 0);
+
+    MemUnlock(mh);
+
+    @callsuper();
+}
+
+/*
+    **Parameters:**
+    *buffer* - Buffer in which to return moniker text.
+    *bufSize* - Size of buffer.
+    *identifier* - Identifier of item whose moniker should be returned.
+
+    **Return:** Size of item's moniker.
+*/
+@method	PrefAppListClass, MSG_PREF_ITEM_GROUP_GET_ITEM_MONIKER
+{
+    char*     str = (void*) 0;
+    word      elSize = 0;
+
+    MemLock(HandleOf(pself->appList));
+    str = (char*) ChunkArrayElementToPtr(pself->appList, identifier, &elSize);
+    strcpy(buffer, str);
+    MemUnlock(HandleOf(pself->appList));
+
+    return strlen(str);
+}
+
 
 /**********************************************************
 
