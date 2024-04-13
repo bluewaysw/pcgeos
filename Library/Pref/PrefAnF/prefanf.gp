@@ -1,32 +1,14 @@
-########################################################################
 #
-#     Copyright (c) Dirk Lausecker 1997 -- All Rights Reserved
+# Basics
 #
-# PROJECT:      BestSound
-# MODULE:       -
-# FILE:         prefsndn.gp
-#
-# AUTHOR:       Dirk Lausecker
-#
-#
-# DESCRIPTION:
-#   Geode definitions for the PREFMIX-Library.
-#
-# REVISION HISTORY:
-#   Date      Name      Description
-#   --------  --------  -----------
-#   08.07.97  DL        Initial Version.
-#   14.09.97  DL	new name (prefsndc)
-#   21.10.98	DL	Mixermodul
-#   21.08.2000	DL	Ableitung PREFSNDN fuer ND
-#
-########################################################################
-
 name prefanf.lib
 longname "Apps 'n Files Module"
 tokenchars "PREF"
 tokenid 0
 
+#
+# Type
+#
 type    library, single, c-api
 
 #
@@ -36,7 +18,6 @@ library geos
 library ui
 library ansic
 library config
-library sound
 
 #exempt ansic
 
@@ -45,7 +26,6 @@ library sound
 #
 resource BASEINTERFACE          object read-only shared discardable
 resource MONIKERRESOURCE        lmem read-only shared
-resource REBOOTSTRINGRESOURCE	lmem read-only shared
 
 #
 # Routines
@@ -54,10 +34,8 @@ export  PREFGETOPTRBOX
 export  PREFGETMODULEINFO
 
 #
-# Export classes
-#       These are the classes exported by the library
+# These are the classes exported by the library
 #
 export  PrefDialogMMClass
 export  PrefAppListClass
-export	PrefItemGroupMMClass
 

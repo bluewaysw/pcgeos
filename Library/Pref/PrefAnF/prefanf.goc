@@ -1,21 +1,14 @@
 /************************************************
- *                                              *
- * Projekt:     BestSound	         	*
- *                                              *
- * File:        prefsndn.GOC             	*
- *                                              *
- * Autor:       Dirk Lausecker          	*
- *                                              *
- *						*
- * �=128 �=133 �=134 �=138 �=154 �=159 �=167	*
- ************************************************/
+Apps 'n Files Pref Module
+allows adding favorite apps to "Open With" Dialog
+started in 04/2024 by MeyerK for FreeGEOS project
+************************************************/
 
 @include <stdapp.goh>
 @include "prefanf.goh"
 @include <config.goh>
 
 #include <gstring.h>
-#include <sound.h>
 #include <library.h>
 #include <initfile.h>
 #include <Ansi/stdio.h>
@@ -24,35 +17,22 @@
 #include <file.h>
 #include <chunkarr.h>
 
-/****************************************************************/
-
-/*
-#define	GERMAN
-@define	GERMAN
-
-/* german Version */
-
-/**************************** Makro *****************************/
-
+/****************************************************************
+Makro
+***************************************************************/
 #define SET_PSELF  pself = ObjDerefGen(oself)
 
-/**************************** Classdeclar. **********************/
+/***************************************************************
+Classdeclar.
+***************************************************************/
 
 @classdecl      PrefDialogMMClass;
 @classdecl      PrefAppListClass;
-@classdecl      PrefItemGroupMMClass;
 
-/****************************** dgroup **************************/
 
-const 	char *	soundCategory	= "sound";
-const 	char *	synthDriverIT 	= "synthDriver";
-const 	char *	sampleDriverIT 	= "sampleDriver";
-
-    char	dosName[13]	= "standard.geo";
-        char 	globalText[50];
-        word	size;
-
-/********************** Functions ******************************/
+/*****************************************************************
+Hooks
+*****************************************************************/
 
 optr    _pascal PrefGetOptrBox(void);
 void    _pascal PrefGetModuleInfo( PrefModuleInfo *info );
@@ -62,38 +42,13 @@ void    _pascal PrefGetModuleInfo( PrefModuleInfo *info );
  */
 
 @start MONIKERRESOURCE, data;
-
 @include <Art/moniker.goh>
-
 @visMoniker     PrefTextMoniker = "Apps 'n Files";
-
 @visMoniker     PrefMM1MonikerList = list {@PrefTextMoniker, @Moniker0, @Moniker1, @Moniker2, @Moniker3 };
-
-
 @end MONIKERRESOURCE;
 
 
-@start REBOOTSTRINGRESOURCE, data;
-
-@ifdef GERMAN
-
-@chunk char RebootString[] = "Treiber f�r die Soundkarte";
-
-@else
-
-@chunk char RebootString[] = "driver for your soundcard";
-
-@endif
-
-@end REBOOTSTRINGRESOURCE;
-
 @start  BASEINTERFACE, notDetachable;
-
-/***********************
-
-    BaseBox
-
- ***********************/
 
 @object PrefDialogMMClass BaseBox = {
     GI_visMoniker = "Apps 'n Files";
@@ -201,378 +156,21 @@ void    _pascal PrefGetModuleInfo( PrefModuleInfo *info );
     HINT_EXPAND_WIDTH_TO_FIT_PARENT;
 }
 
-
-/*****************
- * SoundSubGroup *
- *****************/
-
-@object PrefInteractionClass SoundSubGroup = {
-    GI_comp = @SoundEnableList;
-    HINT_ORIENT_CHILDREN_HORIZONTALLY;
-    HINT_EXPAND_WIDTH_TO_FIT_PARENT;
-        HINT_CENTER_CHILDREN_HORIZONTALLY;
-}
-
-@object PrefItemGroupClass SoundEnableList =
-{
-    GI_visMoniker = 'S',"Sound:";
-    GI_comp = @SoundEnable,
-          @SoundDisable;
-        GIGI_numSelections = 1;
-    GIGI_selection =  TRUE;
-    HINT_ORIENT_CHILDREN_HORIZONTALLY;
-    ATTR_GEN_ITEM_GROUP_INIT_FILE_BOOLEAN;
-    ATTR_GEN_INIT_FILE_CATEGORY = "ui";
-    ATTR_GEN_INIT_FILE_KEY = "sound";
-}
-
-@ifdef	GERMAN
-@visMoniker OnMoniker = "Ein";
-@visMoniker OffMoniker = "Aus";
-@else
-@visMoniker OnMoniker = "Yes";
-@visMoniker OffMoniker = "No";
-@endif
-
-
-@object	GenItemClass SoundEnable =
-{
-     GI_visMoniker = @OnMoniker;
-    GII_identifier = TRUE;
-}
-
-@object	GenItemClass SoundDisable =
-{
-     GI_visMoniker = @OffMoniker;
-    GII_identifier = FALSE;
-}
-
-/*******************
- * DriverEditGroup *
- *******************/
-@ifdef	GERMAN
-@visMoniker TEXT_DRIVER_GROUP = "Soundkartentreiber";
-@else
-@visMoniker TEXT_DRIVER_GROUP = "Sound Driver";
-@endif
-
-@object PrefInteractionClass DriverEditGroup = {
-    GI_visMoniker = @TEXT_DRIVER_GROUP;
-    GI_comp = @TocList;
-
-    HINT_CENTER_CHILDREN_HORIZONTALLY;
-    HINT_CENTER_CHILDREN_VERTICALLY;
-    HINT_ORIENT_CHILDREN_VERTICALLY;
-    HINT_EXPAND_WIDTH_TO_FIT_PARENT;
-    HINT_DRAW_IN_BOX;
-}
-
-/***********
- * TocList *
- ***********/
-
-@object PrefTocListClass TocList = {
-    PI_attrs = (PA_REBOOT_IF_CHANGED);
-    PTLI_flags = @default|TUCF_EXTENDED_DEVICE_DRIVERS;
-    PTLI_tocInfo = {"SNDD",0,0};
-    HINT_EXPAND_WIDTH_TO_FIT_PARENT;
-    HINT_ITEM_GROUP_SCROLLABLE;
-    ATTR_GEN_INIT_FILE_KEY ="device";
-    ATTR_GEN_PATH_DATA = {SP_SYSTEM,"SOUND"};   /* Pfadangabe */
-    ATTR_PREF_REBOOT_STRING = @RebootString;
-}
-
-/***********************
-      SettingsBox
- ***********************/
-
-@ifdef	GERMAN
-@visMoniker TEXT_SETTINGS = "Einstellungen";
-@chunk char TEXT_SETTINGS_TEXT[] = "Bei 16-Bit-Soundkarten die DMA-Puffergr��e auf Maximum stellen !";
-@else
-@visMoniker TEXT_SETTINGS = "Settings";
-@chunk char TEXT_SETTINGS_TEXT[] = "For 16-bit sound, set the value for the DMA buffer to the maximum.";
-@endif
-
-@object PrefInteractionClass SettingsBox = {
-        GI_comp = 	@AIDMainGroup,
-            @SettingsText,
-            @BufferGroup,
-                        @StereoText,
-                        @StereoGroup,
-            @SettingsTrigger;
-        PI_attrs = (@default) | (PA_SAVE_IF_CHANGED);
-        GI_visMoniker = @TEXT_SETTINGS;
-        GII_visibility = GIV_DIALOG;
-    GII_type = GIT_PROPERTIES;
-        GII_attrs = GIA_MODAL;
-    HINT_INTERACTION_COMPLEX_PROPERTIES;
-    HINT_ORIENT_CHILDREN_VERTICALLY;
-    HINT_CENTER_CHILDREN_HORIZONTALLY;
-    HINT_FULL_JUSTIFY_CHILDREN_HORIZONTALLY;
-    ATTR_GEN_HELP_CONTEXT = "dbSoundSet";
-    ATTR_GEN_INIT_FILE_CATEGORY ="sound";
-}
-
-@object GenTextClass SettingsText = {
-    GI_attrs = @default |GA_READ_ONLY;
-    GTXI_text = @TEXT_SETTINGS_TEXT;
-    HINT_EXPAND_WIDTH_TO_FIT_PARENT;
-}
-
-@object GenTriggerClass SettingsTrigger =
-{
-    GI_visMoniker = "OK";
-        GI_attrs = @default | GA_SIGNAL_INTERACTION_COMPLETE;
-        GTI_actionMsg = MSG_PREF_SETTINGS_NOTIFY;
-        GTI_destination = @BaseBox;
-    HINT_SEEK_REPLY_BAR;
-        ATTR_GEN_TRIGGER_INTERACTION_COMMAND = {IC_APPLY};
-}
-
-/**************
-  AIDMainGroup
- **************/
-
-@ifdef	GERMAN
-@visMoniker TEXT_AID_MAIN = "Soundkartenparameter";
-@chunk char TEXT_AID_TEXT[] = "Die Soundkartenparameter nur dann einstellen, wenn es unbedingt n�tig ist !";
-
-@else
-@visMoniker TEXT_AID_MAIN = "Sound Card Settings";
-@chunk char TEXT_AID_TEXT[] = "Do you want to use these settings instead of the settings in your AUTOEXEC.BAT file?";
-@endif
-
-@object PrefInteractionClass AIDMainGroup = {
-        GI_visMoniker = @TEXT_AID_MAIN;
-        GI_comp = @AIDText,@AIDItemGroup,@AIDGroup;
-        PI_attrs = (PA_SAVE_IF_CHANGED);
-        GII_visibility = GIV_SUB_GROUP;
-    HINT_ORIENT_CHILDREN_VERTICALLY;
-        HINT_EXPAND_WIDTH_TO_FIT_PARENT;
-    HINT_DRAW_IN_BOX;
-    ATTR_GEN_INIT_FILE_CATEGORY ="sound";
-}
-
-@object GenTextClass AIDText = {
-    GI_attrs = @default |GA_READ_ONLY;
-    GTXI_text = @TEXT_AID_TEXT;
-    HINT_EXPAND_WIDTH_TO_FIT_PARENT;
-}
-
-#define	AID_IDENT_OFF	1
-#define	AID_IDENT_ON	2
-
-@object	PrefItemGroupMMClass AIDItemGroup =
-{
-    GI_comp = @AID_Off,@AID_On;
-        GIGI_behaviorType = GIGBT_EXCLUSIVE;
-        PIGI_initFileFlags = 0;
-        GIGI_selection = AID_IDENT_OFF;
-        GIGI_destination = @AIDItemGroup;
-        PIGI_originalSelection = AID_IDENT_OFF;
-        PI_attrs = (PA_SAVE_IF_CHANGED);
-
-    ATTR_GEN_INIT_FILE_KEY ="aid";
-        ATTR_GEN_ITEM_GROUP_STATUS_MSG = MSG_GEN_ITEM_GROUP_MM_STATE_2;
-
-    HINT_FULL_JUSTIFY_CHILDREN_HORIZONTALLY;
-        HINT_EXPAND_WIDTH_TO_FIT_PARENT;
-        HINT_INCLUDE_ENDS_IN_CHILD_SPACING;
-}
-
-@object GenItemClass AID_Off =
-{
-    GI_visMoniker  = @OffMoniker;
-        GII_identifier = AID_IDENT_OFF;
-}
-
-@object GenItemClass AID_On =
-{
-    GI_visMoniker  = @OnMoniker;
-        GII_identifier = AID_IDENT_ON;
-}
-
-/**********
-  AIDGroup
- **********/
-
-@ifdef	GERMAN
-@visMoniker TEXT_AID_BASE = "Basisadresse:";
-
-@else
-@visMoniker TEXT_AID_BASE = "Base Address";
-
-@endif
-
-@object PrefInteractionClass AIDGroup = {
-        GI_comp = @BaseAddressValue,@IrqValue,@DmaValue;
-        GI_states = @default & ~GS_ENABLED;
-        PI_attrs = (PA_SAVE_IF_CHANGED);
-        GII_visibility = GIV_SUB_GROUP;
-    HINT_ORIENT_CHILDREN_HORIZONTALLY;
-    HINT_FULL_JUSTIFY_CHILDREN_HORIZONTALLY;
-        HINT_EXPAND_WIDTH_TO_FIT_PARENT;
-    HINT_DRAW_IN_BOX;
-}
-
-@object PrefValueClass BaseAddressValue =
-{
-        GI_visMoniker = @TEXT_AID_BASE;
-        PI_attrs = (PA_SAVE_IF_CHANGED);
-    PVI_originalValue = 220;
-        GVLI_value 	= MakeWWFixed(220.0);
-        GVLI_minimum 	= MakeWWFixed(210.0);
-        GVLI_maximum 	= MakeWWFixed(280.0);
-        GVLI_increment 	= MakeWWFixed(20.0);
-        GVLI_displayFormat = GVDF_INTEGER;
-    ATTR_GEN_INIT_FILE_CATEGORY ="sound";
-    ATTR_GEN_INIT_FILE_KEY ="Address";
-}
-
-@object PrefValueClass IrqValue =
-{
-        GI_visMoniker = "IRQ";
-        PI_attrs = (PA_SAVE_IF_CHANGED);
-    PVI_originalValue = 5;
-        GVLI_value 	= MakeWWFixed(5.0);
-        GVLI_minimum 	= MakeWWFixed(2.0);
-        GVLI_maximum 	= MakeWWFixed(15.0);
-        GVLI_increment 	= MakeWWFixed(1.0);
-        GVLI_displayFormat = GVDF_INTEGER;
-    ATTR_GEN_INIT_FILE_CATEGORY ="sound";
-    ATTR_GEN_INIT_FILE_KEY ="Irq";
-}
-
-@object PrefValueClass DmaValue =
-{
-        GI_visMoniker = "DMA(8 Bit)";
-        PI_attrs = (PA_SAVE_IF_CHANGED);
-    PVI_originalValue = 1;
-        GVLI_value 	= MakeWWFixed(1.0);
-        GVLI_minimum    = MakeWWFixed(0.0);
-        GVLI_maximum    = MakeWWFixed(3.0);
-        GVLI_increment  = MakeWWFixed(1.0);
-        GVLI_displayFormat = GVDF_INTEGER;
-    ATTR_GEN_INIT_FILE_CATEGORY ="sound";
-    ATTR_GEN_INIT_FILE_KEY ="Dma";
-}
-
-/*************
-  BufferGroup
- *************/
-
-@ifdef	GERMAN
-@visMoniker TEXT_PLAY_BUFFER = "Abspielpuffergr��e:";
-@visMoniker TEXT_DMA_BUFFER = "DMA-Puffergr��e:";
-@chunk char TEXT_STEREO_TOGGLE[] = "Mit dem nachfolgenden Schalter wird das System angewiesen, die Stereokan�le bei der Wiedergabe zu vertauschen.";
-
-@else
-@visMoniker TEXT_PLAY_BUFFER = "Play Buffer Size";
-@visMoniker TEXT_DMA_BUFFER = "DMA Buffer Size";
-@chunk char TEXT_STEREO_TOGGLE[] = "To swap the left and right stereo channels when playing WAV files, select this check box.";
-
-@endif
-
-@object PrefInteractionClass BufferGroup = {
-        GI_comp = @PlayValue,@SecondValue;
-        PI_attrs = (@default) | (PA_SAVE_IF_CHANGED);
-        GII_visibility = GIV_SUB_GROUP;
-    HINT_ORIENT_CHILDREN_HORIZONTALLY;
-    HINT_FULL_JUSTIFY_CHILDREN_HORIZONTALLY;
-        HINT_EXPAND_WIDTH_TO_FIT_PARENT;
-    HINT_DRAW_IN_BOX;
-}
-
-@object PrefValueClass PlayValue =
-{
-        GI_visMoniker = @TEXT_PLAY_BUFFER;
-        PI_attrs = (@default) | (PA_SAVE_IF_CHANGED);
-    PVI_originalValue = 8192;
-        GVLI_value 	= MakeWWFixed(8192.0);
-        GVLI_minimum 	= MakeWWFixed(1024.0);
-        GVLI_maximum 	= MakeWWFixed(31744.0);
-        GVLI_increment 	= MakeWWFixed(1024.0);
-        GVLI_displayFormat = GVDF_INTEGER;
-    ATTR_GEN_INIT_FILE_KEY ="PlayBufferSize";
-}
-
-@object PrefValueClass SecondValue =
-{
-        GI_visMoniker = @TEXT_DMA_BUFFER;
-        PI_attrs = (PA_SAVE_IF_CHANGED);
-    PVI_originalValue = 8192;
-        GVLI_value 	= MakeWWFixed(8192.0);
-        GVLI_minimum 	= MakeWWFixed(1024.0);
-        GVLI_maximum 	= MakeWWFixed(31744.0);
-        GVLI_increment 	= MakeWWFixed(1024.0);
-        GVLI_displayFormat = GVDF_INTEGER;
-    ATTR_GEN_INIT_FILE_KEY ="SecondBufferSize";
-}
-
-@object GenTextClass StereoText = {
-    GI_attrs = @default |GA_READ_ONLY;
-    GTXI_text = @TEXT_STEREO_TOGGLE;
-    HINT_EXPAND_WIDTH_TO_FIT_PARENT;
-}
-
-/***************
- * StereoGroup *
- ***************/
-
-@object PrefInteractionClass StereoGroup = {
-       PI_attrs = (PA_SAVE_IF_CHANGED);
-    GI_comp = @StereoBooleanGroup;
-
-    HINT_CENTER_CHILDREN_HORIZONTALLY;
-    HINT_CENTER_CHILDREN_VERTICALLY;
-    HINT_ORIENT_CHILDREN_VERTICALLY;
-    HINT_EXPAND_WIDTH_TO_FIT_PARENT;
-    HINT_DRAW_IN_BOX;
-}
-
-@object PrefBooleanGroupClass StereoBooleanGroup =
-{
-    GI_comp = @StereoBoolean;
-    ATTR_GEN_INIT_FILE_KEY ="OutputChannelReverse";
-}
-
-@object GenBooleanClass StereoBoolean =
-{
-@ifdef	GERMAN
-    GI_visMoniker = "Stereoausgabekan�le tauschen";
-@else
-    GI_visMoniker = "Swap Stereo Channels";
-@endif
-
-        GBI_identifier = 1;
-}
-
 @end    BASEINTERFACE;
 
-/**************************** Funktionen ************************/
-
-/****************************
-
-    PrefGetOptrBox
-
- ****************************/
-
+/*********************************************************************
+PrefGetOptrBox
+**********************************************************************/
 optr    _export _pascal PrefGetOptrBox(void)
 {
     return (@BaseBox);
 }
 
-/****************************
-
-    PrefGetModuleInfo
-
-
- ****************************/
-
+/*********************************************************************
+PrefGetModuleInfo
+**********************************************************************/
 void    _export _pascal PrefGetModuleInfo( PrefModuleInfo *modInfo )
 {
-
     modInfo->PMI_requiredFeatures = PMF_USER;
     modInfo->PMI_prohibitedFeatures = 0;
     modInfo->PMI_minLevel = UIIL_INTRODUCTORY;
@@ -584,118 +182,32 @@ void    _export _pascal PrefGetModuleInfo( PrefModuleInfo *modInfo )
     modInfo->PMI_monikerToken.GT_chars[2] = 'A';
     modInfo->PMI_monikerToken.GT_chars[3] = 'F';
     modInfo->PMI_monikerToken.GT_manufID = MANUFACTURER_ID_APP_LOCAL;
-
 }
 
-/********************************************
-
-        M E T H O D S
-
- ********************************************/
+/********************************************************************
+METHODS
+*********************************************************************/
 
 
-/******************************
-
+/********************************************************************
     MSG_PREF_INIT
-
- ******************************/
-
+********************************************************************/
 @method	PrefDialogMMClass, MSG_PREF_INIT
 {
     @callsuper();
 }
 
-/******************************
-
-    MSG_PREF_GET_PSELF
-
-        Hilfsmessage zum Ermitteln
-        von pself um �ber die
-        eigenen instance Data
-        andere Objekte ansprechen
-        zu k�nnen.
-
- ******************************/
-
-
+/********************************************************************
+MSG_PREF_GET_PSELF
+    Hilfsmessage zum Ermitteln
+    von pself um �ber die
+    eigenen instance Data
+    andere Objekte ansprechen
+    zu k�nnen.
+*********************************************************************/
 @method PrefDialogMMClass, MSG_PREF_GET_PSELF
 {
     return pself;
-}
-
-/*******************************************
-
-    MSG_GEN_GUP_INTERACTION_COMMAND
-
- identifiziert nach Schlie�en der Dialogbox
- ob OK gedr�ckt wurde und ob es sich um
- FMEdit-Box handelte.
- Wenn JA wird der selektierte Text angezeigt
- und der DOS-Name in die [sound] Kategorie
- eingetragen.
-
- *******************************************/
-
-@method PrefDialogMMClass, MSG_GEN_GUP_INTERACTION_COMMAND
-{
-    word	l;
-
-    pself = @call oself::MSG_PREF_GET_PSELF();	/* */
-    if (command==IC_APPLY)
-    {
-    // aktuelle Selektion auslesen
-    l = @call pself->PDMMC_tocList::MSG_PREF_TOC_LIST_GET_SELECTED_DRIVER_NAME(globalText,50);
-
-    if(!l)
-    {
-            // default-String anlegen im Fehlerfall
-        sprintf (globalText, "Standard Sound Driver");
-    }
-
-
-        // DOS-Namen ermitteln, in INI speichern
-    if (FileSetCurrentPath(SP_SYSTEM,"SOUND"))
-        {
-           if(!FileGetPathExtAttributes(globalText,FEA_DOS_NAME,dosName,12))
-       {
-               // DOS-Namen speichern
-                InitFileWriteString(soundCategory,sampleDriverIT,dosName);
-                InitFileWriteString(soundCategory,synthDriverIT,dosName);
-           }
-        }
-    }
-    return @callsuper();
-}
-
-/******************************
-
-    MSG_PREF_SETTINGS_NOTIFY
-
- ******************************/
-
-
-@method PrefDialogMMClass, MSG_PREF_SETTINGS_NOTIFY
-{
-        optr	op;
-        word	aid;
-
-        // InitKeys l�schen wenn AID-Group deaktiviert ist
-    op = ConstructOptr(OptrToHandle(oself), ChunkOf(@AIDItemGroup));
-        aid = @call op::MSG_GEN_ITEM_GROUP_GET_SELECTION();
-        if (aid == AID_IDENT_OFF)
-        {
-         InitFileDeleteEntry(soundCategory,"Address");
-         InitFileDeleteEntry(soundCategory,"Irq");
-         InitFileDeleteEntry(soundCategory,"Dma");
-        };
-
-        // Modified-State setzen
-    op = ConstructOptr(OptrToHandle(oself), ChunkOf(@StereoBooleanGroup));
-        @send op::MSG_GEN_BOOLEAN_GROUP_SET_GROUP_MODIFIED_STATE(0xffff,0);
-
-    op = ConstructOptr(OptrToHandle(oself), ChunkOf(@SoundEnableList));
-        @send op::MSG_GEN_ITEM_GROUP_SET_MODIFIED_STATE(TRUE);
-
 }
 
 Boolean _pascal ReadAppsCallback(const char *stringSection, word sectionNum, void* enumData)
@@ -770,68 +282,3 @@ Boolean _pascal ReadAppsCallback(const char *stringSection, word sectionNum, voi
         return 0;
     }
 }
-
-
-/**********************************************************
-
-    MSG_META_LOAD_OPTIONS
-
- **********************************************************/
-
-@method PrefItemGroupMMClass, MSG_META_LOAD_OPTIONS
-{
-        @callsuper();
-
-        // AIDItemGroup auswerten
-        @send oself::MSG_GEN_ITEM_GROUP_MM_STATE();
-}
-
-/**********************************************************
-
-    MSG_GEN_ITEM_GROUP_MM_STATE
-
- **********************************************************/
-
-@method PrefItemGroupMMClass, MSG_GEN_ITEM_GROUP_MM_STATE
-{
-        word	aid = 0;
-        optr	op;
-
-        // AIDItemGroup auswerten
-        aid = @call oself::MSG_GEN_ITEM_GROUP_GET_SELECTION();
-
-        if (aid == AID_IDENT_ON)
-        {
-        op = ConstructOptr(OptrToHandle(oself), ChunkOf(@AIDGroup));
-        @send op::MSG_GEN_SET_ENABLED(VUM_NOW);
-        };
-}
-
-/**********************************************************
-
-    MSG_GEN_ITEM_GROUP_MM_STATE_2
-
-        word	selection
-        word	numSelection
-        byte	stateFlags
-
- **********************************************************/
-
-@method PrefItemGroupMMClass, MSG_GEN_ITEM_GROUP_MM_STATE_2
-{
-        optr	op;
-
-    op = ConstructOptr(OptrToHandle(oself), ChunkOf(@AIDGroup));
-
-        if (selection == AID_IDENT_ON)
-        {
-        @send op::MSG_GEN_SET_ENABLED(VUM_NOW);
-        }
-        else
-        {
-        @send op::MSG_GEN_SET_NOT_ENABLED(VUM_NOW);
-        };
-
-}
-
-
