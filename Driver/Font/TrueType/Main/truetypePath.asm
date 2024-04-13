@@ -291,35 +291,4 @@ GRREGIONPATHDRAWCURVETO	proc	far	regionpath:hptr, points:fptr
 
 GRREGIONPATHDRAWCURVETO	endp
 
-
-COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-
-C FUNCTION:	GrRegionPathInit
-
-C DECLARATION:	extern void
-			_far _pascal GrRegionPathInit(Handle regionHandle, word maxY);
-
-KNOWN BUGS/SIDE EFFECTS/CAVEATS/IDEAS:
-
-REVISION HISTORY:
-	Name	Date		Description
-	----	----		-----------
-	JK		3/19/24		Initial version
-
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
-
-GRREGIONPATHINIT	proc	far
-	C_GetTwoWordArgs	di, dx, ax, bx		;di = regionHandle, dx = maxY
-
-	push	cx
-	push	bp
-	mov		cx, RFR_ODD_EVEN or (UNUSED_PER_LINE shl 8)
-	clr 	bp
-	call	GrRegionPathInit
-	pop		bp
-	pop		cx
-	ret
-	
-GRREGIONPATHINIT	endp	
-
 

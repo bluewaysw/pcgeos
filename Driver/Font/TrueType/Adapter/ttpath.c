@@ -69,8 +69,6 @@ static void _near ConicTo( GStateHandle gstate, TT_Vector* v_control, TT_Vector*
 
 static void _near RegionPathConicTo( GStateHandle gstate, TT_Vector* v_control, TT_Vector* vec );
 
-static void _near RegionPathInit( Handle regionHandle, word maxY );
-
 static void _near WriteComment( TRUETYPE_VARS, GStateHandle gstate );
 
 static void ScaleOutline( TRUETYPE_VARS );
@@ -253,9 +251,11 @@ void _pascal TrueType_Gen_In_Region(
         TrueTypeVars*          trueTypeVars;
         TrueTypeOutlineEntry*  trueTypeOutline;
         TT_UShort              charIndex;
-        XYValueAsDWord         cursorPos;
         TT_Matrix              transMatrix;
         RenderFunctions        renderFunctions;
+
+
+        TransMatrix            tMatrix;
 
 
 EC(     ECCheckGStateHandle( gstate ) );
@@ -284,28 +284,25 @@ EC(     ECCheckBounds( (void*)trueTypeOutline ) );
         /* store font matrix */
         StoreFontMatrix( trueTypeVars, &transMatrix, pointSize );
 
-        /* translate by current cursor position */
-        cursorPos = GrGetCurPos( gstate );
-        GrApplyTranslationDWord( gstate, DWORD_X( cursorPos ), DWORD_Y( cursorPos ) );
-
         /* set render functions */
         renderFunctions.Proc_MoveTo  = RegionPathMoveTo;
         renderFunctions.Proc_LineTo  = RegionPathLineTo;
         renderFunctions.Proc_ConicTo = RegionPathConicTo;
 
-        //TODO: init region path
-        //GrRegionPathInit( regionPath, 20 );
+
+        //Start TEST
+        GrGetTransform( gstate, &tMatrix );
+
+        //hart verdrahtetes Glyph (Minus)
+        GrRegionPathMovePen( regionPath, tMatrix.TM_e31.DWF_int + 108, tMatrix.TM_e32.DWF_int + 156 );
+
+        GrRegionPathDrawLineTo( regionPath, tMatrix.TM_e31.DWF_int + 108, tMatrix.TM_e32.DWF_int + 168 );
+        GrRegionPathDrawLineTo( regionPath, tMatrix.TM_e31.DWF_int + 144, tMatrix.TM_e32.DWF_int + 168 );
+        GrRegionPathDrawLineTo( regionPath, tMatrix.TM_e31.DWF_int + 144, tMatrix.TM_e32.DWF_int + 136 );
+        GrRegionPathDrawLineTo( regionPath, tMatrix.TM_e31.DWF_int + 108, tMatrix.TM_e32.DWF_int + 136 );
+        //ENDE TEST: hart verdrahtetes Glyph
 
         //TODO: render glyph as regionpath
-
-        //TEST: hart verdrahtetes Glyph (Minus)
-        GrRegionPathMovePen( regionPath, 248, 296 );
-
-        GrRegionPathDrawLineTo( regionPath, 248, 308 );
-        GrRegionPathDrawLineTo( regionPath, 284, 308 );
-        GrRegionPathDrawLineTo( regionPath, 284, 296 );
-        GrRegionPathDrawLineTo( regionPath, 248, 296 );
-        //ENDE TEST: hart verdrahtetes Glyph
 
 Fail:
         TT_Done_Glyph( GLYPH );
@@ -612,31 +609,6 @@ static void _near RegionPathConicTo( Handle regionHandle, TT_Vector* v_control, 
         p[1].P_y = p[2].P_y = vec->y;
 
         GrRegionPathDrawCurveTo( regionHandle, p );
-}
-
-
-/********************************************************************
- *                      RegionPathInit
- ********************************************************************
- * SYNOPSIS:	  Initialize region path.
- * 
- * PARAMETERS:    regionHandle          Handle to regionpath in which 
- *                                      the curve is drawed.
- *                maxY                  Max value for y.
- * 
- * RETURNS:       void
- * 
- * STRATEGY:      
- * 
- * REVISION HISTORY:
- *      Date      Name      Description
- *      ----      ----      -----------
- *      14/03/24  JK        Initial Revision
- *******************************************************************/
-
-static void _near RegionPathInit( Handle regionHandle, word maxY )
-{
-        GrRegionPathInit( regionHandle, maxY );
 }
 
 
