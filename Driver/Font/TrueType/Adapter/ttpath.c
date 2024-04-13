@@ -281,9 +281,20 @@ EC(     ECCheckBounds( (void*)trueTypeOutline ) );
         /* get TT char index */
         charIndex = TT_Char_Index( CHAR_MAP, GeosCharToUnicode( character ) );
 
+
         /* store font matrix */
         StoreFontMatrix( trueTypeVars, &transMatrix, pointSize );
 
+        //TODO: add stylesToImplement, width and weight to transMatrix
+
+        //TODO: add fontmatrix to transMatrix
+
+        //TODO: find baseline and traslate glyph by it
+
+        //TODO: transform glyph by transMatrix
+
+        //TODO: translate by current position
+ 
         /* set render functions */
         renderFunctions.Proc_MoveTo  = RegionPathMoveTo;
         renderFunctions.Proc_LineTo  = RegionPathLineTo;
