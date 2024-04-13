@@ -1,0 +1,339 @@
+/* Benoetigt... */
+@include <globals.goh>
+
+/***********************************************************************
+Retrieves the small iconic moniker of tok from the TokenDB
+************************************************************************/
+ChunkHandle GetSmallIconicMonikerFromTokenDB(optr TargetObj, GeodeToken* tok)
+{
+   Boolean        isMoniker = FALSE;
+   ChunkHandle    newMoniker = NULL;
+   word           chunkSize = NULL;
+
+   MemLock(OptrToHandle(TargetObj));
+
+   isMoniker = TokenLoadMonikerChunk(
+                TOKEN_CHARS_fixed(tok->GT_chars[0],tok->GT_chars[1],tok->GT_chars[2],tok->GT_chars[3]),
+                tok->GT_manufID,
+                (DT_DISP_SIZE | DT_DISP_ASPECT_RATIO | DT_DISP_CLASS),
+                ((VMSF_GSTRING | VMSF_COPY_CHUNK) | (VMS_TOOL << VMSF_STYLE_OFFSET)),
+                OptrToHandle(TargetObj),
+                &chunkSize,
+                &newMoniker);
+
+    MemUnlock(OptrToHandle(TargetObj));
+
+    if (isMoniker)
+    { return newMoniker; }
+    else
+    { return NULL; }
+}
+
+/***********************************************************************
+Retrieves the big iconic moniker of tok from the TokenDB
+Returns the ChunkHandle of this moniker, that has been copied to the
+TargetObj.
+************************************************************************/
+ChunkHandle GetBigIconicMonikerFromTokenDB(optr TargetObj, GeodeToken* tok)
+{
+   Boolean        isMoniker = FALSE;
+   ChunkHandle    newMoniker = NULL;
+   word           chunkSize = NULL;
+
+   MemLock(OptrToHandle(TargetObj));
+
+   isMoniker = TokenLoadMonikerChunk(
+                TOKEN_CHARS_fixed(tok->GT_chars[0],tok->GT_chars[1],tok->GT_chars[2],tok->GT_chars[3]),
+                tok->GT_manufID,
+                ((DT_DISP_SIZE << DS_HUGE) | (DT_DISP_ASPECT_RATIO << DAR_NORMAL) | (DT_DISP_CLASS << DC_COLOR_8)),
+                ((VMSF_GSTRING | VMSF_COPY_CHUNK) | (VMS_ICON << VMSF_STYLE_OFFSET)),
+                OptrToHandle(TargetObj),
+                &chunkSize,
+                &newMoniker);
+
+      MemUnlock(OptrToHandle(TargetObj));
+
+      if (isMoniker)
+      { return newMoniker; }
+      else
+      { return NULL; }
+}
+
+/***********************************************************************
+Retrieves the text moniker of tok from the TokenDB
+Returns the ChunkHandle of this moniker, that has been copied to the
+TargetObj.
+************************************************************************/
+ChunkHandle GetTextMonikerFromTokenDB(optr TargetObj, GeodeToken* tok)
+{
+    Boolean        isMoniker = FALSE;
+    ChunkHandle    newMoniker = NULL;
+    word           chunkSize = NULL;
+
+    MemLock(OptrToHandle(TargetObj));
+
+    isMoniker = TokenLoadMonikerChunk(
+                        TOKEN_CHARS_fixed(tok->GT_chars[0],tok->GT_chars[1],tok->GT_chars[2],tok->GT_chars[3]),
+                        tok->GT_manufID,
+                0,
+                (VMSF_COPY_CHUNK | (VMS_TEXT << VMSF_STYLE_OFFSET)),
+                OptrToHandle(TargetObj),
+                &chunkSize,
+                &newMoniker);
+
+    MemUnlock(OptrToHandle(TargetObj));
+
+    if (isMoniker)
+    { return newMoniker; }
+    else
+    { return NULL; }
+}
+
+/***********************************************************************
+Use Text and iconic Moniker given a token from the TokenDB ---------
+Makes use of functions only available in ND2000 and above.
+************************************************************************/
+void UseTextMonikerFromTokenDB(optr obj, GeodeToken* tok)
+{
+   ChunkHandle newChunk  = NULL;
+
+   newChunk = GetTextMonikerFromTokenDB(obj, tok);
+   if (newChunk) @send obj::MSG_GEN_USE_VIS_MONIKER(newChunk, VUM_NOW);
+}
+
+/***********************************************************************
+Retrieves the moniker of tok from the TokenDB and
+makes this moniker active afterwards.
+************************************************************************/
+void UseIconicMonikerFromTokenDB(optr obj, GeodeToken* tok)
+{
+   ChunkHandle newChunk  = NULL;
+
+   newChunk = GetBigIconicMonikerFromTokenDB(obj, tok);
+   if (newChunk) @send obj::MSG_GEN_USE_VIS_MONIKER(newChunk, VUM_NOW);
+}
+
+/***********************************************************************
+Retrieves the moniker of tok from the TokenDB and
+makes this moniker active afterwards.
+************************************************************************/
+void UseSmallIconicMonikerFromTokenDB(optr obj, GeodeToken* tok)
+{
+   ChunkHandle newChunk  = NULL;
+
+   newChunk = GetSmallIconicMonikerFromTokenDB(obj, tok);
+   if (newChunk) @send obj::MSG_GEN_USE_VIS_MONIKER(newChunk, VUM_NOW);
+}
+
+@ifdef R4
+/***********************************************************************
+Use Text and big iconic Moniker given a token from the TokenDB ---------
+Makes use of functions only available in ND2000 and above.
+************************************************************************/
+void UseTextAndBigIconicMonikerFromTokenDB(optr obj, GeodeToken* tok)
+{
+   ChunkHandle IconChunk  = GetBigIconicMonikerFromTokenDB(obj, tok);
+   ChunkHandle TextChunk  = GetTextMonikerFromTokenDB(obj, tok);
+   optr        newMoniker = NULL;
+
+   if (IconChunk && TextChunk)
+   {
+      newMoniker = UserCreateIconTextMoniker(ConstructOptr(OptrToHandle(obj), TextChunk),
+                                             ConstructOptr(OptrToHandle(obj), IconChunk),
+                                             NullHandle,
+                                             (word) 7,
+                                             CITMF_POSITION_ICON_ABOVE_TEXT);
+
+      if (newMoniker) @send obj::MSG_GEN_USE_VIS_MONIKER(OptrToChunk(newMoniker), VUM_NOW);
+   }
+}
+
+/***********************************************************************
+Use Text and iconic Moniker given a token from the TokenDB ---------
+Makes use of functions only available in ND2000 and above.
+************************************************************************/
+void UseTextAndSmallIconicMonikerFromTokenDB(optr obj, GeodeToken* tok)
+{
+   ChunkHandle IconChunk  = GetSmallIconicMonikerFromTokenDB(obj, tok);
+   ChunkHandle TextChunk  = GetTextMonikerFromTokenDB(obj, tok);
+   optr        newMoniker = NULL;
+
+   if (IconChunk && TextChunk)
+   {
+      newMoniker = UserCreateIconTextMoniker(ConstructOptr(OptrToHandle(obj), TextChunk),
+                                             ConstructOptr(OptrToHandle(obj), IconChunk),
+                                             NullHandle,
+                                             (word) 7,
+                                             0);
+
+      if (newMoniker) @send obj::MSG_GEN_USE_VIS_MONIKER(OptrToChunk(newMoniker), VUM_NOW);
+   }
+}
+@endif
+
+/************************************************************************
+Dummy
+fuer Swat: allows for setting breakpoints in front of critical code.
+*************************************************************************/
+void Dummy(void){}
+
+/* Msg Box -------------------------------------------------------------*/
+/*fuer msg_type:  CDT_ERROR, CDT_WARNING, CDT_NOTIFICATION */
+void MsgBox(CustomDialogType msg_type, optr format)
+{
+   UserStandardDialog(NULL, NULL, NULL, NULL,
+                               LOCK(format),
+                               (msg_type << CDBF_DIALOG_TYPE_OFFSET) |
+                               (GIT_NOTIFICATION << CDBF_INTERACTION_TYPE_OFFSET)
+                               );
+   UNLOCK(format);
+}
+
+/* Ja/Nein Box -----------------------------------------------------------*/
+Boolean DecideBox(optr format)
+{
+   if (UserStandardDialog(NULL, NULL, NULL, NULL,
+                                     LOCK(format),
+                                     (CDT_QUESTION << CDBF_DIALOG_TYPE_OFFSET) |
+                                     (GIT_AFFIRMATION << CDBF_INTERACTION_TYPE_OFFSET)
+                                    ) == IC_YES)
+       {
+            UNLOCK(format);
+            return TRUE;         /* Ja Antwort */
+       }
+       else
+       {
+            UNLOCK(format);
+            return FALSE;        /* Nein Antwort */
+       }
+}
+
+/***********************************************************************
+FileParsePath
+************************************************************************/
+void FileParsePath(char *fpath, DiskHandle *dh, char *fdir, char *fnam)
+{
+   word            test = 0;
+   FileAttrs       *attrs = 0;
+   char            *pb     = 0;
+   /* Variablen zuruecksetzen */
+   pb       = 0;
+   (*dh) = 0;
+   memset(fdir, 0, sizeof(fdir));
+   memset(fnam, 0, sizeof(fnam));
+
+   /* pb auf vollen Pfad setzen */
+   pb = fpath;
+   (*dh) = FileResolveStandardPath(&pb,
+                                   256,
+                                   fpath,
+                                   (~FRSPF_ADD_DRIVE_NAME) | FRSPF_RETURN_FIRST_DIR,
+                                   attrs);
+
+   /* Fhrenden Backslash entfernen */
+   fpath = fpath + 1;
+
+   /* Dateinamen ermitteln */
+   strncpy(fnam, strrchr(fpath, '\\') + 1, (strlen(fpath) - test));
+   strcat(fnam, "\0");
+
+   /* L„nge ohne Dateinamen ermitteln */
+   test = ((int) (strrchr(fpath, '\\')) + 1) - ((int) fpath) - 1;
+
+   /* Pfad ohne Dateinamen erzeugen */
+   strncpy(fdir, fpath, test);
+   strcat(fdir, "\0");
+}
+
+/***********************************************************************
+Applikation via IACP starten....
+************************************************************************/
+void LaunchApp(GeodeToken *tok, MemHandle fiHan)
+{
+IACPConnection       iacpConnectionToken = IACP_NO_CONNECTION;
+word                 connectionFlags   = IACPSM_USER_INTERACTIBLE;
+word                 serverCount;
+MemHandle            hLaunchBlock;
+AppLaunchBlock       *hLaunchBlockPtr;
+FilesStruct*         fiPtr;
+
+   hLaunchBlock = IACPCreateDefaultLaunchBlock(MSG_GEN_PROCESS_OPEN_APPLICATION);
+   hLaunchBlockPtr = MemLock(hLaunchBlock);
+   fiPtr = MemLock(fiHan);
+
+   hLaunchBlockPtr->ALB_diskHandle = fiPtr->datadh;
+   strcpy(hLaunchBlockPtr->ALB_path, fiPtr->datadirn);
+   strcpy(hLaunchBlockPtr->ALB_dataFile, fiPtr->datafname);
+
+   MemUnlock(fiHan);
+   MemUnlock(hLaunchBlock);
+
+   iacpConnectionToken = IACPConnect(tok, connectionFlags,
+                                     hLaunchBlock, NullOptr, &serverCount);
+
+   if(iacpConnectionToken != IACP_NO_CONNECTION)
+   {
+      IACPShutdown(iacpConnectionToken, NullOptr);
+   }
+}
+
+/***********************************************************************
+ ListFiles
+ whatFiles: FESF_NON_GEOS
+                  FESF_GEOS_EXECS
+                  FESF_GEOS_NON_EXECS
+                  FESF_DIRS
+                  FILE_ENUM_ALL_FILE_TYPES (but no directories)
+ ***********************************************************************/
+word ListFiles(MemHandle* FilesToReturn, FileEnumSearchFlags whatFiles)  /*numOfFiles returned*/
+{
+   FileEnumParams fileEnumParams;
+   word                 filesNotHandled = NULL;
+   word                 numOfFiles = NULL;
+
+   fileEnumParams.FEP_searchFlags = whatFiles;
+
+   fileEnumParams.FEP_returnAttrs = (void*) FESRT_NAME;  /*Return the file's Geos filename.*/
+
+   fileEnumParams.FEP_returnSize = FILE_LONGNAME_BUFFER_SIZE;
+   fileEnumParams.FEP_bufSize = FE_BUFSIZE_UNLIMITED;    /* FE_BUFSIZE_UNLIMITED allows the return buffer size to be as large as necessary.*/
+
+   fileEnumParams.FEP_matchAttrs = 0;  /* Set matchAttrs to zero so it will match anything.*/
+   fileEnumParams.FEP_skipCount = 0;   /* Don't skip any files*/
+   fileEnumParams.FEP_callback = 0;   /* Don't need no callback. */
+
+   numOfFiles = FileEnum( &fileEnumParams,
+                                     FilesToReturn,
+                                     &filesNotHandled);
+
+   if (numOfFiles && (*FilesToReturn))
+   {
+      return(numOfFiles);
+   }
+   else
+   {
+      return(0);
+   }
+}
+
+/***********************************************************************
+ strident = vergleicht Strings bezueglich Laenge und Inhalt
+ returns TRUE if equal, FALSE if not
+ ***********************************************************************/
+Boolean strident(char* str1, char* str2)
+{
+   if (
+         (strstr(str1, str2) != 0)
+      && (strcmp(str1, str2) == 0)
+       )
+   {
+      return(TRUE);
+   }
+   else
+   {
+      return(FALSE);
+   }
+}
+/***********************************************************************
+ EOF
+ ***********************************************************************/
