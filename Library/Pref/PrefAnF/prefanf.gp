@@ -24,7 +24,7 @@ library config
 #
 # Resources
 #
-resource BASEINTERFACE          object read-only shared discardable
+resource BASEINTERFACE          read-only shared discardable
 resource MONIKERRESOURCE        lmem read-only shared
 
 #

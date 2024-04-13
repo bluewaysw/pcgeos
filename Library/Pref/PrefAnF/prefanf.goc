@@ -100,7 +100,7 @@ Resources
 }
 
 @object GenFileSelectorClass AddAppSelector = {
-   //GFSI_destination = process;
+   /*GFSI_destination = @OpenWithAppList;*/
    //GFSI_notificationMsg = MSG_FILEBROW_SELECTOR_ACTION;
    GFSI_attrs =           ((FSA_ALLOW_CHANGE_DIRS) & (~FSA_SHOW_FILES_DISABLED) & (~FSA_HAS_OPEN_DIR_BUTTON) & (~FSA_HAS_CHANGE_DIRECTORY_LIST))
                         | ((FSA_HAS_FILE_LIST) & (~FSA_SHOW_FIXED_DISKS_ONLY) & (~FSA_HAS_CLOSE_DIR_BUTTON) & (~FSA_HAS_DOCUMENT_BUTTON)& (~FSA_HAS_CHANGE_DRIVE_LIST))
@@ -117,7 +117,8 @@ Resources
 
 @object GenTriggerClass AddAppTrigger = {
     GI_visMoniker = "=>";
-    //action = MSG_SL_ADD_PROGRAM, ProgStartupList;
+    GTI_destination = @OpenWithAppList;
+    GTI_actionMsg = MSG_ADD_APP;
 }
 
 @object PrefInteractionClass OpenWithAppListGroup = {
@@ -131,7 +132,7 @@ Resources
 
 @object PrefAppListClass OpenWithAppList = {
     GIGI_destination = (TO_SELF);
-	//GIGI_behaviorType = GIGBT_EXCLUSIVE;
+    GIGI_behaviorType = GIGBT_EXCLUSIVE;
     //GIGI_behaviorType = GIGBT_NON_EXCLUSIVE;
 
     HINT_ITEM_GROUP_SCROLLABLE;
@@ -151,6 +152,7 @@ Resources
 @object GenTriggerClass RemoveAppTrigger = {
     //genStates = default -enabled;
     GI_visMoniker = "Remove";
+    GI_states = @default & ~GS_ENABLED;
     //action = MSG_SL_DELETE_PROGRAM, ProgStartupList;
     HINT_EXPAND_WIDTH_TO_FIT_PARENT;
 }
@@ -213,7 +215,7 @@ Boolean _pascal ReadAppsCallback(const char *stringSection, word sectionNum, voi
 {
     char* str;
 
-	str = (char*) ChunkArrayAppend(*((optr*) enumData), 0); // convert voidPOINTER to optrPOINTER and deref aftwerwards...
+    str = (char*) ChunkArrayAppend(*((optr*) enumData), 0); // convert voidPOINTER to optrPOINTER and deref aftwerwards...
     strcpy(str, stringSection);
 
     return FALSE; // no error
@@ -246,7 +248,7 @@ Boolean _pascal ReadAppsCallback(const char *stringSection, word sectionNum, voi
     MemUnlock(mh);
 
     @call oself::MSG_GEN_DYNAMIC_LIST_INITIALIZE(num);
-	@call oself::MSG_GEN_ITEM_GROUP_SET_NONE_SELECTED(TRUE);
+    @call oself::MSG_GEN_ITEM_GROUP_SET_NONE_SELECTED(TRUE);
 
     @callsuper();
 }
@@ -279,5 +281,32 @@ Boolean _pascal ReadAppsCallback(const char *stringSection, word sectionNum, voi
     {
         MemUnlock(HandleOf(pself->appList));
         return 0;
+    }
+}
+
+@method	PrefAppListClass, MSG_ADD_APP
+{
+    dword                       flagsAndDisk;
+    PathName                    pathf;
+    DiskHandle                  disk;
+    GeodeToken                  token;
+    word                        idx = 0;
+    word                        num = 0;
+    optr                        op = NullOptr;
+
+	op = ConstructOptr(OptrToHandle(oself), ChunkOf(@AddAppSelector));
+
+    flagsAndDisk = @call op::MSG_GEN_FILE_SELECTOR_GET_FULL_SELECTION_PATH(&pathf);
+
+    if (GFS_GET_ENTRY_TYPE(flagsAndDisk) == GFSET_FILE)
+    {
+        MemLock(HandleOf(pself->appList));
+        idx = NameArrayAdd(pself->appList, &pathf, 0, 0, (void *) 0);
+        num = ChunkArrayGetCount(pself->appList);
+        MemUnlock(HandleOf(pself->appList));
+
+        //disk = GFS_GET_FULL_SELECTION_PATH_DISK_HANDLE(flagsAndDisk); // Extract disk handle
+        @call oself::MSG_GEN_DYNAMIC_LIST_INITIALIZE(num);
+        @call oself::MSG_GEN_ITEM_GROUP_SET_NONE_SELECTED(TRUE);
     }
 }
