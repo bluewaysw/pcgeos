@@ -57,17 +57,17 @@ static void ConvertOutline( GStateHandle      gstate,
                             TT_Outline*       outline, 
                             RenderFunctions*  functions );
 
-static void _near MoveTo( GStateHandle gstate, TT_Vector* vec );
+static void _near MoveTo( Handle handle, TT_Vector* vec );
 
-static void _near RegionPathMoveTo( Handle regionHandle, TT_Vector* vec );
+static void _near RegionPathMoveTo( Handle handle, TT_Vector* vec );
 
-static void _near LineTo( GStateHandle gstate, TT_Vector* vec );
+static void _near LineTo( Handle handle, TT_Vector* vec );
 
-static void _near RegionPathLineTo( Handle regionHandle, TT_Vector* vec );
+static void _near RegionPathLineTo( Handle handle, TT_Vector* vec );
 
-static void _near ConicTo( GStateHandle gstate, TT_Vector* v_control, TT_Vector* vec );
+static void _near ConicTo( Handle handle, TT_Vector* v_control, TT_Vector* vec );
 
-static void _near RegionPathConicTo( GStateHandle gstate, TT_Vector* v_control, TT_Vector* vec );
+static void _near RegionPathConicTo( Handle handle, TT_Vector* v_control, TT_Vector* vec );
 
 static void _near WriteComment( TRUETYPE_VARS, GStateHandle gstate );
 
@@ -328,8 +328,9 @@ Fin:
  ********************************************************************
  * SYNOPSIS:	  Convert glyphs outline into GrDraw..() calls.
  * 
- * PARAMETERS:    gstate                GStateHande in which the outline 
- *                                      of the character is written.
+ * PARAMETERS:    handle                GStateHande or RegionPathHandle
+ *                                      in which the outline of 
+ *                                      character is written.
  *                *outline              Ptr. to glyphs outline.
  * 
  * RETURNS:       void
@@ -344,7 +345,7 @@ Fin:
 
 #define CURVE_TAG_ON            0x01
 #define CURVE_TAG_CONIC         0x00
-static void ConvertOutline( GStateHandle gstate, TT_Outline* outline, RenderFunctions* functions )
+static void ConvertOutline( Handle gstate, TT_Outline* outline, RenderFunctions* functions )
 {
         TT_Vector   v_last;
         TT_Vector   v_control;
@@ -463,7 +464,8 @@ EC(     ECCheckGStateHandle( gstate ) );
  ********************************************************************
  * SYNOPSIS:	  Change current position.
  * 
- * PARAMETERS:    gstate                Handle in which the position is changed.
+ * PARAMETERS:    handle                GStateHandle in which current 
+ *                                      position is changed.
  *                *vec                  Ptr to Vector to new position.
  * 
  * RETURNS:       void
@@ -476,9 +478,9 @@ EC(     ECCheckGStateHandle( gstate ) );
  *      18/11/23  JK        Initial Revision
  *******************************************************************/
 
-static void _near MoveTo( GStateHandle gstate, TT_Vector* vec )
+static void _near MoveTo( Handle handle, TT_Vector* vec )
 {
-        GrMoveTo( gstate, vec->x, vec->y );
+        GrMoveTo( (GStateHandle) handle, vec->x, vec->y );
 }
 
 
@@ -487,8 +489,8 @@ static void _near MoveTo( GStateHandle gstate, TT_Vector* vec )
  ********************************************************************
  * SYNOPSIS:	  Change current position.
  * 
- * PARAMETERS:    regionHandle          Handle to regionpath in which 
- *                                      the position is changed.
+ * PARAMETERS:    handle                Handle to region path in which 
+ *                                      current position is changed.
  *                *vec                  Ptr to Vector to new position.
  * 
  * RETURNS:       void
@@ -501,9 +503,9 @@ static void _near MoveTo( GStateHandle gstate, TT_Vector* vec )
  *      14/03/24  JK        Initial Revision
  *******************************************************************/
 
-static void _near RegionPathMoveTo( Handle regionHandle, TT_Vector* vec )
+static void _near RegionPathMoveTo( Handle handle, TT_Vector* vec )
 {
-        GrRegionPathMovePen( regionHandle, vec->x, vec->y );
+        GrRegionPathMovePen( handle, vec->x, vec->y );
 }
 
 
@@ -512,7 +514,8 @@ static void _near RegionPathMoveTo( Handle regionHandle, TT_Vector* vec )
  ********************************************************************
  * SYNOPSIS:	  Draw line to given position.
  * 
- * PARAMETERS:    gstate                Handle in which the line is drawed.
+ * PARAMETERS:    handle                GStateHandle in which the line 
+ *                                      is drawed.
  *                *vec                  Ptr. to Vector of end position.
  * 
  * RETURNS:       void
@@ -525,9 +528,9 @@ static void _near RegionPathMoveTo( Handle regionHandle, TT_Vector* vec )
  *      18/11/23  JK        Initial Revision
  *******************************************************************/
 
-static void _near LineTo( GStateHandle gstate, TT_Vector* vec )
+static void _near LineTo( Handle handle, TT_Vector* vec )
 {
-        GrDrawLineTo( gstate, vec->x, vec->y );
+        GrDrawLineTo( (GStateHandle) handle, vec->x, vec->y );
 }
 
 
@@ -536,7 +539,7 @@ static void _near LineTo( GStateHandle gstate, TT_Vector* vec )
  ********************************************************************
  * SYNOPSIS:	  Draw line to given position.
  * 
- * PARAMETERS:    regionHandle          Handle to regionpath in which 
+ * PARAMETERS:    handle                Handle to region path in which 
  *                                      the line is drawed.
  *                *vec                  Ptr. to Vector of end position.
  * 
@@ -550,9 +553,9 @@ static void _near LineTo( GStateHandle gstate, TT_Vector* vec )
  *      14/03/24  JK        Initial Revision
  *******************************************************************/
 
-static void _near RegionPathLineTo( Handle regionHandle, TT_Vector* vec )
+static void _near RegionPathLineTo( Handle handle, TT_Vector* vec )
 {
-        GrRegionPathDrawLineTo( regionHandle, vec->x, vec->y );
+        GrRegionPathDrawLineTo( handle, vec->x, vec->y );
 }
 
 
@@ -561,7 +564,8 @@ static void _near RegionPathLineTo( Handle regionHandle, TT_Vector* vec )
  ********************************************************************
  * SYNOPSIS:	  Draw conic curve to given position.
  * 
- * PARAMETERS:    gstate                Handle in which the curve is drawed.
+ * PARAMETERS:    handle                GStateHandle in which the curve 
+ *                                      is drawed.
  *                *v_control            Vector with control point.
  *                *vec                  Vector of new position.
  * 
@@ -575,7 +579,7 @@ static void _near RegionPathLineTo( Handle regionHandle, TT_Vector* vec )
  *      18/11/23  JK        Initial Revision
  *******************************************************************/
 
-static void _near ConicTo( GStateHandle gstate, TT_Vector* v_control, TT_Vector* vec )
+static void _near ConicTo( Handle handle, TT_Vector* v_control, TT_Vector* vec )
 {
         Point p[3];
 
@@ -585,7 +589,7 @@ static void _near ConicTo( GStateHandle gstate, TT_Vector* v_control, TT_Vector*
         p[1].P_x = p[2].P_x = vec->x;
         p[1].P_y = p[2].P_y = vec->y;
 
-        GrDrawCurveTo( gstate, p );
+        GrDrawCurveTo( (GStateHandle) handle, p );
 }
 
 
@@ -594,7 +598,7 @@ static void _near ConicTo( GStateHandle gstate, TT_Vector* v_control, TT_Vector*
  ********************************************************************
  * SYNOPSIS:	  Draw conic curve to given position.
  * 
- * PARAMETERS:    regionHandle          Handle to regionpath in which 
+ * PARAMETERS:    handle                Handle to region path in which 
  *                                      the curve is drawed.
  *                *v_control            Vector with control point.
  *                *vec                  Vector of new position.
@@ -609,7 +613,7 @@ static void _near ConicTo( GStateHandle gstate, TT_Vector* v_control, TT_Vector*
  *      14/03/24  JK        Initial Revision
  *******************************************************************/
 
-static void _near RegionPathConicTo( Handle regionHandle, TT_Vector* v_control, TT_Vector* vec )
+static void _near RegionPathConicTo( Handle handle, TT_Vector* v_control, TT_Vector* vec )
 {
         Point p[3];
 
@@ -619,7 +623,7 @@ static void _near RegionPathConicTo( Handle regionHandle, TT_Vector* v_control, 
         p[1].P_x = p[2].P_x = vec->x;
         p[1].P_y = p[2].P_y = vec->y;
 
-        GrRegionPathDrawCurveTo( regionHandle, p );
+        GrRegionPathDrawCurveTo( handle, p );
 }
 
 
