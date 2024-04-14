@@ -63,10 +63,6 @@ Resources
     // ATTR_GEN_INIT_FILE_CATEGORY ="sound";
 }
 
-/**************
- * TitleGroup *
- **************/
-
 @object GenInteractionClass TitleGroup = {
     GI_comp =   @TitleGlyph,
                 @TitleHelpText;
@@ -100,19 +96,21 @@ Resources
 }
 
 @object GenFileSelectorClass AddAppSelector = {
-   /*GFSI_destination = @OpenWithAppList;*/
-   //GFSI_notificationMsg = MSG_FILEBROW_SELECTOR_ACTION;
-   GFSI_attrs =           ((FSA_ALLOW_CHANGE_DIRS) & (~FSA_SHOW_FILES_DISABLED) & (~FSA_HAS_OPEN_DIR_BUTTON) & (~FSA_HAS_CHANGE_DIRECTORY_LIST))
-                        | ((FSA_HAS_FILE_LIST) & (~FSA_SHOW_FIXED_DISKS_ONLY) & (~FSA_HAS_CLOSE_DIR_BUTTON) & (~FSA_HAS_DOCUMENT_BUTTON)& (~FSA_HAS_CHANGE_DRIVE_LIST))
-                        | ((FSA_USE_VIRTUAL_ROOT));
+    GFSI_destination = @OpenWithAppList;
+    GFSI_notificationMsg = MSG_FILEBROW_SELECTOR_ACTION;
 
-   GFSI_fileCriteria =      ((FSFC_DIRS) & (~FSFC_NON_GEOS_FILES))
-                          | ((FSFC_GEOS_EXECUTABLES) & (~FSFC_GEOS_NON_EXECUTABLES));
+    GFSI_attrs =           ((FSA_ALLOW_CHANGE_DIRS) & (~FSA_SHOW_FILES_DISABLED) & (~FSA_HAS_OPEN_DIR_BUTTON) & (~FSA_HAS_CHANGE_DIRECTORY_LIST))
+                            | ((FSA_HAS_FILE_LIST) & (~FSA_SHOW_FIXED_DISKS_ONLY) & (~FSA_HAS_CLOSE_DIR_BUTTON) & (~FSA_HAS_DOCUMENT_BUTTON)& (~FSA_HAS_CHANGE_DRIVE_LIST))
+                            | ((FSA_USE_VIRTUAL_ROOT));
 
-   ATTR_GEN_FILE_SELECTOR_VIRTUAL_ROOT = {SP_APPLICATION, ""};
-   ATTR_GEN_PATH_DATA = {SP_APPLICATION, ""};
-   HINT_FILE_SELECTOR_FILE_LIST_WIDTH = 33;
-   HINT_FILE_SELECTOR_NUMBER_OF_FILES_TO_SHOW = 10;
+    GFSI_fileCriteria =      ((FSFC_DIRS) & (~FSFC_NON_GEOS_FILES))
+                            | ((FSFC_GEOS_EXECUTABLES) & (~FSFC_GEOS_NON_EXECUTABLES));
+
+    HINT_FILE_SELECTOR_SINGLE_ACTION;
+    ATTR_GEN_FILE_SELECTOR_VIRTUAL_ROOT = {SP_APPLICATION, ""};
+    ATTR_GEN_PATH_DATA = {SP_APPLICATION, ""};
+    HINT_FILE_SELECTOR_FILE_LIST_WIDTH = 33;
+    HINT_FILE_SELECTOR_NUMBER_OF_FILES_TO_SHOW = 10;
 }
 
 @object GenTriggerClass AddAppTrigger = {
@@ -232,7 +230,7 @@ Boolean _pascal ReadAppsCallback(const char *stringSection, word sectionNum, voi
     mh = MemAllocLMem(LMEM_TYPE_GENERAL, 0);
     MemLock(mh);
 
-    ch = ChunkArrayCreate(mh, sizeof(FileLongName), 0, 0);
+    ch = ChunkArrayCreate(mh, sizeof(PathName) + sizeof(FileLongName), 0, 0);
     pself->appList = ConstructOptr(mh, ch);
     ourList = pself->appList;
 
@@ -284,6 +282,29 @@ Boolean _pascal ReadAppsCallback(const char *stringSection, word sectionNum, voi
     }
 }
 
+@method PrefAppListClass, MSG_FILEBROW_SELECTOR_ACTION
+{
+    // entryNum
+    // entryFlags
+
+    char                        buf[5] = {0};
+    dword                       flagsAndDisk;
+    PathName                    pathf;
+    DiskHandle                  disk;
+    GeodeToken                  token;
+    optr                        op = NullOptr;
+
+    if (GFS_GET_ENTRY_FLAGS(entryFlags) == GFSEF_OPEN) // was it a double click?
+    {
+        if (GFS_GET_ENTRY_TYPE(entryFlags) == GFSET_FILE) // on a file?
+        {
+            op = ConstructOptr(HandleOf(oself), ChunkOf(@AddAppSelector));
+            flagsAndDisk = @call op::MSG_GEN_FILE_SELECTOR_GET_FULL_SELECTION_PATH(&pathf);
+            strcpy(pself->selectedPathApp, &pathf);
+        }
+    }
+}
+
 @method	PrefAppListClass, MSG_ADD_APP
 {
     dword                       flagsAndDisk;
@@ -293,20 +314,30 @@ Boolean _pascal ReadAppsCallback(const char *stringSection, word sectionNum, voi
     word                        idx = 0;
     word                        num = 0;
     optr                        op = NullOptr;
+    char*                       str = (char*) 0;
 
-	op = ConstructOptr(OptrToHandle(oself), ChunkOf(@AddAppSelector));
+	//op = ConstructOptr(HandleOf(oself), ChunkOf(@AddAppSelector));
+    //flagsAndDisk = @call op::MSG_GEN_FILE_SELECTOR_GET_FULL_SELECTION_PATH(&pathf);
+    //flagsAndDisk = @call op::MSG_GEN_FILE_SELECTOR_GET_SELECTION(&pathf);
 
-    flagsAndDisk = @call op::MSG_GEN_FILE_SELECTOR_GET_FULL_SELECTION_PATH(&pathf);
-
-    if (GFS_GET_ENTRY_TYPE(flagsAndDisk) == GFSET_FILE)
+    if (pself->selectedPathApp != "")
     {
         MemLock(HandleOf(pself->appList));
-        idx = NameArrayAdd(pself->appList, &pathf, 0, 0, (void *) 0);
+        //idx = NameArrayAdd(pself->appList, &pathf, 0, 0, (void *) 0);
+	    str = (char*) ChunkArrayAppend(pself->appList, 0);
+        strcpy(str, (char*) &pathf);
+
+        UserStandardDialog(0, 0, 0, 0,
+                    str,
+                    (CDT_NOTIFICATION << CDBF_DIALOG_TYPE_OFFSET) |
+                    (GIT_NOTIFICATION << CDBF_INTERACTION_TYPE_OFFSET));
+
         num = ChunkArrayGetCount(pself->appList);
         MemUnlock(HandleOf(pself->appList));
 
-        //disk = GFS_GET_FULL_SELECTION_PATH_DISK_HANDLE(flagsAndDisk); // Extract disk handle
         @call oself::MSG_GEN_DYNAMIC_LIST_INITIALIZE(num);
         @call oself::MSG_GEN_ITEM_GROUP_SET_NONE_SELECTED(TRUE);
+
+        strcpy(pself->selectedPathApp, "");
     }
 }
