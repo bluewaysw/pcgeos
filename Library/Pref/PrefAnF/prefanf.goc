@@ -54,10 +54,10 @@ Resources
                 @OpenWithGroup;
     //PDMMC_tocList = @TocList;
 
-    HINT_INTERACTION_COMPLEX_PROPERTIES;
-    HINT_ORIENT_CHILDREN_VERTICALLY;
-    HINT_FULL_JUSTIFY_CHILDREN_HORIZONTALLY;
-    HINT_CENTER_CHILDREN_HORIZONTALLY;
+    // HINT_INTERACTION_COMPLEX_PROPERTIES;
+    // HINT_ORIENT_CHILDREN_VERTICALLY;
+    // HINT_FULL_JUSTIFY_CHILDREN_HORIZONTALLY;
+    // HINT_CENTER_CHILDREN_HORIZONTALLY;
     //	ATTR_GEN_HELP_FILE = "prefsndn";
     // ATTR_GEN_HELP_CONTEXT = "dbSound";
     // ATTR_GEN_INIT_FILE_CATEGORY ="sound";
@@ -106,7 +106,7 @@ Resources
     GFSI_fileCriteria =      ((FSFC_DIRS) & (~FSFC_NON_GEOS_FILES))
                             | ((FSFC_GEOS_EXECUTABLES) & (~FSFC_GEOS_NON_EXECUTABLES));
 
-    HINT_FILE_SELECTOR_SINGLE_ACTION;
+    /*HINT_FILE_SELECTOR_SINGLE_ACTION;*/
     ATTR_GEN_FILE_SELECTOR_VIRTUAL_ROOT = {SP_APPLICATION, ""};
     ATTR_GEN_PATH_DATA = {SP_APPLICATION, ""};
     HINT_FILE_SELECTOR_FILE_LIST_WIDTH = 33;
@@ -115,6 +115,7 @@ Resources
 
 @object GenTriggerClass AddAppTrigger = {
     GI_visMoniker = "=>";
+    GI_states = @default & ~GS_USABLE;
     GTI_destination = @OpenWithAppList;
     GTI_actionMsg = MSG_ADD_APP;
 }
@@ -148,10 +149,11 @@ Resources
 }
 
 @object GenTriggerClass RemoveAppTrigger = {
-    //genStates = default -enabled;
     GI_visMoniker = "Remove";
-    GI_states = @default & ~GS_ENABLED;
-    //action = MSG_SL_DELETE_PROGRAM, ProgStartupList;
+    //GI_states = @default & ~GS_ENABLED;
+    GTI_destination = @OpenWithAppList;
+    GTI_actionMsg = MSG_REMOVE_APP;
+
     HINT_EXPAND_WIDTH_TO_FIT_PARENT;
 }
 
@@ -168,7 +170,7 @@ optr    _export _pascal PrefGetOptrBox(void)
 /*********************************************************************
 PrefGetModuleInfo
 **********************************************************************/
-void    _export _pascal PrefGetModuleInfo( PrefModuleInfo *modInfo )
+void    _export _pascal PrefGetModuleInfo(PrefModuleInfo *modInfo)
 {
     modInfo->PMI_requiredFeatures = PMF_USER;
     modInfo->PMI_prohibitedFeatures = 0;
@@ -213,7 +215,7 @@ Boolean _pascal ReadAppsCallback(const char *stringSection, word sectionNum, voi
 {
     char* str;
 
-    str = (char*) ChunkArrayAppend(*((optr*) enumData), 0); // convert voidPOINTER to optrPOINTER and deref aftwerwards...
+    str = (char*) ChunkArrayAppend(*((optr*) enumData), 0); // convert VOID-Pointer to OPTR-Pointer and deref aftwerwards...
     strcpy(str, stringSection);
 
     return FALSE; // no error
@@ -231,12 +233,15 @@ Boolean _pascal ReadAppsCallback(const char *stringSection, word sectionNum, voi
     MemLock(mh);
 
     ch = ChunkArrayCreate(mh, sizeof(PathName) + sizeof(FileLongName), 0, 0);
+
     pself->appList = ConstructOptr(mh, ch);
     ourList = pself->appList;
+    strcpy(pself->iniCat, _TEXT("fileManager"));
+    strcpy(pself->iniKey, _TEXT("openWithFavoriteApps"));
 
     InitFileEnumStringSection(
-        _TEXT("fileManager"),
-        _TEXT("openWithFavoriteApps"),
+        pself->iniCat,
+        pself->iniKey,
         IFRF_READ_ALL,
         ReadAppsCallback,
         (void*) &ourList);
@@ -287,11 +292,8 @@ Boolean _pascal ReadAppsCallback(const char *stringSection, word sectionNum, voi
     // entryNum
     // entryFlags
 
-    char                        buf[5] = {0};
     dword                       flagsAndDisk;
     PathName                    pathf;
-    DiskHandle                  disk;
-    GeodeToken                  token;
     optr                        op = NullOptr;
 
     if (GFS_GET_ENTRY_FLAGS(entryFlags) == GFSEF_OPEN) // was it a double click?
@@ -300,44 +302,106 @@ Boolean _pascal ReadAppsCallback(const char *stringSection, word sectionNum, voi
         {
             op = ConstructOptr(HandleOf(oself), ChunkOf(@AddAppSelector));
             flagsAndDisk = @call op::MSG_GEN_FILE_SELECTOR_GET_FULL_SELECTION_PATH(&pathf);
+            //flagsAndDisk = @call op::MSG_GEN_FILE_SELECTOR_GET_SELECTION(&pathf);
             strcpy(pself->selectedPathApp, &pathf);
+            @call oself::MSG_ADD_APP();
         }
     }
 }
 
 @method	PrefAppListClass, MSG_ADD_APP
 {
-    dword                       flagsAndDisk;
-    PathName                    pathf;
-    DiskHandle                  disk;
-    GeodeToken                  token;
-    word                        idx = 0;
     word                        num = 0;
-    optr                        op = NullOptr;
     char*                       str = (char*) 0;
-
-	//op = ConstructOptr(HandleOf(oself), ChunkOf(@AddAppSelector));
-    //flagsAndDisk = @call op::MSG_GEN_FILE_SELECTOR_GET_FULL_SELECTION_PATH(&pathf);
-    //flagsAndDisk = @call op::MSG_GEN_FILE_SELECTOR_GET_SELECTION(&pathf);
 
     if (strlen(pself->selectedPathApp) > 0)
     {
         MemLock(HandleOf(pself->appList));
-        //idx = NameArrayAdd(pself->appList, pself->selectedPathApp, strlen(pself->selectedPathApp), 0, 0);
-	    str = (char*) ChunkArrayAppend(pself->appList, 0);
-        strcpy(str, pself->selectedPathApp);
-
-        // UserStandardDialog(0, 0, 0, 0,
-        //             str,
-        //             (CDT_NOTIFICATION << CDBF_DIALOG_TYPE_OFFSET) |
-        //             (GIT_NOTIFICATION << CDBF_INTERACTION_TYPE_OFFSET));
 
         num = ChunkArrayGetCount(pself->appList);
+        if (checkIfInList(pself->appList, pself->selectedPathApp, num) == FALSE)
+        {
+            str = (char*) ChunkArrayAppend(pself->appList, 0);
+            strcpy(str, pself->selectedPathApp);
+
+            num = ChunkArrayGetCount(pself->appList);
+            @call oself::MSG_GEN_DYNAMIC_LIST_INITIALIZE(num);
+            @call oself::MSG_GEN_ITEM_GROUP_SET_NONE_SELECTED(TRUE);
+        }
+
+        writeIniFile(pself->iniCat, pself->iniKey, pself->appList, num);
+
         MemUnlock(HandleOf(pself->appList));
-
-        @call oself::MSG_GEN_DYNAMIC_LIST_INITIALIZE(num);
-        @call oself::MSG_GEN_ITEM_GROUP_SET_NONE_SELECTED(TRUE);
-
         strcpy(pself->selectedPathApp, "");
     }
+}
+
+@method	PrefAppListClass, MSG_REMOVE_APP
+{
+    word                        idx = 0;
+    word                        num = 0;
+
+	idx = @call oself::MSG_GEN_ITEM_GROUP_GET_SELECTION();
+
+    MemLock(HandleOf(pself->appList));
+
+	ChunkArrayDeleteRange(pself->appList, idx, 1);
+    num = ChunkArrayGetCount(pself->appList);
+    @call oself::MSG_GEN_DYNAMIC_LIST_INITIALIZE(num);
+    @call oself::MSG_GEN_ITEM_GROUP_SET_NONE_SELECTED(TRUE);
+    writeIniFile(pself->iniCat, pself->iniKey, pself->appList, num);
+
+    MemUnlock(HandleOf(pself->appList));
+
+/*
+    UserStandardDialog(0, 0, 0, 0,
+                &buf,
+                (CDT_NOTIFICATION << CDBF_DIALOG_TYPE_OFFSET) |
+                (GIT_NOTIFICATION << CDBF_INTERACTION_TYPE_OFFSET));
+*/
+}
+
+Boolean checkIfInList(optr list, char* appName, word listLen)
+{
+    word    i = 0;
+    char*   str = (char*) 0;
+    word    elSize = 0;
+
+    // list must be locked!
+    for (i=0; i < listLen; i++)
+    {
+        str = (char*) ChunkArrayElementToPtr(list, i, &elSize);
+        if (strstr(str, appName))
+        {
+            return TRUE;
+        }
+    }
+
+    return FALSE;
+}
+
+void writeIniFile(char* iniCat, char* iniKey, optr list, word listLen)
+{
+    word    i = 0;
+    char*   str = (char*) 0;
+    word    elSize = 0;
+
+    InitFileDeleteEntry(
+        iniCat,
+        iniKey
+    );
+
+    // list must be locked!
+    for (i = 0; i < listLen; i++)
+    {
+        str = (char*) ChunkArrayElementToPtr(list, i, &elSize);
+
+	    InitFileWriteStringSection(
+            iniCat,
+            iniKey,
+			str
+        );
+    }
+
+    InitFileCommit();
 }
