@@ -243,6 +243,8 @@ void _pascal TrueType_Gen_In_Region(
                         Handle               regionPath,
                         word                 character,
                         WWFixedAsDWord       pointSize,
+                        byte                 width,
+                        byte                 weight,
 			const FontInfo*      fontInfo, 
                         const OutlineEntry*  outlineEntry,
                         TextStyle            stylesToImplement,

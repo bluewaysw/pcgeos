@@ -167,7 +167,13 @@ TrueTypeGenInRegion	proc	far
 	clr		al
 	movwbf	dxah, es:GS_fontAttr.FCA_pointsize
 	push	dx					;pass point size
-	push 	ax		
+	push 	ax	
+
+	clr		ah
+	mov		al, es:GS_fontAttr.FCA_width
+	push	ax					;pass width
+	mov		al, es:GS_fontAttr.FCA_weight
+	push	ax					;pass weight
 
 	mov		cx, es:GS_fontAttr.FCA_fontID
 	call	FontDrFindFontInfo
