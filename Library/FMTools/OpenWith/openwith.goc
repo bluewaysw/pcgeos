@@ -75,7 +75,7 @@ Resourcen
 
 
 
-    @object GenInteractionClass ConfigureDialog = {
+    @object ConfigureDialogClass ConfigureDialog = {
         GI_visMoniker = "Configure";
         GI_comp =       //@TitleGroup,
                         @OpenWithGroup,
@@ -157,10 +157,17 @@ Resourcen
         HINT_EXPAND_HEIGHT_TO_FIT_PARENT;
     }
 
-    @object GenDynamicListClass OpenWithAppList = {
-        GIGI_destination = (TO_SELF);
+    @object AppDynamicListClass OpenWithAppList = {
+        //GIGI_destination = (TO_SELF);
         GIGI_behaviorType = GIGBT_EXCLUSIVE;
         //GIGI_behaviorType = GIGBT_NON_EXCLUSIVE;
+
+        // GDLI_numItems
+        // GDLI_queryMsg
+        // GIGI_destination
+
+
+
 
         HINT_ITEM_GROUP_SCROLLABLE;
         HINT_EXPAND_HEIGHT_TO_FIT_PARENT;
@@ -509,3 +516,204 @@ void LaunchApp(
         IACPShutdown(iacpConnectionToken, NullOptr);
     }
 }
+
+
+/********************************************************************
+Configure Dialog Stuff
+********************************************************************/
+
+/********************************************************************
+********************************************************************/
+Boolean _pascal ReadAppsCallback(const char *stringSection, word sectionNum, void* enumData)
+{
+    char* str;
+
+    str = (char*) ChunkArrayAppend(*((optr*) enumData), 0); // convert VOID-Pointer to OPTR-Pointer and deref afterwards...
+    strcpy(str, stringSection);
+
+    return FALSE; // no error
+}
+
+@method ConfigureDialogClass, MSG_GEN_INTERACTION_INITIATE
+{
+    @call OpenWithAppList::MSG_LOAD_APP_LIST();
+}
+
+@method	AppDynamicListClass, MSG_LOAD_APP_LIST
+{
+    MemHandle       mh = NullHandle;
+    ChunkHandle     ch = NullChunk;
+    word            num = 0;
+    optr            ourList = NullOptr;
+
+    mh = MemAllocLMem(LMEM_TYPE_GENERAL, 0);
+    MemLock(mh);
+
+    ch = ChunkArrayCreate(mh, sizeof(PathName) + sizeof(FileLongName), 0, 0);
+
+    pself->appList = ConstructOptr(mh, ch);
+    ourList = pself->appList;
+    strcpy(pself->iniCat, _TEXT("fileManager"));
+    strcpy(pself->iniKey, _TEXT("openWithFavoriteApps"));
+
+    InitFileEnumStringSection(
+        pself->iniCat,
+        pself->iniKey,
+        IFRF_READ_ALL,
+        ReadAppsCallback,
+        (void*) &ourList);
+
+    num = ChunkArrayGetCount(pself->appList);
+
+    MemUnlock(mh);
+
+    @call oself::MSG_GEN_DYNAMIC_LIST_INITIALIZE(num);
+    @call oself::MSG_GEN_ITEM_GROUP_SET_NONE_SELECTED(TRUE);
+
+    @callsuper();
+}
+
+
+/*
+    **Parameters:**
+    *buffer* - Buffer in which to return moniker text.
+    *bufSize* - Size of buffer.
+    *identifier* - Identifier of item whose moniker should be returned.
+
+    **Return:** Size of item's moniker.
+
+    // (optr list, word item);
+*/
+@method	AppDynamicListClass, MSG_QUERY_APP_MONIKER
+{
+    char*   str = (void*) 0;
+    word    elSize = 0;
+    word    len = 0;
+
+    MemLock(HandleOf(pself->appList));
+    str = (char*) ChunkArrayElementToPtr(pself->appList, identifier, &elSize);
+    len = strlen(str);
+    if (len < bufSize)
+    {
+        strcpy(buffer, str);
+        MemUnlock(HandleOf(pself->appList));
+        return len;
+    }
+    else
+    {
+        MemUnlock(HandleOf(pself->appList));
+        return 0;
+    }
+}
+
+@method OpenWithFileSelectorClass, MSG_FILEBROW_SELECTOR_ACTION
+{
+    // entryNum
+    // entryFlags
+
+    dword                       flagsAndDisk;
+    PathName                    pathf;
+    optr                        op = NullOptr;
+
+    if (GFS_GET_ENTRY_FLAGS(entryFlags) == GFSEF_OPEN) // was it a double click?
+    {
+        if (GFS_GET_ENTRY_TYPE(entryFlags) == GFSET_FILE) // on a file?
+        {
+            op = ConstructOptr(HandleOf(oself), ChunkOf(@AddAppSelector));
+            flagsAndDisk = @call op::MSG_GEN_FILE_SELECTOR_GET_FULL_SELECTION_PATH(&pathf);
+            //flagsAndDisk = @call op::MSG_GEN_FILE_SELECTOR_GET_SELECTION(&pathf);
+            strcpy(pself->selectedPathApp, &pathf);
+            @call oself::MSG_ADD_APP();
+        }
+    }
+}
+
+@method	AppDynamicListClass, MSG_ADD_APP
+{
+    word                        num = 0;
+    char*                       str = (char*) 0;
+
+    if (strlen(pself->selectedPathApp) > 0)
+    {
+        MemLock(HandleOf(pself->appList));
+
+        num = ChunkArrayGetCount(pself->appList);
+        if (checkIfInList(pself->appList, pself->selectedPathApp, num) == FALSE)
+        {
+            str = (char*) ChunkArrayAppend(pself->appList, 0);
+            strcpy(str, pself->selectedPathApp);
+
+            num = ChunkArrayGetCount(pself->appList);
+            @call oself::MSG_GEN_DYNAMIC_LIST_INITIALIZE(num);
+            @call oself::MSG_GEN_ITEM_GROUP_SET_NONE_SELECTED(TRUE);
+        }
+
+        writeIniFile(pself->iniCat, pself->iniKey, pself->appList, num);
+
+        MemUnlock(HandleOf(pself->appList));
+        strcpy(pself->selectedPathApp, "");
+    }
+}
+
+@method	AppDynamicListClass, MSG_REMOVE_APP
+{
+    word                        idx = 0;
+    word                        num = 0;
+
+	idx = @call oself::MSG_GEN_ITEM_GROUP_GET_SELECTION();
+
+    MemLock(HandleOf(pself->appList));
+
+	ChunkArrayDeleteRange(pself->appList, idx, 1);
+    num = ChunkArrayGetCount(pself->appList);
+    @call oself::MSG_GEN_DYNAMIC_LIST_INITIALIZE(num);
+    @call oself::MSG_GEN_ITEM_GROUP_SET_NONE_SELECTED(TRUE);
+    writeIniFile(pself->iniCat, pself->iniKey, pself->appList, num);
+
+    MemUnlock(HandleOf(pself->appList));
+
+/*
+    UserStandardDialog(0, 0, 0, 0,
+                &buf,
+                (CDT_NOTIFICATION << CDBF_DIALOG_TYPE_OFFSET) |
+                (GIT_NOTIFICATION << CDBF_INTERACTION_TYPE_OFFSET));
+*/
+}
+
+Boolean checkIfInList(optr list, char* appName, word listLen)
+{
+    word    i = 0;
+    char*   str = (char*) 0;
+    word    elSize = 0;
+
+    // list must be locked!
+    for (i=0; i < listLen; i++)
+    {
+        str = (char*) ChunkArrayElementToPtr(list, i, &elSize);
+        if (strstr(str, appName))
+        {
+            return TRUE;
+        }
+    }
+
+    return FALSE;
+}
+
+void writeIniFile(char* iniCat, char* iniKey, optr list, word listLen)
+{
+    word    i = 0;
+    char*   str = (char*) 0;
+    word    elSize = 0;
+
+    InitFileDeleteEntry(iniCat, iniKey);
+
+    // list must be locked!
+    for (i = 0; i < listLen; i++)
+    {
+        str = (char*) ChunkArrayElementToPtr(list, i, &elSize);
+	    InitFileWriteStringSection(iniCat, iniKey, str);
+    }
+
+    InitFileCommit();
+}
+
