@@ -1,18 +1,18 @@
 @include <openwith.goh>
 
-/*-------------------------------------------------------------
+/**************************************************************
 API Struct
 MUST be global
--------------------------------------------------------------*/
+**************************************************************/
 FMToolStruct FMToolInfo[1] = {
     {
         @Moniker1, (FMTF_SELECTED_ONLY | FMTT_DIALOG), 1
     }
 };
 
-/*-------------------------------------------------------------
+/**************************************************************
 FileManager API Function - fetch Tools
--------------------------------------------------------------*/
+**************************************************************/
 //FMFetchToolsProc GetThoseTools
 word _pascal _export GetThoseTools(FMToolStruct **tablePtr)
 {
@@ -20,13 +20,13 @@ word _pascal _export GetThoseTools(FMToolStruct **tablePtr)
     return 1;
 }
 
-/*-------------------------------------------------------------
+/**************************************************************
 The user has clicked on our Utilities menu item: "Open With"
 GeodeHandle filemgr => Process that is subclass of FileManagerClass
 word toolNum =>	Entry # of activated tool within table returned by
                 FMTF_FETCH_TOOLS
 word entryNum
--------------------------------------------------------------*/
+***************************************************************/
 //FMToolProc OpenWithEntryPoint()
 void _pascal _export OpenWithEntryPoint(
     GeodeHandle filemgr,
@@ -35,30 +35,36 @@ void _pascal _export OpenWithEntryPoint(
 )
 {
     MemHandle                   selFiles;
-    MemHandle                   oldBlock;
-    FileQuickTransferHeader*    headerPtr;
-    FileOperationInfoEntry*     entriesPtr;
-    word                        i;
     InteractionCommand          reply = IC_NULL;
-
     optr                        dialog = NullOptr;
     optr                        fSelect = NullOptr;
     dword	    	            flagsAndDisk;	/* entry flags + disk handle returned by file selector */
-    PathName    	            pathname;   	/* Buffer for fetching the complete path of the application */
+    char    	                pathnameAndFile[PATH_BUFFER_SIZE + FILE_LONGNAME_BUFFER_SIZE];   	/* Buffer for fetching the complete path of the application */
     DiskHandle  	            disk;	    	/* Disk on which it resides */
     GeodeToken  	            token;	    	/* Token for the application, so we can connect to it */
 
+    // check for non-DOS files, folders, etc. first
+    selFiles = @call ConstructOptr(filemgr, 0)::MSG_FM_GET_SELECTED_FILES();
+    if (CheckIfUnsupportedFiles(selFiles)) // true on ERROR
+    {
+        UserStandardDialogOptr(
+            0, 0, 0, 0,
+            @errorNoDOSFile,
+            ((CDT_ERROR << CDBF_DIALOG_TYPE_OFFSET) |
+             (GIT_NOTIFICATION << CDBF_INTERACTION_TYPE_OFFSET))
+        );
+        return;
+    }
 
+    // we assume just DOS files in the list as of now and bring up the dialogue
     dialog = @call ConstructOptr(filemgr, 0)::MSG_FM_DUP_AND_ADD(@SelectDialog, FMP_APPLICATION);
     @call dialog::MSG_GEN_SET_USABLE(VUM_NOW);
-
     reply = UserDoDialog(dialog);
+
     if (reply == IC_OK)
     {
         fSelect = @call dialog::MSG_GEN_FIND_CHILD_AT_POSITION(0);
-        flagsAndDisk = @call fSelect::MSG_GEN_FILE_SELECTOR_GET_FULL_SELECTION_PATH(pathname);
-
-        UserDestroyDialog(dialog); // no more needed
+        flagsAndDisk = @call fSelect::MSG_GEN_FILE_SELECTOR_GET_FULL_SELECTION_PATH(&pathnameAndFile);
 
         if (GFS_GET_ENTRY_TYPE(flagsAndDisk) == GFSET_FILE)
         {
@@ -67,49 +73,33 @@ void _pascal _export OpenWithEntryPoint(
             FilePushDir();
             if (
                  (FileSetCurrentPath(disk, _TEXT("\\")) != 0) &&
-                 (FileGetPathExtAttributes(pathname, FEA_TOKEN, &token, sizeof(token)) == 0)
+                 (FileGetPathExtAttributes(pathnameAndFile, FEA_TOKEN, &token, sizeof(token)) == 0)
                )
             {
-                selFiles = @call ConstructOptr(filemgr, 0)::MSG_FM_GET_SELECTED_FILES();
-
-                while (selFiles != 0)
+                if (IsAppOnBlacklist(&token))
                 {
-                    headerPtr  = (FileQuickTransferHeader*) MemLock(selFiles); // get pointer to it header
-                    entriesPtr = (FileOperationInfoEntry*) (headerPtr + 1); // get pointer to first entry (follows header)
-
-                    for (i=0; i < headerPtr->FQTH_numFiles; i++)
-                    {
-                        if (entriesPtr->FOIE_type == GFT_NOT_GEOS_FILE)
-                        {
-                            LaunchApp(
-                                &token,
-                                disk,
-                                &pathname,
-                                headerPtr->FQTH_diskHandle,
-                                headerPtr->FQTH_pathname,
-                                entriesPtr->FOIE_name
-                            );
-                        }
-
-                        // point to the next entry
-                        entriesPtr = (FileOperationInfoEntry*) entriesPtr + 1;
-                    }
-
-                    // get next block, if any
-                    MemUnlock(selFiles);
-                    oldBlock = selFiles;
-                    selFiles = headerPtr->FQTH_nextBlock; // returns 0 if end, which breaks the loop
-                    MemFree(oldBlock);
+                    UserStandardDialogOptr(
+                        0, 0, 0, 0,
+                        @errorNoCompatibleApp,
+                        ((CDT_ERROR << CDBF_DIALOG_TYPE_OFFSET) |
+                        (GIT_NOTIFICATION << CDBF_INTERACTION_TYPE_OFFSET))
+                    );
+                    return;
                 }
+
+                selFiles = @call ConstructOptr(filemgr, 0)::MSG_FM_GET_SELECTED_FILES();
+                LoadFiles(&token, disk, &pathnameAndFile, selFiles);
             }
             FilePopDir();
         }
     }
+
+    UserDestroyDialog(dialog);
 }
 
-/*-------------------------------------------------------------
-make sure the dialog gets closed when we double-click on an app
--------------------------------------------------------------*/
+/**************************************************************
+make sure the dialog gets closed when we double-click an app
+**************************************************************/
 @method OpenWithFileSelectorClass, MSG_FILEBROW_SELECTOR_ACTION
 {
     if (GFS_GET_ENTRY_FLAGS(entryFlags) == GFSEF_OPEN) // was it a double click?
@@ -121,13 +111,161 @@ make sure the dialog gets closed when we double-click on an app
     }
 }
 
-/*-------------------------------------------------------------
+/**************************************************************
+check if unsupported file
+**************************************************************/
+Boolean CheckIfUnsupportedFiles(MemHandle selFiles)
+{
+    MemHandle                   oldBlock;
+    FileQuickTransferHeader*    headerPtr;
+    FileOperationInfoEntry*     entriesPtr;
+    word                        i;
+    Boolean                     hadError = FALSE;
+    FileAttrs                   fAttrs;
+
+    while (selFiles != 0)
+    {
+        headerPtr  = (FileQuickTransferHeader*) MemLock(selFiles); // get pointer to it header
+        entriesPtr = (FileOperationInfoEntry*) (headerPtr + 1); // get pointer to first entry (follows header)
+
+        for (i=0; i < headerPtr->FQTH_numFiles; i++)
+        {
+            if ((entriesPtr->FOIE_type == GFT_NOT_GEOS_FILE) &&
+                (entriesPtr->FOIE_type != GFT_DIRECTORY))
+            {
+                // for folders above DOCUMENT/WORLD GFT_DIRECTORY seems not to be set (...?) -
+                // so we check again if actually a folder
+                FilePushDir();
+                if (FileSetCurrentPath(headerPtr->FQTH_diskHandle, headerPtr->FQTH_pathname) != NullHandle)
+                {
+                    fAttrs = FileGetAttributes(entriesPtr->FOIE_name);
+                    if ((fAttrs & FA_SUBDIR) ||
+                        (fAttrs & FA_VOLUME) ||
+                        (fAttrs & FA_SYSTEM) ||
+                        (fAttrs & FA_HIDDEN) ||
+                        (fAttrs & FA_RDONLY))
+                    {
+                        FilePopDir();
+                        hadError = TRUE;
+                        break;
+                    }
+                }
+                else
+                {
+                    FilePopDir();
+                    hadError = TRUE;
+                    break;
+                }
+                FilePopDir();
+            }
+            else
+            {
+                hadError = TRUE;
+                break;
+            }
+
+            // point to the next entry
+            entriesPtr = (FileOperationInfoEntry*) entriesPtr + 1;
+        }
+
+        if (hadError)
+        {
+            MemUnlock(selFiles);
+            MemFree(selFiles);
+            break;
+        }
+        else
+        {
+            // get next block, if any
+            MemUnlock(selFiles);
+            oldBlock = selFiles;
+            selFiles = headerPtr->FQTH_nextBlock; // returns 0 if end, which breaks the loop
+            MemFree(oldBlock);
+        }
+    }
+
+    return hadError;
+}
+
+/**************************************************************
+is app on blacklist?
+**************************************************************/
+Boolean IsAppOnBlacklist(GeodeToken* appToken)
+{
+    word            numApps = 0;
+    GeodeToken*     listApp = (void*) 0;
+    word            size = 0;
+    word            i = 0;
+    Boolean         isOnList = FALSE;
+
+    MemLock(HandleOf(@BlacklistArray));
+    numApps = ChunkArrayGetCount(@BlacklistArray);
+
+    for (i = 0; i < numApps; i++)
+    {
+        listApp = ChunkArrayElementToPtr(@BlacklistArray, i, &size);
+
+        if ((appToken->GT_chars[0] == listApp->GT_chars[0]) &&
+            (appToken->GT_chars[1] == listApp->GT_chars[1]) &&
+            (appToken->GT_chars[2] == listApp->GT_chars[2]) &&
+            (appToken->GT_chars[3] == listApp->GT_chars[3]) &&
+            (appToken->GT_manufID  == listApp->GT_manufID))
+        {
+            isOnList = TRUE;
+            break;
+        }
+    }
+
+    MemUnlock(HandleOf(@BlacklistArray));
+
+    return isOnList;
+}
+
+/**************************************************************
+load files one by one
+**************************************************************/
+void LoadFiles(GeodeToken* token, DiskHandle disk, char* pathnameAndFile, MemHandle selFiles)
+{
+MemHandle                   oldBlock;
+FileQuickTransferHeader*    headerPtr;
+FileOperationInfoEntry*     entriesPtr;
+word                        i;
+
+    while (selFiles != 0)
+    {
+        headerPtr  = (FileQuickTransferHeader*) MemLock(selFiles); // get pointer to it header
+        entriesPtr = (FileOperationInfoEntry*) (headerPtr + 1); // get pointer to first entry (follows header)
+
+        for (i=0; i < headerPtr->FQTH_numFiles; i++)
+        {
+            LaunchApp(
+                token,
+                disk,
+                pathnameAndFile,
+                headerPtr->FQTH_diskHandle,
+                headerPtr->FQTH_pathname,
+                entriesPtr->FOIE_name
+            );
+
+            // point to the next entry
+            entriesPtr = (FileOperationInfoEntry*) entriesPtr + 1;
+        }
+
+        // get next block, if any
+        MemUnlock(selFiles);
+        oldBlock = selFiles;
+        selFiles = headerPtr->FQTH_nextBlock; // returns 0 if end, which breaks the loop
+        MemFree(oldBlock);
+    }
+}
+
+/**************************************************************
 launch application with DOS file via IACP...
--------------------------------------------------------------*/
+**************************************************************/
 void LaunchApp(
     GeodeToken *appTok,
     DiskHandle appDisk,
-    PathName *appPath,
+    char *appPath,
     DiskHandle dataDisk,
     PathName *dataPath,
     FileLongName *dataFName)
