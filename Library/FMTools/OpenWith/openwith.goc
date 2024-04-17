@@ -1,5 +1,218 @@
 @include <openwith.goh>
 
+/***********************************************************************
+Resourcen
+***********************************************************************/
+@start FMUI, data;
+
+    @visMoniker Moniker1 = "Open With";
+    @chunk char errorNoDOSFile[] = "Please select DOS files only.";
+    @chunk char errorNoCompatibleApp[] = "The selected application is not compatible with DOS files.";
+
+    @chunkArray GeodeToken BlacklistArray = {
+        { "PMGR" , 0 },
+        { "BCAL" , 0 },
+        { "CLK$" , 0 },
+        { "DUMP" , 0 },
+        { "PERF" , 0 }
+    };
+
+@end FMUI;
+
+
+@start DialogUI, notDetachable;
+
+    @object GenInteractionClass SelectDialog = {
+        GI_visMoniker = "Open With";
+        GI_comp =   @OpenWithFileSelector,
+                    @SelectReplyBar;
+        GI_states = (@default & (~GS_USABLE));
+        GII_visibility = GIV_DIALOG;
+        GII_attrs = @default | GIA_INITIATED_VIA_USER_DO_DIALOG | GIA_MODAL;
+
+        HINT_PLACE_MONIKER_ABOVE;
+        HINT_ORIENT_CHILDREN_VERTICALLY;
+    }
+
+    @object OpenWithFileSelectorClass OpenWithFileSelector = {
+        GFSI_destination = OpenWithFileSelector;
+        GFSI_notificationMsg = MSG_FILEBROW_SELECTOR_ACTION;
+        GFSI_attrs =           ((FSA_ALLOW_CHANGE_DIRS) & (~FSA_SHOW_FILES_DISABLED) & (~FSA_HAS_OPEN_DIR_BUTTON) & (~FSA_HAS_CHANGE_DIRECTORY_LIST))
+                                | ((FSA_HAS_FILE_LIST) & (~FSA_SHOW_FIXED_DISKS_ONLY) & (~FSA_HAS_CLOSE_DIR_BUTTON) & (~FSA_HAS_DOCUMENT_BUTTON)& (~FSA_HAS_CHANGE_DRIVE_LIST))
+                                | ((FSA_USE_VIRTUAL_ROOT));
+
+        GFSI_fileCriteria =      ((FSFC_DIRS) & (~FSFC_NON_GEOS_FILES))
+                                | ((FSFC_GEOS_EXECUTABLES) & (~FSFC_GEOS_NON_EXECUTABLES));
+
+        ATTR_GEN_FILE_SELECTOR_VIRTUAL_ROOT = {SP_APPLICATION, ""};
+        ATTR_GEN_PATH_DATA = {SP_APPLICATION, ""};
+        HINT_FILE_SELECTOR_FILE_LIST_WIDTH = 40;
+        HINT_FILE_SELECTOR_NUMBER_OF_FILES_TO_SHOW = 18;
+    }
+
+    @object GenInteractionClass SelectReplyBar ={
+        GI_comp =   @SelectOkTrigger,
+                    @SelectCancelTrigger,
+                    @ConfigureDialog;
+
+        HINT_MAKE_REPLY_BAR;
+    }
+
+    @object GenTriggerClass SelectOkTrigger = {
+        ATTR_GEN_TRIGGER_INTERACTION_COMMAND = { IC_OK };
+
+        HINT_SEEK_REPLY_BAR;
+        HINT_DEFAULT_DEFAULT_ACTION;
+    }
+
+    @object GenTriggerClass SelectCancelTrigger = {
+        ATTR_GEN_TRIGGER_INTERACTION_COMMAND = { IC_DISMISS };
+
+        HINT_SEEK_REPLY_BAR;
+    }
+
+
+
+
+
+    @object GenInteractionClass ConfigureDialog = {
+        GI_visMoniker = "Configure";
+        GI_comp =       //@TitleGroup,
+                        @OpenWithGroup,
+                        @ConfigureReplyBar;
+
+        //GI_states = (@default & (~GS_USABLE));
+        GII_visibility = GIV_DIALOG;
+        //GII_attrs = @default | GIA_INITIATED_VIA_USER_DO_DIALOG | GIA_MODAL;
+        GII_attrs = @default | GIA_MODAL;
+
+        HINT_PLACE_MONIKER_ABOVE;
+        HINT_ORIENT_CHILDREN_HORIZONTALLY;
+        HINT_SEEK_REPLY_BAR;
+    }
+
+    @object GenInteractionClass TitleGroup = {
+        GI_comp =   @TitleGlyph;
+                    //@TitleHelpText;
+
+        HINT_ORIENT_CHILDREN_HORIZONTALLY;
+        HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+    }
+
+    @object GenGlyphClass TitleGlyph = {
+        //GI_visMoniker = list {@PrefTextMoniker, @Moniker0, @Moniker1, @Moniker2, @Moniker3};
+        GI_visMoniker = "Configure";
+    }
+
+    //@object GenTextClass TitleHelpText = {
+    //    GI_attrs = @default | GA_READ_ONLY;
+    //    GTXI_text = "Choose frequently used applications that appear in the 'Open With' dialogue.";
+    //
+    //    HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+    //}
+
+    @object GenInteractionClass OpenWithGroup = {
+        GI_visMoniker = "Open With";
+        // prefInteractionAttrs = default 	+saveOptionsOnApply;
+        GI_comp =	@AddAppSelector,
+                    @AddAppTrigger,
+                    @OpenWithAppListGroup;
+
+        HINT_DRAW_IN_BOX;
+        HINT_PLACE_MONIKER_ABOVE;
+        HINT_ORIENT_CHILDREN_HORIZONTALLY;
+        HINT_CENTER_CHILDREN_VERTICALLY;
+    }
+
+    @object OpenWithFileSelectorClass AddAppSelector = {
+        GFSI_destination = @AddAppSelector; //@OpenWithAppList;
+        GFSI_notificationMsg = MSG_FILEBROW_SELECTOR_ACTION;
+
+        GFSI_attrs =           ((FSA_ALLOW_CHANGE_DIRS) & (~FSA_SHOW_FILES_DISABLED) & (~FSA_HAS_OPEN_DIR_BUTTON) & (~FSA_HAS_CHANGE_DIRECTORY_LIST))
+                                | ((FSA_HAS_FILE_LIST) & (~FSA_SHOW_FIXED_DISKS_ONLY) & (~FSA_HAS_CLOSE_DIR_BUTTON) & (~FSA_HAS_DOCUMENT_BUTTON)& (~FSA_HAS_CHANGE_DRIVE_LIST))
+                                | ((FSA_USE_VIRTUAL_ROOT));
+
+        GFSI_fileCriteria =      ((FSFC_DIRS) & (~FSFC_NON_GEOS_FILES))
+                                | ((FSFC_GEOS_EXECUTABLES) & (~FSFC_GEOS_NON_EXECUTABLES));
+
+        ATTR_GEN_FILE_SELECTOR_VIRTUAL_ROOT = {SP_APPLICATION, ""};
+        ATTR_GEN_PATH_DATA = {SP_APPLICATION, ""};
+        HINT_FILE_SELECTOR_FILE_LIST_WIDTH = 33;
+        HINT_FILE_SELECTOR_NUMBER_OF_FILES_TO_SHOW = 10;
+    }
+
+    @object GenTriggerClass AddAppTrigger = {
+        GI_visMoniker = "=>";
+        //GI_states = @default & ~GS_USABLE;
+        GTI_destination = @OpenWithAppList;
+        // GTI_actionMsg = MSG_ADD_APP;
+    }
+
+    @object GenInteractionClass OpenWithAppListGroup = {
+        GI_comp =   @OpenWithAppList,
+                    @RemoveAppTrigger;
+
+        HINT_ORIENT_CHILDREN_VERTICALLY;
+        HINT_CENTER_CHILDREN_HORIZONTALLY;
+        HINT_EXPAND_HEIGHT_TO_FIT_PARENT;
+    }
+
+    @object GenDynamicListClass OpenWithAppList = {
+        GIGI_destination = (TO_SELF);
+        GIGI_behaviorType = GIGBT_EXCLUSIVE;
+        //GIGI_behaviorType = GIGBT_NON_EXCLUSIVE;
+
+        HINT_ITEM_GROUP_SCROLLABLE;
+        HINT_EXPAND_HEIGHT_TO_FIT_PARENT;
+        HINT_FIXED_SIZE = {SST_AVG_CHAR_WIDTHS | 33};
+
+        /*
+        HINT_FIXED_SIZE {
+            SpecWidth <SST_AVG_CHAR_WIDTHS, 24>
+            SpecHeight <SST_LINES_OF_TEXT, 3>
+            word	3
+        },
+        */
+        // ATTR_GEN_ITEM_GROUP_STATUS_MSG = (word )MSG_SL_STARTUP_PROGRAM_SELECTED;
+    }
+
+    @object GenTriggerClass RemoveAppTrigger = {
+        GI_visMoniker = "Remove";
+        //GI_states = @default & ~GS_ENABLED;
+        GTI_destination = @OpenWithAppList;
+        // GTI_actionMsg = MSG_REMOVE_APP;
+
+        HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+    }
+
+    @object GenInteractionClass ConfigureReplyBar ={
+        GI_comp =   @ConfigureOkTrigger,
+                    @ConfigureCancelTrigger;
+
+        HINT_MAKE_REPLY_BAR;
+    }
+
+    @object GenTriggerClass ConfigureOkTrigger = {
+        ATTR_GEN_TRIGGER_INTERACTION_COMMAND = { IC_APPLY };
+
+        GI_attrs = @default | GA_SIGNAL_INTERACTION_COMPLETE;
+        // GTI_actionMsg = MSG_PREF_SETTINGS_NOTIFY;
+        GTI_destination = @ConfigureDialog;
+
+        HINT_SEEK_REPLY_BAR;
+        ATTR_GEN_TRIGGER_INTERACTION_COMMAND = {IC_APPLY};
+        HINT_DEFAULT_DEFAULT_ACTION;
+    }
+
+    @object GenTriggerClass ConfigureCancelTrigger = {
+        ATTR_GEN_TRIGGER_INTERACTION_COMMAND = { IC_DISMISS };
+        HINT_SEEK_REPLY_BAR;
+    }
+
+
+@end DialogUI;
+
+
 /**************************************************************
 API Struct
 MUST be global
@@ -102,11 +315,15 @@ make sure the dialog gets closed when we double-click an app
 **************************************************************/
 @method OpenWithFileSelectorClass, MSG_FILEBROW_SELECTOR_ACTION
 {
-    if (GFS_GET_ENTRY_FLAGS(entryFlags) == GFSEF_OPEN) // was it a double click?
+    //if (GFS_GET_ENTRY_FLAGS(entryFlags) == GFSEF_OPEN) // was it a double click?
     {
         if (GFS_GET_ENTRY_TYPE(entryFlags) == GFSET_FILE) // on a file?
         {
-            @send oself::MSG_GEN_GUP_INTERACTION_COMMAND(IC_OK); // close the dialog
+            UserStandardDialog(NullOptr, NullOptr, NullOptr, NullOptr, _TEXT("a file"),
+            (CDT_NOTIFICATION << CDBF_DIALOG_TYPE_OFFSET) |
+            (GIT_NOTIFICATION << CDBF_INTERACTION_TYPE_OFFSET));
+
+            //@send oself::MSG_GEN_GUP_INTERACTION_COMMAND(IC_OK); // close the dialog
         }
     }
 }
