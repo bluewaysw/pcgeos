@@ -22,32 +22,15 @@ Resourcen
 
 @start DialogUI, notDetachable;
 
-    @object GenInteractionClass SelectDialog = {
+    @object OpenWithDialogClass SelectDialog = {
         GI_visMoniker = "Open With";
-        GI_comp =   @OpenWithFileSelector,
-                    @SelectReplyBar;
+        GI_comp =    @SelectReplyBar;
         GI_states = (@default & (~GS_USABLE));
         GII_visibility = GIV_DIALOG;
         GII_attrs = @default | GIA_INITIATED_VIA_USER_DO_DIALOG | GIA_MODAL;
 
         HINT_PLACE_MONIKER_ABOVE;
         HINT_ORIENT_CHILDREN_VERTICALLY;
-    }
-
-    @object OpenWithFileSelectorClass OpenWithFileSelector = {
-        GFSI_destination = OpenWithFileSelector;
-        GFSI_notificationMsg = MSG_FILEBROW_SELECTOR_ACTION;
-        GFSI_attrs =           ((FSA_ALLOW_CHANGE_DIRS) & (~FSA_SHOW_FILES_DISABLED) & (~FSA_HAS_OPEN_DIR_BUTTON) & (~FSA_HAS_CHANGE_DIRECTORY_LIST))
-                                | ((FSA_HAS_FILE_LIST) & (~FSA_SHOW_FIXED_DISKS_ONLY) & (~FSA_HAS_CLOSE_DIR_BUTTON) & (~FSA_HAS_DOCUMENT_BUTTON)& (~FSA_HAS_CHANGE_DRIVE_LIST))
-                                | ((FSA_USE_VIRTUAL_ROOT));
-
-        GFSI_fileCriteria =      ((FSFC_DIRS) & (~FSFC_NON_GEOS_FILES))
-                                | ((FSFC_GEOS_EXECUTABLES) & (~FSFC_GEOS_NON_EXECUTABLES));
-
-        ATTR_GEN_FILE_SELECTOR_VIRTUAL_ROOT = {SP_APPLICATION, ""};
-        ATTR_GEN_PATH_DATA = {SP_APPLICATION, ""};
-        HINT_FILE_SELECTOR_FILE_LIST_WIDTH = 40;
-        HINT_FILE_SELECTOR_NUMBER_OF_FILES_TO_SHOW = 18;
     }
 
     @object GenInteractionClass SelectReplyBar ={
@@ -100,16 +83,8 @@ Resourcen
     }
 
     @object GenGlyphClass TitleGlyph = {
-        //GI_visMoniker = list {@PrefTextMoniker, @Moniker0, @Moniker1, @Moniker2, @Moniker3};
         GI_visMoniker = "Configure";
     }
-
-    //@object GenTextClass TitleHelpText = {
-    //    GI_attrs = @default | GA_READ_ONLY;
-    //    GTXI_text = "Choose frequently used applications that appear in the 'Open With' dialogue.";
-    //
-    //    HINT_EXPAND_WIDTH_TO_FIT_PARENT;
-    //}
 
     @object GenInteractionClass OpenWithGroup = {
         GI_visMoniker = "Open With";
@@ -124,9 +99,9 @@ Resourcen
         HINT_CENTER_CHILDREN_VERTICALLY;
     }
 
-    @object OpenWithFileSelectorClass AddAppSelector = {
-        GFSI_destination = @AddAppSelector; //@OpenWithAppList;
-        GFSI_notificationMsg = MSG_FILEBROW_SELECTOR_ACTION;
+    @object GenFileSelectorClass AddAppSelector = {
+        // GFSI_destination = @AddAppSelector; //@OpenWithAppList;
+        // GFSI_notificationMsg = MSG_FILEBROW_SELECTOR_ACTION;
 
         GFSI_attrs =           ((FSA_ALLOW_CHANGE_DIRS) & (~FSA_SHOW_FILES_DISABLED) & (~FSA_HAS_OPEN_DIR_BUTTON) & (~FSA_HAS_CHANGE_DIRECTORY_LIST))
                                 | ((FSA_HAS_FILE_LIST) & (~FSA_SHOW_FIXED_DISKS_ONLY) & (~FSA_HAS_CLOSE_DIR_BUTTON) & (~FSA_HAS_DOCUMENT_BUTTON)& (~FSA_HAS_CHANGE_DRIVE_LIST))
@@ -145,7 +120,7 @@ Resourcen
         GI_visMoniker = "=>";
         //GI_states = @default & ~GS_USABLE;
         GTI_destination = @OpenWithAppList;
-        // GTI_actionMsg = MSG_ADD_APP;
+        GTI_actionMsg = MSG_ADD_APP;
     }
 
     @object GenInteractionClass OpenWithAppListGroup = {
@@ -158,17 +133,13 @@ Resourcen
     }
 
     @object AppDynamicListClass OpenWithAppList = {
-        //GIGI_destination = (TO_SELF);
+        GIGI_destination = (TO_SELF);
         GIGI_behaviorType = GIGBT_EXCLUSIVE;
         //GIGI_behaviorType = GIGBT_NON_EXCLUSIVE;
-
+        GDLI_queryMsg = MSG_QUERY_APP_MONIKER;
         // GDLI_numItems
-        // GDLI_queryMsg
+
         // GIGI_destination
-
-
-
-
         HINT_ITEM_GROUP_SCROLLABLE;
         HINT_EXPAND_HEIGHT_TO_FIT_PARENT;
         HINT_FIXED_SIZE = {SST_AVG_CHAR_WIDTHS | 33};
@@ -221,14 +192,16 @@ Resourcen
 
 
 /**************************************************************
-API Struct
-MUST be global
+dgroup
 **************************************************************/
+//API Struct - MUST be global
 FMToolStruct FMToolInfo[1] = {
     {
         @Moniker1, (FMTF_SELECTED_ONLY | FMTT_DIALOG), 1
     }
 };
+
+optr    appList = NullOptr;
 
 /**************************************************************
 FileManager API Function - fetch Tools
@@ -317,23 +290,6 @@ void _pascal _export OpenWithEntryPoint(
     UserDestroyDialog(dialog);
 }
 
-/**************************************************************
-make sure the dialog gets closed when we double-click an app
-**************************************************************/
-@method OpenWithFileSelectorClass, MSG_FILEBROW_SELECTOR_ACTION
-{
-    //if (GFS_GET_ENTRY_FLAGS(entryFlags) == GFSEF_OPEN) // was it a double click?
-    {
-        if (GFS_GET_ENTRY_TYPE(entryFlags) == GFSET_FILE) // on a file?
-        {
-            UserStandardDialog(NullOptr, NullOptr, NullOptr, NullOptr, _TEXT("a file"),
-            (CDT_NOTIFICATION << CDBF_DIALOG_TYPE_OFFSET) |
-            (GIT_NOTIFICATION << CDBF_INTERACTION_TYPE_OFFSET));
-
-            //@send oself::MSG_GEN_GUP_INTERACTION_COMMAND(IC_OK); // close the dialog
-        }
-    }
-}
 
 /**************************************************************
 check if unsupported file
@@ -517,169 +473,9 @@ void LaunchApp(
     }
 }
 
-
 /********************************************************************
-Configure Dialog Stuff
+
 ********************************************************************/
-
-/********************************************************************
-********************************************************************/
-Boolean _pascal ReadAppsCallback(const char *stringSection, word sectionNum, void* enumData)
-{
-    char* str;
-
-    str = (char*) ChunkArrayAppend(*((optr*) enumData), 0); // convert VOID-Pointer to OPTR-Pointer and deref afterwards...
-    strcpy(str, stringSection);
-
-    return FALSE; // no error
-}
-
-@method ConfigureDialogClass, MSG_GEN_INTERACTION_INITIATE
-{
-    @call OpenWithAppList::MSG_LOAD_APP_LIST();
-}
-
-@method	AppDynamicListClass, MSG_LOAD_APP_LIST
-{
-    MemHandle       mh = NullHandle;
-    ChunkHandle     ch = NullChunk;
-    word            num = 0;
-    optr            ourList = NullOptr;
-
-    mh = MemAllocLMem(LMEM_TYPE_GENERAL, 0);
-    MemLock(mh);
-
-    ch = ChunkArrayCreate(mh, sizeof(PathName) + sizeof(FileLongName), 0, 0);
-
-    pself->appList = ConstructOptr(mh, ch);
-    ourList = pself->appList;
-    strcpy(pself->iniCat, _TEXT("fileManager"));
-    strcpy(pself->iniKey, _TEXT("openWithFavoriteApps"));
-
-    InitFileEnumStringSection(
-        pself->iniCat,
-        pself->iniKey,
-        IFRF_READ_ALL,
-        ReadAppsCallback,
-        (void*) &ourList);
-
-    num = ChunkArrayGetCount(pself->appList);
-
-    MemUnlock(mh);
-
-    @call oself::MSG_GEN_DYNAMIC_LIST_INITIALIZE(num);
-    @call oself::MSG_GEN_ITEM_GROUP_SET_NONE_SELECTED(TRUE);
-
-    @callsuper();
-}
-
-
-/*
-    **Parameters:**
-    *buffer* - Buffer in which to return moniker text.
-    *bufSize* - Size of buffer.
-    *identifier* - Identifier of item whose moniker should be returned.
-
-    **Return:** Size of item's moniker.
-
-    // (optr list, word item);
-*/
-@method	AppDynamicListClass, MSG_QUERY_APP_MONIKER
-{
-    char*   str = (void*) 0;
-    word    elSize = 0;
-    word    len = 0;
-
-    MemLock(HandleOf(pself->appList));
-    str = (char*) ChunkArrayElementToPtr(pself->appList, identifier, &elSize);
-    len = strlen(str);
-    if (len < bufSize)
-    {
-        strcpy(buffer, str);
-        MemUnlock(HandleOf(pself->appList));
-        return len;
-    }
-    else
-    {
-        MemUnlock(HandleOf(pself->appList));
-        return 0;
-    }
-}
-
-@method OpenWithFileSelectorClass, MSG_FILEBROW_SELECTOR_ACTION
-{
-    // entryNum
-    // entryFlags
-
-    dword                       flagsAndDisk;
-    PathName                    pathf;
-    optr                        op = NullOptr;
-
-    if (GFS_GET_ENTRY_FLAGS(entryFlags) == GFSEF_OPEN) // was it a double click?
-    {
-        if (GFS_GET_ENTRY_TYPE(entryFlags) == GFSET_FILE) // on a file?
-        {
-            op = ConstructOptr(HandleOf(oself), ChunkOf(@AddAppSelector));
-            flagsAndDisk = @call op::MSG_GEN_FILE_SELECTOR_GET_FULL_SELECTION_PATH(&pathf);
-            //flagsAndDisk = @call op::MSG_GEN_FILE_SELECTOR_GET_SELECTION(&pathf);
-            strcpy(pself->selectedPathApp, &pathf);
-            @call oself::MSG_ADD_APP();
-        }
-    }
-}
-
-@method	AppDynamicListClass, MSG_ADD_APP
-{
-    word                        num = 0;
-    char*                       str = (char*) 0;
-
-    if (strlen(pself->selectedPathApp) > 0)
-    {
-        MemLock(HandleOf(pself->appList));
-
-        num = ChunkArrayGetCount(pself->appList);
-        if (checkIfInList(pself->appList, pself->selectedPathApp, num) == FALSE)
-        {
-            str = (char*) ChunkArrayAppend(pself->appList, 0);
-            strcpy(str, pself->selectedPathApp);
-
-            num = ChunkArrayGetCount(pself->appList);
-            @call oself::MSG_GEN_DYNAMIC_LIST_INITIALIZE(num);
-            @call oself::MSG_GEN_ITEM_GROUP_SET_NONE_SELECTED(TRUE);
-        }
-
-        writeIniFile(pself->iniCat, pself->iniKey, pself->appList, num);
-
-        MemUnlock(HandleOf(pself->appList));
-        strcpy(pself->selectedPathApp, "");
-    }
-}
-
-@method	AppDynamicListClass, MSG_REMOVE_APP
-{
-    word                        idx = 0;
-    word                        num = 0;
-
-	idx = @call oself::MSG_GEN_ITEM_GROUP_GET_SELECTION();
-
-    MemLock(HandleOf(pself->appList));
-
-	ChunkArrayDeleteRange(pself->appList, idx, 1);
-    num = ChunkArrayGetCount(pself->appList);
-    @call oself::MSG_GEN_DYNAMIC_LIST_INITIALIZE(num);
-    @call oself::MSG_GEN_ITEM_GROUP_SET_NONE_SELECTED(TRUE);
-    writeIniFile(pself->iniCat, pself->iniKey, pself->appList, num);
-
-    MemUnlock(HandleOf(pself->appList));
-
-/*
-    UserStandardDialog(0, 0, 0, 0,
-                &buf,
-                (CDT_NOTIFICATION << CDBF_DIALOG_TYPE_OFFSET) |
-                (GIT_NOTIFICATION << CDBF_INTERACTION_TYPE_OFFSET));
-*/
-}
-
 Boolean checkIfInList(optr list, char* appName, word listLen)
 {
     word    i = 0;
@@ -699,6 +495,55 @@ Boolean checkIfInList(optr list, char* appName, word listLen)
     return FALSE;
 }
 
+/********************************************************************
+
+********************************************************************/
+word _pascal readAppsFromIniFile()
+{
+    MemHandle       mh = NullHandle;
+    ChunkHandle     ch = NullChunk;
+    word            num = 0;
+    optr            ourList = NullOptr;
+
+    if (mh != NullHandle) MemFree(mh);
+    mh = MemAllocLMem(LMEM_TYPE_GENERAL, 0);
+    MemLock(mh);
+
+    ch = ChunkArrayCreate(mh, sizeof(PathName) + sizeof(FileLongName), 0, 0);
+
+    appList = ConstructOptr(mh, ch);
+    ourList = appList;
+
+    InitFileEnumStringSection(
+        _TEXT("fileManager"),
+        _TEXT("openWithFavoriteApps"),
+        IFRF_READ_ALL,
+        ReadAppsCallback,
+        (void*) &ourList);
+
+    num = ChunkArrayGetCount(appList);
+
+    MemUnlock(mh);
+
+    return num;
+}
+
+/********************************************************************
+
+********************************************************************/
+Boolean _pascal ReadAppsCallback(const char *stringSection, word sectionNum, void* enumData)
+{
+    char* str;
+
+    str = (char*) ChunkArrayAppend(*((optr*) enumData), 0); // convert VOID-Pointer to OPTR-Pointer and deref afterwards...
+    strcpy(str, stringSection);
+
+    return FALSE; // no error
+}
+
+/********************************************************************
+
+********************************************************************/
 void writeIniFile(char* iniCat, char* iniKey, optr list, word listLen)
 {
     word    i = 0;
@@ -716,4 +561,147 @@ void writeIniFile(char* iniCat, char* iniKey, optr list, word listLen)
 
     InitFileCommit();
 }
+
+
+/********************************************************************
+Classes & Methods
+********************************************************************/
+
+
+/********************************************************************
+
+********************************************************************/
+@method OpenWithDialogClass, MSG_GEN_INTERACTION_INITIATE
+{
+    // word    num = 0;
+
+    //num = readAppsFromIniFile();
+    @callsuper();
+}
+
+
+/********************************************************************
+
+********************************************************************/
+@method ConfigureDialogClass, MSG_GEN_INTERACTION_INITIATE
+{
+    word    num = 0;
+
+    @callsuper();
+
+    num = readAppsFromIniFile();
+    @call @dup(@OpenWithAppList)::MSG_GEN_DYNAMIC_LIST_INITIALIZE(num);
+    @call @dup(@OpenWithAppList)::MSG_GEN_ITEM_GROUP_SET_NONE_SELECTED(TRUE);
+}
+
+
+/********************************************************************
+// (optr list, word item);
+********************************************************************/
+@method	AppDynamicListClass, MSG_QUERY_APP_MONIKER
+{
+    char*   str = (void*) 0;
+    word    elSize = 0;
+
+    MemLock(HandleOf(appList));
+    str = (char*) ChunkArrayElementToPtr(appList, item, &elSize);
+    @call list::MSG_GEN_DYNAMIC_LIST_REPLACE_ITEM_TEXT(item, str);
+    MemUnlock(HandleOf(appList));
+}
+
+/********************************************************************
+// (optr list, word item);
+********************************************************************/
+// @method OpenWithFileSelectorClass, MSG_FILEBROW_SELECTOR_ACTION
+// {
+//     dword                       flagsAndDisk;
+//     PathName                    pathf;
+//     optr                        op = NullOptr;
+//
+//     if (GFS_GET_ENTRY_FLAGS(entryFlags) == GFSEF_OPEN) // was it a double click?
+//     {
+//         if (GFS_GET_ENTRY_TYPE(entryFlags) == GFSET_FILE) // on a file?
+//         {
+//             op = ConstructOptr(HandleOf(oself), ChunkOf(@AddAppSelector));
+//             flagsAndDisk = @call op::MSG_GEN_FILE_SELECTOR_GET_FULL_SELECTION_PATH(&pathf);
+//             //flagsAndDisk = @call op::MSG_GEN_FILE_SELECTOR_GET_SELECTION(&pathf);
+//             strcpy(pself->selectedPathApp, &pathf);
+//             @call oself::MSG_ADD_APP();
+//
+//             // UserStandardDialog(NullOptr, NullOptr, NullOptr, NullOptr, _TEXT("a file"),
+//             // (CDT_NOTIFICATION << CDBF_DIALOG_TYPE_OFFSET) |
+//             // (GIT_NOTIFICATION << CDBF_INTERACTION_TYPE_OFFSET));
+//
+//         }
+//     }
+// }
+
+/********************************************************************
+
+********************************************************************/
+@method	AppDynamicListClass, MSG_ADD_APP
+{
+    word                        num = 0;
+    char*                       str = (char*) 0;
+    dword                       flagsAndDisk;
+    char    	                pathnameAndFile[PATH_BUFFER_SIZE + FILE_LONGNAME_BUFFER_SIZE];   	/* Buffer for fetching the complete path of the application */
+
+
+    //flagsAndDisk = @call @dup(@AddAppSelector)::MSG_GEN_FILE_SELECTOR_GET_FULL_SELECTION_PATH(&pathnameAndFile);
+    flagsAndDisk = @call AddAppSelector::MSG_GEN_FILE_SELECTOR_GET_FULL_SELECTION_PATH(&pathnameAndFile);
+
+    if (GFS_GET_ENTRY_TYPE(flagsAndDisk) == GFSET_FILE)
+    {
+        if (strlen(pathnameAndFile) > 0)
+        {
+            MemLock(HandleOf(appList));
+
+            num = ChunkArrayGetCount(appList);
+            if (checkIfInList(appList, pathnameAndFile, num) == FALSE)
+            {
+                str = (char*) ChunkArrayAppend(appList, 0);
+                strcpy(str, pathnameAndFile);
+
+                num = ChunkArrayGetCount(appList);
+                @call oself::MSG_GEN_DYNAMIC_LIST_INITIALIZE(num);
+                @call oself::MSG_GEN_ITEM_GROUP_SET_NONE_SELECTED(TRUE);
+            }
+
+            writeIniFile(pself->iniCat, pself->iniKey, appList, num);
+
+            MemUnlock(HandleOf(appList));
+            strcpy(pathnameAndFile, "");
+        }
+    }
+}
+
+/********************************************************************
+
+********************************************************************/
+@method	AppDynamicListClass, MSG_REMOVE_APP
+{
+    word                        idx = 0;
+    word                        num = 0;
+
+	idx = @call oself::MSG_GEN_ITEM_GROUP_GET_SELECTION();
+
+    MemLock(HandleOf(appList));
+
+	ChunkArrayDeleteRange(appList, idx, 1);
+    num = ChunkArrayGetCount(appList);
+    @call oself::MSG_GEN_DYNAMIC_LIST_INITIALIZE(num);
+    @call oself::MSG_GEN_ITEM_GROUP_SET_NONE_SELECTED(TRUE);
+    writeIniFile(pself->iniCat, pself->iniKey, appList, num);
+
+    MemUnlock(HandleOf(appList));
+}
+
+/*
+    UserStandardDialog(0, 0, 0, 0,
+                &buf,
+                (CDT_NOTIFICATION << CDBF_DIALOG_TYPE_OFFSET) |
+                (GIT_NOTIFICATION << CDBF_INTERACTION_TYPE_OFFSET));
+*/
+
+
 

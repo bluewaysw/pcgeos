@@ -23,4 +23,15 @@ export GETTHOSETOOLS
 export OPENWITHENTRYPOINT
 
 # Not API
-export OpenWithFileSelectorClass
+export CHECKIFUNSUPPORTEDFILES
+export ISAPPONBLACKLIST
+export LOADFILES
+export LAUNCHAPP
+export READAPPSFROMINIFILE
+export READAPPSCALLBACK
+#export WRITEINIFILE2
+
+#classes
+export OpenWithDialogClass
+export AppDynamicListClass
+export ConfigureDialogClass
