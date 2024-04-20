@@ -22,16 +22,9 @@ library ansic
 export GETTHOSETOOLS
 export OPENWITHENTRYPOINT
 
-# Not API
-export CHECKIFUNSUPPORTEDFILES
-export ISAPPONBLACKLIST
-export LOADFILES
-export LAUNCHAPP
-export READAPPSFROMINIFILE
-export READAPPSCALLBACK
-#export WRITEINIFILE2
-
 #classes
 export OpenWithDialogClass
+export OpenWithContentClass
 export AppDynamicListClass
 export ConfigureDialogClass
+export GeodeTokenTriggerClass

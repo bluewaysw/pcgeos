@@ -51,36 +51,12 @@ Resourcen
         HINT_EXPAND_WIDTH_TO_FIT_PARENT;
     }
 
-    @object GenContentClass SelectContent = {
-        GI_comp = @Button1,
-                  @Button2,
-                  @Button3,
-                  @Button4;
+    @object OpenWithContentClass SelectContent = {
         GCI_attrs = @default | VCNA_SAME_WIDTH_AS_VIEW;
         GCI_genView = @SelectView;
 
         HINT_TOOLBOX;
         HINT_ORIENT_CHILDREN_VERTICALLY;
-        HINT_EXPAND_WIDTH_TO_FIT_PARENT;
-    }
-
-    @object GenTriggerClass Button1 = {
-        GI_visMoniker = "Button";
-        HINT_EXPAND_WIDTH_TO_FIT_PARENT;
-    }
-
-    @object GenTriggerClass Button2 = {
-        GI_visMoniker = "Button";
-        HINT_EXPAND_WIDTH_TO_FIT_PARENT;
-    }
-
-    @object GenTriggerClass Button3 = {
-        GI_visMoniker = "Button";
-        HINT_EXPAND_WIDTH_TO_FIT_PARENT;
-    }
-
-    @object GenTriggerClass Button4 = {
-        GI_visMoniker = "Button";
         HINT_EXPAND_WIDTH_TO_FIT_PARENT;
     }
 
@@ -225,7 +201,7 @@ Resourcen
         ATTR_GEN_TRIGGER_INTERACTION_COMMAND = { IC_APPLY };
 
         GI_attrs = @default | GA_SIGNAL_INTERACTION_COMPLETE;
-        // GTI_actionMsg = MSG_PREF_SETTINGS_NOTIFY;
+        GTI_actionMsg = MSG_CLOSE_CONFIGURE_DIALOG;
         GTI_destination = @ConfigureDialog;
 
         HINT_SEEK_REPLY_BAR;
@@ -253,6 +229,10 @@ FMToolStruct FMToolInfo[1] = {
 };
 
 optr    appList = NullOptr;
+#define TOOL_ICON_WIDTH         15
+#define TOOL_ICON_HEIGHT        15
+#define TOOL_ICON_FLAGS         ((VMSF_GSTRING) | (VMS_TOOL << VMSF_STYLE_OFFSET))
+
 
 /**************************************************************
 FileManager API Function - fetch Tools
@@ -549,7 +529,7 @@ Boolean checkIfInList(optr list, char* appName, word listLen)
 /********************************************************************
 
 ********************************************************************/
-word _pascal readAppsFromIniFile()
+word readAppsFromIniFile()
 {
     MemHandle       mh = NullHandle;
     ChunkHandle     ch = NullChunk;
@@ -567,7 +547,7 @@ word _pascal readAppsFromIniFile()
 
     InitFileEnumStringSection(
         _TEXT("fileManager"),
-        _TEXT("openWithFavoriteApps"),
+        _TEXT("openWith"),
         IFRF_READ_ALL,
         ReadAppsCallback,
         (void*) &ourList);
@@ -582,7 +562,7 @@ word _pascal readAppsFromIniFile()
 /********************************************************************
 
 ********************************************************************/
-Boolean _pascal ReadAppsCallback(const char *stringSection, word sectionNum, void* enumData)
+Boolean ReadAppsCallback(const char *stringSection, word sectionNum, void* enumData)
 {
     char* str;
 
@@ -595,19 +575,23 @@ Boolean _pascal ReadAppsCallback(const char *stringSection, word sectionNum, voi
 /********************************************************************
 
 ********************************************************************/
-void writeIniFile(char* iniCat, char* iniKey, optr list, word listLen)
+void writeIniFile(optr list, word listLen)
 {
     word    i = 0;
     char*   str = (char*) 0;
     word    elSize = 0;
 
-    InitFileDeleteEntry(iniCat, iniKey);
+    InitFileDeleteEntry(_TEXT("fileManager"), _TEXT("openWith"));
 
     // list must be locked!
     for (i = 0; i < listLen; i++)
     {
         str = (char*) ChunkArrayElementToPtr(list, i, &elSize);
-	    InitFileWriteStringSection(iniCat, iniKey, str);
+	    InitFileWriteStringSection(
+            _TEXT("fileManager"),
+            _TEXT("openWith"),
+            str
+        );
     }
 
     InitFileCommit();
@@ -624,12 +608,209 @@ Classes & Methods
 ********************************************************************/
 @method OpenWithDialogClass, MSG_GEN_INTERACTION_INITIATE
 {
-    // word    num = 0;
-
-    //num = readAppsFromIniFile();
+    (void) readAppsFromIniFile();
     @callsuper();
 }
 
+@method GeodeTokenTriggerClass, MSG_APP_TRIGGER_PRESSED
+{
+    GeodeToken  gt;
+    char        fname[PATH_BUFFER_SIZE * FILE_LONGNAME_BUFFER_SIZE];
+
+    // @call trigger::MSG_META_GET_VAR_DATA(ATTR_GEODE_TOKEN_TO_PASS, sizeof(GeodeToken), &gt);
+    // @call trigger::MSG_META_GET_VAR_DATA(ATTR_GEODE_FILE_NAME, sizeof(FileLongName), &fname);
+
+    UserStandardDialog(
+        0, 0, 0, 0,
+        _TEXT("WHUT?"),
+        ((CDT_ERROR << CDBF_DIALOG_TYPE_OFFSET) |
+        (GIT_NOTIFICATION << CDBF_INTERACTION_TYPE_OFFSET))
+    );
+}
+
+
+/********************************************************************
+
+********************************************************************/
+@method OpenWithContentClass, MSG_SPEC_BUILD
+{
+    @callsuper();
+
+    @call oself::MSG_BUILD_TRIGGERS();
+}
+
+/********************************************************************
+
+********************************************************************/
+@method OpenWithContentClass, MSG_BUILD_TRIGGERS
+{
+
+    DisplayScheme	    ds;
+    optr                triggerObj = NullOptr;
+    Boolean             monikerFound = FALSE;
+    MemHandle           newMoniker = NULL;
+    word                monikerSize = 0;
+    ChunkHandle         combinedMoniker = NullChunk;
+    GeodeToken          tok;
+    char*               filePtr = (void*) 0;
+    byte                triggerNo = 0;
+    MemHandle           triggerBlock = NullHandle;
+    VisMonikerWithGString*         vmp = (void*) 0;
+    word                width = 0;
+    word                height = 0;
+    ChunkHandle         helpChunk = NullHandle;
+    optr                helpOptr = NullOptr;
+    word                num = 0;
+    word                elSize = 0;
+
+    ChunkHandle         textMoniker;
+    ChunkHandle         iconMoniker;
+    word                chunkSize;
+
+
+    @call oself::MSG_REMOVE_ALL_APP_TRIGGERS();
+
+    MemLock(HandleOf(appList));
+    num = ChunkArrayGetCount(appList);
+
+    if (num > 0)
+    {
+        for (triggerNo=0; triggerNo < num; triggerNo++)
+        {
+            width = 0;
+            height = 0;
+
+            FilePushDir();
+            FileSetStandardPath(SP_APPLICATION);
+            filePtr = (char*) ChunkArrayElementToPtr(appList, triggerNo, &elSize);
+            FileGetPathExtAttributes(filePtr, FEA_TOKEN, (&tok), sizeof(GeodeToken));
+            FilePopDir();
+
+            triggerBlock = OptrToHandle(oself);
+            triggerObj = ObjInstantiate(triggerBlock, &GeodeTokenTriggerClass);
+
+            if (triggerObj != NullOptr)
+            {
+                @call oself::MSG_GEN_ADD_CHILD(triggerObj, CCO_LAST);
+
+
+                //  // trying to create a combined moniker
+                // ObjLockObjBlock(HandleOf(triggerObj));
+                // monikerFound = TokenLoadMonikerChunk(
+                //     TOKEN_CHARS(tok.GT_chars[0],tok.GT_chars[1],tok.GT_chars[2],tok.GT_chars[3]),
+                //     tok.GT_manufID,
+                //     0,
+                //     (VMSF_COPY_CHUNK | (VMS_TEXT << VMSF_STYLE_OFFSET)),
+                //     HandleOf(triggerObj),
+                //     &chunkSize,
+                //     &textMoniker
+                // );
+                // @call GeodeGetAppObject(0)::MSG_GEN_APPLICATION_GET_DISPLAY_SCHEME(&ds);
+                // monikerFound = TokenLoadMonikerChunk(
+                //     TOKEN_CHARS(tok.GT_chars[0],tok.GT_chars[1],tok.GT_chars[2],tok.GT_chars[3]),
+                //     tok.GT_manufID,
+                //     ds.DS_displayType,
+                //     TOOL_ICON_FLAGS,
+                //     HandleOf(triggerObj),
+                //     &chunkSize,
+                //     &iconMoniker
+                // );
+                // if (monikerFound)
+                // {
+                //     vmp = (VisMonikerWithGString*) MemLock(newMoniker);
+                //     if (vmp->VMWGS_common.VM_type & VMT_GSTRING)
+                //     {
+                //         width = vmp->VMWGS_common.VM_width;
+                //         height = vmp->VMWGS_height;
+                //     }
+                //     MemUnlock(newMoniker);
+                // }
+                // if ((monikerFound) && (height <= TOOL_ICON_HEIGHT) && (width <= TOOL_ICON_WIDTH))
+                // {
+                //     typedef WordFlags CreateIconTextMonikerFlags;
+                //     #define CITMF_POSITION_ICON_ABOVE_TEXT	0x8000
+                //     #define CITMF_TEXT_IS_FPTR		0x4000
+                //     #define CITMF_CREATE_CHUNK		0x2000
+                //     #define CITMF_SWAP_ICON_TEXT            0x1000
+                //     #define CITMF_POSITION_ICON_BELOW_TEXT 0x9000
+                //     #define CITMF_POSITION_ICON_RIGHT_OF_TEXT 0x1000
+                //     extern optr _pascal UserCreateIconTextMoniker(optr textMoniker,
+                //                         optr iconMoniker,
+                //                         Handle destinationBlock,
+                //                         word spacing,
+                //                         CreateIconTextMonikerFlags flags);
+                //     combinedMoniker = UserCreateIconTextMoniker(
+                //         @errorNoDOSFile,
+                //         (ConstructOptr(newMoniker, 0)),
+                //         newMoniker,
+                //         (word) 7,
+                //         0
+                //     );
+                //     combinedMoniker = UserCreateIconTextMoniker(
+                //         (ConstructOptr(HandleOf(triggerObj), textMoniker)),
+                //         (ConstructOptr(HandleOf(triggerObj), iconMoniker)),
+                //         NullHandle,
+                //         0,
+                //         CITMF_CREATE_CHUNK
+                //     );
+                //     MemUnlock(HandleOf(triggerObj));
+                //     @call triggerObj::MSG_GEN_REPLACE_VIS_MONIKER(
+                //         VUM_NOW,
+                //         0, 0, monikerSize,
+                //         VMDT_VIS_MONIKER,
+                //         VMST_HPTR,
+                //         ConstructOptr(triggerBlock, combinedMoniker)
+                //     );
+                // }
+                //  else
+                {
+                    @call triggerObj::MSG_GEN_REPLACE_VIS_MONIKER_TEXT(filePtr, VUM_NOW);
+                }
+
+                if (monikerFound) MemFree(newMoniker);
+
+                // set up some common stuff
+                @call triggerObj::MSG_GEN_TRIGGER_SET_ACTION_MSG(MSG_APP_TRIGGER_PRESSED);
+               //@call triggerObj::MSG_GEN_TRIGGER_SET_DESTINATION(triggerObj);
+
+                @call triggerObj::MSG_META_ADD_VAR_DATA((ATTR_GEODE_TOKEN_TO_PASS & (~VDF_SAVE_TO_STATE)), sizeof(GeodeToken), &tok);
+                @call triggerObj::MSG_META_ADD_VAR_DATA((ATTR_GEODE_FILE_NAME & (~VDF_SAVE_TO_STATE)), sizeof(FileLongName), filePtr);
+
+                @call triggerObj::MSG_META_ADD_VAR_DATA((HINT_EXPAND_WIDTH_TO_FIT_PARENT & (~VDF_SAVE_TO_STATE)), 0, 0);
+
+                // add bubble help
+                // MemLock(OptrToHandle(@TrayAppsFolderName)); // get handle of STRINGS resource
+                // helpChunk = LMemAlloc(OptrToHandle(@TrayAppsFolderName), FILE_LONGNAME_BUFFER_SIZE); // allocate new chunk in resource
+                // strcpy(LMemDerefHandles(OptrToHandle(@TrayAppsFolderName), helpChunk), filePtr);
+                // MemUnlock(OptrToHandle(@TrayAppsFolderName));
+                // helpOptr = ConstructOptr(OptrToHandle(@TrayAppsFolderName), helpChunk);
+                // @call triggerObj::MSG_META_ADD_VAR_DATA((ATTR_GEN_FOCUS_HELP & (~VDF_SAVE_TO_STATE)), sizeof(optr), &helpOptr);
+
+                //finally, set usable
+                @call triggerObj::MSG_GEN_SET_USABLE(VUM_NOW);
+            }
+        }
+    }
+
+    MemUnlock(HandleOf(appList));
+}
+
+/*-------------------------------------------------------------------
+remove all our triggers from SysTray
+-------------------------------------------------------------------*/
+@method OpenWithContentClass, MSG_REMOVE_ALL_APP_TRIGGERS
+{
+    optr    trigger = NullOptr;
+
+    while(TRUE)
+    {
+        trigger = @call oself::MSG_GEN_FIND_CHILD_AT_POSITION(0);
+        if (trigger == NullOptr) break;
+        @call trigger::MSG_GEN_SET_NOT_USABLE(VUM_NOW);
+        @call oself::MSG_GEN_REMOVE_CHILD(trigger, CCF_MARK_DIRTY);
+        @call trigger::MSG_META_OBJ_FREE();
+    }
+}
 
 /********************************************************************
 
@@ -640,10 +821,28 @@ Classes & Methods
 
     @callsuper();
 
-    num = readAppsFromIniFile();
+    MemLock(HandleOf(appList));
+    num = ChunkArrayGetCount(appList);
+    MemUnlock(HandleOf(appList));
     @call @dup(@OpenWithAppList)::MSG_GEN_DYNAMIC_LIST_INITIALIZE(num);
     @call @dup(@OpenWithAppList)::MSG_GEN_ITEM_GROUP_SET_NONE_SELECTED(TRUE);
 }
+
+
+@method ConfigureDialogClass, MSG_CLOSE_CONFIGURE_DIALOG
+{
+    word    num = 0;
+
+    MemLock(HandleOf(appList));
+    num = ChunkArrayGetCount(appList);
+    writeIniFile(appList, num);
+    MemUnlock(HandleOf(appList));
+
+    @call @dup(@SelectContent)::MSG_BUILD_TRIGGERS();
+
+    @callsuper();
+}
+
 
 
 /********************************************************************
@@ -660,32 +859,6 @@ Classes & Methods
     MemUnlock(HandleOf(appList));
 }
 
-/********************************************************************
-// (optr list, word item);
-********************************************************************/
-// @method OpenWithFileSelectorClass, MSG_FILEBROW_SELECTOR_ACTION
-// {
-//     dword                       flagsAndDisk;
-//     PathName                    pathf;
-//     optr                        op = NullOptr;
-//
-//     if (GFS_GET_ENTRY_FLAGS(entryFlags) == GFSEF_OPEN) // was it a double click?
-//     {
-//         if (GFS_GET_ENTRY_TYPE(entryFlags) == GFSET_FILE) // on a file?
-//         {
-//             op = ConstructOptr(HandleOf(oself), ChunkOf(@AddAppSelector));
-//             flagsAndDisk = @call op::MSG_GEN_FILE_SELECTOR_GET_FULL_SELECTION_PATH(&pathf);
-//             //flagsAndDisk = @call op::MSG_GEN_FILE_SELECTOR_GET_SELECTION(&pathf);
-//             strcpy(pself->selectedPathApp, &pathf);
-//             @call oself::MSG_ADD_APP();
-//
-//             // UserStandardDialog(NullOptr, NullOptr, NullOptr, NullOptr, _TEXT("a file"),
-//             // (CDT_NOTIFICATION << CDBF_DIALOG_TYPE_OFFSET) |
-//             // (GIT_NOTIFICATION << CDBF_INTERACTION_TYPE_OFFSET));
-//
-//         }
-//     }
-// }
 
 /********************************************************************
 
@@ -695,7 +868,7 @@ Classes & Methods
     word                        num = 0;
     char*                       str = (char*) 0;
     dword                       flagsAndDisk;
-    char    	                pathnameAndFile[PATH_BUFFER_SIZE + FILE_LONGNAME_BUFFER_SIZE];   	/* Buffer for fetching the complete path of the application */
+    char    	                pathnameAndFile[PATH_BUFFER_SIZE + FILE_LONGNAME_BUFFER_SIZE] = {0};   	/* Buffer for fetching the complete path of the application */
 
     flagsAndDisk = @call @dup(@AddAppSelector)::MSG_GEN_FILE_SELECTOR_GET_FULL_SELECTION_PATH(&pathnameAndFile);
 
@@ -716,10 +889,7 @@ Classes & Methods
                 @call oself::MSG_GEN_ITEM_GROUP_SET_NONE_SELECTED(TRUE);
             }
 
-            // writeIniFile(pself->iniCat, pself->iniKey, appList, num);
-
             MemUnlock(HandleOf(appList));
-            strcpy(pathnameAndFile, "");
         }
     }
 }
@@ -740,17 +910,6 @@ Classes & Methods
     num = ChunkArrayGetCount(appList);
     @call oself::MSG_GEN_DYNAMIC_LIST_INITIALIZE(num);
     @call oself::MSG_GEN_ITEM_GROUP_SET_NONE_SELECTED(TRUE);
-    // writeIniFile(pself->iniCat, pself->iniKey, appList, num);
 
     MemUnlock(HandleOf(appList));
 }
-
-/*
-    UserStandardDialog(0, 0, 0, 0,
-                &buf,
-                (CDT_NOTIFICATION << CDBF_DIALOG_TYPE_OFFSET) |
-                (GIT_NOTIFICATION << CDBF_INTERACTION_TYPE_OFFSET));
-*/
-
-
-
