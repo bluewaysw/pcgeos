@@ -11,7 +11,7 @@ type    library, single, c-api
 
 # Resources
 resource FMUI lmem read-only shared
-resource DialogUI ui-object shared
+resource DialogUI object shared read-only
 
 #Libs
 library geos
@@ -27,4 +27,4 @@ export OpenWithDialogClass
 export OpenWithContentClass
 export AppDynamicListClass
 export ConfigureDialogClass
-#export GeodeTokenTriggerClass
+export GeodeTokenTriggerClass
