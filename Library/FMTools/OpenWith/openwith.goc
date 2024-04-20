@@ -570,18 +570,22 @@ Boolean ReadAppsCallback(const char *stringSection, word sectionNum, void* enumD
 /********************************************************************
 
 ********************************************************************/
-void writeIniFile(optr list, word listLen)
+void writeIniFile()
 {
     word    i = 0;
     char*   str = (char*) 0;
     word    elSize = 0;
+    word    listLen = 0;
 
     InitFileDeleteEntry(_TEXT("fileManager"), _TEXT("openWith"));
+
+    MemLock(HandleOf(appList));
+    listLen = ChunkArrayGetCount(appList);
 
     // list must be locked!
     for (i = 0; i < listLen; i++)
     {
-        str = (char*) ChunkArrayElementToPtr(list, i, &elSize);
+        str = (char*) ChunkArrayElementToPtr(appList, i, &elSize);
 	    InitFileWriteStringSection(
             _TEXT("fileManager"),
             _TEXT("openWith"),
@@ -590,6 +594,7 @@ void writeIniFile(optr list, word listLen)
     }
 
     InitFileCommit();
+    MemUnlock(HandleOf(appList));
 }
 
 
@@ -831,11 +836,7 @@ remove all our triggers from SysTray
 {
     word    num = 0;
 
-    MemLock(HandleOf(appList));
-    num = ChunkArrayGetCount(appList);
-    writeIniFile(appList, num);
-    MemUnlock(HandleOf(appList));
-
+    writeIniFile();
     @call @dup(@SelectContent)::MSG_BUILD_TRIGGERS();
 
     @callsuper();
