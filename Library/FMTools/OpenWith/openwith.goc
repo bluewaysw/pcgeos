@@ -156,6 +156,7 @@ Resourcen
         GTI_destination = @OpenWithAppList;
         GTI_actionMsg = MSG_REMOVE_APP;
 
+        HINT_CENTER_MONIKER;
         HINT_EXPAND_WIDTH_TO_FIT_PARENT;
     }
 
@@ -199,6 +200,9 @@ optr    appList = NullOptr;
 #define TOOL_ICON_WIDTH         15
 #define TOOL_ICON_HEIGHT        15
 #define TOOL_ICON_FLAGS         ((VMSF_GSTRING) | (VMS_TOOL << VMSF_STYLE_OFFSET))
+
+
+optr    G_dialog = NullOptr;
 
 
 /**************************************************************
@@ -249,6 +253,7 @@ void _pascal _export OpenWithEntryPoint(
 
     // we assume just DOS files in the list as of now and bring up the dialogue
     dialog = @call ConstructOptr(filemgr, 0)::MSG_FM_DUP_AND_ADD(@SelectDialog, FMP_APPLICATION);
+    G_dialog = dialog;
     @call dialog::MSG_GEN_SET_USABLE(VUM_NOW);
     reply = UserDoDialog(dialog);
 
@@ -553,7 +558,7 @@ void writeIniFile()
     for (i = 0; i < listLen; i++)
     {
         str = (char*) ChunkArrayElementToPtr(appList, i, &elSize);
-	    InitFileWriteStringSection(
+            InitFileWriteStringSection(
             _TEXT("fileManager"),
             _TEXT("openWith"),
             str
@@ -582,13 +587,21 @@ Classes & Methods
 /********************************************************************
 
 ********************************************************************/
-@method GeodeTokenTriggerClass, MSG_APP_TRIGGER_PRESSED
+@method OpenWithDialogClass, MSG_APP_TRIGGER_PRESSED
 {
     GeodeToken  gt;
     char        fname[PATH_BUFFER_SIZE * FILE_LONGNAME_BUFFER_SIZE];
 
-    @call @dup(trigger)::MSG_META_GET_VAR_DATA(ATTR_GEODE_TOKEN_TO_PASS, sizeof(GeodeToken), &gt);
-    @call @dup(trigger)::MSG_META_GET_VAR_DATA(ATTR_GEODE_FILE_NAME, sizeof(FileLongName), &fname);
+    //@call trigger::MSG_META_GET_VAR_DATA(ATTR_GEODE_TOKEN_TO_PASS, sizeof(GeodeToken), &gt);
+    //@call trigger::MSG_META_GET_VAR_DATA(ATTR_GEODE_FILE_NAME, sizeof(FileLongName), &fname);
+
+
+    // InitFileWriteStringSection(
+    //     _TEXT("fileManager"),
+    //     _TEXT("dummy"),
+    //     _TEXT("UHU")
+    // );
+
 
     UserStandardDialog(
         0, 0, 0, 0,
@@ -636,6 +649,7 @@ Classes & Methods
     ChunkHandle         textMoniker;
     ChunkHandle         iconMoniker;
     word                chunkSize;
+    optr                op;
 
 
     @call oself::MSG_REMOVE_ALL_APP_TRIGGERS();
@@ -657,7 +671,7 @@ Classes & Methods
             FilePopDir();
 
             triggerBlock = OptrToHandle(oself);
-            triggerObj = ObjInstantiate(triggerBlock, &GeodeTokenTriggerClass);
+            triggerObj = ObjInstantiate(triggerBlock, &GenTriggerClass);
 
             if (triggerObj != NullOptr)
             {
@@ -740,11 +754,21 @@ Classes & Methods
                 if (monikerFound) MemFree(newMoniker);
 
                 // set up some common stuff
-                @call triggerObj::MSG_GEN_TRIGGER_SET_ACTION_MSG(MSG_APP_TRIGGER_PRESSED);
-               //@call triggerObj::MSG_GEN_TRIGGER_SET_DESTINATION(triggerObj);
+                // op = ConstructOptr(OptrToHandle(oself), OptrToChunk(@SelectDialog));
+                // op = ConstructOptr(GeodeGetCodeProcessHandle(), ChunkOf(@SelectDialog));
+                // op = ConstructOptr(MemGetInfo(OptrToHandle(@dup(@SelectDialog)), MGIT_OWNER_OR_VM_FILE_HANDLE), ChunkOf(@SelectDialog));
+                // op = ConstructOptr(MemGetInfo(OptrToHandle(@dup(@SelectDialog)), MGIT_EXEC_THREAD), ChunkOf(@SelectDialog));
+                // op = ConstructOptr(HandleOf(G_dialog), ChunkOf(@SelectDialog));
+                op = G_dialog;
 
-                @call triggerObj::MSG_META_ADD_VAR_DATA((ATTR_GEODE_TOKEN_TO_PASS & (~VDF_SAVE_TO_STATE)), sizeof(GeodeToken), &tok);
-                @call triggerObj::MSG_META_ADD_VAR_DATA((ATTR_GEODE_FILE_NAME & (~VDF_SAVE_TO_STATE)), sizeof(FileLongName), filePtr);
+                @call triggerObj::MSG_GEN_TRIGGER_SET_DESTINATION(op);
+                @call triggerObj::MSG_GEN_TRIGGER_SET_ACTION_MSG(MSG_APP_TRIGGER_PRESSED);
+                @call triggerObj::MSG_META_ADD_VAR_DATA(ATTR_GEN_DESTINATION_CLASS, sizeof(OpenWithDialogClass), (ClassStruct*)&OpenWithDialogClass);
+
+
+
+                // @call triggerObj::MSG_META_ADD_VAR_DATA((ATTR_GEODE_TOKEN_TO_PASS & (~VDF_SAVE_TO_STATE)), sizeof(GeodeToken), &tok);
+                // @call triggerObj::MSG_META_ADD_VAR_DATA((ATTR_GEODE_FILE_NAME & (~VDF_SAVE_TO_STATE)), sizeof(FileLongName), filePtr);
 
                 @call triggerObj::MSG_META_ADD_VAR_DATA((HINT_EXPAND_WIDTH_TO_FIT_PARENT & (~VDF_SAVE_TO_STATE)), 0, 0);
 
@@ -756,7 +780,7 @@ Classes & Methods
                 // helpOptr = ConstructOptr(OptrToHandle(@TrayAppsFolderName), helpChunk);
                 // @call triggerObj::MSG_META_ADD_VAR_DATA((ATTR_GEN_FOCUS_HELP & (~VDF_SAVE_TO_STATE)), sizeof(optr), &helpOptr);
 
-                //finally, set usable
+                // finally, set usable
                 @call triggerObj::MSG_GEN_SET_USABLE(VUM_NOW);
             }
         }
@@ -794,6 +818,7 @@ remove all our triggers from SysTray
     MemLock(HandleOf(appList));
     num = ChunkArrayGetCount(appList);
     MemUnlock(HandleOf(appList));
+
     @call @dup(@OpenWithAppList)::MSG_GEN_DYNAMIC_LIST_INITIALIZE(num);
     @call @dup(@OpenWithAppList)::MSG_GEN_ITEM_GROUP_SET_NONE_SELECTED(TRUE);
 }
@@ -807,6 +832,7 @@ remove all our triggers from SysTray
     word    num = 0;
 
     writeIniFile();
+
     @call @dup(@SelectContent)::MSG_BUILD_TRIGGERS();
 
     @callsuper();
