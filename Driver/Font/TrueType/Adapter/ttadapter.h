@@ -71,6 +71,8 @@ extern TEngine_Instance engineInstance;
 #define STANDARD_GRIDSIZE                   1000
 #define MAX_NUM_GLYPHS                      2000
 
+#define BASELINE_CORRECTION                 1
+
 
 /***********************************************************************
  *      structures

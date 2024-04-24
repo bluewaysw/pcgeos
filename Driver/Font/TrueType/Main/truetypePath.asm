@@ -147,7 +147,7 @@ REVISION HISTORY:
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
 
 TrueTypeGenInRegion	proc	far
-	uses	ax, bx, si, ds, es
+	uses	ax, bx, cx, dx, si, ds, es
 	.enter
 
 	mov		si,	di				;si <- GState handle
@@ -180,11 +180,24 @@ TrueTypeGenInRegion	proc	far
 	push	ds					;pass ptr to FontInfo
 	push	di
 
+	mov	cx, ds					;save ptr to FontInfo
+	mov	dx, di	
+
 	clr		ah		                   
 	mov		al, es:GS_fontAttr.FCA_textStyle
 	mov		bx, ODF_HEADER
 	call	FontDrFindOutlineData
 	push	ds					;pass ptr to OutlineEntry
+	push	di
+
+	mov	ds, cx					;get saved ptr to FontInfo
+	mov	di, dx
+
+	clr		ah
+	mov		al, es:GS_fontAttr.FCA_textStyle
+	mov		bx, ODF_PART1
+	call	FontDrFindOutlineData
+	push	ds					;pass ptr to FontHeader
 	push	di
 	push	ax					;pass stylesToImplement
 

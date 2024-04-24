@@ -80,8 +80,6 @@ static Boolean IsRegionNeeded( TransformMatrix* transMatrix,
                                     sizeof( TransformMatrix ) +                         \
                                     fontHeader->FH_kernCount * sizeof( KernPair ) )
 
-#define BASELINE_CORRECTION       1
-
 
 /********************************************************************
  *                      TrueType_Gen_Widths

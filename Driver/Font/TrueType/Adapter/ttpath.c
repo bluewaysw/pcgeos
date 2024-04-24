@@ -22,6 +22,17 @@
 #include "ttcharmapper.h"
 #include <ec.h>
 
+
+/*
+ * macros
+ */
+
+#define DW_FIXED_TO_F26DOT6( value )    ( (dword) (value.DWF_int << 6) | (value.DWF_frac >> 10) )
+
+#define WW_FIXED_TO_WWFIXEDASDWORD( value )     ( (dword) ( (((dword)value.WWF_int) << 16) | value.WWF_frac ) )
+
+#define ROUND_WWFIXED( value )    ( value & 0xffff ? ( value >> 16 ) + 1 : value >> 16 )
+
 /*
  * types
  */
@@ -74,8 +85,13 @@ static void _near WriteComment( TRUETYPE_VARS, GStateHandle gstate );
 static void ScaleOutline( TRUETYPE_VARS );
 
 static void StoreFontMatrix( TRUETYPE_VARS,
-                             TT_Matrix*      transMatrix,
-                             WWFixedAsDWord  pointSize );
+                             TransformMatrix*  transMatrix,
+                             WWFixedAsDWord    pointSize,
+                             TextStyle         stylesToImplement,
+                             Byte              width,
+                             Byte              weight );
+
+static void mulMatrix( TransformMatrix* transMatrix, TransMatrix* fontMatrix );
 
 
 /********************************************************************
@@ -151,6 +167,8 @@ EC(     ECCheckBounds( (void*)fontHeader ) );
 
         /* get TT char index */
         charIndex = TT_Char_Index( CHAR_MAP, GeosCharToUnicode( character ) );
+        if( charIndex == 0 )
+                goto Fail;
 
         /* write prologue */
         if( pathFlags & FGPF_SAVE_STATE )
@@ -216,6 +234,9 @@ EC(     ECCheckBounds( (void*)fontHeader ) );
                 GrRestoreState( gstate );
 
         TT_Done_Glyph( GLYPH );
+
+Fail:
+        TrueType_Unlock_Face( trueTypeVars );
 Fin:
         MemUnlock( varBlock );
 }
@@ -247,17 +268,23 @@ void _pascal TrueType_Gen_In_Region(
                         byte                 weight,
 			const FontInfo*      fontInfo, 
                         const OutlineEntry*  outlineEntry,
+                        const OutlineEntry*  firstEntry,
                         TextStyle            stylesToImplement,
                         MemHandle            varBlock )
 {
         TrueTypeVars*          trueTypeVars;
+        FontHeader*            fontHeader;
         TrueTypeOutlineEntry*  trueTypeOutline;
         TT_UShort              charIndex;
-        TT_Matrix              transMatrix;
         RenderFunctions        renderFunctions;
-
-
         TransMatrix            tMatrix;
+        TransformMatrix        transform;
+
+        XYValueAsDWord         cursorPos;
+        XYValueAsDWord         result;
+        word                   baseline;
+        WWFixedAsDWord         scale;
+        TT_Matrix              flipMatrix = HORIZONTAL_FLIP_MATRIX;
 
 
 EC(     ECCheckGStateHandle( gstate ) );
@@ -272,54 +299,56 @@ EC(     ECCheckBounds( (void*)trueTypeVars ) );
         trueTypeOutline = LMemDerefHandles( MemPtrToHandle( (void*)fontInfo ), outlineEntry->OE_handle );
 EC(     ECCheckBounds( (void*)trueTypeOutline ) );
 
-        /* open face, create instance and glyph */
+        /* get pointer to FontHeader */
+        fontHeader = LMemDerefHandles( MemPtrToHandle( (void*)fontInfo ), firstEntry->OE_handle );
+EC(     ECCheckBounds( (void*)fontHeader ) );
+
+        /* open face, create instance */
         if( TrueType_Lock_Face(trueTypeVars, trueTypeOutline) )
                 goto Fin;
 
+        /* get TT char index */
+        charIndex = TT_Char_Index( CHAR_MAP, GeosCharToUnicode( character ) );
+        if( charIndex == 0 )
+                goto Fail;
+
+        /* load glyph */
         TT_New_Glyph( FACE, &GLYPH );
         TT_Load_Glyph( INSTANCE, GLYPH, charIndex, 0 );
         TT_Get_Glyph_Outline( GLYPH, &OUTLINE );
 
-        /* get TT char index */
-        charIndex = TT_Char_Index( CHAR_MAP, GeosCharToUnicode( character ) );
-
+        /* flip on x-axis */ 
+        TT_Transform_Outline( &OUTLINE, &flipMatrix );
 
         /* store font matrix */
-        StoreFontMatrix( trueTypeVars, &transMatrix, pointSize );
+        GrGetTransform( gstate, &tMatrix );
+        StoreFontMatrix( trueTypeVars, &transform, pointSize, stylesToImplement, width, weight );
+ //       mulMatrix( &transform, &tMatrix );
 
-        //TODO: add stylesToImplement, width and weight to transMatrix
+        /* calculate position of baseline */
+        scale = GrUDivWWFixed( pointSize, MakeWWFixed( FACE_PROPERTIES.header->Units_Per_EM ) );
+        baseline = ROUND_WWFIXED( SCALE_WORD( fontHeader->FH_ascent + fontHeader->FH_accent, scale ) );
 
-        //TODO: add fontmatrix to transMatrix
-
-        //TODO: find baseline and traslate glyph by it
-
-        //TODO: transform glyph by transMatrix
-
-        //TODO: translate by current position
+        /* translate by cursoposition an baseline */
+        cursorPos = GrGetCurPos( gstate );
+        result = GrTransform( gstate, DWORD_X(cursorPos), DWORD_Y(cursorPos) );
+        GrGetTransform( gstate, &tMatrix );
+        
+        TT_Transform_Outline( &OUTLINE, &transform.TM_matrix );
+        TT_Translate_Outline( &OUTLINE, DWORD_X(result), 
+                                        DWORD_Y(result) + baseline + BASELINE_CORRECTION );
  
         /* set render functions */
         renderFunctions.Proc_MoveTo  = RegionPathMoveTo;
         renderFunctions.Proc_LineTo  = RegionPathLineTo;
         renderFunctions.Proc_ConicTo = RegionPathConicTo;
 
+        ConvertOutline( regionPath, &OUTLINE, &renderFunctions );
 
-        //Start TEST
-        GrGetTransform( gstate, &tMatrix );
-
-        //hart verdrahtetes Glyph (Minus)
-        GrRegionPathMovePen( regionPath, tMatrix.TM_e31.DWF_int + 108, tMatrix.TM_e32.DWF_int + 156 );
-
-        GrRegionPathDrawLineTo( regionPath, tMatrix.TM_e31.DWF_int + 108, tMatrix.TM_e32.DWF_int + 168 );
-        GrRegionPathDrawLineTo( regionPath, tMatrix.TM_e31.DWF_int + 144, tMatrix.TM_e32.DWF_int + 168 );
-        GrRegionPathDrawLineTo( regionPath, tMatrix.TM_e31.DWF_int + 144, tMatrix.TM_e32.DWF_int + 136 );
-        GrRegionPathDrawLineTo( regionPath, tMatrix.TM_e31.DWF_int + 108, tMatrix.TM_e32.DWF_int + 136 );
-        //ENDE TEST: hart verdrahtetes Glyph
-
-        //TODO: render glyph as regionpath
-
-Fail:
         TT_Done_Glyph( GLYPH );
 
+Fail:
+        TrueType_Unlock_Face( trueTypeVars );
 Fin:
         MemUnlock( varBlock );
 }
@@ -347,7 +376,7 @@ Fin:
 
 #define CURVE_TAG_ON            0x01
 #define CURVE_TAG_CONIC         0x00
-static void ConvertOutline( Handle gstate, TT_Outline* outline, RenderFunctions* functions )
+static void ConvertOutline( Handle handle, TT_Outline* outline, RenderFunctions* functions )
 {
         TT_Vector   v_last;
         TT_Vector   v_control;
@@ -363,7 +392,6 @@ static void ConvertOutline( Handle gstate, TT_Outline* outline, RenderFunctions*
 
 
 EC(     ECCheckBounds( (void*)outline ) );
-EC(     ECCheckGStateHandle( gstate ) );
 
         last = -1;
         for ( n = 0; n < outline->n_contours; ++n )
@@ -403,7 +431,7 @@ EC(     ECCheckGStateHandle( gstate ) );
                 --tags;
         }
 
-        (*functions->Proc_MoveTo)( gstate, &v_start );
+        (*functions->Proc_MoveTo)( handle, &v_start );
 
         while ( point < limit )
         {
@@ -414,7 +442,7 @@ EC(     ECCheckGStateHandle( gstate ) );
                 {
                         case CURVE_TAG_ON:
                         {
-                                (*functions->Proc_LineTo)( gstate, point );
+                                (*functions->Proc_LineTo)( handle, point );
                                 continue;
                         }
 
@@ -437,26 +465,26 @@ EC(     ECCheckGStateHandle( gstate ) );
 
                                         if (  *tags & CURVE_TAG_ON )
                                         {
-                                                (*functions->Proc_ConicTo)( gstate, &v_control, &vec );
+                                                (*functions->Proc_ConicTo)( handle, &v_control, &vec );
                                                 continue;
                                         }
 
                                         v_middle.x = ( v_control.x + vec.x ) >> 1;
                                         v_middle.y = ( v_control.y + vec.y ) >> 1;
 
-                                        (*functions->Proc_ConicTo)( gstate, &v_control, &v_middle );
+                                        (*functions->Proc_ConicTo)( handle, &v_control, &v_middle );
 
                                         v_control = vec;
                                         goto Do_Conic;
                                 }
 
-                                (*functions->Proc_ConicTo)( gstate, &v_control, &v_start );
+                                (*functions->Proc_ConicTo)( handle, &v_control, &v_start );
                                 break;
                         }
                 }
 
                 /* close the contour with a line segment */
-                (*functions->Proc_LineTo)( gstate, &v_start );
+                (*functions->Proc_LineTo)( handle, &v_start );
         }
 }
 
@@ -792,14 +820,89 @@ static void ScaleOutline( TRUETYPE_VARS )
  *******************************************************************/
 
 static void StoreFontMatrix( TRUETYPE_VARS,
-                             TT_Matrix*      transMatrix,
-                             WWFixedAsDWord  pointSize )
+                             TransformMatrix*  transMatrix,
+                             WWFixedAsDWord    pointSize,
+                             TextStyle         stylesToImplement,
+                             Byte              width,
+                             Byte              weight )
 {
-        WWFixedAsDWord scaleFactor = GrUDivWWFixed( pointSize, MakeWWFixed( UNITS_PER_EM ) );
+        WWFixedAsDWord scaleFactor;
+        TT_Matrix      tempMatrix;
 
 
-        transMatrix->xx = scaleFactor;
-        transMatrix->xy = 0L;
-        transMatrix->yx = 0L;
-        transMatrix->yy = scaleFactor;
+EC(     ECCheckBounds( (void*)transMatrix ) );
+EC(     ECCheckBounds( (void*)trueTypeVars ) );
+
+
+        /* calculate scale factor for pointsize */
+        scaleFactor = GrUDivWWFixed( pointSize, MakeWWFixed( UNITS_PER_EM ) );
+
+        /* initilize tranformation matrix */
+        transMatrix->TM_matrix.xx = scaleFactor;
+        transMatrix->TM_matrix.xy = 0L;
+        transMatrix->TM_matrix.yx = 0L;
+        transMatrix->TM_matrix.yy = scaleFactor;
+
+        /* fake bold style       */
+        if( stylesToImplement & TS_BOLD )
+                tempMatrix.xx = BOLD_FACTOR;
+
+        /* fake italic style       */
+        if( stylesToImplement & TS_ITALIC )
+                tempMatrix.yx = NEGATVE_ITALIC_FACTOR;
+
+        /* width and weight */
+        if( width != FWI_MEDIUM )
+                tempMatrix.xx = MUL_100_WWFIXED( tempMatrix.xx, width );
+
+        if( weight != FW_NORMAL )
+                tempMatrix.xx = MUL_100_WWFIXED( tempMatrix.xx, weight );
+
+                /* fake script style      */
+        if( stylesToImplement & ( TS_SUBSCRIPT | TS_SUPERSCRIPT ) )
+        {      
+                /*WWFixedAsDWord scriptOffset = WBFIXED_TO_WWFIXEDASDWORD( fontBuf->FB_height ) + 
+                                              WBFIXED_TO_WWFIXEDASDWORD( fontBuf->FB_heightAdjust ); */
+
+
+                tempMatrix.xx = GrMulWWFixed( tempMatrix.xx, SCRIPT_FACTOR );
+                tempMatrix.yy = GrMulWWFixed( tempMatrix.yy, SCRIPT_FACTOR );
+
+                if( stylesToImplement & TS_SUBSCRIPT )
+                {
+                        //TODO: Is rounding necessary here?
+                        /*transMatrix->TM_scriptY = GrMulWWFixed( scriptOffset, SUBSCRIPT_OFFSET ) >> 16;*/
+                }
+                else
+                {
+                        //TODO: Is rounding necessary here?
+                        /*transMatrix->TM_scriptY = ( GrMulWWFixed( scriptOffset, SUPERSCRIPT_OFFSET) -
+                                                WBFIXED_TO_WWFIXEDASDWORD( fontBuf->FB_baselinePos ) -
+                                                WBFIXED_TO_WWFIXEDASDWORD( fontBuf->FB_baseAdjust ) ) >> 16;*/
+                }
+        }
+
+}
+
+
+/* transmatrix = transmatrix * fontMatrix */
+static void mulMatrix( TransformMatrix* transMatrix, TransMatrix* fontMatrix )
+{
+        TT_Matrix  tempMatrix;
+        
+        tempMatrix.xx = transMatrix->TM_matrix.xx;
+        tempMatrix.xy = transMatrix->TM_matrix.xy;
+        tempMatrix.yx = transMatrix->TM_matrix.yx;
+        tempMatrix.yy = transMatrix->TM_matrix.yy;
+
+
+EC(     ECCheckBounds( (void*)transMatrix ) );
+EC(     ECCheckBounds( (void*)fontMatrix ) );
+
+        transMatrix->TM_matrix.xx = GrMulWWFixed( tempMatrix.xx, WW_FIXED_TO_WWFIXEDASDWORD( fontMatrix->TM_e11 ) );
+        transMatrix->TM_matrix.xy = - ( GrMulWWFixed( tempMatrix.yx, WW_FIXED_TO_WWFIXEDASDWORD( fontMatrix->TM_e11 ) ) +
+                                    GrMulWWFixed( tempMatrix.yy, WW_FIXED_TO_WWFIXEDASDWORD( fontMatrix->TM_e21 ) ) );
+        transMatrix->TM_matrix.yx = - ( GrMulWWFixed( tempMatrix.xx, WW_FIXED_TO_WWFIXEDASDWORD( fontMatrix->TM_e12 ) ) +
+                                    GrMulWWFixed( tempMatrix.xy, WW_FIXED_TO_WWFIXEDASDWORD( fontMatrix->TM_e22 ) ) );
+        transMatrix->TM_matrix.yy = GrMulWWFixed( tempMatrix.yy, WW_FIXED_TO_WWFIXEDASDWORD( fontMatrix->TM_e22 ) );
 }

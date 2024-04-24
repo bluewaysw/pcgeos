@@ -53,6 +53,7 @@ void _pascal TrueType_Gen_In_Region(
                         byte                 weight,
 			const FontInfo*      fontInfo, 
                         const OutlineEntry*  outlineEntry,
+                        const OutlineEntry*  firstEntry,
                         TextStyle            stylesToImplement,
                         MemHandle            varBlock );
 
