@@ -281,7 +281,7 @@ COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 C FUNCTION:	GrRegionPathDrawLineTo
 
 C DECLARATION:	extern void
-			_far _pascal GrRegionPathDrawCurve(Handle regionHandle, Point *points);
+			_far _pascal GrRegionPathDrawCurve(Handle regionHandle, const Point *points);
 
 KNOWN BUGS/SIDE EFFECTS/CAVEATS/IDEAS:
 
@@ -292,20 +292,24 @@ REVISION HISTORY:
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
 
-GRREGIONPATHDRAWCURVETO	proc	far	regionpath:hptr, points:fptr
-				uses ax, bx, cx, bp, di, ds, es
-	.enter
-
-	clr		bp
-	mov		cx, REC_BEZIER_STACK
-	lds		di, points
-	mov		bx, regionpath
+GRREGIONPATHDRAWCURVETO	proc	far	
+	C_GetThreeWordArgs	bx, cx, ax,  dx	;bx = regionHandle, cx = seg of points, ax = off of points
+		
+	push	ds
+	push	bp
+	mov		ds, cx
+	xchg	si, ax						;ds:di addr of points
+	
 	call	MemLock
 	mov		es, ax
+	clr		bp
+	mov		cx, REC_BEZIER_STACK
 	call	GrRegionPathAddBezierAtCP
 	call	MemUnlock
 
-	.leave
+	pop		bp
+	pop		ds
+
 	ret
 
 GRREGIONPATHDRAWCURVETO	endp

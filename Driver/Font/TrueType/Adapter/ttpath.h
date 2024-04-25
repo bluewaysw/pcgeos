@@ -69,7 +69,7 @@ extern void _pascal GrRegionPathDrawLineTo(
                         Handle regionHandle, sword x, sword y );
 
 extern void _pascal GrRegionPathDrawCurveTo(
-                        Handle regionHandle, Point *points );          
+                        Handle regionHandle, const Point *points );          
 
 
 #ifdef __HIGHC__
