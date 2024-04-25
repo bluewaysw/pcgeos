@@ -647,8 +647,6 @@ static void _near RegionPathConicTo( Handle handle, TT_Vector* v_control, TT_Vec
 {
         Point p[3];
 
-        void* t = p;
-
 
         p[0].P_x = v_control->x;
         p[0].P_y = v_control->y;
