@@ -298,15 +298,16 @@ GRREGIONPATHDRAWCURVETO	proc	far
 	push	ds
 	push	bp
 	mov		ds, cx
-	xchg	si, ax						;ds:di addr of points
+	xchg	di, ax						;ds:di addr of points
 	
-	call	MemLock
+	call	MemLock						;get seg of region
 	mov		es, ax
 	clr		bp
 	mov		cx, REC_BEZIER_STACK
 	call	GrRegionPathAddBezierAtCP
 	call	MemUnlock
 
+	xchg	di, ax
 	pop		bp
 	pop		ds
 
