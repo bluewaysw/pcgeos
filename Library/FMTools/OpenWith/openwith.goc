@@ -5,7 +5,7 @@ Resourcen
 ***********************************************************************/
 @start FMUI, data;
 
-    @visMoniker Moniker1 = "Open With";
+    @visMoniker ToolNameMoniker = "Open With";
     @chunk char errorNoDOSFile[] = "Please select DOS files only.";
     @chunk char errorNoCompatibleApp[] = "The selected application is not compatible with DOS files.";
 
@@ -16,6 +16,11 @@ Resourcen
         { "DUMP" , 0 },
         { "PERF" , 0 }
     };
+
+    @include "Art/mkrRightArrowSC.goh"
+    @include "Art/mkrLeftArrowSC.goh"
+    @visMoniker addAppTriggerTextMoniker = "Add";
+    @visMoniker removeAppTriggerTextMoniker = "Remove";
 
 @end FMUI;
 
@@ -37,7 +42,7 @@ Resourcen
     @object GenViewClass SelectView = {
         GVI_content = @SelectContent;
         GVI_attrs = @default | GVA_GENERIC_CONTENTS | GVA_DRAG_SCROLLING | GVA_SAME_COLOR_AS_PARENT_WIN;
-        GVI_horizAttrs = @default | GVDA_NO_SMALLER_THAN_CONTENT; //GVDA_NO_LARGER_THAN_CONTENT
+        GVI_horizAttrs = @default | GVDA_NO_SMALLER_THAN_CONTENT; // GVDA_NO_LARGER_THAN_CONTENT
         GVI_vertAttrs = @default | GVDA_SCROLLABLE;
 
         HINT_FIXED_SIZE = {
@@ -62,16 +67,6 @@ Resourcen
         HINT_EXPAND_WIDTH_TO_FIT_PARENT;
     }
 
-/*
-   @object GeodeTokenTriggerClass DummyTrigger = {
-        GI_visMoniker = "Dummy";
-        GTI_actionMsg = MSG_APP_TRIGGER_PRESSED;
-        GTI_destination = (TO_SELF);
-
-        ATTR_GEODE_TOKEN_TO_PASS = {{"TeEd"}, 0};
-        ATTR_GEODE_FILE_NAME = "Extras\\Text File Editor";
-    }
-*/
     @object GenInteractionClass SelectReplyBar ={
         GI_comp =   @SelectCancelTrigger,
                     @ConfigureDialog;
@@ -101,7 +96,7 @@ Resourcen
     }
 
     @object GenInteractionClass OpenWithGroup = {
-        GI_visMoniker = "Open With";
+        GI_visMoniker = "Select applications to use in the 'Open With' dialogue";
         GI_comp =	@AddAppSelector,
                     @AddAppTrigger,
                     @OpenWithAppListGroup;
@@ -127,9 +122,11 @@ Resourcen
     }
 
     @object GenTriggerClass AddAppTrigger = {
-        GI_visMoniker = "=>";
+        GI_visMoniker = list { @addAppTriggerTextMoniker, @RightArrowSCMoniker };
         GTI_destination = @OpenWithAppList;
         GTI_actionMsg = MSG_ADD_APP;
+
+        HINT_USE_ICON_TEXT_COMBINATION_MONIKER = {0, 7};
     }
 
     @object GenInteractionClass OpenWithAppListGroup = {
@@ -162,11 +159,12 @@ Resourcen
     }
 
     @object GenTriggerClass RemoveAppTrigger = {
-        GI_visMoniker = "Remove";
+        GI_visMoniker = list { @removeAppTriggerTextMoniker, @LeftArrowSCMoniker };
 
         GTI_destination = @OpenWithAppList;
         GTI_actionMsg = MSG_REMOVE_APP;
 
+        HINT_USE_ICON_TEXT_COMBINATION_MONIKER = {0, 7};
         HINT_CENTER_MONIKER;
         HINT_EXPAND_WIDTH_TO_FIT_PARENT;
     }
@@ -202,7 +200,7 @@ dgroup
 //API Struct - MUST be global
 FMToolStruct FMToolInfo[1] = {
     {
-        @Moniker1, (FMTF_SELECTED_ONLY | FMTT_DIALOG), 1
+        @ToolNameMoniker, (FMTF_SELECTED_ONLY | FMTT_DIALOG), 1
     }
 };
 
@@ -239,7 +237,6 @@ void _pascal _export OpenWithEntryPoint(
     word entryNum
 )
 {
-    InteractionCommand          reply = IC_NULL;
     optr                        dialog = NullOptr;
 
     // fetch the GeoManager selection
@@ -812,13 +809,9 @@ remove all our triggers from SysTray
 ********************************************************************/
 @method ConfigureDialogClass, MSG_CLOSE_CONFIGURE_DIALOG
 {
-    word    num = 0;
-
     writeIniFile();
 
     @call @dup(@SelectContent)::MSG_BUILD_TRIGGERS();
-
-    @callsuper();
 }
 
 

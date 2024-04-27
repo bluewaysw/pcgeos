@@ -16,7 +16,8 @@ openwith.eobj: openwith.goh stdapp.goh object.goh ui.goh \
                 Objects/gItemC.goh Objects/gBoolC.goh \
                 Objects/gGadgetC.goh Objects/gToolCC.goh \
                 Objects/gValueC.goh Objects/gToolGC.goh \
-                Objects/helpCC.goh fmtool.goh
+                Objects/helpCC.goh fmtool.goh Art/mkrRightArrowSC.goh \
+                Art/mkrLeftArrowSC.goh
 openwith.obj \
 openwith.eobj: geos.h heap.h geode.h resource.h ec.h object.h lmem.h \
                 graphics.h fontID.h font.h color.h gstring.h timer.h vm.h \
