@@ -27,8 +27,6 @@
  * macros
  */
 
-#define DW_FIXED_TO_F26DOT6( value )    ( (dword) (value.DWF_int << 6) | (value.DWF_frac >> 10) )
-
 #define WW_FIXED_TO_WWFIXEDASDWORD( value )     ( (dword) ( (((dword)value.WWF_int) << 16) | value.WWF_frac ) )
 
 #define ROUND_WWFIXED( value )    ( value & 0xffff ? ( value >> 16 ) + 1 : value >> 16 )
@@ -64,7 +62,7 @@ static void CalcTransformMatrix( TransMatrix*    transMatrix,
                                  WWFixedAsDWord  pointSize, 
                                  TextStyle       stylesToImplement );
 
-static void ConvertOutline( GStateHandle      gstate, 
+static void _near ConvertOutline( GStateHandle      gstate, 
                             TT_Outline*       outline, 
                             RenderFunctions*  functions );
 
@@ -108,11 +106,12 @@ static void mulMatrix( TransformMatrix* transMatrix, TransMatrix* fontMatrix );
  *                *fontInfo             Pointer to FontInfo structure.
  *                *outlineEntry         Ptr. to outline entry containing 
  *                                      TrueTypeOutlineEntry.
+ *                *firstEntry           Ptr. to outline entry containing
+ *                                      FontHeader.
+ *                stylesToImplement     Text styles to be added.
  *                varBlock              Memory handle to var block.
  * 
- * RETURNS:       void 
- * 
- * STRATEGY:      
+ * RETURNS:       void  
  * 
  * REVISION HISTORY:
  *      Date      Name      Description
@@ -245,13 +244,20 @@ Fin:
 /********************************************************************
  *                      TrueType_Gen_In_Region
  ********************************************************************
- * SYNOPSIS:	  
+ * SYNOPSIS:	  Draw outline of the given charcode to region.
  * 
- * PARAMETERS:    
+ * PARAMETERS:    gstate                Hande of gstate. 
+ *                handle                Handle of region path.
+ *                character             Character to build (GEOS Char).
+ *                *fontInfo             Pointer to FontInfo structure.
+ *                *outlineEntry         Ptr. to outline entry containing 
+ *                                      TrueTypeOutlineEntry.
+ *                *firstEntry           Ptr. to outline entry containing
+ *                                      FontHeader.
+ *                stylesToImplement     Text styles to be added.
+ *                varBlock              Memory handle to var block.
  * 
  * RETURNS:       void
- * 
- * STRATEGY:
  * 
  * REVISION HISTORY:
  *      Date      Name      Description
@@ -323,7 +329,6 @@ EC(     ECCheckBounds( (void*)fontHeader ) );
         /* store font matrix */
         GrGetTransform( gstate, &tMatrix );
         StoreFontMatrix( trueTypeVars, &transform, pointSize, stylesToImplement, width, weight );
- //       mulMatrix( &transform, &tMatrix );
 
         /* calculate position of baseline */
         scale = GrUDivWWFixed( pointSize, MakeWWFixed( FACE_PROPERTIES.header->Units_Per_EM ) );
@@ -333,6 +338,7 @@ EC(     ECCheckBounds( (void*)fontHeader ) );
         cursorPos = GrGetCurPos( gstate );
         result = GrTransform( gstate, DWORD_X(cursorPos), DWORD_Y(cursorPos) );
         GrGetTransform( gstate, &tMatrix );
+        //mulMatrix( &transform, &tMatrix );
         
         TT_Transform_Outline( &OUTLINE, &transform.TM_matrix );
         TT_Translate_Outline( &OUTLINE, DWORD_X(result), 
@@ -366,8 +372,6 @@ Fin:
  * 
  * RETURNS:       void
  * 
- * STRATEGY:      
- * 
  * REVISION HISTORY:
  *      Date      Name      Description
  *      ----      ----      -----------
@@ -376,7 +380,7 @@ Fin:
 
 #define CURVE_TAG_ON            0x01
 #define CURVE_TAG_CONIC         0x00
-static void ConvertOutline( Handle handle, TT_Outline* outline, RenderFunctions* functions )
+static void _near ConvertOutline( Handle handle, TT_Outline* outline, RenderFunctions* functions )
 {
         TT_Vector   v_last;
         TT_Vector   v_control;
@@ -498,9 +502,7 @@ EC(     ECCheckBounds( (void*)outline ) );
  *                                      position is changed.
  *                *vec                  Ptr to Vector to new position.
  * 
- * RETURNS:       void
- * 
- * STRATEGY:      
+ * RETURNS:       void 
  * 
  * REVISION HISTORY:
  *      Date      Name      Description
@@ -525,8 +527,6 @@ static void _near MoveTo( Handle handle, TT_Vector* vec )
  * 
  * RETURNS:       void
  * 
- * STRATEGY:      
- * 
  * REVISION HISTORY:
  *      Date      Name      Description
  *      ----      ----      -----------
@@ -548,9 +548,7 @@ static void _near RegionPathMoveTo( Handle handle, TT_Vector* vec )
  *                                      is drawed.
  *                *vec                  Ptr. to Vector of end position.
  * 
- * RETURNS:       void
- * 
- * STRATEGY:      
+ * RETURNS:       void 
  * 
  * REVISION HISTORY:
  *      Date      Name      Description
@@ -575,8 +573,6 @@ static void _near LineTo( Handle handle, TT_Vector* vec )
  * 
  * RETURNS:       void
  * 
- * STRATEGY:      
- * 
  * REVISION HISTORY:
  *      Date      Name      Description
  *      ----      ----      -----------
@@ -600,8 +596,6 @@ static void _near RegionPathLineTo( Handle handle, TT_Vector* vec )
  *                *vec                  Vector of new position.
  * 
  * RETURNS:       void
- * 
- * STRATEGY:      
  * 
  * REVISION HISTORY:
  *      Date      Name      Description
@@ -635,8 +629,6 @@ static void _near ConicTo( Handle handle, TT_Vector* v_control, TT_Vector* vec )
  * 
  * RETURNS:       void
  * 
- * STRATEGY:      
- * 
  * REVISION HISTORY:
  *      Date      Name      Description
  *      ----      ----      -----------
@@ -668,8 +660,6 @@ static void _near RegionPathConicTo( Handle handle, TT_Vector* v_control, TT_Vec
  *                stylesToImplement     Styles that must be added.
  * 
  * RETURNS:       void
- * 
- * STRATEGY:      
  * 
  * REVISION HISTORY:
  *      Date      Name      Description
@@ -747,8 +737,6 @@ static void CalcTransformMatrix( TransMatrix*    transMatrix,
  * 
  * RETURNS:       void   
  * 
- * STRATEGY:      
- * 
  * REVISION HISTORY:
  *      Date      Name      Description
  *      ----      ----      -----------
@@ -783,8 +771,6 @@ static void _near WriteComment( TRUETYPE_VARS, GStateHandle gstate )
  * 
  * RETURNS:       void   
  * 
- * STRATEGY:      
- * 
  * REVISION HISTORY:
  *      Date      Name      Description
  *      ----      ----      -----------
@@ -810,8 +796,6 @@ static void ScaleOutline( TRUETYPE_VARS )
  * PARAMETERS:    
  * 
  * RETURNS:       void   
- * 
- * STRATEGY:      
  * 
  * REVISION HISTORY:
  *      Date      Name      Description
@@ -885,19 +869,33 @@ EC(     ECCheckBounds( (void*)trueTypeVars ) );
 }
 
 
-/* transmatrix = transmatrix * fontMatrix */
+/********************************************************************
+ *                      
+ ********************************************************************
+ * SYNOPSIS:	  
+ * 
+ * PARAMETERS:    
+ * 
+ * RETURNS:       void   
+ * 
+ * REVISION HISTORY:
+ *      Date      Name      Description
+ *      ----      ----      -----------
+ *      26/04/24  JK        Initial Revision
+ *******************************************************************/
+
 static void mulMatrix( TransformMatrix* transMatrix, TransMatrix* fontMatrix )
 {
         TT_Matrix  tempMatrix;
-        
-        tempMatrix.xx = transMatrix->TM_matrix.xx;
-        tempMatrix.xy = transMatrix->TM_matrix.xy;
-        tempMatrix.yx = transMatrix->TM_matrix.yx;
-        tempMatrix.yy = transMatrix->TM_matrix.yy;
 
 
 EC(     ECCheckBounds( (void*)transMatrix ) );
 EC(     ECCheckBounds( (void*)fontMatrix ) );
+
+        tempMatrix.xx = transMatrix->TM_matrix.xx;
+        tempMatrix.xy = transMatrix->TM_matrix.xy;
+        tempMatrix.yx = transMatrix->TM_matrix.yx;
+        tempMatrix.yy = transMatrix->TM_matrix.yy;
 
         transMatrix->TM_matrix.xx = GrMulWWFixed( tempMatrix.xx, WW_FIXED_TO_WWFIXEDASDWORD( fontMatrix->TM_e11 ) );
         transMatrix->TM_matrix.xy = - ( GrMulWWFixed( tempMatrix.yx, WW_FIXED_TO_WWFIXEDASDWORD( fontMatrix->TM_e11 ) ) +
