@@ -607,9 +607,7 @@ Classes & Methods
     DisplayScheme	    ds;
     optr                triggerObj = NullOptr;
     Boolean             monikerFound = FALSE;
-    MemHandle           newMoniker = NULL;
     word                monikerSize = 0;
-    ChunkHandle         combinedMoniker = NullChunk;
     GeodeToken          tok;
     char*               filePtr = (void*) 0;
     byte                triggerNo = 0;
@@ -622,6 +620,8 @@ Classes & Methods
     word                num = 0;
     word                elSize = 0;
 
+    MemHandle           newMoniker = NULL;
+    optr                combinedMoniker;
     ChunkHandle         textMoniker;
     ChunkHandle         iconMoniker;
     word                chunkSize;
@@ -648,10 +648,37 @@ Classes & Methods
 
             triggerBlock = OptrToHandle(oself);
             triggerObj = ObjInstantiate(triggerBlock, (ClassStruct*)&GeodeTokenTriggerClass);
+            triggerBlock = OptrToHandle(triggerObj);
 
             if (triggerObj != NullOptr)
             {
                 @call oself::MSG_GEN_ADD_CHILD(triggerObj, CCO_LAST);
+
+                ObjLockObjBlock(triggerBlock);
+
+                @call GeodeGetAppObject(0)::MSG_GEN_APPLICATION_GET_DISPLAY_SCHEME(&ds);
+
+                monikerFound = TokenLoadMonikerChunk(
+                    TOKEN_CHARS(tok.GT_chars[0],tok.GT_chars[1],tok.GT_chars[2],tok.GT_chars[3]),
+                    tok.GT_manufID,
+                    ds.DS_displayType,
+                    ((VMSF_GSTRING | VMSF_COPY_CHUNK) | (VMS_TOOL << VMSF_STYLE_OFFSET)),
+                    triggerBlock,
+                    &chunkSize,
+                    &iconMoniker
+                );
+
+                combinedMoniker = (optr) UserCreateIconTextMoniker(
+                    (optr)(filePtr),
+                    (optr) ConstructOptr(triggerBlock, iconMoniker),
+                    (word) NullHandle,
+                    (word) 0,
+                    (word) (CITMF_TEXT_IS_FPTR) // | CITMF_CREATE_CHUNK
+                );
+
+                @call triggerObj::MSG_GEN_REPLACE_VIS_MONIKER_OPTR(combinedMoniker, VUM_NOW);
+
+                MemUnlock(triggerBlock);
 
 
                 //  // trying to create a combined moniker
@@ -723,15 +750,15 @@ Classes & Methods
                 //     );
                 // }
                 //  else
-                {
-                    @call triggerObj::MSG_GEN_REPLACE_VIS_MONIKER_TEXT(filePtr, VUM_NOW);
-                }
+                // {
+                //    @call triggerObj::MSG_GEN_REPLACE_VIS_MONIKER_TEXT(filePtr, VUM_NOW);
+                // }
 
-                if (monikerFound) MemFree(newMoniker);
+                // if (monikerFound) MemFree(newMoniker);
 
                 // set up some common stuff
 
-                ShowStopper();
+                // ShowStopper();
 
                 //op = @SelectDialog;
                 // op = ConstructOptr(GeodeGetCodeProcessHandle(), ChunkOf(@SelectDialog));

@@ -11,7 +11,7 @@ type    library, single, c-api
 
 # Resources
 resource FMUI lmem read-only shared
-resource DialogUI object shared read-only
+resource DialogUI object shared
 
 #Libs
 library geos
