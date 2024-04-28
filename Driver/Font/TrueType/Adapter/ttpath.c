@@ -323,11 +323,7 @@ EC(     ECCheckBounds( (void*)fontHeader ) );
         TT_Load_Glyph( INSTANCE, GLYPH, charIndex, 0 );
         TT_Get_Glyph_Outline( GLYPH, &OUTLINE );
 
-        /* flip on x-axis */ 
-        TT_Transform_Outline( &OUTLINE, &flipMatrix );
-
         /* store font matrix */
-        GrGetTransform( gstate, &tMatrix );
         StoreFontMatrix( trueTypeVars, &transform, pointSize, stylesToImplement, width, weight );
 
         /* calculate position of baseline */
@@ -338,11 +334,16 @@ EC(     ECCheckBounds( (void*)fontHeader ) );
         cursorPos = GrGetCurPos( gstate );
         result = GrTransform( gstate, DWORD_X(cursorPos), DWORD_Y(cursorPos) );
         GrGetTransform( gstate, &tMatrix );
-        //mulMatrix( &transform, &tMatrix );
+        mulMatrix( &transform, &tMatrix );
+
+        //TODO: implement heightX, heightY, scriptX, scriptY 
+
         
         TT_Transform_Outline( &OUTLINE, &transform.TM_matrix );
+        TT_Transform_Outline( &OUTLINE, &flipMatrix );
         TT_Translate_Outline( &OUTLINE, DWORD_X(result), 
                                         DWORD_Y(result) + baseline + BASELINE_CORRECTION );
+                                        //TODO: use heightY instead baseline
  
         /* set render functions */
         renderFunctions.Proc_MoveTo  = RegionPathMoveTo;
