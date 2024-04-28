@@ -17,15 +17,15 @@ Resourcen
         { "PERF" , 0 }
     };
 
-    @include "Art/mkrRightArrowSC.goh"
-    @include "Art/mkrLeftArrowSC.goh"
-    @visMoniker addAppTriggerTextMoniker = "Add";
-    @visMoniker removeAppTriggerTextMoniker = "Remove";
-
 @end FMUI;
 
 
 @start DialogUI, notDetachable;
+
+    @include "Art/mkrRightArrowSC.goh"
+    @include "Art/mkrLeftArrowSC.goh"
+    @visMoniker addAppTriggerTextMoniker = "Add";
+    @visMoniker removeAppTriggerTextMoniker = "Remove";
 
     @object OpenWithDialogClass SelectDialog = {
         GI_visMoniker = "Open With";
@@ -606,7 +606,7 @@ Classes & Methods
 
     DisplayScheme	    ds;
     optr                triggerObj = NullOptr;
-    Boolean             monikerFound = FALSE;
+    Boolean             monikerFound = TRUE;
     word                monikerSize = 0;
     GeodeToken          tok;
     char*               filePtr = (void*) 0;
@@ -624,8 +624,18 @@ Classes & Methods
     optr                combinedMoniker;
     ChunkHandle         textMoniker;
     ChunkHandle         iconMoniker;
-    word                chunkSize;
+    word                chunkSize = 0;
     optr                op;
+
+    MemHandle		    newBlock = 0;
+    ChunkHandle		    newChunk;
+    GStateHandle 	    gstate;
+    optr                gstateOptr;
+    GStateHandle        gStrHan;
+    byte*               ptr = (void*) 0;
+    word                foo = 0;
+    TokenMonikerInfo    tmi;
+    byte*               moniker;
 
 
     @call oself::MSG_REMOVE_ALL_APP_TRIGGERS();
@@ -646,40 +656,83 @@ Classes & Methods
             FileGetPathExtAttributes(filePtr, FEA_TOKEN, (&tok), sizeof(GeodeToken));
             FilePopDir();
 
-            triggerBlock = OptrToHandle(oself);
+            triggerBlock = HandleOf(oself);
             triggerObj = ObjInstantiate(triggerBlock, (ClassStruct*)&GeodeTokenTriggerClass);
-            triggerBlock = OptrToHandle(triggerObj);
+            triggerBlock = HandleOf(triggerObj);
 
             if (triggerObj != NullOptr)
             {
                 @call oself::MSG_GEN_ADD_CHILD(triggerObj, CCO_LAST);
 
+                // finally, set usable
+                @call triggerObj::MSG_GEN_SET_USABLE(VUM_NOW);
+
                 ObjLockObjBlock(triggerBlock);
 
                 @call GeodeGetAppObject(0)::MSG_GEN_APPLICATION_GET_DISPLAY_SCHEME(&ds);
 
-                monikerFound = TokenLoadMonikerChunk(
+                monikerFound = TokenLoadMonikerBlock(
                     TOKEN_CHARS(tok.GT_chars[0],tok.GT_chars[1],tok.GT_chars[2],tok.GT_chars[3]),
                     tok.GT_manufID,
                     ds.DS_displayType,
                     ((VMSF_GSTRING | VMSF_COPY_CHUNK) | (VMS_TOOL << VMSF_STYLE_OFFSET)),
-                    triggerBlock,
                     &chunkSize,
-                    &iconMoniker
+                    &newBlock
+                    //&iconMoniker
                 );
 
-                combinedMoniker = (optr) UserCreateIconTextMoniker(
-                    (optr)(filePtr),
-                    (optr) ConstructOptr(triggerBlock, iconMoniker),
-                    (word) NullHandle,
-                    (word) 0,
-                    (word) (CITMF_TEXT_IS_FPTR) // | CITMF_CREATE_CHUNK
-                );
 
-                @call triggerObj::MSG_GEN_REPLACE_VIS_MONIKER_OPTR(combinedMoniker, VUM_NOW);
+                if (newBlock != NullHandle)
+                {
+                    op = ConstructOptr(newBlock, NullChunk);
+                    // vmp = (VisMonikerWithGString*) MemLock(newBlock);
+
+                    ShowStopper();
+
+                    // combinedMoniker = (optr) UserCreateIconTextMoniker(
+                    //     (dword)(filePtr),
+                    //     (optr) op,
+                    //     triggerBlock,
+                    //     (word) 0,
+                    //     (CreateIconTextMonikerFlags) (CITMF_TEXT_IS_FPTR)
+                    // );
+
+                    @call triggerObj::MSG_GEN_REPLACE_VIS_MONIKER_OPTR(op, VUM_NOW);
+
+                    // @call triggerObj::MSG_GEN_REPLACE_VIS_MONIKER(
+                    //     VUM_NOW,
+                    //     // vmp->VMWGS_common.VM_width, vmp->VMWGS_height, chunkSize,
+                    //     0,0,0,
+                    //     VMDT_VIS_MONIKER,
+                    //     VMST_FPTR,
+                    //     (dword) vmp
+                    // );
+
+                    // MemUnlock(newBlock);
+                }
 
                 MemUnlock(triggerBlock);
 
+
+                // newBlock = MemAllocLMem(LMEM_TYPE_GENERAL, sizeof(LMemBlockHeader));
+                // MemModifyFlags(newBlock, HF_SHARABLE, 0);
+                // gstate = GrCreateGString(newBlock, GST_CHUNK, (word*) &newChunk);
+                // gstateOptr = ConstructOptr(newBlock, newChunk);
+                // ptr = LMemDerefHandles(triggerBlock, iconMoniker);
+        	    // gStrHan = GrLoadGString(PtrToSegment(ptr), GST_PTR, PtrToOffset(ptr));
+                // GrDrawGString(gstate, gStrHan, 0, 1, 0, &foo);
+                // GrDrawText(gstate, 0, 0, filePtr, strlen(filePtr));
+                // GrEndGString(gstate);
+                // GrDestroyGString(gstate, 0, GSKT_LEAVE_DATA);
+                // @call triggerObj::MSG_GEN_REPLACE_VIS_MONIKER(
+                //     VUM_NOW,
+                //     0, 0, 0,
+                //     VMDT_GSTRING,
+                //     VMST_OPTR,
+                //     (dword) gstateOptr);
+                // MemFree(HandleOf(gstateOptr));
+                // MemFree(gStrHan);
+                // MemUnlock(triggerBlock);
 
                 //  // trying to create a combined moniker
                 // ObjLockObjBlock(HandleOf(triggerObj));
@@ -787,8 +840,6 @@ Classes & Methods
                 // helpOptr = ConstructOptr(OptrToHandle(@TrayAppsFolderName), helpChunk);
                 // @call triggerObj::MSG_META_ADD_VAR_DATA((ATTR_GEN_FOCUS_HELP & (~VDF_SAVE_TO_STATE)), sizeof(optr), &helpOptr);
 
-                // finally, set usable
-                @call triggerObj::MSG_GEN_SET_USABLE(VUM_NOW);
             }
         }
     }
@@ -912,4 +963,6 @@ remove all our triggers from SysTray
 }
 
 void ShowStopper()
-{}
+{
+    return;
+}
