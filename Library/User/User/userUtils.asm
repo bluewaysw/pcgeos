@@ -1697,11 +1697,15 @@ iconSize	local	Point
 	jmp	haveGState
 
 secondTry:
-	push	di
-	clr	di		; if not answered, create a GState that
-	call	GrCreateState	; Assocate GState with window/null passed.
-	mov	ax, di		; return in bp
-	pop	di
+	push	bp
+	clr	bx
+	call	GeodeGetAppObject
+	call	ECCheckObject
+	mov	ax, MSG_VIS_VUP_CREATE_GSTATE
+	mov	di, mask MF_CALL or mask MF_FIXUP_DS
+	call	ObjMessage
+	mov	ax, bp
+	pop	bp
 	mov	ss:[gstate], ax
 
 haveGState:

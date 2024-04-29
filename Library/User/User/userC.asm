@@ -1364,37 +1364,37 @@ REVISION HISTORY:
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
 global USERCREATEICONTEXTMONIKER:far
+; USERCREATEICONTEXTMONIKER	proc	far 	params:CreateIconTextMonikerParams
+; 	ForceRef params
+; 	popdw	bxcx			; bxcx = return address
+; 	call	UserCreateIconTextMoniker
+; 	pushdw	bxcx			; restore return address
+; 	ret	@ArgSize
+;
+
 USERCREATEICONTEXTMONIKER	proc	far 	textMoniker:dword,
 				      		iconMoniker:optr,
 				      		destinationBlock:hptr,
 				      		spacing:word,
 				      		flags:CreateIconTextMonikerFlags
-						; params:CreateIconTextMonikerParams
-
-	; ForceRef params
-	; popdw	bxcx			; bxcx = return address
-	; call	UserCreateIconTextMoniker
-	; pushdw	bxcx			; restore retuen address
-	; ret	@ArgSize
-
-	uses bx, cx, dx
-	.enter
-	sub	sp, size CreateIconTextMonikerParams
-	mov	bx, sp
-	mov	cx, flags
-	mov	ss:[bx].CITMP_flags, cx
-	mov	cx, spacing
-	mov	ss:[bx].CITMP_spacing, cx
-	mov	cx, destinationBlock
-	mov	ss:[bx].CITMP_destination, cx
-	movdw	cxdx, iconMoniker
-	movdw	ss:[bx].CITMP_iconMoniker, cxdx
-	movdw	cxdx, textMoniker
-	movdw	ss:[bx].CITMP_textMoniker, cxdx
-	call	UserCreateIconTextMoniker
-	add	sp, size CreateIconTextMonikerParams
-	.leave
-	ret
+uses bx, cx, dx
+.enter
+sub	sp, size CreateIconTextMonikerParams
+mov	bx, sp
+mov	cx, flags
+mov	ss:[bx].CITMP_flags, cx
+mov	cx, spacing
+mov	ss:[bx].CITMP_spacing, cx
+mov	cx, destinationBlock
+mov	ss:[bx].CITMP_destination, cx
+movdw	cxdx, iconMoniker
+movdw	ss:[bx].CITMP_iconMoniker, cxdx
+movdw	cxdx, textMoniker
+movdw	ss:[bx].CITMP_textMoniker, cxdx
+call	UserCreateIconTextMoniker
+add	sp, size CreateIconTextMonikerParams
+.leave
+ret
 
 USERCREATEICONTEXTMONIKER	endp
 

@@ -38,7 +38,7 @@ EC GLB	ECEnsureInGenTree
    EXT	GenSetDWord		Simple routines to fetch & stuff gen instance
    EXT	GenGetDWord		Simple routines to fetch & stuff gen instance
    EXT	GenSetBitInByte		Simple routines to fetch & stuff gen instance
-   
+
    EXT	GenReplaceMatchingDWord
    EXT	GenCallSpecIfGrown	Calls specific UI master class if grown
 
@@ -264,7 +264,7 @@ RETURN:		Display scheme structure in ax,cx,dx,bp
 		bp - DS_pointSize
 
 DESTROYED:	nada
- 
+
 PSEUDO CODE/STRATEGY:
 		This page intentionally left blank
 
@@ -405,7 +405,7 @@ FUNCTION:	GenCallSpecIfGrown
 
 DESCRIPTION:	Calls superclass of GenClass if specific UI part of object
 		has been grown. NOTE that this does NOT call this superclass
-		of the current class level, but actually the variant 
+		of the current class level, but actually the variant
 		superclass of this generic object.
 
 CALLED BY:	EXTERNAL
@@ -458,7 +458,7 @@ CALLED BY:	GLOBAL
 PASS:		args for GenCallParent
 RETURN:		nada
 DESTROYED:	nada
- 
+
 PSEUDO CODE/STRATEGY:
 
 KNOWN BUGS/SIDE EFFECTS/IDEAS:
@@ -542,7 +542,7 @@ DESCRIPTION:	Method handler to do nothing but GenCallParent.  May ONLY
 		be used to replace a:
 
 			GOTO	GenCallParent
-			
+
 		from within a method handler, as the non-EC version
 		optimally falls through to GenGotoParentTailRecurse.
 
@@ -680,7 +680,7 @@ FUNCTION:	GenSwapLockParent
 
 DESCRIPTION:	Utility routine to setup *ds:si to be the generic parent of
 		the current object.  To be used in cases where you want
-		to get access to a generic parent's instance data, or 
+		to get access to a generic parent's instance data, or
 		prepare to call a routine where *ds:si much be the object,
 		or for cases where you otherwise might be doing a
 		series of GenCallParent's, which can be somewhat expensive.
@@ -829,20 +829,20 @@ RETURN:
 
 PASSED TO MONIKER:
        When designing a moniker for a gadget, here's what you can expect to get:
-       
+
        		* Line color, text color, area color set to the desired moniker
 		  for that gadget and specific UI, typically black.  You should
 		  use these if your gstring is black and white.  If you're using
-		  color, you can choose your own colors but you must be sure 
+		  color, you can choose your own colors but you must be sure
 		  they look OK against all of the specific UI background colors.
-		  
+
 		* Pen position set to the upper left corner of where the moniker
 		  should be drawn.  Your graphics string *must* be drawn
 		  relative to this pen position.
-       
+
        		* The moniker must return all gstate variables intact, except
 		  that colors and pen position can be destroyed.
-		  
+
 DESTROYED:
 	cx, dx, di, es
 
@@ -878,7 +878,7 @@ Resident	ends
 ;
 ;---------------
 ;
-		
+
 GetUncommon	segment	resource
 
 COMMENT @----------------------------------------------------------------------
@@ -895,7 +895,7 @@ PASS:
 	ss:bp  - DrawMonikerArgs
 
 RETURN:
-	ax, bx - position of the moniker 
+	ax, bx - position of the moniker
 	bp - preserved
 
 DESTROYED:
@@ -930,7 +930,7 @@ GetUncommon	ends
 ;
 ;---------------
 ;
-		
+
 Resident	segment	resource
 
 
@@ -981,7 +981,7 @@ EC<	call	GenCheckGenAssumption	; Make sure gen data exists >
 						;will do error checking
 
 GenGetMonikerSize	endp
-	
+
 
 
 COMMENT @----------------------------------------------------------------------
@@ -1109,7 +1109,7 @@ haveSize:
 	call	LMemAlloc		; allocate a new chunk
 
 	pop	si			;*ES:SI <- source chunk
-	
+
 	; Copy the old chunk => new chunk
 	;
 	tst	cx			; empty chunk?
@@ -1123,7 +1123,7 @@ haveSize:
 ;
 ;	Now, *ES:DI = dest, *DS:SI = source
 ;
-	mov	di, es:[di]		;ES:DI <- dest 
+	mov	di, es:[di]		;ES:DI <- dest
 	mov	si, ds:[si]		;DS:SI <- source
 	rep	movsb			; Copy over contents
 	mov	ds, bp			;Restore ES,DS
@@ -1274,7 +1274,7 @@ GenSetDWord	proc	far
 	mov	di, ds:[si]		; point at instance
 	add	di, ds:[di].Gen_offset	; get offset to Gen master part
 	add	di, bx			; add in offset into gen part
-	cmp	cx, ds:[di].handle	
+	cmp	cx, ds:[di].handle
 	jne	storeNew
 	cmp	dx, ds:[di].chunk
 	je	exit			; no, change, exit, carry clear
@@ -1341,7 +1341,7 @@ ROUTINE:	GenSetBitInByte
 
 SYNOPSIS:	Sets a bit in a byte record, marking the byte dirty if the
 		bit actually changed.
-		
+
 CALLED BY:	GenItemGroupSetIndeterminateState
 
 PASS:		*ds:si -- object
@@ -1368,7 +1368,7 @@ GenSetBitInByte	proc	far			uses	bp, cx, dx, di
 	class	GenClass
 	.enter
 	mov	bp, cx				;passed flag in bp
-	mov	di, ds:[si]			
+	mov	di, ds:[si]
 	add	di, ds:[di].Gen_offset
 	add	di, bx				; add in offset into gen part
 	mov	cl, ds:[di]
@@ -1615,11 +1615,11 @@ PASS:		*ds:si	= GenClass object
 		dx	= ITMP_spacing
 		bp	= VisMonikerSearchFlags
 RETURN:		^lcx:dx	= icon/text combination moniker
-DESTROYED:	
-SIDE EFFECTS:	
+DESTROYED:
+SIDE EFFECTS:
 
 PSEUDO CODE/STRATEGY:
-		
+
 
 REVISION HISTORY:
 	Name	Date		Description
@@ -1662,13 +1662,13 @@ EC <	ERROR_Z	-1							>
 	; Now combine the monikers
 
 	CheckHack <offset CITMF_POSITION_ICON_ABOVE_TEXT eq \
-		   offset ITMF_POSITION_ICON_ABOVE_TEXT> 
+		   offset ITMF_POSITION_ICON_ABOVE_TEXT>
 	CheckHack <offset CITMF_SWAP_ICON_TEXT eq \
-		   offset ITMF_SWAP_ICON_TEXT> 
+		   offset ITMF_SWAP_ICON_TEXT>
 
 	sub	sp, size CreateIconTextMonikerParams
 	mov	bx, sp
-	mov	ax, ss:[monikerFlags]		
+	mov	ax, ss:[monikerFlags]
 	andnf	ax, mask CITMF_POSITION_ICON_ABOVE_TEXT or \
 			mask CITMF_SWAP_ICON_TEXT
 	mov	ss:[bx].CITMP_flags, ax
@@ -1694,7 +1694,7 @@ Build	ends
 ;
 ;---------------
 ;
-		
+
 BuildUncommon	segment	resource
 
 
@@ -1710,7 +1710,7 @@ DESCRIPTION:	Add a child object to a composite.  Allows caller to state
 CALLED BY:	GLOBAL (utility)
 
 PASS:
-	*ds:si - instance data 
+	*ds:si - instance data
 
 	^lcx:dx  - object to add
 	^lax:bx  - reference child
@@ -1789,7 +1789,7 @@ BuildUncommon	ends
 ;
 ;---------------
 ;
-		
+
 Build	segment	resource
 
 
@@ -1943,25 +1943,25 @@ GenRemoveDownwardLink	proc	far
 EC <	call	ECCheckLMemObject					>
 ;	mov	di, ds:[si]			;point to instance
 ;	add	di, ds:[di].Gen_offset		;ds:[di] -- GenInstance
-;	mov	al, ds:[di].GI_states		;get the state flags	
+;	mov	al, ds:[di].GI_states		;get the state flags
 ;	and	al, mask GS_USABLE		;just keep usable flag
 ;	push	ax				;save it
 ;	and	ds:[di].GI_states, not mask GS_USABLE	;clear the usable flag
-	
+
 	push	si				;save si
 	call	GenSwapLockParent		;set *ds:si = parent
 	pop	dx				;restore child's handle
 	push	dx				;save again
 	mov	cx, bx				;child's block in cx
 	push	bx				;save child's block
-	
+
 						;*ds:si is parent
 						;^lcx:dx is object to remove
 	call	GenRemoveGenChildLow		;remove the child
 	call	GenAddChildUpwardLinkOnly	;and add upward link back in
 	pop	bx				;restore bx
 	call	ObjSwapUnlock
-	pop	si				;child back in *ds:si	
+	pop	si				;child back in *ds:si
 ;	pop	ax
 ;	mov	di, ds:[si]			;point to instance
 ;	add	di, ds:[di].Gen_offset		;ds:[di] -- GenInstance
@@ -2066,7 +2066,7 @@ REVISION HISTORY:
 GenQueryUICallSpecificUI	proc	far
 	push	ax
 
-	call	GenSpecGrowParents	; Force all generic parents to be 
+	call	GenSpecGrowParents	; Force all generic parents to be
 					; specifically grown out before
 					; this object is
 
@@ -2203,7 +2203,7 @@ DESCRIPTION:	"Unbuild" a generic branch by shrinking the vis & specific
 		Starts by recursively sending GenSpecShrinkBranch to any child
 		which has been specifically grown.
 
-		Relies on assumption that any object which has been 
+		Relies on assumption that any object which has been
 		specifically grown has all parent objects grown as well.
 
 CALLED BY:	EXTERNAL
@@ -2297,7 +2297,7 @@ COMMENT @----------------------------------------------------------------------
 
 FUNCTION:	GenSpecShrinkCallBack
 
-DESCRIPTION:	Generically unbuilds branch at each child 
+DESCRIPTION:	Generically unbuilds branch at each child
 
 CALLED BY:	INTERNAL
 			GenSpecShrinkBranch
@@ -2809,7 +2809,7 @@ EC <		pushdw	bxsi						>
 EC <		movdw	bxsi, esdi					>
 EC <		call	ECAssertValidFarPointerXIP			>
 EC <		popdw	bxsi						>
-endif		
+endif
 
 treeLoop:
 
@@ -2880,7 +2880,7 @@ REVISION HISTORY:
 ------------------------------------------------------------------------------@
 
 
-if	ERROR_CHECK		; NOT EXPORTED, so don't need to have ret 
+if	ERROR_CHECK		; NOT EXPORTED, so don't need to have ret
 				; in non-ec case
 
 if	0	;Not currently used
@@ -2928,7 +2928,7 @@ PASS:		*ds:si -- handle of object
 			bp low - ToggleState
 			bp high - scan code
 
-RETURN:		carry set if accelerator found 
+RETURN:		carry set if accelerator found
 
 DESTROYED:	di, ax
 
@@ -2946,12 +2946,12 @@ REVISION HISTORY:
 GenCheckKbdAccelerator	proc	far
 	class	GenClass
 	kbdAccelerator	local	KeyboardShortcut
-	savedBp		local	word	
-	
+	savedBp		local	word
+
 	mov	di, bp				;save bp
 	.enter
 	mov	savedBp, di			;   in a local variable
-	
+
 	mov	di, ds:[si]			;point to instance
 	add	di, ds:[di].Gen_offset		;ds:[di] -- GenInstance
 	mov	di, ds:[di].GI_kbdAccelerator	;get kbd accelerator to match
@@ -3003,7 +3003,7 @@ Navigation ends
 ;
 
 Resident segment resource
-       
+
 
 COMMENT @----------------------------------------------------------------------
 
@@ -3214,7 +3214,7 @@ CALLED BY:	GLOBAL (utility)
 PASS:	*ds:si -- handle of your object
 
 	cx	- optimization flag:
-	
+
 		  If non-zero, routine will take no shortcuts, & check each
 		  object up to GenApplication or GenSystem before approving
 		  the object as FULLY ENABLED.
