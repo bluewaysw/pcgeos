@@ -631,7 +631,7 @@ Classes & Methods
     MemUnlock(HandleOf(appList));
 }
 
-
+/*
 @method GeodeTokenTriggerClass, MSG_SET_TRIGGER_MONIKER
 {
     Boolean             isMoniker = FALSE;
@@ -642,15 +642,17 @@ Classes & Methods
     DisplayScheme	    ds;
     MemHandle           mhHeap = NullHandle;
 
-    mhHeap = MemAlloc(STD_INIT_HEAP, HF_DYNAMIC, HAF_STANDARD_LOCK);
-    LMemInitHeap(
-        mhHeap,
-        LMEM_TYPE_GENERAL,
-        0,
-        sizeof(LMemBlockHeader),
-        2,
-        STD_INIT_HEAP
-    );
+    mhHeap = MemAllocLMem(LMEM_TYPE_GENERAL, sizeof(LMemBlockHeader));
+    MemLock(mhHeap);
+    // mhHeap = MemAlloc(STD_INIT_HEAP, HF_DYNAMIC, HAF_STANDARD_LOCK);
+    // LMemInitHeap(
+    //     mhHeap,
+    //     LMEM_TYPE_GENERAL,
+    //     0,
+    //     sizeof(LMemBlockHeader),
+    //     2,
+    //     STD_INIT_HEAP
+    // );
 
     @call GeodeGetAppObject(0)::MSG_GEN_APPLICATION_GET_DISPLAY_SCHEME(&ds);
 
@@ -696,6 +698,118 @@ Classes & Methods
     MemUnlock(mhHeap);
     MemFree(mhHeap);
 }
+*/
+
+
+@method GeodeTokenTriggerClass, MSG_SET_TRIGGER_MONIKER
+{
+    Boolean             isMoniker = FALSE;
+    ChunkHandle         iconMoniker = NULL;
+    ChunkHandle         textMoniker = NULL;
+    ChunkHandle         comboMoniker = NULL;
+    optr                comboMonikerOptr = NULL;
+    GStateHandle        comboMonikerGState = NULL;
+    GStateHandle        iconGString = NULL;
+
+    word                chunkSize = NULL;
+    DisplayScheme	    ds;
+    MemHandle           mhHeap = NullHandle;
+    Rectangle           rect;
+    word                width;
+    word                height;
+    VisMoniker*         vmp;
+    byte*               gstr;
+    word                foo;
+
+    // mhHeap = MemAllocLMem(LMEM_TYPE_GENERAL, sizeof(LMemBlockHeader));
+    mhHeap = MemAlloc(STD_INIT_HEAP, HF_DYNAMIC, HAF_STANDARD_LOCK);
+    LMemInitHeap(
+        mhHeap,
+        LMEM_TYPE_GENERAL,
+        0,
+        sizeof(LMemBlockHeader),
+        2,
+        STD_INIT_HEAP
+    );
+
+    @call GeodeGetAppObject(0)::MSG_GEN_APPLICATION_GET_DISPLAY_SCHEME(&ds);
+
+    isMoniker = TokenLoadMonikerChunk(
+        TOKEN_CHARS(tok->GT_chars[0],tok->GT_chars[1],tok->GT_chars[2],tok->GT_chars[3]),
+        tok->GT_manufID,
+        ds.DS_displayType,
+        ((VMSF_GSTRING | VMSF_COPY_CHUNK) | (VMS_TOOL << VMSF_STYLE_OFFSET)),
+        mhHeap,
+        &chunkSize,
+        &iconMoniker
+    );
+
+    isMoniker = TokenLoadMonikerChunk(
+        TOKEN_CHARS(tok->GT_chars[0],tok->GT_chars[1],tok->GT_chars[2],tok->GT_chars[3]),
+        tok->GT_manufID,
+        ds.DS_displayType,
+        (VMSF_COPY_CHUNK | (VMS_TEXT << VMSF_STYLE_OFFSET)),
+        mhHeap,
+        &chunkSize,
+        &textMoniker
+    );
+
+    // @send oself::MSG_GEN_REPLACE_VIS_MONIKER_OPTR(ConstructOptr(mhHeap, iconMoniker), VUM_NOW);
+    // @send oself::MSG_GEN_REPLACE_VIS_MONIKER_OPTR(ConstructOptr(mhHeap, textMoniker), VUM_NOW);
+
+    if (iconMoniker && textMoniker)
+    {
+        // Create a GState that draws into an LMem chunk in the block.
+        comboMonikerGState = GrCreateGString(mhHeap, GST_CHUNK, (word*) &comboMoniker);
+
+        // Return the optr of the storage area in the space provided.
+        comboMonikerOptr = ConstructOptr(mhHeap, comboMoniker);
+
+        // draw icon as gstring
+        vmp = (VisMoniker*) LMemDeref(ConstructOptr(mhHeap, iconMoniker));
+        gstr = (byte *)vmp+(sizeof(VisMonikerWithGString));
+
+        iconGString = GrLoadGString(
+            PtrToSegment(gstr),
+            GST_PTR,
+            PtrToOffset(gstr)
+        );
+
+        GrDrawGString(comboMonikerGState, iconGString, 0, 1, 0, &foo);
+
+        // draw text
+        // vmp = (VisMoniker*) ConstructOptr(mhHeap, textMoniker);
+        // gstr = (byte *)vmp+(sizeof(VisMonikerWithText));
+        // GrDrawText(comboMonikerGState, 0, 0, gstr, 0);
+        // GrDrawText(comboMonikerGState, 0, 0, _TEXT("WOW"), strlen(_TEXT("WOW")));
+
+
+        // size of gstring
+        GrGetGStringBounds(comboMonikerGState, 0, 0, &rect) ;
+        height = rect.R_bottom - rect.R_top ;
+        width = rect.R_right - rect.R_left ;
+
+        // finalize
+        GrEndGString(comboMonikerGState);
+
+        @call oself::MSG_GEN_REPLACE_VIS_MONIKER(
+            VUM_NOW,
+            width, height, sizeof(comboMonikerOptr),
+            VMDT_GSTRING,
+            VMST_OPTR,
+            (dword) comboMonikerOptr);
+
+        GrDestroyGString(comboMonikerGState, 0, GSKT_KILL_DATA);
+    }
+
+    MemFree(mhHeap);
+    MemFree(iconGString);
+
+    //MemUnlock(mhHeap);
+    //MemFree(mhHeap);
+}
+
+
 
 /*-------------------------------------------------------------------
 remove all our triggers from SysTray
