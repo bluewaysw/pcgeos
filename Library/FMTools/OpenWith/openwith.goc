@@ -595,6 +595,7 @@ Classes & Methods
     word                num = 0;
     word                elSize = 0;
     optr                triggerObj = NullOptr;
+    char                fname[FILE_LONGNAME_BUFFER_SIZE] = {0};
 
     @call oself::MSG_REMOVE_ALL_APP_TRIGGERS();
 
@@ -609,12 +610,13 @@ Classes & Methods
             FileSetStandardPath(SP_APPLICATION);
             filePtr = (char*) ChunkArrayElementToPtr(appList, triggerNo, &elSize);
             FileGetPathExtAttributes(filePtr, FEA_TOKEN, (&tok), sizeof(GeodeToken));
+            FileGetPathExtAttributes(filePtr, FEA_NAME, fname, sizeof(FileLongName));
             FilePopDir();
 
             triggerObj = ObjInstantiate(OptrToHandle(oself), (ClassStruct*)&OpenWithAppLaunchTriggerClass);
             @send oself::MSG_GEN_ADD_CHILD(triggerObj, CCO_LAST);
 
-            @send triggerObj::MSG_SET_TRIGGER_MONIKER(&tok);
+            @send triggerObj::MSG_SET_TRIGGER_MONIKER(&tok, fname);
             @send triggerObj::MSG_GEN_TRIGGER_SET_DESTINATION(@dup(@SelectDialog));
             @send triggerObj::MSG_GEN_TRIGGER_SET_ACTION_MSG(MSG_APP_TRIGGER_PRESSED);
             @send triggerObj::MSG_META_ADD_VAR_DATA((ATTR_GEODE_TOKEN_TO_PASS & (~VDF_SAVE_TO_STATE)), sizeof(GeodeToken), &tok);
@@ -692,9 +694,7 @@ Classes & Methods
 {
     Boolean             isMoniker = FALSE;
     ChunkHandle         iconMoniker = NullChunk;
-    ChunkHandle         textMoniker = NullChunk;
     ChunkHandle         comboMoniker = NullChunk;
-    optr                comboMonikerOptr = NullOptr;
     GStateHandle        comboMonikerGState = NullHandle;
     GStateHandle        iconGString = NullHandle;
 
@@ -720,57 +720,43 @@ Classes & Methods
         &iconMoniker
     );
 
-    isMoniker = TokenLoadMonikerChunk(
-        TOKEN_CHARS(tok->GT_chars[0],tok->GT_chars[1],tok->GT_chars[2],tok->GT_chars[3]),
-        tok->GT_manufID,
-        ds.DS_displayType,
-        (VMSF_COPY_CHUNK | (VMS_TEXT << VMSF_STYLE_OFFSET)),
-        mhHeap,
-        &chunkSize,
-        &textMoniker
-    );
-
     // @send oself::MSG_GEN_REPLACE_VIS_MONIKER_OPTR(ConstructOptr(mhHeap, iconMoniker), VUM_NOW);
-    // @send oself::MSG_GEN_REPLACE_VIS_MONIKER_OPTR(ConstructOptr(mhHeap, textMoniker), VUM_NOW);
 
-    if (iconMoniker && textMoniker)
+    if (iconMoniker)
     {
         // Create a GState that draws into an LMem chunk in the block.
         comboMonikerGState = GrCreateGString(mhHeap, GST_CHUNK, (word*) &comboMoniker);
 
-        // Return the optr of the storage area in the space provided.
-        comboMonikerOptr = ConstructOptr(mhHeap, comboMoniker);
-
         // draw icon as gstring
         vmp = (VisMoniker*) LMemDeref(ConstructOptr(mhHeap, iconMoniker));
         gstr = (byte *)vmp+(sizeof(VisMonikerWithGString));
-        iconGString = GrLoadGString(PtrToSegment(gstr),GST_PTR,PtrToOffset(gstr));
+        iconGString = GrLoadGString(PtrToSegment(gstr), GST_PTR, PtrToOffset(gstr));
         GrDrawGStringAtCP(comboMonikerGState, iconGString, 0, &foo);
 	    GrDestroyGString(iconGString, comboMonikerGState, GSKT_LEAVE_DATA);
 
-        // draw text
-        vmp = (VisMoniker*) LMemDeref(ConstructOptr(mhHeap, textMoniker));
-        gstr = (byte *)vmp+(sizeof(VisMonikerWithText));
-        GrDrawText(comboMonikerGState, 20, 1, (char*) gstr, 0);
+        // Text
+        GrDrawText(comboMonikerGState, 20, 1, fname, 0);
 
         // finalize
         GrEndGString(comboMonikerGState);
+        GrDestroyGString(comboMonikerGState, comboMonikerGState, GSKT_LEAVE_DATA);
 
         @call oself::MSG_GEN_REPLACE_VIS_MONIKER(
-            VUM_DELAYED_VIA_APP_QUEUE,
+            VUM_NOW,
             0,0,0,
             VMDT_GSTRING,
             VMST_OPTR,
-            (dword) comboMonikerOptr);
-
-        GrDestroyGString(comboMonikerGState, comboMonikerGState, GSKT_KILL_DATA);
+            (dword) ConstructOptr(mhHeap, comboMoniker)
+        );
+    }
+    else
+    {
+        @call oself::MSG_GEN_REPLACE_VIS_MONIKER_TEXT(fname, VUM_NOW);
     }
 
     MemUnlock(mhHeap);
     MemFree(mhHeap);
 }
-
-
 
 /*-------------------------------------------------------------------
 remove all our triggers from SysTray
