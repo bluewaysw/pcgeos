@@ -94,7 +94,7 @@ Resourcen
     }
 
     @object GenInteractionClass OpenWithGroup = {
-        GI_visMoniker = "Select applications to use in the 'Open With' dialogue";
+        GI_visMoniker = "Applications to use in the 'Open With' dialog";
         GI_comp =	@AddAppSelector,
                     @AddAppTrigger,
                     @OpenWithAppListGroup;
@@ -188,17 +188,12 @@ Resourcen
 /**************************************************************
 dgroup
 **************************************************************/
-//API Struct - MUST be global
-FMToolStruct FMToolInfo[1] = {
-    {
-        @ToolNameMoniker, (FMTF_SELECTED_ONLY | FMTT_DIALOG), 1
-    }
-};
-
-optr    appList = NullOptr;
+optr    appList                 = NullOptr;
 #define TOOL_ICON_WIDTH         15
 #define TOOL_ICON_HEIGHT        15
 #define TOOL_ICON_FLAGS         ((VMSF_GSTRING) | (VMS_TOOL << VMSF_STYLE_OFFSET))
+const char  iniCat[] = "fileManager";
+const char  iniKey[] = "openWith";
 
 
 MemHandle    G_selFiles = NullHandle;
@@ -207,6 +202,13 @@ MemHandle    G_selFiles = NullHandle;
 /**************************************************************
 FileManager API Function - fetch Tools
 **************************************************************/
+//API Struct - MUST be global
+FMToolStruct FMToolInfo[1] = {
+    {
+        @ToolNameMoniker, (FMTF_SELECTED_ONLY | FMTT_DIALOG), 1
+    }
+};
+
 //FMFetchToolsProc GetThoseTools
 word _pascal _export GetThoseTools(FMToolStruct **tablePtr)
 {
@@ -245,11 +247,15 @@ void _pascal _export OpenWithEntryPoint(
         return;
     }
 
-    // we assume just DOS files in the list as of now and bring up the dialog
+    // we assume just DOS files in the list as of now
+    ReadAppsFromIniFile();
+
     dialog = @call ConstructOptr(filemgr, 0)::MSG_FM_DUP_AND_ADD(@SelectDialog, FMP_APPLICATION);
     @call dialog::MSG_GEN_SET_USABLE(VUM_NOW);
     (void) UserDoDialog(dialog);
     UserDestroyDialog(dialog);
+
+    MemFree(OptrToHandle(appList));
 }
 
 
@@ -269,7 +275,7 @@ Boolean CheckIfUnsupportedFiles()
     curBlock = G_selFiles;
     while (curBlock != 0)
     {
-        headerPtr  = (FileQuickTransferHeader*) MemLock(curBlock); // get pointer to it header
+        headerPtr  = (FileQuickTransferHeader*) MemLock(curBlock); // get pointer to its header
         entriesPtr = (FileOperationInfoEntry*) (headerPtr + 1); // get pointer to first entry (follows header)
 
         for (i=0; i < headerPtr->FQTH_numFiles; i++)
@@ -477,7 +483,7 @@ Boolean checkIfInList(optr list, char* appName, word listLen)
 /********************************************************************
 
 ********************************************************************/
-void readAppsFromIniFile()
+void ReadAppsFromIniFile()
 {
     MemHandle       mh = NullHandle;
     ChunkHandle     ch = NullChunk;
@@ -493,8 +499,8 @@ void readAppsFromIniFile()
     ourList = appList;
 
     InitFileEnumStringSection(
-        _TEXT("fileManager"),
-        _TEXT("openWith"),
+        iniCat,
+        iniKey,
         IFRF_READ_ALL,
         ReadAppsCallback,
         (void*) &ourList);
@@ -518,14 +524,14 @@ Boolean ReadAppsCallback(const char *stringSection, word sectionNum, void* enumD
 /********************************************************************
 
 ********************************************************************/
-void writeIniFile()
+void WriteAppsToIniFile()
 {
     word    i = 0;
     char*   str = (char*) 0;
     word    elSize = 0;
     word    listLen = 0;
 
-    InitFileDeleteEntry(_TEXT("fileManager"), _TEXT("openWith"));
+    InitFileDeleteEntry(iniCat, iniKey);
 
     MemLock(HandleOf(appList));
     listLen = ChunkArrayGetCount(appList);
@@ -535,8 +541,8 @@ void writeIniFile()
     {
         str = (char*) ChunkArrayElementToPtr(appList, i, &elSize);
             InitFileWriteStringSection(
-            _TEXT("fileManager"),
-            _TEXT("openWith"),
+            iniCat,
+            iniKey,
             str
         );
     }
@@ -554,11 +560,10 @@ Classes & Methods
 /********************************************************************
 
 ********************************************************************/
-@method OpenWithDialogClass, MSG_GEN_INTERACTION_INITIATE
-{
-    readAppsFromIniFile();
-    @callsuper();
-}
+// @method OpenWithDialogClass, MSG_GEN_INTERACTION_INITIATE
+// {
+//     @callsuper();
+// }
 
 /********************************************************************
 
@@ -817,7 +822,7 @@ remove all our triggers from SysTray
 ********************************************************************/
 @method ConfigureDialogClass, MSG_CONFIRM_CONFIGURE_DIALOG
 {
-    writeIniFile();
+    WriteAppsToIniFile();
 
     @call @dup(@SelectContent)::MSG_BUILD_TRIGGERS();
 }
