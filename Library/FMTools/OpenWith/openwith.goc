@@ -95,14 +95,22 @@ Resourcen
 
     @object GenInteractionClass OpenWithGroup = {
         GI_visMoniker = "Applications to use in the 'Open With' dialog";
-        GI_comp =	@AddAppSelector,
-                    @AddAppTrigger,
+        GI_comp =	@OpenWithAddAppGroup,
                     @OpenWithAppListGroup;
 
         HINT_DRAW_IN_BOX;
         HINT_PLACE_MONIKER_ABOVE;
         HINT_ORIENT_CHILDREN_HORIZONTALLY;
         HINT_CENTER_CHILDREN_VERTICALLY;
+    }
+
+    @object GenInteractionClass OpenWithAddAppGroup = {
+        GI_comp =   @AddAppSelector,
+                    @AddAppTrigger;
+
+        HINT_ORIENT_CHILDREN_VERTICALLY;
+        HINT_CENTER_CHILDREN_HORIZONTALLY;
+        HINT_EXPAND_HEIGHT_TO_FIT_PARENT;
     }
 
     @object GenFileSelectorClass AddAppSelector = {
@@ -126,6 +134,8 @@ Resourcen
         GTI_destination = @OpenWithAppList;
         GTI_actionMsg = MSG_ADD_APP;
 
+        HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+        HINT_CENTER_MONIKER;
         HINT_USE_ICON_TEXT_COMBINATION_MONIKER = {0, 7};
     }
 
@@ -189,12 +199,12 @@ Resourcen
 dgroup
 **************************************************************/
 optr    appList                 = NullOptr;
+
 #define TOOL_ICON_WIDTH         15
 #define TOOL_ICON_HEIGHT        15
-#define TOOL_ICON_FLAGS         ((VMSF_GSTRING) | (VMS_TOOL << VMSF_STYLE_OFFSET))
+
 const char  iniCat[] = "fileManager";
 const char  iniKey[] = "openWith";
-
 
 MemHandle    G_selFiles = NullHandle;
 
@@ -692,18 +702,21 @@ Classes & Methods
 
 @method OpenWithAppLaunchTriggerClass, MSG_SET_TRIGGER_MONIKER
 {
-    Boolean             isMoniker = FALSE;
-    ChunkHandle         iconMoniker = NullChunk;
-    ChunkHandle         comboMoniker = NullChunk;
-    GStateHandle        comboMonikerGState = NullHandle;
-    GStateHandle        iconGString = NullHandle;
+    Boolean                 isMoniker = FALSE;
+    ChunkHandle             iconMoniker = NullChunk;
+    ChunkHandle             comboMoniker = NullChunk;
+    GStateHandle            comboMonikerGState = NullHandle;
+    GStateHandle            iconGString = NullHandle;
+    word                    width = 0;
+    word                    height = 0;
 
-    word                chunkSize = 0;
-    DisplayScheme	    ds;
-    MemHandle           mhHeap = NullHandle;
-    VisMoniker*         vmp = (void*) 0;
-    byte*               gstr = (void*) 0;
-    word                foo = 0;
+    word                    chunkSize = 0;
+    DisplayScheme	        ds;
+    MemHandle               mhHeap = NullHandle;
+    VisMonikerWithGString*  vmp = (void*) 0;
+    byte*                   gstr = (void*) 0;
+    word                    foo = 0;
+    char                    buf[5] = {0};
 
     mhHeap = MemAllocLMem(LMEM_TYPE_GENERAL, sizeof(LMemBlockHeader));
     MemLock(mhHeap);
@@ -721,37 +734,43 @@ Classes & Methods
     );
 
     // @send oself::MSG_GEN_REPLACE_VIS_MONIKER_OPTR(ConstructOptr(mhHeap, iconMoniker), VUM_NOW);
+    @call oself::MSG_GEN_REPLACE_VIS_MONIKER_TEXT(fname, VUM_DELAYED_VIA_APP_QUEUE);
 
     if (iconMoniker)
     {
-        // Create a GState that draws into an LMem chunk in the block.
-        comboMonikerGState = GrCreateGString(mhHeap, GST_CHUNK, (word*) &comboMoniker);
+        vmp = (VisMonikerWithGString*) LMemDeref(ConstructOptr(mhHeap, iconMoniker));
+        if (vmp->VMWGS_common.VM_type & VMT_GSTRING)
+        {
+            width = vmp->VMWGS_common.VM_width;
+            height = vmp->VMWGS_height;
 
-        // draw icon as gstring
-        vmp = (VisMoniker*) LMemDeref(ConstructOptr(mhHeap, iconMoniker));
-        gstr = (byte *)vmp+(sizeof(VisMonikerWithGString));
-        iconGString = GrLoadGString(PtrToSegment(gstr), GST_PTR, PtrToOffset(gstr));
-        GrDrawGStringAtCP(comboMonikerGState, iconGString, 0, &foo);
-	    GrDestroyGString(iconGString, comboMonikerGState, GSKT_LEAVE_DATA);
+            if ((height <= TOOL_ICON_HEIGHT) && (width <= TOOL_ICON_WIDTH))
+            {
+                // Create a GState that draws into an LMem chunk in the block.
+                comboMonikerGState = GrCreateGString(mhHeap, GST_CHUNK, (word*) &comboMoniker);
 
-        // Text
-        GrDrawText(comboMonikerGState, 20, 1, fname, 0);
+                // draw icon as gstring
+                gstr = (byte *)vmp+(sizeof(VisMonikerWithGString));
+                iconGString = GrLoadGString(PtrToSegment(gstr), GST_PTR, PtrToOffset(gstr));
+                GrDrawGStringAtCP(comboMonikerGState, iconGString, 0, &foo);
+                GrDestroyGString(iconGString, comboMonikerGState, GSKT_LEAVE_DATA);
 
-        // finalize
-        GrEndGString(comboMonikerGState);
-        GrDestroyGString(comboMonikerGState, comboMonikerGState, GSKT_LEAVE_DATA);
+                // Text
+                GrDrawText(comboMonikerGState, 20, 1, fname, 0);
 
-        @call oself::MSG_GEN_REPLACE_VIS_MONIKER(
-            VUM_NOW,
-            0,0,0,
-            VMDT_GSTRING,
-            VMST_OPTR,
-            (dword) ConstructOptr(mhHeap, comboMoniker)
-        );
-    }
-    else
-    {
-        @call oself::MSG_GEN_REPLACE_VIS_MONIKER_TEXT(fname, VUM_NOW);
+                // finalize
+                GrEndGString(comboMonikerGState);
+                GrDestroyGString(comboMonikerGState, comboMonikerGState, GSKT_LEAVE_DATA);
+
+                @call oself::MSG_GEN_REPLACE_VIS_MONIKER(
+                    VUM_NOW,
+                    0,0,0,
+                    VMDT_GSTRING,
+                    VMST_OPTR,
+                    (dword) ConstructOptr(mhHeap, comboMoniker)
+                );
+            }
+        }
     }
 
     MemUnlock(mhHeap);
@@ -801,6 +820,8 @@ remove all our triggers from SysTray
 {
     WriteAppsToIniFile();
 
+    @call @dup(@SelectContent)::MSG_VIS_INVALIDATE();
+    @call @dup(@SelectContent)::MSG_GEN_UPDATE_VISUAL(VUM_NOW);
     @call @dup(@SelectContent)::MSG_BUILD_TRIGGERS();
 }
 
@@ -861,7 +882,7 @@ three arguments:
     MemLock(HandleOf(appList));
 
     filePtr = (char*) ChunkArrayElementToPtr(appList, item, &elSize);
-    fname = strrchr(filePtr, '\\');
+    fname = strrchr(filePtr, '\\') + 1;
     @call list::MSG_GEN_DYNAMIC_LIST_REPLACE_ITEM_TEXT(item, fname);
 
     MemUnlock(HandleOf(appList));
