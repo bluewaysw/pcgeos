@@ -26,6 +26,6 @@ export SHOWSTOPPER
 #classes
 export OpenWithDialogClass
 export OpenWithContentClass
-export AppDynamicListClass
+export ConfigureAppListClass
 export ConfigureDialogClass
-export GeodeTokenTriggerClass
+export OpenWithAppLaunchTriggerClass
