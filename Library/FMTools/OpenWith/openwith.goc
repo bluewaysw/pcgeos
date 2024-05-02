@@ -699,84 +699,75 @@ Classes & Methods
 }
 */
 
-
 @method OpenWithAppLaunchTriggerClass, MSG_SET_TRIGGER_MONIKER
 {
     Boolean                 isMoniker = FALSE;
-    ChunkHandle             iconMoniker = NullChunk;
-    ChunkHandle             comboMoniker = NullChunk;
-    GStateHandle            comboMonikerGState = NullHandle;
-    GStateHandle            iconGString = NullHandle;
-    word                    width = 0;
-    word                    height = 0;
-
-    word                    chunkSize = 0;
     DisplayScheme	        ds;
     MemHandle               mhHeap = NullHandle;
-    VisMonikerWithGString*  vmp = (void*) 0;
+    VisMoniker*             vmp;
+    byte                    *moniker;
     byte*                   gstr = (void*) 0;
     word                    foo = 0;
+    TokenMonikerInfo        tmi;
+    GStateHandle            gs, mgs;
+    word                    gschunk;
 
-    mhHeap = MemAllocLMem(LMEM_TYPE_GENERAL, sizeof(LMemBlockHeader));
-    MemLock(mhHeap);
+    @call oself::MSG_GEN_REPLACE_VIS_MONIKER_TEXT(fname, VUM_DELAYED_VIA_APP_QUEUE);
 
     @call GeodeGetAppObject(0)::MSG_GEN_APPLICATION_GET_DISPLAY_SCHEME(&ds);
-
-    isMoniker = TokenLoadMonikerChunk(
+    isMoniker = TokenLookupMoniker(
         TOKEN_CHARS(tok->GT_chars[0],tok->GT_chars[1],tok->GT_chars[2],tok->GT_chars[3]),
         tok->GT_manufID,
         ds.DS_displayType,
-        ((VMSF_GSTRING | VMSF_COPY_CHUNK) | (VMS_TOOL << VMSF_STYLE_OFFSET)),
-        mhHeap,
-        &chunkSize,
-        &iconMoniker
+        ((VMSF_GSTRING) | (VMS_TOOL << VMSF_STYLE_OFFSET)),
+        &tmi
     );
 
-    // @send oself::MSG_GEN_REPLACE_VIS_MONIKER_OPTR(ConstructOptr(mhHeap, iconMoniker), VUM_NOW);
-    @call oself::MSG_GEN_REPLACE_VIS_MONIKER_TEXT(fname, VUM_DELAYED_VIA_APP_QUEUE);
-
-    if (iconMoniker)
+    if (isMoniker)
     {
-        vmp = (VisMonikerWithGString*) LMemDeref(ConstructOptr(mhHeap, iconMoniker));
-        if (vmp->VMWGS_common.VM_type & VMT_GSTRING)
+        moniker = TokenLockTokenMoniker(tmi);
+        vmp = LMemDeref((optr) moniker);
+
+        if (vmp->VM_width <= TOOL_ICON_WIDTH)
         {
-            width = vmp->VMWGS_common.VM_width;
-            height = vmp->VMWGS_height;
+            // prepare "Canvas", GState for drawing
+            mhHeap = MemAllocLMem(LMEM_TYPE_GSTRING, sizeof(LMemBlockHeader));
+            MemLock(mhHeap);
+            gs = GrCreateGString(mhHeap, GST_CHUNK, &gschunk);
 
-            if ((height <= TOOL_ICON_HEIGHT) && (width <= TOOL_ICON_WIDTH))
-            {
-                // Create a GState that draws into an LMem chunk in the block.
-                comboMonikerGState = GrCreateGString(mhHeap, GST_CHUNK, (word*) &comboMoniker);
+            // load icon moniker from Token-DB, draw on canvas
+            gstr = (byte *)vmp+(sizeof(VisMonikerWithGString));
+            mgs = GrLoadGString(PtrToSegment(gstr), GST_PTR, PtrToOffset(gstr));
+            GrSaveState(gs);
+            GrDrawGString(gs, mgs, 0, 1, 0, &foo);
+            GrRestoreState(gs);
+            GrDestroyGString(mgs, gs, GSKT_LEAVE_DATA);
 
-                // draw icon as gstring
-                gstr = (byte *)vmp+(sizeof(VisMonikerWithGString));
-                iconGString = GrLoadGString(PtrToSegment(gstr), GST_PTR, PtrToOffset(gstr));
-                GrSaveState(comboMonikerGState); // recommended
-                GrDrawGStringAtCP(comboMonikerGState, iconGString, 0, &foo); // foo MUST be provided
-                GrRestoreState(comboMonikerGState); // recommended
-                GrDestroyGString(iconGString, comboMonikerGState, GSKT_LEAVE_DATA); // needed, as further drawing (text!) is expected
+            // draw text
+            GrDrawText(gs, TOOL_ICON_WIDTH + 2, 1, fname, 0);
 
-                // Text
-                GrDrawText(comboMonikerGState, 20, 1, fname, 0);
+            // finish
+            GrEndGString(gs);
 
-                // finalize
-                GrEndGString(comboMonikerGState);
-                GrDestroyGString(comboMonikerGState, comboMonikerGState, GSKT_LEAVE_DATA);
+            // replace moniker
+            @call oself::MSG_GEN_REPLACE_VIS_MONIKER(
+                VUM_NOW,
+                0, 0, 0,
+                VMDT_GSTRING,
+                VMST_OPTR,
+            	(dword) ConstructOptr(mhHeap, gschunk)
+            );
 
-                @call oself::MSG_GEN_REPLACE_VIS_MONIKER(
-                    VUM_NOW,
-                    0,0,0,
-                    VMDT_GSTRING,
-                    VMST_OPTR,
-                    (dword) ConstructOptr(mhHeap, comboMoniker)
-                );
-            }
+            // kill everything
+            GrDestroyGString(gs, 0, GSKT_KILL_DATA);
+            MemUnlock(mhHeap);
+            MemFree(mhHeap);
         }
-    }
 
-    MemUnlock(mhHeap);
-    MemFree(mhHeap);
+        TokenUnlockTokenMoniker(moniker);
+    }
 }
+
 
 /*-------------------------------------------------------------------
 remove all our triggers from SysTray
