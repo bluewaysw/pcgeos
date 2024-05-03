@@ -232,15 +232,14 @@ Resourcen
 /**************************************************************
 dgroup
 **************************************************************/
-optr    appList                 = NullOptr;
-
 #define TOOL_ICON_WIDTH         15
 #define TOOL_ICON_HEIGHT        15
 
 const char  iniCat[] = "fileManager";
 const char  iniKey[] = "openWith";
 
-MemHandle    G_selFiles = NullHandle;
+optr        G_appList = NullOptr;
+MemHandle   G_selFiles = NullHandle;
 
 
 /**************************************************************
@@ -299,7 +298,7 @@ void _pascal _export OpenWithEntryPoint(
     (void) UserDoDialog(dialog);
     UserDestroyDialog(dialog);
 
-    MemFree(OptrToHandle(appList));
+    MemFree(OptrToHandle(G_appList));
 }
 
 
@@ -505,7 +504,7 @@ void LaunchApp(
 /********************************************************************
 
 ********************************************************************/
-Boolean checkIfInList(optr list, char* appName, word listLen)
+Boolean CheckIfAppIsAlreadyInList(optr list, char* appName, word listLen)
 {
     word    i = 0;
     char*   str = (char*) 0;
@@ -539,8 +538,8 @@ void ReadAppsFromIniFile()
 
     ch = ChunkArrayCreate(mh, sizeof(PathName) + sizeof(FileLongName), 0, 0);
 
-    appList = ConstructOptr(mh, ch);
-    ourList = appList;
+    G_appList = ConstructOptr(mh, ch);
+    ourList = G_appList;
 
     InitFileEnumStringSection(
         iniCat,
@@ -577,13 +576,13 @@ void WriteAppsToIniFile()
 
     InitFileDeleteEntry(iniCat, iniKey);
 
-    MemLock(HandleOf(appList));
-    listLen = ChunkArrayGetCount(appList);
+    MemLock(HandleOf(G_appList));
+    listLen = ChunkArrayGetCount(G_appList);
 
     // list must be locked!
     for (i = 0; i < listLen; i++)
     {
-        str = (char*) ChunkArrayElementToPtr(appList, i, &elSize);
+        str = (char*) ChunkArrayElementToPtr(G_appList, i, &elSize);
             InitFileWriteStringSection(
             iniCat,
             iniKey,
@@ -592,7 +591,7 @@ void WriteAppsToIniFile()
     }
 
     InitFileCommit();
-    MemUnlock(HandleOf(appList));
+    MemUnlock(HandleOf(G_appList));
 }
 
 
@@ -643,8 +642,8 @@ Classes & Methods
 
     @call oself::MSG_REMOVE_ALL_APP_TRIGGERS();
 
-    MemLock(HandleOf(appList));
-    num = ChunkArrayGetCount(appList);
+    MemLock(HandleOf(G_appList));
+    num = ChunkArrayGetCount(G_appList);
 
     if (num > 0)
     {
@@ -652,7 +651,7 @@ Classes & Methods
         {
             FilePushDir();
             FileSetStandardPath(SP_APPLICATION);
-            filePtr = (char*) ChunkArrayElementToPtr(appList, triggerNo, &elSize);
+            filePtr = (char*) ChunkArrayElementToPtr(G_appList, triggerNo, &elSize);
             FileGetPathExtAttributes(filePtr, FEA_TOKEN, (&tok), sizeof(GeodeToken));
             fname = strrchr(filePtr, '\\')+1;
             FilePopDir();
@@ -670,7 +669,7 @@ Classes & Methods
         }
     }
 
-    MemUnlock(HandleOf(appList));
+    MemUnlock(HandleOf(G_appList));
 }
 
 /*
@@ -829,9 +828,9 @@ Classes & Methods
 
     @callsuper();
 
-    MemLock(HandleOf(appList));
-    num = ChunkArrayGetCount(appList);
-    MemUnlock(HandleOf(appList));
+    MemLock(HandleOf(G_appList));
+    num = ChunkArrayGetCount(G_appList);
+    MemUnlock(HandleOf(G_appList));
 
     @call @dup(@OpenWithAppList)::MSG_GEN_DYNAMIC_LIST_INITIALIZE(num);
     @call @dup(@OpenWithAppList)::MSG_GEN_ITEM_GROUP_SET_NONE_SELECTED(TRUE);
@@ -861,9 +860,9 @@ Classes & Methods
     {
         (void) @call @dup(@AddAppSelector)::MSG_GEN_FILE_SELECTOR_GET_FULL_SELECTION_PATH(pathnameAndFile);
 
-        MemLock(HandleOf(appList));
-        num = ChunkArrayGetCount(appList);
-        if (checkIfInList(appList, pathnameAndFile, num) == FALSE)
+        MemLock(HandleOf(G_appList));
+        num = ChunkArrayGetCount(G_appList);
+        if (CheckIfAppIsAlreadyInList(G_appList, pathnameAndFile, num) == FALSE)
         {
             @call @dup(@AddAppTrigger)::MSG_GEN_SET_ENABLED(VUM_NOW);
         }
@@ -871,7 +870,7 @@ Classes & Methods
         {
             @call @dup(@AddAppTrigger)::MSG_GEN_SET_NOT_ENABLED(VUM_NOW);
         }
-        MemUnlock(HandleOf(appList));
+        MemUnlock(HandleOf(G_appList));
     }
     else
     {
@@ -903,13 +902,13 @@ three arguments:
     word    elSize = 0;
     char*   fname = (char*) 0;
 
-    MemLock(HandleOf(appList));
+    MemLock(HandleOf(G_appList));
 
-    filePtr = (char*) ChunkArrayElementToPtr(appList, item, &elSize);
+    filePtr = (char*) ChunkArrayElementToPtr(G_appList, item, &elSize);
     fname = strrchr(filePtr, '\\') + 1;
     @call list::MSG_GEN_DYNAMIC_LIST_REPLACE_ITEM_TEXT(item, fname);
 
-    MemUnlock(HandleOf(appList));
+    MemUnlock(HandleOf(G_appList));
 }
 
 
@@ -929,22 +928,22 @@ three arguments:
     {
         if (strlen(pathnameAndFile) > 0)
         {
-            MemLock(HandleOf(appList));
+            MemLock(HandleOf(G_appList));
 
-            num = ChunkArrayGetCount(appList);
-            if (checkIfInList(appList, pathnameAndFile, num) == FALSE)
+            num = ChunkArrayGetCount(G_appList);
+            if (CheckIfAppIsAlreadyInList(G_appList, pathnameAndFile, num) == FALSE)
             {
-                str = (char*) ChunkArrayAppend(appList, 0);
+                str = (char*) ChunkArrayAppend(G_appList, 0);
                 strcpy(str, pathnameAndFile);
 
-                num = ChunkArrayGetCount(appList);
+                num = ChunkArrayGetCount(G_appList);
                 @call oself::MSG_GEN_DYNAMIC_LIST_INITIALIZE(num);
                 @call oself::MSG_GEN_ITEM_GROUP_SET_NONE_SELECTED(TRUE);
                 @call @dup(@RemoveAppTrigger)::MSG_GEN_SET_NOT_ENABLED(VUM_NOW);
                 @call @dup(@AddAppTrigger)::MSG_GEN_SET_NOT_ENABLED(VUM_NOW);
             }
 
-            MemUnlock(HandleOf(appList));
+            MemUnlock(HandleOf(G_appList));
         }
     }
 }
@@ -959,15 +958,15 @@ three arguments:
 
 	idx = @call oself::MSG_GEN_ITEM_GROUP_GET_SELECTION();
 
-    MemLock(HandleOf(appList));
+    MemLock(HandleOf(G_appList));
 
-	ChunkArrayDeleteRange(appList, idx, 1);
-    num = ChunkArrayGetCount(appList);
+	ChunkArrayDeleteRange(G_appList, idx, 1);
+    num = ChunkArrayGetCount(G_appList);
     @call oself::MSG_GEN_DYNAMIC_LIST_INITIALIZE(num);
     @call oself::MSG_GEN_ITEM_GROUP_SET_NONE_SELECTED(TRUE);
     @call @dup(@RemoveAppTrigger)::MSG_GEN_SET_NOT_ENABLED(VUM_NOW);
 
-    MemUnlock(HandleOf(appList));
+    MemUnlock(HandleOf(G_appList));
 }
 
 /********************************************************************
@@ -984,32 +983,32 @@ three arguments:
     char*           curApp = (void*) 0;
     char*           prevOrNextApp = (void*) 0;
 
-    MemLock(HandleOf(appList));
-	num = ChunkArrayGetCount(appList);
+    MemLock(HandleOf(G_appList));
+	num = ChunkArrayGetCount(G_appList);
 
 	idx = @call oself::MSG_GEN_ITEM_GROUP_GET_SELECTION();
     otherIdx = idx + upOrDown;
     if (otherIdx == num) { otherIdx = 0; }
     if (otherIdx == -1) { otherIdx = num - 1; }
 
-    curApp = ChunkArrayElementToPtr(appList, idx, &size);
-    prevOrNextApp = ChunkArrayElementToPtr(appList, otherIdx, &size);
+    curApp = ChunkArrayElementToPtr(G_appList, idx, &size);
+    prevOrNextApp = ChunkArrayElementToPtr(G_appList, otherIdx, &size);
 
-    app1 = LMemAlloc(OptrToHandle(appList), PATH_BUFFER_SIZE + FILE_LONGNAME_BUFFER_SIZE);
-    app2 = LMemAlloc(OptrToHandle(appList), PATH_BUFFER_SIZE + FILE_LONGNAME_BUFFER_SIZE);
+    app1 = LMemAlloc(OptrToHandle(G_appList), PATH_BUFFER_SIZE + FILE_LONGNAME_BUFFER_SIZE);
+    app2 = LMemAlloc(OptrToHandle(G_appList), PATH_BUFFER_SIZE + FILE_LONGNAME_BUFFER_SIZE);
 
-    strcpy(LMemDerefHandles(OptrToHandle(appList), app1), curApp);
-    strcpy(LMemDerefHandles(OptrToHandle(appList), app2), prevOrNextApp);
+    strcpy(LMemDerefHandles(OptrToHandle(G_appList), app1), curApp);
+    strcpy(LMemDerefHandles(OptrToHandle(G_appList), app2), prevOrNextApp);
 
-    strcpy(curApp, LMemDerefHandles(OptrToHandle(appList), app2));
-    strcpy(prevOrNextApp, LMemDerefHandles(OptrToHandle(appList), app1));
+    strcpy(curApp, LMemDerefHandles(OptrToHandle(G_appList), app2));
+    strcpy(prevOrNextApp, LMemDerefHandles(OptrToHandle(G_appList), app1));
 
     @call oself::MSG_GEN_DYNAMIC_LIST_INITIALIZE(num);
     @call oself::MSG_GEN_ITEM_GROUP_SET_SINGLE_SELECTION(otherIdx, FALSE);
 
-    LMemFreeHandles(OptrToHandle(appList), app1);
-    LMemFreeHandles(OptrToHandle(appList), app2);
-    MemUnlock(HandleOf(appList));
+    LMemFreeHandles(OptrToHandle(G_appList), app1);
+    LMemFreeHandles(OptrToHandle(G_appList), app2);
+    MemUnlock(HandleOf(G_appList));
 }
 
 
