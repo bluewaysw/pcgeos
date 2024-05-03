@@ -141,7 +141,9 @@ Resourcen
 
     @object GenInteractionClass OpenWithAppListGroup = {
         GI_comp =   @OpenWithAppList,
-                    @RemoveAppTrigger;
+                    @RemoveAppTrigger,
+                    @UpAppTrigger,
+                    @DownAppTrigger;
 
         HINT_ORIENT_CHILDREN_VERTICALLY;
         HINT_CENTER_CHILDREN_HORIZONTALLY;
@@ -166,6 +168,30 @@ Resourcen
         GTI_actionMsg = MSG_REMOVE_APP;
 
         HINT_USE_ICON_TEXT_COMBINATION_MONIKER = {0, 7};
+        HINT_CENTER_MONIKER;
+        HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+    }
+
+    @object GenTriggerClass UpAppTrigger = {
+        GI_visMoniker = "Up";
+
+        GTI_destination = @OpenWithAppList;
+        GTI_actionMsg = MSG_MOVE_APP;
+        ATTR_GEN_TRIGGER_ACTION_DATA = -1;
+
+        // HINT_USE_ICON_TEXT_COMBINATION_MONIKER = {0, 7};
+        HINT_CENTER_MONIKER;
+        HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+    }
+
+    @object GenTriggerClass DownAppTrigger = {
+        GI_visMoniker = "Down";
+
+        GTI_destination = @OpenWithAppList;
+        GTI_actionMsg = MSG_MOVE_APP;
+        ATTR_GEN_TRIGGER_ACTION_DATA = 1;
+
+        // HINT_USE_ICON_TEXT_COMBINATION_MONIKER = {0, 7};
         HINT_CENTER_MONIKER;
         HINT_EXPAND_WIDTH_TO_FIT_PARENT;
     }
@@ -935,6 +961,44 @@ three arguments:
 
     MemUnlock(HandleOf(appList));
 }
+
+/********************************************************************
+
+********************************************************************/
+@method	ConfigureAppListClass, MSG_MOVE_APP
+{
+    sword        idx = 0;
+    sword        otherIdx = 0;
+    word        num = 0;
+    word        size = 0;
+    char        app1[PATH_BUFFER_SIZE + FILE_LONGNAME_BUFFER_SIZE] = {0};
+    char        app2[PATH_BUFFER_SIZE + FILE_LONGNAME_BUFFER_SIZE] = {0};
+    char*       curApp = (void*) 0;
+    char*       prevOrNextApp = (void*) 0;
+
+    MemLock(HandleOf(appList));
+	num = ChunkArrayGetCount(appList);
+
+	idx = @call oself::MSG_GEN_ITEM_GROUP_GET_SELECTION();
+    otherIdx = idx + upOrDown;
+    if (otherIdx == num) { otherIdx = 0; }
+    if (otherIdx == -1) { otherIdx = num - 1; }
+
+    curApp = ChunkArrayElementToPtr(appList, idx, &size);
+    prevOrNextApp = ChunkArrayElementToPtr(appList, otherIdx, &size);
+
+    strcpy(app1, curApp);
+    strcpy(app2, prevOrNextApp);
+
+    strcpy(curApp, app2);
+    strcpy(prevOrNextApp, app1);
+
+    @call oself::MSG_GEN_DYNAMIC_LIST_INITIALIZE(num);
+    @call oself::MSG_GEN_ITEM_GROUP_SET_SINGLE_SELECTION(otherIdx, FALSE);
+
+    MemUnlock(HandleOf(appList));
+}
+
 
 void ShowStopper()
 {
