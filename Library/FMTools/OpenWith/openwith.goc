@@ -967,14 +967,14 @@ three arguments:
 ********************************************************************/
 @method	ConfigureAppListClass, MSG_MOVE_APP
 {
-    sword        idx = 0;
-    sword        otherIdx = 0;
-    word        num = 0;
-    word        size = 0;
-    char        app1[PATH_BUFFER_SIZE + FILE_LONGNAME_BUFFER_SIZE] = {0};
-    char        app2[PATH_BUFFER_SIZE + FILE_LONGNAME_BUFFER_SIZE] = {0};
-    char*       curApp = (void*) 0;
-    char*       prevOrNextApp = (void*) 0;
+    sword           idx = 0;
+    sword           otherIdx = 0;
+    word            num = 0;
+    word            size = 0;
+    ChunkHandle     app1 = NullHandle;
+    ChunkHandle     app2 = NullHandle;
+    char*           curApp = (void*) 0;
+    char*           prevOrNextApp = (void*) 0;
 
     MemLock(HandleOf(appList));
 	num = ChunkArrayGetCount(appList);
@@ -987,15 +987,20 @@ three arguments:
     curApp = ChunkArrayElementToPtr(appList, idx, &size);
     prevOrNextApp = ChunkArrayElementToPtr(appList, otherIdx, &size);
 
-    strcpy(app1, curApp);
-    strcpy(app2, prevOrNextApp);
+    app1 = LMemAlloc(OptrToHandle(appList), PATH_BUFFER_SIZE + FILE_LONGNAME_BUFFER_SIZE);
+    app2 = LMemAlloc(OptrToHandle(appList), PATH_BUFFER_SIZE + FILE_LONGNAME_BUFFER_SIZE);
 
-    strcpy(curApp, app2);
-    strcpy(prevOrNextApp, app1);
+    strcpy(LMemDerefHandles(OptrToHandle(appList), app1), curApp);
+    strcpy(LMemDerefHandles(OptrToHandle(appList), app2), prevOrNextApp);
+
+    strcpy(curApp, LMemDerefHandles(OptrToHandle(appList), app2));
+    strcpy(prevOrNextApp, LMemDerefHandles(OptrToHandle(appList), app1));
 
     @call oself::MSG_GEN_DYNAMIC_LIST_INITIALIZE(num);
     @call oself::MSG_GEN_ITEM_GROUP_SET_SINGLE_SELECTION(otherIdx, FALSE);
 
+    LMemFreeHandles(OptrToHandle(appList), app1);
+    LMemFreeHandles(OptrToHandle(appList), app2);
     MemUnlock(HandleOf(appList));
 }
 
