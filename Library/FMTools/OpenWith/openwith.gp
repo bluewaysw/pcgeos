@@ -25,7 +25,7 @@ export SHOWSTOPPER
 
 #classes
 export OpenWithDialogClass
-export OpenWithContentClass
+export OpenWithTriggerBoxClass
 export ConfigureAppListClass
 export ConfigureDialogClass
 export OpenWithAppLaunchTriggerClass
