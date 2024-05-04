@@ -978,12 +978,17 @@ three arguments:
     sword           otherIdx = 0;
     word            num = 0;
     word            size = 0;
-    ChunkHandle     app1 = NullHandle;
-    ChunkHandle     app2 = NullHandle;
+    ChunkHandle     app1Chunk = NullHandle;
+    ChunkHandle     app2Chunk = NullHandle;
+    char*           app1 = NullHandle;
+    char*           app2 = NullHandle;
     char*           curApp = (void*) 0;
     char*           prevOrNextApp = (void*) 0;
+    MemHandle       appListHan = NullHandle;
 
-    MemLock(HandleOf(G_appList));
+    appListHan = OptrToHandle(G_appList);
+
+    MemLock(appListHan);
 	num = ChunkArrayGetCount(G_appList);
 
 	idx = @call oself::MSG_GEN_ITEM_GROUP_GET_SELECTION();
@@ -994,21 +999,28 @@ three arguments:
     curApp = ChunkArrayElementToPtr(G_appList, idx, &size);
     prevOrNextApp = ChunkArrayElementToPtr(G_appList, otherIdx, &size);
 
-    app1 = LMemAlloc(OptrToHandle(G_appList), PATH_BUFFER_SIZE + FILE_LONGNAME_BUFFER_SIZE);
-    app2 = LMemAlloc(OptrToHandle(G_appList), PATH_BUFFER_SIZE + FILE_LONGNAME_BUFFER_SIZE);
+    app1Chunk = LMemAlloc(appListHan, PATH_BUFFER_SIZE + FILE_LONGNAME_BUFFER_SIZE);
+    app2Chunk = LMemAlloc(appListHan, PATH_BUFFER_SIZE + FILE_LONGNAME_BUFFER_SIZE);
 
-    strcpy(LMemDerefHandles(OptrToHandle(G_appList), app1), curApp);
-    strcpy(LMemDerefHandles(OptrToHandle(G_appList), app2), prevOrNextApp);
+    if ((app1Chunk != NullChunk) && (app2Chunk != NullChunk))
+    {
+        app1 = LMemDerefHandles(appListHan, app1Chunk);
+        app2 = LMemDerefHandles(appListHan, app2Chunk);
 
-    strcpy(curApp, LMemDerefHandles(OptrToHandle(G_appList), app2));
-    strcpy(prevOrNextApp, LMemDerefHandles(OptrToHandle(G_appList), app1));
+        strcpy(app1, curApp);
+        strcpy(app2, prevOrNextApp);
 
-    @call oself::MSG_GEN_DYNAMIC_LIST_INITIALIZE(num);
-    @call oself::MSG_GEN_ITEM_GROUP_SET_SINGLE_SELECTION(otherIdx, FALSE);
+        strcpy(curApp, app2);
+        strcpy(prevOrNextApp, app1);
 
-    LMemFreeHandles(OptrToHandle(G_appList), app1);
-    LMemFreeHandles(OptrToHandle(G_appList), app2);
-    MemUnlock(HandleOf(G_appList));
+        @call oself::MSG_GEN_DYNAMIC_LIST_INITIALIZE(num);
+        @call oself::MSG_GEN_ITEM_GROUP_SET_SINGLE_SELECTION(otherIdx, FALSE);
+
+        LMemFreeHandles(appListHan, app1Chunk);
+        LMemFreeHandles(appListHan, app2Chunk);
+    }
+
+    MemUnlock(appListHan);
 }
 
 
