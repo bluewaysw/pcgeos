@@ -1,3 +1,10 @@
+/***********************************************************************
+PROJECT:	PC/GEOS Ensemble
+MODULE:	    OpenWith
+AUTHOR:     MeyerK
+NOTES:      started in 2024/04 for FreeGEOS project
+***********************************************************************/
+
 @include <openwith.goh>
 
 /***********************************************************************
@@ -293,6 +300,7 @@ void _pascal _export OpenWithEntryPoint(
     G_selFiles = @call ConstructOptr(filemgr, 0)::MSG_FM_GET_SELECTED_FILES();
 
     // check for non-DOS files, folders, etc. first
+    // we assume just DOS files in the list afterwards
     if (CheckIfUnsupportedFiles()) // true on ERROR
     {
         UserStandardDialogOptr(
@@ -304,14 +312,16 @@ void _pascal _export OpenWithEntryPoint(
         return;
     }
 
-    // we assume just DOS files in the list as of now
+    // read apps from the INI just once
     ReadAppsFromIniFile();
 
+    // bring up dialog
     dialog = @call ConstructOptr(filemgr, 0)::MSG_FM_DUP_AND_ADD(@SelectDialog, FMP_APPLICATION);
     @call dialog::MSG_GEN_SET_USABLE(VUM_NOW);
     (void) UserDoDialog(dialog);
     UserDestroyDialog(dialog);
 
+    // clean up our app list
     MemFree(OptrToHandle(G_appList));
 }
 
@@ -516,7 +526,7 @@ void LaunchApp(
 }
 
 /********************************************************************
-
+is app already on our trigger list?
 ********************************************************************/
 Boolean CheckIfAppIsAlreadyInList(optr list, char* appName, word listLen)
 {
@@ -538,7 +548,7 @@ Boolean CheckIfAppIsAlreadyInList(optr list, char* appName, word listLen)
 }
 
 /********************************************************************
-
+read apps from GEOS.INI
 ********************************************************************/
 void ReadAppsFromIniFile()
 {
@@ -566,7 +576,7 @@ void ReadAppsFromIniFile()
 }
 
 /********************************************************************
-
+the callback for reading an INI string blob...
 ********************************************************************/
 Boolean ReadAppsCallback(const char *stringSection, word sectionNum, void* enumData)
 {
@@ -579,7 +589,7 @@ Boolean ReadAppsCallback(const char *stringSection, word sectionNum, void* enumD
 }
 
 /********************************************************************
-
+write apps to the INI
 ********************************************************************/
 void WriteAppsToIniFile()
 {
@@ -614,7 +624,17 @@ Classes & Methods
 ********************************************************************/
 
 /********************************************************************
+when dialog opens, install triggers
+********************************************************************/
+@method OpenWithDialogClass, MSG_GEN_INTERACTION_INITIATE
+{
+    @callsuper();
 
+    @call @dup(@SelectTriggerBox)::MSG_BUILD_TRIGGERS();
+}
+
+/********************************************************************
+an app trigger has been pressed, launch app with files
 ********************************************************************/
 @method OpenWithDialogClass, MSG_APP_TRIGGER_PRESSED
 {
@@ -629,20 +649,8 @@ Classes & Methods
     @call oself::MSG_GEN_GUP_INTERACTION_COMMAND(IC_OK);
 }
 
-
 /********************************************************************
-
-********************************************************************/
-@method OpenWithDialogClass, MSG_GEN_INTERACTION_INITIATE
-{
-    @callsuper();
-
-    @call @dup(@SelectTriggerBox)::MSG_BUILD_TRIGGERS();
-}
-
-
-/********************************************************************
-
+build our triggers from the apps in GEOS.INI
 ********************************************************************/
 @method OpenWithTriggerBoxClass, MSG_BUILD_TRIGGERS
 {
@@ -746,6 +754,10 @@ Classes & Methods
 }
 */
 
+/********************************************************************
+set the tool icon + fname moniker
+params: tok, fname
+********************************************************************/
 @method OpenWithAppLaunchTriggerClass, MSG_SET_TRIGGER_MONIKER
 {
     Boolean                 isMoniker = FALSE;
@@ -816,9 +828,9 @@ Classes & Methods
 }
 
 
-/*-------------------------------------------------------------------
-
--------------------------------------------------------------------*/
+/********************************************************************
+remove all the triggers, called by ...BUILD_TRIGGERS
+********************************************************************/
 @method OpenWithTriggerBoxClass, MSG_REMOVE_ALL_APP_TRIGGERS
 {
     optr    trigger = NullOptr;
@@ -834,7 +846,7 @@ Classes & Methods
 }
 
 /********************************************************************
-
+when opening config dialog...
 ********************************************************************/
 @method ConfigureDialogClass, MSG_GEN_INTERACTION_INITIATE
 {
@@ -855,7 +867,7 @@ Classes & Methods
 
 
 /********************************************************************
-
+when closing config dialog with OK...
 ********************************************************************/
 @method ConfigureDialogClass, MSG_CONFIRM_CONFIGURE_DIALOG
 {
@@ -865,7 +877,7 @@ Classes & Methods
 }
 
 /********************************************************************
-
+when browsing files in the FS, enable/disable things
 ********************************************************************/
 @method ConfigureDialogClass, MSG_FILEBROW_SELECTOR_ACTION
 {
@@ -895,6 +907,7 @@ Classes & Methods
 }
 
 /********************************************************************
+when browsing the list of apps...
 three arguments:
     selection (the contents of GIGI_selection)
     numSelections (the contents of GIGI_numSelections)
@@ -912,7 +925,8 @@ three arguments:
 
 
 /********************************************************************
-// (optr list, word item);
+give the list the moniker it request: a filename
+Params: optr list, word item
 ********************************************************************/
 @method	ConfigureAppListClass, MSG_QUERY_APP_MONIKER
 {
@@ -931,7 +945,7 @@ three arguments:
 
 
 /********************************************************************
-
+add an app to the list
 ********************************************************************/
 @method	ConfigureAppListClass, MSG_ADD_APP
 {
@@ -969,7 +983,7 @@ three arguments:
 }
 
 /********************************************************************
-
+remove an app from the list
 ********************************************************************/
 @method	ConfigureAppListClass, MSG_REMOVE_APP
 {
@@ -995,7 +1009,7 @@ three arguments:
 }
 
 /********************************************************************
-
+move app in list up/down
 ********************************************************************/
 @method	ConfigureAppListClass, MSG_MOVE_APP
 {
@@ -1050,10 +1064,4 @@ three arguments:
 
         MemUnlock(appListHan);
     }
-}
-
-
-void ShowStopper()
-{
-    return;
 }

@@ -21,7 +21,6 @@ library ansic
 # API functions
 export GETTHOSETOOLS
 export OPENWITHENTRYPOINT
-export SHOWSTOPPER
 
 #classes
 export OpenWithDialogClass
