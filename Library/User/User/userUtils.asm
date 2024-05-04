@@ -17,10 +17,10 @@ REVISION HISTORY:
 
 DESCRIPTION:
 	This file contains utility user interface routines, which are
-	not associated with a particular object class or group
-	(i.e. don't belong in genUtils.asm or visUtils.asm).
+	not associated with a particular object class or group 
+	(i.e. don't belong in genUtils.asm or visUtils.asm). 
 
-
+	
 	$Id: userUtils.asm,v 1.1 97/04/07 11:46:14 newdeal Exp $
 
 ------------------------------------------------------------------------------@
@@ -198,7 +198,7 @@ SimpleSoundHeader STD_ALARM_VOICES = 1
         VoiceOff        0
         General         GE_END_OF_SONG
 
-
+		
 StdSoundAlarm			ends
 
 STD_NO_HELP_VOICES = 1
@@ -240,7 +240,7 @@ PASS:		di  - StandardSoundType
 		ds - dgroup
 RETURN:		nada
 DESTROYED:	nada
-
+ 
 PSEUDO CODE/STRATEGY:
 		This page intentionally left blank
 
@@ -284,7 +284,7 @@ endif
 	mov	bx, segment udata		; bx <- dgroup of UI
 	mov	ds, bx				; ds <- dgroup of UI
 
-	shl	di				;DI <- offset into list of
+	shl	di				;DI <- offset into list of 
 						;standardSoundStreamHandles
 
 	tst	ds:[standardSoundHandles]	;Is there anything there?
@@ -346,7 +346,7 @@ customNote:
 	mov	dl, mask EOSF_UNLOCK or mask EOSF_DESTROY  ; dl <- EOS flags
 	call	SoundPlayMusicNote
 	jmp	done
-
+		
 customBuffer:
 if	FULL_EXECUTE_IN_PLACE
 	;
@@ -415,7 +415,7 @@ CALLED BY:	Entry routine
 PASS:		ds	-> dgroup of ui
 RETURN:		nothing
 DESTROYED:	ax,bx
-SIDE EFFECTS:
+SIDE EFFECTS:	
 		creates four SimpleSoundStreams to use in PlayStandardSound
 PSEUDO CODE/STRATEGY:
 		call SoundStreamAllocSimple for each sound
@@ -462,7 +462,7 @@ topOfLoop:
 	pop	cx
 	loop	topOfLoop
 
-
+		
 	.leave
 	ret
 SetUpStandardSounds	endp
@@ -502,7 +502,7 @@ PSEUDO CODE/STRATEGY:
 			be on top.
 
 KNOWN BUGS/SIDE EFFECTS/IDEAS:
-
+		
 
 REVISION HISTORY:
 	Name	Date		Description
@@ -648,7 +648,7 @@ CALLED BY:	GLOBAL
 PASS:		^lCX:DX - object to register
 RETURN:		nada
 DESTROYED:	nada
-
+ 
 PSEUDO CODE/STRATEGY:
 
 KNOWN BUGS/SIDE EFFECTS/IDEAS:
@@ -683,7 +683,7 @@ CALLED BY:	GLOBAL
 PASS:		^lCX:DX - object to unregister
 RETURN:		nada
 DESTROYED:	nada
-
+ 
 PSEUDO CODE/STRATEGY:
 
 KNOWN BUGS/SIDE EFFECTS/IDEAS:
@@ -719,7 +719,7 @@ CALLED BY:	GLOBAL
 PASS:		nada
 RETURN:		ax = zero if no notification desired
 DESTROYED:	nada
-
+ 
 PSEUDO CODE/STRATEGY:
 
 KNOWN BUGS/SIDE EFFECTS/IDEAS:
@@ -744,7 +744,7 @@ COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 		AddToOrRemoveFromContextList
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-SYNOPSIS:	If the app has supplied a selection type (via the appropriate
+SYNOPSIS:	If the app has supplied a selection type (via the appropriate 
 		vardata entry), we add ourselves to the select state list.
 
 CALLED BY:	GLOBAL
@@ -752,7 +752,7 @@ PASS:		ax - MSG_META_GCN_LIST_ADD/REMOVE
 		^lcx:dx - object to add
 RETURN:		nada
 DESTROYED:	nothing
-
+ 
 PSEUDO CODE/STRATEGY:
 
 KNOWN BUGS/SIDE EFFECTS/IDEAS:
@@ -808,7 +808,7 @@ StandardSoundType	etype	word
 
 	SST_NO_INPUT	enum	StandardSoundType
 	; Sound produced when the users keystrokes/mouse presses are not going
-	; anywhere (if he clicks off a modal dialog box, or clicks on the
+	; anywhere (if he clicks off a modal dialog box, or clicks on the 
 	; field or something)
 
 	SST_KEY_CLICK	enum	StandardSoundType
@@ -833,7 +833,7 @@ StandardSoundType	etype	word
 	; If this is unacceptable, then the stream must use the general
 	; commands to change the settings
 
-	SST_CUSTOM_BUFFER	equ	0xfffe
+	SST_CUSTOM_BUFFER	equ	0xfffe	
 	; Allows applications to play a custom song buffer and does all the
 	; checking for sound being off, etc. This is not a part of the
 	; enumerated type to simplify error checking later.
@@ -869,7 +869,7 @@ RETURN:		interrupts on
 					(countID is needed to call
 					UserStopStandardSound)
 DESTROYED:	nothing
-
+ 
 PSEUDO CODE/STRATEGY:
 		This page intentionally left blank
 
@@ -887,7 +887,7 @@ REVISION HISTORY:
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
 UserStandardSound	proc	far
-
+		
 if	(1)	; Set to (0) to shut this dang thing up!
 
 	uses	 bx, di, ds, cx
@@ -933,10 +933,10 @@ play:
 	;
 	; Check one more thing: if global lowSoundFlag is set to true
 	; in foam library, we will play one particular note, no matter
-	; what is passed.
+	; what is passed. 
 	; -- kho, 5/29/96
 	;
-
+	
 	xchg	ax, di				;DI <- StandardSoundType
 	CallMod	PlayStandardSound
 
@@ -984,7 +984,7 @@ PASS:		ax	= StandardSoundType
 		cx	= countID returned by UserStandardSound
 RETURN:		nothing
 DESTROYED:	nothing
-SIDE EFFECTS:
+SIDE EFFECTS:	
 
 PSEUDO CODE/STRATEGY:
 		If (countID == 0) or (SST_CUSTOM_...) {
@@ -1048,10 +1048,10 @@ CALLED BY:	(INTERNAL) UserStandardSound
 PASS:		nothing
 RETURN:		carry set if flag is true
 DESTROYED:	nothing
-SIDE EFFECTS:
+SIDE EFFECTS:	
 
 PSEUDO CODE/STRATEGY:
-
+		
 
 REVISION HISTORY:
 	Name	Date		Description
@@ -1072,7 +1072,7 @@ CALLED BY:	GLOBAL
 PASS:		nothing
 RETURN:		ax = -1 if system shutting down, 0 otherwise
 DESTROYED:	nada
-
+ 
 PSEUDO CODE/STRATEGY:
 
 KNOWN BUGS/SIDE EFFECTS/IDEAS:
@@ -1108,7 +1108,7 @@ CALLED BY:	GLOBAL
 PASS:		nothing
 RETURN:		ax - handle of HWR library (or 0 if not loaded/not pen mode)
 DESTROYED:	nada
-
+ 
 PSEUDO CODE/STRATEGY:
 
 KNOWN BUGS/SIDE EFFECTS/IDEAS:
@@ -1142,12 +1142,12 @@ PASS:		cx, dx - optr
 		bp - gstate for ink to be drawn through (or 0)
 		ax - width/height of ink (or 0 for default)
 		bx:di - virtual fptr of callback routine (to be passed to
-			ProcCallFixedOrMovable) to determine whether
+			ProcCallFixedOrMovable) to determine whether 
 			a stroke is a gesture or not (BX:DI=0 if none)
-
+			
 RETURN:		bp - handle of IDI structure (or 0 if couldn't alloc)
 DESTROYED:	nothing
-
+ 
 PSEUDO CODE/STRATEGY:
 
 KNOWN BUGS/SIDE EFFECTS/IDEAS:
@@ -1169,18 +1169,18 @@ EC <	call	ECAssertValidFarPointerXIP			>
 EC <	pop	si						>
 EC <continue:							>
 endif
-
+		
 if	ERROR_CHECK
-	tst	bp
-	jz	noGState
-	xchg	bx, bp
-	call	ECCheckMemHandle
+	tst	bp							
+	jz	noGState						
+	xchg	bx, bp							
+	call	ECCheckMemHandle					
 	xchg	bx, bp
 noGState:
 endif
 
 
-
+	
 ;	Set passed object as the destination for the ink, and gstate
 
 	pushdw	bxdi
@@ -1461,7 +1461,7 @@ DESTROYED:	nothing
 	WARNING:  This routine MAY resize LMem and/or object blocks, moving
 		  them on the heap and invalidating stored segment pointers
 		  to them.
-
+ 
 PSEUDO CODE/STRATEGY:
 		This page intentionally left blank
 
@@ -1538,7 +1538,7 @@ DESTROYED:	nothing
 	WARNING:  This routine MAY resize LMem and/or object blocks, moving
 		  them on the heap and invalidating stored segment pointers
 		  to them.
-
+ 
 PSEUDO CODE/STRATEGY:
 		This page intentionally left blank
 
@@ -1598,7 +1598,7 @@ DESTROYED:	nothing
 	WARNING:  This routine MAY resize LMem and/or object blocks, moving
 		  them on the heap and invalidating stored segment pointers
 		  to them.
-
+ 
 PSEUDO CODE/STRATEGY:
 		This page intentionally left blank
 
@@ -1657,10 +1657,10 @@ CALLED BY:	EXTERNAL
 PASS:		CreateIconTextMonikerParams on stack
 RETURN:		^ldx:ax	= newly allocated moniker chunk
 DESTROYED:	nothing
-SIDE EFFECTS:
+SIDE EFFECTS:	
 
 PSEUDO CODE/STRATEGY:
-
+		
 
 REVISION HISTORY:
 	Name	Date		Description
@@ -1682,33 +1682,16 @@ iconSize	local	Point
 
 	; Let's first create a gstate for us to use to calculate sizes.
 
-	cmp	ss:[mParams].CITMP_spacing, 11
-	je	secondTry
-
 	push	bp
 	clr	bx
-	call	GeodeGetAppObject
+	call	GeodeGetAppObject		
 	mov	ax, MSG_VIS_VUP_CREATE_GSTATE
 	mov	di, mask MF_CALL or mask MF_FIXUP_DS
 	call	ObjMessage
-	mov	ax, bp
+	mov	ax, bp	
 	pop	bp
-	mov	ss:[gstate], ax
-	jmp	haveGState
 
-secondTry:
-	push	bp
-	clr	bx
-	call	GeodeGetAppObject
-	call	ECCheckObject
-	mov	ax, MSG_VIS_VUP_CREATE_GSTATE
-	mov	di, mask MF_CALL or mask MF_FIXUP_DS
-	call	ObjMessage
-	mov	ax, bp
-	pop	bp
 	mov	ss:[gstate], ax
-
-haveGState:
 
 	; Make a copy of the icon moniker if necessary
 
@@ -1721,7 +1704,7 @@ haveGState:
 	push	bx, bp
 	mov	ds, ax
 	mov	cx, ss:[mParams].CITMP_destination
-	mov	ss:[newMoniker].handle, cx
+	mov	ss:[newMoniker].handle, cx	
 	clr	ax, bx, dx, di
 	mov	bp, si
 	call	UserCopyChunkOut	; *ds:ax = copied moniker
@@ -1843,7 +1826,7 @@ horizontal::
 
 	test	ss:[mParams].CITMP_flags, mask CITMF_SWAP_ICON_TEXT
 	jnz	swapHoriz
-	mov	cx, ax
+	mov	cx, ax			
 	add	cx, ss:[mParams].CITMP_spacing	; cx = text moniker x-position
 	clr	ax			; ax = icon moniker x-position
 	jmp	horizCommon
@@ -1866,7 +1849,7 @@ iconTaller:
 
 vertical:
 	; Figure out vertical positions
-
+	
 	test	ss:[mParams].CITMP_flags, mask CITMF_SWAP_ICON_TEXT
 	jnz	swapVert
 	mov	dx, bx
@@ -1893,7 +1876,7 @@ drawText:
 	; (ax,bx) = icon moniker position, (cx,dx) = text moniker position
 
 	mov	si, ss:[newMoniker].chunk
-	mov	si, ds:[si]
+	mov	si, ds:[si]	
 	add	si, VM_data+VMGS_gstring
 	mov	ds:[si].ODT_opcode, GR_DRAW_TEXT
 	mov	ds:[si].ODT_x1, cx
@@ -1974,7 +1957,7 @@ UserGetInitFileCategory	proc	far	uses ax, bp
 	clr	bx				; current process
 	call	GeodeGetAppObject		; get app object
 	call	ObjTestIfObjBlockRunByCurThread	; see if we can lock
-	clc
+	clc	
 	jne	hardWay				; if not, do hard way
 
 	push	di
@@ -2024,7 +2007,7 @@ SYNOPSIS:	Get the display type for the passed object.  Currently reads
 CALLED BY:	ConvertVisMoniker, Specific UI Init code ONLY!
 		NOTE:  If you're not already using this, don't!  We're trying
 		to wean people off this function...
-
+		
 
 PASS:		*ds:si - object to get the display type for
 			 (for future expansion possibilities)
@@ -2033,7 +2016,7 @@ RETURN:		ah	- DisplayType
 			  be false before first screen object is put up)
 
 DESTROYED:
-
+ 
 PSEUDO CODE/STRATEGY:
 		This page intentionally left blank
 
@@ -2132,7 +2115,7 @@ PASS:		nothing
 RETURN:		ax	UIInterfaceLevel
 
 DESTROYED:
-
+ 
 PSEUDO CODE/STRATEGY:
 
 KNOWN BUGS/SIDE EFFECTS/IDEAS:
@@ -2167,7 +2150,7 @@ PASS:		nothing
 RETURN:		ax	UIInterfaceLevel
 
 DESTROYED:
-
+ 
 PSEUDO CODE/STRATEGY:
 
 KNOWN BUGS/SIDE EFFECTS/IDEAS:
@@ -2313,7 +2296,7 @@ Resident	ends
 ;
 ;---------------
 ;
-
+		
 Init	segment	resource
 
 
@@ -2326,13 +2309,13 @@ SYNOPSIS:	Set the UI moniker font, size.
 
 CALLED BY:	GLOBAL (SPUI)
 
-PASS:
+PASS:		
 		cx	- fontID
 		dx	- pointSize
 RETURN:
 
 DESTROYED:	nothing
-
+ 
 PSEUDO CODE/STRATEGY:
 		This page intentionally left blank
 
@@ -2361,7 +2344,7 @@ Init	ends
 ;
 ;---------------
 ;
-
+		
 Resident	segment	resource
 
 
@@ -2371,7 +2354,7 @@ COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 SYNOPSIS:	Get the UI moniker font, size for the passed object.
 
-CALLED BY:	GLOBAL,
+CALLED BY:	GLOBAL, 
 		VisGetMonikerSize
 
 PASS:		*ds:si - object to get the display type for
@@ -2380,7 +2363,7 @@ RETURN:		cx	- fontID
 		dx	- pointSize
 
 DESTROYED:	nothing
-
+ 
 PSEUDO CODE/STRATEGY:
 		This page intentionally left blank
 
@@ -2516,7 +2499,7 @@ FUNCTION:	UserLoadApplication
 DESCRIPTION:	Loads a GEOS application.  Changes to standard application
 		directory before attempting GeodeLoad on filename passed.
 		Stores the filename being launched into the AppLaunchBlock,
-		so that information needed to restore this application
+		so that information needed to restore this application 
 		instance will be around later if needed.
 
 		NOTE: Ownership of the launch block is transferred to the
@@ -2531,7 +2514,7 @@ PASS:
 	ah	- AppLaunchFlags (0 for default)
 			mask ALF_SEND_LAUNCH_REQUEST_TO_UI_TO_HANDLE set if
 			the actual launch should be done later by the UI, in
-			a safe memory situation (no error code returned in
+			a safe memory situation (no error code returned in 
 			this case)  If this flag is clear, then the caller
 			should be calling from a fixed memory space, such
 			that none of their movable code segments are locked.
@@ -2562,7 +2545,7 @@ PASS:
 			* No template statefile
 			* Launch in current default field
 			* Current directory is data directory passed to app
-
+		  
 	If si  = -1, then full pathname/filename/diskhandle is stored in
 		     AppLaunchBlock.
 	If si != -1, then either:
@@ -2574,7 +2557,7 @@ PASS:
 		    ds:si = file to load (no path) from either SP_APPLICATION
 			or SP_SYS_APPLICATION, and
 		    bx = StandardPath to use
-		(ds:si *can* be pointing to the movable XIP code resource.)
+		(ds:si *can* be pointing to the movable XIP code resource.)	
 		Either of these takes precedence over data stored in any passed
 		AppLaunchBlock.
 
@@ -2624,7 +2607,7 @@ UserLoadApplication	proc	far	uses	cx, dx, si, di, bp, ds, es
 	push	ax, es
 	segmov	es, dgroup, ax
 	ornf	es:[uiFlags], mask UIF_INIT
-	pop	ax, es
+	pop	ax, es	
 noChange:
 
 ;	IF WE WANT TO HANDLE VIA THE UI QUEUE, SEND IT OFF
@@ -2703,7 +2686,7 @@ NotDiskHandle:
 
 UseSystemDisk:
 
-;	If no disk handle passed in (System disk wanted), set disk handle
+;	If no disk handle passed in (System disk wanted), set disk handle 
 ;	and full pathname in AppInstanceReference.
 
 
@@ -2795,7 +2778,7 @@ COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 		DefaultLauncherCheck
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-SYNOPSIS:	Check to see if the application launch that just failed
+SYNOPSIS:	Check to see if the application launch that just failed 
 		is for the application that used to be the default
 		launcher.  If so, launch the new default launcher.
 		The name of the old default launcher is written out into
@@ -2809,7 +2792,7 @@ PASS:		ds:si	= filename
 RETURN:		nothing
 DESTROYED:	nothing
 
-SIDE EFFECTS:
+SIDE EFFECTS:	
 PSEUDO CODE/STRATEGY:
 
 REVISION HISTORY:
@@ -2852,7 +2835,7 @@ iniDefaultLauncher	local	PathName
 
 	;
 	; OK, the old default launcher failed to launch, so launch
-	; the new one.  Nuke the "old" default launcher string so
+	; the new one.  Nuke the "old" default launcher string so 
 	; that if the old default launcher is the same as the new, we
 	; won't get into an infinite loop if it fails.
 	;
@@ -2923,7 +2906,7 @@ PASS:
 			* No template statefile
 			* Launch in current default field
 			* Current directory is data directory passed to app
-
+		  
 	If si  = -1, then full pathname/filename/diskhandle is stored in
 		     AppLaunchBlock.
 	If si != -1, then either:
@@ -2935,7 +2918,7 @@ PASS:
 		    ds:si = file to load (no path) from either SP_APPLICATION
 			or SP_SYS_APPLICATION, and
 		    bx = StandardPath to use
-
+	
 		Either of these takes precedence over data stored in any passed
 		AppLaunchBlock.
 
@@ -3009,7 +2992,7 @@ HaveBlock:
 	mov	es:[ALB_launchFlags], ah
 UseBlockLaunchFlags:
 
-	jcxz	UseBlockAppMode	; if appMode passed, stuff it into the
+	jcxz	UseBlockAppMode	; if appMode passed, stuff it into the 
 				; LaunchBlock.
 	mov	es:[ALB_appMode], cx
 UseBlockAppMode:
@@ -3031,11 +3014,11 @@ haveMode:
 	mov	cx, PATH_BUFFER_SIZE/2
 	rep	movsw		; Copy into block
 
-				; set disk handle from that passed
+				; set disk handle from that passed 
 	mov	es:[ALB_appRef].AIR_diskHandle, dx
 HaveFilename:
 
-	segmov	ds, es		; copy segment of block to ds where it
+	segmov	ds, es		; copy segment of block to ds where it 
 				; will be handy
 				; See if a path was passed
 
@@ -3104,7 +3087,7 @@ HavePath:
 	mov	ax, GLE_FIELD_DETACHING	; error code to be returned
 	push	ax
 	push	dx
-
+	
 storeFieldOD:
 	mov	ds:[ALB_genParent].handle, cx
 	mov	ds:[ALB_genParent].chunk, dx
@@ -3140,7 +3123,7 @@ CALLED BY:	GLOBAL
 PASS:		bp - handle of AppLaunchBlock
 		ds:si - ptr to filename
 		ax - 0 if we want to report FILE_NOT_FOUND errors via the ack
-			(If we are looking for an application both in the
+			(If we are looking for an application both in the 
 			 \APPL and in the \SYSAPPL directories, we don't want
 			 to whine about not finding it in the \APPL directory)
 
@@ -3148,7 +3131,7 @@ RETURN:		carry set if error
 		      ax <- GeodeLoadError
 		else, cx,bx <- handle of new Geode
 DESTROYED:	ax,bx,cx,dx
-
+ 
 PSEUDO CODE/STRATEGY:
 		This page intentionally left blank
 
@@ -3196,7 +3179,7 @@ LoadApplication	proc	near
 ;	LET THE FIELD KNOW ANOTHER APP WILL BE ATTACHING TO IT.
 
 	push	dx, bp, si
-	movdw	bxsi, parentField
+	movdw	bxsi, parentField	
 	mov	ax, MSG_GEN_FIELD_APP_STARTUP_NOTIFY
 	mov	di, mask MF_CALL
 	call	ObjMessage
@@ -3293,7 +3276,7 @@ noPathToSet:
 	jnc	40$		;If no error, just branch
 
 ;	IF THERE WAS AN ERROR, LET THE FIELD KNOW THE APPLICATION WILL NOT BE
-;	COMING UP.
+;	COMING UP.	
 
 	movdw	bxsi, parentField
 	cmp	dx, GLE_FIELD_DETACHING
@@ -3328,13 +3311,13 @@ bringDownBox:
 	push	bp
 	mov	ax, ackMsg
 	movdw	bxsi, ackOD
-	tst	ignoreFileNotFoundErrors
+	tst	ignoreFileNotFoundErrors	
 	mov	bp, ackID
 				;Restore flag (if 0, report FILE_NOT_FOUND
 				; errors)
 
 	jz	80$		;Branch if we want to report all errors
-	cmp	dx, GLE_FILE_NOT_FOUND	;If FILE_NOT_FOUND error, don't send
+	cmp	dx, GLE_FILE_NOT_FOUND	;If FILE_NOT_FOUND error, don't send 
 	je	90$			; through the ack.
 80$:
 	mov	di, mask MF_FORCE_QUEUE
@@ -3499,7 +3482,7 @@ METHOD:		UserCallApplication
 
 DESCRIPTION:	Call application object of process which owns block passed
 
-PASS:
+PASS:	
 	ax - Method to send to application
 	cx, dx, bp - data to send on to application
 	ds - any object block (for fixup)
@@ -3752,7 +3735,7 @@ if	ERROR_CHECK
 						; 	LMem obj OD
 
 	mov	ax, segment idata		; Get to handle of UI thread
-	mov	ds, ax
+	mov	ds, ax 
 	mov	ax, MGIT_EXEC_THREAD
 	call	MemGetInfo			; Fetch otherInfo = running
 						;	thread
@@ -3770,7 +3753,7 @@ JustECCode	ends
 ;
 ;---------------
 ;
-
+		
 Navigation	segment	resource
 
 
@@ -3787,7 +3770,7 @@ PASS:		cl	= character.
 		dh	= ShiftState
 		bp low = ToggleState
 		bp high = scan code
-
+		
 RETURN:		carry set if accelerator char
 
 DESTROYED:	nothing
@@ -3807,7 +3790,7 @@ UserCheckAcceleratorChar	proc	far
 
 SBCS <	cmp	ch, CS_UI_FUNCS						>
 SBCS <	je	accelChar	;treat UI functions chars as accel chars>
-
+	
 	; accent characters are not accelerators
 
 	test	dl, mask CF_TEMP_ACCENT
@@ -3824,8 +3807,8 @@ SBCS <	je	accelChar	;treat UI functions chars as accel chars>
 
 	test	dh, mask SS_LALT or mask SS_RALT
 	jz	accelChar		; CONTROL only, it's an accelerator
-					; CONTROL and ALT pressed
-
+					; CONTROL and ALT pressed	
+	
 SBCS <	cmp	ch, CS_CONTROL		; control character, not insertable >
 DBCS <	cmp	ch, CS_CONTROL_HB	; control character, not insertable >
 	je	accelChar
@@ -3863,7 +3846,7 @@ else
 
 if	0
 
-;	Nuked this, because this causes the text object to think that
+;	Nuked this, because this causes the text object to think that 
 ;	page up and page down are insertable characters.
 
 endif
@@ -3878,7 +3861,7 @@ accelChar:
 notAccelChar:
 	clc
 	ret
-
+	
 UserCheckAcceleratorChar	endp
 
 
@@ -3891,11 +3874,11 @@ SYNOPSIS:	Returns kbd accelerator mode status.
 CALLED BY:	utility
 
 PASS:		nothing
-
+		
 RETURN:		zero flag clear if on, set if off.
 
 DESTROYED:	nothing
-
+		
 PSEUDO CODE/STRATEGY:
 
 KNOWN BUGS/SIDE EFFECTS/IDEAS:
@@ -3920,7 +3903,7 @@ Navigation	ends
 ;
 ;---------------
 ;
-
+		
 FlowCommon	segment	resource
 
 
@@ -3976,14 +3959,14 @@ DBCS <	cmp	ch, CS_CONTROL_HB		; not control char set, branch>
 10$:
 	;
 	; Now let's convert the keys affected by the num-lock key, but only
-	; if they're not on the extended character set (we don't want the
+	; if they're not on the extended character set (we don't want the 
 	; extended arrows to be converted to numbers).
 	;
 	test	bp, mask TS_NUMLOCK		; see if num-lock pressed
 	jz	noMatch				; no, we won't convert.
 	test	dl, mask CF_EXTENDED		; don't diddle with extendeds
 	jnz	noMatch
-
+	
 	cmp	cl, '.'				; check range '.' to '9'
 	jb	noMatch				; if not, no match
 	cmp	cl, '9'				;
@@ -4010,7 +3993,7 @@ FUNCTION:	UserGetSpecUIProtocolRequirement
 
 DESCRIPTION:	Returns protocol # that should be passed to GeodeUseLibrary
 		in any attempt to load a specific user interface for use with
-		this geode.
+		this geode. 
 
 CALLED BY:	EXTERNAL
 
@@ -4076,10 +4059,10 @@ RETURN:		carry clear if successful:
 DESTROYED:	cx, dx, di, si
 
 PSEUDO CODE/STRATEGY:
-
+		
 
 KNOWN BUGS/SIDE EFFECTS/IDEAS:
-
+		
 
 REVISION HISTORY:
 	Name	Date		Description
@@ -4114,12 +4097,12 @@ strategy	local	fptr.far
 		jc	errorNoDriverStr	;skip if none found...
 	;
 	; Log an entry
-	;
+	; 
 		call	LogWriteInitEntry
 
 	;
-	; Try and load the thing.
-	;
+	; Try and load the thing. 
+	; 
 		push	bx			; save driver filename handle
 
 		call	FilePushDir
@@ -4143,11 +4126,11 @@ strategy	local	fptr.far
 		mov	ss:[strategy].offset, ax
 		mov	ax, ds:[si].DIS_strategy.segment
 		mov	ss:[strategy].segment, ax
-
+		
 	;
 	; Now call the driver's TEST_DEVICE function to see if the thing
 	; actually exists.
-	;
+	; 
 		pop	ds, si			;ds:si <- category
 		push	bx			;save geode handle
 
@@ -4163,18 +4146,18 @@ strategy	local	fptr.far
 		jc	cannotInitFreeDevice
 		cmp	ax, DP_NOT_PRESENT
 		je	cannotInitFreeDevice
-
+		
 	;
 	; Either the driver knows the device is there, or it can't tell.
 	; In either case, we declare the load a success, and tell it to
 	; serve whatever device was in the file.
-	;
+	; 
 		mov	di, DRE_SET_DEVICE
 		mov	bx, ss:[testAndSetBX]
 		call	ss:[strategy]
 	;
 	; Free the device name
-	;
+	; 
 		pop	bx
 		call	MemFree
 		pop	bx		; recover driver handle
@@ -4187,7 +4170,7 @@ errorNoDriverStr:
 	;
 	; Log an entry
 	;
-
+		
 NOFXIP <	segmov	ds, cs, si					>
 FXIP <		mov	si, SEGMENT_CS					>
 FXIP <		mov	ds, si						>
@@ -4220,7 +4203,7 @@ cannotInit:
 	;
 	; Cannot initialize the driver, but we loaded it, so we've got to
 	; get rid of the thing.
-	;
+	; 
 		pop	bx
 		call	GeodeFreeDriver
 
@@ -4253,7 +4236,7 @@ FXIP <		mov	ds, si						>
 
 		stc
 		jmp	popAndLeave
-UserLoadExtendedDriver	endp
+UserLoadExtendedDriver	endp		
 
 if FULL_EXECUTE_IN_PLACE
 Init	ends
@@ -4283,10 +4266,10 @@ RETURN:		carry clear if successful:
 DESTROYED:	cx, dx, di, si
 
 PSEUDO CODE/STRATEGY:
-
+		
 
 KNOWN BUGS/SIDE EFFECTS/IDEAS:
-
+		
 
 REVISION HISTORY:
 	Name	Date		Description
@@ -4381,12 +4364,12 @@ endif
 
 	;
 	; Log an entry
-	;
+	; 
 		call	LogWriteInitEntry	;print ds:si to screen
 
 	;
-	; Try and load the thing.
-	;
+	; Try and load the thing. 
+	; 
 		call	FilePushDir
 		call	FileSetStandardPath	;  set dir passed
 		mov	ax, ss:[protocol].PN_major
@@ -4411,7 +4394,7 @@ endif
 	;
 	; Now call the driver's TEST_DEVICE function to see if the thing
 	; actually exists.
-	;
+	; 
 		push	bx			;save geode handle
 		mov	dx, es			;dx:si = device name
 		mov	si, di
@@ -4428,7 +4411,7 @@ endif
 	; Either the driver knows the device is there, or it can't tell.
 	; In either case, we declare the load a success, and tell it to
 	; serve whatever device was in the file.
-	;
+	; 
 		mov	di, DRE_SET_DEVICE
 		mov	bx, ss:[testAndSetBX]
 		call	ss:[strategy]
@@ -4443,7 +4426,7 @@ cannotInitFreeDevice:
 	;
 	; Cannot initialize the driver, but we loaded it, so we've got to
 	; get rid of the thing.
-	;
+	; 
 		pop	bx
 		call	GeodeFreeDriver
 
@@ -4522,7 +4505,7 @@ SYNOPSIS:	Add an application to the list of those that are to be
 		be loaded when the system is booted.
 
 CALLED BY:	GLOBAL and UserAddAutoExecXIP
-PASS:		ds:si	= name of application (in SP_APPLICATION or
+PASS:		ds:si	= name of application (in SP_APPLICATION or 
 			  SP_SYS_APPLICATION) to be loaded on startup
 		(ds:si *can* be pointing to the movable XIP code resource.)
 RETURN:		nothing
@@ -4535,7 +4518,7 @@ PSEUDO CODE/STRATEGY:
 			  through
 			- if app not in execOnStartup, add string section
 			  containing it
-
+			  
 
 KNOWN BUGS/SIDE EFFECTS/IDEAS:
 		Should have a semaphore to prevent two things from adding
@@ -4562,7 +4545,7 @@ endif
 	;
 	; Enumerate all elements looking for the one being added, so we
 	; don't have it in there twice (we assume this would be a Bad Thing)
-	;
+	; 
 		mov	bx, si
 		segmov	es, ds
 		segmov	ds, cs, cx
@@ -4578,7 +4561,7 @@ endif
 addIt:
 	;
 	; Not in the set of strings, so append it.
-	;
+	; 
 		mov	di, bx
 		call	InitFileWriteStringSection
 done:
@@ -4590,7 +4573,7 @@ checkFound:
 	; from how it went in to signal this. If the key doesn't actually
 	; exist in the ini file, InitFileEnumStringSection returns BX
 	; untouched. This is how we differentiate the two possibilities.
-	;
+	; 
 		cmp	bx, ax
 		jne	done
 		jmp	addIt
@@ -4608,7 +4591,7 @@ SYNOPSIS:	Add an application to the list of those that are to be
 		be loaded when the system is booted.
 
 CALLED BY:	GLOBAL
-PASS:		ds:si	= name of application (in SP_APPLICATION or
+PASS:		ds:si	= name of application (in SP_APPLICATION or 
 			  SP_SYS_APPLICATION) to be loaded on startup
 RETURN:		nothing
 DESTROYED:	nothing
@@ -4620,7 +4603,7 @@ PSEUDO CODE/STRATEGY:
 			  through
 			- if app not in execOnStartup, add string section
 			  containing it
-
+			  
 
 KNOWN BUGS/SIDE EFFECTS/IDEAS:
 		Should have a semaphore to prevent two things from adding
@@ -4671,10 +4654,10 @@ RETURN:		carry set to stop enumerating:
 DESTROYED:	ax, cx, dx, di, si, bp may all be biffed
 
 PSEUDO CODE/STRATEGY:
-
+		
 
 KNOWN BUGS/SIDE EFFECTS/IDEAS:
-
+		
 
 REVISION HISTORY:
 	Name	Date		Description
@@ -4692,7 +4675,7 @@ DBCS <		repe	cmpsw						>
 		jne	done			; no match, so continue enum
 	;
 	; Found a match. Return carry set and BX different from entry.
-	;
+	; 
 		not	bx
 		stc
 done:
@@ -4717,10 +4700,10 @@ RETURN:		nothing
 DESTROYED:	nothing
 
 PSEUDO CODE/STRATEGY:
-
+		
 
 KNOWN BUGS/SIDE EFFECTS/IDEAS:
-
+		
 
 REVISION HISTORY:
 	Name	Date		Description
@@ -4742,7 +4725,7 @@ EC <		pop	bx						>
 endif
 	;
 	; Enumerate all elements looking for the one being removed.
-	;
+	; 
 		mov	bx, si
 		segmov	es, ds
 		segmov	ds, cs, cx
@@ -4762,11 +4745,11 @@ checkFound:
 	; section number and ES 0 to signal it. If the key doesn't actually
 	; exist in the ini file, InitFileEnumStringSection returns BX
 	; untouched. This is how we differentiate the two possibilities.
-	;
+	; 
 		mov	ax, es
 		tst	ax
 		jnz	done		; => didn't find the key
-
+		
 		mov	ax, bx
 		call	InitFileDeleteStringSection
 		jmp	done
@@ -4785,7 +4768,7 @@ USERREMOVEAUTOEXEC proc
 		stc
 removeAddAutoexecCommon label near
 		C_GetOneDWordArg ax, bx, cx, dx
-		push	ds, si
+		push	ds, si		
 		on_stack si ds retf
 		mov	ds, ax
 		mov	si, bx
@@ -4831,7 +4814,7 @@ RETURN:		nothing
 DESTROYED:	nothing
 
 PSEUDO CODE/STRATEGY:
-
+		
 KNOWN BUGS/SIDE EFFECTS/IDEAS:
 
 REVISION HISTORY:
@@ -4879,10 +4862,10 @@ RETURN:		carry set to stop enumerating:
 DESTROYED:	ax, cx, dx, di, si, bp may all be biffed
 
 PSEUDO CODE/STRATEGY:
-
+		
 
 KNOWN BUGS/SIDE EFFECTS/IDEAS:
-
+		
 
 REVISION HISTORY:
 	Name	Date		Description
@@ -4900,7 +4883,7 @@ DBCS <		repe	cmpsw						>
 		jne	done			; no match, so continue enum
 	;
 	; Found a match. Return carry set, bx = section number, and es = 0
-	;
+	; 
 		clr	ax
 		mov	es, ax
 		mov	bx, dx
@@ -4929,11 +4912,11 @@ SYNOPSIS:	Returns overstrike mode status.
 CALLED BY:	utility
 
 PASS:		nothing
-
+		
 RETURN:		zero flag clear if on, set if off.
 
 DESTROYED:	nothing
-
+		
 PSEUDO CODE/STRATEGY:
 
 KNOWN BUGS/SIDE EFFECTS/IDEAS:
@@ -5036,7 +5019,7 @@ DESTROYED:	Nothing.
 SIDE EFFECTS:	May block.
 
 PSEUDO CODE/STRATEGY:
-
+		
 
 REVISION HISTORY:
 	Name	Date		Description
@@ -5099,7 +5082,7 @@ beginChange:
 	call	GCNListRecordAndSend		; cx = # notifications sent
 
 	; Record the number of acks needed and remove our protective 10,000
-	;
+	; 
 	add	ds:[fieldChangeConfirmCount], cx
 	sub	ds:[fieldChangeConfirmCount], 10000
 
@@ -5235,7 +5218,7 @@ _confirmStart:
 	jnc	done
 doneDec:
 	dec	ax
-
+	
 done:
 	.leave
 	ret
