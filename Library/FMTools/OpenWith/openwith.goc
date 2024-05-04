@@ -849,6 +849,8 @@ Classes & Methods
     @call @dup(@OpenWithAppList)::MSG_GEN_DYNAMIC_LIST_INITIALIZE(num);
     @call @dup(@OpenWithAppList)::MSG_GEN_ITEM_GROUP_SET_NONE_SELECTED(TRUE);
     @call @dup(@RemoveAppTrigger)::MSG_GEN_SET_NOT_ENABLED(VUM_NOW);
+    @call @dup(@UpAppTrigger)::MSG_GEN_SET_NOT_ENABLED(VUM_NOW);
+    @call @dup(@DownAppTrigger)::MSG_GEN_SET_NOT_ENABLED(VUM_NOW);
 }
 
 
@@ -902,6 +904,8 @@ three arguments:
 {
     if (selection != GIGS_NONE)
     {
+        @call @dup(@UpAppTrigger)::MSG_GEN_SET_ENABLED(VUM_NOW);
+        @call @dup(@DownAppTrigger)::MSG_GEN_SET_ENABLED(VUM_NOW);
         @call @dup(@RemoveAppTrigger)::MSG_GEN_SET_ENABLED(VUM_NOW);
     }
 }
@@ -972,15 +976,20 @@ three arguments:
 
 	idx = @call oself::MSG_GEN_ITEM_GROUP_GET_SELECTION();
 
-    MemLock(HandleOf(G_appList));
+    if (idx != GIGS_NONE)
+    {
+        MemLock(HandleOf(G_appList));
 
-	ChunkArrayDeleteRange(G_appList, idx, 1);
-    num = ChunkArrayGetCount(G_appList);
-    @call oself::MSG_GEN_DYNAMIC_LIST_INITIALIZE(num);
-    @call oself::MSG_GEN_ITEM_GROUP_SET_NONE_SELECTED(TRUE);
-    @call @dup(@RemoveAppTrigger)::MSG_GEN_SET_NOT_ENABLED(VUM_NOW);
+        ChunkArrayDeleteRange(G_appList, idx, 1);
+        num = ChunkArrayGetCount(G_appList);
+        @call oself::MSG_GEN_DYNAMIC_LIST_INITIALIZE(num);
+        @call oself::MSG_GEN_ITEM_GROUP_SET_NONE_SELECTED(TRUE);
+        @call @dup(@RemoveAppTrigger)::MSG_GEN_SET_NOT_ENABLED(VUM_NOW);
+        @call @dup(@UpAppTrigger)::MSG_GEN_SET_NOT_ENABLED(VUM_NOW);
+        @call @dup(@DownAppTrigger)::MSG_GEN_SET_NOT_ENABLED(VUM_NOW);
 
-    MemUnlock(HandleOf(G_appList));
+        MemUnlock(HandleOf(G_appList));
+    }
 }
 
 /********************************************************************
@@ -1000,41 +1009,45 @@ three arguments:
     char*           prevOrNextApp = (void*) 0;
     MemHandle       appListHan = NullHandle;
 
-    appListHan = OptrToHandle(G_appList);
-
-    MemLock(appListHan);
-	num = ChunkArrayGetCount(G_appList);
-
 	idx = @call oself::MSG_GEN_ITEM_GROUP_GET_SELECTION();
-    otherIdx = idx + upOrDown;
-    if (otherIdx == num) { otherIdx = 0; }
-    if (otherIdx == -1) { otherIdx = num - 1; }
 
-    app1Chunk = LMemAlloc(appListHan, PATH_BUFFER_SIZE + FILE_LONGNAME_BUFFER_SIZE);
-    app2Chunk = LMemAlloc(appListHan, PATH_BUFFER_SIZE + FILE_LONGNAME_BUFFER_SIZE);
-
-    if ((app1Chunk != NullChunk) && (app2Chunk != NullChunk))
+    if (idx != GIGS_NONE)
     {
-        app1 = LMemDerefHandles(appListHan, app1Chunk);
-        app2 = LMemDerefHandles(appListHan, app2Chunk);
+        appListHan = OptrToHandle(G_appList);
+        MemLock(appListHan);
 
-        curApp = ChunkArrayElementToPtr(G_appList, idx, &size);
-        prevOrNextApp = ChunkArrayElementToPtr(G_appList, otherIdx, &size);
+        num = ChunkArrayGetCount(G_appList);
 
-        strcpy(app1, curApp);
-        strcpy(app2, prevOrNextApp);
+        otherIdx = idx + upOrDown;
+        if (otherIdx == num) { otherIdx = 0; }
+        if (otherIdx == -1) { otherIdx = num - 1; }
 
-        strcpy(curApp, app2);
-        strcpy(prevOrNextApp, app1);
+        app1Chunk = LMemAlloc(appListHan, PATH_BUFFER_SIZE + FILE_LONGNAME_BUFFER_SIZE);
+        app2Chunk = LMemAlloc(appListHan, PATH_BUFFER_SIZE + FILE_LONGNAME_BUFFER_SIZE);
 
-        @call oself::MSG_GEN_DYNAMIC_LIST_INITIALIZE(num);
-        @call oself::MSG_GEN_ITEM_GROUP_SET_SINGLE_SELECTION(otherIdx, FALSE);
+        if ((app1Chunk != NullChunk) && (app2Chunk != NullChunk))
+        {
+            app1 = LMemDerefHandles(appListHan, app1Chunk);
+            app2 = LMemDerefHandles(appListHan, app2Chunk);
+
+            curApp = ChunkArrayElementToPtr(G_appList, idx, &size);
+            prevOrNextApp = ChunkArrayElementToPtr(G_appList, otherIdx, &size);
+
+            strcpy(app1, curApp);
+            strcpy(app2, prevOrNextApp);
+
+            strcpy(curApp, app2);
+            strcpy(prevOrNextApp, app1);
+
+            @call oself::MSG_GEN_DYNAMIC_LIST_INITIALIZE(num);
+            @call oself::MSG_GEN_ITEM_GROUP_SET_SINGLE_SELECTION(otherIdx, FALSE);
+        }
+
+        if (app1Chunk != NullChunk) { LMemFreeHandles(appListHan, app1Chunk); }
+        if (app2Chunk != NullChunk) { LMemFreeHandles(appListHan, app2Chunk); }
+
+        MemUnlock(appListHan);
     }
-
-    if (app1Chunk != NullChunk) { LMemFreeHandles(appListHan, app1Chunk); }
-    if (app2Chunk != NullChunk) { LMemFreeHandles(appListHan, app2Chunk); }
-
-    MemUnlock(appListHan);
 }
 
 
