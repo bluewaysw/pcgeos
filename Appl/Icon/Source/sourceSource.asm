@@ -1748,6 +1748,10 @@ noMask:
 		mov	si, offset Bit4String
 		cmp	ah, BMF_4BIT shl offset BMT_FORMAT
 		je	writeColor
+		mov	si, offset Bit8String
+		cmp	ah, BMF_8BIT shl offset BMT_FORMAT
+		je	writeColor
+
 		mov	si, offset MonoString
 writeColor:
 		call	GetChunkStringSize
