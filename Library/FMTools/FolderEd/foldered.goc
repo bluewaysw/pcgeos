@@ -1,46 +1,59 @@
+/***********************************************************************
+ *
+ *	FileManager Tool Demo
+ *
+ *	This sample explains how to write a FileManager tool plugin
+ *	By default, the source of these plugins are located at
+ *	pcgeos/Library/FMTools. More examples can be found there.
+ *	The compiled geode has to be copied to ensemble/system/filemgr
+ *	
+ *	The structures and messages used here can be found in the file fmtool.goh.
+ *	
+ *	
+ ***********************************************************************/
+
+@include <stdapp.goh>
+@include <fmtool.goh>
+#include <Ansi/string.h>
+#include <Ansi/stdio.h>
 @include <foldered.goh>
 
 /*
 	To do
 	- GP: XCCOMFLAGS	--> Info an MeyerK
-
 	MeyerK:	OpenWithEntryPoint: Dilaog wird nicht vernichtet, wenn "Abbruch" gewählt
+		UerseCreateDilaog statt FMTOOL Message -> ist OK
+		
 	
 
 /***********************************************************************
-Resourcen
+Resources
 ***********************************************************************/
-@start FMUI, data;
+@start FMTData, data;
     @visMoniker FolderEditMoniker = "Edit Icon";
-@end FMUI;
+@end FMTData;
 
 @start DialogUI, notDetachable;
-    @object GenInteractionClass SelectDialog = {
+
+    @object FolderEdInteractionClass SelectDialog = {
         GI_visMoniker = "Edit Icon";
-        GI_comp =
-                    @OpenWithFileSelector,
-                    @SelectReplyBar;
+        GI_comp =   @SelectFileList,
+        	    @SelectReplyBar;
         GI_states = (@default & (~GS_USABLE));
         GII_visibility = GIV_DIALOG;
-        GII_attrs = @default | GIA_INITIATED_VIA_USER_DO_DIALOG | GIA_MODAL;
+        GII_attrs = @default | GIA_NOT_USER_INITIATABLE | GIA_MODAL;
         HINT_PLACE_MONIKER_ABOVE;
         HINT_ORIENT_CHILDREN_VERTICALLY;
     }
 
-    @object OpenWithFileSelectorClass OpenWithFileSelector = {
-        GFSI_destination = OpenWithFileSelector;
-        GFSI_notificationMsg = MSG_FILEBROW_SELECTOR_ACTION;
-        GFSI_attrs =           ((FSA_ALLOW_CHANGE_DIRS) & (~FSA_SHOW_FILES_DISABLED) & (~FSA_HAS_OPEN_DIR_BUTTON) & (~FSA_HAS_CHANGE_DIRECTORY_LIST))
-                                | ((FSA_HAS_FILE_LIST) & (~FSA_SHOW_FIXED_DISKS_ONLY) & (~FSA_HAS_CLOSE_DIR_BUTTON) & (~FSA_HAS_DOCUMENT_BUTTON)& (~FSA_HAS_CHANGE_DRIVE_LIST))
-                                | ((FSA_USE_VIRTUAL_ROOT));
-
-        GFSI_fileCriteria =      ((FSFC_DIRS) & (~FSFC_NON_GEOS_FILES))
-                                | ((FSFC_GEOS_EXECUTABLES) & (~FSFC_GEOS_NON_EXECUTABLES));
-
-        ATTR_GEN_FILE_SELECTOR_VIRTUAL_ROOT = {SP_APPLICATION, ""};
-        ATTR_GEN_PATH_DATA = {SP_APPLICATION, ""};
-        HINT_FILE_SELECTOR_FILE_LIST_WIDTH = 40;
-        HINT_FILE_SELECTOR_NUMBER_OF_FILES_TO_SHOW = 15;
+    @object GenDynamicListClass SelectFileList = {
+   	GI_visMoniker = "Select an object";
+	HINT_PLACE_MONIKER_ABOVE;
+	HINT_ITEM_GROUP_SCROLLABLE;
+	HINT_FIXED_SIZE = { SST_AVG_CHAR_WIDTHS | 33,
+			SST_LINES_OF_TEXT | 4, 4};
+   	GDLI_queryMsg = MSG_FED_QUERY_FILE;
+   	GDLI_numItems = 0;
     }
 
     @object GenInteractionClass SelectReplyBar ={
@@ -50,13 +63,17 @@ Resourcen
     }
 
     @object GenTriggerClass SelectOkTrigger = {
-        ATTR_GEN_TRIGGER_INTERACTION_COMMAND = { IC_OK };
+    	GI_visMoniker = "OK";
+    	GTI_actionMsg = MSG_FED_QUIT_DIALOG;
+        ATTR_GEN_TRIGGER_ACTION_DATA = { IC_OK };
         HINT_SEEK_REPLY_BAR;
         HINT_DEFAULT_DEFAULT_ACTION;
     }
 
     @object GenTriggerClass SelectCancelTrigger = {
-        ATTR_GEN_TRIGGER_INTERACTION_COMMAND = { IC_DISMISS };
+    	GI_visMoniker = "Abbrechen";
+    	GTI_actionMsg = MSG_FED_QUIT_DIALOG;
+        ATTR_GEN_TRIGGER_ACTION_DATA = { IC_DISMISS };
         HINT_SEEK_REPLY_BAR;
     }
 
@@ -89,9 +106,13 @@ word _pascal _export GetThoseTools(FMToolStruct **tablePtr)
     return 1;
 }
 
+static	optr		g_dialog = NullOptr;
+static	MemHandle 	g_mh;
+
+
 /*-------------------------------------------------------------
- *	FMToolProc FolderEdEntryPoint()
- *
+ *	FMToolProc FolderEdToolStart()
+ *-------------------------------------------------------------
  *	GeodeHandle filemgr => Process that is subclass of FileManagerClass
  *	word toolNum =>	Entry # of activated tool within table returned by
  *                FMTF_FETCH_TOOLS
@@ -99,134 +120,79 @@ word _pascal _export GetThoseTools(FMToolStruct **tablePtr)
  *
  *	The user has clicked on our Utilities menu item: "Edit Icon"
 -------------------------------------------------------------*/
-//
-void _pascal _export FolderEdEntryPoint(
+// stop in foldered::FolderEdToolStart
+void _pascal _export FolderEdToolStart(
     GeodeHandle filemgr,
     word toolNum,
     word entryNum
 )
 {
-    MemHandle                   selFiles;
-    MemHandle                   oldBlock;
-    FileQuickTransferHeader*    headerPtr;
-    FileOperationInfoEntry*     entriesPtr;
-    word                        i;
-    InteractionCommand          reply = IC_NULL;
-
-    optr                        dialog = NullOptr;
-    optr                        fSelect = NullOptr;
-    dword	    	            flagsAndDisk;	/* entry flags + disk handle returned by file selector */
-    PathName    	            pathname;   	/* Buffer for fetching the complete path of the application */
-    DiskHandle  	            disk;	    	/* Disk on which it resides */
-    GeodeToken  	            token;	    	/* Token for the application, so we can connect to it */
-
+SelectedFilesStruct	*fileInfo;
 
     /*
      * Copy our dialog tempalte and add it to the application object
      */
-    dialog = @call ConstructOptr(filemgr, 0)::MSG_FM_DUP_AND_ADD(@SelectDialog, FMP_APPLICATION);
-    @call dialog::MSG_GEN_SET_USABLE(VUM_NOW);
+    g_dialog = UserCreateDialog(@SelectDialog);
+    	
+    /*
+     * Initialize duplicated dialog objects
+     */
+    @send @DialogObj(@SelectOkTrigger)::MSG_GEN_TRIGGER_SET_DESTINATION(g_dialog);
+    @send @DialogObj(@SelectCancelTrigger)::MSG_GEN_TRIGGER_SET_DESTINATION(g_dialog);
+    @send @DialogObj(@SelectFileList)::MSG_GEN_ITEM_GROUP_SET_DESTINATION(g_dialog);
 
-    reply = UserDoDialog(dialog);
-    if (reply == IC_OK)
-    {
-        fSelect = @call dialog::MSG_GEN_FIND_CHILD_AT_POSITION(0);
-        flagsAndDisk = @call fSelect::MSG_GEN_FILE_SELECTOR_GET_FULL_SELECTION_PATH(pathname);
+    /*
+     * Figure out the selected files and initialie the files list
+     */
+    g_mh = @call ConstructOptr(filemgr, 0)::MSG_FM_GET_SELECTED_FILES();
+    if ( !g_mh ) return;	// be save to avoid crash, should not occur.
+    
+    fileInfo = MemLock(g_mh);
+    @send @DialogObj(@SelectFileList)::MSG_GEN_DYNAMIC_LIST_INITIALIZE(fileInfo->header.FQTH_numFiles);
+    MemUnlock(g_mh);
 
-        UserDestroyDialog(dialog); // no more needed
+    /*
+     * Finally, open dialog box
+     */
+    @send g_dialog::MSG_GEN_INTERACTION_INITIATE();
 
-        if (GFS_GET_ENTRY_TYPE(flagsAndDisk) == GFSET_FILE)
-        {
-            disk = GFS_GET_FULL_SELECTION_PATH_DISK_HANDLE(flagsAndDisk); // Extract disk handle
 
-            FilePushDir();
-            if (
-                 (FileSetCurrentPath(disk, _TEXT("\\")) != 0) &&
-                 (FileGetPathExtAttributes(pathname, FEA_TOKEN, &token, sizeof(token)) == 0)
-               )
-            {
-                selFiles = @call ConstructOptr(filemgr, 0)::MSG_FM_GET_SELECTED_FILES();
-
-                while (selFiles != 0)
-                {
-                    headerPtr  = (FileQuickTransferHeader*) MemLock(selFiles); // get pointer to it header
-                    entriesPtr = (FileOperationInfoEntry*) (headerPtr + 1); // get pointer to first entry (follows header)
-
-                    for (i=0; i < headerPtr->FQTH_numFiles; i++)
-                    {
-                        if (entriesPtr->FOIE_type == GFT_NOT_GEOS_FILE)
-                        {
-                            LaunchApp(
-                                &token,
-                                disk,
-                                &pathname,
-                                headerPtr->FQTH_diskHandle,
-                                headerPtr->FQTH_pathname,
-                                entriesPtr->FOIE_name
-                            );
-                        }
-
-                        // point to the next entry
-                        entriesPtr = (FileOperationInfoEntry*) entriesPtr + 1;
-                    }
-
-                    // get next block, if any
-                    MemUnlock(selFiles);
-                    oldBlock = selFiles;
-                    selFiles = headerPtr->FQTH_nextBlock; // returns 0 if end, which breaks the loop
-                    MemFree(oldBlock);
-                }
-            }
-            FilePopDir();
-        }
-    }
 }
 
 /*-------------------------------------------------------------
-make sure the dialog gets closed when we double-click on an app
+ * void MSG_FED_QUIT_DIALOG(int cmd);	
+ *-------------------------------------------------------------
+ *	Perform tool operation, close and destroy dialog box
+ *
+ *
 -------------------------------------------------------------*/
-@method OpenWithFileSelectorClass, MSG_FILEBROW_SELECTOR_ACTION
-{
-    if (GFS_GET_ENTRY_FLAGS(entryFlags) == GFSEF_OPEN) // was it a double click?
-    {
-        if (GFS_GET_ENTRY_TYPE(entryFlags) == GFSET_FILE) // on a file?
-        {
-            @send oself::MSG_GEN_GUP_INTERACTION_COMMAND(IC_OK); // close the dialog
-        }
+// stop in foldered::FolderEdInteractionFED_QUIT_DIALOG
+@method FolderEdInteractionClass, MSG_FED_QUIT_DIALOG {
+
+    if(cmd == IC_OK) {
     }
+
+    UserDestroyDialog(g_dialog); // close and destroy the dialog
+    if (g_mh) MemFree(g_mh);
 }
+
 
 /*-------------------------------------------------------------
-launch application with DOS file via IACP...
+ * MSG_FED_QUERY_FILE	
+ *-------------------------------------------------------------
+ *	void GEN_DYNAMIC_LIST_QUERY_MSG (optr list, word item);
+ *	Update item moniker in the file list
 -------------------------------------------------------------*/
-void LaunchApp(
-    GeodeToken *appTok,
-    DiskHandle appDisk,
-    PathName *appPath,
-    DiskHandle dataDisk,
-    PathName *dataPath,
-    FileLongName *dataFName)
-{
-    IACPConnection       iacpConnectionToken = IACP_NO_CONNECTION;
-    word                 connectionFlags = IACPSM_USER_INTERACTIBLE | IACPCF_FIRST_ONLY;
-    word                 serverCount;
-    MemHandle            albBlock;
-    AppLaunchBlock       *albPtr;
+// stop in foldered::FolderEdInteractionFED_QUERY_FILE
+@method FolderEdInteractionClass, MSG_FED_QUERY_FILE {
+FileLongName		fName;
+SelectedFilesStruct	*fileInfo;
 
-    albBlock = IACPCreateDefaultLaunchBlock(MSG_GEN_PROCESS_OPEN_APPLICATION);
-
-    albPtr = MemLock(albBlock);
-    strcpy(albPtr->ALB_appRef.AIR_fileName, appPath);
-    albPtr->ALB_appRef.AIR_diskHandle = appDisk;
-    albPtr->ALB_diskHandle = dataDisk;
-    strcpy(albPtr->ALB_path, dataPath);
-    strcpy(albPtr->ALB_dataFile, dataFName);
-    MemUnlock(albBlock);
-
-    iacpConnectionToken = IACPConnect(appTok, connectionFlags, albBlock, NullOptr, &serverCount);
-    if(iacpConnectionToken != IACP_NO_CONNECTION)
-    {
-        IACPShutdown(iacpConnectionToken, NullOptr);
+    if (!g_mh) strcpy(fName, "---");
+    else {
+	fileInfo = MemLock(g_mh);
+	strcpy(fName, fileInfo->entry[item].FOIE_name);
+	MemUnlock(g_mh);	
     }
+    @send list::MSG_GEN_DYNAMIC_LIST_REPLACE_ITEM_TEXT(item, fName);
 }
-

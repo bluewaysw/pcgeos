@@ -10,7 +10,7 @@ tokenid     0
 type    library, single, c-api
 
 # Resources
-resource FMUI lmem read-only shared
+resource FMTData lmem read-only shared
 resource DialogUI ui-object shared
 
 #Libs
@@ -20,7 +20,7 @@ library ansic
 
 # API functions
 export GETTHOSETOOLS
-export FOLDEREDENTRYPOINT
+export FOLDEREDTOOLSTART
 
 # Not API
-export OpenWithFileSelectorClass
+export FolderEdInteractionClass

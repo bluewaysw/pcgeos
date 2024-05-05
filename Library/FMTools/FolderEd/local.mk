@@ -10,16 +10,14 @@
 #
 # Put our copyright message in geode (32 char. max.).
 LINKFLAGS += -N "Programmed by Rabe-Soft 2024"
-#
-#
+
 # Turn off error-checking.
 # NO_EC = 1
-#
+
 # Something for the installable FM Tools
-#
-_PROTO = 1.0
+# Protocol number ist defined in the .rev file
+# _PROTO = 1.0
 # PROTOCONST	= FMTOOL
-#
+
 # Include the system makefile.
-# include <$(SYSMAKEFILE)>
-#
+#include <$(SYSMAKEFILE)>
