@@ -14,15 +14,7 @@ Resourcen
 
     @visMoniker ToolNameMoniker = "Open With";
     @chunk char errorNoDOSFile[] = "Please select DOS files (no folders) only.";
-    @chunk char errorNoCompatibleApp[] = "The selected application is not compatible with DOS files.";
-
-    @chunkArray GeodeToken BlacklistArray = {
-        { "PMGR" , 0 },
-        { "BCAL" , 0 },
-        { "CLK$" , 0 },
-        { "DUMP" , 0 },
-        { "PERF" , 0 }
-    };
+    @chunk char errorNoMoreTriggers[] = "Maximum number of triggers reached.";
 
 @end FMUI;
 
@@ -31,8 +23,11 @@ Resourcen
 
 // Main/Select Dialog
 // ******************************************************************
+
+    @visMoniker @SelectDialogMoniker = "Open With";
+
     @object OpenWithDialogClass SelectDialog = {
-        GI_visMoniker = "Open With";
+        GI_visMoniker = @SelectDialogMoniker
         GI_comp =   @SelectView,
                     @SelectReplyBar;
         GI_states = (@default & (~GS_USABLE));
@@ -87,15 +82,17 @@ Resourcen
 
     @include "Art/mkrRightArrowSC.goh"
     @include "Art/mkrLeftArrowSC.goh"
-    @include "Art/downArrow.goh"
-    @include "Art/upArrow.goh"
-    @visMoniker addAppTriggerTextMoniker = "Add";
-    @visMoniker removeAppTriggerTextMoniker = "Remove";
-    @visMoniker downTriggerTextMoniker = "Down";
-    @visMoniker upTriggerTextMoniker = "Up";
+    @include "Art/DownArrow.goh"
+    @include "Art/UpArrow.goh"
+    @visMoniker AddAppTriggerTextMoniker = "Add";
+    @visMoniker RemoveAppTriggerTextMoniker = "Remove";
+    @visMoniker DownTriggerTextMoniker = "Down";
+    @visMoniker UpTriggerTextMoniker = "Up";
+    @visMoniker OpenWithGroupMoniker = "Applications to use in the 'Open With' dialog";
+    @visMoniker ConfigureDialogMoniker = "Configure";
 
     @object ConfigureDialogClass ConfigureDialog = {
-        GI_visMoniker = "Configure";
+        GI_visMoniker = @ConfigureDialogMoniker;
         GI_comp =       @OpenWithGroup,
                         @ConfigureReplyBar;
 
@@ -115,7 +112,7 @@ Resourcen
     }
 
     @object GenInteractionClass OpenWithGroup = {
-        GI_visMoniker = "Applications to use in the 'Open With' dialog";
+        GI_visMoniker = @OpenWithGroupMoniker;
         GI_comp =	@OpenWithAddAppGroup,
                     @OpenWithAppListGroup;
 
@@ -151,7 +148,7 @@ Resourcen
     }
 
     @object GenTriggerClass AddAppTrigger = {
-        GI_visMoniker = list { @addAppTriggerTextMoniker, @RightArrowSCMoniker };
+        GI_visMoniker = list { @AddAppTriggerTextMoniker, @RightArrowSCMoniker };
         GTI_destination = @OpenWithAppList;
         GTI_actionMsg = MSG_ADD_APP;
 
@@ -191,7 +188,7 @@ Resourcen
     }
 
     @object GenTriggerClass RemoveAppTrigger = {
-        GI_visMoniker = list { @removeAppTriggerTextMoniker, @LeftArrowSCMoniker };
+        GI_visMoniker = list { @RemoveAppTriggerTextMoniker, @LeftArrowSCMoniker };
 
         GTI_destination = @OpenWithAppList;
         GTI_actionMsg = MSG_REMOVE_APP;
@@ -202,7 +199,7 @@ Resourcen
     }
 
     @object GenTriggerClass UpAppTrigger = {
-        GI_visMoniker = list {@upArrowMoniker, @upTriggerTextMoniker};
+        GI_visMoniker = list {@UpArrowMoniker, @UpTriggerTextMoniker};
 
         GTI_destination = @OpenWithAppList;
         GTI_actionMsg = MSG_MOVE_APP;
@@ -214,7 +211,7 @@ Resourcen
     }
 
     @object GenTriggerClass DownAppTrigger = {
-        GI_visMoniker = list {@downArrowMoniker, @downTriggerTextMoniker};
+        GI_visMoniker = list {@DownArrowMoniker, @DownTriggerTextMoniker};
 
         GTI_destination = @OpenWithAppList;
         GTI_actionMsg = MSG_MOVE_APP;
@@ -255,6 +252,7 @@ dgroup
 **************************************************************/
 #define TOOL_ICON_WIDTH         15
 #define TOOL_ICON_HEIGHT        15
+#define MAX_NUM_TRIGGERS        20
 
 const char  iniCat[] = "fileManager";
 const char  iniKey[] = "openWith";
@@ -321,8 +319,9 @@ void _pascal _export OpenWithEntryPoint(
     (void) UserDoDialog(dialog);
     UserDestroyDialog(dialog);
 
-    // clean up our app list
+    // clean up
     MemFree(OptrToHandle(G_appList));
+    FreeSelectedFiles();
 }
 
 
@@ -403,50 +402,6 @@ Boolean CheckIfUnsupportedFiles()
 }
 
 /**************************************************************
-is app on blacklist - currently not active
-    if (IsAppOnBlacklist(&token))
-    {
-        UserStandardDialogOptr(
-            0, 0, 0, 0,
-            @errorNoCompatibleApp,
-            ((CDT_ERROR << CDBF_DIALOG_TYPE_OFFSET) |
-            (GIT_NOTIFICATION << CDBF_INTERACTION_TYPE_OFFSET))
-        );
-        return;
-    }
-**************************************************************/
-Boolean IsAppOnBlacklist(GeodeToken* appToken)
-{
-    word            numApps = 0;
-    GeodeToken*     listApp = (void*) 0;
-    word            size = 0;
-    word            i = 0;
-    Boolean         isOnList = FALSE;
-
-    MemLock(HandleOf(@BlacklistArray));
-    numApps = ChunkArrayGetCount(@BlacklistArray);
-
-    for (i = 0; i < numApps; i++)
-    {
-        listApp = ChunkArrayElementToPtr(@BlacklistArray, i, &size);
-
-        if ((appToken->GT_chars[0] == listApp->GT_chars[0]) &&
-            (appToken->GT_chars[1] == listApp->GT_chars[1]) &&
-            (appToken->GT_chars[2] == listApp->GT_chars[2]) &&
-            (appToken->GT_chars[3] == listApp->GT_chars[3]) &&
-            (appToken->GT_manufID  == listApp->GT_manufID))
-        {
-            isOnList = TRUE;
-            break;
-        }
-    }
-
-    MemUnlock(HandleOf(@BlacklistArray));
-
-    return isOnList;
-}
-
-/**************************************************************
 load files one by one
 **************************************************************/
 void LoadFiles(GeodeToken* token, char* pathnameAndFile)
@@ -484,7 +439,6 @@ void LoadFiles(GeodeToken* token, char* pathnameAndFile)
         // get next block, if any
         nextBlock = headerPtr->FQTH_nextBlock; // returns 0 if end, which breaks the loop
         MemUnlock(curBlock);
-        MemFree(curBlock);
         curBlock = nextBlock;
     }
     FilePopDir();
@@ -524,6 +478,32 @@ void LaunchApp(
         IACPShutdown(iacpConnectionToken, NullOptr);
     }
 }
+
+/**************************************************************
+free selected files blocks
+**************************************************************/
+void FreeSelectedFiles()
+{
+    MemHandle                   curBlock;
+    MemHandle                   nextBlock;
+    FileQuickTransferHeader*    headerPtr;
+
+    curBlock = G_selFiles;
+
+    while (curBlock != 0)
+    {
+        headerPtr = (FileQuickTransferHeader*) MemLock(curBlock); // get pointer to its header
+        nextBlock = headerPtr->FQTH_nextBlock; // returns 0 if no next block, which breaks the loop
+        MemUnlock(curBlock);
+
+        MemFree(curBlock);
+
+        curBlock = nextBlock;
+    }
+
+    G_selFiles = 0;
+}
+
 
 /********************************************************************
 is app already on our trigger list?
@@ -963,18 +943,31 @@ add an app to the list
             MemLock(HandleOf(G_appList));
 
             num = ChunkArrayGetCount(G_appList);
-            if (CheckIfAppIsAlreadyInList(G_appList, pathnameAndFile, num) == FALSE)
-            {
-                str = (char*) ChunkArrayAppend(G_appList, 0);
-                strcpy(str, pathnameAndFile);
 
-                num = ChunkArrayGetCount(G_appList);
-                @call oself::MSG_GEN_DYNAMIC_LIST_INITIALIZE(num);
-                @call oself::MSG_GEN_ITEM_GROUP_SET_NONE_SELECTED(TRUE);
-                @call @dup(@RemoveAppTrigger)::MSG_GEN_SET_NOT_ENABLED(VUM_NOW);
-                @call @dup(@AddAppTrigger)::MSG_GEN_SET_NOT_ENABLED(VUM_NOW);
-                @call @dup(@UpAppTrigger)::MSG_GEN_SET_NOT_ENABLED(VUM_NOW);
-                @call @dup(@DownAppTrigger)::MSG_GEN_SET_NOT_ENABLED(VUM_NOW);
+            if (num < MAX_NUM_TRIGGERS)
+            {
+                if (CheckIfAppIsAlreadyInList(G_appList, pathnameAndFile, num) == FALSE)
+                {
+                    str = (char*) ChunkArrayAppend(G_appList, 0);
+                    strcpy(str, pathnameAndFile);
+
+                    num = ChunkArrayGetCount(G_appList);
+                    @call oself::MSG_GEN_DYNAMIC_LIST_INITIALIZE(num);
+                    @call oself::MSG_GEN_ITEM_GROUP_SET_NONE_SELECTED(TRUE);
+                    @call @dup(@RemoveAppTrigger)::MSG_GEN_SET_NOT_ENABLED(VUM_NOW);
+                    @call @dup(@AddAppTrigger)::MSG_GEN_SET_NOT_ENABLED(VUM_NOW);
+                    @call @dup(@UpAppTrigger)::MSG_GEN_SET_NOT_ENABLED(VUM_NOW);
+                    @call @dup(@DownAppTrigger)::MSG_GEN_SET_NOT_ENABLED(VUM_NOW);
+                }
+            }
+            else
+            {
+                UserStandardDialogOptr(
+                    0, 0, 0, 0,
+                    @errorNoMoreTriggers,
+                    ((CDT_ERROR << CDBF_DIALOG_TYPE_OFFSET) |
+                    (GIT_NOTIFICATION << CDBF_INTERACTION_TYPE_OFFSET))
+                );
             }
 
             MemUnlock(HandleOf(G_appList));
