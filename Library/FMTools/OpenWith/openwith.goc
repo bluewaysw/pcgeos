@@ -14,7 +14,7 @@ Resourcen
 
     @visMoniker ToolNameMoniker = "Open With";
     @chunk char errorNoDOSFile[] = "Please select DOS files (no folders) only.";
-    @chunk char errorNoMoreTriggers[] = "Maximum number of triggers reached.";
+    @chunk char errorNoMoreTriggers[] = "Maximum number of application buttons reached.";
 
 @end FMUI;
 
@@ -285,8 +285,8 @@ word toolNum =>	Entry # of activated tool within table returned by
                 FMTF_FETCH_TOOLS
 word entryNum
 ***************************************************************/
-//FMToolProc OpenWithEntryPoint()
-void _pascal _export OpenWithEntryPoint(
+//FMToolProc OpenWithToolActivated()
+void _pascal _export OpenWithToolActivated(
     GeodeHandle filemgr,
     word toolNum,
     word entryNum
@@ -298,8 +298,21 @@ void _pascal _export OpenWithEntryPoint(
     G_selFiles = @call ConstructOptr(filemgr, 0)::MSG_FM_GET_SELECTED_FILES();
 
     // check for non-DOS files, folders, etc. first
-    // we assume just DOS files in the list afterwards
-    if (CheckIfUnsupportedFiles()) // true on ERROR
+    if (SelectedFilesCheckIfUnsupported() == FALSE) // true if there were unsupported files
+    {
+        // read apps from the INI just once
+        AppListIniFileRead();
+
+        // bring up dialog
+        dialog = @call ConstructOptr(filemgr, 0)::MSG_FM_DUP_AND_ADD(@SelectDialog, FMP_APPLICATION);
+        @call dialog::MSG_GEN_SET_USABLE(VUM_NOW);
+        (void) UserDoDialog(dialog);
+        UserDestroyDialog(dialog);
+
+        // clean up
+        AppListFree();
+    }
+    else
     {
         UserStandardDialogOptr(
             0, 0, 0, 0,
@@ -307,28 +320,18 @@ void _pascal _export OpenWithEntryPoint(
             ((CDT_ERROR << CDBF_DIALOG_TYPE_OFFSET) |
              (GIT_NOTIFICATION << CDBF_INTERACTION_TYPE_OFFSET))
         );
-        return;
     }
 
-    // read apps from the INI just once
-    ReadAppsFromIniFile();
-
-    // bring up dialog
-    dialog = @call ConstructOptr(filemgr, 0)::MSG_FM_DUP_AND_ADD(@SelectDialog, FMP_APPLICATION);
-    @call dialog::MSG_GEN_SET_USABLE(VUM_NOW);
-    (void) UserDoDialog(dialog);
-    UserDestroyDialog(dialog);
-
     // clean up
-    MemFree(OptrToHandle(G_appList));
-    FreeSelectedFiles();
+    SelectedFilesFree();
 }
 
 
 /**************************************************************
 check if unsupported file
+returns TRUE on error == unsupported file
 **************************************************************/
-Boolean CheckIfUnsupportedFiles()
+Boolean SelectedFilesCheckIfUnsupported()
 {
     MemHandle                   curBlock;
     MemHandle                   nextBlock;
@@ -404,7 +407,7 @@ Boolean CheckIfUnsupportedFiles()
 /**************************************************************
 load files one by one
 **************************************************************/
-void LoadFiles(GeodeToken* token, char* pathnameAndFile)
+void SelectedFilesLoad(GeodeToken* token, char* pathnameAndFile)
 {
     MemHandle                   curBlock;
     MemHandle                   nextBlock;
@@ -423,7 +426,7 @@ void LoadFiles(GeodeToken* token, char* pathnameAndFile)
 
         for (i=0; i < headerPtr->FQTH_numFiles; i++)
         {
-            LaunchApp(
+            SelectedFilesLaunchApp(
                 token,
                 SP_APPLICATION,
                 pathnameAndFile,
@@ -447,7 +450,7 @@ void LoadFiles(GeodeToken* token, char* pathnameAndFile)
 /**************************************************************
 launch application with DOS file via IACP...
 **************************************************************/
-void LaunchApp(
+void SelectedFilesLaunchApp(
     GeodeToken *appTok,
     DiskHandle appDisk,
     char *appPath,
@@ -482,7 +485,7 @@ void LaunchApp(
 /**************************************************************
 free selected files blocks
 **************************************************************/
-void FreeSelectedFiles()
+void SelectedFilesFree()
 {
     MemHandle                   curBlock;
     MemHandle                   nextBlock;
@@ -508,7 +511,7 @@ void FreeSelectedFiles()
 /********************************************************************
 is app already on our trigger list?
 ********************************************************************/
-Boolean CheckIfAppIsAlreadyInList(optr list, char* appName, word listLen)
+Boolean AppListIsAppAlreadyInList(optr list, char* appName, word listLen)
 {
     word    i = 0;
     char*   str = (char*) 0;
@@ -530,7 +533,7 @@ Boolean CheckIfAppIsAlreadyInList(optr list, char* appName, word listLen)
 /********************************************************************
 read apps from GEOS.INI
 ********************************************************************/
-void ReadAppsFromIniFile()
+void AppListIniFileRead()
 {
     MemHandle       mh = NullHandle;
     ChunkHandle     ch = NullChunk;
@@ -549,7 +552,7 @@ void ReadAppsFromIniFile()
         iniCat,
         iniKey,
         IFRF_READ_ALL,
-        ReadAppsCallback,
+        AppListIniFileReadCallback,
         (void*) &ourList);
 
     MemUnlock(mh);
@@ -558,7 +561,7 @@ void ReadAppsFromIniFile()
 /********************************************************************
 the callback for reading an INI string blob...
 ********************************************************************/
-Boolean ReadAppsCallback(const char *stringSection, word sectionNum, void* enumData)
+Boolean AppListIniFileReadCallback(const char *stringSection, word sectionNum, void* enumData)
 {
     char* str;
 
@@ -571,7 +574,7 @@ Boolean ReadAppsCallback(const char *stringSection, word sectionNum, void* enumD
 /********************************************************************
 write apps to the INI
 ********************************************************************/
-void WriteAppsToIniFile()
+void AppListIniFileWrite()
 {
     word    i = 0;
     char*   str = (char*) 0;
@@ -596,6 +599,14 @@ void WriteAppsToIniFile()
 
     InitFileCommit();
     MemUnlock(HandleOf(G_appList));
+}
+
+/********************************************************************
+free app list
+********************************************************************/
+void AppListFree()
+{
+    MemFree(OptrToHandle(G_appList));
 }
 
 
@@ -624,7 +635,7 @@ an app trigger has been pressed, launch app with files
     @call trigger::MSG_META_GET_VAR_DATA(ATTR_GEODE_TOKEN_TO_PASS, sizeof(GeodeToken), &token);
     @call trigger::MSG_META_GET_VAR_DATA(ATTR_GEODE_FILE_NAME, sizeof(FileLongName), pathnameAndFile);
 
-    LoadFiles(&token, pathnameAndFile);
+    SelectedFilesLoad(&token, pathnameAndFile);
 
     @call oself::MSG_GEN_GUP_INTERACTION_COMMAND(IC_OK);
 }
@@ -675,66 +686,6 @@ build our triggers from the apps in GEOS.INI
 
     MemUnlock(HandleOf(G_appList));
 }
-
-/*
-@method OpenWithAppLaunchTriggerClass, MSG_SET_TRIGGER_MONIKER
-{
-    Boolean             isMoniker = FALSE;
-    ChunkHandle         iconMoniker = NULL;
-    ChunkHandle         textMoniker = NULL;
-    optr                finalMoniker = NULL;
-    word                chunkSize = NULL;
-    DisplayScheme	    ds;
-    MemHandle           mhHeap = NullHandle;
-
-    mhHeap = MemAllocLMem(LMEM_TYPE_GENERAL, sizeof(LMemBlockHeader));
-    MemLock(mhHeap);
-
-    @call GeodeGetAppObject(0)::MSG_GEN_APPLICATION_GET_DISPLAY_SCHEME(&ds);
-
-    isMoniker = TokenLoadMonikerChunk(
-        TOKEN_CHARS(tok->GT_chars[0],tok->GT_chars[1],tok->GT_chars[2],tok->GT_chars[3]),
-        tok->GT_manufID,
-        ds.DS_displayType,
-        ((VMSF_GSTRING | VMSF_COPY_CHUNK) | (VMS_TOOL << VMSF_STYLE_OFFSET)),
-        mhHeap,
-        &chunkSize,
-        &iconMoniker
-    );
-
-    isMoniker = TokenLoadMonikerChunk(
-        TOKEN_CHARS(tok->GT_chars[0],tok->GT_chars[1],tok->GT_chars[2],tok->GT_chars[3]),
-        tok->GT_manufID,
-        ds.DS_displayType,
-        (VMSF_COPY_CHUNK | (VMS_TEXT << VMSF_STYLE_OFFSET)),
-        mhHeap,
-        &chunkSize,
-        &textMoniker
-    );
-
-    // @send oself::MSG_GEN_REPLACE_VIS_MONIKER_OPTR(ConstructOptr(mhHeap, iconMoniker), VUM_NOW);
-    // @send oself::MSG_GEN_REPLACE_VIS_MONIKER_OPTR(ConstructOptr(mhHeap, textMoniker), VUM_NOW);
-
-    if (iconMoniker && textMoniker)
-    {
-        ECLMemExists(ConstructOptr(OptrToHandle(oself), textMoniker));
-        ECLMemExists(ConstructOptr(OptrToHandle(oself), iconMoniker));
-
-        finalMoniker = UserCreateIconTextMoniker(
-            ConstructOptr(mhHeap, textMoniker),
-            ConstructOptr(mhHeap, iconMoniker),
-            mhHeap,
-            (word) 11,
-            0
-        );
-
-        if (finalMoniker) @send oself::MSG_GEN_REPLACE_VIS_MONIKER_OPTR(finalMoniker, VUM_NOW);
-    }
-
-    MemUnlock(mhHeap);
-    MemFree(mhHeap);
-}
-*/
 
 /********************************************************************
 set the tool icon + fname moniker
@@ -853,7 +804,7 @@ when closing config dialog with OK...
 ********************************************************************/
 @method ConfigureDialogClass, MSG_CONFIRM_CONFIGURE_DIALOG
 {
-    WriteAppsToIniFile();
+    AppListIniFileWrite();
 
     @call @dup(@SelectTriggerBox)::MSG_BUILD_TRIGGERS();
 }
@@ -872,7 +823,7 @@ when browsing files in the FS, enable/disable things
 
         MemLock(HandleOf(G_appList));
         num = ChunkArrayGetCount(G_appList);
-        if (CheckIfAppIsAlreadyInList(G_appList, pathnameAndFile, num) == FALSE)
+        if (AppListIsAppAlreadyInList(G_appList, pathnameAndFile, num) == FALSE)
         {
             @call @dup(@AddAppTrigger)::MSG_GEN_SET_ENABLED(VUM_NOW);
         }
@@ -948,7 +899,7 @@ add an app to the list
 
             if (num < MAX_NUM_TRIGGERS)
             {
-                if (CheckIfAppIsAlreadyInList(G_appList, pathnameAndFile, num) == FALSE)
+                if (AppListIsAppAlreadyInList(G_appList, pathnameAndFile, num) == FALSE)
                 {
                     str = (char*) ChunkArrayAppend(G_appList, 0);
                     strcpy(str, pathnameAndFile);

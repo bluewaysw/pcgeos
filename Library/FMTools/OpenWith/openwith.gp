@@ -20,7 +20,7 @@ library ansic
 
 # API functions
 export GETTHOSETOOLS
-export OPENWITHENTRYPOINT
+export OPENWITHTOOLACTIVATED
 
 #classes
 export OpenWithDialogClass
