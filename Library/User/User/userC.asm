@@ -232,7 +232,7 @@ REVISION HISTORY:
 
 ------------------------------------------------------------------------------@
 CRequestArgs	struct
-	CRA_file		hptr	
+	CRA_file		hptr
 	CRA_data		dword
 	CRA_extra1	word
 	CRA_extra2	word
@@ -810,7 +810,7 @@ COMMENT @----------------------------------------------------------------------
 C FUNCTION:	FlowAlterHierarchicalGrab
 
 C DECLARATION:	extern Segment
-    		FlowAlterHierarchicalGrab(optr objectOptr, 
+    		FlowAlterHierarchicalGrab(optr objectOptr,
 			     	      Message gainedMessage,
 				      word offsetToMasterInstance,
 				      word offsetToHierarchicalGrab,
@@ -831,7 +831,7 @@ FLOWALTERHIERARCHICALGRAB	proc	far	objectOptr:optr,
 					offsetToHierarchicalGrab:word,
 					objectToBeGivenExclusive:dword,
 					flags:word
-	uses ds, si, di 
+	uses ds, si, di
 	.enter
 	movdw	bxsi, objectOptr
 	call	MemDerefDS
@@ -843,7 +843,7 @@ FLOWALTERHIERARCHICALGRAB	proc	far	objectOptr:optr,
 
 	mov	bp, flags
 	call	FlowAlterHierarchicalGrab
-	mov	ax, ds			; updated segment 
+	mov	ax, ds			; updated segment
 	.leave
 	ret
 
@@ -854,7 +854,7 @@ COMMENT @----------------------------------------------------------------------
 C FUNCTION:	FlowUpdateHierarchicalGrab
 
 C DECLARATION:	extern Segment
-    		FlowUpdateHierarchicalGrab(optr objectOptr, 
+    		FlowUpdateHierarchicalGrab(optr objectOptr,
 			      Message gainedMessage,
 			      word offsetToMasterInstance,
 			      word offsetToHierarchicalGrab,
@@ -885,7 +885,7 @@ FLOWUPDATEHIERARCHICALGRAB	proc	far	objectOptr:dword,
 	mov	bp, gainedMessage
 
 	call	FlowUpdateHierarchicalGrab
-	mov	ax, ds			; updated segment 
+	mov	ax, ds			; updated segment
 	.leave
 	ret
 
@@ -896,7 +896,7 @@ COMMENT @----------------------------------------------------------------------
 
 C FUNCTION:	FlowDispatchSendOnOrDestroyClassedEvent
 
-C DECLARATION:	
+C DECLARATION:
 	extern Boolean /* XXX */
     		FlowDispatchSendOnOrDestroyClassedEvent(
 			    MessageReturnValues *retvals,
@@ -939,12 +939,12 @@ FLOWDISPATCHSENDONORDESTROYCLASSEDEVENT	proc	far	retvals:fptr,
 	call	FlowDispatchSendOnOrDestroyClassedEvent
 	jnc 	noDestination
 
-	cmp	di, mask MF_CALL	; see if return values should 
+	cmp	di, mask MF_CALL	; see if return values should
 					; be stuffed
 	jne	destinationFound
 
 	les	di, retvals		; stuff return values
-	stosw	
+	stosw
 	mov_tr	ax, bp
 	stosw
 	mov_tr  ax, cx
@@ -973,7 +973,7 @@ endif
 COMMENT @----------------------------------------------------------------------
 
 C FUNCTION:	FlowCheckKbdShortcut
-  
+
   		This version of FlowCheckKbdShortcut() returns a -1 if
 		the key was not found in the table, or the offset into
 		the table if it was found.
@@ -984,9 +984,9 @@ C DECLARATION:	extern word
 				     word character,
 				     word flags,
 				     word state)
-		Note: "shortuctTable" *can* be pointing to the movable XIP 
+		Note: "shortuctTable" *can* be pointing to the movable XIP
 			code resource.
-				     
+
 KNOWN BUGS/SIDE EFFECTS/CAVEATS/IDEAS:
 
 REVISION HISTORY:
@@ -1014,10 +1014,10 @@ FLOWCHECKKBDSHORTCUT	proc	far	shortcutTable:fptr,
 	call	FlowCheckKbdShortcut
 	mov	ax, si			; assume the key was found
 	jc	done			; jump if it was found.
-	
+
 	mov	ax, -1			; signal: the key was not
 					; found in the table.
-done:	
+done:
 	.leave
 	ret
 
@@ -1033,8 +1033,8 @@ COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 		USERREGISTERFORTEXTCONTEXT
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-C DECLARATION 	void _pascal VisTextRegisterForContext(optr obj);	
- 
+C DECLARATION 	void _pascal VisTextRegisterForContext(optr obj);
+
 PSEUDO CODE/STRATEGY:
 
 KNOWN BUGS/SIDE EFFECTS/IDEAS:
@@ -1057,8 +1057,8 @@ COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 		USERUNREGISTERFORTEXTCONTEXT
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-C DECLARATION 	void _pascal VisTextRegisterForContext(optr obj);	
- 
+C DECLARATION 	void _pascal VisTextRegisterForContext(optr obj);
+
 PSEUDO CODE/STRATEGY:
 
 KNOWN BUGS/SIDE EFFECTS/IDEAS:
@@ -1120,8 +1120,8 @@ COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 		USERGETINITFILECATEGORY
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-C DECLARATION 	void _pascal VisTextRegisterForContext(optr obj);	
- 
+C DECLARATION 	void _pascal VisTextRegisterForContext(optr obj);
+
 PSEUDO CODE/STRATEGY:
 
 KNOWN BUGS/SIDE EFFECTS/IDEAS:
@@ -1162,9 +1162,9 @@ C DECLARATION:
 			char *filename,
 			StandardPath sp,
 			GeodeLoadError *err);
-		Note: "filename" *can* be pointing to the movable XIP 
+		Note: "filename" *can* be pointing to the movable XIP
 			code resource.
-			
+
 PSEUDO CODE/STRATEGY:
 
 KNOWN BUGS/SIDE EFFECTS/IDEAS:
@@ -1321,7 +1321,7 @@ USERGETRECENTDOCFILENAME	proc	far	mh:fptr.word,
 						buffer:fptr.char
 	uses ax, cx, ds, di, es, si
 	.enter
-	push	bp		
+	push	bp
 	call	UserGetRecentDocFileName
 	mov	ax, bp
 	pop	bp
@@ -1346,13 +1346,13 @@ COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 		USERCREATEICONTEXTMONIKER
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-C DECLARATION:	extern optr 
+C DECLARATION:	extern optr
 		    _pascal UserCreateIconTextMoniker(optr textMoniker,
 				      optr iconMoniker,
 				      Handle destinationBlock,
 				      word spacing,
 				      CreateIconTextMonikerFlags flags);
-			
+
 PSEUDO CODE/STRATEGY:
 
 KNOWN BUGS/SIDE EFFECTS/IDEAS:
@@ -1364,15 +1364,31 @@ REVISION HISTORY:
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
 global USERCREATEICONTEXTMONIKER:far
-USERCREATEICONTEXTMONIKER	proc	far	\
-	params:CreateIconTextMonikerParams
+USERCREATEICONTEXTMONIKER	proc	far	params:CreateIconTextMonikerParams
 	ForceRef params
 
-	popdw	bxcx			; bxcx = return address
-	call	UserCreateIconTextMoniker
-	pushdw	bxcx			; restore retuen address
+	;popdw	bxcx			; bxcx = return address
+	;call	UserCreateIconTextMoniker
+	;pushdw	bxcx			; restore retuen address
+	;ret	@ArgSize
 
+	; lock icon moniker lmem block, as UserCreateIconTextMoniker expects one
+	mov 	cx, bp
+	mov 	bp, sp
+	mov 	bx, ss: [bp+4].CITMP_iconMoniker.handle
+	mov 	bp, cx
+	call	ObjLockObjBlock 	; *ds:si icon moniker
+	mov	ds, ax
+
+	popdw	bxcx			; copy return address from stack to bx:cx, save it there for later
+	call	UserCreateIconTextMoniker
+	pushdw	bxcx			; restore return address
+
+	; unlock icon moniker lmem block
+	mov	bx, ds: [LMBH_handle]
+	call	MemUnlock
 	ret	@ArgSize
+
 USERCREATEICONTEXTMONIKER	endp
 
 C_User	ends

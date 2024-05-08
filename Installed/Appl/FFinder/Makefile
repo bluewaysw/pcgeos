@@ -3,10 +3,10 @@
 #
 # If you edit it, you will lose your changes, should it be regenerated.
 #
-GEODE           = FFinder
+GEODE           = ffinder
 ASM_TO_OBJS     =
 UI_TO_RDFS      =
-SRCS            = FFinder.goc FFProcess.goc FFinder.goh FFObjects.goh
+SRCS            = FFinder.goc FFProcess.goc FFObjects.goh FFinder.goh
 OBJS            = FFinder.obj FFProcess.obj
 LOBJS           =
 

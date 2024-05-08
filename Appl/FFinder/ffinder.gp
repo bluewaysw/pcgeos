@@ -14,7 +14,7 @@
 #       edwin   10/23/98        Initial version
 #
 # DESCRIPTION:
-#       This file contains Geode definitions for the "FFinder" 
+#       This file contains Geode definitions for the "FFinder"
 #       application. This file is read by the GLUE linker to
 #       build this application.
 #
@@ -84,7 +84,7 @@ resource APPRESOURCE ui-object
 resource INTERFACE   ui-object
 # resource INTERFACE2 lmem read-only shared
 resource INTERFACE2   ui-object
-resource FIXEDRESOURCE fixed code read-only shared
+# resource FIXEDRESOURCE fixed code read-only shared
 resource TINYMONIKERRESOURCE ui-object
 resource APPMONIKERRESOURCE ui-object
 resource ICONMONIKERRESOURCE lmem read-only shared
