@@ -332,51 +332,57 @@ void UpdateUIForSearchEnd()
  ***********************************************************************/
 @method FFinderProcessClass, MSG_FFP_DISPLAY_RECENT_OPEN_FILES
 {
-    DocumentEntry (*buffer)[NUM_OF_DOCUMENT_ENTRIES];
-    //DocumentEntry*	buffer[NUM_OF_DOCUMENT_ENTRIES];
-    //char	buffer = {0};
-    MemHandle mh;
-    int i;
-    word  start = 0;
+	DocumentEntry	(*buffer)[NUM_OF_DOCUMENT_ENTRIES];
+	MemHandle	mh = NullHandle;
+	int 		i = 0;
+	int  		start = 0;
 
-    /*
-     *  Get the array of most recently opened documents.
-     */
-    UserGetRecentDocFileName(&mh, &start, (char*) &buffer);
-    /*
-     *  List all the non-empty entries.
-     */
-    if (mh && start >= 0 && start < NUM_OF_DOCUMENT_ENTRIES) {
-	i = start;
-	do {
-	    i--;
-	    if (i < 0)
-		i =  NUM_OF_DOCUMENT_ENTRIES-1;
-	    if (strlen((*buffer)[i].DE_name) > 0) {
-		/*
-		 *  It's non-empty, display it.
-		 */
-		if (@call FFSearchResult::MSG_FFRL_ADD_MONIKER
-		     (searchResultCnt,
-		      0,
-		      (*buffer)[i].DE_name,
-		      (*buffer)[i].DE_diskHandle,
-			 (*buffer)[i].DE_path) != NO_ERROR_RETURNED)
-		    continue;
-		@call FFSearchResult::MSG_GEN_DYNAMIC_LIST_ADD_ITEMS
-		     (searchResultCnt, 1);
-		searchResultCnt++;
-	    }
-	} while (i != start && searchResultCnt < NUM_OF_DOCUMENT_ENTRIES);
+	/*
+	*  Get the array of most recently opened documents.
+	*/
+	UserGetRecentDocFileName(&mh, (word*) &start, (char*) &buffer);
+	/*
+	*  List all the non-empty entries.
+	*/
+	if ((mh) && ((start >= 0) && (start < NUM_OF_DOCUMENT_ENTRIES)))
+	{
+		i = start;
+		do
+		{
+			i--;
+			if (i < 0) i = NUM_OF_DOCUMENT_ENTRIES-1;
 
-	MemFree(mh);
-    }
-    /*
-     *  Update UI.
-     */
-    UpdateUIForSearchEnd();
+			if (strlen((*buffer)[i].DE_name) > 0)
+			{
+				/*
+				*  It's non-empty, display it.
+				*/
+				if (@call FFSearchResult::MSG_FFRL_ADD_MONIKER(
+					searchResultCnt,
+					0,
+					(*buffer)[i].DE_name,
+					(*buffer)[i].DE_diskHandle,
+					(*buffer)[i].DE_path) != NO_ERROR_RETURNED
+				)
+				continue;
 
-    return;
+				@call FFSearchResult::MSG_GEN_DYNAMIC_LIST_ADD_ITEMS(
+					searchResultCnt,
+					1
+				);
+				searchResultCnt++;
+			}
+		}
+		while ((i != start) && (searchResultCnt < NUM_OF_DOCUMENT_ENTRIES));
+
+		MemFree(mh);
+	}
+	/*
+	*  Update UI.
+	*/
+	UpdateUIForSearchEnd();
+
+	return;
 } /* End of MSG_FFP_DISPLAY_RECENT_OPEN_FILES */
 
 
@@ -739,197 +745,132 @@ CreateLMemGString (optr *storagePtr)
  ***********************************************************************/
 @method FFResultListClass, MSG_FFRL_QUERY_MONIKER
 {
-    char fullPath[MAX_FILE_DIR_LEN], resolved[MAX_FILE_DIR_LEN],
-	*endOfPath, safe, *finalPath, *docPath;
-    ResultEntry *entry;
-    word itemSize, zero, cnt, len;
-    GStateHandle gshan, gstate;
-    optr gstring;
-    FileAttrs attr;
-    DiskHandle diskh;
+	char	fullPath[MAX_FILE_DIR_LEN], resolved[MAX_FILE_DIR_LEN],
+		*endOfPath, safe, *finalPath, *docPath;
+	ResultEntry	*entry;
+	word		itemSize, zero, cnt, len;
+	FileAttrs 	attr;
+	DiskHandle 	diskh;
 
-    optr	moniker;
-    MemHandle	mhHeap;
-    DisplayScheme	    ds;
-        Boolean             isMoniker = FALSE;
-    ChunkHandle         iconMoniker = NULL;
-    word		chunkSize = 0;
+	optr		moniker;
+	optr		iconMoniker = NULL;
 
 
-    ObjLockObjBlock(HandleOf(@ListMoniker));
+	ObjLockObjBlock(HandleOf(@ListMoniker));
 
-    if (@self->FFRL_monikerChunk &&
-         (cnt = ChunkArrayGetCountHandles(HandleOf(@ListMoniker),
-					@self->FFRL_monikerChunk)) > 0) {
-	EC( if (item >= cnt) FatalError(1); )
-	/*
-	 * Get the search result.  Remember, the first byte is the
-	 * standard path token.  The following bytes are the tail path.
-	 */
-	entry = (ResultEntry *)ChunkArrayElementToPtr
-	    (ConstructOptr(HandleOf(@ListMoniker), @self->FFRL_monikerChunk),
-	     item, &itemSize);
-	/*
-	 *  Construct the full path.
-	 */
-	zero = sizeof(ResultEntry) + entry->RE_pathSize;
-	safe = ((char*)entry)[zero];
-	((char*)entry)[zero] = '\0';
-	endOfPath = fullPath;
-	FileConstructFullPath(&endOfPath, MAX_FILE_DIR_LEN,
-			      entry->RE_pathToken,
-			      ((char*)entry)+sizeof(ResultEntry), TRUE);
-	((char*)entry)[zero] = safe;
-	strcat(fullPath, "\\");
-	strcat(fullPath,
-	       ((char*)entry) + sizeof(ResultEntry) + entry->RE_pathSize);
+	if (@self->FFRL_monikerChunk &&	(cnt = ChunkArrayGetCountHandles(HandleOf(@ListMoniker), @self->FFRL_monikerChunk)) > 0)
+	{
+		EC( if (item >= cnt) FatalError(1); )
+		/*
+		* Get the search result.  Remember, the first byte is the
+		* standard path token.  The following bytes are the tail path.
+		*/
+		entry = (ResultEntry *)ChunkArrayElementToPtr(
+			ConstructOptr(HandleOf(@ListMoniker), @self->FFRL_monikerChunk), item, &itemSize
+		);
+		/*
+		*  Construct the full path.
+		*/
+		zero = sizeof(ResultEntry) + entry->RE_pathSize;
+		safe = ((char*)entry)[zero];
+		((char*)entry)[zero] = '\0';
+		endOfPath = fullPath;
+		FileConstructFullPath(
+			&endOfPath,
+			MAX_FILE_DIR_LEN,
+			entry->RE_pathToken,
+			((char*)entry)+sizeof(ResultEntry), TRUE
+		);
+		((char*)entry)[zero] = safe;
+		strcat(fullPath, "\\");
+		strcat(fullPath,
+		((char*)entry) + sizeof(ResultEntry) + entry->RE_pathSize);
 
-	if (entry->RE_pathToken == SP_TOP ||
-	    entry->RE_pathToken == SP_NOT_STANDARD_PATH) {
-	    endOfPath = resolved;
-	    diskh = FileResolveStandardPath(&endOfPath, MAX_FILE_DIR_LEN, fullPath,
-					 FRSPF_ADD_DRIVE_NAME, &attr);
-	    if (diskh)
-		finalPath = endOfPath = resolved;
-	    else
-		finalPath = endOfPath = fullPath;
+		if (entry->RE_pathToken == SP_TOP || entry->RE_pathToken == SP_NOT_STANDARD_PATH)
+		{
+			endOfPath = resolved;
+			diskh = FileResolveStandardPath(
+				&endOfPath,
+				MAX_FILE_DIR_LEN,
+				fullPath,
+				FRSPF_ADD_DRIVE_NAME,
+				&attr);
 
-	    FileParseStandardPath(0, (const char**) &endOfPath);
-	}
-	else {
-	    finalPath = fullPath;
-	}
+			if (diskh)
+				finalPath = endOfPath = resolved;
+			else
+				finalPath = endOfPath = fullPath;
 
-	/*
-	 *  Now we only show the path below the current path in file
-	 *  selector(if search), or Document, Desktop, or A:(if Recent)
-	 */
-	endOfPath = strstr(finalPath, @self->FFRL_fullPath);
-	if (g_whichListDisplay == WLD_SEARCH) {
-	   if (endOfPath) {
-		 len = strlen(@self->FFRL_fullPath);
-		 }
-	   else if ((len = strlen(finalPath)) > 60) {
-		 /*
-		  *  If the length is more than 45 characters, we may consider
-		  *  truncate the beginning and add "...".
-		  */
-		 len = len - 60;
-		 finalPath[len] = '.';
-		 finalPath[len+1] = '.';
-		 finalPath[len+2] = '.';
-		 }
-	   else {
-		 len = 0;
-		 }
-	   } /* end of WLD_SEARCH */
-	else {  /* we're showing recently opened docs */
-	   if (docPath = strstr(finalPath, "DOCUMENT"))
-		 len = strlen(finalPath) - strlen(docPath) + 8;
+			FileParseStandardPath(0, (const char**) &endOfPath);
+		}
+		else
+		{
+			finalPath = fullPath;
+		}
 
-	   else if (docPath = strstr(finalPath, "DESKTOP"))
-		 len = strlen(finalPath) - strlen(docPath) + 7;
+		/*
+		*  Now we only show the path below the current path in file
+		*  selector(if search), or Document, Desktop, or A:(if Recent)
+		*/
+		endOfPath = strstr(finalPath, @self->FFRL_fullPath);
+		if (g_whichListDisplay == WLD_SEARCH)
+		{
+			if (endOfPath)
+			{
+				len = strlen(@self->FFRL_fullPath);
+			}
+			else if ((len = strlen(finalPath)) > 60)
+			{
+				/*
+				*  If the length is more than 45 characters, we may consider
+				*  truncate the beginning and add "...".
+				*/
+				len = len - 60;
+				finalPath[len] = '.';
+				finalPath[len+1] = '.';
+				finalPath[len+2] = '.';
+			}
+			else
+			{
+				len = 0;
+			}
+		} /* end of WLD_SEARCH */
+		else
+		{  /* we're showing recently opened docs */
+			if (docPath = strstr(finalPath, "DOCUMENT"))
+				len = strlen(finalPath) - strlen(docPath) + 8;
 
-	   else if (docPath = strstr(finalPath, "A:\\"))
-	      len = strlen(finalPath) - strlen(docPath) + 3;
+			else if (docPath = strstr(finalPath, "DESKTOP"))
+				len = strlen(finalPath) - strlen(docPath) + 7;
 
-	   else if ((len = strlen(finalPath)) > 60) {
-		 len = len - 60;
-		 finalPath[len] = '.';
-		 finalPath[len+1] = '.';
-		 finalPath[len+2] = '.';
-		 }
-	   else {
-		 len = 0;
-		 }
-	   } /* end of WLD_RECENT */
+			else if (docPath = strstr(finalPath, "A:\\"))
+				len = strlen(finalPath) - strlen(docPath) + 3;
 
-// @if 0   /* UserCreateIconTextMoniker can't be called from C.  Bummer.  */
+			else if ((len = strlen(finalPath)) > 60)
+			{
+				len = len - 60;
+				finalPath[len] = '.';
+				finalPath[len+1] = '.';
+				finalPath[len+2] = '.';
+			}
+			else
+			{
+				len = 0;
+			}
+		} /* end of WLD_RECENT */
 
-	// moniker = UserCreateIconTextMoniker((optr)(finalPath+len+1),
-	// 				    @FileMoniker,
-	// 				    OptrToHandle(oself),
-	// 				    0,
-	// 				    CITMF_TEXT_IS_FPTR | CITMF_CREATE_CHUNK);
-	// @call self::MSG_GEN_DYNAMIC_LIST_REPLACE_ITEM_MONIKER
-	//      (item, 0, 15, 13, sizeof(moniker),
-	//       VMDT_VIS_MONIKER, VMST_OPTR, (dword)moniker );
+		iconMoniker = (entry->RE_fileType & FA_SUBDIR) ? @FolderMoniker : @FileMoniker;
+		moniker = UserCreateIconTextMoniker(
+			(optr)(finalPath + len + 1),
+			iconMoniker,
+			OptrToHandle(oself),
+			7,
+			CITMF_TEXT_IS_FPTR | CITMF_CREATE_CHUNK
+		);
 
-	//MemLock(OptrToHandle(@FileMoniker));
-
-	mhHeap = MemAllocLMem(LMEM_TYPE_GENERAL, sizeof(LMemBlockHeader));
-	MemLock(mhHeap);
-
-	@call GeodeGetAppObject(0)::MSG_GEN_APPLICATION_GET_DISPLAY_SCHEME(&ds);
-	isMoniker = TokenLoadMonikerChunk(
-		TOKEN_CHARS('F','F','N','R'),
-		0,
-		ds.DS_displayType,
-		((VMSF_GSTRING | VMSF_COPY_CHUNK) | (VMS_TOOL << VMSF_STYLE_OFFSET)),
-		mhHeap,
-		&chunkSize,
-		&iconMoniker
-	);
-
-	moniker = UserCreateIconTextMoniker((optr)(finalPath + len + 1),
-	 				    ConstructOptr(mhHeap, iconMoniker),
-	 				    mhHeap,
-	 				    7,
-	 				    CITMF_TEXT_IS_FPTR | CITMF_CREATE_CHUNK);
-	// @call list::MSG_GEN_DYNAMIC_LIST_REPLACE_ITEM_MONIKER(
-	// 	item,
-	// 	0,
-	// 	0,
-	// 	0,
-	// 	0,
-	//       	VMDT_VIS_MONIKER,
-	// 	VMST_OPTR,
-	// 	(dword) @FileMoniker
-	// );
-
-
-	@call self::MSG_GEN_DYNAMIC_LIST_REPLACE_ITEM_MONIKER_OPTR(item, moniker);
-
-	//MemUnlock(OptrToHandle(@FileMoniker));
-	//@call oself::MSG_GEN_DYNAMIC_LIST_REPLACE_ITEM_TEXT(item, finalPath); // works
-
-
-	//LMemFree(moniker);
-	MemFree(mhHeap);
-
-
-// @else
-// 	MemLock(OptrToHandle(@FileMoniker));
-//         if (entry->RE_fileType & FA_SUBDIR) {
-// 	    gshan = GrLoadGString(OptrToHandle(@FolderMoniker), GST_CHUNK,
-// 				  OptrToChunk(@FolderMoniker));
-// 	} else {
-// 	    gshan = GrLoadGString(OptrToHandle(@FileMoniker), GST_CHUNK,
-// 				  OptrToChunk(@FileMoniker));
-// 	}
-// 	gstate = CreateLMemGString(&gstring);
-// 	GrDrawGStringAtCP(gstate, gshan, 0, (word *)0);
-// 	if (finalPath[len] == '\\')
-// 	    GrDrawText(gstate, 18, -2, finalPath+len+1, 0);
-// 	else
-// 	    GrDrawText(gstate, 18, -2, finalPath+len, 0);
-// 	GrEndGString(gstate);
-// 	GrDestroyGString(gstate, 0, GSKT_LEAVE_DATA);
-//
-// 	@call self::MSG_GEN_DYNAMIC_LIST_REPLACE_ITEM_MONIKER
-// 	     (item, 0, 15, 13, sizeof(gstring),
-// 	      VMDT_GSTRING, VMST_OPTR, (dword)gstring );
-//
-// 	MemFree(HandleOf(gstring));
-// 	MemFree(gshan);
-// 	MemUnlock(OptrToHandle(@FileMoniker));
-// @endif
-
-	/*
-	 * Update the moniker in the definitions list.
-	@call self::MSG_GEN_DYNAMIC_LIST_REPLACE_ITEM_TEXT(item, finalPath+len+1);
-	 */
-    }
+		@call self::MSG_GEN_DYNAMIC_LIST_REPLACE_ITEM_MONIKER_OPTR(item, moniker);
+		LMemFree(moniker);
+    	}
 
     MemUnlock(HandleOf(@ListMoniker));
 } /* End of MSG_DM_GET_MEANING_MONIKER.	*/
