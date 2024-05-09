@@ -45,8 +45,9 @@ FFProcess.eobj: stdapp.goh object.goh ui.goh Objects/metaC.goh \
                 Objects/gItemC.goh Objects/gBoolC.goh \
                 Objects/gGadgetC.goh Objects/gToolCC.goh \
                 Objects/gValueC.goh Objects/gToolGC.goh \
-                Objects/helpCC.goh geoMisc.h initfile.h FFinder.goh \
-                FFObjects.goh Art/mkrFile.goh Art/mkrFolder.goh
+                Objects/helpCC.goh geoMisc.h initfile.h token.h \
+                FFinder.goh FFObjects.goh Art/mkrFile.goh \
+                Art/mkrFolder.goh
 FFProcess.obj \
 FFProcess.eobj: geos.h heap.h geode.h resource.h ec.h object.h lmem.h \
                 graphics.h fontID.h font.h color.h gstring.h timer.h vm.h \

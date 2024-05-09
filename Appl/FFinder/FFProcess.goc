@@ -26,6 +26,7 @@
 @include <stdapp.goh>
 @include <geoMisc.h>
 @include <initfile.h>
+@include <token.h>
 @include "FFinder.goh"
 @include "FFObjects.goh"
 #include <Ansi/string.h>
@@ -746,7 +747,14 @@ CreateLMemGString (optr *storagePtr)
     optr gstring;
     FileAttrs attr;
     DiskHandle diskh;
+
     optr	moniker;
+    MemHandle	mhHeap;
+    DisplayScheme	    ds;
+        Boolean             isMoniker = FALSE;
+    ChunkHandle         iconMoniker = NULL;
+    word		chunkSize = 0;
+
 
     ObjLockObjBlock(HandleOf(@ListMoniker));
 
@@ -847,14 +855,28 @@ CreateLMemGString (optr *storagePtr)
 	//      (item, 0, 15, 13, sizeof(moniker),
 	//       VMDT_VIS_MONIKER, VMST_OPTR, (dword)moniker );
 
-	// MemLock(OptrToHandle(@FileMoniker));
+	//MemLock(OptrToHandle(@FileMoniker));
 
-	// moniker = UserCreateIconTextMoniker((optr)(finalPath + len + 1),
-	// 				    @FileMoniker,
-	// 				    OptrToHandle(oself),
-	// 				    7,
-	// 				    CITMF_TEXT_IS_FPTR | CITMF_CREATE_CHUNK);
-	// @call oself::MSG_GEN_DYNAMIC_LIST_REPLACE_ITEM_MONIKER(
+	mhHeap = MemAllocLMem(LMEM_TYPE_GENERAL, sizeof(LMemBlockHeader));
+	MemLock(mhHeap);
+
+	@call GeodeGetAppObject(0)::MSG_GEN_APPLICATION_GET_DISPLAY_SCHEME(&ds);
+	isMoniker = TokenLoadMonikerChunk(
+		TOKEN_CHARS('F','F','N','R'),
+		0,
+		ds.DS_displayType,
+		((VMSF_GSTRING | VMSF_COPY_CHUNK) | (VMS_TOOL << VMSF_STYLE_OFFSET)),
+		mhHeap,
+		&chunkSize,
+		&iconMoniker
+	);
+
+	moniker = UserCreateIconTextMoniker((optr)(finalPath + len + 1),
+	 				    ConstructOptr(mhHeap, iconMoniker),
+	 				    mhHeap,
+	 				    7,
+	 				    CITMF_TEXT_IS_FPTR | CITMF_CREATE_CHUNK);
+	// @call list::MSG_GEN_DYNAMIC_LIST_REPLACE_ITEM_MONIKER(
 	// 	item,
 	// 	0,
 	// 	0,
@@ -862,39 +884,45 @@ CreateLMemGString (optr *storagePtr)
 	// 	0,
 	//       	VMDT_VIS_MONIKER,
 	// 	VMST_OPTR,
-	// 	(dword) moniker
+	// 	(dword) @FileMoniker
 	// );
-	// @call list::MSG_GEN_DYNAMIC_LIST_REPLACE_ITEM_MONIKER_OPTR(item, moniker);
-	// MemUnlock(OptrToHandle(@FileMoniker));
-	// @call oself::MSG_GEN_DYNAMIC_LIST_REPLACE_ITEM_TEXT(item, finalPath);
-	// LMemFree(moniker);
+
+
+	@call self::MSG_GEN_DYNAMIC_LIST_REPLACE_ITEM_MONIKER_OPTR(item, moniker);
+
+	//MemUnlock(OptrToHandle(@FileMoniker));
+	//@call oself::MSG_GEN_DYNAMIC_LIST_REPLACE_ITEM_TEXT(item, finalPath); // works
+
+
+	//LMemFree(moniker);
+	MemFree(mhHeap);
 
 
 // @else
-	MemLock(OptrToHandle(@FileMoniker));
-        if (entry->RE_fileType & FA_SUBDIR) {
-	    gshan = GrLoadGString(OptrToHandle(@FolderMoniker), GST_CHUNK,
-				  OptrToChunk(@FolderMoniker));
-	} else {
-	    gshan = GrLoadGString(OptrToHandle(@FileMoniker), GST_CHUNK,
-				  OptrToChunk(@FileMoniker));
-	}
-	gstate = CreateLMemGString(&gstring);
-	GrDrawGStringAtCP(gstate, gshan, 0, (word *)0);
-	if (finalPath[len] == '\\')
-	    GrDrawText(gstate, 18, -2, finalPath+len+1, 0);
-	else
-	    GrDrawText(gstate, 18, -2, finalPath+len, 0);
-	GrEndGString(gstate);
-	GrDestroyGString(gstate, 0, GSKT_LEAVE_DATA);
-
-	@call self::MSG_GEN_DYNAMIC_LIST_REPLACE_ITEM_MONIKER
-	     (item, 0, 15, 13, sizeof(gstring),
-	      VMDT_GSTRING, VMST_OPTR, (dword)gstring );
-
-	MemFree(HandleOf(gstring));
-	MemFree(gshan);
-	MemUnlock(OptrToHandle(@FileMoniker));
+// 	MemLock(OptrToHandle(@FileMoniker));
+//         if (entry->RE_fileType & FA_SUBDIR) {
+// 	    gshan = GrLoadGString(OptrToHandle(@FolderMoniker), GST_CHUNK,
+// 				  OptrToChunk(@FolderMoniker));
+// 	} else {
+// 	    gshan = GrLoadGString(OptrToHandle(@FileMoniker), GST_CHUNK,
+// 				  OptrToChunk(@FileMoniker));
+// 	}
+// 	gstate = CreateLMemGString(&gstring);
+// 	GrDrawGStringAtCP(gstate, gshan, 0, (word *)0);
+// 	if (finalPath[len] == '\\')
+// 	    GrDrawText(gstate, 18, -2, finalPath+len+1, 0);
+// 	else
+// 	    GrDrawText(gstate, 18, -2, finalPath+len, 0);
+// 	GrEndGString(gstate);
+// 	GrDestroyGString(gstate, 0, GSKT_LEAVE_DATA);
+//
+// 	@call self::MSG_GEN_DYNAMIC_LIST_REPLACE_ITEM_MONIKER
+// 	     (item, 0, 15, 13, sizeof(gstring),
+// 	      VMDT_GSTRING, VMST_OPTR, (dword)gstring );
+//
+// 	MemFree(HandleOf(gstring));
+// 	MemFree(gshan);
+// 	MemUnlock(OptrToHandle(@FileMoniker));
 // @endif
 
 	/*
