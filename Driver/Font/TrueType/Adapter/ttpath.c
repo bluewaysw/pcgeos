@@ -786,13 +786,13 @@ static void ScaleOutline( TRUETYPE_VARS )
  *                width and weight.
  * 
  * PARAMETERS:    TRUETYPE_VARS         Cached variables needed by driver.
- *                *transmatrix          Ptr. to transformation matrix
- *                                      to fill.
- *                *fontheader
- *                pointSize
- *                stylesToImplement
- *                width
- *                weight
+ *                *transmatrix          Ptr. to drivers transformation 
+ *                                      matrix to fill.
+ *                *fontHeader           Ptr to FontHeader structure.
+ *                pointsize             Desired point size.
+ *                stylesToImplement     Styles that must be added.
+ *                width                 Desired glyph width.
+ *                weight                Desired glyph weight.
  * 
  * RETURNS:       void   
  * 
@@ -876,9 +876,14 @@ EC(     ECCheckBounds( (void*)trueTypeVars ) );
 /********************************************************************
  *                      CalcDriversTransformMatrix
  ********************************************************************
- * SYNOPSIS:	  
+ * SYNOPSIS:	  Calculate fontmatrix for rotation and document scale.
  * 
- * PARAMETERS:    
+ * PARAMETERS:    *transformMatrix      Ptr. to drivers tranformation 
+ *                                      matrix to fill.
+ *                gstate                GStateHande to get graphics 
+ *                                      transformation matrix.
+ *                win                   WindowHandle to get windows
+ *                                      transformation matrix.
  * 
  * RETURNS:       void   
  * 
@@ -895,6 +900,7 @@ static void CalcDriversTransformMatrix( TransformMatrix* transformMatrix, GState
         WWFixedAsDWord  temp_e11, temp_e12, temp_e21, temp_e22;
 
 
+EC(     ECCheckBounds( transformMatrix ) );
 EC(     ECCheckGStateHandle( gstate) );
 EC(     ECCheckWindowHandle( win ) );
 
