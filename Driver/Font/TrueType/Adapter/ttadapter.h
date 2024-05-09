@@ -479,6 +479,12 @@ typedef struct
 #define WBFIXED_TO_WWFIXEDASDWORD( value )       \
         ( (long) ( ( (long)(value.WBF_int) ) * 0x00010000 ) | ( ( (long)value.WBF_frac) << 8 ) )
 
+/*
+ * convert value (WWFixed) to WWFixedAsDWord 
+ */
+#define WWFIXED_TO_WWFIXEDASDWORD( value )       \
+        ( (long) ( ( (long)(value.WWF_int) ) * 0x00010000 ) | ( (long)value.WWF_frac) )
+
 
 #define MUL_100_WWFIXED( factor, percentage )   \
         GrMulWWFixed( factor, GrUDivWWFixed( ((long)percentage ) << 16, 100L << 16))

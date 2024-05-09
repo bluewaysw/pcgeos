@@ -21,6 +21,7 @@
 #include "ttpath.h"
 #include "ttcharmapper.h"
 #include <ec.h>
+#include <win.h>
 
 
 /*
@@ -62,7 +63,7 @@ static void CalcTransformMatrix( TransMatrix*    transMatrix,
                                  WWFixedAsDWord  pointSize, 
                                  TextStyle       stylesToImplement );
 
-static void _near ConvertOutline( GStateHandle      gstate, 
+static void ConvertOutline( GStateHandle      gstate, 
                             TT_Outline*       outline, 
                             RenderFunctions*  functions );
 
@@ -78,18 +79,17 @@ static void _near ConicTo( Handle handle, TT_Vector* v_control, TT_Vector* vec )
 
 static void _near RegionPathConicTo( Handle handle, TT_Vector* v_control, TT_Vector* vec );
 
-static void _near WriteComment( TRUETYPE_VARS, GStateHandle gstate );
+static void WriteComment( TRUETYPE_VARS, GStateHandle gstate );
 
 static void ScaleOutline( TRUETYPE_VARS );
 
 static void StoreFontMatrix( TRUETYPE_VARS,
                              TransformMatrix*  transMatrix,
+                             FontHeader*       fontHeader,
                              WWFixedAsDWord    pointSize,
                              TextStyle         stylesToImplement,
                              Byte              width,
                              Byte              weight );
-
-static void mulMatrix( TransformMatrix* transMatrix, TransMatrix* fontMatrix );
 
 
 /********************************************************************
@@ -283,14 +283,12 @@ void _pascal TrueType_Gen_In_Region(
         TrueTypeOutlineEntry*  trueTypeOutline;
         TT_UShort              charIndex;
         RenderFunctions        renderFunctions;
-        TransMatrix            tMatrix;
         TransformMatrix        transform;
 
         XYValueAsDWord         cursorPos;
         XYValueAsDWord         result;
-        word                   baseline;
-        WWFixedAsDWord         scale;
         TT_Matrix              flipMatrix = HORIZONTAL_FLIP_MATRIX;
+        WindowHandle           win;
 
 
 EC(     ECCheckGStateHandle( gstate ) );
@@ -324,27 +322,19 @@ EC(     ECCheckBounds( (void*)fontHeader ) );
         TT_Get_Glyph_Outline( GLYPH, &OUTLINE );
 
         /* store font matrix */
-        StoreFontMatrix( trueTypeVars, &transform, pointSize, stylesToImplement, width, weight );
+        StoreFontMatrix( trueTypeVars, &transform, fontHeader, pointSize, stylesToImplement, width, weight );
+        win = GrGetWinHandle( gstate );
+        CalcDriversTransformMatrix( &transform, gstate, win );
 
-        /* calculate position of baseline */
-        scale = GrUDivWWFixed( pointSize, MakeWWFixed( FACE_PROPERTIES.header->Units_Per_EM ) );
-        baseline = ROUND_WWFIXED( SCALE_WORD( fontHeader->FH_ascent + fontHeader->FH_accent, scale ) );
-
-        /* translate by cursoposition an baseline */
+        /* get current cursor position */
         cursorPos = GrGetCurPos( gstate );
         result = GrTransform( gstate, DWORD_X(cursorPos), DWORD_Y(cursorPos) );
-        GrGetTransform( gstate, &tMatrix );
-        mulMatrix( &transform, &tMatrix );
-
-        //TODO: implement heightX, heightY, scriptX, scriptY 
-
         
+        /* transform glyphs outline */
         TT_Transform_Outline( &OUTLINE, &transform.TM_matrix );
         TT_Transform_Outline( &OUTLINE, &flipMatrix );
-        TT_Translate_Outline( &OUTLINE, DWORD_X(result), 
-                                        DWORD_Y(result) + baseline + BASELINE_CORRECTION );
-                                        //TODO: use heightY instead baseline
- 
+        TT_Translate_Outline( &OUTLINE, DWORD_X(result) + transform.TM_heightX, 
+                                        DWORD_Y(result) + transform.TM_heightY );
         /* set render functions */
         renderFunctions.Proc_MoveTo  = RegionPathMoveTo;
         renderFunctions.Proc_LineTo  = RegionPathLineTo;
@@ -381,7 +371,7 @@ Fin:
 
 #define CURVE_TAG_ON            0x01
 #define CURVE_TAG_CONIC         0x00
-static void _near ConvertOutline( Handle handle, TT_Outline* outline, RenderFunctions* functions )
+static void ConvertOutline( Handle handle, TT_Outline* outline, RenderFunctions* functions )
 {
         TT_Vector   v_last;
         TT_Vector   v_control;
@@ -745,7 +735,7 @@ static void CalcTransformMatrix( TransMatrix*    transMatrix,
  *******************************************************************/
 
 #define NUM_PARAMS              6
-static void _near WriteComment( TRUETYPE_VARS, GStateHandle gstate )
+static void WriteComment( TRUETYPE_VARS, GStateHandle gstate )
 {
         word            params[NUM_PARAMS];
        
@@ -806,6 +796,7 @@ static void ScaleOutline( TRUETYPE_VARS )
 
 static void StoreFontMatrix( TRUETYPE_VARS,
                              TransformMatrix*  transMatrix,
+                             FontHeader*       fontHeader,
                              WWFixedAsDWord    pointSize,
                              TextStyle         stylesToImplement,
                              Byte              width,
@@ -822,28 +813,32 @@ EC(     ECCheckBounds( (void*)trueTypeVars ) );
         /* calculate scale factor for pointsize */
         scaleFactor = GrUDivWWFixed( pointSize, MakeWWFixed( UNITS_PER_EM ) );
 
-        /* initilize tranformation matrix */
+        /* initilize drivers tranformation matrix */
         transMatrix->TM_matrix.xx = scaleFactor;
         transMatrix->TM_matrix.xy = 0L;
         transMatrix->TM_matrix.yx = 0L;
         transMatrix->TM_matrix.yy = scaleFactor;
+        transMatrix->TM_heightX   = 0L;
+        transMatrix->TM_heightY   = ROUND_WWFIXED( SCALE_WORD( fontHeader->FH_ascent + fontHeader->FH_accent, scaleFactor ) ) + BASELINE_CORRECTION;
+        transMatrix->TM_scriptX   = 0L;
+        transMatrix->TM_scriptY   = 0L;
 
         /* fake bold style       */
         if( stylesToImplement & TS_BOLD )
-                tempMatrix.xx = BOLD_FACTOR;
+                transMatrix->TM_matrix.xx = GrMulWWFixed( BOLD_FACTOR, transMatrix->TM_matrix.xx );
 
         /* fake italic style       */
         if( stylesToImplement & TS_ITALIC )
-                tempMatrix.yx = NEGATVE_ITALIC_FACTOR;
+                transMatrix->TM_matrix.yx = NEGATVE_ITALIC_FACTOR;
 
         /* width and weight */
         if( width != FWI_MEDIUM )
-                tempMatrix.xx = MUL_100_WWFIXED( tempMatrix.xx, width );
+                transMatrix->TM_matrix.xx = MUL_100_WWFIXED( tempMatrix.xx, width );
 
         if( weight != FW_NORMAL )
-                tempMatrix.xx = MUL_100_WWFIXED( tempMatrix.xx, weight );
+                transMatrix->TM_matrix.xx = MUL_100_WWFIXED( tempMatrix.xx, weight );
 
-                /* fake script style      */
+        /* fake script style      */
         if( stylesToImplement & ( TS_SUBSCRIPT | TS_SUPERSCRIPT ) )
         {      
                 /*WWFixedAsDWord scriptOffset = WBFIXED_TO_WWFIXEDASDWORD( fontBuf->FB_height ) + 
@@ -871,7 +866,7 @@ EC(     ECCheckBounds( (void*)trueTypeVars ) );
 
 
 /********************************************************************
- *                      
+ *                      CalcDriversTransformMatrix
  ********************************************************************
  * SYNOPSIS:	  
  * 
@@ -885,23 +880,43 @@ EC(     ECCheckBounds( (void*)trueTypeVars ) );
  *      26/04/24  JK        Initial Revision
  *******************************************************************/
 
-static void mulMatrix( TransformMatrix* transMatrix, TransMatrix* fontMatrix )
+static void CalcDriversTransformMatrix( TransformMatrix* transformMatrix, GStateHandle gstate, WindowHandle win )
 {
-        TT_Matrix  tempMatrix;
+        TransMatrix     windowMatrix;
+        TransMatrix     graphicMatrix;
+        WWFixedAsDWord  temp_e11, temp_e12, temp_e21, temp_e22;
 
 
-EC(     ECCheckBounds( (void*)transMatrix ) );
-EC(     ECCheckBounds( (void*)fontMatrix ) );
+EC(     ECCheckGStateHandle( gstate) );
+EC(     ECCheckWindowHandle( win ) );
 
-        tempMatrix.xx = transMatrix->TM_matrix.xx;
-        tempMatrix.xy = transMatrix->TM_matrix.xy;
-        tempMatrix.yx = transMatrix->TM_matrix.yx;
-        tempMatrix.yy = transMatrix->TM_matrix.yy;
 
-        transMatrix->TM_matrix.xx = GrMulWWFixed( tempMatrix.xx, WW_FIXED_TO_WWFIXEDASDWORD( fontMatrix->TM_e11 ) );
-        transMatrix->TM_matrix.xy = - ( GrMulWWFixed( tempMatrix.yx, WW_FIXED_TO_WWFIXEDASDWORD( fontMatrix->TM_e11 ) ) +
-                                    GrMulWWFixed( tempMatrix.yy, WW_FIXED_TO_WWFIXEDASDWORD( fontMatrix->TM_e21 ) ) );
-        transMatrix->TM_matrix.yx = - ( GrMulWWFixed( tempMatrix.xx, WW_FIXED_TO_WWFIXEDASDWORD( fontMatrix->TM_e12 ) ) +
-                                    GrMulWWFixed( tempMatrix.xy, WW_FIXED_TO_WWFIXEDASDWORD( fontMatrix->TM_e22 ) ) );
-        transMatrix->TM_matrix.yy = GrMulWWFixed( tempMatrix.yy, WW_FIXED_TO_WWFIXEDASDWORD( fontMatrix->TM_e22 ) );
+        WinGetTransform( win, &windowMatrix );
+        GrGetTransform( gstate, &graphicMatrix );
+
+
+        temp_e11 = GrMulWWFixed( transformMatrix->TM_matrix.xx, WWFIXED_TO_WWFIXEDASDWORD( graphicMatrix.TM_e11 ) ) 
+                        + GrMulWWFixed( transformMatrix->TM_matrix.xy, WWFIXED_TO_WWFIXEDASDWORD( graphicMatrix.TM_e21 ) );
+        temp_e12 = GrMulWWFixed( transformMatrix->TM_matrix.xx, WWFIXED_TO_WWFIXEDASDWORD( graphicMatrix.TM_e12 ) ) 
+                        + GrMulWWFixed( transformMatrix->TM_matrix.xy, WWFIXED_TO_WWFIXEDASDWORD( graphicMatrix.TM_e22 ) );
+        temp_e21 = GrMulWWFixed( transformMatrix->TM_matrix.yx, WWFIXED_TO_WWFIXEDASDWORD( graphicMatrix.TM_e11 ) ) 
+                        + GrMulWWFixed( transformMatrix->TM_matrix.yy, WWFIXED_TO_WWFIXEDASDWORD( graphicMatrix.TM_e21 ) );
+        temp_e22 = GrMulWWFixed( transformMatrix->TM_matrix.yx, WWFIXED_TO_WWFIXEDASDWORD( graphicMatrix.TM_e12 ) ) 
+                        + GrMulWWFixed( transformMatrix->TM_matrix.yy, WWFIXED_TO_WWFIXEDASDWORD( graphicMatrix.TM_e22 ) );
+
+        transformMatrix->TM_matrix.xx = GrMulWWFixed( temp_e11, WWFIXED_TO_WWFIXEDASDWORD( windowMatrix.TM_e11 ) ) 
+                        + GrMulWWFixed( temp_e12, WWFIXED_TO_WWFIXEDASDWORD( windowMatrix.TM_e21 ) );
+        transformMatrix->TM_matrix.xy = GrMulWWFixed( temp_e11, WWFIXED_TO_WWFIXEDASDWORD( windowMatrix.TM_e12 ) ) 
+                        + GrMulWWFixed( temp_e12, WWFIXED_TO_WWFIXEDASDWORD( windowMatrix.TM_e22 ) );
+        transformMatrix->TM_matrix.yx = GrMulWWFixed( temp_e21, WWFIXED_TO_WWFIXEDASDWORD( windowMatrix.TM_e11 ) ) 
+                        + GrMulWWFixed( temp_e22, WWFIXED_TO_WWFIXEDASDWORD( windowMatrix.TM_e21 ) );
+        transformMatrix->TM_matrix.yy = GrMulWWFixed( temp_e21, WWFIXED_TO_WWFIXEDASDWORD( windowMatrix.TM_e12 ) ) 
+                        + GrMulWWFixed( temp_e22, WWFIXED_TO_WWFIXEDASDWORD( windowMatrix.TM_e22 ) );
+
+
+        transformMatrix->TM_heightX = INTEGER_OF_WWFIXEDASDWORD( GrMulWWFixed( 
+                        WORD_TO_WWFIXEDASDWORD( transformMatrix->TM_heightY ), WWFIXED_TO_WWFIXEDASDWORD( graphicMatrix.TM_e21 ) ) );
+        transformMatrix->TM_heightY = INTEGER_OF_WWFIXEDASDWORD( GrMulWWFixed( 
+                        WORD_TO_WWFIXEDASDWORD( transformMatrix->TM_heightY ), WWFIXED_TO_WWFIXEDASDWORD( windowMatrix.TM_e22 ) ) );
 }
+
