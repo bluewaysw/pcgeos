@@ -782,9 +782,17 @@ static void ScaleOutline( TRUETYPE_VARS )
 /********************************************************************
  *                      StoreFontMatrix
  ********************************************************************
- * SYNOPSIS:	  
+ * SYNOPSIS:	  Calculate fontmatrix for pointsize, stytes to implement,
+ *                width and weight.
  * 
- * PARAMETERS:    
+ * PARAMETERS:    TRUETYPE_VARS         Cached variables needed by driver.
+ *                *transmatrix          Ptr. to transformation matrix
+ *                                      to fill.
+ *                *fontheader
+ *                pointSize
+ *                stylesToImplement
+ *                width
+ *                weight
  * 
  * RETURNS:       void   
  * 
@@ -917,6 +925,6 @@ EC(     ECCheckWindowHandle( win ) );
         transformMatrix->TM_heightX = INTEGER_OF_WWFIXEDASDWORD( GrMulWWFixed( 
                         WORD_TO_WWFIXEDASDWORD( transformMatrix->TM_heightY ), WWFIXED_TO_WWFIXEDASDWORD( graphicMatrix.TM_e21 ) ) );
         transformMatrix->TM_heightY = INTEGER_OF_WWFIXEDASDWORD( GrMulWWFixed( 
-                        WORD_TO_WWFIXEDASDWORD( transformMatrix->TM_heightY ), WWFIXED_TO_WWFIXEDASDWORD( windowMatrix.TM_e22 ) ) );
+                        WORD_TO_WWFIXEDASDWORD( transformMatrix->TM_heightY ), WWFIXED_TO_WWFIXEDASDWORD( graphicMatrix.TM_e22 ) ) );
 }
 
