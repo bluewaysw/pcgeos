@@ -862,9 +862,8 @@ EC(     ECCheckBounds( (void*)trueTypeVars ) );
                 else
                 {
                         //TODO: Is rounding necessary here?
-                        /*transMatrix->TM_scriptY = ( GrMulWWFixed( scriptOffset, SUPERSCRIPT_OFFSET) -
-                                                WBFIXED_TO_WWFIXEDASDWORD( fontBuf->FB_baselinePos ) -
-                                                WBFIXED_TO_WWFIXEDASDWORD( fontBuf->FB_baseAdjust ) ) >> 16;*/
+                        transMatrix->TM_scriptY = ( GrMulWWFixed( scriptBaseline, SUPERSCRIPT_OFFSET ) - 
+                                                GrMulWWFixed( WORD_TO_WWFIXEDASDWORD( fontHeader->FH_accent + fontHeader->FH_ascent + fontHeader->FH_baseAdjust ), scaleFactor ) >> 16 );
                 }
         }
 
