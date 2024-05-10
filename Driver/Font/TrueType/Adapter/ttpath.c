@@ -63,7 +63,7 @@ static void CalcTransformMatrix( TransMatrix*    transMatrix,
                                  WWFixedAsDWord  pointSize, 
                                  TextStyle       stylesToImplement );
 
-static void ConvertOutline( GStateHandle      gstate, 
+static void ConvertOutline( Handle            handle, 
                             TT_Outline*       outline, 
                             RenderFunctions*  functions );
 
@@ -83,13 +83,17 @@ static void WriteComment( TRUETYPE_VARS, GStateHandle gstate );
 
 static void ScaleOutline( TRUETYPE_VARS );
 
-static void StoreFontMatrix( TRUETYPE_VARS,
-                             TransformMatrix*  transMatrix,
-                             FontHeader*       fontHeader,
-                             WWFixedAsDWord    pointSize,
-                             TextStyle         stylesToImplement,
-                             Byte              width,
-                             Byte              weight );
+static void InitDriversTransformMatrix( TRUETYPE_VARS,
+                                        TransformMatrix*  transMatrix,
+                                        FontHeader*       fontHeader,
+                                        WWFixedAsDWord    pointSize,
+                                        TextStyle         stylesToImplement,
+                                        Byte              width,
+                                        Byte              weight );
+
+static void CalcDriversTransformMatrix( TransformMatrix* transformMatrix, 
+                                        GStateHandle gstate, 
+                                        WindowHandle win );
 
 
 /********************************************************************
@@ -284,11 +288,9 @@ void _pascal TrueType_Gen_In_Region(
         TT_UShort              charIndex;
         RenderFunctions        renderFunctions;
         TransformMatrix        transform;
-
         XYValueAsDWord         cursorPos;
         XYValueAsDWord         result;
         TT_Matrix              flipMatrix = HORIZONTAL_FLIP_MATRIX;
-        WindowHandle           win;
 
 
 EC(     ECCheckGStateHandle( gstate ) );
@@ -322,9 +324,8 @@ EC(     ECCheckBounds( (void*)fontHeader ) );
         TT_Get_Glyph_Outline( GLYPH, &OUTLINE );
 
         /* store font matrix */
-        StoreFontMatrix( trueTypeVars, &transform, fontHeader, pointSize, stylesToImplement, width, weight );
-        win = GrGetWinHandle( gstate );
-        CalcDriversTransformMatrix( &transform, gstate, win );
+        InitDriversTransformMatrix( trueTypeVars, &transform, fontHeader, pointSize, stylesToImplement, width, weight );
+        CalcDriversTransformMatrix( &transform, gstate, GrGetWinHandle( gstate ) );
 
         /* get current cursor position */
         cursorPos = GrGetCurPos( gstate );
@@ -780,10 +781,10 @@ static void ScaleOutline( TRUETYPE_VARS )
 
 
 /********************************************************************
- *                      StoreFontMatrix
+ *                      InitDriversTransformMatrix
  ********************************************************************
- * SYNOPSIS:	  Calculate fontmatrix for pointsize, stytes to implement,
- *                width and weight.
+ * SYNOPSIS:	  Initialize fontdrivers transform matrix with pointsize, 
+ *                stytes to implement, width and weight.
  * 
  * PARAMETERS:    TRUETYPE_VARS         Cached variables needed by driver.
  *                *transmatrix          Ptr. to drivers transformation 
@@ -802,13 +803,13 @@ static void ScaleOutline( TRUETYPE_VARS )
  *      19/02/23  JK        Initial Revision
  *******************************************************************/
 
-static void StoreFontMatrix( TRUETYPE_VARS,
-                             TransformMatrix*  transMatrix,
-                             FontHeader*       fontHeader,
-                             WWFixedAsDWord    pointSize,
-                             TextStyle         stylesToImplement,
-                             Byte              width,
-                             Byte              weight )
+static void InitDriversTransformMatrix( TRUETYPE_VARS,
+                                        TransformMatrix*  transMatrix,
+                                        FontHeader*       fontHeader,
+                                        WWFixedAsDWord    pointSize,
+                                        TextStyle         stylesToImplement,
+                                        Byte              width,
+                                        Byte              weight )
 {
         WWFixedAsDWord scaleFactor;
 
