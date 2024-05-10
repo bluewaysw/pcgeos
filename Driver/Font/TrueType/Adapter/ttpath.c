@@ -333,8 +333,8 @@ EC(     ECCheckBounds( (void*)fontHeader ) );
         /* transform glyphs outline */
         TT_Transform_Outline( &OUTLINE, &transform.TM_matrix );
         TT_Transform_Outline( &OUTLINE, &flipMatrix );
-        TT_Translate_Outline( &OUTLINE, DWORD_X(result) + transform.TM_heightX, 
-                                        DWORD_Y(result) + transform.TM_heightY );
+        TT_Translate_Outline( &OUTLINE, DWORD_X(result) + transform.TM_heightX + transform.TM_scriptX, 
+                                        DWORD_Y(result) + transform.TM_heightY + transform.TM_scriptY );
         /* set render functions */
         renderFunctions.Proc_MoveTo  = RegionPathMoveTo;
         renderFunctions.Proc_LineTo  = RegionPathLineTo;
@@ -848,8 +848,7 @@ EC(     ECCheckBounds( (void*)trueTypeVars ) );
         /* fake script style      */
         if( stylesToImplement & ( TS_SUBSCRIPT | TS_SUPERSCRIPT ) )
         {      
-                /*WWFixedAsDWord scriptOffset = WBFIXED_TO_WWFIXEDASDWORD( fontBuf->FB_height ) + 
-                                              WBFIXED_TO_WWFIXEDASDWORD( fontBuf->FB_heightAdjust ); */
+                WWFixedAsDWord scriptBaseline = GrMulWWFixed( MakeWWFixed( fontHeader->FH_height + fontHeader->FH_baseAdjust ), scaleFactor ); 
 
 
                 transMatrix->TM_matrix.xx = GrMulWWFixed( transMatrix->TM_matrix.xx, SCRIPT_FACTOR );
@@ -858,7 +857,7 @@ EC(     ECCheckBounds( (void*)trueTypeVars ) );
                 if( stylesToImplement & TS_SUBSCRIPT )
                 {
                         //TODO: Is rounding necessary here?
-                        /*transMatrix->TM_scriptY = GrMulWWFixed( scriptOffset, SUBSCRIPT_OFFSET ) >> 16;*/
+                        transMatrix->TM_scriptY = GrMulWWFixed( scriptBaseline, SUBSCRIPT_OFFSET ) >> 16;
                 }
                 else
                 {
