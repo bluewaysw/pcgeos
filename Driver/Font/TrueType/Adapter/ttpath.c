@@ -811,7 +811,6 @@ static void StoreFontMatrix( TRUETYPE_VARS,
                              Byte              weight )
 {
         WWFixedAsDWord scaleFactor;
-        TT_Matrix      tempMatrix;
 
 
 EC(     ECCheckBounds( (void*)transMatrix ) );
@@ -841,10 +840,10 @@ EC(     ECCheckBounds( (void*)trueTypeVars ) );
 
         /* width and weight */
         if( width != FWI_MEDIUM )
-                transMatrix->TM_matrix.xx = MUL_100_WWFIXED( tempMatrix.xx, width );
+                transMatrix->TM_matrix.xx = MUL_100_WWFIXED( transMatrix->TM_matrix.xx, width );
 
         if( weight != FW_NORMAL )
-                transMatrix->TM_matrix.xx = MUL_100_WWFIXED( tempMatrix.xx, weight );
+                transMatrix->TM_matrix.xx = MUL_100_WWFIXED( transMatrix->TM_matrix.xx, weight );
 
         /* fake script style      */
         if( stylesToImplement & ( TS_SUBSCRIPT | TS_SUPERSCRIPT ) )
@@ -853,8 +852,8 @@ EC(     ECCheckBounds( (void*)trueTypeVars ) );
                                               WBFIXED_TO_WWFIXEDASDWORD( fontBuf->FB_heightAdjust ); */
 
 
-                tempMatrix.xx = GrMulWWFixed( tempMatrix.xx, SCRIPT_FACTOR );
-                tempMatrix.yy = GrMulWWFixed( tempMatrix.yy, SCRIPT_FACTOR );
+                transMatrix->TM_matrix.xx = GrMulWWFixed( transMatrix->TM_matrix.xx, SCRIPT_FACTOR );
+                transMatrix->TM_matrix.yy = GrMulWWFixed( transMatrix->TM_matrix.yy, SCRIPT_FACTOR );
 
                 if( stylesToImplement & TS_SUBSCRIPT )
                 {
