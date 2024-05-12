@@ -29,6 +29,7 @@
 #include "ttconfig.h"
 #include "tttypes.h"
 #include <string.h>
+#include <heap.h>
 
 
 #ifdef __cplusplus
@@ -86,6 +87,23 @@
   EXPORT_DEF
   TT_Error  TT_Free( void**  P );
 
+
+  /* Allocate a movable and swapable block of memory of 'Size' bytes */
+  /* from the heap, and return its handle. If 'Size' is 0, or in     */
+  /* case of error, the returned handle is always a NullHandle.      */
+
+  EXPORT_DEF
+  MemHandle GEO_Alloc(  UShort  Size );
+
+
+  /* Releases a block that was previously allocated through GEO_Alloc. */
+  /* Note that the function returns successfully when MemHandle is     */
+  /* already NullHandle. The memHandle is set to NullHandle on exit in */
+  /* case of success.                                                  */
+
+  EXPORT_DEF
+  TT_Error  GEO_Free( MemHandle* memHandle );
+  
 
   LOCAL_DEF TT_Error  TTMemory_Init( void );
   LOCAL_DEF TT_Error  TTMemory_Done( void );

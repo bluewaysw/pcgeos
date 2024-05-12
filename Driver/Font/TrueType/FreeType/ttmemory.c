@@ -27,7 +27,6 @@
 #include "ttengine.h"
 #include "ttadapter.h"
 #include <geode.h>
-#include <heap.h>
 #include <lmem.h>
 #include <ec.h>
 
@@ -141,5 +140,38 @@
   {
     return TT_Err_Ok;
   }
+
+#else  // ifdef __GEOS__
+
+
+  EXPORT_FUNC
+  MemHandle GEO_Alloc(  UShort  Size )
+  {
+    MemHandle memHandle;
+
+
+    if ( Size > MAX_BLOCK_SIZE )
+      return NullHandle;
+  
+    if ( Size > 0 )
+      memHandle = MemAllocSetOwner( GeodeGetCodeProcessHandle(), 
+                                    Size, HF_SHARABLE | HF_SWAPABLE, HAF_ZERO_INIT );
+
+    return memHandle;
+  }
+
+
+  EXPORT_FUNC
+  TT_Error  GEO_Free( MemHandle* memHandle )
+  {
+    if ( !memHandle )
+      return TT_Err_Ok;
+
+    MemFree( memHandle );
+    memHandle = NullHandle;
+
+    return TT_Err_Ok;
+  }
+
 
 #endif
