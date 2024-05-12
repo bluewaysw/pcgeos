@@ -144,23 +144,50 @@
 #else  // ifdef __GEOS__
 
 
+/*******************************************************************
+ *
+ *  Function    :  GEO_Alloc
+ *
+ *  Description :  Allocates movable/swappable memory from the heap buffer.
+ *
+ *  Input  :  Size      size of the memory to be allocated
+ *
+ *  Output :  Error code.
+ *
+ *  NOTE :  - The newly allocated block should _always_ be zeroed
+ *            on return.  Many parts of the engine rely on this to
+ *            work properly.
+ *
+ ******************************************************************/
+
   EXPORT_FUNC
   MemHandle GEO_Alloc(  UShort  Size )
   {
-    MemHandle memHandle;
-
-
     if ( Size > MAX_BLOCK_SIZE )
       return NullHandle;
   
     if ( Size > 0 )
-      memHandle = MemAllocSetOwner( GeodeGetCodeProcessHandle(), 
-                                    Size, HF_SHARABLE | HF_SWAPABLE, HAF_ZERO_INIT );
+      return MemAllocSetOwner( GeodeGetCodeProcessHandle(), 
+                               Size, HF_SHARABLE | HF_SWAPABLE, HAF_ZERO_INIT );
 
-    return memHandle;
+    return NullHandle;
   }
 
 
+/*******************************************************************
+ *
+ *  Function    :  GEO_Free
+ *
+ *  Description :  Releases a previously allocated through GEO_Alloc 
+ *                 block of memory.
+ *
+ *  Input  :  memHandle   handle to memory block
+ *
+ *  Output :  Always SUCCESS.
+ *
+ *  Note : The handle must _always_ be set to NullHandle by this function.
+ *
+ ******************************************************************/
   EXPORT_FUNC
   TT_Error  GEO_Free( MemHandle* memHandle )
   {
@@ -168,7 +195,7 @@
       return TT_Err_Ok;
 
     MemFree( memHandle );
-    memHandle = NullHandle;
+    *memHandle = NullHandle;
 
     return TT_Err_Ok;
   }
