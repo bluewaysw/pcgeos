@@ -3047,26 +3047,108 @@ else ;========================================================================
 	;
 	; draw in bitmap and name
 	;
-	mov	si, offset narrowFolderIconBitmap
+; 	mov	si, offset narrowFolderIconBitmap
+;
+; 	test	olfsState, mask OLFSS_SHOW_PARENT_DIR	; showing parent dir?
+; 	jz	haveFolderBitmap		; nope, use bland folder
+; 	mov	si, offset folderIconBitmap	; else indented folder
+; 	tst	listEntryNum			; first entry?
+; 	jnz	haveFolderBitmap		; nope, got correct bitmap
+; 	mov	si, offset openFolderIconBitmap	; else, use open folder
+; haveFolderBitmap:
+; 	test	fileEntry.OLFSE_fileAttrs, mask FA_SUBDIR
+;
+; 	jnz	haveBitmap
+; useDefault::
+; 	mov	si, offset narrowFileIconBitmap
+; 	test	olfsState, mask OLFSS_SHOW_PARENT_DIR	; showing parent dir?
+; 	jz	haveFileBitmap			; nope, use bland file
+; 	mov	si, offset fileIconBitmap	; else, use indented file
+; haveFileBitmap:
+; 	test	fileEntry.OLFSE_fileAttrs, mask FA_VOLUME
+; 	jz	haveBitmap			; not subdir nor volume, file
+; 	;
+; 	; handle volume (DriveStatus is in high byte of OLFSE_fileFlags)
+; 	;
+; 	mov	al, fileEntry.OLFSE_fileFlags.high
+; 	andnf	al, mask DS_TYPE
+; .assert (offset DS_TYPE eq 0)
+; 	mov	si, offset disk525IconBitmap
+; 	cmp	al, DRIVE_5_25
+; 	je	haveBitmap
+; 	mov	si, offset disk35IconBitmap
+; 	cmp	al, DRIVE_3_5
+; 	je	haveBitmap
+; 	mov	si, offset diskPCMCIAIconBitmap
+; 	cmp	al, DRIVE_PCMCIA
+; 	je	haveBitmap
+; 	mov	si, offset diskHDIconBitmap
+; 	cmp	al, DRIVE_FIXED
+; 	je	haveBitmap
+; 	cmp	al, DRIVE_CD_ROM
+; 	je	haveBitmap
+; 	mov	si, offset diskRamIconBitmap
+; EC <	cmp	al, DRIVE_RAM						>
+; EC <	ERROR_NZ	OL_FILE_SELECTOR_DRIVE_TYPE_UNKNOWN		>
 
-	test	olfsState, mask OLFSS_SHOW_PARENT_DIR	; showing parent dir?
-	jz	haveFolderBitmap		; nope, use bland folder
-	mov	si, offset folderIconBitmap	; else indented folder
-	tst	listEntryNum			; first entry?
-	jnz	haveFolderBitmap		; nope, got correct bitmap
-	mov	si, offset openFolderIconBitmap	; else, use open folder
-haveFolderBitmap:
+
+	tst	listEntryNum				; first entry?
+	jnz	notFirstEntry
+
+	test	olfsState, mask OLFSS_SHOW_PARENT_DIR	; parent dir allowed?
+	jz	notFirstEntry
+
 	test	fileEntry.OLFSE_fileAttrs, mask FA_SUBDIR
+	jz	notFolder
 
-	jnz	haveBitmap
-useDefault::
-	mov	si, offset narrowFileIconBitmap
-	test	olfsState, mask OLFSS_SHOW_PARENT_DIR	; showing parent dir?
-	jz	haveFileBitmap			; nope, use bland file
-	mov	si, offset fileIconBitmap	; else, use indented file
-haveFileBitmap:
-	test	fileEntry.OLFSE_fileAttrs, mask FA_VOLUME
-	jz	haveBitmap			; not subdir nor volume, file
+	mov	si, offset openFolderIconBitmap		; use open folder
+	jmp	haveBitmap
+
+notFirstEntry:
+	test	fileEntry.OLFSE_fileAttrs, mask FA_SUBDIR
+	jz	notFolder
+	test	olfsState, mask OLFSS_SHOW_PARENT_DIR	; parent dir allowed?
+	jz	entryIsUndottedFolder
+	jmp	entryIsDottedFolder
+
+notFolder:
+ 	test	fileEntry.OLFSE_fileAttrs, mask FA_VOLUME
+	jnz	entryIsVolume
+	test	olfsState, mask OLFSS_SHOW_PARENT_DIR	; parent dir allowed?
+	jz	entryIsUndottedFile
+	jmp	entryIsDottedFile
+
+entryIsDottedFile:
+	push	ds				; draw dots
+	segmov	ds, cs				; ds:si = bitmap
+	clr	dx				; no bitmap-drawing callback
+	mov	si, offset dotsBitmap
+	call	GrDrawBitmapAtCP
+	pop	ds
+	mov	dx, 16
+	clr	cx
+	clrdw	bxax
+	call	GrRelMoveTo
+entryIsUndottedFile:
+	mov	si, offset fileIconBitmap		; use folder bitmap
+	jmp	haveBitmap
+
+entryIsDottedFolder:
+	push	ds				; draw dots
+	segmov	ds, cs				; ds:si = bitmap
+	clr	dx				; no bitmap-drawing callback
+	mov	si, offset dotsBitmap
+	call	GrDrawBitmapAtCP
+	pop	ds
+	mov	dx, 16
+	clr	cx
+	clrdw	bxax
+	call	GrRelMoveTo
+entryIsUndottedFolder:
+	mov	si, offset folderIconBitmap		; use folder bitmap
+	jmp	haveBitmap
+
+entryIsVolume:
 	;
 	; handle volume (DriveStatus is in high byte of OLFSE_fileFlags)
 	;
@@ -3091,6 +3173,7 @@ haveFileBitmap:
 EC <	cmp	al, DRIVE_RAM						>
 EC <	ERROR_NZ	OL_FILE_SELECTOR_DRIVE_TYPE_UNKNOWN		>
 
+
 haveBitmap:
 endif ; _DUI ================================================================
 	push	ds
@@ -3102,8 +3185,6 @@ FXIP <	mov	bx, handle RegionResourceXIP				>
 FXIP <	call	MemLock							>
 FXIP <	mov	ds, ax				; ds:si = bitmap	>
 FXIP <	pop	bx, ax							>
-
-
 
 	clr	dx				; no bitmap-drawing callback
 
@@ -3129,7 +3210,7 @@ FXIP <	pop	bx, ax							>
 ; 	mov	bx, 0				; y position
 ; 	call	GrDrawBitmap			; GrDrawBitmapAtCP
 
-	mov	si, offset dotsBitmap
+	;mov	si, offset folderIconBitmap
 	call	GrDrawBitmapAtCP
 
 	mov	dx, ds:[si].B_width
@@ -3710,38 +3791,31 @@ endif
 
 if	not _DUI
 folderIconBitmap	label	byte
-		Bitmap <32,12,BMC_PACKBITS,BMF_4BIT or mask BMT_MASK>
-	db	0xfd, 0x00
-	db	0xf1, 0xdd
-	db	0xfe, 0x00, 0x00, 0x3c
-	db	0xf4, 0xdd, 0x02, 0x88, 0x88, 0xdd
-	db	0xfe, 0x00, 0x00, 0x7e
-	db	0xf5, 0xdd, 0x03, 0xd8, 0xff, 0xff, 0x8d
-	db	0x03, 0x00, 0x00, 0x0f, 0xff
-	db	0xf7, 0xdd, 0x05, 0x88, 0x88, 0x8f, 0xee, 0xee,
-		0xe8
-	db	0x03, 0x00, 0x00, 0x1f, 0xff
-	db	0xf8, 0xdd, 0x06, 0xd8, 0xff, 0xff, 0xf7, 0x77,
-		0x77, 0x78
-	db	0x03, 0x00, 0x00, 0x1f, 0xff
-	db	0xf8, 0xdd, 0x01, 0xd8, 0xfe, 0xfe, 0xee, 0x01,
-		0xe7, 0x78
-	db	0x03, 0x00, 0x00, 0x1f, 0xff
-	db	0xf8, 0xdd, 0x01, 0xd8, 0xfe, 0xfe, 0xee, 0x01,
-		0x77, 0x78
-	db	0x03, 0x00, 0x00, 0x1f, 0xff
-	db	0xf8, 0xdd, 0x06, 0xd8, 0xfe, 0xee, 0xee, 0xe7,
-		0x77, 0x78
-	db	0x03, 0x00, 0x00, 0x1f, 0xff
-	db	0xf8, 0xdd, 0x06, 0xd8, 0xfe, 0xee, 0xee, 0xe7,
-		0x77, 0x78
-	db	0x03, 0x00, 0x00, 0x1f, 0xff
-	db	0xf8, 0xdd, 0x00, 0xd8, 0xfe, 0xee, 0x02, 0x77,
-		0x77, 0x78
-	db	0x03, 0x00, 0x00, 0x1f, 0xff
-	db	0xf8, 0xdd, 0x00, 0xd8, 0xfc, 0x77, 0x00, 0x78
-	db	0x03, 0x00, 0x00, 0x0f, 0xfe
-	db	0xf7, 0xdd, 0xfc, 0x88, 0x00, 0x8d
+		Bitmap <16,12,0,BMF_4BIT or mask BMT_MASK>
+	db	0x00, 0xf0
+	db	0xdd, 0xdd, 0xdd, 0xdd, 0x88, 0x88, 0xdd, 0xdd
+	db	0x01, 0xf8
+	db	0xdd, 0xdd, 0xdd, 0xd8, 0xff, 0xff, 0x8d, 0xdd
+	db	0x3f, 0xfc
+	db	0xdd, 0x88, 0x88, 0x8f, 0xee, 0xee, 0xe8, 0xdd
+	db	0x7f, 0xfc
+	db	0xd8, 0xff, 0xff, 0xf7, 0x77, 0x77, 0x78, 0xdd
+	db	0x7f, 0xfc
+	db	0xd8, 0xfe, 0xee, 0xee, 0xee, 0xe7, 0x78, 0xdd
+	db	0x7f, 0xfc
+	db	0xd8, 0xfe, 0xee, 0xee, 0xee, 0x77, 0x78, 0xdd
+	db	0x7f, 0xfc
+	db	0xd8, 0xfe, 0xee, 0xee, 0xe7, 0x77, 0x78, 0xdd
+	db	0x7f, 0xfc
+	db	0xd8, 0xfe, 0xee, 0xee, 0xe7, 0x77, 0x78, 0xdd
+	db	0x7f, 0xfc
+	db	0xd8, 0xee, 0xee, 0xee, 0x77, 0x77, 0x78, 0xdd
+	db	0x7f, 0xfc
+	db	0xd8, 0x77, 0x77, 0x77, 0x77, 0x77, 0x78, 0xdd
+	db	0x3f, 0xf8
+	db	0xdd, 0x88, 0x88, 0x88, 0x88, 0x88, 0x8d, 0xdd
+	db	0x00, 0x00
+	db	0xdd, 0xdd, 0xdd, 0xdd, 0xdd, 0xdd, 0xdd, 0xdd
 endif
 
 if not _DUI
