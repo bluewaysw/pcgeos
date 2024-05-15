@@ -3091,27 +3091,27 @@ else ;========================================================================
 ; EC <	cmp	al, DRIVE_RAM						>
 ; EC <	ERROR_NZ	OL_FILE_SELECTOR_DRIVE_TYPE_UNKNOWN		>
 
-
+;assumeOpenParentFolder:
 	tst	listEntryNum				; first entry?
-	jnz	notFirstEntry
+	jnz	assumeFolder
 
 	test	olfsState, mask OLFSS_SHOW_PARENT_DIR	; parent dir allowed?
-	jz	notFirstEntry
+	jz	assumeFolder
 
 	test	fileEntry.OLFSE_fileAttrs, mask FA_SUBDIR
-	jz	notFolder
+	jz	assumeFile
 
 	mov	si, offset openFolderIconBitmap		; use open folder
 	jmp	haveBitmap
 
-notFirstEntry:
+assumeFolder:
 	test	fileEntry.OLFSE_fileAttrs, mask FA_SUBDIR
-	jz	notFolder
+	jz	assumeFile
 	test	olfsState, mask OLFSS_SHOW_PARENT_DIR	; parent dir allowed?
 	jz	entryIsUndottedFolder
 	jmp	entryIsDottedFolder
 
-notFolder:
+assumeFile:
  	test	fileEntry.OLFSE_fileAttrs, mask FA_VOLUME
 	jnz	entryIsVolume
 	test	olfsState, mask OLFSS_SHOW_PARENT_DIR	; parent dir allowed?
