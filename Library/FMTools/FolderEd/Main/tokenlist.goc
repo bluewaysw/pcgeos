@@ -1,0 +1,103 @@
+/**************************************************************************
+ *	Project: IconEdit file manager tool
+ *
+ *	File:	tokenlist.goc
+ *
+ *		All routines and handlers, that deal with the token list,
+ *		displayed to the user
+ *
+ *	By RABE-Soft, Rainer Bettsteller, for Free PC/GEOS Project
+ *
+ **************************************************************************/
+
+@include <stdapp.goh>
+@include <token.h>
+
+@include "foldered.goh"
+@include "UI/fedui.goh"
+
+extern optr g_dialog;
+
+static MemHandle g_tokenList = 0;	/* List of all Tokens in the TokenDB */
+
+/*############################################################################
+ *
+ *	Create and manage TokenList strcutre
+ *
+ *############################################################################*/
+
+
+/*-------------------------------------------------------------
+ * FEDListTokens
+ *-------------------------------------------------------------
+ *	Create al list of all tokens in the tokenDB
+ *	µµ muss noch sortiert werden
+ *	Return: Number of tokens in TokenDB
+-------------------------------------------------------------*/
+word FEDListTokens(void) {
+TokenListStruct	*list;
+dword	retVal;
+word count;
+
+    if (g_tokenList) MemFree(g_tokenList);	// Destroy old list
+
+	/*
+	 *	2 byte header to use TokenListStruct for access
+	 */
+    retVal = TokenListTokens(0, 2, 0);
+    g_tokenList = TokenListTokensHandleFromDWord(retVal);
+    if( !g_tokenList ) return 0;			// BAD	
+    count = TokenListTokensCountFromDWord(retVal);
+    
+    list = MemLock(g_tokenList);
+    list->numTokens = count;
+    MemUnlock(g_tokenList);
+	
+    return count;	
+	
+}
+
+
+
+/*############################################################################
+ *
+ *	Handlers
+ *
+ *############################################################################*/
+ 
+/*-------------------------------------------------------------
+ * MSG_FED_QUERY_TOKEN_LIST	
+ *-------------------------------------------------------------
+ *	void GEN_DYNAMIC_LIST_QUERY_MSG (optr list, word item);
+ *	Update item moniker in the file list
+-------------------------------------------------------------*/
+// stop in foldered::FolderEdInteractionFED_QUERY_TOKEN_LIST
+@extern method FolderEdInteractionClass, MSG_FED_QUERY_TOKEN_LIST {
+TokenListStruct	*tokenList;
+GeodeToken tok;
+
+    tokenList = MemLock(g_tokenList);
+    tok = tokenList->token[item];
+    MemUnlock(g_tokenList);
+
+    @call list::MSG_GEN_DYNAMIC_LIST_REPLACE_ITEM_MONIKER(item,
+			0,30,48,0,VMDT_TOKEN,VMST_FPTR,(dword)&tok);
+}
+
+/*-------------------------------------------------------------
+ * MSG_FED_APPLY_TOKEN_LIST
+ *-------------------------------------------------------------
+ *	GEN_ITEM_GROUP_APPLY_MSG ( word selection = cx,
+ * 			    	    word numSelections = bp,
+ *				    GenItemGroupStateFlags stateFlags = dl);
+ *	
+-------------------------------------------------------------*/
+// stop in foldered::FolderEdInteractionFED_APPLY_TOKEN_LIST
+@extern method FolderEdInteractionClass, MSG_FED_APPLY_TOKEN_LIST {
+
+
+    /* Redraw TokenGroup to remove possible artefacts */
+    @call @DialogObj(@FEDTokenGroup)::MSG_GEN_SET_NOT_USABLE(VUM_DELAYED_VIA_UI_QUEUE);
+    @send @DialogObj(@FEDTokenGroup)::MSG_GEN_SET_USABLE(VUM_NOW);
+
+}

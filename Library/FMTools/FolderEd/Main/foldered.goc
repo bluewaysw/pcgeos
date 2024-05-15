@@ -1,0 +1,409 @@
+/**************************************************************************
+ *	Project: IconEdit file manager tool
+ *
+ *	File:	foldered.goc
+ *
+ *		
+ *
+ *	By RABE-Soft, Rainer Bettsteller, for Free PC/GEOS Project
+ *
+ **************************************************************************/
+
+@include <stdapp.goh>
+@include <fmtool.goh>
+#include <Ansi/string.h>
+#include <Ansi/stdio.h>
+
+@include "foldered.goh"
+@include "UI/fedui.goh"
+
+@include "Oldlibs/rstoked.goh"
+/*
+	To do
+	- Token und Creator TRT implementieren, NotFoundMoniker
+	- Edit Creator für executable disablen, Icon und Ccreator für DOS-Files (muss extra implementuert werden)
+		Routine machen UpdateUIDependingOnFileType()
+		
+	
+	* TokenEd Libray Code Benutzen in FMTool
+	
+	-- Bug Ansic wird auf protocol 1.008 gesetzt
+		--> platform fixt das nicht (checken!)
+		Ursache: TokShowConvertTextToToken(und andere): erg *= 10;
+		--> Issue machen
+	
+*/
+
+
+static	optr		g_dialog = NullOptr;
+static	MemHandle 	g_mh;
+
+extern MemHandle	g_tokenList;
+
+/*-------------------------------------------------------------
+ *	API Struct	- tell the file manager infos about our tools
+ *	MUST be global
+-------------------------------------------------------------*/
+FMToolStruct FMToolInfo[1] = {
+    {
+        @FolderEditMoniker, (FMTF_SELECTED_ONLY | FMTT_DIALOG), 1
+        	/* Moniker for Tool Entry
+        	 * FMTF_SELECTED_ONLY: active, onyl if a file/folder is selected
+        	 * FMTT_DIALOG: a dialog will come up (see FMToolType). 
+        	 * 1: number of the tool in our list (we have only one)
+        	 */
+    }
+};
+
+/*-------------------------------------------------------------
+ *	FMFetchToolsProc GetThoseTools
+ *	FileManager API Function - fetch Tools
+-------------------------------------------------------------*/
+
+word _pascal _export GetThoseTools(FMToolStruct **tablePtr)
+{
+    *tablePtr = (FMToolStruct*) &FMToolInfo;
+    return 1;
+}
+
+
+/*-------------------------------------------------------------
+ *	FMToolProc FolderEdToolStart()
+ *-------------------------------------------------------------
+ *	GeodeHandle filemgr => Process that is subclass of FileManagerClass
+ *	word toolNum =>	Entry # of activated tool within table returned by
+ *                FMTF_FETCH_TOOLS
+ *	word entryNum
+ *
+ *	The user has clicked on our Utilities menu item: "Edit Icon"
+-------------------------------------------------------------*/
+// stop in foldered::FolderEdToolStart
+void _pascal _export FolderEdToolStart(
+    GeodeHandle filemgr,
+    word toolNum,
+    word entryNum
+)
+{
+SelectedFilesStruct	*fileInfo;
+word	count;
+
+{word x = toolNum; x= entryNum; x=x; }	// supress compiler warning
+
+    /*
+     * Copy our dialog template and add it to the application object
+     */
+    g_dialog = UserCreateDialog(@SelectDialog);
+    	
+    /*
+     * Initialize duplicated dialog objects
+     */
+    @send @DialogObj(@SelectOkTrigger)::MSG_GEN_TRIGGER_SET_DESTINATION(g_dialog);
+    @send @DialogObj(@SelectCancelTrigger)::MSG_GEN_TRIGGER_SET_DESTINATION(g_dialog);
+    @send @DialogObj(@SelectFileList)::MSG_GEN_ITEM_GROUP_SET_DESTINATION(g_dialog);
+    @send @DialogObj(@IconOrCreatorSelector)::MSG_GEN_ITEM_GROUP_SET_DESTINATION(g_dialog);
+    @send @DialogObj(@FEDTokenList)::MSG_GEN_ITEM_GROUP_SET_DESTINATION(g_dialog);
+    
+
+    /*
+     * Figure out the selected files and initialize the files list
+     */
+    g_mh = @call ConstructOptr(filemgr, 0)::MSG_FM_GET_SELECTED_FILES();
+    if ( !g_mh ) return;	// be save to avoid crash, should not occur.
+    
+    fileInfo = MemLock(g_mh);
+    @send @DialogObj(@SelectFileList)::MSG_GEN_DYNAMIC_LIST_INITIALIZE(fileInfo->header.FQTH_numFiles);
+    @send @DialogObj(@SelectFileList)::MSG_GEN_ITEM_GROUP_SET_SINGLE_SELECTION(0, FALSE);
+    @send @DialogObj(@SelectFileList)::MSG_GEN_ITEM_GROUP_SET_MODIFIED_STATE(TRUE);
+    @send @DialogObj(@SelectFileList)::MSG_GEN_APPLY();
+    MemUnlock(g_mh);
+
+    /*
+     * Create list of tokens and initialize the FEDTokenList
+     */
+    count = FEDListTokens();
+    @send @DialogObj(@FEDTokenList)::MSG_GEN_DYNAMIC_LIST_INITIALIZE(count);
+    @send @DialogObj(@FEDTokenList)::MSG_GEN_ITEM_GROUP_SET_SINGLE_SELECTION(0, FALSE);
+    @send @DialogObj(@FEDTokenList)::MSG_GEN_ITEM_GROUP_SET_MODIFIED_STATE(TRUE);
+    @send @DialogObj(@FEDTokenList)::MSG_GEN_APPLY();
+    
+
+    /*
+     * Finally, open dialog box
+     */
+    @send g_dialog::MSG_GEN_INTERACTION_INITIATE();
+
+}
+
+/*-------------------------------------------------------------
+ *	FEDShowToken
+ *-------------------------------------------------------------
+ *	Display Icon Moniker and ID
+ -------------------------------------------------------------*/
+void  FEDShowToken(GeodeToken tok, optr idObj, optr monikerObj) {
+char buf[15], buf2[15];
+int  n, left;
+#define NUM_CHARS_IN_ID	10
+
+    /* setup token string */
+    for ( n = 0; n< 4; n++ ) if (tok.GT_chars[n]==0) {tok.GT_chars[n]='-'; }
+    sprintf(buf, "%c%c%c%c,%d", tok.GT_chars[0], tok.GT_chars[1], 
+    			tok.GT_chars[2], tok.GT_chars[3], tok.GT_manufID);
+
+    /*
+     * center string, make it NUM_CHARS_IN_ID chars long
+     */
+    
+    left = (NUM_CHARS_IN_ID - strlen(buf)) >> 1;	// spaces on the left side
+    if (left < 0) left = 0;
+    buf2[0] = 0;
+    while (strlen(buf2) < left) strcat(buf2, " ");
+    
+    strcat(buf2, buf);
+    while( strlen(buf2) < NUM_CHARS_IN_ID) strcat(buf2, " ");	    			
+    
+    @call idObj::MSG_GEN_REPLACE_VIS_MONIKER_TEXT(buf2, 0);
+    
+    /*
+     * Set up token moniker
+     */
+    
+    @call monikerObj::MSG_GEN_REPLACE_VIS_MONIKER(
+			VUM_NOW, 0,0,0,VMDT_TOKEN,VMST_FPTR,(dword)&tok);
+
+}
+
+/*-------------------------------------------------------------
+ *	FEDShowFileTokens
+ *-------------------------------------------------------------
+ *	Read and Display Icon and Creator Token for a file
+ *	Return: GeosFileType
+ -------------------------------------------------------------*/
+word FEDShowFileTokens(char *fileName,	DiskHandle dh, char *path) {
+optr idObj, monikerObj;
+word fileAttrs;
+GeodeToken fileToken, creatorToken;
+GeosFileType fileType;
+FileExtAttrDesc	attrDesc[4];	/* Array 0..3 */
+
+  FilePushDir();
+  FileSetCurrentPath(dh,path);
+
+
+  /* Read extended attributes */
+  @SetAttrDesc(attrDesc[0],FEA_TOKEN,&fileToken,sizeof(GeodeToken));
+  @SetAttrDesc(attrDesc[1],FEA_CREATOR,&creatorToken,sizeof(GeodeToken));
+  @SetAttrDesc(attrDesc[2],FEA_FILE_TYPE,&fileType,sizeof(GeosFileType));
+  @SetAttrDesc(attrDesc[3],FEA_FILE_ATTR,&fileAttrs,1);
+  FileGetPathExtAttributes(fileName,FEA_MULTIPLE,attrDesc,4);
+
+@if 0
+/* Replace-Typen fr Tokenazeige setzen */
+  switch ( fileType ) {
+  case GFT_NOT_GEOS_FILE:       if ( fileAttrs & FA_SUBDIR )
+					*tokenReplaceType = TRT_SUBDIR;
+				   else *tokenReplaceType = TRT_DOSFILE;
+				*creatorReplaceType = TRT_DOSEXEC;
+				break;
+  case GFT_EXECUTABLE:          *tokenReplaceType = TRT_NO;
+				*creatorReplaceType = TRT_GEOSEXEC;
+				break;
+  case GFT_DIRECTORY:		*tokenReplaceType = TRT_SUBDIR;
+				*creatorReplaceType = TRT_GEOSEXEC;
+				break;
+  default:                      /* GFT_VM | GFT_DATA | GFT_LINK */
+				*tokenReplaceType = TRT_NO;
+				*creatorReplaceType = TRT_GEOSEXEC;
+				break;
+				}
+
+/* Wenn DOS-File: Leertoken setzen */
+  if (fileType == GFT_NOT_GEOS_FILE) {
+	  TokShowFindDosTokens(fileName,fileAttrs,token,creator);
+	  }
+@endif
+
+  idObj = @DialogObj(@TokenTokenID);
+  monikerObj = @DialogObj(@TokenTokenDisplay);
+  FEDShowToken(fileToken, idObj, monikerObj);
+  
+  idObj = @DialogObj(@TokenCreatorID);
+  monikerObj = @DialogObj(@TokenCreatorDisplay);
+  FEDShowToken(creatorToken, idObj, monikerObj);
+  
+
+  FilePopDir();
+  
+  return fileType;
+  }
+
+
+/*-------------------------------------------------------------
+ *	FEDDisplayFileType
+ *-------------------------------------------------------------
+ *	Display filetype as text 
+ -------------------------------------------------------------*/
+void FEDDisplayFileType(GeosFileType fileType) {
+optr textObj, txtOp;
+
+    switch (fileType) {
+  	case GFT_NOT_GEOS_FILE:
+	    txtOp = @TextNotGEOSFile;
+	    break;
+	case GFT_EXECUTABLE:
+	    txtOp = @TextGEOSExecutable;
+	    break;
+	case GFT_DIRECTORY:
+	    txtOp = @TextFolder;
+	    break;
+	case GFT_VM:
+	    txtOp = @TextVMFile;
+	    break;
+	case GFT_DATA:
+	    txtOp = @TextDataFile;
+	    break;
+	case GFT_LINK:
+	    txtOp = @TextLink;
+	    break;
+	default: 				
+	    txtOp = @TextUnknown;
+    }	   
+    
+    textObj = @DialogObj(@FileTypeText);
+    @call textObj::MSG_VIS_TEXT_REPLACE_ALL_OPTR(txtOp, 0);
+
+}
+
+/*#############################################################
+ *
+ * 	FolderEdInteractionClass
+ *
+ *#############################################################*/
+ 
+@classdecl FolderEdInteractionClass;
+
+@extern method FolderEdInteractionClass, MSG_FED_QUERY_TOKEN_LIST;
+@extern method FolderEdInteractionClass, MSG_FED_APPLY_TOKEN_LIST;
+
+/*-------------------------------------------------------------
+ * void MSG_FED_QUIT_DIALOG(int cmd);	
+ *-------------------------------------------------------------
+ *	Perform tool operation, close and destroy dialog box
+ *
+ *
+-------------------------------------------------------------*/
+// stop in foldered::FolderEdInteractionFED_QUIT_DIALOG
+@method FolderEdInteractionClass, MSG_FED_QUIT_DIALOG {
+GeodeToken tok;
+
+
+    if(cmd == IC_OK) {
+ /*   
+	IconEditSelectTokenDialog(&tok,
+		NULL, IE_DEFAULT_FLAGS,
+		NULL, NULL,
+		NULL, NULL);
+/*	IconEditSelectTokenDialog(GeodeToken *tok,
+		RangeParams *range, IconEditFeatureFlags flags,
+		char* helpContext, optr dialogMoniker,
+		optr okTriggerMoniker, optr extraTriggerMoniker) {
+
+/* Auswahl eines Token aus der Token-Database
+	tok:	ausgew„hltes Token (falls IC_OK oder IC_YES)
+		wenn beim Aufruf belegt: Liste wird auf diesen Startwert eingestellt
+	range:	Einschr„nkung des Bereichs anzuzeigender Token
+		NullPtr wenn keine Einschr„nkung erforderlich
+		range->baseList: TokenListe, aus der ausgew„hlt werden soll
+			- Null, wenn Liste aud der Token-Database erstellt werden soll
+			- falls nicht Null: range->baseCount MUSS belegt sein
+			* baseList wird von Routine NICHT ver„ndert
+		range->minID, maxID: Startwerte fr Einschr„nkung des
+			ManufID-Bereichs. Wederden an die WordValues bergeben
+			* Žnderungen dieser Werte werden ans rufende Programm
+			  zurckgegeben, so das ein konsitentes Verhalten
+			  erzeugt werden kann.
+	flags	IconEditFeatureFlags. Bestimmen die Eigenschaften des Dialogs
+	*/
+    
+    
+    }
+
+    UserDestroyDialog(g_dialog); // close and destroy the dialog
+    if (g_mh) MemFree(g_mh);
+    if (g_tokenList) MemFree(g_tokenList);
+}
+
+
+/*-------------------------------------------------------------
+ * MSG_FED_QUERY_FILE	
+ *-------------------------------------------------------------
+ *	void GEN_DYNAMIC_LIST_QUERY_MSG (optr list, word item);
+ *	Update item moniker in the file list
+-------------------------------------------------------------*/
+// stop in foldered::FolderEdInteractionFED_QUERY_FILE
+@method FolderEdInteractionClass, MSG_FED_QUERY_FILE {
+FileLongName		fName;
+SelectedFilesStruct	*fileInfo;
+
+    if (!g_mh) strcpy(fName, "---");
+    else {
+	fileInfo = MemLock(g_mh);
+	strcpy(fName, fileInfo->entry[item].FOIE_name);
+	MemUnlock(g_mh);	
+    }
+    @send list::MSG_GEN_DYNAMIC_LIST_REPLACE_ITEM_TEXT(item, fName);
+}
+
+
+/*-------------------------------------------------------------
+ * MSG_FED_APPLY_FILE	
+ *-------------------------------------------------------------
+ *	GEN_ITEM_GROUP_APPLY_MSG ( word selection = cx,
+ * 			    	    word numSelections = bp,
+ *				    GenItemGroupStateFlags stateFlags = dl);
+ *	
+-------------------------------------------------------------*/
+// stop in foldered::FolderEdInteractionFED_APPLY_FILE
+@method FolderEdInteractionClass, MSG_FED_APPLY_FILE {
+GeosFileType 		fileType;
+FileLongName		fileName;
+SelectedFilesStruct	*fileInfo;
+
+
+    fileInfo = MemLock(g_mh);
+    strcpy(fileName, fileInfo->entry[selection].FOIE_name);
+    fileType = FEDShowFileTokens(fileName,	
+    				fileInfo->header.FQTH_diskHandle,
+    				fileInfo->header.FQTH_pathname);
+    MemUnlock(g_mh);
+    
+    FEDDisplayFileType(fileType);
+
+    /* Redraw TokenGroup to remove possible artefacts */
+    @call @DialogObj(@FEDTokenGroup)::MSG_GEN_SET_NOT_USABLE(VUM_DELAYED_VIA_UI_QUEUE);
+    @send @DialogObj(@FEDTokenGroup)::MSG_GEN_SET_USABLE(VUM_NOW);
+
+}
+
+/*-------------------------------------------------------------
+ * MSG_FED_APPLY_CHANGE_DESTINATION
+ *-------------------------------------------------------------
+ *	GEN_ITEM_GROUP_APPLY_MSG ( word selection = cx,
+ * 			    	    word numSelections = bp,
+ *				    GenItemGroupStateFlags stateFlags = dl);
+ *	Enable icon to edit, disable the other
+-------------------------------------------------------------*/
+// stop in foldered::FolderEdInteractionFED_APPLY_CHANGE_DESTINATION
+@method FolderEdInteractionClass, MSG_FED_APPLY_CHANGE_DESTINATION {
+
+    if ( selection == FED_CHANGE_ICON ) {
+        @send @DialogObj(@TokenTokenGroup)::MSG_GEN_SET_ENABLED(VUM_NOW);
+        @send @DialogObj(@TokenCreatorGroup)::MSG_GEN_SET_NOT_ENABLED(VUM_NOW);
+    	}
+    else {
+        @send @DialogObj(@TokenTokenGroup)::MSG_GEN_SET_NOT_ENABLED(VUM_NOW);
+        @send @DialogObj(@TokenCreatorGroup)::MSG_GEN_SET_ENABLED(VUM_NOW);
+    	}
+
+}
+
+
