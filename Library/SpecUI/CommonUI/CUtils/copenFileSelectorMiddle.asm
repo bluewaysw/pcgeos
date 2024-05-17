@@ -2976,6 +2976,7 @@ haveFileEntry:
 	mov	cl, GST_CHUNK
 	call	GrCreateGString			; di = gstring handle
 	mov	gstringOptr.chunk, si		; si = chunk
+
 if _DUI	;=====================================================================
 	;
 	; skip the file index number if minimizing width
@@ -3043,6 +3044,9 @@ havePadding:
 hidden:
 	pop	ds				; don't need DS on stack
 	mov	si, offset secretIconBitmap
+
+	mov	cx, FALSE			; CX = FALSE = no "dots" in front of our icon/text
+
 else ;========================================================================
 	;
 	; draw in bitmap and name
@@ -3092,6 +3096,7 @@ else ;========================================================================
 ; EC <	ERROR_NZ	OL_FILE_SELECTOR_DRIVE_TYPE_UNKNOWN		>
 
 ;assumeOpenParentFolder:
+	mov	cx, FALSE				; assume no dots bitmap before our icon/text
 	tst	listEntryNum				; first entry?
 	jnz	assumeFolder
 
@@ -3119,31 +3124,13 @@ assumeFile:
 	jmp	entryIsDottedFile
 
 entryIsDottedFile:
-	push	ds				; draw dots
-	segmov	ds, cs				; ds:si = bitmap
-	clr	dx				; no bitmap-drawing callback
-	mov	si, offset dotsBitmap
-	call	GrDrawBitmapAtCP
-	pop	ds
-	mov	dx, 16
-	clr	cx
-	clrdw	bxax
-	call	GrRelMoveTo
+	mov	cx, TRUE				; yes, draw dots bitmap
 entryIsUndottedFile:
 	mov	si, offset fileIconBitmap		; use folder bitmap
 	jmp	haveBitmap
 
 entryIsDottedFolder:
-	push	ds				; draw dots
-	segmov	ds, cs				; ds:si = bitmap
-	clr	dx				; no bitmap-drawing callback
-	mov	si, offset dotsBitmap
-	call	GrDrawBitmapAtCP
-	pop	ds
-	mov	dx, 16
-	clr	cx
-	clrdw	bxax
-	call	GrRelMoveTo
+	mov	cx, TRUE				; yes, draw dots bitmap
 entryIsUndottedFolder:
 	mov	si, offset folderIconBitmap		; use folder bitmap
 	jmp	haveBitmap
@@ -3186,31 +3173,27 @@ FXIP <	call	MemLock							>
 FXIP <	mov	ds, ax				; ds:si = bitmap	>
 FXIP <	pop	bx, ax							>
 
-	clr	dx				; no bitmap-drawing callback
-
+	; GrDrawBitmapAtCP
 	; di - Handle of the GState used for drawing.
-	; ds:si - Address of the bitmap to be drawn.
-	; dx:cx - Address of the callback routine. If you are not supplying a
-	; callback, pass zero in **dx**. It is unusual to use your own
-	; callback routine.
-	; call	GrFillBitmapAtCP		; draw into chunk
-
-	; di - Handle of the GState used for drawing.
-	; ax, bx - X, Y coordinates to begin drawing at.
 	; ds:si - Address of the bitmap.
 	; dx:cx - Address of the callback routine. If you are not supplying a
 	; callback, pass zero in **dx**.
-; 	tst	listEntryNum			; first entry?
-; 	jz	isFirstDirEntry			; yep, no indent
-; 	mov	ax, 3				; otherwise, indent 3px
-; 	jmp	drawBitmap
-; isFirstDirEntry:
-; 	mov	ax, 0				; first entry = no indent
-; drawBitmap:
-; 	mov	bx, 0				; y position
-; 	call	GrDrawBitmap			; GrDrawBitmapAtCP
+	clr	dx				; no bitmap-drawing callback
 
-	;mov	si, offset folderIconBitmap
+	cmp	cx, FALSE			; let's see if we need to prepend a "dots" bitmap
+	je	noDots				; nope, no dots, jump
+	push	si				; save our carefully selected bitmap
+	mov	si, offset dotsBitmap		; get dot bitmap
+	call	GrDrawBitmapAtCP		; draw
+
+	mov	dx, GFS_NARROW_ICON_WIDTH	; move cursor/"pen" GFS_NARROW_ICON_WIDTH pixels to the right
+	clr	cx				; clear cx, bx, ax
+	clrdw	bxax
+	call	GrRelMoveTo
+	clr	dx				; make sure dx is still clean, no callback routine wanted
+	pop	si				; restore the originally selected bitmap
+noDots:
+	clr	cx				; CX now no longer holds the information wether we want dots or not
 	call	GrDrawBitmapAtCP
 
 	mov	dx, ds:[si].B_width
@@ -3219,7 +3202,7 @@ FXIP <	pop	bx, ax							>
 FXIP <	mov	bx, handle RegionResourceXIP				>
 FXIP <	call	MemUnlock						>
 
-afterBitmap::			; MUST have DS on stack
+afterBitmap::					; MUST have DS on stack
 	clr	cx
 
 	clrdw	bxax
