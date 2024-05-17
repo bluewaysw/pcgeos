@@ -586,6 +586,8 @@
     TPhases     phase;
     PByte       widths;
 
+    PStorage    glyphLocations;
+
 
     /* first of all, check arguments */
     if ( !glyph )
@@ -725,8 +727,10 @@
 
       case Load_Header: /* load glyph */
 
+        glyphLocations = GEO_LOCK( face->glyphLocationBlock );
+
         if ( index + 1 < face->numLocations &&
-             face->glyphLocations[index] == face->glyphLocations[index + 1] )
+             glyphLocations[index] == glyphLocations[index + 1] )
         {
           /* as described by Frederic Loyer, these are spaces, and */
           /* not the unknown glyph.                                */
@@ -749,7 +753,8 @@
           break;
         }
 
-        offset = glyph_offset + face->glyphLocations[index];
+        offset = glyph_offset + glyphLocations[index];
+        GEO_UNLOCK( face->glyphLocationBlock );
 
         /* read first glyph header */
         if ( FILE_Seek( offset ) ||

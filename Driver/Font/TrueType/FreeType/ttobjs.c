@@ -1052,7 +1052,7 @@
     face->numTables = 0;
 
     /* freeing the locations table */
-    FREE( face->glyphLocations );
+    GEO_FREE( face->glyphLocationBlock );
     face->numLocations = 0;
 
     /* freeing the character mapping tables */
@@ -1093,8 +1093,6 @@
 
     /* freeing the hdmx table */
     Free_TrueType_Hdmx( face );
-
-    /* TT_Close_Stream( &face->stream ); -- this is performed by the API */
 
     return TT_Err_Ok;
   }

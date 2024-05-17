@@ -151,6 +151,7 @@
  *  Description :  Allocates movable/swappable memory from the heap buffer.
  *
  *  Input  :  Size      size of the memory to be allocated
+ *            M         pointer to memory handle
  *
  *  Output :  Error code.
  *
@@ -161,16 +162,16 @@
  ******************************************************************/
 
   EXPORT_FUNC
-  MemHandle GEO_Alloc(  UShort  Size )
+  TT_Error GEO_Alloc(  UShort  Size, MemHandle* M )
   {
     if ( Size > MAX_BLOCK_SIZE )
-      return NullHandle;
+      return TT_Err_Out_Of_Memory;
   
     if ( Size > 0 )
-      return MemAllocSetOwner( GeodeGetCodeProcessHandle(), 
+      *M =  MemAllocSetOwner( GeodeGetCodeProcessHandle(), 
                                Size, HF_SHARABLE | HF_SWAPABLE, HAF_ZERO_INIT );
 
-    return NullHandle;
+    return TT_Err_Ok;
   }
 
 
@@ -194,7 +195,7 @@
     if ( !memHandle )
       return TT_Err_Ok;
 
-    MemFree( memHandle );
+    MemFree( *memHandle );
     *memHandle = NullHandle;
 
     return TT_Err_Ok;

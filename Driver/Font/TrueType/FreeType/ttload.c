@@ -571,8 +571,9 @@
   {
     DEFINE_LOCALS;
 
-    Short  n, limit;
-    Short  LongOffsets;
+    Short     n, limit;
+    Short     LongOffsets;
+    PStorage  glyphLocations;
 
 
     LongOffsets = face->fontHeader.Index_To_Loc_Format;
@@ -587,9 +588,9 @@
     {
       face->numLocations = face->dirTables[n].Length >> 2;
 
-      if ( ALLOC_ARRAY( face->glyphLocations,
-                        face->numLocations,
-                        Long ) )
+      if ( GEO_ALLOC_ARRAY( face->glyphLocationBlock,
+                            face->numLocations,
+                            Long ))
         return error;
 
       if ( ACCESS_Frame( face->numLocations * 4L ) )
@@ -597,18 +598,20 @@
 
       limit = face->numLocations;
 
+      glyphLocations = GEO_LOCK( face->glyphLocationBlock );
       for ( n = 0; n < limit; n++ )
-        face->glyphLocations[n] = GET_Long();
+        glyphLocations[n] = GET_Long();
 
+      GEO_UNLOCK( face->glyphLocationBlock );
       FORGET_Frame();
     }
     else
     {
       face->numLocations = face->dirTables[n].Length >> 1;
 
-      if ( ALLOC_ARRAY( face->glyphLocations,
-                        face->numLocations,
-                        Long ) )
+      if ( GEO_ALLOC_ARRAY( face->glyphLocationBlock,
+                            face->numLocations,
+                            Long ))
         return error;
 
       if ( ACCESS_Frame( face->numLocations * 2L ) )
@@ -616,10 +619,11 @@
 
       limit = face->numLocations;
 
+      glyphLocations = GEO_LOCK( face->glyphLocationBlock );
       for ( n = 0; n < limit; n++ )
-        face->glyphLocations[n] =
-          (Long)((ULong)GET_UShort() * 2);
+        glyphLocations[n] = (Long)((ULong)GET_UShort() * 2);
 
+      GEO_UNLOCK( face->glyphLocationBlock );
       FORGET_Frame();
     }
 

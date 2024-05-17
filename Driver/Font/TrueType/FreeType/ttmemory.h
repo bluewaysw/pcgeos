@@ -88,12 +88,29 @@
   TT_Error  TT_Free( void**  P );
 
 
+  #define GEO_MEM_ALLOC( _memHandle_, _size_ ) \
+    GEO_Alloc( _size_, (MemHandle*)&_memHandle_ )
+
+  #define GEO_ALLOC_ARRAY( _memHandle_, _count_, _type_ ) \
+    ( ( error = GEO_MEM_ALLOC( _memHandle_, \
+                              (_count_) * sizeof ( _type_ ) ) ) != TT_Err_Ok )
+
+  #define GEO_FREE( _memHandle_ ) \
+    GEO_Free( (MemHandle*)&_memHandle_ )
+
+  #define GEO_LOCK( _memHandle_ ) \
+    MemLock( _memHandle_ )
+
+  #define GEO_UNLOCK( _memHandle_ ) \
+    MemUnlock( _memHandle_ )
+
+
   /* Allocate a movable and swapable block of memory of 'Size' bytes */
   /* from the heap, and return its handle. If 'Size' is 0, or in     */
   /* case of error, the returned handle is always a NullHandle.      */
 
   EXPORT_DEF
-  MemHandle GEO_Alloc(  UShort  Size );
+  TT_Error GEO_Alloc(  UShort  Size, MemHandle*  M );
 
 
   /* Releases a block that was previously allocated through GEO_Alloc. */
@@ -102,7 +119,7 @@
   /* case of success.                                                  */
 
   EXPORT_DEF
-  TT_Error  GEO_Free( MemHandle* memHandle );
+  TT_Error  GEO_Free( MemHandle*  memHandle );
   
 
   LOCAL_DEF TT_Error  TTMemory_Init( void );

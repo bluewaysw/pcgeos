@@ -23,6 +23,7 @@
 #include "ttcache.h"
 #include "tttables.h"
 #include "ttcmap.h"
+#include <heap.h>
 
 #ifdef __cplusplus
   extern "C" {
@@ -521,11 +522,7 @@
 
     /* The glyph locations table */
     ULong     numLocations;         /* UShort is not enough */
-#ifndef TT_HUGE_PTR
-    PStorage  glyphLocations;
-#else
-    Storage TT_HUGE_PTR * glyphLocations;
-#endif
+    MemHandle glyphLocationBlock;
 
     /* NOTE : The "hmtx" is now part of the horizontal header */
 
