@@ -25,6 +25,8 @@ library geos
 library ui
 library ansic
 
+platform geos21
+
 # API functions
 export GETTHOSETOOLS
 export FOLDEREDTOOLSTART

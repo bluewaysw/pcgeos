@@ -18,7 +18,14 @@
 
 /*+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
   +                                                                         +
-  +		CODE für WordValueClass				            +
+  +	CODE für WordValueClass				            	    +
+  +	-----------------------				            	    +
+  +	Simple implementation to display word sized values in the range	    +
+  +	from 0 to 65535. No decimal places etc. are supported.		    +
+  +									    +
+  +	Use MSG_GEN_VALUE_GET_VALUE to get the word value		    +
+  +	Use MSG_GEN_VALUE_SET_VALUE to set the word value		    +
+  +	Do not use the _INTEGER_ messages for this purposes.		    +
   +                                                                         +
   ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++*/
 
@@ -26,12 +33,12 @@
 
 
 /*      MSG_GEN_VALUE_GET_MAX_TEXT_LEN
- *      Liefert die maximale Anzahl der einzugbenden Zeichen. Zur Gr”áemgerechnung
+ *      Default handler is OK.
  *      Parameter:      byte (void)
  */
 /*
 @method WordValueClass, MSG_GEN_VALUE_GET_MAX_TEXT_LEN {
-DebugInfo("TextLEN angefordert\15");
+UserStandardSound(SST_ERROR);	// debugging
 	return 10;
 	}
 
@@ -41,10 +48,9 @@ DebugInfo("TextLEN angefordert\15");
  */
 
 @method WordValueClass, MSG_GEN_VALUE_GET_VALUE_TEXT {
-@if 1
 word    val;
 @callsuper();
-/* Lesen des angeforderten Instace-Feldes */
+/* Lesen des angeforderten Instacne-Feldes */
 	switch (valueType) {
 		case GVT_VALUE: val = (pself->GVLI_value);
 						break;
@@ -60,15 +66,14 @@ word    val;
 		}
 /* in Text konvertieren */
 	sprintf(buffer,"%u",val);
-@endif
 }
 
 /*      MSG_GEN_VALUE_SET_VALUE_FROM_TEXT
  *      Belegt ein instance-feld mit einem textual vorgegebenen Wert
  *      Parameter:      void (char *text, GenValueType valueType )
  */
+// stop in foldered::WordValueGEN_VALUE_SET_VALUE_FROM_TEXT
 @method WordValueClass, MSG_GEN_VALUE_SET_VALUE_FROM_TEXT {
-@if 1
 dword   erg;
 /* Text konvertieren */
 	erg =0;
@@ -78,9 +83,9 @@ dword   erg;
 			erg = 0;                /* Minimum */
 			break;
 			}
-		//erg = erg*10;		<<-- forces ansic protocol 1.008 which is not supportes by 
-					// earlier PC/GEOS versions (4.13 e.g)
-		erg = erg<<3 + erg<<1;	// 8*erg + 2*erg :-)
+		// erg = erg*10; <<-- forces ansic protocol 1.008 which is not supported by 
+		// earlier PC/GEOS versions (4.13 e.g) --> platform statemet required
+		erg = (erg<<3) + (erg<<1);	// avoids platform statement
 		erg += (dword)(*text - '0');
 		text++;
 		}
@@ -99,6 +104,5 @@ dword   erg;
 		case GVT_INCREMENT:     pself->GVLI_increment = (dword)erg;
 						break;
 		}
-@endif
 }
 

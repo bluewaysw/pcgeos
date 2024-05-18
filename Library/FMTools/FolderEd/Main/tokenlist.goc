@@ -34,23 +34,77 @@ static MemHandle g_tokenList = 0;	/* List of all Tokens in the TokenDB */
  *	도 muss noch sortiert werden
  *	Return: Number of tokens in TokenDB
 -------------------------------------------------------------*/
+
+Boolean CompToken (GeodeToken t1, GeodeToken t2) {
+	// return TRUE wenn t1 < t2
+	if (t1.GT_manufID < t2.GT_manufID ) return TRUE;
+	return FALSE;
+	}
+	
+int FindSmallest(TokenListStruct *list, word von, word bis) {
+int min, n;
+
+	// Sonderfall nur ein Element
+	if (von == bis) return von; 
+
+	// Annahme: kleinstes steht vorne
+	min = von;
+	
+	// Finde kleiners als min
+	for ( n = von+1; n <= bis; n++) {
+		if ( CompToken(list->token[n], list->token[min]) ) min = n;
+		}
+		
+	return min;
+	}
+	
+	
+	
+
 word FEDListTokens(void) {
 TokenListStruct	*list;
 dword	retVal;
-word count;
+word count, minIdx, topIdx, n;
+
 
     if (g_tokenList) MemFree(g_tokenList);	// Destroy old list
 
 	/*
-	 *	2 byte header to use TokenListStruct for access
+	 *	6 byte header to use TokenListStruct for access
 	 */
-    retVal = TokenListTokens(0, 2, 0);
+    retVal = TokenListTokens(TRF_ONLY_GSTRING, 6, 0);
     g_tokenList = TokenListTokensHandleFromDWord(retVal);
     if( !g_tokenList ) return 0;			// BAD	
     count = TokenListTokensCountFromDWord(retVal);
     
     list = MemLock(g_tokenList);
-    list->numTokens = count;
+    list->tokenCount = count;
+    list->firstIndex = 0;
+    list->tokensToShow = count;
+    
+	/*
+	* Sort list by Manufacturer ID
+	* topIdx: 	start of the unsorted list part
+	* minIdx:	index of smallest token ID in unsorted list part 
+	*/
+    for (topIdx = 0; topIdx<(count-1); topIdx++) {
+	
+	minIdx = topIdx;	// assume: smalles ID is on top
+	
+	// check all following tokens to see if the ID is smaller
+	// find the index of the smallest token ID
+	for ( n = topIdx+1; n < count; n++) {
+	    if (list->token[n].GT_manufID < list->token[minIdx].GT_manufID) minIdx = n;
+	    }
+    
+    	if (minIdx != topIdx) {
+    	    // smaller ID found. swap tokens
+    	    GeodeToken tmpToken = list->token[topIdx];
+    	    list->token[topIdx] = list->token[minIdx];
+    	    list->token[minIdx] = tmpToken;
+    	    }
+    }
+
     MemUnlock(g_tokenList);
 	
     return count;	
@@ -77,7 +131,7 @@ TokenListStruct	*tokenList;
 GeodeToken tok;
 
     tokenList = MemLock(g_tokenList);
-    tok = tokenList->token[item];
+    tok = tokenList->token[item + tokenList->firstIndex];
     MemUnlock(g_tokenList);
 
     @call list::MSG_GEN_DYNAMIC_LIST_REPLACE_ITEM_MONIKER(item,
@@ -94,10 +148,99 @@ GeodeToken tok;
 -------------------------------------------------------------*/
 // stop in foldered::FolderEdInteractionFED_APPLY_TOKEN_LIST
 @extern method FolderEdInteractionClass, MSG_FED_APPLY_TOKEN_LIST {
+TokenListStruct	*tokenList;
+GeodeToken tok;
+int n;
+char buf[10];
+
+    tokenList = MemLock(g_tokenList);
+    tok = tokenList->token[selection + tokenList->firstIndex];
+    MemUnlock(g_tokenList);
+
+// 도 Text-Routine nutzen
+
+    for ( n = 0; n< 4; n++ ) if (tok.GT_chars[n]==0) {tok.GT_chars[n]='-'; }
+    sprintf(buf, "%c%c%c%c, %u", tok.GT_chars[0], tok.GT_chars[1], 
+    			tok.GT_chars[2], tok.GT_chars[3], tok.GT_manufID);
+    @call @DialogObj(@FEDIconInfoIDText)::MSG_GEN_REPLACE_VIS_MONIKER_TEXT(buf, 0);
 
 
     /* Redraw TokenGroup to remove possible artefacts */
+    // 도 -> andere Gruppe
     @call @DialogObj(@FEDTokenGroup)::MSG_GEN_SET_NOT_USABLE(VUM_DELAYED_VIA_UI_QUEUE);
     @send @DialogObj(@FEDTokenGroup)::MSG_GEN_SET_USABLE(VUM_NOW);
 
+}
+
+/*-------------------------------------------------------------
+ * MSG_FED_APPLY_TOKEN_RANGE
+ *-------------------------------------------------------------
+ *	
+-------------------------------------------------------------*/
+// stop in foldered::FolderEdInteractionFED_APPLY_TOKEN_RANGE
+@extern method FolderEdInteractionClass, MSG_FED_APPLY_TOKEN_RANGE {
+TokenListStruct	*list;
+word minID, maxID, n;
+Boolean found;
+
+/*
+	도 current selection handling feht noch
+	*/
+
+    minID = @call @DialogObj(@FEDManufIDMinimumValue)::MSG_GEN_VALUE_GET_VALUE();
+    maxID = @call @DialogObj(@FEDManufIDMaximumValue)::MSG_GEN_VALUE_GET_VALUE();
+    if ( minID > maxID ) {
+    	word tmp = minID;
+    	minID=maxID;
+    	maxID=tmp;
+	@call @DialogObj(@FEDManufIDMinimumValue)::MSG_GEN_VALUE_SET_VALUE(minID, FALSE);
+	@call @DialogObj(@FEDManufIDMaximumValue)::MSG_GEN_VALUE_SET_VALUE(maxID, FALSE);
+	}
+	
+    list = MemLock(g_tokenList);
+
+    do {    
+	found = FALSE;
+	list->firstIndex = 0;
+	list->tokensToShow = 0;
+	
+	// find first index to display
+	for (n = 0; n < list->tokenCount; n++ ) {
+	    if (list->token[n].GT_manufID >= minID ) {
+		list->firstIndex = n;
+		found = TRUE;
+		break;
+		}
+	}
+ 	if ( !found ) break;		// minID too large
+ 	
+ 	// find number of token to display
+ 	list->tokensToShow = 0;
+ 	for (n = list->firstIndex; n < list->tokenCount; n++) {
+ 	    if (list->token[n].GT_manufID > maxID ) break;
+ 	    list->tokensToShow++;
+ 	    }
+ 	
+ 	} while(FALSE);
+    
+    // if there are no token to display, list->tokensToShow will be zero
+    // --> no extra handling required
+    @send @DialogObj(@FEDTokenList)::MSG_GEN_DYNAMIC_LIST_INITIALIZE(list->tokensToShow);
+
+    MemUnlock(g_tokenList);
+
+
+
+/* 도    
+    @send @DialogObj(@FEDTokenList)::MSG_GEN_ITEM_GROUP_SET_SINGLE_SELECTION(0, FALSE);
+    @send @DialogObj(@FEDTokenList)::MSG_GEN_ITEM_GROUP_SET_MODIFIED_STATE(TRUE);
+    @send @DialogObj(@FEDTokenList)::MSG_GEN_APPLY();
+*/    
+
+
+    /* Redraw TokenGroup to remove possible artefacts * /
+    // 도 -> andere Gruppe oder nix
+    @call @DialogObj(@FEDTokenGroup)::MSG_GEN_SET_NOT_USABLE(VUM_DELAYED_VIA_UI_QUEUE);
+    @send @DialogObj(@FEDTokenGroup)::MSG_GEN_SET_USABLE(VUM_NOW);
+*/
 }

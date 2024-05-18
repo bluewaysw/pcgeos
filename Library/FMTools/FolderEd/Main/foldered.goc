@@ -21,19 +21,99 @@
 /*
 	To do
 	- Token und Creator TRT implementieren, NotFoundMoniker
+		--> AnzeigeRoutine fileType ¸bergeben oder -1 (DONT_REPLACE_NOT_FOUND)
 	- Edit Creator f¸r executable disablen, Icon und Ccreator f¸r DOS-Files (muss extra implementuert werden)
 		Routine machen UpdateUIDependingOnFileType()
 		
+	-File toktool.goc mit	- TokenId to text (optional centerd)
+				- Token Moniker als VisMoniker, Parameter DisplaySize und ob Tool oder icon
+					evtl Bittiefe (? nur wenn hier verwendet)
+					(Kombination not found durchdenken)
+	++ check:
+		Desk,0 hat keinen SuperVGA moniker laut IocnEditor
+		--> was wird importiert? Memhandle = 0 in InternalGetTokenMonikerBlock??
+		dito PREF,0 PMGR, 0
+		--> Liste muss dann auf Standrad umswitchen!
 	
-	* TokenEd Libray Code Benutzen in FMTool
+	- MSG_GEN_VALUE_SET_VALUE_FROM_TEXT testen (erg>>3 + erg>1)
 	
-	-- Bug Ansic wird auf protocol 1.008 gesetzt
-		--> platform fixt das nicht (checken!)
-		Ursache: TokShowConvertTextToToken(und andere): erg *= 10;
-		--> Issue machen
+	- "Change Iocn" (‰ndern in Change Token) darf Dilaog nicht schlieﬂen
 	
 */
 
+@if 0
+/*--------------------- InternalGetTokenMonikerBlock ---------------------
+ *	Aufgabe:	Image eines Tokens in einen neuen Speicherblock kopieren
+ ---------------------------------------------------------------------------*/
+MemHandle InternalGetTokenMonikerBlock(GeodeToken token,
+				word *sizeRead, Boolean getTool, Boolean *isGString) {
+dword tokenDW;
+word	dispSize, style, x, y;
+MemHandle mh;
+VisMonikerWithGString	*moniker;
+
+
+	if ( getTool ) {
+		dispSize = DS_TINY;
+		style = VMS_TOOL;
+		}
+	else {
+		dispSize = DS_STANDARD;
+		style = VMS_ICON;
+		}
+	memcpy(&tokenDW, &token.GT_chars[0], 4);
+
+	if ( isGString ) *isGString = FALSE;	// Zur sicherheit
+	*sizeRead = 0;	// be sure!
+
+
+	mh = 0;
+    TokenLoadMonikerBlock( tokenDW, token.GT_manufID,
+		(dispSize << DT_DISP_SIZE_OFFSET)|
+		(DAR_NORMAL << DT_DISP_ASPECT_RATIO_OFFSET)|
+		DC_COLOR_8,
+		(style << VMSF_STYLE_OFFSET) | VMSF_GSTRING,
+		sizeRead, &mh );
+
+	if ( !mh) return 0;
+
+	// pr¸fen ob es ein GString ist (es kann auch ein TextMoniker zur¸ckgegeben worden sein)
+	if ( isGString ) {
+		moniker = XmemLock(mh);
+		if ( moniker->VMWGS_common.VM_type & VMT_GSTRING ) *isGString = TRUE;
+		XmemUnlock(mh);
+		}
+
+	if ( !getTool ) return mh;
+
+	// f¸r Tools: checken ob Grˆﬂe passt (15x15, ich erlaube max. 20x20)
+	moniker = XmemLock(mh);
+	x = moniker->VMWGS_common.VM_width;
+	y = moniker->VMWGS_height;
+	XmemUnlock(mh);
+	if ( (x > 20) || (y > 20) ) {
+		// KEIN Tool Icon
+		MemFree(mh);
+		mh = 0;
+		}
+
+	return mh;
+}
+@endif
+
+@if 0
+	if ( mh ) {
+		@call ReleaseLauncherMiniTokenDisplay::MSG_GEN_REPLACE_VIS_MONIKER(
+				VUM_NOW, 30, 48, monikerSize,
+				VMDT_VIS_MONIKER, VMST_FPTR,
+				(dword)MemLock(mh) );
+		MemFree(mh);
+		}
+	else {
+		// Kein Mini-Moniker: Kreuz darstellen
+		@call ReleaseLauncherMiniTokenDisplay::MSG_GEN_REPLACE_VIS_MONIKER_TEXT("X",0);
+		}
+@endif
 
 static	optr		g_dialog = NullOptr;
 static	MemHandle 	g_mh;
@@ -102,6 +182,7 @@ word	count;
     @send @DialogObj(@SelectFileList)::MSG_GEN_ITEM_GROUP_SET_DESTINATION(g_dialog);
     @send @DialogObj(@IconOrCreatorSelector)::MSG_GEN_ITEM_GROUP_SET_DESTINATION(g_dialog);
     @send @DialogObj(@FEDTokenList)::MSG_GEN_ITEM_GROUP_SET_DESTINATION(g_dialog);
+    @send @DialogObj(@FEDManufIDApplayTrigger)::MSG_GEN_TRIGGER_SET_DESTINATION(g_dialog);
     
 
     /*
@@ -126,6 +207,7 @@ word	count;
     @send @DialogObj(@FEDTokenList)::MSG_GEN_ITEM_GROUP_SET_MODIFIED_STATE(TRUE);
     @send @DialogObj(@FEDTokenList)::MSG_GEN_APPLY();
     
+    @send  @DialogObj(@FEDIconInfoCount)::MSG_GEN_VALUE_SET_INTEGER_VALUE(count, FALSE);
 
     /*
      * Finally, open dialog box
@@ -146,7 +228,7 @@ int  n, left;
 
     /* setup token string */
     for ( n = 0; n< 4; n++ ) if (tok.GT_chars[n]==0) {tok.GT_chars[n]='-'; }
-    sprintf(buf, "%c%c%c%c,%d", tok.GT_chars[0], tok.GT_chars[1], 
+    sprintf(buf, "%c%c%c%c, %u", tok.GT_chars[0], tok.GT_chars[1], 
     			tok.GT_chars[2], tok.GT_chars[3], tok.GT_manufID);
 
     /*
@@ -283,6 +365,7 @@ optr textObj, txtOp;
 
 @extern method FolderEdInteractionClass, MSG_FED_QUERY_TOKEN_LIST;
 @extern method FolderEdInteractionClass, MSG_FED_APPLY_TOKEN_LIST;
+@extern method FolderEdInteractionClass, MSG_FED_APPLY_TOKEN_RANGE;
 
 /*-------------------------------------------------------------
  * void MSG_FED_QUIT_DIALOG(int cmd);	
