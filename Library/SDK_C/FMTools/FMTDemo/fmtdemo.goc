@@ -162,18 +162,12 @@ SelectedFilesStruct	*fileInfo;
     
     fileInfo = MemLock(g_mh);
     @send @DialogObj(@SelectFileList)::MSG_GEN_DYNAMIC_LIST_INITIALIZE(fileInfo->header.FQTH_numFiles);
-    
-{
-char buf[30];
 
-sprintf(buf,"OK, anz=%d", fileInfo->header.FQTH_numFiles);
-@call @DialogObj(@SelectOkTrigger)::MSG_GEN_REPLACE_VIS_MONIKER_TEXT(buf, VUM_NOW);
-
-sprintf(buf,"Cancel, block=%d", fileInfo->header.FQTH_nextBlock);
-@call @DialogObj(@SelectCancelTrigger)::MSG_GEN_REPLACE_VIS_MONIKER_TEXT(buf, VUM_NOW);
-
-}
-
+	/*
+	 * Note: fileInfo->header.FQTH_nextBlock may contain the next block with the next file list.
+	 * If your tool can hande a large number of files, you should check and handle it here.
+	 * But in my tests I could not find any non-zero FQTH_nextBlock.
+	 */
 
     MemUnlock(g_mh);
 
@@ -210,7 +204,7 @@ SelectedFilesStruct	*fileInfo;
 			    (char*)0,
 			    (char*)0,
 			    fileInfo->header.FQTH_pathname,
-			    "Perform tool operation in folder '\001'.",
+			    "Perform your tool operation in folder '\001'.",
 			    ((CDT_NOTIFICATION << CDBF_DIALOG_TYPE_OFFSET) |
 			     (GIT_NOTIFICATION << CDBF_INTERACTION_TYPE_OFFSET))
 			    ); 
@@ -219,7 +213,23 @@ SelectedFilesStruct	*fileInfo;
     }
 
     UserDestroyDialog(g_dialog); // close and destroy the dialog
-    if (g_mh) MemFree(g_mh);
+    if (g_mh) {
+	/*
+	 * Note: fileInfo->header.FQTH_nextBlock may contain the next block with the next file list.
+	 * So, we free it recursively. But in my tests I could not find any non-zero 
+	 * FQTH_nextBlock, so this code is not really tested for this case.
+	 */
+	word	block, nextBlock; 
+	block = g_mh;
+	while (block) {
+	    fileInfo = MemLock(block);
+	    nextBlock = fileInfo->header.FQTH_nextBlock;
+	    MemUnlock(block);
+	    MemFree(block);
+	    block = nextBlock;
+    	}
+    }
+    
 }
 
 
