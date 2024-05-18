@@ -11,7 +11,7 @@ type    library, single, c-api
 
 # Resources
 resource FMUI lmem read-only shared
-resource DialogUI ui-object shared
+resource DialogUI object
 
 #Libs
 library geos
@@ -20,7 +20,11 @@ library ansic
 
 # API functions
 export GETTHOSETOOLS
-export OPENWITHENTRYPOINT
+export OPENWITHTOOLACTIVATED
 
-# Not API
-export OpenWithFileSelectorClass
+#classes
+export OpenWithDialogClass
+export OpenWithTriggerBoxClass
+export ConfigureAppListClass
+export ConfigureDialogClass
+export OpenWithAppLaunchTriggerClass
