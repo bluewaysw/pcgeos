@@ -3,83 +3,74 @@ Includes
 ***********************************************************************/
 @include <stdapp.goh>
 @include <fmtool.goh>
-#include <Ansi/string.h>
+
+#include <initfile.h>
+#include <token.h>
+#include <gstring.h>
 #include <Ansi/stdio.h>
+#include <Ansi/stdlib.h>
+#include <Ansi/string.h>
+
+
+/***********************************************************************
+Macros
+***********************************************************************/
+@define dup(obj) ConstructOptr(OptrToHandle(oself), OptrToChunk(obj))
 
 
 /***********************************************************************
 Classes
 ***********************************************************************/
-@class  OpenWithFileSelectorClass, GenFileSelectorClass;
-    /* FileSelector Messages */
-   @message (GEN_FILE_SELECTOR_NOTIFICATION_MSG) MSG_FILEBROW_SELECTOR_ACTION;
+
+@class  OpenWithDialogClass, GenInteractionClass;
+    @message (GEN_TRIGGER_ACTION) MSG_APP_TRIGGER_PRESSED;
 @endc
 
-@classdecl OpenWithFileSelectorClass;
+@class  OpenWithTriggerBoxClass, GenInteractionClass; //GenContentClass;
+    @message void MSG_BUILD_TRIGGERS();
+    @message void MSG_REMOVE_ALL_APP_TRIGGERS();
+@endc
+
+@class OpenWithAppLaunchTriggerClass, GenTriggerClass;
+    @vardata GeodeToken ATTR_GEODE_TOKEN_TO_PASS;
+    @vardata char[FILE_LONGNAME_BUFFER_SIZE + PATH_BUFFER_SIZE] ATTR_GEODE_FILE_NAME;
+
+    @message void MSG_SET_TRIGGER_MONIKER(GeodeToken* tok, char* fname);
+@endc;
+
+@class  ConfigureDialogClass, GenInteractionClass;
+    @message (GEN_FILE_SELECTOR_NOTIFICATION_MSG) MSG_FILEBROW_SELECTOR_ACTION;
+    @message void MSG_CONFIRM_CONFIGURE_DIALOG();
+@endc
+
+@class  ConfigureAppListClass, GenDynamicListClass;
+    @message (GEN_TRIGGER_ACTION) MSG_ADD_APP;
+    @message (GEN_TRIGGER_ACTION) MSG_REMOVE_APP;
+    @message void MSG_MOVE_APP(sword upOrDown);
+    @message (GEN_DYNAMIC_LIST_QUERY_MSG) MSG_QUERY_APP_MONIKER;
+    @message (GEN_ITEM_GROUP_STATUS_MSG) MSG_APPLIST_SELECTION_CHANGED;
+@endc
 
 
-/***********************************************************************
-Resourcen
-***********************************************************************/
-@start FMUI, data;
-    @visMoniker Moniker1 = "Open With";
-@end FMUI;
+@classdecl OpenWithDialogClass;
+@classdecl OpenWithTriggerBoxClass;
+@classdecl OpenWithAppLaunchTriggerClass;
+@classdecl ConfigureAppListClass;
+@classdecl ConfigureDialogClass;
 
-@start DialogUI, notDetachable;
-    @object GenInteractionClass SelectDialog = {
-        GI_visMoniker = "Open With";
-        GI_comp =
-                    @OpenWithFileSelector,
-                    @SelectReplyBar;
-        GI_states = (@default & (~GS_USABLE));
-        GII_visibility = GIV_DIALOG;
-        GII_attrs = @default | GIA_INITIATED_VIA_USER_DO_DIALOG | GIA_MODAL;
-        HINT_PLACE_MONIKER_ABOVE;
-        HINT_ORIENT_CHILDREN_VERTICALLY;
-    }
-
-    @object OpenWithFileSelectorClass OpenWithFileSelector = {
-        GFSI_destination = OpenWithFileSelector;
-        GFSI_notificationMsg = MSG_FILEBROW_SELECTOR_ACTION;
-        GFSI_attrs =           ((FSA_ALLOW_CHANGE_DIRS) & (~FSA_SHOW_FILES_DISABLED) & (~FSA_HAS_OPEN_DIR_BUTTON) & (~FSA_HAS_CHANGE_DIRECTORY_LIST))
-                                | ((FSA_HAS_FILE_LIST) & (~FSA_SHOW_FIXED_DISKS_ONLY) & (~FSA_HAS_CLOSE_DIR_BUTTON) & (~FSA_HAS_DOCUMENT_BUTTON)& (~FSA_HAS_CHANGE_DRIVE_LIST))
-                                | ((FSA_USE_VIRTUAL_ROOT));
-
-        GFSI_fileCriteria =      ((FSFC_DIRS) & (~FSFC_NON_GEOS_FILES))
-                                | ((FSFC_GEOS_EXECUTABLES) & (~FSFC_GEOS_NON_EXECUTABLES));
-
-        ATTR_GEN_FILE_SELECTOR_VIRTUAL_ROOT = {SP_APPLICATION, ""};
-        ATTR_GEN_PATH_DATA = {SP_APPLICATION, ""};
-        HINT_FILE_SELECTOR_FILE_LIST_WIDTH = 40;
-        HINT_FILE_SELECTOR_NUMBER_OF_FILES_TO_SHOW = 15;
-    }
-
-    @object GenInteractionClass SelectReplyBar ={
-        GI_comp =   @SelectOkTrigger,
-                    @SelectCancelTrigger;
-        HINT_MAKE_REPLY_BAR;
-    }
-
-    @object GenTriggerClass SelectOkTrigger = {
-        ATTR_GEN_TRIGGER_INTERACTION_COMMAND = { IC_OK };
-        HINT_SEEK_REPLY_BAR;
-        HINT_DEFAULT_DEFAULT_ACTION;
-    }
-
-    @object GenTriggerClass SelectCancelTrigger = {
-        ATTR_GEN_TRIGGER_INTERACTION_COMMAND = { IC_DISMISS };
-        HINT_SEEK_REPLY_BAR;
-    }
-
-@end DialogUI;
 
 /***********************************************************************
 Headers
 ***********************************************************************/
-// FMFetchToolsProc GetThoseTools;
-word _pascal _export GetThoseTools(FMToolStruct **tablePtr);
+word        _pascal _export GetThoseTools(FMToolStruct **tablePtr); // FMFetchToolsProc GetThoseTools
+void        _pascal _export OpenWithToolActivated(GeodeHandle filemgr, word toolNum, word entryNum); // FMToolProc OpenWithToolActivated;
 
-// FMToolProc OpenWithEntryPoint;
-void _pascal _export OpenWithEntryPoint(GeodeHandle filemgr, word toolNum, word entryNum);
-
-void _pascal _export LaunchApp(GeodeToken *tok, DiskHandle appDisk, PathName *appPath, DiskHandle dataDisk, PathName *dataPath, FileLongName *dataFName);
+Boolean     _pascal SelectedFilesCheckIfUnsupported();
+void        _pascal SelectedFilesLoad(GeodeToken* token, char* pathnameAndFile);
+void        _pascal SelectedFilesLaunchApp(GeodeToken *tok, DiskHandle appDisk, char *appPath, DiskHandle dataDisk, PathName *dataPath, FileLongName *dataFName);
+void        _pascal SelectedFilesFree();
+Boolean     _pascal AppListIsAppAlreadyInList(optr list, char* appName, word listLen);
+void        _pascal AppListIniFileRead();
+Boolean     _pascal AppListIniFileReadCallback(const char *stringSection, word sectionNum, void* enumData);
+void        _pascal AppListIniFileWrite();
+void        _pascal AppListFree();

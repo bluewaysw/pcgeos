@@ -16,7 +16,8 @@ openwith.eobj: openwith.goh stdapp.goh object.goh ui.goh \
                 Objects/gItemC.goh Objects/gBoolC.goh \
                 Objects/gGadgetC.goh Objects/gToolCC.goh \
                 Objects/gValueC.goh Objects/gToolGC.goh \
-                Objects/helpCC.goh fmtool.goh
+                Objects/helpCC.goh fmtool.goh Art/mkrRightArrowSC.goh \
+                Art/mkrLeftArrowSC.goh Art/DownArrow.goh Art/UpArrow.goh
 openwith.obj \
 openwith.eobj: geos.h heap.h geode.h resource.h ec.h object.h lmem.h \
                 graphics.h fontID.h font.h color.h gstring.h timer.h vm.h \
@@ -25,7 +26,7 @@ openwith.eobj: geos.h heap.h geode.h resource.h ec.h object.h lmem.h \
                 disk.h drive.h input.h char.h hwr.h win.h uDialog.h \
                 Objects/gInterC.h Objects/Text/tCommon.h stylesh.h \
                 driver.h thread.h print.h Internal/spoolInt.h serialDr.h \
-                parallDr.h hugearr.h fileEnum.h Ansi/string.h \
-                Ansi/stdio.h
+                parallDr.h hugearr.h fileEnum.h initfile.h token.h \
+                Ansi/stdio.h Ansi/stdlib.h Ansi/string.h
 
 openwithEC.geo openwith.geo : geos.ldf ui.ldf ansic.ldf 

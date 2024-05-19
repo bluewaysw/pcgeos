@@ -1,18 +1,276 @@
+/***********************************************************************
+PROJECT:	PC/GEOS Ensemble
+MODULE:	    OpenWith
+AUTHOR:     MeyerK
+NOTES:      started in 2024/04 for FreeGEOS project
+***********************************************************************/
+
 @include <openwith.goh>
 
-/*-------------------------------------------------------------
-API Struct
-MUST be global
--------------------------------------------------------------*/
+/***********************************************************************
+Resourcen
+***********************************************************************/
+@start FMUI, data;
+
+    @visMoniker ToolNameMoniker = "Open With";
+    @chunk char errorNoDOSFile[] = "Please select DOS files (no folders) only.";
+    @chunk char errorNoMoreTriggers[] = "Maximum number of application buttons reached.";
+
+@end FMUI;
+
+
+@start DialogUI, notDetachable;
+
+// Main/Select Dialog
+// ******************************************************************
+
+    @visMoniker @SelectDialogMoniker = "Open With";
+
+    @object OpenWithDialogClass SelectDialog = {
+        GI_visMoniker = @SelectDialogMoniker
+        GI_comp =   @SelectView,
+                    @SelectReplyBar;
+        GI_states = (@default & (~GS_USABLE));
+        GII_visibility = GIV_DIALOG;
+        GII_attrs = @default | GIA_INITIATED_VIA_USER_DO_DIALOG | GIA_MODAL;
+
+        HINT_PLACE_MONIKER_ABOVE;
+        HINT_ORIENT_CHILDREN_VERTICALLY;
+    }
+
+    @object GenViewClass SelectView = {
+        GVI_content = @SelectContent;
+        GVI_attrs = @default | GVA_GENERIC_CONTENTS | GVA_DRAG_SCROLLING | GVA_SAME_COLOR_AS_PARENT_WIN;
+        GVI_horizAttrs = @default | GVDA_NO_SMALLER_THAN_CONTENT; // GVDA_NO_LARGER_THAN_CONTENT
+        GVI_vertAttrs = @default | GVDA_SCROLLABLE;
+
+        HINT_FIXED_SIZE = {
+        	SST_PCT_OF_FIELD_WIDTH | PCT_25,
+        	SST_PCT_OF_FIELD_HEIGHT | PCT_35,
+	        0
+        };
+
+        HINT_VIEW_REMOVE_SCROLLERS_WHEN_NOT_SCROLLABLE;
+        HINT_ORIENT_CHILDREN_VERTICALLY;
+        HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+    }
+
+    @object GenContentClass SelectContent = {
+        GCI_attrs = @default | VCNA_SAME_WIDTH_AS_VIEW;
+        GCI_genView = @SelectView;
+        GI_comp = @SelectTriggerBox;
+
+        HINT_ORIENT_CHILDREN_VERTICALLY;
+        HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+    }
+
+    @object OpenWithTriggerBoxClass SelectTriggerBox = {
+        HINT_CUSTOM_CHILD_SPACING = SST_PIXELS | 0;
+        HINT_MINIMIZE_CHILD_SPACING;
+        HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+    }
+
+    @object GenInteractionClass SelectReplyBar = {
+        GI_comp =   @ConfigureDialog,
+                    @SelectCancelTrigger;
+
+        HINT_MAKE_REPLY_BAR;
+    }
+
+// Configure Dialog
+// ******************************************************************
+
+    @include "Art/mkrRightArrowSC.goh"
+    @include "Art/mkrLeftArrowSC.goh"
+    @include "Art/DownArrow.goh"
+    @include "Art/UpArrow.goh"
+    @visMoniker AddAppTriggerTextMoniker = "Add";
+    @visMoniker RemoveAppTriggerTextMoniker = "Remove";
+    @visMoniker DownTriggerTextMoniker = "Down";
+    @visMoniker UpTriggerTextMoniker = "Up";
+    @visMoniker OpenWithGroupMoniker = "Applications to use in the 'Open With' dialog";
+    @visMoniker ConfigureDialogMoniker = "Configure";
+
+    @object ConfigureDialogClass ConfigureDialog = {
+        GI_visMoniker = @ConfigureDialogMoniker;
+        GI_comp =       @OpenWithGroup,
+                        @ConfigureReplyBar;
+
+        GII_visibility = GIV_DIALOG;
+        GII_attrs = @default | GIA_MODAL;
+
+        HINT_PLACE_MONIKER_ABOVE;
+        HINT_ORIENT_CHILDREN_HORIZONTALLY;
+        HINT_SEEK_REPLY_BAR;
+        HINT_DEFAULT_DEFAULT_ACTION;
+    }
+
+    @object GenTriggerClass SelectCancelTrigger = {
+        ATTR_GEN_TRIGGER_INTERACTION_COMMAND = { IC_DISMISS };
+
+        HINT_SEEK_REPLY_BAR;
+    }
+
+    @object GenInteractionClass OpenWithGroup = {
+        GI_visMoniker = @OpenWithGroupMoniker;
+        GI_comp =	@OpenWithAddAppGroup,
+                    @OpenWithAppListGroup;
+
+        HINT_DRAW_IN_BOX;
+        HINT_PLACE_MONIKER_ABOVE;
+        HINT_ORIENT_CHILDREN_HORIZONTALLY;
+        HINT_CENTER_CHILDREN_VERTICALLY;
+    }
+
+    @object GenInteractionClass OpenWithAddAppGroup = {
+        GI_comp =   @AddAppSelector,
+                    @AddAppTrigger;
+
+        HINT_ORIENT_CHILDREN_VERTICALLY;
+        HINT_CENTER_CHILDREN_HORIZONTALLY;
+        HINT_EXPAND_HEIGHT_TO_FIT_PARENT;
+    }
+
+    @object GenFileSelectorClass AddAppSelector = {
+        GFSI_attrs =           ((FSA_ALLOW_CHANGE_DIRS) & (~FSA_SHOW_FILES_DISABLED) & (~FSA_HAS_OPEN_DIR_BUTTON) & (~FSA_HAS_CHANGE_DIRECTORY_LIST))
+                                | ((FSA_HAS_FILE_LIST) & (~FSA_SHOW_FIXED_DISKS_ONLY) & (~FSA_HAS_CLOSE_DIR_BUTTON) & (~FSA_HAS_DOCUMENT_BUTTON)& (~FSA_HAS_CHANGE_DRIVE_LIST))
+                                | ((FSA_USE_VIRTUAL_ROOT));
+
+        GFSI_fileCriteria =      ((FSFC_DIRS) & (~FSFC_NON_GEOS_FILES))
+                                | ((FSFC_GEOS_EXECUTABLES) & (~FSFC_GEOS_NON_EXECUTABLES));
+        GFSI_destination = @ConfigureDialog;
+        GFSI_notificationMsg = MSG_FILEBROW_SELECTOR_ACTION;
+
+        ATTR_GEN_FILE_SELECTOR_VIRTUAL_ROOT = {SP_APPLICATION, ""};
+        ATTR_GEN_PATH_DATA = {SP_APPLICATION, ""};
+        HINT_FILE_SELECTOR_FILE_LIST_WIDTH = 33;
+        HINT_FILE_SELECTOR_NUMBER_OF_FILES_TO_SHOW = 10;
+    }
+
+    @object GenTriggerClass AddAppTrigger = {
+        GI_visMoniker = list { @AddAppTriggerTextMoniker, @RightArrowSCMoniker };
+        GTI_destination = @OpenWithAppList;
+        GTI_actionMsg = MSG_ADD_APP;
+
+        HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+        HINT_CENTER_MONIKER;
+        HINT_USE_ICON_TEXT_COMBINATION_MONIKER = {0, 7};
+    }
+
+    @object GenInteractionClass OpenWithAppListGroup = {
+        GI_comp =   @OpenWithAppList,
+                    @OpenWithTriggerGroup;
+
+        HINT_ORIENT_CHILDREN_VERTICALLY;
+        HINT_CENTER_CHILDREN_HORIZONTALLY;
+        HINT_EXPAND_HEIGHT_TO_FIT_PARENT;
+    }
+
+    @object ConfigureAppListClass OpenWithAppList = {
+        GIGI_destination = @OpenWithAppList;
+        GIGI_behaviorType = GIGBT_EXCLUSIVE;
+        GDLI_queryMsg = MSG_QUERY_APP_MONIKER;
+        ATTR_GEN_ITEM_GROUP_STATUS_MSG = MSG_APPLIST_SELECTION_CHANGED;
+
+        HINT_ITEM_GROUP_SCROLLABLE;
+        HINT_EXPAND_HEIGHT_TO_FIT_PARENT;
+        HINT_FIXED_SIZE = {SST_AVG_CHAR_WIDTHS | 33};
+    }
+
+    @object GenInteractionClass OpenWithTriggerGroup = {
+        GI_comp =   @RemoveAppTrigger,
+                    @UpAppTrigger,
+                    @DownAppTrigger;
+
+        HINT_ORIENT_CHILDREN_HORIZONTALLY;
+        HINT_CENTER_CHILDREN_VERTICALLY;
+        HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+    }
+
+    @object GenTriggerClass RemoveAppTrigger = {
+        GI_visMoniker = list { @RemoveAppTriggerTextMoniker, @LeftArrowSCMoniker };
+
+        GTI_destination = @OpenWithAppList;
+        GTI_actionMsg = MSG_REMOVE_APP;
+
+        HINT_USE_ICON_TEXT_COMBINATION_MONIKER = {0, 7};
+        HINT_CENTER_MONIKER;
+        HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+    }
+
+    @object GenTriggerClass UpAppTrigger = {
+        GI_visMoniker = list {@UpArrowMoniker, @UpTriggerTextMoniker};
+
+        GTI_destination = @OpenWithAppList;
+        GTI_actionMsg = MSG_MOVE_APP;
+        ATTR_GEN_TRIGGER_ACTION_DATA = -1;
+
+        HINT_USE_ICON_TEXT_COMBINATION_MONIKER = {0, 7};
+        HINT_CENTER_MONIKER;
+        HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+    }
+
+    @object GenTriggerClass DownAppTrigger = {
+        GI_visMoniker = list {@DownArrowMoniker, @DownTriggerTextMoniker};
+
+        GTI_destination = @OpenWithAppList;
+        GTI_actionMsg = MSG_MOVE_APP;
+        ATTR_GEN_TRIGGER_ACTION_DATA = 1;
+
+        HINT_USE_ICON_TEXT_COMBINATION_MONIKER = {0, 7};
+        HINT_CENTER_MONIKER;
+        HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+    }
+
+    @object GenInteractionClass ConfigureReplyBar ={
+        GI_comp =   @ConfigureOkTrigger,
+                    @ConfigureCancelTrigger;
+
+        HINT_MAKE_REPLY_BAR;
+    }
+
+    @object GenTriggerClass ConfigureOkTrigger = {
+        GI_attrs = @default | GA_SIGNAL_INTERACTION_COMPLETE;
+        GTI_actionMsg = MSG_CONFIRM_CONFIGURE_DIALOG;
+        GTI_destination = @ConfigureDialog;
+
+        HINT_SEEK_REPLY_BAR;
+        ATTR_GEN_TRIGGER_INTERACTION_COMMAND = { IC_APPLY };
+        HINT_DEFAULT_DEFAULT_ACTION;
+    }
+
+    @object GenTriggerClass ConfigureCancelTrigger = {
+        ATTR_GEN_TRIGGER_INTERACTION_COMMAND = { IC_DISMISS };
+        HINT_SEEK_REPLY_BAR;
+    }
+
+@end DialogUI;
+
+
+/**************************************************************
+dgroup
+**************************************************************/
+#define TOOL_ICON_WIDTH         15
+#define TOOL_ICON_HEIGHT        15
+#define MAX_NUM_TRIGGERS        20
+
+const char  iniCat[] = "fileManager";
+const char  iniKey[] = "openWith";
+
+optr        G_appList = NullOptr;
+MemHandle   G_selFiles = NullHandle;
+
+
+/**************************************************************
+FileManager API Function - fetch Tools
+**************************************************************/
+//API Struct - MUST be global
 FMToolStruct FMToolInfo[1] = {
     {
-        @Moniker1, (FMTF_SELECTED_ONLY | FMTT_DIALOG), 1
+        @ToolNameMoniker, (FMTF_SELECTED_ONLY | FMTT_DIALOG), 1
     }
 };
 
-/*-------------------------------------------------------------
-FileManager API Function - fetch Tools
--------------------------------------------------------------*/
 //FMFetchToolsProc GetThoseTools
 word _pascal _export GetThoseTools(FMToolStruct **tablePtr)
 {
@@ -20,117 +278,186 @@ word _pascal _export GetThoseTools(FMToolStruct **tablePtr)
     return 1;
 }
 
-/*-------------------------------------------------------------
+/**************************************************************
 The user has clicked on our Utilities menu item: "Open With"
 GeodeHandle filemgr => Process that is subclass of FileManagerClass
 word toolNum =>	Entry # of activated tool within table returned by
                 FMTF_FETCH_TOOLS
 word entryNum
--------------------------------------------------------------*/
-//FMToolProc OpenWithEntryPoint()
-void _pascal _export OpenWithEntryPoint(
+***************************************************************/
+//FMToolProc OpenWithToolActivated()
+void _pascal _export OpenWithToolActivated(
     GeodeHandle filemgr,
     word toolNum,
     word entryNum
 )
 {
-    MemHandle                   selFiles;
-    MemHandle                   oldBlock;
+    optr    dialog = NullOptr;
+
+    // fetch the GeoManager selection
+    G_selFiles = @call ConstructOptr(filemgr, 0)::MSG_FM_GET_SELECTED_FILES();
+
+    // check for non-DOS files, folders, etc. first
+    if (SelectedFilesCheckIfUnsupported() == FALSE) // true if there were unsupported files
+    {
+        // read apps from the INI just once
+        AppListIniFileRead();
+
+        // bring up dialog
+        dialog = @call ConstructOptr(filemgr, 0)::MSG_FM_DUP_AND_ADD(@SelectDialog, FMP_APPLICATION);
+        @call dialog::MSG_GEN_SET_USABLE(VUM_NOW);
+        (void) UserDoDialog(dialog);
+        UserDestroyDialog(dialog);
+
+        // clean up
+        AppListFree();
+    }
+    else
+    {
+        UserStandardDialogOptr(
+            0, 0, 0, 0,
+            @errorNoDOSFile,
+            ((CDT_ERROR << CDBF_DIALOG_TYPE_OFFSET) |
+             (GIT_NOTIFICATION << CDBF_INTERACTION_TYPE_OFFSET))
+        );
+    }
+
+    // clean up
+    SelectedFilesFree();
+}
+
+
+/**************************************************************
+check if unsupported file
+returns TRUE on error == unsupported file
+**************************************************************/
+Boolean SelectedFilesCheckIfUnsupported()
+{
+    MemHandle                   curBlock;
+    MemHandle                   nextBlock;
     FileQuickTransferHeader*    headerPtr;
     FileOperationInfoEntry*     entriesPtr;
     word                        i;
-    InteractionCommand          reply = IC_NULL;
+    Boolean                     hadError = FALSE;
+    FileAttrs                   fAttrs;
 
-    optr                        dialog = NullOptr;
-    optr                        fSelect = NullOptr;
-    dword	    	            flagsAndDisk;	/* entry flags + disk handle returned by file selector */
-    PathName    	            pathname;   	/* Buffer for fetching the complete path of the application */
-    DiskHandle  	            disk;	    	/* Disk on which it resides */
-    GeodeToken  	            token;	    	/* Token for the application, so we can connect to it */
-
-
-    dialog = @call ConstructOptr(filemgr, 0)::MSG_FM_DUP_AND_ADD(@SelectDialog, FMP_APPLICATION);
-    @call dialog::MSG_GEN_SET_USABLE(VUM_NOW);
-
-    reply = UserDoDialog(dialog);
-    if (reply == IC_OK)
+    curBlock = G_selFiles;
+    while (curBlock != 0)
     {
-        fSelect = @call dialog::MSG_GEN_FIND_CHILD_AT_POSITION(0);
-        flagsAndDisk = @call fSelect::MSG_GEN_FILE_SELECTOR_GET_FULL_SELECTION_PATH(pathname);
+        headerPtr  = (FileQuickTransferHeader*) MemLock(curBlock); // get pointer to its header
+        entriesPtr = (FileOperationInfoEntry*) (headerPtr + 1); // get pointer to first entry (follows header)
 
-        UserDestroyDialog(dialog); // no more needed
-
-        if (GFS_GET_ENTRY_TYPE(flagsAndDisk) == GFSET_FILE)
+        for (i=0; i < headerPtr->FQTH_numFiles; i++)
         {
-            disk = GFS_GET_FULL_SELECTION_PATH_DISK_HANDLE(flagsAndDisk); // Extract disk handle
-
-            FilePushDir();
-            if (
-                 (FileSetCurrentPath(disk, _TEXT("\\")) != 0) &&
-                 (FileGetPathExtAttributes(pathname, FEA_TOKEN, &token, sizeof(token)) == 0)
-               )
+            if ((entriesPtr->FOIE_type == GFT_NOT_GEOS_FILE) &&
+                (entriesPtr->FOIE_type != GFT_DIRECTORY))
             {
-                selFiles = @call ConstructOptr(filemgr, 0)::MSG_FM_GET_SELECTED_FILES();
-
-                while (selFiles != 0)
+                // for folders above DOCUMENT/WORLD GFT_DIRECTORY seems not to be set (...?) -
+                // so we check again if actually a folder
+                FilePushDir();
+                if (FileSetCurrentPath(headerPtr->FQTH_diskHandle, headerPtr->FQTH_pathname) != NullHandle)
                 {
-                    headerPtr  = (FileQuickTransferHeader*) MemLock(selFiles); // get pointer to it header
-                    entriesPtr = (FileOperationInfoEntry*) (headerPtr + 1); // get pointer to first entry (follows header)
-
-                    for (i=0; i < headerPtr->FQTH_numFiles; i++)
+                    fAttrs = FileGetAttributes(entriesPtr->FOIE_name);
+                    if ((fAttrs & FA_SUBDIR) ||
+                        (fAttrs & FA_VOLUME) ||
+                        (fAttrs & FA_SYSTEM) ||
+                        (fAttrs & FA_HIDDEN) ||
+                        (fAttrs & FA_RDONLY))
                     {
-                        if (entriesPtr->FOIE_type == GFT_NOT_GEOS_FILE)
-                        {
-                            LaunchApp(
-                                &token,
-                                disk,
-                                &pathname,
-                                headerPtr->FQTH_diskHandle,
-                                headerPtr->FQTH_pathname,
-                                entriesPtr->FOIE_name
-                            );
-                        }
-
-                        // point to the next entry
-                        entriesPtr = (FileOperationInfoEntry*) entriesPtr + 1;
+                        FilePopDir();
+                        hadError = TRUE;
+                        break;
                     }
-
-                    // get next block, if any
-                    MemUnlock(selFiles);
-                    oldBlock = selFiles;
-                    selFiles = headerPtr->FQTH_nextBlock; // returns 0 if end, which breaks the loop
-                    MemFree(oldBlock);
                 }
+                else
+                {
+                    FilePopDir();
+                    hadError = TRUE;
+                    break;
+                }
+                FilePopDir();
             }
-            FilePopDir();
-        }
-    }
-}
+            else
+            {
+                hadError = TRUE;
+                break;
+            }
 
-/*-------------------------------------------------------------
-make sure the dialog gets closed when we double-click on an app
--------------------------------------------------------------*/
-@method OpenWithFileSelectorClass, MSG_FILEBROW_SELECTOR_ACTION
-{
-    if (GFS_GET_ENTRY_FLAGS(entryFlags) == GFSEF_OPEN) // was it a double click?
-    {
-        if (GFS_GET_ENTRY_TYPE(entryFlags) == GFSET_FILE) // on a file?
+            // point to the next entry
+            entriesPtr = (FileOperationInfoEntry*) entriesPtr + 1;
+        }
+
+        if (hadError)
         {
-            @send oself::MSG_GEN_GUP_INTERACTION_COMMAND(IC_OK); // close the dialog
+            MemUnlock(curBlock);
+            break;
+        }
+        else
+        {
+            // get next block, if any
+            nextBlock = headerPtr->FQTH_nextBlock; // returns 0 if end, which breaks the loop
+            MemUnlock(curBlock);
+            curBlock = nextBlock;
         }
     }
+
+    return hadError;
 }
 
-/*-------------------------------------------------------------
+/**************************************************************
+load files one by one
+**************************************************************/
+void SelectedFilesLoad(GeodeToken* token, char* pathnameAndFile)
+{
+    MemHandle                   curBlock;
+    MemHandle                   nextBlock;
+    FileQuickTransferHeader*    headerPtr;
+    FileOperationInfoEntry*     entriesPtr;
+    word                        i;
+
+    curBlock = G_selFiles;
+
+    FilePushDir();
+    FileSetStandardPath(SP_APPLICATION);
+    while (curBlock != 0)
+    {
+        headerPtr  = (FileQuickTransferHeader*) MemLock(curBlock); // get pointer to its header
+        entriesPtr = (FileOperationInfoEntry*) (headerPtr + 1); // get pointer to first entry (follows header)
+
+        for (i=0; i < headerPtr->FQTH_numFiles; i++)
+        {
+            SelectedFilesLaunchApp(
+                token,
+                SP_APPLICATION,
+                pathnameAndFile,
+                headerPtr->FQTH_diskHandle,
+                headerPtr->FQTH_pathname,
+                entriesPtr->FOIE_name
+            );
+
+            // point to the next entry
+            entriesPtr = (FileOperationInfoEntry*) entriesPtr + 1;
+        }
+
+        // get next block, if any
+        nextBlock = headerPtr->FQTH_nextBlock; // returns 0 if end, which breaks the loop
+        MemUnlock(curBlock);
+        curBlock = nextBlock;
+    }
+    FilePopDir();
+}
+
+/**************************************************************
 launch application with DOS file via IACP...
--------------------------------------------------------------*/
-void LaunchApp(
+**************************************************************/
+void SelectedFilesLaunchApp(
     GeodeToken *appTok,
     DiskHandle appDisk,
-    PathName *appPath,
+    char *appPath,
     DiskHandle dataDisk,
     PathName *dataPath,
-    FileLongName *dataFName)
+    FileLongName *dataFName
+)
 {
     IACPConnection       iacpConnectionToken = IACP_NO_CONNECTION;
     word                 connectionFlags = IACPSM_USER_INTERACTIBLE | IACPCF_FIRST_ONLY;
@@ -152,5 +479,535 @@ void LaunchApp(
     if(iacpConnectionToken != IACP_NO_CONNECTION)
     {
         IACPShutdown(iacpConnectionToken, NullOptr);
+    }
+}
+
+/**************************************************************
+free selected files blocks
+**************************************************************/
+void SelectedFilesFree()
+{
+    MemHandle                   curBlock;
+    MemHandle                   nextBlock;
+    FileQuickTransferHeader*    headerPtr;
+
+    curBlock = G_selFiles;
+
+    while (curBlock != 0)
+    {
+        headerPtr = (FileQuickTransferHeader*) MemLock(curBlock); // get pointer to its header
+        nextBlock = headerPtr->FQTH_nextBlock; // returns 0 if no next block, which breaks the loop
+        MemUnlock(curBlock);
+
+        MemFree(curBlock);
+
+        curBlock = nextBlock;
+    }
+
+    G_selFiles = 0;
+}
+
+
+/********************************************************************
+is app already on our trigger list?
+********************************************************************/
+Boolean AppListIsAppAlreadyInList(optr list, char* appName, word listLen)
+{
+    word    i = 0;
+    char*   str = (char*) 0;
+    word    elSize = 0;
+
+    // list must be locked!
+    for (i=0; i < listLen; i++)
+    {
+        str = (char*) ChunkArrayElementToPtr(list, i, &elSize);
+        if (strstr(str, appName))
+        {
+            return TRUE;
+        }
+    }
+
+    return FALSE;
+}
+
+/********************************************************************
+read apps from GEOS.INI
+********************************************************************/
+void AppListIniFileRead()
+{
+    MemHandle       mh = NullHandle;
+    ChunkHandle     ch = NullChunk;
+    optr            ourList = NullOptr;
+
+    if (mh != NullHandle) MemFree(mh);
+    mh = MemAllocLMem(LMEM_TYPE_GENERAL, 0);
+    MemLock(mh);
+
+    ch = ChunkArrayCreate(mh, sizeof(PathName) + sizeof(FileLongName), 0, 0);
+
+    G_appList = ConstructOptr(mh, ch);
+    ourList = G_appList;
+
+    InitFileEnumStringSection(
+        iniCat,
+        iniKey,
+        IFRF_READ_ALL,
+        AppListIniFileReadCallback,
+        (void*) &ourList);
+
+    MemUnlock(mh);
+}
+
+/********************************************************************
+the callback for reading an INI string blob...
+********************************************************************/
+Boolean AppListIniFileReadCallback(const char *stringSection, word sectionNum, void* enumData)
+{
+    char* str;
+
+    str = (char*) ChunkArrayAppend(*((optr*) enumData), 0); // convert VOID-Pointer to OPTR-Pointer and deref afterwards...
+    strcpy(str, stringSection);
+
+    return FALSE; // no error
+}
+
+/********************************************************************
+write apps to the INI
+********************************************************************/
+void AppListIniFileWrite()
+{
+    word    i = 0;
+    char*   str = (char*) 0;
+    word    elSize = 0;
+    word    listLen = 0;
+
+    InitFileDeleteEntry(iniCat, iniKey);
+
+    MemLock(HandleOf(G_appList));
+    listLen = ChunkArrayGetCount(G_appList);
+
+    // list must be locked!
+    for (i = 0; i < listLen; i++)
+    {
+        str = (char*) ChunkArrayElementToPtr(G_appList, i, &elSize);
+            InitFileWriteStringSection(
+            iniCat,
+            iniKey,
+            str
+        );
+    }
+
+    InitFileCommit();
+    MemUnlock(HandleOf(G_appList));
+}
+
+/********************************************************************
+free app list
+********************************************************************/
+void AppListFree()
+{
+    MemFree(OptrToHandle(G_appList));
+}
+
+
+/********************************************************************
+Classes & Methods
+********************************************************************/
+
+/********************************************************************
+when dialog opens, install triggers
+********************************************************************/
+@method OpenWithDialogClass, MSG_GEN_INTERACTION_INITIATE
+{
+    @callsuper();
+
+    @call @dup(@SelectTriggerBox)::MSG_BUILD_TRIGGERS();
+}
+
+/********************************************************************
+an app trigger has been pressed, launch app with files
+********************************************************************/
+@method OpenWithDialogClass, MSG_APP_TRIGGER_PRESSED
+{
+    GeodeToken        token;
+    char    	      pathnameAndFile[PATH_BUFFER_SIZE + FILE_LONGNAME_BUFFER_SIZE] = {0};
+
+    @call trigger::MSG_META_GET_VAR_DATA(ATTR_GEODE_TOKEN_TO_PASS, sizeof(GeodeToken), &token);
+    @call trigger::MSG_META_GET_VAR_DATA(ATTR_GEODE_FILE_NAME, sizeof(FileLongName), pathnameAndFile);
+
+    SelectedFilesLoad(&token, pathnameAndFile);
+
+    @call oself::MSG_GEN_GUP_INTERACTION_COMMAND(IC_OK);
+}
+
+/********************************************************************
+build our triggers from the apps in GEOS.INI
+********************************************************************/
+@method OpenWithTriggerBoxClass, MSG_BUILD_TRIGGERS
+{
+    GeodeToken          tok;
+    char*               filePtr = (char*) 0;
+    byte                triggerNo = 0;
+    word                num = 0;
+    word                elSize = 0;
+    optr                triggerObj = NullOptr;
+    char*               fname = (char*) 0;
+
+    @call oself::MSG_REMOVE_ALL_APP_TRIGGERS();
+
+    MemLock(HandleOf(G_appList));
+    num = ChunkArrayGetCount(G_appList);
+
+    if (num > 0)
+    {
+        for (triggerNo=0; triggerNo < num; triggerNo++)
+        {
+            if (triggerNo >= MAX_NUM_TRIGGERS) break;
+
+            FilePushDir();
+            FileSetStandardPath(SP_APPLICATION);
+            filePtr = (char*) ChunkArrayElementToPtr(G_appList, triggerNo, &elSize);
+            FileGetPathExtAttributes(filePtr, FEA_TOKEN, (&tok), sizeof(GeodeToken));
+            fname = strrchr(filePtr, '\\')+1;
+            FilePopDir();
+
+            triggerObj = ObjInstantiate(OptrToHandle(oself), (ClassStruct*) &OpenWithAppLaunchTriggerClass);
+            @send oself::MSG_GEN_ADD_CHILD(triggerObj, CCO_LAST);
+
+            @send triggerObj::MSG_SET_TRIGGER_MONIKER(&tok, fname);
+            @send triggerObj::MSG_GEN_TRIGGER_SET_DESTINATION(@dup(@SelectDialog));
+            @send triggerObj::MSG_GEN_TRIGGER_SET_ACTION_MSG(MSG_APP_TRIGGER_PRESSED);
+            @send triggerObj::MSG_META_ADD_VAR_DATA((ATTR_GEODE_TOKEN_TO_PASS & (~VDF_SAVE_TO_STATE)), sizeof(GeodeToken), &tok);
+            @send triggerObj::MSG_META_ADD_VAR_DATA((ATTR_GEODE_FILE_NAME & (~VDF_SAVE_TO_STATE)), strlen(filePtr), filePtr);
+            @send triggerObj::MSG_META_ADD_VAR_DATA((HINT_EXPAND_WIDTH_TO_FIT_PARENT & (~VDF_SAVE_TO_STATE)), 0, 0);
+            @send triggerObj::MSG_GEN_SET_USABLE(VUM_NOW);
+        }
+    }
+
+    MemUnlock(HandleOf(G_appList));
+}
+
+/********************************************************************
+set the tool icon + fname moniker
+params: tok, fname
+********************************************************************/
+@method OpenWithAppLaunchTriggerClass, MSG_SET_TRIGGER_MONIKER
+{
+    Boolean                 isMoniker = FALSE;
+    DisplayScheme	        ds;
+    MemHandle               mhHeap = NullHandle;
+    VisMoniker*             vmp;
+    byte                    *moniker;
+    byte*                   gstr = (void*) 0;
+    word                    foo = 0;
+    TokenMonikerInfo        tmi;
+    GStateHandle            gs, mgs;
+    word                    gschunk;
+
+    @call oself::MSG_GEN_REPLACE_VIS_MONIKER_TEXT(fname, VUM_NOW);
+
+    @call GeodeGetAppObject(0)::MSG_GEN_APPLICATION_GET_DISPLAY_SCHEME(&ds);
+    isMoniker = TokenLookupMoniker(
+        TOKEN_CHARS(tok->GT_chars[0],tok->GT_chars[1],tok->GT_chars[2],tok->GT_chars[3]),
+        tok->GT_manufID,
+        ds.DS_displayType,
+        ((VMSF_GSTRING) | (VMS_TOOL << VMSF_STYLE_OFFSET)),
+        &tmi
+    );
+
+    if (isMoniker)
+    {
+        moniker = TokenLockTokenMoniker(tmi);
+        vmp = LMemDeref((optr) moniker);
+
+        if (vmp->VM_width <= TOOL_ICON_WIDTH)
+        {
+            // prepare "Canvas", GState for drawing
+            mhHeap = MemAllocLMem(LMEM_TYPE_GSTRING, sizeof(LMemBlockHeader));
+            MemLock(mhHeap);
+            gs = GrCreateGString(mhHeap, GST_CHUNK, &gschunk);
+
+            // load icon moniker from Token-DB, draw on canvas
+            gstr = (byte *)vmp+(sizeof(VisMonikerWithGString));
+            mgs = GrLoadGString(PtrToSegment(gstr), GST_PTR, PtrToOffset(gstr));
+            GrSaveState(gs);
+            GrDrawGString(gs, mgs, 0, 1, 0, &foo);
+            GrRestoreState(gs);
+            GrDestroyGString(mgs, gs, GSKT_LEAVE_DATA);
+
+            // draw text
+            GrDrawText(gs, TOOL_ICON_WIDTH + 2, 1, fname, 0);
+
+            // finish
+            GrEndGString(gs);
+
+            // replace moniker
+            @call oself::MSG_GEN_REPLACE_VIS_MONIKER(
+                VUM_NOW,
+                0, 0, 0,
+                VMDT_GSTRING,
+                VMST_OPTR,
+            	(dword) ConstructOptr(mhHeap, gschunk)
+            );
+
+            // kill everything
+            GrDestroyGString(gs, 0, GSKT_KILL_DATA);
+            MemUnlock(mhHeap);
+            MemFree(mhHeap);
+        }
+
+        TokenUnlockTokenMoniker(moniker);
+    }
+}
+
+
+/********************************************************************
+remove all the triggers, called by ...BUILD_TRIGGERS
+********************************************************************/
+@method OpenWithTriggerBoxClass, MSG_REMOVE_ALL_APP_TRIGGERS
+{
+    optr    trigger = NullOptr;
+
+    while(TRUE)
+    {
+        trigger = @call oself::MSG_GEN_FIND_CHILD_AT_POSITION(0);
+        if (trigger == NullOptr) break;
+        @call trigger::MSG_GEN_SET_NOT_USABLE(VUM_NOW);
+        @call oself::MSG_GEN_REMOVE_CHILD(trigger, CCF_MARK_DIRTY);
+        @call trigger::MSG_META_OBJ_FREE();
+    }
+}
+
+/********************************************************************
+when opening config dialog...
+********************************************************************/
+@method ConfigureDialogClass, MSG_GEN_INTERACTION_INITIATE
+{
+    word    num = 0;
+
+    @callsuper();
+
+    MemLock(HandleOf(G_appList));
+    num = ChunkArrayGetCount(G_appList);
+    MemUnlock(HandleOf(G_appList));
+
+    @call @dup(@OpenWithAppList)::MSG_GEN_DYNAMIC_LIST_INITIALIZE(num);
+    @call @dup(@OpenWithAppList)::MSG_GEN_ITEM_GROUP_SET_NONE_SELECTED(TRUE);
+    @call @dup(@RemoveAppTrigger)::MSG_GEN_SET_NOT_ENABLED(VUM_NOW);
+    @call @dup(@UpAppTrigger)::MSG_GEN_SET_NOT_ENABLED(VUM_NOW);
+    @call @dup(@DownAppTrigger)::MSG_GEN_SET_NOT_ENABLED(VUM_NOW);
+}
+
+
+/********************************************************************
+when closing config dialog with OK...
+********************************************************************/
+@method ConfigureDialogClass, MSG_CONFIRM_CONFIGURE_DIALOG
+{
+    AppListIniFileWrite();
+
+    @call @dup(@SelectTriggerBox)::MSG_BUILD_TRIGGERS();
+}
+
+/********************************************************************
+when browsing files in the FS, enable/disable things
+********************************************************************/
+@method ConfigureDialogClass, MSG_FILEBROW_SELECTOR_ACTION
+{
+    word        num = 0;
+    char        pathnameAndFile[PATH_BUFFER_SIZE + FILE_LONGNAME_BUFFER_SIZE] = {0};   	/* Buffer for fetching the complete path of the application */
+
+    if (GFS_GET_ENTRY_TYPE(entryFlags) == GFSET_FILE)
+    {
+        (void) @call @dup(@AddAppSelector)::MSG_GEN_FILE_SELECTOR_GET_FULL_SELECTION_PATH(pathnameAndFile);
+
+        MemLock(HandleOf(G_appList));
+        num = ChunkArrayGetCount(G_appList);
+        if (AppListIsAppAlreadyInList(G_appList, pathnameAndFile, num) == FALSE)
+        {
+            @call @dup(@AddAppTrigger)::MSG_GEN_SET_ENABLED(VUM_NOW);
+        }
+        else
+        {
+            @call @dup(@AddAppTrigger)::MSG_GEN_SET_NOT_ENABLED(VUM_NOW);
+        }
+        MemUnlock(HandleOf(G_appList));
+    }
+    else
+    {
+        @call @dup(@AddAppTrigger)::MSG_GEN_SET_NOT_ENABLED(VUM_NOW);
+    }
+}
+
+/********************************************************************
+when browsing the list of apps...
+three arguments:
+    selection (the contents of GIGI_selection)
+    numSelections (the contents of GIGI_numSelections)
+    stateFlags (the contents of GIGI_stateFlags)
+********************************************************************/
+@method	ConfigureAppListClass, MSG_APPLIST_SELECTION_CHANGED
+{
+    if (selection != GIGS_NONE)
+    {
+        @call @dup(@UpAppTrigger)::MSG_GEN_SET_ENABLED(VUM_NOW);
+        @call @dup(@DownAppTrigger)::MSG_GEN_SET_ENABLED(VUM_NOW);
+        @call @dup(@RemoveAppTrigger)::MSG_GEN_SET_ENABLED(VUM_NOW);
+    }
+}
+
+
+/********************************************************************
+give the list the moniker it request: a filename
+Params: optr list, word item
+********************************************************************/
+@method	ConfigureAppListClass, MSG_QUERY_APP_MONIKER
+{
+    char*   filePtr = (void*) 0;
+    word    elSize = 0;
+    char*   fname = (char*) 0;
+
+    MemLock(HandleOf(G_appList));
+
+    filePtr = (char*) ChunkArrayElementToPtr(G_appList, item, &elSize);
+    fname = strrchr(filePtr, '\\') + 1;
+    @call list::MSG_GEN_DYNAMIC_LIST_REPLACE_ITEM_TEXT(item, fname);
+
+    MemUnlock(HandleOf(G_appList));
+}
+
+
+/********************************************************************
+add an app to the list
+********************************************************************/
+@method	ConfigureAppListClass, MSG_ADD_APP
+{
+    word        num = 0;
+    char*       str = (char*) 0;
+    dword       flagsAndDisk;
+    char        pathnameAndFile[PATH_BUFFER_SIZE + FILE_LONGNAME_BUFFER_SIZE] = {0};   	/* Buffer for fetching the complete path of the application */
+
+    flagsAndDisk = @call @dup(@AddAppSelector)::MSG_GEN_FILE_SELECTOR_GET_FULL_SELECTION_PATH(pathnameAndFile);
+
+    if (GFS_GET_ENTRY_TYPE(flagsAndDisk) == GFSET_FILE)
+    {
+        if (strlen(pathnameAndFile) > 0)
+        {
+            MemLock(HandleOf(G_appList));
+
+            num = ChunkArrayGetCount(G_appList);
+
+            if (num < MAX_NUM_TRIGGERS)
+            {
+                if (AppListIsAppAlreadyInList(G_appList, pathnameAndFile, num) == FALSE)
+                {
+                    str = (char*) ChunkArrayAppend(G_appList, 0);
+                    strcpy(str, pathnameAndFile);
+
+                    num = ChunkArrayGetCount(G_appList);
+                    @call oself::MSG_GEN_DYNAMIC_LIST_INITIALIZE(num);
+                    @call oself::MSG_GEN_ITEM_GROUP_SET_NONE_SELECTED(TRUE);
+                    @call @dup(@RemoveAppTrigger)::MSG_GEN_SET_NOT_ENABLED(VUM_NOW);
+                    @call @dup(@AddAppTrigger)::MSG_GEN_SET_NOT_ENABLED(VUM_NOW);
+                    @call @dup(@UpAppTrigger)::MSG_GEN_SET_NOT_ENABLED(VUM_NOW);
+                    @call @dup(@DownAppTrigger)::MSG_GEN_SET_NOT_ENABLED(VUM_NOW);
+                }
+            }
+            else
+            {
+                UserStandardDialogOptr(
+                    0, 0, 0, 0,
+                    @errorNoMoreTriggers,
+                    ((CDT_ERROR << CDBF_DIALOG_TYPE_OFFSET) |
+                    (GIT_NOTIFICATION << CDBF_INTERACTION_TYPE_OFFSET))
+                );
+            }
+
+            MemUnlock(HandleOf(G_appList));
+        }
+    }
+}
+
+/********************************************************************
+remove an app from the list
+********************************************************************/
+@method	ConfigureAppListClass, MSG_REMOVE_APP
+{
+    word                        idx = 0;
+    word                        num = 0;
+
+	idx = @call oself::MSG_GEN_ITEM_GROUP_GET_SELECTION();
+
+    if (idx != GIGS_NONE)
+    {
+        MemLock(HandleOf(G_appList));
+
+        ChunkArrayDeleteRange(G_appList, idx, 1);
+        num = ChunkArrayGetCount(G_appList);
+        @call oself::MSG_GEN_DYNAMIC_LIST_INITIALIZE(num);
+        @call oself::MSG_GEN_ITEM_GROUP_SET_NONE_SELECTED(TRUE);
+        @call @dup(@RemoveAppTrigger)::MSG_GEN_SET_NOT_ENABLED(VUM_NOW);
+        @call @dup(@UpAppTrigger)::MSG_GEN_SET_NOT_ENABLED(VUM_NOW);
+        @call @dup(@DownAppTrigger)::MSG_GEN_SET_NOT_ENABLED(VUM_NOW);
+
+        MemUnlock(HandleOf(G_appList));
+    }
+}
+
+/********************************************************************
+move app in list up/down
+********************************************************************/
+@method	ConfigureAppListClass, MSG_MOVE_APP
+{
+    sword           idx = 0;
+    sword           otherIdx = 0;
+    word            num = 0;
+    word            size = 0;
+    ChunkHandle     app1Chunk = NullHandle;
+    ChunkHandle     app2Chunk = NullHandle;
+    char*           app1 = NullHandle;
+    char*           app2 = NullHandle;
+    char*           curApp = (void*) 0;
+    char*           prevOrNextApp = (void*) 0;
+    MemHandle       appListHan = NullHandle;
+
+	idx = @call oself::MSG_GEN_ITEM_GROUP_GET_SELECTION();
+
+    if (idx != GIGS_NONE)
+    {
+        appListHan = OptrToHandle(G_appList);
+        MemLock(appListHan);
+
+        num = ChunkArrayGetCount(G_appList);
+
+        otherIdx = idx + upOrDown;
+        if (otherIdx == num) { otherIdx = 0; }
+        if (otherIdx == -1) { otherIdx = num - 1; }
+
+        app1Chunk = LMemAlloc(appListHan, PATH_BUFFER_SIZE + FILE_LONGNAME_BUFFER_SIZE);
+        app2Chunk = LMemAlloc(appListHan, PATH_BUFFER_SIZE + FILE_LONGNAME_BUFFER_SIZE);
+
+        if ((app1Chunk != NullChunk) && (app2Chunk != NullChunk))
+        {
+            app1 = LMemDerefHandles(appListHan, app1Chunk);
+            app2 = LMemDerefHandles(appListHan, app2Chunk);
+
+            curApp = ChunkArrayElementToPtr(G_appList, idx, &size);
+            prevOrNextApp = ChunkArrayElementToPtr(G_appList, otherIdx, &size);
+
+            strcpy(app1, curApp);
+            strcpy(app2, prevOrNextApp);
+
+            strcpy(curApp, app2);
+            strcpy(prevOrNextApp, app1);
+
+            @call oself::MSG_GEN_DYNAMIC_LIST_INITIALIZE(num);
+            @call oself::MSG_GEN_ITEM_GROUP_SET_SINGLE_SELECTION(otherIdx, FALSE);
+        }
+
+        if (app1Chunk != NullChunk) { LMemFreeHandles(appListHan, app1Chunk); }
+        if (app2Chunk != NullChunk) { LMemFreeHandles(appListHan, app2Chunk); }
+
+        MemUnlock(appListHan);
     }
 }
