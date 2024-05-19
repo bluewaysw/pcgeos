@@ -144,9 +144,6 @@ extern TEngine_Instance engineInstance;
     PEngine_Instance  _engine = &engineInstance;
 
 
-    if ( !_engine )
-      return TT_Err_Ok;
-
     TTRaster_Done( _engine );
     TTObjs_Done  ( _engine );
 #ifdef TT_CONFIG_OPTION_EXTEND_ENGINE
@@ -189,9 +186,6 @@ extern TEngine_Instance engineInstance;
     TT_Stream    stream;
     PFace        _face;
 
-
-    if ( !_engine )
-      return TT_Err_Invalid_Engine;
 
     /* open the file */
     error = TT_Open_Stream( file, &stream );
@@ -1308,9 +1302,6 @@ extern TEngine_Instance engineInstance;
     PEngine_Instance  _engine = &engineInstance;
 
 
-    if ( !_engine )
-      return TT_Err_Invalid_Engine;
-
     if ( !outline || !map )
       return TT_Err_Invalid_Argument;
 
@@ -1341,9 +1332,6 @@ TT_Error  TT_Get_Outline_Region( TT_Outline*     outline,
 {
   PEngine_Instance  _engine = &engineInstance;
 
-
-  if ( !_engine )
-    return TT_Err_Invalid_Engine;
 
   if ( !outline || !map )
     return TT_Err_Invalid_Argument;
