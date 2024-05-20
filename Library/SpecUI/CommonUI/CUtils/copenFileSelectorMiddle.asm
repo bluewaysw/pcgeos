@@ -9,7 +9,7 @@ FILE:		copenFileSelectorMiddle.asm
 ROUTINES:
 	Name			Description
 	----			-----------
-    INT OLFSMarkDirtyAndRescanIfRealized
+    INT OLFSMarkDirtyAndRescanIfRealized 
 				React to a change in some attribute of the
 				file selector by marking it dirty and
 				rescanning the thing if it's currently
@@ -18,17 +18,17 @@ ROUTINES:
     INT OLFSCheckIfRealized     See if the passed GenFileSelector is
 				on-screen
 
-    INT OLFSBuildChangeDrivePopup
+    INT OLFSBuildChangeDrivePopup 
 				build list of volumes for Change Drive
 				popup list
 
-    INT OLFSCreateAndInitGenItem
+    INT OLFSCreateAndInitGenItem 
 				Create and initialize a GenItem.
 
     INT OLFSReadList            build list of volumes or list of
 				files/directories
 
-    MTD MSG_GEN_FILE_SELECTOR_GET_FILTER_ROUTINE
+    MTD MSG_GEN_FILE_SELECTOR_GET_FILTER_ROUTINE 
 				Default handler to deal with goofballs that
 				set FSFC_FILTER_FILE but don't intercept
 				this message....
@@ -41,11 +41,11 @@ ROUTINES:
     INT OLFSBuildFileList       read directory and build list of files and
 				directories
 
-    INT ExpandListToHoldSections
+    INT ExpandListToHoldSections 
 				Expands file list to leave room for section
 				"directories".
 
-    INT SetSectionHeaderListItem
+    INT SetSectionHeaderListItem 
 				Creates a fake directory entry for a
 				section header.
 
@@ -78,20 +78,20 @@ ROUTINES:
 
     INT OLFSDestroyListChildren clobber all children
 
-    MTD MSG_OL_FILE_SELECTOR_ITEM_QUERY
+    MTD MSG_OL_FILE_SELECTOR_ITEM_QUERY 
 				dynamic list wants a moniker
 
-    MTD MSG_OL_FILE_SELECTOR_ITEM_QUERY
+    MTD MSG_OL_FILE_SELECTOR_ITEM_QUERY 
 				Table object wants to draw its entry. So
 				tell it what to draw
 
     INT GetSectionAndItem       Returns current item and the section it's
 				in.
 
-    MTD MSG_OL_FILE_SELECTOR_CHANGE_DRIVE_POPUP
+    MTD MSG_OL_FILE_SELECTOR_CHANGE_DRIVE_POPUP 
 				switch to root directory of specified drive
 
-    MTD MSG_OL_FILE_SELECTOR_CHANGE_DIRECTORY_POPUP
+    MTD MSG_OL_FILE_SELECTOR_CHANGE_DIRECTORY_POPUP 
 				switch to choosen directory in change
 				directory popup
 
@@ -230,13 +230,13 @@ SYNOPSIS:	React to a change in some attribute of the file selector
 CALLED BY:	OLFileSelectorSetSomething
 PASS:		*ds:si	= GenFileSelector object
 RETURN:		carry set if scanned
-DESTROYED:
+DESTROYED:	
 
 PSEUDO CODE/STRATEGY:
-
+		
 
 KNOWN BUGS/SIDE EFFECTS/IDEAS:
-
+		
 
 REVISION HISTORY:
 	Name	Date		Description
@@ -285,13 +285,13 @@ CALLED BY:	INTERNAL
 PASS:		*ds:si	= OLFileSelector
 RETURN:		carry set if selector is on-screen
 		carry clear if selector is not on-screen
-DESTROYED:
+DESTROYED:	
 
 PSEUDO CODE/STRATEGY:
-
+		
 
 KNOWN BUGS/SIDE EFFECTS/IDEAS:
-
+		
 
 REVISION HISTORY:
 	Name	Date		Description
@@ -487,13 +487,13 @@ fakeLoop:
 
 	sub	sp, FILE_LONGNAME_BUFFER_SIZE
 	segmov	es, ss
-
+	
 	mov	ax, MSG_GEN_FILE_SELECTOR_FAKE_VOLUME_NAME_GET
 	mov	dx, ss
 	mov	bp, sp
 	call	ObjCallInstanceNoLock
 	tst	ax
-	jnz	failCase
+	jnz	failCase		
 
 						; ^lbx:si = popup list
 	mov	si, offset OLFileSelectorChangeDrivePopup
@@ -650,10 +650,10 @@ RETURN:		ax:cx	= filter routine (ax = 0 => none)
 DESTROYED:	none
 
 PSEUDO CODE/STRATEGY:
-
+		
 
 KNOWN BUGS/SIDE EFFECTS/IDEAS:
-
+		
 
 REVISION HISTORY:
 	Name	Date		Description
@@ -672,12 +672,12 @@ OLFileSelectorGetFilterRoutine		method dynamic OLFileSelectorClass, MSG_GEN_FILE
 
 		mov	cx, ds:[bx].segment
 		mov	ax, ds:[bx].offset
-		clr	bp
+		clr	bp		
 		jmp	done
 noVardata:
 	;
 	; Neither a borrower nor a lender be...
-	;
+	; 
 		clr	ax, cx, bp
 done:
 		.leave
@@ -700,10 +700,10 @@ RETURN:		cx:ax	= FileEnum-like routine (cx = 0 => none)
 DESTROYED:	none
 
 PSEUDO CODE/STRATEGY:
-
+		
 
 KNOWN BUGS/SIDE EFFECTS/IDEAS:
-
+		
 
 REVISION HISTORY:
 	Name	Date		Description
@@ -715,7 +715,7 @@ OLFileSelectorGetFileEnumRoutine	method dynamic OLFileSelectorClass, MSG_GEN_FIL
 		.enter
 	;
 	; Neither a borrower nor a lender be...
-	;
+	; 
 		clr	cx
 		.leave
 		ret
@@ -844,7 +844,7 @@ OLFSEnumParams	struct
 
 	even
 
-OLFSEnumParams	ends
+OLFSEnumParams	ends	
 
 OLFSBuildFileList	proc	near
 	class	OLFileSelectorClass
@@ -886,20 +886,20 @@ compareRealDiskHandles:
 	push	es
 	mov	bp, bx				; bp = disk handle
 
-	segmov	es, cs				; es:di = root path
-	mov	di, offset rootPath
+	segmov	es, cs				; es:di = root path	
+	mov	di, offset rootPath					
 
 FXIP <	push	cx							>
 FXIP <	clr	cx							>
 FXIP <	call	SysCopyToStackESDI					>
 FXIP <	pop	cx							>
-
+	
 	mov	ax, ATTR_GEN_PATH_DATA
 	mov	dx, TEMP_GEN_PATH_SAVED_DISK_HANDLE
 	call	GenPathSetObjectPath
 
 FXIP <	call	SysRemoveFromStack					>
-
+	
 	pop	es
 	LONG jc	done				; invalid, just give up
 
@@ -908,12 +908,12 @@ continueOnOurMerryWay:
 	; Push to the object's current directory so any block motion caused
 	; by initializing the ATTR_GEN_PATH_DATA, if such there be, happens
 	; before we point the FileEnumParams into the object.
-	;
+	; 
 	call	FilePushDir
 	mov	ax, ATTR_GEN_PATH_DATA
 	mov	dx, TEMP_GEN_PATH_SAVED_DISK_HANDLE
 	call	GenPathSetCurrentPathFromObjectPath
-
+	
 	sub	sp, size OLFSEnumParams
 	mov	bp, sp
 	mov	ss:[bp].OLFSEP_filesDisabled, FALSE
@@ -935,10 +935,10 @@ freed:
 
 
 endif	;---------------------------------------------------------------------
-
+	
 	;
 	; Set up constant portion of the parameters.
-	;
+	; 
 	call	OLFSDeref_SI_Gen_DI
 	;
 	; Transfer the file types from our fileCriteria to the searchFlags.
@@ -946,7 +946,7 @@ endif	;---------------------------------------------------------------------
 	; nicely with the four bits in the search flags, so just snag the
 	; high byte of the criteria, clear out all but those four bits, and
 	; OR in the CALLBACK bit, since we always have a callback
-	;
+	; 
 
 CheckHack <\
     offset FSFC_DIRS eq 15 and offset FESF_DIRS eq 7 and \
@@ -961,8 +961,8 @@ CheckHack <\
 	;
 	; If SHOW_FILES_DISABLED, then show all files, regardless of search
 	; criteria, as the intent is to indicate to the user what names
-	; are already taken.
-	;
+	; are already taken. 
+	; 
 	test	ds:[di].GFSI_attrs, mask FSA_SHOW_FILES_DISABLED
 	jz	setSearchFlags
 	mov	ss:[bp].OLFSEP_filesDisabled, TRUE
@@ -974,8 +974,8 @@ setSearchFlags:
 	;
 	; The returnAttrs are constant and specify the offsets and attributes
 	; for our OLFileSelectorEntry structure.
-	;
-if _FXIP
+	; 
+if _FXIP	
 	;
 	; Pointers into our code segment are bad on XIP systems, so copy
 	; the return attrs to the stack
@@ -988,33 +988,33 @@ if _FXIP
 	mov	ss:[bp].OLFSEP_common.FEP_returnAttrs.offset, si
 	mov	ss:[bp].OLFSEP_common.FEP_returnAttrs.segment, ds
 	pop	ds, si, cx
-else
-	mov	ss:[bp].OLFSEP_common.FEP_returnAttrs.offset,
-		offset olfsReturnAttrs
-	mov	ss:[bp].OLFSEP_common.FEP_returnAttrs.segment, cs
+else	
+	mov	ss:[bp].OLFSEP_common.FEP_returnAttrs.offset, 		
+		offset olfsReturnAttrs					
+	mov	ss:[bp].OLFSEP_common.FEP_returnAttrs.segment, cs	
 endif
 
 	mov	ss:[bp].OLFSEP_common.FEP_returnSize, size OLFileSelectorEntry
 	;
 	; matchAttrs come immediately after the parameters; we'll fill in the
 	; array itself in a moment.
-	;
+	; 
 	lea	ax, ss:[bp].OLFSEP_matchAttrs
 	mov	ss:[bp].OLFSEP_common.FEP_matchAttrs.offset, ax
 	mov	ss:[bp].OLFSEP_common.FEP_matchAttrs.segment, ss
 	;
 	; We accept as many files/directories/etc. as we can get.
-	;
+	; 
 	mov	ss:[bp].OLFSEP_common.FEP_bufSize, FE_BUFSIZE_UNLIMITED
 	;
 	; We skip over none of them.
-	;
+	; 
 	clr	ax
 	mov	ss:[bp].OLFSEP_common.FEP_skipCount, ax
 	;
 	; Set the address of our callback routine and zero the segment of the
 	; object's filter routine, so we can easily find if there is one....
-	;
+	; 
 	mov	ss:[bp].OLFSEP_common.FEP_callback.offset,
 		offset OLFSFileEnumCallback
 	mov	ss:[bp].OLFSEP_common.FEP_callback.segment, SEGMENT_CS
@@ -1024,25 +1024,25 @@ endif
 	;
 	; cbData2 holds the address of our object, as we may need to
 	; consult it during the callback.
-	;
+	; 
 	mov	ss:[bp].OLFSEP_common.FEP_cbData2.low, si
 	mov	ss:[bp].OLFSEP_common.FEP_cbData2.high, ds
 	;
 	; cbData1 holds the pattern against which to compare names, if
 	; one is specified. For now, we zero it out, in case there's no pattern.
-	;
+	; 
 	mov	ss:[bp].OLFSEP_common.FEP_cbData1.low, ax
 	mov	ss:[bp].OLFSEP_common.FEP_cbData1.high, ax
 
 	;
 	; Start out with no callback attributes. We'll deal with this later.
-	;
+	; 
 	mov	ss:[bp].OLFSEP_common.FEP_callbackAttrs.segment, ax
 
 	;
 	; Now fill in the matchAttrs array.
 	; 	ds:di = GenFileSelectorInstance, still
-	;
+	; 
 	mov	dx, ds:[di].GFSI_fileCriteria	; dx <- file criteria, as we'll
 						;  need it several places later
 	lea	di, ss:[bp].OLFSEP_matchAttrs	; and we need DI to point
@@ -1052,20 +1052,20 @@ endif
 	;
 	; Start with the name mask. This doesn't actually go in the
 	; matchAttrs array, but what the heck. I like it here.
-	;
+	; 
 	mov	ax, ATTR_GEN_FILE_SELECTOR_NAME_MASK
 	call	ObjVarFindData
 	jnc	checkToken
-
+	
 	;
 	; Attribute exists. Overwrite null pointer with its address. No need
 	; for cbAttrs, as we know our return attrs contain FEA_NAME, and that's
 	; all we'll need in the callback to perform this wildcarding.
-	;
+	; 
 	mov	ss:[bp].OLFSEP_common.FEP_cbData1.offset, bx
 	mov	ss:[bp].OLFSEP_common.FEP_cbData1.segment, ds
-
-checkToken:
+	
+checkToken:	
 	tst	ss:[bp].OLFSEP_filesDisabled	; (clears carry)
 	jnz	setDefaultFileAttrs		; ignore everything if files are
 						;  to be shown disabled. We
@@ -1074,15 +1074,15 @@ checkToken:
 
 	;
 	; See if a file token is specified for the object.
-	;
+	; 
 	mov	ax, ATTR_GEN_FILE_SELECTOR_TOKEN_MATCH
 	call	ObjVarFindData
 	jnc	checkCreator
-
+	
 	;
 	; Yes. Point the next matchAttrs entry to the value, shortening the
 	; usual size by 2 if FSFC_TOKEN_NO_ID is specified in the criteria.
-	;
+	; 
 	mov	ss:[di].FEAD_attr, FEA_TOKEN
 	mov	ss:[di].FEAD_value.offset, bx
 	mov	ss:[di].FEAD_value.segment, ds
@@ -1104,7 +1104,7 @@ checkCreator:
 	;
 	; Yes. Point the next matchAttrs entry to the value, shortening the
 	; usual size by 2 if FSFC_TOKEN_NO_ID is specified in the criteria.
-	;
+	; 
 	mov	ss:[di].FEAD_attr, FEA_CREATOR
 	mov	ss:[di].FEAD_value.offset, bx
 	mov	ss:[di].FEAD_value.segment, ds
@@ -1125,7 +1125,7 @@ checkGeodeAttr:
 	jnc	checkFileAttr
 	;
 	; They're given, so store the match/mismatch words in the value pointer.
-	;
+	; 
 	mov	ss:[di].FEAD_attr, FEA_GEODE_ATTR
 	mov	ax, ds:[bx].GFSGA_match
 	mov	ss:[di].FEAD_value.offset, ax
@@ -1139,7 +1139,7 @@ checkFileAttr:
 	; Check for file attributes. This is a little different, as we've got
 	; a default value (to screen out hidden and system files) if there's
 	; no attribute specified for the object.
-	;
+	; 
 	mov	ax, ATTR_GEN_FILE_SELECTOR_FILE_ATTR
 	call	ObjVarFindData
 
@@ -1149,7 +1149,7 @@ setDefaultFileAttrs:
 	jmp	storeFileAttr
 
 figureDefaultFileAttrs:
-
+	
 	mov	ax, (mask FA_HIDDEN or mask FA_SYSTEM) shl 8	; ax <- default
 if _DUI
 	push	cx
@@ -1183,7 +1183,7 @@ storeFileAttr:
 
 	;
 	; Terminate the array of attributes to match.
-	;
+	; 
 	mov	ss:[di].FEAD_attr, FEA_END_OF_LIST
 
 checkFileHeaderFlags::
@@ -1201,27 +1201,27 @@ checkFileHeaderFlags::
 storeFileHeaderFlags:
 	mov	ss:[bp].OLFSEP_fileHeaderFlags.GFSFHF_match, ax
 	mov	ss:[bp].OLFSEP_fileHeaderFlags.GFSFHF_mismatch, cx
-
+	
 	;
 	; Look for extra callback attributes required by FSFC_FILE_FILTER
 	;
 	test	dx, mask FSFC_FILE_FILTER
 	jz	doItBabe
-
+	
 	mov	ax, MSG_GEN_FILE_SELECTOR_GET_FILTER_ROUTINE
 	push	dx, bp
 	call	ObjCallInstanceNoLock
 	mov	bx, bp
 	mov	di, dx
 	pop	dx, bp
-
+	
 	jcxz	doItBabe		; no routine returned -- ignore filter
 
 EC <	Assert	vfptr,	cxax					>
 	mov	ss:[bp].OLFSEP_rawFilterSeg, cx
 	mov	ss:[bp].OLFSEP_filter.offset, ax
 if	FULL_EXECUTE_IN_PLACE
-	mov	ss:[bp].OLFSEP_filter.segment, cx
+	mov	ss:[bp].OLFSEP_filter.segment, cx	
 
 ;	On Full-XIP systems, don't lock down code resources in the XIP image,
 ;	just call the callback using ProcCallFixedOrMovable
@@ -1232,30 +1232,30 @@ if	FULL_EXECUTE_IN_PLACE
 	shl	cx, 1
 	shl	cx, 1
 	shl	cx, 1
-	shl	cx, 1
+	shl	cx, 1					
 	cmp	cx, LAST_XIP_RESOURCE_HANDLE	;An XIP handle?
 	jbe	noLock				;Branch if so, else lock it
 	push	bx
 	mov	bx, cx
 	call	MemLock
 	pop	bx
-	mov	ss:[bp].OLFSEP_filter.segment, ax
+	mov	ss:[bp].OLFSEP_filter.segment, ax	
 noLock:
 else
-	push	bx
+	push	bx					
 	mov_tr	bx, cx
-	call	MemLockFixedOrMovable
-	mov	ss:[bp].OLFSEP_filter.segment, ax
-	pop	bx
+	call	MemLockFixedOrMovable			
+	mov	ss:[bp].OLFSEP_filter.segment, ax	
+	pop	bx					
 endif
-
+	
 	tst	bx			; extra attributes given?
 	jz	doItBabe		; no -- leave callbackAttrs alone
 
 EC <	Assert	vfptr, bxdi					>
 	;
 	; Additional attributes given, so store the pointer to them.
-	;
+	; 
 	mov	ss:[bp].OLFSEP_common.FEP_callbackAttrs.offset, di
 	mov	ss:[bp].OLFSEP_rawCBAttrsSeg, bx
 	call	MemLockFixedOrMovable
@@ -1272,10 +1272,10 @@ if HAVE_FAKE_FILE_SYSTEM
 	;
 	test	dx, mask FSFC_USE_FAKE_FILE_SYSTEM
 	jz	reallyDoItBabe
-
+	
 	mov	ax, MSG_GEN_FILE_SELECTOR_GET_FILE_ENUM_ROUTINE
 	call	ObjCallInstanceNoLock
-
+	
 	jcxz	reallyDoItBabe		; no routine returned -- use FileEnum
 
 EC <	Assert	vfptr,	cxax					>
@@ -1286,7 +1286,7 @@ EC <	Assert	vfptr,	cxax					>
 reallyDoItBabe:
 endif	;HAVE_FAKE_FILE_SYSTEM
 
-	call	FileEnum
+	call	FileEnum						
 reallyDoneItNow:
 FXIP <	call	SysRemoveFromStack				>
 
@@ -1294,7 +1294,7 @@ FXIP <	call	SysRemoveFromStack				>
 	;
 	; Unlock the filter routine and extra callback attributes, if they
 	; were given.
-	;
+	; 
 	pushf
 	push	bx
 	mov	bx, ss:[bp].OLFSEP_rawCBAttrsSeg
@@ -1304,7 +1304,7 @@ FXIP <	call	SysRemoveFromStack				>
 
 unlockFilterRoutine:
 	mov	bx, ss:[bp].OLFSEP_rawFilterSeg
-	tst	bx
+	tst	bx					
 	jz	clearStack
 
 if	FULL_EXECUTE_IN_PLACE
@@ -1343,16 +1343,16 @@ clearStack::
 
 	;
 	; Record the buffer handle and the number of files we actually got back.
-	;
+	; 
 	call	OLFSDeref_SI_Spec_DI
 	mov	ds:[di].OLFSI_numFiles, cx
 	mov	ds:[di].OLFSI_fileCount, cx	; assume all files, for now
 	mov	ds:[di].OLFSI_fileBuffer, bx
 	jcxz	setDirCount
-
+	
 	;
 	; Figure the number of directories in that array of "files"
-	;
+	; 
 	clr	dx
 	call	OLFSMemLock_ES
 	mov	bp, dx
@@ -1365,12 +1365,12 @@ nextFileEntry:
 	add	bp, size OLFileSelectorEntry
 	loop	dirCountLoop
 	call	MemUnlock
-
+	
 setDirCount:
 	;
 	; Store the number of directories and reduce the number of files by
 	; that amount.
-	;
+	; 
 	mov	ds:[di].OLFSI_dirCount, dx
 	sub	ds:[di].OLFSI_fileCount, dx
 
@@ -1439,10 +1439,10 @@ RETURN:		carry clear to accept the file
 DESTROYED:	nothing
 
 PSEUDO CODE/STRATEGY:
-
+		
 
 KNOWN BUGS/SIDE EFFECTS/IDEAS:
-
+		
 
 REVISION HISTORY:
 	Name	Date		Description
@@ -1511,19 +1511,19 @@ afterFileHeaderFlags:
 	;
 	; Get GFSI_fileCriteria into DX for use in various places throughout
 	; this here function.
-	;
+	; 
 		les	bx, ss:[params].OLFSEP_common.FEP_cbData2
 		mov	di, es:[bx]
 		add	di, es:[di].Gen_offset
 		mov	dx, es:[di].GFSI_fileCriteria
 	;
 	; If no mask passed, then skip wildcard check.
-	;
+	; 
 		tst	ss:[params].OLFSEP_common.FEP_cbData1.segment
 		jz	wildcardCheckComplete
 	;
 	; Fetch the file attributes first.
-	;
+	; 
 		mov	ax, FEA_FILE_ATTR
 		mov	si, offset FECD_attrs
 		call	FileEnumLocateAttr
@@ -1537,18 +1537,18 @@ EC <		ERROR_Z	OLFS_FILE_ATTR_MISSING_FROM_CALLBACK_DATA	>
 	;
 	; If the file is actually a directory, only use the mask if the
 	; FSFC_USE_MASK_FOR_DIRS flag is set.
-	;
+	; 
 		test	cl, mask FA_SUBDIR
 		jz	doWildcard
-
+		
 		test	dx, mask FSFC_USE_MASK_FOR_DIRS
 		jz	wildcardCheckComplete
-
+		
 doWildcard:
 	;
 	; Performing wildcard check on the beast, so determine what to store
 	; in cbData2.low and which routine to call.
-	;
+	; 
 		clr	ax		; assume case-sensitive
 		test	dx, mask FSFC_MASK_CASE_INSENSITIVE
 		jz	callWildcard
@@ -1567,23 +1567,23 @@ wildcardCheckComplete:
 	;
 	; Our check is now done, but we may need to call ourselves to allow
 	; a subclass to have a say in the matter.
-	;
+	; 
 		test	dx, mask FSFC_FILE_FILTER	; (clears carry)
 		LONG jz	done
-
+		
 		tst	ss:[params].OLFSEP_filter.segment	; any routine
 								; given?
 		LONG jz	done				; no (carry clear)
 	;
 	; Call filter routine now.
-	;
+	; 
 		segmov	es, ds			; es <- FECD
 if FSEL_DISABLES_FILTERED_FILES
 		push	es			; save for post-filtering
 endif
 		lds	si, ss:[params].OLFSEP_common.FEP_cbData2
 						; *ds:si <- object
-
+		
 		push	bp			; preserve frame
 EC <		push	ds:[si]	; save object base for EC		>
 
@@ -1626,7 +1626,7 @@ EC <		ERROR_Z	OLFS_FILE_ATTR_MISSING_FROM_CALLBACK_DATA	>
 		stc				; assume subdir, reject
 		LONG jnz haveResult		; yes, really reject subdirs
 
-
+		
 		mov	ax, FEA_FILE_ID
 		mov	si, offset FECD_attrs
 		call	FileEnumLocateAttr
@@ -1687,7 +1687,7 @@ doCFilter:
 	;				     word frame);
 	; THIS ROUTINE MUST BE DECLARED AS A PASCAL ROUTINE!!!
 	; it should return TRUE to reject the file, and FALSE to accept it.
-	;
+	; 
 		push	ds:[LMBH_handle]	; self.handle
 		push	si			; self.chunk
 		push	es			; attributes.segment
@@ -1720,10 +1720,10 @@ RETURN:		flags set so caller can jl, je, or jg according as first
 DESTROYED:	allowed: ax, bx, cx, dx, di, si
 
 PSEUDO CODE/STRATEGY:
-
+		
 
 KNOWN BUGS/SIDE EFFECTS/IDEAS:
-
+		
 
 REVISION HISTORY:
 	Name	Date		Description
@@ -1741,7 +1741,7 @@ CheckDirState	proc	near
 		.enter
 	;
 	; Point ds:si and es:di to the strings for the two entries.
-	;
+	; 
 		mov	di, ds:[di]
 		mov	si, ds:[si]
 		mov	es, bx
@@ -1782,7 +1782,7 @@ OLFSCompareFiles proc	far
 	; be two with the same name, so we don't have to worry about how the
 	; result would be pretty random, given that garbage follows the
 	; null-terminators in the two names.
-	;
+	; 
 		mov	di, ds:[di]
 		mov	si, ds:[si]
 		mov	es, bx
@@ -1793,7 +1793,7 @@ if	_DUI
 	; Horrible hack to deal with dos files, which don't have creation
 	; dates - just make them have really early creation dates, but ones
 	; that come after the directories that lie at the end of the list,
-	; so these DOS files lie at the bottom of the list of files, but
+	; so these DOS files lie at the bottom of the list of files, but 
 	; before the faux directories...
 	;
 		tst	ds:[si].OLFSE_fileDate.FDAT_date
@@ -1862,7 +1862,7 @@ else
 	;
 	; Compare the two strings in the usual manner. Flags are left as
 	; appropriate
-	;
+	; 
 		mov	cx, length OLFSE_name
 		add	si, offset OLFSE_name
 		add	di, offset OLFSE_name
@@ -1927,10 +1927,10 @@ RETURN:		flags set so caller can jl, je, or jg according as first
 DESTROYED:	allowed: ax, bx, cx, dx, di, si
 
 PSEUDO CODE/STRATEGY:
-
+		
 
 KNOWN BUGS/SIDE EFFECTS/IDEAS:
-
+		
 
 REVISION HISTORY:
 	Name	Date		Description
@@ -1962,7 +1962,7 @@ OLFSCompareFilesAlphabetically	proc	far
 	; be two with the same name, so we don't have to worry about how the
 	; result would be pretty random, given that garbage follows the
 	; null-terminators in the two names.
-	;
+	; 
 		mov	di, ds:[di]
 		mov	si, ds:[si]
 		mov	es, bx
@@ -1987,7 +1987,7 @@ OLFSCompareFilesAlphabetically	proc	far
 	;
 	; Compare the two strings in the usual manner. Flags are left as
 	; appropriate
-	;
+	; 
 		mov	cx, length OLFSE_name
 		add	si, offset OLFSE_name
 		add	di, offset OLFSE_name
@@ -2079,7 +2079,7 @@ haveReverseFlag:
 	mov	ss:[compareRoutineOffset], offset OLFSCompareFilesReverse
 haveCompFiles:
 	jnc	gotComparisonRoutine
-	mov	ss:[compareRoutineOffset],
+	mov	ss:[compareRoutineOffset], 
 			offset OLFSCompareFilesAlphabetically
 	jcxz	gotComparisonRoutine
 	mov	ss:[compareRoutineOffset],
@@ -2099,7 +2099,7 @@ if 0
 ; See below...
 ;
 	push	si
-endif
+endif		
 	mov	si, ds:[di].OLFSI_fileBuffer	; si <- file buffer, for sort
 	push	ax				; save for index creation
 	push	ax				;  and sorting.
@@ -2115,7 +2115,7 @@ indexLoop:
 	stosw					; save entry offset
 	add	ax, size OLFileSelectorEntry	; ax = next entry
 	loop	indexLoop
-
+	
 	pop	cx				; cx <- number of entries
 
 	;
@@ -2127,13 +2127,13 @@ indexLoop:
 	;
 	cmp	ss:[shouldWeSort], FALSE	; Should we not sort?
 	je	done				; Nope, so bail.
-
-if SORT_FILE_SELECTOR_ENTRIES
+	
+if SORT_FILE_SELECTOR_ENTRIES		
 
 if 0
 ; if _RUDY
 ; It turns out that we want to sort the SP_DOCUMENT directory after all,
-; in order to place the subdirectories before the files.  The original
+; in order to place the subdirectories before the files.  The original 
 ; reason for not sorting SP_DOCUMENT was that quick-sort was pseudo-randomly
 ; ordering the directories in SP_DOCUMENT, since they are created at almost
 ; the same time, and thus have the same FileTime and FileDate.  We solve
@@ -2142,7 +2142,7 @@ if 0
 ; desired order.  Code to set the FEA_CREATION attributes of the directories
 ; is in InitDocumentDirs in Library/Foam/Foam/Entry/entry.asm.
 ; -Chung 8/3/95
-;
+; 
 
 	;
 	; If the current path is SP_DOCUMENT we do not want to sort.  This
@@ -2156,14 +2156,14 @@ if 0
 	mov	ax, ATTR_GEN_PATH_DATA
 	call	ObjVarFindData
 	mov	di, bx
-	pop	bx, si
+	pop	bx, si	
 	cmp	ds:[di].GFP_disk, SP_DOCUMENT
 	jne	notDocument
 	LocalIsNull ds:[di].GFP_path
 	jz	done
-notDocument:
+notDocument:		
 endif
-
+		
 	push	bx, si				; save index and file buffer
 						;  handles
 	mov	bx, si
@@ -2174,21 +2174,21 @@ endif
 	clr	si				; ds:si <- array start
 	;
 	; Set comparison callback routine.
-	;
+	; 
 	mov	ss:[params].QSP_compareCallback.segment, SEGMENT_CS
 	mov	ax, ss:[compareRoutineOffset]
 	mov	ss:[params].QSP_compareCallback.offset, ax
 	;
 	; There's neither a lock nor an unlock callback.
-	;
+	; 
 	mov	ss:[params].QSP_lockCallback.segment, si
 	mov	ss:[params].QSP_unlockCallback.segment, si
 	;
 	; We've no special requirements for the insert or median limits.
-	;
+	; 
 	mov	ss:[params].QSP_insertLimit, DEFAULT_INSERTION_SORT_LIMIT
 	mov	ss:[params].QSP_medianLimit, DEFAULT_MEDIAN_LIMIT
-
+	
 	mov	ax, size word
 	call	ArrayQuickSort
 
@@ -2210,7 +2210,7 @@ COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 SYNOPSIS:	Create and initialize children for
 		the Change Directory Popup,  setting the children's
-		monikers, etc.
+		monikers, etc. 
 
 CALLED BY:	INTERNAL
 			OLFileSelectorSetSelection
@@ -2221,7 +2221,7 @@ CALLED BY:	INTERNAL
 
 PASS:		*ds:si - instance of OLFileSelector
 
-RETURN:		nothing
+RETURN:		nothing 
 
 DESTROYED:	ax, bx, cx, dx, di
 
@@ -2298,7 +2298,7 @@ if HAVE_FAKE_FILE_SYSTEM
 	mov	es:[pathBuffer], C_BACKSLASH
 	inc	dx
 	call	ObjCallInstanceNoLock
-	mov	curDirIsVirtualRoot, FALSE
+	mov	curDirIsVirtualRoot, FALSE	
 	mov	si, dx
 	tst	ax			; on error, just polish return root
 	jnz	needSlash
@@ -2582,7 +2582,7 @@ RETURN:		ds - fixed up
 
 DESTROYED:	ax,cx
 
-PSEUDO CODE/STRATEGY:
+PSEUDO CODE/STRATEGY:	
 
 KNOWN BUGS/SIDE EFFECTS/IDEAS:
 
@@ -2594,10 +2594,10 @@ REVISION HISTORY:
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
 OLFSCreateCurDirItem	proc near
 		uses	dx
-
+		
 itemGroup	local	optr	push	bx, si
 identifier	local	word	push	cx
-childCount	local	word	push	ax
+childCount	local	word	push	ax		
 
 		.enter
 
@@ -2608,7 +2608,7 @@ childCount	local	word	push	ax
 		mov_tr	cx, ax		; child position
 		mov	ax, MSG_GEN_FIND_CHILD_AT_POSITION
 		call	objMessageCallFixupDS
-
+		
 		jnc	reuse
 
 create:
@@ -2629,7 +2629,7 @@ reuse:
 		mov	ax, MSG_GEN_ITEM_GET_IDENTIFIER
 		call	objMessageCallFixupDS
 		cmp	ax, ss:[identifier]
-
+		
 		je	done
 
 	;
@@ -2647,7 +2647,7 @@ objMessageCallFixupDS:
 		call	ObjMessage
 		pop	bp
 		retn
-
+		
 OLFSCreateCurDirItem	endp
 
 
@@ -2849,7 +2849,7 @@ EC <	ERROR_NE	OL_ERROR >		; must be found as '\' starts
 
 	; (es:di may point to char BEFORE string if no \ or the \ was the
 	; first char.. but that's ok since we advance to next char here.)
-	;  --JimG
+	;  --JimG 
 	LocalNextChar esdi			; point to '\'
 	LocalNextChar esdi			; point to start of current
 						;	directory's path element
@@ -2937,7 +2937,7 @@ getFakeVolume:
 	add	sp, PATH_BUFFER_SIZE
 	jmp	done
 endif ;HAVE_FAKE_FILE_SYSTEM
-
+	
 useBufferEntry:
 	dec	cx				; convert to buffer entry #
 useActualBufferEntry:
@@ -2976,7 +2976,6 @@ haveFileEntry:
 	mov	cl, GST_CHUNK
 	call	GrCreateGString			; di = gstring handle
 	mov	gstringOptr.chunk, si		; si = chunk
-
 if _DUI	;=====================================================================
 	;
 	; skip the file index number if minimizing width
@@ -3044,111 +3043,30 @@ havePadding:
 hidden:
 	pop	ds				; don't need DS on stack
 	mov	si, offset secretIconBitmap
-
-	mov	cx, FALSE			; CX = FALSE = no "dots" in front of our icon/text
-
 else ;========================================================================
 	;
 	; draw in bitmap and name
 	;
-; 	mov	si, offset narrowFolderIconBitmap
-;
-; 	test	olfsState, mask OLFSS_SHOW_PARENT_DIR	; showing parent dir?
-; 	jz	haveFolderBitmap		; nope, use bland folder
-; 	mov	si, offset folderIconBitmap	; else indented folder
-; 	tst	listEntryNum			; first entry?
-; 	jnz	haveFolderBitmap		; nope, got correct bitmap
-; 	mov	si, offset openFolderIconBitmap	; else, use open folder
-; haveFolderBitmap:
-; 	test	fileEntry.OLFSE_fileAttrs, mask FA_SUBDIR
-;
-; 	jnz	haveBitmap
-; useDefault::
-; 	mov	si, offset narrowFileIconBitmap
-; 	test	olfsState, mask OLFSS_SHOW_PARENT_DIR	; showing parent dir?
-; 	jz	haveFileBitmap			; nope, use bland file
-; 	mov	si, offset fileIconBitmap	; else, use indented file
-; haveFileBitmap:
-; 	test	fileEntry.OLFSE_fileAttrs, mask FA_VOLUME
-; 	jz	haveBitmap			; not subdir nor volume, file
-; 	;
-; 	; handle volume (DriveStatus is in high byte of OLFSE_fileFlags)
-; 	;
-; 	mov	al, fileEntry.OLFSE_fileFlags.high
-; 	andnf	al, mask DS_TYPE
-; .assert (offset DS_TYPE eq 0)
-; 	mov	si, offset disk525IconBitmap
-; 	cmp	al, DRIVE_5_25
-; 	je	haveBitmap
-; 	mov	si, offset disk35IconBitmap
-; 	cmp	al, DRIVE_3_5
-; 	je	haveBitmap
-; 	mov	si, offset diskPCMCIAIconBitmap
-; 	cmp	al, DRIVE_PCMCIA
-; 	je	haveBitmap
-; 	mov	si, offset diskHDIconBitmap
-; 	cmp	al, DRIVE_FIXED
-; 	je	haveBitmap
-; 	cmp	al, DRIVE_CD_ROM
-; 	je	haveBitmap
-; 	mov	si, offset diskRamIconBitmap
-; EC <	cmp	al, DRIVE_RAM						>
-; EC <	ERROR_NZ	OL_FILE_SELECTOR_DRIVE_TYPE_UNKNOWN		>
+	mov	si, offset narrowFolderIconBitmap
 
-;assumeOpenParentFolder:
-	mov	cx, FALSE				; assume no dots bitmap before our icon/text
-	tst	listEntryNum				; first entry?
-	jnz	assumeFolder
-
-	test	olfsState, mask OLFSS_SHOW_PARENT_DIR	; parent dir allowed?
-	jz	assumeFolder
-
+	test	olfsState, mask OLFSS_SHOW_PARENT_DIR	; showing parent dir?
+	jz	haveFolderBitmap		; nope, use bland folder
+	mov	si, offset folderIconBitmap	; else indented folder
+	tst	listEntryNum			; first entry?
+	jnz	haveFolderBitmap		; nope, got correct bitmap
+	mov	si, offset openFolderIconBitmap	; else, use open folder
+haveFolderBitmap:
 	test	fileEntry.OLFSE_fileAttrs, mask FA_SUBDIR
-	jz	assumeFile
 
-	mov	si, offset openFolderIconBitmap		; use open folder
-	jmp	haveBitmap
-
-assumeFolder:
-	test	fileEntry.OLFSE_fileAttrs, mask FA_SUBDIR
-	jz	assumeFile
-	test	olfsState, mask OLFSS_SHOW_PARENT_DIR	; parent dir allowed?
-	jz	entryIsUndottedFolder
-	jmp	entryIsDottedFolder
-
-assumeFile:
- 	test	fileEntry.OLFSE_fileAttrs, mask FA_VOLUME
-	jnz	entryIsVolume
-	test	olfsState, mask OLFSS_SHOW_PARENT_DIR	; parent dir allowed?
-	jz	entryIsUndottedFile
-	jmp	entryIsDottedFile
-
-entryIsDottedFile:
-	mov	cx, TRUE				; yes, draw dots bitmap
-entryIsUndottedFile:
-	cmp	fileEntry.OLFSE_fileType, GFT_NOT_GEOS_FILE
-	je	entryIsDOSFile
-	cmp	fileEntry.OLFSE_fileType, GFT_EXECUTABLE
-	je	entryIsGeosApp
-;entryIsGeosFile:
-	mov	si, offset fileIconBitmap		; use file bitmap
-	jmp	haveBitmap
-
-entryIsGeosApp:
-	mov	si, offset appIconBitmap
-	jmp	haveBitmap
-
-entryIsDOSFile:
-	mov	si, offset dosIconBitmap
-	jmp	haveBitmap
-
-entryIsDottedFolder:
-	mov	cx, TRUE				; yes, draw dots bitmap
-entryIsUndottedFolder:
-	mov	si, offset folderIconBitmap		; use folder bitmap
-	jmp	haveBitmap
-
-entryIsVolume:
+	jnz	haveBitmap
+useDefault::
+	mov	si, offset narrowFileIconBitmap
+	test	olfsState, mask OLFSS_SHOW_PARENT_DIR	; showing parent dir?
+	jz	haveFileBitmap			; nope, use bland file
+	mov	si, offset fileIconBitmap	; else, use indented file
+haveFileBitmap:
+	test	fileEntry.OLFSE_fileAttrs, mask FA_VOLUME
+	jz	haveBitmap			; not subdir nor volume, file
 	;
 	; handle volume (DriveStatus is in high byte of OLFSE_fileFlags)
 	;
@@ -3173,41 +3091,21 @@ entryIsVolume:
 EC <	cmp	al, DRIVE_RAM						>
 EC <	ERROR_NZ	OL_FILE_SELECTOR_DRIVE_TYPE_UNKNOWN		>
 
-
 haveBitmap:
 endif ; _DUI ================================================================
 	push	ds
 
 NOFXIP<	segmov	ds, cs				; ds:si = bitmap	>
-
+	
 FXIP <	push	bx, ax							>
 FXIP <	mov	bx, handle RegionResourceXIP				>
 FXIP <	call	MemLock							>
 FXIP <	mov	ds, ax				; ds:si = bitmap	>
 FXIP <	pop	bx, ax							>
 
-	; GrDrawBitmapAtCP
-	; di - Handle of the GState used for drawing.
-	; ds:si - Address of the bitmap.
-	; dx:cx - Address of the callback routine. If you are not supplying a
-	; callback, pass zero in **dx**.
 	clr	dx				; no bitmap-drawing callback
 
-	cmp	cx, FALSE			; let's see if we need to prepend a "dots" bitmap
-	je	noDots				; nope, no dots, jump
-	push	si				; save our carefully selected bitmap
-	mov	si, offset dotsBitmap		; get dot bitmap
-	call	GrDrawBitmapAtCP		; draw
-
-	mov	dx, GFS_ICON_WIDTH
-	clr	cx				; clear cx, bx, ax
-	clrdw	bxax
-	call	GrRelMoveTo			; move cursor/"pen" GFS_ICON_WIDTH pixels to the right
-	clr	dx				; make sure dx is still clean, still no callback routine wanted
-	pop	si				; restore the originally selected bitmap
-noDots:
-	clr	cx				; CX now no longer holds the information wether we want dots or not
-	call	GrDrawBitmapAtCP
+	call	GrFillBitmapAtCP		; draw into chunk
 
 	mov	dx, ds:[si].B_width
 	add	dx, GFS_ICON_SPACING		; spacing btwn icon and name
@@ -3215,9 +3113,9 @@ noDots:
 FXIP <	mov	bx, handle RegionResourceXIP				>
 FXIP <	call	MemUnlock						>
 
-afterBitmap::					; MUST have DS on stack
+afterBitmap::			; MUST have DS on stack
 	clr	cx
-
+	
 	clrdw	bxax
 
 	call	GrRelMoveTo			; space between bitmap and name
@@ -3245,11 +3143,11 @@ if _DUI
 	; for the Rudy spui.  The file selector entry will look something
 	; like this:
 	;
-	;	This is a file name		12.12.95   12.12
-
+	;	This is a file name		12.12.95   12.12	
+		
 	;
 	; If we are dealing with a subdir, a read-only file or a hidden file
-	; then we don't need to display the modification date and time.
+	; then we don't need to display the modification date and time.	
 	;
 	test	ss:[fileEntry].OLFSE_fileAttrs, \
 		mask FA_SUBDIR or mask FA_RDONLY or mask FA_HIDDEN
@@ -3261,14 +3159,14 @@ if _DUI
 	;
 	cmp	ss:[fileEntry].OLFSE_fileType, GFT_EXECUTABLE
 	LONG je	afterColumnation
-
+		
 	;
 	; Get the modification date, if it's zero we are dealing with a
 	; file that we can't display the modification date/time for.
 	;
 	mov	ax, ss:[fileEntry].OLFSE_modification.FDAT_date
 	tst	ax
-	LONG jz	afterColumnation
+	LONG jz	afterColumnation	
 
 if _DUI	;------------------------------------------------------------------
 
@@ -3280,7 +3178,7 @@ if _DUI	;------------------------------------------------------------------
 	push	es, di
 	segmov	es, ss
 	lea	di, ss:[dateTime]
-	mov	si, DTF_ZERO_PADDED_SHORT
+	mov	si, DTF_ZERO_PADDED_SHORT	
 	call	LocalFormatFileDateTime
 	pop	es, di				; di <- gstate
 	;
@@ -3294,7 +3192,7 @@ if _DUI	;------------------------------------------------------------------
 	; the modification date column.
 	;
 	push	dx
-	mov	si, GFMI_MAX_ADJUSTED_HEIGHT
+	mov	si, GFMI_MAX_ADJUSTED_HEIGHT		
 	call	GrFontMetrics	; dx <- height, ah <- frac
 	call	GrGetCurPos	; ax <- x pos, bx <- y pos
 	clr	ax		; for some reason x pos clips the first char
@@ -3304,7 +3202,7 @@ if _DUI	;------------------------------------------------------------------
 	pop	si				; si = date width
 	sub	cx, si				; cx = name right
 	push	cx				; save name right
-	mov	si, PCT_REPLACE
+	mov	si, PCT_REPLACE	
 	call	GrSetClipRect
 	;
 	; Draw the file name first.
@@ -3315,7 +3213,7 @@ if _DUI	;------------------------------------------------------------------
 	;
 	; Reset the clip rect.
 	;
-	mov	si, PCT_NULL
+	mov	si, PCT_NULL	
 	call	GrSetClipRect
 	;
 	; Draw the modification time column.
@@ -3324,7 +3222,7 @@ if _DUI	;------------------------------------------------------------------
 	pop	ax				; ax = name right
 	add	ax, GFS_ICON_SPACING		; ax = date left
 	call	GrMoveTo
-	lea	si, ss:[dateTime]
+	lea	si, ss:[dateTime]	
 	clr	cx				; null-terminated
 	call	GrDrawTextAtCP			; draw date/time
 
@@ -3335,16 +3233,16 @@ else	;------------------------------------------------------------------
 	; the modification date/time column.
 	;
 	push	ax
-	mov	si, GFMI_MAX_ADJUSTED_HEIGHT
+	mov	si, GFMI_MAX_ADJUSTED_HEIGHT		
 	call	GrFontMetrics	; dx <- height, ah <- frac
 	call	GrGetCurPos	; ax <- x pos, bx <- y pos
 	add	dx, bx		; dx <- bottom
 	mov	cx, OLFS_DATE_COLUMN_LEFT_OFFSET - \
 		    RUDY_FILE_SELECTOR_TEXT_X_OFFSET
-	mov	si, PCT_REPLACE
+	mov	si, PCT_REPLACE	
 	call	GrSetClipRect
 	pop	ax
-
+		
 	;
 	; Draw the file name first, underlining the first <matchLength>
 	; characters.
@@ -3354,9 +3252,9 @@ else	;------------------------------------------------------------------
 	;
 	; Reset the clip rect.
 	;
-	mov	si, PCT_NULL
+	mov	si, PCT_NULL	
 	call	GrSetClipRect
-
+		
 	;
 	; Change the font for the modification date/time column.
 	;
@@ -3375,10 +3273,10 @@ else	;------------------------------------------------------------------
 	push	es, di
 	segmov	es, ss
 	lea	di, ss:[dateTime]
-	mov	si, DTF_ZERO_PADDED_SHORT
+	mov	si, DTF_ZERO_PADDED_SHORT	
 	call	LocalFormatFileDateTime
 	pop	di				; di <- gstate
-
+		
 	;
 	; Draw the modification date column.
 	;
@@ -3386,27 +3284,27 @@ else	;------------------------------------------------------------------
 	call	GrGetCurPos
 	mov	ax, OLFS_DATE_COLUMN_LEFT_OFFSET
 	call	GrMoveTo
-	lea	si, ss:[dateTime]
+	lea	si, ss:[dateTime]	
 	clr	cx				; null-terminated
 	call	GrDrawTextAtCP			; draw date/time
 	pop	ax, bx
-
+		
 	;
 	; Get the modification time.
 	;
 	push	di				; save gstate
 	lea	di, ss:[dateTime]
-	mov	si, DTF_HM
+	mov	si, DTF_HM	
 	call	LocalFormatFileDateTime
 	pop	es, di				; di <- gstate
-
+		
 	;
 	; Find out how wide the time column is.
 	;
 	clr	cx				; null-terminated
 	lea	si, ss:[dateTime]
 	call	GrTextWidth			; dx <- width
-
+		
 	;
 	; Draw the modification time column.
 	;
@@ -3414,7 +3312,7 @@ else	;------------------------------------------------------------------
 	mov	ax, OLFS_TIME_COLUMN_RIGHT_OFFSET
 	sub	ax, dx				; right edge is justified
 	call	GrMoveTo
-	lea	si, ss:[dateTime]
+	lea	si, ss:[dateTime]	
 	clr	cx				; null-terminated
 	call	GrDrawTextAtCP			; draw date/time
 
@@ -3686,7 +3584,7 @@ done:
 
 	.leave
 	ret
-
+	
 createFileTableStruct:
 	;
 	; Alloc. a mem block to hold the OLFileSelectorEntry
@@ -3711,9 +3609,10 @@ endif		; if not _FILE_TABLE
 ; icons for to distinguish files/directories and drive types
 ;
 
-GFS_ICON_WIDTH = 16
-GFS_ICON_HEIGHT = 12		; note blank top line for aesthetics (...what does that mean? MeyerK/2024?)
+    GFS_NARROW_ICON_WIDTH = 16
+    GFS_ICON_HEIGHT = 12		; note blank top line for aesthetics
 
+GFS_WIDE_ICON_WIDTH = 32
 if _DUI
 GFS_ICON_SPACING = 5
 else
@@ -3726,180 +3625,90 @@ RegionResourceXIP	segment resource
 endif
 
 if not _DUI
-
-dotsBitmap	label	byte
-		Bitmap <GFS_ICON_WIDTH,GFS_ICON_HEIGHT,BMC_PACKBITS,BMF_4BIT or mask BMT_MASK>
-	db	0x01, 0x00, 0x00
-	db	0xf9, 0xdd
-	db	0x01, 0x01, 0x00
-	db	0xfe, 0xdd, 0x00, 0xd0, 0xfd, 0xdd
-	db	0x01, 0x00, 0x00
-	db	0xf9, 0xdd
-	db	0x01, 0x01, 0x00
-	db	0xfe, 0xdd, 0x00, 0xd0, 0xfd, 0xdd
-	db	0x01, 0x00, 0x00
-	db	0xf9, 0xdd
-	db	0x01, 0x01, 0x00
-	db	0xfe, 0xdd, 0x00, 0xd0, 0xfd, 0xdd
-	db	0x01, 0x00, 0x00
-	db	0xf9, 0xdd
-	db	0x01, 0x01, 0x54
-	db	0xfe, 0xdd, 0xfd, 0xd0, 0x00, 0xdd
-	db	0x01, 0x00, 0x00
-	db	0xf9, 0xdd
-	db	0x01, 0x00, 0x00
-	db	0xf9, 0xdd
-	db	0x01, 0x40, 0x00
-	db	0x00, 0xd7, 0xfa, 0xdd
-	db	0x01, 0x00, 0x00
-	db	0xf9, 0xdd
-
 fileIconBitmap	label	byte
-		Bitmap <GFS_ICON_WIDTH,GFS_ICON_HEIGHT,0,BMF_4BIT or mask BMT_MASK>
-	db	0x03, 0xfe
-	db	0xdd, 0xdd, 0xdd, 0x88, 0x88, 0x88, 0x88, 0x8d
-	db	0x03, 0xfe
-	db	0xdd, 0xdd, 0xdd, 0x8f, 0xff, 0xff, 0xff, 0x8d
-	db	0x0f, 0xfe
-	db	0xdd, 0xdd, 0x88, 0x88, 0x88, 0x88, 0x8f, 0x8d
-	db	0x0f, 0xfe
-	db	0xdd, 0xdd, 0x8f, 0xff, 0xff, 0xff, 0x8f, 0x8d
-	db	0x3f, 0xfe
-	db	0xdd, 0x88, 0x88, 0x88, 0x88, 0x8f, 0x8f, 0x8d
-	db	0x3f, 0xfe
-	db	0xdd, 0x8f, 0xff, 0xff, 0xff, 0x8f, 0x8f, 0x8d
-	db	0x3f, 0xfe
-	db	0xdd, 0x8f, 0xff, 0xff, 0xff, 0x8f, 0x8f, 0x8d
-	db	0x3f, 0xfe
-	db	0xdd, 0x8f, 0x77, 0x77, 0x7f, 0x8f, 0x88, 0x8d
-	db	0x3f, 0xf8
-	db	0xdd, 0x8f, 0xff, 0xff, 0xff, 0x8f, 0x8d, 0xdd
-	db	0x3f, 0xf8
-	db	0xdd, 0x8f, 0x77, 0x77, 0x7f, 0x88, 0x8d, 0xdd
-	db	0x3f, 0xe0
-	db	0xdd, 0x8f, 0xff, 0xff, 0xff, 0x8d, 0xdd, 0xdd
-	db	0x3f, 0xe0
-	db	0xdd, 0x88, 0x88, 0x88, 0x88, 0x8d, 0xdd, 0xdd
-
-appIconBitmap	label	byte
-		Bitmap <GFS_ICON_WIDTH,GFS_ICON_HEIGHT,0,BMF_4BIT or mask BMT_MASK>
-	db	0x07, 0xe0
-	db	0xdd, 0xdd, 0xd7, 0x70, 0x07, 0x7d, 0xdd, 0xdd
-	db	0x0f, 0xf0
-	db	0xdd, 0xdd, 0x09, 0xa9, 0x99, 0x90, 0xdd, 0xdd
-	db	0x1f, 0xf8
-	db	0xdd, 0xd0, 0xaa, 0xaa, 0x99, 0x9a, 0x0d, 0xdd
-	db	0x3f, 0xfc
-	db	0xdd, 0x7a, 0xaa, 0x99, 0x99, 0xaa, 0x27, 0xdd
-	db	0x3f, 0xfc
-	db	0xdd, 0x79, 0x9a, 0x99, 0x99, 0x9a, 0x97, 0xdd
-	db	0x3f, 0xfc
-	db	0xdd, 0x0a, 0x99, 0x99, 0x99, 0xaa, 0xa0, 0xdd
-	db	0x3f, 0xfc
-	db	0xdd, 0x0a, 0xaa, 0x99, 0x99, 0xaa, 0xa0, 0xdd
-	db	0x3f, 0xfc
-	db	0xdd, 0x8a, 0xaa, 0x99, 0x99, 0x9a, 0x28, 0xdd
-	db	0x3f, 0xfc
-	db	0xdd, 0x7a, 0xa9, 0x99, 0x99, 0x91, 0x27, 0xdd
-	db	0x1f, 0xf8
-	db	0xdd, 0xd0, 0xa9, 0x99, 0x99, 0x11, 0x0d, 0xdd
-	db	0x0f, 0xf0
-	db	0xdd, 0xdd, 0x01, 0x99, 0x91, 0x10, 0xdd, 0xdd
-	db	0x07, 0xe0
-	db	0xdd, 0xdd, 0xd8, 0x80, 0x08, 0x8d, 0xdd, 0xdd
-
-
-dosIconBitmap	label	byte
-		Bitmap <GFS_ICON_WIDTH,GFS_ICON_HEIGHT,BMC_PACKBITS,BMF_4BIT or mask BMT_MASK>
-	db	0x01, 0xff, 0xfe
-	db	0xfa, 0xff, 0x00, 0xfd
-	db	0x01, 0xff, 0xfe
-	db	0x00, 0xf0, 0xfb, 0x00, 0x00, 0xfd
-	db	0x01, 0xff, 0xfe
-	db	0x07, 0xf0, 0xaa, 0x00, 0x0a, 0x00, 0x0a, 0x00,
-		0xfd
-	db	0x01, 0xff, 0xfe
-	db	0x00, 0xf0, 0xfb, 0xa0, 0x00, 0xfd
-	db	0x01, 0xff, 0xfe
-	db	0x00, 0xf0, 0xfc, 0xa0, 0x01, 0x00, 0xfd
-	db	0x01, 0xff, 0xfe
-	db	0x00, 0xf0, 0xfd, 0xa0, 0x02, 0x0a, 0x00, 0xfd
-	db	0x01, 0xff, 0xfe
-	db	0x00, 0xf0, 0xfd, 0xa0, 0x02, 0x00, 0xa0, 0xfd
-	db	0x01, 0xff, 0xfe
-	db	0x00, 0xf0, 0xfd, 0xa0, 0x02, 0x00, 0xa0, 0xfd
-	db	0x01, 0xff, 0xfe
-	db	0x00, 0xf0, 0xfb, 0xa0, 0x00, 0xfd
-	db	0x01, 0xff, 0xfe
-	db	0x07, 0xf0, 0xaa, 0x00, 0x0a, 0x00, 0x0a, 0x00,
-		0xfd
-	db	0x01, 0xff, 0xfe
-	db	0x00, 0xf0, 0xfb, 0x00, 0x00, 0xfd
-	db	0x01, 0xff, 0xfe
-	db	0xfa, 0xff, 0x00, 0xfd
+	Bitmap <GFS_WIDE_ICON_WIDTH, GFS_ICON_HEIGHT, 0, BMF_MONO>
+	byte	00000000b, 00000000b, 00000000b, 00000000b
+	byte	00000001b, 00000000b, 00011111b, 11110000b
+        byte    00000000b, 00000000b, 00010000b, 00010000b
+        byte    00000001b, 00000000b, 00010111b, 11010000b
+	byte    00000000b, 00000000b, 00010000b, 00010000b
+	byte    00000001b, 00000000b, 00010111b, 11010000b
+	byte    00000000b, 00000000b, 00010000b, 00010000b
+	byte    00000001b, 01010100b, 00010111b, 11010000b
+	byte    00000000b, 00000000b, 00010000b, 00010000b
+	byte    00000000b, 00000000b, 00010111b, 11010000b
+	byte    00000000b, 00000000b, 00010000b, 00010000b
+	byte    00000000b, 00000000b, 00011111b, 11110000b
 endif
 
 if	not _DUI
 folderIconBitmap	label	byte
-		Bitmap <GFS_ICON_WIDTH, GFS_ICON_HEIGHT,0,BMF_4BIT or mask BMT_MASK>
-	db	0x00, 0x00
-	db	0xdd, 0xdd, 0xdd, 0xdd, 0xdd, 0xdd, 0xdd, 0xdd
-	db	0x00, 0x78
-	db	0xdd, 0xdd, 0xdd, 0xdd, 0xd8, 0x88, 0x8d, 0xdd
-	db	0x00, 0xfc
-	db	0xdd, 0xdd, 0xdd, 0xdd, 0x8f, 0xff, 0xf8, 0xdd
-	db	0x3f, 0xfe
-	db	0xdd, 0x88, 0x88, 0x88, 0xfe, 0xee, 0xee, 0x8d
-	db	0x7f, 0xfe
-	db	0xd8, 0xff, 0xff, 0xff, 0x77, 0x77, 0x77, 0x8d
-	db	0x7f, 0xfe
-	db	0xd8, 0xfe, 0xee, 0xee, 0xee, 0xee, 0xe7, 0x8d
-	db	0x7f, 0xfe
-	db	0xd8, 0xfe, 0xee, 0xee, 0xee, 0xee, 0x77, 0x8d
-	db	0x7f, 0xfe
-	db	0xd8, 0xfe, 0xee, 0xee, 0xee, 0xe7, 0x77, 0x8d
-	db	0x7f, 0xfe
-	db	0xd8, 0xfe, 0xee, 0xee, 0xee, 0xe7, 0x77, 0x8d
-	db	0x7f, 0xfe
-	db	0xd8, 0xee, 0xee, 0xee, 0xee, 0x77, 0x77, 0x8d
-	db	0x7f, 0xfe
-	db	0xd8, 0x77, 0x77, 0x77, 0x77, 0x77, 0x77, 0x8d
-	db	0x3f, 0xfc
-	db	0xdd, 0x88, 0x88, 0x88, 0x88, 0x88, 0x88, 0xdd
+	Bitmap <GFS_WIDE_ICON_WIDTH, GFS_ICON_HEIGHT, 0, BMF_MONO>
+	byte	00000000b, 00000000b, 00000000b, 00000000b
+        byte    00000001b, 00000000b, 01111110b, 00000000b
+        byte    00000000b, 00000000b, 10000001b, 11111110b
+	byte    00000001b, 00000000b, 10111110b, 00000001b
+	byte    00000000b, 00000000b, 10000000b, 00000001b
+	byte    00000001b, 00000000b, 10000000b, 00000001b
+	byte    00000000b, 00000000b, 10000000b, 00000001b
+	byte    00000001b, 01010100b, 10000000b, 00000001b
+	byte    00000000b, 00000000b, 10000000b, 00000001b
+	byte	00000000b, 00000000b, 10000000b, 00000001b
+	byte    00000000b, 00000000b, 10000000b, 00000001b
+	byte    00000000b, 00000000b, 01111111b, 11111110b
 endif
 
+if not _DUI
+narrowFileIconBitmap	label	byte
+	Bitmap <GFS_NARROW_ICON_WIDTH, GFS_ICON_HEIGHT, 0, BMF_MONO>
+	byte	00000000b, 00000000b
+	byte	00011111b, 11110000b
+        byte    00010000b, 00010000b
+        byte    00010111b, 11010000b
+	byte    00010000b, 00010000b
+	byte    00010111b, 11010000b
+	byte    00010000b, 00010000b
+	byte    00010111b, 11010000b
+	byte    00010000b, 00010000b
+	byte    00010111b, 11010000b
+	byte    00010000b, 00010000b
+	byte    00011111b, 11110000b
+endif
 
 if not _DUI
 
+narrowFolderIconBitmap	label	byte
+	Bitmap <GFS_NARROW_ICON_WIDTH, GFS_ICON_HEIGHT, 0, BMF_MONO>
+	byte	00000000b, 00000000b
+	byte    01111110b, 00000000b
+	byte    10000001b, 11111110b
+	byte    10111110b, 00000001b
+	byte    10000000b, 00000001b
+	byte    10000000b, 00000001b
+	byte    10000000b, 00000001b
+	byte    10000000b, 00000001b
+	byte    10000000b, 00000001b
+	byte	10000000b, 00000001b
+	byte    10000000b, 00000001b
+	byte    01111111b, 11111110b
+
 openFolderIconBitmap	label	byte
-		Bitmap <GFS_ICON_WIDTH, GFS_ICON_HEIGHT,0,BMF_4BIT or mask BMT_MASK>
-	db	0x00, 0x00
-	db	0xdd, 0xdd, 0xdd, 0xdd, 0xdd, 0xdd, 0xdd, 0xdd
-	db	0x00, 0x3c
-	db	0xdd, 0xdd, 0xdd, 0xdd, 0xdd, 0x88, 0x88, 0xdd
-	db	0x00, 0x7e
-	db	0xdd, 0xdd, 0xdd, 0xdd, 0xd8, 0xff, 0xff, 0x8d
-	db	0x0f, 0xff
-	db	0xdd, 0xdd, 0x88, 0x88, 0x8f, 0xee, 0xee, 0x78
-	db	0x1f, 0xff
-	db	0xdd, 0xd8, 0xff, 0xff, 0xfe, 0xee, 0xe7, 0x78
-	db	0x1f, 0xff
-	db	0xdd, 0xd8, 0xfe, 0xee, 0xee, 0xee, 0xe7, 0x78
-	db	0x1f, 0xff
-	db	0xdd, 0xd8, 0xfe, 0xee, 0xee, 0xee, 0x77, 0x78
-	db	0x7f, 0xff
-	db	0xd8, 0x88, 0x88, 0x88, 0x88, 0x88, 0x88, 0x78
-	db	0x7f, 0xff
-	db	0xd8, 0x77, 0x77, 0x77, 0x77, 0x77, 0x78, 0x78
-	db	0x3f, 0xff
-	db	0xdd, 0x87, 0x77, 0x77, 0x77, 0x77, 0x77, 0x88
-	db	0x3f, 0xff
-	db	0xdd, 0x87, 0x77, 0x77, 0x77, 0x77, 0x77, 0x88
-	db	0x1f, 0xfe
-	db	0xdd, 0xd8, 0x88, 0x88, 0x88, 0x88, 0x88, 0x8d
+	Bitmap <GFS_NARROW_ICON_WIDTH, GFS_ICON_HEIGHT, 0, BMF_MONO>
+	byte	00000000b, 00000000b
+        byte    00111110b, 00000000b
+	byte    01000001b, 11111111b
+	byte    01000000b, 00000001b
+	byte    01000011b, 11100001b
+	byte    01111100b, 00010001b
+	byte    10000000b, 00001001b
+	byte    10000000b, 00001001b
+	byte    10000000b, 00000101b
+	byte    01000000b, 00000101b
+	byte    01000000b, 00000011b
+	byte    00111111b, 11111110b
 
 disk525IconBitmap	label	byte
-		Bitmap <GFS_ICON_WIDTH, GFS_ICON_HEIGHT, 0, BMF_MONO>
+	Bitmap <GFS_NARROW_ICON_WIDTH, GFS_ICON_HEIGHT, 0, BMF_MONO>
 	byte	00000000b, 00000000b
         byte    00011111b, 11111100b
 	byte    00010000b, 11111100b
@@ -3914,7 +3723,7 @@ disk525IconBitmap	label	byte
 	byte    00011111b, 11111100b
 
 disk35IconBitmap	label	byte
-		Bitmap <GFS_ICON_WIDTH, GFS_ICON_HEIGHT, 0, BMF_MONO>
+	Bitmap <GFS_NARROW_ICON_WIDTH, GFS_ICON_HEIGHT, 0, BMF_MONO>
 	byte	00000000b, 00000000b
         byte    00011111b, 11111000b
 	byte    00011101b, 01011000b
@@ -3929,34 +3738,22 @@ disk35IconBitmap	label	byte
 	byte    00001111b, 11111000b
 
 diskHDIconBitmap	label	byte
-		Bitmap <GFS_ICON_WIDTH,GFS_ICON_HEIGHT,BMC_PACKBITS,BMF_4BIT or mask BMT_MASK>
-	db	0x01, 0x00, 0x00
-	db	0xf9, 0xdd
-	db	0x01, 0x7f, 0xfe
-	db	0x00, 0xd0, 0xfb, 0x00, 0x00, 0x0d
-	db	0x01, 0x7f, 0xfe
-	db	0x00, 0xd0, 0xfb, 0x00, 0x00, 0x0d
-	db	0x01, 0x6f, 0xfe
-	db	0x02, 0xd0, 0x0d, 0x22, 0xfd, 0x00, 0x00, 0x0d
-	db	0x01, 0x7f, 0xfe
-	db	0x00, 0xd0, 0xfb, 0x00, 0x00, 0x0d
-	db	0x01, 0x7f, 0xfe
-	db	0x00, 0xd0, 0xfb, 0x00, 0x00, 0x0d
-	db	0x01, 0x00, 0x00
-	db	0xf9, 0xdd
-	db	0x01, 0x7f, 0xfe
-	db	0x00, 0xd0, 0xfb, 0x00, 0x00, 0x0d
-	db	0x01, 0x7f, 0xfe
-	db	0x00, 0xd0, 0xfb, 0x00, 0x00, 0x0d
-	db	0x01, 0x6f, 0xfe
-	db	0x02, 0xd0, 0x0d, 0x44, 0xfd, 0x00, 0x00, 0x0d
-	db	0x01, 0x7f, 0xfe
-	db	0x00, 0xd0, 0xfb, 0x00, 0x00, 0x0d
-	db	0x01, 0x7f, 0xfe
-	db	0x00, 0xd0, 0xfb, 0x00, 0x00, 0x0d
+	Bitmap <GFS_NARROW_ICON_WIDTH, GFS_ICON_HEIGHT, 0, BMF_MONO>
+	byte	00000000b, 00000000b
+        byte    00000111b, 11111110b
+	byte    00001010b, 10101110b
+	byte    00010101b, 01011110b
+	byte    00101010b, 10111110b
+	byte    01111111b, 11111110b
+	byte    01000000b, 00111110b
+	byte    01000000b, 00111110b
+	byte    01000000b, 00111100b
+	byte    01011000b, 00111000b
+	byte    01000000b, 00110000b
+	byte    01111111b, 11100000b
 
 diskRamIconBitmap	label	byte
-		Bitmap <GFS_ICON_WIDTH, GFS_ICON_HEIGHT, 0, BMF_MONO>
+	Bitmap <GFS_NARROW_ICON_WIDTH, GFS_ICON_HEIGHT, 0, BMF_MONO>
 	byte	00000000b, 00000000b
         byte    11111111b, 00000000b
         byte    10001111b, 00001110b
@@ -3971,7 +3768,7 @@ diskRamIconBitmap	label	byte
         byte    00000000b, 01000000b
 
 diskPCMCIAIconBitmap	label	byte
-		Bitmap <GFS_ICON_WIDTH, GFS_ICON_HEIGHT, 0, BMF_MONO>
+	Bitmap <GFS_NARROW_ICON_WIDTH, GFS_ICON_HEIGHT, 0, BMF_MONO>
 	byte	00000000b, 00000000b
 	byte	00000000b, 00000000b
         byte    00000111b, 11100000b
@@ -4103,12 +3900,12 @@ FXIP <	clr	cx							>
 FXIP <	call	SysCopyToStackDSDX					>
 FXIP <	mov	cx, ds				; cx:dx = string	>
 FXIP <	pop	ds							>
-
+	
 	mov	bp, bx
 setPath:
 	mov	ax, MSG_OL_FILE_SELECTOR_PATH_SET
 	call	ObjCallInstanceNoLock
-
+	
 FXIP <	call	SysRemoveFromStack					>
 pathSet:
 	jc	error				; error
@@ -4418,11 +4215,11 @@ OLFileSelectorOpenDirButtonHandler	endm
 
 
 COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-		OLFileSelectorGrabFocusExcl --
+		OLFileSelectorGrabFocusExcl -- 
 		MSG_META_GRAB_FOCUS_EXCL for OLFileSelectorClass
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-DESCRIPTION:	Handles grabbing the focus.   If we're given the
+DESCRIPTION:	Handles grabbing the focus.   If we're given the 
 		focus, at least in Rudy, we'll pass it to the list
 		so that it can display the selection properly.
 
@@ -4433,7 +4230,7 @@ PASS:		*ds:si 	- instance data
 RETURN:		nothing
 		ax, cx, dx, bp - destroyed
 
-ALLOWED TO DESTROY:
+ALLOWED TO DESTROY:	
 		bx, si, di, ds, es
 
 REGISTER/STACK USAGE:
