@@ -1,0 +1,1571 @@
+/***********************************************************************
+ *
+ *
+ * PROJECT:	Insulin Dose Calculator
+ * MODULE:	Dose
+ * FILE:		process.goc
+ * AUTHOR:	jfh  3/04
+ *
+ * DESCRIPTION:
+ *
+ *
+ *
+ *
+ *
+ *
+ ***********************************************************************/
+
+/*
+ ***************************************************************************
+ *		Include files
+ ***************************************************************************
+ */
+
+@include "dose.goh"
+@include "externs.goh"
+
+/*
+ ***************************************************************************
+ *		globals extern'd in dose.goh
+ ***************************************************************************
+ */
+
+Boolean g_recordDose = FALSE;
+VMFileHandle g_vmfh = 0;
+ChunkHandle g_ch = 0;
+word g_numRecs = 0;
+Boolean g_onOG = TRUE;
+Boolean g_onZ = FALSE;
+word g_upperLim = 0;
+word g_lowerLim = 0;
+Boolean g_mealChanged = FALSE;
+
+/*
+ ***************************************************************************
+ *		Code for DoseProcessClass
+ ***************************************************************************
+ */
+
+@classdecl	DoseProcessClass, neverSaved ;
+
+/* methods in export.goc */
+@extern method DoseProcessClass, MSG_DOSE_EXPORT_HISTORY;
+
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_GEN_PROCESS_OPEN_APPLICATION for DoseProcessClass
+ *
+ * DESCRIPTION:
+ *
+ *
+ ***********************************************************************/
+@method DoseProcessClass, MSG_GEN_PROCESS_OPEN_APPLICATION
+{
+ Boolean	initError;
+ DisplayScheme		displayScheme;
+ byte			size;
+ VMFileHandle	vmfh;
+ VMBlockHandle		mapbh, vmbh;
+ MemHandle			mh, cmh;
+ ChunkHandle		ch;
+ SetupMapStruct	*setupMapPtr;
+ SetupStruct		*setupPtr;
+ word					count, i;
+ optr					meal[] = {@BrkfstStart, @MornStart, @LunchStart,
+									@AftnoonStart, @DinnerStart, @EveningStart};
+ word					defStarts[] = {START_BREAKFAST, START_MORNING, START_LUNCH,
+							START_AFTERNOON, START_DINNER, START_EVENING};
+ TimerDateAndTime	date;
+ char					timeStr[10], str[50];
+ CompSizeHintArgs	dGraphSize = {SST_PIXELS | 400, SST_PIXELS | 210, 0};
+ CompSizeHintArgs	zGraphSize = {SST_PIXELS | 240, SST_PIXELS | 210, 0};
+ CompSizeHintArgs	dListSize = {SST_PIXELS | 400, SST_PIXELS | 30*9, 9};
+
+
+	/* read in the graph limit lines */
+	initError = InitFileReadInteger("dose", "upper", &g_upperLim);
+	if (initError) g_upperLim = 170;
+	@send GLDBUpper::MSG_GEN_VALUE_SET_INTEGER_VALUE(g_upperLim, FALSE);
+	initError = InitFileReadInteger("dose", "lower", &g_lowerLim);
+	if (initError) g_lowerLim = 80;
+	@send GLDBLower::MSG_GEN_VALUE_SET_INTEGER_VALUE(g_lowerLim, FALSE);
+
+	/* see if we're logging */
+	initError = InitFileReadBoolean("dose", "record", &g_recordDose);
+	if (initError) g_recordDose = TRUE;
+	@send SaveGroup::MSG_GEN_BOOLEAN_GROUP_SET_BOOLEAN_STATE(RB_RECORD,
+								g_recordDose);
+
+	/* see if we're on OG or desktop or Zoomer*/
+	@call DoseApp::MSG_GEN_APPLICATION_GET_DISPLAY_SCHEME(&displayScheme);
+	size = (displayScheme.DS_displayType & DT_DISP_SIZE)
+				 >> DT_DISP_SIZE_OFFSET;
+	if (size == DS_TINY) {
+		InitFileReadStringBuffer("ui", "productName", &str, 50, 0);
+		if (!strcmp(str, "Zoomer")) {
+			g_onZ = TRUE;
+			g_onOG = FALSE;
+			}
+		else {
+			g_onOG = TRUE;
+			g_onZ = FALSE;
+			}
+		}
+	else {
+		/* we're on a desktop */
+		g_onOG = FALSE;
+		g_onZ = FALSE;
+		}
+	/* redo the gentree accordingly */
+	if (g_onOG) {
+		/* set the title of the log/carbs/graph primaries */
+		MemLock (OptrToHandle(@LogPrimaryTitle));
+		@call LogPrimary::MSG_GEN_PRIMARY_REPLACE_LONG_TERM_MONIKER(
+						VUM_NOW, 0, 0, 0, VMDT_TEXT, VMST_FPTR,
+						(dword)LMemDeref(@LogPrimaryTitle));
+		@call CarbsPrimary::MSG_GEN_PRIMARY_REPLACE_LONG_TERM_MONIKER(
+						VUM_NOW, 0, 0, 0, VMDT_TEXT, VMST_FPTR,
+						(dword)LMemDeref(@CarbsPrimaryTitle));
+		@call FavsPrimary::MSG_GEN_PRIMARY_REPLACE_LONG_TERM_MONIKER(
+						VUM_NOW, 0, 0, 0, VMDT_TEXT, VMST_FPTR,
+						(dword)LMemDeref(@FavsPrimaryTitle));
+		@call GraphPrimary::MSG_GEN_PRIMARY_REPLACE_LONG_TERM_MONIKER(
+						VUM_NOW, 0, 0, 0, VMDT_TEXT, VMST_FPTR,
+						(dword)LMemDeref(@GraphPrimaryTitle));
+		MemUnlock (OptrToHandle(@LogPrimaryTitle));
+		}
+	else {
+		@call LogGroup::MSG_GEN_REMOVE(VUM_DELAYED_VIA_APP_QUEUE,
+								  CCF_MARK_DIRTY);
+		@call LogDBox::MSG_GEN_ADD_CHILD(@LogGroup,
+					CCF_MARK_DIRTY | CCO_FIRST);
+		@call CarbsGroup::MSG_GEN_REMOVE(VUM_DELAYED_VIA_APP_QUEUE,
+								  CCF_MARK_DIRTY);
+		@call CarbsDBox::MSG_GEN_ADD_CHILD(@CarbsGroup,
+					CCF_MARK_DIRTY | 1);
+		@call FavsGroup::MSG_GEN_REMOVE(VUM_DELAYED_VIA_APP_QUEUE,
+								  CCF_MARK_DIRTY);
+		@call FavsDBox::MSG_GEN_ADD_CHILD(@FavsGroup,
+					CCF_MARK_DIRTY | 1);
+		@call GraphView::MSG_GEN_REMOVE(VUM_DELAYED_VIA_APP_QUEUE,
+								  CCF_MARK_DIRTY);
+		@call GraphDBox::MSG_GEN_ADD_CHILD(@GraphView,
+					CCF_MARK_DIRTY | 1);
+/*		@call GLimitsDbox::MSG_GEN_REMOVE(VUM_DELAYED_VIA_APP_QUEUE,
+								  CCF_MARK_DIRTY);
+		@call GraphDBox::MSG_GEN_ADD_CHILD(@GLimitsDbox,
+					CCF_MARK_DIRTY | 2);
+		@call GLimitsDbox::MSG_META_ADD_VAR_DATA(
+						  (HINT_SEEK_REPLY_BAR | VDF_SAVE_TO_STATE), 0, 0);
+*/		@call GOptionsTrigger::MSG_GEN_REMOVE(VUM_DELAYED_VIA_APP_QUEUE,
+								  CCF_MARK_DIRTY);
+		@call GraphDBox::MSG_GEN_ADD_CHILD(@GOptionsTrigger,
+					CCF_MARK_DIRTY | 0);
+		@call GOptionsTrigger::MSG_META_DELETE_VAR_DATA(HINT_SEEK_MENU_BAR);
+		@call GOptionsTrigger::MSG_META_DELETE_VAR_DATA(HINT_SEEK_SLOT);
+		@call GOptionsTrigger::MSG_META_ADD_VAR_DATA(
+						  (HINT_AVOID_MENU_BAR | VDF_SAVE_TO_STATE), 0, 0);
+		if (!g_onZ) {
+			@call CarbsDList::MSG_META_ADD_VAR_DATA(
+						  (HINT_FIXED_SIZE | VDF_SAVE_TO_STATE),
+							sizeof(CompSizeHintArgs), &dListSize);
+			@call FavsDList::MSG_META_ADD_VAR_DATA(
+						  (HINT_FIXED_SIZE | VDF_SAVE_TO_STATE),
+							sizeof(CompSizeHintArgs), &dListSize);
+			@call GraphView::MSG_META_ADD_VAR_DATA(
+						  (HINT_FIXED_SIZE | VDF_SAVE_TO_STATE),
+							sizeof(CompSizeHintArgs), &dGraphSize);
+			}
+		else {
+			@call GraphView::MSG_META_ADD_VAR_DATA(
+						  (HINT_FIXED_SIZE | VDF_SAVE_TO_STATE),
+							sizeof(CompSizeHintArgs), &zGraphSize);
+			}
+		}
+	@send LogGroup::MSG_GEN_SET_USABLE(VUM_NOW);
+	@send CarbsGroup::MSG_GEN_SET_USABLE(VUM_NOW);
+	@send FavsGroup::MSG_GEN_SET_USABLE(VUM_NOW);
+	@send GraphView::MSG_GEN_SET_USABLE(VUM_NOW);
+	@send GOptionsTrigger::MSG_GEN_SET_USABLE(VUM_NOW);
+
+
+	/* and the log title glyph */
+	DrawLogTitles();
+
+	/* open the setup file and copy the settings */
+	FilePushDir();
+	if (g_onOG || g_onZ) SetPCCard();
+	else FileSetStandardPath(SP_USER_DATA);
+	vmfh = VMOpen("idsetup", VMAF_FORCE_READ_WRITE, VMO_OPEN, 0);
+	if (vmfh)  {
+		/* get the map block */
+		mapbh = VMGetMapBlock(vmfh);
+		if (mapbh) {
+			setupMapPtr = VMLock(vmfh, mapbh, &mh);
+			ch = setupMapPtr->SMS_recsChunkHan;
+			/* get the meal settings */
+			for (i = 0; i < 6; i++) {
+			/*	date.TDAT_hours = setupMapPtr->SMS_mealSettings[i].HMS_hour;
+				date.TDAT_minutes = setupMapPtr->SMS_mealSettings[i].HMS_minute;
+				LocalFormatDateTime(timeStr, DTF_HM, &date); */
+				@call meal[i]::MSG_TIME_INPUT_SET_TIME(
+									(byte)setupMapPtr->SMS_mealSettings[i].HMS_hour,
+									(byte)setupMapPtr->SMS_mealSettings[i].HMS_minute,
+									0);
+				}
+			VMUnlock(mh);
+
+			/* we may not have changed the default settings yet, but if we have
+				we've saved the chunkhandle */
+			if (ch) {
+				vmbh = VMFind(vmfh, NullHandle, SETUP);
+				VMLock(vmfh, vmbh ,&cmh);
+				/* get the most recent settings */
+				count = ChunkArrayGetCountHandles(cmh, ch);
+				setupPtr = ChunkArrayElementToPtrHandles(cmh, ch, count-1, 0);
+				/* set the settings */
+				@send CorrSens::MSG_GEN_VALUE_SET_VALUE(setupPtr->SS_sens, FALSE);
+				@send ItoCRatio::MSG_GEN_VALUE_SET_VALUE(setupPtr->SS_insRatio, FALSE);
+				@send CorrTo::MSG_GEN_VALUE_SET_INTEGER_VALUE(setupPtr->SS_corr, FALSE);
+				VMUnlock(cmh);
+				}
+			} /* end of mapblock if */
+		}
+	else  {
+		/* no file so create it & fill in defaults */
+		vmfh = VMOpen("idsetup", VMAF_FORCE_READ_WRITE, VMO_CREATE_ONLY, 0);
+		/* and the map */
+		mapbh = VMAlloc(vmfh, sizeof(SetupMapStruct), 0);
+		VMSetMapBlock(vmfh, mapbh);
+		setupMapPtr = VMLock(vmfh, mapbh, &mh);
+		setupMapPtr->SMS_recsChunkHan = 0;
+      /* fill in the default meal times */
+		for (i = 0; i < 6; i++) {
+			setupMapPtr->SMS_mealSettings[i].HMS_hour = defStarts[i];
+		/*	date.TDAT_hours = defStarts[i];  */
+			setupMapPtr->SMS_mealSettings[i].HMS_minute = 0;
+		/*	date.TDAT_minutes = 0;  */
+			LocalFormatDateTime(timeStr, DTF_HM, &date);
+		/*	@send meal[i]::MSG_VIS_TEXT_REPLACE_ALL_PTR(timeStr, 0);  */
+			@call meal[i]::MSG_TIME_INPUT_SET_TIME((byte)defStarts[i], 0, 0);
+			}
+		VMDirty(mh);
+		VMUnlock(mh);
+		}
+	VMClose(vmfh, 0);
+	FilePopDir();
+
+	@callsuper();
+
+   /* handle here for desktop */
+	if (!g_onOG)  SetMealFromTime();
+
+}
+
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_DOSE_LOG_BOOLEAN_STATUS for DoseProcessClass
+ *			word	selectedBooleans,
+ *			word	indeterminateBooleans,
+ *			word	changedBooleans);
+ *
+ * DESCRIPTION:
+ *
+ *
+ ***********************************************************************/
+@method DoseProcessClass, MSG_DOSE_LOG_BOOLEAN_STATUS
+{
+
+	if (selectedBooleans & RB_RECORD) g_recordDose = TRUE;
+	else g_recordDose = FALSE;
+
+	InitFileWriteBoolean("dose", "record", g_recordDose);
+	InitFileCommit();
+	 
+}
+
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_DOSE_CALCULATE for DoseProcessClass
+ *
+ * DESCRIPTION:
+ *
+ *
+ ***********************************************************************/
+@method DoseProcessClass, MSG_DOSE_CALCULATE
+{
+ WWFixedAsDWord    carbs, sens, insRatio, dose, t1, t2;
+ word		glu, corr, adjGlu;
+ Boolean	isNeg, recordIt;
+ char		carbsStr[13];
+
+
+	/* get the inputs */
+	sens = @call CorrSens::MSG_GEN_VALUE_GET_VALUE();
+	insRatio = @call ItoCRatio::MSG_GEN_VALUE_GET_VALUE();
+	corr = @call CorrTo::MSG_GEN_VALUE_GET_INTEGER_VALUE();
+	glu = @call Glucose::MSG_GEN_VALUE_GET_INTEGER_VALUE();
+	carbs = @call Carbs::MSG_GEN_VALUE_GET_VALUE();
+
+	/* calc dose */
+	/*dose = ((glu - corr)/sens) + (carbs/insRatio);*/
+	if (glu >= corr) {
+		adjGlu = glu - corr;
+		isNeg = FALSE;
+		}
+	else {
+		adjGlu = corr - glu;
+		isNeg = TRUE;
+		}
+	t1 = GrUDivWWFixed(MakeWWFixed(adjGlu), sens);
+	t2 = GrUDivWWFixed(carbs, insRatio);
+	if (isNeg) dose = t2 - t1;
+	else  dose = t2 + t1;
+
+	/* and show dose */
+	@call Dose::MSG_GEN_VALUE_SET_VALUE(dose, FALSE);
+
+	if (g_recordDose) {
+		/* save the dose poop */
+		recordIt = TRUE;
+		}
+	else {
+		/* ask the user if he want's to save the dose poop */
+		if (AckDBox(0, 0, @ConfirmRecordMsg) == ACK_YES) {
+			/* ok - record it */
+			recordIt = TRUE;
+			}
+		else recordIt = FALSE;
+		}
+
+	if (recordIt) {
+		/* record it */
+		@send oself::MSG_DOSE_LOG_DOSE();
+		}
+
+	/* some extra work if the dose is negative */
+	if (WWFixedToInt(dose) < 0)  {
+		/* make dose a pos number */
+		if (WWFixedToFrac(dose)) {
+			t1 = 0xffff - WWFixedToInt(dose);
+			t1 = (t1 << 16);
+			t1 += 0xffff - WWFixedToFrac(dose) + 1;
+			}
+		else {
+			/* the way neg numbers are constructed, if there's no fractional
+         	part we need to add one to the integer part. */
+			t1 = 0xffff - WWFixedToInt(dose) + 1;
+			t1 = (t1 << 16);
+			}
+		/* carbs to eat = dose * ratio */
+		carbs = GrMulWWFixed(t1, insRatio);
+		/* the easy way to get a text representation of a WWF number
+			use a not USABLE GenValue to do the work */
+		@send EatCarbsGV::MSG_GEN_VALUE_SET_VALUE(carbs, FALSE);
+		@call EatCarbsGV::MSG_GEN_VALUE_GET_VALUE_TEXT(carbsStr, GVT_VALUE);
+		/* and tell the user */
+		NotifyDBox (carbsStr, @EatCarbsMsg);
+		}
+
+}
+
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_DOSE_APPLY_SETTINGS for DoseProcessClass
+ *
+ * DESCRIPTION:	We save the settings in a .vm file so that they're
+ *						available to set on opening the app.
+ *
+ *
+ ***********************************************************************/
+@method DoseProcessClass, MSG_DOSE_APPLY_SETTINGS
+{
+ VMFileHandle		vmfh;
+ VMBlockHandle		mapbh, vmbh;
+ MemHandle			mh, cmh, smh;
+ ChunkHandle		ch;
+ SetupMapStruct	*setupMapPtr;
+ SetupStruct		*setupPtr;
+ TimerDateAndTime	dateTime;
+ word					error;
+ char					errStr[15];
+
+
+	/* open the file */
+	FilePushDir();
+	if (g_onOG || g_onZ) SetPCCard();
+	else FileSetStandardPath(SP_USER_DATA);
+	vmfh = VMOpen("idsetup", VMAF_FORCE_READ_WRITE, VMO_OPEN, 0);
+	/* check for error */
+	if (!vmfh)  {
+		error = ThreadGetError();
+		UtilHex32ToAscii(errStr, (dword)error, UHTAF_NULL_TERMINATE);
+		NotifyDBox(errStr, @SetupFileCreateErrMsg);
+		FilePopDir();
+		return;
+		}
+
+	/* see if there is any setup info already here */
+	mapbh = VMGetMapBlock(vmfh);
+	setupMapPtr = VMLock(vmfh, mapbh, &mh);
+	if (!setupMapPtr->SMS_recsChunkHan) {
+		/* This is the first setup poop change so we need to create the
+			chunk array */
+		vmbh = VMAlloc(vmfh, 2048, SETUP);
+		/* create a mem block to attach to it */
+		smh = MemAlloc(2048, HF_SWAPABLE, HAF_LOCK);
+		LMemInitHeap(smh, LMEM_TYPE_GENERAL, 0,
+				 sizeof(LMemBlockHeader), STD_INIT_HANDLES, STD_INIT_HEAP);
+		/* create the chunk array  */
+		ch = ChunkArrayCreate(smh, sizeof(SetupStruct), 0, 0);
+		MemUnlock(smh);
+		/* and attach the block to the VM - */
+		VMAttach(vmfh, vmbh, smh);
+		/* save the chunkhandle in the map */
+		setupMapPtr->SMS_recsChunkHan = ch;
+		VMDirty(mh);
+		}
+
+	/* just grab chunkhandle from the map */
+	ch = setupMapPtr->SMS_recsChunkHan;
+	VMUnlock(mh);
+
+	vmbh = VMFind(vmfh, NullHandle, SETUP);
+	VMLock(vmfh, vmbh, &cmh);
+
+	setupPtr = ChunkArrayAppendHandles(cmh, ch, 0);
+	/* save the settings */
+	TimerGetDateAndTime(&dateTime);
+	setupPtr->SS_dateTime = dateTime;
+	setupPtr->SS_sens = @call CorrSens::MSG_GEN_VALUE_GET_VALUE();
+	setupPtr->SS_insRatio = @call ItoCRatio::MSG_GEN_VALUE_GET_VALUE();
+	setupPtr->SS_corr = @call CorrTo::MSG_GEN_VALUE_GET_INTEGER_VALUE();
+	VMDirty(cmh);
+	VMUnlock(cmh);
+
+	/* and we're done with the setup file */
+	VMSave(vmfh);
+	VMClose(vmfh, 0);
+
+	FilePopDir();
+
+
+}
+
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_DOSE_LOG_DOSE for DoseProcessClass
+ *
+ * DESCRIPTION:
+ *
+ *
+ ***********************************************************************/
+@method DoseProcessClass, MSG_DOSE_LOG_DOSE
+{
+ VMFileHandle		vmfh;
+ VMBlockHandle		mapbh, vmbh;
+ MemHandle			mh, cmh;
+ ChunkHandle		ch;
+ RecsMapStruct		*recsMapPtr;
+ RecsStruct			*recsPtr;
+ TimerDateAndTime	dateTime;
+ word					error;
+ char					errStr[15];
+
+
+	/* create/open the file */
+	FilePushDir();
+	if (g_onOG || g_onZ) SetPCCard();
+	else FileSetStandardPath(SP_USER_DATA);
+	vmfh = VMOpen("idrecs",
+					 VMAF_FORCE_READ_WRITE,
+					 VMO_CREATE,
+					 0);
+	/* check for error */
+	if (!vmfh)  {
+		error = ThreadGetError();
+		UtilHex32ToAscii(errStr, (dword)error, UHTAF_NULL_TERMINATE);
+		NotifyDBox(errStr, @FileCreateErrMsg);
+		FilePopDir();
+		return;
+		}
+
+	/* get the map block */
+	mapbh = VMGetMapBlock(vmfh);
+	if (!mapbh) {
+		/* the data file was just created so we need to create the
+			chunk array and map block */
+		vmbh = VMAlloc(vmfh, 2048, RECORDS);
+		/* create a mem block to attach to it */
+		mh = MemAlloc(2048, HF_SWAPABLE, HAF_LOCK);
+		LMemInitHeap(mh, LMEM_TYPE_GENERAL, 0,
+				 sizeof(LMemBlockHeader), STD_INIT_HANDLES, STD_INIT_HEAP);
+		/* create the chunk array  */
+		ch = ChunkArrayCreate(mh, sizeof(RecsStruct), 0, 0);
+		MemUnlock(mh);
+		/* and attach the block to the VM - */
+		VMAttach(vmfh, vmbh, mh);
+
+		mapbh = VMAlloc(vmfh, sizeof(RecsMapStruct), 0);
+		VMSetMapBlock(vmfh, mapbh);
+		recsMapPtr = VMLock(vmfh, mapbh, &mh);
+		recsMapPtr->RMS_numRecs = 0;
+		recsMapPtr->RMS_recsChunkHan = ch;
+		}
+	else {
+		/* just grab the map info */
+		recsMapPtr = VMLock(vmfh, mapbh, &mh);
+		ch = recsMapPtr->RMS_recsChunkHan;
+		}
+
+	vmbh = VMFind(vmfh, NullHandle, RECORDS);
+	VMLock(vmfh, vmbh ,&cmh);
+
+	/* save the dose info */
+	recsPtr = ChunkArrayAppendHandles(cmh, ch, 0);
+	/* date & time ... */
+	TimerGetDateAndTime(&dateTime);
+	recsPtr->RS_dateTime = dateTime;
+
+	/* glucose ... */
+	@call Glucose::MSG_GEN_VALUE_GET_VALUE_TEXT(recsPtr->RS_glucose, GVT_VALUE);
+	/* carbs ... */
+	@call Carbs::MSG_GEN_VALUE_GET_VALUE_TEXT(recsPtr->RS_carbs, GVT_VALUE);
+	/* dose ... */
+	@call Dose::MSG_GEN_VALUE_GET_VALUE_TEXT(recsPtr->RS_dose, GVT_VALUE);
+	/* and the meal ... */
+	recsPtr->RS_meal = @call MealItemGroup::MSG_GEN_ITEM_GROUP_GET_SELECTION();
+	VMDirty(cmh);
+	VMUnlock(cmh);
+
+   /* update the map */
+	recsMapPtr->RMS_numRecs++;
+	VMDirty(mh);
+	VMUnlock(mh);
+
+   /* and we're done */
+	VMSave(vmfh);
+	VMClose(vmfh, 0);
+	FilePopDir();
+
+}
+
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_DOSE_OPEN_HISTORY for DoseProcessClass
+ *
+ * DESCRIPTION:
+ *
+ *
+ ***********************************************************************/
+@method DoseProcessClass, MSG_DOSE_OPEN_HISTORY
+{
+ VMBlockHandle		mapbh;
+ MemHandle		mh;
+ RecsMapStruct		*recsMapPtr;
+
+
+	/* open the file */
+	FilePushDir();
+	if (g_onOG || g_onZ) SetPCCard();
+	else FileSetStandardPath(SP_USER_DATA);
+	g_vmfh = VMOpen("idrecs",
+					 VMAF_FORCE_READ_ONLY,
+					 VMO_OPEN,
+					 0);
+	/* check for error */
+	if (!g_vmfh)  {
+		if (ThreadGetError() == VM_FILE_NOT_FOUND)
+			NotifyDBox(0, @FileNotFoundMsg);
+		else
+			NotifyDBox(0, @FileOpenErrMsg);
+		FilePopDir();
+		return;
+		}
+
+	/* get the map block */
+	mapbh = VMGetMapBlock(g_vmfh);
+	recsMapPtr = VMLock(g_vmfh, mapbh, &mh);
+	g_ch = recsMapPtr->RMS_recsChunkHan;
+	g_numRecs = recsMapPtr->RMS_numRecs;
+	VMUnlock(mh);
+
+	@send LogDList::MSG_GEN_DYNAMIC_LIST_INITIALIZE(g_numRecs);
+
+	/* put it on the screen */
+   /* make allowances for OG vs desktop */
+	if (g_onOG) {
+		@call LogPrimary::MSG_GEN_SET_USABLE(VUM_DELAYED_VIA_APP_QUEUE);
+		@call DosePrimary::MSG_GEN_SET_NOT_USABLE(VUM_NOW);
+		}
+	else {
+		@send LogDBox::MSG_GEN_INTERACTION_INITIATE();
+		}
+
+	@call LogDList::MSG_GEN_ITEM_GROUP_MAKE_ITEM_VISIBLE(g_numRecs - 1);
+	@call LogDList::MSG_GEN_ITEM_GROUP_SET_SINGLE_SELECTION(g_numRecs - 1, FALSE);
+
+	/* REMEMBER - we're leaving the file open while the records view is
+   	on the screen */
+
+
+}
+
+/*-------------------------------------------------------------------------
+ | Method:  DoseProcessClass::MSG_DOSE_LOG_DLIST_MONIKER_QUERY
+ *-------------------------------------------------------------------------
+ |
+ | Description:
+ |    Get the information for a single list item
+ |
+ | Inputs:
+ |    optr list                   -- Which list needs the moniker
+ |    word item                   -- What item on the list is needed
+ |
+ | Revision History:
+ |    Who  Date:     Comments:
+ |    ---  --------  ---------
+ |    jfh  04/02/04  Created
+ |
+ *-----------------------------------------------------------------------*/
+@method DoseProcessClass, MSG_DOSE_LOG_DLIST_MONIKER_QUERY
+{
+ VMBlockHandle		vmbh;
+ MemHandle			mh;
+ RecsStruct			*recsPtr;
+ char			glucose[FIELD_LEN], carbs[FIELD_LEN], dose[FIELD_LEN];
+ TimerDateAndTime	dateTime;
+ char			dtString[25];
+ MemHandle			mem;
+ GStateHandle		gstate;
+ ChunkHandle		chunk;
+ word					fudge, width;
+
+
+	/* get the records array VMBlock */
+	vmbh = VMFind(g_vmfh, NullHandle, RECORDS);
+	VMLock(g_vmfh, vmbh ,&mh);
+	/* get the selected record info */
+	recsPtr = ChunkArrayElementToPtrHandles(mh, g_ch, item, 0);
+	dateTime = recsPtr->RS_dateTime;
+	strcpy(glucose, recsPtr->RS_glucose);
+	strcpy(carbs, recsPtr->RS_carbs);
+	strcpy(dose, recsPtr->RS_dose);
+	VMUnlock(mh);
+
+	/* set up the mem and gstate */
+	mem = MemAllocLMem(LMEM_TYPE_GSTRING, 0) ;
+	gstate = GrCreateGString(mem, GST_CHUNK, (unsigned short __far *) &chunk);
+
+	if (g_onOG) fudge = 0;
+	else fudge = 10;
+
+	if (!g_onOG && !g_onZ) {
+		GrSetFont(gstate, FID_DTC_URW_SANS, MakeWWFixed(12));
+		}
+
+	/* fill in the date & time */
+	LocalFormatDateTime(dtString, DTF_ZERO_PADDED_SHORT, &dateTime);
+	GrDrawText(gstate, 0, 0, dtString, 0) ;
+	LocalFormatDateTime(dtString, DTF_HM_24HOUR, &dateTime);
+	GrDrawText(gstate, 50+fudge, 0, dtString, 0) ;
+
+	/* and the data fields */
+	GrDrawText(gstate, 105+fudge, 0, glucose, 0) ;
+	GrDrawText(gstate, 145+fudge, 0, carbs, 0) ;
+	/* right justify the dose number */
+	width = GrTextWidth(gstate, dose, strlen(dose));
+	GrDrawText(gstate, 215 - 20 + fudge - width, 0, dose, 0) ;
+
+	/* terminate the gstring */
+	GrEndGString(gstate) ;
+	/* tell the DList */
+	@call list::MSG_GEN_DYNAMIC_LIST_REPLACE_ITEM_MONIKER(
+				  item,
+				  0,
+				  15,				/* height */
+				  215,				/* width */
+				  0,
+				  VMDT_GSTRING,
+				  VMST_OPTR,
+				  ConstructOptr(mem, chunk));
+
+	/* and 86 the gstate and mem */
+	GrDestroyGString(gstate, gstate, GSKT_KILL_DATA);
+	MemFree(mem);
+
+}
+
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_DOSE_CLEAR_LOG for DoseProcessClass
+ *
+ * DESCRIPTION:
+ *
+ *
+ ***********************************************************************/
+@method DoseProcessClass, MSG_DOSE_CLEAR_LOG
+{
+
+	/* ask if the user is sure */
+	if (AckDBox(0, 0, @ConfirmClearRecsMsg) == ACK_YES) {
+		VMClose(g_vmfh, 0);
+		/* delete the file */
+		FilePushDir();
+		FileSetStandardPath(SP_USER_DATA);
+		FileDelete("idrecs");
+		FilePopDir();
+		/* reset the globals */
+		g_vmfh = 0;
+		g_numRecs = 0;
+		g_ch = 0;
+		/* and clear the screen */
+		@send LogDList::MSG_GEN_DYNAMIC_LIST_INITIALIZE(g_numRecs);
+		}
+
+}
+
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_DOSE_CLOSE_LOG for DoseProcessClass
+ *
+ * DESCRIPTION:
+ *
+ *
+ ***********************************************************************/
+@method DoseProcessClass, MSG_DOSE_CLOSE_LOG
+{
+
+	/* close the file opened when we came on screen */
+	if (g_vmfh) VMClose(g_vmfh, 0);
+
+}
+
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_DOSE_CALCULATE_AVG for DoseProcessClass
+ *
+ * DESCRIPTION:
+ *
+ *
+ ***********************************************************************/
+@method DoseProcessClass, MSG_DOSE_CALCULATE_AVG
+{
+ word		span, rec, i, allRecs;
+ optr		titles[6] = {@AvgDB1Moniker, @AvgDB7Moniker, @AvgDB14Moniker,
+							@AvgDB30Moniker, @AvgDB60Moniker, @AvgDB90Moniker};
+ VMBlockHandle		mapbh;
+ MemHandle		mh;
+ RecsMapStruct		*recsMapPtr;
+ VMBlockHandle		vmbh;
+ RecsStruct			*recsPtr;
+ TimerDateAndTime date;
+ word	/*war FloatNum*/	today, startDay, testDay, allMeals, allAvg, allRecsF, A1CDiv, A1CNum;
+ dword			glucose;
+ word			days[6] = {1, 7, 14, 30, 60, 90};
+ Boolean			keepGoing;
+ word				mealTotal[6] = {0, 0, 0, 0, 0, 0};
+ word				mealNum[6] = {0, 0, 0, 0, 0, 0};
+ optr		avgField[6] = {@ADBBreakfastAvg, @ADBMorningAvg, @ADBLunchAvg,
+							@ADBAfternoonAvg, @ADBDinnerAvg, @ADBEveningAvg};
+ optr		numField[6] = {@ADBBreakfastNum, @ADBMorningNum, @ADBLunchNum,
+							@ADBAfternoonNum, @ADBDinnerNum, @ADBEveningNum};
+ char				numStr[20], avgStr[FLOAT_TO_ASCII_NORMAL_BUF_LEN];
+ WWFixedAsDWord	avg;
+
+
+
+	/* what span do we average? */
+	span = @call AvgSpanGroup::MSG_GEN_ITEM_GROUP_GET_SELECTION();
+
+	/* open the data file */
+	FilePushDir();
+	if (g_onOG || g_onZ) SetPCCard();
+	else FileSetStandardPath(SP_USER_DATA);
+	g_vmfh = VMOpen("idrecs",
+					 VMAF_FORCE_READ_ONLY,
+					 VMO_OPEN,
+					 0);
+	/* check for error */
+	if (!g_vmfh)  {
+		if (ThreadGetError() == VM_FILE_NOT_FOUND)
+			NotifyDBox(0, @FileNotFoundMsg);
+		else
+			NotifyDBox(0, @FileOpenErrMsg);
+		FilePopDir();
+		return;
+		}
+
+	/* get the map block */
+	mapbh = VMGetMapBlock(g_vmfh);
+	recsMapPtr = VMLock(g_vmfh, mapbh, &mh);
+	g_ch = recsMapPtr->RMS_recsChunkHan;
+	rec = recsMapPtr->RMS_numRecs - 1;
+	VMUnlock(mh);
+	/* and the chunk array */
+	vmbh = VMFind(g_vmfh, NullHandle, RECORDS);
+	VMLock(g_vmfh, vmbh ,&mh);
+
+	/* figure out the date range */
+
+	TimerGetDateAndTime(&date);
+	FloatGetDateNumber(date.TDAT_year, (byte)date.TDAT_month, (byte)date.TDAT_day);
+	FloatPopNumber((FloatNumStruct *) &today);
+		
+	startDay = today - days[span - 1];
+
+	/* start collecting the data */
+	keepGoing = TRUE;
+	while (keepGoing) {
+		/* get the selected record info */
+		recsPtr = ChunkArrayElementToPtrHandles(mh, g_ch, rec, 0);
+		/* is it in our date range? */
+		FloatGetDateNumber(recsPtr->RS_dateTime.TDAT_year,
+							(byte)recsPtr->RS_dateTime.TDAT_month,
+							(byte)recsPtr->RS_dateTime.TDAT_day);
+		FloatPopNumber((FloatNumStruct *) &testDay);
+		if (testDay >= startDay) {
+			/* we want this piece of data */
+			UtilAsciiToHex32(recsPtr->RS_glucose, (long *) &glucose);
+			mealTotal[recsPtr->RS_meal - 1] += (word)glucose;
+			mealNum[recsPtr->RS_meal - 1]++;
+			/* check for the last record */
+			if (!rec) keepGoing = FALSE;
+         else rec--;
+			}
+		else keepGoing = FALSE;
+		} /* end of keepGoing while */
+
+	/* unlock the chunk array */
+	VMUnlock(mh);
+	/* and close the file */
+	VMClose(g_vmfh, 0);
+
+	/* show the meal/snack averages */
+	allMeals = 0;
+	allRecs = 0;
+	for (i = 0; i < 6; i++) {
+		if (!mealNum[i]) strcpy(avgStr, "0");
+		else {
+			avg = GrUDivWWFixed(MakeWWFixed(mealTotal[i]), MakeWWFixed(mealNum[i]));
+			@send EatCarbsGV::MSG_GEN_VALUE_SET_VALUE(avg, FALSE);
+			@call EatCarbsGV::MSG_GEN_VALUE_GET_VALUE_TEXT(avgStr, GVT_VALUE);
+			}
+		@call avgField[i]::MSG_VIS_TEXT_REPLACE_ALL_PTR(avgStr, 0);
+		sprintf(numStr, " (%d)", mealNum[i]);
+		@call numField[i]::MSG_VIS_TEXT_REPLACE_ALL_PTR(numStr, 0);
+		allMeals += mealTotal[i];
+		allRecs += mealNum[i];
+		}
+
+	/* and the overall average - since the numbers can get big we'll
+		use FloatNum stuff */
+	if (!allRecs) strcpy(avgStr, "0");
+	else {
+		allRecsF = allRecs;
+		FloatPushNumber((FloatNumStruct *) &allMeals);
+		FloatPushNumber((FloatNumStruct *) &allRecsF);
+		FloatDivide();
+		FloatPopNumber((FloatNumStruct *) &allAvg);
+		FloatFloatToAscii_StdFormat(avgStr, (FloatNumStruct *)&allAvg, FFAF_FROM_ADDR, 5, 1);
+		}
+	@call ADBAllAvg::MSG_VIS_TEXT_REPLACE_ALL_PTR(avgStr, 0);
+	sprintf(numStr, " (%d)", allRecs);
+	@call ADBAllNum::MSG_VIS_TEXT_REPLACE_ALL_PTR(numStr, 0);
+
+	/* calculate and show the A1C */
+	if (!allRecs) strcpy(avgStr, "0");
+	else {
+		allAvg += 77;
+		A1CDiv = 35.7;
+		FloatPushNumber((FloatNumStruct *) &allAvg);
+		FloatPushNumber((FloatNumStruct *) &A1CDiv);
+		FloatDivide();
+		FloatPopNumber((FloatNumStruct *) &A1CNum);
+		FloatFloatToAscii_StdFormat(avgStr, (FloatNumStruct *)&A1CNum, FFAF_FROM_ADDR, 5, 1);
+		}
+	strcat(avgStr, "%");
+	@call ADBA1CPct::MSG_VIS_TEXT_REPLACE_ALL_PTR(avgStr, 0);
+
+	@send AvgDisplayDBox::MSG_GEN_USE_VIS_MONIKER(
+						OptrToChunk(titles[span - 1]), VUM_DELAYED_VIA_APP_QUEUE);
+	@send AvgDisplayDBox::MSG_GEN_INTERACTION_INITIATE();
+
+}
+
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_DOSE_APPLY_MEAL_TIMES for DoseProcessClass
+ *
+ * DESCRIPTION:	make sure the times are in sequence then store
+ *                them in the setup file map block
+ *
+ ***********************************************************************/
+@method DoseProcessClass, MSG_DOSE_APPLY_MEAL_TIMES
+{
+ VMFileHandle	vmfh;
+ VMBlockHandle		mapbh;
+ MemHandle			mh;
+ SetupMapStruct	*setupMapPtr;
+ TimeParamsStruct		timeParams;
+ word						i, prevWord, curWord;
+ optr					start[] = {@BrkfstStart, @MornStart, @LunchStart,
+									@AftnoonStart, @DinnerStart, @EveningStart};
+ Boolean				midnight = FALSE;
+ Boolean				error = FALSE;
+
+
+   /* skip it if nothing was changed */
+	if (!g_mealChanged) return;
+
+	/* make sure the times are in sequence */
+	@call EveningStart::MSG_TIME_INPUT_GET_TIME(&timeParams);
+	prevWord = 60 * timeParams.TP_hours + timeParams.TP_minutes;
+	for (i = 0; i < 6; i++)  {
+		@call start[i]::MSG_TIME_INPUT_GET_TIME(&timeParams);
+		curWord = 60 * timeParams.TP_hours + timeParams.TP_minutes;
+		if (prevWord == curWord) {
+			error = TRUE;
+			break;
+			}
+		else if (prevWord > curWord) {
+			/* allow only one instance where prev is higher (assume midnight) */
+			if (!midnight) {
+				/* set the flag */
+				midnight = TRUE;
+				}
+			else {
+				/* uh oh - here's another instance of prev > cur */
+				error = TRUE;
+				break;
+				}
+			}
+		/* make the current entry the previous */
+		prevWord = curWord;
+		}  /* end of for loop */
+
+	if (error) {
+		NotifyDBox(0, @BadTimesMsg);
+      return;
+		}
+
+	/* everything's OK so open the file and save the new times */
+	FilePushDir();
+	if (g_onOG || g_onZ) SetPCCard();
+	else FileSetStandardPath(SP_USER_DATA);
+	vmfh = VMOpen("idsetup", VMAF_FORCE_READ_WRITE, VMO_OPEN, 0);
+	if (vmfh) {
+		mapbh = VMGetMapBlock(vmfh);
+		setupMapPtr = VMLock(vmfh, mapbh, &mh);
+		for (i = 0; i < 6; i++) {
+			@call start[i]::MSG_TIME_INPUT_GET_TIME(&timeParams);
+			setupMapPtr->SMS_mealSettings[i].HMS_hour = timeParams.TP_hours;
+			setupMapPtr->SMS_mealSettings[i].HMS_minute = timeParams.TP_minutes;
+			} /* end of start for loop */
+		VMDirty(mh);
+		VMUnlock(mh);
+		VMClose(vmfh, 0);
+		} /* end of opened file if */
+
+   /* reset the meal selector */
+	SetMealFromTime();
+
+	/* dismiss the dbox */
+	@send MealTimesDBox::MSG_GEN_GUP_INTERACTION_COMMAND(IC_DISMISS);
+	g_mealChanged = FALSE;
+
+}
+
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_DOSE_CLOSE_MEAL_TIMES for DoseProcessClass
+ *
+ * DESCRIPTION:	reset the saved times if they've been changed
+ *
+ *
+ ***********************************************************************/
+@method DoseProcessClass, MSG_DOSE_CLOSE_MEAL_TIMES
+{
+ VMFileHandle	vmfh;
+ VMBlockHandle		mapbh;
+ MemHandle			mh;
+ SetupMapStruct	*setupMapPtr;
+ word						i;
+ optr					meal[] = {@BrkfstStart, @MornStart, @LunchStart,
+									@AftnoonStart, @DinnerStart, @EveningStart};
+
+
+	if(g_mealChanged) {
+		FilePushDir();
+		if (g_onOG || g_onZ) SetPCCard();
+		else FileSetStandardPath(SP_USER_DATA);
+		vmfh = VMOpen("idsetup", VMAF_FORCE_READ_WRITE, VMO_OPEN, 0);
+		if (vmfh) {
+			mapbh = VMGetMapBlock(vmfh);
+			setupMapPtr = VMLock(vmfh, mapbh, &mh);
+			for (i = 0; i < 6; i++) {
+				@call meal[i]::MSG_TIME_INPUT_SET_TIME(
+									(byte)setupMapPtr->SMS_mealSettings[i].HMS_hour,
+									(byte)setupMapPtr->SMS_mealSettings[i].HMS_minute,
+									0);
+				} /* end of start for loop */
+			VMUnlock(mh);
+			VMClose(vmfh, 0);
+			} /* end of opened file if */
+		}
+
+	g_mealChanged = FALSE;
+
+}
+
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_DOSE_MEAL_TIMES_APPLY for DoseProcessClass
+ *              (TIME_INPUT_ACTION)
+ *
+ * DESCRIPTION:   sets a flag if there's been a change so that we
+ *                can restore saved times if user cancels dbox
+ *
+ ***********************************************************************/
+@method DoseProcessClass, MSG_DOSE_MEAL_TIMES_APPLY
+{
+
+	g_mealChanged = TRUE;
+
+}
+
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_DOSE_OPEN_EBOOK for DoseProcessClass
+ *
+ *
+ * DESCRIPTION:   opens the diabetes info ebook
+ *
+ *
+ ***********************************************************************/
+@method DoseProcessClass, MSG_DOSE_OPEN_EBOOK
+{
+ GeodeToken		readerToken = {"cntv", 0};
+ GeodeHandle	readerGeodeHan;
+ MemHandle		readerALBHan;
+ AppLaunchBlock	*readerALB;
+ word				numServers;
+ IACPConnection	iacpConnectionToken;
+ EventHandle		hToTop;
+ word				connectionFlags = 0;
+
+
+	/* check to see if bookreader is running already */
+	readerGeodeHan = GeodeFind("reader",7,0,0);
+    
+	if(readerGeodeHan == NullHandle)  {  /* reader is not running */
+
+		/* set up a launch block for it */
+		readerALBHan = IACPCreateDefaultLaunchBlock(MSG_GEN_PROCESS_OPEN_APPLICATION);
+
+		/* tell reader what file to open */
+		readerALB = MemLock(readerALBHan);
+		readerALB->ALB_diskHandle = SP_DOCUMENT;
+      strcpy(readerALB->ALB_path, "");
+		strcpy(readerALB->ALB_dataFile, "Principles of Diabetes");  
+		MemUnlock(readerALBHan);
+
+		/* start it */
+		iacpConnectionToken = IACPConnect(
+				&readerToken,
+				IACPCF_OBEY_LAUNCH_MODEL||IACPSM_USER_INTERACTIBLE,
+				readerALBHan,
+				0,
+				&numServers);
+
+		/* check to see if it got started */
+		if (numServers != 1)
+			{
+			/* it didn't so bail out... */
+			return;
+			}
+
+		/* and close the IACP connection */
+		IACPShutdown(iacpConnectionToken, NullOptr);
+		}  /* end of not running if */
+
+	else  {  /* it is already running */
+		/* connect to it */
+		iacpConnectionToken = IACPConnect(
+			&readerToken,
+		   connectionFlags,
+		   NULL,
+		   NullOptr,
+		   &numServers);
+
+      /* encapsulate a message telling calc to come to the top */
+      hToTop = @record GenApplicationClass::MSG_GEN_BRING_TO_TOP();
+
+
+      /* send our message to calc */
+      IACPSendMessage(
+	    iacpConnectionToken,
+	    hToTop,
+	    TO_MODEL,
+	    NullHandle,  /* no return msg needed */
+	    IACPS_CLIENT);
+
+      /* close the connection */
+      IACPShutdown(iacpConnectionToken, NullOptr);
+
+      }  /* end of found it running else */
+
+}
+
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_DOSE_OPEN_ENTER_OTHER_HIST for DoseProcessClass
+ *
+ *
+ * DESCRIPTION:
+ *
+ *
+ ***********************************************************************/
+@method DoseProcessClass, MSG_DOSE_OPEN_ENTER_OTHER_HIST
+{
+ word		sel;
+ optr		selMon[] = {@OHBPItemMon, @OHA1CItemMon, @OHMAItemMon, @OHTotCItemMon,
+						@OHHDLItemMon, @OHLDLItemMon, @OHTriGItemMon,
+						@OHWeightItemMon, @OHBMIItemMon};
+
+
+	/* get the selection */
+	sel = @call OHItemsGroup::MSG_GEN_ITEM_GROUP_GET_SELECTION();
+
+	/* set the appropriate text obj moniker */
+	@send OHEText::MSG_GEN_USE_VIS_MONIKER(OptrToChunk(selMon[sel]),
+						VUM_DELAYED_VIA_APP_QUEUE);
+
+	/* and set the defaults */
+	@send OHEText::MSG_VIS_TEXT_DELETE_ALL();
+	@send OHEDate::MSG_DATE_INPUT_SET_CURRENT_DATE();
+
+   /* open the entry dbox */
+	@send OtherHistEntryDBox::MSG_GEN_INTERACTION_INITIATE();
+
+}
+
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_DOSE_ENTER_OTHER_HIST for DoseProcessClass
+ *
+ *
+ * DESCRIPTION:
+ *
+ *
+ ***********************************************************************/
+@method DoseProcessClass, MSG_DOSE_ENTER_OTHER_HIST
+{
+ word					sel, i;
+ VMFileHandle		vmfh;
+ VMBlockHandle		mapbh, vmbh;
+ MemHandle			mh, cmh;
+ ChunkHandle		ch;
+ OtherMapStruct	*otherMapPtr;
+ OtherStruct		*otherPtr;
+ char					dataStr[20];
+ DateParamsStruct	itemDate;
+
+
+	/* get the selection */
+	sel = @call OHItemsGroup::MSG_GEN_ITEM_GROUP_GET_SELECTION();
+
+	/* open the other hist file */
+	FilePushDir();
+	if (g_onOG || g_onZ) SetPCCard();
+	else FileSetStandardPath(SP_USER_DATA);
+	vmfh = VMOpen("idother", VMAF_FORCE_READ_WRITE, VMO_OPEN, 0);
+	if (vmfh)  {
+		/* get the map block */
+		mapbh = VMGetMapBlock(vmfh);
+		otherMapPtr = VMLock(vmfh, mapbh, &mh);
+		ch = otherMapPtr->OMS_dataChunkHan[sel];
+		VMUnlock(mh);
+		}
+	else  {
+		/* no file so create it & chunk arrays */
+		vmfh = VMOpen("idother", VMAF_FORCE_READ_WRITE, VMO_CREATE_ONLY, 0);
+		/* and the map */
+		mapbh = VMAlloc(vmfh, sizeof(OtherMapStruct), 0);
+		VMSetMapBlock(vmfh, mapbh);
+		otherMapPtr = VMLock(vmfh, mapbh, &mh);
+
+		/* Create a VM block and chunk array for each item to save */
+		for (i = 0; i < 9; i++) {
+			vmbh = VMAlloc(vmfh, 256, i+100);
+			/* create an mem block to attach to it */
+			cmh = MemAlloc(256, HF_SWAPABLE, HAF_LOCK);
+			LMemInitHeap(cmh, LMEM_TYPE_GENERAL, 0, sizeof(LMemBlockHeader),
+							STD_INIT_HANDLES, STD_INIT_HEAP);
+			/* create the chunk array  */
+			ch = ChunkArrayCreate(cmh, sizeof(OtherStruct), 0, 0);
+			MemUnlock(cmh);
+			/* and attach the block to the VM - */
+			VMAttach(vmfh, vmbh, cmh);
+			otherMapPtr->OMS_dataChunkHan[i] = ch;
+			}
+		/* ok - now that we have the arrays created get the ch of our
+			selected item */
+		ch = otherMapPtr->OMS_dataChunkHan[sel];
+		VMDirty(mh);
+		VMUnlock(mh);
+		}
+
+	/* add the poop */
+	@call OHEText::MSG_VIS_TEXT_GET_ALL_PTR(dataStr);
+	@call OHEDate::MSG_DATE_INPUT_GET_DATE(&itemDate);
+
+	vmbh = VMFind(vmfh, 0, sel+100);
+	VMLock(vmfh, vmbh ,&mh);
+	otherPtr = ChunkArrayAppendHandles(mh, ch, 0);
+	strcpy(otherPtr->OS_data, dataStr);
+	otherPtr->OS_date = itemDate;
+
+	VMDirty(mh);
+	VMUnlock(mh);
+
+	VMClose(vmfh, 0);
+	FilePopDir();
+
+}
+
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_DOSE_VIEW_OTHER_HIST for DoseProcessClass
+ *
+ *
+ * DESCRIPTION:
+ *
+ *
+ ***********************************************************************/
+@method DoseProcessClass, MSG_DOSE_VIEW_OTHER_HIST
+{
+ word					sel, i, count;
+ VMFileHandle		vmfh;
+ VMBlockHandle		mapbh, vmbh;
+ MemHandle			mh;
+ ChunkHandle		ch;
+ OtherMapStruct	*otherMapPtr;
+ ChunkHandle		chunk;
+ MemHandle			mem;
+ GStateHandle		gstate;
+ optr			titles[9] = {1,2,3,4,5,6,7,8,9}; /*geändert damit es kompiliert!*/
+/*optr			titles[9] = {@OHBPItemText, @OHA1CItemText, @OHMAItemText, @OHTotCItemText, @OHHDLItemText, @OHLDLItemText, @OHTriGItemText, @OHWeightItemText, @OHBMIItemText};*/
+
+
+	/* get the selection */
+	sel = @call OHItemsGroup::MSG_GEN_ITEM_GROUP_GET_SELECTION();
+
+	/* draw the title of the dlist based on what item's displayed */
+	/* set up the mem and gstate */
+	mem = MemAllocLMem(LMEM_TYPE_GSTRING, 0) ;
+	gstate = GrCreateGString(mem, GST_CHUNK, (void*)&chunk);
+	MemLock (OptrToHandle(@TitleDateStr));
+	GrDrawText(gstate, 25, 0, LMemDeref(@TitleDateStr), 0);
+	GrDrawText(gstate, 105, 0, LMemDeref(titles[sel]), 0);
+	MemUnlock (OptrToHandle(@TitleDateStr));
+	/* terminate the gstring */
+	GrEndGString(gstate) ;
+	@call OHVTitles::MSG_GEN_REPLACE_VIS_MONIKER(
+				  VUM_NOW,
+				  12,				/* height */
+				  200,				/* width */
+				  0,
+				  VMDT_GSTRING,
+				  VMST_OPTR,
+				  ConstructOptr(mem, chunk));
+	/* and 86 the gstate and mem */
+	GrDestroyGString(gstate, gstate, GSKT_KILL_DATA) ;
+	MemFree(mem) ;
+
+	/* open the other hist file */
+	FilePushDir();
+	if (g_onOG || g_onZ) SetPCCard();
+	else FileSetStandardPath(SP_USER_DATA);
+	vmfh = VMOpen("idother", VMAF_FORCE_READ_WRITE, VMO_OPEN, 0);
+	if (vmfh)  {
+		/* get the map block */
+		mapbh = VMGetMapBlock(vmfh);
+		otherMapPtr = VMLock(vmfh, mapbh, &mh);
+		ch = otherMapPtr->OMS_dataChunkHan[sel];
+		VMUnlock(mh);
+		/* get selected item's block */
+		vmbh = VMFind(vmfh, 0, sel+100);
+		VMLock(vmfh, vmbh ,&mh);
+		/* and the number of elements */
+		count = ChunkArrayGetCountHandles(mh, ch);
+		@send OHVDList::MSG_GEN_DYNAMIC_LIST_INITIALIZE(count);
+      if (count)
+			@send OHVDList::MSG_GEN_ITEM_GROUP_SET_SINGLE_SELECTION(0, FALSE);
+		/* and open the dialog box */
+		@send OtherHistViewDBox::MSG_GEN_INTERACTION_INITIATE();
+		VMUnlock(mh);
+		VMClose(vmfh, 0);
+		}
+	else {
+      NotifyDBox(0, @NoOtherHistMsg);
+		}
+
+	FilePopDir();
+
+}
+
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_DOSE_OTHER_VIEW_DLIST_MONIKER_QUERY for DoseProcessClass
+ *
+ *
+ * Description:
+ *    Get the information for a single list item
+ *
+ * Inputs:
+ *    optr list                   -- Which list needs the moniker
+ *    word item                   -- What item on the list is needed
+ *
+ *
+ ***********************************************************************/
+@method DoseProcessClass, MSG_DOSE_OTHER_VIEW_DLIST_MONIKER_QUERY
+{
+ word					sel;
+ VMFileHandle		vmfh;
+ VMBlockHandle		mapbh, vmbh;
+ MemHandle			mh, cmh;
+ ChunkHandle		ch;
+ OtherMapStruct	*otherMapPtr;
+ OtherStruct		*otherPtr;
+ char					dataStr[20], dateStr[25];
+ DateParamsStruct	itemDate;
+ TimerDateAndTime	dateTime;
+ MemHandle			mem;
+ GStateHandle		gstate;
+ ChunkHandle		chunk;
+ word					fudge;
+
+
+	/* get the selection */
+	sel = @call OHItemsGroup::MSG_GEN_ITEM_GROUP_GET_SELECTION();
+
+	/* open the other hist file */
+	FilePushDir();
+	if (g_onOG || g_onZ) SetPCCard();
+	else FileSetStandardPath(SP_USER_DATA);
+	vmfh = VMOpen("idother", VMAF_FORCE_READ_WRITE, VMO_OPEN, 0);
+	if (vmfh)  {
+		/* get the map block */
+		mapbh = VMGetMapBlock(vmfh);
+		otherMapPtr = VMLock(vmfh, mapbh, &mh);
+		ch = otherMapPtr->OMS_dataChunkHan[sel];
+		VMUnlock(mh);
+		/* get selected item's block */
+		vmbh = VMFind(vmfh, 0, sel+100);
+		VMLock(vmfh, vmbh ,&mh);
+		/* Get the arrayed info */
+		otherPtr = ChunkArrayElementToPtrHandles(mh, ch, item, 0);
+		strcpy(dataStr, otherPtr->OS_data);
+		itemDate = otherPtr->OS_date;
+		VMUnlock(mh);
+		VMClose(vmfh, 0);
+		/* and show it */
+		/* set up the mem and gstate */
+		mem = MemAllocLMem(LMEM_TYPE_GSTRING, 0) ;
+		gstate = GrCreateGString(mem, GST_CHUNK, (void*)&chunk);
+
+		if (g_onOG) fudge = 0;
+		else fudge = 10;
+
+		if (!g_onOG && !g_onZ)
+			GrSetFont(gstate, FID_DTC_URW_SANS, MakeWWFixed(12));
+
+		/* fill in the date */
+		dateTime.TDAT_year = itemDate.DP_year;
+		dateTime.TDAT_month = itemDate.DP_month;
+		dateTime.TDAT_day = itemDate.DP_day;
+		LocalFormatDateTime(dateStr, DTF_ZERO_PADDED_SHORT, &dateTime);
+		GrDrawText(gstate, 0, 0, dateStr, 0) ;
+
+		/* and the data fields */
+		GrDrawText(gstate, 105+fudge, 0, dataStr, 0) ;
+
+		/* terminate the gstring */
+		GrEndGString(gstate) ;
+		/* tell the DList */
+		@call list::MSG_GEN_DYNAMIC_LIST_REPLACE_ITEM_MONIKER(
+				  item,
+				  0,
+				  15,				/* height */
+				  200,				/* width */
+				  0,
+				  VMDT_GSTRING,
+				  VMST_OPTR,
+				  ConstructOptr(mem, chunk));
+
+		/* and 86 the gstate and mem */
+		GrDestroyGString(gstate, gstate, GSKT_KILL_DATA);
+		MemFree(mem);
+		}
+
+	FilePopDir();
+
+}
+
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_DOSE_OTHER_DELETE_ITEM for DoseProcessClass
+ *
+ *
+ * DESCRIPTION:
+ *
+ *
+ ***********************************************************************/
+@method DoseProcessClass, MSG_DOSE_OTHER_DELETE_ITEM
+{
+ word					sel, item;
+ VMFileHandle		vmfh;
+ VMBlockHandle		mapbh, vmbh;
+ MemHandle			mh, cmh;
+ ChunkHandle		ch;
+ OtherMapStruct	*otherMapPtr;
+ OtherStruct		*otherPtr;
+
+
+	/* get the selection */
+	sel = @call OHItemsGroup::MSG_GEN_ITEM_GROUP_GET_SELECTION();
+
+	/* open the other hist file */
+	FilePushDir();
+	if (g_onOG || g_onZ) SetPCCard();
+	else FileSetStandardPath(SP_USER_DATA);
+	vmfh = VMOpen("idother", VMAF_FORCE_READ_WRITE, VMO_OPEN, 0);
+	if (vmfh)  {
+		/* get the map block */
+		mapbh = VMGetMapBlock(vmfh);
+		otherMapPtr = VMLock(vmfh, mapbh, &mh);
+		ch = otherMapPtr->OMS_dataChunkHan[sel];
+		VMUnlock(mh);
+		/* get selected item's block */
+		vmbh = VMFind(vmfh, 0, sel+100);
+		VMLock(vmfh, vmbh ,&mh);
+		/* Get the arrayed info */
+		item = @call OHVDList::MSG_GEN_ITEM_GROUP_GET_SELECTION();
+		if (item != GIGS_NONE) {
+			otherPtr = ChunkArrayElementToPtrHandles(mh, ch, item, 0);
+			ChunkArrayDelete((unsigned long) ch, otherPtr);
+			@send OHVDList::MSG_GEN_DYNAMIC_LIST_REMOVE_ITEMS(item, 1);
+         }
+		VMUnlock(mh);
+		VMClose(vmfh, 0);
+		}
+
+	FilePopDir();
+}
+
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_DOSE_OPEN_BMI_CALC for DoseProcessClass
+ *
+ *
+ * DESCRIPTION:
+ *
+ *
+ ***********************************************************************/
+@method DoseProcessClass, MSG_DOSE_OPEN_BMI_CALC
+{
+
+	@send BMIDBox::MSG_GEN_INTERACTION_INITIATE();
+
+}
+
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_DOSE_CALC_BMI for DoseProcessClass
+ *
+ *
+ * DESCRIPTION:
+ *
+ *
+ ***********************************************************************/
+@method DoseProcessClass, MSG_DOSE_CALC_BMI
+{
+ WWFixedAsDWord    height, result, h2, t1;
+ word		weight;
+
+
+	/* get the inputs */
+	weight = @call BMIWeightIn::MSG_GEN_VALUE_GET_INTEGER_VALUE();
+	height = @call BMIHeightIn::MSG_GEN_VALUE_GET_VALUE();
+
+	/* calc BMI */
+	/* result = (weight/(height*height)) * 703 */
+	h2 = GrMulWWFixed(height, height);
+	t1 = GrUDivWWFixed(MakeWWFixed(weight), h2);
+	result = GrMulWWFixed(t1, MakeWWFixed(703));
+
+	/* and show dose */
+	@call BMI::MSG_GEN_VALUE_SET_VALUE(result, FALSE);
+
+
+
+}
+
+/*
+ ***************************************************************************
+ *		Code for GenLogPrimaryClass
+ ***************************************************************************
+ */
+
+@classdecl GenLogPrimaryClass;
+
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_GEN_DISPLAY_CLOSE for GenLogPrimaryClass
+ *
+ * DESCRIPTION:	Close the record view screen & bring back the main
+ *
+ *
+ ***********************************************************************/
+@method GenLogPrimaryClass, MSG_GEN_DISPLAY_CLOSE
+{
+
+	/* close the file opened when we came on screen */
+	if (g_vmfh) VMClose(g_vmfh, 0);
+
+	@call DosePrimary::MSG_GEN_SET_USABLE(VUM_DELAYED_VIA_APP_QUEUE);
+	@call self::MSG_GEN_SET_NOT_USABLE(VUM_NOW);
+	/* Don’t call the superclass or the application will detach! */
+	@send DosePrimary::MSG_META_GRAB_TARGET_EXCL();
+	@send DosePrimary::MSG_META_GRAB_FOCUS_EXCL();
+
+}
+
+/*
+ ***************************************************************************
+ *		Code for GenDoseApplicationClass
+ ***************************************************************************
+ */
+
+@classdecl GenDoseApplicationClass;
+
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_META_GAINED_FULL_SCREEN_EXCL for GenDoseApplicationClass
+ *
+ * DESCRIPTION:	Intercept this to set the meal based on the time of day.
+ *                We can't do this in OPEN_APP because on the OG the app
+ *						is always running
+ *
+ ***********************************************************************/
+@method GenDoseApplicationClass, MSG_META_GAINED_FULL_SCREEN_EXCL
+{
+
+	SetMealFromTime();
+
+   @callsuper();
+
+}
+
+

@@ -1,0 +1,140 @@
+/***********************************************************************
+ *
+ *
+ * PROJECT:	Insulin Dose Calculator
+ * MODULE:	Dose
+ * FILE:		export.goc
+ * AUTHOR:	jfh  6/04
+ *
+ * DESCRIPTION:
+ *
+ *
+ *
+ *
+ *
+ *
+ ***********************************************************************/
+
+/*
+ ***************************************************************************
+ *		Include files
+ ***************************************************************************
+ */
+
+@include "dose.goh"
+@include "externs.goh"
+
+
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_DOSE_EXPORT_HISTORY for DoseProcessClass
+ *
+ * DESCRIPTION:
+ *
+ *
+ ***********************************************************************/
+@extern method DoseProcessClass, MSG_DOSE_EXPORT_HISTORY
+{
+ VMBlockHandle		mapbh, vmbh;
+ MemHandle			mh;
+ RecsMapStruct		*recsMapPtr;
+ RecsStruct			*recsPtr;
+ word					i, len;
+ DiskHandle			dh;
+ FileHandle			fh;
+ char					lineBuf[100], tempStr[25];
+ TimerDateAndTime	dateTime;
+
+
+	/* open the data file */
+	FilePushDir();
+	if (g_onOG || g_onZ) SetPCCard();
+	else FileSetStandardPath(SP_USER_DATA);
+	g_vmfh = VMOpen("idrecs",
+					 VMAF_FORCE_READ_ONLY,
+					 VMO_OPEN,
+					 0);
+	/* check for error */
+	if (!g_vmfh)  {
+		if (ThreadGetError() == VM_FILE_NOT_FOUND)
+			NotifyDBox(0, @FileNotFoundMsg);
+		else
+			NotifyDBox(0, @FileOpenErrMsg);
+		FilePopDir();
+		return;
+		}
+
+	/* get the map block */
+	mapbh = VMGetMapBlock(g_vmfh);
+	recsMapPtr = VMLock(g_vmfh, mapbh, &mh);
+	g_ch = recsMapPtr->RMS_recsChunkHan;
+	g_numRecs = recsMapPtr->RMS_numRecs;
+	VMUnlock(mh);
+
+	/* create a CSV file */
+	FilePushDir();
+	if (g_onOG || g_onZ) {
+		dh = DiskRegisterDiskSilently(4);
+		if (dh)
+			FileSetCurrentPath(dh, "Geoworks\\Document");
+		else {
+			/* go for drive c */
+			dh = DiskRegisterDiskSilently(2);
+			FileSetCurrentPath(dh, "Geoworks\\Document");
+			}
+		}
+	FileSetStandardPath(SP_DOCUMENT);
+	fh = FileCreate("history.csv",
+					 ((FILE_CREATE_TRUNCATE | FCF_NATIVE)
+					 | (FILE_ACCESS_RW | FILE_DENY_RW)), 0);
+	if (!fh)  {
+		NotifyDBox(0, @ExpCreateErrMsg);
+		VMClose(g_vmfh, 0);
+		FilePopDir();
+		return;
+		}
+
+	/* put up the status dbox */
+
+	/* export the data */
+	vmbh = VMFind(g_vmfh, NullHandle, RECORDS);
+	VMLock(g_vmfh, vmbh ,&mh);
+	for (i = 0; i < g_numRecs; i++) {
+		recsPtr = ChunkArrayElementToPtrHandles(mh, g_ch, i, 0);
+		/* fill the buffer with the data */
+		dateTime = recsPtr->RS_dateTime;
+		LocalFormatDateTime(lineBuf, DTF_ZERO_PADDED_SHORT, &dateTime);
+		strcat(lineBuf, ", ");
+		LocalFormatDateTime(tempStr, DTF_HM_24HOUR, &dateTime);
+		strcat(lineBuf, tempStr);
+		strcat(lineBuf, ", ");
+		strcat(lineBuf, recsPtr->RS_glucose);
+		strcat(lineBuf, ", ");
+		strcat(lineBuf, recsPtr->RS_carbs);
+		strcat(lineBuf, ", ");
+		strcat(lineBuf, recsPtr->RS_dose);
+		strcat(lineBuf, "\r");
+
+		/* now write the buffer to the .CSV file */
+		len = FileWrite(fh, lineBuf, strlen(lineBuf), FALSE);
+		if (len != strlen(lineBuf))  {
+			NotifyDBox(0, @ExpWriteErrMsg);
+			VMUnlock(mh);
+			VMClose(g_vmfh, FALSE);
+			FilePopDir();
+			return;
+         }
+		/* and tell the user */
+
+		}
+
+	FileClose(fh, FALSE);
+	FilePopDir();
+
+	VMUnlock(mh);
+	VMClose(g_vmfh, FALSE);
+	FilePopDir();
+
+}
+
+

@@ -1,0 +1,239 @@
+/***********************************************************************
+ *
+ *
+ * PROJECT:	Insulin Dose Calculator
+ * MODULE:	Dose
+ * FILE:		functs.goc
+ * AUTHOR:	jfh  3/04
+ *
+ * DESCRIPTION:
+ *
+ *
+ *
+ *
+ *
+ *
+ ***********************************************************************/
+
+/*
+ ***************************************************************************
+ *		Include files
+ ***************************************************************************
+ */
+
+@include "dose.goh"
+@include "externs.goh"
+
+
+/***********************************************************************
+ *
+ * FUNCTION:	AckDBox (char* string1, char* string2, optr ackMsg)
+ *
+ * CALLED BY:
+ *
+ *
+ * STRATEGY:    returns user's Yes or No response
+ *
+ *
+ ***********************************************************************/
+word AckDBox (char* string1, char* string2, optr ackMsg)
+{
+
+    /* put up an Are you sure box */
+	 MemLock (OptrToHandle(ackMsg));
+	 if ((UserStandardDialog(0, 0,
+			    string2,
+			    string1,
+			    LMemDeref(ackMsg),
+			    ((CDT_WARNING << CDBF_DIALOG_TYPE_OFFSET) |
+			    (GIT_AFFIRMATION << CDBF_INTERACTION_TYPE_OFFSET))
+			    ) != IC_YES))  {
+	  MemUnlock (OptrToHandle(ackMsg));
+	  return(ACK_NO);
+	  }
+	 else  {
+	  MemUnlock (OptrToHandle(ackMsg));
+	  return(ACK_YES);
+	  }
+
+}
+
+
+/***********************************************************************
+ *
+ * FUNCTION:	NotifyDBox  (char* string1, optr notifyMsg)
+ *
+ * CALLED BY:
+ *
+ *
+ * STRATEGY:    Puts up selected notification box
+ *
+ *
+ ***********************************************************************/
+void NotifyDBox (char* string1, optr notifyMsg)
+{
+
+    /* put up a notification box */
+	 MemLock (OptrToHandle(notifyMsg));
+	 UserStandardDialog(0, 0, 0,
+			  string1,
+			  LMemDeref(notifyMsg),
+			  ((CDT_NOTIFICATION << CDBF_DIALOG_TYPE_OFFSET) |
+			  (GIT_NOTIFICATION << CDBF_INTERACTION_TYPE_OFFSET)));
+	 MemUnlock (OptrToHandle(notifyMsg));
+
+}
+
+/***********************************************************************
+ *
+ * FUNCTION:	SetPCCard
+ *
+ * CALLED BY:
+ *
+ *
+ * STRATEGY:
+ *
+ *
+ ***********************************************************************/
+void SetPCCard (void)
+{
+ DiskHandle		dh;
+
+
+	/* On English (or at least US ones) the PC card is drive E: but on
+		Falk's OG the PC card is drive C:.  So we first try E:. */
+	dh = DiskRegisterDiskSilently(4);
+	if (dh)
+		FileSetCurrentPath(dh, "Geoworks\\Userdata");
+	else {
+		dh = DiskRegisterDiskSilently(2);
+		FileSetCurrentPath(dh, "Geoworks\\Userdata");
+		}
+
+}
+
+/***********************************************************************
+ *
+ * FUNCTION:	DrawLogTitles
+ *
+ * CALLED BY:  OPEN_APP
+ *
+ *
+ * STRATEGY:
+ *
+ *
+ ***********************************************************************/
+void DrawLogTitles (void)
+{
+ ChunkHandle			chunk ;
+ MemHandle			mem ;
+ GStateHandle			gstate ;
+ word				start;
+
+
+	 /* set up the mem and gstate */
+    mem = MemAllocLMem(LMEM_TYPE_GSTRING, 0) ;
+    gstate = GrCreateGString(mem, GST_CHUNK, (unsigned short __far *) &chunk);
+
+	 start = 15;
+	 MemLock (OptrToHandle(@TitleDateStr));
+	 GrDrawText(gstate, start + 10, 0, LMemDeref(@TitleDateStr), 0);
+	 GrDrawText(gstate, start + 48, 0, LMemDeref(@TitleTimeStr), 0);
+	 GrDrawText(gstate, start + 90, 0, LMemDeref(@TitleGlucoseStr), 0);
+	 GrDrawText(gstate, start + 135, 0, LMemDeref(@TitleCarbsStr), 0);
+	 GrDrawText(gstate, start + 170, 0, LMemDeref(@TitleDoseStr), 0);
+	 MemUnlock (OptrToHandle(@TitleDateStr));
+
+	 /* terminate the gstring */
+    GrEndGString(gstate) ;
+
+    @call LogTitles::MSG_GEN_REPLACE_VIS_MONIKER(
+				  VUM_NOW,
+				  12,				/* height */
+				  200,				/* width */
+				  0,
+				  VMDT_GSTRING,
+				  VMST_OPTR,
+				  ConstructOptr(mem, chunk));
+
+    /* and 86 the gstate and mem */
+    GrDestroyGString(gstate, gstate, GSKT_KILL_DATA) ;
+    MemFree(mem) ;
+
+ }
+
+ /***********************************************************************
+ *
+ * FUNCTION:	SetMealFromTime
+ *
+ * CALLED BY:	FULL_SCREEN (Omnigo) & OPEN_APP (desktop & Zoomer)
+ *
+ * STRATEGY:	sets the meal selector based on current time
+ *
+ *
+ ***********************************************************************/
+void SetMealFromTime(void)
+{
+ VMFileHandle	vmfh;
+ VMBlockHandle		mapbh;
+ MemHandle			mh;
+ SetupMapStruct	*setupMapPtr;
+ TimerDateAndTime		time;
+ word						sel, i, j, timeWord, startWord, endWord;
+ word					meal[] = {BREAKFAST, MORNING ,LUNCH,
+									AFTERNOON, DINNER, EVENING};
+
+
+	/* open the file */
+	FilePushDir();
+	if (g_onOG || g_onZ) SetPCCard();
+	else FileSetStandardPath(SP_USER_DATA);
+	vmfh = VMOpen("idsetup", VMAF_FORCE_READ_WRITE, VMO_OPEN, 0);
+	if (vmfh) {
+		mapbh = VMGetMapBlock(vmfh);
+		setupMapPtr = VMLock(vmfh, mapbh, &mh);
+
+		TimerGetDateAndTime(&time);
+		timeWord = 60 * time.TDAT_hours + time.TDAT_minutes;
+
+		for (i = 0; i < 6; i++) {
+			/* determine our start and end times for this meal */
+			startWord = 60 * setupMapPtr->SMS_mealSettings[i].HMS_hour +
+						  setupMapPtr->SMS_mealSettings[i].HMS_minute;
+			if (i == 5)  j = 0;
+			else  j = i + 1;
+			endWord = 60 * setupMapPtr->SMS_mealSettings[j].HMS_hour +
+						  setupMapPtr->SMS_mealSettings[j].HMS_minute;
+			/* see if the current time is in the span */
+			if (endWord > startWord) {
+				/* this span doesn't cross midnight */
+				if ((timeWord >= startWord) && (timeWord < endWord)) {
+					/* this is the meal to select */
+					sel = meal[i];
+					break;
+					}
+				}
+			else {
+				/* this span crosses midnight */
+				if ((timeWord >= startWord) || (timeWord < endWord)) {
+					/* this is the meal to select */
+					sel = meal[i];
+					break;
+					}
+				}
+			} /* end of meals for loop */
+
+		VMUnlock(mh);
+		VMClose(vmfh, 0);
+		} /* end of opened file if */
+
+	else {
+		sel = GIGS_NONE;
+		}
+
+	FilePopDir();
+
+	@send MealItemGroup::MSG_GEN_ITEM_GROUP_SET_SINGLE_SELECTION(sel, FALSE);
+
+}
+
