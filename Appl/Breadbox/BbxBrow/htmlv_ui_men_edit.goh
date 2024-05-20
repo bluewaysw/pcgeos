@@ -1,0 +1,86 @@
+/*
+ *              Edit Menu
+ */
+
+@object GenEditControlClass EditControl = {
+    GI_attrs = @default | GA_KBD_SEARCH_PATH;
+    GII_visibility = GIV_SUB_GROUP;
+    ATTR_GEN_CONTROL_PROHIBIT_UI =
+      GECF_UNDO|GECF_DELETE
+@ifndef GLOBAL_INTERNET_BUILD
+      |GECF_CUT|GECF_PASTE
+@endif
+@ifndef COMPILE_OPTION_SELECT_ALL
+      |GECF_SELECT_ALL
+@endif
+      |GECF_CLIP_ART
+      ;
+    ATTR_GEN_CONTROL_PROHIBIT_TOOLBOX_UI =
+      GECTF_UNDO|GECTF_DELETE|GECTF_CUT|GECTF_PASTE
+@ifndef COMPILE_OPTION_SELECT_ALL
+      |GECTF_SELECT_ALL
+@endif
+      ;
+}
+
+@ifdef COPY_TO_SCRAPBOOK
+@object GenInteractionClass CopyToScrapbook = {
+    GI_comp = @CopyToScrapbookTrigger;
+}
+@object GenTriggerClass CopyToScrapbookTrigger = {
+    GI_visMoniker = 'B', "Copy to Browser Scrapbook";
+    GI_states = @default & ~GS_ENABLED;  /* dynamically enabled */
+    GTI_destination = process;
+    GTI_actionMsg = MSG_HMLVP_COPY_TO_SCRAPBOOK;
+    ATTR_GEN_TRIGGER_ACTION_DATA = CTS_COPY;
+}
+@endif
+
+@ifdef GLOBAL_INTERNET_BUILD
+@object WMSearchReplaceControlClass SearchReplaceControl = {
+@else
+@object SearchReplaceControlClass SearchReplaceControl = {
+@endif
+    GI_attrs = @default | GA_KBD_SEARCH_PATH;
+@ifdef GPC_USABILITY_CHANGES
+    GI_visMoniker = 'F', "Find Text on this Page";
+@else
+    GI_visMoniker = 'F', "Find Text";
+@endif
+    GI_kbdAccelerator = control 'F';
+    GII_visibility = GIV_DIALOG;
+    GCI_output = (TO_APP_TARGET);
+    ATTR_SEARCH_CONTROL_INTERACT_ONLY_WITH_TARGETED_TEXT_OBJECTS;
+@ifdef GLOBAL_INTERNET_BUILD
+    /* allow URLEntryClass to forward to URLTextClass */
+    ATTR_GEN_DESTINATION_CLASS = { (ClassStruct*)&VisTextClass };
+@else
+    ATTR_GEN_DESTINATION_CLASS = { (ClassStruct*)&URLTextClass };
+@endif
+    ATTR_GEN_CONTROL_PROHIBIT_UI =
+      SRCF_REPLACE_CURRENT | SRCF_REPLACE_ALL_IN_SELECTION | SRCF_REPLACE_ALL |
+      SRCF_FIND_PREV;
+@ifdef COMPILE_OPTION_SYM_BUTTON
+    ATTR_GEN_CONTROL_APP_UI = @SearchReplaceSYM;
+@endif
+    ATTR_GEN_CONTROL_DO_NOT_USE_LIBRARY_NAME_FOR_HELP;
+    ATTR_GEN_HELP_CONTEXT = "dbFind";
+@ifndef PRODUCT_NDO2000
+@ifdef	PRODUCT_DBCS
+    ATTR_GEN_EXTRA_KBD_ACCELERATORS = C_SYS_F2 & KS_CHAR_MASK;
+@else
+    ATTR_GEN_EXTRA_KBD_ACCELERATORS = (KS_CHAR_SET_CONTROL << 8) | VC_F2;
+@endif
+@endif
+}
+
+@ifdef COMPILE_OPTION_SYM_BUTTON
+@object GenTriggerClass SearchReplaceSYM = {
+    GI_visMoniker = " SYM ";
+    GI_states = @default & ~GS_USABLE;
+    GTI_destination = (TO_APP_TARGET);
+    GTI_actionMsg = MSG_GEN_APPLICATION_TOGGLE_FLOATING_KEYBOARD;
+    ATTR_GEN_DESTINATION_CLASS = { (ClassStruct *)&GenApplicationClass };
+    HINT_SEEK_TITLE_BAR_RIGHT ;
+}
+@endif

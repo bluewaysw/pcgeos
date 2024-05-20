@@ -23,7 +23,7 @@
 #pragma option -WDE
 
 /**************************************************************************
- *		Include files
+ *      Include files
  **************************************************************************/
 
 @include <stdapp.goh>
@@ -111,83 +111,86 @@ void UpdateDownloadProgressDialog(long progress, long total)
     dword now = TimerGetCount();
     static dword S_lastUpdateTime = 0;
 
-    /* store for time update */
+    // store for time update
     G_downloadTotal = total;
     G_downloadProgress = progress;
-    /* init download start time */
+
+    // init download start time
     if (!G_downloadStartTime) {
-	G_downloadStartTime = now;
-	S_lastUpdateTime = G_downloadStartTime;
+        G_downloadStartTime = now;
+        S_lastUpdateTime = G_downloadStartTime;
     } else {
-	/* if already started, don't update unless 1 second has passed */
-	if ((now - S_lastUpdateTime) < 60L) {
-	    return;
-	} else {
-	    S_lastUpdateTime = now;
-	}
+        /* if already started, don't update unless 1 second has passed */
+        if ((now - S_lastUpdateTime) < 60L) {
+            return;
+        } else {
+            S_lastUpdateTime = now;
+        }
     }
+
     if (!total) total = -1;
+
     /* update progress bar */
     if (total == -1) {
-	G_unknownPct += 2;  /* increase .2%, approx file size 500K */
-	if (G_unknownPct >= 1000) {
-	    G_unknownPct = 2;  /* wrap around */
-	}
-	@send, forceQueue DownloadProgressBar::MSG_GEN_VALUE_SET_VALUE(
-	    MakeWWFixed(G_unknownPct), FALSE);
+        G_unknownPct += 2;  /* increase .2%, approx file size 500K */
+        if (G_unknownPct >= 1000) {
+            G_unknownPct = 2;  /* wrap around */
+        }
+        @send, forceQueue DownloadProgressBar::MSG_GEN_VALUE_SET_VALUE(
+            MakeWWFixed(G_unknownPct), FALSE);
     } else {
-	word pPercent;
-	if (progress < (0x7fffffffL/1000L)) {
-	    /* tenth of a percent accuracy  */
-	    pPercent = progress*1000L/total;
-	} else {
-	    /* avoid overflow, less accurate */
-	    pPercent = (progress*10L)/(total/100L);
-	}
-	if (!pPercent) pPercent = 1;
-	@send, forceQueue DownloadProgressBar::MSG_GEN_VALUE_SET_VALUE(
-	    MakeWWFixed(pPercent), FALSE);
+        word pPercent;
+        if (progress < (0x7fffffffL/1000L)) {
+            /* tenth of a percent accuracy  */
+            pPercent = progress*1000L/total;
+        } else {
+            /* avoid overflow, less accurate */
+            pPercent = (progress*10L)/(total/100L);
+        }
+        if (!pPercent) pPercent = 1;
+        @send, forceQueue DownloadProgressBar::MSG_GEN_VALUE_SET_VALUE(
+            MakeWWFixed(pPercent), FALSE);
     }
     /* update download amount/percentage */
     updateBlock = MemAlloc(100, HF_DYNAMIC, HAF_STANDARD);
     if (updateBlock) {
-	char *updateP = MemLock(updateBlock);
-	if (total == -1) {
-	    dword uProgress = (progress+512)/1024L;
-	    if (!uProgress) uProgress = 1;
-	    MemLock(OptrToHandle(@DownloadProgressNoPercentageTemplate));
-	    sprintf(updateP, (G_fileUpload) ?
-		    LMemDeref(@DownloadProgressNoPercentageTemplateUpload) :
-		    LMemDeref(@DownloadProgressNoPercentageTemplate),
-		    uProgress);
-	    MemUnlock(OptrToHandle(@DownloadProgressNoPercentageTemplate));
-	} else {
-	    word uPercent;
-	    dword uTotal = (total+512)/1024L;
-	    if (!uTotal) uTotal = 1;
-	    if ((progress < (0x7fffffffL)/1000L)) {
-		uPercent = (word)(progress*1000L/total);
-	    } else {
-		/* avoid overflow */
-		uPercent = (word)((progress*10L)/(total/100L));
-	    }
-	    if (!uPercent) uPercent = 1;
-	    MemLock(OptrToHandle(@DownloadProgressPercentageTemplate));
-	    if (total > 1024L*1024L) {
-		sprintf(updateP, (G_fileUpload) ?
-			LMemDeref(@DownloadProgressPercentageDecimalTemplateUpload) :
-			LMemDeref(@DownloadProgressPercentageDecimalTemplate),
-			uPercent/10, uPercent%10, uTotal);
-	    } else {
-		sprintf(updateP, (G_fileUpload) ?
-			LMemDeref(@DownloadProgressPercentageTemplateUpload) :
-			LMemDeref(@DownloadProgressPercentageTemplate),
-			(uPercent+5)/10, uTotal);  /* round to full percentage */
-	    }
-	    MemUnlock(OptrToHandle(@DownloadProgressPercentageTemplate));
-	}
-	MemUnlock(updateBlock);
-	@send, forceQueue application::MSG_HMLVA_UPDATE_DOWNLOAD_PROGRESS_DIALOG(updateBlock);
+        char *updateP = MemLock(updateBlock);
+        if (total == -1) {
+            dword uProgress = (progress+512)/1024L;
+            if (!uProgress) uProgress = 1;
+            MemLock(OptrToHandle(@DownloadProgressNoPercentageTemplate));
+            sprintf(updateP, (G_fileUpload) ?
+                    LMemDeref(@DownloadProgressNoPercentageTemplateUpload) :
+                    LMemDeref(@DownloadProgressNoPercentageTemplate),
+                    uProgress);
+            MemUnlock(OptrToHandle(@DownloadProgressNoPercentageTemplate));
+        } else {
+            word uPercent;
+            dword uTotal = (total+512)/1024L;
+            if (!uTotal) uTotal = 1;
+            if ((progress < (0x7fffffffL)/1000L)) {
+                uPercent = (word)(progress*1000L/total);
+            } else {
+                /* avoid overflow */
+                uPercent = (word)((progress*10L)/(total/100L));
+            }
+            if (!uPercent) uPercent = 1;
+            MemLock(OptrToHandle(@DownloadProgressPercentageTemplate));
+            if (total > 1024L*1024L) {
+                sprintf(updateP, (G_fileUpload) ?
+                        LMemDeref(@DownloadProgressPercentageDecimalTemplateUpload) :
+                        LMemDeref(@DownloadProgressPercentageDecimalTemplate),
+                        uPercent/10, uPercent%10, uTotal);
+            } else {
+                sprintf(updateP, (G_fileUpload) ?
+                        LMemDeref(@DownloadProgressPercentageTemplateUpload) :
+                        LMemDeref(@DownloadProgressPercentageTemplate),
+                        (uPercent+5)/10, uTotal);  /* round to full percentage */
+            }
+            MemUnlock(OptrToHandle(@DownloadProgressPercentageTemplate));
+        }
+        MemUnlock(updateBlock);
+        @send, forceQueue application::MSG_HMLVA_UPDATE_DOWNLOAD_PROGRESS_DIALOG(updateBlock);
     }
 }
 
@@ -212,23 +215,30 @@ void UpdateDownloadProgressDialogTimes(void)
 #endif
 
     /* don't do anything unless we're doing a file download */
-    if (!G_fileDownload)
-	return;
+    if (!G_fileDownload) return;
+
     /* init update start time */
-    if (!G_downloadTimersStartTime) {
-	G_downloadTimersStartTime = now;
-	S_timersLastUpdateTime = G_downloadTimersStartTime;
+    if (!G_downloadTimersStartTime)
+    {
+        G_downloadTimersStartTime = now;
+        S_timersLastUpdateTime = G_downloadTimersStartTime;
 #ifdef DONT_INCREASE_REMAINING_TIME
-	S_timersLastLeft = 0x7fffffffL;
+        S_timersLastLeft = 0x7fffffffL;
 #endif
-    } else {
-	/* if already started, don't update unless 1 second has passed */
-	if ((now - S_timersLastUpdateTime) < 60L) {
-	    return;
-	} else {
-	    S_timersLastUpdateTime = now;
-	}
     }
+    else
+    {
+        /* if already started, don't update unless 1 second has passed */
+        if ((now - S_timersLastUpdateTime) < 60L)
+        {
+            return;
+        }
+        else
+        {
+            S_timersLastUpdateTime = now;
+        }
+    }
+
     /* update time past */
     ticksPast = now - G_downloadTimersStartTime;
     secondsPast = (ticksPast / 60L) % 60L;
@@ -236,51 +246,53 @@ void UpdateDownloadProgressDialogTimes(void)
     hoursPast = ticksPast / (60L * 60L * 60L);
     MemLock(OptrToHandle(@DownloadProgressTimePastTemplate));
     sprintf(updateBuffer, LMemDeref(@DownloadProgressTimePastTemplate),
-	    (word)hoursPast, (word)minutesPast, (word)secondsPast);
+            (word)hoursPast, (word)minutesPast, (word)secondsPast);
     MemUnlock(OptrToHandle(@DownloadProgressTimePastTemplate));
-    @call DownloadProgressTimePast::MSG_GEN_REPLACE_VIS_MONIKER_TEXT(
-	updateBuffer, VUM_NOW);
+    @call DownloadProgressTimePast::MSG_GEN_REPLACE_VIS_MONIKER_TEXT(updateBuffer, VUM_NOW);
+
     /* update time remaining */
-    if (G_downloadTotal == 0xffffffff ||
-	G_downloadProgress < START_SIZE_THRESHOLD ||
-	ticksPast < START_TIME_THRESHOLD) {
-	MemLock(OptrToHandle(@DownloadProgressNoTimeLeftTemplate));
-	strcpy(updateBuffer, LMemDeref(@DownloadProgressNoTimeLeftTemplate));
-	MemUnlock(OptrToHandle(@DownloadProgressNoTimeLeftTemplate));
-	@call DownloadProgressTimeLeft::MSG_GEN_REPLACE_VIS_MONIKER_TEXT(
-	    updateBuffer, VUM_NOW);
-    } else {
-	secsPast = (ticksPast+31L) / 60L;
+    if (G_downloadTotal == 0xffffffff || G_downloadProgress < START_SIZE_THRESHOLD || ticksPast < START_TIME_THRESHOLD)
+    {
+        MemLock(OptrToHandle(@DownloadProgressNoTimeLeftTemplate));
+        strcpy(updateBuffer, LMemDeref(@DownloadProgressNoTimeLeftTemplate));
+        MemUnlock(OptrToHandle(@DownloadProgressNoTimeLeftTemplate));
+        @call DownloadProgressTimeLeft::MSG_GEN_REPLACE_VIS_MONIKER_TEXT(updateBuffer, VUM_NOW);
+    }
+    else
+    {
+        secsPast = (ticksPast+31L) / 60L;
 
-	bytesPerSec = G_downloadProgress / secsPast;
-	secsLeft = (G_downloadTotal - G_downloadProgress) / bytesPerSec;
-	if (G_prevSecsLeft) {
-	    /* smoothen by averaging with previous time remaining */
-	    secsLeft = (secsLeft + G_prevSecsLeft)/2;
-	} else {
-	    /* mask start-up time with large time remaining */
-	    secsLeft *= 2;
-	}
-	G_prevSecsLeft = secsLeft;
+        bytesPerSec = G_downloadProgress / secsPast;
+        secsLeft = (G_downloadTotal - G_downloadProgress) / bytesPerSec;
+        if (G_prevSecsLeft)
+        {
+            /* smoothen by averaging with previous time remaining */
+            secsLeft = (secsLeft + G_prevSecsLeft)/2;
+        }
+        else
+        {
+            /* mask start-up time with large time remaining */
+            secsLeft *= 2;
+        }
+        G_prevSecsLeft = secsLeft;
 
 #ifdef DONT_INCREASE_REMAINING_TIME
-	/* only update if less than last time or more than 1% greater */
-	/* (greater than 1% should only occur during throughput drops) */
-	if (secsLeft < S_timersLastLeft ||
-	    (secsLeft-S_timersLastLeft > (secsLeft/(100L/MASK_UP_PERCENTAGE)))) {
-	    S_timersLastLeft = secsLeft;
+        /* only update if less than last time or more than 1% greater */
+        /* (greater than 1% should only occur during throughput drops) */
+        if (secsLeft < S_timersLastLeft || (secsLeft-S_timersLastLeft > (secsLeft/(100L/MASK_UP_PERCENTAGE))))
+        {
+            S_timersLastLeft = secsLeft;
 #endif
-	    secondsLeft = secsLeft % 60L;
-	    minutesLeft = (secsLeft / 60L) % 60L;
-	    hoursLeft = secsLeft / (60L * 60L);
-	    MemLock(OptrToHandle(@DownloadProgressTimeLeftTemplate));
-	    sprintf(updateBuffer, LMemDeref(@DownloadProgressTimeLeftTemplate),
-		    (word)hoursLeft, (word)minutesLeft, (word)secondsLeft);
-	    MemUnlock(OptrToHandle(@DownloadProgressTimeLeftTemplate));
-	    @call DownloadProgressTimeLeft::MSG_GEN_REPLACE_VIS_MONIKER_TEXT(
-		updateBuffer, VUM_NOW);
+            secondsLeft = secsLeft % 60L;
+            minutesLeft = (secsLeft / 60L) % 60L;
+            hoursLeft = secsLeft / (60L * 60L);
+            MemLock(OptrToHandle(@DownloadProgressTimeLeftTemplate));
+            sprintf(updateBuffer, LMemDeref(@DownloadProgressTimeLeftTemplate),
+                    (word)hoursLeft, (word)minutesLeft, (word)secondsLeft);
+            MemUnlock(OptrToHandle(@DownloadProgressTimeLeftTemplate));
+            @call DownloadProgressTimeLeft::MSG_GEN_REPLACE_VIS_MONIKER_TEXT(updateBuffer, VUM_NOW);
 #ifdef DONT_INCREASE_REMAINING_TIME
-	}
+        }
 #endif
     }
 }
@@ -294,32 +306,33 @@ void UpdateDownloadProgressFilename(TCHAR *url)
     fname = strrchr(url, '.');
     /* use length compare to ignore arguments */
     if (fname && ((LocalCmpStringsNoCase(fname+1, _TEXT("jpg"), 3) == 0) ||
-		  (LocalCmpStringsNoCase(fname+1, _TEXT("jpeg"), 4) == 0) ||
-		  (LocalCmpStringsNoCase(fname+1, _TEXT("gif"), 3) == 0)))
-	return;
+                  (LocalCmpStringsNoCase(fname+1, _TEXT("jpeg"), 4) == 0) ||
+                  (LocalCmpStringsNoCase(fname+1, _TEXT("gif"), 3) == 0)))
+        return;
 
     /* otherwise, set filename in download progress dialog */
     bufBlock = MemAlloc((strlen(url)+50)*sizeof(TCHAR), HF_DYNAMIC, HAF_STANDARD);
-    if (bufBlock) {
-	bufP = MemLock(bufBlock);
-	MemLock(OptrToHandle(@DownloadProgressFilenameTemplate));
-	fname = strrchr(url, '/');
-	if (fname) {
-	    fname++;
-	} else {
-	    fname = url;
-	}
-	args = strchr(fname, '?');
-	if (args) *args = C_NULL;  /* temporarily remove args */
-	sprintf(bufP,
-		(G_fileUpload) ? LMemDeref(@DownloadProgressFilenameTemplateUpload) :
-		LMemDeref(@DownloadProgressFilenameTemplate),
-		fname);
-	@call DownloadProgressFilename::MSG_GEN_REPLACE_VIS_MONIKER_TEXT(bufP, VUM_NOW);
-	if (args) *args = '?';  /* restore args */
-	MemUnlock(OptrToHandle(@DownloadProgressFilenameTemplate));
-	MemFree(bufBlock);
-	G_unknownPct = 0;  /* reset unknown-size percentage done */
+    if (bufBlock)
+    {
+        bufP = MemLock(bufBlock);
+        MemLock(OptrToHandle(@DownloadProgressFilenameTemplate));
+        fname = strrchr(url, '/');
+        if (fname) {
+            fname++;
+        } else {
+            fname = url;
+        }
+        args = strchr(fname, '?');
+        if (args) *args = C_NULL;  /* temporarily remove args */
+        sprintf(bufP,
+                (G_fileUpload) ? LMemDeref(@DownloadProgressFilenameTemplateUpload) :
+                LMemDeref(@DownloadProgressFilenameTemplate),
+                fname);
+        @call DownloadProgressFilename::MSG_GEN_REPLACE_VIS_MONIKER_TEXT(bufP, VUM_NOW);
+        if (args) *args = '?';  /* restore args */
+        MemUnlock(OptrToHandle(@DownloadProgressFilenameTemplate));
+        MemFree(bufBlock);
+        G_unknownPct = 0;  /* reset unknown-size percentage done */
     }
     G_downloadStartTime = 0;
     G_downloadTimersStartTime = 0;
@@ -349,77 +362,79 @@ void _pascal _export LoadURLCallback(_URLCallbackParams_)
 
     if(progress == -1)
     {
-      LOG(LogPrintfLine("+%ld %s", token, msg);)
+        LOG(LogPrintfLine("+%ld %s", token, msg);)
 
-	  if (strchr(msg, '/')) {
-	      /* mime-type notification */
+        if (strchr(msg, '/'))
+        {
+            /* mime-type notification */
 @ifdef COMPILE_OPTION_DOWNLOAD_PROGRESS_DIALOG
-              /* if form upload, enable download dialog, configure for upload */
-              if (LocalCmpStringsNoCase(msg, _TEXT("multipart/form-data"),
-					     19) == 0) {
-		  G_fileDownload = TRUE;
-		  G_fileUpload = TRUE;
-		  @call DownloadProgressDialog::MSG_GEN_REPLACE_VIS_MONIKER_OPTR(
-		      @UploadProgressMoniker, VUM_NOW);
-		  @call DownloadProgressFilename::MSG_GEN_SET_NOT_USABLE(VUM_NOW);
-	      }
-	      /* if not text/* or image/*, enable download dialog */
-	      else if (LocalCmpStringsNoCase(msg, _TEXT("text/"), 5) &&
-		  LocalCmpStringsNoCase(msg, _TEXT("image/"), 6) &&
-		  LocalCmpStringsNoCase(msg, _TEXT("application/x-javascript"), 24)/* &&
-		  LocalCmpStringsNoCase(msg, "audio/", 6) */) {
-		  G_fileDownload = TRUE;
-		  G_fileUpload = FALSE;
-		  @call DownloadProgressDialog::MSG_GEN_REPLACE_VIS_MONIKER_OPTR(
-		      @DownloadProgressMoniker, VUM_NOW);
-		  @call DownloadProgressFilename::MSG_GEN_SET_USABLE(VUM_NOW);
-	      }
+            /* if form upload, enable download dialog, configure for upload */
+            if (LocalCmpStringsNoCase(msg, _TEXT("multipart/form-data"),
+                                            19) == 0)
+            {
+                G_fileDownload = TRUE;
+                G_fileUpload = TRUE;
+                @call DownloadProgressDialog::MSG_GEN_REPLACE_VIS_MONIKER_OPTR(@UploadProgressMoniker, VUM_NOW);
+                @call DownloadProgressFilename::MSG_GEN_SET_NOT_USABLE(VUM_NOW);
+            }
+            /* if not text/* or image/*, enable download dialog */
+            else if (LocalCmpStringsNoCase(msg, _TEXT("text/"), 5) &&
+                    LocalCmpStringsNoCase(msg, _TEXT("image/"), 6) &&
+                    LocalCmpStringsNoCase(msg, _TEXT("application/x-javascript"), 24)/* &&
+                    LocalCmpStringsNoCase(msg, "audio/", 6) */)
+            {
+                G_fileDownload = TRUE;
+                G_fileUpload = FALSE;
+                @call DownloadProgressDialog::MSG_GEN_REPLACE_VIS_MONIKER_OPTR(@DownloadProgressMoniker, VUM_NOW);
+                @call DownloadProgressFilename::MSG_GEN_SET_USABLE(VUM_NOW);
+            }
 @endif
-	  } else {
-      mh = MemAlloc((strlen(msg)+1)*sizeof(TCHAR), HF_DYNAMIC, HAF_NO_ERR);
-      buf = MemLock(mh);
-      strcpy(buf, msg);                 /* copy message to allocated buffer */
-      MemUnlock(mh);
-	  }
+        }
+        else
+        {
+            mh = MemAlloc((strlen(msg)+1)*sizeof(TCHAR), HF_DYNAMIC, HAF_NO_ERR);
+            buf = MemLock(mh);
+            strcpy(buf, msg);                 /* copy message to allocated buffer */
+            MemUnlock(mh);
+        }
     }
     else
     {
-      LOG( if(progress == 0) )
-      LOG(   LogPrintfLine("+%ld %s", token, msg); )
+        LOG( if(progress == 0) )
+        LOG(   LogPrintfLine("+%ld %s", token, msg); )
 
-      mh = MemAlloc(80*sizeof(TCHAR), HF_DYNAMIC, HAF_NO_ERR); /* maximum message size !!! */
-      buf = MemLock(mh);
-      if(total < 1)
-      {
-        sprintf(buf, _TEXT("%s ("), msg);
-        val = progress;
-      }
-      else
-      {
-	if (progress < (0x80000000L/100L)) {
-	    percentage = (word)(progress*100L/total);
-	} else {
-	    /* avoid overflow */
-	    percentage = (word)((progress*10L)/(total/10L));
-	}
-	if (!percentage) percentage = 1;
-        sprintf(buf, _TEXT("%s (%d%% / "), msg, percentage);
-        val = total;
-      }
-      if(val>1023)
-        sprintf(buf+strlen(buf), _TEXT("%ldK)"), (val+512)/1024);
-      else
-        sprintf(buf+strlen(buf), _TEXT("%ldb)"), val);
-      MemUnlock(mh);
+        mh = MemAlloc(80*sizeof(TCHAR), HF_DYNAMIC, HAF_NO_ERR); /* maximum message size !!! */
+        buf = MemLock(mh);
+        if(total < 1)
+        {
+            sprintf(buf, _TEXT("%s ("), msg);
+            val = progress;
+        }
+        else
+        {
+            if (progress < (0x80000000L/100L)) {
+                percentage = (word)(progress*100L/total);
+            } else {
+                /* avoid overflow */
+                percentage = (word)((progress*10L)/(total/10L));
+            }
+            if (!percentage) percentage = 1;
+            sprintf(buf, _TEXT("%s (%d%% / "), msg, percentage);
+            val = total;
+        }
+        if(val>1023)
+            sprintf(buf+strlen(buf), _TEXT("%ldK)"), (val+512)/1024);
+        else
+            sprintf(buf+strlen(buf), _TEXT("%ldb)"), val);
+        MemUnlock(mh);
 @ifdef COMPILE_OPTION_DOWNLOAD_PROGRESS_DIALOG
-     if (G_fileDownload && G_allowFileDownloadStatus)
-	 UpdateDownloadProgressDialog(progress, total);
+        if (G_fileDownload && G_allowFileDownloadStatus)
+            UpdateDownloadProgressDialog(progress, total);
 @endif
     }
 
     if (mh)
-    @SendStatusUpdateBlock(
-      mh, HTML_STATUS_TYPE_DOWNLOADING);
+    @SendStatusUpdateBlock(mh, HTML_STATUS_TYPE_DOWNLOADING);
 }
 
 #if PROGRESS_DISPLAY
@@ -444,8 +459,8 @@ extern T_fetchEngineChild G_fetchChildren[];
 
 /* url must be pointer to dynamic NamePool buffer */
 word LoadURLByDriver(TCHAR *type, TCHAR **url, TCHAR *tmpname, TCHAR *mimeType,
-  dword *ret, HTMLFormDataHandle postData, NameToken referer, dword token,
-  void **abortRoutine LOAD_PROGRESS_PARAMS_PROTO CACHE_VAL_LOAD_PROTO)
+    dword *ret, HTMLFormDataHandle postData, NameToken referer, dword token,
+    void **abortRoutine LOAD_PROGRESS_PARAMS_PROTO CACHE_VAL_LOAD_PROTO)
 {
     void *ProcessURL;
     word rtype;
@@ -466,22 +481,22 @@ EC_ERROR_IF(!NamePoolIsDynamic(*url), -1);
 
     if(lastURLDriver==NullHandle || strcmp(lastURLType, type))
     {
-      drvKnown = LoadNewDriver(type);   /* load driver for this mime type */
+        drvKnown = LoadNewDriver(type);   /* load driver for this mime type */
 
-      if(!lastURLDriver || !drvKnown)   /* still no driver loaded */
-      {
-        if(drvKnown)
-          *ret = @MsgViewerError;       /* return error message */
-        else
-          *ret = @MsgNoViewer;          /* none defined: return error code */
+        if(!lastURLDriver || !drvKnown)   /* still no driver loaded */
+        {
+            if(drvKnown)
+                *ret = @MsgViewerError;       /* return error message */
+            else
+                *ret = @MsgNoViewer;          /* none defined: return error code */
 
-        if (postData)
-            MemFree(postData) ;
+            if (postData)
+                MemFree(postData) ;
 
-        ThreadVSem(URLDriverSemaphore); /* finished with drivers  */
-        return URLRequestMakeRet(URL_RET_MESSAGE) | URB_RF_NOCACHE;
-                                        /* return data in buffer */
-      }
+            ThreadVSem(URLDriverSemaphore); /* finished with drivers  */
+            return URLRequestMakeRet(URL_RET_MESSAGE) | URB_RF_NOCACHE;
+                                            /* return data in buffer */
+        }
     }
 
     drv = lastURLDriver;                /* handle to driver we just loaded */
@@ -490,21 +505,21 @@ EC_ERROR_IF(!NamePoolIsDynamic(*url), -1);
     ThreadVSem(URLDriverSemaphore);     /* finished with drivers  */
 
     /* if system shutting down or got an connection error, don't try again */
-    if (UserGetSystemShutdownStatus() ||
-	(@call application::MSG_HMLVA_CHECK_CONNECTION_ERROR())) {
-	rtype = URLRequestMakeRet(URL_RET_MESSAGE) | URB_RF_NOCACHE;
-	*ret = @MsgConnectionError;
-	goto abort;
+    if (UserGetSystemShutdownStatus() || (@call application::MSG_HMLVA_CHECK_CONNECTION_ERROR()))
+    {
+        rtype = URLRequestMakeRet(URL_RET_MESSAGE) | URB_RF_NOCACHE;
+        *ret = @MsgConnectionError;
+        goto abort;
     }
 
     /* get entry points in library */
     ProcessURL = ProcGetLibraryEntry(drv, URL_ENTRY_MAIN);
-    if(abortRoutine)
+    if (abortRoutine)
     {
-      void *abort = ProcGetLibraryEntry(drv, URL_ENTRY_ABORT);
-      __asm cli ;                       /* ensure no half pointers are passed */
-      *abortRoutine = abort;
-      __asm sti ;
+        void *abort = ProcGetLibraryEntry(drv, URL_ENTRY_ABORT);
+        __asm cli ;                       /* ensure no half pointers are passed */
+        *abortRoutine = abort;
+        __asm sti ;
     }
 
     LOG(LogPrintfLine(">%ld",token);)
@@ -514,11 +529,11 @@ EC_ERROR_IF(!NamePoolIsDynamic(*url), -1);
      * last minute abort check
      */
     if (loadProgressDataP) {
-	if (G_fetchChildren[loadProgressDataP->LPD_loadThread].isAbort) {
-	    rtype = URLRequestMakeRet(URL_RET_ABORTED);
-	    *ret = NullHandle;
-	    goto abort;
-	}
+        if (G_fetchChildren[loadProgressDataP->LPD_loadThread].isAbort) {
+            rtype = URLRequestMakeRet(URL_RET_ABORTED);
+            *ret = NullHandle;
+            goto abort;
+        }
     }
 #endif
 
@@ -529,7 +544,7 @@ EC_ERROR_IF(!NamePoolIsDynamic(*url), -1);
      * it to handle download file URLs entered directly in the URL entry
      * field; this should be fixed somehow; see routine for some heuristics)
      */
-     UpdateDownloadProgressFilename(*url);
+    UpdateDownloadProgressFilename(*url);
 @endif
 
     /*
@@ -543,11 +558,12 @@ EC_ERROR_IF(!NamePoolIsDynamic(*url), -1);
     strcpy(LMemDerefHandles(reqBlock, urlChunk), *url);
     fileChunk = LMemAlloc(reqBlock, (strlen(tmpname)+1)*sizeof(TCHAR));
     strcpy(LMemDerefHandles(reqBlock, fileChunk), tmpname);
-    if (referer != NAME_POOL_NONE) {
-	word rLen = NamePoolStrLength(namePool, referer)+1;
-	refererChunk = LMemAlloc(reqBlock, rLen*sizeof(TCHAR));
-	NamePoolCopy(namePool, LMemDerefHandles(reqBlock, refererChunk),
-		     rLen*sizeof(TCHAR), referer, 0);
+    if (referer != NAME_POOL_NONE)
+    {
+        word rLen = NamePoolStrLength(namePool, referer)+1;
+        refererChunk = LMemAlloc(reqBlock, rLen*sizeof(TCHAR));
+        NamePoolCopy(namePool, LMemDerefHandles(reqBlock, refererChunk),
+                     rLen*sizeof(TCHAR), referer, 0);
     }
 
     req = MemDeref(reqBlock);           /* refresh pointer */
@@ -571,7 +587,7 @@ EC_ERROR_IF(!NamePoolIsDynamic(*url), -1);
 @ifdef COMPILE_OPTION_AUTO_BROWSE
     /* log if not connected */
     if (IBM && !CheckConnected()) {
-	ABLog("NOT CONNECTED for request\r\n");
+        ABLog("NOT CONNECTED for request\r\n");
     }
 @endif
 
@@ -579,7 +595,7 @@ EC_ERROR_IF(!NamePoolIsDynamic(*url), -1);
      * Do the request.
      */
     rtype = ((pcfm_URLDrvMain *)ProcCallFixedOrMovable_pascal)
-      (reqBlock, postData, ProcessURL); /* call library to handle URL */
+        (reqBlock, postData, ProcessURL); /* call library to handle URL */
 
     /*
      * Analyze return data.
@@ -587,37 +603,37 @@ EC_ERROR_IF(!NamePoolIsDynamic(*url), -1);
     req = MemLock(reqBlock);
 
     if(rtype & URB_RF_FILE_REDIR)
-      xstrncpy(tmpname, LMemDerefHandles(reqBlock, req->URB_file),
-        PATH_BUFFER_SIZE/sizeof(TCHAR));
+        xstrncpy(tmpname, LMemDerefHandles(reqBlock, req->URB_file), PATH_BUFFER_SIZE/sizeof(TCHAR));
 
-    if(URLRequestGetRet(rtype) == URL_RET_URL_REDIR) {
-      int urlSize = LMemGetChunkSizeHandles(reqBlock, req->URB_url);
+    if(URLRequestGetRet(rtype) == URL_RET_URL_REDIR)
+    {
+        int urlSize = LMemGetChunkSizeHandles(reqBlock, req->URB_url);
 @ifdef DO_DBCS
-      EC_ERROR_IF(urlSize & 1, -1);
+        EC_ERROR_IF(urlSize & 1, -1);
 @endif
-      if (NamePoolResizeDynamic(url, urlSize))
-      xstrncpy(*url, LMemDerefHandles(reqBlock, req->URB_url),
-        urlSize/sizeof(TCHAR)+1);
+        if (NamePoolResizeDynamic(url, urlSize)) xstrncpy(*url, LMemDerefHandles(reqBlock, req->URB_url), urlSize/sizeof(TCHAR)+1);
     }
 
-    if(req->URB_mimeType) {
-      TCHAR *m = LMemDerefHandles(reqBlock, req->URB_mimeType), *n;
-      *mimeType = 0;
-      /* if generic binary data, try to deduce from name, if any */
-      if ((LocalCmpStringsNoCase(m, _TEXT("application/octet-stream"), 24) == 0) &&
-	  /* hopefully lowercase-only check is sufficient */
-	  (n = strstr(m, _TEXT("name=")))) {
-	  /* this can handle a quoted "name" argument */
-	  IdentifyMimeType(n+5, mimeType);
-      }
-      if (*mimeType == 0) {
-	  xstrncpy(mimeType, LMemDerefHandles(reqBlock, req->URB_mimeType),
-		   MIME_MAXBUF);
-      }
+    if(req->URB_mimeType)
+    {
+        TCHAR *m = LMemDerefHandles(reqBlock, req->URB_mimeType), *n;
+        *mimeType = 0;
+        /* if generic binary data, try to deduce from name, if any */
+        if ((LocalCmpStringsNoCase(m, _TEXT("application/octet-stream"), 24) == 0) &&
+            /* hopefully lowercase-only check is sufficient */
+            (n = strstr(m, _TEXT("name="))))
+        {
+            /* this can handle a quoted "name" argument */
+            IdentifyMimeType(n+5, mimeType);
+        }
+        if (*mimeType == 0)
+        {
+            xstrncpy(mimeType, LMemDerefHandles(reqBlock, req->URB_mimeType), MIME_MAXBUF);
+        }
     }
 #ifndef CACHE_VALIDATION  /* leave passed mimeType, if none returned */
     else
-      *mimeType = 0;
+        *mimeType = 0;
 #endif
 
     *ret = req->URB_message;
@@ -629,20 +645,23 @@ EC_ERROR_IF(!NamePoolIsDynamic(*url), -1);
 
     /* if connection error, flag it so we don't try again and again for
        current page (error cleared when page finishes) */
-    if (*ret && req->URB_errorCode == SE_LINK_FAILED) {
-	@call application::MSG_HMLVA_SET_CONNECTION_ERROR();
+    if (*ret && req->URB_errorCode == SE_LINK_FAILED)
+    {
+        @call application::MSG_HMLVA_SET_CONNECTION_ERROR();
     }
 @ifdef COMPILE_OPTION_AUTO_BROWSE
     /* log any errors */
-    if (IBM && *ret) {
-	ABLog("socket error: %d\r\n", req->URB_errorCode);
+    if (IBM && *ret)
+    {
+        ABLog("socket error: %d\r\n", req->URB_errorCode);
     }
 @endif
 
 @ifdef EMAIL_ACCT_CMD
      /* just handle email account commands now */
-     if (req->URB_extraData) {
-	 HandleEmailAcctCmd(LMemDerefHandles(reqBlock, req->URB_extraData));
+     if (req->URB_extraData)
+     {
+         HandleEmailAcctCmd(LMemDerefHandles(reqBlock, req->URB_extraData));
      }
 @endif
 
@@ -653,9 +672,9 @@ abort:
 
     if(abortRoutine)
     {
-      __asm cli ;                       /* ensure no half pointers are passed */
-      *abortRoutine = NULL;             /* we can't abort any more */
-      __asm sti ;
+        __asm cli ;                       /* ensure no half pointers are passed */
+        *abortRoutine = NULL;             /* we can't abort any more */
+        __asm sti ;
     }
 
     GeodeRemoveReference(drv);          /* no longer using driver */
@@ -665,8 +684,7 @@ abort:
         MemFree(postData) ;
 #endif
 
-    @SendStatusUpdateOptr(
-      @MsgBlank, HTML_STATUS_TYPE_DOWNLOADING);
+    @SendStatusUpdateOptr(@MsgBlank, HTML_STATUS_TYPE_DOWNLOADING);
 
     return rtype;                       /* pass back return data type */
 }
@@ -688,8 +706,8 @@ abort:
  *              callback routine that can be used to abort fetching.
  */
 word LoadURLToFile(NameToken *url, TCHAR *tempname, TCHAR *mime,
-  word loadMode, dword *ret, HTMLFormDataHandle postData, NameToken referer, NameToken *anchor, dword token,
-  void **abortRoutine LOAD_PROGRESS_PARAMS_PROTO)
+    word loadMode, dword *ret, HTMLFormDataHandle postData, NameToken referer, NameToken *anchor, dword token,
+    void **abortRoutine LOAD_PROGRESS_PARAMS_PROTO)
 {
     TCHAR curType[URL_MAX_TYPE], curExt[4];
     TCHAR urlbuf[HTML_STATIC_BUF], *urlP;
@@ -717,249 +735,262 @@ word LoadURLToFile(NameToken *url, TCHAR *tempname, TCHAR *mime,
 
     /* init return anchor */
     if (anchor)
-	*anchor = NAME_POOL_NONE;
+        *anchor = NAME_POOL_NONE;
 
     /* If we are posting data, always reload */
     if (postData)
         loadMode = ULM_ALWAYS ;
 
-    srcCache = (@call SettingsBoolGroup::
-      MSG_GEN_BOOLEAN_GROUP_GET_SELECTED_BOOLEANS() & HTMLV_SOURCE_CACHE);
+    srcCache = (@call SettingsBoolGroup::MSG_GEN_BOOLEAN_GROUP_GET_SELECTED_BOOLEANS() & HTMLV_SOURCE_CACHE);
                                         /* source cache enabled */
 
     reloc = 10;                         /* upper limit for relocations */
     NamePoolCopy(namePool, urlbuf, sizeof(urlbuf), *url, &urlP);
 
 #ifdef UNSUPPORTED_EXTS
-    if (UnSupportedExt(urlP)) {
-	word dataSize;
-	MemHandle unURLB;
-	char *unURLP;
-	/* replace old POST data, if any, with original URL */
-	if (postData) {
-	    MemFree(postData);
-	}
-	postData = FormStringCreate();
-	FormStringAppend(postData, _TEXT("url="));
-	FormStringConvertAndAppend(postData, urlP);
+    if (UnSupportedExt(urlP))
+    {
+        word dataSize;
+        MemHandle unURLB;
+        char *unURLP;
+        /* replace old POST data, if any, with original URL */
+        if (postData) {
+            MemFree(postData);
+        }
+        postData = FormStringCreate();
+        FormStringAppend(postData, _TEXT("url="));
+        FormStringConvertAndAppend(postData, urlP);
         loadMode = ULM_ALWAYS;
-	InitFileReadStringBlock(HTMLVIEW_CATEGORY, "unSupportedExtURL",
-				 &unURLB, 0, &dataSize);
-	if (NamePoolResizeDynamic(&urlP, dataSize*sizeof(TCHAR))) {
-	unURLP = MemLock(unURLB);
-	strcpy(urlP, unURLP);
-	}
-	MemFree(unURLB);
-	RedirectURL(url, &urlP, anchor);
+        InitFileReadStringBlock(HTMLVIEW_CATEGORY, "unSupportedExtURL", &unURLB, 0, &dataSize);
+        if (NamePoolResizeDynamic(&urlP, dataSize*sizeof(TCHAR)))
+        {
+            unURLP = MemLock(unURLB);
+            strcpy(urlP, unURLP);
+        }
+        MemFree(unURLB);
+        RedirectURL(url, &urlP, anchor);
     }
 #endif
 @ifdef COMPILE_OPTION_PARENTAL_CONTROL
-     /* allocate server name buffer */
+    /* allocate server name buffer */
     hostBlk = MemAlloc((URL_MAX_SERVER+1)*sizeof(TCHAR), HF_DYNAMIC, HAF_NO_ERR);
 @endif
 
-    do {
-      /*
-       * Special handling for local files
-       */
+    do
+    {
+        /*
+        * Special handling for local files
+        */
 @ifdef COMPILE_OPTION_PARENTAL_CONTROL
-      host = MemLock(hostBlk);  /* might be NULL */
-      ToolsParseURL(urlP, curType, host, NULL);
-      MemUnlock(hostBlk);
+        host = MemLock(hostBlk);  /* might be NULL */
+        ToolsParseURL(urlP, curType, host, NULL);
+        MemUnlock(hostBlk);
 @else
-      ToolsParseURL(urlP, curType, NULL, NULL);
+        ToolsParseURL(urlP, curType, NULL, NULL);
 @endif
-      if(!strcmp(curType, _TEXT("FILE")))      /* Local File URL? */
-      {
-        type = LoadFILEURL(urlP, tempname, mime, ret);
-      }
-      else if (!strcmp(curType, _TEXT("ABOUT"))) {
-	*ret = ToolsFormatMessage(@MsgBlank, NULL);;
-	type = URLRequestMakeRet(URL_RET_MESSAGE);
-	goto endLoop;
-      }
-      else
-      {
-@ifdef CHECK_ISP
-        if (CheckNoISP()) {
-	    *ret = ToolsFormatMessage(@MsgNoISP, NULL);
-	    type = URLRequestMakeRet(URL_RET_MESSAGE);
-	    goto endLoop;
-	}
-@endif
-
-@ifdef COMPILE_OPTION_PARENTAL_CONTROL
-     /*
-      * if doing parental control, check if host is allowed
-      */
-     host = MemLock(hostBlk);
-     if (host) {
-         if (*host) {
-	     TCHAR *hostEnd = host+strlen(host)*sizeof(TCHAR);
-	     Boolean allowed;
-	     dword position;
-	     AccessFlags access = ParentalControlGetAccessInfo();
-	     if (((access & AF_WWWBROWSING) || (access & AF_WWWLIMITED)) &&
-		 !G_pcBypassed) {
-		 ParentalControlEnsureOpenData();
-		 /* check exact host */
-		 allowed = ParentalControlFindURL(host, hostEnd, &position);
-		 /* try .myturn.com instead of www.myturn.com */
-		 if (allowed == FALSE) {
-		     TCHAR *h1 = strrchr(host, '.'), *h2 = 0;
-		     if (h1 && h1!=host) {
-			 *h1 = C_NULL;
-			 h2 = strrchr(host, '.');
-			 *h1 = '.';
-		     }
-		     if (h1 && h2)
-			 allowed = ParentalControlFindURL(h2, hostEnd, &position);
-		 }
-		 ParentalControlCloseData();
-		 if (allowed == FALSE) {
-		     *ret = ToolsFormatMessage(@MsgPCBlocked, host);
-		     type = URLRequestMakeRet(URL_RET_MESSAGE);
-		     MemUnlock(hostBlk);
-		     goto endLoop;
-		 }
-	     }
-	 }
-	 MemUnlock(hostBlk);
-     }
-@endif
-
-        /*
-         * Generate a cache ID under which to store the file
-         */
-        id = SrcCacheGenerateID(urlP);
-
-        /*
-         * Attempt to find URL in cache
-         */
-#ifdef CACHE_VALIDATION
-        /* in case not cache, make unconditional request */
-        lastModDate.CDT_year = 0;
-	/* in case not cache, no mime-type yet */
-   	*mime = 0;
-#endif
-        if(srcCache)                    /* source caching enabled? */
+        if(!strcmp(curType, _TEXT("FILE")))      /* Local File URL? */
         {
-          cached = SrcCacheFindURL(*url, &id, curExt, mime CACHE_VAL_FIND_ARG);
-                                        /* check for ID in cache */
-          if(cached)                    /* create name based on cache name */
-            CreateTempName(id, curExt, tempname);
+            type = LoadFILEURL(urlP, tempname, mime, ret);
+        }
+        else if (!strcmp(curType, _TEXT("ABOUT")))
+        {
+            *ret = ToolsFormatMessage(@MsgBlank, NULL);;
+            type = URLRequestMakeRet(URL_RET_MESSAGE);
+            goto endLoop;
         }
         else
-          cached = FALSE;               /* ignore existing source cache */
-
-        /*
-         * URL not cached: have to load it (if we're allowed to)
-         */
-        if( (!cached ||
-#ifdef CACHE_VALIDATION
-             tryModified ||
-#endif
-             loadMode==ULM_ALWAYS) && loadMode!=ULM_NEVER )
         {
-          if(!cached)                   /* create new temp file or reuse old */
-            CreateTempName(id, _TEXT("$$$"), tempname);
+@ifdef CHECK_ISP
+            if (CheckNoISP())
+            {
+                *ret = ToolsFormatMessage(@MsgNoISP, NULL);
+                type = URLRequestMakeRet(URL_RET_MESSAGE);
+                goto endLoop;
+            }
+@endif
 
-          type = LoadURLByDriver(curType, &urlP, tempname, mime, ret, postData,
-				 referer,
-            token, abortRoutine LOAD_PROGRESS_DATAP_ARG CACHE_VAL_LOAD_ARG);
+@ifdef COMPILE_OPTION_PARENTAL_CONTROL
+            /*
+            * if doing parental control, check if host is allowed
+            */
+            host = MemLock(hostBlk);
+            if (host)
+            {
+                if (*host)
+                {
+                    TCHAR *hostEnd = host+strlen(host)*sizeof(TCHAR);
+                    Boolean allowed;
+                    dword position;
+                    AccessFlags access = ParentalControlGetAccessInfo();
+                    if (((access & AF_WWWBROWSING) || (access & AF_WWWLIMITED)) && !G_pcBypassed)
+                    {
+                        ParentalControlEnsureOpenData();
+                        /* check exact host */
+                        allowed = ParentalControlFindURL(host, hostEnd, &position);
+                        /* try .myturn.com instead of www.myturn.com */
+                        if (allowed == FALSE)
+                        {
+                            TCHAR *h1 = strrchr(host, '.'), *h2 = 0;
+                            if (h1 && h1!=host)
+                            {
+                                *h1 = C_NULL;
+                                h2 = strrchr(host, '.');
+                                *h1 = '.';
+                            }
+                            if (h1 && h2)
+                                allowed = ParentalControlFindURL(h2, hostEnd, &position);
+                        }
+                        ParentalControlCloseData();
+                        if (allowed == FALSE)
+                        {
+                            *ret = ToolsFormatMessage(@MsgPCBlocked, host);
+                            type = URLRequestMakeRet(URL_RET_MESSAGE);
+                            MemUnlock(hostBlk);
+                            goto endLoop;
+                        }
+                    }
+                }
+                MemUnlock(hostBlk);
+            }
+@endif
 
-          /* Past this point, the postData handle is invalidated */
+            /*
+            * Generate a cache ID under which to store the file
+            */
+            id = SrcCacheGenerateID(urlP);
+
+            /*
+            * Attempt to find URL in cache
+            */
+#ifdef CACHE_VALIDATION
+            /* in case not cache, make unconditional request */
+            lastModDate.CDT_year = 0;
+            /* in case not cache, no mime-type yet */
+            *mime = 0;
+#endif
+            if(srcCache)                    /* source caching enabled? */
+            {
+                cached = SrcCacheFindURL(*url, &id, curExt, mime CACHE_VAL_FIND_ARG);
+                                                /* check for ID in cache */
+                if(cached)                    /* create name based on cache name */
+                    CreateTempName(id, curExt, tempname);
+            }
+            else
+            {
+                cached = FALSE;               /* ignore existing source cache */
+            }
+
+            /*
+            * URL not cached: have to load it (if we're allowed to)
+            */
+            if( (!cached ||
+#ifdef CACHE_VALIDATION
+            tryModified ||
+#endif
+            loadMode==ULM_ALWAYS) && loadMode!=ULM_NEVER )
+            {
+                if(!cached)                   /* create new temp file or reuse old */
+                    CreateTempName(id, _TEXT("$$$"), tempname);
+
+                type = LoadURLByDriver(curType, &urlP, tempname, mime, ret, postData, referer,
+                                            token, abortRoutine LOAD_PROGRESS_DATAP_ARG CACHE_VAL_LOAD_ARG);
+
+                /* Past this point, the postData handle is invalidated */
 #if SINGLE_POST  /* preserve post data for redirect, freed in LoadURLToFile */
-          postData = NullHandle ;
+                postData = NullHandle ;
 #endif
 
 #if PROGRESS_DISPLAY
-          if(URLRequestGetRet(type)==URL_RET_FILE ||
-	      URLRequestGetRet(type)==URL_RET_PROGRESS)
+                if(URLRequestGetRet(type)==URL_RET_FILE || URLRequestGetRet(type)==URL_RET_PROGRESS)
 #else
-          if(URLRequestGetRet(type)==URL_RET_FILE)
+                if(URLRequestGetRet(type)==URL_RET_FILE)
 #endif
-          {
-            /* still don't know mime type? */
-            if(!*mime||!strcmpi(mime, _TEXT("*/*"))||!strcmpi(mime, _TEXT("text/plain"))) {
-              IdentifyMimeType(urlP, localMime);
-                                        /* guess from extension */
-	      if (*localMime) strcpy(mime, localMime);
-	    }
-	    /* don't cache any non-text/non-image/non-audio */
-	    if (LocalCmpStringsNoCase(mime, _TEXT("text/"), 5) &&
-		LocalCmpStringsNoCase(mime, _TEXT("image/"), 6) &&
-		LocalCmpStringsNoCase(mime, _TEXT("audio/"), 6) &&
-                LocalCmpStringsNoCase(mime, _TEXT("application/x-javascript"), 24)) {
-		type |= URB_RF_NOCACHE;
-	    }
+                {
+                    /* still don't know mime type? */
+                    if(!*mime||!strcmpi(mime, _TEXT("*/*"))||!strcmpi(mime, _TEXT("text/plain")))
+                    {
+                        IdentifyMimeType(urlP, localMime);
+                        /* guess from extension */
+                        if (*localMime) strcpy(mime, localMime);
+                    }
+                    /* don't cache any non-text/non-image/non-audio */
+                    if (LocalCmpStringsNoCase(mime, _TEXT("text/"), 5) &&
+                        LocalCmpStringsNoCase(mime, _TEXT("image/"), 6) &&
+                        LocalCmpStringsNoCase(mime, _TEXT("audio/"), 6) &&
+                        LocalCmpStringsNoCase(mime, _TEXT("application/x-javascript"), 24))
+                    {
+                        type |= URB_RF_NOCACHE;
+                    }
 
-            if(*mime)                   // normalize mime type
-            {
-              strlwr(mime);
-              p = strchr(mime, ';');
-              if(p)
-                *p = 0;
-            }
+                    if (*mime)                   // normalize mime type
+                    {
+                        strlwr(mime);
+                        p = strchr(mime, ';');
+                        if(p)
+                            *p = 0;
+                    }
 
-            if(!srcCache)
-            {
-              /* if file is not to be cached, mark it as temporary */
-              type |= URB_RF_NOCACHE;
-            }
-	    else if(srcCache && !cached && (type & URB_RF_UNTOUCHED))
-	    {
-		/* if untouched (not-modified), just update name */
-		CreateTempName(id, curExt, tempname);
-		/* XXX: need to update not-modified's cache entry? */
-	    }
-            else if(srcCache && !cached && !(type & URB_RF_FILE_REDIR))
-            {
-              /* we have an uncached file: set extension, add to cache  */
-              if(*mime)                 /* set extension based on Mime type */
-                SuggestMimeExtension(mime, curExt);
-              else
-                *curExt = 0;
+                    if (!srcCache)
+                    {
+                        /* if file is not to be cached, mark it as temporary */
+                        type |= URB_RF_NOCACHE;
+                    }
+                    else if(srcCache && !cached && (type & URB_RF_UNTOUCHED))
+                    {
+                        /* if untouched (not-modified), just update name */
+                        CreateTempName(id, curExt, tempname);
+                        /* XXX: need to update not-modified's cache entry? */
+                    }
+                    else if(srcCache && !cached && !(type & URB_RF_FILE_REDIR))
+                    {
+                        /* we have an uncached file: set extension, add to cache  */
+                        if(*mime)                 /* set extension based on Mime type */
+                            SuggestMimeExtension(mime, curExt);
+                        else
+                            *curExt = 0;
 
-              if(!*curExt)              /* no extension so far? */
-              {
-                p = ToolsFindExtension(urlP);
-                                        /* find last dot indicating extension */
-                if(p)                   /* found one */
-                  xstrncpy(curExt,p,4); /* copy up to three characters */
-              }
+                        if(!*curExt)              /* no extension so far? */
+                        {
+                            p = ToolsFindExtension(urlP);
+                                                    /* find last dot indicating extension */
+                            if(p)                   /* found one */
+                            xstrncpy(curExt,p,4); /* copy up to three characters */
+                        }
 
-              RenameCacheFile(tempname, id, curExt);
-                                        /* rename file to final extension */
-              SrcCacheAddURL(id, curExt, mime, *url, 0 CACHE_VAL_ADD_ARG);
-                                        /* store URL/file association */
-            }
-	    /* after all that, if we we're told to not cache, remove it */
-	    if ((type & URB_RF_NOCACHE)
+                        RenameCacheFile(tempname, id, curExt);
+                                                    /* rename file to final extension */
+                        SrcCacheAddURL(id, curExt, mime, *url, 0 CACHE_VAL_ADD_ARG);
+                                                    /* store URL/file association */
+                    }
+                    /* after all that, if we we're told to not cache, remove it */
+                    if ((type & URB_RF_NOCACHE)
 @ifdef CACHE_ALL
-		&& !G_cacheAll
+                        && !G_cacheAll
 @endif
-		) {
-		(void)SrcCacheRemoveEntryByID(id);
-	    }
-	  } else {
-	      /* some kind of error, so remove existing cache entry */
-	      if (cached) {
-		  (void)SrcCacheRemoveEntryByID(id);
-	      }
-          }
-        }
-        else
-        {
-          type = URLRequestMakeRet(URL_RET_FILE);
-                                        /* cache: use file, not block */
-          if(!cached)                   /* uncached and not loaded: no file */
-            *tempname = 0;
-        }
+                        )
+                    {
+                        (void)SrcCacheRemoveEntryByID(id);
+                    }
+                }
+                else
+                {
+                    /* some kind of error, so remove existing cache entry */
+                    if (cached) {
+                        (void)SrcCacheRemoveEntryByID(id);
+                    }
+                }
+            }
+            else
+            {
+                type = URLRequestMakeRet(URL_RET_FILE);
+                                                /* cache: use file, not block */
+                if(!cached)                   /* uncached and not loaded: no file */
+                    *tempname = 0;
+            }
 
-        if(URLRequestGetRet(type)==URL_RET_URL_REDIR)
-          RedirectURL(url, &urlP, anchor);    /* modify url according to urlP */
-      }
+            if(URLRequestGetRet(type)==URL_RET_URL_REDIR)
+                RedirectURL(url, &urlP, anchor);    /* modify url according to urlP */
+        }
 endLoop:;
     } while(URLRequestGetRet(type)==URL_RET_URL_REDIR && --reloc);
                                         /* repeat for URL redirections */
@@ -972,7 +1003,7 @@ endLoop:;
 #endif
 
 @ifdef COMPILE_OPTION_PARENTAL_CONTROL
-     /* free server name buffer */
+    /* free server name buffer */
     if (hostBlk) MemFree(hostBlk);
 @endif
 
@@ -984,7 +1015,7 @@ endLoop:;
 }
 
 VMBlockHandle ImportGraphicByNative(TCHAR *mtype, TCHAR *file, TCHAR *driver,
-  VMFileHandle vmf, ImageAdditionalData *iad, dword *usedMem, MimeStatus *mimeStatus IMPORT_PROGRESS_PARAMS_PROTO)
+    VMFileHandle vmf, ImageAdditionalData *iad, dword *usedMem, MimeStatus *mimeStatus IMPORT_PROGRESS_PARAMS_PROTO)
 {
     VMBlockHandle dataVMBlock;
     void *ImportGraphic;
@@ -994,13 +1025,13 @@ VMBlockHandle ImportGraphicByNative(TCHAR *mtype, TCHAR *file, TCHAR *driver,
 
     if(lastMimeDriver==NullHandle || strcmp(driver, lastMimeName))
     {                                   /* load mime driver if not loaded */
-      LoadNewMimeDriver(driver);        /* load driver for this mime type */
+        LoadNewMimeDriver(driver);        /* load driver for this mime type */
 
-      if(!lastMimeDriver)               /* still no driver loaded */
-      {
-        ThreadVSem(MimeDriverSemaphore);/* finished with drivers  */
-        return 0;                       /* nothing imported */
-      }
+        if(!lastMimeDriver)               /* still no driver loaded */
+        {
+            ThreadVSem(MimeDriverSemaphore);/* finished with drivers  */
+            return 0;                       /* nothing imported */
+        }
     }
 
     drv = lastMimeDriver;               /* handle to driver we just loaded */
@@ -1014,8 +1045,8 @@ VMBlockHandle ImportGraphicByNative(TCHAR *mtype, TCHAR *file, TCHAR *driver,
 
     /* call library to handle URL */
     dataVMBlock = ((pcfm_MimeDrvGraphic *)ProcCallFixedOrMovable_pascal)
-      (mtype, file, vmf, iad, MIME_RES_DISPLAY_DEFAULT, G_allocWatcher,
-      usedMem, mimeStatus IMPORT_PROGRESS_DATAP_ARG, ImportGraphic);
+        (mtype, file, vmf, iad, MIME_RES_DISPLAY_DEFAULT, G_allocWatcher,
+        usedMem, mimeStatus IMPORT_PROGRESS_DATAP_ARG, ImportGraphic);
 
     LOG(LogPrintfLine("<I");)
 
@@ -1025,18 +1056,17 @@ VMBlockHandle ImportGraphicByNative(TCHAR *mtype, TCHAR *file, TCHAR *driver,
 }
 
 VMBlockHandle ToolsImportGraphicByDriver(TCHAR *file,
-  TCHAR *mimeType, VMFileHandle vmf, ImageAdditionalData *iad, dword *usedMem, MimeStatus *mimeStatus IMPORT_PROGRESS_PARAMS_PROTO)
+    TCHAR *mimeType, VMFileHandle vmf, ImageAdditionalData *iad, dword *usedMem, MimeStatus *mimeStatus IMPORT_PROGRESS_PARAMS_PROTO)
 {
     FileLongName driver;
 
     if(mimeType)                        /* no MIME type passed: can't import */
     {
-      /* Handle "WebMagick native" style drivers */
-      if(NameAssocFindAssociation(assocTypeDriver,
-           mimeType, driver, sizeof(driver), TRUE, NULL))
-      {
-        return ImportGraphicByNative(mimeType, file, driver, vmf, iad, usedMem, mimeStatus IMPORT_PROGRESS_DATAP_ARG);
-      }
+        /* Handle "WebMagick native" style drivers */
+        if(NameAssocFindAssociation(assocTypeDriver, mimeType, driver, sizeof(driver), TRUE, NULL))
+        {
+            return ImportGraphicByNative(mimeType, file, driver, vmf, iad, usedMem, mimeStatus IMPORT_PROGRESS_DATAP_ARG);
+        }
     }
 
     return 0;                           /* didn't find a matching driver */

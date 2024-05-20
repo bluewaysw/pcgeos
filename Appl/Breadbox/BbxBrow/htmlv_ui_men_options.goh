@@ -1,0 +1,218 @@
+/*
+ *              Options Menu
+ */
+
+@include "options.goh"
+
+@ifdef COMPILE_OPTION_SHOW_HIDE_TOOLBAR
+@object GenInteractionClass ShowHideToolbarGroup = {
+    GI_comp = @ShowToolbarTrigger, @HideToolbarTrigger;
+    GII_visibility = GIV_SUB_GROUP;
+}
+
+@object GenTriggerClass ShowToolbarTrigger = {
+    GI_visMoniker = 'S', "Show Toolbar" ;
+    GTI_destination = process ;
+    GTI_actionMsg = MSG_HMLVP_SHOW_TOOLBAR ;
+}
+@object GenTriggerClass HideToolbarTrigger = {
+    GI_visMoniker = 'H', "Hide Toolbar" ;
+    GI_states = (@default) & ~GS_USABLE;
+    GTI_destination = process ;
+    GTI_actionMsg = MSG_HMLVP_HIDE_TOOLBAR ;
+}
+@endif
+
+@object GenBooleanGroupClass SettingsBoolGroup = {
+@ifndef COMPILE_OPTION_ENABLE_SETTINGS
+    GI_states = (@default) & ~GS_USABLE;
+@endif
+    GBGI_selectedBooleans = DEFAULT_VARIOUS_SETTINGS ;
+    GBGI_destination = process;
+    GBGI_applyMsg = MSG_HMLVP_OPTIONS_CHANGED;
+    ATTR_GEN_INIT_FILE_KEY = "settings";
+@ifdef COMPILE_OPTION_ENABLE_SETTINGS
+    GI_comp =
+@ifndef COMPILE_OPTION_SHOW_HIDE_TOOLBAR
+              @htmlv_ui_obj0038,
+@endif
+              @srcCacheOpt,
+@ifdef COMPILE_OPTION_FORMATTING_CACHE_ON
+              @objCacheOpt,
+@endif
+              @htmlv_ui_obj0039
+@ifdef COMPILE_OPTION_TRUNCATE_8_3_NAMES_ON
+              ,@htmlv_ui_obj0040
+@endif
+              ;
+@endif
+}
+
+@ifdef COMPILE_OPTION_ENABLE_SETTINGS
+@ifndef COMPILE_OPTION_SHOW_HIDE_TOOLBAR
+@object GenBooleanClass htmlv_ui_obj0038 = {
+    GI_visMoniker = 'T',"Enable Toolbar";
+    GBI_identifier = HTMLV_ENABLE_TOOLBAR;
+}
+@endif
+@object GenBooleanClass srcCacheOpt = {
+    GI_visMoniker = 'S',"Source File Cache";
+    GBI_identifier = HTMLV_SOURCE_CACHE;
+}
+@ifdef COMPILE_OPTION_FORMATTING_CACHE_ON
+@object GenBooleanClass objCacheOpt = {
+    GI_visMoniker = 'F',"Formatting Cache";
+    GBI_identifier = HTMLV_OBJECT_CACHE;
+}
+@endif
+@object GenBooleanClass htmlv_ui_obj0039 = {
+    GI_visMoniker = 'r',"Act as No-Frame Browser";
+    GBI_identifier = HTMLV_NOFRAME;
+}
+@ifdef COMPILE_OPTION_TRUNCATE_8_3_NAMES_ON
+@object GenBooleanClass htmlv_ui_obj0040 = {
+    GI_visMoniker = 'c',"Truncate File Names (8+3)";
+    GBI_identifier = HTMLV_TRUNC_NAMES;
+}
+@endif
+@endif
+
+@object GenInteractionClass htmlv_ui_obj0041 = {
+    GI_visMoniker = 'M',"Miscellaneous";
+@ifndef COMPILE_OPTION_ENABLE_MISCELLANEOUS
+    GI_states = (@default) & ~GS_USABLE;
+@endif
+    GII_visibility = GIV_DIALOG;
+    GII_type = GIT_COMMAND;
+    ATTR_GEN_INIT_FILE_PROPAGATE_TO_CHILDREN;
+    ATTR_GEN_HELP_CONTEXT = "Misc";
+    GI_comp = @homePageName,
+@ifdef COMPILE_OPTION_ENABLE_MISCELLANEOUS
+              @srcCacheLimit,
+@ifdef COMPILE_OPTION_FORMATTING_CACHE_ON
+              @objCacheLimit,
+@endif
+@endif
+              @proxySite,
+              @newHomeTrigger;
+}
+
+@object GenTextClass homePageName = {
+    GI_visMoniker = 'H',"Home Page:";
+    GTXI_text = "";
+    GTXI_maxLength = HTML_MAX_BUF-1;
+    GTXI_attrs = @default | GTA_SINGLE_LINE_TEXT;
+    ATTR_GEN_INIT_FILE_KEY = "home";
+}
+@if defined(COMPILE_OPTION_ENABLE_SETTINGS) || defined(COMPILE_OPTION_ENABLE_MISCELLANEOUS)
+@object GenValueClass srcCacheLimit = {
+    GI_visMoniker = 'S',"Source Cache Size (KB):";
+    GVLI_value = MakeWWFixed(DEFAULT_SOURCE_CACHE_LIMIT);
+    GVLI_maximum = MakeWWFixed(@COMPILE_OPTION_SOURCE_CACHE_LIMIT);
+    GVLI_minimum = MakeWWFixed(@COMPILE_OPTION_SOURCE_CACHE_MIN_LIMIT);
+    ATTR_GEN_INIT_FILE_KEY = "srcCacheLimit";
+    HINT_VALUE_DIGITAL_DISPLAY;
+}
+@ifdef COMPILE_OPTION_FORMATTING_CACHE_ON
+@object GenValueClass objCacheLimit = {
+    GI_visMoniker = 'F',"Formatting Cache Size (KB):";
+    GVLI_value = MakeWWFixed(DEFAULT_OBJECT_CACHE_LIMIT);
+
+    GVLI_maximum = MakeWWFixed(16384);
+    ATTR_GEN_INIT_FILE_KEY = "objCacheLimit";
+    HINT_VALUE_DIGITAL_DISPLAY;
+}
+@endif
+@endif
+
+@object GenTextClass proxySite = {
+    GI_visMoniker = 'P', "Proxy server:" ;
+    GTXI_text = "";
+    GTXI_maxLength = HTML_MAX_BUF-1;
+    GTXI_attrs = @default | GTA_SINGLE_LINE_TEXT;
+    ATTR_GEN_INIT_FILE_KEY = "WWWProxy";
+}
+
+@object GenTriggerClass newHomeTrigger = {
+    GI_visMoniker = 'N',"Make New Home";
+    GTI_actionMsg = MSG_URL_DOCUMENT_MAKE_NEW_HOME;
+    GTI_destination = (TO_APP_MODEL);
+    ATTR_GEN_DESTINATION_CLASS = { (ClassStruct *)&URLDocumentClass };
+    HINT_SEEK_REPLY_BAR ;
+}
+
+@ifdef COMPILE_OPTION_CUSTOMIZE_TOOL_BARS
+@object GenToolControlClass ToolControl = {
+    GI_visMoniker = 'C',"Customize Tool Bars";
+    GII_visibility = GIV_DIALOG;
+    GTCI_toolboxList = @ToolboxList;
+    GTCI_toolGroupList = @ToolGroupTable;
+    HINT_SAME_CATEGORY_AS_PARENT;
+}
+
+//these are for COMPILE_OPTION_LITTLE_BUTTON_TOOLBAR
+@chunk optr ToolboxList[] = {@MainToolbar, @MainToolbarName};
+@chunk char MainToolbarName[] = "Main Toolbar";
+
+@chunk optr ToolGroupTable[] =
+{
+  @DocToolGroup, @PrintToolGroup, @EditToolGroup, @SearchToolGroup,
+  @ViewToolGroup
+};
+@endif
+
+@ifdef COMPILE_OPTION_FONT_AND_SIZE_CONTROL_ON
+@object GenInteractionClass htmlv_ui_obj0026 = {
+    GI_visMoniker = 'H',"HTML Formatting";
+    GII_visibility = GIV_POPUP;
+    ATTR_GEN_INIT_FILE_PROPAGATE_TO_CHILDREN;
+    GI_comp = @FontControl, @SizeControl;
+}
+
+@object FontControlClass FontControl = {
+    GI_visMoniker = 'n',"Font";
+    GII_visibility = GIV_POPUP;
+    GCI_output = @CurrentURLText;
+}
+
+@object PointSizeControlClass SizeControl = {
+    GI_visMoniker = 'z',"Point Size";
+    GII_visibility = GIV_POPUP;
+    GCI_output = @CurrentURLText;
+    ATTR_GEN_CONTROL_PROHIBIT_UI = PSCF_SMALLER | PSCF_LARGER;
+}
+@endif
+
+@object GenInteractionClass htmlv_ui_obj0033 = {
+    ATTR_GEN_INIT_FILE_PROPAGATE_TO_CHILDREN;
+    GI_comp = @SettingsBoolGroup;
+}
+@ifdef COMPILE_OPTION_CUSTOMIZE_TOOL_BARS
+@object GenInteractionClass htmlv_ui_obj0046 = {
+    GI_comp = @ToolControl;
+}
+@endif
+
+@ifdef COMPILE_OPTION_ENABLE_NUMCONN_OPTION
+@object GenBooleanGroupClass NumConnBooleanGroup = {
+    GI_comp = @NumConnEnableSecondThread;
+    GBGI_destination = process;
+    GBGI_applyMsg = MSG_HMLVP_NUMCONN_OPTION_CHANGED;
+}
+
+@object GenBooleanClass NumConnEnableSecondThread = {
+    GI_visMoniker = 'E', "Enable Multiple Connections";
+    GBI_identifier = 1;
+}
+@endif
+
+@ifndef COMPILE_OPTION_AUTO_SAVE_OPTIONS
+@object GenInteractionClass SaveOptionsGroup = {
+    GI_comp = @SaveOptionsButton;
+}
+@object GenTriggerClass SaveOptionsButton = {
+    GI_visMoniker = 'O',"Save Options";
+    GTI_actionMsg = MSG_META_SAVE_OPTIONS;
+    GTI_destination = @HTMLVApp;
+}
+@endif

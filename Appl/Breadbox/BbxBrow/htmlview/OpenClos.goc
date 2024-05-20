@@ -103,6 +103,10 @@ extern Boolean G_progressStatus;
 @extern object FavoriteTriggerList ;
 @endif
 
+@ifdef COMPILE_OPTION_BOOKMARKS
+@extern object BookmarkTriggerList ;
+@endif
+
 @ifdef CHECK_ISP
 extern Boolean CheckNoISP(void);
 @endif
@@ -145,8 +149,8 @@ GeodeHandle G_Html4Par;
 @ifdef COMPILE_OPTION_DOWNLOAD_PROGRESS_DIALOG
      /* build UI */
      if ((@call application::MSG_GEN_FIND_CHILD(@DownloadProgressDialog)) == 0xffff) {
-	 @call application::MSG_GEN_ADD_CHILD(@DownloadProgressDialog, CCO_LAST);
-	 @call DownloadProgressDialog::MSG_GEN_SET_USABLE(VUM_NOW);
+         @call application::MSG_GEN_ADD_CHILD(@DownloadProgressDialog, CCO_LAST);
+         @call DownloadProgressDialog::MSG_GEN_SET_USABLE(VUM_NOW);
      }
 @endif
 
@@ -164,32 +168,32 @@ GeodeHandle G_Html4Par;
 @else
     /* limit CUI to Document, Archive and Floppy; AUI is anywhere under Doc */
     if (UserGetDefaultUILevel() == UIIL_INTRODUCTORY) {
-	FileSelectorFileCriteria fsfc;
-	FileSelectorAttrs fsa;
-	fsfc = @call DownloadFileSel::MSG_GEN_FILE_SELECTOR_GET_FILE_CRITERIA();
-	fsa = @call DownloadFileSel::MSG_GEN_FILE_SELECTOR_GET_ATTRS();
-	@call DownloadFileSel::MSG_GEN_FILE_SELECTOR_SET_FILE_CRITERIA(
-	    fsfc & ~FSFC_DIRS);
-	@call DownloadFileSel::MSG_GEN_FILE_SELECTOR_SET_ATTRS(
-	    fsa & ~(FSA_ALLOW_CHANGE_DIRS | FSA_HAS_CLOSE_DIR_BUTTON |
-		    FSA_HAS_OPEN_DIR_BUTTON | FSA_HAS_CHANGE_DIRECTORY_LIST));
+        FileSelectorFileCriteria fsfc;
+        FileSelectorAttrs fsa;
+        fsfc = @call DownloadFileSel::MSG_GEN_FILE_SELECTOR_GET_FILE_CRITERIA();
+        fsa = @call DownloadFileSel::MSG_GEN_FILE_SELECTOR_GET_ATTRS();
+        @call DownloadFileSel::MSG_GEN_FILE_SELECTOR_SET_FILE_CRITERIA(
+            fsfc & ~FSFC_DIRS);
+        @call DownloadFileSel::MSG_GEN_FILE_SELECTOR_SET_ATTRS(
+            fsa & ~(FSA_ALLOW_CHANGE_DIRS | FSA_HAS_CLOSE_DIR_BUTTON |
+                    FSA_HAS_OPEN_DIR_BUTTON | FSA_HAS_CHANGE_DIRECTORY_LIST));
     }
 @endif
 
-@ifdef COMPILE_OPTION_TOGGLE_BARS
+@if defined(COMPILE_OPTION_TOGGLE_BARS) && defined(COMPILE_OPTION_SIMPLE_BUTTON_TOOLBAR)
      /* update bar states before calling superclass */
      if (InitFileReadInteger(HTMLVIEW_CATEGORY,
-			     (UserGetDefaultUILevel() == UIIL_INTRODUCTORY) ?
-			     "toggleBarsCUI" : "toggleBarsAUI",
-			     &toggleBars)) {
-	 /* not found in .ini file, set defaults, based on user level */
-	 if (UserGetDefaultUILevel() == UIIL_INTRODUCTORY) {
-	     /* CUI -- both off */
-	     toggleBars = 0;
-	 } else {
-	     /* AUI -- both on */
-	     toggleBars = TOGGLE_BARS_GOTO_ON | TOGGLE_BARS_STATUS_ON;
-	 }
+                             (UserGetDefaultUILevel() == UIIL_INTRODUCTORY) ?
+                             "toggleBarsCUI" : "toggleBarsAUI",
+                             &toggleBars)) {
+         /* not found in .ini file, set defaults, based on user level */
+         if (UserGetDefaultUILevel() == UIIL_INTRODUCTORY) {
+             /* CUI -- both off */
+             toggleBars = 0;
+         } else {
+             /* AUI -- both on */
+             toggleBars = TOGGLE_BARS_GOTO_ON | TOGGLE_BARS_STATUS_ON;
+         }
      }
      UpdateToggleBars(toggleBars);
 @endif
@@ -198,9 +202,11 @@ GeodeHandle G_Html4Par;
     /* before calling super */
     @call application::MSG_GEN_APPLICATION_GET_DISPLAY_SCHEME(&ds);
     dsr = (ds.DS_displayType & DT_DISP_ASPECT_RATIO) >> DT_DISP_ASPECT_RATIO_OFFSET;
+@ifdef COMPILE_OPTION_SIMPLE_BUTTON_TOOLBAR
     if (dsr == DAR_TV && UserGetDefaultUILevel() == UIIL_INTRODUCTORY) {
-	@send SimpleToolbarReload::MSG_GEN_SET_NOT_USABLE(VUM_DELAYED_VIA_APP_QUEUE);
+        @send SimpleToolbarReload::MSG_GEN_SET_NOT_USABLE(VUM_DELAYED_VIA_APP_QUEUE);
     }
+@endif
 @endif
 
     /* before calling super */
@@ -223,52 +229,52 @@ GeodeHandle G_Html4Par;
      /* build search menu items (assumes at least one) */
      for (i=0; i<4; i++) {
 @ifdef DO_DBCS
-	 sprintfsbcs((char *)searchKey, SEARCH_URL_TEMPLATE, i+1);
+         sprintfsbcs((char *)searchKey, SEARCH_URL_TEMPLATE, i+1);
 @else
-	 sprintf(searchKey, SEARCH_URL_TEMPLATE, i+1);
+         sprintf(searchKey, SEARCH_URL_TEMPLATE, i+1);
 @endif
-	 if (InitFileReadStringBuffer(HTMLVIEW_CATEGORY, (char *)searchKey,
-				     searchKey, sizeof(searchKey)-1*sizeof(TCHAR),
-				     &searchSize)) {
-	     /* not found */
-	     @call searchItem[i]::MSG_GEN_SET_NOT_USABLE(VUM_NOW);
-	 } else {
-	     /* found */
-	     @call searchItem[i]::MSG_GEN_SET_USABLE(VUM_NOW);
-	 }
+         if (InitFileReadStringBuffer(HTMLVIEW_CATEGORY, (char *)searchKey,
+                                     searchKey, sizeof(searchKey)-1*sizeof(TCHAR),
+                                     &searchSize)) {
+             /* not found */
+             @call searchItem[i]::MSG_GEN_SET_NOT_USABLE(VUM_NOW);
+         } else {
+             /* found */
+             @call searchItem[i]::MSG_GEN_SET_USABLE(VUM_NOW);
+         }
      }
 @endif
 
 @ifdef DO_DBCS
      /* build encoding menu */
      for (i = 0; i < 6; i++) {
-	 sprintfsbcs((char *)encodingKey, "cp-%d", i);
-	 if (InitFileReadInteger(HTMLVIEW_CATEGORY, (char *)encodingKey, &cp)) {
-	     /* not found */
-	     @call encodingItem[i]::MSG_GEN_ITEM_SET_IDENTIFIER(i);
-	     @call encodingItem[i]::MSG_GEN_SET_NOT_USABLE(VUM_NOW);
-	 } else {
-	     /* found */
-	     @call encodingItem[i]::MSG_GEN_ITEM_SET_IDENTIFIER(cp);
-	     /* set name */
-	     sprintfsbcs((char *)encodingKey, "cp%uname", cp);
-	     if (InitFileReadStringBuffer(HTMLVIEW_CATEGORY, encodingKey,
-					  &encodingKey, sizeof(encodingKey),
-					  &nameSize)) {
-		 /* use generic name */
-		 sprintf(encodingKey, _TEXT("Code Page %d"), cp);
-	     }
-	     @call encodingItem[i]::MSG_GEN_REPLACE_VIS_MONIKER_TEXT(encodingKey, VUM_NOW);
-	     @call encodingItem[i]::MSG_GEN_SET_USABLE(VUM_NOW);
-	 }
+         sprintfsbcs((char *)encodingKey, "cp-%d", i);
+         if (InitFileReadInteger(HTMLVIEW_CATEGORY, (char *)encodingKey, &cp)) {
+             /* not found */
+             @call encodingItem[i]::MSG_GEN_ITEM_SET_IDENTIFIER(i);
+             @call encodingItem[i]::MSG_GEN_SET_NOT_USABLE(VUM_NOW);
+         } else {
+             /* found */
+             @call encodingItem[i]::MSG_GEN_ITEM_SET_IDENTIFIER(cp);
+             /* set name */
+             sprintfsbcs((char *)encodingKey, "cp%uname", cp);
+             if (InitFileReadStringBuffer(HTMLVIEW_CATEGORY, encodingKey,
+                                          &encodingKey, sizeof(encodingKey),
+                                          &nameSize)) {
+                 /* use generic name */
+                 sprintf(encodingKey, _TEXT("Code Page %d"), cp);
+             }
+             @call encodingItem[i]::MSG_GEN_REPLACE_VIS_MONIKER_TEXT(encodingKey, VUM_NOW);
+             @call encodingItem[i]::MSG_GEN_SET_USABLE(VUM_NOW);
+         }
      }
      /* enable menu, if anything */
      if (cp) {
-	 @call EncodingMenu::MSG_GEN_SET_USABLE(VUM_NOW);
-	 @call EncodingList::MSG_GEN_ITEM_GROUP_SET_SINGLE_SELECTION(G_codePage, 0);
+         @call EncodingMenu::MSG_GEN_SET_USABLE(VUM_NOW);
+         @call EncodingList::MSG_GEN_ITEM_GROUP_SET_SINGLE_SELECTION(G_codePage, 0);
      } else {
-	 /* if nothing, remove menu */
-	 @call EncodingMenu::MSG_GEN_SET_NOT_USABLE(VUM_NOW);
+         /* if nothing, remove menu */
+         @call EncodingMenu::MSG_GEN_SET_NOT_USABLE(VUM_NOW);
      }
 @endif
 
@@ -306,7 +312,7 @@ GeodeHandle G_Html4Par;
     @call LinkStatus::MSG_STATUS_TEXT_INITIALIZE() ;
     /* lazarus fix */
     for (i=0; i<HTML_STATUS_TYPE_UNKNOWN; i++) {
-	G_statusIds[i] = STATUS_TEXT_ID_BAD;
+        G_statusIds[i] = STATUS_TEXT_ID_BAD;
     }
     @CallStatusUpdateOptr(
               @StatusLineDone,
@@ -334,20 +340,20 @@ GeodeHandle G_Html4Par;
 @ifdef COMPILE_OPTION_PARENTAL_CONTROL
      /* add to notification lists */
      GCNListAdd(ConstructOptr(GeodeGetProcessHandle(), 0),
-		MANUFACTURER_ID_GEOWORKS, GCNSLT_PARENTAL_CONTROL_CHANGE);
+                MANUFACTURER_ID_GEOWORKS, GCNSLT_PARENTAL_CONTROL_CHANGE);
      GCNListAdd(ConstructOptr(GeodeGetProcessHandle(), 0),
-		MANUFACTURER_ID_GEOWORKS, GCNSLT_PARENTAL_CONTROL_WEBSITE_LIST_CHANGES);
+                MANUFACTURER_ID_GEOWORKS, GCNSLT_PARENTAL_CONTROL_WEBSITE_LIST_CHANGES);
      G_pcAccess = ParentalControlGetAccessInfo();
      /* if no access, ask for password */
      if ((G_pcAccess & AF_WWWBROWSING) && !(G_pcAccess & AF_WWWLIMITED)) {
-	 G_startupPassword = TRUE;
-	 if (@call PCRoot::MSG_PC_CHECK_PASSWORD_DB(PC_WWW) == IC_OK) {
-	     /* allow one-time access */
-	     G_pcBypassed = TRUE;
-	 } else {
-	     @send, forceQueue HTMLVApp::MSG_META_QUIT();
-	 }
-	 G_startupPassword = FALSE;
+         G_startupPassword = TRUE;
+         if (@call PCRoot::MSG_PC_CHECK_PASSWORD_DB(PC_WWW) == IC_OK) {
+             /* allow one-time access */
+             G_pcBypassed = TRUE;
+         } else {
+             @send, forceQueue HTMLVApp::MSG_META_QUIT();
+         }
+         G_startupPassword = FALSE;
      }
      /*
       * display current PC status
@@ -374,7 +380,7 @@ GeodeHandle G_Html4Par;
     /* this is only needed for the CUI, in the AUI, we'll get
        MSG_GEN_DOCUMENT_CONTROL_DISPLAY_DIALOG */
     if (UserGetDefaultUILevel() == UIIL_INTRODUCTORY)
-	@send, forceQueue DocumentControl::MSG_GEN_DOCUMENT_CONTROL_INITIATE_NEW_DOC();
+        @send, forceQueue DocumentControl::MSG_GEN_DOCUMENT_CONTROL_INITIATE_NEW_DOC();
 }
 
 @extern method HTMLVApplicationClass, MSG_HMLVA_GET_LAUNCH_URL
@@ -410,13 +416,13 @@ SemaphoreHandle connectionQuitSem = NullHandle;
     }
     else
     {
-	/* don't let ourselves quit until our open-connection thread is done */
-	if (connectionQuitSem) {
-	    ThreadPSem(connectionQuitSem);
-	    ThreadFreeSem(connectionQuitSem);
-	    connectionQuitSem = NullHandle;
-	}
-	@callsuper();
+        /* don't let ourselves quit until our open-connection thread is done */
+        if (connectionQuitSem) {
+            ThreadPSem(connectionQuitSem);
+            ThreadFreeSem(connectionQuitSem);
+            connectionQuitSem = NullHandle;
+        }
+        @callsuper();
     }
 }
 
@@ -465,138 +471,138 @@ MemHandle lazarusURL = 0;
  ApplicationStates states;
 
 
-	states = @call self::MSG_GEN_APPLICATION_GET_STATE();
-	newLaunch = states & AS_ATTACHING;
-	noISP = CheckNoISP();
-	urlBuf[0] = C_NULL;
-	curType[0] = C_NULL;
-	albP = MemLock(appLaunchBlock);
-	if (albP) {
-		if (*(albP->ALB_dataFile)) {
-			urlBufP = urlBuf;
-			FileConstructFullPath(&urlBufP, PATH_BUFFER_SIZE, albP->ALB_diskHandle,
-				  albP->ALB_path, TRUE);
-			strcat(urlBuf, _TEXT("\\"));
-			strcat(urlBuf, albP->ALB_dataFile);
-			if (*urlBuf)
-				ToolsResolveRelativeURL(urlBuf, nullString);
-			}
-		extraData = albP->ALB_extraData;
-		MemUnlock(appLaunchBlock);
-		}
+        states = @call self::MSG_GEN_APPLICATION_GET_STATE();
+        newLaunch = states & AS_ATTACHING;
+        noISP = CheckNoISP();
+        urlBuf[0] = C_NULL;
+        curType[0] = C_NULL;
+        albP = MemLock(appLaunchBlock);
+        if (albP) {
+                if (*(albP->ALB_dataFile)) {
+                        urlBufP = urlBuf;
+                        FileConstructFullPath(&urlBufP, PATH_BUFFER_SIZE, albP->ALB_diskHandle,
+                                  albP->ALB_path, TRUE);
+                        strcat(urlBuf, _TEXT("\\"));
+                        strcat(urlBuf, albP->ALB_dataFile);
+                        if (*urlBuf)
+                                ToolsResolveRelativeURL(urlBuf, nullString);
+                        }
+                extraData = albP->ALB_extraData;
+                MemUnlock(appLaunchBlock);
+                }
 
-	/* OK - we're gonna do a hack here.  The app crashes when the user dbl
-	 * clicks an HTM file (or selects it from the Express Doc menu) if the app
-	 * is already running.  To avoid this situation, if the app is already
-	 * running AND we have a datafile in the alb, we'll just pass the file's
-	 * path to the entry window and return - jfh 10/15/02  */
-	if ((!newLaunch) && (*urlBuf))  {
-		@call CurrentURLText::MSG_VIS_TEXT_REPLACE_ALL_PTR(urlBuf, 0);
-		/* and send the text apply message simulating the user pressing Enter */
-		@send process::MSG_HMLVP_URL_CHANGED(GTSF_MODIFIED);
+        /* OK - we're gonna do a hack here.  The app crashes when the user dbl
+         * clicks an HTM file (or selects it from the Express Doc menu) if the app
+         * is already running.  To avoid this situation, if the app is already
+         * running AND we have a datafile in the alb, we'll just pass the file's
+         * path to the entry window and return - jfh 10/15/02  */
+        if ((!newLaunch) && (*urlBuf))  {
+                @call CurrentURLText::MSG_VIS_TEXT_REPLACE_ALL_PTR(urlBuf, 0);
+                /* and send the text apply message simulating the user pressing Enter */
+                @send process::MSG_HMLVP_URL_CHANGED(GTSF_MODIFIED);
       return;
-		}
+                }
 
-	@callsuper();
-	/* Only send OPEN_URL if the application is attaching or not quitting.
-		(Both flags are set during attach, but only the latter during quit.)
-		If the app was detaching, this IACP may force it to reattach, but the
-		headache of figuring out how to synchronize the OPEN_URL with the
-		OPEN_APPLICATION is not worth the effort. -dhunter 3/18/2000 */
-	if ((states & AS_ATTACHING) || !(states & AS_QUITTING))  {
-		if (extraData) {
-			urlDataP = MemLock(extraData);
-			iadt = urlDataP->IAB_type;
-			if (iadt == IADT_URL) {
-				strcpy(urlBuf, (TCHAR *)&urlDataP[1]);
-				if (*urlBuf) {
-					ToolsResolveRelativeURL(urlBuf, nullString);
-					}
-				}
-			MemUnlock(extraData);
-			if (iadt == IADT_URL) {
-				if (newLaunch) {
-					/* if newly launched, set launching flag so we don't
-						open home URL */
-					pself->HVAI_launchURL = TRUE;
+        @callsuper();
+        /* Only send OPEN_URL if the application is attaching or not quitting.
+                (Both flags are set during attach, but only the latter during quit.)
+                If the app was detaching, this IACP may force it to reattach, but the
+                headache of figuring out how to synchronize the OPEN_URL with the
+                OPEN_APPLICATION is not worth the effort. -dhunter 3/18/2000 */
+        if ((states & AS_ATTACHING) || !(states & AS_QUITTING))  {
+                if (extraData) {
+                        urlDataP = MemLock(extraData);
+                        iadt = urlDataP->IAB_type;
+                        if (iadt == IADT_URL) {
+                                strcpy(urlBuf, (TCHAR *)&urlDataP[1]);
+                                if (*urlBuf) {
+                                        ToolsResolveRelativeURL(urlBuf, nullString);
+                                        }
+                                }
+                        MemUnlock(extraData);
+                        if (iadt == IADT_URL) {
+                                if (newLaunch) {
+                                        /* if newly launched, set launching flag so we don't
+                                                open home URL */
+                                        pself->HVAI_launchURL = TRUE;
 @ifdef CHECK_ISP
-					/* if newly launched, check ISP if not FILE URL */
-					ToolsParseURL(urlBuf, curType, NULL, NULL);
-					if (strcmp(curType, _TEXT("FILE")) != 0 && noISP) {
-						EventHandle evt;
-						/* no ISP info, let dialer report error, then we'll
-							exit ourselves */
-						connectionQuitSem = ThreadAllocSem(0);
-						OpenConnection(connectionQuitSem);
-						evt = @record HTMLVApp::MSG_META_QUIT();
-						@send, forceQueue HTMLVApp::MSG_META_OBJ_FLUSH_INPUT_QUEUE(
-								 evt, OFIQNS_SYSTEM_INPUT_OBJ, OptrToHandle(@HTMLVApp));
-						/* extra data not needed anymore */
-						MemFree(extraData);
-						return;
-						}
+                                        /* if newly launched, check ISP if not FILE URL */
+                                        ToolsParseURL(urlBuf, curType, NULL, NULL);
+                                        if (strcmp(curType, _TEXT("FILE")) != 0 && noISP) {
+                                                EventHandle evt;
+                                                /* no ISP info, let dialer report error, then we'll
+                                                        exit ourselves */
+                                                connectionQuitSem = ThreadAllocSem(0);
+                                                OpenConnection(connectionQuitSem);
+                                                evt = @record HTMLVApp::MSG_META_QUIT();
+                                                @send, forceQueue HTMLVApp::MSG_META_OBJ_FLUSH_INPUT_QUEUE(
+                                                                 evt, OFIQNS_SYSTEM_INPUT_OBJ, OptrToHandle(@HTMLVApp));
+                                                /* extra data not needed anymore */
+                                                MemFree(extraData);
+                                                return;
+                                                }
 @endif
-					}  /* end of newLaunch if */
-				/* if no problem, open URL */
-				@send, forceQueue process::MSG_HMLVP_OPEN_URL(extraData);
-				}  /* end od URL if */
-			else {
-				/* extraData not needed anymore */
-				MemFree(extraData);
-				}
-			}  /* end of extraData if */
+                                        }  /* end of newLaunch if */
+                                /* if no problem, open URL */
+                                @send, forceQueue process::MSG_HMLVP_OPEN_URL(extraData);
+                                }  /* end od URL if */
+                        else {
+                                /* extraData not needed anymore */
+                                MemFree(extraData);
+                                }
+                        }  /* end of extraData if */
 
-		/* if startup and not passed any file or URL to open, get home URL */
-		if (newLaunch && (*urlBuf == C_NULL)) {
-			word size;
-			/* read .ini ourselves since UI has started up yet */
-			InitFileReadStringBuffer("HTMLView", "home", urlBuf, sizeof(urlBuf),
-					  &size);
-			if (*urlBuf)
-				ToolsResolveRelativeURL(urlBuf, nullString);
-			}
+                /* if startup and not passed any file or URL to open, get home URL */
+                if (newLaunch && (*urlBuf == C_NULL)) {
+                        word size;
+                        /* read .ini ourselves since UI has started up yet */
+                        InitFileReadStringBuffer("HTMLView", "home", urlBuf, sizeof(urlBuf),
+                                          &size);
+                        if (*urlBuf)
+                                ToolsResolveRelativeURL(urlBuf, nullString);
+                        }
 
-		/* if have URL, do stuff with it */
-		if (*urlBuf) {
-			Boolean isFile = FALSE;
-			ToolsParseURL(urlBuf, curType, NULL, NULL);
-			isFile = (strcmp(curType, _TEXT("FILE")) == 0);
-			/* if FILE or have ISP, update URL */
-			if (isFile || !noISP)
-				@call CurrentURLText::MSG_VIS_TEXT_REPLACE_ALL_PTR(urlBuf, 0);
-			/* if not FILE and have ISP, open connection right away */
+                /* if have URL, do stuff with it */
+                if (*urlBuf) {
+                        Boolean isFile = FALSE;
+                        ToolsParseURL(urlBuf, curType, NULL, NULL);
+                        isFile = (strcmp(curType, _TEXT("FILE")) == 0);
+                        /* if FILE or have ISP, update URL */
+                        if (isFile || !noISP)
+                                @call CurrentURLText::MSG_VIS_TEXT_REPLACE_ALL_PTR(urlBuf, 0);
+                        /* if not FILE and have ISP, open connection right away */
 @ifdef CACHE_ALL
-			if (!isFile && !noISP && !G_cacheAll)
-				OpenConnection(NullHandle);
+                        if (!isFile && !noISP && !G_cacheAll)
+                                OpenConnection(NullHandle);
 @else
-			if (!isFile && !noISP)
-				OpenConnection(NullHandle);
+                        if (!isFile && !noISP)
+                                OpenConnection(NullHandle);
 @endif
-			}
-		}  /* end of AS_ATTATCHING if */
+                        }
+                }  /* end of AS_ATTATCHING if */
 
-	else if (states & AS_QUITTING) {
-		/* if quitting, just save URL for upcoming lazarus (URL used in
-			MSG_GEN_DOCUMENT_PHYSICAL_CREATE) */
-		if (extraData) {
-			urlDataP = MemLock(extraData);
-			if (urlDataP->IAB_type == IADT_URL) {
-				strcpy(urlBuf, (TCHAR *)&urlDataP[1]);
-				if (*urlBuf) {
-					ToolsResolveRelativeURL(urlBuf, nullString);
-					}
-				}
-			MemUnlock(extraData);
-			}
-		if (*urlBuf) {
-			if (lazarusURL) MemFree(lazarusURL);
-			lazarusURL = MemAlloc(PATH_BUFFER_SIZE, HF_DYNAMIC, HAF_STANDARD);
-			if (lazarusURL) {
-				strcpy(MemLock(lazarusURL), urlBuf);
-				MemUnlock(lazarusURL);
-				}
-			}
-		}  /* end of AS_QUITTING else */
+        else if (states & AS_QUITTING) {
+                /* if quitting, just save URL for upcoming lazarus (URL used in
+                        MSG_GEN_DOCUMENT_PHYSICAL_CREATE) */
+                if (extraData) {
+                        urlDataP = MemLock(extraData);
+                        if (urlDataP->IAB_type == IADT_URL) {
+                                strcpy(urlBuf, (TCHAR *)&urlDataP[1]);
+                                if (*urlBuf) {
+                                        ToolsResolveRelativeURL(urlBuf, nullString);
+                                        }
+                                }
+                        MemUnlock(extraData);
+                        }
+                if (*urlBuf) {
+                        if (lazarusURL) MemFree(lazarusURL);
+                        lazarusURL = MemAlloc(PATH_BUFFER_SIZE, HF_DYNAMIC, HAF_STANDARD);
+                        if (lazarusURL) {
+                                strcpy(MemLock(lazarusURL), urlBuf);
+                                MemUnlock(lazarusURL);
+                                }
+                        }
+                }  /* end of AS_QUITTING else */
 }
 
 @extern method HTMLVProcessClass, MSG_PROCESS_CREATE_UI_THREAD
@@ -622,20 +628,20 @@ extern void EmailAccountError(MailAccountError mae);
     MailAccountError mae;
 
     if (G_pendingEmailDelete) {
-	deleteData = MemLock(G_pendingEmailDelete);
-	if (appExited == deleteData->geode) {
-	    mae = MailDeleteAccountWithPassword(deleteData->acctname,
-						deleteData->password);
-	    if (mae != MAE_NO_ERROR) {
-		EmailAccountError(mae);
-	    }
-	    MemFree(G_pendingEmailDelete);
-	    G_pendingEmailDelete = 0;
-	    GCNListRemove(ConstructOptr(GeodeGetProcessHandle(), 0),
-			  MANUFACTURER_ID_GEOWORKS, GCNSLT_APPLICATION);
-	} else {
-	    MemUnlock(G_pendingEmailDelete);
-	}
+        deleteData = MemLock(G_pendingEmailDelete);
+        if (appExited == deleteData->geode) {
+            mae = MailDeleteAccountWithPassword(deleteData->acctname,
+                                                deleteData->password);
+            if (mae != MAE_NO_ERROR) {
+                EmailAccountError(mae);
+            }
+            MemFree(G_pendingEmailDelete);
+            G_pendingEmailDelete = 0;
+            GCNListRemove(ConstructOptr(GeodeGetProcessHandle(), 0),
+                          MANUFACTURER_ID_GEOWORKS, GCNSLT_APPLICATION);
+        } else {
+            MemUnlock(G_pendingEmailDelete);
+        }
     }
 }
 
