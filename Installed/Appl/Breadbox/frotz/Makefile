@@ -4,19 +4,19 @@
 # If you edit it, you will lose your changes, should it be regenerated.
 #
 GEODE           = frotz
-GEOS            = gmem.c gscreen.c gpic.c ui.goc ginput.goc gsample.goc\
-                  gtext.goc itextlim.goh ctextlim.goh frotz.goh
-HIGHLEV         = stream.c sound.c redirect.c variable.c table.c text.c\
-                  input.c object.c random.c math.c
-LOWLEV          = hotkey.c screen.c main.c process.c buffer.c files.c\
-                  fastmem.c
+GEOS            = gmem.c gpic.c gscreen.c ginput.goc gsample.goc gtext.goc\
+                  ui.goc ctextlim.goh frotz.goh itextlim.goh
+HIGHLEV         = input.c math.c object.c random.c redirect.c sound.c\
+                  stream.c table.c text.c variable.c
+LOWLEV          = buffer.c fastmem.c files.c hotkey.c main.c process.c\
+                  screen.c
 UI_TO_RDFS      =
-OBJS            = gmem.obj gscreen.obj gpic.obj ui.obj ginput.obj\
-                  gsample.obj gtext.obj stream.obj sound.obj redirect.obj\
-                  variable.obj table.obj text.obj input.obj object.obj\
-                  random.obj math.obj hotkey.obj screen.obj main.obj\
-                  process.obj buffer.obj files.obj fastmem.obj
-COMMON          = frotz.h bboxreg.goh gfzicons.goh
+OBJS            = gmem.obj gpic.obj gscreen.obj ginput.obj gsample.obj\
+                  gtext.obj ui.obj input.obj math.obj object.obj random.obj\
+                  redirect.obj sound.obj stream.obj table.obj text.obj\
+                  variable.obj buffer.obj fastmem.obj files.obj hotkey.obj\
+                  main.obj process.obj screen.obj
+COMMON          = frotz.h gfzicons.goh
 MODULES         =
 CMODULES        = Geos Highlev Lowlev
 SRCS            = $(GEOS) $(HIGHLEV) $(LOWLEV) $(COMMON)

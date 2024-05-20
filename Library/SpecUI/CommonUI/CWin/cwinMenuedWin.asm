@@ -63,7 +63,7 @@ REVISION HISTORY:
 
 ------------------------------------------------------------------------------@
 
-OLMenuedWinInitialize	method private static OLMenuedWinClass, 
+OLMenuedWinInitialize	method private static OLMenuedWinClass,
 							MSG_META_INITIALIZE
 	uses	bx, di, es		; To comply w/static call requirements
 	.enter				; that bx, si, di, & es are preserved.
@@ -349,7 +349,7 @@ REVISION HISTORY:
 
 ------------------------------------------------------------------------------@
 
-OLMenuedWinUpdateWindow	method dynamic	OLMenuedWinClass, 
+OLMenuedWinUpdateWindow	method dynamic	OLMenuedWinClass,
 					MSG_META_UPDATE_WINDOW
 
 	test	cx, mask UWF_ATTACHING
@@ -453,13 +453,12 @@ REVISION HISTORY:
 	JS	7/30/92   	Initial version taken from FindIconMonikers
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
-
-if _ISUI ;--------------------------------------------------------------------
-
-OLMenuedWinSetCustomSystemMenuMoniker	method dynamic OLMenuedWinClass, 
+if _ISUI ;-----------------------------------
+OLMenuedWinSetCustomSystemMenuMoniker	method dynamic OLMenuedWinClass,
 				MSG_OL_WIN_SET_CUSTOM_SYSTEM_MENU_MONIKER
 	uses	ax, cx, dx, bp
 	.enter
+
 	;
 	; check this window for a VMS_TINY, gstring moniker
 	;
@@ -544,10 +543,10 @@ OLMenuedWinFindTitleMonikerFar	proc	far
 	ret
 OLMenuedWinFindTitleMonikerFar	endp
 
-endif	; if _ISUI -----------------------------------------------------------
+endif	; if _ISUI ----------------------------------------
 
 
-
+
 COMMENT @----------------------------------------------------------------------
 
 FUNCTION:	OLMenuedWinCheckForGensMinimized
@@ -698,7 +697,7 @@ EC <	call	VisCheckVisAssumption	;Make sure vis data exists >
 	call	OpenWinCreateBarObject		;creates object, sets visible
 
 	call	WinClasses_DerefVisSpec_DI
-	mov	ds:[di].OLMDWI_gadgetArea, ax	;save handle of gadget area 
+	mov	ds:[di].OLMDWI_gadgetArea, ax	;save handle of gadget area
 						;   object
 
 if INDENT_BOXED_CHILDREN
@@ -727,7 +726,7 @@ endif
 						;if this OLWinClass has already
 						;been visbuilt. (which it
 						;likely hasn't)
-haveGadgetArea:						
+haveGadgetArea:
 	; Send to superclass to cause visual buildout of everything
 	; under the Primary, so that app menus, created menus such as
 	; "file" & "windows" etc. have been created.
@@ -847,12 +846,12 @@ notMaximized:
 	; are specifically built out before things below attempt to vis-build on
 	; to them.  This is the law!  Unfortunately, a bug appears to result
 	; in which menus adopted by the Primary from Displays with adoptable
-	; menus end up appearing to the LEFT of main menus, instead of to 
+	; menus end up appearing to the LEFT of main menus, instead of to
 	; their RIGHT.  A fix was made awhile back in which the following
 	; code was added at the end of this objects' SPEC_BUILD_BRANCH handler,
 	; thereby vis-building the menu bar AFTER the children had been
 	; vis-built!  This amazingly didn't blow up, as most things adding
-	; themselves to the menu or windows hanging off of them (OLPopup) 
+	; themselves to the menu or windows hanging off of them (OLPopup)
 	; were'nt checking for parents that weren't vis-built.   I'm changing
 	; the code back, expecting the strangely placed adopted menus to
 	; come back, but I think this bug should be dealt with in a better
@@ -948,7 +947,7 @@ REVISION HISTORY:
 
 ------------------------------------------------------------------------------@
 
-OLMenuedWinVisUnbuild	method dynamic OLMenuedWinClass, 
+OLMenuedWinVisUnbuild	method dynamic OLMenuedWinClass,
 						MSG_SPEC_UNBUILD
 					; Then, unbuild visible objects
 					; we created. (menu bars)
@@ -1094,7 +1093,7 @@ REVISION HISTORY:
 
 ------------------------------------------------------------------------------@
 
-OLMenuedWinGenSetMinimized	method	OLMenuedWinClass, 
+OLMenuedWinGenSetMinimized	method	OLMenuedWinClass,
 						MSG_GEN_DISPLAY_SET_MINIMIZED
 
 	test	ds:[di].OLWI_specState, mask OLWSS_MINIMIZED
@@ -1131,7 +1130,19 @@ bail:	;forget it!
 
 	call	WinClasses_CallSelf_SET_VIS_SPEC_ATTR_VUM_NOW
 
+
 if not _NO_WIN_ICONS	;------------------------------------------------------
+
+if TOOL_AREA_IS_TASK_BAR
+	;
+	; if TaskBar == on
+	;
+	push	ds					; save ds
+	segmov	ds, dgroup				; load dgroup
+	test	ds:[taskBarPrefs], mask TBF_ENABLED	; test if TBF_ENABLED is set
+	pop	ds					; restore ds
+	LONG	jnz afterNoIconsBecauseOfTaskbar	; if TaskBar => show no Win Icons => jump
+endif
 
 	;See if there is an OLWinIcon object associated with this window
 
@@ -1167,7 +1178,7 @@ else
 	push	bx
 
 	; CREATE new icon object, placing it in the same block as the
-	; GenApplication object.  Note that an icon is actually a 
+	; GenApplication object.  Note that an icon is actually a
 	; GenPrimary w/HINT_WIN_ICON.
 	;
 	mov	dx, si			; add below GenApplication object
@@ -1253,7 +1264,9 @@ OMWGSM_50: ;make the Icon SA_REALIZABLE so will appear on-screen.
 	mov	ax, MSG_META_GRAB_FOCUS_EXCL
 	call	OLMenuedWinCallIconObject
 
+afterNoIconsBecauseOfTaskbar: ;if TOOL_AREA_IS_TASK_BAR
 endif	; if not _NO_WIN_ICONS ------------------------------------------------
+
 
 ;	;release input
 ;
@@ -1272,7 +1285,7 @@ METHOD:		OLMenuedWinSetNotMinimized --
 
 DESCRIPTION:	This method is passed on to us after the Generic UI has
 		handled it.
-		
+
 		This whole process starts when the user selects "restore"
 		from the window's system menu, or when he clicks on the
 		Minimize icon. Each of these triggers sends
@@ -1351,7 +1364,7 @@ endif			; if not _NO_WIN_ICONS --------------------------------
 
 	;set this window REALIZABLE (do not touch generic state data)
 
-;SAVE BYTES: Can we turn on and turn off stuff at the same time?	
+;SAVE BYTES: Can we turn on and turn off stuff at the same time?
 	mov	cx, mask SA_REALIZABLE
 					;turn on SA_REALIZABLE flag
 	call	WinClasses_CallSelf_SET_VIS_SPEC_ATTR_VUM_NOW
@@ -1511,7 +1524,7 @@ maximize:
 	;yet able to determine position and size given our new flags
 	;
 	;(changed to position the window at -1 on B/W systems in order to
-	; inset the window.  We can't do this in  UpdateWinPosition, since the 
+	; inset the window.  We can't do this in  UpdateWinPosition, since the
 	; position is never actually calculated via a specSizePair (WPSS_VIS_-
 	; POS_IS_SPEC_PAIR is never set here).  -cbh 2/14/92)
 
@@ -1520,12 +1533,12 @@ if	(not _MOTIF)
 	call	OpenCheckIfBW
 	jnc	dontInset
 	dec	ax
-dontInset:			
+dontInset:
 else
 	dec	ax			;Motif always does this now, to get nice
 					;etched MDI borders in color. 12/12/92
 endif
-	
+
 	call	WinClasses_DerefVisSpec_DI
 if THREE_DIMENSIONAL_BORDERS
 	;
@@ -1557,6 +1570,7 @@ if TOOL_AREA_IS_TASK_BAR
 	add	di, ds:[di].Vis_offset
 	add	ds:[di].VI_bounds.R_top, dx
 	add	ds:[di].VI_bounds.R_bottom, dx
+
 endif
 
 	call	UpdateWinPosSize	;update window position and size if
@@ -1638,7 +1652,7 @@ FUNCTION:	OLMenuedWinSetNotMaximized -- MSG_GEN_DISPLAY_SET_NOT_MAXIMIZED
 
 DESCRIPTION:	Handle what the specific-UI thinks un-MAXIMIZED means.
 
-CALLED BY:	
+CALLED BY:
 
 PASS:		ds:*si	- instance data
 
@@ -1693,7 +1707,7 @@ SetNotMaximized	proc	far
 	;in case this window was MAXIMIZED when first VIS_BUILT,
 	;must create the system menu icons now. (Do this before the
 	;MSG_VIS_VUP_UPDATE_WIN_GROUP)
-	
+
 CUAS <	mov	bp, mask SBF_IN_UPDATE_WIN_GROUP or mask SBF_WIN_GROUP \
 							or VUM_NOW	>
 CUAS <	call	OpenWinEnsureSysMenu					>
@@ -1934,7 +1948,7 @@ endif	;MENU_BAR_IS_A_MENU
 if	(0)	; Having a little fun w/colors
 	push	ax, bx, si
 	mov	si, ax
-	mov	ax, HINT_GADGET_BACKGROUND_COLORS 
+	mov	ax, HINT_GADGET_BACKGROUND_COLORS
 	call	ObjVarAddData
 	mov	ds:[bx].BC_unselectedColor1, C_LIGHT_GRAY
 	mov	ds:[bx].BC_unselectedColor2, C_WHITE
@@ -1999,10 +2013,10 @@ CALLED BY:	OLMenuedWinGupQuery
 PASS:		*ds:si	= OLMenuedWinClass object
 RETURN:		nothing
 DESTROYED:	nothing
-SIDE EFFECTS:	
+SIDE EFFECTS:
 
 PSEUDO CODE/STRATEGY:
-		
+
 
 REVISION HISTORY:
 	Name	Date		Description
@@ -2107,7 +2121,7 @@ build:
 	call	WinClasses_DerefVisSpec_DI
 	mov	si, ds:[di].OLPWI_button
 	call	WinClasses_DerefVisSpec_DI
-	ornf	ds:[di].OLBI_moreAttrs, mask OLBMA_IN_TOOLBOX 
+	ornf	ds:[di].OLBI_moreAttrs, mask OLBMA_IN_TOOLBOX
 	ornf	ds:[di].OLBI_specState, mask OLBSS_SYS_ICON
 	andnf	ds:[di].OLBI_specState, not mask OLBSS_MENU_DOWN_MARK
 
@@ -2266,7 +2280,7 @@ OLMenuedWinSpecNavigateToPreviousField	endm
 
 COMMENT @----------------------------------------------------------------------
 
-METHOD:		OLMenuedWinFindKbdAccelerator -- 
+METHOD:		OLMenuedWinFindKbdAccelerator --
 		MSG_GEN_FIND_KBD_ACCELERATOR for OLMenuedWinClass
 
 DESCRIPTION:	Finds any keyboard accelerators.  Subclassed here to find
@@ -2304,9 +2318,9 @@ if (0)	; OLMenuBarClass doesn't intercept MSG_GEN_FIND_KBD_ACCELERATOR
 
 OLMenuedWinFindKbdAccelerator	method dynamic OLMenuedWinClass, \
 				MSG_GEN_FIND_KBD_ACCELERATOR
-	mov	si, ds:[di].OLMDWI_menuBar	;else find menu bar	
+	mov	si, ds:[di].OLMDWI_menuBar	;else find menu bar
 	tst	si				;is there one?
-	jz	exit				;no, exit (carry should be 
+	jz	exit				;no, exit (carry should be
 						;  clear from tst)
 	call	ObjCallInstanceNoLock		;else send to menu bar.
 exit:
@@ -2319,10 +2333,10 @@ endif	; if (0)
 
 COMMENT @----------------------------------------------------------------------
 
-METHOD:		OLMenuedWinQueryMenuBar -- 
+METHOD:		OLMenuedWinQueryMenuBar --
 		MSG_OL_WIN_QUERY_MENU_BAR for OLMenuedWinClass
 
-DESCRIPTION:	Returns menu bar handle in cx.  
+DESCRIPTION:	Returns menu bar handle in cx.
 
 PASS:		*ds:si 	- instance data
 		es     	- segment of MetaClass
@@ -2347,7 +2361,7 @@ REVISION HISTORY:
 
 OLMenuedWinQueryMenuBar	method dynamic OLMenuedWinClass, \
 						MSG_OL_WIN_QUERY_MENU_BAR
-	mov	cx, ds:[di].OLMDWI_menuBar	;get the menu bar handle	
+	mov	cx, ds:[di].OLMDWI_menuBar	;get the menu bar handle
 	ret
 OLMenuedWinQueryMenuBar	endm
 
@@ -2358,7 +2372,7 @@ Geometry	segment resource
 
 COMMENT @----------------------------------------------------------------------
 
-METHOD:		OLMenuedWinSetIconPos -- 
+METHOD:		OLMenuedWinSetIconPos --
 		MSG_OL_MW_SET_ICON_POS for OLMenuedWinClass
 
 DESCRIPTION:	Sets a new slot and position (if there is a slot) for the icon.
@@ -2396,7 +2410,7 @@ OLMenuedWinSetIconPos	method OLMenuedWinClass, MSG_OL_MW_SET_ICON_POS
 	add	di, ds:[di].Vis_offset
 	test	bp, mask WPSS_STAGGERED_SLOT shr 8
 	jz	10$				;no slot, don't set icon pos
-	
+
 	mov	ds:[di].OLMDWI_iconPosLeft, cx	;store new position
 	mov	ds:[di].OLMDWI_iconPosTop, dx
 
@@ -2420,7 +2434,7 @@ Unbuild	segment resource
 
 COMMENT @----------------------------------------------------------------------
 
-METHOD:		OLMenuedWinQuit -- 
+METHOD:		OLMenuedWinQuit --
 		MSG_META_QUIT for OLMenuedWinClass
 
 DESCRIPTION:	Handles a quit.  Frees its corresponding icon.
@@ -2449,18 +2463,18 @@ REVISION HISTORY:
 OLMenuedWinQuit	method OLMenuedWinClass, MSG_META_QUIT
 	mov	di, offset OLMenuedWinClass
 	call	ObjCallSuperNoLock
-	
+
 	;Release its staggered slot # if it has one.
 	;This will affect both the instance data for the object
 	;and the data that might be saved.
 
 	call	OpenWinFreeStaggeredSlot
-	
+
 if not _NO_WIN_ICONS	;------------------------------------------------------
 
 	;Release the icon slot as well.
-	
-	mov	di, ds:[si]			
+
+	mov	di, ds:[si]
 	add	di, ds:[di].Vis_offset
 	mov	dl, {byte} ds:[di].OLMDWI_iconWinPosSizeState+1
 	ANDNF	dl, mask WPSS_STAGGERED_SLOT shr 8
@@ -2484,7 +2498,7 @@ WinCommon	segment resource
 
 COMMENT @----------------------------------------------------------------------
 
-METHOD:		OLMenuedWinStartSelect -- 
+METHOD:		OLMenuedWinStartSelect --
 		MSG_META_START_SELECT for OLMenuedWinClass
 
 DESCRIPTION:	Handles a mouse press.   Handles if doubleclick; otherwise
@@ -2517,7 +2531,7 @@ REVISION HISTORY:
 ------------------------------------------------------------------------------@
 
 if	_CUA_STYLE
-	
+
 OLMenuedWinStartSelect	method OLMenuedWinClass, MSG_META_START_SELECT
 
 if not KEYBOARD_ONLY_UI
@@ -2526,7 +2540,7 @@ if not KEYBOARD_ONLY_UI
 	test	bp, mask BI_DOUBLE_PRESS	;see if doublepress
 	jz	callSuper			;nope, skip
 
-	mov	di, ds:[si]			
+	mov	di, ds:[si]
 	add	di, ds:[di].Vis_offset
 	call	MouseInTitleBounds?		;see if in title area
 	jnc	callSuper			;no, skip
@@ -2550,7 +2564,7 @@ endif
 	;
 	; Currently unmaximized.
 	;
-	test	ds:[di].OLWI_attrs, mask OWA_MAXIMIZABLE	
+	test	ds:[di].OLWI_attrs, mask OWA_MAXIMIZABLE
 	jz	callSuper			;not maximizable, skip
 EC <	;before we load up MSG_GEN_DISPLAY_SET_MAXIMIZED, make sure it	>
 EC <	;is a GenDisplay...						>
@@ -2566,11 +2580,11 @@ EC <	ERROR_NC	OL_ERROR					>
 	call	ObjCallInstanceNoLock
 	mov	ax, mask MRF_PROCESSED
 	ret
-	
+
 callSuper:
 endif
 
-	mov	ax, MSG_META_START_SELECT		;reset method	
+	mov	ax, MSG_META_START_SELECT		;reset method
 	mov	di, offset OLMenuedWinClass
 	CallSuper	MSG_META_START_SELECT	;send to superclass
 	ret
@@ -2633,12 +2647,12 @@ OLMenuedWinLostSysExcl	method dynamic	OLMenuedWinClass, \
 
 OLMenuedWinLostSysExcl	endp
 
-			
+
 
 
 COMMENT @----------------------------------------------------------------------
 
-METHOD:		OLMenuedWinDetermineVisParentForChild -- 
+METHOD:		OLMenuedWinDetermineVisParentForChild --
 		MSG_SPEC_DETERMINE_VIS_PARENT_FOR_CHILD for OLMenuedWinClass
 
 DESCRIPTION:	Determines a child's visible parent.
@@ -2654,7 +2668,7 @@ RETURN:		carry set if something special found
 		bp -- SpecBuildFlags
 		ax -- destroyed
 
-ALLOWED TO DESTROY:	
+ALLOWED TO DESTROY:
 		bx, si, di, ds, es
 
 REGISTER/STACK USAGE:
@@ -2671,12 +2685,12 @@ REVISION HISTORY:
 ------------------------------------------------------------------------------@
 OLMenuedWinDetermineVisParentForChild	method OLMenuedWinClass, \
 				MSG_SPEC_DETERMINE_VIS_PARENT_FOR_CHILD
-	
+
 	;
 	;  Check for title-bar left/right group, which should
 	;  be directly below us.
 	;
-	call	WinClasses_DerefVisSpec_DI 
+	call	WinClasses_DerefVisSpec_DI
 	cmp	cx, ds:[di].OLWI_titleBarLeftGroup.handle
 	jne	notTitleBarLeft
 	cmp	dx, ds:[di].OLWI_titleBarLeftGroup.chunk
@@ -2716,7 +2730,7 @@ if _ALLOW_MISC_GADGETS_IN_MENU_BAR	;--------------------------------------
 	;  the menu-bar group as the parent.
 	;
 	call	MaybeInMenuBar
-	jc	exit		
+	jc	exit
 endif	; _ALLOW_MISC_GADGETS_IN_MENU_BAR ------------------------------------
 
 putUnderGadgetArea::
@@ -2726,12 +2740,12 @@ putUnderGadgetArea::
 	mov	si, ds:[di].OLMDWI_gadgetArea	;see if there is anything
 	tst	si
 	jz	exit				;exit (carry should be clear)
-	
+
 	mov	dx, si
 	mov	cx, ds:[LMBH_handle]		;else return ^lbx:si
 	stc					;say found
 	jmp	short exit
-	
+
 exitNoSpecialChild:
 	clr	cx				;(will clear carry)
 	mov	dx, cx				;return null
@@ -2887,7 +2901,7 @@ CreateTitleBarGroup	proc	far
 		jmp	done
 rightGroup:
 		ornf	ds:[di].OLCI_buildFlags, OLBT_FOR_TITLE_BAR_RIGHT \
-			shl offset OLBF_TARGET		
+			shl offset OLBF_TARGET
 done:
 		.leave
 		ret
@@ -3035,7 +3049,7 @@ OLMenuedWinTranslateToGenMessage	endm
 
 COMMENT @----------------------------------------------------------------------
 
-METHOD:		OLMenuedWinNotifyEnabled -- 
+METHOD:		OLMenuedWinNotifyEnabled --
 		MSG_SPEC_NOTIFY_ENABLED and MSG_SPEC_NOTIFY_NOT_ENABLED for
 		OLWinClass
 
@@ -3052,7 +3066,7 @@ PASS:		*ds:si 	- instance data
 RETURN:		nothing
 		ax, cx, dx, bp - destroyed
 
-ALLOWED TO DESTROY:	
+ALLOWED TO DESTROY:
 		bx, si, di, ds, es
 
 REGISTER/STACK USAGE:
@@ -3076,9 +3090,9 @@ OLMenuedWinNotifyEnabled	method dynamic	OLMenuedWinClass,
 	call	ObjCallSuperNoLock		;call superclass
 	DoPop	dx, ax				;restore method and flag
 	jnc	exit				;no state change, exit
-	
+
 	push	si
-	mov	di, ds:[si]			
+	mov	di, ds:[si]
 	add	di, ds:[di].Vis_offset
 	mov	si, ds:[di].OLMDWI_gadgetArea	;get gadget area
 	tst	si
@@ -3090,7 +3104,7 @@ doneGadgetArea:
 	pop	si
 
 	push	si
-	mov	di, ds:[si]			
+	mov	di, ds:[si]
 	add	di, ds:[di].Vis_offset
 	mov	si, ds:[di].OLMDWI_menuBar	;get menu bar
 	tst	si
@@ -3101,7 +3115,7 @@ doneGadgetArea:
 doneMenuBar:
 	pop	si
 
-	mov	di, ds:[si]			
+	mov	di, ds:[si]
 	add	di, ds:[di].Vis_offset
 	mov	si, ds:[di].OLMDWI_triggerBar	;get trigger bar
 	tst	si
@@ -3256,12 +3270,12 @@ OLMenuedWinSpecSetNotUsable	method	dynamic	OLMenuedWinClass,
 	;and the data that might be saved.
 
 	call	OpenWinFreeStaggeredSlot
-	
+
 if not _NO_WIN_ICONS	;------------------------------------------------------
 
 	;Release the icon slot as well.
-	
-	mov	di, ds:[si]			
+
+	mov	di, ds:[si]
 	add	di, ds:[di].Vis_offset
 	mov	dl, {byte} ds:[di].OLMDWI_iconWinPosSizeState+1
 	ANDNF	dl, mask WPSS_STAGGERED_SLOT shr 8
@@ -3328,7 +3342,7 @@ REVISION HISTORY:
 ------------------------------------------------------------------------------@
 
 if not _NO_WIN_ICONS	;------------------------------------------------------
-	
+
 OLMenuedWinUpdateIconMoniker	method dynamic OLMenuedWinClass,
 				MSG_OL_MENUED_WIN_UPDATE_ICON_MONIKER
 	;
@@ -3384,7 +3398,7 @@ REVISION HISTORY:
 ------------------------------------------------------------------------------@
 
 if not _NO_WIN_ICONS	;------------------------------------------------------
-	
+
 OLMenuedWinSpecUpdateVisMoniker	method dynamic OLMenuedWinClass,
 					MSG_SPEC_UPDATE_VIS_MONIKER
 	;
@@ -3504,8 +3518,8 @@ PASS:		*ds:si	= OLMenuedWinClass object
 		ax	= message #
 		cx	= menu center, 0 for screen center
 RETURN:		nothing
-DESTROYED:	
-SIDE EFFECTS:	
+DESTROYED:
+SIDE EFFECTS:
 
 PSEUDO CODE/STRATEGY:
 
@@ -3518,7 +3532,7 @@ REVISION HISTORY:
 
 if MENU_BAR_IS_A_MENU
 
-OLMenuedWinSetMenuCenter	method dynamic OLMenuedWinClass, 
+OLMenuedWinSetMenuCenter	method dynamic OLMenuedWinClass,
 					MSG_OL_MENUED_WIN_SET_MENU_CENTER
 	mov	ds:[di].OLMDWI_menuCenter, cx
 	ret
@@ -3538,8 +3552,8 @@ PASS:		*ds:si	= OLMenuedWinClass object
 		es 	= segment of OLMenuedWinClass
 		ax	= message #
 RETURN:		cx	= menu center, 0 for screen center
-DESTROYED:	
-SIDE EFFECTS:	
+DESTROYED:
+SIDE EFFECTS:
 
 PSEUDO CODE/STRATEGY:
 
@@ -3550,7 +3564,7 @@ REVISION HISTORY:
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
 
-OLMenuedWinGetMenuCenter	method dynamic OLMenuedWinClass, 
+OLMenuedWinGetMenuCenter	method dynamic OLMenuedWinClass,
 					MSG_OL_MENUED_WIN_GET_MENU_CENTER
 	mov	cx, ds:[di].OLMDWI_menuCenter
 	ret
@@ -3567,7 +3581,7 @@ WinMethods	segment resource
 
 COMMENT @----------------------------------------------------------------------
 
-FUNCTION:	OLMenuedWinSpecResolveMonikerList - 
+FUNCTION:	OLMenuedWinSpecResolveMonikerList -
 		MSG_SPEC_RESOLVE_MONIKER_LIST handler.
 
 DESCRIPTION:	Intercept MSG_SPEC_RESOLVE_MONIKER_LIST to NOT resolve moniker

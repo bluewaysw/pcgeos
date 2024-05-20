@@ -628,6 +628,12 @@ CCOMFLAGS += $(.INCLUDES:N*/Include*:S/\//\\/g:S/^-I/-i=/g) \
 					$(XCCOMFLAGS:S/\//\\/g:S/^-I/-i=/g)
 #endif
 
+# Addon flags to be appended to the end of the CCOMFLAGS when wcc is executed.
+# One variant for EC targets, one for NC target
+# Set here to default if not given from the outside (via local.mk)
+WCCNCOPTFLAGS ?= -ox
+WCCECOPTFLAGS ?= 
+
 #if $(PRODUCT) == "NDO2000"
 #else
 CCOMFLAGS	+= -3
@@ -894,14 +900,14 @@ LINK		: .USE
 
 
 .c.eobj		:
-	$(CCOM) -DDO_ERROR_CHECKING $(CCOMFLAGS) -fo="$(.TARGET)" "$(.IMPSRC)" $(GEOERRFL)
+	$(CCOM) -DDO_ERROR_CHECKING $(CCOMFLAGS) $(WCCECOPTFLAGS) -fo="$(.TARGET)" "$(.IMPSRC)" $(GEOERRFL)
 
 .c.obj		:
-	$(CCOM) $(CCOMFLAGS) -fo="$(.TARGET)" "$(.IMPSRC)" $(GEOERRFL)
+	$(CCOM) $(CCOMFLAGS) $(WCCNCOPTFLAGS) -fo="$(.TARGET)" "$(.IMPSRC)" $(GEOERRFL)
 
 .goc.obj	:
 	$(GOC) $(GOCFLAGS) -l -o $(.TARGET:R).nc $(.IMPSRC) $(GEOERRFL)
-	$(CCOM) $(CCOMFLAGS) -fo="$(.TARGET)" "$(.TARGET:R).nc" $(GEOERRFL)
+	$(CCOM) $(CCOMFLAGS) $(WCCNCOPTFLAGS) -fo="$(.TARGET)" "$(.TARGET:R).nc" $(GEOERRFL)
 #if $(DEVEL_DIR:T) == "Installed"
 #if defined(linux)
 	rm $(.TARGET:R).nc
@@ -912,7 +918,7 @@ LINK		: .USE
 
 .goc.eobj	:
 	$(GOC) -DDO_ERROR_CHECKING $(GOCFLAGS) -o $(.TARGET:R).ec $(.IMPSRC) $(GEOERRFL)
-	$(CCOM) -DDO_ERROR_CHECKING $(CCOMFLAGS) -fo="$(.TARGET)" "$(.TARGET:R).ec" $(GEOERRFL)
+	$(CCOM) -DDO_ERROR_CHECKING $(CCOMFLAGS) $(WCCECOPTFLAGS) -fo="$(.TARGET)" "$(.TARGET:R).ec" $(GEOERRFL)
 #if $(DEVEL_DIR:T) == "Installed"
 #if defined(linux)
 	rm $(.TARGET:R).ec

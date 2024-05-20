@@ -20,7 +20,7 @@ name geodex.app
 #
 # Long name
 #
-longname "Address Book"
+longname "Contacts"
 
 # Product specific longnames
 ifdef PRODUCT_NDO1998

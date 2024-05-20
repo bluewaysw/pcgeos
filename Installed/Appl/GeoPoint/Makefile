@@ -6,8 +6,8 @@
 GEODE           = geopoint
 ASM_TO_OBJS     =
 UI_TO_RDFS      =
-SRCS            = proc.goc ui.goc show.goc functs.goc geopoint.goh
-OBJS            = proc.obj ui.obj show.obj functs.obj
+SRCS            = functs.goc proc.goc show.goc ui.goc geopoint.goh
+OBJS            = functs.obj proc.obj show.obj ui.obj
 LOBJS           =
 
 SYSMAKEFILE     = geode.mk

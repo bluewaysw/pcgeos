@@ -1,0 +1,382 @@
+/***************************************************************************
+ *  FILE:		doc_mtds.goc
+ *  PROJECT:		Breadbox Gourmet
+ *  DESCRIPTION:	This file has methods for document manipulation
+ *			
+ **************************************************************************
+ */
+/*
+ ***************************************************************************
+ *		Include files
+ ***************************************************************************
+ */
+
+@include "rbox.goh"
+
+/*
+ ***************************************************************************
+ *		Class & Message Definitions
+ ***************************************************************************
+ */
+
+/* Declare UI object references to those in rboxui.GOC */
+@extern object RBoxApp;
+@extern object RecipeDList;
+@extern object SystMenuList;
+@extern object TextContent;
+@extern object TextWindow;
+@extern object PasteMenuTrigger;
+@extern object RBPrintControl;
+@extern chunk RBIntroCharAttrs;
+
+@extern visMoniker RBDocIconMonikerList;
+
+/*********************************************************************
+ *  All the globals declared as extern in .goh
+ ********************************************************************
+*/
+FileHandle  rBoxFile = NullHandle;  /* handle to the rbox file that's open. */
+
+word  currentRecipe = GIGS_NONE;      /* the currently selected recipe */
+
+word  currentIngred = GIGS_NONE;  /* the currently selected ingredient */
+
+word  currentCat = GIGS_NONE;  /* the currently selected category */
+
+word  measSystem = USA;  /* defaults to US meas system */
+
+word pointSize = 10;   /* defaults to ten point */
+
+MemHandle   sortHeapHandle, ingredHeapHandle, listHeapHandle = NullHandle;
+ChunkHandle    sortChunkArray, ingredChunkArray, listChunkArray = NullHandle;
+word   index = 0;
+
+Boolean  calledByRecalc = FALSE;
+
+word	onScreen = TITLE;  /* defaults to title */
+
+VMFileHandle  clipfile = NullHandle;
+
+/*
+ ***************************************************************************
+ *		Code for RBoxProcessClass   Document Manipulation
+ ***************************************************************************
+ */
+
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_GEN_PROCESS_OPEN_APPLICATION for RBoxProcessClass
+ *
+ * DESCRIPTION:	 do some opening stuff
+ *              
+ *
+ ***********************************************************************/
+@extern method RBoxProcessClass, MSG_GEN_PROCESS_OPEN_APPLICATION
+{
+
+ /*   VisContentInstance *vself;
+    VMFileHandle fileHan; */
+    word      initSystem;
+
+
+    /* check the ini file for saved meas system */
+
+     /* InitFileReadInteger returns true on error,
+       so we test if it's false */
+    if (!InitFileReadInteger("Gourmet", "System", &initSystem)) {
+	  if (initSystem == 2) measSystem = MET;
+	  }
+    else measSystem = USA;
+
+    @call SystMenuList::MSG_GEN_ITEM_GROUP_SET_SINGLE_SELECTION(
+	     (int) measSystem, FALSE);
+
+    @callsuper();
+
+    @call RBoxApp::MSG_GEN_APPLICATION_INSTALL_TOKEN();
+
+    /* see if there is a clip file */
+    /* Open the clip file */
+    clipfile = VMOpen(CLIP_FILENAME, 0, VMO_OPEN, 0);
+    if (clipfile == NullHandle) {  /* no file there */
+       @send PasteMenuTrigger::MSG_GEN_SET_NOT_ENABLED(VUM_NOW);
+      }
+      else {
+       VMClose(clipfile, FALSE);
+      }
+
+}
+
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_META_DOC_OUTPUT_INITIALIZE_DOCUMENT_FILE for RBoxProcessClass
+ *
+ * DESCRIPTION:	Called to initialize a newly opened document.
+ *
+ *
+ ***********************************************************************/
+@extern method RBoxProcessClass, MSG_META_DOC_OUTPUT_INITIALIZE_DOCUMENT_FILE
+{
+    DBGroupAndItem   mapitem;
+    DBMapStruct*     mapPtr;
+
+    /* Create an ungrouped item to use for map item */
+    mapitem = DBAllocUngrouped(file, sizeof(DBMapStruct));
+
+    /* Set the map item to our new item */
+    DBSetMapUngrouped(file, mapitem);
+    /*
+     * Now initialize the map item.  In this app, our map item is
+     * a struct specifying the number of DB groups (recipes), etc followed
+     * by an array of RecipeStruct structures, one for each DB recipe Group.
+     */
+    mapPtr = (DBMapStruct *) DBLockUngrouped(file, mapitem);
+    mapPtr->MS_numRecipes = 0;
+
+    /* Mark the map item as dirty */
+    DBDirty(mapPtr);
+    DBUnlock(mapPtr);
+
+    return(FALSE);
+}
+
+
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_META_DOC_OUTPUT_ATTACH_UI_TO_DOCUMENT for RBoxProcessClass
+ *
+ * DESCRIPTION:	Put the file data into the various boxes.
+ *              
+ *
+ ***********************************************************************/
+@extern method RBoxProcessClass, MSG_META_DOC_OUTPUT_ATTACH_UI_TO_DOCUMENT
+{
+    DBMapStruct*       mapPtr;
+    ListArrayHeaderStruct	*headerInfo;
+    word		numRecipes;
+
+
+    /* assign our Recipe Box file handle */
+    rBoxFile = file;
+
+    /* Just lock the map item */
+    mapPtr = (DBMapStruct *) DBLockMap(rBoxFile);
+
+    /* Set the number of items in the recipe list */
+    numRecipes = mapPtr->MS_numRecipes;
+    @send RecipeDList::MSG_GEN_DYNAMIC_LIST_INITIALIZE(numRecipes);
+
+    DBUnlock(mapPtr);
+
+    /* This shopping list chunk array is created at this time for
+     * each document.  The user adds stuff to the list by clicking
+     * the "Add to" button, and displays and/or clears the list
+     * from the Shopping List main menu.  This chunk is NOT saved. */
+
+    /* create shopping list block then LMem heap */
+    listHeapHandle = MemAlloc(
+		   2048,
+		   HF_SWAPABLE,
+		   HAF_LOCK);
+
+    LMemInitHeap(listHeapHandle,
+                   LMEM_TYPE_GENERAL,
+		   0,
+		   sizeof(LMemBlockHeader),
+                   STD_INIT_HANDLES,
+                   STD_INIT_HEAP);
+
+    /* create the shopping list chunk array */
+    listChunkArray = ChunkArrayCreate(
+		       listHeapHandle,
+		       sizeof(ListChunkStruct),
+		       sizeof(ListArrayHeaderStruct),
+		       0);  /* ObjChunkFlags */
+
+    /* initialize the number of elements in the list */
+    headerInfo = LMemDerefHandles(listHeapHandle, listChunkArray);
+    headerInfo->LAH_numElements = 0;
+    /* and unlock it */
+    MemUnlock(listHeapHandle);
+
+    /* put up appropriate DB */
+    if (numRecipes == 0) {
+       @send self::MSG_OPEN_CREATE_RECIPE();
+       }
+     else {
+       @send self::MSG_OPEN_SELECT_RECIPE(0);
+       }
+
+}
+
+
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_META_DOC_OUTPUT_DETACH_UI_FROM_DOCUMENT for RBoxProcessClass
+ *
+ * DESCRIPTION:	Called when the app is shut down.
+ *              
+ *
+ ***********************************************************************/
+
+@extern method RBoxProcessClass, MSG_META_DOC_OUTPUT_DETACH_UI_FROM_DOCUMENT
+{
+
+    rBoxFile = NullHandle;
+    MemFree(listHeapHandle);
+
+}
+
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_META_DOC_OUTPUT_SAVE_AS_COMPLETED for RBoxProcessClass
+ *
+ * DESCRIPTION:	Called on Save As.
+ *
+ *
+ ***********************************************************************/
+
+@extern method RBoxProcessClass, MSG_META_DOC_OUTPUT_SAVE_AS_COMPLETED
+{
+    rBoxFile = file;
+
+}
+
+
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_GEN_PROCESS_INSTALL_TOKEN for RBoxProcessClass
+ *
+ * DESCRIPTION:	Associates RBd2 token with RBox docs
+ *
+ *              needs token.h include
+ ***********************************************************************/
+
+@extern method RBoxProcessClass, MSG_GEN_PROCESS_INSTALL_TOKEN
+{
+    dword	RBTokenChars;
+    TokenFlags	RBTokenFlags;
+
+    @callsuper();
+
+    RBTokenChars = TOKEN_CHARS('B', 'G', (dword) 'd', (dword) '1');
+    if (!TokenGetTokenInfo(RBTokenChars, 16431, &RBTokenFlags)) {
+
+       TokenDefineToken(RBTokenChars,
+		16431,
+		@RBDocIconMonikerList,
+		0);
+    }
+}
+
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_SYST_ILIST_APPLY for RBoxProcessClass
+ *
+ * DESCRIPTION:	Gets measurement system selected in options menu
+ *              
+ *              void (word selection, numSelections, flags)
+ *              
+ *
+ ***********************************************************************/
+
+@extern method RBoxProcessClass, MSG_SYST_ILIST_APPLY
+{
+    measSystem = selection;
+
+}
+
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_SAVE_MEAS_OPTS for RBoxProcessClass
+ *
+ * DESCRIPTION:	Saves user selected measurement system to geos.ini
+ *              
+ *
+ *              
+ *
+ ***********************************************************************/
+
+@extern method RBoxProcessClass, MSG_SAVE_MEAS_OPTS
+{
+   if (measSystem == USA){
+	 InitFileWriteInteger("Gourmet", "System", 1);
+     }
+   else {
+      InitFileWriteInteger("Gourmet", "System", 2);
+     }
+
+}
+
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_POINT_SIZE_APPLY for RBoxProcessClass
+ *
+ * DESCRIPTION:	Applies point size changes in the text window
+ *              
+ *
+ *              
+ *
+ ***********************************************************************/
+
+@extern method RBoxProcessClass, MSG_POINT_SIZE_APPLY
+{
+    WWFixed	PtSize;
+    
+
+    switch ((int) selection) {
+       case TEN:
+       pointSize = 10;
+       break;
+       case TWL:
+       pointSize = 12;
+       break;
+       case FRT:
+       pointSize = 14;
+       break;
+    }
+
+    PtSize.WWF_int  = pointSize;
+    PtSize.WWF_frac = 0;
+    @send TextWindow::MSG_VIS_TEXT_SET_POINT_SIZE(
+                PtSize, TEXT_ADDRESS_PAST_END, 0);
+
+}
+
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_GOURMET_SCREEN for RBoxProcessClass
+ *
+ * DESCRIPTION:	Shows blue BB Gourmet text
+ *              
+ *
+ *              
+ *
+ ***********************************************************************/
+@extern chunk IntroText;
+
+@extern method RBoxProcessClass, MSG_GOURMET_SCREEN
+{
+    MemHandle		textHeapHandle;
+    VisTextCharAttr     *attr;
+
+
+    /* set font to intro */
+
+    textHeapHandle = OptrToHandle(@RBIntroCharAttrs);
+    ObjLockObjBlock(textHeapHandle);
+    attr = LMemDeref(@RBIntroCharAttrs);
+    @call TextWindow::MSG_VIS_TEXT_SET_CHAR_ATTR(
+		      attr,
+		      TEXT_ADDRESS_PAST_END,
+		      0);
+    MemUnlock(textHeapHandle);
+
+    @call TextWindow::MSG_VIS_TEXT_REPLACE_ALL_OPTR(
+		      @IntroText, 0);
+
+    /* and set the content's variable */
+    onScreen = TITLE;
+
+
+}

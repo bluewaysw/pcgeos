@@ -7,14 +7,16 @@
 
 #ifndef unix
 .SUFFIXES	: .lib .a
-win32LIBS	= $(.TARGET:H)/compat.lib lst.lib \
+win32LIBS	= $(.TARGET:H)/compat.lib $(.TARGET:H)/utils.lib lst.lib \
 		  sprite.lib 
-linuxLIBS	= $(.TARGET:H)/libcompat.a liblst.a \
+linuxLIBS	= $(.TARGET:H)/libcompat.a $(.TARGET:H)/libutils.a liblst.a \
   		  libsprite.a 
-.PATH.lib	: ../../compat $(INSTALL_DIR:H)/compat \
+.PATH.lib	: ../../compat $(INSTALL_DIR:H:H)/compat \
+		  ../../utils $(INSTALL_DIR:H:H)/utils \
 		  ../../pmake/lib/sprite $(INSTALL_DIR:H:H)/pmake/lib/sprite \
 		  ../../pmake/lib/lst $(INSTALL_DIR:H:H)/pmake/lib/lst
-.PATH.a		: ../../compat $(INSTALL_DIR:H)/compat \
+.PATH.a		: ../../compat $(INSTALL_DIR:H:H)/compat \
+		  ../../utils $(INSTALL_DIR:H:H)/utils \
 		  ../../pmake/lib/sprite $(INSTALL_DIR:H:H)/pmake/lib/sprite \
 		  ../../pmake/lib/lst $(INSTALL_DIR:H:H)/pmake/lib/lst
 #endif

@@ -10,7 +10,7 @@
 
 name dirls11.app
 
-longname "DirList"
+longname "Directory Lister"
 
 tokenchars "DL11"
 tokenid 16423

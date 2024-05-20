@@ -53,6 +53,10 @@ TrueTypeGenChar	proc	far
 	uses	ax, bx, cx, dx, ds, si, di, bp
 	.enter
 
+	mov	di, FONT_C_CODE_STACK_SPACE
+	call	ThreadBorrowStackSpace
+	push	di
+
 	segmov	cx, es
 	call	MemSegmentToHandle
 	jnc	err
@@ -94,6 +98,9 @@ TrueTypeGenChar	proc	far
 	call	MemDerefES
 
 err:
+        pop     di
+	call	ThreadReturnStackSpace	; (preserves flags)
+
 	clc
 	.leave
 	ret

@@ -61,11 +61,6 @@ Boolean LWComputeGraphicBounds(optr oself,
 			       word *height);
 VMFileHandle LWVMFileOpen(void);
 
-/*******************************************************************
- 	       	    	App instance...
- *******************************************************************/
-
-@start AppResource;
 
 /*******************************************************************
  	       	    	Code and Message Handlers
@@ -82,38 +77,45 @@ typedef struct {
     SAOptionDesc    LW_saod[LW_NUMBER_OF_OPTIONS];
 } LWSAOptionTable;
 
-@chunk LWSAOptionTable lastwordsOptionTable = {
-    {LW_INI_CATEGORY, LW_NUMBER_OF_OPTIONS},
+const LWSAOptionTable lastwordsOptionTable = {
+    {(char __near*) LW_INI_CATEGORY, LW_NUMBER_OF_OPTIONS},
     { /* Table o' options: */
-    	{LW_INI_KEY_TYPE,
+    	{(char __near*) LW_INI_KEY_TYPE,
 	 sizeof(LWFormatType),
 	 word_offsetof(LWApplicationInstance, LWCI_format)},
-	{LW_INI_KEY_RANDOM_COLOR,
+	{(char __near*) LW_INI_KEY_RANDOM_COLOR,
 	 sizeof(Boolean),
 	 word_offsetof(LWApplicationInstance, LWCI_randomColor)},
-    	{LW_INI_KEY_COLOR,
+    	{(char __near*) LW_INI_KEY_COLOR,
 	 sizeof(byte),
 	 word_offsetof(LWApplicationInstance, LWCI_color)},
-        {LW_INI_KEY_MOTION,
+        {(char __near*) LW_INI_KEY_MOTION,
 	 sizeof(SaverVectorReflectType),
 	 word_offsetof(LWApplicationInstance, LWCI_motion)},
-	{LW_INI_KEY_SPEED,
+	{(char __near*) LW_INI_KEY_SPEED,
 	 sizeof(LWSpeedType),
 	 word_offsetof(LWApplicationInstance, LWCI_speed)},
-	{LW_INI_KEY_SIZE,
+	{(char __near*) LW_INI_KEY_SIZE,
 	 sizeof(word),
 	 word_offsetof(LWApplicationInstance, LWCI_size)},
-	{LW_INI_KEY_RANDOM_ANGLE,
+	{(char __near*) LW_INI_KEY_RANDOM_ANGLE,
 	 sizeof(Boolean),
 	 word_offsetof(LWApplicationInstance, LWCI_randomAngle)},
-	{LW_INI_KEY_ANGLE,
+	{(char __near*) LW_INI_KEY_ANGLE,
 	 sizeof(sword),
 	 word_offsetof(LWApplicationInstance, LWCI_angle)},
-	{LW_INI_KEY_FONT,
+	{(char __near*) LW_INI_KEY_FONT,
 	 sizeof(FontID),
 	 word_offsetof(LWApplicationInstance, LWCI_fontID)},
     }
 };
+
+
+/*******************************************************************
+ 	       	    	App instance...
+ *******************************************************************/
+
+@start AppResource;
 
 @object LWApplicationClass LWApp = {
 	GI_visMoniker = list {@LWTextMoniker};
@@ -161,7 +163,7 @@ typedef struct {
      * .ini file via the option table.
      */
     SaverApplicationGetOptions((SAOptionTable *)
-        LMemDeref(@lastwordsOptionTable), oself);
+                                &lastwordsOptionTable, oself);
 
     @callsuper();
 }
@@ -362,7 +364,7 @@ LWDraw(optr oself)
     /*
      * If there was an error somewhere, don't draw anything.
      */
-    if (pself->LWCI_format == LWFT_BOGUS) {
+    if ((pself->LWCI_format == LWFT_BOGUS) || (pself->LWCI_randomToken == 0)) {
 	return;
     }
 
@@ -893,6 +895,7 @@ LWTimerStart(optr oself)
      * Nuke the random number generator, too.
      */
     SaverEndRandom(pself->LWCI_randomToken);
+    pself->LWCI_randomToken = 0;
 
     /*
      * Close down the VM file, if we're drawing something out of it.

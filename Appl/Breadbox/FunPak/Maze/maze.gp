@@ -21,7 +21,7 @@ exempt sound
 resource AppResource object
 resource Interface object
 #resource SAVEDSTATERESOURCE object
-resource Mouse_Picture object
+resource Mouse_Picture lmem read-only shared
 resource InterfaceMoveBox object
 #resource INTERFACEABOUT object
 #resource STRINGSRESOURCE lmem read-only discardable shared

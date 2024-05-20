@@ -1,0 +1,388 @@
+/*
+ **************************************************************************
+ *  FILE:		srv_mtds.goc
+ *  PROJECT:		Breadbox Gourmet
+ *  DESCRIPTION:	This file has methods for the adjust servings
+ *			functions
+ **************************************************************************
+ */
+/*
+ ***************************************************************************
+ *		Include files
+ ***************************************************************************
+ */
+
+@include "rbox.goh"
+
+/*
+ ***************************************************************************
+ *		Class & Message Definitions
+ ***************************************************************************
+ */
+
+/* Declare UI object references to those in rboxui.GOC */
+@extern object ServingsRecalcValue;
+
+
+
+/****************************************************************************
+ *		Code for RBoxProcessClass Adjust Servings
+ ***************************************************************************
+ */
+
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_INGRED_TO_ARRAY for RBoxProcessClass
+ *
+ * DESCRIPTION:	Puts ingred info into chunk array
+ *
+ ***********************************************************************/
+
+@extern method RBoxProcessClass, MSG_INGRED_TO_ARRAY
+{
+    RecipeStruct      *recipe;
+    IngredStruct     *ingred, *temp;
+    DBGroup	    recipegroup;
+    DBGroupAndItem  mapitem;
+    DBMapStruct*    mapPtr;
+    word            numIngreds, serves;
+    int             j;
+    IngredRecalcStruct	*sortElement;
+    IngredChunkArrayHeaderStruct	*headerInfo;
+
+    /* create block then LMem heap */
+    ingredHeapHandle = MemAlloc(
+		   2048,
+		   HF_SWAPABLE,
+		   HAF_LOCK);
+
+    LMemInitHeap(ingredHeapHandle,
+                   LMEM_TYPE_GENERAL,
+		   0,
+		   sizeof(LMemBlockHeader),
+                   STD_INIT_HANDLES,
+                   STD_INIT_HEAP);
+
+    /* create the chunk array */
+    ingredChunkArray = ChunkArrayCreate(
+		       ingredHeapHandle,
+		       sizeof(IngredRecalcStruct),
+		       sizeof(IngredChunkArrayHeaderStruct),
+		       0);  /* ObjChunkFlags */
+
+    /* standard set-up */
+    mapitem = DBGetMap(rBoxFile);
+    mapPtr = DBLockUngrouped(rBoxFile, mapitem);
+    recipe = (RecipeStruct *) (mapPtr + sizeof(DBMapStruct));
+
+    /* Get number of ingreds... */
+    numIngreds = recipe[currentRecipe].RS_size;
+
+    /* and number served */
+    serves = recipe[currentRecipe].RS_serves;
+
+    /* Put these two into header struct */
+    headerInfo = LMemDerefHandles(ingredHeapHandle, ingredChunkArray);
+    headerInfo->CAH_numIngreds = numIngreds;
+    headerInfo->CAH_origServes = serves;
+    headerInfo->CAH_newServes = serves;
+
+    /* put the rest of the info into array */
+    if (numIngreds == 0)
+       ;   /* hard to imagine but... */
+      else {
+       recipegroup = recipe[currentRecipe].RS_group;
+       ingred = DBLock(rBoxFile, recipegroup, recipe[currentRecipe].RS_head);
+
+       /* by following the linked list.*/
+       for (j = 0; j < numIngreds; j++) {
+
+	  /* and put info in the array */
+          sortElement = ChunkArrayAppendHandles(
+		      ingredHeapHandle,
+		      ingredChunkArray,
+		      0);
+	  sortElement->IRS_units = (int) ingred->IS_units;
+	  strcpy(sortElement->IRS_ingred, ingred->IS_ingred);
+	  strcpy(sortElement->IRS_origQuant, ingred->IS_quant);
+	  strcpy(sortElement->IRS_newQuant, ingred->IS_quant);
+
+
+	  if (j == (numIngreds - 1)) /* if the last piece... */
+	     ;                    /* don't try to get next piece...*/
+	    else {
+             /* get next piece from link */
+		temp = DBLock(rBoxFile, recipegroup, ingred->IS_next);
+	        DBUnlock(ingred);
+	        ingred = temp;
+            }  /* end of next ingred else */
+
+       } /* end of ingreds for */
+
+       DBUnlock(ingred);
+
+    } /* end of ingreds else */
+
+    MemUnlock(ingredHeapHandle);
+    DBUnlock(mapPtr);
+
+}
+
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_RECALC_SERVINGS for RBoxProcessClass
+ *
+ * DESCRIPTION:	recalculates the ingreds when servings changes
+ *
+ ***********************************************************************/
+
+@extern method RBoxProcessClass, MSG_RECALC_SERVINGS
+{
+    IngredChunkArrayHeaderStruct	*headerInfo;
+    IngredRecalcStruct	*ingredElement;
+    word	numIngreds, i, j, k;
+    word	length, recalcdIntVal, recalcdFractVal;
+    Boolean	isFract, isDecimal;
+    char	quantStr[15], tempStr[15], decimalStr[15], sepStr[2];
+    char	intStr[15], numerStr[15], denomStr[15];
+    dword	intVal, numerVal, denomVal, quantVal, decimalVal,
+                newServes, origServes, servRatio, tempVal;
+
+    /* lock the array */
+    MemLock(ingredHeapHandle);
+
+    /* get the servings poop & num ingreds */
+    headerInfo = LMemDerefHandles(ingredHeapHandle, ingredChunkArray);
+    origServes = headerInfo->CAH_origServes;
+    numIngreds = headerInfo->CAH_numIngreds;
+
+    /* get the new servings number */
+    newServes = @call ServingsRecalcValue::MSG_GEN_VALUE_GET_INTEGER_VALUE();
+    headerInfo->CAH_newServes = (word) newServes;
+
+    /* here we go... */
+    for (i = 0; i < numIngreds; i++) {
+       /* grab the ith element */
+       ingredElement = ChunkArrayElementToPtrHandles(
+             ingredHeapHandle,
+	     ingredChunkArray,
+	     i,
+	     0);
+
+       /* get the quantity string */
+       strcpy(quantStr, ingredElement->IRS_origQuant);
+
+       /* strip any leading spaces */
+       *tempStr = NULL;
+       while (quantStr[0] == ' ') {
+	  strcpy(tempStr, &quantStr[1]);
+	  strcpy(quantStr, tempStr);
+          *tempStr = NULL;
+          }
+
+       /* now get it's length */
+       length = strlen(quantStr);
+
+       /* strip any trailing spaces */
+       while (quantStr[length - 1] == ' ') {
+	  quantStr[length - 1] = '\0';
+	  length--;
+          }
+
+       /* init the fraction & decimal flags */
+       isFract = FALSE;
+       isDecimal = FALSE;
+
+       /* and initialize our working strings */
+       *tempStr = NULL;
+       k = 0;   /* counter to cut off tempStr */
+       *intStr = NULL;
+       *numerStr = NULL;
+       *denomStr = NULL;
+
+       /* now parse the string... */
+       for(j = 0; j < length; j++) {
+          /* is it a numeral? */
+	  if(quantStr[j] >= '0' && quantStr[j] <= '9') {
+	     strcat(tempStr, &quantStr[j]);
+	     /* we don't want the rest of the string...
+	      * just the next character so chop off end */ 
+	     tempStr[k+1] = '\0';
+             k++;
+	    }
+	  /* is it the space between the int & fract? */
+	  if(quantStr[j] == ' ') {
+	     /* check for multiple spaces */
+	     if(quantStr[j - 1] == ' ') {
+		; /* don't do anything */
+             }
+	     else {
+	        strcpy(intStr, tempStr);
+                /* re-initialize tempStr */
+	        *tempStr = NULL;
+                k = 0;
+	     }
+	    }
+	  /* is it the comma separator? */
+	  if(quantStr[j] == ',') {
+	     strcpy(intStr, tempStr);
+             /* re-initialize tempStr */
+	     *tempStr = NULL;
+	     k = 0;
+	     isDecimal = TRUE;
+             strcpy(sepStr, ",");
+	    }
+	  /* is it the period separator? */
+	  if(quantStr[j] == '.') {
+	     strcpy(intStr, tempStr);
+             /* re-initialize tempStr */
+	     *tempStr = NULL;
+	     k = 0;
+             isDecimal = TRUE;
+	     strcpy(sepStr, ".");
+	    }
+	  /* is it a slash? */
+	  if(quantStr[j] == '/') {
+	     strcpy(numerStr, tempStr);
+	     /* re-initialize tempStr */
+	     *tempStr = NULL;
+             k = 0;
+	     isFract = TRUE;
+	    }
+	 } /* end of parse for */
+
+       if(isFract == TRUE) {
+	  strcpy(denomStr, tempStr);
+	 }
+       else if(isDecimal == TRUE) {
+	  strcpy(decimalStr, tempStr);
+         }
+       else {
+	  strcpy(intStr, tempStr);
+	 }
+
+       /* convert the four strings to values */
+       UtilAsciiToHex32(intStr, (sdword*) &intVal);
+       UtilAsciiToHex32(numerStr, (sdword*) &numerVal);
+       UtilAsciiToHex32(denomStr, (sdword*) &denomVal);
+       UtilAsciiToHex32(decimalStr, (sdword*) &decimalVal);
+
+       /* put together the quantity value */
+       if(isDecimal == TRUE)  {  /* is it a decimal (metric)... */
+	  if(strlen(decimalStr) == 0) {
+	     quantVal = (WWFixedAsDWord) MakeWWFixed(intVal);
+	    }
+	  else if (strlen(decimalStr) == 1) {
+             denomVal = 10;
+	     quantVal = (WWFixedAsDWord) MakeWWFixed(intVal) +
+	         GrUDivWWFixed((WWFixedAsDWord) MakeWWFixed(decimalVal),
+		       (WWFixedAsDWord) MakeWWFixed(denomVal));
+	    }
+	  else if (strlen(decimalStr) == 2) {
+             denomVal = 100;
+	     quantVal = (WWFixedAsDWord) MakeWWFixed(intVal) +
+	         GrUDivWWFixed((WWFixedAsDWord) MakeWWFixed(decimalVal),
+		       (WWFixedAsDWord) MakeWWFixed(denomVal));
+	    }
+	  else {
+             denomVal = 1000;
+	     quantVal = (WWFixedAsDWord) MakeWWFixed(intVal) +
+	         GrUDivWWFixed((WWFixedAsDWord) MakeWWFixed(decimalVal),
+		       (WWFixedAsDWord) MakeWWFixed(denomVal));
+	    }
+	 }  /* end of isDecimal if */
+
+       else {  /* it is NOT decimal  */
+          if(denomVal == 0) {
+	     quantVal = (WWFixedAsDWord) MakeWWFixed(intVal);
+	    }
+	  else {
+	     quantVal = (WWFixedAsDWord) MakeWWFixed(intVal) +
+	         GrUDivWWFixed((WWFixedAsDWord) MakeWWFixed(numerVal),
+		       (WWFixedAsDWord) MakeWWFixed(denomVal));
+	    }
+	  }
+
+       /* generate the new quantity based on new servings... */
+       /* get the servings 'ratio' */
+       servRatio = GrUDivWWFixed((WWFixedAsDWord) MakeWWFixed(newServes),
+		   (WWFixedAsDWord) MakeWWFixed(origServes));
+       /* and multiply with quantity */
+       quantVal = GrMulWWFixed(quantVal, servRatio);
+
+
+       /* separate int and fract pieces */
+       recalcdIntVal = IntegerOf(quantVal);
+       recalcdFractVal = FractionOf(quantVal);
+
+      /* this next segment is for fractional input */
+      if (isDecimal == FALSE) {
+       /* find the appropriate recalc'd fraction */
+       *numerStr = NULL;
+       if(recalcdFractVal > 61440)  {
+	  recalcdIntVal++;
+	 }
+       else if(recalcdFractVal > 53248)
+	  strcpy(numerStr, "7/8");
+       else if(recalcdFractVal > 46399)
+	  strcpy(numerStr, "3/4");
+       else if(recalcdFractVal > 42303) 
+	  strcpy(numerStr, "2/3");
+       else if(recalcdFractVal > 36864)
+	  strcpy(numerStr, "5/8");
+       else if(recalcdFractVal > 28672)
+	  strcpy(numerStr, "1/2");
+       else if(recalcdFractVal > 23199)
+	  strcpy(numerStr, "3/8");
+       else if(recalcdFractVal > 19103)
+	  strcpy(numerStr, "1/3");
+       else if(recalcdFractVal > 12288)
+	  strcpy(numerStr, "1/4");
+       else if(recalcdFractVal > 4096)
+	  strcpy(numerStr, "1/8");
+       else if(recalcdFractVal > 0)
+	  strcpy(numerStr, "--");
+      }
+      else {  /* it started out as a decimal quantity... */
+       /* so convert the fract portion to a decimal */
+       denomVal = 65535;
+       tempVal = MakeWWFixed(((dword) recalcdFractVal));
+       decimalVal = GrUDivWWFixed((WWFixedAsDWord) tempVal,
+		       (WWFixedAsDWord) MakeWWFixed(denomVal));
+       denomVal = 1000;  /* ensures 3 decimal places */
+       decimalVal = GrMulWWFixed(decimalVal, (WWFixedAsDWord) MakeWWFixed(denomVal));
+       recalcdFractVal = IntegerOf(decimalVal);
+       UtilHex32ToAscii(
+	    numerStr, (sdword) recalcdFractVal, 0 | UHTAF_NULL_TERMINATE);
+       }
+
+       /* convert the recalced integer value to string */
+       if(recalcdIntVal == 0) {
+	  *intStr = NULL;
+	 }
+       else {
+          UtilHex32ToAscii(
+	    intStr, (sdword) recalcdIntVal, 0 | UHTAF_NULL_TERMINATE);
+	 }
+
+       /* and put the new quantity str back into the array */
+
+       if((*intStr != NULL) && (isDecimal == FALSE)) 
+          strcat(intStr, " ");
+       if(isDecimal == TRUE)
+          strcat(intStr, sepStr);
+
+       strcat(intStr, numerStr);
+       strcpy(ingredElement->IRS_newQuant, intStr);
+
+      } /* end of ingredients loop for */
+
+    MemUnlock(ingredHeapHandle);
+
+    /*set the calleByRecalc flag */
+    calledByRecalc = TRUE;
+
+    /* put the recipe in the text window */
+    @send process::MSG_DISPLAY_RECIPE();
+
+}

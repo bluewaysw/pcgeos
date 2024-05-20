@@ -93,15 +93,19 @@ EC(     ECCheckMemHandle( varBlock ) );
 EC(     ECCheckBounds( (void*)trueTypeVars ) );
 
         trueTypeOutline = LMemDerefHandles( MemPtrToHandle( (void*)fontInfo ), outlineEntry->OE_handle );
+EC(     ECCheckBounds( (void*)trueTypeOutline ) );
 
-        /* open face, create instance and glyph */
+        /* open face and instance */
         if( TrueType_Lock_Face(trueTypeVars, trueTypeOutline) )
-                goto Fail;
-
-        TT_New_Glyph( FACE, &GLYPH );
+                goto Fin;
 
          /* get TT char index */
         charIndex = TT_Char_Index( CHAR_MAP, GeosCharToUnicode( character ) );
+        if( charIndex == 0 )
+                goto Fail;
+
+        /* create new glyph */
+        TT_New_Glyph( FACE, &GLYPH );
 
         /* set pointsize and get metrics */
         TT_Set_Instance_CharSize( INSTANCE, ( pointSize >> 10 ) );
@@ -110,8 +114,9 @@ EC(     ECCheckBounds( (void*)trueTypeVars ) );
         TT_Load_Glyph( INSTANCE, GLYPH, charIndex, TTLOAD_DEFAULT );
         TT_Get_Glyph_Outline( GLYPH, &OUTLINE );
 
-        // TODO: Transformationsmatrix anwenden
+        /* get transformmatrix */
         transformMatrix = (TransformMatrix*)(((byte*)fontBuf) + sizeof( FontBuf ) + ( fontBuf->FB_lastChar - fontBuf->FB_firstChar + 1 ) * sizeof( CharTableEntry ));
+EC(     ECCheckBounds( (void*)transformMatrix ) );
         TT_Transform_Outline( &OUTLINE, &transformMatrix->TM_matrix );
 
         /* get glyphs boundig box */
@@ -136,6 +141,7 @@ EC(     ECCheckBounds( (void*)trueTypeVars ) );
 
                 /* get pointer to bitmapBlock */
                 charData = EnsureBitmapBlock( bitmapHandle, size );
+EC(             ECCheckBounds( (void*)charData ) );
 
                 /* init RASTER_MAP */
                 RASTER_MAP.rows   = height;
@@ -147,6 +153,7 @@ EC(     ECCheckBounds( (void*)trueTypeVars ) );
                 TT_Transform_Outline( &OUTLINE, &flipmatrix );
                 TT_Translate_Outline( &OUTLINE, -GLYPH_BBOX.xMin, GLYPH_BBOX.yMax );
                 TT_Get_Outline_Region( &OUTLINE, &RASTER_MAP );
+EC_ERROR_IF(    size < RASTER_MAP.size, -1 );
 
                 /* fill header of charData */
                 ((RegionCharData*)charData)->RCD_xoff = transformMatrix->TM_scriptX + 
@@ -159,28 +166,27 @@ EC(     ECCheckBounds( (void*)trueTypeVars ) );
                 ((RegionCharData*)charData)->RCD_bounds.R_top    = 0;
                 ((RegionCharData*)charData)->RCD_bounds.R_bottom = height;
 
-EC_ERROR_IF(    size < RASTER_MAP.size, -1 );
-
                 size = RASTER_MAP.size + SIZE_REGION_HEADER;
-
         }
         else
         {      
-                size = height * ( ( width + 7 ) / 8 ) + SIZE_CHAR_HEADER;
+                size = height * ( ( width + 7 ) >> 3 ) + SIZE_CHAR_HEADER;
 
                 /* get pointer to bitmapBlock */
                 charData = EnsureBitmapBlock( bitmapHandle, size );
+EC(             ECCheckBounds( (void*)charData ) );
 
                 /* init rasterMap */
                 RASTER_MAP.rows   = height;
                 RASTER_MAP.width  = width;
-                RASTER_MAP.cols   = (width + 7) / 8;
+                RASTER_MAP.cols   = (width + 7) >> 3;
                 RASTER_MAP.size   = RASTER_MAP.rows * RASTER_MAP.cols;
                 RASTER_MAP.bitmap = ((byte*)charData) + SIZE_CHAR_HEADER;
 
                 /* translate outline and render it */
                 TT_Translate_Outline( &OUTLINE, -GLYPH_BBOX.xMin, -GLYPH_BBOX.yMin );
                 TT_Get_Outline_Bitmap( &OUTLINE, &RASTER_MAP );
+EC_ERROR_IF(    size < RASTER_MAP.size, -1 );
 
                 /* fill header of charData */
                 ((CharData*)charData)->CD_pictureWidth = width;
@@ -198,19 +204,24 @@ EC_ERROR_IF(    size < RASTER_MAP.size, -1 );
 
         /* realloc FontBuf if necessary */
         fontBufHandle = MemPtrToHandle( fontBuf );
+EC(     ECCheckMemHandle( fontBufHandle ) );
         if( MemGetInfo( fontBufHandle, MGIT_SIZE ) < fontBuf->FB_dataSize + size )
         {
                 MemReAlloc( fontBufHandle, fontBuf->FB_dataSize + size, HAF_STANDARD_NO_ERR );
+EC(             ECCheckMemHandle( fontBufHandle) );
                 fontBuf = MemDeref( fontBufHandle );
+EC(             ECCheckBounds( (void*)fontBuf ) );
         }
 
         /* add rendered glyph to fontbuf */
-        CopyChar( fontBuf, character, charData ,size );
+        CopyChar( fontBuf, character, charData, size );
 
         /* cleanup */
         MemUnlock( bitmapHandle );
+
+Fail:        
         TrueType_Unlock_Face( trueTypeVars );
-Fail:
+Fin:
         MemUnlock( varBlock );
 }
 
@@ -243,6 +254,9 @@ static void CopyChar( FontBuf* fontBuf, word geosChar, void* charData, word char
         word  indexGeosChar = geosChar - fontBuf->FB_firstChar;
         CharTableEntry*  charTableEntries = (CharTableEntry*) (((byte*)fontBuf) + sizeof( FontBuf ));
 
+ 
+EC(     ECCheckBounds( (void*)charData ) );
+EC(     ECCheckBounds( (void*)(((byte*)fontBuf) + fontBuf->FB_dataSize ) ) );
 
         /* copy rendered Glyph to fontBuf */
         memmove( ((byte*)fontBuf) + fontBuf->FB_dataSize, charData, charDataSize );
@@ -277,15 +291,20 @@ static void ShrinkFontBuf( FontBuf* fontBuf )
         word  sizeCharData;
 
 
+EC(     ECCheckBounds( (void*)charTableEntries ) );
+
         /* shrink fontBuf if necessary */
         while( fontBuf->FB_dataSize > MAX_FONTBUF_SIZE )
         {
                 int   indexLRUChar = FindLRUChar( fontBuf, numOfChars );
                 void* charData = ((byte*)fontBuf) + charTableEntries[indexLRUChar].CTE_dataOffset;
 
+
                 /* ensure that we have a char to remove */
                 if( indexLRUChar == -1 )
                         return;
+
+EC(             ECCheckBounds( (void*)charData ) );
 
                 /* remove CharData of lru char */
                 if( fontBuf->FB_flags & FBF_IS_REGION )
@@ -334,6 +353,9 @@ static int FindLRUChar( FontBuf* fontBuf, int numOfChars )
 
         for( i = 0; i < numOfChars; ++i, ++charTableEntry )
         {
+
+EC(             ECCheckBounds( (void*)charTableEntry ) );
+
                 /* if no data, go to next char */
                 if( charTableEntry->CTE_dataOffset <= CHAR_MISSING )
                         continue;
@@ -343,7 +365,6 @@ static int FindLRUChar( FontBuf* fontBuf, int numOfChars )
                         lru = charTableEntry->CTE_usage;
                         indexLRUChar = i;
                 }
-
         }
 
         return indexLRUChar;
@@ -406,14 +427,19 @@ static void AdjustPointers( CharTableEntry* charTableEntries,
 
 static word ShiftCharData( FontBuf* fontBuf, CharData* charData )
 {
-        word  size = charData->CD_pictureWidth * 
-                     ( ( charData->CD_numRows + 7 ) / 8 ) + SIZE_CHAR_HEADER;
- 
-        memmove( charData, 
-                ((byte*)charData) + size, 
-                (((byte*)fontBuf) + fontBuf->FB_dataSize) - ((byte*)charData) + size );
+        word    dataSize = ( ( charData->CD_pictureWidth + 7 ) >> 3 ) * charData->CD_numRows + SIZE_CHAR_HEADER;
+        word    bytesToMove = fontBuf->FB_dataSize - PtrToOffset( charData ) - dataSize;
 
-        return size;
+
+        if( bytesToMove == 0 )
+                return dataSize;
+
+EC(     ECCheckBounds( (void*)charData ) );
+EC(     ECCheckBounds( (void*)(((byte*)charData) + dataSize ) ) );
+ 
+        memmove( charData, ((byte*)charData) + dataSize, bytesToMove );
+
+        return dataSize;
 }
 
 /********************************************************************
@@ -437,14 +463,19 @@ static word ShiftCharData( FontBuf* fontBuf, CharData* charData )
  *******************************************************************/
 static word ShiftRegionCharData( FontBuf* fontBuf, RegionCharData* charData )
 {
-        word size = charData->RCD_size + SIZE_REGION_HEADER;
+        word    dataSize = charData->RCD_size + SIZE_REGION_HEADER;
+        word    bytesToMove = fontBuf->FB_dataSize - PtrToOffset( charData ) - dataSize;
 
 
-        memmove( charData, 
-                ((byte*)charData) + size, 
-                (((byte*)fontBuf) + fontBuf->FB_dataSize) - ((byte*)charData) + size );
+        if( bytesToMove == 0 )
+                return dataSize;
 
-        return size;
+EC(     ECCheckBounds( (void*)charData ) );
+EC(     ECCheckBounds( (void*)(((byte*)charData) + dataSize ) ) );
+
+        memmove( charData, ((byte*)charData) + dataSize, bytesToMove );
+
+        return dataSize;
 }
 
 

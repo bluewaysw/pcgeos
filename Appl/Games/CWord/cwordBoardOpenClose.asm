@@ -150,9 +150,10 @@ initiate::
         ; Check first to see if the user really wants to see a quick tip.
 		  ;
 	; nah - blow off the tips...
-	;     call    CwordCheckGetQuickTipsStartup
-	;	  jc      letsPlay
-		  jmp      letsPlay
+	; enabled again - R.B.
+	call    CwordCheckGetQuickTipsStartup
+	jc      letsPlay
+	;	  jmp      letsPlay
 
 	mov	bx, handle HelpInteraction	; single-launchable
 	mov	si, offset HelpInteraction

@@ -27,6 +27,6 @@ wmg3ext.eobj: geos.h heap.h geode.h resource.h ec.h object.h lmem.h \
                 driver.h thread.h print.h Internal/spoolInt.h serialDr.h \
                 parallDr.h hugearr.h fileEnum.h geoMisc.h Ansi/string.h \
                 Ansi/stdio.h Ansi/stdlib.h initfile.h htmldrv.h product.h \
-                math.h fixes.h htmlfstr.h awatcher.h htmlprog.h
+                math.h htmlfstr.h awatcher.h htmlprog.h
 
 wmg3extEC.geo wmg3ext.geo : geos.ldf ansic.ldf ui.ldf 

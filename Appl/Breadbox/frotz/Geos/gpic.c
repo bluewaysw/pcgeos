@@ -2,6 +2,7 @@
  * "gpic.c"
  *
  * GEOS front end, picture functions
+ * 2024-01-02 RainerB	Fix a lot of compiler warnings.
  *
  */
 
@@ -15,6 +16,7 @@
  */
 void os_draw_picture (int picture, int y, int x)
 {
+int a; a = picture; a = y; a = x; x=a;		// <- avoid compiler warnings
 #ifdef JUNK
     if (load_picture_info (picture))
     draw_picture (y, x);
@@ -53,6 +55,7 @@ int os_peek_colour (void)
  */
 bool os_picture_data (int picture, int *height, int *width)
 {
+int a; a = picture; *width = *width; *height = *height;		// <- avoid compiler warnings
     return FALSE;
 
 }/* os_picture_data */

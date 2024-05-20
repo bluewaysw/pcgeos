@@ -6,7 +6,11 @@
 # MODULE:	Draw
 # FILE:		geodraw.gp
 #
-# AUTHOR:	Steve Scholl
+# REVISION HISTORY:
+#	Name	Date		Description
+#	----	----		-----------
+#	Steve Scholl		Initial version
+#	RainerB	12/2023		Renamed from Artist to GeoDraw
 #
 #
 # Parameters file for: draw.geo
@@ -21,7 +25,7 @@ name draw.app
 #
 # Long name
 #
-longname "Artist"
+longname "GeoDraw"
 #
 # DB Token
 #

@@ -6,11 +6,11 @@
 GEODE           = bbxchat
 ASM_TO_OBJS     =
 UI_TO_RDFS      =
-SRCS            = sortlis.goc miscpro.goc routines.goc Interfac.goc\
-                  process.goc textlim.goc txt_strs.goc bbox.goh bbxreg.goh\
-                  appcolor.goh externs.goh appicons.goh gpcchat.goh
-OBJS            = sortlis.obj miscpro.obj routines.obj Interfac.obj\
-                  process.obj textlim.obj txt_strs.obj
+SRCS            = Interfac.goc miscpro.goc process.goc routines.goc\
+                  sortlis.goc textlim.goc txt_strs.goc appcolor.goh\
+                  appicons.goh externs.goh gpcchat.goh
+OBJS            = Interfac.obj miscpro.obj process.obj routines.obj\
+                  sortlis.obj textlim.obj txt_strs.obj
 LOBJS           =
 
 SYSMAKEFILE     = geode.mk

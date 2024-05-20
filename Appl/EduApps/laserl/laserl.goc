@@ -3,17 +3,18 @@
  ***************************************************************************/
 
 /*-------------------------------------------------------------------------
- | Program:  Sound Maker
+ | Program:  Laser Letter
  *-------------------------------------------------------------------------
  |
  | Objective:
- |    Allows the user to create simple sound effects to be played through
- |    the PC speaker.  Not intended for MIDI, but may work there too.
+ |    Allows the user to learn faster writing on the keyboard.
  |
  | Revision History:
  |    Who  Date:     Comments:
  |    ---  --------  ---------
  |    LES  03/26/99  Created
+ |    RB   02/06/24  QuickTips added
+ |    RB   03/12/24  Game mode and select lessons added
  |
  *-----------------------------------------------------------------------*/
 
@@ -26,7 +27,11 @@
 @include <Ansi/string.h>
 @include <Ansi/stdio.h>
 @include <Ansi/ctype.h>
+@include <initfile.h>
 @include "laserdb.goh"
+
+/* Enable additional UI and routines for debugging purpose */
+@define DEBUG_MODE	0
 
 /***************************************************************************
  *		Constants and defines:
@@ -85,6 +90,7 @@ typedef byte GameSpeed ;
 #define GAME_SPEED_FAST        3
 #define GAME_SPEED_VERY_FAST   4
 #define GAME_SPEED_DEFAULT     100
+#define GAME_SPEED_INCREASING  101
 
 /* How quickly letters are presented on the screen */
 typedef byte GameDensity ;
@@ -129,6 +135,9 @@ typedef byte GameDensity ;
 #define GAME_FONT_ID            (G_fontID)
 #define GAME_FONT_SIZE          (G_fontSize)
 
+/* Present Quick Tips on startup */
+#define	SHOW_ON_STARTUP		1
+
 /***************************************************************************
  *		Custom types:
  ***************************************************************************/
@@ -167,6 +176,17 @@ typedef struct {
     word pos      ;             /* Position within sample list */
     word priority ;             /* Level priority of sound */
 } T_soundState ;
+
+typedef struct {		/* Options saved to GEOS.INI */
+    byte showTips;
+    byte gameMode;
+    byte soundIsOn;
+    byte isBeginner;
+    byte currentLevel;
+    byte speed;
+    byte unused1;		/* for further expansion */
+    byte unused2;
+} LaserLettersOptions;
 
 /***************************************************************************
  *		Global variables:
@@ -232,6 +252,11 @@ word G_shootRequestCount = 0 ;
 /* What level we are in the game */
 word G_level = 1 ;
 
+/* Control if game is paused */
+/* high word: paused/running, low word: counter */
+word G_pauseState;
+#define gameIsPaused (G_pauseState & 0xFF00)
+
 T_simplePCSound G_sounds[16] ;
 T_soundState G_channelArray[MAX_SOUND_CHANNELS] ;
 
@@ -255,6 +280,9 @@ Boolean G_forceLevelComplete = FALSE ;
 Boolean G_isSoundOn = TRUE ;
 
 word G_driveLetter = 2 ; /* Default to C: */
+
+extern char G_titleString[MAX_TITLE_LEN];
+extern VMFileHandle G_exerciseDBFile;
 
 /***************************************************************************
  *		Tables:
@@ -342,6 +370,25 @@ void SoundStop(void) ;
 void SoundsWaitUntilDone(void) ;
 void UpdateBuildingAnimations(GStateHandle gstate) ;
 void UpdateSound(void) ;
+void UpdatePrimaryUI(Boolean isRunning);
+word FindGameSpeed(int selectedSpeed);
+void DisplayPauseState(void);
+Boolean PrepareGameModeLetters(void);
+void EnableDisableSelectLevelTriggers(word gameMode);
+
+@if @DEBUG_MODE
+void DInfo(char *txt);
+void DInfoClear(void);
+void DInfo1(char *txt, word num);
+void DInfo2(char *txt, word num1, word num2);
+@elseif
+#define DInfo(txt)
+#define DInfoClear()
+#define DInfo1(txt, num)
+#define DInfo2(txt, num1, num2)
+@endif
+
+
 
 /***************************************************************************
  *		Class & Message Definitions
@@ -355,7 +402,15 @@ void UpdateSound(void) ;
         @message void MSG_GAME_STOP() ;
         @message void MSG_GAME_UPDATE_SOUND() ;
         @message void MSG_GAME_SKIP_LEVEL() ;
-        @message void MSG_GAME_TOGGLE_SOUND() ;
+        @message (GEN_BOOLEAN_GROUP_APPLY_MSG) MSG_GAME_TOGGLE_SOUND;
+
+        @message void MSG_GAME_SELECT_LESSON_START() ;
+        @message void MSG_GAME_SELECT_LESSON_DONE() ;
+        @message (GEN_ITEM_GROUP_APPLY_MSG) MSG_GAME_CHANGE_MODE;
+        @message (GEN_DYNAMIC_LIST_QUERY_MSG) MSG_GAME_QUERY_LESSON_MONIKER;
+        @message void MSG_GAME_DIFFICULTY_START() ;
+        @message void MSG_GAME_DIFFICULTY_DONE() ;
+        @message void MSG_GAME_PAUSE(Boolean pause);
     @endc
 
     @classdecl LaserLettersProcessClass, neverSaved ;
@@ -400,7 +455,6 @@ void UpdateSound(void) ;
     @include "Art/iconcga.goh"
     @include "Art/iconsvga.goh"
 	 @include "Art/iconshgc.goh"
-	 @include "Art/bboxreg.goh"
 
     /*---------------------------------------------------------------------*/
 @end IconResource ;
@@ -413,7 +467,12 @@ void UpdateSound(void) ;
     /*---------------------------------------------------------------------*/
     @object GenPrimaryClass LaserLettersPrimary  = {
 		  GI_comp = @LaserLettersGameMenu, @LaserLettersOptionsMenu,
-		            @LaserLettersView ;
+		  	    @LaserLettersLevelText,
+		            @LaserLettersView, @QTipsDialogBox
+@if @DEBUG_MODE
+		            , @LaserLettersDebugText
+@endif
+			    ;
         HINT_SIZE_WINDOW_AS_DESIRED ;
         HINT_CENTER_CHILDREN_HORIZONTALLY ;
         HINT_CENTER_CHILDREN_VERTICALLY ;
@@ -421,89 +480,70 @@ void UpdateSound(void) ;
         HINT_KEEP_ENTIRELY_ONSCREEN;
 
         HINT_PRIMARY_NO_FILE_MENU ;
-		  ATTR_GEN_HELP_CONTEXT = "TOC" ;
+		  /*ATTR_GEN_HELP_CONTEXT = "TOC" ;*/
+	HINT_PRIMARY_NO_HELP_BUTTON;
 	 }
 	 /*---------------------------------------------------------------------*/
 	 @object GenInteractionClass LaserLettersGameMenu = {
 		  GI_visMoniker = 'G', "Game" ;
-		  GI_comp =
-				@LaserLettersStartTrigger,
-				@LaserLettersSkip,
-				@AboutDBox;
+		  GI_comp =	@LaserLettersStartTrigger,
+		  		@LaserLettersPauseTrigger,
+		  		@LaserLettersContinueTrigger,
+		  		@LaserLettersMenuSubGroup;
+		  GI_attrs = @default | GA_KBD_SEARCH_PATH;
 		  GII_visibility = GIV_POPUP ;
 		  ATTR_GEN_INTERACTION_GROUP_TYPE = (GIGT_FILE_MENU) ;
+	 }
+	 /*---------------------------------------------------------------------*/
+	 @object GenInteractionClass LaserLettersMenuSubGroup = {
+		  GI_comp =	@LaserLettersSkip,
+				@LaserLettersQTipsTrigger;
+		  GI_attrs = @default | GA_KBD_SEARCH_PATH;
 	 }
 	 /*---------------------------------------------------------------------*/
     @object GenTriggerClass LaserLettersStartTrigger = {
         GI_visMoniker = 'S', "Start" ;
         GTI_destination = process ;
         GTI_actionMsg = MSG_GAME_START_VIA_UI ;
+	GI_attrs = @default | GA_KBD_SEARCH_PATH;
+	GI_kbdAccelerator = ctrl 'R';
     }
 	 /*---------------------------------------------------------------------*/
 	 @object GenTriggerClass LaserLettersSkip = {
 		  GI_visMoniker = 'k', "Skip level" ;
 		  GTI_destination = process ;
 		  GTI_actionMsg = MSG_GAME_SKIP_LEVEL ;
+		  GI_attrs = @default | GA_KBD_SEARCH_PATH;
+		  /* GI_kbdAccelerator = ctrl 'S'; */
 	 }
-
 	 /*---------------------------------------------------------------------*/
-@object GenInteractionClass AboutDBox = {
-	 GI_visMoniker = 'b', "About";
-	 GI_comp = @AppName, @Beta, @By, @BreadBoxLogo, @Visit,
-			 @Web, @Copyright;
-	 GII_visibility = GIV_DIALOG;
-	 GII_type = GIT_NOTIFICATION;
-	 HINT_CENTER_CHILDREN_HORIZONTALLY;
-}
-
-@object GenTextClass AppName = {
-    GI_attrs = @default | GA_READ_ONLY;
-    GTXI_attrs = @default | GTA_SINGLE_LINE_TEXT;
-	 GTXI_text = "Laser Letters";
-    ATTR_GEN_TEXT_CHAR_ATTR = (ChunkHandle) @AppNameCharAttrs;
-}
-
-@chunk VisTextCharAttr AppNameCharAttrs =
-	CHAR_ATTR_FONT_SIZE_STYLE(
-		FID_DTC_URW_SANS, 24, TS_BOLD);
-
-@object GenGlyphClass Beta = {
-  GI_visMoniker = "An Educational Product";
-}
-
-@object GenGlyphClass By = {
-  GI_visMoniker = "from";
-}
-
-@object GenGlyphClass BreadBoxLogo = {
-  GI_visMoniker = list { @BreadboxLogoMoniker}
-}
-
-@object GenGlyphClass Copyright = {
-  GI_visMoniker = "Copyright 1994-2001 Breadbox Computer Company LLC";
-}
-
-@object GenGlyphClass Visit = {
-  GI_visMoniker = "Visit us at...";
-}
-
-@object GenGlyphClass Web = {
-  GI_visMoniker = "www.breadbox.com";
-}
+	 @object GenTriggerClass LaserLettersQTipsTrigger = {
+		  GI_visMoniker   = 'Q', "Quick Tips" ;
+		  GTI_destination = @QTipsDialogBox ;
+		  GTI_actionMsg   = MSG_GEN_INTERACTION_INITIATE ;
+		  HINT_TRIGGER_BRINGS_UP_WINDOW;
+	 }
 
 	 /*---------------------------------------------------------------------*/
 	 @object GenInteractionClass LaserLettersOptionsMenu = {
 		  GI_visMoniker = 'O', "Options" ;
-		  GI_comp =
+		  GI_comp =	@GameModeSelector, 
 				@LaserLettersToggleSound,
+				@LaserLettersBeginnerMode,
+		  		@GameMenuGroup,
 				@LLSpeedDBox;
 		  GII_visibility = GIV_POPUP ;
 	 }
 	 /*---------------------------------------------------------------------*/
-    @object GenTriggerClass LaserLettersToggleSound = {
+    @object GenBooleanGroupClass LaserLettersToggleSound = {
+		  GI_comp = @LLToggleSoundItem;
+		  GBGI_destination = process ;
+		  GBGI_applyMsg = MSG_GAME_TOGGLE_SOUND ;
+		  GBGI_selectedBooleans = GAME_SOUND_IS_ON;
+    }
+    @object GenBooleanClass LLToggleSoundItem = {
 		  GI_visMoniker = list { @SoundIsOnMoniker } ;
-		  GTI_destination = process ;
-		  GTI_actionMsg = MSG_GAME_TOGGLE_SOUND ;
+		  GBI_identifier = GAME_SOUND_IS_ON;
     }
 	 /*---------------------------------------------------------------------*/
 	 @visMoniker SoundIsOnMoniker = 'O', "Sound is ON" ;
@@ -511,7 +551,7 @@ void UpdateSound(void) ;
 	 @visMoniker SoundIsOffMoniker = 'O', "Sound is OFF" ;
 	 /*---------------------------------------------------------------------*/
 	 @object GenInteractionClass LLSpeedDBox = {
-		  GI_visMoniker = 'S', "Speed" ;
+		  GI_visMoniker = 'e', "Speed" ;
 		  GI_comp = @LLSpeedGroup;
 		  GII_visibility = GIV_POPUP ;
 //	     GII_type = GIT_NOTIFICATION;
@@ -519,34 +559,39 @@ void UpdateSound(void) ;
 	 }
 	 /*---------------------------------------------------------------------*/
 	 @object GenItemGroupClass LLSpeedGroup = {
-		  GI_comp = @LLDefaultItem, @LLVSlowItem, @LLSlowItem,
+		  GI_comp = @LLDefaultItem, @LLIncreasingItem, 
+		  				@LLVSlowItem, @LLSlowItem,
 						@LLNormalItem, @LLFastItem, @LLVFastitem;
 		  GIGI_selection = GAME_SPEED_DEFAULT ;
 		  HINT_ORIENT_CHILDREN_VERTICALLY;
 	 }
 
 	 @object GenItemClass LLDefaultItem = {
-		  GI_visMoniker = "Default" ;
+		  GI_visMoniker = 'D',"Default" ;
 		  GII_identifier = GAME_SPEED_DEFAULT ;
 	 }
+	 @object GenItemClass LLIncreasingItem = {
+		  GI_visMoniker = 'I',"Increasing" ;
+		  GII_identifier = GAME_SPEED_INCREASING ;
+	 }
 	 @object GenItemClass LLVSlowItem = {
-		  GI_visMoniker = "VerySlow" ;
+		  GI_visMoniker = 'V',"VerySlow" ;
 		  GII_identifier = GAME_SPEED_VERY_SLOW ;
 	 }
 	 @object GenItemClass LLSlowItem = {
-		  GI_visMoniker = "Slow" ;
+		  GI_visMoniker = 'S',"Slow" ;
 		  GII_identifier = GAME_SPEED_SLOW ;
 	 }
 	 @object GenItemClass LLNormalItem = {
-		  GI_visMoniker = "Normal" ;
+		  GI_visMoniker = 'N',"Normal" ;
 		  GII_identifier = GAME_SPEED_NORMAL ;
 	 }
 	 @object GenItemClass LLFastItem = {
-		  GI_visMoniker = "Fast" ;
+		  GI_visMoniker = 'F',"Fast" ;
 		  GII_identifier = GAME_SPEED_FAST ;
 	 }
 	 @object GenItemClass LLVFastitem = {
-		  GI_visMoniker = "Very Fast" ;
+		  GI_visMoniker = 't',"Very Fast" ;
 		  GII_identifier = GAME_SPEED_VERY_FAST ;
 	 }
 
@@ -572,29 +617,330 @@ void UpdateSound(void) ;
         HINT_EXPAND_HEIGHT_TO_FIT_PARENT ;
     }
     /*---------------------------------------------------------------------*/
+	 @object GenInteractionClass QTipsDialogBox = {
+		  GI_visMoniker = "Laser Letters Quick Tips";
+		  GI_comp = @GoalText, @InfoGroup, @LearnText,
+				@ShowOnStartupGroup,
+				@OKTipsButton;
+		  GII_visibility = GIV_DIALOG ;
+		  GII_attrs = @default | GIA_MODAL | GIA_NOT_USER_INITIATABLE;
+		  HINT_CENTER_CHILDREN_HORIZONTALLY ;
+		  /*ATTR_GEN_HELP_CONTEXT = "TOC";*/
+	 }
+
+	 @object GenTextClass GoalText = {
+		  GI_attrs = @default | GA_READ_ONLY;
+		  GI_visMoniker = " ";
+		  HINT_PLACE_MONIKER_TO_LEFT;
+		  GTXI_text = "The goal of the game is to protect the city!";
+		  ATTR_GEN_TEXT_NEVER_MAKE_SCROLLABLE;
+	 }
+	 @object GenInteractionClass InfoGroup = {
+		  GI_visMoniker = " ";
+		  HINT_PLACE_MONIKER_TO_LEFT;
+		  HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+		  GI_comp = @InfoText;
+		  }
+	 @object GenTextClass InfoText = {
+		  GI_attrs = @default | GA_READ_ONLY;
+		  GI_visMoniker = list { @VisMonColorShieldedCityBitmap, @VisMonMonoShieldedCityBitmap };
+		  HINT_PLACE_MONIKER_TO_LEFT;
+		  GTXI_text = "Falling letters destroy the buildings. Use the laser guns on both sides to destroy the letters. To do this, simply press the corresponding key on the keyboard.";
+		  ATTR_GEN_TEXT_NEVER_MAKE_SCROLLABLE;
+	 }
+
+
+	 @object GenTextClass LearnText = {
+		  GI_attrs = @default | GA_READ_ONLY;
+		  GI_visMoniker = " ";
+		  HINT_PLACE_MONIKER_TO_LEFT;
+		  GTXI_text = "This game offers various levels of increasing difficulty. This also allows you to learn to write faster with the keyboard.";
+		  ATTR_GEN_TEXT_NEVER_MAKE_SCROLLABLE;
+	 }
+
+	 @object GenBooleanGroupClass ShowOnStartupGroup = {
+		  GI_comp = @ShowOnStartupBoolean;
+	 }
+
+	 @object GenBooleanClass ShowOnStartupBoolean = {
+		  GI_visMoniker = 'S', "Show this Dialog box when Laser Letters starts";
+		  GBI_identifier = SHOW_ON_STARTUP;
+	 }
+
+	 @object GenTriggerClass OKTipsButton = {
+		  GI_visMoniker   = 'O', "OK";
+		  GI_attrs = @default | GA_SIGNAL_INTERACTION_COMPLETE ;
+		  HINT_SEEK_REPLY_BAR;
+		  HINT_DEFAULT_DEFAULT_ACTION;
+	 }
+	 
+@if @DEBUG_MODE
+	 @object GenTextClass LaserLettersDebugText = {
+		/* GTXI_attrs = @default | GTA_INIT_SCROLLING;*/
+		HINT_TEXT_WASH_COLOR = {C_LIGHT_CYAN,CF_INDEX,0,0 };
+		HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+		/*HINT_EXPAND_HEIGHT_TO_FIT_PARENT;*/
+        	HINT_MINIMUM_SIZE = {
+        	    SST_PIXELS | 100,
+        	    SST_LINES_OF_TEXT | 7, 0
+        	    } ;
+		GTXI_attrs = @default | GTA_TAIL_ORIENTED ;
+	} 	
+@endif	
+
 @end Interface
 
 
-@start Strings;
+@start Strings, data;
 
 @chunk char LevelText[] = "Laser Letters -- Level %u";
 @localize "do not localize the %u";
 @chunk char OverText[] = "Game over!";
-@chunk char ComplText[] = "Level completed!  On to level \01";
+@chunk char ComplText[] = "Level completed!\rOn to level \01";
 @localize "do not localize the @1";
 @chunk char LeftKeys[] = "`12345qwert~!@#$%asdfgQWERTASDFGzxcvbZXCVB" ;
-@localize "the keyboard's left hand keys";
+@localize "the keyboard's left hand keys - MUST fit to the keyboard layout of the target language";
 @chunk char RightKeys[] = "67890^&*()yuiopYUIOPhjkl;HJKL:nm,./NM<>?'\"[]{}\\|-=_+" ;
-@localize "the keyboard's right hand keys";
+@localize "the keyboard's right hand keys - MUST fit to the keyboard layout of the target language";
 @chunk char NoExerciseFile[] = "No Typing Tutor exercise file found.  Using sample letters file (3 Levels).";
+
 @chunk char Level1Samp[] = "jjjjffffjjjjffffddddkkkkddddkkkk";
 @localize "the first sample level";
 @chunk char Level2Samp[] = "jjjjffffjjjjffffddddkkkkddddkkkkssssllllssssllll";
 @localize "the second sample level";
 @chunk char Level3Samp[] = "jjjjffffjjjjffffddddkkkkddddkkkkssssllllssssllllaaaa;;;;aaaa;;;;";
-@localize "the third & last sample level";
+@localize "the third & last sample level - respect the keyboard layout of the target language";
+
+@chunk char Title1Samp[] = "Demo Lesson 1 - Home Row (Step 1)";
+@localize "the name of the first sample level";
+@chunk char Title2Samp[] = "Demo Lesson 2 - Home Row (Step 2)";
+@localize "the name of the second sample level";
+@chunk char Title3Samp[] = "Demo Lesson 3 - Home Row (Step 3)";
+@localize "the name of the third sample level";
+
+/* Texts for LevelText */
+@chunk char GameReadyText[] = "Ready.";    
+@localize "Game State: Ready. text";
+@chunk char GameModeChangedText[] = "Game mode changed, reset to first level. Ready.";
+@localize "Game State text when game mode has been changed";
+
+@chunk char GamePausedText1[] = "Paused.";    
+@localize "Game State: paused text 1";
+//chunk char GamePausedText2[] = "________";    
+@chunk char GamePausedText2[] = "--------";    
+@localize "Game State: paused text 2";
+
+/* Game mode Level strings */
+/* Title string must not extend 79 characters! */
+@chunk char GameLevel1TitleString[] = "Only lower case letters are falling - that's simple.";
+@localize { "max 79 charachters" 1-79 };
+@chunk char Game1LowerCaseLetters[] = "abcdefghijklmnopqrstuvwxyz";
+@localize "Game level 1: all lower case letters of target language keyboard layout";
+
+@chunk char GameLevel2TitleString[] = "All letters are falling - why not?";
+@localize { "max 79 charachters" 1-79 };
+@chunk char Game2AllLetters[] = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ";
+@localize "Game level 2: all lower and upper case letters of target language keyboard layout";
+
+@chunk char GameLevel3TitleString[] = "All letters and numbers are falling - crazy.";
+@localize { "max 79 charachters" 1-79 };
+@chunk char Game3AllLettersAndNumbers[] = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ1234567890";
+@localize "Game level 3: all letters plus numbers of target language keyboard layout";
+
+@chunk char GameLevel4TitleString[] = "Numbers and special characters are falling - what a fun.";
+@localize { "max 79 charachters" 1-79 };
+@chunk char Game4NumbersAndSpecialCharcters[] = "1234567890~!@#$%^&*()-_=+{}[]|\;:'\",<.>/?";
+@localize "Game level 4: numbers and special charactes of target language keyboard layout";
+
+@chunk char GameLevel5TitleString[] = "All characters are falling - holy cow!";
+@localize { "max 79 charachters" 1-79 };
+@chunk char Game5AllCharcters[] = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ1234567890~!@#$%^&*()-_=+{}[]|\;:'\",<.>/?";
+@localize "Game level 5: all charactes of target language keyboard layout";
 
 @end Strings;
+
+/***************************************************************************
+ *		Constants for game extension 
+ ***************************************************************************/
+#define  GAME_MODE_GAME		1	/* Random letters, just for fun */
+#define  GAME_MODE_LESSON	2	/* Use exercise file to select letters*/
+#define  GAME_USER_IS_BEGINNER	1	/* present less letters in this case */
+#define  GAME_SOUND_IS_ON	1 
+#define	 GAME_LEVEL_1		1
+#define	 GAME_LEVEL_2		2
+#define	 GAME_LEVEL_3		3
+#define	 GAME_LEVEL_4		4
+#define	 GAME_LEVEL_5		5
+#define	 GAME_LAST_GAME_LEVEL	GAME_LEVEL_5
+
+/***************************************************************************
+ *		UI Objects for game extension 
+ ***************************************************************************/
+
+@start	GameUi;
+
+@object GenInteractionClass GameMenuGroup = {
+    GI_comp = 	@GameLevelTrigger, @SelectLessonTrigger, 
+    		@GameLevelDialog, @SelectLessonDialog;
+    GI_attrs = @default | GA_KBD_SEARCH_PATH;
+    /*HINT_SAME_CATEGORY_AS_PARENT; */
+}
+
+@object GenItemGroupClass GameModeSelector = {
+    GI_comp = @GameModeGame, @GameModeLesson;
+    GIGI_selection = GAME_MODE_GAME;
+    GIGI_destination = process;
+    GIGI_applyMsg = MSG_GAME_CHANGE_MODE;
+}
+
+@object GenItemClass GameModeGame = {
+    GI_visMoniker = 'G', "Game Mode";
+    GII_identifier = GAME_MODE_GAME;
+}
+
+@object GenItemClass GameModeLesson = {
+    GI_visMoniker = 'L', "Lesson Mode";
+    GII_identifier = GAME_MODE_LESSON;
+}
+
+@object GenTriggerClass LaserLettersPauseTrigger = {
+    GI_visMoniker = 'P', "Pause" ;
+    GI_states = @default & ~GS_ENABLED;
+    GTI_destination = process ;
+    GTI_actionMsg = MSG_GAME_PAUSE ;
+    ATTR_GEN_TRIGGER_ACTION_DATA = TRUE;
+    GI_attrs = @default | GA_KBD_SEARCH_PATH;
+    GI_kbdAccelerator = ctrl 'P';
+}
+@object GenTriggerClass LaserLettersContinueTrigger = {
+    GI_visMoniker = 'C', "Continue" ;
+    GI_states = @default & ~GS_ENABLED;
+    GTI_destination = process ;
+    GTI_actionMsg = MSG_GAME_PAUSE ;
+    ATTR_GEN_TRIGGER_ACTION_DATA = FALSE;
+    GI_attrs = @default | GA_KBD_SEARCH_PATH;
+    GI_kbdAccelerator = ctrl 'C';
+}
+
+    /*
+     * Dialogbox to select next lesson in lesson mode
+     */
+@object GenTriggerClass SelectLessonTrigger = { 
+    GI_visMoniker = 'S', "Select Lesson";
+    GTI_destination = process;
+    GTI_actionMsg = MSG_GAME_SELECT_LESSON_START;
+    GI_states = @default & ~GS_ENABLED;
+    HINT_TRIGGER_BRINGS_UP_WINDOW;
+}
+@object GenInteractionClass SelectLessonDialog = {
+    GI_visMoniker = "Select a Lesson";
+    GI_comp = @SelectLessionList, @SelectLessonOKTrigger, @SelectLessonCancelTrigger;
+    GII_visibility = GIV_DIALOG;
+/*    GII_type = GIT_NOTIFICATION; */
+    GII_attrs = GIA_NOT_USER_INITIATABLE
+    		| GIA_MODAL;
+    HINT_INTERACTION_MAKE_RESIZABLE;
+}
+@object GenDynamicListClass SelectLessionList =  {
+    GDLI_numItems = 0;
+    GDLI_queryMsg = MSG_GAME_QUERY_LESSON_MONIKER;
+    GIGI_destination = process;
+    HINT_ITEM_GROUP_DISPLAY_CURRENT_SELECTION;
+    HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+    HINT_EXPAND_HEIGHT_TO_FIT_PARENT;
+    HINT_ITEM_GROUP_SCROLLABLE;
+    HINT_MINIMUM_SIZE = { 40 | SST_AVG_CHAR_WIDTHS, 10 | SST_LINES_OF_TEXT, 10 };
+}
+@object GenTriggerClass SelectLessonCancelTrigger = {
+    GI_visMoniker = 'C',"Cancel";
+    ATTR_GEN_TRIGGER_INTERACTION_COMMAND = IC_DISMISS;
+    HINT_SEEK_REPLY_BAR;
+}
+@object GenTriggerClass SelectLessonOKTrigger = {
+    GI_visMoniker = 'O',"OK";
+    GTI_destination = process;
+    GTI_actionMsg = MSG_GAME_SELECT_LESSON_DONE;
+    HINT_SEEK_REPLY_BAR;
+}
+   
+
+
+    /*
+     * Dialog box to select diffculty in game mode
+     */
+@object GenTriggerClass GameLevelTrigger = { 
+    GI_visMoniker = 'd', "Game mode difficulty";
+    GTI_destination = process;
+    GTI_actionMsg = MSG_GAME_DIFFICULTY_START;
+    HINT_TRIGGER_BRINGS_UP_WINDOW;
+}
+@object GenInteractionClass GameLevelDialog = {
+    GI_visMoniker = "Game Mode Difficulty";
+    GI_comp = @GameLevelSelector, @GameModeOKTrigger, @GameModeCancelTrigger;
+    GII_visibility = GIV_DIALOG;
+    GII_attrs = GIA_NOT_USER_INITIATABLE
+    		| GIA_MODAL;
+    }
+@object GenItemGroupClass GameLevelSelector = {
+    GI_comp = @GameLevel1, @GameLevel2, @GameLevel3, @GameLevel4, @GameLevel5;
+    HINT_ORIENT_CHILDREN_VERTICALLY;
+    GIGI_selection = GAME_LEVEL_1;		/* The simplest level */
+}
+@object GenItemClass GameLevel1 = {
+    GI_visMoniker = '1', "1. Lower case lettes only";
+    GII_identifier = GAME_LEVEL_1;		/* Identifiers are simply the level itself */
+}
+@object GenItemClass GameLevel2 = {
+    GI_visMoniker = '2', "2. Lower and upper case letters";
+    GII_identifier = GAME_LEVEL_2;	
+}
+@object GenItemClass GameLevel3 = {
+    GI_visMoniker = '3', "3. All letters and numbers";
+    GII_identifier = GAME_LEVEL_3;	
+}
+@object GenItemClass GameLevel4 = {
+    GI_visMoniker = '4', "4. Numbers and special characters";
+    GII_identifier = GAME_LEVEL_4;	
+}
+@object GenItemClass GameLevel5 = {
+    GI_visMoniker = '5', "5. All characters";
+    GII_identifier = GAME_LEVEL_5;	
+}
+@object GenTriggerClass GameModeCancelTrigger = {
+    GI_visMoniker = 'C',"Cancel";
+    ATTR_GEN_TRIGGER_INTERACTION_COMMAND = IC_DISMISS;
+    HINT_SEEK_REPLY_BAR;
+}
+@object GenTriggerClass GameModeOKTrigger = {
+    GI_visMoniker = 'O',"OK";
+    GTI_destination = process;
+    GTI_actionMsg = MSG_GAME_DIFFICULTY_DONE;
+    HINT_SEEK_REPLY_BAR;
+}
+
+    /*
+     * more new UI stuff
+     */
+@object GenTextClass LaserLettersLevelText = {
+    GI_visMoniker = " Game State:";
+    GTXI_text = "Ready.";
+    GI_attrs = @default | GA_READ_ONLY;
+    HINT_PLACE_MONIKER_TO_LEFT;
+    HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+    ATTR_GEN_TEXT_NEVER_MAKE_SCROLLABLE;
+}
+@object GenBooleanGroupClass LaserLettersBeginnerMode = {
+    GI_comp = @LLBeginnerItem;
+    /* This group has no apply handler, it will be polled */
+    GBGI_selectedBooleans = 0;
+}
+@object GenBooleanClass LLBeginnerItem = {
+    GI_visMoniker = 'B', "Beginner - less Letters";
+    GBI_identifier = GAME_USER_IS_BEGINNER;
+}
+    
+
+@end	GameUi;
 
 /*
 
@@ -631,6 +977,7 @@ void UpdateSound(void) ;
  |    Who  Date:     Comments:
  |    ---  --------  ---------
  |    LES  03/30/99  Created
+ |    RB   02/06/24  QuickTips added	
  |
  *-----------------------------------------------------------------------*/
 
@@ -640,6 +987,9 @@ void UpdateSound(void) ;
     AppLaunchBlock *p_launch ;
     char buffer[200] ;
     char *p_buffer = buffer ;
+    Boolean initError, tips;
+    LaserLettersOptions	options;
+    word len;
 
     /* Determine where the application's directory is really located */
     p_launch = MemLock(launchBlock) ;
@@ -686,11 +1036,42 @@ void UpdateSound(void) ;
                   0) ;
     }
 
-	 LaserExerciseDBOpen() ;
+    LaserExerciseDBOpen() ;
     PrepareNewGame(TRUE) ;
     @callsuper() ;
     LoadSounds() ;
     SoundStart() ;
+    
+    /* load and apply options */
+    initError = InitFileReadDataBuffer("LaserL", "options", &options, sizeof(LaserLettersOptions), &len);
+    if (initError) { tips = TRUE; }
+    else 
+    {
+    	tips = options.showTips ? TRUE : FALSE;
+	
+	@send GameModeSelector::MSG_GEN_ITEM_GROUP_SET_SINGLE_SELECTION (options.gameMode, FALSE);
+	EnableDisableSelectLevelTriggers(options.gameMode);
+    
+	@send LaserLettersToggleSound::MSG_GEN_BOOLEAN_GROUP_SET_GROUP_STATE(options.soundIsOn, 0);
+	@send LaserLettersToggleSound::MSG_GEN_BOOLEAN_GROUP_SET_GROUP_MODIFIED_STATE (0xFFFF, 0);
+	@send LaserLettersToggleSound::MSG_GEN_APPLY();
+	
+	@send LaserLettersBeginnerMode::MSG_GEN_BOOLEAN_GROUP_SET_GROUP_STATE(options.isBeginner, FALSE);
+	G_level = options.currentLevel;
+	@send LLSpeedGroup::MSG_GEN_ITEM_GROUP_SET_SINGLE_SELECTION(options.speed, FALSE);	
+    }
+    if (tips) {
+	@send ShowOnStartupGroup::MSG_GEN_BOOLEAN_GROUP_SET_BOOLEAN_STATE(
+		SHOW_ON_STARTUP,
+		TRUE);
+	@send QTipsDialogBox::MSG_GEN_INTERACTION_INITIATE();
+    }
+    else {
+	@send ShowOnStartupGroup::MSG_GEN_BOOLEAN_GROUP_SET_BOOLEAN_STATE(
+		SHOW_ON_STARTUP,
+		FALSE);
+    }
+    		
 }
 
 /*-------------------------------------------------------------------------
@@ -704,14 +1085,31 @@ void UpdateSound(void) ;
  |    Who  Date:     Comments:
  |    ---  --------  ---------
  |    LES  03/26/99  Created
+ |    RB   02/06/24  QuickTips added	
  |
  *-----------------------------------------------------------------------*/
 
 @method LaserLettersProcessClass, MSG_GEN_PROCESS_CLOSE_APPLICATION
 {
+    LaserLettersOptions	options;
+    
     @call oself::MSG_GAME_STOP() ;
-    SoundStop() ;
+    SoundsWaitUntilDone();
     LaserExerciseDBClose() ;
+    
+    /* save options */
+    InitFileDeleteEntry("LaserL", "showTips");	/* obsolete */
+    
+    memset(&options, 0, sizeof(options));
+    options.showTips = @call ShowOnStartupGroup::MSG_GEN_BOOLEAN_GROUP_IS_BOOLEAN_SELECTED(SHOW_ON_STARTUP);
+    options.gameMode = @call GameModeSelector::MSG_GEN_ITEM_GROUP_GET_SELECTION();
+    options.soundIsOn = @call LaserLettersToggleSound::MSG_GEN_BOOLEAN_GROUP_GET_SELECTED_BOOLEANS();
+    options.isBeginner = @call LaserLettersBeginnerMode::MSG_GEN_BOOLEAN_GROUP_GET_SELECTED_BOOLEANS();
+    options.currentLevel = G_level;
+    options.speed = @call LLSpeedGroup::MSG_GEN_ITEM_GROUP_GET_SELECTION();
+    InitFileWriteData("LaserL", "options", &options, sizeof(LaserLettersOptions));
+    InitFileCommit();
+
     return @callsuper() ;
 }
 
@@ -729,28 +1127,26 @@ void UpdateSound(void) ;
  |    LES  03/31/99  Updated so it has different levels of speed and
  |                   density.
  |    jfh  07/18/02  Added speed selection
+ |    RB   03/09/24  Speed selection changed	
  *-----------------------------------------------------------------------*/
 @method LaserLettersProcessClass, MSG_GAME_START
 {
-	 word level, speed ;
-    char buffer[60] ;
+    word level, speed ;
 
     level = G_level ;
     if (level > MAX_LEVELS)
         level = MAX_LEVELS ;
 
-	 MemLock (OptrToHandle(@LevelText));
-	 sprintf(buffer, LMemDeref(@LevelText), G_level) ;
-    @call LaserLettersPrimary::MSG_GEN_REPLACE_VIS_MONIKER_TEXT(buffer, VUM_NOW) ;
-	 MemUnlock (OptrToHandle(@LevelText));
 	 /*
     G_gameSpeed = G_levelSpeed[level-1] ;
     */
 
-	 /* and even more messing with speed - jfh */
+	 /* and even more messing with speed - jfh - modified: RB */
 	 speed = @call LLSpeedGroup::MSG_GEN_ITEM_GROUP_GET_SELECTION();
-	 if (speed == GAME_SPEED_DEFAULT) {
-			G_gameSpeed = 0+(((G_level+3)*3)/G_numExercises) ;
+	 if ( (speed == GAME_SPEED_DEFAULT) || (speed==GAME_SPEED_INCREASING) ) {
+			//G_gameSpeed = 0+(((G_level+3)*3)/G_numExercises) ;
+			// ^--- this did assign GAME_SPEED_SLOW to most of the levels R.B.
+			G_gameSpeed = FindGameSpeed(speed);
 			}
 	 else G_gameSpeed = speed;
 
@@ -776,6 +1172,11 @@ G_gameDensity = GAME_DENSITY_HIGH ;
                   MSG_GAME_UPDATE,
                   1,
                   &G_timerId) ;
+
+    /* Enable/Disable Pause Triggers */
+    @send LaserLettersPauseTrigger::MSG_GEN_SET_ENABLED(VUM_NOW);
+    @send LaserLettersContinueTrigger::MSG_GEN_SET_NOT_ENABLED(VUM_NOW);
+
 }
 
 /*-------------------------------------------------------------------------
@@ -796,6 +1197,7 @@ G_gameDensity = GAME_DENSITY_HIGH ;
     if (!G_isRunning)
         @call oself::MSG_GAME_START() ;
     G_forceLevelComplete = TRUE ;
+    G_pauseState = 0;
 }
 
 /*-------------------------------------------------------------------------
@@ -815,8 +1217,7 @@ G_gameDensity = GAME_DENSITY_HIGH ;
 {
     @call oself::MSG_GAME_STOP() ;
 
-    /* Reset to level 1 */
-    G_level = 1 ;
+    /* Restart current level */
     PrepareNewGame(TRUE) ;
 
     @call oself::MSG_GAME_START() ;
@@ -843,6 +1244,10 @@ G_gameDensity = GAME_DENSITY_HIGH ;
         G_timer = NullHandle ;
         G_isRunning = FALSE ;
         G_shootRequestCount = 0 ;
+        
+        /* Disable Pause Triggers */
+        @send LaserLettersPauseTrigger::MSG_GEN_SET_NOT_ENABLED(VUM_NOW);
+	@send LaserLettersContinueTrigger::MSG_GEN_SET_NOT_ENABLED(VUM_NOW);
     }
 }
 
@@ -861,15 +1266,16 @@ G_gameDensity = GAME_DENSITY_HIGH ;
  *-----------------------------------------------------------------------*/
 @method LaserLettersProcessClass, MSG_GAME_TOGGLE_SOUND
 {
-    if (G_isSoundOn)  {
-        G_isSoundOn = FALSE ;
-        @call LaserLettersToggleSound::MSG_GEN_REPLACE_VIS_MONIKER_OPTR(
-                @SoundIsOffMoniker,
+	
+    if (selectedBooleans & GAME_SOUND_IS_ON)  {
+        G_isSoundOn = TRUE ;
+        @call LLToggleSoundItem::MSG_GEN_REPLACE_VIS_MONIKER_OPTR(
+                @SoundIsOnMoniker,
                 VUM_NOW) ;
     } else {
-        G_isSoundOn = TRUE ;
-        @call LaserLettersToggleSound::MSG_GEN_REPLACE_VIS_MONIKER_OPTR(
-                @SoundIsOnMoniker,
+        G_isSoundOn = FALSE ;
+        @call LLToggleSoundItem::MSG_GEN_REPLACE_VIS_MONIKER_OPTR(
+                @SoundIsOffMoniker,
                 VUM_NOW) ;
     }
 }
@@ -901,6 +1307,11 @@ G_gameDensity = GAME_DENSITY_HIGH ;
         if (G_ticksGoneBy < GAME_SMALLEST_TIME_UNIT)
             return ;
 		  G_ticksGoneBy = 0 ;
+		  
+    if (gameIsPaused) {
+    	DisplayPauseState();	
+    	return;
+    	}
 
         if (IsPlayerDead())  {
             /* Game over */
@@ -1758,6 +2169,8 @@ void MakeLettersFall(GStateHandle gstate, Boolean doFall)
     word building ;
     word num ;
     Boolean anyLettersFall = FALSE ;
+    // Use of G_level has been changed. R.B.
+    int lev = (G_level+2)/3;
 
     p_letter = G_letterArray ;
     for (i=0; i<MAX_LETTERS; i++, p_letter++)  {
@@ -1765,7 +2178,7 @@ void MakeLettersFall(GStateHandle gstate, Boolean doFall)
             p_letter->oldX = p_letter->x ;
             p_letter->oldY = p_letter->y ;
             if (doFall)
-                p_letter->y += 2*(LETTER_STEP_Y_RATE+(G_level/5)) ;
+                p_letter->y += 2*(LETTER_STEP_Y_RATE+(lev/5)) ;
             anyLettersFall = TRUE ;
             if (((sword)p_letter->y) >= ((sword)LETTER_BOTTOM_Y))  {
                 /* GONE */
@@ -1842,6 +2255,10 @@ void MakeLettersFall(GStateHandle gstate, Boolean doFall)
  *-----------------------------------------------------------------------*/
 void RecordShootRequest(char character, Boolean isLeftTower)
 {
+
+    /* Only add if not paused */
+    if (gameIsPaused) return;
+    
     /* Only add if we have room */
     if (G_shootRequestCount < MAX_SHOOT_REQUESTS)  {
         /* Append to the end of the list */
@@ -1968,6 +2385,9 @@ void PlaySimpleSound(word soundId, word priority)
     word best = INDEX_NONE ;
     word bestPriority = 0xFFFF ;
     T_soundState *p_channel ;
+    
+    /* Do not setup sound if sound is not enabeld */
+    if (!G_isSoundOn) return;
 
     p_sound = G_sounds + soundId ;
     if (p_sound->priority)
@@ -2027,6 +2447,7 @@ void PrepareNewGame(Boolean isNewBuildings)
         memset(G_buildingArray, BUILDING_STATE_SHIELDED, sizeof(G_buildingArray)) ;
     memset(G_buildingTiming, 0, sizeof(G_buildingTiming)) ;
     PrepareNewLetters() ;
+    UpdatePrimaryUI(!isNewBuildings);
 
     /* Set up the timing */
     G_countPerUpdate = (1+GAME_SPEED_VERY_FAST - G_gameSpeed) *
@@ -2034,6 +2455,7 @@ void PrepareNewGame(Boolean isNewBuildings)
 /*    G_countPerUpdate *= 2 ; */
     G_countTilNextUpdate = (90/GAME_SMALLEST_TIME_UNIT) ;
     G_countTilNextAddition = 1 ;
+    G_pauseState = 0;
 }
 
 /*-------------------------------------------------------------------------
@@ -2056,23 +2478,45 @@ void PrepareNewLetters(void)
     char c ;
     word i ;
     word n ;
-    word exercise ;
+    int exercise ;
     Boolean isRandom = TRUE ;
     word len ;
+    // Use of G_level has been changed. R.B.
+    int lev = (G_level+2)/3;
 
-    num = 60 + (2*(G_level-1)) ;
-
-    exercise = (G_level-1) ;
-    if (exercise < 10)  {
-        exercise = (G_level-1) * 3 ;
-    } else {
-        exercise = (exercise-10)+30 ;
+	/*
+	 * In game mode use another routine to prepare letters
+	 */
+    if ( GAME_MODE_GAME == @call GameModeSelector::MSG_GEN_ITEM_GROUP_GET_SELECTION() )
+    {
+    	PrepareGameModeLetters();
+    	return;
     }
+    
+    if (lev > MAX_LEVELS) lev = MAX_LEVELS;
+    num = 60 + (2*(lev-1)) ;	/* up to 78 letters to present */
+    if ( GAME_USER_IS_BEGINNER & @call LaserLettersBeginnerMode::MSG_GEN_BOOLEAN_GROUP_GET_SELECTED_BOOLEANS() ) 
+    	num = (6*num)/10;
+    if (num > 95) num = 95;
+
+    	/*
+    	 * Select exercise based on the G_level
+    	 * After all exercises are completed, select only text-based exercises.
+    	 */
+    exercise = (G_level-1) ;	
+    while (exercise >= G_numExercises) {
+    	exercise -= ( G_numExercises - (NUM_SPECIAL_GROUPS*NUM_EXERCISES));
+    	if (exercise < 0) {
+    		/* This happens in demo lesson mode or if the excercise.vm file is invald */
+    		exercise = G_numExercises-1;
+    		break;
+    		}
+    	}
     RetrieveExercise(exercise % G_numExercises) ;
     len = strlen(G_exerciseString) ;
     for (n=0; n<num; )  {
         if (isRandom)  {
-            /* PIck a random location */
+            /* Pick a random location */
             i = RandomNumber() % len ;
 
             /* Go to the start of the word */
@@ -2399,6 +2843,512 @@ void UpdateSound(void)
     channel = ((channel+1)%MAX_SOUND_CHANNELS) ;
 }
 
+/*#########################################################################
+ | 
+ |
+ |    ++++ Laser Letters game extension ++++
+ |
+ |    Most of the stuff to add game mode and allow to select the exercise level
+ |
+ |    Who  Date:     Comments:
+ |    ---  --------  ---------
+ |    RB   03/06/24  Initial revision	
+ |
+ *#######################################################################*/
+
+/* Some routines for debugging */
+@if @DEBUG_MODE
+void DInfo(char *txt) {
+    @call LaserLettersDebugText::MSG_VIS_TEXT_APPEND_PTR(txt, 0);
+}
+void DInfo1(char *txt, word num) {
+char buf[40];
+    sprintf(buf, txt, num);
+    @call LaserLettersDebugText::MSG_VIS_TEXT_APPEND_PTR(buf, 0);
+}
+void DInfo2(char *txt, word num1, word num2) {
+char buf[40];
+    sprintf(buf, txt, num1, num2);
+    @call LaserLettersDebugText::MSG_VIS_TEXT_APPEND_PTR(buf, 0);
+}
+void DInfoClear(void) {
+    @call LaserLettersDebugText::MSG_VIS_TEXT_DELETE_ALL();
+}
+@endif
+
+/***************************************************************************
+ *  Methods and Routines
+ ***************************************************************************/
+
+/*-------------------------------------------------------------------------
+ | Method:  LaserLettersProcessClass::MSG_GAME_CHANGE_MODE
+ *-------------------------------------------------------------------------
+ |
+ | Description:
+ |    Update menu UI
+ |
+ | Revision History:
+ |    Who  Date:     Comments:
+ |    ---  --------  ---------
+ |    RB   03/06/24  Created
+ |
+ *-----------------------------------------------------------------------*/
+@method LaserLettersProcessClass, MSG_GAME_CHANGE_MODE {
+
+   EnableDisableSelectLevelTriggers(selection);
+
+ 	/*
+ 	 * Stop current game and reset to first level
+ 	 */
+   @call process::MSG_GAME_STOP();
+   G_level = 1;
+
+	/*
+	 * clean up game screen 
+	 */
+   PrepareNewGame(TRUE);
+   @call LaserLettersView::MSG_GEN_VIEW_REDRAW_CONTENT();
+   
+   UpdatePrimaryUI(FALSE);   
+   @call LaserLettersLevelText::MSG_VIS_TEXT_REPLACE_ALL_OPTR(@GameModeChangedText, 0);
+   
+}
+
+/*-------------------------------------------------------------------------
+ | EnableDisableSelectLevelTriggers
+ *-------------------------------------------------------------------------
+ |
+ | Description:
+ |    Set triggers enabled or disableded, depending on game mode
+ |
+ | Revision History:
+ |    Who  Date:     Comments:
+ |    ---  --------  ---------
+ |    RB   03/19/24  Created
+ *-----------------------------------------------------------------------*/
+void EnableDisableSelectLevelTriggers(word gameMode) {
+
+   if (gameMode == GAME_MODE_GAME)
+   {
+   	@send SelectLessonTrigger::MSG_GEN_SET_NOT_ENABLED(VUM_NOW);
+   	@send GameLevelTrigger::MSG_GEN_SET_ENABLED(VUM_NOW);
+   }
+   else
+   {
+   	@send SelectLessonTrigger::MSG_GEN_SET_ENABLED(VUM_NOW);
+   	@send GameLevelTrigger::MSG_GEN_SET_NOT_ENABLED(VUM_NOW);
+   }
+   
+}
+
+/*-------------------------------------------------------------------------
+ | Method:  LaserLettersProcessClass::MSG_GAME_SELECT_LESSON_START
+ *-------------------------------------------------------------------------
+ |
+ | Description:
+ |    Put up the select lesson dialog box
+ |
+ | Revision History:
+ |    Who  Date:     Comments:
+ |    ---  --------  ---------
+ |    RB   03/06/24  Created
+ |
+ *-----------------------------------------------------------------------*/
+@method LaserLettersProcessClass, MSG_GAME_SELECT_LESSON_START {
+
+    @send SelectLessionList::MSG_GEN_DYNAMIC_LIST_INITIALIZE(G_numExercises);
+    @send SelectLessionList::MSG_GEN_ITEM_GROUP_SET_SINGLE_SELECTION(G_level-1, FALSE);
+
+    @send SelectLessonDialog::MSG_GEN_INTERACTION_INITIATE();
+    
+}
+
+/*-------------------------------------------------------------------------
+ | Method:  LaserLettersProcessClass::MSG_GAME_SELECT_LESSON_DONE
+ *-------------------------------------------------------------------------
+ |
+ | Description:
+ |    Select lesson dialog box has been finished
+ |
+ | Revision History:
+ |    Who  Date:     Comments:
+ |    ---  --------  ---------
+ |    RB   03/06/24  Created
+ |
+ *-----------------------------------------------------------------------*/
+@method LaserLettersProcessClass, MSG_GAME_SELECT_LESSON_DONE {
+int selectedLevel;
+
+    selectedLevel = @call SelectLessionList::MSG_GEN_ITEM_GROUP_GET_SELECTION();
+    selectedLevel++;
+    
+    if (selectedLevel != G_level )
+    {
+    	/* New Level selected */
+    	@call process::MSG_GAME_STOP();
+    	G_level = selectedLevel;
+	/*
+	 * clean up game screen 
+	 */
+   	PrepareNewGame(TRUE);
+   	@call LaserLettersView::MSG_GEN_VIEW_REDRAW_CONTENT();
+    	UpdatePrimaryUI(FALSE);
+    } 
+    
+    @send SelectLessonDialog::MSG_GEN_GUP_INTERACTION_COMMAND(IC_DISMISS);
+    
+}
+
+/*-------------------------------------------------------------------------
+ | Method:  LaserLettersProcessClass::MSG_GAME_QUERY_LESSON_MONIKER
+ *-------------------------------------------------------------------------
+ |
+ | Description:
+ |    Create Moniker (lesson name) for select lesson list
+ |
+ |    Parameter:	GEN_DYNAMIC_LIST_QUERY_MSG (optr list, word item)
+ |
+ | Revision History:
+ |    Who  Date:     Comments:
+ |    ---  --------  ---------
+ |    RB   03/06/24  Created
+ |
+ *-----------------------------------------------------------------------*/
+@method LaserLettersProcessClass, MSG_GAME_QUERY_LESSON_MONIKER {
+char less_name[MAX_TITLE_LEN + 5];	// be save
+MemHandle memMap ;
+VMBlockHandle mapBlock ;
+T_exerciseDatabaseMap *p_map ; 
+MemHandle mem ;
+T_exerciseRecord *p_exercise ;
+
+    if (G_exerciseDBFile == NullHandle)	    
+    {
+	/* This is bad and should not happen */
+	sprintf(less_name, "Invalid lesson %u", item+1);
+	@call list::MSG_GEN_DYNAMIC_LIST_REPLACE_ITEM_TEXT(item, less_name);
+	return;
+    }
+    
+    
+    /* Lock the map block of the exercise file and check if the item is valid */
+    mapBlock = VMGetMapBlock(G_exerciseDBFile) ;
+    p_map = VMLock(G_exerciseDBFile, mapBlock, &memMap) ;
+
+    if (p_map->MS_exercises[item] == NullHandle)
+    {
+        sprintf(less_name, "Lesson %u is empty.", item+1);
+    }
+    else
+    {
+    	/* Ok, let's get it */
+    	p_exercise = VMLock(G_exerciseDBFile, p_map->MS_exercises[item], &mem);
+	strcpy(less_name, p_exercise->ES_title);
+	VMUnlock(mem);    
+    }
+    
+    VMUnlock(memMap);    
+    @call list::MSG_GEN_DYNAMIC_LIST_REPLACE_ITEM_TEXT(item, less_name);
+
+}
+   /*-------------------------------------------------------------------------
+ | Method:  LaserLettersProcessClass::MSG_GAME_DIFFICULTY_START
+ *-------------------------------------------------------------------------
+ |
+ | Description:
+ |    Put up the select lesson dialog box
+ |
+ | Revision History:
+ |    Who  Date:     Comments:
+ |    ---  --------  ---------
+ |    RB   03/06/24  Created
+ |
+ *-----------------------------------------------------------------------*/
+@method LaserLettersProcessClass, MSG_GAME_DIFFICULTY_START {
+
+    @send GameLevelSelector::MSG_GEN_ITEM_GROUP_SET_SINGLE_SELECTION(G_level, FALSE);
+    @send GameLevelDialog::MSG_GEN_INTERACTION_INITIATE();
+    
+}
+
+/*-------------------------------------------------------------------------
+ | Method:  LaserLettersProcessClass::MSG_GAME_DIFFICULTY_DONE
+ *-------------------------------------------------------------------------
+ |
+ | Description:
+ |    Select lesson dialog box has been finished
+ |
+ | Revision History:
+ |    Who  Date:     Comments:
+ |    ---  --------  ---------
+ |    RB   03/06/24  Created
+ |
+ *-----------------------------------------------------------------------*/
+@method LaserLettersProcessClass, MSG_GAME_DIFFICULTY_DONE {
+int selectedLevel;
+
+    selectedLevel = @call GameLevelSelector::MSG_GEN_ITEM_GROUP_GET_SELECTION();
+    
+    if (selectedLevel != G_level )
+    {
+    	/* New Level selected */
+    	@call process::MSG_GAME_STOP();
+    	G_level = selectedLevel;
+    	
+	/*
+	 * clean up game screen 
+	 */
+   	PrepareNewGame(TRUE);
+   	@call LaserLettersView::MSG_GEN_VIEW_REDRAW_CONTENT();
+    	UpdatePrimaryUI(FALSE);
+    } 
+    
+    @send GameLevelDialog::MSG_GEN_GUP_INTERACTION_COMMAND(IC_DISMISS);
+    
+}
+
+ 
+/*-------------------------------------------------------------------------
+ | Method:  LaserLettersProcessClass::MSG_GAME_PAUSE
+ *-------------------------------------------------------------------------
+ |
+ | Description:
+ |    Toggle pause mode
+ |
+ |    Parameter:	void(Boolean pause)
+ |				TRUE: pause game	
+ |				FASLE: continue game
+ |
+ |    G_pauseState: 	high word: paused/running, low word: counter
+ |
+ | Revision History:
+ |    Who  Date:     Comments:
+ |    ---  --------  ---------
+ |    RB   03/10/24  Created
+ |
+ *-----------------------------------------------------------------------*/
+@method LaserLettersProcessClass, MSG_GAME_PAUSE {
+
+    	/* Do nothing if game is not running */	
+    if (!G_isRunning) return;
+
+    if (pause) { 
+    	G_pauseState = 0xFF00; 
+        @send LaserLettersPauseTrigger::MSG_GEN_SET_NOT_ENABLED(VUM_NOW);
+	@send LaserLettersContinueTrigger::MSG_GEN_SET_ENABLED(VUM_NOW);
+    	
+    }
+    else { 
+    	G_pauseState = 0; 
+        @send LaserLettersPauseTrigger::MSG_GEN_SET_ENABLED(VUM_NOW);
+	@send LaserLettersContinueTrigger::MSG_GEN_SET_NOT_ENABLED(VUM_NOW);
+    	UpdatePrimaryUI(TRUE);
+    }
+
+}
+
+/*-------------------------------------------------------------------------
+ | Routine:  UpdatePrimaryUI
+ *-------------------------------------------------------------------------
+ |
+ | Description:
+ |    Update the the UI for running/stopped Game
+ |
+ | Revision History:
+ |    Who  Date:     Comments:
+ |    ---  --------  ---------
+ |    RB   03/06/24  Created
+ |
+ *-----------------------------------------------------------------------*/
+void UpdatePrimaryUI(Boolean isRunning) {
+    char buffer[60] ;
+
+    if (isRunning) 
+    {
+	MemLock (OptrToHandle(@LevelText));
+	sprintf(buffer, LMemDeref(@LevelText), G_level) ;
+	@call LaserLettersPrimary::MSG_GEN_REPLACE_VIS_MONIKER_TEXT(buffer, VUM_NOW) ;
+	MemUnlock (OptrToHandle(@LevelText));
+	@call LaserLettersLevelText::MSG_VIS_TEXT_REPLACE_ALL_PTR(G_titleString, 0);
+    } else {
+	@call LaserLettersPrimary::MSG_GEN_REPLACE_VIS_MONIKER_OPTR(@LaserLettersTextMoniker, VUM_NOW) ;
+	@call LaserLettersLevelText::MSG_VIS_TEXT_REPLACE_ALL_OPTR(@GameReadyText, 0);
+    }
+	 
+}
+
+/*-------------------------------------------------------------------------
+ | FindGameSpeed
+ *-------------------------------------------------------------------------
+ |
+ | Description:
+ |    Find out default or increasing level game speed
+ |
+ |    speedSelected in Lesson mode:
+ |	GAME_SPEED_DEFAULT: All non-text based exercises have GAME_SPEED_SLOW.
+ |			Text based exercises may have higher speed.
+ |	GAME_SPEED_INCREASING: Non-text based exercises consist of 9 groups
+ |			with 3 exercises each. Speed starts with GAME_SPEED_SLOW
+ | 			in every group and increases for the last exercise.
+ |			The speed of text based exercises increases depending on G_level
+ |
+ |    speedSelected in Game mode:
+ |	GAME_SPEED_DEFAULT: All levels have GAME_SPEED_SLOW in fist turn.
+ | 			Levels higher than GAME_LAST_GAME_LEVEL (5) may have higher speed. 
+ |	GAME_SPEED_INCREASING: Level 1 and 2 have speed GAME_SPEED_SLOW
+ |			Then, speed increases with every level.
+ |
+ | Revision History:
+ |    Who  Date:     Comments:
+ |    ---  --------  ---------
+ |    RB   03/09/24  Created
+ *-----------------------------------------------------------------------*/
+word FindGameSpeed(int selectedSpeed) {
+word speed, limit;
+
+    if ( GAME_MODE_GAME == @call GameModeSelector::MSG_GEN_ITEM_GROUP_GET_SELECTION() )
+    {
+    	limit = GAME_LAST_GAME_LEVEL;
+    	if (selectedSpeed == GAME_SPEED_INCREASING) limit = (GAME_LAST_GAME_LEVEL/2);
+    	speed = GAME_SPEED_SLOW;
+    	if (G_level > limit ) speed += (G_level-limit);
+    	if (speed > GAME_SPEED_VERY_FAST ) speed = GAME_SPEED_VERY_FAST;
+    	
+    	return speed;
+    }
+
+
+    switch (selectedSpeed) {
+    case GAME_SPEED_DEFAULT:
+	if (G_level <= (NUM_SPECIAL_GROUPS * NUM_EXERCISES) )
+	{
+	    speed = GAME_SPEED_SLOW;
+	} else {
+	    speed = GAME_SPEED_SLOW + (G_level - (NUM_SPECIAL_GROUPS * NUM_EXERCISES))/2;
+	    if (speed > GAME_SPEED_VERY_FAST ) speed = GAME_SPEED_VERY_FAST;
+	}
+   	break;
+   case GAME_SPEED_INCREASING:
+	if (G_level <= (NUM_SPECIAL_GROUPS * NUM_EXERCISES) )
+	{
+	    speed = GAME_SPEED_SLOW;
+	    speed += ((G_level-1) % NUM_EXERCISES)/2;	
+	    // to increase speed on each exercise use:
+	    //speed += ((G_level-1) % NUM_EXERCISES);	
+	} else {
+	    speed = GAME_SPEED_SLOW + (G_level-1 - (NUM_SPECIAL_GROUPS * NUM_EXERCISES));
+	    if (speed > GAME_SPEED_VERY_FAST ) speed = GAME_SPEED_VERY_FAST;
+	}
+   	break;
+   }
+   
+   return speed;
+}
+
+/*-------------------------------------------------------------------------
+ | DisplayPauseState
+ *-------------------------------------------------------------------------
+ |
+ | Description:
+ |    Toggle pause text in GameState text object
+ |
+ | G_pauseState: high word: paused/runnung
+ |		 low word: counter
+ |
+ | Revision History:
+ |    Who  Date:     Comments:
+ |    ---  --------  ---------
+ |    RB   03/09/24  Created
+ *-----------------------------------------------------------------------*/
+void DisplayPauseState (void) {
+#define PAUSE_DELAY  12
+
+    if ((G_pauseState &0xFF) == 0) {
+	@call LaserLettersLevelText::MSG_VIS_TEXT_REPLACE_ALL_OPTR(@GamePausedText1,0);
+	G_pauseState &= 0xFF00;
+    	G_pauseState += 2*PAUSE_DELAY;
+	}
+    if ((G_pauseState &0xFF) == PAUSE_DELAY) {
+	@call LaserLettersLevelText::MSG_VIS_TEXT_REPLACE_ALL_OPTR(@GamePausedText2,0);
+	}
+    G_pauseState--;
+
+}
+
+/*-------------------------------------------------------------------------
+ | PrepareGameModeLetters
+ *-------------------------------------------------------------------------
+ |
+ | Description:
+ |    Find letters to present when we are in game mode.
+ |
+ | Revision History:
+ |    Who  Date:     Comments:
+ |    ---  --------  ---------
+ |    RB   03/14/24  Created
+ *-----------------------------------------------------------------------*/
+Boolean PrepareGameModeLetters(void) {
+int level, num, n, i, count;
+optr chars, title;
+char *text;
+
+	/* 
+	 * We only have GAME_LAST_GAME_LEVEL game mode levels
+	 */
+    level = (G_level > GAME_LAST_GAME_LEVEL) ? GAME_LAST_GAME_LEVEL : G_level;
+
+    switch (level) {
+    case GAME_LEVEL_1: chars = @Game1LowerCaseLetters; 
+    	    title = @GameLevel1TitleString; 
+    	    break;
+    case GAME_LEVEL_2: chars = @Game2AllLetters; 
+    	    title = @GameLevel2TitleString; 
+    	    break;
+    case GAME_LEVEL_3: chars = @Game3AllLettersAndNumbers; 
+    	    title = @GameLevel3TitleString; 
+    	    break;
+    case GAME_LEVEL_4: chars = @Game4NumbersAndSpecialCharcters; 
+    	    title = @GameLevel4TitleString; 
+    	    break;
+    case GAME_LEVEL_5:
+    default: chars = @Game5AllCharcters; 
+    	     title = @GameLevel5TitleString; 
+    	     break;
+    }
+
+    /* starting with level 6 (GAME_LAST_GAME_LEVEL+1): present more letteres than 60 (default)
+     * or 36 (beginner) */
+    num = (G_level > GAME_LAST_GAME_LEVEL) ? 35 + 5*G_level : 60;
+    if ( GAME_USER_IS_BEGINNER & @call LaserLettersBeginnerMode::MSG_GEN_BOOLEAN_GROUP_GET_SELECTED_BOOLEANS() ) 
+    		num = (6*num)/10;
+    if (num > 95) num = 95;
+
+    /* Find out title string */
+    MemLock(OptrToHandle(title));
+    text = LMemDeref(title);
+    if ( strlen(text) > (MAX_TITLE_LEN-1) ) text[MAX_TITLE_LEN] = 0;
+    strcpy(G_titleString, text);
+    
+    /* Find out the letters to present */
+    /* By default, they are in the same resource like title strings - but be want to be sure. */
+    MemLock(OptrToHandle(chars));
+    text = LMemDeref(chars);
+    count = strlen(text);
+    
+    for ( n = 0; n < num; n++ )
+    {
+    	i = RandomNumber() % count ;
+    	G_lettersToPresent[n] = text[i];
+    }
+
+    MemUnlock(OptrToHandle(chars));
+    MemUnlock(OptrToHandle(title));
+    
+    @call LaserLettersLevelText::MSG_VIS_TEXT_REPLACE_ALL_PTR(G_titleString, 0);
+    G_numPresented = 0 ;
+    
+    return TRUE;
+}
 /***************************************************************************
  *  END OF FILE:  LASERL.GOC                                               *
  ***************************************************************************/

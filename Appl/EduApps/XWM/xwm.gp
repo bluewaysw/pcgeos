@@ -11,10 +11,9 @@ tokenid 16431
 
 resource AppResource ui-object
 resource Interface ui-object
-resource Strings data object
-resource XWMAPPMONIKERRESOURCE data
-resource XWMDOCMONIKERRESOURCE data
-resource LOGORESOURCE data object
+resource Strings lmem read-only shared
+resource XWMAPPMONIKERRESOURCE lmem read-only shared
+resource XWMDOCMONIKERRESOURCE lmem read-only shared
 
 # platform
 platform geos201

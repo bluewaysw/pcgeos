@@ -111,8 +111,6 @@ extern TEngine_Instance engineInstance;
 
 #undef TT_FAIL
 
-    /* create the engine lock */
-    MUTEX_Create( _engine->lock );
     return TT_Err_Ok;
 
   Fail:
@@ -148,8 +146,6 @@ extern TEngine_Instance engineInstance;
 
     if ( !_engine )
       return TT_Err_Ok;
-
-    MUTEX_Destroy( _engine->lock );
 
     TTRaster_Done( _engine );
     TTObjs_Done  ( _engine );
@@ -1310,7 +1306,6 @@ extern TEngine_Instance engineInstance;
                                    TT_Raster_Map*  map )
   {
     PEngine_Instance  _engine = &engineInstance;
-    TT_Error          error;
 
 
     if ( !_engine )
@@ -1319,11 +1314,7 @@ extern TEngine_Instance engineInstance;
     if ( !outline || !map )
       return TT_Err_Invalid_Argument;
 
-    MUTEX_Lock( _engine->raster_lock );
-    error = RENDER_Glyph( outline, map );
-    MUTEX_Release( _engine->raster_lock );
-
-    return error;
+    return RENDER_Glyph( outline, map );
   }
 
 
@@ -1349,7 +1340,6 @@ TT_Error  TT_Get_Outline_Region( TT_Outline*     outline,
                                  TT_Raster_Map*  map )
 {
   PEngine_Instance  _engine = &engineInstance;
-  TT_Error          error;
 
 
   if ( !_engine )
@@ -1358,10 +1348,7 @@ TT_Error  TT_Get_Outline_Region( TT_Outline*     outline,
   if ( !outline || !map )
     return TT_Err_Invalid_Argument;
 
-  MUTEX_Lock( _engine->raster_lock );
-  error = RENDER_Region_Glyph( outline, map );
-  MUTEX_Release( _engine->raster_lock );
-  return error;
+  return RENDER_Region_Glyph( outline, map );
 }
 
 #endif    /* __GEOS__ */
@@ -1603,9 +1590,6 @@ TT_Error  TT_Get_Outline_Region( TT_Outline*     outline,
     /* Load table if needed */
     error = TT_Err_Ok;
 
-    /* MT-NOTE: We're modifying the face object, so protect it. */
-    MUTEX_Lock( faze->lock );
-
     if ( !cmap->loaded )
     {
       (void)USE_Stream( faze->stream, stream );
@@ -1620,7 +1604,6 @@ TT_Error  TT_Get_Outline_Region( TT_Outline*     outline,
       else
         cmap->loaded = TRUE;
     }
-    MUTEX_Release( faze->lock );
 
     HANDLE_Set( *charMap, cmap );
 

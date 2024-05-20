@@ -745,7 +745,7 @@ REVISION HISTORY:
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
 
 GrGetFontName	proc	far
-	uses	ds, si, es, di
+	uses	ds, si, es, di, bx
 	.enter
 
 if	FULL_EXECUTE_IN_PLACE
@@ -758,6 +758,7 @@ endif
 	segmov	es, ds
 	mov	di, si				;es:di <- ptr to buffer
 	call	FarLockInfoBlock		;lock font info block
+	mov	bx, cx				;lookup exact font id
 	call	IsFontAvailable			;is font in system?
 	jnc	notAvailable			;branch if not
 	;
@@ -1200,6 +1201,7 @@ GrFindNearestPointsize	proc	far
 	.enter
 
 	call	FarLockInfoBlock		;lock font info block
+	mov	bx, cx				;lookup for exact font id
 	call	IsFontAvailable			;see if font available
 	jnc	fontNotFound			;branch if font not in system
 	push	cx
@@ -1247,6 +1249,8 @@ REVISION HISTORY:
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
 
+FID_MAKER_MASK		equ	0xF0
+
 LibFindBestFace	proc	far
 	uses	bx, si, di
 	.enter
@@ -1256,7 +1260,13 @@ LibFindBestFace	proc	far
 	mov	bl, es:GS_fontAttr.FCA_textStyle
 	mov	al, bl
 	andnf	al, not KERNEL_STYLES		;al <- no kernel styles
+	and	bl, KERNEL_STYLES
 	push	bx
+	
+	; pass FID without maker id, to enable fuzzy matching
+	mov	bx, cx
+	and	bh, not FID_MAKER_MASK
+
 	;
 	; See if the font is even available.
 	;
@@ -1270,28 +1280,38 @@ SBCS <	mov	cl, TRUE			;cl <- find closest	>
 DBCS <	mov	cl, es:GS_fontAttr.FCA_charSet	;cl <- FontCharSet	>
 	call	FindNearestBitmap
 	pop	cx
-	jc	foundFont			;branch if bitmap found
+	jc	bitmapFontFound			;branch if bitmap found
+	tst	ds:[si].FI_outlineEnd
+	stc
+        jnz	foundFont			;if so, done
+	;call	FindNearestOutline		;see if an outline available
+	;jc	foundFont			;if so, done
+
 useDefaultFont:
 	call	GrGetDefFontID			;get system defaults
 	clr	al				;al <- no styles
-	mov	es:GS_fontAttr.FCA_fontID, cx
+	;mov	es:GS_fontAttr.FCA_fontID, cx
 DBCS <	mov	bh, FCS_ASCII			;bh <- FontCharSet of default>
-foundFont:
-DBCS <	mov	es:GS_fontAttr.FCA_charSet, bh				>
-	pop	bx
-	and	bl, KERNEL_STYLES
-	or	al, bl
-	mov	es:GS_fontAttr.FCA_textStyle, al
-	movwbf	es:GS_fontAttr.FCA_pointsize, dxah
+bitmapFontFound:
 	mov	es:GS_fontAttr.FCA_weight, FW_NORMAL
 	mov	es:GS_fontAttr.FCA_width, FWI_MEDIUM
-	mov	es:GS_fontAttr.FCA_superPos, SPP_DEFAULT
-	mov	es:GS_fontAttr.FCA_superSize, SPS_DEFAULT
-	mov	es:GS_fontAttr.FCA_subPos, SBP_DEFAULT
-	mov	es:GS_fontAttr.FCA_subSize, SBS_DEFAULT
-	ornf	es:GS_fontFlags, mask FBF_MAPPED_FONT
 	clc					;carry <- no outline subst.
-
+foundFont:
+	mov	es:GS_fontAttr.FCA_fontID, cx
+DBCS <	mov	es:GS_fontAttr.FCA_charSet, bh				>
+	pop	bx
+	pushf
+	ornf	al, bl
+	mov	es:GS_fontAttr.FCA_textStyle, al
+	movwbf	es:GS_fontAttr.FCA_pointsize, dxah
+	;mov	es:GS_fontAttr.FCA_weight, FW_NORMAL
+	;mov	es:GS_fontAttr.FCA_width, FWI_MEDIUM
+	;mov	es:GS_fontAttr.FCA_superPos, SPP_DEFAULT
+	;mov	es:GS_fontAttr.FCA_superSize, SPS_DEFAULT
+	;mov	es:GS_fontAttr.FCA_subPos, SBP_DEFAULT
+	;mov	es:GS_fontAttr.FCA_subSize, SBS_DEFAULT
+	ornf	es:GS_fontFlags, mask FBF_MAPPED_FONT
+	popf
 	.leave
 	ret
 LibFindBestFace	endp
@@ -1306,6 +1326,8 @@ CALLED BY:	LibFindNearestPointsize, LibFindBestFace
 
 PASS:		ds - seg addr of font info block
 		cx - font ID to check for
+		bx - font ID to check for, without manufacturer if
+		     manufacturer mapping is requested
 RETURN:		carry set:
 		    ds:si - ptr to FontInfo for font
 DESTROYED:	none
@@ -1319,8 +1341,10 @@ REVISION HISTORY:
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
 
+FID_MAKER_BITS	equ	0xf0	; hi bytes of fontID
+
 IsFontAvailable	proc	near
-	uses	ax
+	uses	ax, dx
 	.enter
 
 	mov	si, ds:[FONTS_AVAIL_HANDLE]	;si <- ptr to chunk
@@ -1331,10 +1355,18 @@ fontLoop:
 	jae	fontNotFound			;branch if end (carry clear)
 	cmp	ds:[si].FAE_fontID, cx		;see if correct font
 	je	fontAvailable			;branch if correct font
+	test	ds:[si].FAE_fontID.high, FID_MAKER_MASK
+	jz	nextFont			;skip bitmap font
+	mov	dx, ds:[si].FAE_fontID
+	and	dh, not FID_MAKER_MASK
+	cmp	dx, bx
+	je	fontAvailable			;branch if usable font
+nextFont:
 	add	si, FontsAvailEntry		;move to next entry
 	jmp	fontLoop
 
 fontAvailable:
+	mov	cx, ds:[si].FAE_fontID
 	mov	si, ds:[si].FAE_infoHandle	;ds:si <- handle of FontInfo
 	mov	si, ds:[si]			;ds:si <- ptr to FontInfo
 	stc					;indicate font available

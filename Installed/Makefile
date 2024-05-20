@@ -100,7 +100,7 @@ minimalLibrary	: kernel swap sound net ui isui motif spool text mailbox \
 		  basicdb gridlib gsol treplib
 #ascii
 
-prefLibs	: prefvid preftd \
+prefLibs	: prefvid prefts preftd \
 		  prefsnd prefos prefmous preflo preflf prefkbd \
 		  prefintl prefcomp prefbg prefpntc preffont configui
 
@@ -120,13 +120,14 @@ extraPrefLibs	: prefpag prefjfep
 # Applications
 #
 minimalAppl	: minimalGame minimalUtils minimalTools minimalSavers \
+ 	  	  extraGame \
 		  minimalEdu calendar geodex geocalc geodraw geowrite \
 		  scrapbk clock bigcalc geopoint \
-		  email manager isdesk linktool setup \
+		  email manager isdesk linktool openwith setup \
 		  launcher webmagick idialup \
 		  charm wordmat banner \
 		  bbxchat bbxmail \
-		  newsread geozip sclock\
+		  newsread geozip sclock trayapps\
  	  	  hmbase pdfvu  bnkr30 ftpc \
  	  	  instc instf
 
@@ -135,11 +136,15 @@ minimalUtils	: prefmgr
 minimalTools    : resedit
 
 minimalGame	: solitaire cword amateur bjack hearts gwpoker \
-                  pyramid sokoban taipei uki mine column
+                  pyramid sokoban uki mine column battle \
+                  row4 munchers vacman snake frcell
+
+extraGame	: taipei column2 mine2 follow treas mazerun \
+		  blkbox hiho magicboard  scode noid paddle \
+		  frotz spider
 
 minimalEdu	: flash fontmgck hangman laserl mflash numbers pvault \
-                  taide thinker wsm wsplay xwm
-# ttype
+                  oliner taide thinker wsm wsplay xwm ttype
 
 minimalSavers	: lol blackhole blank bobbin circles dribble dust \
 		  fades flame hopalong letter logo maze lastwords \
@@ -149,7 +154,8 @@ minimalSavers	: lol blackhole blank bobbin circles dribble dust \
 minimalTools	: prntscrn
 
 otherEnsemble	: conview reader term tedit geofile dirls  \
-		   graphvwr macror dump perf bim ffind bbxcd webbox
+		  graphvwr macror dump perf bim ffind bbxcd webbox \
+		  hinv10 bbg10
 #geocon3
 
 #
@@ -166,7 +172,7 @@ minimalDriver	: nimbus ms4 ntfat os2 cdrom stream dri gdi keyboard modem gdipoin
 		  vga vga8 vga15 vga16 vga24 ega cga mcga hgc att6300 dscga \
 		  printerDriver ctm ctmabs imps2 \
 		  ps2 msys msser msbus kbmouse absgen genmouse emm extmem \
-		  xms filestr nonts sblaster comm spooltd \
+		  xms filestr nonts taskmax bnf sblaster comm spooltd \
 		  vmtree filedd logibus logiser dma mslf kbd_drivers \
 		  etherodi etherpkt msnet cdados truetype
 
@@ -539,8 +545,8 @@ Installed/Library/Pref/Prefsnd:		ui config MAKELIB
 preftd	: Installed/Library/Pref/Preftd
 Installed/Library/Pref/Preftd:		ui config MAKELIB
 
-#prefts	: Installed/Library/Pref/Prefts
-#Installed/Library/Pref/Prefts:		ui config MAKELIB
+prefts	: Installed/Library/Pref/Prefts
+Installed/Library/Pref/Prefts:		ui config MAKELIB
 
 #prefui	: Installed/Library/Pref/Prefui
 #Installed/Library7Pref/Prefui:		ui config MAKELIB
@@ -565,7 +571,7 @@ Installed/Driver/Font/Nimbus:		kernel MAKEDRV
 
 truetype : Installed/Driver/Font/TrueType
 Installed/Driver/Font/TrueType:		kernel MAKEDRV
-	
+
 ms4	: Installed/Driver/IFS/DOS/MS4
 Installed/Driver/IFS/DOS/MS4:		kernel MAKEDRV
 
@@ -939,8 +945,14 @@ Installed/Appl/FileMgrs2/ISDesk:	ui shell spool wav shell MAKEAPPL
 sclock:	Installed/Appl/SysTray/SClock
 Installed/Appl/SysTray/SClock:		ui MAKEAPPL
 
+trayapps: Installed/Appl/SysTray/TrayApps
+Installed/Appl/SysTray/TrayApps:	ui ansic MAKEAPPL
+
 linktool: Installed/Library/FMTools/Linktool
 Installed/Library/FMTools/Linktool:	ui shell MAKEAPPL
+
+openwith: Installed/Library/FMTools/OpenWith
+Installed/Library/FMTools/OpenWith:	ui ansic MAKEAPPL
 
 homebase:
 #	No need to do this because this is sync'ed by morning make script.
@@ -1012,9 +1024,65 @@ Installed/Appl/Games/Taipei:	ui game MAKEAPPL
 uki	: Installed/Appl/Games/Uki
 Installed/Appl/Games/Uki:	ui sound text MAKEAPPL
 
-column	: Installed/Appl/Breadbox/Column
+column2	: Installed/Appl/Breadbox/Column
 Installed/Appl/Breadbox/Column:	ui game MAKEAPPL
 
+column	: Installed/Appl/Breadbox/FunPak/Column
+Installed/Appl/Breadbox/FunPak/Column:	ui game sound MAKEAPPL
+
+battle	: Installed/Appl/Breadbox/FunPak/Battle
+Installed/Appl/Breadbox/FunPak/Battle: ui math sound ansic MAKEAPPL
+
+follow	: Installed/Appl/Breadbox/FunPak/Follow
+Installed/Appl/Breadbox/FunPak/Follow: ui ansic game sound MAKEAPPL
+
+mine2	: Installed/Appl/Breadbox/FunPak/Mine
+Installed/Appl/Breadbox/FunPak/Mine: ui ansic MAKEAPPL
+
+treas	: Installed/Appl/Breadbox/FunPak/Treas
+Installed/Appl/Breadbox/FunPak/Treas: ui math ansic sound MAKEAPPL
+
+mazerun	: Installed/Appl/Breadbox/FunPak/Maze
+Installed/Appl/Breadbox/FunPak/Maze: ui ansic color game sound MAKEAPPL
+
+blkbox : Installed/Appl/Breadbox/EntPak/BlkBox
+Installed/Appl/Breadbox/EntPak/BlkBox: ui ansic game sound MAKEAPPL
+
+hiho : Installed/Appl/Breadbox/EntPak/Hiho
+Installed/Appl/Breadbox/EntPak/Hiho: ui ansic game sound MAKEAPPL
+
+magicboard : Installed/Appl/Breadbox/EntPak/Magic
+Installed/Appl/Breadbox/EntPak/Magic: ui ansic math game sound MAKEAPPL
+
+row4 : Installed/Appl/Breadbox/EntPak/Row4
+Installed/Appl/Breadbox/EntPak/Row4: ui ansic sound MAKEAPPL
+
+scode : Installed/Appl/Breadbox/EntPak/SCode
+Installed/Appl/Breadbox/EntPak/SCode: ui ansic game sound MAKEAPPL
+
+munchers : Installed/Appl/Breadbox/Arcade/munch
+Installed/Appl/Breadbox/Arcade/munch: ui math sound color game ansic MAKEAPPL
+
+vacman	: Installed/Appl/Breadbox/Arcade/vacman
+Installed/Appl/Breadbox/Arcade/vacman: ui game ansic wav sound MAKEAPPL
+
+noid	: Installed/Appl/Breadbox/Arcade/noid
+Installed/Appl/Breadbox/Arcade/noid: ui sound game color ansic MAKEAPPL
+
+paddle	: Installed/Appl/Breadbox/Arcade/paddle
+Installed/Appl/Breadbox/Arcade/paddle: ui ansic color game sound MAKEAPPL
+
+frotz	: Installed/Appl/Breadbox/frotz
+Installed/Appl/Breadbox/frotz: ui ansic text MAKEAPPL
+
+snake	: Installed/Appl/Breadbox/snake
+Installed/Appl/Breadbox/snake: ui game ansic MAKEAPPL
+
+frcell	: Installed/Appl/Breadbox/Cards/frcell
+Installed/Appl/Breadbox/Cards/frcell: ui ansic cards color MAKEAPPL
+
+spider	: Installed/Appl/Breadbox/Cards/spider
+Installed/Appl/Breadbox/Cards/spider: ui cards color sound MAKEAPPL
 
 
 
@@ -1475,6 +1543,12 @@ webbox	: Installed/Appl/Breadbox/Webbox
 Installed/Appl/Breadbox/Webbox:			ui ansic text spool spell \
 						MAKEAPPL
 
+hinv10	: Installed/Appl/Breadbox/Hinv10
+Installed/Appl/Breadbox/Hinv10:			ui ansic spool text MAKEAPPL
+
+bbg10	: Installed/Appl/Breadbox/BBGrmt
+Installed/Appl/Breadbox/BBGrmt:			ui ansic spool text MAKEAPPL
+
 #geocon3	: Installed/Appl/Breadbox/Geocon3
 #Installed/Appl/Breadbox/Geocon3:		ui ansic color MAKEAPPL
 
@@ -1539,8 +1613,8 @@ Installed/Appl/EduApps/tgen:		ui ansic text math spool basicdb \
 ttkr	: Installed/Appl/EduApps/ttkr
 Installed/Appl/EduApps/ttkr:		ui ansic text math basicdb MAKEAPPL
 
-oliner	: Installed/Appl/EduApps/oliner
-Installed/Appl/EduApps/oliner:		ui ansic text math spool basicdb \
+oliner	: Installed/Appl/EduApps/OLiner
+Installed/Appl/EduApps/OLiner:		ui ansic text math spool basicdb \
 					treplib spell MAKEAPPL
 
 instc	: Installed/Appl/Install/Instc
@@ -1600,6 +1674,9 @@ Installed/Library/CoProcessor/Intx87:		kernel math MAKELIB
 
 taskmax	: Installed/Driver/Task/Taskmax
 Installed/Driver/Task/Taskmax:			ui text MAKEDRV
+
+bnf : Installed/Driver/Task/BNF
+Installed/Driver/Task/BNF:				ui text MAKEDRV
 
 cvttool	: Installed/Library/FMTools/CvtTool
 Installed/Library/FMTools/CvtTool:		ui convert MAKELIB

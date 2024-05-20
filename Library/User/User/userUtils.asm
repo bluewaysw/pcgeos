@@ -141,17 +141,12 @@ StdSoundKeyClick		segment resource
 SimpleSoundHeader STD_KEY_CLICK_VOICES
 
 		ChangePriority	<SP_SYSTEM_LEVEL + SP_THEME>
-		ChangeEnvelope	0, IP_HI_MID_TOM
+		ChangeEnvelope	0, IP_REED_ORGAN
 		DeltaTick	1
-		VoiceOn		0, SS_MULTIPLIER*200, VOICE_HIGH	; .35 tick beep
-		DeltaMS		5
-		VoiceOff	0			; .125 tick pause
-		DeltaMS		2
-		VoiceOn		0, SS_MULTIPLIER*100, VOICE_HIGH	; .35 tick beep
+		VoiceOn		0, SS_MULTIPLIER*200, VOICE_LOW	; .35 tick beep
 		DeltaMS		5
 		VoiceOff	0
 		General		GE_END_OF_SONG
-
 
 StdSoundKeyClick		ends
 

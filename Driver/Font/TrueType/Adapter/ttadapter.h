@@ -49,6 +49,7 @@ extern TEngine_Instance engineInstance;
 #define WWFIXED_1_POINR_1                   0x00012000
 
 #define ITALIC_FACTOR                       0x0000366A
+#define NEGATVE_ITALIC_FACTOR               0xffffc996
 #define BOLD_FACTOR                         0x00012000 
 #define SCRIPT_FACTOR                       0x00008000
 #define SCRIPT_SHIFT_FACTOR                 0x00015000
@@ -68,6 +69,9 @@ extern TEngine_Instance engineInstance;
 #define MAX_KERN_TABLE_LENGTH               6000
 
 #define STANDARD_GRIDSIZE                   1000
+#define MAX_NUM_GLYPHS                      2000
+
+#define BASELINE_CORRECTION                 1
 
 
 /***********************************************************************
@@ -475,6 +479,15 @@ typedef struct
 #define WBFIXED_TO_WWFIXEDASDWORD( value )       \
         ( (long) ( ( (long)(value.WBF_int) ) * 0x00010000 ) | ( ( (long)value.WBF_frac) << 8 ) )
 
+/*
+ * convert value (WWFixed) to WWFixedAsDWord 
+ */
+#define WWFIXED_TO_WWFIXEDASDWORD( value )       \
+        ( (long) ( ( (long)(value.WWF_int) ) * 0x00010000 ) | ( (long)value.WWF_frac) )
+
+
+#define MUL_100_WWFIXED( factor, percentage )   \
+        GrMulWWFixed( factor, GrUDivWWFixed( ((long)percentage ) << 16, 100L << 16))
 
 /***********************************************************************
  *      functions

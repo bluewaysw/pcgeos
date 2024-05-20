@@ -335,10 +335,10 @@ SETLIBFLAG	= -l
 # script or something, say, called "diffcopy".  For now, we just
 # copy the file over.
 #
-$(LIBOBJ:S/:/\\:/g)       : $(LIBOBJ:T) .NOEXPORT .IGNORE
+$(LIBOBJ:S/:/\\:/g)       : $(LIBOBJ:T) .NOEXPORT
 	$(COPY_IF_DIFF) $(LIBOBJ:T) $(.TARGET)
 #  ifdef PRODUCT_LDFS
-$(LIBOBJ:H:S/:/\\:/g)/$(_COMMALDFS)/$(LIBOBJ:T)	: $(.TARGET:H:T)/$(LIBOBJ:T) .NOEXPORT .IGNORE
+$(LIBOBJ:H:S/:/\\:/g)/$(_COMMALDFS)/$(LIBOBJ:T)	: $(.TARGET:H:T)/$(LIBOBJ:T) .NOEXPORT
 	$(COPY_IF_DIFF) $(.TARGET:H:T)/$(LIBOBJ:T) $(.TARGET)
 #  endif
 
@@ -593,7 +593,7 @@ $(DEPFILE) : $(SRCS) $(GPFILE)
 #endif
 ##	-del $(.TARGET:X\\[*\\].*).BAK
 ##	-copy $(.TARGET) $(.TARGET:X\\[*\\].*).BAK
-	$(MAKEDPND) $(ROOT_DIR) $(DEVEL_DIR) $(INSTALL_DIR) -o$(.TARGET:S|DEPENDENCIES.MK|dependencies.mk|) `$(PRODUCT_FLAGS) goc $(PRODUCT)` $(CMODULES) ENDCMODULES $(MODULES) ENDASMMODULES $(GOCDEPENDS) $(CDEPENDS) $(ASMDEPENDS) $(SRCS:M*.GOC) $(SRCS:M*.goc) $(SRCS:M*.C) $(SRCS:M*.c) $(UI_TO_RDFS) $(ASM_TO_OBJS) ENDFILES
+	$(MAKEDPND) $(ROOT_DIR) $(DEVEL_DIR) $(INSTALL_DIR) -o$(.TARGET:S|DEPENDENCIES.MK|dependencies.mk|) `$(PRODUCT_FLAGS) goc $(PRODUCT)` $(CMODULES) ENDCMODULES $(MODULES) ENDASMMODULES $(GOCDEPENDS) $(CDEPENDS) $(ASMDEPENDS) $(SRCS:M*.[gG][oO][cC]) $(SRCS:M*.[cC]) $(UI_TO_RDFS) $(ASM_TO_OBJS) ENDFILES
 #if exists($(.ALLSRC:M*.gp))
 	findlbdr $(.ALLSRC:M*.gp) $(.TARGET) $(GEODES)
 #elif exists($(.ALLSRC:M*.GP))

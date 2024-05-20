@@ -56,7 +56,7 @@ impgraph.eobj: geos.h heap.h geode.h resource.h ec.h object.h lmem.h \
                 Objects/gInterC.h Objects/Text/tCommon.h stylesh.h \
                 driver.h thread.h print.h Internal/spoolInt.h serialDr.h \
                 parallDr.h hugearr.h fileEnum.h initfile.h htmldrv.h \
-                product.h math.h fixes.h htmlfstr.h awatcher.h htmlprog.h \
+                product.h math.h htmlfstr.h awatcher.h htmlprog.h \
                 IMPBMP/impgif.h IMPBMP/ibcommon.h IMPBMP/impjpeg.h \
                 ieCommon.h xlatLib.h Ansi/string.h
 awatcher.obj \
@@ -89,6 +89,8 @@ awatcher.eobj: geos.h heap.h geode.h resource.h ec.h object.h lmem.h \
                 parallDr.h hugearr.h fileEnum.h awatcher.h
 impfjpeg.obj \
 impfjpeg.eobj: 
+impfjpeg.obj \
+impfjpeg.eobj: impfjpeg.cpp
 impgifc.obj \
 impgifc.eobj: stdapp.goh object.goh ui.goh Objects/metaC.goh \
                 Objects/inputC.goh Objects/clipbrd.goh \
@@ -118,7 +120,7 @@ impgifc.eobj: geos.h heap.h geode.h resource.h ec.h object.h lmem.h \
                 Objects/gInterC.h Objects/Text/tCommon.h stylesh.h \
                 driver.h thread.h print.h Internal/spoolInt.h serialDr.h \
                 parallDr.h hugearr.h fileEnum.h IMPBMP/ibcommon.h \
-                product.h htmldrv.h math.h fixes.h htmlfstr.h awatcher.h \
+                product.h htmldrv.h math.h htmlfstr.h awatcher.h \
                 htmlprog.h
 impjpeg.obj \
 impjpeg.eobj: stdapp.goh object.goh ui.goh Objects/metaC.goh \
@@ -149,7 +151,7 @@ impjpeg.eobj: geos.h heap.h geode.h resource.h ec.h object.h lmem.h \
                 driver.h thread.h print.h Internal/spoolInt.h serialDr.h \
                 parallDr.h hugearr.h fileEnum.h Ansi/stdio.h jpeglib.h \
                 product.h htmlprog.h jconfig.h jmorecfg.h Ansi/string.h \
-                Ansi/stdlib.h IMPBMP/ibcommon.h htmldrv.h math.h fixes.h \
+                Ansi/stdlib.h IMPBMP/ibcommon.h htmldrv.h math.h \
                 htmlfstr.h awatcher.h initfile.h
 
 impgraphEC.geo impgraph.geo : geos.ldf ansic.ldf ijgjpeg.ldf 

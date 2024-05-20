@@ -36,6 +36,8 @@ static void ProcessFont(        TRUETYPE_VARS,
                                 const char*  file, 
                                 MemHandle    fontInfoBlock );
 
+static Boolean isResourceSaving( TRUETYPE_VARS );
+
 static sword getFontIDAvailIndex( 
                                 FontID     fontID, 
                                 MemHandle  fontInfoBlock );
@@ -289,6 +291,9 @@ EC(     ECCheckFileHandle( truetypeFile ) );
         if ( TT_Get_Face_Properties( FACE, &FACE_PROPERTIES ) )
                 goto Fail;
 
+        if ( !isResourceSaving( trueTypeVars ) )
+                goto Fail;
+
         if ( getCharMap( trueTypeVars, &CHAR_MAP ) )
                 goto Fail;
 
@@ -446,6 +451,33 @@ Fin:
 
 
 /********************************************************************
+ *                      isResourceSaving
+ ********************************************************************
+ * SYNOPSIS:	  Checks if Face can manage with few resources.
+ * 
+ * PARAMETERS:    face            FreeType face.
+ * 
+ * RETURNS:       Boolean         TRUE if Face manages with few resources.
+ * 
+ * SIDE EFFECTS:  none
+ * 
+ * STRATEGY:      
+ * 
+ * REVISION HISTORY:
+ *      Date      Name      Description
+ *      ----      ----      -----------
+ *      19/12/23  JK        Initial Revision
+ *******************************************************************/
+static Boolean isResourceSaving( TRUETYPE_VARS )
+{
+        /* At the moment we are only checking the number of glyphs */
+        /* in the font. Further checks can be implemented here.    */
+
+        return FACE_PROPERTIES.num_Glyphs < MAX_NUM_GLYPHS;
+}
+
+
+/********************************************************************
  *                      toHash
  ********************************************************************
  * SYNOPSIS:	  Calculates the hash value of the passed string.
@@ -472,7 +504,15 @@ static word toHash( const char* str )
         for ( i = 0; i < strlen( str ); ++i )
 		hash = hash * 7 + str[i];
 
-        return hash % 240 + 15;
+        /* The generated FontID has the following structure:      */
+        /* 0bMMMMGGGHHHHHHHHH        MMMM      Fontmaker (4 bit)  */
+        /*                           GGG       FontGroup (3 bit)  */
+        /*                           HHHHHHHHH hash      (9 bit)  */
+        /*                                                        */
+        /* From hash the range from 0b000000000 to 0b000001111 is */
+        /* reserved for mapping original Nimbus Fonts to TrueType */
+        /* fonts via geos.ini.                                    */
+        return hash % 0x01f0 + 15;
 }
 
 

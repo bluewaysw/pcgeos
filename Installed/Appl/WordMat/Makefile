@@ -6,7 +6,7 @@
 GEODE           = wordmat
 ASM_TO_OBJS     =
 UI_TO_RDFS      =
-SRCS            = password.goc wordmat.goc password.goh passwdui.goh
+SRCS            = password.goc wordmat.goc passwdui.goh password.goh
 OBJS            = password.obj wordmat.obj
 LOBJS           =
 
