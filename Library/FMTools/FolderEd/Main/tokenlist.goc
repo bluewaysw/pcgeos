@@ -18,7 +18,10 @@
 
 extern optr g_dialog;
 
-static MemHandle g_tokenList = 0;	/* List of all Tokens in the TokenDB */
+extern	MemHandle 	g_tokenList = 0;	/* List of all Tokens in the TokenDB */
+extern	GeodeToken	g_selectedToken;
+extern	word		g_displaySize;
+extern	word		g_tokenStyle;
 
 /*############################################################################
  *
@@ -31,36 +34,8 @@ static MemHandle g_tokenList = 0;	/* List of all Tokens in the TokenDB */
  * FEDListTokens
  *-------------------------------------------------------------
  *	Create al list of all tokens in the tokenDB
- *	도 muss noch sortiert werden
  *	Return: Number of tokens in TokenDB
 -------------------------------------------------------------*/
-
-Boolean CompToken (GeodeToken t1, GeodeToken t2) {
-	// return TRUE wenn t1 < t2
-	if (t1.GT_manufID < t2.GT_manufID ) return TRUE;
-	return FALSE;
-	}
-	
-int FindSmallest(TokenListStruct *list, word von, word bis) {
-int min, n;
-
-	// Sonderfall nur ein Element
-	if (von == bis) return von; 
-
-	// Annahme: kleinstes steht vorne
-	min = von;
-	
-	// Finde kleiners als min
-	for ( n = von+1; n <= bis; n++) {
-		if ( CompToken(list->token[n], list->token[min]) ) min = n;
-		}
-		
-	return min;
-	}
-	
-	
-	
-
 word FEDListTokens(void) {
 TokenListStruct	*list;
 dword	retVal;
@@ -130,12 +105,86 @@ word count, minIdx, topIdx, n;
 TokenListStruct	*tokenList;
 GeodeToken tok;
 
+MemHandle  mh;
+word 	sizeRead;
+Boolean isGString;
+
+
+@if 0
+/*--------------------- InternalGetTokenMonikerBlock ---------------------
+ * Purpose:	Get the moniker in a memory block
+ * Pass		dispSize DS_TINY  0
+ *			DS_STANDARD  1
+ *			DS_LARGE  2
+ *			DS_HUGE  3
+ *		style	VMS_TEXT  0
+ *			VMS_ABBREV_TEXT  1
+ *			VMS_GRAPHIC_TEXT  2
+ *			VMS_ICON  3
+ *			VMS_TOOL  4
+ * 		*sizeRead: return: bytes read
+ *		*isGString: TRUE if GString
+ * Return:	Handle of memory block containing the moniker image
+ ---------------------------------------------------------------------------*/
+MemHandle InternalGetTokenMonikerBlock(GeodeToken token, word dispSize, word style, 
+				word *sizeRead, Boolean *isGString) {
+@endif
+@if 0
+	if ( mh ) {
+		@call ReleaseLauncherMiniTokenDisplay::MSG_GEN_REPLACE_VIS_MONIKER(
+				VUM_NOW, 30, 48, monikerSize,
+				VMDT_VIS_MONIKER, VMST_FPTR,
+				(dword)MemLock(mh) );
+		MemFree(mh);
+		}
+	else {
+		// Kein Mini-Moniker: Kreuz darstellen
+		@call ReleaseLauncherMiniTokenDisplay::MSG_GEN_REPLACE_VIS_MONIKER_TEXT("X",0);
+		}
+@endif		
+
+
+
     tokenList = MemLock(g_tokenList);
     tok = tokenList->token[item + tokenList->firstIndex];
     MemUnlock(g_tokenList);
+    
+    
+    
+@if 1
+/*
+@message void MSG_GEN_DYNAMIC_LIST_REPLACE_ITEM_MONIKER(@stack
+		word item, ReplaceItemMonikerFlags flags, 
+		word height, word width, word length,
+		VisMonikerDataType dataType,
+		VisMonikerSourceType sourceType,
+		dword source);
+*/
 
+
+    mh = InternalGetTokenMonikerBlock(tok, g_displaySize, g_tokenStyle, &sizeRead, &isGString);
+    
+
+	if ( mh ) {
+		@call list::MSG_GEN_DYNAMIC_LIST_REPLACE_ITEM_MONIKER(item, 
+				0,30,48,sizeRead,
+				VMDT_VIS_MONIKER ,VMST_FPTR,(dword)MemLock(mh));
+		MemFree(mh);
+		}
+	else {
+		@call list::MSG_GEN_DYNAMIC_LIST_REPLACE_ITEM_TEXT(item, "NOT found");
+	}	
+	
+@endif
+
+{char buf[40];
+sprintf(buf, "%u,%u", sizeRead, isGString);
+//call list::MSG_GEN_DYNAMIC_LIST_REPLACE_ITEM_TEXT(item, buf);
+}
+@if 0
     @call list::MSG_GEN_DYNAMIC_LIST_REPLACE_ITEM_MONIKER(item,
 			0,30,48,0,VMDT_TOKEN,VMST_FPTR,(dword)&tok);
+@endif			
 }
 
 /*-------------------------------------------------------------
@@ -150,23 +199,17 @@ GeodeToken tok;
 @extern method FolderEdInteractionClass, MSG_FED_APPLY_TOKEN_LIST {
 TokenListStruct	*tokenList;
 GeodeToken tok;
-int n;
-char buf[10];
 
     tokenList = MemLock(g_tokenList);
     tok = tokenList->token[selection + tokenList->firstIndex];
+    g_selectedToken = tok;
     MemUnlock(g_tokenList);
 
-// 도 Text-Routine nutzen
 
-    for ( n = 0; n< 4; n++ ) if (tok.GT_chars[n]==0) {tok.GT_chars[n]='-'; }
-    sprintf(buf, "%c%c%c%c, %u", tok.GT_chars[0], tok.GT_chars[1], 
-    			tok.GT_chars[2], tok.GT_chars[3], tok.GT_manufID);
-    @call @DialogObj(@FEDIconInfoIDText)::MSG_GEN_REPLACE_VIS_MONIKER_TEXT(buf, 0);
-
+    FEDShowToken(tok, @DialogObj(@TokenNewID), @DialogObj(@TokenNewDisplay), 0);
+    // 도 check, ob TRT_NONE (statt NUll) hier OK ist
 
     /* Redraw TokenGroup to remove possible artefacts */
-    // 도 -> andere Gruppe
     @call @DialogObj(@FEDTokenGroup)::MSG_GEN_SET_NOT_USABLE(VUM_DELAYED_VIA_UI_QUEUE);
     @send @DialogObj(@FEDTokenGroup)::MSG_GEN_SET_USABLE(VUM_NOW);
 
@@ -224,23 +267,51 @@ Boolean found;
  	} while(FALSE);
     
     // if there are no token to display, list->tokensToShow will be zero
-    // --> no extra handling required
+    // --> no extra handling required for the list
     @send @DialogObj(@FEDTokenList)::MSG_GEN_DYNAMIC_LIST_INITIALIZE(list->tokensToShow);
+    @send @DialogObj(@FEDIconInfoDisplayed)::MSG_GEN_VALUE_SET_INTEGER_VALUE(list->tokensToShow, FALSE);
+
+    // ... but disable "Change Token" button and clear "new" token
+    if (0==list->tokensToShow) {
+    	@send @DialogObj(@SelectOkTrigger)::MSG_GEN_SET_NOT_ENABLED(VUM_NOW);
+    	
+    	@call @DialogObj(@TokenNewID)::MSG_GEN_REPLACE_VIS_MONIKER_TEXT("",0);
+    	@call @DialogObj(@TokenNewDisplay)::MSG_GEN_REPLACE_VIS_MONIKER_TEXT("",0);
+    	}
+    else {
+    	@send @DialogObj(@SelectOkTrigger)::MSG_GEN_SET_ENABLED(VUM_NOW);
+    	}
+
 
     MemUnlock(g_tokenList);
 
-
-
-/* 도    
-    @send @DialogObj(@FEDTokenList)::MSG_GEN_ITEM_GROUP_SET_SINGLE_SELECTION(0, FALSE);
-    @send @DialogObj(@FEDTokenList)::MSG_GEN_ITEM_GROUP_SET_MODIFIED_STATE(TRUE);
-    @send @DialogObj(@FEDTokenList)::MSG_GEN_APPLY();
-*/    
-
-
-    /* Redraw TokenGroup to remove possible artefacts * /
-    // 도 -> andere Gruppe oder nix
+    /* Redraw TokenGroup to remove possible artefacts */
     @call @DialogObj(@FEDTokenGroup)::MSG_GEN_SET_NOT_USABLE(VUM_DELAYED_VIA_UI_QUEUE);
     @send @DialogObj(@FEDTokenGroup)::MSG_GEN_SET_USABLE(VUM_NOW);
-*/
+/**/
 }
+
+
+
+/*-------------------------------------------------------------
+ * MSG_FED_APPLY_TOKEN_TYPE
+ *-------------------------------------------------------------
+ *	Select a nee display size and toke style to display in list
+-------------------------------------------------------------*/
+// stop in foldered::FolderEdInteractionFED_APPLY_TOKEN_TYPE
+@extern method FolderEdInteractionClass, MSG_FED_APPLY_TOKEN_TYPE {
+TokenListStruct	*list;
+word count;
+
+    g_tokenStyle = @call @DialogObj(@FEDTokenStyleSelector)::MSG_GEN_ITEM_GROUP_GET_SELECTION();
+    g_displaySize = @call @DialogObj(@FEDDisplaySizeSelector)::MSG_GEN_ITEM_GROUP_GET_SELECTION();
+   
+    list = MemLock(g_tokenList);
+    count = list->tokensToShow;
+    MemUnlock(g_tokenList);
+    
+    @call @DialogObj(@FEDTokenList)::MSG_GEN_DYNAMIC_LIST_INITIALIZE(count);
+
+ 
+}
+

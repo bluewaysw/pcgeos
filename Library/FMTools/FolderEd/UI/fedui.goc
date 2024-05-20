@@ -25,6 +25,18 @@
 @chunk char TextDataFile[] = "GEOS Data-File";
 @chunk char TextLink[] = "Link";
 @chunk char TextUnknown[] = "Unknown";
+
+@chunk char NoChangeNotGEOSFile[] = "You cannot change the token of this native file";
+@chunk char NoChangeGEOSExecutable[] = "You cannot change the token of a GEOS executable file.";
+@chunk char NoChangeFolder[] = "You cannot change the token of this folder.";
+@chunk char NoChangeVMFile[] = "You cannot change the token of a GEOS VM file.";
+@chunk char NoChangeDataFile[] = "You cannot change the token of a GEOS data file.";
+@chunk char NoChangeLink[] = "You cannot change the token of this link.";
+@chunk char NoChangeUnknown[] = "You cannot change the token of this unknown object.";
+
+@chunk char ErrorFileNotFound[] = "Error: File or folder does not exist.";
+@chunk char ErrorChangeToken[] = "Error: The token could not be changed.";
+@chunk char ChangeTokenOK[] = "The token has been changed successfully.";
     
 @end FMTData;
 
@@ -125,7 +137,6 @@
 @object GenInteractionClass TokenCreatorGroup = {
 	GI_visMoniker = " Creator: ";
 	GI_comp = @TokenCreatorDisplay,@TokenCreatorID;
-	GI_states = @default & ~GS_ENABLED;
 	HINT_ORIENT_CHILDREN_VERTICALLY;
 	HINT_CENTER_CHILDREN_HORIZONTALLY;
 	HINT_BOTTOM_JUSTIFY_CHILDREN;
@@ -136,15 +147,15 @@
 	GI_visMoniker = " ";
 	HINT_FIXED_SIZE = { SST_PIXELS | 70, SST_PIXELS | 35, 1 };
 	HINT_CENTER_MONIKER;
-	HINT_TOOLBOX;
 	}
 @object GenInteractionClass TokenCreatorID = {
 	GI_visMoniker = "no ID";
 	HINT_CENTER_MONIKER;
+	HINT_TOOLBOX;
 	}
 
 @object GenInteractionClass TokenNewGroup = {
-	GI_visMoniker = " New: ";
+	GI_visMoniker = " New Icon: ";
 	GI_comp = @TokenNewDisplay,@TokenNewID;
 	HINT_ORIENT_CHILDREN_VERTICALLY;
 	HINT_CENTER_CHILDREN_HORIZONTALLY;
@@ -167,26 +178,19 @@
  */
 
     @object GenInteractionClass FEDTokenOptionsGroup = {
-    	GI_comp = @IconOrCreatorSelector;
-    	HINT_ORIENT_CHILDREN_HORIZONTALLY;
+    	GI_comp = @TokenEditInfoText, @TokenOptionsSpacer ;
+    	HINT_ORIENT_CHILDREN_VERTICALLY;
     	HINT_EXPAND_WIDTH_TO_FIT_PARENT;
     }
     
-    @object GenItemGroupClass IconOrCreatorSelector = {
-    	GI_visMoniker = "Select token to change:";
-    	GI_comp = @ChangeIconItem, @ChangeCreatorItem;
-    	HINT_ORIENT_CHILDREN_HORIZONTALLY;
-    	HINT_PLACE_MONIKER_ABOVE;
-    	GIGI_selection = FED_CHANGE_ICON;
-    	GIGI_applyMsg = MSG_FED_APPLY_CHANGE_DESTINATION;    	
+    @object GenTextClass TokenEditInfoText = {
+    	GI_attrs = @default | GA_READ_ONLY;
+    	HINT_TEXT_FRAME;
+    	HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+    	HINT_MINIMUM_SIZE = { SST_AVG_CHAR_WIDTHS | 20, SST_LINES_OF_TEXT | 2, 2 };
     }
-    @object GenItemClass ChangeIconItem = {
-    	GI_visMoniker = "Change Icon";
-    	GII_identifier = FED_CHANGE_ICON;
-    }
-    @object GenItemClass ChangeCreatorItem = {
-    	GI_visMoniker = "Change Creator";
-    	GII_identifier = FED_CHANGE_CREATROR;
+    @object GenGlyphClass TokenOptionsSpacer = {
+    	GI_visMoniker = "   ";
     }
 /*
  * -------- FEDTokenList     ---------------
@@ -196,8 +200,6 @@
      * SuperVGA moniker size: 64x40
      */ 
     @object GenDynamicListClass FEDTokenList = {
-   	GI_visMoniker = "Select a new token";
-	HINT_PLACE_MONIKER_ABOVE;
 	GIGI_selection = -1;
 	GIGI_applyMsg = MSG_FED_APPLY_TOKEN_LIST;
 	GDLI_queryMsg = MSG_FED_QUERY_TOKEN_LIST;
@@ -214,28 +216,28 @@
  */
  
     @object GenInteractionClass FEDTokenListOptionsGroup = {
-    	GI_comp = @FEDTokenList, @FEDTokenInfoGroup, @FEDTokenRangeGroup;
+   	GI_visMoniker = "Select a new token";
+	HINT_CENTER_MONIKER;
+    	GI_comp = @FEDTokenInfoGroup, @FEDTokenList, @FEDTokenRangeGroup, @FEDTokenStyleGroup;
     	HINT_ORIENT_CHILDREN_VERTICALLY;
 /*    	HINT_CENTER_CHILDREN_HORIZONTALLY;
 */    	HINT_EXPAND_WIDTH_TO_FIT_PARENT;
     	HINT_DRAW_IN_BOX;
     }
- 
+    	
 @object GenInteractionClass FEDTokenInfoGroup = {
-	GI_comp = @FEDIconInfoCount,@FEDIconInfoIDLabel,@FEDIconInfoIDText;
+	GI_comp = @FEDIconInfoCount,@FEDIconInfoDisplayed;
 	HINT_ORIENT_CHILDREN_HORIZONTALLY;
 	HINT_TOP_JUSTIFY_CHILDREN;
 	}
 
 @object GenValueClass FEDIconInfoCount = {
-	GI_visMoniker = "Tokens found: ";
+	GI_visMoniker = "Tokens found:";
 	GI_attrs = @default | GA_READ_ONLY;
 	}
-@object GenGlyphClass FEDIconInfoIDLabel = {
-	GI_visMoniker =" Current Token ID:";
-	}
-@object GenGlyphClass FEDIconInfoIDText = {
-	GI_visMoniker ="-";
+@object GenValueClass  FEDIconInfoDisplayed = {
+	GI_visMoniker =" Currently displayed:";
+	GI_attrs = @default | GA_READ_ONLY;
 	}
 
 @object GenInteractionClass FEDTokenRangeGroup = {
@@ -259,29 +261,82 @@
 	GI_visMoniker = 'R',"Apply Range";
 	GTI_actionMsg = MSG_FED_APPLY_TOKEN_RANGE;
 	}
-
+	
+@object GenInteractionClass FEDTokenStyleGroup = {
+	GI_comp = @FEDDisplaySizeSelector, @FEDTokenStyleSelector;
+	HINT_ORIENT_CHILDREN_HORIZONTALLY;
+	HINT_FULL_JUSTIFY_CHILDREN_HORIZONTALLY;
+	HINT_INCLUDE_ENDS_IN_CHILD_SPACING;	
+	HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+	/*HINT_TOOLBOX;*/
+	}
+	
+@object GenItemGroupClass FEDDisplaySizeSelector = {
+	GI_visMoniker = "Display tokens for display:";
+	HINT_PLACE_MONIKER_TO_LEFT;
+	GI_comp = @DSTiny, @DSStandard, @DSLarge, @DSHuge;
+	HINT_ORIENT_CHILDREN_HORIZONTALLY;
+	GIGI_selection = DEFAULT_TOKEN_DISPLAY_SIZE;
+	GIGI_applyMsg = MSG_FED_APPLY_TOKEN_TYPE;
+	}
+@object GenItemClass DSHuge = {
+	GI_visMoniker = " Huge ";
+	GII_identifier = DS_HUGE;
+	}
+@object GenItemClass DSLarge = {
+	GI_visMoniker = " Large ";
+	GII_identifier = DS_LARGE;
+	}
+@object GenItemClass DSStandard = {
+	GI_visMoniker = " Standard ";
+	GII_identifier = DS_STANDARD;
+	}
+@object GenItemClass DSTiny = {
+	GI_visMoniker = " Tiny ";
+	GII_identifier = DS_TINY;
+	}
+	
+@object GenItemGroupClass FEDTokenStyleSelector  = {
+	GI_visMoniker = "Style:";
+	HINT_PLACE_MONIKER_TO_LEFT;
+	GI_comp = @TSIcon, @TSTool;
+	HINT_ORIENT_CHILDREN_HORIZONTALLY;
+	GIGI_selection = DEFAULT_TOKEN_STYLE;
+	GIGI_applyMsg = MSG_FED_APPLY_TOKEN_TYPE;
+	}
+@object GenItemClass TSIcon = {
+	GI_visMoniker = " Icon ";
+	GII_identifier = VMS_ICON;
+	}
+@object GenItemClass TSTool = {
+	GI_visMoniker = " Tool ";
+	GII_identifier = VMS_TOOL;
+	}
+	
+	
+	
 /*
  * -------- Reply bar ---------------
  */
     @object GenInteractionClass FEDReplyBar ={
-        GI_comp =   @SelectOkTrigger,
+        GI_comp =   @SelectOkTriggerHolder,
                     @SelectCancelTrigger;
         HINT_MAKE_REPLY_BAR;
     }
 
+    @object GenInteractionClass SelectOkTriggerHolder = {
+    	GI_comp = @SelectOkTrigger;
+    }
     @object GenTriggerClass SelectOkTrigger = {
-    	GI_visMoniker = "Change Icon";
-    	GTI_actionMsg = MSG_FED_QUIT_DIALOG;
-        ATTR_GEN_TRIGGER_ACTION_DATA = { IC_OK };
-        HINT_SEEK_REPLY_BAR;
-        HINT_DEFAULT_DEFAULT_ACTION;
+    	GI_visMoniker = "Change Token";
+    	GTI_actionMsg = MSG_FED_CHANGE_TOKEN;
     }
 
     @object GenTriggerClass SelectCancelTrigger = {
     	GI_visMoniker = "Cancel";
     	GTI_actionMsg = MSG_FED_QUIT_DIALOG;
         ATTR_GEN_TRIGGER_ACTION_DATA = { IC_DISMISS };
-        HINT_SEEK_REPLY_BAR;
+        HINT_DEFAULT_DEFAULT_ACTION;
     }
 
 @end DialogUI;

@@ -1,0 +1,197 @@
+/**************************************************************************
+ *	Project: IconEdit file manager tool
+ *
+ *	File:	tokenshow.goc
+ *		Rouines that deal with displaying token monikers
+ *
+ *	By RABE-Soft, Rainer Bettsteller, for Free PC/GEOS Project
+ *
+ **************************************************************************/
+
+@include <stdapp.goh>
+@include <fmtool.goh>
+#include <Ansi/string.h>
+#include <Ansi/stdio.h>
+#include <token.h>
+
+@include "foldered.goh"
+@include "UI/fedui.goh"
+
+extern optr		g_dialog = NullOptr;
+extern MemHandle 	g_mh;
+extern MemHandle	g_tokenList;
+
+
+@if 1
+/*--------------------- InternalGetTokenMonikerBlock ---------------------
+ * Purpose:	Get the moniker in a memory block
+ * Pass		dispSize DS_TINY  0
+ *			DS_STANDARD  1
+ *			DS_LARGE  2
+ *			DS_HUGE  3
+ *		style	VMS_TEXT  0
+ *			VMS_ABBREV_TEXT  1
+ *			VMS_GRAPHIC_TEXT  2
+ *			VMS_ICON  3
+ *			VMS_TOOL  4
+ * 		*sizeRead: return: bytes read
+ *		*isGString: TRUE if GString
+ * Return:	Handle of memory block containing the moniker image
+ ---------------------------------------------------------------------------*/
+MemHandle InternalGetTokenMonikerBlock(GeodeToken token, word dispSize, word style, 
+				word *sizeRead, Boolean *isGString) {
+dword tokenDW;
+//word	x, y;
+MemHandle mh;
+VisMonikerWithGString	*moniker;
+
+/*
+	if ( getTool ) {
+		dispSize = DS_TINY;
+		style = VMS_TOOL;
+		}
+	else {
+		dispSize = DS_STANDARD;
+		style = VMS_ICON;
+		}
+*/		
+	memcpy(&tokenDW, &token.GT_chars[0], 4);
+
+	if ( isGString ) *isGString = FALSE;	// Zur sicherheit
+	*sizeRead = 0;	// be sure!
+
+
+	mh = 0;
+    TokenLoadMonikerBlock( tokenDW, token.GT_manufID,
+		(dispSize << DT_DISP_SIZE_OFFSET)|
+		(DAR_NORMAL << DT_DISP_ASPECT_RATIO_OFFSET)|
+		DC_COLOR_8,
+		(style << VMSF_STYLE_OFFSET) | VMSF_GSTRING,
+		sizeRead, &mh );
+
+	if ( !mh) return 0;
+
+	// prüfen ob es ein GString ist (es kann auch ein TextMoniker zurückgegeben worden sein)
+	if ( isGString ) {
+		moniker = MemLock(mh);
+		if ( moniker->VMWGS_common.VM_type & VMT_GSTRING ) *isGString = TRUE;
+		MemUnlock(mh);
+		}
+/* 
+µµ sinnvoll?
+we may chek the sif if tool is requested
+	if ( !(style == VMS_TOOL) ) return mh;
+
+	// für Tools: checken ob Größe passt (15x15, ich erlaube max. 20x20)
+	moniker = MemLock(mh);
+	x = moniker->VMWGS_common.VM_width;
+	y = moniker->VMWGS_height;
+	MemUnlock(mh);
+	if ( (x > 20) || (y > 20) ) {
+		// KEIN Tool Icon
+		MemFree(mh);
+		mh = 0;
+		}
+*/		
+
+	return mh;
+}
+@endif
+
+@if 0
+	if ( mh ) {
+		@call ReleaseLauncherMiniTokenDisplay::MSG_GEN_REPLACE_VIS_MONIKER(
+				VUM_NOW, 30, 48, monikerSize,
+				VMDT_VIS_MONIKER, VMST_FPTR,
+				(dword)MemLock(mh) );
+		MemFree(mh);
+		}
+	else {
+		// Kein Mini-Moniker: Kreuz darstellen
+		@call ReleaseLauncherMiniTokenDisplay::MSG_GEN_REPLACE_VIS_MONIKER_TEXT("X",0);
+		}
+@endif
+
+
+
+
+/*-------------------------------------------------------------
+ *	FEDTokenIdToText
+ *-------------------------------------------------------------
+ *	convert token to text like "GDAT,0"
+ *	return 'centered' text, if minLen > len(plain-token-id-text)
+ *		you may pass zero to minLen
+ -------------------------------------------------------------*/
+// swat stop in foldered::FEDTokenIdToText 
+void FEDTokenIdToText(GeodeToken tok, int minLen, char *retBuf) {
+char buf[15];
+int  n, left, l;
+
+    /* setup token string */
+    for ( n = 0; n< 4; n++ ) if (tok.GT_chars[n]==0) {tok.GT_chars[n]='-'; }
+    sprintf(buf, "%c%c%c%c,%u", tok.GT_chars[0], tok.GT_chars[1], 
+    			tok.GT_chars[2], tok.GT_chars[3], tok.GT_manufID);
+
+    /*
+     * center string, if minLen > strlen(buf)
+     */
+    l= strlen(buf);
+    left = (minLen - (int)strlen(buf))/2;	// spaces on the left side
+    if (left < 0) left = 0;
+    retBuf[0] = 0;
+    while (strlen(retBuf) < left) strcat(retBuf, " ");
+    
+    strcat(retBuf, buf);
+    while( strlen(retBuf) < minLen) strcat(retBuf, " ");	    			
+    
+}
+
+/*-------------------------------------------------------------
+ *	FEDShowTokenMoniker
+ *-------------------------------------------------------------
+ *	Display Icon Moniker and ID
+ *	fileType is used to replace moniker, if token was not found
+ -------------------------------------------------------------*/
+// swat stop in foldered::FEDShowTokenMoniker 
+void  FEDShowTokenMoniker(GeodeToken tok, optr monikerObj, GeosFileType fileType) {
+
+// µµ Replace muss noch gemacht werden
+// µµ Handling LARGE/HUGE/STANADRAD Toekn Size
+
+{ fileType = fileType; }
+  /*
+     * Set up token moniker
+     */
+    
+    @call monikerObj::MSG_GEN_REPLACE_VIS_MONIKER(
+			VUM_NOW, 0,0,0,VMDT_TOKEN,VMST_FPTR,(dword)&tok);
+
+@if 0
+/* Replace-Typen fr Tokenazeige setzen */
+  switch ( fileType ) {
+  case GFT_NOT_GEOS_FILE:       if ( fileAttrs & FA_SUBDIR )
+					*tokenReplaceType = TRT_SUBDIR;
+				   else *tokenReplaceType = TRT_DOSFILE;
+				*creatorReplaceType = TRT_DOSEXEC;
+				break;
+  case GFT_EXECUTABLE:          *tokenReplaceType = TRT_NO;
+				*creatorReplaceType = TRT_GEOSEXEC;
+				break;
+  case GFT_DIRECTORY:		*tokenReplaceType = TRT_SUBDIR;
+				*creatorReplaceType = TRT_GEOSEXEC;
+				break;
+  default:                      /* GFT_VM | GFT_DATA | GFT_LINK */
+				*tokenReplaceType = TRT_NO;
+				*creatorReplaceType = TRT_GEOSEXEC;
+				break;
+				}
+
+/* Wenn DOS-File: Leertoken setzen */
+  if (fileType == GFT_NOT_GEOS_FILE) {
+	  TokShowFindDosTokens(fileName,fileAttrs,token,creator);
+	  }
+@endif
+
+}
+
+

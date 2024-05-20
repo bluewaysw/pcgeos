@@ -15,7 +15,6 @@ Includes
 	@message void MSG_FED_QUIT_DIALOG(int cmd);
 	@message (GEN_DYNAMIC_LIST_QUERY_MSG) MSG_FED_QUERY_FILE;
 	@message (GEN_ITEM_GROUP_APPLY_MSG)   MSG_FED_APPLY_FILE;
-	@message (GEN_ITEM_GROUP_APPLY_MSG)   MSG_FED_APPLY_CHANGE_DESTINATION;
 	
 	/*
 	 *	Handling token list
@@ -23,7 +22,9 @@ Includes
 	@message (GEN_DYNAMIC_LIST_QUERY_MSG) MSG_FED_QUERY_TOKEN_LIST;
 	@message (GEN_ITEM_GROUP_APPLY_MSG)   MSG_FED_APPLY_TOKEN_LIST;
 	@message void MSG_FED_APPLY_TOKEN_RANGE();
-	
+	@message (GEN_ITEM_GROUP_APPLY_MSG)   MSG_FED_APPLY_TOKEN_TYPE;
+
+	@message void MSG_FED_CHANGE_TOKEN();
 @endc
 
 /*---------------------------------------------------------------------------
@@ -51,6 +52,33 @@ Includes
 @define SetAttrDesc(ad,attr,value,size) ad.FEAD_attr = attr; \
 	ad.FEAD_value = value; ad.FEAD_size  = size;	ad.FEAD_name  = NULL;
 
+#ifndef ErrorBoxOptr
+#define ErrorBoxOptr(txtOp) { \
+ 		UserStandardDialogOptr ( (optr)0,(optr)0,(optr)0,(optr)0, txtOp, \
+ 		(( CDT_ERROR << CDBF_DIALOG_TYPE_OFFSET) | \
+ 		 ( GIT_NOTIFICATION << CDBF_INTERACTION_TYPE_OFFSET)) ); \
+ 		 }
+#endif
+
+#ifndef MessageBox
+	// Note: MessageBox ist not localizable. use MessageBoxOptr for this
+#define MessageBox(txt) { \
+ 		UserStandardDialog ( (char *)0,(char *)0,(char *)0,(char *)0,txt, \
+ 		(( CDT_NOTIFICATION << CDBF_DIALOG_TYPE_OFFSET) | \
+ 		 ( GIT_NOTIFICATION << CDBF_INTERACTION_TYPE_OFFSET)) ); \
+ 		 }
+#endif
+ 
+#ifndef MessageBoxOptr
+#define MessageBoxOptr(txtOp) { \
+ 		UserStandardDialogOptr ( (optr)0,(optr)0,(optr)0,(optr)0, txtOp, \
+ 		(( CDT_NOTIFICATION << CDBF_DIALOG_TYPE_OFFSET) | \
+ 		 ( GIT_NOTIFICATION << CDBF_INTERACTION_TYPE_OFFSET)) ); \
+ 		 }
+#endif
+
+
+
 /***********************************************************************
 	Structures
 ***********************************************************************/
@@ -75,8 +103,9 @@ typedef struct {
 /***********************************************************************
 	Constants
 ***********************************************************************/
-#define FED_CHANGE_ICON		1	
-#define FED_CHANGE_CREATROR	2
+#define DEFAULT_TOKEN_DISPLAY_SIZE	DS_STANDARD
+#define DEFAULT_TOKEN_STYLE		VMS_ICON
+
 
 /***********************************************************************
 	Headers
@@ -89,4 +118,13 @@ void _pascal _export FolderEdToolStart(GeodeHandle filemgr, word toolNum, word e
 
 // Handling TokenList
 word FEDListTokens(void);
+MemHandle InternalGetTokenMonikerBlock(GeodeToken token, word dispSize, word style, 
+				word *sizeRead, Boolean *isGString);
+
+
+// Display Tokens
+void FEDTokenIdToText(GeodeToken tok, int minLen, char *retBuf);
+void  FEDShowTokenMoniker(GeodeToken tok, optr monikerObj, GeosFileType fileType);
+void  FEDShowToken(GeodeToken tok, optr idObj, optr monikerObj, GeosFileType fileType);
+
 
