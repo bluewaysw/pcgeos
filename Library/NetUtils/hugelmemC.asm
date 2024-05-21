@@ -80,7 +80,7 @@ C FUNCTION:	HugeLMemForceDestroy
 C DECLARATION:
 
 	void 
-	  _pascal HugeLMemForceDestory(HugeLMemHandle handle);
+	  _pascal HugeLMemForceDestroy(HugeLMemHandle handle);
 
 	
 KNOWN BUGS/SIDE EFFECTS/CAVEATS/IDEAS:
