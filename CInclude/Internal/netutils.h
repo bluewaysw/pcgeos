@@ -25,6 +25,9 @@ DESCRIPTION:
 	$Id: netutils.h,v 1.1 97/04/04 15:53:47 newdeal Exp $
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+#ifndef _NETUTILS_H_
+#define _NETUTILS_H_
+
 
 
 /*
@@ -242,13 +245,5 @@ pragma Alias(NetGenerateRandom32, "NETGENERATERANDOM32");
 pragma Alias(NetGenerateRandom8, "NETGENERATERANDOM8");
 #endif
 
-
-
-
-
-
-
-
-
-
+#endif
 
