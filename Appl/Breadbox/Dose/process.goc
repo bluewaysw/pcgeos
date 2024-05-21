@@ -760,7 +760,7 @@ Boolean g_mealChanged = FALSE;
  VMBlockHandle		vmbh;
  RecsStruct			*recsPtr;
  TimerDateAndTime date;
- word	/*war FloatNum*/	today, startDay, testDay, allMeals, allAvg, allRecsF, A1CDiv, A1CNum;
+double	today, startDay, testDay, allMeals, allAvg, allRecsF, A1CDiv, A1CNum;
  dword			glucose;
  word			days[6] = {1, 7, 14, 30, 60, 90};
  Boolean			keepGoing;
@@ -772,6 +772,7 @@ Boolean g_mealChanged = FALSE;
 							@ADBAfternoonNum, @ADBDinnerNum, @ADBEveningNum};
  char				numStr[20], avgStr[FLOAT_TO_ASCII_NORMAL_BUF_LEN];
  WWFixedAsDWord	avg;
+ double  valueIEEE64;
 
 
 
@@ -810,8 +811,8 @@ Boolean g_mealChanged = FALSE;
 
 	TimerGetDateAndTime(&date);
 	FloatGetDateNumber(date.TDAT_year, (byte)date.TDAT_month, (byte)date.TDAT_day);
-	FloatPopNumber((FloatNumStruct *) &today);
-		
+	FloatGeos80ToIEEE64(&today);
+
 	startDay = today - days[span - 1];
 
 	/* start collecting the data */
@@ -823,7 +824,7 @@ Boolean g_mealChanged = FALSE;
 		FloatGetDateNumber(recsPtr->RS_dateTime.TDAT_year,
 							(byte)recsPtr->RS_dateTime.TDAT_month,
 							(byte)recsPtr->RS_dateTime.TDAT_day);
-		FloatPopNumber((FloatNumStruct *) &testDay);
+		FloatGeos80ToIEEE64(&testDay);
 		if (testDay >= startDay) {
 			/* we want this piece of data */
 			UtilAsciiToHex32(recsPtr->RS_glucose, (long *) &glucose);
@@ -862,12 +863,16 @@ Boolean g_mealChanged = FALSE;
 		use FloatNum stuff */
 	if (!allRecs) strcpy(avgStr, "0");
 	else {
+		FloatNum value;
+
 		allRecsF = allRecs;
-		FloatPushNumber((FloatNumStruct *) &allMeals);
-		FloatPushNumber((FloatNumStruct *) &allRecsF);
+		FloatIEEE64ToGeos80(&allMeals);
+		FloatIEEE64ToGeos80(&allRecsF);
 		FloatDivide();
-		FloatPopNumber((FloatNumStruct *) &allAvg);
-		FloatFloatToAscii_StdFormat(avgStr, (FloatNumStruct *)&allAvg, FFAF_FROM_ADDR, 5, 1);
+		FloatGeos80ToIEEE64(&allAvg);
+		FloatIEEE64ToGeos80(&allAvg);
+		FloatPopNumber(&value);
+		FloatFloatToAscii_StdFormat(avgStr, &value, FFAF_FROM_ADDR, 5, 1);
 		}
 	@call ADBAllAvg::MSG_VIS_TEXT_REPLACE_ALL_PTR(avgStr, 0);
 	sprintf(numStr, " (%d)", allRecs);
@@ -876,13 +881,17 @@ Boolean g_mealChanged = FALSE;
 	/* calculate and show the A1C */
 	if (!allRecs) strcpy(avgStr, "0");
 	else {
-		allAvg += 77;
+		FloatNum value;
+
+		allAvg += 77.0;
 		A1CDiv = 35.7;
-		FloatPushNumber((FloatNumStruct *) &allAvg);
-		FloatPushNumber((FloatNumStruct *) &A1CDiv);
+		FloatIEEE64ToGeos80(&allAvg);
+		FloatIEEE64ToGeos80(&A1CDiv);
 		FloatDivide();
-		FloatPopNumber((FloatNumStruct *) &A1CNum);
-		FloatFloatToAscii_StdFormat(avgStr, (FloatNumStruct *)&A1CNum, FFAF_FROM_ADDR, 5, 1);
+		FloatGeos80ToIEEE64(&A1CNum);
+		FloatIEEE64ToGeos80(&A1CNum);
+		FloatPopNumber(&value);
+		FloatFloatToAscii_StdFormat(avgStr, &value, FFAF_FROM_ADDR, 5, 1);
 		}
 	strcat(avgStr, "%");
 	@call ADBA1CPct::MSG_VIS_TEXT_REPLACE_ALL_PTR(avgStr, 0);
@@ -1254,8 +1263,7 @@ Boolean g_mealChanged = FALSE;
  ChunkHandle		chunk;
  MemHandle			mem;
  GStateHandle		gstate;
- optr			titles[9] = {1,2,3,4,5,6,7,8,9}; /*geändert damit es kompiliert!*/
-/*optr			titles[9] = {@OHBPItemText, @OHA1CItemText, @OHMAItemText, @OHTotCItemText, @OHHDLItemText, @OHLDLItemText, @OHTriGItemText, @OHWeightItemText, @OHBMIItemText};*/
+optr			titles[] = {@OHBPItemText, @OHA1CItemText, @OHMAItemText, @OHTotCItemText, @OHHDLItemText, @OHLDLItemText, @OHTriGItemText, @OHWeightItemText, @OHBMIItemText};
 
 
 	/* get the selection */
@@ -1536,7 +1544,7 @@ Boolean g_mealChanged = FALSE;
 
 	@call DosePrimary::MSG_GEN_SET_USABLE(VUM_DELAYED_VIA_APP_QUEUE);
 	@call self::MSG_GEN_SET_NOT_USABLE(VUM_NOW);
-	/* Don’t call the superclass or the application will detach! */
+	/* Donï¿½t call the superclass or the application will detach! */
 	@send DosePrimary::MSG_META_GRAB_TARGET_EXCL();
 	@send DosePrimary::MSG_META_GRAB_FOCUS_EXCL();
 
