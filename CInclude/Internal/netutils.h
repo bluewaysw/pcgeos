@@ -109,7 +109,7 @@ DESTROYED:	ax, cx
 ------------------------------------------------------------------------*/
 
 void 
-_pascal HugeLMemForceDestory(HugeLMemHandle handle);
+_pascal HugeLMemForceDestroy(HugeLMemHandle handle);
 /* --------------------------------------------------------------------
 SYNOPSIS:	Destroys a HugeLMem without checking if there are still
 		chunks allocated in it.
