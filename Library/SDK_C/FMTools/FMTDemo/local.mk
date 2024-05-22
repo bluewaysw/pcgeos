@@ -1,11 +1,15 @@
 #####################################################################
-# MODULE:       Local makefile
+# PROJECT:      File Manager Tool Demo
 # FILE:         local.mk
 #####################################################################
 
+
 # Flags to make the C-Compiler put the dgroup in
 # ds before calling functions so we can use global variables there.
-XCCOMFLAGS += -zu
+XCCOMFLAGS += -zu 
+
+# Put our copyright message in geode (32 char. max.).
+LINKFLAGS += -N "place your (c) info here"
 
 # Turn off error-checking version (if adequate).
 # NO_EC = 1
@@ -16,6 +20,7 @@ XCCOMFLAGS += -zu
 
 # no .ldf file required here.
 #undef LIBOBJ
+
 
 # Include the system makefile.
 #include <$(SYSMAKEFILE)>

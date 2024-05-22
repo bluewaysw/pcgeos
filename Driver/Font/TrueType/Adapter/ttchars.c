@@ -95,14 +95,17 @@ EC(     ECCheckBounds( (void*)trueTypeVars ) );
         trueTypeOutline = LMemDerefHandles( MemPtrToHandle( (void*)fontInfo ), outlineEntry->OE_handle );
 EC(     ECCheckBounds( (void*)trueTypeOutline ) );
 
-        /* open face, create instance and glyph */
+        /* open face and instance */
         if( TrueType_Lock_Face(trueTypeVars, trueTypeOutline) )
-                goto Fail;
-
-        TT_New_Glyph( FACE, &GLYPH );
+                goto Fin;
 
          /* get TT char index */
         charIndex = TT_Char_Index( CHAR_MAP, GeosCharToUnicode( character ) );
+        if( charIndex == 0 )
+                goto Fail;
+
+        /* create new glyph */
+        TT_New_Glyph( FACE, &GLYPH );
 
         /* set pointsize and get metrics */
         TT_Set_Instance_CharSize( INSTANCE, ( pointSize >> 10 ) );
@@ -215,8 +218,10 @@ EC(             ECCheckBounds( (void*)fontBuf ) );
 
         /* cleanup */
         MemUnlock( bitmapHandle );
+
+Fail:        
         TrueType_Unlock_Face( trueTypeVars );
-Fail:
+Fin:
         MemUnlock( varBlock );
 }
 
