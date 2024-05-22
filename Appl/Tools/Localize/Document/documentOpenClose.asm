@@ -1769,9 +1769,12 @@ EC<		ERROR_NZ	RESEDIT_INTERNAL_LOGIC_ERROR	>
 		call	DBUnlock
 	
 	; Record resource count in the document instance data.
-
+		push	di
+		mov	di, ds:[si]	; ds:di <- chunk		
+		mov	di, ds:[di].GenDocument_offset	; di <- offset of instance data in chunk
 		mov	ax, ss:[bp].TFF_numResources
 		mov	ds:[di].REDI_totalResources, ax
+		pop	di
 
 	; Load tables from the geode.
 
