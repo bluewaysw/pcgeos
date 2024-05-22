@@ -71,6 +71,8 @@ extern TEngine_Instance engineInstance;
 #define STANDARD_GRIDSIZE                   1000
 #define MAX_NUM_GLYPHS                      2000
 
+#define BASELINE_CORRECTION                 1
+
 
 /***********************************************************************
  *      structures
@@ -476,6 +478,12 @@ typedef struct
  */
 #define WBFIXED_TO_WWFIXEDASDWORD( value )       \
         ( (long) ( ( (long)(value.WBF_int) ) * 0x00010000 ) | ( ( (long)value.WBF_frac) << 8 ) )
+
+/*
+ * convert value (WWFixed) to WWFixedAsDWord 
+ */
+#define WWFIXED_TO_WWFIXEDASDWORD( value )       \
+        ( (long) ( ( (long)(value.WWF_int) ) * 0x00010000 ) | ( (long)value.WWF_frac) )
 
 
 #define MUL_100_WWFIXED( factor, percentage )   \

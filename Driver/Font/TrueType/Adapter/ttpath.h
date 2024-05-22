@@ -49,8 +49,33 @@ void _pascal TrueType_Gen_In_Region(
                         Handle               regionPath,
                         word                 character,
                         WWFixedAsDWord       pointSize,
+                        byte                 width,
+                        byte                 weight,
 			const FontInfo*      fontInfo, 
                         const OutlineEntry*  outlineEntry,
+                        const OutlineEntry*  firstEntry,
+                        TextStyle            stylesToImplement,
                         MemHandle            varBlock );
+
+
+/***********************************************************************
+ *      wrapper functions
+ ***********************************************************************/
+
+extern void _pascal GrRegionPathMovePen(
+                        Handle regionHandle, sword x, sword y );
+
+extern void _pascal GrRegionPathDrawLineTo( 
+                        Handle regionHandle, sword x, sword y );
+
+extern void _pascal GrRegionPathDrawCurveTo(
+                        Handle regionHandle, const Point *points );          
+
+
+#ifdef __HIGHC__
+pragma Alias(GrRegionPathMovePen, "GRREGIONPATHMOVEPEN");
+pragma Alias(GrRegionPathDrawLineTo, "GRREGIONPATHDRAWLINETO");
+pragma Alias(GrRegionPathDrawCurveTo, "GRREGIONPATHDRAWCURVE");
+#endif
 
 #endif  /* _TTPAHT_H_ */
