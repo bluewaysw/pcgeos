@@ -20,6 +20,8 @@
 extern optr		g_dialog = NullOptr;
 extern MemHandle 	g_mh;
 extern MemHandle	g_tokenList;
+extern	word		g_displaySize;
+extern	word		g_tokenStyle;
 
 
 @if 1
@@ -154,7 +156,9 @@ int  n, left, l;
  -------------------------------------------------------------*/
 // swat stop in foldered::FEDShowTokenMoniker 
 void  FEDShowTokenMoniker(GeodeToken tok, optr monikerObj, GeosFileType fileType) {
-
+MemHandle	mh;
+word 		sizeRead;
+Boolean		isGString;
 // µµ Replace muss noch gemacht werden
 // µµ Handling LARGE/HUGE/STANADRAD Toekn Size
 
@@ -162,10 +166,32 @@ void  FEDShowTokenMoniker(GeodeToken tok, optr monikerObj, GeosFileType fileType
   /*
      * Set up token moniker
      */
+    mh = InternalGetTokenMonikerBlock(tok, g_displaySize, g_tokenStyle, &sizeRead, &isGString);
     
+/*--
+
+@message ChunkHandle MSG_GEN_REPLACE_VIS_MONIKER(@stack
+				VisUpdateMode updateMode,
+				word height, word width, word length,
+				VisMonikerDataType dataType,
+				VisMonikerSourceType sourceType,
+				dword source) = ax;
+---*/
+@if 1
+	if ( mh ) {
+		@call monikerObj::MSG_GEN_REPLACE_VIS_MONIKER(VUM_NOW, 
+				30,48,sizeRead,
+				VMDT_VIS_MONIKER ,VMST_FPTR,(dword)MemLock(mh));
+		MemFree(mh);
+		}
+	else {
+		@call monikerObj::MSG_GEN_REPLACE_VIS_MONIKER_TEXT("NOT found", 0);
+	}	
+@endif    
+@if 0
     @call monikerObj::MSG_GEN_REPLACE_VIS_MONIKER(
 			VUM_NOW, 0,0,0,VMDT_TOKEN,VMST_FPTR,(dword)&tok);
-
+@endif
 @if 0
 /* Replace-Typen fÅr Tokenazeige setzen */
   switch ( fileType ) {
