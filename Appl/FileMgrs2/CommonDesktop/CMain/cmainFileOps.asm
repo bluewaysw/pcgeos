@@ -4497,10 +4497,10 @@ longName:
 	sub	sp, 30+FILE_LONGNAME_LENGTH	; room for template & fname
 	segmov	es, ss				; es:di = buffer
 	mov	di, sp
-	GetResourceHandleNS	Dup32PrefixString, bx
+	GetResourceHandleNS	Dup32TemplateString, bx
 	call	MemLock
 	mov	ds, ax				; ds = template segment
-	mov	si, offset Dup32PrefixString
+	mov	si, offset Dup32TemplateString
 	mov	si, ds:[si]			; si = template string
 	clr	cx
 charLoop:
