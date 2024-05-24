@@ -196,6 +196,10 @@ TOKENLOADMONIKERBLOCK	proc	far	tokenChars:dword,
 	push	cx			; unused buffer size
 	call	TokenLoadMoniker	; cx = #bytes, di = block
 					; carry clear if found
+	jnc 	foundit
+	mov	cx, 0			; return zero block and #bytes
+	mov	di, 0			; preserve carry
+foundit:	
 	les	si, blockSize
 	mov	es:[si], cx		; return #bytes
 	les	si, blockHandle
@@ -247,6 +251,10 @@ TOKENLOADMONIKERCHUNK	proc	far	tokenChars:dword,
 	push	di			; unused buffer size
 	call	TokenLoadMoniker	; cx = #bytes, di = lmem chunk
 					; carry clear if found
+	jnc 	foundit
+	mov	cx, 0			; return zero chunk handle and #bytes
+	mov	di, 0			; preserve carry
+foundit:	
 	les	si, chunkSize
 	mov	es:[si], cx		; return #bytes
 	les	si, chunkHandle
@@ -298,6 +306,10 @@ TOKENLOADMONIKERBUFFER	proc	far	tokenChars:dword,
 	push	bufferSize		; pass size on stack
 	call	TokenLoadMoniker	; cx = #bytes
 					; carry clear if found
+	jnc 	foundit
+	mov	cx, 0			; return #bytes = 0
+					; preserve carry
+foundit:	
 	les	di, bytesReturned
 	mov_tr	ax, cx
 	stosw				; return #bytes

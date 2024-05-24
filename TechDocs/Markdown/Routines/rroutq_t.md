@@ -2280,8 +2280,8 @@ This routine extracts the MemHandle from the value returned by
 			word					* blockSize,	/* returned block size */
 			MemHandle				* blockHandle);	/* returned block handle */
 This routine loads a specified token's moniker, allocating a new global 
-memory block for the moniker. The returned Boolean will be *false* if the 
-moniker was found, *true* otherwise. Information about the moniker is 
+memory block for the moniker. The returned Boolean will be *true* if the 
+moniker was found, *false* otherwise. Information about the moniker is 
 returned in the values pointed to by *blockSize* (the size of the newly allocated 
 block) and *blockHandle* (the handle of the new block). If the moniker is not 
 found, both return pointers will be NULL and no block will be allocated.
@@ -2320,7 +2320,7 @@ returned.
 			word					bufSize,			/* size of passed buffer */
 			word					* bytesReturned);	/* number of bytes returned */
 This routine loads a specified token's moniker into a provided buffer. The 
-return value will be *false* if the moniker was found, *true* otherwise. The size 
+returned Boolean will be *true* if the moniker was found, *false* otherwise. The size 
 of the returned moniker will be returned in the word pointed to by the 
 *bytesReturned* parameter.
 
@@ -2360,8 +2360,8 @@ moniker that may be returned.
 			word					* chunkSize,	/* returned new chunk size */
 			ChunkHandle				* chunkHandle);	/* returned new chunk handle */
 This routine loads a specified token's moniker, allocating a new chunk in a 
-local memory block for the moniker. The returned error flag will be *true* if the 
-moniker was not found, *false* otherwise.
+local memory block for the moniker. The returned Boolean will be *true* if the 
+moniker was found, *false* otherwise.
 
 Pass this routine the following:
 
