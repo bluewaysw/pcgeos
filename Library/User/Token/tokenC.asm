@@ -413,6 +413,10 @@ TOKENLOADTOKENBLOCK	proc	far	tokenChars:dword,
 	clr	cx			; allocate global heap block
 	call	TokenLoadToken		; cx = #bytes, di = block
 					; carry clear if found
+	jnc 	foundit
+	mov	cx, 0			; return zero block and #bytes
+	mov	di, 0			; preserve carry
+foundit:	
 	les	si, blockSize
 	mov	es:[si], cx		; return #bytes
 	les	si, blockHandle
@@ -457,6 +461,10 @@ TOKENLOADTOKENCHUNK	proc	far	tokenChars:dword,
 	clr	di			; cx = lmemBlock
 	call	TokenLoadToken		; cx = #bytes, di = lmem chunk
 					; carry clear if found
+	jnc 	foundit
+	mov	cx, 0			; return zero chunk handle and #bytes
+	mov	di, 0			; preserve carry
+foundit:	
 	les	si, chunkSize
 	mov	es:[si], cx		; return #bytes
 	les	si, chunkHandle

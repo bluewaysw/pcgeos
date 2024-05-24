@@ -2401,8 +2401,8 @@ pointers to any chunk in the block.
 			word			* blockSize,		/* returned size of new block */
 			MemHandle		* blockHandle);		/* returned handle of block */
 This routine loads the specified token's **TokenEntry** structure into a 
-newly-allocated global memory block. If the token is not found, the returned 
-error flag will be *true*; otherwise, it will be *false*.
+newly-allocated global memory block. The returned Boolean will be *true* if the 
+token was found, *false* otherwise.
 
 Pass this routine the following:
 
@@ -2428,7 +2428,7 @@ newly-allocated block will be returned.
 			ManufacturerID	manufacturerID,		/* manufacturer ID of token */
 			TokenEntry		* buffer);			/* buffer for returned token */
 This routine loads the specified token's **TokenEntry** structure into a passed 
-buffer. The returned error flag will be *true* if the token was not found, *false* 
+buffer. The returned Boolean will be *true* if the token was found, *false* 
 otherwise. Pass this routine the following:
 
 *tokenChars* - The four token characters that identify the token database 
@@ -2452,8 +2452,8 @@ will be copied.
 			word			* chunkSize,		/* returned size of new chunk */
 			ChunkHandle		* chunkHandle);		/* returned chunk handle */
 This routine loads the specified token's **TokenEntry** structure into a 
-newly-allocated chunk. The returned error flag will be *true* if the token could 
-not be found, *false* otherwise.
+newly-allocated chunk. The returned Boolean will be *true* if the token was found, 
+*false* otherwise.
 
 Pass this routine the following:
 
