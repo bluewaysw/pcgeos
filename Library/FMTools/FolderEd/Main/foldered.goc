@@ -18,8 +18,6 @@
 @include "foldered.goh"
 @include "UI/fedui.goh"
 
-@include "Oldlibs/rstoked.goh"
-
 static	optr		g_dialog = NullOptr;
 static	MemHandle 	g_mh;
 static	GeodeToken	g_selectedToken;
@@ -31,10 +29,12 @@ static 	word		g_tokenStyle = DEFAULT_TOKEN_STYLE;
 	
 	To do
 	
+	- SelectOkTriggerHolder weg
+	
 	* Wenn DOS-Filese Edit nicht geht: ganz raus
 		! Aktuell einfach ignorieren
 	
-	- Folder ohen Dirname: Dirname anlegen und dann ändern
+	-- SelectFileList --> SelectFolderList
 	
 	- Token und Creator TRT implementieren, NotFoundMoniker
 		--> AnzeigeRoutine fileType übergeben oder -1 (DONT_REPLACE_NOT_FOUND)
@@ -44,9 +44,6 @@ static 	word		g_tokenStyle = DEFAULT_TOKEN_STYLE;
 			?? TRT In InternalLoadMonikerBlock???
 			
 		
-	-File tokenshow.goc mit	- Token Moniker als VisMoniker, Parameter DisplaySize und ob Tool oder icon
-					evtl Bittiefe (? nur wenn hier verwendet)
-					(Kombination not found durchdenken)
 */
 
 
@@ -118,11 +115,26 @@ word	count;
     
 
     /*
-     * Figure out the selected files and initialize the files list
+     * Figure out the selected folders
      */
     g_mh = @call ConstructOptr(filemgr, 0)::MSG_FM_GET_SELECTED_FILES();
     if ( !g_mh ) return;	// be save to avoid crash, should not occur.
     
+    count = FEDLookForFoldersInList();
+    if (!count) {
+    	/*
+    	 * No Folders selected. Exit cleanly
+    	 */
+    	ErrorBoxOptr(@ErrorNoFolders);
+    	UserDestroyDialog(g_dialog);
+    	MemFree(g_mh);
+    	g_mh = 0;
+    	return;
+    }
+    
+    /*
+     * Initialize the folder list
+     */
     fileInfo = MemLock(g_mh);
     @send @DialogObj(@SelectFileList)::MSG_GEN_DYNAMIC_LIST_INITIALIZE(fileInfo->header.FQTH_numFiles);
     @send @DialogObj(@SelectFileList)::MSG_GEN_ITEM_GROUP_SET_SINGLE_SELECTION(0, FALSE);
@@ -168,7 +180,7 @@ char buf[NUM_CHARS_IN_ID + 2];
 }
 
 /*-------------------------------------------------------------
- *	FEDShowFileTokens
+ *	FEDShowFileTokens  --> µµ singular
  *-------------------------------------------------------------
  *	Read and Display Icon and Creator Token for a file
  *	Return: GeosFileType
@@ -222,10 +234,6 @@ FileExtAttrDesc	attrDesc[4];	/* Array 0..3 */
   monikerObj = @DialogObj(@TokenTokenDisplay);
   FEDShowToken(fileToken, idObj, monikerObj, fileType);
   
-  idObj = @DialogObj(@TokenCreatorID);
-  monikerObj = @DialogObj(@TokenCreatorDisplay);
-  FEDShowToken(creatorToken, idObj, monikerObj, fileType);
-  
 
   FilePopDir();
   
@@ -233,7 +241,7 @@ FileExtAttrDesc	attrDesc[4];	/* Array 0..3 */
   }
 
 
-
+@if 0
 /*-------------------------------------------------------------
  *	FEDUpdateEditUI
  *-------------------------------------------------------------
@@ -276,8 +284,15 @@ optr textObj, txtOp, noChangeTxtOp;
 	 */
     switch (fileType) {
   	case GFT_NOT_GEOS_FILE:
-	    txtOp = @TextNotGEOSFile;
-	    noChangeTxtOp = @NoChangeNotGEOSFile;
+  	    if ( attrs & FA_SUBDIR ) { 
+	        txtOp = @TextFolder;
+	        noChangeTxtOp = @NoChangeFolder;
+  	    	}
+	    else { 
+		txtOp = @TextNotGEOSFile; 
+		noChangeTxtOp = @NoChangeNotGEOSFile;
+		}
+	    
 	    break;
 	case GFT_EXECUTABLE:
 	    txtOp = @TextGEOSExecutable;
@@ -317,8 +332,80 @@ optr textObj, txtOp, noChangeTxtOp;
     
 
 }
+@endif
 
+/*-------------------------------------------------------------
+ * FEDLookForFoldersInList	
+ *-------------------------------------------------------------
+ *	Scan file list and elect folders only
+ ------------------------------------------------------------*/
+word FEDLookForFoldersInList(void) {
+word count, n;
+FileOperationInfoEntry	*srcEntry, *destEntry;
+SelectedFilesStruct	*fileInfo;
 
+    fileInfo = MemLock(g_mh);
+
+/*     
+-----------------------------------------------------------
+typedef struct {
+    FileQuickTransferHeader	header;
+    FileOperationInfoEntry	entry[];
+    } SelectedFilesStruct;
+-----------------------------------------------------------
+typedef struct {
+	word	    FQTH_nextBlock;	/* next transfer data block (0 if
+					 * none) * /
+	FQTHFlags   FQTH_UIFA;
+	word	    FQTH_numFiles;  	/* Number of following
+					 * FileOperationInfoEntry structs * /
+	word	    FQTH_diskHandle;	/* Handle of disk on which FQTH_pathname
+					 * sits * /
+	PathName    FQTH_pathname;  	/* pathname of files * /
+} FileQuickTransferHeader;
+-----------------------------------------------------------
+typedef	struct {
+	FileLongName		FOIE_name;
+    	GeosFileType		FOIE_type;
+	FileAttrs		FOIE_attrs;
+	GeosFileHeaderFlags	FOIE_flags;
+	DirPathInfo		FOIE_pathInfo;
+	GeodeToken		FOIE_creator;
+	word			FOIE_info;	/* This is a generic word of
+						 * info -- in Workplace Shell,
+						 * this word contains the
+						 * WShellObjectType of
+						 * the file.
+						 * /
+
+} FileOperationInfoEntry;
+-----------------------------------------------------------
+*/     
+    srcEntry  = &(fileInfo->entry[0]);
+    destEntry = srcEntry;
+    count = 0;
+    
+    for ( n = 0; n < fileInfo->header.FQTH_numFiles; n++) {
+    
+    	if ( (srcEntry->FOIE_type == GFT_DIRECTORY) ||
+    	     ( (srcEntry->FOIE_type == GFT_NOT_GEOS_FILE) && (srcEntry->FOIE_attrs & FA_SUBDIR) ) ) {
+    	    /*
+    	     *	It's a folder. Move it up and count it
+    	     */
+    	    *destEntry = *srcEntry;
+    	    destEntry++;    	     
+    	    count++;
+    	}
+    	srcEntry++;
+    }
+     
+    fileInfo->header.FQTH_numFiles = count;	// only deal with the found folders
+    MemUnlock(g_mh);
+     
+    return count;
+ 
+ }
+    
 
 /*#############################################################
  *
@@ -400,7 +487,7 @@ SelectedFilesStruct	*fileInfo;
     attrs = fileInfo->entry[selection].FOIE_attrs;
     MemUnlock(g_mh);
     
-    FEDUpdateEditUI(fileType, attrs);
+// µµ    FEDUpdateEditUI(fileType, attrs);
 
     /* Redraw TokenGroup to remove possible artefacts */
     @call @DialogObj(@FEDTokenGroup)::MSG_GEN_SET_NOT_USABLE(VUM_DELAYED_VIA_UI_QUEUE);
@@ -417,6 +504,7 @@ SelectedFilesStruct	*fileInfo;
 // stop in foldered::FolderEdInteractionFED_CHANGE_TOKEN
 @method FolderEdInteractionClass, MSG_FED_CHANGE_TOKEN {
 GeosFileType 		fileType;
+FileAttrs		fileAttrs;
 FileLongName		fileName;
 SelectedFilesStruct	*fileInfo;
 word		 	selection;
@@ -433,7 +521,7 @@ word		 	selection;
     strcpy(fileName, fileInfo->entry[selection].FOIE_name);
     MemUnlock(g_mh);
     
-    FileGetAttributes(fileName);
+    fileAttrs = FileGetAttributes(fileName);
     if ( ThreadGetError() ) {
     	// file not found
     	ErrorBoxOptr(@ErrorFileNotFound);
@@ -448,7 +536,12 @@ word		 	selection;
 
     switch (fileType) {
   	case GFT_NOT_GEOS_FILE:
-	    MessageBox("ChangeDosToken");
+  	    if ( fileAttrs & FA_SUBDIR ) {
+	    	FEDChangeDosFolderToken(fileName);
+  	    }
+  	    else {
+  	    	MessageBox("ChangeDosFileToken");
+	    }
 	    break;
 	case GFT_EXECUTABLE:
 	case GFT_DIRECTORY:
@@ -471,6 +564,43 @@ word		 	selection;
     
     FilePopDir();
     
+}
+
+/*-------------------------------------------------------------
+ * FEDChangeDosFolderToken
+ *-------------------------------------------------------------
+ *	Change the token for a folder without a dirname file
+-------------------------------------------------------------*/
+void FEDChangeDosFolderToken(char *fileName) {
+FileHandle fh;
+ProtocolNumber proto;
+GeosFileType type;
+
+    FilePushDir();
+    do {
+    	FileSetCurrentPath(0, fileName);
+    	if (ThreadGetError() ) break;
+    	
+	    /*
+	     * Create and set up a dirname file
+	     */
+	fh = FileCreate("@dirname.000",FILE_CREATE_TRUNCATE |
+			FILE_ACCESS_RW | FILE_DENY_RW,
+			0);
+	if ( fh == 0 ) break;
+	
+	proto.PN_major = 1; proto.PN_minor = 0;
+	type = GFT_DIRECTORY;
+	
+	FileSetHandleExtAttributes(fh,FEA_PROTOCOL, &proto,sizeof(ProtocolNumber));
+	FileSetHandleExtAttributes(fh,FEA_FILE_TYPE, &type,sizeof(GeosFileType));
+	FileSetHandleExtAttributes(fh,FEA_NAME, fileName,FILE_LONGNAME_BUFFER_SIZE);
+	FileSetHandleExtAttributes(fh,FEA_TOKEN, &g_selectedToken, sizeof(GeodeToken));
+    
+    	FileClose(fh, FALSE);
+    
+    } while(FALSE);
+    FilePopDir();
 }
 
 
