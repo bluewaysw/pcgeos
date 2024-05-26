@@ -19,8 +19,6 @@ library geos
 library ui
 library ansic
 
-platform geos21
-
 # API functions
 export GETTHOSETOOLS
 export FOLDEREDTOOLSTART
@@ -29,13 +27,4 @@ export FOLDEREDTOOLSTART
 export FolderEdInteractionClass
 export WordValueClass
 
-
-# ----- Routinen werden erst von Library exportiert
-# export ICONEDITSELECTTOKENDIALOG
-# export ICONEDITSELECTTOKEN
-# export ICONEDITTOKENDELETER
-
-# export ICONEDITATTACHFLAGSELECTOR
-# export ICONEDITGETFLAGSFROMSELECTOR
-# export ICONEDITSETFLAGSOFSELECTOR
 

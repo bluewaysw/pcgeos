@@ -12,6 +12,9 @@ XCCOMFLAGS += -zu
 # Put our copyright message in geode (32 char. max.).
 LINKFLAGS += -N "Programmed by Rabe-Soft 2024"
 
+# no .ldf file required here.
+#undef LIBOBJ
+
 # Turn off error-checking.
 # NO_EC = 1
 

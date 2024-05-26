@@ -16,6 +16,7 @@
 
 @include "foldered.goh"
 @include "UI/fedui.goh"
+@include "Art/art.goh"
 
 extern optr		g_dialog = NullOptr;
 extern MemHandle 	g_mh;
@@ -109,10 +110,9 @@ int  n, left, l;
  *	FEDShowTokenMoniker
  *-------------------------------------------------------------
  *	Display Icon Moniker and ID
- *	fileType is used to replace moniker, if token was not found
  -------------------------------------------------------------*/
 // swat stop in foldered::FEDShowTokenMoniker 
-void  FEDShowTokenMoniker(GeodeToken tok, optr monikerObj, GeosFileType fileType) {
+void  FEDShowTokenMoniker(GeodeToken tok, optr monikerObj) {
 MemHandle	mh;
 word 		monikerSize;
 dword tokenDW;
@@ -120,54 +120,48 @@ dword tokenDW;
     mh = 0;
     memcpy(&tokenDW, &tok.GT_chars[0], 4);
 
-// µµ Replace muss noch gemacht werden
-// µµ Paramter 30, 48 durchdenken / checken
-
-{ fileType = fileType; }
-
     /*
      * Set up token moniker
      */
     
     mh = InternalGetTokenMonikerBlock(tok, g_displaySize, g_tokenStyle, &monikerSize);
-	if ( mh ) {
+    if ( mh ) 
+    {
+	@call monikerObj::MSG_GEN_REPLACE_VIS_MONIKER(VUM_NOW, 
+			40,64,monikerSize,
+			VMDT_VIS_MONIKER ,VMST_FPTR,(dword)MemLock(mh));
+	MemFree(mh);
+    }
+    else {
+	/*
+	 * Token not found in TokenDB file. 
+	 * For an emtpty token, show the default folder token
+	 * For any other token show a "not found" image
+	 */
+	if ( (tokenDW==0) && (tok.GT_manufID==0) ) 
+	{	
+	    /*
+	     *	No token set. Use default folder token nFDR,0
+	     */
+	    tok.GT_chars[0]='n'; tok.GT_chars[1]='F'; tok.GT_chars[2]='D'; 
+	    tok.GT_chars[3]='R'; tok.GT_manufID=0;
+	    mh = InternalGetTokenMonikerBlock(tok, g_displaySize, g_tokenStyle, &monikerSize);
+	    if (mh) 
+	    {
 		@call monikerObj::MSG_GEN_REPLACE_VIS_MONIKER(VUM_NOW, 
-				30,48,monikerSize,
+				40,64,monikerSize,
 				VMDT_VIS_MONIKER ,VMST_FPTR,(dword)MemLock(mh));
 		MemFree(mh);
-		}
-	else {
-		@call monikerObj::MSG_GEN_REPLACE_VIS_MONIKER_TEXT("NOT found", 0);
-			// µµ grafischer not found moniker
-			// und/oder TRT
-	}	
-
-@if 0
-/* Replace-Typen fÅr Tokenazeige setzen */
-  switch ( fileType ) {
-  case GFT_NOT_GEOS_FILE:       if ( fileAttrs & FA_SUBDIR )
-					*tokenReplaceType = TRT_SUBDIR;
-				   else *tokenReplaceType = TRT_DOSFILE;
-				*creatorReplaceType = TRT_DOSEXEC;
-				break;
-  case GFT_EXECUTABLE:          *tokenReplaceType = TRT_NO;
-				*creatorReplaceType = TRT_GEOSEXEC;
-				break;
-  case GFT_DIRECTORY:		*tokenReplaceType = TRT_SUBDIR;
-				*creatorReplaceType = TRT_GEOSEXEC;
-				break;
-  default:                      /* GFT_VM | GFT_DATA | GFT_LINK */
-				*tokenReplaceType = TRT_NO;
-				*creatorReplaceType = TRT_GEOSEXEC;
-				break;
-				}
-
-/* Wenn DOS-File: Leertoken setzen */
-  if (fileType == GFT_NOT_GEOS_FILE) {
-	  TokShowFindDosTokens(fileName,fileAttrs,token,creator);
-	  }
-@endif
-
-}
-
+	    }
+	    else {
+	    	/* nFDR,0 not found: bad, set empty image */
+		@call monikerObj::MSG_GEN_REPLACE_VIS_MONIKER_TEXT("", 0);
+	    }
+	} 
+	else {	   
+	    @call monikerObj::MSG_GEN_REPLACE_VIS_MONIKER_OPTR(@IconNotFoundMoniker,VUM_NOW);
+	}
+    }
+	
+}	
 

@@ -98,7 +98,7 @@ word count, minIdx, topIdx, n;
  * MSG_FED_QUERY_TOKEN_LIST	
  *-------------------------------------------------------------
  *	void GEN_DYNAMIC_LIST_QUERY_MSG (optr list, word item);
- *	Update item moniker in the file list
+ *	Update item moniker in the token list
 -------------------------------------------------------------*/
 // stop in foldered::FolderEdInteractionFED_QUERY_TOKEN_LIST
 @extern method FolderEdInteractionClass, MSG_FED_QUERY_TOKEN_LIST {
@@ -115,14 +115,13 @@ word 	sizeRead;
     mh = InternalGetTokenMonikerBlock(tok, g_displaySize, g_tokenStyle, &sizeRead);
     if ( mh ) {
 	@call list::MSG_GEN_DYNAMIC_LIST_REPLACE_ITEM_MONIKER(item, 
-				0,30,48,sizeRead,
+				0,40,64,sizeRead,
 				VMDT_VIS_MONIKER ,VMST_FPTR,(dword)MemLock(mh));
 	MemFree(mh);
 	}
     else {
+    	/* IMHO this sould not happen */
 	@call list::MSG_GEN_DYNAMIC_LIST_REPLACE_ITEM_TEXT(item, "NOT found");
-	// µµ grafischen not found moniker
-	// und / oder TRT
 	}	
 	
 }
@@ -146,12 +145,11 @@ GeodeToken tok;
     MemUnlock(g_tokenList);
 
 
-    FEDShowToken(tok, @DialogObj(@TokenNewID), @DialogObj(@TokenNewDisplay), 0);
-    // µµ check, ob TRT_NONE (statt NUll) hier OK ist
+    FEDShowToken(tok, @DialogObj(@TokenNewID), @DialogObj(@TokenNewDisplay));
 
     /* Redraw TokenGroup to remove possible artefacts */
-    @call @DialogObj(@FEDTokenGroup)::MSG_GEN_SET_NOT_USABLE(VUM_DELAYED_VIA_UI_QUEUE);
-    @send @DialogObj(@FEDTokenGroup)::MSG_GEN_SET_USABLE(VUM_NOW);
+    @call @DialogObj(@FEDTopGroup)::MSG_GEN_SET_NOT_USABLE(VUM_DELAYED_VIA_UI_QUEUE);
+    @send @DialogObj(@FEDTopGroup)::MSG_GEN_SET_USABLE(VUM_NOW);
 
 }
 
@@ -165,10 +163,19 @@ GeodeToken tok;
 TokenListStruct	*list;
 word minID, maxID, n;
 Boolean found;
+int		curIdx;
+GeodeToken	curToken;
 
-/*
-	µµ current selection handling feht noch
-	*/
+
+    /*
+     * Find out current selection an token 
+     */ 
+     curIdx = @call @DialogObj(@FEDTokenList)::MSG_GEN_ITEM_GROUP_GET_SELECTION(); 
+     if (curIdx == GIGS_NONE) curIdx = 0; 
+     list = MemLock(g_tokenList); 
+     curToken = list->token[curIdx + list->firstIndex]; 
+     MemUnlock(g_tokenList);
+	 
 
     minID = @call @DialogObj(@FEDManufIDMinimumValue)::MSG_GEN_VALUE_GET_VALUE();
     maxID = @call @DialogObj(@FEDManufIDMaximumValue)::MSG_GEN_VALUE_GET_VALUE();
@@ -211,7 +218,7 @@ Boolean found;
     @send @DialogObj(@FEDTokenList)::MSG_GEN_DYNAMIC_LIST_INITIALIZE(list->tokensToShow);
     @send @DialogObj(@FEDIconInfoDisplayed)::MSG_GEN_VALUE_SET_INTEGER_VALUE(list->tokensToShow, FALSE);
 
-    // ... but disable "Change Token" button and clear "new" token
+    // ... but disable "Change Token" button and clear "new" token display
     if (0==list->tokensToShow) {
     	@send @DialogObj(@SelectOkTrigger)::MSG_GEN_SET_NOT_ENABLED(VUM_NOW);
     	
@@ -224,10 +231,16 @@ Boolean found;
 
 
     MemUnlock(g_tokenList);
+    
+    /* 
+     *	try to restore previously selected token
+     */
+    if (list->tokensToShow) FEDSelectToken(curToken, TRUE);
+
 
     /* Redraw TokenGroup to remove possible artefacts */
-    @call @DialogObj(@FEDTokenGroup)::MSG_GEN_SET_NOT_USABLE(VUM_DELAYED_VIA_UI_QUEUE);
-    @send @DialogObj(@FEDTokenGroup)::MSG_GEN_SET_USABLE(VUM_NOW);
+    @call @DialogObj(@FEDTopGroup)::MSG_GEN_SET_NOT_USABLE(VUM_DELAYED_VIA_UI_QUEUE);
+    @send @DialogObj(@FEDTopGroup)::MSG_GEN_SET_USABLE(VUM_NOW);
 /**/
 }
 
@@ -260,10 +273,10 @@ word curSel, count;
     @send @DialogObj(@FEDTokenList)::MSG_GEN_APPLY();
 
 	/*
-	 * Update Token and Creator of selected file
+	 * Update Token of selected folder
 	 */    
-    @send @DialogObj(@SelectFileList)::MSG_GEN_ITEM_GROUP_SET_MODIFIED_STATE(TRUE);
-    @send @DialogObj(@SelectFileList)::MSG_GEN_APPLY();
+    @send @DialogObj(@SelectFolderList)::MSG_GEN_ITEM_GROUP_SET_MODIFIED_STATE(TRUE);
+    @send @DialogObj(@SelectFolderList)::MSG_GEN_APPLY();
  
 }
 
