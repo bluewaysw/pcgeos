@@ -31,11 +31,11 @@ tokenid 16431
 #
 #stack 3000
 
-platform geos20
+platform geos201
 
 # Libraries:
-library	geos
-library	ui
+library geos
+library ui
 library ansic
 library text
 library math
@@ -45,19 +45,19 @@ exempt gadgets
 
 #
 # Resources:
-resource APPRESOURCE ui-object
-resource INTERFACE ui-object
-resource SETUPRESOURCE ui-object
-resource SAVERESOURCE ui-object
-resource MEALRESOURCE ui-object
-resource LOGRESOURCE ui-object
-resource AVGRESOURCE ui-object
-resource CARBSRESOURCE ui-object
-resource FAVSRESOURCE ui-object
-resource GRAPHRESOURCE ui-object
-resource OTHERHISTRESOURCE ui-object
-resource BMIRESOURCE ui-object
-resource STRINGS lmem discardable read-only
+resource AppResource ui-object
+resource Interface ui-object
+resource SetupResource ui-object
+resource SaveResource ui-object
+resource MealResource ui-object
+resource LogResource ui-object
+resource AvgResource ui-object
+resource CarbsResource ui-object
+resource FavsResource ui-object
+resource GraphResource ui-object
+resource OtherHistResource ui-object
+resource BMIResource ui-object
+resource Strings lmem discardable read-only
 
 # classes
 export GenDoseApplicationClass

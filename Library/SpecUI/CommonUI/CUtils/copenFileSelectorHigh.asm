@@ -32,15 +32,15 @@ ROUTINES:
 
     INT OLFSSetAvailSection     Sets available Responder sections.
 
-    MTD MSG_VIS_NOTIFY_GEOMETRY_VALID 
+    MTD MSG_VIS_NOTIFY_GEOMETRY_VALID
 				Notifies file selector that its geometry is
 				valid.
 
-    INT SendFileSelectedToTabComp 
+    INT SendFileSelectedToTabComp
 				Sends message to tab composite to update
 				itself.
 
-    INT OLFSSetDefaultWizardDirectory 
+    INT OLFSSetDefaultWizardDirectory
 				Set the default directory for Wizard to be
 				SP_TOP/DESKTOP
 
@@ -53,14 +53,14 @@ ROUTINES:
     INT GetDesktopSlashHomeDir  Set the default directory for Wizard to be
 				SP_TOP/DESKTOP
 
-    INT ConvertStandardPathToWizardPath 
+    INT ConvertStandardPathToWizardPath
 				Convert standard paths into
 				SP_TOP:\DESKTOP\<Home Dir>\...
 
     MTD MSG_SPEC_UNBUILD_BRANCH Unbuild this file selector visually,
 				unbuilding duplicated UI block.
 
-    INT DestroyBlockAndRemoveFromActiveList 
+    INT DestroyBlockAndRemoveFromActiveList
 				destroy
 
     INT OLFSNotifyCommon        Handle being set enabled or not enabled
@@ -75,7 +75,7 @@ ROUTINES:
     MTD MSG_META_ADD_VAR_DATA   Deal with programmer adjusting scanning
 				criteria by manipulating our vardata.
 
-    INT OLFileSelectorCheckRemovable 
+    INT OLFileSelectorCheckRemovable
 				See if the passed path is on a removable
 				drive.  If so, the user may have switched
 				disks, so make sure our disk handle is up
@@ -84,7 +84,7 @@ ROUTINES:
     INT OLFileSelectorGetIDs    Get the IDs for the path we have set and
 				store them in our vardata.
 
-    INT OLFileSelectorWizardChangeDir 
+    INT OLFileSelectorWizardChangeDir
 				Update ATTR_GEN_PATH_DATA to be under
 				SP_TOP:\Desktop\<Home directory>
 
@@ -95,33 +95,33 @@ ROUTINES:
 
     MTD MSG_NOTIFY_FILE_CHANGE  Take note of a change in the filesystem
 
-    INT OLFileSelectorNotifyFileChangeLow 
+    INT OLFileSelectorNotifyFileChangeLow
 				Take note of a change in the filesystem
 
-    INT OLFileSelectorFetchIDFromNotificationBlock 
+    INT OLFileSelectorFetchIDFromNotificationBlock
 				Fetch the three words of ID from the
 				notification block
 
-    INT OLFileSelectorCheckIDIsOurs 
+    INT OLFileSelectorCheckIDIsOurs
 				See if the FCND_disk:FCND_id is one of
 				those for our folder
 
-    INT OLFileSelectorCheckIDIsAncestor 
+    INT OLFileSelectorCheckIDIsAncestor
 				See if the FCND_disk as a StandardPath is
 				the ancestor of one of those for our
 				folder.
 
-    INT OLFileSelectorCloseIfIDIsOurs 
+    INT OLFileSelectorCloseIfIDIsOurs
 				Close this folder, if the ID in the
 				notification is for this folder.
 
-    INT OLFileSelectorCloseForNotify 
+    INT OLFileSelectorCloseForNotify
 				Retreat to the virtual root, if possible,
 				or SP_DOCUMENT, if not, in response to
 				having our current directory or disk nuked
 				from under us.
 
-    INT OLFileSelectorCheckIDIsKids 
+    INT OLFileSelectorCheckIDIsKids
 				See if the affected file is one of our
 				kiddies.
 
@@ -227,7 +227,7 @@ endif
 
 OLFileSelectorInitialize	endm
 
-	
+
 
 COMMENT @----------------------------------------------------------------------
 
@@ -273,7 +273,7 @@ OLFSProcessHints	proc	near		uses	si, di, bx, dx, bp
 	; Each handler receives:
 	; 	*ds:si	= object
 	; 	ds:bx	= vardata extra data offset
-	; 	cl	= number of children that'll be shown, so far	
+	; 	cl	= number of children that'll be shown, so far
 	;	ch	= fixed width argument that we'll use, so far
 	; 	bp	= GenVarData tag from which the number came
 	; 	dx	= segment of associated UI block
@@ -290,6 +290,12 @@ OLFSProcessHints	proc	near		uses	si, di, bx, dx, bp
 	jnc	10$
 	mov	cl, OLFS_CGA_DEFAULT_FILES_SHOWN
 10$:
+
+	call	OpenCheckIfDisplayLarge
+	jnc	15$
+	mov	cl, OLFS_LARGE_DISPLAY_DEFAULT_FILES_SHOWN
+15$:
+
 	push	cx, dx
 	call	OpenGetScreenDimensions	; cx = width, dx = height
 	cmp	cx, TINY_SCREEN_WIDTH_THRESHOLD
@@ -305,7 +311,7 @@ OLFSProcessHints	proc	near		uses	si, di, bx, dx, bp
 	; Set a HINT_FIXED_SIZE on the list, with the width set to display
 	; a longname, height set to 0, and the count set to the number we want
 	; to display.
-	; 
+	;
 	push	ds
 	mov	ds, dx			; ds <- uiBlock
 	mov	si, offset OLFileSelectorFileList
@@ -329,7 +335,7 @@ OLFSProcessHints	proc	near		uses	si, di, bx, dx, bp
 
 	;
 	; Release the duplicated block, now everything's been copied.
-	; 
+	;
 	call	MemUnlock
 	.leave
 	ret
@@ -346,7 +352,7 @@ OLFSHintHandlers	VarDataHandler \
 	<HINT_FILE_SELECTOR_SINGLE_ACTION, offset OLFSSingleAction>
 
 OLFSSize	proc	far
-	mov	cl, {byte} ds:[bx]	; cl <- number of files to show	
+	mov	cl, {byte} ds:[bx]	; cl <- number of files to show
 	ret
 OLFSSize	endp
 
@@ -481,11 +487,11 @@ endif
 
 	;
 	; Make sure we have the IDs for our path.
-	; 
+	;
 	call	OLFileSelectorGetIDs
 	;
 	; Make sure we're on the file-system change notification list.
-	; 
+	;
 	push	bx
 	mov	cx, ds:[LMBH_handle]
 	mov	dx, si
@@ -566,11 +572,11 @@ CheckHack< VUM_MANUAL eq 0 >
 ;	ornf	bp, VUM_MANUAL shl offset SBF_UPDATE_MODE
 
 	call	OLFSDeref_SI_Gen_DI		; ds:di = fs generic instance
-	test	ds:[di].GI_states, mask GS_ENABLED	
+	test	ds:[di].GI_states, mask GS_ENABLED
 	jnz	10$				;object is enabled, branch
 	andnf	bp, not mask SBF_VIS_PARENT_FULLY_ENABLED
 10$:
-	
+
 	mov	si, offset OLFileSelectorGroup	; ^lbx:si <- fs ui group
 	mov	ax, MSG_SPEC_BUILD_BRANCH
 	mov	di, mask MF_CALL or mask MF_FIXUP_DS
@@ -594,8 +600,8 @@ PASS:		*ds:si	= OLFileSelectorClass object
 		es 	= segment of OLFileSelectorClass
 		ax	= message #
 RETURN:		nothing
-DESTROYED:	
-SIDE EFFECTS:	
+DESTROYED:
+SIDE EFFECTS:
 
 PSEUDO CODE/STRATEGY:
 
@@ -606,7 +612,7 @@ REVISION HISTORY:
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
 if _DUI
-OLFSSpecScanGeometryHints	method dynamic OLFileSelectorClass, 
+OLFSSpecScanGeometryHints	method dynamic OLFileSelectorClass,
 					MSG_SPEC_SCAN_GEOMETRY_HINTS
 	mov	di, offset OLFileSelectorClass
 	call	ObjCallSuperNoLock
@@ -629,10 +635,10 @@ PASS:		*ds:si	= instance data
 		es = segment of OLFileSelectorClass
 RETURN:		nothing
 DESTROYED:	ax, bx, cx, di
-SIDE EFFECTS:	
+SIDE EFFECTS:
 
 PSEUDO CODE/STRATEGY:
-		
+
 
 REVISION HISTORY:
 	Name	Date		Description
@@ -656,10 +662,10 @@ PASS:		ds:bx	= GenFilePath to convert
 RETURN:		cx:dx	= filled with 'DESKTOP\<Home Dir>\...'
 		carry clear if passed GenFilePath == SP_TOP:\ or SP_DOCUMENT:\
 DESTROYED:	nothing
-SIDE EFFECTS:	
+SIDE EFFECTS:
 
 PSEUDO CODE/STRATEGY:
-		
+
 
 REVISION HISTORY:
 	Name	Date		Description
@@ -908,7 +914,7 @@ endif
 done:
 	;
 	; Remove ourselves from the file-system change notification list.
-	; 
+	;
 	mov	cx, ds:[LMBH_handle]
 	mov	dx, si
 	mov	bx, MANUFACTURER_ID_GEOWORKS
@@ -952,7 +958,7 @@ PASS:		*ds:si - object
 
 RETURN:		carry set if indicate visual state changed
 
-DESTROYED:	
+DESTROYED:
 
 PSEUDO CODE/STRATEGY:
 
@@ -1064,7 +1070,7 @@ if _DUI
 	mov	ax, NECGCNSLT_NOTIFY_SECRET_MODE_CHANGE
 	call	GCNListAdd
 endif
-		
+
 
 if HAVE_FAKE_FILE_SYSTEM
 	push	di
@@ -1094,7 +1100,7 @@ endif
 	call	ObjVarDeleteData
 	mov	ax, TEMP_GEN_PATH_SAVED_DISK_HANDLE	; nuke saved path
 	call	ObjVarDeleteData
-	
+
 pathValid:
 	;
 	; make sure that we are under virtual root, if any
@@ -1116,15 +1122,15 @@ if not SINGLE_DRIVE_DOCUMENT_DIR and FSEL_HAS_CHANGE_DRIVE_POPUP
 	call	OLFSBuildChangeDrivePopup
 endif
 
-if not SINGLE_DRIVE_DOCUMENT_DIR	
+if not SINGLE_DRIVE_DOCUMENT_DIR
 			;was moved to VIS_DRAW in Redwood to improve drawing.
-			;  Removed from general use 7/ 5/94 cbh.   Seem to be 
+			;  Removed from general use 7/ 5/94 cbh.   Seem to be
 			;  problems in the VIS_DRAW
 			;  code that prevent this from being a general
 			;  improvement.
 	;
 	; Tell ourselves to rescan the current directory.
-	; 
+	;
 	call	OLFSDeref_SI_Spec_DI		; clear error flag
 	andnf	ds:[di].OLFSI_state, not mask OLFSS_VIS_OPEN_ERROR
 
@@ -1146,12 +1152,12 @@ FXIP <	clr	cx						>
 FXIP <	push	cx						>
 FXIP <	mov	cx, ss						>
 FXIP <	mov	dx, sp			; cx:dx = nullPath	>
-	
+
 	mov	ax, MSG_OL_FILE_SELECTOR_PATH_SET
 	call	ObjCallInstanceNoLock
 
-FXIP <	pop	cx		; restore stack, ignore value	>	
-	
+FXIP <	pop	cx		; restore stack, ignore value	>
+
 	; XXX: ignore error -- shouldn't be any
 else
 	; Delay rescanning until after we draw, in Redwood.
@@ -1169,7 +1175,7 @@ OLFileSelectorVisOpen	endm
 
 COMMENT @----------------------------------------------------------------------
 
-METHOD:		OLFileSelectorDraw -- 
+METHOD:		OLFileSelectorDraw --
 		MSG_VIS_DRAW for OLFileSelectorClass
 
 DESCRIPTION:	Draw the file selector.
@@ -1182,7 +1188,7 @@ PASS:		*ds:si 	- instance data
 RETURN:		nothing
 		ax, cx, dx, bp - destroyed
 
-ALLOWED TO DESTROY:	
+ALLOWED TO DESTROY:
 		bx, si, di, ds, es
 
 REGISTER/STACK USAGE:
@@ -1217,7 +1223,7 @@ OLFileSelectorDraw	method dynamic	OLFileSelectorClass, \
 	;
 	; Tell ourselves to rescan the current directory, if this is the
 	; initial draw after the MSG_VIS_OPEN.
-	; 
+	;
 	call	OLFSDeref_SI_Spec_DI		; clear error flag
 	test	ds:[di].OLFSI_state, mask OLFSS_RESCAN_AFTER_DRAW
 	jz	exit
@@ -1246,18 +1252,18 @@ OLFileSelectorDraw	method dynamic	OLFileSelectorClass, \
 
 NOFXIP<	mov	cx, cs						>
 NOFXIP<	mov	dx, offset nullPath				>
-	
+
 FXIP <	; copy path to stack					>
 FXIP <	clr	cx						>
 FXIP <	push	cx						>
 FXIP <	mov	cx, ss						>
 FXIP <	mov	dx, sp			; cx:dx = nullPath	>
-	
+
 	mov	ax, MSG_OL_FILE_SELECTOR_PATH_SET
 	call	ObjCallInstanceNoLock
 
-FXIP< 	pop	cx		; restore stack, ignore value	>	
-	
+FXIP< 	pop	cx		; restore stack, ignore value	>
+
 	; XXX: ignore error -- shouldn't be any
 exit:
 	ret
@@ -1343,7 +1349,7 @@ OLFSFreeBuffers	proc	near
 	call	OLFSDeref_SI_Spec_DI		; ds:di = specific instance
 	clr	bx
 	mov	ds:[di].OLFSI_numFiles, bx	; This used to be in
-						; OLFileSelectorVisClose, 
+						; OLFileSelectorVisClose,
 						; but moved here so
 						; all callers have
 						; nuked numFiles
@@ -1380,7 +1386,7 @@ PASS:		*ds:si	= OLFileSelectorClass object
 			cx - NT_manuf
 			dx - NT_type
 		bp - change specific data
-		
+
 RETURN:		nothing
 DESTROYED:	everything
 SIDE EFFECTS:	Could cause file selector to rescan
@@ -1393,7 +1399,7 @@ REVISION HISTORY:
 	CT	12/22/95   	Initial version
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
-OLFSMetaNotify	method dynamic OLFileSelectorClass, 
+OLFSMetaNotify	method dynamic OLFileSelectorClass,
 					MSG_META_NOTIFY
 	.enter
 
@@ -1416,7 +1422,7 @@ if 1
 ;
 ; all we really need to do is redraw -- brianc 3/11/95
 ;
-	;	
+	;
 	; get current selection for resetting later
 	;	*ds:si = file selector
 	;
@@ -1537,7 +1543,7 @@ OLFileSelectorSetSomething method	OLFileSelectorClass,
 				MSG_GEN_FILE_SELECTOR_SET_GEODE_ATTRS,
 				MSG_GEN_FILE_SELECTOR_SET_TOKEN,
 				MSG_GEN_FILE_SELECTOR_SET_CREATOR
-					
+
 
 	call	OLFSMarkDirtyAndRescanIfRealized
 
@@ -1584,10 +1590,10 @@ RETURN:		nothing
 DESTROYED:	?
 
 PSEUDO CODE/STRATEGY:
-		
+
 
 KNOWN BUGS/SIDE EFFECTS/IDEAS:
-		
+
 
 REVISION HISTORY:
 	Name	Date		Description
@@ -1615,10 +1621,10 @@ RETURN:		nothing
 DESTROYED:	?
 
 PSEUDO CODE/STRATEGY:
-		
+
 
 KNOWN BUGS/SIDE EFFECTS/IDEAS:
-		
+
 
 REVISION HISTORY:
 	Name	Date		Description
@@ -1629,7 +1635,7 @@ REVISION HISTORY:
 OLFileSelectorDeleteVarData method OLFileSelectorClass, MSG_META_DELETE_VAR_DATA
 	;
 	; Let MetaClass deal with the actual data manipulation.
-	; 
+	;
 		push	cx
 		mov	di, offset OLFileSelectorClass
 		call	ObjCallSuperNoLock
@@ -1637,7 +1643,7 @@ OLFileSelectorDeleteVarData method OLFileSelectorClass, MSG_META_DELETE_VAR_DATA
 
 	;
 	; See if it's one of the types that affect what we display.
-	; 
+	;
 CheckHack <(ATTR_GEN_FILE_SELECTOR_NAME_MASK eq \
 	    ATTR_GEN_FILE_SELECTOR_GEODE_ATTR+4) and \
 	   (ATTR_GEN_FILE_SELECTOR_GEODE_ATTR eq \
@@ -1653,7 +1659,7 @@ CheckHack <(ATTR_GEN_FILE_SELECTOR_NAME_MASK eq \
 		jb	done
 		cmp	cx, ATTR_GEN_FILE_SELECTOR_NAME_MASK
 		ja	done
-		
+
 		call	OLFSMarkDirtyAndRescanIfRealized
 done:
 		popf
@@ -1677,9 +1683,9 @@ PASS:		cx:dx - path
 
 RETURN:		bp - updated if changed
 
-DESTROYED:	nothing 
+DESTROYED:	nothing
 
-PSEUDO CODE/STRATEGY:	
+PSEUDO CODE/STRATEGY:
 
 KNOWN BUGS/SIDE EFFECTS/IDEAS:
 
@@ -1699,7 +1705,7 @@ OLFileSelectorCheckRemovable	proc near
 	; be on a removable disk! (doublespace drives are listed as
 	; "removable")
 	;
-		
+
 		test	bp, DISK_IS_STD_PATH_MASK
 		jnz	done
 
@@ -1739,9 +1745,9 @@ PASS:
 
 	ax - MSG_OL_FILE_SELECTOR_PATH_SET
 
-	cx:dx - new path (null-terminated)  
+	cx:dx - new path (null-terminated)
 		(if null, uses root directory to disk specified by disk handle)
-		
+
 		XIP: path must not be in a movable code resource
 
 	bp - disk handle
@@ -1802,7 +1808,7 @@ if HAVE_FAKE_FILE_SYSTEM
 	test	ds:[di].GFSI_fileCriteria, mask FSFC_USE_FAKE_FILE_SYSTEM
 	jnz	continue
 endif
-	; 
+	;
 	; If the pased path is on a removable disk, then re-register
 	; the disk now, in case the user just swapped disks.
 	;
@@ -1842,10 +1848,10 @@ CALLED BY:	(INTERNAL) OLFileSelectorSetPath
 PASS:		*ds:si	= GenFileSelector object
 RETURN:		nothing
 DESTROYED:	nothing
-SIDE EFFECTS:	
+SIDE EFFECTS:
 
 PSEUDO CODE/STRATEGY:
-		
+
 
 REVISION HISTORY:
 	Name	Date		Description
@@ -1859,7 +1865,7 @@ OLFileSelectorGetIDs proc	near
 	.enter
 	;
 	; Fetch our new IDs.
-	; 
+	;
 	call	FilePushDir
 	mov	ax, ATTR_GEN_PATH_DATA
 	mov	dx, TEMP_GEN_PATH_SAVED_DISK_HANDLE
@@ -1868,15 +1874,15 @@ OLFileSelectorGetIDs proc	near
 
 	call	FileGetCurrentPathIDs
 	jc	bleah
-	
+
 	;
 	; Now copy the chunk into vardata, so we don't have the extra
 	; chunk lying around.
-	; 
+	;
 	mov_tr	di, ax				; save handle
 	ChunkSizeHandle ds, di, cx		; cx <- # bytes needed to
 						;  store the thing
-	
+
 	mov	ax, TEMP_GEN_FILE_SELECTOR_DIR_IDS
 						; don't save to state, as we
 						;  need to build this for each
@@ -1963,7 +1969,7 @@ endif ;HAVE_FAKE_FILE_SYSTEM
 		call	OLFileSelectorGetIDs
 	;
 	; If we're not visible, no need to rescan
-	; 
+	;
 continue::
 		call	OLFSDeref_SI_Spec_DI
 		test	ds:[di].VI_attrs, mask VA_REALIZED
@@ -1991,10 +1997,10 @@ PASS:		*ds:si	- instance data
 		bp	- disk handle
 RETURN:		nothing
 DESTROYED:	nothing
-SIDE EFFECTS:	
+SIDE EFFECTS:
 
 PSEUDO CODE/STRATEGY:
-		
+
 
 REVISION HISTORY:
 	Name	Date		Description
@@ -2017,10 +2023,10 @@ PASS:		*ds:si	= file selector
 		dx	= number of affected drive
 RETURN:		nothing
 DESTROYED:	ax, cx, dx, bp
-SIDE EFFECTS:	
+SIDE EFFECTS:
 
 PSEUDO CODE/STRATEGY:
-		
+
 
 REVISION HISTORY:
 	Name	Date		Description
@@ -2035,13 +2041,13 @@ OLFileSelectorNotifyDriveChange method dynamic OLFileSelectorClass, MSG_NOTIFY_D
 		.enter
 	;
 	; Give superclass its crack at it.
-	; 
+	;
 		mov	di, offset OLFileSelectorClass
 		call	ObjCallSuperNoLock
 	;
 	; Now rebuild the change-drive popup list to add or remove drives, as
 	; appropriate.
-	; 
+	;
 		call	OLFSBuildChangeDrivePopup
 		.leave
 		ret
@@ -2060,10 +2066,10 @@ PASS:		*ds:si	= file selector
 		cx	= disk handle
 RETURN:		nothing
 DESTROYED:	ax, cx, dx, bp
-SIDE EFFECTS:	
+SIDE EFFECTS:
 
 PSEUDO CODE/STRATEGY:
-		
+
 
 REVISION HISTORY:
 	Name	Date		Description
@@ -2074,25 +2080,25 @@ REVISION HISTORY:
 OLFileSelectorRemovingDisk method dynamic OLFileSelectorClass, MSG_META_REMOVING_DISK
 	;
 	; Locate the array of IDs in our vardata.
-	; 
+	;
 		mov	ax, TEMP_GEN_FILE_SELECTOR_DIR_IDS
 		call	ObjVarFindData
 		jnc	done		; ya never know, ya know?
 	;
 	; Figure the offset past the last entry.
-	; 
+	;
    		VarDataSizePtr	ds, bx, ax
 		add	ax, bx		; ds:ax <- end
 compareLoop:
 	;
 	; See if this entry matches the removing disk
-	; 
+	;
 		cmp	cx, ds:[bx].FPID_disk
 		je	goToDocumentDir
 next:
 	;
 	; Nope -- advance to next, please.
-	; 
+	;
 		add	bx, size FilePathID
 		cmp	bx, ax
 		jb	compareLoop
@@ -2128,7 +2134,7 @@ DESTROYED:	ax, cx, dx, bp
 SIDE EFFECTS:	selector may rescan
 
 PSEUDO CODE/STRATEGY:
-		
+
 
 REVISION HISTORY:
 	Name	Date		Description
@@ -2136,7 +2142,7 @@ REVISION HISTORY:
 	ardeb	11/11/92	Initial version
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
-OLFileSelectorNotifyFileChange method dynamic OLFileSelectorClass, 
+OLFileSelectorNotifyFileChange method dynamic OLFileSelectorClass,
 					MSG_NOTIFY_FILE_CHANGE
 		mov	bx, bp
 		call	MemLock
@@ -2174,7 +2180,7 @@ notificationTable	nptr.near	\
 	notifySPAdd,			; FCNT_ADD_SP_DIRECTORY
 	notifySPDelete,			; FCNT_DELETE_SP_DIRECTORY
 	notifyUnread,			; FCNT_FILE_UNREAD
-	notifyRead			; FCNT_FILE_READ	
+	notifyRead			; FCNT_FILE_READ
 .assert ($-notificationTable)/2 eq FileChangeNotificationType
 
 notifyCreate:
@@ -2217,7 +2223,7 @@ else
 endif
 		jc	rescanKid
 		retn
-		
+
 rescanKid:
 rescan:
 		push	dx, bp
@@ -2248,18 +2254,18 @@ notifyFormat:
 		jnc	notifyFormatDone
 	;
 	; Figure the offset past the last entry.
-	; 
+	;
    		VarDataSizePtr	ds, bx, ax
 		add	ax, bx		; ds:ax <- end
 formatCompareLoop:
 	;
 	; See if this entry matches the stuff in the notification block
-	; 
+	;
 		cmp	cx, ds:[bx].FPID_disk
 		je	diskFormatted
 	;
 	; Nope -- advance to next, please.
-	; 
+	;
 		add	bx, size FilePathID
 		cmp	bx, ax
 		jb	formatCompareLoop
@@ -2285,7 +2291,7 @@ notifyBatch:
 	;
 	; Process the batch o' notifications one at a time after suspending
 	; the selector.
-	; 
+	;
 		push	bp
 		mov	ax, MSG_GEN_FILE_SELECTOR_SUSPEND
 		call	ObjCallInstanceNoLock
@@ -2299,19 +2305,19 @@ batchLoop:
 		jae	batchLoopDone
 	;
 	; Perform another notification. Fetch the type out
-	; 
+	;
 		mov	dx, es:[di].FCBNI_type
 		push	di, dx
 	;
 	; Point to the start of the stuff that resembles a
 	; FileChangeNotificationData structure and recurse
-	; 
+	;
 		add	di, offset FCBNI_disk
 		call	OLFileSelectorNotifyFileChangeLow
 		pop	di, dx
 	;
 	; Advance pointer, accounting to variable-sized nature of the thing.
-	; 
+	;
 		add	di, size FileChangeBatchNotificationItem
 	CheckHack <FCNT_CREATE eq 0 and FCNT_RENAME eq 1>
 		cmp	dx, FCNT_RENAME
@@ -2333,7 +2339,7 @@ notifyUnread:
 		retn
 notifyRead:
 		retn
-	
+
 OLFileSelectorNotifyFileChangeLow endp
 
 COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -2342,16 +2348,16 @@ COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 SYNOPSIS:	Fetch the three words of ID from the notification block
 
-CALLED BY:	(INTERNAL) OLFileSelectorCheckIDIsKids, 
+CALLED BY:	(INTERNAL) OLFileSelectorCheckIDIsKids,
 			   OLFileSelectorCheckIDIsOurs
 PASS:		es:di	= FileChangeNotificationData
 RETURN:		cxdx	= FileID
 		bp	= disk handle
 DESTROYED:	bx, ax
-SIDE EFFECTS:	
+SIDE EFFECTS:
 
 PSEUDO CODE/STRATEGY:
-		
+
 
 REVISION HISTORY:
 	Name	Date		Description
@@ -2376,10 +2382,10 @@ PASS:		*ds:si	= OLFileSelector object
 		es:di	= FileChangeNotificationData
 RETURN:		carry set if the ID is one of ours
 DESTROYED:	bx, ax, di
-SIDE EFFECTS:	
+SIDE EFFECTS:
 
 PSEUDO CODE/STRATEGY:
-		
+
 
 REVISION HISTORY:
 	Name	Date		Description
@@ -2397,19 +2403,19 @@ OLFileSelectorCheckIDIsOurs proc	near
 		call	OLFileSelectorFetchIDFromNotificationBlock
 	;
 	; Locate the array of IDs in our vardata.
-	; 
+	;
 		mov	ax, TEMP_GEN_FILE_SELECTOR_DIR_IDS
 		call	ObjVarFindData
 		jnc	done		; ya never know, ya know?
 	;
 	; Figure the offset past the last entry.
-	; 
+	;
    		VarDataSizePtr	ds, bx, ax
 		add	ax, bx		; ds:ax <- end
 compareLoop:
 	;
 	; See if this entry matches the stuff in the notification block
-	; 
+	;
 		cmp	bp, ds:[bx].FPID_disk
 		jne	next
 		cmp	cx, ds:[bx].FPID_id.high
@@ -2419,7 +2425,7 @@ compareLoop:
 next:
 	;
 	; Nope -- advance to next, please.
-	; 
+	;
 		add	bx, size FilePathID
 		cmp	bx, ax
 		jb	compareLoop
@@ -2443,10 +2449,10 @@ PASS:		*ds:si	= OLFileSelector object
 		es:di	= FileChangeNotificationData
 RETURN:		carry set if the ID is one of ours
 DESTROYED:	bx, ax, di
-SIDE EFFECTS:	
+SIDE EFFECTS:
 
 PSEUDO CODE/STRATEGY:
-		
+
 
 REVISION HISTORY:
 	Name	Date		Description
@@ -2460,7 +2466,7 @@ OLFileSelectorCheckIDIsAncestor proc	near
 		.enter
 	;
 	; Extract the pertinent word from the block
-	; 
+	;
 		call	OLFileSelectorFetchIDFromNotificationBlock
 	;
 	; Get our current path
@@ -2502,10 +2508,10 @@ PASS:		*ds:si	= OLFileSelector object
 RETURN:		carry set if close under way
 		carry clear if ID wasn't for us
 DESTROYED:	ax, bx, di
-SIDE EFFECTS:	
+SIDE EFFECTS:
 
 PSEUDO CODE/STRATEGY:
-		
+
 
 REVISION HISTORY:
 	Name	Date		Description
@@ -2526,7 +2532,7 @@ done:
 		ret
 OLFileSelectorCloseIfIDIsOurs		endp
 
-		
+
 
 COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 		OLFileSelectorCloseForNotify
@@ -2541,10 +2547,10 @@ CALLED BY:	(INTERNAL) OLFileSelectorCloseIfIDIsOurs,
 PASS:		*ds:si	= GenFileSelector object
 RETURN:		nothing
 DESTROYED:	ax, bp, cx, dx
-SIDE EFFECTS:	
+SIDE EFFECTS:
 
 PSEUDO CODE/STRATEGY:
-		
+
 
 REVISION HISTORY:
 	Name	Date		Description
@@ -2560,15 +2566,15 @@ OLFileSelectorCloseForNotify proc	near
 	; We can't go up a directory if the directory we were in no longer
 	; exists, so retreat to the virtual root, if we have one, or to
 	; the document directory, if not.
-	; 
+	;
 		push	si
 		call	OLFSGetVirtualRoot
 		jnc	popGotoDocument
-		
+
 	;
 	; Copy virtual root onto the stack (it's in our vardata, currently),
 	; so we can actually set it.
-	; 
+	;
 		mov	bp, cx		; bp <- disk handle
 		pop	bx		; *ds:bx <- object
 		sub	sp, size PathName
@@ -2582,7 +2588,7 @@ copyTailLoop:
 
 		mov	dx, sp		; cx:dx <- path
 		mov	si, bx		; *ds:si <- object
-		
+
 		mov	ax, MSG_GEN_PATH_SET
 		call	ObjCallInstanceNoLock
 		mov	bx, sp		; clear the stack
@@ -2599,7 +2605,7 @@ gotoDocument:
 	;
 	; Either no virtual root, or virtual root doesn't exist anymore.
 	; Get back to document, if possible.
-	; 
+	;
 		mov	ax, MSG_OL_FILE_SELECTOR_DOCUMENT_BUTTON
 		call	ObjCallInstanceNoLock
 		jmp	done
@@ -2620,10 +2626,10 @@ RETURN:		carry set if it belongs to a kiddie:
 		carry clear if it's none of ours:
 			di	= destroyed
 DESTROYED:	ax, bx
-SIDE EFFECTS:	
+SIDE EFFECTS:
 
 PSEUDO CODE/STRATEGY:
-		
+
 
 REVISION HISTORY:
 	Name	Date		Description
@@ -2679,8 +2685,8 @@ SYNOPSIS:	build list of all GEOS file FileIDs
 CALLED BY:	OLFileSelectorNotifyFileChangeLow
 PASS:		*ds:si = file selector
 RETURN:		nothing
-DESTROYED:	
-SIDE EFFECTS:	
+DESTROYED:
+SIDE EFFECTS:
 
 PSEUDO CODE/STRATEGY:
 		The problem we are fixing is that when we get CREATE
@@ -2777,10 +2783,10 @@ PASS:		*ds:si	= file selector
 		es:di	= FileChangeNotificationData
 RETURN:		carry set if file found in list
 DESTROYED:	ax, bx
-SIDE EFFECTS:	
+SIDE EFFECTS:
 
 PSEUDO CODE/STRATEGY:
-		
+
 
 REVISION HISTORY:
 	Name	Date		Description
