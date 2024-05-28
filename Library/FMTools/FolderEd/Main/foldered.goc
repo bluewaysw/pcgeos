@@ -29,7 +29,6 @@ static 	word		g_tokenStyle = DEFAULT_TOKEN_STYLE;
 	
 	To do
 	
-	- cLEAR tOKEN bUTTON -> ja
 	
 	- Bezeichnung TOken / Icon noch mal durchdenken - nur Folders evtl doch besser Icon?
 	
@@ -94,7 +93,20 @@ word	count;
      * Copy our dialog template and add it to the application object
      */
     g_dialog = UserCreateDialog(@SelectDialog);
-    	
+   
+   /*
+    *	Enable expert UI - token style group and huge icon
+    */
+@if 0
+    @send @DialogObj(@FEDTokenStyleGroup)::MSG_GEN_SET_USABLE(VUM_NOW);
+    @send @DialogObj(@FEDTokenResultGroup)::MSG_META_ADD_VAR_DATA(HINT_DRAW_IN_BOX, 0, 0);
+    @send @DialogObj(@TokenTokenHuge)::MSG_GEN_SET_USABLE(VUM_NOW);
+    @send @DialogObj(@TokenNewHuge)::MSG_GEN_SET_USABLE(VUM_NOW);
+@endif    
+
+
+   
+   
     /*
      * Initialize duplicated dialog objects
      */
@@ -159,15 +171,79 @@ word	count;
  *	Display Icon Moniker and ID
  -------------------------------------------------------------*/
 // swat stop in foldered::FEDShowToken
-void  FEDShowToken(GeodeToken tok, optr idObj, optr monikerObj) {
+void  FEDShowToken(GeodeToken tok, optr idObj, optr monikerObj, optr hugeObj, optr toolObj) {
 #define NUM_CHARS_IN_ID	10
 char buf[NUM_CHARS_IN_ID + 2];
-
+MemHandle 	mh;
+word 		monikerSize;
+VisMonikerWithGString	*moniker;
+int x, y;
 
     FEDTokenIdToText(tok,NUM_CHARS_IN_ID, buf);
     @call idObj::MSG_GEN_REPLACE_VIS_MONIKER_TEXT(buf, 0);
     
     FEDShowTokenMoniker(tok, monikerObj);
+
+    if ( hugeObj) {
+	mh = InternalGetTokenMonikerBlock(tok, DS_HUGE, VMS_ICON, &monikerSize);
+	if ( mh ) 
+	{
+	    /*
+	     * If there is no huge icon InternalGetTokenMonikerBlock returns a smaller icon.
+	     * But we only want to display a large or huge icon, not a standard size icon. 
+	     * The standard size is 48x30, so a larger icon should extend this size 
+	     * at least in one direction. Since some "standard" icons are slightly 
+	     * larger, we use 5 pixels difference.
+	     */
+	    moniker = MemLock(mh);
+	    x = moniker->VMWGS_common.VM_width;
+	    y = moniker->VMWGS_height;
+	    MemUnlock(mh);
+	    
+	    if ( (x <= 48+5) && (y <= 30+5) ) {
+	    	// This is not a huge or large moniker
+	    	@call hugeObj::MSG_GEN_REPLACE_VIS_MONIKER_TEXT("",VUM_NOW);	
+	    } else {
+	    	@call hugeObj::MSG_GEN_REPLACE_VIS_MONIKER(VUM_NOW, 
+			40,64,monikerSize,
+			VMDT_VIS_MONIKER ,VMST_FPTR,(dword)MemLock(mh));
+	    }
+	    MemFree(mh);
+	}
+	else {
+	    
+	    @call monikerObj::MSG_GEN_REPLACE_VIS_MONIKER_TEXT("",VUM_NOW);
+	}
+    }	
+
+    if ( toolObj) {
+	mh = InternalGetTokenMonikerBlock(tok, DS_TINY, VMS_TOOL, &monikerSize);
+	if ( mh ) 
+	{
+	    /*
+	     * Again, we check the size of the returned moniker.
+	     * The default tool size is 15x15, so a tool should not extend the size of 
+	     * 15+5=20 pixels in any direction.
+	     */
+	    moniker = MemLock(mh);
+	    x = moniker->VMWGS_common.VM_width;
+	    y = moniker->VMWGS_height;
+	    MemUnlock(mh);
+	    
+	    if ( (x > 15+5) || (y > 15+5) ) {
+	    	// This is not a tool moniker
+	    	@call toolObj::MSG_GEN_REPLACE_VIS_MONIKER_TEXT("",VUM_NOW);	
+	    } else {	
+		@call toolObj::MSG_GEN_REPLACE_VIS_MONIKER(VUM_NOW, 
+			40,64,monikerSize,
+			VMDT_VIS_MONIKER ,VMST_FPTR,(dword)MemLock(mh));
+	    }
+	MemFree(mh);
+	}
+	else {
+	    @call monikerObj::MSG_GEN_REPLACE_VIS_MONIKER_TEXT("",VUM_NOW);
+	}
+	}	
 
 }
 
@@ -178,7 +254,6 @@ char buf[NUM_CHARS_IN_ID + 2];
  *	Return: currently used token
  -------------------------------------------------------------*/
 GeodeToken FEDShowFolderToken(char *fileName,	DiskHandle dh, char *path) {
-optr idObj, monikerObj;
 word fileAttrs;
 GeodeToken fileToken, creatorToken;
 GeosFileType fileType;
@@ -196,9 +271,8 @@ FileExtAttrDesc	attrDesc[4];	/* Array 0..3 */
   FileGetPathExtAttributes(fileName,FEA_MULTIPLE,attrDesc,4);
 
   /* Display information */
-  idObj = @DialogObj(@TokenTokenID);
-  monikerObj = @DialogObj(@TokenTokenDisplay);
-  FEDShowToken(fileToken, idObj, monikerObj);
+  FEDShowToken(fileToken, @DialogObj(@TokenTokenID), @DialogObj(@TokenTokenStdDisplay), 
+  			@DialogObj(@TokenTokenHuge), @DialogObj(@TokenTokenTool));
   
 
   FilePopDir();
