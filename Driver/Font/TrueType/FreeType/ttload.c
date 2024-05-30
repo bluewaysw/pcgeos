@@ -599,7 +599,7 @@
       limit = face->numLocations;
 
       glyphLocations = GEO_LOCK( face->glyphLocationBlock );
-      for ( n = 0; n < limit; n++ )
+      for ( n = 0; n < limit; ++n )
         glyphLocations[n] = GET_Long();
 
       GEO_UNLOCK( face->glyphLocationBlock );
@@ -620,7 +620,7 @@
       limit = face->numLocations;
 
       glyphLocations = GEO_LOCK( face->glyphLocationBlock );
-      for ( n = 0; n < limit; n++ )
+      for ( n = 0; n < limit; ++n )
         glyphLocations[n] = (Long)((ULong)GET_UShort() * 2);
 
       GEO_UNLOCK( face->glyphLocationBlock );

@@ -803,8 +803,7 @@
                           PInstance           ins );
 
   LOCAL_DEF
-  TT_Error  Context_Run( PExecution_Context  exec,
-                         Bool                debug );
+  TT_Error  Context_Run( PExecution_Context  exec );
 
   LOCAL_DEF
   TT_Error  Instance_Init( PInstance  ins );

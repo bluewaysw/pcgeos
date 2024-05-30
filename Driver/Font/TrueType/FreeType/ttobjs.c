@@ -577,8 +577,7 @@
  *****************************************************************/
 
   LOCAL_FUNC
-  TT_Error  Context_Run( PExecution_Context  exec,
-                         Bool                debug )
+  TT_Error  Context_Run( PExecution_Context  exec )
   {
     TT_Error  error;
 
@@ -609,10 +608,7 @@
     exec->top     = 0;
     exec->callTop = 0;
 
-    if ( !debug )
-      return RunIns( exec );
-    else
-      return TT_Err_Ok;
+    return RunIns( exec );
   }
 
 
