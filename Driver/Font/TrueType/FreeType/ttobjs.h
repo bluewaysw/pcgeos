@@ -605,15 +605,6 @@
     PLong            storage;   /* instance                            */
 
     TGlyph_Zone      twilight;  /* The instance's twilight zone */
-
-    /* debugging variables */
-
-    /* When using the debugger, we must keep the */
-    /* execution context tied to the instance    */
-    /* object rather than asking it on demand    */
-
-    Bool                debug;
-    PExecution_Context  context;
   };
 
 
