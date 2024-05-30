@@ -69,8 +69,7 @@ ttadapter.eobj: Adapter/ttadapter.h geos.h ec.h fontID.h file.h graphics.h \
                 Adapter/../FreeType/tttypes.h \
                 Adapter/../FreeType/ttconfig.h \
                 Adapter/../FreeType/ft_conf.h resource.h heap.h lmem.h \
-                Ansi/stdlib.h Adapter/../FreeType/ttcalc.h \
-                Adapter/ttcharmapper.h FreeType/freetype.h geode.h
+                Ansi/stdlib.h Adapter/../FreeType/ttcalc.h geode.h
 ttwidths.obj \
 ttwidths.eobj: geos.h ec.h unicode.h graphics.h fontID.h font.h color.h \
                 heap.h Adapter/ttwidths.h Adapter/../FreeType/freetype.h \
@@ -95,7 +94,7 @@ ttpath.eobj: Adapter/ttadapter.h geos.h ec.h fontID.h file.h graphics.h \
                 Adapter/../FreeType/ft_conf.h resource.h heap.h lmem.h \
                 Ansi/stdlib.h Adapter/../FreeType/ttcalc.h \
                 Adapter/ttpath.h Adapter/ttcharmapper.h \
-                FreeType/freetype.h win.h
+                FreeType/freetype.h
 ttcache.obj \
 ttcache.eobj: FreeType/ttengine.h FreeType/tttypes.h FreeType/ttconfig.h \
                 FreeType/ft_conf.h geos.h file.h resource.h graphics.h \
