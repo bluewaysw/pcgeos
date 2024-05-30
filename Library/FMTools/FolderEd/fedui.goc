@@ -25,7 +25,7 @@
     
 @chunk char ErrorNoFolders[] = "You need to select at least one folder!";    
     
-@include "Art/notfound.goh"
+@include "notfound.goh"
     
     
 @end FMTData;
@@ -38,8 +38,8 @@
 
     @object FolderEdInteractionClass SelectDialog = {
         GI_visMoniker = 'F', "Edit Folder Icon";
-        GI_comp =   @FEDTopGroup, @FEDMainSpacer,
-        	@FEDTokenListOptionsGroup, @FEDReplyBar;
+        GI_comp =   @SettingsTrigger, @FEDTopGroup, @FEDMainSpacer,
+        	@FEDTokenListGroup, @FEDReplyBar;
         GI_states = (@default & (~GS_USABLE));
         GI_attrs = @default | GA_KBD_SEARCH_PATH;
         GII_visibility = GIV_DIALOG;
@@ -50,19 +50,28 @@
 
     @object GenInteractionClass FEDMainSpacer = {
     	GI_visMoniker = " "; 
-    /*
-    	GI_visMoniker = "The file manager selects the proper icon."; 
-    	HINT_PLACE_MONIKER_TO_RIGHT;
-    	HINT_EXPAND_WIDTH_TO_FIT_PARENT;
-	*/    	
     }
+
+@object GenInteractionClass SettingsTrigger = {
+	GI_visMoniker = " X ";
+	HINT_SEEK_TITLE_BAR_RIGHT;
+	GI_comp = @TestTrigger;
+	GII_visibility = GIV_POPUP;
+	HINT_INFREQUENTLY_USED;
+		/* 
+		* entweder Menü not pinnabel oder Dialogbox machen
+		*/
+	}
+@object GenTriggerClass TestTrigger = {
+GI_visMoniker ="test";
+}
 
 /*
  * -------- TopGroup ---------------
  */
 
     @object GenInteractionClass FEDTopGroup = {
-    	GI_comp = @SelectFolderList, @TokenTokenGroup/*, @TokenNewGroup*/;
+    	GI_comp = @SelectFolderList, @TokenTokenGroup;
     	HINT_ORIENT_CHILDREN_HORIZONTALLY;
     	HINT_EXPAND_WIDTH_TO_FIT_PARENT;
     	HINT_FULL_JUSTIFY_CHILDREN_HORIZONTALLY;
@@ -84,7 +93,7 @@
     
 
 /*
- * -------- TokenGroup ---------------
+ * -------- TokenGroup - current icon ---------------
  */
     
 @object GenInteractionClass TokenTokenGroup = {
@@ -95,7 +104,6 @@
 	}
 	
 @object GenInteractionClass TokenTokenTopGroup = {
-	/*GI_visMoniker = " New Icon: ";*/
 	GI_comp =  @TokenTokenStdDisplay, @TokenTokenTool, @TokenTokenHuge;
 	HINT_ORIENT_CHILDREN_HORIZONTALLY;
 	HINT_BOTTOM_JUSTIFY_CHILDREN;
@@ -119,43 +127,20 @@
 	HINT_FIXED_SIZE = { SST_PIXELS | 70, SST_PIXELS | 35, 1 };
 	HINT_CENTER_MONIKER;
 	}
-/*
- * -------- TokenNewGroup ---------------
- */
-    
-@object GenInteractionClass TokenNewGroup = {
-	GI_visMoniker = "Selected icon ID:";
-	GI_comp = @TokenNewID;
-	}
-
-
-@object GenInteractionClass TokenNewTopGroup = {
-	GI_comp =  @TokenNewStdDisplay, @TokenNewTool, @TokenNewHuge;
-	HINT_ORIENT_CHILDREN_HORIZONTALLY;
-	HINT_BOTTOM_JUSTIFY_CHILDREN;
-	}
-@object GenInteractionClass TokenNewStdDisplay = {
-	GI_visMoniker = " ";
-	HINT_FIXED_SIZE = { SST_PIXELS | 70, SST_PIXELS | 35, 1 };
-	HINT_CENTER_MONIKER;
-	}
-@object GenInteractionClass TokenNewID = {
-	GI_visMoniker = "no ID";
-	HINT_CENTER_MONIKER;
-	}
-@object GenInteractionClass TokenNewTool = {
-	HINT_FIXED_SIZE = { SST_PIXELS | 20, SST_PIXELS | 20, 1 };
-	HINT_CENTER_MONIKER;
-	}
-@object GenInteractionClass TokenNewHuge = {
-	GI_states = @default & ~GS_USABLE;
-	HINT_FIXED_SIZE = { SST_PIXELS | 70, SST_PIXELS | 35, 1 };
-	HINT_CENTER_MONIKER;
-	}
 
 /*
- * -------- FEDTokenList     ---------------
+ * -------- FEDTokenListGroup     ---------------
  */
+ 
+    @object GenInteractionClass FEDTokenListGroup = {
+   	GI_visMoniker = " Select a new icon ";
+	HINT_CENTER_MONIKER;
+    	GI_comp = @FEDTokenList, @FEDTokenInfoGroup, @FEDTokenStyleGroup, @FEDTokenRangeGroup;
+    	HINT_ORIENT_CHILDREN_VERTICALLY;
+    	HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+    	HINT_DRAW_IN_BOX;
+    }
+    	
     /*
      * Standard moniker size: 48x30
      * SuperVGA moniker size: 64x40
@@ -173,20 +158,10 @@
     }
  
 /*
- * -------- FEDTokenListOptionsGroup     ---------------
+ * -------- FEDTokenInfoGroup     ---------------
  */
- 
-    @object GenInteractionClass FEDTokenListOptionsGroup = {
-   	GI_visMoniker = " Select a new icon ";
-	HINT_CENTER_MONIKER;
-    	GI_comp = @FEDTokenList, @FEDTokenInfoGroup, @FEDTokenStyleGroup, @FEDTokenResultGroup;
-    	HINT_ORIENT_CHILDREN_VERTICALLY;
-    	HINT_EXPAND_WIDTH_TO_FIT_PARENT;
-    	HINT_DRAW_IN_BOX;
-    }
-    	
 @object GenInteractionClass FEDTokenInfoGroup = {
-	GI_comp = @FEDIconInfoCount,@FEDIconInfoDisplayed, @TokenNewGroup;
+	GI_comp = @FEDIconInfoCount, @FEDIconInfoDisplayed, @FEDIconInfoSelected;
 	HINT_ORIENT_CHILDREN_HORIZONTALLY;
 	}
 
@@ -198,21 +173,34 @@
 	GI_visMoniker =" Currently displayed:";
 	GI_attrs = @default | GA_READ_ONLY;
 	}
-
-@object GenInteractionClass FEDTokenResultGroup = {
-	GI_comp = @FEDTokenRangeGroup;
-	HINT_ORIENT_CHILDREN_HORIZONTALLY;
-	HINT_FULL_JUSTIFY_CHILDREN_HORIZONTALLY;
-	HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+@object GenInteractionClass FEDIconInfoSelected = {
+	GI_visMoniker = "Selected icon:";
+	GI_comp = @TokenSelectedID;
 	}
+@object GenInteractionClass TokenSelectedID = {
+	GI_visMoniker = "no ID";
+	HINT_CENTER_MONIKER;
+	}
+
+
+/*
+ * -------- FEDTokenRangeGroup ---------------
+ */
+
 @object GenInteractionClass FEDTokenRangeGroup = {
 	GI_comp = @FEDManufIDMinimumValue,@FEDManufIDMaximumValue,@FEDManufIDApplayTrigger;
 	HINT_ORIENT_CHILDREN_HORIZONTALLY;
 	HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+@if 0	
 	HINT_FULL_JUSTIFY_CHILDREN_HORIZONTALLY;
+	HINT_INCLUDE_ENDS_IN_CHILD_SPACING;
+@elseif
+	HINT_CENTER_CHILDREN_HORIZONTALLY;
+	HINT_CENTER_CHILDREN_VERTICALLY;
+@endif	
 	}
 @object WordValueClass FEDManufIDMinimumValue = {
-	GI_visMoniker = "Show icon ID from:";
+	GI_visMoniker = "Show Icon ID from:";
 	HINT_VALUE_NAVIGATE_TO_NEXT_FIELD_ON_RETURN_PRESS;
 	}
 @object WordValueClass FEDManufIDMaximumValue = {
@@ -221,12 +209,16 @@
 	HINT_VALUE_NAVIGATE_TO_NEXT_FIELD_ON_RETURN_PRESS;
 	}
 @object GenTriggerClass FEDManufIDApplayTrigger = {
-	GI_visMoniker = 'R',"Apply Range";
+	GI_visMoniker = 'r',"Apply range";
 	GTI_actionMsg = MSG_FED_APPLY_TOKEN_RANGE;
-	HINT_EXPAND_WIDTH_TO_FIT_PARENT;
 	HINT_CENTER_MONIKER;
 	}
+
 	
+/*
+ * -------- FEDTokenRangeGroup (not usable by default) ---------------
+ */
+
 @object GenInteractionClass FEDTokenStyleGroup = {
 	GI_states = @default & ~GS_USABLE;
 	GI_comp = @FEDDisplaySizeSelector, @FEDTokenStyleSelector;
@@ -285,52 +277,80 @@
  * -------- Reply bar ---------------
  */
     @object GenInteractionClass FEDReplyBar ={
-        GI_comp =   @SelectOkTriggerGroup, @ClearTokenTriggerGroup,
+        GI_comp =   @NewIconGroup, @ClearTokenTriggerGroup,
                     @SelectCancelTriggerGroup;
         HINT_MAKE_REPLY_BAR;
         HINT_BOTTOM_JUSTIFY_CHILDREN;
     	GI_attrs = @default | GA_KBD_SEARCH_PATH;
     }
+    
 
-    @object GenInteractionClass SelectOkTriggerGroup = {
+    /* -------- New Icon --------------- */
+ 
+
+    @object GenInteractionClass NewIconGroup = {
     	GI_comp = @TokenNewTopGroup, @SelectOkTrigger;
 	HINT_ORIENT_CHILDREN_VERTICALLY;
 	HINT_CENTER_CHILDREN_HORIZONTALLY;
     }
 
+    @object GenInteractionClass TokenNewTopGroup = {
+	GI_comp =  @TokenNewStdDisplay, @TokenNewTool, @TokenNewHuge;
+	HINT_ORIENT_CHILDREN_HORIZONTALLY;
+	HINT_BOTTOM_JUSTIFY_CHILDREN;
+	}
+    @object GenInteractionClass TokenNewStdDisplay = {
+	GI_visMoniker = " ";
+	HINT_FIXED_SIZE = { SST_PIXELS | 70, SST_PIXELS | 35, 1 };
+	HINT_CENTER_MONIKER;
+	}
+    @object GenInteractionClass TokenNewTool = {
+	HINT_FIXED_SIZE = { SST_PIXELS | 20, SST_PIXELS | 20, 1 };
+	HINT_CENTER_MONIKER;
+	}
+    @object GenInteractionClass TokenNewHuge = {
+	GI_states = @default & ~GS_USABLE;
+	HINT_FIXED_SIZE = { SST_PIXELS | 70, SST_PIXELS | 35, 1 };
+	HINT_CENTER_MONIKER;
+	}
+	
     @object GenTriggerClass SelectOkTrigger = {
-    	GI_visMoniker = 'I', "Change Icon";
+    	GI_visMoniker = 'I', "Change Icon"; 
     	GTI_actionMsg = MSG_FED_CHANGE_TOKEN;
     }
 
+    /* -------- Default Icon --------------- */
+    
+    @object GenInteractionClass DefaultTokenGroup = {
+	GI_comp =  @TokenDefaultDisplay, @TokenDefaultTool;
+	HINT_ORIENT_CHILDREN_HORIZONTALLY;
+	HINT_BOTTOM_JUSTIFY_CHILDREN;
+	}
+    @object GenInteractionClass TokenDefaultDisplay = {
+	GI_visMoniker = " ";
+	HINT_FIXED_SIZE = { SST_PIXELS | 70, SST_PIXELS | 35, 1 };
+	HINT_CENTER_MONIKER;
+	}
+    @object GenInteractionClass TokenDefaultTool = {
+	HINT_FIXED_SIZE = { SST_PIXELS | 20, SST_PIXELS | 20, 1 };
+	HINT_CENTER_MONIKER;
+	}
     @object GenInteractionClass ClearTokenTriggerGroup = {
     	GI_comp = @DefaultTokenGroup, @ClearTokenTrigger;
 	HINT_ORIENT_CHILDREN_VERTICALLY;
 	HINT_CENTER_CHILDREN_HORIZONTALLY;
     }
-    
-@object GenInteractionClass DefaultTokenGroup = {
-	GI_comp =  @TokenDefaultDisplay, @TokenDefaultTool;
-	HINT_ORIENT_CHILDREN_HORIZONTALLY;
-	HINT_BOTTOM_JUSTIFY_CHILDREN;
-	}
-@object GenInteractionClass TokenDefaultDisplay = {
-	GI_visMoniker = " ";
-	HINT_FIXED_SIZE = { SST_PIXELS | 70, SST_PIXELS | 35, 1 };
-	HINT_CENTER_MONIKER;
-	}
-@object GenInteractionClass TokenDefaultTool = {
-	HINT_FIXED_SIZE = { SST_PIXELS | 20, SST_PIXELS | 20, 1 };
-	HINT_CENTER_MONIKER;
-	}
 
     @object GenTriggerClass ClearTokenTrigger = {
     	GI_visMoniker = 'e', "Clear Icon";
     	GTI_actionMsg = MSG_FED_CLEAR_TOKEN;
     }
+    
+    /* -------- Close Trigger --------------- */
 
     @object GenInteractionClass SelectCancelTriggerGroup = {
     	/* the UI manger requires this to place to button really at bottom */
+    	GI_attrs = @default | GA_KBD_SEARCH_PATH;
     	GI_comp = @SelectCancelTrigger;	
     }
 
@@ -339,9 +359,11 @@
     	GTI_actionMsg = MSG_FED_QUIT_DIALOG;
         ATTR_GEN_TRIGGER_ACTION_DATA = { IC_DISMISS };
     	GI_attrs = @default | GA_KBD_SEARCH_PATH;
-    	GI_kbdAccelerator = @specificUI ESCAPE;		/* ESC-Taste*/
+    	GI_kbdAccelerator = @specificUI ESCAPE;		/* ESC-Key */
     }
 
+
 @end DialogUI;
+
 
 

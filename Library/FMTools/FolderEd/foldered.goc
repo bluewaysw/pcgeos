@@ -1,0 +1,1119 @@
+/**************************************************************************
+ *	Project: IconEdit file manager tool
+ *
+ *	File:	foldered.goc
+ *
+ *		
+ *
+ *	By RABE-Soft, Rainer Bettsteller, for Free PC/GEOS Project
+ *
+ **************************************************************************/
+
+@include <stdapp.goh>
+@include <fmtool.goh>
+#include <Ansi/string.h>
+#include <Ansi/stdio.h>
+#include <token.h>
+#include <initfile.h>
+
+@include "foldered.goh"
+@include "fedui.goh"
+
+/*+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+  +                                                                         +
+  +	Global variables and classes			            	    +
+  +                                                                         +
+  ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++*/
+
+static	optr		g_dialog = NullOptr;
+static	MemHandle 	g_mh;
+static	GeodeToken	g_selectedToken;
+static 	MemHandle 	g_tokenList = 0;	/* List of all Tokens in the TokenDB */
+static 	word		g_displaySize = DEFAULT_TOKEN_DISPLAY_SIZE;
+static 	word		g_tokenStyle = DEFAULT_TOKEN_STYLE;
+
+
+@classdecl FolderEdInteractionClass;
+
+@extern visMoniker IconNotFoundMoniker;
+
+/*
+	
+	To do
+	- Readraw anti Artefakt-Teil dneu machen
+	- stufe in Stausgropup beseitigen
+		
+	!! In build-Process includen
+	!! in Filetree
+	!! Übersetzungsdatei
+*/
+
+
+/*+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+  +                                                                         +
+  +	Initialize and exit the tool			            	    +
+  +	----------------------------			            	    +
+  +	- Required API functions					    +	
+  +	- Setup the UI objects						    +	
+  +	- Clean up							    +	
+  +                                                                         +
+  ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++*/
+
+
+/*-------------------------------------------------------------
+ *	API Struct	- tell the file manager infos about our tools
+ *	MUST be global
+-------------------------------------------------------------*/
+FMToolStruct FMToolInfo[1] = {
+    {
+        @FolderEditMoniker, (FMTF_SELECTED_ONLY | FMTT_DIALOG), 1
+        	/* Moniker for Tool Entry
+        	 * FMTF_SELECTED_ONLY: active, onyl if a file/folder is selected
+        	 * FMTT_DIALOG: a dialog will come up (see FMToolType). 
+        	 * 1: number of the tool in our list (we have only one)
+        	 */
+    }
+};
+
+/*-------------------------------------------------------------
+ *	FMFetchToolsProc GetThoseTools
+ *	FileManager API Function - fetch Tools
+-------------------------------------------------------------*/
+
+word _pascal _export GetThoseTools(FMToolStruct **tablePtr)
+{
+    *tablePtr = (FMToolStruct*) &FMToolInfo;
+    return 1;
+}
+
+
+/*-------------------------------------------------------------
+ *	FMToolProc FolderEdToolStart()
+ *-------------------------------------------------------------
+ *	GeodeHandle filemgr => Process that is subclass of FileManagerClass
+ *	word toolNum =>	Entry # of activated tool within table returned by
+ *                FMTF_FETCH_TOOLS
+ *	word entryNum
+ *
+ *	The user has clicked on our Utilities menu item: "Edit Folder Icon"
+-------------------------------------------------------------*/
+// stop in foldered::FolderEdToolStart
+void _pascal _export FolderEdToolStart(GeodeHandle filemgr,
+    					word toolNum,
+					word entryNum ) {
+SelectedFilesStruct	*fileInfo;
+word	count;
+GeodeToken 	tok;
+Boolean err, enab;
+
+{word x = toolNum; x= entryNum; x=x; }	// supress compiler warning
+
+    /*
+     * Copy our dialog template and add it to the application object
+     */
+    g_dialog = UserCreateDialog(@SelectDialog);
+   
+   
+   /*
+    *	Enable expert UI - token style group and huge icon
+    */
+    err = InitFileReadBoolean ("fm_fedtool", "expertui", &enab);
+    if (err) enab = FALSE;
+    if (enab) {
+	@send @DialogObj(@FEDTokenStyleGroup)::MSG_GEN_SET_USABLE(VUM_NOW);
+	@send @DialogObj(@FEDTokenRangeGroup)::MSG_META_ADD_VAR_DATA(HINT_DRAW_IN_BOX, 0, 0);
+	@send @DialogObj(@TokenTokenHuge)::MSG_GEN_SET_USABLE(VUM_NOW);
+	@send @DialogObj(@TokenNewHuge)::MSG_GEN_SET_USABLE(VUM_NOW);
+    }
+
+   
+    /*
+     * Initialize duplicated dialog objects
+     */
+    @send @DialogObj(@SelectOkTrigger)::MSG_GEN_TRIGGER_SET_DESTINATION(g_dialog);
+    @send @DialogObj(@ClearTokenTrigger)::MSG_GEN_TRIGGER_SET_DESTINATION(g_dialog);
+    @send @DialogObj(@SelectCancelTrigger)::MSG_GEN_TRIGGER_SET_DESTINATION(g_dialog);
+    @send @DialogObj(@SelectFolderList)::MSG_GEN_ITEM_GROUP_SET_DESTINATION(g_dialog);
+    @send @DialogObj(@FEDTokenList)::MSG_GEN_ITEM_GROUP_SET_DESTINATION(g_dialog);
+    @send @DialogObj(@FEDManufIDApplayTrigger)::MSG_GEN_TRIGGER_SET_DESTINATION(g_dialog);
+    @send @DialogObj(@FEDDisplaySizeSelector)::MSG_GEN_ITEM_GROUP_SET_DESTINATION(g_dialog);
+    @send @DialogObj(@FEDTokenStyleSelector)::MSG_GEN_ITEM_GROUP_SET_DESTINATION(g_dialog);
+    
+    tok.GT_chars[0]='n'; tok.GT_chars[1]='F'; tok.GT_chars[2]='D'; 
+    tok.GT_chars[3]='R'; tok.GT_manufID=0;
+    FEDShowToken(tok, 0, @DialogObj(@TokenDefaultDisplay), 0, @DialogObj(@TokenDefaultTool));
+
+    
+
+    /*
+     * Figure out the selected folders
+     */
+    g_mh = @call ConstructOptr(filemgr, 0)::MSG_FM_GET_SELECTED_FILES();
+    if ( !g_mh ) return;	// be save to avoid crash, should not occur.
+    
+    count = FEDLookForFoldersInList();
+    if (!count) {
+    	/*
+    	 * No Folders selected. Exit cleanly
+    	 */
+    	ErrorBoxOptr(@ErrorNoFolders);
+    	UserDestroyDialog(g_dialog);
+    	MemFree(g_mh);
+    	g_mh = 0;
+    	return;
+    }
+    
+    /*
+     * Create list of tokens and initialize the FEDTokenList
+     */
+    count = FEDListTokens();
+    @send @DialogObj(@FEDTokenList)::MSG_GEN_DYNAMIC_LIST_INITIALIZE(count);
+    
+    /*
+     * Initialize the folder list
+     */
+    fileInfo = MemLock(g_mh);
+    @send @DialogObj(@SelectFolderList)::MSG_GEN_DYNAMIC_LIST_INITIALIZE(fileInfo->header.FQTH_numFiles);
+    @send @DialogObj(@SelectFolderList)::MSG_GEN_ITEM_GROUP_SET_SINGLE_SELECTION(0, FALSE);
+    @send @DialogObj(@SelectFolderList)::MSG_GEN_ITEM_GROUP_SET_MODIFIED_STATE(TRUE);
+    @send @DialogObj(@SelectFolderList)::MSG_GEN_APPLY();
+    MemUnlock(g_mh);
+
+    
+    @send  @DialogObj(@FEDIconInfoCount)::MSG_GEN_VALUE_SET_INTEGER_VALUE(count, FALSE);
+    @send  @DialogObj(@FEDIconInfoDisplayed)::MSG_GEN_VALUE_SET_INTEGER_VALUE(count, FALSE);
+
+    /*
+     * Finally, open dialog box
+     */
+    @send g_dialog::MSG_GEN_INTERACTION_INITIATE();
+
+}
+
+/*-------------------------------------------------------------
+ * FEDListTokens
+ *-------------------------------------------------------------
+ *	Create al list of all tokens in the tokenDB
+ *	Return: Number of tokens in TokenDB
+-------------------------------------------------------------*/
+word FEDListTokens(void) {
+TokenListStruct	*list;
+dword	retVal;
+word count, minIdx, topIdx, n;
+
+
+    if (g_tokenList) MemFree(g_tokenList);	// Destroy old list
+
+	/*
+	 *	6 byte header to use TokenListStruct for access
+	 */
+    retVal = TokenListTokens(TRF_ONLY_GSTRING, 6, 0);
+    g_tokenList = TokenListTokensHandleFromDWord(retVal);
+    if( !g_tokenList ) return 0;			// BAD	
+    count = TokenListTokensCountFromDWord(retVal);
+    
+    list = MemLock(g_tokenList);
+    list->tokenCount = count;
+    list->firstIndex = 0;
+    list->tokensToShow = count;
+    
+	/*
+	* Sort list by Manufacturer ID
+	* topIdx: 	start of the unsorted list part
+	* minIdx:	index of smallest token ID in unsorted list part 
+	*/
+    for (topIdx = 0; topIdx<(count-1); topIdx++) {
+	
+	minIdx = topIdx;	// assume: smalles ID is on top
+	
+	// check all following tokens to see if the ID is smaller
+	// find the index of the smallest token ID
+	for ( n = topIdx+1; n < count; n++) {
+	    if (list->token[n].GT_manufID < list->token[minIdx].GT_manufID) minIdx = n;
+	    }
+    
+    	if (minIdx != topIdx) {
+    	    // smaller ID found. swap tokens
+    	    GeodeToken tmpToken = list->token[topIdx];
+    	    list->token[topIdx] = list->token[minIdx];
+    	    list->token[minIdx] = tmpToken;
+    	    }
+    }
+
+    MemUnlock(g_tokenList);
+	
+    return count;	
+	
+}
+
+
+/*-------------------------------------------------------------
+ * FEDLookForFoldersInList	
+ *-------------------------------------------------------------
+ *	Scan file list and select folders only
+ ------------------------------------------------------------*/
+word FEDLookForFoldersInList(void) {
+word count, n;
+FileOperationInfoEntry	*srcEntry, *destEntry;
+SelectedFilesStruct	*fileInfo;
+
+    fileInfo = MemLock(g_mh);
+    
+    srcEntry  = &(fileInfo->entry[0]);
+    destEntry = srcEntry;
+    count = 0;
+    
+    for ( n = 0; n < fileInfo->header.FQTH_numFiles; n++) {
+    
+    	if ( (srcEntry->FOIE_type == GFT_DIRECTORY) ||
+    	     ( (srcEntry->FOIE_type == GFT_NOT_GEOS_FILE) && (srcEntry->FOIE_attrs & FA_SUBDIR) ) ) {
+    	    /*
+    	     *	It's a folder. Move it up and count it
+    	     */
+    	    *destEntry = *srcEntry;
+    	    destEntry++;    	     
+    	    count++;
+    	}
+    	srcEntry++;
+    }
+     
+    fileInfo->header.FQTH_numFiles = count;	// only deal with the found folders
+    MemUnlock(g_mh);
+     
+    return count;
+ 
+ }
+    
+/*-------------------------------------------------------------
+ * void MSG_FED_QUIT_DIALOG(int cmd);	
+ *-------------------------------------------------------------
+ *	Close and destroy dialog box
+-------------------------------------------------------------*/
+// stop in foldered::FolderEdInteractionFED_QUIT_DIALOG
+@method FolderEdInteractionClass, MSG_FED_QUIT_DIALOG {
+
+    UserDestroyDialog(g_dialog); // close and destroy the dialog
+    if (g_mh) MemFree(g_mh);
+    if (g_tokenList) MemFree(g_tokenList);
+    
+    /* Important: set handles to zero for next call to the tool */
+    g_mh = 0;
+    g_tokenList = 0;
+}
+
+/*+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+  +                                                                         +
+  +	Common tool routines				            	    +
+  +	--------------------				            	    +
+  +	Handle token moniker and ID string				    +	
+  +     								    +
+  ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++*/
+
+/*-------------------------------------------------------------
+ *	FEDShowToken
+ *-------------------------------------------------------------
+ *	Display Icon Monikers and ID
+ -------------------------------------------------------------*/
+// swat stop in foldered::FEDShowToken
+void  FEDShowToken(GeodeToken tok, optr idObj, optr monikerObj, optr hugeObj, optr toolObj) {
+#define NUM_CHARS_IN_ID	0
+char buf[NUM_CHARS_IN_ID + 2];
+MemHandle 	mh;
+word 		monikerSize;
+VisMonikerWithGString	*moniker;
+int x, y;
+
+    if (idObj) {
+    	FEDTokenIdToText(tok,NUM_CHARS_IN_ID, buf);
+    	@call idObj::MSG_GEN_REPLACE_VIS_MONIKER_TEXT(buf, 0);
+    }
+    
+    FEDShowTokenMoniker(tok, monikerObj);
+
+    if ( hugeObj) {
+	mh = InternalGetTokenMonikerBlock(tok, DS_HUGE, VMS_ICON, &monikerSize);
+	if ( mh ) 
+	{
+	    /*
+	     * If there is no huge icon InternalGetTokenMonikerBlock returns a smaller icon.
+	     * But we only want to display a large or huge icon, not a standard size icon. 
+	     * The standard size is 48x30, so a larger icon should extend this size 
+	     * at least in one direction. Since some "standard" icons are slightly 
+	     * larger, we use 5 pixels difference.
+	     */
+	    moniker = MemLock(mh);
+	    x = moniker->VMWGS_common.VM_width;
+	    y = moniker->VMWGS_height;
+	    MemUnlock(mh);
+	    
+	    if ( (x <= 48+5) && (y <= 30+5) ) {
+	    	// This is not a huge or large moniker
+	    	@call hugeObj::MSG_GEN_REPLACE_VIS_MONIKER_TEXT("",VUM_NOW);	
+	    } else {
+	    	@call hugeObj::MSG_GEN_REPLACE_VIS_MONIKER(VUM_NOW, 
+			40,64,monikerSize,
+			VMDT_VIS_MONIKER ,VMST_FPTR,(dword)MemLock(mh));
+	    }
+	    MemFree(mh);
+	}
+	else {
+	    
+	    @call hugeObj::MSG_GEN_REPLACE_VIS_MONIKER_TEXT("",VUM_NOW);
+	}
+    }	
+
+    if ( toolObj) {
+	mh = InternalGetTokenMonikerBlock(tok, DS_TINY, VMS_TOOL, &monikerSize);
+	if ( mh ) 
+	{
+	    /*
+	     * Again, we check the size of the returned moniker.
+	     * The default tool size is 15x15, so a tool should not extend the size of 
+	     * 15+5=20 pixels in any direction.
+	     */
+	    moniker = MemLock(mh);
+	    x = moniker->VMWGS_common.VM_width;
+	    y = moniker->VMWGS_height;
+	    MemUnlock(mh);
+	    
+	    if ( (x > 15+5) || (y > 15+5) ) {
+	    	// This is not a tool moniker
+	    	@call toolObj::MSG_GEN_REPLACE_VIS_MONIKER_TEXT("",VUM_NOW);	
+	    } else {	
+		@call toolObj::MSG_GEN_REPLACE_VIS_MONIKER(VUM_NOW, 
+			40,64,monikerSize,
+			VMDT_VIS_MONIKER ,VMST_FPTR,(dword)MemLock(mh));
+	    }
+	MemFree(mh);
+	}
+	else {
+	    @call toolObj::MSG_GEN_REPLACE_VIS_MONIKER_TEXT("",VUM_NOW);
+	}
+    }	
+
+}
+
+/*-------------------------------------------------------------
+ *	FEDShowTokenMoniker
+ *-------------------------------------------------------------
+ *	Display Icon Moniker and ID in standard Size
+ *	If token could not found ... 
+ *		use standard folder icon, if token is "empty" (all fields are zero)
+ *		show not-found-icon otherwise
+ -------------------------------------------------------------*/
+// swat stop in foldered::FEDShowTokenMoniker 
+void  FEDShowTokenMoniker(GeodeToken tok, optr monikerObj) {
+MemHandle	mh;
+word 		monikerSize;
+dword tokenDW;
+
+    mh = 0;
+    memcpy(&tokenDW, &tok.GT_chars[0], 4);
+
+    /*
+     * Set up token moniker
+     */
+    
+    mh = InternalGetTokenMonikerBlock(tok, DS_STANDARD, VMS_ICON, &monikerSize);
+    if ( mh ) 
+    {
+	@call monikerObj::MSG_GEN_REPLACE_VIS_MONIKER(VUM_NOW, 
+			40,64,monikerSize,
+			VMDT_VIS_MONIKER ,VMST_FPTR,(dword)MemLock(mh));
+	MemFree(mh);
+    }
+    else {
+	/*
+	 * Token not found in TokenDB file. 
+	 * For an emtpty token, show the default folder token
+	 * For any other token show a "not found" image
+	 */
+	if ( (tokenDW==0) && (tok.GT_manufID==0) ) 
+	{	
+	    /*
+	     *	No token set. Use default folder token nFDR,0
+	     */
+	    tok.GT_chars[0]='n'; tok.GT_chars[1]='F'; tok.GT_chars[2]='D'; 
+	    tok.GT_chars[3]='R'; tok.GT_manufID=0;
+	    mh = InternalGetTokenMonikerBlock(tok, DS_STANDARD, VMS_ICON, &monikerSize);
+	    if (mh) 
+	    {
+		@call monikerObj::MSG_GEN_REPLACE_VIS_MONIKER(VUM_NOW, 
+				40,64,monikerSize,
+				VMDT_VIS_MONIKER ,VMST_FPTR,(dword)MemLock(mh));
+		MemFree(mh);
+	    }
+	    else {
+	    	/* nFDR,0 not found: bad, set empty image */
+		@call monikerObj::MSG_GEN_REPLACE_VIS_MONIKER_TEXT("", 0);
+	    }
+	} 
+	else {	   
+	    @call monikerObj::MSG_GEN_REPLACE_VIS_MONIKER_OPTR(@IconNotFoundMoniker,VUM_NOW);
+	}
+    }
+	
+}	
+
+
+/*--------------------- InternalGetTokenMonikerBlock ---------------------
+ * Purpose:	Get the moniker in a memory block
+ *		Allways try to fetch true color gstring moniker
+ * Pass		dispSize DS_TINY  0
+ *			DS_STANDARD  1
+ *			DS_LARGE  2
+ *			DS_HUGE  3
+ *		style	VMS_TEXT  0
+ *			VMS_ABBREV_TEXT  1
+ *			VMS_GRAPHIC_TEXT  2
+ *			VMS_ICON  3
+ *			VMS_TOOL  4
+ * 		*monikerSize: return: byte size of the moniker
+ * Return:	Handle of memory block containing the moniker image
+ ---------------------------------------------------------------------------*/
+// swat stop in foldered::InternalGetTokenMonikerBlock
+MemHandle InternalGetTokenMonikerBlock(GeodeToken token, 
+				word dispSize, word style, 
+				word *monikerSize) {
+dword tokenDW;
+MemHandle mh;
+Boolean	found;
+
+    mh = 0;
+    memcpy(&tokenDW, &token.GT_chars[0], 4);
+
+	/*
+	 * TokenLoadMonikerBlock returns an 'alternative' moniker if the
+	 * passed displaySize/style combination was not found
+	 * e.g it retuns the 16 color moniker if no true color and
+	 * no 8 bit color moniker was found
+	 */
+    found = TokenLoadMonikerBlock( tokenDW, token.GT_manufID,
+	(dispSize << DT_DISP_SIZE_OFFSET)|
+	(DAR_NORMAL << DT_DISP_ASPECT_RATIO_OFFSET)|
+	DC_CF_RGB, 
+	(style << VMSF_STYLE_OFFSET) | VMSF_GSTRING,
+	monikerSize, &mh );
+
+    if ( !found ) {
+    	*monikerSize = 0;
+    	return 0;
+    	}
+    return mh;
+	
+}
+
+
+
+/*-------------------------------------------------------------
+ *	FEDTokenIdToText
+ *-------------------------------------------------------------
+ *	convert token to text like "GDAT,0"
+ *	return 'centered' text, if minLen > len(plain-token-id-text)
+ *		you may pass zero to minLen
+ -------------------------------------------------------------*/
+// swat stop in foldered::FEDTokenIdToText 
+void FEDTokenIdToText(GeodeToken tok, int minLen, char *retBuf) {
+char buf[15];
+int  n, left, l;
+
+    /* setup token string */
+    for ( n = 0; n< 4; n++ ) if (tok.GT_chars[n]==0) {tok.GT_chars[n]='-'; }
+    sprintf(buf, "%c%c%c%c,%u", tok.GT_chars[0], tok.GT_chars[1], 
+    			tok.GT_chars[2], tok.GT_chars[3], tok.GT_manufID);
+
+    /*
+     * center string, if minLen > strlen(buf)
+     */
+    l= strlen(buf);
+    left = (minLen - (int)strlen(buf))/2;	// spaces on the left side
+    if (left < 0) left = 0;
+    retBuf[0] = 0;
+    while (strlen(retBuf) < left) strcat(retBuf, " ");
+    
+    strcat(retBuf, buf);
+    while( strlen(retBuf) < minLen) strcat(retBuf, " ");	    			
+    
+}
+
+
+
+
+/*+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+  +                                                                         +
+  +	Handle folder list				            	    +
+  +                                                                         +
+  ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++*/
+
+
+/*-------------------------------------------------------------
+ *	FEDShowFolderToken
+ *-------------------------------------------------------------
+ *	Read and Display Icon for a folder
+ *	Return: currently used token
+ -------------------------------------------------------------*/
+GeodeToken FEDShowFolderToken(char *fileName,	DiskHandle dh, char *path) {
+word fileAttrs;
+GeodeToken fileToken, creatorToken;
+GeosFileType fileType;
+FileExtAttrDesc	attrDesc[4];	/* Array 0..3 */
+
+  FilePushDir();
+  FileSetCurrentPath(dh,path);
+
+
+  /* Read extended attributes */
+  @SetAttrDesc(attrDesc[0],FEA_TOKEN,&fileToken,sizeof(GeodeToken));
+  @SetAttrDesc(attrDesc[1],FEA_CREATOR,&creatorToken,sizeof(GeodeToken));
+  @SetAttrDesc(attrDesc[2],FEA_FILE_TYPE,&fileType,sizeof(GeosFileType));
+  @SetAttrDesc(attrDesc[3],FEA_FILE_ATTR,&fileAttrs,1);
+  FileGetPathExtAttributes(fileName,FEA_MULTIPLE,attrDesc,4);
+
+  /* Display information */
+  FEDShowToken(fileToken, @DialogObj(@TokenTokenID), @DialogObj(@TokenTokenStdDisplay), 
+  			@DialogObj(@TokenTokenHuge), @DialogObj(@TokenTokenTool));
+  
+
+  FilePopDir();
+  
+  return fileToken;
+  }
+
+
+/*-------------------------------------------------------------
+ * MSG_FED_QUERY_FOLDER	
+ *-------------------------------------------------------------
+ *	void GEN_DYNAMIC_LIST_QUERY_MSG (optr list, word item);
+ *	Update item moniker in the folder list
+-------------------------------------------------------------*/
+// stop in foldered::FolderEdInteractionFED_QUERY_FOLDER
+@method FolderEdInteractionClass, MSG_FED_QUERY_FOLDER {
+FileLongName		fName;
+SelectedFilesStruct	*fileInfo;
+
+    if (!g_mh) strcpy(fName, "---");
+    else {
+	fileInfo = MemLock(g_mh);
+	strcpy(fName, fileInfo->entry[item].FOIE_name);
+	MemUnlock(g_mh);	
+    }
+    @send list::MSG_GEN_DYNAMIC_LIST_REPLACE_ITEM_TEXT(item, fName);
+}
+
+
+/*-------------------------------------------------------------
+ * MSG_FED_APPLY_FOLDER	
+ *-------------------------------------------------------------
+ *	GEN_ITEM_GROUP_APPLY_MSG ( word selection = cx,
+ * 			    	    word numSelections = bp,
+ *				    GenItemGroupStateFlags stateFlags = dl);
+ *	
+-------------------------------------------------------------*/
+// stop in foldered::FolderEdInteractionFED_APPLY_FOLDER
+@method FolderEdInteractionClass, MSG_FED_APPLY_FOLDER {
+GeosFileType 		fileType;
+FileAttrs		attrs;
+FileLongName		fileName;
+SelectedFilesStruct	*fileInfo;
+GeodeToken		tok;
+int			sel;
+
+
+    fileInfo = MemLock(g_mh);
+    strcpy(fileName, fileInfo->entry[selection].FOIE_name);
+    tok = FEDShowFolderToken(fileName,	
+    			fileInfo->header.FQTH_diskHandle,
+    			fileInfo->header.FQTH_pathname);
+    				
+    fileType = fileInfo->entry[selection].FOIE_type;
+    attrs = fileInfo->entry[selection].FOIE_attrs;
+    MemUnlock(g_mh);
+    
+    /* Redraw TokenGroup to remove possible artefacts */
+    @call @DialogObj(@FEDTopGroup)::MSG_GEN_SET_NOT_USABLE(VUM_DELAYED_VIA_UI_QUEUE);
+    @send @DialogObj(@FEDTopGroup)::MSG_GEN_SET_USABLE(VUM_NOW);
+
+    /* If currently no token selected, show currently used token in Tokenlist 
+     * This only happens at startup, but not when teh user selects another folder */
+    sel = @call @DialogObj(@FEDTokenList)::MSG_GEN_ITEM_GROUP_GET_SELECTION();    
+    if (sel==GIGS_NONE) FEDSelectToken(tok, TRUE);
+
+}
+
+
+/*+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+  +                                                                         +
+  +	Handle token list				            	    +
+  +	-----------------------				            	    +
+  +	- µµ					    +	
+  +                                                                         +
+  ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++*/
+
+
+/*-------------------------------------------------------------
+ * FEDSelectToken
+ *-------------------------------------------------------------
+ *	Select given Token in the tokenlist
+ *	selectFirst = TRUE: Select first list entry if token was not found 
+ * 			or is not displayed yet
+ *		      FALSE: Don't change selection in this case
+ *-------------------------------------------------------------*/
+void FEDSelectToken(GeodeToken tok, Boolean selectFirst) {
+TokenListStruct	*tokenList;
+int 	n, manufID, idx;
+Boolean found;
+
+		
+    tokenList = MemLock(g_tokenList);
+    found  = FALSE;
+    idx = 0;
+    manufID = tok.GT_manufID;
+    for ( n = 0; n < tokenList->tokenCount; n++ ) {
+    
+    	if (manufID != tokenList->token[n].GT_manufID) continue;
+    	
+    	if ( memcmp(&tok, &(tokenList->token[n]), sizeof(GeodeToken)) == 0 ) {
+    	    /*
+    	     * token found. See if currently displayed
+    	     * set found = TRUE and asign idx for this case
+    	     * leave idx = 0 and found = FALSE otherwise
+    	     */
+    	    if ( n < tokenList->firstIndex) break;
+    	    if ( n >= (tokenList->firstIndex + tokenList->tokensToShow)) break;
+    	    found = TRUE;
+    	    idx = n - tokenList->firstIndex;
+    	    break;
+    	}
+    }
+    MemUnlock(g_tokenList);
+    
+    /*
+     * Select proper list entry
+     */
+    if ( found || selectFirst) {
+	@send @DialogObj(@FEDTokenList)::MSG_GEN_ITEM_GROUP_SET_SINGLE_SELECTION(idx, FALSE);
+	@send @DialogObj(@FEDTokenList)::MSG_GEN_ITEM_GROUP_SET_MODIFIED_STATE(TRUE);
+	@send @DialogObj(@FEDTokenList)::MSG_GEN_APPLY();
+    }
+    
+
+}
+
+  
+/*-------------------------------------------------------------
+ * MSG_FED_QUERY_TOKEN_LIST	
+ *-------------------------------------------------------------
+ *	void GEN_DYNAMIC_LIST_QUERY_MSG (optr list, word item);
+ *	Update item moniker in the token list
+-------------------------------------------------------------*/
+// stop in foldered::FolderEdInteractionFED_QUERY_TOKEN_LIST
+@method FolderEdInteractionClass, MSG_FED_QUERY_TOKEN_LIST {
+TokenListStruct	*tokenList;
+GeodeToken tok;
+
+MemHandle  mh;
+word 	sizeRead;
+
+    tokenList = MemLock(g_tokenList);
+    tok = tokenList->token[item + tokenList->firstIndex];
+    MemUnlock(g_tokenList);
+    
+    mh = InternalGetTokenMonikerBlock(tok, g_displaySize, g_tokenStyle, &sizeRead);
+    if ( mh ) {
+	@call list::MSG_GEN_DYNAMIC_LIST_REPLACE_ITEM_MONIKER(item, 
+				0,40,64,sizeRead,
+				VMDT_VIS_MONIKER ,VMST_FPTR,(dword)MemLock(mh));
+	MemFree(mh);
+	}
+    else {
+    	/* IMHO this sould not happen */
+	@call list::MSG_GEN_DYNAMIC_LIST_REPLACE_ITEM_TEXT(item, "NOT found");
+	}	
+	
+}
+
+/*-------------------------------------------------------------
+ * MSG_FED_APPLY_TOKEN_LIST
+ *-------------------------------------------------------------
+ *	GEN_ITEM_GROUP_APPLY_MSG ( word selection = cx,
+ * 			    	    word numSelections = bp,
+ *				    GenItemGroupStateFlags stateFlags = dl);
+ *	
+-------------------------------------------------------------*/
+// stop in foldered::FolderEdInteractionFED_APPLY_TOKEN_LIST
+@method FolderEdInteractionClass, MSG_FED_APPLY_TOKEN_LIST {
+TokenListStruct	*tokenList;
+GeodeToken tok;
+
+    tokenList = MemLock(g_tokenList);
+    tok = tokenList->token[selection + tokenList->firstIndex];
+    g_selectedToken = tok;
+    MemUnlock(g_tokenList);
+
+
+    FEDShowToken(tok, @DialogObj(@TokenSelectedID), @DialogObj(@TokenNewStdDisplay), 
+    			@DialogObj(@TokenNewHuge), @DialogObj(@TokenNewTool));
+
+    /* Redraw TokenGroup to remove possible artefacts */
+    @call @DialogObj(@FEDTopGroup)::MSG_GEN_SET_NOT_USABLE(VUM_DELAYED_VIA_UI_QUEUE);
+    @send @DialogObj(@FEDTopGroup)::MSG_GEN_SET_USABLE(VUM_NOW);
+
+}
+
+/*-------------------------------------------------------------
+ * MSG_FED_APPLY_TOKEN_RANGE
+ *-------------------------------------------------------------
+ *	
+-------------------------------------------------------------*/
+// stop in foldered::FolderEdInteractionFED_APPLY_TOKEN_RANGE
+@method FolderEdInteractionClass, MSG_FED_APPLY_TOKEN_RANGE {
+TokenListStruct	*list;
+word minID, maxID, n;
+Boolean found;
+int		curIdx;
+GeodeToken	curToken;
+
+
+    /*
+     * Find out current selection an token 
+     */ 
+     curIdx = @call @DialogObj(@FEDTokenList)::MSG_GEN_ITEM_GROUP_GET_SELECTION(); 
+     if (curIdx == GIGS_NONE) curIdx = 0; 
+     list = MemLock(g_tokenList); 
+     curToken = list->token[curIdx + list->firstIndex]; 
+     MemUnlock(g_tokenList);
+	 
+
+    minID = @call @DialogObj(@FEDManufIDMinimumValue)::MSG_GEN_VALUE_GET_VALUE();
+    maxID = @call @DialogObj(@FEDManufIDMaximumValue)::MSG_GEN_VALUE_GET_VALUE();
+    if ( minID > maxID ) {
+    	word tmp = minID;
+    	minID=maxID;
+    	maxID=tmp;
+	@call @DialogObj(@FEDManufIDMinimumValue)::MSG_GEN_VALUE_SET_VALUE(minID, FALSE);
+	@call @DialogObj(@FEDManufIDMaximumValue)::MSG_GEN_VALUE_SET_VALUE(maxID, FALSE);
+	}
+	
+    list = MemLock(g_tokenList);
+
+    do {    
+	found = FALSE;
+	list->firstIndex = 0;
+	list->tokensToShow = 0;
+	
+	// find first index to display
+	for (n = 0; n < list->tokenCount; n++ ) {
+	    if (list->token[n].GT_manufID >= minID ) {
+		list->firstIndex = n;
+		found = TRUE;
+		break;
+		}
+	}
+ 	if ( !found ) break;		// minID too large
+ 	
+ 	// find number of token to display
+ 	list->tokensToShow = 0;
+ 	for (n = list->firstIndex; n < list->tokenCount; n++) {
+ 	    if (list->token[n].GT_manufID > maxID ) break;
+ 	    list->tokensToShow++;
+ 	    }
+ 	
+ 	} while(FALSE);
+    
+    // if there are no token to display, list->tokensToShow will be zero
+    // --> no extra handling required for the list
+    @send @DialogObj(@FEDTokenList)::MSG_GEN_DYNAMIC_LIST_INITIALIZE(list->tokensToShow);
+    @send @DialogObj(@FEDIconInfoDisplayed)::MSG_GEN_VALUE_SET_INTEGER_VALUE(list->tokensToShow, FALSE);
+
+    // ... but disable "Change Token" button and clear "new" token display
+    if (0==list->tokensToShow) {
+    	@send @DialogObj(@SelectOkTrigger)::MSG_GEN_SET_NOT_ENABLED(VUM_NOW);
+    	
+    	@call @DialogObj(@TokenSelectedID)::MSG_GEN_REPLACE_VIS_MONIKER_TEXT("",0);
+    	@call @DialogObj(@TokenNewStdDisplay)::MSG_GEN_REPLACE_VIS_MONIKER_TEXT("",0);
+    	@call @DialogObj(@TokenNewTool)::MSG_GEN_REPLACE_VIS_MONIKER_TEXT("",0);
+    	@call @DialogObj(@TokenNewHuge)::MSG_GEN_REPLACE_VIS_MONIKER_TEXT("",0);
+    	}
+    else {
+    	@send @DialogObj(@SelectOkTrigger)::MSG_GEN_SET_ENABLED(VUM_NOW);
+    	}
+
+
+    MemUnlock(g_tokenList);
+    
+    /* 
+     *	try to restore previously selected token
+     */
+    if (list->tokensToShow) FEDSelectToken(curToken, TRUE);
+
+
+    /* Redraw TokenGroup to remove possible artefacts */
+    @call @DialogObj(@FEDTopGroup)::MSG_GEN_SET_NOT_USABLE(VUM_DELAYED_VIA_UI_QUEUE);
+    @send @DialogObj(@FEDTopGroup)::MSG_GEN_SET_USABLE(VUM_NOW);
+/**/
+}
+
+
+
+/*-------------------------------------------------------------
+ * MSG_FED_APPLY_TOKEN_TYPE
+ *-------------------------------------------------------------
+ *	Select a new display size and toke style to display in list
+-------------------------------------------------------------*/
+// stop in foldered::FolderEdInteractionFED_APPLY_TOKEN_TYPE
+@method FolderEdInteractionClass, MSG_FED_APPLY_TOKEN_TYPE {
+TokenListStruct	*list;
+word curSel, count;
+
+    g_tokenStyle = @call @DialogObj(@FEDTokenStyleSelector)::MSG_GEN_ITEM_GROUP_GET_SELECTION();
+    g_displaySize = @call @DialogObj(@FEDDisplaySizeSelector)::MSG_GEN_ITEM_GROUP_GET_SELECTION();
+   
+    list = MemLock(g_tokenList);
+    count = list->tokensToShow;
+    MemUnlock(g_tokenList);
+    
+	/*
+	 * Update FEDTokenList and NewIcon UI
+	 */    
+    curSel = @call @DialogObj(@FEDTokenList)::MSG_GEN_ITEM_GROUP_GET_SELECTION();
+    @call @DialogObj(@FEDTokenList)::MSG_GEN_DYNAMIC_LIST_INITIALIZE(count);
+    @send @DialogObj(@FEDTokenList)::MSG_GEN_ITEM_GROUP_SET_SINGLE_SELECTION(curSel, FALSE);
+    @send @DialogObj(@FEDTokenList)::MSG_GEN_ITEM_GROUP_SET_MODIFIED_STATE(TRUE);
+    @send @DialogObj(@FEDTokenList)::MSG_GEN_APPLY();
+
+	/*
+	 * Update Token of selected folder
+	 */    
+    @send @DialogObj(@SelectFolderList)::MSG_GEN_ITEM_GROUP_SET_MODIFIED_STATE(TRUE);
+    @send @DialogObj(@SelectFolderList)::MSG_GEN_APPLY();
+ 
+}
+  
+
+/*+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+  +                                                                         +
+  +	Change tokens				            	    +
+  +                                                                         +
+  ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++*/
+
+/*-------------------------------------------------------------
+ * MSG_FED_CHANGE_TOKEN	
+ *-------------------------------------------------------------
+ *	void (void);
+ *	apply new token
+-------------------------------------------------------------*/
+// stop in foldered::FolderEdInteractionFED_CHANGE_TOKEN
+@method FolderEdInteractionClass, MSG_FED_CHANGE_TOKEN {
+GeosFileType 		fileType;
+FileAttrs		fileAttrs;
+FileLongName		fileName;
+SelectedFilesStruct	*fileInfo;
+word		 	selection;
+
+    FilePushDir();
+
+	/*
+	 * Enter path, load folderName and check if folder exists
+	 */
+    selection = @call @DialogObj(@SelectFolderList)::MSG_GEN_ITEM_GROUP_GET_SELECTION();	 
+    fileInfo = MemLock(g_mh);
+    FileSetCurrentPath(	fileInfo->header.FQTH_diskHandle,
+			fileInfo->header.FQTH_pathname);
+    strcpy(fileName, fileInfo->entry[selection].FOIE_name);
+    MemUnlock(g_mh);
+    
+    fileAttrs = FileGetAttributes(fileName);
+    if ( ThreadGetError() ) {
+    	// folder not found
+    	ErrorBoxOptr(@ErrorFileNotFound);
+    	FilePopDir();
+    	return;
+    }
+
+	/*
+	 * Depending on fileType, set new token
+	 */
+    FileGetPathExtAttributes (fileName, FEA_FILE_TYPE, &fileType, sizeof(GeosFileType));
+
+    switch (fileType) {
+	case GFT_DIRECTORY:
+	    FileSetPathExtAttributes (fileName, FEA_TOKEN, &g_selectedToken, sizeof(GeodeToken));
+	    break;
+  	case GFT_NOT_GEOS_FILE:
+  	    if ( fileAttrs & FA_SUBDIR ) {
+	    	FEDChangeDosFolderToken(fileName);
+	    break;
+  	    }
+	default: 
+	    // IMHO this should never happen
+	    ErrorBoxOptr(@ErrorChangeToken); 	    
+    }	   
+    
+    if ( ThreadGetError() )  { 
+    	ErrorBoxOptr(@ErrorChangeToken); 
+    }
+    else { 
+	MessageBoxOptr(@ChangeTokenOK); 
+	@send @DialogObj(@SelectFolderList)::MSG_GEN_ITEM_GROUP_SET_MODIFIED_STATE(TRUE);
+	@send @DialogObj(@SelectFolderList)::MSG_GEN_APPLY();
+    } 
+
+    
+    FilePopDir();
+    
+}
+
+
+/*-------------------------------------------------------------
+ * FEDChangeDosFolderToken
+ *-------------------------------------------------------------
+ *	Change the token for a folder without a dirname file
+-------------------------------------------------------------*/
+void FEDChangeDosFolderToken(char *fileName) {
+FileHandle fh;
+ProtocolNumber proto;
+GeosFileType type;
+
+    FilePushDir();
+    do {
+    	FileSetCurrentPath(0, fileName);
+    	if (ThreadGetError() ) break;
+    	
+	    /*
+	     * Create and set up a dirname file
+	     */
+	fh = FileCreate("@dirname.000",FILE_CREATE_TRUNCATE |
+			FILE_ACCESS_RW | FILE_DENY_RW,
+			0);
+	if ( fh == 0 ) break;
+	
+	proto.PN_major = 1; proto.PN_minor = 0;
+	type = GFT_DIRECTORY;
+	
+	FileSetHandleExtAttributes(fh,FEA_PROTOCOL, &proto,sizeof(ProtocolNumber));
+	FileSetHandleExtAttributes(fh,FEA_FILE_TYPE, &type,sizeof(GeosFileType));
+	FileSetHandleExtAttributes(fh,FEA_NAME, fileName,FILE_LONGNAME_BUFFER_SIZE);
+	FileSetHandleExtAttributes(fh,FEA_TOKEN, &g_selectedToken, sizeof(GeodeToken));
+    
+    	FileClose(fh, FALSE);
+    
+    } while(FALSE);
+    FilePopDir();
+}
+
+/*-------------------------------------------------------------
+ * MSG_FED_CLEAR_TOKEN	
+ *-------------------------------------------------------------
+ *	void (void);
+ *	Set all tokenchars and manufID to zero for this folder
+ *	This will force the file manager to use the default folder token
+-------------------------------------------------------------*/
+// stop in foldered::FolderEdInteractionFED_CLEAR_TOKEN
+@method FolderEdInteractionClass, MSG_FED_CLEAR_TOKEN {
+GeodeToken 	savedToken;
+int cmd;
+
+    cmd = QuestionBoxOptr(@QuestionClearToken);
+    if ( cmd != IC_YES) return;
+    /* 
+     * simply set selected token to zero and call the set-new-token handler
+     */
+    savedToken = g_selectedToken;
+    memset(&g_selectedToken, 0, sizeof(GeodeToken) );
+    @call oself::MSG_FED_CHANGE_TOKEN(); 
+    g_selectedToken = savedToken;
+    
+
+}
+
+/*+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+  +                                                                         +
+  +	CODE für WordValueClass				            	    +
+  +	-----------------------				            	    +
+  +	Simple implementation to display word sized values in the range	    +
+  +	from 0 to 65535. No decimal places etc. are supported.		    +
+  +									    +
+  +	Use MSG_GEN_VALUE_GET_VALUE to get the word value		    +
+  +	Use MSG_GEN_VALUE_SET_VALUE to set the word value		    +
+  +	Do not use the _INTEGER_ messages for this purposes.		    +
+  +                                                                         +
+  ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++*/
+
+@classdecl WordValueClass;
+
+
+/*      MSG_GEN_VALUE_GET_MAX_TEXT_LEN
+ *      Default handler is OK.
+ *      Parameter:      byte (void)
+ */
+/*
+@method WordValueClass, MSG_GEN_VALUE_GET_MAX_TEXT_LEN {
+UserStandardSound(SST_ERROR);	// debugging
+	return 10;
+	}
+
+/*      MSG_GEN_VALUE_GET_VALUE_TEXT
+ *      konvertiert ein Instance-Feld in einen Text-String
+ *      Parameter:      void ( char *buffer, GenValeType   valueType)
+ */
+
+@method WordValueClass, MSG_GEN_VALUE_GET_VALUE_TEXT {
+word    val;
+@callsuper();
+/* Lesen des angeforderten Instacne-Feldes */
+	switch (valueType) {
+		case GVT_VALUE: val = (pself->GVLI_value);
+						break;
+		case GVT_MINIMUM:       val = (pself->GVLI_minimum);
+						break;
+		case GVT_MAXIMUM:       val = (pself->GVLI_maximum);
+						break;
+		case GVT_INCREMENT:     val = (pself->GVLI_increment);
+						break;
+		case GVT_LONG:          val = 65000 ;
+						break;
+		default:        val = 65001;
+		}
+/* in Text konvertieren */
+	sprintf(buffer,"%u",val);
+}
+
+/*      MSG_GEN_VALUE_SET_VALUE_FROM_TEXT
+ *      Belegt ein instance-feld mit einem textual vorgegebenen Wert
+ *      Parameter:      void (char *text, GenValueType valueType )
+ */
+// stop in foldered::WordValueGEN_VALUE_SET_VALUE_FROM_TEXT
+@method WordValueClass, MSG_GEN_VALUE_SET_VALUE_FROM_TEXT {
+dword   erg;
+/* Text konvertieren */
+	erg =0;
+	while ( *text != 0 ) {
+		if ( *text == '-' )     {
+			@send oself::MSG_GEN_VALUE_SET_VALUE_TO_MINIMUM();
+			erg = 0;                /* Minimum */
+			break;
+			}
+// µµ			
+		// erg = erg*10; <<-- forces ansic protocol 1.008 which is not supported by 
+		// earlier PC/GEOS versions (4.13 e.g) --> platform statemet required
+		erg = (erg<<3) + (erg<<1);	// avoids platform statement
+		erg += (dword)(*text - '0');
+		text++;
+		}
+		if ( erg > 0xFFFF ) {
+				@send oself::MSG_GEN_VALUE_SET_VALUE_TO_MAXIMUM();
+				erg = 0xFFFF;
+				}
+/* Instance-Feld belegen */
+	switch (valueType) {
+		case GVT_VALUE: pself->GVLI_value = (dword)erg ;
+						break;
+		case GVT_MINIMUM:       pself->GVLI_minimum = (dword)erg;
+						break;
+		case GVT_MAXIMUM:       pself->GVLI_maximum = (dword)erg;
+						break;
+		case GVT_INCREMENT:     pself->GVLI_increment = (dword)erg;
+						break;
+		}
+}
+
