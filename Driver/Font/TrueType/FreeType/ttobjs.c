@@ -1091,8 +1091,10 @@
     /* freeing the name table */
     Free_TrueType_Names( face );
 
+#ifdef TT_CONFIG_OPTION_PROCESS_HDMX
     /* freeing the hdmx table */
     Free_TrueType_Hdmx( face );
+#endif
 
     return TT_Err_Ok;
   }
@@ -1166,10 +1168,14 @@
          LOAD_( OS2 )           ||
          LOAD_( PostScript )    ||
 
-         (error = Load_TrueType_Metrics_Header( face, 1 )) != TT_Err_Ok ||
+         (error = Load_TrueType_Metrics_Header( face, 1 )) != TT_Err_Ok
          /* try to load the 'vhea' & 'vmtx' at once if present */
 
-         LOAD_( Hdmx )          )
+#ifdef TT_CONFIG_OPTION_PROCESS_HDMX
+         || LOAD_( Hdmx ) 
+#endif         
+         
+         )
 
       goto Fail;
 

@@ -505,7 +505,9 @@
 
     TT_Postscript         postscript;           /* 'Post' table */
 
+#ifdef TT_CONFIG_OPTION_PROCESS_HDMX
     TT_Hdmx               hdmx;                 /* 'Hdmx' table */
+#endif
 
     TName_Table           nameTable;            /* name table */
 

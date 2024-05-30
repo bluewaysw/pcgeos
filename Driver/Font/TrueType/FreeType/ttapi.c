@@ -257,7 +257,10 @@ extern TEngine_Instance engineInstance;
 
     properties->os2          = &_face->os2;
     properties->postscript   = &_face->postscript;
+
+  #ifdef TT_CONFIG_OPTION_PROCESS_HDMX
     properties->hdmx         = &_face->hdmx;
+  #endif
 
     return TT_Err_Ok;
   }

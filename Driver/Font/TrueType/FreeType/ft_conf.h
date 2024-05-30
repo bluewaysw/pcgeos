@@ -158,6 +158,14 @@
 #define  TT_CONFIG_OPTION_THREAD_SAFE
 
 
+/*************************************************************************/
+/* Define TT_CONFIG_OPTION_PROCESS_HDMX if you want to process optional  */
+/* hdmx table. The PC/Geos ttf driver does not need any information from */
+/* the htmx table.                                                       */
+
+#undef  TT_CONFIG_OPTION_PROCESS_HDMX
+
+
 /**********************************************************************/
 /*                                                                    */
 /*  The following macros are used to define the debug level, as well  */

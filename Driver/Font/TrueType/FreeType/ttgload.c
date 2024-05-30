@@ -99,6 +99,7 @@
   }
 
 
+#ifdef TT_CONFIG_OPTION_PROCESS_HDMX
 /********************************************************/
 /* Return advance width table for a given pixel size    */
 /* if it is found in the font's `hdmx' table (if any).  */
@@ -115,6 +116,7 @@
 
     return NULL;
   }
+#endif
 
 
 /********************************************************/
@@ -1239,6 +1241,7 @@
       glyph->metrics.vertAdvance  = advance;
     }
 
+#ifdef TT_CONFIG_OPTION_PROCESS_HDMX
     /* Adjust advance width to the value contained in the hdmx table. */
     if ( !exec->face->postscript.isFixedPitch && instance &&
          subglyph->is_hinted )
@@ -1248,6 +1251,7 @@
       if ( widths )
         glyph->metrics.horiAdvance = widths[glyph_index] << 6;
     }
+#endif
 
     glyph->outline.dropout_mode = (Char)exec->GS.scan_type;
 
