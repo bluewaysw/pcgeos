@@ -462,20 +462,23 @@ void UpdateUIForSearchEnd()
     if (selection < 26)
     {
 		dh = DiskRegisterDiskSilently(selection);
-		if (!dh)
+		if (dh)
+		{
+			sprintf(buf, "%c:\\", selection + 65); // A=65
+			//(void) @call FileSelector::MSG_GEN_PATH_SET("\\", dh);
+			//if (@call FileSelector::MSG_GEN_FILE_SELECTOR_SET_FULL_SELECTION_PATH(buf, SP_NOT_STANDARD_PATH))
+			if (@call FileSelector::MSG_GEN_PATH_SET(buf, dh))
+			{
+				@send FFWarning::MSG_GEN_INTERACTION_INITIATE();
+				return;
+			}
+    		@call FFSearchTrigger::MSG_GEN_SET_ENABLED(VUM_NOW);
+		}
+		else
 		{
 			@send FFWarning::MSG_GEN_INTERACTION_INITIATE();
 			return;
 		}
-
-		sprintf(buf, "%c:\\", selection + 65); // A=65
-		//(void) @call FileSelector::MSG_GEN_PATH_SET("\\", dh);
-		(void) @call FileSelector::MSG_GEN_FILE_SELECTOR_SET_FULL_SELECTION_PATH(buf, 0);
-		//if (@call FileSelector::MSG_GEN_PATH_SET(buf, 0))
-		// {
-		// 	@send FFWarning::MSG_GEN_INTERACTION_INITIATE();
-		// 	return;
-		// }
 	}
 	else
 	{
@@ -489,11 +492,10 @@ void UpdateUIForSearchEnd()
 				@call FileSelector::MSG_GEN_PATH_SET(".", SP_TOP);
 			break;
 		}
+    	@call FFSearchTrigger::MSG_GEN_SET_ENABLED(VUM_NOW);
 	}
 
 	@call FileSelector::MSG_FFS_UPDATE_UI_CURRENT_PATH();
-    @call FFSearchTrigger::MSG_GEN_SET_ENABLED(VUM_NOW);
-
     return;
 }
 
@@ -504,8 +506,8 @@ void UpdateUIForSearchEnd()
  ***************************************************************************
  */
 
-char 		openPath[MAX_FILE_DIR_LEN];
-DiskHandle 	openPathToken;
+// char 		openPath[MAX_FILE_DIR_LEN];
+// DiskHandle 	openPathToken;
 
 /*
  *  MSG_VIS_OPEN
@@ -513,35 +515,35 @@ DiskHandle 	openPathToken;
  */
 @method FilterFileSelectorClass, MSG_VIS_OPEN
 {
-    char relativePath[MAX_FILE_DIR_LEN];
-    word len;
+    // char relativePath[MAX_FILE_DIR_LEN];
+    // word len;
 
 	/*
      *  Get the disk handle and relative path.
      */
-	@call FileSelector::MSG_GEN_PATH_GET(relativePath, MAX_FILE_DIR_LEN);
-	openPathToken = @call FileSelector::MSG_GEN_PATH_GET_DISK_HANDLE();
+	//@call FileSelector::MSG_GEN_PATH_GET(relativePath, MAX_FILE_DIR_LEN);
+	//openPathToken = @call FileSelector::MSG_GEN_PATH_GET_DISK_HANDLE();
 	@callsuper();
-    @call self::MSG_GEN_PATH_SET(relativePath, openPathToken);
+    //@call self::MSG_GEN_PATH_SET(relativePath, openPathToken);
 
     /*
      *  Get rid of starting or trailing '\'
      */
-    len = strlen(relativePath);
-    if (relativePath[0] == '\\')
-	{
-		strcpy (openPath, relativePath+1);
-    }
-    else if (
-		len > 2 &&
-	    relativePath[len-1] == '.' &&
-	    relativePath[len-2] == '\\'
-	)
-	{
-		strncpy(openPath, relativePath, len-2);
-    }
-    else
-		openPath[0] = '\0';
+    // len = strlen(relativePath);
+    // if (relativePath[0] == '\\')
+	// {
+	// 	strcpy (openPath, relativePath+1);
+    // }
+    // else if (
+	// 	len > 2 &&
+	//     relativePath[len-1] == '.' &&
+	//     relativePath[len-2] == '\\'
+	// )
+	// {
+	// 	strncpy(openPath, relativePath, len-2);
+    // }
+    // else
+	// 	openPath[0] = '\0';
 }
 
 /*  MSG_VIS_CLOSE
@@ -552,39 +554,40 @@ DiskHandle 	openPathToken;
 @method FilterFileSelectorClass, MSG_VIS_CLOSE
 {
     word len;
-    dword dhandleAndFlags;
-    DiskHandle pathToken;
-    char relativePath[MAX_FILE_DIR_LEN];
+    // dword dhandleAndFlags;
+    // DiskHandle pathToken;
+    // char relativePath[MAX_FILE_DIR_LEN];
 
     @callsuper();
 
     len = @call FFSearchText::MSG_VIS_TEXT_GET_TEXT_SIZE();
     if (len > 0)
 	{
-		dhandleAndFlags = @call self::MSG_GEN_FILE_SELECTOR_GET_FULL_SELECTION_PATH(relativePath);
-		pathToken = GFS_GET_FULL_SELECTION_PATH_DISK_HANDLE(dhandleAndFlags);
+		@send FFSearchTrigger::MSG_GEN_SET_ENABLED(VUM_DELAYED_VIA_UI_QUEUE);
 
-		len = strlen(relativePath);
-		if (pathToken != openPathToken)
-		{
-			@send FFSearchTrigger::MSG_GEN_SET_ENABLED(VUM_DELAYED_VIA_UI_QUEUE);
-			return;
-		}
-
-		if (relativePath[0] == '\\' && strcmp(relativePath+1, openPath) != 0)
-		{
-			@send FFSearchTrigger::MSG_GEN_SET_ENABLED(VUM_DELAYED_VIA_UI_QUEUE);
-		}
-		else if (
-			len > 2 &&
-			relativePath[len-1] == '.' &&
-			relativePath[len-2] == '\\' &&
-			strncmp(relativePath, openPath, len-2) != 0
-		)
-		{
-			@send FFSearchTrigger::MSG_GEN_SET_ENABLED(VUM_DELAYED_VIA_UI_QUEUE);
-		}
+		// dhandleAndFlags = @call self::MSG_GEN_FILE_SELECTOR_GET_FULL_SELECTION_PATH(relativePath);
+		// pathToken = GFS_GET_FULL_SELECTION_PATH_DISK_HANDLE(dhandleAndFlags);
+		// len = strlen(relativePath);
+		// if (pathToken != openPathToken)
+		// {
+		// 	@send FFSearchTrigger::MSG_GEN_SET_ENABLED(VUM_DELAYED_VIA_UI_QUEUE);
+		// 	return;
+		// }
+		// if (relativePath[0] == '\\' && strcmp(relativePath+1, openPath) != 0)
+		// {
+		// 	@send FFSearchTrigger::MSG_GEN_SET_ENABLED(VUM_DELAYED_VIA_UI_QUEUE);
+		// }
+		// else if (
+		// 	len > 2 &&
+		// 	relativePath[len-1] == '.' &&
+		// 	relativePath[len-2] == '\\' &&
+		// 	strncmp(relativePath, openPath, len-2) != 0
+		// )
+		// {
+		// 	@send FFSearchTrigger::MSG_GEN_SET_ENABLED(VUM_DELAYED_VIA_UI_QUEUE);
+		// }
     }
+
     return;
 }
 
