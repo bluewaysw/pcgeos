@@ -50,7 +50,7 @@ PASS:		cx - file op box chunk
 RETURN:		carry set if dismissed
 		carry clear otherwise
 
-DESTROYED:	
+DESTROYED:
 
 PSEUDO CODE/STRATEGY:
 
@@ -110,11 +110,11 @@ SYNOPSIS:	rename file(s) specified by dialog box
 
 CALLED BY:	MSG_META_END_RENAME
 
-PASS:		
+PASS:
 
-RETURN:		
+RETURN:
 
-DESTROYED:	
+DESTROYED:
 
 PSEUDO CODE/STRATEGY:
 
@@ -221,7 +221,7 @@ visibleDestFile:
 	je	updateNames			;	list
 	stc					; don't update names
 	jmp	finishUp
-		
+
 
 noError:
 	;
@@ -347,11 +347,11 @@ SYNOPSIS:	create directory/directories specified by dialog box
 
 CALLED BY:	MSG_META_END_CREATE_DIR
 
-PASS:		
+PASS:
 
-RETURN:		
+RETURN:
 
-DESTROYED:	
+DESTROYED:
 
 PSEUDO CODE/STRATEGY:
 
@@ -525,7 +525,7 @@ RETURN:		carry	set if string is blank (or null string)
 
 DESTROYED:	nothing
 
-SIDE EFFECTS:	
+SIDE EFFECTS:
 PSEUDO CODE/STRATEGY:
 
 REVISION HISTORY:
@@ -570,9 +570,9 @@ SYNOPSIS:	duplicate file(s) specified by dialog box
 
 CALLED BY:	MSG_FM_END_DUPLICATE
 
-PASS:		
+PASS:
 
-RETURN:		nothing 
+RETURN:		nothing
 
 DESTROYED:	ax,cx,dx,bp
 
@@ -619,10 +619,10 @@ DesktopEndDuplicate	method	dynamic DesktopClass, MSG_FM_END_DUPLICATE
 	;
 	mov	si, offset FileOperationUI:DuplicateToEntry
 	call	CallGetText			; get dest. filename
-;	jcxz	noDestNameGiven			
+;	jcxz	noDestNameGiven
 	tst	cx
 	LONG jz	noDestNameGiven
-	
+
 	; check if the destination has visible character
 	push	bx, ax
 	mov	bx, dx
@@ -679,7 +679,7 @@ visibleDestFile:
 	call	SuspendFolders
 
 	call	DeskFileCopy
-	
+
 	call	UnsuspendFolders
 	call	FileFlushChangeNotifications
 	jmp	short afterFileDup		; go to finish duplicate
@@ -825,7 +825,7 @@ CALLED BY:	MSG_DUPLICATE_NEXT
 
 PASS:		es	= segment of DesktopClass
 
-RETURN:		nothing 
+RETURN:		nothing
 
 DESTROYED:	ax,cx,dx,bp
 
@@ -872,7 +872,7 @@ CALLED BY:	MSG_FM_END_CHANGE_ATTR
 
 PASS:		es	= segment of DesktopClass
 
-RETURN:		nothing 
+RETURN:		nothing
 
 DESTROYED:	ax,cx,dx,bp
 
@@ -898,7 +898,7 @@ DesktopEndChangeAttr	method	dynamic DesktopClass, MSG_FM_END_CHANGE_ATTR
 	mov	si, offset FileOperationUI:ChangeAttrNameList
 	call	GetSrcFromFileListAndSetCurDir
 	jnc	doIt
-	
+
 	tst	ax
 	jz	exit
 	call	MemUnlock
@@ -911,7 +911,7 @@ doIt:
 	call	ShowFileOpStatus
 
 	;
-	; change attributes of file 
+	; change attributes of file
 	;	ss:[fileOperationInfoEntryBuffer] = source
 	;
 	call	SetNewFileAttributes		; cx = new attributes
@@ -1018,7 +1018,7 @@ flagsAttrs		local	GeosFileHeaderFlags
 	andnf	cl, not (mask FA_RDONLY or mask FA_ARCHIVE or \
 			 mask FA_HIDDEN or mask FA_SYSTEM)
 	mov	ss:[fileAttrs], cl
-	
+
 	;
 	; Get the File Attributes
 	;
@@ -1117,17 +1117,17 @@ COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 SYNOPSIS:	Set the UI for the existing set of attributes for the
-		file 
+		file
 
 CALLED BY:	ChangeAttrShowAttrs
 
 PASS:		cx - old FileAttrs
 
-RETURN:		nothing 
+RETURN:		nothing
 
 DESTROYED:	ax,cx,di,si,bp
 
-PSEUDO CODE/STRATEGY:	
+PSEUDO CODE/STRATEGY:
 
 KNOWN BUGS/SIDE EFFECTS/IDEAS:
 
@@ -1164,12 +1164,12 @@ SYNOPSIS:	Set the original file header flags
 CALLED BY:	ChangeAttrShowAttrs
 
 PASS:		ds:dx - filename
-		
-RETURN:		nothing 
+
+RETURN:		nothing
 
 DESTROYED:	ax,dx,si,di,bp
 
-PSEUDO CODE/STRATEGY:	
+PSEUDO CODE/STRATEGY:
 
 KNOWN BUGS/SIDE EFFECTS/IDEAS:
 
@@ -1199,7 +1199,7 @@ SetOldFileHeaderFlags	proc near
 	;
 	; If it's a document, then set the Template group enabled
 	;
-		
+
 		push	dx
 		mov	bx, handle ChangeFlagsToList
 		mov	si, offset ChangeFlagsToList
@@ -1241,11 +1241,11 @@ SYNOPSIS:	move to next file in Change Attributes dialog box
 
 CALLED BY:	MSG_CHANGE_ATTR_NEXT
 
-PASS:		
+PASS:
 
-RETURN:		
+RETURN:
 
-DESTROYED:	
+DESTROYED:
 
 PSEUDO CODE/STRATEGY:
 
@@ -1261,7 +1261,7 @@ REVISION HISTORY:
 DesktopChangeAttrNext	method	DesktopClass, MSG_CHANGE_ATTR_NEXT
 
 	; tell file list to show next file
-	
+
 	mov	cx, offset ChangeAttrBox
 	mov	dx, offset ChangeAttrNameList
 	mov	ax, MSG_FILE_OP_SKIP_FILE
@@ -1290,10 +1290,10 @@ CALLED BY:	ChangeAttrShowAttrs
 PASS:		nothing
 RETURN:		nothing
 DESTROYED:	nothing
-SIDE EFFECTS:	
+SIDE EFFECTS:
 
 PSEUDO CODE/STRATEGY:
-		
+
 
 REVISION HISTORY:
 	Name	Date		Description
@@ -1329,10 +1329,10 @@ CALLED BY:	ChangeAttrShowAttrs
 PASS:		nothing
 RETURN:		nothing
 DESTROYED:	nothing
-SIDE EFFECTS:	
+SIDE EFFECTS:
 
 PSEUDO CODE/STRATEGY:
-		
+
 
 REVISION HISTORY:
 	Name	Date		Description
@@ -1363,16 +1363,16 @@ COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 SYNOPSIS:	Show the attributes for this file
 
-CALLED BY:	DesktopChangeAttrNext, FolderStartChangeAttr, 
+CALLED BY:	DesktopChangeAttrNext, FolderStartChangeAttr,
 		TreeStartChangeAttr
 
-PASS:		nothing 
+PASS:		nothing
 
-RETURN:		nothing 
+RETURN:		nothing
 
 DESTROYED:	ax,bx,cx,dx,si,di,bp,ds,es
 
-PSEUDO CODE/STRATEGY:	
+PSEUDO CODE/STRATEGY:
 
 KNOWN BUGS/SIDE EFFECTS/IDEAS:
 
@@ -1447,7 +1447,7 @@ COMMENT @-------------------------------------------------------------------
 		DesktopEndChangeToken
 ----------------------------------------------------------------------------
 
-DESCRIPTION:	
+DESCRIPTION:
 
 CALLED BY:	GLOBAL
 PASS:		nothing
@@ -1460,7 +1460,7 @@ REVISION HISTORY:
 	martin	10/28/92   	Initial version
 
 ----------------------------------------------------------------------------@
-DesktopEndChangeToken	method dynamic DesktopClass, 
+DesktopEndChangeToken	method dynamic DesktopClass,
 					MSG_FM_END_CHANGE_TOKEN
 		.enter
 
@@ -1495,11 +1495,11 @@ doIt:
 		mov	bx, handle ChangeIconList
 		mov	si, offset ChangeIconList
 		mov	ax, MSG_ICON_LIST_GET_SELECTED
-		call	ObjMessageCall			
+		call	ObjMessageCall
 		mov	di, dx				; ax:cx:di = GeodeToken
 		pop	dx				; ds:dx = filename
 	;
-	; change token of file 
+	; change token of file
 	;	ss:[fileOperationInfoEntryBuffer] = source
 	;
 		mov	si, offset FileOperationUI:ChangeIconStatus
@@ -1531,10 +1531,10 @@ noError:
 ;		mov	ax, mask FWUF_RESCAN_SOURCE or 		\
 ;			    mask FWUF_DS_IS_FQT_BLOCK
 ;		call	MarkWindowForUpdate		; ds:dx = source name
-;		pop	cx				
+;		pop	cx
 ;		popf
 		jc	finishUp			; error -
-							; don't update name 
+							; don't update name
 updateNames:
 	;
 	; update name entries in change Icons dialog box
@@ -1558,7 +1558,7 @@ done:
 		call	MemUnlock
 
 		mov	ax, SP_TOP			; just go to
-							; top-level path 
+							; top-level path
 		call	FileSetStandardPath
 exit:
 		call	HideHourglass
@@ -1579,7 +1579,7 @@ COMMENT @-------------------------------------------------------------------
 		DesktopChangeTokenNext
 ----------------------------------------------------------------------------
 
-DESCRIPTION:	
+DESCRIPTION:
 
 CALLED BY:	GLOBAL
 
@@ -1593,7 +1593,7 @@ REVISION HISTORY:
 	martin	10/27/92   	Initial version
 
 ----------------------------------------------------------------------------@
-DesktopChangeTokenNext	method dynamic DesktopClass, 
+DesktopChangeTokenNext	method dynamic DesktopClass,
 					MSG_CHANGE_TOKEN_NEXT
 		.enter
 	;
@@ -1623,7 +1623,7 @@ COMMENT @-------------------------------------------------------------------
 DESCRIPTION:	Disable 'Next' button if no more files, set the
 		current Icon, and (in NewDeskBA) have the IconList only
 		show the appropriate icons based on the
-		NewDeskObjectType. 
+		NewDeskObjectType.
 
 CALLED BY:	INTERNAL - FolderStartChangeToken
 
@@ -1733,7 +1733,7 @@ COMMENT @-------------------------------------------------------------------
 
 DESCRIPTION:	Sets the ChangeIconList object in the change icon
 		dialog to use the proper list depending on the
-		NewDeskObjectType of the given file. 
+		NewDeskObjectType of the given file.
 
 CALLED BY:	INTERNAL - ChangeIconShowIcon
 
@@ -1762,7 +1762,7 @@ noError:
 	; Get proper list depending on type, quick solution for now...
 	; change to lookup table later.
 	;
-		clr	cx, dx				; assume all tokens	
+		clr	cx, dx				; assume all tokens
 		cmp	ax, WOT_TEACHER_COURSE
 		jne	next1
 		mov	dx, handle ClassIconLookupTable
@@ -1804,11 +1804,11 @@ SYNOPSIS:	move to next file in get info list
 
 CALLED BY:	MSG_GET_INFO_NEXT, MSG_GET_INFO_OK
 
-PASS:		
+PASS:
 
-RETURN:		
+RETURN:
 
-DESTROYED:	
+DESTROYED:
 
 PSEUDO CODE/STRATEGY:
 
@@ -1881,7 +1881,7 @@ PASS:		nothing
 RETURN:		carry clear if a file was shown
 		carry set if no more files
 
-DESTROYED:	
+DESTROYED:
 
 PSEUDO CODE/STRATEGY:
 
@@ -1969,7 +1969,7 @@ doIt:
 	;
 	; ds:dx	= FileOperationInfoEntry
 	; handle of block containing same pushed on the stack
-	; 
+	;
 	; get DOS file info:
 	; 	- allocate a block to hold the extended attributes and the
 	;	  descriptors by which we get them
@@ -2030,7 +2030,7 @@ FXIP<	pop	ds							>
 	segmov	ds, es
 	;
 	; Set up DOSName field.
-	; 
+	;
 	mov	si, offset GIS_dosName
 SBCS <	mov	cx, size GIS_dosName-1					>
 DBCS <	mov	cx, size GIS_dosName					>
@@ -2076,7 +2076,7 @@ notVM:
 	call	ObjMessageCall
 	;
 	; Put up owner, if known, else "-"
-	; 
+	;
 	call	PointAndInitGetInfoBuffer	; dx:bp <- infoBuffer thingy
 	tst	ds:[GIS_owner][0]		; owner known?
 	jz	setInfoOwner			; no
@@ -2174,7 +2174,7 @@ printSize:
 
 if 0
 	; I'm tired of seeing this damn compilation message!
-		
+
 PrintMessage <need a FileInUse? function to do this now>
 	;
 	; show file busy state
@@ -2364,11 +2364,11 @@ CALLED BY:	ShowCurrentGetInfoFile
 
 PASS:		ds:0 - GetInfoStruct
 
-RETURN:		nothing 
+RETURN:		nothing
 
 DESTROYED:	ax,bx,cx,dx
 
-PSEUDO CODE/STRATEGY:	
+PSEUDO CODE/STRATEGY:
 
 KNOWN BUGS/SIDE EFFECTS/IDEAS:
 	allocates 400 bytes on the stack!
@@ -2432,7 +2432,7 @@ done:
 notUsable:
 	mov	ax, MSG_GEN_SET_NOT_USABLE
 	call	callIt
-	jmp	done	
+	jmp	done
 
 
 	;
@@ -2459,14 +2459,14 @@ SYNOPSIS:	point to the getInfo buffer, and initialize it to
 
 CALLED BY:	ShowCurrentGetInfoFile
 
-PASS:		nothing 
+PASS:		nothing
 
 RETURN:		es:di, dx:bp - pointing to getInfoStringBuffer (in
-		dgroup)  
+		dgroup)
 
-DESTROYED:	nothing 
+DESTROYED:	nothing
 
-PSEUDO CODE/STRATEGY:	
+PSEUDO CODE/STRATEGY:
 
 KNOWN BUGS/SIDE EFFECTS/IDEAS:
 
@@ -2569,7 +2569,7 @@ GetInfoTokenCommon	endp
 ;
 ; Find the text moniker for a creator token in the DB. Much faster than
 ; questing after the application itself...
-; 
+;
 GetNameFromTokenDB	proc	near
 	uses	ax, bx, dx, si, di, bp, ds
 	.enter
@@ -2621,11 +2621,11 @@ CALLED BY:	ShowCurrentGetInfoFile, GetInfoCheckLink
 PASS:		ax - chunk handle of text object
 		dx:bp - pointer to text
 
-RETURN:		nothing 
+RETURN:		nothing
 
 DESTROYED:	ax,bx,cx,dx,bp
 
-PSEUDO CODE/STRATEGY:	
+PSEUDO CODE/STRATEGY:
 
 KNOWN BUGS/SIDE EFFECTS/IDEAS:
 
@@ -2661,7 +2661,7 @@ PASS:		cx:dx = text object
 
 RETURN:		nothing
 
-DESTROYED:	
+DESTROYED:
 
 PSEUDO CODE/STRATEGY:
 
@@ -2714,7 +2714,7 @@ PASS:		nothing
 
 RETURN:		nothing
 
-DESTROYED:	
+DESTROYED:
 
 PSEUDO CODE/STRATEGY:
 
@@ -2834,9 +2834,9 @@ CALLED BY:	MSG_DRIVETOOL_INTERNAL
 
 PASS:		cl = drive number
 
-RETURN:		nothing 
+RETURN:		nothing
 
-DESTROYED:	
+DESTROYED:
 
 PSEUDO CODE/STRATEGY:
 
@@ -2937,9 +2937,9 @@ CALLED BY:	MSG_NEW_TREE_DRIVE
 
 PASS:		cx = identifier of DriveLetter object which got clicked
 
-RETURN:		
+RETURN:
 
-DESTROYED:	
+DESTROYED:
 
 PSEUDO CODE/STRATEGY:
 
@@ -3172,9 +3172,9 @@ CALLED BY:	MSG_DRIVETOOL_QT_INTERNAL
 PASS:		cx:dx = OD of DriveTool object which got QuickTransfer
 		bp = mem handle of block of filenames
 
-RETURN:		
+RETURN:
 
-DESTROYED:	
+DESTROYED:
 
 PSEUDO CODE/STRATEGY:
 
@@ -3221,9 +3221,9 @@ CALLED BY:	MSG_DESKTOOL_QT_INTERNAL
 PASS:		cx:dx = OD of DeskTool object which got QuickTransfer
 		bp = mem handle of block of filenames
 
-RETURN:		
+RETURN:
 
-DESTROYED:	
+DESTROYED:
 
 PSEUDO CODE/STRATEGY:
 
@@ -3256,7 +3256,7 @@ DesktopDeskToolQTInternal	method	DesktopClass,
 wasteBasket:
 	call	WastebasketDeleteFiles
 	call	MemFree				; free up file list (bx)
-	
+
 done:
 	ret
 DesktopDeskToolQTInternal	endm
@@ -3274,9 +3274,9 @@ CALLED BY:	MSG_DIRTOOL_QT_INTERNAL
 PASS:		cx:dx = OD of DirTool object which got QuickTransfer
 		bp = mem handle of block of filenames
 
-RETURN:		
+RETURN:
 
-DESTROYED:	
+DESTROYED:
 
 PSEUDO CODE/STRATEGY:
 
@@ -3381,7 +3381,7 @@ PASS:		bx = filelist mem. block handle
 
 RETURN:		(frees file list block)
 
-DESTROYED:	
+DESTROYED:
 
 PSEUDO CODE/STRATEGY:
 
@@ -3539,7 +3539,7 @@ DBCS <	repne	scasw							>
 	cld					; reset direction flag to 0
 	segxchg	ds, es				; swap these
 	mov	si, di
-	inc	si				; this points ds:si to the 
+	inc	si				; this points ds:si to the
 	inc	si				;  path of the Waste Basket
 DBCS <	inc	si							>
 DBCS <	inc	si							>
@@ -3622,11 +3622,11 @@ CALLED BY:	INTERNAL
 			DesktopEndMove
 			DesktopEndDuplicate
 
-PASS:		
+PASS:
 
-RETURN:		
+RETURN:
 
-DESTROYED:	
+DESTROYED:
 
 PSEUDO CODE/STRATEGY:
 
@@ -3655,14 +3655,14 @@ ChangeToFileOpSrcDir	proc
 	call	GetAndExtractPathFromVolPath
 	;
 	; Set that as our current path.
-	; 
+	;
 	xchg	bx, cx
 ;	mov	ss:[folderUpdateSrcDiskHandle], bx	; save for update
 	mov	dx, si			; ds:dx <- path to set
 	call	FileSetCurrentPath
 	;
 	; Free the path block, preserving the carry, of course.
-	; 
+	;
 	mov	bx, cx
 	pushf
 	call	MemFree
@@ -3692,7 +3692,7 @@ GetAndExtractPathFromVolPath	proc	near
 
 	;
 	; Lock down the returned path block.
-	; 
+	;
 	mov	bx, dx
 	call	MemLock
 	mov	ds, ax
@@ -3859,7 +3859,7 @@ RETURN:		carry	= set on error
 				-or-
 			ax = zero if we couldn't get the last file
 				bx = *not* a handle of a block, so don't unlock!
-				
+
 		carry	= clear if directory set.
 			ds:dx	= FileOperationInfoEntry for the file
 			bx	= handle of block to unlock when done
@@ -3867,10 +3867,10 @@ RETURN:		carry	= set on error
 DESTROYED:	cx
 
 PSEUDO CODE/STRATEGY:
-		
+
 
 KNOWN BUGS/SIDE EFFECTS/IDEAS:
-		
+
 
 REVISION HISTORY:
 	Name	Date		Description
@@ -3889,7 +3889,7 @@ GetSrcFromFileListAndSetCurDir proc	near
 	;  dlitwin 5/19/93:  ...but is seems that a case where no file is left
 	; to process when the user does a jackhammer like pressing of the action
 	; button, so don't fatal error, instead return carry set and ax = zero.
-	; 
+	;
 		mov	bx, handle FileOperationUI
 		mov	ax, MSG_GET_CURRENT_FILE
 		call	ObjMessageCall
@@ -3898,7 +3898,7 @@ GetSrcFromFileListAndSetCurDir proc	near
 
 	; Lock the block down and copy the current file into
 	; fileOperationInfoEntryBuffer, in case something somewhere needs it
-	; 
+	;
 		mov	bx, cx
 		call	MemLock
 		mov	ds, ax
@@ -3909,7 +3909,7 @@ GetSrcFromFileListAndSetCurDir proc	near
 		rep	movsb
 	;
 	; Now switch to the directory described in the header.
-	; 
+	;
 		push	bx, dx
 		mov	bx, ds:[FQTH_diskHandle]
 		mov	dx, offset FQTH_pathname
@@ -3939,10 +3939,10 @@ RETURN:		carry set if no more files
 DESTROYED:	ax, cx, dx, bp, si, di, es
 
 PSEUDO CODE/STRATEGY:
-		
+
 
 KNOWN BUGS/SIDE EFFECTS/IDEAS:
-		
+
 
 REVISION HISTORY:
 	Name	Date		Description
@@ -3958,7 +3958,7 @@ CopyMoveSourceSetUp	proc	near
 	mov	ax, MSG_GET_CURRENT_FILE
 	call	ObjMessageCall			; ^hcx:dx <- FOIE
 	jc	exit				; => no more files to do
-	
+
 	mov	bx, cx
 	call	MemLock
 	mov	ds, ax
@@ -4042,11 +4042,11 @@ CALLED BY:	DesktopRenameNext,
 PASS:		ax - chunk handle of "Next" button
 		si - chunk handle of file list
 
-RETURN:		nothing 
+RETURN:		nothing
 
 DESTROYED:	ax,bx,cx,dx,si,di,bp
 
-PSEUDO CODE/STRATEGY:	
+PSEUDO CODE/STRATEGY:
 
 KNOWN BUGS/SIDE EFFECTS/IDEAS:
 
@@ -4080,7 +4080,7 @@ COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 		ChangeDestNameCharacteristics
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-SYNOPSIS:	
+SYNOPSIS:
 
 CALLED BY:	RenameStuff, DuplicateStuff
 
@@ -4095,14 +4095,14 @@ PASS:		si - source name file list
 
 RETURN:		carry CLEAR if successful
 			fileOperationInfoEntryBuffer - filled with
-			next file		
+			next file
 
 		carry SET if no more names
 
 
-DESTROYED:	nothing 
+DESTROYED:	nothing
 
-PSEUDO CODE/STRATEGY:	
+PSEUDO CODE/STRATEGY:
 
 KNOWN BUGS/SIDE EFFECTS/IDEAS:
 
@@ -4150,7 +4150,7 @@ if not _DOS_LONG_NAME_SUPPORT
 	;
 	; Set the maximum destination filename length.  If the thing
 	; being copied is a subdir, then always allow 32-character
-	; filenames. 
+	; filenames.
 	;
 
 	mov	cx, FILE_LONGNAME_LENGTH	; assume longname
@@ -4334,7 +4334,7 @@ FXIP <		push	bp						>
 FXIP <		mov	bp, sp			;dx:bp = null string	>
 	call	ObjMessageCallFixup
 FXIP <		pop	ax			;restore the stack	>
-		
+
 	;
 	; disable destination name entry so user doesn't get to enter
 	; a name and then see it overwritten by the default destination name
@@ -4374,13 +4374,13 @@ SYNOPSIS:	Update the destination name field characteristics for
 
 CALLED BY:	DesktopDuplicateNext, TreeStartDuplicate
 
-PASS:		nothing 
+PASS:		nothing
 
-RETURN:		nothing 
+RETURN:		nothing
 
-DESTROYED:	nothing 
+DESTROYED:	nothing
 
-PSEUDO CODE/STRATEGY:	
+PSEUDO CODE/STRATEGY:
 
 KNOWN BUGS/SIDE EFFECTS/IDEAS:
 
@@ -4450,7 +4450,7 @@ if not DBCS_PCGEOS
 	;
 	; Funky DOS char mapped to funky geos char sequence; drop all three
 	; chars on the floor.
-	; 
+	;
 EC <	lodsb								>
 EC <	tst	al							>
 EC <	ERROR_Z	GOT_INVALID_NAME_FROM_FILE_ENUM				>
@@ -4466,7 +4466,7 @@ NEC <	inc	si							>
 NEC <	inc	si							>
 endif
 	jmp	copyLoop
-store:	
+store:
 	LocalPutChar esdi, ax
 	loop	copyLoop
 	LocalPrevChar esdi			; erase 8th char
@@ -4490,18 +4490,18 @@ extLoop:
 
 longName:
 	;
-	; handle longname - prefix with "Copy of " (localized)
+	; handle longname - append "(Copy)" (localized)
 	;	ss:bp = longname
 	;
 	push	ds, es
-	sub	sp, 30+FILE_LONGNAME_LENGTH	; room for prefix & fname
+	sub	sp, 30+FILE_LONGNAME_LENGTH	; room for template & fname
 	segmov	es, ss				; es:di = buffer
 	mov	di, sp
-	GetResourceHandleNS	Dup32PrefixString, bx
+	GetResourceHandleNS	Dup32TemplateString, bx
 	call	MemLock
-	mov	ds, ax				; ds = prefix segment
-	mov	si, offset Dup32PrefixString
-	mov	si, ds:[si]			; si = prefix string
+	mov	ds, ax				; ds = template segment
+	mov	si, offset Dup32TemplateString
+	mov	si, ds:[si]			; si = template string
 	clr	cx
 charLoop:
 	LocalGetChar ax, dssi
@@ -4650,7 +4650,7 @@ CALLED BY:	INTERNAL
 PASS:		ax:bx = start of next filename is list
 		si = text object for filename list
 
-RETURN:		
+RETURN:
 
 DESTROYED:	nothing
 
@@ -4805,7 +4805,7 @@ PASS:		cx - number of files
 
 RETURN:		preserves es, di
 
-DESTROYED:	
+DESTROYED:
 
 PSEUDO CODE/STRATEGY:
 
@@ -4948,9 +4948,9 @@ endif
 ; NAME: 	CallGetText
 ; PASS: 	nothing
 ; RETURN: 	cx = length of text
-;			if cx != 0, 
+;			if cx != 0,
 ;	  	dx = handle of block containing text
-; 
+;
 CallGetText	proc	near
 
 	mov	bx, handle FileOperationUI

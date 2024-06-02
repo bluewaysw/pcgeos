@@ -21,23 +21,79 @@
 #include "ttpath.h"
 #include "ttcharmapper.h"
 #include <ec.h>
+#include <win.h>
 
+
+/*
+ * macros
+ */
+
+#define WW_FIXED_TO_WWFIXEDASDWORD( value )     ( (dword) ( (((dword)value.WWF_int) << 16) | value.WWF_frac ) )
+
+#define ROUND_WWFIXED( value )    ( value & 0xffff ? ( value >> 16 ) + 1 : value >> 16 )
+
+/*
+ * types
+ */
+
+typedef void  Function_MoveTo( Handle han, TT_Vector* vec );
+
+typedef void  Function_LineTo( Handle han, TT_Vector* vec );
+
+typedef void  Function_ConicTo( Handle han, TT_Vector* v_control, TT_Vector* vec );
+
+
+/*
+ * structures
+ */
+
+typedef struct 
+{
+      Function_MoveTo  _near * Proc_MoveTo;
+      Function_LineTo  _near * Proc_LineTo;
+      Function_ConicTo _near * Proc_ConicTo;
+} RenderFunctions;
+
+
+/*
+ * prototypes
+ */
 
 static void CalcTransformMatrix( TransMatrix*    transMatrix, 
                                  WWFixedAsDWord  pointSize, 
                                  TextStyle       stylesToImplement );
 
-static void ConvertOutline( GStateHandle gstate, TT_Outline* outline );
+static void ConvertOutline( Handle            handle, 
+                            TT_Outline*       outline, 
+                            RenderFunctions*  functions );
 
-static void MoveTo( GStateHandle gstate, TT_Vector* vec );
+static void _near MoveTo( Handle handle, TT_Vector* vec );
 
-static void LineTo( GStateHandle gstate, TT_Vector* vec );
+static void _near RegionPathMoveTo( Handle handle, TT_Vector* vec );
 
-static void ConicTo( GStateHandle gstate, TT_Vector* v_control, TT_Vector* vec );
+static void _near LineTo( Handle handle, TT_Vector* vec );
+
+static void _near RegionPathLineTo( Handle handle, TT_Vector* vec );
+
+static void _near ConicTo( Handle handle, TT_Vector* v_control, TT_Vector* vec );
+
+static void _near RegionPathConicTo( Handle handle, TT_Vector* v_control, TT_Vector* vec );
 
 static void WriteComment( TRUETYPE_VARS, GStateHandle gstate );
 
 static void ScaleOutline( TRUETYPE_VARS );
+
+static void InitDriversTransformMatrix( TRUETYPE_VARS,
+                                        TransformMatrix*  transMatrix,
+                                        FontHeader*       fontHeader,
+                                        WWFixedAsDWord    pointSize,
+                                        TextStyle         stylesToImplement,
+                                        Byte              width,
+                                        Byte              weight );
+
+static void CalcDriversTransformMatrix( TransformMatrix* transformMatrix, 
+                                        GStateHandle gstate, 
+                                        WindowHandle win );
 
 
 /********************************************************************
@@ -54,11 +110,12 @@ static void ScaleOutline( TRUETYPE_VARS );
  *                *fontInfo             Pointer to FontInfo structure.
  *                *outlineEntry         Ptr. to outline entry containing 
  *                                      TrueTypeOutlineEntry.
+ *                *firstEntry           Ptr. to outline entry containing
+ *                                      FontHeader.
+ *                stylesToImplement     Text styles to be added.
  *                varBlock              Memory handle to var block.
  * 
- * RETURNS:       void 
- * 
- * STRATEGY:      
+ * RETURNS:       void  
  * 
  * REVISION HISTORY:
  *      Date      Name      Description
@@ -84,6 +141,7 @@ void _pascal TrueType_Gen_Path(
         WWFixedAsDWord         pointSize;
         XYValueAsDWord         cursorPos;
         word                   baseline;
+        RenderFunctions        renderFunctions;
 
 
 EC(     ECCheckGStateHandle( gstate ) );
@@ -112,6 +170,8 @@ EC(     ECCheckBounds( (void*)fontHeader ) );
 
         /* get TT char index */
         charIndex = TT_Char_Index( CHAR_MAP, GeosCharToUnicode( character ) );
+        if( charIndex == 0 )
+                goto Fail;
 
         /* write prologue */
         if( pathFlags & FGPF_SAVE_STATE )
@@ -163,15 +223,23 @@ EC(     ECCheckBounds( (void*)fontHeader ) );
         /* calculate transformation matrix and apply it */
         CalcTransformMatrix( &transMatrix, pointSize, stylesToImplement );
         GrApplyTransform( gstate, &transMatrix );
+
+        /* set render functions */
+        renderFunctions.Proc_MoveTo  = MoveTo;
+        renderFunctions.Proc_LineTo  = LineTo;
+        renderFunctions.Proc_ConicTo = ConicTo;
         
         /* convert outline into GrDraw...() calls */
-        ConvertOutline( gstate, &OUTLINE);
+        ConvertOutline( gstate, &OUTLINE, &renderFunctions );
 
         /* write epilogue */
         if( pathFlags & FGPF_SAVE_STATE )
                 GrRestoreState( gstate );
 
         TT_Done_Glyph( GLYPH );
+
+Fail:
+        TrueType_Unlock_Face( trueTypeVars );
 Fin:
         MemUnlock( varBlock );
 }
@@ -180,13 +248,20 @@ Fin:
 /********************************************************************
  *                      TrueType_Gen_In_Region
  ********************************************************************
- * SYNOPSIS:	  
+ * SYNOPSIS:	  Draw outline of the given charcode to region.
  * 
- * PARAMETERS:    
+ * PARAMETERS:    gstate                Hande of gstate. 
+ *                handle                Handle of region path.
+ *                character             Character to build (GEOS Char).
+ *                *fontInfo             Pointer to FontInfo structure.
+ *                *outlineEntry         Ptr. to outline entry containing 
+ *                                      TrueTypeOutlineEntry.
+ *                *firstEntry           Ptr. to outline entry containing
+ *                                      FontHeader.
+ *                stylesToImplement     Text styles to be added.
+ *                varBlock              Memory handle to var block.
  * 
- * RETURNS:       
- * 
- * STRATEGY:      
+ * RETURNS:       void
  * 
  * REVISION HISTORY:
  *      Date      Name      Description
@@ -199,13 +274,23 @@ void _pascal TrueType_Gen_In_Region(
                         Handle               regionPath,
                         word                 character,
                         WWFixedAsDWord       pointSize,
+                        byte                 width,
+                        byte                 weight,
 			const FontInfo*      fontInfo, 
                         const OutlineEntry*  outlineEntry,
+                        const OutlineEntry*  firstEntry,
+                        TextStyle            stylesToImplement,
                         MemHandle            varBlock )
 {
         TrueTypeVars*          trueTypeVars;
+        FontHeader*            fontHeader;
         TrueTypeOutlineEntry*  trueTypeOutline;
         TT_UShort              charIndex;
+        RenderFunctions        renderFunctions;
+        TransformMatrix        transform;
+        XYValueAsDWord         cursorPos;
+        XYValueAsDWord         result;
+        TT_Matrix              flipMatrix = HORIZONTAL_FLIP_MATRIX;
 
 
 EC(     ECCheckGStateHandle( gstate ) );
@@ -220,23 +305,48 @@ EC(     ECCheckBounds( (void*)trueTypeVars ) );
         trueTypeOutline = LMemDerefHandles( MemPtrToHandle( (void*)fontInfo ), outlineEntry->OE_handle );
 EC(     ECCheckBounds( (void*)trueTypeOutline ) );
 
-        /* open face, create instance and glyph */
+        /* get pointer to FontHeader */
+        fontHeader = LMemDerefHandles( MemPtrToHandle( (void*)fontInfo ), firstEntry->OE_handle );
+EC(     ECCheckBounds( (void*)fontHeader ) );
+
+        /* open face, create instance */
         if( TrueType_Lock_Face(trueTypeVars, trueTypeOutline) )
                 goto Fin;
 
-        TT_New_Glyph( FACE, &GLYPH );
+        /* get TT char index */
+        charIndex = TT_Char_Index( CHAR_MAP, GeosCharToUnicode( character ) );
+        if( charIndex == 0 )
+                goto Fail;
 
+        /* load glyph */
+        TT_New_Glyph( FACE, &GLYPH );
         TT_Load_Glyph( INSTANCE, GLYPH, charIndex, 0 );
         TT_Get_Glyph_Outline( GLYPH, &OUTLINE );
 
-        /* get TT char index */
-        charIndex = TT_Char_Index( CHAR_MAP, GeosCharToUnicode( character ) );
+        /* store font matrix */
+        InitDriversTransformMatrix( trueTypeVars, &transform, fontHeader, pointSize, stylesToImplement, width, weight );
+        CalcDriversTransformMatrix( &transform, gstate, GrGetWinHandle( gstate ) );
 
-        //TODO: render glyph as regionpath
+        /* get current cursor position */
+        cursorPos = GrGetCurPos( gstate );
+        result = GrTransform( gstate, DWORD_X(cursorPos), DWORD_Y(cursorPos) );
+        
+        /* transform glyphs outline */
+        TT_Transform_Outline( &OUTLINE, &transform.TM_matrix );
+        TT_Transform_Outline( &OUTLINE, &flipMatrix );
+        TT_Translate_Outline( &OUTLINE, DWORD_X(result) + transform.TM_heightX + transform.TM_scriptX, 
+                                        DWORD_Y(result) + transform.TM_heightY + transform.TM_scriptY );
+        /* set render functions */
+        renderFunctions.Proc_MoveTo  = RegionPathMoveTo;
+        renderFunctions.Proc_LineTo  = RegionPathLineTo;
+        renderFunctions.Proc_ConicTo = RegionPathConicTo;
 
-Fail:
+        ConvertOutline( regionPath, &OUTLINE, &renderFunctions );
+
         TT_Done_Glyph( GLYPH );
 
+Fail:
+        TrueType_Unlock_Face( trueTypeVars );
 Fin:
         MemUnlock( varBlock );
 }
@@ -247,13 +357,12 @@ Fin:
  ********************************************************************
  * SYNOPSIS:	  Convert glyphs outline into GrDraw..() calls.
  * 
- * PARAMETERS:    gstate                GStateHande in which the outline 
- *                                      of the character is written.
+ * PARAMETERS:    handle                GStateHande or RegionPathHandle
+ *                                      in which the outline of 
+ *                                      character is written.
  *                *outline              Ptr. to glyphs outline.
  * 
  * RETURNS:       void
- * 
- * STRATEGY:      
  * 
  * REVISION HISTORY:
  *      Date      Name      Description
@@ -263,7 +372,7 @@ Fin:
 
 #define CURVE_TAG_ON            0x01
 #define CURVE_TAG_CONIC         0x00
-static void ConvertOutline( GStateHandle gstate, TT_Outline* outline )
+static void ConvertOutline( Handle handle, TT_Outline* outline, RenderFunctions* functions )
 {
         TT_Vector   v_last;
         TT_Vector   v_control;
@@ -279,7 +388,6 @@ static void ConvertOutline( GStateHandle gstate, TT_Outline* outline )
 
 
 EC(     ECCheckBounds( (void*)outline ) );
-EC(     ECCheckGStateHandle( gstate ) );
 
         last = -1;
         for ( n = 0; n < outline->n_contours; ++n )
@@ -319,7 +427,7 @@ EC(     ECCheckGStateHandle( gstate ) );
                 --tags;
         }
 
-        MoveTo( gstate, &v_start );
+        (*functions->Proc_MoveTo)( handle, &v_start );
 
         while ( point < limit )
         {
@@ -330,7 +438,7 @@ EC(     ECCheckGStateHandle( gstate ) );
                 {
                         case CURVE_TAG_ON:
                         {
-                                LineTo( gstate, point );
+                                (*functions->Proc_LineTo)( handle, point );
                                 continue;
                         }
 
@@ -353,26 +461,26 @@ EC(     ECCheckGStateHandle( gstate ) );
 
                                         if (  *tags & CURVE_TAG_ON )
                                         {
-                                                ConicTo( gstate, &v_control, &vec );
+                                                (*functions->Proc_ConicTo)( handle, &v_control, &vec );
                                                 continue;
                                         }
 
                                         v_middle.x = ( v_control.x + vec.x ) >> 1;
                                         v_middle.y = ( v_control.y + vec.y ) >> 1;
 
-                                        ConicTo( gstate, &v_control, &v_middle );
+                                        (*functions->Proc_ConicTo)( handle, &v_control, &v_middle );
 
                                         v_control = vec;
                                         goto Do_Conic;
                                 }
 
-                                ConicTo( gstate, &v_control, &v_start );
+                                (*functions->Proc_ConicTo)( handle, &v_control, &v_start );
                                 break;
                         }
                 }
 
                 /* close the contour with a line segment */
-                LineTo( gstate, &v_start );
+                (*functions->Proc_LineTo)( handle, &v_start );
         }
 }
 
@@ -382,12 +490,11 @@ EC(     ECCheckGStateHandle( gstate ) );
  ********************************************************************
  * SYNOPSIS:	  Change current position.
  * 
- * PARAMETERS:    gstate                Handle in which the position is changed.
+ * PARAMETERS:    handle                GStateHandle in which current 
+ *                                      position is changed.
  *                *vec                  Ptr to Vector to new position.
  * 
- * RETURNS:       void
- * 
- * STRATEGY:      
+ * RETURNS:       void 
  * 
  * REVISION HISTORY:
  *      Date      Name      Description
@@ -395,9 +502,32 @@ EC(     ECCheckGStateHandle( gstate ) );
  *      18/11/23  JK        Initial Revision
  *******************************************************************/
 
-static void MoveTo( GStateHandle gstate, TT_Vector* vec )
+static void _near MoveTo( Handle handle, TT_Vector* vec )
 {
-        GrMoveTo( gstate, vec->x, vec->y );
+        GrMoveTo( (GStateHandle) handle, vec->x, vec->y );
+}
+
+
+/********************************************************************
+ *                      RegionPathMoveTo
+ ********************************************************************
+ * SYNOPSIS:	  Change current position.
+ * 
+ * PARAMETERS:    handle                Handle to region path in which 
+ *                                      current position is changed.
+ *                *vec                  Ptr to Vector to new position.
+ * 
+ * RETURNS:       void
+ * 
+ * REVISION HISTORY:
+ *      Date      Name      Description
+ *      ----      ----      -----------
+ *      14/03/24  JK        Initial Revision
+ *******************************************************************/
+
+static void _near RegionPathMoveTo( Handle handle, TT_Vector* vec )
+{
+        GrRegionPathMovePen( handle, vec->x, vec->y );
 }
 
 
@@ -406,12 +536,11 @@ static void MoveTo( GStateHandle gstate, TT_Vector* vec )
  ********************************************************************
  * SYNOPSIS:	  Draw line to given position.
  * 
- * PARAMETERS:    gstate                Handle in which the line is drawed.
+ * PARAMETERS:    handle                GStateHandle in which the line 
+ *                                      is drawed.
  *                *vec                  Ptr. to Vector of end position.
  * 
- * RETURNS:       void
- * 
- * STRATEGY:      
+ * RETURNS:       void 
  * 
  * REVISION HISTORY:
  *      Date      Name      Description
@@ -419,9 +548,32 @@ static void MoveTo( GStateHandle gstate, TT_Vector* vec )
  *      18/11/23  JK        Initial Revision
  *******************************************************************/
 
-static void LineTo( GStateHandle gstate, TT_Vector* vec )
+static void _near LineTo( Handle handle, TT_Vector* vec )
 {
-        GrDrawLineTo( gstate, vec->x, vec->y );
+        GrDrawLineTo( (GStateHandle) handle, vec->x, vec->y );
+}
+
+
+/********************************************************************
+ *                      RegionPathLineTo
+ ********************************************************************
+ * SYNOPSIS:	  Draw line to given position.
+ * 
+ * PARAMETERS:    handle                Handle to region path in which 
+ *                                      the line is drawed.
+ *                *vec                  Ptr. to Vector of end position.
+ * 
+ * RETURNS:       void
+ * 
+ * REVISION HISTORY:
+ *      Date      Name      Description
+ *      ----      ----      -----------
+ *      14/03/24  JK        Initial Revision
+ *******************************************************************/
+
+static void _near RegionPathLineTo( Handle handle, TT_Vector* vec )
+{
+        GrRegionPathDrawLineTo( handle, vec->x, vec->y );
 }
 
 
@@ -430,13 +582,12 @@ static void LineTo( GStateHandle gstate, TT_Vector* vec )
  ********************************************************************
  * SYNOPSIS:	  Draw conic curve to given position.
  * 
- * PARAMETERS:    gstate                Handle in which the curve is drawed.
+ * PARAMETERS:    handle                GStateHandle in which the curve 
+ *                                      is drawed.
  *                *v_control            Vector with control point.
  *                *vec                  Vector of new position.
  * 
  * RETURNS:       void
- * 
- * STRATEGY:      
  * 
  * REVISION HISTORY:
  *      Date      Name      Description
@@ -444,7 +595,7 @@ static void LineTo( GStateHandle gstate, TT_Vector* vec )
  *      18/11/23  JK        Initial Revision
  *******************************************************************/
 
-static void ConicTo( GStateHandle gstate, TT_Vector* v_control, TT_Vector* vec )
+static void _near ConicTo( Handle handle, TT_Vector* v_control, TT_Vector* vec )
 {
         Point p[3];
 
@@ -454,7 +605,39 @@ static void ConicTo( GStateHandle gstate, TT_Vector* v_control, TT_Vector* vec )
         p[1].P_x = p[2].P_x = vec->x;
         p[1].P_y = p[2].P_y = vec->y;
 
-        GrDrawCurveTo( gstate, p );
+        GrDrawCurveTo( (GStateHandle) handle, p );
+}
+
+
+/********************************************************************
+ *                      RegionPathConicTo
+ ********************************************************************
+ * SYNOPSIS:	  Draw conic curve to given position.
+ * 
+ * PARAMETERS:    handle                Handle to region path in which 
+ *                                      the curve is drawed.
+ *                *v_control            Vector with control point.
+ *                *vec                  Vector of new position.
+ * 
+ * RETURNS:       void
+ * 
+ * REVISION HISTORY:
+ *      Date      Name      Description
+ *      ----      ----      -----------
+ *      14/03/24  JK        Initial Revision
+ *******************************************************************/
+
+static void _near RegionPathConicTo( Handle handle, TT_Vector* v_control, TT_Vector* vec )
+{
+        Point p[3];
+
+
+        p[0].P_x = v_control->x;
+        p[0].P_y = v_control->y;
+        p[1].P_x = p[2].P_x = vec->x;
+        p[1].P_y = p[2].P_y = vec->y;
+
+        GrRegionPathDrawCurveTo( handle, p );
 }
 
 
@@ -469,8 +652,6 @@ static void ConicTo( GStateHandle gstate, TT_Vector* v_control, TT_Vector* vec )
  *                stylesToImplement     Styles that must be added.
  * 
  * RETURNS:       void
- * 
- * STRATEGY:      
  * 
  * REVISION HISTORY:
  *      Date      Name      Description
@@ -534,9 +715,6 @@ static void CalcTransformMatrix( TransMatrix*    transMatrix,
                 transMatrix->TM_e21.WWF_frac = FractionOf( shearFactor );
                 transMatrix->TM_e21.WWF_int  = IntegerOf( shearFactor );
         }
-
-        //TODO:
-        //width & weight einarbeiten
 }
 
 
@@ -550,8 +728,6 @@ static void CalcTransformMatrix( TransMatrix*    transMatrix,
  *                                      is written.
  * 
  * RETURNS:       void   
- * 
- * STRATEGY:      
  * 
  * REVISION HISTORY:
  *      Date      Name      Description
@@ -587,8 +763,6 @@ static void WriteComment( TRUETYPE_VARS, GStateHandle gstate )
  * 
  * RETURNS:       void   
  * 
- * STRATEGY:      
- * 
  * REVISION HISTORY:
  *      Date      Name      Description
  *      ----      ----      -----------
@@ -604,3 +778,157 @@ static void ScaleOutline( TRUETYPE_VARS )
 
         TT_Transform_Outline( &OUTLINE, &scaleMatrix );
 }
+
+
+/********************************************************************
+ *                      InitDriversTransformMatrix
+ ********************************************************************
+ * SYNOPSIS:	  Initialize fontdrivers transform matrix with pointsize, 
+ *                stytes to implement, width and weight.
+ * 
+ * PARAMETERS:    TRUETYPE_VARS         Cached variables needed by driver.
+ *                *transmatrix          Ptr. to drivers transformation 
+ *                                      matrix to fill.
+ *                *fontHeader           Ptr to FontHeader structure.
+ *                pointsize             Desired point size.
+ *                stylesToImplement     Styles that must be added.
+ *                width                 Desired glyph width.
+ *                weight                Desired glyph weight.
+ * 
+ * RETURNS:       void   
+ * 
+ * REVISION HISTORY:
+ *      Date      Name      Description
+ *      ----      ----      -----------
+ *      19/02/23  JK        Initial Revision
+ *******************************************************************/
+
+static void InitDriversTransformMatrix( TRUETYPE_VARS,
+                                        TransformMatrix*  transMatrix,
+                                        FontHeader*       fontHeader,
+                                        WWFixedAsDWord    pointSize,
+                                        TextStyle         stylesToImplement,
+                                        Byte              width,
+                                        Byte              weight )
+{
+        WWFixedAsDWord scaleFactor;
+
+
+EC(     ECCheckBounds( (void*)transMatrix ) );
+EC(     ECCheckBounds( (void*)trueTypeVars ) );
+
+
+        /* calculate scale factor for pointsize */
+        scaleFactor = GrUDivWWFixed( pointSize, MakeWWFixed( UNITS_PER_EM ) );
+
+        /* initilize drivers tranformation matrix */
+        transMatrix->TM_matrix.xx = scaleFactor;
+        transMatrix->TM_matrix.xy = 0L;
+        transMatrix->TM_matrix.yx = 0L;
+        transMatrix->TM_matrix.yy = scaleFactor;
+        transMatrix->TM_heightX   = 0L;
+        transMatrix->TM_heightY   = ROUND_WWFIXED( SCALE_WORD( fontHeader->FH_ascent + fontHeader->FH_accent, scaleFactor ) ) + BASELINE_CORRECTION;
+        transMatrix->TM_scriptX   = 0L;
+        transMatrix->TM_scriptY   = 0L;
+
+        /* fake bold style       */
+        if( stylesToImplement & TS_BOLD )
+                transMatrix->TM_matrix.xx = GrMulWWFixed( BOLD_FACTOR, transMatrix->TM_matrix.xx );
+
+        /* fake italic style       */
+        if( stylesToImplement & TS_ITALIC )
+                transMatrix->TM_matrix.yx = NEGATVE_ITALIC_FACTOR;
+
+        /* width and weight */
+        if( width != FWI_MEDIUM )
+                transMatrix->TM_matrix.xx = MUL_100_WWFIXED( transMatrix->TM_matrix.xx, width );
+
+        if( weight != FW_NORMAL )
+                transMatrix->TM_matrix.xx = MUL_100_WWFIXED( transMatrix->TM_matrix.xx, weight );
+
+        /* fake script style      */
+        if( stylesToImplement & ( TS_SUBSCRIPT | TS_SUPERSCRIPT ) )
+        {      
+                WWFixedAsDWord scriptBaseline = GrMulWWFixed( MakeWWFixed( fontHeader->FH_height + fontHeader->FH_baseAdjust ), scaleFactor ); 
+
+
+                transMatrix->TM_matrix.xx = GrMulWWFixed( transMatrix->TM_matrix.xx, SCRIPT_FACTOR );
+                transMatrix->TM_matrix.yy = GrMulWWFixed( transMatrix->TM_matrix.yy, SCRIPT_FACTOR );
+
+                if( stylesToImplement & TS_SUBSCRIPT )
+                {
+                        //TODO: Is rounding necessary here?
+                        transMatrix->TM_scriptY = GrMulWWFixed( scriptBaseline, SUBSCRIPT_OFFSET ) >> 16;
+                }
+                else
+                {
+                        //TODO: Is rounding necessary here?
+                        transMatrix->TM_scriptY = ( GrMulWWFixed( scriptBaseline, SUPERSCRIPT_OFFSET ) - 
+                                                GrMulWWFixed( WORD_TO_WWFIXEDASDWORD( fontHeader->FH_accent + fontHeader->FH_ascent + fontHeader->FH_baseAdjust ), scaleFactor ) >> 16 );
+                }
+        }
+
+}
+
+
+/********************************************************************
+ *                      CalcDriversTransformMatrix
+ ********************************************************************
+ * SYNOPSIS:	  Calculate fontmatrix for rotation and document scale.
+ * 
+ * PARAMETERS:    *transformMatrix      Ptr. to drivers tranformation 
+ *                                      matrix to fill.
+ *                gstate                GStateHande to get graphics 
+ *                                      transformation matrix.
+ *                win                   WindowHandle to get windows
+ *                                      transformation matrix.
+ * 
+ * RETURNS:       void   
+ * 
+ * REVISION HISTORY:
+ *      Date      Name      Description
+ *      ----      ----      -----------
+ *      26/04/24  JK        Initial Revision
+ *******************************************************************/
+
+static void CalcDriversTransformMatrix( TransformMatrix* transformMatrix, GStateHandle gstate, WindowHandle win )
+{
+        TransMatrix     windowMatrix;
+        TransMatrix     graphicMatrix;
+        WWFixedAsDWord  temp_e11, temp_e12, temp_e21, temp_e22;
+
+
+EC(     ECCheckBounds( transformMatrix ) );
+EC(     ECCheckGStateHandle( gstate) );
+EC(     ECCheckWindowHandle( win ) );
+
+
+        WinGetTransform( win, &windowMatrix );
+        GrGetTransform( gstate, &graphicMatrix );
+
+
+        temp_e11 = GrMulWWFixed( transformMatrix->TM_matrix.xx, WWFIXED_TO_WWFIXEDASDWORD( graphicMatrix.TM_e11 ) ) 
+                        + GrMulWWFixed( transformMatrix->TM_matrix.xy, WWFIXED_TO_WWFIXEDASDWORD( graphicMatrix.TM_e21 ) );
+        temp_e12 = GrMulWWFixed( transformMatrix->TM_matrix.xx, WWFIXED_TO_WWFIXEDASDWORD( graphicMatrix.TM_e12 ) ) 
+                        + GrMulWWFixed( transformMatrix->TM_matrix.xy, WWFIXED_TO_WWFIXEDASDWORD( graphicMatrix.TM_e22 ) );
+        temp_e21 = GrMulWWFixed( transformMatrix->TM_matrix.yx, WWFIXED_TO_WWFIXEDASDWORD( graphicMatrix.TM_e11 ) ) 
+                        + GrMulWWFixed( transformMatrix->TM_matrix.yy, WWFIXED_TO_WWFIXEDASDWORD( graphicMatrix.TM_e21 ) );
+        temp_e22 = GrMulWWFixed( transformMatrix->TM_matrix.yx, WWFIXED_TO_WWFIXEDASDWORD( graphicMatrix.TM_e12 ) ) 
+                        + GrMulWWFixed( transformMatrix->TM_matrix.yy, WWFIXED_TO_WWFIXEDASDWORD( graphicMatrix.TM_e22 ) );
+
+        transformMatrix->TM_matrix.xx = GrMulWWFixed( temp_e11, WWFIXED_TO_WWFIXEDASDWORD( windowMatrix.TM_e11 ) ) 
+                        + GrMulWWFixed( temp_e12, WWFIXED_TO_WWFIXEDASDWORD( windowMatrix.TM_e21 ) );
+        transformMatrix->TM_matrix.xy = GrMulWWFixed( temp_e11, WWFIXED_TO_WWFIXEDASDWORD( windowMatrix.TM_e12 ) ) 
+                        + GrMulWWFixed( temp_e12, WWFIXED_TO_WWFIXEDASDWORD( windowMatrix.TM_e22 ) );
+        transformMatrix->TM_matrix.yx = GrMulWWFixed( temp_e21, WWFIXED_TO_WWFIXEDASDWORD( windowMatrix.TM_e11 ) ) 
+                        + GrMulWWFixed( temp_e22, WWFIXED_TO_WWFIXEDASDWORD( windowMatrix.TM_e21 ) );
+        transformMatrix->TM_matrix.yy = GrMulWWFixed( temp_e21, WWFIXED_TO_WWFIXEDASDWORD( windowMatrix.TM_e12 ) ) 
+                        + GrMulWWFixed( temp_e22, WWFIXED_TO_WWFIXEDASDWORD( windowMatrix.TM_e22 ) );
+
+
+        transformMatrix->TM_heightX = INTEGER_OF_WWFIXEDASDWORD( GrMulWWFixed( 
+                        WORD_TO_WWFIXEDASDWORD( transformMatrix->TM_heightY ), WWFIXED_TO_WWFIXEDASDWORD( graphicMatrix.TM_e21 ) ) );
+        transformMatrix->TM_heightY = INTEGER_OF_WWFIXEDASDWORD( GrMulWWFixed( 
+                        WORD_TO_WWFIXEDASDWORD( transformMatrix->TM_heightY ), WWFIXED_TO_WWFIXEDASDWORD( graphicMatrix.TM_e22 ) ) );
+}
+

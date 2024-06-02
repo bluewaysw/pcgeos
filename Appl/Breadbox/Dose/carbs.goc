@@ -1,0 +1,1092 @@
+/***********************************************************************
+ *
+ *
+ * PROJECT:	Insulin Dose Calculator
+ * MODULE:	Dose
+ * FILE:		carbs.goc
+ * AUTHOR:	jfh  4/04
+ *
+ * DESCRIPTION:
+ *
+ *
+ *
+ *
+ *
+ *
+ ***********************************************************************/
+
+/*
+ ***************************************************************************
+ *		Include files
+ ***************************************************************************
+ */
+
+@include "dose.goh"
+@include "externs.goh"
+
+word	g_dlWidth = 0;
+word	g_numOnScreen = 0;
+
+/*
+ ***************************************************************************
+ *		Code for GenCarbsPrimaryClass
+ ***************************************************************************
+ */
+
+@classdecl GenCarbsPrimaryClass;
+
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_GEN_DISPLAY_CLOSE for GenCarbsPrimaryClass
+ *
+ * DESCRIPTION:	Close the carbs view screen & bring back the main
+ *
+ *
+ ***********************************************************************/
+@method GenCarbsPrimaryClass, MSG_GEN_DISPLAY_CLOSE
+{
+ VMFileHandle	vmfh;
+
+
+	/* close the file opened when we came on screen */
+	vmfh = @call CarbsDList::MSG_CARBS_GET_CARBS_FILEHANDLE();
+	if (vmfh) {
+		VMClose(vmfh, 0);
+		}
+
+	@call DosePrimary::MSG_GEN_SET_USABLE(VUM_DELAYED_VIA_APP_QUEUE);
+	@call self::MSG_GEN_SET_NOT_USABLE(VUM_NOW);
+	/* Don’t call the superclass or the application will detach! */
+	@send DosePrimary::MSG_META_GRAB_TARGET_EXCL();
+	@send DosePrimary::MSG_META_GRAB_FOCUS_EXCL();
+
+}
+
+/*
+ ***************************************************************************
+ *		Code for CarbsGenDynamicListClass
+ ***************************************************************************
+ */
+
+@classdecl CarbsGenDynamicListClass;
+
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_CARBS_OPEN_CARBS for CarbsGenDynamicListClass
+ *
+ * DESCRIPTION:
+ *
+ *
+ ***********************************************************************/
+@method CarbsGenDynamicListClass, MSG_CARBS_OPEN_CARBS
+{
+ VMBlockHandle		mapbh;
+ MemHandle			mh;
+ CarbsMapStruct	*carbsMapPtr;
+
+
+	/* open the file */
+	FilePushDir();
+	if (g_onOG || g_onZ) SetPCCard();
+	else FileSetStandardPath(SP_USER_DATA);
+	pself->CGDLI_fileHandle = VMOpen("carbs.vm",
+					 VMAF_FORCE_READ_WRITE,
+					 VMO_OPEN,
+					 0);
+	/* check for error */
+	if (!pself->CGDLI_fileHandle)  {
+		if (ThreadGetError() == VM_FILE_NOT_FOUND)
+			NotifyDBox(0, @CFileNotFoundMsg);
+		else
+			NotifyDBox(0, @CFileOpenErrMsg);
+		FilePopDir();
+		return;
+		}
+
+	/* get the map block */
+	mapbh = VMGetMapBlock(pself->CGDLI_fileHandle);
+	carbsMapPtr = VMLock(pself->CGDLI_fileHandle, mapbh, &mh);
+
+	pself->CGDLI_numCarbRecs = HugeArrayGetCount(pself->CGDLI_fileHandle,
+													carbsMapPtr->CMS_carbsBlockHan);
+
+	VMUnlock(mh);
+
+	@send CarbsDList::MSG_GEN_DYNAMIC_LIST_INITIALIZE(pself->CGDLI_numCarbRecs);
+
+	/* put it on the screen */
+   /* make allowances for OG vs desktop */
+	if (g_onOG){
+		@call CarbsPrimary::MSG_GEN_SET_USABLE(VUM_DELAYED_VIA_APP_QUEUE);
+		@call DosePrimary::MSG_GEN_SET_NOT_USABLE(VUM_NOW);
+		/* gotta do this to get the target & focus to the list */
+		@send CarbsPrimary::MSG_META_GRAB_TARGET_EXCL();
+		@send CarbsPrimary::MSG_META_GRAB_FOCUS_EXCL();
+		@send CarbsGroup::MSG_META_GRAB_TARGET_EXCL();
+		@send CarbsGroup::MSG_META_GRAB_FOCUS_EXCL();
+		@send CarbsDList::MSG_META_GRAB_TARGET_EXCL();
+		@send CarbsDList::MSG_META_GRAB_FOCUS_EXCL();
+		g_dlWidth = 215;
+		g_numOnScreen = 6;
+		}
+	else {
+		@send CarbsDBox::MSG_GEN_INTERACTION_INITIATE();
+		if (g_onZ) {
+			g_dlWidth = 215;
+			g_numOnScreen = 6;
+			}
+		else {
+			g_dlWidth = 400;
+			g_numOnScreen = 9;
+			}
+		}
+
+	@send CarbsDList::MSG_GEN_ITEM_GROUP_SET_SINGLE_SELECTION(0, FALSE);
+
+	/* REMEMBER - we're leaving the file open while the carbs view is
+   	on the screen */
+
+
+}
+
+/*-------------------------------------------------------------------------
+ | Method:  CarbsGenDynamicListClass::MSG_CARBS_DLIST_MONIKER_QUERY
+ *-------------------------------------------------------------------------
+ |
+ | Description:
+ |    Get the information for a single list item
+ |
+ | Inputs:
+ |    optr list                   -- Which list needs the moniker
+ |    word item                   -- What item on the list is needed
+ |
+ | Revision History:
+ |    Who  Date:     Comments:
+ |    ---  --------  ---------
+ |    jfh  04/20/04  Created
+ |
+ *-----------------------------------------------------------------------*/
+typedef struct {
+	char					DS_dataStr[250];
+} DataStruct;
+
+@method CarbsGenDynamicListClass, MSG_CARBS_DLIST_MONIKER_QUERY
+{
+ MemHandle			mh;
+ CarbsMapStruct	*carbsMapPtr;
+ VMBlockHandle		mapbh;
+ DataStruct			*p_data;
+ char					foodStr[FOOD_MAX], portionStr[PORTION_MAX], carbsStr[CARBS_MAX];
+ MemHandle			mem;
+ GStateHandle		gstate;
+ ChunkHandle		chunk;
+ word					len, i, whichStr, foodTab, width, numChars;
+
+
+	/* get the map & huge array block */
+	mapbh = VMGetMapBlock(pself->CGDLI_fileHandle);
+	carbsMapPtr = VMLock(pself->CGDLI_fileHandle, mapbh, &mh);
+
+	HugeArrayLock(pself->CGDLI_fileHandle, carbsMapPtr->CMS_carbsBlockHan,(dword)item, (void **) &p_data, &len);
+
+	/* extract the strings */
+	whichStr = 0;
+	for (i = 0; i < len; i++) {
+		if (p_data->DS_dataStr[i] == '\t') {
+			if (!whichStr) {
+				strncpy(foodStr, p_data->DS_dataStr, i);
+				foodStr[i] = 0;
+				foodTab = i;
+				whichStr++;
+				}
+			else  {
+				strncpy(portionStr, &p_data->DS_dataStr[foodTab + 1], i - foodTab - 1);
+				portionStr[i - foodTab - 1] = 0;
+				strncpy(carbsStr, &p_data->DS_dataStr[i + 1], len - i - 1);
+				carbsStr[len - i - 1] = 0;
+				break;
+				}
+			}
+		}
+
+	HugeArrayUnlock(p_data);
+	VMUnlock(mh);
+
+	/* set up the mem and gstate */
+	mem = MemAllocLMem(LMEM_TYPE_GSTRING, 0) ;
+	gstate = GrCreateGString(mem, GST_CHUNK, (unsigned short __far *) &chunk);
+	if (!g_onOG && !g_onZ)
+		GrSetFont(gstate, FID_DTC_URW_SANS, MakeWWFixed(12));
+
+	/* food item */
+	width = GrTextWidth(gstate, foodStr, strlen(foodStr));
+	if(width > g_dlWidth - 15)  {
+		/* truncate text and add ellipsis */
+		while (width > (g_dlWidth - 15 - /*eWidth*/10)) {
+			numChars = strlen(foodStr);
+			foodStr[numChars - 1] = 0;
+			width = GrTextWidth(gstate, foodStr, strlen(foodStr));
+			}
+		strcat(foodStr, "...");
+		}
+	GrDrawText(gstate, 0, 0, foodStr, 0) ;
+
+	/* portion */
+	width = GrTextWidth(gstate, portionStr, strlen(portionStr));
+	if(width > g_dlWidth - 90)  {
+		/* truncate text and add ellipsis */
+		while (width > (g_dlWidth - 90 - /*eWidth*/10)) {
+			numChars = strlen(portionStr);
+			portionStr[numChars - 1] = 0;
+			width = GrTextWidth(gstate, portionStr, strlen(portionStr));
+			}
+		strcat(portionStr, "...");
+		}
+	GrDrawText(gstate, 20, 16, portionStr, 0) ;
+
+	/* and a horiz line */
+	GrSetLineWidth(gstate, MakeWWFixed(1));
+	if (g_onOG || g_onZ)
+		GrDrawHLine(gstate, 0, 29, g_dlWidth);  /* L, B, R */
+	else
+		GrDrawHLine(gstate, 0, 30, g_dlWidth);  /* L, B, R */
+
+	/* carbs */
+	width = GrTextWidth(gstate, carbsStr, strlen(carbsStr));
+	GrDrawText(gstate, g_dlWidth - 25 - width, 16, carbsStr, 0) ;
+
+	/* terminate the gstring */
+	GrEndGString(gstate) ;
+	/* tell the DList */
+	@call list::MSG_GEN_DYNAMIC_LIST_REPLACE_ITEM_MONIKER(
+				  item,
+				  0,
+				  30,				/* height */
+				  g_dlWidth,	/* width */
+				  0,
+				  VMDT_GSTRING,
+				  VMST_OPTR,
+				  ConstructOptr(mem, chunk));
+
+	/* and 86 the gstate and mem */
+	GrDestroyGString(gstate, gstate, GSKT_KILL_DATA);
+	MemFree(mem);
+
+}
+
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_CARBS_CLOSE_CARBS for CarbsGenDynamicListClass
+ *
+ * DESCRIPTION:
+ *
+ *
+ ***********************************************************************/
+@method CarbsGenDynamicListClass, MSG_CARBS_CLOSE_CARBS
+{
+
+	/* close the file opened when we came on screen */
+	if (pself->CGDLI_fileHandle) VMClose(pself->CGDLI_fileHandle, 0);
+
+}
+
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_CARBS_OPEN_CARBS_DETAILS for CarbsGenDynamicListClass
+ *
+ * DESCRIPTION:
+ *
+ *
+ ***********************************************************************/
+@method CarbsGenDynamicListClass, MSG_CARBS_OPEN_CARBS_DETAILS
+{
+ MemHandle			mh;
+ CarbsMapStruct	*carbsMapPtr;
+ VMBlockHandle		mapbh;
+ DataStruct			*p_data;
+ char					foodStr[FOOD_MAX], portionStr[PORTION_MAX], carbsStr[CARBS_MAX];
+ word					len, i, whichStr, foodTab, item;
+
+
+	/* make sure there's a selection */
+	if (!pself->CGDLI_numCarbRecs) return;
+	item = @call self::MSG_GEN_ITEM_GROUP_GET_SELECTION();
+
+	/* get the map & huge array block */
+	mapbh = VMGetMapBlock(pself->CGDLI_fileHandle);
+	carbsMapPtr = VMLock(pself->CGDLI_fileHandle, mapbh, &mh);
+
+	HugeArrayLock(pself->CGDLI_fileHandle, carbsMapPtr->CMS_carbsBlockHan,(dword)item, (void **) &p_data, &len);
+	/* extract the strings */
+	whichStr = 0;
+	for (i = 0; i < len; i++) {
+		if (p_data->DS_dataStr[i] == '\t') {
+			if (!whichStr) {
+				strncpy(foodStr, p_data->DS_dataStr, i);
+				foodStr[i] = 0;
+				foodTab = i;
+				whichStr++;
+				}
+			else  {
+				strncpy(portionStr, &p_data->DS_dataStr[foodTab + 1], i - foodTab - 1);
+				portionStr[i - foodTab - 1] = 0;
+				strncpy(carbsStr, &p_data->DS_dataStr[i + 1], len - i - 1);
+				carbsStr[len - i - 1] = 0;
+				break;
+				}
+			}
+		}
+
+	HugeArrayUnlock(p_data);
+	VMUnlock(mh);
+
+	@call CDFood::MSG_VIS_TEXT_REPLACE_ALL_PTR(foodStr, 0);
+	@call CDPortion::MSG_VIS_TEXT_REPLACE_ALL_PTR(portionStr, 0);
+	@call CDCarbs::MSG_VIS_TEXT_REPLACE_ALL_PTR(carbsStr, 0);
+
+	@send CarbsDetailsDBox::MSG_GEN_INTERACTION_INITIATE();
+
+
+}
+
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_CARBS_PREV_NEXT_DETAIL for CarbsGenDynamicListClass
+ *               (GEN_TRIGGER_ACTION)
+ *					optr trigger
+ * DESCRIPTION:
+ *
+ *
+ ***********************************************************************/
+@method CarbsGenDynamicListClass, MSG_CARBS_PREV_NEXT_DETAIL
+{
+ word		item;
+
+
+	item = @call self::MSG_GEN_ITEM_GROUP_GET_SELECTION();
+	if (trigger == @CDNextButton) {
+		if (item == pself->CGDLI_numCarbRecs - 1) item = 0;
+		else  item++;
+		}
+	else  {
+		if (!item) item = pself->CGDLI_numCarbRecs - 1;
+		else  item--;
+		}
+	@send self::MSG_GEN_ITEM_GROUP_SET_SINGLE_SELECTION(item, FALSE);
+
+	@send self::MSG_CARBS_OPEN_CARBS_DETAILS();
+
+
+}
+
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_CARBS_OPEN_ADD_CARBS for CarbsGenDynamicListClass
+ *
+ * DESCRIPTION:
+ *
+ *
+ ***********************************************************************/
+@method CarbsGenDynamicListClass, MSG_CARBS_OPEN_ADD_CARBS
+{
+ char					addContext[] = "CarbsAdd\0";
+
+
+	/* set the add UI */
+	@call CarbsAddDBox::MSG_GEN_SET_NOT_USABLE(VUM_NOW);
+	@send CarbsAddDBox::MSG_GEN_USE_VIS_MONIKER(
+						OptrToChunk(@AddDBoxMoniker), VUM_DELAYED_VIA_APP_QUEUE);
+	@send CAAddButton::MSG_GEN_USE_VIS_MONIKER(
+						OptrToChunk(@AddDBoxTriggerMoniker), VUM_DELAYED_VIA_APP_QUEUE);
+	@send CAAddButton::MSG_GEN_TRIGGER_SET_ACTION_MSG(
+													  MSG_CARBS_ADD_CARBS);
+	@call CarbsAddDBox::MSG_META_ADD_VAR_DATA(
+						  (ATTR_GEN_HELP_CONTEXT | VDF_SAVE_TO_STATE),
+							9, &addContext);
+	@call CarbsAddDBox::MSG_GEN_SET_USABLE(VUM_NOW);
+
+	/* make sure the text objs are empty */
+	@send CAFood::MSG_VIS_TEXT_DELETE_ALL();
+	@send CAPortion::MSG_VIS_TEXT_DELETE_ALL();
+	@send CACarbs::MSG_VIS_TEXT_DELETE_ALL();
+
+   /* and open the dbox */
+	@send CarbsAddDBox::MSG_GEN_INTERACTION_INITIATE();
+
+}
+
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_CARBS_ADD_CARBS for CarbsGenDynamicListClass
+ *
+ * DESCRIPTION:
+ *
+ *
+ ***********************************************************************/
+@method CarbsGenDynamicListClass, MSG_CARBS_ADD_CARBS
+{
+ char					buffer[250], tempStr[FOOD_MAX];
+ word					len, start, end, insertLtr, i;
+ MemHandle			mh;
+ CarbsMapStruct	*carbsMapPtr;
+ VMBlockHandle		mapbh;
+ FileHandle			fh;
+ Boolean				append = FALSE, insertAt = FALSE, first = FALSE,
+						last = FALSE;
+ dword				numItems;
+ DataStruct			*p_data;
+
+
+	/* grab the item data */
+	len = @call CAFood::MSG_VIS_TEXT_GET_ALL_PTR(tempStr);
+	if (!len) {
+		NotifyDBox(0, @AddFoodErrMsg);
+		return;
+		}
+	/* make sure food item starts with a letter */
+	LocalUpcaseString(tempStr, 1);
+	if ((tempStr[0] < 'A') || (tempStr[0] > 'Z')) {
+		NotifyDBox(0, @AlphaFoodErrMsg);
+		return;
+		}
+	strcpy(buffer, tempStr);
+	strcat(buffer, "\t");
+	@call CAPortion::MSG_VIS_TEXT_GET_ALL_PTR(tempStr);
+	if (!len) {
+		NotifyDBox(0, @AddPortionErrMsg);
+		return;
+		}
+	strcat(buffer, tempStr);
+	strcat(buffer, "\t");
+	@call CACarbs::MSG_VIS_TEXT_GET_ALL_PTR(tempStr);
+	if (!len) {
+		NotifyDBox(0, @AddCarbsErrMsg);
+		return;
+		}
+	strcat(buffer, tempStr);
+
+	fh = pself->CGDLI_fileHandle;
+	mapbh = VMGetMapBlock(fh);
+	carbsMapPtr = VMLock(fh, mapbh, &mh);
+	numItems = HugeArrayGetCount(fh, carbsMapPtr->CMS_carbsBlockHan);
+	/* get the range of items with the same 1st letter */
+	insertLtr = buffer[0] - 'A';
+	start = carbsMapPtr->CMS_alphaArray[insertLtr];
+	if (start == EMPTY) {
+		/* there are no entries with this first letter so find the next
+			letter that has an entry */
+		first = TRUE;
+		i = 1;
+		while (start == EMPTY) {
+			start = carbsMapPtr->CMS_alphaArray[insertLtr + i];
+			/* are we at the end of the array? */
+			if ((insertLtr + i) == 26) {
+				append = TRUE;
+				break;
+				}
+			i++;
+			}
+		if (!append) {
+			insertAt = TRUE;
+			}
+		}
+	else {
+		/* there are entries with this first letter so find where the
+			next letter (with items) begins */
+		end = EMPTY;
+		i = 1;
+		while (end == EMPTY) {
+			end = carbsMapPtr->CMS_alphaArray[insertLtr + i];
+			/* are we at the end of the array? */
+			i++;
+			if (insertLtr + i == 26) {
+				break;
+				}
+			}
+		if (end == EMPTY) {
+			end = (word) numItems;
+			last = TRUE;
+			}
+		}
+
+
+	/* if we have a range, let's find out where in the range it goes */
+	if (!append && !insertAt) {
+		/* just brute force it */
+		for (i = start; i < end; i++) {
+			/* get the ith item in the array */
+			HugeArrayLock(fh, carbsMapPtr->CMS_carbsBlockHan,(dword)i, (void **) &p_data, &len);
+			/* compare 'em */
+			if (strlen(buffer) < len) len = strlen(buffer);
+			if (LocalCmpStrings(p_data->DS_dataStr, buffer, len) >= 0) {
+				if (LocalCmpStrings(p_data->DS_dataStr, buffer, len) == 0) {
+					/* it's a dupe - ask user to confirm */
+					if (AckDBox (0, 0, @ConfirmDupeCarbsMsg) == ACK_NO) {
+						/* user says no - so bail after cleaning up */
+						HugeArrayUnlock(p_data);
+						VMUnlock(mh);
+						@send CarbsAddDBox::MSG_GEN_GUP_INTERACTION_COMMAND(IC_DISMISS);
+						return;
+						}
+					}
+				HugeArrayUnlock(p_data);
+				insertAt = TRUE;
+				start = i;
+				break;
+				}
+			HugeArrayUnlock(p_data);
+			} /* end of brute force for */
+
+		/* if we still haven't inserted then this is the last item in
+			our given range */
+		if (!insertAt) {
+			if (last) {
+				append = TRUE;
+				}
+			else {
+				start = end;
+				insertAt = TRUE;
+				}
+         }
+		}
+
+	/* OK we have either insertAt = start or append */
+	if (append) {
+		HugeArrayAppend(fh, carbsMapPtr->CMS_carbsBlockHan,
+					strlen(buffer)+ 1, buffer);
+		@send self::MSG_GEN_DYNAMIC_LIST_ADD_ITEMS(GDLP_LAST, 1);
+		/* The record number goes into the alpha array */
+		if (!last)
+			carbsMapPtr->CMS_alphaArray[insertLtr] = pself->CGDLI_numCarbRecs;
+		}
+	else {
+		HugeArrayInsert(fh, carbsMapPtr->CMS_carbsBlockHan,
+					strlen(buffer) + 1, (dword)start, buffer);
+		@send self::MSG_GEN_DYNAMIC_LIST_ADD_ITEMS(start - 1, 1);
+		/* if this was the first item starting with this letter... */
+		if (first) carbsMapPtr->CMS_alphaArray[insertLtr] = start;
+		/* re-set the rest of the alpha array by incrementing each of the
+			following array elements that already have items */
+		for (i = insertLtr + 1; i < 26; i++) {
+			if (carbsMapPtr->CMS_alphaArray[i] != EMPTY)
+				(carbsMapPtr->CMS_alphaArray[i])++;
+			}
+		}
+
+	/* eliminate any extra space */
+	HugeArrayCompressBlocks(fh, carbsMapPtr->CMS_carbsBlockHan);
+
+	VMDirty(mh);
+	VMUnlock(mh);
+	VMUpdate(pself->CGDLI_fileHandle);
+
+	pself = ObjDerefGen(oself);
+	pself->CGDLI_numCarbRecs++;
+
+	@send self::MSG_GEN_DYNAMIC_LIST_INITIALIZE(pself->CGDLI_numCarbRecs);
+	if (append)
+		@send self::MSG_GEN_ITEM_GROUP_SET_SINGLE_SELECTION(
+												  pself->CGDLI_numCarbRecs - 1, FALSE);
+	else
+		@send self::MSG_GEN_ITEM_GROUP_SET_SINGLE_SELECTION(start, FALSE);
+
+	/* dismiss the dbox */
+	@send CarbsAddDBox::MSG_GEN_GUP_INTERACTION_COMMAND(IC_DISMISS);
+
+
+}
+
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_CARBS_DELETE_FROM_CARBS for CarbsGenDynamicListClass
+ *
+ * DESCRIPTION:	NO_CONF is from the Modify functionality
+ *
+ *
+ ***********************************************************************/
+@method CarbsGenDynamicListClass, MSG_CARBS_DELETE_FROM_CARBS,
+											 MSG_CARBS_DELETE_FROM_CARBS_NO_CONF
+{
+ word		item, i, len, thisLtr, nextLtr;
+ MemHandle			mh;
+ CarbsMapStruct	*carbsMapPtr;
+ VMBlockHandle		mapbh;
+ DataStruct			*p_data;
+ Boolean				firstInGroup = FALSE;
+
+
+	/* make sure there's a selection */
+	if (!pself->CGDLI_numCarbRecs) return;
+
+	if (message == MSG_CARBS_DELETE_FROM_CARBS) {
+		/* make sure if a straight delete */
+		if (AckDBox(0, 0, @ConfirmDelCarbsMsg) != ACK_YES) {
+			return;
+			}
+		}
+
+	/* OK - delete the item */
+	item = @call self::MSG_GEN_ITEM_GROUP_GET_SELECTION();
+	mapbh = VMGetMapBlock(pself->CGDLI_fileHandle);
+	carbsMapPtr = VMLock(pself->CGDLI_fileHandle, mapbh, &mh);
+	/* we'll need to reset the first letters array so we grab the first letter
+		of the item */
+	HugeArrayLock(pself->CGDLI_fileHandle, carbsMapPtr->CMS_carbsBlockHan,(dword)item, (void **) &p_data, &len);
+	thisLtr = p_data->DS_dataStr[0];
+	HugeArrayUnlock(p_data);
+	/* now delete it */
+	HugeArrayDelete(pself->CGDLI_fileHandle, carbsMapPtr->CMS_carbsBlockHan,
+					1, (dword)item);
+
+	/* tell the list */
+	@send self::MSG_GEN_DYNAMIC_LIST_REMOVE_ITEMS(item, 1);
+
+	/* reset the alpha array */
+	/* are we deleting the last item in the list? */
+	if (pself->CGDLI_numCarbRecs == 1) {
+		carbsMapPtr->CMS_alphaArray[thisLtr - 'A'] = EMPTY;
+		}
+	else {
+		/* did we del the first item with this letter? */
+		if (item == carbsMapPtr->CMS_alphaArray[thisLtr - 'A'])
+			firstInGroup = TRUE;
+		/* did we delete the only item in this letter group? */
+		nextLtr = EMPTY;
+		i = 1;
+		while (nextLtr == EMPTY) {
+			/* find the next group with a letter in it */
+			nextLtr = carbsMapPtr->CMS_alphaArray[thisLtr - 'A' + i];
+			i++;
+			if ((thisLtr - 'A' + i) == 27)
+				break;
+			}
+		if (firstInGroup && ((item + 1 == nextLtr) || (nextLtr == EMPTY))) {
+			/* we deleted the last in group */
+			carbsMapPtr->CMS_alphaArray[thisLtr - 'A'] = EMPTY;
+			}
+		/* and the rest of the array */
+		for (i = thisLtr - 'A' + 1; i < 26; i++) {
+			if (carbsMapPtr->CMS_alphaArray[i] != EMPTY) {
+				(carbsMapPtr->CMS_alphaArray[i])--;
+				}
+			}
+		} /* end of not the last item else */
+
+	/* eliminate any extra space */
+	HugeArrayCompressBlocks(pself->CGDLI_fileHandle,
+											  carbsMapPtr->CMS_carbsBlockHan);
+
+	VMDirty(mh);
+	VMUnlock(mh);
+
+	pself->CGDLI_numCarbRecs--;
+
+	if (message == MSG_CARBS_DELETE_FROM_CARBS) {
+		/* do this only for straight delete */
+		VMUpdate(pself->CGDLI_fileHandle);
+		if (item == pself->CGDLI_numCarbRecs) item--;
+		@send self::MSG_GEN_ITEM_GROUP_SET_SINGLE_SELECTION(item, FALSE);
+		}
+
+
+}
+
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_CARBS_OPEN_MODIFY_CARBS_ITEM for CarbsGenDynamicListClass
+ *
+ * DESCRIPTION:
+ *
+ *
+ ***********************************************************************/
+@method CarbsGenDynamicListClass, MSG_CARBS_OPEN_MODIFY_CARBS_ITEM
+{
+ MemHandle			mh;
+ CarbsMapStruct	*carbsMapPtr;
+ VMBlockHandle		mapbh;
+ DataStruct			*p_data;
+ char					foodStr[FOOD_MAX], portionStr[PORTION_MAX], carbsStr[CARBS_MAX];
+ word					len, i, whichStr, foodTab, item;
+ char					modContext[] = "CarbsMod\0";
+
+
+	/* make sure there's a selection */
+	if (!pself->CGDLI_numCarbRecs) return;
+	item = @call self::MSG_GEN_ITEM_GROUP_GET_SELECTION();
+
+	/* set the mod UI */
+	@call CarbsAddDBox::MSG_GEN_SET_NOT_USABLE(VUM_NOW);
+	@send CarbsAddDBox::MSG_GEN_USE_VIS_MONIKER(
+						OptrToChunk(@ModDBoxMoniker), VUM_DELAYED_VIA_APP_QUEUE);
+	@send CAAddButton::MSG_GEN_USE_VIS_MONIKER(
+						OptrToChunk(@ModDBoxTriggerMoniker), VUM_DELAYED_VIA_APP_QUEUE);
+	@send CAAddButton::MSG_GEN_TRIGGER_SET_ACTION_MSG(
+													  MSG_CARBS_MODIFY_CARBS_ITEM);
+	@call CarbsAddDBox::MSG_META_ADD_VAR_DATA(
+						  (ATTR_GEN_HELP_CONTEXT | VDF_SAVE_TO_STATE),
+							9, &modContext);
+	@call CarbsAddDBox::MSG_GEN_SET_USABLE(VUM_NOW);
+
+	/* get the map & huge array block */
+	pself = ObjDerefGen(oself);
+	mapbh = VMGetMapBlock(pself->CGDLI_fileHandle);
+	carbsMapPtr = VMLock(pself->CGDLI_fileHandle, mapbh, &mh);
+
+	HugeArrayLock(pself->CGDLI_fileHandle, carbsMapPtr->CMS_carbsBlockHan,(dword)item, (void **) &p_data, &len);
+	/* extract the strings */
+	whichStr = 0;
+	for (i = 0; i < len; i++) {
+		if (p_data->DS_dataStr[i] == '\t') {
+			if (!whichStr) {
+				strncpy(foodStr, p_data->DS_dataStr, i);
+				foodStr[i] = 0;
+				foodTab = i;
+				whichStr++;
+				}
+			else  {
+				strncpy(portionStr, &p_data->DS_dataStr[foodTab + 1], i - foodTab - 1);
+				portionStr[i - foodTab - 1] = 0;
+				strncpy(carbsStr, &p_data->DS_dataStr[i + 1], len - i - 1);
+				carbsStr[len - i - 1] = 0;
+				break;
+				}
+			}
+		}
+
+	HugeArrayUnlock(p_data);
+	VMUnlock(mh);
+
+	@call CAFood::MSG_VIS_TEXT_REPLACE_ALL_PTR(foodStr, 0);
+	@call CAPortion::MSG_VIS_TEXT_REPLACE_ALL_PTR(portionStr, 0);
+	@call CACarbs::MSG_VIS_TEXT_REPLACE_ALL_PTR(carbsStr, 0);
+
+
+   /* and open the dbox */
+	@send CarbsAddDBox::MSG_GEN_INTERACTION_INITIATE();
+
+
+
+}
+
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_CARBS_MODIFY_CARBS_ITEM for CarbsGenDynamicListClass
+ *
+ * DESCRIPTION:
+ *
+ *
+ ***********************************************************************/
+@method CarbsGenDynamicListClass, MSG_CARBS_MODIFY_CARBS_ITEM
+{
+
+	@send self::MSG_CARBS_DELETE_FROM_CARBS_NO_CONF();
+	@send self::MSG_CARBS_ADD_CARBS();
+
+}
+
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_META_FUP_KBD_CHAR for CarbsGenDynamicListClass
+ *             Boolean ( word character, word flags, word state )
+ *
+ * DESCRIPTION:	Intercept this message to provide “key-index” search
+ *						capability on scrolling lists (“Key-index” = user
+ *						types a character, list selects and scrolls to first
+ *						item in list whose moniker’s 1st character matches the
+ *						character)
+ *
+ *
+ ***********************************************************************/
+@method CarbsGenDynamicListClass, MSG_META_FUP_KBD_CHAR
+{
+ MemHandle			mh;
+ CarbsMapStruct	*carbsMapPtr;
+ VMBlockHandle		mapbh;
+ word					item;
+
+
+	if ((flags & CF_FIRST_PRESS) && (character >= 'a') && (character <= 'z')) {
+		/* find the first line with our character from the table in the file's
+			map block */
+		mapbh = VMGetMapBlock(pself->CGDLI_fileHandle);
+		carbsMapPtr = VMLock(pself->CGDLI_fileHandle, mapbh, &mh);
+		item = carbsMapPtr->CMS_alphaArray[character - 'a'];
+
+		/* If there is no item starting with the typed letter we'll go
+			to the next.  If we're at 'z' we'll go to the last item in the
+			database. */
+		while (item == EMPTY) {
+			if (character == 'z') {
+				item = pself->CGDLI_numCarbRecs - 1;
+				break;
+				}
+			else {
+            character++;
+				item = carbsMapPtr->CMS_alphaArray[character - 'a'];
+				}
+			}
+		VMUnlock(mh);
+
+		if (item != EMPTY)  {
+			/* Scroll the dynamic list to the new selection and put the new
+				selection at the top of the list.  MAKE_ITEM_VIS... puts the
+				selected item at the bottom of the list */
+			@call self::MSG_GEN_ITEM_GROUP_SET_SINGLE_SELECTION(
+														 item + g_numOnScreen - 1, FALSE);
+			@call self::MSG_GEN_ITEM_GROUP_MAKE_ITEM_VISIBLE(
+			                                  (word) item + g_numOnScreen - 1);
+			@call self::MSG_GEN_ITEM_GROUP_SET_SINGLE_SELECTION(item, FALSE);
+			}
+
+		/* Return TRUE to indicate that the character was handled. */
+		return(TRUE);
+		}
+
+	/* Let the superclass take care of other presses and cases. */
+	return(@callsuper());
+
+}
+
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_META_START_SELECT() for CarbsGenDynamicListClass
+ *
+ * DESCRIPTION:	works the double click
+ *
+ * PARAMETERS:       MouseReturnParams *retVal
+ *			  	 sword xPosition,
+ *			   	 sword yPosition,
+ *			   	 word inputState;
+ *
+ *
+ ***********************************************************************/
+@method CarbsGenDynamicListClass, MSG_META_START_SELECT
+{
+
+	if (inputState & BI_DOUBLE_PRESS) {
+		@send self::MSG_CARBS_OPEN_CARBS_DETAILS();
+		/* Note that we have processed the mouse event */
+		retVal->flags = MRF_PROCESSED;
+		}
+	else
+   	@callsuper();
+
+}
+
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_CARBS_GET_CARBS_FILEHANDLE() for CarbsGenDynamicListClass
+ *
+ * DESCRIPTION:	returns VMFileHandle
+ *
+ * PARAMETERS:
+ *
+ *
+ *
+ ***********************************************************************/
+@method CarbsGenDynamicListClass, MSG_CARBS_GET_CARBS_FILEHANDLE
+{
+
+	return(pself->CGDLI_fileHandle);
+
+}
+
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_CARBS_GET_CARBS_FILEHANDLE() for CarbsGenDynamicListClass
+ *
+ * DESCRIPTION:	returns number of carbs items
+ *
+ * PARAMETERS:
+ *
+ *
+ *
+ ***********************************************************************/
+@method CarbsGenDynamicListClass, MSG_CARBS_GET_NUM_RECS
+{
+
+	return(pself->CGDLI_numCarbRecs);
+
+}
+
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_CARBS_ADD_TO_FAVS() for CarbsGenDynamicListClass
+ *
+ * DESCRIPTION:	adds the selected carb to the favs list
+ *
+ * PARAMETERS:
+ *
+ *
+ *
+ ***********************************************************************/
+@method CarbsGenDynamicListClass, MSG_CARBS_ADD_TO_FAVS
+{
+ MemHandle			mh;
+ CarbsMapStruct	*carbsMapPtr;
+ VMBlockHandle		mapbh, vmbh;
+ DataStruct			*p_data;
+ char					foodStr[FOOD_MAX], portionStr[PORTION_MAX], carbsStr[CARBS_MAX];
+ word					len, i, whichStr, foodTab, item;
+ VMFileHandle		favfh;
+
+
+	item = @call self::MSG_GEN_ITEM_GROUP_GET_SELECTION();
+
+	/* get the map & huge array block */
+	mapbh = VMGetMapBlock(pself->CGDLI_fileHandle);
+	carbsMapPtr = VMLock(pself->CGDLI_fileHandle, mapbh, &mh);
+
+	HugeArrayLock(pself->CGDLI_fileHandle, carbsMapPtr->CMS_carbsBlockHan,(dword)item, (void **) &p_data, &len);
+	/* extract the strings */
+	whichStr = 0;
+	for (i = 0; i < len; i++) {
+		if (p_data->DS_dataStr[i] == '\t') {
+			if (!whichStr) {
+				strncpy(foodStr, p_data->DS_dataStr, i);
+				foodStr[i] = 0;
+				foodTab = i;
+				whichStr++;
+				}
+			else  {
+				strncpy(portionStr, &p_data->DS_dataStr[foodTab + 1], i - foodTab - 1);
+				portionStr[i - foodTab - 1] = 0;
+				strncpy(carbsStr, &p_data->DS_dataStr[i + 1], len - i - 1);
+				carbsStr[len - i - 1] = 0;
+				break;
+				}
+			}
+		}
+
+	HugeArrayUnlock(p_data);
+	VMUnlock(mh);
+
+	/* put the strings where the FAVS method can get them */
+	@call FAFood::MSG_VIS_TEXT_REPLACE_ALL_PTR(foodStr, 0);
+	@call FAPortion::MSG_VIS_TEXT_REPLACE_ALL_PTR(portionStr, 0);
+	@call FACarbs::MSG_VIS_TEXT_REPLACE_ALL_PTR(carbsStr, 0);
+
+	/* now open/create the fav's file and add this stuff */
+	if (g_onOG || g_onZ) SetPCCard();
+	else FileSetStandardPath(SP_USER_DATA);
+	favfh = VMOpen("favs.vm",
+					 VMAF_FORCE_READ_WRITE,
+					 VMO_CREATE,
+					 0);
+	/* check for error */
+	if (!favfh)  {
+		NotifyDBox(0, @FFileOpenErrMsg);
+		return;
+		}
+	mapbh = VMGetMapBlock(favfh);
+	if (!mapbh) {
+		/* we need to create the array and the map block */
+		vmbh = HugeArrayCreate(favfh, 0, 0);
+		mapbh = VMAlloc(favfh, sizeof(CarbsMapStruct), 0);
+		VMSetMapBlock(favfh, mapbh);
+		carbsMapPtr = VMLock(favfh, mapbh, &mh);
+		carbsMapPtr->CMS_carbsBlockHan = vmbh;
+		for (i = 0; i < 28; i++) {
+         carbsMapPtr->CMS_alphaArray[i] = EMPTY;
+			}
+		VMDirty(mh);
+		VMUnlock(mh);
+		}
+
+	/* now that we have an open favs file we tell the favs obj the file handle */
+	@call FavsDList::MSG_FAVS_SET_FAVS_FILEHANDLE(favfh);
+	/* and have the favs list do an add */
+	if (@call FavsDList::MSG_FAVS_ADD_FAVS(NO_UI)) {
+		/* let the user know it happened */
+		@call FavCopiedDBox::MSG_GEN_INTERACTION_INITIATE();
+		/* make it go away in 3 seconds */
+/*		TimerSleep(3*60);
+		@send FavCopiedDBox::MSG_GEN_GUP_INTERACTION_COMMAND(IC_DISMISS);
+*/    }
+
+	/* and close the favs file */
+	VMClose(favfh, 0);
+
+}
+
+/*
+ ***************************************************************************
+ *		Code for GenDetailsInteractionClass
+ ***************************************************************************
+ */
+
+@classdecl GenDetailsInteractionClass;
+
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_META_FUP_KBD_CHAR for GenDetailsInteractionClass
+ *             Boolean ( word character, word flags, word state )
+ *
+ * DESCRIPTION:	Intercept this message to provide arrow, page and
+ *						home end nav in the details dbox
+ *
+ *
+ *					
+ *
+ ***********************************************************************/
+@method GenDetailsInteractionClass, MSG_META_FUP_KBD_CHAR
+{
+ word			item, i;
+ dword		numCarbs;
+
+
+	if ((flags & CF_FIRST_PRESS) &&
+				  ((character == (0xff00 | VC_NEXT)) ||
+					(character == (0xff00 | VC_PREVIOUS)) ||
+					(character == (0xff00 | VC_UP)) ||
+					(character == (0xff00 | VC_DOWN)) ||
+					(character == (0xff00 | VC_RIGHT)) ||
+					(character == (0xff00 | VC_LEFT)) ||
+					(character == (0xff00 | VC_HOME)) ||
+					(character == (0xff00 | VC_END)))) {
+		/* we'll deal with this key */
+		item = @call CarbsDList::MSG_GEN_ITEM_GROUP_GET_SELECTION();
+		numCarbs = @call CarbsDList::MSG_CARBS_GET_NUM_RECS();
+
+		if ((character == (0xff00 | VC_DOWN)) ||
+					  (character == (0xff00 | VC_RIGHT))) {
+			if (item == (word)(numCarbs - 1)) item = 0;
+			else  item++;
+			}
+		else if ((character == (0xff00 | VC_UP)) ||
+					  (character == (0xff00 | VC_LEFT))) {
+			if (!item) item = (word)numCarbs - 1;
+			else  item--;
+			}
+		else if (character == (0xff00 | VC_NEXT)) {
+			for (i = 0; i < 6; i++) {
+				item++;
+				if (item == (word)(numCarbs - 1)) item = 0;
+				}
+			}
+		else if (character == (0xff00 | VC_PREVIOUS)) {
+			for (i = 0; i < 6; i++) {
+				item--;
+				if (!item) item = (word)numCarbs - 1;
+				}
+			}
+		else if (character == (0xff00 | VC_HOME)) {
+			item = 0;
+			}
+		else if (character == (0xff00 | VC_END)) {
+			item = (word)numCarbs - 1;
+			}
+
+		@call CarbsDList::MSG_GEN_ITEM_GROUP_SET_SINGLE_SELECTION(item, FALSE);
+		@send CarbsDList::MSG_CARBS_OPEN_CARBS_DETAILS();
+
+		/* Return TRUE to indicate that the character was handled. */
+		return(TRUE);
+		}
+
+	/* Let the superclass take care of other presses and cases. */
+	return(@callsuper());
+
+}
+
+
