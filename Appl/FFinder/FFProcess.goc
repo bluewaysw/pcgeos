@@ -190,7 +190,7 @@ void UpdateUIForSearchStart()
     @call FFStopTrigger::MSG_GEN_SET_ENABLED(VUM_NOW);
     @call FFShowSearchResult::MSG_GEN_SET_NOT_ENABLED(VUM_NOW);
     @call FFMostRecent::MSG_GEN_SET_NOT_ENABLED(VUM_NOW);
-    @call FFOpenTrigger::MSG_GEN_SET_NOT_ENABLED(VUM_NOW);
+    // @call FFOpenTrigger::MSG_GEN_SET_NOT_ENABLED(VUM_NOW);
     @call FFinderApp::MSG_GEN_APPLICATION_MARK_BUSY();
 }
 
@@ -215,12 +215,13 @@ void UpdateUIForSearchEnd()
 	@call FFStatus::MSG_GEN_REPLACE_VIS_MONIKER_TEXT
 	     (complete, VUM_NOW);
 	MemFree( mh );
-	@call FFOpenTrigger::MSG_GEN_SET_ENABLED(VUM_NOW);
+	// @call FFOpenTrigger::MSG_GEN_SET_ENABLED(VUM_NOW);
     }
     /* update UI */
-    if (@call FFViewSelection::MSG_GEN_ITEM_GROUP_GET_SELECTION() == 0) {
-	@call FFOptionScreen::MSG_GEN_SET_ENABLED(VUM_NOW);
-	@call FFSearchText::MSG_GEN_SET_ENABLED(VUM_NOW);
+    if (@call FFViewSelection::MSG_GEN_ITEM_GROUP_GET_SELECTION() == 0)
+	{
+		@call FFOptionScreen::MSG_GEN_SET_ENABLED(VUM_NOW);
+		@call FFSearchText::MSG_GEN_SET_ENABLED(VUM_NOW);
     }
 
 /*    @call FFSearchTrigger::MSG_GEN_SET_ENABLED(VUM_NOW); */
@@ -1590,50 +1591,60 @@ void InitializeFFSearchResultList(void) {
  ***********************************************************************/
 @method FFResultListClass, MSG_FFRL_DISPLAY_RECENT_OPEN_FILES
 {
-    if (@call FFViewSelection::MSG_GEN_ITEM_GROUP_GET_SELECTION() == 0) {
-	/*
-	 *  Show the previously searched result, if any.
-	 */
-	g_whichListDisplay = WLD_SEARCH;
-	@call FFSearchResult::MSG_FFRL_RESTORE_LIST();
-	@call FFOptionScreen::MSG_GEN_SET_ENABLED(VUM_DELAYED_VIA_APP_QUEUE);
-	@call FFSearchText::MSG_GEN_SET_ENABLED(VUM_DELAYED_VIA_APP_QUEUE);
-	return;
-    }
-    else if (searchResultCnt) {
-	/*  Show the reently opened files
-	 */
-	@call FFSearchResult::MSG_FFRL_SAVE_LIST();
-	@call FFOptionScreen::MSG_GEN_SET_NOT_ENABLED(VUM_DELAYED_VIA_APP_QUEUE);
-	@call FFSearchText::MSG_GEN_SET_NOT_ENABLED(VUM_DELAYED_VIA_APP_QUEUE);
-    }
+    if (selection == 0)
+	{
+		/*
+		*  Show the previously searched result, if any.
+		*/
+    	@call RecentsGroup::MSG_GEN_SET_NOT_USABLE(VUM_DELAYED_VIA_APP_QUEUE);
+		@call FFGroup::MSG_GEN_SET_USABLE(VUM_DELAYED_VIA_APP_QUEUE);
 
-    g_whichListDisplay = WLD_RECENT;
-    InitializeFFSearchResultList();
+		g_whichListDisplay = WLD_SEARCH;
+		@call FFSearchResult::MSG_FFRL_RESTORE_LIST();
+		@call FFOptionScreen::MSG_GEN_SET_ENABLED(VUM_DELAYED_VIA_APP_QUEUE);
+		@call FFSearchText::MSG_GEN_SET_ENABLED(VUM_DELAYED_VIA_APP_QUEUE);
 
-    if (searchMode == SEARCH_IN_PROGRESS) {
-	/*
-	 *  The process thread is busy doing the search.  Tell the
-	 *  process thread that we want to stop.  The process thread
-	 *  will update the searchMode when stopped..
-	 */
-	stopSearchFlag = TRUE;
-    }
-    else {
-	/*
-	 *  The process thread isn't doing any search.  We tell the
-	 *  process thread that we want to start a search.
-	 *
-	 *  Update UI to indicate a search starts, and update the
-	 *  searchMode.
-	 */
-	UpdateUIForSearchStart();
-	@send process::MSG_FFP_DISPLAY_RECENT_OPEN_FILES();
-	/*
-	 *  The process will update UI and the searchMode when
-	 *  the earch is done.
-	 */
-    }
+		return;
+	}
+    else if (selection = 1)
+	{
+		/*  Show the recently opened files
+		*/
+		@call RecentsGroup::MSG_GEN_SET_USABLE(VUM_DELAYED_VIA_APP_QUEUE);
+    	@call FFGroup::MSG_GEN_SET_NOT_USABLE(VUM_DELAYED_VIA_APP_QUEUE);
+		@call FFSearchResult::MSG_FFRL_SAVE_LIST();
+		@call FFOptionScreen::MSG_GEN_SET_NOT_ENABLED(VUM_DELAYED_VIA_APP_QUEUE);
+		@call FFSearchText::MSG_GEN_SET_NOT_ENABLED(VUM_DELAYED_VIA_APP_QUEUE);
+
+		g_whichListDisplay = WLD_RECENT;
+		InitializeFFSearchResultList();
+
+		if (searchMode == SEARCH_IN_PROGRESS)
+		{
+			/*
+			*  The process thread is busy doing the search.  Tell the
+			*  process thread that we want to stop.  The process thread
+			*  will update the searchMode when stopped..
+			*/
+			stopSearchFlag = TRUE;
+		}
+		else
+		{
+			/*
+			*  The process thread isn't doing any search.  We tell the
+			*  process thread that we want to start a search.
+			*
+			*  Update UI to indicate a search starts, and update the
+			*  searchMode.
+			*/
+			UpdateUIForSearchStart();
+			@send process::MSG_FFP_DISPLAY_RECENT_OPEN_FILES();
+			/*
+			*  The process will update UI and the searchMode when
+			*  the earch is done.
+			*/
+		}
+	}
 }  /* End of MSG_FFRL_DISPLAY_RECENT_OPEN_FILES */
 
 /***********************************************************************
