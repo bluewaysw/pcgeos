@@ -141,7 +141,7 @@ UnlockStrings(void)
 		@send FFinderPrimary::MSG_GEN_REPLACE_VIS_MONIKER_TEXT(LMemDeref(@FindStr), VUM_NOW);
 		UnlockStrings();
 		@call FFOptionScreen::MSG_GEN_SET_NOT_USABLE(VUM_NOW);
-		@call FFCUIFileSelector::MSG_GEN_SET_USABLE(VUM_NOW);
+		@call FFDriveItemGroup::MSG_GEN_SET_USABLE(VUM_NOW);
 		@call FFinderPrimary::MSG_META_DELETE_VAR_DATA(HINT_NO_WIDER_THAN_CHILDREN_REQUIRE);
 		@call FFinderPrimary::MSG_META_DELETE_VAR_DATA(HINT_NO_TALLER_THAN_CHILDREN_REQUIRE);
     }
@@ -153,19 +153,19 @@ UnlockStrings(void)
 	{
         if (DriveGetStatus(i) & DS_PRESENT)
 		{
-            child = @call FFCUIFileSelector::MSG_GEN_FIND_CHILD_AT_POSITION(i) ;
+            child = @call FFDriveItemGroup::MSG_GEN_FIND_CHILD_AT_POSITION(i) ;
             @send child::MSG_GEN_SET_USABLE(VUM_DELAYED_VIA_UI_QUEUE) ;
             @send child::MSG_GEN_SET_ENABLED(VUM_DELAYED_VIA_UI_QUEUE) ;
         }
 		else
 		{
-            child = @call FFCUIFileSelector::MSG_GEN_FIND_CHILD_AT_POSITION(i) ;
+            child = @call FFDriveItemGroup::MSG_GEN_FIND_CHILD_AT_POSITION(i) ;
             @send child::MSG_GEN_SET_NOT_USABLE(VUM_DELAYED_VIA_UI_QUEUE) ;
             @send child::MSG_GEN_SET_NOT_ENABLED(VUM_DELAYED_VIA_UI_QUEUE) ;
         }
 	}
-    @call FFCUIFileSelector::MSG_GEN_SET_USABLE(VUM_DELAYED_VIA_UI_QUEUE) ;
-    @call FFCUIFileSelector::MSG_GEN_SET_ENABLED(VUM_DELAYED_VIA_UI_QUEUE) ;
+    @call FFDriveItemGroup::MSG_GEN_SET_USABLE(VUM_DELAYED_VIA_UI_QUEUE) ;
+    @call FFDriveItemGroup::MSG_GEN_SET_ENABLED(VUM_DELAYED_VIA_UI_QUEUE) ;
 
     @callsuper();
     /*
@@ -467,17 +467,19 @@ void UpdateUIForSearchEnd()
 			sprintf(buf, "%c:\\", selection + 65); // A=65
 			//(void) @call FileSelector::MSG_GEN_PATH_SET("\\", dh);
 			//if (@call FileSelector::MSG_GEN_FILE_SELECTOR_SET_FULL_SELECTION_PATH(buf, SP_NOT_STANDARD_PATH))
-			if (@call FileSelector::MSG_GEN_PATH_SET(buf, dh))
+			if (@call FileSelector::MSG_GEN_PATH_SET(buf, dh) == FALSE) // false = NO ERROR
+			{
+				@call FFSearchTrigger::MSG_GEN_SET_ENABLED(VUM_NOW);
+			}
+			else
 			{
 				@send FFWarning::MSG_GEN_INTERACTION_INITIATE();
-				return;
 			}
-    		@call FFSearchTrigger::MSG_GEN_SET_ENABLED(VUM_NOW);
+
 		}
 		else
 		{
 			@send FFWarning::MSG_GEN_INTERACTION_INITIATE();
-			return;
 		}
 	}
 	else
@@ -495,7 +497,9 @@ void UpdateUIForSearchEnd()
     	@call FFSearchTrigger::MSG_GEN_SET_ENABLED(VUM_NOW);
 	}
 
+	@call FFDriveItemGroup::MSG_GEN_ITEM_GROUP_SET_NONE_SELECTED(TRUE);
 	@call FileSelector::MSG_FFS_UPDATE_UI_CURRENT_PATH();
+
     return;
 }
 
