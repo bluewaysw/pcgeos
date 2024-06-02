@@ -31,6 +31,8 @@
 @include "FFObjects.goh"
 #include <Ansi/string.h>
 #include <Ansi/stdlib.h>
+#include <Ansi/string.h>
+#include <Ansi/stdio.h>
 @start ICONMONIKERRESOURCE, data;
 @include "Art/mkrFile.goh"
 @include "Art/mkrFolder.goh"
@@ -407,19 +409,46 @@ void UpdateUIForSearchEnd()
  ***********************************************************************/
 @method FFinderProcessClass, MSG_FFP_SET_FILE_SELECTOR
 {
-    switch (selection) {
-    case SEARCH_IN_DOCUMENT:
-	@call FileSelector::MSG_GEN_PATH_SET(".", SP_DOCUMENT);
-	break;
-    case SEARCH_IN_ARCHIVE:
-	@call FileSelector::MSG_GEN_PATH_SET("Archive", SP_DOCUMENT);
-	break;
-    case SEARCH_IN_FLOPPY:
-	if (@call FileSelector::MSG_GEN_PATH_SET("a:\\", 0)) {
-	    @send FFWarning::MSG_GEN_INTERACTION_INITIATE();
+	DiskHandle	dh = 0;
+	// char 		buf[4] = {0};
+	// sprintf(buf, "%c:\\", selection + 65); // A=65; a=97
+
+    if (selection < 26)
+    {
+		dh = DiskRegisterDiskSilently(selection);
+
+		if (dh)
+		{
+			if (@call FileSelector::MSG_GEN_PATH_SET("\\", dh))
+			{
+				@send FFWarning::MSG_GEN_INTERACTION_INITIATE();
+			}
+		}
+		else
+		{
+			@send FFWarning::MSG_GEN_INTERACTION_INITIATE();
+		}
+
+		@call FileSelector::MSG_GEN_APPLY();
+		//@call FileSelector::MSG_FFS_UPDATE_UI_CURRENT_PATH();
 	}
-	break;
-    }
+	else
+	{
+		/*
+		break;
+		case SEARCH_IN_DOCUMENT:
+			@call FileSelector::MSG_GEN_PATH_SET(".", SP_DOCUMENT);
+		break;
+		case SEARCH_IN_ARCHIVE:
+			@call FileSelector::MSG_GEN_PATH_SET("Archive", SP_DOCUMENT);
+		break;
+		case SEARCH_IN_FLOPPY:
+			if (@call FileSelector::MSG_GEN_PATH_SET("a:\\", 0))
+			{
+				@send FFWarning::MSG_GEN_INTERACTION_INITIATE();
+			}
+		*/
+	}
 
     @call FFSearchTrigger::MSG_GEN_SET_ENABLED(VUM_NOW);
 
