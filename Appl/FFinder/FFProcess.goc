@@ -64,8 +64,7 @@ SearchMode searchMode = SEARCH_END;  /* current mode of search engine.  */
 Boolean stopSearchFlag = FALSE;
 Boolean FFinderUserIntro = FALSE;
 
-void RecursiveSearch
-     (const char *searchText, StandardPath token, const char *path);
+void RecursiveSearch(const char *searchText, DiskHandle token, const char *path);
 void UpdateUIForSearchStart(void);
 void UpdateUIForSearchEnd(void);
 void InitializeFFSearchResultList(void);
@@ -128,23 +127,46 @@ UnlockStrings(void)
  ***********************************************************************/
 @method FFinderProcessClass, MSG_GEN_PROCESS_OPEN_APPLICATION
 {
+    word       i = 0;
+    optr       child = NullOptr;
+
     /*
      *  If the user level is intro, reduce some UIs
      */
-    if (UserGetDefaultUILevel() == UIIL_INTRODUCTORY) {
-	FFinderUserIntro = TRUE;
-	@call FFCurrentPath::MSG_GEN_SET_NOT_USABLE(VUM_NOW);
-	LockStrings();
-	@send FFinderPrimary::MSG_GEN_REPLACE_VIS_MONIKER_TEXT
-	     (LMemDeref(@FindStr), VUM_NOW);
-	UnlockStrings();
-	@call FFOptionScreen::MSG_GEN_SET_NOT_USABLE(VUM_NOW);
-	@call FFCUIFileSelector::MSG_GEN_SET_USABLE(VUM_NOW);
-	@call FFinderPrimary::MSG_META_DELETE_VAR_DATA(
-	    HINT_NO_WIDER_THAN_CHILDREN_REQUIRE);
-	@call FFinderPrimary::MSG_META_DELETE_VAR_DATA(
-	    HINT_NO_TALLER_THAN_CHILDREN_REQUIRE);
+    if (UserGetDefaultUILevel() == UIIL_INTRODUCTORY)
+	{
+		FFinderUserIntro = TRUE;
+		@call FFCurrentPath::MSG_GEN_SET_NOT_USABLE(VUM_NOW);
+		LockStrings();
+		@send FFinderPrimary::MSG_GEN_REPLACE_VIS_MONIKER_TEXT(LMemDeref(@FindStr), VUM_NOW);
+		UnlockStrings();
+		@call FFOptionScreen::MSG_GEN_SET_NOT_USABLE(VUM_NOW);
+		@call FFCUIFileSelector::MSG_GEN_SET_USABLE(VUM_NOW);
+		@call FFinderPrimary::MSG_META_DELETE_VAR_DATA(HINT_NO_WIDER_THAN_CHILDREN_REQUIRE);
+		@call FFinderPrimary::MSG_META_DELETE_VAR_DATA(HINT_NO_TALLER_THAN_CHILDREN_REQUIRE);
     }
+
+	/*
+	 * enable drive buttons for available drives
+	 */
+    for (i = 0; i < 26; i++)
+	{
+        if (DriveGetStatus(i) & DS_PRESENT)
+		{
+            child = @call FFCUIFileSelector::MSG_GEN_FIND_CHILD_AT_POSITION(i) ;
+            @send child::MSG_GEN_SET_USABLE(VUM_DELAYED_VIA_UI_QUEUE) ;
+            @send child::MSG_GEN_SET_ENABLED(VUM_DELAYED_VIA_UI_QUEUE) ;
+        }
+		else
+		{
+            child = @call FFCUIFileSelector::MSG_GEN_FIND_CHILD_AT_POSITION(i) ;
+            @send child::MSG_GEN_SET_NOT_USABLE(VUM_DELAYED_VIA_UI_QUEUE) ;
+            @send child::MSG_GEN_SET_NOT_ENABLED(VUM_DELAYED_VIA_UI_QUEUE) ;
+        }
+	}
+    @call FFCUIFileSelector::MSG_GEN_SET_USABLE(VUM_DELAYED_VIA_UI_QUEUE) ;
+    @call FFCUIFileSelector::MSG_GEN_SET_ENABLED(VUM_DELAYED_VIA_UI_QUEUE) ;
+
     @callsuper();
     /*
      *  Initialize the current path UI object.
@@ -171,6 +193,7 @@ void UpdateUIForSearchStart()
     @call FFOpenTrigger::MSG_GEN_SET_NOT_ENABLED(VUM_NOW);
     @call FFinderApp::MSG_GEN_APPLICATION_MARK_BUSY();
 }
+
 void UpdateUIForSearchEnd()
 {
     TCHAR * complete;
@@ -232,85 +255,108 @@ void UpdateUIForSearchEnd()
 {
  char		*searchText, *relativePath;
  char		inputText[PATH_LENGTH + 1];
- dword		dhandle;
- StandardPath	pathToken;
+ dword		dhandleAndFlags;
+ DiskHandle	pathToken;
  MemHandle	mem, mem2;
  TCHAR *p;
 
+	/*
+	 *  First, clear any previous search result list.
+	 */
+	if ((mem = MemAlloc(PATH_LENGTH+1, HF_DYNAMIC, HAF_STANDARD_NO_ERR)) == NULL) return;
+	if ((mem2 = MemAlloc(PATH_LENGTH+1, HF_DYNAMIC, HAF_STANDARD_NO_ERR)) == NULL)
+	{
+		MemFree(mem);
+		return;
+	}
 
-    /*
-     *  First, clear any previous search result list.
-     */
-    if ((mem = MemAlloc(PATH_LENGTH+1,
-			HF_DYNAMIC, HAF_STANDARD_NO_ERR)) == NULL)
-	  return;
-    if ((mem2 = MemAlloc(PATH_LENGTH+1,
-			 HF_DYNAMIC, HAF_STANDARD_NO_ERR)) == NULL) {
-	  MemFree(mem);
-	  return;
-	  }
-    searchText = MemLock(mem);
-    relativePath = MemLock(mem2);
+	searchText = MemLock(mem);
+	relativePath = MemLock(mem2);
 
-    if (searchResultCnt) {
-	  @call FFSearchResult::MSG_FFRL_CLEAN_LIST();
-	  }
-    @call FFSearchResult::MSG_FFRL_CLEAN_SAVED_LIST();
+	if (searchResultCnt)
+	{
+		@call FFSearchResult::MSG_FFRL_CLEAN_LIST();
+	}
 
-    /*
-     *  Get the typed search text from the ui.
-     */
-    if (@call FFSearchText::MSG_VIS_TEXT_GET_TEXT_SIZE()) {
-	  searchText[0] = 0;
-	  /* pre and append a * if there isn't already one there */
-	  @call FFSearchText::MSG_VIS_TEXT_GET_ALL_PTR(inputText);
-@ifdef PRODUCT_NDO2000
-          searchText = inputText;
-@else
-	  if (inputText[0] != '*') {
-		/* prepend */
-		strcpy(searchText, "*");
+	@call FFSearchResult::MSG_FFRL_CLEAN_SAVED_LIST();
+
+	/*
+	*  Get the typed search text from the ui.
+	*/
+	if (@call FFSearchText::MSG_VIS_TEXT_GET_TEXT_SIZE())
+	{
+		searchText[0] = 0;
+		/* pre and append a * if there isn't already one there */
+		@call FFSearchText::MSG_VIS_TEXT_GET_ALL_PTR(inputText);
+		if (inputText[0] != '*')
+		{
+			/* prepend */
+			strcpy(searchText, "*");
 		}
-	  strcat(searchText, inputText);
-	  if (inputText[strlen(inputText) - 1] != '*') {
-          /* append */
-		strcat(searchText, "*");
+
+		strcat(searchText, inputText);
+
+		if (inputText[strlen(inputText) - 1] != '*')
+		{
+			/* append */
+			strcat(searchText, "*");
 		}
-@endif
-	  if (FFinderUserIntro == TRUE) {
-		@call FileSelector::MSG_GEN_PATH_GET(relativePath, PATH_LENGTH);
-		pathToken = @call FileSelector::MSG_GEN_PATH_GET_DISK_HANDLE();
+
+		/* if (FFinderUserIntro == TRUE)
+		{
+			//@call FileSelector::MSG_GEN_PATH_GET(relativePath, PATH_LENGTH);
+			//pathToken = @call FileSelector::MSG_GEN_PATH_GET_DISK_HANDLE();
 		}
-	  else {
+		else
+		{*/
+			/*
+			*  Get the DiskHandle and path.
+			*/
+			dhandleAndFlags = @call FileSelector::MSG_GEN_FILE_SELECTOR_GET_FULL_SELECTION_PATH(relativePath);
+			pathToken = GFS_GET_FULL_SELECTION_PATH_DISK_HANDLE(dhandleAndFlags);
+		//}
+
 		/*
-		 *  Get the standard path token and relative path.
-		 */
-		dhandle = @call FileSelector::
-				 MSG_GEN_FILE_SELECTOR_GET_FULL_SELECTION_PATH(relativePath);
-		pathToken = GFS_GET_FULL_SELECTION_PATH_DISK_HANDLE(dhandle);
-	  }
-	  /*
-	   * remove the trailing '\.' as it screws up parsing of StandardPaths
-	   */
-	  p = strrchr(relativePath, '\\');
-	  if (p && (p[1] == '.')) {
-	      p[0] = 0;
-	  }
-	  /*
-	   *  Recursively find all matching files and subdirectories
-	   *  in the current directory.
-	   */
-	  RecursiveSearch(searchText, pathToken, relativePath);
-	  } /* end of text in the window if */
+		* remove the trailing '\.' as it screws up parsing of StandardPaths
+		*/
+		p = strrchr(relativePath, '\\');
+		if (p && (p[1] == '.'))
+		{
+			p[0] = 0;
+		}
 
-    /*
-     *  Update UI.
-     */
-    UpdateUIForSearchEnd();
+		// in disk root directories, MSG_GEN_FILE_SELECTOR_GET_FULL_SELECTION_PATH returns an empty string,
+		// but we need at least a trailing "\"
+		if (strlen(relativePath) == 0)
+		{
+			strcpy(relativePath, "\\");
+		}
 
-    MemFree(mem);
-    MemFree(mem2);
-    return;
+		// FIXME: take me out when done
+		UserStandardDialog(
+			NULL,
+			NULL,
+			NULL,
+			NULL,
+			relativePath,
+			( CDT_ERROR << CDBF_DIALOG_TYPE_OFFSET ) | ( GIT_NOTIFICATION << CDBF_INTERACTION_TYPE_OFFSET )
+		);
+
+		/*
+		*  Recursively find all matching files and subdirectories
+		*  in the current directory.
+		*/
+		RecursiveSearch(searchText, pathToken, relativePath);
+	} /* end of text in the window if */
+
+	/*
+	*  Update UI.
+	*/
+	UpdateUIForSearchEnd();
+
+	MemFree(mem);
+	MemFree(mem2);
+	return;
 } /* End of MSG_FFP_FIND_FILES */
 
 
@@ -410,46 +456,41 @@ void UpdateUIForSearchEnd()
 @method FFinderProcessClass, MSG_FFP_SET_FILE_SELECTOR
 {
 	DiskHandle	dh = 0;
-	// char 		buf[4] = {0};
-	// sprintf(buf, "%c:\\", selection + 65); // A=65; a=97
+	char		buf[5] = {0};
 
     if (selection < 26)
     {
 		dh = DiskRegisterDiskSilently(selection);
-
-		if (dh)
-		{
-			if (@call FileSelector::MSG_GEN_PATH_SET("\\", dh))
-			{
-				@send FFWarning::MSG_GEN_INTERACTION_INITIATE();
-			}
-		}
-		else
+		if (!dh)
 		{
 			@send FFWarning::MSG_GEN_INTERACTION_INITIATE();
+			return;
 		}
 
-		@call FileSelector::MSG_GEN_APPLY();
-		//@call FileSelector::MSG_FFS_UPDATE_UI_CURRENT_PATH();
+		sprintf(buf, "%c:\\", selection + 65); // A=65
+		//(void) @call FileSelector::MSG_GEN_PATH_SET("\\", dh);
+		(void) @call FileSelector::MSG_GEN_FILE_SELECTOR_SET_FULL_SELECTION_PATH(buf, 0);
+		//if (@call FileSelector::MSG_GEN_PATH_SET(buf, 0))
+		// {
+		// 	@send FFWarning::MSG_GEN_INTERACTION_INITIATE();
+		// 	return;
+		// }
 	}
 	else
 	{
-		/*
-		break;
-		case SEARCH_IN_DOCUMENT:
-			@call FileSelector::MSG_GEN_PATH_SET(".", SP_DOCUMENT);
-		break;
-		case SEARCH_IN_ARCHIVE:
-			@call FileSelector::MSG_GEN_PATH_SET("Archive", SP_DOCUMENT);
-		break;
-		case SEARCH_IN_FLOPPY:
-			if (@call FileSelector::MSG_GEN_PATH_SET("a:\\", 0))
-			{
-				@send FFWarning::MSG_GEN_INTERACTION_INITIATE();
-			}
-		*/
+		switch(selection)
+		{
+			case 26:	// SP_DOCUMENT
+				@call FileSelector::MSG_GEN_PATH_SET(".", SP_DOCUMENT);
+			break;
+
+			default:
+				@call FileSelector::MSG_GEN_PATH_SET(".", SP_TOP);
+			break;
+		}
 	}
 
+	@call FileSelector::MSG_FFS_UPDATE_UI_CURRENT_PATH();
     @call FFSearchTrigger::MSG_GEN_SET_ENABLED(VUM_NOW);
 
     return;
@@ -462,8 +503,8 @@ void UpdateUIForSearchEnd()
  ***************************************************************************
  */
 
-char openPath[MAX_FILE_DIR_LEN];
-StandardPath openPathToken;
+char 		openPath[MAX_FILE_DIR_LEN];
+DiskHandle 	openPathToken;
 
 /*
  *  MSG_VIS_OPEN
@@ -472,30 +513,34 @@ StandardPath openPathToken;
 @method FilterFileSelectorClass, MSG_VIS_OPEN
 {
     char relativePath[MAX_FILE_DIR_LEN];
-    dword dhandle;
     word len;
-    /*
-     *  Get the standard path token and relative path.
+
+	/*
+     *  Get the disk handle and relative path.
      */
-    dhandle = @call self::
-	MSG_GEN_FILE_SELECTOR_GET_FULL_SELECTION_PATH(relativePath);
-    openPathToken = GFS_GET_FULL_SELECTION_PATH_DISK_HANDLE(dhandle);
-    @callsuper();
+	@call FileSelector::MSG_GEN_PATH_GET(relativePath, MAX_FILE_DIR_LEN);
+	openPathToken = @call FileSelector::MSG_GEN_PATH_GET_DISK_HANDLE();
+	@callsuper();
     @call self::MSG_GEN_PATH_SET(relativePath, openPathToken);
+
     /*
      *  Get rid of starting or trailing '\'
      */
     len = strlen(relativePath);
-    if (relativePath[0] == '\\') {
-	strcpy (openPath, relativePath+1);
+    if (relativePath[0] == '\\')
+	{
+		strcpy (openPath, relativePath+1);
     }
-    else if (len > 2 &&
-	     relativePath[len-1] == '.' &&
-	     relativePath[len-2] == '\\') {
-	strncpy (openPath, relativePath, len-2);
+    else if (
+		len > 2 &&
+	    relativePath[len-1] == '.' &&
+	    relativePath[len-2] == '\\'
+	)
+	{
+		strncpy(openPath, relativePath, len-2);
     }
     else
-	openPath[0] = '\0';
+		openPath[0] = '\0';
 }
 
 /*  MSG_VIS_CLOSE
@@ -506,35 +551,38 @@ StandardPath openPathToken;
 @method FilterFileSelectorClass, MSG_VIS_CLOSE
 {
     word len;
-    dword dhandle;
-    StandardPath pathToken;
+    dword dhandleAndFlags;
+    DiskHandle pathToken;
     char relativePath[MAX_FILE_DIR_LEN];
 
     @callsuper();
 
     len = @call FFSearchText::MSG_VIS_TEXT_GET_TEXT_SIZE();
-    if (len > 0) {
-	dhandle = @call self::
-	    MSG_GEN_FILE_SELECTOR_GET_FULL_SELECTION_PATH(relativePath);
-	pathToken = GFS_GET_FULL_SELECTION_PATH_DISK_HANDLE(dhandle);
-	len = strlen(relativePath);
-	if (pathToken != openPathToken) {
-	    @send FFSearchTrigger::MSG_GEN_SET_ENABLED
-		 (VUM_DELAYED_VIA_UI_QUEUE);
-	    return;
-	}
-	if (relativePath[0] == '\\' &&
-	    strcmp(relativePath+1, openPath) != 0) {
-	    @send FFSearchTrigger::MSG_GEN_SET_ENABLED
-		 (VUM_DELAYED_VIA_UI_QUEUE);
-	}
-	else if (len > 2 &&
-		 relativePath[len-1] == '.' &&
-		 relativePath[len-2] == '\\' &&
-		 strncmp(relativePath, openPath, len-2) != 0) {
-	    @send FFSearchTrigger::MSG_GEN_SET_ENABLED
-		 (VUM_DELAYED_VIA_UI_QUEUE);
-	}
+    if (len > 0)
+	{
+		dhandleAndFlags = @call self::MSG_GEN_FILE_SELECTOR_GET_FULL_SELECTION_PATH(relativePath);
+		pathToken = GFS_GET_FULL_SELECTION_PATH_DISK_HANDLE(dhandleAndFlags);
+
+		len = strlen(relativePath);
+		if (pathToken != openPathToken)
+		{
+			@send FFSearchTrigger::MSG_GEN_SET_ENABLED(VUM_DELAYED_VIA_UI_QUEUE);
+			return;
+		}
+
+		if (relativePath[0] == '\\' && strcmp(relativePath+1, openPath) != 0)
+		{
+			@send FFSearchTrigger::MSG_GEN_SET_ENABLED(VUM_DELAYED_VIA_UI_QUEUE);
+		}
+		else if (
+			len > 2 &&
+			relativePath[len-1] == '.' &&
+			relativePath[len-2] == '\\' &&
+			strncmp(relativePath, openPath, len-2) != 0
+		)
+		{
+			@send FFSearchTrigger::MSG_GEN_SET_ENABLED(VUM_DELAYED_VIA_UI_QUEUE);
+		}
     }
     return;
 }
@@ -559,42 +607,44 @@ StandardPath openPathToken;
  ***********************************************************************/
 @method FilterFileSelectorClass, MSG_FFS_UPDATE_UI_CURRENT_PATH
 {
-    char fullPath[MAX_FILE_DIR_LEN], relativePath[MAX_FILE_DIR_LEN],
-	*endOfPath;
-    dword dhandle;
-    StandardPath pathToken;
-    word docPtr = 0, len = 0;
-    /*
+	char			relativePath[MAX_FILE_DIR_LEN] = {0};
+    char 			fullPath[MAX_FILE_DIR_LEN] = {0};
+	char			*fullPathPtr;
+    dword 			dhandleAndFlags;
+    DiskHandle 		pathToken;
+	word			len = 0;
+
+	/*
      *  Get the standard path token and relative path.
      */
-    dhandle = @call self::
-	MSG_GEN_FILE_SELECTOR_GET_FULL_SELECTION_PATH(relativePath);
-    pathToken = GFS_GET_FULL_SELECTION_PATH_DISK_HANDLE(dhandle);
-    endOfPath = fullPath;
-    FileConstructFullPath(&endOfPath, MAX_FILE_DIR_LEN, pathToken,
-			  relativePath,
-			  TRUE);
-    endOfPath = strstr(fullPath, "DOCUMENT");
-    if (endOfPath) {
-	/* We are only interested in the path below the DOCUMENT dir */
-	docPtr = endOfPath - fullPath;
-	memcpy(endOfPath, "Document", 8);
-    }
-    len = strlen(fullPath+docPtr);
-    if (len > 33) {
+    dhandleAndFlags = @call self::MSG_GEN_FILE_SELECTOR_GET_FULL_SELECTION_PATH(relativePath);
+    pathToken = GFS_GET_FULL_SELECTION_PATH_DISK_HANDLE(dhandleAndFlags);
+    fullPathPtr = fullPath;
+    FileConstructFullPath(
+		&fullPathPtr,
+    	MAX_FILE_DIR_LEN,
+		pathToken,
+		relativePath,
+		TRUE
+	);
+
 	/*
-	 *  If the length is more than 45 characters, we may consider
-	 *  truncate the beginning and add "...".
-	 */
-	len = len - 33 - docPtr;
-	fullPath[len] = C_ELLIPSIS;
+	*  If the length is more than XX characters, we truncate
+	*  the beginning and prepend "...".
+	*/
+	len = strlen(fullPath);
+    if (len > 33)
+    {
+		len = len - 33;
+		fullPath[len] = C_ELLIPSIS;
     }
     else
-	len = 0;
+		len = 0;
+
     /*
      *  Update the current path UI object.
      */
-    @call FFCurrentPath::MSG_VIS_TEXT_REPLACE_ALL_PTR(fullPath + docPtr + len, 0);
+	@call FFCurrentPath::MSG_VIS_TEXT_REPLACE_ALL_PTR(fullPath + len, 0);
 
     return;
 } /* End of MSG_FFS_UPDATE_UI_CURRENT_PATH */
@@ -622,7 +672,7 @@ StandardPath openPathToken;
  *					reducing the number of accls to FileEnum
  ***********************************************************************/
 void RecursiveSearch(const char *searchText,
-				 StandardPath pathToken,
+				 DiskHandle pathToken,
 				 const char *relativePath)
 {
 FileEnumParams   *FE_params;   /* FileEnum parameters. */
