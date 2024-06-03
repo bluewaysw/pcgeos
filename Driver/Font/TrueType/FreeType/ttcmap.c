@@ -157,28 +157,29 @@
 
       /* load segments */
 
-      if ( ALLOC_ARRAY( cmap4->segments,
-                        num_Seg,
-                        TCMap4Segment )           ||
+      if ( GEO_ALLOC_ARRAY( cmap4->segmentBlock,
+                            num_Seg,
+                            TCMap4Segment )       ||
            ACCESS_Frame( (num_Seg * 4 + 1) * 2L ) )
         goto Fail;
 
-      segments = cmap4->segments;
+      segments = GEO_LOCK( cmap4->segmentBlock );
 
-      for ( i = 0; i < num_Seg; i++ )
+      for ( i = 0; i < num_Seg; ++i )
         segments[i].endCount      = GET_UShort();
 
       (void)GET_UShort();
 
-      for ( i = 0; i < num_Seg; i++ )
+      for ( i = 0; i < num_Seg; ++i )
         segments[i].startCount    = GET_UShort();
 
-      for ( i = 0; i < num_Seg; i++ )
+      for ( i = 0; i < num_Seg; ++i )
         segments[i].idDelta       = GET_Short();
 
-      for ( i = 0; i < num_Seg; i++ )
+      for ( i = 0; i < num_Seg; ++i )
         segments[i].idRangeOffset = GET_UShort();
 
+      GEO_UNLOCK( cmap4->segmentBlock );
       FORGET_Frame();
 
       cmap4->numGlyphId = l =
@@ -190,7 +191,7 @@
            ACCESS_Frame( l * 2L ) )
         goto Fail;
 
-      for ( i = 0; i < l; i++ )
+      for ( i = 0; i < l; ++i )
         cmap4->glyphIdArray[i] = GET_UShort();
 
       FORGET_Frame();
@@ -264,7 +265,7 @@
         break;
 
       case 4:
-        FREE( cmap->c.cmap4.segments );
+        GEO_FREE( cmap->c.cmap4.segmentBlock );
         FREE( cmap->c.cmap4.glyphIdArray );
         cmap->c.cmap4.segCountX2 = 0;
         break;
@@ -427,42 +428,43 @@
                                  PCMap4  cmap4 )
   {
     UShort         index1, segCount;
-    UShort         i;
+    UShort         i, result;
     TCMap4Segment  seg4;
+    PCMap4Segment  segments;
 
 
     segCount = cmap4->segCountX2 / 2;
+    segments = GEO_LOCK( cmap4->segmentBlock );
+    result   = 0;
 
-    for ( i = 0; i < segCount; i++ )
-      if ( charCode <= cmap4->segments[i].endCount )
+    for ( i = 0; i < segCount; ++i )
+      if ( charCode <= segments[i].endCount )
         break;
 
     /* Safety check - even though the last endCount should be 0xFFFF */
-    if ( i >= segCount )
-      return 0;
+    if ( i >= segCount ) 
+      goto Fin;
 
-    seg4 = cmap4->segments[i];
+    seg4 = segments[i];
 
     if ( charCode < seg4.startCount )
-      return 0;
+      goto Fin;
 
     if ( seg4.idRangeOffset == 0 )
-      return ( charCode + seg4.idDelta ) & 0xFFFF;
+      result = ( charCode + seg4.idDelta ) & 0xFFFF;
     else
     {
       index1 = seg4.idRangeOffset / 2 + (charCode - seg4.startCount) -
                (segCount - i);
 
       if ( index1 < cmap4->numGlyphId )
-      {
-        if ( cmap4->glyphIdArray[index1] == 0 )
-          return 0;
-        else
-          return ( cmap4->glyphIdArray[index1] + seg4.idDelta ) & 0xFFFF;
-      }
-      else
-        return 0;
+        if ( cmap4->glyphIdArray[index1] != 0 )
+          result = ( cmap4->glyphIdArray[index1] + seg4.idDelta ) & 0xFFFF;
     }
+
+  Fin:
+    GEO_UNLOCK( cmap4->segmentBlock );
+    return result;
   }
 
 

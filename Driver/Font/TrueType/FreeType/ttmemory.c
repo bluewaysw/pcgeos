@@ -192,7 +192,7 @@
   EXPORT_FUNC
   TT_Error  GEO_Free( MemHandle* memHandle )
   {
-    if ( !memHandle )
+    if ( *memHandle == NullHandle )
       return TT_Err_Ok;
 
     MemFree( *memHandle );

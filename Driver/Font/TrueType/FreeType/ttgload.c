@@ -748,6 +748,7 @@
 
           exec->glyphSize = 0;
           phase = Load_End;
+          GEO_UNLOCK( face->glyphLocationBlock );
           break;
         }
 

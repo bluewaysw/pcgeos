@@ -87,7 +87,7 @@
     UShort  entrySelector;  /* for a binary search          */
     UShort  rangeShift;
 
-    PCMap4Segment  segments;
+    MemHandle      segmentBlock;
     PUShort        glyphIdArray;
     UShort         numGlyphId;          /* control value */
   };
