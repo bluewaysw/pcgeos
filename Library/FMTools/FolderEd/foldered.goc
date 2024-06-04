@@ -35,20 +35,124 @@ static 	word		g_tokenStyle = DEFAULT_TOKEN_STYLE;
 
 @classdecl FolderEdInteractionClass;
 
+	/*
+	 * VisMonikers declared in Art folder
+	 */
 @extern visMoniker IconNotFoundMoniker;
+@extern visMoniker CloseImageMoniker;
+@extern visMoniker SettingsImageMoniker;
+@extern visMoniker SettingOKImageMoniker;
 
 /*
 	
 	To do
+	- Apply To all schalter aktivieren/Funktion impelemnetniert
+	- Monikerliste mit Konstaenten (OK)
+		-> Kinstane aucvh für Current/New/deault Icon
+	
 	- Readraw anti Artefakt-Teil dneu machen
-	- stufe in Stausgropup beseitigen
+	- Default Folde rFür Null-Token: nFDR, 0
 		
 	!! In build-Process includen
 	!! in Filetree
 	!! Übersetzungsdatei
 */
 
+/*-------------------------------------------------------------
+ * CreateButtonMoniker
+ *-------------------------------------------------------------
+ *	Build a Moniker from a graphic an a localizable text
+-------------------------------------------------------------*/
+// stop in foldered::CreateButtonMoniker
+void CreateButtonMoniker(optr button, optr graphicMoniker, optr textMoniker) {
+MemHandle	gsHandle;
+GStateHandle	gsState;
+word 		gsChunk; // ChunkHandle 	gsChunk;
+optr		gsOptr;
 
+word		lElem;
+Handle		monikerGString;
+//MemHandle 	mh;
+//word 		monikerSize;
+byte 		*bPtr;
+VisMonikerWithGString	*monikerPtr;
+int		x, y;
+int		w, h, tw, th;
+Rectangle r;
+
+
+
+    /*
+     * Create Gstring to hold Images
+     */
+     
+    gsHandle = MemAllocLMem(LMEM_TYPE_GENERAL, 0);
+    gsState = GrCreateGString( gsHandle, GST_CHUNK, &gsChunk);
+    gsOptr = ConstructOptr(gsHandle, gsChunk);
+
+    /*
+     *	Lock graphic Image (a visMoniker in a sharable ressource) and draw it
+     */
+    MemLock(OptrToHandle(graphicMoniker));
+    
+    bPtr = LMemDeref(graphicMoniker);
+    monikerPtr = (VisMonikerWithGString*)bPtr;
+    w = monikerPtr->VMWGS_common.VM_width;
+    h = monikerPtr->VMWGS_height;
+
+    // bPtr must point to the gstring to draw
+    bPtr += sizeof(VisMonikerWithGString);
+    monikerGString = GrLoadGString(PtrToSegment(bPtr), GST_PTR, PtrToOffset(bPtr));
+
+
+
+	GrDrawGString(gsState, monikerGString, 0, 0, 0, &lElem);
+	GrDestroyGString(monikerGString, NULL, GSKT_LEAVE_DATA);
+    /*
+     * The text is in the SAME ressource -> no furter lock is required
+     */
+    GrGetTextBounds (gsState, LMemDeref(textMoniker), //const char _far *str, 
+			    0, 0, // word xpos, word ypos, 
+			    0, &r); //word count, Rectangle *bounds);    
+    tw = r.R_right - r.R_left;
+    th = r.R_bottom - r.R_top;
+
+y = (h-th)/2;
+h = (h>th) ? h : th;
+
+    w += 5;
+    GrDrawText(gsState, w, y, LMemDeref(textMoniker), 0); 
+    
+    
+// µm !!!    Zenterpos!
+    
+    /*
+     * Unlock data resource and send the gstring as moniker to the object
+     */
+    MemUnlock(OptrToHandle(graphicMoniker));
+
+/*{
+    monikerGString = GrLoadGString(PtrToSegment(bPtr), GST_PTR, PtrToOffset(bPtr));
+    GrGetGStringBounds (monikerGString, gsState, 0 , &r);
+    w = r.R_right - r.R_left;
+    h = r.R_bottom - r.R_top;
+    GrDestroyGString(monikerGString, NULL, GSKT_LEAVE_DATA);
+}/**/
+
+    GrEndGString(gsState);
+    @call button::MSG_GEN_REPLACE_VIS_MONIKER(
+    				VUM_NOW, 	// VisUpdateMode updateMode,
+    				h, w+tw, 0, 	//word height, word width, word length,
+    				VMDT_GSTRING,	// VisMonikerDataType dataType,
+    				VMST_OPTR,	// VisMonikerSourceType sourceType,
+				gsOptr		//dword source) = ax;
+    				);
+
+    GrDestroyGString(gsState,0,GSKT_KILL_DATA);
+    MemFree(gsHandle);
+	
+}
+ 
 /*+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
   +                                                                         +
   +	Initialize and exit the tool			            	    +
@@ -108,6 +212,8 @@ Boolean err, enab;
 
 {word x = toolNum; x= entryNum; x=x; }	// supress compiler warning
 
+
+
     /*
      * Copy our dialog template and add it to the application object
      */
@@ -122,8 +228,8 @@ Boolean err, enab;
     if (enab) {
 	@send @DialogObj(@FEDTokenStyleGroup)::MSG_GEN_SET_USABLE(VUM_NOW);
 	@send @DialogObj(@FEDTokenRangeGroup)::MSG_META_ADD_VAR_DATA(HINT_DRAW_IN_BOX, 0, 0);
-	@send @DialogObj(@TokenTokenHuge)::MSG_GEN_SET_USABLE(VUM_NOW);
-	@send @DialogObj(@TokenNewHuge)::MSG_GEN_SET_USABLE(VUM_NOW);
+	@send @DialogObj(@CurrentIconHuge)::MSG_GEN_SET_USABLE(VUM_NOW);
+	@send @DialogObj(@NewIconHuge)::MSG_GEN_SET_USABLE(VUM_NOW);
     }
 
    
@@ -131,6 +237,7 @@ Boolean err, enab;
      * Initialize duplicated dialog objects
      */
     @send @DialogObj(@SelectOkTrigger)::MSG_GEN_TRIGGER_SET_DESTINATION(g_dialog);
+    @send @DialogObj(@SelectSettingsTrigger)::MSG_GEN_TRIGGER_SET_DESTINATION(g_dialog);
     @send @DialogObj(@ClearTokenTrigger)::MSG_GEN_TRIGGER_SET_DESTINATION(g_dialog);
     @send @DialogObj(@SelectCancelTrigger)::MSG_GEN_TRIGGER_SET_DESTINATION(g_dialog);
     @send @DialogObj(@SelectFolderList)::MSG_GEN_ITEM_GROUP_SET_DESTINATION(g_dialog);
@@ -138,12 +245,38 @@ Boolean err, enab;
     @send @DialogObj(@FEDManufIDApplayTrigger)::MSG_GEN_TRIGGER_SET_DESTINATION(g_dialog);
     @send @DialogObj(@FEDDisplaySizeSelector)::MSG_GEN_ITEM_GROUP_SET_DESTINATION(g_dialog);
     @send @DialogObj(@FEDTokenStyleSelector)::MSG_GEN_ITEM_GROUP_SET_DESTINATION(g_dialog);
+    @send @DialogObj(@FEDApplyToAllSelector)::MSG_GEN_ITEM_GROUP_SET_DESTINATION(g_dialog);
     
     tok.GT_chars[0]='n'; tok.GT_chars[1]='F'; tok.GT_chars[2]='D'; 
     tok.GT_chars[3]='R'; tok.GT_manufID=0;
     FEDShowToken(tok, 0, @DialogObj(@TokenDefaultDisplay), 0, @DialogObj(@TokenDefaultTool));
 
-    
+{
+/*
+ * Combine icon and text moniker into a single combination moniker.
+ * /
+typedef WordFlags CreateIconTextMonikerFlags;
+#define CITMF_POSITION_ICON_ABOVE_TEXT	0x8000
+#define CITMF_TEXT_IS_FPTR		0x4000
+#define CITMF_CREATE_CHUNK		0x2000
+#define CITMF_SWAP_ICON_TEXT            0x1000
+
+#define CITMF_POSITION_ICON_BELOW_TEXT 0x9000
+#define CITMF_POSITION_ICON_RIGHT_OF_TEXT 0x1000
+* /
+
+
+optr	newMon = @DialogObj(@SettingsTextMon);
+newMon = UserCreateIconTextMoniker(@DialogObj(@SettingsTextMon), // optr textMoniker,
+				      @DialogObj(@SettingsMoniker), // optr iconMoniker,
+				      OptrToHandle(g_dialog), //Handle destinationBlock,
+				      10, // word spacing,
+				      0); // CreateIconTextMonikerFlags flags);
+@call @DialogObj(@SelectCancelTrigger)::MSG_GEN_REPLACE_VIS_MONIKER_OPTR(newMon,VUM_NOW);
+*/
+}    
+CreateButtonMoniker(@DialogObj(@SelectCancelTrigger), @CloseImageMoniker, @CloseTextMoniker);
+CreateButtonMoniker(@DialogObj(@SelectSettingsTrigger), @SettingsImageMoniker, @SettingsTextMoniker);
 
     /*
      * Figure out the selected folders
@@ -170,18 +303,24 @@ Boolean err, enab;
     @send @DialogObj(@FEDTokenList)::MSG_GEN_DYNAMIC_LIST_INITIALIZE(count);
     
     /*
-     * Initialize the folder list
+     * Initialize the folder list (sending it's apply msg is required!). 
+     * If only one foldes was selected, or show folder name only
      */
     fileInfo = MemLock(g_mh);
     @send @DialogObj(@SelectFolderList)::MSG_GEN_DYNAMIC_LIST_INITIALIZE(fileInfo->header.FQTH_numFiles);
     @send @DialogObj(@SelectFolderList)::MSG_GEN_ITEM_GROUP_SET_SINGLE_SELECTION(0, FALSE);
     @send @DialogObj(@SelectFolderList)::MSG_GEN_ITEM_GROUP_SET_MODIFIED_STATE(TRUE);
     @send @DialogObj(@SelectFolderList)::MSG_GEN_APPLY();
+    if (fileInfo->header.FQTH_numFiles > 1) { 
+	
+    } else {
+	@send @DialogObj(@SelectFolderList)::MSG_GEN_SET_NOT_USABLE(VUM_NOW);
+	@send @DialogObj(@FEDApplyToAllSelector)::MSG_GEN_SET_NOT_USABLE(VUM_NOW);
+    }
     MemUnlock(g_mh);
 
-    
-    @send  @DialogObj(@FEDIconInfoCount)::MSG_GEN_VALUE_SET_INTEGER_VALUE(count, FALSE);
-    @send  @DialogObj(@FEDIconInfoDisplayed)::MSG_GEN_VALUE_SET_INTEGER_VALUE(count, FALSE);
+    @send  @DialogObj(@FEDTokenInfoCount)::MSG_GEN_VALUE_SET_INTEGER_VALUE(count, FALSE);
+    @send  @DialogObj(@FEDTokenInfoDisplayed)::MSG_GEN_VALUE_SET_INTEGER_VALUE(count, FALSE);
 
     /*
      * Finally, open dialog box
@@ -285,20 +424,52 @@ SelectedFilesStruct	*fileInfo;
  }
     
 /*-------------------------------------------------------------
- * void MSG_FED_QUIT_DIALOG(int cmd);	
+ * void MSG_FED_QUIT_DIALOG(int action);	
  *-------------------------------------------------------------
  *	Close and destroy dialog box
 -------------------------------------------------------------*/
 // stop in foldered::FolderEdInteractionFED_QUIT_DIALOG
+static optr g_configDialog = 0;
 @method FolderEdInteractionClass, MSG_FED_QUIT_DIALOG {
+optr applyTrigger, cancelTrigger;
 
-    UserDestroyDialog(g_dialog); // close and destroy the dialog
-    if (g_mh) MemFree(g_mh);
-    if (g_tokenList) MemFree(g_tokenList);
-    
-    /* Important: set handles to zero for next call to the tool */
-    g_mh = 0;
-    g_tokenList = 0;
+    switch (action) {
+    case ACTION_OPEN_CONFIG:
+    	@send g_dialog::MSG_GEN_GUP_INTERACTION_COMMAND(IC_DISMISS);
+    	g_configDialog = UserCreateDialog(@ConfigDialog);
+    	applyTrigger = ConstructOptr(OptrToHandle(g_configDialog), OptrToChunk(@ConfigApplyTrigger));
+    	cancelTrigger = ConstructOptr(OptrToHandle(g_configDialog), OptrToChunk(@ConfigCancelTrigger));
+    	
+        @send applyTrigger::MSG_GEN_TRIGGER_SET_DESTINATION(g_dialog);
+        @send cancelTrigger::MSG_GEN_TRIGGER_SET_DESTINATION(g_dialog);
+	CreateButtonMoniker(applyTrigger, @SettingOKImageMoniker, @ConfigApplyTextMoniker);
+	CreateButtonMoniker(cancelTrigger, @CloseImageMoniker, @ConfigCancelTextMoniker);
+    	@send g_configDialog::MSG_GEN_INTERACTION_INITIATE();
+	
+    	break;
+    case ACTION_CLOSE_CONFIG_APPLY:
+MessageBox("apply and save config");    
+    	// APPLY Changes here
+    case ACTION_CLOSE_CONFIG_CANCEL:
+    	if (g_configDialog) {
+    	    UserDestroyDialog(g_configDialog);
+    	    g_configDialog = 0;
+    	    @send g_dialog::MSG_GEN_INTERACTION_INITIATE();
+    	}
+    	break;
+    case ACTION_CLOSE_TOOL:
+    default:
+	UserDestroyDialog(g_dialog); // close and destroy the dialog
+	if (g_mh) MemFree(g_mh);
+	if (g_tokenList) MemFree(g_tokenList);
+
+	/* Important: set handles to zero for next call to the tool */
+	g_mh = 0;
+	g_tokenList = 0;
+    	break;
+    }
+
+
 }
 
 /*+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
@@ -418,7 +589,7 @@ dword tokenDW;
     if ( mh ) 
     {
 	@call monikerObj::MSG_GEN_REPLACE_VIS_MONIKER(VUM_NOW, 
-			40,64,monikerSize,
+			32,50,monikerSize,
 			VMDT_VIS_MONIKER ,VMST_FPTR,(dword)MemLock(mh));
 	MemFree(mh);
     }
@@ -439,7 +610,7 @@ dword tokenDW;
 	    if (mh) 
 	    {
 		@call monikerObj::MSG_GEN_REPLACE_VIS_MONIKER(VUM_NOW, 
-				40,64,monikerSize,
+				32,50,monikerSize,
 				VMDT_VIS_MONIKER ,VMST_FPTR,(dword)MemLock(mh));
 		MemFree(mh);
 	    }
@@ -570,8 +741,8 @@ FileExtAttrDesc	attrDesc[4];	/* Array 0..3 */
   FileGetPathExtAttributes(fileName,FEA_MULTIPLE,attrDesc,4);
 
   /* Display information */
-  FEDShowToken(fileToken, @DialogObj(@TokenTokenID), @DialogObj(@TokenTokenStdDisplay), 
-  			@DialogObj(@TokenTokenHuge), @DialogObj(@TokenTokenTool));
+  FEDShowToken(fileToken, @DialogObj(@CurrentIconID), @DialogObj(@CurrentIconStdDisplay), 
+  			@DialogObj(@CurrentIconHuge), @DialogObj(@CurrentIconTool));
   
 
   FilePopDir();
@@ -699,6 +870,172 @@ Boolean found;
 
 }
 
+
+/*-------------------------------------------------------------
+ * ReplaceTokenItemMoniker
+ *-------------------------------------------------------------
+ *	Replace an item in the token list by a gstring, that
+ *	contains am main token moniker and the tiny tool 
+ *	moniker, if we have any
+-------------------------------------------------------------*/
+// stop in foldered::ReplaceTokenItemMoniker
+void ReplaceTokenItemMoniker(optr list, word item, GeodeToken tok) {
+MemHandle	gsHandle;
+GStateHandle	gsState;
+word 		gsChunk; // ChunkHandle 	gsChunk;
+optr		gsOptr;
+
+word		lElem;
+Handle		monikerGString;
+MemHandle 	mh;
+word 		monikerSize;
+byte 		*bPtr;
+VisMonikerWithGString	*monikerPtr;
+int		x, y;
+
+    /*
+     * Create Gstring to hold Images
+     */
+     
+    gsHandle = MemAllocLMem(LMEM_TYPE_GENERAL, 0);
+    gsState = GrCreateGString( gsHandle, GST_CHUNK, &gsChunk);
+    gsOptr = ConstructOptr(gsHandle, gsChunk);
+
+@if 1
+
+// µµ 
+    /*
+     *	Load main moniker an draw it to the gstring
+     */
+    mh = InternalGetTokenMonikerBlock(tok, g_displaySize, g_tokenStyle, &monikerSize); 
+    if ( mh ) {
+
+	bPtr = MemLock(mh);
+	monikerPtr = (VisMonikerWithGString*)bPtr;
+	
+	// bPtr must point to the gstring 
+	bPtr += sizeof(VisMonikerWithGString);
+	monikerGString = GrLoadGString(PtrToSegment(bPtr), GST_PTR, PtrToOffset(bPtr));
+
+	
+	// Center moniker 
+	x = (TOKEN_LIST_ITEM_WIDTH - monikerPtr->VMWGS_common.VM_width)/2;
+	y = (SVGA_MONIER_SPACE_Y - monikerPtr->VMWGS_height)/2;
+	y += TOKEN_LIST_SVGA_MONIKER_TOP;
+	GrDrawGString(gsState, monikerGString, x, y, 0, &lElem);
+	GrDestroyGString(monikerGString, NULL, GSKT_LEAVE_DATA);
+
+	MemFree(mh);
+    } else {
+    	/* IMHO this sould not happen */
+    	GrDrawText(gsState, 0, TOKEN_LIST_TINY_MONIKER_TOP/3, "NOT found", 0);
+    }	
+
+  //  GrDrawHLine(gsState, 0, TOKEN_LIST_TINY_MONIKER_TOP, TOKEN_LIST_ITEM_WIDTH);
+    
+    /*
+     *	Load tiny tool moniker (if any) an draw it to the gstring
+     */
+    mh = InternalGetTokenMonikerBlock(tok, DS_TINY, VMS_TOOL, &monikerSize);
+    if ( mh ) {
+    
+	bPtr = MemLock(mh);
+	monikerPtr = (VisMonikerWithGString*)bPtr;
+	bPtr += sizeof(VisMonikerWithGString);
+	monikerGString = GrLoadGString(PtrToSegment(bPtr), GST_PTR, PtrToOffset(bPtr));
+
+	// check size bevore draw it centered at bottom
+	x = monikerPtr->VMWGS_common.VM_width;
+	y = monikerPtr->VMWGS_height;
+
+	if ( (x<TINY_MONIKER_SPACE_XY) && (y<TINY_MONIKER_SPACE_XY) ) {
+	    x = (TINY_MONIKER_SPACE_XY - x)/2;
+	    y = (TINY_MONIKER_SPACE_XY - y)/2;
+	    y += TOKEN_LIST_TINY_MONIKER_TOP;
+	    GrDrawGString(gsState, monikerGString, x, y, 0, &lElem);
+	    GrDestroyGString(monikerGString, NULL, GSKT_LEAVE_DATA);
+	}
+	MemFree(mh);
+//GrDrawRect(gsState, 1,1, TOKEN_LIST_ITEM_WIDTH-1,  TOKEN_LIST_ITEM_HIGHT-1);
+    }
+@elseif
+    /*
+     *	Load main moniker an draw it to the gstring
+     */
+    mh = InternalGetTokenMonikerBlock(tok, g_displaySize, g_tokenStyle, &monikerSize); 
+    if ( mh ) {
+
+	bPtr = MemLock(mh);
+	monikerPtr = (VisMonikerWithGString*)bPtr;
+	
+	// bPtr must point to the gstring 
+	bPtr += sizeof(VisMonikerWithGString);
+	monikerGString = GrLoadGString(PtrToSegment(bPtr), GST_PTR, PtrToOffset(bPtr));
+
+	
+	// Center moniker in both dimensions
+	x = (TOKEN_LIST_ITEM_WIDTH - monikerPtr->VMWGS_common.VM_width)/2;
+	y = (TOKEN_LIST_TINY_MONIKER_TOP - monikerPtr->VMWGS_height)/2;
+y += TINY_MONIKER_SPACE_XY;
+	GrDrawGString(gsState, monikerGString, x, y, 0, &lElem);
+	GrDestroyGString(monikerGString, NULL, GSKT_LEAVE_DATA);
+
+	MemFree(mh);
+    } else {
+    	/* IMHO this sould not happen */
+    	GrDrawText(gsState, 0, TOKEN_LIST_TINY_MONIKER_TOP/3, "NOT found", 0);
+    }	
+
+  //  GrDrawHLine(gsState, 0, TOKEN_LIST_TINY_MONIKER_TOP, TOKEN_LIST_ITEM_WIDTH);
+    
+    /*
+     *	Load tiny tool moniker (if any) an draw it to the gstring
+     */
+    mh = InternalGetTokenMonikerBlock(tok, DS_TINY, VMS_TOOL, &monikerSize);
+    if ( mh ) {
+    
+	bPtr = MemLock(mh);
+	monikerPtr = (VisMonikerWithGString*)bPtr;
+	bPtr += sizeof(VisMonikerWithGString);
+	monikerGString = GrLoadGString(PtrToSegment(bPtr), GST_PTR, PtrToOffset(bPtr));
+
+	// check size bevore draw it centered at bottom
+	x = monikerPtr->VMWGS_common.VM_width;
+	y = monikerPtr->VMWGS_height;
+	if ( (x<TINY_MONIKER_SPACE_XY) && (y<TINY_MONIKER_SPACE_XY) ) {
+	    x = (TOKEN_LIST_ITEM_WIDTH - x)/2;
+	    y = TOKEN_LIST_TINY_MONIKER_TOP + (TINY_MONIKER_SPACE_XY - y)/2;
+y -= TOKEN_LIST_TINY_MONIKER_TOP ;
+x = (TINY_MONIKER_SPACE_XY - x)/2;
+	    GrDrawGString(gsState, monikerGString, x, y, 0, &lElem);
+	    GrDestroyGString(monikerGString, NULL, GSKT_LEAVE_DATA);
+	}
+	MemFree(mh);
+    
+    }
+@endif
+
+
+    GrEndGString(gsState);
+    
+@if 0
+MSG_GEN_DYNAMIC_LIST_REPLACE_ITEM_MONIKER(@stack
+		word item, ReplaceItemMonikerFlags flags, 
+		word height, word width, word length,
+		VisMonikerDataType dataType,
+		VisMonikerSourceType sourceType,
+		dword source);
+@endif
+
+    @call list::MSG_GEN_DYNAMIC_LIST_REPLACE_ITEM_MONIKER(item,0,	// item, flags
+    			TOKEN_LIST_ITEM_HIGHT, TOKEN_LIST_ITEM_WIDTH,0,			// Height, width, lenght
+			VMDT_GSTRING,VMST_OPTR,gsOptr);	// dataType, sourceType, source
+
+    GrDestroyGString(gsState,0,GSKT_KILL_DATA);
+    MemFree(gsHandle);
+	
+}
+
   
 /*-------------------------------------------------------------
  * MSG_FED_QUERY_TOKEN_LIST	
@@ -711,25 +1048,11 @@ Boolean found;
 TokenListStruct	*tokenList;
 GeodeToken tok;
 
-MemHandle  mh;
-word 	sizeRead;
-
     tokenList = MemLock(g_tokenList);
     tok = tokenList->token[item + tokenList->firstIndex];
     MemUnlock(g_tokenList);
-    
-    mh = InternalGetTokenMonikerBlock(tok, g_displaySize, g_tokenStyle, &sizeRead);
-    if ( mh ) {
-	@call list::MSG_GEN_DYNAMIC_LIST_REPLACE_ITEM_MONIKER(item, 
-				0,40,64,sizeRead,
-				VMDT_VIS_MONIKER ,VMST_FPTR,(dword)MemLock(mh));
-	MemFree(mh);
-	}
-    else {
-    	/* IMHO this sould not happen */
-	@call list::MSG_GEN_DYNAMIC_LIST_REPLACE_ITEM_TEXT(item, "NOT found");
-	}	
-	
+
+    ReplaceTokenItemMoniker(list, item, tok);
 }
 
 /*-------------------------------------------------------------
@@ -751,8 +1074,8 @@ GeodeToken tok;
     MemUnlock(g_tokenList);
 
 
-    FEDShowToken(tok, @DialogObj(@TokenSelectedID), @DialogObj(@TokenNewStdDisplay), 
-    			@DialogObj(@TokenNewHuge), @DialogObj(@TokenNewTool));
+    FEDShowToken(tok, @DialogObj(@NewIconID), @DialogObj(@NewIconStdDisplay), 
+    			@DialogObj(@NewIconHuge), @DialogObj(@NewIconTool));
 
     /* Redraw TokenGroup to remove possible artefacts */
     @call @DialogObj(@FEDTopGroup)::MSG_GEN_SET_NOT_USABLE(VUM_DELAYED_VIA_UI_QUEUE);
@@ -823,16 +1146,16 @@ GeodeToken	curToken;
     // if there are no token to display, list->tokensToShow will be zero
     // --> no extra handling required for the list
     @send @DialogObj(@FEDTokenList)::MSG_GEN_DYNAMIC_LIST_INITIALIZE(list->tokensToShow);
-    @send @DialogObj(@FEDIconInfoDisplayed)::MSG_GEN_VALUE_SET_INTEGER_VALUE(list->tokensToShow, FALSE);
+    @send @DialogObj(@FEDTokenInfoDisplayed)::MSG_GEN_VALUE_SET_INTEGER_VALUE(list->tokensToShow, FALSE);
 
     // ... but disable "Change Token" button and clear "new" token display
     if (0==list->tokensToShow) {
     	@send @DialogObj(@SelectOkTrigger)::MSG_GEN_SET_NOT_ENABLED(VUM_NOW);
     	
-    	@call @DialogObj(@TokenSelectedID)::MSG_GEN_REPLACE_VIS_MONIKER_TEXT("",0);
-    	@call @DialogObj(@TokenNewStdDisplay)::MSG_GEN_REPLACE_VIS_MONIKER_TEXT("",0);
-    	@call @DialogObj(@TokenNewTool)::MSG_GEN_REPLACE_VIS_MONIKER_TEXT("",0);
-    	@call @DialogObj(@TokenNewHuge)::MSG_GEN_REPLACE_VIS_MONIKER_TEXT("",0);
+    	@call @DialogObj(@NewIconID)::MSG_GEN_REPLACE_VIS_MONIKER_TEXT("",0);
+    	@call @DialogObj(@NewIconStdDisplay)::MSG_GEN_REPLACE_VIS_MONIKER_TEXT("",0);
+    	@call @DialogObj(@NewIconTool)::MSG_GEN_REPLACE_VIS_MONIKER_TEXT("",0);
+    	@call @DialogObj(@NewIconHuge)::MSG_GEN_REPLACE_VIS_MONIKER_TEXT("",0);
     	}
     else {
     	@send @DialogObj(@SelectOkTrigger)::MSG_GEN_SET_ENABLED(VUM_NOW);
