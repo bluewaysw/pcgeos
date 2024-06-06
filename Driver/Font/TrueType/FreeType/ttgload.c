@@ -248,7 +248,7 @@
 
     /* read the flags */
 
-    if ( CHECK_ACCESS_Frame( n_points * 5L ) )
+    if ( CHECK_ACCESS_Frame( n_points * 5 ) )
       return error;
 
     j    = 0;
@@ -425,7 +425,7 @@
     if ( subg->is_hinted                    &&
          subg->element_flag & WE_HAVE_INSTR )
     {
-      if ( ACCESS_Frame( 2L ) )
+      if ( ACCESS_Frame( 2 ) )
         return error;
 
       n_ins = GET_UShort();     /* read size of instructions */
@@ -757,7 +757,7 @@
 
         /* read first glyph header */
         if ( FILE_Seek( offset ) ||
-             ACCESS_Frame( 10L ) )
+             ACCESS_Frame( 10 ) )
           goto Fail_File;
 
         num_contours = GET_Short();
@@ -859,7 +859,7 @@
 
         /* now read composite header */
 
-        if ( ACCESS_Frame( 4L ) )
+        if ( ACCESS_Frame( 4 ) )
           goto Fail_File;
 
         subglyph->element_flag = new_flags = GET_UShort();

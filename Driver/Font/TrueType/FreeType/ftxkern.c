@@ -66,7 +66,7 @@ extern TEngine_Instance engineInstance;
     UShort  num_pairs, n;
 
 
-    if ( ACCESS_Frame( 8L ) )
+    if ( ACCESS_Frame( 8 ) )
       return error;
 
     num_pairs            = GET_UShort();
@@ -82,7 +82,7 @@ extern TEngine_Instance engineInstance;
     if ( ALLOC_ARRAY( kern0->pairs, num_pairs, TT_Kern_0_Pair ) )
       return error;
 
-    if ( ACCESS_Frame( num_pairs * 6L ) )
+    if ( ACCESS_Frame( num_pairs * 6 ) )
       goto Fail;
 
     for ( n = 0; n < num_pairs; n++ )
@@ -150,7 +150,7 @@ extern TEngine_Instance engineInstance;
     /* record the table offset */
     table_base = FILE_Pos();
 
-    if ( ACCESS_Frame( 8L ) )
+    if ( ACCESS_Frame( 8 ) )
       return error;
 
     kern2->rowWidth = GET_UShort();
@@ -163,7 +163,7 @@ extern TEngine_Instance engineInstance;
     /* first load left and right glyph classes */
 
     if ( FILE_Seek( table_base + left_offset ) ||
-         ACCESS_Frame( 4L ) )
+         ACCESS_Frame( 4 ) )
       return error;
 
     kern2->leftClass.firstGlyph = GET_UShort();
@@ -178,7 +178,7 @@ extern TEngine_Instance engineInstance;
 
     /* load left offsets */
 
-    if ( ACCESS_Frame( kern2->leftClass.nGlyphs * 2L ) )
+    if ( ACCESS_Frame( kern2->leftClass.nGlyphs << 1 ) )
       goto Fail_Left;
 
     for ( n = 0; n < kern2->leftClass.nGlyphs; n++ )
@@ -189,7 +189,7 @@ extern TEngine_Instance engineInstance;
     /* right class */
 
     if ( FILE_Seek( table_base + right_offset ) ||
-         ACCESS_Frame( 4L ) )
+         ACCESS_Frame( 4 ) )
       goto Fail_Left;
 
     kern2->rightClass.firstGlyph = GET_UShort();
@@ -204,7 +204,7 @@ extern TEngine_Instance engineInstance;
 
     /* load right offsets */
 
-    if ( ACCESS_Frame( kern2->rightClass.nGlyphs * 2L ) )
+    if ( ACCESS_Frame( kern2->rightClass.nGlyphs << 1 ) )
       goto Fail_Right;
 
     for ( n = 0; n < kern2->rightClass.nGlyphs; n++ )
@@ -306,7 +306,7 @@ extern TEngine_Instance engineInstance;
       return TT_Err_Ok;  /* The table is optional */
 
     if ( FILE_Seek( face->dirTables[table].Offset ) ||
-         ACCESS_Frame( 4L ) )
+         ACCESS_Frame( 4 ) )
       return error;
 
     kern->version = GET_UShort();
@@ -327,7 +327,7 @@ extern TEngine_Instance engineInstance;
 
     for ( table = 0; table < num_tables; table++ )
     {
-      if ( ACCESS_Frame( 6L ) )
+      if ( ACCESS_Frame( 6 ) )
         return error;
 
       sub->loaded   = FALSE;             /* redundant, but good to see */

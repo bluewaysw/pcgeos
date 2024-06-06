@@ -87,7 +87,7 @@
     PTableDirEntry  entry;
 
 
-    if ( FILE_Seek( 0L ) || ACCESS_Frame( 12L ) )
+    if ( FILE_Seek( 0 ) || ACCESS_Frame( 12 ) )
       return error;
 
     tableDir.version   = GET_Long();
@@ -115,7 +115,7 @@
                       TTableDirEntry ) )
       return error;
 
-    if ( ACCESS_Frame( face->numTables * 16L ) )
+    if ( ACCESS_Frame( face->numTables * 16 ) )
       return error;
 
     limit = face->numTables;
@@ -164,7 +164,7 @@
     if ( FILE_Seek( face->dirTables[i].Offset ) )   /* seek to maxprofile */
       return error;
 
-    if ( ACCESS_Frame( 32L ) )  /* read into frame */
+    if ( ACCESS_Frame( 32L) )  /* read into frame */
       return error;
 
     /* read frame data into face table */
@@ -250,7 +250,7 @@
       return TT_Err_Ok; /* gasp table is not required */
 
     if ( FILE_Seek( face->dirTables[i].Offset ) ||
-         ACCESS_Frame( 4L ) )
+         ACCESS_Frame( 4 ) )
       return error;
 
     gas = &face->gasp;
@@ -261,7 +261,7 @@
     FORGET_Frame();
 
     if ( ALLOC_ARRAY( gaspranges, gas->numRanges, GaspRange ) ||
-         ACCESS_Frame( gas->numRanges * 4L ) )
+         ACCESS_Frame( gas->numRanges * 4 ) )
       goto Fail;
 
     face->gasp.gaspRanges = gaspranges;
@@ -308,7 +308,7 @@
       return TT_Err_Header_Table_Missing;
 
     if ( FILE_Seek( face->dirTables[i].Offset ) ||
-         ACCESS_Frame( 54L ) )
+         ACCESS_Frame( 54 ) )
       return error;
 
     header = &face->fontHeader;
@@ -513,7 +513,7 @@
     }
 
     if ( FILE_Seek( face->dirTables[i].Offset ) ||
-         ACCESS_Frame( 36L ) )
+         ACCESS_Frame( 36 ) )
       return error;
 
     header->Version   = GET_ULong();
@@ -593,7 +593,7 @@
                             Long ))
         return error;
 
-      if ( ACCESS_Frame( face->numLocations * 4L ) )
+      if ( ACCESS_Frame( face->numLocations << 2 ) )
         return error;
 
       limit = face->numLocations;
@@ -614,7 +614,7 @@
                             Long ))
         return error;
 
-      if ( ACCESS_Frame( face->numLocations * 2L ) )
+      if ( ACCESS_Frame( face->numLocations << 1 ) )
         return error;
 
       limit = face->numLocations;
@@ -662,7 +662,7 @@
     /* Seek to the beginning of the table and check the frame access. */
     /* The names table has a 6 byte header.                           */
     if ( FILE_Seek( face->dirTables[n].Offset ) ||
-         ACCESS_Frame( 6L ) )
+         ACCESS_Frame( 6 ) )
       return error;
 
     names = &face->nameTable;
@@ -678,7 +678,7 @@
     if ( ALLOC_ARRAY( names->names,
                       names->numNameRecords,
                       TNameRec )                    ||
-         ACCESS_Frame( names->numNameRecords * 12L ) )
+         ACCESS_Frame( names->numNameRecords * 12 ) )
     {
       names->numNameRecords = 0;
       goto Fail;
@@ -810,7 +810,7 @@
       return error;
 
     if ( FILE_Seek( face->dirTables[n].Offset ) ||
-         ACCESS_Frame( face->cvtSize * 2L ) )
+         ACCESS_Frame( face->cvtSize << 1 ) )
       return error;
 
     limit = face->cvtSize;
@@ -856,7 +856,7 @@
     table_start = face->dirTables[n].Offset;
 
     if ( ( FILE_Seek( table_start ) ) ||
-         ( ACCESS_Frame( 4L ) ) )           /* 4 bytes cmap header */
+         ( ACCESS_Frame( 4 ) ) )           /* 4 bytes cmap header */
       return error;
 
     cmap_dir.tableVersionNumber = GET_UShort();
@@ -879,8 +879,7 @@
 
     for ( n = 0; n < limit; n++ )
     {
-      if ( FILE_Seek( off )  ||
-           ACCESS_Frame( 8L ) )
+      if ( FILE_Seek( off )  || ACCESS_Frame( 8 ) )
         return error;
 
       /* extra code using entry_ for platxxx could be cleaned up later */
@@ -895,7 +894,7 @@
       off = FILE_Pos();
 
       if ( FILE_Seek( table_start + entry_.offset ) ||
-           ACCESS_Frame( 6L ) )
+           ACCESS_Frame( 6 ) )
         return error;
 
       cmap->format  = GET_UShort();
@@ -1005,7 +1004,7 @@
     }
 
     if ( FILE_Seek( face->dirTables[i].Offset ) ||
-         ACCESS_Frame( 78L ) )
+         ACCESS_Frame( 78 ) )
       return error;
 
     os2 = &face->os2;
@@ -1053,7 +1052,7 @@
     {
       /* only version 1 tables */
 
-      if ( ACCESS_Frame( 8L ) )  /* read into frame */
+      if ( ACCESS_Frame( 8 ) )  /* read into frame */
         return error;
 
       os2->ulCodePageRange1 = GET_ULong();
@@ -1097,7 +1096,7 @@
       return TT_Err_Post_Table_Missing;
 
     if ( FILE_Seek( face->dirTables[i].Offset ) ||
-         ACCESS_Frame( 32L ) )
+         ACCESS_Frame( 32 ) )
       return error;
 
     /* read frame data into face table */
@@ -1156,7 +1155,7 @@
       return TT_Err_Ok;
 
     if ( FILE_Seek( face->dirTables[table].Offset )  ||
-         ACCESS_Frame( 8L ) )
+         ACCESS_Frame( 8 ) )
       return error;
 
     hdmx.version     = GET_UShort();
@@ -1181,7 +1180,7 @@
     {
       /* read record */
 
-      if ( ACCESS_Frame( 2L ) )
+      if ( ACCESS_Frame( 2 ) )
         goto Fail;
 
       rec->ppem      = GET_Byte();

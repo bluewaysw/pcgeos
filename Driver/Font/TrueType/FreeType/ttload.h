@@ -115,11 +115,11 @@
 #define ACCESS_Frame( _size_ ) \
           ( (error = TT_Access_Frame( stream, \
                                       &frame, \
-                                      (Long)(_size_) )) != TT_Err_Ok )
+                                      _size_ )) != TT_Err_Ok )
 #define CHECK_ACCESS_Frame( _size_ ) \
           ( (error = TT_Check_And_Access_Frame( stream, \
                                                 &frame, \
-                                                (Long)(_size_) )) != TT_Err_Ok )
+                                                _size_ )) != TT_Err_Ok )
 #define FORGET_Frame() \
           ( (void)TT_Forget_Frame( &frame ) )
 
@@ -158,7 +158,7 @@
 #define FILE_Read( buffer, count ) \
           ( (error = TT_Read_File ( stream, \
                                     buffer, \
-                                    (Long)(count) )) != TT_Err_Ok )
+                                    count )) != TT_Err_Ok )
 #define FILE_Read_At( pos, buffer, count ) \
           ( (error = TT_Read_At_File( stream, \
                                       (Long)(pos), \
@@ -191,9 +191,9 @@
 
 
 #define ACCESS_Frame( _size_ ) \
-          ( (error = TT_Access_Frame( (Long)(_size_) )) != TT_Err_Ok )
+          ( (error = TT_Access_Frame( _size_ )) != TT_Err_Ok )
 #define CHECK_ACCESS_Frame( _size_ ) \
-          ( (error = TT_Check_And_Access_Frame( (Long)(_size_) )) != TT_Err_Ok )
+          ( (error = TT_Check_And_Access_Frame( _size_ )) != TT_Err_Ok )
 #define FORGET_Frame() \
           ( (void)TT_Forget_Frame() )
 
@@ -213,7 +213,7 @@
           ( (error = TT_Skip_File( (Long)(_distance_) )) != TT_Err_Ok )
 #define FILE_Read( buffer, count ) \
           ( (error = TT_Read_File ( buffer, \
-                                    (Long)(count) )) != TT_Err_Ok )
+                                    count )) != TT_Err_Ok )
 #define FILE_Read_At( pos, buffer, count ) \
           ( (error = TT_Read_At_File( (Long)(pos), \
                                       buffer, \

@@ -86,7 +86,7 @@
       /* allocate subheader keys */
 
       if ( ALLOC_ARRAY( cmap2->subHeaderKeys, 256, UShort ) ||
-           ACCESS_Frame( 512L )                             )
+           ACCESS_Frame( 512 )                             )
         goto Fail;
 
       for ( i = 0; i < 256; i++ )
@@ -108,12 +108,12 @@
       if ( ALLOC_ARRAY( cmap2->subHeaders,
                         num_SH + 1,
                         TCMap2SubHeader )     ||
-           ACCESS_Frame( ( num_SH + 1 ) * 8L ) )
+           ACCESS_Frame( ( num_SH + 1 ) << 3 ) )
         goto Fail;
 
       cmap2sub = cmap2->subHeaders;
 
-      for ( i = 0; i <= num_SH; i++ )
+      for ( i = 0; i <= num_SH; ++i )
       {
         cmap2sub->firstCode     = GET_UShort();
         cmap2sub->entryCount    = GET_UShort();
@@ -129,7 +129,7 @@
       /* load glyph ids */
 
       if ( ALLOC_ARRAY( cmap2->glyphIdArray, l, UShort ) ||
-           ACCESS_Frame( l * 2L ) )
+           ACCESS_Frame( l << 1 ) )
         goto Fail;
 
       for ( i = 0; i < l; i++ )
@@ -143,7 +143,7 @@
 
       /* load header */
 
-      if ( ACCESS_Frame( 8L ) )
+      if ( ACCESS_Frame( 8 ) )
         goto Fail;
 
       cmap4->segCountX2    = GET_UShort();
@@ -160,7 +160,7 @@
       if ( GEO_ALLOC_ARRAY( cmap4->segmentBlock,
                             num_Seg,
                             TCMap4Segment )       ||
-           ACCESS_Frame( (num_Seg * 4 + 1) * 2L ) )
+           ACCESS_Frame( (num_Seg * 4 + 1) * 2 ) )
         goto Fail;
 
       segments = GEO_LOCK( cmap4->segmentBlock );
@@ -188,7 +188,7 @@
       /* load ids */
 
       if ( ALLOC_ARRAY( cmap4->glyphIdArray, l , UShort ) ||
-           ACCESS_Frame( l * 2L ) )
+           ACCESS_Frame( l << 1 ) )
         goto Fail;
 
       for ( i = 0; i < l; ++i )
@@ -200,7 +200,7 @@
     case 6:
       cmap6 = &cmap->c.cmap6;
 
-      if ( ACCESS_Frame( 4L ) )
+      if ( ACCESS_Frame( 4 ) )
         goto Fail;
 
       cmap6->firstCode  = GET_UShort();
@@ -213,7 +213,7 @@
       if ( ALLOC_ARRAY( cmap6->glyphIdArray,
                         cmap6->entryCount,
                         Short )   ||
-           ACCESS_Frame( l * 2L ) )
+           ACCESS_Frame( l << 1 ) )
         goto Fail;
 
       for ( i = 0; i < l; i++ )
