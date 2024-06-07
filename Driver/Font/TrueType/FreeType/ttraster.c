@@ -1233,8 +1233,8 @@
         else
         {
           /* two successive `off' points => create middle point */
-          mx = ( cx + x ) / 2;
-          my = ( cy + y ) / 2;
+          mx = ( cx + x ) >> 1;
+          my = ( cy + y ) >> 1;
 
           if ( Bezier_To( RAS_VARS  mx, my, cx, cy ) ) return FAILURE;
 
@@ -1579,7 +1579,7 @@
           break;
 
         case 4:
-          e1 = CEILING( (x1 + x2 + 1) / 2 );
+          e1 = CEILING( (x1 + x2 + 1) >> 1 );
           break;
 
         case 2:
@@ -1634,7 +1634,7 @@
           if ( ras.dropOutControl == 2 )
             e1 = e2;
           else
-            e1 = CEILING( (x1 + x2 + 1) / 2 );
+            e1 = CEILING( (x1 + x2 + 1) >> 1 );
 
           break;
 
@@ -1860,7 +1860,7 @@
           break;
 
         case 4:
-          e1 = CEILING( (x1 + x2 + 1) / 2 );
+          e1 = CEILING( (x1 + x2 + 1) >> 1 );
           break;
 
         case 2:
@@ -1898,7 +1898,7 @@
           if ( ras.dropOutControl == 2 )
             e1 = e2;
           else
-            e1 = CEILING( (x1 + x2 + 1) / 2 );
+            e1 = CEILING( (x1 + x2 + 1) >> 1 );
 
           break;
 
@@ -2410,7 +2410,7 @@ Scan_DropOuts :
         i = ras.band_stack[ras.band_top].y_min;
         j = ras.band_stack[ras.band_top].y_max;
 
-        k = ( i + j ) / 2;
+        k = ( i + j ) >> 1;
 
         if ( ras.band_top >= 7 || k < i )
         {
