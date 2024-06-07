@@ -937,7 +937,7 @@
   EXPORT_FUNC
   TT_Error  TT_Read_At_File( STREAM_ARGS Long   position,
                                          void*  buffer,
-                                         Long   count )
+                                         Short  count )
   {
     TT_Error  error;
 

@@ -166,6 +166,13 @@
 #undef  TT_CONFIG_OPTION_PROCESS_HDMX
 
 
+/*************************************************************************/
+/* Define TT_CONFIG_OPTION_SUPPORT_CMAP6 if you want to support cmap 6   */
+/* support. In ttf fonts charmap 4 is the standard for char mapping.     */
+
+#undef  TT_CONFIG_OPTION_SUPPORT_CMAP6
+
+
 /**********************************************************************/
 /*                                                                    */
 /*  The following macros are used to define the debug level, as well  */

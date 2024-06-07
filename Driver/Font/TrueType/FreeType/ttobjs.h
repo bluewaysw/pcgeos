@@ -523,7 +523,7 @@
     PCMapTable  cMaps;
 
     /* The glyph locations table */
-    ULong     numLocations;         /* UShort is not enough */
+    UShort    numLocations;
     MemHandle glyphLocationBlock;
 
     /* NOTE : The "hmtx" is now part of the horizontal header */

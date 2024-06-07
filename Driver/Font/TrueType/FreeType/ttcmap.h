@@ -128,7 +128,9 @@
       TCMap0  cmap0;
       TCMap2  cmap2;
       TCMap4  cmap4;
+#ifdef TT_CONFIG_OPTION_SUPPORT_CMAP6
       TCMap6  cmap6;
+#endif
     } c;
   };
 

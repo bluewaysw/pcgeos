@@ -56,7 +56,10 @@
     PCMap0  cmap0;
     PCMap2  cmap2;
     PCMap4  cmap4;
+
+#ifdef TT_CONFIG_OPTION_SUPPORT_CMAP6
     PCMap6  cmap6;
+#endif
 
     PCMap2SubHeader cmap2sub;
     PCMap4Segment   segments;
@@ -197,6 +200,7 @@
       FORGET_Frame();
       break;
 
+#ifdef TT_CONFIG_OPTION_SUPPORT_CMAP6
     case 6:
       cmap6 = &cmap->c.cmap6;
 
@@ -221,6 +225,7 @@
 
       FORGET_Frame();
       break;
+#endif
 
     default:   /* corrupt character mapping table */
       return TT_Err_Invalid_CharMap_Format;
@@ -270,10 +275,12 @@
         cmap->c.cmap4.segCountX2 = 0;
         break;
 
+#ifdef TT_CONFIG_OPTION_SUPPORT_CMAP6
       case 6:
         FREE( cmap->c.cmap6.glyphIdArray );
         cmap->c.cmap6.entryCount = 0;
         break;
+#endif
 
       default:
         /* invalid table format, do nothing */
@@ -300,7 +307,10 @@
   static UShort  code_to_index0( UShort  charCode, PCMap0  cmap0 );
   static UShort  code_to_index2( UShort  charCode, PCMap2  cmap2 );
   static UShort  code_to_index4( UShort  charCode, PCMap4  cmap4 );
+
+  #ifdef TT_CONFIG_OPTION_SUPPORT_CMAP6
   static UShort  code_to_index6( UShort  charCode, PCMap6  cmap6 );
+  #endif
 
 
   LOCAL_FUNC
@@ -315,8 +325,10 @@
         return code_to_index2( charcode, &cmap->c.cmap2 );
       case 4:
         return code_to_index4( charcode, &cmap->c.cmap4 );
+#ifdef TT_CONFIG_OPTION_SUPPORT_CMAP6
       case 6:
         return code_to_index6( charcode, &cmap->c.cmap6 );
+#endif
       default:
         return 0;
     }
@@ -468,6 +480,7 @@
   }
 
 
+#ifdef TT_CONFIG_OPTION_SUPPORT_CMAP6
 /*******************************************************************
  *
  *  Function    : code_to_index6
@@ -499,6 +512,7 @@
 
     return cmap6->glyphIdArray[charCode - firstCode];
   }
+#endif
 
 
 /* END */

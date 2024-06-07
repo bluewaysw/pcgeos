@@ -163,7 +163,7 @@
           ( (error = TT_Read_At_File( stream, \
                                       (Long)(pos), \
                                       buffer, \
-                                      (Long)(count) )) != TT_Err_Ok )
+                                      count )) != TT_Err_Ok )
 
 #else   /* thread-safe implementation */
 
