@@ -23,7 +23,7 @@ library ansic
 export GETTHOSETOOLS
 export FOLDEREDTOOLSTART
 
-# Not API
+# Not API - classes
 export FolderEdInteractionClass
 export WordValueClass
 

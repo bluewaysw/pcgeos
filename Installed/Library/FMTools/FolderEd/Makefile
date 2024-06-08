@@ -4,15 +4,10 @@
 # If you edit it, you will lose your changes, should it be regenerated.
 #
 GEODE           = foldered
-MAIN            = foldered.goc tokenlist.goc tokenshow.goc wordvalue.goc
-UI              = fedui.goc fedui.goh
+ASM_TO_OBJS     =
 UI_TO_RDFS      =
-OBJS            = foldered.obj tokenlist.obj tokenshow.obj wordvalue.obj\
-                  fedui.obj
-COMMON          = foldered.goh
-MODULES         =
-CMODULES        = Main UI
-SRCS            = $(MAIN) $(UI) $(COMMON)
+SRCS            = fedui.goc foldered.goc fedui.goh foldered.goh
+OBJS            = fedui.obj foldered.obj
 LOBJS           =
 LIBOBJ          = $(DEVEL_DIR)/Include/$(GEODE).ldf
 LIBNAME         = foldered
