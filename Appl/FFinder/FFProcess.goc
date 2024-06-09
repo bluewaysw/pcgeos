@@ -196,16 +196,16 @@ void UpdateUIForSearchStart()
 
 void UpdateUIForSearchEnd()
 {
-    TCHAR * complete;
-    MemHandle mh;
-    /* update status */
-    if (!searchResultCnt)
+	TCHAR * complete;
+	MemHandle mh;
+	/* update status */
+	if (!searchResultCnt)
 	{
 		LockStrings();
 		@call FFStatus::MSG_GEN_REPLACE_VIS_MONIKER_TEXT(LMemDeref(@ZeroFoundStr), VUM_NOW);
 		UnlockStrings();
-    }
-    else
+	}
+	else
 	{
 		LockStrings();
 		mh = MemAlloc ( ( strlen( LMemDeref( @NFoundStr )) + 6 ) * sizeof( TCHAR ), HF_FIXED, 0 );
@@ -216,7 +216,7 @@ void UpdateUIForSearchEnd()
 		@call FFStatus::MSG_GEN_REPLACE_VIS_MONIKER_TEXT(complete, VUM_NOW);
 		MemFree(mh);
 		// @call FFOpenTrigger::MSG_GEN_SET_ENABLED(VUM_NOW);
-    }
+	}
 	/* update UI */
 	if (@call FFViewSelection::MSG_GEN_ITEM_GROUP_GET_SELECTION() == 0)
 	{
@@ -818,21 +818,29 @@ word			  numFound, i;
  ***********************************************************************/
 @method FFResultListClass, MSG_FFRL_QUERY_MONIKER
 {
-	char	fullPath[MAX_FILE_DIR_LEN], resolved[MAX_FILE_DIR_LEN],
-		*endOfPath, safe, *finalPath, *docPath;
-	ResultEntry	*entry;
-	word		itemSize, zero, cnt, len;
-	FileAttrs 	attr;
-	DiskHandle 	diskh;
+	char			fullPath[MAX_FILE_DIR_LEN];
+	char			resolved[MAX_FILE_DIR_LEN];
+	char			safe;
+	char*			endOfPath;
+	char*			finalPath;
+	char*			docPath;
+	ResultEntry		*entry;
+	word			itemSize, zero, cnt, len;
+	FileAttrs 		attr;
+	DiskHandle 		diskh;
 
-	optr			moniker;
-	optr			iconMoniker = NULL;
-	ChunkHandle		monikChunk = NullHandle;
-	word			monikSize = 0;
-	Boolean			isMoniker = FALSE;
-	DisplayScheme	ds;
-	GeodeToken		tok;
-	TCHAR*			ext = 0;
+	optr					moniker;
+	optr					iconMoniker = NULL;
+	MemHandle				monikBlock = NullHandle;
+	ChunkHandle				monikChunk = NullChunk;
+	word					monikSize = 0;
+	Boolean					isMoniker = FALSE;
+	DisplayScheme			ds;
+	GeodeToken				tok;
+	TCHAR*					ext = 0;
+	word					width = 0;
+	word					height = 0;
+    VisMonikerWithGString*	vmp = (void*) 0;
 
 	ObjLockObjBlock(HandleOf(@ListMoniker));
 
@@ -943,6 +951,8 @@ word			  numFound, i;
 		}
 		else
 		{
+			iconMoniker = @FileMoniker; // set default, now let's see if we find something more fitting
+
 			if (FileGetPathExtAttributes(finalPath, FEA_TOKEN, &tok, sizeof(GeodeToken)) != 0)
 			{
 				ext = strrchr(finalPath, '.') + 1;
@@ -952,28 +962,40 @@ word			  numFound, i;
 				}
 			}
 
-			MemLock(OptrToHandle(oself));
-			@call GeodeGetAppObject(0)::MSG_GEN_APPLICATION_GET_DISPLAY_SCHEME(&ds);
-			isMoniker =	TokenLoadMonikerChunk(
-					TOKEN_CHARS(tok.GT_chars[0],tok.GT_chars[1],tok.GT_chars[2],tok.GT_chars[3]),
-					tok.GT_manufID,
-					ds.DS_displayType,	/* type of display for token */
-					((VMSF_GSTRING) | (VMS_TOOL << VMSF_STYLE_OFFSET)),	/* flags for finding token */
-					OptrToHandle(oself),		/* locked block for new chunk */
-					&monikSize,	/* returned new chunk size */
-					&monikChunk);	/* returned new chunk handle */
-			MemUnlock(OptrToHandle(oself));
+			monikBlock = MemAllocLMem(LMEM_TYPE_GENERAL, 0);
+			if (monikBlock)
+			{
+				MemLock(monikBlock);
 
-			if (isMoniker)
-			{
-				iconMoniker = ConstructOptr(OptrToHandle(oself), monikChunk);
-			}
-			else
-			{
-				iconMoniker = @FileMoniker;
+				@call GeodeGetAppObject(0)::MSG_GEN_APPLICATION_GET_DISPLAY_SCHEME(&ds);
+				isMoniker =	TokenLoadMonikerChunk(
+						TOKEN_CHARS(tok.GT_chars[0],tok.GT_chars[1],tok.GT_chars[2],tok.GT_chars[3]),
+						tok.GT_manufID,
+						ds.DS_displayType,	/* type of display for token */
+						((VMSF_GSTRING) | (VMS_TOOL << VMSF_STYLE_OFFSET)),	/* flags for finding token */
+						monikBlock,
+						&monikSize,	/* returned new chunk size */
+						&monikChunk);	/* returned new chunk handle */
+
+				if (monikChunk)
+				{
+					vmp = (VisMonikerWithGString*) LMemDeref(ConstructOptr(monikBlock, monikChunk));
+					if (vmp->VMWGS_common.VM_type & VMT_GSTRING)
+					{
+						width = vmp->VMWGS_common.VM_width;
+						height = vmp->VMWGS_height;
+                    	if ((height <= TOOL_ICON_HEIGHT) && (width <= TOOL_ICON_WIDTH))
+						{
+							iconMoniker = ConstructOptr(monikBlock, monikChunk);
+						}
+					}
+				}
+
+				MemUnlock(monikBlock);
 			}
 		}
 
+		// the C version of UserCreateIconTextMoniker expects the icon moniker in an LMEM-Heap
 		moniker = UserCreateIconTextMoniker(
 			(optr)(finalPath + len + 1),
 			iconMoniker,
@@ -984,13 +1006,8 @@ word			  numFound, i;
 
 		@call self::MSG_GEN_DYNAMIC_LIST_REPLACE_ITEM_MONIKER_OPTR(item, moniker);
 
-		//MemLock(OptrToHandle(iconMoniker));
-		//LMemFree(iconMoniker);
-		//MemUnlock(OptrToHandle(iconMoniker));
-
-		//MemLock(OptrToHandle(moniker));
+		if (monikBlock) MemFree(monikBlock);
 		LMemFree(moniker);
-		//MemUnlock(OptrToHandle(moniker));
     }
 
     MemUnlock(HandleOf(@ListMoniker));
