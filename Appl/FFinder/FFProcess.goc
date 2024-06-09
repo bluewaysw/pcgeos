@@ -69,6 +69,7 @@ void UpdateUIForSearchStart(void);
 void UpdateUIForSearchEnd(void);
 void InitializeFFSearchResultList(void);
 Boolean IsStringMatched(const unsigned char *fileName, const unsigned char *searchText);
+Boolean CheckDOSFileType(TCHAR *ext, GeodeToken *token);
 
 @extern chunk FindStr;
 @extern chunk SearchStr;
@@ -127,13 +128,13 @@ UnlockStrings(void)
  ***********************************************************************/
 @method FFinderProcessClass, MSG_GEN_PROCESS_OPEN_APPLICATION
 {
-    word       i = 0;
-    optr       child = NullOptr;
+	word       i = 0;
+	optr       child = NullOptr;
 
-    /*
-     *  If the user level is intro, reduce some UIs
-     */
-    if (UserGetDefaultUILevel() == UIIL_INTRODUCTORY)
+	/*
+	*  If the user level is intro, reduce some UIs
+	*/
+	if (UserGetDefaultUILevel() == UIIL_INTRODUCTORY)
 	{
 		FFinderUserIntro = TRUE;
 		@call FFCurrentPath::MSG_GEN_SET_NOT_USABLE(VUM_NOW);
@@ -149,31 +150,31 @@ UnlockStrings(void)
 	/*
 	 * enable drive buttons for available drives
 	 */
-    for (i = 0; i < 26; i++)
+	for (i = 0; i < 26; i++)
 	{
-	if (DriveGetStatus(i) & DS_PRESENT)
-		{
-	    child = @call FFDriveItemGroup::MSG_GEN_FIND_CHILD_AT_POSITION(i) ;
-	    @send child::MSG_GEN_SET_USABLE(VUM_DELAYED_VIA_UI_QUEUE) ;
-	    @send child::MSG_GEN_SET_ENABLED(VUM_DELAYED_VIA_UI_QUEUE) ;
-	}
+		if (DriveGetStatus(i) & DS_PRESENT)
+			{
+			child = @call FFDriveItemGroup::MSG_GEN_FIND_CHILD_AT_POSITION(i) ;
+			@send child::MSG_GEN_SET_USABLE(VUM_DELAYED_VIA_UI_QUEUE) ;
+			@send child::MSG_GEN_SET_ENABLED(VUM_DELAYED_VIA_UI_QUEUE) ;
+		}
 		else
 		{
-	    child = @call FFDriveItemGroup::MSG_GEN_FIND_CHILD_AT_POSITION(i) ;
-	    @send child::MSG_GEN_SET_NOT_USABLE(VUM_DELAYED_VIA_UI_QUEUE) ;
-	    @send child::MSG_GEN_SET_NOT_ENABLED(VUM_DELAYED_VIA_UI_QUEUE) ;
+			child = @call FFDriveItemGroup::MSG_GEN_FIND_CHILD_AT_POSITION(i) ;
+			@send child::MSG_GEN_SET_NOT_USABLE(VUM_DELAYED_VIA_UI_QUEUE) ;
+			@send child::MSG_GEN_SET_NOT_ENABLED(VUM_DELAYED_VIA_UI_QUEUE) ;
+		}
 	}
-	}
-    @call FFDriveItemGroup::MSG_GEN_SET_USABLE(VUM_DELAYED_VIA_UI_QUEUE) ;
-    @call FFDriveItemGroup::MSG_GEN_SET_ENABLED(VUM_DELAYED_VIA_UI_QUEUE) ;
+	@call FFDriveItemGroup::MSG_GEN_SET_USABLE(VUM_DELAYED_VIA_UI_QUEUE) ;
+	@call FFDriveItemGroup::MSG_GEN_SET_ENABLED(VUM_DELAYED_VIA_UI_QUEUE) ;
 
-    @callsuper();
-    /*
-     *  Initialize the current path UI object.
-     */
-    @call FileSelector::MSG_FFS_UPDATE_UI_CURRENT_PATH();
+	@callsuper();
+	/*
+	*  Initialize the current path UI object.
+	*/
+	@call FileSelector::MSG_FFS_UPDATE_UI_CURRENT_PATH();
 
-    return;
+	return;
 } /* End of MSG_GEN_PROCESS_OPEN_APPLICATION */
 
 
@@ -181,8 +182,7 @@ void UpdateUIForSearchStart()
 {
     searchMode = SEARCH_IN_PROGRESS;
     LockStrings();
-    @call FFStatus::MSG_GEN_REPLACE_VIS_MONIKER_TEXT
-	 (LMemDeref(@SearchStr), VUM_NOW);
+    @call FFStatus::MSG_GEN_REPLACE_VIS_MONIKER_TEXT(LMemDeref(@SearchStr), VUM_NOW);
     UnlockStrings();
     @call FFSearchText::MSG_GEN_SET_NOT_ENABLED(VUM_NOW);
     @call FFOptionScreen::MSG_GEN_SET_NOT_ENABLED(VUM_NOW);
@@ -199,38 +199,38 @@ void UpdateUIForSearchEnd()
     TCHAR * complete;
     MemHandle mh;
     /* update status */
-    if (!searchResultCnt) {
-	LockStrings();
-	@call FFStatus::MSG_GEN_REPLACE_VIS_MONIKER_TEXT
-	     (LMemDeref(@ZeroFoundStr), VUM_NOW);
-	UnlockStrings();
+    if (!searchResultCnt)
+	{
+		LockStrings();
+		@call FFStatus::MSG_GEN_REPLACE_VIS_MONIKER_TEXT(LMemDeref(@ZeroFoundStr), VUM_NOW);
+		UnlockStrings();
     }
-    else {
-	LockStrings();
-	mh = MemAlloc ( ( strlen( LMemDeref( @NFoundStr )) + 6 ) * sizeof( TCHAR ), HF_FIXED, 0 );
-	complete = ( TCHAR * ) MemDeref( mh );
-	itoa(searchResultCnt, complete);
-	strcat(complete, LMemDeref(@NFoundStr));
-	UnlockStrings();
-	@call FFStatus::MSG_GEN_REPLACE_VIS_MONIKER_TEXT
-	     (complete, VUM_NOW);
-	MemFree( mh );
-	// @call FFOpenTrigger::MSG_GEN_SET_ENABLED(VUM_NOW);
+    else
+	{
+		LockStrings();
+		mh = MemAlloc ( ( strlen( LMemDeref( @NFoundStr )) + 6 ) * sizeof( TCHAR ), HF_FIXED, 0 );
+		complete = ( TCHAR * ) MemDeref( mh );
+		itoa(searchResultCnt, complete);
+		strcat(complete, LMemDeref(@NFoundStr));
+		UnlockStrings();
+		@call FFStatus::MSG_GEN_REPLACE_VIS_MONIKER_TEXT(complete, VUM_NOW);
+		MemFree(mh);
+		// @call FFOpenTrigger::MSG_GEN_SET_ENABLED(VUM_NOW);
     }
-    /* update UI */
-    if (@call FFViewSelection::MSG_GEN_ITEM_GROUP_GET_SELECTION() == 0)
+	/* update UI */
+	if (@call FFViewSelection::MSG_GEN_ITEM_GROUP_GET_SELECTION() == 0)
 	{
 		@call FFOptionScreen::MSG_GEN_SET_ENABLED(VUM_NOW);
 		@call FFSearchText::MSG_GEN_SET_ENABLED(VUM_NOW);
-    }
+	}
 
 /*    @call FFSearchTrigger::MSG_GEN_SET_ENABLED(VUM_NOW); */
-    @call FFStopTrigger::MSG_GEN_SET_NOT_ENABLED(VUM_NOW);
-    @call FFShowSearchResult::MSG_GEN_SET_ENABLED(VUM_NOW);
-    @call FFMostRecent::MSG_GEN_SET_ENABLED(VUM_NOW);
-    searchMode = SEARCH_END;
-    stopSearchFlag = FALSE;
-    @call FFinderApp::MSG_GEN_APPLICATION_MARK_NOT_BUSY();
+	@call FFStopTrigger::MSG_GEN_SET_NOT_ENABLED(VUM_NOW);
+	@call FFShowSearchResult::MSG_GEN_SET_ENABLED(VUM_NOW);
+	@call FFMostRecent::MSG_GEN_SET_ENABLED(VUM_NOW);
+	searchMode = SEARCH_END;
+	stopSearchFlag = FALSE;
+	@call FFinderApp::MSG_GEN_APPLICATION_MARK_NOT_BUSY();
 }
 
 /***********************************************************************
@@ -382,9 +382,9 @@ void UpdateUIForSearchEnd()
 @method FFinderProcessClass, MSG_FFP_DISPLAY_RECENT_OPEN_FILES
 {
 	DocumentEntry	(*buffer)[NUM_OF_DOCUMENT_ENTRIES];
-	MemHandle	mh = NullHandle;
-	int 		i = 0;
-	int  		start = 0;
+	MemHandle		mh = NullHandle;
+	int				i = 0;
+	int				start = 0;
 
 	/*
 	*  Get the array of most recently opened documents.
@@ -490,6 +490,10 @@ void UpdateUIForSearchEnd()
 		{
 			case 26:	// SP_DOCUMENT
 				(void) @call FileSelector::MSG_GEN_PATH_SET("\\", SP_DOCUMENT);
+			break;
+
+			case 27:	// SP_WORLD
+				(void) @call FileSelector::MSG_GEN_PATH_SET("\\", SP_APPLICATION);
 			break;
 
 			default:
@@ -796,26 +800,6 @@ word			  numFound, i;
     return;
 } /* End of RecursiveSearch */
 
-
-GStateHandle
-CreateLMemGString (optr *storagePtr)
-{
-    MemHandle		newBlock;
-    ChunkHandle		newChunk;
-    GStateHandle 	gstate;
-
-    newBlock = MemAllocLMem(LMEM_TYPE_GENERAL, sizeof(LMemBlockHeader));
-    ECCheckMemHandle(newBlock);
-    MemModifyFlags(newBlock, HF_SHARABLE, 0);
-
-    gstate = GrCreateGString(newBlock, GST_CHUNK, (word*) &newChunk);
-    ECCheckGStateHandle(gstate);
-
-    *storagePtr = ConstructOptr(newBlock, newChunk);
-
-    return(gstate);
-}
-
 /***********************************************************************
  *		MSG_FFRL_QUERY_MONIKER for FFResultListClass
  ***********************************************************************
@@ -841,9 +825,14 @@ CreateLMemGString (optr *storagePtr)
 	FileAttrs 	attr;
 	DiskHandle 	diskh;
 
-	optr		moniker;
-	optr		iconMoniker = NULL;
-
+	optr			moniker;
+	optr			iconMoniker = NULL;
+	ChunkHandle		monikChunk = NullHandle;
+	word			monikSize = 0;
+	Boolean			isMoniker = FALSE;
+	DisplayScheme	ds;
+	GeodeToken		tok;
+	TCHAR*			ext = 0;
 
 	ObjLockObjBlock(HandleOf(@ListMoniker));
 
@@ -948,7 +937,43 @@ CreateLMemGString (optr *storagePtr)
 			}
 		} /* end of WLD_RECENT */
 
-		iconMoniker = (entry->RE_fileType & FA_SUBDIR) ? @FolderMoniker : @FileMoniker;
+		if (entry->RE_fileType & FA_SUBDIR)
+		{
+			iconMoniker = @FolderMoniker;
+		}
+		else
+		{
+			if (FileGetPathExtAttributes(finalPath, FEA_TOKEN, &tok, sizeof(GeodeToken)) != 0)
+			{
+				ext = strrchr(finalPath, '.') + 1;
+				if (ext)
+				{
+					(void) CheckDOSFileType(ext, &tok);
+				}
+			}
+
+			MemLock(OptrToHandle(oself));
+			@call GeodeGetAppObject(0)::MSG_GEN_APPLICATION_GET_DISPLAY_SCHEME(&ds);
+			isMoniker =	TokenLoadMonikerChunk(
+					TOKEN_CHARS(tok.GT_chars[0],tok.GT_chars[1],tok.GT_chars[2],tok.GT_chars[3]),
+					tok.GT_manufID,
+					ds.DS_displayType,	/* type of display for token */
+					((VMSF_GSTRING) | (VMS_TOOL << VMSF_STYLE_OFFSET)),	/* flags for finding token */
+					OptrToHandle(oself),		/* locked block for new chunk */
+					&monikSize,	/* returned new chunk size */
+					&monikChunk);	/* returned new chunk handle */
+			MemUnlock(OptrToHandle(oself));
+
+			if (isMoniker)
+			{
+				iconMoniker = ConstructOptr(OptrToHandle(oself), monikChunk);
+			}
+			else
+			{
+				iconMoniker = @FileMoniker;
+			}
+		}
+
 		moniker = UserCreateIconTextMoniker(
 			(optr)(finalPath + len + 1),
 			iconMoniker,
@@ -958,8 +983,15 @@ CreateLMemGString (optr *storagePtr)
 		);
 
 		@call self::MSG_GEN_DYNAMIC_LIST_REPLACE_ITEM_MONIKER_OPTR(item, moniker);
+
+		//MemLock(OptrToHandle(iconMoniker));
+		//LMemFree(iconMoniker);
+		//MemUnlock(OptrToHandle(iconMoniker));
+
+		//MemLock(OptrToHandle(moniker));
 		LMemFree(moniker);
-    	}
+		//MemUnlock(OptrToHandle(moniker));
+    }
 
     MemUnlock(HandleOf(@ListMoniker));
 } /* End of MSG_DM_GET_MEANING_MONIKER.	*/
