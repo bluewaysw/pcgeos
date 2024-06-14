@@ -84,6 +84,7 @@
 
       break;
 
+#ifdef TT_CONFIG_OPTION_SUPPORT_CMAP2
     case 2:
       num_SH = 0;
       cmap2  = &cmap->c.cmap2;
@@ -142,6 +143,7 @@
 
       FORGET_Frame();
       break;
+#endif
 
     case 4:
       cmap4 = &cmap->c.cmap4;
@@ -268,11 +270,13 @@
         FREE( cmap->c.cmap0.glyphIdArray );
         break;
 
+#ifdef TT_CONFIG_OPTION_SUPPORT_CMAP2
       case 2:
         FREE( cmap->c.cmap2.subHeaderKeys );
         FREE( cmap->c.cmap2.subHeaders );
         FREE( cmap->c.cmap2.glyphIdArray );
         break;
+#endif
 
       case 4:
         GEO_FREE( cmap->c.cmap4.segmentBlock );
@@ -326,8 +330,10 @@
     {
       case 0:
         return code_to_index0( charcode, &cmap->c.cmap0 );
+#ifdef TT_CONFIG_OPTION_SUPPORT_CMAP6
       case 2:
         return code_to_index2( charcode, &cmap->c.cmap2 );
+#endif
       case 4:
         return code_to_index4( charcode, &cmap->c.cmap4 );
 #ifdef TT_CONFIG_OPTION_SUPPORT_CMAP6

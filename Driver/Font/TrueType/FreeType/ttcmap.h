@@ -89,7 +89,6 @@
 
     MemHandle      segmentBlock;
     MemHandle      glyphIdBlock;
-  //  PUShort        glyphIdArray;
     UShort         numGlyphId;          /* control value */
   };
 
@@ -127,7 +126,9 @@
     union
     {
       TCMap0  cmap0;
+#ifdef TT_CONFIG_OPTION_SUPPORT_CMAP2
       TCMap2  cmap2;
+#endif
       TCMap4  cmap4;
 #ifdef TT_CONFIG_OPTION_SUPPORT_CMAP6
       TCMap6  cmap6;
