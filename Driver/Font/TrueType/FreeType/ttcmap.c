@@ -56,14 +56,17 @@
     PUShort glyphIdArray;
 
     PCMap0  cmap0;
+#ifdef TT_CONFIG_OPTION_SUPPORT_CMAP2
     PCMap2  cmap2;
+#endif
     PCMap4  cmap4;
-
 #ifdef TT_CONFIG_OPTION_SUPPORT_CMAP6
     PCMap6  cmap6;
 #endif
 
+#ifdef TT_CONFIG_OPTION_SUPPORT_CMAP2
     PCMap2SubHeader cmap2sub;
+#endif
     PCMap4Segment   segments;
 
 
@@ -314,7 +317,11 @@
  ******************************************************************/
 
   static UShort  code_to_index0( UShort  charCode, PCMap0  cmap0 );
+
+  #ifdef TT_CONFIG_OPTION_SUPPORT_CMAP2
   static UShort  code_to_index2( UShort  charCode, PCMap2  cmap2 );
+  #endif
+
   static UShort  code_to_index4( UShort  charCode, PCMap4  cmap4 );
 
   #ifdef TT_CONFIG_OPTION_SUPPORT_CMAP6
@@ -330,7 +337,7 @@
     {
       case 0:
         return code_to_index0( charcode, &cmap->c.cmap0 );
-#ifdef TT_CONFIG_OPTION_SUPPORT_CMAP6
+#ifdef TT_CONFIG_OPTION_SUPPORT_CMAP2
       case 2:
         return code_to_index2( charcode, &cmap->c.cmap2 );
 #endif
@@ -373,6 +380,7 @@
   }
 
 
+#ifdef TT_CONFIG_OPTION_SUPPORT_CMAP2
 /*******************************************************************
  *
  *  Function    : code_to_index2
@@ -430,6 +438,7 @@
         return 0;
     }
   }
+#endif
 
 
 /*******************************************************************
