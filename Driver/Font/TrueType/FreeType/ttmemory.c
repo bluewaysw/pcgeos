@@ -170,6 +170,8 @@
     if ( Size > 0 )
       *M =  MemAllocSetOwner( GeodeGetCodeProcessHandle(), 
                                Size, HF_SHARABLE | HF_SWAPABLE, HAF_ZERO_INIT );
+    else
+      *M = NullHandle;
 
     return TT_Err_Ok;
   }

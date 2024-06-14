@@ -167,8 +167,15 @@
 
 
 /*************************************************************************/
+/* Define TT_CONFIG_OPTION_SUPPORT_CMAP6 if you want to support cmap 2   */
+/* char mapping. Charmapping type 2 is now out of date.                  */
+
+#undef  TT_CONFIG_OPTION_SUPPORT_CMAP2
+
+
+/*************************************************************************/
 /* Define TT_CONFIG_OPTION_SUPPORT_CMAP6 if you want to support cmap 6   */
-/* support. In ttf fonts charmap 4 is the standard for char mapping.     */
+/* char mapping. In ttf fonts charmap 4 is the standard for char mapping.*/
 
 #undef  TT_CONFIG_OPTION_SUPPORT_CMAP6
 

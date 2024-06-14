@@ -88,7 +88,8 @@
     UShort  rangeShift;
 
     MemHandle      segmentBlock;
-    PUShort        glyphIdArray;
+    MemHandle      glyphIdBlock;
+  //  PUShort        glyphIdArray;
     UShort         numGlyphId;          /* control value */
   };
 

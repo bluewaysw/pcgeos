@@ -99,10 +99,10 @@
     GEO_Free( (MemHandle*)&_memHandle_ )
 
   #define GEO_LOCK( _memHandle_ ) \
-    MemLock( _memHandle_ )
+    (( _memHandle_ ) != NullHandle ? MemLock( _memHandle_ ) : NULL )
 
   #define GEO_UNLOCK( _memHandle_ ) \
-    MemUnlock( _memHandle_ )
+    (( _memHandle_ ) != NullHandle ? MemUnlock( _memHandle_ ) : (void)0 )
 
 
   /* Allocate a movable and swapable block of memory of 'Size' bytes */

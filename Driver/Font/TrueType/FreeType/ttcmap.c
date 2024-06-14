@@ -53,6 +53,8 @@
 
     UShort  u, l;
 
+    PUShort glyphIdArray;
+
     PCMap0  cmap0;
     PCMap2  cmap2;
     PCMap4  cmap4;
@@ -190,13 +192,16 @@
 
       /* load ids */
 
-      if ( ALLOC_ARRAY( cmap4->glyphIdArray, l , UShort ) ||
+      if ( GEO_ALLOC_ARRAY( cmap4->glyphIdBlock, l , UShort ) ||
            ACCESS_Frame( l << 1 ) )
         goto Fail;
 
-      for ( i = 0; i < l; ++i )
-        cmap4->glyphIdArray[i] = GET_UShort();
+      glyphIdArray = GEO_LOCK( cmap4->glyphIdBlock );
 
+      for ( i = 0; i < l; ++i )
+        glyphIdArray[i] = GET_UShort();
+
+      GEO_UNLOCK( cmap4->glyphIdBlock );
       FORGET_Frame();
       break;
 
@@ -271,7 +276,7 @@
 
       case 4:
         GEO_FREE( cmap->c.cmap4.segmentBlock );
-        FREE( cmap->c.cmap4.glyphIdArray );
+        GEO_FREE( cmap->c.cmap4.glyphIdBlock );
         cmap->c.cmap4.segCountX2 = 0;
         break;
 
@@ -441,13 +446,15 @@
   {
     UShort         index1, segCount;
     UShort         i, result;
+    PUShort        glyphIdArray;
     TCMap4Segment  seg4;
     PCMap4Segment  segments;
 
 
-    segCount = cmap4->segCountX2 / 2;
-    segments = GEO_LOCK( cmap4->segmentBlock );
-    result   = 0;
+    segCount     = cmap4->segCountX2 >> 1;
+    segments     = GEO_LOCK( cmap4->segmentBlock );
+    glyphIdArray = GEO_LOCK( cmap4->glyphIdBlock );
+    result       = 0;
 
     for ( i = 0; i < segCount; ++i )
       if ( charCode <= segments[i].endCount )
@@ -470,12 +477,13 @@
                (segCount - i);
 
       if ( index1 < cmap4->numGlyphId )
-        if ( cmap4->glyphIdArray[index1] != 0 )
-          result = ( cmap4->glyphIdArray[index1] + seg4.idDelta ) & 0xFFFF;
+        if ( glyphIdArray[index1] != 0 )
+          result = ( glyphIdArray[index1] + seg4.idDelta ) & 0xFFFF;
     }
 
   Fin:
     GEO_UNLOCK( cmap4->segmentBlock );
+    GEO_UNLOCK( cmap4->glyphIdBlock );
     return result;
   }
 
