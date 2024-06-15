@@ -161,9 +161,17 @@
 /*************************************************************************/
 /* Define TT_CONFIG_OPTION_PROCESS_HDMX if you want to process optional  */
 /* hdmx table. The PC/Geos ttf driver does not need any information from */
-/* the htmx table.                                                       */
+/* the hdmx table.                                                       */
 
 #undef  TT_CONFIG_OPTION_PROCESS_HDMX
+
+
+/*************************************************************************/
+/* Define TT_CONFIG_OPTION_PROCESS_VMTX if you want to process optional  */
+/* vtmx table. The PC/Geos ttf driver does not need any information from */
+/* the vtmx table.                                                       */
+
+#undef  TT_CONFIG_OPTION_PROCESS_VTMX
 
 
 /*************************************************************************/
