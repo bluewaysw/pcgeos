@@ -36,6 +36,7 @@
 #include "ttgload.h"
 #include "ttraster.h"
 #include "ttextend.h"
+#include <geos.h>
 
 
 /* required by the tracing mode */

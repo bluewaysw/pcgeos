@@ -28,6 +28,7 @@
 #include <ec.h>
 #include <initfile.h>
 #include <unicode.h>
+#include <fontID.h>
 
 
 static word DetectFontFiles(    MemHandle*  fileEnumBlock );
