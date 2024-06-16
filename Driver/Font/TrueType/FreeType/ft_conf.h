@@ -188,6 +188,14 @@
 #undef  TT_CONFIG_OPTION_SUPPORT_CMAP6
 
 
+/*************************************************************************/
+/* Define TT_CONFIG_OPTION_SUPPORT_KERN2 if you want to support kerning  */
+/* format 1. The ttf driver only supports format 0 because it is very    */
+/* simple and common.                                                    */
+
+#undef  TT_CONFIG_OPTION_SUPPORT_KERN2
+
+
 /**********************************************************************/
 /*                                                                    */
 /*  The following macros are used to define the debug level, as well  */

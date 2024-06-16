@@ -126,7 +126,9 @@ extern "C" {
     union
     {
       TT_Kern_0  kern0;
+#ifdef TT_CONFIG_OPTION_SUPPORT_KERN2
       TT_Kern_2  kern2;
+#endif
     } t;
   };
 

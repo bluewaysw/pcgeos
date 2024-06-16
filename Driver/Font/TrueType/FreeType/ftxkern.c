@@ -112,6 +112,7 @@ extern TEngine_Instance engineInstance;
       return error;
   }
 
+#ifdef TT_CONFIG_OPTION_SUPPORT_KERN2
 
 /*******************************************************************
  *
@@ -257,6 +258,7 @@ extern TEngine_Instance engineInstance;
     return error;
   }
 
+#endif
 
 /*******************************************************************
  *
@@ -401,6 +403,7 @@ extern TEngine_Instance engineInstance;
           sub->t.kern0.rangeShift    = 0;
           break;
 
+#ifdef TT_CONFIG_OPTION_SUPPORT_KERN2
         case 2:
           FREE( sub->t.kern2.leftClass.classes );
           sub->t.kern2.leftClass.firstGlyph = 0;
@@ -413,6 +416,7 @@ extern TEngine_Instance engineInstance;
           FREE( sub->t.kern2.array );
           sub->t.kern2.rowWidth = 0;
           break;
+#endif
 
         default:
           ;       /* invalid subtable format - do nothing */
@@ -518,7 +522,11 @@ extern TEngine_Instance engineInstance;
 
     sub = kern->tables + kern_index;
 
+#ifdef TT_CONFIG_OPTION_SUPPORT_KERN2
     if ( sub->format != 0 && sub->format != 2 )
+#else
+    if ( sub->format != 0 )
+#endif
       return TT_Err_Invalid_Kerning_Table_Format;
 
     /* now access stream */
@@ -530,8 +538,10 @@ extern TEngine_Instance engineInstance;
 
     if ( sub->format == 0 )
       error = Subtable_Load_0( &sub->t.kern0, faze );
+#ifdef TT_CONFIG_OPTION_SUPPORT_KERN2
     else if ( sub->format == 2 )
       error = Subtable_Load_2( &sub->t.kern2, faze );
+#endif
 
     if ( !error )
       sub->loaded = TRUE;
