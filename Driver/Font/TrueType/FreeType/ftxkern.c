@@ -529,6 +529,9 @@ extern TEngine_Instance engineInstance;
 #endif
       return TT_Err_Invalid_Kerning_Table_Format;
 
+    if ( sub->loaded )
+      return TT_Err_Ok;
+
     /* now access stream */
     if ( USE_Stream( faze->stream, stream ) )
       return error;
