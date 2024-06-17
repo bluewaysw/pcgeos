@@ -129,7 +129,7 @@ minimalAppl	: minimalGame minimalUtils minimalTools minimalSavers \
 		  bbxchat bbxmail \
 		  newsread geozip sclock trayapps\
  	  	  hmbase pdfvu  bnkr30 ftpc \
- 	  	  instc instf
+ 	  	  instc instf foldered
 
 minimalUtils	: prefmgr
 
@@ -953,6 +953,9 @@ Installed/Library/FMTools/Linktool:	ui shell MAKEAPPL
 
 openwith: Installed/Library/FMTools/OpenWith
 Installed/Library/FMTools/OpenWith:	ui ansic MAKEAPPL
+
+foldered: Installed/Library/FMTools/FolderEd
+Installed/Library/FMTools/FolderEd:	ui ansic MAKEAPPL
 
 homebase:
 #	No need to do this because this is sync'ed by morning make script.
