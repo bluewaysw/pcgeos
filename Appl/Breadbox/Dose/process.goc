@@ -655,7 +655,7 @@ Boolean g_mealChanged = FALSE;
 
 	/* set up the mem and gstate */
 	mem = MemAllocLMem(LMEM_TYPE_GSTRING, 0) ;
-	gstate = GrCreateGString(mem, GST_CHUNK, &chunk);
+	gstate = GrCreateGString(mem, GST_CHUNK, (unsigned short __far *) &chunk);
 
 	if (g_onOG) fudge = 0;
 	else fudge = 10;
@@ -760,8 +760,7 @@ Boolean g_mealChanged = FALSE;
  VMBlockHandle		vmbh;
  RecsStruct			*recsPtr;
  TimerDateAndTime date;
- FloatNum			today, startDay, testDay, allMeals, allAvg, allRecsF,
-						A1CDiv, A1CNum;
+double	today, startDay, testDay, allMeals, allAvg, allRecsF, A1CDiv, A1CNum;
  dword			glucose;
  word			days[6] = {1, 7, 14, 30, 60, 90};
  Boolean			keepGoing;
@@ -773,6 +772,8 @@ Boolean g_mealChanged = FALSE;
 							@ADBAfternoonNum, @ADBDinnerNum, @ADBEveningNum};
  char				numStr[20], avgStr[FLOAT_TO_ASCII_NORMAL_BUF_LEN];
  WWFixedAsDWord	avg;
+ double  valueIEEE64;
+
 
 
 	/* what span do we average? */
@@ -807,9 +808,11 @@ Boolean g_mealChanged = FALSE;
 	VMLock(g_vmfh, vmbh ,&mh);
 
 	/* figure out the date range */
+
 	TimerGetDateAndTime(&date);
 	FloatGetDateNumber(date.TDAT_year, (byte)date.TDAT_month, (byte)date.TDAT_day);
-	FloatPopNumber(&today);
+	FloatGeos80ToIEEE64(&today);
+
 	startDay = today - days[span - 1];
 
 	/* start collecting the data */
@@ -821,10 +824,10 @@ Boolean g_mealChanged = FALSE;
 		FloatGetDateNumber(recsPtr->RS_dateTime.TDAT_year,
 							(byte)recsPtr->RS_dateTime.TDAT_month,
 							(byte)recsPtr->RS_dateTime.TDAT_day);
-		FloatPopNumber(&testDay);
+		FloatGeos80ToIEEE64(&testDay);
 		if (testDay >= startDay) {
 			/* we want this piece of data */
-			UtilAsciiToHex32(recsPtr->RS_glucose, &glucose);
+			UtilAsciiToHex32(recsPtr->RS_glucose, (long *) &glucose);
 			mealTotal[recsPtr->RS_meal - 1] += (word)glucose;
 			mealNum[recsPtr->RS_meal - 1]++;
 			/* check for the last record */
@@ -860,12 +863,16 @@ Boolean g_mealChanged = FALSE;
 		use FloatNum stuff */
 	if (!allRecs) strcpy(avgStr, "0");
 	else {
+		FloatNum value;
+
 		allRecsF = allRecs;
-		FloatPushNumber(&allMeals);
-		FloatPushNumber(&allRecsF);
+		FloatIEEE64ToGeos80(&allMeals);
+		FloatIEEE64ToGeos80(&allRecsF);
 		FloatDivide();
-		FloatPopNumber(&allAvg);
-		FloatFloatToAscii_StdFormat(avgStr, &allAvg, FFAF_FROM_ADDR, 5, 1);
+		FloatGeos80ToIEEE64(&allAvg);
+		FloatIEEE64ToGeos80(&allAvg);
+		FloatPopNumber(&value);
+		FloatFloatToAscii_StdFormat(avgStr, &value, FFAF_FROM_ADDR, 5, 1);
 		}
 	@call ADBAllAvg::MSG_VIS_TEXT_REPLACE_ALL_PTR(avgStr, 0);
 	sprintf(numStr, " (%d)", allRecs);
@@ -874,13 +881,17 @@ Boolean g_mealChanged = FALSE;
 	/* calculate and show the A1C */
 	if (!allRecs) strcpy(avgStr, "0");
 	else {
-		allAvg += 77;
+		FloatNum value;
+
+		allAvg += 77.0;
 		A1CDiv = 35.7;
-		FloatPushNumber(&allAvg);
-		FloatPushNumber(&A1CDiv);
+		FloatIEEE64ToGeos80(&allAvg);
+		FloatIEEE64ToGeos80(&A1CDiv);
 		FloatDivide();
-		FloatPopNumber(&A1CNum);
-		FloatFloatToAscii_StdFormat(avgStr, &A1CNum, FFAF_FROM_ADDR, 5, 1);
+		FloatGeos80ToIEEE64(&A1CNum);
+		FloatIEEE64ToGeos80(&A1CNum);
+		FloatPopNumber(&value);
+		FloatFloatToAscii_StdFormat(avgStr, &value, FFAF_FROM_ADDR, 5, 1);
 		}
 	strcat(avgStr, "%");
 	@call ADBA1CPct::MSG_VIS_TEXT_REPLACE_ALL_PTR(avgStr, 0);
@@ -1252,9 +1263,7 @@ Boolean g_mealChanged = FALSE;
  ChunkHandle		chunk;
  MemHandle			mem;
  GStateHandle		gstate;
- optr					titles[9] = {@OHBPItemText, @OHA1CItemText, @OHMAItemText,
-										@OHTotCItemText, @OHHDLItemText, @OHLDLItemText,
-										@OHTriGItemText, @OHWeightItemText, @OHBMIItemText};
+optr			titles[] = {@OHBPItemText, @OHA1CItemText, @OHMAItemText, @OHTotCItemText, @OHHDLItemText, @OHLDLItemText, @OHTriGItemText, @OHWeightItemText, @OHBMIItemText};
 
 
 	/* get the selection */
@@ -1263,7 +1272,7 @@ Boolean g_mealChanged = FALSE;
 	/* draw the title of the dlist based on what item's displayed */
 	/* set up the mem and gstate */
 	mem = MemAllocLMem(LMEM_TYPE_GSTRING, 0) ;
-	gstate = GrCreateGString(mem, GST_CHUNK, &chunk);
+	gstate = GrCreateGString(mem, GST_CHUNK, (void*)&chunk);
 	MemLock (OptrToHandle(@TitleDateStr));
 	GrDrawText(gstate, 25, 0, LMemDeref(@TitleDateStr), 0);
 	GrDrawText(gstate, 105, 0, LMemDeref(titles[sel]), 0);
@@ -1372,7 +1381,7 @@ Boolean g_mealChanged = FALSE;
 		/* and show it */
 		/* set up the mem and gstate */
 		mem = MemAllocLMem(LMEM_TYPE_GSTRING, 0) ;
-		gstate = GrCreateGString(mem, GST_CHUNK, &chunk);
+		gstate = GrCreateGString(mem, GST_CHUNK, (void*)&chunk);
 
 		if (g_onOG) fudge = 0;
 		else fudge = 10;
@@ -1453,7 +1462,7 @@ Boolean g_mealChanged = FALSE;
 		item = @call OHVDList::MSG_GEN_ITEM_GROUP_GET_SELECTION();
 		if (item != GIGS_NONE) {
 			otherPtr = ChunkArrayElementToPtrHandles(mh, ch, item, 0);
-			ChunkArrayDelete(ch, otherPtr);
+			ChunkArrayDelete((unsigned long) ch, otherPtr);
 			@send OHVDList::MSG_GEN_DYNAMIC_LIST_REMOVE_ITEMS(item, 1);
          }
 		VMUnlock(mh);
@@ -1535,7 +1544,7 @@ Boolean g_mealChanged = FALSE;
 
 	@call DosePrimary::MSG_GEN_SET_USABLE(VUM_DELAYED_VIA_APP_QUEUE);
 	@call self::MSG_GEN_SET_NOT_USABLE(VUM_NOW);
-	/* Don’t call the superclass or the application will detach! */
+	/* Donï¿½t call the superclass or the application will detach! */
 	@send DosePrimary::MSG_META_GRAB_TARGET_EXCL();
 	@send DosePrimary::MSG_META_GRAB_FOCUS_EXCL();
 
