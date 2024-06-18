@@ -1,0 +1,475 @@
+/***********************************************************************
+ *
+ *	FileManager Tool Demo
+ *
+ *	UI objects
+ *	
+ *	
+ ***********************************************************************/
+
+@include <stdapp.goh>
+@include <fmtool.goh>
+@include <foldered.goh>
+
+/***********************************************************************
+	Data Resource
+***********************************************************************/
+@start FMTData, data;
+
+@visMoniker FolderEditMoniker = 'F', "Edit Folder Icon";
+
+@chunk char QuestionClearToken[] = "This will remove any special icon information for the folder so that the file manager uses the default folder icon.\rWould you like to continue?";
+@chunk char ErrorFileNotFound[] = "Error: Folder does not exist.";
+@chunk char ErrorChangeToken[] = "Error: The icon could not be changed.";
+@chunk char ErrorChangeToken2[] = "Error: At least one icon could not be changed.";
+@chunk char ChangeTokenOK[] = "The icon has been changed successfully.\rYou may need to update the file manager window.";
+@chunk char ChangeTokenOK2[] = "The icons were changed successfully.\rYou may need to update the file manager window.";
+    
+@chunk char ErrorNoFolders[] = "You need to select at least one folder!";    
+    
+@include "Art/notfound.goh"
+	/*
+	 * There are two sets of button images available
+	 *	0: button styled images	(Art/art2.goh)
+	 *	1: flat stlye images	(Art/art.goh)
+	 */
+@if 0
+@include "Art/art.goh"
+@elseif
+@include "Art/art2.goh"
+@endif
+
+@chunk char SettingsTextMoniker[] = "Settings...";
+@chunk char CloseTextMoniker[] = "Close";
+@chunk char ConfigApplyTextMoniker[] = "Apply";
+@chunk char ConfigCancelTextMoniker[] = "Cancel";
+@chunk char ApplyIconTextMoniker[] = "Apply Icon";
+@chunk char DefaultIconTextMoniker[] = "Use Default";
+
+@end FMTData;
+
+
+/***********************************************************************
+	Dialog UI Resource
+***********************************************************************/
+@start DialogUI, notDetachable;
+
+    @object FolderEdInteractionClass SelectDialog = {
+        GI_visMoniker = 'F', "Edit Folder Icon";
+        GI_comp =   @DialogMainGroup, @FEDReplyBar;
+        GI_states = (@default & (~GS_USABLE));
+        GI_attrs = @default | GA_KBD_SEARCH_PATH;
+        GII_visibility = GIV_DIALOG;
+        GII_attrs = @default | GIA_NOT_USER_INITIATABLE | GIA_MODAL;
+        HINT_PLACE_MONIKER_ABOVE;
+        HINT_ORIENT_CHILDREN_HORIZONTALLY;
+        HINT_SIZE_WINDOW_AS_DESIRED;
+    }
+    
+    @object FolderEdInteractionClass DialogMainGroup = {
+        GI_comp =   @FEDTopGroup,
+        	@FEDApplyToAllSelector,
+        	@FEDTokenListGroup;
+        GI_attrs = @default | GA_KBD_SEARCH_PATH;
+        HINT_ORIENT_CHILDREN_VERTICALLY;
+    }
+
+    @object GenBooleanGroupClass FEDApplyToAllSelector = {
+    	GI_comp = @FEDApplyToAllBoolean;
+    	GBGI_applyMsg = MSG_FED_APPLY_CHANGE_ALL;
+    }
+    @object GenBooleanClass FEDApplyToAllBoolean = {
+    	GI_visMoniker = 'A', "Apply changes to all folders";
+    	GBI_identifier = FED_CFG_APPLY_TO_ALL;
+    }
+    	
+
+/*
+ * -------- TopGroup ---------------
+ */
+
+    @object GenInteractionClass FEDTopGroup = {
+    	GI_comp = @SelectFolderList, @FEDTokenGroup;
+    	HINT_ORIENT_CHILDREN_HORIZONTALLY;
+    	HINT_EXPAND_HEIGHT_TO_FIT_PARENT;
+    	HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+    	HINT_FULL_JUSTIFY_CHILDREN_HORIZONTALLY;
+    	HINT_BOTTOM_JUSTIFY_CHILDREN;
+    	HINT_INCLUDE_ENDS_IN_CHILD_SPACING;
+    	
+    }
+    
+    @object GenDynamicListClass SelectFolderList = {
+   	GI_visMoniker = 'f', "Select a folder:";
+	HINT_PLACE_MONIKER_ABOVE;
+	HINT_ITEM_GROUP_SCROLLABLE;
+	HINT_FIXED_SIZE = { SST_AVG_CHAR_WIDTHS | 25,
+			SST_LINES_OF_TEXT | 5, 5};
+   	GIGI_applyMsg = MSG_FED_APPLY_FOLDER;
+   	GDLI_queryMsg = MSG_FED_QUERY_FOLDER;
+   	GDLI_numItems = 0;
+    }
+    
+    @object GenInteractionClass FEDTokenGroup = {
+    	GI_comp = @CurrentIconGroup, @NewIconGroup, @DefaultIconGroup;
+    	HINT_ORIENT_CHILDREN_HORIZONTALLY;
+    }
+
+/*
+ * -------- TokenGroup - current icon ---------------
+ */
+    
+@object GenInteractionClass CurrentIconGroup = {
+	GI_visMoniker = " Current Icon ";
+	GI_comp = @CurrentIconTopGroup, @CurrentIconID;
+	HINT_ORIENT_CHILDREN_VERTICALLY;
+	HINT_CENTER_CHILDREN_HORIZONTALLY;
+	HINT_EXPAND_HEIGHT_TO_FIT_PARENT;
+	HINT_DRAW_IN_BOX;
+	}
+	
+@object GenInteractionClass CurrentIconTopGroup = {
+	GI_comp =  @CurrentIconStdDisplay, @CurrentIconTool, @CurrentIconHuge;
+	HINT_ORIENT_CHILDREN_HORIZONTALLY;
+	HINT_BOTTOM_JUSTIFY_CHILDREN;
+	}
+@object GenInteractionClass CurrentIconID = {
+	GI_visMoniker = "no ID";
+	HINT_CENTER_MONIKER;
+	}
+@object GenInteractionClass CurrentIconStdDisplay = {
+	GI_visMoniker = " ";
+	HINT_FIXED_SIZE = { SST_PIXELS | 50, SST_PIXELS | 32, 1 };
+	HINT_CENTER_MONIKER;
+	}
+@object GenInteractionClass CurrentIconTool = {
+	HINT_FIXED_SIZE = { SST_PIXELS | 20, SST_PIXELS | 20, 1 };
+	HINT_CENTER_MONIKER;
+	}
+@object GenInteractionClass CurrentIconHuge = {
+	GI_states = @default & ~GS_USABLE;
+	HINT_FIXED_SIZE = { SST_PIXELS | 70, SST_PIXELS | 35, 1 };
+	HINT_CENTER_MONIKER;
+	}
+
+/*
+ * -------- TokenGroup - new icon ---------------
+ */
+
+    @object GenInteractionClass NewIconGroup = {
+    	GI_visMoniker = " New Icon ";
+    	HINT_DRAW_IN_BOX;
+    	GI_comp = @NewIconTopGroup, @NewIconID, @SelectOkTrigger;
+	HINT_ORIENT_CHILDREN_VERTICALLY;
+	HINT_CENTER_CHILDREN_HORIZONTALLY;
+	HINT_EXPAND_HEIGHT_TO_FIT_PARENT;
+    }
+
+    @object GenInteractionClass NewIconTopGroup = {
+	GI_comp =  @NewIconStdDisplay, @NewIconTool, @NewIconHuge;
+	HINT_ORIENT_CHILDREN_HORIZONTALLY;
+	HINT_BOTTOM_JUSTIFY_CHILDREN;
+	}
+    @object  GenInteractionClass NewIconStdDisplay = {
+	GI_visMoniker = " ";
+	HINT_FIXED_SIZE = { SST_PIXELS | 50, SST_PIXELS | 32, 1 };
+	HINT_CENTER_MONIKER;
+	}
+    @object GenInteractionClass NewIconTool = {
+	HINT_FIXED_SIZE = { SST_PIXELS | 20, SST_PIXELS | 20, 1 };
+	HINT_CENTER_MONIKER;
+	}
+    @object GenInteractionClass NewIconHuge = {
+	GI_states = @default & ~GS_USABLE;
+	HINT_FIXED_SIZE = { SST_PIXELS | 70, SST_PIXELS | 35, 1 };
+	HINT_CENTER_MONIKER;
+	}
+    @object GenInteractionClass NewIconID = {
+	GI_visMoniker = "no ID";
+	HINT_CENTER_MONIKER;
+	}
+	
+    @object GenTriggerClass SelectOkTrigger = {
+        GI_states = @default & ~GS_USABLE;
+    	GI_visMoniker = 'I', "Apply Icon"; 
+    	GTI_actionMsg = MSG_FED_CHANGE_TOKEN;
+    }
+
+
+/*
+ * -------- TokenGroup - default icon ---------------
+ */    
+    @object GenInteractionClass DefaultIconGroup = {
+    	GI_visMoniker = " Default Icon ";
+    	HINT_DRAW_IN_BOX;
+    	GI_comp = @DefaultTokenGroup, @ClearTokenTrigger;
+	HINT_ORIENT_CHILDREN_VERTICALLY;
+	HINT_CENTER_CHILDREN_HORIZONTALLY;
+	HINT_EXPAND_HEIGHT_TO_FIT_PARENT;
+	HINT_FULL_JUSTIFY_CHILDREN_VERTICALLY; 
+    }
+    @object GenInteractionClass DefaultTokenGroup = {
+	GI_comp =  @TokenDefaultDisplay, @TokenDefaultTool;
+	HINT_ORIENT_CHILDREN_HORIZONTALLY;
+	HINT_BOTTOM_JUSTIFY_CHILDREN;
+	}
+    @object GenInteractionClass TokenDefaultDisplay = {
+	GI_visMoniker = " ";
+	HINT_FIXED_SIZE = { SST_PIXELS | 50, SST_PIXELS | 32, 1 };
+	HINT_CENTER_MONIKER;
+	}
+    @object GenInteractionClass TokenDefaultTool = {
+	HINT_FIXED_SIZE = { SST_PIXELS | 20, SST_PIXELS | 20, 1 };
+	HINT_CENTER_MONIKER;
+	}
+
+    @object GenTriggerClass ClearTokenTrigger = {
+        GI_states = @default & ~GS_USABLE;
+    	GI_visMoniker = 'e', "Use Default";
+    	GTI_actionMsg = MSG_FED_CLEAR_TOKEN;
+    }
+    
+
+/*
+ * -------- FEDTokenListGroup     ---------------
+ */
+
+ 
+    @object GenInteractionClass FEDTokenListGroup = {
+   	GI_visMoniker = " Select a new icon ";
+	HINT_CENTER_MONIKER;
+    	GI_comp = @FEDTokenList, @FEDTokenInfoGroup, @FEDTokenStyleGroup, @FEDTokenRangeGroup;
+    	HINT_ORIENT_CHILDREN_VERTICALLY;
+    	HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+    	HINT_DRAW_IN_BOX;
+    }
+    	
+    /*
+     * Standard moniker size: 48x30
+     * SuperVGA moniker size: 64x40
+     */ 
+    @object GenDynamicListClass FEDTokenList = {
+	GIGI_selection = -1;
+	GIGI_applyMsg = MSG_FED_APPLY_TOKEN_LIST;
+	GDLI_queryMsg = MSG_FED_QUERY_TOKEN_LIST;
+	GDLI_numItems = 0;
+	HINT_ORIENT_CHILDREN_HORIZONTALLY;
+	HINT_ITEM_GROUP_SCROLLABLE;
+	/* initially leave room for 8 tokens in SupeVGA size + a tiny tool moniker below */
+	HINT_INITIAL_SIZE = {SST_PIXELS | 8*TOKEN_LIST_ITEM_WIDTH, SST_PIXELS | TOKEN_LIST_ITEM_HIGHT, 8};
+	HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+    }
+ 
+/*
+ * -------- FEDTokenInfoGroup     ---------------
+ */
+@object GenInteractionClass FEDTokenInfoGroup = {
+	GI_states = @default & ~GS_USABLE;
+	GI_comp = @FEDTokenInfoCount, @FEDTokenInfoDisplayed;
+	HINT_ORIENT_CHILDREN_HORIZONTALLY;
+	}
+
+@object GenValueClass FEDTokenInfoCount = {
+	GI_visMoniker = "Icons found:";
+	GI_attrs = @default | GA_READ_ONLY;
+	}
+@object GenValueClass  FEDTokenInfoDisplayed = {
+	GI_visMoniker =" Currently displayed:";
+	GI_attrs = @default | GA_READ_ONLY;
+	}
+	
+
+/*
+ * -------- FEDTokenRangeGroup ---------------
+ */
+
+@object GenInteractionClass FEDTokenRangeGroup = {
+	GI_states = @default & ~GS_USABLE;
+	GI_comp = @FEDManufIDMinimumValue,@FEDManufIDMaximumValue,@FEDManufIDApplayTrigger;
+	HINT_ORIENT_CHILDREN_HORIZONTALLY;
+	HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+	HINT_CENTER_CHILDREN_HORIZONTALLY;
+	HINT_CENTER_CHILDREN_VERTICALLY;
+	HINT_DRAW_IN_BOX;
+	}
+@object WordValueClass FEDManufIDMinimumValue = {
+	GI_visMoniker = 'm',"Show Icon ID from:";
+	HINT_VALUE_NAVIGATE_TO_NEXT_FIELD_ON_RETURN_PRESS;
+	}
+@object WordValueClass FEDManufIDMaximumValue = {
+	GI_visMoniker = 'o',"to:";
+	GVLI_value = 0xFFFF;
+	HINT_VALUE_NAVIGATE_TO_NEXT_FIELD_ON_RETURN_PRESS;
+	}
+@object GenTriggerClass FEDManufIDApplayTrigger = {
+	GI_visMoniker = 'R',"Apply Range";
+	GTI_actionMsg = MSG_FED_APPLY_TOKEN_RANGE;
+	HINT_CENTER_MONIKER;
+	}
+
+	
+/*
+ * -------- FEDTokenStyleGroup ---------------
+ */
+
+@object GenInteractionClass FEDTokenStyleGroup = {
+	GI_states = @default & ~GS_USABLE;
+	GI_comp = @FEDDisplaySizeSelector, @FEDTokenStyleSelector;
+	HINT_ORIENT_CHILDREN_HORIZONTALLY;
+	HINT_FULL_JUSTIFY_CHILDREN_HORIZONTALLY;
+	HINT_INCLUDE_ENDS_IN_CHILD_SPACING;
+	HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+	HINT_DRAW_IN_BOX;
+	}
+	
+@object GenItemGroupClass FEDDisplaySizeSelector = {
+	GI_visMoniker = "Show icons in list for display size:";
+	HINT_PLACE_MONIKER_ABOVE;
+	GI_comp = @DSTiny, @DSStandard, @DSLarge, @DSHuge;
+	HINT_ORIENT_CHILDREN_HORIZONTALLY;
+	GIGI_selection = DEFAULT_TOKEN_DISPLAY_SIZE;
+	GIGI_applyMsg = MSG_FED_APPLY_TOKEN_TYPE;
+	}
+@object GenItemClass DSHuge = {
+	GI_visMoniker = 'H', "Huge";
+	GII_identifier = DS_HUGE;
+	}
+@object GenItemClass DSLarge = {
+	GI_visMoniker = 'g', "Large";
+	GII_identifier = DS_LARGE;
+	}
+@object GenItemClass DSStandard = {
+	GI_visMoniker = 'S', "Standard";
+	GII_identifier = DS_STANDARD;
+	}
+@object GenItemClass DSTiny = {
+	GI_visMoniker = 'T', "Tiny";
+	GII_identifier = DS_TINY;
+	}
+	
+@object GenItemGroupClass FEDTokenStyleSelector  = {
+	GI_visMoniker = "Style:";
+	HINT_PLACE_MONIKER_ABOVE;
+	GI_comp = @TSIcon, @TSTool;
+	HINT_ORIENT_CHILDREN_HORIZONTALLY;
+	GIGI_selection = DEFAULT_TOKEN_STYLE;
+	GIGI_applyMsg = MSG_FED_APPLY_TOKEN_TYPE;
+	}
+@object GenItemClass TSIcon = {
+	GI_visMoniker = 'n', "Icon";
+	GII_identifier = VMS_ICON;
+	}
+@object GenItemClass TSTool = {
+	GI_visMoniker = 'l',"Tool";
+	GII_identifier = VMS_TOOL;
+	}
+	
+	
+	
+/*
+ * -------- Reply bar ---------------
+ */
+    @object GenInteractionClass FEDReplyBar ={
+        GI_comp = @SelectOkTrigger2, @ClearTokenTrigger2, @SelectSettingsTrigger, @SelectCancelTrigger;
+    	GI_attrs = @default | GA_KBD_SEARCH_PATH;
+        HINT_MAKE_REPLY_BAR;
+    }
+    
+    @object GenTriggerClass SelectCancelTrigger = {
+    	GTI_actionMsg = MSG_FED_QUIT_DIALOG;
+        ATTR_GEN_TRIGGER_ACTION_DATA = { ACTION_CLOSE_TOOL };
+    	GI_attrs = @default | GA_KBD_SEARCH_PATH;
+    	GI_kbdAccelerator = @specificUI ESCAPE;		/* ESC-Key */
+    }
+    @object GenTriggerClass ClearTokenTrigger2 = {
+    	GTI_actionMsg = MSG_FED_CLEAR_TOKEN;
+    }
+    @object GenTriggerClass SelectOkTrigger2 = {
+    	GTI_actionMsg = MSG_FED_CHANGE_TOKEN;
+    }
+    @object GenTriggerClass SelectSettingsTrigger = {
+    	GTI_actionMsg = MSG_FED_QUIT_DIALOG;
+        ATTR_GEN_TRIGGER_ACTION_DATA = { ACTION_OPEN_CONFIG };
+}
+
+
+/*++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+ *	Config Dialog
+ *++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++*/
+
+    @object FolderEdInteractionClass ConfigDialog = {
+        GI_visMoniker = "Configure UI";
+        GI_comp =   	@ConfigInfo, @ConfigOptions, 
+        		@ConfigApplyTrigger, @ConfigCancelTrigger;
+        GI_states = (@default & (~GS_USABLE));
+        GI_attrs = @default | GA_KBD_SEARCH_PATH;
+        GII_visibility = GIV_DIALOG;
+        GII_attrs = @default | GIA_NOT_USER_INITIATABLE | GIA_MODAL;
+        HINT_ORIENT_CHILDREN_VERTICALLY;
+    }
+
+    @object GenTextClass ConfigInfo = {
+    	GI_attrs = @default | GA_READ_ONLY;
+    	GTXI_text = "Note: You may also use the tool if you have selected more than one folder.";
+    	HINT_PLACE_MONIKER_ABOVE;
+    	HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+	HINT_MINIMUM_SIZE = { SST_AVG_CHAR_WIDTHS | 35,
+			SST_LINES_OF_TEXT | 1, 1};
+    }
+    @object GenTriggerClass ConfigCancelTrigger = {
+    	GTI_actionMsg = MSG_FED_QUIT_DIALOG;
+        ATTR_GEN_TRIGGER_ACTION_DATA = { ACTION_CLOSE_CONFIG_CANCEL };
+    	GI_attrs = @default | GA_KBD_SEARCH_PATH;
+    	GI_kbdAccelerator = @specificUI ESCAPE;		/* ESC-Key */
+    	HINT_SEEK_REPLY_BAR;
+    }
+    @object GenTriggerClass ConfigApplyTrigger = {
+    	GTI_actionMsg = MSG_FED_QUIT_DIALOG;
+        ATTR_GEN_TRIGGER_ACTION_DATA = { ACTION_CLOSE_CONFIG_APPLY };
+    	HINT_SEEK_REPLY_BAR;
+    }
+
+    @object GenBooleanGroupClass ConfigOptions = {
+    	GI_comp = @ConfigTinyIconsInList, @ConfigTinyIconsInTokenDisplay,
+    		@ConfigShowHugeIcons, @ConfigShowTokenInfo,
+    		@ConfigShowRangeGroup , @ConfigShowStyleGroup,
+    		@ConfigApplyButtonsOnTop;
+    	GBGI_selectedBooleans = DEFAULT_FED_CONFIG;
+    	HINT_ORIENT_CHILDREN_VERTICALLY;
+    }
+    
+    @object GenBooleanClass ConfigTinyIconsInList = {
+    	GI_visMoniker = 'l', "Show tool icons in token list (if any)";
+    	GBI_identifier = FED_CFG_TINY_ICONS_IN_LIST;
+    	}
+    @object GenBooleanClass ConfigTinyIconsInTokenDisplay = {
+    	GI_visMoniker = 't', "Show tool icons in token display (if any)";
+    	GBI_identifier = FED_CFG_TINY_ICONS_IN_DISPLAY;
+    	}
+    @object GenBooleanClass ConfigShowHugeIcons = {
+    	GI_visMoniker = 'h', "Show huge icons in token display (if any)";
+    	GBI_identifier = FED_CFG_HUGE_ICONS_IN_DISPLAY;
+    	}
+    @object GenBooleanClass ConfigShowTokenInfo = {
+    	GI_visMoniker = 'd', "Show details about token list";
+    	GBI_identifier = FED_CFG_TOKEN_LIST_INFOS;
+    	}
+    @object GenBooleanClass ConfigShowRangeGroup = {
+    	GI_visMoniker = 'r', "Show token range selector";
+    	GBI_identifier = FED_CFG_TOKEN_RANGE_GROUP;
+    	}
+    @object GenBooleanClass ConfigShowStyleGroup = {
+    	GI_visMoniker = 's', "Show token style selector";
+    	GBI_identifier = FED_CFG_TOKEN_STYLE_SELECTOR;
+    	}
+    @object GenBooleanClass ConfigApplyButtonsOnTop = {
+    	GI_visMoniker = 'b', "Place apply buttons on top";
+    	GBI_identifier = FED_CFG_APPLY_BUTTONS_ON_TOP;
+    	}
+    
+    		
+
+@end DialogUI;
+
+
+
