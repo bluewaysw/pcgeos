@@ -1037,7 +1037,7 @@
     face->numLocations = 0;
 
     /* freeing the character mapping tables */
-    for ( n = 0; n < face->numCMaps; n++ )
+    for ( n = 0; n < face->numCMaps; ++n )
       CharMap_Free( face->cMaps + n );
 
     FREE( face->cMaps );

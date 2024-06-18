@@ -247,10 +247,7 @@
     TPoint*   arc;                  /* current Bezier arc pointer */
 
     UShort    bWidth;               /* target bitmap width  */
-    PByte     bTarget;              /* target bitmap buffer */
-#ifdef __GEOS__
-    PShort    rTarget;              /* target region buffer */
-#endif /* __GEOS__ */
+    PByte     bTarget;              /* target bitmap or region buffer */
 
     Long      lastX, lastY, minY, maxY;
 
@@ -1696,8 +1693,8 @@
                                                     PProfile    left,
                                                     PProfile    right )
   {
-    Long   e1, e2;
-    Short*  target;
+    Long    e1, e2;
+    PShort  target;
 
 
     /* Drop-out control */
@@ -1709,7 +1706,7 @@
     else
       e2 = TRUNC( FLOOR( x2 ) );
 
-    target = ras.rTarget + ras.traceOfs;
+    target = ( (PShort)ras.bTarget ) + ras.traceOfs;
 
     if ( ras.traceIncr == 0 )
       target[ras.traceIncr++] = y;
@@ -1735,12 +1732,12 @@
 
   static void _near  Vertical_Region_Sweep_Step( RAS_ARGS Short y )
   {
-    Short*  target;
-    Short*  targetLastLine;
+    PShort  target;
+    PShort  targetLastLine;
 
 
-    target         = ras.rTarget + ras.traceOfs;
-    targetLastLine = ras.rTarget + ras.traceOfsLastLine;
+    target         = ( (PShort)ras.bTarget ) + ras.traceOfs;
+    targetLastLine = ( (PShort)ras.bTarget ) + ras.traceOfsLastLine;
 
 
     /* special case: the current line was empty */
@@ -1751,7 +1748,7 @@
 
     /* finish current line */
 
-    target[ras.traceIncr++] = EOREGREC;
+    target[ras.traceIncr++] = (Short)EOREGREC;
 
 
     /* special case: no differences between last and current line */
@@ -1779,9 +1776,9 @@
 
     /* complete a region */
 
-    target = ras.rTarget + ras.traceOfs;
+    target =  ( (PShort)ras.bTarget ) + ras.traceOfs;
 
-    target[ras.traceIncr++] = EOREGREC;
+    target[ras.traceIncr++] = (Short)EOREGREC;
     ras.target.size = ( ras.traceOfs + ras.traceIncr ) * sizeof( Short );
   }
 
@@ -2356,7 +2353,6 @@ Scan_DropOuts :
       if ( P_Left->countL )
       {
         P_Left->countL = 0;
-        /* dropouts--;    -- this is useful when debugging only */
         ras.Proc_Sweep_Drop( RAS_VARS  y,
                                        P_Left->X,
                                        P_Right->X,
@@ -2593,7 +2589,7 @@ TT_Error  Render_Region_Glyph( RAS_ARGS TT_Outline*     glyph,
   ras.band_stack[0].y_max = ras.target.rows - 1;
 
   ras.bWidth  = ras.target.cols;
-  ras.rTarget = (Short*)ras.target.bitmap;
+  ras.bTarget = (PByte)ras.target.bitmap;
 
   if ( (error = Render_Single_Pass( RAS_VARS 0 )) != 0 )
     return error;
@@ -2606,13 +2602,13 @@ TT_Error  Render_Region_Glyph( RAS_ARGS TT_Outline*     glyph,
 
 static void Render_Region_Empty_Glyph( RAS_ARG )
 {
-    Short*  target = ras.rTarget;
+    PShort  target = (PShort)ras.bTarget;
 
 
     /* complete a region */
 
-    target[0] = EOREGREC;
-    target[1] = EOREGREC;
+    target[0] = (Short)EOREGREC;
+    target[1] = (Short)EOREGREC;
     ras.target.size = 2 * sizeof( Short );
 }
 
