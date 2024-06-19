@@ -85,7 +85,7 @@ extern TEngine_Instance engineInstance;
     if ( ACCESS_Frame( num_pairs * 6 ) )
       goto Fail;
 
-    for ( n = 0; n < num_pairs; n++ )
+    for ( n = 0; n < num_pairs; ++n )
     {
       kern0->pairs[n].left  = GET_UShort();
       kern0->pairs[n].right = GET_UShort();
@@ -327,7 +327,7 @@ extern TEngine_Instance engineInstance;
 
     sub = kern->tables;
 
-    for ( table = 0; table < num_tables; table++ )
+    for ( table = 0; table < num_tables; ++table )
     {
       if ( ACCESS_Frame( 6 ) )
         return error;
@@ -389,7 +389,7 @@ extern TEngine_Instance engineInstance;
     /* scan the table directory and release loaded entries */
 
     sub = kern->tables;
-    for ( n = 0; n < kern->nTables; n++ )
+    for ( n = 0; n < kern->nTables; ++n )
     {
       if ( sub->loaded )
       {
