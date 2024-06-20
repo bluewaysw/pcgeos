@@ -196,6 +196,13 @@
 #undef  TT_CONFIG_OPTION_SUPPORT_KERN2
 
 
+/*************************************************************************/
+/* Define TT_CONFIG_OPTION_SUPPORT_OPTIONAL_FIELDS if you want to hold   */
+/* optional fiels in freetype structures.                                */
+
+#undef  TT_CONFIG_OPTION_SUPPORT_OPTIONAL_FIELDS
+
+
 /**********************************************************************/
 /*                                                                    */
 /*  The following macros are used to define the debug level, as well  */

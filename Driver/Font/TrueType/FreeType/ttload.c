@@ -529,12 +529,16 @@
     header->caret_Slope_Rise       = GET_Short();
     header->caret_Slope_Run        = GET_Short();
 
+#ifdef TT_CONFIG_OPTION_SUPPORT_OPTIONAL_FIELDS
     header->Reserved0 = GET_Short();    /* this is caret_Offset for
                                            vertical headers */
     header->Reserved1 = GET_Short();
     header->Reserved2 = GET_Short();
     header->Reserved3 = GET_Short();
     header->Reserved4 = GET_Short();
+#else
+    SKIP( 10 );
+#endif
 
     header->metric_Data_Format = GET_Short();
     header->number_Of_HMetrics = GET_UShort();
@@ -1034,7 +1038,7 @@
     os2->ulUnicodeRange3     = GET_ULong();
     os2->ulUnicodeRange4     = GET_ULong();
 
-    for ( i = 0; i < 4; i++ )
+    for ( i = 0; i < 4; ++i )
       os2->achVendID[i] = GET_Byte();
 
     os2->fsSelection         = GET_UShort();
@@ -1048,6 +1052,7 @@
 
     FORGET_Frame();
 
+#ifdef TT_CONFIG_OPTION_SUPPORT_OPTIONAL_FIELDS
     if ( os2->version >= 0x0001 )
     {
       /* only version 1 tables */
@@ -1065,6 +1070,7 @@
       os2->ulCodePageRange1 = 0;
       os2->ulCodePageRange2 = 0;
     }
+#endif
     
     return TT_Err_Ok;
   }

@@ -393,11 +393,13 @@
     TT_FWord   caret_Slope_Rise;
     TT_FWord   caret_Slope_Run;
 
+#ifdef TT_CONFIG_OPTION_SUPPORT_OPTIONAL_FIELDS
     TT_Short   Reserved0,
                Reserved1,
                Reserved2,
                Reserved3,
                Reserved4;
+#endif
 
     TT_Short   metric_Data_Format;
     TT_UShort  number_Of_HMetrics;
@@ -433,12 +435,15 @@
     TT_FWord   yMax_Extent;             /* xmax or ymax extents            */
     TT_FWord   caret_Slope_Rise;
     TT_FWord   caret_Slope_Run;
+
+#ifdef TT_CONFIG_OPTION_SUPPORT_OPTIONAL_FIELDS
     TT_FWord   caret_Offset;
 
     TT_Short   Reserved1,
                Reserved2,
                Reserved3,
                Reserved4;
+#endif
 
     TT_Short   metric_Data_Format;
     TT_UShort  number_Of_VMetrics;
@@ -498,10 +503,11 @@
     TT_UShort  usWinAscent;
     TT_UShort  usWinDescent;
 
+#ifdef TT_CONFIG_OPTION_SUPPORT_OPTIONAL_FIELDS
     /* only version 1 tables: */
-
     TT_ULong   ulCodePageRange1;       /* Bits 0-31   */
     TT_ULong   ulCodePageRange2;       /* Bits 32-63  */
+#endif
   };
 
   typedef struct TT_OS2_  TT_OS2;

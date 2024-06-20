@@ -133,6 +133,7 @@
   #define GET_Short()   (Short) (frame.cursor += 2, \
                                  (frame.cursor[-2] << 8) | \
                                   frame.cursor[-1])
+  #define SKIP( _size_ )        (frame.cursor += _size_ )
   
 #else
 
