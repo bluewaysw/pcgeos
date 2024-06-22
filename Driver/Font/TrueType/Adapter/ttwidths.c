@@ -360,6 +360,7 @@ EC(     ECCheckBounds( (void*)kernValue ) );
                         continue;
 
                 pairs = GEO_LOCK( kerningDir.tables->t.kern0.pairsBlock );
+EC(             ECCheckBounds( pairs ) );
 
                 for( i = 0; i < kerningDir.tables->t.kern0.nPairs; ++i )
                 {

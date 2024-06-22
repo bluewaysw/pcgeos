@@ -2333,12 +2333,14 @@
       }
     }
 
+//#ifdef TT_CONFIG_OPTION_GRAY_SCALING
     /* for gray-scaling, flushes the bitmap scanline cache */
     while ( y <= max_Y )
     {
       ras.Proc_Sweep_Step( RAS_VARS y );
       ++y;
     }
+//#endif
 
     ras.Proc_Sweep_Finish( RAS_VAR );
     return SUCCESS;

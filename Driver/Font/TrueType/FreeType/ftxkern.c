@@ -27,6 +27,7 @@
 #include "ttobjs.h"
 #include "ttload.h"  /* For the macros */
 #include "tttags.h"
+#include <ec.h>
 
 /* Required by the tracing mode */
 #undef  TT_COMPONENT
@@ -87,6 +88,7 @@ extern TEngine_Instance engineInstance;
       goto Fail;
 
     pairs = GEO_LOCK( kern0->pairsBlock );
+EC( ECCheckBounds( pairs ) );
 
     for ( n = 0; n < num_pairs; ++n )
     {
