@@ -20,6 +20,7 @@
 #include "ttinit.h"
 #include "ttadapter.h"
 #include "ttcharmapper.h"
+#include "ttmemory.h"
 #include "ftxkern.h"
 #include <fileEnum.h>
 #include <geos.h>
@@ -64,9 +65,9 @@ static word GetKernCount(       TRUETYPE_VARS );
 
 static word toHash( const char* str );
 
-static int  strlen( const char* str );
+static word strlen( const char* str );
 
-static void strcpy( char* dest, const char* source );
+static char* strcpy( char* dest, const char* source );
 
 static void strcpyname( char* dest, const char* source );
 
@@ -1004,6 +1005,7 @@ static word GetKernCount( TRUETYPE_VARS )
 {
         TT_Kerning        kerningDir;
         word              table;
+        TT_Kern_0_Pair*   pairs;
         word              numGeosKernPairs = 0;
 
         if( TT_Get_Kerning_Directory( FACE, &kerningDir ) )
@@ -1020,16 +1022,15 @@ static word GetKernCount( TRUETYPE_VARS )
                 if( kerningDir.tables->format != 0 )
                         continue;
 
-                /* We only support decreasing the character spacing.*/
-                if( kerningDir.tables->t.kern0.pairs[i].value > 0 )
-                        continue;
+                pairs = GEO_LOCK( kerningDir.tables->t.kern0.pairsBlock );
 
                 for( i = 0; i < kerningDir.tables->t.kern0.nPairs; ++i )
                 {
-                        if( isGeosCharPair( kerningDir.tables->t.kern0.pairs[i].left,
-                                        kerningDir.tables->t.kern0.pairs[i].right ) )
+                        if( isGeosCharPair( pairs[i].left, pairs[i].right ) )
                                 ++numGeosKernPairs;
                 }
+
+                GEO_UNLOCK( kerningDir.tables->t.kern0.pairsBlock );
         }
 
 Fail:
@@ -1042,7 +1043,7 @@ Fail:
 /* cycle. Therefore, the required functions are reimplemented here.*/
 /*******************************************************************/
 
-static int strlen( const char* str )
+static word strlen( const char* str )
 {
         const char  *s;
 
@@ -1052,9 +1053,10 @@ static int strlen( const char* str )
 }
 
 
-static void strcpy( char* dest, const char* source )
+static char* strcpy( char* dest, const char* source )
 {
         while( (*dest++ = *source++) != '\0' );
+        return dest;
 }
 
 

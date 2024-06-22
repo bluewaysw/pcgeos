@@ -1185,8 +1185,8 @@
         /* if both first and last points are off the curve, */
         /* start at their middle and record its position    */
         /* for closure                                      */
-        ras.lastX = (ras.lastX + x_last)/2;
-        ras.lastY = (ras.lastY + y_last)/2;
+        ras.lastX = (ras.lastX + x_last) >> 1;
+        ras.lastY = (ras.lastY + y_last) >> 1;
 
         x_last = ras.lastX;
         y_last = ras.lastY;
@@ -1295,7 +1295,7 @@
 
     start = 0;
 
-    for ( i = 0; i < ras.nContours; i++ )
+    for ( i = 0; i < ras.nContours; ++i )
     {
       ras.state    = Unknown;
       ras.gProfile = NULL;
@@ -1800,7 +1800,7 @@
   }
 
 
-  static void _near  Horizontal_Sweep_Span( RAS_ARGS Short       y,
+  static void _near  Horizontal_Sweep_Span( RAS_ARGS Short y,
                                                TT_F26Dot6  x1,
                                                TT_F26Dot6  x2,
                                                PProfile    left,
@@ -2337,7 +2337,7 @@
     while ( y <= max_Y )
     {
       ras.Proc_Sweep_Step( RAS_VARS y );
-      y++;
+      ++y;
     }
 
     ras.Proc_Sweep_Finish( RAS_VAR );

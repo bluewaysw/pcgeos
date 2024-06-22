@@ -55,7 +55,7 @@
     UShort  i;
 
 
-    for ( i = 0; i < face->numTables; i++ )
+    for ( i = 0; i < face->numTables; ++i )
       if ( face->dirTables[i].Tag == tag )
         return i;
 
@@ -121,7 +121,7 @@
     limit = face->numTables;
     entry = face->dirTables;
 
-    for ( n = 0; n < limit; n++ )
+    for ( n = 0; n < limit; ++n )
     {                      /* loop through the tables and get all entries */
       entry->Tag      = GET_Tag4();
       entry->CheckSum = GET_ULong();
@@ -266,7 +266,7 @@
 
     face->gasp.gaspRanges = gaspranges;
 
-    for ( j = 0; j < gas->numRanges; j++ )
+    for ( j = 0; j < gas->numRanges; ++j )
     {
       gaspranges[j].maxPPEM  = GET_UShort();
       gaspranges[j].gaspFlag = GET_UShort();
@@ -409,7 +409,7 @@
     /* never trust derived values! */
 
     num_shorts         = face->maxProfile.numGlyphs - num_longs;
-    num_shorts_checked = ( face->dirTables[n].Length - num_longs * 4 ) / 2;
+    num_shorts_checked = ( face->dirTables[n].Length - num_longs * 4 ) >> 1;
 
     if ( num_shorts < 0 )            /* sanity check */
     {
@@ -428,7 +428,7 @@
       return error;
 
     long_metric = *longs;
-    for ( n = 0; n < num_longs; n++ )
+    for ( n = 0; n < num_longs; ++n )
     {
       long_metric->advance = GET_UShort();
       long_metric->bearing = GET_Short();
@@ -439,7 +439,7 @@
 
     if ( num_shorts > num_shorts_checked )
     {
-      for ( n = 0; n < num_shorts_checked; n++ )
+      for ( n = 0; n < num_shorts_checked; ++n )
         (*shorts)[n] = GET_Short();
 
       /* we fill up the missing left side bearings with the    */
@@ -451,7 +451,7 @@
     }
     else
     {
-      for ( n = 0; n < num_shorts; n++ )
+      for ( n = 0; n < num_shorts; ++n )
         (*shorts)[n] = GET_Short();
     }
 
@@ -691,7 +691,7 @@
     /* Load the name records and determine how much storage is needed */
     /* to hold the strings themselves.                                */
 
-    for ( i = bytes = 0; i < names->numNameRecords; i++ )
+    for ( i = bytes = 0; i < names->numNameRecords; ++i )
     {
       namerec = names->names + i;
       namerec->platformID   = GET_UShort();
@@ -725,7 +725,7 @@
 
       /* Go through and assign the string pointers to the name records. */
 
-      for ( i = 0; i < names->numNameRecords; i++ )
+      for ( i = 0; i < names->numNameRecords; ++i )
       {
         namerec = names->names + i;
         namerec->string = storage + names->names[i].stringOffset;
@@ -819,7 +819,7 @@
 
     limit = face->cvtSize;
 
-    for ( n = 0; n < limit; n++ )
+    for ( n = 0; n < limit; ++n )
       face->cvt[n] = GET_Short();
 
     FORGET_Frame();
@@ -881,7 +881,7 @@
     limit = face->numCMaps;
     cmap  = face->cMaps;
 
-    for ( n = 0; n < limit; n++ )
+    for ( n = 0; n < limit; ++n )
     {
       if ( FILE_Seek( off )  || ACCESS_Frame( 8 ) )
         return error;
@@ -1030,7 +1030,7 @@
     os2->yStrikeoutPosition  = GET_Short();
     os2->sFamilyClass        = GET_Short();
 
-    for ( i = 0; i < 10; i++ )
+    for ( i = 0; i < 10; ++i )
       os2->panose[i] = GET_Byte();
 
     os2->ulUnicodeRange1     = GET_ULong();

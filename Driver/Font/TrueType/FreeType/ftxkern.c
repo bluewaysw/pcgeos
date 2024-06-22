@@ -63,7 +63,8 @@ extern TEngine_Instance engineInstance;
   {
     DEFINE_LOAD_LOCALS( input->stream );
 
-    UShort  num_pairs, n;
+    UShort            num_pairs, n;
+    TT_Kern_0_Pair*   pairs;
 
 
     if ( ACCESS_Frame( 8 ) )
@@ -79,26 +80,29 @@ extern TEngine_Instance engineInstance;
 
     FORGET_Frame();
 
-    if ( ALLOC_ARRAY( kern0->pairs, num_pairs, TT_Kern_0_Pair ) )
+    if ( GEO_ALLOC_ARRAY( kern0->pairsBlock, num_pairs, TT_Kern_0_Pair ) )
       return error;
 
     if ( ACCESS_Frame( num_pairs * 6 ) )
       goto Fail;
 
+    pairs = GEO_LOCK( kern0->pairsBlock );
+
     for ( n = 0; n < num_pairs; ++n )
     {
-      kern0->pairs[n].left  = GET_UShort();
-      kern0->pairs[n].right = GET_UShort();
-      kern0->pairs[n].value = GET_UShort();
+      pairs[n].left  = GET_UShort();
+      pairs[n].right = GET_UShort();
+      pairs[n].value = GET_UShort();
 
-      if ( kern0->pairs[n].left >= input->numGlyphs ||
-           kern0->pairs[n].right >= input->numGlyphs )
+      if ( pairs[n].left >= input->numGlyphs || pairs[n].right >= input->numGlyphs )
       {
         FORGET_Frame();
         error = TT_Err_Invalid_Kerning_Table;
         goto Fail;
       }
     }
+
+    GEO_UNLOCK( kern0->pairsBlock );
 
     FORGET_Frame();
 
@@ -108,7 +112,7 @@ extern TEngine_Instance engineInstance;
     return TT_Err_Ok;
 
     Fail:
-      FREE( kern0->pairs );
+      GEO_FREE( kern0->pairsBlock );
       return error;
   }
 
@@ -396,7 +400,7 @@ extern TEngine_Instance engineInstance;
         switch ( sub->format )
         {
         case 0:
-          FREE( sub->t.kern0.pairs );
+          GEO_FREE( sub->t.kern0.pairsBlock );
           sub->t.kern0.nPairs        = 0;
           sub->t.kern0.searchRange   = 0;
           sub->t.kern0.entrySelector = 0;
