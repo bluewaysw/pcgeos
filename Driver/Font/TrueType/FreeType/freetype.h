@@ -522,10 +522,13 @@
     TT_FWord  underlinePosition;
     TT_FWord  underlineThickness;
     TT_ULong  isFixedPitch;
+    
+#ifdef TT_CONFIG_OPTION_SUPPORT_OPTIONAL_FIELDS
     TT_ULong  minMemType42;
     TT_ULong  maxMemType42;
     TT_ULong  minMemType1;
     TT_ULong  maxMemType1;
+#endif
 
     /* Glyph names follow in the file, but we don't         */
     /* load them by default.  See the ftxpost.c extension.  */
