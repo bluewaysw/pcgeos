@@ -269,6 +269,7 @@ EC(             ECCheckBounds( (void*)charTableEntry ) );
                 charTableEntry->CTE_width.WBF_frac = FRACTION_OF_WWFIXEDASDWORD( scaledWidth );
                 charTableEntry->CTE_dataOffset     = CHAR_NOT_BUILT;
                 charTableEntry->CTE_usage          = 0;
+                charTableEntry->CTE_flags          = 0;
                 
                
                 /* set flags in CTE_flags if needed */
@@ -290,15 +291,17 @@ EC(             ECCheckBounds( (void*)charTableEntry ) );
                         for( i = 0; i < fontBuf->FB_kernCount; ++i )
                         {
                                 /* If currentChar is right or left char in a kernpair set corresponding flags. */
-                                if( currentChar == kernPair->KP_charRight )
+                                if( currentChar == kernPair->KP_charLeft )
                                         charTableEntry->CTE_flags |= CTF_IS_FIRST_KERN;
-                                else if ( currentChar == kernPair->KP_charLeft )
+                                else if ( currentChar == kernPair->KP_charRight )
                                         charTableEntry->CTE_flags |= CTF_IS_SECOND_KERN;
 
                                 /* If currentChar is right and left char in a kernpair, it can be aborted. */
-                                if( charTableEntry->CTE_flags && CTF_IS_FIRST_KERN & 
-                                    charTableEntry->CTE_flags && CTF_IS_SECOND_KERN )
+                                if( charTableEntry->CTE_flags & (CTF_IS_FIRST_KERN | CTF_IS_SECOND_KERN) == 
+                                                                        (CTF_IS_FIRST_KERN | CTF_IS_SECOND_KERN)) 
                                         break;
+                        
+                                kernPair++;
                         }
                 }
 
@@ -307,7 +310,6 @@ EC(             ECCheckBounds( (void*)charTableEntry ) );
 
         TT_Done_Glyph( GLYPH );
 }
-
 
 /********************************************************************
  *                      ConvertKernPairs
