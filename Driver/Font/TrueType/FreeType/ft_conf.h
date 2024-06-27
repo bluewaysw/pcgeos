@@ -175,7 +175,14 @@
 
 
 /*************************************************************************/
-/* Define TT_CONFIG_OPTION_SUPPORT_CMAP6 if you want to support cmap 2   */
+/* Define TT_CONFIG_OPTION_SUPPORT_CMAP2 if you want to support cmap 0   */
+/* char mapping. Charmapping type 0 is now out of date.                  */
+
+#undef  TT_CONFIG_OPTION_SUPPORT_CMAP0
+
+
+/*************************************************************************/
+/* Define TT_CONFIG_OPTION_SUPPORT_CMAP2 if you want to support cmap 2   */
 /* char mapping. Charmapping type 2 is now out of date.                  */
 
 #undef  TT_CONFIG_OPTION_SUPPORT_CMAP2

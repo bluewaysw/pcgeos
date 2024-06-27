@@ -55,7 +55,9 @@
 
     PUShort glyphIdArray;
 
+#ifdef TT_CONFIG_OPTION_SUPPORT_CMAP0
     PCMap0  cmap0;
+#endif
 #ifdef TT_CONFIG_OPTION_SUPPORT_CMAP2
     PCMap2  cmap2;
 #endif
@@ -78,6 +80,7 @@
 
     switch ( cmap->format )
     {
+#ifdef TT_CONFIG_OPTION_SUPPORT_CMAP0
     case 0:
       cmap0 = &cmap->c.cmap0;
 
@@ -86,6 +89,7 @@
          goto Fail;
 
       break;
+#endif
 
 #ifdef TT_CONFIG_OPTION_SUPPORT_CMAP2
     case 2:
@@ -161,7 +165,7 @@
       cmap4->entrySelector = GET_UShort();
       cmap4->rangeShift    = GET_UShort();
 
-      num_Seg = cmap4->segCountX2 / 2;
+      num_Seg = cmap4->segCountX2 >> 1;
 
       FORGET_Frame();
 
@@ -170,7 +174,7 @@
       if ( GEO_ALLOC_ARRAY( cmap4->segmentBlock,
                             num_Seg,
                             TCMap4Segment )       ||
-           ACCESS_Frame( (num_Seg * 4 + 1) * 2 ) )
+           ACCESS_Frame( (num_Seg * 4 + 1) << 1 ) )
         goto Fail;
 
       segments = GEO_LOCK( cmap4->segmentBlock );
@@ -193,7 +197,7 @@
       FORGET_Frame();
 
       cmap4->numGlyphId = l =
-        ( ( cmap->length - ( 16L + 8L * num_Seg ) ) & 0xffff ) / 2;
+        ( ( cmap->length - ( 16L + 8L * num_Seg ) ) & 0xffff ) >> 1;
 
       /* load ids */
 
@@ -269,9 +273,11 @@
 
     switch ( cmap->format )
     {
+#ifdef TT_CONFIG_OPTION_SUPPORT_CMAP0
       case 0:
         FREE( cmap->c.cmap0.glyphIdArray );
         break;
+#endif
 
 #ifdef TT_CONFIG_OPTION_SUPPORT_CMAP2
       case 2:
@@ -316,17 +322,19 @@
  *
  ******************************************************************/
 
+#ifdef TT_CONFIG_OPTION_SUPPORT_CMAP0
   static UShort  code_to_index0( UShort  charCode, PCMap0  cmap0 );
+#endif
 
-  #ifdef TT_CONFIG_OPTION_SUPPORT_CMAP2
+#ifdef TT_CONFIG_OPTION_SUPPORT_CMAP2
   static UShort  code_to_index2( UShort  charCode, PCMap2  cmap2 );
-  #endif
+#endif
 
   static UShort  code_to_index4( UShort  charCode, PCMap4  cmap4 );
 
-  #ifdef TT_CONFIG_OPTION_SUPPORT_CMAP6
+#ifdef TT_CONFIG_OPTION_SUPPORT_CMAP6
   static UShort  code_to_index6( UShort  charCode, PCMap6  cmap6 );
-  #endif
+#endif
 
 
   LOCAL_FUNC
@@ -335,8 +343,10 @@
   {
     switch ( cmap->format )
     {
+#ifdef TT_CONFIG_OPTION_SUPPORT_CMAP0
       case 0:
         return code_to_index0( charcode, &cmap->c.cmap0 );
+#endif
 #ifdef TT_CONFIG_OPTION_SUPPORT_CMAP2
       case 2:
         return code_to_index2( charcode, &cmap->c.cmap2 );
@@ -353,6 +363,7 @@
   }
 
 
+#ifdef TT_CONFIG_OPTION_SUPPORT_CMAP0
 /*******************************************************************
  *
  *  Function    : code_to_index0
@@ -378,6 +389,7 @@
     else
       return 0;
   }
+#endif
 
 
 #ifdef TT_CONFIG_OPTION_SUPPORT_CMAP2

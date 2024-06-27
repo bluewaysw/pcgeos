@@ -302,7 +302,7 @@ EC(             ECCheckBounds( (void*)charTableEntry ) );
                                                                         (CTF_IS_FIRST_KERN | CTF_IS_SECOND_KERN)) 
                                         break;
                         
-                                kernPair++;
+                                ++kernPair;
                         }
                 }
 
