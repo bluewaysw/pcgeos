@@ -762,7 +762,6 @@
   TT_Error  TT_Open_Stream( const FileHandle  file,
                             TT_Stream*        stream )
   {
-    Int          len;
     TT_Error     error;
     PStream_Rec  stream_rec;
 

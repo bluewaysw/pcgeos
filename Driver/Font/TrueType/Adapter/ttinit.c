@@ -1025,10 +1025,8 @@ static word GetKernCount( TRUETYPE_VARS )
                 pairs = GEO_LOCK( kerningDir.tables->t.kern0.pairsBlock );
 
                 for( i = 0; i < kerningDir.tables->t.kern0.nPairs; ++i )
-                {
                         if( isGeosCharPair( pairs[i].left, pairs[i].right ) )
                                 ++numGeosKernPairs;
-                }
 
                 GEO_UNLOCK( kerningDir.tables->t.kern0.pairsBlock );
         }

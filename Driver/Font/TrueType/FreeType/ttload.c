@@ -625,7 +625,7 @@
 
       glyphLocations = GEO_LOCK( face->glyphLocationBlock );
       for ( n = 0; n < limit; ++n )
-        glyphLocations[n] = (Long)((ULong)GET_UShort() * 2);
+        glyphLocations[n] = (Long)((ULong)GET_UShort() >> 1 );
 
       GEO_UNLOCK( face->glyphLocationBlock );
       FORGET_Frame();
@@ -806,7 +806,7 @@
       return TT_Err_Ok;
     }
 
-    face->cvtSize = face->dirTables[n].Length / 2;
+    face->cvtSize = face->dirTables[n].Length << 1;
 
     if ( ALLOC_ARRAY( face->cvt,
                       face->cvtSize,

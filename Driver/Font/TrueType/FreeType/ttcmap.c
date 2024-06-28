@@ -49,10 +49,11 @@
   {
     DEFINE_LOAD_LOCALS( input );
 
-    UShort  num_SH, num_Seg, i;
-
-    UShort  u, l;
-
+#ifdef TT_CONFIG_OPTION_SUPPORT_CMAP2
+    UShort  num_SH, u;
+#endif
+    UShort  num_Seg, i;
+    UShort  l;
     PUShort glyphIdArray;
 
 #ifdef TT_CONFIG_OPTION_SUPPORT_CMAP0

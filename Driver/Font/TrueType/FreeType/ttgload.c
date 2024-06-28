@@ -586,7 +586,10 @@
     TGlyph_Zone base_pts;
 
     TPhases     phase;
+
+#ifdef TT_CONFIG_OPTION_PROCESS_HDMX
     PByte       widths;
+#endif
 
     PStorage    glyphLocations;
 
