@@ -1,0 +1,175 @@
+/**************************************************************************
+ *
+ * PROJECT:      Build a new (!) word list for Word Matcher
+ *               
+ * FILE:         wlistgen.goc
+ *               Code for process class
+ *               by RABE-Soft 06/2024
+ *
+ * AUTHOR:       Rainer Bettsteller
+ *
+ **************************************************************************/
+
+/*  Standard include files */
+@include <stdapp.goh>
+@include <ansi\stdlib.h>
+@include <ansi\stdio.h>
+@include <ansi\string.h>
+
+@include "wlistgen.goh"
+@include "lmacros.goh"
+
+@include "appui.goh"
+
+/*---------------------------------------------------------------------------
+	Global Variables and Types
+ ---------------------------------------------------------------------------*/
+GlobalStruct global;
+
+@classdecl WListProcessClass, neverSaved;
+
+
+/*###########################################################################
+	 CODE fr WListProcessClass
+/*###########################################################################*/
+
+@if 0
+/*--------------------- MSG_GEN_PROCESS_OPEN_APPLICATION ---------------------
+ *	Purpose:	User-Hook beim ™ffnen der Applikation
+ * 	Paramters:	void (	AppAttachFlags		attachFlags,
+ *				MemHandle		launchBlock,
+ *				MemHandle 		extraState);
+ *	AppAttachFlags:	k”nnen folgende Bitflags enthalten:
+ *		  	  AAF_RESTORING_FROM_STATE | AAF_STATE_FILE_PASSED
+ *			| AAF_DATA_FILE_PASSED	| AAF_RESTORING_FROM_QUIT
+ *	launchBlock:	AppLaunchBlock
+ *	extraState:	Handle des Extra-State-Blocks, wenn dieser von
+ *			MSG_GEN_PROCESS_CLOSE_APPLICATION bergeben wurde
+ *	Strategy: 	@callsuper() erforderlich
+ *                      vor @callsuper() sind alle UI-Objekte not enabled
+ *			danach sind sie nutzbar (z.B. auch DialogBoxen)
+ ---------------------------------------------------------------------------*/
+@method WListProcessClass, MSG_GEN_PROCESS_OPEN_APPLICATION {
+
+	/* Initialisieren der globalen Variablen */
+	memset(&global, 0, sizeof(GlobalStruct));
+
+
+	@callsuper();
+	}
+
+/*--------------------- MSG_GEN_PROCESS_CLOSE_APPLICATION ---------------------
+ *	Purpose:	User-Hook beim Schlieáen der Applikation
+ * 	Paramters:	MemHandle ( void );
+ *			Wenn zus„tzliche Daten in der State-Datei gesichert
+ *			werden sollen, kann ein das Handle eines Speicherblocks
+ *			bergeben werden, die diese Daten enth„lt
+ *	Strategy: 	@callsuper() erforderlich
+ *	Return:		Handle des zu sichernden Blocks (oder NULL fr keinen)
+ ---------------------------------------------------------------------------*/
+@method WListProcessClass, MSG_GEN_PROCESS_CLOSE_APPLICATION {
+	return @callsuper();
+	}
+@endif
+
+
+
+/*--------------------- MSG_WLIST_FILE_SELECTED ---------------------
+ *        Purpose:      Handler fr UserAuswahl im File-Selektor
+ *        Context:
+ *        Strategy:
+ *        Paramters:	GEN_FILE_SELECTOR_NOTIFICATION_MSG
+ *			void (word entryNum,
+ *			      GenFileSelectorEntryFlags	entryFlags);
+ *			entryFlags == WordFlags --> GFSEF_OPEN bis GFSEF_PARENT_DIR
+ *        Return:	-
+ ---------------------------------------------------------------------------*/
+@method WListProcessClass, MSG_WLIST_FILE_SELECTED  {
+word entryType;
+
+
+     entryType = GFS_GET_ENTRY_TYPE(entryFlags);
+		/* Das sind die obersten beiden Bits des Records */
+		/* ---> enum: GFSET_FILE, GFSET_SUBDIR, GFSET_VOLUME */
+
+     if ( entryType == GFSET_FILE )
+	{
+	if ( entryFlags & GFSEF_OPEN ) UserStandardSound(SST_ERROR);
+			else          UserStandardSound(SST_NOTIFY);
+	}
+
+     if ( (entryType == GFSET_SUBDIR) )
+	{
+//	UserStandardSound(SST_WARNING);	// <-- l„uft!
+	}
+
+
+     if ( (entryType == GFSET_VOLUME) )
+	/* Bug? Dieser Wert wird nie bergeben. es ist immer GFSET_SUBDIR,
+	 * auch wenn das Root-Verzeichnis selektiert wird */
+	{
+	UserStandardSound(SST_KEY_CLICK);
+	}
+
+}
+
+
+/*--------------------- MSG_WLIST_APPLY_TRIGGER ---------------------
+ *        Purpose:      Handler fr Trigger in der Reply-Bar
+ *        Paramters:	void(void)
+ ---------------------------------------------------------------------------*/
+@method WListProcessClass, MSG_WLIST_APPLY_TRIGGER {
+	UserStandardSound(SST_ERROR);
+}
+/*--------------------- MSG_WLIST_RESET_TRIGGER ---------------------
+ *        Purpose:      Handler fr Trigger in der Reply_bar
+ *        Paramters:	void(void)
+ ---------------------------------------------------------------------------*/
+@method WListProcessClass, MSG_WLIST_RESET_TRIGGER {
+	UserStandardSound(SST_WARNING);
+}
+
+
+/*--------------------- MSG_WLIST_APPLY_INPUT_TEXT ---------------------
+ *        Purpose:      Handler fr Enter im InputText
+ *        Paramters:	void GEN_TEXT_APPLY_MSG(word stateFlags = bp);
+ ---------------------------------------------------------------------------*/
+@method WListProcessClass, MSG_WLIST_APPLY_INPUT_TEXT {
+	UserStandardSound(SST_NOTIFY);
+}
+
+
+/*--------------------- MSG_WLIST_APPLY_BOOLEAN_GROUP ---------------------
+ *	Purpose:        Handler fr Auswahl aus der BooleanGroup
+ *	Context:
+ *	Strategy:
+ *	Paramters:	void GEN_BOOLEAN_GROUP_APPLY_MSG(
+ *           			word selectedBooleans,
+ *				word indeterminateBooleans,
+ *				word modifiedBooleans);
+ *      Return:		-
+ ---------------------------------------------------------------------------*/
+@method WListProcessClass, MSG_WLIST_APPLY_BOOLEAN_GROUP {
+	MessageNumberBox(selectedBooleans);
+}
+
+
+
+
+
+
+
+
+
+
+/*---------------------  ---------------------
+ *	Purpose:
+ *	Context:
+ *	Strategy:
+ *	Paramters:
+ *	Return:
+ ---------------------------------------------------------------------------*/
+
+/* *********** End of file wlistgen.goc ********************/
+
+

@@ -1,0 +1,204 @@
+/**************************************************************************
+ *
+ * PROJECT:      Build a new (!) word list for Word Matcher
+ *               
+ * FILE:         APPUI.GOC
+ *               by RABE-Soft 06/2024
+ *
+ * AUTHOR:       Rainer Bettsteller
+ *
+ **************************************************************************/
+
+
+/*  Standard include files */
+@include <stdapp.goh>
+
+@include "wlistgen.goh"
+
+/*---------------------------------------------------------------------------
+ Resource AppResource
+ ---------------------------------------------------------------------------*/
+@start AppResource;
+
+@object GenApplicationClass WListApp = {
+        GI_visMoniker = list { @WListTextMoniker};
+        GI_comp = @WListPrimary;
+        gcnList(MANUFACTURER_ID_GEOWORKS,GAGCNLT_WINDOWS) = @WListPrimary;
+        }        /* end of WListApp */
+
+@visMoniker WListTextMoniker = "Word List Creator";
+
+@end AppResource;
+
+
+/*---------------------------------------------------------------------------
+ Resource Interface
+ ---------------------------------------------------------------------------*/
+
+@start Interface;
+
+/* ----------------- Main Window ------------------------------*/
+
+@object GenPrimaryClass WListPrimary = {
+	GI_comp = @WListFileMenu,
+			@WListPrimaryMainGroup, @WListMainReplyBar;
+	HINT_ORIENT_CHILDREN_VERTICALLY;
+	HINT_SIZE_WINDOW_AS_DESIRED;
+	} 
+
+
+@object GenInteractionClass WListPrimaryMainGroup = {
+	GI_comp = @WListLeftGroup, @WListRightGroup;
+	HINT_ORIENT_CHILDREN_HORIZONTALLY;
+	}
+
+@object GenInteractionClass WListLeftGroup = {
+	GI_comp = @WListFileSelector, @WListMainBooleanGroup;
+	HINT_ORIENT_CHILDREN_VERTICALLY;
+}
+
+
+@object GenInteractionClass WListRightGroup = {
+	GI_comp = @Spacer1, @WListInputText, @WListMessageText;
+	HINT_ORIENT_CHILDREN_VERTICALLY;
+}
+
+/* ----------------- Left Group ------------------------------*/
+
+@object GenFileSelectorClass WListFileSelector = {
+	GI_visMoniker = "Select a file to import:";
+	HINT_PLACE_MONIKER_ABOVE;
+	GFSI_destination = process;
+	GFSI_notificationMsg = MSG_WLIST_FILE_SELECTED;
+	HINT_FILE_SELECTOR_NUMBER_OF_FILES_TO_SHOW = 12;
+	/* HINT_FILE_SELECTOR_FILE_LIST_WIDTH = ; /*average-width characters, max 255 */
+	GFSI_fileCriteria =  FSFC_DIRS | FSFC_NON_GEOS_FILES;
+
+	}
+
+@object GenBooleanGroupClass WListMainBooleanGroup = {
+	GI_visMoniker = "Options:";
+	HINT_PLACE_MONIKER_ABOVE;
+	GI_comp = @MainBoolean1;
+	HINT_ORIENT_CHILDREN_VERTICALLY;
+	GBGI_destination = process;
+	GBGI_applyMsg = MSG_WLIST_APPLY_BOOLEAN_GROUP;
+	GBGI_selectedBooleans = BOOL_ID_1;
+	/*HINT_BOOLEAN_GROUP_TOOLBOX_STYLE;	/**/
+	/*HINT_BOOLEAN_GROUP_SCROLLABLE;        /**/
+	}
+@object GenBooleanClass MainBoolean1 = {
+	GI_visMoniker = 'c',"Create compressed list";
+	GBI_identifier = BOOL_ID_1;
+	}
+
+/* ----------------- Right Group ------------------------------*/
+
+@object GenGlyphClass Spacer1 = { GI_visMoniker = "  "; }
+
+
+@object GenTextClass WListInputText = {
+	GI_visMoniker = "Filename for new Word-List:";
+	HINT_PLACE_MONIKER_ABOVE;
+	GTXI_text = "WM Words";
+	GTXI_maxLength = 32;
+	ATTR_GEN_TEXT_LEGAL_FILENAMES;
+	GTXI_attrs = @default | GTA_SINGLE_LINE_TEXT;
+	HINT_TEXT_WHITE_WASH_COLOR;
+	HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+	}
+
+
+
+@object GenTextClass WListMessageText = {
+	GI_visMoniker = "Messages:";
+	HINT_PLACE_MONIKER_ABOVE;
+	GTXI_text = "";
+	GTXI_attrs = (@default | GTA_INIT_SCROLLING)
+		     & ~GTA_USE_TAB_FOR_NAVIGATION;
+	/*GI_attrs = @default | GA_READ_ONLY; /**/
+	HINT_TEXT_WHITE_WASH_COLOR;
+	HINT_FIXED_SIZE = { SST_AVG_CHAR_WIDTHS | 30 ,
+		/* SST_PIXELS */ SST_LINES_OF_TEXT | 15 , 0};
+	ATTR_GEN_TEXT_CHAR_ATTR = (ChunkHandle) @WListEditCharAttrs;
+	}
+@chunk VisTextCharAttr WListEditCharAttrs =
+		CHAR_ATTR_FONT_SIZE(/*FID_DTC_URW_SANS*/FID_UNIVERSITY,12);
+
+
+
+/* -------------------- Reply-Bar ---------------------------- */
+@object GenInteractionClass WListMainReplyBar = {
+	GI_comp = @WListApplyTrigger,@WListResetTrigger;
+	HINT_MAKE_REPLY_BAR;
+	}
+@object GenTriggerClass WListApplyTrigger = {
+	GI_visMoniker = 'C'," Create new list ";
+	GTI_destination = process;
+	GTI_actionMsg = MSG_WLIST_APPLY_TRIGGER;
+	}
+@object GenTriggerClass WListResetTrigger = {
+	GI_visMoniker = 'Q'," Quit ";
+	GTI_destination = process;
+	GTI_actionMsg = MSG_WLIST_RESET_TRIGGER;
+	}
+
+
+
+
+@end Interface; /*-------------------------------------------------------*/
+
+
+/*---------------------------------------------------------------------------
+ Resource MenuResource
+ ---------------------------------------------------------------------------*/
+@start MenuResource;
+
+@object GenInteractionClass WListFileMenu = {
+	ATTR_GEN_INTERACTION_GROUP_TYPE = GIGT_FILE_MENU;
+	GI_comp = @WListAboutBox;
+	GII_visibility = GIV_POPUP;
+	}
+
+@object GenInteractionClass WListAboutBox = {
+	GI_visMoniker = 0, "Information ";
+	GI_comp = @AboutGlyph1,@AboutGlyph2,@AboutGlyph3,@AboutGlyph4,
+		@AboutGlyph5;
+	HINT_CENTER_CHILDREN_HORIZONTALLY;
+	GII_visibility = GIV_DIALOG;
+	GII_type = GIT_NOTIFICATION;
+	}
+@object GenGlyphClass AboutGlyph1 = {
+	GI_visMoniker = "Wold List Creator";
+	}
+@object GenGlyphClass AboutGlyph2 = {
+	GI_visMoniker = "";
+	}
+@object GenGlyphClass AboutGlyph3 = {
+	GI_visMoniker = "";
+	}
+@object GenGlyphClass AboutGlyph4 = {
+	GI_visMoniker = " Programmed by: ";
+	}
+@object GenGlyphClass AboutGlyph5 = {
+	GI_visMoniker = " Rainer Bettsteller, Magdeburg ";
+	}
+
+
+
+@end MenuResource; /*-------------------------------------------------------*/
+
+
+/*---------------------------------------------------------------------------
+ Resourcendefinition DataResource
+ Alle lokalisierbaren Texte und Daten mÅssen in einer Resource stehen
+ ---------------------------------------------------------------------------*/
+@start DataResource, data;
+/* Beispiel*/
+@chunk char SampleText[] = "Ich bin ein lokalisierbarer Text.";
+
+@end DataResource; /*-------------------------------------------------------*/
+
+
+/*************************** End of File APPUI.GOC ********************/
+
