@@ -53,6 +53,7 @@ resource AppSCGAMonikerResource lmem read-only shared
 resource AppLCGAMonikerResource lmem read-only shared
 resource AppSMMonikerResource   lmem read-only shared
 resource AppSCMonikerResource   lmem read-only shared
+resource AppTCMonikerResource   lmem read-only shared
 resource AppLMMonikerResource   lmem read-only shared
 resource AppLCMonikerResource  lmem read-only shared
 resource AppTCMonikerResource  lmem read-only shared
