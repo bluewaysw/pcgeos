@@ -333,7 +333,7 @@
     }
 
     ras.precision       = 1 << ras.precision_bits;
-    ras.precision_half  = ras.precision / 2;
+    ras.precision_half  = ras.precision >> 1;
     ras.precision_shift = ras.precision_bits - Pixel_Bits;
   }
 
@@ -473,7 +473,7 @@
 
     /* look for first y value that is <= */
     while ( n >= 0 && y < y_turns[n] )
-      n--;
+      --n;
 
     /* if it is <, simply insert it, ignore if == */
     if ( n >= 0 && y > y_turns[n] )
@@ -482,7 +482,7 @@
         y2 = y_turns[n];
         y_turns[n] = y;
         y = y2;
-        n--;
+        --n;
       }
 
     if ( n < 0 )
@@ -492,8 +492,8 @@
         ras.error = Raster_Err_Overflow;
         return FAILURE;
       }
-      ras.maxBuff--;
-      ras.numTurns++;
+      --ras.maxBuff;
+      ++ras.numTurns;
       ras.sizeBuff[-ras.numTurns] = y;
     }
 
@@ -1830,7 +1830,7 @@
   }
 
 
-  static void _near  Horizontal_Sweep_Drop( RAS_ARGS Short       y,
+  static void _near  Horizontal_Sweep_Drop( RAS_ARGS Short y,
                                                TT_F26Dot6  x1,
                                                TT_F26Dot6  x2,
                                                PProfile    left,

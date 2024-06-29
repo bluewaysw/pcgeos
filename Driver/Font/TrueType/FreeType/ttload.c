@@ -115,7 +115,7 @@
                       TTableDirEntry ) )
       return error;
 
-    if ( ACCESS_Frame( face->numTables * 16 ) )
+    if ( ACCESS_Frame( face->numTables << 4 ) )
       return error;
 
     limit = face->numTables;
@@ -164,7 +164,7 @@
     if ( FILE_Seek( face->dirTables[i].Offset ) )   /* seek to maxprofile */
       return error;
 
-    if ( ACCESS_Frame( 32L) )  /* read into frame */
+    if ( ACCESS_Frame( 32 ) )  /* read into frame */
       return error;
 
     /* read frame data into face table */
@@ -261,7 +261,7 @@
     FORGET_Frame();
 
     if ( ALLOC_ARRAY( gaspranges, gas->numRanges, GaspRange ) ||
-         ACCESS_Frame( gas->numRanges * 4 ) )
+         ACCESS_Frame( gas->numRanges << 2 ) )
       goto Fail;
 
     face->gasp.gaspRanges = gaspranges;
@@ -446,7 +446,7 @@
       /* last valid value. Since this will occur for buggy CJK */
       /* fonts usually, nothing serious will happen.           */
 
-      for ( n = num_shorts_checked; n < num_shorts; n++ )
+      for ( n = num_shorts_checked; n < num_shorts; ++n )
         (*shorts)[n] = (*shorts)[num_shorts_checked - 1];
     }
     else
@@ -625,7 +625,7 @@
 
       glyphLocations = GEO_LOCK( face->glyphLocationBlock );
       for ( n = 0; n < limit; ++n )
-        glyphLocations[n] = (Long)((ULong)GET_UShort() >> 1 );
+        glyphLocations[n] = (Long)((ULong)GET_UShort() << 1 );
 
       GEO_UNLOCK( face->glyphLocationBlock );
       FORGET_Frame();
@@ -806,7 +806,7 @@
       return TT_Err_Ok;
     }
 
-    face->cvtSize = face->dirTables[n].Length << 1;
+    face->cvtSize = face->dirTables[n].Length >> 1;
 
     if ( ALLOC_ARRAY( face->cvt,
                       face->cvtSize,
