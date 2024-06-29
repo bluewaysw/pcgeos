@@ -66,6 +66,9 @@ settingsTable	SettingTableEntry	\
  <ADVANCED_TOOLBAR_STATES, ADVANCED_FEATURES>
 
 featuresKey	char	"features", 0
+dispDatesKey	char	"displayDates", 0
+startupKey	char	"viewOnStartup", 0
+cardTypeKey	char	"cardType", 0
 
 ;---
 
@@ -94,11 +97,10 @@ NTakerApplicationLoadOptions	method dynamic	NTakerApplicationClass,
 	pop	si, ds
 	mov	bp, sp
 	lea	sp, ss:[bp+INI_CATEGORY_BUFFER_SIZE]
-	jnc	exit
+	push	si
+	jnc	afterSetUserLevel2
 
 	; no .ini file settings -- set objects correctly based on level
-
-	push	si
 
 	call	UserGetDefaultLaunchLevel		;ax = UserLevel (0-3)
 ;	mov	bl, size SettingTableEntry
@@ -130,8 +132,82 @@ afterSetUserLevel:
 	mov	cx, cs:[settingsTable][di].STE_showBars
 	call	SetToolbarState
 
+afterSetUserLevel2:
 	pop	si
 
+	; 
+	; Startup view
+	; Cart type
+	mov	bx, offset dispDatesKey
+	call	GetIniCategory
+	push 	si
+	jnc	checkStartupType
+
+
+	; no ini key for "OptionsList -> Display creation date"
+	GetResourceHandleNS	OptionsList, bx
+	mov	si, offset OptionsList
+	mov	ax, MSG_GEN_BOOLEAN_GROUP_GET_SELECTED_BOOLEANS
+	call	ObjMessageCall			;ax = bits set
+
+	mov	cx, 0					; load default
+	xor	ax, cx					;ax = bits changed
+	jz	checkStartupType			;Exit if none changed
+
+	push	ax
+	mov	ax, MSG_GEN_BOOLEAN_GROUP_SET_GROUP_STATE
+	clr	dx
+	call	ObjMessageSend
+	pop	cx
+	clr	dx
+	mov	ax, MSG_GEN_BOOLEAN_GROUP_SET_GROUP_MODIFIED_STATE
+	call	ObjMessageSend
+	mov	ax, MSG_GEN_APPLY
+	call	ObjMessageSend
+
+checkStartupType:
+	mov	bx, offset startupKey
+	pop	si
+	push	si
+	call	GetIniCategory
+	jnc	checkCardTypes
+
+	GetResourceHandleNS	StartupViewList, bx
+	mov	si, offset StartupViewList
+	mov	ax, MSG_GEN_ITEM_GROUP_GET_SELECTION
+	call	ObjMessageCall			;ax = selection
+	mov	cx, 0				; load default
+	cmp	ax, cx
+	jz	checkCardTypes
+	mov	ax, MSG_GEN_ITEM_GROUP_SET_SINGLE_SELECTION
+	clr	dx
+	call	ObjMessageSend
+	mov	cx, 1					;mark modified
+	mov	ax, MSG_GEN_ITEM_GROUP_SET_MODIFIED_STATE
+	call	ObjMessageSend
+	mov	ax, MSG_GEN_APPLY
+	call	ObjMessageSend
+checkCardTypes:
+	mov	bx, offset cardTypeKey
+	pop	si
+	call	GetIniCategory
+	jnc	exit
+
+	GetResourceHandleNS	CardTypeList, bx
+	mov	si, offset CardTypeList
+	mov	ax, MSG_GEN_ITEM_GROUP_GET_SELECTION
+	call	ObjMessageCall			;ax = selection
+	mov	cx, NT_TEXT			; load default
+	cmp	ax, cx
+	jz	exit
+	mov	ax, MSG_GEN_ITEM_GROUP_SET_SINGLE_SELECTION
+	clr	dx
+	call	ObjMessageSend
+	mov	cx, 1					;mark modified
+	mov	ax, MSG_GEN_ITEM_GROUP_SET_MODIFIED_STATE
+	call	ObjMessageSend
+	mov	ax, MSG_GEN_APPLY
+	call	ObjMessageSend
 exit:
 	ret
 NTakerApplicationLoadOptions	endm
@@ -630,6 +706,17 @@ NTakerApplicationSetToolbarState	method dynamic	NTakerApplicationClass,
 
 NTakerApplicationSetToolbarState	endm
 
+
+NTakerApplicationChangeOptions	method dynamic	NTakerApplicationClass,
+										MSG_NTAKER_APPLICATION_CHANGE_OPTIONS
+	call	NTakerNotifyOptionsChange
+
+	mov	ax, MSG_NTAKER_DISPLAY_CHANGE_OPTIONS
+	call	SendMessageToAllDisplays
+	ret
+
+NTakerApplicationChangeOptions	endm
+
 COMMENT @----------------------------------------------------------------------
 
 FUNCTION:	SetToolbarState
@@ -812,6 +899,9 @@ EC <	ERROR_NZ	-1						>
 	mov	ax, 0				;clear "parent is popout" flag
 	call	updateToolbarUsability
 	pop	ax
+
+	call	NTakerNotifyOptionsChange
+
 noToolbarChange:
 
 	ret
@@ -965,6 +1055,104 @@ NTakerApplicationUpdateAppFeatures	method dynamic	NTakerApplicationClass,
 	ret
 
 NTakerApplicationUpdateAppFeatures	endm
+
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		NTakerApplicationOptionsChanged
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	Tell superclass that our options have changed only
+		if we are not launching the application
+
+CALLED BY:	MSG_GEN_APPLICATION_OPTIONS_CHANGED
+
+PASS:		*ds:si	= NTakerApplicationClass object
+		ds:di	= NTakerApplicationClass instance data
+		es 	= segment of NTakerApplicationClass
+		ax	= message #
+
+RETURN:		Nothing
+
+DESTROYED:	Nothing
+
+SIDE EFFECTS:
+
+PSEUDO CODE/STRATEGY:
+
+REVISION HISTORY:
+		Name	Date		Description
+		----	----		-----------
+		don     2/07/99   	Initial version
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+
+NTakerApplicationOptionsChanged	method dynamic NTakerApplicationClass,
+					MSG_GEN_APPLICATION_OPTIONS_CHANGED
+		.enter
+	;
+	; Check to see if we are in the middle of launching the app.
+	; If so, just swallow the notification
+	;
+		test	ds:[di].GAI_states, mask AS_ATTACHING
+		jnz	done
+		mov	di, offset NTakerApplicationClass
+		call	ObjCallSuperNoLock
+done:
+		.leave
+		ret
+NTakerApplicationOptionsChanged	endm
+
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		GetIniCategory
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	Read in the integer value of NTaker key field from
+		the .ini file.
+
+CALLED BY:	UTILITY	
+
+PASS:		*ds:si - instance data
+		bx - offset to the key string
+
+RETURN:		carry clear if successful
+			ax - value
+		else carry set
+			ax - unchanged
+
+DESTROYED:	ax, cx, dx, bp
+
+SIDE EFFECTS:	none
+
+PSEUDO CODE/STRATEGY:
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	THK	1/93		Initial revision
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+GetIniCategory	proc	near	uses	si
+	.enter
+
+	sub	sp, INI_CATEGORY_BUFFER_SIZE
+	movdw	cxdx, sssp		; cx:dx - buffer for .ini category 
+	mov	ax, MSG_META_GET_INI_CATEGORY
+	call	ObjCallInstanceNoLock	; read in category string into the buf.
+	mov	ax, sp
+	push	si, ds
+	segmov	ds, ss
+	mov_tr	si, ax			; ds:si - category string
+	mov	cx, cs
+	mov	dx, bx			; cx:dx - key string
+	call	InitFileReadInteger	; ax - value
+	pop	si, ds
+	mov	bp, sp
+	lea	sp, ss:[bp+INI_CATEGORY_BUFFER_SIZE]	; restore sp
+
+	.leave
+	ret
+GetIniCategory	endp
 
 UserLevelCode	ends
 

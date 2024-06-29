@@ -45,7 +45,7 @@ resource DisplayUI ui-object
 resource DialogUI ui-object
 resource InkDialogUI ui-object
 resource UserLevelUI ui-object
-resource Strings ui-object read-only shared
+resource Strings lmem read-only shared
 
 resource DocumentUI object
 
