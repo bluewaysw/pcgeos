@@ -195,35 +195,6 @@
   }
 
 
-#if 0
-
-/*******************************************************************
- *
- *  Function    :  Get_CodeRange
- *
- *  Description :  Returns a pointer to a given code range.  Should
- *                 be used only by the debugger.  Returns NULL if
- *                 'range' is out of current bounds.
- *
- *  Input  :  exec    target execution context
- *            range   new execution code range
- *
- *  Output :  Pointer to the code range record.  NULL on failure.
- *
- *****************************************************************/
-
-  LOCAL_FUNC
-  PCodeRange  Get_CodeRange( PExecution_Context  exec, Int  range )
-  {
-    if ( range < 1 || range > 3 )
-      return NULL;
-    else                /* arrays start with 1 in Pascal, and with 0 in C */
-      return &exec->codeRangeTable[range - 1];
-  }
-
-#endif
-
-
 /*******************************************************************
  *
  *  Function    :  Set_CodeRange
@@ -400,10 +371,10 @@
 /*         new_max     new capacity (size) of the buffer        */
 
   static
-  TT_Error  Update_Max( ULong*  size,
-                        ULong   multiplier,
-                        void**  buff,
-                        ULong   new_max )
+  TT_Error  Update_Max( UShort*  size,
+                        UShort   multiplier,
+                        void**   buff,
+                        UShort   new_max )
   {
     TT_Error  error;
 

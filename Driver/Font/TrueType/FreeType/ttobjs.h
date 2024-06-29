@@ -625,7 +625,7 @@
 
     Long            top;        /* top of exec. stack  */
 
-    ULong           stackSize;  /* size of exec. stack */
+    UShort          stackSize;  /* size of exec. stack */
     PStorage        stack;      /* current exec. stack */
 
     Long            args;
@@ -654,7 +654,7 @@
     ULong           cvtSize;
     PLong           cvt;
 
-    ULong           glyphSize; /* glyph instructions buffer size */
+    UShort          glyphSize; /* glyph instructions buffer size */
     PByte           glyphIns;  /* glyph instructions buffer */
 
     UShort          numFDefs;  /* number of function defs         */
@@ -686,10 +686,6 @@
     TT_F26Dot6      phase;      /* 'SuperRounding'     */
     TT_F26Dot6      threshold;
 
-    /* this seems to be unused */
-#if 0
-    Int             cur_ppem;       /* ppem along the current proj vector */
-#endif
     Long            scale1;         /* scaling values along the current   */
     Long            scale2;         /* projection vector too..            */
     Bool            cached_metrics; /* the ppem is computed lazily. used  */
@@ -721,7 +717,7 @@
     TSet_CVT_Function  func_write_cvt; /* write a cvt entry (in pixels) */
     TSet_CVT_Function  func_move_cvt;  /* incr a cvt entry (in pixels)  */
 
-    ULong              loadSize;
+    UShort             loadSize;
     PSubglyph_Stack    loadStack;      /* loading subglyph stack */
 
   };
