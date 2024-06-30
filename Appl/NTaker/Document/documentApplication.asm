@@ -708,7 +708,7 @@ NTakerApplicationSetToolbarState	endm
 
 
 NTakerApplicationChangeOptions	method dynamic	NTakerApplicationClass,
-										MSG_NTAKER_APPLICATION_CHANGE_OPTIONS
+					MSG_NTAKER_APPLICATION_CHANGE_OPTIONS
 	call	NTakerNotifyOptionsChange
 
 	mov	ax, MSG_NTAKER_DISPLAY_CHANGE_OPTIONS
