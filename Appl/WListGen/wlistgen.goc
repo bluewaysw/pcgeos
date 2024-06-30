@@ -7,7 +7,12 @@
  *               by RABE-Soft 06/2024
  *
  * AUTHOR:       Rainer Bettsteller
- *
+ *	
+ *	REVISION HISTORY:
+ *	Date     	Name      Description
+ *	------------	--------  -----------
+ *	2024-06-30  	RainerB     Initial version.
+ *	
  **************************************************************************/
 
 /*  Standard include files */
@@ -18,19 +23,430 @@
 
 @include "wlistgen.goh"
 @include "lmacros.goh"
+@include "wmlib.h"
 
 @include "appui.goh"
 
 /*---------------------------------------------------------------------------
 	Global Variables and Types
  ---------------------------------------------------------------------------*/
-GlobalStruct global;
-
 @classdecl WListProcessClass, neverSaved;
+@classdecl StopTriggerClass;
 
+Boolean g_compress;
+Boolean g_umlaut;
+int	g_charSet;
+
+void PrintMessage(char *txt);
+
+/*---------------------------------------------------------------------------
+	Library routines
+ ---------------------------------------------------------------------------*/
+
+/*--------------------- WLCreateNewDB ---------------------
+ *	Purpose:	Start building a new, empty word list data base.
+ *	Strategy:	Create the data base structure and set required flags.
+ *			Note that the database is "development stage" until adding
+ *			words has been finished (WLFinishNewDB habs ben called)
+ *	Paramters:
+ *	Return:
+ ---------------------------------------------------------------------------*/
+#define WL_DB_IS_UNCOMPRESSED 		1
+#define WL_DB_UNDER_CONSTRUCTION 	2
+
+// _pascal _export 
+void WLCreateNewDB(VMFileHandle fh, Boolean compressed) {
+
+{fh = fh;}
+{compressed = compressed;}
+
+if (fh == 0) { PrintMessage ("NewDB keine Datei\r"); return; }
+if (compressed) PrintMessage("New compressed DB created\r");
+	else  PrintMessage("New DB created\r");
+
+}	
+
+
+/*--------------------- WLAddWordToNewDBUnchecked ---------------------
+ *	Purpose:	Add word to database, created with WLCreateNewDB
+ *			It is not checked whether the word already exists!
+ *	Context:
+ *	Strategy:
+ *	Paramters:
+ *	Return:		TRUE in case of any error
+ ---------------------------------------------------------------------------*/
+Boolean WLAddWordToNewDBUnchecked(VMFileHandle fh, char *newWord) {
+int 	len;
+char	wordToAdd[WM_MAX_SIZE_WORD + 2];
+
+{fh = fh;}
+
+
+    /* Check if Data base is created with WLCreateNewDB */
+// if ( WLI_CheckNewDBValid(fh) ) return TRUE;
+
+    /* check for oversized words and upcase word */
+    len = strlen(newWord);
+    if (len > WM_MAX_SIZE_WORD) {
+    	return TRUE;
+    	}
+    strcpy(wordToAdd, newWord);
+    LocalUpcaseString(wordToAdd, 0);	// be sure about that!
+
+
+    
+    return FALSE;
+
+}
+
+
+
+/*--------------------- WLFinishNewDB ---------------------
+ *	Purpose:	Finsh building the new word list data base.
+ *	Strategy:	Leave "development" mode and compress data, if required.
+ *			The word list data base is now ready to use.
+ *	Paramters:
+ *	Return:		TRUE if any error
+ ---------------------------------------------------------------------------*/
+// _pascal _export 
+Boolean WLFinishNewDB(VMFileHandle fh, Boolean closeFile) {
+PrintMessage("FinschNewDB called\r");
+
+    /* Check if Data base is created with WLCreateNewDB */
+// if ( WLI_CheckNewDBValid(fh) ) return TRUE; + close File!
+
+
+     if (closeFile) VMClose(fh, FALSE); 
+     return FALSE;
+}
 
 /*###########################################################################
-	 CODE fr WListProcessClass
+	 CODE for Word List Creator
+/*###########################################################################*/
+
+/*--------------------- PrintMessage/Optr ---------------------
+ *	Purpose:	Display a message in message text object
+ *	Context:
+ *	Strategy:
+ *	Paramters:
+ *	Return:
+ ---------------------------------------------------------------------------*/
+void PrintMessage(char *txt) {
+    @call WListMessageText::MSG_VIS_TEXT_APPEND_PTR(txt,0);
+}    
+
+void PrintMessageOptr(optr txt) {
+    MemLock(OptrToHandle(txt));
+    PrintMessage(LMemDeref(txt));
+    MemUnlock(OptrToHandle(txt));
+}    
+
+/*--------------------- CheckMessageTextSize ---------------------
+ *	Purpose:	Avoid GenText object overflow
+ ---------------------------------------------------------------------------*/
+void CheckMessageTextSize(void) {
+int len;
+
+    len = @call WListMessageText::MSG_VIS_TEXT_GET_TEXT_SIZE();
+    if (len > 6000) {
+    	@call WListMessageText::MSG_VIS_TEXT_DELETE_ALL();
+    	PrintMessage("Too many messages - older messages deleted.\r");
+    }
+}
+
+/*--------------------- PrintError ---------------------
+ *	Purpose:	Simplify printing error messages
+ *	Context:
+ *	Strategy:
+ *	Paramters:
+ *	Return:		handle of the newly craeted file 
+ ---------------------------------------------------------------------------*/
+void PrintError(int err, char *paramText) {
+
+    CheckMessageTextSize();
+
+    switch (err) {
+    case ERR_VERY_LONG:
+   	PrintMessage("** Very long word: ");
+   	PrintMessage(paramText);
+   	break;
+
+    case ERR_TOO_LONG:
+   	PrintMessage("* Word too long: ");
+   	PrintMessage(paramText);
+   	break;
+
+    case ERR_TOO_SHORT:
+   	PrintMessage("* Word too short: ");	
+   	PrintMessage(paramText);
+   	break;
+    }
+    PrintMessage("\r");
+ 
+}
+
+/*--------------------- CreateWordListFile ---------------------
+ *	Purpose:	Create and initialize an empty word list file
+ *	Context:
+ *	Strategy:
+ *	Paramters:
+ *	Return:		handle of the newly craeted file 
+ ---------------------------------------------------------------------------*/
+VMFileHandle CreateWordListFile(void) {
+VMFileHandle 	fh;
+FileLongName	fName;
+word		len;
+#define WordListFolder	"Word Matcher"
+
+    len = @call WListInputText::MSG_VIS_TEXT_GET_ALL_PTR(fName);
+    if (!len) {
+    	ErrorBoxOptr(@NoFileName);
+    	return 0;
+    	}
+    	
+    /* Enter folder */
+    	
+    FileSetStandardPath(SP_USER_DATA);
+    FileCreateDir(WordListFolder);
+    FileSetCurrentPath(0, WordListFolder);
+    if (ThreadGetError() ) {
+    	ErrorBoxOptr(@NoFolder);
+    	return 0;
+    	}
+    	
+    /* Open file */
+    	
+    fh = VMOpen(fName, VMAF_FORCE_READ_WRITE | VMAF_FORCE_DENY_WRITE, VMO_CREATE_ONLY, 0);
+    if (fh == 0 ) {
+    	ErrorBoxOptr(@FileExists);
+    	return 0;
+    	}
+    
+    WLCreateNewDB(fh, g_compress);
+    return fh;
+}
+
+    
+/*--------------------- OpenSourceFile ---------------------
+ *	Purpose:	Open the text file containing the words to import
+ *	Context:
+ *	Strategy:
+ *	Paramters:
+ *	Return:
+ ---------------------------------------------------------------------------*/
+FileHandle OpenSourceFile(void) {
+FileHandle 	fh;
+PathName 	path;
+DiskHandle	dh;
+FileLongName	fName;
+
+    /* Enter path */
+    
+    @call WListFileSelector::MSG_GEN_PATH_GET(path, sizeof(PathName));
+    dh = @call WListFileSelector::MSG_GEN_PATH_GET_DISK_HANDLE();
+    dh = FileSetCurrentPath(dh, path);
+    if ( dh == 0 ) {
+    	ErrorBoxOptr(@ErrorEnterPath);
+    	return 0;
+    	}
+
+    /* Open File */
+    
+    @call WListFileSelector::MSG_GEN_FILE_SELECTOR_GET_SELECTION(fName);
+    fh = FileOpen(fName, FILE_ACCESS_RW | FILE_DENY_RW);
+    if (fh == 0 ) {
+    	ErrorBoxOptr(@FileExists);
+    	return 0;
+    	}
+
+    return fh;
+}    
+
+/*--------------------- ConvertUmlauts ---------------------
+ *	Purpose:	Duplcate the given word and convert umlauts 
+ *			Umlauts will be upcased
+ *	Return:
+ ---------------------------------------------------------------------------*/
+Boolean ConvertUmlauts(char *inWord, char *word2) {
+int len, n, k;
+byte c;
+Boolean found = FALSE;
+
+    len = strlen(inWord);
+    k = 0;
+    for (n = 0; n < len; n++, k++) {
+	c = inWord[n];
+	switch (c) {
+	case '\x80':	// Ä
+	case '\x8A':	// ä
+	    word2[k] = 'A';  k++; word2[k] = 'E'; found = TRUE;
+	    break;
+	    
+	case '\x85':	// Ö
+	case '\x9A':	// ö
+	    word2[k] = 'O'; k++; word2[k] = 'E'; found = TRUE;
+	    break;
+
+	case '\x86':	// Ü
+	case '\x9F':	// ü
+	    word2[k] = 'U'; k++; word2[k] = 'E'; found = TRUE;
+	    break;
+
+	case '\xA7':	// ß
+	    word2[k] = 'S'; k++; word2[k] = 'S'; found = TRUE;
+	    break;
+	    
+	default:
+    	    word2[k] = inWord[n];
+    	}
+    }
+    word2[k] = 0;
+    
+    return found;
+}
+
+/*--------------------- AddWordToDBInternal ---------------------
+ *	Purpose:	Add a word to the worldtlist DB
+ *			If specified, check for umlauts and add modified word too
+ *	Strategy:
+ *	Paramters:
+ *	Return:
+ ---------------------------------------------------------------------------*/
+void AddWordToDBInternal(char *inWord, VMFileHandle listFile) {
+#define WORD_2_BUFFER_SIZE	(2*WM_MAX_SIZE_WORD + 2)
+char word2[WORD_2_BUFFER_SIZE];
+Boolean  found;
+
+    WLAddWordToNewDBUnchecked(listFile, inWord);
+    if (g_umlaut) {
+    	
+    	/* Check for german umlauts and convert them. Then
+    	 * add the converted word.
+    	 */
+    	found = ConvertUmlauts(inWord, word2);
+    	if (found) {
+    	   if (strlen(word2) <= WM_MAX_SIZE_WORD) {
+    	   	WLAddWordToNewDBUnchecked(listFile, word2);
+    	   } else {
+	    	PrintError(ERR_TOO_LONG, word2);
+    	   }
+    	   
+   	}	// umlauts found
+   }		// check umlauts
+}
+    	
+/*--------------------- BuildWordList ---------------------
+ *	Purpose:	Do the work
+ *			The list must be initialied with WLCreateNewDB
+ *	Strategy:	Read source file word bay word and add it to the DB
+ *			Convert characters, if required, check for German 
+ *			umlauts and for too long words
+ *	Paramters:
+ *	Return:
+ ---------------------------------------------------------------------------*/
+void BuildWordList(FileHandle srcFile, VMFileHandle listFile) {
+#define INWORD_BUFFER_SIZE	(WM_MAX_SIZE_WORD + 40)
+#define INWORD_MAX_LEN		(INWORD_BUFFER_SIZE - 2)
+int	i, size;
+Boolean	stop = FALSE;
+dword	read;
+byte 	c;
+char    inWord[INWORD_BUFFER_SIZE];	
+char 	number[15];
+
+	/*
+	 * The main loop reads word by word, convert chacters and 
+	 * check for too long or too short word (Empty word or single character)
+	 *
+	 * There is no check for invald file formats, only one word is assumend 
+	 * to be in a single line. Therefore tabs, spaces and other characters may be 
+	 * part or a "word". Only question mark is replaced by '_', because ? is 
+	 * the place holder for search strings.
+	 */
+    @call WordCounter::MSG_VIS_TEXT_REPLACE_ALL_PTR("0", 0);
+    @call WListMessageText::MSG_VIS_TEXT_DELETE_ALL();
+    read = 0;
+    do {
+    
+	/* Do one word letter by letter. */
+	i = 0;
+	inWord[0] = 0;
+	do {
+	    size = FileRead( srcFile, &c, 1, 0 );
+
+	    // Check for Line feed or end of file	
+	    if (( 1 != size ) || ( '\r' == c ) || ( 0x0a == c )) {
+		break;
+		}
+
+	    // Check for very long words
+	    // No charcter set conversion was done here, so it may
+	    // look strange - but this situation is very rare
+	    if ( i > INWORD_MAX_LEN) {
+	    	PrintError(ERR_VERY_LONG, inWord);	
+	    	break;
+	    	}
+	    
+	    if ( c=='?' ) c = '_';
+	    
+	    inWord[ i ] = c;
+	    inWord[i+1] = 0;
+	    i++;
+	    } while ( TRUE );
+
+	/* Do required checks. */
+
+	if ( 1 != size ) break;		// end of file
+	if ( i == 0) 	continue;	// empty line or 2nd part of 0D0A
+	
+
+	/* First convert character set, then do error checking. */
+
+	switch (g_charSet) {
+	case CONVERT_FROM_DOS:
+	    LocalDosToGeos( inWord, 0, '@');
+	    break;
+	
+	case CONVERT_FROM_WINDOWS:
+	    LocalCodePageToGeos( inWord, 0, CODE_PAGE_LATIN_1, '@');
+	    break;
+	
+	//default : // GEOS charset or unknown. Don't convert.
+	}
+	
+	if ( i == 1) {
+	    PrintError(ERR_TOO_SHORT, inWord);
+	    continue;
+	    }
+
+	if ( i > WM_MAX_SIZE_WORD) {
+	    PrintError(ERR_TOO_LONG, inWord);
+	    continue;
+	    }
+
+	/* Now, inform the user and add the word. */
+
+	read++;
+	sprintf(number, "%lu", read);
+	@call WordCounter::MSG_VIS_TEXT_REPLACE_ALL_PTR(number, 0);
+	@call CurrentWordText::MSG_VIS_TEXT_REPLACE_ALL_PTR(inWord, 0);
+	
+	LocalUpcaseString(inWord, 0);
+	AddWordToDBInternal(inWord, listFile);
+	
+	/* check for stop */
+	stop = @call WListStopTrigger::MSG_STOP_GET_STOPPED();
+	if(stop) break;
+
+    } while ( TRUE );	 
+
+    if (stop) 	PrintMessage("\rBuilding word list canceled\r");	
+    	else	PrintMessage("\rBuilding word list done\r");	
+}
+
+  
+/*###########################################################################
+	 CODE for WListProcessClass
 /*###########################################################################*/
 
 @if 0
@@ -92,25 +508,11 @@ word entryType;
 		/* Das sind die obersten beiden Bits des Records */
 		/* ---> enum: GFSET_FILE, GFSET_SUBDIR, GFSET_VOLUME */
 
-     if ( entryType == GFSET_FILE )
-	{
-	if ( entryFlags & GFSEF_OPEN ) UserStandardSound(SST_ERROR);
-			else          UserStandardSound(SST_NOTIFY);
+     if ( entryType == GFSET_FILE ) {
+	@call WListApplyTrigger::MSG_GEN_SET_ENABLED(VUM_NOW);
+     } else {
+	@call WListApplyTrigger::MSG_GEN_SET_NOT_ENABLED(VUM_NOW);
 	}
-
-     if ( (entryType == GFSET_SUBDIR) )
-	{
-//	UserStandardSound(SST_WARNING);	// <-- l„uft!
-	}
-
-
-     if ( (entryType == GFSET_VOLUME) )
-	/* Bug? Dieser Wert wird nie bergeben. es ist immer GFSET_SUBDIR,
-	 * auch wenn das Root-Verzeichnis selektiert wird */
-	{
-	UserStandardSound(SST_KEY_CLICK);
-	}
-
 }
 
 
@@ -119,47 +521,72 @@ word entryType;
  *        Paramters:	void(void)
  ---------------------------------------------------------------------------*/
 @method WListProcessClass, MSG_WLIST_APPLY_TRIGGER {
-	UserStandardSound(SST_ERROR);
+VMFileHandle	listFile;
+FileHandle	srcFile;
+word 		value;
+
+    value = @call WListMainBooleanGroup::MSG_GEN_BOOLEAN_GROUP_GET_SELECTED_BOOLEANS();
+    g_compress = value & BOOL_ID_1 ? TRUE : FALSE;
+    g_umlaut = value & BOOL_ID_2 ? TRUE : FALSE;
+    g_charSet = @call WLCodePageItemGroup::MSG_GEN_ITEM_GROUP_GET_SELECTION();    
+
+    listFile = CreateWordListFile();
+    if (0 == listFile) return;
+    
+    srcFile = OpenSourceFile();
+    if (0 == srcFile) {
+    	VMClose(listFile, FALSE);
+    	return;
+    	}
+    	
+    @send WListStopTrigger::MSG_STOP_SET_STOP_STATE(FALSE);
+    @send WListStopTrigger::MSG_GEN_SET_ENABLED(VUM_NOW);
+    @send WListApplyTrigger::MSG_GEN_SET_NOT_ENABLED(VUM_NOW);
+    @send WListFileSelector::MSG_GEN_SET_NOT_ENABLED(VUM_NOW);
+    	
+    BuildWordList(srcFile, listFile);
+
+    @send WListStopTrigger::MSG_GEN_SET_NOT_ENABLED(VUM_NOW);
+    @send WListApplyTrigger::MSG_GEN_SET_ENABLED(VUM_NOW);
+    @send WListFileSelector::MSG_GEN_SET_ENABLED(VUM_NOW);
+
+    FileClose(srcFile, FALSE);
+    WLFinishNewDB(listFile, TRUE);	// close DB file
+    
+
 }
-/*--------------------- MSG_WLIST_RESET_TRIGGER ---------------------
- *        Purpose:      Handler fr Trigger in der Reply_bar
+/*--------------------- MSG_WLIST_STOP_TRIGGER ---------------------
+ *        Purpose:      stop building process
  *        Paramters:	void(void)
  ---------------------------------------------------------------------------*/
-@method WListProcessClass, MSG_WLIST_RESET_TRIGGER {
-	UserStandardSound(SST_WARNING);
+@method WListProcessClass, MSG_WLIST_STOP_TRIGGER {
+	@send WListStopTrigger::MSG_STOP_SET_STOP_STATE(TRUE);
 }
 
 
-/*--------------------- MSG_WLIST_APPLY_INPUT_TEXT ---------------------
- *        Purpose:      Handler fr Enter im InputText
- *        Paramters:	void GEN_TEXT_APPLY_MSG(word stateFlags = bp);
+
+/*--------------------- MSG_STOP_CREATE ---------------------
+ *	Purpose:	Cancel list building process
  ---------------------------------------------------------------------------*/
-@method WListProcessClass, MSG_WLIST_APPLY_INPUT_TEXT {
-	UserStandardSound(SST_NOTIFY);
+@method StopTriggerClass, MSG_STOP_CREATE {
+    pself->STI_stop = TRUE;
 }
 
-
-/*--------------------- MSG_WLIST_APPLY_BOOLEAN_GROUP ---------------------
- *	Purpose:        Handler fr Auswahl aus der BooleanGroup
- *	Context:
- *	Strategy:
- *	Paramters:	void GEN_BOOLEAN_GROUP_APPLY_MSG(
- *           			word selectedBooleans,
- *				word indeterminateBooleans,
- *				word modifiedBooleans);
- *      Return:		-
+/*--------------------- MSG_STOP_GET_STOPPED ---------------------
+ *	Purpose:	Cancel list building process
  ---------------------------------------------------------------------------*/
-@method WListProcessClass, MSG_WLIST_APPLY_BOOLEAN_GROUP {
-	MessageNumberBox(selectedBooleans);
+@method StopTriggerClass, MSG_STOP_GET_STOPPED {
+    return (pself->STI_stop);	
 }
 
-
-
-
-
-
-
-
+/*--------------------- MSG_STOP_SET_STOP_STATE ---------------------
+ *	Purpose:	Cancel list building process
+ *	Parameters:	Boolean state
+ ---------------------------------------------------------------------------*/
+@method StopTriggerClass, MSG_STOP_SET_STOP_STATE {
+    pself->STI_stop = state;
+}
+	
 
 
 /*---------------------  ---------------------

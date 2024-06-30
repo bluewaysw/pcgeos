@@ -7,6 +7,11 @@
  *
  * AUTHOR:       Rainer Bettsteller
  *
+ *	REVISION HISTORY:
+ *	Date     	Name      Description
+ *	------------	--------  -----------
+ *	2024-06-30  	RainerB     Initial version.
+ *	
  **************************************************************************/
 
 
@@ -53,13 +58,13 @@
 	}
 
 @object GenInteractionClass WListLeftGroup = {
-	GI_comp = @WListFileSelector, @WListMainBooleanGroup;
+	GI_comp = @WListFileSelector, @WListMainBooleanGroup, @UmlautsInfoText, @WLCodePageItemGroup;
 	HINT_ORIENT_CHILDREN_VERTICALLY;
 }
 
 
 @object GenInteractionClass WListRightGroup = {
-	GI_comp = @Spacer1, @WListInputText, @WListMessageText;
+	GI_comp = @Spacer1, @WListInputText, @WordCounter, @CurrentWordText, @WListMessageText;
 	HINT_ORIENT_CHILDREN_VERTICALLY;
 }
 
@@ -70,37 +75,69 @@
 	HINT_PLACE_MONIKER_ABOVE;
 	GFSI_destination = process;
 	GFSI_notificationMsg = MSG_WLIST_FILE_SELECTED;
-	HINT_FILE_SELECTOR_NUMBER_OF_FILES_TO_SHOW = 12;
+	HINT_FILE_SELECTOR_NUMBER_OF_FILES_TO_SHOW = 10;
 	/* HINT_FILE_SELECTOR_FILE_LIST_WIDTH = ; /*average-width characters, max 255 */
 	GFSI_fileCriteria =  FSFC_DIRS | FSFC_NON_GEOS_FILES;
 
 	}
 
 @object GenBooleanGroupClass WListMainBooleanGroup = {
-	GI_visMoniker = "Options:";
+	/*GI_visMoniker = "Options:";*/
 	HINT_PLACE_MONIKER_ABOVE;
-	GI_comp = @MainBoolean1;
+	GI_comp = @MainBoolean1, @MainBoolean2;
 	HINT_ORIENT_CHILDREN_VERTICALLY;
-	GBGI_destination = process;
-	GBGI_applyMsg = MSG_WLIST_APPLY_BOOLEAN_GROUP;
-	GBGI_selectedBooleans = BOOL_ID_1;
+	GBGI_selectedBooleans = BOOL_ID_1 | BOOL_ID_2;
 	/*HINT_BOOLEAN_GROUP_TOOLBOX_STYLE;	/**/
-	/*HINT_BOOLEAN_GROUP_SCROLLABLE;        /**/
 	}
 @object GenBooleanClass MainBoolean1 = {
 	GI_visMoniker = 'c',"Create compressed list";
 	GBI_identifier = BOOL_ID_1;
+	}
+@object GenBooleanClass MainBoolean2 = {
+	GI_visMoniker = 'u',"Convert german umlauts (\x80 -> AE)";
+	GBI_identifier = BOOL_ID_2;
+	}
+@object GenTextClass UmlautsInfoText = {
+	GI_visMoniker = " ";
+	HINT_PLACE_MONIKER_TO_LEFT;
+	GTXI_text = "Convert umlauts means, that e.g. \x80rger will be added twice: \x80RGER and AERGER.";
+	GI_attrs = @default | GA_READ_ONLY; 
+	/*HINT_TEXT_WHITE_WASH_COLOR;*/
+	HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+	ATTR_GEN_TEXT_CHAR_ATTR = (ChunkHandle) @UmlautInfoCharAttrs;
+	}
+@chunk VisTextCharAttr UmlautInfoCharAttrs =
+		CHAR_ATTR_FONT_SIZE(/*FID_DTC_URW_SANS*/FID_UNIVERSITY,12);
+	
+@object GenItemGroupClass WLCodePageItemGroup = {
+	GI_visMoniker = "Convert characters from:"; 
+	HINT_PLACE_MONIKER_ABOVE;
+	GI_comp = @DosItem, @WinItem, @GEOSItem;
+	GIGI_selection = CONVERT_FROM_WINDOWS;
+/*	HINT_ITEM_GROUP_MINIMIZE_SIZE;
+/*	HINT_ITEM_GROUP_DISPLAY_CURRENT_SELECTION; */
+	}
+@object GenItemClass DosItem = {
+	GI_visMoniker = "DOS";
+	GII_identifier = CONVERT_FROM_DOS;
+	}
+@object GenItemClass WinItem = {
+	GI_visMoniker = "Windows";
+	GII_identifier = CONVERT_FROM_WINDOWS;
+	}
+@object GenItemClass GEOSItem = {
+	GI_visMoniker = "GEOS";
+	GII_identifier = CONVERT_FROM_GEOS;
 	}
 
 /* ----------------- Right Group ------------------------------*/
 
 @object GenGlyphClass Spacer1 = { GI_visMoniker = "  "; }
 
-
 @object GenTextClass WListInputText = {
 	GI_visMoniker = "Filename for new Word-List:";
 	HINT_PLACE_MONIKER_ABOVE;
-	GTXI_text = "WM Words";
+	GTXI_text = "New Word List";
 	GTXI_maxLength = 32;
 	ATTR_GEN_TEXT_LEGAL_FILENAMES;
 	GTXI_attrs = @default | GTA_SINGLE_LINE_TEXT;
@@ -108,12 +145,26 @@
 	HINT_EXPAND_WIDTH_TO_FIT_PARENT;
 	}
 
-
+@object GenTextClass WordCounter = {
+	GI_visMoniker = "Words read:";
+	HINT_PLACE_MONIKER_TO_LEFT;
+	GI_attrs = @default | GA_READ_ONLY;
+	ATTR_GEN_TEXT_NEVER_MAKE_SCROLLABLE;
+	}
+@object GenTextClass CurrentWordText = {
+	GI_visMoniker = "Current:";
+	GTXI_text = "(none)";
+	HINT_PLACE_MONIKER_TO_LEFT;
+	GI_attrs = @default | GA_READ_ONLY; /**/
+	HINT_FIXED_SIZE = { SST_AVG_CHAR_WIDTHS | 22 ,
+		/* SST_PIXELS */ SST_LINES_OF_TEXT | 1 , 1};
+	ATTR_GEN_TEXT_NEVER_MAKE_SCROLLABLE;
+	}
 
 @object GenTextClass WListMessageText = {
 	GI_visMoniker = "Messages:";
 	HINT_PLACE_MONIKER_ABOVE;
-	GTXI_text = "";
+	GTXI_text = "New file will always created in USERDATA/Word Matcher\r";
 	GTXI_attrs = (@default | GTA_INIT_SCROLLING)
 		     & ~GTA_USE_TAB_FOR_NAVIGATION;
 	/*GI_attrs = @default | GA_READ_ONLY; /**/
@@ -129,22 +180,21 @@
 
 /* -------------------- Reply-Bar ---------------------------- */
 @object GenInteractionClass WListMainReplyBar = {
-	GI_comp = @WListApplyTrigger,@WListResetTrigger;
+	GI_comp = @WListApplyTrigger,@WListStopTrigger;
 	HINT_MAKE_REPLY_BAR;
 	}
 @object GenTriggerClass WListApplyTrigger = {
 	GI_visMoniker = 'C'," Create new list ";
 	GTI_destination = process;
 	GTI_actionMsg = MSG_WLIST_APPLY_TRIGGER;
+	GI_states = @default & ~GS_ENABLED;
 	}
-@object GenTriggerClass WListResetTrigger = {
-	GI_visMoniker = 'Q'," Quit ";
-	GTI_destination = process;
-	GTI_actionMsg = MSG_WLIST_RESET_TRIGGER;
+@object StopTriggerClass WListStopTrigger = {
+	GI_visMoniker = 'S'," Stop ";
+	GI_states = @default & ~GS_ENABLED;
+	GTI_destination = @WListStopTrigger;
+	GTI_actionMsg = MSG_STOP_CREATE;
 	}
-
-
-
 
 @end Interface; /*-------------------------------------------------------*/
 
@@ -194,8 +244,11 @@
  Alle lokalisierbaren Texte und Daten mÅssen in einer Resource stehen
  ---------------------------------------------------------------------------*/
 @start DataResource, data;
-/* Beispiel*/
-@chunk char SampleText[] = "Ich bin ein lokalisierbarer Text.";
+
+@chunk char NoFileName[] = "You must enter a file name.";
+@chunk char NoFolder[] = "Could not enter 'USERDATA/Word Matcher' folder.";
+@chunk char FileExists[] = "The file already exists. Use another file name or delete the file yourself.";
+@chunk char ErrorEnterPath[] = "Could not enter path to source file.";
 
 @end DataResource; /*-------------------------------------------------------*/
 

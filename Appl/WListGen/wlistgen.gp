@@ -27,7 +27,9 @@ tokenid     5
 library	geos
 library	ansic
 library	ui
+library wmlib
 
+exempt wmlib
 
 # *************** Resourcen *************** #
 # Bsp: resource DATARESOURCE lmem read-only shared data
@@ -40,6 +42,7 @@ resource	DataResource lmem read-only shared
 
 # *************** Exportierte Klassen und Routinen *************** #
 # Bsp: export SOMEROUTINE
+export 	StopTriggerClass
 
 
 
