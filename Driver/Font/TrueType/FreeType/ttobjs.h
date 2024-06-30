@@ -529,15 +529,15 @@
     /* NOTE : The "hmtx" is now part of the horizontal header */
 
     /* the font program, if any */
-    ULong   fontPgmSize;
+    UShort  fontPgmSize;
     PByte   fontProgram;
 
     /* the cvt program, if any */
-    ULong   cvtPgmSize;
+    UShort  cvtPgmSize;
     PByte   cvtProgram;
 
     /* the original, unscaled, control value table */
-    ULong   cvtSize;
+    UShort  cvtSize;
     PShort  cvt;
 
     /* The following values _must_ be set by the */
@@ -598,10 +598,10 @@
     TGraphicsState   GS;
     TGraphicsState   default_GS;
 
-    ULong            cvtSize;   /* the scaled control value table */
+    UShort           cvtSize;   /* the scaled control value table */
     PLong            cvt;
 
-    ULong            storeSize; /* The storage area is now part of the */
+    UShort           storeSize; /* The storage area is now part of the */
     PLong            storage;   /* instance                            */
 
     TGlyph_Zone      twilight;  /* The instance's twilight zone */
@@ -651,7 +651,7 @@
 
     Bool            step_ins;  /* true if the interpreter must */
                                /* increment IP after ins. exec */
-    ULong           cvtSize;
+    UShort          cvtSize;
     PLong           cvt;
 
     UShort          glyphSize; /* glyph instructions buffer size */
@@ -679,7 +679,7 @@
     TCodeRangeTable codeRangeTable;  /* table of valid coderanges */
                                      /* useful for the debugger   */
 
-    ULong           storeSize;  /* size of current storage */
+    UShort          storeSize;  /* size of current storage */
     PLong           storage;    /* storage area            */
 
     TT_F26Dot6      period;     /* values used for the */

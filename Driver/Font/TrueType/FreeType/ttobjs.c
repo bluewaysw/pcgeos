@@ -458,7 +458,7 @@
       exec->maxFunc  = ins->maxFunc;
       exec->maxIns   = ins->maxIns;
 
-      for ( i = 0; i < MAX_CODE_RANGES; i++ )
+      for ( i = 0; i < MAX_CODE_RANGES; ++i )
         exec->codeRangeTable[i] = ins->codeRangeTable[i];
 
       /* set graphics state */
@@ -534,7 +534,7 @@
     ins->maxFunc  = exec->maxFunc;
     ins->maxIns   = exec->maxIns;
 
-    for ( i = 0; i < MAX_CODE_RANGES; i++ )
+    for ( i = 0; i < MAX_CODE_RANGES; ++i )
       ins->codeRangeTable[i] = exec->codeRangeTable[i];
 
     return TT_Err_Ok;
@@ -692,7 +692,7 @@
       PIns_Metrics   metrics = &ins->metrics;
 
 
-      metrics->pointSize    = 10 * 64;     /* default pointsize  = 10pts */
+      metrics->pointSize    = 10 << 6;     /* default pointsize  = 10pts */
 
       metrics->x_resolution = 72;          /* default resolution = 72dpi */
       metrics->y_resolution = 72;
@@ -701,7 +701,7 @@
       metrics->y_ppem = 0;
 
       /* set default compensation ( all 0 ) */
-      for ( i = 0; i < 4; i++ )
+      for ( i = 0; i < 4; ++i )
         metrics->compensations[i] = 0;
     }
 
@@ -849,7 +849,7 @@
     PExecution_Context  exec;
 
     TT_Error  error;
-    ULong     i;
+    UShort    i;
     UShort    j;
     PFace     face;
 
@@ -897,7 +897,7 @@
                 ins->metrics.scale2 );
 
     /* All twilight points are originally zero */
-    for ( j = 0; j < ins->twilight.n_points; j++ )
+    for ( j = 0; j < ins->twilight.n_points; ++j )
     {
       ins->twilight.org[j].x = 0;
       ins->twilight.org[j].y = 0;
@@ -906,7 +906,7 @@
     }
 
     /* clear storage area */
-    for ( i = 0; i < ins->storeSize; i++ )
+    for ( i = 0; i < ins->storeSize; ++i )
       ins->storage[i] = 0;
 
     ins->GS = Default_GraphicsState;
