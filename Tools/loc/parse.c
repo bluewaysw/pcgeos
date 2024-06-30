@@ -2220,10 +2220,12 @@ main(int argc, char **argv)
 	DumpLocalizations(outputName);
     }
 
+#if defined(_MSDOS) || defined(_WIN32)
     /*
-     * Print out an error message if the requred .rsc files was not found.
+     * Print out an error message if the required .rsc files was not found.
      */
     LocErr(foundFlags, outputName);
+#endif /* _MSDOS || _WIN32 */
 
     /*
      * Free up Hash table to cut down on leaks that BoundsChecker finds.
