@@ -35,11 +35,11 @@ hsttcpipManager.eobj: geos.def heap.def geode.def Internal/interrup.def \
                 driver.def thread.def Internal/semInt.def sem.def \
                 Internal/heapInt.def sysstats.def Internal/im.def \
                 Objects/processC.def Objects/metaC.def chunkarr.def \
-                geoworks.def Internal/threadIn.def Internal/host.def \
-                file.def initfile.def assert.def disk.def drive.def \
-                medium.def ui.def vm.def text.def fontID.def graphics.def \
-                font.def color.def char.def win.def input.def hwr.def \
-                gcnlist.def Objects/Text/tCommon.def stylesh.def iacp.def \
+                geoworks.def Internal/threadIn.def file.def initfile.def \
+                assert.def disk.def drive.def medium.def ui.def vm.def \
+                text.def fontID.def graphics.def font.def color.def \
+                char.def win.def input.def hwr.def gcnlist.def \
+                Objects/Text/tCommon.def stylesh.def iacp.def \
                 Objects/uiInputC.def Objects/visC.def Objects/vCompC.def \
                 Objects/vCntC.def Internal/vUtils.def Objects/genC.def \
                 uDialog.def Objects/gInterC.def token.def \

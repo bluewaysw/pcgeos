@@ -497,28 +497,6 @@ EC <		Assert	thread	bx				>
 TcpipReceiveInterrupt	endp
 
 
-	SetGeosConvention
-
-TCPIPRECEIVESTOP	proc	far	connection:word
-;regs		local	PMRealModeRegister
-								uses	cx, ax, ds
-newBuffer 	local	optr		
-		.enter
-
-		mov	cx, connection
-		mov	bx, handle dgroup
-		call	MemDerefES
-
-EC <		WARNING	TCPIP_RECEIVE_STOP		>
-
-	; close the socket on host side
-		mov	ax, 1007
-		int	GEOS_HOST_API
-done:
-		.leave
-		ret
-TCPIPRECEIVESTOP	endp
-
 
 TCPIPRECEIVESTART	proc	far	connection:word
 ;regs		local	PMRealModeRegister
@@ -728,9 +706,9 @@ TcpipInit	proc	far
 		cmp	ax, 0
 		je	straightError
 
-		mov	ax, 1 
-		mov cx, 1
-		int	GEOS_HOST_API
+		mov	ax, HIF_CHECK
+		mov	cx, 1	; check function group networking
+		call	HostIfCall
 
 		cmp	ax, 0
 		jne	error
@@ -740,8 +718,8 @@ TcpipInit	proc	far
 	;
 		segmov	es, <segment ResidentCode>
 		mov	bx, offset ResidentCode:TcpipReceiveInterrupt
-		mov	ax, 2
-		int	GEOS_HOST_API
+		mov	ax, HIF_SET_RECEIVE_HANDLE
+		call	HostIfCall
 
 	;
 	; Create the input queue.
@@ -850,8 +828,8 @@ TcpipExit	proc	far
 
 		clr	bx
 		mov	es, bx
-		mov	ax, 2
-		int	GEOS_HOST_API
+		mov	ax, HIF_SET_RECEIVE_HANDLE
+		call	HostIfCall
 
 		mov	bx, handle dgroup
 		call	MemDerefDS		
@@ -1186,8 +1164,8 @@ EC <		call	ECCheckCallerThread				>
 EC <		call	ECCheckClientHandle				>
 
 		;call	TSocketCreateConnection		; ax = error or handle
-		mov	ax, HF_NC_ALLOC_CONNECTION
-		int	HOST_INT
+		mov	ax, HIF_NC_ALLOC_CONNECTION
+		call	HostIfCall
 		cmp	bx, 0
 		je	success
 		mov	ax, SDE_INSUFFICIENT_MEMORY
