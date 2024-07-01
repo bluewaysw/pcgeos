@@ -54,7 +54,6 @@ include sem.def
 include Internal/heapInt.def
 include Internal/im.def
 include Internal/threadIn.def
-include Internal/host.def
 
 include file.def
 include localize.def
