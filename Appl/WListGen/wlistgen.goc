@@ -4,7 +4,7 @@
  *               
  * FILE:         wlistgen.goc
  *               Code for process class
- *               by RABE-Soft 06/2024
+ *               by RABE-Soft 06/2024 for FreeGEOS project
  *
  * AUTHOR:       Rainer Bettsteller
  *	
@@ -17,9 +17,9 @@
 
 /*  Standard include files */
 @include <stdapp.goh>
-@include <ansi\stdlib.h>
-@include <ansi\stdio.h>
-@include <ansi\string.h>
+@include <ansi/stdlib.h>
+@include <ansi/stdio.h>
+@include <ansi/string.h>
 
 @include "wlistgen.goh"
 @include "lmacros.goh"
@@ -39,86 +39,6 @@ int	g_charSet;
 
 void PrintMessage(char *txt);
 
-/*---------------------------------------------------------------------------
-	Library routines
- ---------------------------------------------------------------------------*/
-
-/*--------------------- WLCreateNewDB ---------------------
- *	Purpose:	Start building a new, empty word list data base.
- *	Strategy:	Create the data base structure and set required flags.
- *			Note that the database is "development stage" until adding
- *			words has been finished (WLFinishNewDB habs ben called)
- *	Paramters:
- *	Return:
- ---------------------------------------------------------------------------*/
-#define WL_DB_IS_UNCOMPRESSED 		1
-#define WL_DB_UNDER_CONSTRUCTION 	2
-
-// _pascal _export 
-void WLCreateNewDB(VMFileHandle fh, Boolean compressed) {
-
-{fh = fh;}
-{compressed = compressed;}
-
-if (fh == 0) { PrintMessage ("NewDB keine Datei\r"); return; }
-if (compressed) PrintMessage("New compressed DB created\r");
-	else  PrintMessage("New DB created\r");
-
-}	
-
-
-/*--------------------- WLAddWordToNewDBUnchecked ---------------------
- *	Purpose:	Add word to database, created with WLCreateNewDB
- *			It is not checked whether the word already exists!
- *	Context:
- *	Strategy:
- *	Paramters:
- *	Return:		TRUE in case of any error
- ---------------------------------------------------------------------------*/
-Boolean WLAddWordToNewDBUnchecked(VMFileHandle fh, char *newWord) {
-int 	len;
-char	wordToAdd[WM_MAX_SIZE_WORD + 2];
-
-{fh = fh;}
-
-
-    /* Check if Data base is created with WLCreateNewDB */
-// if ( WLI_CheckNewDBValid(fh) ) return TRUE;
-
-    /* check for oversized words and upcase word */
-    len = strlen(newWord);
-    if (len > WM_MAX_SIZE_WORD) {
-    	return TRUE;
-    	}
-    strcpy(wordToAdd, newWord);
-    LocalUpcaseString(wordToAdd, 0);	// be sure about that!
-
-
-    
-    return FALSE;
-
-}
-
-
-
-/*--------------------- WLFinishNewDB ---------------------
- *	Purpose:	Finsh building the new word list data base.
- *	Strategy:	Leave "development" mode and compress data, if required.
- *			The word list data base is now ready to use.
- *	Paramters:
- *	Return:		TRUE if any error
- ---------------------------------------------------------------------------*/
-// _pascal _export 
-Boolean WLFinishNewDB(VMFileHandle fh, Boolean closeFile) {
-PrintMessage("FinschNewDB called\r");
-
-    /* Check if Data base is created with WLCreateNewDB */
-// if ( WLI_CheckNewDBValid(fh) ) return TRUE; + close File!
-
-
-     if (closeFile) VMClose(fh, FALSE); 
-     return FALSE;
-}
 
 /*###########################################################################
 	 CODE for Word List Creator
@@ -221,7 +141,7 @@ word		len;
     	return 0;
     	}
     
-    WLCreateNewDB(fh, g_compress);
+    WLCreateNewDB(fh, g_compress, @WListMessageText);
     return fh;
 }
 
@@ -316,7 +236,7 @@ void AddWordToDBInternal(char *inWord, VMFileHandle listFile) {
 char word2[WORD_2_BUFFER_SIZE];
 Boolean  found;
 
-    WLAddWordToNewDBUnchecked(listFile, inWord);
+    WLAddWordToNewDBUnchecked(listFile, inWord, @WListMessageText);
     if (g_umlaut) {
     	
     	/* Check for german umlauts and convert them. Then
@@ -325,7 +245,7 @@ Boolean  found;
     	found = ConvertUmlauts(inWord, word2);
     	if (found) {
     	   if (strlen(word2) <= WM_MAX_SIZE_WORD) {
-    	   	WLAddWordToNewDBUnchecked(listFile, word2);
+    	   	WLAddWordToNewDBUnchecked(listFile, word2, @WListMessageText);
     	   } else {
 	    	PrintError(ERR_TOO_LONG, word2);
     	   }
@@ -550,7 +470,7 @@ word 		value;
     @send WListFileSelector::MSG_GEN_SET_ENABLED(VUM_NOW);
 
     FileClose(srcFile, FALSE);
-    WLFinishNewDB(listFile, TRUE);	// close DB file
+    WLFinishNewDB(listFile, TRUE, @WListMessageText);	// close DB file
     
 
 }

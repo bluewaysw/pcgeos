@@ -2,7 +2,7 @@
 #
 # PROJECT:      Build a new (!) word list for Word Matcher
 # FILE:         wlistgen.gp
-#               Copyright (c) by RABE-Soft 06/2024
+#               Copyright (c) by RABE-Soft 06/2024 for FreeGEOS project
 #
 # AUTHOR:       Rainer Bettsteller
 #

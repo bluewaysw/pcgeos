@@ -4,6 +4,7 @@
 @include <library.h>
 @include <compress.h>
 @include <Ansi/ctype.h>
+@include <Ansi/string.h>
 @include "wmlib.h"
 
 VMBlockHandle near WMI_CreateLib(
@@ -205,6 +206,7 @@ VMBlockHandle near WMI_CreateLib(VMFileHandle file)
 	 for (i=0; i<(WM_MAX_SIZE_WORD+1); i++) {
 		  ptr[i] = NullHandle ;
         /* jfh 1/20/04 my compiler doesn't like 1 line for loops */
+        /* it's important to initialize prt[0] - this will be used later */
 		  dummy++;
 		  }
     VMDirty(mem) ;
@@ -341,7 +343,7 @@ Boolean near WMI_WordCompare(char *ptr, WMParamsStruct *wmStruct)
     return TRUE ;
 }
 /*-------------------------------------------------------------------------*/
-word WMAddWord(WMParamsStruct *wmStruct)
+word _pascal _export WMAddWord(WMParamsStruct *wmStruct)
 {
     word lenWord ;
     VMBlockHandle block ;
@@ -514,12 +516,12 @@ Boolean near WMI_FindWord(WMParamsStruct *wmStruct, Boolean newSearch)
     /* return FALSE ; */
 }
 /*-------------------------------------------------------------------------*/
-Boolean WMFindWord(WMParamsStruct *wmStruct, Boolean newSearch)
+Boolean _pascal _export WMFindWord(WMParamsStruct *wmStruct, Boolean newSearch)
 {
     return WMI_FindWord(wmStruct, newSearch) ;
 }
 /*-------------------------------------------------------------------------*/
-void WMRenameWord(WMParamsStruct *wmStruct, Boolean doSearch)
+void _pascal _export WMRenameWord(WMParamsStruct *wmStruct, Boolean doSearch)
 {
     WMParamsStruct renameSearch ;
     word lenWord ;
@@ -562,7 +564,7 @@ void WMRenameWord(WMParamsStruct *wmStruct, Boolean doSearch)
     WMI_UnlockCompressed(mem) ;
 }
 /*-------------------------------------------------------------------------*/
-void WMDeleteWord(WMParamsStruct *wmStruct, Boolean doSearch)
+void _pascal _export WMDeleteWord(WMParamsStruct *wmStruct, Boolean doSearch)
 {
     WMParamsStruct deleteSearch ;
     word lenWord ;
@@ -617,6 +619,119 @@ void WMDeleteWord(WMParamsStruct *wmStruct, Boolean doSearch)
     WMI_DirtyCompressed(mem) ;
     WMI_UnlockCompressed(mem) ;
 }
+
+
+/*---------------------------------------------------------------------------
+	2024-07-01	RainerB	- quick creation of a new wordlist added 
+ ---------------------------------------------------------------------------*/
+ 
+ 	/*
+ 	 * For every word len, a linked list of vm blocks is used to store the words.
+ 	 * Because a word len of zero is nonsense, I use the index for this len 
+ 	 * (index is the first vm block handle, strored in the map block) to store
+ 	 * version information and a flag that the new database is "under construction".
+ 	 */
+ 	 
+// Debugging helper
+@define PrintMessage(info) @call debugText::MSG_VIS_TEXT_APPEND_PTR(info, 0);
+
+// Check DB valid by seeing, if the flag WL_DB_UNDER_CONSTRUCTION is set
+// return TRUE if not ok.
+Boolean WLI_CheckNewDBValid(VMFileHandle fh) {
+word flags;
+    flags = WMI_GetIndex(fh, 0);
+    if (flags & WL_DB_UNDER_CONSTRUCTION ) return FALSE;	// ok
+    return TRUE;
+}
+
+/*--------------------- WLCreateNewDB ---------------------
+ *	Purpose:	Start building a new, empty word list data base.
+ *	Strategy:	Create the data base structure and set required flags.
+ *			Note that the database is "development stage" until adding
+ *			words has been finished (WLFinishNewDB habs ben called)
+ *	Paramters:
+ *	Return:
+ ---------------------------------------------------------------------------*/
+void _pascal _export WLCreateNewDB(VMFileHandle fh, Boolean compressed, optr debugText) {
+word flags;
+
+
+if (fh == 0) { @PrintMessage ("NewDB keine Datei\r"); return; }
+
+      	/*
+      	 * I use the index for a word len of zero to store the flag WL_DB_UNDER_CONSTRUCTION
+      	 * So, WLAddWordToNewDBUnchecked and WLFinishNewDB can check if the passed data base 
+      	 * is in correct state.
+      	 */
+    flags = WL_DB_UNDER_CONSTRUCTION;
+    if (compressed == 0) flags |= WL_DB_IS_UNCOMPRESSED;	// <- used by WLFinishNewDB
+    
+    WMI_CreateLib(fh);    
+    WMI_SetIndex(fh, 0,  flags);	/* useword len: zero */
+      	 
+if (compressed) { @PrintMessage("Lib: New compressed DB created\r"); }
+	else  { @PrintMessage("Lib: New DB created\r"); }
+
+}	
+
+
+/*--------------------- WLAddWordToNewDBUnchecked ---------------------
+ *	Purpose:	Add a word to new database, created with WLCreateNewDB
+ *			It is not checked whether the word already exists!
+ *	Context:
+ *	Strategy:
+ *	Paramters:
+ *	Return:		TRUE in case of any error
+ ---------------------------------------------------------------------------*/
+Boolean _pascal _export WLAddWordToNewDBUnchecked(VMFileHandle fh, char *newWord, optr debugText) {
+int 	len;
+char	wordToAdd[WM_MAX_SIZE_WORD + 2];
+
+
+    /* Check if Data base is created with WLCreateNewDB */
+    if ( WLI_CheckNewDBValid(fh) ) return TRUE;
+
+    /* check for oversized words and upcase word */
+    len = strlen(newWord);
+    if (len > WM_MAX_SIZE_WORD) {
+    	return TRUE;
+    	}
+    strcpy(wordToAdd, newWord);
+    LocalUpcaseString(wordToAdd, 0);	// be sure about that!
+
+@PrintMessage("+");
+
+    
+    return FALSE;
+
+}
+
+
+
+/*--------------------- WLFinishNewDB ---------------------
+ *	Purpose:	Finsh building the new word list data base.
+ *	Strategy:	Leave "development" mode and compress data, if required.
+ *			The word list data base is now ready to use.
+ *	Paramters:
+ *	Return:		TRUE if any error
+ ---------------------------------------------------------------------------*/
+// _pascal _export 
+Boolean _pascal _export WLFinishNewDB(VMFileHandle fh, Boolean closeFile, optr debugText) {
+
+    /* Check if Data base is created with WLCreateNewDB */
+    if ( WLI_CheckNewDBValid(fh) ) {
+@PrintMessage("FinshNewDB with INVALID DB called ***** \r");
+    
+     	if (closeFile) VMClose(fh, FALSE); 
+    	return TRUE;
+    	}
+
+@PrintMessage("FinshNewDB called - ok\r");
+
+     if (closeFile) VMClose(fh, FALSE); 
+     return FALSE;
+}
+
 /*-------------------------------------------------------------------------*/
 
 @endlib
