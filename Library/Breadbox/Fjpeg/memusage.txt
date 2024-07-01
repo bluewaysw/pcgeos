@@ -1,0 +1,159 @@
+/***********************************************************************
+ *
+ *	Copyright (c) NewDeal Inc. 2000 -- All Rights Reserved
+ *
+ * PROJECT:     Fast JPEG Decompression Library
+ * FILE:	memusage.txt
+ * AUTHOR:	Jens-Michael Gross, September 3, 2000
+ *
+ * VERSIONS:
+ *          00-09-03    JMG     Initial version
+ *
+ *
+ * DESCRIPTION:
+ *
+ *	Memory usage and memory map informations for FJPEG.GEO
+ *
+ *      This file contains informations about memory usage,
+ *      the resolved values of function pointers as they are used
+ *      in the IJGJPEG library and informations about reduced
+ *      types or variables that are constant for the limited
+ *      functionality in FJPEG.
+ *
+ ***********************************************************************/
+
+
+
+===================
+Memory informations
+===================
+
+
+Resource                          Size   # Relocs
+-------------------------------------------------
+CoreBlock                            0        0
+dgroup                             352        0
+DECODE_TEXT                       6730        8
+INIT_TEXT                        10254       78
+MAIN_TEXT                         2038       21
+
+Total size: 19374 bytes     Fixed size: 352 bytes
+Uninitialized data/stack: 0 bytes
+
+Memory state after initialisation.
+All memory should then allocated, (at least for baseline JPEG)
+
+@1: cinfo = {
+     src
+        void _far *infile                                           0 bytes
+        byte _far *buffer                                        1024 bytes
+     upsample
+        short _far *Cr_r_tab                                      512 bytes
+        short _far *Cb_b_tab                   			  512 bytes
+        long _far *Cr_g_tab                      	         1024 bytes
+        long _far *Cb_g_tab                                      1024 bytes
+     entropy
+        d_derived_tbl _far *dc_derived_tbls[3]                  3*946 bytes
+        d_derived_tbl _far *ac_derived_tbls[3]                  3*946 bytes
+     coef
+        short _far *MCU_buffer[10][64]    			 1280 bytes
+     main
+        byte _far *_far *buffer[3]    			 max. 3*16192 bytes
+        byte _far *_far *_far *xbuffer[2]             (virt) max. 32 MBytes
+    JQUANT_TBL _far *quant_tbl_ptrs[3]
+    JHUFF_TBL _far *dc_huff_tbl_ptrs[3]    			3*128 bytes
+    JHUFF_TBL _far *ac_huff_tbl_ptrs[3]    			3*273 bytes
+    jpeg_component_info _far *comp_info              		    0 bytes
+    byte _far *sample_range_limit                                1408 bytes
+    jpeg_component_info _far *cur_comp_info[3] 			 3*46 bytes
+                                                               +3*128 bytes
+}
+
+
+=====================================
+resolved values for calling functions
+=====================================
+
+the following MASSIGN lines show which function has to be used
+for which type of JPG file.
+The first value in MASSIGN is the value used in MCALL, the second
+is the function it points to under a given condition.
+Use this table to resolve all MCALLS.
+
+For multiple scan files / interlaced files this table is incomlete
+and has to be extended when these capabilities are added to FJPEG.
+
+
+normal upsampling
+
+  MASSIGN(upsample->pub.us_start_pass, start_pass_upsample);
+  MASSIGN(upsample->pub.upsample, sep_upsample);
+  NU_NO_OP    0   MASSIGN(upsample->methods[ci], noop_upsample);
+  NU_FULL_US  1   MASSIGN(upsample->methods[ci], fullsize_upsample);
+  NU_21_US    2   MASSIGN(upsample->methods[ci], h2v1_upsample);
+  NU_22_US    3   MASSIGN(upsample->methods[ci], h2v2_upsample);
+  NU_INT_US   4   MASSIGN(upsample->methods[ci], int_upsample);
+
+
+color conversion
+
+  MASSIGN(cconvert->pub.cd_start_pass, start_pass_dcolor);
+    (empty function->removed)
+
+    if (cinfo->jpeg_color_space == JCS_YCbCr) {
+      MASSIGN(cconvert->pub.cd_color_convert, ycc_rgb_convert);
+    } else if (cinfo->jpeg_color_space == JCS_RGB && RGB_PIXELSIZE == 3) {
+      MASSIGN(cconvert->pub.cd_color_convert, null_convert);
+
+post_processing controller empty!
+
+  cinfo->post = deleted
+  post->pub.dpc_start_pass= start_pass_dpost
+  post->pub.post_process_data = cinfo->upsample->upsample;
+  post->whole_image = NULL;	/* flag for no virtual arrays */
+  post->buffer = NULL;		/* flag for no strip buffer */
+  post->starting_row = post->next_row = 0;
+
+
+idct
+
+  MASSIGN(idct->pub.id_start_pass, start_pass);
+  MASSIGN(idct->pub.inverse_DCT[ci], jpeg_idct_ifast);
+
+huffmann etropy decoder
+
+  MASSIGN(entropy->pub.ed_start_pass, start_pass_huff_decoder);
+  MASSIGN(entropy->pub.decode_mcu, decode_mcu);
+
+coefficient controller
+
+  MASSIGN(coef->pub.start_input_pass, start_input_pass_jdcoefct);
+  MASSIGN(coef->pub.start_output_pass, start_output_pass);
+
+  - single scan (no full buffer)
+
+    MASSIGN(coef->pub.consume_data, dummy_consume_data);
+    MASSIGN(coef->pub.decompress_data, decompress_onepass);
+    coef->pub.coef_arrays = NULL; /* flag for no virtual arrays */
+
+  - multiple scan (full image buffer)
+
+    ... ( not yet implemented - still as comment in source code )
+
+main buffer controller
+
+  MASSIGN(main->pub.dmc_start_pass, start_pass_main);
+  MASSIGN(main->pub.dmc_process_data, process_data_simple_main);
+
+
+
+=============================
+resolved or reduced constants
+=============================
+
+need_context_rows= FALSE
+
+#define DCTELEM int
+#define IFAST_SCALE_BITS  2	      /* fractional bits in scale factors */
+#define IFAST_MULT_TYPE   MULTIPLIER  /* 16 bits is OK, use short if faster */
+#define MULTIPLIER int

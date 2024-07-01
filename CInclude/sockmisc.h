@@ -258,6 +258,10 @@ typedef struct {
 #define	    DOMAIN_SERVER   53  	    	    /* TCP/UDP */
 #define	    FINGER  	    79  	    	    /* TCP */
 #define     POP3            110                     /* TCP */
+#define     IMAP            143                     /* TCP */
+#define     SMTPS           465                     /* TCP */
+#define     IMAPS           993                     /* TCP */
+#define     POP3S           995                     /* TCP */
 
 /*--------------------------------------------------------------------------
  *

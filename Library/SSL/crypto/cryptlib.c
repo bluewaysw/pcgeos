@@ -160,6 +160,10 @@ word mapped = 0;
 MemHandle phyMemInfoBlk;
 #endif
 
+#ifdef COMPILE_OPTION_HOST_SERVICE
+Boolean hostApiAvailable = FALSE;
+#endif
+
 int _far _pascal SSLLIBRARYENTRY(LibraryCallType ty, GeodeHandle client)
 {
     if (ty == LCT_ATTACH) {
@@ -171,6 +175,9 @@ int _far _pascal SSLLIBRARYENTRY(LibraryCallType ty, GeodeHandle client)
 #ifdef FULL_EXECUTE_IN_PLACE
 #pragma option -dc
 #endif
+#endif
+#ifdef COMPILE_OPTION_HOST_SERVICE
+	hostApiAvailable = HostIfDetect() >= 1;
 #endif
 		CRYPTO_thread_setup();
     } else if (ty == LCT_DETACH) {

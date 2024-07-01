@@ -227,7 +227,7 @@ typedef struct {
 
 
 typedef VMBlockHandle _pascal _export entry_MimeDrvGraphic(_MimeGraphicParams_);
-typedef VMBlockHandle _pascal pcfm_MimeDrvGraphic(_MimeGraphicParams_,void *pf);
+typedef VMBlockHandle _pascal _export pcfm_MimeDrvGraphic(_MimeGraphicParams_,void *pf);
 
 
 /*** Entry: Get driver info ***************************************************/
@@ -329,7 +329,7 @@ typedef dword _pascal pcfm_MimeDrvText(_MimeTextParams_,void *pf);
 #define MIME_GREX_NO_SCANLINE_COMPRESS		0x00000002
 
 typedef VMBlockHandle _pascal _export entry_MimeDrvGraphicEx(_MimeGraphicParams_, dword extFlags);
-typedef VMBlockHandle _pascal pcfm_MimeDrvGraphicEx(_MimeGraphicParams_,dword extFlags,void *pf);
+typedef VMBlockHandle _pascal _export pcfm_MimeDrvGraphicEx(_MimeGraphicParams_,dword extFlags,void *pf);
 
 
 

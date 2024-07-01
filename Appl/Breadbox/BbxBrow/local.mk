@@ -22,7 +22,7 @@ GOCFLAGS += $(COMPILE_OPTIONS)
 # -Os: favor size of execution speed
 # JavaScript code uses #if rather than #ifdef
 #XCCOMFLAGS = -d -dc -Z -Os -O $(COMPILE_OPTIONS:S|JAVASCRIPT_SUPPORT|JAVASCRIPT_SUPPORT=1|g)
-XCCOMFLAGS = $(COMPILE_OPTIONS:S|JAVASCRIPT_SUPPORT|JAVASCRIPT_SUPPORT=1|g)
+XCCOMFLAGS = -zu -zc $(COMPILE_OPTIONS:S|JAVASCRIPT_SUPPORT|JAVASCRIPT_SUPPORT=1|g)
 
 # -N:  Add stack probes to every routine (only for EC builds)
 #ifndef NO_EC

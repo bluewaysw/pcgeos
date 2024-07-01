@@ -8146,15 +8146,15 @@ GenerateMethodDef(Method *meth)
 	 */
 	switch (meth->model) {
 	    case MM_FAR:
-		Output("%sInstance *pself, ",
+		Output("%sInstance *volatile pself, ",
 		       	    meth->class->data.symClass.root);
 		break;
 	    case MM_NEAR:
-		Output("%sInstance _near *pself, ",
+		Output("%sInstance _near *volatile pself, ",
 		       	    meth->class->data.symClass.root);
 		break;
 	    case MM_BASED:
-		Output("_segment sself, %sInstance _based(sself) *pself, ",
+		Output("volatile _segment sself, volatile %sInstance _based(sself) *pself, ",
 		       	    meth->class->data.symClass.root);
 		break;
 	}

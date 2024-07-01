@@ -4,36 +4,36 @@
 # If you edit it, you will lose your changes, should it be regenerated.
 #
 GEODE           = ijgjpeg
-COMP            = JFDCTFLT.c JCSAMPLE.c JCCOLOR.c JCMARKER.c JFDCTINT.c\
-                  JCPHUFF.c JDATADST.c JCMASTER.c JCDCTMGR.c JIDCTFLT.c\
-                  JFDCTFST.c JCPREPCT.c JCINIT.c JCHUFF.c JCCOEFCT.c\
-                  JCMAINCT.c
+API             = JCAPIMIN.c JCAPISTD.c JCOMAPI.c JCPARAM.c JCTRANS.c\
+                  JDAPIMIN.c JDAPISTD.c JDTRANS.c
 ASMTOOLS        = asmtoolsManager.asm
-DECOMP          = JDSAMPLE.c JQUANT2.c JDATASRC.c JDMARKER.c JIDCTFST.c\
-                  JIDCTINT.c JDMASTER.c JDMAINCT.c JDCOLOR.c JQUANT1.c\
-                  JIDCTFLT.c JDDCTMGR.c JDCOEFCT.c JDMERGE.c JIDCTRED.c\
-                  JDINPUT.c JDHUFF.c JDPOSTCT.c JDPHUFF.c
-API             = JCAPISTD.c JDTRANS.c JCAPIMIN.c JCOMAPI.c JCTRANS.c\
-                  JDAPIMIN.c JDAPISTD.c JCPARAM.c
-SUPPT           = JERROR.c JMEMMGR.c JUTILS.c JMEMGEOS.c
+COMP            = JCCOEFCT.c JCCOLOR.c JCDCTMGR.c JCHUFF.c JCINIT.c\
+                  JCMAINCT.c JCMARKER.c JCMASTER.c JCPHUFF.c JCPREPCT.c\
+                  JCSAMPLE.c JDATADST.c JFDCTFLT.c JFDCTFST.c JFDCTINT.c\
+                  JIDCTFLT.c
+DECOMP          = JDATASRC.c JDCOEFCT.c JDCOLOR.c JDDCTMGR.c JDHUFF.c\
+                  JDINPUT.c JDMAINCT.c JDMARKER.c JDMASTER.c JDMERGE.c\
+                  JDPHUFF.c JDPOSTCT.c JDSAMPLE.c JIDCTFLT.c JIDCTFST.c\
+                  JIDCTINT.c JIDCTRED.c JQUANT1.c JQUANT2.c
+SUPPT           = JERROR.c JMEMGEOS.c JMEMMGR.c JUTILS.c
 UI_TO_RDFS      =
-OBJS            = JFDCTFLT.obj JCSAMPLE.obj JCCOLOR.obj JCMARKER.obj\
-                  JFDCTINT.obj JCPHUFF.obj JDATADST.obj JCMASTER.obj\
-                  JCDCTMGR.obj JIDCTFLT.obj JFDCTFST.obj JCPREPCT.obj\
-                  JCINIT.obj JCHUFF.obj JCCOEFCT.obj JCMAINCT.obj\
-                  JDSAMPLE.obj JQUANT2.obj JDATASRC.obj JDMARKER.obj\
-                  JIDCTFST.obj JIDCTINT.obj JDMASTER.obj JDMAINCT.obj\
-                  JDCOLOR.obj JQUANT1.obj JIDCTFLT.obj JDDCTMGR.obj\
-                  JDCOEFCT.obj JDMERGE.obj JIDCTRED.obj JDINPUT.obj\
-                  JDHUFF.obj JDPOSTCT.obj JDPHUFF.obj JCAPISTD.obj\
-                  JDTRANS.obj JCAPIMIN.obj JCOMAPI.obj JCTRANS.obj\
-                  JDAPIMIN.obj JDAPISTD.obj JCPARAM.obj JERROR.obj\
-                  JMEMMGR.obj JUTILS.obj JMEMGEOS.obj
-COMMON          = jerror.h jversion.h jpegint.h jchuff.h jdhuff.h jmemsys.h\
-                  jdct.h jinclude.h
+OBJS            = JCAPIMIN.obj JCAPISTD.obj JCOMAPI.obj JCPARAM.obj\
+                  JCTRANS.obj JDAPIMIN.obj JDAPISTD.obj JDTRANS.obj\
+                  JCCOEFCT.obj JCCOLOR.obj JCDCTMGR.obj JCHUFF.obj\
+                  JCINIT.obj JCMAINCT.obj JCMARKER.obj JCMASTER.obj\
+                  JCPHUFF.obj JCPREPCT.obj JCSAMPLE.obj JDATADST.obj\
+                  JFDCTFLT.obj JFDCTFST.obj JFDCTINT.obj JIDCTFLT.obj\
+                  JDATASRC.obj JDCOEFCT.obj JDCOLOR.obj JDDCTMGR.obj\
+                  JDHUFF.obj JDINPUT.obj JDMAINCT.obj JDMARKER.obj\
+                  JDMASTER.obj JDMERGE.obj JDPHUFF.obj JDPOSTCT.obj\
+                  JDSAMPLE.obj JIDCTFLT.obj JIDCTFST.obj JIDCTINT.obj\
+                  JIDCTRED.obj JQUANT1.obj JQUANT2.obj JERROR.obj\
+                  JMEMGEOS.obj JMEMMGR.obj JUTILS.obj
+COMMON          = jchuff.h jdct.h jdhuff.h jerror.h jinclude.h jmemsys.h\
+                  jpegint.h jversion.h
 MODULES         = ASMTOOLS
-CMODULES        = COMP DECOMP API SUPPT
-SRCS            = $(COMP) $(ASMTOOLS) $(DECOMP) $(API) $(SUPPT) $(COMMON)
+CMODULES        = API COMP DECOMP SUPPT
+SRCS            = $(API) $(ASMTOOLS) $(COMP) $(DECOMP) $(SUPPT) $(COMMON)
 LOBJS           =
 LIBOBJ          = $(DEVEL_DIR)/Include/$(GEODE).ldf
 LIBNAME         = ijgjpeg

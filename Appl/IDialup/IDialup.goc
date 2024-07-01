@@ -1359,8 +1359,6 @@ AccessPointLocalDialingOptions GetLocalDialingOptions (void)
 
   if(connectionNum)
     {
-      @call IDModifyConnectionButton::MSG_GEN_SET_ENABLED(VUM_DELAYED_VIA_UI_QUEUE);
-      @call IDDeleteConnectionButton::MSG_GEN_SET_ENABLED(VUM_DELAYED_VIA_UI_QUEUE);
 /*#if _NDO2000
 /*#else
       @call IDNewNumbers::MSG_GEN_SET_ENABLED(VUM_DELAYED_VIA_UI_QUEUE);
@@ -1369,8 +1367,6 @@ AccessPointLocalDialingOptions GetLocalDialingOptions (void)
 	 }
   else
     {
-      @call IDModifyConnectionButton::MSG_GEN_SET_NOT_ENABLED(VUM_DELAYED_VIA_UI_QUEUE);
-      @call IDDeleteConnectionButton::MSG_GEN_SET_NOT_ENABLED(VUM_DELAYED_VIA_UI_QUEUE);
 /*#if _NDO2000
 /*#else
       @call IDNewNumbers::MSG_GEN_SET_NOT_ENABLED(VUM_DELAYED_VIA_UI_QUEUE);
@@ -1395,8 +1391,7 @@ AccessPointLocalDialingOptions GetLocalDialingOptions (void)
     {
 	 @send IDConnectionList::MSG_GEN_ITEM_GROUP_SET_SINGLE_SELECTION(tmpItem, 0);
     }
-
-
+ 
 	/* if there is only 1 access point then let's make it the default
 	  access point automagically...  jfh 2/19/02 */
 	if ((connectionNum == 1) && !defaultAccpnt) {
@@ -1431,6 +1426,21 @@ AccessPointLocalDialingOptions GetLocalDialingOptions (void)
   word datalen;
   TCHAR name[MAX_TEXT_LEN];
   MemHandle mh;
+  int type;
+
+  if (AccessPointGetIntegerPropertyDirect(currentAccpnt, "netType", (int*) &type))
+	type = 0 ;
+  if( connectionNum && ( type != 2 ) )
+  {
+    @call IDModifyConnectionButton::MSG_GEN_SET_ENABLED(VUM_DELAYED_VIA_UI_QUEUE);
+    @call IDDeleteConnectionButton::MSG_GEN_SET_ENABLED(VUM_DELAYED_VIA_UI_QUEUE);
+  }
+  else
+  {
+    @call IDModifyConnectionButton::MSG_GEN_SET_NOT_ENABLED(VUM_DELAYED_VIA_UI_QUEUE);
+    @call IDDeleteConnectionButton::MSG_GEN_SET_NOT_ENABLED(VUM_DELAYED_VIA_UI_QUEUE);
+  }
+
 
   if(!AccessPointGetIntegerPropertyDirect(currentAccpnt, DEFAULT_KEY, (int*) &datalen) 
      && datalen != 0) 
@@ -1889,24 +1899,46 @@ void IDialupUpdateEditOKButton(void)
 
   if (AccessPointGetIntegerPropertyDirect(currentAccpnt, "netType", (int*) &netType))
 	  netType = 0 ;
-  InitFileReadStringBuffer("tcpip", "link", buffer, sizeof(buffer)-1, &size) ;
+  
+  InitFileReadStringBuffer("tcpip", "driver", buffer, sizeof(buffer)-1, &size) ;
   buffer[size] = '\0' ;
-  if (netType)  {
-	  NEC(char *link = "ODI Ethernet Driver" ; )
-	  EC(char *link = "EC ODI Ethernet Driver" ; )
-	  if ((strlen(buffer)) && (strcmp(link, buffer)!=0))
-		  changed = TRUE ;
-	  InitFileWriteString("tcpip", "link", link) ;
-	  InitFileWriteString("tcpip", "linkDomain", "EtherODI") ;
-      InitFileDeleteEntry("tcpip", "linkPermname") ;
+  if( netType == 2 ) {
+	NEC(char *driver = "Host TCP/IP Driver" ; )
+	EC(char *driver = "EC Host TCP/IP Driver" ; )
+	if ((strlen(buffer)) && (strcmp(driver, buffer)!=0))
+		changed = TRUE ;
+	InitFileWriteString("tcpip", "driver", driver) ;
+
+	InitFileDeleteEntry("tcpip", "link") ;
+	InitFileWriteString("tcpip", "linkDomain", "Host") ;
+	InitFileDeleteEntry("tcpip", "linkPermname") ;
+
   } else {
-	  NEC(char *ppplink = "PPP Driver" ; )
-	  EC(char *ppplink = "EC PPP Driver" ; )
-	  if ((strlen(buffer)) && (strcmp(ppplink, buffer)!=0))
+	NEC(char *driver = "TCP/IP Driver" ; )
+	EC(char *driver = "EC TCP/IP Driver" ; )
+	if ((strlen(buffer)) && (strcmp(driver, buffer)!=0))
+		changed = TRUE ;
+	InitFileWriteString("tcpip", "driver", driver) ;
+
+	InitFileReadStringBuffer("tcpip", "link", buffer, sizeof(buffer)-1, &size) ;
+	buffer[size] = '\0' ;
+	if (netType == 1)  {
+	    NEC(char *link = "ODI Ethernet Driver" ; )
+	    EC(char *link = "EC ODI Ethernet Driver" ; )
+	    if ((strlen(buffer)) && (strcmp(link, buffer)!=0))
+		changed = TRUE ;
+	    InitFileWriteString("tcpip", "link", link) ;
+	    InitFileWriteString("tcpip", "linkDomain", "EtherODI") ;
+	    InitFileDeleteEntry("tcpip", "linkPermname") ;
+	} else {
+	    NEC(char *ppplink = "PPP Driver" ; )
+	    EC(char *ppplink = "EC PPP Driver" ; )
+	    if ((strlen(buffer)) && (strcmp(ppplink, buffer)!=0))
 		  changed = TRUE ;
-	  InitFileWriteString("tcpip", "link", ppplink) ;
-	  InitFileWriteString("tcpip", "linkDomain", "PPP") ;
-      InitFileWriteString("tcpip", "linkPermname", "ppp") ;
+	    InitFileWriteString("tcpip", "link", ppplink) ;
+	    InitFileWriteString("tcpip", "linkDomain", "PPP") ;
+	    InitFileWriteString("tcpip", "linkPermname", "ppp") ;
+	}
   }
 
   if (changed)  {
