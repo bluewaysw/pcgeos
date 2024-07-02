@@ -171,7 +171,7 @@
 /* vtmx table. The PC/Geos ttf driver does not need any information from */
 /* the vtmx table.                                                       */
 
-#undef  TT_CONFIG_OPTION_PROCESS_VTMX
+#undef  TT_CONFIG_OPTION_PROCESS_VMTX
 
 
 /*************************************************************************/

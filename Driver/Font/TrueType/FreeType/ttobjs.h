@@ -498,8 +498,10 @@
                                                 /* found in the TTF file */
     TT_Horizontal_Header  horizontalHeader;     /* the horizontal header */
 
+#ifdef TT_CONFIG_OPTION_PROCESS_VMTX
     Bool                  verticalInfo;         /* True when vertical table */
     TT_Vertical_Header    verticalHeader;       /* is present in the font   */
+#endif
 
     TT_OS2                os2;                  /* 'OS/2' table */
 

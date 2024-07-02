@@ -251,10 +251,12 @@ extern TEngine_Instance engineInstance;
     properties->header       = &_face->fontHeader;
     properties->horizontal   = &_face->horizontalHeader;
 
+#ifdef TT_CONFIG_OPTION_PROCESS_VMTX
     if ( _face->verticalInfo )
       properties->vertical   = &_face->verticalHeader;
     else
       properties->vertical   = NULL;
+#endif
 
     properties->os2          = &_face->os2;
     properties->postscript   = &_face->postscript;
@@ -267,6 +269,7 @@ extern TEngine_Instance engineInstance;
   }
 
 
+#ifndef __GEOS__
 /*******************************************************************
  *
  *  Function    :  TT_Get_Face_Metrics
@@ -321,7 +324,7 @@ extern TEngine_Instance engineInstance;
  *  MT-Note : YES!  Reads only permanent data.
  *
  ******************************************************************/
-/*
+
   EXPORT_FUNC
   TT_Error  TT_Get_Face_Metrics( TT_Face     face,
                                  TT_UShort   firstGlyph,
@@ -386,7 +389,8 @@ extern TEngine_Instance engineInstance;
 
     return TT_Err_Ok;
   }
-*/
+#endif  /* __GEOS__ */
+
 
 /*******************************************************************
  *

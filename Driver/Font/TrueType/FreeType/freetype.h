@@ -390,10 +390,11 @@
     TT_FWord   min_Left_Side_Bearing;  /* minimum left-sb       */
     TT_FWord   min_Right_Side_Bearing; /* minimum right-sb      */
     TT_FWord   xMax_Extent;            /* xmax extents          */
+    
+#ifdef TT_CONFIG_OPTION_SUPPORT_OPTIONAL_FIELDS
     TT_FWord   caret_Slope_Rise;
     TT_FWord   caret_Slope_Run;
 
-#ifdef TT_CONFIG_OPTION_SUPPORT_OPTIONAL_FIELDS
     TT_Short   Reserved0,
                Reserved1,
                Reserved2,
@@ -408,8 +409,8 @@
     /* but they're used to connect the metrics header to the relevant     */
     /* `HMTX' or `VMTX' table.                                            */
 
-    void*      long_metrics;
-    void*      short_metrics;
+    MemHandle  long_metrics_block;
+    MemHandle  short_metrics_block;
   };
 
   typedef struct TT_Horizontal_Header_  TT_Horizontal_Header;
@@ -433,10 +434,10 @@
     TT_FWord   min_Top_Side_Bearing;    /* minimum left-sb or top-sb       */
     TT_FWord   min_Bottom_Side_Bearing; /* minimum right-sb or bottom-sb   */
     TT_FWord   yMax_Extent;             /* xmax or ymax extents            */
-    TT_FWord   caret_Slope_Rise;
-    TT_FWord   caret_Slope_Run;
 
 #ifdef TT_CONFIG_OPTION_SUPPORT_OPTIONAL_FIELDS
+    TT_FWord   caret_Slope_Rise;
+    TT_FWord   caret_Slope_Run;
     TT_FWord   caret_Offset;
 
     TT_Short   Reserved1,
@@ -452,8 +453,8 @@
     /* but they're used to connect the metrics header to the relevant     */
     /* `HMTX' or `VMTX' table.                                            */
 
-    void*      long_metrics;
-    void*      short_metrics;
+    MemHandle  long_metrics_block;
+    MemHandle  short_metrics_block;
   };
 
   typedef struct TT_Vertical_Header_  TT_Vertical_Header;
@@ -579,7 +580,9 @@
     TT_Hdmx*               hdmx;          /* TrueType hor. dev. metr. table */
 #endif
 
+#ifdef TT_CONFIG_OPTION_PROCESS_VMTX
     TT_Vertical_Header*    vertical;      /* TT Vertical header, if present */
+#endif
   };
 
   typedef struct TT_Face_Properties_  TT_Face_Properties;

@@ -47,8 +47,11 @@
   LOCAL_DEF TT_Error  Load_TrueType_PostScript       ( PFace  face );
   LOCAL_DEF TT_Error  Load_TrueType_Hdmx             ( PFace  face );
 
-  LOCAL_DEF TT_Error  Load_TrueType_Metrics_Header( PFace  face,
-                                                    Bool   vertical );
+#ifdef TT_CONFIG_OPTION_PROCESS_VMTX
+  LOCAL_DEF TT_Error  Load_TrueType_Metrics_Header( PFace  face, Bool  vertical );
+#else
+  LOCAL_DEF TT_Error  Load_TrueType_Metrics_Header( PFace  face );
+#endif
 /*
   LOCAL_DEF TT_Error  Load_TrueType_Any( PFace  face,
                                          ULong  tag,

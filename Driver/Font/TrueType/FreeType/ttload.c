@@ -353,58 +353,26 @@
  *                 into face object.
  *
  *  Input  :  face
- *            vertical   set to true when loading the vmtx table,
- *                       or false for hmtx
  *
  *  Output :  Error code.
  *
  ******************************************************************/
 
   static
-  TT_Error  Load_TrueType_Metrics( PFace  face,
-                                   Bool   vertical )
+  TT_Error  Load_TrueType_Metrics( PFace  face )
   {
     DEFINE_LOCALS;
 
-    Short             n;
-    UShort            num_shorts, num_shorts_checked, num_longs;
-
-    PLongMetrics*     longs;
-    PShortMetrics*    shorts;
-
-    PLongMetrics      long_metric;
+    Short          n, num_shorts;
+    UShort         num_shorts_checked, num_longs;
+    PLongMetrics   longs;
+    PShortMetrics  shorts;
 
 
-    if ( vertical )
-    {
-      /* The table is optional, quit silently if it wasn't found       */
-      /* XXX : Some fonts have a valid vertical header with a non-null */
-      /*       "number_of_VMetrics" fields, but no corresponding       */
-      /*       'vmtx' table to get the metrics from (e.g. mingliu)     */
-      /*                                                               */
-      /*       For safety, we set the field to 0 !                     */
-      /*                                                               */
-      n = TT_LookUp_Table( face, TTAG_vmtx );
-      if ( n < 0 )
-      {
-        /* Set the number_Of_VMetrics to 0! */
-        face->verticalHeader.number_Of_VMetrics = 0;
-        return TT_Err_Ok;
-      }
+    if ( ( n = TT_LookUp_Table( face, TTAG_hmtx ) ) < 0 )
+      return TT_Err_Hmtx_Table_Missing;
 
-      num_longs = face->verticalHeader.number_Of_VMetrics;
-      longs     = (PLongMetrics*)&face->verticalHeader.long_metrics;
-      shorts    = (PShortMetrics*)&face->verticalHeader.short_metrics;
-    }
-    else
-    {
-      if ( ( n = TT_LookUp_Table( face, TTAG_hmtx ) ) < 0 )
-        return TT_Err_Hmtx_Table_Missing;
-
-      num_longs = face->horizontalHeader.number_Of_HMetrics;
-      longs     = (PLongMetrics*)&face->horizontalHeader.long_metrics;
-      shorts    = (PShortMetrics*)&face->horizontalHeader.short_metrics;
-    }
+    num_longs = face->horizontalHeader.number_Of_HMetrics;
 
     /* never trust derived values! */
 
@@ -412,27 +380,24 @@
     num_shorts_checked = ( face->dirTables[n].Length - num_longs * 4 ) >> 1;
 
     if ( num_shorts < 0 )            /* sanity check */
-    {
-      if ( vertical )
-        return TT_Err_Invalid_Vert_Metrics;
-      else
         return TT_Err_Invalid_Horiz_Metrics;
-    }
 
-    if ( ALLOC_ARRAY( *longs,  num_longs,  TLongMetrics  ) ||
-         ALLOC_ARRAY( *shorts, num_shorts, TShortMetrics ) )
+    if ( GEO_ALLOC_ARRAY( face->horizontalHeader.long_metrics_block, num_longs, TLongMetrics  ) ||
+         GEO_ALLOC_ARRAY( face->horizontalHeader.short_metrics_block, num_shorts, TShortMetrics ) )
       return error;
 
     if ( FILE_Seek( face->dirTables[n].Offset )   ||
          ACCESS_Frame( face->dirTables[n].Length ) )
       return error;
 
-    long_metric = *longs;
+    longs  = (PLongMetrics)GEO_LOCK( face->horizontalHeader.long_metrics_block );
+    shorts = (PShortMetrics)GEO_LOCK( face->horizontalHeader.short_metrics_block );
+
     for ( n = 0; n < num_longs; ++n )
     {
-      long_metric->advance = GET_UShort();
-      long_metric->bearing = GET_Short();
-      long_metric++;
+      longs->advance = GET_UShort();
+      longs->bearing = GET_Short();
+      longs++;
     }
 
     /* do we have an inconsistent number of metric values? */
@@ -440,19 +405,19 @@
     if ( num_shorts > num_shorts_checked )
     {
       for ( n = 0; n < num_shorts_checked; ++n )
-        (*shorts)[n] = GET_Short();
+        (shorts)[n] = GET_Short();
 
       /* we fill up the missing left side bearings with the    */
       /* last valid value. Since this will occur for buggy CJK */
       /* fonts usually, nothing serious will happen.           */
 
       for ( n = num_shorts_checked; n < num_shorts; ++n )
-        (*shorts)[n] = (*shorts)[num_shorts_checked - 1];
+        (shorts)[n] = (shorts)[num_shorts_checked - 1];
     }
     else
     {
       for ( n = 0; n < num_shorts; ++n )
-        (*shorts)[n] = GET_Short();
+        (shorts)[n] = GET_Short();
     }
 
     FORGET_Frame();
@@ -480,8 +445,11 @@
  ******************************************************************/
 
   LOCAL_FUNC
-  TT_Error  Load_TrueType_Metrics_Header( PFace  face,
-                                          Bool   vertical )
+  #ifdef TT_CONFIG_OPTION_PROCESS_VMTX
+  TT_Error  Load_TrueType_Metrics_Header( PFace  face, Bool  vertical )
+  #else 
+  TT_Error  Load_TrueType_Metrics_Header( PFace  face )
+  #endif
   {
     DEFINE_LOCALS;
 
@@ -490,6 +458,7 @@
     TT_Horizontal_Header*  header;
 
 
+#ifdef TT_CONFIG_OPTION_PROCESS_VMTX
     if ( vertical )
     {
       face->verticalInfo = 0;
@@ -503,6 +472,7 @@
       header = (TT_Horizontal_Header*)&face->verticalHeader;
     }
     else
+#endif
     {
       /* The orizontal header is mandatory, return an error if we */
       /* don't find it.                                           */
@@ -526,10 +496,11 @@
     header->min_Left_Side_Bearing  = GET_Short();
     header->min_Right_Side_Bearing = GET_Short();
     header->xMax_Extent            = GET_Short();
+
+#ifdef TT_CONFIG_OPTION_SUPPORT_OPTIONAL_FIELDS
     header->caret_Slope_Rise       = GET_Short();
     header->caret_Slope_Run        = GET_Short();
 
-#ifdef TT_CONFIG_OPTION_SUPPORT_OPTIONAL_FIELDS
     header->Reserved0 = GET_Short();    /* this is caret_Offset for
                                            vertical headers */
     header->Reserved1 = GET_Short();
@@ -537,7 +508,7 @@
     header->Reserved3 = GET_Short();
     header->Reserved4 = GET_Short();
 #else
-    SKIP( 10 );
+    SKIP( 14 );
 #endif
 
     header->metric_Data_Format = GET_Short();
@@ -545,12 +516,16 @@
 
     FORGET_Frame();
 
-    header->long_metrics  = NULL;
-    header->short_metrics = NULL;
+    header->long_metrics_block  = NullHandle;
+    header->short_metrics_block = NullHandle;
 
     /* Now try to load the corresponding metrics */
 
+#ifdef TT_CONFIG_OPTION_PROCESS_VMTX
     return Load_TrueType_Metrics( face, vertical );
+#else
+    return Load_TrueType_Metrics( face );
+#endif
   }
 
 

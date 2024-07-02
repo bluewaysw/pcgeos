@@ -62,22 +62,24 @@
                         Short*                 bearing,
                         UShort*                advance )
   {
-    PLongMetrics  longs_m;
-
-    UShort  k = header->number_Of_HMetrics;
+    PLongMetrics  longs_m  = (PLongMetrics)GEO_LOCK( header->long_metrics_block );
+    PShortMetrics shorts_m = (PShortMetrics)GEO_LOCK( header->short_metrics_block );
+    UShort        k        = header->number_Of_HMetrics;
 
 
     if ( index < k )
     {
-      longs_m = (PLongMetrics)header->long_metrics + index;
-      *bearing = longs_m->bearing;
-      *advance = longs_m->advance;
+      *bearing = longs_m[index].bearing;
+      *advance = longs_m[index].advance;
     }
     else
     {
-      *bearing = ((PShortMetrics)header->short_metrics)[index - k];
-      *advance = ((PLongMetrics)header->long_metrics)[k - 1].advance;
+      *bearing = shorts_m[index - k];
+      *advance = longs_m[k - 1].advance;
     }
+
+    GEO_UNLOCK( header->long_metrics_block );
+    GEO_UNLOCK( header->short_metrics_block );
   }
 
 
@@ -1169,6 +1171,7 @@
       TT_Pos  advance;  /* scaled vertical advance height             */
 
 
+#ifdef TT_CONFIG_OPTION_PROCESS_VMTX
       /* Get the unscaled `tsb' and `ah' values */
       if ( face->verticalInfo                          &&
            face->verticalHeader.number_Of_VMetrics > 0 )
@@ -1182,6 +1185,7 @@
                         &advance_height );
       }
       else
+#endif
       {
         /* Make up the distances from the horizontal header..     */
 

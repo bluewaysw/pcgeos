@@ -1019,9 +1019,10 @@
     face->cvtSize = 0;
 
     /* freeing the horizontal metrics */
-    FREE( face->horizontalHeader.long_metrics );
-    FREE( face->horizontalHeader.short_metrics );
+    GEO_FREE( face->horizontalHeader.long_metrics_block );
+    GEO_FREE( face->horizontalHeader.short_metrics_block );
 
+#ifdef TT_CONFIG_OPTION_PROCESS_VMTX
     /* freeing the vertical ones, if any */
     if (face->verticalInfo)
     {
@@ -1029,6 +1030,7 @@
       FREE( face->verticalHeader.short_metrics );
       face->verticalInfo = 0;
     }
+#endif
 
     /* freeing the programs */
     FREE( face->fontProgram );
@@ -1109,8 +1111,13 @@
          LOAD_( MaxProfile )    ||
          LOAD_( Locations )     ||
 
+#ifdef TT_CONFIG_OPTION_PROCESS_VMTX
          (error = Load_TrueType_Metrics_Header( face, 0 )) != TT_Err_Ok  ||
          /* load the 'hhea' & 'hmtx' tables at once */
+#else
+         (error = Load_TrueType_Metrics_Header( face )) != TT_Err_Ok  ||
+         /* load the 'hhea' & 'hmtx' tables at once */
+#endif
 
          LOAD_( CMap )          ||
          LOAD_( CVT )           ||
@@ -1118,10 +1125,12 @@
          LOAD_( Gasp )          ||
          LOAD_( Names )         ||
          LOAD_( OS2 )           ||
-         LOAD_( PostScript )    ||
+         LOAD_( PostScript )
 
-         (error = Load_TrueType_Metrics_Header( face, 1 )) != TT_Err_Ok
+#ifdef TT_CONFIG_OPTION_PROCESS_VMTX
+         || (error = Load_TrueType_Metrics_Header( face, 1 )) != TT_Err_Ok
          /* try to load the 'vhea' & 'vmtx' at once if present */
+#endif
 
 #ifdef TT_CONFIG_OPTION_PROCESS_HDMX
          || LOAD_( Hdmx ) 
