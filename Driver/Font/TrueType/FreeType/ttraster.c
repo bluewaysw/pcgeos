@@ -553,7 +553,7 @@
           return FAILURE;
 
         p = p->link;
-        n--;
+        --n;
       }
     }
     else
@@ -744,7 +744,7 @@
         Ax -= Dy;
         x1 += Dx;
       }
-      size--;
+      --size;
     }
 
     ras.top = top;
@@ -822,7 +822,7 @@
       {
         if ( ras.joint )
         {
-          top--;
+          --top;
           ras.joint = FALSE;
         }
 
@@ -1196,7 +1196,7 @@
     /* now process each contour point individually */
     while ( index < last )
     {
-      index++;
+      ++index;
       x = SCALED( ras.coords[index].x );
       y = SCALED( ras.coords[index].y );
 
@@ -2333,12 +2333,14 @@
       }
     }
 
+#ifdef TT_CONFIG_OPTION_GRAY_SCALING
     /* for gray-scaling, flushes the bitmap scanline cache */
     while ( y <= max_Y )
     {
       ras.Proc_Sweep_Step( RAS_VARS y );
       ++y;
     }
+#endif
 
     ras.Proc_Sweep_Finish( RAS_VAR );
     return SUCCESS;
