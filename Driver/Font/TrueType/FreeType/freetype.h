@@ -343,25 +343,31 @@
 
   struct  TT_Header_
   {
+#ifdef TT_CONFIG_OPTION_SUPPORT_OPTIONAL_FIELDS
     TT_Fixed   Table_Version;
     TT_Fixed   Font_Revision;
 
     TT_Long    CheckSum_Adjust;
     TT_Long    Magic_Number;
+#endif
 
     TT_UShort  Flags;
     TT_UShort  Units_Per_EM;
 
+#ifdef TT_CONFIG_OPTION_SUPPORT_OPTIONAL_FIELDS
     TT_Long    Created [2];
     TT_Long    Modified[2];
+#endif
 
     TT_FWord   xMin;
     TT_FWord   yMin;
     TT_FWord   xMax;
     TT_FWord   yMax;
 
+#ifdef TT_CONFIG_OPTION_SUPPORT_OPTIONAL_FIELDS
     TT_UShort  Mac_Style;
     TT_UShort  Lowest_Rec_PPEM;
+#endif
 
     TT_Short   Font_Direction;
     TT_Short   Index_To_Loc_Format;
@@ -389,9 +395,9 @@
 
     TT_FWord   min_Left_Side_Bearing;  /* minimum left-sb       */
     TT_FWord   min_Right_Side_Bearing; /* minimum right-sb      */
-    TT_FWord   xMax_Extent;            /* xmax extents          */
-    
+
 #ifdef TT_CONFIG_OPTION_SUPPORT_OPTIONAL_FIELDS
+    TT_FWord   xMax_Extent;            /* xmax extents          */
     TT_FWord   caret_Slope_Rise;
     TT_FWord   caret_Slope_Run;
 
@@ -433,9 +439,9 @@
 
     TT_FWord   min_Top_Side_Bearing;    /* minimum left-sb or top-sb       */
     TT_FWord   min_Bottom_Side_Bearing; /* minimum right-sb or bottom-sb   */
-    TT_FWord   yMax_Extent;             /* xmax or ymax extents            */
 
 #ifdef TT_CONFIG_OPTION_SUPPORT_OPTIONAL_FIELDS
+    TT_FWord   yMax_Extent;             /* xmax or ymax extents            */
     TT_FWord   caret_Slope_Rise;
     TT_FWord   caret_Slope_Run;
     TT_FWord   caret_Offset;
@@ -493,11 +499,13 @@
     TT_ULong   ulUnicodeRange3;        /* Bits 64-95  */
     TT_ULong   ulUnicodeRange4;        /* Bits 96-127 */
 
+#ifdef TT_CONFIG_OPTION_SUPPORT_OPTIONAL_FIELDS
     TT_Char    achVendID[4];
-
     TT_UShort  fsSelection;
     TT_UShort  usFirstCharIndex;
     TT_UShort  usLastCharIndex;
+#endif
+
     TT_Short   sTypoAscender;
     TT_Short   sTypoDescender;
     TT_Short   sTypoLineGap;
@@ -518,8 +526,11 @@
 
   struct  TT_Postscript_
   {
+#ifdef TT_CONFIG_OPTION_SUPPORT_OPTIONAL_FIELDS    
     TT_Fixed  FormatType;
     TT_Fixed  italicAngle;
+#endif
+
     TT_FWord  underlinePosition;
     TT_FWord  underlineThickness;
     TT_ULong  isFixedPitch;

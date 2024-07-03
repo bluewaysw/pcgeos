@@ -734,7 +734,7 @@ static sword getFontIDAvailIndex( FontID fontID, MemHandle fontInfoBlock )
 			ConstructOptr( fontInfoBlock, sizeof(LMemBlockHeader))) );
         elements = LMemGetChunkSizePtr( fontsAvailEntrys ) / sizeof( FontsAvailEntry );
 
-        for( element = 0; element < elements; element++ )
+        for( element = 0; element < elements; ++element )
                 if( fontsAvailEntrys[element].FAE_fontID == fontID )
                         return element;
 

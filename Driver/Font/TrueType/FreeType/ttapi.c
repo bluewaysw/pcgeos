@@ -377,7 +377,7 @@ extern TEngine_Instance engineInstance;
       Short   top_bearing;
       UShort  advance_height;
 
-      for ( n = 0; n <= num; n++ )
+      for ( n = 0; n <= num; ++n )
       {
         TT_Get_Metrics( (TT_Horizontal_Header*)&_face->verticalHeader,
                         firstGlyph + n, &top_bearing, &advance_height );

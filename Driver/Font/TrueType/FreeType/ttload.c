@@ -313,27 +313,39 @@
 
     header = &face->fontHeader;
 
+#ifdef TT_CONFIG_OPTION_SUPPORT_OPTIONAL_FIELDS
     header->Table_Version = GET_ULong();
     header->Font_Revision = GET_ULong();
 
     header->CheckSum_Adjust = GET_Long();
     header->Magic_Number    = GET_Long();
+#else
+    SKIP( 16 );
+#endif
 
     header->Flags        = GET_UShort();
     header->Units_Per_EM = GET_UShort();
 
+#ifdef TT_CONFIG_OPTION_SUPPORT_OPTIONAL_FIELDS
     header->Created [0] = GET_Long();
     header->Created [1] = GET_Long();
     header->Modified[0] = GET_Long();
     header->Modified[1] = GET_Long();
+#else
+    SKIP( 16 );
+#endif
 
     header->xMin = GET_Short();
     header->yMin = GET_Short();
     header->xMax = GET_Short();
     header->yMax = GET_Short();
 
+#ifdef TT_CONFIG_OPTION_SUPPORT_OPTIONAL_FIELDS
     header->Mac_Style       = GET_UShort();
     header->Lowest_Rec_PPEM = GET_UShort();
+#else
+    SKIP( 4 );
+#endif
 
     header->Font_Direction      = GET_Short();
     header->Index_To_Loc_Format = GET_Short();
@@ -495,9 +507,9 @@
 
     header->min_Left_Side_Bearing  = GET_Short();
     header->min_Right_Side_Bearing = GET_Short();
-    header->xMax_Extent            = GET_Short();
 
 #ifdef TT_CONFIG_OPTION_SUPPORT_OPTIONAL_FIELDS
+    header->xMax_Extent            = GET_Short();
     header->caret_Slope_Rise       = GET_Short();
     header->caret_Slope_Run        = GET_Short();
 
@@ -508,7 +520,7 @@
     header->Reserved3 = GET_Short();
     header->Reserved4 = GET_Short();
 #else
-    SKIP( 14 );
+    SKIP( 16 );
 #endif
 
     header->metric_Data_Format = GET_Short();
@@ -1013,12 +1025,17 @@
     os2->ulUnicodeRange3     = GET_ULong();
     os2->ulUnicodeRange4     = GET_ULong();
 
+#ifdef TT_CONFIG_OPTION_SUPPORT_OPTIONAL_FIELDS
     for ( i = 0; i < 4; ++i )
       os2->achVendID[i] = GET_Byte();
 
     os2->fsSelection         = GET_UShort();
     os2->usFirstCharIndex    = GET_UShort();
     os2->usLastCharIndex     = GET_UShort();
+#else
+    SKIP( 10 );
+#endif
+
     os2->sTypoAscender       = GET_Short();
     os2->sTypoDescender      = GET_Short();
     os2->sTypoLineGap        = GET_Short();
@@ -1082,8 +1099,13 @@
 
     /* read frame data into face table */
 
+#ifdef TT_CONFIG_OPTION_SUPPORT_OPTIONAL_FIELDS
     post->FormatType         = GET_ULong();
     post->italicAngle        = GET_ULong();
+#else
+    SKIP( 8 );
+#endif
+
     post->underlinePosition  = GET_Short();
     post->underlineThickness = GET_Short();
     post->isFixedPitch       = GET_ULong();
