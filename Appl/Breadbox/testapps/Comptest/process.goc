@@ -1,0 +1,626 @@
+/**************************************************************************
+ *
+ * PROJECT:      CompressDecompres Test
+ *
+ *		 While working with the Import function from Word Matcher application
+ *		 it looks like CompressDecompress causes memory corruption randomly
+ *		 after 1500 to 3000 words was imported.
+ *		 
+ *		 This program tries to trigger the problem so that it can be swatted.
+ *
+ *		 See also comments in in front of DataRessource for more details.
+ *               
+ * FILE:         PROCESS.GOC
+ *               Copyright (c) by RABE-Soft 06/2024
+ *
+ * AUTHOR:       Rainer Bettsteller
+ *
+ **************************************************************************/
+
+/*  Standard include files */
+@include <stdapp.goh>
+@include <ansi/stdlib.h>
+@include <ansi/stdio.h>
+@include <ansi/string.h>
+@include <compress.h>
+@include <math.h>
+
+@include "comptest.goh"
+
+@include "appui.goh"
+
+/*---------------------------------------------------------------------------
+	Globale Variablen und Typen
+ ---------------------------------------------------------------------------*/
+GlobalStruct global;
+
+
+@classdecl CompProcessClass, neverSaved;
+
+/*--------------------- PrintInfo ---------------------
+ *	Aufgabe:	Add text to CompEditText
+ * 	Parameter:	
+ ---------------------------------------------------------------------------*/
+void PrintInfo(char *info) {
+    @call CompEditText::MSG_VIS_TEXT_APPEND_PTR(info, 0);
+}
+
+/*--------------------- GetRandom ---------------------
+ *	Aufgabe:	Generate a random word sized number up to 8191 (8 kB)
+ * 	Parameter:	
+ ---------------------------------------------------------------------------*/
+word GetRandom() {
+word retVal;
+
+  FloatWordToFloat(0x2000);
+  FloatRandomN();
+  retVal = FloatFloatToDword();
+  retVal &= 0x1FFF;
+
+  return retVal;
+}
+
+/*--------------------- GetRandomASCII ---------------------
+ *	Aufgabe:	Generate a random ASCII character
+ * 	Parameter:	
+ ---------------------------------------------------------------------------*/
+word GetRandomASCII() {
+byte c = 0;
+  
+  while ( c < 0x20 ) {		// no control codes allowed
+  	c = GetRandom();
+  	// make real ASCII chars more likely. This is the fact for word matcher word lists.
+  	if ( c > 0x7F ) c = GetRandom();
+  	if ( c > 0x7F ) c = GetRandom();
+  }
+  return c;
+}
+
+
+/*--------------------- CompareBuffers ---------------------
+ *	Aufgabe:	Compate buffres bytewise and print differences, if any
+ * 	Parameter:	
+ ---------------------------------------------------------------------------*/
+void CompareBuffers(byte *buf1, byte *buf2, word count, char *infotext) {
+char number[100];
+word n, ok, wrong;
+#define MAX_WRONG_FOR_DETAILS	15
+
+    PrintInfo("Compare ");
+    if (infotext) PrintInfo(infotext);
+    sprintf(number, " (%u bytes)\r", count);
+    PrintInfo(number);
+    
+    if (memcmp(buf1, buf2, count) == 0) {
+    	PrintInfo("  No differences found\r");
+    	return;
+    	}
+
+    ok = 0;
+    wrong = 0;
+    for (n = 0; n < count; n++) {
+    	if (buf1[n]==buf2[n]) { ok++; }
+    			else  { wrong++; }    
+    }
+    if ( wrong > MAX_WRONG_FOR_DETAILS ) {
+    	/*
+    	 * print out summary
+    	 */
+	sprintf(number, "  %u bytes ok\r", ok);
+	PrintInfo(number);
+	sprintf(number, "  %u bytes different\r", wrong);
+	PrintInfo(number);
+	for (n = 0; n < count; n++) {
+    	    if (buf1[n]!=buf2[n]) { 
+    	    	sprintf(number, "  First difference at offset %u", n);
+    	    	PrintInfo(number);
+    	    	break;
+		}
+	    }	
+	
+    } else {
+    	/*
+    	 * print detailed diffs
+    	 */
+        for (n = 0; n < count; n++) {
+    	    if (buf1[n]!=buf2[n]) {
+    	    
+		if ( (buf1[n]>=0x20) && (buf2[n]>=0x20) ) {
+		    sprintf(number, "  offset=%u\t%u (%c) -> %u (%c)\r", n, buf1[n], buf1[n], buf2[n], buf2[n]);
+		} else {
+		    sprintf(number, "  offset=%u\t%u     -> %u\r", n, buf1[n], buf2[n]);
+		}
+		PrintInfo(number);
+	    }
+        }
+        
+	sprintf(number, "  %u bytes different\r", wrong);
+	PrintInfo(number);
+    }    
+    	
+    return;
+}
+
+/*--------------------- CompareBuffersSilent ---------------------
+ *	Aufgabe:	Compate buffres bytewise but print out anything
+ *			if any differences are foud
+ * 	Parameter:	
+ ---------------------------------------------------------------------------*/
+void CompareBuffersSilent(byte *buf1, byte *buf2, word count, char *infotext) {
+
+    if (memcmp(buf1, buf2, count) == 0) return;		// nothings to print
+    
+    CompareBuffers(buf1, buf2, count, infotext);
+
+}
+
+/*--------------------- CheckBufferZero ---------------------
+ *	Aufgabe:	Check if al bytes in teh given buffer are zero.
+ *			return TRUE if not
+ * 	Parameter:	
+ ---------------------------------------------------------------------------*/
+Boolean CheckBufferZero(byte *buff, word count ) {
+int n;
+
+    for ( n = 0; n < count; n++ ) {
+    	if (buff[n]) return TRUE;
+    	}
+    return FALSE;
+}    
+
+/*--------------------- Checksum ---------------------
+ *	Aufgabe:	Simple check sum to identify corrupted data
+ * 	Parameter:	
+ ---------------------------------------------------------------------------*/
+dword Checksum(byte *buff, word count ) {
+word  xSum, n;
+dword sum, retVal;
+
+    sum = 0;
+    xSum = 0;
+    for ( n = 0; n < count; n++) {
+    	sum = sum + buff[n];
+    	xSum = (xSum ^ buff[n]) + n;
+    }
+    
+    retVal = xSum;
+    retVal <<= 24;
+    retVal += sum;
+        
+    return retVal;
+}    
+    
+
+/*--------------------- CompressBuffer ---------------------
+ *	Aufgabe:	Compress a given buffer and do some error checking
+ * 	Strategy:	- Copy data to another buffer that contains zeros before and after
+ *			- Compress data to a 2nd buffer that contains zeros before and after
+ *			- Compare both original buffers
+ *			- Check zeros
+ *			- Uncompress compressed data to a third buffer
+ *			- Compare uncompressed data with original and check zeros again
+ *				
+ *	Return:		TRUE, if one of the checks has been failed.
+ ---------------------------------------------------------------------------*/
+Boolean CompressBuffer(byte *data, word count) {
+byte 	*sourceBuffer,	
+	*sourceData,	// data to compress
+	*destBuffer,
+	*destData,	// compressed data
+	*expandBuffer,
+	*expandData;	// uncompressed data (rebuild after compress)
+dword	sumData,
+	sumSource,
+	sumCompressed,
+	sumExpanded;	// simple checksum to identify corrupted buffers
+dword	sumCurrent;	
+int	compressedSize, restoredSize;
+char 	txt[100];
+word	selection, textLen, textLen2;
+
+#define NUM_ZEROS_TO_USE	20
+
+    sprintf(txt, "Compress %u bytes", count);
+    PrintInfo(txt);
+
+	/*
+	 * alloc buffers. Copy data to compress
+	 */
+    sourceBuffer = malloc(count + 2*NUM_ZEROS_TO_USE + 8);
+    memset(sourceBuffer, 0, count + 2*NUM_ZEROS_TO_USE + 8);
+    sourceData = sourceBuffer + NUM_ZEROS_TO_USE;
+    
+    sumData = Checksum(data, count);
+    memcpy(sourceData, data, count);
+    sumSource = Checksum(sourceBuffer, count + 2*NUM_ZEROS_TO_USE);
+
+    destBuffer = malloc(count + 2*NUM_ZEROS_TO_USE + 200);	// in case that 'compress' produces more data
+    memset(destBuffer, 0, count + 2*NUM_ZEROS_TO_USE + 200);
+    destData = destBuffer + NUM_ZEROS_TO_USE;
+
+    expandBuffer = malloc(count + 2*NUM_ZEROS_TO_USE + 8);
+    memset(expandBuffer, 0, count + 2*NUM_ZEROS_TO_USE + 8);
+    expandData = expandBuffer + NUM_ZEROS_TO_USE;
+
+	/*
+	 * Compress Data. The passed flags are the same as used in WMLib 
+	 */
+    compressedSize = CompressDecompress( (CLF_SOURCE_IS_BUFFER | CLF_DEST_IS_BUFFER |
+                                CLF_MOSTLY_ASCII ),
+                                NullHandle,
+                                sourceData,	// quelle
+                                count,		// size
+                                NullHandle,
+                                destData);	// ziel
+
+    sprintf(txt, " to %u bytes", compressedSize);
+    if (compressedSize > count) strcat(txt, " <-- SIZE GROWN!");
+    strcat(txt,"\r");
+    PrintInfo(txt);
+
+	/*
+	 * Store text len. see below
+	 */
+    textLen = @call CompEditText::MSG_VIS_TEXT_GET_TEXT_SIZE();
+	 
+	/*
+	 * Check if buffers are corrupted. Print infos only if corrupted 
+	 */
+     sumCurrent = Checksum(sourceBuffer, count+ 2*NUM_ZEROS_TO_USE);
+     if ( sumCurrent != sumSource) PrintInfo(" - Compress: SourceBuffer corrupted\r");
+     sumCurrent = Checksum(data, count);
+     if ( sumCurrent != sumData) PrintInfo(" - Compress: passed data corrupted\r");
+     
+     CompareBuffersSilent(data, sourceData, count, " - Compress: passed data vs data to compress");
+     
+     if (CheckBufferZero(sourceBuffer, NUM_ZEROS_TO_USE )) PrintInfo(" - Compress: Non-zero bytes before sourceData"); 
+     if (CheckBufferZero(sourceData + count, NUM_ZEROS_TO_USE )) PrintInfo(" - Compress: Non-zero bytes after sourceData"); 
+
+     if (CheckBufferZero(destBuffer, NUM_ZEROS_TO_USE )) PrintInfo(" - Compress: Non-zero bytes before compressed data"); 
+     if (CheckBufferZero(destData + compressedSize, NUM_ZEROS_TO_USE )) PrintInfo("Non-zero bytes after compressed data"); 
+
+     
+	/*
+	 * Uncompress Data, if selected. The passed flags are the same as used in WMLib 
+	 */
+    selection = @call CompressOptions::MSG_GEN_BOOLEAN_GROUP_GET_SELECTED_BOOLEANS();
+    if ( selection & BOOLEAN_ALSO_DECOMPRES ) {
+    	sumCompressed = Checksum(destData,compressedSize);
+    	restoredSize = CompressDecompress( (CLF_SOURCE_IS_BUFFER | CLF_DEST_IS_BUFFER |
+                                CLF_DECOMPRESS | CLF_MOSTLY_ASCII ),
+                                NullHandle,
+                                destData,	// quelle
+                                compressedSize,		// size
+                                NullHandle,
+                                expandData);	// ziel
+     
+     
+	/*
+	 * Check again if buffers are corrupted. Print infos only if corrupted 
+	 */
+     	if (restoredSize != count) {
+     	    sprintf(txt, " - Wrong restored size: %u, but should be %u\r", restoredSize, count);
+     	    PrintInfo(txt);
+     	    }
+	 
+	sumCurrent = Checksum(destData, compressedSize);
+	if ( sumCurrent != sumCompressed) PrintInfo(" - Explode: Compressed data corrupted\r");
+	sumCurrent = Checksum(sourceBuffer, count+ 2*NUM_ZEROS_TO_USE);
+	if ( sumCurrent != sumSource) PrintInfo(" - Explode: SourceData corrupted\r");
+	sumCurrent = Checksum(data, count);
+	if ( sumCurrent != sumData) PrintInfo(" - Explode: passed data corrupted\r");
+
+	CompareBuffersSilent(data, sourceData, count, " - Explode: passed data vs data to compress\r");
+	CompareBuffersSilent(expandData, sourceData, count, " - Explode: expanded data vs data to compress\r");
+	CompareBuffersSilent(expandData, data, count, " - Explode: expanded data vs passed data\r");
+
+	if (CheckBufferZero(sourceBuffer, NUM_ZEROS_TO_USE )) PrintInfo(" - Explode: Non-zero bytes before sourceData\r"); 
+	if (CheckBufferZero(sourceData + count, NUM_ZEROS_TO_USE )) PrintInfo(" - Explode: Non-zero bytes after sourceData\r"); 
+
+	if (CheckBufferZero(destBuffer, NUM_ZEROS_TO_USE )) PrintInfo(" - Explode: Non-zero bytes before compressed data\r"); 
+	if (CheckBufferZero(destData + compressedSize, NUM_ZEROS_TO_USE )) PrintInfo(" - Explode: Non-zero bytes after compressed data\r"); 
+
+	if (CheckBufferZero(expandBuffer, NUM_ZEROS_TO_USE )) PrintInfo(" - Explode: Non-zero bytes before expanded data\r"); 
+	if (CheckBufferZero(expandData + count, NUM_ZEROS_TO_USE )) PrintInfo(" - Explode: Non-zero bytes after expanded data\r"); 
+                           
+	} 	/* end explode part and related checks */
+
+	/*
+	 * Check text len again. If the size has been changed, any error message was printed.
+	 * This indicates, that the compression check has failed. 
+	 */
+    textLen2 = @call CompEditText::MSG_VIS_TEXT_GET_TEXT_SIZE();
+
+    PrintInfo("*** Compress check done ***\r");
+	 
+	/*
+	 * free buffers
+	 */
+    free(sourceBuffer);	 
+    free(destBuffer);	 
+    free(expandBuffer);	 
+
+    if ( textLen != textLen2 ) return TRUE;
+    return FALSE;
+
+}
+	
+
+/*###########################################################################
+	 CODE for CompProcessClass
+/*###########################################################################*/
+
+/*--------------------- MSG_GEN_PROCESS_OPEN_APPLICATION ---------------------
+ *	Aufgabe:	User-Hook beim ôffnen der Applikation
+ * 	Parameter:	void (	AppAttachFlags		attachFlags,
+ *				MemHandle		launchBlock,
+ *				MemHandle 		extraState);
+ *	AppAttachFlags:	kînnen folgende Bitflags enthalten:
+ *		  	  AAF_RESTORING_FROM_STATE | AAF_STATE_FILE_PASSED
+ *			| AAF_DATA_FILE_PASSED	| AAF_RESTORING_FROM_QUIT
+ *	launchBlock:	AppLaunchBlock
+ *	extraState:	Handle des Extra-State-Blocks, wenn dieser von
+ *			MSG_GEN_PROCESS_CLOSE_APPLICATION Åbergeben wurde
+ *	Strategie: 	@callsuper() erforderlich
+ *                      vor @callsuper() sind alle UI-Objekte not enabled
+ *			danach sind sie nutzbar (z.B. auch DialogBoxen)
+ ---------------------------------------------------------------------------*/
+@method CompProcessClass, MSG_GEN_PROCESS_OPEN_APPLICATION {
+
+	/* Initialisieren der globalen Variablen */
+	memset(&global, 0, sizeof(GlobalStruct));
+
+  	FloatRandomize(RGIF_GENERATE_SEED, 8);
+
+	@callsuper();
+	}
+
+/*--------------------- MSG_GEN_PROCESS_CLOSE_APPLICATION ---------------------
+ *	Aufgabe:	User-Hook beim Schlie·en der Applikation
+ * 	Parameter:	MemHandle ( void );
+ *			Wenn zusÑtzliche Daten in der State-Datei gesichert
+ *			werden sollen, kann ein das Handle eines Speicherblocks
+ *			Åbergeben werden, die diese Daten enthÑlt
+ *	Strategie: 	@callsuper() erforderlich
+ *	Return:		Handle des zu sichernden Blocks (oder NULL fÅr keinen)
+ ---------------------------------------------------------------------------*/
+@method CompProcessClass, MSG_GEN_PROCESS_CLOSE_APPLICATION {
+	return @callsuper();
+	}
+
+
+
+
+/*--------------------- MSG_COMP_TEST_COMPRESSION ---------------------
+ *        Aufgabe:      Handler fÅr Trigger in der Reply-Bar
+ *        Parameter:	void(void)
+ ---------------------------------------------------------------------------*/
+	/* 
+	 * Number of bytes generated from word matcher import
+	 */
+#define WM_SOURCE_LEN_1 	4364	/* data in @WMSource1 chunk (without added 3 zeros)*/	
+#define WM_SOURCE_LEN_2 	4721	/* data in @WMSource1 chunk (without added 3 zeros)*/	
+#define FOUR_WORD_DATA_LEN (1309*4)	/* = 5236 characters */	
+
+@method CompProcessClass, MSG_COMP_TEST_COMPRESSION {
+word 	selection, bools;
+optr	op;
+word	start, end, count, n, cnt, try;
+word 	rep = 0;	/* not zero for repeated tests */
+byte 	*ptr;
+char text[30];
+Boolean	err = FALSE;
+
+	
+    selection = @call CompMainItemGroup::MSG_GEN_ITEM_GROUP_GET_SELECTION();
+    bools = @call CompressOptions::MSG_GEN_BOOLEAN_GROUP_GET_SELECTED_BOOLEANS();
+    if (bools & BOOLEAN_REPEAT) {
+    	rep = @call RandomValue::MSG_GEN_VALUE_GET_INTEGER_VALUE();
+    	rep--;	// avoid additonal run
+    	}
+
+    rep++;
+    cnt = 0;
+    try = 0;
+    do {	// repeat test until rep reaches zero
+        rep--;
+    
+    		/*
+    		 * For repeated Test: print some information and clear text 
+    		 * some times to avoid text object overflow.
+    		 */
+        if (bools & BOOLEAN_REPEAT) {
+           cnt++; try++;
+           if ( cnt == 11 ) { cnt = 0; @call CompEditText::MSG_VIS_TEXT_DELETE_ALL(); }
+           sprintf(text, "Test # %u: ", try);
+           PrintInfo(text);
+        }
+    
+    
+        switch (selection ) {	
+	    case ITEM_ID_1:	// '1',"@Source1 Chunk":
+	        op = @WMSource1;
+	        MemLock(OptrToHandle(op));
+	        err = CompressBuffer(LMemDeref(op), WM_SOURCE_LEN_1);
+	        MemUnlock(OptrToHandle(op));
+	        break;
+	    
+	    case ITEM_ID_2:	// '2',"@Source2 Chunk":
+	        op = @WMSource2;
+	        MemLock(OptrToHandle(op));
+	        err = CompressBuffer(LMemDeref(op), WM_SOURCE_LEN_2);
+	        MemUnlock(OptrToHandle(op));
+	        break;
+	    
+	    case ITEM_ID_3:	// 'S',"@SavedSource1 Chunk":
+	        op = @WMSavedSource1;
+	        MemLock(OptrToHandle(op));
+	        err = CompressBuffer(LMemDeref(op), WM_SOURCE_LEN_1);
+	        MemUnlock(OptrToHandle(op));
+	        break;
+	
+	    case ITEM_ID_4:	// 'F',"Complete @FourWordText Chunk":
+	        op = @FourWordText;
+	        MemLock(OptrToHandle(op));
+	        err = CompressBuffer(LMemDeref(op), FOUR_WORD_DATA_LEN);
+	        MemUnlock(OptrToHandle(op));
+	        break;
+	
+	    case ITEM_ID_5:	// 'W',"Part of @FourWordText Chunk":
+	        start = @call FourPartStart::MSG_GEN_VALUE_GET_INTEGER_VALUE();
+	        end = @call FourPartEnd::MSG_GEN_VALUE_GET_INTEGER_VALUE();
+	        if ( end <= start ) { MessageBox("Invalid range"); rep = 0; break; }
+	        count = end - start;
+	    
+	        op = @FourWordText;
+	        MemLock(OptrToHandle(op));
+	        ptr = LMemDeref(op);
+	        err = CompressBuffer(ptr+start, count);
+	        MemUnlock(OptrToHandle(op));
+	    break;
+	
+	    case ITEM_ID_6:	// 'R',"Random of @FourWordText Chunk":
+	        start = 0xF000;
+	        while ( start > 3*(FOUR_WORD_DATA_LEN/4) ) start = GetRandom();
+	        end = 0xF000;
+	        while ( (end >= FOUR_WORD_DATA_LEN) || (end <= start) ) end = GetRandom();
+	        count = end - start;
+	        sprintf(text, "@FourWordText Range from %u to %u:\r", start, end);
+	        PrintInfo(text);
+
+	        op = @FourWordText;
+	        MemLock(OptrToHandle(op));
+	        ptr = LMemDeref(op);
+	        err = CompressBuffer(ptr+start, count);
+	        MemUnlock(OptrToHandle(op));
+	        break;
+	
+	    case ITEM_ID_7:	// 'R',"Random ASCII Data":
+	        count = GetRandom();	// up to 8 kB
+	        ptr = malloc(count+8);
+	        for ( n = 0; n < count; n++ ) {
+	        	ptr[n] = GetRandomASCII();
+	        }
+	        err = CompressBuffer(ptr, count);
+	        break;
+        }
+        
+        if (err) rep = 0;
+        
+    } while (rep > 0);        
+        
+    
+}
+/*--------------------- MSG_COMP_COMPARE_CHUNKS ---------------------
+ *        Aufgabe:      Handler fÅr Trigger in der Reply_bar
+ *        Parameter:	void(void)
+ ---------------------------------------------------------------------------*/
+@method CompProcessClass, MSG_COMP_COMPARE_CHUNKS {
+//char *txt;
+
+
+	MemLock(OptrToHandle(@WMSource1));
+	MemLock(OptrToHandle(@WMSource2));
+	MemLock(OptrToHandle(@FourWordText));
+/*
+define WM_SOURCE_LEN_1 	4364	/* data in @WMSource1 chunk (without added 3 zeros)* /	
+define WM_SOURCE_LEN_2 	4721	/* data in @WMSource1 chunk (without added 3 zeros)* /	
+define FOUR_WORD_DATA_LEN (1309*4)	/* = 5236 characters */	
+/**/
+
+	CompareBuffers(LMemDeref(@WMSource1),LMemDeref(@FourWordText), WM_SOURCE_LEN_1, "Source1 und FourWordText");
+	CompareBuffers(LMemDeref(@WMSavedSource1),LMemDeref(@FourWordText), WM_SOURCE_LEN_1, "SavedSource1 und FourWordText");
+	CompareBuffers(LMemDeref(@WMSource2),LMemDeref(@FourWordText), WM_SOURCE_LEN_2, "Source2 und FourWordText");
+	PrintInfo("\r");
+	CompareBuffers(LMemDeref(@WMSavedSource1),LMemDeref(@WMSource2), WM_SOURCE_LEN_1, "SavedSource1 und Source2");
+	
+
+
+	MemUnlock(OptrToHandle(@WMSource1));
+	MemUnlock(OptrToHandle(@WMSource2));
+	MemUnlock(OptrToHandle(@FourWordText));
+}
+
+
+/*--------------------- MSG_COMP_APPLY_ITEM_GROUP ---------------------
+ *	Aufgabe:        Handler fÅr Auswahl aus der ItemGroup
+ *	Zusammenhang:
+ *	Strategie:
+ *	Parameter:	void GEN_ITEM_GROUP_APPLY_MSG(word selection,
+ *				word numSelections, byte stateFlags);
+ *      Return:		-
+ ---------------------------------------------------------------------------*/
+@method CompProcessClass, MSG_COMP_APPLY_ITEM_GROUP {
+Boolean	FourCharRange = FALSE;
+
+    switch (selection ) {	
+	case ITEM_ID_1:	// '1',"@Source1 Chunk":
+	break;
+	
+	case ITEM_ID_2:	// '2',"@Source2 Chunk":
+	break;
+	
+	case ITEM_ID_3:	// 'S',"@SavedSource1 Chunk":
+	break;
+	
+	case ITEM_ID_4:	// 'F',"Complete @FourWordText Chunk":
+	break;
+	
+	case ITEM_ID_5:	// 'W',"Part of @FourWordText Chunk":
+	FourCharRange = TRUE;
+	break;
+	
+	case ITEM_ID_6:	// 'R',"Random of @FourWordText Chunk":
+	break;
+	
+	case ITEM_ID_7:	// 'R',"Random ASCII Data":
+	break;
+    }
+    
+    if (FourCharRange) {
+    	@send FourPartGroup::MSG_GEN_SET_ENABLED(VUM_NOW);
+    }
+    else {
+    	@send FourPartGroup::MSG_GEN_SET_NOT_ENABLED(VUM_NOW);
+    }
+
+    
+}
+
+
+
+/*--------------------- MSG_COMP_APPLY_BOOLEAN_GROUP ---------------------
+ *	Aufgabe:        Handler f¸r Auswahl aus der BooleanGroup
+ *	Zusammenhang:
+ *	Strategie:
+ *      Return:		-
+ ---------------------------------------------------------------------------*/
+@method CompProcessClass, MSG_COMP_APPLY_BOOLEAN_GROUP {
+Boolean	randomRange = FALSE;
+
+    if (selectedBooleans & BOOLEAN_REPEAT ) randomRange = TRUE;
+    
+    if (randomRange) {
+    	@send RandomValue::MSG_GEN_SET_ENABLED(VUM_NOW);
+    }
+    else {
+    	@send RandomValue::MSG_GEN_SET_NOT_ENABLED(VUM_NOW);
+    }
+
+    
+}
+
+
+
+
+/*---------------------  ---------------------
+ *	Aufgabe:
+ *	Zusammenhang:
+ *	Strategie:
+ *	Parameter:
+ *	Return:
+ ---------------------------------------------------------------------------*/
+
+/* *********** End of file PROCESS.GOC ********************/
+
+
