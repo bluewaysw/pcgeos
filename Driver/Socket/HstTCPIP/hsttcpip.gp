@@ -28,13 +28,6 @@ library ansic
 library accpnt
 library hostif
 
-# Allow static linkage for the resolver library.
-ifdef STATIC_LINK_RESOLVER
-library resolver
-else
-library resolver noload
-endif
-
 #
 # Define resources other than standard discardable code
 #
