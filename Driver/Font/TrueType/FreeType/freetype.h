@@ -367,9 +367,10 @@
 #ifdef TT_CONFIG_OPTION_SUPPORT_OPTIONAL_FIELDS
     TT_UShort  Mac_Style;
     TT_UShort  Lowest_Rec_PPEM;
+    
+    TT_Short   Font_Direction;
 #endif
 
-    TT_Short   Font_Direction;
     TT_Short   Index_To_Loc_Format;
     TT_Short   Glyph_Data_Format;
   };

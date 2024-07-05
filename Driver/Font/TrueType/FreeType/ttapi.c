@@ -354,7 +354,7 @@ extern TEngine_Instance engineInstance;
       UShort  advance_width;
 
 
-      for ( n = 0; n <= num; n++ )
+      for ( n = 0; n <= num; ++n )
       {
         TT_Get_Metrics( &_face->horizontalHeader,
                         firstGlyph + n, &left_bearing, &advance_width );
@@ -1080,125 +1080,6 @@ extern TEngine_Instance engineInstance;
   }
 */
 
-#ifdef __GEOS__
-
-
-/*******************************************************************
- *
- *  Function    :  TT_Get_Glyph_Region
- *
- *  Description :  Produces a region from a glyph outline.
- *
- *  Input  :  glyph      the glyph container's handle
- *            map        target region description block
- *            xOffset    x offset in fractional pixels (26.6 format)
- *            yOffset    y offset in fractional pixels (26.6 format)
- *
- *  Output :  Error code.
- *
- *  Note : Only use integer pixel offsets to preserve the fine
- *         hinting of the glyph and the 'correct' anti-aliasing
- *         (where vertical and horizontal stems aren't grayed).
- *         This means that xOffset and yOffset must be multiples
- *         of 64!
- *
- *         You can experiment with offsets of +32 to get 'blurred'
- *         versions of the glyphs (a nice effect at large sizes that
- *         some graphic designers may appreciate :)
- *
- *  MT-Safe : NO!  Glyph containers can't be shared.
- *
- ******************************************************************/
-/*
-  EXPORT_FUNC
-  TT_Error  TT_Get_Glyph_Region( TT_Glyph        glyph,
-                                 TT_Raster_Map*  map,
-                                 TT_F26Dot6      xOffset,
-                                 TT_F26Dot6      yOffset )
-  {
-    PEngine_Instance  _engine;
-    TT_Error          error;
-    PGlyph            _glyph = HANDLE_Glyph( glyph );
-    TT_Matrix         flipmatrix = HORIZONTAL_FLIP_MATRIX; 
-
-    TT_Outline  outline;
-
-
-    if ( !_glyph )
-      return TT_Err_Invalid_Glyph_Handle;
-
-    _engine = _glyph->face->engine;
-
-    outline = _glyph->outline;
-    // XXX : For now, use only dropout mode 2
-    // outline.dropout_mode = _glyph->scan_type;
-    outline.dropout_mode = 2;
-
-    TT_Transform_Outline( &outline, &flipmatrix );
-    TT_Translate_Outline( &outline, xOffset, yOffset + map->rows * 64 );
-    error = TT_Get_Outline_Region( &outline, map );
-    TT_Translate_Outline( &outline, -xOffset, - ( yOffset + map->rows * 64 ) );
-    TT_Transform_Outline( &outline, &flipmatrix );
-
-    return error;
-  }
-*/
-
- /*******************************************************************
-  *
-  *  Function    :  TT_Get_Glyph_In_Region
-  *
-  *  Description :  Renders a glyph into the given region path.
-  *
-  *  Input  :  glyph         the glyph container's handle
-  *            bitmapBlock   handle 
-  *            regionPath    handle into the outline is to be written
-  *
-  *  Output :  Error code.
-  *
-  *  MT-Safe : NO!  Glyph containers can't be shared.
-  *
-  ******************************************************************/
-/*
-  EXPORT_FUNC
-  TT_Error  TT_Get_Glyph_In_Region( TT_Glyph      glyph,
-                                    MemHandle     bitmapBlock,
-                                    Handle        regionPath )
-  {
-    PEngine_Instance  _engine;
-    TT_Error          error;
-    PGlyph            _glyph = HANDLE_Glyph( glyph );
-
-    TT_Outline  outline;
-
-    if ( !_glyph )
-      return TT_Err_Invalid_Glyph_Handle;
-
-    _engine = _glyph->face->engine;
-
-    outline = _glyph->outline;
-
-    // calc region size
-
-    // alloc bitmapBlock and init regionPath --> GrRegionPathInit
-
-    // translate by current x,y position
-
-    // iterate over contours
-
-      // iterate over segments of current contour
-
-        // switch over current segment
-
-          // LINE_SEGMENT --> GrRegionAddLineAtCP
-          // CURVE_SEGMENT --> GrRegionAddBezierAtCP
-          // ...
-
-    return TT_Err_Ok;
-  }
-*/
-#endif /* __GEOS__ */
-
 
   static const TT_Outline  null_outline
       = { 0, 0, NULL, NULL, NULL, 0, 0, 0, 0 };
@@ -1436,11 +1317,11 @@ TT_Error  TT_Get_Outline_Region( TT_Outline*     outline,
     TT_Vector*  vec = outline->points;
 
 
-    for ( n = 0; n < outline->n_points; n++ )
+    for ( n = 0; n < outline->n_points; ++n )
     {
       vec->x += xOffset;
       vec->y += yOffset;
-      vec++;
+      ++vec;
     }
   }
 
@@ -1483,9 +1364,9 @@ TT_Error  TT_Get_Outline_Region( TT_Outline*     outline,
 
         bbox->xMin = bbox->xMax = vec->x;
         bbox->yMin = bbox->yMax = vec->y;
-        vec++;
+        ++vec;
 
-        for ( k = 1; k < outline->n_points; k++ )
+        for ( k = 1; k < outline->n_points; ++k )
         {
           x = vec->x;
           if ( x < bbox->xMin ) bbox->xMin = x;
@@ -1493,7 +1374,7 @@ TT_Error  TT_Get_Outline_Region( TT_Outline*     outline,
           y = vec->y;
           if ( y < bbox->yMin ) bbox->yMin = y;
           if ( y > bbox->yMax ) bbox->yMax = y;
-          vec++;
+          ++vec;
         }
       }
       return TT_Err_Ok;

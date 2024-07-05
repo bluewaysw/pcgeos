@@ -128,7 +128,7 @@
       entry->Offset   = GET_Long();
       entry->Length   = GET_Long();
 
-      entry++;
+      ++entry;
     }
 
     FORGET_Frame();
@@ -343,11 +343,12 @@
 #ifdef TT_CONFIG_OPTION_SUPPORT_OPTIONAL_FIELDS
     header->Mac_Style       = GET_UShort();
     header->Lowest_Rec_PPEM = GET_UShort();
+
+    header->Font_Direction  = GET_Short();
 #else
-    SKIP( 4 );
+    SKIP( 6 );
 #endif
 
-    header->Font_Direction      = GET_Short();
     header->Index_To_Loc_Format = GET_Short();
     header->Glyph_Data_Format   = GET_Short();
 
@@ -409,7 +410,7 @@
     {
       longs->advance = GET_UShort();
       longs->bearing = GET_Short();
-      longs++;
+      ++longs;
     }
 
     /* do we have an inconsistent number of metric values? */
