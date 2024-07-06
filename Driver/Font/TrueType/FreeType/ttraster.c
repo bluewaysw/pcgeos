@@ -436,7 +436,7 @@
       ras.cProfile->height = 0;
       ras.cProfile->offset = ras.top;
       oldProfile->next     = ras.cProfile;
-      ras.num_Profs++;
+      ++ras.num_Profs;
     }
 
     if ( ras.top >= ras.maxBuff )
@@ -2202,7 +2202,7 @@
 
     if ( ras.numTurns > 0 &&
          ras.sizeBuff[-ras.numTurns] == min_Y )
-      ras.numTurns--;
+      --ras.numTurns;
 
     while ( ras.numTurns > 0 )
     {
@@ -2273,7 +2273,7 @@
 
               /* mark profile for drop-out processing */
               P_Left->countL = 1;
-              dropouts++;
+              ++dropouts;
 
               goto Skip_To_Next;
             }
@@ -2297,7 +2297,7 @@
 
         ras.Proc_Sweep_Step( RAS_VARS y );
 
-        y++;
+        ++y;
 
         if ( y < y_change )
         {
@@ -2421,13 +2421,13 @@ Scan_DropOuts :
         ras.band_stack[ras.band_top+1].y_max = j;
         ras.band_stack[ras.band_top].y_max = k - 1;
 
-        ras.band_top++;
+        ++ras.band_top;
       }
       else
       {
         if ( ras.fProfile )
           if ( Draw_Sweep( RAS_VAR ) ) return ras.error;
-        ras.band_top--;
+        --ras.band_top;
       }
     }
 

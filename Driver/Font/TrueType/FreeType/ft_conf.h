@@ -210,6 +210,13 @@
 #undef  TT_CONFIG_OPTION_SUPPORT_OPTIONAL_FIELDS
 
 
+/*************************************************************************/
+/* Define TT_CONFIG_OPTION_SUPPORT_UNICODE_RANGES if you want to hold    */
+/* unicode ranges in OS/2 table.                                         */
+
+#undef TT_CONFIG_OPTION_SUPPORT_UNICODE_RANGES
+
+
 /**********************************************************************/
 /*                                                                    */
 /*  The following macros are used to define the debug level, as well  */

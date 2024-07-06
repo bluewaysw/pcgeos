@@ -481,6 +481,8 @@
     TT_UShort  usWeightClass;
     TT_UShort  usWidthClass;
     TT_Short   fsType;
+
+#ifdef TT_CONFIG_OPTION_SUPPORT_OPTIONAL_FIELDS
     TT_FWord   ySubscriptXSize;
     TT_FWord   ySubscriptYSize;
     TT_FWord   ySubscriptXOffset;
@@ -491,14 +493,17 @@
     TT_FWord   ySuperscriptYOffset;
     TT_FWord   yStrikeoutSize;
     TT_FWord   yStrikeoutPosition;
-    TT_Short   sFamilyClass;
+#endif
 
+    TT_Short   sFamilyClass;
     TT_Byte    panose[10];
 
+#ifdef TT_CONFIG_OPTION_SUPPORT_UNICODE_RANGES
     TT_ULong   ulUnicodeRange1;        /* Bits 0-31   */
     TT_ULong   ulUnicodeRange2;        /* Bits 32-63  */
     TT_ULong   ulUnicodeRange3;        /* Bits 64-95  */
     TT_ULong   ulUnicodeRange4;        /* Bits 96-127 */
+#endif
 
 #ifdef TT_CONFIG_OPTION_SUPPORT_OPTIONAL_FIELDS
     TT_Char    achVendID[4];

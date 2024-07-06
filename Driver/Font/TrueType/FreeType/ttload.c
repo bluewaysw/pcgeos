@@ -897,7 +897,7 @@
 
       cmap->offset = FILE_Pos();
 
-      cmap++;
+      ++cmap;
     }
 
     return TT_Err_Ok;
@@ -1006,6 +1006,8 @@
     os2->usWeightClass       = GET_UShort();
     os2->usWidthClass        = GET_UShort();
     os2->fsType              = GET_Short();
+
+#ifdef TT_CONFIG_OPTION_SUPPORT_OPTIONAL_FIELDS
     os2->ySubscriptXSize     = GET_Short();
     os2->ySubscriptYSize     = GET_Short();
     os2->ySubscriptXOffset   = GET_Short();
@@ -1016,15 +1018,23 @@
     os2->ySuperscriptYOffset = GET_Short();
     os2->yStrikeoutSize      = GET_Short();
     os2->yStrikeoutPosition  = GET_Short();
+#else
+    SKIP( 20 );
+#endif
+
     os2->sFamilyClass        = GET_Short();
 
     for ( i = 0; i < 10; ++i )
       os2->panose[i] = GET_Byte();
 
+#ifdef TT_CONFIG_OPTION_SUPPORT_UNICODE_RANGES
     os2->ulUnicodeRange1     = GET_ULong();
     os2->ulUnicodeRange2     = GET_ULong();
     os2->ulUnicodeRange3     = GET_ULong();
     os2->ulUnicodeRange4     = GET_ULong();
+#else
+    SKIP( 16 );
+#endif
 
 #ifdef TT_CONFIG_OPTION_SUPPORT_OPTIONAL_FIELDS
     for ( i = 0; i < 4; ++i )
