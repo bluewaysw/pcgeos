@@ -116,7 +116,7 @@
 /* emerged recently on the FreeType lists.  We still do not have Apple's */
 /* opinion on the subject and will change this as soon as we have.       */
 
-#define   TT_CONFIG_OPTION_NO_INTERPRETER
+//#define   TT_CONFIG_OPTION_NO_INTERPRETER
 
 
 /*************************************************************************/
