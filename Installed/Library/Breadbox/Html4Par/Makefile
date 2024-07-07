@@ -4,33 +4,33 @@
 # If you edit it, you will lose your changes, should it be regenerated.
 #
 GEODE           = html4par
-HTMLCLAS        = formset.h htmltpos.goc htmlfdrw.goc htmlclas.goc\
-                  htmltdrw.goc htmlcol.goc htmltabl.goc htmlclrt.goc\
-                  htmltcel.goc htmlfedi.goc htmltpre.goc htmlform.goc\
-                  htmlfsiz.goc
 ASMTOOLS        = asmtoolsManager.asm
-WWWTOOLS        = dialogt.goc wwwtools.goc namepool.goc
+HTMLCLAS        = formset.h htmlclas.goc htmlclrt.goc htmlcol.goc\
+                  htmlfdrw.goc htmlfedi.goc htmlform.goc htmlfsiz.goc\
+                  htmltabl.goc htmltcel.goc htmltdrw.goc htmltpos.goc\
+                  htmltpre.goc
 HTMLEXPT        = htmlexpt.goc
-HTMLPARS        = awatcher.goc stylesh.goc opentags.goc parstags.goc\
-                  htmlpars.goc parsinit.goc
+HTMLPARS        = awatcher.goc htmlpars.goc opentags.goc parsinit.goc\
+                  parstags.goc stylesh.goc
+WWWTOOLS        = dialogt.goc namepool.goc wwwtools.goc
 UI_TO_RDFS      =
-OBJS            = htmltpos.obj htmlfdrw.obj htmlclas.obj htmltdrw.obj\
-                  htmlcol.obj htmltabl.obj htmlclrt.obj htmltcel.obj\
-                  htmlfedi.obj htmltpre.obj htmlform.obj htmlfsiz.obj\
-                  dialogt.obj wwwtools.obj namepool.obj htmlexpt.obj\
-                  awatcher.obj stylesh.obj opentags.obj parstags.obj\
-                  htmlpars.obj parsinit.obj
-COMMON          = htmlsty.goh internal.h tableint.h options.goh regiont.h\
-                  errors.h radio1.goh radio0.goh dialogt.goh
+OBJS            = htmlclas.obj htmlclrt.obj htmlcol.obj htmlfdrw.obj\
+                  htmlfedi.obj htmlform.obj htmlfsiz.obj htmltabl.obj\
+                  htmltcel.obj htmltdrw.obj htmltpos.obj htmltpre.obj\
+                  htmlexpt.obj awatcher.obj htmlpars.obj opentags.obj\
+                  parsinit.obj parstags.obj stylesh.obj dialogt.obj\
+                  namepool.obj wwwtools.obj
+COMMON          = dialogt.goh errors.h htmlsty.goh internal.h options.goh\
+                  radio0.goh radio1.goh regiont.h tableint.h
 MODULES         = asmtools
-CMODULES        = htmlclas wwwtools htmlexpt htmlpars
-SRCS            = $(HTMLCLAS) $(ASMTOOLS) $(WWWTOOLS) $(HTMLEXPT)\
-                  $(HTMLPARS) $(COMMON)
+CMODULES        = htmlclas htmlexpt htmlpars wwwtools
+SRCS            = $(ASMTOOLS) $(HTMLCLAS) $(HTMLEXPT) $(HTMLPARS)\
+                  $(WWWTOOLS) $(COMMON)
 LOBJS           =
 LIBOBJ          = $(DEVEL_DIR)/Include/$(GEODE).ldf
 LIBNAME         = html4par
 
-PRODUCTS        = JS JSDBCS DBCS 
+PRODUCTS        = DBCS JS JSDBCS 
 
 SYSMAKEFILE     = geode.mk
 
@@ -47,14 +47,14 @@ SYSMAKEFILE     = geode.mk
 #include "$(DEPFILE)"
 #endif
 
+#if exists(DBCS/$(DEPFILE))
+#include "DBCS/$(DEPFILE)"
+#endif
+
 #if exists(JS/$(DEPFILE))
 #include "JS/$(DEPFILE)"
 #endif
 
 #if exists(JSDBCS/$(DEPFILE))
 #include "JSDBCS/$(DEPFILE)"
-#endif
-
-#if exists(DBCS/$(DEPFILE))
-#include "DBCS/$(DEPFILE)"
 #endif
