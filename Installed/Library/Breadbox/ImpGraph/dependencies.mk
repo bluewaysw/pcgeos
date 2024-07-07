@@ -28,10 +28,6 @@ ASMIMP.eobj: ASMIMP/asmimpManager.asm \
                 Objects/emomC.def Objects/emTrigC.def Internal/uProcC.def \
                 product.def iimpgif.def bitmap.def hugearr.def impgif.asm \
                 Internal/heapInt.def Internal/semInt.def sysstats.def
-impfjpeg.obj \
-impfjpeg.eobj: 
-impfjpeg.obj \
-impfjpeg.eobj: impfjpeg.cpp
 impgifc.obj \
 impgifc.eobj: stdapp.goh object.goh ui.goh Objects/metaC.goh \
                 Objects/inputC.goh Objects/clipbrd.goh \
