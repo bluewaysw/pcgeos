@@ -1682,8 +1682,8 @@ Installed/Library/CoProcessor/Int8087:		kernel math MAKELIB
 intx87	: Installed/Library/CoProcessor/Intx87
 Installed/Library/CoProcessor/Intx87:		kernel math MAKELIB
 
-taskmax	: Installed/Driver/Task/Taskmax
-Installed/Driver/Task/Taskmax:			ui text MAKEDRV
+taskmax	: Installed/Driver/Task/TaskMax
+Installed/Driver/Task/TaskMax:			ui text MAKEDRV
 
 bnf : Installed/Driver/Task/BNF
 Installed/Driver/Task/BNF:				ui text MAKEDRV
