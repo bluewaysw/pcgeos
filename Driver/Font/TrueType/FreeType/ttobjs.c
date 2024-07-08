@@ -195,35 +195,6 @@
   }
 
 
-#if 0
-
-/*******************************************************************
- *
- *  Function    :  Get_CodeRange
- *
- *  Description :  Returns a pointer to a given code range.  Should
- *                 be used only by the debugger.  Returns NULL if
- *                 'range' is out of current bounds.
- *
- *  Input  :  exec    target execution context
- *            range   new execution code range
- *
- *  Output :  Pointer to the code range record.  NULL on failure.
- *
- *****************************************************************/
-
-  LOCAL_FUNC
-  PCodeRange  Get_CodeRange( PExecution_Context  exec, Int  range )
-  {
-    if ( range < 1 || range > 3 )
-      return NULL;
-    else                /* arrays start with 1 in Pascal, and with 0 in C */
-      return &exec->codeRangeTable[range - 1];
-  }
-
-#endif
-
-
 /*******************************************************************
  *
  *  Function    :  Set_CodeRange
@@ -400,10 +371,10 @@
 /*         new_max     new capacity (size) of the buffer        */
 
   static
-  TT_Error  Update_Max( ULong*  size,
-                        ULong   multiplier,
-                        void**  buff,
-                        ULong   new_max )
+  TT_Error  Update_Max( UShort*  size,
+                        UShort   multiplier,
+                        void**   buff,
+                        UShort   new_max )
   {
     TT_Error  error;
 
@@ -487,7 +458,7 @@
       exec->maxFunc  = ins->maxFunc;
       exec->maxIns   = ins->maxIns;
 
-      for ( i = 0; i < MAX_CODE_RANGES; i++ )
+      for ( i = 0; i < MAX_CODE_RANGES; ++i )
         exec->codeRangeTable[i] = ins->codeRangeTable[i];
 
       /* set graphics state */
@@ -563,7 +534,7 @@
     ins->maxFunc  = exec->maxFunc;
     ins->maxIns   = exec->maxIns;
 
-    for ( i = 0; i < MAX_CODE_RANGES; i++ )
+    for ( i = 0; i < MAX_CODE_RANGES; ++i )
       ins->codeRangeTable[i] = exec->codeRangeTable[i];
 
     return TT_Err_Ok;
@@ -577,8 +548,7 @@
  *****************************************************************/
 
   LOCAL_FUNC
-  TT_Error  Context_Run( PExecution_Context  exec,
-                         Bool                debug )
+  TT_Error  Context_Run( PExecution_Context  exec )
   {
     TT_Error  error;
 
@@ -609,10 +579,7 @@
     exec->top     = 0;
     exec->callTop = 0;
 
-    if ( !debug )
-      return RunIns( exec );
-    else
-      return TT_Err_Ok;
+    return RunIns( exec );
   }
 
 
@@ -658,12 +625,6 @@
     if ( !_instance )
       return TT_Err_Ok;
 
-    if ( ins->debug )
-    {
-      /* the debug context must be deleted by the debugger itself */
-      ins->context = NULL;
-      ins->debug   = FALSE;
-    }
 
     FREE( ins->cvt );
     ins->cvtSize = 0;
@@ -731,7 +692,7 @@
       PIns_Metrics   metrics = &ins->metrics;
 
 
-      metrics->pointSize    = 10 * 64;     /* default pointsize  = 10pts */
+      metrics->pointSize    = 10 << 6;     /* default pointsize  = 10pts */
 
       metrics->x_resolution = 72;          /* default resolution = 72dpi */
       metrics->y_resolution = 72;
@@ -740,7 +701,7 @@
       metrics->y_ppem = 0;
 
       /* set default compensation ( all 0 ) */
-      for ( i = 0; i < 4; i++ )
+      for ( i = 0; i < 4; ++i )
         metrics->compensations[i] = 0;
     }
 
@@ -789,10 +750,7 @@
     PFace     face = ins->owner;
 
 
-    if ( ins->debug )
-      exec = ins->context;
-    else
-      exec = New_Context( face );
+    exec = New_Context( face );
     /* debugging instances have their own context */
 
     if ( !exec )
@@ -863,8 +821,7 @@
   Fin:
     Context_Save( exec, ins );
 
-    if ( !ins->debug )
-      Done_Context( exec );
+    Done_Context( exec );
     /* debugging instances keep their context */
 
     ins->valid = FALSE;
@@ -892,7 +849,7 @@
     PExecution_Context  exec;
 
     TT_Error  error;
-    ULong     i;
+    UShort    i;
     UShort    j;
     PFace     face;
 
@@ -940,7 +897,7 @@
                 ins->metrics.scale2 );
 
     /* All twilight points are originally zero */
-    for ( j = 0; j < ins->twilight.n_points; j++ )
+    for ( j = 0; j < ins->twilight.n_points; ++j )
     {
       ins->twilight.org[j].x = 0;
       ins->twilight.org[j].y = 0;
@@ -949,17 +906,14 @@
     }
 
     /* clear storage area */
-    for ( i = 0; i < ins->storeSize; i++ )
+    for ( i = 0; i < ins->storeSize; ++i )
       ins->storage[i] = 0;
 
     ins->GS = Default_GraphicsState;
 
     /* get execution context and run prep program */
 
-    if ( ins->debug )
-      exec = ins->context;
-    else
-      exec = New_Context(face);
+    exec = New_Context(face);
     /* debugging instances have their own context */
 
     if ( !exec )
@@ -985,8 +939,7 @@
       if ( error )
         goto Fin;
 
-      if ( !ins->debug )
-        error = RunIns( exec );
+      error = RunIns( exec );
     }
     else
       error = TT_Err_Ok;
@@ -997,8 +950,7 @@
   Fin:
     Context_Save( exec, ins );
 
-    if ( !ins->debug )
-      Done_Context( exec );
+    Done_Context( exec );
     /* debugging instances keep their context */
 
     if ( !error )
@@ -1052,11 +1004,11 @@
     face->numTables = 0;
 
     /* freeing the locations table */
-    FREE( face->glyphLocations );
+    GEO_FREE( face->glyphLocationBlock );
     face->numLocations = 0;
 
     /* freeing the character mapping tables */
-    for ( n = 0; n < face->numCMaps; n++ )
+    for ( n = 0; n < face->numCMaps; ++n )
       CharMap_Free( face->cMaps + n );
 
     FREE( face->cMaps );
@@ -1067,9 +1019,10 @@
     face->cvtSize = 0;
 
     /* freeing the horizontal metrics */
-    FREE( face->horizontalHeader.long_metrics );
-    FREE( face->horizontalHeader.short_metrics );
+    GEO_FREE( face->horizontalHeader.long_metrics_block );
+    GEO_FREE( face->horizontalHeader.short_metrics_block );
 
+#ifdef TT_CONFIG_OPTION_PROCESS_VMTX
     /* freeing the vertical ones, if any */
     if (face->verticalInfo)
     {
@@ -1077,6 +1030,7 @@
       FREE( face->verticalHeader.short_metrics );
       face->verticalInfo = 0;
     }
+#endif
 
     /* freeing the programs */
     FREE( face->fontProgram );
@@ -1091,10 +1045,10 @@
     /* freeing the name table */
     Free_TrueType_Names( face );
 
+#ifdef TT_CONFIG_OPTION_PROCESS_HDMX
     /* freeing the hdmx table */
     Free_TrueType_Hdmx( face );
-
-    /* TT_Close_Stream( &face->stream ); -- this is performed by the API */
+#endif
 
     return TT_Err_Ok;
   }
@@ -1157,8 +1111,13 @@
          LOAD_( MaxProfile )    ||
          LOAD_( Locations )     ||
 
+#ifdef TT_CONFIG_OPTION_PROCESS_VMTX
          (error = Load_TrueType_Metrics_Header( face, 0 )) != TT_Err_Ok  ||
          /* load the 'hhea' & 'hmtx' tables at once */
+#else
+         (error = Load_TrueType_Metrics_Header( face )) != TT_Err_Ok  ||
+         /* load the 'hhea' & 'hmtx' tables at once */
+#endif
 
          LOAD_( CMap )          ||
          LOAD_( CVT )           ||
@@ -1166,12 +1125,18 @@
          LOAD_( Gasp )          ||
          LOAD_( Names )         ||
          LOAD_( OS2 )           ||
-         LOAD_( PostScript )    ||
+         LOAD_( PostScript )
 
-         (error = Load_TrueType_Metrics_Header( face, 1 )) != TT_Err_Ok ||
+#ifdef TT_CONFIG_OPTION_PROCESS_VMTX
+         || (error = Load_TrueType_Metrics_Header( face, 1 )) != TT_Err_Ok
          /* try to load the 'vhea' & 'vmtx' at once if present */
+#endif
 
-         LOAD_( Hdmx )          )
+#ifdef TT_CONFIG_OPTION_PROCESS_HDMX
+         || LOAD_( Hdmx ) 
+#endif         
+         
+         )
 
       goto Fail;
 
