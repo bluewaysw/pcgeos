@@ -58,5 +58,7 @@ CharMapFlags GeosCharMapFlag( word geosChar );
 
 char getGeosCharForIndex( word ttIndex );
 
+Boolean isGeosCharPair( word ttIndex_1, word ttIndex_2 );
+
 
 #endif  /* _TTCHARMAPPER_H_ */

@@ -55,7 +55,7 @@
     UShort  i;
 
 
-    for ( i = 0; i < face->numTables; i++ )
+    for ( i = 0; i < face->numTables; ++i )
       if ( face->dirTables[i].Tag == tag )
         return i;
 
@@ -87,7 +87,7 @@
     PTableDirEntry  entry;
 
 
-    if ( FILE_Seek( 0L ) || ACCESS_Frame( 12L ) )
+    if ( FILE_Seek( 0 ) || ACCESS_Frame( 12 ) )
       return error;
 
     tableDir.version   = GET_Long();
@@ -115,20 +115,20 @@
                       TTableDirEntry ) )
       return error;
 
-    if ( ACCESS_Frame( face->numTables * 16L ) )
+    if ( ACCESS_Frame( face->numTables << 4 ) )
       return error;
 
     limit = face->numTables;
     entry = face->dirTables;
 
-    for ( n = 0; n < limit; n++ )
+    for ( n = 0; n < limit; ++n )
     {                      /* loop through the tables and get all entries */
       entry->Tag      = GET_Tag4();
       entry->CheckSum = GET_ULong();
       entry->Offset   = GET_Long();
       entry->Length   = GET_Long();
 
-      entry++;
+      ++entry;
     }
 
     FORGET_Frame();
@@ -164,7 +164,7 @@
     if ( FILE_Seek( face->dirTables[i].Offset ) )   /* seek to maxprofile */
       return error;
 
-    if ( ACCESS_Frame( 32L ) )  /* read into frame */
+    if ( ACCESS_Frame( 32 ) )  /* read into frame */
       return error;
 
     /* read frame data into face table */
@@ -250,7 +250,7 @@
       return TT_Err_Ok; /* gasp table is not required */
 
     if ( FILE_Seek( face->dirTables[i].Offset ) ||
-         ACCESS_Frame( 4L ) )
+         ACCESS_Frame( 4 ) )
       return error;
 
     gas = &face->gasp;
@@ -261,12 +261,12 @@
     FORGET_Frame();
 
     if ( ALLOC_ARRAY( gaspranges, gas->numRanges, GaspRange ) ||
-         ACCESS_Frame( gas->numRanges * 4L ) )
+         ACCESS_Frame( gas->numRanges << 2 ) )
       goto Fail;
 
     face->gasp.gaspRanges = gaspranges;
 
-    for ( j = 0; j < gas->numRanges; j++ )
+    for ( j = 0; j < gas->numRanges; ++j )
     {
       gaspranges[j].maxPPEM  = GET_UShort();
       gaspranges[j].gaspFlag = GET_UShort();
@@ -308,34 +308,47 @@
       return TT_Err_Header_Table_Missing;
 
     if ( FILE_Seek( face->dirTables[i].Offset ) ||
-         ACCESS_Frame( 54L ) )
+         ACCESS_Frame( 54 ) )
       return error;
 
     header = &face->fontHeader;
 
+#ifdef TT_CONFIG_OPTION_SUPPORT_OPTIONAL_FIELDS
     header->Table_Version = GET_ULong();
     header->Font_Revision = GET_ULong();
 
     header->CheckSum_Adjust = GET_Long();
     header->Magic_Number    = GET_Long();
+#else
+    SKIP( 16 );
+#endif
 
     header->Flags        = GET_UShort();
     header->Units_Per_EM = GET_UShort();
 
+#ifdef TT_CONFIG_OPTION_SUPPORT_OPTIONAL_FIELDS
     header->Created [0] = GET_Long();
     header->Created [1] = GET_Long();
     header->Modified[0] = GET_Long();
     header->Modified[1] = GET_Long();
+#else
+    SKIP( 16 );
+#endif
 
     header->xMin = GET_Short();
     header->yMin = GET_Short();
     header->xMax = GET_Short();
     header->yMax = GET_Short();
 
+#ifdef TT_CONFIG_OPTION_SUPPORT_OPTIONAL_FIELDS
     header->Mac_Style       = GET_UShort();
     header->Lowest_Rec_PPEM = GET_UShort();
 
-    header->Font_Direction      = GET_Short();
+    header->Font_Direction  = GET_Short();
+#else
+    SKIP( 6 );
+#endif
+
     header->Index_To_Loc_Format = GET_Short();
     header->Glyph_Data_Format   = GET_Short();
 
@@ -353,106 +366,71 @@
  *                 into face object.
  *
  *  Input  :  face
- *            vertical   set to true when loading the vmtx table,
- *                       or false for hmtx
  *
  *  Output :  Error code.
  *
  ******************************************************************/
 
   static
-  TT_Error  Load_TrueType_Metrics( PFace  face,
-                                   Bool   vertical )
+  TT_Error  Load_TrueType_Metrics( PFace  face )
   {
     DEFINE_LOCALS;
 
-    Short             n;
-    UShort            num_shorts, num_shorts_checked, num_longs;
-
-    PLongMetrics*     longs;
-    PShortMetrics*    shorts;
-
-    PLongMetrics      long_metric;
+    Short          n, num_shorts;
+    UShort         num_shorts_checked, num_longs;
+    PLongMetrics   longs;
+    PShortMetrics  shorts;
 
 
-    if ( vertical )
-    {
-      /* The table is optional, quit silently if it wasn't found       */
-      /* XXX : Some fonts have a valid vertical header with a non-null */
-      /*       "number_of_VMetrics" fields, but no corresponding       */
-      /*       'vmtx' table to get the metrics from (e.g. mingliu)     */
-      /*                                                               */
-      /*       For safety, we set the field to 0 !                     */
-      /*                                                               */
-      n = TT_LookUp_Table( face, TTAG_vmtx );
-      if ( n < 0 )
-      {
-        /* Set the number_Of_VMetrics to 0! */
-        face->verticalHeader.number_Of_VMetrics = 0;
-        return TT_Err_Ok;
-      }
+    if ( ( n = TT_LookUp_Table( face, TTAG_hmtx ) ) < 0 )
+      return TT_Err_Hmtx_Table_Missing;
 
-      num_longs = face->verticalHeader.number_Of_VMetrics;
-      longs     = (PLongMetrics*)&face->verticalHeader.long_metrics;
-      shorts    = (PShortMetrics*)&face->verticalHeader.short_metrics;
-    }
-    else
-    {
-      if ( ( n = TT_LookUp_Table( face, TTAG_hmtx ) ) < 0 )
-        return TT_Err_Hmtx_Table_Missing;
-
-      num_longs = face->horizontalHeader.number_Of_HMetrics;
-      longs     = (PLongMetrics*)&face->horizontalHeader.long_metrics;
-      shorts    = (PShortMetrics*)&face->horizontalHeader.short_metrics;
-    }
+    num_longs = face->horizontalHeader.number_Of_HMetrics;
 
     /* never trust derived values! */
 
     num_shorts         = face->maxProfile.numGlyphs - num_longs;
-    num_shorts_checked = ( face->dirTables[n].Length - num_longs * 4 ) / 2;
+    num_shorts_checked = ( face->dirTables[n].Length - num_longs * 4 ) >> 1;
 
     if ( num_shorts < 0 )            /* sanity check */
-    {
-      if ( vertical )
-        return TT_Err_Invalid_Vert_Metrics;
-      else
         return TT_Err_Invalid_Horiz_Metrics;
-    }
 
-    if ( ALLOC_ARRAY( *longs,  num_longs,  TLongMetrics  ) ||
-         ALLOC_ARRAY( *shorts, num_shorts, TShortMetrics ) )
+    if ( GEO_ALLOC_ARRAY( face->horizontalHeader.long_metrics_block, num_longs, TLongMetrics  ) ||
+         GEO_ALLOC_ARRAY( face->horizontalHeader.short_metrics_block, num_shorts, TShortMetrics ) )
       return error;
 
     if ( FILE_Seek( face->dirTables[n].Offset )   ||
          ACCESS_Frame( face->dirTables[n].Length ) )
       return error;
 
-    long_metric = *longs;
-    for ( n = 0; n < num_longs; n++ )
+    longs  = (PLongMetrics)GEO_LOCK( face->horizontalHeader.long_metrics_block );
+    shorts = (PShortMetrics)GEO_LOCK( face->horizontalHeader.short_metrics_block );
+
+    for ( n = 0; n < num_longs; ++n )
     {
-      long_metric->advance = GET_UShort();
-      long_metric->bearing = GET_Short();
-      long_metric++;
+      longs->advance = GET_UShort();
+      longs->bearing = GET_Short();
+      ++longs;
     }
 
     /* do we have an inconsistent number of metric values? */
 
     if ( num_shorts > num_shorts_checked )
     {
-      for ( n = 0; n < num_shorts_checked; n++ )
-        (*shorts)[n] = GET_Short();
+      for ( n = 0; n < num_shorts_checked; ++n )
+        (shorts)[n] = GET_Short();
 
       /* we fill up the missing left side bearings with the    */
       /* last valid value. Since this will occur for buggy CJK */
       /* fonts usually, nothing serious will happen.           */
 
-      for ( n = num_shorts_checked; n < num_shorts; n++ )
-        (*shorts)[n] = (*shorts)[num_shorts_checked - 1];
+      for ( n = num_shorts_checked; n < num_shorts; ++n )
+        (shorts)[n] = (shorts)[num_shorts_checked - 1];
     }
     else
     {
-      for ( n = 0; n < num_shorts; n++ )
-        (*shorts)[n] = GET_Short();
+      for ( n = 0; n < num_shorts; ++n )
+        (shorts)[n] = GET_Short();
     }
 
     FORGET_Frame();
@@ -480,8 +458,11 @@
  ******************************************************************/
 
   LOCAL_FUNC
-  TT_Error  Load_TrueType_Metrics_Header( PFace  face,
-                                          Bool   vertical )
+  #ifdef TT_CONFIG_OPTION_PROCESS_VMTX
+  TT_Error  Load_TrueType_Metrics_Header( PFace  face, Bool  vertical )
+  #else 
+  TT_Error  Load_TrueType_Metrics_Header( PFace  face )
+  #endif
   {
     DEFINE_LOCALS;
 
@@ -490,6 +471,7 @@
     TT_Horizontal_Header*  header;
 
 
+#ifdef TT_CONFIG_OPTION_PROCESS_VMTX
     if ( vertical )
     {
       face->verticalInfo = 0;
@@ -503,6 +485,7 @@
       header = (TT_Horizontal_Header*)&face->verticalHeader;
     }
     else
+#endif
     {
       /* The orizontal header is mandatory, return an error if we */
       /* don't find it.                                           */
@@ -513,7 +496,7 @@
     }
 
     if ( FILE_Seek( face->dirTables[i].Offset ) ||
-         ACCESS_Frame( 36L ) )
+         ACCESS_Frame( 36 ) )
       return error;
 
     header->Version   = GET_ULong();
@@ -525,6 +508,8 @@
 
     header->min_Left_Side_Bearing  = GET_Short();
     header->min_Right_Side_Bearing = GET_Short();
+
+#ifdef TT_CONFIG_OPTION_SUPPORT_OPTIONAL_FIELDS
     header->xMax_Extent            = GET_Short();
     header->caret_Slope_Rise       = GET_Short();
     header->caret_Slope_Run        = GET_Short();
@@ -535,18 +520,25 @@
     header->Reserved2 = GET_Short();
     header->Reserved3 = GET_Short();
     header->Reserved4 = GET_Short();
+#else
+    SKIP( 16 );
+#endif
 
     header->metric_Data_Format = GET_Short();
     header->number_Of_HMetrics = GET_UShort();
 
     FORGET_Frame();
 
-    header->long_metrics  = NULL;
-    header->short_metrics = NULL;
+    header->long_metrics_block  = NullHandle;
+    header->short_metrics_block = NullHandle;
 
     /* Now try to load the corresponding metrics */
 
+#ifdef TT_CONFIG_OPTION_PROCESS_VMTX
     return Load_TrueType_Metrics( face, vertical );
+#else
+    return Load_TrueType_Metrics( face );
+#endif
   }
 
 
@@ -571,8 +563,9 @@
   {
     DEFINE_LOCALS;
 
-    Short  n, limit;
-    Short  LongOffsets;
+    Short     n, limit;
+    Short     LongOffsets;
+    PStorage  glyphLocations;
 
 
     LongOffsets = face->fontHeader.Index_To_Loc_Format;
@@ -587,39 +580,42 @@
     {
       face->numLocations = face->dirTables[n].Length >> 2;
 
-      if ( ALLOC_ARRAY( face->glyphLocations,
-                        face->numLocations,
-                        Long ) )
+      if ( GEO_ALLOC_ARRAY( face->glyphLocationBlock,
+                            face->numLocations,
+                            Long ))
         return error;
 
-      if ( ACCESS_Frame( face->numLocations * 4L ) )
+      if ( ACCESS_Frame( face->numLocations << 2 ) )
         return error;
 
       limit = face->numLocations;
 
-      for ( n = 0; n < limit; n++ )
-        face->glyphLocations[n] = GET_Long();
+      glyphLocations = GEO_LOCK( face->glyphLocationBlock );
+      for ( n = 0; n < limit; ++n )
+        glyphLocations[n] = GET_Long();
 
+      GEO_UNLOCK( face->glyphLocationBlock );
       FORGET_Frame();
     }
     else
     {
       face->numLocations = face->dirTables[n].Length >> 1;
 
-      if ( ALLOC_ARRAY( face->glyphLocations,
-                        face->numLocations,
-                        Long ) )
+      if ( GEO_ALLOC_ARRAY( face->glyphLocationBlock,
+                            face->numLocations,
+                            Long ))
         return error;
 
-      if ( ACCESS_Frame( face->numLocations * 2L ) )
+      if ( ACCESS_Frame( face->numLocations << 1 ) )
         return error;
 
       limit = face->numLocations;
 
-      for ( n = 0; n < limit; n++ )
-        face->glyphLocations[n] =
-          (Long)((ULong)GET_UShort() * 2);
+      glyphLocations = GEO_LOCK( face->glyphLocationBlock );
+      for ( n = 0; n < limit; ++n )
+        glyphLocations[n] = (Long)((ULong)GET_UShort() << 1 );
 
+      GEO_UNLOCK( face->glyphLocationBlock );
       FORGET_Frame();
     }
 
@@ -658,7 +654,7 @@
     /* Seek to the beginning of the table and check the frame access. */
     /* The names table has a 6 byte header.                           */
     if ( FILE_Seek( face->dirTables[n].Offset ) ||
-         ACCESS_Frame( 6L ) )
+         ACCESS_Frame( 6 ) )
       return error;
 
     names = &face->nameTable;
@@ -674,7 +670,7 @@
     if ( ALLOC_ARRAY( names->names,
                       names->numNameRecords,
                       TNameRec )                    ||
-         ACCESS_Frame( names->numNameRecords * 12L ) )
+         ACCESS_Frame( names->numNameRecords * 12 ) )
     {
       names->numNameRecords = 0;
       goto Fail;
@@ -683,7 +679,7 @@
     /* Load the name records and determine how much storage is needed */
     /* to hold the strings themselves.                                */
 
-    for ( i = bytes = 0; i < names->numNameRecords; i++ )
+    for ( i = bytes = 0; i < names->numNameRecords; ++i )
     {
       namerec = names->names + i;
       namerec->platformID   = GET_UShort();
@@ -717,7 +713,7 @@
 
       /* Go through and assign the string pointers to the name records. */
 
-      for ( i = 0; i < names->numNameRecords; i++ )
+      for ( i = 0; i < names->numNameRecords; ++i )
       {
         namerec = names->names + i;
         namerec->string = storage + names->names[i].stringOffset;
@@ -798,7 +794,7 @@
       return TT_Err_Ok;
     }
 
-    face->cvtSize = face->dirTables[n].Length / 2;
+    face->cvtSize = face->dirTables[n].Length >> 1;
 
     if ( ALLOC_ARRAY( face->cvt,
                       face->cvtSize,
@@ -806,12 +802,12 @@
       return error;
 
     if ( FILE_Seek( face->dirTables[n].Offset ) ||
-         ACCESS_Frame( face->cvtSize * 2L ) )
+         ACCESS_Frame( face->cvtSize << 1 ) )
       return error;
 
     limit = face->cvtSize;
 
-    for ( n = 0; n < limit; n++ )
+    for ( n = 0; n < limit; ++n )
       face->cvt[n] = GET_Short();
 
     FORGET_Frame();
@@ -852,7 +848,7 @@
     table_start = face->dirTables[n].Offset;
 
     if ( ( FILE_Seek( table_start ) ) ||
-         ( ACCESS_Frame( 4L ) ) )           /* 4 bytes cmap header */
+         ( ACCESS_Frame( 4 ) ) )           /* 4 bytes cmap header */
       return error;
 
     cmap_dir.tableVersionNumber = GET_UShort();
@@ -873,10 +869,9 @@
     limit = face->numCMaps;
     cmap  = face->cMaps;
 
-    for ( n = 0; n < limit; n++ )
+    for ( n = 0; n < limit; ++n )
     {
-      if ( FILE_Seek( off )  ||
-           ACCESS_Frame( 8L ) )
+      if ( FILE_Seek( off )  || ACCESS_Frame( 8 ) )
         return error;
 
       /* extra code using entry_ for platxxx could be cleaned up later */
@@ -891,7 +886,7 @@
       off = FILE_Pos();
 
       if ( FILE_Seek( table_start + entry_.offset ) ||
-           ACCESS_Frame( 6L ) )
+           ACCESS_Frame( 6 ) )
         return error;
 
       cmap->format  = GET_UShort();
@@ -902,7 +897,7 @@
 
       cmap->offset = FILE_Pos();
 
-      cmap++;
+      ++cmap;
     }
 
     return TT_Err_Ok;
@@ -1001,7 +996,7 @@
     }
 
     if ( FILE_Seek( face->dirTables[i].Offset ) ||
-         ACCESS_Frame( 78L ) )
+         ACCESS_Frame( 78 ) )
       return error;
 
     os2 = &face->os2;
@@ -1011,6 +1006,8 @@
     os2->usWeightClass       = GET_UShort();
     os2->usWidthClass        = GET_UShort();
     os2->fsType              = GET_Short();
+
+#ifdef TT_CONFIG_OPTION_SUPPORT_OPTIONAL_FIELDS
     os2->ySubscriptXSize     = GET_Short();
     os2->ySubscriptYSize     = GET_Short();
     os2->ySubscriptXOffset   = GET_Short();
@@ -1021,22 +1018,35 @@
     os2->ySuperscriptYOffset = GET_Short();
     os2->yStrikeoutSize      = GET_Short();
     os2->yStrikeoutPosition  = GET_Short();
+#else
+    SKIP( 20 );
+#endif
+
     os2->sFamilyClass        = GET_Short();
 
-    for ( i = 0; i < 10; i++ )
+    for ( i = 0; i < 10; ++i )
       os2->panose[i] = GET_Byte();
 
+#ifdef TT_CONFIG_OPTION_SUPPORT_UNICODE_RANGES
     os2->ulUnicodeRange1     = GET_ULong();
     os2->ulUnicodeRange2     = GET_ULong();
     os2->ulUnicodeRange3     = GET_ULong();
     os2->ulUnicodeRange4     = GET_ULong();
+#else
+    SKIP( 16 );
+#endif
 
-    for ( i = 0; i < 4; i++ )
+#ifdef TT_CONFIG_OPTION_SUPPORT_OPTIONAL_FIELDS
+    for ( i = 0; i < 4; ++i )
       os2->achVendID[i] = GET_Byte();
 
     os2->fsSelection         = GET_UShort();
     os2->usFirstCharIndex    = GET_UShort();
     os2->usLastCharIndex     = GET_UShort();
+#else
+    SKIP( 10 );
+#endif
+
     os2->sTypoAscender       = GET_Short();
     os2->sTypoDescender      = GET_Short();
     os2->sTypoLineGap        = GET_Short();
@@ -1045,11 +1055,12 @@
 
     FORGET_Frame();
 
+#ifdef TT_CONFIG_OPTION_SUPPORT_OPTIONAL_FIELDS
     if ( os2->version >= 0x0001 )
     {
       /* only version 1 tables */
 
-      if ( ACCESS_Frame( 8L ) )  /* read into frame */
+      if ( ACCESS_Frame( 8 ) )  /* read into frame */
         return error;
 
       os2->ulCodePageRange1 = GET_ULong();
@@ -1062,6 +1073,7 @@
       os2->ulCodePageRange1 = 0;
       os2->ulCodePageRange2 = 0;
     }
+#endif
     
     return TT_Err_Ok;
   }
@@ -1093,20 +1105,28 @@
       return TT_Err_Post_Table_Missing;
 
     if ( FILE_Seek( face->dirTables[i].Offset ) ||
-         ACCESS_Frame( 32L ) )
+         ACCESS_Frame( 32 ) )
       return error;
 
     /* read frame data into face table */
 
+#ifdef TT_CONFIG_OPTION_SUPPORT_OPTIONAL_FIELDS
     post->FormatType         = GET_ULong();
     post->italicAngle        = GET_ULong();
+#else
+    SKIP( 8 );
+#endif
+
     post->underlinePosition  = GET_Short();
     post->underlineThickness = GET_Short();
     post->isFixedPitch       = GET_ULong();
+
+#ifdef TT_CONFIG_OPTION_SUPPORT_OPTIONAL_FIELDS
     post->minMemType42       = GET_ULong();
     post->maxMemType42       = GET_ULong();
     post->minMemType1        = GET_ULong();
     post->maxMemType1        = GET_ULong();
+#endif
 
     FORGET_Frame();
 
@@ -1117,6 +1137,7 @@
   }
 
 
+#ifdef TT_CONFIG_OPTION_PROCESS_HDMX
 /*******************************************************************
  *
  *  Function    :  Load_TrueType_Hdmx
@@ -1151,7 +1172,7 @@
       return TT_Err_Ok;
 
     if ( FILE_Seek( face->dirTables[table].Offset )  ||
-         ACCESS_Frame( 8L ) )
+         ACCESS_Frame( 8 ) )
       return error;
 
     hdmx.version     = GET_UShort();
@@ -1176,7 +1197,7 @@
     {
       /* read record */
 
-      if ( ACCESS_Frame( 2L ) )
+      if ( ACCESS_Frame( 2 ) )
         goto Fail;
 
       rec->ppem      = GET_Byte();
@@ -1238,6 +1259,7 @@
 
     return TT_Err_Ok;
   }
+#endif
 
 
 /*******************************************************************

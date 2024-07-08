@@ -87,8 +87,8 @@
     UShort  entrySelector;  /* for a binary search          */
     UShort  rangeShift;
 
-    PCMap4Segment  segments;
-    PUShort        glyphIdArray;
+    MemHandle      segmentBlock;
+    MemHandle      glyphIdBlock;
     UShort         numGlyphId;          /* control value */
   };
 
@@ -126,9 +126,13 @@
     union
     {
       TCMap0  cmap0;
+#ifdef TT_CONFIG_OPTION_SUPPORT_CMAP2
       TCMap2  cmap2;
+#endif
       TCMap4  cmap4;
+#ifdef TT_CONFIG_OPTION_SUPPORT_CMAP6
       TCMap6  cmap6;
+#endif
     } c;
   };
 

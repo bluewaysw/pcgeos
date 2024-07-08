@@ -27,6 +27,7 @@
 #include "ttobjs.h"
 #include "ttload.h"  /* For the macros */
 #include "tttags.h"
+#include <ec.h>
 
 /* Required by the tracing mode */
 #undef  TT_COMPONENT
@@ -63,10 +64,11 @@ extern TEngine_Instance engineInstance;
   {
     DEFINE_LOAD_LOCALS( input->stream );
 
-    UShort  num_pairs, n;
+    UShort            num_pairs, n;
+    TT_Kern_0_Pair*   pairs;
 
 
-    if ( ACCESS_Frame( 8L ) )
+    if ( ACCESS_Frame( 8 ) )
       return error;
 
     num_pairs            = GET_UShort();
@@ -79,26 +81,30 @@ extern TEngine_Instance engineInstance;
 
     FORGET_Frame();
 
-    if ( ALLOC_ARRAY( kern0->pairs, num_pairs, TT_Kern_0_Pair ) )
+    if ( GEO_ALLOC_ARRAY( kern0->pairsBlock, num_pairs, TT_Kern_0_Pair ) )
       return error;
 
-    if ( ACCESS_Frame( num_pairs * 6L ) )
+    if ( ACCESS_Frame( num_pairs * 6 ) )
       goto Fail;
 
-    for ( n = 0; n < num_pairs; n++ )
-    {
-      kern0->pairs[n].left  = GET_UShort();
-      kern0->pairs[n].right = GET_UShort();
-      kern0->pairs[n].value = GET_UShort();
+    pairs = GEO_LOCK( kern0->pairsBlock );
+EC( ECCheckBounds( pairs ) );
 
-      if ( kern0->pairs[n].left >= input->numGlyphs ||
-           kern0->pairs[n].right >= input->numGlyphs )
+    for ( n = 0; n < num_pairs; ++n )
+    {
+      pairs[n].left  = GET_UShort();
+      pairs[n].right = GET_UShort();
+      pairs[n].value = GET_UShort();
+
+      if ( pairs[n].left >= input->numGlyphs || pairs[n].right >= input->numGlyphs )
       {
         FORGET_Frame();
         error = TT_Err_Invalid_Kerning_Table;
         goto Fail;
       }
     }
+
+    GEO_UNLOCK( kern0->pairsBlock );
 
     FORGET_Frame();
 
@@ -108,10 +114,11 @@ extern TEngine_Instance engineInstance;
     return TT_Err_Ok;
 
     Fail:
-      FREE( kern0->pairs );
+      GEO_FREE( kern0->pairsBlock );
       return error;
   }
 
+#ifdef TT_CONFIG_OPTION_SUPPORT_KERN2
 
 /*******************************************************************
  *
@@ -150,7 +157,7 @@ extern TEngine_Instance engineInstance;
     /* record the table offset */
     table_base = FILE_Pos();
 
-    if ( ACCESS_Frame( 8L ) )
+    if ( ACCESS_Frame( 8 ) )
       return error;
 
     kern2->rowWidth = GET_UShort();
@@ -163,7 +170,7 @@ extern TEngine_Instance engineInstance;
     /* first load left and right glyph classes */
 
     if ( FILE_Seek( table_base + left_offset ) ||
-         ACCESS_Frame( 4L ) )
+         ACCESS_Frame( 4 ) )
       return error;
 
     kern2->leftClass.firstGlyph = GET_UShort();
@@ -178,7 +185,7 @@ extern TEngine_Instance engineInstance;
 
     /* load left offsets */
 
-    if ( ACCESS_Frame( kern2->leftClass.nGlyphs * 2L ) )
+    if ( ACCESS_Frame( kern2->leftClass.nGlyphs << 1 ) )
       goto Fail_Left;
 
     for ( n = 0; n < kern2->leftClass.nGlyphs; n++ )
@@ -189,7 +196,7 @@ extern TEngine_Instance engineInstance;
     /* right class */
 
     if ( FILE_Seek( table_base + right_offset ) ||
-         ACCESS_Frame( 4L ) )
+         ACCESS_Frame( 4 ) )
       goto Fail_Left;
 
     kern2->rightClass.firstGlyph = GET_UShort();
@@ -204,7 +211,7 @@ extern TEngine_Instance engineInstance;
 
     /* load right offsets */
 
-    if ( ACCESS_Frame( kern2->rightClass.nGlyphs * 2L ) )
+    if ( ACCESS_Frame( kern2->rightClass.nGlyphs << 1 ) )
       goto Fail_Right;
 
     for ( n = 0; n < kern2->rightClass.nGlyphs; n++ )
@@ -257,6 +264,7 @@ extern TEngine_Instance engineInstance;
     return error;
   }
 
+#endif
 
 /*******************************************************************
  *
@@ -306,7 +314,7 @@ extern TEngine_Instance engineInstance;
       return TT_Err_Ok;  /* The table is optional */
 
     if ( FILE_Seek( face->dirTables[table].Offset ) ||
-         ACCESS_Frame( 4L ) )
+         ACCESS_Frame( 4 ) )
       return error;
 
     kern->version = GET_UShort();
@@ -325,9 +333,9 @@ extern TEngine_Instance engineInstance;
 
     sub = kern->tables;
 
-    for ( table = 0; table < num_tables; table++ )
+    for ( table = 0; table < num_tables; ++table )
     {
-      if ( ACCESS_Frame( 6L ) )
+      if ( ACCESS_Frame( 6 ) )
         return error;
 
       sub->loaded   = FALSE;             /* redundant, but good to see */
@@ -387,20 +395,21 @@ extern TEngine_Instance engineInstance;
     /* scan the table directory and release loaded entries */
 
     sub = kern->tables;
-    for ( n = 0; n < kern->nTables; n++ )
+    for ( n = 0; n < kern->nTables; ++n )
     {
       if ( sub->loaded )
       {
         switch ( sub->format )
         {
         case 0:
-          FREE( sub->t.kern0.pairs );
+          GEO_FREE( sub->t.kern0.pairsBlock );
           sub->t.kern0.nPairs        = 0;
           sub->t.kern0.searchRange   = 0;
           sub->t.kern0.entrySelector = 0;
           sub->t.kern0.rangeShift    = 0;
           break;
 
+#ifdef TT_CONFIG_OPTION_SUPPORT_KERN2
         case 2:
           FREE( sub->t.kern2.leftClass.classes );
           sub->t.kern2.leftClass.firstGlyph = 0;
@@ -413,6 +422,7 @@ extern TEngine_Instance engineInstance;
           FREE( sub->t.kern2.array );
           sub->t.kern2.rowWidth = 0;
           break;
+#endif
 
         default:
           ;       /* invalid subtable format - do nothing */
@@ -518,8 +528,15 @@ extern TEngine_Instance engineInstance;
 
     sub = kern->tables + kern_index;
 
+#ifdef TT_CONFIG_OPTION_SUPPORT_KERN2
     if ( sub->format != 0 && sub->format != 2 )
+#else
+    if ( sub->format != 0 )
+#endif
       return TT_Err_Invalid_Kerning_Table_Format;
+
+    if ( sub->loaded )
+      return TT_Err_Ok;
 
     /* now access stream */
     if ( USE_Stream( faze->stream, stream ) )
@@ -530,8 +547,10 @@ extern TEngine_Instance engineInstance;
 
     if ( sub->format == 0 )
       error = Subtable_Load_0( &sub->t.kern0, faze );
+#ifdef TT_CONFIG_OPTION_SUPPORT_KERN2
     else if ( sub->format == 2 )
       error = Subtable_Load_2( &sub->t.kern2, faze );
+#endif
 
     if ( !error )
       sub->loaded = TRUE;

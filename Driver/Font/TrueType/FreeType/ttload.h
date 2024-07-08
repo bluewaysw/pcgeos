@@ -47,8 +47,11 @@
   LOCAL_DEF TT_Error  Load_TrueType_PostScript       ( PFace  face );
   LOCAL_DEF TT_Error  Load_TrueType_Hdmx             ( PFace  face );
 
-  LOCAL_DEF TT_Error  Load_TrueType_Metrics_Header( PFace  face,
-                                                    Bool   vertical );
+#ifdef TT_CONFIG_OPTION_PROCESS_VMTX
+  LOCAL_DEF TT_Error  Load_TrueType_Metrics_Header( PFace  face, Bool  vertical );
+#else
+  LOCAL_DEF TT_Error  Load_TrueType_Metrics_Header( PFace  face );
+#endif
 /*
   LOCAL_DEF TT_Error  Load_TrueType_Any( PFace  face,
                                          ULong  tag,
@@ -115,11 +118,11 @@
 #define ACCESS_Frame( _size_ ) \
           ( (error = TT_Access_Frame( stream, \
                                       &frame, \
-                                      (Long)(_size_) )) != TT_Err_Ok )
+                                      _size_ )) != TT_Err_Ok )
 #define CHECK_ACCESS_Frame( _size_ ) \
           ( (error = TT_Check_And_Access_Frame( stream, \
                                                 &frame, \
-                                                (Long)(_size_) )) != TT_Err_Ok )
+                                                _size_ )) != TT_Err_Ok )
 #define FORGET_Frame() \
           ( (void)TT_Forget_Frame( &frame ) )
 
@@ -133,6 +136,7 @@
   #define GET_Short()   (Short) (frame.cursor += 2, \
                                  (frame.cursor[-2] << 8) | \
                                   frame.cursor[-1])
+  #define SKIP( _size_ )        (frame.cursor += _size_ )
   
 #else
 
@@ -158,12 +162,12 @@
 #define FILE_Read( buffer, count ) \
           ( (error = TT_Read_File ( stream, \
                                     buffer, \
-                                    (Long)(count) )) != TT_Err_Ok )
+                                    count )) != TT_Err_Ok )
 #define FILE_Read_At( pos, buffer, count ) \
           ( (error = TT_Read_At_File( stream, \
                                       (Long)(pos), \
                                       buffer, \
-                                      (Long)(count) )) != TT_Err_Ok )
+                                      count )) != TT_Err_Ok )
 
 #else   /* thread-safe implementation */
 
@@ -191,9 +195,9 @@
 
 
 #define ACCESS_Frame( _size_ ) \
-          ( (error = TT_Access_Frame( (Long)(_size_) )) != TT_Err_Ok )
+          ( (error = TT_Access_Frame( _size_ )) != TT_Err_Ok )
 #define CHECK_ACCESS_Frame( _size_ ) \
-          ( (error = TT_Check_And_Access_Frame( (Long)(_size_) )) != TT_Err_Ok )
+          ( (error = TT_Check_And_Access_Frame( _size_ )) != TT_Err_Ok )
 #define FORGET_Frame() \
           ( (void)TT_Forget_Frame() )
 
@@ -213,7 +217,7 @@
           ( (error = TT_Skip_File( (Long)(_distance_) )) != TT_Err_Ok )
 #define FILE_Read( buffer, count ) \
           ( (error = TT_Read_File ( buffer, \
-                                    (Long)(count) )) != TT_Err_Ok )
+                                    count )) != TT_Err_Ok )
 #define FILE_Read_At( pos, buffer, count ) \
           ( (error = TT_Read_At_File( (Long)(pos), \
                                       buffer, \
