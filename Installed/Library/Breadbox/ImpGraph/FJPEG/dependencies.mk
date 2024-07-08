@@ -46,7 +46,7 @@ FJPEG/impfjpeg.eobj: stdapp.goh object.goh ui.goh Objects/metaC.goh \
                 Objects/gItemC.goh Objects/gBoolC.goh \
                 Objects/gGadgetC.goh Objects/gToolCC.goh \
                 Objects/gValueC.goh Objects/gToolGC.goh \
-                Objects/helpCC.goh impbmp/impjpeg.h htmldrv.h
+                Objects/helpCC.goh IMPBMP/impjpeg.h htmldrv.h
 FJPEG/impfjpeg.obj \
 FJPEG/impfjpeg.eobj: geos.h heap.h geode.h resource.h ec.h object.h lmem.h \
                 graphics.h fontID.h font.h color.h gstring.h timer.h vm.h \
@@ -55,11 +55,10 @@ FJPEG/impfjpeg.eobj: geos.h heap.h geode.h resource.h ec.h object.h lmem.h \
                 disk.h drive.h input.h char.h hwr.h win.h uDialog.h \
                 Objects/gInterC.h Objects/Text/tCommon.h stylesh.h \
                 driver.h thread.h print.h Internal/spoolInt.h serialDr.h \
-                parallDr.h hugearr.h fileEnum.h ansi/stdio.h \
-                ASMIMP/../../fjpeg/fjpeg.h product.h Ansi/stdio.h \
-                htmlprog.h ansi/string.h ansi/stdlib.h IMPBMP/ibcommon.h \
-                htmldrv.h math.h htmlfstr.h awatcher.h initfile.h \
-                impbmp/ibcommon.h
+                parallDr.h hugearr.h fileEnum.h Ansi/stdio.h \
+                ASMIMP/../../Fjpeg/fjpeg.h product.h htmlprog.h \
+                Ansi/string.h Ansi/stdlib.h IMPBMP/ibcommon.h htmldrv.h \
+                math.h htmlfstr.h awatcher.h initfile.h
 FJPEG/impgifc.obj \
 FJPEG/impgifc.eobj: stdapp.goh object.goh ui.goh Objects/metaC.goh \
                 Objects/inputC.goh Objects/clipbrd.goh \
