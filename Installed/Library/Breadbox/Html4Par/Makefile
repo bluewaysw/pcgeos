@@ -30,7 +30,7 @@ LOBJS           =
 LIBOBJ          = $(DEVEL_DIR)/Include/$(GEODE).ldf
 LIBNAME         = html4par
 
-PRODUCTS        = DBCS JS JSDBCS 
+PRODUCTS        = DBCS JS
 
 SYSMAKEFILE     = geode.mk
 
