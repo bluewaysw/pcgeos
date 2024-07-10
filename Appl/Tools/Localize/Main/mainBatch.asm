@@ -131,6 +131,7 @@ fileEnumParams		local   FileEnumParams
 		; remember the log file handle to be used in the batch process
 		mov	es:[batchLogFile], ax
 
+		mov	bx, ax
 		mov	al, FILE_NO_ERRORS
 		mov	cx, 2
 		push	ds
