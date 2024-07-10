@@ -138,6 +138,8 @@ fileEnumParams		local   FileEnumParams
 		segmov  ds, cs
 		mov	dx, offset stepText
 		call	FileWrite
+		mov	al, FILE_NO_ERRORS
+		call	FileCommit
 		pop	ds
 logFileError:
 		call	MemFree				; free block with handle in bx
