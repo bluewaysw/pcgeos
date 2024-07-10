@@ -76,6 +76,8 @@ REVISION HISTORY:
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
 translationFileToken GeodeToken < "TRNS", MANUFACTURER_ID_GEOWORKS >
+stepText		char	".\r"
+
 
 REARunBatchJob	method dynamic ResEditProcessClass, 
 					MSG_RESEDIT_RUN_BATCH_JOB
@@ -129,6 +131,13 @@ fileEnumParams		local   FileEnumParams
 		; remember the log file handle to be used in the batch process
 		mov	es:[batchLogFile], ax
 
+		mov	al, FILE_NO_ERRORS
+		mov	cx, 2
+		push	ds
+		segmov  ds, cs
+		mov	dx, offset stepText
+		call	FileWrite
+		pop	ds
 logFileError:
 		call	MemFree				; free block with handle in bx
 		call	FilePopDir
