@@ -30,6 +30,7 @@ REVISION HISTORY:
 	JHP	11/19/92   	Initial version.
 	jacob   9/9/96		Ported to Win32.
  	RainerB	9/21/2023   	Error message added to main
+	RainerB	7/11/2024   	Fixup linux issue, add LocHelp
 
 DESCRIPTION:
 	Takes .rsc file(s) and turns them into a single .vm file
@@ -2052,6 +2053,41 @@ ConstructPath (const char *wildcard, const char *path)
 
 
 /***********************************************************************
+ *				LocHelp
+ ***********************************************************************
+ * SYNOPSIS:	    Print out information how to use loc
+ * RETURN:
+ * SIDE EFFECTS:
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	RainerB	7/11/2024   	Initial revision
+ *
+ ***********************************************************************/
+
+void LocHelp(int printMain) {
+
+    if (printMain) fprintf(stderr, "LOC: Takes .rsc file(s) and turns them into a single .vm file for use by ResEdit. ");
+    if (printMain) fprintf(stderr, "The .rsc files are only created for the NC version of the geode. ");
+    fprintf(stderr, "Use:\n");
+    fprintf(stderr, "Windows: loc -o <outfile>.vm [-2] \n");
+    fprintf(stderr, "Linux:   loc -o <outfile>.vm  [-2] rsc.rsc  <uifi1e1>.rsc  [<uifi1e2>.rsc  <ufile3>.rsc ...]\n");
+    fprintf(stderr, "\t\t-o <outfile>.vm: Specify output file\n");
+    fprintf(stderr, "\t\t   Normally use the DOS name of your geode with the extension .vm\n");
+    fprintf(stderr, "\t\t-2: Create dbcs version of .vm file (usually not used)\n");
+#if defined(_LINUX)
+    fprintf(stderr, "Under Linux pass:\n");
+    fprintf(stderr, "\t\trsc.rsc: Resource list file (must be passed)\n");
+    fprintf(stderr, "\t\t<uifile1>.rsc: RSC file for UI code file #1\n");
+    fprintf(stderr, "\t\t<uifile2>.rsc etc: You must pass any rsc file you have\n");
+#endif
+    fprintf(stderr, "Use: loc -?\tPrint out this help\n");
+}
+
+/***********************************************************************
  *				LocErr
  ***********************************************************************
  * SYNOPSIS:	    Print out an error message if the required .rsc files
@@ -2065,6 +2101,7 @@ ConstructPath (const char *wildcard, const char *path)
  *	Name	Date		Description
  *	----	----		-----------
  *	RainerB	9/21/2023   	Initial Revision
+ *	RainerB	7/11/2024   	Additional note if only rsc.rsc was found
  *
  ***********************************************************************/
 
@@ -2076,6 +2113,7 @@ void LocErr(int foundFlags, char *outputName)
     	case 0: 	// no .rsc file found
     	    fprintf(stderr, "\nloc: No .rsc files found.\n");
     	    fprintf(stderr, "* Build the NC version to create the .rsc files. *\n");
+    	    fprintf(stderr, "* Use loc -? for help *\n");
     	    return;
     	case 1: fprintf(stderr, "\nloc warning: Only the file 'rsc.rsc' found. Missing other .rsc file(s).\n");
 	    break;
@@ -2087,6 +2125,9 @@ void LocErr(int foundFlags, char *outputName)
     fprintf(stderr, "* '");
     fprintf(stderr, outputName);
     fprintf(stderr, "' may NOT contain the correct lables. Build the NC version to create all required .rsc files. *\n");
+    if ( foundFlags == 1)
+    	fprintf(stderr, "* NOTE: If you do not have any localizable chunks, you can safely ignore this warning. *\n");
+    fprintf(stderr, "* Use loc -? for help *\n");
 }
 
 /***********************************************************************
@@ -2103,6 +2144,7 @@ void LocErr(int foundFlags, char *outputName)
  *	----	----		-----------
  *	JAG	5/19/96   	Initial Revision
  *	RainerB	9/21/2023   	Error message added
+ *	RainerB	7/11/2024   	Fixup linux issue, add LocHelp
  *
  ***********************************************************************/
 void
@@ -2121,6 +2163,9 @@ main(int argc, char **argv)
 
     Hash_InitTable(&locHash, -1, HASH_STRING_KEYS, -1);
 
+    if (argc==1) LocHelp(TRUE);	// no arguments given -> print out help
+    				// because -o should always passed
+
     for (i = 1; i < argc; i++) {
 	if (argv[i][0] == '-') {
 	    switch (argv[i][1]) {
@@ -2131,6 +2176,7 @@ main(int argc, char **argv)
 				"%s: -o argument requires <output-file> "
 				"argument\n",
 				argv[0]);
+			LocHelp(FALSE);
 		        exit(1);
 		    } else {
 		        outputName = argv[i+1];
@@ -2143,8 +2189,13 @@ main(int argc, char **argv)
 	    case '2':
 		dbcsRelease = 1;
 		break;
+	    case '?':
+	    case 'h':
+		LocHelp(TRUE);
+	    	break;
 	    default:
 		fprintf(stderr, "%s: unknown option %s\n", argv[0], argv[i]);
+		LocHelp(TRUE);
 		exit(1);
 	    }
 	} else {
@@ -2157,6 +2208,23 @@ main(int argc, char **argv)
 	        break;
 	    }
 	    curFile = argv[i];
+/*-----*/
+	    if (strcmp(curFile, "rsc.rsc")==0) {
+		foundFlags |= 1;
+		fprintf(stderr, curFile);
+		fprintf(stderr, " - setzt Flagbit 0\n");
+	    } else {
+		char *p;
+		p =strchr(curFile, '.');
+		if (p) {
+		    if (strcmp(p, ".rsc") == 0 ) {
+			foundFlags |= 2;
+			fprintf(stderr, curFile);
+			fprintf(stderr, " - setzt Flagbit 1\n");
+		    }
+		}
+	    }
+/*-----*/
 	    yylineno = 1;
 	    if (yyparse()) {
 	        (void)fclose(yyin);
