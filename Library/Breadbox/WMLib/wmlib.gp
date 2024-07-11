@@ -12,9 +12,9 @@ export WMDELETEWORD
 export WMRENAMEWORD
 export WMFINDWORD
 
-export WLCREATENEWDB
-export WLADDWORDTONEWDBUNCHECKED
-export WLFINISHNEWDB
+export WMCREATENEWDB
+export WMADDWORDTONEWDBUNCHECKED
+export WMFINISHNEWDB
 
 usernotes "Copyright 1994-2002  Breadbox Computer Company LLC  All Rights Reserved"
 

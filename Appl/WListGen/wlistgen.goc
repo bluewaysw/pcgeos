@@ -141,7 +141,7 @@ word		len;
     	return 0;
     	}
     
-    WLCreateNewDB(fh, g_compress, @WListMessageText);
+    WMCreateNewDB(fh, g_compress, @WListMessageText);
     return fh;
 }
 
@@ -236,7 +236,7 @@ void AddWordToDBInternal(char *inWord, VMFileHandle listFile) {
 char word2[WORD_2_BUFFER_SIZE];
 Boolean  found;
 
-    WLAddWordToNewDBUnchecked(listFile, inWord, @WListMessageText);
+    WMAddWordToNewDBUnchecked(listFile, inWord, @WListMessageText);
     if (g_umlaut) {
     	
     	/* Check for german umlauts and convert them. Then
@@ -245,7 +245,7 @@ Boolean  found;
     	found = ConvertUmlauts(inWord, word2);
     	if (found) {
     	   if (strlen(word2) <= WM_MAX_SIZE_WORD) {
-    	   	WLAddWordToNewDBUnchecked(listFile, word2, @WListMessageText);
+    	   	WMAddWordToNewDBUnchecked(listFile, word2, @WListMessageText);
     	   } else {
 	    	PrintError(ERR_TOO_LONG, word2);
     	   }
@@ -284,6 +284,7 @@ char 	number[15];
 	 */
     @call WordCounter::MSG_VIS_TEXT_REPLACE_ALL_PTR("0", 0);
     @call WListMessageText::MSG_VIS_TEXT_DELETE_ALL();
+    PrintMessageOptr(@DataBaseCreated);    
     read = 0;
     do {
     
@@ -450,11 +451,15 @@ word 		value;
     g_charSet = @call WLCodePageItemGroup::MSG_GEN_ITEM_GROUP_GET_SELECTION();    
 
     listFile = CreateWordListFile();
-    if (0 == listFile) return;
+    if (0 == listFile) {
+    	PrintMessageOptr(@DataBaseFailed);
+    	return;
+    }
     
     srcFile = OpenSourceFile();
     if (0 == srcFile) {
     	VMClose(listFile, FALSE);
+    	PrintMessageOptr(@OpenSourceFileFailed);
     	return;
     	}
     	
@@ -470,7 +475,7 @@ word 		value;
     @send WListFileSelector::MSG_GEN_SET_ENABLED(VUM_NOW);
 
     FileClose(srcFile, FALSE);
-    WLFinishNewDB(listFile, TRUE, @WListMessageText);	// close DB file
+    WMFinishNewDB(listFile, TRUE, @WListMessageText);	// close DB file
     
 
 }

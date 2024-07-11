@@ -28,21 +28,18 @@ void _pascal _export WMDeleteWord(WMParamsStruct *wmStruct, Boolean doSearch) ;
 	2024-07-01	RainerB	- quick creation of a new wordlist added 
  ---------------------------------------------------------------------------*/
 
-#define WL_DB_IS_UNCOMPRESSED 		1
-#define WL_DB_UNDER_CONSTRUCTION 	2
-
-/*--------------------- WLCreateNewDB ---------------------
+/*--------------------- WMCreateNewDB ---------------------
  *	Purpose:	Start building a new, empty word list data base.
  ---------------------------------------------------------------------------*/
-void _pascal _export WLCreateNewDB(VMFileHandle fh, Boolean compressed, optr debugText);
+void _pascal _export WMCreateNewDB(VMFileHandle fh, Boolean compressed, optr debugText);
 
-/*--------------------- WLAddWordToNewDBUnchecked ---------------------
- *	Purpose:	Add a word to new database, created with WLCreateNewDB
+/*--------------------- WMAddWordToNewDBUnchecked ---------------------
+ *	Purpose:	Add a word to new database, created with WMCreateNewDB
  *			For perfomance, it is not checked whether the word already exists!
 ---------------------------------------------------------------------------*/
-Boolean _pascal _export WLAddWordToNewDBUnchecked(VMFileHandle fh, char *newWord, optr debugText);
+Boolean _pascal _export WMAddWordToNewDBUnchecked(VMFileHandle fh, char *newWord, optr debugText);
 
-/*--------------------- WLFinishNewDB ---------------------
- *	Purpose:	Finsh building the new word list data base.
+/*--------------------- WMFinishNewDB ---------------------
+ *	Purpose:	Finish building the new word list data base.
  ---------------------------------------------------------------------------*/
-Boolean _pascal _export WLFinishNewDB(VMFileHandle fh, Boolean closeFile, optr debugText);
+Boolean _pascal _export WMFinishNewDB(VMFileHandle fh, Boolean closeFile, optr debugText);
