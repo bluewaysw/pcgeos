@@ -1,0 +1,437 @@
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+	Copyright (c) 1998 New Deal, Inc. -- All Rights Reserved
+
+PROJECT:	NewBasic
+MODULE:		Synth Component
+SYNTH:		synthComponent.goc
+
+AUTHOR:		Martin Turon, Apr. 22, 1998
+
+ROUTINES:
+	Name			Description
+	----			-----------
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	martin	10/19/1999   	Initial version.
+
+DESCRIPTION:
+	This component oversees synth processing and manipulation by 
+	managing all actions that can be performed on synth sessions. 
+
+	COMPONENT API descriptor	1999/10/19  <martin> rev 0.0.0.1
+	PROPERTIES			1998/10/19  <martin>  
+		synth.name
+		synth.tempo
+	~	synth.volume
+		synth.voices
+		synth.priority
+		synth.error
+		synth.trap
+		synth.parent	 => /get="top"
+	ACTIONS				1999/10/19  <martin>
+	~	synth.play()	
+		synth.stop()
+	~
+	~ Not implemented yet
+
+	$Id: synthComponent.goc,v 1.2 98/07/09 16:02:28 martin Exp $
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+
+@include "songInternal.goh"
+
+@classdecl SynthComponentClass;
+
+/********************************************************
+ *        SynthComponentClass Property Dispatch Tables
+ ********************************************************/
+@propertyDecl(SYNTH, NAME,      STRING,    "name");	  
+@propertyDecl(SYNTH, FLAGS,     INTEGER,   "flags");	  
+@propertyDecl(SYNTH, TEMPO,     INTEGER,   "tempo");	  
+@propertyDecl(SYNTH, VOICES,    INTEGER,   "voices");	  /* operation mode */
+@propertyDecl(SYNTH, PRIORITY,  INTEGER,   "priority"); 
+@propertyDecl(SYNTH, ERROR,     INTEGER,   "error"); 
+@propertyDecl(SYNTH, TRAP,      INTEGER,   "trap");
+
+PropEntryStruct _near *SynthComponentPropTable[] = {
+    @propertyRef(SYNTH, NAME),
+    @propertyRef(SYNTH, FLAGS),
+    @propertyRef(SYNTH, TEMPO),
+    @propertyRef(SYNTH, VOICES),
+    @propertyRef(SYNTH, PRIORITY),
+    @propertyRef(SYNTH, ERROR),
+    @propertyRef(SYNTH, TRAP),
+    endPropTable
+};
+
+/********************************************************
+ *        SynthComponentClass Action Dispatch Tables
+ ********************************************************/
+@actionDecl(SYNTH,   PLAY,     INTEGER,  "play",     0);   
+@actionDecl(SYNTH,   STOP,     INTEGER,  "stop",     0);   
+@actionDecl(SYNTH,   FREE,     INTEGER,  "free",     0);   
+
+ActionEntryStruct _near *SynthComponentActionTable[] = {
+    @actionRef(SYNTH, PLAY),
+    @actionRef(SYNTH, STOP),
+    @actionRef(SYNTH, FREE),
+    endActionTable
+};
+
+
+/***************************************************************************
+ *              Code for SynthComponentClass
+ **************************************************************************/
+
+
+/***********************************************************************
+ *		MSG_META_RESOLVE_VARIANT_SUPERCLASS 
+ ***********************************************************************
+ * SYNOPSIS:	   Inform the system what class to use as the superclass 
+ *		   for the variant class of a particular object.
+ *
+ * PARAMETERS:	   word	MasterOffset 
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	martin	10/19/1999	Initial version
+ *
+ ***********************************************************************/
+@method SynthComponentClass, MSG_META_RESOLVE_VARIANT_SUPERCLASS
+{
+    if (MasterOffset == word_offsetof(EntBase, Ent_offset)) {
+	return &MetaClass;
+    }
+    return @callsuper();
+}	/* End of MSG_META_RESOLVE_VARIANT_SUPERCLASS.	*/
+
+
+
+
+/***********************************************************************
+ *		SCCErrorTrap
+ ***********************************************************************
+ * SYNOPSIS:
+ * 
+ *		ends	 = n  - if currently at last part or final limit
+			   vt - has concluded
+ *		EOF	 = end of file (ancient C constant = -1)
+ *		eohippus = ancient horse ancestor to modern horses
+ *			   having three toes on the hindlegs and 
+ *		   	   four on the fore.
+ *		Eolithic = of the Stone Age
+ *		eon	 = a long age time | eternity 
+ *		goes?	 = present, singular go
+ *
+ * PARAMETERS:	    pself = pointer to FileComponentInstance
+ *		    rhi	  = pointer to RunHeapInfo
+ *		    error = FileError
+ *
+ * SIDE EFFECTS:    
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	martin	10/19/1999   	Initial version
+ *
+ ***********************************************************************/
+void
+SCCErrorTrap (SynthComponentInstance *pself, word error)
+{
+    /* FileError error2 = ThreadGetError(); */
+    pself->SCC_error = error;
+
+    /* expand to signal RunError when appropriate and			*/
+    /* to automatically create a dialog if the proper flags are set.    */
+    switch (pself->SCC_trap) {
+	case SCCT_RUNTIME:
+	   /* SubroutineRaiseError(); via interpreter::MSG_ERROR */
+	   break;
+
+	case SCCT_DIALOG:
+	   pself->SCC_error = 0;    /* reset since dialog handles error */
+//	   ShellReportFileError(error, RunHeapDeref(pself->SCC_rhi, 
+//			        pself->SCC_name));
+	   break;	
+    }
+}
+
+
+/***********************************************************************
+ *		SCCSynthLock
+ ***********************************************************************
+ * SYNOPSIS:	Common action code shared by the various
+ *		MSG_FILE_DO method handlers.
+ *			FCCFileLock()   = Returns file handle, opening or 
+ *					  creating file and locking down
+ *					  any buffers if necessary
+ *			FCCFileUnlock() = make sure the file is closed
+ *
+ * PARAMETERS:	    pself = pointer to FileComponentInstance
+ *		    rhi	  = pointer to RunHeapInfo
+ *
+ * SIDE EFFECTS:    
+ * STRATEGY:        lock:   SynthCreate + SynthConnect, 
+ *                  unlock: SynthClose
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	martin	10/19/1999   	Initial version
+ *
+ ***********************************************************************/
+int
+SCCSynthLock (SynthComponentInstance *pself)  
+{
+    MemHandle synth = pself->SCC_sound;
+    if (synth == NULL) {
+/*	synth = SynthAllocMusic(); */
+	pself->SCC_error    = ((synth == NULL) ? ThreadGetError() : 0);
+	pself->SCC_sound    =   synth;
+    }
+    return synth;    
+}
+
+void
+SCCSynthUnlock (SynthComponentInstance *pself)
+{
+    MemHandle sound = pself->SCC_sound;
+    if (sound != NULL) { 
+	SoundFreeMusic(sound);
+	pself->SCC_sound  = NULL;
+    }
+}
+
+
+/*********************************************************************
+ *          brk SYNTHCOMPONENTENT_GET_PROPERTY ss M
+ *********************************************************************
+ * SYNOPSIS:    Return the value of the property associated with the
+ *              passed in string
+ *
+ *	COMPONENT API descriptor	1998/4/22  <martin> rev 0.0.0.1
+ *	PROPERTIES			1997/4/22  <martin>  
+ *		synth.host
+ *		synth.port
+ *		synth.mode
+ *		synth.status
+ *		synth.options	 => /get=tcp/ip Options /set:disable=0|enable=1
+ *		synth.interrupt
+ *		synth.parent	 => /get="top"
+ *
+ * PARAMETERS:  ComponentData *value
+ *              char *prop
+ * RETURN:      *value filled in
+ * STRATEGY:    Use the property tables define in synthLib.goc 
+ *		to dispatch the correct messages 
+ * REVISION HISTORY:
+ *      Name    Date            Description                          
+ *      ----    ----            -----------                          
+ *      martin  12/5/1997       Initial version                      
+ * 
+ *********************************************************************/
+@method SynthComponentClass, MSG_ENT_GET_PROPERTY
+{
+   pself->SCC_rhi = rhi;
+   if (!EntDispatchGetProperty(oself, SynthComponentPropTable, @propGetArgs))
+   {
+      @callsuper();
+   }
+}
+
+@method SynthComponentClass, MSG_SYNTH_GET_NAME
+{
+   value->CD_type 	    = TYPE_STRING;
+   value->CD_data.LD_string = pself->SCC_name;
+}
+@method SynthComponentClass, MSG_SYNTH_GET_FLAGS
+{
+   value->CD_type 	     = TYPE_INTEGER;
+   value->CD_data.LD_integer = pself->SCC_flags;
+}
+@method SynthComponentClass, MSG_SYNTH_GET_TEMPO
+{
+   value->CD_type 	     = TYPE_INTEGER;
+   value->CD_data.LD_integer = pself->SCC_tempo;
+}
+@method SynthComponentClass, MSG_SYNTH_GET_PRIORITY
+{
+   value->CD_type 	     = TYPE_INTEGER;
+   value->CD_data.LD_integer = pself->SCC_priority;
+}
+@method SynthComponentClass, MSG_SYNTH_GET_TRAP
+{
+   value->CD_type 	     = TYPE_INTEGER;
+   value->CD_data.LD_integer = pself->SCC_trap;
+}
+@method SynthComponentClass, MSG_SYNTH_GET_ERROR
+{
+   value->CD_type 	     = TYPE_INTEGER;
+   value->CD_data.LD_integer = pself->SCC_error;
+}
+@method SynthComponentClass, MSG_SYNTH_GET_VOICES
+{
+   value->CD_type 	     = TYPE_INTEGER;
+   value->CD_data.LD_integer = pself->SCC_voices;
+}
+
+
+
+
+/*********************************************************************
+ *         	brk SYNTHCOMPONENTENT_SET_PROPERTY ss M
+ *********************************************************************
+ * SYNOPSIS: Set a property based on the passed in string
+ *	COMPONENT API descriptor	1998/4/22  <martin> rev 0.0.0.1
+ *	PROPERTIES			1997/4/22  <martin>  
+ *		synth.host
+ *		synth.port
+ *		synth.mode
+ *		synth.status
+ *		synth.options	 => /get=tcp/ip Options /set:disable=0|enable=1
+ *		synth.interrupt
+ *		synth.parent	 => /get="top"
+ *
+ * PARAMETERS: ComponentData value
+ *             char *prop
+ * STRATEGY:
+ *      Just call EntDispatchSetProperty and let it do the right thing
+ *      based on the information in our property table.  If it's not
+ *      in our property table, then call the superclass.
+ *
+ * REVISION HISTORY:
+ *      Name    Date            Description                          
+ *      ----    ----            -----------                          
+ *      martin  12/5/1997       Initial version                      
+ * 
+ *********************************************************************/
+@method SynthComponentClass, MSG_ENT_SET_PROPERTY
+{
+    pself->SCC_rhi = rhi;
+    if (!EntDispatchSetProperty(oself, SynthComponentPropTable, @propSetArgs))
+    {
+	@callsuper();
+    }
+}
+
+@method SynthComponentClass, MSG_SYNTH_SET_NAME
+{
+   if (value->CD_type == TYPE_STRING) {
+      pself->SCC_name = value->CD_data.LD_string;
+   }
+}
+@method SynthComponentClass, MSG_SYNTH_SET_FLAGS
+{
+   if (value->CD_type == TYPE_INTEGER) {
+      pself->SCC_flags = value->CD_data.LD_integer;
+   }
+}
+@method SynthComponentClass, MSG_SYNTH_SET_TEMPO
+{
+   if (value->CD_type == TYPE_INTEGER) {
+      pself->SCC_tempo = value->CD_data.LD_integer;
+   }
+}
+@method SynthComponentClass, MSG_SYNTH_SET_PRIORITY
+{
+   if (value->CD_type == TYPE_INTEGER) {
+      pself->SCC_priority = value->CD_data.LD_integer;
+   }
+}
+@method SynthComponentClass, MSG_SYNTH_SET_VOICES
+{
+   if (value->CD_type == TYPE_INTEGER) {
+      pself->SCC_voices = value->CD_data.LD_integer;
+   }
+}
+@method SynthComponentClass, MSG_SYNTH_SET_ERROR
+{
+   if (value->CD_type == TYPE_INTEGER) {
+      SCCErrorTrap(pself, value->CD_data.LD_integer);
+   }
+}
+@method SynthComponentClass, MSG_SYNTH_SET_TRAP
+{
+   if (value->CD_type == TYPE_INTEGER) {
+      pself->SCC_trap = value->CD_data.LD_integer;
+   }
+}
+
+
+
+/***********************************************************************
+ *		MSG_ENT_DO_ACTION for SynthComponentClass
+ ***********************************************************************
+ * SYNOPSIS:	Handles all actions for the SynthComponentClass.
+ *
+ *	COMPONENT API descriptor	1997/11/17 <martin> rev 0.0.0.2
+ *	ACTIONS				1998/4/22 <martin>
+ *		synth.open(s,N)	= connect to host/port	
+ *		synth.read()		= receive data via synth session
+ *		synth.write(data)	= send data via synth session
+ *		synth.close()		= close synth session
+ *		synth.create() 	= create new synth session
+ *		synth.command(s, data)	= send command with data
+ *		synth.flush()		= force write queue to send
+ *		synth.synch()		=
+ *		synth.reset(N)	  	= where N receive=0|send=1|both=2
+ * 
+ *	~
+ *	~ Not implemented yet
+ *
+ * PARAMETERS:	    ComponentData 	*retval
+ *		    ComponentData 	*argv
+ *	 	    int 		argc
+ *		    char		*actionName
+ *		@actionArgs = EntDoActionArgs structure on stack frame
+ *
+ * SIDE EFFECTS:    
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	martin	12/6/1997   	Initial version
+ *
+ ***********************************************************************/
+@method SynthComponentClass, MSG_ENT_DO_ACTION
+{
+   pself->SCC_rhi = rhi;
+   if (!EntDispatchAction(oself, SynthComponentActionTable, @actionArgs)) {
+      @callsuper();
+   }
+}	/* End of MSG_ENT_DO_ACTION.	*/
+
+
+/********************/
+
+@method SynthComponentClass, MSG_SYNTH_DO_PLAY
+{
+    MemHandle sound = SCCSynthLock(pself); 
+    if (sound) {
+	SCCErrorTrap(pself, SoundPlayMusic(sound, pself->SCC_priority, 
+					 pself->SCC_tempo, pself->SCC_flags));
+    }
+}
+
+@method SynthComponentClass, MSG_SYNTH_DO_STOP
+{
+    SCCErrorTrap(pself, SoundStopMusic(SCCSynthLock(pself)));
+}
+
+@method SynthComponentClass, MSG_SYNTH_DO_FREE
+{
+    SCCSynthUnlock(pself);
+}
+
+/*********************/
+
+
+
+
+

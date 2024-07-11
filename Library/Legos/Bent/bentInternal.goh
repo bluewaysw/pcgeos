@@ -1,0 +1,138 @@
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+	Copyright (c) Geoworks 1994 -- All Rights Reserved
+
+PROJECT:	PC/GEOS	
+MODULE:		LEGOS - UI Builder
+FILE:		bentint.goh
+
+AUTHOR:		Martin Turon, Sep  8, 1994
+
+ROUTINES:
+	Name			Description
+	----			-----------
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	martin	9/ 8/94   	Initial version.
+
+DESCRIPTION:
+	Internal definitions for the Build time componENT library.
+
+	$Id: bentInternal.goh,v 1.1 98/03/11 15:08:55 martin Exp $
+	$Revision: 1.1 $
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+
+
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		Includes
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+
+@include <stdapp.goh>
+@include <Legos/ent.goh>
+@include <Legos/bent.goh>
+#include <Ansi/stdio.h>
+#include <Ansi/string.h>
+#include <geoMisc.h>
+
+
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		Global Constant & Type Definitions
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+
+/* made bigger to accomodate initial text data */
+#define DESCRIPTION_INITIAL_SIZE	2000 * sizeof(TCHAR)
+#define DESCRIPTION_INCREMENT_SIZE	1000 * sizeof(TCHAR)
+#define DESCRIPTION_MAX_LINE_SIZE	 500 * sizeof(TCHAR)
+/* no sizeof tchar wanted here */
+#define DESCRIPTION_MAX_BUFFER_SIZE	8000
+
+typedef struct {
+    sword      	BMD_xPos;
+    sword      	BMD_yPos;
+    optr	BMD_component;
+} BentMouseData;
+
+typedef enum
+{
+    ERROR_BENT_PROP_ARRAY_NOT_INITIALIZED = 50,
+    ERROR_PSELF_NOT_POINTING_TO_THE_RIGHT_PLACE,
+    ERROR_PSELF_NOT_POINTING_TO_THE_RIGHT_OBJECT,
+
+} FatalErrors;
+
+typedef enum 
+{
+    WARNING_BENT_WARNING
+} Warnings;
+
+extern FatalErrors phat;
+extern Warnings homie;
+
+    
+
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		External Objects
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+
+
+
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+ %              External routines
+ %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+
+#define ENT_STATE(_oself) (@call _oself::MSG_ENT_GET_STATE() )
+#define ENT_IS_VIS(_oself) (ENT_STATE(_oself) & (ES_IS_VIS|ES_IS_GEN))
+#define ENT_IS_GEN(_oself) (ENT_STATE(_oself) & ES_IS_GEN)
+
+extern MemHandle
+Bent_AllocDescriptionBlock(MemHandle /* BDescHeader */ descHeader,
+			   word recommendedSize);
+
+extern Boolean
+BentIsObjBuildTimeComponent(optr oself);
+
+extern Boolean _far _pascal
+Bent_VisTestPointInBounds(optr comp, sword x, sword y);
+
+extern Boolean _far _pascal
+BentProcessPropertyArrayElement(void *element, void *event);
+
+/* C stub for ClipboardFreeItem -- takes file handle, block handle */
+extern void _far _pascal
+Bent_ClipboardFreeItem(dword item);
+
+extern word _far _pascal
+setDSToDgroup(void);
+
+extern void _far _pascal
+restoreDS(word oldDS);
+
+
+#ifdef __HIGHC__
+
+extern Boolean
+BentFilterPostProcessElements(void *element, void *postProcessArray);
+
+pragma Alias(BentProcessPropertyArrayElement, 
+	     "BENTPROCESSPROPERTYARRAYELEMENT");
+
+pragma Alias(BentFilterPostProcessElements, 
+	     "BENTFILTERPOSTPROCESSELEMENTS");
+
+pragma Alias(Bent_ClipboardFreeItem, "BENT_CLIPBOARDFREEITEM");
+
+pragma Alias(Bent_VisTestPointInBounds, "BENT_VISTESTPOINTINBOUNDS");
+
+pragma Alias(setDSToDgroup, "SETDSTODGROUP");
+pragma Alias(restoreDS, "RESTOREDS");
+
+#else
+
+extern Boolean _far _pascal
+BentFilterPostProcessElements(void *element, void *postProcessArray);
+
+#endif
+

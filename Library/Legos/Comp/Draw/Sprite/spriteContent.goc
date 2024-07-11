@@ -1,0 +1,213 @@
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+	Copyright (c) Geoworks 1995 -- All Rights Reserved
+
+PROJECT:	PC/GEOS - LEGOS
+MODULE:		Basic Component Set - Sprite Component
+FILE:		spriteContent.goc
+
+AUTHOR:		Martin Turon, April 10, 1995
+
+ROUTINES:
+	Name			Description
+	----			-----------
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	martin	4/10/95   	Initial version.
+
+DESCRIPTION:
+
+	$Id: spriteContent.goc,v 1.1 98/05/13 15:00:06 martin Exp $
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+
+@include "drawInternal.goh"
+
+@classdecl SpriteContentComponentClass;
+
+
+/***************************************************************************
+ *		Constants
+ **************************************************************************/
+
+#define	MAIN_VIEW_WIDTH		512
+#define	MAIN_VIEW_HEIGHT	512
+#define	DEFAULT_TIMER_INTERVAL	4	     /* This is the timer for the  */
+
+
+/***************************************************************************
+ *              Code for SpriteContentComponentClass
+ **************************************************************************/
+
+/***********************************************************************
+ *   MSG_META_RESOLVE_VARIANT_SUPERCLASS for SpriteContentComponentClass 
+ ***********************************************************************
+ * SYNOPSIS:	   Inform the system what class to use as the superclass 
+ *		   for the variant class of a particular object.
+ *
+ * PARAMETERS:	   word	MasterOffset 
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	martin	4/10/95		Initial version
+ *
+ ***********************************************************************/
+@method SpriteContentComponentClass, MSG_META_RESOLVE_VARIANT_SUPERCLASS
+{
+    if (MasterOffset == word_offsetof(EntBase, Ent_offset)) {
+	return &GenViewClass;
+    }
+    return @callsuper();
+}	/* End of MSG_META_RESOLVE_VARIANT_SUPERCLASS.	*/
+
+
+
+/***********************************************************************
+ *		MSG_ENT_INITIALIZE for SpriteContentComponentClass
+ *********************************************************************** 
+ * SYNOPSIS:	    
+ * PARAMETERS:	   
+ * 
+ * SIDE EFFECTS:   
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	martin	4/10/95   	Initial version
+ *
+ ***********************************************************************/
+@method SpriteContentComponentClass, MSG_ENT_INITIALIZE
+{
+    GameContentInstance 	*gself;
+    GenViewInstance 		*vself;
+    optr 			content;
+/*
+    GeoAndDimensionAttrs	attrs;
+*/
+    @callsuper();
+    @call self::MSG_ENT_SET_FLAGS(EF_ALLOWS_CHILDREN, 0);
+
+    content = ObjInstantiate(HandleOf(oself), &SpriteContentClass);
+    @call content::MSG_META_DUMMY();
+    gself = ObjDerefVis(content);
+    gself->VCI_geoAttrs		|= VCGA_CUSTOM_MANAGE_CHILDREN;
+    gself->GCI_timerInterval	 = DEFAULT_TIMER_INTERVAL;
+    gself->GCI_baseWidth	 = MAIN_VIEW_WIDTH;
+    gself->GCI_baseHeight	 = MAIN_VIEW_HEIGHT;
+
+    @call self::MSG_GEN_VIEW_SET_CONTENT(content);
+    @call self::MSG_GEN_VIEW_SET_COLOR(CF_INDEX, C_BLACK, 0);
+    vself = ObjDerefGen(oself);
+    vself->GVI_attrs 	  	|= GVA_SEND_ALL_KBD_CHARS;
+    vself->GVI_horizAttrs 	|= GVDA_KEEP_ASPECT_RATIO;
+
+}	/* End of MSG_ENT_INITIALIZE.	*/
+
+
+/***********************************************************************
+ *		MSG_VIS_ADD_CHILD for SpriteContentComponentClass
+ ***********************************************************************
+ * SYNOPSIS:	 Forwards add child messages to the content.
+ * 
+ * PARAMETERS:	 optr     	child 	= cx:dx
+ *     	     	 CompChildFlags flags 	= bp
+ *
+ * SIDE EFFECTS:    
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	martin	4/10/95   	Initial version
+ *
+ ***********************************************************************/
+@method SpriteContentComponentClass, MSG_VIS_ADD_CHILD
+{
+    optr content = @call self::MSG_GEN_VIEW_GET_CONTENT();
+    @call content::MSG_VIS_ADD_CHILD(child, flags);
+
+}	/* End of MSG_VIS_ADD_CHILD.	*/
+
+/***********************************************************************
+ *		MSG_ENT_DO_ACTION for SpriteContentComponentClass
+ ***********************************************************************
+ * SYNOPSIS:	    
+ * PARAMETERS:	    
+ *
+ * SIDE EFFECTS:    
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	martin	4/10/95   	Initial Version
+ *
+ ***********************************************************************/
+@method SpriteContentComponentClass, MSG_ENT_DO_ACTION
+{
+    optr content = @call self::MSG_GEN_VIEW_GET_CONTENT();
+
+    if (!strcmp(actionName, _TEXT("start"))) {
+   /**********************************************************************
+    * ACTION:	       	start
+    **********************************************************************
+    * DESCRIPTION:	
+    * PARAMETERS:	
+    *
+    * REVISION HISTORY:
+    *	Name	Date		Description
+    *	----	----		-----------
+    *	martin	4/10/95   	Initial version
+    *
+    **********************************************************************/
+	@call content::MSG_GAME_CONTENT_START_GAME();
+
+    } else if (!strcmp(actionName, _TEXT("pause"))) {
+   /**********************************************************************
+    * ACTION:	       	pause
+    **********************************************************************
+    * DESCRIPTION:	
+    * PARAMETERS:	
+    *
+    * REVISION HISTORY:
+    *	Name	Date		Description
+    *	----	----		-----------
+    *	martin	4/10/95   	Initial version
+    *
+    **********************************************************************/
+	@call content::MSG_GAME_CONTENT_PAUSE_GAME();
+
+    } else {
+	@callsuper();
+    }
+} 	/* End of MSG_ENT_DO_ACTION.	*/
+
+/***********************************************************************
+ *		MSG_ENT_CHECK_ACTION for SpriteContentComponentClass
+ ***********************************************************************
+ * SYNOPSIS:	    I really dislike having to write this routine...
+ *		    Tables seem more intuitive...
+ * PARAMETERS:	    
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	martin	4/10/95   	Initial version
+ *
+ ***********************************************************************/
+@method SpriteContentComponentClass, MSG_ENT_CHECK_ACTION
+{
+    return (!strcmp(action,_TEXT("start")) || 
+	    !strcmp(action,_TEXT("pause")));
+}	/* End of MSG_ENT_CHECK_ACTION.	*/
+
+
+
+

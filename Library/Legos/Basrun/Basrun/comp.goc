@@ -1,0 +1,1917 @@
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+	Copyright (c) Geoworks 1995 -- All Rights Reserved
+
+PROJECT:	Legos
+MODULE:		Runtime
+FILE:		componen.goc
+
+AUTHOR:		dubois, Oct 13, 1995
+
+ROUTINES:
+	Name			Description
+	----			-----------
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	jimmy	 8/ 8/94	Initial version.
+
+DESCRIPTION:
+
+	Liberty version control
+	$Id: comp.goc,v 1.2 98/10/05 13:57:32 martin Exp $
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+
+#ifdef LIBERTY
+#include <Legos/interp.h>
+#include <Legos/fido.h>
+#include <Legos/runint.h>
+#include <Legos/stack.h>
+#include <Legos/builtin.h>
+#include <Legos/strmap.h>
+#include <comp/comp.h>
+#include <lAnsi/string.h>		/* for strcpy() with TCHARs */
+#include <jAnsi/string.h>		/* for strcpy() mixing TCHAR and char */
+#include <ui/ui.h>              /* for UI::DelayedFunctionCall() */
+#include <driver/keyboard/tchar.h>
+
+/*
+ * for some reason in linux Ansi/string.h redefines our NULL (defined
+ * in liberty.h) as (void *)0 and we get conversion errors, so put
+ * it back they way we had it to begin with.  Remove this fix
+ * and Ansi/string.h itself when we stop relying on compiler headers.
+ */
+#include <Ansi/string.h>
+#if defined(TOOLSET_gnu) && defined(ARCH_i386)
+#undef NULL
+#define NULL 0
+#endif
+
+/* a hack? for now to have a system module pointer somewhere */
+RTaskHan theSystemModule = NULL;
+
+#else	/* GEOS version below */
+
+@define nopreprocess LIBERTY_ONLY
+@include <stdapp.goh>
+#include <ec.h>
+#include <sem.h>
+#include <library.h>
+#include <Legos/fido.h>
+@include <Legos/ent.goh>
+#include <Ansi/string.h>
+@include <Objects/clipbrd.goh>
+/* needed for system module stuff */
+@include <Legos/basco.goh>
+#include "mystdapp.h"
+#include "runint.h"
+#include "stack.h"
+#include "strmap.h"
+#include "profile.h"
+#include "rheapint.h"
+#include "fixds.h"
+#include "bugext.h"
+#include "builtin.h"
+#endif
+
+#define RMS (*rms)
+
+#ifndef LIBERTY
+/* Sometimes I tire of using 0xffff all the time */
+#define GET_NEW_BLOCK 0xfffd
+static MemHandle GetUiBlock(RunTask* rtask, MemHandle desiredHan);
+
+static void RunCreateBTAggregateComponent
+    (RMLPtr rms, RTaskHan aggLib, word funcNum, optr parentOptr,
+     RunHeapToken nameTok);
+
+extern RunGetOrSetBCPropertyLow(RunHeapInfo *rhi, optr comp,
+				word mess, ComponentData *cd);
+extern RunDoBCActionLow(RunHeapInfo *rhi, optr comp, void *retval,
+			void *argv, word argc, word mess);
+#endif
+
+extern void RunCreateAggregateComponent(RMLPtr rms, RTaskHan aggLib,
+					word funcNum, optr parentOptr);
+static void INT_ON_Local(RMLPtr rms);
+static void INT_OFF_Local(RMLPtr rms);
+
+
+static void INT_ON_Local(RMLPtr rms) {
+    INT_ON(rms);
+}
+static void INT_OFF_Local(RMLPtr rms) {
+    INT_OFF(rms);
+}
+
+const TCHAR* theAppString = _TEXT("app");
+
+#ifdef LIBERTY
+/***********************************************************************
+ *			SystemModuleSwitchTo()
+ ***********************************************************************
+ * SYNOPSIS:	    SwitchTo called on system module
+ * CALLED BY:	    Liberty test applications
+ * RETURN:	    RTaskHan - same as RunLoadModule
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:	    RunCallFunction the "SwitchTo" routine in the
+ *                  system module (theSystemModule).
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	matta	4/25/96  	Initial Revision
+ *
+ ***********************************************************************/
+void
+SystemModuleSwitchTo(TCHAR *moduleLocatorString)
+{
+    PARAM_ASSERT(moduleLocatorString != NULL);
+
+    /* No pretty way to set up Legos routines. */
+    byte params[6];
+    params[0] = 1;		/* Arg count */
+    params[1] = TYPE_STRING;	/* Type */
+    RunHeapToken mlsString = 
+	LRunHeapAlloc(RHT_STRING, /* Run heap type */
+		      0,	/* initial reference count */
+		      ((strlen(moduleLocatorString) + 1) * 
+		       sizeof(TCHAR)), /* size in bytes */
+		      moduleLocatorString); /* initial data */
+    CopyDword(&params[2], &mlsString);
+
+    RunCallFunction(theSystemModule, /* context */
+		    _TEXT("SwitchTo"), /* function mame */
+		    params,	/* parameters */
+		    NULL,	/* pointer to return type */
+		    NULL);	/* pointer to return value */
+}	/* End of SystemModuleSwitchTo() */
+#endif
+
+#ifdef LIBERTY
+/***********************************************************************
+ *			SystemModuleUnload()
+ ***********************************************************************
+ * SYNOPSIS:	    Unload called on system module
+ * CALLED BY:	    Liberty test applications
+ * RETURN:	    nada
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:	    RunCallFunction the "Unload" routine in the
+ *                  system module (theSystemModule).
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	jon	30 may 96	initial revision
+ *
+ ***********************************************************************/
+void
+SystemModuleUnload(MemHandle rtaskHan)
+{
+    PARAM_ASSERT(rtaskHan != NULL);
+
+    /* No pretty way to set up Legos routines. */
+    byte params[6];
+    params[0] = 1;		/* Arg count */
+    params[1] = TYPE_MODULE;	/* Type */
+    CopyDword(&params[2], &rtaskHan);
+
+    RunCallFunction(theSystemModule, /* context */
+		    _TEXT("Unload"), /* function mame */
+		    params,	/* parameters */
+		    NULL,	/* pointer to return type */
+		    NULL);	/* pointer to return value */
+}	/* End of SystemModuleSwitchTo() */
+#endif /* LIBERTY */
+
+/*********************************************************************
+ *			RunSendMessage
+ *********************************************************************
+ * SYNOPSIS:	Send a message, for use by .c files
+ * CALLED BY:
+ * PASS:
+ * RETURN:
+ * SIDE EFFECTS:
+ * STRATEGY:
+ * REVISION HISTORY:
+ *	Name	Date		Description			     
+ *	----	----		-----------			     
+ *	roy	 2/13/95	Initial version			     
+ * 
+ *********************************************************************/
+#ifdef LIBERTY
+void RunSendMessage(optr dest, uint16 msg) {
+#if 0
+    Message *temp;
+
+    @nopreprocess temp = ((MessageBase *)dest)->Record((MessageNum)msg,0,0,0,0);
+    UI::PostMessage(temp);
+#else
+    @nopreprocess ((MessageBase *)dest)->Call((MessageNum)msg,0,0,0,0);
+#endif
+}
+#else
+void RunSendMessage(optr dest, word msg) {
+    /* Cast to META_INITIALIZE which takes no args and returns nothing */
+
+    @send dest::{MSG_META_INITIALIZE} msg();
+}
+#endif
+
+#ifndef LIBERTY
+/*********************************************************************
+ *			GetUiBlock
+ *********************************************************************
+ * SYNOPSIS:	Fetch one of the UI blocks created by this module
+ * RETURN:	Object block
+ * CALLED BY:	INTERNAL
+ * SYNOPSIS:
+ *	Unconditionally create a new block, if requested
+ *	Try desiredHan, if it was created by this module
+ *	Try the most recently created block (if there is one)
+ *
+ *	If both tries fail, create a new block.
+ *	
+ *********************************************************************/
+static MemHandle GetUiBlock(RunTask* rtask, MemHandle desiredHan)
+{
+    word	i, count;
+    MemHandle	mh = NullHandle;
+
+    ObjLockObjBlock(OptrToHandle(rtask->RT_uiBlocks));
+    count = ((ChunkArrayHeader*)LMemDeref(rtask->RT_uiBlocks))->CAH_count;
+
+    /* 1. Try to grab a block
+     */
+    if (desiredHan == GET_NEW_BLOCK || count == 0)
+    {
+	/* mh = NullHandle; already null */
+    }
+    else if (desiredHan)
+    {
+	/* Find desiredHan in this module's blocks.  If it isn't found,
+	 * or it's too big, try getting the most recent block
+	 */
+	MemHandle*	cursor;
+
+	cursor = (MemHandle*)
+	    (((ChunkArrayHeader*)LMemDeref(rtask->RT_uiBlocks))+1);
+
+	for (i=0; i<count; i++,cursor++) {
+	    if (*cursor == desiredHan) {
+		mh = desiredHan;
+		break;
+	    }
+	}
+	if (mh == NullHandle || MemGetInfo(mh, MGIT_SIZE) > 4096)
+	{
+	    goto getFirst;
+	}
+    }
+    else
+    {
+	/* Last try -- if the most recently-created block isn't too big,
+	 * use that
+	 */
+getFirst:
+	mh = *(MemHandle*)ChunkArrayElementToPtr
+	    (rtask->RT_uiBlocks, count-1, NULL);
+	if (MemGetInfo(mh, MGIT_SIZE) > 4096) {
+	    mh = NullHandle;
+	}
+    }
+
+    /* 2. Create and add one if we failed
+     */
+    if (mh == NullHandle)
+    {
+	EntObjectBlockHeader *header;
+	
+	/* Create a new object block with an EntObjectBlockHeader,
+	 * append it to the obj block array.
+	 */
+	mh = MemAllocLMem(LMEM_TYPE_OBJ_BLOCK,
+			  sizeof(EntObjectBlockHeader));
+	ChunkArrayAppend(rtask->RT_uiBlocks, 0);
+	*(MemHandle*)ChunkArrayElementToPtr
+	    (rtask->RT_uiBlocks, count, NULL) = mh;
+
+	/* Init obj block --
+	 * Set owner to the process so we don't die on UI events,
+	 * Give it pointers to the interpreter and the current module
+	 */
+	MemModifyOtherInfo(mh, ThreadGetInfo(0,TGIT_THREAD_HANDLE ));
+	header = ObjLockObjBlock(mh);
+	header->EOBH_task = rtask->RT_handle;
+	header->EOBH_interpreter = rtask->RT_interpreter;
+	MemUnlock(mh);
+    }
+
+    MemUnlock(OptrToHandle(rtask->RT_uiBlocks));
+    return mh;
+}
+
+/*********************************************************************
+ *			RunCreateBTAggregateComponent -d-
+ *********************************************************************
+ * SYNOPSIS:	At build-time, create an aggregate with a "wrapper"
+ * CALLED BY:	INTERNAL
+ * PASS:
+ * RETURN:
+ * SIDE EFFECTS:
+ * STRATEGY:
+ * REVISION HISTORY:
+ *	Name	Date		Description			     
+ *	----	----		-----------			     
+ *	dubois	3/20/96  	Initial version
+ * 
+ *********************************************************************/
+/* FIXME since this is build-time only, it can be moved to
+ * a different code segment.
+ */
+static void
+RunCreateBTAggregateComponent(RMLPtr rms, RTaskHan aggLib,
+			      word funcNum, optr parentOptr,
+			      RunHeapToken nameTok)
+{
+    LibraryClassPointer	aggClass; /* classptr to bgadgetaggclass */
+    ComponentData	cd;
+    Boolean	success;
+    optr	aggComp;
+    byte	params[11] =
+    {2, TYPE_COMPONENT, 0,0,0,0, TYPE_MODULE,0,0,0,0};
+
+    SET_DS_TO_DGROUP;
+    FidoFindComponent(rms->rtask->RT_fidoTask, rms->rtask->RT_fidoModule,
+		      _TEXT("agg"),
+		      FSF_BUILD_TIME, &aggClass);
+    EC_ERROR_IF(aggClass.LCP_library == 0, RE_FAILED_ASSERTION);
+    aggComp = ObjInstantiate(GetUiBlock(rms->rtask, OptrToHandle(parentOptr)),
+			     aggClass.LCP_class);
+
+    INT_ON_Local(rms);
+    if (@call aggComp::MSG_ENT_SET_PARENT(parentOptr))
+    {				/* barf if unable to set parent */
+	INT_OFF_Local(rms);
+	RunSetErrorHandle(rms->rtask->RT_progTask, RTE_INVALID_PARENT);
+	goto pushDone;
+    }
+    @call aggComp::MSG_ENT_INITIALIZE(rms->rhi);
+
+    cd.CD_type = TYPE_STRING;
+    cd.CD_data.LD_string = nameTok;
+    @call aggComp::MSG_ENT_SET_PROPERTY
+	(rms->rhi, &cd, _TEXT("aggClass"));
+
+    /* arg 1: parent
+     * arg 2: loading module
+     * Use RunCallFunction because it must be synchronous
+     */
+    CopyDword(params+2, &aggComp);
+    CopyWordToDword(params+7, &rms->rtask->RT_handle);
+    success = RunCallFunctionWithKey(aggLib, funcNum, params, &cd.CD_type,
+				     &cd.CD_data.LD_gen_dword);
+    NEC(	    success = success		);
+    EC_ERROR_IF(!success, RE_FAILED_ASSERTION);
+    INT_OFF_Local(rms);
+
+    EC_ERROR_IF(cd.CD_type != TYPE_COMPONENT, RE_FAILED_ASSERTION);
+    EC_ERROR_IF(!COMP_IS_AGG(cd.CD_data.LD_comp), RE_FAILED_ASSERTION);
+
+    /* Returned agg won't find its way into a variable because we are
+     * returning the wrapper instead.  We probably want to put the
+     * aggregate somewhere, though; it still has a ref count on it.
+     * Maybe stick it in the wrapper?
+     */
+    @call aggComp::MSG_ENT_SET_PROPERTY
+	(rms->rhi, &cd, _TEXT("aggComp")); /* inc once */
+    /* dec once */
+    RunHeapDecRef(rms->rhi, AGG_TO_STRUCT(cd.CD_data.LD_comp));
+
+    cd.CD_type = TYPE_INTEGER;
+    cd.CD_data.LD_integer = 1;
+    @call aggComp::MSG_ENT_SET_PROPERTY
+	(rms->rhi, &cd, _TEXT("visible"));
+
+ pushDone:
+    PushTypeData(TYPE_COMPONENT, aggComp);
+    RESTORE_DS;
+}
+#endif
+
+#ifdef LIBERTY
+//---------------------------------------------------------------------------
+//		FunctionUpdate()
+//---------------------------------------------------------------------------
+// 
+// SYNOPSIS: 	Implements the Update() builtin function.
+// SCOPE:	PUBLIC
+// RETURN:	nothing
+// STRATEGY:	Call Window::UpdateRootWindow(), which will visually
+//		display anything that has been rendered since the last
+//		update.
+//
+//		The GEOS version of this function is in builtin.c
+// 
+// REVISION HISTORY: 
+//	Name	Date		Description 
+//	----	----		----------- 
+//	matta	6/10/96  	Initial version 
+//
+//---------------------------------------------------------------------------
+void
+FunctionUpdate(RMLPtr rms, BuiltInFuncEnum id)
+{
+    USE_IT(rms);
+    USE_IT(id);
+    Window::UpdateRootWindow();
+}	/* End of FunctionUpdate() */
+#endif
+
+/*********************************************************************
+ *			FunctionHasProperty -d-
+ *********************************************************************
+ * SYNOPSIS:	see if a component supports a property
+ * CALLED BY:	
+ * PASS:	On stack: Property name, component
+ * RETURN:
+ * SIDE EFFECTS:
+ * STRATEGY:
+ * REVISION HISTORY:
+ *	Name	Date		Description			     
+ *	----	----		-----------			     
+ *	jimmy	 2/ 1/95	Initial version			     
+ * 
+ *********************************************************************/
+void
+FunctionHasProperty(RMLPtr rms, BuiltInFuncEnum id)
+{
+    RVal	rvProp, rvComp;
+    dword	val;
+    TCHAR	*name;
+    ComponentData	propData;
+    USE_IT(id);
+
+    PROFILE_START_SECTION(PS_FUNC_HAS_PROPERTY);
+
+    /* the first argument pushed is always the string for the property name */
+    if (TopType() != TYPE_STRING) {
+	RunSetErrorWithData(rms->ptask, RTE_TYPE_MISMATCH, TYPE_STRING);
+	return;
+    }
+    if (NthType(2) != TYPE_COMPONENT) {
+	RunSetErrorWithData(rms->ptask, RTE_TYPE_MISMATCH, TYPE_COMPONENT);
+	return;
+    }
+
+    PopVal(rvProp);
+    PopVal(rvComp);
+
+    if (rvProp.value == EMPTY_STRING_KEY || rvComp.value == NullOptr) {
+	RunSetError(rms->ptask, RTE_VALUE_IS_NULL);
+	return;
+    }
+
+    /* Get the value of the property into a ComponentData structure
+     * (via the standard Ent API).  At this point, cp should point to
+     * the property and the component variable should be unlocked.
+     */
+    
+    RunHeapLock(rms->rhi, rvProp.value, (void**)(&name));
+    propData.CD_type = TYPE_NONE;
+#ifdef LIBERTY
+    ((Component*)(rvComp.value))->GetProperty(rvProp.value, name, &propData);
+    RunHeapDecRefAndUnlock(rms->rhi, rvProp.value, name);
+#else
+    if (COMP_IS_AGG(rvComp.value)) {
+	/* call the external get prop for aggs, so we can get the value
+	 * back and avoid generated runtime errors, a little slow, but
+	 * much easier that trying to use the quicker RunGetAggProperty which
+	 * just calls RunSwitchFunctions and returns control back to the
+	 * interpreter - blech
+	 */
+	RunHeapUnlock(rms->rhi, rvProp.value);
+	if (RunGetAggPropertyExt(rms->ptask->PT_handle, rvComp.value, 
+			     name, &(propData.CD_type), 
+			     &(propData.CD_data.LD_gen_dword)) == FALSE)
+	{
+	    propData.CD_type = TYPE_ERROR;
+	}
+    } else {
+	TCHAR	nameBuf[128];
+
+	strcpy(nameBuf, name);
+	RunHeapDecRefAndUnlock(rms->rhi, rvProp.value, name);
+	INT_ON(rms);
+	@call rvComp.value::MSG_ENT_GET_PROPERTY(rms->rhi, &propData, nameBuf);
+	INT_OFF(rms);
+    }
+#endif
+
+    switch(propData.CD_type) 
+    {
+/*    case TYPE_NONE: causes problems for props that are of return type
+ *		      TYPE_UNKNOWN
+ */
+    case TYPE_ILLEGAL:
+    case TYPE_ERROR:
+	val = 0;
+	break;
+    default:
+	val = 1;
+    }
+
+    PushTypeData(TYPE_INTEGER, val);
+    PROFILE_END_SECTION(PS_FUNC_HAS_PROPERTY);
+    return;
+}
+
+
+/*********************************************************************
+ *			FunctionLaunchApplication
+ *********************************************************************
+ * SYNOPSIS:	Launch the specified application w/ or w/o document
+ * CALLED BY:	RunMainLoop
+ * RETURN:
+ * SIDE EFFECTS:
+ * STRATEGY:
+ * REVISION HISTORY:
+ *	Name	Date		Description			     
+ *	----	----		-----------			     
+ *	eca	10/25/97  	Initial version
+ * 
+ *********************************************************************/
+void
+FunctionLaunchApplication(RMLPtr rms, BuiltInFuncEnum id)
+{
+    TCHAR	*appStr, *docStr;
+    RVal        rvApp, rvDoc;
+
+    IACPConnection iacpCnct;
+    word        retval = 0;
+    word        serverCount;
+    MemHandle   launchBlk;
+    AppLaunchBlock *alb;
+    GeodeToken serverToken;
+
+    USE_IT(id);
+
+    /*
+     * Prepare the AppLaunchBlock
+     */
+    launchBlk =
+IACPCreateDefaultLaunchBlock(MSG_GEN_PROCESS_OPEN_APPLICATION);
+    alb = MemLock(launchBlk);
+
+    /*
+     * lock the document name string (if any) and copy it in
+     */
+    PopVal(rvDoc);
+    RunHeapLock(rms->rhi,rvDoc.value, (void**)(&docStr));
+    EC_ERROR_IF(docStr == NULL, RE_FAILED_ASSERTION);
+    strcpy(alb->ALB_dataFile, docStr);
+    RunHeapDecRefAndUnlock(rms->rhi,rvDoc.value, docStr);
+
+    /*
+     * lock the application name string and copy it in
+     */
+    PopVal(rvApp);
+    RunHeapLock(rms->rhi,rvApp.value, (void**)(&appStr));
+    EC_ERROR_IF(appStr == NULL, RE_FAILED_ASSERTION);
+    strcpy(alb->ALB_appRef.AIR_fileName, appStr);
+    RunHeapDecRefAndUnlock(rms->rhi,rvApp.value, appStr);
+
+    MemUnlock(launchBlk);
+
+    /*
+     * Get the application's token chars
+     */
+    FilePushDir();
+    FileSetStandardPath(SP_APPLICATION);
+    retval = FileGetPathExtAttributes(appStr, FEA_TOKEN,
+			     &serverToken, sizeof(GeodeToken));
+    FilePopDir();
+
+    if (!retval) {
+	/*
+	 * Launch the application
+	 */
+	iacpCnct = IACPConnect(&serverToken,
+			       IACPCF_FIRST_ONLY | IACPSM_USER_INTERACTIBLE,
+			       launchBlk,
+			       NullOptr,
+			       &serverCount);
+
+	/*
+	 * Close the connection, if one was opened
+	 */
+	if (iacpCnct != IACP_NO_CONNECTION) {
+	    retval = 0;
+	    /*
+	     * Shutdown the IACP connection
+	     */
+	    IACPShutdown(iacpCnct, NullOptr);
+	} else {
+	    /*
+	     *
+	     */
+	    retval = -1;
+	}
+    }
+
+    /* push the result as an integer */
+    PushTypeData(TYPE_INTEGER, *(dword *)&retval);
+}
+
+
+/*********************************************************************
+ *			RunCreateComponent -d-
+ *********************************************************************
+ * SYNOPSIS:	routine to create a component 
+ * CALLED BY:	
+ * PASS:
+ * RETURN:
+ * SIDE EFFECTS:
+ * STRATEGY:
+ * REVISION HISTORY:
+ *	Name	Date		Description			     
+ *	----	----		-----------			     
+ *	jimmy	1/27/95  	Initial version			     
+ * 
+ *********************************************************************/
+#ifndef LIBERTY
+/*
+ * GEOS version
+ */
+static void
+RunCreateComponent(RMLPtr rms, optr parentOptr, RunHeapToken nameTok)
+{
+    Boolean		isForm;
+    optr		comp;
+    MemHandle		uiBlock;
+    LibraryClassPointer class;
+
+    ;{
+	TCHAR*	name;
+
+	RunHeapLock(rms->rhi, nameTok, (void**)&name);
+	if (rms->rtask->RT_buildTimeComponents) {
+	    FidoFindComponent(rms->rtask->RT_fidoTask,
+			      rms->rtask->RT_fidoModule,
+			      name, FSF_BUILD_TIME, &class);
+	} else {
+	    FidoFindComponent(rms->rtask->RT_fidoTask,
+			      rms->rtask->RT_fidoModule,
+			      name, STANDARD_RUNTIME_SEARCH, &class);
+	}
+	isForm = !strcmp(name, _TEXT("form"));
+	RunHeapUnlock(rms->rhi, nameTok);
+    }
+
+    /* Massage parentOptr.  It might be BPT_APP or BPT_TOP
+     */
+    if (HandleOf(parentOptr) == 0)
+    {
+	if (ChunkOf(parentOptr) == BPT_APP) {
+	    parentOptr = rms->rtask->RT_appObject;
+	}
+	else if (ChunkOf(parentOptr) == BPT_TOP) {
+	    if (rms->rtask->RT_uiParent == NullOptr) {
+		rms->rtask->RT_uiParent = rms->rtask->RT_appObject;
+	    }
+	    parentOptr = rms->rtask->RT_uiParent;
+	}
+    }
+
+    /* Deal with:
+     *  Component class not found
+     *  Component is an aggregate
+     */
+    if (class.LCP_library == 0)
+    {
+	RunSetError(rms->ptask, RTE_UNKNOWN_COMPONENT_CLASS);
+	PushTypeData(TYPE_COMPONENT, 0);
+	return;
+    }
+    else if (LCP_IS_AGG(class))
+    {
+	if (rms->rtask->RT_buildTimeComponents)	{
+	    /* Create a "wrapper" around the agg if build-time */
+	    RunCreateBTAggregateComponent
+		(rms, LCP_MODULE(class), LCP_FUNCNUM(class), parentOptr,
+		 nameTok);
+	} else {
+	    /* This function will push result when it returns */
+	    RunCreateAggregateComponent
+		(rms, LCP_MODULE(class), LCP_FUNCNUM(class), parentOptr);
+	}
+	return;
+    }
+
+    uiBlock = GetUiBlock(rms->rtask,
+			 isForm ? GET_NEW_BLOCK : OptrToHandle(parentOptr));
+    comp = ObjInstantiate(uiBlock, class.LCP_class);
+    EC_ERROR_IF(comp == NullOptr, RE_FAILED_ASSERTION);
+
+    /* INT_ON b/c component might want to make calls into interpreter
+     */
+    INT_ON_Local(rms);
+    if (@call comp::MSG_ENT_SET_PARENT(parentOptr))
+    {				/* barf if unable to set parent */
+	INT_OFF_Local(rms);
+	RunSetErrorHandle(rms->rtask->RT_progTask, RTE_INVALID_PARENT);
+	comp = NullOptr;
+	goto pushDone;
+    }
+    @call comp::MSG_ENT_INITIALIZE(rms->rhi);
+    INT_OFF_Local(rms);
+
+    /* This used to also set uiParent if this is the first component
+     * created in the module.  Not sure if that's still needed. 4/2/96
+     */
+    if (isForm) rms->rtask->RT_uiParent = comp;
+
+ pushDone:
+    PushTypeData(TYPE_COMPONENT, comp);
+    return;
+}
+
+#else
+
+/************************************************************************
+ *		CReallocH()
+ ************************************************************************
+ * 
+ * SYNOPSIS: 	Implement's a realloc() like ReallocH
+ * SCOPE:	PRIVATE
+ * RETURN:	NullHandle on failure.
+ * STRATEGY:	
+ * 
+ * REVISION HISTORY: 
+ *	Name	Date		Description 
+ *	----	----		----------- 
+ *	matta	5/ 2/96  	Initial version 
+ *
+ ************************************************************************/
+static MemHandle
+CReallocH(MemHandle handle,
+	  size_t size)
+{
+    if (handle == NullHandle) {
+	return MallocH(size);
+    } else if (ReallocH(handle, size) == FAILURE) {
+	return NullHandle;
+    }
+    return handle;
+}	/* End of CReallocH() */
+
+//---------------------------------------------------------------------------
+//		DeleteComponent()
+//---------------------------------------------------------------------------
+// 
+// SYNOPSIS: 	Simply deletes a component
+// SCOPE:	PUBLIC
+// RETURN:	nothing
+// STRATEGY:	Just call delete.
+// 
+// REVISION HISTORY: 
+//	Name	Date		Description 
+//	----	----		----------- 
+//	matta	8/23/96 	Initial version 
+//
+//---------------------------------------------------------------------------
+void
+DeleteComponent(void* comp)
+{
+    delete (Component*)comp;
+}	/* End of DeleteComponent() */
+
+
+/*
+ * Liberty version
+ */
+static void
+RunCreateComponent(RMLPtr rms, optr parentOptr, RunHeapToken nameTok)
+{
+    MemHandle		comp;
+    TCHAR*		name;
+    FidoSearchFlags searchFlag;
+    if(rms->rtask->RT_buildTimeComponents) {
+	searchFlag = FSF_BUILD_TIME;
+    }
+    else {
+	searchFlag = STANDARD_RUNTIME_SEARCH;
+    }
+
+    /* Mike: put in check here to see if FidoRegisterAgg has been
+     * called on <name>; if so emulate code below, near LCP_IS_AGG
+     */
+    word funcNum;
+    RunHeapLock(rms->rhi, nameTok, (void**)&name);
+    FidoSearchResult r = FidoFindAndCreateComponent(rms->rtask->RT_fidoModule,
+						    name, searchFlag,
+						    &comp,
+						    &funcNum);
+    RunHeapUnlock(rms->rhi, nameTok);
+    if(r == FIDO_SEARCH_SUCCEEDED) {
+	ASSERT(comp != NULL);
+	Component* component = (Component*)comp;
+
+	/* Set the parent property.  This is done through the slow
+	   SetProperty() interface.  Could be done through a
+	   specialized interface later if this proves slow. -Matt */
+
+	/* Massage the parent.	If it is NULL (BPT_APP), it is app.
+	   If it is BPT_TOP, it is the ui parent (which is what gets
+	   changed by SetTop()) */
+	ASSERT(BPT_APP == NULL);
+	if (parentOptr == NULL) {
+	    parentOptr = rms->rtask->RT_appObject;
+	} else if (parentOptr == (optr)BPT_TOP) {
+	    if (rms->rtask->RT_uiParent == NullOptr) {
+		rms->rtask->RT_uiParent = rms->rtask->RT_appObject;
+	    }
+	    parentOptr = rms->rtask->RT_uiParent;
+	}
+
+	ComponentData data;
+	data.type = TYPE_COMPONENT;
+	data.data.LD_comp = parentOptr;
+	component->SetProperty(PROP_COMP_PARENT, &data);
+
+	// Deal with a runtime error setting the parent
+	if (data.type == TYPE_ERROR) {
+	    RunSetErrorHandle(rms->rtask->RT_progTask, RTE_INVALID_PARENT);
+	    component->Call(MSG_PRE_DELETE);
+	    UI::DelayedFunctionCall(DeleteComponent, component, FALSE);
+	    comp = NullOptr;
+	    goto pushDone;
+	}
+
+	/* Set the run task of this component.	Every component that
+	   generates an event must have access to a RunTask.
+	   Currently there seems to be one RunTask per module, but I
+	   got the picture from the Legos guys that this wasn't an
+	   invariant, and that it dependeds on what happens in the
+	   future.  The RunTask of each component is stored in the
+	   object block on the GEOS side.  Since Liberty has no object
+	   block, we have to set it for each created component.	 See
+	   Component::SetRunTask() for ideas on how we can avoid
+	   having a RunTask instance data for each component.  In any
+	   case, we keep this API. -Matt */
+	component->SetRunTask(rms->rtask->RT_handle);
+
+	/* If this sucker is a child of "app", then add it to the
+	   last non aggregate RunTask's list of "app" children. */
+	if (component->GetComponentParent() == NULL) {
+	    ASSERT(rms->ptask->PT_lastNonAggregateRunTask != NullHandle);
+	    RunTask *runTask = 
+		(RunTask*)LockH(rms->ptask->PT_lastNonAggregateRunTask);
+	    MemHandle &handle = runTask->RT_topLevelComponents;
+	    word &count = runTask->RT_topLevelCount;
+	    
+	    MemHandle reallocedHandle;
+	    reallocedHandle = CReallocH(handle, ((count + 1) * 
+						 sizeof(Component*)));
+	    if (reallocedHandle != NullHandle) {
+		handle = reallocedHandle;
+		Component **array = (Component**)LockH(reallocedHandle);
+		EC(HeapSetTypeAndOwner(array, "RTLC");)
+		array[count] = component;
+		count++;
+#ifdef LOG_COMP_TRACKING
+		theLog << "rtask " << rms->rtask << " new top level ";
+		component->DispatchName(theLog);
+		theLog << " count now " << (int)count << '\n';
+#endif
+		UnlockH(reallocedHandle);
+	    }
+
+	    UnlockH(rms->ptask->PT_lastNonAggregateRunTask);
+	}
+    }
+    else if(r == FIDO_IS_AGG) {
+	RunCreateAggregateComponent(rms, comp, funcNum, parentOptr);
+	return;
+    }
+    else {
+#if ERROR_CHECK
+	char	warn[80];
+
+	sprintf(warn, "Fido can't find component: ");
+	RunHeapLock(rms->rhi, nameTok, (void**)&name);
+	strcat( warn, name );
+	RunHeapUnlock(rms->rhi, nameTok);
+
+	/* probably want to do something besides fail here... */
+	ASSERTS_WARN(FALSE, (const char *)warn);
+#else
+	ASSERTS_WARN(FALSE, "Fido can't find component");
+#endif
+	comp = NullOptr;
+	RunSetError(rms->ptask, RTE_UNKNOWN_COMPONENT_CLASS);
+    }
+pushDone:
+    PushTypeData(TYPE_COMPONENT, comp);
+    return;
+}
+
+#endif /* !defined(LIBERTY) */
+
+/*********************************************************************
+ *			FunctionComponent -d-
+ *********************************************************************
+ * SYNOPSIS:	create a component and name it
+ * CALLED BY:	
+ * RETURN:
+ * SIDE EFFECTS:
+ * STRATEGY:
+ *		Check to make sure the number of args and the types
+ *		are correct
+ * REVISION HISTORY:
+ *	Name	Date		Description			     
+ *	----	----		-----------			     
+ *	jimmy	8/ 8/94		Initial version			     
+ * 
+ *********************************************************************/
+void
+FunctionComponent(RMLPtr rms, BuiltInFuncEnum id)
+{
+    RVal	rvComp, rvClass;
+    TCHAR	*parent;
+    optr	parentOptr;
+    PTaskPtr	ptask;
+    RunTask*	rtask;
+    USE_IT(id);
+
+    PROFILE_START_SECTION(PS_FUNC_COMPONENT);
+
+    ptask = rms->ptask;
+    rtask = rms->rtask;
+
+    if (TopType() != TYPE_STRING && TopType() != TYPE_COMPONENT) {
+	RunSetErrorWithData(ptask, RTE_TYPE_MISMATCH, TYPE_COMPONENT);
+	return;
+    }
+    if (NthType(2) != TYPE_STRING) {
+	RunSetErrorWithData(ptask, RTE_TYPE_MISMATCH, TYPE_STRING);
+	return;
+    }
+    if (NthData(2) == EMPTY_STRING_KEY) {
+	RunSetError(ptask, RTE_VALUE_IS_NULL);
+	return;
+    }
+
+    PopVal(rvComp);
+    PopVal(rvClass);
+
+    /* If its the first time through, figure out what the app object is
+     * based on root window in the window system(Lib)/primary(GEOS)
+     */
+    if (rtask->RT_appObject == 0)
+    {
+	ASSERTS(rtask->RT_uiParent,"uiParent *must* be set in the run task!");
+LONLY(	rtask->RT_appObject = (optr)Window::GetRootWindow());
+GONLY(	rtask->RT_appObject = @call rtask->RT_uiParent::MSG_GEN_FIND_PARENT());
+    }
+
+    if (rvComp.type == TYPE_STRING)
+    {
+	RunHeapLock(rms->rhi, rvComp.value, (void**)&parent);
+	if (!strcmp(parent, theAppString)) {
+	    parentOptr = rtask->RT_appObject;
+	} else {
+	    if (rtask->RT_uiParent == NullOptr)
+	    {
+		rtask->RT_uiParent = rtask->RT_appObject;
+	    }
+	    parentOptr = rtask->RT_uiParent;
+	}
+	RunHeapDecRefAndUnlock(rms->rhi, rvComp.value, parent);
+
+	/* FIXME -- error if not _TEXT("app") or _TEXT("top") */
+    } else {
+	parentOptr = (optr)rvComp.value;
+    }
+
+    RunCreateComponent(rms, parentOptr, (RunHeapToken)rvClass.value);
+    RunHeapDecRef(rms->rhi, rvClass.value);
+
+    PROFILE_END_SECTION(PS_FUNC_COMPONENT);
+    return;
+}
+
+
+/*********************************************************************
+ *			GetProperty -d-
+ *********************************************************************
+ * SYNOPSIS:	fetch data from the component
+ * CALLED BY:	op_oplevel
+ * PASS:	expression
+ * RETURN:	expression filled in with useful data
+ * SIDE EFFECTS:
+ * STRATEGY:	fetch the value from the component and stuff it into
+ *		the passed expression
+ *
+ *		Assumes a non-aggregate is on the stack.
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description			     
+ *	----	----		-----------			     
+ *	jimmy	10/27/94	Initial version			     
+ * 
+ *********************************************************************/
+void
+GetProperty(RMLPtr rms, Opcode byteCompiled, RunHeapToken propNameToken)
+{
+    RVal	rvComp;
+    TCHAR	*name;
+    ComponentData	propData;
+    dword	propVal;
+    LegosType	propType;
+    byte	message = 0;		/* to surpress gnu warnings */
+
+    /* This is caught in OP_PROPERTY */
+    ASSERT(TopType() == TYPE_COMPONENT);
+
+    PopVal(rvComp);
+    if (rvComp.value == NullOptr) {
+	RunSetError(rms->ptask, RTE_VALUE_IS_NULL);
+	return;
+    }
+    ECG(ECCheckOD(rvComp.value);)
+
+    if (byteCompiled == OP_BC_PROPERTY_RV) {
+	GetByte(rms->pc, message);
+    }
+
+#ifdef LIBERTY
+    propData.CD_type = TYPE_NONE;
+    propData.CD_data.LD_gen_dword = 0;
+#endif
+
+    INT_ON_Local(rms);
+    if (byteCompiled != OP_BC_PROPERTY_RV)
+    {
+#ifndef LIBERTY
+	TCHAR	nameBuf[128];
+#endif
+
+	RunHeapLock(rms->rhi, propNameToken, (void**)(&name));
+	ECG_ERROR_IF(strlen(name) > 127, RE_FAILED_ASSERTION);
+
+#ifndef LIBERTY
+	strcpy(nameBuf, name);
+	name = &nameBuf[0];
+#endif
+
+#ifdef LIBERTY
+	if (byteCompiled == OP_CUSTOM_PROPERTY_RV) {
+	    ((Component*)(rvComp.value))->GetCustomProperty(propNameToken, 
+							    &propData);
+	} else {
+	    ((Component*)(rvComp.value))->GetProperty(propNameToken,
+						      name, &propData);
+	}
+	RunHeapUnlock(rms->rhi, propNameToken);
+#else
+	RunHeapUnlock(rms->rhi, propNameToken);
+	if (byteCompiled == OP_CUSTOM_PROPERTY_RV) {
+	    @call rvComp.value::MSG_ENT_GET_CUSTOM_PROPERTY(rms->rhi, &propData, name);
+	} else {
+	    @call rvComp.value::MSG_ENT_GET_PROPERTY(rms->rhi, &propData, name);
+	}
+#endif
+    }
+    else
+    {
+#ifdef LIBERTY
+	((Component*)(rvComp.value))->GetProperty(message, &propData);
+#else
+	/* Prop #s go from 0-511; even #s are GET */
+	RunGetOrSetBCPropertyLow(rms->rhi, rvComp.value,
+				 (word)message<<1, &propData);
+#endif
+    }
+    INT_OFF_Local(rms);
+
+    if (propData.CD_type == TYPE_ERROR)
+    {
+	RunSetError(rms->ptask, 
+		    (RuntimeErrorCode)(FIRST_COMPONENT_ERROR +
+				       propData.CD_data.LD_error));
+	return;
+    }
+
+    /* FIXME (fix what?? --dubois) */
+    propType = propData.CD_type; 
+    if (propType == TYPE_STRING)
+    {
+	propVal = (dword)propData.CD_data.LD_string;
+    } else if (propType == TYPE_INTEGER) {
+	propVal = propData.CD_data.LD_integer;
+    } else {
+	propVal = propData.CD_data.LD_gen_dword;
+    }
+
+    PushTypeData(propType, propVal);
+
+    if (RUN_HEAP_TYPE(propType, propVal))
+    {
+	/* Add a ref for the stack */
+	if (propType == TYPE_COMPONENT) {
+	    propVal = AGG_TO_STRUCT(propVal);
+	}
+	RunHeapIncRef(rms->rhi, propVal);
+    }
+
+    return;
+}
+
+/*********************************************************************
+ *		    SetProperty
+ *********************************************************************
+ * SYNOPSIS:	set a property field for a component
+ * CALLED BY:	RunMainLoop (ASSIGN statements)
+ * RETURN:
+ * SIDE EFFECTS:
+ * STRATEGY:
+ *	Incrementing RunHeap elements is the responsibility of
+ *	the component.	It is OK for them to not, if they don't
+ *	keep the token around.
+ *
+ *	if <val> is a runheap element, it will be decref'd
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description			     
+ *	----	----		-----------			     
+ *	jimmy	8/15/94		Initial version			     
+ * 
+ *********************************************************************/
+Boolean
+SetProperty(RMLPtr rms, optr comp, 
+	    PropertyName prop, dword val, LegosType type,
+	    PTaskPtr ptask, LegosType byteCompiled)
+{
+    ComponentData   cd;
+
+    if (type == TYPE_NONE) {
+	RunSetError(ptask, RTE_BAD_TYPE);
+	return FALSE;
+    }
+	
+    cd.CD_type = type;
+#ifdef LIBERTY
+    if(type == TYPE_INTEGER) {
+	cd.CD_data.LD_integer = val;
+    }
+    else {
+	cd.CD_data.LD_gen_dword = val;
+    }
+#else
+    cd.CD_data.LD_gen_dword = val;
+#endif
+
+    INT_ON_Local(rms);
+    if (byteCompiled != TYPE_BC_PROPERTY_LV) {
+#ifdef LIBERTY
+	ASSERT(prop.nameToken != NULL_TOKEN);
+	TCHAR *string = (TCHAR*)LRunHeapLock(prop.nameToken);
+	if (byteCompiled == TYPE_PROPERTY_LV) {
+	    ((Component*)(comp))->SetProperty(prop.nameToken, string, &cd);
+	} else {
+	    ((Component*)(comp))->SetCustomProperty(prop.nameToken, &cd);
+	}
+	LRunHeapUnlock(prop.nameToken);
+#else
+	TCHAR	nameBuf[128];
+	strcpy(nameBuf, prop.nameString);
+	if (byteCompiled == TYPE_PROPERTY_LV) {
+	    @call comp::MSG_ENT_SET_PROPERTY(&ptask->PT_runHeapInfo,
+					     &cd, nameBuf);
+	} else {
+	    @call comp::MSG_ENT_SET_CUSTOM_PROPERTY(&ptask->PT_runHeapInfo,
+						    &cd, nameBuf);
+	}
+
+#endif
+    } else {
+#ifdef LIBERTY
+	((Component*)(comp))->SetProperty(prop.nameMessage, &cd);
+#else
+	RunGetOrSetBCPropertyLow(&ptask->PT_runHeapInfo,
+				 comp, (word) prop.nameMessage, &cd);
+#endif
+    }
+    INT_OFF_Local(rms);
+
+    if (RUN_HEAP_TYPE(type, val))
+    {
+	if (type == TYPE_COMPONENT) {
+	    val = AGG_TO_STRUCT(val);
+	}
+	RunHeapDecRef(&ptask->PT_runHeapInfo, val);
+    }
+
+    if (cd.CD_type == TYPE_ERROR) 
+    {
+	RunSetError(ptask, (RuntimeErrorCode)(FIRST_COMPONENT_ERROR + 
+					      cd.CD_data.LD_error));
+	return FALSE;
+    }
+    return TRUE;
+}
+
+/*********************************************************************
+ *			RunDoAction -d-
+ *********************************************************************
+ * SYNOPSIS:	Preform the indicate action and grab the arguments from the
+ *		runtime stack
+ * CALLED BY:	RunMainLoop
+ * PASS:	vpc:	action key if byteCompiled
+ *		stack:	component, # params, [params...]
+ * RETURN:	
+ * SIDE EFFECTS: 
+ * STRATEGY:
+ * REVISION HISTORY:
+ *	Name	Date		Description			     
+ *	----	----		-----------			     
+ *	ron	9/ 1/94		Initial version			     
+ *	dloft	11/7/94		revised to change component api, add return
+ *				values, multiple arguments
+ *********************************************************************/
+void
+RunDoAction(RMLPtr rms, Opcode op, RunHeapToken actionToken,
+	    Boolean byteCompiled)
+{
+    TCHAR	*action;
+    word	actionKey = 0;
+    PTaskPtr	ptask;
+    int		i;
+    RVal	rvComp, rvNum;
+    RVal	rvArg;
+    TCHAR	actionName[32];		/* use buffer so we can unlock heap */
+
+    ComponentData		argbuf[16];    /* FIXME */
+/*    VariableReferenceStruct	  params[16];*/
+    ComponentData		*cd;
+    ComponentData		retval;
+
+    ptask = rms->ptask;
+
+    if (TopType() != TYPE_COMPONENT)
+    {
+	RunSetErrorWithData(ptask, RTE_TYPE_MISMATCH, TYPE_COMPONENT);
+	return;
+    }
+    PopVal(rvComp);
+    if (rvComp.value == NullOptr) {
+	RunSetError(ptask, RTE_VALUE_IS_NULL);
+	return;
+    }
+
+    if (byteCompiled)
+    {
+	actionKey = (word)(*rms->pc++);
+    }
+    else
+    {
+	/* Grab from vpc, lock name of action. */
+	RunHeapLock(rms->rhi, actionToken, (void**)(&action));
+	/*
+	 * Copy the string for the action out of the heap as we don't want
+	 * to keep locks on the heap when we call an action.
+	 */
+	strcpy(actionName, action);
+	RunHeapUnlock(rms->rhi, actionToken);
+    }
+
+    /* # params */
+    ASSERT(TopType() == TYPE_INTEGER);
+    PopVal(rvNum);
+   
+    /* now loop through the rest of the args, setting up a call buffer for
+     * ENT_DO_ACTION
+     */
+    for (i = rvNum.value-1, cd = argbuf+i; i >= 0; i--, cd--)
+    {
+	PopVal(rvArg);
+	cd->CD_type = rvArg.type;
+#ifdef LIBERTY
+	if(rvArg.type == TYPE_INTEGER) {
+	    cd->CD_data.LD_integer = rvArg.value;
+	}
+	else {
+	    cd->CD_data.LD_gen_dword = rvArg.value;
+	}
+#else
+	cd->CD_data.LD_gen_dword = rvArg.value;
+#endif
+    }
+
+    INT_ON(rms);
+    retval.CD_type = TYPE_NONE;
+    if (byteCompiled) {
+	    
+#ifdef LIBERTY
+	((Component*)(rvComp.value))->DoAction(actionKey, rvNum.value,
+					       argbuf, &retval);
+#else
+	RunDoBCActionLow(rms->rhi, rvComp.value, &retval, argbuf, rvNum.value, 
+			 actionKey);
+#endif
+    } else {
+#ifdef LIBERTY
+	((Component*)(rvComp.value))->DoAction(actionName, rvNum.value,
+					       argbuf, &retval);
+#else
+	@call rvComp.value::MSG_ENT_DO_ACTION(rms->rhi, &retval, argbuf,
+					      rvNum.value, actionName);
+#endif
+    }
+    INT_OFF(rms);
+
+    /* see if there are any strings to dec ref */
+    cd = argbuf;
+    for (i=0 ; i < (int)rvNum.value; i++, cd++) 
+    {
+	dword	data = cd->CD_data.LD_gen_dword;
+	if (RUN_HEAP_TYPE(cd->CD_type, data)) 
+	{
+	    if (cd->CD_type == TYPE_COMPONENT) {
+		data = AGG_TO_STRUCT(data);
+	    }
+	    RunHeapDecRef(rms->rhi, data);
+	}
+    }
+
+    if (retval.CD_type == TYPE_ERROR) 
+    {
+	RunSetError(rms->ptask, 
+		    (RuntimeErrorCode)(FIRST_COMPONENT_ERROR + 
+				       retval.CD_data.LD_error));
+	return;
+    }
+
+    /* if it's a PROC rather than a FUNC then forget the return value
+     */
+    if (op == OP_ACTION_FUNC
+	|| op == OP_BC_ACTION_FUNC
+	|| op == OP_STACK_ACTION_FUNC)
+    {
+	/* there's already an element on the stack for the return value */
+	if (RUN_HEAP_TYPE(retval.CD_type, retval.CD_data.LD_string))
+	{
+	    if (retval.CD_type == TYPE_COMPONENT) {
+		retval.CD_data.LD_string =
+		    AGG_TO_STRUCT(retval.CD_data.LD_string);
+	    }
+	    RunHeapIncRef(rms->rhi, retval.CD_data.LD_string);
+	}
+
+	if (retval.CD_type == TYPE_INTEGER) {
+	    TopData() = retval.CD_data.LD_integer;
+	} else {
+	    TopData() = retval.CD_data.LD_gen_dword;
+	}
+	TopType() = retval.CD_type;
+    }
+    else
+    {
+	if (RUN_HEAP_TYPE(retval.CD_type, retval.CD_data.LD_string))
+	{
+	    /* Destroy it if a zero refcount thing was returned */
+	    if (retval.CD_type == TYPE_COMPONENT) {
+		retval.CD_data.LD_string =
+		    AGG_TO_STRUCT(retval.CD_data.LD_string);
+	    }
+	    RunHeapIncRef(rms->rhi, retval.CD_data.LD_string);
+	    RunHeapDecRef(rms->rhi, retval.CD_data.LD_string);
+	}
+    }
+    return;
+}
+
+#ifndef LIBERTY
+/*********************************************************************
+ *			BasrunLibraryEntry
+ *********************************************************************
+ * SYNOPSIS:	Entry point for the library.
+ *
+ *
+ * CALLED BY:	PRIVATE
+ * PASS:	
+ * RETURN:	0 if no problem
+ * SIDE EFFECTS:
+ * STRATEGY:
+ * REVISION HISTORY:
+ *	Name	Date		Description			     
+ *	----	----		-----------			     
+ *	ron	9/ 7/94		Initial version			     
+ * 
+ *********************************************************************/
+Boolean _pascal
+BasrunLibraryEntry(LibraryCallType type, GeodeHandle client)
+{
+    USE_IT(type);
+    USE_IT(client);
+    return 0;
+}
+
+#endif
+/*********************************************************************
+ *			FunctionValidParent -d-
+ *********************************************************************
+ * SYNOPSIS:	create a component and name it
+ * CALLED BY:
+ * PASS:	stack: Component|string, component
+ * RETURN:
+ * SIDE EFFECTS:
+ * STRATEGY:
+ *		Check to make sure the number of args and the types
+ *		are correct
+ * REVISION HISTORY:
+ *	Name	Date		Description			     
+ *	----	----		-----------			     
+ *	jimmy	8/ 8/94		Initial version			     
+ * 
+ *********************************************************************/
+void
+FunctionValidParent(RMLPtr rms, BuiltInFuncEnum id)
+{
+    RVal	rvComp, rvParent;
+    int		retval;
+    USE_IT(id);
+
+    PROFILE_START_SECTION(PS_FUNC_VALID_PARENT);
+
+    /* Pop component/string (parent) */
+    if ((TopType() != TYPE_COMPONENT && TopType() != TYPE_STRING)
+	|| NthType(2) != TYPE_COMPONENT) {
+	RunSetErrorWithData(rms->ptask, RTE_TYPE_MISMATCH, TYPE_COMPONENT);
+	return;
+    }
+
+    if ((TopType() == TYPE_COMPONENT && TopData() == NullOptr)
+	|| NthData(2) == NullOptr) {
+	RunSetError(rms->ptask, RTE_VALUE_IS_NULL);
+	return;
+    }
+
+    PopVal(rvParent);
+    PopVal(rvComp);
+
+    if (rvParent.type == TYPE_STRING)
+    {
+	TCHAR *name;
+
+	RunHeapLock(rms->rhi, rvParent.value, (void**)&name);
+	if (!strcmp(name, theAppString)) {
+	    rvParent.value = rms->rtask->RT_appObject;
+	} else if (!strcmp(name, _TEXT("top"))) {
+	    rvParent.value = rms->rtask->RT_uiParent;
+	}
+	RunHeapDecRefAndUnlock(rms->rhi, rvParent.value, name);
+    }
+
+#ifdef LIBERTY
+    retval = ((Component*)rvComp.value)->Call(MSG_VALIDATE_PARENT, (Component*) rvParent.value);
+#else /* GEOS */
+    retval = @call rvComp.value::MSG_ENT_VALIDATE_PARENT(rvParent.value);
+#endif /* ifdef LIBERTY */
+
+    PushTypeData(TYPE_INTEGER, (retval == 0));
+    PROFILE_END_SECTION(PS_FUNC_VALID_PARENT);
+    return;
+}
+
+
+
+/*********************************************************************
+ *			GetSystemModule
+ *********************************************************************
+ * SYNOPSIS:	get the system module
+ * CALLED BY:	GLOBAL
+ * PASS:	PTaskPtr
+ * RETURN:
+ * SIDE EFFECTS:
+ * STRATEGY:
+ * REVISION HISTORY:
+ *	Name	Date		Description			     
+ *	----	----		-----------			     
+ *	jimmy	11/30/95	Initial version
+ * 
+ *********************************************************************/
+MemHandle   GetSystemModule(PTaskPtr ptask)
+{
+#ifdef LIBERTY
+    USE_IT(ptask);
+    return theSystemModule;
+#else
+    MemHandle	module;
+
+#ifdef __BORLANDC__
+_asm { push es }
+_asm { push di }
+#endif
+
+    module = @call ptask->PT_interpreter::MSG_INTERP_GET_SYSTEM_MODULE();
+
+#ifdef __BORLANDC__
+_asm { pop di }
+_asm { pop es }
+#endif
+    return module;
+#endif
+}
+
+/*********************************************************************
+ *			FunctionSystemModule
+ *********************************************************************
+ * SYNOPSIS:	A little hack to return System module.
+ * CALLED BY:	RunMainLoop (through OP_BUILT_IN_FUNC_CALL)
+ * RETURN:
+ * SIDE EFFECTS:
+ * STRATEGY:
+ * REVISION HISTORY:
+ *	Name	Date		Description			     
+ *	----	----		-----------			     
+ *	ron	 7/ 9/95	Initial version			     
+ * 
+ *********************************************************************/
+void
+FunctionSystemModule(register RMLPtr rms, BuiltInFuncEnum id)
+{
+    RTaskHan   system;
+    USE_IT(id);
+    
+    /* Find out what the system module is by asking the interpreter.
+     */
+
+#ifdef LIBERTY
+    system = theSystemModule;
+#else
+    system = @call rms->ptask->PT_interpreter::MSG_INTERP_GET_SYSTEM_MODULE();
+#endif
+    
+    PushTypeData(TYPE_MODULE, system);
+    return;
+}
+
+
+/*********************************************************************
+ *			OpCompInit -d-
+ *********************************************************************
+ * SYNOPSIS:	run the CompInit opcode
+ * CALLED BY:	RunMainLoop
+ * PASS:
+ * RETURN:
+ * SIDE EFFECTS:
+ * STRATEGY:
+ * REVISION HISTORY:
+ *	Name	Date		Description			     
+ *	----	----		-----------			     
+ *	jimmy	10/26/95	Initial version
+ * 
+ *********************************************************************/
+void
+OpCompInit(register RMLPtr rms)
+{
+    word	    prop, strTok;
+    ComponentData   data;
+    word	    numProps;
+    RVal	    rvComp;
+
+    if (TopType() != TYPE_COMPONENT)
+    {
+	RunSetErrorWithData(rms->ptask, RTE_TYPE_MISMATCH, TYPE_COMPONENT);
+	return;
+    } else if (TopData() == NullOptr) {
+	RunSetError(rms->ptask, RTE_VALUE_IS_NULL);
+	return;
+    }
+
+    if (COMP_IS_AGG(TopData())) {
+	RunSetError(rms->ptask, RTE_COMP_INIT_WITH_AGG);
+	return;
+    }
+
+    PopVal(rvComp);
+    GetByte(rms->pc, numProps);
+
+    while (numProps)
+    {
+	register byte	type;		/* High bit can be set */
+
+	GetByte(rms->pc, type);
+	data.CD_type = type&(~0x80);
+
+	switch (data.CD_type)
+	{
+	case TYPE_BYTE:
+	    GetByte(rms->pc, data.CD_data.LD_integer);
+	    data.CD_type = TYPE_INTEGER;
+	    break;
+	case TYPE_INTEGER:
+	    GetWordBcl(rms->pc, data.CD_data.LD_integer);
+	    break;
+
+	case TYPE_STRING:
+	    GetWordBcl(rms->pc, strTok);
+	    data.CD_data.LD_string = StrMapLookup(rms->rtask->RT_strConstMap,
+						  strTok);
+	    break;
+
+	case TYPE_FLOAT:
+	case TYPE_LONG:
+	    GetDwordBcl(rms->pc, data.CD_data.LD_gen_dword);
+	    break;
+	}
+
+	if (type & 0x80)
+	{
+	    /* High bit of type set -- it's a BC prop
+	     */
+	    GetByte(rms->pc, prop);
+	    /* create the proper value for a set property value */
+	    INT_ON_Local(rms);
+#ifdef LIBERTY
+	    ((Component*)(rvComp.value))->SetProperty(prop, &data);
+#else	/* GEOS version below */
+	    prop = (prop << 1) | 1;
+	    RunGetOrSetBCPropertyLow(rms->rhi, rvComp.value, prop, &data);
+#endif
+	    INT_OFF_Local(rms);
+	}
+	else
+	{
+	    RunHeapToken    tmpKey;
+	    TCHAR	    *propName;
+
+	    GetWordBcl(rms->pc, prop);
+	    tmpKey = StrMapLookup(rms->rtask->RT_strConstMap, prop);
+
+	    INT_ON_Local(rms);
+	    RunHeapLock(rms->rhi, tmpKey, (void **)&propName);
+#ifdef LIBERTY
+	    ((Component*)(rvComp.value))->SetProperty(tmpKey, propName, &data);
+#else  /* GEOS version below */
+	    @call rvComp.value::MSG_ENT_SET_PROPERTY
+		(rms->rhi,&data,propName);
+#endif
+	    RunHeapUnlock(rms->rhi, tmpKey);
+	    INT_OFF_Local(rms);
+	    
+	}
+
+	if (data.CD_type == TYPE_ERROR) 
+	{
+	    RunSetError(rms->ptask, 
+			(RuntimeErrorCode)(FIRST_COMPONENT_ERROR +
+					   data.CD_data.LD_error));
+	    return;
+	}
+	--numProps;
+    }
+}
+
+
+
+
+/*********************************************************************
+ *			FunctionType
+ *********************************************************************
+ * SYNOPSIS:	deal with FUNCTION_TYPE,BASIC_TYPE and SUB_TYPE
+ * CALLED BY:	
+ * RETURN:
+ * SIDE EFFECTS:
+ * STRATEGY:
+ * REVISION HISTORY:
+ *	Name	Date		Description			     
+ *	----	----		-----------			     
+ *	jimmy	3/19/96		Initial version
+ * 
+ *********************************************************************/
+void
+FunctionType(register RMLPtr rms, BuiltInFuncEnum id)
+{
+    RVal	    rv;
+    RunHeapToken    key;
+    TCHAR	    *output;
+
+    PopVal(rv);
+    switch(rv.type)
+    {
+    case TYPE_COMPLEX:
+    {
+	if (id == FUNCTION_BASIC_TYPE) 
+	{
+	    output = _TEXT("complex");
+	} 
+	else if ((RunHeapToken)rv.value == NULL_TOKEN)
+	{
+	    output = _TEXT("Null Complex");
+	}
+	else
+	{
+#ifndef LIBERTY
+	    LegosComplex	*lc;
+
+	    RunHeapLock(rms->rhi, rv.value, (void**)(&lc));
+	    if (ManufacturerFromFormatID(lc->LC_format)==MANUFACTURER_ID_GEOWORKS)
+	    {
+		switch(TypeFromFormatID(lc->LC_format))
+		{
+		case CIF_TEXT:		 output = _TEXT("text"); break;
+		case CIF_GRAPHICS_STRING:output = _TEXT("gstring"); break;
+		case CIF_FILES:		 output = _TEXT("files"); break;
+		case CIF_SPREADSHEET:	 output = _TEXT("spreadsheet"); break;
+		case CIF_INK:		 output = _TEXT("ink"); break;
+		case CIF_GROBJ:		 output = _TEXT("grobj"); break;
+		case CIF_GEODEX:	 output = _TEXT("geodex"); break;
+		case CIF_BITMAP:	 output = _TEXT("bitmap"); break;
+		case CIF_SOUND_SYNTH:	 output = _TEXT("sound synth"); break;
+		default:
+		    output = _TEXT("unknown clipboard type");
+		}
+	    }
+	    else
+	    {
+		output = _TEXT("unknown clipboard type");
+	    }
+	    RunHeapUnlock(rms->rhi, rv.value);
+#else
+	    /* FIXME: this should show up as a bug someday. */
+	    output = _TEXT("unknown clipboard type");
+#endif
+	}
+	break;
+    }
+    case TYPE_INTEGER: output = _TEXT("integer"); break;
+    case TYPE_LONG: output = _TEXT("long"); break;
+    case TYPE_FLOAT: output = _TEXT("float"); break;
+    case TYPE_MODULE: output = _TEXT("module"); break;
+    case TYPE_STRING: output = _TEXT("string"); break;
+    case TYPE_COMPONENT:output = _TEXT("component"); break;
+    case TYPE_ARRAY: output = _TEXT("array"); break;
+    case TYPE_STRUCT: output = _TEXT("struct"); break;
+    default:
+	RunSetError(rms->ptask, RTE_BAD_TYPE);
+	return;
+    }
+
+    /* for now just add strings like there was no tomorrow, and never 
+     * delete them
+     */
+    key = RunHeapAlloc(rms->rhi, RHT_STRING, 1, 
+		       (strlen(output) + 1) * sizeof(TCHAR), 
+		       output);
+
+    /* now push the result onto the stack an we are done! */
+    PushTypeData(TYPE_STRING, key);
+}
+
+
+#ifndef LIBERTY
+extern void _pascal RegisterNoInkWin(MemHandle win, word addOrRemove);
+
+
+/*********************************************************************
+ *			BugThreadPSem
+ *********************************************************************
+ * SYNOPSIS:	P the sem after setting app object not enabled
+ * CALLED BY:	
+ * PASS:
+ * RETURN:
+ * SIDE EFFECTS:
+ * STRATEGY:
+ * REVISION HISTORY:
+ *	Name	Date		Description			     
+ *	----	----		-----------			     
+ *	jimmy	11/ 2/95	Initial version
+ * 
+ *********************************************************************/
+#define MAX_NO_INK_WIN 16   /* from flowC.def */
+void BugThreadPSem(SemaphoreHandle sem)
+{
+    USE_IT(sem);
+#if 0
+    int	    children, i;
+    optr    child;
+    optr	appobj;
+    MemHandle	win;
+
+    appobj = GeodeGetAppObject(0);
+    children = @call appobj::MSG_GEN_COUNT_CHILDREN();
+    if (children > MAX_NO_INK_WIN) 
+    {
+	children = MAX_NO_INK_WIN;
+    }
+    for (i = children-1; i >=0 ; i--)
+    {
+	child = @call appobj::MSG_GEN_FIND_CHILD_AT_POSITION(i);
+	win = @call child::MSG_VIS_QUERY_WINDOW();
+	RegisterNoInkWin(win, TRUE);
+    }
+    ThreadPSem(sem);
+    for (i = children-1; i >=0 ; i--)
+    {
+	child = @call appobj::MSG_GEN_FIND_CHILD_AT_POSITION(i);
+	win = @call child::MSG_VIS_QUERY_WINDOW();
+	RegisterNoInkWin(win, FALSE);
+    }
+#endif
+}
+#endif
+
+
+
+
+#ifndef LIBERTY
+
+/*********************************************************************
+ *			RunComponentLockHeap
+ *********************************************************************
+ * SYNOPSIS:	Locks down RunHeapInfo for components to use
+ * CALLED BY:	EXTERNAL
+ * RETURN:	
+ * SIDE EFFECTS:
+ * STRATEGY:
+ * REVISION HISTORY:
+ *	Name	Date		Description			     
+ *	----	----		-----------			     
+ *	RON	 7/17/95	Initial version
+ * 
+ *********************************************************************/
+RunHeapInfo *
+RunComponentLockHeap(EntObjectBlockHeader *block)
+{
+    ProgTask	*pt;
+    
+    pt = MemLock(@call block->EOBH_interpreter::MSG_INTERP_GET_STATE());
+    return &pt->PT_runHeapInfo;
+}
+
+
+/*********************************************************************
+ *			RunComponentUnlockHeap
+ *********************************************************************
+ * SYNOPSIS:	Unlocks RunHeapInfo for components to use
+ * CALLED BY:	EXTERNAL
+ * RETURN:	
+ * SIDE EFFECTS:
+ * STRATEGY:
+ * REVISION HISTORY:
+ *	Name	Date		Description			     
+ *	----	----		-----------			     
+ *	RON	 7/17/95	Initial version
+ * 
+ *********************************************************************/
+void
+RunComponentUnlockHeap(EntObjectBlockHeader *block)
+{
+    MemUnlock(@call block->EOBH_interpreter::MSG_INTERP_GET_STATE());
+}
+
+
+/*********************************************************************
+ *			RunComponentCopyString
+ *********************************************************************
+ * SYNOPSIS: 	Copies a string from the heap to a buffer
+ * CALLED BY:	EXTERNAL
+ * PASS:	RunHeapToken	stringToken
+ *		TCHAR		*buffer
+ *		optr		comp, any component in a EntObjectBlock
+ * RETURN:
+ * SIDE EFFECTS: buffer filled
+ * STRATEGY:
+ * REVISION HISTORY:
+ *	Name	Date		Description			     
+ *	----	----		-----------			     
+ *	RON	 7/26/95	Initial version
+ * 
+ *********************************************************************/
+void
+RunComponentCopyString(TCHAR *buffer, RunHeapToken stringToken, optr comp)
+{
+    EntObjectBlockHeader *block;
+    RunHeapInfo	*rhi;
+    TCHAR *dataPtr;
+
+    block = ObjLockObjBlock (OptrToHandle(comp));
+    rhi = RunComponentLockHeap(block);
+    RunHeapLock(rhi, stringToken, (void**)(&dataPtr));
+
+    EC_BOUNDS(buffer);
+    EC_BOUNDS(dataPtr);
+    strcpy (buffer, dataPtr);
+
+    RunHeapUnlock(rhi, stringToken);
+    RunComponentUnlockHeap(block);
+    MemUnlock(OptrToHandle(comp));
+}
+#endif

@@ -1,0 +1,1184 @@
+
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+	Copyright (c) Geoworks 1995 -- All Rights Reserved
+
+PROJECT:	PC/GEOS
+MODULE:		LEGOS - UI Builder
+FILE:		bentwin.goc
+
+AUTHOR:		Martin Turon, Mar  2, 1995
+
+ROUTINES:
+	Name			Description			Date	
+	----			-----------			----
+	MSG_ENT_INITIALIZE	create the childGroup hack	3/2/95
+	MSG_GEN_ADD_CHILD	childGroup hack			3/2/95
+	MSG_GEN_FIND_CHILD	childGroup hack			3/6/95
+	MSG_GEN_COUNT_CHILDREN	childGroup hack			3/6/95
+	MSG_GEN_SEND_TO_CHILDREN  childGroup hack		5/9/95
+
+
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	martin	3/2/95   	Initial version.
+
+DESCRIPTION:
+	Code for build-time components that deal with windowing.  This
+	includes forwarding mouse and keyboard events to the
+	BentManagerClass object in charge. 
+
+	$Id: bentWindow.goc,v 1.1 98/03/11 15:07:54 martin Exp $
+	$Revision: 1.1 $
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+
+@include "bentInternal.goh"
+@include <Legos/legosapp.goh>
+
+@classdecl	BentWindowClass;
+@classdecl  	BentViewClass;
+
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		Code for BentWindowClass
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+
+
+/***********************************************************************
+ *		MSG_ENT_INITIALIZE for BentWindowClass
+ ***********************************************************************
+ * SYNOPSIS:	Initializxes this object.  Operations include creating a
+ *	    	GenInteractionClass child into which the generic parts of
+ *		all EntClass children will go.  This group child will allow
+ *		us to later discern whether mouse events should be used for
+ *		window management/resizing (default handling) or to
+ *		manipulate build-time components (forwarded to the
+ *		BentManagerClass)  
+ *
+ * PARAMETERS:	    
+ *
+ * SIDE EFFECTS:    
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	martin	3/2/95   	Initial version
+ *
+ ***********************************************************************/
+@method BentWindowClass, MSG_VIS_OPEN_WIN
+{
+    PointDWord		translation;
+    VisCompInstance	*vself;
+    MemHandle	    	win;
+    int		interactable;
+    optr	impliedWin;
+    
+
+    vself = ObjDerefVis(oself);
+    if (vself->VCI_window == NullHandle)
+    {
+	if (parentWindow != NullHandle) {
+	    @callsuper();
+	}
+	/* call ourselves back after window created passing a window handle
+	 * of zero so we know not to call the super class again if it still
+	 * hasn't updated the VCI_window
+	 */
+	@send , forceQueue oself::MSG_VIS_OPEN_WIN(0);
+	return;
+    }
+
+   /*
+    * Have this window grab the pre-passive mouse events, so it can decide
+    * what to do with the mouse before its children start doing their thing. 
+    * The pre-passive grab list should be a GCN list, but oh well...
+    */
+    
+    vself = ObjDerefVis(oself);
+    translation.PD_x = (sdword)vself->VI_bounds.R_left;
+    translation.PD_y = (sdword)vself->VI_bounds.R_top;
+    win = vself->VCI_window;
+
+    @call self::MSG_VIS_VUP_ALTER_INPUT_FLOW(translation, vself->VCI_window,
+				 	   oself, VIFGT_PRE_PASSIVE, 
+					 VIFGF_FORCE|VIFGF_GRAB|VIFGF_MOUSE);
+    /*
+     * remove self from app's passive list if mouse not inside our
+     * bounds, really.
+     */
+    impliedWin = @call GeodeGetAppObject(0)::MSG_LA_GET_IMPLIED_WINDOW();
+
+    /* The following doesn't work if there is an extra window (the editor)
+       between the mouse and the bentwindow */
+/*    interactable = BentMouseInWindow(win, oself);*/
+    /*    if (!interactable) */
+    if (impliedWin != oself)
+    {
+	@call self::MSG_VIS_REMOVE_BUTTON_PRE_PASSIVE();
+    } else 
+    {
+	@call self::MSG_VIS_ADD_BUTTON_PRE_PASSIVE();
+    }
+    
+    
+    
+    /* @call self::MSG_META_ENSURE_MOUSE_NOT_ACTIVELY_TRESPASSING();*/
+    
+    
+    /*
+     *  @call self::MSG_META_RAW_UNIV_LEAVE(oself, win);
+     */
+
+
+}	/* End of MSG_ENT_INITIALIZE.	*/
+
+@method BentWindowClass, MSG_VIS_CLOSE_WIN
+{
+    PointDWord		translation;
+    VisCompInstance	*vself;
+
+    vself = ObjDerefVis(oself);
+    translation.PD_x = (sdword)vself->VI_bounds.R_left;
+    translation.PD_y = (sdword)vself->VI_bounds.R_top;
+    @call self::MSG_VIS_VUP_ALTER_INPUT_FLOW(translation, vself->VCI_window,
+				 	   oself, VIFGT_PRE_PASSIVE, 
+					   VIFGF_FORCE|VIFGF_MOUSE);
+
+    @callsuper();
+
+}
+
+/***********************************************************************
+ *		MSG_ENT_INITIALIZE for BentWindowClass
+ ***********************************************************************
+ * SYNOPSIS:		Bring windows forward when created.
+ * PARAMETERS:	
+ * SIDE EFFECTS:
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	RON	12/19/95   	Initial Revision
+ *
+ ***********************************************************************/
+@method BentWindowClass, MSG_ENT_INITIALIZE
+{
+    @callsuper();
+    @call self::MSG_GEN_BRING_TO_TOP();
+}	/* End of MSG_ENT_INITIALIZE.	*/
+
+
+
+
+/***********************************************************************
+ *		MSG_ENT_VALIDATE_PARENT for BentWindowClass
+ ***********************************************************************
+ * SYNOPSIS:	    
+ * PARAMETERS:	  optr	parentPtr
+ *  
+ * SIDE EFFECTS:    
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	martin	3/6/95   	Initial version
+ *
+ ***********************************************************************/
+@method BentWindowClass, MSG_ENT_VALIDATE_PARENT
+{
+    Boolean  validParent;
+
+    MemLock(HandleOf(parentPtr));
+    validParent = (ObjIsObjectInClass(parentPtr, &GenApplicationClass) ||
+	       ObjIsObjectInClass(parentPtr,(ClassStruct *)&BentWindowClass));
+    MemUnlock(HandleOf(parentPtr));
+
+    if (validParent) return 0;
+    else return -1;
+
+}	/* End of MSG_ENT_VALIDATE_PARENT.	*/
+
+
+
+
+/***********************************************************************
+ *		MSG_META_KBD_CHAR for BentWindowClass
+ ***********************************************************************
+ * SYNOPSIS:	    Forwards keyboard events to the interpreter.
+ *
+ * PARAMETERS:	    word	character
+ *		    word	flags (Shift1State << 8 | CharFlags)
+ *		    word	state (scan code  << 8 | ToggleState)
+ *
+ * SIDE EFFECTS:    
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	martin	11/15/94   	Initial version
+ *
+ ***********************************************************************/
+@method BentWindowClass, MSG_META_KBD_CHAR
+{
+   /*
+    * If we don't call our superclass in certain situations, weird things
+    * happen.  For instance, in order to move forms or menus with the close
+    * menu "move" option, we must callsuper when VC_NUMPAD_ENTER is passed... 
+    * Also, do nothing on keyboard events when the form is selected.
+    */
+    if ((character == ((CS_CONTROL << 8) | VC_NUMPAD_ENTER)))
+	/* ||       (ECPSelf(pself)->BI_flags & BSF_SELECTED))*/
+    {
+	@callsuper();
+    }
+    else 
+    {
+	@call EntGetInterpreter(ECPSelf(pself))::MSG_META_KBD_CHAR
+						(character, flags, state);
+    }
+}	/* End of MSG_META_KBD_CHAR.	*/
+								
+
+
+/***********************************************************************
+ *		MSG_VIS_DRAW for BentWindowClass
+ ***********************************************************************
+ * SYNOPSIS:    Draws both the visual part of the component, and selection
+ *		handles if necessary.
+ *
+ * PARAMETERS:	DrawFlags drawFlags = cl, 
+ *		GStateHandle gstate = bp	    
+ *
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	martin	10/17/94   	Initial version
+ *
+ ***********************************************************************/
+@method BentWindowClass, MSG_VIS_DRAW
+{
+    int selected = (ECPSelf(pself)->BI_flags & BSF_SELECTED);
+
+    @callsuper();
+
+    if (selected) {
+	@call self::MSG_BENT_DRAW_SELECTED();
+    }
+}	/* End of MSG_VIS_DRAW.	*/
+
+
+
+/***********************************************************************
+ *		MSG_BENT_DRAW_SELECTED for BentWindowClass
+ ***********************************************************************
+ * SYNOPSIS:    
+ *
+ * PARAMETERS:	
+ *		
+ *
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	martin	10/17/94   	Initial version
+ *
+ ***********************************************************************/
+@method BentWindowClass, MSG_BENT_DRAW_SELECTED
+{
+    GStateHandle gstate;
+    SizeAsDWord size;
+
+/*
+    if (@call self::MSG_ENT_GET_PARENT() != NullOptr) 
+    {
+	@callsuper();
+	return;
+    }
+*/
+
+    gstate = @call self::MSG_VIS_VUP_CREATE_GSTATE();
+    /*
+     * Draw handles based on our visible size.
+     */
+    size = @call self::MSG_VIS_GET_SIZE(); 
+    GrSetLineColor(gstate, CF_INDEX, BENT_SELECTION_COLOR, 0 ,0);
+    GrDrawRect(gstate, 0, 0, DWORD_WIDTH(size)-1, DWORD_HEIGHT(size)-1);
+    GrDestroyState(gstate);
+}	/* End of MSG_VIS_DRAW.	*/
+
+
+/***********************************************************************
+ *		MSG_BENT_DRAW_UNSELECTED for BentWindowClass
+ ***********************************************************************
+ * SYNOPSIS:    
+ *
+ * PARAMETERS:	
+ *		
+ *
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	martin	10/17/94   	Initial version
+ *
+ ***********************************************************************/
+@method BentWindowClass, MSG_BENT_DRAW_UNSELECTED
+{
+    GStateHandle gstate;
+    SizeAsDWord size;
+
+    if (@call self::MSG_ENT_GET_PARENT() != GeodeGetAppObject(0)) 
+    {
+	@callsuper();
+	return;
+    }
+    
+    gstate = @call self::MSG_VIS_VUP_CREATE_GSTATE();
+    /*
+     * Draw handles based on our visible size.
+     */
+    size = @call self::MSG_VIS_GET_SIZE();
+    /* left edge */
+    GrInvalRect(gstate,
+		0,0, 1, DWORD_HEIGHT(size)-1);
+    
+    /* top edge */
+    GrInvalRect(gstate,
+		0,0, DWORD_WIDTH(size)-1, 1);
+    
+    /* right edge */
+    GrInvalRect(gstate,
+		DWORD_WIDTH(size)-1,0,
+		DWORD_WIDTH(size), DWORD_HEIGHT(size)-1);
+    
+    /* bottom edge */
+    GrInvalRect(gstate,
+		0,DWORD_HEIGHT(size)-1,
+		DWORD_WIDTH(size)-1, DWORD_HEIGHT(size));
+    
+    GrDestroyState(gstate);
+}	/* End of MSG_VIS_DRAW.	*/
+
+
+
+
+/***********************************************************************
+ *		BentTranslatePassiveButton
+ ***********************************************************************
+ * SYNOPSIS:	Returns the message that the given pre-passive mouse event
+ *		will soon create.  FlowTranslatePassiveButton was used as
+ * 		the template for this code.  Possible results are:
+ *			MSG_META_(START/END/DRAG)_(SELECT/MOVE_COPY), 
+ *
+ * CALLED BY:	
+ * PASS:		word inputState
+ * RETURN:		int  message	
+ * SIDE EFFECTS:	
+ * STRATEGY:
+ *	
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	martin	3/16/95   	Initial Revision
+ *
+ ***********************************************************************/
+int
+BentTranslatePassiveButton (int inputState)
+{
+    int message;
+
+    message = MSG_META_START_SELECT;
+    if (inputState & BUTTON_2) 
+	message = MSG_META_START_MOVE_COPY;
+    else if (inputState & (UIFA_FEATURES<<8)) 
+	message = MSG_META_START_FEATURES;
+
+    if (~inputState & BI_PRESS) {
+	message++;
+    	if (inputState & BI_B0_DOWN) message = MSG_META_DRAG_SELECT;
+    	else if (inputState & BI_B1_DOWN) message = MSG_META_DRAG_MOVE_COPY;
+    }
+
+    return message;
+
+}	/* End of BentTranslatePassiveButton.	*/
+
+
+/***********************************************************************
+ *		MSG_META_PRE_PASSIVE_BUTTON for BentWindowClass
+ ***********************************************************************
+ * SYNOPSIS:	Deals with mouse clicks properly, forwarding the event to
+ *		all the proper children and the interpreter when necessary.
+ *		For menus this means forwarding MSG_META_END_OTHER messages,
+ * 		since there is a specific UI hack in copenMenuButton.asm
+ *		that converts mouse SELECT operations into OTHER operations.
+ *
+ * PARAMETERS:	MouseReturnParams *retVal = bpaxdxcx
+ *		sword xPosition = cx
+ *		sword yPosition = dx
+ *		word inputState = bp
+ *
+ * SIDE EFFECTS:    
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	martin	10/19/94   	Initial version
+ *
+ ***********************************************************************/
+@method BentWindowClass, MSG_META_PRE_PASSIVE_BUTTON
+{
+    @call self::MSG_BENT_PRE_PASSIVE_BUTTON(retVal, xPosition, yPosition, inputState);
+}
+
+extern void BentAdjustWinCoords(optr comp, optr parent, int *x, int *y, int upDown);
+
+@method BentWindowClass, MSG_BENT_PRE_PASSIVE_BUTTON
+{
+    optr    	    child;
+
+    message = BentTranslatePassiveButton(inputState);
+
+    /*
+     * FIXME, this used to be childGroup, I changed it to oself.
+     * We probably need to check the margins as to see if we need to
+     * pass it on.
+     */
+
+/*
+
+    if (@call self::MSG_ENT_GET_PARENT() != NullOptr)
+    {
+	VisCompInstance    *vself;
+	MemHandle   	    owin;
+	Rectangle   	    rect;
+
+	retVal->flags = MRF_PROCESSED;
+	return;
+#if 0
+	vself = ObjDerefVis(oself);
+	owin = vself->VCI_window;
+	WinGetWinScreenBounds(owin, &rect);
+	xPosition -= rect.R_left;
+	yPosition -= rect.R_top;
+#endif
+    }
+
+*/
+
+
+    if (@call self::MSG_BENT_ACCEPT_POINT_IN_BOUNDS(xPosition, yPosition)) 
+    {
+	optr   	    interpreter = EntGetInterpreter(ECPSelf(pself));
+	MemHandle  	    owin, cwin = NullHandle;
+	VisCompInstance    *vself;
+	Rectangle  	    r1, r2;
+
+	/*
+	 * The mouse click was not on one of the form related gadgets
+	 * (title bar, iconify button, etc.) so forward it to the
+	 * BentManagerClass object.  First get the optr of the component
+	 * that was clicked on, and pass this information on.  
+	 */
+
+	vself = ObjDerefVis(oself);
+	owin = vself->VCI_window;
+	 
+	child = @call oself::MSG_BENT_FIND_CHILD_UNDER_POINT(
+							     xPosition,
+							     yPosition);
+
+	/*
+	 * The following code was added so that popups could be popped
+	 * up by having the form pass the mouse event on in case nothing
+	 * under the point was found (since the button in the menu isn't
+	 * a Bent object).
+	 */
+
+	/* if its END_SELECT this will happen in the END_SELECT
+	 * handler, after calling super, so DONT do it here!
+	 */
+	ECPSelf(pself)->BWI_flags &= ~BWF_DEFAULT_MOUSE_BEHAVIOR;
+	
+	if (child == oself) {
+	    if (message == MSG_META_START_SELECT) {
+		if ((@call interpreter::MSG_BENT_MANAGER_GET_BUILD_MODE()) == BBM_NORMAL) 
+		{
+		    pself = ObjDerefBent(oself);
+		    ECPSelf(pself)->BWI_flags |= BWF_DEFAULT_MOUSE_BEHAVIOR;
+		}
+	    }
+	}
+	
+	@call interpreter::MSG_BENT_MANAGER_MOUSE_EVENT
+	    (owin, child, xPosition, yPosition, inputState, message, retVal);
+    } 
+
+    retVal->flags = MRF_PROCESSED;
+}	/* End of MSG_META_PRE_PASSIVE_BUTTON.	*/
+
+
+/***********************************************************************
+ *		MSG_META_START_SELECT for BentWindowClass
+ ***********************************************************************
+ * SYNOPSIS:	Windows get the START_SELECT even if they don't call their
+ *		superclass in the PRE_PASSIVE_BUTTON handler.  This code 
+ *		makes sure nothing strange happens as a result of this.
+ *
+ * PARAMETERS:	MouseReturnParams *retVal = bpaxdxcx
+ *		sword xPosition = cx
+ *		sword yPosition = dx
+ *		word inputState = bp
+ *
+ * SIDE EFFECTS:    
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	martin	10/19/94   	Initial version
+ *
+ ***********************************************************************/
+@method BentWindowClass, MSG_META_START_SELECT,
+                         MSG_META_DRAG_SELECT,
+                         MSG_META_END_SELECT
+{
+
+    /*
+     * If this window is being dragged, resized, or moved, let the event be
+     * passed to its superclass for handling.
+     */
+     if (message == MSG_META_DRAG_SELECT)  {
+         ECPSelf(pself)->BWI_flags |= BWF_DEFAULT_MOUSE_BEHAVIOR;
+     }
+     else if (message == MSG_META_START_SELECT) {
+	 /* grab focus and target just to be greedy */
+	 @call oself::MSG_META_GRAB_TARGET_EXCL();
+	 @call oself::MSG_META_GRAB_FOCUS_EXCL();
+     }
+     pself = ObjDerefBent(oself);
+
+     if ((ECPSelf(pself)->BWI_flags & BWF_DEFAULT_MOUSE_BEHAVIOR) ||
+	 (!@call self::MSG_BENT_ACCEPT_POINT_IN_BOUNDS(xPosition, yPosition)))
+     {
+	 @callsuper();
+     }
+     if (message == MSG_META_END_SELECT) {
+	 pself = ObjDerefBent(oself);
+         ECPSelf(pself)->BWI_flags &= ~BWF_DEFAULT_MOUSE_BEHAVIOR;
+	 /*
+	  * Call the superclass so the form can correctly resize and
+	  * set vardata when the border gets dragged  -- ron
+	  */
+	 @callsuper();
+	 
+     }
+     retVal->flags = MRF_PROCESSED;    
+
+}	/* End of MSG_META_START_SELECT.	*/
+
+
+/***********************************************************************
+ *		MSG_META_PTR for BentWindowClass
+ ***********************************************************************
+ * SYNOPSIS:	Asks the interpreter for the mouse pointer for the 
+ *		current mode.
+ *
+ * PARAMETERS:	MouseReturnParams *retVal = bpaxdxcx
+ *		sword xPosition = cx
+ *		sword yPosition = dx
+ *		word inputState = bp
+ *    
+ * SIDE EFFECTS:    
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	martin	10/14/94	Initial version
+ *
+ ***********************************************************************/
+@method BentWindowClass, MSG_META_PTR, MSG_BENT_MOUSE_PTR
+{
+     optr          	interpreter = EntGetInterpreter(ECPSelf(pself));
+     VisCompInstance	*vci;
+     int 		selected;
+     WindowHandle 	win;
+
+
+     selected = ECPSelf(pself)->BI_flags & BSF_SELECTED;
+
+     retVal->flags = MRF_PROCESSED;
+     
+
+    /*
+     * Deal with quick transfer stuff first.
+     */
+     if ((inputState & (UIFA_MOVE_COPY<<8)) &&
+	 ClipboardGetQuickTransferStatus()) 	{
+	    ClipboardQuickTransferFeedback	cursorType = CQTF_MOVE;
+
+	    if (inputState & (UIFA_COPY))  	cursorType = CQTF_COPY;
+	    ClipboardSetQuickTransferFeedback(cursorType, inputState);
+	    return;
+
+     }
+
+     if (@call self::MSG_BENT_ACCEPT_POINT_IN_BOUNDS(xPosition, yPosition)) {
+	optr child = @call oself::MSG_BENT_FIND_CHILD_UNDER_POINT(
+								  xPosition,
+								  yPosition);
+
+       /*
+	* The mouse pointer is not on one of the form related gadgets
+	* (title bar, iconify button, etc.) so have the BentManagerClass 
+	* object decide which mouse pointer is appropriate.
+	*/
+
+@if 0
+    /*
+     * It seems like I made other changes that makes this no longer needed.
+     */
+
+    /*
+	 * If the mouse is over the window, not a gadget, then adjust
+	 * the coordinates to be relative to screen, not our upper left.
+	 * Otherwise, we get resize handles in the middle of a form for
+	 * the form.  Also if the form is not selected, then don't adjust
+	 * the bound or resizing the selected child is wrong.
+	 */
+	    
+	if (child == oself && selected) 
+	{
+	    /*
+	     * since we got a pointer event, it is safe to ask for vis
+	     * data.
+	     */
+	    XYValueAsDWord pos;
+	    pos = @call self::MSG_VIS_GET_POSITION();
+	    xPosition -= DWORD_X(pos);
+	    yPosition -= DWORD_Y(pos);
+	}
+@endif
+
+    	retVal->flags = retVal->flags | MRF_SET_POINTER_IMAGE;
+	win = @call self::MSG_VIS_QUERY_WINDOW();
+    	retVal->ptrImage = @call interpreter::MSG_BENT_MANAGER_MOUSE_PTR
+	    				      (child, xPosition, yPosition, 
+					       oself);
+
+     }
+}	/* End of MSG_META_PTR. */
+
+
+@if 0 
+
+/***********************************************************************
+ *		MSG_VIS_MOVE_RESIZE_WIN for BentWindowClass
+ ***********************************************************************
+ * SYNOPSIS:	    Marks the size / position dirty when the user
+ *		    changes the size by dragging the window border.
+ *		    (gets called other times too, bummer)
+ * PARAMETERS:	    
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	RON	9/18/95   	Initial Revision
+ *
+ ***********************************************************************/
+@method BentWindowClass, MSG_VIS_MOVE_RESIZE_WIN
+{
+    ComponentData	cdata;
+    SizeAsDWord		size;
+    optr	selected;
+    void	*hint;
+    
+    
+    optr	interp = EntGetInterpreter(ECPSelf(pself));
+    /* Need to use Vis routines for getting size, position as they
+       have not been set explicitly yet. (thats what we are here for)*/
+    @callsuper();
+
+    /* only do this resize stuff for top level objects */
+    if (@call self::MSG_ENT_GET_PARENT() != GeodeGetAppObject(0))
+    {
+	return;
+    }
+    size = @call self::MSG_VIS_GET_SIZE();
+
+
+    
+    cdata.CD_type = TYPE_INTEGER;
+    cdata.CD_data.LD_integer = DWORD_X(size);
+    /*
+     * If using geometry hints, don't set width/height.
+     */
+    hint = ObjVarFindData(oself, HINT_NO_WIDER_THAN_CHILDREN_REQUIRE);
+    if (hint == NULL)
+    {
+	@call self::MSG_ENT_SET_PROPERTY_EXTERNAL(&cdata, _TEXT("width"));
+    }	 
+   
+    cdata.CD_data.LD_integer = DWORD_Y(size);
+    hint = ObjVarFindData(oself, HINT_NO_TALLER_THAN_CHILDREN_REQUIRE);
+    if (hint == NULL)
+    {
+	@call self::MSG_ENT_SET_PROPERTY_EXTERNAL(&cdata, _TEXT("height"));
+    }	 
+
+    /*
+     * Save the VarData so we remeber our size if get hidden.
+     */
+    
+    size = @call self::MSG_VIS_GET_POSITION();
+
+    cdata.CD_data.LD_integer= DWORD_X(size);
+    @call self::MSG_ENT_SET_PROPERTY_EXTERNAL(&cdata, _TEXT("left"));
+
+    cdata.CD_data.LD_integer= DWORD_Y(size);
+
+    @call self::MSG_ENT_SET_PROPERTY_EXTERNAL(&cdata, _TEXT("top"));
+
+
+    /*
+     * If we are the selected component, then tell property controller
+     * to update.
+     */
+
+    selected = @call interp::MSG_BENT_MANAGER_GET_SELECTED_COMPONENT();
+    if (selected == oself)
+    {
+	@send interp::MSG_BENT_MANAGER_UPDATE_CONTROL_UI(TRUE);
+    }
+    
+}	/* End of MSG_VIS_MOVE_RESIZE_WIN.	*/
+@endif
+
+
+/***********************************************************************
+ *		MSG_BENT_ACCEPT_POINT_IN_BOUNDS for BentWindowClass
+ ***********************************************************************
+ * SYNOPSIS:	    If the point is not in our margins, it is fine.
+ * PARAMETERS:	    int	x, y;
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	RON	9/18/95   	Initial Revision
+ *
+ ***********************************************************************/
+@method BentWindowClass, MSG_BENT_ACCEPT_POINT_IN_BOUNDS
+{
+    SizeAsDWord size;
+    Rectangle margins;
+    Rectangle bounds;
+    int width, height;
+    
+    
+    if (@call self::MSG_ENT_GET_PARENT() != GeodeGetAppObject(0)) 
+    {
+	return @callsuper();
+    }
+    
+    size = @call self::MSG_VIS_GET_SIZE();
+    width = DWORD_X(size);
+    height = DWORD_Y(size);
+    @call self::MSG_VIS_COMP_GET_MARGINS(&margins);
+    if ((x > margins.R_left) &&
+	(x < width - margins.R_right) &&
+	(y > margins.R_top) &&
+	(y < height - margins.R_bottom))
+    {
+	return @callsuper();
+    }
+    else return FALSE;
+    
+    
+}	/* End of MSG_BENT_ACCEPT_POINT_IN_BOUNDS.	*/
+
+
+/***********************************************************************
+ *		MSG_BENT_INVALIDATE for BentWindowClass
+ ***********************************************************************
+ * SYNOPSIS:	Handle invalidation specially, since our bounds are 
+ *		relative to the screen.
+ * PARAMETERS:	
+ * SIDE EFFECTS:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	dloft	10/17/95   	Initial Revision
+ *
+ ***********************************************************************/
+@method BentWindowClass, MSG_BENT_INVALIDATE
+{
+    @call self::MSG_VIS_INVALIDATE();
+
+}	/* End of MSG_BENT_INVALIDATE.	*/
+
+
+
+/***********************************************************************
+*	code for BentViewClass
+* 
+* BentView class if for components than have their own Content and this
+* their own view and yet sit inside the bounds of another component
+*
+***********************************************************************/
+
+
+/***********************************************************************
+ *		MSG_META_START_SELECT for BentViewClass
+ ***********************************************************************
+ * SYNOPSIS:	Views get the START_SELECT even if they don't call their
+ *		superclass in the PRE_PASSIVE_BUTTON handler.  This code 
+ *		makes sure nothing strange happens as a result of this.
+ *
+ * PARAMETERS:	MouseReturnParams *retVal = bpaxdxcx
+ *		sword xPosition = cx
+ *		sword yPosition = dx
+ *		word inputState = bp
+ *
+ * SIDE EFFECTS:    
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	martin	10/19/94   	Initial version
+ *
+ ***********************************************************************/
+@method BentViewClass, MSG_META_START_SELECT,
+                         MSG_META_DRAG_SELECT,
+                         MSG_META_END_SELECT
+{
+    SizeAsDWord size;
+    /*
+     * If this window is being dragged, resized, or moved, let the event be
+     * passed to its superclass for handling.
+     */
+    if (message == MSG_META_DRAG_SELECT)  {
+	ECPSelf(pself)->BVI_flags |= BWF_DEFAULT_MOUSE_BEHAVIOR;
+    }
+    else if (message == MSG_META_START_SELECT) {
+	/* grab focus and target just to be greedy */
+	@call oself::MSG_META_GRAB_TARGET_EXCL();
+	@call oself::MSG_META_GRAB_FOCUS_EXCL();
+    }
+
+    message = BentTranslatePassiveButton(inputState);
+
+    if (message == MSG_META_END_SELECT) {
+	ECPSelf(pself)->BVI_flags &= ~BWF_DEFAULT_MOUSE_BEHAVIOR;
+    }
+    retVal->flags = MRF_PROCESSED;    
+}	/* End of MSG_META_START_SELECT.	*/
+
+
+
+/***********************************************************************
+ *		MSG_META_PTR for BentViewClass
+ ***********************************************************************
+ * SYNOPSIS:	Asks the interpreter for the mouse pointer for the 
+ *		current mode.
+ *
+ * PARAMETERS:	MouseReturnParams *retVal = bpaxdxcx
+ *		sword xPosition = cx
+ *		sword yPosition = dx
+ *		word inputState = bp
+ *    
+ * SIDE EFFECTS:    
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	martin	10/14/94	Initial version
+ *
+ ***********************************************************************/
+@method BentViewClass, MSG_META_PTR, MSG_BENT_MOUSE_PTR
+{
+     optr          interpreter = EntGetInterpreter(ECPSelf(pself));
+     optr   	   child;
+     MemHandle	   swin = NullHandle, owin;
+     SizeAsDWord   size;
+
+     retVal->flags = MRF_PROCESSED;
+
+    /*
+     * Deal with quick transfer stuff first.
+     */
+     if ((inputState & (UIFA_MOVE_COPY<<8)) &&
+	 ClipboardGetQuickTransferStatus()) 	{
+	    ClipboardQuickTransferFeedback	cursorType = CQTF_MOVE;
+
+	    if (inputState & (UIFA_COPY))  	cursorType = CQTF_COPY;
+	    ClipboardSetQuickTransferFeedback(cursorType, inputState);
+	    return;
+
+     }
+
+     child = @call oself::MSG_BENT_FIND_CHILD_UNDER_POINT_NO_INTERCEPT(
+						    xPosition,
+						    yPosition);
+
+     if (child == oself) {
+	 child = @call interpreter::MSG_BENT_MANAGER_GET_SELECTED_COMPONENT();
+     }
+
+     if (child != NullOptr) {
+	 swin = @call child::MSG_VIS_QUERY_WINDOW();
+     }
+
+     owin = @call oself::MSG_GEN_VIEW_GET_WINDOW();
+
+     /* if the object is in another window, pass on the message to
+      * the other window
+      */
+     if (swin != owin)
+     {
+	 optr   	parent;
+	 MemHandle	win;
+	 XYValueAsDWord  xy = 0L;
+
+	 /* get the handle of the window we are in (not our own window)
+	  */
+	 win = @call oself::MSG_VIS_QUERY_WINDOW();
+	 WinGetInfo(win, WIT_INPUT_OBJ, &parent);
+
+	 xy = @call oself::MSG_VIS_GET_POSITION();
+
+	 /* pass in the mouse event, hopefully it will get up to the form
+	  * and adjust the coordinates to be coordinates of the parent
+	  * window as well
+	  */
+	 @call parent::MSG_BENT_MOUSE_PTR(retVal, 
+					  xPosition + DWORD_X(xy),
+					  yPosition + DWORD_Y(xy),
+					  inputState);
+	 return;
+     }
+     
+     /*
+      * The mouse pointer is not on one of the form related gadgets
+      * (title bar, iconify button, etc.) so have the BentManagerClass 
+      * object decide which mouse pointer is appropriate.
+      */
+     
+     size = @call oself::MSG_VIS_GET_SIZE();
+     if (xPosition > 0 && yPosition > 0 &&
+	xPosition < DWORD_WIDTH(size) && yPosition < DWORD_HEIGHT(size))
+     {
+	 retVal->flags = retVal->flags | MRF_SET_POINTER_IMAGE;
+	 retVal->ptrImage = @call interpreter::
+	     MSG_BENT_MANAGER_MOUSE_PTR(child, xPosition, yPosition, oself);
+
+     }
+}	/* End of MSG_META_PTR. */
+
+
+
+@if 0
+Not needed as the translation is now done in bentmain.
+
+/* adjust coordinates to parent window and send it on */
+@method BentViewClass, MSG_BENT_FIND_CHILD_UNDER_POINT
+@endif
+
+
+@method BentViewClass, MSG_BENT_INVALIDATE
+{
+    optr    	parent;
+    Rectangle	bounds;
+
+    parent = @call self::MSG_ENT_GET_PARENT();
+
+    @call self::MSG_VIS_GET_BOUNDS(&bounds);
+    @call parent::MSG_VIS_ADD_RECT_TO_UPDATE_REGION(0,0,bounds.R_bottom+1,
+						    bounds.R_right+1,
+						    bounds.R_top-2,
+						    bounds.R_left-2);
+}	/* End of MSG_BENT_INVALIDATE.	*/
+
+
+/***********************************************************************
+ *		MSG_BENT_GET_VIS_ROOT for BentViewClass
+ ***********************************************************************
+ * SYNOPSIS:	We are the root of our tree.
+ * PARAMETERS:	
+ * SIDE EFFECTS:
+ *	
+ * STRATEGY:
+ *		Don't trust superclass to know that we really are the
+ *		top level root object.
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	RON	2/ 8/96   	Initial Revision
+ *
+ ***********************************************************************/
+@method BentViewClass, MSG_BENT_GET_VIS_ROOT
+{
+    return oself;
+}	/* End of MSG_BENT_GET_VIS_ROOT.	*/
+
+
+/***********************************************************************
+ *		MSG_SPEC_BUILD_BRANCH for BentViewClass
+ ***********************************************************************
+ * SYNOPSIS:	Whenever a windowed object gets built out, do some hacks
+ *		so we can figure out where it is going to put GenChildren.
+ *		We store the OLGadgetArea created so later we can ask for
+ *		its offset when we want to find the position of the child
+ *		in us.  The OLGadgetArea offset != the form's bounds when
+ *		there is a popup.
+ *		This hack should be benign for things without a OLGadgetArea
+ *
+ * PARAMETERS:	
+ * SIDE EFFECTS:
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	RON	12/ 1/95   	Initial Revision
+ *
+ ***********************************************************************/
+@method BentWindowClass, MSG_SPEC_BUILD_BRANCH
+{
+    optr	dummyChild;
+    optr	vp;
+
+    @callsuper();
+    dummyChild = ObjInstantiate(OptrToHandle(oself), &GenTriggerClass);
+    @call self::MSG_GEN_ADD_CHILD(dummyChild, CCO_FIRST);
+    @call dummyChild::MSG_GEN_SET_USABLE(VUM_DELAYED_VIA_APP_QUEUE);
+    vp = @call dummyChild::MSG_VIS_FIND_PARENT();
+    @call dummyChild::MSG_GEN_DESTROY(VUM_DELAYED_VIA_APP_QUEUE,0);
+
+    pself = ObjDerefBent(oself);
+    pself->BWI_childParent = vp;
+    
+}	/* End of MSG_SPEC_BUILD_BRANCH.	*/
+
+
+/***********************************************************************
+ *		MSG_SPEC_BUILD for BentWindowClass
+ ***********************************************************************
+ * SYNOPSIS:	 Make sure dialogs really return to the screen.
+ * PARAMETERS:	
+ * SIDE EFFECTS:
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	RON	12/ 7/95   	Initial Revision
+ *
+ ***********************************************************************/
+@method BentWindowClass, MSG_BENT_RETURN_TO_SCREEN
+{
+    EntInstance *eself;
+    @callsuper();
+    /*
+     * Check to see if it is a dialog by seeing if it is an interaction.
+     * Know of any other windowed interactions?
+     */
+    if (ObjIsObjectInClass(oself,
+			   (ClassStruct *) &GenInteractionClass))
+    {
+	eself = ObjDerefEnt(oself);
+	if (eself->EI_flags & EF_VISIBLE)
+	{
+	    /*
+	     * Should use MGII_NO_DISTURB?
+	     */
+	    @call self::MSG_GEN_INTERACTION_INITIATE();
+	}
+	
+    }
+    
+}	/* End of MSG_SPEC_BUILD.	*/
+
+
+
+/***********************************************************************
+ *		MSG_META_MUP_ALTER_FTVMC_EXCL for BGadgetFormClass
+ ***********************************************************************
+ * SYNOPSIS:	    prevent our children from grabbing the focus,
+ *		    while allowing them to release it.
+ * PARAMETERS:	    
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	dloft	9/ 7/95   	Initial Revision
+ *
+ ***********************************************************************/
+@method BentWindowClass, MSG_META_MUP_ALTER_FTVMC_EXCL
+{
+    /*
+     * If a child wants to grab the focus, don't let it.
+     * Allow it to release.
+     */
+    if ((oself != objectWantingControl)	&&
+	(flags & MAEF_GRAB)) {
+	flags &= ~MAEF_FOCUS;
+    }
+
+    @callsuper();
+}	/* End of MSG_META_MUP_ALTER_FTVMC_EXCL.	*/
+
+
+/***********************************************************************
+ *		MSG_BENT_SELECT for BentWindowClass
+ ***********************************************************************
+ * SYNOPSIS:	Bring windows forward when they are selected.
+ * PARAMETERS:	
+ * SIDE EFFECTS:
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	RON	12/19/95   	Initial Revision
+ *
+ ***********************************************************************/
+@method BentWindowClass, MSG_BENT_SELECT
+{
+    @call self::MSG_GEN_BRING_TO_TOP();
+    @callsuper();
+    
+}	/* End of MSG_BENT_SELECT.	*/

@@ -1,0 +1,884 @@
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+	Copyright (c) Geoworks 1994 -- All Rights Reserved
+
+PROJECT:        PC/GEOS
+MODULE:         LEGOS - UI Builder
+FILE:           bgadgetMain.goc
+
+AUTHOR:         Martin Turon, Sep  8, 1994
+
+ROUTINES:
+	Name                    Description
+	----                    -----------
+
+REVISION HISTORY:
+	Name    Date            Description
+	----    ----            -----------
+	martin  9/8/94          Initial version.
+
+DESCRIPTION:
+	Build-time specific code for BService, BGadget, BGadgetWin,
+	and BGadgetView.  All exported Gadget library components
+	are subclasses of one of these four classes.
+
+	Global Tables
+	  Complex-data table
+	  Exported class table for Fido
+
+	Methods that must be subclassed by all immediate
+	descendents of a Bent class:
+	  MSG_BENT_GET_CLASS_INFORMATION
+	  MSG_ENT_GET_PROPERTY
+
+	Code specific to a class defined in this file
+	(classes not listed have none):
+	  BGadgetClass
+	  BGadgetViewClass
+	  BGadgetWinClass
+
+	Common routines
+
+	$Id: bgadgetMain.goc,v 1.1 98/03/12 19:51:49 martin Exp $
+	Revision:   1.67 
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+
+@include <bgadgetInternal.goh>
+#include <Legos/runheap.h>
+@include <Legos/basrun.goh>
+@include <Legos/gadget.goh>
+/*-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+ %		Global Variables and Tables
+ %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+
+@classdecl	BServiceClass;
+@classdecl      BGadgetClass;
+@classdecl      BGadgetWinClass;
+@classdecl      BGadgetViewClass;
+@classdecl      BGadgetLookClass;
+
+static const BentComplexPropertyTable BGadgetDefaultComplexPropertyTable[] =
+{
+    /*
+     * This table is currently used to map clipboard items that are dropped
+     * on build-time components to the correct property.  It may be expanded
+     * in the future to store other build-time information per property.
+     * Be sure to spell the names of the properties here *exactly* like in 
+     * gool!  (Wish we could use one table for all of the info...) -martin
+     */
+
+       {FormatIDFromManufacturerAndType(MANUFACTURER_ID_GEOWORKS, \
+	  CIF_GRAPHICS_STRING), _TEXT("graphic")},
+
+/*
+       {FormatIDFromManufacturerAndType(MANUFACTURER_ID_GEOWORKS, \
+	CIF_TEXT),   "text"},
+
+       {FormatIDFromManufacturerAndType(MANUFACTURER_ID_GEOWORKS, \
+	CIF_BITMAP), "graphic"},
+*/
+
+       (ClipboardItemFormatID)BENT_END_OF_COMPLEX_PROPERTY_TABLE
+};
+
+static const BentLibraryInfoStruct	BGadgetLibraryInfo = {
+    _TEXT("~U\\BASIC\\P-GADGET")
+};
+
+/* This is the table of components that this build-time library knows
+ * how to deal with.  This table is used by the Builder via FIDO
+ * get the information it needs to create these components and their tools.
+ */
+#define TABLE_DEFINITION(bgadgetClass, gadgetClass, name, propBox) \
+       {(ClassStruct *) &BGadget##bgadgetClass##Class, _TEXT(name), \
+	 &Gadget##gadgetClass##Class, _TEXT(propBox), \
+	 (BentComplexPropertyTable *) BGadgetDefaultComplexPropertyTable}
+
+/* This one is for components named ServiceBlahBlah and BServiceBlahBlah
+ */
+#define TABLE_DEFINITION_SRV(_srvClass, _name, _propBox) \
+       {(ClassStruct *) &BService##_srvClass##Class, _TEXT(_name), \
+	 &Service##_srvClass##Class, _TEXT(_propBox), \
+	 (BentComplexPropertyTable *) BGadgetDefaultComplexPropertyTable}
+
+/* This one is for components named SystemBlahBlah and BSystemBlahBlah
+ */
+#define TABLE_DEFINITION_SYS(_sysClass, _name, _propBox) \
+       {(ClassStruct *) &BSystem##_sysClass##Class, _TEXT(_name), \
+	 &System##_sysClass##Class, _TEXT(_propBox), \
+	 (BentComplexPropertyTable *) BGadgetDefaultComplexPropertyTable}
+
+
+/* stick a number in the index field so we can be sure it is the
+   same as the table below. */
+#define NUMBER_ENTRIES 29
+static const BentClassPtrStruct BGadgetClassInfoTable[NUMBER_ENTRIES] = {
+    /* BGadget class, Gadget class, name, specific property box */
+    TABLE_DEFINITION(Entry, Entry, "entry", "~U\\BASIC\\SP-ENTRY"),
+    TABLE_DEFINITION(Form, Form, "form", "~U\\BASIC\\SP-FORM"),
+    TABLE_DEFINITION(Group, Group, "group", "~U\\BASIC\\SP-GROUP"),
+    TABLE_DEFINITION(Label, Label, "label", "none"),
+    TABLE_DEFINITION(List, List, "list", "~U\\BASIC\\SP-LIST"),
+    TABLE_DEFINITION(Button, Button, "button", "~U\\BASIC\\SP-BUTTN"),
+    TABLE_DEFINITION(Number, Number, "number", "~U\\BASIC\\SP-NUMBR"),
+    TABLE_DEFINITION(Toggle, Toggle, "toggle", "~U\\BASIC\\SP-TOGGL"),
+    TABLE_DEFINITION(Choice, Choice, "choice", "~U\\BASIC\\SP-CHOIC"),
+    TABLE_DEFINITION(Agg, Group, "agg", "none"), /* remove */
+    TABLE_DEFINITION(Agg, Group, "agggroup", "none"),
+    TABLE_DEFINITION(Clipper, Clipper, "clipper", "none"),
+    TABLE_DEFINITION(Gadget, Gadget, "gadget", "~U\\BASIC\\SP-GAD"),
+    TABLE_DEFINITION(Text, Text, "text", "~U\\BASIC\\SP-TEXT"),
+    TABLE_DEFINITION(Floater, Floater, "floater", "~U\\BASIC\\SP-FLOAT"),
+    TABLE_DEFINITION(Dialog, Dialog, "dialog", "~U\\BASIC\\SP-DLOG"),
+    TABLE_DEFINITION(Spacer, Spacer, "spacer", "~U\\BASIC\\SP-SPACE"),
+    TABLE_DEFINITION(Picture, Picture, "picture", "none"),
+    TABLE_DEFINITION(Popup, Popup, "popup", "none"),
+    TABLE_DEFINITION(Scrollbar, Scrollbar, "scrollbar", "~U\\BASIC\\SP-SCROL"),
+    TABLE_DEFINITION(Table, Table, "table", "~U\\BASIC\\SP-TABLE"),
+
+    TABLE_DEFINITION_SRV(TimeDate, "timedate", "~U\\BASIC\\SP-TDATE"),
+/*    TABLE_DEFINITION_SRV(Alarm, "alarm", "none"),*/
+{
+    (ClassStruct*) &BServiceAlarmClass,
+    _TEXT("alarm"),
+    &ServiceAlarmClientClass,
+    _TEXT("none"),
+    (BentComplexPropertyTable*) BGadgetDefaultComplexPropertyTable
+},
+    TABLE_DEFINITION_SRV(Timer, "timer", "~U\\BASIC\\SP-TIMER"),
+    TABLE_DEFINITION_SRV(Clipboard, "clipboard", "none"),
+/*    TABLE_DEFINITION(DB, DB, "database", "none"), */
+    TABLE_DEFINITION_SYS(Busy, "busy", "none"),
+    TABLE_DEFINITION_SYS(Display, "display", "none"),
+    TABLE_DEFINITION_SYS(Sound, "sound", "none")
+};
+
+const  BentClassPtrStruct _near *BGadgetClassPtrTable[NUMBER_ENTRIES +1] = {
+       &BGadgetClassInfoTable[0],  /* Ptr to dialog's BentClassPtrStruct */
+       &BGadgetClassInfoTable[1],  /* Ptr to entry's  BentClassPtrStruct */
+       &BGadgetClassInfoTable[2],  /* Ptr to fig's    BentClassPtrStruct */
+       &BGadgetClassInfoTable[3],  /* Ptr to form's   BentClassPtrStruct */
+       &BGadgetClassInfoTable[4],  /* Ptr to group's  BentClassPtrStruct */
+       &BGadgetClassInfoTable[5],  /* Ptr to label's  BentClassPtrStruct */
+       &BGadgetClassInfoTable[6],  /*           ...  etc. ...             */
+       &BGadgetClassInfoTable[7],  
+       &BGadgetClassInfoTable[8],  
+       &BGadgetClassInfoTable[9],  
+       &BGadgetClassInfoTable[10], 
+       &BGadgetClassInfoTable[11], 
+       &BGadgetClassInfoTable[12], 
+       &BGadgetClassInfoTable[13], 
+       &BGadgetClassInfoTable[14], 
+       &BGadgetClassInfoTable[15], 
+       &BGadgetClassInfoTable[16], 
+       &BGadgetClassInfoTable[17], 
+       &BGadgetClassInfoTable[18],
+       &BGadgetClassInfoTable[19],
+       &BGadgetClassInfoTable[20],
+       &BGadgetClassInfoTable[21],
+       &BGadgetClassInfoTable[22],
+       &BGadgetClassInfoTable[23],
+       &BGadgetClassInfoTable[24],
+       &BGadgetClassInfoTable[25],
+       &BGadgetClassInfoTable[26],
+       &BGadgetClassInfoTable[27],
+       &BGadgetClassInfoTable[28],
+       BENT_END_OF_CLASS_TABLE
+};
+#undef NUMBER_ENTRIES
+
+
+
+/*-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+ %		GET_CLASS_INFORMATION handlers
+ %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+
+@method BGadgetClass, MSG_BENT_GET_LIBRARY_INFORMATION
+{
+   return (BentLibraryInfoStruct *)&BGadgetLibraryInfo;
+}
+
+@method BServiceClass, MSG_BENT_GET_LIBRARY_INFORMATION
+{
+   return (BentLibraryInfoStruct *)&BGadgetLibraryInfo;
+}
+
+@method BGadgetWinClass, MSG_BENT_GET_LIBRARY_INFORMATION
+{
+   return (BentLibraryInfoStruct *)&BGadgetLibraryInfo;
+}
+
+@method BGadgetViewClass, MSG_BENT_GET_LIBRARY_INFORMATION
+{
+   return (BentLibraryInfoStruct *)&BGadgetLibraryInfo;
+}
+
+
+
+@method BServiceClass, MSG_BENT_GET_CLASS_INFORMATION
+{
+    BentClassPtrStruct *classInfo;
+
+    classInfo = BentFindClassPtrStruct(oself, (BentClassPtrStruct _near **)
+				       BGadgetClassPtrTable);
+    return classInfo;
+    
+}
+
+@method BGadgetClass, MSG_BENT_GET_CLASS_INFORMATION
+{
+    BentClassPtrStruct *classInfo;
+
+    classInfo = BentFindClassPtrStruct(oself, (BentClassPtrStruct _near **)
+				       BGadgetClassPtrTable);
+    return classInfo;
+    
+}
+
+
+@method BGadgetViewClass, MSG_BENT_GET_CLASS_INFORMATION
+{
+    BentClassPtrStruct *classInfo;
+
+    classInfo = BentFindClassPtrStruct(oself, (BentClassPtrStruct _near **)
+				       BGadgetClassPtrTable);
+    return classInfo;
+    
+}
+
+
+@method BGadgetWinClass, MSG_BENT_GET_CLASS_INFORMATION
+{
+    BentClassPtrStruct *classInfo;
+
+    classInfo = BentFindClassPtrStruct(oself, (BentClassPtrStruct _near **)
+				       BGadgetClassPtrTable);
+    return classInfo;
+    
+}
+
+
+/*-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+ %		BGadgetClass-specific code
+ %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+
+
+/***********************************************************************
+ *		MSG_GADGET_PREVENT_ERROR_ON_GET_WIDTH_HEIGHT
+ *		for BGadgetClass
+ ***********************************************************************
+ * SYNOPSIS:	We don't want build-time components to choke
+ *	 	if asked for their width/height when not visible.
+ * PARAMETERS:	
+ * SIDE EFFECTS:
+ *		I'd prefer having BGadget intercept GADGET_GET_WIDTH/
+ *		HEIGHT, but sometimes BGadgets get width/height requests
+ *		that go directly to gadget.  This causes annoying RTE's
+ *		at build-time.
+ *
+ * STRATEGY:	
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	jmagasin 7/10/96   	Initial Revision
+ *
+ ***********************************************************************/
+@method BGadgetClass, MSG_GADGET_PREVENT_ERROR_ON_GET_WIDTH_HEIGHT
+{
+
+    return TRUE;		/* Don't raise a RTE. */
+    
+}	/* End of MSG_GADGET_PREVENT_ERROR_ON_GET_WIDTH_HEIGHT */
+
+
+/***********************************************************************
+ *		MSG_META_QUERY_IF_PRESS_IS_INK for BGadgetClass
+ ***********************************************************************
+ * SYNOPSIS:	    We don't handle ink for any objects in the builder.
+ * PARAMETERS:	    InkReturnValue	*retVal
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	RON	8/28/95   	Initial Revision
+ *
+ ***********************************************************************/
+@method BGadgetClass, MSG_META_QUERY_IF_PRESS_IS_INK
+{
+    retVal->inkType = IRV_NO_INK;
+}	/* End of MSG_META_QUERY_IF_PRESS_IS_INK.	*/
+;
+
+
+
+/***********************************************************************
+ *		MSG_BENT_DESCRIBE_PROPERTY for  BGadgetClass
+ ***********************************************************************
+ * SYNOPSIS:	    Makes sure not to write out the left and top properties
+ *		    if the parent is "managing/tiling" geometry.
+ *		    Unless we are compiling for liberty.
+ *		    (tiling is build-time only).
+ *
+ *		    Assume liberty default is SIZE_AS_SPECIFIED.
+ *
+ *
+ * PARAMETERS:	    hptr	       buffer to append to
+ *		    TCHAR *	       property to describe
+ *	
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	RON	8/18/95   	Initial Revision
+ *
+ ***********************************************************************/
+int _pascal DPCommon(TCHAR *property, MemHandle descHeader, optr oself);
+
+@method BGadgetViewClass, MSG_BENT_DESCRIBE_PROPERTY
+{
+    if (DPCommon(property, descHeader, oself)) 
+    {
+	@callsuper();
+    }
+}
+
+@method BGadgetClass, MSG_BENT_DESCRIBE_PROPERTY
+{
+    if (DPCommon(property, descHeader, oself))
+    {
+	@callsuper();
+    }
+}    
+
+/*
+ * Not needed for BentWindow class as they have no parent.
+ */
+
+/*
+ * Returns TRUE if you should call superclass.
+ */
+int _pascal DPCommon(TCHAR *property, MemHandle descHeader, optr oself) {
+    int	 noGeometry;
+    noGeometry = BentGetDescriptionFlags(descHeader) & BDF_NO_GEOMETRY;
+    
+    if (((!strcmp (property, _TEXT("left"))) ||
+	 !strcmp(property, _TEXT("top")))
+	&& !noGeometry)
+    {
+	/*
+	 * Check to see if it is being managed.
+	 */
+	optr	parent;
+	ComponentData	data;
+	parent = @call self::MSG_ENT_GET_PARENT();
+	if (parent == NullOptr) return TRUE;
+	@call parent::MSG_ENT_GET_PROPERTY(NULL, &data, _TEXT("tile"));
+	if ( (data.CD_type == TYPE_INTEGER) &&
+	    (data.CD_data.LD_integer == 1))
+	{
+	    return FALSE;
+	}
+    }
+
+    if (!strcmp (property, _TEXT("width")))
+    {
+	ComponentData	data;
+	@call self::MSG_ENT_GET_PROPERTY_EXTERNAL(&data, 
+						  _TEXT("sizeHControl"));
+	if ((data.CD_type == TYPE_INTEGER) &&
+	    (data.CD_data.LD_integer != GSCT_AS_SPECIFIED))
+	    /* if not AS_SPECIFIED, ignore this property */
+	    return FALSE;
+	}
+    
+    if (!strcmp (property, _TEXT("height")))
+    {
+	ComponentData	data;
+	@call self::MSG_ENT_GET_PROPERTY_EXTERNAL(&data, 
+						  _TEXT("sizeVControl"));
+	if ((data.CD_type == TYPE_INTEGER) &&
+	    (data.CD_data.LD_integer != GSCT_AS_SPECIFIED))
+	    return FALSE;		    
+    }
+    
+    return TRUE;
+}	/* End of MSG_BENT_DESCRIBE_PROPERTY.	*/
+
+
+
+/***********************************************************************
+ *		MSG_BENT_SHOULD_WRITE_OUT_PROPERTY for BGadgetClass
+ ***********************************************************************
+ * SYNOPSIS:		Write out left and top even if they are the
+ *			default values (0,0)
+ *
+ *			Don't write out sizeHControl/sizeVControl if
+ *			they  are SIZE_AS_SPECIFIED as setting width/height
+ *			will set them.
+ * PARAMETERS:		TCHAR *prop	; name of property
+ * SIDE EFFECTS:
+ *
+ * STRATEGY:
+ *
+ *			If all components added vardata to set the
+ *			position when they were created, then we wouldn't
+ *			need to get around the default value.  But this
+ *			way seems better
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	RON	12/ 4/95   	Initial Revision
+ *
+ ***********************************************************************/
+@method BGadgetClass, MSG_BENT_SHOULD_WRITE_OUT_PROPERTY
+{
+    if (!strcmp(prop, _TEXT("sizeVControl"))
+	|| !strcmp(prop, _TEXT("sizeHControl"))) 
+    {
+	ComponentData	data;
+	@call self::MSG_ENT_GET_PROPERTY_EXTERNAL(&data, prop);
+	if ((data.CD_type == TYPE_INTEGER) &&
+	    (data.CD_data.LD_integer == GSCT_AS_SPECIFIED))
+	    return FALSE;
+	else return TRUE;
+    }
+    
+	
+    return (!strcmp(prop, _TEXT("left")) || !strcmp(prop, _TEXT("top")));
+}	/* End of MSG_BENT_SHOULD_WRITE_OUT_PROPERTY.	*/
+
+
+
+/***********************************************************************
+ *		MSG_BENT_SHOULD_WRITE_OUT_PROPERTY for BGadgetWinClass
+ ***********************************************************************
+ * SYNOPSIS:	Always write out a window's left/top properties.
+ * PARAMETERS:		TCHAR *prop	; name of property
+ * SIDE EFFECTS:
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	jmagasin 5/ 6/96   	Initial Revision
+ *
+ ***********************************************************************/
+@method BGadgetWinClass, MSG_BENT_SHOULD_WRITE_OUT_PROPERTY
+{
+    return (!strcmp(prop, _TEXT("left")) || !strcmp(prop, _TEXT("top")));
+}	/* End of MSG_BENT_SHOULD_WRITE_OUT_PROPERTY.	*/
+
+
+
+/***********************************************************************
+ *		MSG_BENT_DESCRIBE_SELF for BGadgetClass
+ ***********************************************************************
+ * SYNOPSIS:	When writing out for liberty, make sure the default values
+ *		match the liberty defaults, not the geos defaults (the
+ *		defaults aren't all the same at the object level).
+ * PARAMETERS:	
+ * SIDE EFFECTS:
+ *
+ * STRATEGY:
+ *		Liberty defaults to SIZE_AS_NEEDED.
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	RON	12/11/95   	Initial Revision
+ *
+ ***********************************************************************/
+void
+BGadgetDSCommon(optr propArray, MemHandle descHeader, optr oself);
+
+@method BGadgetClass, MSG_BENT_DESCRIBE_SELF
+{
+    optr propArray = ConstructOptr(HandleOf(oself),pself->BI_propArray);
+    EC_ERROR_IF(ECPSelf(pself)->BI_propArray == 0,
+		ERROR_BENT_PROP_ARRAY_NOT_INITIALIZED);
+    BGadgetDSCommon(propArray, descHeader, oself);
+    @callsuper();
+    RestoreSizing(oself);
+}
+
+@method BGadgetViewClass, MSG_BENT_DESCRIBE_SELF
+{
+    optr propArray = ConstructOptr(HandleOf(oself),pself->BI_propArray);
+    EC_ERROR_IF(ECPSelf(pself)->BI_propArray == 0,
+		ERROR_BENT_PROP_ARRAY_NOT_INITIALIZED);
+    BGadgetDSCommon(propArray, descHeader, oself);
+    @callsuper();
+    RestoreSizing(oself);
+}
+
+@method BGadgetWinClass, MSG_BENT_DESCRIBE_SELF
+{
+    optr propArray = ConstructOptr(HandleOf(oself),pself->BI_propArray);
+    EC_ERROR_IF(ECPSelf(pself)->BI_propArray == 0,
+		ERROR_BENT_PROP_ARRAY_NOT_INITIALIZED);
+    BGadgetDSCommon(propArray, descHeader, oself);
+    @callsuper();
+    RestoreSizing(oself);
+}
+
+void
+BGadgetDSCommon(optr propArray, MemHandle descHeader, optr oself)
+{
+    int	 noGeometry;
+    noGeometry = BentGetDescriptionFlags(descHeader) & BDF_NO_GEOMETRY;
+    if (noGeometry) 
+    {
+	ComponentData   data;
+
+	SetLibertySizingInfo(oself, propArray,
+			     _TEXT("sizeHControl"), _TEXT("width"));
+	SetLibertySizingInfo(oself, propArray,
+			     _TEXT("sizeVControl"), _TEXT("height"));
+				 
+	/*
+	 * Always write left/top.
+	 * Liberty has no geomerty manager, yet.
+	 */
+	NameArrayAdd(propArray, _TEXT("left"), 0, 0, &data);
+	NameArrayAdd(propArray, _TEXT("top"), 0, 0, &data);
+    }	
+}	/* End of MSG_BENT_DESCRIBE_SELF.	*/
+
+
+/*********************************************************************
+ *			SetLibertySizingInfo
+ *********************************************************************
+ * SYNOPSIS:	Modify the property array to do right thing when writing
+ *		out properties for liberty.
+ *		This is really just a help function, not a general function.
+ * CALLED BY:	BGadgetDSCommon
+ * PASS:	TCHAR *control		; which size control
+ *		TCHAR *size		; which size
+ * RETURN:
+ * SIDE EFFECTS:
+ * STRATEGY:
+ *		Default size controls to SIZE_AS_NEEDED.
+ *		Don't write out size control for SIZE_AS_NEEDED (the default)
+ *		or SIZE_AS_SPECIFIED (setting width and height will set this
+ *		in liberty [and geos]).  If SIZE_AS_SPECIFIED be sure
+ *		to write out width and height.
+ *		This WILL write out SMALL_AS_POSSIBLE or BIG_AS_POSSIBLE
+ *		for liberty, even though they are not supported by liberty
+ *		yet.
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description			     
+ *	----	----		-----------			     
+ *	RON	4/29/96  	Initial version
+ * 
+ *********************************************************************/
+SetLibertySizingInfo(optr oself, optr propArray, TCHAR *control, TCHAR *size)
+{
+    /*
+     * If they want size_as_spec'd make sure to write out the value.
+     */
+    ComponentData	data, tileData;
+    @call self::MSG_ENT_GET_PROPERTY_EXTERNAL(&data, control);
+
+    /*
+     * Temporary hack:
+     * Liberty doesn't handle AS_NEEDED for composite objects.
+     * Write out AS_SPECIFIED for things with children for now.
+     */
+    /* ---- HACK ON ----- */
+    /* If you remove this code, remove RestoreSizing() too */
+    if ((data.CD_type == TYPE_INTEGER) &&
+	((data.CD_data.LD_integer == GSCT_AS_NEEDED) ||
+	(data.CD_data.LD_integer == GSCT_AS_SMALL_AS_POSSIBLE) ||
+	(data.CD_data.LD_integer == GSCT_AS_BIG_AS_POSSIBLE)))
+    {
+	@call self::MSG_ENT_GET_PROPERTY_EXTERNAL(&tileData, _TEXT("tile"));
+	/*
+	 * If it has a tile property, then it can have children and doesn't
+	 * support AS_NEEDED.  If it doesn't support tile, the return type
+	 * will be TYPE_ERROR.
+	 * Setting the size control to AS_SPECIFIED will allow us to get
+	 * WIDTH and HEIGHT.
+	 */
+	if (tileData.CD_type == TYPE_INTEGER) 
+	{
+	    int *attr;
+	    ComponentData newData;
+	    /*
+	     * Store the old size control so it can be restored later.
+	     */
+	    ObjDerefBent(oself);
+	    if (!strcmp(control, _TEXT("sizeHControl"))) {
+		attr = ObjVarAddData(oself, ATTR_BENT_OLD_HSIZING_INFO,
+				     sizeof(word));
+		*attr =	data.CD_data.LD_integer;
+	    }
+	    else 
+	    {
+		attr = ObjVarAddData(oself, ATTR_BENT_OLD_VSIZING_INFO,
+				     sizeof(word));
+		*attr = data.CD_data.LD_integer;
+	    }
+	    
+	    newData.CD_type = TYPE_INTEGER;
+	    newData.CD_data.LD_integer=GSCT_AS_SPECIFIED;
+	    
+	    @call self::MSG_ENT_SET_PROPERTY_EXTERNAL(&newData, control);
+
+	    /*
+	     * Set our local variable so we know it is AS_SPECIFIED.
+	     */
+	    data.CD_data.LD_integer = GSCT_AS_SPECIFIED;
+	    
+	}
+    }
+    /*
+     * This will stay AS_SPECIFIED in the builder instead of reverting
+     * back to AS_NEEDED, but I think that is a good thing.  It will let
+     * the user know we are changing things behind their back.
+     */
+
+/* ----- HACK OFF ----- */	
+    if ((data.CD_type == TYPE_INTEGER) &&
+	(data.CD_data.LD_integer == GSCT_AS_SPECIFIED))
+    {
+	/* don't store any data in the props, they don't need it */
+	NameArrayAdd(propArray, size, 0, 0, &data);
+	/* Don't write out the size control property as it isn't needed
+	   since we set the size */
+
+	BentExtractPropertyArrayElement(control, propArray, NullOptr);
+    } else 
+    {
+	/*
+	 * Make sure to write out the property even it matches
+	 * our default.  It doesn't match liberty's sizing defaults.
+	 */
+	if (data.CD_type == TYPE_INTEGER &&
+	    (data.CD_data.LD_integer != GSCT_AS_NEEDED))
+	{
+	    NameArrayAdd(propArray, control,
+			 0,NAAF_SET_DATA_ON_REPLACE, &data);
+	}
+	else 
+	{
+	    /*
+	     * Don't write AS_NEEDED out if it is the liberty default
+	     */
+	    BentExtractPropertyArrayElement(control,propArray,NullOptr);
+	}
+    }
+}
+
+
+/*********************************************************************
+ *			RestoreSizing
+ *********************************************************************
+ * SYNOPSIS:	Restores the sizing info to what it was before we
+ *		changed it.
+ * CALLED BY:	BENT_DESCRIBE_SELF handlers.
+ * PASS:       	optr	oself		 comp
+ *
+ * RETURN:
+ * SIDE EFFECTS:
+ * STRATEGY:
+ * REVISION HISTORY:
+ *	Name	Date		Description			     
+ *	----	----		-----------			     
+ *	RON	5/28/96  	Initial version
+ * 
+ *********************************************************************/
+RestoreSizing(optr oself) 
+{
+    int *attr;
+    ComponentData  cdata;
+    attr = ObjVarFindData(oself, ATTR_BENT_OLD_HSIZING_INFO);
+    if (attr != NULL)
+    {
+	cdata.CD_data.LD_integer = *attr;
+	cdata.CD_type = TYPE_INTEGER;
+	@call self::MSG_ENT_SET_PROPERTY_EXTERNAL(&cdata, _TEXT("sizeHControl"));
+	ObjVarDeleteData(oself, ATTR_BENT_OLD_HSIZING_INFO);
+	ObjDerefBent(oself);
+    }
+
+    attr = ObjVarFindData(oself, ATTR_BENT_OLD_VSIZING_INFO);
+    if (attr != NULL)
+    {
+	cdata.CD_data.LD_integer = *attr;
+	cdata.CD_type = TYPE_INTEGER;
+	@call self::MSG_ENT_SET_PROPERTY_EXTERNAL(&cdata, _TEXT("sizeVControl"));
+	ObjVarDeleteData(oself, ATTR_BENT_OLD_VSIZING_INFO);
+	ObjDerefBent(oself);
+    }
+}
+
+
+
+/***********************************************************************
+*	code for BentAggClass
+* 
+* BentAgg class is for components than have their own Content and this
+* their own Agg and yet sit inside the bounds of another component
+*
+***********************************************************************/
+
+
+/***********************************************************************
+ *		MSG_SPEC_BUILD for BGadgetLookClass
+ ***********************************************************************
+ * SYNOPSIS:	    Forces any children that threaten to mess up bent-style 
+ *		    (window based) mouse handling to forget about it.
+ * PARAMETERS:	    
+ *
+ * SIDE EFFECTS:    
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	martin	10/5/95   	Initial version
+ *
+ ***********************************************************************/
+@method BGadgetLookClass, MSG_SPEC_BUILD
+{
+    GadgetAggInstance	*gself;
+    optr 		view;
+
+    @callsuper();
+
+    gself = ObjDerefEnt(oself);
+    view  = gself->GAI_contentObj;
+    view  = @call view::MSG_GEN_GUP_FIND_OBJECT_OF_CLASS(&GenViewClass);
+    if (view != NullOptr) @call view::MSG_VIS_RELEASE_MOUSE();
+
+}	/* End of MSG_SPEC_BUILD_BRANCH.	*/
+
+
+
+
+/***********************************************************************
+ *		MSG_BENT_ENUM_PROPERTIES for BGadgetClass
+ ***********************************************************************
+ * SYNOPSIS:		Add tile into the array of properties to write out
+ *			if we have a tile property.
+ * PARAMETERS:	
+ * SIDE EFFECTS:
+ *
+ * STRATEGY:
+ *			This is done here because of the weird way that
+ *			the runtime sets the .tile property automatically
+ *			when the align properties are set.
+ *			We should only intercept GadgetGeom stuff, but
+ *			there is not BGadgetGeom class.
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	RON	11/ 2/95   	Initial Revision
+ *
+ ***********************************************************************/
+@method BGadgetClass, MSG_BENT_ENUM_PROPERTIES
+{
+    if (ObjIsObjectInClass(oself, &GadgetGeomClass)) 
+    {
+	optr		propArray = ConstructOptr(HandleOf(oself),
+						  pself->BI_propArray);
+	ComponentData	propInfo;
+	word	element;
+	TCHAR prop[] = _TEXT("tile");
+	/* 
+	 * If the name array doesn't exist yet, create one now.
+	 */ 
+	if (ChunkOf(propArray) == NullHandle) {
+	    propArray = ConstructOptr(HandleOf(oself), 
+		NameArrayCreateAt(ConstructOptr(HandleOf(oself),0),
+		sizeof(ComponentData),0,0));
+	    pself = ObjDerefBent(oself);
+	    pself_check->BI_propArray = ChunkOf(propArray);
+	}
+	element = NameArrayFind(propArray, prop, 0, &propInfo);
+	if (element == CA_NULL_ELEMENT) {
+	    /* 
+	     * If this property doesn't exist in the name array yet,
+	     * then add it now. We need to get the  values first.
+	     */ 
+	    @call self::MSG_ENT_GET_PROPERTY_EXTERNAL(&propInfo, prop);
+	}
+	if (propInfo.CD_data.LD_integer == 1)
+	{
+	    NameArrayAdd(propArray, prop, 0, 0, &propInfo);
+	}
+    }
+    @callsuper();
+	
+
+}	/* End of MSG_BENT_ENUM_PROPERTIES.	*/
+
+
+
+/***********************************************************************
+ *		MSG_META_END_SELECT for BGadgetFormClass
+ ***********************************************************************
+ * SYNOPSIS:	Make sure to set the properties after moving or resizing.
+ * PARAMETERS:	
+ * SIDE EFFECTS:
+ *
+ * STRATEGY:
+ *		If resizing, mark the object dirty
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	RON	11/20/95   	Initial Revision
+ *
+ ***********************************************************************/
+@method BGadgetWinClass, MSG_META_END_SELECT
+{
+    int	flags;
+    ComponentData	width, height;
+    optr	interp, selected;
+
+    flags = @call self::MSG_GADGET_GEOM_GET_FLAGS();
+    @callsuper();
+    /* lets not do this nonsense for popups */
+    if (ObjIsObjectInClass(oself, &BGadgetPopupClass)) 
+    {
+	return;
+    }
+    
+    
+    if (flags & GGF_RESIZING)
+    {
+	
+	@call self::MSG_ENT_GET_PROPERTY_EXTERNAL(&width, _TEXT("width"));
+	@call self::MSG_ENT_GET_PROPERTY_EXTERNAL(&height, _TEXT("height"));
+	
+	@call self::MSG_BENT_MARK_CHANGED_PROPERTY(0, &width, _TEXT("width"));
+	@call self::MSG_BENT_MARK_CHANGED_PROPERTY(0, &height, _TEXT("height"));
+    }
+    /* do positioning stuff too */
+    @call self::MSG_ENT_GET_PROPERTY_EXTERNAL(&width, _TEXT("left"));
+    @call self::MSG_ENT_GET_PROPERTY_EXTERNAL(&height, _TEXT("top"));
+	
+    @call self::MSG_BENT_MARK_CHANGED_PROPERTY(0, &width, _TEXT("left"));
+    @call self::MSG_BENT_MARK_CHANGED_PROPERTY(0, &height, _TEXT("top"));
+
+    pself = ObjDerefBent(oself);
+    interp = EntGetInterpreter(ECPSelf(pself));
+    selected = @call interp::MSG_BENT_MANAGER_GET_SELECTED_COMPONENT();
+    if (selected == oself)
+    {
+	@send, forceQueue interp::MSG_BENT_MANAGER_UPDATE_CONTROL_UI(TRUE);
+    }
+    
+}	/* End of MSG_META_END_SELECT.	*/
+

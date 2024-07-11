@@ -1,0 +1,385 @@
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+	Copyright (c) Geoworks 1995 -- All Rights Reserved
+
+PROJECT:	
+MODULE:		
+FILE:		interp.goc
+
+AUTHOR:		jimmy, Nov  1, 1995
+
+ROUTINES:
+	Name			Description
+	----			-----------
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	jimmy	11/ 1/95	Initial version.
+
+DESCRIPTION:
+	Interp Class code
+
+	$Revision: 1.2 $
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+
+@include <stdapp.goh>
+@include <Legos/ent.goh>
+@include <Legos/basrun.goh>
+#include <Legos/Internal/progtask.h>
+#include <Legos/Internal/runtask.h>
+#include <Legos/fido.h>
+#include "fixds.h"
+
+@classdecl	InterpClass;
+extern void RunMainMessageDispatch(RTaskHan rtaskHan);
+
+/*********************************************************************
+ *			BascoInitProgramWithVMFile
+ *********************************************************************
+ * SYNOPSIS: 	Like above, but takes a VMFile...
+ * CALLED BY:	
+ * PASS:
+ * RETURN:
+ * SIDE EFFECTS:
+ * STRATEGY:
+ * REVISION HISTORY:
+ *	Name	Date		Description			     
+ *	----	----		-----------			     
+ *	roy	 2/ 8/95	Initial version			     
+ * 
+ *********************************************************************/
+PTaskHan BascoInitProgramWithVMFile(optr interpreter,
+				    VMFileHandle vmfile)
+{
+    word oldDS;
+    PTaskHan phan;
+
+    oldDS = setDSToDgroup();
+
+    phan = ProgAllocTask(interpreter, vmfile);
+
+    restoreDS(oldDS);
+    return phan;
+}
+
+@method InterpClass, MSG_INTERP_SET_ALARM_SERVER
+{
+    pself->IC_alarmServer = alarmServer;
+}
+@method InterpClass, MSG_INTERP_GET_ALARM_SERVER
+{
+    return pself->IC_alarmServer;
+}
+
+/*********************************************************************
+ *			InterpGetState
+ *********************************************************************
+ * SYNOPSIS:	get the state of the interpreter
+ * CALLED BY:	GLOBAL
+ * RETURN:	MemHandle contained in IC_state instance data
+ * SIDE EFFECTS:
+ * STRATEGY:
+ * REVISION HISTORY:
+ *	Name	Date		Description			     
+ *	----	----		-----------			     
+ *	jimmy	8/22/94		Initial version			     
+ * 
+ *********************************************************************/
+@method InterpClass, MSG_INTERP_GET_STATE
+{
+    return pself->IC_state;
+}
+
+/*********************************************************************
+ *			MsgInterpInitProgram
+ *********************************************************************
+ * SYNOPSIS: 	A message shell for BascoInitProgramWithVMFile,
+ *              done to make sure the right thread is doing what
+ *              we wnat...
+ * CALLED BY:	
+ * PASS:        VMFileHandle vmfile
+ * RETURN:      Prog Task
+ * SIDE EFFECTS:
+ * STRATEGY:
+ * REVISION HISTORY:
+ *	Name	Date		Description			     
+ *	----	----		-----------			     
+ *	roy	 2/17/95	Initial version			     
+ * 
+ *********************************************************************/
+@method InterpClass, MSG_INTERP_INIT_PROGRAM {
+    return BascoInitProgramWithVMFile(oself, vmfile);
+}
+
+
+/*********************************************************************
+ *			InterpSetState
+ *********************************************************************
+ * SYNOPSIS:	set the state of the interpreter
+ * CALLED BY:	GLOBAL
+ * RETURN:	void
+ * SIDE EFFECTS:    gets the IC_state instance data in the interpreter
+ * STRATEGY:
+ * REVISION HISTORY:
+ *	Name	Date		Description			     
+ *	----	----		-----------			     
+ *	jimmy	8/22/94		Initial version			     
+ * 
+ *********************************************************************/
+@method InterpClass, MSG_INTERP_SET_STATE
+{
+    pself->IC_state = state;
+}
+
+
+/*********************************************************************
+ *			InterpInit
+ *********************************************************************
+ * SYNOPSIS:	handle the MSG_META_INITIALIZE for an InterpClass object
+ * CALLED BY:	the system
+ * RETURN:
+ * SIDE EFFECTS: a state block for the interpreter is allocated
+ * STRATEGY:
+ * REVISION HISTORY:
+ *	Name	Date		Description			     
+ *	----	----		-----------			     
+ *	jimmy	8/22/94		Initial version			     
+ * 
+ *********************************************************************/
+@method InterpClass, MSG_META_INITIALIZE
+{
+    pself->IC_alarmServer = NullOptr;
+    @callsuper();
+}
+
+
+/*********************************************************************
+ *			MSG_INTERP_LOAD_COMPILED_MODULE
+ *********************************************************************
+ * SYNOPSIS: 	Similar to MSG_INTERPRETER_LOAD_MODULE
+ *              except this is for compiled modules
+ * CALLED BY:	
+ * PASS:       MemHandle prog, TCHAR *url, optr uiParent
+ * RETURN:     RTaskHan for the loaded module
+ * SIDE EFFECTS:
+ * STRATEGY:
+ * REVISION HISTORY:
+ *	Name	Date		Description			     
+ *	----	----		-----------			     
+ *	roy	 2/23/95	Initial version			     
+ * 
+ *********************************************************************/
+@method InterpClass, MSG_INTERP_LOAD_COMPILED_MODULE
+{
+    return RunLoadModule(pself->IC_state, url, uiParent);
+}
+#if 0
+{
+    TCHAR *fp, fullPath[128], upstr[128];
+    DiskHandle dhan;
+    FileAttrs fa;
+    word      oldDS;
+    PTaskHan  ptask;
+
+    oldDS = setDSToDgroup();
+
+    ptask = (PTaskHan) pself->IC_state;
+
+   /*
+    * Stuff the default directory that compiled modules are stored in
+    * into the url.
+    */ 
+    strcpy(upstr, _TEXT(".\\"));
+    strcat(upstr, url);
+    LocalUpcaseString(upstr, strlen(upstr));
+    fp = fullPath;
+    FilePushDir();
+    FileSetStandardPath(SP_TOP);
+    dhan = FileResolveStandardPath(&fp, 256, upstr, FRSPF_ADD_DRIVE_NAME,
+				   &fa);
+    FilePopDir();
+
+    if (dhan == NullHandle) {
+	return FALSE;
+    }
+
+    restoreDS(oldDS);
+		      
+    return RunLoadModule(ptask, fullPath, uiParent);
+}
+#endif
+
+
+
+
+/***********************************************************************
+ *		MSG_INTERP_SET_SYSTEM_MODULE for InterpClass
+ ***********************************************************************
+ * SYNOPSIS:	    Stores the system module in instance data.
+ * PARAMETERS:	    RTaskHan	system
+ * SIDE EFFECTS:    none
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	RON	9/ 7/95   	Initial Revision
+ *
+ ***********************************************************************/
+@method InterpClass, MSG_INTERP_SET_SYSTEM_MODULE
+{
+    pself->IC_system = system;
+}	/* End of MSG_INTERP_SET_SYSTEM_MODULE.	*/
+
+
+/***********************************************************************
+ *		MSG_INTERP_GET_SYSTEM_MODULE for InterpClass
+ ***********************************************************************
+ * SYNOPSIS:	    Returns the system module that was set with
+ *		    MSG_INTER_SET_SYSTEM_MODULE.
+ * PARAMETERS:	    none	
+ * SIDE EFFECTS:    none
+ *
+ * STRATEGY:	    none
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	RON	9/ 7/95   	Initial Revision
+ *
+ ***********************************************************************/
+@method InterpClass, MSG_INTERP_GET_SYSTEM_MODULE
+{
+    return	pself->IC_system;
+}	/* End of MSG_INTERP_GET_SYSTEM_MODULE.	*/
+
+
+/***********************************************************************
+ *		MSG_INTERP_FREE_OBJ_BLOCK for InterpClass
+ ***********************************************************************
+ * SYNOPSIS:	free an object block synchronously
+ * PARAMETERS:	
+ * SIDE EFFECTS:
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	jimmy	4/26/96   	Initial Revision
+ *
+ ***********************************************************************/
+@method InterpClass, MSG_INTERP_FREE_OBJ_BLOCK
+{
+    ObjFreeObjBlock(objBlock);
+}	/* End of MSG_INTERP_FREE_OBJ_BLOCK.	*/
+
+/***********************************************************************
+ *		MSG_INTERP_DESTROY_COMPONENTS for InterpClass
+ ***********************************************************************
+ * SYNOPSIS:	Destroy components in passed block
+ * PARAMETERS:	(optr compArray, optr uiBlockArray,
+ *		 optr fidoModuleArray, Message notifyMessage)
+ * SIDE EFFECTS:
+ *
+ * STRATEGY:
+ *	Sent by FunctionUnloadModuleCommon.
+ *	optrs are chunkarrays in the same lmem heap
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	dubois	5/ 3/96   	Initial Revision
+ *
+ ***********************************************************************/
+@method InterpClass, MSG_INTERP_DESTROY_COMPONENTS
+{
+    optr*	compP;
+    MemHandle*	blockP;
+    ModuleToken* fidoModuleP;
+    word	i, count;
+
+    MemHandle	ptaskHan;
+    PTaskPtr	ptask;
+    FTaskHan	ftaskHan;
+
+#ifdef LIBERTY
+    ASSERTS(FALSE, "Hey matt & mike, what do we do here?");
+#endif
+    /* Flush the message queue -- after this, there should be no
+     * messages waiting for the objects to be destroyed
+     */
+    RunMainMessageDispatch(NullHandle);
+    MemLock(OptrToHandle(compArray));
+
+    compP = ChunkArrayElementToPtr(compArray, 0, NULL);
+    count = ChunkArrayGetCount(compArray);
+    for (i=0; i<count; i++)
+    {
+	@call compP[i]::MSG_ENT_DESTROY();
+    }
+
+
+    blockP = ChunkArrayElementToPtr(uiBlockArray, 0, NULL);
+    count = ChunkArrayGetCount(uiBlockArray);
+    for (i=0; i<count; i++)
+    {
+	EventHandle event;
+	event = @record self::MSG_INTERP_FREE_OBJ_BLOCK(blockP[i]);
+	@send self::MSG_META_OBJ_FLUSH_INPUT_QUEUE(event, 0, HandleOf(oself));
+    }
+
+    ptaskHan = @call self::MSG_INTERP_GET_STATE();
+    ptask = (PTaskPtr)MemLock(ptaskHan);
+    ftaskHan = ptask->PT_fidoTask;
+    MemUnlock(ptaskHan);
+    EC(ptask = NULL);
+    
+    fidoModuleP = ChunkArrayElementToPtr(fidoModuleArray, 0, NULL);
+    count = ChunkArrayGetCount(fidoModuleArray);
+    for (i=0; i<count; i++)
+    {
+	FidoCloseModule(ftaskHan, fidoModuleP[i]);
+    }
+
+    MemFree(OptrToHandle(compArray));
+    RunMainMessageDispatch(NullHandle);
+
+    /* Notify ourself that the destruction is done */
+    if (notifyMessage) {
+	/* Cast to META_INITIALIZE which takes no args and returns nothing */
+	@send self::{MSG_META_INITIALIZE} notifyMessage();
+    }
+}	/* End of MSG_INTERP_DESTROY_COMPONENTS.	*/
+
+/*********************************************************************
+ *			RunSendObjFreeMessage
+ *********************************************************************
+ * SYNOPSIS:	send the obj free message to the interp object
+ * CALLED BY:	
+ * PASS:
+ * RETURN:
+ * SIDE EFFECTS:
+ * STRATEGY:
+ * REVISION HISTORY:
+ *	Name	Date		Description			     
+ *	----	----		-----------			     
+ *	jimmy	4/26/96  	Initial version
+ * 
+ *********************************************************************/
+void RunSendObjFreeMessage(RTaskHan rtaskHan, MemHandle objBlock)
+{
+    EventHandle	event;
+    RunTask 	*rtask;
+    optr    	interp;
+
+    rtask = MemLock(rtaskHan);
+    interp = rtask->RT_interpreter;
+    MemUnlock(rtaskHan);
+
+    event = @record interp::MSG_INTERP_FREE_OBJ_BLOCK(objBlock);
+    @send interp::MSG_META_OBJ_FLUSH_INPUT_QUEUE(event, 0, HandleOf(interp));
+}

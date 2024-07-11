@@ -1,0 +1,11 @@
+# local.mk 
+# $Id: local.mk,v 1.3 98/10/15 13:36:15 martin Exp $
+#
+
+#include <$(SYSMAKEFILE)>
+
+GOCFLAGS += -Ha -D__BORLANDC__
+ASMFLAGS += -DREAD_CHECK -DWRITE_CHECK -wjmp
+ASMFLAGS += -DBASRUN_GLUE_BUG
+#ASMFLAGS += -D__HIGHC__
+ASMFLAGS += -D__BORLANDC__

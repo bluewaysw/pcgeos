@@ -1,0 +1,125 @@
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+	Copyright (c) Geoworks 1994 -- All Rights Reserved
+
+PROJECT:	Legos
+MODULE:		Fido Library
+FILE:		fidostr.def
+
+AUTHOR:		Paul L. DuBois, Sep  7, 1994
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	dubois	9/ 7/94   	Initial revision
+
+
+DESCRIPTION:
+	Structures for fido library
+		
+	$Revision: 1.2 $
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+
+SetDef __FIDO_STRUCTS
+
+; for ModuleType enum
+UseDriver Internal/fidoIDr.def
+
+;%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+;%		Global block
+;%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+;; All shared data resides in this structure.
+;; Client-specific data go into separate blocks of memory.
+FidoGlobalsHeader	struct
+    FGH_meta	LMemBlockHeader
+    FGH_clients	lptr.FidoClients	; plain old list
+FidoGlobalsHeader	ends
+
+;%%%%		Client "array" structs
+
+ClientSharedData	struct
+    CSD_handle		hptr			; GeodeHandle of client
+    CSD_privData	hptr.FidoTask	; non-shared client data
+ClientSharedData	ends
+
+FC_MAGIC_NUMBER	= 0xb015	; "bois", get it?
+FidoClients	struct
+    FC_count	word
+    FC_unused	word
+    FC_data	label ClientSharedData
+FidoClients	ends
+    
+
+;%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+;%		Client data block
+;%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+FT_MAGIC_NUMBER = 0xb015
+FidoTask	struct
+    FT_meta	LMemBlockHeader
+EC <    FT_tag	word							>
+    FT_modules	lptr.ModuleArrayHeader	; name array
+    FT_openLibs	lptr.ClientLibraries
+    FT_openDrivers	lptr.ClientDrivers
+    FT_aggHashTable	lptr.HashTableHeader	; hash index to FT_aggregates
+    FT_aggregates	lptr.ChunkArrayHeader	; chunkarray of agg names
+FidoTask	ends
+
+AggData	struct
+    AD_module	hptr			; Module which exports this Agg
+    AD_func	word			; constructor function
+AggData	ends
+
+if 0
+CPD_MAGIC_NUMBER = 0xb015
+ClientPrivData	struct
+    CPD_meta	LMemBlockHeader
+EC <    CPD_tag	word							>
+    CPD_modules	lptr.ModuleArrayHeader	; name array
+    CPD_openLibs	lptr.ClientLibraries
+    CPD_openDrivers	lptr.ClientDrivers
+ClientPrivData	ends
+endif
+
+CL_MAGIC_NUMBER	=	0xccd1
+ClientLibraries	struct
+    CL_count	word
+    CL_unused	word		; Chunks must be 4+ bytes, d'oh
+    CL_data	label hptr	; series of library handles
+ClientLibraries	ends
+
+;; How annoying... ent.def has a "ComponentData" struct with a field
+;; called CD_data.  sigh.
+CDR_MAGIC_NUMBER	=	0xccd3
+ClientDrivers	struct
+    CDR_count	word
+    CDR_unused	word		; Chunks must be 4+ bytes, d'oh
+    CDR_data	label hptr	; series of driver handles
+ClientDrivers	ends
+
+;%%%%		Module NameArray structs
+
+ModuleArrayHeader	struct
+    MAH_meta	NameArrayHeader
+	;; other header data goes here
+ModuleArrayHeader	ends
+
+; Data portion of a ModuleArrayElement
+; FIXME: MAD_strategy doesn't relocate itself
+ModuleArrayData	struct
+    MAD_driver		hptr
+    MAD_driverData	word		; for input driver's use while open
+    MAD_strategy	fptr.far	; stash fptr to driver entry here...
+    MAD_url		lptr		; chunk containing full path
+    MAD_type		ModuleType
+ModuleArrayData	ends
+
+; Standard idiom for a name array element
+ModuleArrayElement	struct
+    MAE_header	RefElementHeader
+    MAE_data	ModuleArrayData
+    MAE_name	label char
+ModuleArrayElement	ends
+

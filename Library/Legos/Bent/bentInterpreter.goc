@@ -1,0 +1,2224 @@
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+	Copyright (c) Geoworks 1994 -- All Rights Reserved
+
+PROJECT:        Legos
+MODULE:         Bent
+FILE:           bentintr.goc
+
+AUTHOR:         Martin Turon, Sep 12, 1994
+
+ROUTINES:
+	Name                    Description
+	----                    -----------
+
+REVISION HISTORY:
+	Name    Date            Description
+	----    ----            -----------
+	martin  9/12/94         Initial version.
+
+DESCRIPTION:
+	Code for BentManagerClass
+
+	$Id: bentInterpreter.goc,v 1.2 98/03/11 15:44:23 martin Exp $
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+
+@include "bentInternal.goh"
+@include "bentArt.goh"
+#include <geoMisc.h>
+#include <Legos/runheap.h>
+@include <Legos/basrun.goh>
+#include <stdarg.h>
+
+/* to get the RunHeapInfo from a PTask... yuk */
+#include <Legos/Internal/progtask.h>
+
+/* Little helper routine to track down invalid pself's
+ */
+
+@classdecl      BentManagerClass;
+
+/*--------------------------------------------------------------------------
+ *              Macros for this file
+ *-------------------------------------------------------------------------*/
+/*
+ * Silly that these are opposite, but that is how Gool implemented 
+ * position property and then the size property followed suit....
+ */
+#define X_POSITION(pos)         DWORD_Y((pos))
+#define Y_POSITION(pos)         DWORD_X((pos))
+#define PointToDword(x,y)       ConstructOptr((x),(y))
+
+void BentMapMouseToPosition (optr parent, optr child, int *x, int *y);
+
+
+/*--------------------------------------------------------------------------
+ *              Code for BentManagerClass
+ *-------------------------------------------------------------------------*/
+
+
+/***********************************************************************
+ *        MSG_BENT_MANAGER_DESCRIBE_COMPONENTS for BentManagerClass
+ ***********************************************************************
+ * SYNOPSIS:       Returns a *full* description of all the current
+ *                 build-time component in a buffer.  The caller is
+ *                 responsible for freeing the returned memory block.
+ *                 The full description is in ASCII (in the language
+ *                 specified in the outputInfo argument) and includes
+ *                 creation of all components and setting of all necessary
+ *                 properties.  This routine basically "passes the buck" in
+ *                 that it forwards the request for a description to each
+ *                 component, so any strange output is probably a result of
+ *                 faulty build-time component code.   
+ *
+ * PASS:           BDescInfo  outputInfo
+ * RETURN:         hptr.BDescHeader	descHeader
+ *
+ * SIDE EFFECTS:
+ * STRATEGY:
+ *      One can either use one struct to handle all different
+ *      descriptions, or have a switch statement here that creates
+ *      a different LMem heap for each BDescType.  The
+ *      former is done here.
+ *
+ * REVISION HISTORY:
+ *      Name    Date            Description
+ *      ----    ----            -----------
+ *      martin  11/30/94        Initial version
+ *
+ ***********************************************************************/
+@method BentManagerClass, MSG_BENT_MANAGER_DESCRIBE_COMPONENTS
+{
+    MemHandle   descHeader;
+    MemHandle*	descP;
+    ChunkHandle clipItemArray, descriptions;
+    EventHandle event;
+    BDescHeader* bdh;
+
+   /* Allocate and initialize an LMem heap to store the description
+    * string and VMTrees in.
+    */
+    descHeader = MemAllocLMem(LMEM_TYPE_GENERAL, sizeof(BDescHeader));
+    if (descHeader == NullHandle) return NullHandle;
+    (void) MemLock(descHeader);
+
+    clipItemArray = ChunkArrayCreate(descHeader, sizeof(RunHeapToken), 0, 0);
+    descriptions = ChunkArrayCreate(descHeader, sizeof(MemHandle), 0, 0);
+
+    bdh = MemDeref(descHeader);
+    bdh->BDH_info = outputInfo;
+    bdh->BDH_clipItemArray = clipItemArray;
+    bdh->BDH_descriptions = descriptions;
+    MemUnlock(descHeader);
+    
+    (void)Bent_AllocDescriptionBlock(descHeader, 0);
+
+    /* Tell each object under the given root to write its description in
+     * the descHeader we just allocated.
+     */
+    /*
+     * FIXME: sending bent messages isn't necessarily safe as not all ent
+     * children have a bent master level.  They may have a different one with
+     * a corresponding message number. But it is very unlikely.
+     */
+    event = @record BentClass::MSG_BENT_DESCRIBE_SELF(descHeader, outputInfo);
+    @call GeodeGetAppObject(0)::MSG_ENT_SEND_TO_CHILDREN(event);
+
+    return descHeader;
+
+}       /* End of MSG_BENT_MANAGER_DESCRIBE_COMPONENTS. */
+
+/***********************************************************************
+ *              MSG_BENT_MANAGER_DESTROY_BUFFER for BentManagerClass
+ ***********************************************************************
+ * SYNOPSIS:    Destroy buffer returned by DESCRIBE_COMPONENTS
+ * PARAMETERS:  MemHandle       descHeader;
+ * SIDE EFFECTS:
+ *
+ * STRATEGY:
+ *      DecRef LegosComplex elements.
+ *
+ * REVISION HISTORY:
+ *      Name    Date            Description
+ *      ----    ----            -----------
+ *      dubois  10/ 2/95        Initial Revision
+ *
+ ***********************************************************************/
+@method BentManagerClass, MSG_BENT_MANAGER_DESTROY_BUFFER
+{
+    BDescHeader*      bdh;
+    optr		descriptions;
+    ChunkArrayHeader*   cah;
+    RunHeapToken*       tok;
+    word        i, count;
+
+    PTaskHan            ptaskHan;
+    PTaskPtr            ptask;
+    RunHeapInfo*        rhi;
+
+    bdh = (BDescHeader*) MemLock(descHeader);
+
+    descriptions = ConstructOptr(descHeader, bdh->BDH_descriptions);
+    count = ChunkArrayGetCount(descriptions);
+    for (i=0; i<count; i++)  {
+	MemHandle	descHan;
+	descHan = *(MemHandle *)ChunkArrayElementToPtr(descriptions, i, NULL);
+	MemFree(descHan);
+    }
+
+    ptaskHan = @call self::MSG_INTERP_GET_STATE();
+    ptask = MemLock(ptaskHan);
+    rhi = &ptask->PT_runHeapInfo;
+
+    cah = LMemDerefHandles(descHeader, bdh->BDH_clipItemArray);
+    EC_ERROR_IF(cah->CAH_elementSize == 0, -1);
+    tok = (RunHeapToken*) (((byte*)cah) + cah->CAH_offset);
+    for (i=0; i<cah->CAH_count; i++, tok++)
+    {
+	RunHeapDecRef(rhi, *tok);
+    }
+
+    MemUnlock(ptaskHan);
+    MemFree(descHeader);
+}       /* End of MSG_BENT_MANAGER_DESTROY_BUFFER.      */
+
+
+/***********************************************************************
+ *              EntCallEvent
+ ***********************************************************************
+ * SYNOPSIS:    This routine shrinks and beautifies code by simplifying the
+ *              code necessary to dispatch an event.  Perhaps at some future
+ *              date we should rewrite this code in assembly, as it wouldn't
+ *              be too difficult, and it would greatly improve its efficiency.
+ *
+ * CALLED BY:   
+ * RETURN:      
+ * SIDE EFFECTS:
+ *      
+ * STRATEGY:
+ *      
+ * REVISION HISTORY:
+ *      Name    Date            Description
+ *      ----    ----            -----------
+ *      martin  9/15/95         Initial version
+ *
+ ***********************************************************************/
+void EntCallEvent (optr oself, TCHAR *event, ComponentData *result, 
+		   int argc, ...)
+{
+    int                     i;
+    va_list                 args;
+    LegosType               type;
+    EntHandleEventStruct    eventStuff;
+    
+    eventStuff.EHES_eventName = event;
+    eventStuff.EHES_argc = argc;
+    eventStuff.EHES_result = result;
+
+    va_start(args, argc);
+    for(i=0; i < argc; i++) {
+	type = va_arg(args, LegosType);
+	eventStuff.EHES_argv[i].CD_type = type;
+	switch (type) {
+	   case TYPE_INTEGER:
+		eventStuff.EHES_argv[i].CD_data.LD_integer = va_arg(args, int);
+		break;
+	   case TYPE_COMPONENT:
+		eventStuff.EHES_argv[i].CD_data.LD_comp = va_arg(args, optr);
+		break;
+	   case TYPE_STRING:
+		eventStuff.EHES_argv[i].CD_data.LD_string = 
+						va_arg(args, RunHeapToken);
+		break;
+	}
+    }
+    @call self::MSG_ENT_HANDLE_EVENT(&eventStuff);
+
+}       /* End of EntCallEvent. */
+
+
+/***********************************************************************
+ *              BentManagerGetClassInfo
+ ***********************************************************************
+ * SYNOPSIS:    Returns the global class information stored for the given
+ *              component in BentManagerClass.
+ *
+ * CALLED BY:   
+ * PASS:	TCHAR *class
+ * RETURN:      ClassInfoStruct *classInfo
+ *
+ *
+ * SIDE EFFECTS:
+ * STRATEGY:
+ *      
+ * REVISION HISTORY:
+ *      Name    Date            Description
+ *      ----    ----            -----------
+ *      martin  9/15/95         Initial version
+ *
+ ***********************************************************************/
+@method BentManagerClass, MSG_BENT_MANAGER_GET_CLASS_INFO
+{
+    word  element;
+    optr  classInfoArray = ConstructOptr(HandleOf(oself), 
+					 ECPSelf(pself)->BMI_classArray);
+    
+    if (ChunkOf(classInfoArray) == NullHandle) {
+       /*
+	* If the class info array hasn't been created yet, create it now.
+	*/
+	classInfoArray = ConstructOptr(HandleOf(oself), 
+	    NameArrayCreateAt(classInfoArray,sizeof(ClassInfoStruct),0,0));
+	    pself = ObjDerefBentManager(oself);
+	    ECPSelf(pself)->BMI_classArray = ChunkOf(classInfoArray);
+    }
+    element = NameArrayFind(classInfoArray, class, 0, 0);
+    
+    if (element == CA_NULL_ELEMENT) {
+	ClassInfoStruct newClassInfo;
+
+       /*
+	* If no entry exists for this class yet, create one now.
+	*/
+	newClassInfo.CIS_count = 0;
+	element = NameArrayAdd(classInfoArray, class, 0, 0, &newClassInfo);
+    } 
+    return ChunkArrayElementToPtr(classInfoArray, element, &element);
+}       /* End of BentManagerGetClassInfo.      */
+
+
+
+/***********************************************************************
+ *     MSG_BENT_MANAGER_INCREMENT_COMPONENT for BentManagerClass
+ ***********************************************************************
+ * SYNOPSIS:        Increments the count of the class of the given
+ *                  component. 
+ *
+ * CALLED BY:       MSG_ENT_INITIALIZE when handled by BentClass
+ *
+ * PARAMETERS:      optr        comp
+ *
+ * SIDE EFFECTS:    
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *      Name    Date            Description
+ *      ----    ----            -----------
+ *      martin  10/13/94        Initial version
+ *
+ ***********************************************************************/
+@method BentManagerClass, MSG_BENT_MANAGER_INCREMENT_COMP_COUNT
+{
+    TCHAR               *className;
+    ClassInfoStruct     *classInfo;
+
+    className = @call comp::MSG_ENT_GET_CLASS();
+    classInfo = @call self::MSG_BENT_MANAGER_GET_CLASS_INFO(className);
+    classInfo->CIS_count++;
+
+}
+
+
+
+/***********************************************************************
+ *     MSG_BENT_MANAGER_RESET_CREATION_CONTROLLER for BentManagerClass
+ ***********************************************************************
+ * SYNOPSIS:        Creates a component of the given class.
+ *
+ * PARAMETERS:      none
+ *
+ * SIDE EFFECTS:    
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *      Name    Date            Description
+ *      ----    ----            -----------
+ *      martin  10/13/94        Initial version
+ *
+ ***********************************************************************/
+@method BentManagerClass, MSG_BENT_MANAGER_RESET_CREATION_CONTROLLER
+{
+     ChunkHandle classArray = ECPSelf(pself)->BMI_classArray;
+
+
+     if (classArray != NullHandle) {
+	 /*
+	  * Free the classInfo array
+	  */
+	ECPSelf(pself)->BMI_classArray = NullHandle;
+	LMemFreeHandles(HandleOf(oself), classArray);
+    }
+
+}
+
+
+
+/***********************************************************************
+ *     MSG_BENT_MANAGER_CREATE_COMPONENT for BentManagerClass
+ ***********************************************************************
+ * SYNOPSIS:        Creates a component of the given class.
+ *
+ * PARAMETERS:      optr        parent
+ *                  int         x, y
+ *
+ * SIDE EFFECTS:    
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *      Name    Date            Description
+ *      ----    ----            -----------
+ *      martin  10/13/94        Initial version
+ *
+ ***********************************************************************/
+@method BentManagerClass, MSG_BENT_MANAGER_CREATE_COMPONENT
+{
+    optr                creationCtrl = ECPSelf(pself)->BMI_creationCtrl;
+    TCHAR               className[50];
+    ClassInfoStruct     *classInfo;
+    ComponentData       result;
+
+   /*
+    * Set the mode of the Builder interpreter to be normal once again (no
+    * longer in creation or placement mode.)  This is a message because 
+    * sometimes the old mode has some clean-up to do 
+    * (killing old gstates, etc.)
+    */
+    @call self::MSG_BENT_MANAGER_SET_BUILD_MODE(BBM_NORMAL, 0);
+
+    if (creationCtrl == NullOptr)
+    {
+       /*
+	* If we don't have a creation control, bail! 
+	*/
+	return NullOptr;
+    }
+
+   /*
+    * Get the name of the class to be created from the creation control, and
+    * look up the current count.
+    */
+    
+    result.CD_data.LD_fptr = (TCHAR*)&className; 
+    @call creationCtrl::MSG_ENT_GET_PROPERTY_EXTERNAL(&result,
+						     _TEXT("classToCreate"));
+    classInfo = @call self::MSG_BENT_MANAGER_GET_CLASS_INFO(className);
+
+    if (x != -1) BentMapMouseToPosition(parent,0,&x,&y);
+
+    /* grab the run task of the creation control object and set it to
+     * build time
+     */
+    {
+    MemHandle             rtask;
+    EntObjectBlockHeader  *eobh;
+
+	eobh = ObjLockObjBlock(OptrToHandle(creationCtrl));     
+	rtask = eobh->EOBH_task;
+	MemUnlock(OptrToHandle(creationCtrl));
+	RunSetBuildTime(rtask, TRUE);
+
+	EntCallEvent(creationCtrl, _TEXT("createInPlace"), &result, 4,
+		  TYPE_COMPONENT, parent, TYPE_INTEGER, classInfo->CIS_count,
+		  TYPE_INTEGER, x, TYPE_INTEGER, y);
+
+	RunSetBuildTime(rtask, FALSE);
+    }
+
+    if (result.CD_type != TYPE_COMPONENT) {
+	return NullOptr;
+    } else {
+	return result.CD_data.LD_comp;
+    }
+}       /* End of MSG_BENT_MANAGER_CREATE_COMPONENT.    */
+
+/*********************************************************************
+ *                      BMBentManagerGetFlags
+ *********************************************************************
+ * SYNOPSIS: check the ui dirty bit and return its value
+ * CALLED BY:   global
+ * RETURN:  non-zero if ui dirty is set, zero otherwise
+ * SIDE EFFECTS:
+ * STRATEGY:
+ * REVISION HISTORY:
+ *      Name    Date            Description                          
+ *      ----    ----            -----------                          
+ *      jimmy    5/22/95        Initial version                      
+ * 
+ *********************************************************************/
+@method BentManagerClass, MSG_BENT_MANAGER_GET_FLAGS
+{
+    return ECPSelf(pself)->BMI_flags;
+}
+
+/*********************************************************************
+ *                      BMBentManagerSetUiDirty
+ *********************************************************************
+ * SYNOPSIS: set and clear appropriate flags
+ * CALLED BY:   global
+ * RETURN:  nothing
+ * SIDE EFFECTS:
+ * STRATEGY:
+ * REVISION HISTORY:
+ *      Name    Date            Description                          
+ *      ----    ----            -----------                          
+ *      jimmy    5/22/95        Initial version                      
+ * 
+ *********************************************************************/
+@method BentManagerClass, MSG_BENT_MANAGER_SET_FLAGS
+{
+    ECPSelf(pself)->BMI_flags |= flagsToSet;
+    ECPSelf(pself)->BMI_flags &= ~flagsToClear;
+}
+
+
+/*********************************************************************
+ *                      BentIsObjectInClass
+ *********************************************************************
+ * SYNOPSIS:    lock down the object block and check the class
+ * CALLED BY:   
+ * PASS:
+ * RETURN:
+ * SIDE EFFECTS:
+ * STRATEGY:
+ * REVISION HISTORY:
+ *      Name    Date            Description                          
+ *      ----    ----            -----------                          
+ *      jimmy   8/22/95 Initial version
+ * 
+ *********************************************************************/
+int BentIsObjectInClass(optr comp, void *classPtr)
+{
+    int retval;
+
+    ObjLockObjBlock(OptrToHandle(comp));
+    retval = ObjIsObjectInClass(comp, classPtr);
+    MemUnlock(OptrToHandle(comp));
+    return retval;
+}
+
+
+/***********************************************************************
+ *              BentMapMouseToPosition
+ ***********************************************************************
+ * SYNOPSIS:    Takes the given x, y coordinates of the mouse pointer,
+ *              and converts it to a position offset within the parent
+ *              frame for a newly placed component.  This conversion involves
+ *              traversing up the Ent tree, and adding the position offsets
+ *              of all parents.
+ *
+ * CALLED BY:   
+ * RETURN:      XYValueAsDword  newPosition
+ *
+ * SIDE EFFECTS:
+ * STRATEGY:
+ *      
+ * REVISION HISTORY:
+ *      Name    Date            Description
+ *      ----    ----            -----------
+ *      martin  5/2/95          Initial version
+ *
+ ***********************************************************************/
+void
+BentMapMouseToPosition (optr parent, optr child, int *x, int *y)
+{
+   /*
+    * Return value should be mouse position minus the position offsets of 
+    * this parent and every parent above (ends at the screen level [0,0]) 
+    * of the new component to be.
+    */
+
+    if (parent != NullOptr) {
+	EC(ECCheckOD(parent));
+	
+	if (BentIsObjectInClass(parent, &BentViewClass)) {
+	    /* this page intentionally left blank.
+	       We don't need to translate more for clippers here
+	       as there is no extra offset within them.
+	       */
+	}
+	else if (BentIsObjectInClass(parent, &BentWindowClass)) {
+
+	    Rectangle    margins;
+	    /*
+	     * If the parent is any type of window, then simply subtract
+	     * the upper left margin and return to end the recursive call.
+	     *
+	     * Actually, getting the margins isn't good enough when popups
+	     * are involved.  Get the OLGadgetArea and its offset.
+	     */
+
+	    optr	vp;
+	    XYValueAsDWord	pos;
+	    BentWindowInstance	*pself;
+	    /*
+	     * When moving with keyboard, sometimes parent isn't locked down.
+	     */
+	    MemLock(OptrToHandle(parent));
+	    pself = ObjDerefBent(parent);
+	    pos = @call pself->BWI_childParent::MSG_VIS_GET_POSITION();
+	    *x -= DWORD_X(pos);
+	    *y -= DWORD_Y(pos);
+	    MemUnlock(OptrToHandle(parent));
+
+	} else {
+
+	 /*
+	  * Otherwise subtract the offset of our parent, and every parent
+	  * above up to and including the window that contains us. 
+	  */
+
+	   ComponentData  newX, newY;
+	   newX.CD_data.LD_integer = 0;
+	   newY.CD_data.LD_integer = 0;
+
+	   @call parent::MSG_ENT_GET_PROPERTY(0, &newX, _TEXT("left"));
+	   @call parent::MSG_ENT_GET_PROPERTY(0, &newY, _TEXT("top"));
+
+	   *x -= newX.CD_data.LD_integer;
+	   *y -= newY.CD_data.LD_integer;
+
+	   BentMapMouseToPosition(@call parent::MSG_ENT_GET_PARENT(), child, x, y);
+	}
+    }
+}       /* End of BentMapMouseToPosition.       */
+
+
+/***********************************************************************
+ *              BentMapPositionToMouse
+ ***********************************************************************
+ * SYNOPSIS:    Given an offset to a parent, determine what the offset
+ *              is to the wingroup margin.
+ * CALLED BY:   
+ * RETURN:      values are changed to be relative to wingroup margin.
+ *
+ * SIDE EFFECTS:
+ * STRATEGY:
+ *      
+ * REVISION HISTORY:
+ *      Name    Date            Description
+ *      ----    ----            -----------
+ *      martin  5/11/95         Initial version
+ *
+ ***********************************************************************/
+void
+BentMapPositionToMouse (optr component, int *x, int *y)
+{
+    optr parent = @call component::MSG_ENT_GET_PARENT();
+
+   /*
+    * Return value should be given position plus the position offsets of 
+    * this parent and every parent above (ends at win group [0,0]) 
+    * of the new component to be.
+    */
+
+    if (parent != NullOptr &&
+	@call component::MSG_GEN_GET_USABLE()) 
+    {
+	if (BentIsObjectInClass(parent, &BentWindowClass))
+	{
+
+	    XYValueAsDWord	pos;
+	    optr	vp, head;
+	    
+	    /*
+	     * Return the position of the OLGadgetArea.
+	     * I wonder if call VisParent::MSG_VIS_GET_BOUNDS would work?
+	     * Note: if this were surrounded by another object we couldn't
+	     * do this as the visposition wouldn't equal the relative position
+	     * to the parent, but we have no parent.
+	     */
+	    /*	    vp = @call parent::MSG_GADGET_GEOM_GET_VIS_CHILD_PARENT();*/
+	    head = @call component::MSG_BENT_GET_VIS_ROOT();
+	    vp = @call head::MSG_VIS_FIND_PARENT();
+	    pos = @call vp::MSG_VIS_GET_POSITION();
+	    *x += DWORD_X(pos);
+	    *y += DWORD_Y(pos);
+
+	}
+	else if (BentIsObjectInClass(parent, &BentViewClass)) 
+	{
+	    /* clippers have no margins, so just return x,y */
+	    /* This page intentionally left blank */
+	}
+	else 
+	{
+
+	   ComponentData  newX, newY;
+
+	   @call parent::MSG_ENT_GET_PROPERTY(0,&newX, _TEXT("left"));
+	   @call parent::MSG_ENT_GET_PROPERTY(0,&newY, _TEXT("top"));
+
+	   *x += newX.CD_data.LD_integer;
+	   *y += newY.CD_data.LD_integer;
+
+	   BentMapPositionToMouse(parent, x, y);
+	}
+
+    }
+
+}       /* End of BentMapPositionToMouse.       */
+
+
+
+
+/***********************************************************************
+ *              BentPlaceComponent
+ ***********************************************************************
+ * SYNOPSIS:    Moves the selected component from its current parent to
+ *              the given new parent, and positions the child correctly.
+ *              If 0 is passed in as the parent's optr, the child will be
+ *              repositioned within its current parent with bounds checking.
+ *
+ * CALLED BY:   MSG_BENT_MANAGER_MOUSE_EVENT    
+ *
+ * PARAMETERS:  optr    child           = component to place
+ *              optr    parent          = new parent (0 to not change)
+ *              int     xpos, ypos      = position in mouse coordinates
+ *
+ * RETURN:      FALSE, if target parent rejected placement
+ *              TRUE, if placement was successful
+ *
+ * SIDE EFFECTS:
+ * STRATEGY:
+ *      
+ * REVISION HISTORY:
+ *      Name    Date            Description
+ *      ----    ----            -----------
+ *      martin  4/21/95         Initial version
+ *
+ ***********************************************************************/
+Boolean
+BentPlaceComponent (optr child, optr parent, int xpos, int ypos)
+{
+    ComponentData       data;
+    optr                currentParent;
+    
+
+    /*
+     * don't try to add a child to itself 
+     */
+    currentParent  = @call child::MSG_ENT_GET_PARENT();
+    
+    if ((parent == child) || (parent == NullOptr))
+	parent = currentParent;
+
+    @call parent::MSG_BENT_INVALIDATE(); /* force a redraw */
+	
+    @call child::MSG_BENT_DESELECT();
+    /*
+     * I took out the hide/show as they don't seem to be needed.
+     */
+    /*    @call child::MSG_ENT_VIS_HIDE();*/
+    if (parent != currentParent) {
+	if (@call child::MSG_ENT_SET_PARENT(parent)) {
+	    if (BentIsObjectInClass(child, &EntVisClass ))
+	    {
+		@call child::MSG_ENT_VIS_SHOW();
+	    }
+	    @send, forceQueue child::MSG_BENT_SELECT();
+				/* since Show is done with VUM_DELAYED, 
+				 * need to send forceQueue */
+	    return FALSE;
+	}
+
+	if (BentIsObjectInClass(parent, &BentViewClass)) 
+	{
+	    @send , forceQueue parent::MSG_GEN_SET_NOT_USABLE(VUM_DELAYED_VIA_APP_QUEUE);
+	    @send , forceQueue parent::MSG_GEN_SET_USABLE(VUM_DELAYED_VIA_APP_QUEUE);
+	}
+    }
+    
+    /* Don't bother setting left and top if we're not vis
+     */
+    if (ENT_IS_VIS(child))
+    {
+	@call parent::MSG_ENT_GET_PROPERTY(0, &data, _TEXT("tile"));
+	if (data.CD_data.LD_integer == 0 || data.CD_type == TYPE_ERROR) {
+	    
+	    /*
+	     * If the parent of this object isn't managing its geometry,
+	     * position this component correctly...
+	     *  - Insure that component was not moved outside of its 
+	     *    parent's bounds.
+	     *  - Set the position property!
+	     */
+	    
+	    BentMapMouseToPosition(parent, child, &xpos, &ypos);
+	    
+	    data.CD_type = TYPE_INTEGER;
+	    data.CD_data.LD_integer = xpos;
+	    @call child::MSG_ENT_SET_PROPERTY(0,&data, _TEXT("left"));
+	    data.CD_type = TYPE_INTEGER;
+	    data.CD_data.LD_integer = ypos;
+	    @call child::MSG_ENT_SET_PROPERTY(0,&data, _TEXT("top"));
+    
+	} else {
+	    /*
+	     * Otherwise, set the tile property of our new parent again to
+	     * insure that any old positioning information the child might
+	     * still have is erased. 
+	     * Also, tell it to redraw, in case geometry changes when
+	     * we're made visible again.
+	     */
+	    @call parent::MSG_ENT_SET_PROPERTY(0,&data, _TEXT("tile"));
+	}
+    }
+    /*
+     * Bent windows classes need to be rebuilt to display correctly
+     * after setting their position properties.
+     */
+    if (BentIsObjectInClass(child, &BentWindowClass))
+    {
+	@call child::MSG_ENT_VIS_HIDE();
+	@call child::MSG_ENT_VIS_SHOW();
+    }
+    
+    /*
+     * I took out the hide/show as they don't seem to be needed.
+     */
+    /*    @call child::MSG_ENT_VIS_SHOW();*/
+    @send, forceQueue child::MSG_BENT_SELECT();
+
+    /*
+     * I don't think this next message is needed... --ron
+     */
+    @send, forceQueue parent::MSG_BENT_INVALIDATE();
+    					 /* force another redraw, after
+					  * bounds have changed. */
+    return TRUE;
+
+}       /* End of BentPlaceComponent.   */
+
+
+/***********************************************************************
+ *              BentSizeComponent
+ ***********************************************************************
+ * SYNOPSIS:    Takes the given mouse coordinates and region and sets the
+ *              proper size and position values of the given component to
+ *              size it correctly. 
+ *
+ * PARAMETERS:  optr       oself   = component to size
+ *              int        width   = new width
+ *              int        height  = new height
+ *              int     newX, newY = position in mouse coordinates
+ *
+ * RETURN:      
+ * SIDE EFFECTS:
+ * STRATEGY:
+ *	We need to mark sizeH/VControl changed.  Here's why:
+ *		- Setting the size here will put a HINT_FIXED_SIZE
+ *		  on the gadget.  This hint will influence what the
+ *		  gadget says when queried for its size?Control.
+ *		- If the user has not yet hit Apply, then the default
+ *		  size?Control is absent from the propArray.
+ *		- So if the user hits Apply *after* resizing, then
+ *		  Gadget will think the default size?Control is
+ *		  AS_SPECIFIED because of the HINT_FIXED_SIZE.
+ *		  This is wrong -- default is AS_NEEDED.
+ *      
+ * REVISION HISTORY:
+ *      Name    Date            Description
+ *      ----    ----            -----------
+ *      martin  5/4/95          Initial version
+ *	jmagasin 5/22/96	Mark sizeH/VControl changed.
+ *
+ ***********************************************************************/
+void
+BentSizeComponent (optr oself, int width, int height, int newX, int newY)
+{
+	ComponentData   data;
+
+	if ((width > 0) && (height > 0)) {
+	   /*
+	    * If we have a legitimate size, set the properties.
+	    */
+	    BentPlaceComponent(oself, 0, newX, newY);
+
+	    data.CD_type             = TYPE_INTEGER;
+	    data.CD_data.LD_integer  = 0;	/* Value doesn't matter.*/
+	                                        /* Any value will force */
+	                                        /* the default to be stuffed */
+	                                        /* into the prop array if */
+	                                        /* it's not there yet. */
+	    @call self::MSG_BENT_MARK_CHANGED_PROPERTY(0, &data,
+						       _TEXT("sizeHControl"));
+	    data.CD_type             = TYPE_INTEGER;
+	    @call self::MSG_BENT_MARK_CHANGED_PROPERTY(0, &data,
+						       _TEXT("sizeVControl"));
+
+	    data.CD_type             = TYPE_INTEGER;
+	    data.CD_data.LD_integer  = width;
+	    @call self::MSG_ENT_SET_PROPERTY(0, &data, _TEXT("width"));
+	    data.CD_type             = TYPE_INTEGER;
+	    data.CD_data.LD_integer  = height;
+	    @call self::MSG_ENT_SET_PROPERTY(0, &data, _TEXT("height"));
+	}
+}       /* End of BentSizeComponent.    */
+
+
+
+/***********************************************************************
+ *              BentFindRegionUnderMouse
+ ***********************************************************************
+ * SYNOPSIS:    Returns the region under the given point for use
+ *              when determining the mouse pointer or the direction of
+ *              a resize/drag operation.
+ *
+ * CALLED BY:   MSG_BENT_MANAGER_MOUSE_PTR
+ * PASS:        int x,y;          offset WinGroup outside border!
+ * RETURN:      
+ *
+ * SIDE EFFECTS:
+ * STRATEGY:
+ *      
+ * REVISION HISTORY:
+ *      Name    Date            Description
+ *      ----    ----            -----------
+ *      martin  5/4/95          Initial version
+ *
+ ***********************************************************************/
+BentRegion
+BentFindRegionUnderMouse (optr oself, int x, int y)
+{
+    Rectangle  rect;
+    optr	head;
+    
+    BentRegion region = BR_CHILD_GROUP;
+
+    EC_ERROR_IF(oself == NullOptr, -1);
+    head = @call oself::MSG_BENT_GET_VIS_ROOT();
+    @call head::MSG_VIS_GET_BOUNDS(&rect);
+
+    /*
+     * If it is a window, then adjust bounds to be relative to 0.
+     */
+    ObjLockObjBlock(OptrToHandle(oself));
+    if (ObjIsObjectInClass(oself, &BentWindowClass))
+    {
+	rect.R_right -= rect.R_left;
+	rect.R_bottom -= rect.R_bottom;
+	rect.R_left = rect.R_top = 0;
+    }
+    MemUnlock(OptrToHandle(oself));
+    
+
+   /*
+    * First make sure the pointer is within the extended object bounds.
+    */
+    if ((x >= rect.R_left-2) && (x <= rect.R_right+1) &&
+	(y >= rect.R_top-2)  && (y <= rect.R_bottom+1)) {
+
+	if (x <= rect.R_left+2)    region = BR_LEFT;
+	if (x >= rect.R_right-2) region = BR_RIGHT;
+	if (y <= rect.R_top+2)    
+	    if (region == BR_LEFT)       region = BR_UPPER_LEFT;
+	    else if (region == BR_RIGHT) region = BR_UPPER_RIGHT;
+	    else                         region = BR_TOP;
+	if (y >= rect.R_bottom-2)
+	    if (region == BR_LEFT)       region = BR_LOWER_LEFT;
+	    else if (region == BR_RIGHT) region = BR_LOWER_RIGHT;
+	    else                         region = BR_BOTTOM;
+
+    }
+    return region;
+
+}       /* End of BentFindRegionUnderMouse.     */
+
+
+
+
+/*********************************************************************
+ *                      BentAdjustWinCoords
+ *********************************************************************
+ * SYNOPSIS:    move coordinates into appropriate window
+ * CALLED BY:   
+ * PASS:
+ * RETURN:
+ * SIDE EFFECTS:
+ * STRATEGY:
+ * REVISION HISTORY:
+ *      Name    Date            Description                          
+ *      ----    ----            -----------                          
+ *      jimmy   8/18/95 Initial version
+ * 
+ *********************************************************************/
+void BentAdjustWinCoords(MemHandle swin, MemHandle pwin, sword *x, sword *y, int upDown)
+{
+    if (swin != pwin && pwin != NullHandle && swin != NullHandle)
+    {
+	Rectangle  r1, r2;
+
+	WinGetWinScreenBounds(swin, &r1);
+	WinGetWinScreenBounds(pwin, &r2);
+
+	if (upDown) 
+	{
+	    *x += (r1.R_left - r2.R_left);
+	    *y += (r1.R_top - r2.R_top);
+	} 
+	else 
+	{
+	    *x -= (r1.R_left - r2.R_left);
+	    *y -= (r1.R_top - r2.R_top);
+	}
+    }
+}
+
+
+/*********************************************************************
+ *			BentAdjustCompCoords
+ *********************************************************************
+ * SYNOPSIS:	This is called to translate the coordinates to be relative
+ *		to the current window.  Usually does nothing, but if the object
+ *		is below a clipper, adjust bounds to be relative to the
+ *		GenView Window.
+ *
+ * CALLED BY:	Placement and movement code.
+ * PASS:	see below
+ * RETURN:	noting
+ * SIDE EFFECTS:
+ *		Changes passed in coordinates when needed.
+ * STRATEGY:
+ * REVISION HISTORY:
+ *	Name	Date		Description			     
+ *	----	----		-----------			     
+ *	JIMMY	who knows	none given
+ * 
+ *********************************************************************/
+void BentAdjustCompCoords(optr comp, MemHandle sourceWin, sword *x, sword *y, int upDown)
+{
+    optr    	inputObj;
+
+    if (BentIsObjectInClass(comp, &BentViewClass))
+    {
+	inputObj = comp;
+    }
+    else     /* Is it under a clipper */
+    {
+	MemHandle	win;
+	win = @call comp::MSG_VIS_QUERY_WINDOW();
+	if (win != NullHandle) {
+	    WinGetInfo(win, WIT_INPUT_OBJ, &inputObj);
+	}
+    }
+    /*
+     * If it is a clipper or is under a clipper ...
+     */
+    
+    if (BentIsObjectInClass(inputObj, &BentViewClass))
+    {
+	MemHandle   swin;
+	swin = @call inputObj::MSG_GEN_VIEW_GET_WINDOW();
+	BentAdjustWinCoords(swin, sourceWin, x, y, upDown);
+    }
+}
+
+
+
+/***********************************************************************
+ *              BentManagerInitActiveBounds
+ ***********************************************************************
+ * SYNOPSIS:    Initialize the active bounds and active mouse offset based
+ *              on the size and position of the selected component and the
+ *              location of the mouse. 
+ *
+ * PASS:        optr oself      = BentManagerClass object
+ *              int  xPosition  = current mouse x position
+ *              int  yPosition  = current mouse y position
+ *		WinHandle sourceWin
+ *
+ *
+ * CALLED BY:   
+ * RETURN:      
+ *
+ * SIDE EFFECTS:        This routine may be the one causing interactive
+ *                      mouse stuff to crash so often...  Weird, I know,
+ *                      because it isn't really doing much...
+ * STRATEGY:
+ *      
+ * REVISION HISTORY:
+ *      Name    Date            Description
+ *      ----    ----            -----------
+ *      martin  5/12/95         Initial version
+ *
+ ***********************************************************************/
+void
+BentManagerInitActiveBounds (optr oself, sword xPosition, sword yPosition, MemHandle sourceWin)
+{
+#define __CURROOT BentManager
+
+    BentManagerInstance *pself;
+    ComponentData       data;
+    int                 x, y, width, height;
+    optr                component, parent, head;
+    MemHandle	    	win;
+    /*
+     * Initialize the active bounds.
+     */
+
+    pself = ObjDerefBentManager(oself);
+    component = ECPSelf(pself)->BMI_selectedComp;
+    EC(ECCheckOD(component));
+
+    if (!ENT_IS_VIS(component))
+    {
+	return;
+    }
+
+    /*
+     * determine the positon of the selected component relative to
+     * the nearest wingroup margin.
+     */
+    @call component::MSG_ENT_GET_PROPERTY(0, &data, _TEXT("left"));
+    x=data.CD_data.LD_integer;
+    @call component::MSG_ENT_GET_PROPERTY(0, &data, _TEXT("top"));
+    y=data.CD_data.LD_integer;
+    BentMapPositionToMouse(component, &x, &y);
+
+    @call component::MSG_ENT_GET_PROPERTY(0, &data, _TEXT("width"));
+    width  = data.CD_data.LD_integer;
+    @call component::MSG_ENT_GET_PROPERTY(0, &data, _TEXT("height"));
+    height = data.CD_data.LD_integer;
+
+
+    pself = ObjDerefBentManager(oself);
+    /*
+     * All positions are relative to win group offset.
+     */
+
+    /*
+     * Find out which window our visible root is in, not which window
+     * we are in.  Needed for things like text in their own view.
+     */
+    head = @call component::MSG_BENT_GET_VIS_ROOT();
+    win = @call head::MSG_VIS_QUERY_WINDOW();
+    BentAdjustWinCoords(win, sourceWin, &xPosition, &yPosition, 0);
+
+    ECPSelf(pself)->BMI_activeOffset.P_x      = xPosition - x;
+    ECPSelf(pself)->BMI_activeOffset.P_y      = yPosition - y;
+
+    ECPSelf(pself)->BMI_activeBounds.R_left   = x;
+    ECPSelf(pself)->BMI_activeBounds.R_top    = y;
+    ECPSelf(pself)->BMI_activeBounds.R_right  = x + width;
+    ECPSelf(pself)->BMI_activeBounds.R_bottom = y + height;
+
+
+} /* End of BentManagerInitActiveBounds.        */
+
+
+/***********************************************************************
+ *              BentManagerUpdateActiveBounds
+ ***********************************************************************
+ * SYNOPSIS:            Stores new positions in instance data.
+ * CALLED BY:
+ * PASS:                int x,y;  position relative to nearest wingroup
+ *                                margin
+ * RETURN:      
+ * SIDE EFFECTS:
+ *      
+ * STRATEGY:
+ *      
+ * REVISION HISTORY:
+ *      Name    Date            Description
+ *      ----    ----            -----------
+ *      martin  5/12/95         Initial version
+ *
+ ***********************************************************************/
+void
+BentManagerUpdateActiveBounds (optr oself, int x, int y)
+{
+#define __CURROOT BentManager
+    BentManagerInstance *pself       = ObjDerefBentManager(oself);
+    BentRegion          region       = pself->BMI_activeRegion;
+    int                 xOffset      = 0;
+    int                 yOffset      = 0;
+    int                 heightOffset = 0;
+    int                 widthOffset  = 0;
+    MemHandle           win;
+    Rectangle           rect;
+    
+    if (!ENT_IS_VIS(pself->BMI_selectedComp)) {
+	return;
+    }
+
+    switch (region) {
+	case BR_UPPER_RIGHT:
+	case BR_UPPER_LEFT:
+	case BR_TOP: 
+	    yOffset = y - ECPSelf(pself)->BMI_activeOffset.P_y  
+			- ECPSelf(pself)->BMI_activeBounds.R_top;
+	    heightOffset = - yOffset;
+	    break;
+
+	case BR_LOWER_LEFT:
+	case BR_LOWER_RIGHT:
+	case BR_BOTTOM:
+	    heightOffset = y - ECPSelf(pself)->BMI_activeBounds.R_bottom;
+	    break;
+
+	case BR_CHILD_GROUP: 
+	    xOffset = x - ECPSelf(pself)->BMI_activeOffset.P_x 
+			- ECPSelf(pself)->BMI_activeBounds.R_left;
+	    yOffset = y - ECPSelf(pself)->BMI_activeOffset.P_y 
+			- ECPSelf(pself)->BMI_activeBounds.R_top;
+	    break;
+	}
+    switch (region) {
+	case BR_LOWER_LEFT:
+	case BR_UPPER_LEFT:
+	case BR_LEFT:
+	    xOffset = x - ECPSelf(pself)->BMI_activeOffset.P_x  
+			- ECPSelf(pself)->BMI_activeBounds.R_left;
+	    widthOffset = - xOffset;
+	    break;
+
+	case BR_UPPER_RIGHT:
+	case BR_LOWER_RIGHT:
+	case BR_RIGHT:
+	    widthOffset = x - ECPSelf(pself)->BMI_activeBounds.R_right;
+	    break;
+	}
+
+    ECPSelf(pself)->BMI_activeBounds.R_left   += xOffset;
+    ECPSelf(pself)->BMI_activeBounds.R_right  += (xOffset + widthOffset);
+    ECPSelf(pself)->BMI_activeBounds.R_top    += yOffset;
+    ECPSelf(pself)->BMI_activeBounds.R_bottom += (yOffset + heightOffset);
+
+	/* keep the active bounds inside the window if resizing */
+    if (pself->BMI_mode == BBM_RESIZE) 
+    {
+	optr	head;
+	head = @call pself->BMI_selectedComp::MSG_BENT_GET_VIS_ROOT();
+	win = @call head::MSG_VIS_QUERY_WINDOW();
+	if (win == NullHandle) {
+	    return;
+	}
+	pself = ObjDerefBentManager(oself);
+	WinGetWinScreenBounds(win, &rect);
+	if (ECPSelf(pself)->BMI_activeBounds.R_right - pself->BMI_activeBounds.R_left >
+	    rect.R_right - rect.R_left) 
+	{
+	    pself->BMI_activeBounds.R_right = pself->BMI_activeBounds.R_left + 
+		rect.R_right - rect.R_left;
+	}
+	if (pself->BMI_activeBounds.R_bottom - pself->BMI_activeBounds.R_top > 
+	    rect.R_bottom - rect.R_top) 
+	{
+	    pself->BMI_activeBounds.R_bottom = pself->BMI_activeBounds.R_top + 
+		rect.R_bottom - rect.R_top;
+	}
+    }
+
+}       /* End of BentManagerUpdateActiveBounds.        */
+
+
+
+/***********************************************************************
+ *              BentManagerDrawActiveBounds
+ ***********************************************************************
+ * SYNOPSIS:    
+ * CALLED BY:   
+ * RETURN:      
+ * SIDE EFFECTS:
+ *      
+ * STRATEGY:
+ *      
+ * REVISION HISTORY:
+ *      Name    Date            Description
+ *      ----    ----            -----------
+ *      martin  5/16/95         Initial version
+ *
+ ***********************************************************************/
+void
+BentManagerDrawActiveBounds (optr oself)
+{
+#define __CURROOT BentManager
+    BentManagerInstance *pself;
+    int                 marginX, marginY;
+
+    pself = ObjDerefBentManager(oself);
+
+    if (pself->BMI_activeGState != NullHandle) 
+    {
+	GrDrawRect(ECPSelf(pself)->BMI_activeGState,
+		   ECPSelf(pself)->BMI_activeBounds.R_left,
+		   ECPSelf(pself)->BMI_activeBounds.R_top,
+		   ECPSelf(pself)->BMI_activeBounds.R_right,
+		   ECPSelf(pself)->BMI_activeBounds.R_bottom);
+	}
+}       /* End of BentManagerDrawActiveBounds.  */
+
+
+@if 0
+/*********************************************************************
+ *                      GetWinGroupOffset
+ *********************************************************************
+ * SYNOPSIS:    Searches up for a win group and returns its margins
+ * CALLED BY:   Below
+ * PASS:        optr    component;      component to start with
+ * RETURN:      SizeAsDWord size;
+ * SIDE EFFECTS:
+ * STRATEGY:
+ * REVISION HISTORY:
+ *      Name    Date            Description                          
+ *      ----    ----            -----------                          
+ *      RON     9/19/95         Initial version
+ * 
+ *********************************************************************/
+void GetWinGroupOffset(optr component, int *x, int *y)
+{
+    Rectangle rect;
+    EventHandle event;
+    optr wingroup;
+    
+    event = @record MetaClass::MSG_META_GET_OPTR();
+    wingroup = @call {MSG_META_GET_OPTR} component::
+	MSG_VIS_VUP_CALL_WIN_GROUP(event);
+    @call wingroup::MSG_VIS_COMP_GET_MARGINS(&rect);
+    *x = rect.R_left;
+    *y = rect.R_top;
+}
+@endif 
+
+    
+
+
+
+/***********************************************************************
+ *              MSG_BENT_MANAGER_MOUSE_EVENT for BentManagerClass
+ ***********************************************************************
+ * SYNOPSIS:    Maps all builder mouse events to the code to do the right
+ *              thing (based on the current build mode.)
+ *
+ * PARAMETERS:  optr                    component under the mouse
+ *              sword                   xPosition
+ *              sword                   yPosition
+ *              word                    inputState
+ *              word                    sourceMsg
+ *              MouseReturnParams       *retVal
+ *
+ * SIDE EFFECTS:    
+ * STRATEGY:
+ *
+ *              xPosition, yPosition are offsets into the form.
+ *              Creating in CREATION_MODE will automatically account
+ *              for the margin of the form.  Otherwise, we need
+ *              to add the margin to get the correct drawing position.
+ *
+ * REVISION HISTORY:
+ *      Name    Date            Description
+ *      ----    ----            -----------
+ *      martin  3/4/95          Initial version
+ *
+ ***********************************************************************/
+@method BentManagerClass, MSG_BENT_MANAGER_MOUSE_EVENT
+{
+    /* click shift-mouse-2 before a left brace to open and close it
+     */
+    switch (sourceMsg)
+    {
+    case MSG_META_START_SELECT:
+    {
+	switch (ECPSelf(pself)->BMI_mode)
+	{
+
+	    /*
+	     * In normal mode, the current component is the start of the
+	     * selection chain.  The following code adds the component to
+	     * the selection, and sends it a message telling it to draw its
+	     * selection.
+	     */
+	case BBM_NORMAL: 
+	{
+	    switch (ECPSelf(pself)->BMI_activeRegion) 
+	    {
+	    case BR_CHILD_GROUP:
+	    case BR_OUT_OF_BOUNDS:
+		@call self::MSG_BENT_MANAGER_SELECT_COMPONENT
+		    (component);
+		BentManagerInitActiveBounds(oself, xPosition, 
+					    yPosition, sourceWin);
+		break;
+	    default:
+		BentManagerInitActiveBounds(oself, xPosition, 
+					    yPosition, sourceWin);
+		@call self::MSG_BENT_MANAGER_SET_BUILD_MODE
+		    (BBM_RESIZE, component);
+	    }
+	    break;
+	}
+
+	    /*
+	     * In creation mode, the component that is clicked on becomes
+	     * the new parent of the component whose creation has been
+	     * pending.  The creation controller specified by
+	     * BMI_creationCtrl is in charge of knowing the class of the
+	     * component to be created.  Future changes: 
+	     *   - pass child # so objects can be created in the *proper*
+	     *     place... 
+	     */
+	case BBM_CREATION: 
+	    BentAdjustCompCoords(component, sourceWin, &xPosition, &yPosition, 0);
+	    @call self::MSG_BENT_MANAGER_CREATE_COMPONENT(component, 
+								xPosition, 
+								yPosition);
+	    /* Make sure the bounds are updated, in case the user 
+	     * goes directly into drag mode.
+	     */
+	    BentManagerInitActiveBounds(oself, xPosition, yPosition, sourceWin);
+	    break;
+	} /* switch (pself->BMI_mode) */
+	break;
+    } /* case MSG_META_START_SELECT */
+
+    case MSG_META_DRAG_SELECT:
+    {
+	switch (ECPSelf(pself)->BMI_mode)
+	{
+	case BBM_NORMAL: {
+	    BentRegion    region   = ECPSelf(pself)->BMI_activeRegion;
+
+	    /* We don't really want to act on the component passed in, 
+	     * since it's just the component under the mouse, not 
+	     * necessarily the selected component.  So let's use the 
+	     * selected component instead.  dl 3/28/96
+	     */
+	    component = pself->BMI_selectedComp;
+
+	    if (BentIsObjectInClass(component, &BentWindowClass)) {
+		break;
+	    }
+
+	    /*
+	     * 1) Determine if this drag should be converted to a move
+	     * or a resize. 
+	     */
+	    if ((region == BR_CHILD_GROUP) || 
+		(region == BR_OUT_OF_BOUNDS)) {
+		@call self::MSG_BENT_MANAGER_SET_BUILD_MODE
+		    (BBM_PLACEMENT, component);
+	    } else {
+		@call self::MSG_BENT_MANAGER_SET_BUILD_MODE
+		    (BBM_RESIZE, component);
+	    }
+
+	    break;
+	}
+	}
+	break;
+    } /* case MSG_META_DRAG_SELECT */
+
+    case MSG_META_END_SELECT:
+    {
+	switch (ECPSelf(pself)->BMI_mode)
+	{
+	    /* In resize mode, the current component is the component to
+	     * be placed. The following code sets the new parent of the
+	     * component to be placed and sends a message to the new
+	     * component to make it visible.
+	     */
+	case BBM_RESIZE:
+	{
+	    /*BentRegion        region   = ECPSelf(pself)->BMI_activeRegion;*/
+	    optr                selected = ECPSelf(pself)->BMI_selectedComp;
+	    int                 newPosX=0, newPosY=0, newSizeX=0, newSizeY=0;
+	    MemHandle	    	win;
+	    optr		head;
+	    
+	    EC_ERROR_IF(selected == NullOptr, -1);
+	    @call self::MSG_BENT_MANAGER_SET_BUILD_MODE(BBM_NORMAL, 0);
+
+	    head = @call selected::MSG_BENT_GET_VIS_ROOT();
+	    win = @call head::MSG_VIS_QUERY_WINDOW();
+	    BentAdjustWinCoords(win, sourceWin, &xPosition, &yPosition, 0);
+	    
+	    BentManagerUpdateActiveBounds(oself, xPosition, yPosition);
+				     
+	    pself = ObjDerefBentManager(oself);
+	    newPosX = ECPSelf(pself)->BMI_activeBounds.R_left;
+	    newPosY = ECPSelf(pself)->BMI_activeBounds.R_top;
+	    newSizeX = ECPSelf(pself)->BMI_activeBounds.R_right;
+	    newSizeY = ECPSelf(pself)->BMI_activeBounds.R_bottom;
+	    newSizeX -= newPosX;
+	    newSizeY -= newPosY;
+
+	    BentSizeComponent(selected, newSizeX, newSizeY,
+			      newPosX, newPosY);
+
+	    @call self::MSG_BENT_MANAGER_UPDATE_CONTROL_UI(TRUE);
+	    @call oself::MSG_BENT_MANAGER_SET_FLAGS(BF_UI_DIRTY, 0);
+
+	    break;              
+	}
+
+	    /* In placement mode, the current component is the component to
+	     * be placed. The following code sets the new parent of the
+	     * component to be placed and sends a message to the new
+	     * component to make it visible.
+	     */
+	case BBM_PLACEMENT:
+	{
+	    optr                selected = ECPSelf(pself)->BMI_selectedComp;
+	    Boolean     placed;
+	    long                newPos;
+	    MemHandle	    win;
+	    EC_ERROR_IF(selected == NullOptr, -1);
+
+	    @call self::MSG_BENT_MANAGER_SET_BUILD_MODE(BBM_NORMAL, 0);
+
+	    /*
+	     * If you are dropping on yourself then, pretend you are
+	     * dropping on your parent.
+	     */
+	    if (component == selected) {
+		component = @call selected::MSG_ENT_GET_PARENT();
+
+		/* If we're placing a toplevel component, something has 
+		 * gone wrong and the code below will crash. dl 3/19/96
+		 */
+		EC_ERROR_IF(component == NullOptr, -1);
+	    }
+
+	    if (component != NullOptr) {
+		BentAdjustCompCoords(component, sourceWin, &xPosition, &yPosition, 0);
+		BentManagerUpdateActiveBounds(oself, xPosition, yPosition); 
+
+		/*
+		 * Add in offset of mouse to top left of component
+		 */
+		xPosition -= ECPSelf(pself)->BMI_activeOffset.P_x;
+		yPosition -= ECPSelf(pself)->BMI_activeOffset.P_y;
+		/*
+		 * Recursively try to place component
+		 */
+		while ((component != (optr) NULL) && 
+		       (!BentPlaceComponent(selected, component, 
+					    xPosition, yPosition))) {
+		    
+		    component = @call component::MSG_ENT_GET_PARENT();
+		}
+	    }
+
+	    @call self::MSG_BENT_MANAGER_UPDATE_CONTROL_UI(TRUE);
+	    @call oself::MSG_BENT_MANAGER_SET_FLAGS(BF_UI_DIRTY, 0);
+				    
+	    break;
+	}
+
+
+	    /* This seemed redundant with adding a component on
+	     * START_SELECT.  There is a bug that occurs if you
+	     * add a toggle and release the mouse 4 seconds later.
+	     *
+	     * In creation mode, the component that is clicked on becomes
+	     * the new parent of the component whose creation has been
+	     * pending.  The creation controller specified by
+	     * BMI_creationCtrl is in charge of knowing the class of the
+	     * component to be created.  Future changes: 
+	     *   - pass child # so objects can be created in the
+	     *     *proper* place... 
+	     */
+	case BBM_CREATION:
+	{
+	    @call self::MSG_BENT_MANAGER_CREATE_COMPONENT(component, 
+							  xPosition, 
+							  yPosition);
+	    break;
+	}
+	}
+	break;
+    } /* case MSG_META_END_SELECT */
+
+    case MSG_META_START_MOVE_COPY:
+    {
+	/*
+	 * force builder to return to normal mode
+	 */
+	@call self::MSG_BENT_MANAGER_SET_BUILD_MODE(BBM_NORMAL, component);
+	break;
+    }
+
+    case MSG_META_END_MOVE_COPY:
+    {
+	/*
+	 * Send out a paste event to the object under the mouse
+	 */
+	if (ClipboardGetQuickTransferStatus()) {
+	    @call component::MSG_META_CLIPBOARD_PASTE();
+	}
+	break;
+    }
+    }
+    retVal->flags = MRF_PROCESSED;
+}       /* End of MSG_BENT_MANAGER_MOUSE_EVENT. */
+
+
+/***********************************************************************
+ *      MSG_BENT_MANAGER_MOUSE_PTR for BentManagerClass
+ ***********************************************************************
+ * SYNOPSIS:     Returns the proper mouse pointer for the given component
+ *               and mode.    
+ *
+ * CALLED BY:    MSG_META_PTR via BentWindowClass
+ *
+ * PARAMETERS:   optr   component
+ *               int    xPosition
+ *               int    yPosition
+ *
+ * RETURN:       optr   returnImage = mouse pointer Image to use
+ *
+ * SIDE EFFECTS: 
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *      Name    Date            Description
+ *      ----    ----            -----------
+ *      martin  10/13/94        Initial version
+ *
+ ***********************************************************************/
+@method BentManagerClass, MSG_BENT_MANAGER_MOUSE_PTR
+{
+    BentRegion  region      = BR_CHILD_GROUP;
+    optr        returnImage = @CrosshairsMousePtr;
+
+   /*
+    * Default to the good 'ol crosshairs, but look for other possible
+    * mouse pointers based on the current mode of the builder.
+    */
+    switch (ECPSelf(pself)->BMI_mode) {
+	case BBM_NORMAL:
+	   /*
+	    * Always on the search for a resize in normal mode...
+	    * Check if the mouse is on the border of the selected 
+	    * component.  If so, determine which side and return 
+	    * the correct mouse image for the that direction. 
+	    */
+
+	    if (ECPSelf(pself)->BMI_selectedComp != NullOptr)
+	    {
+		/*
+		 * changed to be passed in component so we don't get
+		 * forms resize stuff in the middle of dialogs
+		 * -ron
+		 * but now it messes up text objects ...
+		 */
+		/*
+		region = BentFindRegionUnderMouse(
+		                   ECPSelf(pself)->BMI_selectedComp, 
+				   xPosition, yPosition);
+				   */
+		if (ECPSelf(pself)->BMI_selectedComp == component) 
+		{
+		    region = BentFindRegionUnderMouse(component, 
+						      xPosition,
+						      yPosition);
+		}
+		
+
+		pself = ObjDerefBentManager(oself);
+		ECPSelf(pself)->BMI_activeRegion = region; 
+	    }
+	    break;
+
+	case BBM_CREATION:
+	    returnImage = @PlacementMousePtr;
+	    break;
+	case BBM_PLACEMENT:     
+	    
+	    returnImage = @PlacementMousePtr;
+			    
+	case BBM_RESIZE: {
+	    Point               newSize, newPos;
+	    int ml, mt;         /*margins */
+	    
+
+	     region = ECPSelf(pself)->BMI_activeRegion;   
+
+	    /*
+	     * remove the old bounds drawing
+	     */
+	    BentManagerDrawActiveBounds(oself);
+
+	    /*
+	     * Update the bounds box with the new position.
+	     */
+	    BentManagerUpdateActiveBounds(oself, xPosition, yPosition);
+
+	    /*
+	     * If in placement mode, make sure we're drawing into 
+	     * the correct window.  Create new GState if necessary.
+	     */
+
+	    if (ECPSelf(pself)->BMI_mode == BBM_PLACEMENT) {
+		WindowHandle wHan;
+		if (ObjIsObjectInClass(window, &GenViewClass)) {
+		    wHan = @call window::MSG_GEN_VIEW_GET_WINDOW();
+		} else {
+		    wHan = @call window::MSG_VIS_QUERY_WINDOW();
+		}
+
+		if (GrGetWinHandle(ECPSelf(pself)->BMI_activeGState) != wHan) {
+		    GStateHandle	gstate;
+
+		    /* This is redundant code (see below).  Combine, please. */
+		    gstate = @call window::MSG_VIS_VUP_CREATE_GSTATE();
+		    ECPSelf(pself)->BMI_activeGState = gstate;
+		    if (gstate != NullHandle) 
+		    {
+			GrSetLineColor(gstate, CF_INDEX, C_LIGHT_CYAN, 0, 0);
+			GrSetMixMode(gstate, MM_INVERT);
+		    }
+		}
+	    }
+
+	    /*
+	     * Draw our new bounds
+	     */
+	    BentManagerDrawActiveBounds(oself);
+	    break;
+	}
+    }
+
+    
+    switch (region) {
+	case BR_UPPER_LEFT:     return @ResizeUpperLeftMousePtr;
+	case BR_UPPER_RIGHT:    return @ResizeUpperRightMousePtr;
+	case BR_LOWER_LEFT:     return @ResizeLowerLeftMousePtr;
+	case BR_LOWER_RIGHT:    return @ResizeLowerRightMousePtr;
+	case BR_TOP:            return @ResizeTopMousePtr;
+	case BR_BOTTOM:         return @ResizeBottomMousePtr;
+	case BR_LEFT:           return @ResizeLeftMousePtr;
+	case BR_RIGHT:          return @ResizeRightMousePtr;
+    }
+
+    return returnImage;
+
+}       /* End of MSG_BENT_MANAGER_MOUSE_PTR.   */
+
+
+/***********************************************************************
+ *   MSG_BENT_MANAGER_SET_BUILD_MODE for BentManagerClass
+ ***********************************************************************
+ * SYNOPSIS:        Sets the current mode of the builder, and maps the given
+ *                  mode-related object to the correct instance variable.
+ *
+ * PARAMETERS:      BentBuildMode       mode
+ *                  optr                object
+ *
+ * SIDE EFFECTS:    
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *      Name    Date            Description
+ *      ----    ----            -----------
+ *      martin  10/21/94        Initial version
+ *
+ ***********************************************************************/
+@method BentManagerClass, MSG_BENT_MANAGER_SET_BUILD_MODE
+{
+
+    switch (ECPSelf(pself)->BMI_mode) {
+       /*
+	*  The previous builder mode is going away, so close any gstates or
+	*  things that are associated with it. 
+	*/
+	case BBM_NORMAL:
+	case BBM_CREATION:      break;
+
+	case BBM_RESIZE:
+	case BBM_PLACEMENT: {
+	   GStateHandle gstate   = ECPSelf(pself)->BMI_activeGState; 
+
+	   BentManagerDrawActiveBounds(oself);
+	   if (gstate != NullHandle) {
+	       GrDestroyState(gstate);
+	       pself->BMI_activeGState = NullHandle;
+	   }
+	   break;
+	}
+    }
+
+    ECPSelf(pself)->BMI_mode = mode;
+
+    switch (mode) {
+       /*
+	*  Set up the new builder mode.
+	*/
+	case BBM_CREATION:  ECPSelf(pself)->BMI_creationCtrl = object; break;
+
+	case BBM_RESIZE:
+	case BBM_PLACEMENT: 
+	{
+	   GStateHandle gstate   = ECPSelf(pself)->BMI_activeGState; 
+	   optr         selected = ECPSelf(pself)->BMI_selectedComp;
+	   optr		head, headParent;
+	   
+
+	   EC_ERROR_IF(selected == NullOptr, -1);
+
+	   /*
+	    * 3) Create a gstate to draw interactive move/resize to,
+	    *    and prepare its draw mode to xor red lines over the
+	    *    light gray UI color of the form.
+	    *      - C_CYAN xor C_LIGHT_GRAY = C_RED
+	    *      - LIGHT_CYAN xor LIGHT_GRAY = C_LIGHT_RED
+	    */
+
+	   if (!ENT_IS_VIS(selected))
+	   {
+	       return;
+	   }
+	   /* Create a gstate in the right window for things like text */
+	   
+	   head = @call selected::MSG_BENT_GET_VIS_ROOT();
+   	   headParent = @call head::MSG_GEN_FIND_PARENT();
+	   if (headParent == NullOptr) headParent = head;
+	   
+
+	   gstate = @call headParent::MSG_VIS_VUP_CREATE_GSTATE();
+	   ECPSelf(pself)->BMI_activeGState = gstate;
+	   if (gstate != NullHandle) 
+	   {
+	       GrSetLineColor(gstate, CF_INDEX, C_LIGHT_CYAN, 0, 0);
+	       GrSetMixMode(gstate, MM_INVERT);
+	       BentManagerDrawActiveBounds(oself);
+	   }
+	   break;
+	}
+    }
+
+}       /* End of MSG_BENT_MANAGER_SET_BUILD_MODE.      */
+
+
+/***********************************************************************
+ *      MSG_BENT_MANAGER_GET_BUILD_MODE for BentManagerClass
+ ***********************************************************************
+ * SYNOPSIS:        Returns the current mode of the builder, be it
+ *                  PLACEMENT, SELECTION, etc.
+ *
+ * PARAMETERS:      none (returns BentBuildMode)
+ *
+ * SIDE EFFECTS:    
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *      Name    Date            Description
+ *      ----    ----            -----------
+ *      martin  10/20/94        Initial version
+ *
+ ***********************************************************************/
+@method BentManagerClass, MSG_BENT_MANAGER_GET_BUILD_MODE
+{
+    return ECPSelf(pself)->BMI_mode;
+}       /* End of MSG_BENT_MANAGER_GET_BUILD_MODE.      */
+
+
+/***********************************************************************
+ *              MSG_META_KBD_CHAR for BentManagerClass
+ ***********************************************************************
+ * SYNOPSIS:    Forwards keyboard events to the selected object.    
+ *
+ * PARAMETERS:      word        character
+ *                  word        flags (ShiftState << 8 | CharFlags)
+ *                  word        state (scan code  << 8 | ToggleState)
+ *
+ * SIDE EFFECTS:    
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *      Name    Date            Description
+ *      ----    ----            -----------
+ *      martin  11/15/94        Initial version
+ *	dloft	11/95		Revised for shift-arrow, ctrl-alt-arrow, 
+ * 				tab and DBCS keystroke support.
+ *
+ ***********************************************************************/
+#define MYMOD(first, second) ((first + second) % second)
+				/* MYMOD is necessary to deal with the
+				 compiler, which doesn't want to deal
+				 with (-1 mod n) properly...  dl*/
+#ifdef DO_DBCS
+/* Unfortunately, DBCS has different definitions for the keys we want...
+ * dl 11/10/95
+ */
+#define UP_KEY 		C_SYS_UP
+#define DOWN_KEY 	C_SYS_DOWN
+#define LEFT_KEY 	C_SYS_LEFT
+#define RIGHT_KEY 	C_SYS_RIGHT
+#define SHIFT_UP_KEY 	C_SYS_NUMPAD_8
+#define SHIFT_DOWN_KEY 	C_SYS_NUMPAD_2
+#define SHIFT_LEFT_KEY 	C_SYS_NUMPAD_4
+#define SHIFT_RIGHT_KEY	C_SYS_NUMPAD_6
+#define TAB_KEY		C_SYS_TAB
+#else
+#define UP_KEY 		((CS_CONTROL << 8) | VC_UP)
+#define DOWN_KEY 	((CS_CONTROL << 8) | VC_DOWN)
+#define LEFT_KEY 	((CS_CONTROL << 8) | VC_LEFT)
+#define RIGHT_KEY 	((CS_CONTROL << 8) | VC_RIGHT)
+#define SHIFT_UP_KEY 	((CS_CONTROL << 8) | VC_NUMPAD_8)
+#define SHIFT_DOWN_KEY	((CS_CONTROL << 8) | VC_NUMPAD_2)
+#define SHIFT_LEFT_KEY 	((CS_CONTROL << 8) | VC_NUMPAD_4)
+#define SHIFT_RIGHT_KEY ((CS_CONTROL << 8) | VC_NUMPAD_6)
+#define TAB_KEY		((CS_CONTROL << 8) | C_TAB)
+#endif
+
+@method BentManagerClass, MSG_META_KBD_CHAR
+{
+    if (flags & (CF_FIRST_PRESS | CF_REPEAT_PRESS)) {
+       int            childNum, lastChildNum, newX, newY;
+       optr           selectedParent, newSelection;
+       optr           selectedComp = ECPSelf(pself)->BMI_selectedComp;
+       ComponentData  cData;
+       Boolean        doSomething = TRUE;
+
+       if (selectedComp) {
+	   @call selectedComp::MSG_ENT_GET_PROPERTY(0, &cData, _TEXT("left"));
+	   newX = cData.CD_data.LD_integer;
+	   @call selectedComp::MSG_ENT_GET_PROPERTY(0, &cData, _TEXT("top"));
+	   newY = cData.CD_data.LD_integer;
+
+	   selectedParent = @call selectedComp::MSG_ENT_GET_PARENT();
+	   childNum = @call selectedParent::MSG_ENT_FIND_CHILD(selectedComp);
+	   lastChildNum = @call selectedParent::MSG_ENT_COUNT_CHILDREN();
+
+	   /* Figure out which direction and do the right thing.  
+	    * Shift-direction (move by 1 pixel) turns out to be the 
+	    * VC_NUMPAD cases, while regular direction keys and 
+	    * control-direction are the other cases. 
+	    */
+	   switch (character) {
+	      case SHIFT_UP_KEY:	newY +=9; /* fallthru */
+	      case UP_KEY:    		newY -= 10; 
+					childNum--;; 
+					break;
+
+	      case SHIFT_DOWN_KEY: 	newY -=9; /* fallthru */
+	      case DOWN_KEY:		newY += 10; 
+					childNum++;
+					break;
+
+
+	      case SHIFT_LEFT_KEY: 	newX +=9; /* fallthru */
+	      case LEFT_KEY:  		newX -= 10;
+					childNum--;; 
+					break;
+
+	      case SHIFT_RIGHT_KEY:	newX -=9; /* fallthru */
+	      case RIGHT_KEY:		newX += 10;
+					childNum++;
+					break;
+	      case TAB_KEY:	       	
+		  /* Move the selection cursor to the next component */
+		  /* FIXME -- use children[] property when available */
+
+		  /* If shift key is down, go back one, else go forward one */
+		  childNum += (flags & ((SS_LSHIFT | SS_RSHIFT)<<8)) ? -1 : 1;
+
+		  newSelection = @call selectedParent::
+		      MSG_ENT_FIND_CHILD_AT_POSITION(MYMOD(childNum,
+							   lastChildNum));
+		  EC_ERROR_IF(newSelection == NullOptr, -1);
+		  if ((newSelection != NullOptr) && 
+		      (ObjIsObjectInClass(newSelection, &BentClass))) {
+		      @call self::
+			  MSG_BENT_MANAGER_SELECT_COMPONENT(newSelection);
+		  }
+		  doSomething = FALSE;
+		  break;
+	      
+	      case ((CS_CONTROL << 8) | VC_PREVIOUS):
+	      case ((CS_CONTROL << 8) | VC_NEXT):
+		  /* Eventually, do something to change parent here.
+		   * For now, just fall through....
+		   */
+	      default :
+		  doSomething = FALSE;
+	   }
+
+	   if (doSomething) {
+	       /* If both ctrl and alt are being pressed, change child order.
+		* Otherwise, change the component's position.
+		*/
+	       if ((flags & ((SS_LCTRL | SS_RCTRL) << 8)) &&
+		   (flags & ((SS_LALT | SS_RALT) << 8))) {
+		   @call selectedParent::MSG_BENT_MOVE_CHILD
+		       (selectedComp, MYMOD(childNum, lastChildNum));
+	       } else {
+		  /*
+		   * Both BentPlace and BentResize component take "mouse"
+		   * coordinates (absolute window coordinates) versus the 
+		   * Ent "position" coordinate system which is relative 
+		   * to an object's immediate parent.
+		   */
+		   BentMapPositionToMouse(selectedComp, &newX, &newY);
+		   BentPlaceComponent(selectedComp, 0, newX, newY);
+		   
+	       }
+
+	       @call self::MSG_BENT_MANAGER_UPDATE_CONTROL_UI(TRUE);
+	       @call oself::MSG_BENT_MANAGER_SET_FLAGS(BF_UI_DIRTY, 0);
+	   }
+       }
+   }
+    
+}	/* End of MSG_META_KBD_CHAR.    */
+
+
+/*********************************************************************
+ *                      BBentManagerDestroyThroughTool
+ *********************************************************************
+ * SYNOPSIS: destroy an object through the creation tool
+ * CALLED BY:   
+ * RETURN:
+ * SIDE EFFECTS:
+ * STRATEGY:
+ * REVISION HISTORY:
+ *      Name    Date            Description                          
+ *      ----    ----            -----------                          
+ *      jimmy    5/24/95        Initial version                      
+ * 
+ *********************************************************************/
+@method BentManagerClass, MSG_BENT_MANAGER_DESTROY_COMP_THROUGH_TOOL
+{
+    EntHandleEventStruct    eventStuff;
+    ComponentData           result;
+    optr                    creationCtrl = ECPSelf(pself)->BMI_creationCtrl;
+
+    if (creationCtrl != NullOptr)
+    {
+	eventStuff.EHES_eventName = _TEXT("destroyInPlace");
+	eventStuff.EHES_argc = 1;
+	eventStuff.EHES_result = &result;
+	eventStuff.EHES_argv[0].CD_type = TYPE_COMPONENT;
+	eventStuff.EHES_argv[0].CD_data.LD_comp = comp;
+	@call creationCtrl::MSG_ENT_HANDLE_EVENT(&eventStuff);
+    }
+}
+
+
+/*********************************************************************
+ *                      BBentManagerUpdateControllerCount
+ *********************************************************************
+ * SYNOPSIS: update the controllers count used for naming objects
+ * CALLED BY:   
+ * PASS:        TCHAR   *className
+ *              int     count
+ * RETURN:
+ * SIDE EFFECTS:
+ * STRATEGY:
+ * REVISION HISTORY:
+ *      Name    Date            Description                          
+ *      ----    ----            -----------                          
+ *      jimmy    5/24/95        Initial version                      
+ * 
+ *********************************************************************/
+@method BentManagerClass, MSG_BENT_MANAGER_UPDATE_CONTROLLER_COUNT
+{
+    ClassInfoStruct     *classInfo;
+
+    classInfo = @call self::MSG_BENT_MANAGER_GET_CLASS_INFO(className);
+    classInfo->CIS_count = count;
+}
+
+
+/*********************************************************************
+ *                      BMBentManagerSetCurrentTool
+ *********************************************************************
+ * SYNOPSIS: set the current tool
+ * CALLED BY:   
+ * RETURN:
+ * SIDE EFFECTS:
+ * STRATEGY:
+ * REVISION HISTORY:
+ *      Name    Date            Description                          
+ *      ----    ----            -----------                          
+ *      jimmy    6/ 6/95        Initial version                      
+ * 
+ *********************************************************************/
+@method BentManagerClass, MSG_BENT_MANAGER_SET_CURRENT_TOOL
+{
+    optr                    createCtrl;
+    EntHandleEventStruct    eventStuff;
+    ComponentData           result;
+
+    createCtrl = ECPSelf(pself)->BMI_creationCtrl;
+
+    if (createCtrl != NullOptr)
+    {
+	eventStuff.EHES_eventName = _TEXT("setCurrentTool");
+	eventStuff.EHES_argc = 1;
+	eventStuff.EHES_result = &result;
+	eventStuff.EHES_argv[0].CD_type = TYPE_STRING;
+	eventStuff.EHES_argv[0].CD_data.LD_string = className;
+	@call createCtrl::MSG_ENT_HANDLE_EVENT(&eventStuff);
+    }
+}
+
+
+/***********************************************************************
+ *   MSG_BENT_MANAGER_UPDATE_CONTROL_UI for BentManagerClass
+ ***********************************************************************
+ * SYNOPSIS:    Inform all necessary controllers of a change in the current
+ *              object.  (Usually caused by a change in focus or selection.) 
+ *
+ * PARAMETERS:  optr    component = current component controllers should use
+ *              Boolean force = TRUE, if we should force the update, even if
+ *                              current component hasn't been changed.
+ *
+ * SIDE EFFECTS:    
+ * STRATEGY:
+ *              If force = TRUE, don't use GCNLSF_SET_STATUS.  This prevents
+ *              the GCN system from using an optimization that otherwise
+ *              would tell it not to send this event (tag 
+ *              CompareStatusEvents, called by GCNListSendToList for more
+ *              info).
+ * WARNING!  Do not use force unless you are sure that the component
+ * argument has not changed since the last time this message was sent!  This
+ * may cause the controllers to get out of sync with the current selection.
+ *
+ * REVISION HISTORY:
+ *      Name    Date            Description
+ *      ----    ----            -----------
+ *      martin  12/8/94         Initial version
+ *
+ ***********************************************************************/
+@method BentManagerClass, MSG_BENT_MANAGER_UPDATE_CONTROL_UI
+{
+    MemHandle                           dataBlock;
+    EventHandle                         event;
+    NotifyCurrentComponentChange        *description;
+    GCNListSendFlags                    flags = 0;
+    optr				component;
+
+    
+   /*
+
+    * Allocate a data block to store a description of the current
+    * component's property values, and have the component fill it in.
+    * The block will be freed by the notification system.
+    */
+
+    /*
+     * Use the currently selected component.
+     * It is more likely to be the right one, than the one passed in.
+     */
+    
+    component = ECPSelf(pself)->BMI_selectedComp;
+    /*
+     * sometimes the there will be no selected component (loading new module)
+     * In that case, It might be safer to just exit now.
+     */
+	
+    if (component == NullOptr) return;
+    @call GeodeGetAppObject(0)::MSG_GEN_APPLICATION_MARK_BUSY();
+
+    dataBlock = MemAlloc(sizeof(NotifyCurrentComponentChange), 
+		      HF_SWAPABLE, HAF_NO_ERR);
+    description = MemLock(dataBlock);
+    description->NCCC_component = component;
+    MemUnlock(dataBlock);
+
+   /*
+    * Send the notification message.
+    */
+    event = @record (optr) NullClass::MSG_META_NOTIFY_WITH_DATA_BLOCK
+					(MANUFACTURER_ID_GEOWORKS,
+					 GWNT_CURRENT_COMPONENT_CHANGE,
+					 dataBlock); 
+    if (force == FALSE) {
+	/* HACK to get around optimization in GCN system.  If 
+	 * GCNLSF_SET_STATUS is not passed, the update will always be
+	 * delivered.  dl 6/17/95
+	 */
+	flags = GCNLSF_SET_STATUS;
+    }
+
+    @send, forceQueue GeodeGetAppObject(0)::MSG_META_GCN_LIST_SEND
+	(flags, event, dataBlock, 
+	 GAGCNLT_APP_TARGET_NOTIFY_SELECT_STATE_CHANGE,
+	 MANUFACTURER_ID_GEOWORKS);
+    @send, forceQueue GeodeGetAppObject(0)::MSG_GEN_APPLICATION_MARK_NOT_BUSY();
+    
+
+
+}       /* End of MSG_BENT_MANAGER_UPDATE_CONTROL_UI.   */
+
+/*********************************************************************
+ *                      BentManagerBentManagerSelectComponent
+ *********************************************************************
+ * SYNOPSIS:    Selects the new component.  Draws component selected
+ *              and draw old component unselected.  Sends out notification
+ *              that the selection changed
+ * CALLED BY:   
+ * PARAMETERS:   optr   component = current component controllers should use
+ *                                  0 if none
+ * RETURN:      nothing
+ *
+ * SIDE EFFECTS:
+ * STRATEGY:
+ * REVISION HISTORY:
+ *      Name    Date            Description
+ *      ----    ----            -----------
+ *      ron     3/6/95          Initial version
+ * 
+ *********************************************************************/
+
+@method BentManagerClass, MSG_BENT_MANAGER_SELECT_COMPONENT
+{
+    optr               oldSelection = ECPSelf(pself)->BMI_selectedComp;
+    GStateHandle	gs;
+    
+    if (oldSelection == component) return;
+
+    ECPSelf(pself)->BMI_selectedComp = component;
+    if (component == NullOptr)
+    {
+	/*
+	 * don't deselect the old one as it may have just been
+	 * destroyed after a load/new module.
+	 * But make sure to clear any other cached data we may have
+	 * (like gstates)
+	 */
+	gs = ECPSelf(pself)->BMI_activeGState;
+	if (gs != NullHandle){
+	    GrDestroyState(gs);
+	    ECPSelf(pself)->BMI_activeGState = NullHandle;
+	}
+	ECPSelf(pself)->BMI_mode = BBM_NORMAL;
+	
+
+	/*
+	 * Don't update the ctrl-ui as it doesn't like NullOptrs.
+	 * We should bring the box down, though.  
+	 */
+    } else
+    {
+	if (oldSelection != NullOptr) 
+	    @call oldSelection::MSG_BENT_DESELECT();
+     
+	if (component != NullOptr) 
+	    @call component::MSG_BENT_SELECT();
+	@call self::MSG_BENT_MANAGER_UPDATE_CONTROL_UI(FALSE);
+    }	   
+}
+
+/*********************************************************************
+ *                      BentManagerBentManagerGetSelectedComponent
+ *********************************************************************
+ * SYNOPSIS:    Returns selected component
+ * CALLED BY:   
+ * RETURN:      Selected component
+ * SIDE EFFECTS:
+ * STRATEGY:
+ * REVISION HISTORY:
+ *      Name    Date            Description                          
+ *      ----    ----            -----------                          
+ *      ron      3/24/95        Initial version                      
+ * 
+ *********************************************************************/
+
+@method BentManagerClass, MSG_BENT_MANAGER_GET_SELECTED_COMPONENT
+{
+    return ECPSelf(pself)->BMI_selectedComp;
+}

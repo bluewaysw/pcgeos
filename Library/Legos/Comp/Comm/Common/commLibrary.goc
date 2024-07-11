@@ -1,0 +1,140 @@
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+	Copyright (c) 1997 New Deal, Inc. -- All Rights Reserved
+
+PROJECT:	PC/GEOS - LEGOS
+MODULE:		Comm Port Component Set - Comm Components
+FILE:		commInternal.goc
+
+AUTHOR:		Martin Turon, Nov. 17, 1997
+
+ROUTINES:
+	Name			Description
+	----			-----------
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	martin	11/17/1997   	Initial version.
+
+DESCRIPTION:
+	Global component tables for this library and
+	routines common to more than one component.
+
+	$Id: commLibrary.goc,v 1.1 98/05/13 14:46:20 martin Exp $
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+
+@include "commInternal.goh"
+
+static const EntClassPtrStruct CommLibraryClassInfoTable[] = {
+	{(ClassStruct *) &SerialComponentClass,		"serial"}, 
+/*	{(ClassStruct *) &ParallelComponentClass,	"parallel"}, 
+	{(ClassStruct *) &ModemComponentClass,		"modem"}, 
+	{(ClassStruct *) &PCComComponentClass,		"pccom"} 
+*/
+};
+
+const EntClassPtrStruct _near *CommLibraryClassTable[] = {
+    &CommLibraryClassInfoTable[0], 
+/*  &CommLibraryClassInfoTable[1], 
+    &CommLibraryClassInfoTable[2], 
+    &CommLibraryClassInfoTable[3],
+*/ 
+    (EntClassPtrStruct _near *) -1
+};
+
+
+
+
+
+
+/***********************************************************************
+ *		FCCActionDeref<Type><Arg#>
+ ***********************************************************************
+ * SYNOPSIS:	Common action code shared by the various
+ *		MSG_FILE_DO method handlers.  These routines
+ *		dereference the proper argument if it exists.
+ *			FCCActionDerefString0()	 = deref string  in arg[0]
+ *			FCCActionDerefInteger1() = deref integer in arg[1]
+ *
+ * PARAMETERS:	    args = EntDoActionArgs structure on stack frame
+ *			passed by FCCActionDerefString0(@actionArgs)
+ *
+ * SIDE EFFECTS:    
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	martin	12/15/1997   	Initial version
+ *
+ ***********************************************************************/
+int
+FCLActionDerefInteger (int argNum, EntDoActionArgs *args)
+{
+    ComponentData *arg = &((args->EDAA_argv)[argNum]);
+    return (((argNum <= args->EDAA_argc) && (arg->CD_type == TYPE_INTEGER)) ?
+    		arg->CD_data.LD_integer					    :
+		0);	
+}
+long
+FCLActionDerefLong (int argNum, EntDoActionArgs *args)
+{
+    ComponentData *arg = &((args->EDAA_argv)[argNum]);
+    return (((argNum <= args->EDAA_argc) && (arg->CD_type == TYPE_LONG))    ?
+    		arg->CD_data.LD_long					    :
+		0);	
+}
+TCHAR *
+FCLActionDerefString (int argNum, EntDoActionArgs *args)
+{
+    ComponentData *arg = &((args->EDAA_argv)[argNum]);
+    return (((argNum <= args->EDAA_argc) && (arg->CD_type == TYPE_STRING))  ?
+    		RunHeapDeref(args->EDAA_runHeapInfoPtr, 
+			     arg->CD_data.LD_string)			    :
+		NULL);	
+}
+
+void
+FCLActionReturnInteger (int retval, EntDoActionArgs *args)
+{
+    args->EDAA_retval->CD_type 	  	  = TYPE_INTEGER;
+    args->EDAA_retval->CD_data.LD_integer = retval;
+}
+void
+FCLActionReturnLong (long retval, EntDoActionArgs *args)
+{
+    args->EDAA_retval->CD_type 	  	  = TYPE_LONG;
+    args->EDAA_retval->CD_data.LD_long    = retval;
+}
+void
+FCLActionReturnString (RunHeapToken key, EntDoActionArgs *args)
+{
+    args->EDAA_retval->CD_type 	  	 = TYPE_STRING;
+    args->EDAA_retval->CD_data.LD_string = key;
+}
+void
+FCLActionReturnStringCopy (TCHAR *string, int length, 
+			   EntDoActionArgs *actionName)
+{
+    RunHeapToken key = RunHeapAlloc(actionName->EDAA_runHeapInfoPtr, 
+				    RHT_STRING, 0, length, string);
+    FCLActionReturnString(key, @actionArgs);
+}
+
+void
+FCLPropertyReturnString (RunHeapToken key, GetPropertyArgs *args) {
+    	args->GPA_compDataPtr->CD_type 	  	 = TYPE_STRING;
+	args->GPA_compDataPtr->CD_data.LD_string = key;
+}
+
+RunHeapToken
+FCLNewString (TCHAR *string, int length, GetPropertyArgs *args)
+{
+   RunHeapInfo   *rhi = args->GPA_runHeapInfoPtr;
+   RunHeapToken  key  = RunHeapAlloc(rhi, RHT_STRING, 0, length, string);
+   RunHeapDeref(rhi, key);
+   return key;
+}
+

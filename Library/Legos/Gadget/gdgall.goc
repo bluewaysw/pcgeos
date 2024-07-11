@@ -1,0 +1,606 @@
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+	Copyright (c) Geoworks 1995 -- All Rights Reserved
+
+PROJECT:	Legos
+MODULE:		Gadget component library
+FILE:		gdgall.goc
+
+AUTHOR:		Martin Turon, Jun  8, 1995
+
+ROUTINES:
+	Name			Description
+	----			-----------
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	martin	6/8/95   	Initial version.
+
+DESCRIPTION:
+        More code for dealing with the GadgetClass level, 
+	but this time in C!
+
+	$Id: gdgall.goc,v 1.1 98/03/11 04:30:29 martin Exp $
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+
+@include <gdgint.goh>
+@include <Legos/basrun.goh>
+#include <Legos/runheap.h>
+#include <Ansi/ctype.h>
+
+#define FormatIDFromManufacturerAndType(m,t) 	((((dword)(t)) << 16) | (m) )
+#define ManufacturerFromFormatID(id) 		((word) (id))
+#define TypeFromFormatID(id) 			((word) ((id) >> 16))
+
+/*********************************************************************
+ *			GadgetCreateGStringFromComplexData
+ *********************************************************************
+ * SYNOPSIS: convert component data of complex graphic to a gstring 	
+ * CALLED BY:	
+ * PASS:
+ * RETURN:
+ * SIDE EFFECTS:
+ * STRATEGY:
+ * REVISION HISTORY:
+ *	Name	Date		Description			     
+ *	----	----		-----------			     
+ *	jimmy	8/28/95	Initial version
+ * 
+ *********************************************************************/
+optr
+GadgetCreateGStringFromVMChain(optr oself,
+			       VMFileHandle vmfh, VMBlockHandle vmbh)
+{
+    GStateHandle srcGState, destGState;  
+    ChunkHandle	mchunk;
+    Rectangle	bounds;
+
+   /* This sucks, but since MSG_GEN_REPLACE_VIS_MONIKER doesn't support
+    * gstrings stored as GSM_VMEM, have to copy over the gstring twice...
+    * (Once here, and once in VisCreateMonikerChunk. :(
+    *
+    * Possible fix would be to add the following code which copies GStrings
+    * stored within VMem blocks to a chunk to VisCreateMonikerChunk.
+    * This would speed up this code and add versatility to the common stuff.
+    */
+
+    srcGState = destGState = 0;
+
+    srcGState  = GrLoadGString(vmfh, GST_VMEM, vmbh);
+    destGState = GrCreateGString(HandleOf(oself), GST_CHUNK, &mchunk);
+
+   /*
+    * OKay, got the gstring.  Make sure its top, left bounds start at 0,0
+    * and copy it over.
+    */
+
+    GrGetGStringBounds(srcGState, 0, 0, &bounds);
+    GrDrawGString(destGState, srcGState, 
+		  - bounds.R_left, - bounds.R_top, 
+		  GSRT_COMPLETE, 0);
+    GrEndGString(destGState);
+
+    GrDestroyGString(destGState, 0, GSKT_LEAVE_DATA);
+    GrDestroyGString(srcGState,  0, GSKT_LEAVE_DATA);
+    return ConstructOptr(HandleOf(oself), mchunk);
+}
+
+
+/*********************************************************************
+ *			GadgetConvertComplexDataToGString
+ *********************************************************************
+ * SYNOPSIS:	return a gstate:gstring 
+ * CALLED BY:	gadget components that want to draw gstrings
+ * PASS:
+ * RETURN:  	handle to GString as returned by GrLoadGString
+ * SIDE EFFECTS:
+ * STRATEGY:
+ * REVISION HISTORY:
+ *	Name	Date		Description			     
+ *	----	----		-----------			     
+ *	jimmy	11/ 7/95	Initial version
+ * 
+ *********************************************************************/
+GStateHandle GadgetConvertComplexDataToGString(optr oself, RunHeapToken data)
+{
+    optr	  moniker;
+    RunHeapInfo*  rhi;
+    LegosComplex* lc;
+    VMFileHandle  vmfh;
+    VMBlockHandle vmbh;
+    dword	format;
+    GStateHandle    retval = NullHandle;
+
+    /* check for Null data before going ahead */
+    if (data != NULL_TOKEN)
+    {
+	rhi = RunOptrLockHeap(oself);
+	RunHeapLock(rhi, data, (void**)(&lc));
+	
+	vmfh = lc->LC_vmfh;
+	vmbh = OptrToHandle(lc->LC_chain);
+	format = lc->LC_format;
+
+	RunHeapUnlock(rhi, data);
+	RunOptrUnlockHeap(oself);
+
+	if (format ==
+	    FormatIDFromManufacturerAndType(MANUFACTURER_ID_GEOWORKS,
+					    CIF_GRAPHICS_STRING))
+	{
+	    retval  = GrLoadGString(vmfh, GST_VMEM, vmbh);
+	}
+    }
+    return retval;
+}	/* End of GadgetSetMoniker.	*/
+
+
+/*********************************************************************
+ *			GadgetSetComplexMoniker
+ *********************************************************************
+ * SYNOPSIS:	Set a moniker from a complex data token
+ * CALLED BY:	INTERNAL, MSG_GADGET_SET_GRAPHIC
+ * PASS:
+ * RETURN:
+ * SIDE EFFECTS:
+ * STRATEGY:
+ *	Assumes optr is in a locked object block.
+ *
+ *	If data is invalid (null complex, or wrong format),
+ *	silently bail.
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description			     
+ *	----	----		-----------			     
+ *	martin	6/1/95   	Initial version
+ * 
+ *********************************************************************/
+void
+GadgetSetComplexMoniker (optr oself, ComponentData *data)
+{
+    RunHeapInfo*  rhi;
+    LegosComplex* lc;
+    VMFileHandle  vmfh;
+    VMBlockHandle vmbh;
+    dword	format;
+    ChunkHandle	    oldMoniker;
+
+    EC_BOUNDS(data);
+    EC_ERROR_IF(data->CD_type != TYPE_COMPLEX, -1);
+
+    /* check for Null data before going ahead */
+    if (data->CD_data.LD_complex != NULL_TOKEN)
+    {
+	rhi = RunOptrLockHeap(oself);
+	RunHeapLock(rhi, data->CD_data.LD_complex, (void**)(&lc));
+	
+	vmfh = lc->LC_vmfh;
+	vmbh = OptrToHandle(lc->LC_chain);
+	format = lc->LC_format;
+
+	RunHeapUnlock(rhi, data->CD_data.LD_complex);
+	RunOptrUnlockHeap(oself);
+
+
+	if (format ==
+	    FormatIDFromManufacturerAndType(MANUFACTURER_ID_GEOWORKS,
+					    CIF_GRAPHICS_STRING))
+	{
+	    optr	    moniker;
+	    ChunkHandle	    newMoniker;
+	
+
+	    /* first free up old moniker */
+	    oldMoniker = @call self::MSG_GEN_GET_VIS_MONIKER();
+	    moniker = GadgetCreateGStringFromVMChain(oself, vmfh, vmbh);
+	    @call self::MSG_GEN_REPLACE_VIS_MONIKER
+		(VUM_DELAYED_VIA_APP_QUEUE, 0, 0, 0, 
+		 VMDT_GSTRING, VMST_OPTR, moniker);
+	    /* free up moniker now that its been copied into the vis moniker */
+	    LMemFree(ConstructOptr(OptrToHandle(oself), moniker));
+	}
+    }
+    else
+    {
+	/* first free up old moniker */
+	oldMoniker = @call self::MSG_GEN_GET_VIS_MONIKER();
+	if (oldMoniker != NullHandle) 
+	{
+	    @call self::MSG_GEN_USE_VIS_MONIKER(NullHandle, 
+						VUM_DELAYED_VIA_APP_QUEUE);
+	    LMemFree(ConstructOptr(OptrToHandle(oself), oldMoniker));
+	}
+    }
+}	/* End of GadgetSetMoniker.	*/
+
+#define NUM_SPECIALS 23
+#ifdef DO_DBCS
+Chars specialCodes[NUM_SPECIALS] = {
+    C_SYS_BACKSPACE,
+    C_SYS_BACKSPACE,
+    C_SYS_BREAK,
+    C_SYS_BACKSPACE,
+    C_SYS_CAPS_LOCK,
+    C_SYS_DELETE,
+    C_SYS_DELETE,
+    C_SYS_DOWN,
+    C_SYS_END,
+    C_SYS_ENTER,
+    C_SYS_ESCAPE,
+    C_SYS_ESCAPE,
+    C_SYS_HOME,
+    C_SYS_INSERT,
+    C_SYS_LEFT,
+    C_SYS_NUM_LOCK,
+    C_SYS_NEXT,
+    C_SYS_PREVIOUS,
+    C_SYS_PRINT_SCREEN,
+    C_SYS_RIGHT,
+    C_SYS_SCROLL_LOCK,
+    C_SYS_TAB,
+    C_SYS_UP
+};
+#else
+word specialCodes[NUM_SPECIALS] = {
+    (CS_CONTROL << 8) | VC_BACKSPACE, 
+    (CS_CONTROL << 8) | VC_BACKSPACE, 
+    (CS_CONTROL << 8) | VC_BREAK, 
+    (CS_CONTROL << 8) | VC_BACKSPACE, 
+    (CS_CONTROL << 8) | VC_CAPSLOCK, 
+    (CS_CONTROL << 8) | VC_DEL, 
+    (CS_CONTROL << 8) | VC_DEL, 
+    (CS_CONTROL << 8) | VC_DOWN, 
+    (CS_CONTROL << 8) | VC_END, 
+    (CS_CONTROL << 8) | VC_ENTER, 
+    (CS_CONTROL << 8) | VC_ESCAPE, 
+    (CS_CONTROL << 8) | VC_ESCAPE, 
+    (CS_CONTROL << 8) | VC_HOME, 
+    (CS_CONTROL << 8) | VC_INS, 
+    (CS_CONTROL << 8) | VC_LEFT, 
+    (CS_CONTROL << 8) | VC_NUMLOCK, 
+    (CS_CONTROL << 8) | VC_NEXT, 
+    (CS_CONTROL << 8) | VC_PREVIOUS, 
+    (CS_CONTROL << 8) | VC_PRINTSCREEN, 
+    (CS_CONTROL << 8) | VC_RIGHT, 
+    (CS_CONTROL << 8) | VC_SCROLLLOCK, 
+    (CS_CONTROL << 8) | VC_TAB, 
+    (CS_CONTROL << 8) | VC_UP
+};
+#endif
+
+TCHAR *specialChars[NUM_SPECIALS] = {
+    _TEXT("BACKSPACE}"),
+    _TEXT("BKSP}"),
+    _TEXT("BREAK}"),
+    _TEXT("BS}"),
+    _TEXT("CAPSLOCK}"),
+    _TEXT("DELETE}"),
+    _TEXT("DEL}"),
+    _TEXT("DOWN}"),
+    _TEXT("END}"),
+    _TEXT("ENTER}"),
+    _TEXT("ESCAPE}"),
+    _TEXT("ESC}"),
+    _TEXT("HOME}"),
+    _TEXT("INSERT}"),
+    _TEXT("LEFT}"),
+    _TEXT("NUMLOCK}"),
+    _TEXT("PGDN}"),
+    _TEXT("PGUP}"),
+    _TEXT("PRTSC}"),
+    _TEXT("RIGHT}"),
+    _TEXT("SCROLLLOCK}"),
+    _TEXT("TAB}"),
+    _TEXT("UP}")
+};
+
+int
+GadgetUnprintableChar2KeyCode(TCHAR *s)
+{
+    int    cur, res, i = 0, j = NUM_SPECIALS;
+    word   oldDS;
+
+    oldDS = gadgetSetDSToDGroup();
+
+    while (i <= j) {
+	cur = (i + j)/2;
+	res = LocalCmpStrings(s, specialChars[cur], LocalStringLength(specialChars[cur]));
+	if (res == 0) {
+	    gadgetRestoreDS(oldDS);
+	    return cur;
+	} else if (res < 0) {
+	    j = cur - 1;
+	} else {
+	    i = cur + 1;
+	}
+    }
+    gadgetRestoreDS(oldDS);
+    return -1;
+}
+
+/* DBCS chars in the 0xEE00 to 0xEEFF range map to 
+ * to SBCS chars by replacing the high byte with
+ * CS_CONTROL (low byte is the  same).
+ */
+#ifdef DO_DBCS
+#define	CTRL_CHAR_HI_BYTE 0xEE
+#else
+#define CTRL_CHAR_HI_BYTE CS_CONTROL
+#endif
+
+word
+GadgetUtilParseCreateCharsString(TCHAR *s, MemHandle *mhp)
+{
+    TCHAR         c;
+    Key           k, *kp;
+    Boolean       insideParentheses = FALSE;
+    word          charCount = 0;
+
+    *mhp = MemAlloc(sizeof(Key), HF_DYNAMIC, HAF_STANDARD_NO_ERR);
+
+    k.K_shiftstate = 0;
+
+    while (*s) {
+
+	k.K_char = 0;
+	
+	switch (*s) {
+	case _TEXT('+'):
+	    k.K_shiftstate |= SS_SHIFT;
+	    s++;
+	    continue;
+	case _TEXT('^'):
+	    k.K_shiftstate |= SS_CTRL;
+	    s++;
+	    continue;
+	case _TEXT('%'):
+	    k.K_shiftstate |= SS_ALT;
+	    s++;
+	    continue;
+	case _TEXT('{'):
+	    if (*(s+2) == _TEXT('}')) {
+		/*
+		 * If there's just a single character between the {}'s,
+		 * then simply return its value, and skip the trailing }.
+		 */
+		k.K_char = *(s+1);
+		s += 3;     
+	    } else if (*++s == _TEXT('F')) {
+		
+		/*
+		 * Check the fuction keys
+		 */
+		unsigned short     fn;
+
+		fn = (unsigned short) *++s - _TEXT('0');
+		if (fn == 1) {
+		    /*
+		     * It's either F1 or F1x
+		     */
+		    if (*++s == _TEXT('}')) {
+			/*
+			 * return F1
+			 */
+			k.K_char = (CTRL_CHAR_HI_BYTE << 8) | VC_F1;
+		    } else {
+			fn = (unsigned short) *s++ - _TEXT('0');
+			if ((fn <= 6) && (*s++ == _TEXT('}'))) {
+			    k.K_char = (CTRL_CHAR_HI_BYTE << 8) | (VC_F10 + fn);
+			} else {
+			    /*
+			     * We got something like "F1z" or something.
+			     */
+			    MemFree(*mhp);
+			    *mhp = 0;
+			    return(0);
+			}
+		    }
+		} else if ((fn >= 2) && (fn <= 9)) {
+		    if (*++s == _TEXT('}')) {
+			/*
+			 * return Fwhatever
+			 */
+			k.K_char = (CTRL_CHAR_HI_BYTE << 8) | (VC_F1 - 1 + fn);
+		    } else {
+			/*
+			 * This char hasn't been terminated by }, so fail.
+			 */
+			MemFree(*mhp);
+			*mhp = 0;
+			return(0);
+		    }
+		} else {
+		    /*
+		     * We got "Fcrap"
+		     */
+		    MemFree(*mhp);
+		    *mhp = 0;
+		    return(0);
+		}
+		s++;
+	    } else {
+	        word    whichSpecial;
+
+		whichSpecial = GadgetUnprintableChar2KeyCode(s);
+		if (whichSpecial != -1) {
+		    word	oldDS;
+
+		    oldDS = gadgetSetDSToDGroup();
+
+		    s += LocalStringLength(specialChars[whichSpecial]);
+		    k.K_char = specialCodes[whichSpecial];
+
+		    gadgetRestoreDS(oldDS);
+		} else {
+		    /*
+		     * It's some unrecognized keyword. If we later want to
+		     * add the {x 7} syntax to support repeated chars,
+		     * that'll go here.
+		     */
+		    MemFree(*mhp);
+		    *mhp = 0;
+		    return(0);
+		}
+	    }
+	    break;
+	case _TEXT('('):
+	    if (insideParentheses) {
+		MemFree(*mhp);
+		*mhp = 0;
+		return(0);
+	    } else {
+		insideParentheses = TRUE;
+		s++;
+	    }
+	    break;
+	case _TEXT(')'):
+	    if (!insideParentheses) {
+		MemFree(*mhp);
+		*mhp = 0;
+		return(0);
+	    } else {
+		insideParentheses = FALSE;
+		s++;
+	    }
+	    break;
+	    
+	default:
+	    k.K_char = *s++;
+	}
+
+	/*
+	 * Record this key
+	 */
+	if (k.K_char != 0) {
+	    /*
+	     * Shifted alphabetic chars -> upcase version.
+	     */
+	    if (k.K_shiftstate & SS_SHIFT) {
+#ifdef DO_DBCS
+		if (isalpha( k.K_char )) {
+		    k.K_char = toupper( k.K_char );
+		}		
+#else
+		if ((k.K_char >> 8) == CS_BSW) {
+		    k.K_char = toupper( k.K_char );
+		}
+#endif
+	    }
+	    
+	    charCount++;
+	    MemReAlloc(*mhp, charCount * sizeof(Key), HAF_STANDARD_NO_ERR);
+	    kp = (Key *) MemLock(*mhp);
+	    kp[charCount - 1] = k;
+	    MemUnlock(*mhp);
+	}
+
+	/*
+	 * If we're not inside parentheses, then reset the shift state info
+	 */
+	if (!insideParentheses) {
+	    k.K_shiftstate = 0;
+	}
+    }
+    return charCount;
+}
+
+
+/*
+ * Each of these strings must take up no more than
+ * MAX_CLIPBOARDABLE_TYPE_STRING_SIZE bytes, which is
+ * 12 for SBCS, 24 for DBCS.
+ * See gadget.def and gadget.goh.
+ *
+ * NOTE! If you change this array, be sure to change
+ * stringFromLCBT below!
+ */
+TCHAR *typeStrings[NUM_LEGOS_CLIPBOARD_TYPES] = {
+    _TEXT("array"),
+    _TEXT("fax"),
+    _TEXT("float"),
+    _TEXT("graphic"),
+    _TEXT("integer"),
+    _TEXT("long"),
+    _TEXT("sound"),
+    _TEXT("spreadsheet"),
+    _TEXT("string")
+};
+
+word typeVals[] = {
+    LCBT_ARRAY,
+    LCBT_FAX,
+    LCBT_FLOAT,
+    LCBT_GRAPHIC,
+    LCBT_INTEGER,
+    LCBT_LONG,
+    LCBT_SOUND,
+    LCBT_SPREADSHEET,
+    LCBT_STRING,
+};
+
+
+/*
+ * This table is indexed by the LegosClipboardableType enum.
+ * Its entries are indices into the typeString table.  This
+ * is more space efficient than having another table of fptrs
+ * to strings.
+ */
+byte stringFromLCBT[] = {
+    9, /* LCBT_STRING */
+    5, /* LCBT_INTEGER */
+    6, /* LCBT_LONG */
+    2, /* LCBT_FLOAT */
+    0, /* LCBT_ARRAY */
+    3, /* LCBT_GRAPHIC */
+    1, /* LCBT_FAX */
+    7, /* LCBT_SOUND */
+    8  /* LCBT_SPREADSHEET */
+};
+
+
+word
+SCBString2LCBT(TCHAR *s)
+{
+    int    cur, res, i = 0, j = NUM_LEGOS_CLIPBOARD_TYPES;
+    word   oldDS, retVal;
+
+    oldDS = gadgetSetDSToDGroup();
+
+    while (i <= j) {
+	cur = (i + j)/2;
+	res = LocalCmpStrings(s, typeStrings[cur], 0);
+	if (res == 0) {
+	    retVal = typeVals[cur];
+	    gadgetRestoreDS(oldDS);
+	    return retVal;
+	} else if (res < 0) {
+	    j = cur - 1;
+	} else {
+	    i = cur + 1;
+	}
+    }
+    gadgetRestoreDS(oldDS);
+    return -1;
+}
+
+/*
+ * This routine provided for the convenience of
+ * ClipboardableRaiseAcceptPasteEvent.
+ */
+TCHAR*
+SCBGetFormatString(LegosClipboardableType n)
+{
+    TCHAR  *retString;
+    word   oldDS;
+
+    oldDS = gadgetSetDSToDGroup();
+
+    EC_ERROR_IF(n >= NUM_LEGOS_CLIPBOARD_TYPES || n < 0, -1);
+    retString = typeStrings[ stringFromLCBT[n] ];
+
+    gadgetRestoreDS(oldDS);
+    
+    return retString;
+}

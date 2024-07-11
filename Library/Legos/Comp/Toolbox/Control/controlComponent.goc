@@ -1,0 +1,461 @@
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+	Copyright (c) Geoworks 1994 -- All Rights Reserved
+
+PROJECT:	PC/GEOS - LEGOS
+MODULE:		Basic Component Set - Controller Component
+FILE:		goolctrl.goc
+
+AUTHOR:		Martin Turon, Dec 19, 1994
+
+ROUTINES:
+	Name			Description
+	----			-----------
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	martin	12/19/94   	Initial version.
+
+DESCRIPTION:
+    Herein lies the complete implementation of the CONTROL component. To
+    create a controller in in LEGOS, you need to define the following events:
+
+	  myCtrl_showUI 	- create all dialog ui
+	  myCtrl_update		- update all ui to reflect new selection
+
+	$Id: controlComponent.goc,v 1.2 98/07/08 06:42:16 martin Exp $
+	Revision:   1.23
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+
+@include "toolboxInternal.goh"
+@include <Legos/bent.goh>	/* included to support hackSetMode */
+
+@classdecl GoolControlClass;
+
+/***************************************************************************
+ *              Code for GoolControlClass
+ **************************************************************************/
+
+/***********************************************************************
+ *		MSG_META_RESOLVE_VARIANT_SUPERCLASS for CSampTextClass ***********************************************************************
+ * SYNOPSIS:	   Inform the system what class to use as the superclass 
+ *		   for the variant class of a particular object.
+ *
+ * PARAMETERS:	   word	MasterOffset 
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	martin	12/19/94	Initial version
+ *
+ ***********************************************************************/
+@method GoolControlClass, MSG_META_RESOLVE_VARIANT_SUPERCLASS
+{
+    if (MasterOffset == word_offsetof(EntBase, Ent_offset)) {
+	return &GenControlClass;
+    }
+    return @callsuper();
+}	/* End of MSG_META_RESOLVE_VARIANT_SUPERCLASS.	*/
+
+
+
+/***********************************************************************
+ *		MSG_ENT_INTIALIZE for GoolControlClass
+ ***********************************************************************
+ * SYNOPSIS:	    
+ * PARAMETERS:	    
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	martin	12/19/94   	Initial version
+ *
+ ***********************************************************************/
+@method GoolControlClass, MSG_ENT_INITIALIZE
+{
+    ComponentData	data;
+    optr		appObj;
+
+    @callsuper();
+
+   /*
+    * Add ourself to all the appropriate GCN lists.
+    * For extra extensibility, we can change this later to happen in the
+    * MSG_ENT_SET_PROPERTY handler by defining some array property that will
+    * be a list of GCN lists to add ourself to...
+    */
+    appObj = GeodeGetAppObject(0); 
+    @call appObj::MSG_META_GCN_LIST_ADD(oself, GAGCNLT_SELF_LOAD_OPTIONS,
+					MANUFACTURER_ID_GEOWORKS);
+
+    /*
+     * Remove default hints that are added to GadgetGeomClass
+     */
+    ObjVarDeleteData(oself, HINT_CENTER_CHILDREN_HORIZONTALLY);
+    ObjVarDeleteData(oself, HINT_CENTER_CHILDREN_VERTICALLY);
+    /*
+     * Set it to be tiled.
+     */
+    pself = ObjDerefEnt(oself);
+    pself->GGI_flags |= GGF_TILED;
+	
+
+}	/* End of MSG_ENT_INTIALIZE.	*/
+
+@method GoolControlClass, MSG_ENT_DESTROY
+{
+    optr		appObj;
+
+    /* remove ourselves from these prestigious lists before beomcing food
+     * for worms, as sending notification to deceased objects is a very
+     * BAAAAAAAAAAAAAAAD idea
+     */
+    appObj = GeodeGetAppObject(0); 
+    @call appObj::MSG_META_GCN_LIST_REMOVE(oself, GAGCNLT_SELF_LOAD_OPTIONS,
+				   MANUFACTURER_ID_GEOWORKS);
+
+    @callsuper();
+}
+
+
+/***********************************************************************
+ *		MSG_SPEC_BUILD for GoolControlClass
+ ***********************************************************************
+ * SYNOPSIS:	
+ * PARAMETERS:	
+ * SIDE EFFECTS:
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	RON	11/17/95   	Initial Revision
+ *
+ ***********************************************************************/
+@method GoolControlClass, MSG_SPEC_BUILD
+{
+    VisInstance *vself;
+    @callsuper();
+    vself = ObjDerefVis(oself);
+    vself->VI_attrs |= VA_MANAGED;
+    
+}	/* End of MSG_SPEC_BUILD.	*/
+
+
+
+/***********************************************************************
+ *		MSG_ENT_DO_ACTION for GoolControlClass
+ ***********************************************************************
+ * SYNOPSIS:	This hack allows the control component to be used to
+ *		make creation controllers in the builder.  The clean
+ *		solution to this problem is to make a component shell around
+ *		the interpreter and to let the action be dealt with directly
+ *		by the interpreter.  myCtrl.interpreter!setMode(CREATION, self)
+ *		This brings up the need for constant support in the
+ *		interpreter. 
+ *
+ * PARAMETERS:	    ComponentData 	*retval
+ *		    ComponentData 	*argv
+ *	 	    int 		argc
+ *		    char		*actionName
+ *
+ * SIDE EFFECTS:    
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	martin	4/6/95   	Initial version
+ *
+ ***********************************************************************/
+@method GoolControlClass, MSG_ENT_DO_ACTION
+{
+    int	 i;
+    byte *pptr, params[10];
+    optr interpreter = EntGetInterpreter(pself);
+
+    if (argc <= 3) {
+    	pptr = params;
+    	*pptr = argc; 
+	 pptr++;
+    	for (i = 0; i < argc; i++) {
+	         *pptr  = (byte)argv[i].CD_type;
+	          pptr += 3;
+	*(dword *)pptr  = argv[i].CD_data.LD_long;
+    	}
+    	i = @call self::MSG_GOOL_CONTROL_SEND_EVENT(actionName, params);
+    }
+
+   /*
+    * If no BASIC event handler grabbed this action, send it on to our
+    * superclasses.
+    */
+    if (!i) {
+    	if (!strcmp(actionName, _TEXT("hackSetMode"))) {
+	   @call interpreter::MSG_BENT_MANAGER_SET_BUILD_MODE
+	       (argv[0].CD_data.LD_integer, argv[1].CD_data.LD_comp);
+    	} else if (!strcmp(actionName, _TEXT("hackSelectComponent"))) {
+	    @call interpreter::MSG_BENT_MANAGER_SELECT_COMPONENT
+						(argv[0].CD_data.LD_comp);
+    	} else if (!strcmp(actionName, _TEXT("hackDeselectComponent"))) {
+	    @call interpreter::MSG_BENT_MANAGER_SELECT_COMPONENT(NullOptr);
+	} else if (!strcmp(actionName, _TEXT("hackSetUIDirty"))) {
+	    @call interpreter::MSG_BENT_MANAGER_SET_FLAGS(BF_UI_DIRTY, 0);
+	} else if (!strcmp(actionName, _TEXT("hackUnsetUIDirty"))) {
+	    @call interpreter::MSG_BENT_MANAGER_SET_FLAGS(0, BF_UI_DIRTY);
+    	} else if (!strcmp(actionName, _TEXT("hackSetBuildTime"))) {
+    	    RunSetBuildTime(EntGetRunTask(MemDeref(OptrToHandle(oself))), 
+				   argv[0].CD_data.LD_integer);
+        } else if (!strcmp(actionName, _TEXT("hackAddToCompList"))) {
+	    @call interpreter::MSG_BENT_MANAGER_ADD_COMP_TO_COMP_LIST(
+						  argv[0].CD_data.LD_comp);
+	}  
+	else if (!strcmp(actionName, _TEXT("hackCheckUniqueName"))) 
+	{
+	    retval->CD_data.LD_long = @call interpreter::MSG_BENT_MANAGER_IS_UNIQUE_NAME(argv[0].CD_data.LD_string);
+	    retval->CD_type = TYPE_INTEGER;
+
+	    /* if it is unique, make sure its not a keyword either */
+	    if (retval->CD_data.LD_long) 
+	    {
+		TCHAR   *name;
+		RunHeapInfo *rhi;
+	    
+		rhi = RunOptrLockHeap(oself);
+		RunHeapLock(rhi, argv[0].CD_data.LD_string, (void**)&name);
+		if (BascoIsKeyword(name, 0))
+		{
+		    retval->CD_data.LD_long = 0L;
+		}
+		RunHeapUnlock(rhi, argv[0].CD_data.LD_string);
+		RunOptrUnlockHeap(oself);
+	    }
+	}  else if (!strcmp(actionName, _TEXT("hackGetClassCount"))) {
+	    optr		comp;
+    	    TCHAR		*className;
+    	    ClassInfoStruct	*classInfo;
+
+	    comp = argv[0].CD_data.LD_comp;
+    	    className = @call comp::MSG_ENT_GET_CLASS();
+	    classInfo = @call interpreter::
+				MSG_BENT_MANAGER_GET_CLASS_INFO(className);
+	    retval->CD_data.LD_integer = classInfo->CIS_count;
+	    retval->CD_type = TYPE_INTEGER;
+	}
+    }
+}	/* End of MSG_ENT_DO_ACTION.	*/
+
+
+/***********************************************************************
+ *		MSG_GEN_CONTROL_GET_INFO for GoolControlClass
+ ***********************************************************************
+ * SYNOPSIS:	    
+ * PARAMTERS:   GenControlBuildInfo     *info
+ *
+ * SIDE EFFECTS:    
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	martin	12/19/94   	Initial version
+ *
+ ***********************************************************************/
+@method GoolControlClass, MSG_GEN_CONTROL_GET_INFO
+{
+    
+   /* 
+    * All controller components use the same notification scheme. 
+    */
+    
+    static const GCNListType GCC_gcnList[] = {
+       {MANUFACTURER_ID_GEOWORKS,GAGCNLT_APP_TARGET_NOTIFY_SELECT_STATE_CHANGE}
+    };
+
+    static const NotificationType GCC_notificationList[] = {
+       {MANUFACTURER_ID_GEOWORKS,GWNT_CURRENT_COMPONENT_CHANGE}
+    };
+
+    /* --- */
+
+    static const GenControlBuildInfo GCC_dupInfo = {
+       GCBF_SUSPEND_ON_APPLY | 	    	    /* GCBI_flags */ \
+       GCBF_CUSTOM_ENABLE_DISABLE | 	    /* don't enable on notify */ \
+       GCBF_ALWAYS_UPDATE,                  /* use this flag until stuffing */
+					    /* childBlock works... 	    */
+
+       0,	                            /* GCBI_initFileKey */
+       GCC_gcnList,                         /* GCBI_gcnList */
+       ARRAY_LEN(GCC_gcnList, GCNListType),
+       GCC_notificationList,                /* GCBI_notificationList */
+       ARRAY_LEN(GCC_notificationList, NotificationType),
+       0,                                   /* GCBI_controllerName */
+
+       /* ## */ NullHandle,                 /* GCBI_dupBlock */
+       0,                                   /* GCBI_childList */
+       0,
+					    /* GCBI_childCount */
+       0,                                   /* GCBI_featuresList */
+       0,
+					    /* GCBI_featuresCount */
+       0,              			    /* GCBI_features */
+
+       /* ## */ NullHandle,                 /* GCBI_toolBlock */
+       0,                        	    /* GCBI_toolList */
+       0,
+					    /* GCBI_toolCount */
+       0,                		    /* GCBI_toolFeaturesList */
+       0,
+					    /* GCBI_toolFeaturesCount */
+       0              			    /* GCBI_toolFeatures */
+    };
+
+    /*
+     * Copy our structure which contains most of the correct
+     * fields (everything that can be correct given compiler limitations)
+     */
+    memcpy(info, MemLockFixedOrMovable(&GCC_dupInfo),
+					sizeof(GenControlBuildInfo));
+    MemUnlockFixedOrMovable(&GCC_dupInfo);
+
+}	/* End of MSG_GEN_CONTROL_GET_INFO.	*/
+
+
+/***********************************************************************
+ *		MSG_GEN_CONTROL_UPDATE_UI for GoolControlClass
+ ***********************************************************************
+ * SYNOPSIS:	    
+ * PARAMETERS:	MemHandle	toolBlock
+ *		MemHandle 	childBlock
+ *		WordFlags 	toolboxFeatures
+ *		WordFlags 	features
+ *		MemHandle 	data
+ *		word 		changeID
+ *		ManufacturerID 	manufID
+ *
+ * SIDE EFFECTS:    
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	martin	12/19/94   	Initial version
+ *
+ ***********************************************************************/
+@method GoolControlClass, MSG_GEN_CONTROL_UPDATE_UI
+{
+    optr			 component;
+#ifdef USE_NCCC_CRAP
+    NotifyCurrentComponentChange *properties;
+ 
+
+   /*	
+    * Lock down the passed in block and extract the current component. 
+    */
+    properties = MemLock(data);
+    component = properties->NCCC_component;
+    MemUnlock(data);
+#else
+    optr		interpreter = EntGetInterpreter(pself);
+    component = @call interpreter::MSG_BENT_MANAGER_GET_SELECTED_COMPONENT();
+#endif
+
+   /*
+    * Now send the update event, so the user can define in BASIC how to
+    * update the ui controlled by their specific controller.
+    */
+    @call oself::MSG_GOOL_CONTROL_SEND_UPDATE(component);
+}	/* End of MSG_GEN_CONTROL_UPDATE_UI.	*/
+
+
+/*********************************************************************
+ *			MSG_GOOL_CONTROL_SEND_UPDATE
+ *********************************************************************
+ * SYNOPSIS:	call the update routine
+ * CALLED BY:	
+ * PASS:
+ * RETURN:
+ * SIDE EFFECTS:
+ * STRATEGY:
+ * REVISION HISTORY:
+ *	Name	Date		Description			     
+ *	----	----		-----------			     
+ *	jimmy	3/11/96	Initial version
+ * 
+ *********************************************************************/
+@method GoolControlClass, MSG_GOOL_CONTROL_SEND_UPDATE
+{	
+    byte params[10];
+
+    if (component != NullOptr)
+    {
+	*params = 1;  /* 1 parameter */
+	*(params+1) = TYPE_COMPONENT;
+	*(dword *)(params+2) = component;
+	@call oself::MSG_GOOL_CONTROL_SEND_EVENT(_TEXT("update"), params);
+    }
+}
+
+
+/***********************************************************************
+ *		MSG_GOOL_CONTROL_SEND_EVENT for GoolControlClass
+ ***********************************************************************
+ * SYNOPSIS:	    Sends the given event with the given parameters.
+ *
+ * PARAMETERS:	    char	*event
+ *		    char	*argv[]	= null terminated array of arguments
+ *
+ * RETURN:	    FALSE if call failed
+ *
+ * SIDE EFFECTS:   
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	martin	12/21/94   	Initial version
+ *
+ ***********************************************************************/
+@method GoolControlClass, MSG_GOOL_CONTROL_SEND_EVENT
+{
+    ComponentData	data;
+    TCHAR        	*result;
+    TCHAR        	cmdLine[256];
+    int			i = 0;
+    optr		interpreter = EntGetInterpreter(pself);
+    MemHandle		wasteBuffer;
+    LegosType		returnType;
+    dword		returnVal;
+
+    result = cmdLine;
+    data.CD_type = TYPE_STRING;
+    data.CD_data.LD_fptr = result;
+    @call self::MSG_ENT_GET_PROPERTY_EXTERNAL(&data, _TEXT("proto"));
+    if ((data.CD_type == TYPE_ILLEGAL) || (data.CD_type == TYPE_ERROR))
+	return FALSE;
+    
+    strcat(cmdLine, _TEXT("_"));
+    strcat(cmdLine, event);
+    
+    return RunCallFunction(EntGetRunTask(MemDeref(OptrToHandle(oself))),
+			   cmdLine, params,
+			   &returnType, &returnVal);
+
+}	/* End of MSG_GOOL_CONTROL_SEND_EVENT.	*/
+
+
+
+
+
+
+
+
+
+
+

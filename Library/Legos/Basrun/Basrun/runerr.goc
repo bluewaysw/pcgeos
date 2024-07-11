@@ -1,0 +1,380 @@
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+	Copyright (c) Geoworks 1995 -- All Rights Reserved
+
+PROJECT:	L E G O S
+MODULE:		Runtime
+FILE:		runerr.goc
+
+AUTHOR:		Roy Goldman, Jul  7, 1995
+
+ROUTINES:
+	Name			Description
+	----			-----------
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	roy	 7/ 7/95	Initial version.
+
+DESCRIPTION:
+
+	$Id: runerr.goc,v 1.1 97/10/15 11:37:21 newdeal Exp $
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+
+#ifdef LIBERTY
+#ifndef COMPILING_LPERR
+#include <legos/interp.h>
+#include <legos/runint.h>
+#include <kernel/log.h>		/* for theLog */
+#include <driver/fatalerr.h>	/* for fatal error stuff */
+/* RUNTIME error messages */
+char* const RuntimeErrors[] = {
+    "Undefined something or other",
+    "RTE-: Internal error",
+    "RTE-: Bad parameter type",
+    "RTE-: Bad return type",
+    "RTE-: Array reference before dim",
+    "RTE-: Bad module",
+    "RTE-: Bad module reference",
+    "RTE-: Type mismatch",
+    "RTE-: Bad type",
+    "RTE-: Bad array reference",
+    "RTE-: Bad opcode",
+    "RTE-: Bad rval",
+    "RTE-: Bad number of arguments",
+    "RTE-: Argument not a number",
+    "RTE-: Argument not a string",
+    "RTE-: Argument is of invalid type",
+    "RTE-: Divide by zero",
+    "RTE-: Incompatible types",
+    "RTE-: Unknown component class",
+    "RTE-: Invalid action",
+    "RTE-: Readonly property",
+    "RTE-: Unknown property",
+    "RTE-: Wrong value type for property",
+    "RTE-: Wrong size for property",
+    "RTE-: The property has not been set",
+    "RTE-: Wrong number of arguments to action",
+    "RTE-: Wrong type",
+    "RTE-: Specific property error",
+    "RTE-: Function not found in module",
+    "RTE-: Loop overflow. Try using DO WHILE",
+    "RTE-: Overflow",
+    "RTE-: Call to function expected",
+    "RTE-: Call to procedure expected",
+    "RTE-: Bad string index",
+    "RTE-: Null struct or component",
+    "RTE-: GET PAUL; Pass by reference not currently supported",
+    "RTE-: Invalid parent",
+    "RTE-: Stack Overflow (check for infinite recursion)",
+    "RTE-: CompInit (1) is an undocumented feature and (2) can't be used with aggregate components",
+    "RTE-: Array too big",
+    "RTE-: You are exiting a routine that has a pending error.",
+    "RTE-: You cannot use RESUME if there is no pending error.",
+    "RTE-: Negative dimension in DIM or REDIM",
+    "RTE-: quiet exit (you should never see this)",
+    "RTE-: Module already being unloaded",
+    "RTE-: Unexpected end of loop (cannot GOTO inside a for loop from outside)",
+    "RTE-: Unexpected end of routine (cannot GOTO outside a for loop from inside)",
+    "RTE-: Requested component library not found",
+    "RTE-: Module does not export any aggregate components",
+    "RTE-: Memory allocation failed, out of memory",
+    "RTE-: Module generated an error during initialization",
+    "RTE-: You may not load a module when being unloaded",
+/* @@ put liberty thing here  don't move this comment */
+    "RTE-: Confused -- invalid runtime error"
+};
+#endif
+
+#ifndef COMPILING_LPERR
+void SignalRuntimeError(RuntimeErrorCode c, dword errorData)
+{
+    USE_IT(errorData);
+    if (c >= RTE_LAST_ERROR)
+    {
+	c = RTE_NONE;		/* This has the string "undefined" */
+    }
+    
+    /* Errors array and the errors themselves are assumed to be
+     * in the same resource
+     */
+
+    /* This used to do a printf of RuntimeErros[c], but that doesn't
+       work on a detatched prototype. */
+#ifdef EC_LOG
+    theLog << "Unhandled legos runtime error " << (int)c << " " 
+	   << RuntimeErrors[c] << '\n';
+    theLog.Flush();
+#endif
+}
+#endif
+
+#else
+
+@include <stdapp.goh>
+#include <geoMisc.h>
+#include <stdio.h>
+#include <legos/internal/runerr.h>
+#include <legos/legtype.h>
+#include "faterr.h"
+
+@start RunErrorStrings, data;
+
+/* RUNTIME error messages */
+@chunk TCHAR R_NONE[] = _TEXT("Undefined runtime error ()");
+@chunk TCHAR R_INTERNAL_ERROR[] = _TEXT("RTE-: Internal error");
+@chunk TCHAR R_BAD_PARAM_TYPE[] = _TEXT("RTE-: Bad parameter type");
+@chunk TCHAR R_BAD_RETURN_TYPE[] = _TEXT("RTE-: Bad return type");
+@chunk TCHAR R_ARRAY_REF_SANS_DIM[] = _TEXT("RTE-: Array reference before dim");
+@chunk TCHAR R_BAD_MODULE[] = _TEXT("RTE-: Bad module");
+@chunk TCHAR R_BAD_MODULE_REFERENCE[] = _TEXT("RTE-: Bad module reference");
+@chunk TCHAR R_TYPE_MISMATCH[] = _TEXT("RTE-: Type mismatch, expecting ");
+@chunk TCHAR R_BAD_TYPE[] = _TEXT("RTE-: Bad type");
+@chunk TCHAR R_BAD_ARRAY_REF[] = _TEXT("RTE-: Bad array reference");
+@chunk TCHAR R_BAD_OPCODE[] = _TEXT("RTE-: Bad opcode");
+@chunk TCHAR R_BAD_RVAL[] = _TEXT("RTE-: Bad rval");
+@chunk TCHAR R_BAD_NUM_ARGS[] = _TEXT("RTE-: Bad number of arguments");
+@chunk TCHAR R_ARG_NOT_A_NUMBER[] = _TEXT("RTE-: Argument not a number");
+@chunk TCHAR R_ARG_NOT_A_STRING[] = _TEXT("RTE-: Argument not a string");
+@chunk TCHAR R_ARG_INVALID_TYPE[] = _TEXT("RTE-: Argument is of invalid type");
+@chunk TCHAR R_DIVIDE_BY_ZERO[] = _TEXT("RTE-: Divide by zero");
+@chunk TCHAR R_INCOMPATIBLE_TYPES[] = _TEXT("RTE-: Incompatible types");
+@chunk TCHAR R_UNKNOWN_COMPONENT_CLASS[] = _TEXT("RTE-: Unknown component class");
+@chunk TCHAR R_INVALID_ACTION[] = _TEXT("RTE-: Invalid action");
+@chunk TCHAR R_READONLY_PROPERTY[] = _TEXT("RTE-: Attempted to set read-only property");
+@chunk TCHAR R_UNKNOWN_PROPERTY[] = _TEXT("RTE-: Unknown property");
+@chunk TCHAR R_PROPERTY_TYPE_MISMATCH[] = _TEXT("RTE-: Invalid type for property");
+@chunk TCHAR R_PROPERTY_SIZE_MISMATCH[] = _TEXT("RTE-: Wrong size property");
+@chunk TCHAR R_PROPERTY_NOT_SET[] = _TEXT("RTE-: The property has not been set");
+@chunk TCHAR R_WRONG_NUMBER_ARGS[] = _TEXT("RTE-: Wrong number of arguments to action");
+@chunk TCHAR R_WRONG_TYPE[] = _TEXT("RTE-: Invalid type for argument to action");
+@chunk TCHAR R_SPECIFIC_PROPERTY[] = _TEXT("RTE-: Something is wrong with an argument to a property or action.  Later there will be more info here.");
+@chunk TCHAR R_INVALID_MODULE_CALL[] = _TEXT("RTE-: Function does not exist in module");
+@chunk TCHAR R_LOOP_OVERFLOW[] = _TEXT("RTE-: Loop overflow. Try using DO WHILE");
+@chunk TCHAR R_OVERFLOW[] = _TEXT("RTE-: Overflow");
+@chunk TCHAR R_EXPECT_FUNC[] = _TEXT("RTE-: Call to function expected");
+@chunk TCHAR R_EXPECT_PROC[] = _TEXT("RTE-: Call to procedure expected");
+@chunk TCHAR R_BAD_STRING_INDEX[] = _TEXT("RTE-: Bad string index");
+@chunk TCHAR R_VALUE_IS_NULL[] = _TEXT("RTE-: Null struct, component or complex data");
+@chunk TCHAR R_PASS_BY_REF_UNSUPPORTED[] = _TEXT("RTE-: GET PAUL; pass by reference currently unsupported.");
+@chunk TCHAR R_INVALID_PARENT[] = _TEXT("RTE-: Invalid parent");
+@chunk TCHAR R_STACK_OVERFLOW[] = _TEXT("RTE-: Stack Overflow (check for infinite recursion)");
+@chunk TCHAR R_COMP_INIT_WITH_AGG[] = _TEXT("RTE-: CompInit (1) is an undocumented feature and (2) can't be used with aggregate components");
+@chunk TCHAR R_ARRAY_TOO_BIG[] = _TEXT("RTE-: Array too big");
+@chunk TCHAR R_ACTIVE_EHAN[] = _TEXT("RTE-: You are exiting a routine that has a pending error.");
+@chunk TCHAR R_INACTIVE_EHAN[] =
+_TEXT("RTE-: You cannot use RESUME if there is no pending error.");
+
+@chunk TCHAR R_NEGATIVE_DIM[] =
+_TEXT("RTE-: Negative dimension in DIM or REDIM");
+
+@chunk TCHAR R_QUIET_EXIT[] = _TEXT("");
+
+@chunk TCHAR R_BEING_UNLOADED[] =
+_TEXT("RTE-: Module already being unloaded");
+
+@chunk TCHAR R_UNEXPECTED_END_OF_LOOP[] =
+_TEXT("RTE-: Unexpected end of loop (cannot GOTO inside a for loop from outside)");
+
+@chunk TCHAR R_UNEXPECTED_END_OF_ROUTINE[] =
+_TEXT("RTE-: Unexpected end of routine (cannot GOTO outside a for loop from inside)");
+
+@chunk TCHAR R_LIBRARY_NOT_FOUND[] =
+_TEXT("RTE-: The requested library was not found, or wasn't a component library");
+
+@chunk TCHAR R_NOT_AGGREGATE_MODULE[] =
+_TEXT("RTE-: Module does not export any aggregate components");
+
+@chunk TCHAR R_OUT_OF_MEMORY[] =
+_TEXT("RTE-: Memory allocation failed, out of memory");
+
+@chunk TCHAR R_ERROR_IN_MODULE_INIT[] =
+_TEXT("RTE-: Loading module generated RTE- during initialization");
+
+@chunk TCHAR R_CANT_LOAD_WHEN_UNLOADING[] =
+_TEXT("RTE-: You may not load a module when being unloaded");
+
+/* @@ put chunk here */
+
+@chunk TCHAR R_LAST_ERROR[] =
+_TEXT("RTE-\001: Confused -- invalid runtime error");
+
+/* Type chunks
+ */
+@chunk TCHAR TC_FLOAT[] = _TEXT("FLOAT");
+@chunk TCHAR TC_INTEGER[] = _TEXT("INTEGER");
+@chunk TCHAR TC_LONG[] = _TEXT("LONG");
+@chunk TCHAR TC_STRING[] = _TEXT("STRING");
+@chunk TCHAR TC_COMPONENT[] = _TEXT("COMPONENT");
+@chunk TCHAR TC_ARRAY[] = _TEXT("ARRAY");
+@chunk TCHAR TC_MODULE[] = _TEXT("MODULE");
+@chunk TCHAR TC_COMPLEX[] = _TEXT("COMPLEX");
+@chunk TCHAR TC_STRUCT[] = _TEXT("STRUCT");
+@chunk TCHAR TC_INVALID[] = _TEXT("<INVALID ERROR DATA>");
+
+/* A bunch of these should never be used as data, so they're TC_INVALID */
+/* IMPORTANT: ORDER HERE MUST MATCH ORDER IN legtype.h */
+@chunk optr Types[] =
+{
+    @TC_INVALID,	/* TYPE_UNKNOWN */
+    @TC_FLOAT,		/* TYPE_FLOAT */
+    @TC_INTEGER,	/* TYPE_INTEGER */
+    @TC_LONG,		/* TYPE_LONG */
+    @TC_STRING,		/* TYPE_STRING */
+    @TC_COMPONENT,	/* TYPE_COMPONENT */
+    @TC_ARRAY,		/* TYPE_ARRAY */
+    @TC_INVALID,	/* TYPE_ARRAY_ELEMENT */
+    @TC_INVALID,	/* TYPE_ERROR */
+    @TC_INVALID,	/* TYPE_GENERIC */
+    @TC_INVALID,	/* TYPE_VARIANT */
+    @TC_MODULE,		/* TYPE_MODULE */
+    @TC_INVALID,	/* TYPE_ILLEGAL */
+    @TC_COMPLEX,	/* TYPE_COMPLEX */
+    @TC_INVALID,	/* TYPE_UNUSED_1 */
+    @TC_INVALID,	/* TYPE_LOCAL_VAR_LV */
+    @TC_INVALID,	/* TYPE_MODULE_VAR_LV */
+    @TC_INVALID,	/* TYPE_PROPERTY_LV */
+    @TC_INVALID,	/* TYPE_BC_PROPERTY_LV */
+    @TC_INVALID,	/* TYPE_MODULE_REF_LV */
+    @TC_STRUCT,		/* TYPE_STRUCT */
+    @TC_INVALID,	/* TYPE_STRUCT_REF_LV */
+    @TC_INVALID		/* TYPE_VOID */
+};
+
+/* !!!!!!!!!!!!!!!!!!  */
+/* IMPORTANT: ORDER HERE MUST MATCH ORDER IN runerr.h */
+
+@chunk optr RuntimeErrors[] = 
+{	
+    @R_NONE,
+    @R_INTERNAL_ERROR,
+    @R_BAD_PARAM_TYPE,
+    @R_BAD_RETURN_TYPE,
+    @R_ARRAY_REF_SANS_DIM,
+    @R_BAD_MODULE,
+    @R_BAD_MODULE_REFERENCE,
+    @R_TYPE_MISMATCH,
+    @R_BAD_TYPE,
+    @R_BAD_ARRAY_REF,
+    @R_BAD_OPCODE,
+    @R_BAD_RVAL,
+    @R_BAD_NUM_ARGS,
+    @R_ARG_NOT_A_NUMBER,
+    @R_ARG_NOT_A_STRING,
+    @R_ARG_INVALID_TYPE,
+    @R_DIVIDE_BY_ZERO,
+    @R_INCOMPATIBLE_TYPES,
+    @R_UNKNOWN_COMPONENT_CLASS,
+    @R_INVALID_ACTION,
+    @R_READONLY_PROPERTY,
+    @R_UNKNOWN_PROPERTY,
+    @R_PROPERTY_TYPE_MISMATCH,
+    @R_PROPERTY_SIZE_MISMATCH,
+    @R_PROPERTY_NOT_SET,
+    @R_WRONG_NUMBER_ARGS,
+    @R_WRONG_TYPE,
+    @R_SPECIFIC_PROPERTY,
+    @R_INVALID_MODULE_CALL,
+    @R_LOOP_OVERFLOW,
+    @R_OVERFLOW,
+    @R_EXPECT_FUNC,
+    @R_EXPECT_PROC,
+    @R_BAD_STRING_INDEX,
+    @R_VALUE_IS_NULL,
+    @R_PASS_BY_REF_UNSUPPORTED,
+    @R_INVALID_PARENT,
+    @R_STACK_OVERFLOW,
+    @R_COMP_INIT_WITH_AGG,
+    @R_ARRAY_TOO_BIG,
+    @R_ACTIVE_EHAN,
+    @R_INACTIVE_EHAN,
+    @R_NEGATIVE_DIM,
+    @R_QUIET_EXIT,
+    @R_BEING_UNLOADED,
+    @R_UNEXPECTED_END_OF_LOOP,
+    @R_UNEXPECTED_END_OF_ROUTINE,
+    @R_LIBRARY_NOT_FOUND,
+    @R_NOT_AGGREGATE_MODULE,
+    @R_OUT_OF_MEMORY,
+    @R_ERROR_IN_MODULE_INIT,
+    @R_CANT_LOAD_WHEN_UNLOADING,
+/* @@ put array here */
+    @R_LAST_ERROR
+};
+
+@end RunErrorStrings
+
+
+
+void
+SignalRuntimeError(RuntimeErrorCode c, dword errorData)
+{
+    optr*	array;
+    TCHAR*	message;
+    char	numStr[5*sizeof(TCHAR)];
+    TCHAR	scratch[10];
+    optr	arg2Chunk = 0;
+    TCHAR*	arg2String = NULL;
+
+    if (c == RTE_QUIET_EXIT) {
+	return;
+    }
+
+    MemLock(OptrToHandle(@RuntimeErrors));
+    array = LMemDeref(@RuntimeErrors);
+
+    if ((c > RTE_LAST_ERROR) || (c < RTE_NONE))
+    {
+	/* "invalid runtime error" */
+	c = RTE_LAST_ERROR;
+    }
+    
+    /* Errors array and the errors themselves are assumed to be
+     * in the same resource
+     */
+    EC_ERROR_IF(OptrToHandle(@RuntimeErrors) != OptrToHandle(array[c]),
+		RE_FAILED_ASSERTION);
+
+    /* We might have an argument 2; if we do, fill in the optr here
+     */
+    switch (c)
+    {
+    case RTE_TYPE_MISMATCH:
+    {
+	optr*	typeArray;
+
+	typeArray = LMemDeref(@Types);
+	/* FIXME: should have a LAST_TYPE value for enum */
+	if (errorData >= TYPE_NUM_TYPES)
+	{
+	    errorData = TYPE_VOID;
+	}
+	arg2Chunk = typeArray[(word)errorData];
+	arg2String = LMemDeref(arg2Chunk);
+	break;
+    }
+    case RTE_ERROR_IN_MODULE_INIT:
+    {
+	arg2String = scratch;
+	itoa(errorData, arg2String);
+	break;
+    }
+    }
+
+    message = LMemDeref(array[c]);
+    itoa(c, numStr);
+    UserStandardDialog
+	(NULL, NULL,
+	 arg2String,		/* arg2 */
+	 numStr,		/* arg1 */
+	 message,
+	 CDBF_SYSTEM_MODAL | 
+	 (CDT_ERROR << CDBF_DIALOG_TYPE_OFFSET) |
+	 (GIT_NOTIFICATION << CDBF_INTERACTION_TYPE_OFFSET));
+
+    MemUnlock(OptrToHandle(@RuntimeErrors));
+}
+
+#endif

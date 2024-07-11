@@ -1,0 +1,486 @@
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+	Copyright (c) Geoworks 1994 -- All Rights Reserved
+
+PROJECT:	PC/GEOS
+MODULE:		LEGOS - UI Builder
+FILE:		formmain.goc
+
+AUTHOR:		Martin Turon, Sep  8, 1994
+
+ROUTINES:
+	Name			Description
+	----			-----------
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	martin	9/8/94   	Initial version.
+
+DESCRIPTION:
+	Build-time specific code for the Form Component.
+
+	$Id: bgadgetForm.goc,v 1.1 98/03/12 19:50:56 martin Exp $
+	Revision:   1.21
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+
+@include <bgadgetInternal.goh>
+#include <Legos/runheap.h>
+@include <Legos/basrun.goh>
+@include <Legos/gadget.goh>
+
+@classdecl	BGadgetFormClass;
+
+
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		Code for BGadgetFormClass
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+
+
+/***********************************************************************
+ *		MSG_META_RESOLVE_VARIANT_SUPERCLASS for BGadgetFormClass
+ ***********************************************************************
+ * SYNOPSIS:	   Inform the system what class to use as the superclass 
+ *		   for the variant class of a particular object.
+ *
+ * PARAMETERS:	   word	MasterOffset 
+ *
+ * SIDE EFFECTS:    
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	martin	9/8/94   	Initial version
+ *
+ ***********************************************************************/
+@method BGadgetFormClass, MSG_META_RESOLVE_VARIANT_SUPERCLASS
+{
+    if (MasterOffset == word_offsetof(BentBase, Bent_offset)) {
+	return &GadgetFormClass;
+    }
+    return @callsuper();
+}	/* End of MSG_META_RESOLVE_VARIANT_SUPERCLASS.	*/
+
+
+
+
+/***********************************************************************
+ *		MSG_BENT_GET_EVENTS for BGadgetFormClass
+ ***********************************************************************
+ * SYNOPSIS:   	Return info about the events.
+ * PARAMETERS:	
+ * SIDE EFFECTS:
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	jmagasin 12/13/95   	Initial Revision
+ *
+ ***********************************************************************/
+
+BentEventDescriptionStruct BGadgetFormEvent1=
+	{_TEXT("aboutToOpen"), 0, TYPE_ILLEGAL, 1};
+
+BentEventDescriptionStruct BGadgetFormEvent2=
+	{_TEXT("aboutToClose"), 0, TYPE_ILLEGAL, 1};
+
+BentEventDescriptionStruct BGadgetFormEvent3=
+        {_TEXT("activeChanged"), 1, TYPE_ILLEGAL, 1};
+BentEventArgDescriptionStruct BGadgetFormActiveChangedArg1=
+        {_TEXT("gain"), TYPE_INTEGER};
+
+#define NUM_GADGETFORM_EVENTS	3
+BentEventDescriptionStruct *BGadgetFormEvents[NUM_GADGETFORM_EVENTS] =
+   {&BGadgetFormEvent1,
+    &BGadgetFormEvent2,
+    &BGadgetFormEvent3};
+
+@method BGadgetFormClass, MSG_BENT_GET_EVENTS
+{
+    eventBlockPtr = @callsuper();
+    
+    return BentCopyEvents(NUM_GADGETFORM_EVENTS, BGadgetFormEvents,
+			  eventBlockPtr);
+    
+}	/* End of MSG_BENT_GET_EVENTS.	*/
+
+
+/*********************************************************************
+ *			BGadgetFormGenDisplayClose
+ *********************************************************************
+ * SYNOPSIS: 	Set the form NOT_USABLE instead of killing the app
+ * CALLED BY:	MSG_GEN_DISPLAY_CLOSE
+ * RETURN:	nothing
+ * SIDE EFFECTS:
+ * STRATEGY:
+ * REVISION HISTORY:
+ *	Name	Date		Description			     
+ *	----	----		-----------			     
+ *	ron	 3/ 2/95	Initial version			     
+ * 
+ *********************************************************************/
+
+@method BGadgetFormClass, MSG_GEN_DISPLAY_CLOSE
+{
+    /* do nothing */
+}
+
+/*********************************************************************
+ *			BGadgetFormInitialize
+ *********************************************************************
+ * SYNOPSIS: 	Set the form NOT_TARGETABLE
+ * CALLED BY:	
+ * RETURN:	nothing
+ * SIDE EFFECTS:
+ * STRATEGY:
+ * REVISION HISTORY:
+ *	Name	Date		Description			     
+ *	----	----		-----------			     
+ *	jimmy	 3/ 2/95	Initial version			     
+ * 
+ *********************************************************************/
+@method BGadgetFormClass, MSG_ENT_INITIALIZE
+{
+    GenAttrs	set, unset;
+
+    @callsuper();
+
+/*
+    set = 0;
+    unset = GA_TARGETABLE;
+    @call oself::MSG_GEN_SET_ATTRS(set,  unset);
+*/
+}
+
+/*********************************************************************
+ *		   MSG_GADGET_FORM_BUILD_FOCUS_PATH_IN_ENT_VIS_SHOW,
+ *		   MSG_GADGET_FORM_REMEMBER_FOCUS_IN_ENT_VIS_HIDE
+ *********************************************************************
+ * SYNOPSIS: 	BGadgetForm should do nothing for these.
+ * CALLED BY:	
+ * RETURN:	nothing
+ * SIDE EFFECTS:
+ * STRATEGY:
+ * REVISION HISTORY:
+ *	Name	Date		Description			     
+ *	----	----		-----------			     
+ *	jmagasin 1/16/96	Initial version			     
+ * 
+ *********************************************************************/
+@method BGadgetFormClass, MSG_GADGET_FORM_BUILD_FOCUS_PATH_IN_ENT_VIS_SHOW,
+                            MSG_GADGET_FORM_REMEMBER_FOCUS_IN_ENT_VIS_HIDE
+{
+    /* Do nothing! */
+}
+
+
+/***********************************************************************
+ *		MSG_ENT_VALIDATE_PARENT for BGadgetFormClass
+ ***********************************************************************
+ * SYNOPSIS:	    
+ * PARAMETERS:	  optr	parentPtr
+ *  
+ * SIDE EFFECTS:    
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	martin	3/6/95   	Initial version
+ *
+ ***********************************************************************/
+@method BGadgetFormClass, MSG_ENT_VALIDATE_PARENT
+{
+    Boolean  validParent;
+
+    MemLock(HandleOf(parentPtr));
+    validParent = ObjIsObjectInClass(parentPtr, &GenApplicationClass);
+    MemUnlock(HandleOf(parentPtr));
+
+    if (validParent) return 0;
+    else return -1;
+
+}	/* End of MSG_ENT_VALIDATE_PARENT.	*/
+
+/*********************************************************************
+ *		  BGadgetFormGADGET_GEOM_SET_TILE_LAYOUT
+ *********************************************************************
+ * SYNOPSIS: 	Intercept geometry properties and redirect to our child 
+ * 		group.
+ * CALLED BY:	Interpreter
+ * SIDE EFFECTS:
+ * STRATEGY:
+ * REVISION HISTORY:
+ *	Name	Date		Description			     
+ *	----	----		-----------			     
+ *	dloft	6/9/95		Initial version			     
+ * 
+ *********************************************************************/
+
+
+/*********************************************************************
+ *			BGEntGetProperty
+ *********************************************************************
+ * SYNOPSIS: 	Make sure we return libPropBoxURL correctly.  This 
+ * 		routine is necessary because BGadgetForm inherits from
+ * 		BentWindowClass instead of BGadgetClass.
+ * REVISION HISTORY:
+ *	Name	Date		Description			     
+ *	----	----		-----------			     
+ *	dloft	 6/15/95	Initial version			     
+ * 
+ *********************************************************************/
+
+@method BGadgetFormClass, MSG_ENT_GET_PROPERTY
+{
+    RunHeapToken stringToken;
+    TCHAR *retString = 0;
+    
+    
+    if (!strcmp(prop, _TEXT("specPropBoxURL"))) {
+	retString = _TEXT("~U\\BASIC\\SP-FORM");
+    } else if (!strcmp(prop, _TEXT("libPropBoxURL"))) {
+	retString = _TEXT("~U\\BASIC\\P-GADGET");
+    }
+
+    if (retString != 0)
+    {
+
+	stringToken = RunHeapAlloc(rhi, RHT_STRING, 0,
+		     (strlen(retString) +1 ) *sizeof (TCHAR),
+		     retString);
+	
+	value->CD_type 		= TYPE_STRING;
+	value->CD_data.LD_string	= stringToken;
+
+    } else if (!strcmp(prop, _TEXT("isAggTop"))) {
+	value->CD_type = TYPE_INTEGER;
+	value->CD_data.LD_integer = ((ECPSelf(pself)->BI_flags & 
+				      BSF_REMOVE_FROM_OUTPUT) != 0);
+    } else if (!strcmp(prop, _TEXT("focusString"))) {
+	/*
+	 * GadgetFormClass has no focusString property, so we
+	 * do some special handling here to avoid an error.
+	 */
+	retString = ECPSelf(pself)->BFI_focusString;
+	EC_ERROR_IF(strlen(retString) > BENT_COMP_NAME_MAX_LENGTH, -1);
+	stringToken =
+	    RunHeapAlloc(rhi, RHT_STRING, 0,
+			 (strlen(retString) +1) * sizeof(TCHAR),
+			 retString);
+	value->CD_type = TYPE_STRING;
+	value->CD_data.LD_string = stringToken;
+    } else @callsuper();
+
+}
+
+/*********************************************************************
+ *			BGEntSetProperty
+ *********************************************************************
+ * SYNOPSIS: 	Handle the buildtime "isAggTop" and "focus"
+ *		properties.
+ * REVISION HISTORY:
+ *	Name	Date		Description			     
+ *	----	----		-----------			     
+ *	dloft	6/15/95		Initial version			     
+ * 
+ *********************************************************************/
+
+@method BGadgetFormClass, MSG_ENT_SET_PROPERTY
+{
+    if (!strcmp(prop, _TEXT("isAggTop"))) {
+	if (value->CD_data.LD_integer)
+	    ECPSelf(pself)->BI_flags |= BSF_REMOVE_FROM_OUTPUT;
+	else
+	    ECPSelf(pself)->BI_flags &= ~BSF_REMOVE_FROM_OUTPUT;
+    }
+    /*
+     * See if user specified focus in the builder.  Spec prop box
+     * code sets focusString, not focus.  Also, note that we keep
+     * the type as TYPE_STRING.
+     */
+    else if (!strcmp(prop, _TEXT("focusString"))) {
+	TCHAR   propBuf[] = _TEXT("focus");
+	TCHAR	*focus;
+
+	RunHeapLock(rhi, value->CD_data.LD_string, (void**) &focus);
+	strcpy(ECPSelf(pself)->BFI_focusString, focus);
+	RunHeapUnlock(rhi, value->CD_data.LD_string);
+	if (strcmp(ECPSelf(pself)->BFI_focusString, _TEXT(""))) {
+	    @call self::MSG_BENT_MARK_CHANGED_PROPERTY( rhi, value, propBuf );
+	}
+	return;
+    }
+    /*
+     * If "focus" is being set, then we must be loading a legos app.
+     * We need to set up our BFI_focusString with the name of the
+     * focus object.
+     */
+    else if (!strcmp(prop, _TEXT("focus"))) {
+	optr 			fObj;
+	GadgetFormInstance	*gself;
+	
+	@callsuper();
+	gself = ObjDerefEnt(oself);
+	pself = ObjDerefBent(oself);
+	if ((fObj = gself->GFI_focus) == NullOptr) {
+	    strcpy(ECPSelf(pself)->BFI_focusString, _TEXT(""));
+	    return;
+	}
+	BentGetComponentName(fObj, ECPSelf(pself)->BFI_focusString);
+	EC_ERROR_IF(strlen(pself->BFI_focusString) > BENT_COMP_NAME_MAX_LENGTH,
+		    -1);
+	return;
+    }
+    
+    /* go ahead and call the superclass to ensure that this property
+     * setting gets "tracked" by the BentClass ENT_SET_PROPERTY handler
+     */
+    @callsuper();
+
+}
+
+/*********************************************************************
+ *			BGadgetFormDescribe
+ *********************************************************************
+ * SYNOPSIS:	Intercept requests for "isAggTop" and ignore
+ * PARAMETERS:	TCHAR *property = cx:dx
+ *		hptr descHeader = bp
+ *
+ * SIDE EFFECTS:
+ * STRATEGY:	
+ * REVISION HISTORY:
+ *	Name	Date		Description			     
+ *	----	----		-----------			     
+ *	dloft	 7/25/95	Initial version			     
+ * 
+ *********************************************************************/
+@method BGadgetFormClass, MSG_BENT_DESCRIBE_PROPERTY
+{
+    BDescHeader*	bdh;
+    bdh = MemLock(descHeader);
+
+    if ((bdh->BDH_info.BDI_flags & BDF_BUILDTIME) || 
+	(strcmp(property, _TEXT("isAggTop")))) {
+	@callsuper();
+    }
+
+    MemUnlock(descHeader);
+}
+
+
+
+/***********************************************************************
+ *		MSG_BENT_DESCRIBE_SELF for BGadgetFormClass
+ ***********************************************************************
+ * SYNOPSIS:		Intercepted so that we can delay setting
+ *			the focus property until after the desired
+ *			component has been written out.
+ * PARAMETERS:	    hptr.BDescHeader	descHeader
+ *		    BDescInfo		outputInfo
+ * SIDE EFFECTS:
+ *		FIXME This code is almost identical to that
+ *		      used by BGadgetDialog/FloaterClass.  It
+ *		      would be nice to use common code.
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	jmagasin 1/12/96	Initial Revision
+ *
+ ***********************************************************************/
+@method BGadgetFormClass, MSG_BENT_DESCRIBE_SELF
+{
+    /* Dummy pointer will be stuffed with prop name by
+       MSG_ENT_ENUM_PROPERTIES	 */ 
+    TCHAR*		dummy;
+    EventHandle		event;
+    optr		propArray, postProcessArray;
+    
+					
+   /*
+    * Write out all the default stuff by calling our superclass, but
+    * first extract the focus property so we can ensure it's written
+    * out after the corresponding focus component (and our other
+    * properties).
+    */
+    propArray = ConstructOptr(HandleOf(oself), ECPSelf(pself)->BI_propArray);
+    postProcessArray = ConstructOptr(HandleOf(oself),
+			NameArrayCreateAt(ConstructOptr(HandleOf(oself),0),
+			  sizeof(ComponentData),0,0));
+    /*
+     * Remove .focus from the array so it doesn't get written out.
+     */
+    BentExtractPropertyArrayElement(_TEXT("focus"), propArray, 
+				    postProcessArray);
+
+    /*
+     * Take care of all our other properties and children.
+     */
+    @callsuper();
+
+    /*
+     * If we've got no focus, don't bother to put focus
+     * back in the property array.  (User might have specified a
+     * focus, then nulled it out.  We don't want a "form1.focus=",
+     * i.e., syntax error, in our code.)
+     */
+    pself = ObjDerefBent(oself);
+    if (!strcmp(ECPSelf(pself)->BFI_focusString, _TEXT(""))) {
+	LMemFreeHandles(HandleOf(oself), postProcessArray);	
+	return;
+    }
+    
+   /*
+    * Write out the focus property, which was extracted earlier.
+    * Then put it back into the component's propArray, so next save
+    * it will still be there.
+    */
+    pself->BI_flags &= ~BSF_COMP_INIT;
+    event = @record self::MSG_BENT_DESCRIBE_PROPERTY(dummy, descHeader);
+    ChunkArrayEnum(postProcessArray, (void *)event, 
+		   BentProcessPropertyArrayElement);
+    ObjFreeMessage(event);
+    BentExtractPropertyArrayElement(_TEXT("focus"), 
+				    postProcessArray, propArray);
+    pself = ObjDerefBent(oself);
+    pself->BI_flags |= BSF_COMP_INIT;
+    
+    LMemFreeHandles(HandleOf(oself), postProcessArray);
+
+}	/* End of MSG_BENT_DESCRIBE_SELF.	*/
+
+
+/*********************************************************************
+ *			MSG_BENT_GET/SET_PROPERTY
+ *********************************************************************
+ * SYNOPSIS:	Intercepted for special handling of .focus property.
+ *
+ *		FIXME This code is almost identical to that
+ *		      used by BGadgetDialog/FloaterClass.  It
+ *		      would be nice to use common code.
+ *	
+ * REVISION HISTORY:
+ *	Name	Date		Description			     
+ *	----	----		-----------			     
+ *	jmagasin 1/16/96	Initial version			     
+ * 
+ *********************************************************************/
+
+@method BGadgetFormClass, MSG_BENT_GET_PROPERTY
+{
+    if ((strcmp(property, _TEXT("focus")) == 0) ||
+        (strcmp(property, _TEXT("focusString")) == 0)) {
+	strcpy(text, ECPSelf(pself)->BFI_focusString);
+	return FALSE;
+    }
+    else {
+	return @callsuper();
+    }
+}

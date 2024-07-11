@@ -1,0 +1,1118 @@
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+	Copyright (c) Geoworks 1996 -- All Rights Reserved
+
+PROJECT:	Legos
+MODULE:		Runtime
+FILE:		computil.goc
+
+AUTHOR:		Ronald Braunstein , Apr  3, 1996
+
+ROUTINES:
+	Name			Description
+	----			-----------
+    INT Run_GetAllComponents	Returns all components in the EntTree under
+				a given component or the App.  Included
+				passed component if given.
+
+    INT RecurseGACOnChildren	Helper routine for calling
+				Run_GetAllComponents for all children of a
+				component.
+
+    INT AddCompToArray		Adds the passed component to our array of
+				components.
+
+    INT CompInRTask		Returns TRUE if the component is in one of
+				the passed rtasks.
+
+    EXT ComputeSpaceUsedByRTask	Determines the space used by objects in a
+				rtask by summing the sizes of all the
+				object blocks owned by the rtask.
+
+    EXT Run_GetComponentsToDestroy
+				Helper routine for calling
+				Run_GetAllComponents but saving all the
+				"top level" components at the beginning of
+				the array
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	ron	4/3/96  	Initial version.
+
+DESCRIPTION:
+	Utilities for finding components.
+	It is questionable if these should go here or in ent.
+
+
+	$Id: computil.goc,v 1.1 97/10/15 11:37:19 newdeal Exp $
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+
+#ifdef LIBERTY
+#include <legos/interp.h>
+#include <legos/runint.h>
+#include <legos/computil.h>
+#include <ui/ui.h>
+#include <comp/comp.h>
+#include <internal/comp/refs.h>
+#include <internal/ui/freeup.h>
+#include <pos/ramalloc.h>
+#include <legos/unload.h>
+#include <driver/fatalerr.h>
+
+#else	/* GEOS version below */
+
+#include "compat.h"
+#include <geos.h>
+/*#include <Legos/basrun.h>*/
+@include <Legos/basrun.goh>
+@include <Legos/ent.goh>
+#include <Legos/Internal/runtask.h>
+#include "faterr.h"
+#include "computil.h"
+#endif
+
+
+
+/*- Internal routines
+ */
+#ifdef LIBERTY
+
+static int
+Run_GetAllComponents(optr comp, GACFilter filter, RunTask *rtasks,
+		     ArrayOfComponentsHeader *header, optr rootToIgnore);
+
+static Boolean
+CompInRTask(optr component, RunTask *rtasks);
+
+static int
+RecurseGACOnChildren(optr component, GACFilter filter,
+		     RunTask *rtasks, ArrayOfComponentsHeader *header,
+		     optr root);
+
+#else  // Liberty only above, Geos only below
+static int
+Run_GetAllComponents(optr comp, GACFilter filter, RTaskHan *rtasks,
+		     ArrayOfComponentsHeader *header, optr rootToIgnore);
+
+static Boolean
+CompInRTask(optr component, RTaskHan *rtasks);
+
+static int
+RecurseGACOnChildren(optr component, GACFilter filter,
+		     RTaskHan *rtasks, ArrayOfComponentsHeader *header,
+		     optr root);
+
+static int
+CreateArrayBlock(ArrayOfComponentsHeader* header);
+
+#endif // end Geos only
+
+static word
+AddCompToArray(optr component, ArrayOfComponentsHeader *header, optr head);
+
+#ifndef LIBERTY
+#endif
+
+#ifndef LIBERTY
+@ifdef LIBERTY
+#endif
+
+int
+GACIterateTopLevels(GACFilter filter, /* the filter for what to add */
+		    RunTask *rtasks, /* add components in these rtasks */
+		    ArrayOfComponentsHeader *header, /* to this array
+							of comps */
+		    optr head);	/* but omit this one */
+
+class Interpreter : public MessageBase {
+ public:
+    @message void MSG_INTERPRETER_DESTROY(ModuleToken firstFidoToken, Component* head, int32 mTrend);
+    @handler InterpreterDestroyHandler, MSG_INTERPRETER_DESTROY;
+};
+
+@classdecl Interpreter;
+
+static Interpreter theInterpreter;
+
+//---------------------------------------------------------------------------
+//		Interpreter::InterpreterDestroyHandler()
+//---------------------------------------------------------------------------
+// 
+// SYNOPSIS: 	Handles MSG_INTERPRETER_DESTROY
+// SCOPE:	PUBLIC
+// RETURN:	nothing
+// STRATEGY:	Destroy the components passed to me.  Also call 
+//		FidoCloseModule on the list of FidoModules passed.
+// 
+// REVISION HISTORY: 
+//	Name	Date		Description 
+//	----	----		----------- 
+//	matta	5/ 3/96  	Initial version 
+//
+//---------------------------------------------------------------------------
+void
+Interpreter::InterpreterDestroyHandler(ModuleToken firstFidoToken,
+				       Component* head,
+				       int32 mTrend)
+{
+    ECDLM(uint32 beforeCall = theHeap.GetFreeMemoryBytes());
+    ECDLM(printf("Start of InterpreterDestroyHandler(), there is %d bytes free\n", beforeCall));
+    ECDLM(uint32 afterCall);
+
+    Component* curr = head;
+    while (curr) {
+#ifdef LOG_COMP_TRACKING
+	theLog << "Deleting ";
+	curr->DispatchName(theLog);
+	theLog << '\n';
+#endif
+#ifdef LOG_COMP_GET_SIZE		
+	int32 reportedSize = curr->ComputeSize();
+	int32 before = theHeap.GetFreeMemoryBytes();
+	const char* name = 
+	    ((ComponentInfo*)curr->GetClassInfo())->legosClassName;
+#endif
+	Component *next = curr->GetNext();
+	delete curr;
+#ifdef LOG_COMP_GET_SIZE
+	int32 after = theHeap.GetFreeMemoryBytes();
+	if (reportedSize != (after - before)) {
+	    theLog << name << " reported: " << reportedSize
+		   << " actual: " << (after - before) << '\n';
+	}
+#endif
+	curr = next;
+    }
+    ECDLM(afterCall = theHeap.GetFreeMemoryBytes());
+    ECDLM(printf("After freeing all components, freed %d bytes\n", afterCall - beforeCall));
+    ECDLM(beforeCall = afterCall);
+
+    FreeUpList::AddToMemoryTrend(mTrend);
+
+    // now call FidoCloseModule() on all entries in the fidoModuleArray
+    ModuleToken closeToken = firstFidoToken;
+    while (closeToken != NULL_MODULE) {
+	ModuleToken nextToken = FidoModuleGetNextToken(closeToken);
+	ECDLM(afterCall = theHeap.GetFreeMemoryBytes());
+	FidoCloseModule(closeToken);
+	closeToken = nextToken;
+	ECDLM(printf("After FidoCloseModule(), freed %d bytes\n", 
+		     afterCall - beforeCall));
+	ECDLM(beforeCall = afterCall);
+    }
+
+    ECDLM(afterCall = theHeap.GetFreeMemoryBytes());
+    ECDLM(printf("Memory free = %d\n\n", afterCall));
+}	/* End of Interpreter::InterpreterDestroyHandler() */
+#ifndef LIBERTY
+@endif
+#endif
+
+
+#ifdef LIBERTY
+/* Geos version lives in unload.c */
+void 
+UM_CheckComponent(optr* tempOptr, UnloadData* ud)
+{
+    Component *c = ud->headComponent;
+    while (c) {
+	if (c == (Component*)*tempOptr) {
+	    *tempOptr = NullOptr;
+	    break;
+	}
+	c = c->GetNext();
+    }
+}
+#endif
+
+/*********************************************************************
+ *			Run_SendDestroyComponents
+ *********************************************************************
+ * SYNOPSIS:	Send MSG_INTERP_DESTROY_COMPONENTS
+ * CALLED BY:	EXTERNAL
+ * REVISION HISTORY:
+ *	Name	Date		Description			     
+ *	----	----		-----------			     
+ *	dubois	4/ 9/96  	Initial version
+ * 
+ *********************************************************************/
+#ifdef LIBERTY
+void
+Run_SendDestroyComponents(ModuleToken firstFidoToken, Component* head)
+{
+    size_t mTrend = 0;
+
+    Component *curr = head;
+    while (curr) {
+	/* In Liberty, most things don't need a queue delay, but this
+	   scheme provides one anyway.  In any case, one of them might
+	   have methods on the stack -- which prevents their safe
+	   immediate deletion.  Sending MSG_PRE_DELETE also allows
+	   visible sprite windows to set themselves not visible (among
+	   other things), thereby immediately increacing free
+	   memory. */
+#ifdef LOG_COMP_TRACKING
+	theLog << "MSG_PRE_DELETE on ";
+	curr->DispatchName(theLog);
+	theLog << '\n';
+#endif
+
+	PreDeleteResult result;
+	result = curr->Call(MSG_PRE_DELETE);
+	switch (result) {
+	 case PDR_DELETE_CUSTOM:
+	    EC_FAIL("PDR_DELETE_CUSTOM is not supported!");
+	    break;
+	 case PDR_DELETE_DEFAULT:
+	    break;
+	}
+	mTrend += curr->ComputeSize();
+	curr = curr->GetNext();
+    }
+
+    Message *message;
+    message = theInterpreter.Record(MSG_INTERPRETER_DESTROY, firstFidoToken, head, -mTrend);
+    if (!message) {
+	// Dropping this message is a huge memory leak and could cause
+	// a crash later anyway...
+	// We will try one last desparate attempt by trying to get a message
+	// from the ITM pool
+	message = theInterpreter.RecordFromPool(&theITMPool, MSG_INTERPRETER_DESTROY, firstFidoToken, head, -mTrend);
+	if(!message) {
+	    FatalErrorDriver::FatalError(OUT_OF_MEMORY_FATAL_ERROR);
+	}
+    }
+    UI::PostMessage(message);
+    FreeUpList::AddToMemoryTrend(mTrend);
+}
+#else
+void
+Run_SendDestroyComponents(optr o, optr compArray, optr uiBlockArray,
+			  optr fidoModuleArray, Message notifyMessage)
+{
+    @send, forceQueue o::MSG_INTERP_DESTROY_COMPONENTS
+	(compArray, uiBlockArray, fidoModuleArray, notifyMessage);
+}
+#endif
+
+/*********************************************************************
+ *			Run_GetAllComponents
+ *********************************************************************
+ * SYNOPSIS:	Returns all components in the EntTree under a given
+ *		component or the App.  Included passed component if given.
+ * CALLED BY:	INTERNAL
+ * PASS:	optr	component; 	Component to start search at
+ *					or NullOptr to start at app.
+ *
+ *		GACFilter filter;	Limit components to ones that
+ *					the given filter
+ *
+ *		RTaskHan *rtasks	Limit components that belong to
+ *					one of the rtasks in this array.
+ *					Pass Null to use any rtask.
+ *					The array should be Null terminated.
+ *
+ *		ArrayOfComponentsHeader *header, with header->arrayBlock locked
+ *
+ *		optr	head;		This component won't be added to
+ *					the array of components. Pass NullOptr
+ *					if you want the head added too.
+ *
+ * RETURN:	MEM_ERROR if memory error, else 0
+ *
+ *		You are responsible for freeing the array block whether or
+ *		not there is a memory error.
+ *
+ * SIDE EFFECTS:
+ *		Order of components in array will be top down, but this
+ *		can be changed if needed.
+ * STRATEGY:
+ * REVISION HISTORY:
+ *	Name	Date		Description			     
+ *	----	----		-----------			     
+ *	ron	4/3/96  	Initial version
+ * 
+ *********************************************************************/
+static int
+Run_GetAllComponents(optr comp, GACFilter filter, RTaskHan *rtasks,
+		     ArrayOfComponentsHeader *header, optr head)
+{
+    if (comp == NullOptr) 
+    {
+#ifdef LIBERTY
+	if (GACIterateTopLevels(filter, rtasks, header, head)) {
+	    return MEM_ERROR;
+	} else {
+	    return 0;
+	}
+#else
+	comp = GeodeGetAppObject(0);
+#endif
+    }
+
+    switch (filter)
+    {
+    case GACF_NONE:
+	/*
+	 * Visit all components regardless of which rtask any
+	 * is in.
+	 * Only store those in an approved rtask.
+	 */
+	if (CompInRTask(comp, rtasks))
+	{
+	    if(AddCompToArray(comp, header, head)) return MEM_ERROR;
+	}
+	if(RecurseGACOnChildren(comp, filter, rtasks, header, head))return MEM_ERROR;
+	break;
+    case GACF_TOP_LEVEL:
+	/*
+	 * Visit all components until you find one in an acceptable rtask,
+	 * then continue without visiting its children.
+	 * Only store those in with a good rtask.
+	 */
+	if (CompInRTask(comp, rtasks))
+	{
+	    if (AddCompToArray(comp, header, head)) return MEM_ERROR;
+	}
+	else
+	{
+	    if(RecurseGACOnChildren(comp,filter, rtasks,header, head))
+		return MEM_ERROR;
+	}
+	break;
+
+    case GACF_ANY_DESCENDANT:
+	/*
+	 * Visit all components until you find one in an acceptable rtask
+	 * then continue visiting all its children and adding all its children
+	 * regardless of rtask.
+	 *
+	 * Accomplish this by changing filter to GACF_NONE and rtasks to Null
+	 * once we decide we want all children.
+	 */
+	if (CompInRTask(comp, rtasks))
+	{
+	    if (AddCompToArray(comp, header, head)) return MEM_ERROR;
+	    if (RecurseGACOnChildren(comp, GACF_NONE, NULL, header, head))
+		return MEM_ERROR;
+	}
+	else
+	{
+	    if (RecurseGACOnChildren(comp, filter, rtasks, header, head))
+		return MEM_ERROR;
+	}
+	break;
+    }
+    return 0;
+}    
+
+#ifdef LIBERTY
+/***********************************************************************
+ *			GACIterateTopLevels()
+ ***********************************************************************
+ * SYNOPSIS:	    Low level routine called by Run_GetAllComponents()
+ * CALLED BY:	    
+ * RETURN:	    same as Run_GetAllComponents()
+ * SIDE EFFECTS:    Adds elements to the passed array
+ *
+ * STRATEGY:	    Since Liberty doesn't really have an "app", we can't
+ *		    iterate through the app's children, so this function
+ *		    iterates through all the top level
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	matta	4/30/96	Initial Revision
+ *
+ ***********************************************************************/
+int
+GACIterateTopLevels(GACFilter filter, /* the filter for what to add */
+		    RunTask *rtasks, /* add components in these rtasks */
+		    ArrayOfComponentsHeader *header, /* to this array
+							of comps */
+		    optr head)	/* but omit this one */
+{
+    // Recurse through all the children of the root window.  This
+    // effectively traverses all the components in the system.
+    return RecurseGACOnChildren((optr)Window::GetRootWindow(),
+				filter,
+				rtasks,
+				header,
+				head);
+}	/* End of GACIterateTopLevels() */
+#endif
+
+/*********************************************************************
+ *			RecurseGACOnChildren
+ *********************************************************************
+ * SYNOPSIS:	Helper routine for calling Run_GetAllComponents for all
+ *		children of a component.
+ * CALLED BY:	INTERNAL, Run_GetAllComponents
+ * PASS:	same as Run_GetAllComponents
+ * RETURN:	non-zero if failed
+ * SIDE EFFECTS:
+ * STRATEGY:
+ *		We add to the stack by adding this helper routine to
+ * 		the recurrsion.  I don't think this is a problem as the
+ *		stack should never get very deep. (20 levels would suprise
+ *		me).  If needed, this code could be moved back into
+ *		the main routine.
+ *
+ *		The called routines are allowed to move object blocks.
+ * REVISION HISTORY:
+ *	Name	Date		Description			     
+ *	----	----		-----------			     
+ *	ron	4/3/96  	Initial version
+ * 
+ *********************************************************************/
+#ifdef LIBERTY
+static int
+RecurseGACOnChildren(optr component, GACFilter filter,
+		     RunTask *rtasks, ArrayOfComponentsHeader *header,
+		     optr head)
+{
+    /* FIXME: This could, of course, be done faster with a child enum
+       function of some kind. We'll have to wait to profile and see if
+       this is a bottleneck though. */
+    PARAM_ASSERT(component != NULL);
+    WindowChildren children((Window*)component);
+    for (int i = 0; i < children._count; i++) {
+	Window *win = children._array[i];
+	if (win->IsA((const ClassInfo*)&ComponentClassInfo)) {
+	    if (Run_GetAllComponents((optr)win, 
+				     filter, 
+				     rtasks, 
+				     header, 
+				     head)) {
+		return MEM_ERROR;
+	    }
+	}
+    }
+    return 0;
+}
+#else 	/* Liberty only above, Geos only below */
+static int
+RecurseGACOnChildren(optr component, GACFilter filter,
+		     RTaskHan *rtasks, ArrayOfComponentsHeader *header,
+		     optr head)
+{
+    EntInstance *eself;
+    optr	child;
+
+    EC(ECCheckOD(component));
+    EC_BOUNDS(header);
+
+    /* the system routines for walking children for us are hokey, lets
+       just do it ourself. */
+    ObjLockObjBlock(OptrToHandle(component));
+    /*
+     * Basrun doesn't depend on ent so we can't do this.
+     * Maybe this code should be moved to Ent.
+     * EC_ERROR_IF(!ObjIsObjectInClass(child, &EntClass), -1);
+     */
+    eself = ObjDerefEnt(component);
+    child = eself->EI_comp.CP_firstChild;
+    MemUnlock(OptrToHandle(component));
+
+    /* call the first child */
+    if (child == NullOptr) return 0;
+    if (Run_GetAllComponents(child, filter, rtasks, header, head))
+	return MEM_ERROR;
+
+    do 
+    {
+	{
+	    /* Try and keep silly variable out of recursion stack */
+	    optr last = child;
+	    /* now call the rest */
+	    ObjLockObjBlock(OptrToHandle(child));
+	    /*
+	     * Basrun doesn't depend on ent so we can't do this.
+	     * Maybe this code should be moved to Ent.
+	     * EC_ERROR_IF(!ObjIsObjectInClass(child, &EntClass), -1);
+	     */
+	    eself = ObjDerefEnt(child);
+	    /* get the sibling */
+	    child = eself->EI_link.LP_next;
+	    MemUnlock(OptrToHandle(last));
+	}
+	
+	/* if we processed all children and are back to the parent, return. */
+	if (child & LP_IS_PARENT) return 0;
+	if (Run_GetAllComponents(child, filter, rtasks, header, head))
+	    return MEM_ERROR;
+
+    } while (1);
+}
+#endif /* end Geos only */
+
+/*********************************************************************
+ *			AddCompToArray
+ *********************************************************************
+ * SYNOPSIS:	Adds the passed component to our array of components.
+ * CALLED BY:	INTERNAL, Run_GetAllComponents
+ * PASS:	optr	component;	component to add 
+ *		ArrayOfComponentsHeader *header
+ *		optr	head		ignore this component.
+ *					(Don't add if component EQ head)
+ * RETURN:	MEM_ERROR, if memory error, else 0
+ * SIDE EFFECTS:
+ * STRATEGY:
+ *		Create the array if necessary.
+ *		Grow the array if necessary.
+ *		Add the element.
+ * REVISION HISTORY:
+ *	Name	Date		Description			     
+ *	----	----		-----------			     
+ *	ron	4/3/96  	Initial version
+ * 
+ *********************************************************************/
+
+/* Whenever the array is too small, grow it by this amount */
+#if ERROR_CHECK
+#define ARRAY_GROW_SIZE 5
+#else
+#define ARRAY_GROW_SIZE 50
+#endif
+static word
+AddCompToArray(optr component, ArrayOfComponentsHeader *header, optr head)
+{
+#ifdef LIBERTY
+    if (component == head) {
+	return 0;
+    }
+    Component *comp = (Component*)component;
+    ASSERT(comp);
+    comp->SetNext(NULL);
+    if (header->last) {
+	ASSERT(header->head);
+	header->last->SetNext(comp);
+	header->last = comp;
+    } else {
+	ASSERT(!header->head);
+	header->head = header->last = comp;
+    }
+#ifdef LOG_COMP_TRACKING
+    theLog << "Added ";
+    comp->DispatchName(theLog);
+    theLog << " to list of dying components.\n";
+#endif
+    return 0;
+#else
+    ASSERT(header->arrayBlock != NullHandle);
+    ASSERT(header->numElements < 2000);	/* Probably something wrong */
+    ECG(ECCheckOD(component));
+
+    /* If we are ignoring this component, just leave. */
+    if ((component == head) ||
+	(component == GeodeGetAppObject(0)))
+	return 0;
+
+    /* Ensure the array is big enough; make sure the array is null terminated
+     * (leave room for one element on end)
+     */
+    if (header->numElements +1 == header->arrayCount)
+    {
+	MemHandle	retval;
+
+	LONLY(UnlockH(header->arrayBlock));
+	retval =
+	    MemReAlloc(header->arrayBlock,
+		       (header->arrayCount + ARRAY_GROW_SIZE) * sizeof(optr),
+		       HAF_ZERO_INIT);
+	if (retval == NullHandle) return (word)MEM_ERROR;
+	LONLY(LockH(header->arrayBlock));
+	header->comps	= (optr *)MemDeref(header->arrayBlock);
+	header->arrayCount += ARRAY_GROW_SIZE;
+    }
+
+    /* Make sure not to add the app object, as it is not a real component */
+    if (component != GeodeGetAppObject(0))
+    {
+	header->comps[header->numElements++] = component;
+    }
+    return 0;
+#endif
+}
+
+
+/*********************************************************************
+ *			CompInRTask
+ *********************************************************************
+ * SYNOPSIS:	Returns TRUE if the component is in one of the passed
+ *		rtasks.
+ * CALLED BY:	INTERNAL, Run_GetAllComponents
+ * PASS:	optr		component
+ *		RTaskHan *	rtasks		null terminated array 
+ * RETURN:	TRUE 	if the object belongs to one of the rtasks.
+ * SIDE EFFECTS:
+ * STRATEGY:
+ * REVISION HISTORY:
+ *	Name	Date		Description			     
+ *	----	----		-----------			     
+ *	ron	4/3/96  	Initial version
+ * 
+ *********************************************************************/
+#ifdef LIBERTY
+static Boolean
+CompInRTask(optr component, RunTask *rtasks)
+{
+    RTaskHan rtaskHandle;
+
+    /*
+     * Null is passed to mean any rtask is allowed.
+     */
+    if (rtasks == NULL) {
+	return TRUE;
+    }
+
+    rtaskHandle = ((Component*)component)->GetRunTask();
+    if (rtaskHandle == DM_BAD_DATA_HANDLE) {
+	return FALSE;
+    }
+
+    RunTask* curr = rtasks;
+    while (curr) {
+	if (curr->RT_handle == rtaskHandle) {
+	    return TRUE;
+	}
+	curr = curr->RT_next;
+    }
+    return FALSE;
+}
+#else
+static Boolean
+CompInRTask(optr component, RTaskHan *rtasks)
+{
+    RTaskHan rtask;
+
+    /*
+     * Null is passed to mean any rtask is allowed.
+     */
+    if (rtasks == NULL) return TRUE;
+
+    {
+	EntObjectBlockHeader *header;
+	EC(ECCheckOD(component));
+	header = ObjLockObjBlock(OptrToHandle(component));
+	EC_BOUNDS(header);
+	rtask = header->EOBH_task;
+	MemUnlock(OptrToHandle(component));
+    }
+
+    while (*rtasks != NullHandle)
+    {
+	EC_BOUNDS(rtasks);
+	if (rtask == *rtasks) return TRUE;
+	rtasks++;
+    }
+    return FALSE;
+}
+#endif
+
+#ifndef LIBERTY
+/*********************************************************************
+ *			CreateArrayBlock
+ *********************************************************************
+ * SYNOPSIS:	Common code to create array
+ * CALLED BY:	
+ * PASS:
+ * RETURN:	0 on success, MEM_ERROR if not
+ * SIDE EFFECTS:
+ *	Allocates a block, leaves it locked with header->comps pointing
+ *	to the first element.
+ *
+ * STRATEGY:
+ * REVISION HISTORY:
+ *	Name	Date		Description			     
+ *	----	----		-----------			     
+ *	dubois	5/2/96  	Initial version
+ * 
+ *********************************************************************/
+static int
+CreateArrayBlock(ArrayOfComponentsHeader* header)
+{
+    ASSERT(header->arrayBlock == NullHandle);
+
+    header->arrayBlock = MemAlloc(ARRAY_GROW_SIZE * sizeof(optr),
+				  HF_DYNAMIC | HF_SHARABLE,
+				  HAF_LOCK | HAF_ZERO_INIT);
+    if (header->arrayBlock == NullHandle) return MEM_ERROR;
+
+    /* Point after the legos array header */
+    header->comps = (optr *) MemDeref(header->arrayBlock);
+    header->arrayCount = ARRAY_GROW_SIZE;
+    header->numElements = 0;
+    return 0;
+}
+#endif
+
+/*********************************************************************
+ *			Run_GetComponentsToDestroy
+ *********************************************************************
+ * SYNOPSIS:	Helper routine for calling Run_GetAllComponents but saving
+ *		all the "top level" components at the beginning of the
+ *		array
+ * CALLED BY:	EXTERNAL
+ * PASS:	optr	components;	 as in Run_GetAllComponents
+ *		RTaskHan *rtasks;	 as in Run_GetAllComponents
+ *		header			pointer to ArrayOfComponentsHeader
+ * RETURN:	MEM_ERROR if error
+ *		else header->arrayBlock filled in and unlocked
+ * SIDE EFFECTS:
+ * STRATEGY:
+ * REVISION HISTORY:
+ *	Name	Date		Description			     
+ *	----	----		-----------			     
+ *	RON	4/ 5/96  	Initial version
+ * 
+ *********************************************************************/
+#ifdef LIBERTY
+
+Boolean 
+RunTaskBeingDeleted(RunTask *runTaskList, RTaskHan rtask) 
+{
+    while(runTaskList) {
+	if(runTaskList->RT_handle == rtask) {
+	    return TRUE;
+	}
+	runTaskList = runTaskList->RT_next;
+    }
+    return FALSE;
+}
+
+int
+Run_GetComponentsToDestroy(optr EC(component), 
+			   RunTask *head,
+			   ArrayOfComponentsHeader *header)
+{
+    // this used to go through every child component of theRootWindow
+    // and add it to the list if the component's rtask was in the head
+    // list.  This isn't good enough for the case where we are unloading
+    // a module which created components in a shared aggregate module
+    // but the aggregate module isn't being deleted.  The algorithm now
+    // is to go through each rtask in the system, if the rtask is in
+    // the head list, then collect all top level components of that
+    // rtask, else if the rtask is not in the list, go through each
+    // component in its top level list and add it to the collection list
+    // if the component's rtask is in the head list
+    // Run_GetAllComponents(component, GACF_TOP_LEVEL, head, header, NullOptr);
+    ASSERT(head != NULL);
+    ASSERT(component == NullOptr);
+    ProgTask *ptask = (ProgTask*)LockH(head->RT_progTask);
+    RTaskHan *runTasksArray = (RTaskHan*)LockH(ptask->PT_tasks);
+    for(int i = 0; i < ptask->PT_numTasks; i++) {
+	// check if the 
+	RunTask *rtask = (RunTask*)LockH(runTasksArray[i]);
+	if(rtask->RT_topLevelCount > 0) {
+	    Component **topLevels = 
+		(Component**)LockH(rtask->RT_topLevelComponents);
+	    if(RunTaskBeingDeleted(head, runTasksArray[i])) {
+		for(int j = rtask->RT_topLevelCount - 1; j >= 0; j--) {
+		    // add every component in the topLevelComponents list of
+		    // these runtasks that are being destroyed
+		    if(AddCompToArray((optr)topLevels[j], header, NullOptr)) {
+			UnlockH(rtask->RT_topLevelComponents);
+			UnlockH(runTasksArray[i]);
+			UnlockH(ptask->PT_tasks);
+			UnlockH(head->RT_progTask);
+			return MEM_ERROR;
+		    }
+		}
+	    } else {
+		// these runtasks aren't being destroyed, but in their
+		// topLevelComponents lists might be some components whose
+		// runtasks are in the list of runtasks being destroyed.
+		// this can happen if the component is from an aggregate
+		// module, and the aggregate module is being destroyed, but
+		// the module which created the aggregate component is
+		// not being destroyed (so the aggregate component is
+		// in the topLevelComponents list of that persisting module)
+		for(int j = rtask->RT_topLevelCount - 1; j >= 0; j--) {
+		    if(CompInRTask((optr)topLevels[j], head)) {
+			if(AddCompToArray((optr)topLevels[j], header, NullOptr)) {
+			    UnlockH(rtask->RT_topLevelComponents);
+			    UnlockH(runTasksArray[i]);
+			    UnlockH(ptask->PT_tasks);
+			    UnlockH(head->RT_progTask);
+			    return MEM_ERROR;
+			}
+		    } else {
+			// Find children of the top level components
+			// that may be in the rtask's being destroyed.
+			if (RecurseGACOnChildren((optr)topLevels[j],
+						 GACF_TOP_LEVEL,
+						 head,
+						 header,
+						 NullOptr)) {
+			    UnlockH(rtask->RT_topLevelComponents);
+			    UnlockH(runTasksArray[i]);
+			    UnlockH(ptask->PT_tasks);
+			    UnlockH(head->RT_progTask);
+			    return MEM_ERROR;
+			}
+		    }
+		}
+	    }
+	    UnlockH(rtask->RT_topLevelComponents);
+	}
+	UnlockH(runTasksArray[i]);
+    }
+    UnlockH(ptask->PT_tasks);
+    UnlockH(head->RT_progTask);
+    
+    ASSERT(header->lastTopLevel == NULL);
+    header->lastTopLevel = header->last;
+    Component* curr = header->head;
+    while (curr) {
+	Run_GetAllComponents((optr)curr, GACF_NONE, NULL, header, (optr)curr);
+	if (curr == header->lastTopLevel) {
+	    break;
+	}
+	curr = curr->GetNext();
+    }
+    return 0;
+}
+
+#else  /* Geos only below, Liberty only above */
+
+int
+Run_GetComponentsToDestroy(optr component, RTaskHan *rtasks,
+			   ArrayOfComponentsHeader *header)
+{
+    word	numTopLevelComps, count;
+
+    if (header->arrayBlock == NullHandle) {
+	if (CreateArrayBlock(header)) return MEM_ERROR;
+    }
+
+    /* Get all top level components at the start of the array. */
+    if (Run_GetAllComponents(component, GACF_TOP_LEVEL,
+			     rtasks, header, NullOptr))
+	goto error_done;
+
+    numTopLevelComps = header->numElements;
+    
+
+    /* Now call Run_GetAllComponents on each toplevel component */
+    for (count = 0; count < numTopLevelComps; count++)
+    {
+	/* add children of top level components regardless of rtask */
+	if (Run_GetAllComponents(header->comps[count], GACF_NONE, NULL,
+				 header,header->comps[count]))
+	    goto error_done;
+    }
+    header->numTopLevelComps = numTopLevelComps;
+    return 0;
+
+ error_done:
+    MemFree(header->arrayBlock);
+    return MEM_ERROR;
+}
+#endif /* end Geos only */
+
+/*********************************************************************
+ *			Run_CallRemoveReferences
+ *********************************************************************
+ * SYNOPSIS:	
+ * CALLED BY:	EXTERNAL, unload code
+ * PASS:
+ * RETURN:
+ * SIDE EFFECTS:
+ * STRATEGY:
+ * REVISION HISTORY:
+ *	Name	Date		Description			     
+ *	----	----		-----------			     
+ *	dubois	5/ 7/96  	Initial version
+ * 
+ *********************************************************************/
+#ifdef LIBERTY
+void
+Run_CallRemoveReferences(Component* compList, RunTask* taskList)
+{
+    /* Remember, compArray is really the head of a linked list of
+       components. */
+    ComponentReferences references(compList, taskList);
+    Component::RemoveReferences(references);
+}
+#else  /* GEOS below */
+void
+Run_CallRemoveReferences(optr* compArray, RTaskHan* moduleArray)
+{
+    EventHandle	ehan;
+    RemoveReferenceStruct rrs;
+
+    rrs.RRS_comps = compArray;
+    rrs.RRS_modules = moduleArray;
+
+    /* Hack -- don't send to the app obj as it isn't in an EntObjBlock
+     * REMOVE_COMPONENT_REFERENCES assumes it is
+     */
+    ehan = @record NullOptr::MSG_ENT_REMOVE_COMPONENT_REFERENCES(&rrs);
+    @call GeodeGetAppObject(0)::MSG_ENT_SEND_TO_CHILDREN(ehan);
+}
+#endif
+
+#ifdef LIBERTY
+//---------------------------------------------------------------------------
+//		EnumDeadCompsRecurse()
+//---------------------------------------------------------------------------
+// 
+// SYNOPSIS: 	Enums one component in the tree, recursing to
+//              its children.
+// SCOPE:	INTERNAL
+// RETURN:	nothing, always succeeds
+// STRATEGY:	If checkRoot is FALSE or if root is in the passed
+//              of run tasks, call the callback on this component and
+//              set checkRoot to FALSE.
+//
+//              Then, for every child of root, recurse.
+// 
+// REVISION HISTORY: 
+//	Name	Date		Description 
+//	----	----		----------- 
+//	matta	12/17/96 	Initial version 
+//
+//---------------------------------------------------------------------------
+static void
+EnumDeadCompsRecurse(Component* root,
+		     Boolean checkRoot,
+		     RunTask* rtasks,
+		     void (*callback)(Component*, void*),
+		     void* callbackData)
+{
+    PARAM_ASSERT(root);
+
+    // Check if we should call the callback on this component
+    if (!checkRoot || CompInRTask((optr)root, rtasks)) {
+	callback(root, callbackData);
+	checkRoot = FALSE;
+    }
+
+    // Recurse through all children of this component
+    WindowChildren children(root);
+    for (int i = 0; i < children._count; i++) {
+	Component *child = (Component*)children._array[i];
+	if (child->IsA((const ClassInfo*)&ComponentClassInfo)) {
+	    EnumDeadCompsRecurse(child, 
+				 checkRoot, 
+				 rtasks, 
+				 callback, 
+				 callbackData);
+	}
+    }
+}	/* End of EnumDeadCompsRecurse() */
+
+//---------------------------------------------------------------------------
+//		EnumDeadComps()
+//---------------------------------------------------------------------------
+// 
+// SYNOPSIS: 	Passed a list of run tasks, an enum function, and 
+//              enum function data, enumerates through all the
+//              components being destroyed.
+// SCOPE:	INTERNAL
+// RETURN:	nothing -- always works
+// STRATEGY:	
+// 
+// REVISION HISTORY: 
+//	Name	Date		Description 
+//	----	----		----------- 
+//	matta	12/17/96 	Initial version 
+//
+//---------------------------------------------------------------------------
+static void
+EnumDeadComps(RTaskHan* rtasks,
+	      void (*callback)(Component*, void*),
+	      void* callbackData)
+{
+    PARAM_ASSERT(rtasks);
+    PARAM_ASSERT(callback);
+
+    // Enumerate through the "top level" components owned by each
+    // rtask.  Then, find any children in them that belong to these
+    // rtasks.
+
+    // List is null terminated.  FIXME: to fix bug 62469 this should
+    // enum over all rtasks in the system!
+    while (*rtasks != DM_BAD_DATA_HANDLE) {
+	RunTask *rtask = (RunTask*)LockH(*rtasks);
+	if (rtask->RT_topLevelCount > 0) {
+	    ASSERT(rtask->RT_topLevelComponents != NullHandle);
+	    Component** topLevels = 
+		(Component**)LockH(rtask->RT_topLevelComponents);
+	    for (int i = rtask->RT_topLevelCount - 1; i >= 0; i--) {
+		EnumDeadCompsRecurse(
+                    // Enum components below and including this one.
+		    topLevels[i],
+		    // Don't check if components below this one are in
+		    // the list of dying RTasks -- we know they are so
+		    // call the callback unconditionally.
+		    FALSE,
+		    // List of run tasks to be deleted (unused because
+		    // we're passing FALSE above, so pass NULL here).
+		    NULL,
+		    // Callback and callback data
+		    callback,
+		    callbackData);
+	    }
+	    UnlockH(rtask->RT_topLevelComponents);
+	}
+	UnlockH(*rtasks);
+	rtasks++;
+    }
+}	/* End of EnumDeadComps() */
+
+
+//---------------------------------------------------------------------------
+//		ComputeSizeEnumFunction()
+//---------------------------------------------------------------------------
+// 
+// SYNOPSIS: 	An EnumDeadComps enum function that computes the
+//              size of one component.
+// SCOPE:	INTERNAL
+// RETURN:	nothing
+// STRATEGY:	Our (void*) arg is a pointer to size_t which we
+//              add this component's size to.
+// 
+// REVISION HISTORY: 
+//	Name	Date		Description 
+//	----	----		----------- 
+//	matta	12/17/96 	Initial version 
+//
+//---------------------------------------------------------------------------
+static void
+ComputeSizeEnumFunction(Component *comp, void* size)
+{
+    *(size_t*)size += comp->ComputeSize();
+}	/* End of ComputeSizeEnumFunction() */
+
+
+/*********************************************************************
+ *			Run_GetSizeOfComponents
+ *********************************************************************
+ * SYNOPSIS:	Helper routine for getting the size of all the components
+ *		which are descendents of the modules given by an array
+ *		of rtasks.
+ * CALLED BY:	EXTERNAL, FunctionGetMemoryUsedBy
+ * PASS:	optr	components;	 as in Run_GetAllComponents
+ *		RTaskHan *rtasks;	 as in Run_GetAllComponents
+ *		header			pointer to ArrayOfComponentsHeader
+ * RETURN:	Total size.
+ * SIDE EFFECTS:
+ * STRATEGY:
+ * REVISION HISTORY:
+ *	Name	Date		Description			     
+ *	----	----		-----------			     
+ *	RON	4/ 5/96  	Initial version
+ * 
+ *********************************************************************/
+int
+Run_GetSizeOfComponents(RTaskHan *rtasks)
+{
+    size_t totalSize = 0;
+    EnumDeadComps(rtasks, ComputeSizeEnumFunction, &totalSize);
+    return totalSize;
+}
+#endif /* LIBERTY */

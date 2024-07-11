@@ -1,0 +1,813 @@
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+	Copyright (c) 1997 New Deal, Inc. -- All Rights Reserved
+
+PROJECT:	NewBasic
+MODULE:		File Component
+FILE:		fileComponent.goc
+
+AUTHOR:		Martin Turon, Nov. 17, 1997
+
+ROUTINES:
+	Name			Description
+	----			-----------
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	martin	11/17/1997   	Initial version.
+
+DESCRIPTION:
+	This component manages file processing and manipulation
+	by managing all actions that can be performed on files. 
+
+	COMPONENT API descriptor	1997/11/17 <martin> rev 0.0.0.2
+	PROPERTIES			1997/12/05 <martin>  
+		file.name
+	~	file.path
+		file.size	 => /get=size on disk 	/set=FileTruncate
+		file.date	 => /get=date as int	/set=FileSetDateTime
+		file.time	 => /get=time as long   /set=FileSetDateTime
+		file.trap	 => error handler: none=0|~runtime=1|dialog=2
+		file.error	 => /get=error as int   /set=FCCErrorTrap
+		file.buffer	 => /get=memory caching fileBuffer component 
+		file.parent	 => /get="top"
+	ACTIONS				1997/12/19 <martin>
+		file.open()
+		file.close()	
+		file.delete()
+		file.create()
+		file.commit()	  = commits changes without closing
+		file.write(s,N)   = write N of string s to parent file   
+		file.read(N) 	  = return string of length N at current
+		file.peek()	  = return byte as integer at current position 
+		file.poke(N)	  = write given byte as integer N at position
+	~	file.put(a,N)     = write array a[0-N] to parent file   
+	~	file.get(N) 	  = return array of length N at current   
+		file.go(N)	  = move file position to N (or from end -N)
+		file.seek(N)	  = offset file position by N
+		file.tell()	  = return file position offset as long
+		file.ends()	  = ?true if end of file (EOF) reached
+		file.goes()	  = ?true if end of file (EOF) not reached yet
+		file.move(s)	  = move entire file to path string s
+		file.copy(s)	  = copy entire file to path string s
+		file.mkdir(s)	  = create directory in string s
+		file.rmdir(s)	  = remove directory in string s
+		file.chdir(s)	  = change to directory in string s
+		file.pushd()	  = push current directory onto file stack
+		file.popd()	  = pop to next directory from file stack 
+		file.dateline(N)  = return time stamp string of type N format 
+
+	~
+	~ Not implemented yet
+
+	$Id: fileComponent.goc,v 1.2 98/07/10 00:02:29 martin Exp $
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+
+@include "fileInternal.goh"
+
+@classdecl FileComponentClass;
+
+/********************************************************
+ *        FileComponentClass Property Dispatch Tables
+ ********************************************************/
+@propertyDecl(FILE, NAME,      STRING,    "name");
+@propertyDecl(FILE, PATH,      STRING,    "path");
+@propertyDecl(FILE, SIZE,      INTEGER,   "size");
+@propertyDecl(FILE, DATE,      INTEGER,   "date");	  /* FileDate */
+@propertyDecl(FILE, TIME,      LONG,	  "time");	  /* FileDateAndTime */
+@propertyDecl(FILE, TRAP,      INTEGER,	  "trap");  /* FileComponentTrapType */
+@propertyDecl(FILE, ERROR,     INTEGER,	  "error");	  /* FileError */
+@propertyDecl(FILE, BUFFER,    COMPONENT, "buffer");	
+@propertyDecl(FILE, EOF,       INTEGER,   "eof");	
+@propertyDecl(FILE, EXISTS,    INTEGER,   "exists");	  /* BOOLEAN */
+@propertyDecl(FILE, READABLE,  INTEGER,   "readable");	  /* BOOLEAN */
+@propertyDecl(FILE, WRITEABLE, INTEGER,   "writeable");   /* BOOLEAN */
+
+PropEntryStruct _near *FileComponentPropTable[] = {
+    @propertyRef(FILE, NAME),
+    @propertyRef(FILE, PATH),
+    @propertyRef(FILE, SIZE),
+    @propertyRef(FILE, DATE),
+    @propertyRef(FILE, TIME),
+    @propertyRef(FILE, TRAP),
+    @propertyRef(FILE, ERROR),
+    @propertyRef(FILE, BUFFER),
+    @propertyRef(FILE, EOF),
+    @propertyRef(FILE, EXISTS),
+    @propertyRef(FILE, READABLE),
+    @propertyRef(FILE, WRITEABLE),
+    endPropTable
+};
+
+/********************************************************
+ *        FileComponentClass Action Dispatch Tables
+ ********************************************************/
+@actionDecl(FILE,   OPEN,     INTEGER,  "open",     0);
+@actionDecl(FILE,   READ,     STRING,   "read",     1);
+@actionDecl(FILE,   WRITE,    INTEGER,  "write",    2);
+@actionDecl(FILE,   CLOSE,    INTEGER,  "close",    0);
+@actionDecl(FILE,   COMMIT,   INTEGER,  "commit",   0);
+@actionDecl(FILE,   MOVE,     INTEGER,  "move",     1);
+@actionDecl(FILE,   COPY,     INTEGER,  "copy",     1);
+@actionDecl(FILE,   CREATE,   INTEGER,  "create",   0);
+@actionDecl(FILE,   DELETE,   INTEGER,  "delete",   0);
+@actionDecl(FILE,   PEEK,     INTEGER,  "peek",     0);
+@actionDecl(FILE,   POKE,     INTEGER,  "poke",     1);
+@actionDecl(FILE,   GO,       INTEGER,  "go",       1);
+@actionDecl(FILE,   SEEK,     INTEGER,  "seek",     1);
+@actionDecl(FILE,   TELL,     LONG,     "tell",     1);
+@actionDecl(FILE,   GOES,     INTEGER,  "goes",     1);
+@actionDecl(FILE,   ENDS,     INTEGER,  "ends",     1);
+@actionDecl(FILE,   MKDIR,    INTEGER,  "mkdir",    1);
+@actionDecl(FILE,   RMDIR,    INTEGER,  "rmdir",    1);
+@actionDecl(FILE,   CHDIR,    INTEGER,  "chdir",    1);
+@actionDecl(FILE,   PUSHD,    INTEGER,  "pushd",    1);
+@actionDecl(FILE,   POPD,     STRING,   "popd",     0);
+@actionDecl(FILE,   DATELINE, STRING,   "dateline", 1);
+
+ActionEntryStruct _near *FileComponentActionTable[] = {
+    @actionRef(FILE, OPEN),
+    @actionRef(FILE, READ),
+    @actionRef(FILE, WRITE),
+    @actionRef(FILE, CLOSE),
+    @actionRef(FILE, COMMIT),
+    @actionRef(FILE, MOVE),
+    @actionRef(FILE, COPY),
+    @actionRef(FILE, CREATE),
+    @actionRef(FILE, DELETE),
+    @actionRef(FILE, PEEK),
+    @actionRef(FILE, POKE),
+    @actionRef(FILE, GO),
+    @actionRef(FILE, SEEK),
+    @actionRef(FILE, TELL),
+    @actionRef(FILE, GOES),
+    @actionRef(FILE, ENDS),
+    @actionRef(FILE, MKDIR),
+    @actionRef(FILE, RMDIR),
+    @actionRef(FILE, CHDIR),
+    @actionRef(FILE, PUSHD),
+    @actionRef(FILE, POPD),
+    @actionRef(FILE, DATELINE),
+    endActionTable
+};
+
+
+/***************************************************************************
+ *              Code for FileComponentClass
+ **************************************************************************/
+
+
+/***********************************************************************
+ *		FCCErrorTrap
+ ***********************************************************************
+ * SYNOPSIS:
+ * 
+ *		ends	 = n  - if currently at last part or final limit
+			   vt - has concluded
+ *		EOF	 = end of file (ancient C constant = -1)
+ *		eohippus = ancient horse ancestor to modern horses
+ *			   having three toes on the hindlegs and 
+ *		   	   four on the fore.
+ *		Eolithic = of the Stone Age
+ *		eon	 = a long age time | eternity 
+ *		goes?	 = present, singular go
+ *
+ * PARAMETERS:	    pself = pointer to FileComponentInstance
+ *		    rhi	  = pointer to RunHeapInfo
+ *		    error = FileError
+ *
+ * SIDE EFFECTS:    
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	martin	12/22/1997   	Initial version
+ *
+ ***********************************************************************/
+void
+FCCErrorTrap (FileComponentInstance *pself, FileError error)
+{
+    /* FileError error2 = ThreadGetError(); */
+    pself->FCC_error = error;
+    switch (error) {
+	case ERROR_SHORT_READ_WRITE:
+	   pself->FCC_flags |= FCF_EOF;        /* set EOF bit */
+	   break;
+    }
+    /* expand to signal RunError when appropriate and			*/
+    /* to automatically create a dialog if the proper flags are set.    */
+    switch (pself->FCC_trap) {
+	case FCT_RUNTIME:
+	   /* SubroutineRaiseError(); via interpreter::MSG_ERROR */
+	   break;
+
+	case FCT_DIALOG:
+	   pself->FCC_error = 0;    /* reset since dialog handles error */
+	   ShellReportFileError(error, 
+				RunHeapDeref(pself->FCC_rhi, pself->FCC_name));
+	   break;	
+    }
+}
+
+
+/***********************************************************************
+ *		MSG_META_RESOLVE_VARIANT_SUPERCLASS 
+ ***********************************************************************
+ * SYNOPSIS:	   Inform the system what class to use as the superclass 
+ *		   for the variant class of a particular object.
+ *
+ * PARAMETERS:	   word	MasterOffset 
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	martin	11/17/1997	Initial version
+ *
+ ***********************************************************************/
+@method FileComponentClass, MSG_META_RESOLVE_VARIANT_SUPERCLASS
+{
+    if (MasterOffset == word_offsetof(EntBase, Ent_offset)) {
+	return &MetaClass;
+    }
+    return @callsuper();
+}	/* End of MSG_META_RESOLVE_VARIANT_SUPERCLASS.	*/
+
+
+/***********************************************************************
+ *	MSG_ENT_VALIDATE_CHILD for FileComponentClass
+ ***********************************************************************
+ * SYNOPSIS:	    
+ * PARAMETERS:	    
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	martin	12/16/97   	Initial version
+ *
+ ***********************************************************************/
+@method FileComponentClass, MSG_ENT_VALIDATE_CHILD
+{
+    Boolean  validChild;
+
+    MemLock(HandleOf(childPtr));
+    validChild = ObjIsObjectInClass(childPtr, &FileBufferComponentClass);
+    MemUnlock(HandleOf(childPtr));
+
+    if (validChild) return 0;
+    else return -1;
+}	/* End of MSG_ENT_VALIDATE_CHILD.	*/
+
+
+
+
+
+/***********************************************************************
+ *		FCCFileLock
+ ***********************************************************************
+ * SYNOPSIS:	Common action code shared by the various
+ *		MSG_FILE_DO method handlers.
+ *			FCCFileLock()   = Returns file handle, opening or 
+ *					  creating file and locking down
+ *					  any buffers if necessary
+ *			FCCFileUnlock() = make sure the file is closed
+ *
+ * PARAMETERS:	    pself = pointer to FileComponentInstance
+ *		    rhi	  = pointer to RunHeapInfo
+ *
+ * SIDE EFFECTS:    
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	martin	12/15/1997   	Initial version
+ *
+ ***********************************************************************/
+FileHandle
+FCCFileLock (FileComponentInstance *pself)  
+{
+    FileHandle file = pself->FCC_file;
+    if (file == NULL) {
+    	TCHAR *fileName = RunHeapDeref(pself->FCC_rhi, pself->FCC_name);
+	file = FileOpen(fileName, FCL_FLAGS);
+	if (file == NULL) {
+	   pself->FCC_error = ThreadGetError();	   	
+	   if (pself->FCC_trap == FCT_NEVER) {
+	      /* When user says to avoid errors,	      */
+	      /* create an empty file if none exists.         */
+	      /* Zero out error flag if create is successful. */
+	      file = FileCreate(fileName, FCL_FLAGS, FCL_ATTRS);
+	      pself->FCC_error = ((file == NULL) ? ThreadGetError() : 0);
+	   }
+	}
+	pself->FCC_flags &= ~FCF_EOF;		/* clear EOF bit */
+	pself->FCC_file  =  file;
+    }
+    return file;    
+}
+void
+FCCFileUnlock (FileComponentInstance *pself)
+{
+    FileHandle file = pself->FCC_file;
+    if (file != NULL) { 
+	FCCErrorTrap(pself, FileClose(file, 0));
+	pself->FCC_file  = NULL;
+    }
+}
+
+/***********************************************************************
+ *		FCCBufferCreate
+ ***********************************************************************
+ * SYNOPSIS:	Common action code shared by the various
+ *		MSG_FILE_DO method handlers.
+ *
+ * PARAMETERS:	    pself = pointer to FileComponentInstance
+ *		    rhi	  = pointer to RunHeapInfo
+ *
+ * SIDE EFFECTS:    
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	martin	12/17/1997   	Initial version
+ *
+ ***********************************************************************/
+optr
+FCCBufferCreate (optr oself)	/* convert to FCCBufferCheck() */
+{
+    FileComponentInstance *pself = ObjDerefEnt(oself); 
+    optr  	 buffer = pself->FCC_buffer;
+    RunHeapInfo *rhi 	= pself->FCC_rhi;
+    if (buffer == NullOptr) {
+       buffer = ObjInstantiate(HandleOf(oself), &FileBufferComponentClass);
+       @call buffer::MSG_ENT_SET_PARENT(oself);
+       @call buffer::MSG_ENT_INITIALIZE(rhi);
+       pself = ObjDerefEnt(oself);
+       pself->FCC_buffer = buffer;
+    }
+    return buffer;
+}
+/*
+void
+FCCBufferDestroy (FileComponentInstance *pself)
+{
+    optr buffer = pself->FCC_buffer;
+    if (buffer != NullOptr) {
+       @call buffer::MSG_META_OBJ_FREE();
+    }
+}
+void
+FCCBufferAction (optr oself, Message msg, EntDoActionArgs *args)
+{
+    RunHeapInfo *rhi   = args->EDAA_runHeapInfoPtr;
+    optr  	buffer = FCCBufferCreate(oself, rhi);
+    @call {MSG_ENT_DO_ACTION}buffer::msg(rhi, 
+		      			 args->EDAA_retval, 
+					 args->EDAA_argv, 
+					 args->EDAA_argc, 
+					 args->EDAA_actionName);
+}
+*/
+
+
+@method FileComponentClass, MSG_FILE_GET_FILE
+{
+    return FCCFileLock(pself);
+}	/* End of MSG_ENT_DO_ACTION.	*/
+
+
+
+/*********************************************************************
+ *          brk FILECOMPONENTENT_GET_PROPERTY ss M
+ *********************************************************************
+ * SYNOPSIS:    Return the value of the property associated with the
+ *              passed in string
+ *
+ *	COMPONENT API descriptor	1997/11/17 <martin> rev 0.0.0.2
+ *	PROPERTIES			1997/12/05 <martin>  
+ *		file.name
+ *	~	file.path
+ *		file.size	 => /get=size on disk 	/set=FileTruncate
+ * 		file.date	 => /get=date as int	/set=FileSetDateTime
+ *		file.time	 => /get=time as long   /set=FileSetDateTime
+ *		file.trap	 => error handler: none=0|~runtime=1|dialog=2
+ *		file.error	 => /get=error as int   /set=FCCErrorTrap
+ *		file.buffer	 => /get=memory caching fileBuffer component 
+ *		file.parent	 => /get="top" 
+ *
+ * PARAMETERS:  ComponentData *value
+ *              char *prop
+ * RETURN:      *value filled in
+ * STRATEGY:    Use the property tables define in fileLib.goc 
+ *		to dispatch the correct messages 
+ * REVISION HISTORY:
+ *      Name    Date            Description                          
+ *      ----    ----            -----------                          
+ *      martin  12/5/1997       Initial version                      
+ * 
+ *********************************************************************/
+@method FileComponentClass, MSG_ENT_GET_PROPERTY
+{
+   pself->FCC_rhi = rhi;
+   if (!EntDispatchGetProperty(oself, FileComponentPropTable, @propGetArgs)) {
+      @callsuper();
+   }
+}
+
+@method FileComponentClass, MSG_FILE_GET_NAME
+{
+   value->CD_type 	    = TYPE_STRING;
+   value->CD_data.LD_string = pself->FCC_name;
+}
+@method FileComponentClass, MSG_FILE_GET_PATH
+{
+   value->CD_type 	    = TYPE_STRING;
+   value->CD_data.LD_string = pself->FCC_path;
+}
+@method FileComponentClass, MSG_FILE_GET_SIZE
+{
+   value->CD_type 	     = TYPE_INTEGER;
+   value->CD_data.LD_integer = FileSize(FCCFileLock(pself));
+}
+@method FileComponentClass, MSG_FILE_GET_DATE
+{
+   FileDateAndTime  date     = FileGetDateAndTime(FCCFileLock(pself));
+   value->CD_type 	     = TYPE_INTEGER;
+   value->CD_data.LD_integer = date;
+}
+@method FileComponentClass, MSG_FILE_GET_TIME
+{
+   FileDateAndTime  time     = FileGetDateAndTime(FCCFileLock(pself));
+   value->CD_type 	     = TYPE_LONG;
+   value->CD_data.LD_long    = time;
+}
+@method FileComponentClass, MSG_FILE_GET_TRAP
+{
+   value->CD_type 	     = TYPE_INTEGER;
+   value->CD_data.LD_integer = pself->FCC_trap;
+}
+@method FileComponentClass, MSG_FILE_GET_ERROR
+{
+   value->CD_type 	     = TYPE_INTEGER;
+   value->CD_data.LD_integer = pself->FCC_error;
+}
+@method FileComponentClass, MSG_FILE_GET_BUFFER
+{
+   value->CD_type 	    = TYPE_COMPONENT;
+   value->CD_data.LD_comp   = FCCBufferCreate(oself);
+}
+@method FileComponentClass, MSG_FILE_GET_EOF
+{
+   value->CD_type 	     = TYPE_INTEGER;
+   value->CD_data.LD_integer = (pself->FCC_flags & FCF_EOF);
+}
+@method FileComponentClass, MSG_FILE_GET_EXISTS
+{
+}
+@method FileComponentClass, MSG_FILE_GET_READABLE
+{
+}
+@method FileComponentClass, MSG_FILE_GET_WRITEABLE
+{
+}
+
+
+/*********************************************************************
+ *         	brk FILECOMPONENTENT_SET_PROPERTY ss M
+ *********************************************************************
+ * SYNOPSIS: Set a property based on the passed in string
+ *	COMPONENT API descriptor	1997/11/17 <martin> rev 0.0.0.2
+ *	PROPERTIES			1997/12/05 <martin>  
+ *		file.name
+ *	~	file.path
+ *		file.size	 => /get=size on disk 	/set=FileTruncate
+ *		file.date	 => /get=date as int	/set=FileSetDateTime
+ *		file.time	 => /get=time as long   /set=FileSetDateTime
+ *		file.trap	 => error handler: none=0|~runtime=1|dialog=2
+ *		file.error	 => /get=error as int   /set=FCCErrorTrap
+ *		file.buffer	 => /get=memory caching fileBuffer component 
+ *		file.parent	 => /get="top"
+ *
+ * PARAMETERS: ComponentData value
+ *             char *prop
+ * STRATEGY:
+ *      Just call EntDispatchSetProperty and let it do the right thing
+ *      based on the information in our property table.  If it's not
+ *      in our property table, then call the superclass.
+ *
+ * REVISION HISTORY:
+ *      Name    Date            Description                          
+ *      ----    ----            -----------                          
+ *      martin  12/5/1997       Initial version                      
+ * 
+ *********************************************************************/
+@method FileComponentClass, MSG_ENT_SET_PROPERTY
+{
+    pself->FCC_rhi = rhi;
+    if (!EntDispatchSetProperty(oself, FileComponentPropTable, @propSetArgs)) {
+	@callsuper();
+    }
+}
+
+@method FileComponentClass, MSG_FILE_SET_NAME
+{
+   if (value->CD_type == TYPE_STRING) {
+      pself->FCC_name = value->CD_data.LD_string;
+   }
+}
+@method FileComponentClass, MSG_FILE_SET_PATH
+{
+   if (value->CD_type == TYPE_STRING) {
+      pself->FCC_path = value->CD_data.LD_string;
+   }
+}
+@method FileComponentClass, MSG_FILE_SET_SIZE
+{
+   if (value->CD_type == TYPE_INTEGER) {
+      FCCErrorTrap(pself, FileTruncate(FCCFileLock(pself), 
+		   	               value->CD_data.LD_integer, 
+		   	               FCL_ERRORS));
+   }
+}
+@method FileComponentClass, MSG_FILE_SET_DATE
+{
+   if (value->CD_type == TYPE_INTEGER) {
+      FileDateAndTime  date   =  value->CD_data.LD_integer;
+      FCCErrorTrap(pself, FileSetDateAndTime(FCCFileLock(pself), date));
+   }
+}
+@method FileComponentClass, MSG_FILE_SET_TIME
+{
+   if (value->CD_type == TYPE_LONG) {
+      FileDateAndTime  time   =  value->CD_data.LD_long;
+      FCCErrorTrap(pself, FileSetDateAndTime(FCCFileLock(pself), time));
+   }
+}
+@method FileComponentClass, MSG_FILE_SET_TRAP
+{
+   if (value->CD_type == TYPE_INTEGER) {
+      pself->FCC_trap = value->CD_data.LD_integer;
+   }
+}
+@method FileComponentClass, MSG_FILE_SET_ERROR
+{
+   if (value->CD_type == TYPE_INTEGER) {
+      FCCErrorTrap(pself, value->CD_data.LD_integer);
+   }
+}
+@method FileComponentClass, MSG_FILE_SET_BUFFER
+{
+   if (value->CD_type == TYPE_COMPONENT) {
+      pself->FCC_buffer = value->CD_data.LD_comp;
+   }
+}
+@method FileComponentClass, MSG_FILE_SET_EOF
+{
+   if (value->CD_type == TYPE_INTEGER) {
+      if (value->CD_data.LD_integer == 0) {
+	pself->FCC_flags &= ~FCF_EOF;
+      } else {
+	/* 	pself->FCC_flags |= FCF_EOF;     */
+        FCCErrorTrap(pself, ERROR_SHORT_READ_WRITE);
+      }
+   }
+}
+@method FileComponentClass, MSG_FILE_SET_EXISTS
+{
+}
+@method FileComponentClass, MSG_FILE_SET_READABLE
+{
+}
+@method FileComponentClass, MSG_FILE_SET_WRITEABLE
+{
+}
+
+
+/***********************************************************************
+ *		MSG_ENT_DO_ACTION for FileComponentClass
+ ***********************************************************************
+ * SYNOPSIS:	Handles all actions for the FileComponentClass.
+ *
+ *	COMPONENT API descriptor	1997/11/17 <martin> rev 0.0.0.2
+ *	PROPERTIES			1998/02/12 <martin>
+ *		file.eof	  = /get:end of file?	/set:force end of file
+ *	ACTIONS				1997/12/19 <martin>
+ *		file.open()
+ *		file.close()	
+ *		file.delete()
+ *		file.create()
+ *		file.commit()	  = commits changes without closing
+ *		file.write(s,N)   = write N of string s to parent file   
+ *		file.read(N) 	  = return string of length N at current
+ *		file.peek()	  = return byte as integer at current position 
+ *		file.poke(N)	  = write given byte as integer N at position
+ *	~	file.put(a,N)     = write array a[0-N] to parent file   
+ *	~	file.get(N) 	  = return array of length N at current   
+ *		file.go(N)	  = move file position to N (or from end -N)
+ *		file.seek(N)	  = offset file position by N
+ *		file.tell()	  = return file position offset as long
+ *		file.ends()	  = ?true if end of file (EOF) reached
+ *		file.goes()	  = ?true if end of file (EOF) not reached yet
+ *		file.move(s)	  = move entire file to path string s
+ *		file.copy(s)	  = copy entire file to path string s
+ *		file.mkdir(s)	  = create directory in string s
+ *		file.rmdir(s)	  = remove directory in string s
+ *	~	file.chdir(s)	  = change to directory in string s
+ *	~	file.pushd(s)	  = push to directory in string s
+ *	~	file.popd()	  = pop to next directory in stack 
+ *		file.dateline(N)  = return time stamp string of type N format 
+ *
+ *	~
+ *	~ Not implemented yet
+ *
+ * PARAMETERS:	    ComponentData 	*retval
+ *		    ComponentData 	*argv
+ *	 	    int 		argc
+ *		    char		*actionName
+ *		@actionArgs = EntDoActionArgs structure on stack frame
+ *
+ * SIDE EFFECTS:    
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	martin	12/6/1997   	Initial version
+ *
+ ***********************************************************************/
+@method FileComponentClass, MSG_ENT_DO_ACTION
+{
+   pself->FCC_rhi = rhi;
+   if (!EntDispatchAction(oself, FileComponentActionTable, @actionArgs)) {
+      @callsuper();
+   }
+}	/* End of MSG_ENT_DO_ACTION.	*/
+
+@method FileComponentClass, MSG_FILE_DO_OPEN
+{
+    FCCFileLock(pself);
+}
+
+@method FileComponentClass, MSG_FILE_DO_CLOSE
+{
+    FCCFileUnlock(pself);
+}
+@method FileComponentClass, MSG_FILE_DO_COMMIT
+{
+    FCCErrorTrap(pself, FileCommit(FCCFileLock(pself), FCL_ERRORS));
+}
+@method FileComponentClass, MSG_FILE_DO_READ
+{
+    int		 length	= FCLActionDerefInteger(0, @actionArgs);
+    RunHeapToken key	= RunHeapAlloc(rhi, RHT_STRING, 0, length, NULL);
+    TCHAR 	*buffer = RunHeapDeref(rhi, key);
+    FileHandle	 file   = FCCFileLock(pself);
+
+    FCCErrorTrap(pself, FCLFileRead(file, buffer, length, FCL_ERRORS));
+    FCLActionReturnString(key, @actionArgs);
+
+}
+@method FileComponentClass, MSG_FILE_DO_WRITE
+{
+    /* Expand so if (argc < 2), writes the entire string length... */
+    FCCErrorTrap(pself, FCLFileWrite(FCCFileLock(pself),
+	      		FCLActionDerefString(0, @actionArgs), 
+	      		FCLActionDerefInteger(1, @actionArgs), 
+	      		FCL_ERRORS));
+}
+@method FileComponentClass, MSG_FILE_DO_PEEK
+{
+    byte	 buffer;
+    FileHandle	 file   = FCCFileLock(pself);
+
+    FCCErrorTrap(pself, FCLFileRead(file, &buffer, sizeof(byte), FCL_ERRORS));
+    FCLActionReturnInteger(buffer, @actionArgs);
+}
+@method FileComponentClass, MSG_FILE_DO_POKE
+{
+    byte	buffer	= FCLActionDerefInteger(0, @actionArgs);  
+    FileHandle	 file   = FCCFileLock(pself);
+
+    FCCErrorTrap(pself, FCLFileWrite(file, &buffer, sizeof(byte), FCL_ERRORS));
+}
+@method FileComponentClass, MSG_FILE_DO_TELL
+{
+    retval->CD_type = TYPE_LONG;
+    retval->CD_data.LD_long = 
+	FilePos(FCCFileLock(pself), 0, FILE_POS_RELATIVE);
+}
+@method FileComponentClass, MSG_FILE_DO_ENDS
+{
+    retval->CD_type = TYPE_INTEGER;
+    retval->CD_data.LD_integer  = (pself->FCC_flags & FCF_EOF);
+}
+@method FileComponentClass, MSG_FILE_DO_GOES
+{
+    retval->CD_type = TYPE_INTEGER;
+    retval->CD_data.LD_integer  = !(pself->FCC_flags & FCF_EOF);
+}
+@method FileComponentClass, MSG_FILE_DO_SEEK
+{
+    FilePos(FCCFileLock(pself), 
+	    FCLActionDerefInteger(0, @actionArgs),
+	    FILE_POS_RELATIVE);
+}
+@method FileComponentClass, MSG_FILE_DO_GO
+{
+    int offset = FCLActionDerefInteger(0, @actionArgs); 
+    FilePos(FCCFileLock(pself), 
+	    offset, 
+	    ((offset < 0) ? FILE_POS_END : FILE_POS_START));
+}
+@method FileComponentClass, MSG_FILE_DO_MOVE
+{
+    FCCFileUnlock(pself);
+    FCCErrorTrap(pself, FileMove(RunHeapDeref(rhi, pself->FCC_name), 
+	     			 FCLActionDerefString(0, @actionArgs), 
+	     			 pself->FCC_disk, pself->FCC_disk));
+}
+@method FileComponentClass, MSG_FILE_DO_COPY
+{
+    FCCErrorTrap(pself, FileCopy(RunHeapDeref(rhi, pself->FCC_name), 
+	     			 FCLActionDerefString(0, @actionArgs),
+	     			 pself->FCC_disk, pself->FCC_disk));
+}
+@method FileComponentClass, MSG_FILE_DO_CREATE
+{
+    FCCFileLock(pself);
+}
+@method FileComponentClass, MSG_FILE_DO_DELETE
+{
+    FCCFileUnlock(pself);
+    FCCErrorTrap(pself, FileDelete(RunHeapDeref(rhi, pself->FCC_name)));
+}
+@method FileComponentClass, MSG_FILE_DO_MKDIR
+{
+    TCHAR *dirName = FCLActionDerefString(0, @actionArgs);
+   /*
+    * if (legalPath(dirName)) { 
+    *    mkdir! 
+    * } else if (legalPath(fileName+dirName)) {
+    *    mkdir!
+    * } else if (legalNonExistantPath(fileName)) {
+    *    mkdir!
+    * } 
+    */
+    FCCErrorTrap(pself, FileCreateDir(dirName));
+}
+@method FileComponentClass, MSG_FILE_DO_RMDIR
+{
+    TCHAR *dirName = FCLActionDerefString(0, @actionArgs);
+   /*
+    * if (legalPath(dirName)) { 
+    *    rmdir! 
+    * } else if (legalPath(fileName+dirName)) {
+    *    rmdir!
+    * } else if (isDirectory(fileName)) {
+    *    rmdir!
+    * } 
+    */
+    FCCErrorTrap(pself, FileDeleteDir(dirName));
+}
+@method FileComponentClass, MSG_FILE_DO_CHDIR
+{
+    TCHAR *dirName = FCLActionDerefString(0, @actionArgs);
+   /*
+    * if (legalPath(dirName)) { 
+    *    chdir! 
+    * } else if (legalPath(fileName+dirName)) {
+    *    chdir!
+    * } else if (isDirectory(fileName)) {
+    *    chdir!
+    * } 
+    */
+    FCCErrorTrap(pself, FileSetCurrentPath(pself->FCC_disk, dirName));
+}
+@method FileComponentClass, MSG_FILE_DO_PUSHD
+{
+    FilePushDir();
+}
+@method FileComponentClass, MSG_FILE_DO_POPD
+{
+    FilePopDir();
+}
+@method FileComponentClass, MSG_FILE_DO_DATELINE
+{
+    FileDateAndTime  date = FileGetDateAndTime(FCCFileLock(pself));
+    RunHeapToken     key  = RunHeapAlloc(rhi,RHT_STRING,0,FCL_DATESIZE,NULL);
+    TCHAR	    *line = RunHeapDeref(rhi, key);
+    LocalFormatFileDateTime(line, FCLActionDerefInteger(0,@actionArgs), &date);
+    FCLActionReturnString(key, @actionArgs);
+}
+
+
+
+
+

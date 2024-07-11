@@ -1,0 +1,504 @@
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+	Copyright (c) 1998 New Deal, Inc. -- All Rights Reserved
+
+PROJECT:	NewBasic
+MODULE:		Telnet Component
+TELNET:		telnetComponent.goc
+
+AUTHOR:		Martin Turon, Apr. 22, 1998
+
+ROUTINES:
+	Name			Description
+	----			-----------
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	martin	4/22/1998   	Initial version.
+
+DESCRIPTION:
+	This component oversees telnet processing and manipulation by 
+	managing all actions that can be performed on telnet sessions. 
+
+	COMPONENT API descriptor	1999/10/6  <martin> rev 0.0.0.2
+	PROPERTIES			1998/4/22  <martin>  
+		telnet.host
+		telnet.port
+		telnet.mode
+		telnet.trap
+		telnet.error
+		telnet.status
+		telnet.options	 => /get=tcp/ip Options /set:disable=0|enable=1
+		telnet.interrupt
+		telnet.parent	 => /get="top"
+	ACTIONS				1998/4/22 <martin>
+		telnet.open(s,N)	= connect to host/port	
+		telnet.read()		
+		telnet.write(data)	= send data
+		telnet.close()		= close telnet session
+		telnet.create() 	= create new telnet session
+		telnet.flush()
+		telnet.synch()
+		telnet.reset(N)	  	= where N receive=0|send=1|both=2
+	~	telnet.command(s, data)	= send command with data
+
+	~
+	~ Not implemented yet
+
+	$Id: telnetComponent.goc,v 1.2 98/07/09 16:02:28 martin Exp $
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+
+@include "netInternal.goh"
+
+@classdecl TelnetComponentClass;
+
+/********************************************************
+ *        TelnetComponentClass Property Dispatch Tables
+ ********************************************************/
+@propertyDecl(TELNET, HOST,      STRING,    "host");	  
+@propertyDecl(TELNET, PORT,      INTEGER,   "port");	  
+@propertyDecl(TELNET, MODE,      INTEGER,   "mode");	  /* operation mode */
+@propertyDecl(TELNET, TRAP,      INTEGER,   "trap"); 
+@propertyDecl(TELNET, ERROR,     INTEGER,   "error"); 
+@propertyDecl(TELNET, STATUS,    STRING,    "status");
+@propertyDecl(TELNET, TIMEOUT,   INTEGER,   "timeout");
+@propertyDecl(TELNET, OPTIONS,   INTEGER,   "options");
+@propertyDecl(TELNET, INTERRUPT, INTEGER,   "interrupt");
+
+PropEntryStruct _near *TelnetComponentPropTable[] = {
+    @propertyRef(TELNET, HOST),
+    @propertyRef(TELNET, PORT),
+    @propertyRef(TELNET, MODE),
+    @propertyRef(TELNET, TRAP),
+    @propertyRef(TELNET, ERROR),
+    @propertyRef(TELNET, STATUS),
+    @propertyRef(TELNET, TIMEOUT),
+    @propertyRef(TELNET, OPTIONS),
+    @propertyRef(TELNET, INTERRUPT),
+    endPropTable
+};
+
+/********************************************************
+ *        TelnetComponentClass Action Dispatch Tables
+ ********************************************************/
+@actionDecl(TELNET,   OPEN,     INTEGER,  "open",     0);   /* connect */
+@actionDecl(TELNET,   READ,     STRING,   "read",     1);   /* receive */
+@actionDecl(TELNET,   WRITE,    INTEGER,  "write",    2);   /* send    */
+@actionDecl(TELNET,   CLOSE,    INTEGER,  "close",    0);   /* destroy */
+@actionDecl(TELNET,   CREATE,   INTEGER,  "create",   0);   /* init    */
+@actionDecl(TELNET,   FLUSH,    INTEGER,  "flush",    0);   /* commit  */
+@actionDecl(TELNET,   SYNCH,    INTEGER,  "synch",    0);   /* refresh */
+@actionDecl(TELNET,   RESET,    INTEGER,  "reset",    1);   
+@actionDecl(TELNET,   COMMAND,  INTEGER,  "command",  1);   
+
+ActionEntryStruct _near *TelnetComponentActionTable[] = {
+    @actionRef(TELNET, OPEN),
+    @actionRef(TELNET, READ),
+    @actionRef(TELNET, WRITE),
+    @actionRef(TELNET, CLOSE),
+    @actionRef(TELNET, CREATE),
+    @actionRef(TELNET, FLUSH),
+    @actionRef(TELNET, SYNCH),
+    @actionRef(TELNET, RESET),
+    @actionRef(TELNET, COMMAND),
+    endActionTable
+};
+
+
+/***************************************************************************
+ *              Code for TelnetComponentClass
+ **************************************************************************/
+
+
+/***********************************************************************
+ *		TNCCErrorTrap
+ ***********************************************************************
+ * SYNOPSIS:
+ * 
+ *		ends	 = n  - if currently at last part or final limit
+			   vt - has concluded
+ *		EOF	 = end of file (ancient C constant = -1)
+ *		eohippus = ancient horse ancestor to modern horses
+ *			   having three toes on the hindlegs and 
+ *		   	   four on the fore.
+ *		Eolithic = of the Stone Age
+ *		eon	 = a long age time | eternity 
+ *		goes?	 = present, singular go
+ *
+ * PARAMETERS:	    pself = pointer to FileComponentInstance
+ *		    rhi	  = pointer to RunHeapInfo
+ *		    error = FileError
+ *
+ * SIDE EFFECTS:    
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	martin	12/22/1997   	Initial version
+ *
+ ***********************************************************************/
+void
+TNCCErrorTrap (TelnetComponentInstance *pself, TelnetError error)
+{
+    /* FileError error2 = ThreadGetError(); */
+    pself->TNCC_error = error;
+
+    /* expand to signal RunError when appropriate and			*/
+    /* to automatically create a dialog if the proper flags are set.    */
+    switch (pself->TNCC_trap) {
+	case TNCT_RUNTIME:
+	   /* SubroutineRaiseError(); via interpreter::MSG_ERROR */
+	   break;
+
+	case TNCT_DIALOG:
+	   pself->TNCC_error = 0;    /* reset since dialog handles error */
+	   ShellReportFileError(error, RunHeapDeref(pself->TNCC_rhi, 
+						    pself->TNCC_host));
+	   break;	
+    }
+}
+
+
+/***********************************************************************
+ *		MSG_META_RESOLVE_VARIANT_SUPERCLASS 
+ ***********************************************************************
+ * SYNOPSIS:	   Inform the system what class to use as the superclass 
+ *		   for the variant class of a particular object.
+ *
+ * PARAMETERS:	   word	MasterOffset 
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	martin	11/17/1997	Initial version
+ *
+ ***********************************************************************/
+@method TelnetComponentClass, MSG_META_RESOLVE_VARIANT_SUPERCLASS
+{
+    if (MasterOffset == word_offsetof(EntBase, Ent_offset)) {
+	return &MetaClass;
+    }
+    return @callsuper();
+}	/* End of MSG_META_RESOLVE_VARIANT_SUPERCLASS.	*/
+
+
+
+/***********************************************************************
+ *		TNCCTelnetLock
+ ***********************************************************************
+ * SYNOPSIS:	Common action code shared by the various
+ *		MSG_FILE_DO method handlers.
+ *			FCCFileLock()   = Returns file handle, opening or 
+ *					  creating file and locking down
+ *					  any buffers if necessary
+ *			FCCFileUnlock() = make sure the file is closed
+ *
+ * PARAMETERS:	    pself = pointer to FileComponentInstance
+ *		    rhi	  = pointer to RunHeapInfo
+ *
+ * SIDE EFFECTS:    
+ * STRATEGY:        lock:   TelnetCreate + TelnetConnect, 
+ *                  unlock: TelnetClose
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	martin	12/15/1997   	Initial version
+ *
+ ***********************************************************************/
+static const TelnetOptionDesc telnetOptions[] = {
+	{TOID_TRANSMIT_BINARY, TELNET_OPT_LOCAL_AND_REMOTE},
+	{TOID_ECHO, TELNET_OPT_REMOTE_ONLY},
+	{TOID_SUPPRESS_GO_AHEAD, TELNET_OPT_LOCAL_AND_REMOTE},
+	{TOID_STATUS, TELNET_OPT_LOCAL_ONLY},
+	{TOID_TIMING_MARK, TELNET_OPT_LOCAL_AND_REMOTE},
+	{TOID_TERMINAL_TYPE, TELNET_OPT_LOCAL_ONLY},
+};
+static char *terminal = "VT100";
+
+TelnetConnectionID
+TNCCTelnetLock (TelnetComponentInstance *pself)  
+{
+    TelnetConnectionID session = pself->TNCC_session;
+    if (session == NULL) {
+	session = TelnetCreate();
+	pself->TNCC_error    = ((session == NULL) ? ThreadGetError() : 0);
+	pself->TNCC_session  =  session;
+    }
+
+   /****************************************************************
+     =====> IMPLEMENT THIS FIRST TO ENABLE COMPONENT!
+    *****************************************************************
+       /* 
+        * build a SocketAddress structure and call TelnetConnect!
+	*/
+    {
+    	TCHAR *host = RunHeapDeref(pself->TNCC_rhi, pself->TNCC_host);
+	SocketAddress socket;
+	socket.SA_port.SP_port  = pself->TNCC_port;
+	socket.SA_port.SP_manuf = MANUFACTURER_ID_SOCKET_16BIT_PORT;
+	socket.SA_domain        = host;
+	socket.SA_domainSize    = 0;
+	socket.SA_addressSize   = 0;
+	session = TelnetConnect(session, pself->TNCC_timeout, 
+				TOM_CHAR_AT_A_TIME, &telnetOptions, &socket);
+    }     
+    return session;    
+}
+
+void
+TNCCTelnetUnlock (TelnetComponentInstance *pself)
+{
+    TelnetConnectionID session = pself->TNCC_session;
+    if (session != NULL) { 
+	TNCCErrorTrap(pself, TelnetClose(session));
+	pself->TNCC_session  = NULL;
+    }
+}
+
+
+/*********************************************************************
+ *          brk TELNETCOMPONENTENT_GET_PROPERTY ss M
+ *********************************************************************
+ * SYNOPSIS:    Return the value of the property associated with the
+ *              passed in string
+ *
+ *	COMPONENT API descriptor	1998/4/22  <martin> rev 0.0.0.1
+ *	PROPERTIES			1997/4/22  <martin>  
+ *		telnet.host
+ *		telnet.port
+ *		telnet.mode
+ *		telnet.status
+ *		telnet.options	 => /get=tcp/ip Options /set:disable=0|enable=1
+ *		telnet.interrupt
+ *		telnet.parent	 => /get="top"
+ *
+ * PARAMETERS:  ComponentData *value
+ *              char *prop
+ * RETURN:      *value filled in
+ * STRATEGY:    Use the property tables define in telnetLib.goc 
+ *		to dispatch the correct messages 
+ * REVISION HISTORY:
+ *      Name    Date            Description                          
+ *      ----    ----            -----------                          
+ *      martin  12/5/1997       Initial version                      
+ * 
+ *********************************************************************/
+@method TelnetComponentClass, MSG_ENT_GET_PROPERTY
+{
+   pself->TNCC_rhi = rhi;
+   if (!EntDispatchGetProperty(oself, TelnetComponentPropTable, @propGetArgs))
+   {
+      @callsuper();
+   }
+}
+
+/*
+@method TelnetComponentClass, MSG_TELNET_GET_STATUS
+{
+   value->CD_type 	    = TYPE_STRING;
+   value->CD_data.LD_string = pself->TNCC_status;
+}
+*/
+
+@method TelnetComponentClass, MSG_TELNET_GET_HOST
+{
+   value->CD_type 	    = TYPE_STRING;
+   value->CD_data.LD_string = pself->TNCC_host;
+}
+@method TelnetComponentClass, MSG_TELNET_GET_PORT
+{
+   value->CD_type 	     = TYPE_INTEGER;
+   value->CD_data.LD_integer = pself->TNCC_port;
+}
+@method TelnetComponentClass, MSG_TELNET_GET_TRAP
+{
+   value->CD_type 	     = TYPE_INTEGER;
+   value->CD_data.LD_integer = pself->TNCC_trap;
+}
+@method TelnetComponentClass, MSG_TELNET_GET_ERROR
+{
+   value->CD_type 	     = TYPE_INTEGER;
+   value->CD_data.LD_integer = pself->TNCC_error;
+}
+@method TelnetComponentClass, MSG_TELNET_GET_TIMEOUT
+{
+   value->CD_type 	     = TYPE_INTEGER;
+   value->CD_data.LD_integer = pself->TNCC_timeout;
+}
+
+
+
+
+/*********************************************************************
+ *         	brk TELNETCOMPONENTENT_SET_PROPERTY ss M
+ *********************************************************************
+ * SYNOPSIS: Set a property based on the passed in string
+ *	COMPONENT API descriptor	1998/4/22  <martin> rev 0.0.0.1
+ *	PROPERTIES			1997/4/22  <martin>  
+ *		telnet.host
+ *		telnet.port
+ *		telnet.mode
+ *		telnet.status
+ *		telnet.options	 => /get=tcp/ip Options /set:disable=0|enable=1
+ *		telnet.interrupt
+ *		telnet.parent	 => /get="top"
+ *
+ * PARAMETERS: ComponentData value
+ *             char *prop
+ * STRATEGY:
+ *      Just call EntDispatchSetProperty and let it do the right thing
+ *      based on the information in our property table.  If it's not
+ *      in our property table, then call the superclass.
+ *
+ * REVISION HISTORY:
+ *      Name    Date            Description                          
+ *      ----    ----            -----------                          
+ *      martin  12/5/1997       Initial version                      
+ * 
+ *********************************************************************/
+@method TelnetComponentClass, MSG_ENT_SET_PROPERTY
+{
+    pself->TNCC_rhi = rhi;
+    if (!EntDispatchSetProperty(oself, TelnetComponentPropTable, @propSetArgs))
+    {
+	@callsuper();
+    }
+}
+
+/*
+@method TelnetComponentClass, MSG_TELNET_SET_STATUS
+{
+   if (value->CD_type == TYPE_STRING) {
+      pself->TNCC_status = value->CD_data.LD_string;
+   }
+}
+*/
+
+
+@method TelnetComponentClass, MSG_TELNET_SET_HOST
+{
+   if (value->CD_type == TYPE_STRING) {
+      pself->TNCC_host = value->CD_data.LD_string;
+   }
+}
+@method TelnetComponentClass, MSG_TELNET_SET_PORT
+{
+   if (value->CD_type == TYPE_INTEGER) {
+      pself->TNCC_port = value->CD_data.LD_integer;
+   }
+}
+@method TelnetComponentClass, MSG_TELNET_SET_TRAP
+{
+   if (value->CD_type == TYPE_INTEGER) {
+      pself->TNCC_trap = value->CD_data.LD_integer;
+   }
+}
+@method TelnetComponentClass, MSG_TELNET_SET_ERROR
+{
+   if (value->CD_type == TYPE_INTEGER) {
+      TNCCErrorTrap(pself, value->CD_data.LD_integer);
+   }
+}
+@method TelnetComponentClass, MSG_TELNET_SET_TIMEOUT
+{
+   if (value->CD_type == TYPE_INTEGER) {
+      pself->TNCC_timeout = value->CD_data.LD_integer;
+   }
+}
+
+
+
+/***********************************************************************
+ *		MSG_ENT_DO_ACTION for TelnetComponentClass
+ ***********************************************************************
+ * SYNOPSIS:	Handles all actions for the TelnetComponentClass.
+ *
+ *	COMPONENT API descriptor	1997/11/17 <martin> rev 0.0.0.2
+ *	ACTIONS				1998/4/22 <martin>
+ *		telnet.open(s,N)	= connect to host/port	
+ *		telnet.read()		= receive data via telnet session
+ *		telnet.write(data)	= send data via telnet session
+ *		telnet.close()		= close telnet session
+ *		telnet.create() 	= create new telnet session
+ *		telnet.command(s, data)	= send command with data
+ *		telnet.flush()		= force write queue to send
+ *		telnet.synch()		=
+ *		telnet.reset(N)	  	= where N receive=0|send=1|both=2
+ * 
+ *	~
+ *	~ Not implemented yet
+ *
+ * PARAMETERS:	    ComponentData 	*retval
+ *		    ComponentData 	*argv
+ *	 	    int 		argc
+ *		    char		*actionName
+ *		@actionArgs = EntDoActionArgs structure on stack frame
+ *
+ * SIDE EFFECTS:    
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	martin	12/6/1997   	Initial version
+ *
+ ***********************************************************************/
+@method TelnetComponentClass, MSG_ENT_DO_ACTION
+{
+   pself->TNCC_rhi = rhi;
+   if (!EntDispatchAction(oself, TelnetComponentActionTable, @actionArgs)) {
+      @callsuper();
+   }
+}	/* End of MSG_ENT_DO_ACTION.	*/
+
+
+/********************/
+
+@method TelnetComponentClass, MSG_TELNET_DO_OPEN
+{
+    TNCCTelnetLock(pself);
+}
+
+@method TelnetComponentClass, MSG_TELNET_DO_CLOSE
+{
+    TNCCTelnetUnlock(pself);
+}
+@method TelnetComponentClass, MSG_TELNET_DO_FLUSH
+{
+  /*    TNCCErrorTrap(pself, TelnetFlush(TNCCTelnetLock(pself), FCL_ERRORS));*/
+}
+@method TelnetComponentClass, MSG_TELNET_DO_READ
+{
+    int		 length	= FCLActionDerefInteger(0, @actionArgs);
+    RunHeapToken key	= RunHeapAlloc(rhi, RHT_STRING, 0, length, NULL);
+    TCHAR 	*buffer = RunHeapDeref(rhi, key);
+    TelnetConnectionID	 telnet   = TNCCTelnetLock(pself);
+
+    TNCCErrorTrap(pself, TelnetRecv(telnet, buffer, length, 
+				    pself->TNCC_timeout));
+    FCLActionReturnString(key, @actionArgs);
+}
+@method TelnetComponentClass, MSG_TELNET_DO_WRITE
+{
+    /* Expand so if (argc < 2), writes the entire string length... */
+
+    TNCCErrorTrap(pself, TelnetSend(TNCCTelnetLock(pself),
+	      		 FCLActionDerefString(0, @actionArgs), 
+	      		 FCLActionDerefInteger(1, @actionArgs)));
+}
+
+@method TelnetComponentClass, MSG_TELNET_DO_CREATE
+{
+    TNCCTelnetLock(pself);
+}
+
+/*********************/
+
+
+
+
+

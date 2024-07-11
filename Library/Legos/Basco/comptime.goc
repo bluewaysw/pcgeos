@@ -1,0 +1,115 @@
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+	Copyright (c) Geoworks 1995 -- All Rights Reserved
+
+PROJECT:        
+MODULE:         
+FILE:           comptime.goc
+
+AUTHOR:         Jimmy Lefkowitz, May  5, 1995
+
+ROUTINES:
+	Name                    Description
+	----                    -----------
+
+REVISION HISTORY:
+	Name    Date            Description
+	----    ----            -----------
+	jimmy        5/ 5/95           Initial version.
+
+DESCRIPTION:
+	compile time stuff that needs to be in a goc file
+
+	$Id: comptime.goc,v 1.1 98/10/13 21:42:40 martin Exp $
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+
+
+@include <stdapp.goh>
+#include "comptime.h"
+#include "bascoint.h"
+#include "stable.h"
+@include <Legos/ent.goh>
+
+extern word setDSToDgroup(void);
+extern void restoreDS(word oldDS);
+
+
+/*********************************************************************
+ *			CompileResolveProperty
+ *********************************************************************
+ * SYNOPSIS: 	get a property at compile time
+ * CALLED BY:	EXTERNAL, Type_Check
+ * PASS:
+ * RETURN:	0xffff if not able to resolve (FIXME add a #define please)
+ * SIDE EFFECTS:
+ * STRATEGY: just a way to avoid change types.c to types.goc
+ * REVISION HISTORY:
+ *	Name	Date		Description			     
+ *	----	----		-----------			     
+ *	jimmy	 5/ 5/95	Initial version
+ * 
+ *********************************************************************/
+Boolean
+CompileResolvePropertyOrAction(TaskPtr task, optr comp, TokenCode code, 
+			       TCHAR *propOrAction, byte* bcMess, 
+			       LegosType* lt, word* typeData, word *numParams)
+{
+    EntResolveStruct	ers;
+    Boolean	fail;
+    byte	mess;
+    EntTypeName	typeName;
+
+    ers.ERS_propOrAction = propOrAction;
+    ers.ERS_typeBuf = &typeName;
+
+    if (code == PROPERTY)
+    {
+	fail = @call comp::MSG_ENT_RESOLVE_PROPERTY(&ers);
+    }
+    else
+    {
+	fail = @call comp::MSG_ENT_RESOLVE_ACTION(&ers);
+    }
+    
+    if (fail) return FALSE;
+
+/*    byteVal = (word) wordVal - MSG_ENT_GET_PROPERTY_0;*/
+/* FIXME, TEMPORARY UGLY HACK--above code doesn't work, so for now use 
+ * a hardcoded message number.
+ */
+    mess = ers.ERS_message - 33792;
+
+    /* Properties are shifted because we now assume _GET_ and _SET_ are
+     * numbered consecutively
+     */
+    if (code == PROPERTY)
+    {
+	EC_ERROR_IF(mess & 1, BE_FAILED_ASSERTION);
+	mess >>= 1;
+    }
+
+    /* Byte-compiled number should fit within a byte
+     */
+    EC_ERROR_IF(mess & ~0xff, BE_FAILED_ASSERTION);
+    *lt = ers.ERS_type;
+    if (numParams != NULL) {
+	*numParams = ers.ERS_numParams;
+    }
+    *bcMess = mess;
+
+    /* We could do something here for components, but nobody tries
+     * to resolve to a specific component type
+     */
+    if (ers.ERS_type == TYPE_STRUCT)
+    {
+	*typeData = StringTableLookupString(STRUCT_TABLE, typeName);
+    }
+    else
+    {
+	/* Return null data.  FIXME there should be a define for this */
+	*typeData = 0xffff;
+    }
+    return TRUE;
+}
+

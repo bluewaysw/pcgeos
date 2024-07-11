@@ -1,0 +1,396 @@
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+	Copyright (c) Geoworks 1996 -- All Rights Reserved
+
+PROJECT:	Legos
+MODULE:		Gadget Library
+FILE:		gdgappc.goc
+
+AUTHOR:		none, Jan 29, 1996
+
+ROUTINES:
+	Name			Description
+	----			-----------
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	jmagasin 1/29/96  	Initial version.
+
+DESCRIPTION:
+	
+
+	$Id: gdgappc.goc,v 1.1 98/03/11 04:30:58 martin Exp $
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+
+@include <stdapp.goh>
+#include <Ansi/string.h>
+#include <Ansi/stdio.h>
+#include <math.h>
+
+#include <Legos/legtype.h>
+@include <Legos/legosapp.goh>
+@include <Legos/ent.goh>
+@include <Legos/gadget.goh>
+
+@classdecl LegosAppClass;
+
+/* FIXME FIXME FIXME FIXME FIXME FIXME FIXME FIXME FIXME
+ *
+ * LView subclasses LegosAppClass; however due to some bug
+ * LView's calls to superclass are bypassing LegosApp methods
+ * and going straight to GenApplicationClass.  So LView currently
+ * duplicates the following code.  Once this bug is solved, the
+ * duplicated code should be removed and the following code should
+ * be uncommented-out.
+ */
+
+@if 0
+
+
+/*********************************************************************
+ *			MakeActiveChangedEvent
+ *********************************************************************
+ * SYNOPSIS:	Generate an "activeChanged" event for the passed
+ *	 	window.
+ * CALLED BY:	MakeActiveChangedSequence only
+ * PASS:	theWin	- window to generate the actuiveChanged
+ *			  event
+ *		theVal	- value of event (0 for loss, 1 for gain)
+ * RETURN:
+ * SIDE EFFECTS:
+ * STRATEGY:
+ * REVISION HISTORY:
+ *	Name	Date		Description			     
+ *	----	----		-----------			     
+ *	jmagasin 1/29/96	Initial version
+ * 
+ *********************************************************************/
+void
+MakeActiveChangedEvent(optr theWin, int theVal)
+{
+    EntHandleEventStruct	event;
+
+    event.EHES_eventName= _TEXT("activeChanged");
+    event.EHES_result = &(event.EHES_argv[1]);
+    event.EHES_argc = 1;
+    event.EHES_argv[0].CD_type = TYPE_INTEGER;
+    event.EHES_argv[0].CD_data.LD_integer = theVal;
+    @call theWin::MSG_ENT_HANDLE_EVENT( &event );
+}
+
+
+
+
+/*********************************************************************
+ *			MakeActiveChangedSequence
+ *********************************************************************
+ * SYNOPSIS:	Generates a pair of activeChanged events.
+ *
+ * CALLED BY:	MSG_META_MUP_ALTER_FTVMC_EXCL for LegosAppClass only
+ * PASS:	*appObj		- the LegosAppClass object
+ *		newActiveWin	- new active window
+ *		awt		- ActiveWinType
+ * RETURN:
+ * SIDE EFFECTS:
+ * STRATEGY:
+ * REVISION HISTORY:
+ *	Name	Date		Description			     
+ *	----	----		-----------			     
+ *	jmagasin 1/29/96	Initial version
+ * 
+ *********************************************************************/
+typedef enum {
+    AWT_FORM,
+    AWT_NON_MODAL,
+    AWT_MODAL
+} ActiveWinType;
+
+void
+MakeActiveChangedSequence(LegosAppInstance *appObj, optr newActiveWin,
+			  ActiveWinType awt, ClassStruct *gainerWinClass)
+{
+    optr	oldActiveWin;
+    ClassStruct	*loserWinClass;
+    Boolean	skipGainEvent, skipLossEvent;
+
+    /*
+     * Update our instance data.
+     */
+    switch (awt) {
+    case AWT_FORM:
+	oldActiveWin = appObj->LAI_activeForm;
+	appObj->LAI_activeForm = newActiveWin;	     /* Maybe overwrite */
+	break;
+
+    case AWT_NON_MODAL:
+	oldActiveWin = appObj->LAI_activeNonModal;
+	appObj->LAI_activeNonModal = newActiveWin;
+	break;
+
+    case AWT_MODAL:
+	oldActiveWin = appObj->LAI_activeModal;
+	appObj->LAI_activeModal = newActiveWin;
+	break;
+    }
+
+    /*
+     * Avoid redundant activeChange events.
+     */
+    if (oldActiveWin == newActiveWin) {
+	return;
+    }
+    
+    /*
+     * Forms are a special case.
+     *
+     * If a form is gaining activeness of one type but already
+     * is active, it should not generate an activeChanged(1)
+     * event.  For example, an active-form form should not generate
+     * an aC(1) event if it becomes the active non-modal.
+     *
+     * Also, when a form loses form-activeness, it needs to make
+     * an aC(0) event even if it is still the active non-modal
+     * (because a form will soon lose non-modal activeness).
+     * And if a form loses non-modal activeness (i.e., it's the
+     * active form, but is losing non-modal activeness) 
+     * it will have already made an aC(0) event, so skip the event.
+     */
+    skipGainEvent = FALSE;
+    skipLossEvent = FALSE;
+
+    if (gainerWinClass == &GadgetFormClass) {
+	if ((awt == AWT_FORM) &&
+	    (newActiveWin == appObj->LAI_activeNonModal)) {
+	    skipGainEvent = TRUE;
+	}
+	else if ((awt == AWT_NON_MODAL) &&
+		 (newActiveWin == appObj->LAI_activeForm)) {
+	    skipGainEvent = TRUE;
+	}
+    }
+
+    if (oldActiveWin == NullOptr) {
+	skipLossEvent = TRUE;
+    }
+    else if (awt == AWT_NON_MODAL) {
+	loserWinClass = @call oldActiveWin::MSG_META_GET_CLASS();
+	if (loserWinClass == &GadgetFormClass) {
+	    skipLossEvent = TRUE;
+	}
+    }
+
+    /*
+     * Generate activeChanged events.
+     */
+    if (!skipLossEvent) {
+	MakeActiveChangedEvent(oldActiveWin, 0);  /* "Lost" */
+    }
+    if (!skipGainEvent) {
+	MakeActiveChangedEvent(newActiveWin, 1);  /* "Gained" */
+    }
+    
+}
+
+
+
+/***********************************************************************
+ *		MSG_META_MUP_ALTER_FTVMC_EXCL for LegosAppClass
+ ***********************************************************************
+ * SYNOPSIS:	Intercepted so that the app can keep track of the
+ *		active form/non-modal/modal windows and cause
+ *		activeChanged events to be generated when appropriate.
+ *
+ * PARAMETERS:	optr				objectWantingControl
+ *		MetaAlterFTVMCExclFlags		flags
+ * SIDE EFFECTS:
+ *
+ * STRATEGY:
+ *		MAEF_GRAB is received when focus/target is transfered
+ *		from one window to another.  The first half of this
+ *		method deals with such transfers.
+ *		Releases (!MAEF_GRAB) occur when an object is made
+ *		not visible.  The last portion of this method deals
+ *		with releases.
+ *
+ *		if this is a grab
+ *		   if a form is grabbing
+ *		      if target being grabbed
+ *	  	         make "activeChanged" events
+ *		      else if focus being grabbed
+ *	  	         make "activeChanged" events
+ *		   else if a dialog/floater is grabbing focus
+ *		      if a non-modal is grabbing
+ *	  	         make "activeChanged" events
+ *		      else if a modal is grabbing
+ *	  	         make "activeChanged" events
+ *
+ *		else if this is a release
+ *		   
+ *		callsuper
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	jmagasin 1/29/96   	Initial Revision
+ *
+ ***********************************************************************/
+@method LegosAppClass, MSG_META_MUP_ALTER_FTVMC_EXCL
+{
+    ClassStruct		*windowClass;
+    GadgetDialogType	dialogType;
+    ActiveWinType	awt;
+    Boolean		skipEvents = FALSE;
+
+    
+    if (flags & MAEF_GRAB) {
+	/*
+	 * If the app object is doing a grab, then we can get rid
+	 * of any "ignore" vardata.  The app object does not grab
+	 * after LA_STOP has been received (empirically determined).
+	 * But the app object is the first object to grab when an
+	 * app is run (also empirically determined).
+	 */
+	if (objectWantingControl == oself) {
+	    ObjVarDeleteData(oself, HINT_TEMP_LA_IGNORE_GRABS);
+	}
+
+	/*
+	 * If we've got an "ignore" hint, then LA_STOP was just
+	 * handled and any attempts to grab should not cause us
+	 * to write to LAI_active<shme>.....or else we'll have
+	 * garbage optrs the next time we run.
+	 */
+	else if (!ObjVarFindData(oself, HINT_TEMP_LA_IGNORE_GRABS)) {
+
+	    windowClass = @call objectWantingControl::
+		MSG_META_GET_CLASS();
+
+	    if (windowClass == &GadgetFormClass) {
+		/*
+		 * Is the passed form a new active form/non-modal?
+		 */
+		if (flags & MAEF_TARGET) {
+		    awt = AWT_FORM;
+		}
+		else if (flags & MAEF_FOCUS) {
+		    awt = AWT_NON_MODAL;
+		}
+		else {
+		    skipEvents = TRUE;
+		}
+		
+	    }
+		
+	    else if (windowClass == &GadgetDialogClass ||
+		     windowClass == &GadgetFloaterClass) {
+		/*
+		 * Is the passed dialog/floater a new activeNonModal or
+		 * activeModal?
+		 */
+		if (flags & MAEF_FOCUS) {
+		    dialogType = @call objectWantingControl::
+			MSG_GADGET_DIALOG_GET_TYPE_INTERNAL();
+		    
+		    if ((dialogType == GDT_MODAL) ||
+			(dialogType == GDT_SYS_MODAL)) {
+			awt = AWT_MODAL;
+		    }
+		    else if (dialogType == GDT_NON_MODAL) {
+			awt = AWT_NON_MODAL;
+		    }
+		    else {
+			skipEvents = TRUE;
+		    }
+		}
+		
+	    } /* else */
+
+	    else {
+		skipEvents = TRUE;
+	    }		
+
+	    if (!skipEvents) {
+		MakeActiveChangedSequence(pself,
+					  objectWantingControl,
+					  awt, windowClass);
+	    }
+	    
+	} /* Search for "ignore" vardata */
+    } /* Is this a grab? */
+
+    
+    else if ((flags & MAEF_FOCUS) || (flags & MAEF_TARGET)) {
+	/*
+	 * When an active window is made not visible, it should lose
+	 * activeness.  Since there might not be another window
+	 * around of its type to become active, we make the active-
+	 * Changed(0) event here.  (If another window became active,
+	 * we wouldn't receive an "release", but our MAEF_GRAB
+	 * code would take care of activeChanged(0) event.
+	 */
+	skipEvents = TRUE;
+	if (objectWantingControl == pself->LAI_activeForm) {
+	    pself->LAI_activeForm = NullOptr;
+	    skipEvents = FALSE;
+	}
+	if (objectWantingControl == pself->LAI_activeNonModal) {
+	    pself->LAI_activeNonModal = NullOptr;
+	    skipEvents = FALSE;
+	}
+	if (objectWantingControl == pself->LAI_activeModal) {
+	    pself->LAI_activeModal = NullOptr;
+	    skipEvents = FALSE;
+	}
+	if (!skipEvents) {
+	    MakeActiveChangedEvent(objectWantingControl, 0);
+	}
+    }
+
+    /*
+     * Invoke default behavior.
+     */
+    @callsuper();
+    
+}	/* End of MSG_META_MUP_ALTER_FTVMC_EXCL.	*/
+
+
+
+/***********************************************************************
+ *		MSG_LA_STOP for LegosAppClass
+ ***********************************************************************
+ * SYNOPSIS:	Clear  out LAI_active<Form,NonModal,Modal> and
+ *		set some vardata so that we won't update these
+ *		fields on in MSG_META_MUP_ALTER_FTVMC_EXCL.
+ * PARAMETERS:	
+ * SIDE EFFECTS:
+ *
+ * STRATEGY:
+ *	When we get this message, we clear out LAI_active<Form,NonModal,
+ *	Modal> so that MUP_ALTER won't try to send an activeChanged(0)
+ *	event to some garbage optr on the next run.  However, since it's
+ * 	possible to receive some MAEF_GRAB MUP_ALTERs after LA_STOP, which
+ *	would overwrite our now null instance data, we add some vardata so
+ *	that MUP_ALTER will ignore the trailing grabs.  Lastly, MUP_ALTER
+ *	will know to nuke the vardata once it receives a grab request from
+ *	the app object since this type of request only happens when an
+ *	app is first started.
+ *	
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	jmagasin 2/ 1/96   	Initial Revision
+ *
+ ***********************************************************************/
+@method LegosAppClass, MSG_LA_STOP
+{
+    pself->LAI_activeForm = NullOptr;
+    pself->LAI_activeNonModal = NullOptr;
+    pself->LAI_activeModal = NullOptr;
+    ObjVarAddData(oself, HINT_TEMP_LA_IGNORE_GRABS, 0);
+
+}	/* End of MSG_LA_STOP.	*/
+
+@endif

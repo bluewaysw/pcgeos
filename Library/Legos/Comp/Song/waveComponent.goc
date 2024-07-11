@@ -1,0 +1,372 @@
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+	Copyright (c) 1998 New Deal, Inc. -- All Rights Reserved
+
+PROJECT:	NewBasic
+MODULE:		Wave Component
+FILE:		waveComponent.goc
+
+AUTHOR:		Martin Turon, Oct. 22, 1999
+
+ROUTINES:
+	Name			Description
+	----			-----------
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	martin	10/22/1999   	Initial version.
+
+DESCRIPTION:
+	This component oversees sound processing and manipulation by 
+	managing all actions that can be performed on sound sessions. 
+
+	COMPONENT API descriptor	1999/10/22  <martin> rev 0.0.0.1
+	PROPERTIES			1998/10/22  <martin>  
+		wave.name
+		wave.path
+	  	wave.root
+	  ~	wave.file
+		wave.error
+		wave.trap
+		wave.parent	 => /get="top"
+	ACTIONS				1999/10/19  <martin>
+		wave.play()	
+	~	wave.stop()
+	~
+	~ Not implemented yet
+
+	$Id: waveComponent.goc,v 1.1$
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+
+@include "songInternal.goh"
+
+@classdecl WaveComponentClass;
+
+/********************************************************
+ *        WaveComponentClass Property Dispatch Tables
+ ********************************************************/
+@propertyDecl(WAVE_COMP, NAME,      STRING,    "name");	  
+@propertyDecl(WAVE_COMP, PATH,      STRING,    "path");	  
+@propertyDecl(WAVE_COMP, ROOT,      INTEGER,   "root");	  
+@propertyDecl(WAVE_COMP, FILE,      COMPONENT, "file");	  
+@propertyDecl(WAVE_COMP, ERROR,     INTEGER,   "error"); 
+@propertyDecl(WAVE_COMP, TRAP,      INTEGER,   "trap");
+
+PropEntryStruct _near *WaveComponentPropTable[] = {
+    @propertyRef(WAVE_COMP, NAME),
+    @propertyRef(WAVE_COMP, PATH),
+    @propertyRef(WAVE_COMP, ROOT),
+    @propertyRef(WAVE_COMP, FILE),
+    @propertyRef(WAVE_COMP, ERROR),
+    @propertyRef(WAVE_COMP, TRAP),
+    endPropTable
+};
+
+
+/********************************************************
+ *        WaveComponentClass Action Dispatch Tables
+ ********************************************************/
+@actionDecl(WAVE_COMP,   PLAY,     INTEGER,  "play",     0);   
+@actionDecl(WAVE_COMP,   STOP,     INTEGER,  "stop",     0);   
+
+ActionEntryStruct _near *WaveComponentActionTable[] = {
+    @actionRef(WAVE_COMP, PLAY),
+    @actionRef(WAVE_COMP, STOP),
+    endActionTable
+};
+
+/***************************************************************************
+ *              Code for WAVE_COMPComponentClass
+ **************************************************************************/
+
+
+/***********************************************************************
+ *		MSG_META_RESOLVE_VARIANT_SUPERCLASS 
+ ***********************************************************************
+ * SYNOPSIS:	   Inform the system what class to use as the superclass 
+ *		   for the variant class of a particular object.
+ *
+ * PARAMETERS:	   word	MasterOffset 
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	martin	10/19/1999	Initial version
+ *
+ ***********************************************************************/
+@method WaveComponentClass, MSG_META_RESOLVE_VARIANT_SUPERCLASS
+{
+    if (MasterOffset == word_offsetof(EntBase, Ent_offset)) {
+	return &MetaClass;
+    }
+    return @callsuper();
+}	/* End of MSG_META_RESOLVE_VARIANT_SUPERCLASS.	*/
+
+
+
+
+/***********************************************************************
+ *		WCCErrorTrap
+ ***********************************************************************
+ * SYNOPSIS:
+ * 
+ *		ends	 = n  - if currently at last part or final limit
+			   vt - has concluded
+ *		EOF	 = end of file (ancient C constant = -1)
+ *		eohippus = ancient horse ancestor to modern horses
+ *			   having three toes on the hindlegs and 
+ *		   	   four on the fore.
+ *		Eolithic = of the Stone Age
+ *		eon	 = a long age time | eternity 
+ *		goes?	 = present, singular go
+ *
+ * PARAMETERS:	    pself = pointer to FileComponentInstance
+ *		    rhi	  = pointer to RunHeapInfo
+ *		    error = FileError
+ *
+ * SIDE EFFECTS:    
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	martin	10/19/1999   	Initial version
+ *
+ ***********************************************************************/
+void
+WCCErrorTrap (WaveComponentInstance *pself, word error)
+{
+    /* FileError error2 = ThreadGetError(); */
+    pself->WCC_error = error;
+
+    /* expand to signal RunError when appropriate and			*/
+    /* to automatically create a dialog if the proper flags are set.    */
+    switch (pself->WCC_trap) {
+	case WCCT_RUNTIME:
+	   /* SubroutineRaiseError(); via interpreter::MSG_ERROR */
+	   break;
+
+	case WCCT_DIALOG:
+	   pself->WCC_error = 0;    /* reset since dialog handles error */
+/*	   ShellReportFileError(error, RunHeapDeref(pself->WCC_rhi, 
+			        pself->WCC_name));
+*/
+	   break;	
+    }
+}
+
+/*********************************************************************
+ *          brk WAVECOMPONENTENT_GET_PROPERTY ss M
+ *********************************************************************
+ * SYNOPSIS:    Return the value of the property associated with the
+ *              passed in string
+ *
+ *	COMPONENT API descriptor	1999/10/22  <martin> rev 0.0.0.1
+ *	PROPERTIES			1998/10/22  <martin>  
+ *		wave.name
+ *		wave.path
+ *	  	wave.root
+ *	  ~	wave.file
+ *		wave.error
+ *		wave.trap
+ *		wave.parent	 => /get="top"
+ *	~
+ *	~ Not implemented yet
+ *
+ *
+ * PARAMETERS:  ComponentData *value
+ *              char *prop
+ * RETURN:      *value filled in
+ * STRATEGY:    Use the property tables define in waveLib.goc 
+ *		to dispatch the correct messages 
+ * REVISION HISTORY:
+ *      Name    Date            Description                          
+ *      ----    ----            -----------                          
+ *      martin  10/22/1999       Initial version                      
+ * 
+ *********************************************************************/
+@method WaveComponentClass, MSG_ENT_GET_PROPERTY
+{
+   pself->WCC_rhi = rhi;
+   if (!EntDispatchGetProperty(oself, WaveComponentPropTable, @propGetArgs))
+   {
+      @callsuper();
+   }
+} 
+
+@method WaveComponentClass, MSG_WAVE_COMP_GET_NAME
+{
+   value->CD_type 	    = TYPE_STRING;
+   value->CD_data.LD_string = pself->WCC_name;
+}
+@method WaveComponentClass, MSG_WAVE_COMP_GET_FILE
+{
+   value->CD_type 	     = TYPE_COMPONENT;
+   value->CD_data.LD_integer = pself->WCC_file;
+}
+@method WaveComponentClass, MSG_WAVE_COMP_GET_ROOT
+{
+   value->CD_type 	     = TYPE_INTEGER;
+   value->CD_data.LD_integer = pself->WCC_root;
+}
+@method WaveComponentClass, MSG_WAVE_COMP_GET_PATH
+{
+   value->CD_type 	     = TYPE_STRING;
+   value->CD_data.LD_integer = pself->WCC_path;
+}
+@method WaveComponentClass, MSG_WAVE_COMP_GET_TRAP
+{
+   value->CD_type 	     = TYPE_INTEGER;
+   value->CD_data.LD_integer = pself->WCC_trap;
+}
+@method WaveComponentClass, MSG_WAVE_COMP_GET_ERROR
+{
+   value->CD_type 	     = TYPE_INTEGER;
+   value->CD_data.LD_integer = pself->WCC_error;
+}
+
+
+
+/*********************************************************************
+ *         	brk WAVECOMPONENTENT_SET_PROPERTY ss M
+ *********************************************************************
+ * SYNOPSIS: Set a property based on the passed in string
+ *	COMPONENT API descriptor	1999/10/22  <martin> rev 0.0.0.1
+ *	PROPERTIES			1998/10/22  <martin>  
+ *		wave.name
+ *		wave.path
+ *	  	wave.root
+ *	  ~	wave.file
+ *		wave.error
+ *		wave.trap
+ *		wave.parent	 => /get="top"
+ *	~
+ *	~ Not implemented yet
+ *
+ * PARAMETERS: ComponentData value
+ *             char *prop
+ * STRATEGY:
+ *      Just call EntDispatchSetProperty and let it do the right thing
+ *      based on the information in our property table.  If it's not
+ *      in our property table, then call the superclass.
+ *
+ * REVISION HISTORY:
+ *      Name    Date            Description                          
+ *      ----    ----            -----------                          
+ *      martin  10/22/1999       Initial version                      
+ * 
+ *********************************************************************/
+@method WaveComponentClass, MSG_ENT_SET_PROPERTY
+{
+    pself->WCC_rhi = rhi;
+    if (!EntDispatchSetProperty(oself, WaveComponentPropTable, @propSetArgs))
+    {
+	@callsuper();
+    }
+}
+
+@method WaveComponentClass, MSG_WAVE_COMP_SET_NAME
+{
+   if (value->CD_type == TYPE_STRING) {
+      pself->WCC_name = value->CD_data.LD_string;
+   }
+}
+@method WaveComponentClass, MSG_WAVE_COMP_SET_FILE
+{
+   if (value->CD_type == TYPE_COMPONENT) {
+      pself->WCC_file = value->CD_data.LD_comp;
+   }
+}
+@method WaveComponentClass, MSG_WAVE_COMP_SET_ROOT
+{
+   if (value->CD_type == TYPE_INTEGER) {
+      pself->WCC_root = value->CD_data.LD_integer;
+   }
+}
+@method WaveComponentClass, MSG_WAVE_COMP_SET_PATH
+{
+   if (value->CD_type == TYPE_STRING) {
+      pself->WCC_path = value->CD_data.LD_string;
+   }
+}
+@method WaveComponentClass, MSG_WAVE_COMP_SET_ERROR
+{
+   if (value->CD_type == TYPE_INTEGER) {
+      WCCErrorTrap(pself, value->CD_data.LD_integer);
+   }
+}
+@method WaveComponentClass, MSG_WAVE_COMP_SET_TRAP
+{
+   if (value->CD_type == TYPE_INTEGER) {
+      pself->WCC_trap = value->CD_data.LD_integer;
+   }
+}
+
+
+
+/***********************************************************************
+ *		MSG_ENT_DO_ACTION for WaveComponentClass
+ ***********************************************************************
+ * SYNOPSIS:	Handles all actions for the WaveComponentClass.
+ *
+ *
+ * PARAMETERS:	    ComponentData 	*retval
+ *		    ComponentData 	*argv
+ *	 	    int 		argc
+ *		    char		*actionName
+ *		@actionArgs = EntDoActionArgs structure on stack frame
+ *
+ *	COMPONENT API descriptor	1999/10/22  <martin> rev 0.0.0.1
+ *	ACTIONS				1999/10/19  <martin>
+ *		wave.play()	
+ *	~	wave.stop()
+ *	~
+ *	~ Not implemented yet
+ *
+ * SIDE EFFECTS:    
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	martin	10/22/1999   	Initial version
+ *
+ ***********************************************************************/
+@method WaveComponentClass, MSG_ENT_DO_ACTION
+{
+   pself->WCC_rhi = rhi;
+   if (!EntDispatchAction(oself, WaveComponentActionTable, @actionArgs)) {
+      @callsuper();
+   }
+}	/* End of MSG_ENT_DO_ACTION.	*/
+
+
+/********************/
+
+@method WaveComponentClass, MSG_WAVE_COMP_DO_PLAY
+{
+    optr file = pself->WCC_file;
+    if (file) {
+        FileHandle fh = @call file::MSG_FILE_GET_FILE(pself->WCC_rhi);
+	if (fh) PlaySoundFromFile(fh);
+    } else {
+	WavPlayFile(pself->WCC_root,
+		    RunHeapDeref(pself->WCC_rhi,pself->WCC_path),
+		    RunHeapDeref(pself->WCC_rhi,pself->WCC_name));
+    }
+}
+
+@method WaveComponentClass, MSG_WAVE_COMP_DO_STOP
+{
+  /* WCCErrorTrap(pself, WaveStopMusic(WCCWaveLock(pself))); */
+}
+
+
+/*********************/
+
+
+
+
+

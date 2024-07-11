@@ -1,0 +1,2511 @@
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+	Copyright (c) Geoworks 1994 -- All Rights Reserved
+
+PROJECT:	PC/GEOS
+MODULE:		LEGOS - UI Builder
+FILE:		bgall.goc
+
+AUTHOR:		Martin Turon, Oct  11, 1994
+
+ROUTINES:
+	Name			Description
+	----			-----------
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	martin	10/11/94	Initial version.
+
+DESCRIPTION:
+	Build-time specific code for components in gadget library.
+
+	$Id: bgadgetAll.goc,v 1.1 98/03/12 19:51:27 martin Exp $
+	Revision:   1.127
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+
+@include <stdapp.goh>
+#include <Ansi/stdio.h>
+@include <bgadgetInternal.goh>
+#include <Legos/runheap.h>
+@include <Legos/basrun.goh>
+#include <geoMisc.h>			/* defined itoa */
+
+@classdecl	BGadgetEntryClass;
+@if 0
+/* Unused.  Removed for efficiency.  -jmagasin 6/19/96 */
+@classdecl	BGadgetFigClass;
+@endif
+@classdecl	BGadgetGroupClass;
+@classdecl	BGadgetLabelClass;
+@classdecl	BGadgetListClass;
+@classdecl	BGadgetButtonClass;
+@classdecl	BGadgetNumberClass;
+@classdecl	BGadgetToggleClass;
+@classdecl	BGadgetChoiceClass;
+@classdecl	BGadgetAggClass;
+@classdecl	BGadgetClipperClass;
+@classdecl	BGadgetGadgetClass;
+@classdecl	BGadgetTextClass;
+@classdecl	BGadgetFloaterClass;
+@classdecl	BGadgetDialogClass;
+@classdecl	BGadgetSpacerClass;
+@classdecl	BGadgetPictureClass;
+@classdecl	BGadgetPopupClass;
+@classdecl	BGadgetScrollbarClass;
+@classdecl	BServiceTimeDateClass;
+@classdecl	BServiceAlarmClass;
+@classdecl	BServiceTimerClass;
+@classdecl	BGadgetTableClass;
+@classdecl	BServiceClipboardClass;
+/*@classdecl	BGadgetDBClass;		/* rename me to BServiceDB someday */
+@classdecl	BSystemDisplayClass;
+@classdecl	BSystemPenClass;
+@classdecl	BSystemBusyClass;
+@classdecl	BSystemSoundClass;
+
+
+/* made bigger to accomodate initial text data */
+#define DESCRIPTION_INITIAL_SIZE	4000 * sizeof(TCHAR)
+#define DESCRIPTION_MAX_LINE_SIZE	1000 * sizeof(TCHAR)
+
+/* include this in DBCS just wasn't working */
+#define C_CR	0x0d
+typedef struct {
+    int left:1;
+    int top:1;
+    int right:1;
+    int bottom:1;
+    int horizontal:1;
+    int vertical:1;
+    int match:1;
+    int off_left:1;
+    int off_right:1;
+    int off_top:1;
+    int off_bottom:1;
+    int pending:1;
+    int nomatch:1;
+    int none:3;
+    
+} resizeStruct;
+
+resizeStruct NullSize=
+{
+    0,0,0,0,0,0,0,0,0,0,0,0,0,0
+};
+
+
+void BentDrawBoxIfNotSelected(optr oself, MemHandle gstate);
+
+#define DefEvent(_structName, _eventName, _numArgs, _retType)	\
+BentEventDescriptionStruct _structName =			\
+{_TEXT(_eventName), _numArgs, _retType, 1}
+
+#define DefEventArg(_structName, _argName, _type)	\
+BentEventArgDescriptionStruct _structName = {_TEXT(_argName, _type)}
+
+#define DefEventArray(_arrayName, _numElts)		\
+BentEventDescriptionStruct* _arrayName[_numElts]
+void WriteTextLines(optr oself, MemHandle descHeader);
+
+
+
+
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+ %		Code for BGadgetFigClass
+ %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+
+@if 0
+
+/* Not used so removed for efficiency.  -jmagasin 6/19/96 */
+
+/*********************************************************************
+ *			BGadgetFigBentGetEvents
+ *********************************************************************
+ * SYNOPSIS: 
+ * CALLED BY:	
+ * RETURN:
+ * SIDE EFFECTS:
+ * STRATEGY:
+ * REVISION HISTORY:
+ *	Name	Date		Description			     
+ *	----	----		-----------			     
+ *	ron	 2/23/95	Initial version			     
+ * 
+ *********************************************************************/
+
+BentEventDescriptionStruct BGadgetFigEvent1 = {_TEXT("applied"), 2, TYPE_VOID, 1};
+BentEventArgDescriptionStruct  BGadgetFigAppliedArg1 = {_TEXT("xValue"), TYPE_INTEGER};
+BentEventArgDescriptionStruct  BGadgetFigAppliedArg2 = {_TEXT("yValue"), TYPE_INTEGER};
+
+#define NUM_GADGETFIG_EVENTS	1
+BentEventDescriptionStruct *BGadgetFigEvents[NUM_GADGETFIG_EVENTS] =
+   {&BGadgetFigEvent1};
+
+@method BGadgetFigClass, MSG_BENT_GET_EVENTS
+{
+    eventBlockPtr = @callsuper();
+    
+    return BentCopyEvents(NUM_GADGETFIG_EVENTS, BGadgetFigEvents,
+			  eventBlockPtr);
+    
+}
+@endif
+
+
+
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		Code for BGadgetButtonClass
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+
+BentEventDescriptionStruct BGadgetButtonEvent1 = {_TEXT("pressed"), 0, TYPE_VOID, 1};
+
+#define NUM_GADGETBUTTON_EVENTS	1
+BentEventDescriptionStruct *BGadgetButtonEvents[NUM_GADGETBUTTON_EVENTS] =
+   {&BGadgetButtonEvent1};
+
+@method BGadgetButtonClass, MSG_BENT_GET_EVENTS
+{
+    eventBlockPtr = @callsuper();
+    return BentCopyEvents(NUM_GADGETBUTTON_EVENTS, BGadgetButtonEvents,
+			  eventBlockPtr);
+}
+/*
+ * Make sure dialogs with close/cancel buttons don't go away when
+ * ESC is hit in the builder.
+ */
+@method BGadgetButtonClass, MSG_GEN_FIND_KBD_ACCELERATOR
+{
+    return 0;
+}
+
+
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		Code for BGadgetNumberClass
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+
+
+BentEventDescriptionStruct BGadgetNumberEvent1 =
+	{_TEXT("changed"), 1, TYPE_VOID, 1};
+BentEventArgDescriptionStruct BGadgetNumberArg1 = 
+	{ _TEXT("value"), TYPE_INTEGER };
+
+#define NUM_GADGETNUMBER_EVENTS	1
+BentEventDescriptionStruct *BGadgetNumberEvents[NUM_GADGETNUMBER_EVENTS] =
+   {&BGadgetNumberEvent1};
+
+@method BGadgetNumberClass, MSG_BENT_GET_EVENTS
+{
+    eventBlockPtr = @callsuper();
+    return BentCopyEvents(NUM_GADGETNUMBER_EVENTS, BGadgetNumberEvents,
+			  eventBlockPtr);
+}
+
+/*
+ * The normal mechanism for figurig this out doesn't work for GenValues.
+ */
+@method BGadgetNumberClass, MSG_BENT_GET_VIS_ROOT
+{
+    return oself;
+}
+
+
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		Code for BGadgetListClass
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+
+BentEventDescriptionStruct BGadgetListEvent1 = {_TEXT("changed"), 1, TYPE_VOID, 1};
+BentEventArgDescriptionStruct  BGadgetListAppliedArg1 = {_TEXT("index"), TYPE_INTEGER};
+
+#define NUM_GADGETLIST_EVENTS	1
+BentEventDescriptionStruct *BGadgetListEvents[NUM_GADGETLIST_EVENTS] =
+   {&BGadgetListEvent1};
+
+@method BGadgetListClass, MSG_BENT_GET_EVENTS
+{
+    eventBlockPtr = @callsuper();
+    return BentCopyEvents(NUM_GADGETLIST_EVENTS, BGadgetListEvents,
+			  eventBlockPtr);
+}
+
+
+
+/***********************************************************************
+ *		EntCallAction
+ ***********************************************************************
+ * SYNOPSIS:	This routine shrinks and beautifies code by simplifying the
+ *		code necessary to dispatch an action.  Perhaps at some future
+ *		date we should rewrite this code in assembly, as it wouldn't
+ *		be too difficult, and it would greatly improve its
+ *		efficiency.
+ *
+ * USAGE:	EntCallAction(comp, _TEXT("action"), &result, 2, 
+ *			      TYPE_INTEGER, 3, 
+ *			      TYPE_STRING,  _TEXT("string"));
+ *
+ * CALLED BY:	
+ * RETURN:	
+ * SIDE EFFECTS:
+ *	
+ * STRATEGY:
+ *	
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	martin	10/6/95		Initial version
+ *
+ ***********************************************************************/
+void EntCallAction (optr oself, TCHAR *action, ComponentData *result, 
+		    int argc, ...)
+{
+    RunHeapInfo		    *rhi;
+    EntObjectBlockHeader    *block;
+    int			    i;
+    va_list		    args;
+    LegosType		    type;
+    ComponentData	    actionArgs[4];
+    
+    EC_ERROR_IF(argc > 4, 0);
+
+    va_start(args, argc);
+    for(i=0; i < argc; i++) {
+	type = va_arg(args, LegosType);
+	actionArgs[i].CD_type = type;
+	switch (type) {
+	   case TYPE_INTEGER:
+		actionArgs[i].CD_data.LD_integer = va_arg(args, int);
+		break;
+	   case TYPE_COMPONENT:
+		actionArgs[i].CD_data.LD_comp = va_arg(args, optr);
+		break;
+	   case TYPE_STRING:
+		actionArgs[i].CD_data.LD_string = va_arg(args, RunHeapToken);
+		break;
+	}
+    }
+
+    block = ObjLockObjBlock(OptrToHandle(oself));
+    rhi = RunComponentLockHeap(block);
+    @call self::MSG_ENT_DO_ACTION(rhi, result, (ComponentData*)&actionArgs, 
+				  argc, action);
+    RunComponentUnlockHeap(block);
+    MemUnlock(OptrToHandle(oself));
+
+}	/* End of EntCallAction.	*/
+
+@if 0
+
+/***********************************************************************
+ *		EntTokenToString
+ ***********************************************************************
+ * SYNOPSIS:	
+ * CALLED BY:	
+ * RETURN:	
+ * SIDE EFFECTS:
+ *	
+ * STRATEGY:
+ *	
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	martin	10/6/95		Initial version
+ *
+ ***********************************************************************/
+void
+EntTokenToString (optr oself, TCHAR *buffer, RunHeapToken token)
+{
+    RunHeapInfo		 *rhi;
+    EntObjectBlockHeader *block;
+    TCHAR		 *string;
+
+    block = ObjLockObjBlock(OptrToHandle(oself));
+    rhi = RunComponentLockHeap(block);
+    RunHeapLock(rhi, token, &string);
+    strcpy(buffer, string);
+    RunHeapUnlock(rhi, token);
+    RunComponentUnlockHeap(block);
+    MemUnlock(OptrToHandle(oself));
+
+}	/* End of EntTokenToString.	*/
+@endif
+
+
+/***********************************************************************
+ *		MSG_BENT_DESCRIBE_SELF for BGadgetListClass
+ ***********************************************************************
+ * SYNOPSIS:	    
+ * PARAMETERS:	    
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	martin	10/6/95		Initial version
+ *
+ ***********************************************************************/
+@method BGadgetListClass, MSG_BENT_DESCRIBE_SELF
+{
+    TCHAR*	dummy;		/* Dummy pointer will be	  */
+				/* stuffed with prop name by */
+				/* MSG_ENT_ENUM_PROPERTIES	  */ 
+    EventHandle	event;
+    int		i;
+    optr	propArray, postProcessArray; 
+    GadgetListInstance	*gself;
+					
+    /* Write out all the default stuff by calling our superclass, but
+     * first extract the visible and selectedItem properties so we can
+     * insure they are written out last.
+     */
+    propArray = ConstructOptr(HandleOf(oself), ECPSelf(pself)->BI_propArray);
+    postProcessArray = ConstructOptr(HandleOf(oself),
+			NameArrayCreateAt(ConstructOptr(HandleOf(oself),0),
+			                  sizeof(ComponentData),0,0));
+    BentExtractPropertyArrayElement(_TEXT("visible"), propArray, 
+				    postProcessArray);
+    BentExtractPropertyArrayElement(_TEXT("selectedItem"), propArray, 
+				    postProcessArray);
+    BentExtractPropertyArrayElement(_TEXT("numItems"), propArray, 
+				    postProcessArray);
+    @callsuper();
+
+    pself = ObjDerefBent(oself);
+    pself->BI_flags &= ~BSF_COMP_INIT;
+
+    /* Now enumerate list items and write out actions to create them.
+     *		comp.captions(1, "string")
+     */
+    gself = ObjDerefEnt(oself);
+    i = gself->GL_currentItems;
+    while(--i >= 0)
+    {
+	MemHandle	descHan;
+	TCHAR*		descP;
+	ComponentData	result;
+
+	BentEnsureBufferSpace(descHeader, DESCRIPTION_MAX_LINE_SIZE);
+	descP = BentLockDescription(descHeader, &descHan);
+
+	BentGetComponentName(oself, descP);
+	descP = strchr(descP, C_NULL);
+	strcpy(descP, _TEXT(".captions["));
+	descP += 10;
+	itoa(i, descP);
+	descP = strchr(descP, C_NULL);
+	strcpy(descP, _TEXT("]=\""));
+	descP += 3;
+
+	EntCallAction(oself, _TEXT("Getcaptions"), &result, 1, 
+		      TYPE_INTEGER, i);
+@if 0
+	EntTokenToString(oself, descP, result.CD_data.LD_string);
+@endif
+	RunComponentCopyString(descP, result.CD_data.LD_string, oself);
+	    
+	descP = strchr(descP, C_NULL);
+	strcpy(descP, _TEXT("\"\r\n"));
+
+	BentUnlockDescription(descHan);
+    }
+
+
+    /* Write out the left over properties that were extracted earlier,
+     * then put them back into the component's propArray, so next save
+     * the properties will still be there.
+     */
+    event = @record self::MSG_BENT_DESCRIBE_PROPERTY(dummy, descHeader);
+    ChunkArrayEnum(postProcessArray, (void *)event, 
+		   BentProcessPropertyArrayElement);
+    ObjFreeMessage(event);
+    BentExtractPropertyArrayElement(_TEXT("numItems"), 
+				    postProcessArray, propArray);
+    BentExtractPropertyArrayElement(_TEXT("selectedItem"), 
+				    postProcessArray, propArray);
+    BentExtractPropertyArrayElement(_TEXT("visible"), 
+				    postProcessArray, propArray);
+    pself = ObjDerefBent(oself);
+    pself->BI_flags |= BSF_COMP_INIT;
+    LMemFreeHandles(HandleOf(oself), postProcessArray);
+
+} /* End of MSG_BENT_DESCRIBE_SELF.	*/
+
+
+@ifdef 0
+
+/***********************************************************************
+ *		MSG_SPEC_BUILD_BRANCH for BGadgetScrollListClass
+ ***********************************************************************
+ * SYNOPSIS:	    This doesn't work, but its been tried just so you know.
+ *		    The attempts here are to make the scrolllist work
+ *		    correctly with the mouse.
+ * PARAMETERS:	    
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	martin	10/10/95	Initial version
+ *
+ ***********************************************************************/
+@method BGadgetScrollListClass, MSG_SPEC_BUILD_BRANCH
+{
+    GadgetAggInstance	*gself;
+    optr		view, interpreter, ptrImage;
+    VisContentInstance	*vself;
+
+    interpreter = EntGetInterpreter(ECPSelf(pself));
+
+    @callsuper();
+
+    gself = ObjDerefEnt(oself);
+    view = @call gself->GAI_contentObj::MSG_SPEC_GET_SPECIFIC_VIS_OBJECT(0);
+    @call view::MSG_VIS_RELEASE_MOUSE();
+    @call view::MSG_VIS_REMOVE_BUTTON_PRE_PASSIVE();
+    @call self::MSG_VIS_RELEASE_GADGET_EXCL(view);
+    @call view::MSG_VIS_SET_ATTRS(0, VA_DETECTABLE, VUM_DELAYED_VIA_APP_QUEUE);
+    @call view::MSG_VIS_SET_TYPE_FLAGS(0, VTF_IS_INPUT_NODE);
+    @call view::MSG_GEN_SET_NOT_ENABLED(VUM_DELAYED_VIA_APP_QUEUE);
+    ptrImage = @call interpreter::MSG_BENT_MANANGER_MOUSE_PTR(oself,0,0);
+    vself = ObjDerefVis(view);
+/*    WinSetPtrImage(PIL_GADGET, ptrImage, vself->VCI_window);
+*/
+}
+
+
+/***********************************************************************
+ *  MSG_VIS_VUP_SET_MOUSE_INTERACTION_BOUNDS for BGadgetScrollListClass
+ ***********************************************************************
+ * SYNOPSIS:	    Disables the view contained by this object by
+ *		    zeroing out the mouse interaction bounds.
+ * PARAMETERS:	    
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	martin	10/10/95	Initial version
+ *
+ ***********************************************************************/
+@method BGadgetScrollListClass, MSG_VIS_VUP_SET_MOUSE_INTERACTION_BOUNDS
+{
+    bottom = right = top = left = 0;
+}
+
+@endif
+
+
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		Code for BGadgetGroupClass
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+@method BGadgetGroupClass, MSG_VIS_DRAW
+{
+    @callsuper();
+    
+    if (ObjVarFindData(oself, HINT_DRAW_IN_BOX) == 0L) {
+	BentDrawBoxIfNotSelected(oself, gstate);
+    }
+}
+
+@if 0
+@method BGadgetGroupClass, MSG_ENT_INITIALIZE
+{
+    ComponentData data;
+    @callsuper();
+
+
+    data.CD_type = TYPE_INTEGER;
+    data.CD_data.LD_integer = LOOK_GROUP_DRAW_IN_BOX;
+    @call self::MSG_ENT_SET_PROPERTY_EXTERNAL(&data, _TEXT("look"));
+}
+@endif
+    
+
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		Code for BGadgetToggleClass
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+
+BentEventDescriptionStruct BGadgetToggleEvent1 = {_TEXT("changed"), 0, TYPE_VOID, 1};
+
+#define NUM_GADGETTOGGLE_EVENTS	1
+BentEventDescriptionStruct *BGadgetToggleEvents[NUM_GADGETTOGGLE_EVENTS] =
+   {&BGadgetToggleEvent1};
+
+@method BGadgetToggleClass, MSG_BENT_GET_EVENTS
+{
+    eventBlockPtr = @callsuper();
+    return BentCopyEvents(NUM_GADGETTOGGLE_EVENTS, BGadgetToggleEvents,
+			  eventBlockPtr);
+}
+
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		Code for BGadgetChoiceClass
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+
+
+BentEventDescriptionStruct BGadgetChoiceEvent1 = {_TEXT("changed"), 0, TYPE_VOID, 1};
+
+#define NUM_GADGETCHOICE_EVENTS	1
+BentEventDescriptionStruct *BGadgetChoiceEvents[NUM_GADGETCHOICE_EVENTS] =
+   {&BGadgetChoiceEvent1};
+
+@method BGadgetChoiceClass, MSG_BENT_GET_EVENTS
+{
+    eventBlockPtr = @callsuper();
+    return BentCopyEvents(NUM_GADGETCHOICE_EVENTS, BGadgetChoiceEvents,
+			  eventBlockPtr);
+}
+
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		Code for BGadgetAggClass
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+
+@method BGadgetAggClass, MSG_ENT_INITIALIZE
+{
+    @callsuper();
+    /* CompInit doesn't work with aggs
+     */
+    pself = ObjDerefBent(oself);
+    ECPSelf(pself)->BI_flags &= ~BSF_COMP_INIT;
+}
+
+@method BGadgetAggClass, MSG_ENT_VALIDATE_CHILD
+{
+    /* Don't allow components to be dropped on us!
+     * This prevents aggregates-with-children, but that has its own
+     * suite of problems we don't have time to deal with yet
+     */
+    if (pself->BGAI_aggregate == NULL_TOKEN)
+    {
+	/* Hack: we need to allow the components that comprise the agg
+	 * to be added!	 We know that BGAI_aggregate gets set very soon
+	 * after the children are created and added, so use that as the
+	 * indicator that we should start rejecting children.
+	 */
+	return @callsuper();
+    } else {
+
+	return 1;
+
+	/* this works, but causes problems because the aggParent object
+	 * is not a bent object - FIXME
+	 */
+@if 0
+	ComponentData	cd;
+
+	/* aggs that take children must have the aggParent property,
+	 * so if it has an aggParent property, then just pass on the
+	 * validate child to the aggParent
+	 *
+	 */
+	@call self::MSG_ENT_GET_PROPERTY(NULL, &cd, _TEXT("aggParent"));
+	if (cd.CD_type == TYPE_ERROR || cd.CD_data.LD_comp == NullOptr)
+	{
+	    return 1;
+	}
+	return @call cd.CD_data.LD_comp::MSG_ENT_VALIDATE_CHILD(childPtr);
+@endif
+    }
+}
+
+@method BGadgetAggClass, MSG_META_INITIALIZE
+{
+    pself->BI_flags |= BSF_DIM_AS_COMPONENT;
+    pself->BGAI_aggregate = NULL_TOKEN;
+}
+
+/* Most properties are retrieved from the aggregate.
+ * Build-time properties, properties that are specifically owned
+ * by BGadgetAggClass, and some ui stuff are the only exceptions.
+ */
+
+/* The following properties should caught and handled by BGadgetEntryClass
+ * (or a superclass).  Underscored props are for bent.
+ */
+#define BGA_LOCAL_PROP(_prop)			\
+((_prop)[0] == C_UNDERSCORE			\
+ || !strcmp((_prop), _TEXT("name"))		\
+ || !strcmp((_prop), _TEXT("parent"))		\
+ || !strcmp((_prop), _TEXT("top"))		\
+ || !strcmp((_prop), _TEXT("left"))		\
+ || !strcmp((_prop), _TEXT("visible")))
+
+/*- Pass: *rhi, *value, *prop */
+@method BGadgetAggClass, MSG_ENT_GET_PROPERTY
+{
+    if (!strcmp(prop, _TEXT("aggClass")) ||
+	!strcmp(prop, _TEXT("libPropBoxURL")) ||
+	!strcmp(prop, _TEXT("specPropBoxURL")) ||
+	BGA_LOCAL_PROP(prop))
+    {
+	/* Let build-time props and aggClass through */
+	@callsuper();
+    }
+    else if (!strcmp(prop, _TEXT("class"))) {
+	/* When writing ourselves out, need to write the proper class
+	 * aggs don't handle 'class' prop by default (yet?)
+	 */
+	prop = _TEXT("aggClass");
+	@callsuper();
+    }
+    else if (!strcmp(prop, _TEXT("aggComp"))) {
+	value->CD_type = TYPE_COMPONENT;
+	value->CD_data.LD_comp = 0xffff0000 | pself->BGAI_aggregate;
+    }
+    else
+    {
+	RunHeapToken	aggComp;
+	PTaskHan	ptaskHan;
+	Boolean		success;
+
+	/* Because of people calling Update(), the property box can
+	 * try and read our properties before the agg has been set.
+	 * D'oh.  So, we have to do something intelligent
+	 * if BGAI_aggregate is null
+	 */
+
+	/* TYPE_ERROR means "prop doesn't exist" to the interpreter
+	 * Agg will return TYPE_NONE if prop doesn't exist, which the
+	 * interp thinks means "prop has no defined type".  *sigh*
+	 */
+	aggComp = ECPSelf(pself)->BGAI_aggregate;
+	if (aggComp != NULL_TOKEN) {
+	    ptaskHan = @call EntGetInterpreter(pself)::MSG_INTERP_GET_STATE();
+	    success = RunGetAggPropertyExt
+		(ptaskHan, aggComp, prop,
+		 &value->CD_type, &value->CD_data.LD_gen_dword);
+	    if (value->CD_type == TYPE_NONE) value->CD_type = TYPE_ERROR;
+	    EC_WARNING_IF(!success, -1);
+	    NEC( success = success );
+	} else {
+	    value->CD_type = TYPE_ERROR;
+	    value->CD_data.LD_gen_dword = 0L;
+	}
+    }
+}
+
+
+/* See above for discussion of which properties are handled here
+ */   
+/*- Pass: rhi, value, prop */
+@method BGadgetAggClass, MSG_ENT_SET_PROPERTY
+{
+    optr	interp;
+    TCHAR*	class;
+    ClassInfoStruct* cis;
+
+    interp = EntGetInterpreter(pself);
+
+    if (BGA_LOCAL_PROP(prop))
+    {
+	@callsuper();
+    }
+    else if (!strcmp(prop, _TEXT("aggClass")) && value->CD_type == TYPE_STRING)
+    {
+	/* This is a hack to get the proper class count incremented
+	 * when an aggregate is created in the builder.	 The Agg
+	 * doesn't know its aggClass at the time it gets
+	 * MSG_ENT_INITIALIZE, otherwise this would be done there.
+	 */
+	@callsuper();
+	RunHeapLock(rhi, value->CD_data.LD_string, (void**) &class);
+	cis = @call interp::MSG_BENT_MANAGER_GET_CLASS_INFO(class);
+	cis->CIS_count++;
+	RunHeapUnlock(rhi, value->CD_data.LD_string);
+    }
+    else if (!strcmp(prop, _TEXT("aggComp")))
+    {
+	if (value->CD_type == TYPE_COMPONENT &&
+	    (value->CD_data.LD_comp>>16) == 0xffff)
+	{
+	    RunHeapIncRef(rhi, (RunHeapToken)value->CD_data.LD_comp);
+	    ECPSelf(pself)->BGAI_aggregate =
+		(RunHeapToken)value->CD_data.LD_comp;
+	}
+    }
+    else
+    {
+	/* Punt to aggregate
+	 */
+	PTaskHan	ptaskHan;
+	RunHeapToken	aggComp;
+	Boolean		success;
+	
+	/* Copy some of bent's ENT_SET_PROP handler in here, because
+	 * we won't be doing a callsuper.  Maybe @callsuper would be
+	 * worthwhile anyway..?
+	 */
+	@call self::MSG_BENT_MARK_CHANGED_PROPERTY(rhi, value, prop);
+	pself = ObjDerefBent(oself);
+	aggComp = ECPSelf(pself)->BGAI_aggregate;
+	if (aggComp != NULL_TOKEN)
+	{
+	    ptaskHan = @call interp::MSG_INTERP_GET_STATE();
+	    success = RunSetAggPropertyExt
+		(ptaskHan, aggComp, prop,
+		 value->CD_type, value->CD_data.LD_gen_dword);
+	    EC_WARNING_IF(!success, -1);
+	    NEC( success = success );
+	}
+    }
+    return;
+}
+
+/*
+ * We don't want our children to be selectable, so always return ourselves
+ * as the child under the point
+ */
+@method BGadgetAggClass, MSG_BENT_FIND_CHILD_UNDER_POINT
+{
+    ComponentData	cd;
+    optr    	    	child, parent;
+
+    return oself;
+
+    /* this stuff doesn't work because the aggParent object of an aggregate
+     * that accepts children is not a bent object, but an runtime ent object
+     * FIXME
+     */
+@if 0
+    /* aggs that take children must have the aggParent property,
+     * so if it has an aggParent property, then just pass on the
+     * validate child to the aggParent
+     */
+    @call self::MSG_ENT_GET_PROPERTY(NULL, &cd, _TEXT("aggParent"));
+    if (cd.CD_type == TYPE_ERROR || cd.CD_data.LD_comp == NullOptr)
+    {
+	return oself;
+    }
+    child = @call cd.CD_data.LD_comp::MSG_BENT_FIND_CHILD_UNDER_POINT(x, y);
+    if (child == oself || child == cd.CD_data.LD_comp) {
+	return child;
+    }
+    /* try running up the ent tree to see if we get to the aggParent or the
+     * app first, if the former, then it is movable so return it, otherwise
+     * dont
+     */
+    parent = child;
+    while (1)
+    {
+	parent = @call parent::MSG_ENT_GET_PARENT();
+	if (parent == NullOptr) {
+	    return oself;
+	}
+	if (parent == cd.CD_data.LD_comp)
+	{
+	    return child;
+	}
+    }
+@endif
+}
+
+@method BGadgetAggClass, MSG_BENT_DESCRIBE_SELF
+{
+    optr	  postProcessArray = ConstructOptr(HandleOf(oself), 0);
+    optr	  propArray	   = ConstructOptr(HandleOf(oself),
+						   pself->BI_propArray);
+
+    EC_ERROR_IF(pself->BI_propArray == 0, -1);
+
+    postProcessArray = ConstructOptr(oself, 
+	NameArrayCreateAt(postProcessArray, sizeof(ComponentData), 0, 0));
+    BentExtractPropertyArrayElement(_TEXT("aggClass"),
+				    propArray, postProcessArray);
+
+    @callsuper();
+
+    BentExtractPropertyArrayElement(_TEXT("aggClass"), 
+				    postProcessArray, propArray);
+    LMemFree(postProcessArray);
+	
+} /* End of MSG_BENT_DESCRIBE_SELF.	  */
+#define SEEK_NULL(ptr) (ptr = strchr(descP, C_NULL))
+
+
+@if 0
+/***********************************************************************
+ *		MSG_BENT_DESCRIBE_SELF for BGadgetAggClass
+ ***********************************************************************
+ * SYNOPSIS:	Appends a description of the aggregate to the given 
+ *		buffer.	 Intercepted since the aggregate itself doesn't
+ *		know from build-time
+ *
+ * PARAMETERS:	    hptr.BDescHeader	descHeader
+ *		    BDescInfo		outputInfo
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	dloft	9/5/95		Initial version
+ *
+ ***********************************************************************/
+@method BGadgetAggClass, MSG_BENT_DESCRIBE_SELF
+{
+    TCHAR *	descP;
+    MemHandle	descHan;
+    
+    BentEnsureBufferSpace(descHeader, 2048);
+    descP = BentLockDescription(descHeader, &descHan);
+
+    /* DIM <name> as component */
+    strcat(descP, _TEXT("DIM "));
+    SEEK_NULL(descP);
+    BentGetComponentPropertyUnquoted(oself, descP, _TEXT("name"));
+    strcat(descP, _TEXT(" as component\r\n"));
+    SEEK_NULL(descP);
+
+    /* <compname> = MakeComponent(<aggClass>, parent) */
+    BentGetComponentPropertyUnquoted(oself, descP, _TEXT("name"));
+    strcat(descP, _TEXT(" = MakeComponent("));
+    SEEK_NULL(descP);
+    (void) @call self::MSG_BENT_GET_PROPERTY(_TEXT("aggClass"), descP);
+    strcat(descP, _TEXT(","));
+    SEEK_NULL(descP);
+    (void) @call self::MSG_BENT_GET_PROPERTY(_TEXT("parent"), descP);
+    strcat(descP,_TEXT(")\r\n"));
+    SEEK_NULL(descP);
+
+    /* This is something of a hack; isntead of writing out all
+     * properties, we'll just do some hard-coded ones for now.
+     */
+	/* <compname>.name = <compname> */
+	/* <compname>.proto = <compproto> */
+
+    BentGetComponentPropertyUnquoted(oself, descP, _TEXT("name"));
+    strcat(descP, _TEXT(".name = "));
+    SEEK_NULL(descP);
+    (void) @call self::MSG_BENT_GET_PROPERTY(_TEXT("name"), descP);
+    strcat(descP,_TEXT("\r\n"));
+    SEEK_NULL(descP);
+    
+    BentGetComponentPropertyUnquoted(oself, descP, _TEXT("name"));
+    strcat(descP, _TEXT(".proto = "));
+    SEEK_NULL(descP);
+    (void) @call self::MSG_BENT_GET_PROPERTY(_TEXT("proto"), descP);
+    strcat(descP,_TEXT("\r\n"));
+    
+    BentUnlockDescription(descHan);
+}
+@endif
+
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		Code for BGadgetClipperClass
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+
+@method BGadgetClipperClass, MSG_VIS_DRAW
+{
+    @callsuper();
+    BentDrawBoxIfNotSelected(oself, gstate);
+}
+
+/* routine to prevent the object from having a caption set */
+@method BGadgetClipperClass, MSG_ENT_SET_PROPERTY
+{
+    word    usable = FALSE;
+
+    if (strcmp(prop, _TEXT("visible")) && @call self::MSG_GEN_GET_USABLE())
+    {
+	usable = TRUE;
+	@call self::MSG_GEN_SET_NOT_USABLE(VUM_DELAYED_VIA_APP_QUEUE);
+    }
+    /* if its not the caption property, set it */
+    if (strcmp(prop, _TEXT("caption"))) 
+    {
+	@callsuper();
+    }
+    if (usable) 
+    {
+	@call self::MSG_GEN_SET_USABLE(VUM_DELAYED_VIA_APP_QUEUE);
+    }
+}
+
+
+
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		Define the clipboardable API events
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+
+/*
+ * The following events are part of the clipboardable API.
+ * Gadget, entry, text and table support subsets of these events.
+ */
+
+BentEventDescriptionStruct ClipboardableEvent1 = {_TEXT("focusChanged"), 1, TYPE_VOID, 1};
+BentEventArgDescriptionStruct  ClipboardableFocusChangedArg1 = {_TEXT("oldFocusState"), TYPE_INTEGER};
+
+BentEventDescriptionStruct ClipboardableEvent2 = {_TEXT("acceptPaste"), 1, TYPE_INTEGER, 1};
+BentEventArgDescriptionStruct  ClipboardableAcceptPasteArg1 = {_TEXT("format"), TYPE_STRING};
+
+BentEventDescriptionStruct ClipboardableEvent3 = {_TEXT("delete"), 0, TYPE_VOID, 1};
+
+BentEventDescriptionStruct ClipboardableEvent4 = {_TEXT("copy"), 0, TYPE_VOID, 1};
+
+BentEventDescriptionStruct ClipboardableEvent5 = {_TEXT("paste"), 0, TYPE_VOID, 1};
+
+/*
+ * Components with clipboardable events will add this constant
+ * to the number of events they define to make their own constant.
+ * See gadget for an example.
+ */
+#define NUM_CLIPBOARDABLE_EVENTS 5
+
+
+
+
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		Code for BGadgetGadgetClass
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+
+/*********************************************************************
+ *			BGadgetGadgetBentGetEvents
+ *********************************************************************
+ * SYNOPSIS: return info about the events
+ * CALLED BY:	
+ * RETURN:
+ * SIDE EFFECTS:
+ * STRATEGY:
+ * REVISION HISTORY:
+ *	Name	Date		Description			     
+ *	----	----		-----------			     
+ *	jimmy	 2/23/95	Initial version			     
+ * 
+ *********************************************************************/
+
+
+BentEventDescriptionStruct BGadgetGadgetEvent1 = {_TEXT("draw"), 0, TYPE_VOID, 1};
+
+BentEventDescriptionStruct BGadgetGadgetEvent2 = {_TEXT("mouse"), 5, TYPE_VOID, 1};
+BentEventArgDescriptionStruct BGadgetGadgetPenArg1 = {_TEXT("action"), TYPE_INTEGER};
+BentEventArgDescriptionStruct BGadgetGadgetPenArg2 = {_TEXT("flag"), TYPE_INTEGER};
+BentEventArgDescriptionStruct BGadgetGadgetPenArg3 = {_TEXT("X"), TYPE_INTEGER};
+BentEventArgDescriptionStruct BGadgetGadgetPenArg4 = {_TEXT("Y"), TYPE_INTEGER};
+BentEventArgDescriptionStruct BGadgetGadgetPenArg5 = {_TEXT("modifier"), TYPE_INTEGER};
+
+BentEventDescriptionStruct BGadgetGadgetEvent3 = {_TEXT("char"), 3, TYPE_INTEGER, 1};
+BentEventArgDescriptionStruct BGadgetGadgetCharArg1 = {_TEXT("action"), TYPE_INTEGER};
+BentEventArgDescriptionStruct BGadgetGadgetCharArg2 = {_TEXT("char"), TYPE_INTEGER};
+BentEventArgDescriptionStruct BGadgetGadgetCharArg3 = {_TEXT("modifierState"), TYPE_INTEGER};
+
+#define NUM_GADGETGADGET_EVENTS	3 + NUM_CLIPBOARDABLE_EVENTS
+BentEventDescriptionStruct *BGadgetGadgetEvents[NUM_GADGETGADGET_EVENTS] =
+   {&BGadgetGadgetEvent1,
+    &BGadgetGadgetEvent2,
+    &BGadgetGadgetEvent3,
+    &ClipboardableEvent1,
+    &ClipboardableEvent2,
+    &ClipboardableEvent3,
+    &ClipboardableEvent4,
+    &ClipboardableEvent5};
+
+
+
+/*********************************************************************
+ *			BentDrawBoxIfNotSelected
+ *********************************************************************
+ * SYNOPSIS:	utility routine used by primitive components
+ * CALLED BY:	MSG_VIS_DRAW handlers
+ * PASS:
+ * RETURN:
+ * SIDE EFFECTS:
+ * STRATEGY:
+ * REVISION HISTORY:
+ *	Name	Date		Description			     
+ *	----	----		-----------			     
+ *	jimmy	8/29/95	Initial version
+ * 
+ *********************************************************************/
+void BentDrawBoxIfNotSelected(optr oself, MemHandle gstate)
+{
+    void    *pself;
+    optr    interp;
+    Rectangle	bounds;
+
+    pself = MemDeref(HandleOf(oself));
+    interp = EntGetInterpreter(pself);
+
+    if (@call interp::MSG_BENT_MANAGER_GET_SELECTED_COMPONENT() != oself)
+    {
+	DrawMask    dm;
+
+	@call oself::MSG_VIS_GET_BOUNDS(&bounds);
+	/*
+	 * Shouldn't need to set a default value.
+	 *
+	 * GrSetLineColor(gstate, CF_INDEX, C_BLACK, 0, 0);
+	 */
+
+	GrSetLineMaskSys(gstate, SDM_50);
+	GrDrawRect(gstate, bounds.R_left-2, bounds.R_top-2, bounds.R_right, 
+		   bounds.R_bottom);
+	GrSetLineMaskSys(gstate, SDM_100);
+    }
+}
+
+
+@method BGadgetGadgetClass, MSG_BENT_GET_EVENTS
+{
+    eventBlockPtr = @callsuper();
+    return BentCopyEvents(NUM_GADGETGADGET_EVENTS, BGadgetGadgetEvents,
+			  eventBlockPtr);    
+}
+
+
+@method BGadgetGadgetClass, MSG_VIS_DRAW
+{
+    @callsuper();
+    BentDrawBoxIfNotSelected(oself, gstate);
+}
+
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		Code for BGadgetFloaterClass
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+
+#define FLOATER_BORDER_WIDTH 5
+
+XorFlags PointOnFloaterBorder(int x, int y, optr oself)
+{
+    XorFlags point=0;
+    XYValueAsDWord pos;
+    /*
+     * I don't want to install the stuff that uses this just before
+     * a release, so ...
+     */
+
+    pos = @call self::MSG_VIS_GET_SIZE();
+    /*
+     * If they click on the border, then setup for a resize,
+     * otherwise setup for a move.
+     */
+
+    if (x < FLOATER_BORDER_WIDTH) point |= SIZE_LEFT;
+    if (y < FLOATER_BORDER_WIDTH) point |= SIZE_TOP;
+    if (x + FLOATER_BORDER_WIDTH > DWORD_X(pos)) point |= SIZE_RIGHT;
+    if (y + FLOATER_BORDER_WIDTH > DWORD_Y(pos)) point |= SIZE_BOTTOM;
+
+    return point;
+}
+    
+@method BGadgetFloaterClass, MSG_META_DRAG_SELECT
+{
+    XorFlags *selectFlags;
+    /* don't move window around if we are clicking on a child object */
+    if (@call self::MSG_BENT_FIND_CHILD_UNDER_POINT(xPosition, yPosition)
+	== oself)
+    {
+	selectFlags = ObjVarFindData(oself, ATTR_GADGET_FLOATER_RESIZING);
+	if (selectFlags == NULL)
+	{
+	    ECPSelf(pself)->BFI_drag = 1;
+	}
+	
+    }
+
+    retVal->flags = MRF_PROCESSED;
+}
+
+@method BGadgetFloaterClass, MSG_META_START_SELECT
+{
+    XorFlags flags;
+    flags = PointOnFloaterBorder(xPosition, yPosition, oself);
+    
+    if (flags)
+    {
+	WindowHandle	win;
+	Rectangle	bounds;
+	XYValueAsDWord	size;
+	XorFlags *vardata;
+	
+	
+
+	/*
+	 * Remind ourselves how things got started
+	 */
+	vardata =ObjVarAddData(oself, ATTR_GADGET_FLOATER_RESIZING, sizeof(XorFlags));
+	*vardata = flags;
+	
+
+
+
+	
+	/*
+	 * It is a resize. Start your engines.
+	 */
+	@call self::MSG_VIS_GET_BOUNDS(&bounds);
+	size = @call self::MSG_VIS_GET_SIZE();
+	
+	win = @call self::MSG_VIS_QUERY_WINDOW();
+	BentImResizeWindow(0, 0,
+			   DWORD_X(size), DWORD_Y(size),
+
+			   win,
+			   3 * FLOATER_BORDER_WIDTH,	/* min width */
+			   3 * FLOATER_BORDER_WIDTH,	/* min height */
+			   0			   ,	/* max width */
+			   0			   ,	   /* max height */
+
+			   xPosition, yPosition,	 /* ptr coords */
+			   flags			/* XorFlags */
+			   );
+    }
+    
+			   
+    pself = ObjDerefBent(oself);
+    ECPSelf(pself)->BFI_xPosition = xPosition;
+    ECPSelf(pself)->BFI_yPosition = yPosition;
+    ECPSelf(pself)->BFI_lastX = xPosition;
+    ECPSelf(pself)->BFI_lastY = yPosition;
+    
+
+    @call self::MSG_VIS_GRAB_MOUSE();
+    retVal->flags = MRF_PROCESSED;
+    
+}
+
+@method BGadgetFloaterClass, MSG_META_END_SELECT
+{
+    XorFlags *selectFlags;
+    ComponentData	top, left, width, height;
+    optr		interp;
+
+    interp = EntGetInterpreter(ECPSelf(pself));
+    @callsuper();
+    @call   self::MSG_VIS_RELEASE_MOUSE();
+    
+    pself = ObjDerefBent(oself);
+    selectFlags = ObjVarFindData(oself, ATTR_GADGET_FLOATER_RESIZING);
+    
+    if (selectFlags != NULL)
+    {
+	Rectangle bounds;
+	@call self::MSG_VIS_GET_BOUNDS(&bounds);
+	
+	if (*selectFlags & SIZE_TOP)
+	{
+	    bounds.R_top += yPosition;
+	}
+	if (*selectFlags & SIZE_BOTTOM)
+	{
+	    bounds.R_bottom = bounds.R_top + yPosition;
+	}
+	if (*selectFlags & SIZE_LEFT)
+	{
+	    bounds.R_left += xPosition;
+	}
+	if (*selectFlags  &SIZE_RIGHT)
+	{
+	    bounds.R_right = bounds.R_left + xPosition;
+	}
+	top.CD_type = left.CD_type = width.CD_type = height.CD_type = TYPE_INTEGER;
+	top.CD_data.LD_integer = bounds.R_top;
+	left.CD_data.LD_integer = bounds.R_left;
+	width.CD_data.LD_integer = bounds.R_right - bounds.R_left;
+	height.CD_data.LD_integer = bounds.R_bottom - bounds.R_top;
+
+
+	@call self::MSG_VIS_SET_SIZE(width.CD_data.LD_integer,
+				     height.CD_data.LD_integer);
+	
+	@call self::MSG_VIS_SET_POSITION(bounds.R_left, bounds.R_top);
+	
+	@call self::MSG_ENT_SET_PROPERTY_EXTERNAL(&top, _TEXT("top"));
+	@call self::MSG_ENT_SET_PROPERTY_EXTERNAL(&left, _TEXT("left"));
+	@call self::MSG_ENT_SET_PROPERTY_EXTERNAL(&width, _TEXT("width"));
+	@call self::MSG_ENT_SET_PROPERTY_EXTERNAL(&height, _TEXT("height"));
+	@call self::MSG_VIS_INVALIDATE();
+
+	pself = ObjDerefBent(oself);
+	ObjVarDeleteData(oself, ATTR_GADGET_FLOATER_RESIZING);
+
+	if (@call interp::MSG_BENT_MANAGER_GET_SELECTED_COMPONENT() == oself) {
+	    @send, forceQueue interp::MSG_BENT_MANAGER_UPDATE_CONTROL_UI(TRUE);
+	}
+    }
+    else if (ECPSelf(pself)->BFI_drag)
+    {
+	MemHandle	win;
+	Rectangle	bounds;
+
+	pself = ObjDerefBent(oself);
+	ECPSelf(pself)->BFI_drag = 0;
+	win = @call self::MSG_VIS_QUERY_WINDOW();
+	WinGetWinScreenBounds(win, &bounds);
+	top.CD_type = left.CD_type = TYPE_INTEGER;
+	top.CD_data.LD_integer = bounds.R_top;
+	left.CD_data.LD_integer = bounds.R_left;
+
+	@call self::MSG_VIS_SET_POSITION(bounds.R_left, bounds.R_top);
+	
+	@call self::MSG_ENT_SET_PROPERTY_EXTERNAL(&top, _TEXT("top"));
+	@call self::MSG_ENT_SET_PROPERTY_EXTERNAL(&left, _TEXT("left"));
+
+	if (@call interp::MSG_BENT_MANAGER_GET_SELECTED_COMPONENT() == oself) {
+	    @send, forceQueue interp::MSG_BENT_MANAGER_UPDATE_CONTROL_UI(TRUE);
+	}
+    }
+    retVal->flags = MRF_PROCESSED;
+}
+
+@method BGadgetFloaterClass, MSG_BGADGET_FLOATER_WIN_MOVE
+{
+    MemHandle	win;
+
+    win = @call self::MSG_VIS_QUERY_WINDOW();
+    if (win != NullHandle)
+    {
+	if ( (xPosition != ECPSelf(pself)->BFI_lastX) ||
+	     (yPosition != ECPSelf(pself)->BFI_lastY))
+	{
+	    WinMove(win, 
+		    xPosition - ECPSelf(pself)->BFI_xPosition,
+		    yPosition - ECPSelf(pself)->BFI_yPosition,
+		    0);
+	    ECPSelf(pself)->BFI_lastX = xPosition;
+	    ECPSelf(pself)->BFI_lastY = yPosition;
+	}
+    }
+}
+
+@method BGadgetFloaterClass, MSG_META_PTR
+{
+    if (ECPSelf(pself)->BFI_drag)
+    {
+	@send , forceQueue, replace , checkDuplicate self::MSG_BGADGET_FLOATER_WIN_MOVE(xPosition, yPosition);
+	retVal->flags = MRF_PROCESSED;
+    }
+    else
+    {
+	@callsuper();
+    }
+}
+
+/*
+ * Don't let superclass deal with focus stuff at all.
+ */
+@method BGadgetFloaterClass, MSG_META_GAINED_FOCUS_EXCL,
+MSG_META_GRAB_FOCUS_EXCL,
+MSG_META_RELEASE_FOCUS_EXCL
+{
+    /* This space intentionally left blank */
+}
+
+
+
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		Code for BGadgetDialogClass
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+
+/*********************************************************************
+ *			BGadgetDialogBentGetEvents
+ *********************************************************************
+ * SYNOPSIS: 
+ * CALLED BY:	
+ * RETURN:
+ * SIDE EFFECTS:
+ * STRATEGY:
+ * REVISION HISTORY:
+ *	Name	Date		Description			     
+ *	----	----		-----------			     
+ *	ron	 2/23/95	Initial version			     
+ * 
+ *********************************************************************/
+
+BentEventDescriptionStruct BGadgetDialogEvent1=
+	{_TEXT("aboutToOpen"), 0, TYPE_VOID, 1};
+
+BentEventDescriptionStruct BGadgetDialogEvent2=
+	{_TEXT("aboutToClose"), 0, TYPE_VOID, 1};
+
+BentEventDescriptionStruct BGadgetDialogEvent3=
+        {_TEXT("activeChanged"), 1, TYPE_VOID, 1};
+BentEventArgDescriptionStruct BGadgetDialogActiveChangedArg1=
+        {_TEXT("gain"), TYPE_INTEGER};
+
+#define NUM_GADGETDIALOG_EVENTS	3
+BentEventDescriptionStruct *BGadgetDialogEvents[NUM_GADGETDIALOG_EVENTS] =
+   {&BGadgetDialogEvent1,
+    &BGadgetDialogEvent2,
+    &BGadgetDialogEvent3};  
+
+@method BGadgetDialogClass, MSG_BENT_GET_EVENTS
+{
+    eventBlockPtr = @callsuper();
+    
+    return BentCopyEvents(NUM_GADGETDIALOG_EVENTS, BGadgetDialogEvents,
+			  eventBlockPtr);
+}
+
+
+/***********************************************************************
+ *		MSG_BENT_DESCRIBE_SELF for BGadgetDialogClass
+ ***********************************************************************
+ * SYNOPSIS:		Intercepted so that we can delay setting
+ *			the focus property until after the desired
+ *			component has been written out.
+ * PARAMETERS:	    hptr.BDescHeader	descHeader
+ *		    BDescInfo 	outputInfo
+ * SIDE EFFECTS:
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	jmagasin 1/12/96	Initial Revision
+ *
+ ***********************************************************************/
+#define _SYS_MODALS_BEHAVE_LIKE_MODALS TRUE
+/* See gdgdlog.asm.  This constant means that sys-modals will behave
+ * like modal dialogs (for the most part).
+ *  - will be app-modal
+ *  - will appear between GDT_TOOL_BOX and GDT_ON_TOP (but could
+ *    appear below a GDT_MODAL)
+ *  - will not allow interaction with any dialog other than self
+ *    or a GDT_ON_TOP when visible
+ *
+ * Without the true GIA_SYS_MODAL behavior, there is no danger of the
+ * Legos programmer "losing" the builder when a GDT_SYS_MODAL is up.
+ */
+
+@method BGadgetDialogClass, MSG_BENT_DESCRIBE_SELF
+{
+    /* Dummy pointer will be stuffed with prop name by
+       MSG_ENT_ENUM_PROPERTIES	 */ 
+    TCHAR*		dummy;
+    EventHandle		event;
+    optr		propArray, postProcessArray;
+    ComponentData   	type;
+#ifndef _SYS_MODALS_BEHAVE_LIKE_MODALS
+    Boolean 	    	sysModal = FALSE;
+#endif
+   /*
+    * Write out all the default stuff by calling our superclass, but
+    * first extract the focus property so we can ensure it's written
+    * out after the corresponding focus component (and our other
+    * properties).
+    */
+    propArray = ConstructOptr(HandleOf(oself), ECPSelf(pself)->BI_propArray);
+    postProcessArray = ConstructOptr(HandleOf(oself), 
+    	NameArrayCreateAt(ConstructOptr(HandleOf(oself),0),
+			  sizeof(ComponentData),0,0));
+    /*
+     * Remove .focus from the array so it doesn't get written out.
+     */
+    BentExtractPropertyArrayElement(_TEXT("focus"), propArray, 
+				    postProcessArray);
+
+    /* if we run from the builder, don't make the dialog system modal */
+#ifndef _SYS_MODALS_BEHAVE_LIKE_MODALS
+    if (outputInfo.BDI_flags & BDF_RUN_FROM_BUILDER)
+    {
+	@call self::MSG_ENT_GET_PROPERTY_EXTERNAL(&type, _TEXT("type"));
+	if (type.CD_data.LD_integer == GDT_SYS_MODAL)
+	{
+	    type.CD_data.LD_integer = GDT_MODAL;
+	    @call self::MSG_ENT_SET_PROPERTY_EXTERNAL(&type, _TEXT("type"));
+	    sysModal = TRUE;
+	}
+    }
+#endif
+
+
+    /*
+     * Take care of all our other properties and children.
+     */
+    @callsuper();
+
+    /* if we are sysModal, then set the value back to its proper value
+     */
+#ifndef _SYS_MODALS_BEHAVE_LIKE_MODALS
+    if (sysModal)
+    {
+	type.CD_data.LD_integer = GDT_SYS_MODAL;
+	@call self::MSG_ENT_SET_PROPERTY_EXTERNAL(&type, _TEXT("type"));
+    }
+#endif
+
+    /*
+     * If we've got no focus, don't bother to put focus
+     * back in the property array.  (User might have specified a
+     * focus, then nulled it out.  We don't want a "dialog1.focus=",
+     * i.e., syntax error, in our code.)
+     */
+    pself = ObjDerefBent(oself);
+    if (!strcmp(ECPSelf(pself)->BDI_focusString, _TEXT(""))) {
+	LMemFreeHandles(HandleOf(oself), postProcessArray);	
+	return;
+    }
+    
+   /*
+    * Write out the focus property, which was extracted earlier.
+    * Then put it back into the component's propArray, so next save
+    * it will still be there.
+    */
+    pself->BI_flags &= ~BSF_COMP_INIT;
+    event = @record self::MSG_BENT_DESCRIBE_PROPERTY(dummy, descHeader);
+    ChunkArrayEnum(postProcessArray, (void *)event, 
+		   BentProcessPropertyArrayElement);
+    ObjFreeMessage(event);
+    BentExtractPropertyArrayElement(_TEXT("focus"), 
+				    postProcessArray, propArray);
+    pself = ObjDerefBent(oself);
+    pself->BI_flags |= BSF_COMP_INIT;
+    
+    LMemFreeHandles(HandleOf(oself), postProcessArray);
+
+
+}	/* End of MSG_BENT_DESCRIBE_SELF.	*/
+
+/*********************************************************************
+ *			BGEntGetProperty
+ *********************************************************************
+ * SYNOPSIS:	Make sure we return libPropBoxURL correctly.  This 
+ *		routine is necessary because BGadgetDialog inherits from
+ *		BentWindowClass instead of BGadgetClass.
+ * REVISION HISTORY:
+ *	Name	Date		Description			     
+ *	----	----		-----------			     
+ *	dloft	 6/15/95	Initial version			     
+ * 
+ *********************************************************************/
+
+@method BGadgetDialogClass, MSG_ENT_GET_PROPERTY
+{
+    RunHeapToken stringToken;
+    TCHAR *retString = 0;
+    
+    
+    if (!strcmp(prop, _TEXT("specPropBoxURL"))) {
+	if (ObjIsObjectInClass(oself, &BGadgetFloaterClass)) {
+	    retString = _TEXT("~U\\BASIC\\SP-FLOAT");
+	} else {
+	    retString = _TEXT("~U\\BASIC\\SP-DLOG");
+	}
+    } else if (!strcmp(prop, _TEXT("libPropBoxURL"))) {
+	retString = _TEXT("~U\\BASIC\\P-GADGET");
+    }
+
+    if (retString != 0)
+    {
+
+	stringToken = RunHeapAlloc(rhi, RHT_STRING, 0,
+		     (strlen(retString) +1 ) *sizeof (TCHAR),
+		     retString);
+	
+	value->CD_type		= TYPE_STRING;
+	value->CD_data.LD_string	= stringToken;
+
+    } else if (!strcmp(prop, _TEXT("isAggTop"))) {
+	value->CD_type = TYPE_INTEGER;
+	value->CD_data.LD_integer = ((ECPSelf(pself)->BI_flags & 
+				      BSF_REMOVE_FROM_OUTPUT) != 0);
+    } else if (!strcmp(prop, _TEXT("focusString"))) {
+	/*
+	 * GadgetDialogClass has no focusString property, so we
+	 * do some special handling here to avoid an error.
+	 */
+	retString = ECPSelf(pself)->BDI_focusString;
+	EC_ERROR_IF(strlen(retString) > BENT_COMP_NAME_MAX_LENGTH, -1);
+	stringToken =
+	    RunHeapAlloc(rhi, RHT_STRING, 0,
+			 (strlen(retString) +1) * sizeof(TCHAR),
+			 retString);
+	value->CD_type = TYPE_STRING;
+	value->CD_data.LD_string = stringToken;
+    } else {
+	@callsuper();
+    }
+}
+
+/*********************************************************************
+ *			MSG_BENT_GET/SET_PROPERTY
+ *********************************************************************
+ * SYNOPSIS:	Intercepted for special handling of .focus property.
+ *	
+ * REVISION HISTORY:
+ *	Name	Date		Description			     
+ *	----	----		-----------			     
+ *	jmagasin 1/16/96	Initial version			     
+ * 
+ *********************************************************************/
+
+@method BGadgetDialogClass, MSG_BENT_GET_PROPERTY
+{
+    if ((strcmp(property, _TEXT("focus")) == 0) ||
+        (strcmp(property, _TEXT("focusString")) == 0)) {
+	strcpy(text, ECPSelf(pself)->BDI_focusString);
+	return FALSE;
+    }
+    else {
+	return @callsuper();
+    }
+}
+
+@method BGadgetDialogClass, MSG_ENT_SET_PROPERTY
+{
+    /*
+     * First see if user specified focus in the builder.
+     * Spec prop box code sets focusString, not focus.  Also, note
+     * that we keep the type as TYPE_STRING.
+     */
+    if (!strcmp(prop, _TEXT("focusString"))) {
+	TCHAR   propBuf[] = _TEXT("focus");
+	TCHAR	*focus;
+
+	RunHeapLock(rhi, value->CD_data.LD_string, (void**) &focus);
+	strcpy(ECPSelf(pself)->BDI_focusString, focus);
+	RunHeapUnlock(rhi, value->CD_data.LD_string);
+	if (strcmp(ECPSelf(pself)->BDI_focusString, _TEXT(""))) {
+	    @call self::MSG_BENT_MARK_CHANGED_PROPERTY( rhi, value, propBuf );
+	}
+    }
+    /*
+     * If "focus" is being set, then we must be loading a legos app.
+     * We need to set up our BDI_focusString with the name of the
+     * focus object.
+     */
+    else if (!strcmp(prop, _TEXT("focus"))) {
+	optr 			fObj;
+	GadgetDialogInstance	*gself;
+	
+	@callsuper();
+	gself = ObjDerefEnt(oself);
+	pself = ObjDerefBent(oself);
+	if ((fObj = gself->GDI_focus) == NullOptr) {
+	    strcpy(ECPSelf(pself)->BDI_focusString, _TEXT(""));
+	    return;
+	}
+	BentGetComponentName(fObj, ECPSelf(pself)->BDI_focusString);
+	EC_ERROR_IF(strlen(pself->BDI_focusString) > BENT_COMP_NAME_MAX_LENGTH,
+		    -1);
+    }
+    else {
+	@callsuper();
+    }
+}
+
+/*********************************************************************
+ *			MSG_GADGET_DIALOG_SET/GET_TYPE
+ *********************************************************************
+ * SYNOPSIS:	Intercept GadgetDialogClass' set/get type messages.
+ *	
+ * REVISION HISTORY:
+ *	Name	Date		Description			     
+ *	----	----		-----------			     
+ *	jmagasin 1/16/96	Initial version			     
+ * 
+ *********************************************************************/
+
+@method BGadgetDialogClass, MSG_GADGET_DIALOG_SET_TYPE
+{
+    TCHAR   	    	propBuf[BENT_PROPERTY_MAX_LENGTH + 1];
+    EC_ERROR_IF(strlen(prop) > BENT_PROPERTY_MAX_LENGTH, -1);
+
+    /* Don't change our type now.  Remember it for later, but make
+       sure the property and value get written out (mark changed). */
+    ECPSelf(pself)->BDI_type = value->CD_data.LD_integer;
+    strcpy(propBuf, prop);
+    @call self::MSG_BENT_MARK_CHANGED_PROPERTY( rhi, value, propBuf );
+}
+
+@method BGadgetDialogClass, MSG_GADGET_DIALOG_GET_TYPE
+{
+    /* Now it's okay to use the user-specified dialog type. */
+    value->CD_data.LD_integer = ECPSelf(pself)->BDI_type;
+    value->CD_type = TYPE_INTEGER;
+}
+
+/*********************************************************************
+ *		MSG_GADGET_DIALOG_BUILD_FOCUS_PATH_IN_ENT_VIS_SHOW,
+ *		MSG_GADGET_DIALOG_REMEMBER_FOCUS_IN_ENT_VIS_HIDE
+ *********************************************************************
+ * SYNOPSIS:	GadgetDialog does special .focus-related stuff for
+ *		ENT_VIS_SHOW/HIDE.  BGadgetDialog shouldn't do anything
+ *		.focus-related on ENT_VIS_SHOW/HIDE.
+ *	
+ * REVISION HISTORY:
+ *	Name	Date		Description			     
+ *	----	----		-----------			     
+ *	jmagasin 1/16/96	Initial version			     
+ * 
+ *********************************************************************/
+
+@method BGadgetDialogClass, MSG_GADGET_DIALOG_BUILD_FOCUS_PATH_IN_ENT_VIS_SHOW,
+                            MSG_GADGET_DIALOG_REMEMBER_FOCUS_IN_ENT_VIS_HIDE
+{
+    /* Do nothing! */
+}
+
+@if 0
+/* not resizable for pcv*/
+@method BGadgetDialogClass, MSG_ENT_INITIALIZE
+{
+    @callsuper();
+    ObjVarAddData(oself, HINT_INTERACTION_MAKE_RESIZABLE,0 );
+}
+@endif
+
+
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		Code for BGadgetPopupClass
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+
+@method BGadgetPopupClass, MSG_BENT_ACCEPT_POINT_IN_BOUNDS
+{
+     return TRUE;
+}
+
+@method BGadgetPopupClass, MSG_ENT_INITIALIZE
+{
+    optr    parent;
+
+    @callsuper();
+    parent = @call self::MSG_ENT_GET_PARENT();
+    @send , forceQueue parent::MSG_VIS_MARK_INVALID(VOF_WINDOW_INVALID, VUM_DELAYED_VIA_APP_QUEUE);
+}
+
+
+
+/*-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+ %		Code for BServiceTimeDateClass
+ %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+
+DefEvent(STDEvent1, "timeChanged", 0, TYPE_VOID);
+DefEvent(STDEvent2, "dateChanged", 0, TYPE_VOID);
+
+#define NUM_SERVICETIMEDATE_EVENTS	2
+DefEventArray(STDEvents, NUM_SERVICETIMEDATE_EVENTS) =
+   {&STDEvent1, &STDEvent2};
+
+@method BServiceTimeDateClass, MSG_BENT_GET_EVENTS
+{
+    eventBlockPtr = @callsuper();
+    return BentCopyEvents(NUM_SERVICETIMEDATE_EVENTS, STDEvents,
+			  eventBlockPtr);    
+}
+
+@method BServiceTimeDateClass, MSG_STD_ADD_TO_DATE_TIME_LIST,
+                               MSG_STD_REMOVE_FROM_DATE_TIME_LIST,
+                               MSG_STD_CREATE_NEW_TIMER
+{
+    /* Do nothing.  We don't want BServiceTimeDate on GCNSLT_TIME_DATE. */
+    /* We don't want BServiceTimeDate creating a timer. */
+}
+
+
+/*-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+ %		Code for BServiceAlarmClass
+ %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+
+/*- No events any more */
+
+/*
+DefEvent(SAEvent1, "alarm", 0, TYPE_VOID);
+
+#define NUM_SERVICEALARM_EVENTS	1	
+DefEventArray(SAEvents, NUM_SERVICEALARM_EVENTS) = {&SAEvent1};
+@method BServiceAlarmClass, MSG_BENT_GET_EVENTS
+{
+    eventBlockPtr = @callsuper();
+    return BentCopyEvents(NUM_SERVICEALARM_EVENTS, SAEvents,
+			  eventBlockPtr);
+}
+*/
+
+/*-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+ %		Code for BServiceTimerClass
+ %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+
+DefEvent(STEvent1, "ring", 0, TYPE_VOID);
+
+#define NUM_SERVICETIMER_EVENTS	1
+DefEventArray(STEvents, NUM_SERVICETIMER_EVENTS) = {&STEvent1};
+
+@method BServiceTimerClass, MSG_BENT_GET_EVENTS
+{
+    eventBlockPtr = @callsuper();
+    return BentCopyEvents(NUM_SERVICETIMER_EVENTS, STEvents,
+			  eventBlockPtr);
+}
+
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+ %		Code for BServiceClipboardClass
+ %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+
+DefEvent(SCBEvent1, "selectionChanged", 0, TYPE_VOID);
+DefEvent(SCBEvent2, "clipboardChanged", 0, TYPE_VOID);
+
+#define NUM_SERVICECLIPBOARD_EVENTS	2
+DefEventArray(SCBEvents, NUM_SERVICECLIPBOARD_EVENTS) =
+   {&SCBEvent1, &SCBEvent2};
+
+@method BServiceClipboardClass, MSG_BENT_GET_EVENTS
+{
+    eventBlockPtr = @callsuper();
+    return BentCopyEvents(NUM_SERVICECLIPBOARD_EVENTS, SCBEvents,
+			  eventBlockPtr);
+}
+
+
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		Code for BGadgetSpacer
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+
+@method BGadgetSpacerClass, MSG_VIS_DRAW
+{
+    @callsuper();
+    BentDrawBoxIfNotSelected(oself, gstate);
+}
+
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		Code for BGadgetPicture
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+
+@method BGadgetPictureClass, MSG_VIS_DRAW
+{
+    @callsuper();
+    BentDrawBoxIfNotSelected(oself, gstate);
+}
+
+
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		Code for BGadgetTextClass
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+
+BentEventDescriptionStruct BGadgetTextEvent1 = {_TEXT("filterChar"), 4, TYPE_INTEGER, 1};
+BentEventArgDescriptionStruct  BGadgetTextAppliedArg1 = {_TEXT("newChar"), TYPE_INTEGER};
+BentEventArgDescriptionStruct  BGadgetTextAppliedArg2 = {_TEXT("replaceStart"), TYPE_INTEGER};
+BentEventArgDescriptionStruct  BGadgetTextAppliedArg3 = {_TEXT("replaceEnd"), TYPE_INTEGER};
+BentEventArgDescriptionStruct  BGadgetTextAppliedArg4 = {_TEXT("endOfGroup"), TYPE_INTEGER};
+
+BentEventDescriptionStruct BGadgetTextEvent2 = {_TEXT("scrolled"), 0, TYPE_VOID,1};
+
+BentEventDescriptionStruct  BGadgetTextEvent3 = {_TEXT("numLinesChanged"), 0,TYPE_VOID,1};
+
+#define NUM_GADGETTEXT_EVENTS	4
+BentEventDescriptionStruct *BGadgetTextEvents[NUM_GADGETTEXT_EVENTS] =
+   {&BGadgetTextEvent1,
+    &BGadgetTextEvent2,
+    &BGadgetTextEvent3,
+    &ClipboardableEvent1};
+
+@method BGadgetTextClass, MSG_BENT_GET_EVENTS
+{
+    eventBlockPtr = @callsuper();
+    return BentCopyEvents(NUM_GADGETTEXT_EVENTS, BGadgetTextEvents,
+			  eventBlockPtr);
+}
+
+
+@method BGadgetTextClass, MSG_ENT_INITIALIZE
+{
+    @callsuper();
+
+    /*
+     * Add hint so gandalf knows not to send it pointer events.
+     * This is a big ole hack.
+     */
+    ObjVarAddData(oself, HINT_NEVER_ADOPT_MENUS, 0);
+    
+}
+
+       
+
+/***********************************************************************
+ *		MSG_BENT_DESCRIBE_SELF for BGadgetTextClass
+ ***********************************************************************
+ * SYNOPSIS:		Write out .text one line at a time in case
+ *			the text has embedded new lines.
+ * PARAMETERS:		(see .goh file)
+ * SIDE EFFECTS:
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	RON	12/ 4/95	Initial Revision
+ *
+ ***********************************************************************/
+@method BGadgetTextClass, MSG_BENT_DESCRIBE_SELF
+{
+    /* Dummy pointer will be stuffed with prop name by
+       MSG_ENT_ENUM_PROPERTIES	 */ 
+    TCHAR*			dummy;
+    EventHandle		event;
+    optr		desc;
+    optr		propArray, postProcessArray;
+    word		textPropIndex;
+    int			element;
+    
+					
+   /*
+    * Write out all the default stuff by calling our superclass, but
+    * first extract the visible and text properties so we can
+    * insure they are written out last.
+    */
+    propArray = ConstructOptr(HandleOf(oself), ECPSelf(pself)->BI_propArray);
+    postProcessArray = ConstructOptr(HandleOf(oself),
+	NameArrayCreateAt(ConstructOptr(HandleOf(oself),0),
+			  sizeof(ComponentData),0,0));
+    /*
+     * Remove .text from the array so it doesn't get written out.
+     */
+    element =  NameArrayFind(propArray, _TEXT("text"),
+			     0,0);
+    
+    if (element != CA_NULL_ELEMENT)
+    {
+	ElementArrayDelete(propArray,element);
+    }		    
+    
+    /*
+     * Copy .visible from propArray to postProcessArray so we can 
+     * write it out later...
+     */
+    BentExtractPropertyArrayElement(_TEXT("visible"), propArray, 
+				    postProcessArray);
+    
+    @callsuper();
+
+    pself = ObjDerefBent(oself);
+    pself->BI_flags &= ~BSF_COMP_INIT;
+    
+   /* Now write out the text, one paragraph at a time.
+    *		text.AppendString(line1);
+    *		text.AppendString(line2);
+    *		...
+    */
+    WriteTextLines(oself, descHeader);
+    
+
+   /*
+    * Write out the left over properties that were extracted earlier,
+    * then put them back into the component's propArray, so next save
+    * the properties will still be there.
+    */
+    event = @record self::MSG_BENT_DESCRIBE_PROPERTY(dummy, descHeader);
+    ChunkArrayEnum(postProcessArray, (void *)event, 
+		   BentProcessPropertyArrayElement);
+    ObjFreeMessage(event);
+    BentExtractPropertyArrayElement(_TEXT("visible"), 
+				    postProcessArray, propArray);
+    pself = ObjDerefBent(oself);
+    pself->BI_flags |= BSF_COMP_INIT;
+    
+    LMemFreeHandles(HandleOf(oself), postProcessArray);
+
+
+}	/* End of MSG_BENT_DESCRIBE_SELF.	*/
+
+
+/*********************************************************************
+ *			WriteEscapedString
+ *********************************************************************
+ * SYNOPSIS:	Write a string to a buffer adding BACKSLASHES before
+ *		QUOTES and BACKSLASHES
+ * CALLED BY:	WriteTextLines
+ * PASS:	TCHAR *destBuffer
+ *		TCHAR *srcBuffer
+ * RETURN:	nothing
+ * SIDE EFFECTS:
+ * STRATEGY:
+ * REVISION HISTORY:
+ *	Name	Date		Description			     
+ *	----	----		-----------			     
+ *	RON	3/ 8/96	Initial version
+ * 
+ *********************************************************************/
+void WriteEscapedString(TCHAR *dest, TCHAR *src)
+{
+    /*
+     * case for exiting loop inside loop.
+     */
+    EC_BOUNDS(src);
+    EC_BOUNDS(dest);
+    while (1)
+    {
+	switch (*src)
+	{
+	case C_NULL:
+	    *dest = *src;
+	    EC_BOUNDS(src);
+	    EC_BOUNDS(dest);
+	    return;
+
+	case C_BACKSLASH:
+	    /* Write 2 backslashes to escape it. */
+	    *dest++ = *src;
+	    *dest++ = *src++;
+	    break;
+	    
+	case C_QUOTE:
+	    *dest++ = C_BACKSLASH;
+	    *dest++ = *src++;
+	    break;
+
+	default:
+	    *dest++ = *src++;
+	}
+    }
+}    		
+		
+
+
+/*********************************************************************
+ *			WriteTextLines
+ *********************************************************************
+ * SYNOPSIS:	Write out all paragraphs one line at a time.
+ *		The compiler doesn't like getting embedded CR's in
+ *		strings, so we need to write each line or change the
+ *		CR's to \r
+ * CALLED BY:	BGadgetText::MSG_BENT_DESCRIBE_SELF
+ * PASS:	optr	oself	; the text object
+ *		MemHandle descHeader; buffer to write to
+ * RETURN:	nothing
+ * SIDE EFFECTS:
+ * STRATEGY:
+ * REVISION HISTORY:
+ *	Name	Date		Description			     
+ *	----	----		-----------			     
+ *	RON	12/ 4/95	Initial version
+ * 
+ *********************************************************************/
+void WriteTextLines(optr oself, MemHandle descHeader)
+{
+    VisTextGetLineOffsetAndFlagsParameters	lineOffsetParams;
+    TextReference	ref;
+    
+    int		lineCount;
+    LineFlags	lineFlags;
+    TCHAR *	descP;
+    long	end, start;
+
+    TCHAR *	lineStart;
+    int		len;
+    TCHAR *	ptr;
+    MemHandle	tempBlock;
+    TCHAR *	tempPtr;
+
+    MemHandle	descHan;
+    
+
+    /*
+     * if there is no text, don't do anything.
+     */
+    len = @call self::MSG_VIS_TEXT_GET_TEXT_SIZE();
+    
+    if (len == 0)
+    {
+	return;
+    }
+    /*
+     * If it is not realized then the there is no line info so we need
+     * to just write out the lines one at a time.
+     */
+
+
+    /* add space for various self.AppendString()
+     * We use a constant here to try and not reallocate a lot later
+     * and allocate a huge buffer now.  We will have to check the
+     * space inside the loop though.
+     */
+    BentEnsureBufferSpace(descHeader, len * sizeof(TCHAR) + 400);
+    descP = BentLockDescription(descHeader, &descHan);
+    
+    tempBlock = @call self::MSG_VIS_TEXT_GET_ALL_BLOCK(0);
+    EC_BOUNDS(descP+len);
+
+    tempPtr = MemLock(tempBlock);
+
+    ptr = strchr(tempPtr, C_CR);
+    while (ptr != NULL)
+    {
+	/*
+	 * Convert the CR to a Nil in the temp buffer to make
+	 * string operations easier.
+	 */
+	
+	*ptr = '\0';		/* overwrite '\r' with nil */
+	
+	/*
+	 * Make sure there is enough buffer space.
+	 * Since there probably is, due to the initial alloc,
+	 * this call isn't too painful.
+	 */
+	    
+	BentUnlockDescription(descHan);
+	/*
+	 * Reserve space for the string plus "selfName.AppendString()\r"
+	 * Note: selfName can be long so just use 100 chars.
+	 * Note 2: each character may have to be escaped so use
+	 * 2 * strlen.  (QUOTES, BACKSLASHES, need to be escaped before
+	 * written out.
+	 */
+	BentEnsureBufferSpace(descHeader,
+			      (2*strlen(tempPtr)+100)* sizeof(TCHAR));
+	
+	descP = BentLockDescription(descHeader, &descHan);
+	
+	/*
+	 * Write in self.AppendString(
+	 */
+	BentGetComponentName(oself, descP);
+	strcat(descP, _TEXT(".AppendString(\""));
+	descP = strchr(descP, C_NULL);
+
+
+	/*
+	 * Write the string.
+	 */
+
+	WriteEscapedString(descP, tempPtr);
+
+	/*
+	 * Write "\r)\n"	\r is for text, \n is for interp
+	 */
+	EC_BOUNDS(descP);
+	strcat(descP, _TEXT("\\r\")\n\0"));
+	descP = strchr(descP, C_NULL);
+	
+	tempPtr = ptr+1;		/* go past \r */
+	ptr = strchr(tempPtr, C_CR);
+    }
+
+    /* Now write the last line that didn't end with a CR */
+    
+    /*
+     * Write in self.AppenString(
+     */
+    BentUnlockDescription(descHan);
+    BentEnsureBufferSpace(descHeader,
+			  (2*strlen(tempPtr)+100)* sizeof(TCHAR));
+    descP = BentLockDescription(descHeader, &descHan);
+    
+    BentGetComponentName(oself, descP);
+    strcat(descP, _TEXT(".AppendString(\""));
+    descP = strchr(descP, C_NULL);
+
+    WriteEscapedString(descP, tempPtr);
+
+    /*
+     * Write "\r)\n"	\r is for text, \n is for interp
+     */
+    strcat(descP, _TEXT("\")\n\0"));
+
+    MemFree(tempBlock);
+    BentUnlockDescription(descHan);
+}
+
+/***********************************************************************
+ *		MSG_BENT_GET_VIS_ROOT for BentClass
+ ***********************************************************************
+ * SYNOPSIS:	Returns the visible object to use as the container
+ *		for this component.  The bounds and window are used
+ *		for drawing selection et al.
+ * PARAMETERS:	
+ * SIDE EFFECTS:
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	RON	2/ 7/96   	Initial Revision
+ *
+ ***********************************************************************/
+@method BGadgetTextClass, MSG_BENT_GET_VIS_ROOT
+{
+    optr head;
+    SpecAttrs sa;
+    
+    sa = @call self::MSG_SPEC_GET_ATTRS();
+    if (sa & SA_SIMPLE_GEN_OBJ) head = oself;
+    else head = @call self::MSG_SPEC_GET_SPECIFIC_VIS_OBJECT(0);
+    if (head == NullOptr) head = oself;
+
+    return head;
+
+}	/* End of MSG_BENT_GET_VIS_ROOT.	*/
+
+
+
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		Code for BGadgetEntryClass
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+/*********************************************************************
+ *			BGadgetEntryBentGetEvents
+ *********************************************************************
+ * SYNOPSIS: 	
+ * CALLED BY:	
+ * RETURN:	
+ * SIDE EFFECTS:
+ * STRATEGY:
+ * REVISION HISTORY:
+ *	Name	Date		Description			     
+ *	----	----		-----------			     
+ *	ron	 2/23/95	Initial version			     
+ * 
+ *********************************************************************/
+
+/* Entry shares the filter events from text.
+   */
+BentEventDescriptionStruct BGadgetEntryEvent1=
+	{_TEXT("entered"), 0, TYPE_VOID, 1};
+
+#define NUM_GADGETENTRY_EVENTS	3
+BentEventDescriptionStruct *BGadgetEntryEvents[NUM_GADGETENTRY_EVENTS] =
+{
+    &BGadgetEntryEvent1,
+    &BGadgetTextEvent1,
+    &ClipboardableEvent1
+};
+
+@method BGadgetEntryClass, MSG_BENT_GET_EVENTS
+{
+    eventBlockPtr = @callsuper();
+    
+    return BentCopyEvents(NUM_GADGETENTRY_EVENTS, BGadgetEntryEvents,
+			  eventBlockPtr);
+}
+
+
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		Code for BGadgetScrollbarClass
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+
+/*********************************************************************
+ *			BGadgetScrollbarBentGetEvents
+ *********************************************************************
+ * SYNOPSIS: 	Return information about our events
+ * CALLED BY:	EventList
+ * RETURN:	BentEventTypicalDescriptionStruct *eventBlockPtr
+ * REVISION HISTORY:
+ *	Name	Date		Description			     
+ *	----	----		-----------			     
+ *	dloft	9/26/95		Initial version			     
+ * 
+ *********************************************************************/
+
+@ifdef OLD_SCROLLBAR_EVENTS
+BentEventDescriptionStruct BGadgetScrollbarEvent1=
+	{_TEXT("thumbMoved"), 0, TYPE_VOID, 1};
+
+BentEventDescriptionStruct BGadgetScrollbarEvent2=
+	{_TEXT("upArrowClicked"), 0, TYPE_VOID, 1};
+
+BentEventDescriptionStruct BGadgetScrollbarEvent3=
+	{_TEXT("downArrowClicked"), 0, TYPE_VOID, 1};
+
+BentEventDescriptionStruct BGadgetScrollbarEvent4=
+	{_TEXT("pageUpClicked"), 0, TYPE_VOID, 1};
+
+BentEventDescriptionStruct BGadgetScrollbarEvent5=
+	{_TEXT("pageDownClicked"), 0, TYPE_VOID, 1};
+
+#define NUM_GADGETSCROLLBAR_EVENTS	5
+BentEventDescriptionStruct
+*BGadgetScrollbarEvents[NUM_GADGETSCROLLBAR_EVENTS] =
+{
+    &BGadgetScrollbarEvent1,
+    &BGadgetScrollbarEvent2,
+    &BGadgetScrollbarEvent3,
+    &BGadgetScrollbarEvent4,
+    &BGadgetScrollbarEvent5
+};
+@else
+
+BentEventDescriptionStruct BGadgetScrollbarEvent1 =
+{_TEXT("changed"), 1, TYPE_VOID, 1};
+BentEventArgDescriptionStruct BGadgetScrollbarArg1 = 
+	{ _TEXT("scrollType"), TYPE_INTEGER };
+
+BentEventDescriptionStruct *BGadgetScrollbarEvents[1] = 
+{
+    &BGadgetScrollbarEvent1
+};
+     
+    
+@endif
+
+
+@method BGadgetScrollbarClass, MSG_BENT_GET_EVENTS
+{
+/* Don't want superclass's changed event... */
+/*    eventBlockPtr = @callsuper();*/
+    
+#ifdef OLD_SCROLLBAR_EVENTS
+    return BentCopyEvents(NUM_GADGETSCROLLBAR_EVENTS,
+			  BGadgetScrollbarEvents,
+			  eventBlockPtr);
+#else
+    return BentCopyEvents(1, BGadgetScrollbarEvents, eventBlockPtr);
+#endif
+    
+}
+
+
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+u		Code for BGadgetTableClass
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+
+BentEventDescriptionStruct BGadgetTableEvent1 =
+	{_TEXT("selectionChanged"), 0, TYPE_VOID, 1};
+BentEventDescriptionStruct BGadgetTableEvent2 =
+	{_TEXT("aboutToDraw"), 0, TYPE_VOID, 1};
+
+BentEventDescriptionStruct BGadgetTableEvent3 =
+	{_TEXT("drawCell"), 4, TYPE_VOID, 1};
+BentEventArgDescriptionStruct BGadgetTableDrawArg1 = {_TEXT("row"), TYPE_INTEGER };
+BentEventArgDescriptionStruct BGadgetTableDrawArg2 = {_TEXT("column"), TYPE_INTEGER };
+BentEventArgDescriptionStruct BGadgetTableDrawArg3 = {_TEXT("x"), TYPE_INTEGER };
+BentEventArgDescriptionStruct BGadgetTableDrawArg4 = {_TEXT("y"), TYPE_INTEGER };
+BentEventDescriptionStruct BGadgetTableEvent4 =
+	{_TEXT("scrolled"), 0, TYPE_VOID, 1};
+BentEventDescriptionStruct BGadgetTableEvent5 =
+	{_TEXT("overallHeightChanged"), 0, TYPE_VOID, 1};
+
+
+#define NUM_GADGETTABLE_EVENTS	5
+BentEventDescriptionStruct *BGadgetTableEvents[NUM_GADGETTABLE_EVENTS] =
+   {&BGadgetTableEvent1,
+    &BGadgetTableEvent2,
+    &BGadgetTableEvent3,
+    &BGadgetTableEvent4,
+    &BGadgetTableEvent5
+};
+
+@method BGadgetTableClass, MSG_BENT_GET_EVENTS
+{
+    eventBlockPtr = @callsuper();
+    return BentCopyEvents(NUM_GADGETTABLE_EVENTS, BGadgetTableEvents,
+			  eventBlockPtr);
+}
+
+
+/***********************************************************************
+ *		MSG_BENT_DESCRIBE_SELF for BGadgetTableClass
+ ***********************************************************************
+ * SYNOPSIS:	    
+ * PARAMETERS:	    
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	martin	10/6/95   	Initial version
+ *
+ ***********************************************************************/
+@method BGadgetTableClass, MSG_BENT_DESCRIBE_SELF
+{
+    /* Dummy pointer will be stuffed with prop name by
+       MSG_ENT_ENUM_PROPERTIES   */ 
+    TCHAR*	  		dummy;
+    EventHandle	  	event;
+    int			i;
+    TCHAR*		descP;
+    MemHandle		descHan;
+    GadgetTableInstance	*gself;
+    optr		propArray, postProcessArray;
+    ComponentData	selectionType, mouseInterest;
+	     				
+   /*
+    * Write out all the default stuff by calling our superclass, but
+    * first extract the visible and selectedItem properties so we can
+    * insure they are written out last.
+    */
+    propArray = ConstructOptr(HandleOf(oself), ECPSelf(pself)->BI_propArray);
+    postProcessArray = ConstructOptr(HandleOf(oself),
+			NameArrayCreateAt(ConstructOptr(HandleOf(oself),0),
+			  sizeof(ComponentData),0,0));
+    BentExtractPropertyArrayElement(_TEXT("visible"), propArray, 
+				    postProcessArray);
+
+    /* mouseInterest is ignored unless selectionType is 5, in which case
+     * it defaults to 2.  Thus, only write it out if type == 5, interest != 2
+     */
+    @call self::MSG_ENT_GET_PROPERTY_EXTERNAL
+	(&selectionType, _TEXT("selectionType"));
+    @call self::MSG_ENT_GET_PROPERTY_EXTERNAL
+	(&mouseInterest, _TEXT("mouseInterest"));
+    if ((selectionType.CD_type != TYPE_INTEGER) ||
+	(mouseInterest.CD_type != TYPE_INTEGER))
+    {
+	EC_WARNING(-1);
+    }
+    else if ((selectionType.CD_data.LD_integer == 5) &&
+	     (mouseInterest.CD_data.LD_integer != 2))
+    {
+	/* Delete it if it's there, then tack one on at the end */
+	BentExtractPropertyArrayElement
+	    (_TEXT("mouseInterest"), propArray, 0);
+	mouseInterest.CD_data.LD_integer = 2; /* just reuse this thing */
+	NameArrayAdd(propArray, _TEXT("mouseInterest"), 0, 0, &mouseInterest);
+    }
+    else
+    {
+	BentExtractPropertyArrayElement
+	    (_TEXT("mouseInterest"), propArray, 0);
+    }
+    
+    @callsuper();
+
+    pself = ObjDerefBent(oself);
+    pself->BI_flags &= ~BSF_COMP_INIT;
+    
+   /*
+    * Now enumerate table items and write out actions to create them.
+    *		comp.RowHeights(1, height)
+    */
+    gself = ObjDerefEnt(oself);
+    i = gself->GT_numRows;
+    while(--i >= 0)
+    {
+	ComponentData  	result;
+
+	
+	BentEnsureBufferSpace(descHeader, DESCRIPTION_MAX_LINE_SIZE);
+	descP = BentLockDescription(descHeader, &descHan);
+
+	BentGetComponentName(oself, descP);
+	descP = strchr(descP, C_NULL);
+	strcpy(descP, _TEXT(".rowHeights["));
+	descP += 12;
+	itoa(i, descP);
+	descP = strchr(descP, C_NULL);
+	strcpy(descP, _TEXT("]="));
+	descP += 2;
+	
+	EntCallAction(oself, _TEXT("GetrowHeights"), &result, 1, 
+		      TYPE_INTEGER, i);
+	itoa(result.CD_data.LD_integer, descP);
+	
+	descP = strchr(descP, C_NULL);
+	strcpy(descP, _TEXT("\n"));
+
+	BentUnlockDescription(descHan);
+    }
+
+   /*
+    * Now enumerate table items and write out actions to create them.
+    *		comp.ColumnWidths(1, width)
+    */
+    gself = ObjDerefEnt(oself);
+    i = gself->GT_numCols;
+    while(--i >= 0) {
+	ComponentData  	result;
+
+	BentEnsureBufferSpace(descHeader, DESCRIPTION_MAX_LINE_SIZE);
+	descP = BentLockDescription(descHeader, &descHan);
+	BentGetComponentName(oself, descP);
+	descP = strchr(descP, C_NULL);
+	strcpy(descP, _TEXT(".columnWidths["));
+	descP += 14;
+	itoa(i, descP);
+	descP = strchr(descP, C_NULL);
+	strcpy(descP, _TEXT("]="));
+	descP += 2;
+	
+	EntCallAction(oself, _TEXT("GetcolumnWidths"), &result, 1, 
+		      TYPE_INTEGER, i);
+	itoa(result.CD_data.LD_integer,descP);
+	
+	descP = strchr(descP, C_NULL);
+	strcpy(descP, _TEXT("\n"));
+
+	BentUnlockDescription(descHan);
+    }
+
+   /*
+    * Write out the left over properties that were extracted earlier,
+    * then put them back into the component's propArray, so next save
+    * the properties will still be there.
+    */
+    event = @record self::MSG_BENT_DESCRIBE_PROPERTY(dummy, descHeader);
+    ChunkArrayEnum(postProcessArray, (void *)event, 
+		   BentProcessPropertyArrayElement);
+    ObjFreeMessage(event);
+    BentExtractPropertyArrayElement(_TEXT("visible"), 
+				    postProcessArray, propArray);
+    pself = ObjDerefBent(oself);
+    pself->BI_flags |= BSF_COMP_INIT;
+    
+    LMemFreeHandles(HandleOf(oself), postProcessArray);
+
+
+}	/* End of MSG_BENT_DESCRIBE_SELF.	*/
+
+
+@method BGadgetTableClass, MSG_GADGET_TABLE_ACTION_SET_ROW_HEIGHTS,
+			   MSG_GADGET_TABLE_ACTION_SET_COLUMN_WIDTHS
+{
+    optr	interp;
+    @callsuper();
+    
+    /*
+     * Tell the interpreter that the UI is dirty so it recompiles
+     */
+
+    pself = ObjDerefBent(oself);
+    interp = EntGetInterpreter(pself);
+    @call interp::MSG_BENT_MANAGER_SET_FLAGS(BF_UI_DIRTY,0);
+}
+
+
+
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		Code for BGadgetLabelClass
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+@method BGadgetLabelClass, MSG_VIS_DRAW
+{
+    @callsuper();
+    BentDrawBoxIfNotSelected(oself, gstate);
+}
+
+
+
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		Code for BSystemBusyClass
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+
+BentEventDescriptionStruct BSystemBusyEvent1 =
+     {_TEXT("busyTotalChanged"), 0, TYPE_VOID, 1};
+
+#define NUM_SYSTEMBUSY_EVENTS	1
+BentEventDescriptionStruct *BSystemBusyEvents[NUM_SYSTEMBUSY_EVENTS] =
+   {&BSystemBusyEvent1};
+
+@method BSystemBusyClass, MSG_BENT_GET_EVENTS
+{
+    eventBlockPtr = @callsuper();
+    return BentCopyEvents(NUM_SYSTEMBUSY_EVENTS, BSystemBusyEvents,
+			  eventBlockPtr);
+}
+
+/*********************************************************************
+ *			MSG_SYSTEM_BUSY_ADD_TO_BUSY_ARRAY
+ *			MSG_SYSTEM_BUSY_REMOVE_FROM_BUSY_ARRAY
+ *********************************************************************
+ * SYNOPSIS:	BSystemBusy has no business messing with
+ *		the array of busy components.  Intercept
+ *		these messages and do nothing.
+ *	
+ * REVISION HISTORY:
+ *	Name	Date		Description			     
+ *	----	----		-----------			     
+ *	jmagasin 3/28/96	Initial version			     
+ * 
+ *********************************************************************/
+
+@method BSystemBusyClass, MSG_SYSTEM_BUSY_ADD_SELF_TO_BUSY_ARRAY,
+                          MSG_SYSTEM_BUSY_REMOVE_SELF_FROM_BUSY_ARRAY
+{
+    /* Do nothing! */
+}

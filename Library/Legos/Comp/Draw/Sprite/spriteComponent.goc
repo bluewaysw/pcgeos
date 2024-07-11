@@ -1,0 +1,545 @@
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+	Copyright (c) Geoworks 1995 -- All Rights Reserved
+
+PROJECT:	PC/GEOS - LEGOS
+MODULE:		Basic Component Set - Sprite Component
+FILE:		spriteComponent.goc
+
+AUTHOR:		Martin Turon, April 10, 1995
+
+ROUTINES:
+	Name			Description
+	----			-----------
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	martin	4/10/95   	Initial version.
+
+DESCRIPTION:
+
+	$Id: spriteComponent.goc,v 1.1 98/05/13 15:00:17 martin Exp $
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+
+
+@include "drawInternal.goh"
+@include <sprite.goh>
+
+@classdecl SpriteComponentClass;
+
+
+/***************************************************************************
+ *		Constants
+ **************************************************************************/
+
+#define	DEFAULT_FRAME_COUNT	4	     /* How many to optrs to   */
+					     /* allocate in the frame  */
+					     /*	array by default       */
+
+/********************************************************
+ *        SpriteComponentClass Property Dispatch Tables
+ ********************************************************/
+
+/*
+
+@propertyDecl(SPRITE, X,          INTEGER,    "x");
+@propertyDecl(SPRITE, Y,          INTEGER,    "y");
+@propertyDecl(SPRITE, XVEL,       INTEGER,    "xVel");
+@propertyDecl(SPRITE, YVEL,       INTEGER,    "yVel");
+@propertyDecl(SPRITE, ROTATION,   INTEGER,    "rotation");
+@propertyDecl(SPRITE, COLOR,      INTEGER,    "color");
+@propertyDecl(SPRITE, IMAGECOUNT, INTEGER,    "imageCount");
+
+PropEntryStruct _near *SpriteComponentPropTable[] = {
+    mkPropTableEntry(SPRITE, X),
+    mkPropTableEntry(SPRITE, Y),
+    mkPropTableEntry(SPRITE, XVEL),
+    mkPropTableEntry(SPRITE, YVEL),
+    mkPropTableEntry(SPRITE, ROTATION),
+    mkPropTableEntry(SPRITE, COLOR),
+    mkPropTableEntry(SPRITE, IMAGECOUNT),
+    endPropTable
+};
+
+*/
+
+/***************************************************************************
+ *              Code for SpriteComponentClass
+ **************************************************************************/
+
+
+/***********************************************************************
+ *		MSG_META_INITIALIZE for SpriteComponentClass
+ ***********************************************************************
+ * SYNOPSIS:	    
+ * PARAMETERS:	    
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	martin	4/10/95   	Initial version
+ *
+ ***********************************************************************/
+@method SpriteComponentClass, MSG_META_INITIALIZE
+{
+    @callsuper();
+    pself->EI_state &= ~ES_IS_GEN;
+    pself->EI_state |= ES_IS_VIS;
+}	/* End of MSG_META_INITIALIZE.	*/
+
+/***********************************************************************
+ *		MSG_META_RESOLVE_VARIANT_SUPERCLASS for SpriteComponentClass 
+ ***********************************************************************
+ * SYNOPSIS:	   Inform the system what class to use as the superclass 
+ *		   for the variant class of a particular object.
+ *
+ * PARAMETERS:	   word	MasterOffset 
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	martin	4/10/95		Initial version
+ *
+ ***********************************************************************/
+@method SpriteComponentClass, MSG_META_RESOLVE_VARIANT_SUPERCLASS
+{
+    if (MasterOffset == word_offsetof(EntBase, Ent_offset)) {
+	return &SpriteClass;
+    }
+    return @callsuper();
+}	/* End of MSG_META_RESOLVE_VARIANT_SUPERCLASS.	*/
+
+
+/***********************************************************************
+ *		MSG_ENT_INITIALIZE for SpriteComponentClass
+ ***********************************************************************
+ * SYNOPSIS:	    
+ * PARAMETERS:	    
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	martin	4/17/95   	Initial version
+ *
+ ***********************************************************************/
+@method SpriteComponentClass, MSG_ENT_INITIALIZE
+{
+    SpriteInstance *sself;
+    ChunkHandle    gstringArray;
+
+   /*
+    * Allocate an initial gstringArray to store an optr to a gstring for
+    * each frame of a the current animation sequence for this sprite.
+    * Don't forget to allocate room for the null, and to zero out the image
+    * count!
+    */
+    gstringArray = LMemAlloc(HandleOf(oself),
+			     (DEFAULT_FRAME_COUNT + 1)*sizeof(optr));
+    sself = ObjDerefVis(oself);
+
+    sself->SI_imageCount   = 0;
+    sself->SI_gstringArray = gstringArray;
+
+}	/* End of MSG_ENT_INITIALIZE.	*/
+
+
+/***********************************************************************
+ *		MSG_ENT_VALIDATE_PARENT for SpriteComponentClass
+ ***********************************************************************
+ * SYNOPSIS:	    
+ * PARAMETERS:	    
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	martin	4/11/95   	Initial version
+ *
+ ***********************************************************************/
+@method SpriteComponentClass, MSG_ENT_VALIDATE_PARENT
+{
+    Boolean  validParent;
+
+    MemLock(HandleOf(parentPtr));
+    validParent = ObjIsObjectInClass(parentPtr, &SpriteContentComponentClass);
+    MemUnlock(HandleOf(parentPtr));
+
+    if (validParent) return 0;
+    else return -1;
+}	/* End of MSG_ENT_VALIDATE_PARENT.	*/
+
+
+/***********************************************************************
+ *		MSG_ENT_SET_PROPERTY for SpriteComponentClass
+ ***********************************************************************
+ * SYNOPSIS:	    
+ * PARAMETERS:	ComponentData 	*value
+ *		char		*prop
+ *
+ * SIDE EFFECTS:    
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	martin	4/10/95   	Initial version
+ *
+ ***********************************************************************/
+@method SpriteComponentClass, MSG_ENT_SET_PROPERTY
+{
+    SpriteInstance *sself = ObjDerefVis(oself);
+
+    if (!strcmp(prop,_TEXT("x"))) {
+	VisInstance *vself = ObjDerefVis(oself);
+	vself->VI_bounds.R_left = value->CD_data.LD_integer;
+
+    } else if (!strcmp(prop,_TEXT("y"))) {
+	VisInstance *vself = ObjDerefVis(oself);
+	vself->VI_bounds.R_top = value->CD_data.LD_integer;
+
+    } else if (!strcmp(prop,_TEXT("xVel"))) {
+	sself->SI_XVelocity = value->CD_data.LD_integer;
+
+    } else if (!strcmp(prop,_TEXT("yVel"))) {
+	sself->SI_YVelocity = value->CD_data.LD_integer;
+
+    } else if (!strcmp(prop,_TEXT("rotation"))) {
+	sself->SI_rotation = value->CD_data.LD_integer;
+
+    } else if (!strcmp(prop,_TEXT("color"))) {
+	sself->SI_color = value->CD_data.LD_integer;
+
+    } else if (!strcmp(prop,_TEXT("imageCount"))) {
+
+	int  	imageCount   = value->CD_data.LD_integer;
+	optr 	gstringArray = ConstructOptr(HandleOf(oself),
+					     sself->SI_gstringArray);
+
+       /*
+        * Set the image count, and re-allocate the gstringArray if necessary
+	*/
+
+	sself->SI_imageCount = imageCount;
+	  
+	if (gstringArray > DEFAULT_FRAME_COUNT) {
+	    LMemReAlloc(gstringArray, sizeof(optr)*(imageCount+1));
+	}
+
+    }
+}	/* End of MSG_ENT_SET_PROPERTY.	*/
+
+
+
+/***********************************************************************
+ *		MSG_ENT_GET_PROPERTY for SpriteComponentClass
+ ***********************************************************************
+ * SYNOPSIS:	    
+ * PARAMETERS:	ComponentData 	*value
+ *		char		*prop	    
+ *
+ * SIDE EFFECTS:    
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	martin	4/10/95   	Initial version
+ *
+ ***********************************************************************/
+@method SpriteComponentClass, MSG_ENT_GET_PROPERTY
+{
+    SpriteInstance *sself = ObjDerefVis(oself);
+
+    value->CD_type = TYPE_INTEGER;
+
+    if (!strcmp(prop,_TEXT("x"))) {
+	VisInstance *vself = ObjDerefVis(oself);
+	value->CD_data.LD_integer = vself->VI_bounds.R_left;
+
+    } else if (!strcmp(prop,_TEXT("y"))) {
+	VisInstance *vself = ObjDerefVis(oself);
+	value->CD_data.LD_integer = vself->VI_bounds.R_top;
+
+    } else if (!strcmp(prop,_TEXT("xVel"))) {
+	value->CD_data.LD_integer = sself->SI_XVelocity;
+
+    } else if (!strcmp(prop,_TEXT("yVel"))) {
+	value->CD_data.LD_integer = sself->SI_YVelocity;
+
+    } else if (!strcmp(prop,_TEXT("rotation"))) {
+	value->CD_data.LD_integer = sself->SI_rotation;
+
+    } else if (!strcmp(prop,_TEXT("color"))) {
+	value->CD_data.LD_integer = sself->SI_color;
+
+    } else if (!strcmp(prop,_TEXT("imageCount"))) {
+	value->CD_data.LD_integer = sself->SI_imageCount;
+	
+    }
+}	/* End of MSG_ENT_GET_PROPERTY.	*/
+
+
+
+/***********************************************************************
+ *		MSG_ENT_DO_ACTION for SpriteComponentClass
+ ***********************************************************************
+ * SYNOPSIS:	    These actions let the user define what the individual
+ *		    frames of the given sprite will look like.  This code is
+ *		    based on a HACK in the gstring component that passes the
+ *		    optr of a particular gstring as a type LONG constant.
+ *
+ * PARAMETERS:	
+ *
+ * SIDE EFFECTS:
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	martin	1/27/95   	Initial version
+ *
+ ***********************************************************************/
+@method SpriteComponentClass, MSG_ENT_DO_ACTION
+{
+    optr    		interpreter 	= EntGetInterpreter(pself);
+    SpriteInstance 	*sself 		= ObjDerefVis(oself);
+
+    if (!strcmp(actionName, _TEXT("setframe"))) {
+   /**********************************************************************
+    * ACTION:	       	setframe
+    **********************************************************************
+    * DESCRIPTION:	Sets the given frame of the gstringArray to the
+    *			given gstring.  
+    *
+    * PARAMETERS:	frameNum	as integer
+    *			gstring 	as long (HACK)
+    *
+    * REVISION HISTORY:
+    *	Name	Date		Description
+    *	----	----		-----------
+    *	martin	5/24/95   	Initial version
+    *
+    **********************************************************************/
+	int  		frameNum 	= argv[0].CD_data.LD_integer;
+	ChunkHandle 	frameArrayHan 	= sself->SI_gstringArray;
+	optr	    	*frameArray;
+
+	if (frameNum > sself->SI_imageCount) {
+	    /* 
+	     * Expand the array of gstring frames.
+	     */
+	}
+	    
+       /*
+	* Stuff the gstring into the frame array.
+	*/
+	frameArray = LMemDerefHandles(HandleOf(oself), frameArrayHan);
+	frameArray[frameNum] = (optr)argv[1].CD_data.LD_long;
+
+    } else if (!strcmp(actionName, _TEXT("getframe"))) {
+   /**********************************************************************
+    * ACTION:	       	getframe
+    **********************************************************************
+    * DESCRIPTION:	Returns the gstring for the given frame.
+    *
+    * PARAMETERS:	frameNum	as integer
+    *
+    * REVISION HISTORY:
+    *	Name	Date		Description
+    *	----	----		-----------
+    *	martin	5/24/95   	Initial version
+    *
+    **********************************************************************/
+	int  		frameNum 	= argv[0].CD_data.LD_integer;
+	ChunkHandle 	frameArrayHan 	= sself->SI_gstringArray;
+	optr	    	*frameArray;
+
+	frameArray = LMemDerefHandles(HandleOf(oself), frameArrayHan);
+	retval->CD_type = TYPE_LONG;
+	retval->CD_data.LD_long = (long)frameArray[frameNum];
+
+    } else {
+	@callsuper();
+    }
+}	/* End of MSG_ENT_DO_ACTION.	*/
+
+
+/***********************************************************************
+ *		MSG_ENT_CHECK_ACTION for SpriteComponentClass
+ ***********************************************************************
+ * SYNOPSIS:	    I really dislike having to write this routine...
+ *		    Tables seem more intuitive...
+ * PARAMETERS:	    
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	martin	4/10/95   	Initial version
+ *
+ ***********************************************************************/
+@method SpriteComponentClass, MSG_ENT_CHECK_ACTION
+{
+    return (!strcmp(action,_TEXT("setframe")) || 
+	    !strcmp(action,_TEXT("getframe")));
+}	/* End of MSG_ENT_CHECK_ACTION.	*/
+
+
+
+/***********************************************************************
+ *		SpriteComponentDrawGString
+ ***********************************************************************
+ * SYNOPSIS:	
+ * CALLED BY:	
+ * RETURN:	
+ *
+ * SIDE EFFECTS:
+ * STRATEGY:
+ *	
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	martin	1/30/95   	Initial version
+ *
+ ***********************************************************************/
+void
+SpriteComponentDrawGString (GStateHandle gstate, optr oself)
+{
+	SpriteInstance	*pself 		= ObjDerefVis(oself);
+	ChunkHandle 	frameArrayHan 	= pself->SI_gstringArray;
+	optr	    	*frameArray;
+    	GStateHandle 	gstringHan;
+        int		color 		= pself->SI_color;
+        int		frameNum	= pself->SI_currentImage;
+
+	frameArray = LMemDerefHandles(HandleOf(oself), frameArrayHan);
+	gstringHan = GrLoadGString(
+			  HandleOf(frameArray[frameNum]),
+			  GST_CHUNK,
+			  ChunkOf(frameArray[frameNum]));
+
+	GrSaveState(gstate);
+	GrSetLineColor(gstate, CF_INDEX, color, 0, 0);
+	GrSetAreaColor(gstate, CF_INDEX, color, 0, 0);
+	GrApplyTranslation(gstate,
+			   IntToWWFixed(pself->VI_bounds.R_left),
+			   IntToWWFixed(pself->VI_bounds.R_top));
+	GrApplyRotation(gstate, IntToWWFixed(pself->SI_angle));
+	GrDrawGString(gstate, gstringHan, 0, 0, GSRT_COMPLETE, 0);
+
+	GrRestoreState(gstate);
+	GrDestroyGString(gstringHan, 0, GSKT_LEAVE_DATA);
+
+}	/* End of SpriteComponentDrawGString.	*/
+
+
+/***********************************************************************
+ *		SpriteComponentEraseGString
+ ***********************************************************************
+ * SYNOPSIS:	
+ * CALLED BY:	
+ * RETURN:	
+ *
+ * SIDE EFFECTS:
+ * STRATEGY:
+ *	
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	martin	1/30/95   	Initial version
+ *
+ ***********************************************************************/
+void
+SpriteComponentEraseGString (GStateHandle gstate, optr oself)
+{
+	SpriteInstance	*pself 		= ObjDerefVis(oself);
+	Rectangle	bounds;
+	ChunkHandle 	frameArrayHan 	= pself->SI_gstringArray;
+	optr	    	*frameArray;
+    	GStateHandle 	gstringHan;
+        int		color 		= pself->SI_color;
+        int		frameNum	= pself->SI_currentImage;
+
+	frameArray = LMemDerefHandles(HandleOf(oself), frameArrayHan);
+	gstringHan = GrLoadGString(
+			  HandleOf(frameArray[frameNum]),
+			  GST_CHUNK,
+			  ChunkOf(frameArray[frameNum]));
+
+	GrGetGStringBounds(gstringHan, gstate, 0, &bounds);
+	GrSaveState(gstate);
+	GrApplyTranslation(gstate,
+			   IntToWWFixed(pself->VI_bounds.R_left),
+			   IntToWWFixed(pself->VI_bounds.R_top));
+	GrApplyRotation(gstate, IntToWWFixed(pself->SI_angle));
+
+	GrSetMixMode(gstate, MM_CLEAR);
+	GrFillRect(gstate, bounds.R_left-3, bounds.R_top-3, 
+		    bounds.R_right+3, bounds.R_bottom+3);
+
+	GrRestoreState(gstate);
+
+
+	GrDestroyGString(gstringHan, 0, GSKT_LEAVE_DATA);
+
+}	/* End of SpriteComponentEraseGString.	*/
+
+
+/***********************************************************************
+ *		MSG_SPRITE_DRAW for SpriteComponentClass
+ ***********************************************************************
+ * SYNOPSIS:	    
+ * PARAMETERS:	  GStateHandle	gstate  
+ *
+ * SIDE EFFECTS:    
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	martin	4/12/95   	Initial version
+ *
+ ***********************************************************************/
+@method SpriteComponentClass, MSG_SPRITE_DRAW
+{
+    SpriteComponentDrawGString(gstate, oself);
+}	/* End of MSG_SPRITE_DRAW.	*/
+
+
+/***********************************************************************
+ *		MSG_SPRITE_ERASE for SpriteComponentClass
+ ***********************************************************************
+ * SYNOPSIS:	    
+ * PARAMETERS:	    GStateHandle   gstate
+ *
+ * SIDE EFFECTS:    
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	martin	4/12/95   	Initial version
+ *
+ ***********************************************************************/
+@method SpriteComponentClass, MSG_SPRITE_ERASE
+{
+    SpriteComponentEraseGString(gstate, oself);
+}	/* End of MSG_SPRITE_ERASE.	*/
+
+
+
+
+
+

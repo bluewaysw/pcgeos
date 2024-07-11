@@ -1,0 +1,506 @@
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+	Copyright (c) Geoworks 1995 -- All Rights Reserved
+
+PROJECT:	NewBASIC
+MODULE:		Complex Component Set - GString Component
+FILE:		drawComponent.goc
+
+AUTHOR:		Martin Turon, Jan 27, 1995
+
+ROUTINES:
+	Name			Description
+	----			-----------
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	martin	1/27/95   	Initial version.
+
+DESCRIPTION:
+	
+
+	$Id: drawComponent.goc,v 1.2 98/07/09 15:50:26 martin Exp $
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+
+@include "drawInternal.goh"
+
+#include <Legos/basrun.h>
+#include <Legos/opcode.h>
+#include <Legos/runheap.h>
+@include <Legos/basrun.goh>
+
+@classdecl	DrawComponentClass;
+
+
+/***************************************************************************
+ *              Code for DrawComponentClass
+ **************************************************************************/
+
+
+/***********************************************************************
+ *		MSG_META_INITIALIZE for DrawComponentClass
+ ***********************************************************************
+ * SYNOPSIS:	    
+ * PARAMETERS:	    
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	martin	2/7/95   	Initial version
+ *
+ ***********************************************************************/
+@method DrawComponentClass, MSG_META_INITIALIZE
+{
+    @callsuper();
+    pself->EI_state &= ~ES_IS_GEN;
+}	/* End of MSG_META_INITIALIZE.	*/
+
+/***********************************************************************
+ *		MSG_META_RESOLVE_VARIANT_SUPERCLASS for CSampTextClass 
+ ***********************************************************************
+ * SYNOPSIS:	   Inform the system what class to use as the superclass 
+ *		   for the variant class of a particular object.
+ *
+ * PARAMETERS:	   word	MasterOffset 
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	martin	2/7/95		Initial version
+ *
+ ***********************************************************************/
+@method DrawComponentClass, MSG_META_RESOLVE_VARIANT_SUPERCLASS
+{
+    if (MasterOffset == word_offsetof(EntBase, Ent_offset)) {
+	return &MetaClass;
+    }
+    return @callsuper();
+}	/* End of MSG_META_RESOLVE_VARIANT_SUPERCLASS.	*/
+
+
+/***********************************************************************
+ *		MSG_ENT_GET_PROPERTY for DrawComponentClass
+ ***********************************************************************
+ * SYNOPSIS:	    
+ * PARAMETERS:	    
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	martin	2/7/95   	Initial version
+ *
+ ***********************************************************************/
+@method DrawComponentClass, MSG_ENT_GET_PROPERTY
+{
+    if (!strcmp(prop,"data")) {
+       /*
+	* HACK!!!!!  Should return complex data!
+	*/
+	value->CD_type = TYPE_LONG;
+	value->CD_data.LD_long = ConstructOptr(HandleOf(oself),
+						pself->GGSI_gstring);
+    }
+}	/* End of MSG_ENT_GET_PROPERTY.	*/
+
+
+
+/***********************************************************************
+ *		MSG_ENT_DO_ACTION for DrawComponentClass
+ ***********************************************************************
+ * SYNOPSIS:	    
+ * PARAMETERS:	    
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	martin	1/27/95   	Initial version
+ *
+ ***********************************************************************/
+@method DrawComponentClass, MSG_ENT_DO_ACTION
+{
+    optr    interpreter = EntGetInterpreter(pself);
+    int	    i;
+
+    if (!strcmp(actionName, "start")) {
+   /**********************************************************************
+    * ACTION:	       	start
+    **********************************************************************
+    * DESCRIPTION:	Begins the definition of a gstring.
+    * PARAMETERS:	none
+    *
+    * REVISION HISTORY:
+    *	Name	Date		Description
+    *	----	----		-----------
+    *	martin	2/7/95   	Initial version
+    *
+    **********************************************************************/
+	ChunkHandle	gstring, gstrHan; 
+	MemHandle 	block = HandleOf(oself);
+
+	pself->GGSI_flags |= GGSF_DEFINING;
+	gstrHan = GrCreateGString(block, GST_CHUNK, &gstring);
+	pself = ObjDerefEnt(oself);
+	pself->GGSI_gstrHan = gstrHan;     
+	pself->GGSI_gstring = gstring;     
+    } else if (!strcmp(actionName, "stop")) {
+   /**********************************************************************
+    * ACTION:	       	stop
+    **********************************************************************
+    * DESCRIPTION:	Ends definition of a gstring.
+    * PARAMETERS:	none
+    *
+    * REVISION HISTORY:
+    *	Name	Date		Description
+    *	----	----		-----------
+    *	martin	2/7/95   	Initial version
+    *
+    **********************************************************************/
+	pself->GGSI_flags &= ~GGSF_DEFINING;
+	GrEndGString(pself->GGSI_gstrHan);
+	pself = ObjDerefEnt(oself);
+        GrDestroyGString(pself->GGSI_gstrHan, 0, GSKT_LEAVE_DATA);
+
+    } else if (!strcmp(actionName, "drawrect")) {
+   /**********************************************************************
+    * ACTION:	       	drawrect
+    **********************************************************************
+    * DESCRIPTION:	Draws the given rectangle filled.
+    *
+    * PARAMETERS:	left, top	as integer
+    *			right, bottom	as integer
+    *
+    * REVISION HISTORY:
+    *	Name	Date		Description
+    *	----	----		-----------
+    *	martin	2/7/95   	Initial version
+    *
+    **********************************************************************/
+
+	for (i=0; i < 4; i++)
+	{
+	    if (argv[i].CD_type != TYPE_INTEGER) {
+		break;
+	    }
+	}
+	if (pself->GGSI_flags | GGSF_DEFINING && i == 4) 
+	{
+             GrFillRect(pself->GGSI_gstrHan, argv[0].CD_data.LD_integer, 
+		      argv[1].CD_data.LD_integer, argv[2].CD_data.LD_integer, 
+		      argv[3].CD_data.LD_integer);
+        }
+
+    } else if (!strcmp(actionName, "drawellipse")) {
+   /**********************************************************************
+    * ACTION:	       	drawellipse
+    **********************************************************************
+    * DESCRIPTION:	Draws the given ellipse filled.
+    *
+    * PARAMETERS:	left, top	as integer
+    *			right, bottom	as integer
+    *
+    * REVISION HISTORY:
+    *	Name	Date		Description
+    *	----	----		-----------
+    *	jimmy	3/2/95   	Initial version
+    *
+    **********************************************************************/
+	for (i=0; i < 4; i++)
+	{
+	    if (argv[i].CD_type != TYPE_INTEGER) {
+		break;
+	    }
+	}
+
+	if (pself->GGSI_flags | GGSF_DEFINING && i == 4) {
+             GrFillEllipse(pself->GGSI_gstrHan, argv[0].CD_data.LD_integer, 
+			   argv[1].CD_data.LD_integer, argv[2].CD_data.LD_integer, 
+			   argv[3].CD_data.LD_integer);
+        }
+
+    } else if (!strcmp(actionName, "drawpolygon")) {
+   /**********************************************************************
+    * ACTION:	       	drawpolygon
+    **********************************************************************
+    * DESCRIPTION:	Draws the given ellipse filled.
+    *
+    * PARAMETERS:	left, top	as integer
+    *			right, bottom	as integer
+    *
+    *	    	    	NOTE: this code relies on the current implementation
+    *	    	    	      of arrays, as a nX2 array happens to be stored
+    *	    	    	      the same way GrFillPolygon expects its points
+    *	    	    	      to be (very convenient, not very portable)
+    *
+    * REVISION HISTORY:
+    *	Name	Date		Description
+    *	----	----		-----------
+    *	jimmy	3/2/95   	Initial version
+    *
+    **********************************************************************/
+	if (pself->GGSI_flags | GGSF_DEFINING) 
+	{
+	    MemHandle	array;
+	    word    numpoints;
+	    ArrayHeader    *data;
+	    word    points[128], i, xmax, *p;
+
+	    array = argv[0].CD_data.LD_gen_word;
+#if ERROR_CHECK
+	    ECCheckMemHandle(array);
+#endif
+	    numpoints = argv[1].CD_data.LD_integer;
+	    data = (ArrayHeader *)MemLock(array);
+	    if (data->AH_type != TYPE_INTEGER || data->AH_numDims != 2 ||
+		data->AH_dims[1] != 2 || data->AH_dims[0] < numpoints) 
+	    {
+		MemUnlock(array);
+		return;
+	    }
+
+	    xmax = data->AH_dims[0];
+	    p = points;
+	    data++;
+
+	    for (i=0; i<numpoints; i++)
+	    {
+		*p++ = *(word *)((word *)data + i);
+		*p++ = *(word *)((word *)data + i + xmax);
+	    }
+	    MemUnlock(array);
+/*
+	    GrFillPolygon(pself->GGSI_gstrHan, argv[2].CD_data.LD_integer, 
+			   points, numpoints);
+*/
+        }
+	
+    } else if (!strcmp(actionName, "areacolor")) {
+   /**********************************************************************
+    * ACTION:	       	areacolor
+    **********************************************************************
+    * DESCRIPTION:	Sets the current area color.
+    *
+    * PARAMETERS:	ColorFlag	as integer
+    *			  if ColorFlag = 0
+    *				colorIndex	as integer
+    *				zero1		as integer
+    *				zero2		as integer
+    *			  else
+    *				redValue	as integer
+    *				greenValue	as integer
+    *				blueValue	as integer
+    *
+    * REVISION HISTORY:
+    *	Name	Date		Description
+    *	----	----		-----------
+    *	martin	2/8/95   	Initial version
+    *
+    **********************************************************************/
+
+	for (i=0; i < 4; i++)
+	{
+	    if (argv[i].CD_type != TYPE_INTEGER) {
+		break;
+	    }
+	}
+	if (pself->GGSI_flags | GGSF_DEFINING && i == 4) {
+             GrSetAreaColor(pself->GGSI_gstrHan, argv[0].CD_data.LD_integer, 
+		      argv[1].CD_data.LD_integer, argv[2].CD_data.LD_integer,
+		      argv[3].CD_data.LD_integer);
+        }
+
+    } else if (!strcmp(actionName, "linecolor")) {
+   /**********************************************************************
+    * ACTION:	       	linecolor
+    **********************************************************************
+    * DESCRIPTION:	Sets the current line color.
+    *
+    * PARAMETERS:	ColorFlag	as integer
+    *			  if ColorFlag = 0
+    *				colorIndex	as integer
+    *				zero1		as integer
+    *				zero2		as integer
+    *			  else
+    *				redValue	as integer
+    *				greenValue	as integer
+    *				blueValue	as integer
+    *
+    * REVISION HISTORY:
+    *	Name	Date		Description
+    *	----	----		-----------
+    *	martin	2/8/95   	Initial version
+    *
+    **********************************************************************/
+	for (i=0; i < 4; i++)
+	{
+	    if (argv[i].CD_type != TYPE_INTEGER) {
+		break;
+	    }
+	}
+	if (pself->GGSI_flags | GGSF_DEFINING && i == 4) {
+             GrSetLineColor(pself->GGSI_gstrHan, argv[0].CD_data.LD_integer, 
+		      argv[1].CD_data.LD_integer, argv[2].CD_data.LD_integer,
+		      argv[3].CD_data.LD_integer);
+        }
+
+    } else if (!strcmp(actionName, "moveto")) {
+   /**********************************************************************
+    * ACTION:	       	moveto
+    **********************************************************************
+    * DESCRIPTION:	Moves the current cursor position to the given point.
+    *
+    * PARAMETERS:	x,y	as integer
+    *
+    * REVISION HISTORY:
+    *	Name	Date		Description
+    *	----	----		-----------
+    *	martin	2/8/95   	Initial version
+    *
+    **********************************************************************/
+	if (argv[0].CD_type == TYPE_INTEGER && argv[1].CD_type == TYPE_INTEGER) 
+	{
+	    if (pself->GGSI_flags | GGSF_DEFINING) {
+		GrMoveTo(pself->GGSI_gstrHan, argv[0].CD_data.LD_integer, 
+		     argv[1].CD_data.LD_integer);
+	    }
+	}
+    } else if (!strcmp(actionName, "drawlineto")) {
+   /**********************************************************************
+    * ACTION:	       	drawlineto
+    **********************************************************************
+    * DESCRIPTION:	Draws a line from the current cursor position to the
+    *			gven point.
+    *
+    * PARAMETERS:	x,y	as integer
+    *
+    * REVISION HISTORY:
+    *	Name	Date		Description
+    *	----	----		-----------
+    *	martin	2/8/95   	Initial version
+    *
+    **********************************************************************/
+	if (argv[0].CD_type == TYPE_INTEGER && argv[1].CD_type == TYPE_INTEGER) 
+	{
+	    if (pself->GGSI_flags | GGSF_DEFINING) {
+		GrDrawLineTo(pself->GGSI_gstrHan, argv[0].CD_data.LD_integer, 
+			     argv[1].CD_data.LD_integer);
+	    }
+	}
+    } else if (!strcmp(actionName, "drawtext")) {
+   /**********************************************************************
+    * ACTION:	       	drawtext
+    **********************************************************************
+    * DESCRIPTION:	Draws text at the current position.  
+    *
+    * PARAMETERS:	text	as string
+    * (OPTIONAL):	x,y	as integer	(not implemented yet)	
+    *
+    * REVISION HISTORY:
+    *	Name	Date		Description
+    *	----	----		-----------
+    *	martin	2/9/95   	Initial version
+    *
+    **********************************************************************/
+	if (argv[0].CD_type == TYPE_STRING && pself->GGSI_flags | GGSF_DEFINING)
+	{
+	    RunHeapInfo *rhi;
+	    TCHAR *stringPtr;
+	    
+	    rhi = RunComponentLockHeap(MemDeref(OptrToHandle(oself)));
+	    RunHeapLock(rhi, argv[0].CD_data.LD_string, (void **)&stringPtr);
+	    
+	    GrDrawTextAtCP(pself->GGSI_gstrHan, stringPtr, 0);
+	    RunHeapUnlock(rhi, argv[0].CD_data.LD_string);
+	    RunComponentUnlockHeap(MemDeref(OptrToHandle(oself)));
+        }
+
+    } else if (!strcmp(actionName, "setfont")) {
+   /**********************************************************************
+    * ACTION:	       	setfont
+    **********************************************************************
+    * DESCRIPTION:      Sets the current font and point size.  
+    *
+    * PARAMETERS:	font	as integer
+    * 			size	as integer
+    *
+    * REVISION HISTORY:
+    *	Name	Date		Description
+    *	----	----		-----------
+    *	martin	2/9/95   	Initial version
+    *
+    **********************************************************************/
+	if (argv[0].CD_type == TYPE_INTEGER && argv[1].CD_type == TYPE_INTEGER) 
+	{
+	    if (pself->GGSI_flags | GGSF_DEFINING) {
+		GrSetFont(pself->GGSI_gstrHan, argv[0].CD_data.LD_integer, 
+			  IntToWWFixed(argv[1].CD_data.LD_integer));
+	    }
+	}
+    } else if (!strcmp(actionName, "rotate")) {
+   /**********************************************************************
+    * ACTION:	       	rotate
+    **********************************************************************
+    * DESCRIPTION:	Rotates subsequent operations by given angle
+    *
+    * PARAMETERS:      	angle	as integer
+    *
+    * REVISION HISTORY:
+    *	Name	Date		Description
+    *	----	----		-----------
+    *	martin	2/9/95   	Initial version
+    *
+    **********************************************************************/
+	if (pself->GGSI_flags | GGSF_DEFINING && argv[0].CD_type == TYPE_INTEGER)
+	{
+           GrApplyRotation(pself->GGSI_gstrHan, 
+			   IntToWWFixed(argv[0].CD_data.LD_integer));
+        }
+
+    } else {
+	@callsuper();
+    }
+    
+}	/* End of MSG_ENT_DO_ACTION.	*/
+
+/***********************************************************************
+ *		MSG_ENT_CHECK_ACTION for DrawComponentClass
+ ***********************************************************************
+ * SYNOPSIS:	    I really dislike having to write this routine...
+ *		    Tables seem more intuitive...
+ * PARAMETERS:	    
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	martin	2/7/95   	Initial version
+ *
+ ***********************************************************************/
+@method DrawComponentClass, MSG_ENT_CHECK_ACTION
+{
+    return (!strcmp(action,"start") || 
+	    !strcmp(action,"drawrect") || 
+	    !strcmp(action,"drawellipse") || 
+	    !strcmp(action,"drawpolygon") || 
+	    !strcmp(action,"areacolor") || 
+	    !strcmp(action,"linecolor") || 
+	    !strcmp(action,"moveto") || 
+	    !strcmp(action,"drawlineto") || 
+	    !strcmp(action,"drawtext") || 
+	    !strcmp(action,"setfont") || 
+	    !strcmp(action,"rotate") || 
+	    !strcmp(action,"stop"));
+}	/* End of MSG_ENT_CHECK_ACTION.	*/
+

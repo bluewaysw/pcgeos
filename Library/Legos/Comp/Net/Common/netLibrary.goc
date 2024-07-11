@@ -1,0 +1,98 @@
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+	Copyright (c) Geoworks 1995 -- All Rights Reserved
+
+PROJECT:	PC/GEOS - LEGOS
+MODULE:		Basic Component Set - Net Component
+FILE:		netLibrary.goc
+
+AUTHOR:		Martin Turon, Oct 6, 1999
+
+ROUTINES:
+	Name			Description
+	----			-----------
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	martin	1999/10/6   	Initial version.
+
+DESCRIPTION:
+	
+
+	$Id: netLibrary.goc,v 1.1 98/05/13 15:06:31 martin Exp $
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+
+@include "netInternal.goh"
+
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		Global Variables and Tables
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+
+/*
+ * This is the table of components that this run-time library knows
+ * how to deal with.  This table is used by the interpreter via FIDO
+ * to get the information it needs to create these components.
+ *
+ */
+
+static const EntClassPtrStruct CoolNetLibraryClassInfoTable[] = {
+	{&TelnetComponentClass, 	_TEXT("telnet")},
+/*	{&EMailComponentClass,		_TEXT("email")} */
+};
+
+
+const EntClassPtrStruct _near *CoolNetLibraryClassTable[] = {
+    &CoolNetLibraryClassInfoTable[0],
+    (EntClassPtrStruct _near *) -1
+};
+
+
+
+/***********************************************************************
+ *		FCCActionDeref<Type><Arg#>
+ ***********************************************************************
+ * SYNOPSIS:	Common action code shared by the various
+ *		MSG_FILE_DO method handlers.  These routines
+ *		dereference the proper argument if it exists.
+ *			FCCActionDerefString0()	 = deref string  in arg[0]
+ *			FCCActionDerefInteger1() = deref integer in arg[1]
+ *
+ * PARAMETERS:	    args = EntDoActionArgs structure on stack frame
+ *			passed by FCCActionDerefString0(@actionArgs)
+ *
+ * SIDE EFFECTS:    
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	martin	12/15/1997   	Initial version
+ *
+ ***********************************************************************/
+int
+FCLActionDerefInteger (int argNum, EntDoActionArgs *args)
+{
+    ComponentData *arg = &((args->EDAA_argv)[argNum]);
+    return (((argNum <= args->EDAA_argc) && (arg->CD_type == TYPE_INTEGER)) ?
+    		arg->CD_data.LD_integer					    :
+		0);	
+}
+TCHAR *
+FCLActionDerefString (int argNum, EntDoActionArgs *args)
+{
+    ComponentData *arg = &((args->EDAA_argv)[argNum]);
+    return (((argNum <= args->EDAA_argc) && (arg->CD_type == TYPE_STRING))  ?
+    		RunHeapDeref(args->EDAA_runHeapInfoPtr, 
+			     arg->CD_data.LD_string)			    :
+		NULL);	
+}
+
+
+void
+FCLActionReturnString (RunHeapToken key, EntDoActionArgs *args)
+{
+    args->EDAA_retval->CD_type 	  	 = TYPE_STRING;
+    args->EDAA_retval->CD_data.LD_string = key;
+}

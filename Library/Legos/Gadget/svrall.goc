@@ -1,0 +1,1142 @@
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+	Copyright (c) Geoworks 1996 -- All Rights Reserved
+
+PROJECT:	
+MODULE:		
+FILE:		alserver.goc
+
+AUTHOR:		Paul L. Du Bois, May 20, 1996
+
+ROUTINES:
+	Name			Description
+	----			-----------
+    INT StartOrRestartAlarm	Start an alarm, or restart it if it's
+				already going
+
+    INT AlarmHasPassed		Is alarm time/date set in the past
+
+    INT RaiseAlarmEvent		Common code to raise an "alarm" event
+
+    INT FindEntryWithID		Find entry corresponding to given ID
+
+    INT ValidEntryDateAndTime	Validate entry's date and time
+
+    MTD MSG_META_INITIALIZE	Init state and start timers
+
+    MTD MSG_META_DETACH		Stop timers and destroy state
+
+    MTD MSG_AS_ALARM_RING	Raise an event to all launchers
+
+    MTD MSG_AS_ACTIVATE_ALARMS,
+	MSG_AS_DEACTIVATE_ALARMS
+				Create or destroy GEOS alarms, called on
+				init or shutdown
+
+    MTD MSG_AS_LOAD_DATA	Load saved alarm state from a file
+
+    MTD MSG_AS_SAVE_DATA	Save alarm state to a file
+
+    MTD MSG_AS_CLIENT_ATTACH	Add an AlarmEntry
+
+    MTD MSG_AS_CLIENT_DETACH	Remove an AlarmEntry
+
+    MTD MSG_AS_SET_ALARM_DATE	Set date
+
+    MTD MSG_AS_SET_ALARM_TIME	Set time
+
+    MTD MSG_AS_GET_ALARM_ENTRY	Retrieve a whole AlarmEntry
+
+    MTD MSG_AS_PUT_ALARM_ENTRY	Unlock an alarm entry, possibly re-starting
+				alarm
+
+    MTD MSG_AS_SET_ENABLED	Set an alarm's "enabled" status
+
+    MTD MSG_AS_SET_CONTEXT	Set an alarm's context string
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	dubois	5/20/96  	Initial version.
+
+DESCRIPTION:
+	"Server" object for alarm
+
+	No synchronization is done; all operations are rather atomic.
+
+	The concept of an "active" alarm is a little strange.
+
+	Alarms loaded from the state file are always considered enabled,
+	but timers aren't started for them right away.  This is because
+	we need to wait for a launcher object to be created before it
+	makes sense to raise alarm events for any alarms that might have
+	already gone off.
+
+	Creation of the first launcher will cause a MSG_AS_ACTIVATE_ALARMS,
+	which creates timers for alarms in the future, and raises alarm
+	events for alarms that have passed.
+
+	For simplicity, new alarm entries are always active; it's assumed
+	that not a lot will go on between the creation of an interpreter/
+	alarm server pair, and the creation of the first launcher.
+
+	$Id: svrall.goc,v 1.1 98/03/11 04:31:15 martin Exp $
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+
+@include <stdapp.goh>
+@include <Legos/basrun.goh>
+@include <Legos/gadget.goh>
+#include <Legos/Internal/runtask.h>
+#include <lmem.h>
+#include <file.h>
+#include <Ansi/string.h>
+
+#include "alserver.h"
+
+#pragma option -zEALSERVER_TEXT -zFCODE
+
+
+static const TCHAR _far AS_StateFileNameCS[] =
+_TEXT("ALARMS.DAT");
+/* #define AS_StateFileName ((const TCHAR _cs*)((word)AS_StateFileNameCS)) */
+#define AS_StateFileName ((const TCHAR *)((word)AS_StateFileNameCS))
+
+
+static const TCHAR _far AS_AlarmDialogStringCS[] =
+_TEXT("Alarm has gone off: id \"\001\" context \"\002\"");
+#define AS_AlarmDialogString ((const TCHAR _cs*)((word)AS_AlarmDialogStringCS))
+
+#if 0
+/* Temp debugging stuff */
+#define CS_DEF_STR(_var, _str) \
+ static const TCHAR _far _var[] = _TEXT(_str)
+#define CS_STR(_var) ((const TCHAR _cs*)((word)_var))
+
+CS_DEF_STR(loadStr, "Loading alarms");
+CS_DEF_STR(saveStr, "Saving alarms");
+#endif
+
+#pragma option -zE* -zF*
+
+/*- Internal utils */
+static Boolean	StartOrRestartAlarm(optr oself, AlarmEntry* entry);
+static Boolean	AlarmHasPassed(AlarmEntry* entry);
+static void	RaiseAlarmEvent(optr serverComp, AlarmEntry* entry);
+static AlarmEntry* FindEntryWithID(optr alarmArray, TCHAR* uniqueID,
+				   word* idNum, Boolean force);
+Boolean	ValidEntryDateAndTime(AlarmEntry* entry);
+
+@classdecl	AlarmServerClass;
+
+
+/*********************************************************************
+ *			StartOrRestartAlarm
+ *********************************************************************
+ * SYNOPSIS:	Start an alarm, or restart it if it's already going
+ * CALLED BY:	INTERNAL
+ * PASS:
+ * RETURN:
+ * SIDE EFFECTS:
+ *	Causes an alarm to become both active and enabled
+ *
+ * STRATEGY:
+ * REVISION HISTORY:
+ *	Name	Date		Description			     
+ *	----	----		-----------			     
+ *	dubois	5/24/96  	Initial version
+ * 
+ *********************************************************************/
+static Boolean
+StartOrRestartAlarm(optr oself, AlarmEntry* entry)
+{
+    TimerHandle	timer;
+    TimerCompressedDate	date;
+    word	time, id;
+
+    ASSERT(ValidEntryDateAndTime(entry));
+
+    if (entry->active && entry->enabled) {
+	TimerStop(entry->timerHandle, entry->timerID);
+    }
+
+    /* Deal with these right away... otherwise the real-time timer
+     * will sit up to a minute before ringing
+     */
+    if (AlarmHasPassed(entry))
+    {
+	RaiseAlarmEvent(oself, entry);
+	entry->enabled = FALSE;
+	entry->active = TRUE;
+	return TRUE;
+    }
+
+    date = ((((entry->year-1980) << TCD_YEAR_OFFSET) & TCD_YEAR) |
+	    ((entry->month << TCD_MONTH_OFFSET) & TCD_MONTH) |
+	    ((entry->day << TCD_DAY_OFFSET) & TCD_DAY));
+    time = (entry->hour << 8) | entry->minute;
+
+    timer = TimerStart
+	(TIMER_EVENT_REAL_TIME, oself, date,
+	 MSG_AS_ALARM_RING, time, &id);
+
+    entry->active = TRUE;
+    if (timer != NullHandle) {
+	entry->enabled = TRUE;
+	entry->timerHandle = timer;
+	entry->timerID = id;
+    } else {
+	entry->enabled = FALSE;
+	entry->timerHandle = NullHandle;
+	entry->timerID = 0;
+    }
+    return (timer != NullHandle);
+}
+
+/*********************************************************************
+ *			AlarmHasPassed
+ *********************************************************************
+ * SYNOPSIS:	Is alarm time/date set in the past
+ * CALLED BY:	INTERNAL
+ * PASS:
+ * RETURN:	TRUE if alarm has passed
+ * SIDE EFFECTS:
+ * STRATEGY:
+ *	Ignores the "seconds" fields because the geos real-time timer's
+ *	resolution is one minute. 
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description			     
+ *	----	----		-----------			     
+ *	dubois	5/22/96  	Initial version
+ * 
+ *********************************************************************/
+
+#define CHECK(n1, n2) {				\
+  if (n1 > n2) return FALSE;			\
+  else if (n1 < n2) return TRUE;		\
+}
+
+static Boolean
+AlarmHasPassed(AlarmEntry* entry)
+{
+    TimerDateAndTime	timedate;
+
+    TimerGetDateAndTime(&timedate);
+  
+    CHECK(entry->year, timedate.TDAT_year);
+    CHECK(entry->month, timedate.TDAT_month);
+    CHECK(entry->day, timedate.TDAT_day);
+    CHECK(entry->hour, timedate.TDAT_hours);
+    CHECK(entry->minute, timedate.TDAT_minutes);
+    /* Ignore seconds
+       CHECK(entry->second, timedate.TDAT_seconds);
+       */
+    
+    /* if they're equal, assume alarm has passed */
+    return TRUE;
+}
+#undef CHECK
+
+/*********************************************************************
+ *			RaiseAlarmEvent
+ *********************************************************************
+ * SYNOPSIS:	Common code to raise an "alarm" event
+ * CALLED BY:	INTERNAL
+ * STRATEGY:
+ *	What if there's more than one interp in the system?
+ *	Right now, let's try only raising the alarm on launchers
+ *	that use the same interpreter as the alarm server.
+ *
+ *	This could be more efficient, but it could change too.
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description			     
+ *	----	----		-----------			     
+ *	dubois	5/22/96  	Initial version
+ * 
+ *********************************************************************/
+static void
+RaiseAlarmEvent(optr serverComp, AlarmEntry* entry)
+{
+    MemHandle	stateBlock;
+    word	i, count;
+    optr*	cursor;
+    optr	mlString, contextString;
+
+    USE_IT(serverComp);
+
+    stateBlock = ((LMemBlockHeader*)((dword)entry & 0xffff0000))->LMBH_handle;
+
+    if (theLauncherArray == NullOptr) goto done;
+    MemLock(OptrToHandle(theLauncherArray));
+    
+    mlString = ConstructOptr(stateBlock, entry->moduleLocator);
+    contextString = ConstructOptr(stateBlock, entry->moduleContext);
+
+    count = ChunkArrayGetCount(theLauncherArray);
+    cursor = ChunkArrayElementToPtr(theLauncherArray, 0, NULL);
+    for (i=0; i<count; i++, cursor++)
+    {
+	EntObjectBlockHeader*	eobh;
+	optr	cursorInterp;		/* Interp of current launcher */
+	optr	interpAlarmServer;	/* alarm server of said interp */
+
+	eobh = MemLock(OptrToHandle(*cursor));
+	cursorInterp = eobh->EOBH_interpreter;
+	MemUnlock(eobh->EOBH_lmemHeader.OLMBH_header.LMBH_handle);
+	interpAlarmServer = @call cursorInterp::MSG_INTERP_GET_ALARM_SERVER();
+
+	if (interpAlarmServer != serverComp) continue;
+	@send, forceQueue (*cursor)::
+	    MSG_SL_ALARM_RING(mlString, contextString);
+    }
+    
+    MemUnlock(OptrToHandle(theLauncherArray));
+ done:
+#if ERROR_CHECK
+{
+    TCHAR*	idString;
+    TCHAR*	contextString;
+    TCHAR*	dialogString;
+
+    idString = LMemDerefHandles(stateBlock, entry->uniqueID);
+    contextString = LMemDerefHandles(stateBlock, entry->moduleContext);
+    dialogString = AS_AlarmDialogString;
+    UserStandardDialog
+	(NULL, NULL, contextString, idString, dialogString,
+	 ((CDT_NOTIFICATION << CDBF_DIALOG_TYPE_OFFSET) |
+	  (GIT_NOTIFICATION << CDBF_INTERACTION_TYPE_OFFSET)));
+}
+#endif
+    return;
+}
+
+/*********************************************************************
+ *			FindEntryWithID
+ *********************************************************************
+ * SYNOPSIS:	Find entry corresponding to given ID
+ * CALLED BY:	INTERNAL
+ * PASS:
+ * RETURN:	pointer to entry; idNum filled in if non-null
+ * SIDE EFFECTS:
+ * STRATEGY:
+ *	Assumes alarmArray is locked
+ *
+ *	Will create a new entry if uniqueID not found and
+ *	"force" is not FALSE.
+ *
+ *	Caller should ensure that entry.moduleLocator is filled in
+ *	if a new entry is created.
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description			     
+ *	----	----		-----------			     
+ *	dubois	5/23/96  	Initial version
+ * 
+ *********************************************************************/
+static AlarmEntry*
+FindEntryWithID(optr alarmArray, TCHAR* uniqueID, word* idNum, Boolean force)
+{
+    word	i, count;
+    AlarmEntry*	entry;
+
+    count = ChunkArrayGetCount(alarmArray);
+    entry = ChunkArrayElementToPtr(alarmArray, 0, NULL);
+    for (i=0; i<count; i++, entry++)
+    {
+	TCHAR*	entryID;
+
+	entryID = LMemDerefHandles
+	    (OptrToHandle(alarmArray), entry->uniqueID);
+	if (!strcmp(uniqueID, entryID)) {
+	    if (idNum) *idNum = i;
+	    return entry;
+	}
+    }
+
+    if (force) {
+	ChunkHandle	id_chunk, nullString_chunk;
+	TCHAR*		tmpString;
+
+	/* Create a new entry associated with this ID */
+	id_chunk = LMemAlloc(OptrToHandle(alarmArray),
+			     (strlen(uniqueID)+1)*sizeof(TCHAR));
+
+	nullString_chunk = LMemAlloc(OptrToHandle(alarmArray), sizeof(TCHAR));
+	
+	tmpString = LMemDerefHandles(OptrToHandle(alarmArray), id_chunk);
+	strcpy(tmpString, uniqueID);
+	
+	*(TCHAR*)LMemDerefHandles(OptrToHandle(alarmArray), nullString_chunk)
+	    = C_NULL;
+
+	entry = ChunkArrayAppend(alarmArray, 0);
+	entry->uniqueID = id_chunk;
+
+	entry->moduleContext = nullString_chunk;
+	entry->moduleLocator = NullChunk; /* set by caller */
+	entry->active = TRUE;
+	entry->enabled = FALSE;
+	entry->year = 1980;
+	entry->month = entry->day = 1;
+	entry->hour = entry->minute = entry->second = 0;
+	if (idNum) *idNum = ChunkArrayGetCount(alarmArray)-1;
+    } else {
+	entry = NULL;
+    }
+    return entry;
+}
+
+/*********************************************************************
+ *			ValidEntryDateAndTime
+ *********************************************************************
+ * SYNOPSIS:	Validate entry's date and time
+ * CALLED BY:	EXTERNAL
+ * RETURN:	TRUE if valid
+ * SIDE EFFECTS:
+ * STRATEGY:
+ * REVISION HISTORY:
+ *	Name	Date		Description			     
+ *	----	----		-----------			     
+ *	dubois	5/22/96  	Initial version
+ * 
+ *********************************************************************/
+Boolean
+ValidEntryDateAndTime(AlarmEntry* entry)
+{
+    Boolean	retval = TRUE;
+
+    /* Date */
+    if (entry->year < YEAR_MIN || entry->year > YEAR_MAX ||
+	entry->month < 1 || entry->month > 12 ||
+	LocalCalcDaysInMonth(entry->year, entry->month) < entry->day)
+    {
+	retval = FALSE;
+    }
+
+    /* Time -- all unsigned */
+    if (entry->hour > 23 || entry->minute > 59 || entry->second > 59)
+    {
+	retval = FALSE;
+    }
+    return retval;
+}
+
+/***********************************************************************
+ *		MSG_META_INITIALIZE for AlarmServerClass
+ ***********************************************************************
+ * SYNOPSIS:	Init state and start timers
+ * PARAMETERS:	
+ * SIDE EFFECTS:
+ *
+ * STRATEGY:	Load state from file
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	dubois	5/20/96   	Initial Revision
+ *
+ ***********************************************************************/
+@method AlarmServerClass, MSG_META_INITIALIZE
+{
+    ChunkHandle	arrayChunk;
+
+    @callsuper();
+
+    pself->ASI_alarmHeap = MemAllocLMem(LMEM_TYPE_GENERAL, 0);
+
+    (void)MemLock(pself->ASI_alarmHeap);
+    arrayChunk = ChunkArrayCreate
+	(pself->ASI_alarmHeap, sizeof(AlarmEntry), 0, 0);
+    pself->ASI_alarmArray = ConstructOptr(pself->ASI_alarmHeap, arrayChunk);
+    MemUnlock(pself->ASI_alarmHeap);
+
+}	/* End of MSG_META_INITIALIZE.	*/
+
+/***********************************************************************
+ *		MSG_META_FINAL_OBJ_FREE for AlarmServerClass
+ ***********************************************************************
+ * SYNOPSIS:	Stop timers and destroy state
+ * PARAMETERS:	
+ * SIDE EFFECTS:
+ *
+ * STRATEGY:	Save state to file and stop timers
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	dubois	5/20/96   	Initial Revision
+ *
+ ***********************************************************************/
+@method AlarmServerClass, MSG_META_DETACH
+{
+    if (pself->ASI_alarmHeap != NullHandle)
+    {
+	@call self::MSG_AS_DEACTIVATE_ALARMS();
+	@call self::MSG_AS_SAVE_DATA(0);
+	pself = ObjDeref(oself, 0);
+	MemFree(pself->ASI_alarmHeap);
+	pself->ASI_alarmHeap = NullHandle;
+    }
+
+    @callsuper();
+}	/* End of MSG_META_DETACH.	*/
+
+/***********************************************************************
+ *		MSG_AS_ALARM_RING for AlarmServerClass
+ ***********************************************************************
+ * SYNOPSIS:	Raise an event to all launchers
+ * PARAMETERS:	(dword tickCount = cx:dx, word timerID = bp)
+ * SIDE EFFECTS:
+ *
+ * STRATEGY:	Raise launcher event if id corresponds to an enabled
+ *		alarm.  No need to TimerStop; timer is destroyed by
+ *		the system.
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	dubois	5/22/96   	Initial Revision
+ *
+ ***********************************************************************/
+@method AlarmServerClass, MSG_AS_ALARM_RING
+{
+    optr	alarmArray = pself->ASI_alarmArray;
+    word	i, count;
+    AlarmEntry*	entry;
+    
+    if (pself->ASI_alarmHeap == NullHandle) {
+	EC_WARNING(-1);
+	return;
+    }
+
+    (void)MemLock(OptrToHandle(alarmArray));
+
+    count = ChunkArrayGetCount(alarmArray);
+    entry = ChunkArrayElementToPtr(alarmArray, 0, NULL);
+    for (i=0; i<count; i++, entry++)
+    {
+	/* Handle isn't passed in the message, maybe timer IDs are
+	 * guaranteed unique??
+	 */
+	if (!entry->active || !entry->enabled || entry->timerID != timerID)
+	{
+	    continue;
+	}
+
+	/* Might have disabled alarm while message was in queue */
+	if (entry->enabled) {
+	    RaiseAlarmEvent(oself, entry);
+	    entry->enabled = FALSE;
+	}
+
+	/* No need to TimerStop */
+#if ERROR_CHECK
+	entry->timerHandle = NullHandle;
+	entry->timerID = 0;
+#endif
+	break;
+    }
+
+    MemUnlock(OptrToHandle(alarmArray));
+}	/* End of MSG_AS_ALARM_RING.	*/
+
+/***********************************************************************
+ *		MSG_AS_ACTIVATE_ALARMS for AlarmServerClass
+ ***********************************************************************
+ * SYNOPSIS:	Create or destroy GEOS alarms, called on init or shutdown
+ * PARAMETERS:	none
+ * SIDE EFFECTS:
+ *
+ * STRATEGY:	If state has just been loaded, create timers for enabled
+ *		alarms (make them "active").
+ *
+ *		Inversely, destroy timers if we're deactivating.
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	dubois	5/21/96   	Initial Revision
+ *
+ ***********************************************************************/
+@method AlarmServerClass, MSG_AS_ACTIVATE_ALARMS, MSG_AS_DEACTIVATE_ALARMS
+{
+    optr	alarmArray = pself->ASI_alarmArray;
+    word	i, count;
+    AlarmEntry*	entry;
+
+    if (pself->ASI_alarmHeap == NullHandle) {
+	EC_WARNING(-1);
+	return;
+    }
+
+    (void)MemLock(OptrToHandle(alarmArray));
+
+    count = ChunkArrayGetCount(alarmArray);
+    entry = ChunkArrayElementToPtr(alarmArray, 0, NULL);
+    for (i=0; i<count; i++, entry++)
+    {
+	if (message == MSG_AS_ACTIVATE_ALARMS && entry->enabled)
+	{
+	    ASSERT(ValidEntryDateAndTime(entry));
+
+	    if (entry->active) continue;
+	    if (!StartOrRestartAlarm(oself, entry)) {
+		EC_WARNING(-1);
+	    }
+	    ASSERT(entry->active);
+	}
+	else if (entry->enabled && message == MSG_AS_DEACTIVATE_ALARMS)
+	{
+	    if (entry->active) {
+		TimerStop(entry->timerHandle, entry->timerID);
+		entry->active = FALSE;
+		entry->timerHandle = NullHandle;
+		entry->timerID = 0;
+	    }
+	}
+    }
+
+    MemUnlock(OptrToHandle(alarmArray));
+}	/* End of MSG_AS_ACTIVATE_ALARMS.	*/
+
+/***********************************************************************
+ *		MSG_AS_LOAD_DATA for AlarmServerClass
+ ***********************************************************************
+ * SYNOPSIS:	Load saved alarm state from a file
+ * PARAMETERS:	dword	unused;
+ * SIDE EFFECTS:
+ *
+ * STRATEGY:
+ *	State file is human-readable for ease of debugging.
+ *	This method can be cleaned up later.
+ *	Format:
+ *	dword		Magic number, newline
+ *
+ *	and zero or more of the following:
+ *	ZT string	uniqueID
+ *	ZT string	module locator
+ *	ZT string	module context
+ *	SBCS!! string	____y__m__d__h__m__s\n where _ are digits
+ *
+ *	and a trailing C_NULL
+ *
+ * BUGS:
+ *	FIXME should remove previous alarm entries gracefully
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	dubois	5/20/96   	Initial Revision
+ *
+ ***********************************************************************/
+#define MAX_SANE_FILESIZE 8192
+#define MAX_SANE_LENGTH 300
+#define GET_2DIGIT(_cp) ((*(_cp)-'0')*10 + (*(_cp+1)-'0'))
+
+static void adv_space(byte **cpp)
+{
+    register byte*	cp = *cpp;
+    while (*cp == '\r' || *cp == '\n' || *cp == ' ') cp++;
+    *cpp = cp;
+}
+
+@method AlarmServerClass, MSG_AS_LOAD_DATA
+{
+    MemHandle	stateBlock;
+    FileHandle	fileHan;
+    byte*	stateP;
+    dword	fileSize;
+
+    word	fileError;
+    Boolean	error = FALSE;
+    MemHandle	alarmHeap = pself->ASI_alarmHeap;
+
+    USE_IT(unused);
+    ASSERT(alarmHeap != NullHandle);
+
+    FilePushDir();
+    FileSetStandardPath(SP_PRIVATE_DATA);
+
+    /* An exercise in avoiding goto. */
+    fileError = FileGetPathExtAttributes
+	(AS_StateFileName, FEA_SIZE, &fileSize, sizeof fileSize);
+    if (fileError == 0 && fileSize < MAX_SANE_FILESIZE) {
+	word	threadError;
+
+	USE_IT(threadError);
+	fileHan = FileOpen(AS_StateFileName, FILE_DENY_W | FILE_ACCESS_R);
+	threadError = ThreadGetError();
+	if (fileHan != NullHandle && fileSize != 0L) {
+	    stateBlock = MemAlloc(fileSize, HF_DYNAMIC, HAF_STANDARD_LOCK);
+	    if (stateBlock != NullHandle) {
+		word	numRead;
+		stateP = MemLock(stateBlock);
+		numRead = FileRead(fileHan, stateP, fileSize, FALSE);
+		MemUnlock(stateBlock);
+		if (numRead != fileSize) {
+		    MemFree(stateBlock);
+		    error = TRUE;
+		}
+	    } else {
+		error = TRUE;
+	    }
+	    FileClose(fileHan, TRUE);
+	} else {
+	    error = TRUE;
+	}
+    } else {
+	error = TRUE;
+    }
+    FilePopDir();
+    if (error) return;
+
+    stateP = MemLock(stateBlock);
+    (void) MemLock(alarmHeap);
+
+    if (*(dword*)stateP != ALARM_MAGIC_DWORD) error = TRUE;
+    stateP += 4;
+    adv_space(&stateP);
+
+    while (!error) {
+	word		length;
+	ChunkHandle	id_chunk, locator_chunk, context_chunk;
+	TCHAR*		tmpString;
+	AlarmEntry*	entry;
+
+	if (*stateP == C_NUMBER_SIGN) {
+	    while (*stateP && *stateP != '\n' && *stateP != '\r')
+		stateP++;
+	    while (*stateP == '\n' || *stateP == '\r')
+		stateP++;
+	}
+
+	/* uniqueID */
+	length = strlen((TCHAR*)stateP);
+	if (length == 0 || length > MAX_SANE_LENGTH) {
+	    EC_WARNING_IF(length > MAX_SANE_LENGTH, -1);
+	    break;
+	}
+	id_chunk = LMemAlloc(alarmHeap, (length+1) * sizeof(TCHAR));
+	tmpString = LMemDerefHandles(alarmHeap, id_chunk);
+	strcpy(tmpString, (TCHAR*)stateP);
+	stateP += (length+1)*sizeof(TCHAR);
+	
+	/* module locator */
+	length = strlen((TCHAR*)stateP);
+	if (length > MAX_SANE_LENGTH) {
+	    EC_WARNING(-1);
+	    break;
+	}
+	locator_chunk = LMemAlloc(alarmHeap, (length+1)*sizeof(TCHAR));
+	tmpString = LMemDerefHandles(alarmHeap, locator_chunk);
+	strcpy(tmpString, (TCHAR*)stateP);
+	stateP += (length+1)*sizeof(TCHAR);
+	
+	/* module context */
+	length = strlen((TCHAR*)stateP);
+	if (length > MAX_SANE_LENGTH) {
+	    EC_WARNING(-1);
+	    break;
+	}
+	context_chunk = LMemAlloc(alarmHeap, (length+1)*sizeof(TCHAR));
+	tmpString = LMemDerefHandles(alarmHeap, context_chunk);
+	strcpy(tmpString, (TCHAR*)stateP);
+	stateP += (length+1)*sizeof(TCHAR);
+
+	entry = ChunkArrayAppend(pself->ASI_alarmArray, 0);
+	entry->uniqueID = id_chunk;
+	entry->moduleLocator = locator_chunk;
+	entry->moduleContext = context_chunk;
+	entry->active = FALSE;
+	entry->enabled = 1;		/* only enabled alarms are stored */
+	entry->year  = GET_2DIGIT(stateP) * 100;stateP += 2;
+	entry->year += GET_2DIGIT(stateP);	stateP += 3;
+	entry->month = GET_2DIGIT(stateP);	stateP += 3;
+	entry->day   = GET_2DIGIT(stateP);	stateP += 3;
+	entry->hour  = GET_2DIGIT(stateP);	stateP += 3;
+	entry->minute= GET_2DIGIT(stateP);	stateP += 3;
+	entry->second= GET_2DIGIT(stateP);	stateP += 3;
+
+	if (!ValidEntryDateAndTime(entry)) {
+	    EC_WARNING(-1);
+	    ChunkArrayDelete(pself->ASI_alarmArray, entry);
+	}
+	while (*stateP == '\n' || *stateP == '\r')
+	    stateP++;
+    }
+    MemUnlock(alarmHeap);
+    MemUnlock(stateBlock);
+    MemFree(stateBlock);
+    return;
+
+}	/* End of MSG_AS_LOAD_DATA.	*/
+
+/***********************************************************************
+ *		MSG_AS_SAVE_DATA for AlarmServerClass
+ ***********************************************************************
+ * SYNOPSIS:	Save alarm state to a file
+ * PARAMETERS:	dword	unused;
+ * SIDE EFFECTS:
+ *
+ * STRATEGY:
+ *	See LOAD_DATA for a description of the format.
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	dubois	5/22/96   	Initial Revision
+ *
+ ***********************************************************************/
+#define EMIT(_thing)	\
+  FileWrite(fhan, &_thing, sizeof _thing, TRUE)
+
+#define WRITE_2FIELD(_output, _n, _c)		\
+{						\
+    EC_ERROR_IF(_n > 99, -1);			\
+    *(_output)++ = (_n/10)+'0';			\
+    *(_output)++ = (_n%10)+'0';			\
+    *(_output)++ = _c;				\
+}
+
+@method AlarmServerClass, MSG_AS_SAVE_DATA
+{
+    FileHandle	fhan;
+    word	i, count;
+    AlarmEntry*	entry;
+    word	threadError;
+    
+    USE_IT(threadError);
+
+    FilePushDir();
+    FileSetStandardPath(SP_PRIVATE_DATA);
+    fhan = FileCreate
+	(AS_StateFileName,
+	 FILE_CREATE_TRUNCATE | FCF_NATIVE | FILE_ACCESS_RW | FILE_DENY_RW,
+	 0);
+    threadError = ThreadGetError();
+
+    if (fhan != NullHandle)
+    {
+	dword	dwTemp;
+	char	crlf[2];
+
+	TCHAR*	strTemp;
+	word	length;
+
+	MemHandle alarmHeap = pself->ASI_alarmHeap;
+
+	crlf[0] = '\r'; crlf[1] = '\n';
+
+	dwTemp = ALARM_MAGIC_DWORD;
+	FileWrite(fhan, &dwTemp, sizeof dwTemp, TRUE);
+	FileWrite(fhan, crlf, sizeof crlf, TRUE);
+
+	(void) MemLock(alarmHeap);
+
+	count = ChunkArrayGetCount(pself->ASI_alarmArray);
+	entry = ChunkArrayElementToPtr(pself->ASI_alarmArray, 0, NULL);
+	for (i=0; i<count; i++, entry++)
+	{
+	    /* year (5 chars), mm dd hh mm ss (3 each), crlf */
+	    char	timedate[5 + 5*3 + 2];
+	    register char*	cp;
+
+	    if (!entry->enabled) continue;
+
+	    strTemp = LMemDerefHandles(alarmHeap, entry->uniqueID);
+	    length = strlen(strTemp);
+	    FileWrite(fhan, strTemp, (length+1)*sizeof(TCHAR), TRUE);
+
+	    strTemp = LMemDerefHandles(alarmHeap, entry->moduleLocator);
+	    length = strlen(strTemp);
+	    FileWrite(fhan, strTemp, (length+1)*sizeof(TCHAR), TRUE);
+
+	    strTemp = LMemDerefHandles(alarmHeap, entry->moduleContext);
+	    length = strlen(strTemp);
+	    FileWrite(fhan, strTemp, (length+1)*sizeof(TCHAR), TRUE);
+
+	    cp = timedate;
+	    WRITE_2FIELD(cp, entry->year/100, '\0');
+	    cp--;
+	    WRITE_2FIELD(cp, entry->year%100, 'y');
+	    WRITE_2FIELD(cp, entry->month, 'm');
+	    WRITE_2FIELD(cp, entry->day, 'd');
+	    WRITE_2FIELD(cp, entry->hour, 'h');
+	    WRITE_2FIELD(cp, entry->minute, 'm');
+	    WRITE_2FIELD(cp, entry->second, 's');
+	    timedate[(sizeof timedate)-2] = '\r';
+	    timedate[(sizeof timedate)-1] = '\n';
+	    FileWrite(fhan, timedate, sizeof timedate, TRUE);
+	}
+
+	/* Trailing NULL */
+	crlf[0] = '\0';
+	crlf[1] = '\0';
+	FileWrite(fhan, crlf, sizeof crlf, TRUE);
+	MemUnlock(alarmHeap);
+    }
+
+    FilePopDir();
+}	/* End of MSG_AS_SAVE_DATA.	*/
+
+/***********************************************************************
+ *		MSG_AS_CLIENT_ATTACH for AlarmServerClass
+ ***********************************************************************
+ * SYNOPSIS:	Add an AlarmEntry
+ * PARAMETERS:	(TCHAR* uniqueID=cx:dx, RTaskHan clientTask=bp)
+ * SIDE EFFECTS:
+ *
+ * STRATEGY:
+ *	Returns id # of created entry (not useful to most)
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	dubois	5/23/96   	Initial Revision
+ *
+ ***********************************************************************/
+
+/* Using this routine is a no-no and a hack */
+extern TCHAR* Fido_GetML(FTaskHan ftaskHan, ModuleToken module);
+
+@method AlarmServerClass, MSG_AS_CLIENT_ATTACH
+{
+    word	entryNum;
+    AlarmEntry*	entry;
+    word	length;
+    ChunkHandle	locator_chunk;
+    TCHAR*	tmpString;
+
+    ASSERT(pself->ASI_alarmHeap != NullHandle);
+    EC_BOUNDS(uniqueID);
+
+    (void)MemLock(pself->ASI_alarmHeap);
+
+    ;{
+	RunTask*	rtask;
+	TCHAR*		fidoMLString;
+
+	rtask = MemLock(clientTask);
+	(void)MemLock(rtask->RT_fidoTask);
+	fidoMLString = Fido_GetML(rtask->RT_fidoTask, rtask->RT_fidoModule);
+	locator_chunk = LMemAlloc(pself->ASI_alarmHeap,
+				  (strlen(fidoMLString)+1)*sizeof(TCHAR));
+	tmpString = LMemDerefHandles(pself->ASI_alarmHeap, locator_chunk);
+	strcpy(tmpString, fidoMLString);
+	MemUnlock(rtask->RT_fidoTask);
+	MemUnlock(clientTask);
+    }
+
+    entry = FindEntryWithID(pself->ASI_alarmArray, uniqueID, &entryNum, TRUE);
+    
+    if (entry->moduleLocator != NullChunk) {
+	LMemFreeHandles(pself->ASI_alarmHeap, entry->moduleLocator);
+    }
+    entry->moduleLocator = locator_chunk;
+
+    MemUnlock(pself->ASI_alarmHeap);
+
+    return entryNum;
+}	/* End of MSG_AS_CLIENT_ATTACH.	*/
+
+/***********************************************************************
+ *		MSG_AS_CLIENT_DETACH for AlarmServerClass
+ ***********************************************************************
+ * SYNOPSIS:	Remove an AlarmEntry
+ * PARAMETERS:	(TCHAR* uniqueID)
+ * SIDE EFFECTS:
+ *
+ * STRATEGY:
+ *	An alarm object is being destroyed.  Spec says we can get
+ *	rid of the data if the alarm is not enabled when destroyed.
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	dubois	5/23/96   	Initial Revision
+ *
+ ***********************************************************************/
+@method AlarmServerClass, MSG_AS_CLIENT_DETACH
+{
+    word	idNum;
+    AlarmEntry*	entry;
+
+    EC_BOUNDS(uniqueID);
+
+    (void) MemLock(pself->ASI_alarmHeap);
+    entry = FindEntryWithID(pself->ASI_alarmArray, uniqueID, &idNum, FALSE);
+    if (entry && !entry->enabled) {
+	ChunkArrayDelete(pself->ASI_alarmArray, entry);
+    }
+    MemUnlock(pself->ASI_alarmHeap);
+}	/* End of MSG_AS_REMOVE_ENTRY.	*/
+
+/***********************************************************************
+ *		MSG_AS_GET_ALARM_ENTRY for AlarmServerClass
+ ***********************************************************************
+ * SYNOPSIS:	Retrieve a whole AlarmEntry
+ * PARAMETERS:	(TCHAR* uniqueID)
+ * SIDE EFFECTS:
+ *	Locks down a state block.  Caller is responsible for unlocking,
+ *	if we return non-null.
+ *
+ * STRATEGY:
+ *	Used by client for ease of getting/setting data.
+ *	MSG_AS_PUT_ALARM_ENTRY should be used when client is done.
+ *	(if no changes are made, the block can just be unlocked)
+ *
+ *	This message shouldn't be used to set the enabled flag;
+ *	use MSG_AS_SET_ENABLED for that.
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	dubois	5/24/96   	Initial Revision
+ *
+ ***********************************************************************/
+#define NUM_LOCKS(_b) MGI_LOCK_COUNT(MemGetInfo(_b, MGIT_FLAGS_AND_LOCK_COUNT))
+
+@method AlarmServerClass, MSG_AS_GET_ALARM_ENTRY
+{
+    AlarmEntry*	entry;
+
+    EC_WARNING_IF(NUM_LOCKS(pself->ASI_alarmHeap) > 0, -1);
+    EC_BOUNDS(uniqueID);
+
+    (void) MemLock(pself->ASI_alarmHeap);
+    
+    entry = FindEntryWithID(pself->ASI_alarmArray, uniqueID, NULL, FALSE);
+
+    if (entry) {
+	return entry;
+    } else {
+	MemUnlock(pself->ASI_alarmHeap);
+	return NULL;
+    }
+} /* End of MSG_AS_GET_ALARM_ENTRY.	*/
+
+/***********************************************************************
+ *		MSG_AS_PUT_ALARM_ENTRY for AlarmServerClass
+ ***********************************************************************
+ * SYNOPSIS:	Unlock an alarm entry, possibly re-starting alarm
+ * PARAMETERS:	(AlarmEntry* entry)
+ * SIDE EFFECTS:
+ *
+ * STRATEGY:	Restart alarm if entry is enabled
+ *	It is more efficient to just unlock the alarm entry's block
+ *	if the entry was not modified.
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	dubois	5/28/96   	Initial Revision
+ *
+ ***********************************************************************/
+@method AlarmServerClass, MSG_AS_PUT_ALARM_ENTRY
+{
+    Boolean	retval = TRUE;
+
+    EC_BOUNDS(entry);
+
+    /* Caller should validate */
+    ASSERT(ValidEntryDateAndTime(entry));
+
+    if (entry->enabled) {
+	retval = StartOrRestartAlarm(oself, entry);
+    }
+    MemUnlock(pself->ASI_alarmHeap);
+    return retval;
+}	/* End of MSG_AS_PUT_ALARM_ENTRY.	*/
+
+/***********************************************************************
+ *		MSG_AS_SET_ENABLED for AlarmServerClass
+ ***********************************************************************
+ * SYNOPSIS:	Set an alarm's "enabled" status
+ * PARAMETERS:	(TCHAR* uniqueID, Boolean newEnabled)
+ * SIDE EFFECTS:
+ *
+ * STRATEGY:	Must pass a valid uniqueID
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	dubois	5/28/96   	Initial Revision
+ *
+ ***********************************************************************/
+@method AlarmServerClass, MSG_AS_SET_ENABLED
+{
+    AlarmEntry*	entry;
+    Boolean	prevVal, retval = FALSE;
+
+    EC_BOUNDS(uniqueID);
+    (void) MemLock(pself->ASI_alarmHeap);
+    
+    entry = FindEntryWithID(pself->ASI_alarmArray, uniqueID, NULL, FALSE);
+    if (entry) {
+	retval = TRUE;
+	if (entry->enabled != newEnabled) {
+	    if (newEnabled) {
+		/* takes care of alarm enabled status -- won't enable
+		 * if alarm rings as a result of being in the past
+		 */
+		StartOrRestartAlarm(oself, entry);
+	    } else {
+		TimerStop(entry->timerHandle, entry->timerID);
+		entry->timerHandle = NullHandle;
+		entry->timerID = 0;
+		entry->enabled = FALSE;
+	    }
+	}
+    }
+    MemUnlock(pself->ASI_alarmHeap);
+
+    return retval;
+}	/* End of MSG_AS_SET_ENABLED.	*/
+
+/***********************************************************************
+ *		MSG_AS_SET_CONTEXT for AlarmServerClass
+ ***********************************************************************
+ * SYNOPSIS:	Set an alarm's context string
+ * PARAMETERS:	(TCHAR* uniqueID, TCHAR* newContext)
+ * SIDE EFFECTS:
+ *
+ * STRATEGY:	Must pass a valid uniqueID
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	dubois	5/28/96   	Initial Revision
+ *
+ ***********************************************************************/
+@method AlarmServerClass, MSG_AS_SET_CONTEXT
+{
+    AlarmEntry*	entry;
+    Boolean	retval = FALSE;
+    ChunkHandle	context_chunk;
+    TCHAR*	tmpString;
+
+    EC_BOUNDS(uniqueID);
+    EC_BOUNDS(newContext);
+
+    (void) MemLock(pself->ASI_alarmHeap);
+
+    context_chunk = LMemAlloc(pself->ASI_alarmHeap,
+			      (strlen(newContext)+1)*sizeof(TCHAR));
+    tmpString = LMemDerefHandles(pself->ASI_alarmHeap, context_chunk);
+    strcpy(tmpString, newContext);
+
+    entry = FindEntryWithID(pself->ASI_alarmArray, uniqueID, NULL, FALSE);
+    if (entry) {
+	retval = TRUE;
+	ASSERT(entry->moduleContext != NullChunk);
+	LMemFreeHandles(pself->ASI_alarmHeap, entry->moduleContext);
+	entry->moduleContext = context_chunk;
+    } else {
+	LMemFreeHandles(pself->ASI_alarmHeap, context_chunk);
+    }	
+
+    MemUnlock(pself->ASI_alarmHeap);
+    return retval;
+}	/* End of MSG_AS_SET_CONTEXT.	*/

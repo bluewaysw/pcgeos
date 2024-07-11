@@ -1,0 +1,381 @@
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+	Copyright (c) 1997 New Deal, Inc. -- All Rights Reserved
+
+PROJECT:	PC/GEOS - LEGOS
+MODULE:		I/O Component Set - File Buffer Component
+FILE:		fileBuffer.goc
+
+AUTHOR:		Martin Turon, Dec. 11, 1997
+
+ROUTINES:
+	Name			Description
+	----			-----------
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	martin	12/11/1997   	Initial version.
+
+DESCRIPTION:
+	This component oversees the reading and writing of
+	the file managed by a parent FileComponent into memory
+	buffer to allow for later processing and manipulation.
+
+	COMPONENT API descriptor	1997/12/11 <martin> rev 0.0.0.2
+	PROPERTIES			1997/12/16 <martin>  
+		buffer.parent	  = return file component
+	~	buffer.position	 => /get=parent.tell()	/set=parent.go()
+	ACTIONS				1997/12/22 <martin>
+		buffer.getc()	  = return byte at current position as integer 
+		buffer.putc(N)	  = write given integer N as byte at current
+		buffer.gets(N) 	  = return string of length N at current
+		buffer.puts(s,N)  = write N of string s to parent file   
+		buffer.geti()	  = return integer at current position 
+		buffer.puti(N)	  = write given integer N to parent file
+	*	buffer.geta(N) 	  = return array of length N at current   
+	*	buffer.puta(a,N)  = write array a[0-N] to parent file   
+
+	* Not implemented yet
+
+	$Id: fileBuffer.goc,v 1.2 98/07/10 00:02:19 martin Exp $
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+
+@include "fileInternal.goh"
+
+@classdecl FileBufferComponentClass;
+
+/********************************************************
+ *        FileBufferComponentClass Property Dispatch Tables
+ ********************************************************/
+@propertyDecl(FILE_BUFFER, SIZE,      INTEGER,    "size");
+@propertyDecl(FILE_BUFFER, POSITION,  INTEGER,    "position");
+
+PropEntryStruct _near *FileBufferComponentPropTable[] = {
+    @propertyRef(FILE_BUFFER, SIZE),
+    @propertyRef(FILE_BUFFER, POSITION),
+    endPropTable
+};
+
+
+/********************************************************
+ *        FileComponentClass Action Dispatch Tables
+ ********************************************************/
+@actionDecl(FILE_BUFFER,   READ_STRING,   STRING,  "gets",  1);
+@actionDecl(FILE_BUFFER,   WRITE_STRING,  INTEGER, "puts",  2);
+@actionDecl(FILE_BUFFER,   READ_INTEGER,  INTEGER, "geti",  0);
+@actionDecl(FILE_BUFFER,   WRITE_INTEGER, INTEGER, "puti",  1);
+@actionDecl(FILE_BUFFER,   READ_ARRAY,    ARRAY,   "geta",  0);
+@actionDecl(FILE_BUFFER,   WRITE_ARRAY,   INTEGER, "puta",  1);
+@actionDecl(FILE_BUFFER,   READ_BYTE,     INTEGER, "getc",  0);
+@actionDecl(FILE_BUFFER,   WRITE_BYTE,    INTEGER, "putc",  1);
+
+
+ActionEntryStruct _near *FileBufferComponentActionTable[] = {
+    @actionRef(FILE_BUFFER, READ_BYTE),
+    @actionRef(FILE_BUFFER, WRITE_BYTE),
+    @actionRef(FILE_BUFFER, READ_STRING),
+    @actionRef(FILE_BUFFER, WRITE_STRING),
+    @actionRef(FILE_BUFFER, READ_ARRAY),
+    @actionRef(FILE_BUFFER, WRITE_ARRAY),
+    @actionRef(FILE_BUFFER, READ_INTEGER),
+    @actionRef(FILE_BUFFER, WRITE_INTEGER),
+    endActionTable
+};
+
+/***************************************************************************
+ *              Code for FileBufferComponentClass
+ **************************************************************************/
+
+
+/***********************************************************************
+ *		MSG_META_RESOLVE_VARIANT_SUPERCLASS 
+ ***********************************************************************
+ * SYNOPSIS:	   Inform the system what class to use as the superclass 
+ *		   for the variant class of a particular object.
+ *
+ * PARAMETERS:	   word	MasterOffset 
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	martin	12/11/1997	Initial version
+ *
+ ***********************************************************************/
+@method FileBufferComponentClass, MSG_META_RESOLVE_VARIANT_SUPERCLASS
+{
+    if (MasterOffset == word_offsetof(EntBase, Ent_offset)) {
+	return &MetaClass;
+    }
+    return @callsuper();
+}	/* End of MSG_META_RESOLVE_VARIANT_SUPERCLASS.	*/
+
+
+
+/***********************************************************************
+ *		MSG_ENT_INTIALIZE for FileBufferComponentClass
+ ***********************************************************************
+ * SYNOPSIS:	    
+ * PARAMETERS:	    
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	martin	12/11/1997   	Initial version
+ *
+ ***********************************************************************/
+/****>
+@method FileBufferComponentClass, MSG_ENT_INITIALIZE
+{
+    FBCBufferLock(pself);
+    @callsuper();
+}	/* End of MSG_ENT_INTIALIZE.	<*******/
+/****
+@method FileBufferComponentClass, MSG_ENT_DESTROY
+{
+    FBCBufferUnlock(pself);
+    @callsuper();
+}	/* End of MSG_ENT_DESTROY.	<*******/
+
+
+/***********************************************************************
+ *	MSG_ENT_VALIDATE_PARENT for FileBufferComponentClass
+ ***********************************************************************
+ * SYNOPSIS:	    
+ * PARAMETERS:	    
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	martin	12/16/97   	Initial version
+ *
+ ***********************************************************************/
+@method FileBufferComponentClass, MSG_ENT_VALIDATE_PARENT
+{
+    Boolean  validParent;
+
+    MemLock(HandleOf(parentPtr));
+    validParent = ObjIsObjectInClass(parentPtr, &FileComponentClass);
+    MemUnlock(HandleOf(parentPtr));
+
+    if (validParent) return 0;
+    else return -1;
+}	/* End of MSG_ENT_VALIDATE_PARENT.	*/
+
+
+/*********************************************************************
+ *              FILEBUFFERENT_GET_PROPERTY
+ *********************************************************************
+ * SYNOPSIS:    Return the value of the property associated with the
+ *              passed in string
+ * PARAMETERS:  ComponentData *value
+ *              char *prop
+ * RETURN:      *value filled in
+ * STRATEGY:    Use the property tables define in fileLib.goc 
+ *		to dispatch the correct messages 
+ * REVISION HISTORY:
+ *      Name    Date            Description                          
+ *      ----    ----            -----------                          
+ *      martin  12/11/1997      Initial version                      
+ * 
+ *********************************************************************/
+@method FileBufferComponentClass, MSG_ENT_GET_PROPERTY
+{
+   if (!EntDispatchGetProperty(oself,
+			FileBufferComponentPropTable, @propGetArgs)) {
+      @callsuper();
+   }
+}
+
+@method FileBufferComponentClass, MSG_FILE_BUFFER_GET_SIZE
+{
+   value->CD_type 	    = TYPE_INTEGER;
+   value->CD_data.LD_string = pself->FBC_size;
+}
+@method FileBufferComponentClass, MSG_FILE_BUFFER_GET_POSITION
+{
+   value->CD_type 	    = TYPE_INTEGER;
+   value->CD_data.LD_string = pself->FBC_position;
+}
+
+
+/*********************************************************************
+ *                FILEBUFFERCOMPONENTENT_SET_PROPERTY
+ *********************************************************************
+ * SYNOPSIS: Set a property based on the passed in string
+ * PARAMETERS: ComponentData value
+ *             char *prop
+ * STRATEGY:
+ *      Just call EntDispatchSetProperty and let it do the right thing
+ *      based on the information in our property table.  If it's not
+ *      in our property table, then call the superclass.
+ *
+ * REVISION HISTORY:
+ *      Name    Date            Description                          
+ *      ----    ----            -----------                          
+ *      martin  12/11/1997      Initial version                      
+ * 
+ *********************************************************************/
+@method FileBufferComponentClass, MSG_ENT_SET_PROPERTY
+{
+   if (!EntDispatchSetProperty(oself,
+			FileBufferComponentPropTable, @propSetArgs)) {
+	@callsuper();
+   }
+}
+
+@method FileBufferComponentClass, MSG_FILE_BUFFER_SET_SIZE
+{
+   if (value->CD_type == TYPE_INTEGER) {
+      pself->FBC_size = value->CD_data.LD_integer;
+   }
+}
+@method FileBufferComponentClass, MSG_FILE_BUFFER_SET_POSITION
+{
+   if (value->CD_type == TYPE_INTEGER) {
+      pself->FBC_position = value->CD_data.LD_integer;
+   }
+}
+
+
+
+
+/***********************************************************************
+ *		FBCBufferLock
+ ***********************************************************************
+ * SYNOPSIS:	Common property access code shared by the various
+ *		MSG_FILE_BUFFER_DO action method handlers.
+ *			FBCBufferLock()   = Returns pointer to file contents
+ *			FBCBufferUnlock() = Release the buffer
+ *
+ * PARAMETERS:	    pself = pointer to FileComponentInstance
+ *		    rhi	  = pointer to RunHeapInfo
+ *
+ * SIDE EFFECTS:    
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	martin	12/15/1997   	Initial version
+ *
+ ***********************************************************************/
+void
+FBCParentAction (optr oself, Message msg, EntDoActionArgs *args)
+{
+    RunHeapInfo *rhi   = args->EDAA_runHeapInfoPtr;
+    optr 	parent = @call self::MSG_ENT_GET_PARENT();
+    @call {MSG_ENT_DO_ACTION}parent::msg(rhi, 
+		      			 args->EDAA_retval, 
+					 args->EDAA_argv, 
+					 args->EDAA_argc, 
+					 args->EDAA_actionName);
+}
+
+/*
+TCHAR *
+FBCBufferLock (FileBufferComponentInstance *pself, RunHeapInfo *rhi)
+{
+    MemHandle buffer = pself->FBC_buffer;
+    if (buffer == NULL) {
+    	optr     parent = @call self::MSG_ENT_GET_PARENT();
+	FileHandle file = @call parent::MSG_FILE_GET_FILE(rhi)
+	buffer = ShellBufferAlloc();
+	pself->FBC_buffer = buffer;
+    }
+    return ShellBufferLock(buffer);
+}
+void
+FBCBufferUnlock (FileBufferComponentInstance *pself)
+{
+    MemHandle buffer = pself->FBC_buffer;
+    if (buffer != NULL) {
+	ShellBufferUnlock(buffer);
+    }
+}
+*/
+
+
+/***********************************************************************
+ *		MSG_ENT_DO_ACTION for FileBufferComponentClass
+ ***********************************************************************
+ * SYNOPSIS:	Handles all actions for the FileBufferComponentClass.
+ *		This should be changed to use the C interface
+ *		to EntDispathAction once it is written.
+ *
+ * PARAMETERS:	    ComponentData 	*retval
+ *		    ComponentData 	*argv
+ *	 	    int 		argc
+ *		    char		*actionName
+ *
+ * SIDE EFFECTS:    
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	martin	12/11/1997   	Initial version
+ *
+ ***********************************************************************/
+@method FileBufferComponentClass, MSG_ENT_DO_ACTION
+{
+  if (!EntDispatchAction(oself, FileBufferComponentActionTable, @actionArgs)) {
+     @callsuper();
+  }
+}	/* End of MSG_ENT_DO_ACTION.	*/
+
+@method FileBufferComponentClass, MSG_FILE_BUFFER_DO_READ_BYTE
+{
+  /* translate: self.buffer.getc() ==> parent.peek() */
+    FBCParentAction(oself, MSG_FILE_DO_PEEK, @actionArgs);
+
+}
+@method FileBufferComponentClass, MSG_FILE_BUFFER_DO_WRITE_BYTE
+{
+  /* translate: self.buffer.putc() ==> parent.poke() */
+    FBCParentAction(oself, MSG_FILE_DO_POKE, @actionArgs);
+}
+@method FileBufferComponentClass, MSG_FILE_BUFFER_DO_READ_INTEGER
+{
+    int		 buffer;
+    optr 	 parent = @call self::MSG_ENT_GET_PARENT();
+    FileHandle	 file   = @call parent::MSG_FILE_GET_FILE(rhi);
+
+    FileRead(file, &buffer, sizeof(int), FCL_ERRORS);
+    FCLActionReturnInteger(buffer, @actionArgs);
+}
+@method FileBufferComponentClass, MSG_FILE_BUFFER_DO_WRITE_INTEGER
+{
+    int		buffer	= FCLActionDerefInteger(0, @actionArgs);  
+    optr     	parent	= @call self::MSG_ENT_GET_PARENT();
+    FileHandle	 file   = @call parent::MSG_FILE_GET_FILE(rhi);
+
+    FileWrite(file, &buffer, sizeof(int), FCL_ERRORS);
+}
+@method FileBufferComponentClass, MSG_FILE_BUFFER_DO_READ_STRING
+{
+   /* translate: self.buffer.gets() ==> parent.read() */
+    FBCParentAction(oself, MSG_FILE_DO_READ, @actionArgs);
+}
+@method FileBufferComponentClass, MSG_FILE_BUFFER_DO_WRITE_STRING
+{
+   /* translate: self.buffer.puts() ==> parent.write() */
+    FBCParentAction(oself, MSG_FILE_DO_WRITE, @actionArgs);
+}
+@method FileBufferComponentClass, MSG_FILE_BUFFER_DO_READ_ARRAY
+{
+}
+@method FileBufferComponentClass, MSG_FILE_BUFFER_DO_WRITE_ARRAY
+{
+}
+
+
+
+

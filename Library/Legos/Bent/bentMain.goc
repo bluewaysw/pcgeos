@@ -1,0 +1,2290 @@
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+	Copyright (c) Geoworks 1994 -- All Rights Reserved
+
+PROJECT:	PC/GEOS
+MODULE:		LEGOS - UI Builder
+FILE:		bentmain.goc
+
+AUTHOR:		Martin Turon, Sep  8, 1994
+
+ROUTINES:
+	Name			Description
+	----			-----------
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	martin	9/8/94		Initial version.
+
+DESCRIPTION:
+	Main code page for BentClass objects.
+
+	$Id: bentMain.goc,v 1.1 98/03/11 15:10:28 martin Exp $
+	$Revision: 1.1 $
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+
+@include "bentInternal.goh"
+@include <Legos/ent.goh>
+#include <geoMisc.h>
+@include <Objects/clipbrd.goh>
+#include <Legos/runheap.h>
+@include <Legos/basrun.goh>
+@include <Legos/bent.goh>
+
+@classdecl	BentClass;
+
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		Handy macros to ease portability
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+
+#define ExtractNptr(table, i) (void *)ConstructOptr(SegmentOf(table),table[i])
+
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		Globally exported Bent utility routines
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+
+/*
+ * Define the class to be void * so we can cast all classes to it without
+ * getting silly warnings.  We'll turn off the warning inside here.
+ */
+void *ECCheckPSelf(void *pself, optr oself, void *class) {
+#if ERROR_CHECK
+    void *shouldBe;
+    MemHandle ECBlock;
+    
+    ErrorCheckingFlags	ecFlags, newECFlags;
+    
+    ecFlags = SysGetECLevel(&ECBlock);
+    newECFlags = ecFlags | ECF_HIGH | ECF_NORMAL;
+    SysSetECLevel(newECFlags, ECBlock);
+
+    shouldBe = ObjDeref(oself, ((const ClassStruct *) class)->Class_masterOffset);
+
+    EC_ERROR_IF(pself != shouldBe, ERROR_PSELF_NOT_POINTING_TO_THE_RIGHT_PLACE);
+    EC_ERROR_IF(!ObjIsObjectInClass(oself, class), ERROR_PSELF_NOT_POINTING_TO_THE_RIGHT_OBJECT);
+    SysSetECLevel(ecFlags, ECBlock);
+    
+#endif
+
+    
+    return pself;
+}
+
+/***********************************************************************
+ *		BentFindClassPtrStruct
+ ***********************************************************************
+ * SYNOPSIS:	
+ * CALLED BY:	
+ * RETURN:	
+ * SIDE EFFECTS:
+ *	
+ * STRATEGY:
+ *	
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	martin	5/17/95		Initial version
+ *
+ ***********************************************************************/
+BentClassPtrStruct *
+BentFindClassPtrStruct (optr oself, BentClassPtrStruct _near *table[])
+{
+    BentClassPtrStruct	*classInfo;
+    ClassStruct		*myClass;
+    int			i = 0;
+
+   /*
+    * The fact that *table[] is an array of _near pointers and that 
+    * and most other pointers in C are _far makes the following code 
+    * a bit touchy.  Be careful!
+    */
+    myClass = ((MetaBase *)ObjDeref(oself,0))->MB_class;
+
+  if (SegmentOf(table) != SegmentOf(myClass)) return NULL;
+
+    while (table[i] != BENT_END_OF_CLASS_TABLE) {
+       /* 
+	* Lookup the table entry and convert it to a _far pointer.
+	*/
+	classInfo = (BentClassPtrStruct *)
+			ConstructOptr(SegmentOf(table), table[i]);
+       /* 
+	* If we found our class we're done!
+	*/
+	if (classInfo->ECPS_classPtr == myClass) break; 
+	i++;
+    }
+
+    if (table[i] == BENT_END_OF_CLASS_TABLE) return NULL;
+   
+   /*
+    * Return pointer to class info after converting it from _near to _far.
+    */
+    return classInfo;
+
+}	/* End of BentFindClassPtrStruct.	*/
+
+
+
+/***********************************************************************
+ *		BentExtractPropertyArrayElement
+ ***********************************************************************
+ * SYNOPSIS:	Finds the information on the given property, copies it into
+ *		another, new property array, and removes the element from the
+ *		original property array.  Use this routine to do pre and post
+ *		processing when enumerating properties.
+ *
+ *		Pass NullOptr as NewArray to just remove the property.
+ *
+ * CALLED BY:	MSG_BENT_ENUM_PROPERTIES
+ *
+ * RETURN:	nothing
+ * SIDE EFFECTS:	
+ * STRATEGY:
+ *	
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	martin	3/8/95		Initial version
+ *
+ ***********************************************************************/
+void
+BentExtractPropertyArrayElement(TCHAR *property,optr propArray,optr newArray)
+{
+    word			element;
+    ComponentData	propInfo;
+
+    element = NameArrayFind(propArray, property, 0, &propInfo);
+    if (element != CA_NULL_ELEMENT) {
+       /*
+	* If the property was found, move it from the original property
+	* array to its new property array.
+	*/
+	if (newArray != NullOptr)
+	{
+	    NameArrayAdd(newArray, property, 0, 0, &propInfo);
+#ifdef ERROR_CHECK
+/* this is to defeat an EC segment bug in NameArrayAdd */
+/*
+asm {	push	ds  }
+asm {	pop	es  }
+*/
+#endif
+	}
+	
+	ElementArrayDelete(propArray, element);
+    }
+}	/* End of BentExtractPropertyArrayElement.	*/
+
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		BentClass method handlers
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+
+
+/***********************************************************************
+ *		MSG_VIS_CLOSE for BentClass
+ ***********************************************************************
+ * SYNOPSIS:	Release the mouse
+ * PARAMETERS:	
+ * SIDE EFFECTS:
+ *
+ * STRATEGY:
+ *	Bent objs are given mouse grabs by gandalf.  We need to make
+ *	sure they are released.  Forms will crash if destroyed while
+ *	they still have active mouse grab.
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	dubois	9/26/96   	Initial Revision
+ *
+ ***********************************************************************/
+@method BentClass, MSG_VIS_CLOSE
+{
+    @callsuper();
+    @call self::MSG_VIS_RELEASE_MOUSE();
+}	/* End of MSG_VIS_LOST_GADGET_EXCL.	*/
+
+/***********************************************************************
+ *		MSG_META_RESOLVE_VARIANT_SUPERCLASS for BentClass
+ ***********************************************************************
+ * SYNOPSIS:	    Look up and return superclass from class info table
+ * PARAMETERS:	    
+ *
+ * SIDE EFFECTS:    
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	martin	10/12/94	Initial version.
+ *
+ ***********************************************************************/
+@method BentClass, MSG_META_RESOLVE_VARIANT_SUPERCLASS
+{
+    if (MasterOffset == word_offsetof(BentBase, Bent_offset)) {
+       BentClassPtrStruct *classInfo;
+
+       classInfo = @call self::MSG_BENT_GET_CLASS_INFORMATION();
+       if (classInfo) return classInfo->BCPS_superClass;
+    }
+    return @callsuper();
+}	/* End of MSG_META_RESOLVE_VARIANT_SUPERCLASS.	*/
+
+
+/***********************************************************************
+ *		MSG_ENT_GET_CLASS for BentClass
+ ***********************************************************************
+ * SYNOPSIS:	    Look up and return class name from class info table.
+ * PARAMETERS:	    
+ *
+ * SIDE EFFECTS:    
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	martin	6/19/95		Initial version
+ *
+ ***********************************************************************/
+@method BentClass, MSG_ENT_GET_CLASS
+{
+    BentClassPtrStruct *classInfo;
+
+    classInfo = @call self::MSG_BENT_GET_CLASS_INFORMATION();
+    return (TCHAR *)ConstructOptr(SegmentOf(classInfo),
+				 classInfo->ECPS_className);
+
+}	/* End of MSG_ENT_GET_CLASS.	*/
+
+
+/***********************************************************************
+ *		MSG_ENT_GET_PROPERTY for BentClass
+ ***********************************************************************
+ * SYNOPSIS:	    Return any build-time properties.  Most of these will
+ *		    probably be looked up in the class info table.
+ *
+ * PARAMETERS:	    
+ *
+ * SIDE EFFECTS:    
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	martin	5/17/95		Initial version
+ *
+ ***********************************************************************/
+@method BentClass, MSG_ENT_GET_PROPERTY
+{
+    TCHAR *specBoxName;
+    
+    if (!strcmp(prop, _TEXT("specPropBoxURL"))) {
+       BentClassPtrStruct *classInfo;
+
+       classInfo = @call self::MSG_BENT_GET_CLASS_INFORMATION();
+       value->CD_type		= TYPE_STRING;
+       specBoxName =	(TCHAR *)	/* not actually an optr */
+	   ConstructOptr(SegmentOf(classInfo), classInfo->BCPS_specPropBox);
+       value->CD_data.LD_string=
+	   RunHeapAlloc(rhi, RHT_STRING, 0,
+			(strlen(specBoxName)+1)*sizeof(TCHAR),
+			specBoxName);
+       
+    } else if (!strcmp(prop,_TEXT("libPropBoxURL"))) {
+       
+	BentLibraryInfoStruct *libraryInfo;
+	TCHAR *retString;
+	RunHeapToken stringToken;
+
+	libraryInfo = @call self::MSG_BENT_GET_LIBRARY_INFORMATION();
+	retString = (TCHAR *)	/* not actually an optr */
+	   ConstructOptr(SegmentOf(libraryInfo), libraryInfo->BLIS_libPropBox);
+
+	stringToken = RunHeapAlloc(rhi, RHT_STRING, 0,
+		     (strlen(retString) +1 ) *sizeof (TCHAR),
+		     retString);
+	
+	value->CD_type			= TYPE_STRING;
+	value->CD_data.LD_string	= stringToken;
+	return;
+
+    } else @callsuper();
+
+#if 0
+if ((!strcmp(prop, _TEXT("name"))) &&
+	       (pself->BI_flags & BSF_REMOVE_FROM_OUTPUT)) {
+	/* If we're asked for our name, and we're supposed to be removed
+	 * from the output, reply "no comment"...i.e. "top"
+	 */
+	value->CD_type		= TYPE_STRING;
+	value->CD_data.LD_string=
+	    RunHeapAlloc(rhi, RHT_STRING, 0,
+			 strlen(_TEXT("\"top\""))*sizeof(TCHAR),
+			 _TEXT("\"top\""));
+    } else 
+#endif
+}	/* End of MSG_ENT_GET_PROPERTY.	*/
+
+
+
+/***********************************************************************
+ *		BentFindChildCallback
+ ***********************************************************************
+ * SYNOPSIS:	
+ * CALLED BY:	
+ * RETURN:	
+ * SIDE EFFECTS:
+ *	
+ * STRATEGY:
+ *	
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	martin	3/6/95		Initial version
+ *
+ ***********************************************************************/
+#pragma argsused
+Boolean _pascal
+BentFindChildCallback (optr parent, optr oself, void *cbData)
+{
+    BentMouseData *data = cbData;
+
+    if (oself == data->BMD_component) {
+	data->BMD_xPos = -1;
+	return TRUE;
+    }
+
+    ObjCompProcessChildren(oself, 0, OCCT_DONT_SAVE_PARAMS_TEST_ABORT,
+			   data, 
+			   offsetof(EntBase, Ent_offset),
+			   offsetof(EntInstance, EI_comp),
+			   offsetof(EntInstance, EI_link),
+			   BentFindChildCallback);
+
+    if (data->BMD_xPos == -1) return TRUE;
+    else return FALSE;
+
+}	/* End of BentFindChildCallback.	*/
+
+
+
+/***********************************************************************
+ *		MSG_ENT_VALIDATE_PARENT for BentClass
+ ***********************************************************************
+ * SYNOPSIS:	    
+ * PARAMETERS:	  optr	parentPtr
+ *  
+ * SIDE EFFECTS:    
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	martin	3/6/95		Initial version
+ *
+ ***********************************************************************/
+@method BentClass, MSG_ENT_VALIDATE_PARENT
+{
+    BentMouseData data;
+
+   /*
+    * Cascade through our children and make sure none of them are our
+    * proposed new parent.
+    */
+    
+    data.BMD_xPos = 0;			/* assume valid parent */
+    data.BMD_component = parentPtr;
+    
+    BentFindChildCallback(0, oself, &data);
+
+    /*
+     * If we've discovered that this is an invalid parent, return such.
+     * Otherwise, ask the superclass.
+     */
+
+    if (data.BMD_xPos) {
+	return data.BMD_xPos;
+    }
+
+    return @callsuper();
+    
+}	/* End of MSG_ENT_VALIDATE_PARENT.	*/
+
+/*********************************************************************
+ *			Bent_AllocDescriptionBlock
+ *********************************************************************
+ * SYNOPSIS:	Allocate another BDescBlock in passed header
+ * CALLED BY:	EXTERNAL
+ * PASS:	hptr.BDescHeader
+ * RETURN:	MemHandle added to BDH_descriptions
+ * SIDE EFFECTS:
+ * STRATEGY:
+ * REVISION HISTORY:
+ *	Name	Date		Description			     
+ *	----	----		-----------			     
+ *	dubois	2/27/96	Initial version
+ * 
+ *********************************************************************/
+MemHandle
+Bent_AllocDescriptionBlock(MemHandle descHeader, word recommendedSize)
+{
+    optr	descriptions;
+    BDescBlock*	bdb;
+    BDescHeader* bdh;
+    word	count;
+    MemHandle	newBlock, *eltPtr;
+    word	strSize;
+
+    /* use max(recommendedSize, INITIAL_SIZE) */
+    strSize = (recommendedSize > DESCRIPTION_INITIAL_SIZE) ?
+	recommendedSize : DESCRIPTION_INITIAL_SIZE;
+
+    /* Allocate the block
+     */
+    newBlock = MemAlloc(sizeof(BDescBlock)+strSize,
+			HF_DYNAMIC, HAF_LOCK);
+
+    if (newBlock == NullHandle) return NullHandle;
+
+    bdb = MemDeref(newBlock);
+    bdb->BDB_cookie = BDB_COOKIE;
+    bdb->BDB_myHeader = descHeader;
+    bdb->BDB_me = newBlock;
+    bdb->BDB_size = strSize;
+    *(TCHAR*)(bdb+1) = C_NULL;	/* Null string */
+    MemUnlock(newBlock);
+
+    /* Append it to array
+     */
+    bdh = MemLock(descHeader);
+    descriptions=ConstructOptr(descHeader, bdh->BDH_descriptions);
+    eltPtr = ChunkArrayAppend(descriptions, 0);
+    *eltPtr = newBlock;
+    MemUnlock(descHeader);
+
+    return newBlock;
+}
+
+/*********************************************************************
+ *			BentLockDescription
+ *********************************************************************
+ * SYNOPSIS:	Lock down block and return optr of description chunk
+ * CALLED BY:	INTERNAL
+ * PASS:
+ * RETURN:	Pointer to NULL at end of description string
+ *		(to preserve compatibility)
+ * SIDE EFFECTS:Locks description block
+ * STRATEGY:
+ * REVISION HISTORY:
+ *	Name	Date		Description			     
+ *	----	----		-----------			     
+ *	dubois	 2/23/95	Initial version			     
+ * 
+ *********************************************************************/
+TCHAR*
+BentLockDescription(MemHandle buf, MemHandle* descHan)
+{
+    BDescHeader* bdh;
+    BDescBlock* bdb;
+    optr	descriptions;
+    TCHAR*	str;
+
+    bdh = MemLock(buf);
+    descriptions = ConstructOptr(buf, bdh->BDH_descriptions);
+    *descHan = *(MemHandle*)ChunkArrayElementToPtr
+	(descriptions,
+	 ChunkArrayGetCount(descriptions)-1,
+	 NULL);
+    MemUnlock(buf);
+    
+    bdb = MemLock(*descHan);
+    str = (TCHAR*)(bdb+1);
+    return strchr(str, C_NULL);
+}
+
+void
+BentUnlockDescription(MemHandle han)
+{
+#if ERROR_CHECK
+    BDescBlock* bdb;
+    bdb = MemDeref(han);
+    EC_ERROR_IF(bdb->BDB_cookie != BDB_COOKIE, -1);
+#endif
+    MemUnlock(han);
+}
+
+
+/***********************************************************************
+ *		BentEnsureBufferSpace
+ ***********************************************************************
+ * SYNOPSIS:	Ensure that there are N bytes free after trailing NULL
+ * CALLED BY:	INTERNAL
+ * RETURN:
+ * SIDE EFFECTS:
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	martin	9/30/94		Initial version
+ *	dubois	2/27/96  	Uses new buffer mechanism
+ *
+ ***********************************************************************/
+Boolean
+BentEnsureBufferSpace(MemHandle descHeader, word space)
+{
+    BDescHeader	*bdh;
+    BDescBlock	*bdb;
+    MemHandle	descHan;
+    word	len, newSize;
+    TCHAR*	str;
+    Boolean	retval = TRUE;
+
+    bdh = MemLock(descHeader);
+    descHan = *(MemHandle*)ChunkArrayElementToPtrHandles
+	(descHeader, bdh->BDH_descriptions,
+	 ChunkArrayGetCountHandles(descHeader,bdh->BDH_descriptions)-1,
+	 NULL);
+    MemUnlock(descHeader);
+
+    bdb = MemLock(descHan);
+    str = (TCHAR*)(bdb+1);
+
+    newSize = (strlen(str)+1)*sizeof(TCHAR) + space;
+
+    if (newSize > bdb->BDB_size)
+    {
+	/* Try increasing in a big chunk, if we can
+	 */
+	if (newSize + DESCRIPTION_INCREMENT_SIZE < DESCRIPTION_MAX_BUFFER_SIZE)
+	{
+	    newSize += DESCRIPTION_INCREMENT_SIZE;
+	}
+	    
+	/* Alloc a new block, or resize old one? */
+	if (newSize > DESCRIPTION_MAX_BUFFER_SIZE)
+	{
+	    Bent_AllocDescriptionBlock(descHeader, space);
+	} else {
+	    bdb->BDB_size = newSize;
+	    if (!MemReAlloc(descHan, newSize + sizeof(BDescBlock),0))
+	    {
+		retval = FALSE;
+	    }
+	}
+    }
+    MemUnlock(descHan);
+    return retval;
+} /* End of BentEnsureBufferSpace.	*/
+
+
+/***********************************************************************
+ *		BentGetComponentPropertyUnquoted
+ ***********************************************************************
+ * SYNOPSIS:	Returns the name of the given component in the given buffer.
+ *		Unlike MSG_BENT_GET_PROPERTY, the name will not be
+ *		surrounded by quotation marks. 
+ *
+ * CALLED BY:	
+ * RETURN:	
+ *
+ * SIDE EFFECTS:	
+ * STRATEGY:
+ *	
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	martin	2/15/95		Initial version
+ *
+ ***********************************************************************/
+void
+BentGetComponentPropertyUnquoted(optr oself, TCHAR *buffer, TCHAR *property)
+{
+    ComponentData  data;
+    EntObjectBlockHeader *block;
+    RunHeapInfo *rhi;
+    TCHAR *string;
+    
+   /*
+    * Get the value of the property into a ComponentData structure 
+    * (via the standard Ent API)
+    */
+    block = ObjLockObjBlock(OptrToHandle(oself));
+    rhi = RunComponentLockHeap(block);
+    
+    data.CD_type = TYPE_STRING;
+    @call self::MSG_ENT_GET_PROPERTY(rhi, &data, property);
+    if (data.CD_type != TYPE_STRING) {
+	buffer[0] = C_NULL;
+    } else {
+	RunHeapLock(rhi, data.CD_data.LD_string, (void *)&string);
+	strcpy(buffer, string);
+	RunHeapUnlock(rhi, data.CD_data.LD_string);
+    }	
+    RunComponentUnlockHeap(block);
+    MemUnlock(OptrToHandle(oself));
+
+}	/* End of BentGetComponentPropertyUnquoted.	*/
+
+/*********************************************************************
+ *			BentGetComponentName
+ *********************************************************************
+ * SYNOPSIS:	
+ * CALLED BY:	
+ * PASS:
+ * RETURN:
+ * SIDE EFFECTS:
+ * STRATEGY:
+ * REVISION HISTORY:
+ *	Name	Date		Description			     
+ *	----	----		-----------			     
+ *	RON	 7/25/95	Initial version
+ * 	dloft	5/29/96		added proto hack
+ *********************************************************************/
+void BentGetComponentName(optr oself, TCHAR *buffer)
+{
+    word oldDS = setDSToDgroup();
+    BentGetComponentPropertyUnquoted(oself, buffer, _TEXT("name"));
+    if (buffer[0] == C_NULL) {
+	EC_ERROR(-1);		/* ack!  no name property... */
+	BentGetComponentPropertyUnquoted(oself, buffer, _TEXT("proto"));
+    }
+    restoreDS(oldDS);
+}
+void BentGetComponentClass(optr oself, TCHAR *buffer)
+{
+    word oldDS = setDSToDgroup();
+    BentGetComponentPropertyUnquoted(oself, buffer, _TEXT("class"));
+    restoreDS(oldDS);
+}
+
+	
+
+
+
+/***********************************************************************
+ *		BentGetBasicDescription
+ ***********************************************************************
+ * SYNOPSIS:	Appends a BASIC description of the component to the 
+ *		given description buffer.
+ *
+ * CALLED BY:	INTERNAL - MSG_BENT_GET_DESCRIPTION
+ * RETURN:	nothing
+ *
+ * SIDE EFFECTS:
+ * STRATEGY:
+ *	If !BDF_BUILDTIME, check to see if we should use the _trueClass
+ *	property instead of the _class property.
+ *	
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	martin	9/16/94		Initial version
+ *
+ ***********************************************************************/
+void 
+BentGetBasicDescription(MemHandle descHeader, optr oself, 
+			BDescInfo outputInfo,
+			Boolean useCompInit)
+{
+    TCHAR*	dummy;		/* Dummy pointer that will be stuffed with
+				 * property name by MSG_ENT_ENUM_PROPERTIES */
+    TCHAR*	descP;
+    MemHandle	descHan;
+    TCHAR*	classProp;	/* Property to use to retrieve the class */
+    EventHandle event;
+    Boolean	asComponent;
+    ComponentData   cd;
+
+    BentEnsureBufferSpace(descHeader, DESCRIPTION_MAX_LINE_SIZE);
+    descP = BentLockDescription(descHeader, &descHan);
+
+    ;{
+	BentInstance* pself;
+	pself = (BentInstance*)ObjDerefBent(oself);
+	asComponent = (ECPSelf(pself)->BI_flags & BSF_DIM_AS_COMPONENT);
+    }
+
+    /* set classProp appropriately */
+    if (! (outputInfo.BDI_flags & BDF_BUILDTIME))
+    {
+	ComponentData	data;
+	RunHeapInfo*	rhi = NULL; /* opt: the GET_PROP shouldn't need this */
+
+	@call self::MSG_ENT_GET_PROPERTY(rhi, &data, _TEXT("_trueClass"));
+	classProp = (data.CD_type == TYPE_STRING) ?
+	    _TEXT("_trueClass") : _TEXT("class");
+    } else {
+	classProp = _TEXT("class");
+    }
+    
+    /* Write out the line to describe the component type:
+     *		 Dim <name> as <class>
+     */
+    strcat(descP, _TEXT("Dim "));
+    descP += 4;
+    BentGetComponentName(oself, descP);
+    descP = strchr(descP, C_NULL);
+    strcat(descP, _TEXT(" as "));
+    descP += 4;
+    if (asComponent) {
+	strcat(descP, _TEXT("component\r\n"));
+	descP = strchr(descP, C_NULL);
+    } else {
+	BentGetComponentPropertyUnquoted(oself, descP, classProp);
+	descP = strchr(descP, C_NULL);
+	strcat(descP, _TEXT("\r\n"));
+	descP += 2;
+    }
+    
+    /* Write out the line to create the component:
+     *		 <name> = component(<_TEXT("class")>,<parent>)
+     */    
+    BentGetComponentName(oself, descP);
+    strcat(descP, _TEXT(" = MakeComponent("));
+    descP = strchr(descP, C_NULL);
+
+    (void) @call self::MSG_BENT_GET_PROPERTY(classProp, descP);
+    strcat(descP, _TEXT(","));
+    descP = strchr(descP, C_NULL);
+    @call self::MSG_ENT_GET_PROPERTY(NULL, &cd, _TEXT("parent"));
+    if (COMP_IS_AGG(cd.CD_data.LD_comp)) {
+	EC_ERROR(-1);
+	/* this doesn't work because the aggParent is not a bent object */
+	/* FIXME */
+@if 0	
+	@call cd.CD_data.LD_comp::MSG_ENT_GET_PROPERTY(NULL, &cd, 
+						       _TEXT("aggParent"));
+	EC_ERROR_IF(cd.CD_type == TYPE_ERROR || cd.CD_data.LD_comp == NullOptr,
+		    -1);
+	@call cd.CD_data.LD_comp::MSG_BENT_GET_PROPERTY(_TEXT("parent"), descP);
+@endif
+    } else {
+	(void) @call self::MSG_BENT_GET_PROPERTY(_TEXT("parent"), descP);
+    }
+    strcat(descP,_TEXT(")\r\n"));
+	   
+    if (useCompInit)
+    {
+	strcat(descP, _TEXT("CompInit "));
+	descP = strchr(descP, C_NULL);
+	BentGetComponentName(oself, descP);
+	strcat(descP, _TEXT("\r\n"));
+    }
+    BentUnlockDescription(descHan);
+
+    /* Write out the properties of this component:
+     *		 <name>.<property> = <value>
+     */
+    event = @record self::MSG_BENT_DESCRIBE_PROPERTY(dummy, descHeader);
+    @call self::MSG_BENT_ENUM_PROPERTIES(event);
+    ObjFreeMessage(event);
+
+    if (useCompInit)
+    {
+	/* space for "EndCompInit\r\n" */
+	BentEnsureBufferSpace(descHeader, 40);
+	descP = BentLockDescription(descHeader, &descHan);
+	strcat(descP, _TEXT("End CompInit\r\n"));
+	BentUnlockDescription(descHan);
+    }
+
+} /* End of BentGetBasicDescription.	  */
+
+/***********************************************************************
+ *		MSG_BENT_DESCRIBE_PROPERTY for BentClass
+ ***********************************************************************
+ * SYNOPSIS:	Appends a BASIC definition for the given component 
+ *		property to the given description buffer. 
+ *
+ * CALLED BY:	INTERNAL = BentGetBasicDescription via EntEnumProperties
+ *
+ * PARAMETERS:	TCHAR *property = cx:dx
+ *		hptr.BDescHeader descHeader= bp
+ *
+ * SIDE EFFECTS:may move buffer on the heap, invalidating pointers, etc
+ *
+ * STRATEGY:
+ *	Build-time properties are filtered out here if the
+ *	BDF_BUILDTIME flag isn't set
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	martin	9/30/94		Initial version
+ *
+ ***********************************************************************/
+@method BentClass, MSG_BENT_DESCRIBE_PROPERTY
+{
+    dword	genericData;
+    BDescFlags	descFlags;
+    Boolean	error;
+
+    /* Lock down the given description buffer, and output the statement
+     * to set the given property in the standard basic syntax:
+     *	<component>.<property> = <value>
+     */
+
+
+    /* top level visible objects don't spit out visible if doing COMP_INIT
+     */
+    if (!strcmp(property, _TEXT("visible")) &&
+	(@call self::MSG_ENT_GET_PARENT() == GeodeGetAppObject(0)) &&
+	(ECPSelf(pself)->BI_flags & BSF_COMP_INIT))
+    {
+	return;
+    }
+
+    /* Only output buildtime properties if BDF_BUILDTIME is set
+     * buildtime properties start with _, with the exception of "name"
+     */
+    descFlags = BentGetDescriptionFlags(descHeader);
+    if ((descFlags & BDF_BUILDTIME)			/* flag's set */
+	|| ((property[0] != C_UNDERSCORE		/* or it's not */
+	    && strcmp(property, _TEXT("name")))))	/* a bt-prop   */
+    {
+	TCHAR*		descP;
+	MemHandle	descHan;
+	word		start;	/* offset of starting char */
+	
+	BentEnsureBufferSpace(descHeader, DESCRIPTION_MAX_LINE_SIZE);
+	descP = BentLockDescription(descHeader, &descHan);
+	start = (word)descP;
+
+	if ( !(ECPSelf(pself)->BI_flags & BSF_COMP_INIT))
+	{
+	    /* '<component>' */
+	    BentGetComponentName(oself, descP);
+	    descP = strchr(descP, C_NULL);
+	
+	    /* '.<property name>=' */
+	    *descP++ =C_PERIOD;
+	}
+	EC_ERROR_IF(strlen(property) == 0, -1);
+	strcpy(descP, property);
+	descP += strlen(property);
+	*descP++ = C_EQUAL; *descP = C_NULL;
+	
+       /* Write out '<prop>\r\n' 
+	*
+	* MSG_BENT_GET_PROPERTY is designed to return the ASCII description 
+	* of *any* property (including complex properties.)  If the property 
+	* returns an error or otherwise can't write the ASCII version of the 
+	* property, we need to effectively nuke this line.  
+	* Otherwise, write out the correct end of line sequence.
+	*/
+	error = @call self::MSG_BENT_GET_PROPERTY(property, descP);
+
+	/* No deref operation */
+	BentUnlockDescription(descHan);
+	descP = BentLockDescription(descHeader, &descHan);
+
+	if (error) {
+	    /* Kludge -- if error, then no text was added by BENT_GET_PROP
+	     * so no new block was added, and setting char to null will
+	     * safely strip the new stuff
+	     */
+	    descP = (TCHAR*) (((dword)descP&0xffff0000)|start);
+	    *descP = C_NULL;
+	} else {
+	    strcat(descP,_TEXT("\r\n"));
+	}
+
+	BentUnlockDescription(descHan);
+    }
+
+} /* End of MSG_BENT_DESCRIBE_PROPERTY. */
+
+/***********************************************************************
+ *		MSG_BENT_DESCRIBE_SELF for BentClass
+ ***********************************************************************
+ * SYNOPSIS:	    Appends a description of the component to the given 
+ *		    buffer.  The syntax of the description output is
+ *		    specified by the enumerated type passed in.
+ *
+ * PARAMETERS:	    hptr.BDescHeader	descHeader
+ *		    BDescInfo 		outputInfo
+ *
+ * SIDE EFFECTS:    
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	martin	9/16/94		Initial version
+ *
+ ***********************************************************************/
+@method BentClass, MSG_BENT_DESCRIBE_SELF
+{
+    TCHAR*	  dummy;       /* Dummy pointer that will be stuffed with
+			        * property name by MSG_ENT_ENUM_PROPERTIES */
+    EventHandle	  event;
+    optr	  postProcessArray = ConstructOptr(HandleOf(oself), 0);
+    optr	  propArray	   = ConstructOptr(HandleOf(oself),
+						   pself->BI_propArray);
+    Boolean	  ignoreSelf = ((pself->BI_flags & BSF_REMOVE_FROM_OUTPUT)
+				&& !(outputInfo.BDI_flags & BDF_BUILDTIME));
+
+    EC_ERROR_IF(pself->BI_propArray == 0, 
+		ERROR_BENT_PROP_ARRAY_NOT_INITIALIZED);
+
+    if (!ignoreSelf) {
+	/*
+	 * Write out visible property *after* all our children have been 
+	 * written out.  
+	 */
+	postProcessArray = ConstructOptr(HandleOf(postProcessArray),
+	    NameArrayCreateAt(postProcessArray, sizeof(ComponentData), 0, 0));
+
+	ChunkArrayEnum(propArray, (void *) postProcessArray,
+		       BentFilterPostProcessElements);
+		
+	switch (outputInfo.BDI_type) {
+	case BDT_BASIC:
+	case BDT_CLIPBOARD:
+	case BDT_DOT_UI:
+	case BDT_GOC:
+	default:
+	    pself = ObjDerefBent(oself);
+	    BentGetBasicDescription(descHeader, oself, outputInfo,
+				    pself->BI_flags & BSF_COMP_INIT);
+	    pself = ObjDerefBent(oself);
+	    break;
+	}
+
+	event = @record BentClass::MSG_BENT_DESCRIBE_SELF
+	    (descHeader,outputInfo);
+	/* MSG_ENT_SEND_TO_CHILDREN frees event handle */
+	@call self::MSG_ENT_SEND_TO_CHILDREN(event);
+
+	;{
+	    word	oldFlags;
+
+	    /* Do props that were put off until later
+	     */
+	    pself = ObjDerefBent(oself);
+	    oldFlags = pself->BI_flags;
+	    ECPSelf(pself)->BI_flags &= ~BSF_COMP_INIT;
+	    event = @record self::MSG_BENT_DESCRIBE_PROPERTY
+		(dummy, descHeader);
+	    ChunkArrayEnum(postProcessArray, (void *)event, 
+	                   BentProcessPropertyArrayElement);
+	    ObjFreeMessage(event);
+	    pself = ObjDerefBent(oself);
+	    ECPSelf(pself)->BI_flags = oldFlags;
+	}
+
+	/* reverse migration to get elements back into original array
+	 * so this whole process works more that just the first time 
+	 */
+	ChunkArrayEnum(postProcessArray, (void *)propArray,
+		       BentFilterPostProcessElements);
+	LMemFreeHandles(HandleOf(oself), postProcessArray);
+    }
+    else
+    {
+	/*
+	 * In the aggregate case, spit out some code that'll let things work
+	 * if there is no top
+	 */
+	/* FIXME: is this still needed? 2/96 */
+	 if (outputInfo.BDI_flags & BDF_AGGREGATE)
+	 {
+	     TCHAR*	descP;
+	     MemHandle	descHan;
+
+	     BentEnsureBufferSpace(descHeader, DESCRIPTION_MAX_LINE_SIZE);
+	     descP = BentLockDescription(descHeader, &descHan);
+	     strcpy(descP, _TEXT("DIM top as component\r\ntop = aggTop\r\n"));
+	     BentUnlockDescription(descHan);
+	 }
+
+	 event = @record BentClass::MSG_BENT_DESCRIBE_SELF
+	     (descHeader, outputInfo);
+	 /* ENT_SEND_TO_CHILDREN frees event handle */
+	 @call self::MSG_ENT_SEND_TO_CHILDREN(event);
+     }
+	
+} /* End of MSG_BENT_DESCRIBE_SELF.	  */
+
+
+/***********************************************************************
+ *		MSG_BENT_GET_PROPERTY for BentClass
+ ***********************************************************************
+ * SYNOPSIS:	Fills the given buffer with the value of the given
+ *		property in the form of a string.  Assumes *text
+ *		points to somewhere within a hptr.BDescBlock
+ *		block, _NOT_ to just any random piece of memory.
+ *
+ * PARAMETERS:	TCHAR	*property	= name of property
+ *		TCHAR	*text		= buffer to fill with property
+ *					  value (in the form of a string)
+ *
+ * RETURN:	TRUE  if property couldn't be represented as a string.
+ * SIDE EFFECTS: *** Can move text's LMEM block ***
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	martin	9/23/94		Initial version
+ *
+ ***********************************************************************/
+@method BentClass, MSG_BENT_GET_PROPERTY
+{
+    ComponentData  data;
+    Boolean	   error    = FALSE;
+
+    /* Get the value of the property into a ComponentData structure 
+     * (via the standard Ent API)
+     */
+    data.CD_type = TYPE_STRING;
+    data.CD_data.LD_fptr = text+1;
+    @call self::MSG_ENT_GET_PROPERTY_EXTERNAL(&data, property);
+#if ERROR_CHECK
+    if (data.CD_type == TYPE_STRING) {
+	EC_BOUNDS(text+1+strlen(text+1));
+    }
+#endif
+
+    /* Now convert the value in the ComponentData structure into a string
+     */
+    switch (data.CD_type)
+    {
+    case TYPE_COMPLEX:
+    {
+	optr		complexArray;
+	BDescHeader*	bdh;
+	BDescBlock*	bdb;
+	RunHeapToken*	newTok;
+	RunHeapToken	complex;
+	RunHeapInfo*	rhi;
+	
+
+	complex = data.CD_data.LD_complex;
+        if (complex)
+	{
+	    /* Not representable as text, so add the description ourselves
+	     * (or not, as the case may be)
+	     */
+	    rhi = RunComponentLockHeap((EntObjectBlockHeader*)
+				       MemDeref(OptrToHandle(oself)));
+	    bdb = (BDescBlock *)ConstructOptr(SegmentOf(text), 0);
+	    EC_ERROR_IF(bdb->BDB_cookie != BDB_COOKIE, -1);
+	    bdh = (BDescHeader*)MemLock(bdb->BDB_myHeader);
+	    complexArray = ConstructOptr(bdh->BDH_meta.LMBH_handle,
+					 bdh->BDH_clipItemArray);
+	    EC_BOUNDS(text);
+	    
+	    strcat(text, _TEXT("GetComplex(")); text += 11;
+	    /* text += strlen(_TEXT("GetComplex(")); */
+	    itoa(ChunkArrayGetCount(complexArray), text);
+	    strcat(text, _TEXT(")"));
+	    EC_BOUNDS(text);
+
+	    newTok = ChunkArrayAppend(complexArray, 0);
+	    *newTok = complex;
+	    /* memunlock must be after all ChunkArray calls */
+	    MemUnlock(bdb->BDB_myHeader);
+	    
+	    RunHeapIncRef(rhi, complex);
+
+	    RunComponentUnlockHeap((EntObjectBlockHeader*)
+				   MemDeref(OptrToHandle(oself)));
+	    
+	}
+	else
+	{
+	    error    = TRUE;
+	}
+	break;
+    }
+
+    case TYPE_STRING:
+	/* All string properties, except for name (which is really the
+	 * string version of a component) should be surrounded with
+	 * quotation marks.  Stuff them in now if appropriate,
+	 * otherwise shift over the name to the proper place in the
+	 * buffer. 
+	 */
+	text[0] = C_QUOTE;
+	text = strchr(text,NULL);
+	text[0] = C_QUOTE;
+	text[1] = NULL;
+	break;
+
+    case TYPE_INTEGER:
+	sprintf(text, _TEXT("%d"), data.CD_data.LD_integer);
+	break;
+
+    case TYPE_LONG:
+	sprintf(text, _TEXT("%ld"), data.CD_data.LD_long);
+	break;
+
+    case TYPE_COMPONENT:
+	/*
+	 * Return the name of the component, or _TEXT("app") if the
+	 * GET_PROPERTY message returned 0. 
+	 */
+    if (data.CD_data.LD_comp == 0 ||
+	BentIsObjectInClass(data.CD_data.LD_comp, &GenApplicationClass)) {
+	    strcpy(text,_TEXT("\"app\""));
+	} else {
+	    BentGetComponentName(data.CD_data.LD_comp, text);
+	}
+	break;
+
+    case TYPE_ERROR:
+    default:
+	error    = TRUE;
+	break;
+
+
+    } /* switch */
+    return error;
+} /* End of MSG_BENT_GET_PROPERTY.	  */
+
+
+/***********************************************************************
+ *		MSG_BENT_SELECT for BentClass
+ ***********************************************************************
+ * SYNOPSIS:	    
+ * PARAMETERS:	    
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	martin	10/17/94	Initial version
+ ***********************************************************************/
+@method BentClass, MSG_BENT_SELECT
+{
+    pself->BI_flags = pself->BI_flags | BSF_SELECTED;
+
+    @call self::MSG_BENT_DRAW_SELECTED();
+
+}	/* End of MSG_BENT_SELECT.	*/
+
+
+/***********************************************************************
+ *		MSG_BENT_DESELECT for BentClass
+ ***********************************************************************
+ * SYNOPSIS:	    
+ * PARAMETERS:	    
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	martin	10/18/94	Initial version
+ *
+ ***********************************************************************/
+@method BentClass, MSG_BENT_DESELECT
+{
+    pself->BI_flags = pself->BI_flags & ~BSF_SELECTED;
+    
+    @call self::MSG_BENT_DRAW_UNSELECTED();
+    
+}	/* End of MSG_BENT_DESELECT.	*/
+
+
+
+/***********************************************************************
+ *		MSG_BENT_MOVE_CHILD for BentClass
+ ***********************************************************************
+ * SYNOPSIS:	    
+ * PARAMETERS:	    optr	child
+ *		    int		childNum
+ *
+ * SIDE EFFECTS: 
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	martin	11/14/94	Initial version
+ *
+ ***********************************************************************/
+@method BentClass, MSG_BENT_MOVE_CHILD
+{
+    EntInstance *eself;
+    BentInstance *cself;
+    EntState	state;
+    Boolean	isEntVis;
+
+    @call self::MSG_BENT_INVALIDATE();
+    
+    ObjCompMoveChild(oself, child, childNum, 
+		     word_offsetof(EntBase,	Ent_offset), 
+		     word_offsetof(EntInstance, EI_comp), 
+		     word_offsetof(EntInstance, EI_link));
+
+    eself = ObjDerefEnt(oself);
+    state = eself->EI_state;
+    ObjLockObjBlock(OptrToHandle(child));
+    cself = ObjDerefBent(child);
+    if (cself->BI_flags & BSF_SELECTED) 
+    {
+	@call child::MSG_BENT_DRAW_UNSELECTED();
+    }
+    MemUnlock(OptrToHandle(child));
+
+    isEntVis = BentIsObjectInClass(child, &EntVisClass);
+    if (isEntVis) 
+    {
+	@call child::MSG_ENT_VIS_HIDE();
+    }
+    if (state & ES_IS_GEN)
+	@call self::MSG_GEN_MOVE_CHILD(child, childNum);
+    if (state & ES_IS_VIS)
+	@call self::MSG_VIS_MOVE_CHILD(child, childNum);
+    if (isEntVis) 
+    {
+	@call child::MSG_ENT_VIS_SHOW();
+    }
+
+}	/* End of MSG_BENT_MOVE_CHILD.	*/
+
+
+/***********************************************************************
+ *		MSG_ENT_SET_PROPERTY for BentClass
+ ***********************************************************************
+ * SYNOPSIS:	    Stores the given property as dirty, so when the
+ *		    build-time component is told to write out its
+ *		    description, it knows which properties to write out, and
+ *		    which properties use the default values.
+ *		    Additionally, tell the interpreter that properties have
+ *		    changed so that it knows to recompile things.
+ *
+ * PARAMETERS:	    ComponentData	*value
+ *		    TCHAR		*prop
+ *
+ * SIDE EFFECTS:    
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	martin	2/13/95		Initial version
+ *
+ ***********************************************************************/
+@method BentClass, MSG_ENT_SET_PROPERTY
+{
+    /* FIXME?? - this assumes a properety name will be < 64 characters */
+    TCHAR   	    	propBuf[64];
+    EC_ERROR_IF(strlen(prop) > 63, -1);
+
+    strcpy(propBuf, prop);
+
+    /*
+     * If the component is selected, unselect it before we change its size.
+     */
+    @call self::MSG_BENT_DRAW_UNSELECTED();
+    
+    /*
+     * Store the change info. (MARK_CHANGED will invalidate prop !!!!)
+     */
+    @call self::MSG_BENT_MARK_CHANGED_PROPERTY(rhi, value, propBuf);
+
+    if (!strcmp(propBuf, _TEXT("_noOutput")))
+    {
+	@call self::MSG_BENT_SET_STATUS_FLAGS(BSF_REMOVE_FROM_OUTPUT,0);
+    }
+    
+    /*	
+     * Finally, we still need to set the actual property!
+     */
+
+    /* NOTE: we need to change prop to point to a copy of the string here
+     * since it moght been invalidated by the ENT_GET_PROPERTY in MARK_CHANGED
+     * and prop gets used by callsuper()
+     */
+    prop = propBuf;
+    @callsuper();
+
+    /*
+     * If it is selected, redraw it selected *.
+     */
+    @call self::MSG_BENT_DRAW_SELECTED();
+
+} /* End of MSG_ENT_SET_PROPERTY.	*/
+
+/***********************************************************************
+ *		MSG_BENT_MARK_CHANGED_PROPERTY for BentClass
+ ***********************************************************************
+ * SYNOPSIS:	    Marks the property as being changed so it
+ *		    knows to be written out sometime later.
+ * PARAMETERS:	    TCHAR *	prop;	name of property
+ * SIDE EFFECTS:    ObjectBlock may grow.
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	RON	9/15/95   	Initial Revision
+ *
+ ***********************************************************************/
+@method BentClass, MSG_BENT_MARK_CHANGED_PROPERTY
+{
+
+    word		element, new=FALSE;
+    ComponentData	propInfo;
+    optr 		interp;
+    optr		propArray = ConstructOptr(HandleOf(oself),
+						  pself->BI_propArray);
+    word 	    	typeSize;
+
+    /* 
+     * If the name array doesn't exist yet, create one now.
+     */ 
+    if (ChunkOf(propArray) == NullHandle) {
+	propArray = ConstructOptr(HandleOf(oself),
+	    	NameArrayCreateAt(propArray,sizeof(ComponentData),0,0));
+	pself = ObjDerefBent(oself);
+	pself_check->BI_propArray = ChunkOf(propArray);
+    }
+
+    element = NameArrayFind(propArray, prop, 0, &propInfo);
+    if (element == CA_NULL_ELEMENT) {
+	/* If this property doesn't exist in the name array yet, then add it
+	 * now. We need to get the default values first.
+	 */ 
+	@call self::MSG_ENT_GET_PROPERTY(rhi, &propInfo, prop);
+	new = TRUE;
+    } 
+
+    switch(value->CD_type)
+    {
+    case TYPE_INTEGER:
+    case TYPE_STRING:
+    case TYPE_COMPLEX:
+    case TYPE_ARRAY:
+    case TYPE_MODULE:
+    case TYPE_STRUCT:
+	typeSize =2;
+	break;
+    case TYPE_COMPONENT:
+    case TYPE_LONG:
+    case TYPE_FLOAT:
+	typeSize = 4;
+	break;
+    }
+    if ((value->CD_type	== propInfo.CD_type) &&
+	((((typeSize == 4) &&
+	   (value->CD_data.LD_comp  == propInfo.CD_data.LD_comp)) ||
+	  ((typeSize == 2) &&
+	   (value->CD_data.LD_integer == propInfo.CD_data.LD_integer)))))
+    {
+	/*
+	 * Otherwise, if the current values match the defaults, delete it. 
+	 */
+	int reallyWantIt;
+
+	reallyWantIt =@call oself::MSG_BENT_SHOULD_WRITE_OUT_PROPERTY(prop);
+	
+	if ((new == FALSE) && !reallyWantIt)
+	{
+	    ElementArrayDelete(propArray, element);
+	}
+	/* "new" properties such as "left" and "top" need to be written out
+	 * when parent goes from tiled to not tiled.
+	 */
+	else if ((new == TRUE) && reallyWantIt) 
+	{
+	    NameArrayAdd(propArray, prop, 0, 0, &propInfo);
+	}
+    }
+    else if (new != FALSE) 
+    {
+	NameArrayAdd(propArray, prop, 0, 0, &propInfo);
+    }
+
+    /* Tell the interpreter that the UI is dirty so it recompiles
+     */
+    pself = ObjDerefBent(oself);
+    interp = EntGetInterpreter(pself);
+    @call interp::MSG_BENT_MANAGER_SET_FLAGS(BF_UI_DIRTY,0);
+} /* End of MSG_BENT_MARK_CHANGED_PROPERTY.	*/
+
+
+/***********************************************************************
+ *		MSG_BENT_SHOULD_WRITE_OUT_PROPERTY for BentClass
+ ***********************************************************************
+ * SYNOPSIS:	Replies that no property is special and should not be
+ *		written out if it is differnent than its default.
+ * PARAMETERS:	TCHAR 	* prop
+ * SIDE EFFECTS:
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	RON	12/ 4/95   	Initial Revision
+ *
+ ***********************************************************************/
+@method BentClass, MSG_BENT_SHOULD_WRITE_OUT_PROPERTY
+{
+    return FALSE;
+}	/* End of MSG_BENT_SHOULD_WRITE_OUT_PROPERTY.	*/
+
+
+
+
+/***********************************************************************
+ *		MSG_BENT_ENUM_PROPERTIES for BentClass
+ ***********************************************************************
+ * SYNOPSIS:	    Enumerates through all modified properties, and sends
+ *		    the given event for each.  The string name of the
+ *		    current property is stuffed into the first argument of
+ *		    the classed event before it is sent. 
+ *
+ * PARAMETERS:	    EventHandle		event
+ *
+ * SIDE EFFECTS:    
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	martin	2/13/95		Initial version
+ *
+ ***********************************************************************/
+@method BentClass, MSG_BENT_ENUM_PROPERTIES
+{
+    optr	  propArray	   = ConstructOptr(HandleOf(oself),
+						   pself->BI_propArray);
+    optr	  postProcessArray = ConstructOptr(HandleOf(oself),
+						   0);
+    EC_ERROR_IF(pself->BI_propArray == 0, 
+		ERROR_BENT_PROP_ARRAY_NOT_INITIALIZED);
+    
+   /*
+    * If we have a visible property in the name array, pull that element out
+    * and process the property last.
+    */
+
+    if (ChunkOf(propArray) == NullChunk)
+    {
+	return;
+    }
+
+/************************************************************************
+ *    Example of ordering property output.  
+ * 1) Remove "delayed" properties from the array.
+ ************************************************************************/
+    postProcessArray = ConstructOptr(HandleOf(oself),
+ 	    NameArrayCreateAt(postProcessArray, sizeof(ComponentData), 0, 0));
+    BentExtractPropertyArrayElement(_TEXT("visible"), propArray, postProcessArray);
+ 
+/************************************************************************
+ * 2) Enumerate the regular properties.
+ ************************************************************************/
+
+    ChunkArrayEnumRange(propArray, 0, ChunkArrayGetCount(propArray),
+			(void *)event, BentProcessPropertyArrayElement);
+
+/************************************************************************
+ * 3) Enumerate the delayed properties.
+ ************************************************************************/
+    ChunkArrayEnum(postProcessArray, (void *)event, 
+ 		   BentProcessPropertyArrayElement);
+ 
+/************************************************************************
+ * 4) Return delayed properties to the property array so we don't lose
+ * them for the next save.
+ ************************************************************************/
+   BentExtractPropertyArrayElement(_TEXT("visible"), postProcessArray, propArray);
+ 
+
+}	/* End of MSG_BENT_ENUM_PROPERTIES.	*/
+
+/*********************************************************************
+ *			BentGetEvents
+ *********************************************************************
+ * SYNOPSIS:	Add Bent level events (none) to the block.
+ * CALLED BY:	MSG_BENT_GET_EVENTS
+ * RETURN:	
+ * SIDE EFFECTS:
+ * STRATEGY:
+ * REVISION HISTORY:
+ *	Name	Date		Description			     
+ *	----	----		-----------			     
+ *	ron	 2/23/95	Initial version			     
+ * 
+ *********************************************************************/
+@method	 BentClass, MSG_BENT_GET_EVENTS
+{
+    return eventBlockPtr;
+}
+
+
+/*********************************************************************
+ *			 BentDrawSelected
+ *********************************************************************
+ * SYNOPSIS:	Draws this component selected
+ * CALLED BY:	
+ * RETURN:
+ * SIDE EFFECTS:
+ * STRATEGY:
+ * REVISION HISTORY:
+ *	Name	Date		Description			     
+ *	----	----		-----------			     
+ *	ron	 3/13/95	Initial version			     
+ * 
+ *********************************************************************/
+
+@method	  BentClass, MSG_BENT_DRAW_SELECTED
+{
+    Rectangle rect;
+    GStateHandle gstate;
+    optr	head;
+
+    head = @call self::MSG_BENT_GET_VIS_ROOT();
+    
+    
+    if (ENT_IS_VIS(oself))
+    {
+	VisInstance	*vself;
+
+	vself = ObjDerefVis(oself);
+	if (!(vself->VI_optFlags & 
+	     (VOF_GEOMETRY_INVALID | VOF_WINDOW_INVALID))) {
+	    /*
+	     * Create the gstate in your parent's window, not yours.
+	     * This is needed for objects that create their own views.
+	     * (and we want genParent, not visParent for text)
+	     */
+	    gstate = @call @genParent::MSG_VIS_VUP_CREATE_GSTATE();
+	    
+	    /*
+	     * Draw handles based on our visible size.
+	     */
+	    @call head::MSG_VIS_GET_BOUNDS(&rect); 
+	    
+	    GrSetLineColor(gstate, CF_INDEX, BENT_SELECTION_COLOR, 0 ,0);
+	    GrDrawRect(gstate, rect.R_left-2,	 rect.R_top-2,
+		       rect.R_right, rect.R_bottom);
+	    GrDestroyState(gstate);
+	}
+    }
+}
+
+
+/***********************************************************************
+ *		MSG_BENT_INVALIDATE for BentClass
+ ***********************************************************************
+ * SYNOPSIS:	    Invalidate ourselves.  Needed because we draw ever so
+ * 		    slightly outside our visual bounds.
+ * PARAMETERS: 	    none
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	dloft	9/ 1/95   	Initial Revision
+ *
+ ***********************************************************************/
+@method BentClass, MSG_BENT_INVALIDATE
+{
+    Rectangle bounds;
+
+    @call self::MSG_VIS_GET_BOUNDS(&bounds);
+    @call self::MSG_VIS_ADD_RECT_TO_UPDATE_REGION(0,0,bounds.R_bottom+1,
+						  bounds.R_right+1,
+						  bounds.R_top-2,
+						  bounds.R_left-2);
+
+}	/* End of MSG_BENT_INVALIDATE.	*/
+
+/*********************************************************************
+ *			 BentDrawUnSelected
+ *********************************************************************
+ * SYNOPSIS:	Draws this component selected
+ * CALLED BY:	
+ * RETURN:
+ * SIDE EFFECTS:
+ * STRATEGY:
+ * REVISION HISTORY:
+ *	Name	Date		Description			     
+ *	----	----		-----------			     
+ *	ron	 3/13/95	Initial version			     
+ * 
+ *********************************************************************/
+
+@method	  BentClass, MSG_BENT_DRAW_UNSELECTED,
+                     MSG_ENT_VIS_HIDE
+{
+    GStateHandle gstate;
+    Rectangle bounds;
+    optr	head;
+    
+
+    /*
+     * Check to see if our component is more than just one object, and if so
+     * get the highest visual representation.
+     */
+    head = @call self::MSG_BENT_GET_VIS_ROOT();
+    
+
+    if (ENT_IS_VIS(oself))
+    {
+#ifdef TEXT_WILL_NOT_WORK_FOR_TEXT
+	    @call self::MSG_BENT_INVALIDATE();
+#else
+/*    gstate = @call @genParent::MSG_VIS_VUP_CREATE_GSTATE();*/
+	    @call head::MSG_VIS_GET_BOUNDS(&bounds);
+/*	    
+	@call @genParent::MSG_VIS_ADD_RECT_TO_UPDATE_REGION(0,0,bounds.R_bottom+1,
+							    bounds.R_right+1,
+							    bounds.R_top-2,
+							    bounds.R_left-2);
+
+							    */
+	    
+/* if 0 */
+	gstate = @call @genParent::MSG_VIS_VUP_CREATE_GSTATE();
+    
+	/*
+	 * Draw handles based on our visible size.
+	 */
+/*	@call self::MSG_VIS_GET_BOUNDS(&bounds); */
+
+	/* left edge */
+	GrInvalRect(gstate,
+		    bounds.R_left-2,	bounds.R_top-2,
+		    bounds.R_left, 	bounds.R_bottom);
+	/* top edge */
+	GrInvalRect(gstate,
+		    bounds.R_left-2,	bounds.R_top-2,
+		    bounds.R_right, 	bounds.R_top);
+	/* right edge */
+	GrInvalRect(gstate,
+		    bounds.R_right,	bounds.R_top-2,
+		    bounds.R_right+1, bounds.R_bottom);
+	/* bottom edge */
+	GrInvalRect(gstate,
+		    bounds.R_left-2,	bounds.R_bottom,
+		    bounds.R_right, 	bounds.R_bottom+1);
+	GrDestroyState(gstate);
+#endif
+    }
+    @callsuper();
+}
+
+/*********************************************************************
+ *			BentVisDraw
+ *********************************************************************
+ * SYNOPSIS: 
+ * CALLED BY:	
+ * RETURN:
+ * SIDE EFFECTS:
+ * STRATEGY:
+ * REVISION HISTORY:
+ *	Name	Date		Description			     
+ *	----	----		-----------			     
+ *	ron	 3/13/95	Initial version			     
+ * 
+ *********************************************************************/
+
+@method BentClass, MSG_VIS_DRAW
+{
+    @callsuper();
+
+    pself = ObjDerefBent(oself);
+    EC(ECCheckBounds(pself));
+    if (pself->BI_flags & BSF_SELECTED) 
+    {
+	@call self::MSG_BENT_DRAW_SELECTED();
+    }
+}
+
+
+/*********************************************************************
+ *			BentENT_HANDLE_EVENT
+ *********************************************************************
+ * SYNOPSIS: 	Prevent events from being processed at build time
+ * CALLED BY:	ent components
+ * RETURN:	0 (signals event not handled)
+ * REVISION HISTORY:
+ *	Name	Date		Description			     
+ *	----	----		-----------			     
+ *	dloft	 3/15/95	Initial version			     
+ * 
+ *********************************************************************/
+
+@method BentClass, MSG_ENT_HANDLE_EVENT
+{
+    return 0;
+}
+
+
+/*********************************************************************
+ *			BEntInitialize
+ *********************************************************************
+ * SYNOPSIS: deal with any global bent initialization issues
+ * CALLED BY:	
+ * RETURN:  
+ * SIDE EFFECTS:
+ * STRATEGY:
+ * REVISION HISTORY:
+ *	Name	Date		Description			     
+ *	----	----		-----------			     
+ *	jimmy	 5/24/95	Initial version			     
+ * 
+ *********************************************************************/
+@method BentClass, MSG_ENT_INITIALIZE
+{
+    optr    interp;
+
+    /* By default, have everyone do compinit 'cause it's fast
+     */
+    pself->BI_flags |= BSF_COMP_INIT;
+
+    interp = EntGetInterpreter(pself);
+    @callsuper();
+
+   /* 
+    * Tell the manager about all sorts of things:
+    * 		- that the ui has changed 
+    *		- that another instance of a class has been created
+    *		- that the new component should be selected
+    *		- that the new component should be added to the comp list
+    */
+
+    @call interp::MSG_BENT_MANAGER_SET_FLAGS(BF_UI_DIRTY, 0);
+    @call interp::MSG_BENT_MANAGER_INCREMENT_COMP_COUNT(oself);
+    @call interp::MSG_BENT_MANAGER_SELECT_COMPONENT(oself);
+    @call interp::MSG_BENT_MANAGER_ADD_COMP_TO_COMP_LIST(oself);
+
+}
+
+
+/***********************************************************************
+ *		RunCopyComplexFromClipboard
+ ***********************************************************************
+ * SYNOPSIS:	Copies the current clipboard item of the given format into
+ *		the interpreter's internal complex data store, and returns 
+ *		a reference to that data.
+ *
+ *	Code for dealing with transfer items that are dropped on build-time
+ *	components.  This is meant to handle the most general cases for all
+ *	components.  More specific cases should be handled by subclassing
+ *	critical messages and handling them on the Bool level, or through
+ *	basic code designed to deal with build-time handling in legos 
+ *	(the later hasn't been implemented yet...)	
+ *
+ * CALLED BY:	GLOBAL	
+ * RETURN:	LegosComplex 	data = reference to copy of clipboard item 
+ *				       or 0 if none
+ * SIDE EFFECTS:	
+ * STRATEGY:
+ *	
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	martin	6/1/95   	Initial version
+ *
+ ***********************************************************************/
+@if 0
+LegosComplex
+RunCopyComplexFromClipboard (PTaskHan ptask,
+			     ClipboardItemFlags flags, 
+			     ClipboardItemFormatID format)
+{
+    LegosComplex	 complex	  = 0;
+    ClipboardQueryArgs	 clipInfo;
+    ClipboardRequestArgs dataInfo;
+
+    ClipboardQueryItem(flags, &clipInfo);
+    if (clipInfo.CQA_numFormats > 0) {
+    	ClipboardRequestItemFormat(format,
+				   clipInfo.CQA_header,
+				   &dataInfo);
+	if (dataInfo.CRA_data != 0) {
+	   complex = RunCopyComplex(ptask, 
+				    VMChainToComplex(dataInfo.CRA_file, 
+						     dataInfo.CRA_data)); 
+    	}
+    	ClipboardDoneWithItem(clipInfo.CQA_header);
+    }
+
+    return complex;
+
+}	/* End of RunCopyComplexFromClipboard.	*/
+@endif
+
+
+/***********************************************************************
+ *		BentClipboardRequestPreferredFormat
+ ***********************************************************************
+ * SYNOPSIS:	Copy preferred format from Clipboard; put it into a
+ *		RunHeap entry.
+ *
+ * CALLED BY:	INTERNAL, META_CLIPBOARD_PASTE for BentClass
+ *
+ * RETURN:	RunHeapToken			complex = copy of clip item 
+ *		BentComplexPropertyTable	**table = table entry returned
+ *
+ * SIDE EFFECTS:	
+ * STRATEGY:
+ *	
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	martin	6/7/95   	Initial version
+ *
+ ***********************************************************************/
+RunHeapToken
+BentClipboardCopyPreferredFormat (optr oself, 
+				 ClipboardItemFlags flags,
+				 BentComplexPropertyTable **tableEntry)
+{
+    BentInstance  *pself	= ObjDerefBent(oself);
+    optr	  interpreter	= EntGetInterpreter(pself);
+    PTaskHan	  ptask		= @call interpreter::MSG_INTERP_GET_STATE();
+    BentClassPtrStruct		*classInfo;
+    BentComplexPropertyTable	*table;
+    ClipboardQueryArgs	 	clipInfo;
+    ClipboardRequestArgs 	dataInfo;
+    RunHeapToken		complex=NULL_TOKEN;
+
+    ClipboardQueryItem(flags, &clipInfo);
+
+    classInfo = @call self::MSG_BENT_GET_CLASS_INFORMATION();
+    table = classInfo->BCPS_complexTable;
+    while (table->BCPT_format != (ClipboardItemFormatID)
+				BENT_END_OF_COMPLEX_PROPERTY_TABLE)
+    {
+	EC(ECCheckBounds(table));
+    	ClipboardRequestItemFormat
+	    (table->BCPT_format, clipInfo.CQA_header, &dataInfo);
+	if (dataInfo.CRA_data != 0)
+	{
+	   complex = RunCreateComplex
+	       (ptask, table->BCPT_format,
+		dataInfo.CRA_file, dataInfo.CRA_data);
+	   break;
+	}
+	table++;
+	
+    }
+
+    ClipboardDoneWithItem(clipInfo.CQA_header);
+    *tableEntry = table;
+
+    return complex;
+
+}	/* End of BentClipboardRequestPreferredFormat.	*/
+
+
+
+/***********************************************************************
+ *		MSG_META_CLIPBOARD_PASTE for BentClass
+ ***********************************************************************
+ * SYNOPSIS:	Code for dealing with transfer items that are dropped on
+ * 		build-time components.  This is meant to handle the most
+ *		general cases for all components.  More specific cases
+ * 		should be handled by subclassing critical messages and
+ *		handling them on the Bool level, or through basic code
+ *		designed to deal with build-time handling in legos  `
+ *		(the later hasn't been implemented yet...)	
+ *
+ *
+ * PARAMETERS:	    
+ *
+ * SIDE EFFECTS:    
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	martin	5/31/95   	Initial version
+ *
+ ***********************************************************************/
+@method BentClass, MSG_META_CLIPBOARD_PASTE
+{
+    ComponentData 		complex, temp;
+    BentComplexPropertyTable	*table;
+    Message			msg;
+    RunHeapInfo*		rhi;
+
+    /* Copy the preferred format out of the clipboard, and set the 
+     * property that corresponds with that extracted complex data.
+     */
+    complex.CD_type = TYPE_COMPLEX;
+    complex.CD_data.LD_complex = 
+	BentClipboardCopyPreferredFormat(oself, CIF_QUICK, &table);
+    if (complex.CD_data.LD_complex == NULL_TOKEN) return;
+	
+    /* Do a get_property before the set_property to make sure
+     * the component knows what to do with the thing.
+     */
+    @call self::MSG_ENT_GET_PROPERTY_EXTERNAL(&temp,
+					      getBCPT_property(table));
+    if (temp.CD_type != TYPE_ERROR) {
+
+	@call self::MSG_ENT_SET_PROPERTY_EXTERNAL(&complex,
+						  getBCPT_property(table));
+    }
+    
+    rhi = RunOptrLockHeap(oself);
+    /* complex comes back from CopyPreferred with a refcount of 1
+     * Component will incref if it wants to keep it
+     */
+    RunHeapDecRef(rhi, complex.CD_data.LD_complex);
+    RunOptrUnlockHeap(oself);
+
+}	/* End of MSG_META_CLIPBOARD_PASTE.	*/
+
+
+
+/***********************************************************************
+ *		MSG_GEN_REPLACE_VIS_MONIKER for BentClass
+ ***********************************************************************
+ * SYNOPSIS:	    
+ * PARAMETERS:	    
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	martin	6/8/95   	Initial version
+ *
+ ***********************************************************************/
+@method BentClass, MSG_GEN_REPLACE_VIS_MONIKER
+{
+    ChunkHandle retval;
+
+    if (ECPSelf(pself)->BI_flags & BSF_SELECTED) 
+	@call self::MSG_BENT_DRAW_UNSELECTED();
+
+    retval = @callsuper();
+
+    pself = ObjDerefBent(oself);
+    if (ECPSelf(pself)->BI_flags & BSF_SELECTED) 
+	@call self::MSG_BENT_DRAW_SELECTED();
+
+    return retval;
+
+}	/* End of MSG_GEN_REPLACE_VIS_MONIKER.	*/
+
+
+
+
+
+/***********************************************************************
+ *		BentFindChildUnderPointCallback
+ ***********************************************************************
+ * SYNOPSIS:	Determine if we're the component under the point, or if 
+ * 		it's one of our children.
+ *
+ * CALLED BY:	Parent
+ * RETURN:	Boolean, cbData filled in.
+ *	
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	martin	3/2/95   	Initial version
+ *
+ ***********************************************************************/
+#pragma argsused
+Boolean _pascal
+BentFindChildUnderPointCallback (optr parent, optr child, void *cbData)
+{
+    BentMouseData  *data = cbData;
+    Boolean 	   retVal;
+    WindowHandle	parentWin, childWin;
+    int		xpos, ypos;
+    xpos = data->BMD_xPos;
+    ypos = data->BMD_yPos;
+
+    if (!ObjIsObjectInClass(child, &VisClass) ||
+	!ObjIsObjectInClass(child, &EntClass))
+    {
+	return FALSE;
+    }
+
+    if (ENT_IS_GEN(child) && !(@call child::MSG_GEN_GET_USABLE())) {
+	return FALSE;
+    }
+
+    if (!((@call child::MSG_VIS_GET_ATTRS()) & VA_REALIZED))
+    {
+	return FALSE;
+    }
+    /*
+     * if the child is in a different view/window then translate the
+     * the coords.  This will happen for text objects which create
+     * their own view. The position is at 0,0 relative to the view
+     */
+    parentWin = @call parent::MSG_VIS_QUERY_WINDOW();
+    childWin = @call child::MSG_VIS_QUERY_WINDOW();
+    
+    if (childWin != parentWin) 
+    {
+	Rectangle childBounds, parentBounds;
+	
+	WinGetWinScreenBounds(childWin, &childBounds);
+	WinGetWinScreenBounds(parentWin, &parentBounds);
+		
+	xpos -= childBounds.R_left - parentBounds.R_left;
+	ypos -= childBounds.R_top - parentBounds.R_top;
+    }
+
+    retVal = Bent_VisTestPointInBounds(child, xpos, ypos);
+
+    /*
+     * See if we should be selecting a child of a child.
+     */
+    
+    if (retVal) {
+	optr grandChild;
+
+	grandChild = @call child::MSG_BENT_FIND_CHILD_UNDER_POINT(
+							xpos, 
+							ypos);
+	if (grandChild == 0) data->BMD_component = child;
+	else 		data->BMD_component = grandChild;
+    }
+    return retVal;
+
+}	/* End of BentFindChildUnderPointCallback.	*/
+
+
+/***********************************************************************
+ *		BentFindChildUnderPoint
+ ***********************************************************************
+ * SYNOPSIS:	Figure out what child is under the passed x,y coordinates
+ * CALLED BY:	Ent Parent
+ * RETURN:	optr to child, 0 if no children
+ * STRATEGY:
+ *	
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	martin	3/2/95   	Initial version
+ *	dloft	7/20/95   	converted to message, added docs
+ *
+ ***********************************************************************/
+/*optr
+BentFindChildUnderPoint (optr parent, int x, int y)*/
+@method BentClass, MSG_BENT_FIND_CHILD_UNDER_POINT,
+                   MSG_BENT_FIND_CHILD_UNDER_POINT_NO_INTERCEPT
+{
+    BentMouseData passData;
+
+    passData.BMD_xPos 	   = x;
+    passData.BMD_yPos 	   = y;
+    passData.BMD_component = 0;
+
+    ObjCompProcessChildren(oself, 0, OCCT_DONT_SAVE_PARAMS_TEST_ABORT,
+			   &passData, 
+			   offsetof(EntBase, Ent_offset),
+			   offsetof(EntInstance, EI_comp),
+			   offsetof(EntInstance, EI_link),
+			   BentFindChildUnderPointCallback);
+
+    if (passData.BMD_component == 0) passData.BMD_component = oself; 	
+    return passData.BMD_component;
+    
+}	/* End of BentFindChildUnderPoint.	*/
+
+
+/*********************************************************************
+ *		MSG_BENT_GET_STATUS_FLAGS for BentClass
+ *********************************************************************
+ * SYNOPSIS: 	check the status flags
+ * RETURN:  	BI_flags
+ * SIDE EFFECTS:
+ * STRATEGY:
+ * REVISION HISTORY:
+ *	Name	Date		Description			     
+ *	----	----		-----------			     
+ *	jimmy	 5/22/95	Initial version			     
+ * 
+ *********************************************************************/
+@method BentClass, MSG_BENT_GET_STATUS_FLAGS
+{
+    return pself->BI_flags;
+}
+
+/*********************************************************************
+ *		 MSG_BENT_SET_STATUS_FLAGS for BentClass
+ *********************************************************************
+ * SYNOPSIS: 	set and clear appropriate flags
+ * RETURN:  	nothing
+ * SIDE EFFECTS:
+ * STRATEGY:
+ * REVISION HISTORY:
+ *	Name	Date		Description			     
+ *	----	----		-----------			     
+ *	jimmy	 5/22/95	Initial version			     
+ * 
+ *********************************************************************/
+@method BentClass, MSG_BENT_SET_STATUS_FLAGS
+{
+    pself->BI_flags |= flagsToSet;
+    pself->BI_flags &= ~flagsToClear;
+}
+
+
+
+/***********************************************************************
+ *		MSG_BENT_ACCEPT_POINT_IN_BOUNDS for BentClass
+ ***********************************************************************
+ * SYNOPSIS:	    Always allows point
+ * PARAMETERS:	    int	x, y;
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	RON	9/18/95   	Initial Revision
+ *
+ ***********************************************************************/
+@method BentClass, MSG_BENT_ACCEPT_POINT_IN_BOUNDS
+{
+    return Bent_VisTestPointInBounds(oself, x, y);
+}	/* End of MSG_BENT_ACCEPT_POINT_IN_BOUNDS.	*/
+
+
+
+/***********************************************************************
+ *		MSG_BENT_REMOVE_FROM_SCREEN for BentClass
+ ***********************************************************************
+ * SYNOPSIS:	      Makes not visible, without modifying EF_VISIBLE
+ * PARAMETERS:	
+ * SIDE EFFECTS:
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	RON	12/ 7/95   	Initial Revision
+ *
+ ***********************************************************************/
+@method BentClass, MSG_BENT_REMOVE_FROM_SCREEN
+{
+    /* doesn't hurt to send this if not currently visible */
+    @call self::MSG_GEN_SET_NOT_USABLE(VUM_DELAYED_VIA_APP_QUEUE);
+}	/* End of MSG_BENT_REMOVE_FROM_SCREEN.	*/
+
+
+
+/***********************************************************************
+ *		MSG_BENT_RETURN_TO_SCREEN for BentClass
+ ***********************************************************************
+ * SYNOPSIS:	Makes visible if EF_VISIBLE is set.
+ * PARAMETERS:	
+ * SIDE EFFECTS:
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	RON	12/ 7/95   	Initial Revision
+ *
+ ***********************************************************************/
+@method BentClass, MSG_BENT_RETURN_TO_SCREEN
+{
+    EntInstance *eself;
+    eself = ObjDerefEnt(oself);
+    if (eself->EI_flags & EF_VISIBLE) 
+    {
+	@call self::MSG_GEN_SET_USABLE(VUM_DELAYED_VIA_APP_QUEUE);
+    }
+  
+}	/* End of MSG_BENT_RETURN_TO_SCREEN.	*/
+
+
+/***********************************************************************
+ *		MSG_BENT_GET_VIS_ROOT for BentClass
+ ***********************************************************************
+ * SYNOPSIS:	Returns the visible object to use as the container
+ *		for this component.  The bounds and window are used
+ *		for drawing selection et al.
+ * PARAMETERS:	
+ * SIDE EFFECTS:
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	RON	2/ 7/96   	Initial Revision
+ *
+ ***********************************************************************/
+@method BentClass, MSG_BENT_GET_VIS_ROOT
+{
+    return oself;
+}	/* End of MSG_BENT_GET_VIS_ROOT.	*/
+
+
+/*********************************************************************
+ *	util routines
+*********************************************************************/
+BentEventTypicalDescriptionStruct *BentCopyEvents(int numEvents, 
+		    BentEventDescriptionStruct **source,
+		    BentEventTypicalDescriptionStruct *dest)
+{
+    int	i, j;
+    BentEventTypicalDescriptionStruct	*bte;
+    BentEventDescriptionStruct	*be, *be2;
+
+    bte = dest;
+    for (i=0; i < numEvents; i++)
+    {
+	be2 = (BentEventDescriptionStruct *)bte;
+	*be2 = *(source[i]);
+	for (j = 0; j < source[i]->BEDS_numArgs; j++)
+	{
+	    bte->BETDS_args[j] = ((BentEventTypicalDescriptionStruct *)(source[i]))->BETDS_args[j];
+	}
+	bte = (BentEventTypicalDescriptionStruct *)&(bte->BETDS_args[j]);
+    }
+
+    return bte;
+}
+
+
+/*********************************************************************
+ *			BentGetDescriptionFlags
+ *********************************************************************
+ * SYNOPSIS:	Returns the flags used for writing out the current property
+ * CALLED BY:	EXTERNAL
+ * PASS:	hptr		buffer
+ * RETURN:	BDescFlags	flags
+ * SIDE EFFECTS:
+ * STRATEGY:
+ * REVISION HISTORY:
+ *	Name	Date		Description			     
+ *	----	----		-----------			     
+ *	RON	12/12/95	Initial version
+ * 
+ *********************************************************************/
+BDescFlags
+BentGetDescriptionFlags(MemHandle descHan)
+{
+    BDescHeader*	bdh;
+    BDescFlags	flags;
+    
+    bdh = MemLock(descHan);
+    flags = bdh->BDH_info.BDI_flags;
+    MemUnlock(descHan);
+    return flags;
+}
+

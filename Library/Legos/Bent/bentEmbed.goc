@@ -1,0 +1,176 @@
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+	Copyright (c) Geoworks 1995 -- All Rights Reserved
+
+PROJECT:	PC/GEOS - LEGOS
+MODULE:		Basic Component Set - Embedded Legos Code Object
+FILE:		bentebed.goc
+
+AUTHOR:		Martin Turon, Jan 11, 1995
+
+ROUTINES:
+	Name			Description
+	----			-----------
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	martin	1/11/95   	Initial version.
+
+DESCRIPTION:
+	This object allows normal GEOS 2.0 applications to embed legos
+	components within themselves.  The code is executed when the
+	application comes alive, and allows for portions of an application's
+        UI to be defined in LEGOS.  
+
+	$Id: bentEmbed.goc,v 1.1 98/03/11 15:07:07 martin Exp $
+	$Revision: 1.1 $
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+
+@include <stdapp.goh>
+@include <Legos/bent.goh>
+#include <Legos/Internal/runtask.h>
+
+@classdecl	GenEmbeddedCodeClass;
+@classdecl	GenCTriggerClass;
+
+
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		Global Variables and Tables
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+
+
+
+/***************************************************************************
+ *              Code for GenEmbeddedCodeClass
+ **************************************************************************/
+
+
+/***********************************************************************
+ *		MSG_SPEC_BUILD_BRANCH for GenEmbeddedCodeClass
+ ***********************************************************************
+ * SYNOPSIS:	    
+ * PARAMETERS:	    SpecBuildFlags	flags
+ *
+ * SIDE EFFECTS:    
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	martin	1/11/95   	Initial version
+ *
+ ***********************************************************************/
+@method GenEmbeddedCodeClass, MSG_SPEC_BUILD_BRANCH
+{
+    @callsuper();
+
+    @send, forceQueue oself::MSG_GEC_LOAD_MODULE(FALSE);
+     
+}	/* End of MSG_SPEC_BUILD_BRANCH */
+
+/*********************************************************************
+ *			GECGetTask
+ *********************************************************************
+ * SYNOPSIS:	Return the RunTask for our loaded module
+ * REVISION HISTORY:
+ *	Name	Date		Description			     
+ *	----	----		-----------			     
+ *	dloft	 7/26/95	Initial version			     
+ * 
+ *********************************************************************/
+
+@method GenEmbeddedCodeClass, MSG_GEC_GET_TASK
+{
+    return pself->GECI_moduleTask;
+}
+
+/*********************************************************************
+ *			GECLoadModule
+ *********************************************************************
+ * SYNOPSIS:	Load in our module, if it's not already loaded
+ * REVISION HISTORY:
+ *	Name	Date		Description			     
+ *	----	----		-----------			     
+ *	dloft	 7/26/95	Initial version			     
+ * 
+ *********************************************************************/
+
+@method GenEmbeddedCodeClass, MSG_GEC_LOAD_MODULE
+{
+    VisInstance *vself;
+    RTaskHan	temp;
+    Boolean	doLoad;
+
+    vself = ObjDerefVis(oself);
+    pself = ObjDerefGen(oself);
+
+   /*
+    * If the specific UI thinks its time to draw this embedded object, 
+    * load in the module specified in our instance data and enable all our
+    * component children.  From as far as I can tell, if the object doesn't
+    * use DUAL_BUILD, always load its module.  If the object does use
+    * DUAL_BUILD, only build it if it is set REALIZABLE.
+    * Ignore the above if the caller sets forceLoad...
+    * Ignore the above if we've already been loaded...
+    */
+#define REALLY_FORCE_LOAD 0xb015
+
+    if (pself->GECI_loaded && forceLoad != REALLY_FORCE_LOAD)
+	goto done;
+    
+    if (forceLoad)
+	goto LOAD_IT;
+
+    if (!(vself->VI_specAttrs & SA_USES_DUAL_BUILD) ||
+	(vself->VI_specAttrs & SA_REALIZABLE))
+    {
+	EventHandle 	event;
+	TCHAR		*filename;
+	optr 		interpreter;
+
+ LOAD_IT:
+	interpreter = pself->GECI_interpreter;
+	event = @record EntVisClass::MSG_ENT_VIS_HIDE();
+	@call self::MSG_GEN_SEND_TO_CHILDREN(event);
+	event = @record EntClass::MSG_ENT_DESTROY();
+	@call self::MSG_GEN_SEND_TO_CHILDREN(event);
+
+	pself = ObjDerefGen(oself);
+	pself_check->GECI_loaded = 1;
+	filename = LMemDeref(pself->GECI_moduleName);
+	temp = @call interpreter::
+	    MSG_INTERP_LOAD_COMPILED_MODULE(filename, oself);
+	if (temp != NullHandle) {
+	    RunTaskSetFlags(temp, RT_OWNED_BY_BUILDER, 0);
+	}
+	pself = ObjDerefGen(oself);
+	pself_check->GECI_moduleTask = temp;
+
+	if (pself->GECI_destination != NullOptr) {
+	    Message	m = pself->GECI_actionMsg;
+	    optr	o = pself->GECI_destination;
+	    @call {MSG_GEC_MODULE_LOADED_PROTO}o::m(oself);
+	}
+	@call GeodeGetAppObject(0)::MSG_GEN_APPLICATION_MARK_BUSY();
+	event = @record GenClass::MSG_GEN_SET_USABLE(VUM_DELAYED_VIA_UI_QUEUE);
+	@call self::MSG_GEN_SEND_TO_CHILDREN(event);
+	@send, forceQueue GeodeGetAppObject(0)::MSG_GEN_APPLICATION_MARK_NOT_BUSY();
+	
+
+	/*
+	 * We aren't responsible for selecting components, so lets not.
+	 * Perhaps, we made need to generate a update control_ui if we
+	 * don't update when we are not visible.
+	 * Especially, don't null out the selected component.
+	 */
+
+	@call interpreter::MSG_BENT_MANAGER_UPDATE_CONTROL_UI(TRUE);
+
+    }
+   
+ done:
+    pself = ObjDerefGen(oself);
+    return pself->GECI_moduleTask;
+}

@@ -1,0 +1,118 @@
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+	Copyright (c) Geoworks 1995 -- All Rights Reserved
+
+PROJECT:	Legos
+MODULE:		Message Sender component
+FILE:		goolmsg.goc
+
+AUTHOR:		dloft, Aug 24, 1995
+
+ROUTINES:
+	Name			Description
+	----			-----------
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	dloft	8/24/95	Initial version.
+
+DESCRIPTION:
+	
+
+	$Id: messageComponent.goc,v 1.2 98/07/08 06:42:37 martin Exp $
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+
+@include "toolboxInternal.goh"
+@include <Legos/bent.goh>		/* for ObjDerefEnt */
+
+@classdecl GoolMsgSendClass;
+
+/***************************************************************************
+ *              Code for GoolMsgSendClass
+ **************************************************************************/
+
+
+/***********************************************************************
+ *		MSG_META_RESOLVE_VARIANT_SUPERCLASS for CSampTextClass
+ ***********************************************************************
+ * SYNOPSIS:	   Inform the system what class to use as the superclass 
+ *		   for the variant class of a particular object.
+ *
+ * PARAMETERS:	   word	MasterOffset 
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	dloft	8/24/95		Initial version
+ *
+ ***********************************************************************/
+@method GoolMsgSendClass, MSG_META_RESOLVE_VARIANT_SUPERCLASS
+{
+    /* Meta is master but not variant, so Ent should be the only 
+     * level we ever need resolve...
+     */
+    return &MetaClass;
+}
+
+
+/***********************************************************************
+ *		MSG_META_INITIALIZE for GoolMsgSendClass
+ ***********************************************************************
+ * SYNOPSIS:	    Set up our master level's instance data
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	dloft	8/24/95   	Initial Revision
+ *
+ ***********************************************************************/
+@method GoolMsgSendClass, MSG_META_INITIALIZE
+{
+    @callsuper();
+    pself = ObjDerefEnt(oself);
+    pself->EI_state &= (~(ES_IS_GEN | ES_IS_VIS));  /*0x9f;*/
+}
+
+
+/***********************************************************************
+ *		MSG_GOOL_MSG_SEND_SEND for GoolMsgSendClass
+ ***********************************************************************
+ * SYNOPSIS:	    Retrieve data, message, target properties and fire off
+ *		    a message.
+ * PARAMETERS:	RunHeapInfo *rhi,
+ *		ComponentData *retval,
+ *		ComponentData *argv,
+ *		int argc,
+ *		TCHAR _far *actionName
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	dloft	8/24/95   	Initial Revision
+ *
+ ***********************************************************************/
+@method GoolMsgSendClass, MSG_ENT_DO_ACTION
+{
+    if (!strcmp(actionName, _TEXT("Send"))) {
+	ComponentData	ourData, ourData2;
+	word		msg;
+
+	@call self::MSG_ENT_GET_PROPERTY_EXTERNAL(&ourData, _TEXT("message"));
+	if (ourData.CD_type == TYPE_INTEGER) {
+	   msg = ourData.CD_data.LD_integer;
+	
+ 	@call self::MSG_ENT_GET_PROPERTY_EXTERNAL(&ourData, _TEXT("target"));
+	if (ourData.CD_type == TYPE_COMPONENT) {
+	   optr		target;
+ 	   target = ourData.CD_data.LD_comp;
+
+	   @call target::{MSG_ENT_DO_ACTION} msg(rhi, retval, argv, argc, 
+					      actionName);
+        }}
+    } else {
+	@callsuper();
+    }
+
+}

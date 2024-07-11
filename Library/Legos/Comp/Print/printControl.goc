@@ -1,0 +1,284 @@
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+	Copyright (c) 1998 New Deal, Inc. -- All Rights Reserved
+
+PROJECT:	NewBASIC
+MODULE:		I/O Component Set - printControl Component
+FILE:		printControl.goc
+
+AUTHOR:		Martin Turon, May 27, 1998
+
+ROUTINES:
+	Name			Description
+	----			-----------
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	martin	1998/5/27   	Initial version.
+
+DESCRIPTION:
+
+	The GEOS PrintControlClass requires the following basic
+	code to execute for printing:
+		.size  = set
+		.pages = set
+		.name  = set
+		!redraw()
+		!complete()
+	Note that the initial properties can be set in NewBASIC,
+	or the MSG_ENT_INTIALIZE defaults could be based on 
+	auto-probe settings.
+
+	$Id: printControl.goc,v 1.1 98/07/12 05:03:12 martin Exp $
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+
+@include "printInternal.goh"
+
+@classdecl PrintControlComponentClass;
+
+
+/********************************************************
+ *  PrintControlComponentClass Property Dispatch Tables
+ ********************************************************/
+@propertyDecl(PCC, OUTPUT, 	COMPONENT, "output");	
+@propertyDecl(PCC, DOC_NAME,    STRING,    "name");	
+@propertyDecl(PCC, DOC_SIZE,    INTEGER,   "size");
+@propertyDecl(PCC, DOC_MARGINS, INTEGER,   "margins");
+@propertyDecl(PCC, ATTRS,       INTEGER,   "attrs");
+@propertyDecl(PCC, PAGES,       INTEGER,   "pages");
+
+
+PropEntryStruct _near *PrintControlPropTable[] = {
+    (PropEntryStruct _near *)&PCCOUTPUTProp,
+    (PropEntryStruct _near *)&PCCDOC_NAMEProp,
+    (PropEntryStruct _near *)&PCCDOC_SIZEProp,
+    (PropEntryStruct _near *)&PCCDOC_MARGINSProp,
+    (PropEntryStruct _near *)&PCCATTRSProp,
+    (PropEntryStruct _near *)&PCCPAGESProp,
+    (PropEntryStruct _near *)(-1)
+};
+
+/********************************************************
+ *   PrintControlComponentClass Action Dispatch Tables
+ ********************************************************/
+@actionDecl(PCC,   PRINT,     INTEGER,  "print",     0);
+@actionDecl(PCC,   INITIATE,  INTEGER,  "show",      0);
+@actionDecl(PCC,   REPORT,    INTEGER,  "report",    0);
+@actionDecl(PCC,   CANCEL,    INTEGER,  "cancel",    0);
+@actionDecl(PCC,   COMPLETED, INTEGER,  "done",      0);
+
+ActionEntryStruct _near *PrintControlActionTable[] = {
+    (ActionEntryStruct _near *)&PCCPRINTAction,
+    (ActionEntryStruct _near *)&PCCINITIATEAction,
+    (ActionEntryStruct _near *)&PCCREPORTAction,
+    (ActionEntryStruct _near *)&PCCCANCELAction,
+    (ActionEntryStruct _near *)&PCCCOMPLETEDAction,
+    endActionTable
+};
+
+/***************************************************************************
+ *              Code for FileSelectorComponentClass
+ **************************************************************************/
+
+/***********************************************************************
+ *		MSG_META_RESOLVE_VARIANT_SUPERCLASS 
+ ***********************************************************************
+ * SYNOPSIS:	   Inform the system what class to use as the superclass 
+ *		   for the variant class of a particular object.
+ *
+ * PARAMETERS:	   word	MasterOffset 
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	martin	1994/12/19	Initial version
+ *
+ ***********************************************************************/
+@method PrintControlComponentClass, MSG_META_RESOLVE_VARIANT_SUPERCLASS
+{
+    if (MasterOffset == word_offsetof(EntBase, Ent_offset)) {
+	return &PrintControlClass;
+    } 
+    return @callsuper();
+}	/* End of MSG_META_RESOLVE_VARIANT_SUPERCLASS.	*/
+
+
+/***********************************************************************
+ *		MSG_ENT_INTIALIZE for PrintControlComponentClass
+ ***********************************************************************
+ * SYNOPSIS:	    
+ * PARAMETERS:	    
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	martin	1994/12/19   	Initial version
+ *
+ ***********************************************************************/
+@method PrintControlComponentClass, MSG_ENT_INITIALIZE
+{
+    @callsuper();
+}	/* End of MSG_ENT_INTIALIZE.	*/
+
+@method PrintControlComponentClass, MSG_ENT_DESTROY
+{
+    @callsuper();
+}
+
+/*********************************************************************
+ *          brk PRINTCONTROLENT_GET_PROPERTY ss M
+ *********************************************************************
+ * SYNOPSIS:    Return the value of the property associated with the
+ *              passed in string
+ *
+ *	COMPONENT API descriptor	1997/11/17 <martin> rev 0.0.0.2
+ *	PROPERTIES			1997/12/05 <martin>  
+ *		file.parent	 => /get="top" 
+ *
+ * PARAMETERS:  ComponentData *value
+ *              char *prop
+ * RETURN:      *value filled in
+ * STRATEGY:    Use the property tables define in fileLib.goc 
+ *		to dispatch the correct messages 
+ * REVISION HISTORY:
+ *      Name    Date            Description                          
+ *      ----    ----            -----------                          
+ *      martin  1998/5/27       Initial version                      
+ * 
+ *********************************************************************/
+@method PrintControlComponentClass, MSG_ENT_GET_PROPERTY
+{
+   if (!EntDispatchGetProperty(oself, PrintControlPropTable, 
+			(GetPropertyArgs _near *)@propArgs)) {
+      @callsuper();
+   }
+}
+
+
+@method PrintControlComponentClass, MSG_PCC_GET_OUTPUT
+{
+   PrintControlInstance	    *gself = ObjDerefGen(oself);
+   value->CD_type 	    = TYPE_COMPONENT;
+   value->CD_data.LD_comp   = gself->PCI_output;
+}
+
+@method PrintControlComponentClass, MSG_PCC_GET_DOC_NAME
+{
+}
+
+@method PrintControlComponentClass, MSG_PCC_GET_ATTRS
+{
+}
+
+/*********************************************************************
+ *          brk PrintControlENT_SET_PROPERTY ss M
+ *********************************************************************
+ * SYNOPSIS:    Return the value of the property associated with the
+ *              passed in string
+ *
+ *	COMPONENT API descriptor	1997/11/17 <martin> rev 0.0.0.2
+ *	PROPERTIES			1997/12/05 <martin>  
+ *		file.parent	 => /get="top" 
+ *
+ * PARAMETERS:  ComponentData *value
+ *              char *prop
+ * RETURN:      *value filled in
+ * STRATEGY:    Use the property tables define in fileLib.goc 
+ *		to dispatch the correct messages 
+ * REVISION HISTORY:
+ *      Name    Date            Description                          
+ *      ----    ----            -----------                          
+ *      martin  1998/5/27       Initial version                      
+ * 
+ *********************************************************************/
+@method PrintControlComponentClass, MSG_ENT_SET_PROPERTY
+{
+   if (!EntDispatchSetProperty(oself, PrintControlPropTable, 
+				(SetPropertyArgs _near *)@propArgs)) {
+      @callsuper();
+   }
+}
+
+@method PrintControlComponentClass, MSG_PCC_SET_OUTPUT
+{
+   PrintControlInstance	*gself = ObjDerefGen(oself);
+   if (value->CD_type == TYPE_COMPONENT) {
+      gself->PCI_output = value->CD_data.LD_comp;
+   }
+}
+
+@method PrintControlComponentClass, MSG_PCC_SET_DOC_NAME
+{
+}
+
+@method PrintControlComponentClass, MSG_PCC_SET_ATTRS
+{
+}
+
+
+
+/***********************************************************************
+ *		MSG_ENT_DO_ACTION for GoolControlClass
+ ***********************************************************************
+ * SYNOPSIS:	This hack allows the control component to be used to
+ *		make creation controllers in the builder.  The clean
+ *		solution to this problem is to make a component shell around
+ *		the interpreter and to let the action be dealt with directly
+ *		by the interpreter.  myCtrl.interpreter!setMode(CREATION, self)
+ *		This brings up the need for constant support in the
+ *		interpreter. 
+ *
+ * PARAMETERS:	    ComponentData 	*retval
+ *		    ComponentData 	*argv
+ *	 	    int 		argc
+ *		    char		*actionName
+ *
+ * SIDE EFFECTS:    
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	martin	1998/5/28   	Initial version: print, show, cancel, done
+ *
+ ***********************************************************************/
+@method PrintControlComponentClass, MSG_ENT_DO_ACTION
+{
+   if (!EntDispatchAction(oself, PrintControlActionTable, @actionArgs)) {
+      @callsuper();
+   }
+}	/* End of MSG_ENT_DO_ACTION.	*/
+
+
+@method PrintControlComponentClass, MSG_PCC_DO_PRINT
+{
+	@call self::MSG_PRINT_CONTROL_PRINT();
+}
+
+@method PrintControlComponentClass, MSG_PCC_DO_INITIATE
+{
+	@call self::MSG_ENT_VIS_SHOW();
+	@call self::MSG_PRINT_CONTROL_INITIATE_PRINT();
+}
+
+@method PrintControlComponentClass, MSG_PCC_DO_CANCEL
+{
+	/* Severe spelling error in spool.goh! canceled. */
+	@call self::MSG_PRINT_CONTROL_PRINTING_CANCELLED();
+}
+
+@method PrintControlComponentClass, MSG_PCC_DO_COMPLETED
+{
+	@call self::MSG_PRINT_CONTROL_PRINTING_COMPLETED();
+}
+
+
+
+
+
+

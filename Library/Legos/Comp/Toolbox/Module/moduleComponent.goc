@@ -1,0 +1,331 @@
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+	Copyright (c) Geoworks 1995 -- All Rights Reserved
+
+PROJECT:	
+MODULE:		
+FILE:		goolswit.goc
+
+AUTHOR:		Martin Turon, May 17, 1995
+
+ROUTINES:
+	Name			Description
+	----			-----------
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	martin	5/17/95   	Initial version.
+
+DESCRIPTION:
+	Code to implement the switch frame class.
+
+	$Id: moduleComponent.goc,v 1.2 98/07/08 06:42:28 martin Exp $
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+
+@include "toolboxInternal.goh"
+#include <Legos/runheap.h>
+@include <Legos/basrun.goh>
+#include <Legos/Internal/runtask.h>
+@include <Legos/bent.goh>
+
+@classdecl GoolSwitchFrameClass;
+
+/*-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+ %		Internal type declarations
+ %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+
+typedef struct
+{
+    MemHandle	GSFE_module;
+    optr	GSFE_optr;	/* optr of top-level compo in module */
+} GSFElt;
+
+/* These have to be defined once, somewhere */
+
+FatalErrors feGoolC;
+Warnings    wGoolC; 
+
+/***************************************************************************
+ *              Code for GoolSwitchFrameClass
+ **************************************************************************/
+
+ 
+/***********************************************************************
+ *     MSG_META_RESOLVE_VARIANT_SUPERCLASS for GoolSwitchFrameClass
+ ***********************************************************************
+ * SYNOPSIS:	    
+ * PARAMETERS:	    
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	martin	5/18/95   	Initial version
+ *
+ ***********************************************************************/
+@method GoolSwitchFrameClass, MSG_META_RESOLVE_VARIANT_SUPERCLASS
+{
+    if (MasterOffset == word_offsetof(EntBase, Ent_offset)) {
+       return &GenInteractionClass;
+    }
+    return @callsuper();
+
+}	/* End of MSG_META_RESOLVE_VARIANT_SUPERCLASS.	*/
+
+
+/***********************************************************************
+ *		MSG_ENT_INITIALIZE for GoolSwitchFrameClass
+ ***********************************************************************
+ * SYNOPSIS:	    
+ * PARAMETERS:	    
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	martin	5/17/95   	Initial version
+ *
+ ***********************************************************************/
+@method GoolSwitchFrameClass, MSG_ENT_INITIALIZE
+{
+    optr moduleArray;
+
+    @callsuper();
+
+    moduleArray = ConstructOptr(HandleOf(oself),
+	             NameArrayCreateAt(moduleArray, sizeof(GSFElt), 0, 0));
+    pself = ObjDerefEnt(oself);
+    pself->GSFI_moduleArray = moduleArray;
+    pself->GGI_flags |= GGF_TILED;
+
+}	/* End of MSG_ENT_INITIALIZE.	*/
+
+
+/***********************************************************************
+ *		MSG_SPEC_BUILD for GoolSwitchFrameClass
+ ***********************************************************************
+ * SYNOPSIS:	
+ * PARAMETERS:	
+ * SIDE EFFECTS:
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	RON	11/17/95   	Initial Revision
+ *
+ ***********************************************************************/
+@method GoolSwitchFrameClass, MSG_SPEC_BUILD
+{
+    VisInstance *vself;
+    @callsuper();
+    vself = ObjDerefVis(oself);
+    vself->VI_attrs |= VA_MANAGED;
+    
+   
+}	/* End of MSG_SPEC_BUILD.	*/
+
+
+/***********************************************************************
+ *		GSFGetEltAtURL
+ ***********************************************************************
+ * SYNOPSIS:	
+ * CALLED BY:	INTERNAL, MSG_ENT_DO_ACTION
+ * RETURN:	
+ * SIDE EFFECTS:
+ *	
+ * STRATEGY:
+ *	
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	martin	5/17/95   	Initial version
+ *
+ ***********************************************************************/
+void
+GSFGetEltAtURL (optr oself, RunHeapToken url, GSFElt* elt)
+{
+    GoolSwitchFrameInstance	*pself 		= ObjDerefEnt(oself);
+    optr	interpreter	= EntGetInterpreter(pself);
+    optr	moduleArray;
+    TCHAR	urlString[80];
+    optr	selectedComp;
+    FatalErrors			error;
+    
+
+    /*  Perform some excessive error checking...
+     */
+    EC( 	ECCheckOD(oself)			 		);
+    EC( 	ECCheckOD(interpreter)	 				);
+    
+    moduleArray = ConstructOptr(HandleOf(oself), pself->GSFI_moduleArray);
+
+    /* Turn the url token into a string.
+     * Copy the string to a buffer instead of just locking it as calling
+     * into the interpreter may invalidate it.
+     */
+    RunComponentCopyString(urlString, url, oself);
+	    
+    /* Look in name array of previously loaded modules to make sure we 
+     * haven't opened this URL already.  If we find it, return the optr 
+     * of the top level component for that module.  If we can't find it,
+     * open it, and return the top level component. 
+     */
+    if (NameArrayFind(moduleArray, urlString, 0, elt) == CA_NULL_ELEMENT)
+    {
+	RTaskHan	rtaskHan;
+	LegosType	type;
+
+	rtaskHan = @call interpreter::MSG_INTERP_LOAD_COMPILED_MODULE
+	    (urlString, oself);
+	
+	if (rtaskHan != NullHandle)
+	{
+	    int callWorked;
+	    elt->GSFE_module = rtaskHan;
+	    RunTaskSetFlags(rtaskHan, RT_OWNED_BY_BUILDER, 0);
+	    callWorked = RunCallFunction(rtaskHan, _TEXT("duplo_top"),
+					 NULL, &type, &(elt->GSFE_optr));
+
+	    EC_ERROR_IF(!callWorked, ERROR_MODULE_NEEDS_DUPLO_TOP);
+
+	    /* For now crash whenever we are returned garbage.
+	     */
+	    EC(		ECCheckOD(elt->GSFE_optr)			 );
+
+	    if (callWorked)
+	    {
+		/* call the update routine once upon loading the module so
+		 * the current property is sure to be set
+		 */
+		selectedComp = @call interpreter::
+		    MSG_BENT_MANAGER_GET_SELECTED_COMPONENT();
+		@send, forceQueue elt->GSFE_optr::
+		    MSG_GOOL_CONTROL_SEND_UPDATE(selectedComp);
+		NameArrayAdd(moduleArray, urlString, 0, 0, elt);
+	    } 
+ 	    else
+	    {
+		elt->GSFE_optr = NullOptr;
+		elt->GSFE_module = NullHandle;
+	    }
+	}
+	else
+	{
+	    elt->GSFE_optr = NullOptr;
+	    elt->GSFE_module = NullHandle;
+	}
+    }
+    else 
+    {	/* Update the controller.  This might not be necessary, but it's
+	 * safer.  Why?  Because it's possible for one of the BentManager's
+	 * notifications to the GAGCNLT_APP_TARGET_NOTIFY_SELECT_STATE_
+	 * CHANGE list to be overwritten.  This will happen if you click
+	 * on the name/proto/caption entry, select another component of
+	 * the same type, then hit "specific". -jmagasin 5/9/96
+	 */
+	selectedComp = @call interpreter::
+	    MSG_BENT_MANAGER_GET_SELECTED_COMPONENT();
+	@send, forceQueue elt->GSFE_optr::
+	    MSG_GOOL_CONTROL_SEND_UPDATE(selectedComp);
+    }
+    
+} /* End of GSFGetEltAtURL.	*/
+
+/***********************************************************************
+ *		MSG_ENT_DO_ACTION for GoolSwitchFrameClass
+ ***********************************************************************
+ * SYNOPSIS:	Implement the actions supported by this component
+ *
+ * PARAMETERS:	    ComponentData 	*retval
+ *		    ComponentData 	*argv
+ *	 	    int 		argc
+ *		    char		*actionName
+ *
+ * SIDE EFFECTS:    
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	martin	 4/6/95   	Initial version
+ *
+ ***********************************************************************/
+@method GoolSwitchFrameClass, MSG_ENT_DO_ACTION
+{
+    GSFElt	elt;
+
+    if (!strcmp(actionName, _TEXT("switchTo")))
+    {
+	/******************************************************************
+	 * ACTION:	       	switchTo
+	 ******************************************************************
+	 * DESCRIPTION:	Switchs the contents of this frame to those of the
+	 *			the given module or aggregate component.
+	 *
+	 * PARAMETERS:	url	as string
+	 *
+	 * REVISION HISTORY:
+	 *	Name	Date		Description
+	 *	----	----		-----------
+	 *	martin	3/17/95   	Initial version
+	 *
+	 ******************************************************************/
+	optr	currentContent = pself->GSFI_currentContent;
+
+	if (argv[0].CD_type == TYPE_STRING)
+	{
+	    
+	    GSFGetEltAtURL(oself, argv[0].CD_data.LD_string, &elt);
+
+	    if (elt.GSFE_optr != currentContent)
+	    {
+
+		/* FIXME, should we inform the user when this error happens
+		   or just ignore it?  There is an EC death at a lower level.
+		   */
+		if (elt.GSFE_optr != NullOptr) {
+
+		    if (@call currentContent::
+			MSG_META_IS_OBJECT_IN_CLASS( &EntVisClass ))
+		    {
+			@call currentContent::MSG_ENT_VIS_HIDE();
+		    }
+		    if (@call elt.GSFE_optr::
+			MSG_META_IS_OBJECT_IN_CLASS( &EntVisClass ))
+		    {
+			@call elt.GSFE_optr::MSG_ENT_VIS_SHOW();
+		    }
+		    pself = ObjDerefEnt(oself);
+		    pself->GSFI_currentContent = elt.GSFE_optr;
+		}
+	    }
+	}
+	
+	retval->CD_data.LD_module = elt.GSFE_module;
+	retval->CD_type = TYPE_MODULE;
+    }
+    else if (!strcmp(actionName, _TEXT("load")))
+    {
+	/* Just like switchTo, but doesn't change current view */
+	GSFGetEltAtURL(oself, argv[0].CD_data.LD_string, &elt);
+	retval->CD_data.LD_module = elt.GSFE_module;
+	retval->CD_type = TYPE_MODULE;
+    }
+    else if (!strcmp(actionName, _TEXT("close")))
+    {
+	@call pself->GSFI_currentContent::MSG_ENT_VIS_HIDE();
+    }
+
+}	/* End of MSG_ENT_DO_ACTION.	*/
+
+
+
+

@@ -1,0 +1,217 @@
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+	Copyright (c) Geoworks 1996 -- All Rights Reserved
+
+PROJECT:	Legos
+MODULE:		Runtime
+FILE:		fidoint.def
+
+AUTHOR:		Paul L. Du Bois, Apr 15, 1996
+
+MACROS:
+	Name			Description
+	----			-----------
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	dubois	4/15/96		Coalesced two .def files
+
+
+DESCRIPTION:
+	Coalesced fidostr and fidogeod.def
+		
+	$Id: fidoint.def,v 1.3 98/10/15 13:35:48 martin Exp $
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+
+include geos.def
+include resource.def
+include chunkarr.def
+include heap.def
+include geode.def
+include ec.def
+include lmem.def
+include file.def
+include library.def
+include assert.def
+include char.def
+UseLib hash.def
+
+DefLib Legos/fido.def
+UseDriver Internal/fidoiDr.def
+
+;%%%%		Global non-exported decls
+
+;%% C segments
+ifdef __BORLANDC__
+FIDOUTIL_TEXT	segment public byte "CODE"
+global FIDO_MAKEMLCANONICAL:far
+FIDOUTIL_TEXT	ends
+else ;__HIGHC__
+global Fido_MakeMLCanonical:far
+endif
+
+;%% eagg.asm
+MainCode	segment resource
+global	FindLibraryAgg:near
+global	EnumHTHash:far
+global	EnumHTComp:far
+MainCode	ends
+
+;%% emain.asm
+MainCode	segment resource
+global	FidoPushDir:far
+MainCode	ends
+
+;%% mtask.asm
+MainCode	segment resource
+global	FIDOUSELIBRARY_AGG:far
+global	FIDOUSELIBRARY_GEODE:far
+global	TaskLockDS:near
+global	TaskUnlockDS:near
+global	Fido_AddLibrary:far
+global	Fido_DestroyLibrary:far
+global	Fido_AddLocalLibraryRef:far
+global	Fido_AddGlobalLibraryRef:far
+global	Fido_AddDriver:far
+MainCode	ends
+
+;%%%%		Compile Constants
+
+;; Length to reserve for "<driver>://"
+ML_PROLOGUE	=	10
+
+URL_LENGTH	=	ML_PROLOGUE + PATH_LENGTH
+URL_LENGTH_ZT	=	URL_LENGTH + 1
+
+if DBCS_PCGEOS
+
+URL_SIZE	=	URL_LENGTH*2
+URLBuffer	type	URL_LENGTH_ZT dup (wchar)
+
+else
+
+URL_SIZE	=	URL_LENGTH
+URLBuffer	type	URL_LENGTH_ZT dup (char)
+
+endif
+
+GENERAL_FIDO	equ 1
+; When this constant is set, fido must be able to deal with both
+; build-time and run-time requests.  When it is set to 0, a minimal
+; run-time only version of fido will be created.
+
+;%%%%		Structures
+
+FT_MAGIC_NUMBER = 0xb015
+FidoTask	struct
+    FT_meta		LMemBlockHeader
+EC <FT_tag		word						>
+    FT_modules		lptr.ModuleArrayHeader	; array of ModuleData
+    FT_libraries	lptr.LibraryArrayHeader	; array of LibraryData
+    FT_drivers		lptr.ClientDrivers
+    FT_globalLibs	lptr.ChunkArrayHeader	; array of FT_libraries elt #s
+FidoTask	ends
+
+;%%	Module Array structs (FT_modules)
+
+ModuleArrayHeader	struct
+    MAH_meta	ElementArrayHeader
+	;; other header data goes here
+ModuleArrayHeader	ends
+
+; FIXME: MAD_strategy doesn't relocate itself
+; Aggregate modules keep a reference to their associated LibraryData
+ModuleData	struct
+    MD_meta		RefElementHeader
+    MD_driver		hptr		; GeodeHandle of library
+    MD_driverData	word		; for input driver's use while open
+    MD_strategy		fptr.far	; stash fptr to driver entry here...
+    MD_ml		lptr		; chunk containing full path
+    MD_localLibs	lptr.ChunkArrayHeader	; libs this module will search
+    ; These following are only useful for aggregate libs
+    ; Used to disable a library elt when module is unloaded
+    MD_myLibrary	word		; LibraryData elt, or CA_NULL
+ModuleData	ends
+
+;%% 	Library array structs (FT_libraries)
+LibraryArrayHeader	struct
+    LAH_meta	ElementArrayHeader
+LibraryArrayHeader	ends
+
+LibraryDataFlags	record
+    :14
+    LDF_AGGREGATE:1			; is an aggregate lib
+    LDF_STATIC:1			; should not be freed dynamically
+LibraryDataFlags	end
+
+LibraryData	struct
+    LD_meta		RefElementHeader
+    LD_flags		LibraryDataFlags
+    LD_library		hptr		; GeodeHandle or RunTask
+    ; These following are only useful for aggregate libs
+    LD_myModule		word		; module elt#, or CA_NULL if unloaded
+    LD_components lptr.ChunkArrayHeader	; array of AggCompDecl
+LibraryData	ends
+
+AggCompDecl	struct
+    ACD_constructor	word		; function number of constructor
+    ACD_name		label TCHAR	; name of compo
+AggCompDecl	ends
+
+;%% 	Driver array structs (FT_driver)
+;; FIXME change to just chunkarray
+;; How annoying... ent.def has a "ComponentData" struct with a field
+;; called CD_data.  sigh.
+CDR_MAGIC_NUMBER	= 0xccd3
+ClientDrivers	struct
+    CDR_count	word
+    CDR_unused	word		; Chunks must be 4+ bytes, d'oh
+    CDR_data	label hptr	; series of driver handles
+ClientDrivers	ends
+
+;%%%%		Fatal Errors
+
+BARK_YELP_YELP	enum	FatalErrors
+; Something happened which really shouldn't have, or I haven't yet
+; created an enum for this error yet.
+
+FIDO_BAD_MAGIC_NUMBER	enum	FatalErrors
+; What it sounds like
+
+FIDO_LIB_ALREADY_ADDED	enum	FatalErrors
+
+FIDO_NULL_MODULE_TOKEN	enum	FatalErrors
+FIDO_INVALID_MODULE_TOKEN	enum	FatalErrors
+; Module token is invalid or null
+
+;%%%%		Warnings
+
+FIDO_WARNING_NO_COMPONENT_LIBRARIES_FOUND	enum	Warnings
+; Hm... FidoFindComponent was called by legos, but there were no
+; component libraries to be found.
+
+FIDO_WARNING_DRIVER_NOT_FOUND	enum	Warnings
+; Couldn't find a driver to fit the specified file type.
+
+FIDO_WARNING_COMP_NOT_IN_LOADED_LIBS	enum	Warnings
+; Component wasn't in the list of libraries loaded by module
+
+;%%%%		Macros
+
+movfptr	macro	var,ptr,virtualFlag
+regargs = 0
+_ParseDWordArg	<var>, varl, varh, regargs, <movfptr>
+
+ifnb <virtualFlag>
+    ifidn <virtualFlag>, <VIRTUAL>
+		mov	varh, vsegment ptr
+    else
+		ErrMessage <Flag must be VIRTUAL or nonexistent>
+    endif
+else		
+		mov	varh, segment ptr
+endif
+		mov	varl, offset ptr
+endm

@@ -1,0 +1,294 @@
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+	Copyright (c) 1997 New Deal, Inc. -- All Rights Reserved
+
+PROJECT:	PC/GEOS - LEGOS
+MODULE:		I/O Component Set - File Component
+FILE:		fileSelector.goc
+
+AUTHOR:		Martin Turon, Nov. 17, 1997
+
+ROUTINES:
+	Name			Description
+	----			-----------
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	martin	11/17/1997   	Initial version.
+	martin	5/1/1998	Filled in properties and actions.
+
+DESCRIPTION:
+
+	$Id: fileSelector.goc,v 1.2 98/07/10 00:01:56 martin Exp $
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+
+@include "fileInternal.goh"
+
+@classdecl FileSelectorComponentClass;
+
+/********************************************************
+ *  FileSelectorComponentClass Property Dispatch Tables
+ ********************************************************/
+@propertyDecl(FILE_SELECTOR, NUMBER_OF_FILES,	INTEGER,   "size");	
+@propertyDecl(FILE_SELECTOR, SELECTION,		COMPONENT, "selection");
+@propertyDecl(FILE_SELECTOR, PATH,     		STRING,    "path");
+@propertyDecl(FILE_SELECTOR, MASK,      	STRING,    "mask");
+@propertyDecl(FILE_SELECTOR, TOKEN,     	ARRAY,     "token");	
+@propertyDecl(FILE_SELECTOR, CREATOR,   	LONG,	   "creator");	
+@propertyDecl(FILE_SELECTOR, ACTION,    	INTEGER,   "action");
+@propertyDecl(FILE_SELECTOR, CRITERIA,  	INTEGER,   "criteria");	
+@propertyDecl(FILE_SELECTOR, SUSPEND,   	INTEGER,   "suspend");	
+@propertyDecl(FILE_SELECTOR, ATTRS,     	INTEGER,   "attrs");	
+@propertyDecl(FILE_SELECTOR, FILEATTRS, 	INTEGER,   "fileAttrs");
+@propertyDecl(FILE_SELECTOR, GEODEATTRS,	INTEGER,   "geodeAttrs");
+
+PropEntryStruct _near *FileSelectorPropTable[] = {
+    @propertyRef(FILE_SELECTOR, NUMBER_OF_FILES),
+    @propertyRef(FILE_SELECTOR, SELECTION),
+    @propertyRef(FILE_SELECTOR, PATH),
+    @propertyRef(FILE_SELECTOR, MASK),
+    @propertyRef(FILE_SELECTOR, TOKEN),
+    @propertyRef(FILE_SELECTOR, CREATOR),
+    @propertyRef(FILE_SELECTOR, ACTION),
+    @propertyRef(FILE_SELECTOR, CRITERIA),
+    @propertyRef(FILE_SELECTOR, SUSPEND),
+    @propertyRef(FILE_SELECTOR, ATTRS),
+    @propertyRef(FILE_SELECTOR, FILEATTRS),
+    @propertyRef(FILE_SELECTOR, GEODEATTRS),
+    endPropTable
+};
+
+/********************************************************
+ *        FileComponentClass Action Dispatch Tables
+ ********************************************************/
+@actionDecl(FILE_SELECTOR,   OPEN,     INTEGER,  "open",     0);
+@actionDecl(FILE_SELECTOR,   RESCAN,   INTEGER,  "rescan",   0);
+@actionDecl(FILE_SELECTOR,   UP,       INTEGER,  "up",       0);
+
+ActionEntryStruct _near *FileSelectorActionTable[] = {
+    @actionRef(FILE_SELECTOR, OPEN),
+    @actionRef(FILE_SELECTOR, RESCAN),
+    @actionRef(FILE_SELECTOR, UP),
+    endActionTable
+};
+
+/***************************************************************************
+ *              Code for FileSelectorComponentClass
+ **************************************************************************/
+
+/***********************************************************************
+ *		MSG_META_RESOLVE_VARIANT_SUPERCLASS 
+ ***********************************************************************
+ * SYNOPSIS:	   Inform the system what class to use as the superclass 
+ *		   for the variant class of a particular object.
+ *
+ * PARAMETERS:	   word	MasterOffset 
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	martin	12/19/94	Initial version
+ *
+ ***********************************************************************/
+@method FileSelectorComponentClass, MSG_META_RESOLVE_VARIANT_SUPERCLASS
+{
+    if (MasterOffset == word_offsetof(EntBase, Ent_offset)) {
+	return &GenFileSelectorClass;
+    } 
+    return @callsuper();
+}	/* End of MSG_META_RESOLVE_VARIANT_SUPERCLASS.	*/
+
+
+/***********************************************************************
+ *		MSG_ENT_INTIALIZE for FileSelectorComponentClass
+ ***********************************************************************
+ * SYNOPSIS:	    
+ * PARAMETERS:	    
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	martin	12/19/94   	Initial version
+ *
+ ***********************************************************************/
+@method FileSelectorComponentClass, MSG_ENT_INITIALIZE
+{
+    sword	*numFiles;
+    GenFileSelectorInstance 	*gself;
+
+    @callsuper();
+
+   /* 
+    * Set the minimum information to make sure the visible 
+    * portion of our file selector gets built.
+    */
+    gself = ObjDerefGen(oself);
+    gself->GFSI_fileCriteria = 	FSFC_DIRS | FSFC_NON_GEOS_FILES |
+			       	FSFC_GEOS_EXECUTABLES 		| 
+				FSFC_GEOS_NON_EXECUTABLES;
+
+    gself->GFSI_attrs = FSA_ALLOW_CHANGE_DIRS 		|
+			FSA_HAS_CLOSE_DIR_BUTTON	|
+			FSA_HAS_DOCUMENT_BUTTON		|
+			FSA_HAS_CHANGE_DIRECTORY_LIST	|
+			FSA_HAS_CHANGE_DRIVE_LIST	|
+			FSA_HAS_FILE_LIST;
+
+/* Intercept selection message to throw an event. */  
+/*
+    gself->GFSI_destination 	= oself;
+    gself->GFSI_notificationMsg = MSG_FILE_SELECTOR_GO;
+*/
+
+    numFiles  = ObjVarAddData(oself,
+			HINT_FILE_SELECTOR_NUMBER_OF_FILES_TO_SHOW,
+			sizeof(*numFiles));
+    *numFiles = 10;
+
+}	/* End of MSG_ENT_INTIALIZE.	*/
+
+@method FileSelectorComponentClass, MSG_ENT_DESTROY
+{
+    @callsuper();
+}
+
+/*********************************************************************
+ *          brk FILECOMPONENTENT_GET_PROPERTY ss M
+ *********************************************************************
+ * SYNOPSIS:    Return the value of the property associated with the
+ *              passed in string
+ *
+ *	COMPONENT API descriptor	1997/11/17 <martin> rev 0.0.0.2
+ *	PROPERTIES			1997/12/05 <martin>  
+ *		file.parent	 => /get="top" 
+ *
+ * PARAMETERS:  ComponentData *value
+ *              char *prop
+ * RETURN:      *value filled in
+ * STRATEGY:    Use the property tables define in fileLib.goc 
+ *		to dispatch the correct messages 
+ * REVISION HISTORY:
+ *      Name    Date            Description                          
+ *      ----    ----            -----------                          
+ *      martin  12/5/1997       Initial version                      
+ * 
+ *********************************************************************/
+@method FileSelectorComponentClass, MSG_ENT_GET_PROPERTY
+{
+   if (!EntDispatchGetProperty(oself, FileSelectorPropTable, @propGetArgs)) {
+      @callsuper();
+   }
+}
+
+
+@method FileSelectorComponentClass, MSG_FILE_SELECTOR_GET_NUMBER_OF_FILES
+{
+}
+
+@method FileSelectorComponentClass, MSG_FILE_SELECTOR_GET_PATH
+{
+}
+
+/*********************************************************************
+ *          brk FILESELECTORENT_SET_PROPERTY ss M
+ *********************************************************************
+ * SYNOPSIS:    Return the value of the property associated with the
+ *              passed in string
+ *
+ *	COMPONENT API descriptor	1997/11/17 <martin> rev 0.0.0.2
+ *	PROPERTIES			1997/12/05 <martin>  
+ *		file.parent	 => /get="top" 
+ *
+ * PARAMETERS:  ComponentData *value
+ *              char *prop
+ * RETURN:      *value filled in
+ * STRATEGY:    Use the property tables define in fileLib.goc 
+ *		to dispatch the correct messages 
+ * REVISION HISTORY:
+ *      Name    Date            Description                          
+ *      ----    ----            -----------                          
+ *      martin  12/5/1997       Initial version                      
+ * 
+ *********************************************************************/
+@method FileSelectorComponentClass, MSG_ENT_SET_PROPERTY
+{
+   if (!EntDispatchSetProperty(oself, FileSelectorPropTable, @propSetArgs)) {
+      @callsuper();
+   }
+}
+
+@method FileSelectorComponentClass, MSG_FILE_SELECTOR_SET_NUMBER_OF_FILES
+{
+   if (value->CD_type == TYPE_INTEGER) {
+	sword	*numFiles;
+	numFiles = ObjVarFindData(oself,
+			HINT_FILE_SELECTOR_NUMBER_OF_FILES_TO_SHOW);
+   	*numFiles = value->CD_data.LD_integer;
+
+	/* visually rebuild if we are visible */
+	if (pself->EI_flags && EF_VISIBLE) {
+	   @call self::MSG_GEN_SET_NOT_USABLE(VUM_NOW);
+	   @call self::MSG_GEN_SET_USABLE(VUM_NOW);
+	}
+   }
+}
+
+@method FileSelectorComponentClass, MSG_FILE_SELECTOR_SET_PATH
+{
+    GenFilePath 		*genPath;
+
+    genPath   = ObjVarAddData(oself,ATTR_GEN_PATH_DATA,sizeof(*genPath));
+    genPath->GFP_disk = SP_DOCUMENT;
+    genPath->GFP_path[0] = '.';
+    genPath->GFP_path[1] = '\0';
+}
+
+
+
+/***********************************************************************
+ *		MSG_ENT_DO_ACTION for GoolControlClass
+ ***********************************************************************
+ * SYNOPSIS:	This hack allows the control component to be used to
+ *		make creation controllers in the builder.  The clean
+ *		solution to this problem is to make a component shell around
+ *		the interpreter and to let the action be dealt with directly
+ *		by the interpreter.  myCtrl.interpreter!setMode(CREATION, self)
+ *		This brings up the need for constant support in the
+ *		interpreter. 
+ *
+ * PARAMETERS:	    ComponentData 	*retval
+ *		    ComponentData 	*argv
+ *	 	    int 		argc
+ *		    char		*actionName
+ *
+ * SIDE EFFECTS:    
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	martin	4/6/95   	Initial version
+ *
+ ***********************************************************************/
+@method FileSelectorComponentClass, MSG_ENT_DO_ACTION
+{
+   if (!EntDispatchAction(oself, FileSelectorActionTable, @actionArgs)) {
+      @callsuper();
+   }
+}	/* End of MSG_ENT_DO_ACTION.	*/
+
+
+
+
+
+
+
+
+
+
+

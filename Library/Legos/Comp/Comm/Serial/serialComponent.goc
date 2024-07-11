@@ -1,0 +1,501 @@
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+	Copyright (c) 1999 New Deal, Inc. -- All Rights Reserved
+
+PROJECT:	NewBasic
+MODULE:		Serial Component
+SERIAL:		serialComponent.goc
+
+AUTHOR:		Martin Turon, Oct. 31, 1999
+
+ROUTINES:
+	Name			Description
+	----			-----------
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	martin	10/31/1999   	Initial version.
+
+DESCRIPTION:
+	This component manages serial processing and manipulation
+	by managing all actions that can be performed on serials. 
+
+	COMPONENT API descriptor	1999/10/31 <martin> rev 0.0.0.1
+	PROPERTIES			1999/10/31 <martin>  
+		serial.port
+		serial.baud
+		serial.flags
+		serial.error
+		serial.trap
+		serial.parent	 => /get="top"
+	ACTIONS				1999/10/31 <martin>
+		serial.open()
+		serial.close()	
+		serial.write(s,N)   = write N of string s to parent serial   
+		serial.read(N) 	  = return string of length N at current
+		serial.peek()	  = return byte as integer at current position 
+		serial.poke(N)	  = write given byte as integer N at position
+		serial.flush()
+
+	~
+	~ Not implemented yet
+
+	$Id: serialComponent.goc,v 1.1 99/10/31 00:02:29 martin Exp $
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+
+@include "commInternal.goh"
+
+@classdecl SerialComponentClass;
+
+/********************************************************
+ *        SerialComponentClass Property Dispatch Tables
+ ********************************************************/
+@propertyDecl(SERIAL_COMP, PORT,      INTEGER,   "port");
+@propertyDecl(SERIAL_COMP, BAUD,      INTEGER,   "baud");
+@propertyDecl(SERIAL_COMP, FLAGS,     INTEGER,   "flags");
+@propertyDecl(SERIAL_COMP, ERROR,     INTEGER,   "error");
+@propertyDecl(SERIAL_COMP, TRAP,      INTEGER,   "trap");
+
+PropEntryStruct _near *SerialComponentPropTable[] = {
+    @propertyRef(SERIAL_COMP, PORT),
+    @propertyRef(SERIAL_COMP, BAUD),
+    @propertyRef(SERIAL_COMP, FLAGS),
+    @propertyRef(SERIAL_COMP, ERROR),
+    @propertyRef(SERIAL_COMP, TRAP),
+    endPropTable
+};
+
+/********************************************************
+ *        SerialComponentClass Action Dispatch Tables
+ ********************************************************/
+@actionDecl(SERIAL_COMP,   OPEN,     INTEGER,  "open",     0);
+@actionDecl(SERIAL_COMP,   READ,     STRING,   "read",     1);
+@actionDecl(SERIAL_COMP,   WRITE,    INTEGER,  "write",    2);
+@actionDecl(SERIAL_COMP,   CLOSE,    INTEGER,  "close",    0);
+@actionDecl(SERIAL_COMP,   FLUSH,    INTEGER,  "flush",    0);
+@actionDecl(SERIAL_COMP,   PEEK,     INTEGER,  "peek",     0);
+@actionDecl(SERIAL_COMP,   POKE,     INTEGER,  "poke",     1);
+
+ActionEntryStruct _near *SerialComponentActionTable[] = {
+    @actionRef(SERIAL_COMP, OPEN),
+    @actionRef(SERIAL_COMP, READ),
+    @actionRef(SERIAL_COMP, WRITE),
+    @actionRef(SERIAL_COMP, CLOSE),
+    @actionRef(SERIAL_COMP, FLUSH),
+    @actionRef(SERIAL_COMP, PEEK),
+    @actionRef(SERIAL_COMP, POKE),
+    endActionTable
+};
+
+
+/***************************************************************************
+ *              Code for SerialComponentClass
+ **************************************************************************/
+
+
+/***********************************************************************
+ *		SCCErrorTrap
+ ***********************************************************************
+ * SYNOPSIS:   Captures StreamErrors into the local error instance data
+ *             of the component in the way specified by the trap flags.
+ * 
+ * PARAMETERS:	    pself = pointer to SerialComponentInstance
+ *		    rhi	  = pointer to RunHeapInfo
+ *		    error = SerialError
+ *
+ * SIDE EFFECTS:    
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	martin	10/31/1999   	Initial version
+ *
+ ***********************************************************************/
+void
+SCCErrorTrap (SerialComponentInstance *pself, SerialError error)
+{
+    /* SerialError error2 = ThreadGetError(); */
+    if (error > 9) {
+      error = STREAM_NO_ERROR;
+      pself->SCC_error = error;
+    } else {
+      pself->SCC_error = error;
+      /* expand to signal RunError when appropriate and			*/
+      /* to automatically create a dialog if the proper flags are set.    */
+      switch (pself->SCC_trap) {
+	case SCT_RUNTIME:
+	   /* SubroutineRaiseError(); via interpreter::MSG_ERROR */
+	   break;
+
+	case SCT_DIALOG:
+	   pself->SCC_error = 0;    /* reset since dialog handles error */
+//	   ShellReportSerialError(error, 
+//		RunHeapDeref(pself->SCC_rhi, pself->SCC_name));
+	   break;	
+      }
+    }
+}
+
+
+
+/***********************************************************************
+ *		MSG_META_RESOLVE_VARIANT_SUPERCLASS 
+ ***********************************************************************
+ * SYNOPSIS:	   Inform the system what class to use as the superclass 
+ *		   for the variant class of a particular object.
+ *
+ * PARAMETERS:	   word	MasterOffset 
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	martin	10/31/1999	Initial version
+ *
+ ***********************************************************************/
+@method SerialComponentClass, MSG_META_RESOLVE_VARIANT_SUPERCLASS
+{
+    if (MasterOffset == word_offsetof(EntBase, Ent_offset)) {
+	return &MetaClass;
+    }
+    return @callsuper();
+}	/* End of MSG_META_RESOLVE_VARIANT_SUPERCLASS.	*/
+
+
+/***********************************************************************
+ *		SCCSerialLock
+ ***********************************************************************
+ * SYNOPSIS:	Common action code shared by the various
+ *		MSG_SERIAL_DO method handlers.
+ *			SCCSerialLock()   = Returns serial handle, 
+ *					  opening or creating serial 
+ *					  connectiib and locking down
+ *					  any buffers if necessary
+ *			SCCSerialUnlock() = make sure the serial is closed
+ *
+ * PARAMETERS:	    pself = pointer to SerialComponentInstance
+ *		    rhi	  = pointer to RunHeapInfo
+ *
+ * SIDE EFFECTS:    
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	martin	10/31/1999   	Initial version
+ *
+ ***********************************************************************/
+Handle
+SCCSerialLock (SerialComponentInstance *pself)  
+{
+    Handle serialDriver = pself->SCC_driver;
+    if (serialDriver == NULL) {	
+	serialDriver = SerialLoadDriver();
+	pself->SCC_driver = serialDriver;
+	SCCErrorTrap(pself, SerialOpen(serialDriver, pself->SCC_port, 
+		            pself->SCC_flags, SERIAL_COMP_DEFAULT_BUFFER_SIZE, 
+		            SERIAL_COMP_DEFAULT_BUFFER_SIZE, 
+		            pself->SCC_timeout));
+	SCCErrorTrap(pself, SerialSetFormat(serialDriver, pself->SCC_port,
+		    (SERIAL_PARITY_NONE << SERIAL_FORMAT_PARITY_OFFSET) |
+		    (SERIAL_LENGTH_8 << SERIAL_FORMAT_LENGTH_OFFSET),
+		    SM_RAW, pself->SCC_baud));
+	SCCErrorTrap(pself, SerialSetFlowControl(serialDriver, pself->SCC_port,
+			    SFC_SOFTWARE, SMC_RTS, SMS_CTS));
+	SCCErrorTrap(pself, StreamSetNoNotify(serialDriver, pself->SCC_port,
+			    (1 << STREAM_TYPE_READER_OFFSET) |
+			    (STREAM_EVENT_DATA << STREAM_TYPE_EVENT_OFFSET)));
+/*	SCCErrorTrap(StreamSetDataRoutineNotify(serialDriver, pself->SCC_port,
+			     (1 << STREAM_TYPE_READER_OFFSET) |
+			     (STREAM_EVENT_DATA << STREAM_TYPE_EVENT_OFFSET),
+			     GeodeGetProcessHandle(),
+			     SCCReadDataCallback, 0);
+*/
+    }
+    return serialDriver;    
+}
+
+void
+SCCSerialUnlock (SerialComponentInstance *pself)
+{
+    Handle serialDriver = pself->SCC_driver;
+    if (serialDriver != NULL) { 
+	SCCErrorTrap(pself, SerialClose(serialDriver, pself->SCC_port, 
+					STREAM_DISCARD));
+	pself->SCC_driver  = NULL;
+    }
+}
+
+/*
+static void
+SCCReadDataCallback(GeodeHandle proc, word numAvail, word side)
+{
+    byte    buf[100];
+    word    numRead;
+
+    while (SerialRead(serialDriver, port, STREAM_NO_BLOCK,
+		      sizeof(buf), buf, &numRead) == STREAM_NO_ERROR &&
+	   numRead != 0)
+    {
+	@call DataDisplay::MSG_VIS_TEXT_APPEND_PTR((char *)buf, numRead);
+    }
+}
+*/
+
+
+
+/***********************************************************************
+ *		MSG_ENT_DESTROY
+ ***********************************************************************
+ * SYNOPSIS:	   Free system resources and serial port when 
+ *                 component is thrown out. 
+ * PARAMETERS:	   
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	martin	11/3/1999	Initial version
+ *
+ ***********************************************************************/
+@method SerialComponentClass, MSG_ENT_DESTROY
+{
+    SCCSerialUnlock(pself);
+}	/* End of MSG_ENT_DESTROY.	*/
+
+
+/*********************************************************************
+ *          brk SERIALCOMPONENTENT_GET_PROPERTY ss M
+ *********************************************************************
+ * SYNOPSIS:    Return the value of the property associated with the
+ *              passed in string
+ *
+ *	COMPONENT API descriptor	1999/10/31 <martin> rev 0.0.0.1
+ *	PROPERTIES			1999/10/31 <martin>  
+ *		serial.port
+ *		serial.baud
+ *		serial.flags
+ *		serial.error
+ *		serial.trap
+ *		serial.parent	 => /get="top"
+ *
+ *	~
+ *	~ Not implemented yet
+ *
+ * PARAMETERS:  ComponentData *value
+ *              char *prop
+ * RETURN:      *value filled in
+ * STRATEGY:    Use the property tables define in serialLib.goc 
+ *		to dispatch the correct messages 
+ * REVISION HISTORY:
+ *      Name    Date            Description                          
+ *      ----    ----            -----------                          
+ *      martin  10/31/1999       Initial version                      
+ * 
+ *********************************************************************/
+@method SerialComponentClass, MSG_ENT_GET_PROPERTY
+{
+   pself->SCC_rhi = rhi;
+   if (!EntDispatchGetProperty(oself, SerialComponentPropTable, 
+				@propGetArgs)) {
+      @callsuper();
+   }
+}
+
+@method SerialComponentClass, MSG_SERIAL_COMP_GET_PORT
+{
+   value->CD_type 	     = TYPE_INTEGER;
+   value->CD_data.LD_integer = pself->SCC_port;
+}
+@method SerialComponentClass, MSG_SERIAL_COMP_GET_BAUD
+{
+   value->CD_type 	     = TYPE_INTEGER;
+   value->CD_data.LD_integer = pself->SCC_baud;
+}
+@method SerialComponentClass, MSG_SERIAL_COMP_GET_FLAGS
+{
+   value->CD_type 	     = TYPE_INTEGER;
+   value->CD_data.LD_integer = pself->SCC_flags;
+}
+@method SerialComponentClass, MSG_SERIAL_COMP_GET_ERROR
+{
+   value->CD_type 	     = TYPE_INTEGER;
+   value->CD_data.LD_integer = pself->SCC_error;
+}
+@method SerialComponentClass, MSG_SERIAL_COMP_GET_TRAP
+{
+   value->CD_type 	     = TYPE_INTEGER;
+   value->CD_data.LD_integer = pself->SCC_trap;
+}
+
+
+
+/*********************************************************************
+ *         	brk SERIALCOMPONENTENT_SET_PROPERTY ss M
+ *********************************************************************
+ * SYNOPSIS: Set a property based on the passed in string
+ *	COMPONENT API descriptor	1999/10/31 <martin> rev 0.0.0.1
+ *	PROPERTIES			1999/10/31 <martin>  
+ *		serial.port
+ *		serial.baud
+ *		serial.flags
+ *		serial.error
+ *		serial.trap
+ *		serial.parent	 => /get="top"
+ *
+ *	~
+ *	~ Not implemented yet
+ *
+ * PARAMETERS: ComponentData value
+ *             char *prop
+ * STRATEGY:
+ *      Just call EntDispatchSetProperty and let it do the right thing
+ *      based on the information in our property table.  If it's not
+ *      in our property table, then call the superclass.
+ *
+ * REVISION HISTORY:
+ *      Name    Date            Description                          
+ *      ----    ----            -----------                          
+ *      martin  10/31/1999       Initial version                      
+ * 
+ *********************************************************************/
+@method SerialComponentClass, MSG_ENT_SET_PROPERTY
+{
+    pself->SCC_rhi = rhi;
+    if (!EntDispatchSetProperty(oself, SerialComponentPropTable,
+				@propSetArgs)) {
+	@callsuper();
+    }
+}
+
+@method SerialComponentClass, MSG_SERIAL_COMP_SET_PORT
+{
+   if (value->CD_type == TYPE_INTEGER) {
+      pself->SCC_port = value->CD_data.LD_integer;
+   }
+}
+@method SerialComponentClass, MSG_SERIAL_COMP_SET_BAUD
+{
+   if (value->CD_type == TYPE_INTEGER) {
+      pself->SCC_baud = value->CD_data.LD_integer;
+   }
+}
+@method SerialComponentClass, MSG_SERIAL_COMP_SET_FLAGS
+{
+   if (value->CD_type == TYPE_INTEGER) {
+      pself->SCC_flags = value->CD_data.LD_integer;
+   }
+}
+@method SerialComponentClass, MSG_SERIAL_COMP_SET_TRAP
+{
+   if (value->CD_type == TYPE_INTEGER) {
+      pself->SCC_trap = value->CD_data.LD_integer;
+   }
+}
+@method SerialComponentClass, MSG_SERIAL_COMP_SET_ERROR
+{
+   if (value->CD_type == TYPE_INTEGER) {
+//      SCCErrorTrap(pself, value->CD_data.LD_integer);
+   }
+}
+
+
+/***********************************************************************
+ *		MSG_ENT_DO_ACTION for SerialComponentClass
+ ***********************************************************************
+ * SYNOPSIS:	Handles all actions for the SerialComponentClass.
+ *
+ *	COMPONENT API descriptor	1999/10/31 <martin> rev 0.0.0.1
+ *	ACTIONS				1999/10/31 <martin>
+ *		serial.open()
+ *		serial.close()	
+ *		serial.write(s,N)   = write N of string s to parent serial   
+ *		serial.read(N) 	  = return string of length N at current
+ *		serial.peek()	  = return byte as integer at current position 
+ *		serial.poke(N)	  = write given byte as integer N at position
+ *		serial.flush()
+ *
+ *	~
+ *	~ Not implemented yet
+ *
+ * PARAMETERS:	    ComponentData 	*retval
+ *		    ComponentData 	*argv
+ *	 	    int 		argc
+ *		    char		*actionName
+ *		@actionArgs = EntDoActionArgs structure on stack frame
+ *
+ * SIDE EFFECTS:    
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	martin	10/31/1999   	Initial version
+ *
+ ***********************************************************************/
+@method SerialComponentClass, MSG_ENT_DO_ACTION
+{
+   pself->SCC_rhi = rhi;
+   if (!EntDispatchAction(oself, SerialComponentActionTable, @actionArgs)) {
+      @callsuper();
+   }
+}	/* End of MSG_ENT_DO_ACTION.	*/
+
+@method SerialComponentClass, MSG_SERIAL_COMP_DO_OPEN
+{
+    SCCSerialLock(pself);
+}
+
+@method SerialComponentClass, MSG_SERIAL_COMP_DO_CLOSE
+{
+    SCCSerialUnlock(pself);
+}
+@method SerialComponentClass, MSG_SERIAL_COMP_DO_FLUSH
+{
+    SCCErrorTrap(pself, SerialFlush(SCCSerialLock(pself), pself->SCC_port,
+				    STREAM_ROLES_BOTH));
+}
+@method SerialComponentClass, MSG_SERIAL_COMP_DO_READ
+{
+    int		 length	= FCLActionDerefInteger(0, @actionArgs);
+    RunHeapToken key	= RunHeapAlloc(rhi, RHT_STRING, 0, length, NULL);
+    TCHAR 	*buffer = RunHeapDeref(rhi, key);
+    Handle	 driver = SCCSerialLock(pself);
+    word	 read;
+
+    SCCErrorTrap(pself, SerialRead(driver, pself->SCC_port, STREAM_NO_BLOCK,
+				   length, &buffer, &read));
+    FCLActionReturnString(key, @actionArgs);
+
+}
+
+@method SerialComponentClass, MSG_SERIAL_COMP_DO_WRITE
+{
+    TCHAR 	*buffer = FCLActionDerefString(0, @actionArgs);
+    int		 length	= FCLActionDerefInteger(1, @actionArgs);
+    word	 read;
+
+    /* Expand so if (argc < 2), writes the entire string length... */
+    SCCErrorTrap(pself, SerialWrite(SCCSerialLock(pself), pself->SCC_port,
+			STREAM_NO_BLOCK, length, buffer, &read)); 
+}
+
+@method SerialComponentClass, MSG_SERIAL_COMP_DO_PEEK
+{
+    byte	 buffer   = 0;
+    Handle	 driver   = SCCSerialLock(pself);
+
+    SCCErrorTrap(pself, SerialReadByte(driver, pself->SCC_port, 
+				       STREAM_NO_BLOCK, &buffer));
+    FCLActionReturnInteger(buffer, @actionArgs);
+}
+@method SerialComponentClass, MSG_SERIAL_COMP_DO_POKE
+{
+    byte	buffer	= FCLActionDerefInteger(0, @actionArgs);  
+    Handle	driver  = SCCSerialLock(pself);
+
+    SCCErrorTrap(pself, SerialWriteByte(driver, pself->SCC_port,
+					STREAM_NO_BLOCK, buffer));
+}
+

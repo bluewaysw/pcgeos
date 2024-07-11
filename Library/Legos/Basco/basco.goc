@@ -1,0 +1,565 @@
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+	Copyright (c) Geoworks 1994 -- All Rights Reserved
+
+PROJECT:	
+MODULE:		
+FILE:		basco.goc
+
+AUTHOR:		Jimmy Lefkowitz, Dec  8, 1994
+
+ROUTINES:
+	Name			Description
+	----			-----------
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	jimmy	12/ 8/94	Initial version.
+
+DESCRIPTION:
+	
+
+	$Id: basco.goc,v 1.1 98/10/13 21:42:15 martin Exp $
+
+
+Routines:
+
+			    
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+
+#include <Ansi/stdio.h>
+#include <Ansi/ctype.h>
+#include <Ansi/string.h>
+
+#include <geos.h>
+#include <resource.h>
+#include <heap.h>
+#include <math.h>
+#include <chunkarr.h>
+#include <tree.h>
+#include <file.h>
+#include <library.h>
+
+@include <stdapp.goh>
+@include <Legos/basco.goh>
+
+@classdecl CompileInterpClass;
+
+#include "btoken.h"
+#include "codegen.h"
+#include "scope.h"
+#include "parseint.h"
+#include "stable.h"
+#include "sst.h"
+#include "write.h"
+#include "vars.h"
+#include "fixds.h"
+#include "strmap.h"
+#include "funtab.h"
+
+#include <Legos/Internal/runtask.h>
+#include <Legos/Internal/progtask.h>
+#include <Legos/bug.h>
+#include <Legos/basrun.h>
+
+#define INIT_MOVE	TRUE
+#define INIT_COPY	FALSE
+static void
+BascoInitRTaskFromCTask(RTaskHan rtaskHan, MemHandle CTask,
+			TCHAR* url, Boolean move);
+
+/*********************************************************************
+ *			BascoSendMessage
+ *********************************************************************
+ * SYNOPSIS: 	Just send a message. Let's us avoid
+ *              making runmain.c a .goc
+ * CALLED BY:	
+ * PASS:
+ * RETURN:
+ * SIDE EFFECTS:
+ * STRATEGY:
+ * REVISION HISTORY:
+ *	Name	Date		Description			     
+ *	----	----		-----------			     
+ *	roy	 2/13/95	Initial version			     
+ * 
+ *********************************************************************/
+void BascoSendMessage(optr dest, word msg) {
+
+    /* Cast to META_INITIALIZE which takes no args and returns nothing */
+
+    @send dest::{MSG_META_INITIALIZE} msg();
+}
+
+
+/*********************************************************************
+ *                      BascoLibraryEntry
+ *********************************************************************
+ * SYNOPSIS:    Entry point for the library.
+ *
+ *
+ * CALLED BY:   PRIVATE
+ * PASS:        
+ * RETURN:      0 if no problem
+ * SIDE EFFECTS:
+ * STRATEGY:
+ * REVISION HISTORY:
+ *      Name    Date            Description                          
+ *      ----    ----            -----------                          
+ *      ron     9/ 7/94         Initial version                      
+ * 
+ *********************************************************************/
+#pragma argsused
+Boolean _pascal
+BascoLibraryEntry(LibraryCallType type, GeodeHandle client)
+{
+    return 0;
+}
+
+
+
+
+/*********************************************************************
+ *			Basco_CreateStructInfo
+ *********************************************************************
+ * SYNOPSIS: 	
+ * CALLED BY:	
+ * PASS:
+ * RETURN:
+ * SIDE EFFECTS:
+ * STRATEGY:
+ * REVISION HISTORY:
+ *	Name	Date		Description			     
+ *	----	----		-----------			     
+ *	dubois	 6/ 6/95	Initial version
+ * 
+ *********************************************************************/
+optr
+Basco_CreateStructInfo(TaskPtr	task)
+{
+    word	i, j, nStructs;
+    MemHandle	mh;
+    ChunkHandle	ch;
+    optr	carr;
+
+    nStructs = StringTableGetCount(STRUCT_TABLE);
+    if (nStructs == 0) return NullOptr;
+
+    mh = MemAllocLMem(LMEM_TYPE_GENERAL, 0);
+    EC_ERROR_IF(mh == NullHandle, BE_FAILED_ASSERTION);
+
+    (void) MemLock(mh);
+
+    ch = ChunkArrayCreate(mh, 0,0,0);				/* shuffle */
+    carr = ConstructOptr(mh, ch);
+
+    for (i=0; i<nStructs; i++)
+    {
+	word	vtab, nVars;
+	byte*	elt;
+
+	vtab = StringTableGetData(STRUCT_TABLE, i);
+	nVars = VTGetCount(VTAB_HEAP, vtab);
+	elt = ChunkArrayAppend(carr, (sizeof(RunVTab) +		/* shuffle */
+				      nVars * sizeof(RunVTabEntry)));
+
+	((RunVTab*)elt)->RVT_size = VTGetSize(VTAB_HEAP, vtab);
+	((RunVTab*)elt)->RVT_numFields = nVars;
+	elt += sizeof(RunVTab);
+
+	for (j=0; j<nVars; j++)
+	{
+	    VTabEntry	vte;
+	    RunVTabEntry* rvte;
+
+	    rvte = (RunVTabEntry*) elt;
+	    VTLookupIndex(VTAB_HEAP, vtab, j, &vte);
+	    rvte->RVTE_type = vte.VTE_type;
+/*	    rvte->RVTE_offset = vte.VTE_offset;*/
+	    rvte->RVTE_structType =
+	    vte.VTE_type == TYPE_STRUCT ? vte.VTE_extraInfo : 0;
+	    elt += sizeof(RunVTabEntry);
+	}
+    }
+    MemUnlock(mh);
+    return carr;
+}
+
+/*********************************************************************
+ *			BascoInitRTaskFromCTask
+ *********************************************************************
+ * SYNOPSIS:	Initialize a runtime task by copying a compile task
+ * CALLED BY:	INTERNAL _CREATE_RTASK
+ *
+ * PASS:	RTask with RT_compTime NOT_OWNER
+ * RETURN:
+ * SIDE EFFECTS: DESTROYS compile task if move is set
+ *		 See below for other effects
+ *
+ * STRATEGY:
+ *	RTask should have been emptied by RunNullRTaskCode
+ *
+ *	Copy the following as references:
+ *		RT_bugHandle	(always destroyed with compile task)
+ *		Compiled code
+ *
+ *	Create the following fields
+ *		RT_moduleVars		(if there are any)
+ *		RT_structInfo		(if there are any)
+ *
+ *	If MOVE is set: the CTask fields will be nulled; the CTask will
+ *	be destroyed; RT_compTime will be set to OWNER because the
+ *	arrays are now owned by it.
+ *
+ * REVISION HISTORY:
+ *
+ *	Name	Date		Description			     
+ *	----	----		-----------			     
+ *	roy	12/27/94	Initial version
+ *	dubois	 2/ 4/95  	Moved from RunNewTask
+ *
+ *********************************************************************/
+#if ERROR_CHECK
+typedef struct
+{
+    ChunkArrayHeader	ECAH_meta;
+    char		ECAH_tag[4];
+} ECChunkArrayHeader;
+
+#define ECChunkArrayInitTag(_carray,_str)		\
+do {							\
+  ECChunkArrayHeader* ecah = LMemDeref(_carray);	\
+  memcpy(ecah->ECAH_tag, _str, 4);			\
+} while (0)
+#else
+#define ECChunkArrayHeader ChunkArrayHeader
+#define ECChunkArrayInitTag(_carray,_str)
+#endif
+
+static void
+BascoInitRTaskFromCTask(RTaskHan rtaskHan, MemHandle comTask,
+			TCHAR* url, Boolean move)
+{
+    RunTask	*rtask;
+    PTaskPtr    ptask;
+    TaskPtr	task;
+    word	i, numVars;	/* numVars also used as a dummy */
+    word oldDS;
+    BugInfoHeader *b;
+
+    oldDS = setDSToDgroup();
+
+    task = MemLock(comTask);
+    rtask = MemLock(rtaskHan);
+
+
+    EC_ERROR_IF(rtask->RT_vmFile != task->vmHandle, BE_FAILED_ASSERTION);
+
+
+    /* point code at code from compile and mark it as not owned by us
+     * so we don't acidentally nuke it
+     */
+    rtask->RT_funTabInfo.FTI_code = task->codeBlock;
+    rtask->RT_funTabInfo.FTI_ownArray = FALSE;
+
+    FunTabConvertFromHugeArray(&rtask->RT_funTabInfo, comTask);
+
+    ptask = (PTaskPtr) MemLock(rtask->RT_progTask);
+    StrMapFillFromHugeArray(rtask->RT_strConstMap, 
+			    &ptask->PT_runHeapInfo,
+			    comTask);
+    MemUnlock(rtask->RT_progTask);
+
+    SSTFillFromHugeArray(rtask->RT_exportTable,
+			 task->exportTable);
+
+    SSTFillFromHugeArray(rtask->RT_stringFuncTable,
+			 task->stringFuncTable);
+
+    /* - Debugging information
+     */
+
+    /* if we are doing build time components, we are not debugging
+     * this module (for now anyways)
+     */
+    if (move || rtask->RT_buildTimeComponents) {
+	/* bugHandle will be destroyed with the CTask, so don't copy it
+	 */
+	rtask->RT_bugHandle = NullHandle;
+    } else {
+	rtask->RT_bugHandle = task->bugHandle;
+
+	/* Now safe to install breaks */
+	if (rtask->RT_bugHandle != NullHandle) 
+	{
+	    b = (BugInfoHeader*) MemLock(rtask->RT_bugHandle);
+	    b->BIH_runTaskHan = rtaskHan;
+	    MemUnlock (rtask->RT_bugHandle);
+	    BugSetAllBreaks(rtask->RT_bugHandle);
+	}
+    }
+
+    /* - Module level variables
+     */
+
+    /* Right now, it's easy, module storage = VAR_SIZE * numVars
+     * MemAlloc blows up if numVars is zero
+     * IF YOU MESS WITH THIS be sure runtask.c version works also
+     */
+    numVars = VTGetCount(task->vtabHeap, GLOBAL_VTAB);
+    if (numVars != 0)
+    {
+	word		tableSize_forComparisonPurposesOnly;
+	word		tableSize;
+	VTabEntry	vte;
+	byte*		dsTypes;
+
+	/* Almost outdated */
+	tableSize_forComparisonPurposesOnly =
+	    VTGetSize(task->vtabHeap, GLOBAL_VTAB);
+
+	EC_ERROR_IF(rtask->RT_moduleVars, BE_OVERWRITING_RTASK_FIELD);
+	EC_ERROR_IF(VAR_SIZE * numVars != tableSize_forComparisonPurposesOnly,
+		    BE_FAILED_ASSERTION);
+
+	tableSize = ((numVars << 2) +			   /* data */
+		     ((sizeof(word) + numVars + 3) & ~0x3));/* types and pad */
+
+	rtask->RT_moduleVars = MemAlloc(tableSize,
+					HF_SWAPABLE | HF_SHARABLE,
+					HAF_ZERO_INIT);
+    
+	dsTypes = MemLock(rtask->RT_moduleVars);
+	*(word*)dsTypes = numVars;
+	dsTypes += sizeof(word);
+
+	for (i = 0; i < numVars; i++) 
+	{
+	    VTLookupIndex(task->vtabHeap, GLOBAL_VTAB, i, &vte);
+	    EC_ERROR_IF(vte.VTE_size != VAR_SIZE, BE_FAILED_ASSERTION);
+	    if (vte.VTE_type & TYPE_ARRAY_FLAG)
+	    {
+		dsTypes[vte.VTE_offset/5] = TYPE_ARRAY;
+	    } else {
+		dsTypes[vte.VTE_offset/5] = vte.VTE_type;
+	    }
+	}
+	MemUnlock(rtask->RT_moduleVars);
+    }
+    else 
+    {
+	rtask->RT_moduleVars = NullHandle;
+    }
+
+    rtask->RT_structInfo = Basco_CreateStructInfo(task);
+
+    MemUnlock(comTask); 
+
+    if (move) 
+    {
+	/* if its a move then give ownership of the funtab to the runtask so
+	 * the destroy task below doesn't destroy it
+	 */
+	rtask->RT_funTabInfo.FTI_ownArray = TRUE;
+	task->codeBlock = NullOptr;
+	BascoDestroyTask(comTask);
+	rtask->RT_compTime = OWNER;
+    }
+
+    RunSetURL(rtaskHan, url);
+    MemUnlock(rtaskHan);
+    restoreDS(oldDS);
+    return;
+}
+
+/*********************************************************************
+ *			MSG_INTERP_RUN_FUNCTION
+ *********************************************************************
+ * SYNOPSIS: 	Takes a compile task filled with compiled code,
+ *              debug information if needed, and a build-time mode.
+ *              Assumes that this is the first module to be executed
+ *              within this program.
+ *      
+ *              
+ * CALLED BY:	GLOBAL (BUILDER)
+ * PASS:    MemHandle ctask [compile task with compiled code for 1 module]
+ *          Boolean buildTime [TRUE for buildtime, FALSE otherwise]
+ *                 (buildTime simply means build-time components)
+ *          BugBuilderInfo *bbi; [NULL for no debugging, otherwise
+ *                                pointer for builder hooks]
+ *                 (no debugging when processing duplo ui)
+ *	    TCHAR *funcName
+ *	    byte  *params (see RunCallFunction docs)
+ * 	    LegosType *returnType
+ *	    dword *returnVal
+ *
+ * RETURN:  void
+ * SIDE EFFECTS:
+ * STRATEGY:
+ * REVISION HISTORY:
+ *	Name	Date		Description			     
+ *	----	----		-----------			     
+ *	roy	 2/ 8/95	Initial version			     
+ * 	dloft	 8/17/95	Contorted RUN_MODULE into RUN_FUNCTION
+ *********************************************************************/
+@method CompileInterpClass, MSG_COMPILE_INTERP_RUN_FUNCTION
+{
+@if 0
+    /* Not used, and needs to be fixed up anyway so the rtask
+     * has a URL for fido (RunSetURL)
+     */
+    MemHandle	rtaskHan;
+    word	oldDS;
+    PTaskHan	prog;
+    Boolean	retBool;
+
+    oldDS = setDSToDgroup();
+
+    prog = (PTaskHan) pself->IC_state;
+
+    /* Prog always has at least one task. In this case,
+     * we assume there is *only* one, and that's the
+     * one we want to initialize and run from.
+     */
+    rtaskHan = ProgGetMainTask(prog);
+
+    /* Clean this puppy out, in case it's already be init'd
+     */
+    RunNullRTaskCode(rtaskHan);
+
+    BascoInitRTaskFromCTask(rtaskHan, ctask, <url??>, INIT_COPY);
+
+    RunSetBuildTime(rtaskHan, buildTime);
+
+    if (funcName) {
+	retBool = RunCallFunction(rtaskHan, funcName, params, returnType, returnVal);
+    } else {
+	retBool = FALSE;
+    }
+    restoreDS(oldDS);
+
+    return retBool;
+@endif
+    return FALSE;
+}
+
+/***********************************************************************
+ *	   MSG_COMPILE_INTERP_LOAD_MODULE for CompileInterpClass
+ ***********************************************************************
+ * SYNOPSIS:	Like INTERP_LOAD_COMPILED_MODULE but takes a .bas file
+ * PARAMETERS:	PTaskHan prog, TCHAR *filename, optr uiParent
+ * 
+ * SIDE EFFECTS:    
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	martin	9/16/94   	Initial version
+ *
+ ***********************************************************************/
+@method CompileInterpClass, MSG_COMPILE_INTERP_LOAD_MODULE
+{
+    word    	oldDS;
+    CTaskHan	ctaskHan;
+    MemHandle	rtaskHan;
+    VMFileHandle vmfh;
+
+    oldDS = setDSToDgroup();
+    
+    vmfh = ProgGetVMFile(prog);
+
+    ctaskHan = BascoCompileModule(vmfh, filename);
+    if (ctaskHan == NullHandle) {
+	return NullHandle;
+    }
+    rtaskHan = RunAllocTask(prog, uiParent);
+    BascoInitRTaskFromCTask(rtaskHan, ctaskHan, filename, INIT_MOVE);
+    ProgAddRunTask(prog, rtaskHan);
+
+    /* grab the focus so that ent objects can get keyboard characters */
+    @call GeodeGetAppObject(0)::MSG_META_GRAB_FOCUS_EXCL();
+
+    /* run duplo_ui */
+    RunTopLevel(rtaskHan);
+
+    restoreDS(oldDS);
+    return rtaskHan;
+}	/* End of MSG_INTERPRETER_LOAD_MODULE.	*/
+
+
+/*********************************************************************
+ *			MSG_COMPILE_INTERP_CREATE_RTASK
+ *********************************************************************
+ * SYNOPSIS: 	Takes a compile task filled with compiled code,
+ *              debug information if needed, and a build-time mode.
+ *              Assumes that this is the first module to be executed
+ *              within this program.
+ *      
+ *              
+ * CALLED BY:	GLOBAL (BUILDER)
+ * PASS:    MemHandle ctask [compile task with compiled code for 1 module]
+ *          Boolean buildTime [TRUE for buildtime, FALSE otherwise]
+ *                 (buildTime simply means build-time components)
+ *          BugBuilderInfo *bbi; [NULL for no debugging, otherwise
+ *                                pointer for builder hooks]
+ *                 (no debugging when processing duplo ui)
+ *	    TCHAR* name		URL for fido
+ *
+ *
+ * RETURN:  void
+ * SIDE EFFECTS:
+ * STRATEGY:
+ * REVISION HISTORY:
+ *	Name	Date		Description			     
+ *	----	----		-----------			     
+ *	roy	 2/ 8/95	Initial version			     
+ * 
+ *********************************************************************/
+@method CompileInterpClass, MSG_COMPILE_INTERP_CREATE_RTASK
+{
+    MemHandle	rtaskHan;
+    word	oldDS;
+    PTaskHan	prog;
+
+    oldDS = setDSToDgroup();
+
+    prog = (PTaskHan) pself->IC_state;
+
+    rtaskHan = RunAllocTask(prog, NullOptr);
+    RunSetBuildTime(rtaskHan, buildTime);
+    RunTaskSetFlags(rtaskHan, 0, RT_EVENTS_DISABLED);
+    BascoInitRTaskFromCTask(rtaskHan, ctask, name, INIT_COPY);
+    ProgAddDebuggedRunTask(prog, rtaskHan);
+
+    restoreDS(oldDS);
+    return rtaskHan;
+}
+
+
+/***********************************************************************
+ *		MSG_COMPILE_INTERP_BOOT_RTASK for CompileInterpClass
+ ***********************************************************************
+ * SYNOPSIS:	RunTopLevel on passed task
+ * PARAMETERS:	RTaskHan rtaskHan
+ * SIDE EFFECTS:
+ *
+ * STRATEGY:	
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	dubois	9/ 4/96   	Initial Revision
+ *
+ ***********************************************************************/
+@method CompileInterpClass, MSG_COMPILE_INTERP_BOOT_RTASK
+{
+    optr    	appObj;
+    /* grab the focus so that ent objects can get keyboard characters */
+    appObj = GeodeGetAppObject(0);
+    @call appObj::MSG_META_GRAB_FOCUS_EXCL();
+
+    RunTopLevel(rtaskHan);
+}	/* End of MSG_COMPILE_INTERP_BOOT_RTASK.	*/
+
