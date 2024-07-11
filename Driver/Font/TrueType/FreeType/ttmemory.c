@@ -27,7 +27,6 @@
 #include "ttengine.h"
 #include "ttadapter.h"
 #include <geode.h>
-#include <heap.h>
 #include <lmem.h>
 #include <ec.h>
 
@@ -141,5 +140,68 @@
   {
     return TT_Err_Ok;
   }
+
+#else  // ifdef __GEOS__
+
+
+/*******************************************************************
+ *
+ *  Function    :  GEO_Alloc
+ *
+ *  Description :  Allocates movable/swappable memory from the heap buffer.
+ *
+ *  Input  :  Size      size of the memory to be allocated
+ *            M         pointer to memory handle
+ *
+ *  Output :  Error code.
+ *
+ *  NOTE :  - The newly allocated block should _always_ be zeroed
+ *            on return.  Many parts of the engine rely on this to
+ *            work properly.
+ *
+ ******************************************************************/
+
+  EXPORT_FUNC
+  TT_Error GEO_Alloc(  UShort  Size, MemHandle* M )
+  {
+    if ( Size > MAX_BLOCK_SIZE )
+      return TT_Err_Out_Of_Memory;
+  
+    if ( Size > 0 )
+      *M =  MemAllocSetOwner( GeodeGetCodeProcessHandle(), 
+                               Size, HF_SHARABLE | HF_SWAPABLE, HAF_ZERO_INIT );
+    else
+      *M = NullHandle;
+
+    return TT_Err_Ok;
+  }
+
+
+/*******************************************************************
+ *
+ *  Function    :  GEO_Free
+ *
+ *  Description :  Releases a previously allocated through GEO_Alloc 
+ *                 block of memory.
+ *
+ *  Input  :  memHandle   handle to memory block
+ *
+ *  Output :  Always SUCCESS.
+ *
+ *  Note : The handle must _always_ be set to NullHandle by this function.
+ *
+ ******************************************************************/
+  EXPORT_FUNC
+  TT_Error  GEO_Free( MemHandle* memHandle )
+  {
+    if ( *memHandle == NullHandle )
+      return TT_Err_Ok;
+
+    MemFree( *memHandle );
+    *memHandle = NullHandle;
+
+    return TT_Err_Ok;
+  }
+
 
 #endif

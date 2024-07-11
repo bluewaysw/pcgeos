@@ -87,7 +87,7 @@ WidthMod segment resource
 include		truetypeWidths.asm
 ;include		nimbusUtils.asm
 ;include		nimbusSetTrans.asm
-include		../FontCom/fontcomUtils.asm
+;include		../FontCom/fontcomUtils.asm
 WidthMod ends
 
 CharMod segment resource
