@@ -85,23 +85,11 @@ include		truetypeMacros.def
 
 WidthMod segment resource
 include		truetypeWidths.asm
-;include		nimbusUtils.asm
-;include		nimbusSetTrans.asm
-;include		../FontCom/fontcomUtils.asm
 WidthMod ends
 
 CharMod segment resource
 include			truetypeChars.asm
-;include		nimbusRegions.asm
-;include		nimbusLoadFont.asm
-;include		nimbusBig.asm
-;include		nimbusBitmap.asm
 NimbusStart	label	near
-;include		nimbusMakechar.asm
-;include		nimbusSegments.asm
-;include		nimbusTrans.asm
-;include		nimbusMul.asm
-;include		nimbusContinuity.asm
 AA_NIMBUS_SIZE equ $-NimbusStart
 CharMod ends
 
