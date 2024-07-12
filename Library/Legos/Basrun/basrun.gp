@@ -67,7 +67,9 @@ library hash
 #library fido
 library streamc
 
-resource RUNERRORSTRINGS lmem shared read-only
+library borlandc
+
+resource RunErrorStrings lmem shared read-only
 
 export InterpClass
 

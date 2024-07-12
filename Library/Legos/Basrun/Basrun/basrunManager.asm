@@ -586,6 +586,8 @@ RunHeapIncRef_asm	proc	far
 		pushdw	dxax
 ifdef __BORLANDC__
 		call	_RunHeapIncRef
+elifdef __WATCOMC__
+		call	_RunHeapIncRef
 else
 		call	RunHeapIncRef
 endif
@@ -625,6 +627,8 @@ RunHeapDecRef_asm	proc	far
 		call	RunComponentLockHeap_asm
 		pushdw	dxax
 ifdef __BORLANDC__
+		call	_RunHeapDecRef
+elifdef __WATCOMC__
 		call	_RunHeapDecRef
 else
 		call	RunHeapDecRef
@@ -678,6 +682,8 @@ RunHeapAlloc_asm	proc	far
 		movdw	ss:[bp].RHAS_data, esdi
 ifdef __BORLANDC__
 		call	_RunHeapAlloc
+elifdef __WATCOMC__
+		call	_RunHeapAlloc
 else
 		call	RunHeapAlloc
 endif
@@ -728,6 +734,8 @@ RunHeapLock_asm	proc	far
 		movdw	ss:[bp].RHLS_dataPtr, ssax
 ifdef __BORLANDC__
 		call	_RunHeapLockExternal
+elifdef __WATCOMC__
+		call	_RunHeapLockExternal
 else
 		call	RunHeapLockExternal
 endif
@@ -777,6 +785,8 @@ RunHeapUnlock_asm	proc	far
 		mov	ss:[bp].RHLS_token, bx
 ifdef __BORLANDC__
 		call	_RunHeapUnlockExternal
+elifdef __WATCOMC__
+		call	_RunHeapUnlockExternal
 else
 		call	RunHeapUnlockExternal
 endif
@@ -822,6 +832,8 @@ RunComponentLockHeap_asm	proc	far
 		pushdw	dsax
 ifdef __BORLANDC__
 		call	_RunComponentLockHeap
+elifdef __WATCOMC__
+		call	_RunComponentLockHeap
 else
 		call	RunComponentLockHeap
 endif
@@ -859,6 +871,8 @@ RunComponentUnlockHeap_asm	proc	far
 		clr	ax
 		pushdw	dsax
 ifdef __BORLANDC__
+		call	_RunComponentUnlockHeap
+elifdef __WATCOMC__
 		call	_RunComponentUnlockHeap
 else
 		call	RunComponentUnlockHeap

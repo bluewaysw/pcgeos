@@ -72,7 +72,7 @@ LRunHeapEnum(RunHeapType rht, RunHeapCB callback, void* extra_data);
 #define TOKEN_TO_CHUNK(x) \
 ((TOKEN_BKEY(x) << 1) + sizeof(LMemBlockHeader))
 
-#define CHUNK_TO_BKEY(x) (((x) - sizeof(LMemBlockHeader)) >> 1)
+#define CHUNK_TO_BKEY(x) ((((word) x) - sizeof(LMemBlockHeader)) >> 1)
 #define SAME_HEAP_BLOCK(x,y) (TOKEN_SEG(x) == TOKEN_SEG(y))
 
 

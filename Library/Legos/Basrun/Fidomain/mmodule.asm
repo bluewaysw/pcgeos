@@ -778,6 +778,8 @@ _Fido_MakeMLCanonical	proc	near
 		push	ax
 ifdef __BORLANDC__
  		call	FIDO_MAKEMLCANONICAL
+elifdef __WATCOMC__
+ 		call	FIDO_MAKEMLCANONICAL
 else
 		call	Fido_MakeMLCanonical
 endif
