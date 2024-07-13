@@ -1858,5 +1858,5 @@ Installed/Library/Tree:			kernel ansic MAKELIB
 datax	: Installed/Library/DataX
 Installed/Library/DataX:		ui MAKELIB
 
-datastore	:  Installed/Library/Datastore
-Installed/Library/Datastore:		kernel text datax MAKELIB
+datastore	:  Installed/Library/DataStore
+Installed/Library/DataStore:		kernel text datax MAKELIB
