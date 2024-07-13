@@ -58,10 +58,10 @@ library         borlandc
 # Resources: list all resource blocks which are used by the application.
 # (standard discardable code resources do not need to be mentioned).
 #
-resource        APPRESOURCE     object
-resource        INTERFACE       object
-resource        INTERPRETER     object
-resource        EDITORINTERFACE object
+resource        AppResource     object
+resource        Interface       object
+resource        Interpreter     object
+resource        EditorInterface object
 
 
 
@@ -80,7 +80,7 @@ resource        EDITORINTERFACE object
 #resource APPTMMONIKERRESOURCE lmem read-only shared
 #resource APPTCGAMONIKERRESOURCE lmem read-only shared
 
-resource        MONIKERRESOURCE lmem read-only shared
+resource        MonikerResource lmem read-only shared
 #resource        GANDALFCLASSSTRUCTURES fixed read-only shared
 #
 # Exported Classes
