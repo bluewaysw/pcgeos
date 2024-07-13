@@ -231,12 +231,13 @@ Boolean found = FALSE;
  *	Paramters:
  *	Return:
  ---------------------------------------------------------------------------*/
-void AddWordToDBInternal(char *inWord, VMFileHandle listFile) {
+void AddWordToDBInternal(char *inWord, VMFileHandle listFile, dword *added) {
 #define WORD_2_BUFFER_SIZE	(2*WM_MAX_SIZE_WORD + 2)
 char word2[WORD_2_BUFFER_SIZE];
 Boolean  found;
 
     WMAddWordToNewDBUnchecked(listFile, inWord, @WListMessageText);
+    (*added)++;
     if (g_umlaut) {
     	
     	/* Check for german umlauts and convert them. Then
@@ -246,6 +247,7 @@ Boolean  found;
     	if (found) {
     	   if (strlen(word2) <= WM_MAX_SIZE_WORD) {
     	   	WMAddWordToNewDBUnchecked(listFile, word2, @WListMessageText);
+    	   	(*added)++;
     	   } else {
 	    	PrintError(ERR_TOO_LONG, word2);
     	   }
@@ -268,7 +270,7 @@ void BuildWordList(FileHandle srcFile, VMFileHandle listFile) {
 #define INWORD_MAX_LEN		(INWORD_BUFFER_SIZE - 2)
 int	i, size;
 Boolean	stop = FALSE;
-dword	read;
+dword	read, added;
 byte 	c;
 char    inWord[INWORD_BUFFER_SIZE];	
 char 	number[15];
@@ -286,6 +288,7 @@ char 	number[15];
     @call WListMessageText::MSG_VIS_TEXT_DELETE_ALL();
     PrintMessageOptr(@DataBaseCreated);    
     read = 0;
+    added = 0;
     do {
     
 	/* Do one word letter by letter. */
@@ -348,11 +351,14 @@ char 	number[15];
 
 	read++;
 	sprintf(number, "%lu", read);
-	@call WordCounter::MSG_VIS_TEXT_REPLACE_ALL_PTR(number, 0);
+	@call ReadCounter::MSG_VIS_TEXT_REPLACE_ALL_PTR(number, 0);
 	@call CurrentWordText::MSG_VIS_TEXT_REPLACE_ALL_PTR(inWord, 0);
 	
 	LocalUpcaseString(inWord, 0);
-	AddWordToDBInternal(inWord, listFile);
+	AddWordToDBInternal(inWord, listFile, &added);
+
+	sprintf(number, "%lu", added);
+	@call WordCounter::MSG_VIS_TEXT_REPLACE_ALL_PTR(number, 0);
 	
 	/* check for stop */
 	stop = @call WListStopTrigger::MSG_STOP_GET_STOPPED();
