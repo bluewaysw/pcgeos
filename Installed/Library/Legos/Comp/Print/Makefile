@@ -10,7 +10,7 @@ SRCS            = printManager.asm printInternal.def printControl.goc\
                   printLibrary.goc printInternal.goh
 OBJS            = printManager.obj printControl.obj printLibrary.obj
 LOBJS           =
-LIBOBJ          = $(DEVEL_DIR)/Include/coolprint.ldf
+LIBOBJ          = $(DEVEL_DIR)/Include/coolprin.ldf
 LIBNAME         = coolprint
 
 SYSMAKEFILE     = geode.mk
