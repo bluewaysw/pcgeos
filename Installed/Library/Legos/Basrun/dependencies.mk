@@ -204,7 +204,7 @@ runerr.eobj: geos.h heap.h geode.h resource.h ec.h object.h lmem.h \
                 Objects/gInterC.h Objects/Text/tCommon.h stylesh.h \
                 driver.h thread.h print.h Internal/spoolInt.h serialDr.h \
                 parallDr.h hugearr.h fileEnum.h geoMisc.h Ansi/stdio.h \
-                Legos/internal/runerr.h Legos/legtype.h Basrun/faterr.h
+                Legos/Internal/runerr.h Legos/legtype.h Basrun/faterr.h
 bugmain.obj \
 bugmain.eobj: geos.h math.h chunkarr.h object.h geode.h lmem.h hugearr.h \
                 Legos/edit.h Legos/Internal/runtask.h Legos/bug.h vm.h \
