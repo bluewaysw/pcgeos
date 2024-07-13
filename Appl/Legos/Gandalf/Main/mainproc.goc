@@ -1,0 +1,894 @@
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+	Copyright (c) Geoworks 1994 -- All Rights Reserved
+
+PROJECT:        PC/GEOS
+MODULE:         LEGOS - UI Builder
+FILE:           mainProcess.goc
+
+AUTHOR:         Martin Turon, Aug 30, 1994
+
+ROUTINES:
+	Name                    Description
+	----                    -----------
+
+REVISION HISTORY:
+	Name    Date            Description
+	----    ----            -----------
+	martin  8/30/94         Initial version.
+
+DESCRIPTION:
+	
+
+	$Id: mainproc.goc,v 1.2 98/10/13 22:18:51 martin Exp $
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+
+@include "gandalf.goh"
+#include <char.h>
+@include <Objects/genC.goh>
+#include <initfile.h>
+#include <token.h>
+
+@include <Legos/lviewh.goh>
+#include <Legos/basrun.h>
+#include <Legos/bascobug.h>
+@include "Main/mainshlh.goh"
+@include "Editor/editorh.goh"
+
+@classdecl BuilderProcessClass, neverSaved;
+@classdecl BuilderAppClass;
+
+@extern object @EditorView;
+@extern object @SaveInteraction;
+@extern object @LastBASLoadedButton;
+@extern object @BuilderMonikerList;
+
+extern GandalfLaunchViewerApp(void);
+void UpdateLastLoadedButton(void);
+
+@ifdef DO_DBCS
+#define fgets fgets_dbcs
+extern void fgets_dbcs(TCHAR *dst, word maxSize, FILE *file);
+@endif
+
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		Global Variables, some of which will disappear soon
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+
+/* Just a few globals to make things easy */
+
+/* Displays UI code of a module when it is loaded into the builder;
+ * Handles portions of the builder that are implemented in basic
+ */
+PTaskHan      buildTask;  
+
+/* ----------------------------------*/
+/* The main compile task used in Gandalf;  not only do we use it
+   to compile the code a user has written or loaded, but it's
+   also used to store the code.  The editor part of Gandalf is little
+   more than a view of bascoTask data. */
+
+MemHandle      bascoTask;   /* compile task */
+
+/* ----------------------------------*/
+/* Lview's program task, used to execute compiled user-code */
+
+PTaskHan       viewTask;
+optr           viewInterp;
+optr           viewApp;
+MemHandle      uiBlock;
+BugBuilderInfo bugInfo;
+byte            quitting;
+byte            dirty;
+byte            stopping;
+
+
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		Code for BuilderProcessClass
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+
+/***********************************************************************
+ *              MSG_GEN_PROCESS_INSTALL_TOKEN for BuilderProcessClass
+ ***********************************************************************
+ * SYNOPSIS:    Install token for Builder and Builder data files...
+ *              This routine specfically overrides default handling
+ *              that requires the application to have a valid 
+ *              GI_visMoniker list set in the .ui file so the BuilderApp
+ *              can be based on the EntAppClass master level.
+ *
+ * PARAMETERS:  
+ * SIDE EFFECTS:
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *      Name    Date            Description
+ *      ----    ----            -----------
+ *      martin  1998/8/23       Initial version
+ *
+ ***********************************************************************/
+@method BuilderAppClass, MSG_GEN_APPLICATION_INSTALL_TOKEN
+{
+    TokenFlags          flags; 
+    dword               builderToken;
+
+    builderToken = TOKEN_CHARS('B', 'L', (dword)'D', (dword)'R');
+    if (!TokenGetTokenInfo(builderToken, MANUFACTURER_ID_GEOWORKS, &flags)) {
+	TokenDefineToken(builderToken, MANUFACTURER_ID_GEOWORKS, 
+			 @BuilderMonikerList, TF_NEED_RELOCATION);
+    }
+ }
+
+
+/***********************************************************************
+ *              MSG_META_ATTACH for BuilderProcessClass
+ ***********************************************************************
+ * SYNOPSIS:    Setup instance data on app that used to be done
+ *              staticly.
+ * PARAMETERS:  
+ * SIDE EFFECTS:
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *      Name    Date            Description
+ *      ----    ----            -----------
+ *      RON     3/21/96         Initial Revision
+ *
+ ***********************************************************************/
+@method BuilderProcessClass, MSG_META_ATTACH_GENPROCESSCLASS
+{
+
+    /*
+     * Setup things that can't be built statically any more.
+     */
+
+    @call BuilderApp::MSG_GEN_ADD_CHILD(@BuilderPrimary, CCO_FIRST);
+    
+    @call BuilderApp::MSG_GEN_SET_ATTRS(GA_TARGETABLE, 0);
+
+    @call BuilderApp::MSG_GEN_REPLACE_VIS_MONIKER_OPTR(@BuilderTextMoniker,
+					     VUM_DELAYED_VIA_APP_QUEUE);
+
+/*
+    @call BuilderApp::MSG_GEN_USE_VIS_MONIKER(@BuilderMoniker,
+					      VUM_DELAYED_VIA_APP_QUEUE);
+*/
+
+/*
+    @call BuilderApp::MSG_GEN_USE_VIS_MONIKER(
+			OptrToChunk(@BuilderMonikerList), 
+			VUM_DELAYED_VIA_APP_QUEUE);
+*/
+
+
+    @callsuper();
+    
+}       /* End of MSG_META_ATTACH.      */
+
+/*********************************************************************
+ *                      OpenApplication
+ *********************************************************************
+ * SYNOPSIS:    do some initialization
+ * CALLED BY:       
+ * RETURN:
+ * SIDE EFFECTS:
+ * STRATEGY:
+ * REVISION HISTORY:
+ *      Name    Date            Description                          
+ *      ----    ----            -----------                          
+ *      jimmy   6/20/94         Initial version                      
+ * 
+ *********************************************************************/
+
+@method BuilderProcessClass,    MSG_GEN_PROCESS_OPEN_APPLICATION
+{
+    RTaskHan    sysModule;
+
+    @call BuilderPrimary::MSG_GEN_SET_USABLE(VUM_DELAYED_VIA_APP_QUEUE);
+    
+    @send BuilderApp::MSG_META_GCN_LIST_ADD
+	(@BuilderPrimary, GAGCNLT_WINDOWS, MANUFACTURER_ID_GEOWORKS);
+
+    @send BuilderApp::MSG_META_GCN_LIST_ADD
+	(@FloatingToolbox, GAGCNLT_WINDOWS, MANUFACTURER_ID_GEOWORKS);
+
+    @send BuilderApp::MSG_META_GCN_LIST_ADD
+	(@BuilderInterpreter, MGCNLT_ACTIVE_LIST, MANUFACTURER_ID_GEOWORKS);
+
+    @send BuilderApp::MSG_META_GCN_LIST_ADD
+	(@BuilderShell, MGCNLT_ACTIVE_LIST, MANUFACTURER_ID_GEOWORKS);
+    
+    @send BuilderApp::MSG_META_GCN_LIST_ADD
+	(@BuilderEditControl, GAGCNLT_SELF_LOAD_OPTIONS, MANUFACTURER_ID_GEOWORKS);
+    
+    buildTask = ProgAllocTask(@BuilderInterpreter, NullHandle);
+    ProgTurboChargeFido(buildTask);
+    @call BuilderInterpreter::MSG_INTERP_SET_STATE(buildTask);
+    sysModule = RunLoadModule
+	(buildTask, _TEXT("~U\\BASIC\\G_SYSTM"), GeodeGetAppObject(0));
+    @call BuilderInterpreter::MSG_INTERP_SET_SYSTEM_MODULE(sysModule);
+
+    dirty = FALSE;
+    quitting = FALSE;
+    viewTask = NullHandle;
+
+    @callsuper();
+
+    /* Used for gstrings, other ui jazz */
+    uiBlock = MemAllocLMem(LMEM_TYPE_GENERAL,0);
+
+    /* Some static information about the builder that
+       we provide to the debug handle owned by each
+       runtask we create.
+    */
+
+    bugInfo.BBI_destObject    = @BuilderShell;
+    bugInfo.BBI_destMessage   = MSG_BS_ABOUT_TO_BREAK;
+    bugInfo.BBI_finishMessage = MSG_BS_DONE;
+
+    bascoTask = BascoAllocTask(ProgGetVMFile(buildTask), &bugInfo);
+    BugSetBuilderState(BascoBugGetBugHandleFromCTask(bascoTask), BS_STOPPED);
+
+    @call SaveFileText::MSG_VIS_TEXT_SET_MAX_LENGTH(12);
+    @call Editor::MSG_VIS_TEXT_CLEAR_ALL_TABS(TEXT_ADDRESS_PAST_END,0);
+    @call Editor::MSG_VIS_TEXT_SET_LEFT_MARGIN(0,TEXT_ADDRESS_PAST_END,0);
+    @call Editor::MSG_VIS_TEXT_SET_PARA_MARGIN(0,TEXT_ADDRESS_PAST_END,0);
+
+    @call Editor::MSG_VIS_TEXT_SET_DEFAULT_TABS(192,TEXT_ADDRESS_PAST_END,0);
+
+@ifdef DO_DBCS
+#define VTDF_JSYS (VTDF_CENTURY_SCHOOLBOOK+1)
+#define VTDF_KANJI_HON_MINCHO (VTDF_JSYS+1)
+{
+    /*
+     * Use FID_PIZZA_KANJI + 1
+     */
+    @call Editor::MSG_VIS_TEXT_SET_FONT_ID(0xc01, TEXT_ADDRESS_PAST_END, 0);
+}
+@endif
+
+    GCNListAdd(@BuilderApp, MANUFACTURER_ID_GEOWORKS, GCNSLT_APPLICATION);
+
+    @call BuilderApp::MSG_GEN_SET_ATTRS(GA_TARGETABLE,0);
+
+    @call EditorView::MSG_GEN_SET_NOT_USABLE(VUM_NOW);
+    @call EditorView::MSG_GEN_SET_ATTRS(GA_TARGETABLE,0);
+    @call EditorView::MSG_GEN_SET_USABLE(VUM_NOW);
+
+    /* lauch the viewer on start up so its always running */
+    GandalfLaunchViewerApp();
+
+    @send , forceQueue BuilderShell::MSG_BS_NEW(FALSE);
+
+    UpdateLastLoadedButton();
+}
+
+void
+UpdateLastLoadedButton()
+{
+    TCHAR fPath[PATH_BUFFER_SIZE + 5] = _TEXT("Open ");
+    word dummy;
+
+    /*
+     * put the name of the last loaded BAS file into the file menu
+     */
+    if (!InitFileReadStringBuffer(GANDALF_CATEGORY, LAST_LOAD_KEY, &fPath[5],
+				  PATH_BUFFER_SIZE, &dummy)) {
+	@call LastBASLoadedButton::MSG_GEN_REPLACE_VIS_MONIKER_TEXT(fPath, VUM_NOW);
+    }
+}
+
+
+
+/*********************************************************************
+ *                      RunDefaultModuleInViewer
+ *********************************************************************
+ * SYNOPSIS:    When the viewer gets initiated, tell it to load
+ *              the system module or whatever is specified in the .ini file.
+ *              It is done here instead of in the view as the viewer doesn't
+ *              really know when things are ready to roll (it sends this
+ *              message back to us.)
+ * CALLED BY:   Handshake 
+ * PASS:        viewInterp              - optr
+ *              viewTask                - MemHandle
+ * RETURN:      nada
+ * SIDE EFFECTS:
+ * STRATEGY:
+ *              See if they specify a module in the .ini file, else
+ *              use the system module.
+ *
+ *              this code has been moved to view where it belongs
+ *
+ * REVISION HISTORY:
+ *      Name    Date            Description                          
+ *      ----    ----            -----------                          
+ *      RON     9/ 7/95 Initial version
+ * 
+ *********************************************************************/
+@if 0
+void
+RunDefaultModuleInView(optr viewInterp, MemHandle viewTask)
+{
+    MemHandle   ptaskHan;
+    RTaskHan    rtaskHan;
+    TCHAR *modName = _TEXT("~U\\BASIC\\SYSTEM");
+    
+    optr        app;
+
+    app = GeodeGetAppObject(0);
+    
+    
+    ptaskHan = @call viewInterp::MSG_INTERP_GET_STATE();
+    rtaskHan = RunLoadModule(ptaskHan, modName, app);
+    
+    @call viewInterp::MSG_INTERP_SET_SYSTEM_MODULE(rtaskHan);
+}
+@endif
+
+
+
+/***********************************************************************
+ *              MSG_LA_STOP_COMPLETE for BuilderAppClass
+ ***********************************************************************
+ * SYNOPSIS:    turn back on the Run trigger now
+ * PARAMETERS:  
+ * SIDE EFFECTS:
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *      Name    Date            Description
+ *      ----    ----            -----------
+ *      jimmy   3/26/96         Initial Revision
+ *
+ ***********************************************************************/
+@method BuilderAppClass, MSG_LA_STOP_COMPLETE
+{
+    stopping = FALSE;
+    @call RunTrigger::MSG_GEN_SET_ENABLED(VUM_NOW);
+    return NullOptr;            /* what's the return supposed to be? */
+}       /* End of MSG_LA_STOP_COMPLETE. */
+
+
+/*********************************************************************
+ *                        Handshake
+ *********************************************************************
+ * SYNOPSIS:    The interpreter optr is passed back from our viewer app
+ *              (after we called it from MSG_BS_RUN (mainshel.goc)
+ *
+ * CALLED BY:   IACP - MSG_LA_HANDSHAKE
+ * PASS:        optr callerObject
+ * RETURN:      nothing
+ * SIDE EFFECTS:none
+ * STRATEGY:     Do some interpreter initialization also..
+ *
+ * REVISION HISTORY:
+ *      Name    Date            Description                          
+ *      ----    ----            -----------                          
+ *      ron     10/20/94        Initial version                      
+ * 
+ *********************************************************************/
+
+@method BuilderAppClass, MSG_LA_HANDSHAKE
+{
+
+    viewInterp = callerObject;
+    pself->BAI_viewerAppHandle 
+	= @call viewInterp::MSG_LVI_GET_PROCESS_HANDLE();
+
+    viewApp = @call viewInterp::MSG_LVI_GET_CONTAINER_APP();
+    viewTask = @call viewInterp::MSG_LVI_INIT_PROGRAM(ProgGetVMFile(buildTask));
+}
+
+@method BuilderAppClass, MSG_BA_GET_VIEWER_TOKEN {
+    return pself->BAI_token;
+}
+
+
+@method BuilderAppClass, MSG_BA_SET_VIEWER_TOKEN {
+    pself->BAI_token = token;
+}
+
+
+@method BuilderAppClass, MSG_NOTIFY_APP_EXITED {
+    if (appExited == pself->BAI_viewerAppHandle)
+	@call BuilderShell::MSG_BS_DONE_PART_TWO();
+
+}
+
+
+/* Use this to make sure user doesn't close window or hit F3
+   when not allowed
+*/
+#define IC_YES 6
+#define IC_NO 7
+@method BuilderAppClass, MSG_META_QUIT 
+{
+    if (!(@call FileMenu::MSG_GEN_GET_ENABLED())) {
+	return;
+    }
+
+    @callsuper();
+}
+
+
+@method BuilderProcessClass, MSG_META_QUIT_PROCESS
+{
+    word    save;
+    int     dirt = FALSE;
+
+    /* if the viewTask is NullHandle we never even initialized */
+    if ((viewTask != NullHandle) &&
+	(dirty || @call Editor::MSG_ET_IS_CODE_DIRTY(FALSE)))
+    {
+	dirt = TRUE;
+    }
+
+    
+    if (quitLevel != QL_BEFORE_UI || !dirt)
+    {
+	@callsuper();
+	return;
+    }
+
+    save = UserStandardDialog( (char*) 0,
+			      (char*) 0,
+			      (char*) 0,
+			      (char*) 0,
+		       _TEXT("Would you like to save before exiting?"),
+		       (CDT_ERROR << CDBF_DIALOG_TYPE_OFFSET) |
+		       (GIT_AFFIRMATION << CDBF_INTERACTION_TYPE_OFFSET));
+
+    if (save == IC_YES) 
+    {
+	quitting = TRUE;
+	@call SaveInteraction::MSG_GEN_INTERACTION_INITIATE();
+	@call process::MSG_META_QUIT_ACK(quitLevel, TRUE);
+    }
+    else
+    {
+	@callsuper();
+    }
+}
+
+@method BuilderProcessClass, MSG_GEN_PROCESS_CLOSE_APPLICATION
+{
+    MemHandle retval;
+    EventHandle event;
+    IACPConnection iacpConnectionToken;
+
+
+    iacpConnectionToken = @call BuilderApp::MSG_BA_GET_VIEWER_TOKEN();
+
+    /* shut down the viewer app */
+    if (iacpConnectionToken) {
+	IACPShutdown(iacpConnectionToken, NullOptr);
+    }
+
+    if (viewApp != NullOptr) 
+    {
+	@send , forceQueue viewApp::MSG_LA_END_PROGRAM();
+    }
+
+    BascoDestroyTask(bascoTask);
+    bascoTask = NullHandle;
+    MemFree(uiBlock);
+
+    event = @record BuilderApp::MSG_BA_END_PROGRAM();
+
+    @send process::MSG_META_OBJ_FLUSH_INPUT_QUEUE(event, 0, 
+						 HandleOf(@BuilderApp));
+
+    retval = @callsuper();
+    return retval;
+}
+
+
+/*********************************************************************
+ *                      EndProgram
+ *********************************************************************
+ * SYNOPSIS:    Detach any program tasks...
+ * CALLED BY:   
+ * PASS:
+ * RETURN:
+ * SIDE EFFECTS:
+ * STRATEGY:
+ * REVISION HISTORY:
+ *      Name    Date            Description                          
+ *      ----    ----            -----------                          
+ *      roy      2/10/95        Initial version                      
+ * 
+ *********************************************************************/
+@method BuilderAppClass, MSG_BA_END_PROGRAM {
+    
+    ProgDestroyTask(buildTask);
+}
+
+
+
+/*********************************************************************
+ *                      BuilderApp - MSG_META_ATTACH
+ *********************************************************************
+ * SYNOPSIS:    Installs the relevant moniker lists so this application
+ *              can get a valid icon installed by the file manager.
+ * CALLED BY:   
+ * PASS:
+ * RETURN:
+ * SIDE EFFECTS:
+ * STRATEGY:
+ * REVISION HISTORY:
+ *      Name    Date            Description                          
+ *      ----    ----            -----------                          
+ *      martin  1998/8/23       Initial version
+ * 
+ *********************************************************************/
+/*
+@method BuilderAppClass, MSG_META_INITIALIZE {
+}
+*/
+
+/*********************************************************************
+ *                      META_DETACH
+ *********************************************************************
+ * SYNOPSIS:    Shutdown...
+ * CALLED BY:   
+ * PASS:
+ * RETURN:
+ * SIDE EFFECTS:
+ * STRATEGY:    FIXME: Do I even need this anymore? RG 2/10/95
+ * REVISION HISTORY:
+ *      Name    Date            Description                          
+ *      ----    ----            -----------                          
+ *      roy     11/ 8/94                Initial version                      
+ * 
+ *********************************************************************/
+@method BuilderAppClass, MSG_META_DETACH {
+    MemHandle tempBugHan;
+
+    GCNListRemove(@BuilderApp, MANUFACTURER_ID_GEOWORKS,
+		  GCNSLT_APPLICATION);
+
+    /* if we get a QUIT while we are running then this must have been
+     * done through the express menu, so tell lview to stop before doing
+     * the detach, so we can exit synchronously...
+     * first we check to see if we have either already started a STOP but
+     * not completed it OR we are running have not yet told lview to STOP.
+     * if neither of these cases if true, we can just continue as normal
+     */
+    tempBugHan = NullHandle;
+    if (bascoTask != NullHandle) {
+	tempBugHan = BascoBugGetBugHandleFromCTask(bascoTask);
+    }
+    if  ((tempBugHan != NullHandle) && 
+	 ((BugGetBuilderState(tempBugHan)) != BS_STOPPED || stopping))
+    {
+	/* ok, if stopping is FALSE, we need to tell lview to STOP */
+	if (stopping == FALSE)
+	{
+	    @call BuilderShell::MSG_BS_STOP();
+	}
+	/* now just continue ignoring DETACHes until stopping == FALSE and
+	 * the builder state == BS_STOPPED as that will indicate we are truly
+	 * done - we do this be just sending ourselved another DETACH and
+	 * letting the above if statement see whether we are ready or not
+	 */
+	@send , forceQueue oself::MSG_META_DETACH(callerID, caller);
+	return;
+    }
+    @callsuper();
+}
+
+@method BuilderProcessClass, MSG_GEN_PROCESS_CREATE_NEW_STATE_FILE
+{
+    return NullHandle;
+}
+
+
+/***********************************************************************
+ *              MSG_LA_GET_IMPLIED_WINDOW for BuilderAppClass
+ ***********************************************************************
+ * SYNOPSIS:    returns the last window that the system told us
+ *              was the implied window. (used in conjuntion with Bent
+ *              window to avoid some prepassive problems)
+ * PARAMETERS:  none
+ * SIDE EFFECTS:none
+ *
+ * STRATEGY:    nonen
+ * REVISION HISTORY:
+ *      Name    Date            Description
+ *      ----    ----            -----------
+ *      RON     1/16/96         Initial Revision
+ *
+ ***********************************************************************/
+@method BuilderAppClass, MSG_LA_GET_IMPLIED_WINDOW
+{
+    return pself->LAI_impliedWindow;
+}       /* End of MSG_LA_GET_IMPLIED_WINDOW.    */
+
+@method BuilderAppClass, MSG_META_IMPLIED_WIN_CHANGE
+{
+    /* save last window we were in */
+    optr implied = ECPSelf(pself)->LAI_impliedWindow;
+    void *hint = NULL;
+
+/*    pself->LAI_impliedWindow = inputObject;     z! */
+    @callsuper();
+    /*
+     * If it was a special GenView, then release the mouse as we had
+     * grabbed it away.
+     */
+    /*
+     * FIXME:  A common function for determining this woudl be nice.
+     * This was copied out of MSG_META_PTR
+     */
+    
+    
+    /* implied can = NullOptr win moving windows around ... */
+    if (implied != NullOptr) {
+    
+	ObjLockObjBlock(OptrToHandle(implied));
+    
+	if (ObjIsObjectInClass(implied, (ClassStruct *) &GenViewClass))
+	{
+	    hint = ObjVarFindData(implied, HINT_NEVER_ADOPT_MENUS);
+	    if (hint != NULL) 
+	    {
+		optr bentWin;
+		
+		bentWin = @call implied::MSG_GEN_GUP_FIND_OBJECT_OF_CLASS(&BentWindowClass);
+		if (bentWin == NULL)
+		{
+		    hint = NULL;
+		} 
+		else
+		{
+
+		    @call bentWin::MSG_VIS_RELEASE_MOUSE();
+		    
+		    
+		}
+		
+	    }
+	}
+	MemUnlock(OptrToHandle(implied));
+    }
+    
+}       
+
+
+/***********************************************************************
+ *              MSG_META_PTR for BuilderAppClass
+ ***********************************************************************
+ * SYNOPSIS:    Make sure pointer events don't get swallowed by
+ *              text objects
+ * PARAMETERS:  MouseReturnParams       *retval
+ *              sword                   xPosition, yPosition
+ *              word                    inputState
+ * SIDE EFFECTS:
+ *
+ * STRATEGY:    If the implied window is a GenView, then most likely
+ *              it is a Text object or something that really doesn't want
+ *              the mouse. (hopefully the rest of builder should be okay).
+ *
+ *              I subclass the messages here to Get around VisContentMouseEvent
+ *              which will send the events off to the text object because
+ *              the app thinks the view of the text object is the implied grab.
+ *
+ * REVISION HISTORY:
+ *      Name    Date            Description
+ *      ----    ----            -----------
+ *      RON     2/12/96         Initial Revision
+ *
+ ***********************************************************************/
+@method BuilderAppClass, MSG_META_PTR
+
+
+@if 0
+/*
+ * I thought these would be needed.  I was wrong, they appear to break
+ * resizing text.
+ */
+			MSG_META_START_SELECT, 
+			MSG_META_DRAG_SELECT,
+			MSG_META_END_SELECT
+
+@endif
+
+@if 0
+/*
+ * VisContentClass, subclasses all these when doing the impliedgrab
+ * stuff, but it doesn't look like we need to worry about it.
+ */
+			MSG_META_DRAG_FEATURES,
+			MSG_META_START_MOVE_COPY,
+			MSG_META_START_FEATURES,
+			MSG_META_START_OTHER,
+			MSG_META_DRAG_MOVE_COPY,
+			MSG_META_DRAG_OTHER,
+			MSG_META_END_MOVE_COPY,
+			MSG_META_END_FEATURES,
+			MSG_META_END_OTHER
+
+@endif
+{
+    optr implied = ECPSelf(pself)->LAI_impliedWindow;
+    void *hint = NULL;
+    
+    
+    /*
+     * If the implied window is a GenView and a has HINT_UNUSED_G then
+     * send the mouse ptr to Primary/Dialog it is under, not the view.
+     * [note this a HACK to get around problems with the view created
+     * by text objects.
+     */
+
+    /*
+     * If the builder changes to not depend on BGadget then somehow mark the
+     * view of text object in BGadget. (perhaps add a Bent hint or Gen or
+     * meta hint.
+     */
+    /* implied can = NullOptr win moving windows around ... */
+    if (implied != NullOptr) {
+    
+	ObjLockObjBlock(OptrToHandle(implied));
+    
+	if (ObjIsObjectInClass(implied, (ClassStruct *) &GenViewClass))
+	{
+	    hint = ObjVarFindData(implied, HINT_NEVER_ADOPT_MENUS);
+	    if (hint != NULL) 
+	    {
+		optr bentWin;
+		
+		bentWin = @call implied::MSG_GEN_GUP_FIND_OBJECT_OF_CLASS(&BentWindowClass);
+		if (bentWin == NULL)
+		{
+		    hint = NULL;
+		} 
+		else
+		{
+
+
+
+    /*
+     * If you don't send the MSG_META_PTR then the outline won't be draw
+     * while inside of the text.
+     */
+		    Rectangle parentBounds;
+		    word foo;
+
+		    
+		    /*
+		     * translate x,y for the window.
+		     */
+		    WindowHandle parentWin;
+		    parentWin = @call implied::MSG_VIS_QUERY_WINDOW();
+		    if (parentWin == NullOptr) 
+		    {
+			@call implied::MSG_VIS_RELEASE_MOUSE();
+		    }
+		    else
+		    {
+			
+			WinGetWinScreenBounds(parentWin, &parentBounds);
+			foo = message;
+		    
+			@call implied::MSG_VIS_RELEASE_MOUSE();
+			@call bentWin::MSG_VIS_GRAB_MOUSE();
+
+			@call bentWin::{MSG_UI_BUTTON} foo(retVal,
+					   xPosition - parentBounds.R_left,
+					    yPosition - parentBounds.R_top,
+						inputState);
+
+			/*
+			 * Now, set the pointer image as we don't let the
+			 * superclass do it for us.
+			 */
+			if (retVal->flags & MRF_SET_POINTER_IMAGE) 
+			{
+			    WinSetPtrImage(parentWin, PIL_GADGET,
+					   retVal->ptrImage);
+			}
+		    }
+		    /* Release the mouse when the implied window changes.
+		     * (BuilderApp::MSG_META_IMPLIED_WIN_CHANGE)
+		     */
+		    
+		}
+		
+	    }
+	}
+	MemUnlock(OptrToHandle(implied));
+
+    }
+
+    
+    if (hint == NULL) 
+    {
+	/*
+	 * Make sure the active grab is correct.
+	 */
+	/*      @call implied::MSG_VIS_GRAB_MOUSE();*/
+
+	@callsuper();
+    }
+			   
+}       /* End of MSG_META_PTR. */
+
+@ifdef RESPONDER
+/*********************************************************************
+ *                      BuilderAppMetaKbdChar
+ *********************************************************************
+ * SYNOPSIS:    Checks keyboard input for adding components
+ * CALLED BY:   MSG_META_KBD_CHAR
+ * PASS:        word    character=cx
+ *              word    flags = dx
+ *              word    state = bp
+ * RETURN:      nada
+ * SIDE EFFECTS:
+ * STRATEGY:
+ * REVISION HISTORY:
+ *      Name    Date            Description                          
+ *      ----    ----            -----------                          
+ *      ron      3/24/95        Initial version                      
+ * 
+ *********************************************************************/
+
+@method BuilderAppClass, MSG_META_KBD_CHAR
+{
+    optr comp, parent;
+    int add = 0;
+    int id;
+    
+	
+    switch (character)
+    {
+    case C_ONE: /* entry */
+	id = 2;
+	add = 1;
+	break;
+    case C_TWO: /* frame */
+	id = 6;
+	add = 1;
+	break;
+    case C_SEVEN: /* trigger */
+	id = 15;        
+	add = 1;
+	break;
+    case C_SMALL_O:
+	if (!(flags & CF_FIRST_PRESS)) break;
+	comp = @call BuilderInterpreter::MSG_BENT_MANAGER_GET_SELECTED_COMPONENT();
+	ObjLockObjBlock(OptrToHandle(comp));
+	parent = ObjLinkFindParent(comp, word_offsetof(EntBase, Ent_offset),
+				   word_offsetof(EntInstance, EI_link));
+	
+	MemUnlock(OptrToHandle(comp));
+	if (parent == NullOptr) break;
+
+	@call BuilderInterpreter::MSG_BENT_MANAGER_SELECT_COMPONENT(parent);
+	
+	/* Add the first tool to the selected component */
+	break;
+    case C_SMALL_R:
+	@send RunTrigger::MSG_GEN_TRIGGER_SEND_ACTION(0);
+	break;
+    default:
+	@callsuper();
+    }
+    
+    if (add && (flags & CF_FIRST_PRESS)) 
+    {
+	comp = @call BuilderInterpreter::MSG_BENT_MANAGER_GET_SELECTED_COMPONENT();
+	if (comp != NullOptr)
+	{
+	}
+	
+    }
+}
+@endif
+
+
+
+

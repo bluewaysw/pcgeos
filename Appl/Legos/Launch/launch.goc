@@ -1,0 +1,142 @@
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+	Copyright (c) Geoworks 1995 -- All Rights Reserved
+
+PROJECT:        L E G O S	
+MODULE:		
+FILE:		launch.goc
+
+AUTHOR:		Roy Goldman, Jun 22, 1995
+
+ROUTINES:
+	Name			Description
+	----			-----------
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	roy	 6/22/1995	Initial version.
+	martin	 5/21/1998	Modernized to use InterpClass
+
+DESCRIPTION:
+	
+        This app launches a compiled basic file when that file
+	is double-clicked...
+
+	$Revision:   1.1  $
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+
+@include <stdapp.goh>
+@include <alb.goh>
+@include <Legos/basrun.goh>
+#include <Legos/basrun.h>
+// @include <Legos/legosapp.goh>
+#include <Ansi/string.h>
+
+@class LaunchProcessClass, GenProcessClass;
+@endc
+
+@classdecl LaunchProcessClass;
+
+@start AppResource;
+
+@object GenApplicationClass /*LegosAppClass*/ LaunchApp =
+{
+    gcnList(MANUFACTURER_ID_GEOWORKS, MGCNLT_ACTIVE_LIST) = @Interpreter;
+    GI_visMoniker = list { @monikerText }
+    HINT_DEFAULT_TARGET;
+}
+
+@visMoniker monikerText = "NewBASIC Application";
+
+@end AppResource;
+
+
+@start Interface;
+
+@object InterpClass Interpreter = {
+}
+
+@end Interface;
+
+@method LaunchProcessClass, MSG_GEN_PROCESS_OPEN_APPLICATION
+{
+    int	    		i;
+    MemHandle		progHan;
+    RTaskHan		rtaskHan;
+    AppLaunchBlock*    	alb;
+    TCHAR        	fullPath[PATH_BUFFER_SIZE];
+    TCHAR*       	fullPathP;
+    TCHAR        	filename[PATH_BUFFER_SIZE];
+
+    @callsuper();
+
+   /*
+    * First combine ALB_path + ALB_dataFile.
+    */
+    alb = MemLock(launchBlock);
+    strcpy(filename, alb->ALB_path);
+    strcat(filename, "\\");
+    strcat(filename, alb->ALB_dataFile);
+
+    fullPathP = fullPath;
+    if (alb->ALB_dataFile[0] != '\000') {
+	FileConstructFullPath(&fullPathP, PATH_BUFFER_SIZE,
+			      alb->ALB_diskHandle,
+			      filename,
+			      TRUE);
+    } else {
+	FileConstructFullPath(&fullPathP, PATH_BUFFER_SIZE,
+			      SP_DOCUMENT,
+			      "EMPTY.BC",
+			      TRUE);
+    }
+    MemUnlock(launchBlock);
+
+    /*
+     * find and remove the trailing .BC -- fido expects no suffix
+     */
+    for (i = LocalStringLength(fullPath)-1; i > 0; i--) {
+	if (fullPath[i] == '.') {
+	    fullPath[i] = 0;
+	    break;
+	}
+    }
+
+    /*
+     * load and run the beasty
+     */
+    progHan =  ProgAllocTask(@Interpreter, NullHandle);
+    ProgTurboChargeFido(progHan);
+    @call Interpreter::MSG_INTERP_SET_STATE(progHan);
+    rtaskHan = RunLoadModule(progHan, fullPath, NULL);
+    @call Interpreter::MSG_INTERP_SET_SYSTEM_MODULE(rtaskHan);
+
+    /*
+     * if it loaded, make it appear on screen
+     */
+    if (rtaskHan != NullHandle) {
+    	RunCallFunction(rtaskHan, _TEXT("module_show"), NULL, NULL, NULL);
+    }
+
+}
+
+@method LaunchProcessClass, MSG_GEN_PROCESS_CLOSE_APPLICATION
+{
+    MemHandle 	retval;
+    EventHandle event;
+    MemHandle   progHan  = @call Interpreter::MSG_INTERP_GET_STATE();
+
+//    RTaskHan	rtaskHan = @call Interpreter::MSG_INTERP_GET_SYSTEM_MODULE();
+//    RunUnloadModule(NULL, rtaskHan, TRUE, MSG_INTERP_UNLOAD_COMPLETE);
+
+//    event = @record EntClass::MSG_ENT_DESTROY();
+//    @call LaunchApp::MSG_GEN_SEND_TO_CHILDREN(event);  /* frees event */
+
+    ProgDestroyTask(progHan);
+
+    retval = @callsuper();
+    return retval;
+}
+

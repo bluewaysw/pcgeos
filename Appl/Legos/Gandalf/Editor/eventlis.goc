@@ -1,0 +1,264 @@
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+	Copyright (c) Geoworks 1995 -- All Rights Reserved
+
+PROJECT:        
+MODULE:         
+FILE:           eventlist.goc
+
+AUTHOR:         Ronald Braunstein, Feb 27, 1995
+
+ROUTINES:
+	Name                    Description
+	----                    -----------
+
+REVISION HISTORY:
+	Name    Date            Description
+	----    ----            -----------
+	ron        2/27/95           Initial version.
+
+DESCRIPTION:
+	Routines for dealing with the event list.
+
+	$Id: eventlis.goc,v 1.2 98/10/13 22:17:49 martin Exp $
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+@include <gandalf.goh>
+@include <Legos/basco.goh>
+@include <Legos/basrun.goh>
+@include <Legos/bent.goh>
+@include "Editor/editorh.goh"
+@classdecl EventListClass;
+
+#define MAX_EVENT_NAME_LENGTH	128
+
+/*********************************************************************
+ *			 MSG_EVENT_LIST_SHOW_EVENTS
+ *********************************************************************
+ * SYNOPSIS: 	Initializes list for a given component.
+ * CALLED BY:	global
+ * PASS:	optr	component	# component to display events of
+ * RETURN:	nothing
+ * SIDE EFFECTS:
+ * STRATEGY:	Ask the component for its events and display them
+ *		This keeps a heap block around (unlocked) and should
+ *		(but does not) free it when the list dies.
+ * REVISION HISTORY:
+ *	Name	Date		Description			     
+ *	----	----		-----------			     
+ *	ron	 2/27/95	Initial version			     
+ * 
+ *********************************************************************/
+
+@method EventListClass, MSG_EVENT_LIST_SHOW_EVENTS 
+{
+    MemHandle	bufHan;
+    BentEventTypicalDescriptionStruct *buffer, *ptr;
+    int numArgs;
+    int numEvents = 0;
+    
+
+    bufHan = pself->ELI_eventBlock;
+    pself->ELI_component = component;	/* save for later */
+    if (bufHan == NullHandle) 
+    {
+	bufHan = MemAlloc(4096, HF_SWAPABLE | HF_SHARABLE, HAF_LOCK);
+	pself->ELI_eventBlock = bufHan;
+    } else 
+    {
+	MemLock(bufHan);
+    }
+    
+    buffer = MemDeref(bufHan);
+
+    ptr = @call component::MSG_BENT_GET_EVENTS(buffer);
+    EC_BOUNDS(ptr);
+
+    while (buffer != ptr) 
+    {
+	EC_BOUNDS(buffer);
+	numEvents++;
+	numArgs = buffer[0].BETDS_desc.BEDS_numArgs;
+	buffer = (BentEventTypicalDescriptionStruct *) &buffer[0].BETDS_args[numArgs];
+    }
+
+    @call self::MSG_GEN_DYNAMIC_LIST_INITIALIZE(numEvents);
+    MemUnlock(bufHan);
+}    
+	
+/*********************************************************************
+ *			MSG_GEN_DYNAMIC_LIST_QUERY_ITEM_MONIKER
+ *********************************************************************
+ * SYNOPSIS: 	Displays monikers for list items.
+ * CALLED BY:	List Init
+ * PASS:	optr	list		# self
+ *		word	item		# selection
+ * RETURN:	nothing
+ * SIDE EFFECTS:
+ * STRATEGY:
+ * REVISION HISTORY:
+ *	Name	Date		Description			     
+ *	----	----		-----------			     
+ *	ron	 2/27/95	Initial version			     
+ * 
+ *********************************************************************/
+
+@method EventListClass, MSG_GEN_DYNAMIC_LIST_QUERY_ITEM_MONIKER
+{
+    MemHandle	bufHan;
+    BentEventTypicalDescriptionStruct *buffer, *ptr;
+    int numEvents = 0;
+    int numArgs;
+
+    bufHan = pself->ELI_eventBlock;
+    buffer = MemLock(bufHan);
+
+    while (numEvents != item) 
+    {
+	numArgs = buffer[0].BETDS_desc.BEDS_numArgs;
+	buffer = (BentEventTypicalDescriptionStruct *) &buffer[0].BETDS_args[numArgs];
+	numEvents++;
+    }
+    @call self::MSG_GEN_DYNAMIC_LIST_REPLACE_ITEM_TEXT(item,buffer[0].BETDS_desc.BEDS_eventName);
+
+    pself = ObjDerefGen(oself);
+    MemUnlock(pself->ELI_eventBlock);
+    
+}
+
+/*********************************************************************
+ *			MSG_EVENT_LIST_CONSTRUCT_ROUTINE_NAME
+ *********************************************************************
+ * SYNOPSIS: 	Create the routine name for the item.
+ * CALLED BY:	global
+ * PASS:	char *	name		# buffer to fill in
+ *		word	item		# Which list element
+ * RETURN:	nothing
+ * SIDE EFFECTS: buffer filled in
+ * STRATEGY:	add $(proto)_ before the routine name
+ * REVISION HISTORY:
+ *	Name	Date		Description			     
+ *	----	----		-----------			     
+ *	ron	 2/27/95	Initial version			     
+ * 
+ *********************************************************************/
+
+@method EventListClass, MSG_EVENT_LIST_CONSTRUCT_ROUTINE_NAME
+{
+    
+    MemHandle	bufHan;
+    BentEventTypicalDescriptionStruct *buffer, *ptr;
+    int numEvents = 0;
+    int numArgs;
+    ComponentData data;
+    int len;
+    RunHeapInfo *rhi;
+    optr component;
+    
+
+    bufHan = pself->ELI_eventBlock;
+    buffer = MemLock(bufHan);
+
+    while (numEvents != item) 
+    {
+	numArgs = buffer[0].BETDS_desc.BEDS_numArgs;
+	buffer = (BentEventTypicalDescriptionStruct *) &buffer[0].BETDS_args[numArgs];
+	numEvents++;
+       
+    }
+
+    component = pself->ELI_component;
+    rhi = RunComponentLockHeap(ObjLockObjBlock(OptrToHandle(component)));
+    @call pself->ELI_component::MSG_ENT_GET_PROPERTY(rhi, &data, 
+						     _TEXT("proto"));
+    RunComponentUnlockHeap(MemDeref(OptrToHandle(component)));
+    MemUnlock(OptrToHandle(component));
+    
+    RunComponentCopyString(name, data.CD_data.LD_string, component);
+
+    len = strlen(name);
+    name[len]=C_UNDERSCORE;
+    len++;
+    strcpy (&name[len], buffer->BETDS_desc.BEDS_eventName);
+    EC_ERROR_IF(strlen(name) >= MAX_EVENT_NAME_LENGTH, -1);
+
+    pself = ObjDerefGen(oself);
+    MemUnlock(pself->ELI_eventBlock);
+}
+
+    
+/*********************************************************************
+ *			 MSG_EVENT_LIST_APPLY_MSG
+ *********************************************************************
+ * SYNOPSIS: 	Shows current event in code window
+ * CALLED BY:	apply message (single press, or keyboard navigation)
+ * PASS:	word	selection
+ *		word	numSelections
+ * RETURN:	nada
+ * SIDE EFFECTS:
+ *		Creates routine if not alread in interpreter
+ * STRATEGY:
+ * REVISION HISTORY:
+ *	Name	Date		Description			     
+ *	----	----		-----------			     
+ *	ron	 2/27/95	Initial version			     
+ * 
+ *********************************************************************/
+
+@method EventListClass, MSG_EVENT_LIST_APPLY_MSG 
+{
+    TCHAR routine[MAX_EVENT_NAME_LENGTH];
+    int  f, numHidden;
+    BentEventTypicalDescriptionStruct *eventBlockPtr;
+    MemHandle	bufHan;
+    
+
+    /*
+     * We're about to insert code, so make sure what's currently in the 
+     * editor gets downloaded.  dl 11/9/95
+     */
+    if (@call Editor::MSG_ET_UPDATE_CODE_IF_NECESSARY(TRUE))
+    {
+	/* hit an error, so stay at old routine */
+	return;
+    }
+    
+    /*
+     * Check to see if the function is already defined.
+     */
+
+    /* First get the name of the routine. */
+    @call self::MSG_EVENT_LIST_CONSTRUCT_ROUTINE_NAME( routine, selection);
+
+    /*
+     * If so, display it.
+     */
+    f = EditGetRoutineIndex(bascoTask, routine);
+    if (f != -1) 
+    {
+	/* deal with the fact that there are hidden routines... */
+	numHidden = @call RoutineList::MSG_RL_GET_NUM_HIDDEN();
+	@call RoutineList::MSG_RL_SHOW_ROUTINE_FROM_LIST(f-numHidden,1,0);
+    } 
+    else
+    {
+	int numArgs;
+	int numEvents = 0;
+	bufHan = pself->ELI_eventBlock;
+	eventBlockPtr = MemLock(bufHan);
+
+	while (numEvents != selection) 
+	{
+	    numArgs = eventBlockPtr[0].BETDS_desc.BEDS_numArgs;
+	    eventBlockPtr = (BentEventTypicalDescriptionStruct *) &(eventBlockPtr->BETDS_args[numArgs]);
+	    numEvents++;
+	}
+	pself = ObjDerefGen(oself);
+	@call Editor::MSG_ET_ADD_NEW_EVENT_HANDLER(eventBlockPtr, pself->ELI_component, (TCHAR *) NULL, (TCHAR *) NULL);
+	MemUnlock(bufHan);
+	
+	@call RoutineList::MSG_GEN_ITEM_GROUP_SET_NONE_SELECTED(0);
+    }
+
+    
+}

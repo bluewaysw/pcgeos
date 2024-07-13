@@ -1,0 +1,826 @@
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+	Copyright (c) Geoworks 1996 -- All Rights Reserved
+
+PROJECT:	Legos
+MODULE:		Builder
+FILE:		mainagg.goc
+
+AUTHOR:		dloft, Jun 11, 1996
+
+ROUTINES:
+	Name			Description
+	----			-----------
+    INT BSGen_AggregateCode	Generate and add routines for an aggregate
+
+    INT BSGenAgg_DuploUi	Generate duplo_ui routine in aggregate mode
+
+    INT BSGenAgg_Make		Generate the Make<Agg> routine
+
+    INT BSGenAgg_Properties	Generate the Get/Set property routines
+
+    INT BSGetAggInfo		Talk to the aggregate property box to find
+				out what properties, actions, and events
+				are defined for this aggregate.
+
+    INT BSGetAggName		Snag the name of the 0th aggregate from the
+				agg prop box
+
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	dloft	6/11/96  	Initial version.
+
+DESCRIPTION:
+	
+
+	$Id: mainagg.goc,v 1.2 98/10/13 22:18:28 martin Exp $
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+
+@include "gandalf.goh"
+@include "Main/mainshlh.goh"
+@include "Editor/editorh.goh"
+
+#include <Legos/Internal/progtask.h>
+#include <Legos/runheap.h>
+#include <Ansi/ctype.h>
+
+#include "main.h"
+
+optr		BSGen_AggregateCode(MemHandle task,BDescFlags flags,
+				    Boolean duploUiOnly, int *error);
+static void	BSGenAgg_DuploUi(MemHandle task, BDescFlags flags,
+				 TCHAR* line, TCHAR* aggname,
+				 AggField privs[], int numPrivs,
+				 AggField props[], int numProps,
+				 AggField cVars[], int numcVars,
+				 AggField actions[], int numActions,
+				 RunHeapToken defaultComp);
+static optr	BSGenAgg_Make(MemHandle task, BDescFlags flags,
+			      TCHAR* line, TCHAR* aggname, AggField *vars, 
+			      int numVars, RunHeapToken defaultComp); \
+static void	BSGenAgg_Properties(MemHandle task, BDescFlags flags,
+				    TCHAR* line, TCHAR* aggname,
+				    AggField props[], int numProps,
+				    RunHeapToken defaultComp);
+static void	BSGetAggInfo(AggField props[], int *numProps,
+			     TCHAR*, TCHAR*, TCHAR*);
+
+static int  	BSGetAggNameString(TCHAR *retval);
+static void	BSGetAggNameKey(dword *retval);
+
+static void	EmitDefaultCompInfo(ProgTask* ptask, TCHAR* line,
+				    MemHandle ctask, RunHeapToken defComp);
+static void	EmitStructInfo(int num, AggField *array, ProgTask *ptaskPtr,
+			       TCHAR *line, TCHAR *lineStart, MemHandle task);
+static void	EmitHeaderInfo(int num, AggField *array, ProgTask *ptaskPtr,
+			       TCHAR *line, TCHAR *lineStart, MemHandle task);
+
+static RunHeapToken AggHasDefaultComp(void);
+
+extern optr EmitComponents(MemHandle task, BDescFlags flags, TCHAR
+			   *line, Boolean addDuploStart);
+
+#define MAX_AGG_PROPS 30 
+
+@extern chunk @AggPrivVarInfo;
+@extern chunk @AggClassVarInfo;
+@extern chunk @AggVersion;
+@extern chunk @EnableEvents;
+@extern chunk @DisableEvents;
+
+
+@define SaveStrings OptrToHandle(@AggGetCaseElse)
+@start SaveStrings, data;
+
+@chunk TCHAR AggGetCaseElse[] = \
+_TEXT("  CASE ELSE\r\n"
+      "    %s_GetProperty=self.defaultComp.(prop)");
+
+@chunk TCHAR AggSetCaseElse[] = \
+_TEXT("  CASE ELSE\r\n"
+      "    self.defaultComp.(prop) = value\r\n");
+
+@chunk TCHAR AggStandardSetProps[] = \
+_TEXT("  CASE \"proto\"\r\n"
+      "    self^MI_proto=value");
+
+@chunk TCHAR AggStandardGetProps[] = \
+_TEXT("  CASE \"proto\"\r\n"
+      "    %s_GetProperty=self^MI_proto\r\n"
+      "  CASE \"class\"\r\n"
+      "    %s_GetProperty=self^MI_class");
+
+@chunk TCHAR AggSelectCaseProp[] = _TEXT("select CASE prop");
+@end SaveStrings
+
+
+/*********************************************************************
+ *			BSGen_AggregateCode
+ *********************************************************************
+ * SYNOPSIS:	Generate and add routines for an aggregate file
+ * CALLED BY:	INTERNAL, MSG_BS_GENERATE_UI_CODE
+ * PASS:
+ *
+ * RETURN:	optr of complex data, if BDF_COMPLEX passed.
+ *		Caller is responsible for destroying it.
+ *		If duploUiOnly won't return optr
+ *
+ * STRATEGY:	1) Write out a duplo_ui_ui_ui that sets up the structure
+ *		that will serve as instance data for this aggregate.
+ *
+ * 		2) Write out the make function that creates and returns
+ *		a new instance of the aggregate.
+ *
+ * 		3) Write out get and set property routines.
+ *
+ * BUGS:	Currently only handles a single aggregate.  Eventually, 
+ *		we should support > 1 aggregate per file.
+ * REVISION HISTORY:
+ *	Name	Date		Description			     
+ *	----	----		-----------			     
+ *	dloft	 7/20/95	Initial version
+ * 
+ *********************************************************************/
+optr
+BSGen_AggregateCode(MemHandle task, BDescFlags flags, 
+		    Boolean duploUiOnly, int *error)
+{
+    MemHandle	lineHan;
+    TCHAR	*line;
+    optr	retval;
+    RunHeapToken    defaultComp;
+
+    AggField	privVar[MAX_AGG_PROPS + 1] /*, actions[6], events[6]*/;
+    AggField	properties[MAX_AGG_PROPS + 1] /*, actions[6], events[6]*/;
+    AggField	classVar[MAX_AGG_PROPS + 1] /*, actions[6], events[6]*/;
+    AggField	actions[MAX_AGG_PROPS + 1];
+    int		numPrivVars, numProperties, numClassVars, numActions; 
+				/*, numActions, numEvents*/
+    TCHAR	aggname[32];	/* ick */
+
+    lineHan = MemAlloc(4096*sizeof(TCHAR), HF_SWAPABLE | HF_SHARABLE, 0);
+    line = MemLock(lineHan);
+    *line = DBG_NORMAL;
+    MemLock(OptrToHandle(@SubDuploUi));
+
+    *error = FALSE;
+
+    /* get the name and make sure its legal */
+    if (!BSGetAggNameString(aggname))
+
+    {
+	*error = TRUE;
+	MemUnlock(OptrToHandle(@SubDuploUi));
+	MemFree(lineHan);
+	return retval;
+    }
+    /*
+     * Find out what we need to know about this aggregate (props, acts, events)
+     * NOTE: actions, events removed by dl 8/21/95
+     */
+
+    EC_ERROR_IF(strlen(aggname) > 31, -1);
+    BSGetAggInfo(privVar, &numPrivVars, _TEXT("getNumPrivVars"),
+		 _TEXT("getAggPrivVarName"), _TEXT("getAggPrivVarType"));
+    BSGetAggInfo(properties, &numProperties, _TEXT("getNumProperties"),
+		 _TEXT("getAggPropertyName"), _TEXT("getAggPropertyType"));
+    BSGetAggInfo(classVar, &numClassVars, _TEXT("getNumClassVars"),
+		 _TEXT("getAggClassVarName"), _TEXT("getAggClassVarType"));
+    BSGetAggInfo(actions, &numActions, _TEXT("getNumActions"),
+		 _TEXT("getAggActionName"), NULL);
+
+    defaultComp = AggHasDefaultComp();
+    BSGenAgg_DuploUi(task, flags, line, aggname,
+		     privVar, numPrivVars, properties, numProperties,
+		     classVar, numClassVars, actions, numActions,
+		 defaultComp);
+    EC_ERROR_IF(strlen(line) > 4096, -1);
+    if (duploUiOnly) {
+	MemUnlock(OptrToHandle(@SubDuploUi));
+	MemFree(lineHan);
+	return NullOptr;
+    }
+
+    retval=BSGenAgg_Make(task, flags, line, aggname, classVar, numClassVars,
+			 defaultComp);
+
+    EC_ERROR_IF(strlen(line) > 4096, -1);
+    BSGenAgg_Properties	(task, flags, line, aggname,
+			 properties, numProperties, defaultComp);
+
+    EC_ERROR_IF(strlen(line) > 4096, -1);
+
+    MemUnlock(OptrToHandle(@SubDuploUi));
+    MemFree(lineHan);
+    return retval;
+}
+
+/*********************************************************************
+ *			BSGenAgg_DuploUi
+ *********************************************************************
+ * SYNOPSIS:	Generate duplo_ui routine in aggregate mode
+ * CALLED BY:	INTERNAL, BSGen_Aggregate
+ * PASS:
+ * RETURN:
+ * SIDE EFFECTS:
+ * STRATEGY:
+ * REVISION HISTORY:
+ *	Name	Date		Description			     
+ *	----	----		-----------			     
+ *	dubois	10/13/95	Initial version
+ * 
+ *********************************************************************/
+void
+BSGenAgg_DuploUi(MemHandle task, BDescFlags flags, TCHAR* line,
+		 TCHAR* aggname, AggField privVar[], int numPrivVars,
+		 AggField properties[], int numProperties, 
+		 AggField cVars[], int numcVars,
+		 AggField actions[], int numActions,
+		 RunHeapToken defaultComp)
+{
+    PTaskHan	ptaskHan;
+    ProgTask	*ptask;
+
+    /* Get our ptask from the interpreter
+     */
+     ptaskHan = @call BuilderInterpreter::MSG_INTERP_GET_STATE();
+     ptask = MemLock(ptaskHan);
+
+    /* toplevel routine, structure definition
+     * FIXME need to do a foreach aggregate kinda thing here
+     */
+    doLineAdd(task, line, LMemDeref(@SubDuploUi));
+    doLineAdd(task, line, LMemDeref(@DisableEvents));
+
+    EmitStandardInclude(task, flags, line);
+    EmitLoadModule(task, line);
+
+    /* Structs that define the aggregates' internal instance data
+     */
+			/* STRUCT <agg> */
+    sprintf(&line[1], LMemDeref(@StructString), aggname);
+    BascoLineAdd(task, line);
+			/* Dim MI_libModule as module... */
+    doBlockAdd(task, line, LMemDeref(@AggDefaultStructFields));
+			/* Dim <prop1> as <type> ...*/
+    EmitStructInfo(numPrivVars, privVar, ptask, line, 
+		   LMemDeref(@AggPropertyStructFields), task);
+			/* end struct */
+    doLineAdd(task, line, LMemDeref(@EndStructString));
+
+    /* Out-of-band data that is sent to the agg prop box when
+     * module is re-loaded, and other random such.
+     */
+    if (flags & BDF_BUILDTIME)
+    {
+	RunHeapToken	defComp;
+	/* Buildtime-only stuff here */
+				/* REM aggName=fooAgg... */
+
+	/* NOTE NOTE NOTE: mainload.goc makes some assumptions about
+	 * the order this stuff is in in the file, so don't move it around
+	 * unless you are prepared to update mainload.goc as well
+	 */
+
+	strcpy(&line[1], LMemDeref(@AggNameInfo));
+	strcat(&line[1], aggname);
+	BascoLineAdd(task, line);
+
+	sprintf(&line[1], _TEXT("%s%d"), LMemDeref(@AggVersion), AGG_VERSION);
+	BascoLineAdd(task, line);
+	EmitHeaderInfo(numProperties, properties, ptask, line,
+		       LMemDeref(@AggPropertyInfo), task);
+	EmitHeaderInfo(numPrivVars, privVar, ptask, line,
+		       LMemDeref(@AggPrivVarInfo), task);
+	EmitHeaderInfo(numcVars, cVars, ptask, line,
+		       LMemDeref(@AggClassVarInfo), task);
+	EmitHeaderInfo(numActions, actions, ptask, line,
+		       LMemDeref(@AggActionInfo), task);
+	
+	EmitDefaultCompInfo(ptask, line, task, defaultComp);
+
+    } else {
+	/* Runtime-only stuff here */
+	/* ExportAggregate("<aggname>", CurModule()) */
+	sprintf(&line[1], LMemDeref(@ExportAggregate), aggname, aggname);
+	BascoLineAdd(task, line);
+    }
+	
+    if (flags & BDF_RUN_FROM_BUILDER) {
+				/* If being run from the builder, call the
+				 * test function so we can see something. */
+	sprintf(&line[1], LMemDeref(@CallTestSub), aggname);
+	if (EditGetRoutineIndex(bascoTask, &line[1]) >= 0) {
+	    /* add parens to make it a call */
+	    strcat(&line[1], _TEXT("()"));
+	    BascoLineAdd(task, line);
+	}
+    } else if (flags & BDF_BUILDTIME) {
+				/* If being saved from the builder, call the
+				 * make function so we can see something
+				 * when we load it back in. */
+	sprintf(&line[1], LMemDeref(@CallMakeSub), aggname);
+	BascoLineAdd(task, line);
+    }
+				/* end sub */
+    doLineAdd(task, line, LMemDeref(@EnableEvents));
+    doLineAdd(task, line, LMemDeref(@EndSub));
+
+    MemUnlock(ptaskHan);
+}
+
+/*********************************************************************
+ *			BSGenAgg_Make
+ *********************************************************************
+ * SYNOPSIS:	Generate the Make<Agg> routine
+ * CALLED BY:	INTERNAL, BSGen_Aggregate
+ * PASS:
+ * RETURN:	optr of complex data
+ * SIDE EFFECTS:
+ * STRATEGY:
+ * REVISION HISTORY:
+ *	Name	Date		Description			     
+ *	----	----		-----------			     
+ *	dubois	10/13/95	Initial version
+ * 
+ *********************************************************************/
+optr
+BSGenAgg_Make(MemHandle task, BDescFlags flags, TCHAR* line,
+	      TCHAR* aggname, AggField cVars[], int numcVars, 
+	      RunHeapToken defaultComp)
+{
+    optr	retval;
+    MemHandle	ptaskHan;
+    ProgTask	*ptask;
+
+    if (flags & BDF_BUILDTIME) {
+	sprintf(&line[1], LMemDeref(@MakeAggregateBuildtime), aggname);
+	BascoBlockAdd(task, line);
+    } else {
+	sprintf(&line[1], LMemDeref(@MakeAggregateRuntime), aggname, aggname,
+		aggname);
+	BascoBlockAdd(task, line);
+    }
+
+    retval = EmitComponents(task, flags, line, FALSE);
+
+
+    if (flags & BDF_BUILDTIME) {
+	doLineAdd(task, line, _TEXT("REM init code here"));
+	doLineAdd(task, line, LMemDeref(@EndSub));
+    } else {
+
+	/* this isn't really in a struct, but it turns out that
+	 * EmitStructInfo will do exactly what I want, believe it or
+	 * not - btw: this spits out the global variables
+	 */
+	ptaskHan = @call BuilderInterpreter::MSG_INTERP_GET_STATE();
+	ptask = MemLock(ptaskHan);
+	EmitStructInfo(numcVars, cVars, ptask, line, 
+		       LMemDeref(@AggPropertyStructFields), task);
+
+	sprintf(&line[1], LMemDeref(@InitAggregate), aggname, aggname, 
+		aggname, aggname, aggname, aggname);
+	BascoBlockAdd(task, line);
+	
+	/* if there is a default component, init the default value in the
+	 * struct
+	 */
+	if (defaultComp != NULL_TOKEN)
+	{
+	    TCHAR   *compName;
+	    RunHeapLock(&ptask->PT_runHeapInfo, defaultComp,(void**)&compName);
+	    sprintf(&line[1], LMemDeref(@AggInitDefaultComp), aggname, 
+		    compName);
+	    RunHeapUnlock(&ptask->PT_runHeapInfo, defaultComp);
+	    BascoLineAdd(task, line);
+	}
+	MemUnlock(ptaskHan);
+
+	/* If we have an aggname_Created routine, and we're generating 
+	 * runtime code, spit out code to call it!
+	 */
+	sprintf(&line[1], LMemDeref(@AggCreatedRoutineName), aggname);
+	if (EditGetRoutineIndex(bascoTask, &line[1]) >= 0)
+	{
+	    sprintf(&line[1], LMemDeref(@AggCreatedRoutineHeader), 
+		    aggname, aggname);
+	    BascoBlockAdd(task, line);
+	}
+
+	doLineAdd(task, line, LMemDeref(@EndFunction));
+    }
+    return retval;
+}
+
+/*********************************************************************
+ *			BSGenAgg_Properties
+ *********************************************************************
+ * SYNOPSIS:	Generate the Get/Set property routines
+ * CALLED BY:	INTERNAL, BSGen_Aggregate
+ * PASS:
+ * RETURN:
+ * SIDE EFFECTS:
+ * STRATEGY:
+ * REVISION HISTORY:
+ *	Name	Date		Description			     
+ *	----	----		-----------			     
+ *	dubois	10/13/95	Initial version
+ * 
+ *********************************************************************/
+/* don't really need the "flags" property right now, but... */
+#pragma argsused
+static void
+BSGenAgg_Properties(MemHandle task, BDescFlags flags, TCHAR* line,
+		    TCHAR* aggname, AggField properties[], int numProperties,
+		    RunHeapToken defaultComp)
+{
+    int		i;
+    TCHAR	*propString;
+    PTaskHan	ptaskHan;
+    ProgTask	*ptask;
+
+    (void) MemLock(@SaveStrings);
+    ptaskHan = @call BuilderInterpreter::MSG_INTERP_GET_STATE();
+    ptask = MemLock(ptaskHan);
+
+    /*- SetProperty subroutine
+     */
+
+    /* sub <aggname>_SetProperty(...) */
+    sprintf(&line[1], LMemDeref(@AggSetPropSub), aggname, aggname);
+    BascoLineAdd(task, line);
+    doBlockAdd(task, line, LMemDeref(@AggSelectCaseProp));
+    for (i=0; i < numProperties; i++)
+    {
+	/* CASE "prop"... */
+
+	/* If there's a routine defined to handle this property
+	 * setting, then call it.  Otherwise, do the usual thing of
+	 * setting the appropriate field in the struct.
+	 */
+	RunHeapLock(&ptask->PT_runHeapInfo, properties[i].fieldNameToken,
+		    (void **) &propString);
+
+	sprintf(&line[1], LMemDeref(@AggSpecialSetRoutineName), aggname, 
+		propString);
+	if (EditGetRoutineIndex(bascoTask, &line[1]) >= 0) {
+	    sprintf(&line[1], LMemDeref(@AggSpecialSetPropCase), 
+		    propString, aggname, propString);
+	} else {
+	    sprintf(&line[1], LMemDeref(@AggDefaultSetPropCase), 
+		    propString, propString);
+	}
+
+	BascoBlockAdd(task, line);
+
+	RunHeapUnlock(&ptask->PT_runHeapInfo, properties[i].fieldNameToken);
+    } 
+
+    /* Add some handlers which always appear -- proto and class.
+     * (actually class doesn't appear 'cause it's read-only)
+     */
+    sprintf(&line[1], LMemDeref(@AggStandardSetProps));
+    BascoBlockAdd(task, line);
+
+    /* If a "default component" exists, CASE ELSE will perform
+     * a setproperty on that component
+     */
+    if (defaultComp != NULL_TOKEN) 
+    {
+	sprintf(&line[1], LMemDeref(@AggSetCaseElse));
+	BascoBlockAdd(task, line);
+    }
+
+				/* end select */
+    doLineAdd(task, line, LMemDeref(@AggEndSelect));
+				/* end sub */
+    doLineAdd(task, line, LMemDeref(@EndSub));
+
+
+    /*- GetProperty function
+     */
+				/* function <aggname>_GetProperty(...) */
+    sprintf(&line[1], LMemDeref(@AggGetPropFunc), aggname, aggname);
+    BascoLineAdd(task, line);
+    sprintf(&line[1], LMemDeref(@AggSelectCaseProp), aggname);
+    BascoBlockAdd(task, line);
+    for (i=0; i < numProperties; i++) {
+				/* CASE "prop"... */
+	RunHeapLock(&ptask->PT_runHeapInfo, properties[i].fieldNameToken,
+		    (void **) &propString);
+
+	sprintf(&line[1], LMemDeref(@AggSpecialGetRoutineName), aggname, 
+		propString);
+	if (EditGetRoutineIndex(bascoTask, &line[1]) >= 0) {
+	    sprintf(&line[1], LMemDeref(@AggSpecialGetPropCase), 
+		    propString, aggname, aggname, 
+		    propString);
+	} else {
+	    sprintf(&line[1], LMemDeref(@AggDefaultGetPropCase), 
+		    propString, aggname, propString);
+	}
+	RunHeapUnlock(&ptask->PT_runHeapInfo, properties[i].fieldNameToken);
+
+	BascoBlockAdd(task, line);
+    } 
+
+    /* Add some handlers which always appear -- proto and class.
+     */
+    sprintf(&line[1], LMemDeref(@AggStandardGetProps), aggname, aggname);
+    BascoBlockAdd(task, line);
+
+    /* If a "default component" exists, CASE ELSE will perform
+     * a getproperty on that component
+     */
+    if (defaultComp != NULL_TOKEN) 
+    {
+	sprintf(&line[1], LMemDeref(@AggGetCaseElse), aggname);
+	BascoBlockAdd(task, line);
+    }
+    doLineAdd(task, line, LMemDeref(@AggEndSelect));
+    doLineAdd(task, line, LMemDeref(@EndFunction));
+
+    MemUnlock(ptaskHan);
+    MemUnlock(@SaveStrings);
+}
+
+/*********************************************************************
+ *			BSGetAggInfo
+ *********************************************************************
+ * SYNOPSIS:	Talk to the aggregate property box to find out what
+ * 		properties, actions, and events are defined for this
+ *		aggregate.
+ *
+ * CALLED BY:	INTERNAL, BSGen_AggregateCode
+ * PASS:	
+ * RETURN:
+ * REVISION HISTORY:
+ *	Name	Date		Description			     
+ *	----	----		-----------			     
+ *	dloft	 7/28/95	Initial version
+ * 
+ *********************************************************************/
+static void 
+BSGetAggInfo(AggField props[], int *numProps, TCHAR *getNumFunc,
+	     TCHAR *getNameFunc, TCHAR *getTypeFunc)
+{
+    TCHAR		*propString;
+    dword		retval;
+    byte 		count;
+    LegosType		type;
+    byte		args[6] = {1,TYPE_INTEGER,0,0,0,0};
+    MemHandle		rtaskHan = @call AggPropBox::MSG_GEC_GET_TASK();
+
+    EC(ECCheckBounds(numProps));
+    EC(ECCheckBounds(props));
+
+    if (rtaskHan == (MemHandle) NULL) 
+    {
+	*numProps = 0;	/* User hasn't defined any properties? 
+			 * What a nut!  Well, let's try to save 
+			 * anyway...
+			 */
+    } 
+    else 
+    {
+	if (RunCallFunction(rtaskHan, getNumFunc, NULL, &type, &retval))
+	{
+	    *numProps = (int) retval;
+	    if (*numProps > MAX_AGG_PROPS) *numProps = MAX_AGG_PROPS;
+	    for (count = 0; count < *numProps; count++) 
+	    {
+		args[2] = count;
+
+		RunCallFunction(rtaskHan, getNameFunc, args, &type, &retval);
+		props[count].fieldNameToken = (RunHeapToken) retval;
+		
+		if (getTypeFunc != NULL)
+		{
+		    RunCallFunction(rtaskHan, getTypeFunc, args, 
+				    &type, &retval);
+		    props[count].fieldTypeToken = (RunHeapToken) retval;
+		}
+		else
+		{
+		    props[count].fieldTypeToken = (RunHeapToken)0;
+		}
+	    }
+	} else {
+	    *numProps = 0;
+	}
+    }    
+}
+
+/*********************************************************************
+ *			BSGetAggNameString
+ *********************************************************************
+ * SYNOPSIS:	Snag the name of the 0th aggregate from the agg prop box
+ * CALLED BY:	INTERNAL, BSGen_AggregateCode
+ * PASS:	TCHAR *aggname -- filled in with the aggregate's name
+ * REVISION HISTORY:
+ *	Name	Date		Description			     
+ *	----	----		-----------			     
+ *	dloft	8/17/95		Initial version
+ * 
+ *********************************************************************/
+static int
+BSGetAggNameString(TCHAR *aggname)
+{
+    RTaskHan	rtaskHan = @call AggPropBox::MSG_GEC_GET_TASK();
+    TCHAR	*nameString;
+    Boolean	success = TRUE;
+    dword	retval;
+    int	    	length, i;
+    RunHeapInfo	*rhi;
+
+    if (rtaskHan != NullHandle) {
+	rhi = LockRHIFromRTaskHan(rtaskHan);
+
+	EC(ECCheckBounds(aggname));
+
+	if (rtaskHan == (MemHandle) NULL) {
+	    aggname[0] = C_NULL;
+	} else {
+	    BSGetAggNameKey(&retval);
+
+	    if (retval != (dword) NULL) {
+		RunHeapLock(rhi, retval, (void **) &nameString); 
+		if (strlen(nameString)) {
+		    strcpy(aggname, nameString);
+		    EC_BOUNDS(aggname+strlen(aggname));
+		} else {
+		    success = FALSE;
+		}
+		RunHeapUnlock(rhi, retval);
+	    } else {
+		success = FALSE;
+	    }
+	}
+	UnlockRHIFromRTaskHan(rtaskHan);
+    } else {
+	success = FALSE;
+    }
+
+    /* now check the validity of the name */
+    length = strlen(aggname);
+    for (i = 0; i < length; i++)
+    {
+	if (!i && !isalpha(aggname[i]))
+	{
+	    success = FALSE;
+	} 
+	else if (!isalnum(aggname[i]) && (aggname[i] != C_UNDERSCORE))
+	{
+	    success = FALSE;
+	}
+    }
+    if (!success) {
+	strcpy(aggname, _TEXT("newagg"));
+    }
+    return success;
+}
+
+static void
+BSGetAggNameKey(dword *retval)
+{
+    RTaskHan	rtaskHan = @call AggPropBox::MSG_GEC_GET_TASK();
+    byte	args[6] = {1,TYPE_INTEGER,0,0,0,0};
+    LegosType	type;
+
+    EC(ECCheckBounds(retval));
+
+    *retval = (dword) NULL;
+
+    if (rtaskHan != NullHandle) {
+	if (rtaskHan != (MemHandle) NULL) {
+	    RunCallFunction(rtaskHan, _TEXT("getAggName"), args, &type, 
+				retval);
+	}
+    }
+}
+
+/*********************************************************************
+ *			Emit(Struct/Header)Info
+ *********************************************************************
+ * SYNOPSIS:	This routine spits out the following line within
+ *		the Make<myagg> initialization routine:
+ *			Instance.<default property> = <default comp>
+ *
+ * CALLED BY:	INTERNAL, BSGen_AggregateCode
+ * PASS:	int num, AggField *array, ProgTask *ptask, TCHAR *line,
+ *		TCHAR *lineStart, MemHandle task
+ * RETURN:	nothing
+ * REVISION HISTORY:
+ *	Name	Date		Description			     
+ *	----	----		-----------			     
+ *	dloft	 7/28/95	Initial version
+ * 
+ *********************************************************************/
+static void
+EmitDefaultCompInfo(ProgTask* ptask, TCHAR* line, MemHandle ctask,
+ 	            RunHeapToken defComp)
+{
+    Boolean 	    success;
+    TCHAR*	    compName;
+
+    if (defComp == NULL_TOKEN) return;
+    RunHeapLock(&ptask->PT_runHeapInfo, defComp, (void**)&compName);
+    sprintf(&line[1], LMemDeref(@AggDefaultInfo));
+    strcat(&line[1], compName);
+    RunHeapUnlock(&ptask->PT_runHeapInfo, defComp);
+    BascoLineAdd(ctask, line);
+}
+
+static void
+EmitStructInfo(int num, AggField *array, ProgTask *ptask, TCHAR *line,
+	       TCHAR *lineStart, MemHandle task)
+{
+    TCHAR *propString;
+    TCHAR *typeString;
+    int i;
+
+    for (i=0; i < num; i++) 
+    {
+	RunHeapLock(&ptask->PT_runHeapInfo, array[i].fieldNameToken,
+		    (void **) &propString);
+	RunHeapLock(&ptask->PT_runHeapInfo, array[i].fieldTypeToken,
+		    (void **) &typeString);
+	sprintf(&line[1], lineStart, propString, typeString);
+	BascoLineAdd(task, line);
+	RunHeapUnlock(&ptask->PT_runHeapInfo, array[i].fieldNameToken);
+	RunHeapUnlock(&ptask->PT_runHeapInfo, array[i].fieldTypeToken);
+    }
+}
+
+static void
+EmitHeaderInfo(int num, AggField *array, ProgTask *ptask, TCHAR *line,
+	       TCHAR *lineStart, MemHandle task)
+{
+    int i;
+    TCHAR *propString;
+    TCHAR *typeString;
+
+    strcpy(&line[1], lineStart);
+    for (i=0; i < num; i++) 
+    {
+	RunHeapLock(&ptask->PT_runHeapInfo, array[i].fieldNameToken,
+		    (void **) &propString);
+
+	strcat(&line[1], propString);
+	RunHeapUnlock(&ptask->PT_runHeapInfo, array[i].fieldNameToken);
+	if (array[i].fieldTypeToken != (RunHeapToken)0)
+	{
+	    RunHeapLock(&ptask->PT_runHeapInfo, array[i].fieldTypeToken,
+			(void **) &typeString);
+
+	    strcat(&line[1], _TEXT(" as "));
+	    strcat(&line[1], typeString);
+	    RunHeapUnlock(&ptask->PT_runHeapInfo, array[i].fieldTypeToken);
+	}
+ 	strcat(&line[1], _TEXT(","));
+
+    }
+    BascoLineAdd(task, line);
+}
+
+
+/*********************************************************************
+ *			AggHasDefaultComp
+ *********************************************************************
+ * SYNOPSIS:	return the token of the default comps name or NULL_TOKEN
+ * CALLED BY:	global
+ * PASS:
+ * RETURN:
+ * SIDE EFFECTS:
+ * STRATEGY:
+ * REVISION HISTORY:
+ *	Name	Date		Description			     
+ *	----	----		-----------			     
+ *	jimmy	1/10/96	Initial version
+ * 
+ *********************************************************************/
+RunHeapToken AggHasDefaultComp()
+{
+    LegosType		type;
+    dword	    	defComp;
+    Boolean 	    	success;
+
+    RTaskHan	rt = @call AggPropBox::MSG_GEC_GET_TASK();
+
+    if (rt == NullHandle) {
+	return NULL_TOKEN;
+    }
+
+    success = RunCallFunction(rt, _TEXT("GetDefaultComp"), NULL, &type, 
+			      &defComp);
+    if (!success || type != TYPE_STRING) {
+	return NULL_TOKEN;
+    } else {
+	return defComp;
+    }
+}
+

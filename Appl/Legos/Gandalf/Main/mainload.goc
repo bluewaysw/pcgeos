@@ -1,0 +1,1179 @@
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+	Copyright (c) Geoworks 1995 -- All Rights Reserved
+
+PROJECT:	Legos
+MODULE:		Builder
+FILE:		mainload.goc
+
+AUTHOR:		dubois, Oct 12, 1995
+
+ROUTINES:
+	Name			Description
+	----			-----------
+    MTD MSG_BS_NEW_MODULE	* PARAMETERS:
+
+ ?? INT NewFinish		finish off NEW work
+
+    MTD MSG_BS_NEW_AGG_FINISH	* PARAMETERS:
+
+    MTD MSG_BS_NEW		Clear out the code in memory. First prompt
+				to see if that's kosher...
+
+    MTD MSG_BS_LOAD_FILE_LOW	Load a basic file and show its ui
+
+    INT BSLoad_ParseOOBInfo	Search first routine for interesting gook,
+				possibly switching builder modes.
+
+    INT BSParseAggInfoLow	Collect all the fields from our particular
+				agg info line
+
+    INT BSLoad_ShowUI		Show the UI for the just-loaded module
+
+    INT BSLoad_MakePathAbsolute	Turn DiskHandle/Path into an absolute path.
+				Pulled out of MSG_BS_LOAD_FILE to lighten
+				stack load
+
+    INT BSCopyEditorCodeToTask	Copy code from the main compiler
+				(bascoTask) into a subsidiary one.
+
+    INT ResetGandalfCommon	Clear/initialize state in various places
+
+    INT ML_RunCallOneArg	Call a basic function with one string
+				argument
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	dubois	10/12/95	Initial version.
+
+DESCRIPTION:
+	Deals with loading .bas files
+
+	$Id: mainload.goc,v 1.2 98/10/13 22:18:39 martin Exp $
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+
+#include <Legos/runheap.h>
+#include <Legos/Internal/progtask.h>
+#include <Legos/Internal/runtask.h>
+#include <Legos/bascobug.h>
+
+#include "main.h"
+
+@include "gandalf.goh"
+@include "Main/mainshlh.goh"
+@include "Editor/editorh.goh"
+#include <Ansi/stdlib.h>
+#include <initfile.h>
+
+
+/* FIXME: put global vars in mainproc
+ */
+PathName	gCurFilePath;
+Boolean		gHackNoTopLevelShow;
+
+/* FIXME whoever created these was lame and didn't create proper protos */
+extern void UpdateLastLoadedButton(void);
+
+/* - Internal decls */
+static void	ResetGandalfCommon(void);
+
+static void	BSLoad_ParseOOBInfo(optr oself, MemHandle task);
+static void	BSParseAggInfoLow(TCHAR *text, TCHAR *function,
+				  RTaskHan rtaskHan);
+static Boolean	BSLoad_ShowUI(TCHAR* path, Boolean aggregateP);
+static void	BSLoad_MakePathAbsolute(word disk, TCHAR* path);
+static void	BSCopyEditorCodeToTask(int numLines, dword codeOffset, 
+				       MemHandle compTask, Boolean duploUI);
+static void	ML_RunCallOneArg(RTaskHan rtaskHan, TCHAR* func, TCHAR* arg);
+
+RTaskHan	activeModule;
+
+
+extern void  GandalfMessageDispatch(void);
+
+@extern chunk @AggPrivVarInfo;
+@extern chunk @AggClassVarInfo;
+@extern chunk @AggVersion;
+@extern object @NewInteraction;
+@extern object @NewAggInteraction;
+@extern object @LoadInteraction;
+@extern object @LoadDeleteInteraction;
+@extern chunk @BadAggNameError;
+
+@define GEC_GET_MOD(_optr)  @call _optr::MSG_GEC_GET_TASK()
+@define GEC_LOAD_MOD(dest, _optr) dest = @call _optr::MSG_GEC_LOAD_MODULE(TRUE),RunTaskSetFlags(dest, RT_OWNED_BY_BUILDER, 0)
+#define BORK NULL
+
+
+
+/***********************************************************************
+ *		MSG_BS_NEW_MODULE for BuilderShellClass
+ ***********************************************************************
+ * SYNOPSIS:	
+ * PARAMETERS:	
+ * SIDE EFFECTS:
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	jimmy	2/ 6/96   	Initial Revision
+ *
+ ***********************************************************************/
+@extern method BuilderShellClass, MSG_BS_NEW_MODULE
+{
+    if (dirty || @call Editor::MSG_ET_IS_CODE_DIRTY(FALSE))
+    {
+	@call NewInteraction::MSG_GEN_INTERACTION_INITIATE();
+    }
+    else
+    {
+	@call self::MSG_BS_NEW(FALSE);
+    }
+}	/* End of MSG_BS_NEW_MODULE.	*/
+
+@extern method BuilderShellClass, MSG_BS_NEW_AGG
+{
+    if (dirty || @call Editor::MSG_ET_IS_CODE_DIRTY(FALSE))
+    {
+	@call NewAggInteraction::MSG_GEN_INTERACTION_INITIATE();
+    }
+    else
+    {
+	@call self::MSG_BS_NEW(TRUE);
+    }
+}	/* End of MSG_BS_NEW_MODULE.	*/
+
+@extern method BuilderShellClass, MSG_BS_OPEN
+{
+    if (dirty || @call Editor::MSG_ET_IS_CODE_DIRTY(FALSE))
+    {
+	@call LoadDeleteInteraction::MSG_GEN_INTERACTION_INITIATE();
+    }
+    else
+    {
+	@call LoadInteraction::MSG_GEN_INTERACTION_INITIATE();
+    }
+}
+
+
+
+
+/*********************************************************************
+ *			NewFinish
+ *********************************************************************
+ * SYNOPSIS:	finish off NEW work
+ * CALLED BY:	
+ * PASS:
+ * RETURN:
+ * SIDE EFFECTS:
+ * STRATEGY:
+ * REVISION HISTORY:
+ *	Name	Date		Description			     
+ *	----	----		-----------			     
+ *	jimmy	6/10/96  	Initial version
+ * 
+ *********************************************************************/
+void
+NewFinish(int aggregate, int numHidden)
+{
+    /* compile the code once from scratch */
+    if (BascoCompileCodeFromTask(bascoTask, FALSE) == NullHandle) 
+    {
+	GandalfCheckForCompileError(bascoTask);
+    }
+
+
+    /*
+     * Initialize the routine list with the correct number of 
+     * hidden routines.
+     */
+    @send, forceQueue RoutineList::MSG_RL_SET_NUM_HIDDEN(numHidden);
+    @send, forceQueue RoutineList::MSG_GEN_DYNAMIC_LIST_INITIALIZE(numHidden);
+
+    if (!aggregate)
+    {
+	/*
+	 * Select and display the module_init() routine and position the 
+	 * cursor in a handy place.
+	 */
+	@send, forceQueue RoutineList::MSG_RL_SHOW_ROUTINE_FROM_LIST(0,1,0);
+	@send, forceQueue Editor::MSG_VIS_TEXT_SELECT_RANGE(18,18);
+    }
+
+    @send, forceQueue SaveTrigger::MSG_GEN_SET_NOT_ENABLED(VUM_DVAQ);
+    @send, forceQueue BuildGEOS::MSG_GEN_SET_NOT_ENABLED(VUM_DVAQ);
+
+    dirty = FALSE;
+}
+
+
+
+/***********************************************************************
+ *		MSG_BS_NEW_AGG_FINISH for BuilderShellClass
+ ***********************************************************************
+ * SYNOPSIS:	
+ * PARAMETERS:	
+ * SIDE EFFECTS:
+ *
+ * STRATEGY:	
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	jimmy	6/10/96   	Initial Revision
+ *
+ ***********************************************************************/
+@extern method BuilderShellClass, MSG_BS_NEW_AGG_FINISH
+{
+    if (@call BuilderShell::MSG_BS_GENERATE_UI_CODE(BDF_COMPLEX, TRUE) != FALSE)
+    {
+	NewFinish(TRUE, NUM_HIDDEN_AGG);
+	return TRUE;
+    }
+
+    /* clear the UI_DIRTY flag to nobody tries to recompile the UI
+     * again - as of now, the only error we can get is a bad agg name
+     * so report it
+     */
+    @call BuilderInterpreter::MSG_BENT_MANAGER_SET_FLAGS(0, BF_UI_DIRTY);
+    GandalfError(@BadAggNameError);
+    dirty = FALSE;
+    @send, forceQueue BuilderShell::MSG_BS_NEW_AGG();
+    return FALSE;
+}	/* End of MSG_BS_NEW_AGG_FINISH.	*/
+
+
+/*********************************************************************
+ *			New
+ *********************************************************************
+ * SYNOPSIS:	Clear out the code in memory. First prompt to see
+ *		if that's kosher...
+ * PASS:	Boolean aggregate	   put into BSM_AGGREGATE mode
+ * RETURN:
+ * SIDE EFFECTS:
+ * STRATEGY:
+ * REVISION HISTORY:
+ *	Name	Date		Description			     
+ *	----	----		-----------			     
+ *	roy	11/ 4/94	Initial version			     
+ * 
+ *********************************************************************/
+@extern method BuilderShellClass, MSG_BS_NEW
+{
+    TCHAR   line[40];
+    int	    num = 0;
+    TCHAR*	pathEnd;
+
+    if (aggregate) {
+	pself->BS_mode = BSM_AGGREGATE;
+    } else {
+	pself->BS_mode = BSM_NORMAL;
+    }
+
+    /* Clean up our mess
+     */
+    /* FIXME Unnecessary?  task is being destroyed */
+
+    BugDeleteAllBreaks(BascoBugGetBugHandleFromCTask(bascoTask));
+    BascoDestroyTask(bascoTask);
+    bascoTask = BascoAllocTask(ProgGetVMFile(buildTask), &bugInfo);
+    /* we are always stopped at this point (or should be, anyways) */
+    BugSetBuilderState(BascoBugGetBugHandleFromCTask(bascoTask), BS_STOPPED);
+
+
+    ResetGandalfCommon();
+
+    /* Give ourselves a default module name
+     */
+    MemLock(OptrToHandle(@ResFile));
+    pathEnd = (TCHAR*)&gCurFilePath;
+    (void)FileConstructFullPath
+	(&pathEnd, sizeof(PathName), SP_DOCUMENT, _TEXT(""), TRUE);
+    strcat(pathEnd, LMemDeref(@ResFile));
+    MemUnlock(OptrToHandle(@ResFile));
+
+    @call self::MSG_META_UNSUSPEND();
+
+    @call SaveFileText::MSG_VIS_TEXT_REPLACE_ALL_PTR(_TEXT(""),0);
+    Notify(_TEXT("New Module"), TRUE);
+
+    MemLock(OptrToHandle(@EditorStart));
+    if (aggregate) {
+	@call Editor::
+	    MSG_VIS_TEXT_REPLACE_ALL_PTR((TCHAR *)LMemDeref(@EditorAggStart),
+					 0);
+    } else {
+	/* The non-agg string includes "form1.visible=1" */
+	@call Editor::
+	    MSG_VIS_TEXT_REPLACE_ALL_PTR((TCHAR *)LMemDeref(@EditorStart),0);
+    }
+
+    @call Editor::MSG_VIS_TEXT_SET_USER_MODIFIED();
+    MemUnlock(OptrToHandle(@EditorStart));
+
+   /*
+    * Make an initial form appear at the proper position and 
+    * with the proper size.
+    */
+    {
+	optr		component;
+	ComponentData	data;
+	SpecWinSizePair	*ptr;
+	/*
+	 * Get a fptr.RunHeapInfo so we can create a form and set properties.
+	 */
+    
+
+	/*
+	 * If we're in aggregate mode, set the name to "top".  This is the name
+	 * of the parent argument passed in to the aggregate creation routine.
+	 * When the children of the form are written out, they will refer to
+	 * their parent as "top" instead of "form0", which will do the right 
+	 * thing when the aggregate code gets compiled.  Get it?
+	 *
+	 * Also, set the "isAggTop" property, so we know what to do if the file
+	 * gets saved out uncompiled and read back in again.
+	 *
+	 * Also, enable the "include form in aggregate" list in the save 
+	 * dialog.
+	 */
+
+	if (aggregate) 
+	{
+	    RTaskHan 	  aggTaskHan;
+
+	    activeModule = 
+		    @call BuilderInterpreter::MSG_INTERP_LOAD_COMPILED_MODULE
+			(_TEXT("~U\\BASIC\\NEWAGG"), @BuilderApp);
+	    if (activeModule != NullHandle) {
+		RunTaskSetFlags(activeModule, RT_OWNED_BY_BUILDER, 0);
+	    }
+
+ 	    @call SaveFormList::MSG_GEN_SET_ENABLED(VUM_DVAQ);
+	    @call AggPropBox::MSG_GEN_SET_ENABLED(VUM_DVAQ);
+
+	    /* Bring up reset agg prop box
+	     */
+	    @send, forceQueue AggPropBox::MSG_GEN_INTERACTION_INITIATE();
+
+	    /* Hide duplo_ui and duplo_start
+	     */
+	    num = NUM_HIDDEN_AGG;
+
+	} 
+	else 
+	{
+
+	   /* 
+	    *  Create a default form.
+	    */
+
+	    activeModule = 
+		    @call BuilderInterpreter::MSG_INTERP_LOAD_COMPILED_MODULE
+			(_TEXT("~U\\BASIC\\NEWFORM"), @BuilderApp);
+	    if (activeModule != NullHandle) {
+		RunTaskSetFlags(activeModule, RT_OWNED_BY_BUILDER, 0);
+	    }
+
+	    @send, forceQueue SaveFormList::MSG_GEN_SET_NOT_ENABLED(VUM_DVAQ);
+	    @send, forceQueue AggPropBox::
+		MSG_GEN_INTERACTION_ACTIVATE_COMMAND(IC_DISMISS);
+	    @send, forceQueue AggPropBox::MSG_GEN_SET_NOT_ENABLED(VUM_DVAQ);
+				/* hide duplo_ui only */
+	    num = NUM_HIDDEN_NORMAL;
+	}
+    }
+    dirty = FALSE;
+
+    if (!aggregate)
+    {
+	NewFinish(aggregate, num);
+    }
+}
+
+
+/*********************************************************************
+ *			LoadFile
+ *********************************************************************
+ * SYNOPSIS:	Load a basic file and show its ui
+ * CALLED BY:
+ * PASS:	global gCurFilePath - full path of file to load
+ * RETURN:
+ * REVISION HISTORY:
+ *	Name	Date		Description			     
+ *	----	----		-----------			     
+ *	jimmy	6/15/94		Initial version			     
+ * 
+ *********************************************************************/
+@extern method BuilderShellClass, MSG_BS_LOAD_FILE_LOW
+{
+    TCHAR*	fName;
+
+    MemHandle	bugHandle;
+
+    /* delete all the old breakpoints as they obviously wont be relevant
+     * for the new file
+     */
+    bugHandle = BascoBugGetBugHandleFromCTask(bascoTask);
+    BugDeleteAllBreaks(bugHandle);
+    BugSetBuilderState(bugHandle, BS_LOADING_FILE);
+    @call BuilderApp::MSG_GEN_APPLICATION_MARK_BUSY();
+    @call BuilderApp::MSG_GEN_APPLICATION_HOLD_UP_INPUT();
+
+    ResetGandalfCommon();
+
+    /* Put away the property box.  If we're about to load, we don't want to
+     * do 40 or 50 property box updates...
+     */
+    @call PropertiesBox::MSG_GEN_GUP_INTERACTION_COMMAND(IC_DISMISS);
+    @call AggPropBox::MSG_GEN_INTERACTION_ACTIVATE_COMMAND(IC_DISMISS);
+
+    /* Set path and name in the save box */
+    @call SaveFileSelector::MSG_GEN_FILE_SELECTOR_SET_FULL_SELECTION_PATH
+	(gCurFilePath,0);
+    @call SaveFileSelector::MSG_GEN_FILE_SELECTOR_SET_SELECTION(_TEXT("."));
+    fName = strrchr(gCurFilePath, C_BACKSLASH);  fName++;
+    @call SaveFileText::MSG_VIS_TEXT_REPLACE_ALL_PTR(fName, strlen(fName));
+
+    @call SaveTrigger::MSG_GEN_SET_ENABLED(VUM_DVAQ);
+    @call BuildGEOS::MSG_GEN_SET_ENABLED(VUM_DVAQ);
+
+    if (BascoLoadFile(bascoTask, gCurFilePath) == FALSE)
+    {
+	goto DONE;
+    }
+
+    Notify(gCurFilePath, TRUE);
+
+    BSLoad_ParseOOBInfo(oself, bascoTask);
+
+    pself = ObjDeref(oself, 0);
+    if (BSLoad_ShowUI(gCurFilePath, (pself->BS_mode == BSM_AGGREGATE)))
+    {
+	 /*
+	  * Add the full path into the .ini file
+	  */
+	 InitFileWriteString(GANDALF_CATEGORY, LAST_LOAD_KEY, gCurFilePath);
+	 InitFileCommit();
+	 UpdateLastLoadedButton();
+
+	@send, forceQueue RoutineList::
+	    MSG_GEN_DYNAMIC_LIST_INITIALIZE(EditGetNumRoutines(bascoTask));
+
+	@send, forceQueue RoutineList::
+	    MSG_GEN_ITEM_GROUP_SET_NONE_SELECTED(FALSE);
+
+	/* This call sets thing not dirty if they are, sets text not-modified*/
+	@call Editor::MSG_ET_IS_CODE_DIRTY(TRUE);
+
+
+	@send, forceQueue ComponentList::MSG_COMPONENT_LIST_UPDATE_COUNTERS();
+
+	pself = ObjDeref(oself, 0);
+
+	/* create all the generated code to start out with */
+	@call BuilderShell::MSG_BS_GENERATE_UI_CODE(BDF_COMPLEX, FALSE);
+
+	/* compile the code once from scratch */
+	if (BascoCompileCodeFromTask(bascoTask, FALSE) == NullHandle) 
+	{
+	    GandalfCheckForCompileError(bascoTask);
+	}
+    }
+
+DONE:
+    @call BuilderApp::MSG_GEN_APPLICATION_MARK_NOT_BUSY();
+    @call BuilderApp::MSG_GEN_APPLICATION_RESUME_INPUT();
+    @send, forceQueue self::MSG_META_UNSUSPEND();
+    
+    BugSetBuilderState(BascoBugGetBugHandleFromCTask(bascoTask), BS_STOPPED);
+    dirty = FALSE;
+}
+
+
+/* Load file from open trigger */
+@extern method BuilderShellClass, MSG_BS_DO_LOAD_FILE
+{
+    dword	disk;
+    TCHAR	fPath[PATH_BUFFER_SIZE];
+
+    @call LoadFileSelector::MSG_GEN_GUP_INTERACTION_COMMAND(IC_DISMISS);
+
+    disk = @call 
+	LoadFileSelector::MSG_GEN_FILE_SELECTOR_GET_FULL_SELECTION_PATH(fPath);
+    BSLoad_MakePathAbsolute
+	(GFS_GET_FULL_SELECTION_PATH_DISK_HANDLE(disk), fPath);
+    strcpy(gCurFilePath, fPath);
+
+    @send, forceQueue self::MSG_BS_LOAD_FILE_LOW();
+}
+
+
+/* Load file from dialog box */
+@extern method BuilderShellClass, MSG_BS_LOAD_FILE
+{
+    if (!(   (GFS_GET_ENTRY_FLAGS(entryFlags) & GFSEF_OPEN) &&
+	     (GFS_GET_ENTRY_TYPE(entryFlags) == GFSET_FILE)))
+	return;
+
+    @call self::MSG_BS_DO_LOAD_FILE();
+}
+
+
+/* Load file from ini file */
+@extern method BuilderShellClass, MSG_BS_LOAD_LAST
+{
+    TCHAR	fPath[PATH_BUFFER_SIZE];
+    word dummy;
+
+    if (dirty || @call Editor::MSG_ET_IS_CODE_DIRTY(FALSE))
+    {
+	word	response;
+	response = UserStandardDialog(NULL, NULL, NULL, NULL, 
+				      _TEXT("Throw away current changes?"),
+				      CDBF_SYSTEM_MODAL | 
+				      (CDT_ERROR<<CDBF_DIALOG_TYPE_OFFSET) |
+				      (GIT_AFFIRMATION << 
+				       CDBF_INTERACTION_TYPE_OFFSET));
+	if (response != IC_YES)
+	{
+	    return;
+	}
+    }
+
+    if (!InitFileReadStringBuffer(GANDALF_CATEGORY, LAST_LOAD_KEY, fPath,
+				  PATH_BUFFER_SIZE, &dummy)) {
+	strcpy(gCurFilePath, fPath);
+	/* Set path and name in the load box */
+	@call LoadFileSelector::
+	    MSG_GEN_FILE_SELECTOR_SET_FULL_SELECTION_PATH(gCurFilePath,0);
+	@call LoadFileSelector::
+	    MSG_GEN_FILE_SELECTOR_SET_SELECTION(_TEXT("."));
+	@send, forceQueue self::MSG_BS_LOAD_FILE_LOW();
+    }
+}
+
+
+/*********************************************************************
+ *			BSLoad_ParseOOBInfo
+ *********************************************************************
+ * SYNOPSIS:	Search first routine for interesting gook, possibly
+ *		switching builder modes.
+ * CALLED BY:	INTERNAL MSG_BS_LOAD_FILE
+ * PASS:	compiler to search
+ * RETURN:
+ * SIDE EFFECTS:
+ *	Might switch modes to BSM_AGGREGATE; if so, will perform
+ *	necessary initialization work with the agg prop box and the
+ *	rest of Gandalf.
+ *
+ * STRATEGY:
+ * REVISION HISTORY:
+ *	Name	Date		Description			     
+ *	----	----		-----------			     
+ *	dloft	 7/27/95	Initial version
+ *	dubois	10/25/95	Separated from show_ui mechanism
+ * 
+ *********************************************************************/
+/* FIXME: these strlens can be optimized out easily */
+@define LOOKING_AT(_chunk)					\
+    (len = LocalStringLength(LMemDeref(_chunk)),		\
+     !strncmp(line, LMemDeref(_chunk), len))
+static void
+BSLoad_ParseOOBInfo(optr oself, MemHandle task)
+{
+    int		i, numLines;
+    dword	codeOffset;
+    TCHAR*	line;
+    int     	version=0;
+    Boolean 	gotAggInfo=FALSE, gotAggInfoDone=FALSE;
+    Boolean 	gotBgadInfo=FALSE;
+    RTaskHan	rtaskHan = 0;
+    BuilderShellInstance	*pself;
+    int		len;
+
+    
+    pself = ObjDeref(oself, 0);
+    pself->BS_mode = BSM_NORMAL;
+
+    numLines = EditGetRoutineNumLines(bascoTask, 0, &codeOffset);
+    if (! (numLines>2) ) return; /* optimization */
+
+    MemLock(OptrToHandle(@SubDuploUi));
+    for (i = 0; i < numLines; i++)
+    {
+	line = EditGetLineTextWithLock(task, codeOffset, i);
+	/* If this might be a REM statement, check if it
+	 * contains any out-of-band data
+	 */
+	if (*line == C_CAP_R)
+	{
+	    /* Hack : if this line exists, don't show initial forms */
+	    if (!strncmp(line, "REM MAGIC NO SHOW", 17))
+	    {
+		/* FIXME: make this a chunk */
+		gHackNoTopLevelShow = TRUE;
+	    }
+
+	    /* - Look for aggregate def'n */
+	    if (gotAggInfo==FALSE && @LOOKING_AT(@AggNameInfo))
+	    {
+		/* register this aggregate with the property box.  To do the 
+		 * arguments, we'll need to temporarily mangle our string to 
+		 * embed the number of arguments and the type.
+		 */
+		TCHAR*	textPtr		= &line[len];
+
+		/*
+		 * talking to the aggpropbox module causes some intense ui 
+		 * contortions if the thing is usable.  Let's make it go 
+		 * bye-bye, then restore at the end of the process.  dl 6/26/96
+		 */
+		@call AggPropBox::MSG_GEN_SET_NOT_USABLE(VUM_DVAQ);
+
+		if (!rtaskHan) {
+		    @GEC_LOAD_MOD(rtaskHan, AggPropBox);
+		}
+		if (rtaskHan == NullHandle)
+		{
+		    MemUnlock(OptrToHandle(@SubDuploUi));
+		    return;
+		}
+		pself = ObjDeref(oself, 0);
+		pself->BS_mode = BSM_AGGREGATE;
+		ML_RunCallOneArg(rtaskHan, _TEXT("addLoadedAggregate"),
+				 textPtr);
+		gotAggInfo = TRUE;
+	    }
+	    else if (gotAggInfo && !gotAggInfoDone)
+	    {
+		if (@LOOKING_AT(@AggVersion))
+		{
+		    version = atoi(&line[len]);
+		}
+		/* - Look for aggregate properties */
+		else if (@LOOKING_AT(@AggPropertyInfo))
+		{
+		    if (!rtaskHan) {
+			@GEC_LOAD_MOD(rtaskHan, AggPropBox);
+		    }
+		    if (rtaskHan == NullHandle)
+		    {
+			MemUnlock(OptrToHandle(@SubDuploUi));
+			return;
+		    }
+
+		    BSParseAggInfoLow(&line[len], _TEXT("addLoadedProperty"), 
+				      rtaskHan);
+
+		    if (version == 0)
+		    {
+			/* code to convert a version 0 agg adds all properties
+			 * to privVars as well
+			 */
+			BSParseAggInfoLow(&line[len], _TEXT("addLoadedPrivVar"), 
+					  rtaskHan);
+		    }
+		}
+		else if (@LOOKING_AT(@AggClassVarInfo))
+		{
+		    if (!rtaskHan) {
+			@GEC_LOAD_MOD(rtaskHan, AggPropBox);
+		    }
+		    if (rtaskHan == NullHandle)
+		    {
+			MemUnlock(OptrToHandle(@SubDuploUi));
+			return;
+		    }
+		    BSParseAggInfoLow(&line[len], _TEXT("addLoadedClassVar"), 
+				      rtaskHan);
+		}
+		else if (@LOOKING_AT(@AggPrivVarInfo))
+		{
+		    if (!rtaskHan) {
+			@GEC_LOAD_MOD(rtaskHan, AggPropBox);
+		    }
+		    if (rtaskHan == NullHandle)
+		    {
+			MemUnlock(OptrToHandle(@SubDuploUi));
+			return;
+		    }
+		    BSParseAggInfoLow(&line[len], _TEXT("addLoadedPrivVar"), 
+				      rtaskHan);
+		}
+		else if (@LOOKING_AT(@AggActionInfo))
+		{
+		    if (!rtaskHan) {
+			@GEC_LOAD_MOD(rtaskHan, AggPropBox);
+		    }
+		    if (rtaskHan == NullHandle)
+		    {
+			MemUnlock(OptrToHandle(@SubDuploUi));
+			return;
+		    }
+		    BSParseAggInfoLow(&line[len], _TEXT("addLoadedAction"), 
+				      rtaskHan);
+		}
+
+		/* - Look for default compo for property handling */
+		else if (@LOOKING_AT(@AggDefaultInfo))
+		{
+		    if (!rtaskHan) {
+			@GEC_LOAD_MOD(rtaskHan, AggPropBox);
+		    }
+		    if (rtaskHan == NullHandle)
+		    {
+			MemUnlock(OptrToHandle(@SubDuploUi));
+			return;
+		    }
+		    BSParseAggInfoLow(&line[len], _TEXT("SetDefaultComp"),
+				      rtaskHan);
+		    gotAggInfoDone = FALSE;
+		}
+
+	    }
+	    /* - Look for bgadnew state */
+	    if (gotBgadInfo == FALSE && @LOOKING_AT(@BgadnewState))
+	    {
+		ML_RunCallOneArg(@GEC_GET_MOD(EmbeddedCreationControl),
+				 _TEXT("state_set"), &line[len]);
+		gotBgadInfo = TRUE;
+	    }
+	}
+	HugeArrayUnlock(line);
+    }
+    MemUnlock(OptrToHandle(@SubDuploUi));
+
+    /* Something we saw might have put us into agg mode.
+     * Finish off the work of changing modes here
+     */
+    pself = ObjDeref(oself, 0);
+    if (pself->BS_mode == BSM_AGGREGATE)
+    {
+	EC_ERROR_IF(!rtaskHan, -1); /* should be loaded by now */
+	@send, forceQueue AggPropBox::MSG_GEN_SET_USABLE(VUM_DVAQ);
+	@send, forceQueue AggPropBox::MSG_GEN_SET_ENABLED(VUM_DVAQ);
+	@send, forceQueue SaveFormList::MSG_GEN_SET_ENABLED(VUM_DVAQ);
+	@send, forceQueue AggPropBox::MSG_GEN_INTERACTION_INITIATE();
+	@send, forceQueue RoutineList::MSG_RL_SET_NUM_HIDDEN(NUM_HIDDEN_AGG);
+    } else {
+	@send, forceQueue SaveFormList::MSG_GEN_SET_NOT_ENABLED(VUM_DVAQ);
+	@send, forceQueue AggPropBox::MSG_GEN_INTERACTION_ACTIVATE_COMMAND(IC_DISMISS);
+	@send, forceQueue AggPropBox::MSG_GEN_SET_NOT_ENABLED(VUM_DVAQ);
+	@send, forceQueue RoutineList::MSG_RL_SET_NUM_HIDDEN(NUM_HIDDEN_NORMAL);
+    }
+}
+
+/*********************************************************************
+ *			BSParseAggInfoLow
+ *********************************************************************
+ * SYNOPSIS:	Collect all the fields from our particular agg info line
+ * CALLED BY:	INTERNAL, BSLoad_ParseOOBInfo
+ * PASS:	TCHAR *text		the start of the fields
+ *		TCHAR *function		name of function to call to 
+ *					register each field
+ * RETURN:	nothing
+ * REVISION HISTORY:
+ *	Name	Date		Description			     
+ *	----	----		-----------			     
+ *	dloft	 7/27/95	Initial version
+ * 
+ *********************************************************************/
+static void
+BSParseAggInfoLow(TCHAR *text, TCHAR *function, RTaskHan rtaskHan)
+{
+    TCHAR*	front;
+    TCHAR*	end;
+
+    front=end=text;
+    while (*front != C_NULL)
+    {
+	EC(ECCheckBounds(front));
+	EC(ECCheckBounds(end));
+
+	end = strchr(front, C_COMMA);
+
+	if (end != (TCHAR *) NULL) { 
+	    *end = C_NULL;	/* comma found -- null terminate */
+	}
+
+	ML_RunCallOneArg(rtaskHan, function, front);
+
+	if (end != (TCHAR *) NULL) {
+	    EC(ECCheckBounds(end));
+	    *end = C_COMMA;	/* if comma found, get ready to iterate */
+	    front = end+1;
+	} else {
+	    front = strchr(front, C_NULL);	/* seek NULL */
+	}
+    }
+}
+
+/*********************************************************************
+ *			BSLoad_ShowUI
+ *********************************************************************
+ * SYNOPSIS:	Show the UI for the just-loaded module
+ * CALLED BY:	INTERNAL, MSG_BS_LOAD_FILE
+ * PASS:	Full pathname of file loaded into compiler
+ * RETURN:
+ * SIDE EFFECTS:
+ * STRATEGY:
+ *	If this is a normal module, compile and run the first routine
+ *	in the compiler, on the assumption that it's duplo_ui.  Copy
+ *	code to a new compiler so we can strip out calls to
+ *	duplo_start.
+ *
+ *	If it's an aggregate module, copy over the Make routine as well.
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description			     
+ *	----	----		-----------			     
+ *	dubois	10/ 9/95	Pulled out of MSG_BS_LOAD
+ * 
+ *********************************************************************/
+Boolean
+BSLoad_ShowUI(TCHAR* fPath, Boolean aggregateP)
+{
+/*    int		func;*/
+    int		numLines;
+    dword	codeOffset;
+    MemHandle	compTask;
+    MemHandle	fidoTask;
+    MemHandle	task;
+    word	numRoutines;
+/*    sword	linenum;*/
+    Boolean	success = TRUE;
+
+    /* Assume 0 is duplo_ui */
+    numLines = EditGetRoutineNumLines(bascoTask, 0, &codeOffset);
+    if (! (numLines>2) ) return success; /* optimization: no UI code */
+
+    compTask = BascoAllocTask(ProgGetVMFile(buildTask), &bugInfo);
+	
+#if 0
+    fidoTask = BascoCompileTaskSetFidoTask
+	(compTask, RunGetFidoTask(ProgGetMainTask(buildTask)));
+    EC_ERROR_IF(fidoTask == NullHandle, -1);
+#endif
+    BascoSetCompileTaskBuildTime(compTask, TRUE);
+
+    BSCopyEditorCodeToTask(numLines, codeOffset, compTask, TRUE);
+
+    /* Now check if we're in aggregate mode.  If so, copy over
+     * the Make routine, since duplo_ui will try to call it.
+     */
+    if (aggregateP)
+    {
+	/* room for argc, type, integer */
+	byte	  getNameArgs[6] = {1,TYPE_INTEGER,0,0,0,0};
+		
+	MemHandle 	  aggTaskHan =
+	    @call AggPropBox::MSG_GEC_GET_TASK();
+	RunHeapInfo   *rhi;
+	LegosType 	  type;
+	dword	  retval;
+	TCHAR	  *aggname;
+	TCHAR	  routineName[128]; /* ick */
+	int  	  numAggLines;
+		
+	rhi = LockRHIFromRTaskHan(aggTaskHan);
+	RunCallFunction(aggTaskHan, _TEXT("getAggName"), 
+			getNameArgs, &type, &retval);
+	RunHeapLock(rhi, retval, (void **) &aggname);
+	strcpy(routineName, _TEXT("Make"));
+	strcat(routineName, aggname);
+	EC_ERROR_IF((strlen(routineName) > 127), -1);
+	RunHeapUnlock(rhi, retval);
+		
+	numAggLines =
+	    EditGetRoutineNumLines(bascoTask, 
+				   EditGetRoutineIndex(bascoTask, 
+						       routineName),
+				   &codeOffset);
+	BSCopyEditorCodeToTask(numAggLines, codeOffset, compTask, FALSE);
+	UnlockRHIFromRTaskHan(aggTaskHan);
+    }
+
+    /* don't try to run the code if it didn't compile, this
+     * will only happen, of course, if the user has mucked with
+     * the file by hand rather than using the builder (we hope)
+     */
+    task = BascoCompileCodeFromTask(compTask, FALSE);
+    if (task != NullHandle) 
+    {
+	EventHandle	event;
+
+	/* Switch to build time mode by supplying TRUE here...
+	 */
+	activeModule = @call BuilderInterpreter::
+	    MSG_COMPILE_INTERP_CREATE_RTASK(compTask, TRUE, &bugInfo, fPath);
+	@call BuilderInterpreter::MSG_COMPILE_INTERP_BOOT_RTASK(activeModule);
+	
+	/*
+	 * Make sure that forms, dialogs and floaters are set visible, 
+	 * since we're explicitly not running duplo_start()
+	 */
+	if (!gHackNoTopLevelShow) {
+	    /*
+	     * Changed to @send, as this is a huge memory hog.  dl 6/13/96
+	     */
+	    @send, forceQueue ComponentList::MSG_COMPONENT_LIST_SET_TOPLEVELS_VISIBLE();
+	}
+    }
+    else
+    {
+	success = FALSE;
+	GandalfCompileError(compTask);
+    }
+
+#if 0
+    /* reset the original fido task so it gets destroyed
+     */
+    BascoCompileTaskSetFidoTask(compTask, fidoTask);
+#endif
+    BascoDestroyTask(compTask);
+
+    return success;
+}
+
+/*********************************************************************
+ *			BSLoad_MakePathAbsolute
+ *********************************************************************
+ * SYNOPSIS:	Turn DiskHandle/Path into an absolute path.
+ *		Pulled out of MSG_BS_LOAD_FILE to lighten stack load
+ * CALLED BY:	INTERNAL, MSG_BS_LOAD_FILE
+ * SIDE EFFECTS:
+ * STRATEGY:
+ * REVISION HISTORY:
+ *	Name	Date		Description			     
+ *	----	----		-----------			     
+ *	dubois	 7/28/95	Initial version
+ * 
+ *********************************************************************/
+void
+BSLoad_MakePathAbsolute(word disk, TCHAR *path)
+{
+    TCHAR	tempPath[PATH_BUFFER_SIZE];
+
+    /* FileConstructFullPath must be passed two separate buffers;
+     * make it write into the buffer that we were given
+     */
+    strcpy(tempPath, path);
+    FileConstructFullPath(&path, PATH_BUFFER_SIZE, disk, tempPath, TRUE);
+    return;
+}
+
+/*********************************************************************
+ *			BSCopyEditorCodeToTask
+ *********************************************************************
+ * SYNOPSIS:	Copy code from the main compiler (bascoTask) into a
+ *		subsidiary one.
+ *
+ * CALLED BY:	INTERNAL
+ * PASS:	int 	numLines	# of lines to copy over
+ * 		dword 	codeOffset	Offset to the code to copy
+ * 		MemHandle compTask	Task to copy to
+ *		Boolean duploUI		Whether to do special duplo_ui
+ *					checking (see comments below)
+ * RETURN:
+ * SIDE EFFECTS/BUGS:
+ *	This function also overloaded to parse OOB info that's stored
+ *	in duplo_ui.
+ *
+ * STRATEGY:
+ * REVISION HISTORY:
+ *	Name	Date		Description			     
+ *	----	----		-----------			     
+ *	dloft	8/16/95		Initial version
+ * 
+ *********************************************************************/
+void
+BSCopyEditorCodeToTask(int numLines, dword codeOffset, MemHandle compTask,
+		       Boolean duploUI)
+{
+    int	i;
+    TCHAR *text, *uiLine;
+    MemHandle lineHan;
+
+    lineHan = MemAlloc(4096, HF_SWAPABLE | HF_SHARABLE, HAF_STANDARD_LOCK);
+    uiLine  = MemDeref(lineHan);
+
+    *uiLine = DBG_NORMAL;
+
+    for (i = 0; i < numLines; i++) {
+		
+	text = EditGetLineTextWithLock(bascoTask, codeOffset, i);
+
+	if (duploUI) {
+	    /* If the caller says we're loading a duplo_ui routine, then
+	     * do some special checks.  Namely, strip out any calls to
+	     * duplo_start, and look for aggregate component info.
+	     * 
+	     * If the line we find is a call to duplo_start,
+	     * ignore it--we don't want to call duplo_start
+	     * when loading up our ui
+	     */
+	    MemLock(OptrToHandle(@CallDuploStart));
+	    if (*text == C_SMALL_D && 
+		!strcmp((TCHAR *)LMemDeref(@CallDuploStart), text))
+	    {
+		*(uiLine+1) = C_NULL;
+	    }
+	    else
+	    {
+		strcpy(uiLine+1, text);
+	    }
+	    MemUnlock(OptrToHandle(@CallDuploStart));
+			      
+	} else {
+	    strcpy(uiLine+1, text);
+	}
+	
+	BascoLineAdd(compTask, uiLine);
+	HugeArrayUnlock(text);
+    }
+
+    MemFree(lineHan);
+}
+
+/*********************************************************************
+ *			ResetGandalfCommon
+ *********************************************************************
+ * SYNOPSIS:	Clear/initialize state in various places
+ * CALLED BY:	INTERNAL, MSG_BS_NEW, MSG_BS_LOAD_FILE
+ * PASS:
+ * RETURN:
+ * SIDE EFFECTS:
+ * STRATEGY:
+ *	Here we perform as much as possible that is common to
+ *	MSG_BS_LOAD and MSG_BS_NEW
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description			     
+ *	----	----		-----------			     
+ *	dubois	10/12/95	Initial version
+ * 
+ *********************************************************************/
+#define LINE_LEN 64
+#define ADD_LINE(chunk) EC_ERROR_IF((strlen((TCHAR *) LMemDeref(chunk)) > \
+				    LINE_LEN), -1);\
+		strcpy(line+1, (TCHAR *)LMemDeref(chunk));\
+		BascoLineAdd(bascoTask, line);
+#define ADD_BLOCK(chunk) EC_ERROR_IF((strlen((TCHAR *) LMemDeref(chunk)) > \
+				    LINE_LEN), -1);\
+		strcpy(line+1, (TCHAR *)LMemDeref(chunk));\
+		BascoBlockAdd(bascoTask, line);
+
+static void
+ResetGandalfCommon()
+{
+    RTaskHan	rtaskHan;
+    TCHAR	line[LINE_LEN];
+
+    /* do this first, as it could free up a lot of memory */
+    @call Editor::MSG_ET_CLEAR_EDITOR();
+    @call EditorInteraction::MSG_GEN_GUP_INTERACTION_COMMAND(IC_DISMISS);
+    MemLock(OptrToHandle(@EndSub));
+
+    gHackNoTopLevelShow = FALSE;
+
+    /* unload the currently active module */
+    if (activeModule != NullHandle) {
+	RunUnloadModule(NULL, activeModule, TRUE, 0);
+	activeModule = NullHandle;
+    }
+
+    /* this destroys those component that aren't caught by the unload module
+     */
+    @call BuilderComponent::MSG_BC_DESTROY_COMPS_IN_LIST();
+
+
+    /* this now just clears out the component list, it doesn't actually
+     * desttroy any components, that is handled by the unload module
+     */
+    @call ComponentList::MSG_COMPONENT_LIST_DELETE_ALL();
+
+    EditDeleteAllCode(bascoTask);
+
+    /* don't ask */
+    GandalfMessageDispatch();
+
+    line[0] = DBG_NORMAL;
+
+    /* Force duplo_ui to always exist and be function 0.
+     */
+    ADD_LINE(@SubDuploUi);
+    ADD_LINE(@EndSub);
+
+    /* Insert the other default subroutines.
+     */
+    ADD_LINE(@SubDuploStart);
+    ADD_LINE(@EndSub);
+
+    MemUnlock(OptrToHandle(@EndSub));
+    @call BuilderInterpreter::MSG_BENT_MANAGER_SELECT_COMPONENT(NullOptr);
+    @call BuilderInterpreter::MSG_BENT_MANAGER_RESET_CREATION_CONTROLLER();
+    /*
+     * After things have "cleared" don't allow updates until the end.
+     */
+    @call BuilderShell::MSG_META_SUSPEND();
+    
+
+    if (@call BuilderShell::MSG_BS_GET_MODE() == BSM_AGGREGATE)
+    {
+	rtaskHan = @call AggPropBox::MSG_GEC_GET_TASK();
+	if (rtaskHan != NullHandle)
+	{
+	    RunCallFunction(rtaskHan, _TEXT("resetAggPropBox"),
+			    BORK, BORK, BORK);
+	}
+    }
+    rtaskHan = @call EmbeddedCreationControl::MSG_GEC_LOAD_MODULE(TRUE);
+
+    dirty = FALSE;
+    @call BuilderInterpreter::MSG_BENT_MANAGER_SET_FLAGS(0, BF_UI_DIRTY);
+
+    if (rtaskHan == NullHandle) return;
+    RunTaskSetFlags(rtaskHan, RT_OWNED_BY_BUILDER, 0);
+    ML_RunCallOneArg(rtaskHan, _TEXT("state_set"), _TEXT(""));
+}
+
+/*********************************************************************
+ *			ML_RunCallOneArg
+ *********************************************************************
+ * SYNOPSIS:	Call a basic function with one string argument
+ * CALLED BY:	INTERNAL
+ * PASS:
+ * RETURN:
+ * SIDE EFFECTS:
+ * STRATEGY:
+ * REVISION HISTORY:
+ *	Name	Date		Description			     
+ *	----	----		-----------			     
+ *	dubois	10/12/95	Initial version
+ * 
+ *********************************************************************/
+static void
+ML_RunCallOneArg(RTaskHan rtaskHan, TCHAR* func, TCHAR* arg)
+{
+    RunHeapInfo*	rhi;
+    RunHeapToken	argTok;
+    byte		args[6] = {1, TYPE_STRING, 0,0,0,0};
+    Boolean		success;
+    
+    rhi = LockRHIFromRTaskHan(rtaskHan);
+    argTok = RunHeapAlloc(rhi, RHT_STRING, 0,
+			  (strlen(arg)+1) * sizeof(TCHAR), arg);
+    UnlockRHIFromRTaskHan(rtaskHan);
+
+    *((word*) &args[2]) = argTok;
+    success = RunCallFunction(rtaskHan, func, args, NULL, NULL);
+NEC( success = success );
+    EC_ERROR_IF(!success, -1);
+    
+}
+

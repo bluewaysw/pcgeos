@@ -1,0 +1,307 @@
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+	Copyright (c) Geoworks 1996 -- All Rights Reserved
+
+PROJECT:	Legos
+MODULE:		Builder
+FILE:		mainitrp.goc
+
+AUTHOR:		RON, Apr 11, 1996
+
+ROUTINES:
+	Name			Description
+	----			-----------
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	RON	4/11/96  	Initial version.
+
+DESCRIPTION:
+	Code for dealing with the interpreter, BuilderManagerClass
+
+	$Id: mainitrp.goc,v 1.2 98/10/13 22:18:18 martin Exp $
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+@include "gandalf.goh"
+@include <Legos/basco.goh>
+@include "Editor/editorh.goh"
+@include "Main/mainshlh.goh"
+@include <Legos/bgadget.goh>
+
+@classdecl BuilderManagerClass;
+/*********************************************************************
+ *			BuilderManagerBentManagerCreateComponent
+ *********************************************************************
+ * SYNOPSIS: 
+ * CALLED BY:	
+ * RETURN:
+ * SIDE EFFECTS:
+ * STRATEGY:
+ * REVISION HISTORY:
+ *	Name	Date		Description			     
+ *	----	----		-----------			     
+ *	ron	 2/23/95	Initial version			     
+ * 
+ *********************************************************************/
+@if 0
+@method BuilderManagerClass, MSG_BENT_MANAGER_CREATE_COMPONENT
+{
+    optr component;
+
+    component = @callsuper();
+				/* only call if component was actually
+				   created. */
+    if (component != NullOptr) {
+	@call ComponentList::MSG_COMPONENT_LIST_ADD_COMPONENT(component);
+    }
+
+    return component;
+}
+@endif
+
+@method BuilderManagerClass, MSG_BENT_MANAGER_ADD_COMP_TO_COMP_LIST
+{
+    if (comp != NullOptr) {
+	@call ComponentList::MSG_COMPONENT_LIST_ADD_COMPONENT(comp);
+    }
+}
+
+
+/*********************************************************************
+ *			 
+ *********************************************************************
+ * SYNOPSIS: 	Processes the mouse event and checks to see
+ *		if it should select the component in the ComponentList.
+ * CALLED BY:
+ * PARAMETERS:	optr 			component
+ *		sword 			xPosition
+ *		sword	 		yPosition
+ *		word 			inputState
+ *		word 			sourceMsg
+ *		MouseReturnParams	*retVal
+ *
+ * RETURN:
+ * SIDE EFFECTS:
+ * STRATEGY:
+ * REVISION HISTORY:
+ *	Name	Date		Description			     
+ *	----	----		-----------			     
+ *	ron	 2/27/95	Initial version			     
+ * 
+ *********************************************************************/
+
+@method   BuilderManagerClass, MSG_BENT_MANAGER_MOUSE_EVENT
+{
+    if (inputState & (word) BI_DOUBLE_PRESS) {
+	@send, forceQueue EditorInteraction::MSG_GEN_INTERACTION_INITIATE();
+	retVal->flags = MRF_PROCESSED;
+    } else {
+	@callsuper();
+    }
+    
+}
+
+
+/*********************************************************************
+ *		 	MSG_META_KBD_CHAR
+ *********************************************************************
+ * SYNOPSIS: 	Deleted selected component if it has no children
+ *		
+ * CALLED BY:	
+ * RETURN:
+ * SIDE EFFECTS:
+ * STRATEGY:
+ * REVISION HISTORY:
+ *	Name	Date		Description			     
+ *	----	----		-----------			     
+ *	ron	 3/ 1/95	Initial version			     
+ * 
+ *********************************************************************/
+
+@method   BuilderManagerClass, MSG_META_KBD_CHAR
+{
+    optr	component;
+    EntInstance *eself;
+    
+    
+    if	(!(flags & (word) CF_RELEASE) &&
+	 ((character & VC_DEL) == (word) VC_DEL) &&
+	 (pself->BMI_mode == BBM_NORMAL))
+    {
+	component = pself->BMI_selectedComp;
+	if (component != NullOptr) 
+	{
+	    word inputState;
+	    MouseReturnFlags mrf;
+
+	    ObjLockObjBlock(OptrToHandle(component));
+	    eself = ObjDerefEnt(component);
+	    
+	    /* if it has children and not an aggregate, don't delete,
+	     * and don't delete last component
+	     */
+	    if (((eself->EI_comp.CP_firstChild == NullOptr) ||
+		 (ObjIsObjectInClass(component, &BGadgetAggClass)))
+		&&
+		@call ComponentList::MSG_GEN_DYNAMIC_LIST_GET_NUM_ITEMS() > 1)
+	    {
+		/*
+		 * This prevents deaths when deleting dialogs
+		 * in some instances -- ron
+		 */
+		@call self::MSG_VIS_REMOVE_BUTTON_PRE_PASSIVE();
+		/*
+		 * Do this before unbuilding the component.
+		 */
+		@call self::MSG_META_RELEASE_FT_EXCL();
+		
+	     
+		@call self::MSG_BENT_MANAGER_SELECT_COMPONENT(NullOptr);
+		/* This doesn't seem necessary */
+		/*@call self::MSG_BENT_MANAGER_DESTROY_COMP_THROUGH_TOOL(component);*/
+		@call ComponentList::MSG_COMPONENT_LIST_DELETE_COMPONENT(component);
+		@call BuilderComponent::MSG_BC_DELETE_COMP_FROM_DESTROY_LIST(component);
+		if (@call component::
+			MSG_META_IS_OBJECT_IN_CLASS( &EntVisClass ))
+		{
+			@call component::MSG_ENT_VIS_HIDE();
+		}
+		@call component::MSG_ENT_REMOVE_PARENT_LINKAGE(CCF_DIRTY);
+		@send , forceQueue component::MSG_ENT_DESTROY();
+		@call self::MSG_BENT_MANAGER_SET_FLAGS(BF_UI_DIRTY, 0);
+	    }
+	    else 
+	    {
+		UserStandardSound(SST_WARNING);
+	    }
+	    
+	    MemUnlock(OptrToHandle(component));
+	}
+    } else 
+    {
+	@callsuper();
+    }
+}
+
+/***********************************************************************
+ *		MSG_BENT_MANAGER_SET_FLAGS for BuilderManagerClass
+ ***********************************************************************
+ * SYNOPSIS:	    set our dirty flag if setting BF_UI_DIRTY
+ * PARAMETERS:	    
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	jimmy	9/15/95   	Initial Revision
+ *
+ ***********************************************************************/
+@method BuilderManagerClass, MSG_BENT_MANAGER_SET_FLAGS
+{
+    @callsuper();
+
+    if (flagsToSet & BF_UI_DIRTY) {
+	dirty = TRUE;
+    }
+}	/* End of MSG_BENT_MANAGER_SET_FLAGS.	*/
+
+
+/***********************************************************************
+ *		MSG_BENT_MANAGER_IS_UNIQUE_NAME for BuilderManagerClass
+ ***********************************************************************
+ * SYNOPSIS:	    
+ * PARAMETERS:	    
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	jimmy	9/15/95   	Initial Revision
+ *
+ ***********************************************************************/
+@method BuilderManagerClass, MSG_BENT_MANAGER_IS_UNIQUE_NAME
+{
+    return @call ComponentList::MSG_COMPONENT_LIST_IS_UNIQUE_NAME(name);
+}	/* End of MSG_BENT_MANAGER_IS_UNIQUE_NAME.	*/
+
+
+
+/***********************************************************************
+ *		MSG_BENT_MANAGER_UPDATE_CONTROL_UI for BuilderManagerClass
+ ***********************************************************************
+ * SYNOPSIS:	Intercept this message so we can keep the component list
+ *		in sync with the current selection
+ * PARAMETERS:	optr 	component
+ *		Boolean force
+ * SIDE EFFECTS:
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	dloft	11/10/95   	Initial Revision
+ *
+ ***********************************************************************/
+@method BuilderManagerClass, MSG_BENT_MANAGER_UPDATE_CONTROL_UI
+{
+    if (@call BuilderShell::MSG_BS_GET_SUSPENDED() == 0) 
+    {
+	@callsuper();
+	pself = ObjDerefBentManager(oself);
+	@send, forceQueue ComponentList::MSG_COMPONENT_LIST_SELECT_COMPONENT(pself->BMI_selectedComp);
+    }
+    
+
+}	/* End of MSG_BENT_MANAGER_UPDATE_CONTROL_UI.	*/
+
+
+
+/***********************************************************************
+ *		MSG_BENT_MANAGER_SELECT_COMPONENT for BuilderManagerClass
+ ***********************************************************************
+ * SYNOPSIS:	Bring down property box and deselect component list when
+ *		selecting NullOptr
+ * PARAMETERS:	optr	component
+ * SIDE EFFECTS:
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	RON	3/28/96		Initial Revision
+ *
+ ***********************************************************************/
+@method BuilderManagerClass, MSG_BENT_MANAGER_SELECT_COMPONENT
+{
+    if (!(@call BuilderShell::MSG_BS_GET_SUSPENDED()))
+    {
+	
+	if (component == NullOptr) 
+	{
+	    @send, forceQueue PropertiesBox::
+		MSG_GEN_SET_NOT_ENABLED(VUM_DELAYED_VIA_UI_QUEUE);
+	    @send, forceQueue ComponentList::
+		MSG_GEN_ITEM_GROUP_SET_NONE_SELECTED(0);
+	    @send, forceQueue EventList::
+		MSG_GEN_DYNAMIC_LIST_INITIALIZE(0);
+	} else 
+	{
+	    /* reenable the properties box */
+	    @send, forceQueue PropertiesBox::
+		MSG_GEN_SET_ENABLED(VUM_DELAYED_VIA_UI_QUEUE);
+	}
+    }
+    
+    
+    @callsuper();
+}	/* End of MSG_BENT_MANAGER_SELECT_COMPONENT.	*/
+
+
+

@@ -1,0 +1,331 @@
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+	Copyright (c) Geoworks 1994 -- All Rights Reserved
+
+PROJECT:	PC/GEOS
+MODULE:		UI Builder
+FILE:		gandalf.goh
+
+AUTHOR:		Martin Turon, Aug 30, 1994
+
+ROUTINES:
+	Name			Description
+	----			-----------
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	martin	8/30/94   	Initial version.
+
+DESCRIPTION:
+	
+
+	$Id: gandalf.goh,v 1.2 98/10/13 22:15:40 martin Exp $
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+
+@ifndef __GANDALF_GOH_
+@define __GANDALF_GOH_
+
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		Includes
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+
+@include <stdapp.goh>
+@include <iacp.goh>
+			/* dynamically add and replace component */
+			/* libraries...  We are statically dependant on bool */
+			/* until the the BoolCreateControlClass is split up */
+			/* and put into Bent... */
+
+#include <sem.h>
+#include <Ansi/string.h>
+#include <Ansi/stdio.h>
+#include <chunkarr.h>
+
+#include <Legos/edit.h>
+#include <Legos/bug.h>
+@include <Legos/basco.goh>
+@include <Legos/bent.goh>
+@include <Legos/legosapp.goh>
+#include <Legos/basrun.h>
+#include <Legos/runheap.h>
+@include <Legos/basrun.goh>
+
+
+
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		Global Constant & Type Definitions
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+
+#define MAXSTRINGSIZE 256
+#define NUM_HIDDEN_NORMAL 1
+#define NUM_HIDDEN_AGG 5
+#define NUM_HIDDEN_STARTUP_AGG 2
+
+#define GANDALF_CATEGORY "gandalf"
+#define LAST_LOAD_KEY "bas0"
+#define NUM_LINES_DISPLAYED_KEY "numLinesDisplayed"
+#define DEFAULT_NUM_LINES_DISPLAYED 250
+#define VUM_DVAQ VUM_DELAYED_VIA_APP_QUEUE
+
+
+/*-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+ %		Global functions
+ %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+
+extern word	GandalfLocalGeosToDos(TCHAR *text, TCHAR *dst);
+extern Boolean	GandalfCheckForCompileError(MemHandle	taskHan);
+extern void	GandalfCompileError(CTaskHan);
+
+extern void	UnlockRHIFromRTaskHan(RTaskHan rtaskHan);
+extern RunHeapInfo* LockRHIFromRTaskHan(RTaskHan rtaskHan);
+
+extern void     UpdateLastLoadedButton();
+
+PTaskHan GandalfGetMainTask(void);
+
+void Notify(TCHAR *message, Boolean clearFirst);
+
+
+/*-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+ %		Global variables
+ %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+
+extern PTaskHan  buildTask;	/* PTask: user creation of components */
+extern MemHandle bascoTask;	/* CTask: attached to buildTask */
+
+extern PTaskHan  viewTask;	/* PTask: currently-running interp */
+extern PTaskHan  uiTask;	/* PTask: controller ui */
+
+extern MemHandle uiBlock;
+
+extern optr	viewInterp;
+extern optr	viewApp;
+extern BugBuilderInfo bugInfo;
+
+extern byte	quitting;
+extern byte	dirty;
+extern PathName	gCurFilePath;	/* Currently-loaded module */
+
+extern Boolean	gHackNoTopLevelShow; /* set if we shouldn't exec duplo_ui */
+extern BDescFlags gCurUIFlags;	/* Last flags passed to GENERATE_UI_CODE */
+
+/*-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+ %		Structs and types
+ %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+
+typedef struct
+{
+    RunHeapToken	fieldNameToken;
+    RunHeapToken	fieldTypeToken;	
+    /* token of string version of the type, not LegosType */
+} AggField;
+
+
+/*-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+ %		Class definitions
+ %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+
+/* BuilderProcessClass
+ */
+@class BuilderProcessClass, GenProcessClass;
+@endc;
+
+/* BuilderAppClass
+ */
+@class  BuilderAppClass, LegosAppClass;
+    /* IACP Communication with the spawned viewer
+    /* We want to use same token for all references to an active viewer */
+
+    @message word MSG_BA_GET_VIEWER_TOKEN();
+    @message void MSG_BA_SET_VIEWER_TOKEN(word token);
+
+    /* Aid shutdown...*/
+    @message void MSG_BA_END_PROGRAM();
+
+    @instance word BAI_token = IACP_NO_CONNECTION;
+
+    /* We need this to send a MSG_META_QUIT to the app */
+    @instance GeodeHandle BAI_viewerAppHandle = NullHandle;
+
+@endc
+
+/* BuilderTextClass
+ */
+@class  BuilderTextClass, GenTextClass;
+@endc
+
+/* BuilderComponentClass
+ */
+@class	BuilderComponentClass, EntClass;
+    @message (MSG_ENT_GET_PROPERTY_0) MSG_BUILDER_GET_SELECTION;
+    @message (MSG_ENT_GET_PROPERTY_0) MSG_BUILDER_SET_SELECTION;
+
+    @message ChunkHandle MSG_BC_GET_DESTROY_LIST();
+    @message void MSG_BC_DESTROY_COMPS_IN_LIST();
+    @message void MSG_BC_DELETE_COMP_FROM_DESTROY_LIST(optr comp);
+
+    @instance	ChunkHandle BCI_destroyCompList;
+@endc
+
+
+@class	BuilderManagerClass, BentManagerClass;
+
+@endc;
+
+@endif
+
+
+
+@ifndef __GANDALF_UI_MAIN_GOC
+@define __GANDALF_UI_MAIN_GOC
+
+
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		External Objects
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+
+/* UI MAIN */
+
+@extern object @BuilderApp;
+@extern object @BuilderPrimary;
+@extern object @BuilderInterpreter;
+@extern object @UiInterpreter;
+@extern object @BuilderComponent;
+
+@extern object @PropertiesBox;
+@extern object @AggPropBox;
+@extern object @UserToolBox;
+@extern object @FloatingToolbox;
+@extern object @EmbeddedCreationControl;
+
+@extern object @SaveTrigger;
+@extern object @BuildGEOS;
+
+@extern object @LoadFileSelector;
+@extern object @SaveFileSelector;
+@extern object @SaveFileText;
+@extern object @SaveFormList;
+
+@extern object @BuilderShell;
+@extern object @SingleStepTrigger;
+@extern object @ProcStepTrigger;
+@extern object @FinishTrigger;
+@extern object @ContTrigger;
+@extern object @PCTrigger;
+@extern object @PauseTrigger;
+@extern object @StopTrigger;
+@extern object @RunTrigger;
+@extern object @RunRemoteTrigger;
+
+@extern object @FileMenu;
+
+@extern object @EditorInteraction;
+@extern object @Editor;
+@extern object @RoutineList;
+@extern object @NewFuncTrigger;
+@extern object @NewSubTrigger;
+@extern object @DeleteRoutineTrigger;
+@extern object @DeleteComponentTrigger;
+@extern object @BreakTrigger;
+
+@extern object @GlobalInteraction;
+@extern object @GlobalChart;
+@extern object @LocalInteraction;
+@extern object @LocalChart;
+@extern object @InternalInteraction;
+@extern object @InternalChart;
+@extern object @CallStack;
+@extern object @DebugMenu;
+@extern object @CallStackInteraction;
+
+@extern object @VarUpdateInteraction;
+@extern object @VariableName;
+@extern object @VariableValue;
+@extern object @StructValue;
+
+@extern chunk @debugInfo;
+@extern chunk @buildDebugInfo;
+
+@extern object @ComponentList;
+@extern object @EventList;
+
+@extern object @BuilderTextMoniker;
+@extern object @BuilderMoniker;
+@extern object @BuilderEditControl;
+
+@endif  /* __GANDALF_UI_MAIN_GOC */
+
+@ifndef __GANDALF_UI_MAIN_STRINGS
+@define __GANDALF_UI_MAIN_STRINGS
+
+@extern chunk @SorryNotSupportedYet;
+@extern chunk @InternalVariables;
+@extern chunk @Shadowed;
+@extern chunk @DuploStart;
+@extern chunk @DuploRev;
+@extern chunk @None;
+@extern chunk @NoActive;
+@extern chunk @TopLevel;
+@extern chunk @RevisionHeader;
+@extern chunk @Array;
+@extern chunk @Comp;
+@extern chunk @Module;
+@extern chunk @Complex;
+@extern chunk @StartTop;
+@extern chunk @FuncDuploStart;
+@extern chunk @SubDuploStart;
+@extern chunk @CallUpdateDuploStart;
+@extern chunk @CallDuploStart;
+@extern chunk @SubDuploUi;
+@extern chunk @DuploUi;
+@extern chunk @FuncDuploRev;
+@extern chunk @StartRev;
+@extern chunk @EndTop;
+@extern chunk @EndRev;
+@extern chunk @EndFunction;
+@extern chunk @EndSub;
+@extern chunk @GandalfFileError;
+@extern chunk @EditorStart;
+@extern chunk @EditorAggStart;
+@extern chunk @NoUpdateAfterError;
+@extern chunk @WriteError;
+@extern chunk @LviewError;
+@extern chunk @StructString;
+@extern chunk @EndStructString;
+@extern chunk @AggDefaultStructFields;
+@extern chunk @AggPropertyStructFields;
+@extern chunk @ExportAggregate;
+@extern chunk @CallTestSub;
+@extern chunk @CallMakeSub;
+@extern chunk @MakeAggregateRuntime;
+@extern chunk @MakeAggregateBuildtime;
+@extern chunk @InitAggregate;
+@extern chunk @AggInitDefaultComp;
+@extern chunk @AggCreatedRoutineName;
+@extern chunk @AggCreatedRoutineHeader;
+@extern chunk @AggSetPropSub;
+@extern chunk @AggSetPropSubPrelude;
+@extern chunk @AggSpecialGetRoutineName;
+@extern chunk @AggSpecialSetRoutineName;
+@extern chunk @AggDefaultGetPropCase;
+@extern chunk @AggDefaultSetPropCase;
+@extern chunk @AggSpecialGetPropCase;
+@extern chunk @AggSpecialSetPropCase;
+@extern chunk @AggEndSelect;
+@extern chunk @AggGetPropFunc;
+@extern chunk @AggGetPropFuncPrelude;
+
+@extern chunk @AggNameInfo;
+@extern chunk @AggPropertyInfo;
+@extern chunk @AggActionInfo;
+@extern chunk @AggEventInfo;
+@extern chunk @AggDefaultInfo;
+
+@extern chunk @BgadnewState;
+
+@extern chunk @ResFile;
+@extern chunk @WriteResourceError;
+@endif
+

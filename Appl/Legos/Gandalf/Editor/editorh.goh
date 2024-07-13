@@ -1,0 +1,313 @@
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+	Copyright (c) Geoworks 1994 -- All Rights Reserved
+
+PROJECT:	LEGOS
+MODULE:		Editor
+
+FILE:		editor.goh
+
+AUTHOR:		Roy Goldman, Sep 17, 1994
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	roy	9/17/94   	Initial version.
+
+DESCRIPTION:
+                supports line marking for
+                breakpoints, execution points, displaying
+		routines, any potential
+		syntax checking, dumping code down to interpreter, etc.
+
+		This file also includes the RoutineList which
+		is closely associated with the editor...
+
+	$Id: editorh.goh,v 1.2 98/10/13 22:18:07 martin Exp $
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+
+@ifndef __EDITOR_GOH
+@define __EDITOR_GOH
+
+@include <stdapp.goh>
+@include <Objects/vTextC.goh>
+
+/* This data structure keeps our minimal set of line descriptions.
+   SPA_bgColor doesn't work, but maybe it will eventually if
+   the editor is switched to a VisText
+*/
+
+typedef struct {
+    ColorQuad                   SPA_bgColor;
+} SimpleParaAttr;
+
+/* Checks to see if two of the above structures are equal.
+   Currently ignors bgColor, so change it if you want to use it. */
+
+byte SimpEqual(VisTextParaAttr *vtpa, SimpleParaAttr *spa);
+
+
+/* CLASS: Editor
+   Currently subclassed of GenText, but this might need to change
+   to VisText.
+   
+   Future requirements:
+   
+   - A way to have unlimited line length to prevent word wrapping.
+     Some suggestions we got were monitoring keypresses and
+     then changing the text object's width accordingly...
+
+   - A nice way to have a scrolling view of the text object.
+     (GenText only allows vertical scrolling, and a series of
+      hacks were futile:)
+
+      1. Tried putting much wider Gentext in GenContent in Genview,
+         but couldn't get cursor to stay on screen. Also, still
+	 text would wrap at end of long text box....
+
+      2. Tried converting to Vistext, but got a slew of problems.
+         One, text updates were much slower. Two, couldn't find
+	 a way to get the thing to scroll vertically! We had
+	 to specify a size for it to show up, but then that size
+	 was fixed. 
+	 
+   I just didn't have the energy to muck with this stuff now.
+   My object should be ploppable into any scheme...
+
+   Warning: Slight rendering bug if one line stretches over
+   several lines on the view, when setting breakpoints/execution
+   points on next to last line...
+
+*/
+
+@class EditorTextClass, GenTextClass;
+   @uses EntClass;
+
+   /* The SimpleParaAttr styles used to define the possible
+      states for a line, marked for break, marked as next
+      line to be executed, or both */
+
+   @instance optr ETI_breakAttrs;
+   @instance optr ETI_pcAttrs;
+   @instance optr ETI_breakPcAttrs;
+   @instance int  ETI_numLines = 0;
+   @instance dword ETI_codeOffset = -1L;
+   @instance sword ETI_funcNumber;
+   @instance sword ETI_event;
+
+   /* These next two fields are used in conjunction with displaying
+    * routines that are very long.  Since EditorText will cramp Geos
+    * for long routines (over 250 lines), we only display a portion
+    * of a long routine.
+    */
+    @instance word  ETI_numLinesDisplayed = 0;  /* max lines to display */
+    @instance byte  ETI_showingLongRoutine = 0; /* nonzero if long routine */
+    @instance word  ETI_firstLineVisible = 0;
+
+
+   /* Flag is set if editor has changed and code needs to be downloaded
+    *  to editor.
+    */
+   @instance byte ETI_dirty;
+   @instance int ETI_errorLine = -1;
+
+   /* Get status of current line. 0 = empty, 1=breakpoint, 2=pc, 4 = both */
+   @message byte MSG_ET_GET_LINE_STATUS(int lineNum);
+
+   /* Toggle breakpoint at current line(-1) or given line */
+   /* If dirty byte is TRUE then set dirty flag */
+   @message void MSG_ET_TOGGLE_BREAKPOINT(int lineNum, byte dirty);
+
+   /* Set PC at current line (lineNum = -1) or a sepcific line */
+   /* if dirty is TRUE then set dirty flag */
+   @message void MSG_ET_SET_PC(int lineNum, byte dirty);
+
+   /* Clear the PC marker if it's currently visible
+      (Unless it's at lineNum, an optimization to
+       eliminate flickering*/
+   @message void MSG_ET_CLEAR_PC(int line);
+
+   /* Internal function used to orient ourselves in a gentext*/
+   /* Fills in cursor/selection start/end, line number, line offset*/
+
+   @message void MSG_ET_GET_CURSOR_INFO(dword *start, dword *end,
+					dword *line, dword *boff,
+					dword *eoff);
+
+   /* Change the style for the line number specified */
+
+   @message void MSG_ET_UPDATE_LINE(SimpleParaAttr atts,
+				    dword line);
+
+
+   /* Display the routine for the given index into the function table*/
+   @message void MSG_ET_SHOW_ROUTINE_BY_INDEX(int index);
+
+@if 0
+   /* Check if the editor has new breakpoints/exec points */
+   @message byte MSG_ET_IS_BREAK_DIRTY();
+
+   /* Dirty the editor for breakpoints/exec points, and clean it*/
+   @message void MSG_ET_BREAK_DIRTY();
+@endif
+   /* Check if the code has actually been modified and needs
+      to be reinstalled */
+
+   @message byte MSG_ET_IS_CODE_DIRTY(Boolean	clear);
+
+   /* Put cursor at beginning of specified line*/
+   @message void MSG_ET_SET_CURSOR_AT_LINE(sdword lineNum);
+
+   /* Download code and/or breakpoints if necessary */
+   @message int MSG_ET_UPDATE_CODE_IF_NECESSARY(Boolean withCompile);
+
+   /* Download code from editor into interpreter. Use above
+      unless sure that's what you want! */
+   @message int MSG_ET_DOWNLOAD_CODE(Boolean withCompile);
+
+   /* Download current code if necessary and add code for new routine.
+      if given flag is 0, show code for a new function. if 1,
+      show code for a new subroutine
+   */
+   @message void MSG_ET_ADD_NEW_ROUTINE(int flag);
+
+    /* Adds <text> to a blank editor and optionally tries to compile it */
+    @message void MSG_ET_ADD_NEW_ROUTINE_TEXT
+	(TCHAR* text, word insertPoint, Boolean sendToEditor);
+
+   @message void MSG_ET_DELETE_ROUTINE();
+
+/* Reset editor */
+@message void MSG_ET_CLEAR_EDITOR();
+
+/* Add a new event handler to the editor.  Save old work if
+ * necessary.  If defaultProto and/or defaultClass are null, ask the
+ * component to supply these values.
+ */
+@message void MSG_ET_ADD_NEW_EVENT_HANDLER(BentEventTypicalDescriptionStruct *desc, optr component, TCHAR *defaultProto, TCHAR *defaultClass);
+
+
+   @message void MSG_ET_SET_ERROR_LINE(int lineNum);
+   @message int MSG_ET_GET_ERROR_LINE();
+
+   @message (MSG_ENT_DO_ACTION_0) MSG_ET_AGG_PROPERTY_CHANGED;
+   @message (MSG_ENT_DO_ACTION_0) MSG_ET_NEW_AGG_PROPERTY;
+
+   @message (MSG_ENT_DO_ACTION_0) MSG_ET_AGG_NAME_CHANGED;
+   @message (MSG_ENT_DO_ACTION_0) MSG_ET_NEW_AGG_NAME;
+
+   @message int MSG_ET_GET_FUNC_NUMBER();
+
+   @message int	MSG_ET_GET_NUM_LINES_DISPLAYED();
+   @message void MSG_ET_ADJUST_DISPLAY_RANGE_FOR_LONG_ROUTINE(int index,
+							      int *startLine,
+							      int *numLines);
+   @message Boolean MSG_ET_PREVENT_LONG_ROUTINES(word character,
+					         ShiftState shiftState);
+   @message int MSG_ET_CONVERT_TEXT_LINE_TO_CODE_LINE(int tLine);
+   @message int MSG_ET_CONVERT_CODE_LINE_TO_TEXT_LINE(int cLine);
+
+@endc;
+
+
+/* CLASS: Routine List */
+@class RoutineListClass, GenDynamicListClass;
+  
+   /* Standard query message to get name of routine with specific index */
+   @message (GEN_DYNAMIC_LIST_QUERY_MSG) MSG_RL_QUERY_ROUTINE_NAME;
+
+   /* Tell Editor to display appropriate routine */
+
+   @message (GEN_ITEM_GROUP_APPLY_MSG) MSG_RL_SHOW_ROUTINE_FROM_LIST;
+
+   /* Change the number of routines that we hide from the user */
+   @message void MSG_RL_SET_NUM_HIDDEN(int num);
+
+   /* Return the number of routines that we hide from the user */
+   @message int MSG_RL_GET_NUM_HIDDEN();
+
+   @instance optr RLI_editor;
+   @instance optr RLI_pcTrigger;
+   @instance int RLI_numHidden = NUM_HIDDEN_NORMAL; 
+   /* the number of routines to hide */
+@endc;
+
+/*
+ * A ComponentList can be used for displaying components.
+ * Just send a MSG_COMPONENT_LIST_ADD_COMPONENT for each component to show.
+ * The name of the component will show up as the moniker.
+ */
+@class ComponentListClass, GenDynamicListClass;
+
+/* Add this component to the list */
+@message void MSG_COMPONENT_LIST_ADD_COMPONENT(optr component);
+/* Send this off as the appy message */
+@message (GEN_ITEM_GROUP_APPLY_MSG) MSG_COMPONENT_LIST_APPLY_MSG;
+
+@message void MSG_COMPONENT_LIST_SELECT_COMPONENT(optr component);
+@message void MSG_COMPONENT_LIST_DELETE_COMPONENT(optr component);
+@message void MSG_COMPONENT_LIST_DELETE_ALL();
+
+/* a routine to update all component controllers count */
+@message void MSG_COMPONENT_LIST_UPDATE_COUNTERS();
+@message int MSG_COMPONENT_LIST_IS_UNIQUE_NAME(RunHeapToken name);
+/*@message void MSG_COMPONENT_LIST_TOPLEVEL_OUTPUT_VISIBLE(MemHandle buffer);*/
+@message void MSG_COMPONENT_LIST_SET_TOPLEVELS_VISIBLE();
+
+/* Chunk array of all components we know about */
+@instance ChunkHandle CLI_componentArray = NullChunk;
+/* optr of EventList it should communicate with */
+@instance optr CLI_eventList;
+@endc;
+
+
+@class EventListClass, GenDynamicListClass;
+
+@message (GEN_ITEM_GROUP_APPLY_MSG) MSG_EVENT_LIST_APPLY_MSG;
+
+/* Show all events for this component */
+@message void MSG_EVENT_LIST_SHOW_EVENTS(optr component);
+
+/* Create the routine name for the item of the list.
+ * Fill in the passed buffer.
+ */
+@message void MSG_EVENT_LIST_CONSTRUCT_ROUTINE_NAME(TCHAR *name, word item);
+
+
+/* Heap block that stores descriptions of events for the component */
+@instance MemHandle ELI_eventBlock = NullHandle;
+/* Current component whose events are being displayed */
+@instance optr	ELI_component = NullOptr;
+@endc;
+
+/*
+ * There is something weird going on such that the Editor needs
+ * to recieved a VIS_UPDATE_GEOMETRY before its parent interaction
+ * finished its GEN_INTERACTION_INITIATE. I have no idea why, but it
+ * will crash if it doesn't.  (The crash happens bringing up the
+ * editor.
+ */
+@class UpdatingGenInteractionClass, GenInteractionClass;
+@endc;
+
+
+typedef enum
+{
+    ERROR_NULL_COMPONENT
+} FatalErrors;
+
+
+typedef enum
+{
+    WARNING_NULL_COMPONENT
+} Warnings;
+
+
+
+@endif
+
+
+
+
+

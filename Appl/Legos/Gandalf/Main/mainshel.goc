@@ -1,0 +1,1643 @@
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+	Copyright (c) Geoworks 1994 -- All Rights Reserved
+
+PROJECT:	Legos
+MODULE:		Gandalf
+FILE:		mainshell.goc
+
+AUTHOR:		Roy Goldman, Oct 25, 1994
+
+ROUTINES:
+	Name			Description
+	----			-----------
+    MTD MSG_BS_STOP		Called when the user hits the STOP trigger.
+				Responsible for terminating the viewer app.
+				Assume there is one!
+
+    MTD MSG_BS_DONE_PART_TWO	Called after viewer app has been
+				successfully terminated.
+
+    INT PausedCommonUI		some common code
+
+    MTD MSG_BS_ABOUT_TO_BREAK	Call back from interpreter right before
+				it's about to block on a breakpoint.  Sets
+				up the UI to do exactly what we want after
+				a breakpoint
+
+    MTD MSG_BS_SHOW_VAR_CHANGE	Tell the various variable charts that
+				variables have changed and it's time to
+				update.	 Should be finer-grained later.
+
+    MTD MSG_BS_CONTINUE_COMMON	common code for various callers of
+				BS_CONTINUE
+
+    MTD MSG_BS_START		Does nothing, now.
+
+    MTD MSG_BS_DONE		Turn off some triggers since we aren't
+				running code
+
+    MTD MSG_BS_CONTINUE		Continue after a breakpoint.
+
+    MTD MSG_BS_PAUSE		Tell interpreter to stop ASAP
+
+    MTD MSG_BS_PROC_STEP	Set up UI and tell Interpreter to routine
+				step
+
+    MTD MSG_BS_FINISH		Set up UI & Tell Interpreter to finish
+				current routine
+
+    MTD MSG_BS_SINGLE_STEP	Set up UI & Tell Interperter to single step
+
+    EXT LockRHIFromRTaskHan	Extract a pointer to the RunHeapInfo for an
+				RTask's PTask
+
+    EXT GandalfLaunchViewerApp	launch the viewer application
+
+    MTD MSG_BS_RUN		Powerhouse routine: 1. Set up UI for run
+				mode 2. Compile source and spawn a viewer
+				app 3. Download all code from builder to
+				viewer 4. Execute start
+
+    GLB GandalfCheckForCompileError
+				check for any compile errors
+
+    EXT GandalfCompileError	Pop up erroneous line in editor
+
+    GLB GandalfError		Pop up a standard error dialog
+
+    MTD MSG_BS_COMPILE_ALL	compile everything in bascoTask
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	roy	10/25/94	Initial version.
+
+DESCRIPTION:
+	Code for the "Builder Shell" which coordinates activities
+	which encompass or involve multiple UI objects.
+	For example, when you hit "CONTINUE" after a breakpoint,
+	one must deactivate the trigger, update any code changes,
+	and restart the interprter.  All such messages will be here.
+	Note: We could decide to put this into the process later on,
+	but I think it's conceptually different: the UI coordinator.
+
+	Also, it's the "first line of defense" for processing
+	UI actions which don't belong 100% to any of the component
+	objects... 
+
+	$Id: mainshel.goc,v 1.2 98/10/13 22:18:43 martin Exp $
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+
+
+@include "gandalf.goh"
+@include "Main/mainshlh.goh"
+
+#include <Legos/Internal/progtask.h>
+#include <Legos/Internal/runtask.h>
+#include <Legos/runheap.h>
+#include <Legos/rpc.h>
+#include <Legos/bascobug.h>
+@include <Legos/lviewh.goh>
+
+#include "main.h"
+@include "Editor/editorh.goh"
+@include "Debug/debugh.goh"
+#include <geoMisc.h>                    /* for itoa */
+
+
+
+
+
+
+@classdecl BuilderShellClass;
+
+/***************************************************************************
+ *	 External method declarations for BuilderShellClass 
+ ***************************************************************************/
+
+/* The following methods are defined in mainsave.goc */
+@extern method BuilderShellClass, MSG_BS_SAVE_FILE;
+@extern method BuilderShellClass, MSG_BS_SAVE_COMPILED_FILE;
+@extern method BuilderShellClass, MSG_BS_GENERATE_UI_CODE;
+@extern method BuilderShellClass, MSG_BS_SAVE_CANCEL;
+
+/* The following methods are defined in mainload.goc */
+@extern method BuilderShellClass, MSG_BS_LOAD_FILE;
+@extern method BuilderShellClass, MSG_BS_LOAD_LAST;
+@extern method BuilderShellClass, MSG_BS_DO_LOAD_FILE;
+@extern method BuilderShellClass, MSG_BS_LOAD_FILE_LOW;
+@extern method BuilderShellClass, MSG_BS_NEW;
+@extern method BuilderShellClass, MSG_BS_NEW_MODULE;
+@extern method BuilderShellClass, MSG_BS_NEW_AGG;
+@extern method BuilderShellClass, MSG_BS_OPEN;
+@extern method BuilderShellClass, MSG_BS_NEW_AGG_FINISH;
+
+@if 0
+@extern object PreText;
+@extern object PostText;
+@extern object WriteWatch;
+@extern object ReadWatch;
+@endif
+
+@extern object @DebugInfoGroup;
+@extern object @COMList;
+@extern object @TestCOMTrigger;
+
+@extern object NotificationText;
+
+@extern object RemoteSettingsDialog;
+
+extern byte stopping;
+
+extern void NukeInstantiatedVarCharts(void);
+
+extern byte serialUnit;
+
+extern Boolean	hack_compilingBCL;
+
+
+/* - internal things */
+
+static MemHandle servers = NullHandle;
+SerialPortNum myPort = GIGS_NONE;
+
+static int PausedCommonUI(optr oself);
+
+
+void
+Notify(TCHAR *message, Boolean clearFirst)
+{
+    if (clearFirst) {
+	@call NotificationText::MSG_VIS_TEXT_REPLACE_ALL_PTR(message, 0);
+    } else {
+	@call NotificationText::MSG_VIS_TEXT_APPEND_PTR(message, 0);
+    }
+}
+
+PTaskHan
+GandalfGetMainTask()
+{
+    if ((word)myPort != GIGS_NONE) {
+	return REMOTE_CONNECTION_ID | ((myPort >> 1) + 1);
+    } else {
+	return viewTask;
+    }
+}
+
+
+
+/***********************************************************************
+ *		MSG_BS_ENABLE_CONTINUE for BuilderShellClass
+ ***********************************************************************
+ * SYNOPSIS:	
+ * PARAMETERS:	
+ * SIDE EFFECTS:
+ *
+ * STRATEGY:	
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	dubois	9/19/96   	Initial Revision
+ *
+ ***********************************************************************/
+extern void  GandalfMessageDispatch(void);
+@method BuilderShellClass, MSG_BS_ENABLE_CONTINUE
+{
+    /* don't ask */
+    GandalfMessageDispatch();
+    @call ContTrigger::MSG_GEN_SET_ENABLED(VUM_DVAQ);
+}	/* End of MSG_BS_ENABLE_CONTINUE.	*/
+
+/*********************************************************************
+ *			Stop
+ *********************************************************************
+ * SYNOPSIS:	Called when the user hits the STOP trigger.
+ *		Responsible for terminating the viewer app.
+ *		Assume there is one!
+ *	       
+ * CALLED BY:	
+ * PASS:	void
+ * RETURN:	void
+ * SIDE EFFECTS:
+ * STRATEGY:	Because of synchronization problems, this functions
+ *		should rely as LITTLE as possible on resources
+ *		shared by the viewer interpreter. Currently,
+ *		the only thing we do is sset a flag in its BuggerInfo.
+ *		No other interference.
+ * REVISION HISTORY:
+ *	Name	Date		Description			     
+ *	----	----		-----------			     
+ *	roy	10/25/94	Initial version			     
+ * 
+ *********************************************************************/
+
+@method BuilderShellClass, MSG_BS_STOP
+{
+    word dispatchedMsgCount;
+    EventHandle hMsgToSend, hCompletionMsg;
+
+    /* Hack: there is not enough synchronization in the startup process.
+     * It is possible to get a stop before lview is started (don't know
+     * about tether).  If !tether, patch the hole by punting if other side
+     * is not ready */
+    if ((word)myPort == GIGS_NONE) {
+	PTaskPtr	ptask;
+	MemHandle	bugHan;
+	ptask = MemLock(GandalfGetMainTask());
+	bugHan = ptask->PT_bugHandle;
+	MemUnlock(GandalfGetMainTask());
+	if (bugHan == NullHandle) {
+	    return;
+	}
+    }
+    stopping = TRUE;
+
+    NukeInstantiatedVarCharts();
+    @call Editor::MSG_ET_CLEAR_PC(-1);
+    @call PauseTrigger::MSG_GEN_SET_NOT_ENABLED(VUM_DVAQ);
+
+    @call BuilderApp::MSG_GEN_APPLICATION_MARK_BUSY();
+
+    @call StopTrigger::MSG_GEN_SET_NOT_ENABLED(VUM_DVAQ);
+    @call DebugInfoGroup::MSG_GEN_SET_NOT_ENABLED(VUM_DVAQ);
+    @call LocalInteraction::MSG_GEN_GUP_INTERACTION_COMMAND(IC_DISMISS);
+    @call GlobalInteraction::MSG_GEN_GUP_INTERACTION_COMMAND(IC_DISMISS);
+    @call InternalInteraction::MSG_GEN_GUP_INTERACTION_COMMAND(IC_DISMISS);
+    @call CallStack::MSG_GEN_GUP_INTERACTION_COMMAND(IC_DISMISS);
+    @call ContTrigger::MSG_GEN_SET_NOT_ENABLED(VUM_DVAQ);
+    @call SingleStepTrigger::MSG_GEN_SET_NOT_ENABLED(VUM_DVAQ);
+    @call ProcStepTrigger::MSG_GEN_SET_NOT_ENABLED(VUM_DVAQ);
+    @call FinishTrigger::MSG_GEN_SET_NOT_ENABLED(VUM_DVAQ);
+
+
+    /* Now, without IACP, get the name of the viewer app and
+       shut it down.  This bulder app well get NOTIFY when
+       the shutdown is complete to continue processing... */
+
+    /* There are three possible states that the running interpreter
+       is in when we want to quit.
+
+       1. Executing Basic Code: We set a BuggerInfo flag, telling
+	  the interpreter to unwind the stack ASAP. We also
+	  send a QUIT message which will get processed when
+	  the stack is done.
+
+	  Potential problems: How do we make sure QUIT is the first
+	  thing on the Queue after the stack is unwound versus
+	  some component event...
+
+       2. Idling: Just send this message down, it should get
+	  processed right away.
+
+       3. Suspended because of a breakpoint.  We just V the semaphore
+	  and send QUIT down. 
+	  We need to make sure this is 
+	  the case before doing so.
+	  (The P could have occured in two spots, either within
+	   the execution of code or while idling. If it was idling,
+	   then it will process the QUIT message immediately after
+	   the V.  Otherwise, it will rely on the HALT flag as in 
+	   case 1).
+	   */
+
+    /* This is the only modification of a shared resource
+       during possible concurrent execution */
+
+    BascoBugSetBuilderRequest(GandalfGetMainTask(), BBR_HALT);
+
+    /* We can tell that we're suspended just by checking a piece
+       of data from ouir bughandle that maintains the state
+       PAUSE should never be available if we're in break
+       mode.... If we're running, PAUSE will be available. So it's safe.
+       Well I guess there is a micron of a window if the user hits
+       STOP before the PSem routine is called in the interpreter.
+       I'm not going to worry about that for now...
+    */
+    if (BugGetBuilderState(BascoBugGetBugHandleFromCTask(bascoTask))
+	== BS_PAUSED) 
+    {
+	/* Guaranteed the viewer isn't working so we don't
+	   worry about this access into a shared resource */
+	@send , forceQueue viewApp::MSG_BS_ABOUT_TO_BREAK();
+/*	ThreadVSem(bugInfo.BBI_semHandle); */
+    }
+
+    @send , forceQueue viewApp::MSG_LA_STOP();
+
+    @call BuilderShell::MSG_BS_DONE_PART_TWO();
+}
+
+/*********************************************************************
+ *			DonePartTwo
+ *********************************************************************
+ * SYNOPSIS:	Called after viewer app has been successfully
+ *		terminated.
+ * CALLED BY:	
+ * PASS:
+ * RETURN:
+ * SIDE EFFECTS:
+ * STRATEGY:
+ * REVISION HISTORY:
+ *	Name	Date		Description			     
+ *	----	----		-----------			     
+ *	roy	11/ 6/94	Initial version			     
+ * 
+ *********************************************************************/
+
+@method BuilderShellClass, MSG_BS_DONE_PART_TWO 
+{
+    int     numLinesInRoutine, numLinesDisplayed, fNum;
+    dword   codeOffset;
+
+    
+    BugSetBuilderState(BascoBugGetBugHandleFromCTask(bascoTask), BS_STOPPED);
+
+    @call FileMenu::MSG_GEN_SET_ENABLED(VUM_DVAQ);
+
+    /* If we're not displaying an entire function, don't allow user
+     * to edit it.  Also make sure it doesn't look like we've already
+     * been edited.
+     */
+    fNum = @call Editor::MSG_ET_GET_FUNC_NUMBER();
+    if (fNum > -1 && bascoTask != NullHandle) {
+	numLinesInRoutine =
+	    EditGetRoutineNumLines(bascoTask, fNum, &codeOffset);
+	numLinesDisplayed =
+	    @call Editor::MSG_ET_GET_NUM_LINES_DISPLAYED();
+	if (numLinesInRoutine > numLinesDisplayed) {
+	    @call Editor::
+		MSG_VIS_TEXT_MODIFY_EDITABLE_SELECTABLE(0,VTS_EDITABLE);
+	}
+	else {
+	    @call Editor::
+		MSG_VIS_TEXT_MODIFY_EDITABLE_SELECTABLE(VTS_EDITABLE,0);
+	}
+
+	@call Editor::MSG_VIS_TEXT_SET_NOT_USER_MODIFIED();
+    }
+    else {
+	@call Editor::
+	    MSG_VIS_TEXT_MODIFY_EDITABLE_SELECTABLE(VTS_EDITABLE,0);
+    }
+    
+    @call NewFuncTrigger::MSG_GEN_SET_ENABLED(VUM_DVAQ);
+    @call NewSubTrigger::MSG_GEN_SET_ENABLED(VUM_DVAQ);
+    @call BreakTrigger::MSG_GEN_SET_ENABLED(VUM_DVAQ);
+    @call RoutineList::MSG_GEN_SET_ENABLED(VUM_DVAQ);
+    @call DeleteRoutineTrigger::MSG_GEN_SET_ENABLED(VUM_DVAQ);
+    @call DeleteComponentTrigger::MSG_GEN_SET_ENABLED(VUM_DVAQ);
+
+    @call PropertiesBox::MSG_GEN_SET_USABLE(VUM_DVAQ);
+    @call EditorInteraction::MSG_GEN_SET_USABLE(VUM_DVAQ);
+    @call FloatingToolbox::MSG_GEN_SET_USABLE(VUM_DVAQ);
+
+    @call self::MSG_BS_SHOW_EDITOR();
+
+    pself = ObjDeref(oself,0);
+    if (ECPSelf(pself)->BS_toolboxVisible) {
+	@call FloatingToolbox::MSG_GEN_INTERACTION_INITIATE();
+    }
+    
+    @call self::MSG_BS_SHOW_TOPLEVEL_COMPONENTS();
+
+    /* do this after the MSG_ENT_VIS_SHOW so that the properties box can
+     * fetch things like the visible bit AFTER the objects that should
+     * be visible are visible
+     */
+    pself = ObjDeref(oself,0);
+    if (pself->BS_propBoxVisible) {
+	@call PropertiesBox::MSG_GEN_INTERACTION_INITIATE();
+    }
+
+
+#if 0
+    /* this is no good, as it prevents you from setting breakpoints when
+     * you are stopped
+     */
+    BugSetBugHandleNotRunning(BugGetBugHandleFromCTask(bascoTask));
+#endif
+    @call BuilderApp::MSG_GEN_APPLICATION_MARK_NOT_BUSY();
+    /* Enable editor again */
+     Notify(gCurFilePath, TRUE);
+
+    /*
+     * Close the serial port down.
+     */
+    if ((word)myPort != GIGS_NONE) {
+	BasrunRpcExit(myPort);
+	myPort = GIGS_NONE;
+	if (servers != NullHandle) {
+	    MemFree(servers);
+	}
+	/* send a STOP_COMPLETE since we don't need to snynchronize
+	 * with the other side (hopefully)
+	 */
+	@call BuilderApp::MSG_LA_STOP_COMPLETE();
+    }
+}
+
+/*********************************************************************
+ *			PausedCommonUI
+ *********************************************************************
+ * SYNOPSIS:	some common code
+ * CALLED BY:	INTERNAL, MSG_BS_ABOUT_TO_BREAK, MSG_BS_PAUSE
+ * PASS:
+ * RETURN:
+ * SIDE EFFECTS:
+ * STRATEGY:
+ * REVISION HISTORY:
+ *	Name	Date		Description			     
+ *	----	----		-----------			     
+ *	jimmy	 6/13/95	Initial version
+ * 
+ *********************************************************************/
+static int
+PausedCommonUI(optr oself)
+{
+    byte err = 1;
+
+    Notify(_TEXT("Paused"), TRUE);
+
+    @call PauseTrigger::MSG_GEN_SET_NOT_ENABLED(VUM_DVAQ);
+    @call DebugInfoGroup::MSG_GEN_SET_ENABLED(VUM_DVAQ);
+    @call RoutineList::MSG_GEN_SET_ENABLED(VUM_DVAQ);
+    @call BreakTrigger::MSG_GEN_SET_ENABLED(VUM_DVAQ);
+    @call StopTrigger::MSG_GEN_SET_ENABLED(VUM_DVAQ);
+
+    @call EditorInteraction::MSG_GEN_SET_USABLE(VUM_DVAQ);
+    @call self::MSG_BS_SHOW_EDITOR();
+    @call Editor::MSG_VIS_TEXT_MODIFY_EDITABLE_SELECTABLE(0,VTS_EDITABLE);
+
+    /* err is true if our user code hit an error, triggering
+       an "auto-break", what a cool term.
+       */
+
+    @call oself::MSG_BS_SHOW_VAR_CHANGE();
+    @call LocalInteraction::MSG_GEN_SET_ENABLED(VUM_DVAQ);
+    @call GlobalInteraction::MSG_GEN_SET_ENABLED(VUM_DVAQ);
+    @call InternalInteraction::MSG_GEN_SET_ENABLED(VUM_DVAQ);
+    @call CallStack::MSG_GEN_SET_ENABLED(VUM_DVAQ);
+
+    if (BugGetSuspendStatus(BascoBugGetBugHandleFromCTask(bascoTask)) 
+	!= BSS_ERROR) 
+    {
+	err = 0;
+    }
+
+    /* this seems to happen too soon -- lview restarts before all our
+     * charts update, if user clicks continue repeatedly */
+/*    @call ContTrigger::MSG_GEN_SET_ENABLED(VUM_DVAQ);*/
+    @send self::MSG_BS_ENABLE_CONTINUE();
+
+    return err;
+}
+
+/*********************************************************************
+ *			AboutToBreak
+ *********************************************************************
+ * SYNOPSIS:	Call back from interpreter right before
+ *		it's about to block on a breakpoint.
+ *		Sets up the UI to do exactly what we want
+ *		after a breakpoint
+ * CALLED BY:	
+ * PASS:	void
+ * RETURN:	void
+ * SIDE EFFECTS:
+ * STRATEGY:
+ * REVISION HISTORY:
+ *	Name	Date		Description			     
+ *	----	----		-----------			     
+ *	roy	10/25/94	Initial version			     
+ * 
+ *********************************************************************/
+@method BuilderShellClass, MSG_BS_ABOUT_TO_BREAK
+{
+
+    sword	lineNumber;
+    sword	cf;
+    word	funcIndex;
+    sword	numHidden = 1;	/* duplo_ui */
+    byte	err = 1;
+    PTaskHan	ptaskHan;
+    MemHandle	bugHandle;
+    BugInfoHeader   *bih;
+
+    TCHAR	notification[256];
+    Boolean	isDebugged;
+
+    /* if viewTask is NullOptr there is no lview for some reason,
+     * if stopping is TRUE, then have alreay hit stop and then hit an
+     * error or breakpoint, so just ignore it 
+     * also - we are already stopped, this ignore this
+     */
+    if ((word)myPort == GIGS_NONE) {
+	if (viewTask == NullOptr)
+	{
+	     return;
+	}
+
+	if (stopping ||
+	    (BugGetBuilderState(BascoBugGetBugHandleFromCTask(bascoTask)) ==
+	     BS_STOPPED)) {
+				/*
+	     * lview is spinning now, so this will cause it to continue again
+	     */
+	    @send , forceQueue viewApp::MSG_BS_ABOUT_TO_BREAK();
+	    return;
+	}
+    }
+
+    if (pself->BS_mode == BSM_AGGREGATE) {
+	numHidden = 4;
+    }
+
+
+    @call self::MSG_VIS_GRAB_MOUSE();
+    bugHandle = BascoBugGetBugHandleFromCTask(bascoTask);
+    BugSetBuilderState(bugHandle, BS_PAUSED);
+    ptaskHan = GandalfGetMainTask();
+
+    /* we are now sitting at a break point for whatever reason, so
+     * put the runtask into a suspended state, until it gets its next
+     * request (step, finish, continue, stop, etc...)
+     */
+    BascoBugSetBuilderRequest(ptaskHan, BBR_SUSPEND);
+
+    err = PausedCommonUI(oself);
+
+    @call CallStack::MSG_CSL_UPDATE_CALL_STACK();
+    cf = BascoBugGetCurrentFrame(ptaskHan);
+
+    /* Bail if there's no current frame */
+    if (cf < 0) {
+	@call Editor::MSG_ET_CLEAR_EDITOR();
+	@call RoutineList::MSG_GEN_ITEM_GROUP_SET_NONE_SELECTED(FALSE);
+	return;
+    }
+    isDebugged = BascoBugGetFrameInfo(ptaskHan, cf, &funcIndex);
+
+    /* Never want to break inside hidden routines */
+    if (isDebugged && (funcIndex >= numHidden)) {
+	if (funcIndex != (@call Editor::MSG_ET_GET_FUNC_NUMBER())) {
+	    @call Editor::MSG_ET_SHOW_ROUTINE_BY_INDEX(funcIndex);
+	    @call RoutineList::
+	    MSG_GEN_ITEM_GROUP_SET_SINGLE_SELECTION(funcIndex-
+						    numHidden,FALSE);
+	}
+    } else {
+	/* hidden routine, or frame's module has no debug info */
+	@call Editor::MSG_ET_CLEAR_EDITOR();
+	@call RoutineList::MSG_GEN_ITEM_GROUP_SET_NONE_SELECTED(FALSE);
+	if (!isDebugged) {
+	    @call CallStackInteraction::MSG_GEN_INTERACTION_INITIATE();
+	}
+	return;
+    }
+
+    lineNumber = BascoBugGetFrameLineNumber(ptaskHan, bascoTask, cf);
+
+    Notify(_TEXT(" in "), FALSE);
+    BascoBugGetFrameName(ptaskHan, cf, notification);
+    Notify(notification, FALSE);
+    Notify(_TEXT(", line "), FALSE);
+    if (!isDebugged && lineNumber == 0) {
+	/* display something a little less confusing than 0 */
+	strcpy(notification, _TEXT("<??>"));
+    } else {
+	itoa(lineNumber, notification);
+    }
+    Notify(notification, FALSE);
+
+    if (err)
+    {
+	@call SingleStepTrigger::MSG_GEN_SET_NOT_ENABLED(VUM_DVAQ);
+	@call ProcStepTrigger::MSG_GEN_SET_NOT_ENABLED(VUM_DVAQ);
+	@call FinishTrigger::MSG_GEN_SET_NOT_ENABLED(VUM_DVAQ);
+    } 
+    else
+    {
+	@call SingleStepTrigger::MSG_GEN_SET_ENABLED(VUM_DVAQ);
+	@call ProcStepTrigger::MSG_GEN_SET_ENABLED(VUM_DVAQ);
+	@call FinishTrigger::MSG_GEN_SET_ENABLED(VUM_DVAQ);
+    }
+    @call Editor::MSG_VIS_UPDATE_GEOMETRY();
+    @call EditorInteraction::MSG_GEN_INTERACTION_INITIATE();
+    @send , forceQueue Editor::MSG_ET_SET_PC(lineNumber,0);
+    @send , forceQueue Editor::MSG_ET_SET_CURSOR_AT_LINE(lineNumber);
+    @call BuilderApp::MSG_GEN_BRING_TO_TOP();
+}
+
+/*********************************************************************
+ *			ShowVarChange
+ *********************************************************************
+ * SYNOPSIS:	Tell the various variable charts that variables
+ *		have changed and it's time to update.  Should be
+ *		finer-grained later.
+ * CALLED BY:	
+ * PASS:	void
+ * RETURN:	void
+ * SIDE EFFECTS:
+ * STRATEGY:
+ * REVISION HISTORY:
+ *	Name	Date		Description			     
+ *	----	----		-----------			     
+ *	roy	10/25/94		Initial version			     
+ * 
+ *********************************************************************/
+@method BuilderShellClass, MSG_BS_SHOW_VAR_CHANGE 
+{
+    int cf;
+
+    @call GlobalChart::MSG_VC_UPDATE_SCOPE(MODULE_LEVEL);
+
+    cf = BascoBugGetCurrentFrame(GandalfGetMainTask());
+    if (cf < 0) {
+	cf = UNDEFINED_FRAME;
+    }
+    
+    @call LocalChart::MSG_VC_UPDATE_SCOPE(cf);
+    
+    @call InternalChart::MSG_VC_UPDATE_SCOPE(LAST_FRAME);
+}
+
+/*********************************************************************
+ *			ContinueCommon
+ *********************************************************************
+ * SYNOPSIS:	common code for various callers of BS_CONTINUE
+ * CALLED BY:	
+ * PASS:
+ * RETURN:
+ * SIDE EFFECTS:
+ * STRATEGY:
+ * REVISION HISTORY:
+ *	Name	Date		Description			     
+ *	----	----		-----------			     
+ *	jimmy	 6/ 7/95	Initial version
+ * 
+ *********************************************************************/
+@method	BuilderShellClass,  MSG_BS_CONTINUE_COMMON
+{
+    byte temp;
+
+    /* nuke all the var charts under ValueInteraction */
+    NukeInstantiatedVarCharts();
+    
+
+    if (@call Editor::MSG_ET_UPDATE_CODE_IF_NECESSARY(TRUE)) 
+    {
+	EC_ERROR(-1);		/* Only updating breaks -- how error? */
+    }
+    @call Editor::MSG_ET_CLEAR_PC(-1);
+
+    if (BascoBugGetBuilderRequest(GandalfGetMainTask()) == BBR_NONE)
+    {
+	@call self::MSG_BS_HIDE_EDITOR();
+    }
+
+    if (BugGetBuilderState(BascoBugGetBugHandleFromCTask(bascoTask)) != BS_PAUSED_IDLE)
+    {
+	 if ((word)myPort != GIGS_NONE) {
+	     BasrunRpcCall(myPort, RPC_DEFAULT_TIMEOUT, RPC_STOP_SITTING_AND_SPINNING, 0, 0, 0, 0);
+	 } else {
+	     /* MSG_BS_ABOUT_TO_BREAK is the magic message that BugSitAndSpin
+	      * looks for as a signal to continue, this is to replace the old
+	      * ThreadVSem we used to use
+	      */
+	     @send , forceQueue viewApp::MSG_BS_ABOUT_TO_BREAK();
+	 }
+     }
+     return FALSE;
+}
+
+
+
+/*********************************************************************
+ *			Done
+ *********************************************************************
+ * SYNOPSIS:	Turn off some triggers since we aren't running code
+ * CALLED BY:	
+ * PASS:	void
+ * RETURN:	void
+ * SIDE EFFECTS:
+ * STRATEGY:	  
+ * REVISION HISTORY:
+ *	Name	Date		Description			     
+ *	----	----		-----------			     
+ *	roy	10/25/94		Initial version			     
+ * 
+ *********************************************************************/
+
+@method BuilderShellClass, MSG_BS_DONE
+{   
+    @call SingleStepTrigger::MSG_GEN_SET_NOT_ENABLED(VUM_DVAQ);
+    @call ContTrigger::MSG_GEN_SET_NOT_ENABLED(VUM_DVAQ);
+    @call ProcStepTrigger::MSG_GEN_SET_NOT_ENABLED(VUM_DVAQ);
+    @call FinishTrigger::MSG_GEN_SET_NOT_ENABLED(VUM_DVAQ);
+
+    switch(BugGetBuilderState(BascoBugGetBugHandleFromCTask(bascoTask))) {
+    case BS_STOPPED:
+	@call PauseTrigger::MSG_GEN_SET_NOT_ENABLED(VUM_DVAQ);
+	break;
+    case BS_PAUSED_IDLE:
+    case BS_PAUSED:
+	/* this happens when something like a single step or finish actually
+	 * finishes off the executing code, thus we need to update our
+	 * status and some builder UI
+	 */
+	@call self::MSG_BS_HIDE_EDITOR();
+
+	@call EditorInteraction::MSG_GEN_SET_NOT_USABLE(VUM_DVAQ);
+	@call PauseTrigger::MSG_GEN_SET_ENABLED(VUM_DVAQ);
+	@call RunTrigger::MSG_GEN_SET_NOT_ENABLED(VUM_DVAQ);
+    @call LocalInteraction::MSG_GEN_SET_NOT_ENABLED(VUM_DVAQ);
+    @call GlobalInteraction::MSG_GEN_SET_NOT_ENABLED(VUM_DVAQ);
+    @call CallStack::MSG_GEN_SET_NOT_ENABLED(VUM_DVAQ);
+    @call DebugInfoGroup::MSG_GEN_SET_NOT_ENABLED(VUM_DVAQ);
+
+
+	BugSetBuilderState(BascoBugGetBugHandleFromCTask(bascoTask), BS_IDLE);
+	break;
+    case BS_RUNNING:
+	BugSetBuilderState(BascoBugGetBugHandleFromCTask(bascoTask), BS_IDLE);
+    case BS_LOADING_FILE:/* should already be in correct state */
+    default:
+	break;
+	/* no need to do anything*/
+    }
+}
+
+/*********************************************************************
+ *			Continue
+ *********************************************************************
+ * SYNOPSIS:	Continue after a breakpoint. 
+ * CALLED BY:	
+ * PASS:	void
+ * RETURN:	void
+ * SIDE EFFECTS:
+ * STRATEGY:	  
+ * REVISION HISTORY:
+ *	Name	Date		Description			     
+ *	----	----		-----------			     
+ *	roy	10/25/94		Initial version			     
+ * 
+ *********************************************************************/
+
+@method BuilderShellClass, MSG_BS_CONTINUE
+{   
+    BugBuilderRequest bbr;
+
+    bbr = BascoBugGetBuilderRequest(GandalfGetMainTask());
+    switch(bbr) {
+    case BBR_ROUTINE_STEP:
+    case BBR_FINISH:
+	break; /* do nothing */
+    default:
+	/* back to normal execution */
+	BascoBugSetBuilderRequest(GandalfGetMainTask(), BBR_NONE);
+    }
+
+    if (BugGetBuilderState(BascoBugGetBugHandleFromCTask(bascoTask)) == BS_PAUSED_IDLE) {
+	BugSetBuilderState(BascoBugGetBugHandleFromCTask(bascoTask), BS_IDLE);
+    } else {
+	BugSetBuilderState(BascoBugGetBugHandleFromCTask(bascoTask), BS_RUNNING);
+    }
+
+    @call SingleStepTrigger::MSG_GEN_SET_NOT_ENABLED(VUM_DVAQ);
+    @call ContTrigger::MSG_GEN_SET_NOT_ENABLED(VUM_NOW);
+    @call ProcStepTrigger::MSG_GEN_SET_NOT_ENABLED(VUM_DVAQ);
+    @call FinishTrigger::MSG_GEN_SET_NOT_ENABLED(VUM_DVAQ);
+    @call PauseTrigger::MSG_GEN_SET_ENABLED(VUM_DVAQ);
+    @call InternalInteraction::MSG_GEN_GUP_INTERACTION_COMMAND(IC_DISMISS);
+    @call LocalInteraction::MSG_GEN_SET_NOT_ENABLED(VUM_DVAQ);
+    @call GlobalInteraction::MSG_GEN_SET_NOT_ENABLED(VUM_DVAQ);
+    @call CallStack::MSG_GEN_SET_NOT_ENABLED(VUM_DVAQ);
+    @call DebugInfoGroup::MSG_GEN_SET_NOT_ENABLED(VUM_DVAQ);
+    @call RoutineList::MSG_GEN_SET_NOT_ENABLED(VUM_DVAQ);
+    @call BreakTrigger::MSG_GEN_SET_NOT_ENABLED(VUM_DVAQ);
+
+    if ((word)myPort != GIGS_NONE) {
+	Notify(_TEXT("Running remotely."), TRUE);
+    } else {
+	Notify(_TEXT("Running locally."), TRUE);
+    }
+
+    @call self::MSG_BS_CONTINUE_COMMON();
+}
+
+/*********************************************************************
+ *			Pause
+ *********************************************************************
+ * SYNOPSIS:	Tell interpreter to stop ASAP
+ * CALLED BY:	
+ * PASS:	void
+ * RETURN:	void
+ * SIDE EFFECTS:
+ * STRATEGY:
+ * REVISION HISTORY:
+ *	Name	Date		Description			     
+ *	----	----		-----------			     
+ *	roy	10/25/94		Initial version			     
+ * 
+ *********************************************************************/
+@method BuilderShellClass, MSG_BS_PAUSE
+{
+    MemHandle	bugHandle;
+
+
+
+    /* This is the only modification of a shared resource
+       during possible concurrent execution */
+    BascoBugSetBuilderRequest(GandalfGetMainTask(), BBR_SUSPEND);
+    
+    /* This is interesting.  If the interpreter is busy
+       executing code, then it will find this flag before
+       it executes the next line. It will then clear the flag,
+       rendering this message useless.
+       
+       If, on the other hand, the interpreter is idle, then
+       this message will get the desired result */
+
+    @call PauseTrigger::MSG_GEN_SET_NOT_ENABLED(VUM_DVAQ);
+    @call EditorInteraction::MSG_GEN_SET_USABLE(VUM_DVAQ);
+    @call self::MSG_BS_SHOW_EDITOR();
+
+@if 0
+    @send viewInterp::MSG_LVI_PAUSE();
+@endif
+    
+    bugHandle = BascoBugGetBugHandleFromCTask(bascoTask);
+    if (((word)myPort != GIGS_NONE) ||
+	(BugGetBuilderState(bugHandle) == BS_IDLE)) {
+	/* this would normally get called by ABOUT_TO_BREAK, but since
+	 * we weren't actually executing code, ABOUT_TO_BREAK wont get
+	 * called
+	 */
+	PausedCommonUI(oself);
+
+	BugSetBuilderState(bugHandle, BS_PAUSED_IDLE);
+	@call CallStack::MSG_CSL_UPDATE_CALL_STACK();
+    } 
+    else 
+    {
+	BugSetBuilderState(bugHandle, BS_PAUSED);
+    }
+}
+
+/*********************************************************************
+ *			ProcStep
+ *********************************************************************
+ * SYNOPSIS:	Set up UI and tell Interpreter to routine step
+ * CALLED BY:	
+ * PASS:	  void
+ * RETURN:	  void
+ * SIDE EFFECTS:
+ * STRATEGY:
+ * REVISION HISTORY:
+ *	Name	Date		Description			     
+ *	----	----		-----------			     
+ *	roy	10/25/94		Initial version			     
+ * 
+ *********************************************************************/
+
+@method BuilderShellClass, MSG_BS_PROC_STEP
+{
+
+    BascoBugSetBuilderRequest(GandalfGetMainTask(), BBR_ROUTINE_STEP);
+    @call self::MSG_BS_CONTINUE();
+}
+
+/*********************************************************************
+ *			Finish
+ *********************************************************************
+ * SYNOPSIS:	Set up UI & Tell Interpreter to finish current routine
+ * CALLED BY:	
+ * PASS:
+ * RETURN:
+ * SIDE EFFECTS:
+ * STRATEGY:
+ * REVISION HISTORY:
+ *	Name	Date		Description			     
+ *	----	----		-----------			     
+ *	roy	10/25/94		Initial version			     
+ * 
+ *********************************************************************/
+
+@method BuilderShellClass, MSG_BS_FINISH
+{
+    BascoBugSetBuilderRequest(GandalfGetMainTask(), BBR_FINISH);
+    @call self::MSG_BS_CONTINUE();
+}
+
+/*********************************************************************
+ *			SingleStep
+ *********************************************************************
+ * SYNOPSIS:	Set up UI & Tell Interperter to single step
+ * CALLED BY:	
+ * PASS:
+ * RETURN:
+ * SIDE EFFECTS:
+ * STRATEGY:
+ * REVISION HISTORY:
+ *	Name	Date		Description			     
+ *	----	----		-----------			     
+ *	roy	10/25/94		Initial version			     
+ * 
+ *********************************************************************/
+
+@method BuilderShellClass, MSG_BS_SINGLE_STEP
+{
+    /* if we are already doing a single step, do nothing */
+    if (BascoBugGetBuilderRequest(GandalfGetMainTask()) == BBR_SINGLE_STEP)
+    {
+	return;
+    }
+    BascoBugSetBuilderRequest(GandalfGetMainTask(), BBR_SINGLE_STEP);
+    @call self::MSG_BS_CONTINUE_COMMON();
+}
+
+/*********************************************************************
+ *			LockRHIFromRTaskHan
+ *********************************************************************
+ * SYNOPSIS:	Extract a pointer to the RunHeapInfo for an RTask's PTask
+ * CALLED BY:	EXTERNAL
+ * PASS:	RTaskHan
+ * RETURN:	RunHeapInfo *
+ * SIDE EFFECTS: The progTask associated with this rtask remains 
+ *		 locked.
+ * REVISION HISTORY:
+ *	Name	Date		Description			     
+ *	----	----		-----------			     
+ *	dloft	8/16/95	Initial version
+ * 
+ *********************************************************************/
+RunHeapInfo *
+LockRHIFromRTaskHan(RTaskHan rtaskHan) {
+    RunTask *rtask;
+    PTaskPtr ptask;
+    RunHeapInfo *rhi;
+
+    rtask  = (RunTask *) MemLock(rtaskHan);
+    ptask  = (PTaskPtr) MemLock(rtask->RT_progTask);
+    rhi	= &ptask->PT_runHeapInfo;
+
+    MemUnlock(rtaskHan);
+
+    return rhi;
+}
+
+void
+UnlockRHIFromRTaskHan(RTaskHan rtaskHan) {
+    RunTask *rtask;
+    
+    rtask  = (RunTask *) MemLock(rtaskHan);
+    MemUnlock(rtask->RT_progTask);
+    MemUnlock(rtaskHan);
+}
+
+
+/*********************************************************************
+ *			GandalfLaunchViewerApp
+ *********************************************************************
+ * SYNOPSIS:	launch the viewer application
+ * CALLED BY:	EXTERNAL somewhere in mainproc.goc
+ * PASS:	nothing
+ * RETURN:	zero on error
+ * SIDE EFFECTS:
+ * STRATEGY:
+ *	FIXME move this into mainproc.goc and make it internal
+ * REVISION HISTORY:
+ *	Name	Date		Description			     
+ *	----	----		-----------			     
+ *	jimmy	 3/22/95	Initial version			     
+ * 
+ *********************************************************************/
+Boolean
+GandalfLaunchViewerApp()
+{
+    MemHandle		hLaunchBlock;
+#ifdef __BORLANDC__
+    GeodeToken	serverGeodeToken = {"LVie", MANUFACTURER_ID_GEOWORKS};
+#else
+    GeodeToken  serverGeodeToken;
+#endif
+    word		connectionFlags	 = IACPSM_USER_INTERACTIBLE;
+    word		serverCount;
+    IACPConnection	iacpConnectionToken;
+    EventHandle		hMsgToSend;
+
+
+
+    hLaunchBlock =
+	IACPCreateDefaultLaunchBlock(MSG_GEN_PROCESS_OPEN_APPLICATION);
+    
+    iacpConnectionToken =
+	    IACPConnect(&serverGeodeToken, connectionFlags,
+			hLaunchBlock, NullOptr, &serverCount);
+	
+    @call BuilderApp::MSG_BA_SET_VIEWER_TOKEN(iacpConnectionToken);
+	
+    if (iacpConnectionToken == IACP_NO_CONNECTION) 
+    {
+	/*
+	 * do something intellingent here
+	 */
+	return FALSE;
+    }
+
+    /*
+     * Encapsulate a message to send
+     */
+    hMsgToSend = @record GenApplicationClass::MSG_LA_HANDSHAKE(@BuilderApp);
+    
+    IACPSendMessage(iacpConnectionToken, hMsgToSend, TO_SELF, 0, IACPS_CLIENT);
+    return TRUE;
+}
+
+
+
+/*********************************************************************
+ *			BSRun
+ *********************************************************************
+ * SYNOPSIS:	Powerhouse routine:
+ *		1. Set up UI for run mode
+ *		2. Compile source and spawn a viewer app
+ *		3. Download all code from builder to viewer
+ *		4. Execute start
+ * CALLED BY:	
+ * PASS:
+ * RETURN:
+ * SIDE EFFECTS:
+ * STRATEGY:
+ * REVISION HISTORY:
+ *	Name	Date		Description			     
+ *	----	----		-----------			     
+ *	roy	11/ 5/94		Initial version			     
+ * 
+ *********************************************************************/
+@method BuilderShellClass, MSG_BS_RUN
+{
+    EventHandle	event;
+    byte	temp, temp2, temp3;
+    int		i;
+    RTaskHan	rtaskHan;
+
+    myPort = GIGS_NONE;
+
+    BascoSetLiberty(bascoTask, FALSE);
+
+    if (viewTask == NullHandle)
+    {
+	/* no lview for some reason */
+	GandalfError(@LviewError);
+	return;
+    }
+
+    /* Code to be run in lview needs RUN_FROM_BUILDER flag.  Both agg mode
+     * and "normal" mode use the flag now.  As an optimization, if the ui
+     * is already generated with RUN_FROM_BUILDER, don't re-generate
+     */
+    /* FIXME -- share this code with ET_UPDATE_CODE_IF_NECESSARY, which
+     * should take a flags param, instead of defaulting to whatever it is
+     * it uses
+     */
+    @call BuilderApp::MSG_GEN_APPLICATION_MARK_BUSY();
+    pself = ObjDeref(oself, 0);
+    if (gCurUIFlags != (BDF_COMPLEX|BDF_RUN_FROM_BUILDER))
+    {
+				/* dirty the UI to force regeneration */
+	/* i don't think this first call is needed? --dubois */
+	/* me neither - jimmy */
+@if 0
+	@call BuilderInterpreter::MSG_BENT_MANAGER_SET_FLAGS(BF_UI_DIRTY, 0);
+@endif
+	@call self::MSG_BS_GENERATE_UI_CODE
+	    (BDF_COMPLEX|BDF_RUN_FROM_BUILDER, FALSE);
+	@call BuilderInterpreter::MSG_BENT_MANAGER_SET_FLAGS(0, BF_UI_DIRTY);
+    }
+    @call BuilderApp::MSG_GEN_APPLICATION_MARK_NOT_BUSY();
+
+    if (@call Editor::MSG_ET_UPDATE_CODE_IF_NECESSARY(TRUE))
+    {
+	return;	/* hit an error, so stop */
+    }
+
+    /* TRUE means we are smart about recompilation and only recompile
+     * things that need it
+     */
+    Notify(_TEXT("Compiling..."), TRUE);
+    @call BuilderApp::MSG_GEN_APPLICATION_MARK_BUSY();
+    BascoCompileCodeFromTask(bascoTask, TRUE);
+    @call BuilderApp::MSG_GEN_APPLICATION_MARK_NOT_BUSY();
+
+    if (GandalfCheckForCompileError(bascoTask))
+    {
+	return;
+    }
+
+    /* Set up UI -- enable/disable buttons, hide
+     * build-time components
+     */
+    @call FileMenu::MSG_GEN_SET_NOT_ENABLED(VUM_DVAQ);
+    @call DebugInfoGroup::MSG_GEN_SET_NOT_ENABLED(VUM_DVAQ);
+    @call LocalInteraction::MSG_GEN_SET_NOT_ENABLED(VUM_DVAQ);
+    @call GlobalInteraction::MSG_GEN_SET_NOT_ENABLED(VUM_DVAQ);
+    @call CallStack::MSG_GEN_SET_NOT_ENABLED(VUM_DVAQ);
+    @call RunTrigger::MSG_GEN_SET_NOT_ENABLED(VUM_DVAQ);
+    @call StopTrigger::MSG_GEN_SET_NOT_ENABLED(VUM_DVAQ);
+    @call Editor::MSG_VIS_TEXT_MODIFY_EDITABLE_SELECTABLE(0,VTS_EDITABLE);
+    @call NewFuncTrigger::MSG_GEN_SET_NOT_ENABLED(VUM_DVAQ);
+    @call NewSubTrigger::MSG_GEN_SET_NOT_ENABLED(VUM_DVAQ);
+    @call BreakTrigger::MSG_GEN_SET_NOT_ENABLED(VUM_DVAQ);
+    @call RoutineList::MSG_GEN_SET_NOT_ENABLED(VUM_DVAQ);
+    @call DeleteRoutineTrigger::MSG_GEN_SET_NOT_ENABLED(VUM_DVAQ);
+    @call DeleteComponentTrigger::MSG_GEN_SET_NOT_ENABLED(VUM_DVAQ);
+
+
+    temp = ((@call PropertiesBox::MSG_VIS_GET_ATTRS()) & VA_REALIZED);
+    temp3 = ((@call FloatingToolbox::MSG_VIS_GET_ATTRS()) & VA_REALIZED);
+
+    pself = ObjDeref(oself,0);
+    
+    ECPSelf(pself)->BS_propBoxVisible = temp;
+    ECPSelf(pself)->BS_toolboxVisible = temp3;
+
+    @call PropertiesBox::MSG_GEN_SET_NOT_USABLE(VUM_DVAQ);
+    @call FloatingToolbox::MSG_GEN_SET_NOT_USABLE(VUM_DVAQ);
+    
+    event = @record BentClass::MSG_BENT_REMOVE_FROM_SCREEN();		  
+    @call BuilderApp::MSG_GEN_SEND_TO_CHILDREN(event);
+
+    @call self::MSG_BS_HIDE_EDITOR();
+    @call EditorInteraction::MSG_GEN_SET_NOT_USABLE(VUM_DVAQ);
+
+#if 0
+    /* should always be BBR_NONE here since hasn't actually been
+     * allocated yet 
+     */
+    /* set the bug state to none so we start running on a clean slate */
+    BascoBugSetBuilderRequest(GandalfGetMainTask(), BBR_NONE);
+    /* be sure to reenabled events in case they were disabled at the time
+     * we stopped or paused last, or else we will never run again
+     */
+    RunTaskSetFlags(GandalfGetMainTask(), 0, RT_EVENTS_DISABLED);
+#endif
+
+    BugSetBuilderState(BascoBugGetBugHandleFromCTask(bascoTask), BS_RUNNING);
+
+    /* Try to make the interpreter act like it's been freshly created
+     */
+    ProgResetTask(viewTask);
+
+    /* hack alert -- BOOT_RTASK will be sent by lview's CREATE handler.
+     * Can't do it here 'cause we don't get a return value
+     */
+    @send, forceQueue viewInterp::MSG_COMPILE_INTERP_CREATE_RTASK
+	(bascoTask, FALSE, &bugInfo, gCurFilePath);
+
+@if 0
+    /*
+     * If RUN_MODULE succeeded, call module_goTo and app_show().  No need 
+     * to check if they exists, RunCallFunction will just return false if not.
+     */
+    if (rtaskHan != NullHandle) {
+	byte	args[6] = {1, TYPE_STRING, 0,0,0,0};
+
+	RunCallFunction(rtaskHan, _TEXT("module_goTo"), args, NULL, NULL);
+	RunCallFunction(rtaskHan, _TEXT("app_show"), NULL, NULL, NULL);
+    }
+@endif
+
+    /* 1 (revisited).  Only activate these here, after
+       viewtask has been initialized and is therefore ready
+       to be mucked with. */
+
+    @call PauseTrigger::MSG_GEN_SET_ENABLED(VUM_DVAQ);
+    @call StopTrigger::MSG_GEN_SET_ENABLED(VUM_DVAQ);
+    @call RoutineList::MSG_GEN_ITEM_GROUP_SET_NONE_SELECTED(FALSE);
+	
+    Notify(_TEXT("Running"), TRUE);
+    return;
+}
+
+
+
+/*********************************************************************
+ *			GandalfCheckForCompileError
+ *********************************************************************
+ * SYNOPSIS:	check for any compile errors
+ * CALLED BY:	GLOBAL
+ * PASS:	compile task handle
+ * RETURN:	true if found an error
+ * SIDE EFFECTS:
+ * STRATEGY:
+ * REVISION HISTORY:
+ *	Name	Date		Description			     
+ *	----	----		-----------			     
+ *	jimmy	 4/28/95	Initial version			     
+ * 
+ *********************************************************************/
+Boolean
+GandalfCheckForCompileError(MemHandle	taskHan)
+{
+    int	i, numRoutines;
+
+    numRoutines = EditGetNumRoutines(taskHan);
+    for (i=0; i<numRoutines; i++)
+    {
+	if (BascoGetCompileErrorForFunction(taskHan, i)) {
+	    /* report the error */
+	    
+	    BascoSetTaskErrorToFunction(taskHan, i);
+	    GandalfCompileError(taskHan);
+	    return TRUE;
+	}
+    }
+    return FALSE;
+}
+
+/*********************************************************************
+ *			GandalfCompileError
+ *********************************************************************
+ * SYNOPSIS:	Pop up erroneous line in editor
+ * CALLED BY:	EXTERNAL, MSG_BS_RUN, MSG_BS_SAVE_COMPILED_FILE
+ * PASS:	Compile task containing error
+ * RETURN:
+ * SIDE EFFECTS:
+ * STRATEGY:
+ * REVISION HISTORY:
+ *	Name	Date		Description			     
+ *	----	----		-----------			     
+ *	dubois	 2/17/95	Initial version			     
+ * 
+ *********************************************************************/
+void
+GandalfCompileError(MemHandle comTask)
+{
+    word	j, funcIndex;
+    int		lineNum;
+
+    @call EditorInteraction::MSG_GEN_INTERACTION_INITIATE();
+    /* Initialize editor crap in case editor hasn't been brought up yet */
+
+    @call Editor::MSG_VIS_UPDATE_GEOMETRY();
+
+    BascoReportError(comTask, (int *)&funcIndex, (int *)&lineNum);
+
+    @call Editor::MSG_ET_SHOW_ROUTINE_BY_INDEX(funcIndex);
+
+    if (funcIndex > 0) 
+    {
+	@call RoutineList::
+	    MSG_GEN_ITEM_GROUP_SET_SINGLE_SELECTION(funcIndex-1, FALSE);
+    }
+
+    /* We have symbol problems if the lineNum is less than 0.
+       Just don't do anything for now...*/
+
+    if (lineNum >= 0) {
+	@send , forceQueue Editor::MSG_ET_SET_PC(lineNum,0);
+	@send , forceQueue Editor::MSG_ET_SET_CURSOR_AT_LINE(lineNum);
+	@call Editor::MSG_ET_SET_ERROR_LINE(lineNum);
+    }
+
+    return;
+}
+
+/*********************************************************************
+ *			GandalfError
+ *********************************************************************
+ * SYNOPSIS:	Pop up a standard error dialog
+ * CALLED BY:	GLOBAL
+ * PASS:	Chunk of error string
+ * RETURN:
+ * SIDE EFFECTS:
+ * STRATEGY:
+ * REVISION HISTORY:
+ *	Name	Date		Description			     
+ *	----	----		-----------			     
+ *	dubois	 2/17/95	Initial version			     
+ * 
+ *********************************************************************/
+void
+GandalfError(optr errorStr)
+{
+    (void) MemLock(OptrToHandle(errorStr));
+
+    UserStandardDialog( (char*) 0,
+		       (char*) 0,
+		       (char*) 0,
+		       (char*) 0,
+		       LMemDeref(errorStr),
+		       (CDT_ERROR << CDBF_DIALOG_TYPE_OFFSET) |
+		       (GIT_NOTIFICATION << CDBF_INTERACTION_TYPE_OFFSET));
+
+    MemUnlock(OptrToHandle(errorStr));
+    return;
+}
+
+/*********************************************************************
+ *			BSCompileAll
+ *********************************************************************
+ * SYNOPSIS:	compile everything in bascoTask
+ * CALLED BY:	
+ * RETURN:
+ * SIDE EFFECTS:
+ * STRATEGY:
+ * REVISION HISTORY:
+ *	Name	Date		Description			     
+ *	----	----		-----------			     
+ *	jimmy	 4/ 3/95	Initial version			     
+ * 
+ *********************************************************************/
+
+@method BuilderShellClass, MSG_BS_COMPILE_ALL
+{
+    @call BuilderApp::MSG_GEN_APPLICATION_MARK_BUSY();
+
+    /* Recreate the UI (and associated junk, if aggregate) because we
+     * truly want a fresh start here.
+     */
+    @call BuilderInterpreter::MSG_BENT_MANAGER_SET_FLAGS
+	(BF_UI_DIRTY, 0);
+
+    /* FALSE because the whole noodle will be recompiled anyway */
+    @call Editor::MSG_ET_UPDATE_CODE_IF_NECESSARY(FALSE);
+
+    if (BascoCompileCodeFromTask(bascoTask, FALSE) == NullHandle) {
+	GandalfCheckForCompileError(bascoTask);
+    }
+
+    @call BuilderApp::MSG_GEN_APPLICATION_MARK_NOT_BUSY();
+}
+
+/***********************************************************************
+ *		MSG_BS_GET_MODE for BuilderShellClass
+ ***********************************************************************
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	dloft	10/18/95	Initial Revision
+ *
+ ***********************************************************************/
+@method BuilderShellClass, MSG_BS_GET_MODE
+{
+    return pself->BS_mode;
+}	/* End of MSG_BS_GET_MODE.	*/
+
+
+/***********************************************************************
+ *		MSG_BS_SET_MODE for BuilderShellClass
+ ***********************************************************************
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	dloft	10/18/95	Initial Revision
+ *
+ ***********************************************************************/
+@method BuilderShellClass, MSG_BS_SET_MODE
+{
+    pself->BS_mode = mode;
+}	/* End of MSG_BS_SET_MODE.	*/
+
+/***********************************************************************
+ *		MSG_BS_INIT_GEC_MODULE for BuilderShellClass
+ ***********************************************************************
+ * SYNOPSIS:	Init just-loaded module's BUILDER variable
+ * PARAMETERS:	optr	o	(a GenEmbeddedCodeClass object)
+ * RETURN:	nothing
+ * SIDE EFFECTS:
+ *
+ * STRATEGY:
+ *	Assume dest module has a "ConnectToBuilder" function with
+ *	which to set an internal variable to our BuilderComponent optr.
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	dubois	11/ 2/95	Initial Revision
+ *
+ ***********************************************************************/
+@method BuilderShellClass, MSG_BS_INIT_GEC_MODULE
+{
+    byte	args[6] = {1, TYPE_COMPONENT, 0,0,0,0};
+    Boolean	success;
+    RTaskHan	rtaskHan;
+
+    rtaskHan = @call o::MSG_GEC_GET_TASK();
+    if (rtaskHan == NullHandle)
+    {
+	return;
+    }
+    
+    *((dword*)&args[2]) = @BuilderComponent;
+    success = RunCallFunction(rtaskHan, _TEXT("ConnectToBuilder"),
+			      args, NULL, NULL);
+    NEC( success = success );
+    EC_ERROR_IF(!success, -1);
+
+    if (o == @AggPropBox) {
+	success = RunCallFunction(rtaskHan, _TEXT("resetAggPropBox"),
+				  NULL, NULL, NULL);
+	NEC( success = success );
+	EC_ERROR_IF(!success, -1);
+    }
+
+}	/* End of MSG_BS_INIT_GEC_MODULE.	*/
+
+/***********************************************************************
+ *		MSG_BS_RELOAD_GEC for BuilderShellClass
+ ***********************************************************************
+ * SYNOPSIS:	
+ * PARAMETERS:	
+ * SIDE EFFECTS:
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	dubois	11/30/95	Initial Revision
+ *
+ ***********************************************************************/
+@method BuilderShellClass, MSG_BS_RELOAD_GEC
+{
+    /* Special code for really force-loading module
+     */
+    @call AggPropBox::MSG_GEC_LOAD_MODULE(0xb015);
+}	/* End of MSG_BS_RELOAD_GEC.	*/
+
+
+
+/***********************************************************************
+ *		MSG_BS_SHOW_TOPLEVEL_COMPONENTS for BuilderShellClass
+ ***********************************************************************
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	dloft	2/ 7/96		Initial Revision
+ *
+ ***********************************************************************/
+@method BuilderShellClass, MSG_BS_SHOW_TOPLEVEL_COMPONENTS
+{
+	EventHandle	event;
+
+	/*
+	 * Show all the build-time components that were hiden at run-time 
+	 * by setting visible the top level Ent components (forms). 
+	 */
+	event = @record BentClass::MSG_BENT_RETURN_TO_SCREEN();		  
+	@call BuilderApp::MSG_GEN_SEND_TO_CHILDREN(event);
+
+}	/* End of MSG_BS_SHOW_TOPLEVEL_COMPONENTS.	*/
+
+
+/***********************************************************************
+ *		MSG_BUILDER_SHELL_HIDE_EDITOR for BuilderShellClass
+ ***********************************************************************
+ * SYNOPSIS:	Dismiss the interaction if it isn't already dismissed.
+ *		Pair this with MSG_BS_SHOW_EDITOR
+ * PARAMETERS:	none
+ * SIDE EFFECTS: sets instance data indicating the current state of
+ *		visibility of the editor.
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	RON	4/15/96		Initial Revision
+ *
+ ***********************************************************************/
+@method BuilderShellClass, MSG_BS_HIDE_EDITOR
+{
+    byte temp;
+
+    temp = ((@call EditorInteraction::MSG_VIS_GET_ATTRS()) & VA_REALIZED);
+
+    pself = ObjDeref(oself, 0);
+    pself->BS_editorVisible = temp;
+    if (temp)
+    {
+	@call EditorInteraction::MSG_GEN_GUP_INTERACTION_COMMAND(IC_DISMISS);
+    }
+    
+}	/* End of MSG_BUILDER_SHELL_HIDE_EDITOR.	*/
+
+
+
+/***********************************************************************
+ *		MSG_BS_SHOW_EDITOR for BuilderShellClass
+ ***********************************************************************
+ * SYNOPSIS:	Make the editor visible if it was visible when last hidden.
+ * PARAMETERS:	none
+ * SIDE EFFECTS:none
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	RON	4/15/96		Initial Revision
+ *
+ ***********************************************************************/
+@method BuilderShellClass, MSG_BS_SHOW_EDITOR
+{
+    if (pself->BS_editorVisible) 
+    {
+	/* Initialize editor crap in case editor hasn't been brought up yet */
+
+	@call Editor::MSG_VIS_UPDATE_GEOMETRY();
+	@call EditorInteraction::MSG_GEN_INTERACTION_INITIATE();
+    }
+    
+}	/* End of MSG_BS_SHOW_EDITOR.	*/
+
+
+/***********************************************************************
+ *		MSG_META_SUSPEND for BuilderShellClass
+ ***********************************************************************
+ * SYNOPSIS:	Set instance data to so we know we are suspended
+ *		Bring down UI so it doesn't get tons of updates
+ *		while we load new things.
+ * PARAMETERS:	none
+ * SIDE EFFECTS:none
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	RON	4/11/96		Initial Revision
+ *
+ ***********************************************************************/
+@method BuilderShellClass, MSG_META_SUSPEND
+{
+    pself->BS_suspended += 1;
+    EC_ERROR_IF(pself->BS_suspended <= 0, -1);
+    if (pself->BS_suspended == 1) 
+    {
+	/*
+	 * Set the eventlist not usable as it caches information that
+	 * gets invalidated while loading.
+	 */
+/*	@call self::MSG_BS_HIDE_EDITOR(); */
+	@call EventList::MSG_GEN_SET_NOT_USABLE(VUM_DVAQ);
+	@call ComponentList::MSG_GEN_SET_NOT_USABLE(VUM_DVAQ);
+    }
+    
+}	/* End of MSG_META_SUSPEND.	*/
+
+
+/***********************************************************************
+ *		MSG_META_UNSUSPEND for BuilderShellClass
+ ***********************************************************************
+ * SYNOPSIS:	Restore ui after we are done loading.
+ * PARAMETERS:	
+ * SIDE EFFECTS:
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	RON	4/11/96		Initial Revision
+ *
+ ***********************************************************************/
+@method BuilderShellClass, MSG_META_UNSUSPEND
+{
+    pself->BS_suspended -=1;
+    EC_ERROR_IF(pself->BS_suspended < 0, -1);
+    if (pself->BS_suspended == 0)
+    {
+	@call EventList::MSG_GEN_SET_USABLE(VUM_DVAQ);
+	@call ComponentList::MSG_GEN_SET_USABLE(VUM_DVAQ);
+/*	@call self::MSG_BS_SHOW_EDITOR(); */
+    }
+
+    @call BuilderInterpreter::MSG_BENT_MANAGER_UPDATE_CONTROL_UI(TRUE);
+}	/* End of MSG_META_UNSUSPEND.	*/
+
+
+/***********************************************************************
+ *		MSG_BS_GET_SUSPENDED for BuilderShellClass
+ ***********************************************************************
+ * SYNOPSIS:	returns suspended count
+ * PARAMETERS:	none
+ * SIDE EFFECTS:
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	RON	4/15/96   	Initial Revision
+ *
+ ***********************************************************************/
+@method BuilderShellClass, MSG_BS_GET_SUSPENDED
+{
+    return	pself->BS_suspended;
+    
+}	/* End of MSG_BS_GET_SUSPENDED.	*/

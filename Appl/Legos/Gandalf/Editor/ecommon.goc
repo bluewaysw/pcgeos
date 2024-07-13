@@ -1,0 +1,860 @@
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+	Copyright (c) Geoworks 1996 -- All Rights Reserved
+
+PROJECT:	Legos
+MODULE:		Editor
+FILE:		ecommon.goc
+
+AUTHOR:		dloft, Jun 11, 1996
+
+ROUTINES:
+	Name			Description
+	----			-----------
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	dloft	6/11/96  	Initial version.
+
+DESCRIPTION:
+	Frequently-accessed code should go in this file.
+	
+
+	$Id: ecommon.goc,v 1.2 98/10/13 22:18:02 martin Exp $
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+@include "gandalf.goh"
+@include "Editor/editorh.goh"
+@include "Main/mainshlh.goh"
+
+#include <Legos/edit.h>
+#include <Legos/basrun.h>
+#include <Legos/bascobug.h>
+#include <Ansi/ctype.h>
+#include <char.h>
+
+@include <Legos/basco.goh>
+@include <Legos/bent.goh>
+
+@extern object EditorView;
+
+/*********************************************************************
+ *			IsCodeDirty
+ *********************************************************************
+ * SYNOPSIS:	Returns true iff code has been modified. 
+ *              Should trigger breakpoint and and code reinstall
+ * CALLED BY:	
+ * PASS:
+ * RETURN:
+ * SIDE EFFECTS: MAKES CLEAN if dirty!
+ *
+ * STRATEGY:
+ * REVISION HISTORY:
+ *	Name	Date		Description			     
+ *	----	----		-----------			     
+ *	roy	10/19/94		Initial version			     
+ * 
+ *********************************************************************/
+
+@extern method EditorTextClass, MSG_ET_IS_CODE_DIRTY 
+{
+    if (@call self::MSG_VIS_TEXT_GET_USER_MODIFIED_STATE()) 
+    {
+	if (clear)
+	{
+	    pself = ObjDerefGen(oself);
+#if 0
+	    pself->ETI_dirty = 0;
+#endif
+	    @call self::MSG_VIS_TEXT_SET_NOT_USER_MODIFIED();
+	}
+	return 1;
+    }
+    return 0;
+}
+
+
+/*********************************************************************
+ *			ClearEditor
+ *********************************************************************
+ * SYNOPSIS:	Clear editor and reset any breakpoint/pc modes
+ * CALLED BY:	
+ * PASS:
+ * RETURN:
+ * SIDE EFFECTS:
+ * STRATEGY:
+ * REVISION HISTORY:
+ *	Name	Date		Description			     
+ *	----	----		-----------			     
+ *	roy	11/12/94		Initial version			     
+ * 
+ *********************************************************************/
+@extern method EditorTextClass, MSG_ET_CLEAR_EDITOR 
+{
+    SimpleParaAttr def;
+
+    pself->ETI_funcNumber = -1;
+    pself->ETI_event = -1;
+    @call self::MSG_ET_SET_ERROR_LINE(-1);
+    @call self::MSG_VIS_TEXT_REPLACE_ALL_PTR((char *) _TEXT(""),0);
+    
+    /* If the last line is toggled as a breakpoint, then
+       any new replaced text or text inserted will also be a breakpoint.
+       Bad. Add a new line and turn it off */
+
+    def.SPA_bgColor.CQ_redOrIndex =  C_WHITE;
+    def.SPA_bgColor.CQ_info = CF_INDEX;
+    def.SPA_bgColor.CQ_green = 0;
+    def.SPA_bgColor.CQ_blue = 0;
+    
+	    
+
+    @call self::MSG_ET_UPDATE_LINE(def,0);
+    @call EditorView::MSG_GEN_VIEW_SCROLL_TOP();
+}
+
+
+/*********************************************************************
+ *			updateLine
+ *********************************************************************
+ * SYNOPSIS: Install the specified style at the current line	
+ * CALLED BY:	
+ * PASS:	void(SimpleParaAttr atts, dword line);
+ * RETURN:
+ * SIDE EFFECTS:
+ * STRATEGY:
+ *		Note that line is relative to the first line
+ *		displayed.
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description			     
+ *	----	----		-----------			     
+ *	roy	9/17/94		Initial version			     
+ * 
+ *********************************************************************/
+
+@extern method EditorTextClass, MSG_ET_UPDATE_LINE 
+{
+    VisTextGetLineOffsetAndFlagsParameters lineInfo;
+    byte 		hacked;
+    VisTextRange 	range;
+    dword 		offset;
+    VisAttrs	        va;
+
+
+    /* dont try this if we are not onscreen */
+    va = @call self::MSG_VIS_GET_ATTRS();
+    if (! (va&VA_REALIZED))
+    {
+	return;
+    }
+
+    /* If the desired line isn't displayed, bail. */
+    if ((line < 0) ||
+	(line >= @call self::MSG_ET_GET_NUM_LINES_DISPLAYED()))
+    {
+	return;
+    }
+    
+    hacked = 0;
+
+    /* An apparent quirk (bug?) in Vistext changes the attributes
+       of the line AFTER this line if the following
+       line is the last one and it's empty.... */
+
+    lineInfo.VTGLOAFP_line = line;
+
+    /* This call does some initialization which apparently
+       keeps the system happy just in case the editor hasn't
+       been initialized yet on screen.
+    */
+
+    @call self::MSG_VIS_UPDATE_GEOMETRY();
+    @call self::MSG_VIS_TEXT_GET_LINE_OFFSET_AND_FLAGS(&lineInfo);
+    offset = lineInfo.VTGLOAFP_offset;
+
+    /* Check if this isn't the last line */
+
+    if (!(lineInfo.VTGLOAFP_flags & LF_ENDS_IN_NULL)) {
+	/* Get offset of next line. */
+
+	lineInfo.VTGLOAFP_line++;
+	@call self::MSG_VIS_TEXT_GET_LINE_OFFSET_AND_FLAGS(&lineInfo);
+
+	/* If this is the last line, and it's empty,
+	   then just add a space. Pretty harmless, don't you think?
+	*/
+	if ( (lineInfo.VTGLOAFP_flags & LF_ENDS_IN_NULL) &&
+	    @call self::MSG_VIS_TEXT_GET_TEXT_SIZE() == 
+	                        lineInfo.VTGLOAFP_offset){
+	    @call self::MSG_VIS_TEXT_APPEND_PTR((char *) _TEXT(" "),0);
+	    	hacked = TRUE;
+	}
+
+    }
+
+    /* Actually change the style */
+
+    @call self::MSG_VIS_TEXT_SET_PARA_BG_COLOR(atts.SPA_bgColor,
+					       offset,offset);
+
+    @call self::MSG_VIS_TEXT_SET_PARA_BG_GRAY_SCREEN(SDM_100,offset,offset);
+    
+    if (hacked) {
+	/* Now remove that damn space! */
+
+	@call self::MSG_VIS_TEXT_GET_SELECTION_RANGE(&range);
+	@call self::MSG_VIS_TEXT_DO_KEY_FUNCTION(VTKF_DESELECT,0);
+	@call self::MSG_VIS_TEXT_DO_KEY_FUNCTION(VTKF_END_OF_TEXT,0);
+	@call self::MSG_VIS_TEXT_DO_KEY_FUNCTION(VTKF_DELETE_BACKWARD_CHAR,0);
+	if (range.VTR_start <= @call self::MSG_VIS_TEXT_GET_TEXT_SIZE())
+	    @call self::
+		MSG_VIS_TEXT_SELECT_RANGE(range.VTR_end,range.VTR_start);
+    }
+}
+
+/*********************************************************************
+ *			SetErrorLine
+ *********************************************************************
+ * SYNOPSIS:	Keep track of the line where a compile time error
+ *              occurred
+ * CALLED BY:	
+ * PASS:        int lineNum: a valid line number, or -1 to clear
+ * RETURN:      nothing
+ * SIDE EFFECTS:
+ * STRATEGY:
+ * REVISION HISTORY:
+ *	Name	Date		Description			     
+ *	----	----		-----------			     
+ *	roy	 3/ 1/95	Initial version			     
+ * 
+ *********************************************************************/
+@extern method EditorTextClass, MSG_ET_SET_ERROR_LINE {
+
+    pself->ETI_errorLine = lineNum;
+}
+
+
+
+/*********************************************************************
+ *			UpdateCodeIfNecessary
+ *********************************************************************
+ * SYNOPSIS:	If needed, download current code in editor
+ *              down to interpreter and/or update breakpoints,pc marker
+ * CALLED BY:	
+ * PASS:	Boolean withCompile
+ * RETURN:
+ * SIDE EFFECTS:
+ * STRATEGY:
+ * REVISION HISTORY:
+ *	Name	Date		Description			     
+ *	----	----		-----------			     
+ *	roy	10/25/94		Initial version			     
+ * 
+ *********************************************************************/
+@extern method EditorTextClass, MSG_ET_UPDATE_CODE_IF_NECESSARY 
+{
+    Boolean retval;
+
+    @call BuilderApp::MSG_GEN_APPLICATION_MARK_BUSY();
+
+    /* Initialize editor crap in case editor hasn't been brought up yet */
+
+    @call self::MSG_VIS_UPDATE_GEOMETRY();
+
+    /* if we have added UI, then recompile the ui code */
+    if (@call BuilderInterpreter::MSG_BENT_MANAGER_GET_FLAGS() & BF_UI_DIRTY)
+    {
+	@call BuilderShell::MSG_BS_GENERATE_UI_CODE(BDF_COMPLEX | 
+						    BDF_RUN_FROM_BUILDER, 
+						    FALSE);
+	BascoCompileFunction(bascoTask, 0);
+	@call BuilderInterpreter::MSG_BENT_MANAGER_SET_FLAGS(0, BF_UI_DIRTY);
+    }
+
+    if (@call self::MSG_ET_IS_CODE_DIRTY(TRUE))
+    {
+	retval = @call self::MSG_ET_DOWNLOAD_CODE(withCompile);
+    } else {
+	retval = FALSE;
+    }
+    @call BuilderApp::MSG_GEN_APPLICATION_MARK_NOT_BUSY();
+
+    return retval;
+}
+
+/*********************************************************************
+ *			DownloadCode
+ *********************************************************************
+ * SYNOPSIS:	Download code from editor to compiler.
+ * CALLED BY:	
+ * PASS:      void
+ * RETURN:    void
+ * SIDE EFFECTS:
+ * STRATEGY:    
+ * REVISION HISTORY:
+ *	Name	Date		Description			     
+ *	----	----		-----------			     
+ *	roy	10/25/94	Initial version			     
+ * 
+ *********************************************************************/
+
+@extern method	EditorTextClass, MSG_ET_DOWNLOAD_CODE 
+{
+    TCHAR    	*buffer, *eol;
+    Boolean	done, error = FALSE;
+    int	    	lineCount;
+    TCHAR    	*line;
+    MemHandle 	buf, bugHandle, lineBuf;
+    dword   	numChars;
+
+    /* 11/12, tried to access actual optr, but VTI_text 
+       wasn't recognized. Why is there no access method? */
+
+    buf = @call self::MSG_VIS_TEXT_GET_ALL_BLOCK(NullHandle);
+    numChars = @call self::MSG_VIS_TEXT_GET_TEXT_SIZE();
+
+    buffer = MemLock (buf);
+    lineBuf = MemAlloc(4096, HF_SHARABLE | HF_SWAPABLE, HAF_ZERO_INIT | HAF_LOCK);
+    line = MemDeref(lineBuf);
+
+    MemLock(OptrToHandle(@StartTop));
+
+    bugHandle = BascoBugGetBugHandleFromCTask(bascoTask);
+    done = FALSE;
+    lineCount = 0;
+    while(!done)
+    {
+	BascoFuncType	ft;
+	int 	    	funcNumber;
+	TCHAR	    	*cp;
+
+	eol = strchr(buffer, C_ENTER);
+	if (eol != NULL) 
+	{
+	    *eol = C_NULL;
+	    EC_ERROR_IF(strlen(buffer) >= 4095, -1);
+	    strcpy(line+1,buffer);
+	}
+	else
+	{
+	    word    nsize;
+
+	    /* if there is no C_ENTER at the end, pretend there was one */
+	    nsize = numChars - (dword)(buffer - (TCHAR *)MemDeref(buf));
+	    if (!nsize) {
+		break;
+	    } else {
+		strncpy(line+1, buffer, nsize);
+		line[nsize+1] = C_NULL;
+		done = TRUE;
+	    }
+	}
+	/* First byte of the line stores a debug flag.
+	   You had better have BUILD_TIME set in your Legos lib, or it
+	   will choke big time when it tries to add the line */
+
+	/* clear all the breakpoints since the code has changed */
+	*line = @call Editor::MSG_ET_GET_LINE_STATUS(lineCount);
+
+	if (!strcmp(line+1,LMemDeref(@StartTop))) {
+	    strcpy(line+1,LMemDeref(@SubDuploStart));
+	}
+	else if (!strcmp(line+1, LMemDeref(@StartRev))) {
+	    strcpy(line+1,LMemDeref(@FuncDuploRev));
+	}
+	else if (!strcmp(line+1, LMemDeref(@EndTop)) ||
+		 !strcmp(line+1, LMemDeref(@EndRev))) {
+	    strcpy(line+1,LMemDeref(@EndSub));
+	}
+	
+	ft = BascoLineAdd(bascoTask, line);
+	switch (ft)
+	{
+	case FT_SUBROUTINE:
+	case FT_FUNCTION:
+	    cp = line;
+	    if (ft == FT_SUBROUTINE) {
+		cp += SUB_LENGTH_PLUS_ONE;
+	    } else {
+		cp += FUNCTION_LENGTH_PLUS_ONE;
+	    }
+	    cp++; /* there is at least one space character */
+	    while (isspace(*cp)) {
+		cp++;
+	    }
+
+	    funcNumber = EditGetRoutineIndex(bascoTask, cp);
+	    if (withCompile) {
+		BugDeleteBreaksForFunction(bugHandle, funcNumber);
+	    }
+	    break;
+	case FT_END_SUB:
+	case FT_END_FUNCTION:
+
+	    if (withCompile) 
+	    {
+		@call BuilderApp::MSG_GEN_APPLICATION_MARK_BUSY();
+		if (!BascoCompileFunction(bascoTask, funcNumber))
+		{
+		    GandalfCompileError(bascoTask);
+		    error = TRUE;
+		    /* causes any other funcs to be ignored */
+		    /* done = TRUE; */
+		}
+		@call BuilderApp::MSG_GEN_APPLICATION_MARK_NOT_BUSY();
+	    }
+	    /* update our funcNumber */
+	    pself = ObjDerefGen(oself);
+	    pself->ETI_funcNumber = funcNumber;
+	    pself->ETI_event = -1;
+	    break;
+
+	case FT_ERROR:
+	    GandalfCompileError(bascoTask);
+	    error = TRUE;
+	    done = TRUE;
+	    break;
+	case FT_NONE:
+	default:    break;
+	}
+
+	if ((byte)*line == DBG_BREAK || (byte)*line == DBG_BREAK_AND_PC)
+	{
+	    BugSetBreakAtLine(bugHandle, funcNumber, lineCount);
+	}
+
+	lineCount++;
+	if (!done) {
+	    buffer = eol+1;
+	}
+    }
+
+    BascoTerminateRoutine(bascoTask);
+
+    MemFree(buf);
+    MemFree(lineBuf);
+
+    /* Subtract the number of hidden routines */
+
+    @call RoutineList::MSG_GEN_DYNAMIC_LIST_INITIALIZE(EditGetNumRoutines(bascoTask));
+    MemUnlock(OptrToHandle(@StartTop));
+    return error;
+}
+
+
+/*********************************************************************
+ *			GetLineStatus
+ *********************************************************************
+ * SYNOPSIS:	Get the highlight state of the current line
+ * CALLED BY:	
+ * PASS:
+ * RETURN:
+ * SIDE EFFECTS:
+ * STRATEGY:
+ * REVISION HISTORY:
+ *	Name	Date		Description			     
+ *	----	----		-----------			     
+ *	roy	10/19/94		Initial version			     
+ * 
+ *********************************************************************/
+@extern method EditorTextClass, MSG_ET_GET_LINE_STATUS 
+{
+    VisTextMaxParaAttr	attrs;
+    SimpleParaAttr	brk, pc, brkPc, *ptr;
+    dword		start,end,line,boff,eoff;
+    MemHandle		han;
+    VisTextGetLineOffsetAndFlagsParameters lineInfo;
+    VisTextParaAttrDiffs	diffs;
+    byte    	    	err;
+
+    /* Orient ourselves... */
+    if (lineNum < 0) {
+	@call self::MSG_ET_GET_CURSOR_INFO(&start,&end,&line,&boff,&eoff);
+    }
+    else {
+	line = lineNum;
+	lineInfo.VTGLOAFP_line = line;
+	err = @call self::MSG_VIS_TEXT_GET_LINE_OFFSET_AND_FLAGS(&lineInfo);
+	if (err) {
+	    return DBG_NORMAL;
+	}
+	boff = lineInfo.VTGLOAFP_offset;
+    }
+	
+    /* Now check the status of this line */
+
+    @call self::MSG_VIS_TEXT_GET_PARA_ATTR((VisTextGetAttrFlags)0,
+					   &diffs,&attrs,boff,boff);
+
+
+    /* Get the attributes of each style */
+
+    pself = ObjDerefGen(oself);
+
+    han = OptrToHandle(pself->ETI_pcAttrs);
+    ObjLockObjBlock(han);
+    ptr   = LMemDeref(pself->ETI_pcAttrs);
+    pc = *ptr;
+
+    MemUnlock(han);
+
+    han = OptrToHandle(pself->ETI_breakPcAttrs);
+    ObjLockObjBlock(han);
+    ptr   = LMemDeref(pself->ETI_breakPcAttrs);
+    brkPc = *ptr;
+    MemUnlock(han);
+
+
+    han = OptrToHandle(pself->ETI_breakAttrs);
+    ObjLockObjBlock(han);
+    ptr   = LMemDeref(pself->ETI_breakAttrs);
+    brk = *ptr;
+
+    MemUnlock(han);
+
+
+    /* Break marker underneath */
+
+    if (SimpEqual(&attrs.VTMPA_paraAttr, &brk)) {
+
+	return DBG_BREAK;
+    }
+    
+    /* PC marker underneath */
+
+    else if (SimpEqual(&attrs.VTMPA_paraAttr, &pc)) {
+
+	return DBG_PC;
+    }
+
+    /* Both markers underneath */
+
+    else if (SimpEqual(&attrs.VTMPA_paraAttr, &brkPc)) {
+
+	return DBG_BREAK_AND_PC;
+    }
+
+    else /* nothing underneath */ {
+
+	return DBG_NORMAL;
+    }
+
+}
+
+/*********************************************************************
+ *			ShowRoutineByIndex
+ *********************************************************************
+ * SYNOPSIS:	 Show routine for given index into function table
+ * CALLED BY:	
+ * PASS:         int index
+ * RETURN:
+ * SIDE EFFECTS:
+ * STRATEGY:
+ * REVISION HISTORY:
+ *	Name	Date		Description			     
+ *	----	----		-----------			     
+ *	roy	10/14/94	Initial version
+ *	jmagasin 10/22/96	Handle routines w/ too many lines.
+ * 
+ *********************************************************************/
+
+@extern method EditorTextClass, MSG_ET_SHOW_ROUTINE_BY_INDEX 
+{
+    int numLines, i;
+    dword codeOffset;
+    TCHAR *text;
+    byte seenStart = 0;
+    byte seenRev = 0;
+    int	startLine = 0;
+    
+    
+    @call self::MSG_META_SUSPEND();
+    
+    @call self::MSG_ET_CLEAR_EDITOR();
+
+    MemLock(OptrToHandle(@DuploStart));
+    numLines = EditGetRoutineNumLines(bascoTask, index, &codeOffset);
+
+    /* Cache these goodies for quick updates of new breakpoints */
+    pself = ObjDerefGen(oself);
+
+    pself->ETI_codeOffset = codeOffset;
+    pself->ETI_numLines   = numLines;
+    pself->ETI_funcNumber = index;
+    pself->ETI_event = -1;
+
+
+    /* If the routine is too long, adjust startLine and numLines
+     * so that only a portion is displayed.  Also set some instance
+     * data so that we can compensate for the clipped lines in
+     * other routines.
+     */
+    @call self::MSG_ET_ADJUST_DISPLAY_RANGE_FOR_LONG_ROUTINE(index,
+							     &startLine,
+							     &numLines);
+
+
+    for (i = startLine; i < numLines; i++) 
+    {
+	text = EditGetLineTextWithLock(bascoTask, codeOffset, i);
+	if(!strcmp(text,LMemDeref(@SubDuploStart)) ||
+	   !strcmp(text,LMemDeref(@FuncDuploStart))) {
+	    seenStart = 1;
+	    @call self::MSG_VIS_TEXT_APPEND_PTR((char *) 
+			      LMemDeref(@StartTop),0);
+	}
+	else if (!strcmp(text,LMemDeref(@FuncDuploRev))) {
+	    seenRev = 1;
+	    @call self::MSG_VIS_TEXT_APPEND_PTR((char *) 
+			      LMemDeref(@StartRev),0);
+	}
+	else if (seenStart && (!strcmp(text,LMemDeref(@EndSub)) ||
+			       !strcmp(text,LMemDeref(@EndFunction)))) {
+	    @call self::MSG_VIS_TEXT_APPEND_PTR((char *) 
+			      LMemDeref(@EndTop),0);
+	}
+	else if (seenRev && !strcmp(text,LMemDeref(@EndFunction))) {
+	    @call self::MSG_VIS_TEXT_APPEND_PTR((char *) 
+                              LMemDeref(@EndRev),0);
+	}
+	else
+	    @call self::MSG_VIS_TEXT_APPEND_PTR((char *) text,0);
+	
+	HugeArrayUnlock(text);
+	@call self::MSG_VIS_TEXT_APPEND_PTR((char *) _TEXT("\r"),0);
+    }
+
+    @call self::MSG_ET_SET_CURSOR_AT_LINE(startLine);
+    @call self::MSG_META_UNSUSPEND();
+    @call self::MSG_META_SUSPEND();
+    
+    /* Show all the breakpoints, unless we're displaying a partial
+     * funcion in which case we can't.
+     */
+    if (startLine == 0) 
+    {
+	for (i = startLine; i < numLines; i++) 
+	{	
+	    if (EditGetLineDebugStatus(bascoTask,codeOffset, i)) {
+		@call self::MSG_ET_TOGGLE_BREAKPOINT(i, 0);
+	    }
+	}
+    }
+    @call self::MSG_META_UNSUSPEND();
+    @call self::MSG_VIS_TEXT_SET_NOT_USER_MODIFIED();
+
+    MemUnlock(OptrToHandle(@DuploStart));
+}
+
+
+
+
+/***********************************************************************
+ *	MSG_ET_ADJUST_DISPLAY_RANGE_FOR_LONG_ROUTINE for EditorTextClass
+ ***********************************************************************
+ * SYNOPSIS:	Helper method called *only* by MSG_ET_SHOW_ROUTINE_BY
+ *		INDEX.  If the editor is asked to display a routine
+ *		that is too long, it will display only a portion of
+ *		the routine.  Routines over 150 lines in length
+ *		require large blocks of memory and might crash Geos.
+ *		
+ * PARAMETERS:	(int index, int *startLine, int *numLines)
+ *		If necessary, *startLine and *numLines are adjusted
+ *		so that only a portion of the routine is displayed.
+ *
+ * SIDE EFFECTS:
+ *
+ * STRATEGY:
+ *     Gandalf uses a GenText, which has problems displaying routines
+ *     of more than 150 lines.  Check if the user has specified (in the
+ *     INI file) a maximum number of lines that he is willing to show.
+ *     Use that value, or the default value of 250, to determine the
+ *     range of lines to display.  Also, don't allow the user to edit a
+ *     partially displayed routine.
+ *
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	jmagasin 10/25/96   	Initial Revision
+ *
+ ***********************************************************************/
+@extern method EditorTextClass, MSG_ET_ADJUST_DISPLAY_RANGE_FOR_LONG_ROUTINE
+{
+    int           numLinesDisplayed;
+    BuilderState  bState;
+    Boolean	  newRange = FALSE;
+    int 	  funcNum, lineNum, halfNum, curFrame;
+    PTaskHan	  mainTask;
+    word	  rteFuncNum;
+    
+    
+    bState = BugGetBuilderState(BascoBugGetBugHandleFromCTask(bascoTask));
+    numLinesDisplayed = @call self::MSG_ET_GET_NUM_LINES_DISPLAYED();
+    if (*numLines > numLinesDisplayed)
+    {
+	/* Foul!  This routine is too long. */
+	pself->ETI_showingLongRoutine = 0xFF;
+	
+	/* If in state that allows editing, disable editing. */
+	if (bState == BS_STOPPED || bState == BS_LOADING_FILE) {
+	    @call self::
+		MSG_VIS_TEXT_MODIFY_EDITABLE_SELECTABLE(0,VTS_EDITABLE);
+	}
+
+	/* On compile errors, display code above and below error. */
+	if (BascoGetCompileErrorForFunction(bascoTask, index))
+	{
+	    BascoSetTaskErrorToFunction(bascoTask, index);
+	    BascoReportError(bascoTask, &funcNum, &lineNum);
+	    newRange = TRUE;
+	}
+
+	/* On runtime errors, display code above and below error.  But
+	 * make sure the routine we want to show is the one in which
+	 * the error occurred.
+	 */
+	else if ((mainTask = GandalfGetMainTask()) != NullHandle)
+	{
+	    curFrame = BascoBugGetCurrentFrame(mainTask);
+	    if (curFrame >= 0) 
+	    {
+		if (BascoBugGetFrameInfo(mainTask, curFrame, &rteFuncNum))
+		{
+		    if (rteFuncNum == index) 
+		    {
+			lineNum = BascoBugGetFrameLineNumber(mainTask,
+							     bascoTask,
+							     curFrame);
+			newRange = TRUE;
+		    }
+		}
+	    }
+	}
+
+	if (newRange)
+	{
+	    /* Make a new range, clipped to 0 above and numLines below. */
+	    halfNum = numLinesDisplayed/2;
+	    if (lineNum > halfNum) {
+		*startLine = lineNum - halfNum;
+	    }
+	    if (*numLines > *startLine + numLinesDisplayed) {
+		*numLines = *startLine + numLinesDisplayed;
+	    }
+	}
+	else {
+	    /* Last line to display will be numLinesDisplayed-1. */
+	    *numLines = numLinesDisplayed;
+	}
+    }
+
+    /* This routine is not hideously long. */
+    else {
+	pself->ETI_showingLongRoutine = 0;
+	
+	if (bState == BS_STOPPED) {
+	    /* User can edit a wholly displayed routine.  Undo any
+	     * disabling done in the first clause.
+	     */
+	    @call Editor::
+		MSG_VIS_TEXT_MODIFY_EDITABLE_SELECTABLE(VTS_EDITABLE,0);
+	}
+    }
+
+    /* Remember the number of the first line showing in this routine. */
+    pself->ETI_firstLineVisible = *startLine;
+    
+}	/* End of MSG_ET_ADJUST_DISPLAY_RANGE_FOR_LONG_ROUTINE.	*/
+
+
+
+/*********************************************************************
+ *			SetCursorAtLine
+ *********************************************************************
+ * SYNOPSIS:	Sets the cursor at a specified line
+ *              Useful for putting cursor at beginng of a routine
+ *              when starting up OR putting the cursor at a break
+ *              line when breaking...
+ * CALLED BY:	
+ * PASS:
+ * RETURN:
+ * SIDE EFFECTS:
+ * STRATEGY:
+ * REVISION HISTORY:
+ *	Name	Date		Description			     
+ *	----	----		-----------			     
+ *	roy	10/25/94		Initial version			     
+ * 
+ *********************************************************************/
+
+@extern method EditorTextClass, MSG_ET_SET_CURSOR_AT_LINE 
+{
+    VisTextGetLineOffsetAndFlagsParameters lineInfo;
+    VisAttrs	        va;
+
+    va = @call self::MSG_VIS_GET_ATTRS();
+    if ((!(va&VA_REALIZED)) || lineNum == -1)
+    {
+	return;
+    }
+
+    
+    /* Compensate for lines not shown. */
+    lineNum = @call self::MSG_ET_CONVERT_CODE_LINE_TO_TEXT_LINE(lineNum);
+    if (lineNum < 0)
+    {
+	return;
+    }
+    
+
+    lineInfo.VTGLOAFP_line = lineNum;
+    if (@call self::MSG_VIS_TEXT_GET_LINE_OFFSET_AND_FLAGS(&lineInfo)) 
+    {
+	return;
+    }
+
+    @call self::MSG_VIS_TEXT_SELECT_RANGE(lineInfo.VTGLOAFP_offset,
+						 lineInfo.VTGLOAFP_offset);
+
+    @call self::MSG_VIS_TEXT_SHOW_POSITION(lineInfo.VTGLOAFP_offset);
+}
+
+
+/*********************************************************************
+ *			SimpEqual
+ *********************************************************************
+ * SYNOPSIS:	Compare paragraph attributes at a line to
+ *		a SimpleParaAttr structure.
+ * CALLED BY:	
+ * PASS:
+ * RETURN:
+ * SIDE EFFECTS:
+ * STRATEGY:
+ * REVISION HISTORY:
+ *	Name	Date		Description			     
+ *	----	----		-----------			     
+ *	roy	9/17/94		Initial version			     
+ * 
+ *********************************************************************/
+#ifdef DO_DBCS
+byte
+SimpEqual(VisTextParaAttr *a1, SimpleParaAttr *a2) 
+{
+    ColorQuad	*c1, *c2;
+    c1 = &a1->VTPA_bgColor;
+    c2 = &a2->SPA_bgColor;
+    return ((c1->CQ_redOrIndex == c2->CQ_redOrIndex) &&
+	    (c1->CQ_info == c2->CQ_info) &&
+	    (c1->CQ_green == c2->CQ_green) &&
+	    (c1->CQ_blue == c2->CQ_blue));
+    
+}
+#else
+byte
+SimpEqual(VisTextParaAttr *a1, SimpleParaAttr *a2) {
+    return (a1->VTPA_bgColor.CQ_redOrIndex == a2->SPA_bgColor.CQ_redOrIndex);
+}
+#endif

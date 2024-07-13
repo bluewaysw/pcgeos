@@ -1,0 +1,204 @@
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+	Copyright (c) Geoworks 1994 -- All Rights Reserved
+
+PROJECT:	LEGOS
+MODULE:		Builder Shell
+
+FILE:		mainshlh.goh
+
+AUTHOR:		Roy Goldman, Sep 17, 1994
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	roy	9/17/94   	Initial version.
+
+DESCRIPTION:
+                BuilderShell Class declaration
+
+	$Id: mainshlh.goh,v 1.2 98/10/13 22:18:24 martin Exp $
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+
+@ifndef __MAINSHLH_GOH
+@define __MAINSHLH_GOH
+
+@include <stdapp.goh>
+
+typedef enum {
+    BSM_NORMAL,
+    BSM_AGGREGATE
+} BuilderShellMode;
+
+/* CLASS: BuilderShellClass
+   A class of which there will be exactly one instance.
+   It's meant to be the main UI handler for events which affect
+   multiple objects and other events which aren't easily categorized
+   as belonging to a specific object... Could be the process class,
+   but I sort of like this better.
+
+*/
+@class BuilderShellClass, MetaClass;
+
+@instance byte BS_propBoxVisible;
+@instance byte BS_editorVisible;
+@instance byte BS_toolboxVisible;
+@instance BuilderShellMode BS_mode;
+/*
+ * Use MSG_META_SUSPEND/UNSUSPEND to suspend ui updates
+ * on loads.
+ */
+@instance char BS_suspended;
+
+
+/* TEMPORARY CALL: Used to run some code in the viewer app */
+
+@message void MSG_BS_INTERACT_LINE();
+
+/* Erase data in memory, perhaps with a warning first */
+@message void MSG_BS_NEW(Boolean aggregate);
+
+/* Run program in memory--currently means executing Startup functio */
+
+@message void MSG_BS_RUN();
+
+/* Second half of run, must be split off into another function
+   for synchronization reasons. See code for details */
+
+@message void MSG_BS_RUN_PART_TWO();
+
+/* Load in a file, using file selector information */
+@message (GEN_FILE_SELECTOR_NOTIFICATION_MSG) MSG_BS_LOAD_FILE;
+@message void MSG_BS_LOAD_LAST();
+
+/* Save a file, using file selector information */
+typedef enum {
+    SFO_NORMAL,
+    SFO_RAW_GEOS,
+    SFO_RAW_LIBERTY
+} SaveFileOptions;
+@message void MSG_BS_SAVE_FILE(SaveFileOptions sfo);
+@message void MSG_BS_SAVE_COMPILED_FILE(BDescFlags flags);
+@message void MSG_BS_SAVE_CANCEL();
+
+
+/* Call back from viewer
+   to indicate execution of a breakable entity is finished */
+
+/* NOTE: hack::MSG_BS_START must = MSG_BS_DONE-1 */
+@message void MSG_BS_START();
+@message void MSG_BS_DONE();
+
+/* Like with RUN, because of synchronization reasons we finish
+   off over here... */
+
+@message void MSG_BS_DONE_PART_TWO();
+
+/* Called to update all variable/scope displays */
+@message void MSG_BS_SHOW_VAR_CHANGE();
+
+/* Call back from the interpreter, right before it's about to
+   block on a breakpoint */
+@message void MSG_BS_ABOUT_TO_BREAK();
+
+/* Called to Continue after a breakpoint */
+@message void MSG_BS_CONTINUE();
+@message Boolean MSG_BS_CONTINUE_COMMON() = ax;
+
+/* Called to tell Interpreter to Stop ASAP.. Maybe push to interpreter..*/
+@message void MSG_BS_PAUSE();
+
+/* Tell interpreter to Halt--Stop and then kill viewer */
+@message void MSG_BS_STOP();
+
+/* Set up UI as needed and tell interpreter to routine step */
+@message void MSG_BS_PROC_STEP();
+
+/* Like above but for finishing a routine */
+@message void MSG_BS_FINISH();
+
+/* Like above but for single stepping */
+@message void MSG_BS_SINGLE_STEP();
+
+/* an action to cause an entire module to get recompiled */
+@message void MSG_BS_COMPILE_ALL();
+
+/* Generate code for the currently displayed UI,
+ * and write out a resource file.
+ *
+ * Returns True if resource file was successfully written out.
+ */
+@message Boolean MSG_BS_GENERATE_UI_CODE(BDescFlags flags,
+					 Boolean uiOnly);
+
+/* Return BS_mode */
+@message BuilderShellMode MSG_BS_GET_MODE();
+
+/* current aggregate version number */
+#define AGG_VERSION 1
+
+/* Set BS_mode */
+@message void MSG_BS_SET_MODE(BuilderShellMode mode);
+
+/* Sent by our GenEmbeddedCode objects when they've loaded their modules */
+@message(MSG_GEC_MODULE_LOADED_PROTO) MSG_BS_INIT_GEC_MODULE;
+
+/* Reload some GenEmbeddedCode modules, for debugging purposes
+ */
+@message void MSG_BS_RELOAD_GEC();
+
+@message void MSG_BS_NEW_MODULE();
+@message void MSG_BS_NEW_AGG();
+
+@message void MSG_BS_SHOW_TOPLEVEL_COMPONENTS();
+/* Sends MSG_BENT_RETURN_TO_SCREEN to the children of BuilderApp
+ */
+
+@message void MSG_BS_OPEN();
+
+/*
+ * Tethered debugging related messages.
+ */
+
+@message void MSG_BS_RUN_REMOTE();
+@message void MSG_BS_RPC_INIT();
+@message void MSG_BS_RPC_EXIT();
+@message void MSG_BS_RPC_SEND();
+@message void MSG_BS_RPC_NOTIFY_DATA();
+@message void MSG_BS_RPC_NOTIFY_ERROR();
+@message void MSG_BS_TEST_COM();
+@message (GEN_ITEM_GROUP_STATUS_MSG) MSG_BS_COM_PORT_SELECTED;
+
+@message void MSG_BS_HIDE_EDITOR();
+/*
+ * Hides the editor window.  Pair this with MSG_BS_SHOW_EDITOR.
+ * If the editor is hidden then you hide and show it will still be hidden.
+ */
+
+@message void MSG_BS_SHOW_EDITOR();
+/*
+ * Shows the editor if it was visible when last hidden.
+ * Pair this with MSG_BS_HIDE_EDITOR.
+ */
+
+@message int MSG_BS_GET_SUSPENDED();
+/*
+ * Returns current suspended count, 0 if not suspended.
+ */
+
+/* complete the rest of the new aggregate work */
+@message Boolean MSG_BS_NEW_AGG_FINISH();
+
+/* Action message sent from open trigger */
+@message void MSG_BS_DO_LOAD_FILE();
+
+/* Load the file specified ny global var gCurFilePath */
+@message void MSG_BS_LOAD_FILE_LOW();
+
+/* Needed to provide some synchronization -- GEN_SET_USABLE happens
+ * too quickly, even with VUM_DVAQ
+ */
+@message void MSG_BS_ENABLE_CONTINUE();
+@endc
+@endif

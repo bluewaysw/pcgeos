@@ -1,0 +1,435 @@
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+	Copyright (c) Geoworks 1995 -- All Rights Reserved
+
+PROJECT:	Legos
+MODULE:		Builder
+FILE:		maincomp.goc
+
+AUTHOR:		dubois, Oct 25, 1995
+
+ROUTINES:
+	Name			Description
+	----			-----------
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	dubois	10/25/95	Initial version.
+
+DESCRIPTION:
+	Implements the BuilderComponent class
+
+	$Id: maincomp.goc,v 1.2 98/10/13 22:18:35 martin Exp $
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+@include "gandalf.goh"
+@include "Editor/editorh.goh"
+@include "Main/mainshlh.goh"
+#include <chunkarr.h>
+
+#ifndef ObjDerefEnt
+#define ObjDerefEnt(obj)  ObjDeref(obj, word_offsetof(EntBase,  Ent_offset))
+#endif
+
+@classdecl BuilderComponentClass;
+
+@define GET_PROP(_cd, _p) \
+  @call self::MSG_ENT_GET_PROPERTY_EXTERNAL(&(_cd), _TEXT(_p))
+
+#define IS_ACTION(_t) !strcmp(actionName, _TEXT(_t))
+
+/***************************************************************************
+ *              Property Table for BuilderComponentClass
+ **************************************************************************/
+
+
+makeMessagePropertyStruct(BuilderComponent, selection, _TEXT("selection"),\
+			  TYPE_COMPONENT,	    	    	    	\
+			  MSG_BUILDER_GET_SELECTION,			\
+			  MSG_BUILDER_SET_SELECTION)
+
+
+/***********************************************************************
+ *		MSG_ENT_DO_ACTION for BuilderComponentClass
+ ***********************************************************************
+ * SYNOPSIS:	Perform one of our endearing actions
+ *
+ * PARAMETERS:	RunHeapInfo*	rhi
+ *		ComponentData*	retval
+ *		ComponentData*	argv
+ *		int		argc
+ *		TCHAR _far*	actionName
+ *
+ * DESCRIPTION:	Implement the following actions:
+ *
+ *	HasRoutine(name as string) as Boolean
+ *	  TRUE if routine exists.
+ *
+ *	ShowRoutine(name as string) as Boolean
+ *	  Make editor show routine.  FALSE if failed (routine doesn't exist)
+ *
+ *	AddRoutine(String text, Int insertPoint, Bool withDownload)
+ *	  Adds <text> to the compiler.  <insertPoint> is the index within
+ *	  the text to leave the cursor.  If <withDownload> is FALSE,
+ *	  routine will be forgotten unless the user modifies it (useful for
+ *	  adding routine templates and such)
+ *
+ *	  NOTE!  If you AddRoutine an existing routine, the old routine
+ *	  will be _destroyed_.  Be careful.
+ *
+ *	NewProperty	-> MSG_ET_NEW_AGG_PROPERTY
+ *
+ *	PropertyChanged -> MSG_ET_AGG_PROPERTY_CHANGED
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	dubois	10/25/95   	Initial Revision
+ *
+ ***********************************************************************/
+#define CK_ARGS(_n) if (argc!=(_n)) goto badNumArgs
+#define CK_TYPE(_n, _t) if (argv[_n].CD_type != (_t)) goto badType
+
+@method BuilderComponentClass, MSG_ENT_DO_ACTION
+{
+    if (IS_ACTION("HasRoutine"))
+    {
+	TCHAR*	text;
+	sword	index;
+
+	CK_ARGS(1);
+	CK_TYPE(0, TYPE_STRING);
+	RunHeapLock(rhi, argv[0].CD_data.LD_string, (void**) &text);
+	index = EditGetRoutineIndex(bascoTask, text);
+	RunHeapUnlock(rhi, argv[0].CD_data.LD_string);
+
+	/* index == -1 if routine doesn't exist
+	 */
+	retval->CD_type = TYPE_INTEGER;
+	retval->CD_data.LD_integer = !(index == -1);
+    }
+    else if (IS_ACTION("ShowRoutine"))
+    {
+	TCHAR*	text;
+	sword	index;
+
+	@call EditorInteraction::MSG_GEN_INTERACTION_INITIATE();
+
+	CK_ARGS(1);
+	CK_TYPE(0, TYPE_STRING);
+	RunHeapLock(rhi, argv[0].CD_data.LD_string, (void**) &text);
+	index = EditGetRoutineIndex(bascoTask, text);
+	RunHeapUnlock(rhi, argv[0].CD_data.LD_string);
+
+	retval->CD_type = TYPE_INTEGER;
+
+	if (index != -1) {
+	    @call Editor::MSG_ET_SHOW_ROUTINE_BY_INDEX(index);
+	    retval->CD_data.LD_integer = 1;
+	} else {
+	    retval->CD_data.LD_integer = 0;
+	}
+    }
+    else if (IS_ACTION("AddRoutine"))
+    {
+	TCHAR 	    	*text, *buffer;
+	MemHandle   	buf;
+	CK_ARGS(3);
+	CK_TYPE(0, TYPE_STRING);
+	CK_TYPE(1, TYPE_INTEGER);
+	CK_TYPE(2, TYPE_INTEGER);
+
+	RunHeapLock(rhi, argv[0].CD_data.LD_string, (void**) &text);
+	buf = MemAlloc((strlen(text)+1)*sizeof(TCHAR),  
+		       HF_SWAPABLE | HF_SHARABLE, HAF_LOCK);
+	buffer = MemDeref(buf);
+	strcpy(buffer, text);
+	RunHeapUnlock(rhi, argv[0].CD_data.LD_string);
+	
+	@call Editor::MSG_ET_ADD_NEW_ROUTINE_TEXT
+	    (buffer, argv[1].CD_data.LD_integer, argv[2].CD_data.LD_integer);
+	MemFree(buf);
+    }
+    else if (IS_ACTION("UIDirty"))
+    {
+	@call BuilderInterpreter::MSG_BENT_MANAGER_SET_FLAGS(BF_UI_DIRTY, 0);
+    }
+    else if (IS_ACTION("NewProperty"))
+    {
+	@call Editor::MSG_ET_NEW_AGG_PROPERTY(rhi, retval, argv, argc,
+					      actionName);
+    }
+    else if (IS_ACTION("PropertyChanged"))
+    {
+	@call Editor::MSG_ET_AGG_PROPERTY_CHANGED(rhi, retval, argv, argc,
+						  actionName);
+    }
+    else if (IS_ACTION("NewAggFinish"))
+    {
+	retval->CD_data.LD_integer = 
+	    	(int) @call BuilderShell::MSG_BS_NEW_AGG_FINISH();
+	retval->CD_type = TYPE_INTEGER;
+    }
+    else if (IS_ACTION("AddComponentToDestroyList"))
+    {
+	optr		*newComp;
+	ChunkHandle	newArray;
+
+	CK_ARGS(1);
+	CK_TYPE(0, TYPE_COMPONENT);
+
+	if (pself->BCI_destroyCompList == NullHandle) {
+	    newArray = ChunkArrayCreate(OptrToHandle(oself),
+					sizeof(optr), 0, 0);
+	    pself = ObjDerefEnt(oself);
+	    pself->BCI_destroyCompList = newArray;
+	}
+	newComp = ChunkArrayAppendHandles(OptrToHandle(oself), 
+					  pself->BCI_destroyCompList,
+					  0);
+	*newComp = argv[0].CD_data.LD_comp;
+    }
+    else
+    {
+	@callsuper();
+    }
+    return;
+
+ badType:
+    retval->CD_type = TYPE_ERROR;
+    retval->CD_data.LD_error = CAE_WRONG_TYPE;
+    return;
+ badNumArgs:
+    retval->CD_type = TYPE_ERROR;
+    retval->CD_data.LD_error = CAE_WRONG_NUMBER_ARGS;
+    return;
+}	/* End of MSG_ENT_DO_ACTION.	*/
+
+
+/***********************************************************************
+ *		MSG_META_RESOLVE_VARIANT_SUPERCLASS for BuilderComponentClass
+ ***********************************************************************
+ * SYNOPSIS:	Resolve to Meta
+ * PARAMETERS:	word MasterOffset
+ * SIDE EFFECTS:
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	dubois	10/25/95   	Initial Revision
+ *
+ ***********************************************************************/
+@method BuilderComponentClass, MSG_META_RESOLVE_VARIANT_SUPERCLASS
+{
+    /* Meta is master but not variant, so Ent should be the only 
+     * level we ever need resolve...
+     */
+    return &MetaClass;
+}	/* End of MSG_META_RESOLVE_VARIANT_SUPERCLASS.	*/
+
+/***********************************************************************
+ *		MSG_META_INITIALIZE for BuilderComponentClass
+ ***********************************************************************
+ * SYNOPSIS:	    Set up our master level's instance data
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	dloft	8/24/95   	Initial Revision
+ *
+ ***********************************************************************/
+@method BuilderComponentClass, MSG_META_INITIALIZE
+{
+    @callsuper();
+    pself = ObjDerefEnt(oself);
+    pself->EI_state &= (~(ES_IS_GEN | ES_IS_VIS));  /*0x9f;*/
+}
+
+/***********************************************************************
+ *		MSG_ENT_SET/GET_PROPERTY for BuilderComponentClass
+ ***********************************************************************
+ * SYNOPSIS:	Since this component is within Gandalf -- not some
+ *		standard component library -- it isn't byte-compiled,
+ *		and needs to forward get/set property messages itself.
+
+ * PARAMETERS:	@stack	RunHeapInfo 	*rhi
+ *			ComponentData 	*value
+ *			TCHAR _far 	*prop
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	martin	12/28/95   	Initial version
+ *
+ ***********************************************************************/
+@method BuilderComponentClass, MSG_ENT_SET_PROPERTY,
+                               MSG_ENT_GET_PROPERTY
+{
+    if (!strcmp(prop,_TEXT("selection"))) {
+	if (message == MSG_ENT_SET_PROPERTY) {
+	    @call self::MSG_BUILDER_SET_SELECTION(rhi, value, prop);
+	} else {
+	    @call self::MSG_BUILDER_GET_SELECTION(rhi, value, prop);
+	}
+    }
+}
+
+
+/***********************************************************************
+ *		MSG_BUILDER_SET_SELECTION for BuilderComponentClass
+ ***********************************************************************
+ * SYNOPSIS:	    
+ * PARAMETERS:	@stack	RunHeapInfo 	*rhi
+ *			ComponentData 	*value
+ *			TCHAR _far 	*prop
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	martin	12/27/95   	Initial version
+ *
+ ***********************************************************************/
+@method BuilderComponentClass, MSG_BUILDER_SET_SELECTION
+{
+    /* EntGetInterpreter doesn't work correctly with 	*/
+    /* BuilderComponentClass, for whatever reason... 	*/
+    /* Probably because it isn't in a normal component 	*/
+    /* library, and isn't created inside a special ent 	*/
+    /* object block like moset components...		*/
+    optr interp = @BuilderInterpreter;
+
+    if (value->CD_type == TYPE_COMPONENT) {
+       @call interp::MSG_BENT_MANAGER_SELECT_COMPONENT(value->CD_data.LD_comp);
+   }
+}
+
+
+/***********************************************************************
+ *		MSG_BUILDER_GET_SELECTION for BuilderComponentClass
+ ***********************************************************************
+ * SYNOPSIS:	    
+ * PARAMETERS:	@stack	RunHeapInfo 	*rhi
+ *			ComponentData 	*value
+ *			TCHAR _far 	*prop
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	martin	12/27/95   	Initial version
+ *
+ ***********************************************************************/
+@method BuilderComponentClass, MSG_BUILDER_GET_SELECTION
+{
+    optr interp = @BuilderInterpreter;
+
+    value->CD_type = TYPE_COMPONENT;
+    value->CD_data.LD_comp = 
+	@call interp::MSG_BENT_MANAGER_GET_SELECTED_COMPONENT();
+}
+
+
+
+
+/***********************************************************************
+ *		MSG_BC_GET_DESTROY_LIST for BuilderComponentClass
+ ***********************************************************************
+ * SYNOPSIS:	    
+ * PARAMETERS:	
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	jimmy	12/27/95   	Initial version
+ *
+ ***********************************************************************/
+
+@method BuilderComponentClass, MSG_BC_GET_DESTROY_LIST
+{
+    return pself->BCI_destroyCompList;
+}
+
+
+
+/***********************************************************************
+ *		MSG_BC_DESTROY_COMPS_IN_LIST for BuilderComponentClass
+ ***********************************************************************
+ * SYNOPSIS:	
+ * PARAMETERS:	
+ * SIDE EFFECTS:
+ *
+ * STRATEGY:	
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	jimmy	6/20/96   	Initial Revision
+ *
+ ***********************************************************************/
+@method BuilderComponentClass, MSG_BC_DESTROY_COMPS_IN_LIST
+{
+    int	    count, i, size;
+    optr    list, *o;
+    
+    if (pself->BCI_destroyCompList == NullHandle) {
+	return;
+    }
+    list = ConstructOptr(OptrToHandle(oself), pself->BCI_destroyCompList);
+    count = ChunkArrayGetCount(list);
+    for (i = 0; i < count; i++)
+    {
+	o = ChunkArrayElementToPtr(list, 0, (word *)&size);
+	@call *o::MSG_ENT_DESTROY();
+	ChunkArrayDelete(list, o);
+    }
+}	/* End of MSG_BC_DESTROY_COMPS_IN_LIST.	*/
+
+
+/***********************************************************************
+ *		MSG_BC_DELETE_COMP_FROM_DESTROY_LIST for BuilderComponentClass
+ ***********************************************************************
+ * SYNOPSIS:	remove a component from the destroy list
+ * PARAMETERS:	component to remove
+ * SIDE EFFECTS:
+ *
+ * STRATEGY:	
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	jimmy	7/23/96   	Initial Revision
+ *
+ ***********************************************************************/
+@method BuilderComponentClass, MSG_BC_DELETE_COMP_FROM_DESTROY_LIST
+{
+    int	    count, i, size;
+    optr    list, *o;
+    
+    if (pself->BCI_destroyCompList == NullHandle) {
+	return;
+    }
+    list = ConstructOptr(OptrToHandle(oself), pself->BCI_destroyCompList);
+    count = ChunkArrayGetCount(list);
+    for (i = count - 1; i >= 0; i++)
+    {
+	o = ChunkArrayElementToPtr(list, 0, (word *)&size);
+	if (*o == comp) {
+	    ChunkArrayDeleteRange(list, i, 1);
+	}
+    }
+}	/* End of MSG_BC_DELETE_COMP_FROM_DESTROY_LIST.	*/
+

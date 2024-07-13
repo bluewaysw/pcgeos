@@ -1,0 +1,574 @@
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+	Copyright (c) Geoworks 1995 -- All Rights Reserved
+
+PROJECT:        
+MODULE:         
+FILE:           complist.goc
+
+AUTHOR:         Ronald Braunstein, Feb 27, 1995
+
+ROUTINES:
+	Name                    Description
+	----                    -----------
+
+REVISION HISTORY:
+	Name    Date            Description
+	----    ----            -----------
+	ron        2/27/95           Initial version.
+
+DESCRIPTION:
+	Routines for dealing with the component list
+
+	$Id: complist.goc,v 1.2 98/10/13 22:17:54 martin Exp $
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+@include "gandalf.goh"
+@include <Legos/bgadget.goh>
+@include <Legos/basco.goh>
+@include "Editor/editorh.goh"
+@include <Legos/basrun.goh>
+#include <Legos/runheap.h>
+#include <Ansi/stdlib.h>
+
+@classdecl ComponentListClass;
+
+
+/*********************************************************************
+ *			 MSG_COMPONENT_LIST_ADD_COMPONENT
+ *********************************************************************
+ * SYNOPSIS: 	Add passed in component to list of already known about
+ *		components.
+ * CALLED BY:	Used when a new component is created in the builder
+ * PASS:	optr	component
+ * RETURN:	nothing
+ * SIDE EFFECTS:
+ * STRATEGY:
+ *		Add optr to ChunkArray of components.  Tell the list
+ *		Initialize itself with one more element.
+ *		The moniker will be constructed by asking the component
+ *		for its name.
+ * REVISION HISTORY:
+ *	Name	Date		Description			     
+ *	----	----		-----------			     
+ *	ron	 2/27/95	Initial version			     
+ * 
+ *********************************************************************/
+
+@method ComponentListClass, MSG_COMPONENT_LIST_ADD_COMPONENT
+{
+    ChunkHandle carray;
+    int count;
+    optr *newElement;
+    FatalErrors fe;
+    Warnings wa;
+    
+
+    EC_ERROR_IF(component == NullOptr, ERROR_NULL_COMPONENT);
+    carray = pself->CLI_componentArray;
+    
+    if (carray == NullChunk)
+    {
+	carray = ChunkArrayCreate(OptrToHandle(oself),sizeof(optr),0,OCF_DIRTY);
+	pself = ObjDerefGen(oself);
+	pself->CLI_componentArray = carray;
+    }
+
+    newElement = ChunkArrayAppend(ConstructOptr(OptrToHandle(oself),carray),
+				  0);
+    *newElement = component;
+
+    count = ChunkArrayGetCount(ConstructOptr(OptrToHandle(oself),carray));
+    @call self::MSG_GEN_DYNAMIC_LIST_INITIALIZE(count);
+    @call self::MSG_GEN_ITEM_GROUP_SET_SINGLE_SELECTION(count-1,0);
+    @call self::MSG_COMPONENT_LIST_APPLY_MSG(count-1,1,GIGSF_MODIFIED);
+    
+}
+/*********************************************************************
+ *			 MSG_GEN_DYNAMIC_LIST_QUERY_ITEM_MONIKER
+ *********************************************************************
+ * SYNOPSIS: 	Sets the moniker for the given list item
+ * CALLED BY:	List Initialization
+ * PASS:	optr	list   		# self
+ * 		word	item		# which item of list
+ * RETURN:	none
+ * SIDE EFFECTS:
+ * STRATEGY:
+ * REVISION HISTORY:
+ *	Name	Date		Description			     
+ *	----	----		-----------			     
+ *	ron	 2/27/95	Initial version			     
+ * 
+ *********************************************************************/
+
+@method ComponentListClass, MSG_GEN_DYNAMIC_LIST_QUERY_ITEM_MONIKER
+{
+    ComponentData data;
+    optr    	*componentPtr, component;
+    ChunkHandle	carray;
+    word	dummySize;
+    RunHeapInfo *rhi;
+    TCHAR	*namePtr;
+
+    carray = pself->CLI_componentArray;
+    if (carray != NullChunk) 
+    {
+	componentPtr = ChunkArrayElementToPtr(
+					 ConstructOptr(OptrToHandle(oself),
+					 carray),
+					 item, &dummySize);
+	component = *componentPtr;
+	rhi = RunComponentLockHeap(ObjLockObjBlock(OptrToHandle(component)));
+	@call component::MSG_ENT_GET_PROPERTY(rhi, &data, _TEXT("name"));
+	if (data.CD_type == TYPE_ERROR) {
+	    @call self::MSG_GEN_DYNAMIC_LIST_REPLACE_ITEM_TEXT(item, _TEXT("<Unnamed>"));
+	}
+	else
+	{
+	    RunHeapLock(rhi, data.CD_data.LD_string, (void**)&namePtr);
+	    @call self::MSG_GEN_DYNAMIC_LIST_REPLACE_ITEM_TEXT(item, namePtr);
+	    RunHeapUnlock(rhi, data.CD_data.LD_string);
+	}
+	RunComponentUnlockHeap(MemDeref(OptrToHandle(component)));
+	MemUnlock(OptrToHandle(component));
+    }
+}
+
+/*********************************************************************
+ *			 MSG_COMPONENT_LIST_APPLY_MSG
+ *********************************************************************
+ * SYNOPSIS: 	Tells EventList to display events for selected component
+ * CALLED BY:	Selecting a list item (single click or keyboard navigation)
+ * PASS:	word	selection	# which item
+ * RETURN:	nothing
+ * SIDE EFFECTS:
+ * STRATEGY:
+ * REVISION HISTORY:
+ *	Name	Date		Description			     
+ *	----	----		-----------			     
+ *	ron	 2/27/95	Initial version			     
+ * 
+ *********************************************************************/
+
+@method ComponentListClass, MSG_COMPONENT_LIST_APPLY_MSG 
+{
+    ChunkHandle carray;
+    word	dummySize;
+    optr *	component;
+    optr	comp;
+    
+    
+    carray = pself->CLI_componentArray;
+    if (carray != NullChunk)
+    {
+	component = ChunkArrayElementToPtr(ConstructOptr(OptrToHandle(oself),
+							 carray),
+					   selection, &dummySize);
+	comp = *component;
+	EC_WARNING_IF(comp == 0, WARNING_NULL_COMPONENT);
+    
+	@call pself->CLI_eventList::MSG_EVENT_LIST_SHOW_EVENTS(comp);
+	@call BuilderInterpreter::MSG_BENT_MANAGER_SELECT_COMPONENT(comp);
+    }
+    				  
+}
+
+/*********************************************************************
+ *			 MSG_COMPONENT_LIST_SELECT_COMPONENT
+ *********************************************************************
+ * SYNOPSIS: 	Selects given component
+ * CALLED BY:	global
+ * PASS:	optr	component	# component in list to select
+ * RETURN:	nothing
+ * SIDE EFFECTS:
+ * STRATEGY:
+ * REVISION HISTORY:
+ *	Name	Date		Description			     
+ *	----	----		-----------			     
+ *	ron	 2/27/95	Initial version			     
+ * 
+ *********************************************************************/
+
+@method ComponentListClass, MSG_COMPONENT_LIST_SELECT_COMPONENT
+{
+    ChunkHandle	carray;
+    optr eventList;
+    int c, i;
+    optr data;
+
+    carray = pself->CLI_componentArray;
+    eventList = pself->CLI_eventList;
+    if (carray != NullChunk)
+    {
+	c = ChunkArrayGetCountHandles(OptrToHandle(oself),carray);
+	for (i=0;i<c;i++)
+	{
+	    ChunkArrayGetElementHandles(OptrToHandle(oself),carray,
+					i,
+					&data);
+	    if (data == component) 
+	    {
+		@call self::MSG_GEN_ITEM_GROUP_SET_SINGLE_SELECTION(i,0);
+		@call eventList::MSG_EVENT_LIST_SHOW_EVENTS(component);
+		break;
+	    }
+	}
+    }
+}
+
+/*********************************************************************
+ *			 
+ *********************************************************************
+ * SYNOPSIS: 
+ * CALLED BY:	
+ * RETURN:
+ * SIDE EFFECTS:
+ * STRATEGY:
+ * REVISION HISTORY:
+ *	Name	Date		Description			     
+ *	----	----		-----------			     
+ *	ron	 3/ 1/95	Initial version			     
+ * 
+ *********************************************************************/
+
+@method   ComponentListClass, MSG_COMPONENT_LIST_DELETE_COMPONENT
+{
+    ChunkHandle	carray;
+    word	c, i, dummySize;
+    optr	*data;
+
+    carray = pself->CLI_componentArray;
+    if (carray != NullChunk)
+    {
+	c = ChunkArrayGetCountHandles(OptrToHandle(oself),carray);
+	for (i=0;i<c;i++)
+	{
+	    data = ChunkArrayElementToPtrHandles(OptrToHandle(oself),carray,
+						 i,
+						 &dummySize);
+	    if (*data == component) 
+	    {
+		ChunkArrayDeleteHandle(carray, (void *) data);
+		@send self::MSG_GEN_DYNAMIC_LIST_INITIALIZE(c-1);
+		if (i == 0) i = 1;
+		if (c == 1) {
+		    /*
+		     * Make sure nothing is selected in the event
+		     * list.
+		     */
+		    @send EventList::MSG_GEN_DYNAMIC_LIST_INITIALIZE(0);
+		    break; /* nothing left to select */
+		}		       
+		@send self::MSG_GEN_ITEM_GROUP_SET_SINGLE_SELECTION(i-1,0);
+		@send self::MSG_COMPONENT_LIST_APPLY_MSG(i-1,1,0);
+		break;
+	    
+	    }
+	}
+    }
+}
+
+
+
+
+/*********************************************************************
+ *			 MSG_COMPONENT_LIST_DELETE_ALL
+ *********************************************************************
+ * SYNOPSIS: 	Deletes all components in the component list
+ * CALLED BY:	Gandalf when New or Load happens
+ * RETURN:	nothing
+ * SIDE EFFECTS:
+ * STRATEGY:
+ *		Deleting components can do a GenDestroy which needs to
+ *		happen on parents before children.  Just destroy those
+ *		objects directly below the app.
+ * REVISION HISTORY:
+ *	Name	Date		Description			     
+ *	----	----		-----------			     
+ *	ron	 3/ 6/95	Initial version			     
+ * 
+ *********************************************************************/
+
+@method   ComponentListClass, MSG_COMPONENT_LIST_DELETE_ALL
+{
+    ChunkHandle	carray;
+    word	c, i, dummySize;
+    optr	*component;
+    ComponentData	data;
+    EventHandle	event;
+
+    carray = pself->CLI_componentArray;
+    if (carray != NullChunk)
+    {
+	c = ChunkArrayGetCountHandles(OptrToHandle(oself),carray);
+	for (i=1;i <=c ;i++)
+	{
+	    component = ChunkArrayElementToPtrHandles(OptrToHandle(oself),carray,
+						      c-i,
+						      &dummySize);
+
+	    ChunkArrayDeleteHandle(carray, (void *) component);
+	}
+    }
+    @call self::MSG_GEN_DYNAMIC_LIST_INITIALIZE(0);
+    @call EventList::MSG_GEN_DYNAMIC_LIST_INITIALIZE(0);
+}
+
+
+
+
+/*********************************************************************
+ *			 MSG_COMPONENT_LIST_TOPLEVEL_OUTPUT_VISIBLE
+ *********************************************************************
+ * SYNOPSIS: spits out visible lines for all top level objects
+ * CALLED BY:	EmitComponents
+ * RETURN:
+ * SIDE EFFECTS:
+ * STRATEGY:	
+ * REVISION HISTORY:
+ *	Name	Date		Description			     
+ *	----	----		-----------			     
+ *	ron	 3/ 6/95	Initial version			     
+ * 
+ *********************************************************************/
+@ifdef 0
+@method   ComponentListClass, MSG_COMPONENT_LIST_TOPLEVEL_OUTPUT_VISIBLE
+{
+    ChunkHandle	carray;
+    word	c, i, dummySize;
+    optr	*component;
+    ComponentData	data;
+
+    carray = pself->CLI_componentArray;
+    if (carray != NullChunk)
+    {
+	c = ChunkArrayGetCountHandles(OptrToHandle(oself),carray);
+	for (i=0;i < c ;i++)
+	{
+	    component = ChunkArrayElementToPtrHandles(OptrToHandle(oself),
+						      carray,
+						      i,
+						      &dummySize);
+
+	    /* emit all top level components visible lines if needed */
+	    if (@call *component::MSG_ENT_GET_PARENT() == NullOptr)
+	    {
+		ComponentData	vis;
+		@call *component::MSG_ENT_GET_PROPERTY(NULL, &vis, 
+						       _TEXT("visible"));
+		if (vis.CD_data.LD_integer)
+		{
+		    BentStatusFlags bsf;
+
+		    /* if its not set to COMP_INIT, then visible already
+		     * got spit out during the normal coarse of things
+		     */
+		    bsf = @call *component::MSG_BENT_GET_STATUS_FLAGS();
+		    if (bsf & BSF_COMP_INIT)
+		    {
+			/* clear out COMP_INIT flag first */
+			@call *component::MSG_BENT_SET_STATUS_FLAGS(0, 
+								BSF_COMP_INIT);
+			@call *component::MSG_BENT_DESCRIBE_PROPERTY(_TEXT("visible"),
+								 buffer);
+			/* restore BSF_COMP_INIT */
+			@call *component::MSG_BENT_SET_STATUS_FLAGS(bsf, 0);
+		    }
+		}
+	    }
+	}
+    }
+}
+@endif
+
+@ifdef 0
+/* No longer necessary because of automatic count mechanism within bent. */
+
+/*********************************************************************
+ *			 MSG_COMPONENT_LIST_UPDATE_COUNTERS
+ *********************************************************************
+ * SYNOPSIS: 	Uses component names to update counters
+ * CALLED BY:	
+ * RETURN:
+ * SIDE EFFECTS:
+ * STRATEGY:
+ * REVISION HISTORY:
+ *	Name	Date		Description			     
+ *	----	----		-----------			     
+ *	jimmy	 9/10/95	Initial version			     
+ * 
+ *********************************************************************/
+
+@method   ComponentListClass, MSG_COMPONENT_LIST_UPDATE_COUNTERS
+{
+    ChunkHandle	carray;
+    word	c, i, dummySize;
+    optr	*component;
+    ComponentData	data;
+
+    carray = pself->CLI_componentArray;
+    if (carray != NullChunk)
+    {
+	c = ChunkArrayGetCountHandles(OptrToHandle(oself),carray);
+	for (i=1;i <=c ;i++)
+	{
+	    TCHAR   	    *class, *name;
+	    ComponentData   data;
+	    RunHeapInfo	    *rhi;
+	    sword    	    count;
+	    RunHeapToken    ct;
+
+	    component = ChunkArrayElementToPtrHandles(OptrToHandle(oself),carray,
+						      c-i,
+						      &dummySize);
+
+
+	    class = @call *component::MSG_ENT_GET_CLASS();
+	    rhi = RunComponentLockHeap(ObjLockObjBlock(OptrToHandle(*component)));
+	    @call *component::MSG_ENT_GET_PROPERTY(rhi, &data, _TEXT("name"));
+	    /* FIXME - make sure this thing gets freed */
+	    ct = RunHeapAlloc(rhi, RHT_STRING, 1, 
+			      (strlen(class) + 1) *sizeof(TCHAR), class);
+	    RunHeapLock(rhi, data.CD_data.LD_string, &name);
+	    if (!strncmp(name, class, strlen(class))) {
+		count = atoi(name+strlen(class)) + 1;
+	    } else {
+		count = -1;
+	    }
+	    if (count != -1)
+	    {
+		@call BuilderInterpreter::MSG_BENT_MANAGER_UPDATE_CONTROLLER_COUNT(class, count);
+	    }
+
+	    RunHeapUnlock(rhi, data.CD_data.LD_string);
+	    RunComponentUnlockHeap(MemDeref(OptrToHandle(*component)));
+	    MemUnlock(OptrToHandle(*component));
+	}
+    }
+}
+@endif 
+
+
+
+/*********************************************************************
+ *			 MSG_COMPONENT_IS_UNIQUE_NAME
+ *********************************************************************
+ * SYNOPSIS: 	Uses component names to update counters
+ * CALLED BY:	
+ * RETURN:
+ * SIDE EFFECTS:
+ * STRATEGY:
+ * REVISION HISTORY:
+ *	Name	Date		Description			     
+ *	----	----		-----------			     
+ *	jimmy	 9/10/95	Initial version			     
+ * 
+ *********************************************************************/
+
+@method   ComponentListClass, MSG_COMPONENT_LIST_IS_UNIQUE_NAME
+{
+    ChunkHandle	carray;
+    word	c, i, dummySize, retval;
+    optr	*component;
+    ComponentData	data;
+
+    retval = 1;
+    carray = pself->CLI_componentArray;
+    if (carray != NullChunk)
+    {
+	c = ChunkArrayGetCountHandles(OptrToHandle(oself),carray);
+	for (i=1;i <= c && retval ;i++)
+	{
+	    TCHAR   	    *testName, *inputName;
+	    ComponentData   data;
+	    RunHeapInfo	    *rhi;
+	    sword    	    count;
+	    RunHeapToken    ct;
+
+	    component = ChunkArrayElementToPtrHandles(OptrToHandle(oself),carray,
+						      c-i,
+						      &dummySize);
+
+	    rhi = RunComponentLockHeap(ObjLockObjBlock(OptrToHandle(*component)));
+	    @call *component::MSG_ENT_GET_PROPERTY(rhi, &data, _TEXT("name"));
+
+	    RunHeapLock(rhi, data.CD_data.LD_string, (void**)&testName);
+	    RunHeapLock(rhi, name, (void**)&inputName);
+
+	    if (!strcmp(testName, inputName)) {
+		retval = 0;
+	    }
+	    RunHeapUnlock(rhi, data.CD_data.LD_string);
+	    RunHeapUnlock(rhi, name);
+	    RunComponentUnlockHeap(MemDeref(OptrToHandle(*component)));
+	    MemUnlock(OptrToHandle(*component));
+	}
+    }
+
+    /* if we are returning TRUE, we are probably going to change the name
+     * of a component, and thus want to update our monikers
+     */
+    if (retval) {
+	@call self::MSG_GEN_DYNAMIC_LIST_INITIALIZE(GDLI_NO_CHANGE);
+    }
+    return retval;
+}
+
+
+/*********************************************************************
+ *			 MSG_COMPONENT_LIST_SET_TOPLEVEL_VISIBLE
+ *********************************************************************
+ * SYNOPSIS: 	Sets all forms, dialogs and floaters visible
+ * CALLED BY:	mainload.goc routines
+ * RETURN:	nothing
+ * SIDE EFFECTS:
+ * STRATEGY:
+ * REVISION HISTORY:
+ *	Name	Date		Description			     
+ *	----	----		-----------			     
+ *	dloft	2/7/96		Initial version			     
+ * 
+ *********************************************************************/
+@method   ComponentListClass, MSG_COMPONENT_LIST_SET_TOPLEVELS_VISIBLE
+{
+    ChunkHandle	carray;
+    word	c, i, dummySize;
+    optr	*component;
+    ComponentData	data;
+    int		saveDirty;
+
+    /* preserve dirtiness */
+    saveDirty = dirty;
+    data.CD_type = TYPE_INTEGER;
+    data.CD_data.LD_integer = 1;
+
+    carray = pself->CLI_componentArray;
+    if (carray != NullChunk)
+    {
+	c = ChunkArrayGetCountHandles(OptrToHandle(oself),carray);
+	for (i=0;i < c ;i++)
+	{
+	    optr    comp;
+	    component = ChunkArrayElementToPtrHandles(OptrToHandle(oself),
+						      carray,
+						      i,
+
+						      &dummySize);
+	    comp = *component;
+	    /*
+	     * Set them's that should be visible, visible.  Lock each 
+	     * component (sigh), as ObjIsObjectInClass requires...
+	     */
+	    ObjLockObjBlock(OptrToHandle(comp));
+	    if (ObjIsObjectInClass(comp, &BGadgetDialogClass) ||
+		ObjIsObjectInClass(comp, &BGadgetFormClass))
+	    {
+		@call comp::MSG_ENT_SET_PROPERTY(NULL, &data, 
+						       _TEXT("visible"));
+	    }
+	    MemUnlock(OptrToHandle(comp));
+	}
+    }
+    /* restore dirtiness to whatever it was when we entered this routine */
+    dirty = saveDirty;
+}

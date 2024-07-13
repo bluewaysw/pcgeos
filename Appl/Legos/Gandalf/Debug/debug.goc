@@ -1,0 +1,1842 @@
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+	Copyright (c) Geoworks 1994 -- All Rights Reserved
+
+PROJECT:        Code for debugger objects
+MODULE:         
+FILE:           debug.goc
+
+AUTHOR:         Roy Goldman, Oct 25, 1994
+
+ROUTINES:
+	Name                    Description
+	----                    -----------
+
+REVISION HISTORY:
+	Name    Date            Description
+	----    ----            -----------
+	roy       10/25/94           Initial version.
+
+DESCRIPTION:
+	
+
+	$Id: debug.goc,v 1.2 98/10/13 22:15:45 martin Exp $
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+
+@include "gandalf.goh"
+@include "Editor/editorh.goh"
+@include "Debug/debugh.goh"
+@include "Main/mainshlh.goh"
+@include <Legos/bent.goh>
+@include <Legos/gadget.goh>
+#include <gstring.h>
+/*#include <Legos/bug.h>*/
+#include <Legos/bascobug.h>
+#include <Legos/basrun.h>
+#include <math.h>
+#include <char.h>
+
+/* -------------------------*/
+/* CallStackListClass methods
+/* -------------------------*/
+
+@classdecl CallStackListClass;
+
+@extern object ValueInteraction;
+@extern object UpdateTrigger;
+
+extern SerialPortNum myPort;
+
+int	    	numCharts = 0;
+ChunkHandle 	chartList = NullHandle;
+
+optr InstantiateNewChart(void);
+
+
+#define SWAP_THREADS 0
+    /* hack -- MSG_META_RESERVED_1 is a special message, telling the
+     * lview dispatcher to toggle processing of messages.
+     */
+void Debug_EnableMessages(optr comp) {
+    @call comp::MSG_META_RESERVED_1();
+}
+void Debug_DisableMessages(optr comp) {
+    @call comp::MSG_META_RESERVED_1();
+}
+
+/*********************************************************************
+ *			UpdateCallStack
+ *********************************************************************
+ * SYNOPSIS: 	   Tell callstack (self) that the number of
+ *                 active frames has changed, and to update
+ *                 the moniker of the Local Variable frame
+ * CALLED BY:	   Builder when we know we are in a different routine
+ * PASS:           nothing
+ * RETURN:         nothing
+ * SIDE EFFECTS:
+ * STRATEGY:
+ * REVISION HISTORY:
+ *	Name	Date		Description			     
+ *	----	----		-----------			     
+ *	roy	11/10/94		Initial version			     
+ * 
+ *********************************************************************/
+
+@method CallStackListClass, MSG_CSL_UPDATE_CALL_STACK
+{
+
+    int items;
+    TCHAR newMon[MAXSTRINGSIZE], firstFrame[MAXSTRINGSIZE];
+    TCHAR *cp;
+    byte offset;
+    PTaskHan	ptaskHan;
+    word	funcNum;
+    word	fpNotUsed;
+
+    ptaskHan = GandalfGetMainTask();
+
+    MemLock(OptrToHandle(@DuploStart));
+
+    items = BascoBugGetCurrentFrame(ptaskHan);
+
+    if (items >= 0) {
+
+	
+	/* Duplo_UI hack, don't show it as an active frame,
+	   (always the first) 
+	*/
+
+	pself = ObjDerefGen(oself);
+
+	BascoBugGetFrameName(ptaskHan, 0, firstFrame);
+
+	if (!strcmp(firstFrame,LMemDeref(@DuploUi))) {
+	    items--;
+	    offset = 1;
+	    pself->CSL_uiActive = TRUE;
+	}
+	else {
+	    offset = 0;
+	    pself->CSL_uiActive = FALSE;
+	}
+
+	sprintf(newMon, _TEXT("Locals: <%d: "),items+1);
+	BascoBugGetFrameName(ptaskHan, items + offset, newMon + strlen(newMon));
+	
+	/* START hack - Fix up local variable window moniker */
+	if (!strcmp((cp =strchr(newMon+8,':')+2),LMemDeref(@DuploStart))) {
+	    strcpy(cp,LMemDeref(@TopLevel));
+	}
+
+	@call self::MSG_GEN_DYNAMIC_LIST_INITIALIZE(items + 1);
+
+	strcat(newMon,_TEXT(">"));
+    }
+    else {
+	strcpy(newMon, LMemDeref(@NoActive));
+	@call self::MSG_GEN_DYNAMIC_LIST_INITIALIZE(0);
+    }
+    MemUnlock(OptrToHandle(@DuploStart));
+
+    @call LocalInteraction::MSG_GEN_REPLACE_VIS_MONIKER_TEXT(newMon, VUM_NOW);
+}
+
+/*********************************************************************
+ *			QueryCallStackMoniker
+ *********************************************************************
+ * SYNOPSIS: 	Dynamic List callback for the call stack
+ *              for setting the moniker for the given index
+ * CALLED BY:	
+ * PASS:        word item is the requested list index
+ * RETURN:
+ * SIDE EFFECTS:
+ * STRATEGY:
+ * REVISION HISTORY:
+ *	Name	Date		Description			     
+ *	----	----		-----------			     
+ *	roy	11/10/94		Initial version			     
+ * 
+ *********************************************************************/
+
+@method CallStackListClass, MSG_CSL_QUERY_CALL_STACK_MONIKER 
+{
+    TCHAR dest[MAXSTRINGSIZE];
+    TCHAR *cs;
+    byte offset;
+
+    pself = ObjDerefGen(oself);
+
+    if (pself->CSL_uiActive) {
+	offset = 1;
+    }
+    else {
+	offset = 0;
+    }
+
+    MemLock(OptrToHandle(@DuploStart));
+    sprintf(dest, _TEXT("%d: "),item+1);
+    
+    BascoBugGetFrameName(GandalfGetMainTask(),
+			   item + offset, dest + strlen(dest));
+
+
+    /* START hack */
+    if (!strcmp((cs = strchr(dest, C_COLON)+2),
+		LMemDeref(@DuploStart))) {
+	strcpy(cs, LMemDeref(@TopLevel));
+    }
+
+    @call self::MSG_GEN_DYNAMIC_LIST_REPLACE_ITEM_TEXT(item,dest);
+
+    MemUnlock(OptrToHandle(@DuploStart));
+}
+
+/*********************************************************************
+ *			ShowInternalFrame
+ *********************************************************************
+ * SYNOPSIS: 	Trigger the viewing of an internal frame corresponding
+ *              to the clicked item
+ * CALLED BY:	CallStack action data for clicking on an entry
+ * PASS:        word selection is index
+ * RETURN:
+ * SIDE EFFECTS:
+ * STRATEGY:
+ * REVISION HISTORY:
+ *	Name	Date		Description			     
+ *	----	----		-----------			     
+ *	roy	11/10/94		Initial version			     
+ * 
+ *********************************************************************/
+
+@method CallStackListClass, MSG_CSL_SHOW_INTERNAL_FRAME 
+{
+    TCHAR newMon[MAXSTRINGSIZE];
+    int		num;
+    word	funcIndex;
+    TCHAR *cp;
+    byte offset;
+    PTaskHan	ptaskHan;
+    int	    numHidden;
+    Boolean	isDebugged;
+    
+    ptaskHan = GandalfGetMainTask();
+    pself = ObjDerefGen(oself);
+
+    if (pself->CSL_uiActive) {
+	offset = 1;
+    }
+    else {
+	offset = 0;
+    }
+
+  /*  byte noview = 0; */
+
+    MemLock(OptrToHandle(@DuploStart));
+
+    sprintf(newMon, _TEXT("Frame: <%d: "),selection+1);
+    BascoBugGetFrameName(ptaskHan, selection + offset, newMon + strlen(newMon));
+
+
+    if (!strcmp((cp = strchr(newMon+7, C_COLON)+2),LMemDeref(@DuploStart))) {
+	strcpy(cp,LMemDeref(@TopLevel));
+    }
+
+    @call InternalInteraction::MSG_GEN_INTERACTION_INITIATE();
+
+
+    strcat(newMon,_TEXT(">"));
+
+    @call InternalInteraction::
+	MSG_GEN_REPLACE_VIS_MONIKER_TEXT(newMon,VUM_NOW);
+
+    /* We assume that index in the call stack matches
+       exactly the frame number. */
+
+    @call InternalChart::MSG_VC_UPDATE_SCOPE(selection+offset);
+
+
+    @call Editor::MSG_ET_UPDATE_CODE_IF_NECESSARY(TRUE);
+
+    isDebugged = BascoBugGetFrameInfo
+	(ptaskHan, selection+offset, &funcIndex);
+
+    if (isDebugged) {
+	@call Editor::MSG_ET_SHOW_ROUTINE_BY_INDEX(funcIndex);
+
+	/* Subtract 1 since duplo_ui isn't in the routine list*/
+
+	numHidden = @call RoutineList::MSG_RL_GET_NUM_HIDDEN();
+	@call RoutineList::MSG_GEN_ITEM_GROUP_SET_SINGLE_SELECTION
+	    (funcIndex-numHidden, FALSE);
+
+
+	/* Policy: Can only set PC for current frame */
+
+	num = BascoBugGetFrameLineNumber
+	    (ptaskHan, bascoTask, selection+offset);
+
+	@call Editor::MSG_ET_SET_PC(num,0);
+	@call Editor::MSG_ET_SET_CURSOR_AT_LINE(num);
+	@call EditorInteraction::MSG_GEN_INTERACTION_INITIATE();
+    }
+ 
+    MemUnlock(OptrToHandle(@DuploStart));
+
+}
+
+/* --------------------------------------------------*/
+/* VarChartClass Methods
+/* --------------------------------------------------*/
+
+@classdecl VarChartClass;
+
+/*********************************************************************
+ *			VCSetVarItem
+ *********************************************************************
+ * SYNOPSIS: 
+ * CALLED BY:	
+ * RETURN:
+ * SIDE EFFECTS:
+ * STRATEGY:
+ * REVISION HISTORY:
+ *	Name	Date		Description			     
+ *	----	----		-----------			     
+ *	jimmy	 7/ 5/95	Initial version			     
+ * 
+ *********************************************************************/
+@method VarChartClass, MSG_VC_SET_DATA
+{
+    pself->VCI_data = element;
+}
+
+/*********************************************************************
+ *			VCSetVarItem
+ *********************************************************************
+ * SYNOPSIS: 
+ * CALLED BY:	
+ * RETURN:
+ * SIDE EFFECTS:
+ * STRATEGY:
+ * REVISION HISTORY:
+ *	Name	Date		Description			     
+ *	----	----		-----------			     
+ *	jimmy	 7/ 5/95	Initial version			     
+ * 
+ *********************************************************************/
+@method VarChartClass, MSG_VC_GET_DATA
+{
+    return pself->VCI_data;
+}
+
+/*********************************************************************
+ *			VCSetVarItem
+ *********************************************************************
+ * SYNOPSIS: 
+ * CALLED BY:	
+ * RETURN:
+ * SIDE EFFECTS:
+ * STRATEGY:
+ * REVISION HISTORY:
+ *	Name	Date		Description			     
+ *	----	----		-----------			     
+ *	jimmy	 7/ 5/95	Initial version			     
+ * 
+ *********************************************************************/
+@method VarChartClass, MSG_VC_SET_PROP_MAP
+{
+    if (pself->VCI_propMap != NullHandle) {
+	MemFree(pself->VCI_propMap);
+    }
+    pself->VCI_propMap = propMap;
+}
+
+/*********************************************************************
+ *			VCSetVarItem
+ *********************************************************************
+ * SYNOPSIS: 
+ * CALLED BY:	
+ * RETURN:
+ * SIDE EFFECTS:
+ * STRATEGY:
+ * REVISION HISTORY:
+ *	Name	Date		Description			     
+ *	----	----		-----------			     
+ *	jimmy	 7/ 5/95	Initial version			     
+ * 
+ *********************************************************************/
+@method VarChartClass, MSG_VC_GET_PROP_MAP
+{
+    return pself->VCI_propMap;
+}
+
+/*********************************************************************
+ *			VCSetVarItem
+ *********************************************************************
+ * SYNOPSIS: 
+ * CALLED BY:	
+ * RETURN:
+ * SIDE EFFECTS:
+ * STRATEGY:
+ * REVISION HISTORY:
+ *	Name	Date		Description			     
+ *	----	----		-----------			     
+ *	jimmy	 7/ 5/95	Initial version			     
+ * 
+ *********************************************************************/
+@method VarChartClass, MSG_VC_SET_VAR_ITEM
+{
+    pself->VCI_varItem = item;
+}
+
+/*********************************************************************
+ *			VCSetVarItem
+ *********************************************************************
+ * SYNOPSIS: 
+ * CALLED BY:	
+ * RETURN:
+ * SIDE EFFECTS:
+ * STRATEGY:
+ * REVISION HISTORY:
+ *	Name	Date		Description			     
+ *	----	----		-----------			     
+ *	jimmy	 7/ 5/95	Initial version			     
+ * 
+ *********************************************************************/
+@method VarChartClass, MSG_VC_GET_VAR_ITEM
+{
+    return pself->VCI_varItem;
+}
+
+
+/*********************************************************************
+ *			VCSetChartType
+ *********************************************************************
+ * SYNOPSIS: set the chart type of a chart
+ * CALLED BY:	
+ * RETURN:
+ * SIDE EFFECTS:
+ * STRATEGY:
+ * REVISION HISTORY:
+ *	Name	Date		Description			     
+ *	----	----		-----------			     
+ *	jimmy	 7/ 5/95	Initial version			     
+ * 
+ *********************************************************************/
+@method VarChartClass, MSG_VC_SET_CHART_TYPE
+{
+    pself->VCI_chartType = ct;
+}
+
+/*********************************************************************
+ *			VCGetChartType
+ *********************************************************************
+ * SYNOPSIS: get the Chart Type of a chart
+ * CALLED BY:	
+ * RETURN:
+ * SIDE EFFECTS:
+ * STRATEGY:
+ * REVISION HISTORY:
+ *	Name	Date		Description			     
+ *	----	----		-----------			     
+ *	jimmy	 7/ 5/95	Initial version			     
+ * 
+ *********************************************************************/
+@method VarChartClass, MSG_VC_GET_CHART_TYPE
+{
+    return pself->VCI_chartType;
+}
+
+
+
+/*********************************************************************
+ *			NukeInstantiatedVarCharts
+ *********************************************************************
+ * SYNOPSIS:	kill of all the instantiated var charts
+ * CALLED BY:	
+ * PASS:
+ * RETURN:
+ * SIDE EFFECTS:
+ * STRATEGY:
+ * REVISION HISTORY:
+ *	Name	Date		Description			     
+ *	----	----		-----------			     
+ *	jimmy	5/ 2/96  	Initial version
+ * 
+ *********************************************************************/
+void
+NukeInstantiatedVarCharts()
+{
+    optr    child;
+    int	    c, i;
+
+    c = @call ValueInteraction::MSG_GEN_COUNT_CHILDREN() - 1;
+
+    /* skip first child as its the Variable Value */
+    while (c > 0)
+    {
+	child = @call ValueInteraction::MSG_GEN_FIND_CHILD_AT_POSITION(c);
+	@call child::MSG_VC_SET_PROP_MAP(NullHandle);
+	@call child::MSG_GEN_DESTROY(VUM_NOW, 0);
+	--numCharts;
+	--c;
+    }
+    
+    /* now kill off the object blocks I created */
+    if (chartList != NullHandle) 
+    {
+	MemLock(OptrToHandle(@ValueInteraction));
+	c = ChunkArrayGetCount(ConstructOptr(OptrToHandle(@ValueInteraction),
+					     chartList)) - 1;
+	while (c >= 0)
+	{
+	    MemHandle   *block;
+	    word	    dummy;
+	    EventHandle event;
+	    
+	    block = ChunkArrayElementToPtrHandles(
+					 OptrToHandle(@ValueInteraction),
+						  chartList, c, &dummy);
+	    event = @record BuilderInterpreter::MSG_INTERP_FREE_OBJ_BLOCK(
+								  *block);
+	    @send BuilderInterpreter::MSG_META_OBJ_FLUSH_INPUT_QUEUE(event, 0, 
+					     HandleOf(@BuilderInterpreter));
+	    ChunkArrayDeleteHandle(chartList, block);
+	    --c;
+	}
+	MemUnlock(OptrToHandle(@ValueInteraction));
+    }
+
+}
+
+/*********************************************************************
+ *			ShowVariable
+ *********************************************************************
+ * SYNOPSIS: 	Show in detail variable at index <selection> within
+ *              this variable chart's frame.
+ * CALLED BY:	
+ * PASS:        word selection (index)
+ * RETURN:
+ * SIDE EFFECTS:
+ * STRATEGY:
+ * REVISION HISTORY:
+ *	Name	Date		Description			     
+ *	----	----		-----------			     
+ *	roy	11/10/94		Initial version			     
+ * 
+ *********************************************************************/
+
+@method VarChartClass, MSG_VC_SHOW_VARIABLE 
+{
+    int frame, index;
+    
+    frame = pself->VCI_frameNum;
+
+    switch(pself->VCI_chartType) 
+    {
+    case CT_STRUCT:
+    case CT_ARRAY:
+	index = pself->VCI_varItem;
+	break;
+    case CT_NORMAL:
+    case CT_COMPONENT:
+	index = selection;
+	break;
+    default:
+	EC_ERROR(-1);
+    }
+
+
+    @call VarUpdateInteraction::MSG_VUI_SHOW_VARIABLE_BY_INDEX(
+						      oself,
+						      frame, 
+						      index,
+						      pself->VCI_chartType,
+						      selection);
+
+    @call self::MSG_GEN_ITEM_GROUP_SET_NONE_SELECTED(FALSE);
+}
+
+/*********************************************************************
+ *			UpdateScope
+ *********************************************************************
+ * SYNOPSIS: 	Trigger a reset for this variable chart.
+ * CALLED BY:	
+ * PASS:        int frameNum, or LAST_FRAME to use last one,
+ *              or UNDEFINED_FRAME for none.
+ * RETURN:
+ * SIDE EFFECTS:
+ * STRATEGY:
+ * REVISION HISTORY:
+ *	Name	Date		Description			     
+ *	----	----		-----------			     
+ *	roy	11/10/94		Initial version			     
+ * 
+ *********************************************************************/
+@method VarChartClass, MSG_VC_UPDATE_SCOPE 
+{
+    int     	num;
+    TCHAR   	val[80];
+    ChartType	ct;
+    PTaskHan	ptaskHan;
+
+    /* Use LAST_FRAME indicate that we are sure this thing is already visible
+       and we want to use the cached value.
+
+       The only place this is currently used is to update
+       an internal interaction after a change of a variable
+       through modifying the UI.  Internal are read-only,
+       but the internal interaction may be showing the local variables...
+    */
+    
+    ptaskHan = GandalfGetMainTask();
+    if (frameNum == LAST_FRAME) {
+	/* If the frame this was displaying has disappeared don't
+	   even make the call.
+	*/
+	if (pself->VCI_frameNum <= BascoBugGetCurrentFrame(ptaskHan)) {
+	    frameNum = pself->VCI_frameNum;
+	}
+	else {
+	    frameNum = UNDEFINED_FRAME;
+	}
+    }
+    else
+    {
+	pself->VCI_frameNum = frameNum;
+    }
+
+    /* for some reason, the call to initiaze the list doesn't reset the
+     * topItem (i think) 
+     */
+    num = @call self::MSG_GEN_DYNAMIC_LIST_GET_NUM_ITEMS();
+    if (num) 
+    {
+	/* clears out topItem instance data */
+	@call self::MSG_GEN_ITEM_GROUP_MAKE_ITEM_VISIBLE(0);
+	/* clears out focusItem instance data */
+    	@call oself::MSG_GEN_ITEM_GROUP_SET_SINGLE_SELECTION(0, FALSE);
+    }
+    pself = ObjDerefGen(oself);
+    ct = pself->VCI_chartType;
+
+    switch(ct) 
+    {
+    case CT_STRUCT:
+	if ((word)myPort == GIGS_NONE) {
+	    num = BascoBugGetNumFields(ptaskHan, frameNum, pself->VCI_varItem);
+	} else {
+	    num = 0;
+	}
+	strcpy(val, _TEXT("<Struct> "));
+	break;
+    case CT_NORMAL:
+    	if (frameNum != UNDEFINED_FRAME) {
+	    num = BascoBugGetNumVars(ptaskHan, frameNum);
+	} else {
+	    num = 0;
+	}
+	break;
+    case CT_ARRAY:
+    {
+	int numDims, i;
+	word dims[MAX_DIMS];
+
+        if ((word)myPort == GIGS_NONE) {
+	    numDims = BascoBugGetArrayDims
+		(ptaskHan, frameNum, pself->VCI_varItem, dims);
+	    for (i = 0, num = 1; i < numDims; i++) {
+		num *= dims[i];
+	    }
+	} else {
+	    num = 0;
+	}
+	    strcpy(val, _TEXT("<Array> "));
+	    
+    }
+	break;
+    case CT_COMPONENT:
+    {
+	word	*map;
+
+	if ((pself->VCI_propMap == NullHandle) ||
+	    ((word)myPort != GIGS_NONE)) {
+	    num = 0;
+	} else {
+	    map = MemLock(pself->VCI_propMap);
+	    /* first get number of predefined properties */
+	    num = *map;
+	    map += num+1;
+	    /* then add in custom properties */
+	    num += *map;
+	    MemUnlock(pself->VCI_propMap);
+	}
+	strcpy(val, _TEXT("<Component> "));
+	break;
+    }
+    default:
+	EC_ERROR(-1);
+    }
+
+    @call self::MSG_GEN_DYNAMIC_LIST_INITIALIZE(num);
+}
+
+/*********************************************************************
+ *			InstantiateNewChart
+ *********************************************************************
+ * SYNOPSIS:	create a new var chart object
+ * CALLED BY:	
+ * PASS:
+ * RETURN:
+ * SIDE EFFECTS:
+ * STRATEGY:
+ * REVISION HISTORY:
+ *	Name	Date		Description			     
+ *	----	----		-----------			     
+ *	jimmy	5/ 1/96  	Initial version
+ * 
+ *********************************************************************/
+optr InstantiateNewChart()
+{
+    optr    	    	    newInt, newChart;
+    SpecWinSizePair 	    *swsp;
+    GenDynamicListInstance  *pself;
+    MemHandle	    	    block;
+
+    /* split up charts into different object blocks as these blocks get
+     * large quickly, because lists create lots of Item objects
+     * we must maintain a list of created object blocks so we can
+     * then destroy them all in NukeInstantiatedVarCharts
+     */
+    MemLock(OptrToHandle(@ValueInteraction));
+    if (chartList == NullHandle)
+    {
+	chartList = ChunkArrayCreate(OptrToHandle(@ValueInteraction),
+				     sizeof(MemHandle), 0, 0);
+    }
+
+    /* every 4 charts, created a new object block */
+    if ( (numCharts & 0x03) == 0x0)
+    {
+	MemHandle   mh, *new;
+
+	mh = MemAllocLMem(LMEM_TYPE_OBJ_BLOCK,
+			    sizeof(ObjLMemBlockHeader));
+
+	MemModifyOtherInfo(mh, ThreadGetInfo(0,TGIT_THREAD_HANDLE ));
+	new = ChunkArrayAppend(ConstructOptr(OptrToHandle(@ValueInteraction),
+					     chartList), 0);
+	*new = mh;
+	block = mh;
+    }
+    else
+    {
+	MemHandle   *last;
+	word	dummy;
+	int 	    count;
+
+	/* use old object block */
+	count = ChunkArrayGetCount(ConstructOptr(OptrToHandle(@ValueInteraction),
+						 chartList));
+	last = ChunkArrayElementToPtrHandles(OptrToHandle(@ValueInteraction),
+					     chartList,
+					     count - 1, &dummy);
+	block = *last;
+					     
+    }
+
+    numCharts++;
+    MemUnlock(OptrToHandle(@ValueInteraction));
+				       
+    MemLock(block);
+    newInt = ObjInstantiate(block, &GenInteractionClass);
+    @call ValueInteraction::MSG_GEN_ADD_CHILD(newInt, CCO_LAST);
+    @call newInt::MSG_GEN_INTERACTION_SET_VISIBILITY(GIV_DIALOG);
+    @call newInt::MSG_GEN_INTERACTION_SET_TYPE(GIT_ORGANIZATIONAL);
+    @call newInt::MSG_GEN_INTERACTION_SET_ATTRS(GIA_NOT_USER_INITIATABLE, 0);
+    ObjVarAddData(newInt, HINT_INTERACTION_MAKE_RESIZABLE, 0);
+
+    swsp = ObjVarAddData(newInt, HINT_SIZE_WINDOW_AS_RATIO_OF_FIELD, 
+			 sizeof(SpecWinSizePair));
+    swsp->SWSP_x = SWSS_RATIO | PCT_40;
+    swsp->SWSP_y = SWSS_RATIO | PCT_25;
+
+    newChart = ObjInstantiate(block, (ClassStruct*)&VarChartClass);
+    @call   newInt::MSG_GEN_ADD_CHILD(newChart, CCO_FIRST);
+    @call newChart::MSG_GEN_ITEM_GROUP_SET_DESTINATION(newChart);
+    @call newChart::MSG_GEN_ITEM_GROUP_SET_APPLY_MSG(MSG_VC_SHOW_VARIABLE);
+    @call newChart::MSG_GEN_ITEM_GROUP_SET_NONE_SELECTED(0);
+    @call newChart::MSG_GEN_DYNAMIC_LIST_INITIALIZE(0);
+
+    pself = ObjDerefGen(newChart);
+    pself->GDLI_queryMsg = MSG_VC_QUERY_VAR_CHART_MONIKER;
+    ObjVarAddData(newChart, HINT_ITEM_GROUP_SCROLLABLE, 0);
+    ObjVarAddData(newChart, HINT_EXPAND_HEIGHT_TO_FIT_PARENT, 0);
+    ObjVarAddData(newChart, HINT_EXPAND_WIDTH_TO_FIT_PARENT, 0);
+
+    @call newChart::MSG_GEN_SET_USABLE(VUM_NOW);
+    @call newInt::MSG_GEN_SET_USABLE(VUM_NOW);
+    MemUnlock(block);
+    return newChart;
+}
+
+
+
+/*********************************************************************
+ *			SwapBurdenThreads
+ *********************************************************************
+ * SYNOPSIS:	swap out the bruden thread of some lview blocks
+ * CALLED BY:	
+ * PASS:
+ * RETURN:
+ * SIDE EFFECTS:
+ * STRATEGY:
+ * REVISION HISTORY:
+ *	Name	Date		Description			     
+ *	----	----		-----------			     
+ *	jimmy	8/14/96  	Initial version
+ * 
+ *********************************************************************/
+void
+SwapBurdenThreads(optr comp, MemHandle *ot1, MemHandle *ot2, MemHandle *ot3,
+		  optr *parent, optr *interp)
+{
+    EntObjectBlockHeader	    *eobh;
+
+    /* temporarily make this object block run by our thread */
+    if (!ObjTestIfObjBlockRunByCurThread(OptrToHandle(comp)))
+    {
+	MemHandle	   thread;
+
+	thread = ThreadGetInfo(0, TGIT_THREAD_HANDLE);
+	*ot1 = MemGetInfo(OptrToHandle(comp), MGIT_OTHER_INFO);
+	MemModifyOtherInfo(OptrToHandle(comp), thread);
+    }
+
+    *parent = @call comp::MSG_ENT_GET_PARENT();
+    /* temporarily make the parent object block run by our thread */
+    if (!ObjTestIfObjBlockRunByCurThread(OptrToHandle(*parent)))
+    {
+	MemHandle	   thread;
+
+	thread = ThreadGetInfo(0, TGIT_THREAD_HANDLE);
+	*ot2 = MemGetInfo(OptrToHandle(*parent), MGIT_OTHER_INFO);
+	MemModifyOtherInfo(OptrToHandle(*parent), thread);
+    }
+    /* temporarily make the interp object block run by our thread */
+    eobh = MemLock(OptrToHandle(comp));
+    *interp = eobh->EOBH_interpreter;
+    MemUnlock(OptrToHandle(comp));
+    if (!ObjTestIfObjBlockRunByCurThread(OptrToHandle(*interp)))
+    {
+	MemHandle	   thread;
+
+	thread = ThreadGetInfo(0, TGIT_THREAD_HANDLE);
+	*ot3 = MemGetInfo(OptrToHandle(*interp), MGIT_OTHER_INFO);
+	MemModifyOtherInfo(OptrToHandle(*interp), thread);
+    }
+}
+
+
+/*********************************************************************
+ *			UnswapBurdenThreads
+ *********************************************************************
+ * SYNOPSIS:	undo waht SwapBurdenThreads did
+ * CALLED BY:	
+ * PASS:
+ * RETURN:
+ * SIDE EFFECTS:
+ * STRATEGY:
+ * REVISION HISTORY:
+ *	Name	Date		Description			     
+ *	----	----		-----------			     
+ *	jimmy	8/14/96  	Initial version
+ * 
+ *********************************************************************/
+void
+UnswapBurdenThreads(optr comp, optr parent, optr interp,
+		    MemHandle t1, MemHandle t2, MemHandle t3)
+{
+    if (t1 != NullHandle) {
+	MemModifyOtherInfo(OptrToHandle(comp), t1);
+    }
+    if (t2 != NullHandle) {
+	MemModifyOtherInfo(OptrToHandle(parent), t2);
+    }
+    if (t3 != NullHandle) {
+	MemModifyOtherInfo(OptrToHandle(interp), t3);
+    }
+}
+
+
+/*********************************************************************
+ *			GetVarFromProperty
+ *********************************************************************
+ * SYNOPSIS:	get data for a property given a propNumber
+ * CALLED BY:	
+ * PASS:
+ * RETURN:
+ * SIDE EFFECTS:
+ * STRATEGY:
+ * REVISION HISTORY:
+ *	Name	Date		Description			     
+ *	----	----		-----------			     
+ *	jimmy	5/ 1/96  	Initial version
+ * 
+ *********************************************************************/
+BugVar GetVarFromProperty(optr chart, word item, TCHAR *nameBuf)
+{
+    word	    	    	*map;
+    optr	    	    	comp, parent, interp;
+    MemHandle	    	    	propMap;
+    BugVar  	    	    	bvar;
+    MemHandle	oldBurdenThread = NullHandle;
+    MemHandle   oldBurdenThreadParent = NullHandle;
+    MemHandle	oldBurdenThreadInterp = NullHandle;
+    Boolean	swap_threads;
+
+    bvar.BV_type = TYPE_ERROR;
+    comp = @call chart::MSG_VC_GET_DATA();
+    propMap = @call chart::MSG_VC_GET_PROP_MAP();
+    if (propMap == NullHandle)
+    {
+	return bvar;
+    }
+
+    Debug_EnableMessages(comp);
+
+    map = MemLock(propMap);
+    if (item >= *map) 
+    {
+	word    	    temp, csize;
+	EntInstance	    *ei;
+	byte    	    *data;
+	ComponentData       *c;
+
+	/* must be a custom property */
+	    
+	temp = item - *map;
+	map += *map + 1;
+	if (temp >= *map)
+	{
+	    return bvar;
+	}
+	MemLock(OptrToHandle(comp));
+	ei = ObjDerefEnt(comp);
+	data = ChunkArrayElementToPtr(ConstructOptr(OptrToHandle(comp), 
+						    ei->EI_propIndex), 
+				      temp,  &csize);
+
+	/* the data should be a NameArrayElement, followed by a 
+	 * component data, followed by the name of the property
+	 */
+	data += sizeof(NameArrayElement);
+	c = (ComponentData *)data;
+	*(dword *)&bvar.BV_data = *(dword *)&c->CD_data;
+	bvar.BV_type = c->CD_type;
+	if (nameBuf != NULL)
+	{
+	    c++;
+	    csize -= (sizeof(ComponentData) + sizeof(NameArrayElement));
+	    csize /= sizeof(TCHAR); 
+	    /* add a * to signify that its a custom property */
+	    strcpy(nameBuf, _TEXT("* "));
+	    strncpy(nameBuf+2, (TCHAR *)c, csize);
+	    nameBuf[csize+2] = C_NULL;
+	}
+	MemUnlock(OptrToHandle(comp));
+    }
+    else
+    {
+	ProgTask    	    	*ptask;
+	ComponentData	    	cd;
+	TCHAR	    	    	buf[128], *cp;
+
+	ptask = LockProgTaskForComponent(comp);
+	if (nameBuf == NULL) {
+	    cp = buf;
+	} else {
+	    cp = nameBuf;
+	}
+	@call comp::MSG_ENT_GET_PROPERTY_NAME_AND_DATA(map[item+1], 
+						       cp,
+						       &ptask->PT_runHeapInfo,
+						       &cd, NULL);
+
+	UnlockProgTaskForComponent(comp);
+	*(dword *)&bvar.BV_data = *(dword *)&cd.CD_data;
+	bvar.BV_type = cd.CD_type;
+    }
+    MemUnlock(propMap);
+
+    if (swap_threads) {
+	UnswapBurdenThreads(comp, parent, interp, oldBurdenThread, 
+			    oldBurdenThreadParent, oldBurdenThreadInterp);
+    } else {
+	Debug_DisableMessages(comp);
+    }
+    return bvar;
+}
+
+
+
+/*********************************************************************
+ *			LockOrUnlockProgTaskForComponent
+ *********************************************************************
+ * SYNOPSIS:	helper routine to get at a prog task 
+ * CALLED BY:	
+ * PASS:
+ * RETURN:
+ * SIDE EFFECTS:
+ * STRATEGY:
+ * REVISION HISTORY:
+ *	Name	Date		Description			     
+ *	----	----		-----------			     
+ *	jimmy	5/ 1/96  	Initial version
+ * 
+ *********************************************************************/
+
+ProgTask *
+LockOrUnlockProgTaskForComponent(optr comp, Boolean lock)
+{
+    PTaskHan    	    	ptaskHan;
+    ProgTask	    	    	*ptask;
+
+    /* it seems that we are always referencing components in lviews progtask
+     * so just use viewTask, rather than doing all this crap
+     */
+#if 0
+    EntObjectBlockHeader	*hdr;
+    optr    	    	    	interpreter;
+
+    if (comp == NullOptr) return NULL;
+    hdr = MemLock(OptrToHandle(comp));
+    if (ObjIsObjectInClass(comp, &EntAppClass)) 
+    {
+	MemUnlock(OptrToHandle(comp));
+	return NULL;
+    }
+    interpreter = hdr->EOBH_interpreter;
+    MemUnlock(OptrToHandle(comp));
+    ptaskHan = @call interpreter::MSG_INTERP_GET_STATE();
+#else
+    (void)comp;
+    ptaskHan = viewTask;
+#endif
+    if (lock)
+    {
+	ptask = MemLock(ptaskHan);
+	return ptask;
+    }
+    else
+    {
+	MemUnlock(ptaskHan);
+	return NULL;
+    }
+}
+
+/*********************************************************************
+ *			SetPropertyFromVar
+ *********************************************************************
+ * SYNOPSIS:	assign a bvar value to a property
+ * CALLED BY:	
+ * PASS:
+ * RETURN:
+ * SIDE EFFECTS:
+ * STRATEGY:
+ * REVISION HISTORY:
+ *	Name	Date		Description			     
+ *	----	----		-----------			     
+ *	jimmy	5/ 1/96  	Initial version
+ * 
+ *********************************************************************/
+void
+SetPropertyFromVar(optr chart, BugVar bv, int index)
+{
+    TCHAR   	    nameBuf[128], *cp;
+    ComponentData   cd;
+    ProgTask	    *ptask;
+    optr    	    comp, parent, interp;
+#if SWAP_THREADS
+    MemHandle	    oldBurdenThread = NullHandle;
+    MemHandle	    oldBurdenThreadParent = NullHandle;
+    MemHandle	    oldBurdenThreadInterp = NullHandle;
+#endif
+
+    comp = @call chart::MSG_VC_GET_DATA();
+
+    /* first get the name of the property using the GetVar routine */
+    GetVarFromProperty(chart, index, nameBuf);
+    /* now we can just do a SET_PROPERTY */
+    *(dword *)&cd.CD_data = *(dword *)&bv.BV_data;
+    cd.CD_type = bv.BV_type;
+    ptask = LockProgTaskForComponent(comp);
+    cp = nameBuf;
+    /* if its a custom property, bypass the * prepended to the name */
+    if (*cp == C_ASTERISK)
+    {
+	cp += 2;
+    }
+
+#if SWAP_THREADS
+    SwapBurdenThreads(comp, &oldBurdenThread, &oldBurdenThreadParent,
+		     &oldBurdenThreadInterp, &parent, &interp);
+
+    @call comp::MSG_ENT_SET_PROPERTY(&ptask->PT_runHeapInfo, &cd, cp);
+    
+    UnswapBurdenThreads(comp, parent, interp, oldBurdenThread, 
+			oldBurdenThreadParent, oldBurdenThreadInterp);
+#else
+    Debug_EnableMessages(comp);
+    @call comp::MSG_ENT_SET_PROPERTY(&ptask->PT_runHeapInfo, &cd, cp);
+    Debug_DisableMessages(comp);
+#endif
+
+    UnlockProgTaskForComponent(comp);
+}
+
+
+/*********************************************************************
+ *			QueryVarChartMoniker
+ *********************************************************************
+ * SYNOPSIS: 	Dynamic List query function to get variable names
+ * CALLED BY:	
+ * PASS:        word item as index
+ * RETURN:
+ * SIDE EFFECTS:
+ * STRATEGY:
+ * REVISION HISTORY:
+ *	Name	Date		Description			     
+ *	----	----		-----------			     
+ *	roy	11/10/94		Initial version			     
+ * 
+ *********************************************************************/
+
+@method VarChartClass, MSG_VC_QUERY_VAR_CHART_MONIKER 
+{
+    optr	o, array;
+    ChunkHandle	chunkHan;
+    SizeAsDWord	size;
+    int		width, varWidth, valWidth, baseLine;
+    int		frame;
+    TCHAR	*cs, *var, *vals;
+    TCHAR	val[FLOAT_TO_ASCII_HUGE_BUF_LEN], varText[80];
+    int		varSize, valSize;
+    BugVar	bvar;
+    LegosType	type;
+    dword	data;
+    PTaskHan	ptaskHan;
+    GStateHandle state;
+
+    /* if its a qquery for an item that has gone away, bail */
+    if (item >= @call self::MSG_GEN_DYNAMIC_LIST_GET_NUM_ITEMS()) {
+	return;
+    }
+
+    ptaskHan = GandalfGetMainTask();
+    MemLock(OptrToHandle(@DuploStart));
+
+    frame = pself->VCI_frameNum;
+    switch(pself->VCI_chartType) 
+    {
+    case CT_STRUCT:
+	if ((word)myPort == GIGS_NONE) {
+	    bvar = BascoBugGetSetStructFieldData
+		(ptaskHan, frame, pself->VCI_varItem, item, varText, 
+		 pself->VCI_data, bvar, GET_VAR);
+	} else {
+	    bvar.BV_type = TYPE_INTEGER;
+	    bvar.BV_data = 0;
+	}
+	break;
+    case CT_ARRAY:
+	if ((word)myPort == GIGS_NONE) {
+	    bvar = BascoBugGetSetArrayElement
+		(ptaskHan, frame, pself->VCI_varItem, item, bvar, GET_VAR);
+	} else {
+	    bvar.BV_type = TYPE_INTEGER;
+	    bvar.BV_data = 0;
+	}
+	sprintf(varText, _TEXT("Element %d"), item);
+	break;
+    case CT_NORMAL:
+	bvar = BascoBugGetSetVar(ptaskHan, frame, item, bvar, GET_VAR);
+	BascoBugGetVarName(ptaskHan, bascoTask, frame, item, varText);
+	break;
+    case CT_COMPONENT:
+	bvar = GetVarFromProperty(oself, item, varText);
+	if (bvar.BV_type == TYPE_ERROR) {
+	    return;
+	}
+	break;
+    default:
+	EC_ERROR(-1);
+    }
+
+    type = bvar.BV_type;
+    data = bvar.BV_data;
+
+    switch(type) {
+    case TYPE_ARRAY:
+	strcpy(val,LMemDeref(@Array));break;
+    case TYPE_COMPONENT:
+	strcpy(val,LMemDeref(@Comp));break;
+    case TYPE_MODULE:
+	strcpy(val,LMemDeref(@Module));break;
+    case TYPE_COMPLEX:
+	strcpy(val,LMemDeref(@Complex));break;
+    case TYPE_STRING:
+	strcpy(val, _TEXT("\""));
+
+	/* 10 is max number of chars we want written... 
+	   val will always be null-terminated though.. */
+
+	BascoBugGetString(ptaskHan, data, val+1, 10);
+
+	if (strlen(val) >= 10) {
+	    val[9] = val[10] = val[11] = C_PERIOD;
+	    val[12] = C_NULL;
+	}
+	strcat(val,_TEXT("\""));
+	break;
+    case TYPE_INTEGER:
+    case TYPE_FLOAT:
+    case TYPE_LONG:
+	BascoBugNumVarToString(bvar, val);
+	break;
+    case TYPE_VARIANT:
+        strcpy(val,_TEXT("")); break;
+    case TYPE_STRUCT:
+	strcpy(val, _TEXT("Structure"));break;
+    default:
+	strcpy(val,_TEXT("???"));
+    }
+
+    valSize = strlen(val) * sizeof(TCHAR);
+
+    MemLock(uiBlock);
+
+    state = GrCreateGString (uiBlock,GST_CHUNK,&chunkHan);
+    
+
+    size = @call self::MSG_VIS_GET_SIZE();
+
+    varSize = strlen(varText);
+    EC_ERROR_IF(varSize+1 > sizeof(varText), -1);
+
+    width = DWORD_WIDTH(size);
+
+    varWidth = GrTextWidth(state,varText,varSize);
+    valWidth = GrTextWidth(state,val,valSize);
+    baseLine = GrFontMetrics(state,GFMI_BASELINE_ROUNDED);
+
+
+    GrSetLineStyle(state, LS_DOTTED, 0, NULL, 0);
+
+    if (width - (varWidth + valWidth + 6) <= 20)
+    {
+	varText[15] = C_PERIOD;
+	varText[16] = C_PERIOD;
+	varText[17] = C_PERIOD;
+	varText[18] = C_NULL;
+	varWidth = GrTextWidth(state,varText,varSize);
+	valWidth = GrTextWidth(state,val,valSize);
+	baseLine = GrFontMetrics(state,GFMI_BASELINE_ROUNDED);
+    }
+
+    if (width - (varWidth + valWidth + 6) > 20) {
+	GrDrawText(state,2,0,varText,varSize);
+	GrDrawLine(state,((varWidth + 4)/2)*2,
+		   baseLine, 
+		   ((width - valWidth - 6)/2)*2,
+		   baseLine);
+	GrDrawText(state,width - valWidth - 4, 0, val,valSize);
+    }
+
+
+    GrEndGString(state);
+ 
+    o = ConstructOptr(uiBlock,chunkHan);
+
+    /* Got to find a way to extract this 15 from somewhere. 15 is right!*/
+    @call self::MSG_GEN_DYNAMIC_LIST_REPLACE_ITEM_MONIKER(item, 0,
+						  15,
+						  15,0,
+						  VMDT_GSTRING,
+						  VMST_OPTR,
+						  o);
+
+
+    GrDestroyGString(state, 0, GSKT_LEAVE_DATA);
+    
+    LMemFree(o);
+    MemUnlock(uiBlock);
+    MemUnlock(OptrToHandle(@DuploStart));
+}
+
+/*********************************************************************
+ *			
+ *********************************************************************
+ * SYNOPSIS:        Intercepted to trigger a redraw of var chart,
+ *                  important if user resizes variable window.
+ * CALLED BY:       Ui?	
+ * PASS:            void
+ * RETURN:          void
+ * SIDE EFFECTS:
+ * STRATEGY:        Ignore that hackstack crap, no selections is safer
+ * REVISION HISTORY:
+ *	Name	Date		Description			     
+ *	----	----		-----------			     
+ *	roy	11/10/94	Initial version			     
+ * 
+ *********************************************************************/
+
+@method VarChartClass, MSG_GEN_DYNAMIC_LIST_TOP_ITEM_CHANGED
+{
+
+    /* Nasty function.  This is interecepted on resizing... */
+    /* We call initialize to trigger a redraw.              */
+
+    /* So far I also attempt to keep track of the selection.
+       Nasty because setting the selection recursively calls
+       this message. So I use my hackstack to make sure
+       we only do this on the outermost call.
+       Doesn't totally work, though, because when the damn
+       thing resizes to be so small so that the selection
+       doesn't show up anymore, we lose it! Don't ask me why! */
+
+    /* Probably should just not allow selections, or give up
+       on this thing altogether and use a more complex object
+       later on. */
+
+    word selStatus;
+
+    pself = ObjDerefGen(oself);
+    
+    if (pself->VCI_hackStack == 0) {
+	selStatus = @call self::MSG_GEN_ITEM_GROUP_GET_SELECTION();
+
+	pself = ObjDerefGen(oself);
+	pself->VCI_selStatus = selStatus;
+    }
+    pself->VCI_hackStack++;
+
+    @call self::MSG_GEN_DYNAMIC_LIST_INITIALIZE(GDLI_NO_CHANGE);
+    @callsuper();
+
+    if (pself->VCI_hackStack == 1) {
+	selStatus = pself->VCI_selStatus;
+
+	if (selStatus != GIGS_NONE) {
+	    @call self::
+		MSG_GEN_ITEM_GROUP_SET_SINGLE_SELECTION(selStatus,
+							FALSE);
+	}
+    }
+    pself = ObjDerefGen(oself);
+    pself->VCI_hackStack--;
+
+}
+
+/* -------------------------*/
+/* VariableUpdateInteraction methods */
+/* -------------------------*/
+	
+
+@classdecl VarUpdateInteractionClass;
+
+
+
+/*********************************************************************
+ *			GetVarByType
+ *********************************************************************
+ * SYNOPSIS:	get a bvar from its type
+ * CALLED BY:	
+ * PASS:
+ * RETURN:
+ * SIDE EFFECTS:
+ * STRATEGY:
+ * REVISION HISTORY:
+ *	Name	Date		Description			     
+ *	----	----		-----------			     
+ *	jimmy	2/15/96	Initial version
+ * 
+ *********************************************************************/
+BugVar GetVarByType
+(PTaskHan ptaskHan, int frame, int index, 
+ int fieldIndex, ChartType ct, TCHAR* val, optr chart)
+{
+    BugVar  bvar;
+
+    switch(ct)
+    {
+    case CT_STRUCT:
+    {
+	int arrayElement;
+
+	arrayElement = @call chart::MSG_VC_GET_DATA();
+	if ((word)myPort == GIGS_NONE) {
+	    bvar = BascoBugGetSetStructFieldData
+		(ptaskHan, frame, index,
+		 fieldIndex, val, arrayElement,
+		 bvar, GET_VAR);
+	} else {
+	    bvar.BV_type = TYPE_INTEGER;
+	    bvar.BV_data = 0;
+	}
+	break;
+    }
+    case CT_ARRAY:
+	if ((word)myPort == GIGS_NONE) {
+	    bvar = BascoBugGetSetArrayElement
+		(ptaskHan, frame, index, fieldIndex, bvar, GET_VAR);
+	} else {
+	    bvar.BV_type = TYPE_INTEGER;
+	    bvar.BV_data = 0;
+	}
+	sprintf(val, _TEXT("Element %d"), fieldIndex);
+	break;
+    case CT_NORMAL:
+	bvar = BascoBugGetSetVar(ptaskHan, frame, index, bvar, GET_VAR);
+	break;
+    case CT_COMPONENT:
+	bvar = GetVarFromProperty(chart, index, val);
+	break;
+    default:
+	EC_ERROR(-1);
+    }
+    return bvar;
+}
+
+/*********************************************************************
+ *			UpdateVariableByIndex
+ *********************************************************************
+ * SYNOPSIS:       Update given variable with a call into interpreter 	
+ * CALLED BY:	   VarUpdate Interaction 
+ * PASS:           void
+ * RETURN:         void
+ * SIDE EFFECTS:
+ * STRATEGY:
+ * REVISION HISTORY:
+ *	Name	Date		Description			     
+ *	----	----		-----------			     
+ *	jimmy	2/96		Initial version			     
+ * 
+ *********************************************************************/
+
+@method VarUpdateInteractionClass, MSG_VUI_UPDATE_VARIABLE_BY_INDEX
+{
+    TCHAR   	*varString;
+    MemHandle	varBlock;
+    int     	frame, index, fieldIndex;
+    PTaskHan	ptaskHan;
+    TCHAR   	val[128];
+    TCHAR   	*cp;
+    optr    	chart;
+    /* bvar = old value
+     * nvar = new value 
+     */
+    BugVar  	bvar, nvar;
+    ChartType	ct;
+
+    ptaskHan = GandalfGetMainTask();
+ 
+    frame = pself->VUII_frame;
+    index = pself->VUII_index;
+    fieldIndex = pself->VUII_fieldIndex;
+    ct = pself->VUII_sourceType;
+    chart = pself->VUII_chart;
+
+    bvar = GetVarByType(ptaskHan, frame, index, fieldIndex, ct, val, chart);
+
+    varBlock = @call VariableValue::MSG_VIS_TEXT_GET_ALL_BLOCK(NullHandle);
+    varString = MemLock(varBlock);
+
+    switch (bvar.BV_type)
+    {
+    case TYPE_STRING:
+    {
+	/* BugCreateString handles the decref */
+
+	varString = strchr(varString, '"');
+	if (varString == NULL) {
+	    varString = MemDeref(varBlock);
+	    cp = NULL;
+	} else {
+	    varString++;
+	    cp = strchr(varString, '"');
+	    *cp = '\0';
+	}
+	nvar = BascoBugCreateString(ptaskHan, varString, bvar);
+	if (cp != NULL) {
+	    *cp = '"';
+	}
+	break;
+    }
+    case TYPE_INTEGER:
+    case TYPE_LONG:
+    case TYPE_FLOAT:
+	nvar = BascoBugStringToNumber(varString, bvar.BV_type);
+	break;
+    default:
+	EC_ERROR(-1);
+    }
+
+
+    if (nvar.BV_type != TYPE_ILLEGAL)
+    {
+	switch (ct)
+	{
+	case CT_NORMAL:
+	    BascoBugGetSetVar(ptaskHan, frame, index, nvar, SET_VAR);
+	    break;
+	case CT_ARRAY:
+	    if ((word)myPort == GIGS_NONE) {
+		BascoBugGetSetArrayElement
+		    (ptaskHan, frame, index, fieldIndex, nvar, SET_VAR);
+		@call chart::MSG_GEN_DYNAMIC_LIST_INITIALIZE(GDLI_NO_CHANGE);
+	    }
+	    break;
+	case CT_STRUCT:
+	{
+	    int arrayElement;
+	
+	    if ((word)myPort == GIGS_NONE) {
+		arrayElement = @call chart::MSG_VC_GET_DATA();
+		BascoBugGetSetStructFieldData
+		    (ptaskHan, frame, index, fieldIndex, val, 
+		     arrayElement, nvar, SET_VAR);
+		@call chart::MSG_GEN_DYNAMIC_LIST_INITIALIZE(GDLI_NO_CHANGE);
+	    }
+	    break;
+	}
+	
+	case CT_COMPONENT:
+	    SetPropertyFromVar(chart, nvar, index);
+	    @call chart::MSG_GEN_DYNAMIC_LIST_INITIALIZE(GDLI_NO_CHANGE);
+	    break;
+	}
+    }
+    MemUnlock(varBlock);
+    if (frame == MODULE_LEVEL) {
+	@call GlobalChart::MSG_GEN_DYNAMIC_LIST_INITIALIZE(GDLI_NO_CHANGE);
+    } else {
+	/* we might have been looking at an internal chart of the top
+	 * frame, or the local chart 
+	 */
+	@call LocalChart::MSG_GEN_DYNAMIC_LIST_INITIALIZE(GDLI_NO_CHANGE);
+	@call InternalChart::MSG_GEN_DYNAMIC_LIST_INITIALIZE(GDLI_NO_CHANGE);
+    }
+}
+
+/*********************************************************************
+ *			CreatePropertyMap
+ *********************************************************************
+ * SYNOPSIS:	create a map of index values to property numbers
+ * CALLED BY:	
+ * PASS:
+ * RETURN:
+ * SIDE EFFECTS:
+ * STRATEGY:
+ *	    	store an array of valid prop numbers. the first word is the
+ *	    	number of prop numbers stored, followed by the prop numbers
+ *	    	after that is a word for the number of custom properties
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description			     
+ *	----	----		-----------			     
+ *	jimmy	4/29/96  	Initial version
+ * 
+ *********************************************************************/
+void
+CreatePropertyMap(optr chart, optr	comp)
+{
+    optr	parent, interp;
+    word    	numProps, actualNumProps, custom;
+    MemHandle	propMap;
+    word    	*map, i;
+    TCHAR   	name[128];
+    ProgTask	*ptask;
+    EntInstance *ei;
+    MemHandle	oldBurdenThread = NullHandle;
+    MemHandle   oldBurdenThreadParent = NullHandle;
+    MemHandle	oldBurdenThreadInterp = NullHandle;
+    Boolean	swap_threads;
+
+    /* check for aggregates */
+    if (comp == NullOptr || OptrToHandle(comp) == 0xffff)
+    {
+	@call chart::MSG_VC_SET_PROP_MAP(NullHandle);
+	return;
+    }
+
+    ptask = LockProgTaskForComponent(comp);
+    if (ptask == NULL)
+    {
+	@call chart::MSG_VC_SET_PROP_MAP(NullHandle);
+	return;
+    }
+
+#define MAX_PROPS 256    
+    numProps = MAX_PROPS; /* maximum possible number */
+    propMap = @call chart::MSG_VC_GET_PROP_MAP();
+    if (propMap == NullHandle) 
+    {
+	propMap = MemAlloc(MAX_PROPS+2 * sizeof(word),
+			   HF_SWAPABLE | HF_SHARABLE, 
+			   HAF_ZERO_INIT | HAF_LOCK);
+	
+	@call chart::MSG_VC_SET_PROP_MAP(propMap);
+    }
+    else
+    {
+	MemLock(propMap);
+    }
+    map = MemDeref(propMap);
+
+    /* the first word will be the actual number of properties */
+    actualNumProps = 0;
+    map++;
+    for (i = 0; i < numProps; i++)
+    {
+	ComponentData	cd;
+
+	if (!swap_threads) {
+	    Debug_EnableMessages(comp);
+	}
+	@call comp::MSG_ENT_GET_PROPERTY_NAME_AND_DATA(i, name, 
+							&ptask->PT_runHeapInfo,
+							&cd, NULL);
+	if (!swap_threads) {
+	    Debug_DisableMessages(comp);
+	}
+	if (cd.CD_type != TYPE_ERROR)
+	{
+	    *map++ = i;
+	    actualNumProps++;
+	}
+    }
+
+    custom = 0;
+    MemLock(OptrToHandle(comp));
+    ei = ObjDerefEnt(comp);
+    if (ei->EI_propIndex != NullHandle)
+    {
+	custom = ChunkArrayGetCountHandles(OptrToHandle(comp), 
+					   ei->EI_propIndex);
+    }
+    map = MemDeref(propMap);
+    *map = actualNumProps;
+    map += (actualNumProps+1);
+    *map = custom;
+    UnlockProgTaskForComponent(comp);
+    MemUnlock(OptrToHandle(comp));
+    MemUnlock(propMap);
+
+    if (swap_threads) {
+	UnswapBurdenThreads(comp, parent, interp, oldBurdenThread, 
+			    oldBurdenThreadParent, oldBurdenThreadInterp);
+    }
+}
+
+
+/*********************************************************************
+ *			ComplexChartCommon
+ *********************************************************************
+ * SYNOPSIS:	
+ * CALLED BY:	
+ * PASS:
+ * RETURN:
+ * SIDE EFFECTS:
+ * STRATEGY:
+ * REVISION HISTORY:
+ *	Name	Date		Description			     
+ *	----	----		-----------			     
+ *	jimmy	4/29/96  	Initial version
+ * 
+ *********************************************************************/
+void
+ComplexChartCommon(ChartType ct, int frame, int index, dword data, TCHAR* name)
+{
+    optr    newChart, parent;
+
+    @call VariableValue::MSG_GEN_SET_NOT_USABLE(VUM_NOW);
+    /* this stuff is all force queued, as there may be QUERYs for
+     * for the currect dynamic list that we want to finish processing
+     * before changing instance data and calling UPDATE_SCOPE
+     */
+    newChart = InstantiateNewChart();
+    parent = @call newChart::MSG_GEN_FIND_PARENT();
+
+    @call parent::MSG_GEN_REPLACE_VIS_MONIKER_TEXT(name, VUM_NOW);
+
+/*    num = @call newChart::MSG_GEN_DYNAMIC_LIST_GET_NUM_ITEMS();
+ *	unused? */
+
+    if (ct == CT_COMPONENT) {
+	CreatePropertyMap(newChart, data);
+    }
+
+    @send , forceQueue parent::MSG_GEN_INTERACTION_INITIATE();
+    @send , forceQueue newChart::MSG_VC_SET_CHART_TYPE(ct);
+    @send , forceQueue newChart::MSG_VC_SET_VAR_ITEM(index);
+    @send , forceQueue newChart::MSG_VC_SET_DATA(data);
+    @send , forceQueue newChart::MSG_VC_UPDATE_SCOPE(frame);
+    MemUnlock(OptrToHandle(@DuploStart));
+    return;
+}
+
+
+/*********************************************************************
+ *			ShowVariableByIndex
+ *********************************************************************
+ * SYNOPSIS: 	Show a variable update window for <scope,index> variable
+ * CALLED BY:	VC_SHOW_VARIABLE
+ * PASS:         int frame, int index
+ * RETURN:
+ * SIDE EFFECTS:
+ * STRATEGY:
+ * REVISION HISTORY:
+ *	Name	Date		Description			     
+ *	----	----		-----------			     
+ *	roy	11/10/94		Initial version			     
+ * 
+ *********************************************************************/
+
+@method VarUpdateInteractionClass, MSG_VUI_SHOW_VARIABLE_BY_INDEX 
+{
+    TCHAR	*var, *vals, *cs, *sm;
+    TCHAR	val[128];
+    BugVar	bvar;
+    LegosType	type;
+    dword	data;
+    optr	value;
+    PTaskHan	ptaskHan;
+    MemHandle   mh;
+    int 	    num;
+
+    ptaskHan = GandalfGetMainTask();
+
+    pself->VUII_frame = frame;
+    pself->VUII_index = index;
+    pself->VUII_sourceType = ct;
+    pself->VUII_fieldIndex = fieldIndex;
+    pself->VUII_chart = chart;
+
+    bvar = GetVarByType(ptaskHan, frame, index, fieldIndex, ct, val, chart);
+    type = bvar.BV_type;
+    data = bvar.BV_data;
+
+    MemLock(OptrToHandle(@DuploStart));
+
+#if 0
+    if ((BugGetBuilderState(BugGetBugHandleFromCTask(bascoTask)) != 
+	 BS_PAUSED_IDLE) && (type == TYPE_COMPONENT))
+    {
+	type = TYPE_ILLEGAL;
+    }
+#endif
+    /*
+     * If we're running remotely, then we can only show numbers, so far.
+     *
+     * If we're running locally, then we've got more choices.
+     */
+    if ((((word)myPort != GIGS_NONE)
+	 && ((type != TYPE_INTEGER)
+	     && (type != TYPE_FLOAT)
+	     && (type != TYPE_LONG))) ||
+	((type != TYPE_STRING) &&
+	(type != TYPE_INTEGER) &&
+	(type != TYPE_FLOAT) &&
+	(type != TYPE_LONG) &&
+	(type != TYPE_VARIANT) &&
+	(type != TYPE_STRUCT) &&
+	(type != TYPE_ARRAY) &&
+	(type != TYPE_COMPONENT))) {
+	sm = LMemDeref(@SorryNotSupportedYet);
+	UserStandardDialog( (char*) 0,
+			    (char*) 0,
+			    (char*) 0,
+			    (char*) 0,
+			    sm,
+			   (CDT_ERROR << CDBF_DIALOG_TYPE_OFFSET) |
+			   (GIT_NOTIFICATION << CDBF_INTERACTION_TYPE_OFFSET));
+	MemUnlock(OptrToHandle(@DuploStart));
+	return;
+    }
+
+
+    /* only enable the change button if we are not in an internal frame */
+    /* I think this is pretty lame, so I'm removing the crippledness
+     * --dubois
+     */
+    if (frame !=  MODULE_LEVEL && 0 &&
+	frame !=  BascoBugGetCurrentFrame(ptaskHan)) 
+    {
+    	@call UpdateTrigger::MSG_GEN_SET_NOT_ENABLED(VUM_NOW);
+    }
+    else 
+    {
+    	@call UpdateTrigger::MSG_GEN_SET_ENABLED(VUM_NOW);
+    }
+
+    if (ct == CT_NORMAL) {
+	BascoBugGetVarName(ptaskHan, bascoTask, frame, index, val);
+    }
+
+    @call VariableName::MSG_GEN_REPLACE_VIS_MONIKER_TEXT(val, VUM_NOW);
+
+    value = @VariableValue;
+
+    @call VariableValue::MSG_GEN_SET_USABLE(VUM_NOW);
+    switch(type) 
+    {
+    case TYPE_STRING:
+    {
+	 mh = MemAlloc(4096, HF_SWAPABLE | HF_SHARABLE,
+			     HAF_ZERO_INIT | HAF_LOCK);
+	 var = (TCHAR *)MemDeref(mh);
+
+	 strcpy(var,_TEXT("\""));
+
+	 BascoBugGetString(ptaskHan, data, var+1, NULL);
+
+	 strcat(var,_TEXT("\""));
+     }
+	break;
+    case TYPE_INTEGER:
+    case TYPE_LONG:
+    case TYPE_FLOAT:
+	var = val;
+	BascoBugNumVarToString(bvar, var);
+	break;
+    case TYPE_COMPONENT:
+    {
+	ComplexChartCommon(CT_COMPONENT, frame, index, data, val);
+	return;
+    }
+    case TYPE_STRUCT:
+	ComplexChartCommon(CT_STRUCT, frame, index, fieldIndex, val);
+	return;
+    case TYPE_ARRAY:
+	ComplexChartCommon(CT_ARRAY, frame, index, 0, val);
+	return;
+
+    default:
+	var = val;
+	strcpy(val,_TEXT(""));
+    }
+    
+    @call value::MSG_VIS_TEXT_REPLACE_ALL_PTR(var, 0);
+    if (type == TYPE_STRING) {
+	MemFree(mh);
+    }
+    @call value::MSG_VIS_TEXT_SELECT_RANGE(0,0);
+    
+    @call self::MSG_GEN_INTERACTION_INITIATE();
+    MemUnlock(OptrToHandle(@DuploStart));
+}
+
+
+
+

@@ -1,0 +1,246 @@
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+	Copyright (c) Geoworks 1994 -- All Rights Reserved
+
+PROJECT:        Legos
+MODULE:         Editor: Handles the routine list...
+                        (All methods for RoutineListClass)
+
+FILE:           routine.goc
+
+AUTHOR:         Roy Goldman, Oct 25, 1994
+
+ROUTINES:
+	Name                    Description
+	----                    -----------
+
+REVISION HISTORY:
+	Name    Date            Description
+	----    ----            -----------
+	roy       10/25/94           Initial version.
+
+DESCRIPTION:
+	
+
+	$Id: routine.goc,v 1.2 98/10/13 22:17:58 martin Exp $
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+
+@include "gandalf.goh"
+@include <Legos/basco.goh>
+@include "Editor/editorh.goh"
+@include "Main/mainshlh.goh"
+
+#include <Legos/bascobug.h>
+
+@classdecl RoutineListClass;
+
+extern byte dirty;
+
+
+/*********************************************************************
+ *			SET_NONE_SELECTED
+ *********************************************************************
+ * SYNOPSIS: 	SET_NONE_SELECTED handler
+ * CALLED BY:	
+ * PASS:
+ * RETURN:
+ * SIDE EFFECTS:
+ * STRATEGY:
+ * REVISION HISTORY:
+ *	Name	Date		Description			     
+ *	----	----		-----------			     
+ *	jimmy	9/11/95	Initial version
+ * 
+ *********************************************************************/
+@method RoutineListClass, MSG_GEN_ITEM_GROUP_SET_NONE_SELECTED
+{
+    @callsuper();
+
+    @call DeleteRoutineTrigger::MSG_GEN_SET_NOT_ENABLED(VUM_NOW);
+}
+
+/*********************************************************************
+ *			QueryRoutineName
+ *********************************************************************
+ * SYNOPSIS: 	Dynamic List query message, displays name of routine
+ *              at func table with same index
+ * CALLED BY:	
+ * PASS:        word item, the index into the func table & routine list
+ * RETURN:
+ * SIDE EFFECTS:
+ * STRATEGY:    A couple minor hacks for duplo_start, duplo_revision
+ * REVISION HISTORY:
+ *	Name	Date		Description			     
+ *	----	----		-----------			     
+ *	roy	11/11/94		Initial version			     
+ * 
+ *********************************************************************/
+
+@method RoutineListClass, MSG_RL_QUERY_ROUTINE_NAME {
+    TCHAR dest[256];
+
+    /* Skip over duplo_ui */
+
+    EditGetRoutineName(bascoTask, item + pself->RLI_numHidden, dest);
+
+    MemLock(OptrToHandle(@DuploRev));
+
+    if (!strcmp(dest,LMemDeref(@DuploRev)))
+	strcpy(dest,LMemDeref(@RevisionHeader));
+
+    if (!strcmp(dest,LMemDeref(@DuploStart)))
+	strcpy(dest,LMemDeref(@TopLevel));
+
+    MemUnlock(OptrToHandle(@DuploRev));
+
+    @call self::MSG_GEN_DYNAMIC_LIST_REPLACE_ITEM_TEXT(item,dest);
+
+}
+
+/*********************************************************************
+ *			ShowRoutineFromList
+ *********************************************************************
+ * SYNOPSIS: 	Tell the editor to display the appropriate routine
+ * CALLED BY:	
+ * PASS:        word selection, the index of selected routine on the
+ *              routine list. We actually add one to skip over
+ *              the "invisible" top level code routine.
+ *
+ *              Also used to display the top level scope when
+ *              selection is passed in as -1. 
+ * RETURN:
+ * SIDE EFFECTS:
+ * STRATEGY:
+ * REVISION HISTORY:
+ *	Name	Date		Description			     
+ *	----	----		-----------			     
+ *	roy	11/11/94		Initial version			     
+ * 
+ *********************************************************************/
+
+@method RoutineListClass, MSG_RL_SHOW_ROUTINE_FROM_LIST 
+{
+
+    /* Policy: When choosing routines from the routine list,
+       we only show the TRUE execution line since it's undefined
+       when there are multiple active calls.  So that's
+       the only case where the user can modify execution
+    */
+
+    /* This may add new routines, but they will be appended,
+       making current selection still valid */
+
+    if (@call Editor::MSG_ET_UPDATE_CODE_IF_NECESSARY(TRUE)) 
+    {
+	/* hit an error, so do nothing */
+	return;
+    }
+
+    @call self::MSG_GEN_ITEM_GROUP_SET_SINGLE_SELECTION(selection,FALSE);
+
+    /* never allow deletion of top level routine in normal mode */
+    if ((selection == 0) &&
+	(@call BuilderShell::MSG_BS_GET_MODE() == BSM_NORMAL)) 
+    {
+	@call DeleteRoutineTrigger::MSG_GEN_SET_NOT_ENABLED(VUM_NOW);
+    } 
+    else 
+    {
+	/* only allow deleting routines if we are stopped */
+	if (BugGetBuilderState(BascoBugGetBugHandleFromCTask(bascoTask)) ==
+	    BS_STOPPED)
+	{
+	    @call DeleteRoutineTrigger::MSG_GEN_SET_ENABLED(VUM_NOW);
+	}
+    }
+
+    /* Hacks are lame... We don't want to ever show the first routine
+       in memory, which actually only contains code for the builder's
+       build-time components... So skip over it...
+    */
+
+    pself = ObjDerefGen(oself);
+    @call Editor::MSG_ET_SHOW_ROUTINE_BY_INDEX(selection + 
+					       pself->RLI_numHidden);
+
+    /* If running... */
+    if (@call StopTrigger::MSG_GEN_GET_ENABLED()) 
+    {
+	int	cf;
+	word	funcNum;
+	if ((cf = BascoBugGetCurrentFrame(GandalfGetMainTask())) >= 0) 
+	{
+	    BascoBugGetFrameInfo(GandalfGetMainTask(), cf, &funcNum);
+
+	    pself = ObjDerefGen(oself);
+	    /* Add numHidden to compensate for hidden routines */
+	    if (funcNum == (selection + pself->RLI_numHidden)) {
+
+		/* Note that if there are multiple active frames
+		   of the same routine, choosing the routine from
+		   the menu will show the pc at the current frame's
+		   position
+		*/
+
+		@call Editor::MSG_ET_SET_PC
+		    (BascoBugGetFrameLineNumber
+		     (GandalfGetMainTask(), bascoTask, cf), 0);
+	    }
+	}
+
+    }
+    @call EventList::MSG_GEN_ITEM_GROUP_SET_NONE_SELECTED(0);
+}
+
+/***********************************************************************
+ *		MSG_RL_SET_NUM_HIDDEN for RoutineListClass
+ ***********************************************************************
+ * SYNOPSIS:	    Set the number of routines to hide
+ * PARAMETERS:	    int num
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	dloft	8/22/95   	Initial Revision
+ *
+ ***********************************************************************/
+@method RoutineListClass, MSG_RL_SET_NUM_HIDDEN
+{
+    pself->RLI_numHidden = num;
+    /* also set the number in the bug handle so we dont set breakpoints
+     * in hidden routines when single stepping through code
+     */
+    BugSetNumHiddenFuncs(BascoBugGetBugHandleFromCTask(bascoTask), num);
+}	/* End of MSG_RL_SET_NUM_HIDDEN.	*/
+
+
+@method RoutineListClass, MSG_RL_GET_NUM_HIDDEN
+{
+    return pself->RLI_numHidden;
+}	/* End of MSG_RL_SET_NUM_HIDDEN.	*/
+
+
+/***********************************************************************
+ *		MSG_GEN_DYNAMIC_LIST_INITIALIZE for RoutineListClass
+ ***********************************************************************
+ * SYNOPSIS:	    deal with the fact that we're hiding a few items
+ * PARAMETERS:	    word numItems
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	dloft	8/23/95   	Initial Revision
+ *
+ ***********************************************************************/
+@method RoutineListClass, MSG_GEN_DYNAMIC_LIST_INITIALIZE
+{
+    numItems = EditGetNumRoutines(bascoTask) - pself->RLI_numHidden;
+    @callsuper();
+
+    @call DeleteRoutineTrigger::MSG_GEN_SET_NOT_ENABLED(VUM_NOW);
+}	/* End of MSG_GEN_DYNAMIC_LIST_INITIALIZE.	*/
+
+
+
+

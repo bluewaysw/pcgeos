@@ -1,0 +1,1865 @@
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+	Copyright (c) Geoworks 1994 -- All Rights Reserved
+
+PROJECT:	Legos
+MODULE:		Editor: All code for EditorTextClass
+FILE:		editor.goc
+
+AUTHOR:		Roy Goldman, Sep 17, 1994
+
+ROUTINES:
+	Name			Description
+	----			-----------
+    MTD MSG_ET_TOGGLE_BREAKPOINT
+				Toggle a breakpoint marker at the current
+				line
+
+    MTD MSG_ET_GET_LINE_STATUS	Get the highlight state of the current line
+
+    MTD MSG_ET_CLEAR_PC		Clear the PC marker if it currently exists
+
+    MTD MSG_ET_SET_PC		Sets the PC marker (next execution line) at
+				current line or specified line. (Does
+				current if lineNum is -1) Invariant handled
+				here: ONLY ONE SUCH LINE AT A TIME!  If
+				Dirty, sets code dirty flag to true.
+
+    MTD MSG_ET_UPDATE_LINE	Install the specified style at the current
+				line
+
+ ?? INT SimpEqual		Compare paragraph attributes at a line to
+
+    MTD MSG_ET_GET_CURSOR_INFO	Grab a bunch of info about the current line
+
+    MTD MSG_ET_SHOW_ROUTINE_BY_INDEX
+				Show routine for given index into function
+				table
+
+ ?? INT IsBreakDirty		Returns true iff new breakpoints have been
+				set but code has NOT been modified. Allows
+				fast breakpoint registration.
+
+ ?? INT BreakDirty		Set dirty for breakpoints
+
+    MTD MSG_ET_IS_CODE_DIRTY	Returns true iff code has been modified.
+				Should trigger breakpoint and and code
+				reinstall
+
+    MTD MSG_ET_SET_CURSOR_AT_LINE
+				Sets the cursor at a specified line Useful
+				for putting cursor at beginng of a routine
+				when starting up OR putting the cursor at a
+				break line when breaking...
+
+    GLB InstallBreakpoint	install a breakpoint
+
+    MTD MSG_ET_UPDATE_CODE_IF_NECESSARY
+				If needed, download current code in editor
+				down to interpreter and/or update
+				breakpoints,pc marker
+
+    MTD MSG_ET_DOWNLOAD_CODE	Download code from editor into interpreter.
+
+    MTD MSG_ET_DELETE_ROUTINE	get rid of a routine
+
+    MTD MSG_ET_ADD_NEW_ROUTINE	Download code if necessary, clear editor,
+				and add function outline.
+
+    MTD MSG_ET_ADD_NEW_EVENT_HANDLER
+				Add the routine to deal with the an event.
+				Display event's parameters.
+
+    MTD MSG_META_START_SELECT	Intercept Select Mouse clicks. If we are in
+				debug mode (non editable), we simply toggle
+				a breakpoint
+
+    MTD MSG_ET_GET_ERROR_LINE	Return the editor's error line status
+
+    MTD MSG_VIS_TEXT_SHOW_SELECTION
+				Intercept MSG_VIS_TEXT_SHOW_SELECTION and
+				call vistext's handler.
+
+    MTD MSG_ET_AGG_PROPERTY_CHANGED
+				A change has occurred in the aggregate
+				property box
+
+?? none MSG_ET_NEW_AGG_PROPERTY for EditorTextClass
+				A change has occurred in the aggregate
+				property box
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	roy	9/17/94   	Initial version.
+
+DESCRIPTION:
+	Method handlers for EditorTextClass
+
+	$Id: editor.goc,v 1.2 98/10/13 22:17:44 martin Exp $
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+
+@include "gandalf.goh"
+@include "Editor/editorh.goh"
+@include "Main/mainshlh.goh"
+
+#include <Legos/edit.h>
+#include <Legos/basrun.h>
+#include <Legos/bascobug.h>
+#include <Ansi/ctype.h>
+#include <char.h>
+#include <initfile.h>
+
+@include <Legos/basco.goh>
+@include <Legos/bent.goh>
+
+@classdecl EditorTextClass;
+@extern object EditorView;
+@classdecl UpdatingGenInteractionClass;
+
+extern void GandalfCompileError(MemHandle task);
+extern byte SimpEqual(VisTextParaAttr *a1, SimpleParaAttr *a2);
+
+extern SerialPortNum myPort;
+void InstallBreakpoint(int funcNumber, word codeOffset, int lineNumber);
+
+@extern method EditorTextClass, MSG_ET_IS_CODE_DIRTY;
+@extern method EditorTextClass, MSG_ET_CLEAR_EDITOR;
+@extern method EditorTextClass, MSG_ET_UPDATE_LINE;
+@extern method EditorTextClass, MSG_ET_SET_ERROR_LINE;
+@extern method EditorTextClass, MSG_ET_UPDATE_CODE_IF_NECESSARY;
+@extern method EditorTextClass, MSG_ET_DOWNLOAD_CODE;
+@extern method EditorTextClass, MSG_ET_GET_LINE_STATUS;
+@extern method EditorTextClass, MSG_ET_SHOW_ROUTINE_BY_INDEX;
+@extern method EditorTextClass, MSG_ET_SET_CURSOR_AT_LINE;
+@extern method EditorTextClass, MSG_ET_ADJUST_DISPLAY_RANGE_FOR_LONG_ROUTINE;
+
+
+
+
+/***********************************************************************
+ *		MSG_VIS_RECALC_SIZE for EditorTextClass
+ ***********************************************************************
+ * SYNOPSIS:	Return something very wide
+ * PARAMETERS	RecalcSizeArgs width, RecalcSizeArgs height
+ * SIDE EFFECTS:
+ *
+ * STRATEGY:
+ *	Can't get big enough in the SST hint
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	dubois	9/19/96   	Initial Revision
+ *
+ ***********************************************************************/
+@method EditorTextClass, MSG_VIS_RECALC_SIZE
+{
+    SizeAsDWord	retval = @callsuper();
+    retval = MAKE_SIZE_DWORD(2000, DWORD_HEIGHT(retval));
+    return retval;
+}	/* End of MSG_VIS_RECALC_SIZE.	*/
+   
+/*********************************************************************
+ *			ToggleBreakpoint
+ *********************************************************************
+ * SYNOPSIS:  Toggle a breakpoint marker at the current line 
+ *            if linenum is -1, else specific number.
+ *            Sets dirty flag if dirty is TRUE.
+ * CALLED BY:	
+ * PASS:      void(int lineNum, byte dirty)
+ * RETURN:    void
+ * SIDE EFFECTS:
+ * STRATEGY:
+ *		Note that lineNum is relative to the first line
+ *		displayed. 
+ * REVISION HISTORY:
+ *	Name	Date		Description			     
+ *	----	----		-----------			     
+ *	roy	9/12/94		Initial version			     
+ * 
+ *********************************************************************/
+
+@method EditorTextClass, MSG_ET_TOGGLE_BREAKPOINT
+{
+
+    VisTextMaxParaAttr	attrs;
+    SimpleParaAttr	brk, pc, brkPc, def, *ptr;
+    dword		start,end,line,boff,eoff;
+    MemHandle		han;
+    VisTextGetLineOffsetAndFlagsParameters lineInfo;
+    VisTextParaAttrDiffs diffs;
+    byte		temp;
+    sword		codeOffset, funcNumber;
+
+
+    /* Don't do anything if window is empty.. Eventually
+       change this to be ALL WHITESPACE */
+
+    if (@call self::MSG_VIS_TEXT_GET_TEXT_SIZE() == 0) {
+	return;
+    }
+
+    /* if we have just added an event, but haven't modified it, then
+     * setting a breakpoint on it is a problem, so go ahead and download
+     * it, and change over to showing the routine by index
+     */
+    if (pself->ETI_event != -1)
+    {
+	TCHAR 	routine[80];
+	int 	f, numHidden;
+
+	@call EventList::MSG_EVENT_LIST_CONSTRUCT_ROUTINE_NAME(routine, 
+							    pself->ETI_event);
+	f = EditGetRoutineIndex(bascoTask, routine);
+	if (f == -1) 
+	{
+	    @call self::MSG_VIS_TEXT_SET_USER_MODIFIED();
+	    @call self::MSG_ET_UPDATE_CODE_IF_NECESSARY(TRUE);
+	    f = EditGetRoutineIndex(bascoTask, routine);
+	    /* now update the list */
+	    @call RoutineList::MSG_GEN_DYNAMIC_LIST_INITIALIZE(
+					   EditGetNumRoutines(bascoTask));
+	}
+	numHidden = @call RoutineList::MSG_RL_GET_NUM_HIDDEN();
+	@call RoutineList::MSG_RL_SHOW_ROUTINE_FROM_LIST(f - numHidden,1,0);
+    }
+
+    /* Preserve modification state */
+    temp = @call self::MSG_VIS_TEXT_GET_USER_MODIFIED_STATE();
+
+@if 0
+    if (dirty) {
+	@call self::MSG_ET_BREAK_DIRTY();
+    }
+@endif
+   
+    /* Orient ourselves... */
+    if (lineNum < 0) 
+    {
+	@call self::MSG_ET_GET_CURSOR_INFO(&start,&end,&line,&boff,&eoff);
+    }
+    else 
+    {
+	line = lineNum;
+	lineInfo.VTGLOAFP_line = line;
+	@call self::MSG_VIS_TEXT_GET_LINE_OFFSET_AND_FLAGS(&lineInfo);
+	boff = lineInfo.VTGLOAFP_offset;
+    }
+
+    /* Now check the status of this line, so we can toggle effectively */
+
+    @call self::MSG_VIS_TEXT_GET_PARA_ATTR((VisTextGetAttrFlags)0,
+					   &diffs,&attrs,boff,boff);
+
+
+    /* Get the attributes of each style */
+
+    pself = ObjDerefGen(oself);
+
+    codeOffset = pself->ETI_codeOffset;
+    funcNumber = pself->ETI_funcNumber;
+
+
+    han = OptrToHandle(pself->ETI_breakAttrs);
+    MemLock(han);
+    ptr   = LMemDeref(pself->ETI_breakAttrs);
+    brk = *ptr;
+    MemUnlock(han);
+
+
+    han = OptrToHandle(pself->ETI_pcAttrs);
+    MemLock(han);
+    ptr   = LMemDeref(pself->ETI_pcAttrs);
+    pc = *ptr;
+
+    MemUnlock(han);
+
+    han = OptrToHandle(pself->ETI_breakPcAttrs);
+    MemLock(han);
+    ptr   = LMemDeref(pself->ETI_breakPcAttrs);
+    brkPc = *ptr;
+    MemUnlock(han);
+
+    def.SPA_bgColor.CQ_redOrIndex = C_WHITE;
+    def.SPA_bgColor.CQ_info = CF_INDEX;
+    def.SPA_bgColor.CQ_green = 0;
+    def.SPA_bgColor.CQ_blue = 0;
+  
+    /* Already marked for break? */
+
+  
+    /* Break marker underneath */
+
+    if (SimpEqual(&attrs.VTMPA_paraAttr, &brk)) 
+    {
+	/* Install defaults */
+	@call self::MSG_ET_UPDATE_LINE(def,line);
+    }
+    
+    /* PC marker underneath */
+
+    else if (SimpEqual(&attrs.VTMPA_paraAttr, &pc)) 
+    {
+	/* Install "overlap" */
+	@call self::MSG_ET_UPDATE_LINE(brkPc,line);
+    }
+
+    /* Both markers underneath */
+
+    else if (SimpEqual(&attrs.VTMPA_paraAttr, &brkPc)) 
+    {
+	/* Install pc */
+	@call self::MSG_ET_UPDATE_LINE(pc,line);
+    }
+
+    else /* nothing underneath */ 
+    {
+	/* Install break */
+	@call self::MSG_ET_UPDATE_LINE(brk,line);
+    }
+
+    if (temp) {
+	@call self::MSG_VIS_TEXT_SET_USER_MODIFIED();
+    } else {
+	@call self::MSG_VIS_TEXT_SET_NOT_USER_MODIFIED();
+    }
+
+
+    /* if the code is dirty, then the breakpoint will be set during
+     * the downloading of the code, otherwise we can just do it now
+     */
+    if (dirty && (! @call self::MSG_ET_IS_CODE_DIRTY(FALSE)) &&
+	funcNumber != -1)
+    {
+	/* install the breakpoint now */
+	InstallBreakpoint(funcNumber, codeOffset, line);
+    }
+}
+
+/*********************************************************************
+ *			ClearPc
+ *********************************************************************
+ * SYNOPSIS:   Clear the PC marker if it currently exists 	
+ * CALLED BY:	
+ * PASS:
+ * RETURN:
+ * SIDE EFFECTS:
+ * STRATEGY:
+ * REVISION HISTORY:
+ *	Name	Date		Description			     
+ *	----	----		-----------			     
+ *	roy	9/23/94		Initial version			     
+ * 
+ *********************************************************************/
+@method EditorTextClass, MSG_ET_CLEAR_PC 
+{
+    SimpleParaAttr	pc, brkPc, brk, def, *ptr;
+
+    dword		pcLine;
+    dword		token[2];
+
+    dword		counter, pos, i;
+    byte		elementFound;
+    VisTextParaAttr	*element;
+
+    optr		run, style, *runPtr;
+    TextRunArrayHeader	*runHeader;
+    TextRunArrayElement	wahPos, *wahPosPtr;
+    MemHandle		han;
+
+    VisTextMaxParaAttr	attrs;
+    VisTextGetLineOffsetAndFlagsParameters lineInfo;
+    byte		modifiedState;
+    VisTextParaAttrDiffs diffs;		/* Never used... */
+
+    modifiedState = @call self::MSG_VIS_TEXT_GET_USER_MODIFIED_STATE();
+
+    elementFound = FALSE;
+
+    /* Get the attributes of each style */
+
+    pself = ObjDerefGen(oself);
+
+    han = OptrToHandle(pself->ETI_pcAttrs);
+    MemLock(han);
+    ptr   = LMemDeref(pself->ETI_pcAttrs);
+    pc = *ptr;
+    MemUnlock(han);
+
+    han = OptrToHandle(pself->ETI_breakPcAttrs);
+    MemLock(han);
+    ptr   = LMemDeref(pself->ETI_breakPcAttrs);
+    brkPc = *ptr;
+    MemUnlock(han);
+
+
+    han = OptrToHandle(pself->ETI_breakAttrs);
+    MemLock(han);
+    ptr   = LMemDeref(pself->ETI_breakAttrs);
+    brk = *ptr;
+
+    MemUnlock(han);
+
+
+    /* Grab two structures: The run array (run), and the
+       array with the styles in use (style)*/
+
+    runPtr = ObjVarFindData(oself,ATTR_GEN_TEXT_MULTIPLE_PARA_ATTR_RUNS);
+    
+    run = ConstructOptr(OptrToHandle(oself),*runPtr);
+
+    runHeader = LMemDeref(run);
+    
+    style = ConstructOptr(OptrToHandle(oself),runHeader->TRAH_elementArray);
+
+    /* Now for the fun part. We have to find if the PC has
+       already been set somewhere in the document. If it
+       is we want to erase it... */
+    
+    counter = 0;
+
+    /* First we check to see if either the pc or pcbreak style
+       is in use by the text object. If so, store one or both
+       in the token array.
+    */
+
+    for (i = 0; i < ChunkArrayGetCount(style); i++) {
+	element = ChunkArrayElementToPtr(style, i, NULL);
+	if(SimpEqual(element, &pc)) { 
+	    token[counter] = i;
+	    counter++;
+	}
+	if(SimpEqual(element, &brkPc)) {
+	    token[counter] = i;
+	    counter++;
+	}
+    }
+
+    /* ASSERT: Hope to high hell counter <= 2 */
+    if (counter > 0) {
+
+	/* Style is in use, so now check the run array to see
+	   if any run refers to this style. We assume
+	   at most ONE exists..... */
+
+	for (i = 0; i < ChunkArrayGetCount(run); i++) {
+
+	    /* Position is a word and a half, so do some
+	       primitive mangling to upgrade it to a dword */
+
+	    wahPosPtr = ChunkArrayElementToPtr(run, i, NULL);
+	    wahPos = *wahPosPtr;
+
+	    if(wahPos.TRAE_token == token[0] || 
+	       (counter ==2 && wahPos.TRAE_token == token[1])) { 
+		
+		pos = (wahPos.TRAE_position.WAAH_high * 65536) | 
+		    wahPos.TRAE_position.WAAH_low;
+		elementFound = TRUE;
+		break;
+	    }
+	    
+	}
+    }
+
+    
+    def.SPA_bgColor.CQ_redOrIndex = C_WHITE;
+    def.SPA_bgColor.CQ_info = CF_INDEX;
+    def.SPA_bgColor.CQ_green = 0;
+    def.SPA_bgColor.CQ_blue = 0;
+
+    /* Clear the previous one if there was one */
+
+    if (elementFound) {
+	pcLine = @call self::MSG_VIS_TEXT_GET_LINE_FROM_OFFSET(pos+1);
+	
+        @call self::MSG_VIS_TEXT_GET_PARA_ATTR((VisTextGetAttrFlags)0,
+					       &diffs,&attrs,pos,pos);
+	
+	if (pcLine != line) {
+	
+	    if (SimpEqual(&attrs.VTMPA_paraAttr, &pc)) {
+		@call self::MSG_ET_UPDATE_LINE(def, pcLine);
+	    }
+	    if (SimpEqual(&attrs.VTMPA_paraAttr, &brkPc)) {
+		@call self::MSG_ET_UPDATE_LINE(brk, pcLine);
+	    }
+	}
+    }
+
+    if (modifiedState)
+	@call self::MSG_VIS_TEXT_SET_USER_MODIFIED();
+    else
+	@call self::MSG_VIS_TEXT_SET_NOT_USER_MODIFIED();
+
+}
+
+/*********************************************************************
+ *			SetPC
+ *********************************************************************
+ * SYNOPSIS:	Sets the PC marker (next execution line) at current line
+ *              or specified line. (Does current if lineNum is -1)
+ *              Invariant handled here: ONLY ONE SUCH LINE AT A TIME!
+ *              If Dirty, sets code dirty flag to true.
+ * CALLED BY:	
+ * PASS:         int lineNum, byte dirty
+ * RETURN:
+ * SIDE EFFECTS:
+ * STRATEGY:
+ * REVISION HISTORY:
+ *	Name	Date		Description			     
+ *	----	----		-----------			     
+ *	roy	9/14/94		Initial version
+ * 
+ *********************************************************************/
+@method EditorTextClass, MSG_ET_SET_PC 
+{
+    SimpleParaAttr	pc, brkPc, brk, def, *ptr;
+    dword		start,end,line,boff,eoff;
+
+    MemHandle		han;
+    VisTextMaxParaAttr	attrs;
+    VisTextGetLineOffsetAndFlagsParameters lineInfo;
+    
+    VisTextParaAttrDiffs diffs;		/* Never used... */
+    byte		temp;
+    byte    	    	err;
+    VisAttrs	    	va;
+    
+    
+    /* dont try this if we are not onscreen */
+    va = @call self::MSG_VIS_GET_ATTRS();
+    if (! (va&VA_REALIZED))
+    {
+	return;
+    }
+
+
+    /* Compensate for lines not shown. If the line we want to display
+     * is not in the text, then force user to select continue or stop. */
+    lineNum = @call self::MSG_ET_CONVERT_CODE_LINE_TO_TEXT_LINE(lineNum);
+    if ((lineNum < 0) ||
+	(lineNum > @call self::MSG_ET_GET_NUM_LINES_DISPLAYED()))
+    {
+	@call SingleStepTrigger::MSG_GEN_SET_NOT_ENABLED(VUM_DVAQ);
+	@call ProcStepTrigger::MSG_GEN_SET_NOT_ENABLED(VUM_DVAQ);
+	return;	
+    }
+    
+
+    temp = @call self::MSG_VIS_TEXT_GET_USER_MODIFIED_STATE();
+
+    /* Orient ourselves */
+
+    if (lineNum < 0) {
+	@call self::MSG_ET_GET_CURSOR_INFO(&start,&end,&line,&boff,&eoff);
+    }
+    else {
+	line = lineNum;
+	lineInfo.VTGLOAFP_line = line;
+	err = @call self::MSG_VIS_TEXT_GET_LINE_OFFSET_AND_FLAGS(&lineInfo);
+	if (err) {
+	    return;
+	}
+	boff = lineInfo.VTGLOAFP_offset;
+    }
+	/* Now check the status, so we can toggle effectively */
+
+    @call self::MSG_VIS_TEXT_GET_PARA_ATTR((VisTextGetAttrFlags)0,
+					   &diffs,&attrs,boff,boff);
+    
+        /* Clear the PC if it exists.. unless it's at line */
+
+    @call self::MSG_ET_CLEAR_PC(line);
+
+    /* Get the attributes of each style */
+
+    han = OptrToHandle(pself->ETI_breakAttrs);
+    ObjLockObjBlock(han);
+    ptr   = LMemDeref(pself->ETI_breakAttrs);
+    brk = *ptr;
+    MemUnlock(han);
+
+    
+    han = OptrToHandle(pself->ETI_pcAttrs);
+    ObjLockObjBlock(han);
+    ptr   = LMemDeref(pself->ETI_pcAttrs);
+    pc = *ptr;
+    MemUnlock(han);
+
+
+    han = OptrToHandle(pself->ETI_breakPcAttrs);
+    ObjLockObjBlock(han);
+    ptr   = LMemDeref(pself->ETI_breakPcAttrs);
+    brkPc = *ptr;
+    MemUnlock(han);
+
+    def.SPA_bgColor.CQ_redOrIndex = C_WHITE;
+    def.SPA_bgColor.CQ_info = CF_INDEX;
+    def.SPA_bgColor.CQ_green = 0;
+    def.SPA_bgColor.CQ_blue = 0;
+    
+
+    if (SimpEqual(&attrs.VTMPA_paraAttr, &brk)) {
+	@call self::MSG_ET_UPDATE_LINE(brkPc, line);
+    }
+    
+    else if (SimpEqual(&attrs.VTMPA_paraAttr, &def)) {
+	@call self::MSG_ET_UPDATE_LINE(pc, line);
+    }
+
+    if (temp)
+	@call self::MSG_VIS_TEXT_SET_USER_MODIFIED();
+    else
+	@call self::MSG_VIS_TEXT_SET_NOT_USER_MODIFIED();
+
+}
+
+
+
+@method EditorTextClass, MSG_META_KBD_CHAR
+{
+    dword start,end,line,boff,eoff;
+
+    SimpleParaAttr def;
+/*    char				  currentLine[120];*/
+    TextReference			   reference;
+    VisTextRange  			   range;
+    VisTextGetLineOffsetAndFlagsParameters lineInfo;
+#define LINEBUF_LEN 20
+    TCHAR	buffer[LINEBUF_LEN];
+    int 	func = -1, ln;
+
+    ByteFlags 	fstate = flags & 0x00FF;
+    ByteFlags	ss = flags >> 8;
+
+
+    /* Call helper routine to see if adding this character
+     * would make the routine too long.
+     */
+    if (@call self::MSG_ET_PREVENT_LONG_ROUTINES(character, ss))
+    {
+	return;
+    }
+
+    dirty = TRUE;
+
+    /* Is this a key press event? */
+    if (!((flags & CF_REPEAT_PRESS) || (flags & CF_RELEASE)))
+    {
+	pself = ObjDerefGen(oself);
+
+	def.SPA_bgColor.CQ_redOrIndex = C_WHITE;
+	def.SPA_bgColor.CQ_info = CF_INDEX;
+	def.SPA_bgColor.CQ_green = 0;
+	def.SPA_bgColor.CQ_blue = 0;
+
+	if ((ln = @call self::MSG_ET_GET_ERROR_LINE()) >= 0) 
+	{
+	    @call self::MSG_ET_SET_ERROR_LINE(-1);
+	    @call self::MSG_ET_UPDATE_LINE(def,ln);
+	}
+
+#ifdef DO_DBCS
+	if (character == C_SYS_ENTER)
+#else
+	if (character == (word)((CS_CONTROL << 8) | VC_CTRL_M)) 
+#endif
+	{
+	    VisTextInstance* vself;
+	    TCHAR*		text;
+	    /* User pressed RETURN. Keep track of this and
+	       reset the next line after modification is complete.
+	       We do this so breakpoint lines and execution lines
+	       don't continue on to extra lines.
+	       Will need to do this when cut/paste are added...
+	       */
+@ifndef AUTO_INDENT
+	    @callsuper();
+@endif
+
+	    /* When can we be !Editable but still get key events? */
+	    if (!(@call self::MSG_VIS_TEXT_GET_STATE() & VTS_EDITABLE))
+		return;
+		    
+	    /* start,end-sel range. line-line tok. boff,eoff-line range */
+	    @call self::MSG_ET_GET_CURSOR_INFO(&start,&end,&line,&boff,&eoff);
+@ifdef AUTO_INDENT
+	    /* Copy initial chars of line, leaving room for a CR and NULL
+	     * strncpy won't null-terminate if src string is too long :-P
+	     */
+	    vself = ObjDerefVis(oself);
+	    text = LMemDerefHandles(OptrToHandle(oself), vself->VTI_text);
+	    buffer[0] = C_CR;
+	    strncpy(buffer+1, text+boff, LINEBUF_LEN-1); /* -1 for CR */
+	    buffer[LINEBUF_LEN-1] = C_NULL; /* -1 because 0-based */
+
+	    /* Null-terminate after all the whitespace and insert */
+	    text = buffer+1;
+	    while (*text && (*text == C_SPACE || *text == C_TAB)) {
+		text++;
+	    }
+	    *text = C_NULL;
+	    @call self::MSG_VIS_TEXT_REPLACE_SELECTION_PTR((char *) buffer, 0);
+@endif
+	    @call self::MSG_ET_UPDATE_LINE(def,line);
+	    return;
+	}
+    }
+
+    /*
+     * Handle ctrl-chars here
+     */
+    if (!(ss & (SS_LCTRL |SS_RCTRL)) || !(fstate & (CF_FIRST_PRESS | CF_REPEAT_PRESS) ) ) goto afterCtrl;
+    
+
+    /*
+     * If this is a control-a, then change to a HOME
+     */
+    switch (character) 
+    {
+
+    case 'a':
+	func = VTKF_START_OF_LINE;
+	break;
+
+    case 'b':
+	func = VTKF_BACKWARD_CHAR;
+	break;
+
+    case 'd':
+	func = VTKF_DELETE_CHAR;
+	break;
+
+    case 'e':
+	func = VTKF_END_OF_LINE;
+	break;
+
+    case 'f':
+	func = VTKF_FORWARD_CHAR;
+	break;
+
+    case 'j':
+    {
+@ifdef AUTO_INDENT
+	VisTextInstance* vself;
+	TCHAR*		text;
+
+	if (!(@call self::MSG_VIS_TEXT_GET_STATE() & VTS_EDITABLE)) return;
+
+	/* Indent the same way the current line indents */
+	/* start,end - sel range. line - line token. boff,eoff - line range */
+	@call self::MSG_ET_GET_CURSOR_INFO(&start,&end,&line,&boff,&eoff);
+
+	/* Copy initial chars of line, leaving room for a CR and NULL
+	 * strncpy won't null-terminate if src string is too long :-P
+	 */
+	vself = ObjDerefVis(oself);
+	text = LMemDerefHandles(OptrToHandle(oself), vself->VTI_text);
+	buffer[0] = C_CR;
+	strncpy(buffer+1, text+boff, LINEBUF_LEN-1); /* -1 because of CR */
+	buffer[LINEBUF_LEN-1] = C_NULL;		     /* -1 because 0-based */
+
+	/* Null-terminate after all the whitespace and insert */
+	text = buffer+1;
+	while (*text && (*text == C_SPACE || *text == C_TAB)) {
+	    text++;
+	}
+	*text = C_NULL;
+	@call self::MSG_VIS_TEXT_REPLACE_SELECTION_PTR((char *) buffer, 0);
+	@call self::MSG_ET_UPDATE_LINE(def,line);
+	return;
+@else
+	@call	self::MSG_ET_ADD_NEW_ROUTINE(0);
+	return;
+@endif
+    }
+
+    case 'k':
+	func = VTKF_DELETE_LINE;
+	break;
+
+    case 'n':
+	func = VTKF_FORWARD_LINE;
+	break;
+
+    case 'o':
+	@call self::MSG_ET_UPDATE_CODE_IF_NECESSARY(TRUE);
+	return;
+    case 'p':
+	func = VTKF_BACKWARD_LINE;
+	break;
+    }
+afterCtrl:    
+    if (func != -1) {
+	@call self::MSG_VIS_TEXT_DO_KEY_FUNCTION(func,0);
+    } else {
+    	@callsuper();
+    }
+    
+}
+
+
+
+
+/***********************************************************************
+ *		MSG_ET_PREVENT_LONG_ROUTINES for EditorTextClass
+ ***********************************************************************
+ * SYNOPSIS:	Helper routine, called by MSG_META_KDB_CHAR, to
+ *		determine if we should allow the user to add another
+ *		line to the routine being edited.  Since routines
+ *		with more than ETI_numLinesDisplayed may not be edited
+ *		we want to prevent creation of long routines.  If
+ *		we allowed them, then the user could cause a compile-
+ *		time error and be unable to fix it with the editor.
+ *
+ * PARAMETERS:	Boolean (word character, ShiftState shiftState);
+ *		Returns TRUE if routine would be too long if the
+ *		passed character were added.
+ * SIDE EFFECTS:
+ *
+ * STRATEGY:
+ *		If character is "enter" and we are our would
+ *		   be pushed over the limit by adding a line
+ *		   then return TRUE
+ *		else if character might delete a line, force
+ *		   self to recompute limit on next character
+ *		return FALSE
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	jmagasin 10/25/96   	Initial Revision
+ *
+ ***********************************************************************/
+@method EditorTextClass, MSG_ET_PREVENT_LONG_ROUTINES
+{
+
+    /*
+     * Make sure it's okay to add a new line.
+     */
+#ifdef DO_DBCS
+    if (character == C_SYS_ENTER)
+#else
+    if (character == (word)((CS_CONTROL << 8) | VC_CTRL_M)) 
+#endif
+    {
+	if (pself->ETI_showingLongRoutine) 
+	{
+	    return TRUE; /* We're already sure the code is too long. */
+	}
+	else
+	{
+	    /* We're not supposed to use VIS_TEXT_GET_LINE_HEIGHT; but
+	     * all our lines are the same height and use the default
+	     * gstate so it will work.
+	     */
+	    word textWidth, textHeightForWidth;
+	    word textLineHeight, numLines;
+
+	    textWidth = (word) (@call self::MSG_VIS_GET_SIZE()) & 0x0000FFFF;
+	    textHeightForWidth =
+		@call self::MSG_VIS_TEXT_CALC_HEIGHT(textWidth, 0);
+	    textLineHeight = @call self::MSG_VIS_TEXT_GET_LINE_HEIGHT();
+	    numLines = textHeightForWidth / textLineHeight;
+	    if (numLines >= @call self::MSG_ET_GET_NUM_LINES_DISPLAYED())
+	    {
+		pself = ObjDerefGen(oself);
+		pself->ETI_showingLongRoutine = 0xFF;
+		return TRUE;	/* We're at our maximum. */
+	    }
+	}
+    }
+
+    /* If backspace, delete, or a control-d was hit, then
+     * a line *might* have been deleted.  Force ourself to recompute
+     * the number of lines on the next key press.
+     */
+#ifdef DO_DBCS
+    else if (character == C_SYS_BACKSPACE ||
+             character == C_SYS_DELETE ||
+	     shiftState & (SS_LCTRL | SS_RCTRL))
+#else
+    else if (character == (word)((CS_CONTROL << 8) | VC_BACKSPACE) ||
+             character == (word)((CS_CONTROL << 8) | VC_DEL) ||
+	     ((shiftState & (SS_LCTRL | SS_RCTRL)) && (character == 'd')))
+#endif
+    {
+	pself = ObjDerefGen(oself);
+        pself->ETI_showingLongRoutine = 0;
+    }
+
+    return FALSE;
+
+}	/* End of MSG_ET_PREVENT_LONG_ROUTINES.	*/
+
+
+
+/*********************************************************************
+ *			GetCursorInfo
+ *********************************************************************
+ * SYNOPSIS:	Grab a bunch of info about the current line
+ * CALLED BY:	
+ * PASS:
+ * RETURN:
+ * SIDE EFFECTS:
+ * STRATEGY:
+ * REVISION HISTORY:
+ *	Name	Date		Description			     
+ *	----	----		-----------			     
+ *	roy	9/17/94		Initial version			     
+ * 
+ *********************************************************************/
+
+@method EditorTextClass, MSG_ET_GET_CURSOR_INFO
+{
+
+
+    VisTextRange  			   range;
+    VisTextGetLineOffsetAndFlagsParameters lineInfo;
+
+    @call self::MSG_VIS_TEXT_GET_SELECTION_RANGE(&range);
+    *start = range.VTR_start;
+    *end   = range.VTR_end;
+    
+    *line = lineInfo.VTGLOAFP_line = 
+	@call self::MSG_VIS_TEXT_GET_LINE_FROM_OFFSET(range.VTR_start);
+
+    @call self::MSG_VIS_TEXT_GET_LINE_OFFSET_AND_FLAGS(&lineInfo);
+
+    *boff = lineInfo.VTGLOAFP_offset;
+
+    if (lineInfo.VTGLOAFP_flags & LF_ENDS_IN_NULL) {
+	*eoff = TEXT_ADDRESS_PAST_END;
+    }
+    else {
+	lineInfo.VTGLOAFP_line++;
+	@call self::MSG_VIS_TEXT_GET_LINE_OFFSET_AND_FLAGS(&lineInfo);
+	*eoff = lineInfo.VTGLOAFP_offset;
+    }
+}
+
+
+/*********************************************************************
+ *			IsBreakDirty
+ *********************************************************************
+ * SYNOPSIS:	Returns true iff new breakpoints have been set but
+ *              code has NOT been modified. Allows fast breakpoint
+ *              registration.
+ * CALLED BY:	
+ * PASS:
+ * RETURN:
+ * SIDE EFFECTS: MAKES CLEAN!
+ * STRATEGY:
+ * REVISION HISTORY:
+ *	Name	Date		Description			     
+ *	----	----		-----------			     
+ *	roy	10/19/94		Initial version			     
+ * 
+ *********************************************************************/
+@if 0
+@method EditorTextClass, MSG_ET_IS_BREAK_DIRTY 
+{
+    if (pself->ETI_dirty && 
+	!@call self::MSG_VIS_TEXT_GET_USER_MODIFIED_STATE()) 
+    {
+	pself = ObjDerefGen(oself);
+	pself->ETI_dirty = 0;
+        return 1;
+
+    }
+    return 0;
+}
+@endif
+/*********************************************************************
+ *			BreakDirty
+ *********************************************************************
+ * SYNOPSIS:	Set dirty for breakpoints
+ * CALLED BY:	
+ * PASS:
+ * RETURN:
+ * SIDE EFFECTS:
+ * STRATEGY:
+ * REVISION HISTORY:
+ *	Name	Date		Description			     
+ *	----	----		-----------			     
+ *	roy	10/19/94		Initial version			     
+ * 
+ *********************************************************************/
+@if 0
+@method EditorTextClass, MSG_ET_BREAK_DIRTY 
+{
+    pself->ETI_dirty = 1;
+}
+@endif
+
+
+
+
+/*********************************************************************
+ *			InstallBreakpoint
+ *********************************************************************
+ * SYNOPSIS:	install a breakpoint
+ * CALLED BY:	GLOBAL
+ * PASS:    	funcNumber  (function number)
+ *	    	codeOffset  (index into code array)
+ *	    	line number
+ *
+ * RETURN:
+ * SIDE EFFECTS:
+ * STRATEGY:
+ *		Note that lineNumber is relative to the first line
+ *		displayed.
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description			     
+ *	----	----		-----------			     
+ *	jimmy	 4/ 6/95	Initial version			     
+ * 
+ *********************************************************************/
+void
+InstallBreakpoint(int funcNumber, word codeOffset, int lineNumber)
+{
+    DebugStatus    lineStatus;
+    MemHandle      bugHandle;
+
+
+    lineStatus = @call Editor::MSG_ET_GET_LINE_STATUS(lineNumber);
+
+    lineNumber = @call Editor::
+	MSG_ET_CONVERT_TEXT_LINE_TO_CODE_LINE(lineNumber);
+
+    EditSetLineDebugStatus(bascoTask, codeOffset, lineNumber, lineStatus);
+
+    bugHandle = BascoBugGetBugHandleFromCTask(bascoTask);
+
+    if ((byte)lineStatus == DBG_BREAK ||
+	(byte)lineStatus == DBG_BREAK_AND_PC) 
+    {
+	if ((word)myPort != GIGS_NONE) {
+	    BascoBugSetBreakAtOffset(REMOTE_CONNECTION_ID |
+				     ((myPort >> 1) + 1),
+				     funcNumber,
+				     BugLineNumToOffset(bugHandle,
+							funcNumber,
+							lineNumber),
+				     lineNumber,
+				     BBF_NORMAL);
+	} else {
+	    BugSetBreakAtLine(bugHandle, funcNumber, lineNumber);
+	}
+    } else {
+	if ((word)myPort != GIGS_NONE) {
+	    BascoBugClearBreakAtOffset(REMOTE_CONNECTION_ID |
+				       ((myPort >> 1) + 1),
+				       funcNumber,
+				       BugLineNumToOffset(bugHandle,
+							  funcNumber,
+							  lineNumber));
+	} else {
+	    BugClearBreakAtLine(bugHandle, funcNumber, lineNumber);
+	}
+    }
+}	
+
+
+/*********************************************************************
+ *			DeleteRoutine
+ *********************************************************************
+ * SYNOPSIS:	get rid of a routine
+ * CALLED BY:	MSG_ET_DELETE_ROUTINE
+ * PASS:    	nothing
+ * RETURN:
+ * SIDE EFFECTS:
+ * STRATEGY:
+ * REVISION HISTORY:
+ *	Name	Date		Description			     
+ *	----	----		-----------			     
+ *	jimmy	9/11/95	Initial version
+ * 
+ *********************************************************************/
+@method EditorTextClass, MSG_ET_DELETE_ROUTINE
+{
+    word	funcNumber;
+
+    funcNumber = @call RoutineList::MSG_GEN_ITEM_GROUP_GET_SELECTION();\
+
+    /* do nothing if no routine is selected
+     * and do not allow deletion of the TopLevel routine
+     */
+    
+    if ((funcNumber == GIGS_NONE || funcNumber == 0) && 
+	(@call BuilderShell::MSG_BS_GET_MODE() == BSM_NORMAL)) {
+	return;
+    }
+
+    /* adjust function number to account for hidden routines */
+    funcNumber += @call RoutineList::MSG_RL_GET_NUM_HIDDEN();
+
+    if (BascoDeleteRoutine(bascoTask, funcNumber) == FALSE)
+    {
+	/* report any error, like references to the deleted function */
+	GandalfCompileError(bascoTask);
+    }
+    else
+    {
+	/* clear out code for routine from the editor*/
+	@call self::MSG_ET_CLEAR_EDITOR();
+	/* now update the list */
+	@call RoutineList::MSG_GEN_DYNAMIC_LIST_INITIALIZE(EditGetNumRoutines(bascoTask));
+    }
+
+    if (@call BuilderShell::MSG_BS_GET_MODE() == BSM_AGGREGATE)
+    {
+	/* User might have deleted a get/set property message; if so,
+	 * the invisible Agg_SetProperty message will need to be regenerated.
+	 * Not a big deal, as we're recompiling everything anyway
+	 */
+	@call BuilderShell::MSG_BS_GENERATE_UI_CODE(BDF_COMPLEX, FALSE);
+    }
+}
+
+/*********************************************************************
+ *		MSG_ET_ADD_NEW_ROUTINE for EditorTextClass
+ *********************************************************************
+ * SYNOPSIS:	Download code if necessary, clear editor,
+ *              and add function outline.
+ * CALLED BY:	
+ * PASS:        int flag (sub or function)
+ * RETURN:      void
+ * SIDE EFFECTS:
+ * STRATEGY:
+ * REVISION HISTORY:
+ *	Name	Date		Description			     
+ *	----	----		-----------			     
+ *	roy	11/ 8/94	Initial version			     
+ * 
+ *********************************************************************/
+@method EditorTextClass, MSG_ET_ADD_NEW_ROUTINE
+{
+    byte	cursorIndex;
+    TCHAR*	s;
+
+    pself->ETI_showingLongRoutine = 0;
+    pself->ETI_firstLineVisible = 0;
+    @call self::MSG_VIS_TEXT_MODIFY_EDITABLE_SELECTABLE(VTS_EDITABLE,0);
+
+    if (flag) {
+	s = _TEXT("sub \r\rend sub");
+	cursorIndex = 4;
+    } else {
+	s = _TEXT("function \r\rend function");
+	cursorIndex = 9;
+    }
+    @call self::MSG_ET_ADD_NEW_ROUTINE_TEXT(s, cursorIndex, FALSE);
+}
+
+/***********************************************************************
+ *		MSG_ET_ADD_NEW_ROUTINE_TEXT for EditorTextClass
+ ***********************************************************************
+ * SYNOPSIS:	Add some text to the editor, optionally downloading it
+ *		to the compiler
+ * PARAMETERS:	TCHAR*	text
+ *		word	insertPoint	;; leave cursor here
+ *		Bool	sendToEditor	;; compile after inserting?
+ * SIDE EFFECTS:
+ *	If sendToEditor, sends code down to the compiler immediately;
+ *	otherwise code will only be sent if the user modifies it and
+ *	later causes a MSG_ET_UPDATE... to be sent.
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	dubois	10/26/95   	Initial Revision
+ *
+ ***********************************************************************/
+@method EditorTextClass, MSG_ET_ADD_NEW_ROUTINE_TEXT
+{
+    word	len;
+
+    if (@call self::MSG_ET_UPDATE_CODE_IF_NECESSARY(TRUE)) 
+    {
+	/* no good, hit an error, so stay in the same function */
+	return;
+    }
+    len = LocalStringLength((char *) text);
+    if (insertPoint > len) insertPoint = len;
+
+    @call self::MSG_META_SUSPEND();
+    @call self::MSG_ET_CLEAR_EDITOR();
+    @call self::MSG_VIS_TEXT_REPLACE_ALL_PTR((char *) text,len);
+    @call self::MSG_VIS_TEXT_SELECT_RANGE(insertPoint, insertPoint);
+    @call self::MSG_META_UNSUSPEND();
+    @call RoutineList::MSG_GEN_ITEM_GROUP_SET_NONE_SELECTED(FALSE);
+
+    if (sendToEditor) 
+    {
+	@call self::MSG_VIS_TEXT_SET_USER_MODIFIED();
+	@call self::MSG_ET_UPDATE_CODE_IF_NECESSARY(FALSE);
+    }
+    @send , forceQueue RoutineList::MSG_GEN_DYNAMIC_LIST_INITIALIZE(
+					   EditGetNumRoutines(bascoTask));
+    
+}	/* End of MSG_ET_ADD_NEW_ROUTINE_TEXT.	*/
+
+/*********************************************************************
+ *			EditorTextAddNewEventHandler
+ *********************************************************************
+ * SYNOPSIS:	Add the routine to deal with the an event.
+ *		Display event's parameters.
+ * CALLED BY:
+ * PASS:	BentEventTypicalDescriptionStruct *desc
+ *		optr	component
+ *		TCHAR	*defaultProto
+ *		TCHAR	*defaultClass
+ * RETURN:	nothing
+ * SIDE EFFECTS:
+ * STRATEGY:
+ * REVISION HISTORY:
+ *	Name	Date		Description			     
+ *	----	----		-----------			     
+ *	ron	 2/26/95	Initial version			     
+ * 
+ *********************************************************************/
+
+@method EditorTextClass, MSG_ET_ADD_NEW_EVENT_HANDLER
+{
+    int func =0;		/* 0 = sub, 1 = func */
+    TCHAR *ptr;
+    ComponentData data;
+    TCHAR buffer[80];
+    int count;
+    LegosType retType;
+
+    pself->ETI_showingLongRoutine = 0;
+    pself->ETI_firstLineVisible = 0;
+    @call self::MSG_VIS_TEXT_MODIFY_EDITABLE_SELECTABLE(VTS_EDITABLE,0);
+    
+    
+    @call BuilderApp::MSG_GEN_APPLICATION_MARK_BUSY();
+
+    if (@call self::MSG_ET_UPDATE_CODE_IF_NECESSARY(TRUE)) 
+    {
+	/* hit an error, so do nothing */
+	@call BuilderApp::MSG_GEN_APPLICATION_MARK_NOT_BUSY();
+	return;
+    }
+    @call self::MSG_META_SUSPEND();
+    @call self::MSG_ET_CLEAR_EDITOR();
+
+    pself = ObjDerefGen(oself);
+    pself->ETI_event = @call EventList::MSG_GEN_ITEM_GROUP_GET_SELECTION();
+
+    switch (desc->BETDS_desc.BEDS_returnType) 
+    {
+	case TYPE_VOID:
+	{
+	    ptr = _TEXT("sub ");
+	    break;
+	}
+	default:
+	{
+	    ptr = _TEXT("function ");
+	    retType = desc->BETDS_desc.BEDS_returnType;
+	    func = 1;
+	}
+    }
+    @call self::MSG_VIS_TEXT_APPEND_PTR((char *) ptr,0);
+    if (defaultProto == NULL) {
+	EC_ERROR_IF(component == NULL, -1);
+	data.CD_data.LD_fptr = buffer;
+	data.CD_type = TYPE_STRING;
+	@call component::MSG_ENT_GET_PROPERTY_EXTERNAL(&data,_TEXT("proto"));
+	@call self::MSG_VIS_TEXT_APPEND_PTR((char *) buffer,0);
+    } else {
+	@call self::MSG_VIS_TEXT_APPEND_PTR((char *) defaultProto,0);
+    }
+    @call self::MSG_VIS_TEXT_APPEND_PTR((char *) _TEXT("_"),0);
+    @call self::MSG_VIS_TEXT_APPEND_PTR((char *) desc->BETDS_desc.BEDS_eventName, 0);
+    @call self::MSG_VIS_TEXT_APPEND_PTR((char *) _TEXT("("),0);
+
+    @call self::MSG_VIS_TEXT_APPEND_PTR((char *) _TEXT("self as "),0);
+    if (defaultClass == (TCHAR *) NULL) {
+	EC_ERROR_IF(component == NULL, -1);
+	data.CD_data.LD_fptr = buffer;
+	data.CD_type = TYPE_STRING;
+	@call component::MSG_ENT_GET_PROPERTY_EXTERNAL(&data,_TEXT("class"));
+	@call self::MSG_VIS_TEXT_APPEND_PTR((char *) buffer,0);
+    } else {
+	@call self::MSG_VIS_TEXT_APPEND_PTR((char *) defaultClass,0);
+    }
+
+    for (count = 0;count < desc->BETDS_desc.BEDS_numArgs; count++)
+    {
+	@call self::MSG_VIS_TEXT_APPEND_PTR((char *) _TEXT(", "),0);
+	@call self::MSG_VIS_TEXT_APPEND_PTR((char *) desc->BETDS_args[count].BEADS_argName, 0);
+	switch (desc->BETDS_args[count].BEADS_argType)
+	{
+	case TYPE_INTEGER:
+	    ptr = _TEXT("integer");
+	    goto hasType;
+	case TYPE_STRING:
+	    ptr = _TEXT("string");
+	    goto hasType;
+	case TYPE_LONG:
+	    ptr = _TEXT("long");
+	    goto hasType;
+	case TYPE_FLOAT:
+	    ptr = _TEXT("float");
+	    goto hasType;
+	case TYPE_COMPONENT:
+	    ptr = _TEXT("component");
+	    goto hasType;
+	case TYPE_COMPLEX:
+	    ptr = _TEXT("complex");
+	    goto hasType;
+	case TYPE_ILLEGAL:
+	case TYPE_UNKNOWN:
+	case TYPE_ARRAY:	/* FIXME this nice little hack... */
+	    /* fallthrough */
+	default:
+	    ptr = _TEXT("");
+	    break;
+	hasType:
+	    @call self::MSG_VIS_TEXT_APPEND_PTR((char *) _TEXT(" as "),0);
+	    break;
+
+	}
+	@call self::MSG_VIS_TEXT_APPEND_PTR((char *) ptr,0);
+    }
+    /* If it is a function set the return type. */
+    if (func)
+    {
+	switch (retType)
+	{
+	default:
+	    ptr = _TEXT(")\r\r");
+	    break;
+
+	case TYPE_INTEGER:
+	    ptr = _TEXT("integer\r\r");
+	    goto hasType2;
+	    
+	case TYPE_STRING:
+	    ptr = _TEXT("string\r\r");
+	    goto hasType2;
+
+	case TYPE_COMPLEX:
+	    ptr = _TEXT("complex\r\r");
+	    /* fallthrough */
+	hasType2:
+	    @call self::MSG_VIS_TEXT_APPEND_PTR((char *) _TEXT(") as "), 0);
+	    break;
+	    
+	}
+	
+	@call self::MSG_VIS_TEXT_APPEND_PTR((char *) ptr, 0);
+    }
+    else
+    {
+	@call self::MSG_VIS_TEXT_APPEND_PTR((char *) _TEXT(")\r\r"),0);
+    }
+    
+    if (func) 
+    {
+	ptr = _TEXT("end function");
+    } else 
+    {
+	ptr = _TEXT("end sub");
+    }
+    @call self::MSG_VIS_TEXT_APPEND_PTR((char *) ptr,0);
+
+    @call self::MSG_META_UNSUSPEND();
+    @call BuilderApp::MSG_GEN_APPLICATION_MARK_NOT_BUSY();
+}
+
+/*********************************************************************
+ *			MetaStartSelect
+ *********************************************************************
+ * SYNOPSIS:	Intercept Select Mouse clicks. If we are in debug
+ *              mode (non editable), we simply toggle a breakpoint.
+ * CALLED BY:	UI
+ * PASS:
+ * RETURN:
+ * SIDE EFFECTS:
+ * STRATEGY:
+ * REVISION HISTORY:
+ *	Name	Date		Description			     
+ *	----	----		-----------			     
+ *	roy	11/17/94		Initial version			     
+ * 
+ *********************************************************************/
+@method EditorTextClass, MSG_META_START_SELECT {
+    @callsuper();
+
+    if (! (@call self::MSG_VIS_TEXT_GET_STATE() & VTS_EDITABLE)
+	&& @call BreakTrigger::MSG_GEN_GET_ENABLED())
+    {
+	@call self::MSG_ET_TOGGLE_BREAKPOINT(-1,1);
+    }
+}
+
+/*********************************************************************
+ *			GetErrorLine
+ *********************************************************************
+ * SYNOPSIS:	Return the editor's error line status
+ * CALLED BY:	
+ * PASS:        nothing
+ * RETURN:      return valid line number or -1
+ * SIDE EFFECTS:
+ * STRATEGY:
+ * REVISION HISTORY:
+ *	Name	Date		Description			     
+ *	----	----		-----------			     
+ *	roy	 3/ 1/95	Initial version			     
+ * 
+ *********************************************************************/
+@method EditorTextClass, MSG_ET_GET_ERROR_LINE {
+    
+    return pself->ETI_errorLine;
+}
+
+
+/*********************************************************************
+ *			VisTextShowSelection
+ *********************************************************************
+ * SYNOPSIS:	Intercept MSG_VIS_TEXT_SHOW_SELECTION and call
+ *              vistext's handler.
+ * CALLED BY:	
+ * PASS:
+ * RETURN:
+ * SIDE EFFECTS:
+ * STRATEGY:
+ * REVISION HISTORY:
+ *	Name	Date		Description			     
+ *	----	----		-----------			     
+ *	roy	 3/ 3/95	Initial version			     
+ * 
+ *********************************************************************/
+@extern method ETVisTextShowSelection, EditorTextClass, MSG_VIS_TEXT_SHOW_SELECTION;
+#ifdef __HIGHC__
+pragma Alias(ETVisTextShowSelection, "ETVISTEXTSHOWSELECTION");
+#endif
+
+
+/***********************************************************************
+ *		MSG_ET_PROPERTY_CHANGED for EditorTextClass
+ ***********************************************************************
+ * SYNOPSIS:	    A change has occurred in the aggregate property box
+ * 		    that we must know about
+ * PARAMETERS:	    same as MSG_ENT_DO_ACTION
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	dloft	8/25/95   	Initial Revision
+ *
+ ***********************************************************************/
+@method EditorTextClass, MSG_ET_AGG_PROPERTY_CHANGED
+{
+    EC_ERROR_IF(argv[0].CD_type != TYPE_STRING, -1);
+    EC_ERROR_IF(argv[1].CD_type != TYPE_STRING, -1);
+}	/* End of MSG_ET_PROPERTY_CHANGED.	*/
+
+
+/***********************************************************************
+ *		MSG_ET_NEW_AGG_PROPERTY for EditorTextClass
+ ***********************************************************************
+ * SYNOPSIS:	    A change has occurred in the aggregate property box
+ * 		    that we must know about
+ * PARAMETERS:	    same as MSG_ENT_DO_ACTION.  We expect that
+ *		    argc = 2, and that the arguments are the name of
+ *		    the aggregate and the name of the new property.
+ * BUGS:
+ *		FIXME -- should take a third parameter, the type of the
+ *		property, to use as the type of the value parameter.
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	dloft	8/25/95   	Initial Revision
+ *
+ ***********************************************************************/
+#define TEMP_MAX 60
+@method EditorTextClass, MSG_ET_NEW_AGG_PROPERTY
+{
+    BentEventTypicalDescriptionStruct eventDesc;
+    TCHAR *aggname, *propname;
+    TCHAR protoString[TEMP_MAX]; /* FIXME */
+    TCHAR structString[TEMP_MAX]; /* FIXME */
+
+    EC_ERROR_IF((argv[0].CD_type != TYPE_STRING), -1);
+    EC_ERROR_IF((argv[1].CD_type != TYPE_STRING), -1);
+
+    if ((argv[0].CD_type != TYPE_STRING) || (argv[1].CD_type != TYPE_STRING))
+	return;
+
+    RunHeapLock(rhi, argv[0].CD_data.LD_string, (void **) &aggname);
+    RunHeapLock(rhi, argv[1].CD_data.LD_string, (void **) &propname);
+
+    /* sub aggnameSet_propname(self as STRUCT aggname, value) */
+
+    strncpy(eventDesc.BETDS_desc.BEDS_eventName, propname, 
+	    sizeof(eventDesc.BETDS_desc.BEDS_eventName));
+    eventDesc.BETDS_desc.BEDS_numArgs = 1;
+    eventDesc.BETDS_desc.BEDS_returnType = TYPE_ILLEGAL;
+    eventDesc.BETDS_desc.BEDS_enabled = 1;
+    strcpy(eventDesc.BETDS_args[0].BEADS_argName, _TEXT("value"));
+    eventDesc.BETDS_args[0].BEADS_argType = TYPE_UNKNOWN;
+
+				/* FIXME */
+    sprintf(protoString, _TEXT("%sSet_%s"), aggname, propname);
+    EC_ERROR_IF((strlen(protoString) > TEMP_MAX), -1);	/* trashed memory */
+
+    /* Check if the routine already exists in the builder (this really
+     * should be done by the MSG_ET_ADD_NEW_EVENT_HANDLER code, but...)
+     */
+    if (EditGetRoutineIndex(bascoTask, protoString) == -1) {
+
+	sprintf(structString, _TEXT("STRUCT %s"), aggname);
+	sprintf(protoString, _TEXT("%sSet"), aggname);
+
+	@call self::MSG_ET_ADD_NEW_EVENT_HANDLER(&eventDesc, (optr) NULL, 
+						 protoString, structString);
+	/* We'll be adding another routine in a bit; make sure this
+	 * one gets into the compiler
+	 */
+	@call self::MSG_ET_DOWNLOAD_CODE(FALSE);
+    }
+
+    aggname = RunHeapDeref(rhi, argv[0].CD_data.LD_string);
+    propname = RunHeapDeref(rhi, argv[1].CD_data.LD_string);
+
+    /* function aggnameGet_propname(self as STRUCT aggname) */
+
+    eventDesc.BETDS_desc.BEDS_numArgs = 0;
+    eventDesc.BETDS_desc.BEDS_returnType = TYPE_UNKNOWN; /* hack */
+    eventDesc.BETDS_desc.BEDS_enabled = 1;
+
+    sprintf(protoString, _TEXT("%sGet_%s"), aggname, propname);
+    EC_ERROR_IF((strlen(protoString) > TEMP_MAX), -1);	/* trashed memory */
+
+
+    if (EditGetRoutineIndex(bascoTask, protoString) == -1) {
+	sprintf(protoString, _TEXT("%sGet"), aggname);
+
+	@call self::MSG_ET_ADD_NEW_EVENT_HANDLER(&eventDesc, (optr) NULL, 
+						 protoString, structString);
+	@call self::MSG_ET_DOWNLOAD_CODE(FALSE);
+    }
+	
+    RunHeapUnlock(rhi, argv[0].CD_data.LD_string);
+    RunHeapUnlock(rhi, argv[1].CD_data.LD_string);
+	
+    /*
+     * I hate to do this... we need to make sure that the new property
+     * (i.e. structure field) gets compiled, so that if someone references
+     * it in a routine the compiler doesn't bitch about unknown structure
+     * field.  The only way to do this is to mark the UI dirty so that the
+     * duplo_ui routine gets rebuilt... sigh...
+     * We also need to download the code (without compiling for now) to
+     * ensure that it doesn't get lost if the user does something weird.
+     */
+    @call BuilderInterpreter::MSG_BENT_MANAGER_SET_FLAGS(BF_UI_DIRTY, 0);
+}
+
+
+
+/***********************************************************************
+ *		MSG_VIS_OPEN|CLOSE for EditorTextClass
+ ***********************************************************************
+ * SYNOPSIS:	deal with text editor becoming visible or invisible
+ * PARAMETERS:	
+ * SIDE EFFECTS:
+ *
+ * STRATEGY:	delete text and restore text to make sure the block
+ *	    	does keep growing
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	jimmy	11/21/95   	Initial Revision
+ *
+ ***********************************************************************/
+@method EditorTextClass, MSG_VIS_CLOSE
+{
+    /* for some reason, if we don't do this, the object block grows
+     * and grows, as if it was drinking milk...
+     */
+
+    if (@call self::MSG_VIS_TEXT_GET_USER_MODIFIED_STATE()) 
+    {
+	pself->ETI_dirty = TRUE;
+	/* save out the code */
+	@call self::MSG_ET_DOWNLOAD_CODE(FALSE);
+    } else {
+	pself->ETI_dirty = FALSE;
+    }
+    @call self::MSG_VIS_TEXT_DELETE_ALL();
+    @callsuper();
+}	/* End of MSG_SPEC_UNBUILD.	*/
+
+@method EditorTextClass, MSG_VIS_OPEN
+{
+    int	    cf, num;
+
+    @callsuper();
+
+    /* restore text when editor becomes visible again */
+    pself = ObjDerefGen(oself);
+
+    if (viewTask == NullHandle) return;
+
+    /* make sure its not a hidden function (or the default 0) */
+    if  (pself->ETI_funcNumber >= @call RoutineList::MSG_RL_GET_NUM_HIDDEN())
+    {
+	@call self::MSG_ET_SHOW_ROUTINE_BY_INDEX(pself->ETI_funcNumber);
+	/* update PC and current line indicator if the function is
+	 * active
+	 */
+	cf = BascoBugGetCurrentFrame(GandalfGetMainTask());
+	if (cf >= 0) 
+	{
+	    num = BascoBugGetFrameLineNumber
+		(GandalfGetMainTask(), bascoTask, cf);
+	    @call Editor::MSG_ET_SET_PC(num,0);
+	    @call Editor::MSG_ET_SET_CURSOR_AT_LINE(num);
+	}
+	
+	pself = ObjDerefGen(oself);
+	if (pself->ETI_dirty) {
+	    @call self::MSG_VIS_TEXT_SET_USER_MODIFIED();
+	}
+    }
+    else
+    {
+	if (pself->ETI_funcNumber == -1 && pself->ETI_event != -1)
+	{
+	    @call EventList::MSG_EVENT_LIST_APPLY_MSG(pself->ETI_event, 1, 0);
+	}
+    }
+}
+
+
+
+
+/***********************************************************************
+ *		MSG_ET_GET_FUNC_NUMBER for EditorTextClass
+ ***********************************************************************
+ * SYNOPSIS:	return function number of function being displayed
+ * PARAMETERS:	
+ * SIDE EFFECTS:
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	jimmy	12/ 4/95   	Initial Revision
+ *
+ ***********************************************************************/
+@method EditorTextClass, MSG_ET_GET_FUNC_NUMBER
+{
+    return pself->ETI_funcNumber;
+}	/* End of MSG_ET_GET_FUNC_NUMBER.	*/
+
+
+
+/***********************************************************************
+ *		MSG_ET_GET_NUM_LINES_DISPLAYED for EditorTextClass
+ ***********************************************************************
+ * SYNOPSIS:	Get the number of lines the editor will show.
+ *		This value is specified in the ini file under
+ *		the category, "gandalf", and key, "numLinesDisplayed"
+ * PARAMETERS:	int (void)
+ * SIDE EFFECTS:
+ *
+ * STRATEGY:	
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	jmagasin 10/22/96   	Initial Revision
+ *
+ ***********************************************************************/
+@method EditorTextClass, MSG_ET_GET_NUM_LINES_DISPLAYED
+{
+    word   numLinesDisplayed;
+
+    numLinesDisplayed = pself->ETI_numLinesDisplayed;
+    if (numLinesDisplayed == 0) {
+	if (InitFileReadInteger(GANDALF_CATEGORY,
+				NUM_LINES_DISPLAYED_KEY,
+				&numLinesDisplayed)) {
+	    numLinesDisplayed = DEFAULT_NUM_LINES_DISPLAYED;
+	}
+	if (numLinesDisplayed < 0) 
+	{
+	    numLinesDisplayed = DEFAULT_NUM_LINES_DISPLAYED;
+	}
+	pself->ETI_numLinesDisplayed = numLinesDisplayed;
+    }
+
+    return (int)numLinesDisplayed;
+    
+}	/* End of MSG_ET_GET_NUM_LINES_DISPLAYED.	*/
+
+
+
+/***********************************************************************
+ * 	MSG_ET_CONVERT_TEXT_LINE_TO_CODE_LINE for EditorTextClass
+ ***********************************************************************
+ * SYNOPSIS:	Convert the passed line, relative to the portion of
+ *		routine displayed, to an absolute line (i.e., line in
+ *		the complete routine).
+ * PARAMETERS:	int (int tLine)
+ * SIDE EFFECTS:
+ *
+ * STRATEGY:	
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	jmagasin 10/28/96   	Initial Revision
+ *
+ ***********************************************************************/
+@method EditorTextClass, MSG_ET_CONVERT_TEXT_LINE_TO_CODE_LINE
+{
+    EC_ERROR_IF(tLine < 0, -1);
+    return tLine + pself->ETI_firstLineVisible;
+    
+}	/* End of MSG_ET_CONVERT_TEXT_LINE_TO_CODE_LINE.	*/
+
+
+
+/***********************************************************************
+ * 	MSG_ET_CONVERT_CODE_LINE_TO_TEXT_LINE for EditorTextClass
+ ***********************************************************************
+ * SYNOPSIS:	Convert the passed, absolute line so that it is
+ *		relative to that portion of the routine actually
+ *		displayed.
+ * PARAMETERS:	int (int cLine)
+ * SIDE EFFECTS:
+ *
+ * STRATEGY:	
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	jmagasin 10/28/96   	Initial Revision
+ *
+ ***********************************************************************/
+@method EditorTextClass, MSG_ET_CONVERT_CODE_LINE_TO_TEXT_LINE
+{
+    if (cLine < 0) 
+    {
+	return cLine;
+    }
+    else
+    {
+	EC_ERROR_IF(pself->ETI_firstLineVisible < 0, -1);
+	EC_WARNING_IF(pself->ETI_firstLineVisible > cLine, -1);
+	return cLine - pself->ETI_firstLineVisible;
+    }
+    
+}	/* End of MSG_ET_CONVERT_CODE_LINE_TO_TEXT_LINE.	*/
+
+
+
+/*********************************************************************
+ *			AddEditorVarData
+ *********************************************************************
+ * SYNOPSIS:	add some var data to the editor
+ * CALLED BY:	
+ * PASS:
+ * RETURN:
+ * SIDE EFFECTS:
+ * STRATEGY:
+ * REVISION HISTORY:
+ *	Name	Date		Description			     
+ *	----	----		-----------			     
+ *	jimmy	9/ 9/96  	Initial version
+ * 
+ *********************************************************************/
+void
+AddEditorVarData(optr oself)
+{
+	XYValueAsDWord	pos;
+	SizeAsDWord	size;
+	SpecWinSizePair *attr;
+	VisAttrs    va;
+
+	va = @call oself::MSG_VIS_GET_ATTRS();
+	if (! (va & VA_REALIZED)) {
+	    return;
+	}
+	
+	pos = @call oself::MSG_VIS_GET_POSITION();
+	size = @call oself::MSG_VIS_GET_SIZE();
+	attr = ObjVarAddData(oself, HINT_SIZE_WINDOW_AS_RATIO_OF_FIELD,
+			     sizeof(SpecWinSizePair));
+	attr->SWSP_x = ~SWSS_RATIO & DWORD_WIDTH(size);
+	attr->SWSP_y = ~SWSS_RATIO & DWORD_HEIGHT(size);
+
+	attr = ObjVarAddData(oself, HINT_POSITION_WINDOW_AT_RATIO_OF_PARENT,
+			     sizeof(SpecWinSizePair));
+	attr->SWSP_x = ~SWSS_RATIO & DWORD_X(pos);
+	attr->SWSP_y = ~SWSS_RATIO & DWORD_Y(pos);
+}
+
+
+/***********************************************************************
+ *		MSG_GEN_INTERACTION_INITIATE for UpdatingGenInteractionClass
+ ***********************************************************************
+ * SYNOPSIS:	Make sure the editor's geometry is valid before it
+ *		comes up on screen.
+ * PARAMETERS:	
+ * SIDE EFFECTS:
+ *
+ * STRATEGY:
+ *
+ *		This is hack that seems to get around a bug.  I don't
+ *		really know why it is needed.
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	RON	4/15/96   	Initial Revision
+ *
+ ***********************************************************************/
+@method UpdatingGenInteractionClass, MSG_GEN_INTERACTION_INITIATE
+{
+    @call Editor::MSG_VIS_UPDATE_GEOMETRY();
+    @callsuper();
+}	/* End of MSG_GEN_INTERACTION_INITIATE.	*/
+
+
+/***********************************************************************
+ *		MSG_GEN_GUP_INTERACTION_COMMAND for UpdatingGenInteractionClass
+ ***********************************************************************
+ * SYNOPSIS:	Save the editor position when it closes.
+ * PARAMETERS:	InteractionCommand	command
+ * SIDE EFFECTS:
+ *
+ * STRATEGY:	
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	RON	5/28/96   	Initial Revision
+ *
+ ***********************************************************************/
+@method UpdatingGenInteractionClass, MSG_GEN_GUP_INTERACTION_COMMAND
+{
+    if (command == IC_DISMISS) 
+    {
+	AddEditorVarData(oself);
+    }
+    return @callsuper();
+}	/* End of MSG_GEN_GUP_INTERACTION_COMMAND.	*/
+
+

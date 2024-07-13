@@ -1,0 +1,147 @@
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+	Copyright (c) Geoworks 1994 -- All Rights Reserved
+
+PROJECT:	LEGOS
+MODULE:		Debugger
+
+FILE:		debugh.goh
+
+AUTHOR:		Roy Goldman, Sep 17, 1994
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	roy	9/17/94   	Initial version.
+
+DESCRIPTION:
+                Class descriptions for ui components specific
+		to the debugger.  Including:  Variable Charts,
+		Call Stack Lists, Variable Update Interactions...
+		(future:watch lists..., ???)
+		
+
+	$Id: debugh.goh,v 1.2 98/10/13 22:17:39 martin Exp $
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+
+@ifndef __DEBUGH_GOH
+@define __DEBUGH_GOH
+
+@include <stdapp.goh>
+
+#include <Legos/Internal/progtask.h>
+
+
+/* CLASS: Variable Chart:
+          Shows all variables in a scope and their values
+*/
+
+#define LAST_FRAME -2
+#define UNDEFINED_FRAME -3
+
+typedef enum {
+    CT_NORMAL,
+    CT_STRUCT,
+    CT_ARRAY,
+    CT_COMPONENT
+} ChartType;
+
+@class VarChartClass, GenDynamicListClass;
+
+/* Dynamic List query message for variable name & value*/
+@message (GEN_DYNAMIC_LIST_QUERY_MSG) MSG_VC_QUERY_VAR_CHART_MONIKER;
+
+/* Re-initialize a given scope */
+@message void MSG_VC_UPDATE_SCOPE(int frameNum);
+
+/* Action data, display a variable update interaction for selection */
+@message (GEN_ITEM_GROUP_APPLY_MSG) MSG_VC_SHOW_VARIABLE;
+
+@message void MSG_VC_SET_VAR_ITEM(word item);
+@message word MSG_VC_GET_VAR_ITEM() = ax;
+@message void MSG_VC_SET_DATA(dword element);
+@message dword MSG_VC_GET_DATA();
+@message void MSG_VC_SET_CHART_TYPE(ChartType ct);
+@message ChartType MSG_VC_GET_CHART_TYPE() = ax;
+@message MemHandle  MSG_VC_GET_PROP_MAP() = ax;
+@message void  MSG_VC_SET_PROP_MAP(MemHandle propMap);
+
+/* Provide a dummy object so we can use its segment
+   for storage of monikers, chart data */
+@instance optr VCI_dummy;
+@instance int VCI_frameNum = UNDEFINED_FRAME;
+
+/* When we send off a message to a variable update, we store the
+   destination here */
+
+@instance optr VCI_varDestination;
+
+/* These are private */
+@instance word VCI_selStatus;
+@instance word VCI_hackStack = 0;
+
+@instance word VCI_chartType = CT_NORMAL;
+@instance word VCI_varItem;
+@instance dword VCI_data;
+@instance MemHandle VCI_propMap;
+@endc
+
+
+/* CLASS: Variable Update Interaction:
+
+          Displayed when a user clicks on a variable within
+	  a VariableChart to change a string or a number*/
+
+@class VarUpdateInteractionClass, GenInteractionClass;
+
+/* Show the specific variable and cache frame,index */
+@message  void MSG_VUI_SHOW_VARIABLE_BY_INDEX(optr chart,
+					      int frame, int index,
+					      ChartType ct, int fieldIndex);
+
+/* Action message: update the cached <scope,index> with new
+   value in interaction */
+
+@message  void MSG_VUI_UPDATE_VARIABLE_BY_INDEX();
+
+
+/* Remember which scope, variable we're modifying */
+@instance int 	VUII_frame;
+@instance int 	VUII_index;
+@instance int 	VUII_sourceType;
+@instance int 	VUII_fieldIndex;
+@instance optr 	VUII_chart;
+@endc
+
+/* CLASS: Call Stack:
+
+          Shows a list of active routines
+*/
+
+@class CallStackListClass, GenDynamicListClass;
+
+/* Query function: Show routine name for given list index */
+@message (GEN_DYNAMIC_LIST_QUERY_MSG) MSG_CSL_QUERY_CALL_STACK_MONIKER;
+
+/* Tell internal interaction to display variables in an internal frame,
+   called when user clicks on a frame name */
+
+@message (GEN_ITEM_GROUP_APPLY_MSG) MSG_CSL_SHOW_INTERNAL_FRAME;
+
+/* Reset Call Stack */
+@message void MSG_CSL_UPDATE_CALL_STACK();
+
+@instance byte CSL_uiActive;
+@endc
+
+ProgTask *LockOrUnlockProgTaskForComponent(optr comp, Boolean lock);
+
+#define LockProgTaskForComponent(comp) LockOrUnlockProgTaskForComponent(comp,TRUE)
+#define UnlockProgTaskForComponent(comp) LockOrUnlockProgTaskForComponent(comp, FALSE)
+
+@endif
+
+
+
+

@@ -1,0 +1,890 @@
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+	Copyright (c) Geoworks 1994 -- All Rights Reserved
+
+PROJECT:	Legos
+MODULE:		Builder
+FILE:		mainsave.goc
+
+AUTHOR:		Martin Turon, Nov 16, 1994
+
+ROUTINES:
+	Name			Description
+	----			-----------
+    MTD MSG_BS_SAVE_FILE	Save a file....
+
+    MTD MSG_BS_GENERATE_UI_CODE	    Generate code for the UI currently
+				being built
+
+    INT BSGen_NormalCode	Generate and add routine(s) for a "normal"
+				file.
+
+    INT EmitComponents		Emit component descriptions
+
+    INT EmitStandardInclude	Emit "standard include" file
+
+    INT Emit(Struct/Header)Info	Helper routines to emit AggField array info
+				to a string.
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	martin	11/16/94   	Initial version.
+
+DESCRIPTION:
+	Code related to saving out proper LEGOS files.
+	Put any special pre-save build-time compilation 
+	(byte-compiling, code optimizing, etc) here.
+
+	$Id: mainsave.goc,v 1.2 98/10/13 22:18:47 martin Exp $
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+
+@include "gandalf.goh"
+@include "Main/mainshlh.goh"
+@include "Editor/editorh.goh"
+
+#include <Legos/Internal/progtask.h>
+#include <Legos/runheap.h>
+#include <Ansi/ctype.h>
+
+#include "main.h"
+
+/*- Global variables */
+BDescFlags	gCurUIFlags = 0;
+
+/* - Internal func decls */
+static TCHAR*	BSSave_SetupFilePath(SaveFileOptions sfo);
+
+static optr	BSGen_NormalCode(MemHandle task, BDescFlags flags);
+extern optr BSGen_AggregateCode(MemHandle, BDescFlags, Boolean, int*);
+optr EmitComponents(MemHandle task, BDescFlags flags, TCHAR *line,
+		    Boolean addDuploStart);
+
+Boolean	hack_compilingBCL = FALSE;
+static InteractionCommand BSCheckValidCompiledFilename(TCHAR *fname);
+extern RunHeapToken AggHasDefaultComp(void);
+
+/* - Other internal things */
+
+/* NOTE: we DO NOT want to use the _TEXT macro here as we are
+ * spitting out shift JIS for DBCS - jimmy
+ */
+#define spitOutCRLF(fh) FileWrite(fh, "\r\n",2,0)
+
+typedef enum
+{
+    SAVE_OK,
+    SAVE_FILE_ERROR,
+    SAVE_COMPILE_ERROR,
+    SAVE_CANCEL
+} GandalfSaveError;
+
+@extern chunk @EnableEvents;
+@extern chunk @DisableEvents;
+
+
+/***********************************************************************
+ *		MSG_BS_SAVE_CANCEL for BuilderShellClass
+ ***********************************************************************
+ * SYNOPSIS:	stop quitting procedure if started
+ * PARAMETERS:	
+ * SIDE EFFECTS:
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	jimmy	11/27/95   	Initial Revision
+ *
+ ***********************************************************************/
+@extern method BuilderShellClass, MSG_BS_SAVE_CANCEL
+{
+    /* Make sure the user didn't dork the SaveFileText and the
+     * fselpath.  we rely on on the text to implement "save", and
+     * restoring the text and not the path is kinda weird...
+     */
+    if (@call SaveTrigger::MSG_GEN_GET_ENABLED())
+    {
+	TCHAR*	end;
+	TCHAR	tmp;
+
+	end = strrchr(gCurFilePath, C_BACKSLASH);
+	/* Should never happen! */
+	EC_ERROR_IF(end == NULL, -1);
+	@call SaveFileText::MSG_VIS_TEXT_REPLACE_ALL_PTR
+	    ((TCHAR *) end+1, 0);
+	tmp = *end; *end = C_NULL;
+	@call SaveFileSelector::MSG_GEN_PATH_SET(gCurFilePath, 0);
+	*end = tmp;
+    } else {
+	@call SaveFileText::MSG_VIS_TEXT_DELETE_ALL();
+    }
+    quitting = FALSE;
+}	/* End of MSG_BS_SAVE_CANCEL.	*/
+
+/*********************************************************************
+ *			BSSaveFile
+ *********************************************************************
+ * SYNOPSIS:	Save a file....
+ * CALLED BY:
+ * PASS:	SaveFileOptions sfo
+ * RETURN:
+ * SIDE EFFECTS:
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description			     
+ *	----	----		-----------			     
+ *	jimmy	6/15/94		Initial version			     
+ * 
+ *********************************************************************/
+@extern method BuilderShellClass, MSG_BS_SAVE_FILE
+{
+    TCHAR*	fname;
+    FileHandle	fhandle;
+    DiskHandle	disk;
+    GandalfSaveError	error = SAVE_OK;
+    BDescFlags flags;
+
+    FilePushDir();
+
+    fname = BSSave_SetupFilePath(sfo);
+    if (fname == NULL) goto fileError;
+
+    /* Create correct UI code and compile it.
+     * No way to tell ET_UPDATE_CODE_IF_NECESSARY what flags to pass
+     * when it calls BS_GENERATE_UI_CODE, so we have to hack here
+     * by generating it ourself until it is FIXME fixed.
+     */
+    Notify(_TEXT("Saving..."), TRUE);
+    @call BuilderApp::MSG_GEN_APPLICATION_MARK_BUSY();
+
+    /* standard flag:		BDF_COMPLEX
+       raw format:		no BDF_BUILDTIME
+       liberty:			BDF_NO_GEOMETRY
+       */
+    flags = BDF_COMPLEX;
+    if (sfo == SFO_NORMAL) {
+	flags |= BDF_BUILDTIME;
+    } else if (sfo == SFO_RAW_LIBERTY) {
+	flags |= BDF_NO_GEOMETRY;
+    }
+    @call self::MSG_BS_GENERATE_UI_CODE(flags, FALSE);
+    @call BuilderInterpreter::MSG_BENT_MANAGER_SET_FLAGS(0, BF_UI_DIRTY);
+    BascoCompileFunction(bascoTask, 0);
+    if (@call Editor::MSG_ET_UPDATE_CODE_IF_NECESSARY(TRUE)) {
+	error = SAVE_COMPILE_ERROR;
+    } else if (GandalfCheckForCompileError(bascoTask)) {
+	error = SAVE_COMPILE_ERROR;
+    }
+
+    @call BuilderApp::MSG_GEN_APPLICATION_MARK_NOT_BUSY();
+
+    if (error == SAVE_COMPILE_ERROR) 
+    {
+#define IC_YES 6
+#define IC_NO 7
+	InteractionCommand	save;
+
+	save = UserStandardDialog
+	    (NULL, NULL, NULL, NULL,
+	     (char *) _TEXT("Would you like to save anyway?"),
+	     (CDT_ERROR << CDBF_DIALOG_TYPE_OFFSET) |
+	     (GIT_AFFIRMATION << CDBF_INTERACTION_TYPE_OFFSET));
+	if (save == IC_YES) {
+	    error = SAVE_OK;
+	}
+    }
+
+    if (error == SAVE_OK)
+    {
+	int	numRoutines,numLines, i, j;
+	dword	codeOffset;
+	TCHAR*	text;
+
+
+	if (sfo == SFO_NORMAL)
+	{
+	    /* backup existing file, if there is one
+	     */
+	    TCHAR	backupname[32];
+	    TCHAR*	bn;
+
+	    EC_ERROR_IF(strlen(fname) > 31, -1);
+	    strcpy(backupname, fname);
+	    /* most files will be .BAS files, replace S with K */
+	    bn = backupname + strlen(backupname) - 1;
+	    if (*bn != C_CAP_K) {
+		*bn = C_CAP_K;
+	    } else {
+		/* use UNDERSCORE if they have a K there for some reason */
+		*bn = C_UNDERSCORE;
+	    }
+	    /* delete the old backup */
+	    FileDelete((char *) backupname);
+	    FileRename((char *) fname, (char *) backupname);
+	}
+
+	fhandle = FileCreate(fname,
+			     FILE_CREATE_TRUNCATE| FCF_NATIVE|
+			     FILE_ACCESS_W | FILE_DENY_RW,0);
+	if (fhandle == NullHandle) goto fileError;
+
+
+	/* Now enumerate through all the lines of all routines and
+	 * put them in our file.
+	 */
+	numRoutines = EditGetNumRoutines(bascoTask);
+
+#ifdef DO_DBCS
+    {
+	MemHandle   bufHandle;
+	TCHAR	    *buf;
+
+	bufHandle = MemAlloc(4096, HF_SWAPABLE | HF_SHARABLE, HAF_LOCK);
+	buf = MemDeref(bufHandle);
+#endif
+	for (i = 0; i < numRoutines; i++) {
+	    numLines = EditGetRoutineNumLines(bascoTask, i, &codeOffset);
+	    for (j = 0; j < numLines; j++) {
+		int size;
+
+		text = EditGetLineTextWithLock(bascoTask, codeOffset, j);
+#ifdef DO_DBCS
+		/* subtract one so we don't write out the NULL */
+		size = GandalfLocalGeosToDos(text, buf) - 1;
+		FileWrite(fhandle,buf,size,0);
+		HugeArrayUnlock(text);
+#else
+	        size = strlen(text) * sizeof(TCHAR);
+		FileWrite(fhandle,text,size,0);
+		HugeArrayUnlock(text);
+#endif
+		spitOutCRLF(fhandle);
+	    }
+	    spitOutCRLF(fhandle);
+	}
+#ifdef DO_DBCS
+	MemFree(bufHandle);
+    }	
+#endif
+	
+	@call LoadFileSelector::MSG_GEN_FILE_SELECTOR_SET_FULL_SELECTION_PATH
+	    (gCurFilePath, 0);	/* gCurFilePath has drive letter */
+	
+	if (fhandle != NullHandle) {
+	    FileClose(fhandle,0);
+	}
+    }
+
+    Notify(gCurFilePath, TRUE);
+    
+    if (error == SAVE_FILE_ERROR) {
+	GandalfError(@GandalfFileError);
+    }
+    
+    FilePopDir();
+    
+    if (error != SAVE_COMPILE_ERROR) 
+    {
+	@call SaveTrigger::MSG_GEN_SET_ENABLED(VUM_DVAQ);
+	@call BuildGEOS::MSG_GEN_SET_ENABLED(VUM_DVAQ);
+    }
+
+    if (error == SAVE_OK)
+    {
+	dirty = FALSE;
+	if (quitting) 
+	{
+	    /* restart the quit process */
+	    @send , forceQueue BuilderApp::MSG_META_QUIT();
+	}
+    }
+
+{
+    int	rn = @call Editor::MSG_ET_GET_FUNC_NUMBER();
+    @call Editor::MSG_ET_SHOW_ROUTINE_BY_INDEX(rn);
+}
+    return;
+
+ fileError:
+    FilePopDir();
+    GandalfError(@GandalfFileError);
+#if 0
+    @call Editor::MSG_ET_CLEAR_EDITOR();
+    @call RoutineList::MSG_GEN_ITEM_GROUP_SET_NONE_SELECTED(FALSE);
+#endif
+    return;
+}
+
+
+/*********************************************************************
+ *			BSSave_SetupFilePath
+ *********************************************************************
+ * SYNOPSIS:	Create gCurFilePath from save dialog box ui and
+ *		switch to its directory
+ * CALLED BY:	INTERNAL, BS_SAVE_FILE
+ * PASS:
+ * RETURN:	pointer to tail end of gCurFilePath, NULL on error
+ * SIDE EFFECTS:
+ *	Mucks with current path
+ * STRATEGY:
+ * REVISION HISTORY:
+ *	Name	Date		Description			     
+ *	----	----		-----------			     
+ *	dubois	2/23/96	Initial version
+ * 
+ *********************************************************************/
+static TCHAR*
+BSSave_SetupFilePath(SaveFileOptions sfo)
+{
+    TCHAR	path[PATH_BUFFER_SIZE];
+    TCHAR*	pathEnd = (TCHAR*)&gCurFilePath;
+    TCHAR*	fname;
+    DiskHandle	disk;
+
+    /* Set up fhandle, jumping to fileError if unsuccessful
+     */
+    if (@call SaveFileSelector::MSG_GEN_PATH_GET(path,PATH_BUFFER_SIZE))
+    {
+	return FALSE;
+    }
+    disk = @call SaveFileSelector::MSG_GEN_PATH_GET_DISK_HANDLE();
+    FileSetCurrentPath(disk,path);
+
+    {	
+	int	s = @call SaveFileText::MSG_VIS_TEXT_GET_TEXT_SIZE();
+	if (s == 0 || s > 31) return FALSE;
+    }
+
+    /* Construct gCurFilePath, leaving fname pointing to the tail
+     */
+    fname = (TCHAR*)&gCurFilePath; /* stupid FileConstruct API */
+    (void) FileConstructFullPath
+	(&fname, sizeof(PathName), disk, path, TRUE);
+    strcat(fname, _TEXT("\\"));
+    fname = strchr(pathEnd, C_NULL);
+    @call SaveFileText::MSG_VIS_TEXT_GET_ALL_PTR(fname);
+
+    if (sfo == SFO_RAW_GEOS || sfo == SFO_RAW_LIBERTY)
+    {
+	/* save as .bag (geos) or .bal (liberty)
+	 * so we don't nuke the .bas file */
+	TCHAR*	tmp;
+	tmp = fname + strlen(fname) - 4;
+	if (*tmp != C_PERIOD) return FALSE;
+	tmp += 3;		/* cheesy check... should match .??S */
+	if (*tmp != C_CAP_S) return FALSE;
+	*tmp = (sfo == SFO_RAW_GEOS) ? C_CAP_G : C_CAP_L;
+    }
+    else {EC_WARNING_IF(sfo != SFO_NORMAL, -1);}
+
+    return fname;
+}
+
+/*********************************************************************
+ *			BSSaveCompiledFile
+ *********************************************************************
+ * SYNOPSIS:	Compile our code and write it out
+ * CALLED BY:	
+ * RETURN:
+ * SIDE EFFECTS:
+ * STRATEGY:
+ * REVISION HISTORY:
+ *	Name	Date		Description			     
+ *	----	----		-----------			     
+ *	dubois	 2/15/95	Initial version			     
+ * 
+ *********************************************************************/
+
+@extern method BuilderShellClass, MSG_BS_SAVE_COMPILED_FILE
+{
+    Boolean		success;
+    dword		disk;
+    word		size;
+    TCHAR		path[PATH_BUFFER_SIZE];
+    TCHAR		fname[FILE_LONGNAME_BUFFER_SIZE];
+    int			numProps, count;
+
+    @call BuilderApp::MSG_GEN_APPLICATION_MARK_BUSY();
+
+    if (!(@call self::MSG_BS_GENERATE_UI_CODE
+	  (BDF_COMPLEX | flags, FALSE)))
+    {
+	goto done;
+    }
+
+    /* Tell the builder we're clean now, since we just downloaded new 
+     * ui code.
+     */
+    @call BuilderInterpreter::MSG_BENT_MANAGER_SET_FLAGS(0, BF_UI_DIRTY);
+
+    /* Try to compile
+     */
+    if (! @call Editor::MSG_ET_UPDATE_CODE_IF_NECESSARY(TRUE))
+    {
+	success = BascoCompileCodeFromTask(bascoTask, FALSE);
+    }
+
+    if (success == NullHandle) {
+	GandalfCompileError(bascoTask);
+	goto done;
+    }
+
+    /* Save!
+     */
+    FilePushDir();
+
+    /* Set path; get filename into fname.  Mangle appropriately
+     */
+    {
+	TCHAR	tmp;
+	TCHAR*	end;
+	end = strrchr(gCurFilePath, C_BACKSLASH);
+	if (end == NULL) {
+	    FilePopDir();
+	    GandalfError(@GandalfFileError);
+	    goto done;
+	}
+	tmp = *end;
+	*end = C_NULL;
+	FileSetCurrentPath(0, gCurFilePath);
+	*end = tmp;
+	strcpy(fname, end+1);
+
+	/* terminate with .BC or .BCL */
+	end = strrchr(fname, C_PERIOD);
+	if (end == NULL) {
+	    FilePopDir();
+	    GandalfError(@GandalfFileError);
+	    goto done;
+	}
+	end += 1;
+	*end++ = C_CAP_B; *end++ = C_CAP_C;
+	if (hack_compilingBCL) *end++ = C_CAP_L;
+	*end = C_NULL;
+    }
+
+    success = BascoWriteCode(fname, bascoTask);
+
+    FilePopDir();
+ done:
+    if (success != NullHandle)
+    {
+	if (quitting) 
+	{
+	    /* restart the quit process */
+	    @send , forceQueue BuilderApp::MSG_META_QUIT();
+	}
+    }
+
+    @call BuilderApp::MSG_GEN_APPLICATION_MARK_NOT_BUSY();
+    
+    return;
+}
+
+/***********************************************************************
+ *			BSGenerateUICode
+ ***********************************************************************
+ * SYNOPSIS:	Generate code for the UI currently being built
+ * PARAMETERS:	none
+ * PASS:	BDescFlags flags
+ *		Boolean		uiOnly
+ * STRATEGY:
+ *	BSGen_ routines do most of the work of adding code.
+ *	We then write out the resource file.
+ *
+ *	If uiOnly, just re-create duplo_ui, nothing else.
+ *	This makes a difference when creating aggregates.
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	dloft	8/23/95   	Initial Revision
+ *
+ ***********************************************************************/
+@extern method BuilderShellClass, MSG_BS_GENERATE_UI_CODE
+{
+    optr		complexArray;
+    Boolean		success = TRUE;
+    BuilderShellMode	mode = pself->BS_mode;
+
+    gCurUIFlags = flags;	/* Store for optimization purposes */
+
+    MemLock(OptrToHandle(@SubDuploUi));
+
+/*    if (@call SaveAggregateList::MSG_GEN_ITEM_GROUP_GET_SELECTION()) {
+ *    if selected, the include form in our output...
+ */
+
+    if (mode == BSM_NORMAL)
+    {
+	complexArray = BSGen_NormalCode(bascoTask, flags);
+    }
+    else
+    {
+	int 	error;
+	complexArray = BSGen_AggregateCode(bascoTask, flags | BDF_AGGREGATE,
+					   uiOnly, &error);
+	if (error)
+	{ 
+	    MemUnlock(OptrToHandle(@SubDuploUi));
+	    return FALSE;
+	}
+
+	/* Set the number of hidden routines, in case this is the first time
+	 * these routines have been generated... (see the _NEW code -- it
+	 * can't SET_NUM_HIDDEN at that point, because the aggregate's name
+	 * and such aren't known yet.
+	 */
+	@call RoutineList::MSG_RL_SET_NUM_HIDDEN(NUM_HIDDEN_AGG);
+    }
+    MemUnlock(OptrToHandle(@SubDuploUi));
+
+    /* This isn't the most satisfactory solution (basco should not have
+     * to deal with a RunHeap just to write out resources) but it's the
+     * easiest current solution
+     */
+    if (complexArray != NullOptr)
+    {
+	PTaskHan	ptaskHan;
+	ProgTask*	ptask;
+
+	ptaskHan = @call BuilderInterpreter::MSG_INTERP_GET_STATE();
+	ptask = MemLock(ptaskHan);
+	MemLock(OptrToHandle(complexArray));
+
+	if (ChunkArrayGetCount(complexArray) == 0)
+	{
+	    /* Don't bother writing it out */
+	    success = TRUE;
+	} else {
+	    success = BascoWriteResources(gCurFilePath, complexArray,
+					  &ptask->PT_runHeapInfo, 
+					  hack_compilingBCL);
+	}
+	MemUnlock(OptrToHandle(complexArray));
+	MemUnlock(ptaskHan);
+
+	if (!success)
+	{
+	    GandalfError(@WriteResourceError);
+	}
+
+	@call BuilderInterpreter::MSG_BENT_MANAGER_DESTROY_BUFFER
+	    (OptrToHandle(complexArray));
+    }
+
+    return success;
+}	/* End of MSG_BS_GENERATE_UI_CODE.	*/
+
+/*********************************************************************
+ *			BSGen_NormalCode
+ *********************************************************************
+ * SYNOPSIS:	Generate and add routine(s) for a "normal" file.
+ * CALLED BY:	INTERNAL, MSG_BS_GENERATE_UI_CODE
+ * PASS:
+ * RETURN:	optr of complex data if BDF_COMPLEX passed.
+ *		Caller is responsible for destroying it.
+ * STRATEGY:
+ *	Currently the only routine we need to generate is duplo_ui.
+ * 
+ * REVISION HISTORY:
+ *	Name	Date		Description			     
+ *	----	----		-----------			     
+ *	dubois	10/13/95	Initial version
+ * 
+ *********************************************************************/
+optr
+BSGen_NormalCode(MemHandle task, BDescFlags flags)
+{
+    MemHandle	lineHan;
+    TCHAR*	line;
+    optr	retval;
+
+
+    lineHan = MemAlloc(4096*sizeof(TCHAR), HF_SWAPABLE | HF_SHARABLE,
+		       HAF_STANDARD_LOCK);
+    line = MemDeref(lineHan);
+    *line = DBG_NORMAL;
+    MemLock(OptrToHandle(@SubDuploUi));
+
+    doLineAdd(task, line, LMemDeref(@SubDuploUi));
+
+    EmitStandardInclude(task, flags, line);
+    EmitLoadModule(task, line);
+    
+    if (gHackNoTopLevelShow) {
+	/* FIXME: make this a chunk */
+	doLineAdd(task, line, _TEXT("REM MAGIC NO SHOW"));
+    }
+    retval = EmitComponents(task, flags, line, TRUE);
+
+    doLineAdd(task, line, LMemDeref(@EndSub));
+
+    MemUnlock(OptrToHandle(@SubDuploUi));
+    MemFree(lineHan);
+    return retval;
+}
+
+
+/*********************************************************************
+ *			EmitComponents
+ *********************************************************************
+ * SYNOPSIS:	Emit component descriptions
+ * CALLED BY:	INTERNAL
+ * PASS:
+ * RETURN:	optr to array of Complex data, or NullOptr if
+ *		they were not requested in <flags>
+ * SIDE EFFECTS:
+ * STRATEGY:
+ * REVISION HISTORY:
+ *	Name	Date		Description			     
+ *	----	----		-----------			     
+ *	dubois	 2/15/95	Initial version			     
+ *	dloft	7/24/95		Generalized for use with aggregates 
+ *********************************************************************/
+optr
+EmitComponents(MemHandle task, BDescFlags flags, TCHAR *line,
+	       Boolean addDuploStart)
+{
+    MemHandle	descHeader;
+    EventHandle	event;
+    BDescHeader 	*bdh;
+    BDescInfo	   	info;
+
+    optr	descArray;
+    word	i, len;
+
+    optr	retval;
+
+    info.BDI_type = BDT_BASIC;
+    info.BDI_flags = flags;
+    descHeader = @call BuilderInterpreter::
+	MSG_BENT_MANAGER_DESCRIBE_COMPONENTS(info);
+    bdh = MemLock(descHeader);
+
+    /* Add source code to create all necessary components in the
+     * viewer application.  This all goes into our duplo_ui routine,
+     * known to the compiler as a routine where all variables are
+     * created as globals.
+     */
+
+    *line = DBG_NORMAL;
+    doLineAdd(task, line, LMemDeref(@DisableEvents));
+    descArray = ConstructOptr(descHeader, bdh->BDH_descriptions);
+
+    len = ChunkArrayGetCount(descArray);
+    for (i=0; i<len; i++)
+    {
+	MemHandle	descHan;
+	TCHAR*		descP;
+	BDescBlock* bdb;
+
+	descHan = *(MemHandle*)ChunkArrayElementToPtr(descArray, i, NULL);
+	bdb = MemLock(descHan);
+	descP = (TCHAR*)(bdb+1);
+	BascoBlockAdd(task, descP);
+	MemUnlock(descHan);
+    }
+
+    doLineAdd(task, line, LMemDeref(@EnableEvents));
+    if (addDuploStart) {
+	doLineAdd(task, line, LMemDeref(@CallDuploStart));
+    }
+
+/* 
+ * Removed code to output toplevel visible lines.  The user is now 
+ * responsible for sticking form and dialog visibility lines into 
+ * duplo_start by hand (well, we help a little bit).  dl 2/7/96
+ */
+@ifdef 0
+    /* reset out description pointer to the start of the block by nulling
+     * out the first character so it thinks its empty
+     */
+
+    /* if you comment this in, This code breaks with the new format of
+     * *bdh --dubois 2/29/96
+     */
+    
+    bdh = MemDeref(descHeader);
+    description = (TCHAR *)LMemDerefHandles(descHeader, bdh->BDH_description);
+    description[0] = C_NULL;
+
+    /* now output all the .visibles that we didn't output before */
+    @call ComponentList::MSG_COMPONENT_LIST_TOPLEVEL_OUTPUT_VISIBLE(descHeader);
+    bdh = MemDeref(descHeader);
+    description = (TCHAR *)LMemDerefHandles(descHeader, bdh->BDH_description);
+    BascoBlockAdd(task, description);
+@endif
+
+    if (flags & BDF_COMPLEX)
+    {
+	retval = ConstructOptr(descHeader, bdh->BDH_clipItemArray);
+	MemUnlock(descHeader);
+    } else {
+	retval = NullHandle;
+	MemUnlock(descHeader);
+	@call BuilderInterpreter::MSG_BENT_MANAGER_DESTROY_BUFFER(descHeader);
+    }
+    return retval;
+}
+
+/*********************************************************************
+ *			EmitStandardInclude
+ *********************************************************************
+ * SYNOPSIS:	Emit "standard include" file
+ * CALLED BY:	INTERNAL, BSGen_* routines
+ * PASS:	MemHandle of compiler, MemHandle of pre-allocated 4K buffer
+ * RETURN:	nothing
+ * SIDE EFFECTS:
+ * STRATEGY:
+ * REVISION HISTORY:
+ *	Name	Date		Description			     
+ *	----	----		-----------			     
+ *	dubois	 8/ 7/95	Initial version
+ * 
+ *********************************************************************/
+#ifdef DO_DBCS
+/* this is a routine defined in manager.asm */
+#define fgets fgets_dbcs
+extern void fgets_dbcs(TCHAR *dst, word maxSize, FILE *file);
+#endif
+
+void
+EmitStandardInclude(MemHandle ctaskHan, BDescFlags flags, TCHAR* line)
+{
+    FILE*	stream;
+    FileHandle	fileHan;
+
+    /* stream <- file stream for SP_TOP\STDINC.BH */
+
+    FilePushDir();
+    FileSetCurrentPath(SP_USER_DATA, _TEXT("BASIC"));
+    /* if we are running from the builder and locally
+     * (ie. not compiling for liberty) then use special
+     * include file
+     */
+    fileHan = FileOpen((((flags & BDF_RUN_FROM_BUILDER) &&
+			 (hack_compilingBCL == FALSE)) ?
+			 _TEXT("LVIEW.BH") :
+			 _TEXT("STDINC.BH")),
+		       	 FILE_ACCESS_R | FILE_DENY_NONE);
+    FilePopDir();
+    if (fileHan == NullHandle) {
+	return;
+    }
+    stream = fdopen(fileHan, "r");
+    if (stream == NULL) return;
+
+    while (!feof(stream))
+    {
+	TCHAR*	cursor;
+
+	fgets(line+1, 4096-1, stream);
+	/* Kill linefeed */
+	for (cursor = line+1; *cursor != C_NULL; cursor++)
+	{
+	    if (*cursor == C_LINEFEED || *cursor == C_ENTER
+#ifdef DO_DBCS
+		|| *cursor == 0x1a
+#endif
+		)
+	    {
+		*cursor = C_NULL;
+		break;
+	    }
+	}
+	BascoLineAdd(ctaskHan, line);
+    }
+
+    fileHan = fdclose(stream);
+    (void) FileClose(fileHan, TRUE);
+
+    return;
+}
+
+/*********************************************************************
+ *			EmitLoadModule
+ *********************************************************************
+ * SYNOPSIS:	Emit any LoadModules of aggregate libraries, and REM
+ *		statements to re-init bgadnew.
+ *
+ * CALLED BY:	INTERNAL, Gen_Normal and Gen_Aggregate
+ * PASS:
+ * RETURN:
+ * SIDE EFFECTS:
+ * STRATEGY:
+ *	Query bgadnew module and write out the code it gives us
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description			     
+ *	----	----		-----------			     
+ *	dubois	10/13/95	Initial version
+ * 
+ *********************************************************************/
+void
+EmitLoadModule(MemHandle task, TCHAR* line)
+{
+    PTaskHan	ptaskHan;
+    ProgTask*	ptask;
+    RTaskHan	rtaskHan;
+    LegosType	type;
+    byte	args[6] = {1, TYPE_INTEGER,0,0,0,0};
+
+    dword	descToken;
+    TCHAR*	descPtr;
+
+    ptaskHan = @call BuilderInterpreter::MSG_INTERP_GET_STATE();
+    ptask = MemLock(ptaskHan);
+
+    rtaskHan = @call EmbeddedCreationControl::MSG_GEC_GET_TASK();
+    EC_ERROR_IF(rtaskHan == NullHandle, -1);
+
+    args[2] = hack_compilingBCL;
+    RunCallFunction(rtaskHan, _TEXT("duplo_description"), args,
+		    &type, &descToken);
+
+    EC_ERROR_IF(type != TYPE_STRING, -1);
+
+    RunHeapLock(&ptask->PT_runHeapInfo, descToken, (void**)&descPtr);
+    strcpy(line+1, descPtr);
+    RunHeapUnlock(&ptask->PT_runHeapInfo, descToken);
+
+    BascoBlockAdd(task, line);
+    MemUnlock(ptaskHan);
+}
+
+
+
+
+/*********************************************************************
+ *			BSCheckValidCompiledFilename
+ *********************************************************************
+ * SYNOPSIS:	Check if the filename the user wants has a .BAS extension
+ *		and confirm if so.
+ * CALLED BY:	INTERNAL
+ * PASS:	TCHAR *fname
+ * RETURN:	InteractionCommand from dialog, or IC_YES if filename 
+ *		is ok.
+ * REVISION HISTORY:
+ *	Name	Date		Description			     
+ *	----	----		-----------			     
+ *	dloft	10/18/95	Initial version
+ * 
+ *********************************************************************/
+InteractionCommand
+BSCheckValidCompiledFilename(TCHAR *fname) {
+    
+    return strstr(fname, ".BAS") ? 
+	UserStandardDialog( (char*) 0, 
+			   (char*) 0,
+			   (char*) 0,
+			   (char*) 0,
+			   _TEXT("Are you sure you want to save a compiled file with a .BAS extension?"),
+			   (CDT_ERROR << CDBF_DIALOG_TYPE_OFFSET) |
+			   (GIT_AFFIRMATION << CDBF_INTERACTION_TYPE_OFFSET))
+    : IC_YES;
+}

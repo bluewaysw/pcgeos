@@ -1,0 +1,1247 @@
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+	Copyright (c) Geoworks 1994 -- All Rights Reserved
+
+PROJECT:	PC/GEOS
+MODULE:		UI Builder
+FILE:		uiMain.goc
+
+AUTHOR:		Martin Turon, Aug 30, 1994
+
+ROUTINES:
+	Name			Description
+	----			-----------
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	martin	8/30/94		Initial version
+
+DESCRIPTION:
+
+	$Id: uimain.goc,v 1.2 98/10/13 22:59:46 martin Exp $
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+
+@define __GANDALF_UI_MAIN_GOC
+@include <stdapp.goh>
+@include <Objects/Text/tCtrlC.goh>
+
+@include "gandalf.goh"
+
+@include "Art/uiicon.goh"
+
+@include <Legos/legosapp.goh>
+#include <color.h>
+@include "Main/mainshlh.goh"
+@include "Debug/debugh.goh"
+@include "Editor/editorh.goh"
+
+#define JUST_BELOW_THE_BUILDER PCT_20
+
+/*---------------------------------------------------------------------
+		Application Resource (GenApplicationClass)		
+-----------------------------------------------------------------------*/
+
+@start	AppResource;
+
+@object BuilderAppClass BuilderApp = {
+}
+
+@visMoniker BuilderTextMoniker = "NewBASIC Builder";
+
+@visMoniker BuilderMonikerList = list {
+    @BuilderTextMoniker,
+    @Moniker0,
+    @Moniker1,
+    @Moniker2
+}
+
+@end	AppResource;
+
+/*---------------------------------------------------------------------
+		Interpreter Resource
+-----------------------------------------------------------------------*/
+@start	Interpreter;
+
+@object BuilderManagerClass BuilderInterpreter = {
+}
+
+@object BuilderComponentClass BuilderComponent = {
+}
+
+@end	Interpreter;
+
+
+@start EditorInterface;
+
+/*----------------------------------------------------------------------------
+			Editor primary and all its children
+-----------------------------------------------------------------------------*/
+@object UpdatingGenInteractionClass EditorInteraction = {
+    GI_visMoniker = "Editor";
+    GI_attrs = (@default) +GA_TARGETABLE;
+
+    GI_comp = @EditorFluff, @RoutineInteraction, @EditorView;
+    GII_visibility = GIV_DIALOG;
+    GII_type = GIT_ORGANIZATIONAL;
+
+    HINT_ORIENT_CHILDREN_VERTICALLY;
+
+    HINT_SIZE_WINDOW_AS_RATIO_OF_FIELD = {
+	SWSS_RATIO | PCT_75, SWSS_RATIO | PCT_75};
+
+    HINT_INTERACTION_MAKE_RESIZABLE;
+    HINT_POSITION_WINDOW_AT_RATIO_OF_PARENT = {SWSS_RATIO |PCT_5,
+					       SWSS_RATIO | JUST_BELOW_THE_BUILDER};
+    HINT_DEFAULT_TARGET;
+    HINT_DEFAULT_FOCUS;
+}
+
+@object GenInteractionClass EditorFluff = {
+    GI_comp = @ComponentInteraction;
+    HINT_ORIENT_CHILDREN_HORIZONTALLY;
+    HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+/*    HINT_CENTER_CHILDREN_VERTICALLY;*/
+/*    HINT_DIVIDE_WIDTH_EQUALLY;*/
+}
+
+@object GenInteractionClass ComponentInteraction = 
+{
+    GI_comp = @ComponentList, @EventList, @RoutineList;
+/*    GII_type = GIT_ORGANIZATIONAL; */
+    /* GII_visibility = GIV_POPOUT; */
+    
+    HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+    HINT_MINIMUM_SIZE = {0, SST_PIXELS | 90, 1};
+    HINT_EXPAND_HEIGHT_TO_FIT_PARENT;
+    HINT_ORIENT_CHILDREN_HORIZONTALLY;
+}
+
+@object GenInteractionClass RoutineInteraction = 
+{
+    GI_comp =  @EditorToolbar;
+    HINT_ORIENT_CHILDREN_HORIZONTALLY;
+    HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+/*    HINT_RIGHT_JUSTIFY_CHILDREN;*/
+    HINT_CENTER_CHILDREN_HORIZONTALLY;
+    HINT_CENTER_CHILDREN_VERTICALLY;
+}
+    
+@object GenInteractionClass EditorToolbar = {
+    GI_comp = @EditorMainTools, @DeleteComponentTrigger, @DeleteRoutineTrigger;
+    HINT_ORIENT_CHILDREN_HORIZONTALLY;
+    HINT_FULL_JUSTIFY_CHILDREN_HORIZONTALLY;
+    HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+}
+
+@object GenInteractionClass EditorMainTools = {
+    GI_comp = @NewFuncTrigger, @NewSubTrigger, @BreakTrigger;
+    HINT_ORIENT_CHILDREN_HORIZONTALLY;
+    HINT_LEFT_JUSTIFY_CHILDREN;
+}
+
+@object GenTriggerClass NewFuncTrigger = {
+    GI_visMoniker = 'F', "New Function";
+    GTI_actionMsg = MSG_ET_ADD_NEW_ROUTINE;
+    GTI_destination = Editor;
+    ATTR_GEN_TRIGGER_ACTION_DATA = {0};
+}
+
+@object GenTriggerClass NewSubTrigger = {
+    GI_visMoniker = 'S', "New Sub";
+    GTI_actionMsg = MSG_ET_ADD_NEW_ROUTINE;
+    GTI_destination = Editor;
+    ATTR_GEN_TRIGGER_ACTION_DATA = {1};
+}
+
+@object GenTriggerClass DeleteComponentTrigger = {
+    /* Our purpose in life is to send a Delete key to the builder 
+     * interpreter, which handles all the details of deleting the
+     * component.
+     */
+    GI_visMoniker = "Delete Component";
+    GTI_actionMsg = MSG_META_KBD_CHAR;
+    GTI_destination = BuilderInterpreter;
+    ATTR_GEN_TRIGGER_ACTION_TWO_WORDS = {VC_DEL, CF_FIRST_PRESS};
+}
+
+@object GenTriggerClass DeleteRoutineTrigger = {
+    GI_visMoniker = 'D', "Delete Routine";
+    GTI_actionMsg = MSG_ET_DELETE_ROUTINE;
+    GTI_destination = Editor;
+}
+
+@object GenTriggerClass BreakTrigger = {
+    GI_visMoniker = 'B', "Toggle Break";
+    GTI_actionMsg = MSG_ET_TOGGLE_BREAKPOINT;
+    GTI_destination = Editor;
+    /* -1 means current line, 1 means make break-dirty */
+    ATTR_GEN_TRIGGER_ACTION_TWO_WORDS = {1,-1};
+    GI_states = @default ;
+
+}
+
+@object GenViewClass EditorView = 
+{
+    GI_attrs = (@default) +GA_TARGETABLE;
+
+    GVI_attrs = @default + GVA_GENERIC_CONTENTS + GVA_DRAG_SCROLLING +GVA_VIEW_FOLLOWS_CONTENT_GEOMETRY;
+    GVI_horizAttrs = @default + GVDA_SCROLLABLE;
+    GVI_vertAttrs = @default + GVDA_SCROLLABLE;
+    GVI_content = @EditorContent;
+    HINT_DEFAULT_TARGET;
+    HINT_DEFAULT_FOCUS;
+}
+
+@object GenContentClass EditorContent = 
+{
+    GI_comp = @Editor;
+    HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+    HINT_EXPAND_HEIGHT_TO_FIT_PARENT;
+}    
+@ifdef DO_DBCS
+#define VTDF_JSYS (VTDF_CENTURY_SCHOOLBOOK+1)
+#define VTDF_KANJI_HON_MINCHO (VTDF_JSYS+1)
+
+@endif
+@object EditorTextClass Editor = {
+    ETI_breakAttrs = @breakStyle;
+    ETI_pcAttrs = @PCStyle;
+    ETI_breakPcAttrs = @breakPcStyle;
+    ETI_event = -1;
+    GI_attrs = @default + GA_TARGETABLE;
+    
+
+    GTXI_attrs = (@default +GTA_NO_WORD_WRAPPING +GTA_TAIL_ORIENTED) & ~GTA_USE_TAB_FOR_NAVIGATION;
+
+    ATTR_GEN_TEXT_MULTIPLE_PARA_ATTR_RUNS = (ChunkHandle) @DefaultRun;
+    HINT_TEXT_WHITE_WASH_COLOR;
+    HINT_DEFAULT_TARGET;
+    HINT_DEFAULT_FOCUS;
+    /*
+     * these get overridden byt the SET_FONT in mainproc.goc
+     */
+@ifdef DO_DBCS    
+    ATTR_GEN_TEXT_DEFAULT_CHAR_ATTR = ( (VTDS_12 << VTDCA_SIZE_OFFSET) |
+				       VTDF_JSYS);
+@else
+    ATTR_GEN_TEXT_DEFAULT_CHAR_ATTR = ( (VTDS_12 << VTDCA_SIZE_OFFSET) |
+				       VTDF_BISON);
+@endif
+	
+    HINT_MINIMUM_SIZE = {SST_WIDE_CHAR_WIDTHS| 600, SST_LINES_OF_TEXT| 100,0};
+
+}
+
+/* Code is written to assume that the next two pieces
+   ALWAYS exist in the same segment as the Editor object.
+   Makes sense because these two things are unique to each
+   object instance */
+
+/* One.... Don't worry about the element here. It's just
+   there to get things working with paragraph attributes */
+
+@elementArray VisTextParaAttr (TextElementArrayHeader (TAT_PARA_ATTRS))
+   DefaultAttrs = {
+
+   PARA_ATTR_STYLE_JUST_LEFT_RIGHT_PARA(2,CA_NULL_ELEMENT,0,1,0,0)
+
+};
+
+/* Two.... This thing also is just here to get the attributes
+   system working*/
+
+@RUN_ARRAY_HEADER(DefaultAttrs) DefaultRun = {
+    TRAE_ABS(0,0), 
+    TRAE_END
+};
+
+@ifdef DO_DBCS
+/* Breakpoint style - Red Box */
+
+@chunk SimpleParaAttr breakStyle = 
+{{255,CF_RGB,255,220}};
+
+
+/* Set Execution style - Blue Shadow Box */
+
+@chunk SimpleParaAttr PCStyle = 
+{{255,CF_RGB,255,170}};
+
+
+/* Both are marked with a violet shadow box. Not ideal
+   but will have to do for now */
+
+@chunk SimpleParaAttr breakPcStyle = 
+{{220,CF_RGB,255,220}};
+
+@else
+/* Breakpoint style - Red Box */
+
+@chunk SimpleParaAttr breakStyle = 
+{{C_LIGHT_RED,CF_INDEX,0,0}};
+
+
+/* Set Execution style - Blue Shadow Box */
+
+@chunk SimpleParaAttr PCStyle = 
+{{C_CYAN,CF_INDEX,0,0}};
+
+
+/* Both are marked with a violet shadow box. Not ideal
+   but will have to do for now */
+
+@chunk SimpleParaAttr breakPcStyle = 
+{{C_LIGHT_VIOLET,CF_INDEX,0,0}};
+@endif
+
+/* END EDITOR STUFF */
+/* ======================================================= */
+@end EditorInterface;
+
+
+/*---------------------------------------------------------------------
+		Interface Resource (GenPrimaryClass)		
+-----------------------------------------------------------------------*/
+
+@start	Interface;	
+
+/*----------------------------------------------------------------------------
+		 Builder Shell -- coordinates calls which
+		 conceptually apply to multiple UI objects...
+		 I guess this could be the process, but
+		 for now I'll keep it here...  RG
+-----------------------------------------------------------------------------*/
+
+
+@object BuilderShellClass BuilderShell = {
+}
+
+/*----------------------------------------------------------------------------
+			BuilderPrimary and its children
+-----------------------------------------------------------------------------*/
+@object GenPrimaryClass BuilderPrimary = {
+	GI_comp = 
+
+		  @FileMenu,
+		  @BuilderEditControl, 
+		  @DebugMenu,
+		  @WindowMenu,
+		  @LocalInteraction,
+		  @InternalInteraction,
+		  @VarUpdateInteraction,
+		  @NewInteraction, @NewAggInteraction, @LoadDeleteInteraction,
+		  @NotificationText,
+		  @ToolbarInteraction;
+	
+	ATTR_GEN_HELP_CONTEXT = "TOC";
+	GI_states = (@default) -GS_USABLE;
+	
+
+@ifndef RESPONDER
+	HINT_DEFAULT_TARGET;
+	HINT_SIZE_WINDOW_AS_DESIRED;
+	HINT_PRIMARY_NO_FILE_MENU;
+	HINT_POSITION_WINDOW_AT_RATIO_OF_PARENT = { SWSS_RATIO | PCT_0,
+							SWSS_RATIO | PCT_0 };
+@else
+	HINT_DEFAULT_TARGET;
+	HINT_SIZE_WINDOW_AS_DESIRED;
+	HINT_PRIMARY_NO_FILE_MENU;
+	HINT_POSITION_WINDOW_AT_RATIO_OF_PARENT = { SWSS_RATIO | PCT_0,
+							SWSS_RATIO | PCT_75 };
+
+@endif
+	
+
+}
+
+@object GenTextClass NotificationText = {
+    HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+    HINT_TEXT_DO_NOT_MAKE_LARGER_ON_PEN_SYSTEMS;
+    HINT_TEXT_NO_FRAME;
+    GI_attrs = (@default | GA_READ_ONLY);
+    GTXI_attrs = (@default | GTA_SINGLE_LINE_TEXT);
+}
+
+/*----------------------------------------------------------------------------
+			UI Builder "Toolbar" --now just triggers. 
+-----------------------------------------------------------------------------*/
+@object GenInteractionClass ToolbarInteraction = {
+    GI_comp = @RunTrigger, @PauseTrigger, @StopTrigger, @ContTrigger,
+	      @SingleStepTrigger, @ProcStepTrigger, @FinishTrigger;
+    HINT_ORIENT_CHILDREN_HORIZONTALLY;
+
+}
+
+@object GenTriggerClass RunTrigger = {
+    GI_visMoniker = 'R', "Run";
+    GTI_actionMsg = MSG_BS_RUN;
+    GTI_destination = BuilderShell;
+@ifdef RESPONDER
+    HINT_SEEK_REPLY_BAR;
+@endif
+    
+}
+
+@object GenTriggerClass SingleStepTrigger = {
+    GI_visMoniker = 'S', "Single Step";
+    GTI_actionMsg = MSG_BS_SINGLE_STEP;
+    GTI_destination = BuilderShell;
+    GI_states = @default -GS_ENABLED;
+}
+
+@object GenTriggerClass ProcStepTrigger = {
+    GI_visMoniker = 'n', "Routine Step";
+    GTI_actionMsg = MSG_BS_PROC_STEP;
+    GTI_destination = BuilderShell;
+    GI_states = @default -GS_ENABLED;
+}
+@object GenTriggerClass FinishTrigger = {
+    GI_visMoniker = 'i', "Finish";
+    GTI_actionMsg = MSG_BS_FINISH;
+    GTI_destination = BuilderShell;
+    GI_states = @default -GS_ENABLED;
+}
+
+@object GenTriggerClass PauseTrigger = {
+    GI_visMoniker = 'P', "Pause";
+    GTI_actionMsg = MSG_BS_PAUSE;
+    GTI_destination = BuilderShell;
+    GI_states = @default -GS_ENABLED ;
+}
+
+@object GenTriggerClass StopTrigger = {
+    GI_visMoniker = 't', "Stop";
+    GTI_actionMsg = MSG_BS_STOP;
+    GTI_destination = BuilderShell;
+    GI_states = @default -GS_ENABLED;
+}
+
+
+@object GenTriggerClass ContTrigger = {
+    GI_visMoniker = 'C', "Continue";
+    GTI_destination = BuilderShell;
+    GTI_actionMsg = MSG_BS_CONTINUE;
+    GI_states = @default -GS_ENABLED;
+}
+
+
+/*----------------------------------------------------------------------------
+			Gandalf File Menu
+-----------------------------------------------------------------------------*/
+@object GenInteractionClass FileMenu = {
+    GI_visMoniker = 'F', "File";
+    GI_comp = @NewTrigger, @NewAggTrigger, @LoadInteraction,
+    	      @LoadDeleteTrigger,  @LastBASLoadedButton,
+    	      @SaveTrigger, @SaveInteraction, @BuildGEOS,
+    	      @FileExitButton;
+    GII_visibility = GIV_POPUP;
+}
+
+@object GenTriggerClass SaveTrigger = {
+    GI_visMoniker = 'S', "Save";
+    GTI_destination = @BuilderShell;
+    GTI_actionMsg = MSG_BS_SAVE_FILE;
+    GI_states = @default -GS_ENABLED;
+    GI_kbdAccelerator = control 's';
+    /* Save in normal builder format */
+    ATTR_GEN_TRIGGER_ACTION_DATA = {0};
+}
+
+@object GenTriggerClass BuildGEOS = {
+    GI_visMoniker = 'B', "Build for New Deal";
+    GTI_destination = @BuilderShell;
+    GTI_actionMsg = MSG_BS_SAVE_COMPILED_FILE;
+    ATTR_GEN_TRIGGER_ACTION_DATA = {0} ; /* BDescFlags */
+}
+
+@object GenInteractionClass NewInteraction = {
+    GI_visMoniker = 'N',"New Module";
+    GI_comp = @NewGlyph, @YesTrigger;
+    GII_type = GIT_AFFIRMATION;
+    GII_visibility = GIV_DIALOG;
+    GII_attrs = @default | GIA_MODAL | GIA_NOT_USER_INITIATABLE;
+    HINT_SIZE_WINDOW_AS_RATIO_OF_FIELD = {
+	SWSS_RATIO | PCT_45, SWSS_RATIO | PCT_20};
+    HINT_CENTER_CHILDREN_HORIZONTALLY;
+}
+@object GenTriggerClass YesTrigger = {
+    GI_attrs = @default | GA_SIGNAL_INTERACTION_COMPLETE;
+    GTI_destination = @BuilderShell;
+    GTI_actionMsg = MSG_BS_NEW;
+    ATTR_GEN_TRIGGER_INTERACTION_COMMAND = {IC_YES};
+    HINT_SEEK_REPLY_BAR;
+    ATTR_GEN_TRIGGER_ACTION_DATA = {0};
+}
+@object GenGlyphClass NewGlyph = {
+    GI_visMoniker = list { @DeleteCodeMoniker };
+}
+@object GenInteractionClass NewAggInteraction = {
+    GI_visMoniker = 'A',"New Aggregate";
+    GI_comp = @NewAggGlyph, @YesAggTrigger;
+    GII_type = GIT_AFFIRMATION;
+    GII_visibility = GIV_DIALOG;
+    GII_attrs = @default | GIA_MODAL | GIA_NOT_USER_INITIATABLE;
+    HINT_SIZE_WINDOW_AS_RATIO_OF_FIELD = {
+	SWSS_RATIO | PCT_45, SWSS_RATIO | PCT_20};
+    HINT_CENTER_CHILDREN_HORIZONTALLY;
+}
+
+@object GenGlyphClass NewAggGlyph = {
+    GI_visMoniker = list { @DeleteCodeMoniker };
+}
+
+@object GenTriggerClass YesAggTrigger = {
+    GI_attrs = @default | GA_SIGNAL_INTERACTION_COMPLETE;
+    GTI_destination = @BuilderShell;
+    GTI_actionMsg = MSG_BS_NEW;
+    ATTR_GEN_TRIGGER_INTERACTION_COMMAND = {IC_YES};
+    HINT_SEEK_REPLY_BAR;
+    ATTR_GEN_TRIGGER_ACTION_DATA = {1};
+}
+
+@object GenTriggerClass NewTrigger = {
+    GI_visMoniker = 'N', "New Module";
+    GTI_destination = @BuilderShell;
+    GTI_actionMsg = MSG_BS_NEW_MODULE;
+}
+@object GenTriggerClass NewAggTrigger = {
+    GI_states = @default -GS_USABLE;
+    GI_visMoniker = 'g', "New Aggregate";
+    GTI_destination = @BuilderShell;
+    GTI_actionMsg = MSG_BS_NEW_AGG;
+}
+@visMoniker DeleteCodeMoniker = "Throw away current changes?";
+
+
+
+@object GenTriggerClass LoadDeleteTrigger = {
+    GI_visMoniker = 'O', "Open";
+    GTI_destination = @BuilderShell;
+    GTI_actionMsg = MSG_BS_OPEN;
+}
+
+@object GenInteractionClass LoadDeleteInteraction = {
+    GI_visMoniker = 'O',"Open";
+    GI_comp = @LoadGlyph, @YesLoadTrigger;
+    GII_type = GIT_AFFIRMATION;
+    GII_visibility = GIV_DIALOG;
+    GII_attrs = @default | GIA_MODAL | GIA_NOT_USER_INITIATABLE;
+    HINT_SIZE_WINDOW_AS_RATIO_OF_FIELD = {
+	SWSS_RATIO | PCT_45, SWSS_RATIO | PCT_20};
+    HINT_CENTER_CHILDREN_HORIZONTALLY;
+}
+
+@object GenGlyphClass LoadGlyph = {
+    GI_visMoniker = list { @DeleteCodeMoniker };
+}
+
+@object GenTriggerClass YesLoadTrigger = {
+    GI_attrs = @default | GA_SIGNAL_INTERACTION_COMPLETE;
+    GTI_destination = @LoadInteraction;
+    GTI_actionMsg = MSG_GEN_INTERACTION_INITIATE;
+    ATTR_GEN_TRIGGER_INTERACTION_COMMAND = {IC_YES};
+    HINT_SEEK_REPLY_BAR;
+    ATTR_GEN_TRIGGER_ACTION_DATA = {1};
+}
+
+
+@object GenInteractionClass LoadInteraction = {
+    GI_visMoniker = "Open";
+    GI_comp = @LoadFileSelector, @LoadFileTrigger;
+    GII_attrs = @default | GIA_MODAL | GIA_NOT_USER_INITIATABLE;
+    GII_visibility = GIV_DIALOG;
+    GII_type = GIT_COMMAND;
+
+    HINT_ORIENT_CHILDREN_HORIZONTALLY;
+}
+
+@object GenTriggerClass LoadFileTrigger = {
+    GI_visMoniker = 'O', "Open";
+    GTI_actionMsg = MSG_BS_DO_LOAD_FILE;	/* must work! */
+    GTI_destination = @BuilderShell;
+    GI_attrs = @default | GA_SIGNAL_INTERACTION_COMPLETE;
+    /* Save in normal builder format */
+    ATTR_GEN_TRIGGER_ACTION_DATA = {0};
+    HINT_SEEK_REPLY_BAR;
+    HINT_DEFAULT_DEFAULT_ACTION;
+}
+
+@object GenFileSelectorClass LoadFileSelector = {
+    GFSI_destination = @BuilderShell;
+    GFSI_notificationMsg = MSG_BS_LOAD_FILE;
+    GFSI_attrs = @default | FSA_HAS_OPEN_DIR_BUTTON;
+     HINT_FILE_SELECTOR_NUMBER_OF_FILES_TO_SHOW = {10};
+    HINT_ORIENT_CHILDREN_HORIZONTALLY;
+    HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+    /* don't ask */
+@ifdef DO_DBCS
+    ATTR_GEN_FILE_SELECTOR_NAME_MASK = "*\0.\0B\0A\0S\0";
+@else
+    ATTR_GEN_FILE_SELECTOR_NAME_MASK = "*.BAS";
+@endif
+    ATTR_GEN_PATH_DATA = {SP_DOCUMENT, ""};
+}
+
+/* --- */
+
+@object GenInteractionClass SaveInteraction = {
+    GI_visMoniker = 'A', "Save As";
+    GI_comp = @SaveFileTrigger,
+		@SaveFileSelector, @SaveFileText, /* @SaveFormList, */
+		@SaveCancelTrigger;
+    GII_attrs = @default | GIA_MODAL;
+    GII_visibility = GIV_DIALOG;
+
+    HINT_ORIENT_CHILDREN_VERTICALLY;
+}
+
+@object GenItemGroupClass SaveFormList = {
+    GIGI_behaviorType = GIGBT_NON_EXCLUSIVE;
+    GI_comp = @SaveFormItem;
+}
+
+@object GenItemClass SaveFormItem = {
+    GI_visMoniker = "Include Form in Aggregate";
+    GI_states = @default -GS_ENABLED;
+}	 
+
+@object GenTextClass SaveFileText = {
+    GI_visMoniker = "Filename";
+    GTXI_attrs = @default +GTA_SINGLE_LINE_TEXT;
+    GTXI_destination = @SaveFileTrigger;
+    GTXI_applyMsg = MSG_GEN_TRIGGER_SEND_ACTION;
+    ATTR_GEN_TEXT_LEGAL_DOS_FILENAMES;
+    ATTR_GEN_TEXT_MAKE_UPPERCASE;
+    HINT_DEFAULT_FOCUS;
+}
+
+@object GenTriggerClass SaveFileTrigger = {
+    GI_visMoniker = 'S', "Save";
+    GTI_destination = @BuilderShell;
+    GTI_actionMsg = MSG_BS_SAVE_FILE;
+    GI_attrs = @default | GA_SIGNAL_INTERACTION_COMPLETE;
+    /* Save in normal builder format */
+    ATTR_GEN_TRIGGER_ACTION_DATA = {0};
+    HINT_SEEK_REPLY_BAR;
+}
+
+@object GenTriggerClass SaveCancelTrigger = {
+    GI_visMoniker = 'C', "Cancel";
+    GTI_destination = @BuilderShell;
+    GTI_actionMsg = MSG_BS_SAVE_CANCEL;
+    GI_attrs = @default | GA_SIGNAL_INTERACTION_COMPLETE;
+    HINT_SEEK_REPLY_BAR;
+}
+
+@object GenFileSelectorClass SaveFileSelector = {
+    HINT_ORIENT_CHILDREN_HORIZONTALLY;
+    GFSI_attrs = @default +FSA_SHOW_FILES_DISABLED;
+    HINT_FILE_SELECTOR_NUMBER_OF_FILES_TO_SHOW = {10};
+    ATTR_GEN_PATH_DATA = {SP_DOCUMENT, ""};
+
+}
+
+/* --- */
+
+@object GenTriggerClass FileExitButton = {
+    GI_visMoniker = 'x', "Exit";
+    GTI_actionMsg = MSG_META_QUIT;
+    GTI_destination = @BuilderApp;
+}
+
+@object GenTriggerClass LastBASLoadedButton = {
+    GTI_actionMsg = MSG_BS_LOAD_LAST;
+    GTI_destination = @BuilderShell;
+}
+
+/*-------------------------------------------------------------------------
+			UI Builder Edit Menu  
+--------------------------------------------------------------------------*/
+
+/* @object GenInteractionClass BuilderEditMenu = {
+    GII_visibility = GIV_POPUP;
+    GI_comp =
+	@BuilderEditControl,
+	@BuilderSearchReplaceControl;
+    
+    ATTR_GEN_INTERACTION_GROUP_TYPE = (GIGT_EDIT_MENU);
+}
+*/
+
+@object GenEditControlClass BuilderEditControl = {
+    GII_visibility = GIV_POPUP;
+    
+	/* ATTR_GEN_CONTROL_APP_UI = (@EditMenuGroup);
+	*/
+    ATTR_GEN_INTERACTION_GROUP_TYPE = (GIGT_EDIT_MENU);
+    ATTR_GEN_CONTROL_PROHIBIT_UI = (GECF_UNDO);
+}
+
+/* @object SearchReplaceControlClass BuilderSearchReplaceControl = {
+    GI_visMoniker = 'F',"Find";
+    GII_visibility = GIV_DIALOG;
+    ATTR_SEARCH_CONTROL_INTERACT_ONLY_WITH_TARGETED_TEXT_OBJECTS;
+} */
+
+/*-------------------------------------------------------------------------
+
+@object GenInteractionClass EditMenuGroup = {
+	GI_states = @default & ~GS_USABLE;
+	GI_comp = @GroupComponentsButton;
+}
+
+
+@object GenInteractionClass CreateComponentMenu = {
+	GI_visMoniker = 'a', "Create";
+
+	GII_visibility = GIV_POPUP;
+}
+
+---------------------------------------------------------------------------*/
+@end Interface;
+@start UiResource;
+
+@object GenEmbeddedCodeClass PropertiesBox = {
+	GI_visMoniker  = 'P', "Component Properties";
+	GII_type       = GIT_ORGANIZATIONAL;
+	GII_visibility = GIV_DIALOG;
+	GI_attrs       = (@default) +GA_TARGETABLE; /* We want the entries
+						     * to be able to get the
+						     * target so that they
+						     * will scroll properly.
+						     * See bug 54727.
+						     */
+	GECI_moduleName	 = @PropertyBoxModuleName;
+	GECI_interpreter = @BuilderInterpreter;
+	HINT_NO_TALLER_THAN_CHILDREN_REQUIRE;
+	HINT_NO_WIDER_THAN_CHILDREN_REQUIRE;
+	HINT_INTERACTION_UNRELATED_PROPERTIES;
+	ATTR_GEN_HELP_FILE    = "components";
+	ATTR_GEN_HELP_CONTEXT = "componenttypes";
+@ifndef RESPONDER	
+	HINT_POSITION_WINDOW_AT_RATIO_OF_PARENT = { SWSS_RATIO | PCT_85,
+							SWSS_RATIO | JUST_BELOW_THE_BUILDER };
+@endif
+@ifdef RESPONDER	
+	HINT_POSITION_WINDOW_AT_RATIO_OF_PARENT = { SWSS_RATIO | PCT_30,
+							SWSS_RATIO | PCT_50 };
+@endif
+}
+
+@chunk TCHAR PropertyBoxModuleName[] = _TEXT("~U\\BASIC\\PROPCTRL");
+
+@object GenTriggerClass GroupComponentsButton = {
+	GI_visMoniker = 'G', "Group";
+    }
+
+@object GenEmbeddedCodeClass AggPropBox = {
+	GI_visMoniker  = 'A', "Aggregate Properties";
+	GI_states = @default -GS_ENABLED -GS_USABLE;
+	GII_type       = GIT_COMMAND;
+	GII_visibility = GIV_DIALOG;
+
+	GECI_moduleName	 = @AggPropBoxModuleName;
+	GECI_interpreter = @BuilderInterpreter;
+	GECI_destination = BuilderShell;
+	GECI_actionMsg = MSG_BS_INIT_GEC_MODULE;
+
+	HINT_NO_TALLER_THAN_CHILDREN_REQUIRE;
+	HINT_NO_WIDER_THAN_CHILDREN_REQUIRE;
+	HINT_INTERACTION_UNRELATED_PROPERTIES;
+	HINT_POSITION_WINDOW_AT_RATIO_OF_PARENT = { SWSS_RATIO | PCT_90,
+							SWSS_RATIO | JUST_BELOW_THE_BUILDER };
+}
+
+@chunk TCHAR AggPropBoxModuleName[] = _TEXT("~U\\BASIC\\AGGPROP");
+    
+@end UiResource;
+
+@start Interface;
+
+
+
+
+/*--------------------------------------------------------------------------
+			UI Builder Options Menu
+---------------------------------------------------------------------------
+
+@object GenInteractionClass OptionsMenu = {
+	GI_comp = @CreateComponentMenu, @ShowTreeView, @ToolControl, 
+		  @SaveOptionsTrigger;
+	GII_visibility = GIV_POPUP;
+	ATTR_GEN_INTERACTION_GROUP_TYPE = (GIGT_OPTIONS_MENU);
+}
+
+@object GenTriggerClass ShowTreeView = {
+	GI_visMoniker = 'T', "Show Tree View";
+}
+
+@object	GenTriggerClass SaveOptionsTrigger =
+{
+	GI_visMoniker	= 'v', "Save Configuration";
+	GTI_actionMsg	= MSG_META_SAVE_OPTIONS;
+	GTI_destination	= @BuilderApp;
+}
+---------------------------------------------------------------------------*/
+
+
+/*--------------------------------------------------------------------------
+	       Toolbar, Controllers, and the ToolControl
+---------------------------------------------------------------------------*/
+
+
+
+/* 
+ * The ToolControl itself.  Lets the user pick which tools will be visible,
+ * & move them around to different tool areas
+ */
+
+/*
+@object GenToolControlClass  ToolControl = {
+	GI_visMoniker  = 'T', "Customize Tool Bars";
+	GII_visibility = GIV_DIALOG;
+	GII_type       = GIT_COMMAND;
+	GTCI_toolboxList   = ToolboxList;
+	GTCI_toolGroupList = ToolGroupList;
+}
+*/
+@ifdef RESPONDER
+@object GenInteractionClass FloatingToolbox = {
+    GI_visMoniker  = 'T', "Toolbox";
+    GII_visibility = GIV_DIALOG;
+
+    HINT_TOOLBOX;
+    HINT_MINIMIZE_CHILD_SPACING;
+    HINT_ORIENT_CHILDREN_HORIZONTALLY;
+    HINT_ALLOW_CHILDREN_TO_WRAP;
+    HINT_NO_WIDER_THAN_CHILDREN_REQUIRE;
+    HINT_POSITION_WINDOW_AT_RATIO_OF_PARENT = { SWSS_RATIO | PCT_0,
+						SWSS_RATIO | PCT_90 };
+}
+@else
+@object GenInteractionClass FloatingToolbox = {
+    GI_comp = @EmbeddedCreationControl;
+    GI_visMoniker  = 'T', "Toolbox";
+    GII_visibility = GIV_DIALOG;
+
+    HINT_TOOLBOX;
+    HINT_NO_WIDER_THAN_CHILDREN_REQUIRE;
+    HINT_MINIMIZE_CHILD_SPACING;
+
+/* For some reason, these hints were causing the toolbox to double in
+ * size at certain times.  It was driving me insane.  dl 4/23/96
+ * HINT_ALLOW_CHILDREN_TO_WRAP;
+ * HINT_INTERACTION_MAKE_RESIZABLE;
+ */
+    HINT_POSITION_WINDOW_AT_RATIO_OF_PARENT = { SWSS_RATIO | PCT_0,
+						SWSS_RATIO | JUST_BELOW_THE_BUILDER };
+}
+@endif
+
+@object GenEmbeddedCodeClass EmbeddedCreationControl = {
+	GECI_moduleName	 = @BGadgetCreationToolsModuleName;
+	GECI_interpreter = @BuilderInterpreter;
+	GECI_destination = BuilderShell;
+	GECI_actionMsg = MSG_BS_INIT_GEC_MODULE;
+}
+@chunk TCHAR BGadgetCreationToolsModuleName[] = _TEXT("~U\\BASIC\\BGADNEW");
+
+/*
+ * The component library creation tools are currently hardcoded in the
+ * builder.  This will change when Project Management is implemented.
+ * -martin 6/13/95
+ */
+
+
+@end Interface;
+@start DebugResource;
+
+
+/*-----------------------------------------------------------------------
+			UI Builder Debug Menu & Its Children
+-------------------------------------------------------------------------*/
+@object GenInteractionClass DebugMenu = {
+	GI_visMoniker = 'D', "Debug";
+	GII_visibility = GIV_POPUP;
+	GI_comp = @DebugInfoGroup;
+}
+
+@object GenInteractionClass DebugInfoGroup = {
+        GI_comp = @GlobalInteraction, @LocalTrigger, @CallStackInteraction;
+	GII_visibility = GIV_SUB_GROUP;
+	GI_states = @default -GS_ENABLED;
+}
+	
+@if 0
+@object GenInteractionClass RpcMenu = {
+	GI_visMoniker = 'R', "RPC";
+	GII_visibility = GIV_POPUP;
+	GI_comp = @RpcInteraction;
+}
+
+@object GenInteractionClass RpcInteraction = {
+    GI_comp = @RpcInitTrigger, @RpcSendTrigger, @RpcExitTrigger,
+	      @PreText, @PostText, @WriteWatch, @ReadWatch;
+    GI_visMoniker = "RPC";
+    GII_visibility = GIV_DIALOG;
+}
+
+@object GenTextClass PreText = {
+    GI_visMoniker = "pre:";
+    HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+    GTXI_maxLength = 19;
+    GTXI_attrs = (@default | GTA_SINGLE_LINE_TEXT);
+}
+
+@object GenTextClass PostText = {
+    GI_visMoniker = "post:";
+    HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+    GTXI_maxLength = 19;
+    GTXI_attrs = (@default | GTA_SINGLE_LINE_TEXT);
+}
+
+@object GenTextClass WriteWatch = {
+    GI_visMoniker = "write";
+    HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+}
+
+@object GenTextClass ReadWatch = {
+    GI_visMoniker = "read";
+    HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+}
+
+@object GenTriggerClass RpcInitTrigger = {
+    GI_visMoniker = "RPC Init";
+    GTI_actionMsg = MSG_BS_RPC_INIT;
+    GTI_destination = BuilderShell;
+}
+
+@object GenTriggerClass RpcSendTrigger = {
+    GI_visMoniker = "RPC Send";
+    GTI_actionMsg = MSG_BS_RPC_SEND;
+    GTI_destination = BuilderShell;
+}
+
+@object GenTriggerClass RpcExitTrigger = {
+    GI_visMoniker = "RPC Exit";
+    GTI_actionMsg = MSG_BS_RPC_EXIT;
+    GTI_destination = BuilderShell;
+}
+@endif
+
+
+/*----------------------------------------------------------------------------
+			UI Builder Global Variable Display  
+-----------------------------------------------------------------------------*/
+
+@object GenInteractionClass GlobalInteraction = {
+    GI_comp = @GlobalChart;
+    GI_visMoniker = "Global Variables";
+    GII_visibility = GIV_DIALOG;
+    GII_type = GIT_ORGANIZATIONAL;
+    HINT_INTERACTION_MAKE_RESIZABLE;
+    HINT_SIZE_WINDOW_AS_RATIO_OF_FIELD = {
+	SWSS_RATIO | PCT_40, SWSS_RATIO | PCT_25};
+}
+
+@object VarChartClass GlobalChart = {
+    GIGI_destination = @GlobalChart;
+    GIGI_applyMsg = MSG_VC_SHOW_VARIABLE;
+    GIGI_selection = GIGS_NONE;
+    GDLI_numItems = 0;
+    GDLI_queryMsg = MSG_VC_QUERY_VAR_CHART_MONIKER;
+
+    VCI_varDestination = @VarUpdateInteraction;
+
+    HINT_ITEM_GROUP_SCROLLABLE;
+    HINT_EXPAND_HEIGHT_TO_FIT_PARENT;
+    HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+
+}
+
+
+
+
+/*----------------------------------------------------------------------------
+			UI Builder Local Variable Display  
+-----------------------------------------------------------------------------*/
+
+@object GenTriggerClass LocalTrigger = {
+    GI_visMoniker = 'L', "Local Variables...";
+    GTI_actionMsg = MSG_GEN_INTERACTION_INITIATE;
+    GTI_destination = @LocalInteraction;
+}
+
+@object GenInteractionClass LocalInteraction = {
+    GI_comp = @LocalChart;
+    GI_visMoniker = "Locals: <No Active Routines>";
+
+    GII_attrs = @default | GIA_NOT_USER_INITIATABLE;
+    GII_visibility = GIV_DIALOG;
+    GII_type = GIT_ORGANIZATIONAL;
+    HINT_INTERACTION_MAKE_RESIZABLE;
+    HINT_SIZE_WINDOW_AS_RATIO_OF_FIELD = {
+	SWSS_RATIO | PCT_40, SWSS_RATIO | PCT_25};
+}
+
+@object VarChartClass LocalChart = {
+    GIGI_destination = @LocalChart;
+    GIGI_applyMsg = MSG_VC_SHOW_VARIABLE;
+    GIGI_selection = GIGS_NONE;
+    GDLI_numItems = 0;
+    GDLI_queryMsg = MSG_VC_QUERY_VAR_CHART_MONIKER;
+
+    HINT_ITEM_GROUP_SCROLLABLE;
+    HINT_EXPAND_HEIGHT_TO_FIT_PARENT;
+    HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+
+}
+
+
+/*----------------------------------------------------------------------------
+			UI Builder Internal Frame Display 
+-----------------------------------------------------------------------------*/
+
+@object GenInteractionClass InternalInteraction = {
+    GI_comp = @InternalChart;
+    GII_attrs = @default | GIA_NOT_USER_INITIATABLE;
+    GII_visibility = GIV_DIALOG;
+    GII_type = GIT_ORGANIZATIONAL;
+    HINT_INTERACTION_MAKE_RESIZABLE;
+    HINT_SIZE_WINDOW_AS_RATIO_OF_FIELD = {
+	SWSS_RATIO | PCT_40, SWSS_RATIO | PCT_25};
+}
+
+
+@object VarChartClass InternalChart = {
+    GIGI_destination = @InternalChart;
+    GIGI_applyMsg = MSG_VC_SHOW_VARIABLE;
+    GIGI_selection = GIGS_NONE;
+    GDLI_numItems = 0;
+    GDLI_queryMsg = MSG_VC_QUERY_VAR_CHART_MONIKER;
+
+    VCI_varDestination = @VarUpdateInteraction;
+
+    HINT_ITEM_GROUP_SCROLLABLE;
+    HINT_EXPAND_HEIGHT_TO_FIT_PARENT;
+    HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+
+}
+
+
+/*----------------------------------------------------------------------------
+			UI Builder Variable Update Objects 
+-----------------------------------------------------------------------------*/
+
+@object VarUpdateInteractionClass VarUpdateInteraction = {
+    
+    GI_visMoniker = "Variable View";
+    GI_comp = @MainInteraction ,@UpdateTrigger;
+
+    GII_type = GIT_COMMAND;
+
+    GII_visibility = GIV_DIALOG;
+
+    GII_attrs = @default | GIA_SYS_MODAL | GIA_NOT_USER_INITIATABLE;
+}
+
+@object GenInteractionClass MainInteraction = {
+    GI_comp = @NameInteraction, @ValueInteraction;
+    HINT_CENTER_CHILDREN_ON_MONIKERS;
+
+}
+
+@object GenInteractionClass NameInteraction = {
+    GI_visMoniker = "Name";
+    GI_comp = @VariableName;
+}
+
+@object GenInteractionClass ValueInteraction = {
+    GI_visMoniker = "Value";
+    GI_comp = @VariableValue;
+}
+
+@object GenGlyphClass VariableName = {
+    /* Name of variable */
+}
+
+@object GenTextClass VariableValue = {
+    GTXI_destination = @UpdateTrigger;
+    GTXI_applyMsg = MSG_GEN_TRIGGER_SEND_ACTION;
+    GTXI_attrs = @default +GTA_SINGLE_LINE_TEXT;
+}
+
+
+@object GenTriggerClass UpdateTrigger = {
+    GI_visMoniker = "Change";
+    GTI_destination = @VarUpdateInteraction;
+    GTI_actionMsg = MSG_VUI_UPDATE_VARIABLE_BY_INDEX;
+    GI_attrs = @default | GA_SIGNAL_INTERACTION_COMPLETE;
+    HINT_SEEK_REPLY_BAR;
+}
+
+
+/*----------------------------------------------------------------------------
+			UI Builder Call Stack 
+-----------------------------------------------------------------------------*/
+@object GenInteractionClass CallStackInteraction = {
+    GI_comp = @CallStack;
+    GI_visMoniker = "Call Stack";
+    GII_visibility = GIV_DIALOG;
+    GII_type = GIT_ORGANIZATIONAL;
+    HINT_INTERACTION_MAKE_RESIZABLE;
+    HINT_SIZE_WINDOW_AS_RATIO_OF_FIELD = {
+	SWSS_RATIO | PCT_25, SWSS_RATIO | PCT_25};
+}
+
+@object CallStackListClass CallStack = {
+
+    GIGI_applyMsg = MSG_CSL_SHOW_INTERNAL_FRAME;
+    GIGI_destination = @CallStack;
+    GIGI_selection = 0;
+    GDLI_numItems = 0;
+    GDLI_queryMsg = MSG_CSL_QUERY_CALL_STACK_MONIKER;
+    HINT_ITEM_GROUP_SCROLLABLE;
+
+
+    HINT_EXPAND_HEIGHT_TO_FIT_PARENT;
+    HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+}
+
+
+/*----------------------------------------------------------------------------
+			UI Builder Window Menu	
+-----------------------------------------------------------------------------*/
+@object GenInteractionClass WindowMenu = {
+    GI_comp = @FloatingToolbox, @PropertiesBox, @AggPropBox,
+	@EditorInteraction;
+
+    GII_visibility = GIV_POPUP;
+    GI_attrs = @default +GA_TARGETABLE;
+
+    ATTR_GEN_INTERACTION_GROUP_TYPE = (GIGT_WINDOW_MENU);
+    HINT_DEFAULT_TARGET;
+    HINT_DEFAULT_FOCUS;
+}
+
+@object GenTriggerClass ReloadTrigger = {
+    GI_visMoniker = "Reload GECs";
+    GTI_actionMsg = MSG_BS_RELOAD_GEC;
+    GTI_destination = @BuilderShell;
+}
+
+@ifdef 0
+@object GenInteractionClass CommandLineDialog = {
+	GI_visMoniker = 'C', "Command Line";
+	GI_comp = @CommandLineText;
+	GII_visibility = GIV_DIALOG;
+	GII_type = GIT_COMMAND;
+}
+
+@object BuilderTextClass CommandLineText = {
+	GTXI_attrs = (@default | GTA_INIT_SCROLLING | GTA_TAIL_ORIENTED | 
+		      GTA_NO_WORD_WRAPPING) & ~GTA_USE_TAB_FOR_NAVIGATION;
+
+	HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+	HINT_EXPAND_HEIGHT_TO_FIT_PARENT;
+}
+@endif
+
+@end DebugResource;
+
+
+
+/*----------------------------------------------------------------------------
+			Component Dialog and lists
+  --------------------------------------------------------------------------*/
+@start UiResource;
+
+@object ComponentListClass ComponentList = 
+{
+    GI_visMoniker = "Components:";
+    GIGI_selection = 0;
+    GDLI_numItems = 0;
+    GIGI_destination = @ComponentList;
+    GIGI_applyMsg = MSG_COMPONENT_LIST_APPLY_MSG;
+    CLI_eventList = @EventList;
+    HINT_ITEM_GROUP_SCROLLABLE;
+@ifdef WANT_POPUPS
+    HINT_ITEM_GROUP_MINIMIZE_SIZE;
+    HINT_ITEM_GROUP_DISPLAY_CURRENT_SELECTION;
+@endif
+    HINT_PLACE_MONIKER_ABOVE;
+
+
+    HINT_EXPAND_HEIGHT_TO_FIT_PARENT;
+/*    HINT_EXPAND_WIDTH_TO_FIT_PARENT;*/
+    HINT_FIXED_SIZE =  {SST_AVG_CHAR_WIDTHS | 14, 0 };
+}
+
+@object EventListClass EventList = 
+{
+    GI_visMoniker = "Events:";
+    GIGI_selection = 0;
+    GDLI_numItems = 0;
+    GIGI_applyMsg = MSG_EVENT_LIST_APPLY_MSG;
+    GIGI_destination = @EventList;
+@ifdef WANT_POPUPS
+    HINT_ITEM_GROUP_MINIMIZE_SIZE;
+    HINT_ITEM_GROUP_DISPLAY_CURRENT_SELECTION;
+@endif
+    HINT_ITEM_GROUP_SCROLLABLE;
+    HINT_PLACE_MONIKER_ABOVE;
+    HINT_EXPAND_HEIGHT_TO_FIT_PARENT;
+/*    HINT_EXPAND_WIDTH_TO_FIT_PARENT;*/
+    HINT_FIXED_SIZE =  {SST_AVG_CHAR_WIDTHS | 14, 0 };
+    ATTR_GEN_ITEM_GROUP_SET_MODIFIED_ON_REDUNDANT_SELECTION;
+}
+
+@object RoutineListClass RoutineList = {
+    GI_visMoniker = "Routines:";
+    GIGI_applyMsg = MSG_RL_SHOW_ROUTINE_FROM_LIST;
+    GIGI_destination = @RoutineList;
+    GIGI_selection = 0;
+    GDLI_numItems = 0;
+    GDLI_queryMsg = MSG_RL_QUERY_ROUTINE_NAME;
+
+@ifdef WANT_POPUPS
+    HINT_ITEM_GROUP_MINIMIZE_SIZE;
+    HINT_ITEM_GROUP_DISPLAY_CURRENT_SELECTION;
+@endif
+    HINT_ITEM_GROUP_SCROLLABLE;
+    HINT_PLACE_MONIKER_ABOVE;
+    HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+    HINT_EXPAND_HEIGHT_TO_FIT_PARENT;
+    ATTR_GEN_ITEM_GROUP_SET_MODIFIED_ON_REDUNDANT_SELECTION;
+    RLI_editor = @Editor;
+}
+
+@end UiResource;
+
+/* Segment for UI related stuff */
+/*
+@object GenGlyphClass Spacer = 
+{
+    HINT_MINIMUM_SIZE =	 {SST_PIXELS | 72, 0 };
+}
+*/
+       
+
+/*
+@start UiData, data;
+@chunk byte Dummy = 9;
+@end UiData
+*/
+
+/* Segment for Debugging state shared by builder and interpreter */
+/*
+@start BuggerData, data;
+@chunk BuggerInfo debugInfo = {0,0,0};
+@chunk BuggerInfo buildDebugInfo = {0,0,0};
+@end BuggerData
+*/
+
+

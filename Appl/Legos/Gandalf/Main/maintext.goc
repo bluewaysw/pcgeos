@@ -1,0 +1,109 @@
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+	Copyright (c) Geoworks 1994 -- All Rights Reserved
+
+PROJECT:	PC/GEOS
+MODULE:		UI Builder -- Main
+FILE:		mainText.goc
+
+AUTHOR:		Martin Turon, Aug 30, 1994
+
+ROUTINES:
+	Name			Description
+	----			-----------
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	martin	9/2/94   	Initial version.
+
+DESCRIPTION:
+	
+
+	$Id: maintext.goc,v 1.2 98/10/13 22:18:11 martin Exp $
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+
+@include "gandalf.goh"
+
+@classdecl BuilderTextClass;
+
+
+/*--------------------------------------------------------------------------
+ *		Code for BuilderTextClass
+ *-------------------------------------------------------------------------*/
+
+@ifdef 0
+
+/***********************************************************************
+ *		MSG_META_KBD_CHAR for GoopTextClass
+ ***********************************************************************
+ * SYNOPSIS:	Handle all keyboard events.
+ *	    
+ * PARAMETERS:	word character	= Input character
+ *		word flags	= ShiftState & CharFlags
+ *		word state	= scan code & ToggleState
+ *	   
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	martin	6/13/94   	Initial version
+ *
+ ***********************************************************************/
+@method BuilderTextClass, MSG_META_KBD_CHAR
+{
+    char				  *currentLine;
+    TextReference			   reference;
+    VisTextRange  			   range;
+    VisTextGetLineOffsetAndFlagsParameters lineInfo;
+    MemHandle				   lineBuffer;
+
+    /* Is this a key press event? */
+    if (~((flags & CF_REPEAT_PRESS) || (flags & CF_RELEASE))) {
+
+	if (character == ((CS_CONTROL << 8) | VC_CTRL_C)) {
+
+	    /* Deal with a break */
+	    
+	} else { if (character == ((CS_CONTROL << 8) | VC_CTRL_M)) {
+
+	    /*
+	     * User pressed RETURN, so get next line of text to process:
+	     *      1) Get end of line
+	     *      2) Get line #
+	     *      3) Get start of given line #
+	     *      4) Grab text in this range
+	     */
+
+	    @call self::MSG_VIS_TEXT_GET_SELECTION_RANGE(&range);
+	    lineInfo.VTGLOAFP_line =
+		@call self::MSG_VIS_TEXT_GET_LINE_FROM_OFFSET(range.VTR_start);
+	    @call self::MSG_VIS_TEXT_GET_LINE_OFFSET_AND_FLAGS(&lineInfo);
+
+
+    	    lineBuffer = @call BuilderInterpreter::
+				MSG_INTERPRETER_GET_LINE_BUFFER();
+    	    currentLine = MemLock(lineBuffer);
+	    reference.TR_ref.TRU_pointer.TRP_pointer = currentLine;
+	    reference.TR_type = TRT_POINTER;
+
+	    @send self::MSG_VIS_TEXT_GET_TEXT_RANGE
+		(0, reference, range.VTR_end, lineInfo.VTGLOAFP_offset);
+
+	    MemUnlock(lineBuffer);
+	    /*
+	     * Send the extracted line of text to the interpreter 
+	     * to be evaluated.
+	     */
+	    @send BuilderInterpreter::MSG_INTERPRETER_EVALUATE(lineBuffer);
+
+	}}
+    }
+    @callsuper();
+}
+
+@endif

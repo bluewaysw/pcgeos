@@ -1,0 +1,764 @@
+/********************************************************************
+*								     
+*	Copyright (c) GeoWorks 1991 -- All Rights Reserved	     
+*								     
+* 	PROJECT:	PC GEOS					     
+* 	MODULE:     	test out the basic interpreter library application
+* 	FILE:		bastest.goc				     
+*								     
+*	AUTHOR:		jimmy lefkowitz				     
+*								     
+*	REVISION HISTORY:					     
+*								     
+*	Name	Date		Description			     
+*	----	----		-----------			     
+*	jimmy	6/15/94		Initial version			     
+*								     
+*	DESCRIPTION:						     
+*								     
+*	$Id: bastest.goc,v 1.2 98/10/16 00:08:47 martin Exp $
+*	$Revision: 1.2 $
+*
+*********************************************************************/
+
+@include <stdapp.goh>
+#include <Ansi/string.h>
+#include <Ansi/stdio.h>
+@include <Objects/gBoolC.goh>
+@include <Objects/gBoolGC.goh>
+@include <Legos/gadget.goh>
+@include <alb.goh>
+#include <math.h>
+
+@include <Legos/basco.goh>
+@include <Legos/ent.goh>
+#include <Legos/basrun.h>
+#include <char.h>
+#include <file.h>
+#include <disk.h>
+#include <fileEnum.h>
+#define LIL_BUF_SIZE 40
+
+MemHandle   rtaskHan;		/* Not really used for much */
+MemHandle   ptaskHan;		/* ProgTask */
+
+/* Returns error and sets value for ThreadGetError()
+ */
+extern word _pascal
+FileCopyLocal_BT(const char *source, const char *dest,
+		 DiskHandle sourceDisk, DiskHandle destDisk);
+
+#ifdef __HIGHC__
+pragma Alias (FileCopyLocal_BT, "FILECOPYLOCAL_BT");
+#endif
+
+void DoCompile(TCHAR* filename, Boolean showError);
+Boolean PushToFSelPath(TCHAR* tail);
+Boolean CheckSuffix(TCHAR*str, TCHAR*tail);
+void CompileBasFiles(void);
+
+@class BasicTestApplicationClass, EntAppClass;
+@message void MSG_BTA_END_PROGRAM();
+@endc
+
+@classdecl  BasicTestApplicationClass;
+
+@class BasicTestProcessClass, GenProcessClass;
+@message void MSG_BTP_RUN_BAS();/* compile and run a module */
+@message void MSG_BTP_COMPILE();	/* compile and save to file */
+@message void MSG_BTP_COMPILE_ALL();
+@message void MSG_BTP_COPY();	/* copy to SP_TOP */
+@message void MSG_BTP_RUN_BC();		/* run a precompiled file */
+@message void MSG_BTP_RUN_URL();	/* as above, but as a "url" */
+@message void MSG_BTP_CD_TO_GANDALF();
+@message void MSG_BTP_CD_TO_BGADGET();
+@message void MSG_BTP_CD_TO_TEST();
+@endc
+
+@classdecl  BasicTestProcessClass, neverSaved;
+
+
+/* {{{ Objects */
+
+@start AppResource;
+
+@object BasicTestApplicationClass BasicTestApp = {
+/*
+   Can't set gen instance data -- fuck!
+    GI_visMoniker = list { @BasicTestMoniker }
+    GI_comp = @BasicTestPrimary;
+    gcnList(MANUFACTURER_ID_GEOWORKS,GAGCNLT_WINDOWS) = @BasicTestPrimary;
+    gcnList(MANUFACTURER_ID_GEOWORKS,MGCNLT_ACTIVE_LIST) = @Interpreter;
+*/
+}
+
+@visMoniker BasicTestMoniker = "Basic Interpreter Test Application";
+
+@end AppResource;
+
+/*
+ * Interface
+ */
+
+@start Interface;
+
+@object GenPrimaryClass BasicTestPrimary = {
+    GI_comp = @BoolGroup, @TopTrigs, @LoadFileSelector, @Trigs, @RunURL;
+    /* set not usable because we add it to app dynamically */
+    GI_states = (@default) -GS_USABLE;
+    HINT_SIZE_WINDOW_AS_DESIRED;
+}
+
+#define BG_LOCAL	0x1
+
+@object GenBooleanGroupClass BoolGroup = {
+    GI_comp = @LocalBool;
+    GBGI_selectedBooleans = BG_LOCAL;
+}
+
+@object GenBooleanClass LocalBool = {
+    GI_visMoniker = "Local dir";
+    GBI_identifier = BG_LOCAL;
+}
+
+@object GenInteractionClass TopTrigs = {
+    GI_comp = @GandalfTrigger, @TestTrigger, @BGadgetTrigger;
+    HINT_ORIENT_CHILDREN_HORIZONTALLY;
+}
+
+@object GenTriggerClass GandalfTrigger = {
+    GI_visMoniker = 'G', "CD to Gandalf";
+    GI_attrs = (@default | GA_INITIATES_BUSY_STATE);
+    GTI_destination = process;
+    GTI_actionMsg = MSG_BTP_CD_TO_GANDALF;
+}
+
+@object GenTriggerClass TestTrigger = {
+    GI_visMoniker = 'T', "CD to Test";
+    GI_attrs = (@default | GA_INITIATES_BUSY_STATE);
+    GTI_destination = process;
+    GTI_actionMsg = MSG_BTP_CD_TO_TEST;
+}
+
+@object GenTriggerClass BGadgetTrigger = {
+    GI_visMoniker = 'B', "CD to BGadget";
+    GI_attrs = (@default | GA_INITIATES_BUSY_STATE);
+    GTI_destination = process;
+    GTI_actionMsg = MSG_BTP_CD_TO_BGADGET;
+}
+
+
+@ifdef DO_DBCS
+@object GenFileSelectorClass LoadFileSelector = {
+    HINT_FILE_SELECTOR_NUMBER_OF_FILES_TO_SHOW = {10};
+    HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+    HINT_ORIENT_CHILDREN_HORIZONTALLY;
+    ATTR_GEN_PATH_DATA = { SP_DOCUMENT, ".\0" };
+}
+@else
+@object GenFileSelectorClass LoadFileSelector = {
+    HINT_FILE_SELECTOR_NUMBER_OF_FILES_TO_SHOW = {10};
+    HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+    HINT_ORIENT_CHILDREN_HORIZONTALLY;
+    ATTR_GEN_PATH_DATA = { SP_DOCUMENT, "." };
+}
+@endif
+
+@object GenTextClass RunURL = {
+    GI_visMoniker = "Run URL";
+
+    GTXI_applyMsg = MSG_BTP_RUN_URL;
+    GTXI_destination = process;
+
+    GTXI_text = "DOS://~D/FOO";
+    GTXI_maxLength = LIL_BUF_SIZE-1;
+    GTXI_attrs = (@default | GTA_SINGLE_LINE_TEXT);
+    HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+    ATTR_GEN_TEXT_MAKE_UPPERCASE;
+}
+
+/* {{{ Trigs */
+
+@object GenInteractionClass Trigs = {
+    GI_comp = @RunBasTrigger, @RunBCTrigger,
+    	@CompileTrigger, @CopyTrigger;
+    HINT_ORIENT_CHILDREN_HORIZONTALLY;
+}
+
+@object GenTriggerClass RunBasTrigger = {
+    GI_visMoniker = 'A', "Run BAS";
+    GI_attrs = (@default | GA_INITIATES_BUSY_STATE);
+    GTI_destination = process;
+    GTI_actionMsg = MSG_BTP_RUN_BAS;
+}
+
+@object GenTriggerClass RunBCTrigger = {
+    GI_visMoniker = 'R', "Run BC";
+    GTI_destination = process;
+    GTI_actionMsg = MSG_BTP_RUN_BC;
+}
+
+@object GenTriggerClass RunLoadURLTrigger = {
+    GI_visMoniker = 'U', "Run URL";
+    GTI_destination = process;
+    GTI_actionMsg = MSG_BTP_RUN_URL;
+}
+
+@object GenTriggerClass CompileTrigger = {
+    GI_visMoniker = 'C', "Compile";
+    GI_attrs = (@default | GA_INITIATES_BUSY_STATE);
+    GTI_destination = process;
+    GTI_actionMsg = MSG_BTP_COMPILE;
+}
+
+@object GenTriggerClass CopyTrigger = {
+    GI_visMoniker = 'o', "Copy to USERDATA";
+    GI_attrs = (@default | GA_INITIATES_BUSY_STATE);
+    GTI_destination = process;
+    GTI_actionMsg = MSG_BTP_COPY;
+}
+
+/* }}} */
+
+@object AlarmServerClass AlarmServer = {
+    ASI_alarmHeap = NullHandle;
+}
+
+@object CompileInterpClass Interpreter = {
+    IC_alarmServer = @AlarmServer;
+}
+
+@end Interface;
+
+/* }}} */
+
+
+
+/*********************************************************************
+ *			LoadModule
+ *********************************************************************
+ * SYNOPSIS: 	load a basic module and compile it
+ * CALLED BY:	
+ * RETURN:
+ * SIDE EFFECTS:
+ * STRATEGY:
+ * REVISION HISTORY:
+ *	Name	Date		Description			     
+ *	----	----		-----------			     
+ *	jimmy	6/15/94		Initial version			     
+ * 
+ *********************************************************************/
+@method BasicTestProcessClass, MSG_BTP_RUN_BAS
+{
+    TCHAR	path[PATH_BUFFER_SIZE], *cp;
+    TCHAR	fullPath[PATH_BUFFER_SIZE], *fpathp;
+    dword	diskDword;
+    DiskHandle	disk;
+
+    diskDword = @call LoadFileSelector::
+	MSG_GEN_FILE_SELECTOR_GET_FULL_SELECTION_PATH(path);
+    disk = GFS_GET_FULL_SELECTION_PATH_DISK_HANDLE(diskDword);
+
+    /* This function has a STUPID API */
+    fpathp = (TCHAR*)&fullPath;
+    FileConstructFullPath(&fpathp, PATH_BUFFER_SIZE, disk, path, TRUE);
+
+    if (CheckSuffix(fullPath, _TEXT(".BAS")))
+    {
+	(void) @call Interpreter::
+	    MSG_COMPILE_INTERP_LOAD_MODULE
+		(ptaskHan, fullPath, @BasicTestPrimary);
+    }
+}
+
+
+/*********************************************************************
+ *			BTPLoadFSel
+ *********************************************************************
+ * SYNOPSIS:	Load a module, taking name from file selector
+ * CALLED BY:	
+ * RETURN:
+ * SIDE EFFECTS:
+ * STRATEGY:
+ * REVISION HISTORY:
+ *	Name	Date		Description			     
+ *	----	----		-----------			     
+ *	dubois	 1/18/95	Initial version			     
+ * 
+ *********************************************************************/
+@method BasicTestProcessClass, MSG_BTP_RUN_BC
+{
+    DiskHandle	disk;
+    TCHAR	fselPath[PATH_BUFFER_SIZE];
+    TCHAR	fullPath[PATH_BUFFER_SIZE], *fullPathP, *cp;
+    Boolean	success;
+
+    /* Can you believe this verbose crap??? */
+    disk = GFS_GET_FULL_SELECTION_PATH_DISK_HANDLE
+	(@call LoadFileSelector::
+	 MSG_GEN_FILE_SELECTOR_GET_FULL_SELECTION_PATH(fselPath));
+
+    fullPathP = fullPath;
+    FileConstructFullPath(&fullPathP, PATH_BUFFER_SIZE, disk, fselPath, TRUE);
+
+    if (! CheckSuffix(fullPath, _TEXT(".BC"))) return;
+
+    /* strip off the .BC -- RunLoadModule doesn't want it */
+    fullPath[ strlen(fullPath) - 3 ] = C_NULL;
+
+    success = RunLoadModule(ptaskHan, fullPath, @BasicTestPrimary);
+    success = success;
+}
+
+
+/*********************************************************************
+ *			BTPSave
+ *********************************************************************
+ * SYNOPSIS:	Write out the compiled file
+ * CALLED BY:	
+ * RETURN:
+ * SIDE EFFECTS:
+ * STRATEGY:
+ * REVISION HISTORY:
+ *	Name	Date		Description			     
+ *	----	----		-----------			     
+ *	dubois	 1/18/95	Initial version			     
+ * 
+ *********************************************************************/
+@method BasicTestProcessClass, MSG_BTP_COMPILE
+{
+    TCHAR	tail[FILE_LONGNAME_BUFFER_SIZE];
+    
+    if (! PushToFSelPath(tail) ) return;
+    DoCompile(tail, FALSE);
+    FilePopDir();
+}
+
+
+/***********************************************************************
+ *		MSG_BTP_COPY for BasicTestProcessClass
+ ***********************************************************************
+ * SYNOPSIS:	
+ * PARAMETERS:	
+ * SIDE EFFECTS:
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	dubois	11/ 3/95   	Initial Revision
+ *
+ ***********************************************************************/
+@method BasicTestProcessClass, MSG_BTP_COPY
+{
+    TCHAR	sourcePath[PATH_BUFFER_SIZE];
+    TCHAR	destPath[PATH_BUFFER_SIZE];
+    DiskHandle	sourceDisk;
+    
+    strcpy(destPath, "BASIC\\");
+    sourceDisk =
+	GFS_GET_FULL_SELECTION_PATH_DISK_HANDLE
+	    (@call LoadFileSelector::
+	     MSG_GEN_FILE_SELECTOR_GET_FULL_SELECTION_PATH(sourcePath));
+
+    @call LoadFileSelector::
+	MSG_GEN_FILE_SELECTOR_GET_SELECTION(destPath+6);
+
+    FileCopyLocal_BT(sourcePath, destPath, sourceDisk, SP_USER_DATA);
+    
+}	/* End of MSG_BTP_COPY.	*/
+
+
+/*********************************************************************
+ *			DoCompile
+ *********************************************************************
+ * SYNOPSIS: 	
+ * CALLED BY:	MSG_BTP_BUILD_SAVE
+ * PASS:	filename to compile
+ * RETURN:
+ * SIDE EFFECTS:
+ * STRATEGY:
+ * REVISION HISTORY:
+ *	Name	Date		Description			     
+ *	----	----		-----------			     
+ *	dubois	 5/ 1/95	Pulled out of MSG_BTP_BUILD_SAVE
+ * 
+ *********************************************************************/
+void
+DoCompile(TCHAR* filename, Boolean showError)
+{
+    dword	disk;
+    TCHAR    	*buffer, *cp;
+    MemHandle	comTask;
+    Boolean	libertyP;
+
+    if (CheckSuffix(filename, _TEXT(".BAS")))
+    {
+
+	@call process::MSG_GEN_APPLICATION_MARK_BUSY();
+	comTask = BascoCompileModule(ProgGetVMFile(ptaskHan),
+				     filename);
+	@call process::MSG_GEN_APPLICATION_MARK_NOT_BUSY();
+
+
+	cp = strchr(filename, C_PERIOD);
+	if (cp != NULL)
+	{
+	    *cp = C_NULL;
+	}
+
+	if (comTask != NullHandle)
+	{
+	    if (libertyP) {
+		strcat(filename, _TEXT(".BCL"));
+	    } else {
+		strcat(filename, _TEXT(".BC"));
+	    }
+
+	    BascoWriteCode(filename, comTask);
+	    BascoDestroyTask(comTask);
+	} else if (showError) {
+	    UserStandardDialog(NULL, NULL, NULL, filename,
+			       _TEXT("File \001 not compiled."),
+			       (CDT_ERROR << CDBF_DIALOG_TYPE_OFFSET) |
+			       (GIT_NOTIFICATION << CDBF_INTERACTION_TYPE_OFFSET));
+	}
+    }
+    return;
+}
+
+
+/*********************************************************************
+ *			BTPLoadURL
+ *********************************************************************
+ * SYNOPSIS:	Load a module, taking name from "URL" GenText
+ * CALLED BY:	
+ * RETURN:
+ * SIDE EFFECTS:
+ * STRATEGY:
+ * REVISION HISTORY:
+ *	Name	Date		Description			     
+ *	----	----		-----------			     
+ *	dubois	 1/18/95	Initial version			     
+ * 
+ *********************************************************************/
+@method BasicTestProcessClass, MSG_BTP_RUN_URL
+{
+    TCHAR	url[LIL_BUF_SIZE];
+    Boolean	success;
+
+    @call RunURL::MSG_VIS_TEXT_GET_ALL_PTR(url);
+    if (strchr(url, C_PERIOD)) {
+	UserStandardDialog(NULL, NULL, url, NULL,
+			   _TEXT("\"\001\" has a suffix"),
+			   (CDT_ERROR << CDBF_DIALOG_TYPE_OFFSET) |
+			   (GIT_NOTIFICATION << CDBF_INTERACTION_TYPE_OFFSET));
+	return;
+    }
+    success = RunLoadModule(ptaskHan, url, @BasicTestPrimary);
+    success = success;
+}
+
+
+Boolean
+PushToFSelPath(TCHAR* tail)
+{
+    TCHAR	path[PATH_BUFFER_SIZE], *cp;
+    dword	disk;
+
+    disk = @call LoadFileSelector::MSG_GEN_FILE_SELECTOR_GET_FULL_SELECTION_PATH(path);
+    cp = strrchr(path, C_BACKSLASH);
+    if (cp == NULL)
+    {
+	return FALSE;
+    }
+    *cp++ = C_NULL;
+    FilePushDir();
+    FileSetCurrentPath(GFS_GET_FULL_SELECTION_PATH_DISK_HANDLE(disk), path);
+    strcpy(tail, cp);
+    return TRUE;
+}
+
+
+Boolean
+CheckSuffix(TCHAR* str, TCHAR* tail)
+{
+    TCHAR*	cp;
+
+    cp = strrchr(str, C_PERIOD);
+    if (cp == NULL || strcmp(cp, tail))
+    {
+	UserStandardDialog(NULL, NULL, tail, str,
+			   _TEXT("\001 is not a \002 file"),
+			   (CDT_ERROR << CDBF_DIALOG_TYPE_OFFSET) |
+			   (GIT_NOTIFICATION << CDBF_INTERACTION_TYPE_OFFSET));
+	return FALSE;
+    } else {
+	return TRUE;
+    }
+}
+
+
+
+/*********************************************************************
+ *			CDToPath
+ *********************************************************************
+ * SYNOPSIS:	CD to one of our favorite directories
+ * CALLED BY:	UI
+ * REVISION HISTORY:
+ *	Name	Date		Description			     
+ *	----	----		-----------			     
+ *	dloft	9/4/95		Initial version			     
+ * 
+ *********************************************************************/
+void
+CDToPath(TCHAR *specificPath)
+{
+    TCHAR	fullPath[PATH_BUFFER_SIZE];
+
+    if (@call BoolGroup::MSG_GEN_BOOLEAN_GROUP_GET_SELECTED_BOOLEANS() & BG_LOCAL)
+    {
+	if (SysGetDosEnvironment(_TEXT("LOCAL_ROOT"), 
+				 fullPath, PATH_BUFFER_SIZE)) {
+	    strcpy(fullPath, _TEXT("E:\\SDKBETA\\LEGOS"));
+	}
+    } else {
+	if (SysGetDosEnvironment(_TEXT("ROOT_DIR"), 
+				 fullPath, PATH_BUFFER_SIZE)) {
+	    strcpy(fullPath, _TEXT("E:\\SDKBETA\\LEGOS"));
+	}
+    }
+    strcat(fullPath, specificPath);
+
+    if (@call LoadFileSelector::MSG_GEN_FILE_SELECTOR_SET_FULL_SELECTION_PATH
+	(fullPath, 0)) {
+	UserStandardDialog(NULL, NULL, NULL, fullPath,
+			   _TEXT("Unable to change to directory \001."),
+			   (CDT_ERROR << CDBF_DIALOG_TYPE_OFFSET) |
+			   (GIT_NOTIFICATION << CDBF_INTERACTION_TYPE_OFFSET));
+    }
+}
+
+@method BasicTestProcessClass, MSG_BTP_CD_TO_GANDALF
+{
+    CDToPath(_TEXT("\\APPL\\LEGOS\\GANDALF\\BAS\\"));
+}
+
+@method BasicTestProcessClass, MSG_BTP_CD_TO_TEST
+{
+    CDToPath(_TEXT("\\BASIC\\TEST\\"));
+}
+
+@method BasicTestProcessClass, MSG_BTP_CD_TO_BGADGET
+{
+    CDToPath(_TEXT("\\LIBRARY\\LEGOS\\BGADGET\\BAS\\"));
+}
+
+
+/***********************************************************************
+ *		MSG_META_ATTACH_GENPROCESSCLASS for BasicTestProcessClass
+ ***********************************************************************
+ * SYNOPSIS:	Set up instance data on app that used to be
+ *		done statically.
+ * PARAMETERS:	
+ * SIDE EFFECTS:
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	dubois	4/11/96   	Initial Revision
+ *
+ ***********************************************************************/
+@method BasicTestProcessClass, MSG_META_ATTACH_GENPROCESSCLASS
+/*@method	BasicTestProcessClass,	MSG_PROCESS_CREATE_UI_THREAD*/
+{
+/*    Boolean retval;
+    retval = @callsuper();*/
+    /* Can't be built statically any more because App is not Gen
+     */
+    @call BasicTestApp::MSG_GEN_ADD_CHILD(@BasicTestPrimary, CCO_FIRST);
+    @call BasicTestApp::MSG_GEN_SET_ATTRS(GA_TARGETABLE, 0);
+    @call BasicTestApp::MSG_GEN_REPLACE_VIS_MONIKER_OPTR
+	(@BasicTestMoniker, VUM_DELAYED_VIA_APP_QUEUE);
+    @callsuper();
+/*    return retval;*/
+}
+
+
+
+/*********************************************************************
+ *			OpenApplication
+ *********************************************************************
+ * SYNOPSIS: 	do some initialization
+ * CALLED BY:	    
+ * PASS:	AppAttachFlags		attachFlags
+ *		MemHandle		launchBlock
+ *		MemHandle		extraState
+ * RETURN:
+ * SIDE EFFECTS:
+ * STRATEGY:
+ * REVISION HISTORY:
+ *	Name	Date		Description			     
+ *	----	----		-----------			     
+ *	jimmy	6/20/94		Initial version			     
+ * 
+ *********************************************************************/
+
+@method	BasicTestProcessClass,	MSG_GEN_PROCESS_OPEN_APPLICATION
+{
+    AppLaunchBlock*	alb;
+
+    /* Required alarm server init shme
+     * FIXME: can some of this be done by META_ATTACH since
+     * it's on the active list?
+     */
+    @send BasicTestApp::MSG_META_GCN_LIST_ADD
+	(@AlarmServer, MGCNLT_ACTIVE_LIST, MANUFACTURER_ID_GEOWORKS);
+    @call AlarmServer::MSG_META_INITIALIZE();
+    @call AlarmServer::MSG_AS_LOAD_DATA(0);
+
+    /* Since we can't set gen instance data on BasicTestApp,
+     * do the GCN stuff here
+     */
+    @call BasicTestPrimary::MSG_GEN_SET_USABLE(VUM_DELAYED_VIA_APP_QUEUE);
+    @send BasicTestApp::MSG_META_GCN_LIST_ADD
+	(@BasicTestPrimary, GAGCNLT_WINDOWS, MANUFACTURER_ID_GEOWORKS);
+
+
+
+    @send BasicTestApp::MSG_META_GCN_LIST_ADD
+	(@Interpreter, MGCNLT_ACTIVE_LIST, MANUFACTURER_ID_GEOWORKS);
+
+    @callsuper();
+
+    alb = MemLock(launchBlock);
+
+    ptaskHan = ProgAllocTask(@Interpreter, NullHandle);
+    ProgTurboChargeFido(ptaskHan);
+    @call Interpreter::MSG_INTERP_SET_STATE(ptaskHan);
+
+    if (alb->ALB_dataFile != 0)
+    {
+	TCHAR* cp;
+
+	@call LoadFileSelector::MSG_GEN_PATH_SET
+	    (alb->ALB_path, alb->ALB_diskHandle);
+	@call LoadFileSelector::MSG_GEN_FILE_SELECTOR_SET_SELECTION
+	    (alb->ALB_dataFile);
+
+	cp = strrchr(alb->ALB_dataFile, C_PERIOD);
+	if (cp != NULL && !strcmp(cp, _TEXT(".BC")))
+	{
+	    TCHAR	fullPath[PATH_BUFFER_SIZE];
+	    TCHAR*	fullPathP;
+
+	    fullPathP = fullPath;
+	    FileConstructFullPath(&fullPathP, PATH_BUFFER_SIZE,
+				  alb->ALB_diskHandle,
+				  alb->ALB_path,
+				  TRUE);
+
+	    RunLoadModule(ptaskHan, fullPath, @BasicTestPrimary);
+	}
+	else if (cp != NULL && !strcmp(cp, _TEXT(".BAS")))
+	{
+	    FilePushDir();
+	    FileSetCurrentPath(alb->ALB_diskHandle, alb->ALB_path);
+	    DoCompile(alb->ALB_dataFile, FALSE);
+	    FilePopDir();
+	}
+    }
+    MemUnlock(launchBlock);
+}
+
+@method	BasicTestProcessClass,	MSG_GEN_PROCESS_CLOSE_APPLICATION
+{
+    MemHandle	retval;
+    EventHandle	event;
+
+    /* this is a mechanism that supposedly will call MSG_BT_END_PROGRAM
+     * after the death mechanism for the primaries under BasicTestApp
+     * is done, meaning that it will be safe to call ProgDestroyTask which
+     * will unload gool and other component libraries that need to be
+     * around until their objects are gone - jimmy (from the mind of brianc)
+     */
+    event = @record BasicTestApp::MSG_BTA_END_PROGRAM();
+    @send process::MSG_META_OBJ_FLUSH_INPUT_QUEUE(event, 0, HandleOf(@BasicTestApp));
+
+    retval = @callsuper();
+    return retval;
+}
+
+
+/*********************************************************************
+ *			CompileBasFiles
+ *********************************************************************
+ * SYNOPSIS:	Return all .bas files in current dir
+ * CALLED BY:	
+ * PASS:
+ * RETURN:
+ * SIDE EFFECTS:
+ * STRATEGY:
+ * REVISION HISTORY:
+ *	Name	Date		Description			     
+ *	----	----		-----------			     
+ *	dubois	6/17/96  	Initial version
+ * 
+ *********************************************************************/
+void
+CompileBasFiles()
+{
+    MemHandle	filesHan;
+    word	foo, numFiles, i;
+    FileEnumParams	fep;
+
+    FileLongName*	fileArray;
+    
+    fep.FEP_searchFlags = FESF_NON_GEOS | FESF_CALLBACK;
+    fep.FEP_returnAttrs = (void*)FESRT_NAME;
+    fep.FEP_returnSize = sizeof(FileLongName);
+    fep.FEP_matchAttrs = NULL;
+    fep.FEP_bufSize = FE_BUFSIZE_UNLIMITED;
+    fep.FEP_skipCount = 0;
+#ifdef __HIGHC__
+    fep.FEP_callback = FESC_WILDCARD;
+#else
+    fep.FEP_callback = (void*)FESC_WILDCARD;
+#endif
+    fep.FEP_callbackAttrs = NULL;
+    fep.FEP_cbData1 = (dword)_TEXT("*.BAS");
+    fep.FEP_cbData2 = 0;
+    fep.FEP_headerSize = 0;
+    numFiles = FileEnum(&fep, &filesHan, &foo);
+
+    fileArray = MemLock(filesHan);
+    for (i=0; i<numFiles; i++) {
+	DoCompile(fileArray[i], TRUE);
+    }
+   
+    MemUnlock(filesHan);
+}
+
+
+/*********************************************************************
+ *			BTAEndProgram
+ *********************************************************************
+ * SYNOPSIS: call ProgDestroyTask now that it should be safe to
+ * CALLED BY:	
+ * RETURN:
+ * SIDE EFFECTS:
+ * STRATEGY:
+ * REVISION HISTORY:
+ *	Name	Date		Description			     
+ *	----	----		-----------			     
+ *	jimmy	 2/ 8/95	Initial version			     
+ * 
+ *********************************************************************/
+
+@method BasicTestApplicationClass, MSG_BTA_END_PROGRAM
+{
+    ProgDestroyTask(ptaskHan);
+}
