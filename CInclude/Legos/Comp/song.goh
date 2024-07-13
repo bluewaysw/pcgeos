@@ -1,0 +1,192 @@
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+	Copyright (c) Geoworks 1995 -- All Rights Reserved
+
+PROJECT:	NewBASIC
+MODULE:		Basic Component Set - Net Component Library
+FILE:		coolnet.goh
+
+AUTHOR:		Martin Turon, Jan 27, 1995
+
+ROUTINES:
+	Name			Description
+	----			-----------
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	martin	1/27/95   	Initial version.
+
+DESCRIPTION:
+	
+	COMPONENT API descriptor	1999/10/6  <martin> rev 0.0.0.2
+	PROPERTIES			1998/4/22  <martin>  
+		synth.host
+		synth.port
+		synth.mode
+		synth.trap
+		synth.error
+		synth.status
+		synth.options	 => /get=tcp/ip Options /set:disable=0|enable=1
+		synth.interrupt
+		synth.parent	 => /get="top"
+	ACTIONS				1998/4/22 <martin>
+		synth.open(s,N)	= connect to host/port	
+		synth.read()		
+		synth.write(data)	= send data
+		synth.close()		= close synth session
+		synth.create() 	= create new synth session
+		synth.flush()
+		synth.synch()
+		synth.reset(N)	  	= where N receive=0|send=1|both=2
+	~	synth.command(s, data)	= send command with data
+
+	~
+	~ Not implemented yet
+
+	$Id: net.goh,v 1.1 98/05/13 14:54:51 martin Exp $
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+
+@include <stdapp.goh>
+@include <Legos/ent.goh>
+@include <Legos/gadget.goh>
+
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		SynthComponent Class Definitions
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+
+/******	library/legos/comp/net/sound ******/
+
+@class SynthComponentClass, EntClass;
+
+	typedef	   enum {/* word... to get byte, use ByteEnum and define */
+		SCCT_NEVER,		/* avoid all errors              */
+		SCCT_RUNTIME,		/* raise errors to basic runtime */
+		SCCT_DIALOG		/* create user dialog on errors  */ 
+	} SynthComponentTraps;
+
+        @instance  RunHeapInfo		*SCC_rhi;	/* tmp 4 action/prop */
+        @instance  RunHeapToken	         SCC_name;
+        @instance  MemHandle	         SCC_sound;	
+        @instance  word		         SCC_tempo;	
+        @instance  word		         SCC_voices;	
+        @instance  word		         SCC_priority;	
+        @instance  EndOfSongFlags	 SCC_flags;
+	@instance  SynthComponentTraps   SCC_trap  	= SCCT_NEVER;
+        @instance  int		         SCC_error   	= 0;
+
+	/**** EVENTS:	(handled by BASIC)	none!!!
+	 */
+
+	/**** PROPERTIES:	
+	 *	host,	port,	  mode,      status, 	timeout,
+	 *      trap,	error,	options,   interrupt
+	 */
+	@define synthPropertyMessage(x)		 		      \
+	 @atme (@message (MSG_ENT_GET_PROPERTY_0) MSG_SYNTH_GET_)x;    \
+	 @atme (@message (MSG_ENT_SET_PROPERTY_0) MSG_SYNTH_SET_)x;
+	@startPropertyMessages(SynthComponent,EntVis)
+	@synthPropertyMessage(NAME)
+	@synthPropertyMessage(FLAGS)
+	@synthPropertyMessage(TEMPO)
+	@synthPropertyMessage(VOICES)
+	@synthPropertyMessage(PRIORITY)
+	@synthPropertyMessage(ERROR)
+	@synthPropertyMessage(TRAP)
+	@endPropertyMessages(SynthComponent_SUB_PROP, EntVis, 24)
+
+	/**** ACTIONS:	
+	 *	open,  close
+	 *	move,  copy, create, delete, 
+	 *	go,    seek
+	 *      peek,  poke  	(byte normalized integer)
+	 *	read,  write 	(string)
+	 *  ++  get,   put   	(array)
+	 *	mkdir, rmdir,	 
+	 *	dateline
+	 *  ++
+	 *  ++ Not Implemented yet
+	 */
+	@define SYNTH_ACTION_MESSAGE(x) \
+	 @atme (@message (MSG_ENT_DO_ACTION) MSG_SYNTH_DO_)x;
+	@startActionMessages	(SynthComponent, Ent)
+	@SYNTH_ACTION_MESSAGE(PLAY)
+	@SYNTH_ACTION_MESSAGE(STOP)
+	@SYNTH_ACTION_MESSAGE(FREE)
+	@endActionMessages	(SynthComponent, Ent, 16)
+
+@endc
+
+/******/
+
+@class WaveComponentClass, EntClass;
+
+	typedef	   enum {/* word... to get byte, use ByteEnum and define */
+		WCCT_NEVER,		/* avoid all errors              */
+		WCCT_RUNTIME,		/* raise errors to basic runtime */
+		WCCT_DIALOG		/* create user dialog on errors  */ 
+	} WaveComponentTraps;
+
+        @instance  RunHeapInfo		*WCC_rhi;	/* tmp 4 action/prop */
+        @instance  RunHeapToken	         WCC_name;
+        @instance  RunHeapToken	         WCC_path;
+        @instance  StandardPath	         WCC_root;
+        @instance  optr		         WCC_file	= NULL;	
+	@instance  WaveComponentTraps    WCC_trap  	= WCCT_NEVER;
+        @instance  int		         WCC_error   	= 0;
+
+	/**** EVENTS:	(handled by BASIC)	none!!!
+	 */
+
+	/**** PROPERTIES:	
+	 *	name,	path,	  root, file,      error, 	trap,
+	 */
+	@define wavePropertyMessage(x)		 		      \
+	 @atme (@message (MSG_ENT_GET_PROPERTY_0) MSG_WAVE_COMP_GET_)x;    \
+	 @atme (@message (MSG_ENT_SET_PROPERTY_0) MSG_WAVE_COMP_SET_)x;
+	@startPropertyMessages(WaveComponent,EntVis)
+	@wavePropertyMessage(NAME)
+	@wavePropertyMessage(PATH)
+	@wavePropertyMessage(ROOT)
+	@wavePropertyMessage(FILE)
+	@wavePropertyMessage(ERROR)
+	@wavePropertyMessage(TRAP)
+	@endPropertyMessages(WaveComponent_SUB_PROP, EntVis, 24)
+
+	/**** ACTIONS:	
+	 *	play,  stop
+	 *  ++
+	 *  ++ Not Implemented yet
+	 */
+	@define WAVE_ACTION_MESSAGE(x) \
+	 @atme (@message (MSG_ENT_DO_ACTION) MSG_WAVE_COMP_DO_)x;
+	@startActionMessages	(WaveComponent, Ent)
+	@WAVE_ACTION_MESSAGE(PLAY)
+	@WAVE_ACTION_MESSAGE(STOP)
+	@endActionMessages	(WaveComponent, Ent, 16)
+
+@endc
+
+/******/
+
+/*
+typedef enum
+{
+	ERROR_WAVE_COMPONENT,
+	ERROR_SYNTH_COMPONENT
+} FatalErrors;
+
+typedef enum 
+{
+	WARNING_WAVE_COMPONENT,
+	WARNING_SYNTH_COMPONENT
+} Warnings;
+
+extern FatalErrors feCoolSong;
+extern Warnings wCoolSong;
+*/
+
+
+
+

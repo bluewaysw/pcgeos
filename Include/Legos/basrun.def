@@ -1,0 +1,242 @@
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+	Copyright (c) Geoworks 1995 -- All Rights Reserved
+
+PROJECT:	Legos
+MODULE:		Basic runtime
+FILE:		basrun.def
+
+AUTHOR:		Roy Goldman, Jul 10, 1995
+
+MACROS:
+	Name			Description
+	----			-----------
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	roy	 7/10/95		Initial revision
+
+
+DESCRIPTION:
+	Assembly exports from basic runtime interpreter
+
+	$Id: basrun.def,v 1.2 98/06/24 20:53:28 martin Exp $		
+	$Revision: 1.2 $
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+
+SetDef __BASRUN
+
+StartLibrary	basrun
+
+include	Objects/clipbrd.def
+
+
+ifndef BASRUN_GLUE_BUG	
+InterpClass	class	MetaClass
+
+;;
+;; See basco.goh for documentation on these messages
+;;
+MSG_INTERP_GET_STATE			message
+MSG_INTERP_SET_STATE			message
+MSG_INTERP_INIT_PROGRAM			message
+MSG_INTERP_LOAD_COMPILED_MODULE		message
+MSG_INTERP_SET_SYSTEM_MODULE		message
+MSG_INTERP_GET_SYSTEM_MODULE		message
+MSG_INTERP_FREE_OBJ_BLOCK		message
+MSG_INTERP_DESTROY_COMPONENTS		message
+MSG_INTERP_SET_ALARM_SERVER		message
+MSG_INTERP_GET_ALARM_SERVER		message
+
+IC_state	hptr	null
+IC_system	hptr	null
+IC_alarmServer	optr	0
+
+InterpClass	endc
+endif	; BASRUN_GLUE_BUG
+	
+LegosComplex	struct
+    LC_vmfh	hptr.VMFileHandle
+    LC_chain	dword			; VMChain ( block:dbitem )
+    LC_format	ClipboardItemFormatID
+LegosComplex	ends
+
+;; Format of a structure field
+;; There is no padding between fields
+;;
+LegosStructField	struct
+    LSF_value	dword
+    LSF_type	byte
+LegosStructField	ends
+
+	;;  this stuff is in runtime.def (don't ask me why)
+;
+; LegosType -- used by the interpreter and the components to classify data.
+; NOTE:  The following definition MUST match the definition in legos.h!!!
+;
+LegosType	etype word
+	LT_TYPE_UNKNOWN		enum	LegosType
+
+	LT_TYPE_FLOAT		enum	LegosType
+	LT_TYPE_INTEGER		enum	LegosType
+	LT_TYPE_LONG		enum	LegosType
+	LT_TYPE_STRING		enum	LegosType
+	LT_TYPE_COMPONENT	enum	LegosType
+	LT_TYPE_ARRAY		enum	LegosType
+
+	LT_TYPE_ARRAY_ELT_LV	enum	LegosType
+    ; Runtime-internal
+
+	LT_TYPE_ERROR		enum	LegosType
+	;
+	; TYPE_ERROR added to provide a way for components to return an error
+	; from a SET_PROPERTY handler.  At some point, the components may
+	; return an error type as part of LegosData, currently we just assume
+	; that a type mismatch occurred.
+	;
+
+	LT_TYPE_FOR_LOOP	enum	LegosType
+    ; Runtime-internal
+    	LT_TYPE_UNUSED_3	enum	LegosType
+    ; formerly VARIANT, before it was made a synonym for UNKNOWN
+
+    	LT_TYPE_MODULE		enum	LegosType
+    	LT_TYPE_ILLEGAL		enum	LegosType
+    	LT_TYPE_COMPLEX		enum	LegosType
+
+    	LT_TYPE_ERROR_HANDLER	enum	LegosType
+    ; Runtime-internal
+
+    	LT_TYPE_LOCAL_VAR_LV	enum	LegosType
+    	LT_TYPE_MODULE_VAR_LV	enum	LegosType
+    	LT_TYPE_PROPERTY_LV	enum	LegosType
+    	LT_TYPE_BC_PROPERTY_LV	enum	LegosType 
+    	LT_TYPE_MODULE_REF_LV	enum	LegosType  
+    ; All the above, runtime-internal
+
+    	LT_TYPE_STRUCT		enum	LegosType
+
+	LT_TYPE_STRUCT_REF_LV	enum	LegosType
+    ; Runtime-internal
+
+    	LT_TYPE_VOID		enum	LegosType
+    ; Compiler-internal
+
+LT_TYPE_NONE 	equ 	LT_TYPE_UNKNOWN
+LT_TYPE_VARIANT	equ	LT_TYPE_UNKNOWN
+LT_TYPE_NUMBER	equ	LT_TYPE_FLOAT
+
+LegosClipboardableType	etype word
+
+	LCBT_STRING		enum LegosClipboardableType
+	LCBT_INTEGER		enum LegosClipboardableType
+	LCBT_LONG		enum LegosClipboardableType
+	LCBT_FLOAT		enum LegosClipboardableType
+	LCBT_ARRAY		enum LegosClipboardableType
+	LCBT_GRAPHIC		enum LegosClipboardableType
+	LCBT_FAX		enum LegosClipboardableType
+	LCBT_SOUND		enum LegosClipboardableType
+	LCBT_SPREADSHEET	enum LegosClipboardableType
+
+
+
+
+
+;
+; CompPropertyError -- used as a return value for LT_TYPE_ERROR from
+; MSG_ENT_GET_PROPERTY and MSG_ENT_SET_PROPERTY.  Order MUST match that in
+; legos.h.
+;
+CompPropertyError	etype	word
+	CPE_INVALID_ACTION		enum	CompPropertyError
+; CPE_READONLY_PROPERTY must be first, don't change it.
+	CPE_READONLY_PROPERTY		enum	CompPropertyError
+	; property cannot be set
+	CPE_UNKNOWN_PROPERTY		enum	CompPropertyError
+	; property that the component does not know about
+
+	CPE_PROPERTY_TYPE_MISMATCH	enum	CompPropertyError
+	; wrong type passed in and the component won't convert it for you
+
+	CPE_PROPERTY_SIZE_MISMATCH	enum	CompPropertyError
+
+
+	CPE_PROPERTY_NOT_SET		enum	CompPropertyError
+	; the component knows about this property, but it can't determine
+	; what the current value is.
+
+	CAE_WRONG_NUMBER_ARGS		enum	CompPropertyError
+	; the action expected a different number of args than passed in.
+
+	CAE_WRONG_TYPE			enum	CompPropertyError
+	; The type of an argument is wrong.
+
+	CPE_SPECIFIC_PROPERTY_ERROR	enum	CompPropertyError
+	; Temporary place holder tell components can return
+	; specific errors.
+
+	; union for all types of legos data
+LegosData	union
+    LD_integer	sword			; TYPE_INTEGER
+    LD_long	sdword			; TYPE_LONG
+    LD_float	dword			; TYPE_FLOAT
+
+    LD_array	hptr.ArrayHeader	; TYPE_ARRAY
+    LD_module	hptr.RunTask		; TYPE_MODULE (hptr.RunTask)
+
+    LD_comp	dword			; TYPE_COMPONENT (was optr, now dword)
+    LD_struct	word			; TYPE_STRUCT
+    LD_string	word			; TYPE_STRING
+    LD_complex	word			; TYPE_COMPLEX
+    
+    LD_gen_word		word		; generic values -- word, dword
+    LD_gen_dword	dword
+
+    LD_error	CompPropertyError	; TYPE_ERROR
+    LD_fptr	fptr
+LegosData	end
+
+MAX_DIMS = 3
+;;; glue NT can't handle linking this via C 
+;;; DimArray	type MAX_DIMS dup (word)
+ArrayHeader 	struct
+    AH_type	LegosType
+    AH_numDims	word
+    AH_dims	word MAX_DIMS dup (?)
+    AH_maxElt	word
+ArrayHeader	ends
+
+
+global	RunFindFunction:far
+global 	RunCallFunction:far
+global	RunCallFunctionWithKey:far
+
+FunctionKey	type	dword
+NULL_KEY	equ	-1
+
+;extern VMFileHandle ProgGetVMFile(PTaskHan);
+global	ProgGetVMFile:far
+; Pass	ss:bp[0] ProgTask Handle
+; Return ax - VMFileHandle
+
+;extern PTaskHan ProgAllocTask(optr interpreter);
+global	ProgAllocTask:far
+
+;extern Boolean RunLoadModule(PTaskHan, char* url, optr uiParent);
+global	RunLoadModule:far
+
+;extern void ProgDestroyTask(PTaskHan);
+global	ProgDestroyTask:far
+
+global	RunTaskGetVMFile:far
+;
+; Pass		- ^hRunTask on stack
+; Return	ax = vmFile 
+
+
+
+EndLibrary	basrun
+
+

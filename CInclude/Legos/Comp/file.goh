@@ -1,0 +1,272 @@
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+	Copyright (c) 1997 New Deal, Inc. -- All Rights Reserved
+
+PROJECT:	PC/GEOS - LEGOS
+MODULE:		Input/Output Component Set - File Component
+FILE:		file.goh
+
+AUTHOR:		Martin Turon, Nov. 17, 1997
+
+ROUTINES:
+	Name			Description
+	----			-----------
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	martin	11/17/1997   	Initial version.
+
+DESCRIPTION:
+
+	FileComponentClass:
+		* EVENTS:	
+	        * PROPERTIES:   name, path, size, date, time, trap, 
+				error, buffer, exists, readable, writeable
+	        * ACTIONS:      open, read, write, close
+				create, delete, move, copy,
+				peek, poke, go, seek, 
+				mkdir, rmdir, chdir, pushd, popd
+
+	FileSelectorComponentClass
+		* EVENTS:	
+        	* PROPERTIES:   type (open/save)
+		* ACTIONS:	
+
+	$Id: file.goh,v 1.2 98/07/10 00:09:52 martin Exp $
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+
+@include <Legos/ent.goh>
+@include <Legos/gadget.goh>
+@include <Objects/gFSelC.goh>	/* FileSelectorComponentClass */
+
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		Component Class Definitions
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+
+@class FileComponentClass, EntClass;
+
+	typedef	   ByteFlags            FileComponentFlags;
+	#define	   FCF_EOF	 	0x0001
+	#define	   FCF_READ_ONLY 	0x0002
+
+	typedef	   enum byte {
+		FCT_NEVER,		/* avoid all errors              */
+		FCT_RUNTIME,		/* raise errors to basic runtime */
+		FCT_DIALOG,		/* create user dialog on errors  */ 
+		FCT_BOTH,		/* create error event & dialog   */ 
+		FCT_SYSTEM,		/* don't avoid errors like NEVER */
+					/* this enum, really should be a */
+					/* bitfield:			 */
+					/*	:1 error events		 */
+					/*	:2 error dialogs	 */
+					/*	:4 error override	 */
+	} FileComponentTraps;
+
+        @instance  FileError		 FCC_error = 0;
+        @instance  FileComponentFlags	 FCC_flags = 0;
+	@instance  FileComponentTraps    FCC_trap  = FCT_NEVER;
+        @instance  FileHandle		 FCC_file  = NULL;
+        @instance  DiskHandle		 FCC_disk;
+        @instance  RunHeapToken		 FCC_name;	/* string */
+        @instance  RunHeapToken		 FCC_path;	/* string */
+        @instance  RunHeapInfo		*FCC_rhi;	/* tmp 4 action/prop */
+        @instance  optr			 FCC_buffer;
+
+	@message   FileHandle MSG_FILE_GET_FILE(RunHeapInfo *rhi);
+
+	/**** EVENTS:	(handled by BASIC)	none!!!
+	 */
+
+	/**** PROPERTIES:	
+	 *	name,	path,	  size,      date, 	time,
+	 *      buffer, exists,   readable,  writeable	 
+	 */
+	@define filePropertyMessage(x)		 		      \
+	 @atme (@message (MSG_ENT_GET_PROPERTY_0) MSG_FILE_GET_)x;    \
+	 @atme (@message (MSG_ENT_SET_PROPERTY_0) MSG_FILE_SET_)x;
+	@startPropertyMessages(FileComponent,Ent)
+	@filePropertyMessage(NAME)
+	@filePropertyMessage(PATH)
+	@filePropertyMessage(SIZE)
+	@filePropertyMessage(DATE)
+	@filePropertyMessage(TIME)
+	@filePropertyMessage(TRAP)
+	@filePropertyMessage(ERROR)
+	@filePropertyMessage(BUFFER)
+	@filePropertyMessage(EOF)
+	@filePropertyMessage(EXISTS)
+	@filePropertyMessage(READABLE)
+	@filePropertyMessage(WRITEABLE)
+	@endPropertyMessages(FileComponent_SUB_PROP, Ent, 24)
+
+	/**** ACTIONS:	
+	 *	open,  close
+	 *	move,  copy, create, delete, 
+	 *	go,    seek
+	 *      peek,  poke  	(byte normalized integer)
+	 *	read,  write 	(string)
+	 *  ++  get,   put   	(array)
+	 *	mkdir, rmdir,	 
+	 *	dateline
+	 *  ++
+	 *  ++ Not Implemented yet
+	 */
+	@define FILE_ACTION_MESSAGE(x) \
+	 @atme (@message (MSG_ENT_DO_ACTION) MSG_FILE_DO_)x;
+	@startActionMessages	(FileComponent, Ent)
+	@FILE_ACTION_MESSAGE(OPEN)
+	@FILE_ACTION_MESSAGE(READ)
+	@FILE_ACTION_MESSAGE(WRITE)
+	@FILE_ACTION_MESSAGE(CLOSE)
+	@FILE_ACTION_MESSAGE(COMMIT)
+	@FILE_ACTION_MESSAGE(MOVE)
+	@FILE_ACTION_MESSAGE(COPY)
+	@FILE_ACTION_MESSAGE(CREATE)
+	@FILE_ACTION_MESSAGE(DELETE)
+	@FILE_ACTION_MESSAGE(PEEK)
+	@FILE_ACTION_MESSAGE(POKE)
+	@FILE_ACTION_MESSAGE(GO)
+	@FILE_ACTION_MESSAGE(SEEK)
+	@FILE_ACTION_MESSAGE(TELL)
+	@FILE_ACTION_MESSAGE(GOES)
+	@FILE_ACTION_MESSAGE(ENDS)
+	@FILE_ACTION_MESSAGE(MKDIR)
+	@FILE_ACTION_MESSAGE(RMDIR)
+	@FILE_ACTION_MESSAGE(CHDIR)
+	@FILE_ACTION_MESSAGE(PUSHD)
+	@FILE_ACTION_MESSAGE(POPD)
+	@FILE_ACTION_MESSAGE(DATELINE)
+	@endActionMessages	(FileComponent_SUB_ACT, Ent, 16)
+
+@endc
+
+@class FileBufferComponentClass, EntClass;
+
+        @instance  MemHandle		FBC_buffer;
+        @instance  int			FBC_size;
+        @instance  int			FBC_position;
+        @instance  int			FBC_increment;
+
+	/**** EVENTS:	(handled by BASIC)	none!!!
+	 */
+
+	/**** PROPERTIES:	
+	 *	name,	path,	  size,     date, 
+	 *      exists,	position, readable, writeable	 
+	 *
+	 *	buffer.parent	  = file component
+	 */
+	@define fileBufferPropertyMessage(x)				     \
+	 @atme (@message (MSG_ENT_GET_PROPERTY_0) MSG_FILE_BUFFER_GET_)x;    \
+	 @atme (@message (MSG_ENT_SET_PROPERTY_0) MSG_FILE_BUFFER_SET_)x;
+	@startPropertyMessages(FileBufferComponent,Ent)
+	@fileBufferPropertyMessage(SIZE)
+	@fileBufferPropertyMessage(POSITION)
+	@endPropertyMessages(FileBufferComponent_SUB_PROP, EntVis, 24)
+
+	/**** ACTIONS:
+	 *	buffer.getc()	  = return byte at current position as integer 
+	 *	buffer.putc(N)	  = write given integer N as byte at position
+	 *	buffer.gets(N) 	  = return string of length N at position
+	 *	buffer.puts(s,N)  = write N of string s to parent file   
+	 *	buffer.geti()	  = return integer at current position 
+	 *	buffer.puti(N)	  = write given integer N to parent file
+	 *  ~	buffer.geta(N) 	  = return array of length N at position   
+	 *  ~	buffer.puta(a,N)  = write array a[0-N] to parent file   
+         *  ~   buffer.commit()  
+	 *
+	 *  ~ Not implemented yet
+	 *
+	 * tables may be added to further translate:
+	 *	readInt, writeInt, readInteger, writeInteger,
+	 * 	readString, writeString, readArray, writeArray,
+	 */
+	@define FILE_BUFFER_ACTION_MESSAGE(x) \
+	 @atme (@message (MSG_ENT_DO_ACTION) MSG_FILE_BUFFER_DO_)x;
+	@startActionMessages	(FileBufferComponent, Ent)
+	@FILE_BUFFER_ACTION_MESSAGE(READ_BYTE)
+	@FILE_BUFFER_ACTION_MESSAGE(WRITE_BYTE)
+	@FILE_BUFFER_ACTION_MESSAGE(READ_STRING)
+	@FILE_BUFFER_ACTION_MESSAGE(WRITE_STRING)
+	@FILE_BUFFER_ACTION_MESSAGE(READ_ARRAY)
+	@FILE_BUFFER_ACTION_MESSAGE(WRITE_ARRAY)
+	@FILE_BUFFER_ACTION_MESSAGE(READ_INTEGER)
+	@FILE_BUFFER_ACTION_MESSAGE(WRITE_INTEGER)
+	@endActionMessages	(FileBufferComponent_SUB_ACT, Ent, 16)
+
+@endc
+
+@class FileSelectorComponentClass, GadgetClass; /* EntVisClass; */
+	@uses GenFileSelectorClass;
+
+	@message void MSG_FILE_SELECTOR_GO();
+
+	/**** PROPERTIES:	
+	 *	selection, path, mask, token, creator, action	
+	 *	criteria, suspend, attrs, fileattrs, geodeattrs
+	 */
+	@define fileSelectorPropertyMessage(x)		 		\
+	 @atme (@message (MSG_ENT_GET_PROPERTY_0) MSG_FILE_SELECTOR_GET_)x; \
+	 @atme (@message (MSG_ENT_SET_PROPERTY_0) MSG_FILE_SELECTOR_SET_)x;
+	@startPropertyMessages(FileSelectorComponent,Gadget)
+	@fileSelectorPropertyMessage(NUMBER_OF_FILES)
+	@fileSelectorPropertyMessage(SELECTION)
+	@fileSelectorPropertyMessage(PATH)
+	@fileSelectorPropertyMessage(DISK)
+	@fileSelectorPropertyMessage(MASK)
+	@fileSelectorPropertyMessage(FILEATTRS)
+	@fileSelectorPropertyMessage(TOKEN)
+	@fileSelectorPropertyMessage(CREATOR)
+	@fileSelectorPropertyMessage(GEODEATTRS)
+	@fileSelectorPropertyMessage(ACTION)
+	@fileSelectorPropertyMessage(ATTRS)
+	@fileSelectorPropertyMessage(CRITERIA)
+	@fileSelectorPropertyMessage(SUSPEND)
+	@endPropertyMessages(FileSelectorComponent_SUB_PROP, Gadget, 24)
+
+	/**** ACTIONS:	
+	 *	open,  rescan, up
+	 */
+	@define FILE_SELECTOR_ACTION_MESSAGE(x) \
+	 @atme (@message (MSG_ENT_DO_ACTION) MSG_FILE_SELECTOR_DO_)x;
+	@startActionMessages	(FileSelectorComponent, Gadget)
+	@FILE_SELECTOR_ACTION_MESSAGE(RESCAN)
+	@FILE_SELECTOR_ACTION_MESSAGE(UP)
+	@FILE_SELECTOR_ACTION_MESSAGE(OPEN)
+	@endActionMessages	(FileSelectorComponent_SUB_ACT, Gadget, 16)
+
+	/* 
+	 * Instance data
+	 */
+        @instance  RunHeapToken		 FSCC_path;	/* string */
+	@instance optr FSCI_file;
+@endc
+
+typedef enum {
+    ERROR_FILE_COMPONENT_FAILURE,
+    ERROR_FILE_BUFFER_COMPONENT_FAILURE,
+} FatalErrors;
+
+typedef enum {
+    WARNING_FILE_COMPONENT_PROBLEM,
+    WARNING_FILE_BUFFER_COMPONENT_PROBLEM,
+} Warnings;
+
+extern FatalErrors feFileComp;
+extern Warnings    wFileComp;
+
+
+
+
+
+
+
+
+
+
+
+
+
+

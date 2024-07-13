@@ -1,0 +1,147 @@
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+	Copyright (c) Geoworks 1995 -- All Rights Reserved
+
+PROJECT:	
+MODULE:		
+FILE:		basco.def
+
+AUTHOR:		Jimmy Lefkowitz, Jan 19, 1995
+
+MACROS:
+	Name			Description
+	----			-----------
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	jimmy	 1/19/95		Initial revision
+
+
+DESCRIPTION:
+	header for basco library
+
+	$Id: basco.def,v 1.1 97/12/05 12:16:03 gene Exp $		
+	$Revision: 1.1 $
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+
+
+include geos.def
+include Objects/metaC.def
+	
+SetDef __BASCO
+
+StartLibrary	basco
+
+	;;  this stuff is in runtime.def (don't ask me why)
+;
+; LegosType -- used by the interpreter and the components to classify data.
+; NOTE:  The following definition MUST match the definition in legos.h!!!
+;
+LegosType	etype word
+	LT_TYPE_UNKNOWN		enum	LegosType
+	LT_TYPE_FLOAT		enum	LegosType
+	LT_TYPE_INTEGER		enum	LegosType
+	LT_TYPE_LONG		enum	LegosType
+	LT_TYPE_STRING		enum	LegosType
+	LT_TYPE_COMPONENT	enum	LegosType
+	LT_TYPE_ARRAY		enum	LegosType
+	LT_TYPE_ARRAY_REF	enum	LegosType
+	LT_TYPE_ERROR		enum	LegosType
+	;
+	; TYPE_ERROR added to provide a way for components to return an error
+	; from a SET_PROPERTY handler.  At some point, the components may
+	; return an error type as part of LegosData, currently we just assume
+	; that a type mismatch occurred.
+	;
+	LT_TYPE_GENERIC		enum	LegosType
+	;
+	; TYPE_GENERIC added in anticipation of generic/complex/extended data
+	; types.  Currently not used.
+    	LT_TYPE_VARIANT		enum	LegosType
+    	LT_TYPE_MODULE		enum	LegosType
+    	LT_TYPE_ILLEGAL		enum	LegosType
+    	LT_TYPE_COMPLEX		enum	LegosType
+    	LT_TYPE_COMPLEX_UNOWNED	enum	LegosType
+
+    	LT_TYPE_LOCAL_VAR_LV	enum	LegosType
+    	LT_TYPE_MODULE_VAR_LV	enum	LegosType
+    	LT_TYPE_PROPERTY_LV	enum	LegosType
+    	LT_TYPE_BC_PROPERTY_LV	enum	LegosType 
+    	LT_TYPE_MODULE_REF_LV	enum	LegosType  
+    	LT_TYPE_STRUCT		enum	LegosType
+
+      ; Used in compiler for untyped nodes 
+    	LT_TYPE_VOID		enum	LegosType
+
+LT_TYPE_NONE 	equ 	LT_TYPE_UNKNOWN
+LT_TYPE_NUMBER	equ	LT_TYPE_FLOAT
+;
+; CompPropertyError -- used as a return value for LT_TYPE_ERROR from
+; MSG_ENT_GET_PROPERTY and MSG_ENT_SET_PROPERTY.  Order MUST match that in
+; legos.h.
+;
+CompPropertyError	etype	word
+	CPE_UNKNOWN_PROPERTY		enum	CompPropertyError
+	; property that the component does not know about
+
+	CPE_PROPERTY_TYPE_MISMATCH	enum	CompPropertyError
+	; wrong type passed in and the component won't convert it for you
+
+	CPE_PROPERTY_SIZE_MISMATCH	enum	CompPropertyError
+
+
+	CPE_PROPERTY_NOT_SET		enum	CompPropertyError
+	; the component knows about this property, but it can't determine
+	; what the current value is.
+
+	CPE_WRONG_NUMBER_ARGS		enum	CompPropertyError
+	; the action expected a different number of args than passed in.
+	
+
+	; union for all types of legos data
+LegosData	union
+	LD_num		dword
+	LD_str		word
+	LD_array	word
+	LD_comp		optr
+	LD_module	dword
+	LD_integer	sword
+	LD_long_int	sdword
+	LD_string	fptr.char
+	LD_complex	dword
+	LD_gen_word	word
+	LD_gen_dword	dword
+	LD_error_type	CompPropertyError
+LegosData	end
+
+
+	
+global	RunFindFunction:far
+global	RunCallFunction:far
+global	RunCallFunctionWithKey:far
+
+FunctionKey	type	dword	;returned by RunFindFunction
+NULL_KEY	equ	-1	;returned if function not found
+
+;extern VMFileHandle ProgGetVMFile(PTaskHan);
+global	ProgGetVMFile:far
+; Pass	ss:bp[0] ProgTask Handle
+; Return ax - VMFileHandle
+
+;extern PTaskHan ProgAllocTask(optr interpreter);
+global	ProgAllocTask:far
+
+;extern Boolean RunLoadModule(PTaskHan, char* url, optr uiParent);
+global	RunLoadModule:far
+
+;extern void ProgDestroyTask(PTaskHan);
+global	ProgDestroyTask:far
+
+global	BascoRunTaskGetVMFile:far
+;
+; Pass		- ^hRunTask on stack
+; Return	ax = vmFile 
+
+EndLibrary	basco

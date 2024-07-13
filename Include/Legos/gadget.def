@@ -1,0 +1,2173 @@
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+	Copyright (c) Geoworks 1995 -- All Rights Reserved
+
+PROJECT:	Legos
+MODULE:		Gadget Library
+FILE:		gadget.def
+
+AUTHOR:		David Loftesness, Jan  3, 1995
+
+MACROS:
+	Name			Description
+	----			-----------
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	dloft	1/ 3/95		Initial revision
+
+
+DESCRIPTION:
+	
+	$Id: gadget.def,v 1.2 98/06/24 20:54:34 martin Exp $		
+	$Revision: 1.2 $
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+
+SetDef __GADGET
+
+StartLibrary	gadget
+
+UseLib Legos/ent.def
+include Legos/gadmacro.def
+
+
+COMMENT	@%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		Property and Action chart
+
+* = Has Properties
++ = Has Actions
+
+Gadget*+
+	GadgetGeom*
+		GadgetForm*
+		GadgetClipper*
+		GadgetGroup
+			GadgetPopup
+		GadgetDialog*
+			GadgetFloater*+
+
+
+	GadgetButton*
+	GadgetLabel
+	GadgetNumber*+
+	GadgetVis+
+		GadgetFig
+	GadgetTimer*+
+	GadgetToggle*
+	GadgetChoice*
+	GadgetList*+
+
+	GadgetSpacer
+	GadgetPicture
+	GadgetClipboardable*+
+		GadgetGadget*+
+			GadgetTable*+
+		GadgetEntry*+
+		GadgetText*+
+
+[Ent]
+ ServSys
+    ServiceTimeDate*+
+    ServiceAlarm*+
+    ServiceTimer*+
+    ServiceFile*+
+
+    SystemBusy*+
+    SystemDisplay
+    SystemSound+
+    SystemLauncher*+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+
+;%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+; 			Class Definitions
+;%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+GadgetClass		class 	EntVisClass
+
+MSG_GADGET_MAKE_CLIPBOARD_SELECTION_STATE_NULL	message
+;
+; If a non-ClipboardableClass component gains the system target, it
+; must notify the clipboards that the selection state has changed
+; to 0 for each of copyable/pastable/deletable.  (forms, dialogs
+; and floaters are the only examples.)
+;
+; Pass:		nothing
+; Return:	nothing
+; Destroyed:	ax, cx, dx, bp
+;
+
+
+MSG_GADGET_PREVENT_ERROR_ON_GET_WIDTH_HEIGHT	message
+;
+; Provided so that BGadgetClass can filter out errors when requesting
+; the width/height of a non-visible gadget.  It would be better for
+; BGadget to intercept GADGET_GET_WIDTH/HEIGHT, but BGadget doesn't
+; always intercept this message.
+;
+; Pass:		nothing
+; Return:	carry	- set if should skip error
+; Destroyed:	nothing
+; 
+
+
+;
+; Set on WinGroups so we know which button is set to the default
+;
+ATTR_GADGET_DEFAULT_BUTTON	vardata	optr
+
+StartPropertyMessages			Gadget, EntVis
+MSG_GADGET_GET_LOOK		message
+MSG_GADGET_SET_LOOK		message
+MSG_GADGET_GET_READ_ONLY	message
+MSG_GADGET_SET_READ_ONLY	message
+MSG_GADGET_GET_CAPTION		message
+MSG_GADGET_SET_CAPTION		message
+MSG_GADGET_GET_GRAPHIC		message
+MSG_GADGET_SET_GRAPHIC		message
+MSG_GADGET_GET_HELP_CONTEXT	message
+MSG_GADGET_SET_HELP_CONTEXT	message
+MSG_GADGET_GET_LEFT		message
+MSG_GADGET_SET_LEFT		message
+MSG_GADGET_GET_TOP		message
+MSG_GADGET_SET_TOP		message
+MSG_GADGET_GET_HEIGHT		message
+MSG_GADGET_SET_HEIGHT		message
+MSG_GADGET_GET_WIDTH		message
+MSG_GADGET_SET_WIDTH		message
+MSG_GADGET_GET_SIZE_HCONTROL	message
+MSG_GADGET_SET_SIZE_HCONTROL	message
+MSG_GADGET_GET_SIZE_VCONTROL	message
+MSG_GADGET_SET_SIZE_VCONTROL	message
+MSG_GADGET_GET_HELP_FILE	message
+MSG_GADGET_SET_HELP_FILE	message
+EndPropertyMessages			Gadget, EntVis, 24
+
+GadgetSizeControlType etype word
+	GSCT_AS_SPECIFIED		enum GadgetSizeControlType
+	GSCT_AS_SMALL_AS_POSSIBLE	enum GadgetSizeControlType
+	GSCT_AS_BIG_AS_POSSIBLE		enum GadgetSizeControlType
+	GSCT_AS_NEEDED			enum GadgetSizeControlType
+
+StartActionMessages			Gadget, EntVis
+MSG_GADGET_ACTION_SET_COLOR	message
+MSG_GADGET_ACTION_SET_SIZE	message
+MSG_GADGET_ACTION_POSITIONED	message
+EndActionMessages			Gadget, EntVis, 16	; no more than
+							; 24 properties
+							; and 16 actions
+
+	GI_graphic		word	; RunHeapToken, TYPE_COMPLEX
+	GI_look			byte	; look value
+GadgetClass 		endc
+
+GenDummyClass		class  VisClass, master
+GenDummyClass		endc
+
+
+
+;
+; The following type, record and macro are for the clipboardable's
+; focus state, specified in GCLI_flags
+;
+ClipboardableFocusState	etype	byte
+	CFS_NONE	enum	ClipboardableFocusState
+				; Clipboardable has no focus at all.
+	CFS_WITHOUT_KBD	enum	ClipboardableFocusState
+				; Clipboardable has focus within its window
+				; (where window is a form, floater, or
+				; dialog) but is not receiving kbd input.
+				; I.e., has target and lacks focus.
+	CFS_FULL	enum	ClipboardableFocusState
+				; Clipboardable has exclusive focus.  It gets
+				; keyboard input.
+
+;
+; Map the CF_hasFocus/CF_hasTarget bits onto our enumerated type.
+;
+GetClipboardableFocusState	macro result
+	local done
+
+	CheckHack <offset CF_hasTarget eq 0>
+	CheckHack <offset CF_hasFocus eq 1>
+	and	result, mask CF_hasFocus or mask CF_hasTarget
+	cmp	result, CFS_FULL
+	jle	done
+	mov	result, CFS_FULL
+done:
+endm
+
+;
+; All the boolean flags for clipboardable can be stored here
+; Note that the order of the focusable, clipboardable, deletable
+; and copyable bits corresponds to the order of the associated
+; property messages.  This allows us to use common handlers for
+; these properties - we use the msg number to index into the flags.
+;
+ClipboardableFlags	record
+	:9
+	CF_pastable:1		; Result of most recent acceptPaste.
+	CF_copyable:1
+	CF_deletable:1
+	CF_clipboardable:1
+	CF_focusable:1
+	CF_hasFocus:1		; Has the focus.
+	CF_hasTarget:1		; Has the target. (is active selection)
+ClipboardableFlags	end
+
+GadgetClipboardableClass	class	GadgetClass
+
+MSG_GADGET_CLIPBOARDABLE_RAISE_ACCEPT_PASTE_EVENT	message
+;
+; This message sent to a ClipboardableClass component to get it
+; to raise an acceptPaste event.  Components that do not want
+; to raise acceptPaste events should intercept this message and
+; do nothing.
+; Caveat: Since Geos' clipboard supports multiple formats for an
+; item, this message raises acceptPaste events for each supported
+; format.
+;
+; Pass:       nothing
+; Return:     nothing
+; Destroyed:  ax,cx,dx
+;
+
+MSG_GADGET_CLIPBOARDABLE_UPDATE_CLIPBOARDS		message
+;
+; This message is sent to a ClipboardableClass component when
+; clipboard components should be notified that the active selection's
+; state has changed.  Note that the GCN mechanism will discard redundant
+; updates.
+;
+; Pass:       nothing
+; Return:     nothing
+; Destroyed:  ax,cx,dx
+;
+
+MSG_GADGET_CLIPBOARDABLE_CLIPBOARD_ITEM_CHANGED		message
+;
+; A clipboared component will send this message to the active selection
+; (target) to tell it that the normal transfer item has changed.  The
+; receiving clipboardable component should raise an acceptPaste for
+; the new item and then tell the clipboard component its new state.
+; Then it should tell the clipboard component to raise a
+; clipboardChanged event.
+;
+; Pass:       ^lcx:dx	= optr of clipboard component
+; Return:     nothing
+; Destroyed:  ax,cx,dx,bp
+;
+
+MSG_GADGET_CLIPBOARDABLE_GET_FOCUSABLE_INTERNAL		message
+; Internal message for getting a gadget's focusable property.
+; Pass:		nothing
+; Return: 	zero flag	- set if gadget is *not* focusable
+; Destroyed: 	nothing
+; Interception:	Not likely.
+;
+
+
+; Don't change the order of these messages.  See comments for
+; ClipboardableFlags.
+
+StartPropertyMessages			GadgetClipboardable, Gadget
+MSG_GADGET_CLIPBOARDABLE_GET_FOCUS_STATE	message
+MSG_GADGET_CLIPBOARDABLE_SET_FOCUS_STATE	message
+MSG_GADGET_CLIPBOARDABLE_GET_FOCUSABLE		message
+MSG_GADGET_CLIPBOARDABLE_SET_FOCUSABLE		message
+MSG_GADGET_CLIPBOARDABLE_GET_CLIPBOARDABLE	message
+MSG_GADGET_CLIPBOARDABLE_SET_CLIPBOARDABLE	message
+MSG_GADGET_CLIPBOARDABLE_GET_DELETABLE		message
+MSG_GADGET_CLIPBOARDABLE_SET_DELETABLE		message
+MSG_GADGET_CLIPBOARDABLE_GET_COPYABLE		message
+MSG_GADGET_CLIPBOARDABLE_SET_COPYABLE		message
+EndPropertyMessages		GadgetClipboardable, Gadget, 8
+
+; Some checks to make sure the orders of the property messages and
+; the bits in ClipboardableFlags correspond.
+
+CheckHack < MSG_GADGET_CLIPBOARDABLE_GET_FOCUS_STATE eq \
+	    MSG_GADGET_CLIPBOARDABLE_GET_FOCUSABLE - 2 >
+CheckHack < MSG_GADGET_CLIPBOARDABLE_GET_FOCUSABLE eq \
+	    MSG_GADGET_CLIPBOARDABLE_GET_CLIPBOARDABLE - 2 >
+CheckHack < MSG_GADGET_CLIPBOARDABLE_GET_CLIPBOARDABLE eq \
+	    MSG_GADGET_CLIPBOARDABLE_GET_DELETABLE - 2 >
+CheckHack < MSG_GADGET_CLIPBOARDABLE_GET_DELETABLE eq \
+	    MSG_GADGET_CLIPBOARDABLE_GET_COPYABLE - 2 >
+CheckHack < offset CF_focusable eq offset CF_clipboardable - 1 >
+CheckHack < offset CF_clipboardable eq offset CF_deletable - 1 >
+CheckHack < offset CF_deletable eq offset CF_copyable - 1 >
+
+
+StartActionMessages	GadgetClipboardable, Gadget
+EndActionMessages		GadgetClipboardable, Gadget, 7
+
+HINT_CLIPBOARDABLE_IN_ACCEPT_PASTE_HANDLER	vardata
+	; When we're raising accept paste events, we want to prevent
+	; an acceptPaste handler from generating further acceptPastes
+	; - infinite loop.  See GadgetClipboardableSetDeletable.
+
+	GCLI_flags	ClipboardableFlags
+GadgetClipboardableClass	endc
+
+
+	
+GadgetGeomFlags	record
+	:5
+	GGF_MOVING:1	; set on MSG_META_START_SELECT when a free spot
+			; the object is clicked on. Cleared in END_SELECT
+	GGF_RESIZING:1	; set on MSG_META_START_SELECT when a resize
+			; border is clicked on. Cleared in END_SELECT.
+
+	GGF_TILED:1
+GadgetGeomFlags	end
+
+
+GadgetGeomInsetData	struct
+	GGID_vertical	word
+	GGID_horizontal	word
+GadgetGeomInsetData	ends
+
+GadgetGeomClass		class	GadgetClass
+	;
+	; GadgetGeomClass serves as superclass to geometry-providing components
+	; like form, frame, list, etc.  Not exported as a component itself.
+	;
+MSG_GADGET_GEOM_GET_FLAGS		message
+;
+; cx = GadgetGeomFlags
+
+MSG_GADGET_GEOM_GET_VIS_CHILD_PARENT	message
+; Used generally to get the OLGadgetArea of GenPrimaries.
+;
+; Pass:		*ds:si	- GadgetGeomClass
+; Return:	dx:ax	- optr of Vis object that holds ent children
+;			  or 0 if self or in tiling mode.
+
+StartPropertyMessages		GadgetGeom, Gadget
+MSG_GADGET_GEOM_GET_NUM_CHILDREN	message
+MSG_GADGET_GEOM_SET_NUM_CHILDREN	message
+MSG_GADGET_GEOM_GET_TILE_LAYOUT		message
+MSG_GADGET_GEOM_SET_TILE_LAYOUT		message
+MSG_GADGET_GEOM_GET_TILE_SPACING	message
+MSG_GADGET_GEOM_SET_TILE_SPACING	message
+MSG_GADGET_GEOM_GET_TILED		message
+MSG_GADGET_GEOM_SET_TILED		message
+MSG_GADGET_GEOM_GET_TILE_HALIGN		message
+MSG_GADGET_GEOM_SET_TILE_HALIGN		message
+MSG_GADGET_GEOM_GET_TILE_VALIGN		message
+MSG_GADGET_GEOM_SET_TILE_VALIGN		message
+MSG_GADGET_GEOM_GET_TILE_HINSET		message
+MSG_GADGET_GEOM_SET_TILE_HINSET		message
+MSG_GADGET_GEOM_GET_TILE_VINSET		message
+MSG_GADGET_GEOM_SET_TILE_VINSET		message
+EndPropertyMessages		GadgetGeom, Gadget, 16
+
+StartActionMessages		GadgetGeom, Gadget
+MSG_GADGET_GEOM_ACTION_SET_CHILDREN		message
+MSG_GADGET_GEOM_ACTION_GET_CHILDREN		message
+EndActionMessages		GadgetGeom, Gadget, 8
+
+ATTR_GADGET_GEOM_INSET_DATA	vardata	GadgetGeomInsetData
+	; Added to store the tileHInset and tileVInset properties.  If not
+	; present, these are assumed to be 0.
+
+HINT_GADGET_GEOM_SKIP_OPEN_EVENT vardata
+HINT_GADGET_GEOM_SKIP_CLOSE_EVENT vardata
+	; Forms, dialogs and floaters skip raising aboutToOpen/Close
+	; events if these hints are present.  Prevents infinite recursion
+	; if Legos programmer makes a window visible from within an
+	; aboutToOpen handler, or invisible from within an aboutToClose
+	; handler.
+
+	GGI_flags		GadgetGeomFlags
+	GGI_childParent		optr		; VisComp that holds parent.
+						; self for group, gadgetArea
+						; for forms.
+
+GadgetGeomClass		endc
+
+
+;;;
+;;; The GadgetAggClass is designed to contain objects with pesky specific UI
+;;; behavior.  It was specifically designed to make GadgetListClass work
+;;; properly in the visual world.
+;;;
+GadgetAggClass		class	GadgetClass
+	uses	GenInteractionClass
+
+	GAI_contentClass	fptr.ClassStruct	; class to contain
+	GAI_contentObj		optr			; contained object
+GadgetAggClass		endc
+
+
+GadgetButtonFlags record
+	:7
+	GBF_CLOSE_DIALOG:1
+GadgetButtonFlags end
+
+GadgetButtonClass	class	GadgetClass
+
+StartPropertyMessages		GadgetButton, Gadget
+MSG_GADGET_BUTTON_GET_DEFAULT		message
+MSG_GADGET_BUTTON_SET_DEFAULT		message
+MSG_GADGET_BUTTON_GET_CANCEL		message
+MSG_GADGET_BUTTON_SET_CANCEL		message
+MSG_GADGET_BUTTON_GET_DESTRUCTIVE	message
+MSG_GADGET_BUTTON_SET_DESTRUCTIVE	message
+MSG_GADGET_BUTTON_GET_CLOSE_DIALOG	message
+MSG_GADGET_BUTTON_SET_CLOSE_DIALOG	message
+EndPropertyMessages		GadgetButton, Gadget, 8
+
+	uses	GenTriggerClass
+	GBI_default	word		; This is a flag that says
+					; we could not set ourselves to be the
+					; default and we should try again at
+					; the spec build
+	GBI_flags	GadgetButtonFlags
+
+GadgetButtonClass	endc
+
+GadgetEntryClass		class	GadgetClipboardableClass
+
+GADGET_ENTRY_MAX_CHARS equ 250
+
+MSG_GADGET_ENTRY_APPLY	message
+
+StartPropertyMessages		GadgetEntry, GadgetClipboardable
+MSG_GADGET_ENTRY_GET_TEXT		message
+MSG_GADGET_ENTRY_SET_TEXT		message
+MSG_GADGET_ENTRY_GET_FILTER		message
+MSG_GADGET_ENTRY_SET_FILTER		message
+MSG_GADGET_ENTRY_GET_MAX_CHARS		message
+MSG_GADGET_ENTRY_SET_MAX_CHARS		message
+MSG_GADGET_ENTRY_GET_NUM_CHARS		message
+MSG_GADGET_ENTRY_SET_NUM_CHARS		message
+EndPropertyMessages		GadgetEntry, GadgetClipboardable, 8
+
+StartActionMessages		GadgetEntry, GadgetClipboardable
+EndActionMessages		GadgetEntry, GadgetClipboardable, 0
+
+	uses GenTextClass
+;
+; Apply message that is sent out to itself
+;
+	GE_filter		word		; filter to use
+GadgetEntryClass		endc
+
+GadgetLabelClass		class	GadgetClass
+	uses GenGlyphClass
+
+GadgetLabelClass		endc
+
+
+GadgetFormClass		class	GadgetGeomClass
+
+MSG_GADGET_FORM_BUILD_FOCUS_PATH_IN_ENT_VIS_SHOW	message
+; When a form becomes visible, this method looks at
+; the form's GDI_focus instance data and builds a focus
+; hierarchy down to the desired GDI_focus.  Actually, we
+; only have this message (instead of building the hierarchy
+; in ENT_VIS_SHOW) so that the build-time form can also intercept
+; it and *not* build the hierarchy.
+; Pass:		nothing
+; Return:	nothing
+; Destroyed:	nothing
+; Interception:	BGadgetFormClass intercepts and does nothing.
+;
+
+MSG_GADGET_FORM_REMEMBER_FOCUS_IN_ENT_VIS_HIDE	message
+; When a form becomes not visible, this method determines
+; the focused descendent of the form and records it in
+; GDI_focus.  We only have this message (instead of recording
+; the focus in ENT_VIS_HIDE) so that the build-time form can
+; also intercept it and do nothing.
+; Pass:		nothing
+; Return:	nothing
+; Destroyed:	cx,dx
+; Interception:	BGadgetFormClass intercepts and does nothing.
+;
+
+StartPropertyMessages		GadgetForm, GadgetGeom
+MSG_GADGET_FORM_GET_FOCUS	message
+MSG_GADGET_FORM_SET_FOCUS	message
+EndPropertyMessages		GadgetForm, GadgetGeom, 8
+
+StartActionMessages		GadgetForm, GadgetGeom
+MSG_GADGET_FORM_BRING_TO_FRONT	message
+EndActionMessages		GadgetForm, GadgetGeom, 8
+
+	uses GenPrimaryClass
+	GFI_focus	optr	; LT_TYPE_COMPONENT
+				; The component within this form that the
+				; window wants as focus.  If this form is
+				; inactive, then this component is not the
+				; system focus.  When this form goes active,
+				; it will try to make GFI_focus the system
+				; focus.
+
+GadgetFormClass		endc
+
+
+
+GadgetNumberLook	etype	word
+LOOK_NUMBER_SPINNER		enum GadgetNumberLook, 0
+LOOK_NUMBER_SLIDER		enum GadgetNumberLook, 1
+LOOK_NUMBER_VERTICAL_SLIDER	enum GadgetNumberLook, 2
+
+GadgetNumberClass		class	GadgetClass
+
+StartPropertyMessages		GadgetNumber, Gadget
+MSG_GADGET_NUMBER_GET_VALUE	message
+MSG_GADGET_NUMBER_SET_VALUE	message
+MSG_GADGET_NUMBER_GET_MINIMUM	message
+MSG_GADGET_NUMBER_SET_MINIMUM	message
+MSG_GADGET_NUMBER_GET_MAXIMUM	message
+MSG_GADGET_NUMBER_SET_MAXIMUM	message
+MSG_GADGET_NUMBER_GET_INCREMENT	message
+MSG_GADGET_NUMBER_SET_INCREMENT	message
+MSG_GADGET_NUMBER_GET_DISPLAY_FORMAT	message
+MSG_GADGET_NUMBER_SET_DISPLAY_FORMAT	message
+EndPropertyMessages		GadgetNumber, Gadget, 16
+
+StartActionMessages		GadgetNumber, Gadget
+MSG_GADGET_NUMBER_ACTION_INC		message	
+MSG_GADGET_NUMBER_ACTION_SET_VALUE	message	
+EndActionMessages		GadgetNumber, Gadget, 8
+
+	uses GenValueClass
+
+MSG_GADGET_NUMBER_RAISE_EVENT	message
+; Message used as status message by GadgetNumberClass.
+; Context:	
+; Source:	
+; Destination:  self
+; Interception: nope
+;		
+;
+; Pass:		nothing
+; Return:	
+; Destroyed:	
+
+GadgetNumberClass		endc
+
+GadgetScrollbarLook	etype	word
+LOOK_SCROLLBAR_SPINNER		enum GadgetScrollbarLook, 0
+LOOK_SCROLLBAR_VERTICAL		enum GadgetScrollbarLook, 1
+LOOK_SCROLLBAR_HORIZONTAL	enum GadgetScrollbarLook, 2
+
+GadgetScrollbarClass		class	GadgetNumberClass
+
+MSG_GADGET_SCROLLBAR_SCROLL_TOP		message
+MSG_GADGET_SCROLLBAR_SCROLL_PAGE_UP	message
+MSG_GADGET_SCROLLBAR_SCROLL_UP		message
+MSG_GADGET_SCROLLBAR_SCROLL_SET		message
+MSG_GADGET_SCROLLBAR_SCROLL_DOWN	message
+MSG_GADGET_SCROLLBAR_SCROLL_PAGE_DOWN	message
+MSG_GADGET_SCROLLBAR_SCROLL_BOTTOM	message
+;
+; Context:	
+; These are used as apply messages by GadgetScrollbarClass.  The reason we need
+; 7 of these is that there's a disgusting hack in the implementation of
+; OLScrollbarClass that adds fixed values to the apply message when sending it
+; off based on the area that's been clicked.  This is how a GenView knows how
+; much to scroll when it's notified by the scrollbar.  Luckily the hack works
+; in our favor (yes, it's still a hack since it has no documentation), as we
+; want to raise different events based on each of the different messages
+; above.
+;
+; SCROLLBAR_DRAG is a bit of a special case -- it is sent out by the status
+; message mechanism rather than the apply message mechanism, but is handled in
+; the same way.
+;
+; Source:	self, GenValueClass
+; Destination:  self
+; Interception: perhaps by a subclass that wants to mask or alter certain
+; 		events.
+;
+; Pass:		dx.cx -- signed <integer>.<fraction> current value
+;		bp low -- GenValueStatusFlags
+; Return:	nothing
+; Destroyed:	ax, cx, dx, bp allowed
+
+
+; Context:	sent out as status message by scrollbar (GenValue)
+; Source:	self, GenValueClass
+; Destination:  self
+; Interception: perhaps by a subclass that wants to mask or alter the drag
+; 		event.
+;
+; Pass:		dx.cx -- signed <integer>.<fraction> current value
+;		bp low -- GenValueStatusFlags
+; Return:	nothing
+; Destroyed:	ax, cx, dx, bp allowed
+
+StartPropertyMessages		GadgetScrollbar, GadgetNumber
+MSG_GADGET_SCROLLBAR_GET_THUMBSIZE	message
+MSG_GADGET_SCROLLBAR_SET_THUMBSIZE	message
+MSG_GADGET_SCROLLBAR_GET_ORIENTATION	message
+MSG_GADGET_SCROLLBAR_SET_ORIENTATION	message
+MSG_GADGET_SCROLLBAR_GET_NOTIFYDRAG	message
+MSG_GADGET_SCROLLBAR_SET_NOTIFYDRAG	message
+EndPropertyMessages		GadgetScrollbar, GadgetNumber, 8
+
+	uses	GenValueClass
+GadgetScrollbarClass		endc
+
+GadgetScrollbarScrollType		etype	word
+	ST_THUMB		enum	GadgetScrollbarScrollType, 1
+	ST_BACK_ARROW		enum	GadgetScrollbarScrollType
+	ST_FORWARD_ARROW	enum	GadgetScrollbarScrollType
+	ST_BACK_PAGE		enum	GadgetScrollbarScrollType
+	ST_FORWARD_PAGE		enum	GadgetScrollbarScrollType
+
+
+GadgetGroupLook		etype	word
+	LOOK_GROUP_NORMAL		enum	GadgetGroupLook
+	LOOK_GROUP_DRAW_IN_BOX		enum	GadgetGroupLook
+	LOOK_GROUP_NO_MONIKER		enum	GadgetGroupLook
+
+GadgetGroupClass		class	GadgetGeomClass
+	uses GenInteractionClass
+
+GadgetGroupClass		endc
+
+
+
+GadgetPopupLook		etype	word
+	GPL_POPUP_BUTTON		enum	GadgetPopupLook
+	GPL_MAIN_MENU			enum	GadgetPopupLook
+	GPL_SUB_MENU			enum	GadgetPopupLook
+
+GadgetPopupClass		class	GadgetGroupClass
+	uses GenInteractionClass
+GadgetPopupClass		endc
+
+
+
+GadgetDialogClass		class	GadgetGeomClass
+MSG_GADGET_DIALOG_GET_TYPE_INTERNAL		message
+; Internal message for getting a dialog's GDI_dialogType.
+; Pass:		nothing
+; Return: 	al	- GDI_dialogType
+; Destroyed: 	nothing
+; Interception:	Not likely.
+;
+
+MSG_GADGET_DIALOG_RELEASE_FOCUS_EXCL_IF_POPUP	message
+; Internal message for making a popup dialog disappear.
+; GDT_POPUP dialogs disappear when they lose the focus.
+; However, since GDT_ON_TOP and GDT_TOOL_BOX dialogs don't
+; grab the focus when pressed on, a popup won't lose the
+; focus and thus won't know to come down.  This message is
+; sent from MSG_META_MUP_ALTER_FTVMC_EXCL when an on-top
+; or tool-box is asked (but refuses) to grab the focus so
+; that any popped-up popup will come down.
+; Pass:		nothing
+; Return: 	nothing
+; Destroyed: 	ax,cx,dx,bp
+; Interception:	Not likely.
+;
+
+MSG_GADGET_DIALOG_BUILD_FOCUS_PATH_IN_ENT_VIS_SHOW	message
+; When a dialog becomes visible, this method looks at
+; the dialog's GDI_focus instance data and builds a focus
+; hierarchy down to the desired GDI_focus.  Actually, we
+; only have this message (instead of building the hierarchy
+; in ENT_VIS_SHOW) so that the build-time dialog can also
+; intercept it and *not* build the hierarchy.
+; Pass:		nothing
+; Return:	nothing
+; Destroyed:	nothing
+; Interception:	BGadgetDialogClass intercepts and does nothing.
+;
+
+MSG_GADGET_DIALOG_REMEMBER_FOCUS_IN_ENT_VIS_HIDE	message
+; When a dialog becomes not visible, this method determines
+; the focused descendent of the dialog and records it in
+; GDI_focus.  We only have this message (instead of recording
+; the focus in ENT_VIS_HIDE) so that the build-time dialog can
+; also intercept it and do nothing.
+; Pass:		nothing
+; Return:	nothing
+; Destroyed:	cx,dx
+; Interception:	BGadgetDialogClass intercepts and does nothing.
+;
+
+StartPropertyMessages		GadgetDialog, GadgetGeom
+MSG_GADGET_DIALOG_GET_FOCUS	message
+MSG_GADGET_DIALOG_SET_FOCUS	message
+MSG_GADGET_DIALOG_GET_TYPE	message
+MSG_GADGET_DIALOG_SET_TYPE	message
+EndPropertyMessages		GadgetDialog, GadgetGeom, 2
+
+StartActionMessages		GadgetDialog, GadgetGeom
+MSG_GADGET_DIALOG_BRING_TO_FRONT	message
+EndActionMessages		GadgetDialog, GadgetGeom, 2
+
+
+GadgetDialogType	etype	byte
+	GDT_NON_MODAL			enum	GadgetDialogType
+	GDT_TOOL_BOX			enum	GadgetDialogType
+	GDT_MODAL			enum	GadgetDialogType
+	GDT_SYS_MODAL			enum	GadgetDialogType
+	GDT_ON_TOP			enum	GadgetDialogType
+	GDT_POPUP			enum	GadgetDialogType
+
+	uses GenInteractionClass
+	GDI_focus	optr	; LT_TYPE_COMPONENT
+				; The component within this dialog that is
+				; the window's focus.  If this dialog is
+				; inactive, then this component is not the
+				; system focus.  When Legos code sets this
+				; property, the dialog will try to make
+				; GFI_focus the system focus when the dialog
+				; goes active.
+	GDI_dialogType	GadgetDialogType
+	
+GadgetDialogClass		endc
+
+
+
+;
+; This component is not currently used.
+; Commented out for efficiency.  -jmagasin 6/19/96
+;
+if 0
+GadgetVisClass		class	GadgetClass
+
+StartActionMessages		GadgetVis, Gadget
+MSG_GADGET_VIS_ACTION_CREATE	message
+MSG_GADGET_VIS_ACTION_BOX	message
+MSG_GADGET_VIS_ACTION_DRAW	message
+MSG_GADGET_VIS_ACTION_LINE	message
+MSG_GADGET_VIS_ACTION_TEXT	message
+MSG_GADGET_VIS_ACTION_AREA_COLOR	message
+MSG_GADGET_VIS_ACTION_LINE_COLOR	message
+MSG_GADGET_VIS_ACTION_TEXT_COLOR	message
+MSG_GADGET_VIS_ACTION_BOX_THICKNESS	message
+EndActionMessages		GadgetVis, Gadget, 16
+
+	GLVI_gstate		hptr
+	GLVI_gstring		lptr
+	GLVI_text		lptr
+	GLVI_textX		word
+	GLVI_textY		word
+	GLVI_textColor		RGBValue
+	GLVI_textColorFlag	ColorFlag
+	GLVI_rectColor		RGBValue
+	GLVI_boxColor		RGBValue
+	GLVI_boxColorFlag	ColorFlag
+	GLVI_boxThickness	byte
+
+	uses GenGlyphClass
+GadgetVisClass		endc
+
+GadgetFigClass		class	GadgetVisClass
+	uses VisClass
+GadgetFigClass		endc
+endif
+
+
+
+
+;
+; Replaced by ServiceTimerClass. -jmagasin 6/19/96
+;
+if 0
+GadgetTimerClass		class	GadgetClass
+
+MSG_GADGET_TIMER_BUZZED	message
+;
+; Gets sent out whenever the timer goes off.
+;
+
+MSG_GADGET_TIMER_SET_INTERVAL message
+; pass in dx
+
+MSG_GADGET_TIMER_GET_INTERVAL message
+; return in ax
+
+; requisite handlers for the interval property
+
+StartPropertyMessages		GadgetTimer, Gadget
+MSG_GADGET_TIMER_GET_INTERVAL_PROP	message
+MSG_GADGET_TIMER_SET_INTERVAL_PROP	message
+EndPropertyMessages		GadgetTimer, Gadget, 4
+	
+StartActionMessages		GadgetTimer, Gadget
+MSG_GADGET_TIMER_ACTION_START		message
+MSG_GADGET_TIMER_ACTION_STOP		message
+EndActionMessages		GadgetTimer, Gadget, 4
+
+	GTI_id		word
+	GTI_handle	hptr
+	GTI_interval	word		; num of tenths of secs before next.
+
+GadgetTimerClass		endc
+endif
+
+
+
+GadgetTextFilter	etype	byte
+	; first sixteen taken by VisTextFilterClass.  See vTextC.def
+;;	FILTER_CUSTOM_STRING	enum	GadgetTextFilter, 16
+	FILTER_CUSTOM_CHAR	enum	GadgetTextFilter, 1
+GadgetTextClass			class	GadgetClipboardableClass
+	uses	VisTextClass
+
+
+StartPropertyMessages		GadgetText, GadgetClipboardable
+MSG_GADGET_TEXT_GET_TEXT	message
+MSG_GADGET_TEXT_SET_TEXT	message
+MSG_GADGET_TEXT_GET_MAX_LINES	message
+MSG_GADGET_TEXT_SET_MAX_LINES	message
+MSG_GADGET_TEXT_GET_FILTER	message
+MSG_GADGET_TEXT_SET_FILTER	message
+MSG_GADGET_TEXT_GET_FONT	message
+MSG_GADGET_TEXT_SET_FONT	message
+MSG_GADGET_TEXT_GET_FONT_STYLE	message
+MSG_GADGET_TEXT_SET_FONT_STYLE	message
+MSG_GADGET_TEXT_GET_FONT_SIZE	message
+MSG_GADGET_TEXT_SET_FONT_SIZE	message
+MSG_GADGET_TEXT_GET_START	message
+MSG_GADGET_TEXT_SET_START	message
+MSG_GADGET_TEXT_GET_END		message
+MSG_GADGET_TEXT_SET_END		message
+MSG_GADGET_TEXT_GET_COLOR	message
+MSG_GADGET_TEXT_SET_COLOR	message
+MSG_GADGET_TEXT_GET_BG_COLOR	message
+MSG_GADGET_TEXT_SET_BG_COLOR	message
+MSG_GADGET_TEXT_GET_NUM_CHARS	message
+MSG_GADGET_TEXT_SET_NUM_CHARS	message
+MSG_GADGET_TEXT_GET_NUM_LINES message
+MSG_GADGET_TEXT_SET_NUM_LINES message
+MSG_GADGET_TEXT_GET_FIRST_VISIBLE_LINE	message
+MSG_GADGET_TEXT_SET_FIRST_VISIBLE_LINE	message
+MSG_GADGET_TEXT_GET_LAST_VISIBLE_LINE	message
+MSG_GADGET_TEXT_SET_LAST_VISIBLE_LINE	message
+MSG_GADGET_TEXT_GET_MAX_CHARS		message
+MSG_GADGET_TEXT_SET_MAX_CHARS		message
+
+EndPropertyMessages		GadgetText, GadgetClipboardable, 16
+
+
+
+
+StartActionMessages		GadgetText, GadgetClipboardable
+MSG_GADGET_TEXT_ACTION_DELETE_RANGE		message
+MSG_GADGET_TEXT_ACTION_APPEND_STRING		message
+MSG_GADGET_TEXT_ACTION_INSERT_STRING		message
+MSG_GADGET_TEXT_ACTION_GET_LINE_NUMBER		message
+MSG_GADGET_TEXT_ACTION_GET_STRING		message
+MSG_GADGET_TEXT_ACTION_REPLACE_STRING		message
+MSG_GADGET_TEXT_ACTION_CUT			message
+MSG_GADGET_TEXT_ACTION_COPY			message
+MSG_GADGET_TEXT_ACTION_PASTE			message
+MSG_GADGET_TEXT_ACTION_SET_SELECTION_RANGE	message
+
+EndActionMessages		GadgetText, GadgetClipboardable, 10
+
+	GTI_bgColor	dword
+	GTI_fgColor	dword
+	GTI_maxLines	word
+	GTI_fontStyle	word
+	
+	uses	GenTextClass
+ATTR_GADGET_TEXT_DONT_FILTER	vardata
+	; Used to signify that we are currently in a custom event handler
+	; and any no further filtering needs to happen.
+
+GadgetTextClass	endc
+MAX_TEXT_INSERTION_STRING	equ	4000	; largest string a filter
+						; can deal with. Above this
+						; it avoids the string.
+
+
+
+
+GenBooleanFocusClass		class	GenBooleanClass
+	;
+	; This class only exists to notify keyboard components
+	; when a GadgetToggle gains the system focus.  A GadgetToggle
+	; won't really gain the system focus - its child GenBoolean
+	; will.  So we use this subclass to intercept MSG_META_GAINED
+	; _SYS_FOCUS_EXCL and notify the keyboard components.
+	;
+GenBooleanFocusClass		endc
+
+GadgetToggleClass		class	GadgetClass
+	uses GenBooleanGroupClass
+
+MSG_GADGET_TOGGLE_STATUS_MSG	message
+;	cx - current selection or GIGS_NONE
+;	bp - number of selections
+;	dl GenItemGroupStateFlags; GIGSF_MODIFIED correct
+;
+
+StartPropertyMessages		GadgetToggle, Gadget
+MSG_GADGET_TOGGLE_GET_STATUS	message
+MSG_GADGET_TOGGLE_SET_STATUS	message
+EndPropertyMessages		GadgetToggle, Gadget, 8
+
+	GTGI_item	nptr
+
+GadgetToggleClass		endc
+
+
+
+
+GenItemFocusClass		class	GenItemClass
+	;
+	; This class only exists to notify keyboard components
+	; when a GadgetChoice gains the system focus.  A GadgetChoice
+	; won't really gain the system focus - its child GenItem
+	; will.  So we use this subclass to intercept MSG_META_GAINED
+	; _SYS_FOCUS_EXCL and notify the keyboard components.
+	;
+GenItemFocusClass		endc
+
+GadgetChoiceLook	etype	word
+LOOK_CHOICE_RADIO_BUTTON	enum GadgetChoiceLook, 0
+LOOK_CHOICE_TOOL_BUTTON		enum GadgetChoiceLook, 1
+
+GadgetChoiceClass		class	GadgetClass
+	uses GenItemGroupClass
+
+MSG_GADGET_CHOICE_GET_SELECTED_COMPONENT		message
+MSG_GADGET_CHOICE_GET_SELECTED_COMPONENT_CALLBACK	message
+MSG_GADGET_CHOICE_STATUS_MSG	message
+;	cx - current selection or GIGS_NONE
+;	bp - number of selections
+;	dl GenItemGroupStateFlags; GIGSF_MODIFIED correct
+;
+StartPropertyMessages		GadgetChoice, Gadget
+MSG_GADGET_CHOICE_GET_STATUS	message
+MSG_GADGET_CHOICE_SET_STATUS	message
+MSG_GADGET_CHOICE_GET_CHOICE	message
+MSG_GADGET_CHOICE_SET_CHOICE	message
+EndPropertyMessages		GadgetChoice, Gadget, 8
+
+	GCI_item	nptr
+
+GadgetChoiceClass		endc
+
+GadgetWinFlags		record
+	:7,
+	GWF_overlap:1		; set if children overlap each other
+				; so all should get draw notice when one does
+GadgetWinFlags		end
+	
+GadgetClipperClass	class	GadgetGeomClass
+
+	uses GenViewClass
+	uses VisContentClass
+	uses GenContentClass
+
+StartPropertyMessages		GadgetClipper, GadgetGeom
+MSG_GADGET_CLIPPER_GET_BGCOLOR		message
+MSG_GADGET_CLIPPER_SET_BGCOLOR		message
+EndPropertyMessages		GadgetClipper, GadgetGeom, 16
+
+
+	GCI_window	hptr
+	GCI_gstate	lptr
+	GCI_flags	GadgetWinFlags
+	GCI_bgColor	word
+	GCI_width	word
+	GCI_height	word
+GadgetClipperClass	endc
+
+
+GadgetListClass		class	GadgetAggClass
+	uses	GenDynamicListClass
+MSG_GADGET_LIST_SET_ITEM	message
+; Pass:
+; 	cx	= string to use
+; 	bp	= item to set
+; Return:
+;	none
+
+MSG_GADGET_LIST_GET_ITEM	message
+; Pass:
+; 	bp	= item to get
+; Return:
+;	cx	= string
+
+MSG_GADGET_LIST_GENERATE_CHANGED_EVENT	message
+; Sent (by item) to tell us an item was selected.
+; We should now generate a basic event for the user.
+;
+; Pass:
+;	cx	= index
+;	dx	= value (0 = unselected)
+;
+
+MSG_GADGET_LIST_STATUS_MSG		message
+; Used for status updates on the list.
+; (see ATTR_GEN_ITEM_GROUP_STATUS_MSG)
+; Pass:
+; 	cx = current selection
+; 	bp = number of selections
+; 	dl = GenItemGroupStateFlags (GIGSF_MODIFIED )
+; Destroyed: ax, cx, dx, bp
+
+MSG_GADGET_LIST_QUERY_ITEM_MONIKER	message
+; messages the component uses to tell itself to update
+; a moniker
+; Pass:
+;	Same as MSG_GEN_DYNAMIC_LIST_QUERY_ITEM_MONIKER
+;	^lcx:dx		= Dynamic list requesting the moniker
+;	bp		= postion of the item requested
+; Return:		nothing (send _REPLACE_ITEM_...)
+; Destroyed:		ax, cx, dx, bp
+
+MSG_GADGET_LIST_GENERATE_CHANGED_EVENT_LOW	message
+; Do the real work for raising the _changed event; this is force-queued
+; by GENERATE_CHANGED_EVENT to get around a bug.
+;
+; Pass:	cx	= index
+;	dx	= value (0 = unselected)
+;
+
+
+StartPropertyMessages		GadgetList, Gadget
+MSG_GADGET_LIST_GET_BEHAVIOR		message
+MSG_GADGET_LIST_SET_BEHAVIOR		message
+MSG_GADGET_LIST_GET_NUM_SELECTIONS	message
+MSG_GADGET_LIST_SET_NUM_SELECTIONS	message
+MSG_GADGET_LIST_GET_NUM_ITEMS		message
+MSG_GADGET_LIST_SET_NUM_ITEMS		message
+MSG_GADGET_LIST_GET_SELECTED_ITEM	message
+MSG_GADGET_LIST_SET_SELECTED_ITEM	message
+MSG_GADGET_LIST_GET_NUM_VISIBLE_ITEMS	message
+MSG_GADGET_LIST_SET_NUM_VISIBLE_ITEMS	message
+MSG_GADGET_LIST_GET_WIDTH_IN_STD_CHARS	message
+MSG_GADGET_LIST_SET_WIDTH_IN_STD_CHARS	message
+EndPropertyMessages		GadgetList, Gadget, 8
+
+
+StartActionMessages		GadgetList, Gadget
+MSG_GADGET_LIST_ACTION_DELETE_ITEM	message
+MSG_GADGET_LIST_ACTION_CLEAR_ALL	message
+MSG_GADGET_LIST_ACTION_INSERT_ITEM	message
+MSG_GADGET_LIST_ACTION_GET_ITEM		message
+MSG_GADGET_LIST_ACTION_SET_ITEM		message
+MSG_GADGET_LIST_ACTION_GET_SELECTIONS	message
+MSG_GADGET_LIST_ACTION_SET_SELECTIONS	message
+EndActionMessages		GadgetList, Gadget, 10
+
+GadgetListLook	etype	word
+	LOOK_LIST_POPUP		enum	GadgetListLook
+	LOOK_LIST_SCROLLABLE	enum	GadgetListLook
+
+
+	GL_currentItems		word
+	; Max number element user has added to list.
+	; If the users sets item 20 without setting 1-19 then
+	; deletes 20, there will still be 19 items. 
+
+
+	GL_arraySize		word
+	; Number of elements that have been allocated in
+	; the array.  Initialed to 100 in ENT_INITIALIZE. It grows
+	; when list gets bigger.
+
+	GL_stringArrayToken	word
+	; Token to use to access the array of strings in the heap.
+	; This token points to an array of tokens.  Each of those
+	; tokens refers to the given string.
+	; If there is no string, the NULL_TOKEN will be used in the
+	; array instead of creating a null string.
+	; Array initialized to 100 null elemens in ENT_INITIALIZE.
+
+	GL_look			GadgetListLook
+
+GadgetListClass		endc
+
+
+
+; these commands are store in a buffer (GSI_commands). each command
+; has an id byte (one of the following enums) followed by data
+; HLINE:	color	dword (RGB value + opacity byte)
+;	 	xStart 	word
+;		xEnd	word
+;		yCoord	word
+; VLINE:	color	dword (RGB value + opacity byte)
+;		yStart 	word
+;		yEnd	word
+;		xCoord	word
+; FILL_RECT:	color	dword (RGB value + opacity byte)
+;		leftEdge	word
+;		topEdge		word
+;		rightEdge	word
+;		bottomEdge	word
+; INVERT_RECT:	color	dword (RGB value + opacity byte)
+;		leftEdge	word
+;		topEdge		word
+;		rightEdge	word
+;		bottomEdge	word
+; STRING:	length		word
+;		string		Null terminated if length is 0
+;		textState	GrFontState
+
+GadgetFontPointSize	etype	byte
+	SFP_SMALL	enum	GadgetFontPointSize, 10
+	SFP_NORMAL	enum	GadgetFontPointSize, 12
+	SFP_LARGE	enum	GadgetFontPointSize, 16
+
+GadgetFontTextStyle	etype	byte
+	SFTS_PLAIN	enum	GadgetFontTextStyle
+	SFTS_BOLD	enum	GadgetFontTextStyle
+
+GadgetFontMetricInfo	etype	byte
+	SFMI_HEIGHT		enum	GadgetFontMetricInfo
+	SFMI_AVERAGE_WIDTH	enum	GadgetFontMetricInfo
+	SFMI_BASELINE		enum	GadgetFontMetricInfo
+
+GadgetFontInfo	record
+	:2
+	SFI_pointSize	GadgetFontPointSize:3
+	SFI_textStyle	GadgetFontTextStyle:1
+	SFI_metricInfo	GadgetFontMetricInfo:2
+GadgetFontInfo	end
+
+WinXYPoint	struct
+	WXYP_x	word
+	WXYP_y	word
+WinXYPoint	end
+	
+GadgetFontState	struct
+	sizeAndStyle	GadgetFontInfo
+	position	WinXYPoint
+GadgetFontState	end
+
+GadgetCommandHeader	struct
+	GCH_bufSize	word
+	GCH_offset	word
+GadgetCommandHeader	end
+	
+GadgetDrawCommands etype byte
+	SDC_NONE		enum	GadgetDrawCommands
+	SDC_HLINE		enum	GadgetDrawCommands
+	SDC_VLINE		enum	GadgetDrawCommands
+	SDC_FILL_RECT		enum	GadgetDrawCommands
+	SDC_INVERT_RECT	 	enum	GadgetDrawCommands
+	SDC_STRING		enum	GadgetDrawCommands
+	SDC_UISHAPE		enum	GadgetDrawCommands
+	SDC_INVERT_UISHAPE	enum	GadgetDrawCommands
+	SDC_DRAW_IMAGE		enum	GadgetDrawCommands
+	SDC_DRAW_LINE		enum	GadgetDrawCommands
+	SDC_INVERT_LINE		enum	GadgetDrawCommands
+	SDC_TEXT_HEIGHT		enum	GadgetDrawCommands
+	SDC_TEXT_WIDTH		enum	GadgetDrawCommands
+
+GadgetPenActions	etype	byte, 1
+	GPA_PRESS	enum	GadgetPenActions
+	GPA_HOLD	enum	GadgetPenActions
+	GPA_DRAG	enum	GadgetPenActions
+	GPA_TO		enum	GadgetPenActions
+	GPA_RELEASE	enum	GadgetPenActions
+	GPA_LOST	enum	GadgetPenActions
+	GPA_FLY_OVER	enum	GadgetPenActions
+
+GadgetPenStates		etype	byte
+	GPS_NONE	enum	GadgetPenStates
+	GPS_PRESSED	enum	GadgetPenStates
+	GPS_DRAGGED	enum	GadgetPenStates
+	GPS_HELD	enum	GadgetPenStates
+	GPS_MOVED	enum	GadgetPenStates
+GadgetPenInterest	etype	byte
+	GPI_NONE		enum	GadgetPenInterest
+	GPI_ENTER_LEAVE		enum	GadgetPenInterest
+	GPI_ALL			enum	GadgetPenInterest
+
+
+GadgetGadgetFlags	record
+	GGF_PEN_STATE GadgetPenStates:3
+	GGF_PEN:1
+	GGF_READY_PEN_MOVE:1
+	GGF_IN_BOUNDS:1
+	GGF_DRAW_COMMANDS:1
+	GGF_HAS_MOUSE_GRAB:1
+GadgetGadgetFlags	end
+
+ALL_PEN_EVENTS equ (mask GGF_PEN or mask GGF_READY_PEN_MOVE)
+
+;
+; handy dandy macros for getting/setting bits in the gadgetFlags record
+;
+SetGadgetPenState	macro source
+	SetEtypeInRecord source, GGF_PEN_STATE,	ds:[di].GGI_gadgetFlags
+endm
+
+GetGadgetPenState	macro dest
+	GetEtypeFromRecord dest, GGF_PEN_STATE,	ds:[di].GGI_gadgetFlags
+endm
+
+
+GadgetGadgetClass	class	GadgetClipboardableClass
+
+MSG_GADGET_GADGET_DRAW				message
+
+StartActionMessages		GadgetGadget, GadgetClipboardable
+MSG_GADGET_GADGET_ACTION_SET_CHILDREN		message
+MSG_GADGET_GADGET_ACTION_GET_CHILDREN		message
+MSG_GADGET_GADGET_ACTION_HLINE			message
+MSG_GADGET_GADGET_ACTION_VLINE			message
+MSG_GADGET_GADGET_ACTION_FILL_RECT		message
+MSG_GADGET_GADGET_ACTION_INVERT_RECT		message
+MSG_GADGET_GADGET_ACTION_STRING			message
+MSG_GADGET_GADGET_ACTION_UISHAPE		message
+MSG_GADGET_GADGET_ACTION_INVERT_UISHAPE		message
+MSG_GADGET_GADGET_ACTION_DRAW_IMAGE		message
+MSG_GADGET_GADGET_ACTION_DRAW_LINE		message		
+MSG_GADGET_GADGET_ACTION_INVERT_LINE		message		
+
+; note all messages handled by GadgetGadgetDrawCommands must be
+; defined above this line and below ACTION_HLINE!
+MSG_GADGET_GADGET_ACTION_TEXT_HEIGHT		message		
+MSG_GADGET_GADGET_ACTION_TEXT_WIDTH		message		
+MSG_GADGET_GADGET_ACTION_SET_CLIP_RECT		message
+MSG_GADGET_GADGET_ACTION_CLEAR_CLIP_RECT	message
+
+MSG_GADGET_GADGET_ACTION_REDO_GEOMETRY		message
+MSG_GADGET_GADGET_ACTION_READY_PEN_MOVE		message
+MSG_GADGET_GADGET_ACTION_GRAB_PEN		message
+EndActionMessages		GadgetGadget, GadgetClipboardable, 24
+
+StartPropertyMessages		GadgetGadget, GadgetClipboardable
+MSG_GADGET_GADGET_GET_NUM_CHILDREN	message
+MSG_GADGET_GADGET_SET_NUM_CHILDREN	message
+MSG_GADGET_GADGET_GET_PEN		message
+MSG_GADGET_GADGET_SET_PEN		message
+MSG_GADGET_GADGET_GET_TILE		message
+MSG_GADGET_GADGET_SET_TILE		message
+EndPropertyMessages		GadgetGadget, Gadget, 12
+
+	GGI_commands		hptr
+	GGI_gstate		hptr
+	GGI_gadgetFlags		GadgetGadgetFlags
+	GGI_clipRect		Rectangle
+	GGI_lastPenX		word
+	GGI_lastPenY		word
+	GGI_retval		word
+	GGI_shiftState		byte
+GadgetGadgetClass	endc
+
+GadgetFloaterClass		class	GadgetDialogClass
+
+MSG_GADGET_FLOATER_WIN_MOVE		message
+StartActionMessages		GadgetFloater, GadgetDialog
+MSG_GADGET_FLOATER_ACTION_REDO_GEOMETRY	message
+EndActionMessages		GadgetFloater, GadgetDialog, 1
+
+StartPropertyMessages		GadgetFloater, GadgetDialog
+MSG_GADGET_FLOATER_GET_MASK	message
+MSG_GADGET_FLOATER_SET_MASK	message
+EndPropertyMessages		GadgetFloater, GadgetDialog, 6
+
+
+	GFI_width	word	; param1 when region is non-zero
+	GFI_height	word	; param2 when region is non-zero
+	GFI_left	word
+	GFI_top		word	
+	GFI_region	word	; chunk handle of region data or zero
+	GFI_param3	word	; parameters to region
+	GFI_param4	word	; unused when region is zero
+GadgetFloaterClass		endc
+
+
+GadgetSpacerLineType	etype byte
+	GSLT_NONE		enum	GadgetSpacerLineType
+	GSLT_HORIZONTAL		enum	GadgetSpacerLineType 
+	GSLT_VERTICAL		enum	GadgetSpacerLineType
+
+GadgetSpacerLineColor	etype	byte
+	GSLC_BLANK	enum	GadgetSpacerLineColor
+	GSLC_BLACK	enum	GadgetSpacerLineColor
+	GSLC_WHITE	enum	GadgetSpacerLineColor
+	GSLC_DOTTED	enum	GadgetSpacerLineColor
+	GSLC_3D_IN	enum	GadgetSpacerLineColor
+	GSLC_3D_OUT	enum	GadgetSpacerLineColor
+
+GadgetSpacerClass	class	GadgetClass
+					; low byte = GadgetSpacerLineColor
+GadgetSpacerClass	endc
+
+GadgetPictureClass	class	GadgetClass
+GadgetPictureClass	endc
+
+
+
+; this class is just a common place to have a MSG_ENT_SET_PARENT that only
+; allows "app" as parent for the various system and service components
+ServSysClass	class	EntClass
+ServSysClass	endc
+
+
+ServiceTimeDateClass	class	ServSysClass
+
+MSG_STD_TIMER_TICK				message
+;
+; Once-a-minute message sent by a geos timer
+;
+; Pass:		cx:dx	- tick count
+;   		bp	- interval
+; Return:	nothing
+; Destroyed:
+
+MSG_STD_ADD_TO_DATE_TIME_LIST			message
+;
+; Add ourself to GCNSLT_DATE_TIME so that we'll know when to
+; raise dateChanged events.
+; Provided so that BServiceTimeDateClass can intercept and do
+; nothing.
+;
+; Pass: 	nothing
+; Return:	nothing
+; Destroyed:	ax,cx,dx
+;
+
+MSG_STD_REMOVE_FROM_DATE_TIME_LIST		message
+;
+; Remove ourself from GCNSLT_DATE_TIME.
+; Provided so that BServiceTimeDateClass can intercept and do
+; nothing.
+;
+; Pass: 	nothing
+; Return:	nothing
+; Destroyed:	ax,cx,dx
+;
+
+MSG_STD_CREATE_NEW_TIMER			message
+;
+; Create a new once-a-minute timer, and destroy any old timer.
+; Provided so that BServiceTimeDateClass can intercept and do
+; nothing.
+;
+; Pass:		nothing
+; Return:	nothing
+; Destroyed:	ax, cx, dx
+;
+
+
+;; Reserve 8 messages because some properties might eventually become
+;; actions.
+StartActionMessages	ServiceTimeDate, Ent
+MSG_STD_ACTION_GETDAYOFWEEK	message
+MSG_STD_ACTION_GETDAYSINMONTH	message
+MSG_STD_ACTION_GETTIME		message
+MSG_STD_ACTION_SETTIME		message
+MSG_STD_ACTION_GETDATE		message
+MSG_STD_ACTION_SETDATE		message
+MSG_STD_ACTION_FORMATDATE	message
+MSG_STD_ACTION_PARSEDATE	message
+MSG_STD_ACTION_FORMATTIME	message
+MSG_STD_ACTION_PARSETIME	message
+EndActionMessages	ServiceTimeDate, Ent, 12
+
+StartPropertyMessages	ServiceTimeDate, Ent
+MSG_STD_GET_TIMEINTEREST	message
+MSG_STD_SET_TIMEINTEREST	message
+MSG_STD_GET_SYSTEMCLOCK		message
+MSG_STD_SET_SYSTEMCLOCK		message
+EndPropertyMessages	ServiceTimeDate, Ent, 6
+
+    STDI_timerHandle	hptr		; handle of continual minute timer
+    STDI_timeInterest	word		; timeChanged property
+    STDI_timeDelta	word		; minutes to next timeChanged
+    STDI_dateDelta	word		; minutes to next dateChanged
+ServiceTimeDateClass	endc
+
+
+; This had better be the same as the value in gadget.goh.
+;
+NUM_LEGOS_CLIPBOARD_TYPES	equ	10
+
+; This string is used by clipboardables when raising
+; acceptPaste events, which require the format string
+; to be placed on the heap.  We allocate enough space
+; for the longest format and reuse the space.
+; See strings in gdgmastc.goc.  If you change this, don't
+; forget to change the corresponding value in gadget.goh.
+;
+if DBCS_PCGEOS
+  MAX_CLIPBOARDABLE_TYPE_STRING_SIZE	equ	24
+else
+  MAX_CLIPBOARDABLE_TYPE_STRING_SIZE	equ	12
+endif
+
+ServiceClipboardClass	class	ServSysClass
+
+MSG_SCB_RAISE_CLIPBOARD_CHANGED_EVENT	message
+;
+; Sent to a clipboard component when it is alright to raise a
+; clipboardChanged event.
+; Typical sequence:
+;   1. Clipboard component sends active clipboardable component
+;      MSG_GADGET_CLIPBOARDABLE_CLIPBOARD_ITEM_CHANGED.
+;   2. Clipboardable component raises an acceptPaste event.
+;   3. Clipboardable component sends us SCB_RAISE_CLIPBOARD_CHANGED
+;      EVENT.
+; If the active selection is not a clipboardable, then the clipboard
+; component will send itself this message.
+;
+; Pass:	      nothing
+; Return:     nothing
+; Destroyed:  ax,cx,dx,bp
+
+StartPropertyMessages	ServiceClipboard, Ent
+MSG_SCB_GET_CLIPBOARDABLE		message
+MSG_SCB_SET_CLIPBOARDABLE		message
+MSG_SCB_GET_DELETABLE			message
+MSG_SCB_SET_DELETABLE			message
+MSG_SCB_GET_PASTABLE			message
+MSG_SCB_SET_PASTABLE			message
+MSG_SCB_GET_ACTIVE_SELECTION		message
+MSG_SCB_SET_ACTIVE_SELECTION		message
+EndPropertyMessages	ServiceClipboard, Ent, 16
+
+StartActionMessages	ServiceClipboard, Ent
+MSG_SCB_ACTION_QUERYITEM		message
+MSG_SCB_ACTION_SETITEM			message
+MSG_SCB_ACTION_GETITEM			message
+MSG_SCB_ACTION_SETACTIVESELECTION	message
+MSG_SCB_ACTION_CUT			message
+MSG_SCB_ACTION_COPY			message
+MSG_SCB_ACTION_PASTE			message
+MSG_SCB_ACTION_DELETE			message
+EndActionMessages	ServiceClipboard, Ent, 16
+
+
+; These flags represent the selection state of the
+; current active selection.
+;
+ActiveSelectionStateFlags	record
+	:5
+	ASSF_COPYABLE:1
+	ASSF_DELETABLE:1
+	ASSF_PASTABLE:1
+ActiveSelectionStateFlags	end
+
+
+; These flags have been added to prevent recursion in the
+; case where event handlers trigger the same event.
+;
+ClipboardEventFlags	record
+	:6
+	CEF_DOING_SELECTION_CHANGED:1	; set if the component is in the middle
+					; of a selectionChanged event
+	CEF_DOING_CLIPBOARD_CHANGED:1	; set if the component is in the middle
+					; of a clipboardChanged event
+ClipboardEventFlags	end
+
+	SCBI_activeSelectionState	ActiveSelectionStateFlags
+	SCBI_eventFlags			ClipboardEventFlags
+ServiceClipboardClass	endc
+
+
+
+
+;; OBSOLETE 
+if 0
+ServiceAlarmClass	class	EntClass
+MSG_SA_ALARM_DING	message
+; One-shot timer message sent by SAI_oneShotTimerHandle.
+; When this goes off, the "alarm" event is raised.
+;
+; Pass:		cx:dx	- tick count
+;   		bp	- interval
+; Return:	nothing
+; Destroyed:
+
+StartPropertyMessages	ServiceAlarm, Ent
+MSG_SA_GET_ENABLED	message
+MSG_SA_SET_ENABLED	message
+EndPropertyMessages	ServiceAlarm, Ent, 2
+
+StartActionMessages	ServiceAlarm, Ent
+MSG_SA_ACTION_GETALARMTIME	message
+MSG_SA_ACTION_SETALARMTIME	message
+MSG_SA_ACTION_GETALARMDATE	message
+MSG_SA_ACTION_SETALARMDATE	message
+MSG_SA_ACTION_GETALARMDATA	message
+MSG_SA_ACTION_SETALARMDATA	message
+EndActionMessages	ServiceAlarm, Ent, 6
+
+AlarmTime	struct
+    AT_hour	byte
+    AT_minute	byte
+    AT_second	byte
+AlarmTime	ends
+
+AlarmDate	struct
+    AD_year	word
+    AD_day	byte
+    AD_month	byte
+AlarmDate	ends
+
+    SAI_timerHandle	hptr
+    SAI_timerID		word
+    SAI_time		AlarmTime
+    SAI_date		AlarmDate
+    SAI_alarmData	word		; Heap token of a Notification struct
+    SAI_enabled		word
+
+;    SAI_continualTimerHandle	hptr	; continual, ticks every 10 minutes
+;    SAI_oneShotTimerHandle	hptr	; one-shot, when there are < 60s left
+;    SAI_oneShotTimerID	word		; ID of the one-shot
+
+ServiceAlarmClass	endc
+endif
+
+ServiceTimerClass	class	ServSysClass
+
+MSG_ST_TICK		message
+
+StartPropertyMessages	ServiceTimer, Ent
+MSG_ST_GET_INTERVAL	message
+MSG_ST_SET_INTERVAL	message
+MSG_ST_GET_ENABLED	message
+MSG_ST_SET_ENABLED	message
+EndPropertyMessages	ServiceTimer, Ent, 4
+
+StartActionMessages	ServiceTimer, Ent
+EndActionMessages	ServiceTimer, Ent, 0
+
+    STI_timerHandle	hptr
+    STI_interval	word
+    STI_enabled		word
+ServiceTimerClass	endc
+
+TableCell	struct
+	TC_row	word
+	TC_col	word
+TableCell	ends
+
+GadgetTableSelectionType etype word
+	GTST_SELECT_NONE		enum GadgetTableSelectionType
+	; 0 - not No Properties updated, No events sent, No visual updates
+	; on screen
+	GTST_SELECT_CELL		enum GadgetTableSelectionType
+	; 1 - select cell, selection properties updated, No events sent.
+	; The cell will be selected on the screen.
+	GTST_SELECT_ROW			enum GadgetTableSelectionType
+	; 2 - select row.  Selection properties updated. No events sent.
+	; The row will be selected on the screen.
+	GTST_SELECT_COLUMN		enum GadgetTableSelectionType
+	; 3 - select column, selection properties updated. No events sent.
+	; The column will be selected on the screen.
+	GTST_SELECT_RANGE		enum GadgetTableSelectionType
+	; 4- drag select area, Selection properties updated, no events sent.
+	; The area will be updated on the screen.
+	GTST_SELECT_CUSTOM		enum GadgetTableSelectionType
+	; 5 - custom selection - No properties updated. Pen event will
+	; be sent.  No update will happen on the screen.
+
+GadgetTableLook		etype	byte
+
+;
+; For now we don't want to use these looks for pcv, but they will
+; probably come back later.
+;
+ifdef	MOTIF_COMPONENT_SET
+	LOOK_TABLE_FULL_GRID		enum GadgetTableLook
+	LOOK_TABLE_NO_GRID		enum GadgetTableLook
+endif
+
+	LOOK_TABLE_RECORD_LIST		enum GadgetTableLook
+	LOOK_TABLE_DOTTED_CELLS		enum GadgetTableLook
+	LOOK_TABLE_DOTTED_HORIZ_LINES	enum GadgetTableLook
+	LOOK_TABLE_BLANK		enum GadgetTableLook
+
+GadgetTableClass	class	GadgetGadgetClass
+
+MSG_GADGET_TABLE_SET_NUM_ROWS_INTERNAL	message
+; uses for setting the data after parameters have been checked.
+; Pass:		cx	- new number of rows
+; Return: 	ax = 0 iff error
+; Destroyed: 	ax, cx, dx, bp
+; Interception:	Not likely.  GadgetTableClass will size the chunk array
+;		appropiately and set instance data
+;
+
+MSG_GADGET_TABLE_SET_NUM_COLUMNS_INTERNAL	message
+; used for setting the data after parameters have been checked.
+; Pass:		cx	- new number of cols
+; Return: 	ax = 0 iff error
+; Destroyed: 	ax, cx, dx, bp
+; Interception:	Not likely.  GadgetTableClass will size the chunk array
+;		appropiately and set instance data
+;
+
+MSG_GADGET_TABLE_SCROLL_UP		message
+MSG_GADGET_TABLE_SCROLL_DOWN		message
+; Tell the table to scroll up a row.
+; This is sent out by the table when it is drag scrolling and the mouse leaves
+; the visible area of the table.
+; Pass:		nothing
+; Return:	nothing
+; Destroyed:	nothing
+; Interception:	Only intercept if you want to override the way tables scroll
+;		on drag scrolling.
+;
+; Side effects: As this scrolls the table, it will cause a redraw and send
+;		events for all cells to draw themselves.
+
+MSG_GADGET_TABLE_DRAG_UP		message
+MSG_GADGET_TABLE_DRAG_DOWN		message
+;
+; Used to notify the table that the mouse has been outside the visible bounds
+; for a designated period of time.  A drag message should be sent out depending
+; on the state of timerHandle and timerID.  These are sent internally during
+; a drag and should not be sent by anyone else or subclassed.
+;
+; Pass:		nothing
+; Destroyed:	ax, cx, dx, bp
+
+StartPropertyMessages	GadgetTable, GadgetGadget
+MSG_GADGET_TABLE_GET_NUM_ROWS	message
+MSG_GADGET_TABLE_SET_NUM_ROWS	message
+
+MSG_GADGET_TABLE_GET_OVERALL_HEIGHT	message
+MSG_GADGET_TABLE_SET_OVERALL_HEIGHT	message
+
+MSG_GADGET_TABLE_GET_NUM_COLUMNS	message
+MSG_GADGET_TABLE_SET_NUM_COLUMNS	message
+
+MSG_GADGET_TABLE_GET_DEFAULT_ROW_HEIGHT	message
+MSG_GADGET_TABLE_SET_DEFAULT_ROW_HEIGHT	message
+
+MSG_GADGET_TABLE_GET_SELECTION_TYPE	message
+MSG_GADGET_TABLE_SET_SELECTION_TYPE	message
+
+MSG_GADGET_TABLE_GET_LEFT_COLUMN	message
+MSG_GADGET_TABLE_SET_LEFT_COLUMN	message
+
+MSG_GADGET_TABLE_GET_RIGHT_COLUMN	message
+MSG_GADGET_TABLE_SET_RIGHT_COLUMN	message
+
+MSG_GADGET_TABLE_GET_TOP_ROW		message
+MSG_GADGET_TABLE_SET_TOP_ROW		message
+
+MSG_GADGET_TABLE_GET_BOTTOM_ROW		message
+MSG_GADGET_TABLE_SET_BOTTOM_ROW		message
+
+MSG_GADGET_TABLE_GET_FIRST_VISIBLE_ROW	message
+MSG_GADGET_TABLE_SET_FIRST_VISIBLE_ROW	message
+
+MSG_GADGET_TABLE_GET_LAST_VISIBLE_ROW	message
+MSG_GADGET_TABLE_SET_LAST_VISIBLE_ROW	message
+EndPropertyMessages	GadgetTable, GadgetGadget, 20
+
+StartActionMessages	GadgetTable, GadgetGadget
+
+; normal actions
+MSG_GADGET_TABLE_ACTION_UPDATE		message
+; these next 6 need to stay in order.
+MSG_GADGET_TABLE_ACTION_SHOW_ROW	message
+MSG_GADGET_TABLE_ACTION_SCROLL		message
+MSG_GADGET_TABLE_ACTION_GET_ROW_AT	message
+MSG_GADGET_TABLE_ACTION_GET_COLUMN_AT	message
+MSG_GADGET_TABLE_ACTION_GET_Y_POS_AT	message
+MSG_GADGET_TABLE_ACTION_GET_X_POS_AT	message
+MSG_GADGET_TABLE_ACTION_GET_ABS_Y_POS_AT message
+
+;
+; Properties that are being implemented as actions
+;
+MSG_GADGET_TABLE_ACTION_GET_ROW_HEIGHTS	message
+MSG_GADGET_TABLE_ACTION_SET_ROW_HEIGHTS	message
+MSG_GADGET_TABLE_ACTION_GET_COLUMN_WIDTHS message
+MSG_GADGET_TABLE_ACTION_SET_COLUMN_WIDTHS message
+; more actions
+MSG_GADGET_TABLE_ACTION_SET_SELECTION	message
+
+EndActionMessages	GadgetTable, GadgetGadget, 20
+
+ATTR_GADGET_TABLE_DOING_REDRAW	vardata
+GADGET_TABLE_MAX_ROWS equ 4000
+GADGET_TABLE_MAX_COLS equ 40
+	; number of rows in the table. (1-XXX)
+	; Set via .numRows
+	; Don't set this without using MSG_GADGET_TABLE_INTERNAL_SET_NUM_ROWS
+	; It needs to grow the rowHeight array if needed.
+	; Initializes to 1, first element is 0.
+
+	GT_numRows		word
+
+	; (1-XXX)
+	; There is a fixed number of columns for the whole table.
+	; set via .numCols
+	; Don't set this without using MSG_GADGET_TABLE_INTERNAL_SET_NUM_COLS
+	; It needs to grow the columnWidths array if needed.
+	; Initializes to 1, first element is 0.
+
+	GT_numCols		word
+
+	; Array of height of each row.
+	; Array contains element for each row. (see GT_numRows)
+	; All sizes should be >= 0.
+	; First element is 0.
+	GT_rowHeights		nptr.word
+
+	; Array of widths of each column.
+	; Array contains element for each column. (see GT_numCols)
+	; All sizes should be >= 0.
+	; First element is 0.
+	GT_columnWidths		nptr.word
+
+GADGET_TABLE_DEFAULT_DEFAULT_ROW_HEIGHT	equ 14
+GADGET_TABLE_DEFAULT_COL_WIDTH equ 0
+	;
+	; Height additional rows should be set to.
+	; default is 10 pixels
+	;
+	GT_defaultRowHeight	word
+
+	;
+	; overall height that data and grid lines will require whether
+	; currently visible or not.
+;	GT_overallHeight	word, not stored
+
+	;
+	; Indicates how pen actions change the selection. One of:
+	; defaults to GTST_SELECT_CELL
+	GT_selectionType	GadgetTableSelectionType
+
+
+GADGET_TABLE_SELECT_WHOLE_LINE equ -2
+GADGET_TABLE_SELECT_NONE equ -1
+	;
+	; bounds of current selection, inclusive.
+	; not valid for GTST_SELECT_NONE or GTST_SELECT_CUSTOM
+	; -1 for left/top means whole whole row, col
+	; -2 means no selection
+
+ 	GT_leftSelection	word
+	GT_rightSelection 	word
+	GT_topSelection		word
+	GT_bottomSelection	word
+
+	; first visible row
+	; This gets set via the Scroll and ShowRow actions and the
+	; firstVisibleRow property.
+	; Don't set this without updating the ui and sending out drawCell
+	; events.  firstVisibleRow and lastVisibleRow only are guaranteed
+	; to be fully visible when they are set.  After that they are allowed
+	; to be partially visible.
+	GT_firstVisibleRow	word
+	GT_lastVisibleRow	word
+
+	;
+	; The first and last cells of a drag select.
+	; Note: These are not the left,top and bottom right
+	; coords of drag select box.  They are the first cell clicked
+	; in and the cell the mouse is currently over.
+	; They get set in MSG_META_START_SELECT and MSG_META_PTR
+	; dragSelectStart.TC_row = NO_DRAG_IN_PROCESS implies there is
+	; no drag in process.  This is used when trying to figure out what
+	; selection to draw during a drag scroll. (Set in META_INITIALIZE
+	; and END_SELECT)
+	; For cell, col, row select only SelectEnd is used.
+GADGET_TABLE_NO_DRAG_IN_PROCESS equ -1
+	GT_dragSelectStart	TableCell
+	GT_dragSelectEnd	TableCell
+
+	;
+	; The timerHandle and timerID are used drag scrolling.
+	; In MSG_META_PTR it is determined if the mouse is above or below
+	; the visible bounds of the table.  If it is, a timer will be started
+	; and stored here.  MSG_META_END_SELECT will stop the timer and clear
+	; the instance data to 0. [MSG_META_PTR ignores mouse events while
+	; the timer is active]
+
+	GT_timerHandle		hptr
+	GT_timerID		word
+
+	;
+	; This holds the amount of firstVisibleRow that is clipped.
+	; It is used internally for drawing and should not be set by others.
+	; It should always be valid.  It gets set by any action or property
+	; change that affects the firstVisibleRow.  Drag scrolling also will
+	; change it.  It should only be non-zero when the Scroll() action is
+	; called.
+	GT_topClipped		word
+
+	; Note: this handles the object specific bit in DrawFlags in
+	; MSG_VIS_DRAW to mean don't send out more events.
+	;
+GadgetTableClass	endc
+
+GadgetDBClass	class	EntClass
+
+StartPropertyMessages	GadgetDB,Ent
+MSG_GADGET_DB_GET_NAME				message
+MSG_GADGET_DB_SET_NAME				message
+MSG_GADGET_DB_GET_NUM_RECORDS			message
+MSG_GADGET_DB_SET_NUM_RECORDS			message
+MSG_GADGET_DB_GET_RECORD				message
+MSG_GADGET_DB_SET_RECORD				message
+MSG_GADGET_DB_GET_RECORD_ID			message
+MSG_GADGET_DB_SET_RECORD_ID			message
+MSG_GADGET_DB_GET_NEXT_RECORD_ID			message
+MSG_GADGET_DB_SET_NEXT_RECORD_ID			message
+MSG_GADGET_DB_GET_NUM_FIELDS			message
+MSG_GADGET_DB_SET_NUM_FIELDS			message
+EndPropertyMessages	GadgetDB,Ent,16
+
+StartActionMessages	GadgetDB,Ent
+MSG_GADGET_DB_ACTION_CREATE			message
+MSG_GADGET_DB_ACTION_DELETE			message
+MSG_GADGET_DB_ACTION_OPEN				message
+MSG_GADGET_DB_ACTION_CLOSE				message
+MSG_GADGET_DB_ACTION_RENAME			message
+MSG_GADGET_DB_ACTION_GET_RECORD			message
+MSG_GADGET_DB_ACTION_PUT_RECORD			message
+MSG_GADGET_DB_ACTION_NEW_RECORD			message
+MSG_GADGET_DB_ACTION_DELETE_RECORD			message
+MSG_GADGET_DB_ACTION_GET_FIELD			message
+MSG_GADGET_DB_ACTION_PUT_FIELD			message
+MSG_GADGET_DB_ACTION_ADD_FIELD			message
+MSG_GADGET_DB_ACTION_DELETE_FIELD			message
+MSG_GADGET_DB_ACTION_RENAME_FIELD			message
+MSG_GADGET_DB_ACTION_SEARCH_STRING			message
+MSG_GADGET_DB_ACTION_SEARCH_NUMBER			message
+
+MSG_GADGET_DB_ACTION_GET_FIELD_NAME		message
+MSG_GADGET_DB_ACTION_GET_FIELD_CATEGORY		message
+MSG_GADGET_DB_ACTION_GET_FIELD_TYPE		message
+MSG_GADGET_DB_ACTION_PUT_RECORD_NO_UPDATE	message
+EndActionMessages	GadgetDB,Ent,32
+
+
+;
+; Define some error codes that don't have DataStore counterparts
+; (that is, they can't be mapped into DataStoreError, DSDE, DSSE).
+;
+GadgetDBErrorCode	etype word, 300
+	GDBEC_INVALID_KEY_FIELD_COUNT	enum	GadgetDBErrorCode
+		; Returned when key field count isn't 0 or 1 (Liberty)
+	GDBEC_DATABASE_NOT_OPEN		enum	GadgetDBErrorCode
+		; Returned by all but open, create and rename actions
+		; when no open db
+	GDBEC_PROTECTED_FIELD		enum	GadgetDBErrorCode
+		; Put action on recordID or timestamp
+	GDBEC_NO_CURRENT_RECORD		enum	GadgetDBErrorCode
+		; Most actions can return this.
+	GDBEC_TOO_MANY_RECORDS		enum	GadgetDBErrorCode
+		; Spec says this is returned if NewRecord is called
+		; when numRecords is at its maximum, but Geos doesn't
+		; return this.
+	GDBEC_PUT_ERROR			enum	GadgetDBErrorCode
+		; An error occurred in the Put action.
+	GDBEC_INVALID_MATCH_STRING	enum	GadgetDBErrorCode
+		; SearchString has been called with an invalid match
+		; string, e.g., "".
+
+;
+; Define some useful constants.
+;
+GDB_RECORDNUM_FOR_NO_RECORD		equ	-1
+	; No current record.
+GDB_RECORDNUM_FOR_NEW_RECORD		equ	-2
+	; Database is working with a new record.
+GDB_RECORDID_FOR_NO_RECORD		equ	-1
+	; There's no current record, or there's no RecordID field.
+
+
+NumberSearchFlags	record
+    :15
+    NSF_BACKWARDS:1
+NumberSearchFlags	end
+
+StringSearchFlags	record
+    :12
+    SSF_BACKWARDS:1
+    SSF_CASE_SENSITIVE:1
+    SSF_PARTIAL_START:1
+    SSF_PARTIAL_END:1
+StringSearchFlags	end	
+
+CreateDatabaseFlags	record
+    :12
+    CDF_TIMESTAMP:1
+    CDF_RECORD_ID:1
+    CDF_READ_WRITE:1
+    CDF_SHARED:1
+CreateDatabaseFlags	end
+
+GadgetDBFlags	record
+    GDBF_RECORD_ID:1		
+    GDBF_TIMESTAMP:1
+    GDBF_OPEN_EXCLUSIVE:1		
+    GDBF_OPEN_READ_WRITE:1		
+    GDBF_DATASTORE_OPEN:1		
+    GDBF_HAVE_RECORD:1
+    GDBF_HAVE_NEW_RECORD:1
+    GDBF_RECORD_MODIFIED:1		; HAVE_RECORD=1 and did PutField.
+    :8
+GadgetDBFlags	end
+
+	GDBI_flags	GadgetDBFlags
+	GDBI_recordNum	dword
+	GDBI_recordID	dword
+	GDBI_token	word
+	GDBI_name	lptr
+	
+GadgetDBClass	endc
+
+ifdef HAS_FILE_COMPONENT
+ServiceFileClass	class	ServSysClass
+
+;MSG_ST_TICK		message
+
+StartPropertyMessages	ServiceFile, Ent
+MSG_SERVICE_FILE_GET_PATH	message
+MSG_SERVICE_FILE_SET_PATH	message
+
+MSG_SERVICE_FILE_GET_FILE_NAME	message
+MSG_SERVICE_FILE_SET_FILE_NAME	message
+
+MSG_SERVICE_FILE_GET_DISK	message
+MSG_SERVICE_FILE_SET_DISK	message
+
+MSG_SERVICE_FILE_GET_POSITION	message
+MSG_SERVICE_FILE_SET_POSITION	message
+
+EndPropertyMessages	ServiceFile, Ent, 4
+
+StartActionMessages	ServiceFile, Ent
+MSG_SERVICE_FILE_READ_LINE	message
+MSG_SERVICE_FILE_WRITE_LINE	message
+MSG_SERVICE_FILE_POSITION_AT_LINE	message
+MSG_SERVICE_FILE_POSITION		message
+MSG_SERVICE_FILE_WRITE_DATA		message
+MSG_SERVICE_FILE_READ_DATA		message
+MSG_SERVICE_FILE_OPEN			message
+MSG_SERVICE_FILE_CLOSE			message
+EndActionMessages	ServiceFile, Ent, 8
+
+	SFI_path		RunHeapToken
+	SFI_name		RunHeapToken
+	SFI_disk		word
+	SFI_fileHandle		FileHandle
+
+ServiceFileClass	endc
+endif; HAS_FILE_COMPONENT
+
+
+SJisUnicodeConversionClass class	EntClass
+StartActionMessages	SJisUnicodeConversion, Ent
+MSG_SJU_ACTION_SJIS_CHAR_TO_UNICODE	message
+MSG_SJU_ACTION_UNICODE_CHAR_TO_SJIS	message
+MSG_SJU_ACTION_SJIS_STRING_TO_UNICODE	message
+MSG_SJU_ACTION_UNICODE_STRING_TO_SJIS	message
+EndActionMessages	SJisUnicodeConversion, Ent, 4
+
+SJisUnicodeConversionClass endc
+
+global TextIsInViewFar:far
+
+
+SystemBusyClass class	ServSysClass
+;
+; Internal messages go here.
+
+MSG_SYSTEM_BUSY_ADD_SELF_TO_BUSY_ARRAY		message
+;
+; When a busy compnent is created it adds itself to a global
+; array of busy components so that it will be notified when
+; any busy component issues an Enter or Leave action.
+;
+
+MSG_SYSTEM_BUSY_REMOVE_SELF_FROM_BUSY_ARRAY	message
+;
+; When a busy component is destroyed, it takes itself off
+; the list of busy components.
+;
+
+MSG_SYSTEM_BUSY_RAISE_BUSY_TOTAL_CHANGED_EVENT	message
+;
+; This message is sent to a busy component when some
+; busy component has been sent an Enter or Leave action.
+;
+
+StartPropertyMessages	SystemBusy, Ent
+MSG_SYSTEM_BUSY_GET_BUSY_COUNT		message
+MSG_SYSTEM_BUSY_SET_BUSY_COUNT		message
+
+MSG_SYSTEM_BUSY_GET_BUSY_TOTAL		message
+MSG_SYSTEM_BUSY_SET_BUSY_TOTAL		message
+EndPropertyMessages	SystemBusy, Ent,6
+
+StartActionMessages	SystemBusy, Ent
+MSG_SYSTEM_BUSY_ACTION_ENTER		message
+MSG_SYSTEM_BUSY_ACTION_LEAVE		message
+
+EndActionMessages	SystemBusy, Ent,6
+
+	SBI_busyCount	word
+	; Number of times this component has been marked busy without
+	; being marked not busy.
+
+SystemBusyClass	endc
+
+
+SystemSoundClass class	ServSysClass
+;
+; Internal messages go here.
+
+
+StartPropertyMessages	SystemSound, Ent
+EndPropertyMessages	SystemSound, Ent,6
+
+StartActionMessages	SystemSound, Ent
+MSG_SYSTEM_SOUND_ACTION_STANDARDSOUND	message
+EndActionMessages	SystemSound, Ent,6
+
+SystemSoundClass	endc
+
+
+SystemDisplayClass class	ServSysClass
+
+;
+; Internal messages go here.
+
+StartPropertyMessages	SystemDisplay, Ent
+MSG_SYSTEM_DISPLAY_GET_WIDTH		message
+MSG_SYSTEM_DISPLAY_SET_WIDTH		message
+
+MSG_SYSTEM_DISPLAY_GET_HEIGHT		message
+MSG_SYSTEM_DISPLAY_SET_HEIGHT		message
+
+MSG_SYSTEM_DISPLAY_GET_ACTIVE_FORM	message
+MSG_SYSTEM_DISPLAY_SET_ACTIVE_FORM	message
+
+MSG_SYSTEM_DISPLAY_GET_TYPE		message
+MSG_SYSTEM_DISPLAY_SET_TYPE		message
+
+EndPropertyMessages	SystemDisplay, Ent,4
+StartActionMessages	SystemDisplay, Ent
+EndActionMessages	SystemDisplay, Ent,4
+
+SystemDisplayClass	endc
+
+SystemLauncherClass	class	ServSysClass
+MSG_SL_ALARM_RING	message
+
+StartPropertyMessages	SystemLauncher, Ent
+MSG_SYSTEM_LAUNCHER_GET_MEMORY_AVAILABLE	message
+MSG_SYSTEM_LAUNCHER_SET_MEMORY_AVAILABLE	message
+
+MSG_SYSTEM_LAUNCHER_GET_MEMORY_RESERVED		message
+MSG_SYSTEM_LAUNCHER_SET_MEMORY_RESERVED		message
+
+EndPropertyMessages	SystemLauncher, Ent,7
+
+StartActionMessages	SystemLauncher, Ent
+MSG_SYSTEM_LAUNCHER_ACTION_GO_TO	message
+MSG_SYSTEM_LAUNCHER_ACTION_SWITCH_TO	message
+MSG_SYSTEM_LAUNCHER_ACTION_REQUEST_MEMORY	message
+MSG_SYSTEM_LAUNCHER_ACTION_HIDE		message
+
+EndActionMessages	SystemLauncher, Ent, 7
+
+SystemLauncherClass	endc
+
+;% AlarmServerClass
+
+AlarmServerClass_asm	class	MetaClass
+
+    ; All messages and instance data private
+    ; No public API
+
+    MSG_AFS_ALARM_RING		message
+
+    MSG_AFS_LOAD_DATA		message
+    MSG_AFS_ACTIVATE_ALARMS	message
+    MSG_AFS_DEACTIVATE_ALARMS 	message
+    MSG_AFS_SAVE_DATA		message
+
+    ; Messages below are for use by AlarmClientClass
+
+    MSG_AFS_CLIENT_ATTACH	message
+    MSG_AFS_CLIENT_DETACH	message
+
+    MSG_AFS_SET_ENABLED		message
+    MSG_AFS_SET_CONTEXT		message
+
+    MSG_AFS_GET_ALARM_ENTRY	message
+    MSG_AFS_PUT_ALARM_ENTRY	message
+
+    AFSI_alarmHeap	hptr
+    AFSI_alarmArray	optr
+
+AlarmServerClass_asm	endc
+
+;% ServiceAlarmClient
+
+ServiceAlarmClientClass	class	ServSysClass
+; Internal messages go here
+;
+
+StartPropertyMessages	ServiceAlarmClient, Ent
+MSG_SAC_GET_UNIQUE_ID	message
+MSG_SAC_SET_UNIQUE_ID	message
+
+MSG_SAC_GET_ENABLED	message
+MSG_SAC_SET_ENABLED	message
+
+MSG_SAC_GET_MODULE_CONTEXT	message
+MSG_SAC_SET_MODULE_CONTEXT	message
+
+EndPropertyMessages	ServiceAlarmClient, Ent,10
+
+StartActionMessages	ServiceAlarmClient, Ent
+
+MSG_SAC_ACTION_GETALARMDATE	message
+MSG_SAC_ACTION_SETALARMDATE	message
+
+MSG_SAC_ACTION_GETALARMTIME	message
+MSG_SAC_ACTION_SETALARMTIME	message
+
+EndActionMessages	ServiceAlarmClient, Ent,10
+
+	SACI_uniqueID		word	;RunHeapToken
+ServiceAlarmClientClass	endc
+
+EndLibrary	gadget
+
+
+
+;=============== Errors / Warnings ============================
+WARNING_GADGET_POSITION_VARDATA_EXPECTED		enum	Warnings
+; Someone called GadgetUtilPositionChildren when one of the children
+; did not have ATTR_GEN_POSITION_X or ATTR_GEN_POSITION_Y vardata.
+; Do a pvardata *ds:si to see.  This often happens when the parent is not
+; set tiled and the children are not given explicit positions in a hand coded
+; basic file.
+
+ERROR_WHERE_IS_THE_FORM_DIALOG_OR_FLOATER		enum	FatalErrors
+; BuildFocusPath reached the top of the UI tree without encountering
+; a window (GadgetForm, GadgetDialog or GadgetFloater).  This should be
+; impossible.
+
+ERROR_COMP_MISSING_CUSTOM_WINDOW_PRIORITY_VARDATA	enum	FatalErrors
+; Some component is supposed to have ATTR_GEN_WINDOW_CUSTOM_WINDOW_
+; PRIORITY.  This error means the vardata isn't there!
+
+ERROR_ILLEGAL_FOCUS_OBJECT				enum	FatalErrors
+; An object specified in some window's G?I_focus instance data is not
+; legal.  It should never have been allowed into instance data.  Or
+; something happened that made it no longer an acceptable .focus.
+
+;==== The following clipboard formats are needed by Legos ====
+
+CIF_INTEGER		enum	ClipboardItemFormat
+CIF_LONG		enum	ClipboardItemFormat
+CIF_FLOAT		enum	ClipboardItemFormat
+

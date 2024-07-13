@@ -1,0 +1,1484 @@
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+	Copyright (c) Geoworks 1994 -- All Rights Reserved
+
+PROJECT:	Legos
+MODULE:		Ent Library
+FILE:		ent.def
+
+AUTHOR:		Ronald Braunstein, Jul  5, 1994
+
+MACROS:
+	Name			Description
+	----			-----------
+    ComponentData		struct
+    EntState			record
+    EntFlags			record
+    EntObjectBlockHeader	struct
+    EntGetInterpreter		macro
+    {Start,End}{Property,Action}Messages	macros
+
+    EntClass			class
+    EntVisClass			class
+    ML1Class			class
+    ML2Class			class
+    EntAppClass			class
+
+    EntClassPtrStruct		struct
+    EntArgumentType		etype word
+    PropertyDispatchType	etype word
+    PropertyDispatchData	union
+    PropertyDispatchStruct	struct
+    [Extended]PropEntryStruct	struct
+    [Extended]ActionEntryStruct	struct
+    PropActionCommonStruct	struct
+
+    makePropEntry		macro
+    makeActionEntry		macro
+    makeECPS			macro
+    compMake{Property,Action}Tables	macro
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	ron	7/ 5/94   	Initial revision
+
+
+DESCRIPTION:
+
+	$Id: ent.def,v 1.2 98/03/11 15:45:48 martin Exp $
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+
+SetDef __ENT
+
+StartLibrary	ent
+
+include Objects/genC.def
+UseLib Legos/basrun.def
+;include legos/basrun.def
+
+
+ComponentData struct
+	CD_type		LegosType
+	CD_data		LegosData
+ComponentData ends
+
+EntState		record
+	ES_INITIALIZED:1,	; true if MSG_ENT_INITIALIZED has been handled
+				; by the default EntClass handler, which is
+				; the only code allowed to set the bit.
+	ES_IS_VIS:1,		; true if the component wants gen messages
+				; for adding to trees et al
+	ES_IS_GEN:1,		; true if the component wants vis messages
+				; for adding to trees et al
+	:5
+EntState		end
+
+EntFlags		record
+	:5,
+	EF_BUILT:1,		; object is visibly on screen
+	EF_ALLOWS_CHILDREN:1,	; Set this if your component is mature enough
+				; to handle this major responsibility.
+	EF_VISIBLE:1		; Visible should be moved to GOOL(um, gadget),
+				; but will live here for now...
+				; object wants to be visible
+				; This flags just means ENT_SHOW has been
+				; called since the last ENT_HIDE.  It doesn't
+				; mean it is REALIZED (built out).
+				; See EF_BUILT.
+EntFlags		end
+
+;
+; Components for a given interpreter need to be in their own object block
+; with the following header.  This happens automatically when a component is
+; created via the interpreter.
+;
+EntObjectBlockHeader 	struct
+    EOBH_lmemHeader	ObjLMemBlockHeader
+    EOBH_interpreter	optr
+    EOBH_task		hptr.RunTask
+EntObjectBlockHeader 	ends
+
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		EntGetInterpreter
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	Use this macro to get the optr of the interpreter for a
+		given EntClass object.  The placement of the interpreter's
+		optr might move from the EntObjectBlockHeader to the first
+		chunk of an ObjectBlock containing components when we try to
+		add support for statically defining components in goc or .ui
+		files.  If you use this macro, such changes shouldn't affect
+		you.
+
+PASS:		ds		= must equal segment of EntClass object
+		dest		= memory or register pair for destination
+		[trashreg]	= required if dest is a memory location
+				  rather than a register pair such as cxdx
+PSEUDO CODE/STRATEGY:
+KNOWN BUGS/SIDE EFFECTS/IDEAS:
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	martin	12/1/94   	Initial version
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+EntGetInterpreter		macro	dest, thrashreg
+	movdw	dest, ds:[EOBH_interpreter], thrashreg
+endm
+
+
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		(Start,End)(Property,Action)Messages
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	These macros must be invoked around the property message
+		definitions for a component.
+
+PASS:	StartPropertyMessages
+		class		The class we're dealing with
+		super		The superclass of class
+	EndPropertyMessages
+		class		The class we're dealing with
+		super		The superclass of class
+		total		The total number of properties to reserve
+				space for (include extra space if property
+				count may increase in the future).
+
+	Arguments are the same for the Action macros.
+
+USAGE:
+	StartPropertyMessages	MyComp, Ent
+		MSG_MYCOMP_GET_MYPROP		message
+		MSG_MYCOMP_SET_MYPROP		message
+	EndPropertyMessages	MyComp, Ent, 5
+	StartActionMessages	MyComp, Ent
+		MSG_MYCOMP_DO_MYACTION		message
+	EndActionMessages	MyComp, Ent, 3
+
+CAVEATS:
+	Note above that 5 is passed to EndPropertyMessages.  This will allow
+	up to 4 more properties message pairs to be added without altering
+	the message numbers of subclassed components and potentially
+	invalidating compiled code based on those components.
+
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	dloft	5/12/95   	Initial version
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+
+StartPropertyMessages		macro	class, super
+	;	PrintE	<class&_MESSAGE_PLACE_HOLDER =>, %(class&Messages)
+	;
+	; Record the message count, so we can restore it later
+	;
+		class&_MESSAGE_PLACE_HOLDER = class&Messages
+	;
+	; Set the message count to somewhere in the EntPropertyMessages range.
+	; The starting value has been pre-determined by the superclass.
+	;
+ifndef super&_FIRST_SUBCLASS_PROPERTY
+		PrintMessage <Unable to start Property messages>
+		PrintMessage <super has not defined messages properly...>
+endif
+		class&Messages = super&_FIRST_SUBCLASS_PROPERTY
+endm
+
+StartActionMessages		macro	class, super
+	;	PrintE	<class&_MESSAGE_PLACE_HOLDER =>, %(class&Messages)
+	;
+	; Record the message count, so we can restore it later
+	;
+		class&_MESSAGE_PLACE_HOLDER = class&Messages
+	;
+	; Set the message count to somewhere in the EntActionMessages range.
+	; The starting value has been pre-determined by the superclass.
+	;
+ifndef super&_FIRST_SUBCLASS_ACTION
+		PrintMessage <Unable to start Action messages>
+		PrintMessage <super has not defined messages properly...>
+		.err
+endif
+		class&Messages = super&_FIRST_SUBCLASS_ACTION
+endm
+
+
+EndPropertyMessages		macro	class, super, total
+		local	numDefined
+	;PrintE	<class has defined: >, %(class&Messages - super&_FIRST_SUBCLASS_PROPERTY)
+
+	numDefined = class&Messages - super&_FIRST_SUBCLASS_PROPERTY
+
+	;PrintE	<class&Messages	=>, %(class&Messages)
+	;PrintE	<First Subclass Message =>, %((2*total) - numDefined + class&Messages)
+
+	class&_FIRST_SUBCLASS_PROPERTY=(2*total) - numDefined + class&Messages
+	;
+	; restore the message count, so successive definitions will be outside
+	; the EntPropertyMessages range.  First, a sanity check...
+	;
+if (class&_FIRST_SUBCLASS_PROPERTY lt class&Messages)
+		PrintMessage <Not enough space reserved for property messages>
+		.err
+endif
+	class&Messages = class&_MESSAGE_PLACE_HOLDER
+endm
+
+EndActionMessages		macro	class, super, total
+		local	numDefined
+	;PrintE	<class has defined: >, %(class&Messages - super&_FIRST_SUBCLASS_ACTION)
+
+	numDefined = class&Messages - super&_FIRST_SUBCLASS_ACTION
+
+	;PrintE	<class&Messages	=>, %(class&Messages)
+	;PrintE	<First Subclass Message =>, %((2*total) - numDefined + class&Messages)
+
+	class&_FIRST_SUBCLASS_ACTION=(2*total) - numDefined + class&Messages
+	;
+	; restore the message count, so successive definitions will be outside
+	; the EntPropertyMessages range
+	;
+if (class&_FIRST_SUBCLASS_ACTION lt class&Messages)
+		PrintMessage <Not enough space reserved for property messages>
+		.err
+endif
+	class&Messages = class&_MESSAGE_PLACE_HOLDER
+endm
+
+;%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+;% 			Class definitions
+;%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+EntClass		class	GenClass, master, variant
+
+MSG_ENT_INITIALIZE		message
+;
+; Should be sent to a component after sending MSG_ENT_SET_PARENT, which should
+; be sent immediately after instantiation.  This message IS guaranteed to
+; build out all master levels, since it is always passed to the superclass,
+; and is not intercepted at the Ent level.  This allows the component (after
+; calling the superclass) to initialize default values in non-Ent master
+; levels.  This message must be sent after MSG_ENT_SET_PARENT, as some generic
+; object classes require that their generic parents be set before a variant
+; superclass can be chosen.
+;
+; Context:	Sent to any component after instantiation
+; Source:	Anyone, usually Interpreter
+; Destination:	Any Ent class object
+; Interception:	Should be intercepted by every component that needs to setup
+; 		default values for its instance data, including instance data
+; 		in an ancestor master level.  Other actions, such as adding
+; 		vardata, sending messages, etc, may be performed.  You MUST
+;		pass this up to your superclass and the superclass should be
+;		called before you do your own work.
+;
+; Pass:		cx:dx	- fptr.RunHeapInfo, may be needed for creating data
+;			  structures on the runtime heap.
+;
+; Return:	nothing
+; Destroyed:	ax, cx, dx, bp
+;
+
+
+MSG_ENT_SET_PROPERTY		message
+;
+; Sets the property of the object to the value indicated.
+; If it is not a natural property of the object, it will be added to a table.
+;
+; Context:	Sent to any component to tell it to update some value
+; Source:	Anyone, usually Interpreter
+; Destination:	Any Ent class object
+; Interception:	Should be intercepted by every component that has internal
+;   		properties that are setable.  Only call superclass if it is
+;		an unknown property of the component.
+;
+; Pass:		ss:bp	= SetPropertyArgs
+;
+; Return:	nothing.  if *(ss:[bp].SPA_compData.CD_type) is incorrect
+; 		(e.g. the user is trying to set a string property to a
+; 		number), the handler should set it to LT_TYPE_ERROR and
+; 		return.
+;
+; Destroyed:	ax, cx, dx
+;
+SetPropertyArgs	struct
+	SPA_propName	fptr.TCHAR
+	SPA_compDataPtr	fptr.ComponentData
+	SPA_runHeapInfoPtr	fptr.RunHeapInfo
+SetPropertyArgs	ends
+
+MSG_ENT_GET_PROPERTY		message
+;
+; Gets the indicated property of the object.
+;
+; Context:	Sent to any component to get the value of some property
+; Source:	Anyone
+; Destination:	Any Ent class object
+; Interception:	Should be intercepted by every component that has internal
+;		properties. Only call superclass if it is an unknown property.
+;		If the property returned stores data in the RunHeap, the caller
+;		not the handler is responsible for incrementing the RefCount.
+;
+; Pass:		ss:bp 	= GetPropertyArgs
+;
+; Return:	if found compData buffer filled in
+;		else Carry set
+; Destroyed:	ax, cx, dx
+;
+
+GetPropertyArgs	struct
+	GPA_propName		fptr.TCHAR
+	GPA_compDataPtr		fptr.ComponentData
+	GPA_runHeapInfoPtr	fptr.RunHeapInfo
+GetPropertyArgs	ends
+
+MSG_ENT_DO_ACTION		message
+;
+; Perform the action specified
+;
+; Context:	Sent to any component, usually asynchronously
+; Source:	Anyone
+; Destination:	Any Ent class object
+; Interception: Should be intercepted by every component that has actions
+;		that can be performed.  If the action is unknown to the
+;		component, it should be passed on to the superclass.
+;		If the action stores data in the RunHeap, the caller
+;		not the handler is responsible for incrementing the RefCount.
+;
+; Pass:		ss:bp	= EntDoActionArgs
+;
+; Return:	EDAA_retval filled in
+; Destroyed:	ax, cx, dx
+;
+EntDoActionArgs	struct
+	EDAA_actionName	fptr.TCHAR
+	EDAA_argc	word			; number or args in array
+	EDAA_argv	fptr.ComponentData	; array of arguments
+	EDAA_retval	fptr.ComponentData	; return value (pre-allocated)
+	EDAA_runHeapInfoPtr	fptr.RunHeapInfo
+
+EntDoActionArgs	ends
+
+MSG_ENT_SEND_TO_CHILDREN	message
+MSG_ENT_SEND_TO_PARENT		message
+;
+;
+; Context:
+; Source:
+; Destination:
+; Interception:
+;
+; Pass:		^hcx - ClassedEvent handle
+; Return:	Nothing
+;		(event handle freed)
+;
+
+
+MSG_ENT_REMOVE_COMPONENT_REFERENCES message
+;
+; When modules are destroyed, this message is sent to all remaining
+; components so they can remove references to the destroyed components
+; if there are any.  All tree manipulations should already be done.  This
+; message just lets you NULL out stored Optrs.  The superclass will null
+; User-defined component properties.
+;
+; Pass:		^fcx:dx	- RemoveReferenceStruct
+;			  Array of optrs, null terminated
+;			  Array of components that has been deleted.
+; Source:	interpreter
+; Destination:	any Ent component
+; Interception:	Must be handled if you store component optrs
+;		in instance data.  You must call the superclass.
+
+RemoveReferenceStruct	struct
+	RRS_comps	fptr.optr	; array of components, null terminated
+	RRS_modules	fptr.hptr.RTaskHan ; array of modules, null terminated
+RemoveReferenceStruct	ends
+
+
+MSG_ENT_GET_CLASS 		message
+;
+; Returns the string description of this component's class.
+;
+; NOTE: This information could just as easily be gotten through
+; MSG_ENT_GET_PROPERTY.  The reason it exists as a separate message is to
+; allow component classes without special properties to not intercept and deal
+; with MSG_ENT_SET/GET_PROPERTY and simply respond to this message.  If any
+; other class-specific information need be retrieved, this message could be
+; expanded to return some class description structure containing both the name
+; of the class and whatever other information is needed.
+;
+; Context:	Sent by EntClass object to itself during processing of the
+; 		"class" property in MSG_ENT_GET_PROPERTY.
+; Source:	typically sent by object to itself from the EntClass
+; 		MSG_ENT_GET_PROPERTY method.
+; Destination:  subclass of EntClass
+; Interception: Should be intercepted by every component class.  if not
+; 		intercepted, ent will return that the class is unknown.
+;
+; Pass:		nothing
+; Return:	cx:dx = fptr.char to the name of the component's class.
+
+
+MSG_ENT_SET_PARENT		message
+;
+; Sets the parent of the component makes the component a child of the parent.
+; This should be the FIRST message sent to a component after instantiation,
+; followed by MSG_ENT_INITIALIZE.
+;
+; Context:	Usually set via MSG_ENT_SET_PROPERTY
+; Source:	Anyone
+; Destination:	Any Ent Class object
+; Interception: Usually not.  Can be intercepted if the component needs to
+;		special checking to see if it can be added.  Otherwise, the
+;		superclass will just check the table to see what can be added
+;		where.
+;
+; Pass:		cx:dx	= optr of parent
+;
+; Return:	ax	= nonzero if the add was not performed due to
+; 			  incompatibility between the two components.
+;			= 0 if the add was accepted.
+
+MSG_ENT_GET_PARENT		message
+;
+; Pass:		nothing
+; Return:	^lcx:dx	= optr of parent
+;
+
+
+MSG_ENT_CHECK_ACTION		message
+;
+; Pass:		ss:bp	= fptr to action name to look for
+; Interception:	Should be intercepted if subclass allows actions
+; Return	ax	= 0 if not found, 1 if found
+;
+
+MSG_ENT_VALIDATE_PARENT		message
+;
+; When MSG_ENT_SET_PARENT is handled by EntClass, the method will send
+; this message to itself before actually setting the component linkage to
+; determine if the parent being added is valid.  This makes it easier for a
+; subclass of Ent to check on the validity of its new parent, since
+; intercepting MSG_ENT_SET_PARENT is not necessary.
+;
+; Context:	sent by MSG_ENT_SET_PARENT method
+; Source:	No restrictions, though usually the intercepting object.
+; Destination:	Any Ent Class object
+; Interception: Whenever a component has limitations on what components it can
+; 		be a child of.  For example, listitem components may only be
+; 		children of list components.
+;
+; Pass:		^lcx:dx	= optr to potential parent
+;
+; Return:	ax	= nonzero if the parent should be rejected.
+;			= 0 if the parent should be accepted.
+
+MSG_ENT_VALIDATE_CHILD		message
+;
+; Similar to MSG_ENT_VALIDATE_PARENT, but used to check whether a given
+; component is a valid child.
+;
+; Context:	Usually sent by MSG_ENT_SET_PARENT method
+; Source:	No restrictions, usually sent by the child object.
+; Destination:	Any Ent Class object
+; Interception: Whenever a component has limitations on what components it can
+; 		have as children.  For example, a list component may only have
+; 		listitem components as children.
+;
+; Pass:		^lcx:dx	= optr to potential child
+;
+; Return:	ax	= nonzero if the child should be rejected.
+;			= 0 if the child should be accepted.
+
+
+MSG_ENT_HANDLE_EVENT		message
+;
+; Asks the interpreter to call an event handler, if one is present.
+; Typical components will always call MSG_ENT_HANDLE_EVENT.  Components
+; that generate events with great frequency should use MSG_ENT_HANDLE_EVENT
+; once, to determine if the handler is present and, if so, obtain its function
+; key (see Return, below).  When generating later events, this function key
+; may be passed to MSG_ENT_HANDLE_EVENT_WITH_KEY, which takes much less time
+; to call the event handler.
+;
+; Pass:		cx:dx	- EntHandleEventStruct
+;	for MSG_ENT_HANDLE_EVENT,
+;		cx:dx.EHES_eventID = fptr.char to ascii string name to use in
+;				generating the event
+;	for MSG_ENT_HANDLE_EVENT_WITH_KEY
+;		cx:dx.EHES_eventID = dword function key to use in generating
+;				the event
+;
+;   RunHeap elements with 0 ref counts may be passed; they will be destroyed
+;   after the call completes, if necessary.
+;
+; Interception:	May be intercepted by subclasses who want to mask out an event
+; 		provided by a superclass.  In this situation, simply returning
+; 		ax = 0 should suffice.
+; Return:	ax		   =	1 if handler was called, else 0.
+;		cx:dx.EHES_eventID = 	function key for the event handler
+;					called.
+;
+
+
+
+EventID		union
+	EID_eventName	fptr.TCHAR
+	EID_eventKey	dword
+EventID		end
+
+EntHandleEventStruct	struct
+	EHES_eventID		EventID			; name of event, or key
+	EHES_result		fptr.ComponentData	; place to store result if
+							; expected
+	EHES_argc		word			; number of args
+	EHES_argv		ComponentData 6 dup (?)	; create entry for each
+							; argument
+EntHandleEventStruct	ends
+
+MSG_ENT_ADD_CHILD		message
+;
+; Allows subclasses to setup linkages outside of the ent tree.
+;
+; Source:	Internal.  You should not be sending this to a component.
+;		Use MSG_ENT_SET_PARENT_INSTEAD
+;
+; Pass:		^lcx:dx	= optr of child to add
+;		bp	= CompChildFlags
+; Destroyed:	ax
+;
+; Interception:	Generally not intercepted.
+;
+MSG_ENT_REMOVE_CHILD		message
+;
+; Allows subclasses to setup linkages outside of the ent tree.
+;
+; Source:	Internal.  You should not be sending this to a component.
+;		Use MSG_ENT_SET_PARENT_INSTEAD
+;
+; Pass:		^lcx:dx	= optr of child to remove
+;		bp	= CompChildFlags
+;
+; Interception:	Generally not intercepted.
+;
+
+MSG_ENT_SET_PARENT_LINKAGE	message
+;
+; Used by EntClass children that are able to be children of non-Ent
+; composites.  This handler will send the correct message to the parent
+; to add this component to its tree.  (Assuming the parent is a type we know
+; about: Gen Vis Grobj.
+;
+; Context:
+; Source:	MSG_ENT_SET_PARENT_HANDLER
+; Destination:  any Ent object
+; Interception:
+;
+; Pass:		^lcx:dx	= optr of parent to be added to
+;		bp	= CompChildFlags
+;
+; Return:
+;
+;	- unchanged
+;	- destroyed
+;
+
+MSG_ENT_REMOVE_PARENT_LINKAGE	message
+;
+; Remove Ent linkage, as well as Gen/Vis (if necessary, depending on EI_state)
+;
+; Context:
+; Source:
+; Destination:
+; Interception:
+;
+; Pass: 	bp	= CompChildFlags
+;
+; Return:
+;
+;	- unchanged
+;	- destroyed
+;
+
+MSG_ENT_SET_PROTOTYPE message
+;
+; Sets a string to be used when generating function names to call for event
+; handlers. Normally, the name of the object is used.  You can make one object
+; act like another without duplicating script code by setting this field.
+;
+; Pass:		^fcx:dx	= name to use
+; Return:	nothing
+
+MSG_ENT_DESTROY	message
+;
+; A routine to destroy an entire ent tree, using GenDestroy and VisDestroy
+; when applicable, otherwise using MSG_META_OBJ_FREE after calling
+; MSG_META_DETACH
+;
+
+MSG_ENT_SET_FLAGS message
+;
+; Set the passed in flags
+;
+; Pass:		cl = flags to set
+;		dl = flags to clear
+; Return:	nothing
+; Destroyed:	ax
+
+MSG_ENT_GET_FLAGS message
+;
+; Return the flags of the Component
+;
+; Pass:		nothing
+; Return:	al	= EntFlags
+
+MSG_ENT_RESOLVE_PROPERTY	message
+MSG_ENT_RESOLVE_ACTION		message
+; Converts a property name into a message number
+;
+;
+; Context:	Sent to any component to get the message number of a property
+; Source:	Anyone
+; Destination:	Any Ent class object
+; Interception:	Should be intercepted by every component that has internal
+;		properties. Only call superclass if it is an unknown property.
+;
+; Pass:		dx:bp	= EntResolveStruct with ERS_propOrAction filled in
+; Return:	dx:bp	= filled in.  ERS_message is 0 if prop/action not found
+; Destroyed:	nothing
+;
+ENT_TYPE_BUFFER_LENGTH equ 30
+VAR_NUM_PARAMS equ 0xffff
+
+EntTypeName	type	ENT_TYPE_BUFFER_LENGTH dup (TCHAR)
+EntResolveStruct	struct
+    ERS_propOrAction	fptr.TCHAR	; Name of prop/action to resolve
+
+;; The following fields are filled in by the method
+
+    ERS_message		word		; Action or GetProp message
+					; Add 1 to get SetProp message
+    ERS_type		LegosType
+    ERS_numParams	word
+    ERS_typeBuf	fptr.EntTypeName ; Buffer for type name, if LT_TYPE_STRUCT
+EntResolveStruct	ends
+
+MSG_ENT_HANDLE_EVENT_WITH_KEY	message
+;
+; See documentation on MSG_ENT_HANDLE_EVENT
+;
+
+MSG_ENT_GET_FIRST_CHILD message
+;
+; Pass:		nothing
+; Return:	^lcx:dx = first child, NullOptr if no children.
+;
+MSG_ENT_GET_NEXT_SIBLING message
+; Pass:		nothing
+; Return:	^cx:dx = next sibling or parent if last child.
+;
+
+MSG_ENT_GET_PROPERTY_EXTERNAL	message
+MSG_ENT_SET_PROPERTY_EXTERNAL	message
+; Pass: SetPropertyArgs
+;
+; Description:
+; Use these routines when either the property is not a string property
+; or the you want to pass the string in a buffer or get the string back in
+; buffer rather than in a token.
+;
+;
+; For MSG_ENT_SET_PROPERTY_EXTERNAL set (ss:[bp].SPA_compDataPtr)->CD_type
+; to LT_TYPE_STRING and (ss:[bp].SPA_compDataPtr)->CD_data.LD_fptr to a
+; fptr.TCHAR, not CD_data.LD_string to a RunHeapToken.
+;
+; For MSG_ENT_GET_PROPERTY_EXTERNAL, set value->CD_data.fptr to a buffer that
+; has space to hold the returned string.
+;
+; Interception:
+;	You probably want to intercept MSG_ENT_GET/SET_PROPERTY instead.
+;	This Message will generate the base ENT_SET/GET_PROPERTY message.
+
+
+MSG_ENT_GET_STATE	message
+;
+; Pass:		nothing
+; Return:	EntState
+
+MSG_ENT_SET_STATE	message
+;
+; Pass:		cl	- bits to set
+; 		ch	- bits to clear
+; Return	dl	- new state
+;		dh	- clear
+
+MSG_ENT_UNIV_LEAVE	message
+; this routine gets propogated down the ent tree by any windowed ent
+; component, so that children like gadgets that need to know when the
+; mouse has left its bounds have a chace to do something if the parent
+; windows bounds are smaller than the childs bounds
+
+
+MSG_ENT_FIND_CHILD			message
+;
+; Determines the position of an ent child of this object
+;
+; Context:	Utility message to find an ent child given optr.  Use
+;		MSG_GEN_ENT_CHILD_AT_POSITION if given child position.
+; Source:	Anyone
+; Destination:	Any EntClass object
+; Interception: Generally not intercepted.  However, custom gadgets may
+;		handle.  In this case, superclass will not need to be
+;		called as default functionality is replaced.
+;
+; Pass:	 	^lcx:dx - child object
+; Return:	carry - set if NOT FOUND
+;		ax - child position (0 = first child, -1 if not found)
+;		cx, dx - unchanged
+;
+
+MSG_ENT_FIND_CHILD_AT_POSITION			message
+;
+; Looks up a child's address, given its position in the tree.
+;
+; Context:	Utility message to find ent child given child position.  Use
+;		MSG_ENT_FIND_CHILD if given optr.
+; Source:	Anyone
+; Destination:	Any EntClass object
+; Interception: Generally not intercepted.  However, custom gadgets may
+;		handle.  In this case, superclass will not need to be
+;		called as default functionality is replaced.
+;
+; Pass:	 	cx - # of child to find
+; Return:	carry - set if NOT FOUND
+;		^lcx:dx  - child, or null if no child at that position
+;		ax - destroyed
+;
+
+MSG_ENT_COUNT_CHILDREN		message
+;
+; Counts the ent children of an object. 
+;
+;
+; Context:	Utility message to count ent children of object.
+; Source:	Anyone
+; Destination:	Any GenClass object
+; Interception: Generally not intercepted.  However, custom gadgets may
+;		handle.  In this case, superclass will not need to be
+;		called as default functionality is replaced.
+;
+; Pass:		nothing
+; Return:	ax - # of ent children 
+;
+
+EntGetPropNameAndDataStruct		struct
+	EGPNADS_getProp		GetPropertyArgs
+	EGPNADS_name		fptr.TCHAR
+	EGPNADS_propNum		word
+EntGetPropNameAndDataStruct		ends
+
+MSG_ENT_GET_PROPERTY_NAME_AND_DATA	message
+;
+; given a propNum, get the name of the property and the data
+; for that property
+; ss:bp = EntGetPropNameAndDataStruct
+
+
+MSG_ENT_GET_CUSTOM_PROPERTY		message
+MSG_ENT_SET_CUSTOM_PROPERTY		message
+; this message allows us to bypass searching through all the prop
+; tables up the class heirarchy for a property when we already know
+; its a custom property (this happens when a specific component type
+; has an unresolved property at compile time
+
+
+MSG_ENT_GET_NUM_CHILDREN		message
+;
+; Components with a numChildren property use this message to
+; have Ent count their children.  (See GadgetGadgetClass or
+; GadgetGeomClass.)
+;
+; Pass:		ss:bp	- GetPropertyArgs
+; Return:	ss:bp	- GetPropertyArgs filled in
+;
+
+MSG_ENT_GET_CHILDREN			message
+;
+; Components with children use this message to get the .children
+; property.  (See GadgetGadgetClass or GadgetGeomClass.)
+;
+; Pass:		ss:bp	- EntDoActionArgs
+; Return:	ss:bp	- EntDoActionArgs filled in
+;
+
+
+MSG_ENT_PAUSE				message
+; sent to components when the interpreter is about to be paused by
+; the debugger
+MSG_ENT_RESUME				message
+; sent to components when the interpreter is about to be continued by
+; the debugger afterbeing paused
+
+;%
+;% NEW NON-PROPERTY ENT MESSAGES GO ABOVE HERE
+;%
+
+;
+; Define the first of 512 slots for property messages, starting 1K after the
+; first Ent message.  These will be filled in by Ent and its subclasses.
+;
+EntMessages				= MSG_ENT_INITIALIZE + 1024
+EntPropertyMessages				export	512
+
+MSG_ENT_GET_PROPERTY_0			message	EntPropertyMessages
+MSG_ENT_SET_PROPERTY_0			message EntPropertyMessages
+;
+; Define the first of 256 slots for action messages, starting immediately
+; after the property messages.
+;
+EntActionMessages				export	256
+MSG_ENT_DO_ACTION_0			message EntActionMessages
+
+;
+; To define our property messages, reset message etype to the correct starting
+; location.
+;
+Ent_MESSAGE_PLACE_HOLDER = EntMessages
+
+EntMessages = MSG_ENT_GET_PROPERTY_0
+;
+; Name:		Various Property messages
+; Source:	Anyone
+; Destination:	Any Ent class object
+; Interception:	shouldn't be intercepted by anyone
+;
+; Pass:		ss:bp = GetPropertyArgs
+; Return:	ComponentData filled in
+; Destroyed:	ax, cx, dx
+
+;
+
+MSG_ENT_GET_PROTO	message
+MSG_ENT_SET_PROTO	message
+MSG_ENT_GET_PARENT_PROP	message
+MSG_ENT_SET_PARENT_PROP	message
+MSG_ENT_GET_NAME_PROP_REUSE_ME	message
+MSG_ENT_SET_NAME_PROP_REUSE_ME	message
+MSG_ENT_GET_VERSION	message
+MSG_ENT_SET_VERSION	message
+MSG_ENT_GET_CLASS_PROP	message
+MSG_ENT_SET_CLASS_PROP	message
+
+;
+; To define our action messages, reset message etype to the correct starting
+; location.
+;
+EntMessages = MSG_ENT_DO_ACTION_0
+; note: get/set_children moved out of Ent and into GadgetGadget/Geom
+
+;
+; Tell subclasses to leave space for a maximum of 32 Ent properties and 16 Ent
+; actions.
+;
+Ent_FIRST_SUBCLASS_PROPERTY	equ	MSG_ENT_GET_PROPERTY_0 + 64
+Ent_FIRST_SUBCLASS_ACTION	equ	MSG_ENT_DO_ACTION_0 + 32
+
+;
+; Restore message count
+;
+EntMessages = Ent_MESSAGE_PLACE_HOLDER
+
+;%
+;% DO NOT PUT ANY NEW ENT MESSAGES HERE!  PUT THEM BEFORE THE PROPERTY
+;% MESSAGES!
+;%
+
+
+;%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+;%		Ent instance data
+;%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+	EI_propIndex	nptr
+	; Holds chunk of name array of properties.
+	; The name array stores ComponentData for the data.
+
+	EI_link		LinkPart <>
+	; (modified) optr to sibling
+
+	EI_comp		CompPart <>
+	; optr to first child
+
+	EI_state	EntState <>
+
+	;; EI_interpreter	hptr
+
+	;
+	; Handle of task that the interpreter wants, not the optr to the
+	; interpreter.
+	EI_flags	EntFlags
+	;
+
+    	EI_proto	word		;RunHeapToken
+EntClass		endc
+
+
+
+EntVisClass		class	EntClass
+
+;
+; EntVisClass provides functionality useful to visible components.
+;
+
+MSG_ENT_VIS_SHOW		message
+;
+; Tells the component to make itself visible on the screen.  (if applicable).
+; It will also modify the property "visible" as appropiate.
+;
+; Pass:		nothing
+;
+; Interception: Generally not intercepted.  If the component is from a non
+;		vis or gen derived class, then you may need to do work here
+;		to get the component in a usable format.
+;
+; Return:	nothing
+;
+
+MSG_ENT_VIS_HIDE		message
+;
+; Tells the component to make itself NOT visible on the screen.  (if
+; applicable).  It will also modify the property "visible" as appropiate.
+;
+; Pass:		nothing
+;
+; Interception: Generally not intercepted.  If the component is from a non
+;		vis or gen derived class, then you may need to do work here
+;		to get the component in a usable format.
+;
+; Return:	nothing
+;
+.assert MSG_ENT_VIS_HIDE eq MSG_ENT_VIS_SHOW+1
+
+StartPropertyMessages		EntVis, Ent
+MSG_ENT_VIS_GET_VISIBLE		message
+MSG_ENT_VIS_SET_VISIBLE		message
+MSG_ENT_VIS_GET_ENABLED		message
+MSG_ENT_VIS_SET_ENABLED		message
+EndPropertyMessages		EntVis, Ent, 8
+
+StartActionMessages		EntVis, Ent
+EndActionMessages		EntVis, Ent, 8
+
+EntVisClass		endc
+
+
+ML1Class		class	MetaClass, master
+ML1Class		endc
+
+ML2Class		class	ML1Class, master
+ML2Class		endc
+
+EntAppClass		class	EntClass
+			uses GenApplicationClass
+EntAppClass		endc
+
+;%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+;%		Routines
+;%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+global	EntDispatchSetProperty:far
+global	EntDispatchGetProperty:far
+global  EntDispatchAction:far
+global	ENTDISPATCHSETPROPERTY:far
+global	ENTDISPATCHGETPROPERTY:far
+global	EntGetVMFile:far
+; Pass		ds	- segment of component object block
+; Return	ax	- handle of vm file to use.
+global	ENTGETVMFILE:far
+global	EntCreateComplexHeader:far
+global  EntResolvePropertyAccess:far
+global	EntSetPropertyInTable:far
+global	EntGetPropertyFromTable:far
+global	EntGetAction:far
+global  EntResolveAction:far
+global  EntUtilCheckClass:far
+global	EntCallParent:far
+global  EntGetPropNameAndDataCommon:far
+;
+; Have your ent parent call the message
+;Pass		ax - message
+;		cx, dx, bp - args
+; Return	depends on message
+global	EntUtilGetProperty:far
+global	EntUtilSetProperty:far
+global	EntResolvePropertyCommon:far
+global	EntResolveActionCommon:far
+global	EntUtilDoAction:far
+global	ENTDISPATCHACTION:far
+
+
+;%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+;%		Structures
+;%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+EntClassPtrStruct struct
+	ECPS_classPtr	fptr.ClassStruct	; pointer to ClassStruct
+	ECPS_className	nptr.TCHAR		; classname
+EntClassPtrStruct ends
+
+EntArgumentType etype word
+	EAT_GENERAL_CXDX	enum EntArgumentType
+	EAT_INTEGER_DXCX	enum EntArgumentType
+	EAT_COMPONENT_CXDX	enum EntArgumentType
+
+
+; new stuff starts
+PropertyDispatchType	etype	word, 1, 1
+	PDT_WORD_DATA		enum PropertyDispatchType
+	PDT_DWORD_DATA		enum PropertyDispatchType
+		; just return the PES_data.PD_wordData to the caller
+		; (NOT IMPLEMENTED)
+	PDT_SEND_MESSAGE	enum PropertyDispatchType
+		; Indicates that the message in PES_data.PD_message should be
+		; sent directly.
+	PDT_CALL_FPTR		enum PropertyDispatchType
+		; call the fptr stored in PES_data before returning
+		; (NOT IMPLEMENTED)
+	PDT_ERROR		enum PropertyDispatchType
+		; returned by EntDispatchSetProperty to signal type mismatch
+	PDT_UNDEFINED_PROPERTY	enum PropertyDispatchType
+		; Indicates that this property is implemented by a superclass,
+		; but is not a valid property for this class.  On a get, this
+		; causes an invalid property error to be generated.  On a set,
+		; the custom property creation code will be called.
+
+;
+; PropertyData is a union of all the possible data you might want to store in
+; your property table.  For a particular PropEntryStruct, the type of
+; PropertyData is specified by the associated PropertyDispatchType.
+;
+PropertyDispatchData	union
+	PD_message	word
+	PD_fptr		fptr
+	PD_dword	dword
+	PD_word		word
+PropertyDispatchData	end
+
+PropertyDispatchStruct	struct
+	PDS_dispatchType	PropertyDispatchType
+	PDS_dispatchData	PropertyDispatchData
+PropertyDispatchStruct	ends
+
+PropEntryStruct struct
+	PES_propName	nptr.TCHAR
+		;
+		; change to word for byte-compiling support
+		;
+	PES_propType	LegosType
+	PES_get		PropertyDispatchStruct
+	PES_set		PropertyDispatchStruct
+PropEntryStruct ends
+
+ActionEntryStruct struct
+	AES_name	nptr.TCHAR
+	AES_message	word
+	AES_type	LegosType
+	AES_numParams	word
+ActionEntryStruct ends
+
+PropActionCommonStruct	struct
+	PAC_name	nptr.TCHAR
+PropActionCommonStruct	ends
+
+; used when PES_propType or AES_propType is LT_TYPE_STRUCT
+ExtendedPropEntryStruct	struct
+    EPES_meta		PropEntryStruct
+    EPES_typeName	nptr.TCHAR
+ExtendedPropEntryStruct	ends
+
+ExtendedActionEntryStruct	struct
+    EAES_meta		ActionEntryStruct
+    EAES_typeName	nptr.TCHAR
+ExtendedActionEntryStruct	ends
+
+;%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+;%		Table-creation macros
+;%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+ENT_PROPERTY_TABLE_TERMINATOR	equ	-1
+ENT_ACTION_TABLE_TERMINATOR	equ	-1
+
+; Entry-point number of table of nptrs to structs created
+; by the makeECPS macro
+;
+ENT_TABLE_ENTRY_NUMBER		equ	0
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+MACRO:		makePropEntry
+
+DESCRIPTION:	Creates a PropEntryStruct.  See goolxxx.asm for examples.
+
+ARGUMENTS:	compName -- the name of the component
+		propName -- the name of the property
+		propValue -- the unique number to associate with this value,
+		usually derived from an enumerated type
+
+EXAMPLE:	makePropEntry   value, minimum, GVP_MINIMUM
+
+CAVEATS:	There should be one call to makePropEntry for each property a
+		component supports.
+
+REVISION:	dloft	9/7/94		initial version
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+
+
+;; makePropEntry -- create a PropEntryStruct
+;;
+makePropEntry	macro compName, propName, type, getDispatch, getData, setDispatch, setData
+
+compName&propName&Name	TCHAR <propName>, 0
+compName&propName&Prop	PropEntryStruct <offset compName&propName&Name, \
+			type, <getDispatch, <getData>>, \
+			<setDispatch, <setData>>>
+	;ForceRef compName&propName&Name
+
+endm
+
+makeUndefinedPropEntry 	macro compName, propName
+compName&propName&Name 	TCHAR <propName>, 0
+compName&propName&Prop 	PropEntryStruct <offset compName&propName&Name,, \
+			<PDT_UNDEFINED_PROPERTY, <>>, \
+			<PDT_UNDEFINED_PROPERTY, <>>>
+		
+endm
+;; Like makePropEntry, but takes a type name as well as a type
+;;
+if  0
+
+makeExtendedPropEntry	macro compName, propName, type, typeName, getDispatch, getData, setDispatch, setData
+
+makePropEntry compName,propName,type,getDispatch,<getData>,setDispatch,<setData>
+compName&propName&Type	TCHAR <typeName>, 0
+ForceRef compName&propName&Type
+
+endm
+
+else
+
+;; alternate defn
+makeExtendedPropEntry	macro compName, propName, type, typeName, getDispatch, getData, setDispatch, setData
+
+compName&propName&Name	TCHAR <propName>, 0
+compName&propName&Type	TCHAR <typeName>, 0
+ForceRef compName&propName&Name
+ForceRef compName&propName&Type
+
+compName&propName&Prop	PropEntryStruct		\
+    <offset compName&propName&Name,		\
+     type,					\
+     <getDispatch, <getData>>,			\
+     <setDispatch, <setData>>>
+nptr.TCHAR offset compName&propName&Type
+
+endm
+
+endif
+
+;; makeActionEntry -- create a ActionEntryStruct
+;;
+makeActionEntry	macro compName, actionName, actionValue, actionType, numParams
+ifb <numParams>
+	ErrMessage <makeActionEntry : need number of parameters >
+endif
+compName&actionName&AName	TCHAR <actionName>, 0
+compName&actionName&Action	ActionEntryStruct \
+	<offset compName&actionName&AName, actionValue, actionType, numParams>
+ForceRef compName&actionName&AName
+
+endm
+
+
+;; Like makeActionEntry, but takes a type name as well as a type
+;;
+makeExtendedActionEntry	macro compName, actionName, actionValue, actionType, typeName, numParams
+ifb <numParams>
+	ErrMessage <makeExtendedActionEntry : need number of parameters >
+endif
+compName&actionName&AName	TCHAR <actionName>, 0
+compName&actionName&Type	TCHAR <typeName>, 0
+ForceRef compName&actionName&AName
+ForceRef compName&actionName&Type
+
+compName&actionName&Action	ExtendedActionEntryStruct		\
+    <<offset compName&actionName&AName, actionValue, actionType, numParams>,	\
+     offset compName&actionName&Type>
+
+endm
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+MACRO:		makeECPS
+
+DESCRIPTION:	Creates an EntClassPtrStruct
+
+ARGUMENTS:	className -- the component class
+		classDescriptiong -- the text name for the class
+
+EXAMPLE:	makeECPS	GoolValue, value
+
+CAVEATS:	There should be one call to makeECPS for each component class
+		a component library supports.
+
+REVISION:	dloft	7/12/94		initial version
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+
+makeECPS	macro	className, classDescription
+className&Struct	EntClassPtrStruct	<className&Class,
+						 offset className&String>
+className&String	TCHAR	<classDescription>, 0
+ForceRef className&String
+endm
+
+
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		compMakePropertyTables, compMakeActionTables
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+DESCRIPTION:	The following set of macros are used for declaring the jump,
+		property and action tables that are used in getting and setting
+		component properties and dispatching actions.  Each table
+		consists of near offsets, each corresponding to a property or
+		action as defined in the enum parameter. The property and
+		action tables are suitable for passing to GoolFindTableEntry.
+
+
+ARGUMENTS (to compMakeTables):
+	enum		the enumerated type of this component's properties
+			(e.g. "TriggerPropertyEnum")
+	name		the name of the component (e.g. "trigger")
+	p1, p2, ...	a list of property names that can be used to form the
+			offsets for the jump table.
+
+e.g., "compMakePropertyTables TriggerPropertyEnum, trigger, actionRoutine"
+would expand to the following:
+
+	global	triggerGet_actionRoutine:label	near
+
+	triggerGetPropertyJumpTable	label	nptr
+		word	offset	triggerGet_actionRoutine
+
+	global	triggerSet_actionRoutine:label	near
+	triggerSetPropertyJumpTable	label	nptr
+		word	offset	triggerSet_actionRoutine
+
+	triggerPropertyTable	label	nptr.PropEntryStruct
+		word	offset	actionRoutineProp
+
+
+NOTES:		Yes, I know that swat has trouble printing out these tables.
+		You try getting macros to expand into the proper form, eh?  It
+		doesn't work for me.
+
+		Note how the labels in the jump tables get expanded.  You need
+		to follow this format when writing your GET_PROPERTY and
+		SET_PROPERTY handlers.
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	dloft	9/13/94		Initial version.
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+
+compJTOffsets	macro	name,p1,p2,p3,p4,p5,p6,p7,p8,p9,p10,p11,p12,p13,p14,p15,p16,p17,p18,p19,p20
+ifnb <p1>
+	word	offset	name&_&p1
+	compJTOffsets name,p2,p3,p4,p5,p6,p7,p8,p9,p10,p11,p12,p13,p14,p15,p16,p17,p18,p19
+endif
+endm
+
+compJTGlobals	macro	name,p1,p2,p3,p4,p5,p6,p7,p8,p9,p10,p11,p12,p13,p14,p15,p16,p17,p18,p19,p20
+ifnb <p1>
+	global	name&_&p1:label near
+	compJTGlobals name,p2,p3,p4,p5,p6,p7,p8,p9,p10,p11,p12,p13,p14,p15,p16,p17,p18,p19
+endif
+endm
+
+compMkJT macro	enum,name,type,l1,l2,l3,l4,l5,l6,l7,l8,l9,l10,l11,l12,l13,l14,l15,l16,l17,l18,l19,l20
+	compJTGlobals	name,l1,l2,l3,l4,l5,l6,l7,l8,l9,l10,l11,l12,l13,l14,l15,l16,l17,l18,l19,l20
+	name&type&JumpTable	label	nptr
+	compJTOffsets	name,l1,l2,l3,l4,l5,l6,l7,l8,l9,l10,l11,l12,l13,l14,l15,l16,l17,l18,l19,l20
+	; Don't work no more...
+	;	.assert (($-(offset name&type&JumpTable)) eq (2*enum))
+endm
+
+compPTEntries	macro	name,p1,p2,p3,p4,p5,p6,p7,p8,p9,p10,p11,p12,p13,p14,p15,p16,p17,p18,p19,p20
+ifnb <p1>
+    word	offset name&p1&Prop
+	compPTEntries name,p2,p3,p4,p5,p6,p7,p8,p9,p10,p11,p12,p13,p14,p15,p16,p17,p18,p19
+else
+    word	ENT_PROPERTY_TABLE_TERMINATOR
+endif
+endm
+
+compATEntries	macro	name,p1,p2,p3,p4,p5,p6,p7,p8,p9,p10,p11,p12,p13,p14,p15,p16,p17,p18,p19,p20
+ifnb <p1>
+	word	offset name&p1&Action
+		compATEntries name,p2,p3,p4,p5,p6,p7,p8,p9,p10,p11,p12,p13,p14,p15,p16,p17,p18,p19
+else
+	word	ENT_ACTION_TABLE_TERMINATOR
+endif
+endm
+
+compMkPropTable macro enum,name,l1,l2,l3,l4,l5,l6,l7,l8,l9,l10,l11,l12,l13,l14,l15,l16,l17,l18,l19,l20
+	;
+	; FIXME enum argument can be removed...
+	;
+	name&PropertyTable	label nptr.PropEntryStruct
+	compPTEntries name,l1,l2,l3,l4,l5,l6,l7,l8,l9,l10,l11,l12,l13,l14,l15,l16,l17,l18,l19,l20
+	; .assert (($-(offset name&PropertyTable)) eq (2*(enum + 1)))
+endm
+
+compMkActTable macro name,l1,l2,l3,l4,l5,l6,l7,l8,l9,l10,l11,l12,l13,l14,l15,l16,l17,l18,l19,l20
+	name&ActionTable	label nptr.ActionEntryStruct
+	compATEntries name,l1,l2,l3,l4,l5,l6,l7,l8,l9,l10,l11,l12,l13,l14,l15,l16,l17,l18,l19,l20
+	; .assert (($-(offset name&ActionTable)) eq (2*(enum + 1)))
+
+endm
+
+if 0
+compMakeTables macro enum,myName,l1,l2,l3,l4,l5,l6,l7,l8,l9,l10,l11,l12,l13,l14
+	compMkJT enum,myName&Get,Property,l1,l2,l3,l4,l5,l6,l7,l8,l9,l10,l11,l12,l13,l14
+	compMkJT enum,myName&Set,Property,l1,l2,l3,l4,l5,l6,l7,l8,l9,l10,l11,l12,l13,l14
+	compMkPropTable enum,myName,l1,l2,l3,l4,l5,l6,l7,l8,l9,l10,l11,l12,l13,l14
+endm
+endif
+
+compMakeActionTables macro enum,myName,l1,l2,l3,l4,l5,l6,l7,l8,l9,l10,l11,l12,l13,l14,l15,l16,l17,l18,l19,l20
+	compMkJT enum,myName&Do,Action,l1,l2,l3,l4,l5,l6,l7,l8,l9,l10,l11,l12,l13,l14,l15,l16,l17,l18,l19,l20
+	compMkActTable enum,myName,l1,l2,l3,l4,l5,l6,l7,l8,l9,l10,l11,l12,l13,l14,l15,l16,l17,l18,l19,l20
+endm
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+MACRO:		definePropertyEnum
+
+DESCRIPTION:	Sets up a property enumerated type.  Specifically, ensures
+		that the starting value is correct based on the superclass'
+		property etype.  ONLY USE THIS IS WE NEED TO GENERATE UNIQUE
+		PROPERTY ID'S.
+
+ARGUMENTS:	name -- the name for this etype
+		superEtype -- the property etype that this etype "inherits"
+		from, i.e. the one defined by the superclass.
+
+EXAMPLE:	definePropertyEnum   myClassProperty, mySuperClassProperty
+
+CAVEATS:	Be sure that the correct superclass property enum is passed,
+		otherwise the property table will not be correctly defined.
+
+REVISION:	dloft	1/3/95		initial version
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+
+definePropertyEnum	macro   name, superEtype
+	name	etype word, (((superEtype / 64) + 1) * 64), 1
+endm
+
+
+
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		compResolveSuperclass
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	creates a MSG_META_RESOLVE_VARIANT_SUPERCLASS handler
+
+PASS:		class, Ent superclass [Gen superclass [Vis Superclass]]
+
+Usage:		compResolveSuperclass	GadgetValue, GenValue
+
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	dloft	9/23/94		Initial version.
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+
+compResolveSuperclass	macro	myclass, entSuper, genSuper, visSuper
+
+	local	returnEntSuper, returnGenSuper, returnVisSuper, done
+
+		cmp	cx, Ent_offset
+		je	returnEntSuper
+
+ifnb <genSuper>
+		cmp	cx, Gen_offset
+		je	returnGenSuper
+endif
+
+ifnb <visSuper>
+		cmp	cx, Vis_offset
+		je	returnVisSuper
+endif
+
+		mov	di, offset myclass&Class
+		call	ObjCallSuperNoLock
+done:
+		ret
+
+returnEntSuper:
+		mov	cx, segment entSuper&Class
+		mov	dx, offset entSuper&Class
+		jmp	done
+
+ifnb <genSuper>
+returnGenSuper:
+		mov	cx, segment genSuper&Class
+		mov	dx, offset genSuper&Class
+		jmp	done
+endif
+
+ifnb <visSuper>
+returnVisSuper:
+		mov	cx, segment visSuper&Class
+		mov	dx, offset visSuper&Class
+		jmp	done
+endif
+
+endm
+
+
+
+MakeResolveSuperClassRoutine macro className, superClassName
+className&ResolveVariantClass method dynamic Gadget&className&Class, MSG_META_RESOLVE_VARIANT_SUPERCLASS
+	compResolveSuperclass Gadget&className, superClassName
+className&ResolveVariantClass endp
+endm
+
+EndLibrary	ent
+
+if 0
+EntMakePropertyMessages		macro	number, limit
+	PrintE <Defining number >, %(number)
+		MSG_ENT_GET_PROPERTY_&number	message
+		MSG_ENT_SET_PROPERTY_&number	message
+	i-f (number lt limit)
+			EntMakePropertyMessages	%(number+1), limit
+	e-ndif
+endm
+
+EntMakePropertyMessages		0, 256
+endif
+

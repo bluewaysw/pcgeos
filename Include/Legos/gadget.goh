@@ -1,0 +1,1177 @@
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+	Copyright (c) Geoworks 1994 -- All Rights Reserved
+
+PROJECT:	Legos
+MODULE:		Gadget Library
+FILE:		gadget.goh
+
+AUTHOR:         Ronald Braunstein, Jul  5, 1994
+
+MACROS:
+	Name                    Description
+	----                    -----------
+
+REVISION HISTORY:
+	Name    Date            Description
+	----    ----            -----------
+	ron     7/ 5/94         Initial revision
+	dloft   1/ 5/95         Added property info
+
+DESCRIPTION:
+	
+        $Id: gadget.goh,v 1.1 97/12/05 12:16:20 gene Exp $
+	$Revision: 1.1 $
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+@deflib gadget
+@include <legos/ent.goh>
+#include <legos/runheap.h>
+@include <pen.goh>
+
+/* atme defined in ent.goh */
+@define GADGET_PROP_MESSAGES(x) \
+@atme (@message (MSG_ENT_GET_PROPERTY_0) MSG_GADGET_GET_)x;\
+@atme (@message (MSG_ENT_GET_PROPERTY_0) MSG_GADGET_SET_)x;
+
+/*****************************************************************
+ * Class Definitions
+ *****************************************************************/
+
+/*****************************************************************
+ * GadgetClass
+ *****************************************************************/
+@class  GadgetClass, EntVisClass;
+
+@message void MSG_GADGET_MAKE_CLIPBOARD_SELECTION_STATE_NULL();
+@message Boolean MSG_GADGET_PREVENT_ERROR_ON_GET_WIDTH_HEIGHT() = carry;
+
+@vardata optr	ATTR_GADGET_DEFAULT_BUTTON ;
+
+/* ADD NEW MESSAGES HERE */
+
+@startPropertyMessages(Gadget,EntVis)
+@GADGET_PROP_MESSAGES(LOOK)
+@GADGET_PROP_MESSAGES(ENABLED)
+@GADGET_PROP_MESSAGES(READ_ONLY)
+@GADGET_PROP_MESSAGES(CAPTION)
+@GADGET_PROP_MESSAGES(GRAPHIC)
+@GADGET_PROP_MESSAGES(HELP_CONTEXT)
+@GADGET_PROP_MESSAGES(LEFT)
+@GADGET_PROP_MESSAGES(TOP)
+@GADGET_PROP_MESSAGES(HEIGHT)
+@GADGET_PROP_MESSAGES(WIDTH)
+@GADGET_PROP_MESSAGES(SIZE_HCONTROL)
+@GADGET_PROP_MESSAGES(SIZE_VCONTROL)
+@GADGET_PROP_MESSAGES(HELP_FILE)
+@endPropertyMessages(Gadget_SUB_PROP, EntVis, 24)
+
+typedef enum
+{
+  GSCT_AS_SPECIFIED,
+  GSCT_AS_SMALL_AS_POSSIBLE,
+  GSCT_AS_BIG_AS_POSSIBLE,
+  GSCT_AS_NEEDED
+} GadgetSizeControlType;
+
+@startActionMessages(Gadget, EntVis)
+@message (MSG_ENT_DO_ACTION_0) MSG_GADGET_ACTION_SET_COLOR;
+@message (MSG_ENT_DO_ACTION_0) MSG_GADGET_ACTION_SET_SIZE;
+@message (MSG_ENT_DO_ACTION_0) MSG_GADGET_ACTION_SET_POSITIONED;
+@endActionMessages(Gadget_SUB_ACT, EntVis, 16)
+
+@instance 	RunHeapToken	GI_graphic;
+@instance   	byte	    	GI_look;
+@endc   /* GadgetClass */
+
+
+/*****************************************************************
+ * GadgetGeomClass
+ *****************************************************************/
+
+typedef ByteFlags GadgetGeomFlags;
+#define	GGF_TILED	0x01
+#define GGF_RESIZING	0x02
+
+typedef struct {
+    word GGID_vertical;
+    word GGID_horizontal;
+} GadgetGeomInsetData;
+
+@class  GadgetGeomClass, GadgetClass;
+@message int MSG_GADGET_GEOM_GET_FLAGS()=cx;
+@message optr MSG_GADGET_GEOM_GET_VIS_CHILD_PARENT()=cx:dx;
+/* ADD NEW MESSAGES HERE */
+
+@startPropertyMessages(GadgetGeom,Gadget)
+@message (MSG_ENT_GET_PROPERTY_0) MSG_GADGET_GEOM_GET_NUM_CHILDREN;
+@message (MSG_ENT_SET_PROPERTY_0) MSG_GADGET_GEOM_SET_NUM_CHILDREN;
+@message (MSG_ENT_GET_PROPERTY_0) MSG_GADGET_GEOM_GET_TILE_LAYOUT;
+@message (MSG_ENT_SET_PROPERTY_0) MSG_GADGET_GEOM_SET_TILE_LAYOUT;
+@message (MSG_ENT_GET_PROPERTY_0) MSG_GADGET_GEOM_GET_TILE_SPACING;
+@message (MSG_ENT_SET_PROPERTY_0) MSG_GADGET_GEOM_SET_TILE_SPACING;
+@message (MSG_ENT_GET_PROPERTY_0) MSG_GADGET_GEOM_GET_TILED;
+@message (MSG_ENT_SET_PROPERTY_0) MSG_GADGET_GEOM_SET_TILED;
+@message (MSG_ENT_GET_PROPERTY_0) MSG_GADGET_GEOM_GET_TILE_HALIGN;
+@message (MSG_ENT_SET_PROPERTY_0) MSG_GADGET_GEOM_SET_TILE_HALIGN;
+@message (MSG_ENT_GET_PROPERTY_0) MSG_GADGET_GEOM_GET_TILE_VALIGN;
+@message (MSG_ENT_SET_PROPERTY_0) MSG_GADGET_GEOM_SET_TILE_VALIGN;
+@message (MSG_ENT_GET_PROPERTY_0) MSG_GADGET_GEOM_GET_TILE_HINSET;
+@message (MSG_ENT_SET_PROPERTY_0) MSG_GADGET_GEOM_SET_TILE_HINSET;
+@message (MSG_ENT_GET_PROPERTY_0) MSG_GADGET_GEOM_GET_TILE_VINSET;
+@message (MSG_ENT_SET_PROPERTY_0) MSG_GADGET_GEOM_SET_TILE_VINSET;
+@endPropertyMessages(GadgetGeom_SUB_PROP, Gadget, 16)
+
+@startActionMessages(GadgetGeom, Gadget)
+@message (MSG_ENT_DO_ACTION_0) MSG_GADGET_GEOM_ACTION_SET_CHILDREN;
+@message (MSG_ENT_DO_ACTION_0) MSG_GADGET_GEOM_ACTION_GET_CHILDREN;
+@endActionMessages(GadgetGeom_SUB_ACT, Gadget, 8)
+
+@vardata GadgetGeomInsetData ATTR_GADGET_GEOM_INSET_DATA;
+	/* Added to store the tileHInset and tileVInset properties.  If not
+	 * present, these are assumed to be 0.
+	 */
+
+@vardata void HINT_GADGET_GEOM_SKIP_OPEN_EVENT;
+@vardata void HINT_GADGET_GEOM_SKIP_CLOSE_EVENT;
+	/* Forms, dialogs and floaters skip raising aboutToOpen/Close
+	 * events if these hints are present.  Prevents infinite recursion
+	 * if Legos programmer makes a window visible from within an
+	 * aboutToOpen handler, or invisible from within an aboutToClose
+	 * handler.
+	 */
+
+@instance 	GadgetGeomFlags	GGI_flags;
+@instance	optr		GGI_childParent;
+
+
+@endc   /* GadgetGeomClass */
+
+
+/*
+ * The following type and record are for the clipboardable's
+ * focus state, specified in GCLI_flags
+ */
+typedef enum {
+CFS_NONE,
+CFS_WITHOUT_KBD,
+CFS_FULL
+} ClipboardableFocusState;
+
+typedef WordFlags ClipboardableFlags;
+
+@class	GadgetClipboardableClass, GadgetClass;
+
+@message void MSG_GADGET_CLIPBOARDABLE_RAISE_ACCEPT_PASTE_EVENT();
+@message void MSG_GADGET_CLIPBOARDABLE_UPDATE_CLIPBOARDS();
+@message void MSG_GADGET_CLIPBOARDABLE_CLIPBOARD_ITEM_CHANGED();
+@message void MSG_GADGET_CLIPBOARDABLE_GET_FOCUSABLE_INTERNAL();
+
+
+/* Don't change order of property messages.  See gadget.def. */
+
+@startPropertyMessages(GadgetClipboardable, Gadget)
+
+@message (MSG_ENT_GET_PROPERTY_0) MSG_GADGET_CLIPBOARDABLE_GET_FOCUS_STATE;
+@message (MSG_ENT_SET_PROPERTY_0) MSG_GADGET_CLIPBOARDABLE_SET_FOCUS_STATE;
+@message (MSG_ENT_GET_PROPERTY_0) MSG_GADGET_CLIPBOARDABLE_GET_FOCUSABLE;
+@message (MSG_ENT_SET_PROPERTY_0) MSG_GADGET_CLIPBOARDABLE_SET_FOCUSABLE;
+@message (MSG_ENT_GET_PROPERTY_0) MSG_GADGET_CLIPBOARDABLE_GET_CLIPBOARDABLE;
+@message (MSG_ENT_SET_PROPERTY_0) MSG_GADGET_CLIPBOARDABLE_SET_CLIPBOARDABLE;
+@message (MSG_ENT_GET_PROPERTY_0) MSG_GADGET_CLIPBOARDABLE_GET_DELETABLE;
+@message (MSG_ENT_SET_PROPERTY_0) MSG_GADGET_CLIPBOARDABLE_SET_DELETABLE;
+@message (MSG_ENT_GET_PROPERTY_0) MSG_GADGET_CLIPBOARDABLE_GET_COPYABLE;
+@message (MSG_ENT_SET_PROPERTY_0) MSG_GADGET_CLIPBOARDABLE_SET_COPYABLE;
+@endPropertyMessages(GadgetClipboardable_SUB_PROP, Gadget, 8)
+
+@startActionMessages(GadgetClipboardable, Gadget)
+@endActionMessages(GadgetClipboardable_SUB_ACT, Gadget,7)
+
+@vardata void HINT_CLIPBOARDABLE_IN_ACCEPT_PASTE_HANDLER;
+
+@instance	ClipboardableFlags GCLI_flags;
+@endc
+
+/*****************************************************************
+ * GadgetAggClass
+ *****************************************************************/
+@class	GadgetAggClass, GadgetClass;
+@uses		GenInteractionClass;
+
+@instance	ClassStruct	*GAI_contentClass;
+@instance	optr		GAI_contentObj;
+@endc
+
+/*****************************************************************
+ * GadgetButtonClass
+ *****************************************************************/
+
+typedef ByteFlags GadgetButtonFlags;
+
+@class  GadgetButtonClass, GadgetClass;
+@uses		GenTriggerClass;
+
+/* ADD NEW MESSAGES HERE */
+	
+@startPropertyMessages(GadgetButton,Gadget)
+@message (MSG_ENT_GET_PROPERTY_0) MSG_GADGET_BUTTON_GET_DEFAULT;
+@message (MSG_ENT_SET_PROPERTY_0) MSG_GADGET_BUTTON_SET_DEFAULT;
+@message (MSG_ENT_GET_PROPERTY_0) MSG_GADGET_BUTTON_GET_CANCEL;
+@message (MSG_ENT_SET_PROPERTY_0) MSG_GADGET_BUTTON_SET_CANCEL;
+@message (MSG_ENT_GET_PROPERTY_0) MSG_GADGET_BUTTON_GET_DESTRUCTIVE;
+@message (MSG_ENT_SET_PROPERTY_0) MSG_GADGET_BUTTON_SET_DESTRUCTIVE;
+@message (MSG_ENT_GET_PROPERTY_0) MSG_GADGET_BUTTON_GET_CLOSE_DIALOG;
+@message (MSG_ENT_SET_PROPERTY_0) MSG_GADGET_BUTTON_SET_CLOSE_DIALOG;
+@endPropertyMessages(GadgetButton_SUB_PROP, Gadget, 8)
+
+@instance	int			GBI_default;
+@instance	GadgetButtonFlags	GBI_flags;
+
+@endc   /* GadgetButtonClass */
+
+
+/*****************************************************************
+ * GadgetEntryClass
+ *****************************************************************/
+
+@class  GadgetEntryClass, GadgetClipboardableClass;
+
+@message void MSG_GADGET_ENTRY_APPLY();
+/* ADD NEW MESSAGES HERE */
+
+@startPropertyMessages(GadgetEntry,GadgetClipboardable)
+@message (MSG_ENT_GET_PROPERTY_0) MSG_GADGET_ENTRY_GET_TEXT;
+@message (MSG_ENT_SET_PROPERTY_0) MSG_GADGET_ENTRY_SET_TEXT;
+@message (MSG_ENT_SET_PROPERTY_0) MSG_GADGET_ENTRY_SET_FILTER;
+@message (MSG_ENT_GET_PROPERTY_0) MSG_GADGET_ENTRY_GET_FILTER;
+@message (MSG_ENT_SET_PROPERTY_0) MSG_GADGET_ENTRY_GET_MAX_CHARS;
+@message (MSG_ENT_SET_PROPERTY_0) MSG_GADGET_ENTRY_SET_MAX_CHARS;
+@message (MSG_ENT_SET_PROPERTY_0) MSG_GADGET_ENTRY_GET_NUM_CHARS;
+@message (MSG_ENT_SET_PROPERTY_0) MSG_GADGET_ENTRY_SET_NUM_CHARS;
+@endPropertyMessages(GadgetEntry_SUB_PROP, GadgetClipboardable, 8)
+
+@startActionMessages(GadgetEntry, GadgetClipboardable)
+@endActionMessages(GadgetEntry_SUB_ACT, GadgetClipboardable, 4)
+@endc   /* GadgetEntryClass */
+
+
+/*****************************************************************
+ * GadgetLabelClass
+ *****************************************************************/
+
+@class  GadgetLabelClass, GadgetClass;
+@endc
+
+
+/*****************************************************************
+ * GadgetFormClass
+ *****************************************************************/
+
+@class  GadgetFormClass, GadgetGeomClass;
+
+@message void MSG_GADGET_FORM_BUILD_FOCUS_PATH_IN_ENT_VIS_SHOW();
+@message void MSG_GADGET_FORM_REMEMBER_FOCUS_IN_ENT_VIS_HIDE();
+/* ADD NEW MESSAGES HERE */
+
+@startPropertyMessages(GadgetForm,GadgetGeom)
+@message (MSG_ENT_GET_PROPERTY_0) MSG_GADGET_FORM_GET_FOCUS;
+@message (MSG_ENT_SET_PROPERTY_0) MSG_GADGET_FORM_SET_SET;
+@endPropertyMessages(GadgetForm_SUB_PROP, GadgetGeom, 8)
+
+@startActionMessages(GadgetForm,GadgetGeom)
+@message (MSG_ENT_DO_ACTION_0) MSG_GADGET_FORM_BRING_TO_FRONT;
+@endActionMessages(GadgetForm_SUB_ACT, GadgetGeom, 8)
+
+@uses		GenPrimaryClass;
+@instance    optr	GFI_focus;
+
+@endc   /* GadgetFormClass */
+
+
+
+/*****************************************************************
+ * GadgetNumberClass
+ *****************************************************************/
+
+@class  GadgetNumberClass, GadgetClass;
+
+@message void MSG_GADGET_NUMBER_RAISE_EVENT();
+/* ADD NEW MESSAGES HERE */
+
+@startPropertyMessages(GadgetNumber, Gadget)
+@message (MSG_ENT_GET_PROPERTY_0) MSG_GADGET_NUMBER_GET_VALUE;
+@message (MSG_ENT_SET_PROPERTY_0) MSG_GADGET_NUMBER_SET_VALUE;
+@message (MSG_ENT_GET_PROPERTY_0) MSG_GADGET_NUMBER_GET_MINIMUM;
+@message (MSG_ENT_SET_PROPERTY_0) MSG_GADGET_NUMBER_SET_MINIMUM;
+@message (MSG_ENT_GET_PROPERTY_0) MSG_GADGET_NUMBER_GET_MAXIMUM;
+@message (MSG_ENT_SET_PROPERTY_0) MSG_GADGET_NUMBER_SET_MAXIMUM;
+@message (MSG_ENT_GET_PROPERTY_0) MSG_GADGET_NUMBER_GET_INCREMENT;
+@message (MSG_ENT_SET_PROPERTY_0) MSG_GADGET_NUMBER_SET_INCREMENT;
+@message (MSG_ENT_GET_PROPERTY_0) MSG_GADGET_NUMBER_GET_DISPLAY_FORMAT;
+@message (MSG_ENT_SET_PROPERTY_0) MSG_GADGET_NUMBER_SET_DISPLAY_FORMAT;
+@endPropertyMessages(GadgetNumber_SUB_PROP, Gadget, 16)
+
+@startActionMessages(GadgetNumber, Gadget)
+@message (MSG_ENT_DO_ACTION_0) MSG_GADGET_NUMBER_DO_ACTION_INC;
+@message (MSG_ENT_DO_ACTION_0) MSG_GADGET_NUMBER_DO_ACTION_SET_VALUE;
+@endActionMessages(GadgetNumber_SUB_ACT, Gadget, 8)
+@endc   /* GadgetNumberClass */
+
+/*****************************************************************
+ * GadgetScrollbarClass
+ *****************************************************************/
+
+@class GadgetScrollbarClass, GadgetNumberClass;
+@message (GEN_VALUE_APPLY_MSG) MSG_GADGET_SCROLLBAR_SCROLL_TOP;
+@message (GEN_VALUE_APPLY_MSG) MSG_GADGET_SCROLLBAR_SCROLL_PAGE_UP;
+@message (GEN_VALUE_APPLY_MSG) MSG_GADGET_SCROLLBAR_SCROLL_UP;
+@message (GEN_VALUE_APPLY_MSG) MSG_GADGET_SCROLLBAR_SCROLL_SET;
+@message (GEN_VALUE_APPLY_MSG) MSG_GADGET_SCROLLBAR_SCROLL_DOWN;
+@message (GEN_VALUE_APPLY_MSG) MSG_GADGET_SCROLLBAR_SCROLL_PAGE_DOWN;
+@message (GEN_VALUE_APPLY_MSG) MSG_GADGET_SCROLLBAR_SCROLL_BOTTOM;
+/* ADD NEW MESSAGES HERE */
+
+@startPropertyMessages(GadgetScrollbar, GadgetNumber)
+@message (MSG_ENT_GET_PROPERTY_0) MSG_GADGET_SCROLLBAR_GET_THUMBSIZE;
+@message (MSG_ENT_SET_PROPERTY_0) MSG_GADGET_SCROLLBAR_SET_THUMBSIZE;
+@message (MSG_ENT_GET_PROPERTY_0) MSG_GADGET_SCROLLBAR_GET_ORIENTATION;
+@message (MSG_ENT_SET_PROPERTY_0) MSG_GADGET_SCROLLBAR_SET_ORIENTATION;
+@message (MSG_ENT_GET_PROPERTY_0) MSG_GADGET_SCROLLBAR_GET_NOTIFYDRAG;
+@message (MSG_ENT_SET_PROPERTY_0) MSG_GADGET_SCROLLBAR_SET_NOTIFYDRAG;
+@endPropertyMessages(GadgetScrollbar_SUB_PROP, GadgetNumber, 8)
+@endc	/* GadgetScrollbarClass */
+
+/*****************************************************************
+ * GadgetGroupClass
+ *****************************************************************/
+
+@class  GadgetGroupClass, GadgetGeomClass;
+@endc
+
+/*****************************************************************
+ * GadgetPopupClass
+ *****************************************************************/
+
+typedef enum
+{   GPL_POPUP_BUTTON,
+    GPL_MAIN_MENU,
+    GPL_SUB_MENU
+} GadgetPopupLook;
+
+@class  GadgetPopupClass, GadgetGroupClass;
+@endc
+
+/*****************************************************************
+ * GadgetDialogClass
+ *****************************************************************/
+
+@class  GadgetDialogClass, GadgetGeomClass;
+
+typedef enum 
+{
+    GDT_NON_MODAL,
+    GDT_TOOL_BOX,
+    GDT_MODAL,
+    GDT_SYS_MODAL,
+    GDT_ON_TOP,
+    GDT_POPUP
+} GadgetDialogType;
+
+@message GadgetDialogType MSG_GADGET_DIALOG_GET_TYPE_INTERNAL() = al;
+@message void MSG_GADGET_DIALOG_RELEASE_FOCUS_EXCL_IF_POPUP();
+@message void MSG_GADGET_DIALOG_BUILD_FOCUS_PATH_IN_ENT_VIS_SHOW();
+@message void MSG_GADGET_DIALOG_REMEMBER_FOCUS_IN_ENT_VIS_HIDE();
+/* ADD NEW MESSAGES HERE */
+
+@startPropertyMessages(GadgetDialog, GadgetGeom)
+@message (MSG_ENT_GET_PROPERTY_0) MSG_GADGET_DIALOG_GET_FOCUS;
+@message (MSG_ENT_SET_PROPERTY_0) MSG_GADGET_DIALOG_SET_FOCUS;
+@message (MSG_ENT_GET_PROPERTY_0) MSG_GADGET_DIALOG_GET_TYPE;
+@message (MSG_ENT_SET_PROPERTY_0) MSG_GADGET_DIALOG_SET_TYPE;
+@endPropertyMessages(GadgetDialog_SUB_PROP, GadgetGeom, 2)
+
+@startActionMessages(GadgetDialog, GadgetGeom)
+@message (MSG_ENT_GET_PROPERTY_0) MSG_GADGET_DIALOG_BRING_TO_FRONT;
+@endActionMessages(GadgetDialog_SUB_ACT, GadgetGeom, 2)
+
+@uses		GenInteractionClass;
+        @instance   optr		GDI_focus;
+        @instance   GadgetDialogType	GDI_dialogType;
+
+@endc
+
+
+
+/*****************************************************************
+ * GadgetTimerClass
+ *****************************************************************/
+
+/*
+ * This class has been replaced by ServiceTimerClass. -jmagasin 6/19/96
+ */
+@if 0
+@class  GadgetTimerClass, GadgetClass;
+
+@message void MSG_GADGET_TIMER_BUZZED();
+@message void MSG_GADGET_TIMER_SET_INTERVAL();
+@message void MSG_GADGET_TIMER_GET_INTERVAL();
+/* ADD NEW MESSAGES HERE */
+
+@startPropertyMessages(GadgetTimer,Gadget)
+@message (MSG_ENT_GET_PROPERTY_0) MSG_GADGET_TIMER_GET_INTERVAL_PROP;
+@message (MSG_ENT_SET_PROPERTY_0) MSG_GADGET_TIMER_SET_INTERVAL_PROP;
+@endPropertyMessages(GadgetTimer_SUB_PROP, Gadget, 4)
+
+@startActionMessages(GadgetTimer,Gadget)
+@message (MSG_ENT_DO_ACTION_0) MSG_GADGET_TIMER_ACTION_START;
+@message (MSG_ENT_DO_ACTION_0) MSG_GADGET_TIMER_ACTION_STOP;
+@endActionMessages(GadgetTimer_SUB_ACT, Gadget, 4)
+
+ 	@instance   word    	GTI_id;
+ 	@instance   MemHandle   GTI_handle;
+	@instance   word    	GTI_interval;
+
+@endc
+@endif
+
+
+
+/*****************************************************************
+ * GadgetTextClass
+ *****************************************************************/
+
+@class GadgetTextClass, GadgetClipboardableClass;
+
+/* ADD NEW MESSAGES HERE */
+@startPropertyMessages(GadgetText,GadgetClipboardable)
+@message (MSG_ENT_GET_PROPERTY_0) MSG_GADGET_TEXT_GET_TEXT;
+@message (MSG_ENT_SET_PROPERTY_0) MSG_GADGET_TEXT_SET_TEXT;
+@message (MSG_ENT_GET_PROPERTY_0) MSG_GADGET_TEXT_GET_MAX_LINES;
+@message (MSG_ENT_SET_PROPERTY_0) MSG_GADGET_TEXT_SET_MAX_LINES;
+@message (MSG_ENT_GET_PROPERTY_0) MSG_GADGET_TEXT_GET_FILTER;
+@message (MSG_ENT_SET_PROPERTY_0) MSG_GADGET_TEXT_SET_FILTER;
+@message (MSG_ENT_GET_PROPERTY_0) MSG_GADGET_TEXT_GET_FONT;
+@message (MSG_ENT_SET_PROPERTY_0) MSG_GADGET_TEXT_SET_FONT;
+@message (MSG_ENT_GET_PROPERTY_0) MSG_GADGET_TEXT_GET_FONT_STYLE;
+@message (MSG_ENT_SET_PROPERTY_0) MSG_GADGET_TEXT_SET_FONT_STYLE;
+@message (MSG_ENT_GET_PROPERTY_0) MSG_GADGET_TEXT_GET_FONT_SIZE;
+@message (MSG_ENT_SET_PROPERTY_0) MSG_GADGET_TEXT_SET_FONT_SIZE;
+@message (MSG_ENT_GET_PROPERTY_0) MSG_GADGET_TEXT_GET_START;
+@message (MSG_ENT_SET_PROPERTY_0) MSG_GADGET_TEXT_SET_START;
+@message (MSG_ENT_GET_PROPERTY_0) MSG_GADGET_TEXT_GET_END;
+@message (MSG_ENT_SET_PROPERTY_0) MSG_GADGET_TEXT_SET_END;
+@message (MSG_ENT_GET_PROPERTY_0) MSG_GADGET_TEXT_GET_COLOR;
+@message (MSG_ENT_SET_PROPERTY_0) MSG_GADGET_TEXT_SET_COLOR;
+@message (MSG_ENT_GET_PROPERTY_0) MSG_GADGET_TEXT_GET_BG_COLOR;
+@message (MSG_ENT_SET_PROPERTY_0) MSG_GADGET_TEXT_SET_BG_COLOR;
+@message (MSG_ENT_GET_PROPERTY_0) MSG_GADGET_TEXT_GET_NUM_CHARS;
+@message (MSG_ENT_SET_PROPERTY_0) MSG_GADGET_TEXT_SET_NUM_CHARS;
+@message (MSG_ENT_GET_PROPERTY_0) MSG_GADGET_TEXT_GET_NUM_LINES;
+@message (MSG_ENT_SET_PROPERTY_0) MSG_GADGET_TEXT_SET_NUM_LINES;
+@message (MSG_ENT_GET_PROPERTY_0) MSG_GADGET_TEXT_GET_FIRST_VISIBLE_LINE;
+@message (MSG_ENT_SET_PROPERTY_0) MSG_GADGET_TEXT_SET_FIRST_VISIBLE_LINE;
+@message (MSG_ENT_GET_PROPERTY_0) MSG_GADGET_TEXT_GET_LAST_VISIBLE_LINE;
+@message (MSG_ENT_SET_PROPERTY_0) MSG_GADGET_TEXT_SET_LAST_VISIBLE_LINE;
+@message (MSG_ENT_GET_PROPERTY_0) MSG_GADGET_TEXT_GET_MAX_CHARS;
+@message (MSG_ENT_SET_PROPERTY_0) MSG_GADGET_TEXT_SET_MAX_CHARS;
+@endPropertyMessages(GadgetText_SUB_PROP, GadgetClipboardable, 16)
+
+@startActionMessages(GadgetText,GadgetClipboardable)
+@message (MSG_ENT_DO_ACTION_0) MSG_GADGET_TEXT_ACTION_DELETE_RANGE;
+@message (MSG_ENT_DO_ACTION_0) MSG_GADGET_TEXT_ACTION_APPEND_STRING;
+@message (MSG_ENT_DO_ACTION_0) MSG_GADGET_TEXT_ACTION_INSERT_STRING;
+@message (MSG_ENT_DO_ACTION_0) MSG_GADGET_TEXT_ACTION_GET_LINE_NUMBER;
+@message (MSG_ENT_DO_ACTION_0) MSG_GADGET_TEXT_ACTION_GET_STRING;
+@message (MSG_ENT_DO_ACTION_0) MSG_GADGET_TEXT_ACTION_REPLACE_STRING;
+@message (MSG_ENT_DO_ACTION_0) MSG_GADGET_TEXT_ACTION_CUT;
+@message (MSG_ENT_DO_ACTION_0) MSG_GADGET_TEXT_ACTION_COPY;
+@message (MSG_ENT_DO_ACTION_0) MSG_GADGET_TEXT_ACTION_PASTE;
+@message (MSG_ENT_DO_ACTION_0) MSG_GADGET_TEXT_ACTION_SET_SELECTION_RANGE;
+@endActionMessages(GadgetText_SUB_ACT, GadgetClipboardable, 10)
+
+@vardata void ATTR_GADGET_TEXT_DONT_FILTER;
+@instance	long	GTI_bgColor;
+@instance	long	GTI_fgColor;
+@instance	int	GTI_maxLines;
+@instance	word	GTI_fontStyle;
+
+@endc
+
+/*****************************************************************
+ * GadgetToggleClass
+ *****************************************************************/
+@class	GenBooleanFocusClass, GenBooleanClass;
+     /* This class is needed to inform keyboard components
+        when a GagdgetToggle gains the system focus. */
+@endc;
+
+@class	GadgetToggleClass, GadgetClass;
+@message (MSG_ENT_GET_PROPERTY_0) MSG_GADGET_TOGGLE_GET_STATUS;
+@message (MSG_ENT_SET_PROPERTY_0) MSG_GADGET_TOGGLE_SET_STATUS;
+/* ADD NEW MESSAGES HERE */
+@startPropertyMessages(GadgetToggle,Gadget)
+
+@endPropertyMessages(GadgetToggle_SUB_PROP, Gadget, 8)
+@instance	ChunkHandle GTGI_item;
+@endc
+
+
+/*****************************************************************
+ * GadgetChoiceClass
+ *****************************************************************/
+@class	GenItemFocusClass, GenItemClass;
+     /* This class is needed to inform keyboard components
+        when a GagdgetChoice gains the system focus. */
+@endc;
+
+@class	GadgetChoiceClass, GadgetClass;
+@message optr MSG_GADGET_CHOICE_GET_SELECTED_COMPONENT();
+@message void MSG_GADGET_CHOICE_GET_SELECTED_COMPONENT_CALLBACK();
+@message void MSG_GADGET_CHOICE_STATUS_MSG();
+/* ADD NEW MESSAGES HERE */
+
+@startPropertyMessages(GadgetChoice,Gadget)
+@message (MSG_ENT_GET_PROPERTY_0) MSG_GADGET_CHOICE_GET_CHOICE;
+@message (MSG_ENT_SET_PROPERTY_0) MSG_GADGET_CHOICE_SET_CHOICE;
+@endPropertyMessages(GadgetChoice_SUB_PROP, Gadget, 8)
+@instance	ChunkHandle GCI_item;
+@endc
+
+
+/*****************************************************************
+ * GadgetClipperClass
+ *****************************************************************/
+
+@class	GadgetClipperClass, GadgetGeomClass;
+
+/* ADD NEW MESSAGES HERE */
+
+@startPropertyMessages(GadgetClipper, GadgetGeom)
+@message (MSG_ENT_GET_PROPERTY_0) MSG_GADGET_CLIPPER_GET_PRIORITY;
+@message (MSG_ENT_SET_PROPERTY_0) MSG_GADGET_CLIPPER_SET_PRIORITY;
+@message (MSG_ENT_GET_PROPERTY_0) MSG_GADGET_CLIPPER_GET_BGCOLOR;
+@message (MSG_ENT_SET_PROPERTY_0) MSG_GADGET_CLIPPER_SET_BGCOLOR;
+@endPropertyMessages(GadgetClipper_SUB_PROP, GadgetGeom, 16)
+
+@instance   MemHandle	    	GCI_window;
+@instance   MemHandle	    	GCI_gstate;
+@instance   byte    		GCI_flags;
+@instance   word    		GCI_bgColor;
+
+@endc
+
+/*****************************************************************
+ * GadgetListClass
+ *****************************************************************/
+
+@class  GadgetListClass, GadgetAggClass;
+@uses	GenDynamicListClass;
+
+@message    void MSG_GADGET_LIST_SET_ITEM();
+@message    void MSG_GADGET_LIST_GET_ITEM();
+@message    void MSG_GADGET_LIST_GENERATE_CHANGED_EVENT();
+@message    void MSG_GADGET_LIST_STATUS_MSG();
+@message (MSG_GEN_DYNAMIC_LIST_QUERY_ITEM_MONIKER) MSG_GADGET_LIST_QUERY_ITEM_MONIKER;
+
+/* ADD NEW MESSAGES HERE */
+
+@startPropertyMessages(GadgetList,Gadget)
+@message (MSG_ENT_GET_PROPERTY_0) MSG_GADGET_LIST_GET_BEHAVIOR;
+@message (MSG_ENT_SET_PROPERTY_0) MSG_GADGET_LIST_SET_BEHAVIOR;
+@message (MSG_ENT_GET_PROPERTY_0) MSG_GADGET_LIST_GET_NUM_SELECTIONS;	
+@message (MSG_ENT_SET_PROPERTY_0) MSG_GADGET_LIST_SET_NUM_SELECTIONS;	
+@message (MSG_ENT_GET_PROPERTY_0) MSG_GADGET_LIST_GET_NUM_ITEMS;
+@message (MSG_ENT_SET_PROPERTY_0) MSG_GADGET_LIST_SET_NUM_ITEMS;
+@message (MSG_ENT_GET_PROPERTY_0) MSG_GADGET_LIST_GET_SELECTED_ITEM;	
+@message (MSG_ENT_SET_PROPERTY_0) MSG_GADGET_LIST_SET_SELECTED_ITEM;	
+@message (MSG_ENT_GET_PROPERTY_0) MSG_GADGET_LIST_GET_NUM_VISIBLE_ITEMS;
+@message (MSG_ENT_SET_PROPERTY_0) MSG_GADGET_LIST_SET_NUM_VISIBLE_ITEMS;
+@message (MSG_ENT_GET_PROPERTY_0) MSG_GADGET_LIST_GET_WIDTH_IN_STD_CHARS;
+@message (MSG_ENT_SET_PROPERTY_0) MSG_GADGET_LIST_SET_WIDTH_IN_STD_CHARS;
+@endPropertyMessages(GadgetList_SUB_PROP, Gadget, 8)
+
+@startActionMessages(GadgetList,Gadget)
+@message (MSG_ENT_DO_ACTION_0) MSG_GADGET_LIST_ACTION_DELETE_ITEM;
+@message (MSG_ENT_DO_ACTION_0) MSG_GADGET_LIST_ACTION_CLEAR_ALL;
+@message (MSG_ENT_DO_ACTION_0) MSG_GADGET_LIST_ACTION_INSERT_ITEM;
+@message (MSG_ENT_DO_ACTION_0) MSG_GADGET_LIST_ACTION_GET_ITEM;
+@message (MSG_ENT_DO_ACTION_0) MSG_GADGET_LIST_ACTION_SET_ITEM;
+@message (MSG_ENT_DO_ACTION_0) MSG_GADGET_LIST_ACTION_GET_SELECTIONS;
+@message (MSG_ENT_DO_ACTION_0) MSG_GADGET_LIST_ACTION_SET_SELECTIONS;
+@endActionMessages(GadgetList_SUB_ACT, Gadget, 10)
+
+typedef enum
+{   GLL_PULLDOWN,
+    GLL_SCROLLABLE
+} GadgetListLook;
+
+@instance	word		GL_currentItems;
+@instance	word		GL_arraySize;
+@instance	word		GL_stringArrayToken;
+@instance	GadgetListLook	GL_look;
+
+@endc
+
+/*****************************************************************
+ * GadgetGadgetClass
+ *****************************************************************/
+typedef ByteFlags GadgetGadgetFlags;
+
+@class GadgetGadgetClass, GadgetClipboardableClass;
+
+@message void MSG_GADGET_GADGET_DRAW();
+/* ADD NEW MESSAGES HERE */
+
+@startPropertyMessages(GadgetGadget, GadgetClipboardable)
+@message (MSG_ENT_GET_PROPERTY_0) MSG_GADGET_GADGET_GET_NUM_CHILDREN;
+@message (MSG_ENT_GET_PROPERTY_0) MSG_GADGET_GADGET_SET_NUM_CHILDREN;
+@message (MSG_ENT_GET_PROPERTY_0) MSG_GADGET_GADGET_GET_PEN;
+@message (MSG_ENT_SET_PROPERTY_0) MSG_GADGET_GADGET_SET_PEN;
+@message (MSG_ENT_GET_PROPERTY_0) MSG_GADGET_GADGET_GET_TILE;
+@message (MSG_ENT_SET_PROPERTY_0) MSG_GADGET_GADGET_SET_TILE;
+@endPropertyMessages(GadgetGadget_SUB_PROP, GadgetClipboardable, 12)
+
+@startActionMessages(GadgetGadget, GadgetClipboardable)
+@message (MSG_ENT_DO_ACTION_0) MSG_GADGET_GADGET_ACTION_SET_CHILDREN;
+@message (MSG_ENT_DO_ACTION_0) MSG_GADGET_GADGET_ACTION_GET_CHILDREN;
+@message (MSG_ENT_DO_ACTION_0) MSG_GADGET_GADGET_ACTION_HLINE;
+@message (MSG_ENT_DO_ACTION_0) MSG_GADGET_GADGET_ACTION_VLINE;
+@message (MSG_ENT_DO_ACTION_0) MSG_GADGET_GADGET_ACTION_FILL_RECT;
+@message (MSG_ENT_DO_ACTION_0) MSG_GADGET_GADGET_ACTION_INVERT_RECT;
+@message (MSG_ENT_DO_ACTION_0) MSG_GADGET_GADGET_ACTION_STRING;
+@message (MSG_ENT_DO_ACTION_0) MSG_GADGET_GADGET_ACTION_UISHAPE;
+@message (MSG_ENT_DO_ACTION_0) MSG_GADGET_GADGET_ACTION_INVERT_UISHAPE;
+@message (MSG_ENT_DO_ACTION_0) MSG_GADGET_GADGET_ACTION_DRAW_IMAGE;
+@message (MSG_ENT_DO_ACTION_0) MSG_GADGET_GADGET_ACTION_DRAW_LINE;
+@message (MSG_ENT_DO_ACTION_0) MSG_GADGET_GADGET_ACTION_DRAW_INVERT_LINE;
+@message (MSG_ENT_DO_ACTION_0) MSG_GADGET_GADGET_ACTION_TEXT_HEIGHT;
+@message (MSG_ENT_DO_ACTION_0) MSG_GADGET_GADGET_ACTION_TEXT_WIDTH;
+@message (MSG_ENT_DO_ACTION_0) MSG_GADGET_GADGET_ACTION_SET_CLIP_RECT;
+@message (MSG_ENT_DO_ACTION_0) MSG_GADGET_GADGET_ACTION_CLEAR_CLIP_RECT;
+@message (MSG_ENT_DO_ACTION_0) MSG_GADGET_GADGET_ACTION_REDO_GEOMETRY;
+@message (MSG_ENT_DO_ACTION_0) MSG_GADGET_GADGET_ACTION_READY_PEN_MOVE;
+@message (MSG_ENT_DO_ACTION_0) MSG_GADGET_GADGET_ACTION_GRAB_PEN;
+@endActionMessages(GadgetGadget_SUB_ACT, GadgetClipboardable, 24)
+
+typedef enum {
+GPS_NONE,
+GPS_PRESSED,
+GPS_HELD
+} GadgetPenStates;
+
+@instance   MemHandle	    		GGI_commands;
+@instance   MemHandle	    		GGI_gstate;
+@instance   GadgetGadgetFlags 		GGI_gadgetFlags;
+@instance   Rectangle	    		GGI_clipRect;
+@instance   word    	    	    	GGI_lastPenX;
+@instance   word    	    	    	GGI_lastPenY;
+@instance   word    	    	    	GGI_retval;
+@instance   byte			GGI_shiftState;
+@endc
+
+/*****************************************************************
+ * GadgetFloaterClass
+ *****************************************************************/
+
+@class GadgetFloaterClass, GadgetDialogClass;
+
+@message    void MSG_GADGET_FLOATER_WIN_MOVE();
+/* ADD NEW MESSAGES HERE */
+
+@startActionMessages(GadgetFloater, Gadget)
+@message (MSG_ENT_DO_ACTION_0) MSG_GADGET_FLOATER_ACTION_REDO_GEOMETRY;
+@endActionMessages(GadgetFloater_SUB_ACT, Gadget, 1)
+
+@startPropertyMessages(GadgetFloater, GadgetDialog)
+@message (MSG_ENT_GET_PROPERTY_0) MSG_GADGET_FLOATER_GET_MASK;
+@message (MSG_ENT_SET_PROPERTY_0) MSG_GADGET_FLOATER_SET_MASK;
+@endPropertyMessages(GadgetFloater_SUB_PROP, GadgetDialog, 6)
+
+@instance word	GFI_width;
+@instance word	GFI_height;
+@instance word	GFI_left;
+@instance word	GFI_top;
+@instance word	GFI_region;
+@instance word	GFI_param3;
+@instance word	GFI_param4;
+
+@endc
+
+/*****************************************************************
+ * GadgetSpacerClass
+ *****************************************************************/
+
+@class GadgetSpacerClass, GadgetClass;
+@endc
+
+/*****************************************************************
+ * GadgetPictureClass
+ *****************************************************************/
+
+@class GadgetPictureClass, GadgetClass;
+@endc
+
+
+/*****************************************************************
+ * ServiceTimeDateClass
+ *****************************************************************/
+
+@class ServSysClass, EntClass;
+@endc
+
+@class ServiceTimeDateClass, ServSysClass;
+
+@message void MSG_STD_TIMER_TICK();
+@message void MSG_STD_ADD_TO_DATE_TIME_LIST();
+@message void MSG_STD_REMOVE_FROM_DATE_TIME_LIST();
+@message void MSG_STD_CREATE_NEW_TIMER();
+/* ADD NEW MESSAGES HERE */
+
+@startActionMessages(ServiceTimeDate, Ent)
+@message (MSG_ENT_DO_ACTION_0) MSG_STD_ACTION_GETDAYOFWEEK;
+@message (MSG_ENT_DO_ACTION_0) MSG_STD_ACTION_GETDAYSINMONTH;
+@message (MSG_ENT_DO_ACTION_0) MSG_STD_ACTION_GETTIME;
+@message (MSG_ENT_DO_ACTION_0) MSG_STD_ACTION_SETTIME;
+@message (MSG_ENT_DO_ACTION_0) MSG_STD_ACTION_GETDATE;
+@message (MSG_ENT_DO_ACTION_0) MSG_STD_ACTION_SETDATE;
+@message (MSG_ENT_DO_ACTION_0) MSG_STD_ACTION_FORMATDATE;
+@message (MSG_ENT_DO_ACTION_0) MSG_STD_ACTION_PARSEDATE;
+@message (MSG_ENT_DO_ACTION_0) MSG_STD_ACTION_FORMATTIME;
+@message (MSG_ENT_DO_ACTION_0) MSG_STD_ACTION_PARSETIME;
+@endActionMessages(ServiceTimeDate_SUB_ACT, Ent, 12)
+
+@startPropertyMessages(ServiceTimeDate, Ent)
+/* @message (MSG_ENT_GET_PROPERTY_0) MSG_STD_GET_DATE; */
+/* @message (MSG_ENT_SET_PROPERTY_0) MSG_STD_SET_DATE; */
+/* @message (MSG_ENT_GET_PROPERTY_0) MSG_STD_GET_TIME; */
+/* @message (MSG_ENT_SET_PROPERTY_0) MSG_STD_SET_TIME; */
+@message (MSG_ENT_GET_PROPERTY_0) MSG_STD_GET_TIMEINTEREST;
+@message (MSG_ENT_SET_PROPERTY_0) MSG_STD_SET_TIMEINTEREST;
+@endPropertyMessages(ServiceTimeDate_SUB_PROP, Ent, 6)
+
+@instance word	STDI_timerHandle;
+@instance word	STDI_timeInterest;
+@instance word	STDI_timeDelta;
+@instance word	STDI_dateDelta;
+@endc
+
+/* This better be the same as the value in gadget.def. */
+#define NUM_LEGOS_CLIPBOARD_TYPES	10
+
+#ifdef DO_DBCS
+  #define MAX_CLIPBOARDABLE_TYPE_STRING_SIZE   24
+#else
+  #define MAX_CLIPBOARDABLE_TYPE_STRING_SIZE   12
+#endif
+
+typedef ByteFlags ActiveSelectionStateFlags;
+typedef ByteFlags ClipboardEventFlags;
+
+@class ServiceClipboardClass, ServSysClass;
+
+@message void MSG_SCB_RAISE_CLIPBOARD_CHANGED_EVENT();
+
+@startPropertyMessages(ServiceClipboard, Ent)
+@message (MSG_ENT_GET_PROPERTY_0) MSG_SCB_GET_CLIPBOARDABLE;
+@message (MSG_ENT_SET_PROPERTY_0) MSG_SCB_SET_CLIPBOARDABLE;
+@message (MSG_ENT_GET_PROPERTY_0) MSG_SCB_GET_DELETABLE;
+@message (MSG_ENT_SET_PROPERTY_0) MSG_SCB_SET_DELETABLE;
+@message (MSG_ENT_GET_PROPERTY_0) MSG_SCB_GET_PASTABLE;
+@message (MSG_ENT_SET_PROPERTY_0) MSG_SCB_SET_PASTABLE;
+@message (MSG_ENT_GET_PROPERTY_0) MSG_SCB_GET_ACTIVE_SELECTION;
+@message (MSG_ENT_SET_PROPERTY_0) MSG_SCB_SET_ACTIVE_SELECTION;
+@endPropertyMessages(ServiceClipboard_SUB_PROP, Ent, 16)
+
+@startActionMessages(ServiceClipboard, Ent)
+@message (MSG_ENT_DO_ACTION_0) MSG_SCB_ACTION_QUERYITEM;
+@message (MSG_ENT_DO_ACTION_0) MSG_SCB_ACTION_SETITEM;
+@message (MSG_ENT_DO_ACTION_0) MSG_SCB_ACTION_GETITEM;
+@message (MSG_ENT_DO_ACTION_0) MSG_SCB_ACTION_SETACTIVESELECTION;
+@message (MSG_ENT_DO_ACTION_0) MSG_SCB_ACTION_CUT;
+@message (MSG_ENT_DO_ACTION_0) MSG_SCB_ACTION_COPY;
+@message (MSG_ENT_DO_ACTION_0) MSG_SCB_ACTION_PASTE;
+@message (MSG_ENT_DO_ACTION_0) MSG_SCB_ACTION_DELETE;
+@endActionMessages(ServiceClipboard_SUB_ACT, Ent, 16)
+
+@instance ActiveSelectionStateFlags	SCBI_activeSelectionState;
+@instance ClipboardEventFlags		SCBI_eventFlags;
+
+@endc
+
+/*****************************************************************
+ * ServiceAlarmClass _OBSOLETE_
+ *****************************************************************/
+@if 0
+@class ServiceAlarmClass, EntClass;
+
+@message void MSG_SA_ALARM_DING();
+/* ADD NEW MESSAGES HERE */
+
+@startPropertyMessages(ServiceAlarm, Ent)
+@message (MSG_ENT_GET_PROPERTY_0) MSG_SA_GET_ENABLED;
+@message (MSG_ENT_SET_PROPERTY_0) MSG_SA_SET_ENABLED;
+@endPropertyMessages(ServiceAlarm_SUB_PROP, Ent, 2)
+
+@startActionMessages(ServiceAlarm, Ent)
+@message (MSG_ENT_DO_ACTION_0) MSG_SA_ACTION_GETALARMTIME;
+@message (MSG_ENT_DO_ACTION_0) MSG_SA_ACTION_SETALARMTIME;
+@message (MSG_ENT_DO_ACTION_0) MSG_SA_ACTION_GETALARMDATE;
+@message (MSG_ENT_DO_ACTION_0) MSG_SA_ACTION_SETALARMDATE;
+@message (MSG_ENT_DO_ACTION_0) MSG_SA_ACTION_GETALARMDATA;
+@message (MSG_ENT_DO_ACTION_0) MSG_SA_ACTION_SETALARMDATA;
+@endActionMessages(ServiceAlarm_SUB_ACT, Ent, 6)
+
+typedef struct
+{
+    byte	AT_hour;
+    byte	AT_minute;
+    byte	AT_second;
+} AlarmTime;
+
+typedef struct
+{
+    word	AD_year;
+    byte	AD_month;
+    byte	AD_day;
+} AlarmDate;
+
+@instance word	SAI_timerHandle;
+@instance word	SAI_timerID;
+@instance AlarmTime	SAI_time;
+@instance AlarmDate	SAI_date;
+@instance word	SAI_alarmData;		/* RunHeap token of struct */
+@instance word	SAI_enabled;
+
+@endc
+@endif
+/*****************************************************************
+ * ServiceTimerClass
+ *****************************************************************/
+
+@class ServiceTimerClass, ServSysClass;
+
+@message void MSG_ST_TICK();
+/* ADD NEW MESSAGES HERE */
+
+@startPropertyMessages(ServiceTimer, Ent)
+@message (MSG_ENT_GET_PROPERTY_0) MSG_ST_GET_INTERVAL;
+@message (MSG_ENT_SET_PROPERTY_0) MSG_ST_SET_INTERVAL;
+@message (MSG_ENT_GET_PROPERTY_0) MSG_ST_GET_ENABLED;
+@message (MSG_ENT_SET_PROPERTY_0) MSG_ST_SET_ENABLED;
+@endPropertyMessages(ServiceTimer_SUB_PROP, Ent, 4)
+
+@startActionMessages(ServiceTimer, Ent)
+@endActionMessages(ServiceTimer_SUB_ACT, Ent, 4)
+
+@instance word	STI_timerHandle;
+@instance word	STI_interval;
+@instance word	STI_enabled;
+
+@endc
+
+/*****************************************************************
+ * GadgetTableClass
+ *****************************************************************/
+@define GADGET_TABLE_PROPERTY_MESSAGES(x) \
+@atme (@message (MSG_ENT_GET_PROPERTY_0) MSG_GADGET_TABLE_GET_)x;\
+@atme (@message (MSG_ENT_GET_PROPERTY_0) MSG_GADGET_TABLE_SET_)x;
+
+#ifdef MOTIF_COMPONENT_SET
+typedef enum
+{   LOOK_TABLE_FULL_GRID,
+    LOOK_TABLE_NO_GRID
+} GadgetTableLook;
+#else
+typedef enum
+{
+    LOOK_TABLE_RECORD_LIST,
+    LOOK_TABLE_DOTTED_CELLS,
+    LOOK_TABLE_DOTTED_HORIZ_LINES,
+    LOOK_TABLE_BLANK
+} GadgetTableLook;
+#endif
+
+typedef	struct 
+{
+    int TC_row;
+    int	TC_cell;
+} TableCell;	
+
+@class GadgetTableClass, GadgetGadgetClass;
+@message int MSG_GADGET_TABLE_SET_NUM_ROWS_INTERNAL(int rows = cx);
+@message int MSG_GADGET_TABLE_SET_NUM_COLUMNS_INTERNAL(int cols = cx);
+@message void MSG_GADGET_TABLE_SCROLL_UP();
+@message void MSG_GADGET_TABLE_SCROLL_DOWN();
+@message void MSG_GADGET_TABLE_DRAG_UP();
+@message void MSG_GADGET_TABLE_DRAG_DOWN();
+/* ADD NEW MESSAGES HERE */
+
+@startPropertyMessages(GadgetTable, GadgetGadget)
+@GADGET_TABLE_PROPERTY_MESSAGES(NUM_ROWS);
+@GADGET_TABLE_PROPERTY_MESSAGES(OVERALL_HEIGHT);
+@GADGET_TABLE_PROPERTY_MESSAGES(NUM_COLUMNS);
+@GADGET_TABLE_PROPERTY_MESSAGES(DEFAULT_ROW_HEIGHT);
+@GADGET_TABLE_PROPERTY_MESSAGES(SELECTION_TYPE);
+@GADGET_TABLE_PROPERTY_MESSAGES(LEFT_COLUMN);
+@GADGET_TABLE_PROPERTY_MESSAGES(RIGHT_COLUMN);
+@GADGET_TABLE_PROPERTY_MESSAGES(TOP_ROW);
+@GADGET_TABLE_PROPERTY_MESSAGES(BOTTOM_ROW);
+@GADGET_TABLE_PROPERTY_MESSAGES(FIRST_VISIBLE_ROW);
+@GADGET_TABLE_PROPERTY_MESSAGES(LAST_VISIBLE_ROW);
+@endPropertyMessages(GadgetTable_SUB_PROP, GadgetGadget, 20)
+
+
+@startActionMessages(GadgetTable, GadgetGadget)
+@message (MSG_ENT_DO_ACTION_0) MSG_GADGET_TABLE_ACTION_UPDATE;
+@message (MSG_ENT_DO_ACTION_0) MSG_GADGET_TABLE_ACTION_SHOW_ROW;
+@message (MSG_ENT_DO_ACTION_0) MSG_GADGET_TABLE_ACTION_SCROLL;
+@message (MSG_ENT_DO_ACTION_0) MSG_GADGET_TABLE_ACTION_GET_ROW_AT;
+@message (MSG_ENT_DO_ACTION_0) MSG_GADGET_TABLE_ACTION_GET_COLUMN_AT;
+@message (MSG_ENT_DO_ACTION_0) MSG_GADGET_TABLE_ACTION_Y_POS_AT;
+@message (MSG_ENT_DO_ACTION_0) MSG_GADGET_TABLE_ACTION_X_POS_AT;
+@message (MSG_ENT_DO_ACTION_0) MSG_GADGET_TABLE_ACTION_GET_ABS_Y_POS_AT;
+@message (MSG_ENT_DO_ACTION_0) MSG_GADGET_TABLE_ACTION_GET_ROW_HEIGHTS;
+@message (MSG_ENT_DO_ACTION_0) MSG_GADGET_TABLE_ACTION_SET_ROW_HEIGHTS;
+@message (MSG_ENT_DO_ACTION_0) MSG_GADGET_TABLE_ACTION_GET_COLUMN_WIDTHS;
+@message (MSG_ENT_DO_ACTION_0) MSG_GADGET_TABLE_ACTION_SET_COLUMN_WIDTHS;
+@message (MSG_ENT_DO_ACTION_0) MSG_GADGET_TABLE_ACTION_SET_SELECTION;
+@endActionMessages(GadgetTable_SUB_ACT, GadgetGadget, 20)
+
+
+@vardata void ATTR_GADGET_TABLE_DOING_REDRAW;
+
+@instance	int	GT_numRows;
+@instance	int	GT_numCols;
+@instance	_near int *	GT_rowHeights;
+@instance	_near int *	GT_columnWidths;
+@instance	int	GT_defaultRowHeight;
+@instance	int	GT_selectionType;
+@instance	int	GT_leftSelection;
+@instance	int	GT_rightSelection;
+@instance	int	GT_topSelection;
+@instance	int	GT_bottomSelection;
+@instance	int	GT_firstVisibleRow;
+@instance	int	GT_lastVisibleRow;
+@instance	TableCell      GT_dragSelectStart;
+@instance	TableCell      GT_dragSelectEnd;
+@instance	Handle	       GT_timerHandle;
+@instance	int	       GT_timerID;
+@instance	int		GT_topClipped;
+
+@endc
+
+
+
+@class	SJisUnicodeConversionClass, EntClass;
+@startActionMessages(ShiftJisUnicodeConversion_SUB_ACT, Ent)
+@message (MSG_ENT_DO_ACTION_0) MSG_SJU_ACTION_SJIS_CHAR_TO_UNICODE;
+@message (MSG_ENT_DO_ACTION_0) MSG_SJU_ACTION_UNICODE_CHAR_TO_SJIS;
+@endActionMessages(SJisUnicodeConversion_SUB_ACT, Ent, 8)
+@endc
+
+
+
+extern optr _pascal TextGetView(optr text);
+
+/*****************************************************************
+ * GadgetDBClass
+ *****************************************************************/
+@class	GadgetDBClass	EntClass;
+
+@startPropertyMessages(GadgetDB, Ent)
+@message (MSG_ENT_GET_PROPERTY_0) MSG_GADGET_DB_GET_NAME;
+@message (MSG_ENT_SET_PROPERTY_0) MSG_GADGET_DB_SET_NAME;
+@message (MSG_ENT_GET_PROPERTY_0) MSG_GADGET_DB_GET_NUM_RECORDS;
+@message (MSG_ENT_SET_PROPERTY_0) MSG_GADGET_DB_SET_NUM_RECORDS;
+@message (MSG_ENT_GET_PROPERTY_0) MSG_GADGET_DB_GET_RECORD;
+@message (MSG_ENT_SET_PROPERTY_0) MSG_GADGET_DB_SET_RECORD;
+@message (MSG_ENT_GET_PROPERTY_0) MSG_GADGET_DB_GET_RECORD_ID;
+@message (MSG_ENT_SET_PROPERTY_0) MSG_GADGET_DB_SET_RECORD_ID;
+@message (MSG_ENT_GET_PROPERTY_0) MSG_GADGET_DB_GET_NEXT_RECORD_ID;
+@message (MSG_ENT_SET_PROPERTY_0) MSG_GADGET_DB_SET_NEXT_RECORD_ID;
+@message (MSG_ENT_GET_PROPERTY_0) MSG_GADGET_DB_GET_NUM_FIELDS;
+@message (MSG_ENT_SET_PROPERTY_0) MSG_GADGET_DB_SET_NUM_FIELDS;
+@endPropertyMessages(GadgetDB_SUB_PROP, Ent, 16)
+
+@startActionMessages(GadgetDB, Ent)
+@message (MSG_ENT_DO_ACTION_0) MSG_GADGET_DB_ACTION_CREATE;
+@message (MSG_ENT_DO_ACTION_0) MSG_GADGET_DB_ACTION_DELETE;
+@message (MSG_ENT_DO_ACTION_0) MSG_GADGET_DB_ACTION_OPEN;
+@message (MSG_ENT_DO_ACTION_0) MSG_GADGET_DB_ACTION_CLOSE;
+@message (MSG_ENT_DO_ACTION_0) MSG_GADGET_DB_ACTION_RENAME;
+@message (MSG_ENT_DO_ACTION_0) MSG_GADGET_DB_ACTION_GET_RECORD;
+@message (MSG_ENT_DO_ACTION_0) MSG_GADGET_DB_ACTION_PUT_RECORD;
+@message (MSG_ENT_DO_ACTION_0) MSG_GADGET_DB_ACTION_NEW_RECORD;
+@message (MSG_ENT_DO_ACTION_0) MSG_GADGET_DB_ACTION_DELETE_RECORD;
+@message (MSG_ENT_DO_ACTION_0) MSG_GADGET_DB_ACTION_GET_FIELD;
+@message (MSG_ENT_DO_ACTION_0) MSG_GADGET_DB_ACTION_PUT_FIELD;
+@message (MSG_ENT_DO_ACTION_0) MSG_GADGET_DB_ACTION_ADD_FIELD;
+@message (MSG_ENT_DO_ACTION_0) MSG_GADGET_DB_ACTION_DELETE_FIELD;
+@message (MSG_ENT_DO_ACTION_0) MSG_GADGET_DB_ACTION_RENAME_FIELD;
+@message (MSG_ENT_DO_ACTION_0) MSG_GADGET_DB_ACTION_SEARCH_STRING;
+@message (MSG_ENT_DO_ACTION_0) MSG_GADGET_DB_ACTION_SEARCH_NUMBER;
+@message (MSG_ENT_DO_ACTION_0) MSG_GADGET_DB_ACTION_GET_FIELD_NAME;
+@message (MSG_ENT_DO_ACTION_0) MSG_GADGET_DB_ACTION_GET_FIELD_CATEGORY;
+@message (MSG_ENT_DO_ACTION_0) MSG_GADGET_DB_ACTION_GET_FIELD_TYPE;
+@message (MSG_ENT_DO_ACTION_0) MSG_GADGET_DB_ACTION_PUT_RECORD_NO_UPDATE;
+@endPropertyMessages(GadgetDB_SUB_ACT, Ent, 32)
+@endc
+
+
+/* ======================================= */
+@class  SystemBusyClass, ServSysClass;
+/* ======================================= */
+/*
+ *  Internal messages go here.
+ */
+@message void MSG_SYSTEM_BUSY_ADD_SELF_TO_BUSY_ARRAY();
+@message void MSG_SYSTEM_BUSY_REMOVE_SELF_FROM_BUSY_ARRAY();
+@message void MSG_SYSTEM_BUSY_RAISE_BUSY_TOTAL_CHANGED_EVENT();
+
+@startPropertyMessages	(SystemBusy, Ent)
+@message (MSG_ENT_GET_PROPERTY_0) MSG_SYSTEM_BUSY_GET_BUSY_COUNT;
+@message (MSG_ENT_SET_PROPERTY_0) MSG_SYSTEM_BUSY_SET_BUSY_COUNT;
+
+@message (MSG_ENT_GET_PROPERTY_0) MSG_SYSTEM_BUSY_GET_BUSY_TOTAL;
+@message (MSG_ENT_SET_PROPERTY_0) MSG_SYSTEM_BUSY_SET_BUSY_TOTAL;
+@endPropertyMessages	(SystemBusy_SUB_PROP, Ent,6)
+
+@startActionMessages	(SystemBusy, Ent)
+@message (MSG_ENT_DO_ACTION_0) MSG_SYSTEM_BUSY_ACTION_ENTER;
+@message (MSG_ENT_DO_ACTION_0) MSG_SYSTEM_BUSY_ACTION_LEAVE;
+
+@endActionMessages	(SystemBusy_SUB_ACT, Ent,6)
+
+@instance	int	SBI_busyCount;
+
+@endc	/* SystemBusyClass */
+
+
+/* ======================================= */
+@class  SystemSoundClass, ServSysClass;
+/* ======================================= */
+/*
+ *  Internal messages go here.
+ */
+
+@startPropertyMessages	(SystemSound, Ent)
+@endPropertyMessages	(SystemSound_SUB_PROP, Ent,6)
+
+@startActionMessages	(SystemSound, Ent)
+@message (MSG_ENT_DO_ACTION_0) MSG_SYSTEM_SOUND_ACTION_STANDARDSOUND;
+@endActionMessages	(SystemSound_SUB_ACT, Ent,6)
+
+@endc	/* SystemSoundClass */
+
+
+/* ======================================= */
+@class  SystemDisplayClass, ServSysClass;
+/* ======================================= */
+
+/*
+ *  Internal messages go here.
+ */
+
+@startPropertyMessages	(SystemDisplay, Ent)
+@message (MSG_ENT_GET_PROPERTY_0) MSG_SYSTEM_DISPLAY_GET_WIDTH;
+@message (MSG_ENT_SET_PROPERTY_0) MSG_SYSTEM_DISPLAY_SET_WIDTH;
+
+@message (MSG_ENT_GET_PROPERTY_0) MSG_SYSTEM_DISPLAY_GET_HEIGHT;
+@message (MSG_ENT_SET_PROPERTY_0) MSG_SYSTEM_DISPLAY_SET_HEIGHT;
+
+@message (MSG_ENT_GET_PROPERTY_0) MSG_SYSTEM_DISPLAY_GET_ACTIVE_FORM;
+@message (MSG_ENT_SET_PROPERTY_0) MSG_SYSTEM_DISPLAY_SET_ACTIVE_FORM;
+
+@endPropertyMessages	(SystemDisplay_SUB_PROP, Ent,4)
+@startActionMessages	(SystemDisplay, Ent)
+@endActionMessages	(SystemDisplay_SUB_ACT, Ent,4)
+
+@endc	/* SystemDisplayClass */
+
+/*- SystemLauncherClass
+ */
+@class SystemLauncherClass, ServSysClass;
+
+/*
+ *  Internal messages go here.
+ */
+@message void MSG_SL_ALARM_RING
+    (@stack optr mlString, optr contextString);
+
+@startPropertyMessages	(SystemLauncher, Ent)
+@message (MSG_ENT_SET_PROPERTY_0) MSG_SYSTEM_LAUNCHER_GET_MEMORY_AVAILABLE;
+@message (MSG_ENT_SET_PROPERTY_0) MSG_SYSTEM_LAUNCHER_SET_MEMORY_AVAILABLE;
+@message (MSG_ENT_SET_PROPERTY_0) MSG_SYSTEM_LAUNCHER_GET_MEMORY_RESERVED;
+@message (MSG_ENT_SET_PROPERTY_0) MSG_SYSTEM_LAUNCHER_SET_MEMORY_RESERVED;
+@endPropertyMessages	(SystemLauncher_SUB_PROP, Ent,7)
+
+@startActionMessages	(SystemLauncher, Ent)
+@message (MSG_ENT_DO_ACTION_0) MSG_SYSTEM_LAUNCHER_ACTION_GO_TO;
+@message (MSG_ENT_DO_ACTION_0) MSG_SYSTEM_LAUNCHER_ACTION_SWITCH_TO;
+@message (MSG_ENT_DO_ACTION_0) MSG_SYSTEM_LAUNCHER_ACTION_REQUEST_MEMORY;
+@message (MSG_ENT_DO_ACTION_0) MSG_SYSTEM_LAUNCHER_ACTION_HIDE;
+@endActionMessages	(SystemLauncher, Ent, 7)
+
+@endc
+
+/*- ServiceAlarmClientClass
+ */
+@class ServiceAlarmClientClass, ServSysClass;
+
+@startPropertyMessages(ServiceAlarmClient, Ent)
+@message (MSG_ENT_GET_PROPERTY_0) MSG_SAC_GET_UNIQUE_ID; /* XXX */
+@message (MSG_ENT_GET_PROPERTY_0) MSG_SAC_SET_UNIQUE_ID; /* XXX */
+@message (MSG_ENT_GET_PROPERTY_0) MSG_SAC_GET_ENABLED;	 /* XXX */
+@message (MSG_ENT_GET_PROPERTY_0) MSG_SAC_SET_ENABLED;	 /* XXX */
+@message (MSG_ENT_GET_PROPERTY_0) MSG_SAC_GET_MODULE_CONTEXT; /* XXX */
+@message (MSG_ENT_GET_PROPERTY_0) MSG_SAC_SET_MODULE_CONTEXT; /* XXX */
+@endPropertyMessages(ServiceAlarmClient_SUB_PROP, Ent, 10)
+
+@startActionMessages(ServiceAlarmClient, Ent)
+@message (MSG_ENT_DO_ACTION_0) MSG_SAC_ACTION_GETALARMDATE; /* XXX */
+@message (MSG_ENT_DO_ACTION_0) MSG_SAC_ACTION_SETALARMDATE; /* XXX */
+
+@message (MSG_ENT_DO_ACTION_0) MSG_SAC_ACTION_GETALARMTIME; /* XXX */
+@message (MSG_ENT_DO_ACTION_0) MSG_SAC_ACTION_SETALARMTIME; /* XXX */
+@endActionMessages(ServiceAlarmClient_SUB_ACT, Ent, 10)
+
+@instance	RunHeapToken	SACI_uniqueID;
+
+@endc
+
+/*- AlarmServerClass
+ */
+@class	AlarmServerClass, MetaClass;
+
+@message void MSG_AS_ALARM_RING(dword tickCount = cx:dx, word timerID = bp);
+
+@message void MSG_AS_LOAD_DATA(dword unused);
+@message void MSG_AS_ACTIVATE_ALARMS();
+@message void MSG_AS_DEACTIVATE_ALARMS();
+@message void MSG_AS_SAVE_DATA(dword unused);
+
+/* The following messages are used by the client
+ * EC code assumes AS_CLIENT_ATTACH is the first */
+
+@message word MSG_AS_CLIENT_ATTACH
+    (TCHAR* uniqueID=cx:dx, RTaskHan clientTask=bp); /* XXX */
+
+@message void MSG_AS_CLIENT_DETACH(TCHAR* uniqueID=cx:dx); /* XXX */
+
+@message Boolean MSG_AS_SET_ENABLED
+    (Boolean newEnabled=bp, TCHAR* uniqueID=cx:dx) = ax;
+
+@message Boolean MSG_AS_SET_CONTEXT
+    (@stack TCHAR* newContext, TCHAR* uniqueID) = ax;
+
+@message AlarmEntry* MSG_AS_GET_ALARM_ENTRY
+    (TCHAR* uniqueID=cx:dx) = cx:dx;
+
+@message Boolean MSG_AS_PUT_ALARM_ENTRY
+    (AlarmEntry* entry=cx:dx) = ax;
+
+	@instance MemHandle	ASI_alarmHeap = 0;
+	@instance optr		ASI_alarmArray = 0;
+@endc
+
+@endlib

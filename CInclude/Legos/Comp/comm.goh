@@ -1,0 +1,137 @@
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+	Copyright (c) 1997 New Deal, Inc. -- All Rights Reserved
+
+PROJECT:	PC/GEOS - LEGOS
+MODULE:		Input/Output Component Set - Comm Component
+FILE:		comm.goh
+
+AUTHOR:		Martin Turon, Oct. 31, 1999
+
+ROUTINES:
+	Name			Description
+	----			-----------
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	martin	10/31/1999   	Initial version.
+
+DESCRIPTION:
+
+	CommComponentClass:
+		* EVENTS:	
+	        * PROPERTIES:   name, path, size, date, time, trap, 
+				error, buffer, exists, readable, writeable
+	        * ACTIONS:      open, read, write, close
+				create, delete, move, copy,
+				peek, poke, go, seek, 
+				mkdir, rmdir, chdir, pushd, popd
+
+	CommSelectorComponentClass
+		* EVENTS:	
+        	* PROPERTIES:   type (open/save)
+		* ACTIONS:	
+
+	$Id: comm.goh,v 1.1 1999/10/31 11:33:33 (c)turon Exp martin $
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+
+@include <stdapp.goh>
+@include <Legos/ent.goh>
+@include <streamC.h>
+
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		Component Class Definitions
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+
+@class SerialComponentClass, EntClass;
+
+	typedef	   enum {
+		SCT_NEVER,		/* avoid all errors              */
+		SCT_RUNTIME,		/* raise errors to basic runtime */
+		SCT_DIALOG,		/* create user dialog on errors  */ 
+		SCT_BOTH,		/* create error event & dialog   */ 
+		SCT_SYSTEM,		/* don't avoid errors like NEVER */
+					/* this enum, really should be a */
+					/* bitfield:			 */
+					/*	:1 error events		 */
+					/*	:2 error dialogs	 */
+					/*	:4 error override	 */
+	} SerialComponentTraps;
+
+        @instance  RunHeapInfo		*SCC_rhi;
+        @instance  SerialError		 SCC_error   = 0;
+	@instance  SerialComponentTraps  SCC_trap    = SCT_NEVER;
+        @instance  Handle		 SCC_driver  = NULL;
+        @instance  StreamOpenFlags	 SCC_flags   = STREAM_OPEN_NO_BLOCK;
+        @instance  SerialPortNum	 SCC_port    = SERIAL_COM1;
+        @instance  SerialBaud		 SCC_baud    = SB_38400;
+        @instance  word			 SCC_timeout = 0;
+
+	/**** EVENTS:	(handled by BASIC)	none!!! */
+
+	/**** PROPERTIES:	
+	 *	port,	baud,	  flags, 
+	 *      error,  trap,     timeout
+	 */
+	@define serialPropertyMessage(x)     				  \
+	 @atme (@message (MSG_ENT_GET_PROPERTY_0) MSG_SERIAL_COMP_GET_)x; \
+	 @atme (@message (MSG_ENT_SET_PROPERTY_0) MSG_SERIAL_COMP_SET_)x;
+	@startPropertyMessages(SerialComponent,Ent)
+	@serialPropertyMessage(PORT)
+	@serialPropertyMessage(BAUD)
+	@serialPropertyMessage(FLAGS)
+	@serialPropertyMessage(ERROR)
+	@serialPropertyMessage(TRAP)
+	@serialPropertyMessage(TIMEOUT)
+	@endPropertyMessages(SerialComponent_SUB_PROP, Ent, 24)
+
+	/**** ACTIONS:	
+	 *	open,  close
+	 *	read,  write 	(string)
+	 *	flush, peek, poke
+	 *  ++
+	 *  ++ Not Implemented yet
+	 */
+	@define SERIAL_ACTION_MESSAGE(x) \
+	 @atme (@message (MSG_ENT_DO_ACTION) MSG_SERIAL_COMP_DO_)x;
+	@startActionMessages	(SerialComponent, Ent)
+	@SERIAL_ACTION_MESSAGE(OPEN)
+	@SERIAL_ACTION_MESSAGE(READ)
+	@SERIAL_ACTION_MESSAGE(WRITE)
+	@SERIAL_ACTION_MESSAGE(CLOSE)
+	@SERIAL_ACTION_MESSAGE(FLUSH)
+	@SERIAL_ACTION_MESSAGE(PEEK)
+	@SERIAL_ACTION_MESSAGE(POKE)
+	@endActionMessages	(SerialComponent_SUB_ACT, Ent, 16)
+
+@endc
+
+
+typedef enum {
+    ERROR_SERIAL_COMPONENT_FAILURE,
+    ERROR_PARALLEL_COMPONENT_FAILURE,
+    ERROR_MODEM_COMPONENT_FAILURE,
+    ERROR_PCCOM_COMPONENT_FAILURE,
+} FatalErrors;
+
+typedef enum {
+    WARNING_SERIAL_COMPONENT_PROBLEM,
+    WARNING_PARALLEL_COMPONENT_PROBLEM,
+    WARNING_MODEM_COMPONENT_PROBLEM,
+    WARNING_PCCOM_COMPONENT_PROBLEM,
+} Warnings;
+
+extern FatalErrors feCommComp;
+extern Warnings    wCommComp;
+
+
+
+
+
+
+
+
+
+

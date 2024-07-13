@@ -1,0 +1,148 @@
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+	Copyright (c) Geoworks 1995 -- All Rights Reserved
+
+PROJECT:	NewBASIC
+MODULE:		Basic Component Set - Net Component Library
+FILE:		coolnet.goh
+
+AUTHOR:		Martin Turon, Jan 27, 1995
+
+ROUTINES:
+	Name			Description
+	----			-----------
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	martin	1/27/95   	Initial version.
+
+DESCRIPTION:
+	
+	COMPONENT API descriptor	1999/10/6  <martin> rev 0.0.0.2
+	PROPERTIES			1998/4/22  <martin>  
+		telnet.host
+		telnet.port
+		telnet.mode
+		telnet.trap
+		telnet.error
+		telnet.status
+		telnet.options	 => /get=tcp/ip Options /set:disable=0|enable=1
+		telnet.interrupt
+		telnet.parent	 => /get="top"
+	ACTIONS				1998/4/22 <martin>
+		telnet.open(s,N)	= connect to host/port	
+		telnet.read()		
+		telnet.write(data)	= send data
+		telnet.close()		= close telnet session
+		telnet.create() 	= create new telnet session
+		telnet.flush()
+		telnet.synch()
+		telnet.reset(N)	  	= where N receive=0|send=1|both=2
+	~	telnet.command(s, data)	= send command with data
+
+	~
+	~ Not implemented yet
+
+	$Id: net.goh,v 1.1 98/05/13 14:54:51 martin Exp $
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+
+@include <stdapp.goh>
+@include <Legos/ent.goh>
+@include <Legos/gadget.goh>
+
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		Component Class Definitions
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+
+/******	library/legos/comp/net/telnet ******/
+
+#define NO_RESPONSE_TIMEOUT	60 * 180
+
+@class TelnetComponentClass, GadgetClass;
+
+	typedef	   enum {/* word... to get byte, use ByteEnum and define */
+		TNCT_NEVER,		/* avoid all errors              */
+		TNCT_RUNTIME,		/* raise errors to basic runtime */
+		TNCT_DIALOG		/* create user dialog on errors  */ 
+	} TelnetComponentTraps;
+
+        @instance  RunHeapInfo		*TNCC_rhi;	/* tmp 4 action/prop */
+        @instance  RunHeapToken		 TNCC_host;	/* string */
+        @instance  int			 TNCC_port;
+	@instance  TelnetComponentTraps  TNCC_trap  	= TNCT_NEVER;
+        @instance  TelnetError		 TNCC_error   	= 0;
+        @instance  int			 TNCC_timeout 	= NO_RESPONSE_TIMEOUT;
+	@instance  TelnetConnectionID	 TNCC_session	= NULL;
+
+	/**** EVENTS:	(handled by BASIC)	none!!!
+	 */
+
+	/**** PROPERTIES:	
+	 *	host,	port,	  mode,      status, 	timeout,
+	 *      trap,	error,	options,   interrupt
+	 */
+	@define telnetPropertyMessage(x)		 		      \
+	 @atme (@message (MSG_ENT_GET_PROPERTY_0) MSG_TELNET_GET_)x;    \
+	 @atme (@message (MSG_ENT_SET_PROPERTY_0) MSG_TELNET_SET_)x;
+	@startPropertyMessages(TelnetComponent,EntVis)
+	@telnetPropertyMessage(HOST)
+	@telnetPropertyMessage(PORT)
+	@telnetPropertyMessage(MODE)
+	@telnetPropertyMessage(TRAP)
+	@telnetPropertyMessage(ERROR)
+	@telnetPropertyMessage(STATUS)
+	@telnetPropertyMessage(TIMEOUT)
+	@telnetPropertyMessage(OPTIONS)
+	@telnetPropertyMessage(INTERRUPT)
+	@endPropertyMessages(TelnetComponent_SUB_PROP, EntVis, 24)
+
+	/**** ACTIONS:	
+	 *	open,  close
+	 *	move,  copy, create, delete, 
+	 *	go,    seek
+	 *      peek,  poke  	(byte normalized integer)
+	 *	read,  write 	(string)
+	 *  ++  get,   put   	(array)
+	 *	mkdir, rmdir,	 
+	 *	dateline
+	 *  ++
+	 *  ++ Not Implemented yet
+	 */
+	@define TELNET_ACTION_MESSAGE(x) \
+	 @atme (@message (MSG_ENT_DO_ACTION) MSG_TELNET_DO_)x;
+	@startActionMessages	(TelnetComponent, Ent)
+	@TELNET_ACTION_MESSAGE(OPEN)
+	@TELNET_ACTION_MESSAGE(READ)
+	@TELNET_ACTION_MESSAGE(WRITE)
+	@TELNET_ACTION_MESSAGE(CLOSE)
+	@TELNET_ACTION_MESSAGE(CREATE)
+	@TELNET_ACTION_MESSAGE(FLUSH)
+	@TELNET_ACTION_MESSAGE(SYNCH)
+	@TELNET_ACTION_MESSAGE(RESET)
+	@TELNET_ACTION_MESSAGE(COMMAND)
+	@endActionMessages	(TelnetComponent, Ent, 16)
+
+@endc
+
+/******/
+
+
+typedef enum
+{
+	ERROR_NET_COMPONENT_LIBRARY
+} FatalErrors;
+
+typedef enum 
+{
+	WARNING_NET_COMPONENT_LIBRARY
+} Warnings;
+
+extern FatalErrors feCoolNet;
+extern Warnings wCoolNet;
+
+
+
+
+

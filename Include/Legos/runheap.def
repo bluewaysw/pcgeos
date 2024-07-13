@@ -1,0 +1,139 @@
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+	Copyright (c) Geoworks 1995 -- All Rights Reserved
+
+PROJECT:	Legos
+MODULE:		Runtime
+FILE:		runheap.def
+
+AUTHOR:		Ronald Braunstein, Jul 21, 1995
+
+MACROS:
+	Name			Description
+	----			-----------
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	RON	 7/21/95	Initial revision
+
+
+DESCRIPTION:
+	Exported API for accessing the runtime heap
+
+	$Id: runheap.def,v 1.2 98/06/24 20:54:09 martin Exp $
+		
+	$Revision: 1.2 $
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+
+SetDef __RUNHEAP_DEF
+
+StartLibrary	basrun
+
+global	RunHeapIncRef:far
+global	RunHeapDecRef:far
+global	RunHeapLock:far
+global	RunHeapUnlock:far
+global	RunHeapAlloc:far
+global	RunComponentLockHeap:far
+global	RunComponentUnlockHeap:far
+
+global	RunHeapAlloc_asm:far
+; pass:		cx 	- size
+;		bx	- RunHeapType
+;		dl	- init ref count
+;		ds	- sptr.EntObjectBlock
+;		ax:di	- data to init with, 0 for no init
+;
+; return:	ax	- RunHeapToken
+; destroyed	none
+
+global	RunHeapLock_asm:far
+; pass		ax	- token
+;		ds	- sptr.EntObjectBlock
+;
+; return	es:di	- fptr to locked data
+; destroyed	none
+
+global	RunHeapUnlock_asm:far
+; pass		ax	- token
+;		ds	- sptr.EntObjectBlock
+;
+; destroyed	none
+
+global	RunHeapIncRef_asm:far
+; pass		ax	- token
+;		ds	- sptr.EntObjectBlock
+;
+; destroyed	none
+
+global	RunHeapDecRef_asm:far
+; pass		ax	- token
+;		ds	- sptr.EntObjectBlock
+;
+; destroyed	none
+
+; This structure can be used for passing args to RunHeapLock or RunHeapUnlock
+; RunHeapLock wants a **void, that is RHLS_dataPtr.  Fill in RHLS_dataPtr with
+; the address of RHLS_eptr so RunHeapLock can return the fptr to us.
+;
+RunHeapLockStruct struct
+; This will be the low word in memory		/ pushed last
+	RHLS_rhi	fptr.RunHeapInfo
+	RHLS_token	word
+	RHLS_dataPtr	fptr.fptr.byte		; RunHeapLock wants a **void
+	RHLS_eptr	fptr.byte
+; This will be the high word in memory	/ pushed first
+	even					; swat gets confused if not
+						; even when allocated on
+						; stack
+RunHeapLockStruct	ends
+
+RunHeapAllocStruct	struct
+; This will be the low word in memory	/ pushed last
+	RHAS_rhi	fptr.RunHeapInfo
+	RHAS_type	word		; RunHeapType
+align word
+	RHAS_refCount	byte		; initial ref count, should be 0 or 1
+align word
+	RHAS_size	word		; size to allocate
+	RHAS_data	fptr.byte	; initial data to store, 0 for none
+; This will be the high word in memory	/ pushed first
+	even				; swat gets confused if not even
+					; when allocated on stack.
+RunHeapAllocStruct ends
+
+
+
+; Give this struct an Asm suffix so glue won't complain about the hptr.
+HeapBlockEntryAsm struct
+	HBE_handle	hptr		
+	HBE_usedSize	word
+HeapBlockEntryAsm ends
+
+MAX_HEAP_BLOCKS equ 128
+
+; Give this struct an Asm suffix so glue won't complain about the hptr.
+RunHeapInfoAsm	struct
+EC <    RHI_numLocks	byte	>	; num of locks on entire heap
+EC <	RHI_heapLocks	byte	>	; heap-wide lock count
+; Block Table is simply an array of HeapBlockEntries,
+; and there are always MAX_HEAP_BLOCKS of them.
+
+    RHI_blockTable	HeapBlockEntryAsm MAX_HEAP_BLOCKS dup (?)
+
+; Cache the last block used for allocation; for speed, chances
+;       are good we can allocate from the last block we used...
+    RHI_lastBlock	byte
+RunHeapInfoAsm	ends
+
+RunHeapType	etype	word
+	RHT_STRING	enum RunHeapType
+	RHT_STRUCT	enum RunHeapType
+	RHT_COMPLEX	enum RunHeapType
+
+
+NULL_TOKEN equ 0
+
+EndLibrary	basrun

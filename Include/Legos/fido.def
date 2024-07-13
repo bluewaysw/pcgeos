@@ -1,0 +1,161 @@
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+	Copyright (c) Geoworks 1994 -- All Rights Reserved
+
+PROJECT:	Legos
+MODULE:		Fido
+FILE:		fido.def
+
+AUTHOR:		Paul DuBois, Jul 26, 1994
+
+MACROS:
+	Name			Description
+	----			-----------
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	dubois	7/26/94		Initial revision
+
+
+DESCRIPTION:
+		
+	$Id: fido.def,v 1.1 1999/02/18 22:45:46 (c)turon Exp martin $
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+SetDef __FIDO
+StartLibrary	basrun
+
+; Used in the C stub for FidoFindComponent
+; Keep this in line with the version in fido.h!
+;
+LibraryClassPointer	struct
+    LCP_library		hptr.GeodeHeader
+    LCP_class		fptr
+LibraryClassPointer	ends
+
+FidoSearchFlags		record
+	FSF_BUILD_TIME:1	; Tells FIDO to return build-time stuff
+	:15
+FidoSearchFlags		end
+
+STANDARD_RUNTIME_SEARCH	equ	0
+
+;%% eagg.asm
+
+global	FidoRegisterAgg:far
+global	FIDOREGISTERAGG:far
+; Pass:		ds:si	- name of agg
+;		bx	- hptr.FidoTask
+;		cx	- module
+;		dx	- "constructor" function
+; Return:	ax	- zero on error (already registered)
+; Destroyed:	nothing
+
+;%% emain.asm
+
+global 	FidoRegLoadedCompLibs:far
+global 	FIDOREGLOADEDCOMPLIBS:far
+; Pass:         bx      - handle to fido task
+
+global	FidoFindComponent:far
+global	FIDOFINDCOMPONENT:far
+; Pass:		es:di	- null-terminated component name
+;   		ax	- FidoSearchFlags
+;   		bx	- hptr.FidoTask
+;
+; Return:	ax	- library handle, or zero if not found/error
+;		cx:dx	- fptr to ClassStruct, or garbage
+; Destroyed:	nothing
+
+global	FidoGetCompLibs:far
+; Pass:		ax	- FidoSearchFlags
+; Return:	carry	- set if error
+;		ax	- FileError, or destroyed
+;		bx	- handle of block containing list of FileLongNames
+;		cx	- number of matches
+; Destroyed:	nothing
+
+global	FidoPushDir:far
+; Nothing to pass/return/destroy
+
+;%% etable.asm
+
+global	FidoUnlockComponentInfoTable:far
+; Pass:		ax	- handle of library
+;   		bx	- vseg of table
+
+global	FidoLockComponentInfoTable:far
+; Pass:		ds:si	- FileLongName of library
+; Return:	ax	- handle of library
+;   		bx	- vseg of table
+;   		ds:si	- table of nptrs to EntClassPtrStruct
+
+;%% mclient.asm
+
+global	FIDONEWCLIENT:far
+global	FIDOCLIENTEXIT:far
+
+global	FidoAllocTask:far
+global	FIDOALLOCTASK:far
+
+global	FidoDestroyTask:far
+global	FIDODESTROYTASK:far
+
+;%% mmodule.asm
+NULL_MODULE	= 0xffff
+global	FidoOpenModule:far
+global	FIDOOPENMODULE:far
+; Description:	Open up a module and return the title page
+; Pass:		es:di	- URL
+;   		ax	- Module token (or FIDO_NULL_MODULE)
+;   		bx	- hptr.FidoTask
+; Return:	carry	- set on error
+;   		ax	- module token (or destroyed)
+
+global	FidoCloseModule:far
+global	FIDOCLOSEMODULE:far
+; Description:	Remove a reference to a module
+; Pass:		ax	- Module token
+;		bx	- hptr.FidoTask
+; Return:	nothing
+; Destroyed:	nothing
+
+global	FidoGetComplexData:far
+global	FIDOGETCOMPLEXDATA:far
+; Description:	Return a page from a module
+; Pass:		ax	- Module token
+;   		bx	- hptr.FidoTask
+;   		dx	- data element
+; Return:	carry	- set on error
+;   		^vbx:ax	- VM Tree
+; Destroyed:	nothing
+
+global	FidoGetPage:far
+global	FIDOGETPAGE:far
+; Description:	Return a page from a module
+; Pass:		ax	- Module token
+;   		bx	- hptr.FidoTask
+;   		dx	- page number
+; Return:	carry	- set on error
+;   		bx	- MemHandle, garbage on error
+; Destroyed:	nothing
+
+global	FidoGetHeader:far
+global	FIDOGETHEADER:far
+; Description:	Return a listing of exported symbols
+; Pass:		ax	- Module token
+;   		bx	- hptr.FidoTask
+; Return:	carry	- set on error
+;   		bx	- MemHandle, garbage on error
+; Destroyed:	nothing
+
+global	FIDOCLEANTASK:far
+; Description:	Clean out progtask-specific information
+;
+; Pass:		stack	- hptr.FidoTask
+; Return:	
+; Destroyed:	ax-dx, es possibly trashed
+
+EndLibrary	basrun
+

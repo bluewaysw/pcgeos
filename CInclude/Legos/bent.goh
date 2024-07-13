@@ -1,0 +1,760 @@
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+	Copyright (c) Geoworks 1994 -- All Rights Reserved
+
+PROJECT:        
+MODULE:         
+FILE:           bent.goh
+
+AUTHOR:         Martin Turon, Sep  8, 1994
+
+ROUTINES:
+	Name                    Description
+	----                    -----------
+
+REVISION HISTORY:
+	Name    Date            Description
+	----    ----            -----------
+	martin  9/8/94          Initial version.
+
+DESCRIPTION:
+	header for the Build time componENT library.
+
+	$Id: bent.goh,v 1.1 98/03/11 15:12:06 martin Exp $
+	$Revision: 1.1 $
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+
+@ifndef _BENT_GOH_
+@define _BENT_GOH_
+
+@deflib bent
+
+
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		Includes
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+#include <lmem.h>
+@include <Legos/basco.goh>
+@include <Legos/ent.goh>
+#include <Legos/opcode.h>
+
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		Structures
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+
+
+typedef struct {
+   ClipboardItemFormatID        BCPT_format;
+   TCHAR _near                  *BCPT_property;
+} BentComplexPropertyTable;
+
+#define getBCPT_property(table) (TCHAR *)ConstructOptr(SegmentOf(table), \
+						      table->BCPT_property)
+#define BENT_END_OF_COMPLEX_PROPERTY_TABLE  (BentComplexPropertyTable *)-1
+
+
+/*
+ * BentClassPtrStruct is the structure exported by each specific component 
+ * library to specify what components the library contains, and how they
+ * are to be created.
+ */
+typedef struct {
+   ClassStruct  *ECPS_classPtr;    /* build-time class to use              */
+   TCHAR _near   *ECPS_className;   /* name of component class for BASIC    */
+   ClassStruct  *BCPS_superClass;  /* run-time class to use                */
+   TCHAR _near   *BCPS_specPropBox; /* name of specific property box module */
+   BentComplexPropertyTable             *BCPS_complexTable;
+} BentClassPtrStruct;
+
+#define BENT_END_OF_CLASS_TABLE  (BentClassPtrStruct _near *)-1
+
+/* BentLibraryInfoStruct is a structure that every build-time component
+ * library must define to specify defaults for all its contained component
+ * classes. 
+ */
+typedef struct {
+    TCHAR _near *BLIS_libPropBox;       /* URL of top-level property box */
+} BentLibraryInfoStruct;
+
+/* BDescType is used by the save mechanism to specify what format
+ * output should be written in.  BDescFlags specify different
+ * options within that output format.
+ */
+typedef enum {
+    BDT_BASIC,                  /* standard basic code */
+    BDT_CLIPBOARD,              /* unsupported */
+    BDT_DOT_UI,                 /* unsupported */
+    BDT_GOC                     /* unsupported */
+} BDescType;
+
+typedef WordFlags BDescFlags;
+#define BDF_AGGREGATE                   0x8000
+				/* Generate code as if part of an aggregate 
+				 * component */
+#define BDF_BUILDTIME                   0x4000
+				/* Generate code to be saved out as text and
+				 * read back into the builder.
+				 * This is sort of a misnomer -- perhaps
+				 * BDF_SAVE_FORMAT would be better
+				 */
+#define BDF_COMPLEX                     0x2000
+				/* Include complex data in component 
+				 * descriptions (gets saved to .RSC file)
+				 */
+#define BDF_RUN_FROM_BUILDER            0x1000
+				/* This code is about to be run by the
+				 * builder.  Used by the aggregate generation
+				 * code to insert a call to the aggregate's 
+				 * Make function.  Implies !BDF_BUILDTIME.
+				 */
+#define BDF_NO_GEOMETRY                 0x0800
+				/* The code should not write out properties
+				 * that are geometry / tiling dependant.
+				 * i.e. "left" and "top" should be written
+				 * out even by things under a tiled parent.
+				 */
+
+typedef struct {
+    BDescType   BDI_type;
+    BDescFlags  BDI_flags;
+} BDescInfo;
+
+
+/* This is the format of the block returned by
+ * MSG_BENT_MANAGER_DESCRIBE_COMPONENTS, and passed in Bent description
+ * messages
+ */
+typedef struct
+{
+    LMemBlockHeader     BDH_meta;
+    BDescInfo   BDH_info;
+    ChunkHandle BDH_clipItemArray; /* array of clipboard items */
+    ChunkHandle BDH_descriptions;  /* array of handles to DescriptionBlocks */
+} BDescHeader;
+
+#define BDB_COOKIE 0xde5c
+typedef struct
+{
+    MemHandle   BDB_myHeader;   /* handle of parent block */
+    MemHandle   BDB_me;         /* handle of self */
+    word        BDB_size;       /* Size of buffer following BDescBlock */
+    word        BDB_cookie;
+/*  TCHAR       BDB_description[0];             */
+} BDescBlock;
+
+typedef enum {
+    BBM_NORMAL,         /* Click on an object, and it gets selected       */
+    BBM_PLACEMENT,      /* Click on new parent for BMI_floatingComp       */
+    BBM_CREATION,       /* Click on parent to create new comp under       */
+    BBM_RESIZE          /* Drag border of selected object to desired size */
+} BentBuildMode;
+
+typedef enum {
+	BR_OUT_OF_BOUNDS,
+	BR_CHILD_GROUP,
+	BR_UPPER_LEFT,
+	BR_UPPER_RIGHT,
+	BR_LOWER_LEFT,
+	BR_LOWER_RIGHT,
+	BR_TOP,
+	BR_BOTTOM,
+	BR_LEFT,
+	BR_RIGHT
+} BentRegion;
+
+typedef word    BentFlags;
+#define BF_UI_DIRTY 1
+
+typedef WordFlags BentStatusFlags;
+#define BSF_SELECTED                    0x8000
+/* this is a hack to get BSF_SELECTED to work right */
+#define BSF_INVAL_REGION                0x4000
+#define BSF_REMOVE_FROM_OUTPUT          0x2000
+/* Don't write our description out to file.  Corresponds to the
+ * _noOutput buildtime property.
+ */
+#define BSF_COMP_INIT                   0x1000
+/* this flag is used when we want to spit out COmpInit entries rather
+ * than normal property setting entries in DESCRIBE_PROP
+ */
+#define BSF_DIM_AS_COMPONENT            0x0800
+/* Set when the DIM should be "as component" instead of "as <class>"
+ */
+
+typedef WordFlags BentWindowFlags;
+#define BWF_DEFAULT_MOUSE_BEHAVIOR      0x8000
+
+/*
+ * This structure is used by BentManager to keep track of information global
+ * to a particular component class.  Right now this is simply a count of 
+ * how many objects of a certain class have been created (for naming purposes.)
+ */
+
+typedef struct {
+    int                 CIS_count;
+} ClassInfoStruct;
+
+
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		Constants and  Macros
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+
+#define ObjDerefBentManager(obj)  ObjDeref(obj,0)
+#define ObjDerefBent(obj) ObjDeref(obj, word_offsetof(BentBase, Bent_offset))
+#define ObjDerefEnt(obj)  ObjDeref(obj, word_offsetof(EntBase,  Ent_offset))
+
+#define BENT_SELECTION_COLOR            C_RED
+#define BENT_SELECTED_GROUP_COLOR       C_YELLOW
+
+#define BENT_COMP_NAME_MAX_LENGTH       64
+#define BENT_PROPERTY_MAX_LENGTH        64
+
+#if ERROR_CHECK
+#define pself_check ECCheckBounds(pself); pself
+#else
+#define pself_check pself
+#endif
+
+
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		Class Definitions
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+@class  BentClass, EntVisClass, master, variant;
+
+@prototype void MSG_BENT_ENUM_PROPERTIES_PROTO
+	(TCHAR *property = cx:dx, MemHandle descHeader = bp);
+
+@message void MSG_BENT_DESCRIBE_SELF
+	(MemHandle descHeader, BDescInfo outputInfo);
+/* Appends a description of the component to the given buffer.
+ * buffer.  The syntax of the description output is specified by the 
+ * enumerated type stored in the BDescHeader of buffer.
+ *
+ * Context:             Normally sent by the save mechanism to write out
+ *                      component info. 
+ * Source:              Anyone.
+ * Destination:         Any BentClass object or subclass.
+ * Interception:        The superclass will handle writing out of code for
+ *                      the creation and setting properties of a component.
+ *                      Special case stuff may be handled via interception.
+ *
+ */
+
+@message(MSG_BENT_ENUM_PROPERTIES_PROTO) MSG_BENT_DESCRIBE_PROPERTY;
+/* Appends a description of the given property of the component to the given
+ * null-terminated buffer. This write the whole line (me.prop = value)
+ *
+ * WARNING: May move buffer on the heap, invalidating pointers etc.
+ *
+ * Context:      Normally sent by the save mechanism.
+ * Source:       Anyone
+ * Destination:  Any BentClass object or subclass
+ * Interception: Shouldn't be necessary. but may be desired for really
+ *               strange properties... 
+ */
+
+@message Boolean MSG_BENT_GET_PROPERTY(TCHAR *property, TCHAR *text);
+/* Fills the given buffer with the string value for the given property
+ * of the given component.  Returns TRUE on error.
+ *
+ * *text must point to within a hptr.BDescHeader block; if it
+ * doesn't, havoc will occur when getting complex data.
+ *
+ * See BentGetDescriptionFlags for getting the current flags.
+ *
+ * WARNING: can move/resize/shuffle text's LMem block
+ *
+ * Context:             Normally sent by the save mechanism.
+ * Source:              Anyone.
+ * Destination:         Any BentClass object or subclass.
+ * Interception:
+ */
+
+
+@message void MSG_BENT_SELECT();
+/* Informs the component recieving this message that it is the currently 
+ * selected component.
+ */
+
+@message void MSG_BENT_DESELECT();
+
+@message void MSG_BENT_MOVE_CHILD(optr child, int childNum);
+/* This routine changes the child # of the given component.
+ *
+ * Context:     
+ * Source:      
+ * Destination: 
+ * Interception:
+ */
+
+@message void MSG_BENT_ENUM_PROPERTIES(EventHandle event);
+/* Enumerates through all modified properties of the given component, and
+ * sends the given classed event for each.  A fptr to the name of the
+ * current property is stuffed into the first argument of the classed event
+ * before it is sent. 
+ *
+ * Context:     
+ * Source:       anything
+ * Destination:  any EntClass object
+ * Interception: generally not intercepted
+ */
+
+@message void MSG_BENT_DRAW_SELECTED();
+@message void MSG_BENT_DRAW_UNSELECTED();
+
+typedef struct 
+{
+    TCHAR       BEADS_argName[20];
+    LegosType   BEADS_argType;
+
+} BentEventArgDescriptionStruct;
+
+
+typedef struct 
+{
+    TCHAR       BEDS_eventName[20];     /* Name of event                */
+    int         BEDS_numArgs;           /* Number of args to event      */
+    LegosType   BEDS_returnType;        /* Return type, if any          */
+    int         BEDS_enabled;           /* Set to 1 to actually use the
+					 * event.  Subclass can set to 0
+					 * to mask out event            */
+    
+} BentEventDescriptionStruct;
+
+typedef struct 
+{
+    BentEventDescriptionStruct  BETDS_desc;
+    BentEventArgDescriptionStruct       BETDS_args[6];
+} BentEventTypicalDescriptionStruct;
+
+typedef struct
+{
+    optr        BGES_eventName;
+    optr        BGES_string;
+} BentGetEventsStruct;
+
+    
+/*
+ * Used for determining what events are provided by this component.
+ *
+ * Context:     sent when trying to make an event list
+ * Source:      anything
+ * Destination: any BentClass object
+ * Interception: Any class that provides events will want to intercept this.
+ *              It must be passed to the superclass.  If you need to mask out
+ *              events that the superclass handles, then clear the BEDS_enabled
+ *              field.  You can pass as many args as you like, the
+ *              BentEventTypicalDescriptionStruct exist to make it easy to
+ *              access the args after the header struct.
+ * Return:      You need to return a pointer to the end of your new entries.
+ * Notes:       Don't include 'self' as an arg, that will be done
+ *              automatically as you can't avoid passing it.
+ */
+
+
+@message BentEventTypicalDescriptionStruct *MSG_BENT_GET_EVENTS
+(BentEventTypicalDescriptionStruct *eventBlockPtr);
+
+
+/*
+ * Returns the BentClassPtrStruct for the given component.
+ *
+ * Context:     
+ * Source:      
+ * Destination: 
+ * Interception:
+ */
+@message BentClassPtrStruct *MSG_BENT_GET_CLASS_INFORMATION();
+
+/*
+ * Returns the BentLibraryInforStruct for the given component.
+ *
+ * Context:     
+ * Source:      
+ * Destination: 
+ * Interception:
+ */
+@message BentLibraryInfoStruct *MSG_BENT_GET_LIBRARY_INFORMATION();
+
+
+/*
+ * Requests the identity of the child associated with the passed mouse
+ * coordinates.  Returns 0 if receiver has no children.
+ *
+ * Context:     Sent by parent object, initiated by BentWindow after a 
+ *              user mouse click.
+ * Source:      Ent parent
+ * Destination: Any Bent object
+ * Interception:Usually not intercepted, unless object wants to prevent
+ *              its children from being clicked on, as in the case of an
+ *              aggregate component.
+ */
+@message optr MSG_BENT_FIND_CHILD_UNDER_POINT(int x, int y);
+@message optr MSG_BENT_FIND_CHILD_UNDER_POINT_NO_INTERCEPT(int x, int y);
+
+@message BentStatusFlags MSG_BENT_GET_STATUS_FLAGS() = ax;
+@message void MSG_BENT_SET_STATUS_FLAGS(BentStatusFlags flagsToSet, 
+					 BentStatusFlags flagsToClear);
+
+
+@message (MSG_META_PTR) MSG_BENT_MOUSE_PTR;
+@message (MSG_META_PRE_PASSIVE_BUTTON) MSG_BENT_PRE_PASSIVE_BUTTON;
+
+/*
+ * Invalidate ourselves.  Needed because we draw the selection border
+ * ever so slightly outside our visual bounds.
+ */
+@message void MSG_BENT_INVALIDATE();
+
+/*
+ * Marks the property as changed so it will be written out later.
+ */
+@message (MSG_ENT_SET_PROPERTY) MSG_BENT_MARK_CHANGED_PROPERTY;
+
+
+/*
+ * Allows the buildtime component some flexibilty in deciding if it
+ * is really being selected or being dropped on.
+ * This is sent out as part of the Bent_VisIsPointInBounds mechanism.
+ * return TRUE (non-0)  to accept point.
+ */
+@message Boolean MSG_BENT_ACCEPT_POINT_IN_BOUNDS(int x, int y);
+
+
+/*
+ * Allows subclasses to say that certain properties should always
+ * be written out properties regardless of default values.
+ * Default handler returns FALSE. (no need to call superclass).
+ */
+@message int MSG_BENT_SHOULD_WRITE_OUT_PROPERTY(TCHAR *prop);
+
+/*
+ * Used to make an object not visible without modifying the EF_VISIBLE flag.
+ * Use MSG_BENT_RETURN_TO_SCREEN to make it come back.
+ * If the object was previously not visible, nothing happen, otherwise it
+ * gets a MSG_GEN_SET_NOT_USABLE.
+ * Subclassing probably not needed.
+ */
+@message void MSG_BENT_REMOVE_FROM_SCREEN();
+
+/*
+ * Used to make an object that was sent MSG_BENT_REMOVE_FROM_SCREEN visible
+ * again, if it was visible before the REMOVE message was sent.
+ * If the EF_VISIBLE is not set, then nothing happens.
+ */
+@message void MSG_BENT_RETURN_TO_SCREEN();
+
+/*
+ * Find out what object we can grab the vis bounds and window from for
+ * drawing the selection.
+ */
+@message optr MSG_BENT_GET_VIS_ROOT();
+
+
+@instance BentStatusFlags  BI_flags     = 0;
+@instance ChunkHandle      BI_propArray = NullHandle;   
+	  /*
+	   * BI_propInfo is the chunk of a name array of ComponentData.
+	   * It is used to remember the default values of properties that
+	   * have been modified at build-time.  If a property is in this
+	   * name array, it has been dirtied during editing and needs to
+	   * be written out during the next run or save.  
+	   */
+@instance    Rectangle     BI_bounds;
+
+/*
+ * BGadget needs to store sizing info because it may change it
+ * when writing out code for liberty.
+ * This is a convinient place to store it.
+ * It gets set in SetLibertySizingInfo and deleted in RestoreSizing
+ */
+@vardata     word    ATTR_BENT_OLD_HSIZING_INFO;
+@vardata     word    ATTR_BENT_OLD_VSIZING_INFO;
+
+
+@endc;
+
+
+@class  BentWindowClass, BentClass;
+
+@message void MSG_BENT_WINDOW_SET_SIZE(int width, int height);
+
+@instance    BentWindowFlags  BWI_flags = 0;
+@instance    optr             BWI_childParent;/* OLGadgetArea or self that */
+					      /* contains bent children of */
+					      /* this window               */
+
+@endc
+
+@class BentViewClass, BentClass;
+@instance    BentWindowFlags BVI_flags = 0;
+@endc
+
+
+
+@class  BentManagerClass, CompileInterpClass;
+
+   /* Returns buffer filled with a description of all current components
+    * (MemHandle.BDescHeader)
+    *
+    * Context:  
+    * Source:   
+    * Destination:      
+    * Interception:
+    */
+    @message MemHandle MSG_BENT_MANAGER_DESCRIBE_COMPONENTS
+					 (BDescInfo     outputInfo);
+
+   /*
+    * Creates a component of the given class.  The name of the new component
+    * is its class name with a count appended.
+    * If unable to create the component (perhaps it was rejected by the 
+    * parent), the return value will be 0.
+    *
+    * Context:  
+    * Source:   
+    * Destination:      
+    * Interception:
+    */
+    @message optr MSG_BENT_MANAGER_CREATE_COMPONENT(optr parent, int x, int y);
+
+   /*
+    * Handles mouse events forwarded from BentWindowClass components.
+    *
+    * Context:  
+    * Source:   
+    * Destination:      
+    * Interception:
+    */
+    @message void MSG_BENT_MANAGER_MOUSE_EVENT(MemHandle sourceWin,
+					       optr component,
+					       sword xPosition,
+					       sword yPosition,
+					       word inputState,
+					       word sourceMsg,
+					       MouseReturnParams *retVal);
+
+   /*
+    * Returns the proper mouse pointer for the given component and mode. 
+    *
+    * Context:  
+    * Source:   
+    * Destination:      
+    * Interception:
+    */
+    @message optr MSG_BENT_MANAGER_MOUSE_PTR(optr component,
+					     sword xPosition,
+					     sword yPosition,
+					     optr window);
+
+   /*
+    * Returns the current mode of the builder, be it PLACEMENT, 
+    * SELECTION, etc.
+    *
+    * Context:  
+    * Source:   
+    * Destination:      
+    * Interception:
+    */
+    @message BentBuildMode MSG_BENT_MANAGER_GET_BUILD_MODE();
+
+   /*
+    * Sets the current mode of the BENT_MANAGER.  The object that is passed
+    * in depends on the mode:
+    *   BBM_NORMAL:     pass NullHandle
+    *   BBM_PLACEMENT:  pass optr of object to be placed
+    *   BBM_CREATION:   pass optr of controller in charge of creating object.
+    *
+    * Context:  
+    * Source:   
+    * Destination:      
+    * Interception:
+    */
+    @message void MSG_BENT_MANAGER_SET_BUILD_MODE(BentBuildMode mode,
+						  optr object);
+
+   /*
+    * Performs all the necessary actions to have all bent controllers
+    * reflect the current state of affairs in the builder.  Currently, this
+    * means sending notification messages to all the properties controllers
+    * to have them show the properties of the current (given) component.
+    * If the currently selected component is NullOptr, then don't send any
+    * updates.
+    *
+    * Note the force argument -- if the component hasn't changed since this
+    * message was last called, the GCN system may not send the update.  Set
+    * force = TRUE to force the update to happen.
+    *
+    * Context:  
+    * Source:           Sent by BentManagerClass object on target and
+    *                   selection changes 
+    * Destination:      
+    * Interception:
+    */
+    @message void MSG_BENT_MANAGER_UPDATE_CONTROL_UI(Boolean force);
+
+   /*
+    * Deselects current component and selects new one, this will send
+    * MSG_BENT_DRAW_SELECTED, and BENT_MANAGER_UPDATE_CONTROL_UI.
+    * Passing Null will not deselect the old component.
+    *
+    * Context:  Sent from someone who wants to change the selection
+    * Interception:
+    */
+    @message void MSG_BENT_MANAGER_SELECT_COMPONENT(optr component);
+
+    /* UNUSED -- use SELECT_COMPONENT(NullOptr) instead */
+    @message void MSG_BENT_MANAGER_DESELECT_ALL();
+
+    /*
+     * Returns the currently selected component
+     */
+    @message optr MSG_BENT_MANAGER_GET_SELECTED_COMPONENT();
+
+    @message BentFlags  MSG_BENT_MANAGER_GET_FLAGS() = ax;
+    @message void       MSG_BENT_MANAGER_SET_FLAGS(BentFlags flagsToSet, 
+						   BentFlags flagsToClear);
+
+    @message void   MSG_BENT_MANAGER_INCREMENT_COMP_COUNT(optr comp);
+    @message void   MSG_BENT_MANAGER_RESET_CREATION_CONTROLLER();
+
+    @message void   MSG_BENT_MANAGER_DESTROY_COMP_THROUGH_TOOL(optr comp);
+    @message void   MSG_BENT_MANAGER_SET_CURRENT_TOOL(RunHeapToken className);
+
+    @message void   MSG_BENT_MANAGER_ADD_COMP_TO_COMP_LIST(optr comp);
+    @message void   MSG_BENT_MANAGER_UPDATE_CONTROLLER_COUNT(
+							  TCHAR *className,
+							     int   count);
+
+    @message int   MSG_BENT_MANAGER_IS_UNIQUE_NAME(RunHeapToken name);
+
+    /* Propertly destroy the buffer returned by
+     * MSG_BENT_MANAGER_DESCRIBE_COMPONENTS
+     */
+    @message void       MSG_BENT_MANAGER_DESTROY_BUFFER(MemHandle descHeader);
+
+    @message ClassInfoStruct *MSG_BENT_MANAGER_GET_CLASS_INFO(TCHAR *class);
+
+
+    @instance BentBuildMode     BMI_mode = BBM_NORMAL;
+    @instance BentFlags         BMI_flags;        /* various flags */
+    @instance optr              BMI_editor;       /* Obj in charge of code */
+    @instance optr              BMI_selectedComp; /*first component in     */
+						  /*selection chain        */
+    @instance optr              BMI_creationCtrl; /*controller that will   */
+						  /*create next component  */
+    @instance BentRegion        BMI_activeRegion; /* region being moved or */
+						  /* resized interactively.*/
+    @instance GStateHandle      BMI_activeGState; /* gstate to draw to     */
+						  /* during interactive    */
+						  /* move or resize.       */
+/* The activeBounds are relative the nearest winGroup margins */
+
+    @instance Rectangle         BMI_activeBounds; /* Latest bounds for obj */
+						  /* during interactive    */
+						  /* move or resize        */
+    @instance Point             BMI_activeOffset; /* Mouse offset during   */
+						  /*interactive move/resize*/
+    @instance ChunkHandle       BMI_classArray;   /* array of information  */
+						  /* on classes in use     */
+@endc
+
+
+
+
+
+@class GenEmbeddedCodeClass, GenInteractionClass;
+
+/* Sent to destination when module is loaded */
+@prototype void MSG_GEC_MODULE_LOADED_PROTO(optr o);
+
+	/* Returns the RTask associated with our module 
+	 */
+	@message RTaskHan MSG_GEC_GET_TASK();
+	/*
+	 * Force the loading in of our module, even if we're not being 
+	 * built out yet (which is the usual time to do so);
+	 * Returns the RTask associated with the module just loaded.
+	 */
+	@message RTaskHan MSG_GEC_LOAD_MODULE(Boolean forceLoad);
+
+	@instance optr          GECI_interpreter;
+	@instance optr          GECI_moduleName;
+	@instance RTaskHan      GECI_moduleTask;
+	@instance int           GECI_loaded = 0;
+
+	/* If destination is non-null, the message will be sent
+	 * to the object when module is loaded.  1 arg: oself
+	 */
+	@instance optr          GECI_destination = 0;
+	@instance Message       GECI_actionMsg;
+@endc
+
+@class GenCTriggerClass, GenTriggerClass;
+
+	@vardataAlias (ATTR_GEN_TRIGGER_ACTION_DATA) 
+		      optr ATTR_GEN_TRIGGER_ACTION_DATA_OPTR;
+@endc
+
+/* this BentNodeClass is useful for defining behaviour for all non-form
+ * Bent objects
+ */
+@class BentNodeClass, BentClass;
+@endc
+
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		Exported Routines
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+
+extern Boolean  BentEnsureBufferSpace(MemHandle buf, word size);
+extern TCHAR*   BentLockDescription(MemHandle buf, MemHandle* descHan);
+extern void     BentUnlockDescription(MemHandle descHan);
+
+extern optr BentFindChildUnderPoint (optr parent, int x, int y);
+extern BentClassPtrStruct *BentFindClassPtrStruct       \
+			     (optr oself, BentClassPtrStruct _near *table[]);
+
+extern BentEventTypicalDescriptionStruct *BentCopyEvents(int numEvents, 
+		    BentEventDescriptionStruct **source,
+		    BentEventTypicalDescriptionStruct *dest);
+
+extern void BentGetComponentPropertyUnquoted(optr oself, TCHAR *buffer, 
+					     TCHAR *property);
+extern void BentGetComponentName(optr oself, TCHAR *buffer);
+extern void BentExtractPropertyArrayElement(TCHAR *property, optr propArray,
+					    optr newArray);
+extern Boolean _far _pascal 
+BentProcessPropertyArrayElement(void *element, void *event);
+
+extern BDescFlags BentGetDescriptionFlags(MemHandle buffer);
+
+
+#ifdef __HIGHC__
+pragma Alias(BentProcessPropertyArrayElement, 
+	     "BENTPROCESSPROPERTYARRAYELEMENT");
+#endif
+
+void *
+ECCheckPSelf(void *pself, optr oself , void *class);
+
+#if ERROR_CHECK
+#ifndef DO_DBCS
+
+/* CURROOT will be spit out by goc, but not by DBCS goc */
+#define ECP_join(x,y) x##y
+#define ECP_join2(A,B) ECP_join(A,B)
+#define ECPSelf(pself) (( ECP_join2(__CURROOT, Instance) *) ECCheckPSelf(pself, oself, &ECP_join2(__CURROOT, Class)))
+#else
+#define ECPSelf(pself) pself
+#endif
+#else
+#define ECPSelf(pself) pself
+#endif
+
+
+@endlib
+
+@endif /* _BENT_GOH_ */
+
+
