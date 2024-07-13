@@ -4,7 +4,7 @@ COMMENT @----------------------------------------------------------------------
 
 
 PROJECT:	PC GEOS
-MODULE:		Font Driver
+MODULE:		TrueType Font Driver
 FILE:		truetype.asm
 
 AUTHOR:		Gene Anderson
@@ -146,14 +146,14 @@ PASS:
 	di - one of the following function codes:
 	Function #		routine called		Function
 	----------		--------------		--------
-	DR_INIT			NimbusInit		initialize
-	DR_EXIT			NimbusExit		exit
-	DR_FONT_GEN_CHAR	NimbusGenChar		generate one char
-	DR_FONT_GEN_WIDTHS	NimbusGenWidths		generate char widths
-	DR_FONT_CHAR_METRICS	NimbusCharMetrics	return character metrics
-	DR_FONT_INIT_FONTS	NimbusInitFonts		init non-GEOS fonts
-	DR_FONT_GEN_PATH	NimbusGenPath		generate outline path
-	DR_FONT_GEN_IN_REGION	NimbusGenInRegion 	gen in passed region
+	DR_INIT			TrueTypeInit		initialize
+	DR_EXIT			TrueTypeExit		exit
+	DR_FONT_GEN_CHAR	TrueTypeGenChar		generate one char
+	DR_FONT_GEN_WIDTHS	TrueTypeGenWidths	generate char widths
+	DR_FONT_CHAR_METRICS	TrueTypeCharMetrics	return character metrics
+	DR_FONT_INIT_FONTS	TrueTypeInitFonts	init non-GEOS fonts
+	DR_FONT_GEN_PATH	TrueTypeGenPath		generate outline path
+	DR_FONT_GEN_IN_REGION	TrueTypeGenInRegion 	gen in passed region
 
 RETURN:
 	depends on function called
