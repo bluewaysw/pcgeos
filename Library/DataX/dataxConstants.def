@@ -1,0 +1,212 @@
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+	Copyright (c) Geoworks 1996.  All rights reserved.
+
+PROJECT:	PC GEOS
+MODULE:		Data Exchange Library
+FILE:		dataXConstants.def
+
+AUTHOR:		Robert Greenwalt, Nov  5, 1996
+
+MACROS:
+	Name			Description
+	----			-----------
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	robertg	11/ 5/96   	Initial revision
+
+DESCRIPTION:
+
+	Internal constants for DataX
+		
+	$Id: dataxConstants.def,v 1.1 97/04/04 17:54:09 newdeal Exp $
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+
+DataXHelperClass	class	ProcessClass
+
+MSG_DXH_KILL_PIPE	message
+;
+;
+; Context:	kill the pipe from within
+; Source:	DXInternalPipeKill
+; Destination:  
+; Interception: nope
+;
+; Pass:		dx = pipe descriptor handle
+;			
+; Return:	nothing
+;
+;
+
+MSG_DXH_KILL_SELF	message
+;
+;
+; Context:	Die!
+; Source:	DXEntry
+;
+
+DataXHelperClass	endc
+
+
+;----------------------------------------------------------------------------
+;	Data Structures
+;----------------------------------------------------------------------------
+
+DXGeodeTableHeader	struct
+	DXGTH_blockSize		word
+	DXGTH_entryCount	byte	; limits us to 255 
+	DXGTH_unused		byte	; padding
+	DXGTH_firstElement	label byte
+DXGeodeTableHeader	ends
+
+
+DXGeodeTableEntry	struct
+	DXGTE_token		GeodeToken
+	DXGTE_refCount		byte
+		; The ref count is set to 0 if the geode is
+		; reentrant, 1 if not.  If the ref count is 0 we don't
+		; allow use.  Each time it is used it is
+		; decremented.  If we're done and the ref is 0, we
+		; dump it from the table.  We inc it.  If it is zero,
+		; we again dump it from the table
+	DXGTE_unused		byte
+		; I don't know what goes here, but I don't want to be
+		; unaligned..  for future use.
+DXGeodeTableEntry	ends
+
+
+	;
+	; These two structures overlay the DataXPipeDescriptor and
+	; ElementDescriptor structures.  They are
+	; guaranteed to fit in the block
+DXInternalPipeDescriptor	struct
+DXIPD_infoBlock			hptr	; the DataXInfo block
+DXIPD_elementCount		word
+DXIPD_firstElement		label byte
+DXInternalPipeDescriptor	ends
+
+CheckHack < (size DXInternalPipeDescriptor) eq (size DataXPipeDescriptor)>
+
+DXInternalElementDescriptor	struct
+DXIED_geodeToken		GeodeToken
+DXIED_IACPConnection		IACPConnection
+DXIED_intLeft			hptr
+DXIED_intRight			hptr
+DXInternalElementDescriptor	ends
+
+CheckHack < (size DXInternalElementDescriptor) eq (size DataXElementDescriptor) >
+
+DXInternalDataXInfo	struct
+DXIDXI_dataXInfo	DataXInfo
+DXIDXI_oldInfoWord	DXInfoWord
+DXIDXI_deathCount	word
+DXIDXI_deathInfo	hptr
+DXIDXI_deathSema	hptr
+DXIDXI_infoWordSema	hptr		; Used by datax library to synchronize
+DXInternalDataXInfo	ends
+
+CheckHack < DXIDXI_dataXInfo eq 0 >	; People are going to assume
+					; DataXInfo starts at zero offset.
+
+;-----------------------------------------------------------------------------
+;	Constants
+;-----------------------------------------------------------------------------
+
+DX_MAJOR_PROTO	equ	1
+DX_MINOR_PROTO	equ	1
+DX_START_TIME	equ	6000
+
+
+;-----------------------------------------------------------------------------
+;		Internal Macros
+;-----------------------------------------------------------------------------
+
+EvenCopy	macro
+EC<	push	si, di						>
+EC<	Assert_fptr	dssi					>
+EC<	Assert_fptr	esdi					>
+EC<	add	di, cx						>
+EC<	dec	di						>
+EC<	add	si, cx						>
+EC<	dec	si						>
+EC<	Assert_fptr	dssi					>
+EC<	Assert_fptr	esdi					>
+EC<	pop	si, di						>
+			rep	movsw
+		endm
+
+ArbitraryCopy	macro
+EC<	push	si, di						>
+EC<	Assert_fptr	dssi					>
+EC<	Assert_fptr	esdi					>
+EC<	add	di, cx						>
+EC<	dec	di						>
+EC<	add	si, cx						>
+EC<	dec	si						>
+EC<	Assert_fptr	dssi					>
+EC<	Assert_fptr	esdi					>
+EC<	pop	si, di						>
+			shr	cx
+			jnc	itsEven	; if this pops up twice in a
+					; routine tough!
+			movsb
+itsEven:
+			rep	movsw
+		endm
+
+SemaphoreTwiddle	macro
+EC<		mov	ax, ss					>
+EC<		pushdw	axbp					>
+EC<		call	ECDXCHECKPEH				>
+		mov	al, ss:[bp].PEH_pipeToggle
+		xor	ss:[bp].PEH_pipeDirection, al
+		mov	al, ss:[bp].PEH_pipeDirection
+		cbw
+CheckHack < (mask DXD_LEFT) eq 1 >
+CheckHack < (mask DXD_RIGHT) eq 2 >
+		shr	al		; either 1 or 0
+		shl	al		;        2
+		shl	al		;        4
+		add	ax, offset PEH_intSemaphoreLeft
+		push	bp
+		add	bp, ax
+		mov	bx, ss:[bp].2
+		call	ThreadVSem
+		mov	bx, ss:[bp]
+		call	ThreadPSem
+		pop	bp
+endm
+
+
+CheckArguments		macro
+EC<		push	ds, bp				>
+EC<		segmov	ds, ss					>
+EC<		sub	bp, size DataXBehaviorArguments		>
+EC<		pushdw	dsbp					>
+EC<		call	ECDXCHECKDATAXBEHAVIORARGUMENTS		>
+EC<		pop	ds, bp				>
+endm
+
+;----------------------------------------------------------------------------
+;		Warnings
+;----------------------------------------------------------------------------
+CUSTOM_BEHAVIOR_RETURNED_UNEXPECTED_ERROR_TYPE		enum Warnings
+
+;------------------------------------------------------------------------------
+;		Fatal Errors
+;------------------------------------------------------------------------------
+BAD_ROUTINE_TABLE_ENTRY					enum	FatalErrors
+INVALID_INFO_WORD					enum	FatalErrors
+ROUTINE_TRASHED_SYSTEM_INFO_WORD			enum	FatalErrors
+
+
+
+
+
+
+
+
+

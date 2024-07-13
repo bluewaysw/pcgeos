@@ -1,0 +1,346 @@
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+	(c) Copyright Geoworks 1995 -- All Rights Reserved
+	GEOWORKS CONFIDENTIAL
+
+PROJECT:	PC GEOS (Network Extensions)
+MODULE:		TELNET Library
+FILE:		telnetConstant.def
+
+AUTHOR:		Simon Auyeung, Jul  9, 1995
+
+MACROS:
+	Name			Description
+	----			-----------
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	simon	7/ 9/95   	Initial revision
+
+
+DESCRIPTION:
+	
+		
+	$Id: telnetConstant.def,v 1.1 97/04/07 11:16:19 newdeal Exp $
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+
+;-----------------------------------------------------------------------------
+;			Constants
+;-----------------------------------------------------------------------------
+
+EC <NULL_TELNET_CONNECTION_ID 	equ	-1	; invalid TelnetConnectionID>
+
+;
+; For Terminal-type option
+;
+SEND				equ	1	; request to send
+IS				equ	0	; reply for request
+TELNET_RECV_TEMP_BUF_SIZE	equ	50h
+
+;
+; Packet constants
+;
+TELNET_SUBOPTION_PACKET_HEAD_SIZE \
+				equ	3
+TELNET_SUBOPTION_PACKET_TAIL_SIZE \
+				equ	2
+TELNET_COMMAND_PACKET_SIZE	equ	2
+
+;-----------------------------------------------------------------------------
+;			Records
+;-----------------------------------------------------------------------------
+
+TelnetStatus	record
+	TS_CONNECTION_OPEN:1
+	TS_CONNECTING:1
+	TS_SYNCH_MODE:1
+	; Received Telnet Synch signal
+
+	TS_PARSED_IAC:1
+	; got 1st IAC byte, have to wait for next byte before any
+	; interpretation 
+	
+	TS_OPERATION_MODE	TelnetOperationMode:2
+TelnetStatus	end
+
+;
+; Which options are enabled
+;
+TelnetOptionStatus	record
+	:10
+	TOS_TRANSMIT_BINARY:1
+	TOS_ECHO:1
+	TOS_SUPPRESS_GO_AHEAD:1
+	TOS_STATUS:1
+	TOS_TIMING_MARK:1
+	TOS_TERMINAL_TYPE:1
+TelnetOptionStatus	end
+
+;-----------------------------------------------------------------------------
+;			Types
+;-----------------------------------------------------------------------------
+
+;
+; The current states. Each state handler will be responsible for reading a
+; new byte, process it and set the next state.
+;
+TelnetStateType		etype	word, 0, 2
+TST_GROUND		enum	TelnetStateType	; Fresh, in data mode
+TST_CONTROL_READY	enum	TelnetStateType	; parsed 1st IAC escape char
+TST_OPTION_START	enum	TelnetStateType	; got TelnetOptionRequest
+TST_SUBOPTION_START	enum	TelnetStateType	; Start suboption packet
+TST_SUBOPTION_READ	enum	TelnetStateType	; read suboption data
+TST_SUBOPTION_END_READY enum	TelnetStateType	; got IAC byte while in
+						; suboption mode
+
+;
+; States for negotiating Terminal type option (TelnetOptionID 24)
+;
+TelnetTerminalSuboptionStateType	etype	word, TelnetStateType, 2
+TTSST_NONE		enum	TelnetTerminalSuboptionStateType
+; No suboption negotiation is going on
+
+TTSST_SEND		enum	TelnetTerminalSuboptionStateType
+; Request to send terminal type
+
+TTSST_RECV		enum	TelnetTerminalSuboptionStateType
+; Receiving terminal type data
+
+;
+; Null parameters
+;
+TC_NULL_COMMAND		enum	TelnetCommand, 0	; null command
+TOID_NULL_OPTION_ID	enum	TelnetOptionID, -1	; null TelnetOptionID
+TOR_NULL_REQUEST	enum	TelnetOptionRequest, -1 ; null
+							; TelnetOptionRequest
+	
+;
+; The TelnetCommand that requires sending Synch signal.
+;
+TelnetSynchCommand	etype	byte
+TSC_IP			enum	TelnetSynchCommand,	TC_IP
+TSC_AO			enum	TelnetSynchCommand,	TC_AO
+
+;-----------------------------------------------------------------------------
+;			Structures
+;-----------------------------------------------------------------------------
+
+TelnetBufferStruct	struct
+	TBS_chunk	lptr			; chunk of the data
+	TBS_size	word			; how much data
+TelnetBufferStruct	ends
+
+;
+; The packet of an option request
+;
+TelnetOptionPacket	struct
+	TOP_escape	TelnetCommand	TC_IAC	; IAC byte
+	TOP_request	TelnetOptionRequest	; WILL/WONT/DO/DONT
+	TOP_optionID	TelnetOptionID		; ID of a telnet option
+TelnetOptionPacket	ends
+	
+;
+; Each connection has such a structure
+;
+TelnetInfo			struct
+EC <	TI_debugID		TelnetConnectionID			>
+	; ID for debugging to see if the right info is retrieved
+
+	TI_chunkHandle		lptr.TelnetInfo
+	; lmem chunk handle to this chunk
+
+	TI_socket		Socket
+	; identify the connection and for sending/receiving data
+
+	TI_socketAddress	lptr.SocketAddress
+	; a chunk storing SocketAddress information
+
+	TI_state		TelnetStateType
+	; State of parsing incoming data 
+
+	TI_notification		TelnetNotificationType
+	; Notification that needs to report to library caller
+
+	TI_termTypeState	TelnetTerminalSuboptionStateType
+	; State of parsing terminal type suboption
+
+	TI_enabledRemoteOptions	TelnetOptionStatus
+	; options current enabled in remote host. 
+
+	TI_enabledLocalOptions	TelnetOptionStatus
+	; options current enabled locally. Upon request, any options
+	; not enabled will be rejected.
+
+	TI_needReplyOptions	TelnetOptionStatus
+	; options set on local side that are waiting for reply
+
+	TI_status		TelnetStatus
+	; internal status
+	
+	TI_currentOption	TelnetOptionID
+	; current option parsed from input
+
+	TI_currentCommand	TelnetCommand
+	; current command parsed from input
+
+	TI_error		TelnetError
+	; The error occurred during connection
+
+	TI_suboptionData	TelnetBufferStruct
+	; holding sub-option data
+
+	TI_cacheDataBuf		lptr.byte
+	; chunk holding temporary data that cannot be processed until more
+	; data come in to determine its context.
+
+	TI_cacheDataSize	word
+	; Size of data filled up in TI_cacheDataBuf
+
+	TI_cacheDataPtr		word
+	; Zero-based offset within the cacheDataBuf where useful data
+	; starts.
+
+	TI_termType		label	char
+	; null-terminated terminal type string
+TelnetInfo		ends
+
+if	ERROR_CHECK
+
+;
+; Customized ChunkArrayHeader of chunk array storing telnet connection IDs
+;
+TelnetIDArrayHeader	struct
+	TIDAH_chunkArrHeader	ChunkArrayHeader
+	TIDAH_sem		hptr
+	; semaphore to ensure exclusive use of the array especially when doing
+	; ChunkArrayEnum, ChunkArrayAppend, ChunkArrayDelete by different
+	; threads 
+TelnetIDArrayHeader	ends
+	
+endif	; ERROR_CHECK
+	
+;----------------------------------------------------------------------------
+;				FatalErrors
+;----------------------------------------------------------------------------
+
+TELNET_UNEXPECTED_SOCKET_ERROR       enum    FatalErrors
+TELNET_INVALID_TELNET_INFO           enum    FatalErrors
+TELNET_INVALID_TELNET_OPTION_REQUEST enum    FatalErrors
+TELNET_INVALID_TELNET_COMMAND        enum    FatalErrors
+TELNET_INVALID_TERMINAL_TYPE_STATE   enum    FatalErrors
+TELNET_INVALID_CACHE_DATA_BUF_SIZE   enum    FatalErrors
+TELNET_CANNOT_APPEND_ID_ARRAY        enum    FatalErrors
+; When we want to append a TelnetConnectionID in TelnetCreate to a debugging
+; connection ID list, it fails to add. It implies the system may run out of
+; memory.
+
+TELNET_CONNECTION_DUPLICATED         enum    FatalErrors
+; When TelnetCreate is called, it checks if the internal info is already
+; existing and no info should be found. This error occurs when this is not
+; the case.
+
+TELNET_CONNECTION_NOT_FOUND          enum    FatalErrors
+; When TelnetClose is called, the internal info should be removed. However,
+; the info associated with the connection is not found when this error occurs.
+
+TELNET_PARSE_EMPTY_INPUT_DATA        enum    FatalErrors
+; The input data buffer passed in should not be empty.
+
+TELNET_RECV_DISABLED_SUBOPTION       enum    FatalErrors
+; Receive suboption data of disabled TelnetOptionID which is
+; impossible. This is because if the option has not been negotiated, the
+; suboption data/request should not have been sent.
+
+TELNET_INVALID_SYNCH_SIGNAL_STATE    enum    FatalErrors
+; We receive a synch signal (DM + urgent ptr) but the internal state is not
+; correct.
+
+TELNET_INVALID_CONNECTION_STATUS     enum    FatalErrors
+; The telnet connection status is not as expected.
+
+TELNET_LIB_ENTRY_ERROR               enum    FatalErrors
+; There is an error in the library entry routine.
+ 
+TELNET_CORRUPTED_TELNETOPTIONDESCARRAY                       enum FatalErrors
+; The information contained in TelnetOptionDescArray does not look correct.
+
+TELNET_CREATE_INCORRECT_SOCKET_ADDRESS_DOMAIN_SIZE           enum FatalErrors
+; The SocketAddress passed to TelnetCreate does not have correct domain size.
+; Please make sure the size is byte size regardless of DBCS or SBCS.
+
+TELNET_CREATE_INCORRECT_SOCKET_ADDRESS_DOMAIN                enum FatalErrors
+; The SocketAddress passed to TelnetCreate does not have the correct domain
+; name. It should be "TCPIP".
+
+TELNET_INVALID_SUBOPTION_TELNET_OPTION_ID                    enum FatalErrors
+; The TelnetOptionID for the currently processed suboption is unsupported.
+        
+TELNET_INVALID_ELAPSED_TIME_WAITING_FOR_INITIAL_OPTION_REPLY enum FatalErrors
+; The time elapsed when waiting for initial telnet option negotiation to
+; complete is invalid.
+
+TELNET_INCORRECT_CACHE_BYTE_CALCULATION			     enum FatalErrors
+; There is an error in calculation of cache data bytes and buffer boundary.
+
+;----------------------------------------------------------------------------
+;				Warnings
+;----------------------------------------------------------------------------
+
+TELNET_CANNOT_SEND_OPTION		enum	Warnings
+; An error occurs when trying to send an option.
+
+TELNET_TERM_TYPE_SUBOPTION_EXPECTS_IS_OR_SEND \
+					enum	Warnings
+; The Terminal type suboption byte expected is IS or SEND, but other bytes
+; have been received. 
+
+TELNET_TERM_TYPE_SUBOPTION_EXPECTS_IAC_SE \
+					enum	Warnings
+; The Terminal type suboption byte expected is IAC SE, but something other
+; than IAC is received.
+
+TELNET_SUBOPTION_EXPECTS_SE		enum	Warnings
+; It only expects SE TelnetCommand, but other TelnetCommand has been sent in.
+
+TELNET_RECV_UNSUPPORTED_SUBOPTION_OPTION_ID \
+					enum	Warnings
+; Unsupported suboption option ID has been received.
+
+TELNET_RECV_CONNECTION_FAIL		enum	Warnings
+; Some miscellenous socket error returned in TelnetRecv 
+
+TELNET_CLIENT_SHOULD_NOT_ACCEPT_TERM_TYPE_SUBOPTION \
+					enum	Warnings
+; The telnet client has received terminal type information. This information
+; should only be sent from client to server, but not the other way round.
+
+TELNET_TELNET_CREATE_PARSE_REPEATED_OPTION \
+					enum	Warnings
+; Detected TelnetOptionDesc with option previously processed in TelnetCreate.
+; There should not be repeated option ID in TelnetOptionDescArray.
+
+TELNET_RECV_INVALID_TELNET_COMMAND	enum	Warnings
+; Received unsupported Telnet command from host.
+
+TELNET_SHRINK_TEMP_RECV_BUF		enum	Warnings
+; Shrunk the temp recv buffer of a connection that holds the raw data that
+; have not been returned to applications.
+
+TELNET_CANNOT_SHRINK_TEMP_RECV_BUF	enum	Warnings
+; Cannot shrunk the temp recv buffer when it needs to.
+
+TELNET_INTERRUPT_RECV_UNEXPECTED_SOCKET_ERROR \
+					enum	Warnings
+; SocketInterrupt returns unexpected error.
+
+if	_CLOSE_MEDIUM
+	
+TELNET_CANNOT_GET_ADDRESS_MEDIUM	enum	Warnings
+; SocketGetAddressMedium returns error.
+
+TELNET_CANNOT_CLOSE_DOMAIN_MEDIUM	enum	Warnings
+; SocketCloseDomainMedium returns error.
+	
+endif	; _CLOSE_MEDIUM

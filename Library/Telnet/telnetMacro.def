@@ -1,0 +1,374 @@
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+	(c) Copyright Geoworks 1995 -- All Rights Reserved
+	GEOWORKS CONFIDENTIAL
+
+PROJECT:	PC GEOS (Network Extensions)
+MODULE:		TELNET Library
+FILE:		telnetMacro.def
+
+AUTHOR:		Simon Auyeung, Jul 19, 1995
+
+MACROS:
+	Name			Description
+	----			-----------
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	simon	7/19/95   	Initial revision
+
+
+DESCRIPTION:
+	
+		
+	$Id: telnetMacro.def,v 1.1 97/04/07 11:16:25 newdeal Exp $
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		movm
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	Move between memory
+
+PASS:		dest - memory or register pair for destination
+		source - memory or register pair for source
+		[trashreg] - re'qd if moving memory to memory
+RETURN:		nothing
+DESTROYED:	nothing
+
+PSEUDO CODE/STRATEGY:
+	Use trash reg if possible, otherwise, mov by pushing and popping from
+	stack. 
+
+KNOWN BUGS/SIDE EFFECTS/IDEAS:
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	simon	7/21/95   	Initial version
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+movm		macro	dest, source, trashreg
+
+ifnb	<trashreg>
+		mov	trashreg, source
+		mov	dest, trashreg
+else
+		push	source
+		pop	dest
+endif
+		
+endm
+
+
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		BitTest
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	A similar macro to BitClr and BitSet to test a bit in a
+		location 
+
+PASS:		location -- the byte or word to set the bit in
+		bit -- bit field to set (this is a field in a record)
+RETURN:		nothing
+DESTROYED:	nothing
+
+PSEUDO CODE/STRATEGY:
+
+KNOWN BUGS/SIDE EFFECTS/IDEAS:
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	simon	8/ 6/95   	Initial version
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+BitTest		macro	location, bit
+		test	location, mask bit	
+endm
+
+
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		TelnetIsOptionEnabled
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	Test if the Telnet option is enabled
+
+PASS:		ds:si	= fptr to TelnetInfo
+		optMask	= mask of TelnetOptionStatus to test the bit
+		REMOTE / LOCAL = indicate local or remote option
+RETURN:		ZF clear if option enabled
+DESTROYED:	nothing
+
+PSEUDO CODE/STRATEGY:
+
+KNOWN BUGS/SIDE EFFECTS/IDEAS:
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	simon	8/ 6/95   	Initial version
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+TelnetIsOptionEnabled		macro	optMask, remoteLocal
+ifidn	<remoteLocal>, <REMOTE>
+		test	ds:[si].TI_enabledRemoteOptions, optMask
+elseifidn <remoteLocal>, <LOCAL>
+		test	ds:[si].TI_enabledLocalOptions, optMask
+else
+		ErrMessage <TelnetIsOptionEnabled: must supply REMOTE or LOCAL>
+endif
+		
+endm
+
+
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		TelnetUpdateOption
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	Update the TelnetInfo's current options
+
+PASS:		ds:si	= fptr to TelnetInfo
+		optMask	= mask of TelnetOptionStatus to update
+		REMOTE or LOCAL = to indicate remote or local option
+		carry clear if enable option
+		carry set if disable option
+RETURN:		nothing
+DESTROYED:	optMask
+
+PSEUDO CODE/STRATEGY:
+
+KNOWN BUGS/SIDE EFFECTS/IDEAS:
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	simon	8/ 6/95   	Initial version
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+TelnetUpdateOption	macro	optMask, remoteLocal
+		local	disable, done
+	
+		jc	disable
+ifidn	<remoteLocal>, <REMOTE>
+		ornf	ds:[si].TI_enabledRemoteOptions, optMask
+elseifidn <remoteLocal>, <LOCAL>
+		ornf	ds:[si].TI_enabledLocalOptions, optMask
+else
+		ErrMessage <TelnetIsOptionEnabled: must supply REMOTE or LOCAL>
+endif
+		jmp	done
+disable:
+		not	optMask
+ifidn	<remoteLocal>, <REMOTE>
+		andnf	ds:[si].TI_enabledRemoteOptions, optMask
+elseifidn <remoteLocal>, <LOCAL>
+		andnf	ds:[si].TI_enabledLocalOptions, optMask
+endif
+		
+done:
+	
+endm
+
+
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		TelnetIsCommandAssocSynch
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	Is the command passed associated with a Synch signal? This
+		implies it may be an important TelnetCommand to process.
+
+PASS:		command (byte size)
+RETURN:		ZF set if YES
+		ZF clear if NO
+DESTROYED:	other flags 
+
+PSEUDO CODE/STRATEGY:
+
+KNOWN BUGS/SIDE EFFECTS/IDEAS:
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	simon	8/16/95   	Initial version
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+TelnetIsCommandAssocSynch	macro	command
+		local	done
+		cmp	command, TSC_AO
+		je	done
+		cmp	command, TSC_IP
+done:
+	
+endm
+
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		TelnetCheckIntError
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	Check if there is any internal error
+
+PASS:		ds:si	= fptr to TelnetInfo
+RETURN:		carry set if there is internal error
+			ax = TelnetError
+		carry set if no internal error
+			ax = TE_NORMAL
+DESTROYED:	nothing
+
+PSEUDO CODE/STRATEGY:
+
+KNOWN BUGS/SIDE EFFECTS/IDEAS:
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	simon	8/ 7/95   	Initial version
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+TelnetCheckIntError		macro	expr
+		local	done
+		
+EC <		Assert_fptrXIP	dssi					>
+		CheckHack <TE_NORMAL eq 0>
+		mov	ax, ds:[si].TI_error
+		tst	ax			; assume TE_NORMAL is 0
+						; carry clear
+		jz	done
+		stc				; indicate error
+done:
+
+endm
+
+
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		ByteStrLength
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	Find the length of a NULL-terminated string with each
+		character being 1 byte 
+
+PASS:		esdi - ptr to string
+		includeNull - if non-blank, include NULL in length
+
+RETURN:		esdi - ptr beyond NULL
+		if includeNull:
+		    cx - length of string (w/ NULL)
+		else:
+		    cx - length of string (w/o NULL)
+
+DESTROYED:	ax
+PSEUDO CODE/STRATEGY:
+
+KNOWN BUGS/SIDE EFFECTS/IDEAS:
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	simon	8/ 9/95   	Initial version
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+ByteStrLength		macro	includeNull
+	;
+	; We could have used LocalStrLength, but we don't want DBCS since
+	; Telnet protocol only expects byte-size characters.
+	;
+	clr	al				; al <- byte to scan for
+	mov	cx, -1				; Scan this many bytes/words
+	repne	scasb				; di <- offset past null
+
+	not	cx				; cx <- # of chars w/ null
+ifb <includeNull>
+	dec	cx				; cx <- # of chars w/o null
+endif
+
+endm
+
+
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		ByteCopyString
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	Copy a NULL-terminated string with byte size characters
+
+PASS:		ds:si - ptr to source
+		es:di - ptr to dest
+		<optional> SAVE_REGS to preserve registers
+			(Otherwise, SI and DI will point to the byte/word
+			immediately following the null term in the source
+			and dest strings.)
+RETURN:		nothing
+DESTROYED:	ax (see note above concerning how SI and DI may change)
+
+PSEUDO CODE/STRATEGY:
+
+KNOWN BUGS/SIDE EFFECTS/IDEAS:
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	simon	8/ 9/95   	Initial version
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+ByteCopyString		macro	saveFlag
+	local	charLoop
+ifnb <saveFlag>
+    ifidn <saveFlag>, <SAVE_REGS>
+	push	ax, si, di
+    else
+	ErrMessage <LocalCopyString: unrecognized flag>
+    endif
+endif
+charLoop:
+					; bytes / cycles
+	lodsb				; 1 / 12
+	stosb				; 1 / 11
+	tst	al			; 2 /  3
+	jnz	charLoop		; 2 / 16
+					; 6 / 42 per char
+ifnb <saveFlag>
+    ifidn <saveFlag>, <SAVE_REGS>
+	pop	ax, si, di
+    endif
+endif
+	
+endm
+
+
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		CLOSE_MEDIUM
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	Insert an instruction when _CLOSE_MEDIUM feature is set
+
+PASS:		line	= line of code
+RETURN:		nothing
+DESTROYED:	nothing
+
+PSEUDO CODE/STRATEGY:
+
+KNOWN BUGS/SIDE EFFECTS/IDEAS:
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	simon	10/ 8/95   	Initial version
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+CLOSE_MEDIUM		macro	line
+
+if	_CLOSE_MEDIUM
+		line
+endif	; _CLOSE_MEDIUM
+		
+endm

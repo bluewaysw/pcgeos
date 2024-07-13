@@ -3590,6 +3590,8 @@ RAISE_ACCEPT_PASTE_EVENT_LOCALS
 		push	ax
 ifdef __HIGHC__
 		call	SCBGetFormatString		; dx:ax = *TCHAR
+elifdef __WATCOMC__
+		call	_SCBGetFormatString		; dx:ax = *TCHAR
 else
 		call	_SCBGetFormatString		; dx:ax = *TCHAR
 endif

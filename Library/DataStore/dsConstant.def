@@ -1,0 +1,403 @@
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+	Copyright (c) Geoworks 1994,1995 -- All Rights Reserved
+			GEOWORKS CONFIDENTIAL
+
+PROJECT:	DataStore
+FILE:		dsConstant.def
+
+
+REVISION HISTORY:
+	
+	Name	Date		Description
+	----	----		-----------
+	cassie	10/ 5/95	Initial revision
+
+
+DESCRIPTION:
+	Contains constants and structures used internally by DataStore
+		
+	$Id: dsConstant.def,v 1.1 97/04/04 17:53:55 newdeal Exp $
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+
+DS_TOKEN_1_2	equ	('D') or ('T' shl 8)
+DS_TOKEN_3_4	equ	('S') or ('T' shl 8)
+	
+
+DSREF_MODIFY_RECORDS 	equ 	(mask DSREF_RESERVED)
+
+;-----------------------------------------------------------------------
+;		DataSoreElementFlags
+;-----------------------------------------------------------------------
+; The DataStore Locks are implemented as flags. Global routines
+; need to pass DSEF_READ_LOCK & DSEF_WRITE_LOCK to lock a DataStore.
+
+
+DSElementFlags record
+	DSEF_READ_LOCK:1
+	DSEF_WRITE_LOCK:1
+	DSEF_OPENED_EXCLUSIVE:1
+	DSEF_INDEX_LOCK:1
+	DSEF_lockCount:4	;Change DSEF_MAXIMUM_READ_LOCKS
+DSElementFlags end
+
+DSEF_MAXIMUM_READ_LOCKS    = 16
+DSEF_MAXIMUM_SESSION_LOCKS = 16
+
+;-----------------------------------------------------------------------
+;		DataStoreMap
+;-----------------------------------------------------------------------
+; Structure of the DataStore file map block.
+
+;
+; DataStore file protocol number
+;
+DS_PROTO_MAJOR	= 	2	;this changed from 1 to 2
+				;  because DataStoreFlags changed and a
+				;  slight restructuring of DataStoreMap
+DS_PROTO_MINOR	= 	0
+
+DataStoreMap	struct
+	DSM_flags		DataStoreFlags
+	; word of flags
+
+	DSM_version		ProtocolNumber
+	; The version number of this DataStore
+
+	DSM_owner		GeodeToken
+	; GeodeToken of the geode which created this datastore
+
+	DSM_timestamp		FileDateAndTime
+	; Time of last modification.
+
+	DSM_recordCount		dword		
+	; Number of records in this datastore. (RecordID is a dword)
+
+	DSM_recordID		RecordID
+	; The ID of the next record that will be allocated
+
+	DSM_fieldArray		word
+	; The VM handle of the block containing the FieldNameElement array
+
+	DSM_recordArray		word
+	; Handle of HugeArray that contains all the records
+
+	DSM_delList		word
+	; Handle of the optional (DSF_TRACK_MODS) deletion list
+
+	DSM_extraData		word
+	; Handle of VMBlock containing user data 
+
+	DSM_extraDataSize	word
+	; size of extra data in extraData block
+
+	DSM_language		StandardLanguage
+	; Language used in determining sort order
+
+	DSM_transactionNumber	dword
+	; The optional number (DSF_TRACK_MODS) of the last transaction
+
+	DSM_reserved		byte 	12 dup (?)
+	; reserved for future use
+
+	align	word
+DataStoreMap			ends
+
+FIRST_RECORD_ID		equ	0x00010001
+NEW_RECORD_ID		equ	FIRST_RECORD_ID -1
+LAST_RECORD_ID		equ	FIRST_RECORD_ID - 2
+EMPTY_BUFFER_ID		equ	LAST_RECORD_ID
+
+;------------------------------------------------------------------------
+; 		FieldNameElement array
+;------------------------------------------------------------------------
+
+FieldNameElement	struct
+	FNE_meta	RefElementHeader<>
+	FNE_data	FieldData
+	FNE_name	label	TCHAR
+FieldNameElement	ends
+
+FieldArrayLMemBlockHeader	struct
+	FALMBH_meta	LMemBlockHeader<>
+	FALMBH_array	lptr		; Chunk handle of the lmem array
+FieldArrayLMemBlockHeader	ends
+
+MAX_FIELD_COUNT		equ	255
+MAX_FIELD_SIZE		equ	32767
+
+;
+; Because the timestamp field, if it exists, is always added *first*, and
+; may never be deleted, it's fieldID will never change. Use this constant
+; to access the timestamp field. It's name is defined in the Strings
+; resource, in TimeStampFieldName (File/fileOpen.asm).
+;
+TIMESTAMP_FIELD_ID	equ	0
+
+
+;------------------------------------------------------------------------
+;  			Record Buffer Block
+;------------------------------------------------------------------------
+
+BufferFlags	record
+	BF_NEW_RECORD:1		; The record is newly created and
+				; never saved to file.
+	BF_RECORDID_MODIFIED:1	; User has modified the record's id
+	BF_MODIFIED_IN_BUFFER:1	; The record is changed since it is
+				; brought to the buffer
+				; never saved to file.
+	BF_LOCKED:1		; The record is locked down on the heap
+	BF_PRIMARY_KEY_MODIFIED:1 ; One or more of the primary key fields
+				; in this record has been modified
+	BF_TIMESTAMP_MODIFIED:1	; User has modified the timestamp field
+	:2
+BufferFlags	end
+
+
+RecordLMemBlockHeader 	struct
+    RLMBH_meta 		LMemBlockHeader
+    RLMBH_flags	        BufferFlags ; flags used for record buffer 
+    RLMBH_record	lptr	    ; Chunk handle of the record
+RecordLMemBlockHeader 	ends
+
+
+;--------------------------------------------------------------------------
+;	FATAL ERRORS AND WARNINGS
+;--------------------------------------------------------------------------
+
+INVALID_RECORD_ID					enum FatalErrors
+; A record had an ID value that was out of range
+
+INVALID_RECORD_SIZE					enum FatalErrors
+; The stored size does not agree with the calculated size or actual size
+
+INVALID_RECORD_COUNT					enum FatalErrors
+; The stored record count does not agree with number of records in array
+
+INVALID_FIELD_ID					enum FatalErrors
+; A field had an ID value that was out of range
+
+INVALID_FIELD_TYPE					enum FatalErrors
+; A field had an invalid type
+
+INVALID_FIELD_CATEGORY					enum FatalErrors
+; A field had an invalid category
+
+INVALID_FIELD_FLAGS					enum FatalErrors
+; A field had bad flags
+
+INVALID_FIELD_DATA					enum FatalErrors
+; A field had data which did not agree with its type
+
+INVALID_FIELD_COUNT					enum FatalErrors
+; A record had too many fields
+
+INVALID_FIELD_SIZE					enum FatalErrors
+; A field had a size that was too large
+
+CORRUPT_FIELD_SIZES					enum FatalErrors
+; The sizes of the fields didn't match up.
+
+FIELDS_OUT_OF_ORDER					enum FatalErrors
+; The fields were not sorted by type
+
+KEY_FIELDS_OUT_OF_ORDER					enum FatalErrors
+; The key fields in the field name array are not contiguous
+
+FIELD_TYPE_MISMATCH					enum FatalErrors
+; Two fields being compared had different types
+
+INVALID_INDEX_VALUE					enum FatalErrors
+; A record index value is out of range
+
+CANNOT_INSERT_OR_DELETE_ZERO_BYTES			enum FatalErrors
+; For some reason, somebody tried to insert/delete 0 bytes in a record
+
+BX_IS_NOT_THE_HANDLE_OF_DS				enum FatalErrors
+; BX is supposed to hold the handle of the block whose segment is in DS
+
+CALLBACK_RETURNED_0					enum FatalErrors
+; The callback that determines where an element should be inserted returned
+; 0, which is an illegal value.
+
+INVALID_MAP_BLOCK_OFFSET				enum FatalErrors
+; An internal error, meaning that someone tried to read a value from the map
+; block that was in an invalid location
+
+ERROR_RETURNED_FROM_VM_UPDATE				enum FatalErrors
+; A serious error occurred when VMUpdate was called, likely meaning that
+; the disk was full or something
+
+UNKNOWN_FILE_ERROR					enum FatalErrors
+; An unknown FileError was returned from a file operation.
+
+FILE_ATTRS_ERROR					enum FatalErrors
+; Setting or getting file attributes failed.
+
+MANAGER_EXIT_WITHOUT_EMPTY_SESSION_ARRAY		enum FatalErrors
+; The DataStoreLibraryEntry routine ManagerExit tried to exit the
+; the DataStore Library with entries still in the Session array.
+
+MANAGER_EXIT_WITHOUT_EMPTY_DATASTORE_ARRAY		enum FatalErrors
+; The DataStoreLibraryEntry routine ManagerExit tried to exit the
+; the DataStore Library with entries still in the DataStore array
+
+BAD_MANAGER_LMEM_BLOCK					enum FatalErrors
+; The DataStore Manager LMEM block handle with the Session array and the
+; DataStore array.
+
+BAD_CHUNK_ARRAY_ELEMENT_NUMBER				enum FatalErrors
+; For ChunkArray messages that return carry set when a out of 
+; bounds element number is passed
+
+MANAGER_CLIENT_EXIT_CANT_CLOSE_DATASTORE                enum FatalErrors
+; In managerInit.asm, ManagerClientExit, routine tried to a close
+; a DataStore and DataStoreClose returned an error
+
+ERROR_ADDING_TO_NAME_ARRAY				enum FatalErrors
+; NameArrayAdd failed in DataStoreOpen
+
+ERROR_ADDING_TO_CHUNK_ARRAY				enum FatalErrors
+; ChunkArrayAppend failed in DataStoreOpen
+
+INVALID_TOKEN_VALUE_GENERATED				enum FatalErrors
+; DataStoreOpen generated an invalid token value.
+
+BAD_DSELEMENT_TOKEN_IN_SESSION_TABLE			enum FatalErrors
+; DataStoreFileClose tried to access a DataStore array element with
+; an invalid token for the Session array.
+
+BAD_BUFFER_LMEM_BLOCK					enum FatalErrors
+; Can not lock the current record.
+
+BAD_LOCK_FLAGS						enum FatalErrors
+; Passed an invalid DSElementFlag value when requesting a DataStore lock
+
+BAD_SESSION_TOKEN					enum FatalErrors
+;ChunkArrayElementToPtr for a session array token failed
+
+BAD_LOCK_COUNT					enum FatalErrors
+;Lock count went below zero yet the read was set. Or lock is 
+;begin acquired for the first time and the lock count is not zero. 
+
+DATASTORE_LOCK_REQUESTED_TWICE				enum FatalErrors
+;LockDataStore received a request by the same Geode to lock the same
+;DataStore twice without a call to unlock inbetween.
+
+UNLOCKDATASTORE_PASSED_BAD_SESSION_TOKEN		enum FatalErrors
+;Tried to unlock a DataStore that doesn't exist.
+
+CORRUPTED_DATASTORE_TOKEN_IN_DATASTORELOADRECORD	enum FatalErrors
+;The datastore token passed wasn't bad, but corrupted somehow
+;in the DataStoreLoadRecord routine.
+
+BAD_SESSION_ENTRY_LOCK_COUNT				enum FatalErrors
+;In LockDataStoreCommon there is a lock bit set in DSEFlags but the 
+;DSE_lockCount is 0.
+
+REQUESTED_MORE_THAN_MAXIMUM_SESSION_LOCKS		enum FatalErrors
+;A session may request locks multiple times. However, this error
+;occurs when a session requested more than the maximum.
+
+BAD_DATASTORE_FILE_HANDLE				enum FatalErrors
+;MMGetDSElementToken was passed a file handle and did not find a
+;DSElement with the file handle.
+
+ERROR_GETTING_TIME_STAMP_FIELD				enum FatalErrors
+;DataStoreSaveRecord can't set or get the time stamp field while
+;it holds the lock on the buffer. Time stamps are implemented 
+;internally and this should never happen.
+
+ERROR_CORRUPTED_RECORD_BUFFER				enum FatalErrors
+;The record buffer handle for a session entry in the session table
+;is not NULL and the record id is EMPTY_BUFFER_ID
+
+CALLBACK_POINTER_NULL_IN_DATASTOREBUILDINDEX		enum FatalErrors
+;The call back pointer to DataStoreBuildIndex should never
+;be null.
+
+BAD_DATASTORE_TOKEN					enum FatalErrors
+; Bad datastore token found in internal routine where a correct
+; datastore token was passed in orginally.
+
+BAD_BITMAP_BLOCK_NUMBER					enum FatalErrors
+; The LMem block number calculated to set a record id's bit in the
+; the index bitmap is greater than the number of LMem blocks.
+; This is a logic error and should never happen.
+
+INDEX_CALLBACK_RETURNED_INVALID_VALUE			enum FatalErrors
+; When building an index there is a callback used to determine which
+; of two records is the smallest. This callback returned and invalid
+; value. 
+
+SETTING_BITMAP_BIT_THAT_IS_ALREADY_SET			enum FatalErrors
+; This should never happen because once a bit in an index array bitmap
+; has been set that means the record corresponding to that bit has 
+; already been added to the index. This indicates there is a logic
+; flaw in appending indexes to the index array.
+
+VM_UPDATE_FAILED_DUE_TO_LOCKED_BLOCK			enum Warnings
+; VMUpdate was called, but failed because a dirty block was locked on a 
+; separate thread.
+
+DATASTORE_LOAD_OR_CLOSE_CALLED_WITHOUT_EMPTY_BUFFER	enum Warnings
+;Tried to load or lose a datstore with a record still in the
+;record buffer.
+
+WRITE_LOCK_REQUESTED_WHEN_HOLDING_READ_LOCK		enum Warnings
+;in LockDataStoreCommon a write lock was requested when the session
+;already had a read lock. 
+
+UNABLE_TO_CLOSE_DATASTORE_FILE				enum Warnings
+; A call to DFFileClose returned an error that the DataStore file
+; couldn't be closed.
+
+UNLOCKDATATSTORE_CALLED_WITH_NO_LOCK			enum Warnings
+;Soneone tried to unlock a DataStore without holding the lock.
+
+UNLOCK_A_RECORD_THAT_WAS_NOT_LOCKED			enum Warnings
+	
+NO_COMPARISON_FOR_BINARY_FIELDS				enum Warnings
+; The Library supplied callback for doing index field comparisons does
+; not currently support binary field comparing.
+
+INVALID_TRUNCATE_SIZE					enum FatalErrors
+; A record is being truncated, but its new size is not smaller 
+; than its old size.
+
+INVALID_FIELD_TYPE_FOR_PRIMARY_KEY			enum FatalErrors
+; A primary key field is of a type which cannot be used in comparisons.
+; Like it is DSFT_BINARY.
+
+KEY_FIELD_MODIFIED_WITHOUT_SETTING_BUFFER_FLAG		enum FatalErrors
+; A primary key field was modified, but the BF_PRIMARY_KEY_MODIFIED
+; flag was not set when the record was saved.
+
+RECORD_ID_OVERFLOW					enum FatalErrors
+; The "next RecordID" value stored in the map block has wrapped
+
+RECORD_MODIFIED_IN_FILE					enum FatalErrors
+; A callback has modified a record in place. Records may only
+; be modified while in the record buffer, not directly in their
+; HugeArrayElement form.
+
+CALLBACK_TRASHED_PTR					enum FatalErrors
+; A callback trashed *ds:si - record array ptr.
+
+NO_TIMESTAMP_FIELD					enum FatalErrors
+; Can't set timestamp field to a record of a datastore which is
+; created with no timestamp field.
+
+LOGIC_ERROR_IN_ENUM_BACKWARDS				enum FatalErrors
+
+FREEING_MODIFIED_OR_LOCKED_RECORD_BUFFER		enum FatalErrors
+; DMSetNewRecord has been called when the record in the buffer is
+; locked or modified.
+
+ATTEMPTED_TO_OPEN_FILE_WHICH_IS_ALREADY_OPEN		enum FatalErrors
+; DataStoreOpen is trying to VMOpen a file which is already open. 
+; Manager should have just issued a new token.
+
+DSF_FLAG_NOT_CONSISTANT_WITH_KEY_COUNT      		enum FatalErrors
+; DAtaStoreFalg is not consistant with DSCP_keyCount

@@ -65,7 +65,7 @@ library tree
 #library fido
 library basrun
 
-resource DIALOGSTRINGS lmem shared read-only
+resource DialogStrings lmem shared read-only
 export CompileInterpClass
 
 # Loading/compiling/saving

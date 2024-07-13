@@ -1166,7 +1166,7 @@ FixedNodeData *ResizeAndRelock(VMFileHandle vmFile,
  * 
  *********************************************************************/
 #pragma argsused
-extern _pascal Boolean TreeLibraryEntry(LibraryCallType type,
+extern Boolean _pascal TreeLibraryEntry(LibraryCallType type,
 					GeodeHandle client) {
 
     /* Just crap to get these into the symbol file */

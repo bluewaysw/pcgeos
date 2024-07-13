@@ -155,7 +155,7 @@ minimalTools	: prntscrn
 
 otherEnsemble	: conview reader term tedit geofile dirls  \
 		  graphvwr macror dump perf bim ffind bbxcd webbox \
-		  hinv10 bbg10
+		  hinv10 bbg10 legos
 #geocon3
 
 #
@@ -1801,3 +1801,62 @@ Installed/Appl/Slides:				ui text impex convert MAKEAPPL
 
 resedit	: Installed/Appl/Tools/Localize
 Installed/Appl/Tools/Localize:		ui text spool MAKEAPPL
+
+# Legos geodes
+legos	: basrun basco ent gadget bent bgadget comps
+
+basrun	: Installed/Library/Legos/Basrun
+Installed/Library/Legos/Basrun:		ui math ansic hash streamc MAKELIB
+
+basco	: Installed/Library/Legos/Basco
+Installed/Library/Legos/Basco:		basrun tree MAKELIB
+
+ent	: Installed/Library/Legos/Ent
+Installed/Library/Legos/Ent:		basrun MAKELIB
+
+gadget	: Installed/Library/Legos/Gadget
+Installed/Library/Legos/Gadget:		ent datax datastore MAKELIB
+
+bent	: Installed/Library/Legos/Bent
+Installed/Library/Legos/Bent:		ent basco gadget MAKELIB
+
+bgadget	: Installed/Library/Legos/BGadget
+Installed/Library/Legos/BGadget:	bent MAKELIB
+
+comps	: cooltoolbox coolnet cooldraw coolfile coolprint coolsong coolcomm
+
+cooltoolbox	: Installed/Library/Legos/Comp/Toolbox
+Installed/Library/Legos/Comp/Toolbox:	gadget basco hash MAKELIB
+
+cooldraw	: Installed/Library/Legos/Comp/Draw
+Installed/Library/Legos/Comp/Draw:	ent sprite game MAKELIB
+
+telnet		: Installed/Library/Telnet
+Installed/Library/Telnet:		socket MAKELIB
+
+coolnet		: Installed/Library/Legos/Comp/Net
+Installed/Library/Legos/Comp/Net:	telnet gadget shell MAKELIB
+
+coolfile	: Installed/Library/Legos/Comp/File
+Installed/Library/Legos/Comp/File:	gadget shell MAKELIB
+
+coolprint	: Installed/Library/Legos/Comp/Print 
+Installed/Library/Legos/Comp/Print:	gadget spool MAKELIB
+
+coolsong	: Installed/Library/Legos/Comp/Song 
+Installed/Library/Legos/Comp/Song:	gadget wav sound MAKELIB
+
+coolcomm	: Installed/Library/Legos/Comp/Comm 
+Installed/Library/Legos/Comp/Comm:	gadget shell streamc MAKELIB
+
+sprite	: Installed/Library/Sprite
+Installed/Library/Sprite:		ui MAKELIB
+
+tree	: Installed/Library/Tree
+Installed/Library/Tree:			kernel ansic MAKELIB
+
+datax	: Installed/Library/DataX
+Installed/Library/DataX:		ui MAKELIB
+
+datastore	:  Installed/Library/Datastore
+Installed/Library/Datastore:		kernel text datax MAKELIB

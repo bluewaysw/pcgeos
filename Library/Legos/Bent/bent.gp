@@ -91,4 +91,4 @@ export BentGetDescriptionFlags
 incminor
 export BentUnlockDescription
 
-resource POINTERIMAGES data read-only shared
+resource PointerImages data read-only shared
