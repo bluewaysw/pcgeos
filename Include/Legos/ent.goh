@@ -1,539 +1,1078 @@
-/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-
-	Copyright (c) Geoworks 1994 -- All Rights Reserved
-
-PROJECT:        Legos
-MODULE:         Ent Library
-FILE:           ent.goh
-
-AUTHOR:         ron, Aug 17, 1994
-
-ROUTINES:
-	Name                    Description
-	----                    -----------
-
-REVISION HISTORY:
-	Name    Date            Description
-	----    ----            -----------
-	ron     8/17/94         Initial version.
-
-DESCRIPTION:
-	header file for the componENT library
-
-	$Id: ent.goh,v 1.1 97/12/05 12:16:15 gene Exp $
-	$Revision: 1.1 $
-
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
-@ifndef _ENT_GOH_
-@define _ENT_GOH_
-
-@deflib ent
-
-@include <stdapp.goh>
-@include <Objects/metaC.goh>
-
-#include <legos/ent.h>
-
-
-/*****************************************************************
- * Class Definitions
- *****************************************************************/
-
-@class  EntClass, GenClass, master, variant;
-
-@message void MSG_ENT_INITIALIZE(MemHandle interpHandle = dx);
-/*
- * Should be sent to a component after sending MSG_ENT_SET_PARENT, which
- * should be sent immediately after instantiation.  This message IS guaranteed
- * to build out all master levels, since it is always passed to the superclass,
- * and is not intercepted at the Ent level.  This allows the component (after
- * calling the superclass) to initialize default values in non-Ent master
- * levels.  This message must be sent after MSG_ENT_SET_PARENT, as some generic
- * object classes require that their generic parents be set before a variant
- * superclass can be chosen.
- *
- * Context:     Sent to any component after instantiation
- * Source:      Anyone, usually Interpreter
- * Destination: Any Ent class object
- * Interception:Should be intercepted by every component that needs to setup
- *              default values for its instance data, including instance data
- *              in an ancestor master level.  Other actions, such as adding
- *              vardata, sending messages, etc, may be performed.
- *              You MUST pass up to superclass before doing your own work.
- *
- * Pass: MemHandle interpHandle -  Handle that the component should uses
- *                                 when calling into the interpreter library.
- *
- * Return: nothing
- *
- */
-
-@message void MSG_ENT_SET_PROPERTY(@stack RunHeapInfo *rhi,
-				   ComponentData *value,
-				   TCHAR _far *prop);
-/*  Sets the property of the object to the value indicated.
- *  If it is not a natural property of the object, it will be added to a table.
- * 
- *  Context:    Sent to any component to tell it to update some value
- *  Source:     Anyone, usually Interpreter
- *  Destination:        Any Ent class object
- *  Interception:       Should be intercepted by every component that has 
- *                      internal properties that are setable.  Only call 
- *                      superclass if the passed property is not recognized.
- * 
- *  Pass:       value - pointer to ComponentData to set
- *              prop  - string name for the property
- * 
- *  Return:     nothing
- */
-
-
-@message void MSG_ENT_GET_PROPERTY(@stack RunHeapInfo *rhi,
-				   ComponentData *value, TCHAR *prop);
-/*
- *  Gets the indicated property of the object.
- * 
- *  Context:    Sent to any component to get the value of some property
- *  Source:     Anyone
- *  Destination:        Any Ent class object
- *  Interception:       Should be intercepted by every component that has 
- *                      internal properties. Only call superclass if it is 
- *                      an unknown property.
- * 
- *  Pass:       value - pointer to ComponentData to fill in.
- *              prop  - string name for the property
- *		rhi   - If you are getting a property that requires extra
- *			storage space (such as string or structure), then
- *			you need to pass in a valid RunHeapInfo *.
- *			Use RunComponentLockHeap to get it.
- *			Also, the caller, not the handler of ENT_GET_PROPERTY
- *			is responsible for upping the RefCount of the returned
- *			token.
- * 
- *  Return:     if found buffer filled in
- *              else Carry set
- */
-
-
-
-
-@message void MSG_ENT_DO_ACTION(@stack RunHeapInfo *rhi, ComponentData *retval,
-				ComponentData *argv, int argc,
-				TCHAR _far *actionName);
-/*
- *  Perform the action specified
- * 
- *  Context:    Sent to any component
- *  Source:     Anyone
- *  Destination:        Any Ent class object
- *  Interception: Should be intercepted by every component that has actions
- *              that can be performed.  If the action is unknown to the 
- *              component, it should be passed on to the superclass.
- *              Modifying the passed in values has no effect on the
- *              interpreter.  (passed by value, not reference)
- * 
- *  Pass:       char *actionName        - name of action
- *              int     argc            - number or args in array
- *              ComponentData   *argv[] - Array of values to use
- *                   NOTE: this isn't defined as an array currently, because
- *                         the interpreter isn't building such a structure
- *                         yet...  Need to fix exp_action(). 
- *              ComponentData   *retval - return value of action
- *		rhi   - If you are getting a data that requires extra
- *			storage space (such as string or structure), then
- *			you need to pass in a valid RunHeapInfo *.
- *			Use RunComponentLockHeap to get it.
- *			Also, the caller, not the handler 
- *			is responsible for upping the RefCount of the returned
- *			token.
- * 
- *  Return:     carry set if action not recognized
- */
-
-
-
-@message void MSG_ENT_SEND_TO_CHILDREN(EventHandle event = cx);
-/*
- * Sends the given event to all the children of an EntClass component.
- * Frees event when done.
- *
- * Context:     
- * Source:      
- * Destination: 
- * Interception:
- */
-
-
-@message void MSG_ENT_SEND_TO_PARENT(EventHandle event = cx);
-/*
- * Sends the given event to one's ent parent.
- *
- * Context:     
- * Source:      
- * Destination: 
- * Interception:
- */
-
-
-@message void MSG_ENT_REMOVE_COMPONENT_REFERENCES(RemoveReferenceStruct *thingsToDelete = cx:dx);
-/*
- * When modules are destroyed, this message is sent to all remaining
- * components so they can remove references to the destroyed components
- * if there are any.  All tree manipulations should already be done.  This
- * message just lets you NULL out stored Optrs.  The superclass will null
- * User-defined component properties.
- *
- * Source:	interpreter
- * Destination: any Ent component
- * Interception:	Must be handled if you store component optrs
- *			in instance data.  You must call the superclass.
- */
-
-
-@message TCHAR *MSG_ENT_GET_CLASS() = cx:dx;
-/*
- *  Gets the class name of the component.
- * 
- *  Context:    see ent.def
- * 
- *  Pass:   nothing
- *  Return: char pointer to class name string
- */
-
-
-@message int MSG_ENT_SET_PARENT(optr parentPtr = cx:dx);
-/*
- *  Sets the parent of the component makes the component a child of the parent
- * 
- *  Context:      Usually set via MSG_ENT_SET_PROPERTY
- *  Source:       Anyone
- *  Destination:  Any Ent Class object
- *  Interception: Usually not.  Can be intercepted if the component needs to
- *                special checking to see if it can be added.  Otherwise, the
- *                superclass will just check the table to see what can be
- *                added where.
- * 
- *  Pass:               cx:dx   = optr of parent
- * 
- *  Return:     If the add was rejected.  The parent will remain unchanged
- *                      return 1
- *              else
- *                      return 0
- */
-
-
-@message optr MSG_ENT_GET_PARENT() = cx:dx;
-/*
- *  Pass:               nothing
- *  Return:             cx:dx   = optr of parent
- */
-
-
-
-@message int MSG_ENT_CHECK_ACTION(@stack TCHAR *action);
-/*
- * Checks to see if the action is defined for this component
- * Return:      1 if defined, 0 otherwise.
- */
-
-
-@message int MSG_ENT_VALIDATE_PARENT(optr parentPtr = cx:dx) = ax;
-/*
- * Pass: parentPtr = optr to potential parent
- * Return: 0 to accept, non-zero to reject
- */
-
-
-@message int MSG_ENT_VALIDATE_CHILD(optr childPtr = cx:dx) = ax;
-/*
- * Pass: childPtr = optr to potential child
- * Return: 0 to accept, non-zero to reject
- */
-
-    
-@message int MSG_ENT_HANDLE_EVENT(EntHandleEventStruct *args = cx:dx);
-/*
- * Asks the interpreter to call an event handler, if one is present.
- * Typical components will always call MSG_ENT_HANDLE_EVENT.  Components
- * that generate events with great frequency should use MSG_ENT_HANDLE_EVENT
- * once, to determine if the handler is present and, if so, obtain its function
- * key (see Return, below).  When generating later events, this function key
- * may be passed to MSG_ENT_HANDLE_EVENT_WITH_KEY, which takes much less time
- * to call the event handler.
- *	If an argument to the basic function is a RunHeapToken,
- *	it will be decremented by the interpreter after the function
- *	call.  Make sure the RefCount >=1 before calling.
- */
-
-
-@message void MSG_ENT_ADD_CHILD(optr child = cx:dx, CompChildFlags flags = bp);
-/*
- * Adds the given child to the component.
- *
- * Context:     
- * Source:      
- * Destination: 
- * Interception:
- */
-
-
-@message void MSG_ENT_REMOVE_CHILD(optr child = cx:dx, 
-				   CompChildFlags flags = bp);
-/*
- * Removes the given child to the component.
- *
- * Context:     
- * Source:      
- * Destination: 
- * Interception:
- */
-
-
-@message void MSG_ENT_SET_PARENT_LINKAGE(optr parent = cx:dx, CompChildFlags flags = bp);
-/*
- * Used by EntClass children that are able to be children of non-Ent
- * composites.  This handler will send the correct message to the parent
- * to add this component to its tree. 
- *
- * Context:     
- * Source:       MSG_ENT_SET_PARENT handler
- * Destination:  any EntClass object
- * Interception: intercept if you need to be able to be added to anything
- *               other than EntClass or GenClass composites. 
- */
-
-@message void MSG_ENT_REMOVE_PARENT_LINKAGE(CompChildFlags flags = bp);
-
-@message void MSG_ENT_SET_PROTOTYPE(TCHAR _far* name = cx:dx); 
-/*
- * Sets a string to be used when generating function names to call for event
- * handlers. Normally, the name of the object is used.  You can make one object
- * act like another without duplicating script code by setting this field.
- * 
- * 
- *  Pass:   char _far* name             ; name to use
- */
-
-
-@message void MSG_ENT_DESTROY();
-
-@message void MSG_ENT_SET_FLAGS(EntFlags toSet = cl,
-				EntFlags toClear = dl);
-@message EntFlags MSG_ENT_GET_FLAGS() = al;
-
-
-@message Boolean MSG_ENT_RESOLVE_PROPERTY
-    (EntResolveStruct _far* ers = dx:bp) = carry;
-/* Returns TRUE if _not_ found */
-
-@message Boolean MSG_ENT_RESOLVE_ACTION
-    (EntResolveStruct _far* ers = dx:bp) = carry;
-/* Returns TRUE if _not_ found */
-
-@message int MSG_ENT_HANDLE_EVENT_WITH_KEY(EntHandleEventStruct *args = cx:dx);
-
-@message optr MSG_ENT_GET_FIRST_CHILD() = cx:dx;
-@message optr MSG_ENT_GET_NEXT_SIBLING() = cx:dx;
-
-@message void MSG_ENT_GET_PROPERTY_EXTERNAL(@stack 
-				   ComponentData *value,
-				   TCHAR _far *prop);
-@message void MSG_ENT_SET_PROPERTY_EXTERNAL(@stack 
-				   ComponentData *value,
-				   TCHAR _far *prop);
-/* Use the GET/SET_PROPERTY_EXTERNAL messages when either the property is 
- * not a string property or the you want to pass the string in a buffer
- * or get the string back in buffer rather than in a token.
- *
- * For MSG_ENT_SET_PROPERTY_EXTERNAL set value->CD_type to TYPE_STRING and
- * value.CD_data.fptr to a TCHAR *, not CD_data.string to a RunHeapToken.
- *
- * For MSG_ENT_GET_PROPERTY_EXTERNAL, set value->CD_data.fptr to a buffer that
- * has space to hold the returned string.
- *
- * You probably don't want to intercept theses messages, but MSG_ENT/GET_SET_
- * PROPERTY instead.  They will get generated by these messages.
- *
- */
-
-@message int MSG_ENT_GET_STATE() = dx;
-/*
- * Return the current EntState.
- */
-
-@message int MSG_ENT_SET_STATE(int newState = cx) = dx;
-/*
- * Sets the current EntState.  The high byte of newState contains
- * bits to clear, the low byte contains bits to set.
- * This message merely sets instance data.  The state should only be
- * set in the ENT_INITIALIZE handler.
- */
-
-
-@message void MSG_ENT_UNIV_LEAVE();
-
-@message word MSG_ENT_FIND_CHILD(optr child = cx:dx) = ax;
-@message optr MSG_ENT_FIND_CHILD_AT_POSITION(word position = cx) = cx:dx;
-@message word MSG_ENT_COUNT_CHILDREN() = ax;
-
-
-@message void MSG_ENT_GET_PROPERTY_NAME_AND_DATA(@stack word propNum,
-						 TCHAR *name,
-						 RunHeapInfo *rhi,
-						 ComponentData *value,
-						 TCHAR *prop);
-
-@message void MSG_ENT_GET_CUSTOM_PROPERTY(@stack RunHeapInfo *rhi,
-					  ComponentData *value, TCHAR *prop);
-@message void MSG_ENT_SET_CUSTOM_PROPERTY(@stack RunHeapInfo *rhi,
-					  ComponentData *value, TCHAR *prop);
-
-
-@message void MSG_ENT_GET_NUM_CHILDREN(@stack RunHeapInfo *rhi,
-				       ComponentData *value, TCHAR *prop);
-/* Takes GetPropertyArgs on stack. */
-
-@message void MSG_ENT_GET_CHILDREN(@stack RunHeapInfo *rhi,
-				   ComponentData *retVal,
-				   ComponentData *argv,
-				   int argc,
-				   TCHAR _far *actionName);
-/* Takes EntDoActionArgs on stack. */
-
-
-/* used by debugger to let components know they are being paused/resumed */
-@message void MSG_ENT_PAUSE();
-@message void MSG_ENT_RESUME();
-
-
-
-@define me(x) x
-@define atme(x) @x
-@define join(a,b) @me(a)b
-@define atjoin(a,b) @atme(a)b
-@define startPropertyMessages(class, super) \
-	@setMessageNum @atjoin(super,_SUB_PROP);
-@define endPropertyMessages(classdef, super, num) @define classdef @atjoin(super,_SUB_PROP) + (num + num)
-@define startActionMessages(class, super) \
-	@setMessageNum @atjoin(super, _SUB_ACT);
-@define endActionMessages(classdef, super, num) @define classdef @atjoin(super,_SUB_ACT) + (num + num)
-
-/*
- * Make sure a range of 512 property messages starts at 
- * MSG_ENT_INITIALIZE + 1024, and a range of 256 action messages
- * just above the property messages.
- */
-@setMessageNum	MSG_ENT_INITIALIZE+1024;
-@message(MSG_ENT_GET_PROPERTY) MSG_ENT_GET_PROPERTY_0;
-@message(MSG_ENT_SET_PROPERTY) MSG_ENT_SET_PROPERTY_0;
-@reserveMessages	510;
-@message(MSG_ENT_DO_ACTION) MSG_ENT_DO_ACTION_0;
-
-/*
- * Reset the message counter, so our property messages fall within the 
- * reserved range.
- */
-@setMessageNum		MSG_ENT_GET_PROPERTY_0;
-@message (MSG_ENT_GET_PROPERTY_0) MSG_ENT_GET_PROTO;
-@message (MSG_ENT_SET_PROPERTY_0) MSG_ENT_SET_PROTO;
-@message (MSG_ENT_GET_PROPERTY_0) MSG_ENT_GET_PARENT_PROP;
-@message (MSG_ENT_SET_PROPERTY_0) MSG_ENT_SET_PARENT_PROP;
-@message (MSG_ENT_GET_PROPERTY_0) MSG_ENT_GET_NAME_PROP_REUSE_ME;
-@message (MSG_ENT_SET_PROPERTY_0) MSG_ENT_SET_NAME_PROP_REUSE_ME;
-@message (MSG_ENT_GET_PROPERTY_0) MSG_ENT_GET_VERSION;
-@message (MSG_ENT_SET_PROPERTY_0) MSG_ENT_SET_VERSION;
-@message (MSG_ENT_GET_PROPERTY_0) MSG_ENT_GET_CLASS_PROP;
-@message (MSG_ENT_SET_PROPERTY_0) MSG_ENT_SET_CLASS_PROP;
-
-/*
- * Reset the message counter again, so the action messages fall within 
- * the action message range.
- */
-@setMessageNum		MSG_ENT_DO_ACTION_0;
-/* note: get/set_children moved out of Ent and into GadgetGadget/Geom*/
-
-/*
- * Specify that our subclasses' properties start at our first property + 64.
- * This will reserve space for a maximum of 32 properties.  Also, reserve
- * space for 16 actions.  Sorry for the goofy names -- GOC bonks if they get
- * too long...
- */
-@define	Ent_SUB_PROP	(64 + MSG_ENT_GET_PROPERTY_0)
-@define	Ent_SUB_ACT	(32 + MSG_ENT_DO_ACTION_0)
-
-/*                      ;;;
- *  Instance Data       ;;;
- *                      ;;;*/
-@instance       ChunkHandle EI_propIndex;
-/* Holds chunk of name array of properties/
- * The name array stores ComponentData
- */
-
-@instance       @link EI_link;
-/*  (modified) optr to sibling */
-
-@instance       @composite EI_comp = EI_link;
-/*  optr to first child */
-
-@instance       EntState EI_state;
-
-@instance       EntFlags EI_flags = 0;    /* Visible property should be moved  */
-					/* to Gool, but for now this'll work */
-
-@instance	RunHeapToken	EI_proto;
-@endc;   /* EntClass */
-
-
-@class	EntVisClass, EntClass;
-
-/*
- * EntVisClass provides functionality useful to visible components.
- */
-
-@message void MSG_ENT_VIS_SHOW();
-/*
- * Tells the component to make itself visible on the screen and modifies the
- * "visible" property to 1.  Does nothing if already visible.
- *
- * Pass:                nothing
- * Return:              nothing
- * Interception:        Generally not intercepted.
- */
-
-@message void MSG_ENT_VIS_HIDE();
-/*
- * Tells the component to make itself invisible on the screen and modifies the
- * "visible" property to 0.  Does nothing if already invisible.
- *
- * Pass:                nothing
- * Return:              nothing
- * Interception:        Generally not intercepted.
- */
-
-@startPropertyMessages(EntVis, Ent)
-@message (MSG_ENT_GET_PROPERTY_0) MSG_ENT_VIS_GET_VISIBLE;
-@message (MSG_ENT_SET_PROPERTY_0) MSG_ENT_VIS_SET_VISIBLE;
-@endPropertyMessages(EntVis_SUB_PROP, Ent, 8)
-
-@startActionMessages(EntVis, Ent)
-@endActionMessages(EntVis_SUB_ACT, Ent, 8)
-
-@endc;	/* EntVisClass */
-
-
-/*@class	ML1Class, MetaClass, master;
- *@endc
- *
- *@class	ML2Class, ML1Class, master;
- *@endc
- */
-
-@class  EntAppClass, EntClass;
-@default EI_flags = EF_ALLOWS_CHILDREN;
-
-@endc
-
-@endlib
-
-@endif /* _ENT_GOH_ */    
-		
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+
+
+	Copyright (c) Geoworks 1994 -- All Rights Reserved
+
+
+
+PROJECT:        Legos
+
+MODULE:         Ent Library
+
+FILE:           ent.goh
+
+
+
+AUTHOR:         ron, Aug 17, 1994
+
+
+
+ROUTINES:
+
+	Name                    Description
+
+	----                    -----------
+
+
+
+REVISION HISTORY:
+
+	Name    Date            Description
+
+	----    ----            -----------
+
+	ron     8/17/94         Initial version.
+
+
+
+DESCRIPTION:
+
+	header file for the componENT library
+
+
+
+	$Id: ent.goh,v 1.1 97/12/05 12:16:15 gene Exp $
+
+	$Revision: 1.1 $
+
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+
+@ifndef _ENT_GOH_
+
+@define _ENT_GOH_
+
+
+
+@deflib ent
+
+
+
+@include <stdapp.goh>
+
+@include <Objects/metaC.goh>
+
+
+
+#include <Legos/ent.h>
+
+
+
+
+
+/*****************************************************************
+
+ * Class Definitions
+
+ *****************************************************************/
+
+
+
+@class  EntClass, GenClass, master, variant;
+
+
+
+@message void MSG_ENT_INITIALIZE(MemHandle interpHandle = dx);
+
+/*
+
+ * Should be sent to a component after sending MSG_ENT_SET_PARENT, which
+
+ * should be sent immediately after instantiation.  This message IS guaranteed
+
+ * to build out all master levels, since it is always passed to the superclass,
+
+ * and is not intercepted at the Ent level.  This allows the component (after
+
+ * calling the superclass) to initialize default values in non-Ent master
+
+ * levels.  This message must be sent after MSG_ENT_SET_PARENT, as some generic
+
+ * object classes require that their generic parents be set before a variant
+
+ * superclass can be chosen.
+
+ *
+
+ * Context:     Sent to any component after instantiation
+
+ * Source:      Anyone, usually Interpreter
+
+ * Destination: Any Ent class object
+
+ * Interception:Should be intercepted by every component that needs to setup
+
+ *              default values for its instance data, including instance data
+
+ *              in an ancestor master level.  Other actions, such as adding
+
+ *              vardata, sending messages, etc, may be performed.
+
+ *              You MUST pass up to superclass before doing your own work.
+
+ *
+
+ * Pass: MemHandle interpHandle -  Handle that the component should uses
+
+ *                                 when calling into the interpreter library.
+
+ *
+
+ * Return: nothing
+
+ *
+
+ */
+
+
+
+@message void MSG_ENT_SET_PROPERTY(@stack RunHeapInfo *rhi,
+
+				   ComponentData *value,
+
+				   TCHAR _far *prop);
+
+/*  Sets the property of the object to the value indicated.
+
+ *  If it is not a natural property of the object, it will be added to a table.
+
+ * 
+
+ *  Context:    Sent to any component to tell it to update some value
+
+ *  Source:     Anyone, usually Interpreter
+
+ *  Destination:        Any Ent class object
+
+ *  Interception:       Should be intercepted by every component that has 
+
+ *                      internal properties that are setable.  Only call 
+
+ *                      superclass if the passed property is not recognized.
+
+ * 
+
+ *  Pass:       value - pointer to ComponentData to set
+
+ *              prop  - string name for the property
+
+ * 
+
+ *  Return:     nothing
+
+ */
+
+
+
+
+
+@message void MSG_ENT_GET_PROPERTY(@stack RunHeapInfo *rhi,
+
+				   ComponentData *value, TCHAR *prop);
+
+/*
+
+ *  Gets the indicated property of the object.
+
+ * 
+
+ *  Context:    Sent to any component to get the value of some property
+
+ *  Source:     Anyone
+
+ *  Destination:        Any Ent class object
+
+ *  Interception:       Should be intercepted by every component that has 
+
+ *                      internal properties. Only call superclass if it is 
+
+ *                      an unknown property.
+
+ * 
+
+ *  Pass:       value - pointer to ComponentData to fill in.
+
+ *              prop  - string name for the property
+
+ *		rhi   - If you are getting a property that requires extra
+
+ *			storage space (such as string or structure), then
+
+ *			you need to pass in a valid RunHeapInfo *.
+
+ *			Use RunComponentLockHeap to get it.
+
+ *			Also, the caller, not the handler of ENT_GET_PROPERTY
+
+ *			is responsible for upping the RefCount of the returned
+
+ *			token.
+
+ * 
+
+ *  Return:     if found buffer filled in
+
+ *              else Carry set
+
+ */
+
+
+
+
+
+
+
+
+
+@message void MSG_ENT_DO_ACTION(@stack RunHeapInfo *rhi, ComponentData *retval,
+
+				ComponentData *argv, int argc,
+
+				TCHAR _far *actionName);
+
+/*
+
+ *  Perform the action specified
+
+ * 
+
+ *  Context:    Sent to any component
+
+ *  Source:     Anyone
+
+ *  Destination:        Any Ent class object
+
+ *  Interception: Should be intercepted by every component that has actions
+
+ *              that can be performed.  If the action is unknown to the 
+
+ *              component, it should be passed on to the superclass.
+
+ *              Modifying the passed in values has no effect on the
+
+ *              interpreter.  (passed by value, not reference)
+
+ * 
+
+ *  Pass:       char *actionName        - name of action
+
+ *              int     argc            - number or args in array
+
+ *              ComponentData   *argv[] - Array of values to use
+
+ *                   NOTE: this isn't defined as an array currently, because
+
+ *                         the interpreter isn't building such a structure
+
+ *                         yet...  Need to fix exp_action(). 
+
+ *              ComponentData   *retval - return value of action
+
+ *		rhi   - If you are getting a data that requires extra
+
+ *			storage space (such as string or structure), then
+
+ *			you need to pass in a valid RunHeapInfo *.
+
+ *			Use RunComponentLockHeap to get it.
+
+ *			Also, the caller, not the handler 
+
+ *			is responsible for upping the RefCount of the returned
+
+ *			token.
+
+ * 
+
+ *  Return:     carry set if action not recognized
+
+ */
+
+
+
+
+
+
+
+@message void MSG_ENT_SEND_TO_CHILDREN(EventHandle event = cx);
+
+/*
+
+ * Sends the given event to all the children of an EntClass component.
+
+ * Frees event when done.
+
+ *
+
+ * Context:     
+
+ * Source:      
+
+ * Destination: 
+
+ * Interception:
+
+ */
+
+
+
+
+
+@message void MSG_ENT_SEND_TO_PARENT(EventHandle event = cx);
+
+/*
+
+ * Sends the given event to one's ent parent.
+
+ *
+
+ * Context:     
+
+ * Source:      
+
+ * Destination: 
+
+ * Interception:
+
+ */
+
+
+
+
+
+@message void MSG_ENT_REMOVE_COMPONENT_REFERENCES(RemoveReferenceStruct *thingsToDelete = cx:dx);
+
+/*
+
+ * When modules are destroyed, this message is sent to all remaining
+
+ * components so they can remove references to the destroyed components
+
+ * if there are any.  All tree manipulations should already be done.  This
+
+ * message just lets you NULL out stored Optrs.  The superclass will null
+
+ * User-defined component properties.
+
+ *
+
+ * Source:	interpreter
+
+ * Destination: any Ent component
+
+ * Interception:	Must be handled if you store component optrs
+
+ *			in instance data.  You must call the superclass.
+
+ */
+
+
+
+
+
+@message TCHAR *MSG_ENT_GET_CLASS() = cx:dx;
+
+/*
+
+ *  Gets the class name of the component.
+
+ * 
+
+ *  Context:    see ent.def
+
+ * 
+
+ *  Pass:   nothing
+
+ *  Return: char pointer to class name string
+
+ */
+
+
+
+
+
+@message int MSG_ENT_SET_PARENT(optr parentPtr = cx:dx);
+
+/*
+
+ *  Sets the parent of the component makes the component a child of the parent
+
+ * 
+
+ *  Context:      Usually set via MSG_ENT_SET_PROPERTY
+
+ *  Source:       Anyone
+
+ *  Destination:  Any Ent Class object
+
+ *  Interception: Usually not.  Can be intercepted if the component needs to
+
+ *                special checking to see if it can be added.  Otherwise, the
+
+ *                superclass will just check the table to see what can be
+
+ *                added where.
+
+ * 
+
+ *  Pass:               cx:dx   = optr of parent
+
+ * 
+
+ *  Return:     If the add was rejected.  The parent will remain unchanged
+
+ *                      return 1
+
+ *              else
+
+ *                      return 0
+
+ */
+
+
+
+
+
+@message optr MSG_ENT_GET_PARENT() = cx:dx;
+
+/*
+
+ *  Pass:               nothing
+
+ *  Return:             cx:dx   = optr of parent
+
+ */
+
+
+
+
+
+
+
+@message int MSG_ENT_CHECK_ACTION(@stack TCHAR *action);
+
+/*
+
+ * Checks to see if the action is defined for this component
+
+ * Return:      1 if defined, 0 otherwise.
+
+ */
+
+
+
+
+
+@message int MSG_ENT_VALIDATE_PARENT(optr parentPtr = cx:dx) = ax;
+
+/*
+
+ * Pass: parentPtr = optr to potential parent
+
+ * Return: 0 to accept, non-zero to reject
+
+ */
+
+
+
+
+
+@message int MSG_ENT_VALIDATE_CHILD(optr childPtr = cx:dx) = ax;
+
+/*
+
+ * Pass: childPtr = optr to potential child
+
+ * Return: 0 to accept, non-zero to reject
+
+ */
+
+
+
+    
+
+@message int MSG_ENT_HANDLE_EVENT(EntHandleEventStruct *args = cx:dx);
+
+/*
+
+ * Asks the interpreter to call an event handler, if one is present.
+
+ * Typical components will always call MSG_ENT_HANDLE_EVENT.  Components
+
+ * that generate events with great frequency should use MSG_ENT_HANDLE_EVENT
+
+ * once, to determine if the handler is present and, if so, obtain its function
+
+ * key (see Return, below).  When generating later events, this function key
+
+ * may be passed to MSG_ENT_HANDLE_EVENT_WITH_KEY, which takes much less time
+
+ * to call the event handler.
+
+ *	If an argument to the basic function is a RunHeapToken,
+
+ *	it will be decremented by the interpreter after the function
+
+ *	call.  Make sure the RefCount >=1 before calling.
+
+ */
+
+
+
+
+
+@message void MSG_ENT_ADD_CHILD(optr child = cx:dx, CompChildFlags flags = bp);
+
+/*
+
+ * Adds the given child to the component.
+
+ *
+
+ * Context:     
+
+ * Source:      
+
+ * Destination: 
+
+ * Interception:
+
+ */
+
+
+
+
+
+@message void MSG_ENT_REMOVE_CHILD(optr child = cx:dx, 
+
+				   CompChildFlags flags = bp);
+
+/*
+
+ * Removes the given child to the component.
+
+ *
+
+ * Context:     
+
+ * Source:      
+
+ * Destination: 
+
+ * Interception:
+
+ */
+
+
+
+
+
+@message void MSG_ENT_SET_PARENT_LINKAGE(optr parent = cx:dx, CompChildFlags flags = bp);
+
+/*
+
+ * Used by EntClass children that are able to be children of non-Ent
+
+ * composites.  This handler will send the correct message to the parent
+
+ * to add this component to its tree. 
+
+ *
+
+ * Context:     
+
+ * Source:       MSG_ENT_SET_PARENT handler
+
+ * Destination:  any EntClass object
+
+ * Interception: intercept if you need to be able to be added to anything
+
+ *               other than EntClass or GenClass composites. 
+
+ */
+
+
+
+@message void MSG_ENT_REMOVE_PARENT_LINKAGE(CompChildFlags flags = bp);
+
+
+
+@message void MSG_ENT_SET_PROTOTYPE(TCHAR _far* name = cx:dx); 
+
+/*
+
+ * Sets a string to be used when generating function names to call for event
+
+ * handlers. Normally, the name of the object is used.  You can make one object
+
+ * act like another without duplicating script code by setting this field.
+
+ * 
+
+ * 
+
+ *  Pass:   char _far* name             ; name to use
+
+ */
+
+
+
+
+
+@message void MSG_ENT_DESTROY();
+
+
+
+@message void MSG_ENT_SET_FLAGS(EntFlags toSet = cl,
+
+				EntFlags toClear = dl);
+
+@message EntFlags MSG_ENT_GET_FLAGS() = al;
+
+
+
+
+
+@message Boolean MSG_ENT_RESOLVE_PROPERTY
+
+    (EntResolveStruct _far* ers = dx:bp) = carry;
+
+/* Returns TRUE if _not_ found */
+
+
+
+@message Boolean MSG_ENT_RESOLVE_ACTION
+
+    (EntResolveStruct _far* ers = dx:bp) = carry;
+
+/* Returns TRUE if _not_ found */
+
+
+
+@message int MSG_ENT_HANDLE_EVENT_WITH_KEY(EntHandleEventStruct *args = cx:dx);
+
+
+
+@message optr MSG_ENT_GET_FIRST_CHILD() = cx:dx;
+
+@message optr MSG_ENT_GET_NEXT_SIBLING() = cx:dx;
+
+
+
+@message void MSG_ENT_GET_PROPERTY_EXTERNAL(@stack 
+
+				   ComponentData *value,
+
+				   TCHAR _far *prop);
+
+@message void MSG_ENT_SET_PROPERTY_EXTERNAL(@stack 
+
+				   ComponentData *value,
+
+				   TCHAR _far *prop);
+
+/* Use the GET/SET_PROPERTY_EXTERNAL messages when either the property is 
+
+ * not a string property or the you want to pass the string in a buffer
+
+ * or get the string back in buffer rather than in a token.
+
+ *
+
+ * For MSG_ENT_SET_PROPERTY_EXTERNAL set value->CD_type to TYPE_STRING and
+
+ * value.CD_data.fptr to a TCHAR *, not CD_data.string to a RunHeapToken.
+
+ *
+
+ * For MSG_ENT_GET_PROPERTY_EXTERNAL, set value->CD_data.fptr to a buffer that
+
+ * has space to hold the returned string.
+
+ *
+
+ * You probably don't want to intercept theses messages, but MSG_ENT/GET_SET_
+
+ * PROPERTY instead.  They will get generated by these messages.
+
+ *
+
+ */
+
+
+
+@message int MSG_ENT_GET_STATE() = dx;
+
+/*
+
+ * Return the current EntState.
+
+ */
+
+
+
+@message int MSG_ENT_SET_STATE(int newState = cx) = dx;
+
+/*
+
+ * Sets the current EntState.  The high byte of newState contains
+
+ * bits to clear, the low byte contains bits to set.
+
+ * This message merely sets instance data.  The state should only be
+
+ * set in the ENT_INITIALIZE handler.
+
+ */
+
+
+
+
+
+@message void MSG_ENT_UNIV_LEAVE();
+
+
+
+@message word MSG_ENT_FIND_CHILD(optr child = cx:dx) = ax;
+
+@message optr MSG_ENT_FIND_CHILD_AT_POSITION(word position = cx) = cx:dx;
+
+@message word MSG_ENT_COUNT_CHILDREN() = ax;
+
+
+
+
+
+@message void MSG_ENT_GET_PROPERTY_NAME_AND_DATA(@stack word propNum,
+
+						 TCHAR *name,
+
+						 RunHeapInfo *rhi,
+
+						 ComponentData *value,
+
+						 TCHAR *prop);
+
+
+
+@message void MSG_ENT_GET_CUSTOM_PROPERTY(@stack RunHeapInfo *rhi,
+
+					  ComponentData *value, TCHAR *prop);
+
+@message void MSG_ENT_SET_CUSTOM_PROPERTY(@stack RunHeapInfo *rhi,
+
+					  ComponentData *value, TCHAR *prop);
+
+
+
+
+
+@message void MSG_ENT_GET_NUM_CHILDREN(@stack RunHeapInfo *rhi,
+
+				       ComponentData *value, TCHAR *prop);
+
+/* Takes GetPropertyArgs on stack. */
+
+
+
+@message void MSG_ENT_GET_CHILDREN(@stack RunHeapInfo *rhi,
+
+				   ComponentData *retVal,
+
+				   ComponentData *argv,
+
+				   int argc,
+
+				   TCHAR _far *actionName);
+
+/* Takes EntDoActionArgs on stack. */
+
+
+
+
+
+/* used by debugger to let components know they are being paused/resumed */
+
+@message void MSG_ENT_PAUSE();
+
+@message void MSG_ENT_RESUME();
+
+
+
+
+
+
+
+@define me(x) x
+
+@define atme(x) @x
+
+@define join(a,b) @me(a)b
+
+@define atjoin(a,b) @atme(a)b
+
+@define startPropertyMessages(class, super) \
+
+	@setMessageNum @atjoin(super,_SUB_PROP);
+
+@define endPropertyMessages(classdef, super, num) @define classdef @atjoin(super,_SUB_PROP) + (num + num)
+
+@define startActionMessages(class, super) \
+
+	@setMessageNum @atjoin(super, _SUB_ACT);
+
+@define endActionMessages(classdef, super, num) @define classdef @atjoin(super,_SUB_ACT) + (num + num)
+
+
+
+/*
+
+ * Make sure a range of 512 property messages starts at 
+
+ * MSG_ENT_INITIALIZE + 1024, and a range of 256 action messages
+
+ * just above the property messages.
+
+ */
+
+@setMessageNum	MSG_ENT_INITIALIZE+1024;
+
+@message(MSG_ENT_GET_PROPERTY) MSG_ENT_GET_PROPERTY_0;
+
+@message(MSG_ENT_SET_PROPERTY) MSG_ENT_SET_PROPERTY_0;
+
+@reserveMessages	510;
+
+@message(MSG_ENT_DO_ACTION) MSG_ENT_DO_ACTION_0;
+
+
+
+/*
+
+ * Reset the message counter, so our property messages fall within the 
+
+ * reserved range.
+
+ */
+
+@setMessageNum		MSG_ENT_GET_PROPERTY_0;
+
+@message (MSG_ENT_GET_PROPERTY_0) MSG_ENT_GET_PROTO;
+
+@message (MSG_ENT_SET_PROPERTY_0) MSG_ENT_SET_PROTO;
+
+@message (MSG_ENT_GET_PROPERTY_0) MSG_ENT_GET_PARENT_PROP;
+
+@message (MSG_ENT_SET_PROPERTY_0) MSG_ENT_SET_PARENT_PROP;
+
+@message (MSG_ENT_GET_PROPERTY_0) MSG_ENT_GET_NAME_PROP_REUSE_ME;
+
+@message (MSG_ENT_SET_PROPERTY_0) MSG_ENT_SET_NAME_PROP_REUSE_ME;
+
+@message (MSG_ENT_GET_PROPERTY_0) MSG_ENT_GET_VERSION;
+
+@message (MSG_ENT_SET_PROPERTY_0) MSG_ENT_SET_VERSION;
+
+@message (MSG_ENT_GET_PROPERTY_0) MSG_ENT_GET_CLASS_PROP;
+
+@message (MSG_ENT_SET_PROPERTY_0) MSG_ENT_SET_CLASS_PROP;
+
+
+
+/*
+
+ * Reset the message counter again, so the action messages fall within 
+
+ * the action message range.
+
+ */
+
+@setMessageNum		MSG_ENT_DO_ACTION_0;
+
+/* note: get/set_children moved out of Ent and into GadgetGadget/Geom*/
+
+
+
+/*
+
+ * Specify that our subclasses' properties start at our first property + 64.
+
+ * This will reserve space for a maximum of 32 properties.  Also, reserve
+
+ * space for 16 actions.  Sorry for the goofy names -- GOC bonks if they get
+
+ * too long...
+
+ */
+
+@define	Ent_SUB_PROP	(64 + MSG_ENT_GET_PROPERTY_0)
+
+@define	Ent_SUB_ACT	(32 + MSG_ENT_DO_ACTION_0)
+
+
+
+/*                      ;;;
+
+ *  Instance Data       ;;;
+
+ *                      ;;;*/
+
+@instance       ChunkHandle EI_propIndex;
+
+/* Holds chunk of name array of properties/
+
+ * The name array stores ComponentData
+
+ */
+
+
+
+@instance       @link EI_link;
+
+/*  (modified) optr to sibling */
+
+
+
+@instance       @composite EI_comp = EI_link;
+
+/*  optr to first child */
+
+
+
+@instance       EntState EI_state;
+
+
+
+@instance       EntFlags EI_flags = 0;    /* Visible property should be moved  */
+
+					/* to Gool, but for now this'll work */
+
+
+
+@instance	RunHeapToken	EI_proto;
+
+@endc;   /* EntClass */
+
+
+
+
+
+@class	EntVisClass, EntClass;
+
+
+
+/*
+
+ * EntVisClass provides functionality useful to visible components.
+
+ */
+
+
+
+@message void MSG_ENT_VIS_SHOW();
+
+/*
+
+ * Tells the component to make itself visible on the screen and modifies the
+
+ * "visible" property to 1.  Does nothing if already visible.
+
+ *
+
+ * Pass:                nothing
+
+ * Return:              nothing
+
+ * Interception:        Generally not intercepted.
+
+ */
+
+
+
+@message void MSG_ENT_VIS_HIDE();
+
+/*
+
+ * Tells the component to make itself invisible on the screen and modifies the
+
+ * "visible" property to 0.  Does nothing if already invisible.
+
+ *
+
+ * Pass:                nothing
+
+ * Return:              nothing
+
+ * Interception:        Generally not intercepted.
+
+ */
+
+
+
+@startPropertyMessages(EntVis, Ent)
+
+@message (MSG_ENT_GET_PROPERTY_0) MSG_ENT_VIS_GET_VISIBLE;
+
+@message (MSG_ENT_SET_PROPERTY_0) MSG_ENT_VIS_SET_VISIBLE;
+
+@endPropertyMessages(EntVis_SUB_PROP, Ent, 8)
+
+
+
+@startActionMessages(EntVis, Ent)
+
+@endActionMessages(EntVis_SUB_ACT, Ent, 8)
+
+
+
+@endc;	/* EntVisClass */
+
+
+
+
+
+/*@class	ML1Class, MetaClass, master;
+
+ *@endc
+
+ *
+
+ *@class	ML2Class, ML1Class, master;
+
+ *@endc
+
+ */
+
+
+
+@class  EntAppClass, EntClass;
+
+@default EI_flags = EF_ALLOWS_CHILDREN;
+
+
+
+@endc
+
+
+
+@endlib
+
+
+
+@endif /* _ENT_GOH_ */    
+
+		
+

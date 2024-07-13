@@ -1,161 +1,322 @@
-/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-
-	Copyright (c) Geoworks 1995 -- All Rights Reserved
-
-PROJECT:	PC/GEOS - LEGOS
-MODULE:		Basic Component Set - Controller Component
-FILE:		goolc.goh
-
-AUTHOR:		Martin Turon, Jan 27, 1995
-
-ROUTINES:
-	Name			Description
-	----			-----------
-
-REVISION HISTORY:
-	Name	Date		Description
-	----	----		-----------
-	martin	1/27/95   	Initial version.
-
-DESCRIPTION:
-	
-        $Id: goolC.goh,v 1.1 97/12/05 12:16:24 gene Exp $
-	$Revision: 1.1 $
-
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
-
-@include <stdapp.goh>
-@include <legos/basco.goh>
-@include <legos/ent.goh>
-@include <legos/gadget.goh>
-@include <string.h>
-@include <sprite.goh>
-
-/***************************************************************************
- *	    Macros that should be globally available, but aren't
- **************************************************************************/
-#define IntToWWFixed(x) (((dword)(x))<<16)
-
-typedef ByteFlags GoolControlFlags;
-#define GCF_BUILT 	0x01
-
-
-/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-		Component Class Definitions
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
-
-@class GoolControlClass, GadgetGeomClass;
-	@uses GenControlClass;
-
-       /*
- 	* This message is a temporary replacement for MSG_ENT_HANDLE_EVENT.
-	* It will be used until the real mechanism for sending events
-	* w/arguments is put into place.
- 	*
- 	* Context:
-	*	Note: Parameters that are strings should be RunHeapTokens.
- 	* Source:	
- 	* Destination:	
- 	* Interception:
-	*
- 	*/
-     	@message Boolean MSG_GOOL_CONTROL_SEND_EVENT(char *event, 
-						     byte *params);
-
-       /*
- 	* This message is used as a cast to get MSG_META_GCN_LIST_SEND to
-	* return the proper values when sending a MSG_META_GET_OPTR.  
-	* It is sort of a hack, but it seems there isn't any really good way
-	* to do this...
- 	*
- 	* Pass:		EventHandle	event 
-	* Return:	optr of desired object
- 	*
-	* Usage:	event = @record Class::MSG_META_GET_OPTR();
-	* Context:	 Used in the handler for MSG_BENT_MOVE_CHILD
- 	* Source:	 n/a
- 	* Destination:	 n/a
- 	* Interception: *Never* intercept this message.  It doesn't have a
- 	*		 handler, and it is never sent.  It is simply used
-	*		 to trick MSG_META_GCN_LIST_SEND to return the
-	*		 correct value. 
- 	*/
-        @alias (MSG_META_GCN_LIST_SEND) optr MSG_META_GET_OPTR_VIA_GCN_LIST 
-                          (@stack GCNListSendFlags flags, EventHandle event,
-			   MemHandle block, word listType, 
-			   ManufacturerID listManuf) = cx:dx;
-
-       /*
- 	* This message exists to allow us to send the update event
-	* asynchronously (i.e. use an @send instead of @call).  If 
-	* an @call is used, we tend to run out of memory when bringing
-	* up the property box.
- 	*
- 	* Context:  	sent by control to itself after receiving 
-	* 		GEN_CONTROL_UPDATE_UI.
- 	* Source:   	self
- 	* Destination: 	self
- 	* Interception: ???
-	*
- 	*/
-     	@message Boolean MSG_GOOL_CONTROL_SEND_UPDATE(optr component);
-
-        @instance  GoolControlFlags	GCI_flags = 0;
-
-@endc
-
-typedef WordFlags GoolGStringFlags;
-#define GGSF_DEFINING	0x0001
-
-
-@class GoolGStringClass, EntClass;
-
-        @instance GoolGStringFlags	GGSI_flags;
-        @instance ChunkHandle 		GGSI_gstring;
-        @instance GStateHandle		GGSI_gstrHan;
-@endc
-
-@class GoolSpriteContentClass, EntVisClass;
-@endc
-
-@class GoolSpriteClass, EntClass;
-
-    	@uses SpriteClass;
-@endc
-
-@class GoolSwitchFrameClass, GadgetGeomClass;
-        @instance optr		GSFI_currentContent;
-        @instance ChunkHandle	GSFI_moduleArray;
-@endc
-
-@class GoolMsgSendClass, EntClass;
-/*
- * GoolMsgSendClass relies on three generic properties:
- *  "message"  - an integer value specifying the message # to send
- *  "target"   - a component value specifying where to send it to
- *
- * GoolMsgSendClass responds to one action:
- *  "Send"     - component grabs the properties above and sends off a message,
- * 	         supplying the arguments passed in.
- *
- * The target method that will receive the message from GoolMsgSendClass
- * should be defined using MSG_ENT_DO_ACTION as a prototype.
- */
-
-@endc
-
-typedef enum
-{
-    ERROR_MODULE_NEEDS_DUPLO_TOP = 100,
-    ERROR_PSELF_NOT_POINTING_TO_THE_RIGHT_PLACE,
-    ERROR_PSELF_NOT_POINTING_TO_THE_RIGHT_OBJECT,
-
-} FatalErrors;
-
-typedef enum 
-{
-    WARNING_GOOLC_WARNING = 100
-} Warnings;
-
-extern FatalErrors feGoolC;
-extern Warnings wGoolC;
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+
+
+	Copyright (c) Geoworks 1995 -- All Rights Reserved
+
+
+
+PROJECT:	PC/GEOS - LEGOS
+
+MODULE:		Basic Component Set - Controller Component
+
+FILE:		goolc.goh
+
+
+
+AUTHOR:		Martin Turon, Jan 27, 1995
+
+
+
+ROUTINES:
+
+	Name			Description
+
+	----			-----------
+
+
+
+REVISION HISTORY:
+
+	Name	Date		Description
+
+	----	----		-----------
+
+	martin	1/27/95   	Initial version.
+
+
+
+DESCRIPTION:
+
+	
+
+        $Id: goolC.goh,v 1.1 97/12/05 12:16:24 gene Exp $
+
+	$Revision: 1.1 $
+
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+
+
+
+@include <stdapp.goh>
+
+@include <Legos/basco.goh>
+
+@include <Legos/ent.goh>
+
+@include <Legos/gadget.goh>
+
+@include <string.h>
+
+@include <sprite.goh>
+
+
+
+/***************************************************************************
+
+ *	    Macros that should be globally available, but aren't
+
+ **************************************************************************/
+
+#define IntToWWFixed(x) (((dword)(x))<<16)
+
+
+
+typedef ByteFlags GoolControlFlags;
+
+#define GCF_BUILT 	0x01
+
+
+
+
+
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+		Component Class Definitions
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+
+
+
+@class GoolControlClass, GadgetGeomClass;
+
+	@uses GenControlClass;
+
+
+
+       /*
+
+ 	* This message is a temporary replacement for MSG_ENT_HANDLE_EVENT.
+
+	* It will be used until the real mechanism for sending events
+
+	* w/arguments is put into place.
+
+ 	*
+
+ 	* Context:
+
+	*	Note: Parameters that are strings should be RunHeapTokens.
+
+ 	* Source:	
+
+ 	* Destination:	
+
+ 	* Interception:
+
+	*
+
+ 	*/
+
+     	@message Boolean MSG_GOOL_CONTROL_SEND_EVENT(char *event, 
+
+						     byte *params);
+
+
+
+       /*
+
+ 	* This message is used as a cast to get MSG_META_GCN_LIST_SEND to
+
+	* return the proper values when sending a MSG_META_GET_OPTR.  
+
+	* It is sort of a hack, but it seems there isn't any really good way
+
+	* to do this...
+
+ 	*
+
+ 	* Pass:		EventHandle	event 
+
+	* Return:	optr of desired object
+
+ 	*
+
+	* Usage:	event = @record Class::MSG_META_GET_OPTR();
+
+	* Context:	 Used in the handler for MSG_BENT_MOVE_CHILD
+
+ 	* Source:	 n/a
+
+ 	* Destination:	 n/a
+
+ 	* Interception: *Never* intercept this message.  It doesn't have a
+
+ 	*		 handler, and it is never sent.  It is simply used
+
+	*		 to trick MSG_META_GCN_LIST_SEND to return the
+
+	*		 correct value. 
+
+ 	*/
+
+        @alias (MSG_META_GCN_LIST_SEND) optr MSG_META_GET_OPTR_VIA_GCN_LIST 
+
+                          (@stack GCNListSendFlags flags, EventHandle event,
+
+			   MemHandle block, word listType, 
+
+			   ManufacturerID listManuf) = cx:dx;
+
+
+
+       /*
+
+ 	* This message exists to allow us to send the update event
+
+	* asynchronously (i.e. use an @send instead of @call).  If 
+
+	* an @call is used, we tend to run out of memory when bringing
+
+	* up the property box.
+
+ 	*
+
+ 	* Context:  	sent by control to itself after receiving 
+
+	* 		GEN_CONTROL_UPDATE_UI.
+
+ 	* Source:   	self
+
+ 	* Destination: 	self
+
+ 	* Interception: ???
+
+	*
+
+ 	*/
+
+     	@message Boolean MSG_GOOL_CONTROL_SEND_UPDATE(optr component);
+
+
+
+        @instance  GoolControlFlags	GCI_flags = 0;
+
+
+
+@endc
+
+
+
+typedef WordFlags GoolGStringFlags;
+
+#define GGSF_DEFINING	0x0001
+
+
+
+
+
+@class GoolGStringClass, EntClass;
+
+
+
+        @instance GoolGStringFlags	GGSI_flags;
+
+        @instance ChunkHandle 		GGSI_gstring;
+
+        @instance GStateHandle		GGSI_gstrHan;
+
+@endc
+
+
+
+@class GoolSpriteContentClass, EntVisClass;
+
+@endc
+
+
+
+@class GoolSpriteClass, EntClass;
+
+
+
+    	@uses SpriteClass;
+
+@endc
+
+
+
+@class GoolSwitchFrameClass, GadgetGeomClass;
+
+        @instance optr		GSFI_currentContent;
+
+        @instance ChunkHandle	GSFI_moduleArray;
+
+@endc
+
+
+
+@class GoolMsgSendClass, EntClass;
+
+/*
+
+ * GoolMsgSendClass relies on three generic properties:
+
+ *  "message"  - an integer value specifying the message # to send
+
+ *  "target"   - a component value specifying where to send it to
+
+ *
+
+ * GoolMsgSendClass responds to one action:
+
+ *  "Send"     - component grabs the properties above and sends off a message,
+
+ * 	         supplying the arguments passed in.
+
+ *
+
+ * The target method that will receive the message from GoolMsgSendClass
+
+ * should be defined using MSG_ENT_DO_ACTION as a prototype.
+
+ */
+
+
+
+@endc
+
+
+
+typedef enum
+
+{
+
+    ERROR_MODULE_NEEDS_DUPLO_TOP = 100,
+
+    ERROR_PSELF_NOT_POINTING_TO_THE_RIGHT_PLACE,
+
+    ERROR_PSELF_NOT_POINTING_TO_THE_RIGHT_OBJECT,
+
+
+
+} FatalErrors;
+
+
+
+typedef enum 
+
+{
+
+    WARNING_GOOLC_WARNING = 100
+
+} Warnings;
+
+
+
+extern FatalErrors feGoolC;
+
+extern Warnings wGoolC;
+

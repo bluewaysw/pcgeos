@@ -34,9 +34,9 @@ basco.eobj: Ansi/stdio.h geos.h Ansi/ctype.h Ansi/string.h resource.h \
                 parseint.h parse.h scanner.h ftab.h label.h stable.h \
                 sst.h Legos/Bridge/bsst.h write.h \
                 Legos/Internal/fformat.h vars.h vtab.h fixds.h strmap.h \
-                Legos/Bridge/bstrmap.h legos/runheap.h funtab.h \
-                Legos/Bridge/bfuntab.h Legos/Internal/runtask.h \
-                Legos/Internal/progtask.h Legos/Internal/runerr.h
+                Legos/Bridge/bstrmap.h funtab.h Legos/Bridge/bfuntab.h \
+                Legos/Internal/runtask.h Legos/Internal/progtask.h \
+                Legos/Internal/runerr.h
 comptime.obj \
 comptime.eobj: stdapp.goh object.goh ui.goh Objects/metaC.goh \
                 Objects/inputC.goh Objects/clipbrd.goh \
@@ -260,7 +260,7 @@ strmap.eobj: stable.h mystdapp.h geos.h heap.h geode.h resource.h ec.h \
                 Legos/basco.h Legos/opcode.h Legos/bug.h Legos/basrun.h \
                 math.h Legos/legtype.h Legos/runheap.h serialDr.h \
                 Legos/fido.h Ansi/stdio.h Ansi/string.h comtask.h \
-                btoken.h Legos/Bridge/bstrmap.h legos/runheap.h
+                btoken.h Legos/Bridge/bstrmap.h
 table.obj \
 table.eobj: geos.h object.h geode.h lmem.h table.h Legos/legtype.h \
                 Legos/Bridge/btable.h

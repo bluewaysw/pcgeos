@@ -28,7 +28,7 @@ DESCRIPTION:
 
 #ifndef LIBERTY
 #include <geos.h>
-#include <legos/runheap.h>
+#include <Legos/runheap.h>
 #endif
 
 #ifdef LIBERTY
