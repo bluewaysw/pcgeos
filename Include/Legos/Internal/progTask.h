@@ -66,7 +66,7 @@ DESCRIPTION:
 
 #include <Legos/runheap.h>
 
-#include <Legos/internal/runerr.h>
+#include <Legos/Internal/runerr.h>
 
 #endif
 

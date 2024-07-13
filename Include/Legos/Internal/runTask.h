@@ -68,7 +68,7 @@ typedef byte BugBuilderRequest;
 
 #else
 
-#include <Legos/bridge/bfuntab.h>
+#include <Legos/Bridge/bfuntab.h>
 
 #endif
 
