@@ -247,10 +247,7 @@
     TPoint*   arc;                  /* current Bezier arc pointer */
 
     UShort    bWidth;               /* target bitmap width  */
-    PByte     bTarget;              /* target bitmap buffer */
-#ifdef __GEOS__
-    PShort    rTarget;              /* target region buffer */
-#endif /* __GEOS__ */
+    PByte     bTarget;              /* target bitmap or region buffer */
 
     Long      lastX, lastY, minY, maxY;
 
@@ -336,7 +333,7 @@
     }
 
     ras.precision       = 1 << ras.precision_bits;
-    ras.precision_half  = ras.precision / 2;
+    ras.precision_half  = ras.precision >> 1;
     ras.precision_shift = ras.precision_bits - Pixel_Bits;
   }
 
@@ -439,7 +436,7 @@
       ras.cProfile->height = 0;
       ras.cProfile->offset = ras.top;
       oldProfile->next     = ras.cProfile;
-      ras.num_Profs++;
+      ++ras.num_Profs;
     }
 
     if ( ras.top >= ras.maxBuff )
@@ -476,7 +473,7 @@
 
     /* look for first y value that is <= */
     while ( n >= 0 && y < y_turns[n] )
-      n--;
+      --n;
 
     /* if it is <, simply insert it, ignore if == */
     if ( n >= 0 && y > y_turns[n] )
@@ -485,7 +482,7 @@
         y2 = y_turns[n];
         y_turns[n] = y;
         y = y2;
-        n--;
+        --n;
       }
 
     if ( n < 0 )
@@ -495,8 +492,8 @@
         ras.error = Raster_Err_Overflow;
         return FAILURE;
       }
-      ras.maxBuff--;
-      ras.numTurns++;
+      --ras.maxBuff;
+      ++ras.numTurns;
       ras.sizeBuff[-ras.numTurns] = y;
     }
 
@@ -556,7 +553,7 @@
           return FAILURE;
 
         p = p->link;
-        n--;
+        --n;
       }
     }
     else
@@ -747,7 +744,7 @@
         Ax -= Dy;
         x1 += Dx;
       }
-      size--;
+      --size;
     }
 
     ras.top = top;
@@ -825,7 +822,7 @@
       {
         if ( ras.joint )
         {
-          top--;
+          --top;
           ras.joint = FALSE;
         }
 
@@ -1188,8 +1185,8 @@
         /* if both first and last points are off the curve, */
         /* start at their middle and record its position    */
         /* for closure                                      */
-        ras.lastX = (ras.lastX + x_last)/2;
-        ras.lastY = (ras.lastY + y_last)/2;
+        ras.lastX = (ras.lastX + x_last) >> 1;
+        ras.lastY = (ras.lastY + y_last) >> 1;
 
         x_last = ras.lastX;
         y_last = ras.lastY;
@@ -1199,7 +1196,7 @@
     /* now process each contour point individually */
     while ( index < last )
     {
-      index++;
+      ++index;
       x = SCALED( ras.coords[index].x );
       y = SCALED( ras.coords[index].y );
 
@@ -1233,8 +1230,8 @@
         else
         {
           /* two successive `off' points => create middle point */
-          mx = ( cx + x ) / 2;
-          my = ( cy + y ) / 2;
+          mx = ( cx + x ) >> 1;
+          my = ( cy + y ) >> 1;
 
           if ( Bezier_To( RAS_VARS  mx, my, cx, cy ) ) return FAILURE;
 
@@ -1298,7 +1295,7 @@
 
     start = 0;
 
-    for ( i = 0; i < ras.nContours; i++ )
+    for ( i = 0; i < ras.nContours; ++i )
     {
       ras.state    = Unknown;
       ras.gProfile = NULL;
@@ -1579,7 +1576,7 @@
           break;
 
         case 4:
-          e1 = CEILING( (x1 + x2 + 1) / 2 );
+          e1 = CEILING( (x1 + x2 + 1) >> 1 );
           break;
 
         case 2:
@@ -1634,7 +1631,7 @@
           if ( ras.dropOutControl == 2 )
             e1 = e2;
           else
-            e1 = CEILING( (x1 + x2 + 1) / 2 );
+            e1 = CEILING( (x1 + x2 + 1) >> 1 );
 
           break;
 
@@ -1696,8 +1693,8 @@
                                                     PProfile    left,
                                                     PProfile    right )
   {
-    Long   e1, e2;
-    Short*  target;
+    Long    e1, e2;
+    PShort  target;
 
 
     /* Drop-out control */
@@ -1709,7 +1706,7 @@
     else
       e2 = TRUNC( FLOOR( x2 ) );
 
-    target = ras.rTarget + ras.traceOfs;
+    target = ( (PShort)ras.bTarget ) + ras.traceOfs;
 
     if ( ras.traceIncr == 0 )
       target[ras.traceIncr++] = y;
@@ -1735,12 +1732,12 @@
 
   static void _near  Vertical_Region_Sweep_Step( RAS_ARGS Short y )
   {
-    Short*  target;
-    Short*  targetLastLine;
+    PShort  target;
+    PShort  targetLastLine;
 
 
-    target         = ras.rTarget + ras.traceOfs;
-    targetLastLine = ras.rTarget + ras.traceOfsLastLine;
+    target         = ( (PShort)ras.bTarget ) + ras.traceOfs;
+    targetLastLine = ( (PShort)ras.bTarget ) + ras.traceOfsLastLine;
 
 
     /* special case: the current line was empty */
@@ -1751,7 +1748,7 @@
 
     /* finish current line */
 
-    target[ras.traceIncr++] = EOREGREC;
+    target[ras.traceIncr++] = (Short)EOREGREC;
 
 
     /* special case: no differences between last and current line */
@@ -1779,9 +1776,9 @@
 
     /* complete a region */
 
-    target = ras.rTarget + ras.traceOfs;
+    target =  ( (PShort)ras.bTarget ) + ras.traceOfs;
 
-    target[ras.traceIncr++] = EOREGREC;
+    target[ras.traceIncr++] = (Short)EOREGREC;
     ras.target.size = ( ras.traceOfs + ras.traceIncr ) * sizeof( Short );
   }
 
@@ -1803,7 +1800,7 @@
   }
 
 
-  static void _near  Horizontal_Sweep_Span( RAS_ARGS Short       y,
+  static void _near  Horizontal_Sweep_Span( RAS_ARGS Short y,
                                                TT_F26Dot6  x1,
                                                TT_F26Dot6  x2,
                                                PProfile    left,
@@ -1833,7 +1830,7 @@
   }
 
 
-  static void _near  Horizontal_Sweep_Drop( RAS_ARGS Short       y,
+  static void _near  Horizontal_Sweep_Drop( RAS_ARGS Short y,
                                                TT_F26Dot6  x1,
                                                TT_F26Dot6  x2,
                                                PProfile    left,
@@ -1860,7 +1857,7 @@
           break;
 
         case 4:
-          e1 = CEILING( (x1 + x2 + 1) / 2 );
+          e1 = CEILING( (x1 + x2 + 1) >> 1 );
           break;
 
         case 2:
@@ -1898,7 +1895,7 @@
           if ( ras.dropOutControl == 2 )
             e1 = e2;
           else
-            e1 = CEILING( (x1 + x2 + 1) / 2 );
+            e1 = CEILING( (x1 + x2 + 1) >> 1 );
 
           break;
 
@@ -2205,7 +2202,7 @@
 
     if ( ras.numTurns > 0 &&
          ras.sizeBuff[-ras.numTurns] == min_Y )
-      ras.numTurns--;
+      --ras.numTurns;
 
     while ( ras.numTurns > 0 )
     {
@@ -2276,7 +2273,7 @@
 
               /* mark profile for drop-out processing */
               P_Left->countL = 1;
-              dropouts++;
+              ++dropouts;
 
               goto Skip_To_Next;
             }
@@ -2300,7 +2297,7 @@
 
         ras.Proc_Sweep_Step( RAS_VARS y );
 
-        y++;
+        ++y;
 
         if ( y < y_change )
         {
@@ -2336,12 +2333,14 @@
       }
     }
 
+#ifdef TT_CONFIG_OPTION_GRAY_SCALING
     /* for gray-scaling, flushes the bitmap scanline cache */
     while ( y <= max_Y )
     {
       ras.Proc_Sweep_Step( RAS_VARS y );
-      y++;
+      ++y;
     }
+#endif
 
     ras.Proc_Sweep_Finish( RAS_VAR );
     return SUCCESS;
@@ -2356,7 +2355,6 @@ Scan_DropOuts :
       if ( P_Left->countL )
       {
         P_Left->countL = 0;
-        /* dropouts--;    -- this is useful when debugging only */
         ras.Proc_Sweep_Drop( RAS_VARS  y,
                                        P_Left->X,
                                        P_Right->X,
@@ -2410,7 +2408,7 @@ Scan_DropOuts :
         i = ras.band_stack[ras.band_top].y_min;
         j = ras.band_stack[ras.band_top].y_max;
 
-        k = ( i + j ) / 2;
+        k = ( i + j ) >> 1;
 
         if ( ras.band_top >= 7 || k < i )
         {
@@ -2423,13 +2421,13 @@ Scan_DropOuts :
         ras.band_stack[ras.band_top+1].y_max = j;
         ras.band_stack[ras.band_top].y_max = k - 1;
 
-        ras.band_top++;
+        ++ras.band_top;
       }
       else
       {
         if ( ras.fProfile )
           if ( Draw_Sweep( RAS_VAR ) ) return ras.error;
-        ras.band_top--;
+        --ras.band_top;
       }
     }
 
@@ -2593,7 +2591,7 @@ TT_Error  Render_Region_Glyph( RAS_ARGS TT_Outline*     glyph,
   ras.band_stack[0].y_max = ras.target.rows - 1;
 
   ras.bWidth  = ras.target.cols;
-  ras.rTarget = (Short*)ras.target.bitmap;
+  ras.bTarget = (PByte)ras.target.bitmap;
 
   if ( (error = Render_Single_Pass( RAS_VARS 0 )) != 0 )
     return error;
@@ -2606,13 +2604,13 @@ TT_Error  Render_Region_Glyph( RAS_ARGS TT_Outline*     glyph,
 
 static void Render_Region_Empty_Glyph( RAS_ARG )
 {
-    Short*  target = ras.rTarget;
+    PShort  target = (PShort)ras.bTarget;
 
 
     /* complete a region */
 
-    target[0] = EOREGREC;
-    target[1] = EOREGREC;
+    target[0] = (Short)EOREGREC;
+    target[1] = (Short)EOREGREC;
     ras.target.size = 2 * sizeof( Short );
 }
 

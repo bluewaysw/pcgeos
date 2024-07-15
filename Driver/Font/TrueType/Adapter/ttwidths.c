@@ -24,6 +24,7 @@
 #include <heap.h>
 #include "ttwidths.h"
 #include "ttcharmapper.h"
+#include "ttmemory.h"
 #include "ttinit.h"
 #include "freetype.h"
 #include "ftxkern.h"
@@ -269,6 +270,7 @@ EC(             ECCheckBounds( (void*)charTableEntry ) );
                 charTableEntry->CTE_width.WBF_frac = FRACTION_OF_WWFIXEDASDWORD( scaledWidth );
                 charTableEntry->CTE_dataOffset     = CHAR_NOT_BUILT;
                 charTableEntry->CTE_usage          = 0;
+                charTableEntry->CTE_flags          = 0;
                 
                
                 /* set flags in CTE_flags if needed */
@@ -290,15 +292,17 @@ EC(             ECCheckBounds( (void*)charTableEntry ) );
                         for( i = 0; i < fontBuf->FB_kernCount; ++i )
                         {
                                 /* If currentChar is right or left char in a kernpair set corresponding flags. */
-                                if( currentChar == kernPair->KP_charRight )
+                                if( currentChar == kernPair->KP_charLeft )
                                         charTableEntry->CTE_flags |= CTF_IS_FIRST_KERN;
-                                else if ( currentChar == kernPair->KP_charLeft )
+                                else if ( currentChar == kernPair->KP_charRight )
                                         charTableEntry->CTE_flags |= CTF_IS_SECOND_KERN;
 
                                 /* If currentChar is right and left char in a kernpair, it can be aborted. */
-                                if( charTableEntry->CTE_flags && CTF_IS_FIRST_KERN & 
-                                    charTableEntry->CTE_flags && CTF_IS_SECOND_KERN )
+                                if( charTableEntry->CTE_flags & (CTF_IS_FIRST_KERN | CTF_IS_SECOND_KERN) == 
+                                                                        (CTF_IS_FIRST_KERN | CTF_IS_SECOND_KERN)) 
                                         break;
+                        
+                                ++kernPair;
                         }
                 }
 
@@ -307,7 +311,6 @@ EC(             ECCheckBounds( (void*)charTableEntry ) );
 
         TT_Done_Glyph( GLYPH );
 }
-
 
 /********************************************************************
  *                      ConvertKernPairs
@@ -334,6 +337,7 @@ static void ConvertKernPairs( TRUETYPE_VARS, FontBuf* fontBuf )
 {
         TT_Kerning        kerningDir;
         word              table;
+        TT_Kern_0_Pair*   pairs;
 
         KernPair*  kernPair  = (KernPair*) ( ( (byte*)fontBuf ) + fontBuf->FB_kernPairs );
         BBFixed*   kernValue = (BBFixed*) ( ( (byte*)fontBuf ) + fontBuf->FB_kernValues );
@@ -357,15 +361,14 @@ EC(     ECCheckBounds( (void*)kernValue ) );
                 if( kerningDir.tables->format != 0 )
                         continue;
 
+                pairs = GEO_LOCK( kerningDir.tables->t.kern0.pairsBlock );
+EC(             ECCheckBounds( pairs ) );
+
                 for( i = 0; i < kerningDir.tables->t.kern0.nPairs; ++i )
                 {
-                        char left  = getGeosCharForIndex( kerningDir.tables->t.kern0.pairs[i].left );
-                        char right = getGeosCharForIndex( kerningDir.tables->t.kern0.pairs[i].right );
+                        char left  = getGeosCharForIndex( pairs[i].left );
+                        char right = getGeosCharForIndex( pairs[i].right );
 
-
-                        /* We only support decreasing the character spacing.*/
-                        if( kerningDir.tables->t.kern0.pairs[i].value > 0 )
-                                continue;
 
                         if( left && right )
                         {
@@ -375,7 +378,7 @@ EC(     ECCheckBounds( (void*)kernValue ) );
                                 kernPair->KP_charRight = right;
 
                                 /* save scaled kerning value */
-                                scaledKernValue = SCALE_WORD( kerningDir.tables->t.kern0.pairs[i].value, SCALE_WIDTH );
+                                scaledKernValue = SCALE_WORD( pairs[i].value, SCALE_WIDTH );
                                 kernValue->BBF_int = IntegerOf( scaledKernValue );
                                 kernValue->BBF_frac = FractionOf( scaledKernValue ) >> 8;
 
@@ -383,6 +386,8 @@ EC(     ECCheckBounds( (void*)kernValue ) );
                                 ++kernValue;
                         }
                 }
+
+                GEO_UNLOCK( kerningDir.tables->t.kern0.pairsBlock );
         }
 }
 
