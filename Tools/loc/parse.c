@@ -2067,17 +2067,18 @@ ConstructPath (const char *wildcard, const char *path)
  *	RainerB	7/11/2024   	Initial revision
  *
  ***********************************************************************/
-
 void LocHelp(int printMain) {
 
     if (printMain) fprintf(stderr, "LOC: Takes .rsc file(s) and turns them into a single .vm file for use by ResEdit. ");
     if (printMain) fprintf(stderr, "The .rsc files are only created for the NC version of the geode. ");
     fprintf(stderr, "Use:\n");
-    fprintf(stderr, "Windows: loc -o <outfile>.vm [-2] \n");
+    fprintf(stderr, "Windows: loc -o <outfile>.vm [-2] [fPattern]\n");
     fprintf(stderr, "Linux:   loc -o <outfile>.vm  [-2] rsc.rsc  <uifi1e1>.rsc  [<uifi1e2>.rsc  <ufile3>.rsc ...]\n");
     fprintf(stderr, "\t\t-o <outfile>.vm: Specify output file\n");
     fprintf(stderr, "\t\t   Normally use the DOS name of your geode with the extension .vm\n");
     fprintf(stderr, "\t\t-2: Create dbcs version of .vm file (usually not used)\n");
+    fprintf(stderr, "\t\tfPattern: (windows only, usually not used) specify another file pattern than *.rsc\n");
+    fprintf(stderr, "\t\t   Default is *.rsc\n");
 #if defined(_LINUX)
     fprintf(stderr, "Under Linux pass:\n");
     fprintf(stderr, "\t\trsc.rsc: Resource list file (must be passed)\n");
@@ -2157,6 +2158,7 @@ main(int argc, char **argv)
 
 #if defined(_LINUX)
     if (argc == 1) {
+    	LocHelp(TRUE);
 	exit(0);
     }
 #endif
@@ -2165,7 +2167,6 @@ main(int argc, char **argv)
 
     if (argc==1) LocHelp(TRUE);	// no arguments given -> print out help
     				// because -o should always passed
-
     for (i = 1; i < argc; i++) {
 	if (argv[i][0] == '-') {
 	    switch (argv[i][1]) {
@@ -2192,7 +2193,7 @@ main(int argc, char **argv)
 	    case '?':
 	    case 'h':
 		LocHelp(TRUE);
-	    	break;
+	    	exit(0);
 	    default:
 		fprintf(stderr, "%s: unknown option %s\n", argv[0], argv[i]);
 		LocHelp(TRUE);
@@ -2208,23 +2209,17 @@ main(int argc, char **argv)
 	        break;
 	    }
 	    curFile = argv[i];
-/*-----*/
 	    if (strcmp(curFile, "rsc.rsc")==0) {
 		foundFlags |= 1;
-		fprintf(stderr, curFile);
-		fprintf(stderr, " - setzt Flagbit 0\n");
 	    } else {
 		char *p;
 		p =strchr(curFile, '.');
 		if (p) {
 		    if (strcmp(p, ".rsc") == 0 ) {
 			foundFlags |= 2;
-			fprintf(stderr, curFile);
-			fprintf(stderr, " - setzt Flagbit 1\n");
 		    }
 		}
 	    }
-/*-----*/
 	    yylineno = 1;
 	    if (yyparse()) {
 	        (void)fclose(yyin);
@@ -2263,7 +2258,7 @@ main(int argc, char **argv)
 		    break;
 		}
 		free(fullPath);	/* #1 */
-		yylineno = 1;
+   		yylineno = 1;
 		if (yyparse()) {
 		    (void)fclose(yyin);
 		    break;
