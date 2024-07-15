@@ -1,3 +1,16 @@
+/**************************************************************************
+ *
+ * PROJECT:      Word Matcher wordlist supprot library
+ *               
+ *	REVISION HISTORY:
+ *	Date     	Name      Description
+ *	------------	--------  -----------
+ *	?		?	  Initial version. 
+ *	2024-06-30  	RainerB   Add Routines to create an new word list
+ *				  and support for uncompressed data base
+ *	
+ **************************************************************************/
+
 @deflib wmlib
 
 @include <stdapp.goh>
@@ -41,6 +54,8 @@ void near WMI_SetNextOfBlock(
                VMBlockHandle next) ;
 
 Boolean near WMI_FindWord(WMParamsStruct *wmStruct, Boolean newSearch) ;
+
+int WMI_CompressDecompressOrCopy(byte *src, int count, byte *dest, VMFileHandle fh, Boolean calledFromLock);
 
 #define WMI_SIZE_BLOCKS 6000
 
@@ -102,6 +117,14 @@ void * _export WMI_LockCompressed(
 
     if ( ptr->size > sizeof( WMI_BlockHeader ) )
     {
+    
+	WMI_CompressDecompressOrCopy(
+	    			(byte*) ptr + sizeof( WMI_SavedBlockHeader ),
+                            	ptr->compressedSize,
+                                (byte*) newPtr + sizeof( WMI_BlockHeader ), 
+                                file, TRUE);
+/*
+µµ
         CompressDecompress( (CLF_SOURCE_IS_BUFFER | CLF_DEST_IS_BUFFER |
                             CLF_DECOMPRESS | CLF_MOSTLY_ASCII ),
                             NullHandle,
@@ -109,6 +132,7 @@ void * _export WMI_LockCompressed(
                             ptr->compressedSize,
                             NullHandle,
                             (byte*) newPtr + sizeof( WMI_BlockHeader ));
+*/
     }
     VMUnlock( mem );
     *mh = currentMemBlock;
@@ -122,6 +146,7 @@ void _export WMI_UnlockCompressed(
     )
 {
     WMI_BlockHeader* newPtr;
+    VMFileHandle     fh;	
     MemHandle mem;
     WMI_SavedBlockHeader * ptr;
     word size;
@@ -131,6 +156,7 @@ void _export WMI_UnlockCompressed(
     if ( BHF_dirty & newPtr->flags )
     {
         ptr = VMLock( newPtr->vmFile, newPtr->vmBlock, &mem );
+        fh = newPtr->vmFile;
 
         ptr->next = newPtr->next;
         ptr->size = newPtr->size;
@@ -140,6 +166,13 @@ void _export WMI_UnlockCompressed(
             MemReAlloc( mem, newPtr->size + 16, 0 );
             ptr = MemDeref( mem );
 
+	    size = WMI_CompressDecompressOrCopy(
+	    			(byte*) newPtr + sizeof( WMI_BlockHeader ),
+                                newPtr->size - sizeof( WMI_BlockHeader ),
+                                (byte*) ptr + sizeof( WMI_SavedBlockHeader ), 
+                                fh, FALSE);
+/*	    
+µµ
             size = CompressDecompress( (CLF_SOURCE_IS_BUFFER | CLF_DEST_IS_BUFFER |
                                 CLF_MOSTLY_ASCII ),
                                 NullHandle,
@@ -147,6 +180,7 @@ void _export WMI_UnlockCompressed(
                                 newPtr->size - sizeof( WMI_BlockHeader ),
                                 NullHandle,
                                 (byte*) ptr + sizeof( WMI_SavedBlockHeader ));
+*/                                
             MemReAlloc( mem, size + sizeof( WMI_SavedBlockHeader ), 0 );
             ptr = MemDeref( mem );
             ptr->compressedSize = size;
@@ -823,45 +857,50 @@ sprintf(buff, " ->0x%X", block);
 
 
 
-    if ( compress )
-    {
-    	/*
-    	 * Current state: 	[WMI_BlockHeader] [uncompressed data]
-    	 * Destination state: 	[WMI_SavedBlockHeader] [compressed data]
-    	 * Strategy: 	lock VM block and get important information 
-    	 *		compress data to an extra memory block 
-    	 *		then resize VM block and copy compressed data back
-    	 */
-        srcPtr = VMLock(fh, block, &mem );
-        dataSize = srcPtr->size - sizeof(WMI_BlockHeader);
-        next = srcPtr->next;
-        
-	/* Alloc buffer, compress data */
-	buffer = malloc(dataSize + 100);
-	ptr = ((byte*)srcPtr) + sizeof(WMI_BlockHeader);
-	
+    /*
+     * Current state: 	[WMI_BlockHeader] [uncompressed data]
+     * Destination state: 	[WMI_SavedBlockHeader] [compressed data]
+     * Strategy: 	lock VM block and get important information 
+     *		compress data to an extra memory block 
+     *		then resize VM block and copy compressed data back
+     */
+    srcPtr = VMLock(fh, block, &mem );
+    dataSize = srcPtr->size - sizeof(WMI_BlockHeader);
+    next = srcPtr->next;
+    
+    /* Alloc buffer, compress data */
+    buffer = malloc(dataSize + 100);
+    ptr = ((byte*)srcPtr) + sizeof(WMI_BlockHeader);
+
+    compressedDataSize = WMI_CompressDecompressOrCopy(ptr, dataSize, buffer, fh, FALSE);
+
+
+/*	
+µµ
 	compressedDataSize = CompressDecompress( (CLF_SOURCE_IS_BUFFER | CLF_DEST_IS_BUFFER |
-                                CLF_MOSTLY_ASCII ),
-                                NullHandle,
-                                ptr,
-                                dataSize,
-                                NullHandle,
-                                buffer);
-        
-        /* Copy compressed data back to VM block */
-        MemReAlloc( mem, compressedDataSize + sizeof( WMI_SavedBlockHeader ), 0 );
-        destPtr = MemDeref( mem );
-        destPtr->size = dataSize + sizeof(WMI_BlockHeader);
-        destPtr->next = next;
-        destPtr->compressedSize = compressedDataSize;
-        ptr = ((byte*)destPtr) + sizeof(WMI_SavedBlockHeader);
-        memcpy(ptr, buffer, compressedDataSize);
+                CLF_MOSTLY_ASCII ),
+                NullHandle,
+                ptr,
+                dataSize,
+                NullHandle,
+                buffer);
+*/    
+    /* Copy  data back to VM block */
+    MemReAlloc( mem, compressedDataSize + sizeof( WMI_SavedBlockHeader ), 0 );
+    destPtr = MemDeref( mem );
+    destPtr->size = dataSize + sizeof(WMI_BlockHeader);
+    destPtr->next = next;
+    destPtr->compressedSize = compressedDataSize;
+    ptr = ((byte*)destPtr) + sizeof(WMI_SavedBlockHeader);
+    memcpy(ptr, buffer, compressedDataSize);
 
 	/* clean up */
-        VMDirty( mem );
-        VMUnlock( mem );
-        free(buffer);
-        
+    VMDirty( mem );
+    VMUnlock( mem );
+    free(buffer);
+
+if (compress) {        
+@PrintMessage(" (COMPRESS)");
     } else {
 @PrintMessage(" (uncompressed)");
     }
@@ -925,6 +964,46 @@ if (!block) @PrintMessage("-");
      if (closeFile) VMClose(fh, FALSE); 
      return FALSE;
 }
+
+/*--------------------- WMI_CompressDecompressOrCopy ---------------------
+ *	Purpose:	Compress, decompress or copy data
+ *	Strategy:	Check if data should be stored comressed and
+ *			select the proper strategy
+ *	Paramters:	*src	source buffer
+ *			count	number of bytes in source buffer
+ *			*dest	destination buffer
+ *			calledFromLock: relevant if data base holds compressed data
+ *				TRUE:  decompress data
+ *				FALSE: compress data
+ *			fh:	VMFile that holds the data base
+ *	Return:		number of copied bytes (if uncompressed)
+ *			number of compressed bytes (if compression has been performed )
+ *			compression error (if decompression has been performed )
+ ---------------------------------------------------------------------------*/
+int WMI_CompressDecompressOrCopy(byte *src, int count, byte *dest, VMFileHandle fh, Boolean calledFromLock) {
+word flags, retVal;
+
+    /* check for WL_DB_IS_UNCOMPRESSED bit */
+    
+    flags = WMI_GetIndex(fh, 0);
+    if ( flags & WL_DB_IS_UNCOMPRESSED ) {
+ 	/* uncompressed version of word list: just copy data */
+ 	memcpy(dest, src, count);
+ 	return count;
+    }
+    
+    /* Setup CompressDecompress flags and call the routine */
+    flags = CLF_SOURCE_IS_BUFFER | CLF_DEST_IS_BUFFER | CLF_MOSTLY_ASCII;
+    if (calledFromLock) flags |= CLF_DECOMPRESS;
+
+    retVal = CompressDecompress( flags, 
+    			NullHandle, src, count,
+    			NullHandle, dest);
+
+    return retVal;    // compressed size if calledFromLock is FASLE
+    		      // CMP_NO_ERROR or CMP_xxx error value if calledFromLock is TRUE
+}
+
 
 /*-------------------------------------------------------------------------*/
 

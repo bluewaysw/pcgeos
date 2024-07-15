@@ -1,4 +1,7 @@
 
+/*---------------------------------------------------------------------------
+	Some times ago:	Initial release, used by Wormatcher and Hangman App
+ ---------------------------------------------------------------------------*/
 #define WM_MAX_SIZE_WORD 20
 
 #define WME_NONE		0
@@ -26,6 +29,8 @@ void _pascal _export WMDeleteWord(WMParamsStruct *wmStruct, Boolean doSearch) ;
 
 /*---------------------------------------------------------------------------
 	2024-07-01	RainerB	- quick creation of a new wordlist added 
+			Uses by "Word List Creator" Application stored in
+			pcgeos/Appl/Tools/WListGen
  ---------------------------------------------------------------------------*/
 
 /*--------------------- WMCreateNewDB ---------------------
