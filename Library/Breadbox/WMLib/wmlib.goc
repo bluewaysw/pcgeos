@@ -1,6 +1,6 @@
 /**************************************************************************
  *
- * PROJECT:      Word Matcher wordlist supprot library
+ * PROJECT:      Word Matcher wordlist support library
  *               
  *	REVISION HISTORY:
  *	Date     	Name      Description
@@ -123,16 +123,7 @@ void * _export WMI_LockCompressed(
                             	ptr->compressedSize,
                                 (byte*) newPtr + sizeof( WMI_BlockHeader ), 
                                 file, TRUE);
-/*
-µµ
-        CompressDecompress( (CLF_SOURCE_IS_BUFFER | CLF_DEST_IS_BUFFER |
-                            CLF_DECOMPRESS | CLF_MOSTLY_ASCII ),
-                            NullHandle,
-                            (byte*) ptr + sizeof( WMI_SavedBlockHeader ),
-                            ptr->compressedSize,
-                            NullHandle,
-                            (byte*) newPtr + sizeof( WMI_BlockHeader ));
-*/
+
     }
     VMUnlock( mem );
     *mh = currentMemBlock;
@@ -171,16 +162,7 @@ void _export WMI_UnlockCompressed(
                                 newPtr->size - sizeof( WMI_BlockHeader ),
                                 (byte*) ptr + sizeof( WMI_SavedBlockHeader ), 
                                 fh, FALSE);
-/*	    
-µµ
-            size = CompressDecompress( (CLF_SOURCE_IS_BUFFER | CLF_DEST_IS_BUFFER |
-                                CLF_MOSTLY_ASCII ),
-                                NullHandle,
-                                (byte*) newPtr + sizeof( WMI_BlockHeader ),
-                                newPtr->size - sizeof( WMI_BlockHeader ),
-                                NullHandle,
-                                (byte*) ptr + sizeof( WMI_SavedBlockHeader ));
-*/                                
+
             MemReAlloc( mem, size + sizeof( WMI_SavedBlockHeader ), 0 );
             ptr = MemDeref( mem );
             ptr->compressedSize = size;
@@ -671,9 +653,6 @@ void _pascal _export WMDeleteWord(WMParamsStruct *wmStruct, Boolean doSearch)
 #define WL_DB_IS_UNCOMPRESSED 		1
 #define WL_DB_UNDER_CONSTRUCTION 	2
  	 
-// Debugging helper
-@define PrintMessage(info) @call debugText::MSG_VIS_TEXT_APPEND_PTR(info, 0);
-
 // Check DB valid by seeing, if the flag WL_DB_UNDER_CONSTRUCTION is set
 // return TRUE if not valid
 Boolean WMI_CheckNewDBValid(VMFileHandle fh) {
@@ -691,11 +670,8 @@ word flags;
  *	Paramters:
  *	Return:
  ---------------------------------------------------------------------------*/
-void _pascal _export WMCreateNewDB(VMFileHandle fh, Boolean compressed, optr debugText) {
+void _pascal _export WMCreateNewDB(VMFileHandle fh, Boolean compressed) {
 word flags;
-
-
-if (fh == 0) { @PrintMessage ("NewDB keine Datei\r"); return; }
 
       	/*
       	 * I use the index for a word len of zero to store the flag WL_DB_UNDER_CONSTRUCTION
@@ -703,14 +679,11 @@ if (fh == 0) { @PrintMessage ("NewDB keine Datei\r"); return; }
       	 * is in correct state.
       	 */
     flags = WL_DB_UNDER_CONSTRUCTION;
-    if (compressed == 0) flags |= WL_DB_IS_UNCOMPRESSED;	// <- used by WMFinishNewDB
+    if (compressed == 0) flags |= WL_DB_IS_UNCOMPRESSED;	// <- used by WMI_CompressDecompressOrCopy
     
     WMI_CreateLib(fh);    
     WMI_SetIndex(fh, 0,  flags);	/* useword len: zero */
       	 
-if (compressed) { @PrintMessage("Lib: New compressed DB created\r"); }
-	else  { @PrintMessage("Lib: New DB created\r"); }
-
 }	
 
 
@@ -723,7 +696,7 @@ if (compressed) { @PrintMessage("Lib: New compressed DB created\r"); }
  *	Paramters:
  *	Return:		TRUE in case of any error
  ---------------------------------------------------------------------------*/
-Boolean _pascal _export WMAddWordToNewDBUnchecked(VMFileHandle fh, char *newWord, optr debugText) {
+Boolean _pascal _export WMAddWordToNewDBUnchecked(VMFileHandle fh, char *newWord) {
 
 char	wordToAdd[WM_MAX_SIZE_WORD + 2];
 word 	lenWord ;
@@ -779,16 +752,6 @@ MemHandle mem ;
      */
     ptr = VMLock( fh, block, &mem );
 
-/*
-{
-char *buff = malloc(1000);
-memset(buff, 0, 1000);
-if(blockSize > sizeof(WMI_BlockHeader) ) memcpy(buff, ptr+sizeof(WMI_BlockHeader), blockSize - sizeof(WMI_BlockHeader));
-@PrintMessage(buff);
-@PrintMessage(" --> ");
-free(buff);
-}
-*/
     /* Expand the block for an additional word size. 
      * This also sets the new size for this block an marks it dirty */
     WMI_ResizeBlockInMem(mem, blockSize+lenWord) ;
@@ -798,18 +761,7 @@ free(buff);
        the newly added word will start and copy the word*/
     ptr += blockSize ;
     for (i=0; i<lenWord; i++)  *(ptr++) = wordToAdd[i] ;
-/*
-{
-char *buff = malloc(1000);
-ptr = (char *)MemDeref(mem) ;	// ptr was cchanged!
-memset(buff, 0, 1000);
-blockSize += lenWord;
-memcpy(buff, ptr+sizeof(WMI_BlockHeader), blockSize - sizeof(WMI_BlockHeader));
-@PrintMessage(buff);
-@PrintMessage("\r");
-free(buff);
-}
-*/
+
     /* Now we can unlock the block. */
     VMUnlock(mem) ;
 
@@ -820,11 +772,10 @@ free(buff);
 
 /*--------------------- WMI_FinishBlock ---------------------
  *	Purpose:	Finish a single data block 
- *			If compression is requested, compress data.
  *	Paramters:
  *	Return:		TRUE if any error
  ---------------------------------------------------------------------------*/
-void WMI_FinishBlock(VMFileHandle fh, VMBlockHandle block, Boolean compress, optr debugText) {
+void WMI_FinishBlock(VMFileHandle fh, VMBlockHandle block) {
 WMI_BlockHeader		*srcPtr;
 WMI_SavedBlockHeader	*destPtr;
 byte			*buffer, *ptr;
@@ -832,59 +783,23 @@ word 		dataSize, compressedDataSize;
 MemHandle	mem;
 VMBlockHandle	next;
 
-@if 0
-
-typedef struct {
-    VMBlockHandle next ;
-    word size ;            /* Uncompressed size incl. WMI_BlockHeader */
-    word compressedSize ;
-} WMI_SavedBlockHeader ;
-
-typedef struct {
-    VMBlockHandle next ;
-    word size ;            /* Uncompressed size incl. WMI_BlockHeader */
-    VMFileHandle  vmFile;
-    VMBlockHandle vmBlock;
-    word flags;
-} WMI_BlockHeader ;
-
-@endif
-
-
-char buff[20];
-sprintf(buff, " ->0x%X", block);
-@PrintMessage(buff);
-
-
-
     /*
-     * Current state: 	[WMI_BlockHeader] [uncompressed data]
-     * Destination state: 	[WMI_SavedBlockHeader] [compressed data]
-     * Strategy: 	lock VM block and get important information 
-     *		compress data to an extra memory block 
-     *		then resize VM block and copy compressed data back
+     * Current state: 		[WMI_BlockHeader] [uncompressed data]
+     * Destination state: 	[WMI_SavedBlockHeader] [compressed or copied data]
+     * Strategy:  lock VM block and get important information 
+     *		  compress or copy data to an extra memory block 
+     *		  then resize VM block and copy data back
      */
     srcPtr = VMLock(fh, block, &mem );
     dataSize = srcPtr->size - sizeof(WMI_BlockHeader);
     next = srcPtr->next;
     
-    /* Alloc buffer, compress data */
+    /* Alloc buffer, compress or copy data */
     buffer = malloc(dataSize + 100);
     ptr = ((byte*)srcPtr) + sizeof(WMI_BlockHeader);
 
     compressedDataSize = WMI_CompressDecompressOrCopy(ptr, dataSize, buffer, fh, FALSE);
 
-
-/*	
-µµ
-	compressedDataSize = CompressDecompress( (CLF_SOURCE_IS_BUFFER | CLF_DEST_IS_BUFFER |
-                CLF_MOSTLY_ASCII ),
-                NullHandle,
-                ptr,
-                dataSize,
-                NullHandle,
-                buffer);
-*/    
     /* Copy  data back to VM block */
     MemReAlloc( mem, compressedDataSize + sizeof( WMI_SavedBlockHeader ), 0 );
     destPtr = MemDeref( mem );
@@ -894,18 +809,10 @@ sprintf(buff, " ->0x%X", block);
     ptr = ((byte*)destPtr) + sizeof(WMI_SavedBlockHeader);
     memcpy(ptr, buffer, compressedDataSize);
 
-	/* clean up */
+    /* clean up */
     VMDirty( mem );
     VMUnlock( mem );
     free(buffer);
-
-if (compress) {        
-@PrintMessage(" (COMPRESS)");
-    } else {
-@PrintMessage(" (uncompressed)");
-    }
-    
-
 
 }
 
@@ -916,15 +823,12 @@ if (compress) {
  *	Paramters:
  *	Return:		TRUE if any error
  ---------------------------------------------------------------------------*/
-Boolean _pascal _export WMFinishNewDB(VMFileHandle fh, Boolean closeFile, optr debugText) {
+Boolean _pascal _export WMFinishNewDB(VMFileHandle fh, Boolean closeFile) {
 word	flags, n;
-Boolean	compress;
 VMBlockHandle	block, next;
 
     /* Check if database is created with WMCreateNewDB */
     if ( WMI_CheckNewDBValid(fh) ) {
-@PrintMessage("FinshNewDB with INVALID DB called ***** \r");
-    
      	if (closeFile) VMClose(fh, FALSE); 
     	return TRUE;
     	}
@@ -934,35 +838,20 @@ VMBlockHandle	block, next;
     flags &= ~WL_DB_UNDER_CONSTRUCTION;
     WMI_SetIndex(fh, 0, flags);
     
-    /* Transform any data block into a state, usabele by the rest of the library */
-    compress = (flags & WL_DB_IS_UNCOMPRESSED ) ? FALSE : TRUE;
+    /* Transform any data block into a state, usable by the rest of the library */
     for ( n = 1; n <= WM_MAX_SIZE_WORD; n++ ) {
-{
-char buff[20];
-sprintf(buff, "len=%u: ", n);
-@PrintMessage(buff);
-}
     	block = WMI_GetIndex(fh, n);
-if (!block) @PrintMessage("-");
     	while ( block ) {
     	    /* Handle chain of VM blocks */
     	    next = WMI_GetNextOfBlock(fh, block);
-    	    WMI_FinishBlock(fh, block, compress, debugText);
+    	    WMI_FinishBlock(fh, block);
     	    block = next;
     	} 
-@PrintMessage("\r");
     	
     }
-    
 
-
-@PrintMessage("FinshNewDB called - ok\r");
-
-
-
-
-     if (closeFile) VMClose(fh, FALSE); 
-     return FALSE;
+    if (closeFile) VMClose(fh, FALSE); 
+    return FALSE;
 }
 
 /*--------------------- WMI_CompressDecompressOrCopy ---------------------

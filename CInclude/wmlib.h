@@ -1,6 +1,6 @@
 
 /*---------------------------------------------------------------------------
-	Some times ago:	Initial release, used by Wormatcher and Hangman App
+	Some times ago:	Initial release, used by WordMatcher and Hangman App
  ---------------------------------------------------------------------------*/
 #define WM_MAX_SIZE_WORD 20
 
@@ -36,15 +36,15 @@ void _pascal _export WMDeleteWord(WMParamsStruct *wmStruct, Boolean doSearch) ;
 /*--------------------- WMCreateNewDB ---------------------
  *	Purpose:	Start building a new, empty word list data base.
  ---------------------------------------------------------------------------*/
-void _pascal _export WMCreateNewDB(VMFileHandle fh, Boolean compressed, optr debugText);
+void _pascal _export WMCreateNewDB(VMFileHandle fh, Boolean compressed);
 
 /*--------------------- WMAddWordToNewDBUnchecked ---------------------
  *	Purpose:	Add a word to new database, created with WMCreateNewDB
  *			For perfomance, it is not checked whether the word already exists!
 ---------------------------------------------------------------------------*/
-Boolean _pascal _export WMAddWordToNewDBUnchecked(VMFileHandle fh, char *newWord, optr debugText);
+Boolean _pascal _export WMAddWordToNewDBUnchecked(VMFileHandle fh, char *newWord);
 
 /*--------------------- WMFinishNewDB ---------------------
  *	Purpose:	Finish building the new word list data base.
  ---------------------------------------------------------------------------*/
-Boolean _pascal _export WMFinishNewDB(VMFileHandle fh, Boolean closeFile, optr debugText);
+Boolean _pascal _export WMFinishNewDB(VMFileHandle fh, Boolean closeFile);

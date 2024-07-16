@@ -134,14 +134,14 @@ word		len;
     	}
     	
     /* Open file */
-    	
+    fh = 0;	
     fh = VMOpen(fName, VMAF_FORCE_READ_WRITE | VMAF_FORCE_DENY_WRITE, VMO_CREATE_ONLY, 0);
-    if (fh == 0 ) {
+    if (fh == 0) {
     	ErrorBoxOptr(@FileExists);
     	return 0;
     	}
     
-    WMCreateNewDB(fh, g_compress, @WListMessageText);
+    WMCreateNewDB(fh, g_compress);
     return fh;
 }
 
@@ -236,7 +236,7 @@ void AddWordToDBInternal(char *inWord, VMFileHandle listFile, dword *added) {
 char word2[WORD_2_BUFFER_SIZE];
 Boolean  found;
 
-    WMAddWordToNewDBUnchecked(listFile, inWord, @WListMessageText);
+    WMAddWordToNewDBUnchecked(listFile, inWord);
     (*added)++;
     if (g_umlaut) {
     	
@@ -246,7 +246,7 @@ Boolean  found;
     	found = ConvertUmlauts(inWord, word2);
     	if (found) {
     	   if (strlen(word2) <= WM_MAX_SIZE_WORD) {
-    	   	WMAddWordToNewDBUnchecked(listFile, word2, @WListMessageText);
+    	   	WMAddWordToNewDBUnchecked(listFile, word2);
     	   	(*added)++;
     	   } else {
 	    	PrintError(ERR_TOO_LONG, word2);
@@ -339,11 +339,15 @@ char 	number[15];
 	
 	if ( i == 1) {
 	    PrintError(ERR_TOO_SHORT, inWord);
+	    stop = @call WListStopTrigger::MSG_STOP_GET_STOPPED();
+	    if(stop) break;
 	    continue;
 	    }
 
 	if ( i > WM_MAX_SIZE_WORD) {
 	    PrintError(ERR_TOO_LONG, inWord);
+	    stop = @call WListStopTrigger::MSG_STOP_GET_STOPPED();
+	    if(stop) break;
 	    continue;
 	    }
 
@@ -481,7 +485,7 @@ word 		value;
     @send WListFileSelector::MSG_GEN_SET_ENABLED(VUM_NOW);
 
     FileClose(srcFile, FALSE);
-    WMFinishNewDB(listFile, TRUE, @WListMessageText);	// close DB file
+    WMFinishNewDB(listFile, TRUE);	// close DB file
     
 
 }
