@@ -613,7 +613,7 @@ CCOM_MODEL	?= -ml
 # -fpi87 -> generate x87 instructions
 
 CCOMFLAGS       += -D__GEOS__ -D__WATCOM__ -w4 -fpi87\
-		   -zu -ol -ol+ -s -of -of+ -ecc -zp1 -ei -zdp -d2 -hc -os \
+		   -zu -of -of+ -ol -ol+ -s -ecc -zp1 -ei -zdp -d2 -hc\
 		   $(CCOM_MODEL)
 
 #if defined(linux)
