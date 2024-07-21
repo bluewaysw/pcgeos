@@ -1207,7 +1207,7 @@ OutputLineNumberWithCount(int lineNumber, char *fileName,Boolean print)
 		*to = (*from =='\\' && 
 			((compiler==COM_MSC) || (compiler==COM_WATCOM)))? '/' : *from;
 	    }
-	    strcpy(to,"\"\n");
+	    sprintf(to,"\"\n");
 	    prevFile =  fileName;
 	}
 	break;
