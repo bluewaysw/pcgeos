@@ -288,6 +288,21 @@ MSObj_ReadRecord(FILE	*stream,    /* Stream from which to read */
     if ((sum == 0) && (rectype == MO_LEDATA || rectype == MO_LIDATA || rectype == MO_LEDATA32 || rectype == MO_LIDATA32 )) {
 	byte	nextRecord = getc(stream);
 
+	if (nextRecord == MO_COMENT) {
+	    byte	lenLow, lenHigh, data;
+	    word	fixLen;
+
+	    lenLow = getc(stream);
+	    lenHigh = getc(stream);
+
+	    fixLen = lenLow | (lenHigh << 8);
+	    while(fixLen > 0) {
+		data = getc(stream);
+		fixLen--;
+	    }
+	    nextRecord = getc(stream);
+	}
+
 	if (nextRecord == MO_FIXUPP) {
 	    byte	lenLow, lenHigh;
 	    word	fixLen;
@@ -2044,6 +2059,7 @@ MSObj_PerformRelocations(const char	*file,	    /* Name of object file */
     } else {
 	nextRel = NULL;
     }
+
     /*
      * This is garbage; it works for every case but the standalone, thread-
      * defining FIXUPP record, where nothing comes before the data for the
@@ -2456,6 +2472,7 @@ MSObj_PerformRelocations(const char	*file,	    /* Name of object file */
 			 * to do the offset relocation
 			 */
 		    } else {
+
 			if (!(fixLoc & FL_SEG_REL)) {
 			    if (pass == 2) {
 				Pass2_RelocError(sd, fixOff,
@@ -2494,7 +2511,8 @@ MSObj_PerformRelocations(const char	*file,	    /* Name of object file */
                                                         offset+(fixme[0]|(fixme[1]<<8)),
 							&os,
 							&targetBlock);
-                                }
+                                
+				}
 
 				/*
 				 * Byte before the far pointer is a far call
