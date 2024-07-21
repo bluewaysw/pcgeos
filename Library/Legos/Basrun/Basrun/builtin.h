@@ -28,19 +28,7 @@ DESCRIPTION:
 #ifndef _BUILTIN_H_
 #define _BUILTIN_H_
 
-typedef enum
-{
-#define BTABLE_ENUM
-#ifdef LIBERTY
-#include "Legos/btable.h"
-#else
-#include <Legos/Bridge/btable.h>
-#endif
-#undef BTABLE_ENUM
-    NUM_BUILT_IN_FUNCTIONS
-} BuiltInFuncEnum;
-
-typedef void (BuiltInVector)(RMLPtr, BuiltInFuncEnum);
+#include "table.h"
 
 /* This table is defined in builtin.c
  */
@@ -50,16 +38,9 @@ const BuiltInVector *
 GetBuiltInFunction(int funcNumber);
 
 #else
-typedef struct {
-    BuiltInVector       *BIFE_vector;
-} BuiltInFuncEntry;
 
-#ifdef __BORLANDC__
-extern BuiltInFuncEntry _far BuiltInFuncs[NUM_BUILT_IN_FUNCTIONS];
-#else /* __HIGHC__ */
-extern BuiltInFuncEntry BuiltInFuncs[NUM_BUILT_IN_FUNCTIONS];
 #endif
-#endif
+
 
 #define DEFUN(_name) void _name(register RMLPtr rms, BuiltInFuncEnum id)
 

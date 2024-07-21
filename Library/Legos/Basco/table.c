@@ -36,7 +36,7 @@ DESCRIPTION:
 #define vfar
 #endif
 
-BascoBuiltInEntry vfar BuiltInFuncs[ NUM_BUILT_IN_FUNCTIONS ] =
+const BascoBuiltInEntry vfar BuiltInFuncs[ NUM_BUILT_IN_FUNCTIONS ] =
 {
 #define BTABLE_BASCO_TABLE
 #include <Legos/Bridge/btable.h>

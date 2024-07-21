@@ -660,6 +660,8 @@ LRunHeapEnum(RunHeapType EC(rht), RunHeapCB callback, void *extra_data)
 /* Borland thing */
 #ifdef __BORLANDC__
 #define MK_FP( seg,ofs )( (void _seg * )( seg ) +( void near * )( ofs ))
+#elif defined(__WATCOMC__)
+#define MK_FP( seg,ofs )( ((unsigned short)(seg)):>((void __near*)(ofs)) )
 #else /*__HIGHC__*/
 #define MK_FP( seg,ofs )( (void *)ConstructOptr((void*)seg,(void*)ofs) )
 #endif
@@ -1517,7 +1519,7 @@ RunHeapEnum(RunHeapInfo* rhi, RunHeapType rht,
 #else  /*__HIGHC__*/
 	lmbh = (LMemBlockHeader *)MemLock(heap_block);
 #endif
-	chunks = (ChunkHandle*)MK_FP(lmbh, lmbh->LMBH_offset);
+	chunks = (ChunkHandle*)MK_FP(((dword) lmbh) >> 16, lmbh->LMBH_offset);
 
 	for (j=0; j<lmbh->LMBH_nHandles; j++, chunks++)
 	{
@@ -1527,7 +1529,7 @@ RunHeapEnum(RunHeapInfo* rhi, RunHeapType rht,
 	    chunkOffset = *chunks;
 	    if (chunkOffset == 0 || chunkOffset == -1) continue;
 	    
-	    rhe = MK_FP(lmbh, chunkOffset);
+	    rhe = MK_FP(((dword) lmbh) >> 16, chunkOffset);
 	    EC_ERROR_IF(rhe->RHE_cookie != RHE_COOKIE_VALUE,
 			RE_FAILED_ASSERTION);
 

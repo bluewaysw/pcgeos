@@ -35,9 +35,9 @@ library math
 library	gadget		# For LegosAppClass.
 library ent		# For EntAppClass
 
-resource APPRESOURCE    object
-resource INTERFACE      object
-resource LVHACK_TEXT	fixed code read-only shared
+resource AppResource    object
+resource Interface      object
+resource lvhack_TEXT	fixed code read-only shared
 
 export  LViewInterpClass
 export LViewAppClass

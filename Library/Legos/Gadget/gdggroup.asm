@@ -271,7 +271,7 @@ GadgetGroupSetLook	method dynamic GadgetGroupClass,
 	;
 	; call our superclass to set the look
 	;
-		mov	di, offset GadgetScrollbarClass
+		mov	di, offset GadgetGroupClass
 		call	ObjCallSuperNoLock
 	;
 	; call utility to add and remove hints as necessary

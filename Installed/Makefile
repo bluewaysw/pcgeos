@@ -1803,7 +1803,7 @@ resedit	: Installed/Appl/Tools/Localize
 Installed/Appl/Tools/Localize:		ui text spool MAKEAPPL
 
 # Legos geodes
-legos	: basrun basco ent gadget bent bgadget comps
+legos	: basrun basco ent gadget bent bgadget comps gandalf launch lview vmfi
 
 basrun	: Installed/Library/Legos/Basrun
 Installed/Library/Legos/Basrun:		ui math ansic hash streamc MAKELIB
@@ -1860,3 +1860,15 @@ Installed/Library/DataX:		ui MAKELIB
 
 datastore	:  Installed/Library/DataStore
 Installed/Library/DataStore:		kernel text datax MAKELIB
+
+gandalf	:  Installed/Appl/Legos/Gandalf
+Installed/Appl/Legos/Gandalf:			ui ansic ent bent basco basrun bgadget gadget borlandc MAKEAPPL
+
+launch	:  Installed/Appl/Legos/Launch
+Installed/Appl/Legos/Launch:			ui ansic gadget	basrun ent MAKEAPPL
+
+lview	:  Installed/Appl/Legos/LView
+Installed/Appl/Legos/LView:			ui ansic basrun basco math gadget ent MAKEAPPL
+
+vmfi	:  Installed/Driver/Fido/VMFI
+Installed/Driver/Fido/VMFI:			kernel MAKEDRV

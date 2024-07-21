@@ -110,7 +110,8 @@ comp.eobj: geos.h heap.h geode.h resource.h ec.h object.h lmem.h \
                 Legos/Internal/runerr.h Legos/Internal/progtask.h \
                 Basrun/fixds.h Basrun/stack.h Basrun/strmap.h \
                 Legos/Bridge/bstrmap.h Basrun/profile.h Basrun/rheapint.h \
-                Basrun/bugext.h Basrun/builtin.h Legos/Bridge/btable.h
+                Basrun/bugext.h Basrun/builtin.h Basrun/table.h \
+                Legos/Bridge/btable.h
 computil.obj \
 computil.eobj: Legos/basrun.goh Legos/ent.goh stdapp.goh object.goh \
                 ui.goh Objects/metaC.goh Objects/inputC.goh \
@@ -230,8 +231,8 @@ builtin.eobj: Basrun/mystdapp.h geos.h heap.h geode.h resource.h ec.h \
                 Basrun/funtab.h Legos/Internal/runerr.h \
                 Legos/Internal/progtask.h Basrun/fixds.h Basrun/stack.h \
                 Basrun/mymath.h Basrun/prog.h Basrun/rheapint.h \
-                Basrun/builtin.h Legos/Bridge/btable.h Basrun/profile.h \
-                fidoint.h
+                Basrun/builtin.h Basrun/table.h Legos/Bridge/btable.h \
+                Basrun/profile.h fidoint.h
 debug.obj \
 debug.eobj: Basrun/mystdapp.h geos.h heap.h geode.h resource.h ec.h \
                 object.h lmem.h system.h geoworks.h char.h \
@@ -253,8 +254,8 @@ ehan.eobj: Ansi/string.h geos.h Basrun/mystdapp.h heap.h geode.h \
                 Legos/Bridge/bfuntab.h Basrun/funtab.h \
                 Legos/Internal/runerr.h Legos/Internal/progtask.h \
                 Basrun/fixds.h Basrun/stack.h Basrun/bugext.h sem.h \
-                Basrun/rheapint.h Basrun/builtin.h Legos/Bridge/btable.h \
-                Basrun/ehan.h Basrun/ehanint.h
+                Basrun/rheapint.h Basrun/builtin.h Basrun/table.h \
+                Legos/Bridge/btable.h Basrun/ehan.h Basrun/ehanint.h
 fidoutil.obj \
 fidoutil.eobj: Ansi/string.h geos.h Basrun/compat.h Basrun/mystdapp.h \
                 heap.h geode.h resource.h ec.h object.h lmem.h system.h \
@@ -314,8 +315,8 @@ runmain.eobj: Basrun/mystdapp.h geos.h heap.h geode.h resource.h ec.h \
                 Legos/Internal/runerr.h Basrun/runint.h Basrun/compat.h \
                 Basrun/run.h Legos/fido.h Legos/Internal/runtask.h \
                 Legos/bug.h serialDr.h Basrun/fixds.h Basrun/stack.h \
-                Basrun/builtin.h Legos/Bridge/btable.h Basrun/sst.h \
-                hash.h Legos/Bridge/bsst.h Basrun/runmath.h \
+                Basrun/builtin.h Basrun/table.h Legos/Bridge/btable.h \
+                Basrun/sst.h hash.h Legos/Bridge/bsst.h Basrun/runmath.h \
                 Basrun/profile.h Basrun/strmap.h Legos/Bridge/bstrmap.h \
                 Basrun/rheapint.h Basrun/bugext.h sem.h Basrun/ehan.h
 runmain2.obj \
@@ -331,8 +332,8 @@ runmain2.eobj: Basrun/mystdapp.h geos.h heap.h geode.h resource.h ec.h \
                 Basrun/fixds.h Basrun/stack.h Basrun/sst.h hash.h \
                 Legos/Bridge/bsst.h Basrun/strmap.h \
                 Legos/Bridge/bstrmap.h Basrun/profile.h Basrun/rheapint.h \
-                Basrun/builtin.h Legos/Bridge/btable.h Basrun/runmath.h \
-                Basrun/bugext.h
+                Basrun/builtin.h Basrun/table.h Legos/Bridge/btable.h \
+                Basrun/runmath.h Basrun/bugext.h
 runmath.obj \
 runmath.eobj: Ansi/stdio.h geos.h Ansi/string.h Legos/runheap.h math.h \
                 Basrun/mystdapp.h heap.h geode.h resource.h ec.h object.h \
@@ -382,6 +383,15 @@ strmap.eobj: Basrun/mystdapp.h geos.h heap.h geode.h resource.h ec.h \
                 Basrun/faterr.h Ansi/string.h Basrun/strmap.h \
                 Legos/runheap.h Legos/Bridge/bstrmap.h Basrun/fixds.h \
                 Basrun/rheapint.h
+table.obj \
+table.eobj: geos.h object.h geode.h lmem.h Basrun/table.h \
+                Basrun/runint.h Basrun/compat.h hugearr.h Basrun/run.h \
+                Legos/fido.h Legos/basrun.h geoworks.h vm.h math.h \
+                Legos/opcode.h Legos/legtype.h Legos/runheap.h \
+                Legos/Internal/runtask.h Legos/bug.h serialDr.h \
+                Legos/Bridge/bfuntab.h Basrun/funtab.h \
+                Legos/Internal/runerr.h Legos/Internal/progtask.h \
+                Basrun/fixds.h Legos/Bridge/btable.h
 unload.obj \
 unload.eobj: Basrun/mystdapp.h geos.h heap.h geode.h resource.h ec.h \
                 object.h lmem.h system.h geoworks.h char.h \
@@ -392,8 +402,8 @@ unload.eobj: Basrun/mystdapp.h geos.h heap.h geode.h resource.h ec.h \
                 Legos/bug.h serialDr.h Legos/Bridge/bfuntab.h \
                 Basrun/runint.h Basrun/compat.h hugearr.h Basrun/run.h \
                 Basrun/funtab.h Basrun/fixds.h Basrun/stack.h \
-                Basrun/ehan.h Basrun/builtin.h Legos/Bridge/btable.h \
-                Basrun/computil.h Basrun/prog.h Basrun/rheapint.h \
-                Basrun/unload.h
+                Basrun/ehan.h Basrun/builtin.h Basrun/table.h \
+                Legos/Bridge/btable.h Basrun/computil.h Basrun/prog.h \
+                Basrun/rheapint.h Basrun/unload.h
 
 basrunEC.geo basrun.geo : geos.ldf ui.ldf math.ldf ansic.ldf hash.ldf streamc.ldf borlandc.ldf 

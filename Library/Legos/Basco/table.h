@@ -42,8 +42,8 @@ typedef struct
 } BascoBuiltInEntry;
 
 #ifdef __BORLANDC__
-extern BascoBuiltInEntry _far BuiltInFuncs[NUM_BUILT_IN_FUNCTIONS];
+extern const BascoBuiltInEntry _far BuiltInFuncs[NUM_BUILT_IN_FUNCTIONS];
 #else
-extern BascoBuiltInEntry BuiltInFuncs[NUM_BUILT_IN_FUNCTIONS];
+extern const BascoBuiltInEntry BuiltInFuncs[NUM_BUILT_IN_FUNCTIONS];
 #endif
 #endif /* _TABLE_H_ */

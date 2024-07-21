@@ -44,11 +44,13 @@ NEC <LVHACK_G_TEXT	segment  public "CODE" byte			>
 	global	_LViewSendDestroyMsg:far
 NEC <LVHACK_G_TEXT	ends						>
 EC  <LVHACK_E_TEXT	ends						>
+elifdef __WATCOMC__
+	global	_LViewSendDestroyMsg:far
 else
 	global	LViewSendDestroyMsg:far
 endif
 
-LVHACK_TEXT 	segment  public "CODE" byte
+lvhack_TEXT 	segment  public "CODE" byte
 
 COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 		LViewIdleHandler
@@ -92,6 +94,8 @@ LViewIdleHandler	proc	far
 	; (written in GOC for convenience)
 ifdef __BORLANDC__
 		call	_LViewSendDestroyMsg
+elifdef __WATCOMC__
+		call	_LViewSendDestroyMsg
 else
 		call	LViewSendDestroyMsg
 endif
@@ -99,11 +103,11 @@ endif
 		ret
 LViewIdleHandler	endp
 	
-LVHACK_TEXT	ends
+lvhack_TEXT	ends
 
 
 
-LVIEW_TEXT segment public  "CODE"  byte
+lvview_TEXT segment public  "CODE"  byte
 
 COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 		InstallSysIdleHandler
@@ -171,4 +175,4 @@ _UninstallSysIdleHandler	proc	far
 _UninstallSysIdleHandler	endp
 	public _UninstallSysIdleHandler
 		
-LVIEW_TEXT ends
+lvview_TEXT ends

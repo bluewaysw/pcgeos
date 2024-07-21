@@ -35,5 +35,5 @@ library ui
 library	basrun
 library ent
 
-resource APPRESOURCE    object
+resource AppResource    object
 stack	8192

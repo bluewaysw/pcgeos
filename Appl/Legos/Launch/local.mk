@@ -2,5 +2,5 @@
 
 zoomer  :: $(GEODE).geo
 
-CCOMFLAGS += -wdef -wuse
+#CCOMFLAGS += -wdef -wuse
 LINKFLAGS += -r

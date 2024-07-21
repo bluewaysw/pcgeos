@@ -151,41 +151,6 @@ asm {	pop	es			}
 #pragma warn +rvl
 #endif
 
-#if defined(__BORLANDC__)
-#pragma option -zEFUNC_TABLE_TEXT -zFDATA
-#define vfar _far
-#endif
-
-/* The compiler has already mapped built-in calls into one of the following
-   entries. the Enum field for each is also supplied to the called routine...
-   
-   There is one entry for _every_ built-in basic function.
-
-   Make sure the order here matches the order in the enum declaration
-   (in Bridge/btable.h) EXACTLY!
-*/
-
-#ifdef LIBERTY
-const BuiltInVector * const BuiltInFuncs[ NUM_BUILT_IN_FUNCTIONS ] =
-#else
-#ifdef __BORLANDC__
-BuiltInFuncEntry vfar BuiltInFuncs[ NUM_BUILT_IN_FUNCTIONS ] =
-#else /* __HIGHC__ */
-BuiltInFuncEntry BuiltInFuncs[ NUM_BUILT_IN_FUNCTIONS ] =
-#endif
-#endif
-{
-#define BTABLE_BASRUN_TABLE
-#ifdef LIBERTY
-#include "Legos/btable.h"
-#else
-#include <Legos/Bridge/btable.h>
-#endif
-};
-
-#if defined(__BORLANDC__)
-#pragma option -zE* -zF*
-#endif
 
 #ifdef LIBERTY
 /* workaround a GHS compiler bug for exporting const arrays, the GHS

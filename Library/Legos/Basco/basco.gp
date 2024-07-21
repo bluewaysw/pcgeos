@@ -66,6 +66,9 @@ library tree
 library basrun
 
 resource DialogStrings lmem shared read-only
+
+
+
 export CompileInterpClass
 
 # Loading/compiling/saving

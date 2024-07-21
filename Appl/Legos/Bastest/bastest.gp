@@ -37,8 +37,8 @@ library ent
 library gadget
 library bgadget
 
-resource APPRESOURCE    object
-resource INTERFACE      object
+resource AppResource    object
+resource Interface      object
 
 stack   8192
 

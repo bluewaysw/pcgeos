@@ -7,12 +7,12 @@ GEODE           = basrun
 BASRUN          = basrunManager.asm heapint.def bugmain.c builtin.c debug.c\
                   ehan.c fidoutil.c funtab.c math.c prog.c rpc.c runec.c\
                   runheap.c runmain.c runmain2.c runmath.c runrout.c\
-                  runtask.c sst.c strmap.c unload.c bugext.h bugint.h\
-                  builtin.h compat.h computil.h ehan.h ehanint.h faterr.h\
-                  fixds.h funtab.h mymath.h mystdapp.h profile.h prog.h\
-                  rheapint.h run.h runint.h runmath.h sst.h stack.h\
-                  strmap.h unload.h comp.goc computil.goc interp.goc\
-                  runerr.goc
+                  runtask.c sst.c strmap.c table.c unload.c bugext.h\
+                  bugint.h builtin.h compat.h computil.h ehan.h ehanint.h\
+                  faterr.h fixds.h funtab.h mymath.h mystdapp.h profile.h\
+                  prog.h rheapint.h run.h runint.h runmath.h sst.h stack.h\
+                  strmap.h table.h unload.h comp.goc computil.goc\
+                  interp.goc runerr.goc
 FIDOENUM        = eagg.asm emain.asm etable.asm fidoenumManager.asm
 FIDOMAIN        = fidomainManager.asm mentry.asm mgeode.asm mmodule.asm\
                   mtask.asm
@@ -20,8 +20,8 @@ UI_TO_RDFS      =
 OBJS            = bugmain.obj builtin.obj debug.obj ehan.obj fidoutil.obj\
                   funtab.obj math.obj prog.obj rpc.obj runec.obj\
                   runheap.obj runmain.obj runmain2.obj runmath.obj\
-                  runrout.obj runtask.obj sst.obj strmap.obj unload.obj\
-                  comp.obj computil.obj interp.obj runerr.obj
+                  runrout.obj runtask.obj sst.obj strmap.obj table.obj\
+                  unload.obj comp.obj computil.obj interp.obj runerr.obj
 COMMON          = fidoint.def fidoint.h fidostr.def
 MODULES         = Basrun Fidoenum Fidomain
 CMODULES        = Basrun
