@@ -13,7 +13,7 @@
 
 name        wlgen.app
 type        appl, process, single
-platform    geos201
+# platform    geos201
 class       WListProcessClass
 appobj      WListApp
 
@@ -28,8 +28,6 @@ library	geos
 library	ansic
 library	ui
 library wmlib
-
-exempt wmlib
 
 # *************** Resourcen *************** #
 # Bsp: resource DATARESOURCE lmem read-only shared data
