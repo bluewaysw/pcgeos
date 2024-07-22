@@ -621,8 +621,8 @@ i_vfprintf(FILE *stream,		/* Where to output formatted results. */
 				 * printed.  See the man page for details. */
 	 va_list args,		/* Variable number of values to be formatted
 				 * and printed. */
-	 int isstrm) /* TRUE if the stream paramater is actually a
-										 pointer to a buffer pointer */
+	 int isstrm)		/* FALSE if the stream paramater is actually a
+				 * pointer to a buffer pointer */
 {
     int leftAdjust;		/* TRUE means field should be left-adjusted*/
     int minWidth;		/* Minimum width of field. */
@@ -674,10 +674,12 @@ i_vfprintf(FILE *stream,		/* Where to output formatted results. */
 	     * but only if the stream is in binary mode, otherwise it happens
 	     * automatically.
 	     */
-#if defined(__HIGHC__) || defined(_MSC_VER) || defined(__WATCOMC__)
-	    if ((c == '\n') && (!isstrm || (stream->_flag & _O_BINARY))) {
+#if defined(__HIGHC__) || defined(_MSC_VER)
+	    if (isstrm && (c == '\n') && (stream->_flag & _O_BINARY)) {
+#elif defined(__WATCOMC__)
+	    if (isstrm && (c == '\n') && (stream->_flag & _BINARY)) {
 #else
-	    if ((c == '\n') && (!isstrm || (stream->flags & _F_BIN))) {
+	    if (isstrm && (c == '\n') && (stream->flags & _F_BIN)) {
 #endif
 		i_putc('\r', stream);
 	    }
