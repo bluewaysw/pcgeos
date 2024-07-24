@@ -241,8 +241,8 @@ GadgetFormEntInitialize	method dynamic GadgetFormClass,
 		mov	di, offset GadgetFormClass
 		call	ObjCallSuperNoLock
 	;
-	; Set the moniker to "NewBASIC", so it doesn't inherit it from the
-	; app.  HINT_DO_NOT_USE_MONIKER does not seem to work.
+	; Set the moniker to "My Application", so it doesn't inherit it from
+	; the app.  HINT_DO_NOT_USE_MONIKER does not seem to work.
 	; nor does, HINT_CAN_CLIP_MONIKER_WIDTH
 		mov	ax, MSG_GEN_REPLACE_VIS_MONIKER_TEXT
 		mov	cx, cs
@@ -271,7 +271,7 @@ GadgetFormEntInitialize	method dynamic GadgetFormClass,
 	.leave
 	ret
 GadgetFormEntInitialize	endm
-newMoniker TCHAR "NewBASIC",0
+newMoniker TCHAR "My Application",0
 
 
 COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%

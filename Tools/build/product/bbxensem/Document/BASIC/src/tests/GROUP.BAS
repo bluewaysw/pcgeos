@@ -167,7 +167,7 @@ proto="form1"
 top=95
 left=100
 tile=1
-caption="NewBASIC"
+caption="BASIC"
 End CompInit
 Dim group1 as group
 group1 = MakeComponent("group",form1)

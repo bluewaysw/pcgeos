@@ -167,7 +167,7 @@ proto="form1"
 top=95
 left=100
 tile=1
-caption="NewBASIC"
+caption="BASIC"
 End CompInit
 Dim label1 as label
 label1 = MakeComponent("label",form1)

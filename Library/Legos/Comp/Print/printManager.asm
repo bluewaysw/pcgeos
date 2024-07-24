@@ -61,7 +61,7 @@ REVISION HISTORY:
 	martin	1998/5/29	Initial version
 	
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
-defaultPrintJobName	TCHAR	"NewBASIC Gadget", C_NULL
+defaultPrintJobName	TCHAR	"BASIC Gadget", C_NULL
 
 PrintControlComponentInitialize	method dynamic PrintControlComponentClass, 
 					MSG_ENT_INITIALIZE

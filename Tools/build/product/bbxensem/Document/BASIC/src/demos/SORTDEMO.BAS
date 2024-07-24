@@ -413,7 +413,7 @@ sizeVControl=2
 readOnly=1
 End CompInit
 text2.name="text2"
-text2.AppendString("This program demonstrates several simple sorting algorithms. It also shows how to use various NewBASIC components including lists, buttons and gadgets.")
+text2.AppendString("This program demonstrates several simple sorting algorithms. It also shows how to use various BASIC components including lists, buttons and gadgets.")
 text2.visible=1
 Dim button10 as button
 button10 = MakeComponent("button",dialog1)

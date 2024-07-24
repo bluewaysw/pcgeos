@@ -444,7 +444,7 @@ REVISION HISTORY:
 	martin	1998/5/27	Initial version
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
-defaultPrintJobName	TCHAR	"NewBASIC Gadget", C_NULL
+defaultPrintJobName	TCHAR	"BASIC Gadget", C_NULL
 	
 GadgetPrintStartPrinting	method dynamic GadgetClass, 
 					MSG_PRINT_START_PRINTING

@@ -15,7 +15,7 @@
 #
 name            gandalf.app
 
-longname         "NewBASIC Builder"
+longname         "BASIC Builder"
 type            appl, process, single
 
 class           BuilderProcessClass

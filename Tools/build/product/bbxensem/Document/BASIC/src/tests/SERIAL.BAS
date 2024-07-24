@@ -264,7 +264,7 @@ SUB module_init()
   serial = MakeComponent("serial","top")
   serial.port = 0
   serial.baud = 3
-  out.AppendString("NewBASIC serial component on port ",Str(serial.port)," at ",Str(serial.baud)," baud:\r")
+  out.AppendString("BASIC serial component on port ",Str(serial.port)," at ",Str(serial.baud)," baud:\r")
 
 END SUB
 
