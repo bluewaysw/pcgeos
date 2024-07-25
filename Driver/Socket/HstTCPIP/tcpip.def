@@ -1,0 +1,628 @@
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+	Copyright (c) Geoworks 1994 -- All Rights Reserved
+
+			GEOWORKS CONFIDENTIAL
+
+PROJECT:	PC GEOS
+MODULE:		TCP/IP Driver
+FILE:		tcpip.def
+
+AUTHOR:		Jennifer Wu, Jul  5, 1994
+
+	
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	jwu	7/ 5/94		Initial revision
+
+
+DESCRIPTION:
+	Definition file for the TCP/IP driver.
+		
+	$Id: tcpip.def,v 1.1 97/04/18 11:57:03 newdeal Exp $
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+
+;---------------------------------------------------------------------------
+;		Constants and Definitions for Driver
+;---------------------------------------------------------------------------
+
+TCP_LINK_OPEN_WAIT_TIME		equ	60*60*2	; 2 minutes (should be enough)
+HUGELMEM_ALLOC_WAIT_TIME	equ	30	; half a second (arbitrary)
+
+;
+; Default maximum for tcp output queue size.
+;
+DEFAULT_OUTPUT_QUEUE_MAX	equ	4096	
+
+;
+; Code depends on NO_WAITER being zero and expects a non-zero value when
+; a waiter exists.
+;
+TCPIP_NO_WAITER		equ	0
+TCPIP_WAITER_EXISTS	equ	1		
+
+;
+; Interval at which timer goes off.  (Must match definition in tcp.h)
+;
+TCPIP_TIMEOUT_INTERVAL		equ	5	; 30 ticks is half a second
+
+;
+; Timeout before a dead/rejected connection is destroyed.  Waiting before 
+; destroying a rejected connection allows duplicate SYNs to be recognized  
+; and ignored by the driver.  Otherwise, duplicate SYN segments will be 
+; interpreted as new connection requests by the peer.  	Also, waiting 
+; before destroying a connection (e.g. after a failed connect request 
+; safeguards against destroying the connection while the driver's thread 
+; is accessing it.
+;
+CONNECTION_DESTRUCT_TIME	equ	6  	; 30 intervals is 3 secs
+
+;
+; These are totally arbitrary optimal sizes for HugeLMemCreate.
+;
+MIN_OPTIMAL_BLOCK_SIZE		equ	100
+MAX_OPTIMAL_BLOCK_SIZE		equ	8000	
+
+;
+; These are totally arbitrary sizes for QueueLMemCreate.
+;
+INIT_INPUT_QUEUE_CAPACITY	equ	10
+MAX_INPUT_QUEUE_CAPACITY	equ	500
+
+;
+; Size of a TCB block.  Definition of the TCP Control Block (tcpcb) is 
+; in tcp.h but the ASM code needs the size for allocation purposes.
+; Make sure this size is at leats as big as the structure!  
+;
+TCB_BLOCK_SIZE			equ	200		; must be even!
+
+TCPIP_THREAD_STACK_SIZE		equ	1500		
+		; must be big enough for UserDoDialog
+
+;
+; Sequenced packets require 2 bytes for link connections to implement
+; preservation of packet boundaries.  Datagram packet headers require 
+; room for the IP header.
+;
+TCPIP_SEQUENCED_PACKET_HDR_SIZE	equ	(2 + size SequencedPacketHeader)
+TCPIP_DATAGRAM_PACKET_HDR_SIZE	equ	\
+		(UDPIP_MIN_HEADER + size DatagramPacketHeader)
+
+;
+; Used for local addr for the loopback link.  192.0.2.1 is officially
+; defined to be "nothing".  (in network order)
+;
+LOOPBACK_LOCAL_IP_ADDR		equ	0x010200c0
+
+
+COMMENT |-----------------------------------------------------------------
+
+The following data structure is used to keep track of the TCP/IP driver's 
+clients.  RegisterStatus is word sized because the mask is used as the
+client handle which is word sized.  Bits in RegistrationStatus are defined
+so that the mask is equal to 1 shifted left by the driver type.  Fields 
+in TcpipClientInfo are ordered the same as the driver type enums.   
+
+--------------------------------------------------------------------------|
+
+ClientInfo 	struct
+	CI_domain	word		; domain handle of client
+	CI_entry	fptr		; SCO entry point
+ClientInfo	ends
+
+TcpipClientInfo	struct
+	TCI_data	ClientInfo <>	; client using TCP as a data driver
+	TCI_link	ClientInfo <>	; client using TCP as a link driver
+	TCI_rawIp	ClientInfo <>	; client using TCP for raw IP
+TcpipClientInfo ends
+
+RegisterStatus	record
+	:13=0				; Must be 0
+	RS_RAW_IP:1			; raw ip client registered
+	RS_LINK:1			; link client registered
+	RS_DATA:1			; data
+RegisterStatus	end
+
+
+
+GeosHostNetConnectCallbackData	struct
+	; input
+	GHNCCD_callback		fptr
+	GHNCCD_semaphore	word
+	GHNCCD_semaphore2	word
+	
+	; output
+	GHNCCD_result		word
+
+GeosHostNetConnectCallbackData	ends
+
+GeosHostNetDisconnectCallbackData	struct
+	; input
+	GHNDCD_callback		fptr
+	GHNDCD_semaphore	word
+	GHNDCD_semaphore2	word
+	
+	; output
+	GHNDCD_result		word
+
+GeosHostNetDisconnectCallbackData	ends
+
+COMMENT |-----------------------------------------------------------------
+
+The following data structure is used to preserve packet boundaries when
+TCP is used as a link connection.  The input buffers are kept in a chunk
+array until a complete packet has been received.  
+
+---------------------------------------------------------------------------|
+TcpLinkInputHeader	struct
+
+	TLIH_common	ChunkArrayHeader	<>
+	TLIH_packetSize	word 	; size of next packet (0 if none)	
+	TLIH_bytesRecvd	word 	; amount of input data received
+
+TcpLinkInputHeader	ends
+
+TcpLinkInputElt	struct
+	TLIE_data	optr		; data buffer (HugeLMem chunk)
+TcpLinkInputElt	ends
+
+COMMENT |-------------------------------------------------------------------
+
+The following defines data structures and constants used to keep track
+of TCP connections.  All information about each connection will be stored
+in a Socket.  The handles to all the connections will be stored in a list.
+
+---------------------------------------------------------------------------|
+;
+; A TcpSocketState indicates the current state of the socket.
+;
+TcpSocketState	etype	byte, 1
+TSS_NEW			enum	TcpSocketState	; socket just allocated
+TSS_OPEN		enum	TcpSocketState	
+TSS_CONNECTING		enum	TcpSocketState	; connection being established
+TSS_DISCONNECTING	enum	TcpSocketState	; disconnect requested
+TSS_CLOSED		enum	TcpSocketState	; socket about to be destroyed
+	; All above states, with the exception of TSS_NEW, require
+	; notification when the connection is closed asynchronously.
+	; Code depends on this!
+TSS_CONNECT_REQUESTED	enum	TcpSocketState	; remote connect requested
+						;  but not accepted yet
+TSS_DEAD		enum	TcpSocketState	; socket waiting to be destroyed
+
+TcpSocketElt	struct
+	TSE_socket	lptr.TcpSocket		; connection handle 
+TcpSocketElt	ends
+
+TcpSocket	struct
+	TS_state	TcpSocketState	
+	TS_localPort	word	0
+	TS_remotePort	word	0
+	TS_localAddr	IPAddr		
+	TS_remoteAddr	IPAddr
+	TS_link		word		; domain handle of link connection
+	TS_tcb		optr		; TCP control block
+	TS_output	optr		; output queue
+	TS_maxData	word		; max size of output queue
+	TS_pendingData	word		; # bytes output data waiting for space
+	TS_sendSem	hptr		; semaphore to block threads waiting 
+					;  for space in output queue
+	TS_input	optr		; input queue (invalid for tcp
+					;  data connections)
+	TS_sem		hptr	0	; handle of semaphore for driver calls
+	TS_waiter	byte	0	; non zero if waiter exists
+	TS_destructTime	word	0	; time before destroying a dead socket
+	TS_error	SocketDrError
+		align word		; make sure it's even!
+TcpSocket	ends
+
+
+COMMENT |-------------------------------------------------------------------
+
+The output queue is a chunk array containing optrs to data buffers.
+All data in the queue is either un-acked or unsent.  The chunk array
+for the output queue and all its data buffers are HugeLMem chunks.
+
+The maximum limit for the output queue is an approximate maximum, which
+may be exceeded.  But once the max is exceeded, further sends of data
+must wait for the size to fall below the maximum again.
+
+---------------------------------------------------------------------------|
+
+TcpOutputQueueHeader	struct
+	TOQH_common	ChunkArrayHeader  <>
+	TOQH_size	word		; # bytes of data in output queue
+TcpOutputQueueHeader	ends
+
+TcpOutputElt	struct
+	TOE_data	optr		; data buffer (HugeLMem chunk)
+TcpOutputElt	ends
+
+COMMENT |-------------------------------------------------------------------
+
+The following defines data structures and constants for keeping track of
+the link level protocol used for connections.   The link control blocks
+are kept in a table (chunk array).  Use MemLockExcl to ensure exclusive 
+access to the link table. 
+
+The index of the LCB in the link table is used as the domain handle.  All 
+new entries must be appended to the list and entries are only destroyed 
+when the driver exits.  This ensures that the index for a LCB will
+never change.
+
+---------------------------------------------------------------------------|
+;
+; Domain handles.  Code relies on the loopback link being the first entry in
+; the link table.  The main link is the entry immediately after the
+; loopback link.
+;
+LOOPBACK_LINK_DOMAIN_HANDLE	equ	0
+MAIN_LINK_DOMAIN_HANDLE		equ	1
+
+;
+; Number of link entries in the link table which never get destroyed.
+;
+NUM_FIXED_LINK_ENTRIES		equ	2
+
+;
+; Default MTUs for link level protocols.
+;
+DEFAULT_LINK_MTU		equ	1500		; PPP max packet size
+MAX_LINK_MTU			equ	65535
+
+;
+; A LinkState indicates the current state of the link connection.
+; TcpipStatusNotificationType in gcnlist.def/goh matches these definitions.
+; It doesn't have to, however, if changing this keep the GCN list in mind.
+;
+LinkState	etype	byte
+LS_CLOSED		enum	LinkState	
+LS_CLOSING		enum	LinkState
+LS_OPENING		enum	LinkState	
+LS_OPEN			enum	LinkState	
+
+;
+; LinkOptions indicate special behaviour of the link connection.
+;
+LinkOptions	record
+	LO_ALWAYS_BUSY:1	;  link is busy even with no TCP connections
+	:7
+LinkOptions	end	
+
+;
+; A LinkControlBlock stores information about a particular link level
+; protocol. 
+;
+LinkControlBlock	struct
+  	LCB_state	LinkState	
+  	LCB_drvr	hptr		; handle to link driver
+  	LCB_strategy	fptr		; strategy routine for link driver
+  	LCB_minHdr	byte		; min hdr size of protocol (in bytes)
+	LCB_mtu		word		; max transmission unit (in bytes)
+	LCB_localAddr	IPAddr		; local addr for the connection
+	LCB_connection	word		; link connection handle 
+	LCB_clientHan	word		; client handle
+        LCB_options	LinkOptions	; options for the link
+	LCB_semCount	word		; # of blockers on LCB sem
+	LCB_sem		hptr		; queue for (main) link to open
+	LCB_closeCount	word		; # of blockers on LCB closeSem
+	LCB_closeSem	hptr		; queue for (main) link close to
+					;	complete so a new open can start
+	LCB_error	word		; error for (main) link open requests
+	LCB_lastError	word		; error before new link open request
+	LCB_openCount	word		; total # of (main) link open requests
+
+	LCB_linkSize	word		; size of link address
+	LCB_linkAddr	label byte	; start of link address
+LinkControlBlock	ends
+
+COMMENT |-------------------------------------------------------------------
+
+The driver has its own thread for processing events.  Routines for the
+driver's interface will usually do some small bookkeeping and then queue
+the event for the driver to process.  The TcpipProcessClass is created
+to run the driver's thread.
+
+NOTE:  The "_ASM" appended to the message names is used to keep glue from
+	complaining.
+---------------------------------------------------------------------------|
+
+ifdef PASCAL_CONV
+_TcpipProcessClass	class	ProcessClass
+else
+TcpipProcessClass	class	ProcessClass
+endif
+
+MSG_TCPIP_OPEN_CONNECTION_ASM	message
+; SYNOPSIS: start the process required to open a connection
+;	
+; PASS:		cx	= connection handle	
+; RETURN: 	nothing
+; DESTROYS: 	nothing
+;
+
+MSG_TCPIP_CLOSE_CONNECTION_ASM	message
+; SYNOPSIS: start the process to close a connection
+;	
+; PASS:		cx	= connection handle
+; RETURN: 	nothing
+; DESTROYS: 	nothing
+;
+
+MSG_TCPIP_RESET_CONNECTION_ASM	message
+; SYNOPSIS: start the process to reset a connection
+;
+; PASS:		cx	= connection handle
+;		dx	= SocketDrError 
+; RETURN: 	nothing
+; DESTROYS: 	nothing
+;
+
+MSG_TCPIP_ACCEPT_CONNECTION_ASM	message
+; SYNOPSIS: start the process to accept a connection requested by the peer
+;	
+; PASS:		cx	= connection handle
+; RETURN:	nothing
+; DESTROYS: 	nothing
+;
+
+MSG_TCPIP_SEND_DATA_ASM		message
+; SYNOPSIS: process outgoing data for a connection
+;	
+; PASS:		cx 	= connection handle
+;		dx	= SocketSendMode
+; RETURN: 	ax	= SocketDrError
+; DESTROYS: 	nothing
+;
+
+MSG_TCPIP_SEND_DATAGRAM_ASM	message
+; SYNOPSIS: send a datagram
+;
+; PASS:		cx	= link domain handle
+;		dx:bp	= data buffer 
+; RETURN:	ax	= SocketDrError
+; DESTROYS: 	nothing
+
+MSG_TCPIP_RECEIVE_DATA_ASM	message
+; SYNOPSIS: process incoming data from the link
+;
+; PASS:		nothing
+; RETURN:	nothing
+; DESTROYS: 	nothing
+;
+
+MSG_TCPIP_TIMEOUT_OCCURRED_ASM	message
+; SYNOPSIS: process a timeout
+;
+; PASS:		nothing
+; RETURN:	nothing
+; DESTROYS:	nothing
+;
+
+MSG_TCPIP_DELETE_LINK_ASM	message
+; SYNOPSIS: delete a link and terminate tcp's existence if no other links exist
+;	 [TCP should only send this to itself if it has no registered clients.]
+;		 
+;
+; PASS:		cx	= domain handle of link
+; RETURN:	nothing
+; DESTROYS:	nothing
+;
+
+MSG_TCPIP_DESTROY_CONNECTIONS_ASM	message
+; SYNOPSIS: Destroy all Tcp connections.  They should all be dead.
+;
+; PASS:		nothing
+; RETURN:	nothing
+; DESTROYS:	ax, cx, dx, bp
+
+MSG_TCPIP_SEND_RAW_IP_ASM	message
+; SYNOPSIS: send a raw ip packet
+;
+; PASS: 	dx:bp 	= data buffer
+;		cx	= RawIpFlags
+; RETURN:	ax 	= SocketDrError
+; DESTROYS:	nothing
+
+MSG_TCPIP_DHCP_RENEW_TIMER_ASM	message
+; SYNOPSYS: Sent by timer to handle DHCP lease renewal
+;
+; Don't directly send.
+
+MSG_TCPIP_DHCP_RENEW_NOW_ASM	message
+; SYNOPSYS: Sent by timer to handle DHCP lease renewal
+;
+; Don't directly send.
+
+MSG_TCPIP_START_RECEIVE_ASM		message
+MSG_TCPIP_ASYNC_UNLOCK_ASM		message
+
+
+ifdef PASCAL_CONV
+_TcpipProcessClass	endc
+else
+TcpipProcessClass	endc
+endif
+
+
+
+;---------------------------------------------------------------------------
+;		Fatal Errors
+;---------------------------------------------------------------------------
+
+TCPIP_CANNOT_CREATE_SOCKET_LIST		enum	FatalErrors
+TCPIP_CANNOT_CREATE_LINK_TABLE		enum	FatalErrors
+TCPIP_CANNOT_DESTROY_CONNECTION		enum	FatalErrors
+
+TCPIP_CANNOT_FIND_TIMER			enum	FatalErrors
+TCPIP_CANNOT_FIND_EXIT_SEMAPHORE	enum	FatalErrors
+TCPIP_CANNOT_FIND_CONNECT_SEMAPHORE	enum	FatalErrors
+; Timeout routine occurred or else connection was established but 
+; there's nobody waiting for a connection when there should be!  
+
+TCPIP_INVALID_IP_ADDRESS		enum	FatalErrors
+; TCPIP expects address in the ESACAddress format which combines
+; link addresses with the IP address into a single address string.
+; Passing a regular 4 byte binary IP address will generate this
+; error.  If possible, please use the address returned from the 
+; address controller after calling SocketResolve.
+;
+
+TCPIP_INVALID_DOMAIN_HANDLE		enum	FatalErrors
+TCPIP_INVALID_LINK_DOMAIN_HANDLE	enum	FatalErrors
+TCPIP_INVALID_PORT_NUMBER		enum	FatalErrors
+TCPIP_INVALID_CONNECTION_HANDLE		enum	FatalErrors
+TCPIP_INVALID_SEMAPHORE			enum	FatalErrors
+TCPIP_INVALID_SOCKET_DRIVER_TYPE	enum	FatalErrors
+TCPIP_INVALID_CLIENT_HANDLE		enum	FatalErrors
+TCPIP_INVALID_PARAMS_TO_GET_MEDIA_LIST	enum	FatalErrors
+
+TCPIP_BAD_SOCKET_STATE			enum	FatalErrors
+TCPIP_STILL_REGISTERED			enum	FatalErrors
+TCPIP_NOT_REGISTERED			enum	FatalErrors
+TCPIP_CORRUPTED_LINK_TABLE		enum	FatalErrors
+TCPIP_MUST_CLOSE_LINK_FIRST		enum	FatalErrors
+; A link driver should not be unloaded until the link connection has been
+; closed.
+
+TCPIP_NOT_ENOUGH_OUTPUT_DATA		enum	FatalErrors
+
+TCPIP_BAD_DELIVERY			enum	FatalErrors
+; Any connections that exist in TCP driver and are capable of receiving 
+; data should have corresponding connections in the socket library.  Failed
+; delivery indicates an error in the implementation.
+
+TCPIP_BAD_PACKET_HEADER			enum	FatalErrors
+
+LOOPBACK_SHOULD_NOT_REACH_LINK_LEVEL	enum	FatalErrors
+
+TCPIP_OPERATION_IN_PROGRESS		enum	FatalErrors
+; Only one operation at a time is allowed for each connection.
+;
+
+TCPIP_ADDRESS_CORRUPTED			enum	FatalErrors
+; Address string is corrupted
+;
+
+TCPIP_SEND_DATA_CALL_IN_PROGRESS	enum	FatalErrors
+; Only one send can be allowed on a connection at a time.  Or else a 
+; connection is being destroyed while a send data request is blocked.
+; 
+
+TCPIP_REFUSE_SUSPEND_STRING_TOO_LONG	enum	FatalErrors
+
+TCPIP_QUERIED_FOR_RECV_BUFFER_LIMIT	enum	FatalErrors
+; The client is supposed to tell TCP what the limit is, not the other
+; way around!
+;
+
+TCPIP_MAIN_LINK_ALREADY_REGISTERED	enum	FatalErrors
+; The main link driver is adding itself as a domain to TCP more than
+; once.  Naughty link driver.
+;
+
+TCPIP_INTERNAL_ERROR			enum	FatalErrors
+; This is used to flag a coding error.  Each use should be accompanied
+; by comments indicating what the reason for failure might be.
+;
+
+;---------------------------------------------------------------------------
+;			Warnings
+;---------------------------------------------------------------------------
+
+TCPIP_UNABLE_TO_CREATE_THREAD			enum	Warnings
+TCPIP_EXITING_WITH_CLIENTS_REGISTERED		enum	Warnings
+; The system is exiting before the TCP driver's clients had a chance 
+; to unregistered TCP.  This should only happen during a dirty shutdown.
+;
+TCPIP_EXITING_WITH_CONNECTIONS_OPEN		enum	Warnings
+; The only time this warning should legally appear is if the system
+; is doing a dirty shutdown.
+;
+
+TCPIP_EXITING_WITH_CLIENTS_BLOCKED		enum	Warnings
+; Sem will be V'ed but this is a way to signal a dirty shutdown.
+;
+
+TCPIP_NOT_SINGLE_ADDRESS			enum	Warnings
+; The addresses passed to IPAddressControlClass does not contain exactly
+; one address.  Currently IPAddressControlClass can only handle a single
+; address.
+;
+
+TCPIP_NO_CHILD_FOR_SET_ADDRESSES		enum	Warnings
+; The set addresses will have no effect because the address 
+; controller is being told to set addresses before any of its 
+; child's UI has been created.
+; 
+
+TCPIP_CONNECTION_HANDLE_IS_BAD			enum	Warnings
+; Not fatal erroring here because the socket library has some synchronicity
+; problems and can't get the connection handle correct all the time.
+;
+
+TCPIP_CONNECTION_DOES_NOT_EXIST			enum	Warnings
+; The connection handle cannot be found in the list of connections.  
+; Will occur if 2MSL timer causes a connection to be destroyed while
+; a close medium is attempting to reset the connection.  If this warning
+; appears for another reason, there may be a problem in the code.
+;
+
+TCPIP_USING_STRANGE_CLIENT_SERVER_ADDRESS	enum	Warnings
+; Local address used by link is neither the default server nor client
+; addresses.  TCP may be assigning an invalid default address.
+; Select your own IP address when this happens, rather than relying on
+; the defaults.  Either that or stop configuring your own addresses
+; at the link level.
+; 
+
+TCPIP_DISCARDING_OUTPUT_BUFFER			enum	Warnings
+; Either the output buffer contains no data, the data could
+; not be placed in the output queue or, in the case of datagrams,
+; the link connection could not be opened.
+;
+
+TCPIP_COULD_NOT_CLOSE_MEDIUM			enum	Warnings
+; Tcp should always be able to succeed in closing the medium.  Make 
+; sure link driver is returning carry properly.
+;
+
+TCPIP_CANN0T_CREATE_LINK_TABLE			enum	Warnings
+; Insufficient memory to create TCP link table.
+;
+
+TCPIP_ABORTING_SEND_DATA_REQUEST		enum	Warnings
+; Disconnect or reset call is being made on a connection while a 
+; send_data call is in progress, causing the send data to be
+; aborted.  This is BAD coding style.  Applications should wait 
+; for send operations to complete before disconnecting/resetting
+; a connection.
+;
+
+TCPIP_PARSER_DETECTED_INVALID_ADDRESS		enum	Warnings
+
+TCPIP_ALLOWING_INVALID_ADDR_BUT_PLEASE_FIX_IT_BUB	enum	Warnings
+; This will most likely occur if the user entered the IP address in 
+; the .ini file improperly, leaving white space at the end of the string. 
+; Technically, this is an invalid address and should be fixed but the
+; parser will allow the minor error after griping to the user.
+;
+
+TCPIP_MISSING_LINK_DOMAIN_INI_SETTING		enum	Warnings
+; TCP cannot find the main link driver's domain name in the INI file.
+;
+
+
+TCPIP_CALLED_WITH_OWN_THREAD			enum	Warnings
+; TCP should not be called with its own thread because this violates
+; the principles of modularity.
+;
+
+TCPIP_DISCARDING_INPUT_BUFFER			enum	Warnings
+; Maximum number of input packets awaiting TCP processing has been
+; reached.  Packets are discarded until TCP processes some packets.
+;
+
+TCPIP_RECEIVE_START_LOOP	enum	Warnings
+TCPIP_RECEIVE_STOP	enum	Warnings

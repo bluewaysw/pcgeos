@@ -97,7 +97,7 @@ minimalLibrary	: kernel swap sound net ui isui motif spool text mailbox \
 		  jpeg giflib gif htmlimpx n2txt inetmsg extui \
 		  winword8 zlib dirlist minizip idialc eps impex_libs \
 		  thumbdb ftplib flllib sitelist int8087 intx87\
-		  basicdb gridlib gsol treplib
+		  basicdb gridlib gsol treplib hostif
 #ascii
 
 prefLibs	: prefvid prefts preftd \
@@ -338,6 +338,9 @@ Installed/Library/Spline:	ui MAKELIB
 
 ssmeta	: Installed/Library/SSMeta
 Installed/Library/SSMeta:	ui math MAKELIB
+
+hostif	: Installed/Library/HostIf
+Installed/Library/HostIf:	kernel MAKELIB
 
 # bsnwav will only be compiled (and is only referenced in WAV) if PRODUCT==NDO2000
 wav	: Installed/Library/Wav
@@ -1338,6 +1341,10 @@ tcpip	: Installed/Driver/Socket/TCPIP
 Installed/Driver/Socket/TCPIP:	netutils socket ansic resolver accpnt \
 				MAKELIB
 
+hsttcpip	: Installed/Driver/Socket/HstTCPIP
+Installed/Driver/Socket/HstTCPIP:	netutils socket ansic resolver accpnt \
+				MAKELIB
+
 ppp	: Installed/Driver/Socket/PPP
 Installed/Driver/Socket/PPP:	netutils ansic accpnt MAKELIB
 
@@ -1350,7 +1357,7 @@ Installed/Appl/Breadbox/BbxBrow:	ui ansic text spool \
 					modem \
 					ibms parentc wav mailhub socket \
 					js netutils cookies idialc \
-					ppp  tcpip MAKEAPPL
+					ppp  tcpip hsttcpip MAKEAPPL
 
 # sorry, executing CLEAN in the global makefile is not only bad style, it forces
 # EVERYONE, even people not working on the browser, to compile the whole stuff
@@ -1412,13 +1419,13 @@ Installed/Library/SSL:				ansic socket mapheap MAKELIB
 
 # product-specific dependency on fjpeg
 impgraph	: Installed/Library/Breadbox/ImpGraph
-Installed/Library/Breadbox/ImpGraph:		ansic ijgjpeg MAKELIB #fjpeg
+Installed/Library/Breadbox/ImpGraph:		ansic ijgjpeg fjpeg MAKELIB 
 
 ijgjpeg	: 	Installed/Library/Breadbox/Ijgjpeg
 Installed/Library/Breadbox/Ijgjpeg:		ui ansic MAKELIB
 
-#fjpeg	: 	Installed/Library/Breadbox/fjpeg
-#Installed/Library/Breadbox/fjpeg:		ui ansic MAKELIB
+fjpeg	: 	Installed/Library/Breadbox/Fjpeg
+Installed/Library/Breadbox/Fjpeg:		ui ansic MAKELIB
 #	mdcd %ROOT_DIR%\
 #	$(MAKE) -I$(ROOT_DIR)\Library\Breadbox\fjpeg lib full
 
@@ -1675,8 +1682,8 @@ Installed/Library/CoProcessor/Int8087:		kernel math MAKELIB
 intx87	: Installed/Library/CoProcessor/Intx87
 Installed/Library/CoProcessor/Intx87:		kernel math MAKELIB
 
-taskmax	: Installed/Driver/Task/Taskmax
-Installed/Driver/Task/Taskmax:			ui text MAKEDRV
+taskmax	: Installed/Driver/Task/TaskMax
+Installed/Driver/Task/TaskMax:			ui text MAKEDRV
 
 bnf : Installed/Driver/Task/BNF
 Installed/Driver/Task/BNF:				ui text MAKEDRV
