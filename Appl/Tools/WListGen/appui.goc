@@ -1,0 +1,280 @@
+/**************************************************************************
+ *
+ * PROJECT:      Build a new (!) word list for Word Matcher
+ *               
+ * FILE:         APPUI.GOC
+ *               by RABE-Soft 06/2024 for FreeGEOS project
+ *
+ * AUTHOR:       Rainer Bettsteller
+ *
+ *	REVISION HISTORY:
+ *	Date     	Name      Description
+ *	------------	--------  -----------
+ *	2024-06-30  	RainerB     Initial version.
+ *	
+ **************************************************************************/
+
+
+/*  Standard include files */
+@include <stdapp.goh>
+
+@include "wlistgen.goh"
+
+/*---------------------------------------------------------------------------
+ Resource AppResource
+ ---------------------------------------------------------------------------*/
+@start AppResource;
+
+@object GenApplicationClass WListApp = {
+        GI_visMoniker = list { @WListTextMoniker};
+        GI_comp = @WListPrimary;
+        gcnList(MANUFACTURER_ID_GEOWORKS,GAGCNLT_WINDOWS) = @WListPrimary;
+        }        /* end of WListApp */
+
+@visMoniker WListTextMoniker = "Word List Creator";
+
+@end AppResource;
+
+
+/*---------------------------------------------------------------------------
+ Resource Interface
+ ---------------------------------------------------------------------------*/
+
+@start Interface;
+
+/* ----------------- Main Window ------------------------------*/
+
+@object GenPrimaryClass WListPrimary = {
+	GI_comp = @WListFileMenu,
+			@WListPrimaryMainGroup, @WListMainReplyBar;
+	HINT_ORIENT_CHILDREN_VERTICALLY;
+	HINT_SIZE_WINDOW_AS_DESIRED;
+	} 
+
+
+@object GenInteractionClass WListPrimaryMainGroup = {
+	GI_comp = @WListLeftGroup, @WListRightGroup;
+	HINT_ORIENT_CHILDREN_HORIZONTALLY;
+	}
+
+@object GenInteractionClass WListLeftGroup = {
+	GI_comp = @WListFileSelector, @WListMainBooleanGroup, @UmlautsInfoText, @WLCodePageItemGroup;
+	HINT_ORIENT_CHILDREN_VERTICALLY;
+}
+
+
+@object GenInteractionClass WListRightGroup = {
+	GI_comp = @Spacer1, @WListInputText, @WordsGroup, @WListMessageText;
+	HINT_ORIENT_CHILDREN_VERTICALLY;
+}
+
+/* ----------------- Left Group ------------------------------*/
+
+@object GenFileSelectorClass WListFileSelector = {
+	GI_visMoniker = 'f', "Select a file to import:";
+	HINT_PLACE_MONIKER_ABOVE;
+	GFSI_destination = process;
+	GFSI_notificationMsg = MSG_WLIST_FILE_SELECTED;
+	HINT_FILE_SELECTOR_NUMBER_OF_FILES_TO_SHOW = 10;
+	/* HINT_FILE_SELECTOR_FILE_LIST_WIDTH = ; /*average-width characters, max 255 */
+	GFSI_fileCriteria =  FSFC_DIRS | FSFC_NON_GEOS_FILES;
+
+	}
+
+@object GenBooleanGroupClass WListMainBooleanGroup = {
+	/*GI_visMoniker = "Options:";*/
+	HINT_PLACE_MONIKER_ABOVE;
+	GI_comp = @MainBoolean1, @MainBoolean2;
+	HINT_ORIENT_CHILDREN_VERTICALLY;
+	GBGI_selectedBooleans = /* BOOL_ID_1 | */ BOOL_ID_2;
+	/*HINT_BOOLEAN_GROUP_TOOLBOX_STYLE;	/**/
+	}
+@object GenBooleanClass MainBoolean1 = {
+	GI_visMoniker = 'c',"Create compressed list";
+	GBI_identifier = BOOL_ID_1;
+	}
+@object GenBooleanClass MainBoolean2 = {
+	GI_visMoniker = 'm',"Convert German umlauts (\x80 -> AE)";
+	GBI_identifier = BOOL_ID_2;
+	}
+@object GenTextClass UmlautsInfoText = {
+	GI_visMoniker = " ";
+	HINT_PLACE_MONIKER_TO_LEFT;
+	GTXI_text = "Convert umlauts means, that e.g. \x80rger will be added twice: \x80RGER and AERGER.";
+	GI_attrs = @default | GA_READ_ONLY; 
+	/*HINT_TEXT_WHITE_WASH_COLOR;*/
+	HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+	ATTR_GEN_TEXT_CHAR_ATTR = (ChunkHandle) @UmlautInfoCharAttrs;
+	}
+@chunk VisTextCharAttr UmlautInfoCharAttrs =
+		CHAR_ATTR_FONT_SIZE(/*FID_DTC_URW_SANS*/FID_UNIVERSITY,12);
+	
+@object GenItemGroupClass WLCodePageItemGroup = {
+	GI_visMoniker = "Convert characters from:"; 
+	HINT_PLACE_MONIKER_ABOVE;
+	GI_comp = @DosItem, @WinItem, @GEOSItem;
+	GIGI_selection = CONVERT_FROM_DOS;
+/*	HINT_ITEM_GROUP_MINIMIZE_SIZE;
+/*	HINT_ITEM_GROUP_DISPLAY_CURRENT_SELECTION; */
+	}
+@object GenItemClass DosItem = {
+	GI_visMoniker = 'D', "DOS";
+	GII_identifier = CONVERT_FROM_DOS;
+	}
+@object GenItemClass WinItem = {
+	GI_visMoniker = 'W', "Windows";
+	GII_identifier = CONVERT_FROM_WINDOWS;
+	}
+@object GenItemClass GEOSItem = {
+	GI_visMoniker = 'G', "GEOS";
+	GII_identifier = CONVERT_FROM_GEOS;
+	}
+
+/* ----------------- Right Group ------------------------------*/
+
+@object GenGlyphClass Spacer1 = { GI_visMoniker = "  "; }
+
+@object GenTextClass WListInputText = {
+	GI_visMoniker = 'L', "Filename for new Word-List:";
+	HINT_PLACE_MONIKER_ABOVE;
+	GTXI_text = "New Word List";
+	GTXI_maxLength = 32;
+	ATTR_GEN_TEXT_LEGAL_FILENAMES;
+	GTXI_attrs = @default | GTA_SINGLE_LINE_TEXT;
+	HINT_TEXT_WHITE_WASH_COLOR;
+	HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+	}
+
+@object GenInteractionClass WordsGroup = {
+	GI_comp = @ReadCounter, @WordCounter, @CurrentWordText;
+	HINT_CENTER_CHILDREN_ON_MONIKERS;
+	HINT_MINIMIZE_CHILD_SPACING;
+	}
+
+@object GenTextClass ReadCounter = {
+	GI_visMoniker = "Words read:";
+	HINT_PLACE_MONIKER_TO_LEFT;
+	GI_attrs = @default | GA_READ_ONLY;
+	ATTR_GEN_TEXT_NEVER_MAKE_SCROLLABLE;
+	}
+@object GenTextClass WordCounter = {
+	GI_visMoniker = "Words added:";
+	HINT_PLACE_MONIKER_TO_LEFT;
+	GI_attrs = @default | GA_READ_ONLY;
+	ATTR_GEN_TEXT_NEVER_MAKE_SCROLLABLE;
+	}
+@object GenTextClass CurrentWordText = {
+	GI_visMoniker = "Current word:";
+	GTXI_text = "(none)";
+	HINT_PLACE_MONIKER_TO_LEFT;
+	GI_attrs = @default | GA_READ_ONLY; /**/
+	HINT_INITIAL_SIZE = { SST_AVG_CHAR_WIDTHS | 1 ,
+		/* SST_PIXELS */ SST_LINES_OF_TEXT | 1 , 1};
+	ATTR_GEN_TEXT_NEVER_MAKE_SCROLLABLE;
+	}
+
+@object GenTextClass WListMessageText = {
+	GI_visMoniker = "Messages:";
+	HINT_PLACE_MONIKER_ABOVE;
+	GTXI_text = "Create a new word list data base for WordMatcher or similar programs.\r\rNew file will always created in USERDATA/Word Matcher\r";
+	GTXI_attrs = (@default | GTA_INIT_SCROLLING)
+		     & ~GTA_USE_TAB_FOR_NAVIGATION;
+	/*GI_attrs = @default | GA_READ_ONLY; /**/
+	HINT_TEXT_WHITE_WASH_COLOR;
+	HINT_INITIAL_SIZE = { SST_AVG_CHAR_WIDTHS | 30 ,
+		/* SST_PIXELS */ SST_LINES_OF_TEXT | 15 , 0};
+ 	HINT_EXPAND_WIDTH_TO_FIT_PARENT;		
+	ATTR_GEN_TEXT_CHAR_ATTR = (ChunkHandle) @WListEditCharAttrs;
+	}
+@chunk VisTextCharAttr WListEditCharAttrs =
+		CHAR_ATTR_FONT_SIZE(/*FID_DTC_URW_SANS*/FID_UNIVERSITY,12);
+
+
+
+/* -------------------- Reply-Bar ---------------------------- */
+@object GenInteractionClass WListMainReplyBar = {
+	GI_comp = @WListApplyTrigger,@WListStopTrigger;
+	HINT_MAKE_REPLY_BAR;
+	}
+@object GenTriggerClass WListApplyTrigger = {
+	GI_visMoniker = 'n',"Create new list";
+	GTI_destination = process;
+	GTI_actionMsg = MSG_WLIST_APPLY_TRIGGER;
+	GI_states = @default & ~GS_ENABLED;
+	}
+@object StopTriggerClass WListStopTrigger = {
+	GI_visMoniker = 'S',"Stop";
+	GI_states = @default & ~GS_ENABLED;
+	GTI_destination = @WListStopTrigger;
+	GTI_actionMsg = MSG_STOP_CREATE;
+	}
+
+@end Interface; /*-------------------------------------------------------*/
+
+
+/*---------------------------------------------------------------------------
+ Resource MenuResource
+ ---------------------------------------------------------------------------*/
+@start MenuResource;
+
+@object GenInteractionClass WListFileMenu = {
+	ATTR_GEN_INTERACTION_GROUP_TYPE = GIGT_FILE_MENU;
+	GI_comp = @WListAboutBox;
+	GII_visibility = GIV_POPUP;
+	}
+
+@object GenInteractionClass WListAboutBox = {
+	GI_visMoniker = 0, "Information ";
+	GI_comp = @AboutGlyph1,@AboutGlyph2,@AboutGlyph3,@AboutGlyph4,
+		@AboutGlyph5;
+	HINT_CENTER_CHILDREN_HORIZONTALLY;
+	GII_visibility = GIV_DIALOG;
+	GII_type = GIT_NOTIFICATION;
+	}
+@object GenGlyphClass AboutGlyph1 = {
+	GI_visMoniker = "Wold List Creator";
+	}
+@object GenGlyphClass AboutGlyph2 = {
+	GI_visMoniker = "Build a new word list";
+	}
+@object GenGlyphClass AboutGlyph3 = {
+	GI_visMoniker = "for Word Matcher";
+	}
+@object GenGlyphClass AboutGlyph4 = {
+	GI_visMoniker = " or similar programs ";
+	}
+@object GenGlyphClass AboutGlyph5 = {
+	GI_visMoniker = " by Rabe-Soft for Free PC/GEOS ";
+	}
+
+
+
+@end MenuResource; /*-------------------------------------------------------*/
+
+
+/*---------------------------------------------------------------------------
+ Resourcendefinition DataResource
+ Alle lokalisierbaren Texte und Daten mÅssen in einer Resource stehen
+ ---------------------------------------------------------------------------*/
+@start DataResource, data;
+
+@chunk char NoFileName[] = "You must enter a file name.";
+@chunk char NoFolder[] = "Could not enter 'USERDATA/Word Matcher' folder.";
+@chunk char FileExists[] = "The file already exists. Use another file name or delete the file yourself.";
+@chunk char ErrorEnterPath[] = "Could not enter path to source file.";
+
+@chunk char TooManyMsg[] = "Too many messages - older messages deleted.\r";
+@chunk char DataBaseCreated[] = "*** Word List data base created ***\rImporting words ...\r";	
+@chunk char DataBaseFailed[] = "Error: Could not create Word List data base.\r";	
+@chunk char OpenSourceFileFailed[] = "Error: Could not open source file.\r";	
+@chunk char VeryLongWord[] = "** Very long word: ";
+@chunk char LongWord[] = "* Word too long: ";
+@chunk char ShortWord[] = "* Word too short: ";
+@chunk char BuildCancel[] = "\r*** Building word list canceled ***\r";	
+@chunk char BuildDone[] = "\r*** Building word list done ***\r";	
+
+@end DataResource; /*-------------------------------------------------------*/
+
+
+/*************************** End of File APPUI.GOC ********************/
+
