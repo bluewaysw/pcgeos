@@ -3,14 +3,12 @@
 #
 # If you edit it, you will lose your changes, should it be regenerated.
 #
-GEODE           = wmlib
+GEODE           = wlistgen
 ASM_TO_OBJS     =
 UI_TO_RDFS      =
-SRCS            = wmlib.goc
-OBJS            = wmlib.obj
+SRCS            = appui.goc wlistgen.goc appui.goh lmacros.goh wlistgen.goh
+OBJS            = appui.obj wlistgen.obj
 LOBJS           =
-LIBOBJ          = $(DEVEL_DIR)/Include/$(GEODE).ldf
-LIBNAME         = wmlib
 
 SYSMAKEFILE     = geode.mk
 

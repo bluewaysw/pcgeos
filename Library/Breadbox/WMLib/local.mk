@@ -5,5 +5,5 @@
 #XCCOMFLAGS = -d -WDE
 
 
-_PROTO = 2.0
+# _PROTO = 2.0
 
