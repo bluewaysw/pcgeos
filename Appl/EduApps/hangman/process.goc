@@ -672,13 +672,17 @@ char		textStr[13];
  *             number between 0 and numWords and use that to retrieve that
  *             word from the list and make it available to Hang Man.
  *
+ *	       Main functionality moved to HMGrabARandomWord_internal
+ *	       to make hangman compatible with the german word list.
+ *
  * REVISION HISTORY:
  *	Name	Date		Description
  *	----	----		-----------
  *	jfh	11/2		Initial Revision
+ *	RainerB 07/19/2024	Reject words with umlauts or special characters
  *
  ***********************************************************************/
-void HMGrabARandomWord(void)
+void HMGrabARandomWord_internal(void)
 {
 word		numWords, i, length, whichWord;
 char		questionStr[] = "??????????";
@@ -691,7 +695,7 @@ Boolean	isFound;
 		}
 
 	/* get a random length */
-	length = HMGetRandomNum(4, 10);
+	length = HMGetRandomNum(4, MAX_LETTERS);
 
 	/* fill the search buffer */
 	g_wordParams.WMPS_lengthWord = length;
@@ -724,6 +728,31 @@ Boolean	isFound;
 
 
 }
+
+void HMGrabARandomWord(void) {
+Boolean invalid;
+int	i, len;
+	
+	/* 
+	 * A foreign (e.g. German) world list may contain umlauts and other
+	 * special characters. But Hangman cannot deal with this.
+	 * Therefore, reject any word which contains invalid characters.
+	 */
+
+    do {
+	HMGrabARandomWord_internal();
+	len = strlen(g_wordStr);
+	invalid = FALSE;
+	
+	for ( i = 0; i < len; i++ ) {
+	    if (g_wordStr[i] < 'A') invalid = TRUE;
+	    if (g_wordStr[i] > 'Z') invalid = TRUE;
+	}
+	
+    } while(invalid);
+}
+
+
 
 /***********************************************************************
  *		HMGrabACustomWord

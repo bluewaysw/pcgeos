@@ -1,9 +1,25 @@
+/**************************************************************************
+ *
+ * PROJECT:      Word Matcher wordlist support library
+ *               
+ *	REVISION HISTORY:
+ *	Date     	Name      Description
+ *	------------	--------  -----------
+ *	?		?	  Initial version. 
+ *	2024-06-30  	RainerB   Add Routines to create an new word list
+ *				  and support for uncompressed data base
+ *	
+ **************************************************************************/
+
 @deflib wmlib
 
 @include <stdapp.goh>
 @include <library.h>
 @include <compress.h>
 @include <Ansi/ctype.h>
+@include <Ansi/string.h>
+@include <Ansi/stdlib.h>
+@include <Ansi/stdio.h>
 @include "wmlib.h"
 
 VMBlockHandle near WMI_CreateLib(
@@ -38,6 +54,8 @@ void near WMI_SetNextOfBlock(
                VMBlockHandle next) ;
 
 Boolean near WMI_FindWord(WMParamsStruct *wmStruct, Boolean newSearch) ;
+
+int WMI_CompressDecompressOrCopy(byte *src, int count, byte *dest, VMFileHandle fh, Boolean calledFromLock);
 
 #define WMI_SIZE_BLOCKS 6000
 
@@ -99,13 +117,13 @@ void * _export WMI_LockCompressed(
 
     if ( ptr->size > sizeof( WMI_BlockHeader ) )
     {
-        CompressDecompress( (CLF_SOURCE_IS_BUFFER | CLF_DEST_IS_BUFFER |
-                            CLF_DECOMPRESS | CLF_MOSTLY_ASCII ),
-                            NullHandle,
-                            (byte*) ptr + sizeof( WMI_SavedBlockHeader ),
-                            ptr->compressedSize,
-                            NullHandle,
-                            (byte*) newPtr + sizeof( WMI_BlockHeader ));
+    
+	WMI_CompressDecompressOrCopy(
+	    			(byte*) ptr + sizeof( WMI_SavedBlockHeader ),
+                            	ptr->compressedSize,
+                                (byte*) newPtr + sizeof( WMI_BlockHeader ), 
+                                file, TRUE);
+
     }
     VMUnlock( mem );
     *mh = currentMemBlock;
@@ -119,6 +137,7 @@ void _export WMI_UnlockCompressed(
     )
 {
     WMI_BlockHeader* newPtr;
+    VMFileHandle     fh;	
     MemHandle mem;
     WMI_SavedBlockHeader * ptr;
     word size;
@@ -128,6 +147,7 @@ void _export WMI_UnlockCompressed(
     if ( BHF_dirty & newPtr->flags )
     {
         ptr = VMLock( newPtr->vmFile, newPtr->vmBlock, &mem );
+        fh = newPtr->vmFile;
 
         ptr->next = newPtr->next;
         ptr->size = newPtr->size;
@@ -137,13 +157,12 @@ void _export WMI_UnlockCompressed(
             MemReAlloc( mem, newPtr->size + 16, 0 );
             ptr = MemDeref( mem );
 
-            size = CompressDecompress( (CLF_SOURCE_IS_BUFFER | CLF_DEST_IS_BUFFER |
-                                CLF_MOSTLY_ASCII ),
-                                NullHandle,
-                                (byte*) newPtr + sizeof( WMI_BlockHeader ),
+	    size = WMI_CompressDecompressOrCopy(
+	    			(byte*) newPtr + sizeof( WMI_BlockHeader ),
                                 newPtr->size - sizeof( WMI_BlockHeader ),
-                                NullHandle,
-                                (byte*) ptr + sizeof( WMI_SavedBlockHeader ));
+                                (byte*) ptr + sizeof( WMI_SavedBlockHeader ), 
+                                fh, FALSE);
+
             MemReAlloc( mem, size + sizeof( WMI_SavedBlockHeader ), 0 );
             ptr = MemDeref( mem );
             ptr->compressedSize = size;
@@ -205,6 +224,7 @@ VMBlockHandle near WMI_CreateLib(VMFileHandle file)
 	 for (i=0; i<(WM_MAX_SIZE_WORD+1); i++) {
 		  ptr[i] = NullHandle ;
         /* jfh 1/20/04 my compiler doesn't like 1 line for loops */
+        /* it's important to initialize prt[0] - this will be used later */
 		  dummy++;
 		  }
     VMDirty(mem) ;
@@ -341,7 +361,7 @@ Boolean near WMI_WordCompare(char *ptr, WMParamsStruct *wmStruct)
     return TRUE ;
 }
 /*-------------------------------------------------------------------------*/
-word WMAddWord(WMParamsStruct *wmStruct)
+word _pascal _export WMAddWord(WMParamsStruct *wmStruct)
 {
     word lenWord ;
     VMBlockHandle block ;
@@ -514,12 +534,12 @@ Boolean near WMI_FindWord(WMParamsStruct *wmStruct, Boolean newSearch)
     /* return FALSE ; */
 }
 /*-------------------------------------------------------------------------*/
-Boolean WMFindWord(WMParamsStruct *wmStruct, Boolean newSearch)
+Boolean _pascal _export WMFindWord(WMParamsStruct *wmStruct, Boolean newSearch)
 {
     return WMI_FindWord(wmStruct, newSearch) ;
 }
 /*-------------------------------------------------------------------------*/
-void WMRenameWord(WMParamsStruct *wmStruct, Boolean doSearch)
+void _pascal _export WMRenameWord(WMParamsStruct *wmStruct, Boolean doSearch)
 {
     WMParamsStruct renameSearch ;
     word lenWord ;
@@ -562,7 +582,7 @@ void WMRenameWord(WMParamsStruct *wmStruct, Boolean doSearch)
     WMI_UnlockCompressed(mem) ;
 }
 /*-------------------------------------------------------------------------*/
-void WMDeleteWord(WMParamsStruct *wmStruct, Boolean doSearch)
+void _pascal _export WMDeleteWord(WMParamsStruct *wmStruct, Boolean doSearch)
 {
     WMParamsStruct deleteSearch ;
     word lenWord ;
@@ -617,6 +637,263 @@ void WMDeleteWord(WMParamsStruct *wmStruct, Boolean doSearch)
     WMI_DirtyCompressed(mem) ;
     WMI_UnlockCompressed(mem) ;
 }
+
+
+/*---------------------------------------------------------------------------
+	2024-07-01	RainerB	- quick creation of a new wordlist added 
+ ---------------------------------------------------------------------------*/
+ 
+ 	/*
+ 	 * For every word len, a linked list of vm blocks is used to store the words.
+ 	 * Because a word len of zero is nonsense, I use the index for this len 
+ 	 * (index is the first vm block handle, stored in the map block) to store
+ 	 * version information and a flag that the new database is "under construction".
+ 	 */
+
+#define WL_DB_IS_UNCOMPRESSED 		1
+#define WL_DB_UNDER_CONSTRUCTION 	2
+ 	 
+// Check DB valid by seeing, if the flag WL_DB_UNDER_CONSTRUCTION is set
+// return TRUE if not valid
+Boolean WMI_CheckNewDBValid(VMFileHandle fh) {
+word flags;
+    flags = WMI_GetIndex(fh, 0);
+    if (flags & WL_DB_UNDER_CONSTRUCTION ) return FALSE;	// ok
+    return TRUE;
+}
+
+/*--------------------- WMCreateNewDB ---------------------
+ *	Purpose:	Start building a new, empty word list database.
+ *	Strategy:	Create the database structure and set required flags.
+ *			Note that the database is "development stage" until adding
+ *			words has been finished (WMFinishNewDB habs ben called)
+ *	Paramters:
+ *	Return:
+ ---------------------------------------------------------------------------*/
+void _pascal _export WMCreateNewDB(VMFileHandle fh, Boolean compressed) {
+word flags;
+
+      	/*
+      	 * I use the index for a word len of zero to store the flag WL_DB_UNDER_CONSTRUCTION
+      	 * So, WMAddWordToNewDBUnchecked and WMFinishNewDB can check if the passed database 
+      	 * is in correct state.
+      	 */
+    flags = WL_DB_UNDER_CONSTRUCTION;
+    if (compressed == 0) flags |= WL_DB_IS_UNCOMPRESSED;	// <- used by WMI_CompressDecompressOrCopy
+    
+    WMI_CreateLib(fh);    
+    WMI_SetIndex(fh, 0,  flags);	/* useword len: zero */
+      	 
+}	
+
+
+/*--------------------- WMAddWordToNewDBUnchecked ---------------------
+ *	Purpose:	Add a word to new database, created with WMCreateNewDB
+ *			It is not checked whether the word already exists!
+ *	Context:
+ *	Strategy:	This routine is basically inspired by the WMAddWord 
+ *			routine above, but does not use data compression.
+ *	Paramters:
+ *	Return:		TRUE in case of any error
+ ---------------------------------------------------------------------------*/
+Boolean _pascal _export WMAddWordToNewDBUnchecked(VMFileHandle fh, char *newWord) {
+
+char	wordToAdd[WM_MAX_SIZE_WORD + 2];
+word 	lenWord ;
+VMBlockHandle 	block ;
+VMBlockHandle 	next ;
+word 	maxSize ;
+word 	blockSize ;
+char 	*ptr ;
+word 	i ;
+MemHandle mem ;
+
+    /* Check if database is created with WMCreateNewDB */
+    if ( WMI_CheckNewDBValid(fh) ) return TRUE;
+
+    /* check for oversized words and upcase word */
+    lenWord = strlen(newWord);
+    if (lenWord > WM_MAX_SIZE_WORD) {
+    	return TRUE;
+    	}
+    strcpy(wordToAdd, newWord);
+    LocalUpcaseString(wordToAdd, 0);	// be sure about that!
+
+    maxSize = (lenWord * (WMI_SIZE_BLOCKS/lenWord))+sizeof(WMI_BlockHeader) ;
+    block = WMI_GetIndex(fh, lenWord) ;
+    if (block == NullHandle)  {
+        /* No words of that size exist.  Create a new block and continue. */
+        block = WMI_CreateBlock(fh) ;
+        WMI_SetIndex(fh, lenWord, block) ;
+    }
+
+    /* Find a block that can hold another word. Do this by sequential
+       following the block chain.  If you get to the end, create a new
+       block and follow over to it.  Since that new block is blank, there
+       should be room for a new word ... and thus the search finds a block. */
+    blockSize = WMI_GetBlockSize(fh, block) ;
+    while (blockSize >= maxSize)  {
+        next = WMI_GetNextOfBlock(fh, block) ;
+        if (next == NullHandle)  {
+            next = WMI_CreateBlock(fh) ;
+            WMI_SetNextOfBlock(fh, block, next) ;
+        }
+        block = next ;
+        blockSize = WMI_GetBlockSize(fh, block) ;
+    }
+
+    /* General error check here: */
+    if (block == NullHandle)
+		  return TRUE;
+
+    /* Now we have found a block, let's add the word to it. 
+     * Because we are "under construction", we don't use data compression.
+     * So, we can simply lock the VM block.
+     */
+    ptr = VMLock( fh, block, &mem );
+
+    /* Expand the block for an additional word size. 
+     * This also sets the new size for this block an marks it dirty */
+    WMI_ResizeBlockInMem(mem, blockSize+lenWord) ;
+    ptr = (char *)MemDeref(mem) ;
+    
+    /* Move to the end of the old block size and the position of where
+       the newly added word will start and copy the word*/
+    ptr += blockSize ;
+    for (i=0; i<lenWord; i++)  *(ptr++) = wordToAdd[i] ;
+
+    /* Now we can unlock the block. */
+    VMUnlock(mem) ;
+
+    
+    return FALSE;
+
+}
+
+/*--------------------- WMI_FinishBlock ---------------------
+ *	Purpose:	Finish a single data block 
+ *	Paramters:
+ *	Return:		TRUE if any error
+ ---------------------------------------------------------------------------*/
+void WMI_FinishBlock(VMFileHandle fh, VMBlockHandle block) {
+WMI_BlockHeader		*srcPtr;
+WMI_SavedBlockHeader	*destPtr;
+byte			*buffer, *ptr;
+word 		dataSize, compressedDataSize;
+MemHandle	mem;
+VMBlockHandle	next;
+
+    /*
+     * Current state: 		[WMI_BlockHeader] [uncompressed data]
+     * Destination state: 	[WMI_SavedBlockHeader] [compressed or copied data]
+     * Strategy:  lock VM block and get important information 
+     *		  compress or copy data to an extra memory block 
+     *		  then resize VM block and copy data back
+     */
+    srcPtr = VMLock(fh, block, &mem );
+    dataSize = srcPtr->size - sizeof(WMI_BlockHeader);
+    next = srcPtr->next;
+    
+    /* Alloc buffer, compress or copy data */
+    buffer = malloc(dataSize + 100);
+    ptr = ((byte*)srcPtr) + sizeof(WMI_BlockHeader);
+
+    compressedDataSize = WMI_CompressDecompressOrCopy(ptr, dataSize, buffer, fh, FALSE);
+
+    /* Copy  data back to VM block */
+    MemReAlloc( mem, compressedDataSize + sizeof( WMI_SavedBlockHeader ), 0 );
+    destPtr = MemDeref( mem );
+    destPtr->size = dataSize + sizeof(WMI_BlockHeader);
+    destPtr->next = next;
+    destPtr->compressedSize = compressedDataSize;
+    ptr = ((byte*)destPtr) + sizeof(WMI_SavedBlockHeader);
+    memcpy(ptr, buffer, compressedDataSize);
+
+    /* clean up */
+    VMDirty( mem );
+    VMUnlock( mem );
+    free(buffer);
+
+}
+
+/*--------------------- WMFinishNewDB ---------------------
+ *	Purpose:	Finish building the new word list database.
+ *	Strategy:	Leave "development" mode and compress data, if required.
+ *			The word list database is now ready to use.
+ *	Paramters:
+ *	Return:		TRUE if any error
+ ---------------------------------------------------------------------------*/
+Boolean _pascal _export WMFinishNewDB(VMFileHandle fh, Boolean closeFile) {
+word	flags, n;
+VMBlockHandle	block, next;
+
+    /* Check if database is created with WMCreateNewDB */
+    if ( WMI_CheckNewDBValid(fh) ) {
+     	if (closeFile) VMClose(fh, FALSE); 
+    	return TRUE;
+    	}
+
+    /* Reset "under construction" bit */
+    flags = WMI_GetIndex(fh, 0);
+    flags &= ~WL_DB_UNDER_CONSTRUCTION;
+    WMI_SetIndex(fh, 0, flags);
+    
+    /* Transform any data block into a state, usable by the rest of the library */
+    for ( n = 1; n <= WM_MAX_SIZE_WORD; n++ ) {
+    	block = WMI_GetIndex(fh, n);
+    	while ( block ) {
+    	    /* Handle chain of VM blocks */
+    	    next = WMI_GetNextOfBlock(fh, block);
+    	    WMI_FinishBlock(fh, block);
+    	    block = next;
+    	} 
+    	
+    }
+
+    if (closeFile) VMClose(fh, FALSE); 
+    return FALSE;
+}
+
+/*--------------------- WMI_CompressDecompressOrCopy ---------------------
+ *	Purpose:	Compress, decompress or copy data
+ *	Strategy:	Check if data should be stored comressed and
+ *			select the proper strategy
+ *	Paramters:	*src	source buffer
+ *			count	number of bytes in source buffer
+ *			*dest	destination buffer
+ *			calledFromLock: relevant if data base holds compressed data
+ *				TRUE:  decompress data
+ *				FALSE: compress data
+ *			fh:	VMFile that holds the data base
+ *	Return:		number of copied bytes (if uncompressed)
+ *			number of compressed bytes (if compression has been performed )
+ *			compression error (if decompression has been performed )
+ ---------------------------------------------------------------------------*/
+int WMI_CompressDecompressOrCopy(byte *src, int count, byte *dest, VMFileHandle fh, Boolean calledFromLock) {
+word flags, retVal;
+
+    /* check for WL_DB_IS_UNCOMPRESSED bit */
+    
+    flags = WMI_GetIndex(fh, 0);
+    if ( flags & WL_DB_IS_UNCOMPRESSED ) {
+ 	/* uncompressed version of word list: just copy data */
+ 	memcpy(dest, src, count);
+ 	return count;
+    }
+    
+    /* Setup CompressDecompress flags and call the routine */
+    flags = CLF_SOURCE_IS_BUFFER | CLF_DEST_IS_BUFFER | CLF_MOSTLY_ASCII;
+    if (calledFromLock) flags |= CLF_DECOMPRESS;
+
+    retVal = CompressDecompress( flags, 
+    			NullHandle, src, count,
+    			NullHandle, dest);
+
+    return retVal;    // compressed size if calledFromLock is FASLE
+    		      // CMP_NO_ERROR or CMP_xxx error value if calledFromLock is TRUE
+}
+
+
 /*-------------------------------------------------------------------------*/
 
 @endlib
