@@ -8,7 +8,7 @@
 # Define the Bullet specific version
 #
 #GOCFLAGS	+= -DBULLET
-#XCCOMFLAGS	= -zc
+XCCOMFLAGS	= -zc
 LINKFLAGS       += -r
 
 #include <$(SYSMAKEFILE)>
