@@ -155,6 +155,8 @@ COMPRESSDECOMPRESS		proc	far	flags:CompLibFlags,
 	mov	ax, PK_COMPRESS_BUFFER
 alloc_block:
 	mov	cx, ALLOC_DYNAMIC_LOCK
+	or	ch, HAF_ZERO_INIT
+
 	call	MemAlloc
 	mov	cx, 0
 	jc	errorVSem
