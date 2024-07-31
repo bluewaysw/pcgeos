@@ -226,31 +226,35 @@ noSetViewMode:
 	call	ClipboardAddToNotificationList
 
 noNotificationList:
-
-
-
-;	If not in pen mode, make the ink menu not-user-initiatable.
-
-	call	SysGetPenMode
-	mov	cx, (mask GIA_NOT_USER_INITIATABLE) or (0 shl 8)
-	tst	ax
-	jz	setAttrs
-	mov	cx, (mask GIA_NOT_USER_INITIATABLE shl 8) or 0
-setAttrs:
-	mov	ax, MSG_GEN_INTERACTION_SET_ATTRS
+; hide non-appropriate tool controls
 	GetResourceHandleNS	InkMenu, bx
-	mov	si, offset InkMenu
+	call	SysGetPenMode
+	tst	ax
+	mov	ax, MSG_GEN_SET_NOT_USABLE
+	mov	si, offset NTakerToolControl
+	jz	noPen
+	mov	si, offset NTakerToolControlNoPen
+noPen:
+	mov	dl, VUM_NOW
 	mov	di, mask MF_FIXUP_DS
 	call	ObjMessage
 
 ;	Set various pen-mode only controllers not-usable
-
 	call	SysGetPenMode
 	tst	ax
 	mov	ax, MSG_GEN_SET_NOT_USABLE
 	jz	setUsability
 	mov	ax, MSG_GEN_SET_USABLE
+
 setUsability:
+	GetResourceHandleNS	InkMenu, bx
+	push	ax
+	mov	si, offset InkMenu
+	mov	dl, VUM_NOW
+	mov	di, mask MF_FIXUP_DS
+	call	ObjMessage
+	pop	ax
+
 	push	ax
 	mov	si, offset PrintCurPage
 	mov	dl, VUM_NOW
@@ -501,6 +505,7 @@ REVISION HISTORY:
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
 NTakerChangeOptions	method	NTakerProcessClass, MSG_NTAKER_CHANGE_OPTIONS
+
 	mov	ax, MSG_NTAKER_DISPLAY_CHANGE_OPTIONS
 	FALL_THRU	SendMessageToAllDisplays
 NTakerChangeOptions	endp
@@ -542,5 +547,45 @@ SendMessageToAllDisplays	proc	far
 	clr	di
 	GOTO	ObjMessage
 SendMessageToAllDisplays	endp
+
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		NTakerNotifyOptionsChange
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	Notify the application object of a user-option change
+
+CALLED BY:	Various
+
+PASS:		Nothing
+
+RETURN:		Nothing 
+
+DESTROYED:	Nothing
+
+PSEUDO CODE/STRATEGY:
+
+KNOWN BUGS/SIDE EFFECTS/IDEAS:
+		
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	Don	2/7/99		Initial version
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+
+NTakerNotifyOptionsChange	proc	far
+	uses	ax, bx, di, si
+	.enter
+
+	mov	ax, MSG_GEN_APPLICATION_OPTIONS_CHANGED
+	GetResourceHandleNS NTakerApp, bx
+	mov	si, offset NTakerApp
+	clr	di
+	call	ObjMessage
+
+	.leave
+	ret
+NTakerNotifyOptionsChange	endp
 
 DocumentCode	ends
