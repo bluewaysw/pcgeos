@@ -81,7 +81,7 @@ static void _near RegionPathConicTo( Handle handle, TT_Vector* v_control, TT_Vec
 
 static void WriteComment( TRUETYPE_VARS, GStateHandle gstate );
 
-static void ScaleOutline( TRUETYPE_VARS );
+static void CalcScaleAndScaleOutline( TRUETYPE_VARS );
 
 static void InitDriversTransformMatrix( TRUETYPE_VARS,
                                         TransformMatrix*  transMatrix,
@@ -180,7 +180,7 @@ EC(     ECCheckBounds( (void*)fontHeader ) );
         /* load glyph and scale its outline to 1000 units per em */
         TT_Load_Glyph( INSTANCE, GLYPH, charIndex, 0 );
         TT_Get_Glyph_Outline( GLYPH, &OUTLINE );
-        ScaleOutline( trueTypeVars );
+        CalcScaleAndScaleOutline( trueTypeVars );
 
         /* write comment with glyph parameters */
         WriteComment( trueTypeVars, gstate );
@@ -743,21 +743,22 @@ static void WriteComment( TRUETYPE_VARS, GStateHandle gstate )
 
         TT_Get_Glyph_Metrics( GLYPH, &GLYPH_METRICS );
 
-        params[0] = GLYPH_METRICS.advance;
+        params[0] = SCALE_WORD( GLYPH_METRICS.advance, SCALE_WIDTH ) >> 16;
         params[1] = 0;
-        params[2] = GLYPH_BBOX.xMin;
-        params[3] = GLYPH_BBOX.yMin;
-        params[4] = GLYPH_BBOX.xMax;
-        params[5] = GLYPH_BBOX.yMax;
+        params[2] = SCALE_WORD( GLYPH_BBOX.xMin, SCALE_WIDTH ) >> 16;
+        params[3] = SCALE_WORD( GLYPH_BBOX.yMin, SCALE_HEIGHT ) >> 16;
+        params[4] = SCALE_WORD( GLYPH_BBOX.xMax, SCALE_WIDTH ) >> 16;
+        params[5] = SCALE_WORD( GLYPH_BBOX.yMax, SCALE_HEIGHT ) >> 16;
 
         GrComment( gstate, params, NUM_PARAMS * sizeof( word ) );
 }
 
 
 /********************************************************************
- *                      ScaleOutline
+ *                      CalcScaleAndScaleOutline
  ********************************************************************
- * SYNOPSIS:	  Scale current outline to 1000 untits per em.
+ * SYNOPSIS:	  Calculate scale factors to 1000 units per em and 
+ *                scale current outline.
  * 
  * PARAMETERS:    TRUETYPE_VARS         Cached variables needed by driver.
  * 
@@ -769,12 +770,12 @@ static void WriteComment( TRUETYPE_VARS, GStateHandle gstate )
  *      18/11/23  JK        Initial Revision
  *******************************************************************/
 
-static void ScaleOutline( TRUETYPE_VARS )
+static void CalcScaleAndScaleOutline( TRUETYPE_VARS )
 {
         TT_Matrix      scaleMatrix = { 0, 0, 0, 0 };
 
 
-        scaleMatrix.xx = scaleMatrix.yy = GrUDivWWFixed( STANDARD_GRIDSIZE, UNITS_PER_EM );
+        SCALE_HEIGHT = SCALE_WIDTH = scaleMatrix.xx = scaleMatrix.yy = GrUDivWWFixed( STANDARD_GRIDSIZE, UNITS_PER_EM );
 
         TT_Transform_Outline( &OUTLINE, &scaleMatrix );
 }
