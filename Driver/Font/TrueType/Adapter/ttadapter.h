@@ -389,7 +389,6 @@ typedef struct
     TT_Glyph_Metrics            glyphMetrics;
     TT_CharMap                  charMap;
     TT_Outline                  outline;
-    TT_BBox                     bbox;
 
     /* currently open face */
     FileHandle                  ttfile;
