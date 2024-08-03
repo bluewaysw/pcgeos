@@ -56,7 +56,8 @@ NTakerApp = NTakerApplication vardataReloc {
 		 NTakerDisplayControl;
 	gcnList(MANUFACTURER_ID_GEOWORKS,GAGCNLT_STARTUP_LOAD_OPTIONS) =
 		NTakerToolControl,
-		OptionsList, 
+		NTakerToolControlNoPen,
+		OptionsList,
 		UserLevelList,
 		ShowBarList,
 		StartupViewList,
@@ -88,9 +89,12 @@ NTakerApp = NTakerApplication vardataReloc {
 		},
 		/*ATTR_GEN_APPLICATION_SAVE_OPTIONS_TRIGGER {
 			UN_OPTR SaveOptionsTrigger
+		},
+		ATTR_GEN_APPLICATION_RESET_OPTIONS_TRIGGER {
+			UN_OPTR ResetOptionsTrigger
 		},*/
-	ATTR_GEN_HELP_FILE {
-		char "ntaker", 0
+		ATTR_GEN_HELP_FILE {
+		char	"ntaker", 0
 		},
 	}
 }
@@ -122,7 +126,7 @@ end AppLCMonikerResource;
 start	Interface;		/* this resource is for misc UI objects */
 
 NTakerPrimary = GenPrimary {
-	children = FileMenu, EditMenu, /*InkMenu,*/ ViewMenu,
+	children = FileMenu, EditMenu, InkMenu, ViewMenu,
 		   OptionsMenu, NTakerDisplayControl,
 		   NTakerIconBar, NTakerDispGroup,
 		   DialogGroup;
@@ -477,7 +481,7 @@ OptionsMenu = GenInteraction {
 
 OptionsGroup = GenInteraction {
 	children = ShowBarList, OptionsList,
-		   StartupViewGroup, CardTypeGroup, NTakerToolControl;
+		   StartupViewGroup, CardTypeGroup, NTakerToolControl, NTakerToolControlNoPen;
 }
 
 SaveResetGroup = GenInteraction {
@@ -487,9 +491,9 @@ SaveResetGroup = GenInteraction {
 /* --- */
 
 OptionsList = GenBooleanGroup {
-	destination = process;
+	destination = NTakerApp;
 	children = DisplayDates;
-	applyMsg = MSG_NTAKER_CHANGE_OPTIONS;
+	applyMsg = MSG_NTAKER_APPLICATION_CHANGE_OPTIONS;
 	hints = { 
 			ATTR_GEN_INIT_FILE_KEY { 
 				char "displayDates",0
@@ -501,6 +505,7 @@ DisplayDates = GenBoolean {
 	moniker = 'D', "Display Card Dates";     
 	identifier = "mask NTO_DISPLAY_DATES";
 }
+
 StartupViewGroup = GenInteraction {
 	visibility = popup;
 	moniker = 'V', "View on Startup";
@@ -512,6 +517,8 @@ StartupViewList = GenItemGroup {
 	numSelections = 1;
 	selection = VT_CARD;
 	children = StartupCardView, StartupListView, StartupBothView;
+	applyMsg = MSG_GEN_APPLICATION_OPTIONS_CHANGED;
+	destination = NTakerApp;
 	hints = { 
 			ATTR_GEN_INIT_FILE_KEY { 
 				char "viewOnStartup",0
@@ -533,7 +540,7 @@ StartupBothView = GenItem {
 
 ShowBarList = GenBooleanGroup {
 	children = ShowToolbarEntry;
-	hints = {ATTR_GEN_INIT_FILE_KEY { char "showBars",0}}
+	hints = {ATTR_GEN_INIT_FILE_KEY { char "showBars",0}, HINT_SAME_CATEGORY_AS_PARENT}
 	applyMsg = MSG_NTAKER_APPLICATION_UPDATE_TOOLBARS;
 	destination = NTakerApp;    
 	selectedBooleans = "DEFAULT_TOOLBAR_STATES";
@@ -544,10 +551,18 @@ ShowToolbarEntry = GenBoolean {
 }
 
 NTakerToolControl = GenToolControl {
-	moniker = 'T', "Manage Tools";	  
+	moniker = 'T', "Customize Tool Bars";	  
 	visibility = dialog;
 	toolboxList = NTakerToolboxList;
 	toolGroupList = NTakerToolGroupList;
+	hints = {HINT_SAME_CATEGORY_AS_PARENT}
+}
+
+NTakerToolControlNoPen = GenToolControl {
+	moniker = 'T', "Customize Tool Bars";	  
+	visibility = dialog;
+	toolboxList = NTakerToolboxList;
+	toolGroupList = NTakerToolGroupListNoPen;
 	hints = {HINT_SAME_CATEGORY_AS_PARENT}
 }
 
@@ -562,6 +577,9 @@ chunk	NTakerToolGroupList = data {
 	UN_OPTR NTakerInkTools
 }
 
+chunk	NTakerToolGroupListNoPen = data {
+	UN_OPTR NTakerEditTools
+}
 
 
 SaveOptionsTrigger = GenTrigger {
@@ -583,6 +601,8 @@ CardTypeList = GenItemGroup {
 	behaviorType = exclusive; 	/* Only one item selected at a time */
 	numSelections = 1;
 	selection = NT_TEXT;  		/* What we want selected by default */
+	applyMsg = MSG_GEN_APPLICATION_OPTIONS_CHANGED;
+	destination = NTakerApp;
 	children = CardTypeInk, CardTypeText;
 	hints = { ATTR_GEN_INIT_FILE_KEY { char "cardType", 0 } }
 }
