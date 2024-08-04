@@ -354,6 +354,7 @@ EC(     ECCheckBounds( (void*)kernValue ) );
         for( table = 0; table < kerningDir.nTables; ++table )
         {
                 word i;
+                word minKernValue = UNITS_PER_EM / KERN_VALUE_DIVIDENT;
 
                 if( TT_Load_Kerning_Table( FACE, table ) )
                         return;
@@ -366,13 +367,17 @@ EC(             ECCheckBounds( pairs ) );
 
                 for( i = 0; i < kerningDir.tables->t.kern0.nPairs; ++i )
                 {
-                        char left  = getGeosCharForIndex( pairs[i].left );
-                        char right = getGeosCharForIndex( pairs[i].right );
+                        char left   = getGeosCharForIndex( pairs[i].left );
+                        char right  = getGeosCharForIndex( pairs[i].right );
+                        
 
+                        if( ABS( pairs[i].value ) < minKernValue )
+                                continue;
 
                         if( left && right )
                         {
                                 WWFixedAsDWord  scaledKernValue;
+
 
                                 kernPair->KP_charLeft  = left;
                                 kernPair->KP_charRight = right;
@@ -556,7 +561,7 @@ static word AllocFontBlock( word        additionalSpace,
                             MemHandle*  fontHandle )
 {
         word size = sizeof( FontBuf ) + numOfCharacters * sizeof( CharTableEntry ) +
-                numOfKernPairs * ( sizeof( KernPair ) + sizeof( WBFixed ) ) +
+                numOfKernPairs * ( sizeof( KernPair ) + sizeof( BBFixed ) ) +
                 additionalSpace; 
                      
         /* allocate memory for FontBuf, CharTableEntries, KernPairs and additional space */

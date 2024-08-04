@@ -66,7 +66,7 @@ extern TEngine_Instance engineInstance;
 #define FAMILY_NAME_LENGTH                  20
 #define STYLE_NAME_LENGTH                   16
 
-#define MAX_KERN_TABLE_LENGTH               6000
+#define KERN_VALUE_DIVIDENT                 100
 
 #define STANDARD_GRIDSIZE                   1000
 #define MAX_NUM_GLYPHS                      2000
