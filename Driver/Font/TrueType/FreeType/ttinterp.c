@@ -773,7 +773,7 @@
  *
  *****************************************************************/
 
-  static Bool  Ins_Goto_CodeRange( EXEC_OPS Int  aRange, ULong  aIP )
+  static Bool  Ins_Goto_CodeRange( EXEC_OPS Int  aRange, UShort  aIP )
   {
     TCodeRange*  WITH;
 

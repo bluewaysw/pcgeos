@@ -166,7 +166,7 @@
   LOCAL_FUNC
   TT_Error  Goto_CodeRange( PExecution_Context  exec,
                             Int                 range,
-                            ULong               IP )
+                            UShort              IP )
   {
     PCodeRange  cr;
 
@@ -214,7 +214,7 @@
   TT_Error  Set_CodeRange( PExecution_Context  exec,
                            Int                 range,
                            void*               base,
-                           ULong               length )
+                           UShort              length )
   {
     if ( range < 1 || range > 3 )
       return TT_Err_Bad_Argument;
