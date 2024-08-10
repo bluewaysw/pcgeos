@@ -625,13 +625,13 @@
 
     TT_Error        error;     /* last execution error */
 
-    Long            top;        /* top of exec. stack  */
+    Short           top;        /* top of exec. stack  */
 
     UShort          stackSize;  /* size of exec. stack */
     PStorage        stack;      /* current exec. stack */
 
     Long            args;
-    ULong           new_top;    /* new top after exec.    */
+    UShort          new_top;    /* new top after exec.    */
 
     TGlyph_Zone     zp0,            /* zone records */
                     zp1,

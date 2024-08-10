@@ -73,7 +73,7 @@
 /* a counter within the run loop. a singly stroke of interpretation */
 /* is now limited to a maximum number of opcodes defined below..    */
 /*                                                                  */
-#define MAX_RUNNABLE_OPCODES  1000000
+#define MAX_RUNNABLE_OPCODES  15000
 
 
 /* There are two kinds of implementations there:              */
@@ -5663,7 +5663,7 @@
     PDefRecord   WITH;
     PCallRecord  WITH1;
 
-    Long         ins_counter = 0;  /* executed instructions counter */
+    Short        ins_counter = 0;  /* executed instructions counter */
 
 #ifdef TT_CONFIG_OPTION_STATIC_INTERPRETER
     cur = *exc;

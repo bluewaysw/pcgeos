@@ -217,7 +217,14 @@
 #undef TT_CONFIG_OPTION_SUPPORT_UNICODE_RANGES
 
 
+/*************************************************************************/
+/* Define TT_CONGIG_OPTION_SUPPORT_NON_SQUARE_PIXELS if you want to      */
+/* support displays with non square pixels.                              */
+
 #undef TT_CONGIG_OPTION_SUPPORT_NON_SQUARE_PIXELS
+
+
+#undef TT_CONFIG_OPTION_SUPPORT_PEDANTIC_HINTING
 
 
 /**********************************************************************/
