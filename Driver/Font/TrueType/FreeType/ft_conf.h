@@ -217,6 +217,9 @@
 #undef TT_CONFIG_OPTION_SUPPORT_UNICODE_RANGES
 
 
+#undef TT_CONGIG_OPTION_SUPPORT_NON_SQUARE_PIXELS
+
+
 /**********************************************************************/
 /*                                                                    */
 /*  The following macros are used to define the debug level, as well  */
