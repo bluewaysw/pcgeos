@@ -385,8 +385,11 @@
           exec->pedantic_hinting = load_flags & TTLOAD_PEDANTIC;
 
           error = Context_Run( exec );
+
+#ifdef TT_CONFIG_OPTION_SUPPORT_PEDANTIC_HINTING
           if (error && exec->pedantic_hinting)
             return error;
+#endif
         }
       }
       else
@@ -485,8 +488,11 @@
       exec->pedantic_hinting = load_flags & TTLOAD_PEDANTIC;
 
       error = Context_Run( exec );
+
+#ifdef TT_CONFIG_OPTION_SUPPORT_PEDANTIC_HINTING
       if (error && exec->pedantic_hinting)
         return error;
+#endif
     }
 
     /* save glyph origin and advance points */
