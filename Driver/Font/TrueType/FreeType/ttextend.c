@@ -101,7 +101,7 @@
 
     clazz->offset  = exts->cur_offset;
 
-    exts->num_extensions++;
+    ++exts->num_extensions;
     exts->cur_offset += ( size + ALIGNMENT-1 ) & -ALIGNMENT;
 
     return TT_Err_Ok;
@@ -125,7 +125,7 @@
 
     registry = (PExtension_Registry)face->engine->extension_component;
 
-    for ( n = 0; n < face->n_extensions; n++ )
+    for ( n = 0; n < face->n_extensions; ++n )
     {
       clazz = registry->classes + n;
       if ( clazz->id == extension_id )
@@ -154,7 +154,7 @@
 
     registry = (PExtension_Registry)engine->extension_component;
 
-    for ( n = 0; n < face->n_extensions; n++ )
+    for ( n = 0; n < face->n_extensions; ++n )
     {
       clazz = registry->classes + n;
       ext   = (PByte)face->extension + clazz->offset;
@@ -196,7 +196,7 @@
     if ( ALLOC( face->extension, registry->cur_offset ) )
       return error;
 
-    for ( n = 0; n < face->n_extensions; n++ )
+    for ( n = 0; n < face->n_extensions; ++n )
     {
       clazz = registry->classes + n;
       ext   = (PByte)face->extension + clazz->offset;

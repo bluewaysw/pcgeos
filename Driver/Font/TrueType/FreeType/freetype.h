@@ -343,27 +343,34 @@
 
   struct  TT_Header_
   {
+#ifdef TT_CONFIG_OPTION_SUPPORT_OPTIONAL_FIELDS
     TT_Fixed   Table_Version;
     TT_Fixed   Font_Revision;
 
     TT_Long    CheckSum_Adjust;
     TT_Long    Magic_Number;
+#endif
 
     TT_UShort  Flags;
     TT_UShort  Units_Per_EM;
 
+#ifdef TT_CONFIG_OPTION_SUPPORT_OPTIONAL_FIELDS
     TT_Long    Created [2];
     TT_Long    Modified[2];
+#endif
 
     TT_FWord   xMin;
     TT_FWord   yMin;
     TT_FWord   xMax;
     TT_FWord   yMax;
 
+#ifdef TT_CONFIG_OPTION_SUPPORT_OPTIONAL_FIELDS
     TT_UShort  Mac_Style;
     TT_UShort  Lowest_Rec_PPEM;
-
+    
     TT_Short   Font_Direction;
+#endif
+
     TT_Short   Index_To_Loc_Format;
     TT_Short   Glyph_Data_Format;
   };
@@ -389,6 +396,8 @@
 
     TT_FWord   min_Left_Side_Bearing;  /* minimum left-sb       */
     TT_FWord   min_Right_Side_Bearing; /* minimum right-sb      */
+
+#ifdef TT_CONFIG_OPTION_SUPPORT_OPTIONAL_FIELDS
     TT_FWord   xMax_Extent;            /* xmax extents          */
     TT_FWord   caret_Slope_Rise;
     TT_FWord   caret_Slope_Run;
@@ -398,6 +407,7 @@
                Reserved2,
                Reserved3,
                Reserved4;
+#endif
 
     TT_Short   metric_Data_Format;
     TT_UShort  number_Of_HMetrics;
@@ -406,8 +416,8 @@
     /* but they're used to connect the metrics header to the relevant     */
     /* `HMTX' or `VMTX' table.                                            */
 
-    void*      long_metrics;
-    void*      short_metrics;
+    MemHandle  long_metrics_block;
+    MemHandle  short_metrics_block;
   };
 
   typedef struct TT_Horizontal_Header_  TT_Horizontal_Header;
@@ -430,6 +440,8 @@
 
     TT_FWord   min_Top_Side_Bearing;    /* minimum left-sb or top-sb       */
     TT_FWord   min_Bottom_Side_Bearing; /* minimum right-sb or bottom-sb   */
+
+#ifdef TT_CONFIG_OPTION_SUPPORT_OPTIONAL_FIELDS
     TT_FWord   yMax_Extent;             /* xmax or ymax extents            */
     TT_FWord   caret_Slope_Rise;
     TT_FWord   caret_Slope_Run;
@@ -439,6 +451,7 @@
                Reserved2,
                Reserved3,
                Reserved4;
+#endif
 
     TT_Short   metric_Data_Format;
     TT_UShort  number_Of_VMetrics;
@@ -447,8 +460,8 @@
     /* but they're used to connect the metrics header to the relevant     */
     /* `HMTX' or `VMTX' table.                                            */
 
-    void*      long_metrics;
-    void*      short_metrics;
+    MemHandle  long_metrics_block;
+    MemHandle  short_metrics_block;
   };
 
   typedef struct TT_Vertical_Header_  TT_Vertical_Header;
@@ -468,6 +481,8 @@
     TT_UShort  usWeightClass;
     TT_UShort  usWidthClass;
     TT_Short   fsType;
+
+#ifdef TT_CONFIG_OPTION_SUPPORT_OPTIONAL_FIELDS
     TT_FWord   ySubscriptXSize;
     TT_FWord   ySubscriptYSize;
     TT_FWord   ySubscriptXOffset;
@@ -478,30 +493,36 @@
     TT_FWord   ySuperscriptYOffset;
     TT_FWord   yStrikeoutSize;
     TT_FWord   yStrikeoutPosition;
-    TT_Short   sFamilyClass;
+#endif
 
+    TT_Short   sFamilyClass;
     TT_Byte    panose[10];
 
+#ifdef TT_CONFIG_OPTION_SUPPORT_UNICODE_RANGES
     TT_ULong   ulUnicodeRange1;        /* Bits 0-31   */
     TT_ULong   ulUnicodeRange2;        /* Bits 32-63  */
     TT_ULong   ulUnicodeRange3;        /* Bits 64-95  */
     TT_ULong   ulUnicodeRange4;        /* Bits 96-127 */
+#endif
 
+#ifdef TT_CONFIG_OPTION_SUPPORT_OPTIONAL_FIELDS
     TT_Char    achVendID[4];
-
     TT_UShort  fsSelection;
     TT_UShort  usFirstCharIndex;
     TT_UShort  usLastCharIndex;
+#endif
+
     TT_Short   sTypoAscender;
     TT_Short   sTypoDescender;
     TT_Short   sTypoLineGap;
     TT_UShort  usWinAscent;
     TT_UShort  usWinDescent;
 
+#ifdef TT_CONFIG_OPTION_SUPPORT_OPTIONAL_FIELDS
     /* only version 1 tables: */
-
     TT_ULong   ulCodePageRange1;       /* Bits 0-31   */
     TT_ULong   ulCodePageRange2;       /* Bits 32-63  */
+#endif
   };
 
   typedef struct TT_OS2_  TT_OS2;
@@ -511,15 +532,21 @@
 
   struct  TT_Postscript_
   {
+#ifdef TT_CONFIG_OPTION_SUPPORT_OPTIONAL_FIELDS    
     TT_Fixed  FormatType;
     TT_Fixed  italicAngle;
+#endif
+
     TT_FWord  underlinePosition;
     TT_FWord  underlineThickness;
     TT_ULong  isFixedPitch;
+    
+#ifdef TT_CONFIG_OPTION_SUPPORT_OPTIONAL_FIELDS
     TT_ULong  minMemType42;
     TT_ULong  maxMemType42;
     TT_ULong  minMemType1;
     TT_ULong  maxMemType1;
+#endif
 
     /* Glyph names follow in the file, but we don't         */
     /* load them by default.  See the ftxpost.c extension.  */
@@ -565,8 +592,14 @@
     TT_Horizontal_Header*  horizontal;    /* TrueType horizontal header     */
     TT_OS2*                os2;           /* TrueType OS/2 table            */
     TT_Postscript*         postscript;    /* TrueType Postscript table      */
+
+#ifdef TT_CONFIG_OPTION_PROCESS_HDMX
     TT_Hdmx*               hdmx;          /* TrueType hor. dev. metr. table */
+#endif
+
+#ifdef TT_CONFIG_OPTION_PROCESS_VMTX
     TT_Vertical_Header*    vertical;      /* TT Vertical header, if present */
+#endif
   };
 
   typedef struct TT_Face_Properties_  TT_Face_Properties;

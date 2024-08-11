@@ -158,6 +158,65 @@
 #define  TT_CONFIG_OPTION_THREAD_SAFE
 
 
+/*************************************************************************/
+/* Define TT_CONFIG_OPTION_PROCESS_HDMX if you want to process optional  */
+/* hdmx table. The PC/Geos ttf driver does not need any information from */
+/* the hdmx table.                                                       */
+
+#undef  TT_CONFIG_OPTION_PROCESS_HDMX
+
+
+/*************************************************************************/
+/* Define TT_CONFIG_OPTION_PROCESS_VMTX if you want to process optional  */
+/* vtmx table. The PC/Geos ttf driver does not need any information from */
+/* the vtmx table.                                                       */
+
+#undef  TT_CONFIG_OPTION_PROCESS_VMTX
+
+
+/*************************************************************************/
+/* Define TT_CONFIG_OPTION_SUPPORT_CMAP2 if you want to support cmap 0   */
+/* char mapping. Charmapping type 0 is now out of date.                  */
+
+#undef  TT_CONFIG_OPTION_SUPPORT_CMAP0
+
+
+/*************************************************************************/
+/* Define TT_CONFIG_OPTION_SUPPORT_CMAP2 if you want to support cmap 2   */
+/* char mapping. Charmapping type 2 is now out of date.                  */
+
+#undef  TT_CONFIG_OPTION_SUPPORT_CMAP2
+
+
+/*************************************************************************/
+/* Define TT_CONFIG_OPTION_SUPPORT_CMAP6 if you want to support cmap 6   */
+/* char mapping. In ttf fonts charmap 4 is the standard for char mapping.*/
+
+#undef  TT_CONFIG_OPTION_SUPPORT_CMAP6
+
+
+/*************************************************************************/
+/* Define TT_CONFIG_OPTION_SUPPORT_KERN2 if you want to support kerning  */
+/* format 1. The ttf driver only supports format 0 because it is very    */
+/* simple and common.                                                    */
+
+#undef  TT_CONFIG_OPTION_SUPPORT_KERN2
+
+
+/*************************************************************************/
+/* Define TT_CONFIG_OPTION_SUPPORT_OPTIONAL_FIELDS if you want to hold   */
+/* optional fiels in freetype structures.                                */
+
+#undef  TT_CONFIG_OPTION_SUPPORT_OPTIONAL_FIELDS
+
+
+/*************************************************************************/
+/* Define TT_CONFIG_OPTION_SUPPORT_UNICODE_RANGES if you want to hold    */
+/* unicode ranges in OS/2 table.                                         */
+
+#undef TT_CONFIG_OPTION_SUPPORT_UNICODE_RANGES
+
+
 /**********************************************************************/
 /*                                                                    */
 /*  The following macros are used to define the debug level, as well  */

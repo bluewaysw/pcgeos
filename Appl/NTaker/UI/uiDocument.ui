@@ -1,0 +1,351 @@
+/***********************************************************************
+ *
+ *	Copyright (c) GeoWorks 1992 -- All Rights Reserved
+ *
+ * PROJECT:	NTaker app
+ * FILE:	uiDocument.ui
+ *
+ *
+ * REVISION HISTORY:
+ *	
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	atw	10/27/92	Initial revision
+ *
+ *
+ * DESCRIPTION:
+ *	Contains the UI for each document.
+ *		
+ *	$Id: uiDocument.ui,v 1.1 97/04/04 16:17:07 newdeal Exp $
+ *
+ ***********************************************************************/
+
+#include "Art/mkrUpArrow.ui"
+#include "Art/mkrDownArrow.ui"
+#include "Art/mkrNewCard.ui"
+
+class TitledGenTrigger = GenTrigger {
+	title = nptrComp:null;
+      	pictureNumber = byteComp:0;
+}
+
+/*-----------------------------------------------------------------------------
+	Block to duplicate for each document
+-----------------------------------------------------------------------------*/
+
+start DisplayUI;
+class NTakerDisplay = GenDisplay {
+	static	wordComp : 0;	/* NDISPI_hasTopics */
+	static	wordComp : 0;	/* NDISPI_numTopics */
+}
+NTakerDisp = NTakerDisplay {
+	/*
+	 * The display starts not usable since it is not in the generic tree.
+	 * It will be set usable after being added to the display control.
+	 */
+	genStates = default -usable;
+	children = NTakerListInfo, NTakerCardInfo;
+	hints = { 
+			HINT_DISPLAY_DEFAULT_ACTION_IS_NAVIGATE_TO_NEXT_FIELD,
+			ATTR_GEN_DISPLAY_NOT_MINIMIZABLE,
+		  	HINT_DEFAULT_TARGET,
+		  	HINT_SIZE_WINDOW_AS_DESIRED,
+		  	HINT_ORIENT_CHILDREN_HORIZONTALLY,
+		  }
+}
+
+/******************************************************************
+ *	List View
+ ******************************************************************/
+
+NTakerListInfo = GenInteraction {
+	children = TopicGroup, CardList, ListDateDisplay, ListTools;
+	hints = {
+			HINT_EXPAND_HEIGHT_TO_FIT_PARENT
+		}
+}
+
+TopicGroup = GenInteraction {
+	children = UpTopic, DownTopic, TopicName;   	
+	hints = {
+		HINT_ORIENT_CHILDREN_HORIZONTALLY,
+		HINT_EXPAND_WIDTH_TO_FIT_PARENT,
+		HINT_CENTER_CHILDREN_VERTICALLY
+	}	
+}
+UpTopic = GenTrigger vardataReloc {
+	moniker = "^";
+	hints = {
+		HINT_TRIGGER_DESTRUCTIVE_ACTION,
+		ATTR_GEN_DESTINATION_CLASS {
+			UN_DD NTakerDocumentClass
+		}
+	}
+	genAttributes = default +initiatesInputIgnore;
+	action = MSG_NTAKER_DOC_GET_PARENT_FOLDER, "TO_OBJ_BLOCK_OUTPUT";
+}
+DownTopic = GenTrigger vardataReloc {
+	genStates = default -enabled;
+	moniker = "V";
+	action = MSG_NTAKER_DOC_DOWN_TOPIC, "TO_OBJ_BLOCK_OUTPUT";
+	hints = {
+		HINT_TRIGGER_DESTRUCTIVE_ACTION,
+		ATTR_GEN_DESTINATION_CLASS {
+			UN_DD NTakerDocumentClass
+		}
+	}
+	genAttributes = default +initiatesInputIgnore;
+}
+
+TopicName = GenText {
+	genAttributes = readOnly;
+	moniker = "Current Topic:";
+	textDisplayAttributes = singleLineText;
+	hints = {HINT_EXPAND_WIDTH_TO_FIT_PARENT}
+}
+
+CardList = GenDynamicList vardataReloc {
+	behaviorType = exclusive;
+	numItems = 0;
+	queryMsg = MSG_NTAKER_DISPLAY_QUERY_FOR_NOTE_LIST_MONIKER;
+	destination = NTakerDisp;
+	applyMsg = MSG_NTAKER_DISPLAY_CHANGE_NOTE;
+	hints = {
+		HINT_ITEM_GROUP_SCROLLABLE,
+		HINT_FIXED_SIZE {
+			SpecWidth <SST_AVG_CHAR_WIDTHS, 40>
+			SpecHeight <>
+                },
+		HINT_EXPAND_HEIGHT_TO_FIT_PARENT,
+		ATTR_GEN_ITEM_GROUP_CUSTOM_DOUBLE_PRESS {	
+			word MSG_NTAKER_DISPLAY_CARD_LIST_DOUBLE_CLICK
+		},
+	}
+}
+
+ListDateDisplay = GenInteraction {
+	genStates = default -usable;
+	children = ListCreationDate, ListModificationDate;
+	hints = {
+			HINT_EXPAND_WIDTH_TO_FIT_PARENT,
+			HINT_CENTER_CHILDREN_ON_MONIKERS,
+			HINT_LEFT_JUSTIFY_MONIKERS
+		}
+
+}
+ListCreationDate = GenText {
+	genAttributes = readOnly;
+	textDisplayAttributes = singleLineText;
+	hints = {HINT_EXPAND_WIDTH_TO_FIT_PARENT}
+	moniker = "Creation Date:";
+}
+
+ListModificationDate = GenText {
+	genAttributes = readOnly;
+	textDisplayAttributes = singleLineText;
+	hints = {HINT_EXPAND_WIDTH_TO_FIT_PARENT}
+	moniker = "Modification Date:";
+}
+ListTools = GenInteraction {
+	children = EditCardTrigger, CreateTopicTrigger, DeleteTrigger, MoveBoxTrigger;
+	hints = {
+			HINT_ORIENT_CHILDREN_HORIZONTALLY,
+			HINT_FULL_JUSTIFY_CHILDREN_HORIZONTALLY,
+			HINT_INCLUDE_ENDS_IN_CHILD_SPACING,
+			HINT_EXPAND_WIDTH_TO_FIT_PARENT
+		}
+}
+EditCardTrigger = GenTrigger {
+	moniker = 'C', "Edit Card";
+	action = MSG_NTAKER_DOC_EDIT_SELECTED_CARD, "TO_OBJ_BLOCK_OUTPUT";
+}
+CreateTopicTrigger = GenTrigger {
+	moniker = 'T', "Create Topic";
+	action = MSG_NTAKER_DOC_BRINGUP_CREATE_TOPIC_BOX, "TO_OBJ_BLOCK_OUTPUT";
+	hints = {
+ 			HINT_TRIGGER_BRINGS_UP_WINDOW
+		}	   
+}
+DeleteTrigger = GenTrigger vardataReloc {
+	moniker = 'D', "Delete";
+	genAttributes = default +initiatesInputIgnore;
+	action = MSG_NTAKER_DOC_DELETE, "TO_OBJ_BLOCK_OUTPUT";
+	hints = {
+		ATTR_GEN_DESTINATION_CLASS {
+			UN_DD NTakerDocumentClass
+		}
+	}
+
+}
+
+MoveBoxTrigger = GenTrigger vardataReloc {
+	moniker = 'M', "Move";
+	hints = {HINT_TRIGGER_BRINGS_UP_WINDOW}
+	action = MSG_NTAKER_DOC_INIT_MOVE_BOX, "TO_OBJ_BLOCK_OUTPUT";
+	hints = {
+		ATTR_GEN_DESTINATION_CLASS {
+			UN_DD NTakerDocumentClass
+		}
+	}
+
+}
+
+/******************************************************************
+ *	Card View
+ ******************************************************************/
+
+NTakerCardInfo = GenInteraction {
+	children = CardDisplay, CardTools;
+	hints = {
+		HINT_ORIENT_CHILDREN_HORIZONTALLY,
+		HINT_EXPAND_WIDTH_TO_FIT_PARENT,
+		HINT_EXPAND_HEIGHT_TO_FIT_PARENT
+	}       
+}
+CardDisplay = GenInteraction {
+	children = CardTitleKeywordsGroup, NTakerView, CardDateDisplay;
+	hints = {
+		HINT_EXPAND_HEIGHT_TO_FIT_PARENT,
+		HINT_EXPAND_WIDTH_TO_FIT_PARENT
+	}	
+}
+CardTools = GenInteraction {
+	children = CardNextCard, CardPrevCard, CardNewCard;
+	hints = {
+		HINT_ORIENT_CHILDREN_VERTICALLY,
+		HINT_FULL_JUSTIFY_CHILDREN_VERTICALLY,
+		HINT_INCLUDE_ENDS_IN_CHILD_SPACING,
+		HINT_EXPAND_HEIGHT_TO_FIT_PARENT
+	}
+}
+CardPrevCard = TitledGenTrigger vardataReloc {
+	title = "Prev";
+	pictureNumber = PN_UP_ARROW;
+	kbdAccelerator = ctrl 'P';
+	action = MSG_NTAKER_DOC_PREV_CARD, "TO_OBJ_BLOCK_OUTPUT";
+	hints = {
+		HINT_CENTER_MONIKER,
+		HINT_DRAW_SHORTCUT_BELOW,
+		ATTR_GEN_DESTINATION_CLASS {
+			UN_DD NTakerDocumentClass
+		}
+	}
+}
+CardNextCard = TitledGenTrigger vardataReloc {
+	title = "Next";
+	pictureNumber = PN_DOWN_ARROW;
+	kbdAccelerator = ctrl 'N';
+	action = MSG_NTAKER_DOC_NEXT_CARD, "TO_OBJ_BLOCK_OUTPUT";
+	hints = {
+		HINT_CENTER_MONIKER,
+		HINT_DRAW_SHORTCUT_BELOW,
+		ATTR_GEN_DESTINATION_CLASS {
+			UN_DD NTakerDocumentClass
+		}
+	}
+}
+
+CardNewCard = TitledGenTrigger vardataReloc {
+	title = "New Card";
+	genAttributes = default +initiatesInputHoldUp;
+	pictureNumber = PN_NEW_CARD;
+	kbdAccelerator = ctrl 'C';
+	action = MSG_NTAKER_DOC_NEW_NOTE, "TO_OBJ_BLOCK_OUTPUT";
+	hints = {
+		HINT_CENTER_MONIKER,
+		HINT_DRAW_SHORTCUT_BELOW,
+		ATTR_GEN_DESTINATION_CLASS {
+			UN_DD NTakerDocumentClass
+		}
+	}
+
+}
+CardTitleKeywordsGroup = GenInteraction {
+	children = CardTitle, CardKeywords;
+	hints = {
+			HINT_CENTER_CHILDREN_ON_MONIKERS,
+			HINT_LEFT_JUSTIFY_MONIKERS
+		}
+}
+CardTitle = GenText vardataReloc {
+	moniker = 'l', "Title:";
+	genAttributes = default -targetable;
+	maxLength = INK_DB_MAX_TITLE_SIZE;
+	textDisplayAttributes = default +singleLineText;
+	hints = {
+		HINT_TEXT_DO_NOT_MAKE_LARGER_ON_PEN_SYSTEMS,
+		HINT_FIXED_SIZE {
+			SpecWidth <SST_AVG_CHAR_WIDTHS, 25>
+			SpecHeight <>
+		},
+		ATTR_GEN_DESTINATION_CLASS {
+			UN_DD NTakerDocumentClass
+		},
+		ATTR_GEN_PROPERTY
+	}
+	destination = "TO_OBJ_BLOCK_OUTPUT";
+}
+CardDateDisplay = GenInteraction {
+	genStates = default -usable;
+	children = CardCreationDate, CardModificationDate;
+	hints = {
+			HINT_EXPAND_WIDTH_TO_FIT_PARENT,
+			HINT_CENTER_CHILDREN_ON_MONIKERS,
+			HINT_LEFT_JUSTIFY_MONIKERS
+		}
+}
+CardCreationDate = GenText {
+	genAttributes = readOnly;
+	textDisplayAttributes = singleLineText;
+	hints = {HINT_EXPAND_WIDTH_TO_FIT_PARENT}
+	moniker = "Creation Date:";
+}
+
+CardModificationDate = GenText {
+	genAttributes = readOnly;
+	textDisplayAttributes = singleLineText;
+	hints = {HINT_EXPAND_WIDTH_TO_FIT_PARENT}
+	moniker = "Modification Date:";
+}
+
+CardKeywords = GenText vardataReloc {
+	moniker = 'K', "Keywords:";
+	genAttributes = default -targetable;
+	maxLength = INK_DB_MAX_NOTE_KEYWORDS_SIZE;
+	textDisplayAttributes = default +singleLineText;
+	hints = {
+		ATTR_GEN_PROPERTY,
+		HINT_TEXT_DO_NOT_MAKE_LARGER_ON_PEN_SYSTEMS,
+		HINT_FIXED_SIZE {
+			SpecWidth <SST_AVG_CHAR_WIDTHS, 25>
+			SpecHeight <>
+		},
+		ATTR_GEN_DESTINATION_CLASS {
+			UN_DD NTakerDocumentClass
+		}
+	}
+	destination = "TO_OBJ_BLOCK_OUTPUT";
+}
+
+NTakerView = GenView {
+	inkType = "GVIT_PRESSES_ARE_INK";
+	docRight = DEFAULT_TEXT_MIN_WIDTH;
+	docBottom = 0;
+	viewAttributes = default +dragScrolling;
+	horizAttributes = default +scrollable, +dontDisplayScrollbar;
+	vertAttributes = default +scrollable;
+	hints = {
+		  HINT_DEFAULT_TARGET,
+		  HINT_DEFAULT_FOCUS,
+		  HINT_MINIMUM_SIZE {
+		  	SpecWidth <SST_PIXELS, DEFAULT_TEXT_MIN_WIDTH>
+			SpecHeight <>
+		  }
+		}  
+}
+
+
+end DisplayUI;
+
+
+

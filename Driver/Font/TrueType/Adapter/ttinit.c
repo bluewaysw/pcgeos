@@ -20,6 +20,7 @@
 #include "ttinit.h"
 #include "ttadapter.h"
 #include "ttcharmapper.h"
+#include "ttmemory.h"
 #include "ftxkern.h"
 #include <fileEnum.h>
 #include <geos.h>
@@ -28,6 +29,7 @@
 #include <ec.h>
 #include <initfile.h>
 #include <unicode.h>
+#include <fontID.h>
 
 
 static word DetectFontFiles(    MemHandle*  fileEnumBlock );
@@ -63,9 +65,9 @@ static word GetKernCount(       TRUETYPE_VARS );
 
 static word toHash( const char* str );
 
-static int  strlen( const char* str );
+static word strlen( const char* str );
 
-static void strcpy( char* dest, const char* source );
+static char* strcpy( char* dest, const char* source );
 
 static void strcpyname( char* dest, const char* source );
 
@@ -732,7 +734,7 @@ static sword getFontIDAvailIndex( FontID fontID, MemHandle fontInfoBlock )
 			ConstructOptr( fontInfoBlock, sizeof(LMemBlockHeader))) );
         elements = LMemGetChunkSizePtr( fontsAvailEntrys ) / sizeof( FontsAvailEntry );
 
-        for( element = 0; element < elements; element++ )
+        for( element = 0; element < elements; ++element )
                 if( fontsAvailEntrys[element].FAE_fontID == fontID )
                         return element;
 
@@ -1003,6 +1005,7 @@ static word GetKernCount( TRUETYPE_VARS )
 {
         TT_Kerning        kerningDir;
         word              table;
+        TT_Kern_0_Pair*   pairs;
         word              numGeosKernPairs = 0;
 
         if( TT_Get_Kerning_Directory( FACE, &kerningDir ) )
@@ -1012,6 +1015,7 @@ static word GetKernCount( TRUETYPE_VARS )
         for( table = 0; table < kerningDir.nTables; ++table )
         {
                 word i;
+                word minKernValue = UNITS_PER_EM / KERN_VALUE_DIVIDENT;
 
                 if( TT_Load_Kerning_Table( FACE, table ) )
                         goto Fail;
@@ -1019,16 +1023,18 @@ static word GetKernCount( TRUETYPE_VARS )
                 if( kerningDir.tables->format != 0 )
                         continue;
 
-                /* We only support decreasing the character spacing.*/
-                if( kerningDir.tables->t.kern0.pairs[i].value > 0 )
-                        continue;
+                pairs = GEO_LOCK( kerningDir.tables->t.kern0.pairsBlock );
 
                 for( i = 0; i < kerningDir.tables->t.kern0.nPairs; ++i )
                 {
-                        if( isGeosCharPair( kerningDir.tables->t.kern0.pairs[i].left,
-                                        kerningDir.tables->t.kern0.pairs[i].right ) )
+                        if( ABS( pairs[i].value ) < minKernValue )
+                                continue;
+
+                        if( isGeosCharPair( pairs[i].left, pairs[i].right ) )
                                 ++numGeosKernPairs;
                 }
+
+                GEO_UNLOCK( kerningDir.tables->t.kern0.pairsBlock );
         }
 
 Fail:
@@ -1041,19 +1047,20 @@ Fail:
 /* cycle. Therefore, the required functions are reimplemented here.*/
 /*******************************************************************/
 
-static int strlen( const char* str )
+static word strlen( const char* str )
 {
         const char  *s;
 
         for ( s = str; *s; ++s )
                 ;
-        return( s - str );
+        return( s - str );  
 }
 
 
-static void strcpy( char* dest, const char* source )
+static char* strcpy( char* dest, const char* source )
 {
         while( (*dest++ = *source++) != '\0' );
+        return dest;
 }
 
 

@@ -25,6 +25,9 @@ DESCRIPTION:
 	$Id: netutils.h,v 1.1 97/04/04 15:53:47 newdeal Exp $
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+#ifndef _NETUTILS_H_
+#define _NETUTILS_H_
+
 
 
 /*
@@ -106,7 +109,7 @@ DESTROYED:	ax, cx
 ------------------------------------------------------------------------*/
 
 void 
-_pascal HugeLMemForceDestory(HugeLMemHandle handle);
+_pascal HugeLMemForceDestroy(HugeLMemHandle handle);
 /* --------------------------------------------------------------------
 SYNOPSIS:	Destroys a HugeLMem without checking if there are still
 		chunks allocated in it.
@@ -242,13 +245,5 @@ pragma Alias(NetGenerateRandom32, "NETGENERATERANDOM32");
 pragma Alias(NetGenerateRandom8, "NETGENERATERANDOM8");
 #endif
 
-
-
-
-
-
-
-
-
-
+#endif
 

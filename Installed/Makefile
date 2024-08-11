@@ -129,11 +129,11 @@ minimalAppl	: minimalGame minimalUtils minimalTools minimalSavers \
 		  bbxchat bbxmail \
 		  newsread geozip sclock trayapps\
  	  	  hmbase pdfvu  bnkr30 ftpc \
- 	  	  instc instf
+ 	  	  instc instf foldered
 
 minimalUtils	: prefmgr
 
-minimalTools    : resedit
+minimalTools    : resedit wlgen
 
 minimalGame	: solitaire cword amateur bjack hearts gwpoker \
                   pyramid sokoban uki mine column battle \
@@ -953,6 +953,9 @@ Installed/Library/FMTools/Linktool:	ui shell MAKEAPPL
 
 openwith: Installed/Library/FMTools/OpenWith
 Installed/Library/FMTools/OpenWith:	ui ansic MAKEAPPL
+
+foldered: Installed/Library/FMTools/FolderEd
+Installed/Library/FMTools/FolderEd:	ui ansic MAKEAPPL
 
 homebase:
 #	No need to do this because this is sync'ed by morning make script.
@@ -1798,3 +1801,6 @@ Installed/Appl/Slides:				ui text impex convert MAKEAPPL
 
 resedit	: Installed/Appl/Tools/Localize
 Installed/Appl/Tools/Localize:		ui text spool MAKEAPPL
+
+wlgen	: Installed/Appl/Tools/WListGen
+Installed/Appl/Tools/WListGen:			ui ansic wmlib MAKEAPPL

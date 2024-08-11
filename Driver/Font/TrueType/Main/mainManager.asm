@@ -87,7 +87,7 @@ WidthMod segment resource
 include		truetypeWidths.asm
 ;include		nimbusUtils.asm
 ;include		nimbusSetTrans.asm
-include		../FontCom/fontcomUtils.asm
+;include		../FontCom/fontcomUtils.asm
 WidthMod ends
 
 CharMod segment resource
@@ -114,6 +114,10 @@ global  TRUETYPE_CHAR_METRICS:far
 global  TRUETYPE_GEN_WIDTHS:far
 global  TRUETYPE_GEN_PATH:far
 global  TRUETYPE_GEN_IN_REGION:far
+
+global  GRREGIONPATHMOVEPEN:far
+global	GRREGIONPATHDRAWLINETO:far
+global	GRREGIONPATHDRAWCURVETO:far
 
 global  bitmapHandle:hptr
 global  bitmapSize:word

@@ -3,14 +3,21 @@
 #
 # If you edit it, you will lose your changes, should it be regenerated.
 #
-GEODE           = NTAKER
-DOCUMENT        = Appl.goc Proc.goc Doc.goc Display.goc
-UI              = ntakerui.goc
-UI_TO_RDFS      =
-OBJS            = Appl.obj Proc.obj Doc.obj Display.obj ntakerui.obj
-COMMON          = ntaker.goh
-MODULES         =
-CMODULES        = Document UI
+GEODE           = ntaker
+DOCUMENT        = documentApplication.asm documentCode.asm\
+                  documentDisplay.asm documentInk.asm documentManager.asm\
+                  documentMisc.asm documentPrint.asm documentText.asm\
+                  documentTitledButton.asm documentConstant.def\
+                  documentVariable.def
+UI              = uiManager.asm uiDocument.ui uiMain.ui
+UI_TO_RDFS      = uiMain.ui
+OBJS            =
+COMMON          = ntakerApplication.def ntakerDisplay.def\
+                  ntakerDocument.def ntakerErrors.def ntakerGeode.def\
+                  ntakerGlobal.def ntakerInk.def ntakerProcess.def\
+                  ntakerText.def ntakerTitledButton.def
+MODULES         = Document UI
+CMODULES        =
 SRCS            = $(DOCUMENT) $(UI) $(COMMON)
 LOBJS           =
 

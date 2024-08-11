@@ -1,0 +1,1217 @@
+/*
+ * Project:	PC/GEOS
+ * Module:	NTaker (Sample PC/GEOS application)
+ * File:	ntaker.ui
+ *
+ * Author:	Tony Requist
+ *
+ *	This file contains the user Interface description for this
+ * application. This file is written in a language called ESPIRE, which is
+ * compiled by the UIC compiler. See Spec/User/uic.doc for info.
+ *
+ * IMPORTANT NOTE:
+ *	This sample application is primarily intended to demonstrate a
+ *	model for handling documents.  Basic parts of a PC/GEOS application
+ *	are not documented heavily here.  See the "Hello" sample application
+ *	for more detailed documentation on the standard parts of a PC/GEOS
+ *	application.
+ *
+ * RCS STAMP:
+ *	$Id: uiMain.ui,v 1.1 97/04/04 16:17:09 newdeal Exp $
+ *
+ */
+
+/* ----------------------------------------------------------------------------
+	Include files
+-----------------------------------------------------------------------------*/
+
+#include "generic.uih"
+#include "ink.uih"
+#include "spool.uih"
+#include "Objects/Text/tCtrl.uih"
+
+#include "Art/mkrNTakerApp.ui"
+#include "Art/mkrNTakerDoc.ui"
+#include "Art/mkrNewPage.ui"
+
+#include "UI/uiDocument.ui"
+
+class NTakerApplication = GenApplication {
+      barStates = wordComp : "DEFAULT_TOOLBAR_STATES";
+      default appFeatures = "DEFAULT_FEATURES";
+}
+/* ----------------------------------------------------------------------------
+	Application Object
+-----------------------------------------------------------------------------*/
+
+start	AppResource;
+
+NTakerApp = NTakerApplication vardataReloc {
+	children = NTakerPrimary;
+	gcnList(MANUFACTURER_ID_GEOWORKS,GAGCNLT_WINDOWS) = NTakerPrimary;
+	gcnList(MANUFACTURER_ID_GEOWORKS,MGCNLT_APP_STARTUP) =
+		 NTakerDocumentControl;
+	gcnList(MANUFACTURER_ID_GEOWORKS,MGCNLT_ACTIVE_LIST) =
+		 NTakerDocumentControl,
+		 NTakerDisplayControl;
+	gcnList(MANUFACTURER_ID_GEOWORKS,GAGCNLT_STARTUP_LOAD_OPTIONS) =
+		NTakerToolControl,
+		NTakerToolControlNoPen,
+		OptionsList,
+		UserLevelList,
+		ShowBarList,
+		StartupViewList,
+		CardTypeList;
+	gcnList(MANUFACTURER_ID_GEOWORKS,GAGCNLT_SELF_LOAD_OPTIONS) =
+		NTakerDocumentControl,
+		NTakerPageControl,
+		NTakerEditControl,
+		NTakerInkControl,
+		NTakerDisplayControl, 
+		NTakerSearchControl,
+		NTakerPrintControl;
+	moniker = list {
+		NTakerTextMoniker,
+		NTakerAppLCMoniker,
+		NTakerAppLMMoniker,
+		NTakerAppSCMoniker,
+		NTakerAppSMMoniker,
+		NTakerAppTCMoniker,
+		NTakerAppLCGAMoniker,
+		NTakerAppSCGAMoniker
+	}
+	hints = {
+		ATTR_GEN_INIT_FILE_CATEGORY {
+		char	"notetaker", 0
+		},
+		ATTR_GEN_APPLICATION_PRINT_CONTROL {
+			UN_OPTR NTakerPrintControl
+		},
+		/*ATTR_GEN_APPLICATION_SAVE_OPTIONS_TRIGGER {
+			UN_OPTR SaveOptionsTrigger
+		},
+		ATTR_GEN_APPLICATION_RESET_OPTIONS_TRIGGER {
+			UN_OPTR ResetOptionsTrigger
+		},*/
+		ATTR_GEN_HELP_FILE {
+		char	"ntaker", 0
+		},
+	}
+}
+
+visMoniker NTakerTextMoniker = "Note Taker";
+
+end	AppResource;
+
+start AppLCMonikerResource, notDetachable;
+visMoniker DatafileMonikerList = list {
+	NTakerDocLCMoniker,
+	NTakerDocLMMoniker,
+	NTakerDocSCMoniker,
+	NTakerDocSMMoniker,
+	NTakerDocLCGAMoniker,
+	NTakerDocSCGAMoniker
+}
+
+end AppLCMonikerResource;
+/* ----------------------------------------------------------------------------
+	 Primary window.
+-----------------------------------------------------------------------------*/
+
+/*
+ * The GenDocumentControl must be a child of the primary, and must be
+ * on the active list.
+ */
+
+start	Interface;		/* this resource is for misc UI objects */
+
+NTakerPrimary = GenPrimary {
+	children = FileMenu, EditMenu, InkMenu, ViewMenu,
+		   OptionsMenu, NTakerDisplayControl,
+		   NTakerIconBar, NTakerDispGroup,
+		   DialogGroup;
+	hints = { 
+			HINT_SIZE_WINDOW_AS_DESIRED,
+			HINT_KEEP_INITIALLY_ONSCREEN,
+		ATTR_GEN_HELP_CONTEXT {
+			char "TOC", 0
+		}
+		}	
+}
+DialogGroup = GenInteraction {
+	children = SearchResultBox, MoveBox, CreateTopicBox;
+	type = organizational;
+	attributes = default +notUserInitiatable;
+}
+FileMenu = GenInteraction {
+	children = NTakerDocumentControl, NTakerFileSubGroup;
+	visibility = popup;
+	hints = { ATTR_GEN_INTERACTION_GROUP_TYPE { GenInteractionGroupType GIGT_FILE_MENU } }
+}
+
+NTakerDisplayControl = GenDisplayControl {
+	visibility = popup;
+	hints = { 
+		ATTR_GEN_INTERACTION_GROUP_TYPE { 
+			GenInteractionGroupType GIGT_WINDOW_MENU 
+		},
+		HINT_DISPLAY_CONTROL_NO_FEATURES_IF_TRANSPARENT_DOC_CTRL_MODE,
+		ATTR_GEN_CONTROL_PROHIBIT_UI {
+			word	mask GDCTF_OVERLAPPING_MAXIMIZED or mask GDCTF_TILE
+		},
+		HINT_GEN_CONTROL_SCALABLE_UI_DATA { GenControlScalableUIEntry <
+		     GCSUIC_SET_NORMAL_FEATURES_IF_APP_LEVEL,
+		     UIIL_INTRODUCTORY,
+		     mask GDCTF_DISPLAY_LIST>,
+		    <GCSUIC_SET_NORMAL_FEATURES_IF_APP_LEVEL,
+		     UIIL_INTERMEDIATE,
+		     GDC_DEFAULT_FEATURES>}
+	}
+}
+
+
+
+/* ----------------------------------------------------------------------------
+	 Icon bar
+-----------------------------------------------------------------------------*/
+
+NTakerIconBar = GenInteraction {
+	children = NewPageTrigger,
+		NTakerPageTools, NTakerEditTools,NTakerInkTools;
+	visibility = popout;
+	genAttributes = default +notifyVisibility;
+	hints = {
+		HINT_TOOLBOX,
+		HINT_ALLOW_CHILDREN_TO_WRAP,
+		HINT_ORIENT_CHILDREN_HORIZONTALLY,
+		HINT_EXPAND_WIDTH_TO_FIT_PARENT,
+		HINT_FULL_JUSTIFY_CHILDREN_HORIZONTALLY,
+		ATTR_GEN_VISIBILITY_MESSAGE {
+			word MSG_NTAKER_APPLICATION_TOOLBAR_VISIBILITY
+		},
+		ATTR_GEN_VISIBILITY_DATA {
+			word 0, mask NTS_SHOW_TOOLBAR
+		}
+	}
+}
+chunk NTakerIconBarName = {Icon Bar}
+
+NTakerPageTools = GenToolGroup {
+	controller = NTakerPageControl;
+	hints = {
+		HINT_SAME_ORIENTATION_AS_PARENT,
+		HINT_MINIMIZE_CHILD_SPACING
+	}
+}
+
+NTakerEditTools = GenToolGroup {
+	controller = NTakerEditControl;
+	hints = {
+		HINT_SAME_ORIENTATION_AS_PARENT,
+		HINT_MINIMIZE_CHILD_SPACING
+	}
+}
+
+NTakerInkTools = GenToolGroup {
+	controller = NTakerInkControl;
+	hints = {
+		HINT_SAME_ORIENTATION_AS_PARENT,
+		HINT_MINIMIZE_CHILD_SPACING
+	}
+}
+
+
+NTakerPageControl = GenPageControl vardataReloc {
+	output = "TO_APP_MODEL";
+	hints = {
+		ATTR_GEN_DESTINATION_CLASS {
+			UN_DD NTakerDocumentClass
+		}
+	}
+}
+
+NewPageTrigger = GenTrigger vardataReloc {
+	moniker = list {
+		NewPageTCMoniker,
+		NewPageTMMoniker,
+		NewPageTCGAMoniker
+	}
+	action = MSG_NTAKER_DOC_INSERT_PAGE, "TO_APP_MODEL";
+	genAttributes = default +initiatesInputHoldUp;
+	hints = {
+		ATTR_GEN_DESTINATION_CLASS {
+			UN_DD NTakerDocumentClass
+		}
+	}
+}
+
+
+/* ----------------------------------------------------------------------------
+	 Menus
+-----------------------------------------------------------------------------*/
+
+EditMenu = GenInteraction {
+	children = NTakerEditControl, CreateGroup, SearchSubGroup;
+	visibility = popup;
+	hints = { ATTR_GEN_INTERACTION_GROUP_TYPE { GenInteractionGroupType GIGT_EDIT_MENU } }
+}
+
+CreateGroup = GenInteraction {
+	visibility = subGroup;
+	children = CreateCardTrigger;
+}
+CreateCardTrigger = GenTrigger vardataReloc {
+	moniker = 'N', "Create New Card";
+	genAttributes = default +initiatesInputHoldUp;
+	action = MSG_NTAKER_DOC_NEW_NOTE, "TO_APP_MODEL";
+	hints = {
+		ATTR_GEN_DESTINATION_CLASS {
+			UN_DD NTakerDocumentClass
+		}
+	}
+}
+
+
+SearchSubGroup = GenInteraction {
+	visibility = subGroup;
+	children = NTakerSearchControl, SearchKeywordBox;
+}
+
+NTakerFileSubGroup = GenInteraction {
+	children = NTakerPrintControl;
+}
+
+NTakerPrintControl = PrintControl vardataReloc {
+	printOutput = "TO_APP_MODEL";
+	docNameOutput = NTakerDocumentGroup;
+	docWidth = "36 * 17";
+	docHeight= "36 * 22";
+	hints = {
+		HINT_SAME_CATEGORY_AS_PARENT,
+		ATTR_GEN_DESTINATION_CLASS { UN_DD NTakerDocumentClass },
+		ATTR_PRINT_CONTROL_APP_UI { UN_OPTR NTakerPrintGroup }
+	}
+}
+
+NTakerPrintGroup = GenInteraction  {
+	genStates = default -usable;
+	children = PrintPageRangeList, NTakerPrintOptions;
+}
+NTakerPrintOptions = GenInteraction {
+	moniker = 'O', "Print Options";
+	type = properties;
+	visibility = dialog;	
+	attributes = default +modal;
+	children = PrintPageInfoList, PrintPageInfoPositionList;
+	hints = { 
+		HINT_SEEK_REPLY_BAR,
+		HINT_ORIENT_CHILDREN_VERTICALLY,
+		HINT_EXPAND_WIDTH_TO_FIT_PARENT,
+		HINT_CENTER_CHILDREN_ON_MONIKERS,
+		HINT_LEFT_JUSTIFY_MONIKERS
+	}	
+}
+
+PrintPageRangeList = GenItemGroup {
+	moniker = "Print Range:";
+	behaviorType = exclusive; 	/* Only one item selected at a time */
+	numSelections = 1;
+	selection = PR_CUR_NOTE;  	/* What we want selected by default */
+	children = PrintCurPage, PrintCurCard, PrintCurTopic, PrintAllCards;
+}
+
+PrintCurPage = GenItem {
+	moniker = 'P', "Current Page";
+	identifier = PR_CUR_PAGE;	
+}
+
+PrintCurCard = GenItem {
+	moniker = 'C', "Current Card";
+	identifier = PR_CUR_NOTE;	
+}
+
+PrintAllCards = GenItem {
+	moniker = 'A', "All Cards";
+	identifier = PR_ALL_NOTES;
+}
+PrintCurTopic = GenItem {
+	moniker = 'T', "Current Topic";
+	identifier = PR_CUR_FOLDER;	
+}
+
+PrintPageInfoList = GenBooleanGroup {
+	moniker = "Print Card Information:";
+	children = PrintDate, PrintTitle, PrintKeywords;
+	selectedBooleans = "mask PI_DATE or mask PI_TITLE";
+}
+
+PrintDate = GenBoolean {
+	moniker = 'D', "Creation Date";
+	identifier = "mask PI_DATE";	
+}
+
+PrintTitle = GenBoolean {
+	moniker = 'T', "Title";
+	identifier = "mask PI_TITLE";	
+}
+
+PrintKeywords = GenBoolean {
+	moniker = 'K', "Keywords";
+	identifier = "mask PI_KEYWORDS";
+}
+
+PrintPageInfoPositionList = GenItemGroup {
+	moniker = "Information Position:";
+	behaviorType = exclusive; 	/* Only one item selected at a time */
+	numSelections = 1;
+	selection = PIP_TOP;	  	/* What we want selected by default */
+	children = PrintTop, UpperLeft, UpperRight;
+}
+
+PrintTop = GenItem {
+	moniker = 'T', "Top";
+	identifier = PIP_TOP;
+}
+
+UpperLeft = GenItem {
+	moniker = 'L', "Upper Left";
+	identifier = PIP_UPPER_LEFT;
+}
+
+UpperRight = GenItem {
+	moniker = 'R', "Upper Right";
+	identifier = PIP_UPPER_RIGHT;
+}
+
+InkMenu = GenInteraction {
+	moniker = 'I', "Ink";
+	children = NTakerInkControl, NTakerBackgroundListGroup;
+	visibility = popup;
+}
+
+NTakerInkControl = InkControl vardataReloc {
+	visibility = subGroup;
+	hints = {
+		ATTR_GEN_DESTINATION_CLASS {
+			UN_DD InkClass
+		}
+	}
+}
+
+NTakerBackgroundListGroup = GenInteraction {
+	moniker = 'I', "Ink Backgrounds";	
+	visibility = dialog;
+	type = properties;
+	attributes = default +modal;
+	genStates = default -usable;
+	children = NTakerBackgroundList, NTakerBackgroundPasteTrigger;
+	hints = {
+		HINT_ORIENT_CHILDREN_VERTICALLY,
+		HINT_EXPAND_WIDTH_TO_FIT_PARENT
+	}	
+}
+
+NTakerSearchControl = SearchReplaceControl vardataReloc {
+	moniker = 'F', "Find in Text";
+	visibility = dialog;
+	hints = {
+		ATTR_SEARCH_CONTROL_SET_FIND_NEXT_MONIKER {
+			word	offset SearchMoniker
+		},
+		ATTR_GEN_CONTROL_PROHIBIT_UI {
+			word	mask SRCF_FIND_PREV or mask SRCF_REPLACE_CURRENT or mask SRCF_REPLACE_ALL or mask SRCF_SPECIAL_CHARS or mask SRCF_REPLACE_ALL_IN_SELECTION
+		},
+		ATTR_GEN_CONTROL_APP_UI {UN_OPTR SearchOtherOptions},
+		ATTR_GEN_DESTINATION_CLASS {
+			UN_DD NTakerDocumentClass
+		},
+		HINT_GEN_CONTROL_SCALABLE_UI_DATA {GenControlScalableUIEntry <
+			GCSUIC_SET_NORMAL_FEATURES_IF_APP_LEVEL,
+			UIIL_BEGINNING,
+			SRC_SUGGESTED_BEGINNING_FEATURES>,
+			<GCSUIC_SET_NORMAL_FEATURES_IF_APP_LEVEL,
+			UIIL_ADVANCED,
+			SRC_DEFAULT_FEATURES>
+		}
+
+	}
+	output = "TO_APP_MODEL";
+}
+
+visMoniker SearchMoniker = "Search for Matching Cards";
+
+SearchOtherOptions = GenInteraction {
+	children = SearchOptionsListGroup;
+	genStates = default -usable;
+	hints = {
+			HINT_EXPAND_WIDTH_TO_FIT_PARENT,
+			HINT_ORIENT_CHILDREN_HORIZONTALLY,
+			HINT_CENTER_CHILDREN_HORIZONTALLY
+		}
+}
+SearchOptionsListGroup = GenBooleanGroup {
+	children = SearchTextItem;
+}
+
+SearchTextItem = GenBoolean {
+	moniker = 'C', "Find in Card Text";
+	identifier = 1;
+}
+
+NTakerEditControl = GenEditControl {
+	visibility = subGroup;
+	hints = {
+		ATTR_GEN_CONTROL_PROHIBIT_UI {
+			word mask GECF_SELECT_ALL
+		},
+		ATTR_GEN_CONTROL_PROHIBIT_TOOLBOX_UI {
+			word mask GECTF_SELECT_ALL
+		}
+	}
+}
+
+
+/* --- */
+
+OptionsMenu = GenInteraction {
+	visibility = popup;
+	children = SetUserLevelDialog, OptionsGroup, SaveResetGroup;
+	hints = { ATTR_GEN_INTERACTION_GROUP_TYPE { GenInteractionGroupType GIGT_OPTIONS_MENU } }
+}
+
+OptionsGroup = GenInteraction {
+	children = ShowBarList, OptionsList,
+		   StartupViewGroup, CardTypeGroup, NTakerToolControl, NTakerToolControlNoPen;
+}
+
+SaveResetGroup = GenInteraction {
+	children = SaveOptionsTrigger, ResetOptionsTrigger;
+}
+
+/* --- */
+
+OptionsList = GenBooleanGroup {
+	destination = NTakerApp;
+	children = DisplayDates;
+	applyMsg = MSG_NTAKER_APPLICATION_CHANGE_OPTIONS;
+	hints = { 
+			ATTR_GEN_INIT_FILE_KEY { 
+				char "displayDates",0
+			}
+		}	
+}
+
+DisplayDates = GenBoolean {
+	moniker = 'D', "Display Card Dates";     
+	identifier = "mask NTO_DISPLAY_DATES";
+}
+
+StartupViewGroup = GenInteraction {
+	visibility = popup;
+	moniker = 'V', "View on Startup";
+	children = StartupViewList;
+}
+
+StartupViewList = GenItemGroup {
+	behaviorType = exclusive;
+	numSelections = 1;
+	selection = VT_CARD;
+	children = StartupCardView, StartupListView, StartupBothView;
+	applyMsg = MSG_GEN_APPLICATION_OPTIONS_CHANGED;
+	destination = NTakerApp;
+	hints = { 
+			ATTR_GEN_INIT_FILE_KEY { 
+				char "viewOnStartup",0
+			}
+		}	
+}
+StartupCardView = GenItem {
+	moniker = 'C', "Card";
+	identifier = VT_CARD;
+}
+StartupListView = GenItem {
+	moniker = 'L', "List";
+	identifier = VT_LIST;
+}
+StartupBothView = GenItem {
+	moniker = 'B', "Both";
+	identifier = VT_BOTH;
+}
+
+ShowBarList = GenBooleanGroup {
+	children = ShowToolbarEntry;
+	hints = {ATTR_GEN_INIT_FILE_KEY { char "showBars",0}, HINT_SAME_CATEGORY_AS_PARENT}
+	applyMsg = MSG_NTAKER_APPLICATION_UPDATE_TOOLBARS;
+	destination = NTakerApp;    
+	selectedBooleans = "DEFAULT_TOOLBAR_STATES";
+}
+ShowToolbarEntry = GenBoolean {
+	moniker = 'T', "Show Toolbar";
+	identifier = "mask NTS_SHOW_TOOLBAR";
+}
+
+NTakerToolControl = GenToolControl {
+	moniker = 'T', "Customize Tool Bars";	  
+	visibility = dialog;
+	toolboxList = NTakerToolboxList;
+	toolGroupList = NTakerToolGroupList;
+	hints = {HINT_SAME_CATEGORY_AS_PARENT}
+}
+
+NTakerToolControlNoPen = GenToolControl {
+	moniker = 'T', "Customize Tool Bars";	  
+	visibility = dialog;
+	toolboxList = NTakerToolboxList;
+	toolGroupList = NTakerToolGroupListNoPen;
+	hints = {HINT_SAME_CATEGORY_AS_PARENT}
+}
+
+chunk	NTakerToolboxList = data {
+	UN_OPTR	NTakerIconBar
+	UN_OPTR	NTakerIconBarName
+}
+
+chunk	NTakerToolGroupList = data {
+	UN_OPTR NTakerPageTools
+	UN_OPTR NTakerEditTools
+	UN_OPTR NTakerInkTools
+}
+
+chunk	NTakerToolGroupListNoPen = data {
+	UN_OPTR NTakerEditTools
+}
+
+
+SaveOptionsTrigger = GenTrigger {
+	SAVE_OPTIONS_TRIGGER_VALUES
+	action = MSG_META_SAVE_OPTIONS, NTakerApp;
+}
+
+ResetOptionsTrigger = GenTrigger {
+	RESET_OPTIONS_TRIGGER_VALUES
+	action = MSG_NTAKER_APPLICATION_QUERY_RESET_OPTIONS, NTakerApp;
+}
+
+CardTypeGroup = GenInteraction {
+	visibility = popup;
+	moniker = 'D', "Default Card Type";
+	children = CardTypeList;
+}
+CardTypeList = GenItemGroup {
+	behaviorType = exclusive; 	/* Only one item selected at a time */
+	numSelections = 1;
+	selection = NT_TEXT;  		/* What we want selected by default */
+	applyMsg = MSG_GEN_APPLICATION_OPTIONS_CHANGED;
+	destination = NTakerApp;
+	children = CardTypeInk, CardTypeText;
+	hints = { ATTR_GEN_INIT_FILE_KEY { char "cardType", 0 } }
+}
+
+CardTypeInk = GenItem {
+	moniker = 'I', "Ink";
+	identifier = NT_INK;
+}
+
+CardTypeText = GenItem {
+	moniker = 'T', "Text";
+	identifier = NT_TEXT;
+}
+
+
+/* --- */
+ViewMenu = GenInteraction {
+	children = ViewTypeList, NTakerPageControl;
+	visibility = popup;
+	hints = { ATTR_GEN_INTERACTION_GROUP_TYPE { GenInteractionGroupType GIGT_VIEW_MENU } }
+}
+
+ViewTypeList = GenItemGroup {
+	behaviorType = exclusive;
+	children = CardViewEntry, ListViewEntry, BothViewEntry;
+	destination = process;
+	applyMsg = MSG_NTAKER_SET_VIEW_TYPE;
+}
+
+CardViewEntry = GenItem {
+	moniker = 'C', "Card";
+	identifier = VT_CARD;
+}
+ListViewEntry = GenItem {
+	moniker = 'L', "List";
+	identifier = VT_LIST;
+}
+BothViewEntry = GenItem {
+	moniker = 'B', "Both";
+	identifier = VT_BOTH;
+}
+
+/* ----------------------------------------------------------------------------
+	 UI Document Control
+-----------------------------------------------------------------------------*/
+
+/*
+ * The GenDocumentControl should be put in the same resource as the
+ * GenPrimary (for efficiency).  The GenDocumentControl will build the
+ * file menu.
+ */
+
+NTakerDocumentControl = GenDocumentControl {
+	documentTokenChars = "'n', 't', 'k', 'r'";
+	documentTokenID = "MANUFACTURER_ID_GEOWORKS";
+
+	/*
+	 * Text to display in the header area of the primary when no
+	 * document is open.
+	 */
+	noNameText = "No Document";
+	/*
+	 * Special attributes: allow multiple open files, don't display
+	 * name on primary (this will be handled via the display control)
+	 */
+	dcAttributes = default +multipleOpenFiles, currentTask none;
+	features = default +supportsUserSettableDefaultDocument, 
+			-supportsUserSettableEmptyDocument, -supportsTemplates;
+	/*
+	 * Name of the default file (if the user has not set one)
+	 */
+	defaultFile = "My Notes";
+
+	/*
+	 * Pointer to the GenDocumentGroup
+	 */
+	appDC = NTakerDocumentGroup;
+
+	/*
+	 * List of objects to enable/disable based on whether or not a
+	 * document exists
+	 */
+	enableDisableList = NTakerEnableList;
+	userLevelDialog = SetUserLevelDialog;
+	hints = {
+	    HINT_GEN_CONTROL_SCALABLE_UI_DATA { GenControlScalableUIEntry <
+		 GCSUIC_SET_NORMAL_FEATURES_IF_APP_LEVEL,
+		 UIIL_INTRODUCTORY,
+		 GDC_SUGGESTED_INTRODUCTORY_FEATURES>,
+		<GCSUIC_SET_NORMAL_FEATURES_IF_APP_LEVEL,
+		 UIIL_BEGINNING,
+		 GDC_SUGGESTED_BEGINNING_FEATURES>,
+		<GCSUIC_SET_NORMAL_FEATURES_IF_APP_LEVEL,
+		 UIIL_INTERMEDIATE,
+		 GDC_SUGGESTED_INTERMEDIATE_FEATURES>,
+		<GCSUIC_SET_NORMAL_FEATURES_IF_APP_LEVEL,
+		 UIIL_ADVANCED,
+		 GDC_SUGGESTED_ADVANCED_FEATURES>},
+	    ATTR_GEN_CONTROL_PROHIBIT_UI {
+	    	word mask GDCF_SAVE_AS_TEMPLATE
+	    }
+	}
+	/*
+	 * Special Strings
+	 */
+	dialogNewText = "Create a new Note Taker document starting from an"
+	 		 " empty document";
+	dialogOpenText = "Open an existing Note Taker document";
+	dialogOpenDefaultText = {Open the default \"My Notes\" document}
+}
+
+chunk NTakerEnableList = data {
+      	UN_OPTR	CreateCardTrigger
+	UN_OPTR	NTakerIconBar
+	UN_OPTR SearchKeywordBox
+	UN_OPTR NTakerPrintControl
+	UN_OPTR NTakerSearchControl
+}
+
+end Interface;
+
+#define RESOURCE_FOR_STRINGS			Strings
+#define RESOURCE_FOR_USER_LEVEL_DIALOG_TOP	Interface
+#define RESOURCE_FOR_USER_LEVEL_DIALOG_INSIDES	UserLevelUI
+
+#define USER_LEVEL_APPLICATION_OBJECT	NTakerApp
+#define USER_LEVEL_SET_USER_LEVEL_MSG	MSG_NTAKER_APPLICATION_SET_USER_LEVEL
+#define USER_LEVEL_INITIATE_FINE_TUNE_MSG	\
+			MSG_NTAKER_APPLICATION_INITIATE_FINE_TUNE
+#define USER_LEVEL_FINE_TUNE_MSG	MSG_NTAKER_APPLICATION_FINE_TUNE
+#define USER_LEVEL_CHANGE_USER_LEVEL_MSG		\
+			MSG_NTAKER_APPLICATION_CHANGE_USER_LEVEL
+#define USER_LEVEL_CANCEL_USER_LEVEL_MSG		\
+			MSG_NTAKER_APPLICATION_CANCEL_USER_LEVEL
+#define USER_LEVEL_STATUS_MSG	MSG_NTAKER_APPLICATION_USER_LEVEL_STATUS
+#define USER_LEVEL_FINE_TUNE_TEXT	"Fine Tune Note Taker Features"
+
+#include <usrLevel.uih>
+
+
+start UserLevelUI;
+FeaturesList = GenBooleanGroup {
+	children = CardListEntry, KeywordsEntry, SearchEntry, TopicsEntry, MiscEntry, ToolsEntry;
+	selectedBooleans = "DEFAULT_FEATURES";
+	hints = {HINT_ORIENT_CHILDREN_VERTICALLY}
+}
+CardListEntry = GenBoolean {
+	moniker = 'L', "List of Cards";
+	identifier = "mask NF_CARD_LIST";
+}
+KeywordsEntry = GenBoolean {
+	moniker = 'K', "Keyword Entry Field";
+	identifier = "mask NF_KEYWORDS";
+}
+SearchEntry = GenBoolean {
+	moniker = 'S', "Search Features";
+	identifier = "mask NF_SEARCH";
+}
+TopicsEntry = GenBoolean {
+	moniker = 'T', "Create Topics";    
+	identifier = "mask NF_CREATE_TOPICS";
+}
+MiscEntry = GenBoolean {
+	moniker = 'O', "Special Options";  
+	identifier = "mask NF_MISC";
+}
+ToolsEntry = GenBoolean {
+	moniker = 'b', "Toolbar";
+	identifier = "mask NF_TOOLS";
+}
+
+end UserLevelUI;
+/* ----------------------------------------------------------------------------
+	 Various dialog boxes
+-----------------------------------------------------------------------------*/
+start InkDialogUI, notDetachable;
+
+NTakerBackgroundPasteTrigger = GenTrigger vardataReloc {
+	moniker = 'P', "Paste Custom Ink Background";
+	action = MSG_NTAKER_DOC_CUSTOM_BACKGROUND_PASTE, "TO_APP_MODEL";
+	hints = {
+		ATTR_GEN_DESTINATION_CLASS {
+			UN_DD NTakerDocumentClass
+		},
+		 HINT_SEEK_REPLY_BAR
+	}
+}
+
+NTakerBackgroundList = GenItemGroup vardataReloc {
+	behaviorType = exclusive;
+	moniker = "Ink Backgrounds:";
+	destination = "TO_APP_MODEL";
+	applyMsg = MSG_NTAKER_DOC_BACKGROUND_SELECTED;
+	children = NoBackgroundEntry, NarrowLinedPaperEntry, 
+		   MediumLinedPaperEntry, WideLinedPaperEntry,
+		   NarrowStenoPaperEntry, 
+		   MediumStenoPaperEntry, WideStenoPaperEntry,
+		   SmallGridEntry, MediumGridEntry, LargeGridEntry,
+		   SmallCrossSectionEntry, MediumCrossSectionEntry,
+		   LargeCrossSectionEntry,ToDoListEntry, PhoneMessageEntry,
+		   CustomBackgroundEntry;
+	hints = {
+		HINT_PLACE_MONIKER_ABOVE,
+		ATTR_GEN_DESTINATION_CLASS { UN_DD NTakerDocumentClass },
+			HINT_ITEM_GROUP_SCROLLABLE,
+			HINT_FIXED_SIZE {
+				SpecWidth <SST_AVG_CHAR_WIDTHS, 40>
+				SpecHeight <SST_LINES_OF_TEXT, 5>
+				word	5
+	                }
+		}
+}
+
+NoBackgroundEntry = GenItem {
+	moniker = "No Ink Background";
+	identifier = "IBT_NO_BACKGROUND";
+}
+
+NarrowLinedPaperEntry = GenItem {
+	moniker = "Lined Paper (Narrow)";
+	identifier = "IBT_NARROW_LINED_PAPER";
+}
+
+MediumLinedPaperEntry = GenItem {
+	moniker = "Lined Paper (Medium)";
+	identifier = "IBT_MEDIUM_LINED_PAPER";
+}
+
+WideLinedPaperEntry = GenItem {
+	moniker = "Lined Paper (Wide)";
+	identifier = "IBT_WIDE_LINED_PAPER";
+}
+
+NarrowStenoPaperEntry = GenItem {
+	moniker = "Steno Paper (Narrow)";
+	identifier = "IBT_NARROW_STENO_PAPER";
+}
+
+MediumStenoPaperEntry = GenItem {
+	moniker = "Steno Paper (Medium)";
+	identifier = "IBT_MEDIUM_STENO_PAPER";
+}
+
+WideStenoPaperEntry = GenItem {
+	moniker = "Steno Paper (Wide)";
+	identifier = "IBT_WIDE_STENO_PAPER";
+}
+
+SmallGridEntry = GenItem {
+	moniker = "Small Grid";
+	identifier = "IBT_SMALL_GRID";
+}
+
+MediumGridEntry = GenItem {
+	moniker = "Medium Grid";
+	identifier = "IBT_MEDIUM_GRID";
+}
+
+LargeGridEntry = GenItem {
+	moniker = "Large Grid";
+	identifier = "IBT_LARGE_GRID";
+}
+
+SmallCrossSectionEntry = GenItem {
+	moniker = "Small Cross Section";
+	identifier = "IBT_SMALL_CROSS_SECTION";
+}
+
+MediumCrossSectionEntry = GenItem {
+	moniker = "Medium Cross Section";
+	identifier = "IBT_MEDIUM_CROSS_SECTION";
+}
+
+LargeCrossSectionEntry = GenItem {
+	moniker = "Large Cross Section";
+	identifier = "IBT_LARGE_CROSS_SECTION";
+}
+
+ToDoListEntry = GenItem {
+	moniker = "To Do List";
+	identifier = "IBT_TO_DO_LIST";
+}
+
+PhoneMessageEntry = GenItem {
+	moniker = "Phone Message";
+	identifier = "IBT_PHONE_MESSAGE";
+}
+
+CustomBackgroundEntry = GenItem {
+	genStates = default -enabled;	      
+	moniker = "Custom Ink Background";
+	identifier = "IBT_CUSTOM_BACKGROUND";
+}
+
+end InkDialogUI;
+start DialogUI, notDetachable;
+CreateTopicBox = GenInteraction {
+	moniker = 'C', "Create New Topic";
+	type = command;
+	visibility = dialog;
+	attributes = modal, notUserInitiatable;
+	children = TopicNameTextEdit, CreateNewTopicTrigger;
+	hints = {HINT_INTERACTION_SINGLE_USAGE}
+}
+
+TopicNameTextEdit = GenText vardataReloc {
+	moniker = "Enter the Name of the New Topic:";
+	textDisplayAttributes = default +singleLineText;
+	hints = {
+			HINT_PLACE_MONIKER_ABOVE,
+			HINT_DEFAULT_FOCUS,
+			ATTR_GEN_TEXT_SET_OBJECT_ENABLED_WHEN_TEXT_EXISTS  {
+				UN_OPTR CreateNewTopicTrigger
+			}
+		}
+}
+
+CreateNewTopicTrigger = GenTrigger vardataReloc {
+	moniker = 'C', "Create New Topic";
+	genStates = default -enabled;
+	genAttributes = default +signalInteractionComplete;
+	hints = { HINT_SEEK_REPLY_BAR,
+		  ATTR_GEN_DESTINATION_CLASS {
+				UN_DD NTakerDocumentClass
+		  },
+		  HINT_DEFAULT_DEFAULT_ACTION}
+	action = MSG_NTAKER_DOC_CREATE_FOLDER, "TO_APP_MODEL";
+
+}
+
+/***************** MOVE ******************* START */
+
+MoveBox = GenInteraction {
+	moniker = 'M', "Move";
+	type = command;
+	visibility = dialog;
+	attributes = modal, notUserInitiatable;
+	children = MoveChooseDestTopicTextDisplay, MoveTopicNameGroup,
+		   MoveTopicList, MoveTrigger;
+	hints = {HINT_INTERACTION_SINGLE_USAGE}
+}
+
+MoveChooseDestTopicTextDisplay = GenGlyph {
+	moniker = "Choose Destination Topic for Move:";
+	hints = { HINT_EXPAND_WIDTH_TO_FIT_PARENT }
+}
+
+MoveTopicNameGroup = GenInteraction {
+	children = MoveUpTopicTrigger,MoveDownTopicTrigger, MoveTopicNameDisplay;
+	hints = {
+		HINT_ORIENT_CHILDREN_HORIZONTALLY,
+		HINT_EXPAND_WIDTH_TO_FIT_PARENT
+	}	
+}
+
+MoveUpTopicTrigger = GenTrigger vardataReloc {
+	moniker = "^";
+	action = MSG_NTAKER_DOC_GET_PARENT_MOVE_FOLDER, "TO_APP_MODEL";
+	genAttributes = default +initiatesInputIgnore;
+	hints = {
+		ATTR_GEN_DESTINATION_CLASS {
+			UN_DD NTakerDocumentClass
+		}
+	}
+}
+MoveDownTopicTrigger = GenTrigger vardataReloc {
+	moniker = "V";
+	action = MSG_NTAKER_DOC_MOVE_OPEN_FOLDER, "TO_APP_MODEL";
+	genAttributes = default +initiatesInputIgnore;
+	hints = {
+			ATTR_GEN_DESTINATION_CLASS {
+				UN_DD NTakerDocumentClass
+			}
+		 }
+}
+
+MoveTopicNameDisplay = GenText {
+	genAttributes = readOnly;
+	moniker = "Current Topic:";
+	textDisplayAttributes = singleLineText;
+	hints = { HINT_EXPAND_WIDTH_TO_FIT_PARENT }
+}
+
+MoveTopicList = GenDynamicList vardataReloc {
+	behaviorType = exclusive;
+	numItems = 0;
+	queryMsg = MSG_NTAKER_DOC_QUERY_FOR_MOVE_LIST_MONIKER;
+	destination = "TO_APP_MODEL";
+
+	hints = {
+		ATTR_GEN_ITEM_GROUP_CUSTOM_DOUBLE_PRESS {	
+			word MSG_NTAKER_DOC_MOVE_OPEN_FOLDER
+		},
+		HINT_ITEM_GROUP_SCROLLABLE,
+		HINT_FIXED_SIZE {
+			SpecWidth <SST_AVG_CHAR_WIDTHS, 40>
+			SpecHeight <SST_LINES_OF_TEXT, 5>
+			word	5
+                },
+		ATTR_GEN_DESTINATION_CLASS {
+			UN_DD NTakerDocumentClass
+		}
+	}
+}
+
+MoveTrigger = GenTrigger vardataReloc {
+	moniker = 'M', "Move to Current Topic";
+	genAttributes = default +signalInteractionComplete;
+	hints = { 
+		HINT_SEEK_REPLY_BAR,
+		HINT_TRIGGER_DESTRUCTIVE_ACTION,
+		ATTR_GEN_DESTINATION_CLASS {
+			UN_DD NTakerDocumentClass
+		}
+	}
+	action = MSG_NTAKER_DOC_MOVE, "TO_APP_MODEL";
+
+}
+
+
+/***************** SEARCH BY TITLE ******************* START */
+
+SearchResultBox = GenInteraction {
+	moniker = "Search Result";
+	type = command;
+	visibility = dialog;
+	attributes = modal, notUserInitiatable;
+	children = FoundTextDisplay, SearchList, 
+		   DisplayCardTrigger, SearchCloseTrigger;
+	hints = {HINT_INTERACTION_SINGLE_USAGE}
+}
+
+FoundTextDisplay = GenGlyph {
+	moniker = "Cards Found:";
+	hints = { HINT_EXPAND_WIDTH_TO_FIT_PARENT }
+}
+
+SearchList = GenDynamicList vardataReloc {
+	behaviorType = exclusive;
+	numItems = 0;
+	queryMsg = MSG_NTAKER_DOC_QUERY_FOR_SEARCH_LIST_MONIKER;
+	destination = "TO_APP_MODEL";
+	hints = {
+		HINT_ITEM_GROUP_SCROLLABLE,
+		HINT_FIXED_SIZE {
+			SpecWidth <SST_AVG_CHAR_WIDTHS, 40>
+			SpecHeight <SST_LINES_OF_TEXT, 5>
+			word	5
+                },
+		ATTR_GEN_DESTINATION_CLASS {
+			UN_DD NTakerDocumentClass
+		}
+	}
+}
+
+DisplayCardTrigger = GenTrigger vardataReloc {
+	moniker = 'D', "Display Card";
+	hints = { HINT_SEEK_REPLY_BAR,
+		  HINT_DEFAULT_DEFAULT_ACTION,
+		ATTR_GEN_DESTINATION_CLASS {
+			UN_DD NTakerDocumentClass
+		}
+	}
+	action = MSG_NTAKER_DOC_DISPLAY_NOTE, "TO_APP_MODEL";
+
+}
+
+SearchCloseTrigger = GenTrigger vardataReloc {
+	moniker = "VMO_CANCEL", "Done";
+	genAttributes = default +signalInteractionComplete;
+	hints = { HINT_SEEK_REPLY_BAR,
+		ATTR_GEN_DESTINATION_CLASS {
+			UN_DD NTakerDocumentClass
+		},
+		ATTR_GEN_TRIGGER_INTERACTION_COMMAND{
+			word	IC_DISMISS
+		}
+	}
+	action = MSG_NTAKER_DOC_CLOSE_SEARCH_DIALOG, "TO_APP_MODEL";
+}
+
+/***************** SEARCH BY TITLE ******************* END */
+
+/***************** SEARCH BY KEYWORD  ******************* START */
+SearchKeywordBox = GenInteraction {
+	genStates = default -enabled;
+	moniker = 'K', "Find by Keywords";
+	type = command;
+	visibility = dialog;
+	children = EnterSearchKeywordTextDisplay, SearchKeywordTextEdit,
+		   SearchByAllKeywordList,SearchKeywordTrigger;
+	hints = {HINT_INTERACTION_SINGLE_USAGE}
+}
+
+EnterSearchKeywordTextDisplay = GenGlyph {
+	moniker = "Enter the keywords to search for:";
+	hints = { HINT_EXPAND_WIDTH_TO_FIT_PARENT }
+}
+
+SearchKeywordTextEdit = GenText {
+	moniker = "Keywords: ";
+	textDisplayAttributes = default +singleLineText;
+	hints = {HINT_DEFAULT_FOCUS}
+}
+
+SearchByAllKeywordList = GenBooleanGroup {
+	children = SearchByAllKeywordListEntry;
+}
+
+SearchByAllKeywordListEntry = GenBoolean {
+	moniker = 'O', "Only match cards with every keyword";
+	identifier = 1;
+}
+
+SearchKeywordTrigger = GenTrigger vardataReloc {
+	moniker = 'F', "Find Keywords";
+/*	genAttributes = default +signalInteractionComplete; */
+	hints = { HINT_SEEK_REPLY_BAR,
+		  ATTR_GEN_DESTINATION_CLASS {
+				UN_DD NTakerDocumentClass
+		  },
+		  HINT_DEFAULT_DEFAULT_ACTION}
+	action = MSG_NTAKER_DOC_SEARCH_BY_KEYWORD, "TO_APP_MODEL";
+}
+
+/***************** SEARCH BY KEYWORD ******************* END */
+end DialogUI;
+
+/* ----------------------------------------------------------------------------
+	 App Document Control
+-----------------------------------------------------------------------------*/
+
+/*
+ * The GenDocumentGroup should be put in a resource of its own run by
+ * the application thread.
+ */
+
+start DocumentUI;
+
+NTakerDocumentGroup = GenDocumentGroup {
+	/*
+	 * Name for untitled documents
+	 */
+	defaultName = "Untitled Notes";
+	documentClass = "NTakerDocumentClass";
+	/*
+	 * GenDisplay to automatically duplicate, GenDisplayGroup to attach
+	 * duplicated displays to and GenView to attach documents to
+	 */
+	genDisplayGroup = NTakerDispGroup;
+	genDisplay = NTakerDisp;
+	genView = NTakerView;
+	/*
+	 * Document protocol
+	 */
+	protocolMajor = "INK_DB_PROTOCOL_MAJOR";
+	protocolMinor = "INK_DB_PROTOCOL_MINOR";
+	/*
+	 * Pointer to the GenDocumentControl
+	 */
+	uiDC = NTakerDocumentControl;
+
+	attributes = default -dontManageChildren; 
+}
+
+end DocumentUI;
+
+/*-----------------------------------------------------------------------------
+	GenDisplayGroup object
+-----------------------------------------------------------------------------*/
+
+start Interface;
+
+NTakerDispGroup = GenDisplayGroup {
+	hints = {
+		ATTR_GEN_DISPLAY_GROUP_NO_OVERLAPPING,
+		HINT_DEFAULT_FOCUS,
+		HINT_DEFAULT_TARGET,
+		HINT_INITIAL_SIZE {
+			SpecWidth <>,
+			SpecHeight <SST_LINES_OF_TEXT, 18>,
+			0
+		}
+	}
+}
+
+
+end Interface;
+
+start Strings, data;
+
+chunk	tooManyTopicLevels = {Only ten levels of sub-topics are allowed. \rTry creating this topic at a higher level. (NT-01)}
+
+chunk	topicNotEmptyString = {There are cards under this topic.\rAre you sure you want to delete this topic?}
+
+chunk	searchNoMatchString = {Search completed.\rNo matching cards were found.}
+
+chunk	toDoListString = { Things To Do ... }
+chunk	phoneMessageTitleString = { Phone Message }
+chunk	phoneMessageToWhomString = { To: }
+chunk	phoneMessageNameString = { Name: }
+chunk	phoneMessageCompanyString = { Company: }
+chunk	phoneMessagePhoneString = { Telephone: }
+chunk	phoneMessageDateString = { Date: }
+chunk	phoneMessageTimeString = { Time: }
+chunk	phoneMessageString = { Message: }
+
+chunk 	PrintDateString = {Date: }
+chunk 	PrintTitleString = {Title: }
+chunk 	PrintKeywordString = {Keywords: }
+
+end Strings;

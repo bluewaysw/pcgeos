@@ -24,6 +24,7 @@
 #define FTXKERN_H
 
 #include "freetype.h"
+#include <heap.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -77,8 +78,7 @@ extern "C" {
     TT_UShort  searchRange;     /* these values are defined by the TT spec */
     TT_UShort  entrySelector;   /* for table searchs.                      */
     TT_UShort  rangeShift;
-
-    TT_Kern_0_Pair*  pairs;     /* a table of nPairs `pairs' */
+    MemHandle  pairsBlock;      /* a table of nPairs `pairs' */
   };
 
   typedef struct TT_Kern_0_  TT_Kern_0;
@@ -126,7 +126,9 @@ extern "C" {
     union
     {
       TT_Kern_0  kern0;
+#ifdef TT_CONFIG_OPTION_SUPPORT_KERN2
       TT_Kern_2  kern2;
+#endif
     } t;
   };
 

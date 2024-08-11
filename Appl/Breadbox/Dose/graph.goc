@@ -1,0 +1,1056 @@
+/***********************************************************************
+ *
+ *
+ * PROJECT:	Insulin Dose Calculator
+ * MODULE:	Dose
+ * FILE:		graph.goc
+ * AUTHOR:	jfh  5/04
+ *
+ * DESCRIPTION:
+ *
+ *
+ *
+ *
+ *
+ *
+ ***********************************************************************/
+
+/*
+ ***************************************************************************
+ *		Include files
+ ***************************************************************************
+ */
+
+@include "dose.goh"
+@include "externs.goh"
+
+word	g_numDays = 0;
+MemHandle	g_daysMH = 0;
+word		g_right = 0;
+word		g_dateTicks = 0;
+word		g_maxDataPts = 0;
+Boolean	g_graphLines = FALSE;
+
+/***********************************************************************
+ *
+ * FUNCTION:	GlucoseToGrid
+ *
+ * CALLED BY:
+ *
+ *
+ * STRATEGY:
+ *
+ *
+ ***********************************************************************/
+word GlucoseToGrid(word glucose)
+{
+ word		t2, yPos;
+
+
+	/* need to go round the barn, the Zoomer doesn't like this
+		yPos = 180 - (glucose -50) * .6; returns 0 */
+	t2 = (glucose - 50) * 6;
+	yPos = 180 - (t2/10);
+
+	return(yPos);
+
+
+}
+
+/***********************************************************************
+ *
+ * FUNCTION:	DrawGraphGrid
+ *
+ * CALLED BY:
+ *
+ *
+ * STRATEGY:
+ *
+ *
+ ***********************************************************************/
+void DrawGraphGrid (GStateHandle gstate)
+{
+ word		i, width;
+ optr		ticks[] = {@Str50, @Str100, @Str150, @Str200, @Str250, @Str300};
+
+
+	GrSetFont(gstate, FID_DTC_URW_SANS, MakeWWFixed(12));
+
+	/* Draw the chart axes */
+	GrDrawVLine(gstate, GRAPH_LEFT, GRAPH_TOP, GRAPH_BOTTOM);   /* x, t, b */
+	GrDrawHLine(gstate, GRAPH_LEFT, GRAPH_BOTTOM, g_right); /* l, y, r */
+
+	/* the glucose ticks 50 -> 300 by 50s */
+	MemLock (OptrToHandle(@Str50));
+	width = GrTextWidth(gstate, LMemDeref(ticks[0]),0);
+	GrDrawText(gstate, GRAPH_LEFT-width-2, GRAPH_BOTTOM-10, LMemDeref(ticks[0]), 0);
+	for (i = 1; i < 6; i++)  {
+		GrDrawHLine(gstate, GRAPH_LEFT, GRAPH_BOTTOM-(i*GRAPH_GLUC_TICKS),
+		            GRAPH_LEFT+5);
+		width = GrTextWidth(gstate, LMemDeref(ticks[i]), 0);
+		GrDrawText(gstate, GRAPH_LEFT-width-2, GRAPH_BOTTOM-(i*GRAPH_GLUC_TICKS)-10,
+					  LMemDeref(ticks[i]), 0);
+		}
+	MemUnlock (OptrToHandle(@Str50));
+
+	/* and the data point ticks */
+	for (i = 1; i < g_dateTicks; i++) {
+		GrDrawVLine(gstate, GRAPH_LEFT+(i*GRAPH_POINT_TICKS), GRAPH_BOTTOM-5,
+						GRAPH_BOTTOM);   /* x, t, b */
+		}
+
+	/* Draw the upper & lower limits */
+	if (!g_onOG && !g_onZ) GrSetLineColor(gstate, CF_INDEX, C_RED, 0, 0);
+	else GrSetLineColor(gstate, CF_INDEX, C_BLACK, 0, 0);
+	GrSetLineStyle(gstate, LS_DASHED, 0, 0, 0);
+	GrDrawHLine(gstate, GRAPH_LEFT, GlucoseToGrid(g_upperLim), g_right); /* l, y, r */
+	GrDrawHLine(gstate, GRAPH_LEFT, GlucoseToGrid(g_lowerLim), g_right); /* l, y, r */
+	GrSetLineStyle(gstate, LS_SOLID, 0, 0, 0);
+	GrSetLineColor(gstate, CF_INDEX, C_BLACK, 0, 0);
+
+}
+
+/***********************************************************************
+ *
+ * FUNCTION:	DrawGraphDataMeals
+ *
+ * CALLED BY:
+ *
+ *
+ * STRATEGY:
+ *             
+ *
+ ***********************************************************************/
+void DrawGraphDataMeals (GStateHandle gstate, word sPoint)
+{
+ word					i, j, start, end, d, n, width, tWidth;
+ word					days[] = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
+ word					months[] = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
+ word					newDays[] = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
+ dword				dwGlucose;
+ int					yPos, glucose;
+ VMBlockHandle		vmbh;
+ MemHandle			mh;
+ RecsStruct			*recsPtr;
+ char					dtStr[6];
+ Boolean				doDays = TRUE;
+ Point				arrow[3];
+ word					lastX, lastY;
+ Boolean				firstPoint = TRUE;
+
+
+	/* get the records array VMBlock */
+	vmbh = VMFind(g_vmfh, NullHandle, RECORDS);
+	VMLock(g_vmfh, vmbh ,&mh);
+
+	/* get the range */
+	if (sPoint == 0xffff) {
+		/* we're just starting */
+		start = 0;
+      @send GraphContent::MSG_GRAPH_SET_START(start);
+		}
+	else {
+      start = sPoint;
+		}
+	if (start < g_numRecs - g_maxDataPts) end = start + g_maxDataPts - 1;
+	else end = g_numRecs - 1;
+
+	j = 0;
+	d = 0;
+	n = 0;
+	for (i = start; i <= end; i++) {
+		/* get the selected record info */
+		recsPtr = ChunkArrayElementToPtrHandles(mh, g_ch, i, 0);
+
+		/* get the date info and fill in the day & month arrays */
+		if ((!d) || (recsPtr->RS_dateTime.TDAT_day != days[d-1])){
+			days[d] = recsPtr->RS_dateTime.TDAT_day;
+			months[d] = recsPtr->RS_dateTime.TDAT_month;
+			d++;
+			newDays[n] = j;
+			n++;
+			}
+
+		/* draw the data point */
+		UtilAsciiToHex32(recsPtr->RS_glucose, (long *) &dwGlucose);
+		glucose = (word)dwGlucose;
+		/* are we off the graph high? */
+		if (glucose > 300) {
+			if (g_onOG || g_onZ) GrSetAreaColor(gstate, CF_INDEX, C_BLACK, 0, 0);
+			else GrSetAreaColor(gstate, CF_INDEX, C_RED, 0, 0);
+			/* draw an up triangle */
+			arrow[0].P_x = GRAPH_POINTS_LEFT+(j*GRAPH_POINT_TICKS);
+			arrow[0].P_y = GRAPH_TOP;
+			arrow[1].P_x = GRAPH_POINTS_LEFT+(j*GRAPH_POINT_TICKS)+GRAPH_POINT_SIZE;
+			arrow[1].P_y = GRAPH_TOP + (3*GRAPH_POINT_SIZE);
+			arrow[2].P_x = GRAPH_POINTS_LEFT+(j*GRAPH_POINT_TICKS)-GRAPH_POINT_SIZE;
+			arrow[2].P_y = GRAPH_TOP + (3*GRAPH_POINT_SIZE);
+			GrFillPolygon(gstate, ODD_EVEN, arrow, 3);
+			if (g_graphLines) {
+				if (!firstPoint) {
+					/* draw the line */
+					GrDrawLine(gstate, lastX, lastY,
+							  GRAPH_POINTS_LEFT+(j*GRAPH_POINT_TICKS), GRAPH_TOP);
+					}
+				else firstPoint = FALSE;
+				/* reset the last point */
+				lastX = arrow[0].P_x;
+				lastY = GRAPH_TOP;
+				}
+			}
+		/* are we off the graph low? */
+		else if (glucose < 50) {
+			if (g_onOG || g_onZ) GrSetAreaColor(gstate, CF_INDEX, C_BLACK, 0, 0);
+			else GrSetAreaColor(gstate, CF_INDEX, C_RED, 0, 0);
+			/* draw a down triangle */
+			arrow[0].P_x = GRAPH_POINTS_LEFT+(j*GRAPH_POINT_TICKS);
+			arrow[0].P_y = GRAPH_BOTTOM;
+			arrow[1].P_x = GRAPH_POINTS_LEFT+(j*GRAPH_POINT_TICKS)+GRAPH_POINT_SIZE;
+			arrow[1].P_y = GRAPH_BOTTOM - (3*GRAPH_POINT_SIZE);
+			arrow[2].P_x = GRAPH_POINTS_LEFT+(j*GRAPH_POINT_TICKS)-GRAPH_POINT_SIZE;
+			arrow[2].P_y = GRAPH_BOTTOM - (3*GRAPH_POINT_SIZE);
+			GrFillPolygon(gstate, ODD_EVEN, arrow, 3);
+			if (g_graphLines) {
+				if (!firstPoint) {
+					/* draw the line */
+					GrDrawLine(gstate, lastX, lastY,
+							  GRAPH_POINTS_LEFT+(j*GRAPH_POINT_TICKS), GRAPH_BOTTOM);
+					}
+				else firstPoint = FALSE;
+				/* reset the last point */
+				lastX = arrow[0].P_x;
+				lastY = GRAPH_BOTTOM;
+				}
+			}
+		/* we're on the graph */
+		else {
+			yPos = GlucoseToGrid(glucose);
+			if (g_onOG || g_onZ) {
+				GrSetAreaColor(gstate, CF_INDEX, C_BLACK, 0, 0);
+				}
+			else {
+				if ((glucose > g_upperLim) || (glucose < g_lowerLim))
+					GrSetAreaColor(gstate, CF_INDEX, C_RED, 0, 0);
+				else
+					GrSetAreaColor(gstate, CF_INDEX, C_GREEN, 0, 0);
+				}
+			/* draw a square */
+			GrFillRect(gstate, GRAPH_POINTS_LEFT+(j*GRAPH_POINT_TICKS)-GRAPH_POINT_SIZE,
+					  yPos-GRAPH_POINT_SIZE,
+					  GRAPH_POINTS_LEFT+(j*GRAPH_POINT_TICKS)+GRAPH_POINT_SIZE,
+					  yPos+GRAPH_POINT_SIZE);
+			if (g_graphLines) {
+				if (!firstPoint) {
+					/* draw the line */
+					GrDrawLine(gstate, lastX, lastY,
+							  GRAPH_POINTS_LEFT+(j*GRAPH_POINT_TICKS), yPos);
+					}
+				else firstPoint = FALSE;
+				/* reset the last point */
+				lastX = GRAPH_POINTS_LEFT+(j*GRAPH_POINT_TICKS);
+				lastY = yPos;
+            }
+			}
+		j++;
+		if (i == g_numRecs - 1) {
+			/* set the last day end and bail */
+         newDays[n] = j;
+			break;
+			}
+		} /* end of draw points for loop */
+
+	VMUnlock(mh);
+
+	/* now do the date stuff below the horiz axis */
+	i = 0;
+	while (doDays) {
+		/* draw the dividers */
+		GrDrawVLine(gstate, GRAPH_LEFT+(newDays[i]*GRAPH_POINT_TICKS),
+						GRAPH_BOTTOM, GRAPH_BOTTOM+10);   /* x, t, b */
+		if (newDays[i+1]) i++;
+		else doDays = FALSE;
+		/* and maybe the date text */
+		if (i) {
+			width = (newDays[i]*GRAPH_POINT_TICKS) -
+							  (newDays[i-1]*GRAPH_POINT_TICKS);
+			sprintf(dtStr, "%d/%d", months[i-1], days[i-1]);
+			tWidth = GrTextWidth(gstate, dtStr, 0);
+			if (width > tWidth) {
+				/* center and print the text */
+				GrDrawText(gstate, GRAPH_LEFT+(newDays[i-1]*GRAPH_POINT_TICKS)+
+																  ((width - tWidth)/2),
+							  GRAPH_BOTTOM+2,
+							  dtStr, 0);
+				}
+			}
+		}
+
+
+}
+
+/***********************************************************************
+ *
+ * FUNCTION:	DrawGraphDataDays
+ *
+ * CALLED BY:
+ *
+ *
+ * STRATEGY:
+ *             
+ *
+ ***********************************************************************/
+void DrawGraphDataDays (GStateHandle gstate, word sPoint)
+{
+ word					i, j, start, startDay, end, yPos, today, days;
+ dword				dwGlucose;
+ word					glucose;
+ VMBlockHandle		vmbh;
+ MemHandle			mh;
+ RecsStruct			*recsPtr;
+ char					dtStr[6];
+ Point				arrow[3];
+ Point				diamond[4];
+ Boolean				doDays = TRUE;
+ word					*dayStart;
+
+
+	/* get the records array VMBlock */
+	vmbh = VMFind(g_vmfh, NullHandle, RECORDS);
+	VMLock(g_vmfh, vmbh ,&mh);
+
+	/* get the range */
+	if (sPoint == 0xffff) {
+		/* we're just starting - prolly don't need since we're always starting
+			in meal mode (at least for now) */
+		start = 0;
+      @send GraphContent::MSG_GRAPH_SET_START(start);
+		}
+	else {
+      start = sPoint;
+		}
+	/* gotta figure out the end point */
+	dayStart = MemLock(g_daysMH);
+	startDay = 0;
+	/* get the start day */
+	while (dayStart[startDay] != start) {
+		startDay++;
+		}
+	if (startDay < g_numDays - g_maxDataPts) {
+		end = dayStart[startDay + g_maxDataPts] - 1;
+      }
+	else end = g_numRecs - 1;
+	MemUnlock(g_daysMH);
+
+	recsPtr = ChunkArrayElementToPtrHandles(mh, g_ch, start, 0);
+	today = recsPtr->RS_dateTime.TDAT_day;
+
+	i = start;
+   j = 0;
+	for (i = start; i <= end; i++) {
+		/* get the selected record info */
+		recsPtr = ChunkArrayElementToPtrHandles(mh, g_ch, i, 0);
+		if (recsPtr->RS_dateTime.TDAT_day != today) {
+			today = recsPtr->RS_dateTime.TDAT_day;
+			j++;
+			}
+
+		/* draw the data point */
+		UtilAsciiToHex32(recsPtr->RS_glucose, (long *) &dwGlucose);
+      glucose = (word)dwGlucose;
+		/* are we off the graph high? */
+		if (glucose > 300) {
+			if (g_onOG || g_onZ) GrSetAreaColor(gstate, CF_INDEX, C_BLACK, 0, 0);
+			else GrSetAreaColor(gstate, CF_INDEX, C_RED, 0, 0);
+			/* draw an up triangle */
+			arrow[0].P_x = GRAPH_POINTS_LEFT+(j*GRAPH_POINT_TICKS);
+			arrow[0].P_y = GRAPH_TOP;
+			arrow[1].P_x = GRAPH_POINTS_LEFT+(j*GRAPH_POINT_TICKS)+GRAPH_POINT_SIZE;
+			arrow[1].P_y = GRAPH_TOP + (3*GRAPH_POINT_SIZE);
+			arrow[2].P_x = GRAPH_POINTS_LEFT+(j*GRAPH_POINT_TICKS)-GRAPH_POINT_SIZE;
+			arrow[2].P_y = GRAPH_TOP + (3*GRAPH_POINT_SIZE);
+			GrFillPolygon(gstate, ODD_EVEN, arrow, 3);
+			}
+		/* are we off the graph low? */
+		else if (glucose < 50) {
+			if (g_onOG || g_onZ) GrSetAreaColor(gstate, CF_INDEX, C_BLACK, 0, 0);
+			else GrSetAreaColor(gstate, CF_INDEX, C_RED, 0, 0);
+			/* draw a down triangle */
+			arrow[0].P_x = GRAPH_POINTS_LEFT+(j*GRAPH_POINT_TICKS);
+			arrow[0].P_y = GRAPH_BOTTOM;
+			arrow[1].P_x = GRAPH_POINTS_LEFT+(j*GRAPH_POINT_TICKS)+GRAPH_POINT_SIZE;
+			arrow[1].P_y = GRAPH_BOTTOM - (3*GRAPH_POINT_SIZE);
+			arrow[2].P_x = GRAPH_POINTS_LEFT+(j*GRAPH_POINT_TICKS)-GRAPH_POINT_SIZE;
+			arrow[2].P_y = GRAPH_BOTTOM - (3*GRAPH_POINT_SIZE);
+			GrFillPolygon(gstate, ODD_EVEN, arrow, 3);
+			}
+		/* we're on the graph */
+		else {
+			yPos = GlucoseToGrid(glucose);
+			if (g_onOG || g_onZ) GrSetAreaColor(gstate, CF_INDEX, C_BLACK, 0, 0);
+			else {
+				if ((glucose > g_upperLim) || (glucose < g_lowerLim))
+					GrSetAreaColor(gstate, CF_INDEX, C_RED, 0, 0);
+				else
+					GrSetAreaColor(gstate, CF_INDEX, C_GREEN, 0, 0);
+				}
+			/* draw a diamond */
+			diamond[0].P_x = GRAPH_POINTS_LEFT+(j*GRAPH_POINT_TICKS);
+			diamond[0].P_y = yPos-GRAPH_POINT_SIZE;
+			diamond[1].P_x = GRAPH_POINTS_LEFT+(j*GRAPH_POINT_TICKS)+GRAPH_POINT_SIZE;
+			diamond[1].P_y = yPos;
+			diamond[2].P_x = GRAPH_POINTS_LEFT+(j*GRAPH_POINT_TICKS);
+			diamond[2].P_y = yPos+GRAPH_POINT_SIZE;
+			diamond[3].P_x = GRAPH_POINTS_LEFT+(j*GRAPH_POINT_TICKS)-GRAPH_POINT_SIZE;
+			diamond[3].P_y = yPos;
+			GrFillPolygon(gstate, ODD_EVEN, diamond, 4);
+			}
+		} /* end of draw points for loop */
+
+	/* draw the date dividers (7 days) & dates */
+	dayStart = MemLock(g_daysMH);
+	i = 0;
+	if (g_onOG || g_onZ) days = 15;
+	else days = 29;
+	while (doDays) {
+		if ((i + startDay < g_numDays) && (i < days)) {
+			/* draw the dividers */
+			GrDrawVLine(gstate, GRAPH_LEFT+(i*GRAPH_POINT_TICKS),
+						GRAPH_BOTTOM, GRAPH_BOTTOM+10);   /* x, t, b */
+			/* and the text */
+			recsPtr = ChunkArrayElementToPtrHandles(mh, g_ch, dayStart[i+startDay], 0);
+			sprintf(dtStr, "%d/%d", recsPtr->RS_dateTime.TDAT_month,
+													recsPtr->RS_dateTime.TDAT_day);
+			GrDrawText(gstate, GRAPH_LEFT+(i*GRAPH_POINT_TICKS)+4,
+														  GRAPH_BOTTOM+2, dtStr, 0);
+			i += 7;
+			}
+		else doDays = FALSE;
+		}
+	MemUnlock(g_daysMH);
+
+	VMUnlock(mh);
+
+}
+
+/*
+ ***************************************************************************
+ *		Code for GenGraphPrimaryClass
+ ***************************************************************************
+ */
+
+@classdecl GenGraphPrimaryClass;
+
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_GEN_DISPLAY_CLOSE for GenGraphPrimaryClass
+ *
+ * DESCRIPTION:	Close the graph view screen & bring back the main
+ *
+ *
+ ***********************************************************************/
+@method GenGraphPrimaryClass, MSG_GEN_DISPLAY_CLOSE
+{
+
+	/* close the file opened when we came on screen */
+	if (g_vmfh) VMClose(g_vmfh, 0);
+	if (g_daysMH) MemFree(g_daysMH);
+
+	@call DosePrimary::MSG_GEN_SET_USABLE(VUM_DELAYED_VIA_APP_QUEUE);
+	@call self::MSG_GEN_SET_NOT_USABLE(VUM_NOW);
+	/* Don’t call the superclass or the application will detach! */
+	@send DosePrimary::MSG_META_GRAB_TARGET_EXCL();
+	@send DosePrimary::MSG_META_GRAB_FOCUS_EXCL();
+
+}
+
+/*
+ ***************************************************************************
+ *		Code for VisGraphContentClass
+ ***************************************************************************
+ */
+
+@classdecl VisGraphContentClass;
+
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_GRAPH_OPEN_GRAPH for VisGraphContentClass
+ *
+ * DESCRIPTION:
+ *
+ *
+ ***********************************************************************/
+@method VisGraphContentClass, MSG_GRAPH_OPEN_GRAPH
+{
+ VMBlockHandle		mapbh, vmbh;
+ MemHandle			mh;
+ RecsMapStruct		*recsMapPtr;
+ RecsStruct			*recsPtr;
+ word					today, i, j;
+ word					*dayStart;
+ Boolean				initError;
+
+
+	/* open the file */
+	FilePushDir();
+	if (g_onOG || g_onZ) SetPCCard();
+	else FileSetStandardPath(SP_USER_DATA);
+	g_vmfh = VMOpen("idrecs",
+					 VMAF_FORCE_READ_ONLY,
+					 VMO_OPEN,
+					 0);
+	/* check for error */
+	if (!g_vmfh)  {
+		if (ThreadGetError() == VM_FILE_NOT_FOUND)
+			NotifyDBox(0, @FileNotFoundMsg);
+		else
+			NotifyDBox(0, @FileOpenErrMsg);
+		FilePopDir();
+		return;
+		}
+
+	/* get the map block */
+	mapbh = VMGetMapBlock(g_vmfh);
+	recsMapPtr = VMLock(g_vmfh, mapbh, &mh);
+	g_ch = recsMapPtr->RMS_recsChunkHan;
+	g_numRecs = recsMapPtr->RMS_numRecs;
+	VMUnlock(mh);
+
+	/* Find out how many days contained in the file */
+	vmbh = VMFind(g_vmfh, NullHandle, RECORDS);
+	VMLock(g_vmfh, vmbh ,&mh);
+	recsPtr = ChunkArrayElementToPtrHandles(mh, g_ch, 0, 0);
+	today = recsPtr->RS_dateTime.TDAT_day;
+	g_numDays = 1;
+	/* and fill in the array with the record number of the first
+		record of each day */
+	g_daysMH = MemAlloc(2048, HF_SWAPABLE, HAF_LOCK | HAF_ZERO_INIT);
+	dayStart = MemDeref(g_daysMH);
+	dayStart[0] = 0;
+	j = 1;
+	for (i = 1; i < g_numRecs - 1; i++) {
+		recsPtr = ChunkArrayElementToPtrHandles(mh, g_ch, i, 0);
+		if (recsPtr->RS_dateTime.TDAT_day != today) {
+			today = recsPtr->RS_dateTime.TDAT_day;
+			g_numDays++;
+			dayStart[j] = i;
+         j++;
+			}
+		}
+	VMUnlock(mh);
+	MemUnlock(g_daysMH);
+
+	/* put it on the screen making allowances for OG vs desktop */
+
+	/* see if we're connecting the dots */
+	initError = InitFileReadBoolean("dose", "lines", &g_graphLines);
+	if (initError) g_graphLines = FALSE;
+	@send LinesGroup::MSG_GEN_BOOLEAN_GROUP_SET_BOOLEAN_STATE(DRAW_LINES,
+								g_graphLines);
+
+
+	if (g_onOG){
+		@call GraphPrimary::MSG_GEN_SET_USABLE(VUM_DELAYED_VIA_APP_QUEUE);
+		@call DosePrimary::MSG_GEN_SET_NOT_USABLE(VUM_NOW);
+		/* gotta do this to get the target & focus to the graph */
+		@send GraphPrimary::MSG_META_GRAB_TARGET_EXCL();
+		@send GraphPrimary::MSG_META_GRAB_FOCUS_EXCL();
+		@send GraphView::MSG_META_GRAB_TARGET_EXCL();
+		@send GraphView::MSG_META_GRAB_FOCUS_EXCL();
+		g_right = GRAPH_RIGHT;
+		g_dateTicks = 21;
+		g_maxDataPts = 20;
+		}
+	else {
+		@send GraphDBox::MSG_GEN_INTERACTION_INITIATE();
+		if (g_onZ) {
+			g_right = GRAPH_RIGHT;
+			g_dateTicks = 21;
+			g_maxDataPts = 20;
+			}
+		else {
+			g_right = GRAPH_RIGHT_DESKTOP;
+			g_dateTicks = 36;
+			g_maxDataPts = 35;
+         }
+		}
+
+   /* NOTE - we're leaving the data file open */
+
+}
+
+/***********************************************************************
+ *              MSG_VIS_DRAW for VisGraphContentClass
+ ***********************************************************************
+ * SYNOPSIS:        Draws the graph
+ * PARAMETERS:      void (DrawFlags drawFlags, GStateHandle gstate)
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:
+ *
+ *
+ ***********************************************************************/
+@method VisGraphContentClass, MSG_VIS_DRAW
+{
+
+
+	DrawGraphGrid(gstate);
+
+	if (pself->VGCI_graphType == GT_MEALS) {
+		DrawGraphDataMeals(gstate, pself->VGCI_startPoint);
+		}
+	else {
+		DrawGraphDataDays(gstate, pself->VGCI_startPoint);
+		}
+
+}
+
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_GRAPH_DAY_SCROLL for VisGraphContentClass
+ *                 (GEN_TRIGGER_ACTION) optr trigger
+ *
+ * DESCRIPTION:	Meals mode: Open the array and find the first reading on the
+ *                next/prev day.  Set that as the scroll point instance.
+ *						Days mode: go to the next/prev week and set the scroll point
+ *
+ ***********************************************************************/
+@method VisGraphContentClass, MSG_GRAPH_DAY_SCROLL
+{
+ word			i, j;
+ word			*dayStart;
+ Boolean		goBack = FALSE;
+
+	/* get the starting point */
+	i = pself->VGCI_startPoint;
+	j = 0;
+
+	if (trigger == @GScrollDRight || trigger == @GDBScrollDRight) {
+		if (pself->VGCI_graphType == GT_MEALS) {
+			/* move one day to the right (higher record numbers in the array)
+				and we'll try to keep the screen as full as we can */
+			if (i >= g_numRecs - g_maxDataPts) {
+				/*	already showing the last day(s) */
+				return;
+				}
+			/* find the next day's starting record */
+			dayStart = MemLock(g_daysMH);
+			while (dayStart[j] != i) {
+				j++;
+				}
+			pself->VGCI_startPoint = dayStart[j+1];
+			MemUnlock(g_daysMH);
+			}  /* end of meals mode */
+		else {
+			/* move 7 days to the right (higher record numbers in the array)
+				and we'll try to keep the screen as full as we can */
+			/* find what day we're currently on */
+			dayStart = MemLock(g_daysMH);
+			while (dayStart[j] != i) {
+				j++;
+				}
+			if (j >= g_numDays - 7) {
+				/* already showing the last day(s) */
+				MemUnlock(g_daysMH);
+				return;
+				}
+			/* Let's go 7 right and see where we are. Then
+				go back left to keep screen full if necessary */
+			j += 7;
+			if (j >= g_numDays) j = g_numDays - 1;
+			while (j >= g_numDays - g_maxDataPts) {
+				j--;
+				goBack = TRUE;
+				}
+			if (goBack)  pself->VGCI_startPoint = dayStart[j+1];
+			else  pself->VGCI_startPoint = dayStart[j];
+			MemUnlock(g_daysMH);
+			}  /* end of days mode */
+		}  /* end of scroll right */
+
+	else {  /* scroll left */
+		if (!i) {
+			/* we're already at the first record */
+			return;
+			}
+		if (pself->VGCI_graphType == GT_MEALS) {
+			/* move one day to the left (lower record numbers in the array) */
+			/* find the previous day's starting record */
+			dayStart = MemLock(g_daysMH);
+			while (dayStart[j] != i) {
+				j++;
+				}
+			pself->VGCI_startPoint = dayStart[j-1];
+			MemUnlock(g_daysMH);
+			}  /* end of meals mode */
+		else {
+			/* move 7 days to the left (lower record numbers in the array) */
+			/* find what day we're currently on */
+			dayStart = MemLock(g_daysMH);
+			while (dayStart[j] != i) {
+				j++;
+				}
+			if (j > 7) j -= 7;
+			else j = 0;
+			pself->VGCI_startPoint = dayStart[j];
+			MemUnlock(g_daysMH);
+			}  /* end of days mode */
+		}  /* end of scroll left */
+
+	/* and redraw the data points */
+   @send GraphView::MSG_GEN_VIEW_REDRAW_CONTENT();
+
+}
+
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_GRAPH_PAGE_SCROLL for VisGraphContentClass
+ *                 (GEN_TRIGGER_ACTION) optr trigger
+ *
+ * DESCRIPTION:	Meals mode: Open the array and find the first reading of
+ *							the next/prev full day on the next/prev screen.
+ *                	Set that as the scroll point instance.
+ *						Days mode: go to the next/prev 20 day window
+ *
+ ***********************************************************************/
+@method VisGraphContentClass, MSG_GRAPH_PAGE_SCROLL
+{
+ word			i, j;
+ word			*dayStart;
+ Boolean		goBack = FALSE;
+
+
+	/* get the current starting record */
+	i = pself->VGCI_startPoint;
+	j = 0;
+
+	if (trigger == @GScrollPRight || trigger == @GDBScrollPRight) {
+		if (pself->VGCI_graphType == GT_MEALS) {
+			/* Move one page to the right (higher record numbers in the array).
+				And we'll try and keep the screen as full as we can. */
+			if (i >= g_numRecs - g_maxDataPts) {
+				/* we're already as right as we can go */
+				return;
+				}
+			/* Let's go 20 right and see where we are. */
+			dayStart = MemLock(g_daysMH);
+			while ((dayStart[j] < i+g_maxDataPts) && (j < g_numDays)) {
+				j++;
+				}
+			/* go back left to keep screen full if necessary*/
+			if (j >= g_numDays) j = g_numDays - 1;
+			while (dayStart[j] >= g_numRecs - g_maxDataPts) {
+				j--;
+				goBack = TRUE;
+				}
+			if (goBack) pself->VGCI_startPoint = dayStart[j+1];
+			else pself->VGCI_startPoint = dayStart[j-1];
+			MemUnlock(g_daysMH);
+			}  /* end of meals mode */
+		else {
+			/* Move 20 days to the right (higher record numbers in the array).
+				And we'll try and keep the screen as full as we can. */
+			/* find what day we're currently on */
+			dayStart = MemLock(g_daysMH);
+			while (dayStart[j] != i) {
+				j++;
+				}
+			if (j >= g_numDays - g_maxDataPts) {
+				/* already showing the last day(s) */
+				MemUnlock(g_daysMH);
+				return;
+				}
+			/* Let's go 20 right and see where we are. Then
+				go back left to keep screen full if necessary */
+			j += 20;
+			if (j >= g_numDays) j = g_numDays - 1;
+			while (j >= g_numDays - g_maxDataPts) {
+				j--;
+				goBack = TRUE;
+				}
+			if (goBack)  pself->VGCI_startPoint = dayStart[j+1];
+			else  pself->VGCI_startPoint = dayStart[j];
+			MemUnlock(g_daysMH);
+			}
+		}  /* end of scroll page right */
+
+	else {  /* scroll left */
+		if (!i) {
+			/* we're already at the beginning */
+			return;
+			}
+		if (pself->VGCI_graphType == GT_MEALS) {
+			/* move one page to the left (lower record numbers in the array) */
+			if (i < g_maxDataPts) {
+				/* we'll go to straight the beginning */
+				pself->VGCI_startPoint = 0;
+				}
+			else {
+				/* step 20 to the left and find the leftmost new day */
+				dayStart = MemLock(g_daysMH);
+				while (dayStart[j] < i-g_maxDataPts) {
+					j++;
+					}
+				pself->VGCI_startPoint = dayStart[j];
+				MemUnlock(g_daysMH);
+				}
+			}  /* end meals mode */
+		else {
+			/* move g_maxDataPts days to the left (lower record numbers in the array) */
+			/* find what day we're currently on */
+			dayStart = MemLock(g_daysMH);
+			while (dayStart[j] != i) {
+				j++;
+				}
+			if (j > g_maxDataPts) j -= g_maxDataPts;
+			else j = 0;
+			pself->VGCI_startPoint = dayStart[j];
+			MemUnlock(g_daysMH);
+			}  /* end days mode */
+		}  /* end of scroll page left */
+
+	/* and redraw the data points */
+	@send GraphView::MSG_GEN_VIEW_REDRAW_CONTENT();
+
+}
+
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_GRAPH_SCROLL_HOME for VisGraphContentClass
+ *
+ *
+ * DESCRIPTION:	
+ *
+ *
+ *
+ ***********************************************************************/
+@method VisGraphContentClass, MSG_GRAPH_SCROLL_HOME
+{
+
+	/* set the start to zero if it's not already there */
+	if (pself->VGCI_startPoint)  {
+		pself->VGCI_startPoint = 0;
+		/* and redraw the data points */
+		@send GraphView::MSG_GEN_VIEW_REDRAW_CONTENT();
+		}
+
+}
+
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_GRAPH_SCROLL_END for VisGraphContentClass
+ *
+ *
+ * DESCRIPTION:	
+ *
+ *
+ *
+ ***********************************************************************/
+@method VisGraphContentClass, MSG_GRAPH_SCROLL_END
+{
+ word			j;
+ word			*dayStart;
+ Boolean		goBack = TRUE;
+
+
+
+	if (pself->VGCI_graphType == GT_MEALS) {
+		/* meals mode */
+		if (g_numRecs <= g_maxDataPts) {
+			/* we're already there */
+			return;
+			}
+		/* put the last record at the right end - well, we'll left justify to
+			the nearest day */
+		dayStart = MemLock(g_daysMH);
+		j = g_numDays - 1;
+		while (goBack) {
+			if (dayStart[j] > (g_numRecs - g_maxDataPts)) {
+				j--;
+				}
+			else {
+				j++;
+				goBack = FALSE;
+				}
+			}
+		pself->VGCI_startPoint = dayStart[j];
+		MemUnlock(g_daysMH);
+		}  /* end of meals mode */
+
+	else {
+		/* day mode */
+		if (g_numDays <= g_maxDataPts)  {
+			/* we're already there */
+			return;
+			}
+		/* put the last day at the right end */
+		dayStart = MemLock(g_daysMH);
+		pself->VGCI_startPoint = dayStart[g_numDays - g_maxDataPts];
+		MemUnlock(g_daysMH);
+		}
+
+	/* and redraw the data points */
+	@send GraphView::MSG_GEN_VIEW_REDRAW_CONTENT();
+
+
+}
+
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_GRAPH_CLOSE_DBOX for VisGraphContentClass
+ *
+ * DESCRIPTION:
+ *
+ *
+ ***********************************************************************/
+@method VisGraphContentClass, MSG_GRAPH_CLOSE_DBOX
+{
+
+	/* close the file opened when we came on screen */
+	if (g_vmfh) VMClose(g_vmfh, 0);
+	if (g_daysMH) MemFree(g_daysMH);
+
+}
+
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_GRAPH_SET_START for VisGraphContentClass
+ *                   (word sPoint)
+ * DESCRIPTION:
+ *
+ *
+ ***********************************************************************/
+@method VisGraphContentClass, MSG_GRAPH_SET_START
+{
+
+	pself->VGCI_startPoint = sPoint;
+
+}
+
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_GRAPH_SET_NEW_LIMITS for VisGraphContentClass
+ *
+ * DESCRIPTION:
+ *
+ *
+ ***********************************************************************/
+@method VisGraphContentClass, MSG_GRAPH_SET_NEW_LIMITS
+{
+
+	g_upperLim = @call GLDBUpper::MSG_GEN_VALUE_GET_INTEGER_VALUE();
+	g_lowerLim = @call GLDBLower::MSG_GEN_VALUE_GET_INTEGER_VALUE();
+
+	/* save it to .ini */
+	InitFileWriteInteger("dose", "upper", g_upperLim);
+	InitFileWriteInteger("dose", "lower", g_upperLim);
+	InitFileCommit();
+
+	/* we need to redraw the data points */
+	@send GraphView::MSG_GEN_VIEW_REDRAW_CONTENT();
+
+}
+
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_GRAPH_LINES_BOOLEAN_STATUS for DoseProcessClass
+ *			word	selectedBooleans,
+ *			word	indeterminateBooleans,
+ *			word	changedBooleans);
+ *
+ * DESCRIPTION:
+ *
+ *
+ ***********************************************************************/
+@method VisGraphContentClass, MSG_GRAPH_LINES_BOOLEAN_STATUS
+{
+
+	if (selectedBooleans & DRAW_LINES) g_graphLines = TRUE;
+	else g_graphLines = FALSE;
+
+	InitFileWriteBoolean("dose", "lines", g_graphLines);
+	InitFileCommit();
+	 
+	/* we need to redraw the data points */
+	@send GraphView::MSG_GEN_VIEW_REDRAW_CONTENT();
+
+}
+
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_GRAPH_TYPE_APPLY for VisGraphContentClass
+ *            (GEN_ITEM_GROUP_APPLY_MSG)
+ *				word selection
+ *          word numSelections
+ *          byte stateFlags
+ *
+ * DESCRIPTION:
+ *
+ *
+ ***********************************************************************/
+@method VisGraphContentClass, MSG_GRAPH_TYPE_APPLY
+{
+
+	if (pself->VGCI_graphType != selection) {
+		/* we're changing the type */
+		pself->VGCI_graphType = selection;
+		@send GraphView::MSG_GEN_VIEW_REDRAW_CONTENT();
+		}
+
+}
+
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_META_FUP_KBD_CHAR for VisGraphContentClass
+ *             Boolean ( word character, word flags, word state )
+ *
+ * DESCRIPTION:	Intercept this message to provide arrow, page and
+ *						home end nav in the graphs
+ *
+ *
+ *					
+ *
+ ***********************************************************************/
+@method VisGraphContentClass, MSG_META_FUP_KBD_CHAR
+{
+
+
+	if ((flags & CF_FIRST_PRESS) &&
+				  ((character == (0xff00 | VC_NEXT)) ||
+					(character == (0xff00 | VC_PREVIOUS)) ||
+					(character == (0xff00 | VC_NEXT_BUTTON)) ||
+					(character == (0xff00 | VC_PREV_BUTTON)) ||
+					(character == (0xff00 | VC_RIGHT)) ||
+					(character == (0xff00 | VC_LEFT)) ||
+					(character == (0xff00 | VC_HOME)) ||
+					(character == (0xff00 | VC_END)))) {
+		/* we'll deal with these keys */
+		if (character == (0xff00 | VC_RIGHT)) {
+			@send self::MSG_GRAPH_DAY_SCROLL(@GScrollDRight);
+			}
+		else if (character == (0xff00 | VC_LEFT)) {
+			@send self::MSG_GRAPH_DAY_SCROLL(@GScrollDLeft);
+			}
+		else if ((character == (0xff00 | VC_NEXT)) ||
+						(character == (0xff00 | VC_NEXT_BUTTON))) {
+			@send self::MSG_GRAPH_PAGE_SCROLL(@GScrollPRight);
+			}
+		else if ((character == (0xff00 | VC_PREVIOUS)) ||
+						(character == (0xff00 | VC_PREV_BUTTON))) {
+			@send self::MSG_GRAPH_PAGE_SCROLL(@GScrollPLeft);
+			}
+		else if (character == (0xff00 | VC_HOME)) {
+			@send self::MSG_GRAPH_SCROLL_HOME();
+			}
+		else if (character == (0xff00 | VC_END)) {
+			@send self::MSG_GRAPH_SCROLL_END();
+			}
+
+		/* Return TRUE to indicate that the character was handled. */
+		return(TRUE);
+		}
+
+	/* Let the superclass take care of other presses and cases. */
+	return(@callsuper());
+
+}
+
