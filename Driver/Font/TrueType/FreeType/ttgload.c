@@ -382,7 +382,9 @@
         if ( n_ins > 0 )
         {
           exec->is_composite     = FALSE;
+#ifdef TT_CONFIG_OPTION_SUPPORT_PEDANTIC_HINTING
           exec->pedantic_hinting = load_flags & TTLOAD_PEDANTIC;
+#endif
 
           error = Context_Run( exec );
 
@@ -485,7 +487,9 @@
     if ( subg->is_hinted && n_ins > 0 )
     {
       exec->is_composite     = TRUE;
+#ifdef TT_CONFIG_OPTION_SUPPORT_PEDANTIC_HINTING
       exec->pedantic_hinting = load_flags & TTLOAD_PEDANTIC;
+#endif
 
       error = Context_Run( exec );
 

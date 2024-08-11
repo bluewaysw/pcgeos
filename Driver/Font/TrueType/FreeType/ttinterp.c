@@ -2052,6 +2052,7 @@
     args[0] = (args[0] + 63) & (-64);
 
 
+#ifdef TT_CONFIG_OPTION_SUPPORT_PEDANTIC_HINTING
 #define DO_RS                                                   \
    {                                                            \
      ULong  I = (ULong)args[0];                                 \
@@ -2067,8 +2068,19 @@
      else                                                       \
        args[0] = CUR.storage[I];                                \
    }
+#else
+#define DO_RS                                                   \
+   {                                                            \
+     ULong  I = (ULong)args[0];                                 \
+     if ( BOUNDS( I, CUR.storeSize ) )                          \
+       args[0] = 0;                                             \
+     else                                                       \
+       args[0] = CUR.storage[I];                                \
+   }
+#endif
 
 
+#ifdef TT_CONFIG_OPTION_SUPPORT_PEDANTIC_HINTING
 #define DO_WS  \
    {                                                            \
      ULong  I = (ULong)args[0];                                 \
@@ -2082,10 +2094,18 @@
      else                                                       \
        CUR.storage[I] = args[1];                                \
    }
+#else
+#define DO_WS  \
+   {                                                            \
+     ULong  I = (ULong)args[0];                                 \
+     if ( ! BOUNDS( I, CUR.storeSize ) )                        \
+       CUR.storage[I] = args[1];                                \
+   }
+#endif
 
 
-
-#define DO_RCVT                              \
+#ifdef TT_CONFIG_OPTION_SUPPORT_PEDANTIC_HINTING
+#define DO_RCVT  \
    {                                                            \
      ULong  I = (ULong)args[0];                                 \
      if ( BOUNDS( I, CUR.cvtSize ) )                            \
@@ -2100,8 +2120,19 @@
      else                                                       \
        args[0] = CUR_Func_read_cvt(I);                          \
    }
+#else
+#define DO_RCVT  \
+   {                                                            \
+     ULong  I = (ULong)args[0];                                 \
+     if ( BOUNDS( I, CUR.cvtSize ) )                            \
+         args[0] = 0;                                           \
+     else                                                       \
+       args[0] = CUR_Func_read_cvt(I);                          \
+   }
+#endif
 
 
+#ifdef TT_CONFIG_OPTION_SUPPORT_PEDANTIC_HINTING
 #define DO_WCVTP                             \
    {                                                            \
      ULong  I = (ULong)args[0];                                 \
@@ -2115,8 +2146,17 @@
      else                                                       \
        CUR_Func_write_cvt( I, args[1] );                        \
    }
+#else
+#define DO_WCVTP                             \
+   {                                                            \
+     ULong  I = (ULong)args[0];                                 \
+     if ( ! BOUNDS( I, CUR.cvtSize ) )                          \
+       CUR_Func_write_cvt( I, args[1] );                        \
+   }
+#endif
 
 
+#ifdef TT_CONFIG_OPTION_SUPPORT_PEDANTIC_HINTING
 #define DO_WCVTF                                                   \
    {                                                               \
      ULong  I = (ULong)args[0];                                    \
@@ -2130,6 +2170,14 @@
      else                                                          \
        CUR.cvt[I] = FUnits_To_Pixels( EXEC_ARGS (Short)args[1] );  \
    }
+#else
+#define DO_WCVTF                                                   \
+   {                                                               \
+     ULong  I = (ULong)args[0];                                    \
+     if ( ! BOUNDS( I, CUR.cvtSize ) )                             \
+       CUR.cvt[I] = FUnits_To_Pixels( EXEC_ARGS (Short)args[1] );  \
+   }
+#endif
 
 
 #define DO_DEBUG  \

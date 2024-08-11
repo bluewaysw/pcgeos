@@ -700,8 +700,9 @@
                                    /* the prep program               */
     Bool            is_composite;  /* ture if the glyph is composite */
 
-    Bool            pedantic_hinting;  /* if true, read and write array   */
-                                       /* bounds faults halt the hinting  */
+#ifdef TT_CONFIG_OPTION_SUPPORT_PEDANTIC_HINTING
+   Bool            pedantic_hinting;  /* if true, read and write array   */
+#endif                                /* bounds faults halt the hinting  */
 
     /* latest interpreter additions */
 
