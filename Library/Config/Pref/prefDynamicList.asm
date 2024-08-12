@@ -181,7 +181,7 @@ DBCS <buffer	local	PREF_ITEM_GROUP_STRING_BUFFER_SIZE	dup (wchar)>
 	pop	bp
 	
 	tst	ax
-	jz	done
+	jz	noItem
 
 	mov	cx, ss
 	mov	ds, cx
@@ -196,6 +196,19 @@ DBCS <buffer	local	PREF_ITEM_GROUP_STRING_BUFFER_SIZE	dup (wchar)>
 done:
 	.leave
 	ret
+
+noItem:
+
+	mov	cx, ss
+	mov	ds, cx
+	mov	es, cx
+	mov	bx, ss:[params]
+	lea	si, ss:[bx].GOP_category
+	lea	dx, ss:[bx].GOP_key
+	call	InitFileDeleteEntry
+
+	jmp	done
+
 PrefDynamicListSaveOptions	endm
 
 
