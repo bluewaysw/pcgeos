@@ -520,7 +520,6 @@ closeLoop:
 	;
 	; close sockets.
 	;		
-if 0
 		push	ax, dx
 
 		mov	bx, handle dgroup
@@ -541,7 +540,6 @@ if 0
 
 		pop	ax, dx				; ax = data size
 							; dx = connection
-endif
 
 		jmp	closeLoop
 recvLoop:
