@@ -3,7 +3,7 @@ COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 	Copyright (c) GeoWorks 1989 -- All Rights Reserved
 
 PROJECT:	PC GEOS
-MODULE:		RasterMod
+MODULE:		TrueType Font Driver
 FILE:		truetypeChars.asm
 
 AUTHOR:		Falk Rehwagen

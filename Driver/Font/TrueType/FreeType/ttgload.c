@@ -382,11 +382,16 @@
         if ( n_ins > 0 )
         {
           exec->is_composite     = FALSE;
+#ifdef TT_CONFIG_OPTION_SUPPORT_PEDANTIC_HINTING
           exec->pedantic_hinting = load_flags & TTLOAD_PEDANTIC;
+#endif
 
           error = Context_Run( exec );
+
+#ifdef TT_CONFIG_OPTION_SUPPORT_PEDANTIC_HINTING
           if (error && exec->pedantic_hinting)
             return error;
+#endif
         }
       }
       else
@@ -482,11 +487,16 @@
     if ( subg->is_hinted && n_ins > 0 )
     {
       exec->is_composite     = TRUE;
+#ifdef TT_CONFIG_OPTION_SUPPORT_PEDANTIC_HINTING
       exec->pedantic_hinting = load_flags & TTLOAD_PEDANTIC;
+#endif
 
       error = Context_Run( exec );
+
+#ifdef TT_CONFIG_OPTION_SUPPORT_PEDANTIC_HINTING
       if (error && exec->pedantic_hinting)
         return error;
+#endif
     }
 
     /* save glyph origin and advance points */

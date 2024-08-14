@@ -233,8 +233,8 @@
 
   struct  TCodeRange_
   {
-    PByte  Base;
-    ULong  Size;
+    PByte   Base;
+    UShort  Size;
   };
 
   typedef struct TCodeRange_  TCodeRange;
@@ -256,7 +256,7 @@
   struct  TDefRecord_
   {
     Int    Range;     /* in which code range is it located ? */
-    ULong  Start;     /* where does it start ?               */
+    UShort Start;     /* where does it start ?               */
     Int    Opc;       /* function #, or instruction code     */
     Bool   Active;    /* is it active ?                      */
   };
@@ -270,9 +270,9 @@
   struct  TCallRecord_
   {
     Int    Caller_Range;
-    ULong  Caller_IP;
-    Long   Cur_Count;
-    ULong  Cur_Restart;
+    UShort Caller_IP;
+    Short  Cur_Count;
+    UShort Cur_Restart;
   };
 
   typedef struct TCallRecord_  TCallRecord;
@@ -625,13 +625,13 @@
 
     TT_Error        error;     /* last execution error */
 
-    Long            top;        /* top of exec. stack  */
+    Short           top;        /* top of exec. stack  */
 
     UShort          stackSize;  /* size of exec. stack */
     PStorage        stack;      /* current exec. stack */
 
     Long            args;
-    ULong           new_top;    /* new top after exec.    */
+    UShort          new_top;    /* new top after exec.    */
 
     TGlyph_Zone     zp0,            /* zone records */
                     zp1,
@@ -645,8 +645,8 @@
 
     Int             curRange;  /* current code range number   */
     PByte           code;      /* current code range          */
-    ULong           IP;        /* current instruction pointer */
-    ULong           codeSize;  /* size of current range       */
+    UShort          IP;        /* current instruction pointer */
+    UShort          codeSize;  /* size of current range       */
 
     Byte            opcode;    /* current opcode              */
     Int             length;    /* length of current opcode    */
@@ -700,8 +700,9 @@
                                    /* the prep program               */
     Bool            is_composite;  /* ture if the glyph is composite */
 
-    Bool            pedantic_hinting;  /* if true, read and write array   */
-                                       /* bounds faults halt the hinting  */
+#ifdef TT_CONFIG_OPTION_SUPPORT_PEDANTIC_HINTING
+   Bool            pedantic_hinting;  /* if true, read and write array   */
+#endif                                /* bounds faults halt the hinting  */
 
     /* latest interpreter additions */
 
@@ -762,22 +763,15 @@
   LOCAL_DEF
   TT_Error  Goto_CodeRange( PExecution_Context  exec,
                             Int                 range,
-                            ULong               IP );
+                            UShort              IP );
 
-#if 0
-  /* Return a pointer to a given coderange record. */
-  /* Used only by the debugger.                    */
-  LOCAL_DEF
-  PCodeRange  Get_CodeRange( PExecution_Context  exec,
-                             Int                 range );
-#endif
 
   /* Set a given code range properties */
   LOCAL_DEF
   TT_Error  Set_CodeRange( PExecution_Context  exec,
                            Int                 range,
                            void*               base,
-                           ULong               length );
+                           UShort              length );
 
   /* Clear a given coderange */
   LOCAL_DEF

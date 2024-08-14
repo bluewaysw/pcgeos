@@ -73,7 +73,7 @@
 /* a counter within the run loop. a singly stroke of interpretation */
 /* is now limited to a maximum number of opcodes defined below..    */
 /*                                                                  */
-#define MAX_RUNNABLE_OPCODES  1000000
+#define MAX_RUNNABLE_OPCODES  15000
 
 
 /* There are two kinds of implementations there:              */
@@ -639,11 +639,12 @@
     return CUR.cvt[index];
   }
 
-
+#ifdef TT_CONGIG_OPTION_SUPPORT_NON_SQUARE_PIXELS
   static TT_F26Dot6  Read_CVT_Stretched( EXEC_OPS ULong  index )
   {
     return TT_MulFix( CUR.cvt[index], CURRENT_Ratio() );
   }
+#endif
 
 
   static void  Write_CVT( EXEC_OPS ULong  index, TT_F26Dot6  value )
@@ -651,22 +652,24 @@
     CUR.cvt[index] = value;
   }
 
+#ifdef TT_CONGIG_OPTION_SUPPORT_NON_SQUARE_PIXELS
   static void  Write_CVT_Stretched( EXEC_OPS ULong  index, TT_F26Dot6  value )
   {
     CUR.cvt[index] = TT_MulDiv( value, 0x10000, CURRENT_Ratio() );
   }
-
+#endif
 
   static void  Move_CVT( EXEC_OPS ULong  index, TT_F26Dot6  value )
   {
     CUR.cvt[index] += value;
   }
 
+#ifdef TT_CONGIG_OPTION_SUPPORT_NON_SQUARE_PIXELS
   static void  Move_CVT_Stretched( EXEC_OPS ULong  index, TT_F26Dot6  value )
   {
     CUR.cvt[index] += TT_MulDiv( value, 0x10000, CURRENT_Ratio() );
   }
-
+#endif
 
 /******************************************************************
  *
@@ -770,7 +773,7 @@
  *
  *****************************************************************/
 
-  static Bool  Ins_Goto_CodeRange( EXEC_OPS Int  aRange, ULong  aIP )
+  static Bool  Ins_Goto_CodeRange( EXEC_OPS Int  aRange, UShort  aIP )
   {
     TCodeRange*  WITH;
 
@@ -1649,8 +1652,10 @@
     if ( BOUNDS( aIdx1, CUR.zp2.n_points ) ||
          BOUNDS( aIdx2, CUR.zp1.n_points ) )
     {
+#ifdef TT_CONFIG_OPTION_SUPPORT_PEDANTIC_HINTING
       if ( CUR.pedantic_hinting )
         CUR.error = TT_Err_Invalid_Reference;
+#endif
       return FAILURE;
     }
 
@@ -2047,6 +2052,7 @@
     args[0] = (args[0] + 63) & (-64);
 
 
+#ifdef TT_CONFIG_OPTION_SUPPORT_PEDANTIC_HINTING
 #define DO_RS                                                   \
    {                                                            \
      ULong  I = (ULong)args[0];                                 \
@@ -2062,8 +2068,19 @@
      else                                                       \
        args[0] = CUR.storage[I];                                \
    }
+#else
+#define DO_RS                                                   \
+   {                                                            \
+     ULong  I = (ULong)args[0];                                 \
+     if ( BOUNDS( I, CUR.storeSize ) )                          \
+       args[0] = 0;                                             \
+     else                                                       \
+       args[0] = CUR.storage[I];                                \
+   }
+#endif
 
 
+#ifdef TT_CONFIG_OPTION_SUPPORT_PEDANTIC_HINTING
 #define DO_WS  \
    {                                                            \
      ULong  I = (ULong)args[0];                                 \
@@ -2077,10 +2094,18 @@
      else                                                       \
        CUR.storage[I] = args[1];                                \
    }
+#else
+#define DO_WS  \
+   {                                                            \
+     ULong  I = (ULong)args[0];                                 \
+     if ( ! BOUNDS( I, CUR.storeSize ) )                        \
+       CUR.storage[I] = args[1];                                \
+   }
+#endif
 
 
-
-#define DO_RCVT                              \
+#ifdef TT_CONFIG_OPTION_SUPPORT_PEDANTIC_HINTING
+#define DO_RCVT  \
    {                                                            \
      ULong  I = (ULong)args[0];                                 \
      if ( BOUNDS( I, CUR.cvtSize ) )                            \
@@ -2095,8 +2120,19 @@
      else                                                       \
        args[0] = CUR_Func_read_cvt(I);                          \
    }
+#else
+#define DO_RCVT  \
+   {                                                            \
+     ULong  I = (ULong)args[0];                                 \
+     if ( BOUNDS( I, CUR.cvtSize ) )                            \
+         args[0] = 0;                                           \
+     else                                                       \
+       args[0] = CUR_Func_read_cvt(I);                          \
+   }
+#endif
 
 
+#ifdef TT_CONFIG_OPTION_SUPPORT_PEDANTIC_HINTING
 #define DO_WCVTP                             \
    {                                                            \
      ULong  I = (ULong)args[0];                                 \
@@ -2110,8 +2146,17 @@
      else                                                       \
        CUR_Func_write_cvt( I, args[1] );                        \
    }
+#else
+#define DO_WCVTP                             \
+   {                                                            \
+     ULong  I = (ULong)args[0];                                 \
+     if ( ! BOUNDS( I, CUR.cvtSize ) )                          \
+       CUR_Func_write_cvt( I, args[1] );                        \
+   }
+#endif
 
 
+#ifdef TT_CONFIG_OPTION_SUPPORT_PEDANTIC_HINTING
 #define DO_WCVTF                                                   \
    {                                                               \
      ULong  I = (ULong)args[0];                                    \
@@ -2125,6 +2170,14 @@
      else                                                          \
        CUR.cvt[I] = FUnits_To_Pixels( EXEC_ARGS (Short)args[1] );  \
    }
+#else
+#define DO_WCVTF                                                   \
+   {                                                               \
+     ULong  I = (ULong)args[0];                                    \
+     if ( ! BOUNDS( I, CUR.cvtSize ) )                             \
+       CUR.cvt[I] = FUnits_To_Pixels( EXEC_ARGS (Short)args[1] );  \
+   }
+#endif
 
 
 #define DO_DEBUG  \
@@ -3550,12 +3603,14 @@
 
     if ( BOUNDS( L, CUR.zp2.n_points ) )
     {
+#ifdef TT_CONFIG_OPTION_SUPPORT_PEDANTIC_HINTING
       if ( CUR.pedantic_hinting )
       {
         CUR.error = TT_Err_Invalid_Reference;
         return;
       }
       else
+#endif
         R = 0;
     }
     else
@@ -3590,8 +3645,10 @@
 
     if ( BOUNDS( L, CUR.zp2.n_points ) )
     {
+#ifdef TT_CONFIG_OPTION_SUPPORT_PEDANTIC_HINTING
       if ( CUR.pedantic_hinting )
         CUR.error = TT_Err_Invalid_Reference;
+#endif
       return;
     }
 
@@ -3633,12 +3690,14 @@
     if( BOUNDS( L, CUR.zp0.n_points ) ||
         BOUNDS( K, CUR.zp1.n_points ) )
     {
+#ifdef TT_CONFIG_OPTION_SUPPORT_PEDANTIC_HINTING
       if ( CUR.pedantic_hinting )
       {
         CUR.error = TT_Err_Invalid_Reference;
         return;
       }
       else
+#endif
         D = 0;
     }
     else
@@ -3670,8 +3729,10 @@
     if ( BOUNDS( p2, CUR.zp1.n_points ) ||
          BOUNDS( p1, CUR.zp2.n_points ) )
     {
+#ifdef TT_CONFIG_OPTION_SUPPORT_PEDANTIC_HINTING
       if ( CUR.pedantic_hinting )
         CUR.error = TT_Err_Invalid_Reference;
+#endif
       return;
     }
 
@@ -3733,8 +3794,10 @@
       break;
 
     default:
+#ifdef TT_CONFIG_OPTION_SUPPORT_PEDANTIC_HINTING
       if ( CUR.pedantic_hinting )
         CUR.error = TT_Err_Invalid_Reference;
+#endif
       return;
     }
 
@@ -3760,8 +3823,10 @@
       break;
 
     default:
+#ifdef TT_CONFIG_OPTION_SUPPORT_PEDANTIC_HINTING
       if ( CUR.pedantic_hinting )
         CUR.error = TT_Err_Invalid_Reference;
+#endif
       return;
     }
 
@@ -3787,8 +3852,10 @@
       break;
 
     default:
+#ifdef TT_CONFIG_OPTION_SUPPORT_PEDANTIC_HINTING
       if ( CUR.pedantic_hinting )
         CUR.error = TT_Err_Invalid_Reference;
+#endif
       return;
     }
 
@@ -3814,8 +3881,10 @@
       break;
 
     default:
+#ifdef TT_CONFIG_OPTION_SUPPORT_PEDANTIC_HINTING
       if ( CUR.pedantic_hinting )
         CUR.error = TT_Err_Invalid_Reference;
+#endif
       return;
     }
 
@@ -3843,8 +3912,10 @@
 
     if ( K < 1 || K > 2 )
     {
+#ifdef TT_CONFIG_OPTION_SUPPORT_PEDANTIC_HINTING
       if ( CUR.pedantic_hinting )
         CUR.error = TT_Err_Invalid_Reference;
+#endif
       return;
     }
 
@@ -3955,11 +4026,13 @@
 
       if ( BOUNDS( point, CUR.pts.n_points ) )
       {
+#ifdef TT_CONFIG_OPTION_SUPPORT_PEDANTIC_HINTING
         if ( CUR.pedantic_hinting )
         {
           CUR.error = TT_Err_Invalid_Reference;
           return;
         }
+#endif
       }
       else
         CUR.pts.touch[point] ^= TT_Flag_On_Curve;
@@ -3989,8 +4062,10 @@
     if ( BOUNDS( K, CUR.pts.n_points ) ||
          BOUNDS( L, CUR.pts.n_points ) )
     {
+#ifdef TT_CONFIG_OPTION_SUPPORT_PEDANTIC_HINTING
       if ( CUR.pedantic_hinting )
         CUR.error = TT_Err_Invalid_Reference;
+#endif
       return;
     }
 
@@ -4016,8 +4091,10 @@
     if ( BOUNDS( K, CUR.pts.n_points ) ||
          BOUNDS( L, CUR.pts.n_points ) )
     {
+#ifdef TT_CONFIG_OPTION_SUPPORT_PEDANTIC_HINTING
       if ( CUR.pedantic_hinting )
         CUR.error = TT_Err_Invalid_Reference;
+#endif
       return;
     }
 
@@ -4050,8 +4127,10 @@
 
     if ( BOUNDS( p, zp.n_points ) )
     {
+#ifdef TT_CONFIG_OPTION_SUPPORT_PEDANTIC_HINTING
       if ( CUR.pedantic_hinting )
         CUR.error = TT_Err_Invalid_Displacement;
+#endif
       return FAILURE;
     }
 
@@ -4120,11 +4199,13 @@
 
       if ( BOUNDS( point, CUR.zp2.n_points ) )
       {
+#ifdef TT_CONFIG_OPTION_SUPPORT_PEDANTIC_HINTING
         if ( CUR.pedantic_hinting )
         {
           CUR.error = TT_Err_Invalid_Reference;
           return;
         }
+#endif
       }
       else
         /* UNDOCUMENTED! SHP touches the points */
@@ -4158,8 +4239,10 @@
 
     if ( BOUNDS( contour, CUR.pts.n_contours ) )
     {
+#ifdef TT_CONFIG_OPTION_SUPPORT_PEDANTIC_HINTING
       if ( CUR.pedantic_hinting )
         CUR.error = TT_Err_Invalid_Reference;
+#endif
       return;
     }
 
@@ -4209,8 +4292,10 @@
 
     if ( BOUNDS( args[0], 2 ) )
     {
+#ifdef TT_CONFIG_OPTION_SUPPORT_PEDANTIC_HINTING
       if ( CUR.pedantic_hinting )
         CUR.error = TT_Err_Invalid_Reference;
+#endif
       return;
     }
 
@@ -4263,11 +4348,13 @@
 
       if ( BOUNDS( point, CUR.zp2.n_points ) )
       {
+#ifdef TT_CONFIG_OPTION_SUPPORT_PEDANTIC_HINTING
         if ( CUR.pedantic_hinting )
         {
           CUR.error = TT_Err_Invalid_Reference;
           return;
         }
+#endif
       }
       else
         MOVE_Zp2_Point( point, dx, dy, TRUE );
@@ -4296,8 +4383,10 @@
     if ( BOUNDS( point,      CUR.zp1.n_points ) ||
          BOUNDS( CUR.GS.rp0, CUR.zp0.n_points ) )
     {
+#ifdef TT_CONFIG_OPTION_SUPPORT_PEDANTIC_HINTING
       if ( CUR.pedantic_hinting )
         CUR.error = TT_Err_Invalid_Reference;
+#endif
       return;
     }
 
@@ -4337,8 +4426,10 @@
 
     if ( BOUNDS( point, CUR.zp0.n_points ) )
     {
+#ifdef TT_CONFIG_OPTION_SUPPORT_PEDANTIC_HINTING
       if ( CUR.pedantic_hinting )
         CUR.error = TT_Err_Invalid_Reference;
+#endif
       return;
     }
 
@@ -4379,8 +4470,10 @@
     if ( BOUNDS( point,    CUR.zp0.n_points ) ||
          BOUNDS( cvtEntry, CUR.cvtSize )      )
     {
+#ifdef TT_CONFIG_OPTION_SUPPORT_PEDANTIC_HINTING
       if ( CUR.pedantic_hinting )
         CUR.error = TT_Err_Invalid_Reference;
+#endif
       return;
     }
 
@@ -4450,8 +4543,10 @@
     if ( BOUNDS( point,      CUR.zp1.n_points ) ||
          BOUNDS( CUR.GS.rp0, CUR.zp0.n_points ) )
     {
+#ifdef TT_CONFIG_OPTION_SUPPORT_PEDANTIC_HINTING
       if ( CUR.pedantic_hinting )
         CUR.error = TT_Err_Invalid_Reference;
+#endif
       return;
     }
 
@@ -4537,8 +4632,10 @@
          BOUNDS( cvtEntry,   CUR.cvtSize + 1 )  ||
          BOUNDS( CUR.GS.rp0, CUR.zp0.n_points ) )
     {
+#ifdef TT_CONFIG_OPTION_SUPPORT_PEDANTIC_HINTING
       if ( CUR.pedantic_hinting )
         CUR.error = TT_Err_Invalid_Reference;
+#endif
       return;
     }
 
@@ -4650,8 +4747,10 @@
     if ( CUR.top < CUR.GS.loop ||
          BOUNDS( CUR.GS.rp0, CUR.zp0.n_points ) )
     {
+#ifdef TT_CONFIG_OPTION_SUPPORT_PEDANTIC_HINTING
       if ( CUR.pedantic_hinting )
         CUR.error = TT_Err_Invalid_Reference;
+#endif
       return;
     }
 
@@ -4663,11 +4762,13 @@
 
       if ( BOUNDS( point, CUR.zp1.n_points ) )
       {
+#ifdef TT_CONFIG_OPTION_SUPPORT_PEDANTIC_HINTING
         if ( CUR.pedantic_hinting )
         {
           CUR.error = TT_Err_Invalid_Reference;
           return;
         }
+#endif
       }
       else
       {
@@ -4720,8 +4821,10 @@
          BOUNDS( a1, CUR.zp1.n_points ) ||
          BOUNDS( point, CUR.zp2.n_points ) )
     {
+#ifdef TT_CONFIG_OPTION_SUPPORT_PEDANTIC_HINTING
       if ( CUR.pedantic_hinting )
         CUR.error = TT_Err_Invalid_Reference;
+#endif
       return;
     }
 
@@ -4782,8 +4885,10 @@
     if ( BOUNDS( args[0], CUR.zp1.n_points ) ||
          BOUNDS( args[1], CUR.zp0.n_points ) )
     {
+#ifdef TT_CONFIG_OPTION_SUPPORT_PEDANTIC_HINTING
       if ( CUR.pedantic_hinting )
         CUR.error = TT_Err_Invalid_Reference;
+#endif
       return;
     }
 
@@ -4841,11 +4946,13 @@
       point = (UShort)CUR.stack[CUR.args];
       if ( BOUNDS( point, CUR.zp2.n_points ) )
       {
+#ifdef TT_CONFIG_OPTION_SUPPORT_PEDANTIC_HINTING
         if ( CUR.pedantic_hinting )
         {
           CUR.error = TT_Err_Invalid_Reference;
           return;
         }
+#endif
       }
       else
       {
@@ -4896,8 +5003,10 @@
 
     if ( BOUNDS( point, CUR.zp0.n_points ) )
     {
+#ifdef TT_CONFIG_OPTION_SUPPORT_PEDANTIC_HINTING
       if ( CUR.pedantic_hinting )
         CUR.error = TT_Err_Invalid_Reference;
+#endif
       return;
     }
 
@@ -5174,9 +5283,11 @@
           CUR_Func_move( &CUR.zp0, A, B );
         }
       }
+#ifdef TT_CONFIG_OPTION_SUPPORT_PEDANTIC_HINTING
       else
         if ( CUR.pedantic_hinting )
           CUR.error = TT_Err_Invalid_Reference;
+#endif
     }
 
     CUR.new_top = CUR.args;
@@ -5212,11 +5323,13 @@
 
       if ( BOUNDS( A, CUR.cvtSize ) )
       {
+#ifdef TT_CONFIG_OPTION_SUPPORT_PEDANTIC_HINTING
         if ( CUR.pedantic_hinting )
         {
           CUR.error = TT_Err_Invalid_Reference;
           return;
         }
+#endif
       }
       else
       {
@@ -5660,7 +5773,7 @@
     PDefRecord   WITH;
     PCallRecord  WITH1;
 
-    Long         ins_counter = 0;  /* executed instructions counter */
+    Short        ins_counter = 0;  /* executed instructions counter */
 
 #ifdef TT_CONFIG_OPTION_STATIC_INTERPRETER
     cur = *exc;
@@ -5668,6 +5781,7 @@
 
     /* set CVT functions */
     CUR.metrics.ratio = 0;
+#ifdef TT_CONGIG_OPTION_SUPPORT_NON_SQUARE_PIXELS
     if ( CUR.metrics.x_ppem != CUR.metrics.y_ppem )
     {
       /* non-square pixels, use the stretched routines */
@@ -5676,6 +5790,7 @@
       CUR.func_move_cvt  = Move_CVT_Stretched;
     }
     else
+#endif /* TT_CONGIG_OPTION_SUPPORT_NON_SQUARE_PIXELS */
     {
       /* square pixels, use normal routines */
       CUR.func_read_cvt  = Read_CVT;
