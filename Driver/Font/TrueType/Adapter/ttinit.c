@@ -1015,6 +1015,7 @@ static word GetKernCount( TRUETYPE_VARS )
         for( table = 0; table < kerningDir.nTables; ++table )
         {
                 word i;
+                word minKernValue = UNITS_PER_EM / KERN_VALUE_DIVIDENT;
 
                 if( TT_Load_Kerning_Table( FACE, table ) )
                         goto Fail;
@@ -1025,8 +1026,13 @@ static word GetKernCount( TRUETYPE_VARS )
                 pairs = GEO_LOCK( kerningDir.tables->t.kern0.pairsBlock );
 
                 for( i = 0; i < kerningDir.tables->t.kern0.nPairs; ++i )
+                {
+                        if( ABS( pairs[i].value ) < minKernValue )
+                                continue;
+
                         if( isGeosCharPair( pairs[i].left, pairs[i].right ) )
                                 ++numGeosKernPairs;
+                }
 
                 GEO_UNLOCK( kerningDir.tables->t.kern0.pairsBlock );
         }
