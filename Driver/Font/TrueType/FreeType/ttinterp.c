@@ -696,7 +696,7 @@
       if ( CUR.IP + 1 >= CUR.codeSize )
         return FAILURE;
 
-      CUR.length = CUR.code[CUR.IP + 1] * 2 + 2;
+      CUR.length = ( CUR.code[CUR.IP + 1] << 1 ) + 2;
       break;
 
     case 0xB0:
@@ -718,7 +718,7 @@
     case 0xBD:
     case 0xBE:
     case 0xBF:
-      CUR.length = (CUR.opcode - 0xB8) * 2 + 3;
+      CUR.length = ( (CUR.opcode - 0xB8) << 1 ) + 3;
       break;
 
     default:
@@ -1278,7 +1278,7 @@
     switch ( (Int)(selector & 0xC0) )
     {
       case 0:
-        CUR.period = GridPeriod / 2;
+        CUR.period = GridPeriod >> 1;
         break;
 
       case 0x40:
@@ -1286,7 +1286,7 @@
         break;
 
       case 0x80:
-        CUR.period = GridPeriod * 2;
+        CUR.period = GridPeriod << 1;
         break;
 
       /* This opcode is reserved, but... */
@@ -1303,26 +1303,26 @@
       break;
 
     case 0x10:
-      CUR.phase = CUR.period / 4;
+      CUR.phase = CUR.period >> 2;
       break;
 
     case 0x20:
-      CUR.phase = CUR.period / 2;
+      CUR.phase = CUR.period >> 1;
       break;
 
     case 0x30:
-      CUR.phase = GridPeriod * 3 / 4;
+      CUR.phase = ( GridPeriod * 3 ) >> 2;
       break;
     }
 
     if ( (selector & 0x0F) == 0 )
       CUR.threshold = CUR.period - 1;
     else
-      CUR.threshold = ( (Int)(selector & 0x0F) - 4 ) * CUR.period / 8;
+      CUR.threshold = ( (Int)(selector & 0x0F) - 4 ) * ( CUR.period >> 3 );
 
-    CUR.period    /= 256;
-    CUR.phase     /= 256;
-    CUR.threshold /= 256;
+    CUR.period    >>= 8;
+    CUR.phase     >>= 8;
+    CUR.threshold >>= 8;
   }
 
 
@@ -1598,9 +1598,9 @@
     {
       /* We need to increase W, by a minimal amount */
       if ( Vx < Vy )
-        Vx++;
+        ++Vx;
       else
-        Vy++;
+        ++Vy;
 
       W = Vx * Vx + Vy * Vy;
     }

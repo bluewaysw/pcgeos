@@ -101,7 +101,10 @@ extern TEngine_Instance engineInstance;
 #define TT_FAIL( x )  ( error = x (_engine) ) != TT_Err_Ok
 
     /* Initalize components */
-    if ( TT_FAIL( TTFile_Init  )  ||
+    if ( 
+#ifndef __GEOS__
+         TT_FAIL( TTFile_Init  )  ||
+#endif
          TT_FAIL( TTCache_Init )  ||
 #ifdef TT_CONFIG_OPTION_EXTEND_ENGINE
          TT_FAIL( TTExtend_Init ) ||
@@ -151,7 +154,9 @@ extern TEngine_Instance engineInstance;
     TTExtend_Done( _engine );
 #endif
     TTCache_Done ( _engine );
+#ifndef __GEOS__
     TTFile_Done  ( _engine );
+#endif
 
     TTMemory_Done();
 
