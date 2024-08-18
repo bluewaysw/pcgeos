@@ -634,38 +634,38 @@
   }
 
 
-  static TT_F26Dot6  Read_CVT( EXEC_OPS ULong  index )
+  static TT_F26Dot6  Read_CVT( EXEC_OPS UShort  index )
   {
     return CUR.cvt[index];
   }
 
 #ifdef TT_CONGIG_OPTION_SUPPORT_NON_SQUARE_PIXELS
-  static TT_F26Dot6  Read_CVT_Stretched( EXEC_OPS ULong  index )
+  static TT_F26Dot6  Read_CVT_Stretched( EXEC_OPS UShort  index )
   {
     return TT_MulFix( CUR.cvt[index], CURRENT_Ratio() );
   }
 #endif
 
 
-  static void  Write_CVT( EXEC_OPS ULong  index, TT_F26Dot6  value )
+  static void  Write_CVT( EXEC_OPS UShort  index, TT_F26Dot6  value )
   {
     CUR.cvt[index] = value;
   }
 
 #ifdef TT_CONGIG_OPTION_SUPPORT_NON_SQUARE_PIXELS
-  static void  Write_CVT_Stretched( EXEC_OPS ULong  index, TT_F26Dot6  value )
+  static void  Write_CVT_Stretched( EXEC_OPS UShort  index, TT_F26Dot6  value )
   {
     CUR.cvt[index] = TT_MulDiv( value, 0x10000, CURRENT_Ratio() );
   }
 #endif
 
-  static void  Move_CVT( EXEC_OPS ULong  index, TT_F26Dot6  value )
+  static void  Move_CVT( EXEC_OPS UShort  index, TT_F26Dot6  value )
   {
     CUR.cvt[index] += value;
   }
 
 #ifdef TT_CONGIG_OPTION_SUPPORT_NON_SQUARE_PIXELS
-  static void  Move_CVT_Stretched( EXEC_OPS ULong  index, TT_F26Dot6  value )
+  static void  Move_CVT_Stretched( EXEC_OPS UShort  index, TT_F26Dot6  value )
   {
     CUR.cvt[index] += TT_MulDiv( value, 0x10000, CURRENT_Ratio() );
   }
@@ -2107,7 +2107,7 @@
 #ifdef TT_CONFIG_OPTION_SUPPORT_PEDANTIC_HINTING
 #define DO_RCVT  \
    {                                                            \
-     ULong  I = (ULong)args[0];                                 \
+     UShort  I = (UShort)args[0];                                 \
      if ( BOUNDS( I, CUR.cvtSize ) )                            \
      {                                                          \
        if ( CUR.pedantic_hinting )                              \
@@ -2123,7 +2123,7 @@
 #else
 #define DO_RCVT  \
    {                                                            \
-     ULong  I = (ULong)args[0];                                 \
+     UShort  I = (UShort)args[0];                                 \
      if ( BOUNDS( I, CUR.cvtSize ) )                            \
          args[0] = 0;                                           \
      else                                                       \
@@ -2135,7 +2135,7 @@
 #ifdef TT_CONFIG_OPTION_SUPPORT_PEDANTIC_HINTING
 #define DO_WCVTP                             \
    {                                                            \
-     ULong  I = (ULong)args[0];                                 \
+     UShort  I = (UShort)args[0];                                 \
      if ( BOUNDS( I, CUR.cvtSize ) )                            \
      {                                                          \
        if ( CUR.pedantic_hinting )                              \
@@ -2149,7 +2149,7 @@
 #else
 #define DO_WCVTP                             \
    {                                                            \
-     ULong  I = (ULong)args[0];                                 \
+     UShort  I = (UShort)args[0];                                 \
      if ( ! BOUNDS( I, CUR.cvtSize ) )                          \
        CUR_Func_write_cvt( I, args[1] );                        \
    }
@@ -4615,7 +4615,7 @@
   static void  Ins_MIRP( INS_ARG )
   {
     UShort      point;
-    ULong       cvtEntry;
+    UShort      cvtEntry;
 
     TT_F26Dot6  cvt_dist,
                 distance,
@@ -4624,7 +4624,7 @@
 
 
     point    = (UShort)args[0];
-    cvtEntry = (ULong)(args[1] + 1);
+    cvtEntry = (UShort)(args[1] + 1);
 
     /* XXX: UNDOCUMENTED! cvt[-1] = 0 always */
 
@@ -5302,7 +5302,8 @@
   static void  Ins_DELTAC( INS_ARG )
   {
     ULong  nump, k;
-    ULong  A, C;
+    UShort A;
+    ULong  C;
     Long   B;
 
 
@@ -5318,7 +5319,7 @@
 
       CUR.args -= 2;
 
-      A = (ULong)CUR.stack[CUR.args + 1];
+      A = (UShort)CUR.stack[CUR.args + 1];
       B = CUR.stack[CUR.args];
 
       if ( BOUNDS( A, CUR.cvtSize ) )
@@ -5355,8 +5356,8 @@
         {
           B = ((ULong)B & 0xF) - 8;
           if ( B >= 0 )
-            B++;
-          B = B * 64L / (1L << CUR.GS.delta_shift);
+            ++B;
+          B = (B << 6) / (1L << CUR.GS.delta_shift);
 
           CUR_Func_move_cvt( A, B );
         }
@@ -5414,7 +5415,7 @@
     
     def   = CUR.IDefs;
     limit = def + CUR.numIDefs;
-    for ( ; def < limit; def++ )
+    for ( ; def < limit; ++def )
     {
       if ( def->Opc == CUR.opcode && def->Active )
       {

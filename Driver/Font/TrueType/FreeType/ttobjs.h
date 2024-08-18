@@ -331,11 +331,11 @@
                                                      TT_Vector*  v2 );
 
   /* reading a cvt value. Take care of non-square pixels when needed */
-  typedef TT_F26Dot6  (*TGet_CVT_Function)( EXEC_OPS ULong  index );
+  typedef TT_F26Dot6  (*TGet_CVT_Function)( EXEC_OPS UShort  index );
 
   /* setting or moving a cvt value.  Take care of non-square pixels  */
   /* when needed                                                     */
-  typedef void  (*TSet_CVT_Function)( EXEC_OPS  ULong       index,
+  typedef void  (*TSet_CVT_Function)( EXEC_OPS  UShort      index,
                                                 TT_F26Dot6  value );
 
   /* subglyph transformation record */
