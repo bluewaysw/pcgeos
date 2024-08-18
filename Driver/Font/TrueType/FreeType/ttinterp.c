@@ -196,23 +196,11 @@
 #define CUR_Func_round( d, c )     CUR.func_round( EXEC_ARGS d, c )
 #endif  /* __GEOS__ */
 
-#ifdef __GEOS__
-#define CUR_Func_read_cvt( index )  ProcCallFixedOrMovable_cdecl( CUR.func_read_cvt, EXEC_ARGS index ) 
-#else
 #define CUR_Func_read_cvt( index )  CUR.func_read_cvt( EXEC_ARGS index )
-#endif  /* __GEOS__ */
 
-#ifdef __GEOS__
-#define CUR_Func_write_cvt( index, val ) ProcCallFixedOrMovable_cdecl( CUR.func_write_cvt, EXEC_ARGS index, val )
-#else
 #define CUR_Func_write_cvt( index, val ) CUR.func_write_cvt( EXEC_ARGS index, val )
-#endif  /* __GEOS__ */
 
-#ifdef __GEOS__
-#define CUR_Func_move_cvt( index, val ) ProcCallFixedOrMovable_cdecl( CUR.func_move_cvt, EXEC_ARGS index, val )
-#else
 #define CUR_Func_move_cvt( index, val ) CUR.func_move_cvt( EXEC_ARGS index, val )
-#endif  /* __GEOS__ */
 
 #define CURRENT_Ratio()  Current_Ratio( EXEC_ARG )
 #define CURRENT_Ppem()   Current_Ppem( EXEC_ARG )
@@ -634,38 +622,38 @@
   }
 
 
-  static TT_F26Dot6  Read_CVT( EXEC_OPS UShort  index )
+  static TT_F26Dot6  _near Read_CVT( EXEC_OPS UShort  index )
   {
     return CUR.cvt[index];
   }
 
 #ifdef TT_CONGIG_OPTION_SUPPORT_NON_SQUARE_PIXELS
-  static TT_F26Dot6  Read_CVT_Stretched( EXEC_OPS UShort  index )
+  static TT_F26Dot6  _near Read_CVT_Stretched( EXEC_OPS UShort  index )
   {
     return TT_MulFix( CUR.cvt[index], CURRENT_Ratio() );
   }
 #endif
 
 
-  static void  Write_CVT( EXEC_OPS UShort  index, TT_F26Dot6  value )
+  static void  _near Write_CVT( EXEC_OPS UShort  index, TT_F26Dot6  value )
   {
     CUR.cvt[index] = value;
   }
 
 #ifdef TT_CONGIG_OPTION_SUPPORT_NON_SQUARE_PIXELS
-  static void  Write_CVT_Stretched( EXEC_OPS UShort  index, TT_F26Dot6  value )
+  static void  _near Write_CVT_Stretched( EXEC_OPS UShort  index, TT_F26Dot6  value )
   {
     CUR.cvt[index] = TT_MulDiv( value, 0x10000, CURRENT_Ratio() );
   }
 #endif
 
-  static void  Move_CVT( EXEC_OPS UShort  index, TT_F26Dot6  value )
+  static void  _near Move_CVT( EXEC_OPS UShort  index, TT_F26Dot6  value )
   {
     CUR.cvt[index] += value;
   }
 
 #ifdef TT_CONGIG_OPTION_SUPPORT_NON_SQUARE_PIXELS
-  static void  Move_CVT_Stretched( EXEC_OPS UShort  index, TT_F26Dot6  value )
+  static void  __near Move_CVT_Stretched( EXEC_OPS UShort  index, TT_F26Dot6  value )
   {
     CUR.cvt[index] += TT_MulDiv( value, 0x10000, CURRENT_Ratio() );
   }
@@ -3117,7 +3105,7 @@
       switch ( CUR.opcode )
       {
       case 0x58:      /* IF */
-        nIfs++;
+        ++nIfs;
         break;
 
       case 0x1b:      /* ELSE */
@@ -3125,7 +3113,7 @@
         break;
 
       case 0x59:      /* EIF */
-        nIfs--;
+        --nIfs;
         Out = (nIfs == 0);
         break;
       }
@@ -3153,11 +3141,11 @@
       switch ( CUR.opcode )
       {
       case 0x58:    /* IF */
-        nIfs++;
+        ++nIfs;
         break;
 
       case 0x59:    /* EIF */
-        nIfs--;
+        --nIfs;
         break;
       }
     } while ( nIfs != 0 );
@@ -3423,7 +3411,7 @@
     /* First of all, look for the same instruction in our table */
     def   = CUR.IDefs;
     limit = def + CUR.numIDefs;
-    for ( ; def < limit; def++ )
+    for ( ; def < limit; ++def )
       if ( def->Opc == opcode )
         break;
     
@@ -3491,7 +3479,7 @@
       return;
     }
 
-    for ( K = 1; K <= L; K++ )
+    for ( K = 1; K <= L; ++K )
       args[K - 1] = CUR.code[CUR.IP + K + 1];
 
     CUR.new_top += L;
@@ -3518,7 +3506,7 @@
 
     CUR.IP += 2;
 
-    for ( K = 0; K < L; K++ )
+    for ( K = 0; K < L; ++K )
       args[K] = GET_ShortIns();
 
     CUR.step_ins = FALSE;
@@ -3544,7 +3532,7 @@
       return;
     }
 
-    for ( K = 1; K <= L; K++ )
+    for ( K = 1; K <= L; ++K )
       args[K - 1] = CUR.code[CUR.IP + K];
   }
 
@@ -3569,7 +3557,7 @@
 
     CUR.IP++;
 
-    for ( K = 0; K < L; K++ )
+    for ( K = 0; K < L; ++K )
       args[K] = GET_ShortIns();
 
     CUR.step_ins = FALSE;
@@ -4069,7 +4057,7 @@
       return;
     }
 
-    for ( I = L; I <= K; I++ )
+    for ( I = L; I <= K; ++I )
       CUR.pts.touch[I] |= TT_Flag_On_Curve;
   }
 
@@ -4098,7 +4086,7 @@
       return;
     }
 
-    for ( I = L; I <= K; I++ )
+    for ( I = L; I <= K; ++I )
       CUR.pts.touch[I] &= ~TT_Flag_On_Curve;
   }
 
@@ -4267,7 +4255,7 @@
     }
 
     /* UNDOCUMENTED! SHC doesn't touch the points */
-    for ( i = first_point; i <= last_point; i++ )
+    for ( i = first_point; i <= last_point; ++i )
     {
       if ( zp.cur != CUR.zp2.cur || refp != i )
         MOVE_Zp2_Point( i, dx, dy, FALSE );
@@ -4308,7 +4296,7 @@
       last_point = 0;
 
     /* UNDOCUMENTED! SHZ doesn't touch the points */
-    for ( i = 0; i <= last_point; i++ )
+    for ( i = 0; i <= last_point; ++i )
     {
       if ( zp.cur != CUR.zp2.cur || refp != i )
         MOVE_Zp2_Point( i, dx, dy, FALSE );
@@ -4458,13 +4446,13 @@
 
   static void  Ins_MIAP( INS_ARG )
   {
-    ULong       cvtEntry;
+    UShort      cvtEntry;
     UShort      point;
     TT_F26Dot6  distance,
                 org_dist;
 
 
-    cvtEntry = (ULong)args[1];
+    cvtEntry = (UShort)args[1];
     point    = (UShort)args[0];
 
     if ( BOUNDS( point,    CUR.zp0.n_points ) ||
@@ -4859,11 +4847,11 @@
       CUR.zp2.cur[point].x = ( CUR.zp1.cur[a0].x +
                                CUR.zp1.cur[a1].x +
                                CUR.zp0.cur[b0].x +
-                               CUR.zp0.cur[b1].x ) / 4;
+                               CUR.zp0.cur[b1].x ) >> 2;
       CUR.zp2.cur[point].y = ( CUR.zp1.cur[a0].y +
                                CUR.zp1.cur[a1].y +
                                CUR.zp0.cur[b0].y +
-                               CUR.zp0.cur[b1].y ) / 4;
+                               CUR.zp0.cur[b1].y ) >> 2;
     }
   }
 
@@ -4893,7 +4881,7 @@
     }
 
     distance = CUR_Func_project( CUR.zp0.cur + p2,
-                                 CUR.zp1.cur + p1 ) / 2;
+                                 CUR.zp1.cur + p1 ) >> 1;
 
     CUR_Func_move( &CUR.zp1, p1, distance );
     CUR_Func_move( &CUR.zp0, p2, -distance );
@@ -5069,7 +5057,7 @@
 
     if ( x1 == x2 )
     {
-      for ( i = p1; i <= p2; i++ )
+      for ( i = p1; i <= p2; ++i )
       {
         x = LINK->orgs[i].x;
 
@@ -5085,7 +5073,7 @@
 
     if ( x1 < x2 )
     {
-      for ( i = p1; i <= p2; i++ )
+      for ( i = p1; i <= p2; ++i )
       {
         x = LINK->orgs[i].x;
 
@@ -5108,7 +5096,7 @@
 
     /* x2 < x1 */
 
-    for ( i = p1; i <= p2; i++ )
+    for ( i = p1; i <= p2; ++i )
     {
       x = LINK->orgs[i].x;
       if ( x <= x2 )
@@ -5170,14 +5158,14 @@
       first_point = point;
 
       while ( point <= end_point && (CUR.pts.touch[point] & mask) == 0 )
-        point++;
+        ++point;
 
       if ( point <= end_point )
       {
         first_touched = point;
         cur_touched   = point;
 
-        point++;
+        ++point;
 
         while ( point <= end_point )
         {
@@ -5192,7 +5180,7 @@
             cur_touched = point;
           }
 
-          point++;
+          ++point;
         }
 
         if ( cur_touched == first_touched )
@@ -5213,7 +5201,7 @@
                     &V );
         }
       }
-      contour++;
+      ++contour;
     } while ( contour < CUR.pts.n_contours );
   }
 

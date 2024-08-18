@@ -331,12 +331,12 @@
                                                      TT_Vector*  v2 );
 
   /* reading a cvt value. Take care of non-square pixels when needed */
-  typedef TT_F26Dot6  (*TGet_CVT_Function)( EXEC_OPS UShort  index );
+  typedef TT_F26Dot6  TGet_CVT_Function ( EXEC_OPS UShort  index );
 
   /* setting or moving a cvt value.  Take care of non-square pixels  */
   /* when needed                                                     */
-  typedef void  (*TSet_CVT_Function)( EXEC_OPS  UShort      index,
-                                                TT_F26Dot6  value );
+  typedef void  TSet_CVT_Function ( EXEC_OPS  UShort      index,
+                                              TT_F26Dot6  value );
 
   /* subglyph transformation record */
   struct  TTransform_
@@ -716,9 +716,9 @@
 
     TMove_Function     func_move;      /* current point move function */
 
-    TGet_CVT_Function  func_read_cvt;  /* read a cvt entry              */
-    TSet_CVT_Function  func_write_cvt; /* write a cvt entry (in pixels) */
-    TSet_CVT_Function  func_move_cvt;  /* incr a cvt entry (in pixels)  */
+    TGet_CVT_Function  _near * func_read_cvt;  /* read a cvt entry              */
+    TSet_CVT_Function  _near * func_write_cvt; /* write a cvt entry (in pixels) */
+    TSet_CVT_Function  _near * func_move_cvt;  /* incr a cvt entry (in pixels)  */
 
     UShort             loadSize;
     PSubglyph_Stack    loadStack;      /* loading subglyph stack */
