@@ -35,6 +35,11 @@
 #include <cookies.h>
 #endif
 
+void CLSet(dword cl) {
+    int a;
+    a++;
+}
+
 #if 0
 #ifdef COOKIE_ENABLE
     #include <lmem.h>
@@ -448,8 +453,10 @@ int SocketGetBlock(
 		    return -1;
 		}
 	    }
+    CLSet(0);
 	    (*pp_conn)->chunkSize = htoi((*pp_conn)->buffer);
 	    if ((*pp_conn)->chunkSize == 0) {
+
 		/* read entity headers */
 		while (sock_getline(conn, pp_conn) > 0) {
 		    /* XXX */
@@ -648,9 +655,13 @@ void SocketMyClose(Socket sock)
 /* a glue bug presents us from putting the above include in the AuthCode
    segment */
 
+#ifdef __WATCOMC__
+#pragma code_seg("AuthCode")
+#else
 #pragma codeseg AuthCode
+#endif
 
-    void base64encode(TCHAR *in, char *out)
+void base64encode(TCHAR *in, char *out)
 {
     const char basis_64[] =
         "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
@@ -696,7 +707,11 @@ void SocketMyClose(Socket sock)
     *out = '\0';
 }
 
+#ifdef __WATCOMC__
+#pragma code_seg()
+#else
 #pragma codeseg
+#endif
 
 int sock_getline(HTTPConnectionHandle conn, T_HTTPConnection **retptr)
 {
@@ -781,7 +796,11 @@ word sock_printf(T_HTTPConnection *p_conn, char *buffer, char *fmt, ...)
     return SOCK_SEND_NO_ERR;
 }
 
+#ifdef __WATCOMC__
+#pragma code_seg("HeaderCode")
+#else
 #pragma codeseg HeaderCode
+#endif
 
 /* rarely called from main code resource */
 Boolean HeaderlessHTML(T_HTTPConnection *p_conn)
@@ -1128,7 +1147,8 @@ long header(HTTPConnectionHandle conn, long *clret, word *responseCode)
 	    }
 	}
 	/* detected chunked encodings */
-	else if (LocalCmpStringsNoCaseSBCS(p, strn("Transfer-Encoding: chunked")) == 0) {
+	else if ((LocalCmpStringsNoCaseSBCS(p, strn("Transfer-Encoding:")) == 0) && 
+                                (LocalCmpStringsNoCaseSBCS(s, strn("chunked")) == 0)) {
 	    p_conn->chunked = TRUE;
 	    p_conn->chunkSize = 0;  /* ready for first chunk */
 	}
@@ -1231,9 +1251,17 @@ long header(HTTPConnectionHandle conn, long *clret, word *responseCode)
     return URLRequestMakeRet(URL_RET_FILE) | (noCache ? URB_RF_NOCACHE : 0);
 }
 
+#ifdef __WATCOMC__
+#pragma code_seg()
+#else
 #pragma codeseg
+#endif
 
+#ifdef __WATCOMC__
+#pragma code_seg("cookies_TEXT")
+#else
 #pragma codeseg COOKIES_TEXT
+#endif
 
 #ifdef COOKIE_ENABLE
 /*
@@ -1282,9 +1310,17 @@ word SendCookies(T_HTTPConnection *p_conn)
 }
 #endif
 
+#ifdef __WATCOMC__
+#pragma code_seg()
+#else
 #pragma codeseg
+#endif
 
+#ifdef __WATCOMC__
+#pragma code_seg("CacheCode")
+#else
 #pragma codeseg CacheCode
+#endif
 
 #ifdef PERSISTANT_CONNECTIONS
 Boolean FindAndUseSocket(T_HTTPConnection *p_conn)
@@ -1396,7 +1432,11 @@ Boolean PutSocketInCache(T_HTTPConnection *p_conn)
 }
 #endif
 
+#ifdef __WATCOMC__
+#pragma code_seg()
+#else
 #pragma codeseg
+#endif
 
 #ifdef PERSISTANT_CONNECTIONS
 void HandleErrorFunc(T_HTTPConnection *p_conn, Boolean *retry)
@@ -2487,6 +2527,7 @@ word HTTPGet(HTTPConnectionHandle conn)
                     (i = SocketGetBlock(conn, &p_conn, FALSE)) > 0);
 
 		/* can't re-use socket if data overflow */
+lenCheck:
 		if (length > contentlength) {
 		    p_conn->allowSocketCache = FALSE;
 		    EC_WARNING(-1);
@@ -2872,7 +2913,11 @@ word _pascal _export URLDrvMain(_URLMainParams_)
     return rcode;                       /* pass back return data type */
 }
 
+#ifdef __WATCOMC__
+#pragma code_seg("MiscCode")
+#else
 #pragma codeseg MiscCode
+#endif
 
 /* entry_URLDrvAbort URLDrvAbort */
 void _pascal _export URLDrvAbort(_URLAbortParams_)
@@ -3110,4 +3155,8 @@ Boolean _pascal _export WMG3HTTPEntry(LibraryCallType ty, GeodeHandle client)
     return FALSE;
 }
 
+#ifdef __WATCOMC__
+#pragma code_seg()
+#else
 #pragma codeseg
+#endif
