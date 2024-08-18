@@ -1609,9 +1609,9 @@
     {
       /* We need to decrease W, by a minimal amount */
       if ( Vx < Vy )
-        Vx--;
+        --Vx;
       else
-        Vy--;
+        --Vy;
 
       W = Vx * Vx + Vy * Vy;
     }
@@ -2055,7 +2055,7 @@
 #ifdef TT_CONFIG_OPTION_SUPPORT_PEDANTIC_HINTING
 #define DO_RS                                                   \
    {                                                            \
-     ULong  I = (ULong)args[0];                                 \
+     UShort  I = (UShort)args[0];                               \
      if ( BOUNDS( I, CUR.storeSize ) )                          \
      {                                                          \
        if ( CUR.pedantic_hinting )                              \
@@ -2071,7 +2071,7 @@
 #else
 #define DO_RS                                                   \
    {                                                            \
-     ULong  I = (ULong)args[0];                                 \
+     UShort  I = (UShort)args[0];                               \
      if ( BOUNDS( I, CUR.storeSize ) )                          \
        args[0] = 0;                                             \
      else                                                       \
@@ -2083,7 +2083,7 @@
 #ifdef TT_CONFIG_OPTION_SUPPORT_PEDANTIC_HINTING
 #define DO_WS  \
    {                                                            \
-     ULong  I = (ULong)args[0];                                 \
+     UShort  I = (UShort)args[0];                                 \
      if ( BOUNDS( I, CUR.storeSize ) )                          \
      {                                                          \
        if ( CUR.pedantic_hinting )                              \
@@ -2097,7 +2097,7 @@
 #else
 #define DO_WS  \
    {                                                            \
-     ULong  I = (ULong)args[0];                                 \
+     UShort  I = (UShort)args[0];                                 \
      if ( ! BOUNDS( I, CUR.storeSize ) )                        \
        CUR.storage[I] = args[1];                                \
    }
@@ -2149,7 +2149,7 @@
 #else
 #define DO_WCVTP                             \
    {                                                            \
-     UShort  I = (UShort)args[0];                                 \
+     UShort  I = (UShort)args[0];                               \
      if ( ! BOUNDS( I, CUR.cvtSize ) )                          \
        CUR_Func_write_cvt( I, args[1] );                        \
    }
@@ -2159,7 +2159,7 @@
 #ifdef TT_CONFIG_OPTION_SUPPORT_PEDANTIC_HINTING
 #define DO_WCVTF                                                   \
    {                                                               \
-     ULong  I = (ULong)args[0];                                    \
+     UShort  I = (UShort)args[0];                                  \
      if ( BOUNDS( I, CUR.cvtSize ) )                               \
      {                                                             \
        if ( CUR.pedantic_hinting )                                 \
@@ -2173,7 +2173,7 @@
 #else
 #define DO_WCVTF                                                   \
    {                                                               \
-     ULong  I = (ULong)args[0];                                    \
+     UShort  I = (UShort)args[0];                                  \
      if ( ! BOUNDS( I, CUR.cvtSize ) )                             \
        CUR.cvt[I] = FUnits_To_Pixels( EXEC_ARGS (Short)args[1] );  \
    }
