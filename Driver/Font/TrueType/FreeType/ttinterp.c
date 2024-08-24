@@ -166,25 +166,14 @@
 #define INS_Goto_CodeRange( range, ip ) \
                         Ins_Goto_CodeRange( EXEC_ARGS range, ip )
 
-#ifdef __GEOS__
-#define CUR_Func_project( x, y )   ProcCallFixedOrMovable_cdecl( CUR.func_project, EXEC_ARGS x, y )
-#else
+
 #define CUR_Func_project( x, y )   CUR.func_project( EXEC_ARGS x, y )
-#endif  /* __GEOS__ */
 
 #define CUR_Func_move( z, p, d )   CUR.func_move( EXEC_ARGS z, p, d )
 
-#ifdef __GEOS__
-#define CUR_Func_dualproj( x, y )  ProcCallFixedOrMovable_cdecl( CUR.func_dualproj, EXEC_ARGS x, y )
-#else
 #define CUR_Func_dualproj( x, y )  CUR.func_dualproj( EXEC_ARGS x, y )
-#endif  /* __GEOS__ */
 
-#ifdef __GEOS__
-#define CUR_Func_freeProj( x, y )  ProcCallFixedOrMovable_cdecl( CUR.func_freeProj, EXEC_ARGS x, y )
-#else
 #define CUR_Func_freeProj( x, y )  CUR.func_freeProj( EXEC_ARGS x, y )
-#endif  /* __GEOS__ */
 
 #define CUR_Func_round( d, c )     CUR.func_round( EXEC_ARGS d, c )
 
@@ -1319,7 +1308,7 @@
  *
  *****************************************************************/
 
-  static TT_F26Dot6  Project( EXEC_OPS TT_Vector*  v1,
+  static TT_F26Dot6 _near Project( EXEC_OPS TT_Vector*  v1,
                                        TT_Vector*  v2 )
   {
     TT_Int64  T1, T2;
@@ -1347,7 +1336,7 @@
  *
  *****************************************************************/
 
-  static TT_F26Dot6  Dual_Project( EXEC_OPS TT_Vector*  v1,
+  static TT_F26Dot6 _near Dual_Project( EXEC_OPS TT_Vector*  v1,
                                             TT_Vector*  v2 )
   {
     TT_Int64  T1, T2;
@@ -1375,7 +1364,7 @@
  *
  *****************************************************************/
 
-  static TT_F26Dot6  Free_Project( EXEC_OPS TT_Vector*  v1,
+  static TT_F26Dot6 _near Free_Project( EXEC_OPS TT_Vector*  v1,
                                             TT_Vector*  v2 )
   {
     TT_Int64  T1, T2;
@@ -1402,7 +1391,7 @@
  *
  *****************************************************************/
 
-  static TT_F26Dot6  Project_x( EXEC_OPS TT_Vector*  v1,
+  static TT_F26Dot6 _near Project_x( EXEC_OPS TT_Vector*  v1,
                                          TT_Vector*  v2 )
   {
     return (v1->x - v2->x);
@@ -1421,7 +1410,7 @@
  *
  *****************************************************************/
 
-  static TT_F26Dot6  Project_y( EXEC_OPS TT_Vector*  v1,
+  static TT_F26Dot6 _near Project_y( EXEC_OPS TT_Vector*  v1,
                                          TT_Vector*  v2 )
   {
     return (v1->y - v2->y);
@@ -1443,19 +1432,19 @@
   {
     if ( CUR.GS.freeVector.x == 0x4000 )
     {
-      CUR.func_freeProj = (TProject_Function)Project_x;
+      CUR.func_freeProj = Project_x;
       CUR.F_dot_P       = CUR.GS.projVector.x * 0x10000L;
     }
     else
     {
       if ( CUR.GS.freeVector.y == 0x4000 )
       {
-        CUR.func_freeProj = (TProject_Function)Project_y;
+        CUR.func_freeProj = Project_y;
         CUR.F_dot_P       = CUR.GS.projVector.y * 0x10000L;
       }
       else
       {
-        CUR.func_freeProj = (TProject_Function)Free_Project;
+        CUR.func_freeProj = Free_Project;
         CUR.F_dot_P = (Long)CUR.GS.projVector.x * CUR.GS.freeVector.x * 4 +
                       (Long)CUR.GS.projVector.y * CUR.GS.freeVector.y * 4;
       }
@@ -1464,23 +1453,23 @@
     CUR.cached_metrics = FALSE;
 
     if ( CUR.GS.projVector.x == 0x4000 )
-      CUR.func_project = (TProject_Function)Project_x;
+      CUR.func_project = Project_x;
     else
     {
       if ( CUR.GS.projVector.y == 0x4000 )
-        CUR.func_project = (TProject_Function)Project_y;
+        CUR.func_project = Project_y;
       else
-        CUR.func_project = (TProject_Function)Project;
+        CUR.func_project = Project;
     }
 
     if ( CUR.GS.dualVector.x == 0x4000 )
-      CUR.func_dualproj = (TProject_Function)Project_x;
+      CUR.func_dualproj = Project_x;
     else
     {
       if ( CUR.GS.dualVector.y == 0x4000 )
-        CUR.func_dualproj = (TProject_Function)Project_y;
+        CUR.func_dualproj = Project_y;
       else
-        CUR.func_dualproj = (TProject_Function)Dual_Project;
+        CUR.func_dualproj = Dual_Project;
     }
 
     CUR.func_move = Direct_Move;
@@ -1800,44 +1789,44 @@
 
 #define DO_RTHG                                           \
     CUR.GS.round_state = TT_Round_To_Half_Grid;           \
-    CUR.func_round = /*(TRound_Function)*/Round_To_Half_Grid;
+    CUR.func_round = Round_To_Half_Grid;
 
 
 #define DO_RTG                                       \
     CUR.GS.round_state = TT_Round_To_Grid;           \
-    CUR.func_round = /*(TRound_Function)*/Round_To_Grid;
+    CUR.func_round = Round_To_Grid;
 
 
 #define DO_RTDG                                             \
     CUR.GS.round_state = TT_Round_To_Double_Grid;           \
-    CUR.func_round = /*(TRound_Function)*/Round_To_Double_Grid;
+    CUR.func_round = Round_To_Double_Grid;
 
 
 #define DO_RUTG                                         \
     CUR.GS.round_state = TT_Round_Up_To_Grid;           \
-    CUR.func_round = /*(TRound_Function)*/Round_Up_To_Grid;
+    CUR.func_round = Round_Up_To_Grid;
 
 
 #define DO_RDTG                                           \
     CUR.GS.round_state = TT_Round_Down_To_Grid;           \
-    CUR.func_round = /*(TRound_Function)*/Round_Down_To_Grid;
+    CUR.func_round = Round_Down_To_Grid;
 
 
 #define DO_ROFF                                   \
     CUR.GS.round_state = TT_Round_Off;            \
-    CUR.func_round = /*(TRound_Function)*/Round_None;
+    CUR.func_round = Round_None;
 
 
 #define DO_SROUND                                  \
     SET_SuperRound( 0x4000L, args[0] );            \
     CUR.GS.round_state = TT_Round_Super;           \
-    CUR.func_round = /*(TRound_Function)*/Round_Super;
+    CUR.func_round = Round_Super;
 
 
 #define DO_S45ROUND                                   \
     SET_SuperRound( 0x2D41L, args[0] );               \
     CUR.GS.round_state = TT_Round_Super_45;           \
-    CUR.func_round = /*(TRound_Function)*/Round_Super_45;
+    CUR.func_round = Round_Super_45;
 
 
 #define DO_SLOOP                       \

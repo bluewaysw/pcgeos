@@ -317,18 +317,18 @@
 
   /* Rounding function, as used by the interpreter */
   typedef TT_F26Dot6  TRound_Function( EXEC_OPS TT_F26Dot6 distance,
-                                                   TT_F26Dot6 compensation );
+                                                TT_F26Dot6 compensation );
 
   /* Point displacement along the freedom vector routine, as */
   /* used by the interpreter                                 */
   typedef void  TMove_Function( EXEC_OPS PGlyph_Zone  zone,
-                                            UShort       point,
-                                            TT_F26Dot6   distance );
+                                         UShort       point,
+                                         TT_F26Dot6   distance );
 
   /* Distance projection along one of the proj. vectors, as used */
   /* by the interpreter                                          */
-  typedef TT_F26Dot6  (*TProject_Function)( EXEC_OPS TT_Vector*  v1,
-                                                     TT_Vector*  v2 );
+  typedef TT_F26Dot6  TProject_Function( EXEC_OPS TT_Vector*  v1,
+                                                  TT_Vector*  v2 );
 
   /* reading a cvt value. Take care of non-square pixels when needed */
   typedef TT_F26Dot6  TGet_CVT_Function( EXEC_OPS UShort  index );
@@ -708,11 +708,11 @@
 
     Long               F_dot_P;    /* dot product of freedom and projection */
                                    /* vectors                               */
-    TRound_Function    _near * func_round; /* current rounding function             */
+    TRound_Function    _near * func_round;     /* current rounding function   */
 
-    TProject_Function  func_project,   /* current projection function */
-                       func_dualproj,  /* current dual proj. function */
-                       func_freeProj;  /* current freedom proj. func  */
+    TProject_Function  _near * func_project;   /* current projection function */
+    TProject_Function  _near * func_dualproj;  /* current dual proj. function */
+    TProject_Function  _near * func_freeProj;  /* current freedom proj. func  */
 
     TMove_Function     _near * func_move;      /* current point move function */
 
