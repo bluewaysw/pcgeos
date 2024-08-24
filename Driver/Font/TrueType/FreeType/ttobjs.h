@@ -316,7 +316,7 @@
 #endif
 
   /* Rounding function, as used by the interpreter */
-  typedef TT_F26Dot6  (*TRound_Function)( EXEC_OPS TT_F26Dot6 distance,
+  typedef TT_F26Dot6  TRound_Function( EXEC_OPS TT_F26Dot6 distance,
                                                    TT_F26Dot6 compensation );
 
   /* Point displacement along the freedom vector routine, as */
@@ -708,7 +708,7 @@
 
     Long               F_dot_P;    /* dot product of freedom and projection */
                                    /* vectors                               */
-    TRound_Function    func_round; /* current rounding function             */
+    TRound_Function    _near * func_round; /* current rounding function             */
 
     TProject_Function  func_project,   /* current projection function */
                        func_dualproj,  /* current dual proj. function */

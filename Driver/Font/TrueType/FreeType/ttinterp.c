@@ -186,11 +186,7 @@
 #define CUR_Func_freeProj( x, y )  CUR.func_freeProj( EXEC_ARGS x, y )
 #endif  /* __GEOS__ */
 
-#ifdef __GEOS__
-#define CUR_Func_round( d, c )     ProcCallFixedOrMovable_cdecl( CUR.func_round, EXEC_ARGS d, c )
-#else
 #define CUR_Func_round( d, c )     CUR.func_round( EXEC_ARGS d, c )
-#endif  /* __GEOS__ */
 
 #define CUR_Func_read_cvt( index )  CUR.func_read_cvt( EXEC_ARGS index )
 
@@ -894,7 +890,7 @@
  *
  ******************************************************************/
 
-  static TT_F26Dot6  Round_None( EXEC_OPS TT_F26Dot6  distance,
+  static TT_F26Dot6 _near Round_None( EXEC_OPS TT_F26Dot6  distance,
                                           TT_F26Dot6  compensation )
   {
     TT_F26Dot6  val;
@@ -930,7 +926,7 @@
  *
  *****************************************************************/
 
-  static TT_F26Dot6  Round_To_Grid( EXEC_OPS TT_F26Dot6  distance,
+  static TT_F26Dot6 _near Round_To_Grid( EXEC_OPS TT_F26Dot6  distance,
                                              TT_F26Dot6  compensation )
   {
     TT_F26Dot6  val;
@@ -969,7 +965,7 @@
  *
  *****************************************************************/
 
-  static TT_F26Dot6  Round_To_Half_Grid( EXEC_OPS TT_F26Dot6  distance,
+  static TT_F26Dot6 _near Round_To_Half_Grid( EXEC_OPS TT_F26Dot6  distance,
                                                   TT_F26Dot6  compensation )
   {
     TT_F26Dot6  val;
@@ -1006,7 +1002,7 @@
  *
  *****************************************************************/
 
-  static TT_F26Dot6  Round_Down_To_Grid( EXEC_OPS TT_F26Dot6  distance,
+  static TT_F26Dot6 _near Round_Down_To_Grid( EXEC_OPS TT_F26Dot6  distance,
                                                   TT_F26Dot6  compensation )
   {
     TT_F26Dot6  val;
@@ -1045,7 +1041,7 @@
  *
  *****************************************************************/
 
-  static TT_F26Dot6  Round_Up_To_Grid( EXEC_OPS TT_F26Dot6  distance,
+  static TT_F26Dot6 _near Round_Up_To_Grid( EXEC_OPS TT_F26Dot6  distance,
                                                 TT_F26Dot6  compensation )
   {
     TT_F26Dot6  val;
@@ -1084,7 +1080,7 @@
  *
  *****************************************************************/
 
-  static TT_F26Dot6  Round_To_Double_Grid( EXEC_OPS TT_F26Dot6  distance,
+  static TT_F26Dot6 _near Round_To_Double_Grid( EXEC_OPS TT_F26Dot6  distance,
                                                     TT_F26Dot6  compensation )
   {
     TT_F26Dot6 val;
@@ -1128,7 +1124,7 @@
  *
  *****************************************************************/
 
-  static TT_F26Dot6  Round_Super( EXEC_OPS TT_F26Dot6  distance,
+  static TT_F26Dot6 _near Round_Super( EXEC_OPS TT_F26Dot6  distance,
                                            TT_F26Dot6  compensation )
   {
     TT_F26Dot6  val;
@@ -1172,7 +1168,7 @@
  *
  *****************************************************************/
 
-  static TT_F26Dot6  Round_Super_45( EXEC_OPS TT_F26Dot6  distance,
+  static TT_F26Dot6 _near Round_Super_45( EXEC_OPS TT_F26Dot6  distance,
                                               TT_F26Dot6  compensation )
   {
     TT_F26Dot6  val;
@@ -1209,35 +1205,35 @@
     switch ( round_mode )
     {
     case TT_Round_Off:
-      CUR.func_round = (TRound_Function)Round_None;
+      CUR.func_round = Round_None;
       break;
 
     case TT_Round_To_Grid:
-      CUR.func_round = (TRound_Function)Round_To_Grid;
+      CUR.func_round = Round_To_Grid;
       break;
 
     case TT_Round_Up_To_Grid:
-      CUR.func_round = (TRound_Function)Round_Up_To_Grid;
+      CUR.func_round = Round_Up_To_Grid;
       break;
 
     case TT_Round_Down_To_Grid:
-      CUR.func_round = (TRound_Function)Round_Down_To_Grid;
+      CUR.func_round = Round_Down_To_Grid;
       break;
 
     case TT_Round_To_Half_Grid:
-      CUR.func_round = (TRound_Function)Round_To_Half_Grid;
+      CUR.func_round = Round_To_Half_Grid;
       break;
 
     case TT_Round_To_Double_Grid:
-      CUR.func_round = (TRound_Function)Round_To_Double_Grid;
+      CUR.func_round = Round_To_Double_Grid;
       break;
 
     case TT_Round_Super:
-      CUR.func_round = (TRound_Function)Round_Super;
+      CUR.func_round = Round_Super;
       break;
 
     case TT_Round_Super_45:
-      CUR.func_round = (TRound_Function)Round_Super_45;
+      CUR.func_round = Round_Super_45;
       break;
     }
   }
@@ -1804,44 +1800,44 @@
 
 #define DO_RTHG                                           \
     CUR.GS.round_state = TT_Round_To_Half_Grid;           \
-    CUR.func_round = (TRound_Function)Round_To_Half_Grid;
+    CUR.func_round = /*(TRound_Function)*/Round_To_Half_Grid;
 
 
 #define DO_RTG                                       \
     CUR.GS.round_state = TT_Round_To_Grid;           \
-    CUR.func_round = (TRound_Function)Round_To_Grid;
+    CUR.func_round = /*(TRound_Function)*/Round_To_Grid;
 
 
 #define DO_RTDG                                             \
     CUR.GS.round_state = TT_Round_To_Double_Grid;           \
-    CUR.func_round = (TRound_Function)Round_To_Double_Grid;
+    CUR.func_round = /*(TRound_Function)*/Round_To_Double_Grid;
 
 
 #define DO_RUTG                                         \
     CUR.GS.round_state = TT_Round_Up_To_Grid;           \
-    CUR.func_round = (TRound_Function)Round_Up_To_Grid;
+    CUR.func_round = /*(TRound_Function)*/Round_Up_To_Grid;
 
 
 #define DO_RDTG                                           \
     CUR.GS.round_state = TT_Round_Down_To_Grid;           \
-    CUR.func_round = (TRound_Function)Round_Down_To_Grid;
+    CUR.func_round = /*(TRound_Function)*/Round_Down_To_Grid;
 
 
 #define DO_ROFF                                   \
     CUR.GS.round_state = TT_Round_Off;            \
-    CUR.func_round = (TRound_Function)Round_None;
+    CUR.func_round = /*(TRound_Function)*/Round_None;
 
 
 #define DO_SROUND                                  \
     SET_SuperRound( 0x4000L, args[0] );            \
     CUR.GS.round_state = TT_Round_Super;           \
-    CUR.func_round = (TRound_Function)Round_Super;
+    CUR.func_round = /*(TRound_Function)*/Round_Super;
 
 
 #define DO_S45ROUND                                   \
     SET_SuperRound( 0x2D41L, args[0] );               \
     CUR.GS.round_state = TT_Round_Super_45;           \
-    CUR.func_round = (TRound_Function)Round_Super_45;
+    CUR.func_round = /*(TRound_Function)*/Round_Super_45;
 
 
 #define DO_SLOOP                       \
