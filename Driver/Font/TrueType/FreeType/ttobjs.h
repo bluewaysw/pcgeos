@@ -321,7 +321,7 @@
 
   /* Point displacement along the freedom vector routine, as */
   /* used by the interpreter                                 */
-  typedef void  (*TMove_Function)( EXEC_OPS PGlyph_Zone  zone,
+  typedef void  TMove_Function( EXEC_OPS PGlyph_Zone  zone,
                                             UShort       point,
                                             TT_F26Dot6   distance );
 
@@ -331,7 +331,7 @@
                                                      TT_Vector*  v2 );
 
   /* reading a cvt value. Take care of non-square pixels when needed */
-  typedef TT_F26Dot6  TGet_CVT_Function ( EXEC_OPS UShort  index );
+  typedef TT_F26Dot6  TGet_CVT_Function( EXEC_OPS UShort  index );
 
   /* setting or moving a cvt value.  Take care of non-square pixels  */
   /* when needed                                                     */
@@ -714,7 +714,7 @@
                        func_dualproj,  /* current dual proj. function */
                        func_freeProj;  /* current freedom proj. func  */
 
-    TMove_Function     func_move;      /* current point move function */
+    TMove_Function     _near * func_move;      /* current point move function */
 
     TGet_CVT_Function  _near * func_read_cvt;  /* read a cvt entry              */
     TSet_CVT_Function  _near * func_write_cvt; /* write a cvt entry (in pixels) */

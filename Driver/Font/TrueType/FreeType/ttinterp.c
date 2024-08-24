@@ -172,11 +172,7 @@
 #define CUR_Func_project( x, y )   CUR.func_project( EXEC_ARGS x, y )
 #endif  /* __GEOS__ */
 
-#ifdef __GEOS__
-#define CUR_Func_move( z, p, d )   ProcCallFixedOrMovable_cdecl( CUR.func_move, EXEC_ARGS z, p, d )
-#else
 #define CUR_Func_move( z, p, d )   CUR.func_move( EXEC_ARGS z, p, d )
-#endif  /* __GEOS__ */
 
 #ifdef __GEOS__
 #define CUR_Func_dualproj( x, y )  ProcCallFixedOrMovable_cdecl( CUR.func_dualproj, EXEC_ARGS x, y )
@@ -814,7 +810,7 @@
  *
  *****************************************************************/
 
-  static void  Direct_Move( EXEC_OPS PGlyph_Zone zone,
+  static void _near Direct_Move( EXEC_OPS PGlyph_Zone zone,
                                      UShort      point,
                                      TT_F26Dot6  distance )
   {
@@ -857,7 +853,7 @@
  *
  *******************************************************************/
 
-  static void  Direct_Move_X( EXEC_OPS PGlyph_Zone  zone,
+  static void _near Direct_Move_X( EXEC_OPS PGlyph_Zone  zone,
                                        UShort       point,
                                        TT_F26Dot6   distance )
   {
@@ -871,7 +867,7 @@
  *
  *******************************************************************/
 
-  static void  Direct_Move_Y( EXEC_OPS PGlyph_Zone  zone,
+  static void _near Direct_Move_Y( EXEC_OPS PGlyph_Zone  zone,
                                        UShort       point,
                                        TT_F26Dot6   distance )
   {
@@ -1491,16 +1487,16 @@
         CUR.func_dualproj = (TProject_Function)Dual_Project;
     }
 
-    CUR.func_move = (TMove_Function)Direct_Move;
+    CUR.func_move = Direct_Move;
 
     if ( CUR.F_dot_P == 0x40000000L )
     {
       if ( CUR.GS.freeVector.x == 0x4000 )
-        CUR.func_move = (TMove_Function)Direct_Move_X;
+        CUR.func_move = Direct_Move_X;
       else
       {
         if ( CUR.GS.freeVector.y == 0x4000 )
-          CUR.func_move = (TMove_Function)Direct_Move_Y;
+          CUR.func_move = Direct_Move_Y;
       }
     }
 
