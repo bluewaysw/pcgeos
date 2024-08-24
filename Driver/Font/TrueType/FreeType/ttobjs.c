@@ -890,11 +890,7 @@
 
     /* Scale the cvt values to the new ppem.          */
     /* We use by default the y ppem to scale the CVT. */
-
-    for ( i = 0; i < ins->cvtSize; ++i )
-      ins->cvt[i] = TT_MulDiv( face->cvt[i],
-                               ins->metrics.scale1,
-                               ins->metrics.scale2 );
+    MulDivList( ins->cvt, ins->cvtSize, face->cvt, ins->metrics.scale1, ins->metrics.scale2 );
 
     /* All twilight points are originally zero */
     for ( j = 0; j < ins->twilight.n_points; ++j )
