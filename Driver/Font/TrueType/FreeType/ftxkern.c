@@ -353,7 +353,7 @@ EC( ECCheckBounds( pairs ) );
       if ( FILE_Skip( sub->length ) )
         return error;
 
-      sub++;
+      ++sub;
     }
 
     /* that's fine, leave now */

@@ -420,7 +420,6 @@
                                 Short               n_contours,
                                 PExecution_Context  exec,
                                 PSubglyph_Record    subg,
-                                UShort              load_flags,
                                 TT_Stream           input )
   {
     DEFINE_LOAD_LOCALS( input );
@@ -489,13 +488,13 @@
       exec->is_composite     = TRUE;
 #ifdef TT_CONFIG_OPTION_SUPPORT_PEDANTIC_HINTING
       exec->pedantic_hinting = load_flags & TTLOAD_PEDANTIC;
-#endif
 
       error = Context_Run( exec );
 
-#ifdef TT_CONFIG_OPTION_SUPPORT_PEDANTIC_HINTING
       if (error && exec->pedantic_hinting)
         return error;
+#else
+      Context_Run( exec );
 #endif
     }
 
@@ -883,10 +882,10 @@
 
         FORGET_Frame();
 
-        k = 1 + 1;
+        k = 2;
 
         if ( new_flags & ARGS_ARE_WORDS )
-          k *= 2;
+          k <<= 1;
 
         if ( new_flags & WE_HAVE_A_SCALE )
           k += 2;
@@ -1087,7 +1086,6 @@
                                         num_contours,
                                         exec,
                                         subglyph,
-                                        load_flags,
                                         stream );
             if ( error )
               goto Fail;
