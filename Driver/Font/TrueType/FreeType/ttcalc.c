@@ -154,7 +154,7 @@
 
       MulTo64( a, b, &temp );
       temp2.hi = (TT_Int32)(c >> 31);
-      temp2.lo = (TT_Word32)(c << 1);
+      temp2.lo = (TT_Word32)(c >> 1);
       Add64( &temp, &temp2, &temp );
       a = Div64by32( &temp, c );
     }
