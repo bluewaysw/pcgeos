@@ -723,7 +723,7 @@
   {
     /* Reading a byte stream so there is no endianess (DaveP) */
     CUR.IP += 2;
-    return (Short)((CUR.code[CUR.IP - 2] << 8) + CUR.code[CUR.IP - 1]);
+    return (Short)((CUR.code[CUR.IP - 2] << 8) | CUR.code[CUR.IP - 1]);
   }
 
 
@@ -5246,7 +5246,7 @@
         {
           B = ((ULong)B & 0xF) - 8;
           if ( B >= 0 )
-            B++;
+            ++B;
           B = B * 64L / (1L << CUR.GS.delta_shift);
 
           CUR_Func_move( &CUR.zp0, A, B );
@@ -5307,9 +5307,6 @@
 
         switch ( CUR.opcode )
         {
-        case 0x73:
-          break;
-
         case 0x74:
           C += 16;
           break;
