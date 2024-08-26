@@ -424,8 +424,9 @@
   {
     DEFINE_LOAD_LOCALS( input );
 
-    UShort       k, n_ins;
     PGlyph_Zone  pts;
+    UShort       k;
+    UShort       n_ins = 0;
 
 
     if ( subg->is_hinted                    &&
@@ -451,8 +452,6 @@
       if ( error )
         return error;
     }
-    else
-      n_ins = 0;
 
 
     /* prepare the execution context */
@@ -1002,11 +1001,7 @@
 
           if ( subglyph2->is_scaled )
           {
-            TT_Matrix matrix;
-            matrix.xx = subglyph->transform.xx;
-            matrix.xy = subglyph->transform.xy;
-            matrix.yx = subglyph->transform.yx;
-            matrix.yy = subglyph->transform.yy;
+            TT_Matrix* matrix = &subglyph->transform;
 
             TransVecList( subglyph2->zone.cur, num_points, &matrix );
             TransVecList( subglyph2->zone.org, num_points, &matrix );
