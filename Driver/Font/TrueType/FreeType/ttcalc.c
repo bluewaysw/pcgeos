@@ -407,7 +407,7 @@ void  MulDivList( TT_Long*  a, UShort  n, TT_Short*  b, TT_Long  c, TT_Long  d )
   UShort i;
 
   for ( i = 0; i < n; ++i )
-    a[i] = TT_MulDiv( b[i], b, c );
+    a[i] = TT_MulDiv( b[i], c, d );
 }
 
 /* This convenience function applies a matrix  to a list of vectors.       */
