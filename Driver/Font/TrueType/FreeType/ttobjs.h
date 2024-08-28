@@ -806,15 +806,6 @@
 
   /********************************************************************/
   /*                                                                  */
-  /*   Handy scaling functions                                        */
-  /*                                                                  */
-  /********************************************************************/
-
-  LOCAL_DEF TT_Pos   Scale_X( PIns_Metrics  metrics, TT_Pos  x );
-  LOCAL_DEF TT_Pos   Scale_Y( PIns_Metrics  metrics, TT_Pos  y );
-
-  /********************************************************************/
-  /*                                                                  */
   /*   Component Initializer/Finalizer                                */
   /*                                                                  */
   /*   Called from 'freetype.c'                                       */
