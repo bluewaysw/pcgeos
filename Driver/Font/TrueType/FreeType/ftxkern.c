@@ -386,11 +386,8 @@ EC( ECCheckBounds( pairs ) );
 
 
     /* by convention */
-    if ( !kern )
+    if ( !kern || kern->nTables == 0 )
       return TT_Err_Ok;
-
-    if ( kern->nTables == 0 )
-      return TT_Err_Ok;      /* no tables to release */
 
     /* scan the table directory and release loaded entries */
 
@@ -423,9 +420,6 @@ EC( ECCheckBounds( pairs ) );
           sub->t.kern2.rowWidth = 0;
           break;
 #endif
-
-        default:
-          ;       /* invalid subtable format - do nothing */
         }
 
         sub->loaded   = FALSE;
@@ -435,7 +429,7 @@ EC( ECCheckBounds( pairs ) );
         sub->coverage = 0;
         sub->format   = 0;
       }
-      sub++;
+      ++sub;
     }
 
     FREE( kern->tables );
@@ -566,19 +560,11 @@ EC( ECCheckBounds( pairs ) );
   EXPORT_FUNC
   TT_Error  TT_Init_Kerning_Extension( void )
   {
-    PEngine_Instance  _engine = &engineInstance;
-    TT_Error          error;
-
-
-    if ( !_engine )
-      return TT_Err_Invalid_Engine;
-
-    error = TT_Register_Extension( _engine,
+    return TT_Register_Extension( &engineInstance,
                                 KERNING_ID,
                                 sizeof ( TT_Kerning ),
                                 Kerning_Create,
                                 Kerning_Destroy );
-    return error;
   }
 
 
