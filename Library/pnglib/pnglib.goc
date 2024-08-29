@@ -10,17 +10,10 @@ unsigned long swapEndian(unsigned long val)
 
 int abs(int x)
 {
-  if ( x >= 0 )
-  {
-    return(x);
-  }
-  else
-  {
-    return(0 - x);
-  }
-} /* abs */
+    return x >= 0 ? x : -x;
+}
 
-void unfilterImage(unsigned char *imageDataPtr, unsigned long width, unsigned long height, unsigned char bpp)
+void unfilterImage(unsigned char *imageDataPtr, unsigned long width, unsigned long height, unsigned char bpp, void (*callback)(unsigned char *data, size_t length))
 {
     unsigned long rowBytes = width * bpp;
     unsigned long rowPitch = rowBytes + 1;
@@ -74,122 +67,66 @@ void unfilterImage(unsigned char *imageDataPtr, unsigned long width, unsigned lo
                 }
             }
         }
+
+        // Invoke callback with slices of the unfiltered row
+        for (i = 0; i < rowBytes; i += CHUNK_SIZE) {
+            size_t chunkLen = (i + CHUNK_SIZE < rowBytes) ? CHUNK_SIZE : rowBytes - i;
+            callback(row + i, chunkLen);
+        }
+
         imageDataPtr += rowBytes;
     }
 }
 
-void writePPM(const char *filename, unsigned char *imageData, unsigned long width, unsigned long height, unsigned char bpp) {
-    FileHandle out;
-    unsigned long rowBytes = width * bpp;
-    unsigned long y;
-    unsigned long x;
-    const char buf[25] = {0};
-
-    out = FileCreate(filename, (FCF_NATIVE | FILE_ACCESS_W | FILE_DENY_RW | FILE_CREATE_TRUNCATE), 0);
-    if (!out) {
-        //printf("Error opening output file.\n");
-        return;
-    }
-
-    //fprintf(out, "P3\n%lu %lu\n255\n", width, height);
-
-    for (y = 0; y < height; ++y)
-    {
-        unsigned char *row = imageData + y * (rowBytes + 1);
-        for (x = 0; x < width; ++x)
-        {
-            unsigned char r = row[x * bpp];
-            unsigned char g = (bpp > 1) ? row[x * bpp + 1] : r;
-            unsigned char b = (bpp > 2) ? row[x * bpp + 2] : r;
-            sprintf(buf, "%u %u %u \n\0", r, g, b);
-            FileWrite(out, buf, strlen(buf) + 1, FALSE);
-        }
-    }
-
-    FileClose(out, FALSE);
-}
-
-// int argc, char *argv[]
-int _pascal convertPNG()
+void processPNGChunks(FileHandle file, void (*callback)(unsigned char *data, size_t length))
 {
-    //FILE *file;
     z_stream strm;
-    unsigned char buffer[CHUNK_SIZE];
+
+    MemHandle bufferHan = NullHandle;
+    unsigned char *buffer;
 
     MemHandle chunkDataHan = NullHandle;
-    unsigned char *chunkData = NULL;
+    unsigned char *chunkData;
+
     unsigned long width = 0, height = 0, bpp = 0;
     unsigned long rowBytes = 0;
-    unsigned long compressedSize = 0;
-    unsigned long totalDataSize = 0;
-    // unsigned long chunkDataSize = 0;
     int ret;
     struct ChunkHeader chdr;
     unsigned char *current;
     unsigned char *end;
     unsigned long dataSize;
-    size_t bytesRead;
-    FileHandle file;
-
-
-    file = FileOpen("FLUGZEUG.PNG", FILE_ACCESS_R | FILE_DENY_RW);
-    if (file == NullHandle) return 1;
-
+    size_t have;
 
     // Initialize zlib stream
     memset(&strm, 0, sizeof(strm));
-
     ret = inflateInit(&strm);
     if (ret != Z_OK) {
-        //printf("Error initializing zlib.\n");
-        FileClose(file, FALSE);
-        return 1;
+        return;
     }
 
+    chunkDataHan = MemAlloc(CHUNK_SIZE, HF_DYNAMIC, 0);
+    chunkData = MemLock(chunkDataHan);
 
-    // chunkData = (unsigned char *)malloc(DECOMPRESSED_CHUNK_SIZE);
-    chunkDataHan = MemAlloc(DECOMPRESSED_CHUNK_SIZE, HF_DYNAMIC, 0);
-    chunkData = (unsigned char *) MemLock(chunkDataHan);
-    if (!chunkData) {
-        //printf("Memory allocation failed.\n");
-        inflateEnd(&strm);
-        FileClose(file, FALSE);
-        return 1;
-    }
+    bufferHan = MemAlloc(CHUNK_SIZE, HF_DYNAMIC, 0);
+    buffer = MemLock(bufferHan);
 
-    /*
-
-    // Process PNG file
     while (1)
     {
-        // size_t bytesRead = fread(buffer, 1, CHUNK_SIZE, file);
-        bytesRead = FileRead(file, buffer, CHUNK_SIZE, FALSE); // -1: we will need to add a zero in the end, so we can't max out
-
-        if (bytesRead == 0)
-        {
-            //printf("Error reading file.\n");
-            free(chunkData);
-            inflateEnd(&strm);
-            FileClose(file, FALSE);
-            return 1;
-        }
+        size_t bytesRead = FileRead(file, buffer, CHUNK_SIZE, FALSE);
         if (bytesRead == 0)
         {
             break;  // End of file
         }
 
-        *current = (unsigned char) buffer;
-        *end = (unsigned char) buffer + bytesRead;
+        current = buffer;
+        end = buffer + bytesRead;
 
         while (current < end)
         {
-            if (current + sizeof(struct ChunkHeader) > end)
+            if ((current + sizeof(struct ChunkHeader)) > end)
             {
-                //printf("Unexpected end of chunk header.\n");
-                free(chunkData);
                 inflateEnd(&strm);
-                FileClose(file, FALSE);
-                return 1;
+                return;  // Unexpected end of chunk header
             }
 
             memcpy(&chdr, current, sizeof(struct ChunkHeader));
@@ -197,23 +134,23 @@ int _pascal convertPNG()
             dataSize = chdr.dataSize;
             current += sizeof(struct ChunkHeader);
 
-            if (current + dataSize > end)
+            writePPMChunk(_TEXT("dummy!"), 6);
+
+            if ((current + dataSize) > end)
             {
-                //printf("Chunk data extends beyond buffer boundary.\n");
-                free(chunkData);
                 inflateEnd(&strm);
-                FileClose(file, FALSE);
-                return 1;
+                MemUnlock(bufferHan); MemFree(bufferHan);
+                MemUnlock(chunkDataHan); MemFree(chunkDataHan);
+                return;  // Chunk data extends beyond buffer boundary
             }
 
             if (chdr.chunkType == HEADER_CHUNK)
             {
                 struct IHDRChunk ihdr;
+
                 memcpy(&ihdr, current, sizeof(struct IHDRChunk));
                 width = swapEndian(ihdr.Width);
                 height = swapEndian(ihdr.Height);
-                // assert(ihdr.BitDepth == 8);
-                // assert(ihdr.Compression == 0 && ihdr.Filter == 0 && ihdr.Interlace == 0);
 
                 switch (ihdr.ColorType) {
                     case 2: bpp = 3; break;  // RGB
@@ -223,53 +160,35 @@ int _pascal convertPNG()
                 }
 
                 rowBytes = width * bpp;
-                totalDataSize = (width * bpp + 1) * height;
             }
             else if (chdr.chunkType == IMAGE_DATA_CHUNK)
             {
-                unsigned long remainingDataSize = dataSize;
-                while (remainingDataSize > 0)
+                strm.avail_in = dataSize;
+                strm.next_in = current;
+
+                while (strm.avail_in > 0)
                 {
-                    size_t chunkSize = (remainingDataSize < CHUNK_SIZE) ? remainingDataSize : CHUNK_SIZE;
-                    if (compressedSize + chunkSize > totalDataSize)
+                    strm.avail_out = CHUNK_SIZE;
+                    strm.next_out = chunkData;
+
+                    ret = inflate(&strm, Z_NO_FLUSH);
+                    if (ret != Z_OK && ret != Z_STREAM_END)
                     {
-                        //printf("Compressed data too large.\n");
-                        free(chunkData);
                         inflateEnd(&strm);
-                        FileClose(file, FALSE);
-                        return 1;
+                        MemUnlock(bufferHan); MemFree(bufferHan);
+                        MemUnlock(chunkDataHan); MemFree(chunkDataHan);
+                        return;
                     }
 
-                    memcpy(chunkData + compressedSize, current, chunkSize);
-                    compressedSize += chunkSize;
-                    current += chunkSize;
-                    remainingDataSize -= chunkSize;
-
-                    // Decompress data if enough data is accumulated
-                    if (compressedSize >= totalDataSize)
+                    have = CHUNK_SIZE - strm.avail_out;
+                    if (have > 0)
                     {
-                        strm.avail_in = compressedSize;
-                        strm.next_in = chunkData;
-                        strm.avail_out = totalDataSize;
-                        strm.next_out = chunkData;
+                        unfilterImage(chunkData, width, height, bpp, callback);
+                    }
 
-                        ret = inflate(&strm, Z_NO_FLUSH);
-                        if (ret != Z_OK && ret != Z_STREAM_END)
-                        {
-                            //printf("Error decompressing image data.\n");
-                            free(chunkData);
-                            inflateEnd(&strm);
-                            FileClose(file, FALSE);
-                            return 1;
-                        }
-
-                        // Unfilter and write data
-                        unfilterImage(chunkData, width, height, bpp);
-                        writePPM("output.ppm", chunkData, width, height, bpp);
-
-                        // Reset for the next chunk
-                        compressedSize = 0;
-                        totalDataSize = (width * bpp + 1) * height;
+                    if (ret == Z_STREAM_END)
+                    {
+                        break;
                     }
                 }
             }
@@ -282,13 +201,38 @@ int _pascal convertPNG()
         }
     }
 
-    // Clean up
     inflateEnd(&strm);
-*/
-    MemUnlock(chunkDataHan);
-    MemFree(chunkDataHan);
+    MemUnlock(bufferHan); MemFree(bufferHan);
+    MemUnlock(chunkDataHan); MemFree(chunkDataHan);
+}
+
+void writePPMChunk(unsigned char *data, size_t length) {
+    static FileHandle out = NULL;
+
+    if (!out) {
+        out = FileCreate("output.ppm", (FCF_NATIVE | FILE_ACCESS_W | FILE_DENY_RW | FILE_CREATE_TRUNCATE), 0);
+        if (!out) {
+            return;
+        }
+    }
+
+    FileWrite(out, data, length, FALSE);
+}
+
+int _pascal _export convertPNG()
+{
+    FileHandle file;
+
+    FilePushDir();
+    FileSetStandardPath(SP_DOCUMENT);
+
+    file = FileOpen("FLUGZEUG.PNG", FILE_ACCESS_R | FILE_DENY_RW);
+    if (file == NullHandle) return 1;
+
+    processPNGChunks(file, writePPMChunk);
 
     FileClose(file, FALSE);
+    FilePopDir();
 
     return 0;
 }
