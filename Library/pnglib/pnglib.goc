@@ -13,6 +13,25 @@ unsigned long swapEndian(unsigned long val)
            ((val << 24) & 0xFF000000);
 }
 
+// Funktion zum Überprüfen des PNG-Headers
+int checkPNGHeader(FileHandle file)
+{
+    unsigned char header[8];
+
+    // Lese die ersten 8 Bytes ein
+    if (FileRead(file, header, 8, FALSE) != 8) {
+        return 0;
+    }
+
+    // Vergleiche die gelesenen Bytes mit der PNG-Signatur
+    if (memcmp(header, PNG_SIGNATURE, 8) != 0) {
+        return 0;
+    }
+
+    // PNG-Signatur ist korrekt
+    return 1;
+}
+
 // Paeth-Prädiktor-Funktion
 static inline unsigned char paethPredictor(int a, int b, int c)
 {
@@ -27,7 +46,7 @@ static inline unsigned char paethPredictor(int a, int b, int c)
 }
 
 // Unfilter-Funktion zur Verarbeitung der PNG-Bilddaten
-void unfilterImage(unsigned char *data, unsigned long width, unsigned char bpp, unsigned char *previousRow, void (*callback)(unsigned char *data, unsigned long length, unsigned long width, unsigned long height))
+void unfilterImage(unsigned char *data, unsigned long width, unsigned long height, unsigned char bpp, unsigned char *previousRow, void (*callback)(unsigned char *data, unsigned long length))
 {
     unsigned char *currentRow = data;
     unsigned char filterType = *currentRow;
@@ -77,14 +96,14 @@ void unfilterImage(unsigned char *data, unsigned long width, unsigned char bpp, 
     }
 
     // Rufe den Callback mit den dekodierten Bilddaten auf
-    callback(currentRow, rowBytes, width, height);
+    callback(currentRow, rowBytes);
 
     // Zeilenzeiger aktualisieren
     memcpy(previousRow, currentRow, rowBytes);
 }
 
 // Verarbeitung von IDAT-Chunks
-void processIDATChunks(FileHandle file, unsigned long length, unsigned long width, unsigned char bpp, unsigned long height, void (*callback)(unsigned char *data, unsigned long length, unsigned long width, unsigned long height))
+void processIDATChunks(FileHandle file, unsigned long length, unsigned long width, unsigned long height, unsigned char bpp, void (*callback)(unsigned char *data, unsigned long length))
 {
     z_stream strm;
     int ret;
@@ -160,7 +179,10 @@ void processIDATChunks(FileHandle file, unsigned long length, unsigned long widt
                 return;
             }
             have = CHUNK_SIZE - strm.avail_out;
-            unfilterImage(out, width, bpp, previousRow, callback);
+            if (have > 0)
+            {
+                unfilterImage(out, width, height, bpp, previousRow, callback);
+            }
         } while (strm.avail_out == 0);
 
         length -= bytesToRead;
@@ -174,27 +196,9 @@ void processIDATChunks(FileHandle file, unsigned long length, unsigned long widt
     MemFree(previousRowHandle);
 }
 
-// Funktion zum Überprüfen des PNG-Headers
-int checkPNGHeader(FileHandle file)
-{
-    unsigned char header[8];
-
-    // Lese die ersten 8 Bytes ein
-    if (FileRead(file, header, 8, FALSE) != 8) {
-        return 0;
-    }
-
-    // Vergleiche die gelesenen Bytes mit der PNG-Signatur
-    if (memcmp(header, PNG_SIGNATURE, 8) != 0) {
-        return 0;
-    }
-
-    // PNG-Signatur ist korrekt
-    return 1;
-}
 
 // Hauptfunktion zur Verarbeitung von PNG-Chunks
-void processPNGChunks(FileHandle file, void (*callback)(unsigned char *data, unsigned long length, unsigned long width, unsigned long height))
+void processPNGChunks(FileHandle file, void (*callback)(unsigned char *data, unsigned long length))
 {
     IHDRData ihdrData;
     ChunkHeader chdr;
@@ -223,7 +227,7 @@ void processPNGChunks(FileHandle file, void (*callback)(unsigned char *data, uns
             case CHUNK_IDAT:
             {
                 // Verarbeite IDAT-Chunks und rufe den Callback für die Bilddaten auf
-                processIDATChunks(file, chdr.length, ihdrData.width, ihdrData.bitDepth / 8, ihdrData.height, callback);
+                processIDATChunks(file, chdr.length, ihdrData.width, ihdrData.height, ihdrData.bitDepth / 8, callback);
                 break;
             }
             case CHUNK_IEND:
@@ -245,31 +249,27 @@ void processPNGChunks(FileHandle file, void (*callback)(unsigned char *data, uns
 }
 
 // Callback-Funktion zum Schreiben der Bilddaten ins NetPBM-Format (PPM)
-void writePPMChunk(unsigned char *data, unsigned long length, unsigned long width, unsigned long height)
+void writePPMChunk(unsigned char *data, unsigned long length)
 {
     FileHandle outputFile;
-    unsigned long linesWritten = 0;
 
-    outputFile = FileCreate("output.ppm", (FCF_NATIVE | FILE_ACCESS_W | FILE_DENY_RW | FILE_CREATE_TRUNCATE), 0);
+    outputFile = FileOpen("output.ppm", FILE_ACCESS_W | FILE_DENY_RW);
 
     // PPM-Header schreiben (Angenommen RGB, 8-Bit pro Kanal)
     // FileWrite(outputFile, "P6\n%lu %lu\n255\n", width, height);
-
-    // Schreibe die dekomprimierten Bilddaten ins PPM-Format
-    if (FileWrite(outputFile, data, length, FALSE) != length)
+    if (outputFile)
     {
-        // Fehler beim Schreiben in die Ausgabedatei
-        return;
-    }
-    linesWritten += length / (width * 3);  // Zählt die geschriebenen Zeilen
+        // Schreibe die dekomprimierten Bilddaten ins PPM-Format
+        if (FileWrite(outputFile, data, length, FALSE) != length)
+        {
+            // Fehler beim Schreiben in die Ausgabedatei
+            // return;
+        }
 
-    // Wenn alle Zeilen geschrieben wurden, schließe die Datei
-    if (linesWritten >= height)
-    {
         FileClose(outputFile, FALSE);
-        outputFile = NULL;
-        linesWritten = 0;  // Zurücksetzen für zukünftige Aufrufe
     }
+
+    return;
 }
 
 int convertPNG()
