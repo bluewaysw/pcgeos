@@ -7,42 +7,45 @@
 #include "file.h"
 #include "heap.h"
 
-#pragma pack(push, 1)
+// PNG-Chunks
+#define CHUNK_IHDR 0x49484452  // "IHDR"
+#define CHUNK_IDAT 0x49444154  // "IDAT"
+#define CHUNK_IEND 0x49454E44  // "IEND"
 
-struct ChunkHeader {
-    unsigned long dataSize;
-    unsigned long chunkType;
-};
+#define CHUNK_SIZE 8192  // 8 KB Häppchen
 
-struct IHDRChunk {
-    unsigned long Width;
-    unsigned long Height;
-    unsigned char BitDepth;
-    unsigned char ColorType;
-    unsigned char Compression;
-    unsigned char Filter;
-    unsigned char Interlace;
-};
+// Struktur für die IHDR-Daten
+typedef struct {
+    unsigned long width;
+    unsigned long height;
+    unsigned char bitDepth;
+    unsigned char colorType;
+    unsigned char compressionMethod;
+    unsigned char filterMethod;
+    unsigned char interlaceMethod;
+} IHDRData;
 
-#pragma pack(pop)
+// Struktur für den ChunkHeader
+typedef struct {
+    unsigned long length;
+    unsigned long type;
+} ChunkHeader;
 
-#define HEADER_CHUNK 0x52444849  // 'IHDR' in little-endian
-#define IMAGE_DATA_CHUNK 0x54414449  // 'IDAT' in little-endian
-#define END_CHUNK 0x444E4549  // 'IEND' in little-endian
+const unsigned char PNG_SIGNATURE[8] = {0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A};
 
-enum LineFilter {
-    LFNone = 0,
-    LFSub = 1,
-    LFUp = 2,
-    LFAverage = 3,
-    LFPaeth = 4
-};
+// Filtertypen gemäß PNG-Spezifikation
+#define FILTER_NONE    0
+#define FILTER_SUB     1
+#define FILTER_UP      2
+#define FILTER_AVERAGE 3
+#define FILTER_PAETH   4
 
-#define CHUNK_SIZE 8192  // Size for reading chunks
-
-unsigned long swapEndian(unsigned long val);
 int abs(int x);
-void unfilterImage(unsigned char *imageDataPtr, unsigned long width, unsigned long height, unsigned char bpp, void (*callback)(unsigned char *data, unsigned long length));
-void processPNGChunks(FileHandle file, void (*callback)(unsigned char *data, unsigned long length));
-void writePPMChunk(unsigned char *data, unsigned long length);
+unsigned long swapEndian(unsigned long val);
+static inline unsigned char paethPredictor(int a, int b, int c);
+void unfilterImage(unsigned char *data, unsigned long width, unsigned char bpp, unsigned char *previousRow, void (*callback)(unsigned char *data, unsigned long length, unsigned long width, unsigned long height));
+void processIDATChunks(FileHandle file, unsigned long length, unsigned long width, unsigned char bpp, unsigned long height, void (*callback)(unsigned char *data, unsigned long length, unsigned long width, unsigned long height));
+void processPNGChunks(FileHandle file, void (*callback)(unsigned char *data, unsigned long length, unsigned long width, unsigned long height));
+void writePPMChunk(unsigned char *data, unsigned long length, unsigned long width, unsigned long height);
+int checkPNGHeader(FileHandle file);
 int _pascal _export convertPNG();
