@@ -13,7 +13,7 @@ int abs(int x)
     return x >= 0 ? x : -x;
 }
 
-void unfilterImage(unsigned char *imageDataPtr, unsigned long width, unsigned long height, unsigned char bpp, void (*callback)(unsigned char *data, size_t length))
+void unfilterImage(unsigned char *imageDataPtr, unsigned long width, unsigned long height, unsigned char bpp, void (*callback)(unsigned char *data, unsigned long length))
 {
     unsigned long rowBytes = width * bpp;
     unsigned long rowPitch = rowBytes + 1;
@@ -69,8 +69,9 @@ void unfilterImage(unsigned char *imageDataPtr, unsigned long width, unsigned lo
         }
 
         // Invoke callback with slices of the unfiltered row
-        for (i = 0; i < rowBytes; i += CHUNK_SIZE) {
-            size_t chunkLen = (i + CHUNK_SIZE < rowBytes) ? CHUNK_SIZE : rowBytes - i;
+        for (i = 0; i < rowBytes; i += CHUNK_SIZE)
+        {
+            unsigned long chunkLen = (i + CHUNK_SIZE < rowBytes) ? CHUNK_SIZE : rowBytes - i;
             callback(row + i, chunkLen);
         }
 
@@ -78,10 +79,9 @@ void unfilterImage(unsigned char *imageDataPtr, unsigned long width, unsigned lo
     }
 }
 
-void processPNGChunks(FileHandle file, void (*callback)(unsigned char *data, size_t length))
+void processPNGChunks(FileHandle file, void (*callback)(unsigned char *data, unsigned long length))
 {
     z_stream strm;
-
     MemHandle bufferHan = NullHandle;
     unsigned char *buffer;
 
@@ -95,7 +95,12 @@ void processPNGChunks(FileHandle file, void (*callback)(unsigned char *data, siz
     unsigned char *current;
     unsigned char *end;
     unsigned long dataSize;
-    size_t have;
+    unsigned long have;
+    unsigned long remainingBytes = 0;
+    int inIDAT = 0;
+    unsigned long bytesRead = 0;
+    struct IHDRChunk ihdr;
+    unsigned long chunkBytes = 0;
 
     // Initialize zlib stream
     memset(&strm, 0, sizeof(strm));
@@ -104,66 +109,52 @@ void processPNGChunks(FileHandle file, void (*callback)(unsigned char *data, siz
         return;
     }
 
-    chunkDataHan = MemAlloc(CHUNK_SIZE, HF_DYNAMIC, 0);
+    chunkDataHan = MemAlloc(CHUNK_SIZE, HF_SHARABLE | HF_SWAPABLE, HAF_ZERO_INIT);
     chunkData = MemLock(chunkDataHan);
 
-    bufferHan = MemAlloc(CHUNK_SIZE, HF_DYNAMIC, 0);
+    bufferHan = MemAlloc(CHUNK_SIZE, HF_SHARABLE | HF_SWAPABLE, HAF_ZERO_INIT);
     buffer = MemLock(bufferHan);
 
     while (1)
     {
-        size_t bytesRead = FileRead(file, buffer, CHUNK_SIZE, FALSE);
-        if (bytesRead == 0)
+        bytesRead = FileRead(file, (buffer + remainingBytes), (CHUNK_SIZE - remainingBytes), FALSE);
+        if (bytesRead == 0 && remainingBytes == 0)
         {
             break;  // End of file
         }
 
         current = buffer;
-        end = buffer + bytesRead;
+        end = buffer + bytesRead + remainingBytes;
 
         while (current < end)
         {
-            if ((current + sizeof(struct ChunkHeader)) > end)
+            if ((current + sizeof(struct ChunkHeader)) > end && !inIDAT)
             {
-                inflateEnd(&strm);
-                return;  // Unexpected end of chunk header
+                // Move partial data to the beginning of the buffer
+                remainingBytes = end - current;
+                memmove(buffer, current, remainingBytes);
+                break;
             }
 
-            memcpy(&chdr, current, sizeof(struct ChunkHeader));
-            chdr.dataSize = swapEndian(chdr.dataSize);
-            dataSize = chdr.dataSize;
-            current += sizeof(struct ChunkHeader);
-
-            writePPMChunk(_TEXT("dummy!"), 6);
-
-            if ((current + dataSize) > end)
+            if (!inIDAT)
             {
-                inflateEnd(&strm);
-                MemUnlock(bufferHan); MemFree(bufferHan);
-                MemUnlock(chunkDataHan); MemFree(chunkDataHan);
-                return;  // Chunk data extends beyond buffer boundary
+                memcpy(&chdr, current, sizeof(struct ChunkHeader));
+                chdr.dataSize = swapEndian(chdr.dataSize);
+                dataSize = chdr.dataSize;
+                current += sizeof(struct ChunkHeader);
+
+                inIDAT = (chdr.chunkType == IMAGE_DATA_CHUNK);
             }
 
-            if (chdr.chunkType == HEADER_CHUNK)
+            if (inIDAT)
             {
-                struct IHDRChunk ihdr;
-
-                memcpy(&ihdr, current, sizeof(struct IHDRChunk));
-                width = swapEndian(ihdr.Width);
-                height = swapEndian(ihdr.Height);
-
-                switch (ihdr.ColorType) {
-                    case 2: bpp = 3; break;  // RGB
-                    case 4: bpp = 2; break;  // Grayscale + Alpha
-                    case 6: bpp = 4; break;  // RGBA
-                    default: bpp = 1; break; // Grayscale
+                chunkBytes = end - current;
+                if (chunkBytes > dataSize)
+                {
+                    chunkBytes = dataSize;
                 }
 
-                rowBytes = width * bpp;
-            }
-            else if (chdr.chunkType == IMAGE_DATA_CHUNK)
-            {
-                strm.avail_in = dataSize;
+                strm.avail_in = chunkBytes;
                 strm.next_in = current;
 
                 while (strm.avail_in > 0)
@@ -183,21 +174,59 @@ void processPNGChunks(FileHandle file, void (*callback)(unsigned char *data, siz
                     have = CHUNK_SIZE - strm.avail_out;
                     if (have > 0)
                     {
-                        unfilterImage(chunkData, width, height, bpp, callback);
+                        // Pass the decompressed data to unfilterImage
+                        //unfilterImage(chunkData, width, height, bpp, callback);
+                        //callback("dummy!", 6);
+                        writePPMChunk("dummy!", 6);
                     }
 
                     if (ret == Z_STREAM_END)
                     {
+                        inIDAT = 0;
                         break;
                     }
                 }
+
+                current += chunkBytes;
+                dataSize -= chunkBytes;
+
+                if (dataSize == 0)
+                {
+                    inIDAT = 0;
+                    current += 4;  // Skip CRC
+                }
+
+            }
+            else if (chdr.chunkType == HEADER_CHUNK)
+            {
+                memcpy(&ihdr, current, sizeof(struct IHDRChunk));
+                width = swapEndian(ihdr.Width);
+                height = swapEndian(ihdr.Height);
+
+                switch (ihdr.ColorType) {
+                    case 2: bpp = 3; break;  // RGB
+                    case 4: bpp = 2; break;  // Grayscale + Alpha
+                    case 6: bpp = 4; break;  // RGBA
+                    default: bpp = 1; break; // Grayscale
+                }
+
+                rowBytes = width * bpp;
+                current += dataSize + 4;  // Skip to next chunk, including CRC
             }
             else if (chdr.chunkType == END_CHUNK)
             {
                 break;
             }
+            else
+            {
+                current += dataSize + 4;  // Skip to next chunk, including CRC
+            }
+        }
 
-            current += dataSize + 4;  // Move to the next chunk, skip CRC
+        remainingBytes = end - current;
+        if (remainingBytes > 0)
+        {
+            memmove(buffer, current, remainingBytes);
         }
     }
 
@@ -206,7 +235,7 @@ void processPNGChunks(FileHandle file, void (*callback)(unsigned char *data, siz
     MemUnlock(chunkDataHan); MemFree(chunkDataHan);
 }
 
-void writePPMChunk(unsigned char *data, size_t length) {
+void writePPMChunk(unsigned char *data, unsigned long length) {
     static FileHandle out = NULL;
 
     if (!out) {
