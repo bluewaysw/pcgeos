@@ -3068,15 +3068,11 @@
 
   static void  Ins_IF( INS_ARG )
   {
-    Int   nIfs;
-    Bool  Out;
+    Int   nIfs = 1;
 
 
     if ( args[0] != 0 )
       return;
-
-    nIfs = 1;
-    Out = 0;
 
     do
     {
@@ -3090,15 +3086,15 @@
         break;
 
       case 0x1b:      /* ELSE */
-        Out = (nIfs == 1);
+        if (nIfs == 1) return;
         break;
 
       case 0x59:      /* EIF */
         --nIfs;
-        Out = (nIfs == 0);
+        if (nIfs == 0) return;
         break;
       }
-    } while ( Out == 0 );
+    } while ( TRUE );
   }
 
 
