@@ -1284,9 +1284,6 @@
     TT_Error      error;
 
 
-    face_cache = 0;
-    exec_cache = 0;
-
     if ( ALLOC( face_cache, sizeof ( TCache ) ) ||
          ALLOC( exec_cache, sizeof ( TCache ) ) )
       goto Fail;
