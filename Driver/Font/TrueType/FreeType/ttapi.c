@@ -51,7 +51,7 @@ extern TEngine_Instance engineInstance;
 #ifdef TT_STATIC_RASTER
 #define RAS_OPS  /* void */
 #else
-#define RAS_OPS  ((TRaster_Instance*)_engine->raster_component),
+#define RAS_OPS ((TRaster_Instance*) engineInstance.raster_component),
 #endif /* TT_STATIC_RASTER */
 
 
@@ -209,14 +209,12 @@ extern TEngine_Instance engineInstance;
     /* Set the handle */
     HANDLE_Set( *face, _face );
 
-    if ( error )
-      goto Fail;
+    if (error) {
+        TT_Close_Stream(&stream);
+        return error;
+    }
 
     return TT_Err_Ok;
-
-  Fail:
-    TT_Close_Stream( &stream );
-    return error;
   }
 
 
@@ -901,12 +899,10 @@ extern TEngine_Instance engineInstance;
                            TT_UShort    glyphIndex,
                            TT_UShort    loadFlags   )
   {
-    PInstance  _ins;
-    PGlyph     _glyph;
+    PInstance  _ins   = HANDLE_Instance( instance );
+    PGlyph     _glyph = HANDLE_Glyph( glyph );
     TT_Error   error;
 
-
-    _ins = HANDLE_Instance( instance );
 
     if ( !_ins )
       loadFlags &= ~(TTLOAD_SCALE_GLYPH | TTLOAD_HINT_GLYPH);
@@ -914,7 +910,6 @@ extern TEngine_Instance engineInstance;
     if ( (loadFlags & TTLOAD_SCALE_GLYPH) == 0 )
       _ins = 0;
 
-    _glyph = HANDLE_Glyph( glyph );
     if ( !_glyph )
       return TT_Err_Invalid_Glyph_Handle;
 
@@ -1193,9 +1188,6 @@ extern TEngine_Instance engineInstance;
   TT_Error  TT_Get_Outline_Bitmap( TT_Outline*     outline,
                                    TT_Raster_Map*  map )
   {
-    PEngine_Instance  _engine = &engineInstance;
-
-
     if ( !outline || !map )
       return TT_Err_Invalid_Argument;
 
@@ -1224,9 +1216,6 @@ EXPORT_FUNC
 TT_Error  TT_Get_Outline_Region( TT_Outline*     outline,
                                  TT_Raster_Map*  map )
 {
-  PEngine_Instance  _engine = &engineInstance;
-
-
   if ( !outline || !map )
     return TT_Err_Invalid_Argument;
 
