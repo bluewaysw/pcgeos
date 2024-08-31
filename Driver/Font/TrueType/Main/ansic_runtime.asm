@@ -85,24 +85,23 @@ ttcalc_TEXT	SEGMENT BYTE PUBLIC 'CODE'
 	.386
 	__U4D proc far
 
-	push dx							;push dividend in dx:ax to stack
-	push ax
-	push cx							;push divisor in cx:bx to stack
-	push bx
-	
-	pop ecx							;pop divisor from stack to ecx
-	pop eax							;pop low qword from stack to eax
-	mov edx, 0h						;set high qword of dividend to 0h
+	shl edx, 16		;edx <- high dividend
+	mov dx, ax		;dx <- low dividend
 
-	div ecx							;unsigned divide	
+	shl ecx, 16		;ecx <- high divisor
+	mov cx, bx		;cx <- low divisor
 
-	push eax						;push quotient to stack
-	push edx						;push remainder to stack
+	mov eax, edx		;eax <- dividend
 
-	pop bx							;pop low word of remainder from stack to bx
-	pop cx							;pop high word of remainder from stack to cx
-	pop ax							;pop low word of qoutient from stack to ax
-	pop dx							;pop high word of qoutient from stack to dx
+	mov edx, 0h		;set high qword of dividend to 0h
+	div ecx			;unsigned divide
+
+	mov ecx, edx		
+	mov bx, cx		;bx <- low remainder
+	shr ecx, 16		;cx <- high remainder
+
+	mov edx, eax		;ax <- low qoutient
+	shr edx, 16 		;dx <- high qoutient	
 	
 	ret
 	__U4D endp
@@ -119,29 +118,28 @@ ttcalc_TEXT	SEGMENT BYTE PUBLIC 'CODE'
 ;	dx:ax	qoutient
 ;	cx:bx	remainder
 ;
-; Note: This is a temporary implementation. This function must be reimplemented in 8086 assembler instructions.
+; Note: This is an implementation with 80386.
 	
 	.386
 	__I4D proc far
 
-	push dx							;push dividend in dx:ax to stack
-	push ax
-	push cx							;push divisor in cx:bx to stack
-	push bx
-	
-	pop ecx							;pop divisor from stack to ecx
-	pop eax							;pop low qword from stack to eax
-	
-	cdq								;extend dividend in eax to edx:eax
-	idiv ecx						;signed divide	
+	shl edx, 16		;edx <- high dividend
+	mov dx, ax		;dx <- low dividend
 
-	push eax						;push quotient to stack
-	push edx						;push remainder to stack
+	shl ecx, 16		;ecx <- high divisor
+	mov cx, bx		;cx <- low divisor
 
-	pop bx							;pop low word of remainder from stack to bx
-	pop cx							;pop high word of remainder from stack to cx
-	pop ax							;pop low word of quotient from stack to ax
-	pop dx							;pop high word of quotient from stack to dx
+	mov eax, edx		;eax <- dividend
+	
+	cdq			;extend dividend in eax to edx:eax
+	idiv ecx		;signed divide
+
+	mov ecx, edx		
+	mov bx, cx		;bx <- low remainder
+	shr ecx, 16		;cx <- high remainder
+
+	mov edx, eax		;ax <- low qoutient
+	shr edx, 16 		;dx <- high qoutient
 	
 	ret
 	__I4D endp
