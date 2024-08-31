@@ -46,26 +46,50 @@ static inline unsigned char paethPredictor(int a, int b, int c)
 }
 
 // Unfilter-Funktion zur Verarbeitung der PNG-Bilddaten
-void unfilterImage(unsigned char *data, unsigned long width, unsigned long height, unsigned char bpp, unsigned char *previousRow, void (*callback)(unsigned char *data, unsigned long length))
+void unfilterImage(unsigned char *data, unsigned long width, unsigned char bitDepth, unsigned char colorType, unsigned char *previousRow)
 {
     unsigned char *currentRow = data;
     unsigned char filterType = *currentRow;
-    unsigned long rowBytes = width * bpp;
+    unsigned long rowBytes;
+    unsigned long bytesPerPixel; // Bytes per Pixel
     unsigned long i;
 
+    // Calculate bytesPerPixel based on colorType and bitDepth
+    switch (colorType) {
+        case 0: // Grayscale
+            bytesPerPixel = (bitDepth + 7) / 8; // Round up to full bytes
+            break;
+        case 2: // Truecolor (RGB)
+            bytesPerPixel = 3 * ((bitDepth + 7) / 8);
+            break;
+        case 3: // Indexed color
+            bytesPerPixel = (bitDepth + 7) / 8;
+            break;
+        case 4: // Grayscale with Alpha
+            bytesPerPixel = 2 * ((bitDepth + 7) / 8);
+            break;
+        case 6: // Truecolor with Alpha (RGBA)
+            bytesPerPixel = 4 * ((bitDepth + 7) / 8);
+            break;
+        default:
+            // Unsupported color type
+            return;
+    }
 
-    // Pointer zum ersten Byte nach dem Filtertyp
+    rowBytes = width * bytesPerPixel;
+
+    // Pointer to the first byte after the filter type
     currentRow++;
 
-    // Filter anwenden
+    // Apply the filter
     switch (filterType)
     {
         case FILTER_NONE:
-            // Kein Filter, Daten direkt kopieren
+            // No filter, data is already in place
             break;
         case FILTER_SUB:
-            for (i = bpp; i < rowBytes; i++) {
-                currentRow[i] += currentRow[i - bpp];
+            for (i = bytesPerPixel; i < rowBytes; i++) {
+                currentRow[i] += currentRow[i - bytesPerPixel];
             }
             break;
         case FILTER_UP:
@@ -76,7 +100,7 @@ void unfilterImage(unsigned char *data, unsigned long width, unsigned long heigh
         case FILTER_AVERAGE:
             for (i = 0; i < rowBytes; i++)
             {
-                unsigned char left = (i >= bpp) ? currentRow[i - bpp] : 0;
+                unsigned char left = (i >= bytesPerPixel) ? currentRow[i - bytesPerPixel] : 0;
                 unsigned char up = previousRow[i];
                 currentRow[i] += (left + up) / 2;
             }
@@ -84,82 +108,108 @@ void unfilterImage(unsigned char *data, unsigned long width, unsigned long heigh
         case FILTER_PAETH:
             for (i = 0; i < rowBytes; i++)
             {
-                unsigned char left = (i >= bpp) ? currentRow[i - bpp] : 0;
+                unsigned char left = (i >= bytesPerPixel) ? currentRow[i - bytesPerPixel] : 0;
                 unsigned char up = previousRow[i];
-                unsigned char upLeft = (i >= bpp) ? previousRow[i - bpp] : 0;
+                unsigned char upLeft = (i >= bytesPerPixel) ? previousRow[i - bytesPerPixel] : 0;
                 currentRow[i] += paethPredictor(left, up, upLeft);
             }
             break;
         default:
-            // Ungültiger Filtertyp
+            // Invalid filter type
             return;
     }
 
-    // Rufe den Callback mit den dekodierten Bilddaten auf
-    //callback(currentRow, rowBytes);
-    writePPMChunk(currentRow, rowBytes);
-
-    // Zeilenzeiger aktualisieren
-    memcpy(previousRow, currentRow, rowBytes);
+    // Write out the unfiltered image data (without the filter byte)
+    writePPMChunk(currentRow, rowBytes - 1, width, 1); // Adjust rowBytes by -1 to exclude the filter byte
 }
 
 // Verarbeitung von IDAT-Chunks
-void processIDATChunks(FileHandle file, unsigned long length, unsigned long width, unsigned long height, unsigned char bpp, void (*callback)(unsigned char *data, unsigned long length))
+void processIDATChunks(FileHandle file, unsigned long length, unsigned long width, unsigned long height, unsigned char bitDepth, unsigned char colorType)
 {
     z_stream strm;
     int ret;
     unsigned long have;
     unsigned long bytesToRead;
+    unsigned long rowBytes;
     MemHandle inHan = NullHandle;
     unsigned char *in = NULL;
     MemHandle outHan = NullHandle;
     unsigned char *out = NULL;
+    MemHandle rowBufferHan = NullHandle;
+    unsigned char *rowBuffer = NULL;
+    unsigned long rowBufferOffset = 0;
     MemHandle previousRowHandle = NullHandle;
     unsigned char *previousRow = NULL;
+    unsigned long toCopy;
+    unsigned char *src = out;
 
-    // Speicher für die vorherige Zeile (wenn noch nicht zugewiesen)
-    if (!previousRow)
-    {
-        previousRowHandle = MemAlloc((width * bpp), HF_SHARABLE | HF_SWAPABLE, HAF_ZERO_INIT);
-        previousRow = MemLock(previousRowHandle);
-
-        if (previousRow == NULL) {
+    // Calculate the number of bits per pixel based on bitDepth and colorType
+    unsigned long bitsPerPixel;
+    switch (colorType) {
+        case 0: // Grayscale
+            bitsPerPixel = bitDepth;
+            break;
+        case 2: // Truecolor (RGB)
+            bitsPerPixel = 3 * bitDepth;
+            break;
+        case 3: // Indexed color
+            bitsPerPixel = bitDepth;
+            break;
+        case 4: // Grayscale with Alpha
+            bitsPerPixel = 2 * bitDepth;
+            break;
+        case 6: // Truecolor with Alpha (RGBA)
+            bitsPerPixel = 4 * bitDepth;
+            break;
+        default:
+            // Unsupported color type
             return;
-        }
     }
 
+    rowBytes = (width * bitsPerPixel + 7) / 8; // Round up to the next whole byte
+
+    // Allocate memory for the previous row
+    previousRowHandle = MemAlloc(rowBytes, HF_SHARABLE | HF_SWAPABLE, HAF_ZERO_INIT);
+    previousRow = MemLock(previousRowHandle);
+
+    // Input - decoded zlib data
     inHan = MemAlloc(CHUNK_SIZE, HF_SHARABLE | HF_SWAPABLE, HAF_ZERO_INIT);
     in = MemLock(inHan);
 
+    // Output - undecoded data
     outHan = MemAlloc(CHUNK_SIZE, HF_SHARABLE | HF_SWAPABLE, HAF_ZERO_INIT);
     out = MemLock(outHan);
 
-    // Zlib Stream initialisieren
+    // Accumulated output - one row of data (scanline)
+    rowBufferHan = MemAlloc(rowBytes + 1, HF_SHARABLE | HF_SWAPABLE, HAF_ZERO_INIT); // +1 to account for filter byte
+    rowBuffer = MemLock(rowBufferHan);
+
+    // Initialize zlib stream
     strm.zalloc = Z_NULL;
     strm.zfree = Z_NULL;
     strm.opaque = Z_NULL;
     strm.avail_in = 0;
     strm.next_in = Z_NULL;
 
-    //ret = inflateInit(&strm);
     ret = inflateInit2(&strm, 15);
     if (ret != Z_OK) {
-        // Fehler bei der Initialisierung von zlib
+        // Error initializing zlib
         return;
     }
 
-    // Verarbeite den IDAT-Chunk in Häppchen
+    // Process the IDAT chunk in chunks
     while (length > 0)
     {
         bytesToRead = (length < CHUNK_SIZE) ? length : CHUNK_SIZE;
 
         if (FileRead(file, in, bytesToRead, FALSE) != bytesToRead)
         {
-            // Fehler beim Lesen der PNG-Daten.
+            // Error reading PNG data
+            inflateEnd(&strm);
             MemFree(inHan);
             MemFree(outHan);
+            MemFree(rowBufferHan);
             MemFree(previousRowHandle);
-            inflateEnd(&strm);
             return;
         }
         strm.avail_in = bytesToRead;
@@ -172,34 +222,53 @@ void processIDATChunks(FileHandle file, unsigned long length, unsigned long widt
             ret = inflate(&strm, Z_NO_FLUSH);
             if (ret != Z_OK && ret != Z_STREAM_END)
             {
-                // Dekomprimierungsfehler
+                // Decompression error
+                inflateEnd(&strm);
                 MemFree(inHan);
                 MemFree(outHan);
+                MemFree(rowBufferHan);
                 MemFree(previousRowHandle);
-                inflateEnd(&strm);
                 return;
             }
             have = CHUNK_SIZE - strm.avail_out;
+
             if (have > 0)
             {
-                unfilterImage(out, width, height, bpp, previousRow, callback);
+                src = out;
+
+                while (have > 0)
+                {
+                    toCopy = ((rowBytes + 1 - rowBufferOffset) < have) ? (rowBytes + 1 - rowBufferOffset) : have;
+                    memcpy(rowBuffer + rowBufferOffset, src, toCopy);
+                    rowBufferOffset += toCopy;
+                    src += toCopy;
+                    have -= toCopy;
+
+                    if (rowBufferOffset == rowBytes + 1) // +1 to include the filter byte
+                    {
+                        unfilterImage(rowBuffer, width, bitDepth, colorType, previousRow);
+                        memcpy(previousRow, rowBuffer + 1, rowBytes); // +1 to skip the filter byte
+                        rowBufferOffset = 0;
+                    }
+                }
             }
         } while (strm.avail_out == 0);
 
         length -= bytesToRead;
     }
 
-    // Bereinige Zlib
+    // Clean up zlib
     inflateEnd(&strm);
 
     MemFree(inHan);
     MemFree(outHan);
+    MemFree(rowBufferHan);
     MemFree(previousRowHandle);
 }
 
 
 // Hauptfunktion zur Verarbeitung von PNG-Chunks
-void processPNGChunks(FileHandle file, void (*callback)(unsigned char *data, unsigned long length))
+void processPNGChunks(FileHandle file)
 {
     IHDRData ihdrData;
     ChunkHeader chdr;
@@ -228,7 +297,7 @@ void processPNGChunks(FileHandle file, void (*callback)(unsigned char *data, uns
             case CHUNK_IDAT:
             {
                 // Verarbeite IDAT-Chunks und rufe den Callback für die Bilddaten auf
-                processIDATChunks(file, chdr.length, ihdrData.width, ihdrData.height, ihdrData.bitDepth / 8, callback);
+                processIDATChunks(file, chdr.length, ihdrData.width, ihdrData.height, ihdrData.bitDepth, ihdrData.colorType);
                 break;
             }
             case CHUNK_IEND:
@@ -250,22 +319,33 @@ void processPNGChunks(FileHandle file, void (*callback)(unsigned char *data, uns
 }
 
 // Callback-Funktion zum Schreiben der Bilddaten ins NetPBM-Format (PPM)
-void writePPMChunk(unsigned char *data, unsigned long length)
+void writePPMChunk(unsigned char *data, unsigned long length, unsigned long width, unsigned long height)
 {
     FileHandle outputFile;
-    char buf[25] = {0};
-    unsigned long i = 0;
+    unsigned long i, j;
+    char header[50];
+    char pixelData[20];
+    unsigned long rowBytes = width * 3; // 3 Bytes pro Pixel (RGB)
 
-    outputFile = FileCreate("png.ppm", (FCF_NATIVE | FILE_ACCESS_W | FILE_DENY_RW), 0);
+    // PPM-ASCII-Format (P3)
+    outputFile = FileCreate("output.ppm", (FCF_NATIVE | FILE_ACCESS_W | FILE_DENY_RW | FILE_CREATE_NO_TRUNCATE), 0);
+    FilePos(outputFile, 0, FILE_POS_END);
 
-    // PPM-Header schreiben (Angenommen RGB, 8-Bit pro Kanal)
-    // FileWrite(outputFile, "P6\n%lu %lu\n255\n", width, height);
     if (outputFile)
     {
-        for (i = 0; i < length; i += 3)
+        // PPM-Header schreiben (P3 Format)
+        // sprintf(header, "P3\n%lu %lu\n255\n", width, height);
+        // FileWrite(outputFile, header, strlen(header), FALSE);
+
+        // Bilddaten schreiben
+        for (i = 0; i < height; i++)
         {
-            sprintf(buf, "%d %d %d\n\0", data[i], data[i + 1], data[i + 2]);
-            FileWrite(outputFile, buf, strlen(buf), FALSE);
+            for (j = 0; j < width * 3; j += 3)
+            {
+                // Schreibe die RGB-Werte als Text
+                sprintf(pixelData, "%d %d %d\n", data[i * rowBytes + j], data[i * rowBytes + j + 1], data[i * rowBytes + j + 2]);
+                FileWrite(outputFile, pixelData, strlen(pixelData), FALSE);
+            }
         }
 
         FileClose(outputFile, FALSE);
@@ -284,7 +364,7 @@ int convertPNG()
     file = FileOpen("FLUGZEUG.PNG", FILE_ACCESS_R | FILE_DENY_RW);
     if (file == NullHandle) return 1;
 
-    if (checkPNGHeader(file)) processPNGChunks(file, writePPMChunk);
+    if (checkPNGHeader(file)) processPNGChunks(file);
 
     FileClose(file, FALSE);
     FilePopDir();
