@@ -13,6 +13,44 @@ unsigned long swapEndian(unsigned long val)
            ((val << 24) & 0xFF000000);
 }
 
+// Calculate the number of bits per pixel based on bitDepth and colorType
+unsigned long calcBytesPerRow(width, colorType, bitDepth)
+{
+    unsigned long bitsPerPixel;
+    unsigned long rowBytes;
+
+    switch (colorType) {
+        case 0: // Grayscale
+            bitsPerPixel = bitDepth;
+            break;
+        case 2: // Truecolor (RGB)
+            bitsPerPixel = 3 * bitDepth;
+            break;
+        case 3: // Indexed color
+            bitsPerPixel = bitDepth;
+            break;
+        case 4: // Grayscale with Alpha
+            bitsPerPixel = 2 * bitDepth;
+            break;
+        case 6: // Truecolor with Alpha (RGBA)
+            bitsPerPixel = 4 * bitDepth;
+            break;
+        default:
+            // Unsupported color type
+            return 0;
+    }
+
+    rowBytes = (width * bitsPerPixel + 7) / 8; // Round up to the next whole byte
+
+    return rowBytes;
+}
+
+// Bytes per Pixel.
+unsigned long calcBytesPerPixel(colorType, bitDepth)
+{
+    return calcBytesPerRow(1, colorType, bitDepth);
+}
+
 // Funktion zum Überprüfen des PNG-Headers
 int checkPNGHeader(FileHandle file)
 {
@@ -55,28 +93,8 @@ void unfilterImage(unsigned char *data, unsigned long width, unsigned char bitDe
     unsigned long i;
 
     // Calculate bytesPerPixel based on colorType and bitDepth
-    switch (colorType) {
-        case 0: // Grayscale
-            bytesPerPixel = (bitDepth + 7) / 8; // Round up to full bytes
-            break;
-        case 2: // Truecolor (RGB)
-            bytesPerPixel = 3 * ((bitDepth + 7) / 8);
-            break;
-        case 3: // Indexed color
-            bytesPerPixel = (bitDepth + 7) / 8;
-            break;
-        case 4: // Grayscale with Alpha
-            bytesPerPixel = 2 * ((bitDepth + 7) / 8);
-            break;
-        case 6: // Truecolor with Alpha (RGBA)
-            bytesPerPixel = 4 * ((bitDepth + 7) / 8);
-            break;
-        default:
-            // Unsupported color type
-            return;
-    }
-
-    rowBytes = width * bytesPerPixel;
+    bytesPerPixel = calcBytesPerPixel(colorType, bitDepth);
+    rowBytes = calcBytesPerRow(width, colorType, bitDepth);
 
     // Pointer to the first byte after the filter type
     currentRow++;
@@ -144,30 +162,8 @@ void processIDATChunks(FileHandle file, unsigned long length, unsigned long widt
     unsigned long toCopy;
     unsigned char *src = out;
 
-    // Calculate the number of bits per pixel based on bitDepth and colorType
-    unsigned long bitsPerPixel;
-    switch (colorType) {
-        case 0: // Grayscale
-            bitsPerPixel = bitDepth;
-            break;
-        case 2: // Truecolor (RGB)
-            bitsPerPixel = 3 * bitDepth;
-            break;
-        case 3: // Indexed color
-            bitsPerPixel = bitDepth;
-            break;
-        case 4: // Grayscale with Alpha
-            bitsPerPixel = 2 * bitDepth;
-            break;
-        case 6: // Truecolor with Alpha (RGBA)
-            bitsPerPixel = 4 * bitDepth;
-            break;
-        default:
-            // Unsupported color type
-            return;
-    }
-
-    rowBytes = (width * bitsPerPixel + 7) / 8; // Round up to the next whole byte
+    // calculate row bytes
+    rowBytes = calcBytesPerRow(width, colorType, bitDepth);
 
     // Allocate memory for the previous row
     previousRowHandle = MemAlloc(rowBytes, HF_SHARABLE | HF_SWAPABLE, HAF_ZERO_INIT);
