@@ -46,7 +46,7 @@ static inline unsigned char paethPredictor(int a, int b, int c)
 }
 
 // Unfilter-Funktion zur Verarbeitung der PNG-Bilddaten
-void unfilterImage(unsigned char *data, unsigned long width, unsigned char bitDepth, unsigned char colorType, unsigned char *previousRow)
+void unfilterImage(unsigned char *data, unsigned long width, unsigned char bitDepth, unsigned char colorType, unsigned char *previousRow, FileHandle oFile)
 {
     unsigned char *currentRow = data;
     unsigned char filterType = *currentRow;
@@ -120,11 +120,12 @@ void unfilterImage(unsigned char *data, unsigned long width, unsigned char bitDe
     }
 
     // Write out the unfiltered image data (without the filter byte)
-    writePPMChunk(currentRow, rowBytes, width, 1); // Adjust rowBytes by -1 to exclude the filter byte
+    writeOutputFile(oFile, currentRow, rowBytes, width, 1); // Adjust rowBytes by -1 to exclude the filter byte
+    //writeOutputFile(oFile, currentRow, rowBytes, width);
 }
 
 // Verarbeitung von IDAT-Chunks
-void processIDATChunks(FileHandle file, unsigned long length, unsigned long width, unsigned long height, unsigned char bitDepth, unsigned char colorType)
+void processIDATChunks(FileHandle file, unsigned long length, unsigned long width, unsigned long height, unsigned char bitDepth, unsigned char colorType, FileHandle oFile)
 {
     z_stream strm;
     int ret;
@@ -246,7 +247,7 @@ void processIDATChunks(FileHandle file, unsigned long length, unsigned long widt
 
                     if (rowBufferOffset == rowBytes + 1) // +1 to include the filter byte
                     {
-                        unfilterImage(rowBuffer, width, bitDepth, colorType, previousRow);
+                        unfilterImage(rowBuffer, width, bitDepth, colorType, previousRow, oFile);
                         memcpy(previousRow, rowBuffer + 1, rowBytes); // +1 to skip the filter byte
                         rowBufferOffset = 0;
                     }
@@ -272,6 +273,7 @@ void processPNGChunks(FileHandle file)
 {
     IHDRData ihdrData;
     ChunkHeader chdr;
+    FileHandle oFile;
 
     while (FileRead(file, &chdr, sizeof(chdr), FALSE))
     {
@@ -292,17 +294,19 @@ void processPNGChunks(FileHandle file)
                 ihdrData.width = swapEndian(ihdrData.width);
                 ihdrData.height = swapEndian(ihdrData.height);
                 FilePos(file, chdr.length - sizeof(IHDRData), FILE_POS_RELATIVE);
+                oFile = openOutputFile(ihdrData.width, ihdrData.height);
                 break;
             }
             case CHUNK_IDAT:
             {
                 // Verarbeite IDAT-Chunks und rufe den Callback für die Bilddaten auf
-                processIDATChunks(file, chdr.length, ihdrData.width, ihdrData.height, ihdrData.bitDepth, ihdrData.colorType);
+                processIDATChunks(file, chdr.length, ihdrData.width, ihdrData.height, ihdrData.bitDepth, ihdrData.colorType, oFile);
                 break;
             }
             case CHUNK_IEND:
             {
                 // Beende die Verarbeitung bei IEND
+                closeOutputFile(oFile);
                 return;
             }
             default:
@@ -319,24 +323,15 @@ void processPNGChunks(FileHandle file)
 }
 
 // Callback-Funktion zum Schreiben der Bilddaten ins NetPBM-Format (PPM)
-void writePPMChunk(unsigned char *data, unsigned long length, unsigned long width, unsigned long height)
+void writeOutputFile(FileHandle outputFile, unsigned char *data, unsigned long length, unsigned long width, unsigned long height)
 {
-    FileHandle outputFile;
     unsigned long i, j;
     char header[50];
     char pixelData[20];
     unsigned long rowBytes = width * 3; // 3 Bytes pro Pixel (RGB)
 
-    // PPM-ASCII-Format (P3)
-    outputFile = FileCreate("output.ppm", (FCF_NATIVE | FILE_ACCESS_W | FILE_DENY_RW | FILE_CREATE_NO_TRUNCATE), 0);
-    FilePos(outputFile, 0, FILE_POS_END);
-
     if (outputFile)
     {
-        // PPM-Header schreiben (P3 Format)
-        // sprintf(header, "P3\n%lu %lu\n255\n", width, height);
-        // FileWrite(outputFile, header, strlen(header), FALSE);
-
         // Bilddaten schreiben
         for (i = 0; i < height; i++)
         {
@@ -347,11 +342,34 @@ void writePPMChunk(unsigned char *data, unsigned long length, unsigned long widt
                 FileWrite(outputFile, pixelData, strlen(pixelData), FALSE);
             }
         }
-
-        FileClose(outputFile, FALSE);
     }
 
     return;
+}
+
+FileHandle openOutputFile(unsigned long width, unsigned long height)
+{
+    FileHandle file;
+    char header[50] = {0};
+
+    // PPM-ASCII-Format (P3)
+    file = FileCreate("output.ppm", (FCF_NATIVE | FILE_ACCESS_W | FILE_DENY_RW | FILE_CREATE_TRUNCATE), 0);
+
+    if (file)
+    {
+        // PPM-Header schreiben (P3 Format)
+        sprintf(header, "P3\n%lu %lu\n255\n", width, height);
+        FileWrite(file, header, strlen(header), FALSE);
+
+        return file;
+    }
+
+    return NULL;
+}
+
+void closeOutputFile(FileHandle file)
+{
+    FileClose(file, FALSE);
 }
 
 int convertPNG()
