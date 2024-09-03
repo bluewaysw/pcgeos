@@ -83,18 +83,43 @@ static inline unsigned char paethPredictor(int a, int b, int c)
     else return (unsigned char)c;
 }
 
+void convertRGBAtoRGB(unsigned char *data, unsigned long width, unsigned long height)
+{
+    unsigned long i, j;
+    unsigned long rowBytesRGBA = width * 4;  // 4 bytes per pixel (RGBA)
+    unsigned long rowBytesRGB = width * 3;   // 3 bytes per pixel (RGB)
+
+    unsigned char *src = data;           // Start at the first pixel (RGBA)
+    unsigned char *dst = data;           // Start at the first pixel (RGB)
+
+    for (i = 0; i < height; i++)
+    {
+        for (j = 0; j < width; j++)
+        {
+            // Copy RGB values, ignoring the alpha channel
+            dst[0] = src[0];  // Red
+            dst[1] = src[1];  // Green
+            dst[2] = src[2];  // Blue
+
+            // Move the source pointer forward by 4 (skip the alpha channel)
+            src += 4;
+            // Move the destination pointer forward by 3 (RGB only)
+            dst += 3;
+        }
+
+        // Adjust the src pointer to skip any padding at the end of the row
+        src += rowBytesRGBA - (width * 4);
+
+        // dst does not need adjustment as RGB rows are packed
+    }
+}
+
 // Unfilter-Funktion zur Verarbeitung der PNG-Bilddaten
-void unfilterImage(unsigned char *data, unsigned long width, unsigned char bitDepth, unsigned char colorType, unsigned char *previousRow, FileHandle oFile)
+void unfilterImage(unsigned char *data, unsigned char *previousRow, unsigned long bytesPerPixel, unsigned long rowBytes)
 {
     unsigned char *currentRow = data;
     unsigned char filterType = *currentRow;
-    unsigned long rowBytes;
-    unsigned long bytesPerPixel; // Bytes per Pixel
     unsigned long i;
-
-    // Calculate bytesPerPixel based on colorType and bitDepth
-    bytesPerPixel = calcBytesPerPixel(colorType, bitDepth);
-    rowBytes = calcBytesPerRow(width, colorType, bitDepth);
 
     // Pointer to the first byte after the filter type
     currentRow++;
@@ -136,10 +161,6 @@ void unfilterImage(unsigned char *data, unsigned long width, unsigned char bitDe
             // Invalid filter type
             return;
     }
-
-    // Write out the unfiltered image data (without the filter byte)
-    //writeOutputFile(oFile, currentRow, rowBytes, width, 1); // Adjust rowBytes by -1 to exclude the filter byte
-    //writeOutputFile(oFile, currentRow, rowBytes, width);
 }
 
 // Verarbeitung von IDAT-Chunks
@@ -161,8 +182,10 @@ void processIDATChunks(FileHandle file, unsigned long length, unsigned long widt
     unsigned char *previousRow = NULL;
     unsigned long toCopy;
     unsigned char *src = out;
+    unsigned long bytesPerPixel = 0; // Bytes per Pixel
 
     // calculate row bytes
+    bytesPerPixel = calcBytesPerPixel(colorType, bitDepth);
     rowBytes = calcBytesPerRow(width, colorType, bitDepth);
 
     // Allocate memory for the previous row
@@ -243,9 +266,18 @@ void processIDATChunks(FileHandle file, unsigned long length, unsigned long widt
 
                     if (rowBufferOffset == rowBytes + 1) // +1 to include the filter byte
                     {
-                        unfilterImage(rowBuffer, width, bitDepth, colorType, previousRow, oFile);
+                        unfilterImage(rowBuffer, previousRow, bytesPerPixel, rowBytes);
 
-                        writeOutputFile(oFile, rowBuffer + 1, rowBytes, width, 1); // Adjust rowBytes by -1 to exclude the filter byte
+                        if (colorType == 6)
+                        {
+                            // Konvertiere nach RGB, Setze colorType auf 2 (Truecolor RGB) und reduziere die Anzahl der Bytes pro Pixel
+                            convertRGBAtoRGB(rowBuffer, width, height);
+                            colorType = 2;
+                            bytesPerPixel = calcBytesPerPixel(colorType, bitDepth);
+                            rowBytes = calcBytesPerRow(width, colorType, bitDepth);
+                        }
+
+                        writeOutputFile(oFile, rowBuffer + 1, width, 1); // Adjust rowBytes by -1 to exclude the filter byte
 
                         memcpy(previousRow, rowBuffer + 1, rowBytes); // +1 to skip the filter byte
                         rowBufferOffset = 0;
@@ -322,10 +354,9 @@ void processPNGChunks(FileHandle file)
 }
 
 // Callback-Funktion zum Schreiben der Bilddaten ins NetPBM-Format (PPM)
-void writeOutputFile(FileHandle outputFile, unsigned char *data, unsigned long length, unsigned long width, unsigned long height)
+void writeOutputFile(FileHandle outputFile, unsigned char *data, unsigned long width, unsigned long height)
 {
     unsigned long i, j;
-    char header[50];
     char pixelData[20];
     unsigned long rowBytes = width * 3; // 3 Bytes pro Pixel (RGB)
 
