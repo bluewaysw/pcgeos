@@ -83,34 +83,28 @@ static inline unsigned char paethPredictor(int a, int b, int c)
     else return (unsigned char)c;
 }
 
-void convertRGBAtoRGB(unsigned char *data, unsigned long width, unsigned long height)
+void convertRGBAtoRGB(unsigned char *data, unsigned long width)
 {
-    unsigned long i, j;
-    unsigned long rowBytesRGBA = width * 4;  // 4 bytes per pixel (RGBA)
-    unsigned long rowBytesRGB = width * 3;   // 3 bytes per pixel (RGB)
-
+    unsigned long j;
     unsigned char *src = data;           // Start at the first pixel (RGBA)
     unsigned char *dst = data;           // Start at the first pixel (RGB)
 
-    for (i = 0; i < height; i++)
+    for (j = 0; j < width; j++)
     {
-        for (j = 0; j < width; j++)
-        {
-            // Copy RGB values, ignoring the alpha channel
-            dst[0] = src[0];  // Red
-            dst[1] = src[1];  // Green
-            dst[2] = src[2];  // Blue
+        unsigned char r = src[0];
+        unsigned char g = src[1];
+        unsigned char b = src[2];
+        unsigned char a = src[3];  // Alpha value
 
-            // Move the source pointer forward by 4 (skip the alpha channel)
-            src += 4;
-            // Move the destination pointer forward by 3 (RGB only)
-            dst += 3;
-        }
+        // Blend the RGB values with a white background
+        dst[0] = (r * a + 255 * (255 - a)) / 255;  // Red channel
+        dst[1] = (g * a + 255 * (255 - a)) / 255;  // Green channel
+        dst[2] = (b * a + 255 * (255 - a)) / 255;  // Blue channel
 
-        // Adjust the src pointer to skip any padding at the end of the row
-        src += rowBytesRGBA - (width * 4);
-
-        // dst does not need adjustment as RGB rows are packed
+        // Move the source pointer forward by 4 (skip the alpha channel)
+        src += 4;
+        // Move the destination pointer forward by 3 (RGB only)
+        dst += 3;
     }
 }
 
@@ -271,13 +265,16 @@ void processIDATChunks(FileHandle file, unsigned long length, unsigned long widt
                         if (colorType == 6)
                         {
                             // Konvertiere nach RGB, Setze colorType auf 2 (Truecolor RGB) und reduziere die Anzahl der Bytes pro Pixel
-                            convertRGBAtoRGB(rowBuffer, width, height);
+                            convertRGBAtoRGB(rowBuffer + 1, width);
                             colorType = 2;
-                            bytesPerPixel = calcBytesPerPixel(colorType, bitDepth);
+                            //bytesPerPixel = calcBytesPerPixel(colorType, bitDepth);
                             rowBytes = calcBytesPerRow(width, colorType, bitDepth);
+                            writeOutputFile(oFile, rowBuffer + 1, width, 1); // Adjust rowBytes by 1 to exclude the filter byte
                         }
-
-                        writeOutputFile(oFile, rowBuffer + 1, width, 1); // Adjust rowBytes by -1 to exclude the filter byte
+                        else
+                        {
+                            writeOutputFile(oFile, rowBuffer + 1, width, 1); // Adjust rowBytes by 1 to exclude the filter byte
+                        }
 
                         memcpy(previousRow, rowBuffer + 1, rowBytes); // +1 to skip the filter byte
                         rowBufferOffset = 0;
