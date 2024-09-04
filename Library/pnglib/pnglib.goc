@@ -108,6 +108,24 @@ void convertRGBAtoRGB(unsigned char *data, unsigned long width)
     }
 }
 
+void convert16BitLineTo8BitInPlace(unsigned char *line, unsigned long width)
+{
+    unsigned long i;
+    unsigned char *dst = (unsigned char *)line;  // Interpretiere den Eingabepuffer als Ziel für die 8-Bit-Werte
+
+    // Beginne von hinten, um Überschreibungen zu vermeiden
+    for (i = width; i > 0; i--)
+    {
+        unsigned long index16 = (i - 1) * 3;  // 16-Bit-Indizes (3 Werte: Rot, Grün, Blau)
+        unsigned long index8 = (i - 1) * 3;   // 8-Bit-Indizes (gleicher Index, da wir in-place arbeiten)
+
+        // Konvertiere 16-Bit-Werte zu 8-Bit und schreibe sie an die richtige Stelle
+        dst[index8 + 0] = line[index16 + 0] >> 8;  // Rot
+        dst[index8 + 1] = line[index16 + 1] >> 8;  // Grün
+        dst[index8 + 2] = line[index16 + 2] >> 8;  // Blau
+    }
+}
+
 // Unfilter-Funktion zur Verarbeitung der PNG-Bilddaten
 void unfilterImage(unsigned char *data, unsigned char *previousRow, unsigned long bytesPerPixel, unsigned long rowBytes)
 {
@@ -262,11 +280,20 @@ void processIDATChunks(FileHandle file, unsigned long length, unsigned long widt
                     {
                         unfilterImage(rowBuffer, previousRow, bytesPerPixel, rowBytes);
 
-                        if (colorType == 6)
+                        // if (colorType == 6)
+                        // {
+                        //     // Konvertiere nach RGB, Setze colorType auf 2 (Truecolor RGB) und reduziere die Anzahl der Bytes pro Pixel
+                        //     convertRGBAtoRGB(rowBuffer + 1, width);
+                        //     colorType = 2;
+                        //     bytesPerPixel = calcBytesPerPixel(colorType, bitDepth);
+                        //     rowBytes = calcBytesPerRow(width, colorType, bitDepth);
+                        // }
+
+                        if (bytesPerPixel == 6)
                         {
                             // Konvertiere nach RGB, Setze colorType auf 2 (Truecolor RGB) und reduziere die Anzahl der Bytes pro Pixel
-                            convertRGBAtoRGB(rowBuffer + 1, width);
-                            colorType = 2;
+                            convert16BitLineTo8BitInPlace(rowBuffer + 1, width);
+                            bitDepth = 8;
                             bytesPerPixel = calcBytesPerPixel(colorType, bitDepth);
                             rowBytes = calcBytesPerRow(width, colorType, bitDepth);
                         }
@@ -350,22 +377,12 @@ void processPNGChunks(FileHandle file)
 // Callback-Funktion zum Schreiben der Bilddaten ins NetPBM-Format (PPM)
 void writeOutputFile(FileHandle outputFile, unsigned char *data, unsigned long width, unsigned long height)
 {
-    unsigned long i, j;
-    char pixelData[20];
-    unsigned long rowBytes = width * 3; // 3 Bytes pro Pixel (RGB)
+    unsigned long rowBytes = width * 3;  // RGB is 3 bytes per pixel
 
     if (outputFile)
     {
-        // Bilddaten schreiben
-        for (i = 0; i < height; i++)
-        {
-            for (j = 0; j < width * 3; j += 3)
-            {
-                // Schreibe die RGB-Werte als Text
-                sprintf(pixelData, "%d %d %d\n", data[i * rowBytes + j], data[i * rowBytes + j + 1], data[i * rowBytes + j + 2]);
-                FileWrite(outputFile, pixelData, strlen(pixelData), FALSE);
-            }
-        }
+        // Write the image data directly as binary
+        FileWrite(outputFile, data, rowBytes * height, FALSE);  // Write entire row
     }
 
     return;
@@ -376,13 +393,13 @@ FileHandle openOutputFile(unsigned long width, unsigned long height)
     FileHandle file;
     char header[50] = {0};
 
-    // PPM-ASCII-Format (P3)
+    // Use P6 format for binary output
     file = FileCreate("output.ppm", (FCF_NATIVE | FILE_ACCESS_W | FILE_DENY_RW | FILE_CREATE_TRUNCATE), 0);
 
     if (file)
     {
-        // PPM-Header schreiben (P3 Format)
-        sprintf(header, "P3\n%lu %lu\n255\n", width, height);
+        // Write the PPM binary header (P6 format)
+        sprintf(header, "P6\n%lu %lu\n255\n", width, height);
         FileWrite(file, header, strlen(header), FALSE);
 
         return file;
