@@ -433,6 +433,63 @@ void closeOutputFile(FileHandle file)
     FileClose(file, FALSE);
 }
 
+VMBlockHandle initiateOutputBitmap(VMFileHandle vmFileHan, unsigned long width, unsigned long height, unsigned char bitDepth)
+{
+    /*
+    ; case BMT_FORMAT:
+    ;    BMF_MONO:   #bytes = ((width+7)>>3) * height
+    ;    BMF_4BIT:   #bytes = ((width+1)>>1) * height
+    ;    BMF_8BIT:   #bytes = width * height
+    ;    BMF_24BIT:  #bytes = width * height * 3
+
+    typedef ByteFlags BMType;
+    #define BMT_PALETTE	0x40
+    #define BMT_HUGE	0x20
+    #define BMT_MASK	0x10
+    #define BMT_COMPLEX	0x08
+    #define BMT_FORMAT	0x07
+
+    // MONO: BMF_MONO|BMT_COMPLEX|BMT_PALETTE
+    // 4 BIT: BMF_4BIT|BMT_COMPLEX|BMT_PALETTE
+    // 8 BIT: BMF_8BIT|BMT_COMPLEX|BMT_PALETTE
+    // 24 BIT: BMF_24BIT|BMT_COMPLEX
+*/
+    GStateHandle bmstate;
+    VMBlockHandle bitmapHandle;
+
+    bitmapHandle = GrCreateBitmap(
+        BMF_24BIT|BMT_COMPLEX,
+        width, height,
+        vmFileHan,
+        0,
+        &bmstate
+    );
+
+    GrDestroyBitmap(bmstate, BMD_LEAVE_DATA);
+
+    return bitmapHandle;
+}
+
+void writePixelLine(VMFileHandle vmFileHan, VMBlockHandle bitmapHandle, unsigned long lineNo, unsigned char* rowData)
+{
+    void* lineptr;
+    unsigned long size;
+
+    HugeArrayLock(
+        vmFileHan,
+        bitmapHandle,
+        lineNo,
+        &lineptr,
+        &size);
+
+    // CopyAndDither(lineptr, buffer[0], size) ;
+
+    memcpy(lineptr, rowData, size);
+
+    HugeArrayDirty(lineptr);
+    HugeArrayUnlock(lineptr);
+}
+
 int convertPNG()
 {
     FileHandle file = NULL;
