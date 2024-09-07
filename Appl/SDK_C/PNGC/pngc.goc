@@ -66,22 +66,26 @@
  *              Class Definitions
  *******************************************************************/
     @class AppLaunchProcessClass, GenProcessClass;
-    @message void MSG_APPLAUNCH_PROCESS_LOAD_APP_START();
+        @message void MSG_APPLAUNCH_PROCESS_LOAD_APP_START();
     @endc;
-
-/********************************************************************
- *              Class Declarations
- *******************************************************************/
     @classdecl AppLaunchProcessClass, neverSaved;
+
+    @class  DoggyClass, VisClass;
+
+        @message void MSG_DOGGY_SET_HUGE_BITMAP_INFO(
+            VMFileHandle vmf,
+            VMBlockHandle vmb
+        );
+
+        @instance VMFileHandle DI_vmFile = NullHandle;
+        @instance VMBlockHandle DI_vmBitmapBlock = NullHandle;
+
+    @endc;
+    @classdecl	DoggyClass;
 
 /********************************************************************
  *              Global Variable Definitions
  *******************************************************************/
-      /*
-       * launchError - TRUE if the application could not
-       *               be launched using UserLoadApplication.
-       */
-    Boolean launchError;
 
 /********************************************************************
  *              UI Object Resources
@@ -94,12 +98,11 @@
 
 @object GenApplicationClass AppLaunchApp = {
     GI_visMoniker = list { @AppLaunchTextMoniker };
-    GI_comp = @AppLaunchPrimary;
-    gcnList( MANUFACTURER_ID_GEOWORKS, GAGCNLT_WINDOWS ) =
-        @AppLaunchPrimary;
+    GI_comp = @BitmapPrimary;
+    gcnList( MANUFACTURER_ID_GEOWORKS, GAGCNLT_WINDOWS ) = @BitmapPrimary;
 }
 
-@visMoniker AppLaunchTextMoniker = "App Launcher";
+@visMoniker AppLaunchTextMoniker = "PNG View Sample";
 
 @end Application;
 
@@ -108,22 +111,45 @@
  *******************************************************************/
 @start Interface;
 
-@object GenPrimaryClass AppLaunchPrimary = {
-    GI_comp = @AppLaunchUserLoadStart;
+@object GenPrimaryClass BitmapPrimary  = {
+    GI_comp = @DoggyView, @StartTrigger;
+
     HINT_CENTER_CHILDREN_HORIZONTALLY;
     HINT_CENTER_CHILDREN_VERTICALLY;
     HINT_SIZE_WINDOW_AS_DESIRED;
 }
 
-  /*
-   * This trigger will start the other application
-   * using UserLoadApplication.
-   */
-@object GenTriggerClass AppLaunchUserLoadStart = {
+@object GenViewClass DoggyView = {
+    GVI_horizAttrs = @default | GVDA_SCROLLABLE | GVDA_NO_LARGER_THAN_CONTENT;
+    GVI_vertAttrs  = @default | GVDA_SCROLLABLE | GVDA_NO_LARGER_THAN_CONTENT;
+    GVI_docBounds = {0, 0, 32, 32};
+    GVI_content = @DoggyContent;
+
+    ATTR_GEN_VIEW_DOES_NOT_ACCEPT_TEXT_INPUT;
+}
+
+@object VisContentClass DoggyContent = {
+    VCNI_view = @DoggyView;
+    VCNI_attrs = (@default) | VCNA_SAME_WIDTH_AS_VIEW
+                            | VCNA_SAME_HEIGHT_AS_VIEW;
+    VCI_comp = @Doggy;
+}
+
+@object DoggyClass Doggy = {
+    /*
+     * Make this fixed size otherwise it won't have any geometry because
+     * the GenGlyph has no gstring statically associated with it.
+     */
+    VI_bounds = {0, 0, 32, 32};
+}
+
+@object GenTriggerClass StartTrigger =
+{
     GI_visMoniker = "Convert?";
     GTI_destination = process;
     GTI_actionMsg = MSG_APPLAUNCH_PROCESS_LOAD_APP_START;
 }
+
 
 @end Interface;
 
@@ -166,12 +192,51 @@ be started." };
  *******************************************************************/
 @method AppLaunchProcessClass, MSG_APPLAUNCH_PROCESS_LOAD_APP_START
 {
-    int i = 0;
+    VMFileHandle vmFile = NullHandle;
+    VMBlockHandle vmBlock = NullHandle;
+    FileHandle file = NullHandle;
 
+    FilePushDir();
+    FileSetStandardPath(SP_DOCUMENT);
 
-    i = convertPNG();
+    file = FileOpen("FLUGZEUG.PNG", FILE_ACCESS_R | FILE_DENY_RW);
+    if (file != NullHandle)
+    {
+        vmFile = ClipboardGetClipboardFile();
+        vmBlock = convertPNG(file, vmFile);
+        @call Doggy::MSG_DOGGY_SET_HUGE_BITMAP_INFO(vmFile, vmBlock);
+    }
 
-    // (void) unzStringFileNameCompare("FLUGZEUG.PNG", "FLUGZEUG.PNG", 0);
-
+    FileClose(file, FALSE);
+    FilePopDir();
 
 } /* MSG_APPLAUNCH_PROCESS_LOAD_APP_START */
+
+
+@method DoggyClass, MSG_DOGGY_SET_HUGE_BITMAP_INFO
+{
+    pself->DI_vmFile = vmf;
+    pself->DI_vmBitmapBlock = vmb;
+}
+
+@method DoggyClass, MSG_VIS_DRAW
+{
+    Rectangle visBounds;
+
+    pself = ObjDerefVis(oself);
+    if (pself->DI_vmFile)
+    {
+	  /*
+	   * Get the bounds because we want to draw within the
+	   * bounds of this object
+	   */
+        @call oself::MSG_VIS_GET_BOUNDS(&visBounds);
+
+        GrDrawHugeBitmap(gstate,
+                         visBounds.R_left,
+                         visBounds.R_top,
+                         pself->DI_vmFile,
+                         pself->DI_vmBitmapBlock);
+    }
+}
+

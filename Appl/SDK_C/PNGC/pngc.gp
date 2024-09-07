@@ -75,7 +75,7 @@ library geos
 library ui
 library ansic
 library pnglib
-#library minizip
+
 #
 # Resources: list all resource blocks which are used by the application whose
 # allocation flags can't be inferred by Glue. Usually this is needed only for
@@ -86,3 +86,4 @@ resource Application ui-object
 resource Interface   ui-object
 resource Strings     lmem shared read-only
 
+export DoggyClass

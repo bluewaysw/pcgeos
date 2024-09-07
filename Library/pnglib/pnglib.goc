@@ -195,7 +195,7 @@ void unfilterImage(unsigned char *data, unsigned char *previousRow, unsigned lon
 }
 
 // Verarbeitung von IDAT-Chunks
-void processIDATChunks(FileHandle file, unsigned long length, unsigned long width, unsigned long height, unsigned char bitDepth, unsigned char colorType, FileHandle oFile)
+void processIDATChunks(FileHandle file, unsigned long length, unsigned long width, unsigned long height, unsigned char bitDepth, unsigned char colorType, VMFileHandle vmFile, VMBlockHandle vmBlock, FileHandle oFile)
 {
     z_stream strm;
     int ret;
@@ -214,6 +214,7 @@ void processIDATChunks(FileHandle file, unsigned long length, unsigned long widt
     unsigned long toCopy;
     unsigned char *src = out;
     unsigned long bytesPerPixel = 0; // Bytes per Pixel
+    unsigned long lineNo = 0;
 
     // calculate row bytes
     bytesPerPixel = calcBytesPerPixel(colorType, bitDepth);
@@ -298,8 +299,8 @@ void processIDATChunks(FileHandle file, unsigned long length, unsigned long widt
                     if (rowBufferOffset == rowBytes + 1) // +1 to include the filter byte
                     {
                         unfilterImage(rowBuffer, previousRow, bytesPerPixel, rowBytes);
-
                         memcpy(previousRow, rowBuffer + 1, rowBytes); // +1 to skip the filter byte
+                        lineNo++;
 
                         if (colorType == 6)
                         {
@@ -319,7 +320,8 @@ void processIDATChunks(FileHandle file, unsigned long length, unsigned long widt
                             // rowBytes = calcBytesPerRow(width, colorType, bitDepth);
                         }
 
-                        writeOutputFile(oFile, rowBuffer + 1, width, 1); // Adjust rowBytes by 1 to exclude the filter byte
+                        // writeOutputFile(oFile, rowBuffer + 1, width, 1); // Adjust rowBytes by 1 to exclude the filter byte
+                        writePixelLine(vmFile, vmBlock, lineNo, rowBuffer + 1);
 
                         rowBufferOffset = 0;
                     }
@@ -341,11 +343,12 @@ void processIDATChunks(FileHandle file, unsigned long length, unsigned long widt
 
 
 // Hauptfunktion zur Verarbeitung von PNG-Chunks
-void processPNGChunks(FileHandle file)
+VMBlockHandle processPNGChunks(FileHandle file, VMFileHandle vmFile)
 {
     IHDRData ihdrData;
     ChunkHeader chdr;
     FileHandle oFile;
+    VMBlockHandle vmBlock;
 
     while (FileRead(file, &chdr, sizeof(chdr), FALSE))
     {
@@ -360,26 +363,28 @@ void processPNGChunks(FileHandle file)
                 if (FileRead(file, &ihdrData, sizeof(ihdrData), FALSE) != sizeof(ihdrData))
                 {
                     // Fehler beim Lesen des IHDR-Chunks.
-                    return;
+                    return NullHandle;
                 }
 
                 ihdrData.width = swapEndian(ihdrData.width);
                 ihdrData.height = swapEndian(ihdrData.height);
                 FilePos(file, chdr.length - sizeof(IHDRData), FILE_POS_RELATIVE);
-                oFile = openOutputFile(ihdrData.width, ihdrData.height);
+                // oFile = openOutputFile(ihdrData.width, ihdrData.height);
+                vmBlock = initiateOutputBitmap(vmFile, ihdrData.width, ihdrData.height, ihdrData.bitDepth);
+
                 break;
             }
             case CHUNK_IDAT:
             {
                 // Verarbeite IDAT-Chunks und rufe den Callback für die Bilddaten auf
-                processIDATChunks(file, chdr.length, ihdrData.width, ihdrData.height, ihdrData.bitDepth, ihdrData.colorType, oFile);
+                processIDATChunks(file, chdr.length, ihdrData.width, ihdrData.height, ihdrData.bitDepth, ihdrData.colorType, vmFile, vmBlock, oFile);
                 break;
             }
             case CHUNK_IEND:
             {
                 // Beende die Verarbeitung bei IEND
-                closeOutputFile(oFile);
-                return;
+                //closeOutputFile(oFile);
+                return vmBlock;
             }
             default:
             {
@@ -392,6 +397,8 @@ void processPNGChunks(FileHandle file)
         // Überspringe CRC (4 Bytes)
         FilePos(file, 4, FILE_POS_RELATIVE);
     }
+
+    return NullHandle;
 }
 
 // Callback-Funktion zum Schreiben der Bilddaten ins NetPBM-Format (PPM)
@@ -433,7 +440,7 @@ void closeOutputFile(FileHandle file)
     FileClose(file, FALSE);
 }
 
-VMBlockHandle initiateOutputBitmap(VMFileHandle vmFileHan, unsigned long width, unsigned long height, unsigned char bitDepth)
+VMBlockHandle initiateOutputBitmap(VMFileHandle vmFile, unsigned long width, unsigned long height, unsigned char bitDepth)
 {
     /*
     ; case BMT_FORMAT:
@@ -455,32 +462,34 @@ VMBlockHandle initiateOutputBitmap(VMFileHandle vmFileHan, unsigned long width, 
     // 24 BIT: BMF_24BIT|BMT_COMPLEX
 */
     GStateHandle bmstate;
-    VMBlockHandle bitmapHandle;
+    VMBlockHandle vmBlock;
 
-    bitmapHandle = GrCreateBitmap(
+    vmBlock = GrCreateBitmap(
         BMF_24BIT|BMT_COMPLEX,
         width, height,
-        vmFileHan,
+        vmFile,
         0,
         &bmstate
     );
 
-    GrDestroyBitmap(bmstate, BMD_LEAVE_DATA);
+    //GrDestroyBitmap(bmstate, BMD_LEAVE_DATA);
 
-    return bitmapHandle;
+    return vmBlock;
 }
 
-void writePixelLine(VMFileHandle vmFileHan, VMBlockHandle bitmapHandle, unsigned long lineNo, unsigned char* rowData)
+void writePixelLine(VMFileHandle vmFile, VMBlockHandle vmBlock, unsigned long lineNo, unsigned char* rowData)
 {
-    void* lineptr;
-    unsigned long size;
+    //unsigned char *lineptr;
+    void *lineptr;
+    word size;
 
     HugeArrayLock(
-        vmFileHan,
-        bitmapHandle,
-        lineNo,
+        vmFile,
+        vmBlock,
+        (dword) lineNo - 1,
         &lineptr,
-        &size);
+        &size
+    );
 
     // CopyAndDither(lineptr, buffer[0], size) ;
 
@@ -490,20 +499,12 @@ void writePixelLine(VMFileHandle vmFileHan, VMBlockHandle bitmapHandle, unsigned
     HugeArrayUnlock(lineptr);
 }
 
-int convertPNG()
+VMBlockHandle convertPNG(FileHandle fileHan, VMFileHandle vmFile)
 {
-    FileHandle file = NULL;
+    if (checkPNGHeader(fileHan))
+    {
+        return processPNGChunks(fileHan, vmFile);
+    }
 
-    FilePushDir();
-    FileSetStandardPath(SP_DOCUMENT);
-
-    file = FileOpen("FLUGZEUG.PNG", FILE_ACCESS_R | FILE_DENY_RW);
-    if (file == NullHandle) return 1;
-
-    if (checkPNGHeader(file)) processPNGChunks(file);
-
-    FileClose(file, FALSE);
-    FilePopDir();
-
-    return 0;
+    return NullHandle;
 }

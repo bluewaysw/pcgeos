@@ -2,10 +2,13 @@
 #include <stdio.h>
 #include <Ansi/stdlib.h>
 #include <Ansi/string.h>
-#include "zlib.h"
+#include <graphics.h>
+#include <vm.h>
+#include <hugearr.h>
+#include <zlib.h>
+#include <file.h>
+#include <heap.h>
 
-#include "file.h"
-#include "heap.h"
 
 // PNG-Chunks
 #define CHUNK_IHDR 0x49484452  // "IHDR"
@@ -46,12 +49,15 @@ static inline unsigned char paethPredictor(int a, int b, int c);
 void convertRGBAtoRGB(unsigned char *data, unsigned long width);
 void convert16BitLineTo8Bit(unsigned char *line, unsigned long width);
 void unfilterImage(unsigned char *data, unsigned char *previousRow, unsigned long bytesPerPixel, unsigned long rowBytes);
-void processIDATChunks(FileHandle file, unsigned long length, unsigned long width, unsigned long height, unsigned char bitDepth, unsigned char colorType, FileHandle oFile);
-void processPNGChunks(FileHandle file);
+void processIDATChunks(FileHandle file, unsigned long length, unsigned long width, unsigned long height, unsigned char bitDepth, unsigned char colorType, VMFileHandle vmFile, VMBlockHandle vmBlock, FileHandle oFile);
+VMBlockHandle processPNGChunks(FileHandle file, VMFileHandle vmFile);
+VMBlockHandle initiateOutputBitmap(VMFileHandle vmFile, unsigned long width, unsigned long height, unsigned char bitDepth);
+void writePixelLine(VMFileHandle vmFile, VMBlockHandle bitmapHandle, unsigned long lineNo, unsigned char* rowData);
+
 void writeOutputFile(FileHandle outputFile, unsigned char *data, unsigned long width, unsigned long height);
 
 FileHandle openOutputFile(unsigned long width, unsigned long height);
 void closeOutputFile(FileHandle file);
 
 int checkPNGHeader(FileHandle file);
-int _pascal _export convertPNG();
+VMBlockHandle _pascal _export convertPNG(FileHandle fileHan, VMFileHandle vmFile);
