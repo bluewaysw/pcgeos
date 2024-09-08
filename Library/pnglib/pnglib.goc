@@ -40,7 +40,6 @@ VMBlockHandle processPNGChunks(FileHandle file, VMFileHandle vmFile)
     IHDRData ihdrData;
     ChunkHeader chdr;
     VMBlockHandle vmBlock;
-    MemHandle paletteHan = NullHandle;
 
     while (FileRead(file, &chdr, sizeof(chdr), FALSE))
     {
@@ -68,14 +67,14 @@ VMBlockHandle processPNGChunks(FileHandle file, VMFileHandle vmFile)
 
             case CHUNK_PLTE:
             {
-                paletteHan = readPLTEChunk(file, chdr.length);
+                readPLTEChunk(file, chdr.length, vmFile, vmBlock);
                 break;
             }
 
             case CHUNK_IDAT:
             {
                 // Verarbeite IDAT-Chunks und rufe den Callback für die Bilddaten auf
-                processIDATChunks(file, chdr.length, ihdrData, paletteHan, vmFile, vmBlock);
+                processIDATChunks(file, chdr.length, ihdrData, vmFile, vmBlock);
                 break;
             }
 
@@ -100,40 +99,41 @@ VMBlockHandle processPNGChunks(FileHandle file, VMFileHandle vmFile)
     return NullHandle;
 }
 
-MemHandle readPLTEChunk(FileHandle file, unsigned long length)
+void readPLTEChunk(FileHandle file, unsigned long length, VMFileHandle vmFile, VMBlockHandle vmBlock)
 {
-    PaletteEntry* palette = NULL;
+    byte* palette = NULL;
     MemHandle paletteHan = NullHandle;
-    unsigned int num_entries = 0;
-    unsigned int i = 0;
+    MemHandle bmmem;
+    word offset;
+    byte *bmblock;
 
     // Make sure the length is divisible by 3 (each color is 3 bytes)
     if (length % 3 != 0 || (length / 3) > MAX_PALETTE_ENTRIES)
     {
-        return NullHandle;  // Invalid palette length
+        return;  // Invalid palette length
     }
 
-    // calc number of palette entries
-    num_entries = (unsigned int)(length / 3);
-
+    // Create our temp. palette storage
     paletteHan = MemAlloc(length, HF_SHARABLE | HF_SWAPABLE, HAF_ZERO_INIT);
-    palette = (PaletteEntry *) MemLock(paletteHan);
+    palette = MemLock(paletteHan);
 
-    // Read the palette data into the array
-    for (i = 0; i < num_entries; i++)
-    {
-        FileRead(file, &palette[i].red, 1, FALSE);
-        FileRead(file, &palette[i].green, 1, FALSE);
-        FileRead(file, &palette[i].blue, 1, FALSE);
-    }
+    // Read the palette data
+    FileRead(file, palette, length, FALSE);
 
-    MemUnlock(paletteHan);
+    // Copy palette data to Bitmap VM File
+    bmblock = VMLock(vmFile, vmBlock, &bmmem);
+    offset = bmblock[0x28]+256*(bmblock[0x29]); // WHUT?!
+    offset += 0x1c;
+    memcpy(&(bmblock[offset]), palette, length);
+    VMDirty(bmmem);
+    VMUnlock(bmmem);
 
-    return paletteHan;
+    // Free Palette mem, no unlock needed
+    MemFree(paletteHan);
 }
 
 // Verarbeitung von IDAT-Chunks
-void processIDATChunks(FileHandle file, unsigned long length, IHDRData ihdr, MemHandle paletteHan, VMFileHandle vmFile, VMBlockHandle vmBlock)
+void processIDATChunks(FileHandle file, unsigned long length, IHDRData ihdr, VMFileHandle vmFile, VMBlockHandle vmBlock)
 {
     z_stream strm;
     int ret;
@@ -308,7 +308,10 @@ VMBlockHandle initiateOutputBitmap(VMFileHandle vmFile, unsigned long width, uns
     VMBlockHandle vmBlock;
 
     vmBlock = GrCreateBitmap(
-        BMF_24BIT | BMT_COMPLEX,
+        // BMF_MONO | BMT_COMPLEX | BMT_PALETTE,
+        BMF_4BIT | BMT_COMPLEX | BMT_PALETTE,
+        // BMF_8BIT | BMT_COMPLEX | BMT_PALETTE,
+        // BMF_24BIT | BMT_COMPLEX,
         width, height,
         vmFile,
         0,
