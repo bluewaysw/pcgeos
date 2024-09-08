@@ -341,6 +341,39 @@ void processIDATChunks(FileHandle file, unsigned long length, unsigned long widt
     MemFree(previousRowHandle);
 }
 
+MemHandle readPLTEChunk(FileHandle file, unsigned long length)
+{
+    PaletteEntry* palette = NULL;
+    MemHandle paletteHan = NullHandle;
+    unsigned int num_entries = 0;
+    unsigned int i = 0;
+
+    // Make sure the length is divisible by 3 (each color is 3 bytes)
+    if (length % 3 != 0 || (length / 3) > MAX_PALETTE_ENTRIES)
+    {
+        return NullHandle;  // Invalid palette length
+    }
+
+    // calc number of palette entries
+    num_entries = (unsigned int)(length / 3);
+
+    paletteHan = MemAlloc(length, HF_SHARABLE | HF_SWAPABLE, HAF_ZERO_INIT);
+    palette = (PaletteEntry*) MemLock(paletteHan);
+
+    // Read the palette data into the array
+    for (i = 0; i < num_entries; i++)
+    {
+        FileRead(file, &palette->red, 1, FALSE);
+        FileRead(file, &palette->green, 1, FALSE);
+        FileRead(file, &palette->blue, 1, FALSE);
+        palette++;
+    }
+
+    MemUnlock(paletteHan);
+
+    return paletteHan;
+}
+
 
 // Hauptfunktion zur Verarbeitung von PNG-Chunks
 VMBlockHandle processPNGChunks(FileHandle file, VMFileHandle vmFile)
