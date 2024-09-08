@@ -1,55 +1,9 @@
 #include <pnglib.goh>
 
-int abs(int x)
-{
-    return x >= 0 ? x : -x;
-}
-
-unsigned long swapEndian(unsigned long val)
-{
-    return ((val >> 24) & 0x000000FF) |
-           ((val >> 8) & 0x0000FF00) |
-           ((val << 8) & 0x00FF0000) |
-           ((val << 24) & 0xFF000000);
-}
-
-// Calculate the number of bits per pixel based on bitDepth and colorType
-unsigned long calcBytesPerRow(width, colorType, bitDepth)
-{
-    unsigned long bitsPerPixel;
-    unsigned long rowBytes;
-
-    switch (colorType) {
-        case 0: // Grayscale
-            bitsPerPixel = bitDepth;
-            break;
-        case 2: // Truecolor (RGB)
-            bitsPerPixel = 3 * bitDepth;
-            break;
-        case 3: // Indexed color
-            bitsPerPixel = bitDepth;
-            break;
-        case 4: // Grayscale with Alpha
-            bitsPerPixel = 2 * bitDepth;
-            break;
-        case 6: // Truecolor with Alpha (RGBA)
-            bitsPerPixel = 4 * bitDepth;
-            break;
-        default:
-            // Unsupported color type
-            return 0;
-    }
-
-    rowBytes = (width * bitsPerPixel + 7) / 8; // Round up to the next whole byte
-
-    return rowBytes;
-}
-
-// Bytes per Pixel.
-unsigned long calcBytesPerPixel(colorType, bitDepth)
-{
-    return calcBytesPerRow(1, colorType, bitDepth);
-}
+/**
+ * Reading and processing the PNG file
+ ********************************************************************
+ */
 
 // Funktion zum Überprüfen des PNG-Headers
 int checkPNGHeader(FileHandle file)
@@ -70,128 +24,112 @@ int checkPNGHeader(FileHandle file)
     return 1;
 }
 
-// Paeth-Prädiktor-Funktion
-static inline unsigned char paethPredictor(int a, int b, int c)
+VMBlockHandle convertPNG(FileHandle fileHan, VMFileHandle vmFile)
 {
-    int p = a + b - c;
-    int pa = abs(p - a);
-    int pb = abs(p - b);
-    int pc = abs(p - c);
-
-    if (pa <= pb && pa <= pc) return (unsigned char)a;
-    else if (pb <= pc) return (unsigned char)b;
-    else return (unsigned char)c;
-}
-
-void convertRGBAtoRGB(unsigned char *data, unsigned long width)
-{
-    unsigned long j;
-    unsigned char *src = data;           // Start at the first pixel (RGBA)
-    unsigned char *dst = data;
-
-    for (j = 0; j < width; j++)
+    if (checkPNGHeader(fileHan))
     {
-        unsigned char r = src[0];
-        unsigned char g = src[1];
-        unsigned char b = src[2];
-        unsigned char a = src[3];  // Alpha value
-
-        // Blend the RGB values with a white background
-        dst[0] = (r * a + 255 * (255 - a)) / 255;  // Red channel
-        dst[1] = (g * a + 255 * (255 - a)) / 255;  // Green channel
-        dst[2] = (b * a + 255 * (255 - a)) / 255;  // Blue channel
-
-        // Move the source pointer forward by 4 (skip the alpha channel)
-        src += 4;
-        // Move the destination pointer forward by 3 (RGB only)
-        dst += 3;
-    }
-}
-
-void convert16BitLineTo8Bit(unsigned char *line, unsigned long width)
-{
-    unsigned long i;
-
-    MemHandle dstHan = NullHandle;
-    unsigned char *dst = NULL;
-    unsigned char *dstStart = NULL;
-
-    // Allocate memory for the destination buffer (3 bytes per pixel for 8-bit RGB)
-    dstHan = MemAlloc(3 * width, HF_SHARABLE | HF_SWAPABLE, HAF_ZERO_INIT);
-    dst = MemLock(dstHan);
-    dstStart = dst;
-
-    // Process from front to back
-    for (i = 0; i < width; i++)
-    {
-        unsigned long index16 = i * 6;  // 16-bit indices (6 bytes per pixel, 2 bytes per channel: R, G, B)
-        unsigned long index8 = i * 3;   // 8-bit indices (3 bytes per pixel for RGB)
-
-        // Combine two consecutive bytes to form the 16-bit value, then convert to 8-bit
-        unsigned short red16   = (line[index16 + 0] << 8) | line[index16 + 1];  // Combine high and low byte for Red
-        unsigned short green16 = (line[index16 + 2] << 8) | line[index16 + 3];  // Combine high and low byte for Green
-        unsigned short blue16  = (line[index16 + 4] << 8) | line[index16 + 5];  // Combine high and low byte for Blue
-
-        // Convert 16-bit values to 8-bit by right-shifting 8 bits
-        dst[index8 + 0] = red16 >> 8;   // Red
-        dst[index8 + 1] = green16 >> 8; // Green
-        dst[index8 + 2] = blue16 >> 8;  // Blue
+        return processPNGChunks(fileHan, vmFile);
     }
 
-    // Copy the converted 8-bit values back to the original buffer
-    memcpy(line, dstStart, 3 * width);
-
-    // Free the memory allocated for the destination buffer
-    MemFree(dstHan);
+    return NullHandle;
 }
 
-// Unfilter-Funktion zur Verarbeitung der PNG-Bilddaten
-void unfilterImage(unsigned char *data, unsigned char *previousRow, unsigned long bytesPerPixel, unsigned long rowBytes)
+// Hauptfunktion zur Verarbeitung von PNG-Chunks
+VMBlockHandle processPNGChunks(FileHandle file, VMFileHandle vmFile)
 {
-    unsigned char *currentRow = data;
-    unsigned char filterType = *currentRow;
-    unsigned long i;
+    IHDRData ihdrData;
+    ChunkHeader chdr;
+    VMBlockHandle vmBlock;
+    MemHandle paletteHan = NullHandle;
 
-    // Pointer to the first byte after the filter type
-    currentRow++;
-
-    // Apply the filter
-    switch (filterType)
+    while (FileRead(file, &chdr, sizeof(chdr), FALSE))
     {
-        case FILTER_NONE:
-            // No filter, data is already in place
-            break;
-        case FILTER_SUB:
-            for (i = bytesPerPixel; i < rowBytes; i++) {
-                currentRow[i] += currentRow[i - bytesPerPixel];
-            }
-            break;
-        case FILTER_UP:
-            for (i = 0; i < rowBytes; i++) {
-                currentRow[i] += previousRow[i];
-            }
-            break;
-        case FILTER_AVERAGE:
-            for (i = 0; i < rowBytes; i++)
+        chdr.length = swapEndian(chdr.length);
+        chdr.type = swapEndian(chdr.type);
+
+        switch (chdr.type)
+        {
+            case CHUNK_IHDR:
             {
-                unsigned char left = (i >= bytesPerPixel) ? currentRow[i - bytesPerPixel] : 0;
-                unsigned char up = previousRow[i];
-                currentRow[i] += (left + up) / 2;
+                // Lese und speichere die IHDR-Daten
+                if (FileRead(file, &ihdrData, sizeof(ihdrData), FALSE) != sizeof(ihdrData))
+                {
+                    // Fehler beim Lesen des IHDR-Chunks.
+                    return NullHandle;
+                }
+
+                ihdrData.width = swapEndian(ihdrData.width);
+                ihdrData.height = swapEndian(ihdrData.height);
+                FilePos(file, chdr.length - sizeof(IHDRData), FILE_POS_RELATIVE);
+                vmBlock = initiateOutputBitmap(vmFile, ihdrData.width, ihdrData.height, ihdrData.bitDepth);
+
+                break;
             }
-            break;
-        case FILTER_PAETH:
-            for (i = 0; i < rowBytes; i++)
+
+            case CHUNK_PLTE:
             {
-                unsigned char left = (i >= bytesPerPixel) ? currentRow[i - bytesPerPixel] : 0;
-                unsigned char up = previousRow[i];
-                unsigned char upLeft = (i >= bytesPerPixel) ? previousRow[i - bytesPerPixel] : 0;
-                currentRow[i] += paethPredictor(left, up, upLeft);
+                paletteHan = readPLTEChunk(file, chdr.length);
+                break;
             }
-            break;
-        default:
-            // Invalid filter type
-            return;
+
+            case CHUNK_IDAT:
+            {
+                // Verarbeite IDAT-Chunks und rufe den Callback für die Bilddaten auf
+                processIDATChunks(file, chdr.length, ihdrData, paletteHan, vmFile, vmBlock);
+                break;
+            }
+
+            case CHUNK_IEND:
+            {
+                // Beende die Verarbeitung bei IEND
+                return vmBlock;
+            }
+
+            default:
+            {
+                // Überspringe unbekannte Chunks
+                FilePos(file, chdr.length, FILE_POS_RELATIVE);
+                break;
+            }
+        }
+
+        // Überspringe CRC (4 Bytes)
+        FilePos(file, 4, FILE_POS_RELATIVE);
     }
+
+    return NullHandle;
+}
+
+MemHandle readPLTEChunk(FileHandle file, unsigned long length)
+{
+    PaletteEntry* palette = NULL;
+    MemHandle paletteHan = NullHandle;
+    unsigned int num_entries = 0;
+    unsigned int i = 0;
+
+    // Make sure the length is divisible by 3 (each color is 3 bytes)
+    if (length % 3 != 0 || (length / 3) > MAX_PALETTE_ENTRIES)
+    {
+        return NullHandle;  // Invalid palette length
+    }
+
+    // calc number of palette entries
+    num_entries = (unsigned int)(length / 3);
+
+    paletteHan = MemAlloc(length, HF_SHARABLE | HF_SWAPABLE, HAF_ZERO_INIT);
+    palette = (PaletteEntry *) MemLock(paletteHan);
+
+    // Read the palette data into the array
+    for (i = 0; i < num_entries; i++)
+    {
+        FileRead(file, &palette[i].red, 1, FALSE);
+        FileRead(file, &palette[i].green, 1, FALSE);
+        FileRead(file, &palette[i].blue, 1, FALSE);
+    }
+
+    MemUnlock(paletteHan);
+
+    return paletteHan;
 }
 
 // Verarbeitung von IDAT-Chunks
@@ -298,7 +236,7 @@ void processIDATChunks(FileHandle file, unsigned long length, IHDRData ihdr, Mem
 
                     if (rowBufferOffset == rowBytes + 1) // +1 to include the filter byte
                     {
-                        unfilterImage(rowBuffer, previousRow, bytesPerPixel, rowBytes);
+                        unfilterRow(rowBuffer, previousRow, bytesPerPixel, rowBytes);
                         memcpy(previousRow, rowBuffer + 1, rowBytes); // +1 to skip the filter byte
                         lineNo++;
 
@@ -340,105 +278,10 @@ void processIDATChunks(FileHandle file, unsigned long length, IHDRData ihdr, Mem
     MemFree(previousRowHandle);
 }
 
-MemHandle readPLTEChunk(FileHandle file, unsigned long length)
-{
-    PaletteEntry* palette = NULL;
-    MemHandle paletteHan = NullHandle;
-    unsigned int num_entries = 0;
-    unsigned int i = 0;
-
-    // Make sure the length is divisible by 3 (each color is 3 bytes)
-    if (length % 3 != 0 || (length / 3) > MAX_PALETTE_ENTRIES)
-    {
-        return NullHandle;  // Invalid palette length
-    }
-
-    // calc number of palette entries
-    num_entries = (unsigned int)(length / 3);
-
-    paletteHan = MemAlloc(length, HF_SHARABLE | HF_SWAPABLE, HAF_ZERO_INIT);
-    palette = (PaletteEntry *) MemLock(paletteHan);
-
-    // Read the palette data into the array
-    for (i = 0; i < num_entries; i++)
-    {
-        FileRead(file, &palette[i].red, 1, FALSE);
-        FileRead(file, &palette[i].green, 1, FALSE);
-        FileRead(file, &palette[i].blue, 1, FALSE);
-    }
-
-    MemUnlock(paletteHan);
-
-    return paletteHan;
-}
-
-
-// Hauptfunktion zur Verarbeitung von PNG-Chunks
-VMBlockHandle processPNGChunks(FileHandle file, VMFileHandle vmFile)
-{
-    IHDRData ihdrData;
-    ChunkHeader chdr;
-    FileHandle oFile;
-    VMBlockHandle vmBlock;
-    MemHandle paletteHan = NullHandle;
-
-    while (FileRead(file, &chdr, sizeof(chdr), FALSE))
-    {
-        chdr.length = swapEndian(chdr.length);
-        chdr.type = swapEndian(chdr.type);
-
-        switch (chdr.type)
-        {
-            case CHUNK_IHDR:
-            {
-                // Lese und speichere die IHDR-Daten
-                if (FileRead(file, &ihdrData, sizeof(ihdrData), FALSE) != sizeof(ihdrData))
-                {
-                    // Fehler beim Lesen des IHDR-Chunks.
-                    return NullHandle;
-                }
-
-                ihdrData.width = swapEndian(ihdrData.width);
-                ihdrData.height = swapEndian(ihdrData.height);
-                FilePos(file, chdr.length - sizeof(IHDRData), FILE_POS_RELATIVE);
-                vmBlock = initiateOutputBitmap(vmFile, ihdrData.width, ihdrData.height, ihdrData.bitDepth);
-
-                break;
-            }
-
-            case CHUNK_PLTE:
-            {
-                paletteHan = readPLTEChunk(file, chdr.length);
-                break;
-            }
-
-            case CHUNK_IDAT:
-            {
-                // Verarbeite IDAT-Chunks und rufe den Callback für die Bilddaten auf
-                processIDATChunks(file, chdr.length, ihdrData, paletteHan, vmFile, vmBlock);
-                break;
-            }
-
-            case CHUNK_IEND:
-            {
-                // Beende die Verarbeitung bei IEND
-                return vmBlock;
-            }
-
-            default:
-            {
-                // Überspringe unbekannte Chunks
-                FilePos(file, chdr.length, FILE_POS_RELATIVE);
-                break;
-            }
-        }
-
-        // Überspringe CRC (4 Bytes)
-        FilePos(file, 4, FILE_POS_RELATIVE);
-    }
-
-    return NullHandle;
-}
+/**
+ * Writing the GEOS Bitmap
+ ********************************************************************
+ */
 
 VMBlockHandle initiateOutputBitmap(VMFileHandle vmFile, unsigned long width, unsigned long height, unsigned char bitDepth)
 {
@@ -499,12 +342,184 @@ void writePixelLine(VMFileHandle vmFile, VMBlockHandle vmBlock, unsigned long li
     HugeArrayUnlock(lineptr);
 }
 
-VMBlockHandle convertPNG(FileHandle fileHan, VMFileHandle vmFile)
+
+/**
+ * Helpers and processing of image data itself
+ ********************************************************************
+ */
+
+int abs(int x)
 {
-    if (checkPNGHeader(fileHan))
-    {
-        return processPNGChunks(fileHan, vmFile);
+    return x >= 0 ? x : -x;
+}
+
+unsigned long swapEndian(unsigned long val)
+{
+    return ((val >> 24) & 0x000000FF) |
+           ((val >> 8) & 0x0000FF00) |
+           ((val << 8) & 0x00FF0000) |
+           ((val << 24) & 0xFF000000);
+}
+
+// Calculate the number of bits per pixel based on bitDepth and colorType
+unsigned long calcBytesPerRow(unsigned long width, unsigned char colorType, unsigned char bitDepth)
+{
+    unsigned long bitsPerPixel;
+    unsigned long rowBytes;
+
+    switch (colorType) {
+        case 0: // Grayscale
+            bitsPerPixel = bitDepth;
+            break;
+        case 2: // Truecolor (RGB)
+            bitsPerPixel = 3 * bitDepth;
+            break;
+        case 3: // Indexed color
+            bitsPerPixel = bitDepth;
+            break;
+        case 4: // Grayscale with Alpha
+            bitsPerPixel = 2 * bitDepth;
+            break;
+        case 6: // Truecolor with Alpha (RGBA)
+            bitsPerPixel = 4 * bitDepth;
+            break;
+        default:
+            // Unsupported color type
+            return 0;
     }
 
-    return NullHandle;
+    rowBytes = (width * bitsPerPixel + 7) / 8; // Round up to the next whole byte
+
+    return rowBytes;
 }
+
+// Bytes per Pixel.
+unsigned long calcBytesPerPixel(unsigned char colorType, unsigned char bitDepth)
+{
+    return calcBytesPerRow(1, colorType, bitDepth);
+}
+
+// Paeth-Prädiktor-Funktion
+static inline unsigned char paethPredictor(int a, int b, int c)
+{
+    int p = a + b - c;
+    int pa = abs(p - a);
+    int pb = abs(p - b);
+    int pc = abs(p - c);
+
+    if (pa <= pb && pa <= pc) return (unsigned char)a;
+    else if (pb <= pc) return (unsigned char)b;
+    else return (unsigned char)c;
+}
+
+void convertRGBAtoRGB(unsigned char *data, unsigned long width)
+{
+    unsigned long j;
+    unsigned char *src = data;           // Start at the first pixel (RGBA)
+    unsigned char *dst = data;
+
+    for (j = 0; j < width; j++)
+    {
+        unsigned char r = src[0];
+        unsigned char g = src[1];
+        unsigned char b = src[2];
+        unsigned char a = src[3];  // Alpha value
+
+        // Blend the RGB values with a white background
+        dst[0] = (r * a + 255 * (255 - a)) / 255;  // Red channel
+        dst[1] = (g * a + 255 * (255 - a)) / 255;  // Green channel
+        dst[2] = (b * a + 255 * (255 - a)) / 255;  // Blue channel
+
+        // Move the source pointer forward by 4 (skip the alpha channel)
+        src += 4;
+        // Move the destination pointer forward by 3 (RGB only)
+        dst += 3;
+    }
+}
+
+void convert16BitLineTo8Bit(unsigned char *line, unsigned long width)
+{
+    unsigned long i;
+
+    MemHandle dstHan = NullHandle;
+    unsigned char *dst = NULL;
+    unsigned char *dstStart = NULL;
+
+    // Allocate memory for the destination buffer (3 bytes per pixel for 8-bit RGB)
+    dstHan = MemAlloc(3 * width, HF_SHARABLE | HF_SWAPABLE, HAF_ZERO_INIT);
+    dst = MemLock(dstHan);
+    dstStart = dst;
+
+    // Process from front to back
+    for (i = 0; i < width; i++)
+    {
+        unsigned long index16 = i * 6;  // 16-bit indices (6 bytes per pixel, 2 bytes per channel: R, G, B)
+        unsigned long index8 = i * 3;   // 8-bit indices (3 bytes per pixel for RGB)
+
+        // Combine two consecutive bytes to form the 16-bit value, then convert to 8-bit
+        unsigned short red16   = (line[index16 + 0] << 8) | line[index16 + 1];  // Combine high and low byte for Red
+        unsigned short green16 = (line[index16 + 2] << 8) | line[index16 + 3];  // Combine high and low byte for Green
+        unsigned short blue16  = (line[index16 + 4] << 8) | line[index16 + 5];  // Combine high and low byte for Blue
+
+        // Convert 16-bit values to 8-bit by right-shifting 8 bits
+        dst[index8 + 0] = red16 >> 8;   // Red
+        dst[index8 + 1] = green16 >> 8; // Green
+        dst[index8 + 2] = blue16 >> 8;  // Blue
+    }
+
+    // Copy the converted 8-bit values back to the original buffer
+    memcpy(line, dstStart, 3 * width);
+
+    // Free the memory allocated for the destination buffer
+    MemFree(dstHan);
+}
+
+// Unfilter-Funktion zur Verarbeitung der PNG-Bilddaten
+void unfilterRow(unsigned char *data, unsigned char *previousRow, unsigned long bytesPerPixel, unsigned long rowBytes)
+{
+    unsigned char *currentRow = data;
+    unsigned char filterType = *currentRow;
+    unsigned long i;
+
+    // Pointer to the first byte after the filter type
+    currentRow++;
+
+    // Apply the filter
+    switch (filterType)
+    {
+        case FILTER_NONE:
+            // No filter, data is already in place
+            break;
+        case FILTER_SUB:
+            for (i = bytesPerPixel; i < rowBytes; i++) {
+                currentRow[i] += currentRow[i - bytesPerPixel];
+            }
+            break;
+        case FILTER_UP:
+            for (i = 0; i < rowBytes; i++) {
+                currentRow[i] += previousRow[i];
+            }
+            break;
+        case FILTER_AVERAGE:
+            for (i = 0; i < rowBytes; i++)
+            {
+                unsigned char left = (i >= bytesPerPixel) ? currentRow[i - bytesPerPixel] : 0;
+                unsigned char up = previousRow[i];
+                currentRow[i] += (left + up) / 2;
+            }
+            break;
+        case FILTER_PAETH:
+            for (i = 0; i < rowBytes; i++)
+            {
+                unsigned char left = (i >= bytesPerPixel) ? currentRow[i - bytesPerPixel] : 0;
+                unsigned char up = previousRow[i];
+                unsigned char upLeft = (i >= bytesPerPixel) ? previousRow[i - bytesPerPixel] : 0;
+                currentRow[i] += paethPredictor(left, up, upLeft);
+            }
+            break;
+        default:
+            // Invalid filter type
+            return;
+    }
+}
+
