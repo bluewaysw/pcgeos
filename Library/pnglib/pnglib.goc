@@ -195,7 +195,7 @@ void unfilterImage(unsigned char *data, unsigned char *previousRow, unsigned lon
 }
 
 // Verarbeitung von IDAT-Chunks
-void processIDATChunks(FileHandle file, unsigned long length, unsigned long width, unsigned long height, unsigned char bitDepth, unsigned char colorType, VMFileHandle vmFile, VMBlockHandle vmBlock, FileHandle oFile)
+void processIDATChunks(FileHandle file, unsigned long length, IHDRData ihdr, MemHandle paletteHan, VMFileHandle vmFile, VMBlockHandle vmBlock)
 {
     z_stream strm;
     int ret;
@@ -217,8 +217,8 @@ void processIDATChunks(FileHandle file, unsigned long length, unsigned long widt
     unsigned long lineNo = 0;
 
     // calculate row bytes
-    bytesPerPixel = calcBytesPerPixel(colorType, bitDepth);
-    rowBytes = calcBytesPerRow(width, colorType, bitDepth);
+    bytesPerPixel = calcBytesPerPixel(ihdr.colorType, ihdr.bitDepth);
+    rowBytes = calcBytesPerRow(ihdr.width, ihdr.colorType, ihdr.bitDepth);
 
     // Input - decoded zlib data
     inHan = MemAlloc(CHUNK_SIZE, HF_SHARABLE | HF_SWAPABLE, HAF_ZERO_INIT);
@@ -302,10 +302,10 @@ void processIDATChunks(FileHandle file, unsigned long length, unsigned long widt
                         memcpy(previousRow, rowBuffer + 1, rowBytes); // +1 to skip the filter byte
                         lineNo++;
 
-                        if (colorType == 6)
+                        if (ihdr.colorType == 6)
                         {
                             // Konvertiere nach RGB, Setze colorType auf 2 (Truecolor RGB) und reduziere die Anzahl der Bytes pro Pixel
-                            convertRGBAtoRGB(rowBuffer + 1, width);
+                            convertRGBAtoRGB(rowBuffer + 1, ihdr.width);
                             // colorType = 2;
                             // bytesPerPixel = 3; //calcBytesPerPixel(colorType, bitDepth);
                             // rowBytes = width * bytesPerPixel; //calcBytesPerRow(width, colorType, bitDepth);
@@ -314,13 +314,12 @@ void processIDATChunks(FileHandle file, unsigned long length, unsigned long widt
                         if (bytesPerPixel == 6)
                         {
                             // Konvertiere nach RGB, Setze colorType auf 2 (Truecolor RGB) und reduziere die Anzahl der Bytes pro Pixel
-                            convert16BitLineTo8Bit(rowBuffer + 1, width);
+                            convert16BitLineTo8Bit(rowBuffer + 1, ihdr.width);
                             // bitDepth = 8;
                             // bytesPerPixel = calcBytesPerPixel(colorType, bitDepth);
                             // rowBytes = calcBytesPerRow(width, colorType, bitDepth);
                         }
 
-                        // writeOutputFile(oFile, rowBuffer + 1, width, 1); // Adjust rowBytes by 1 to exclude the filter byte
                         writePixelLine(vmFile, vmBlock, lineNo, rowBuffer + 1);
 
                         rowBufferOffset = 0;
@@ -358,15 +357,14 @@ MemHandle readPLTEChunk(FileHandle file, unsigned long length)
     num_entries = (unsigned int)(length / 3);
 
     paletteHan = MemAlloc(length, HF_SHARABLE | HF_SWAPABLE, HAF_ZERO_INIT);
-    palette = (PaletteEntry*) MemLock(paletteHan);
+    palette = (PaletteEntry *) MemLock(paletteHan);
 
     // Read the palette data into the array
     for (i = 0; i < num_entries; i++)
     {
-        FileRead(file, &palette->red, 1, FALSE);
-        FileRead(file, &palette->green, 1, FALSE);
-        FileRead(file, &palette->blue, 1, FALSE);
-        palette++;
+        FileRead(file, &palette[i].red, 1, FALSE);
+        FileRead(file, &palette[i].green, 1, FALSE);
+        FileRead(file, &palette[i].blue, 1, FALSE);
     }
 
     MemUnlock(paletteHan);
@@ -382,6 +380,7 @@ VMBlockHandle processPNGChunks(FileHandle file, VMFileHandle vmFile)
     ChunkHeader chdr;
     FileHandle oFile;
     VMBlockHandle vmBlock;
+    MemHandle paletteHan = NullHandle;
 
     while (FileRead(file, &chdr, sizeof(chdr), FALSE))
     {
@@ -402,23 +401,30 @@ VMBlockHandle processPNGChunks(FileHandle file, VMFileHandle vmFile)
                 ihdrData.width = swapEndian(ihdrData.width);
                 ihdrData.height = swapEndian(ihdrData.height);
                 FilePos(file, chdr.length - sizeof(IHDRData), FILE_POS_RELATIVE);
-                // oFile = openOutputFile(ihdrData.width, ihdrData.height);
                 vmBlock = initiateOutputBitmap(vmFile, ihdrData.width, ihdrData.height, ihdrData.bitDepth);
 
                 break;
             }
+
+            case CHUNK_PLTE:
+            {
+                paletteHan = readPLTEChunk(file, chdr.length);
+                break;
+            }
+
             case CHUNK_IDAT:
             {
                 // Verarbeite IDAT-Chunks und rufe den Callback für die Bilddaten auf
-                processIDATChunks(file, chdr.length, ihdrData.width, ihdrData.height, ihdrData.bitDepth, ihdrData.colorType, vmFile, vmBlock, oFile);
+                processIDATChunks(file, chdr.length, ihdrData, paletteHan, vmFile, vmBlock);
                 break;
             }
+
             case CHUNK_IEND:
             {
                 // Beende die Verarbeitung bei IEND
-                //closeOutputFile(oFile);
                 return vmBlock;
             }
+
             default:
             {
                 // Überspringe unbekannte Chunks
@@ -432,45 +438,6 @@ VMBlockHandle processPNGChunks(FileHandle file, VMFileHandle vmFile)
     }
 
     return NullHandle;
-}
-
-// Callback-Funktion zum Schreiben der Bilddaten ins NetPBM-Format (PPM)
-void writeOutputFile(FileHandle outputFile, unsigned char *data, unsigned long width, unsigned long height)
-{
-    unsigned long rowBytes = width * 3;  // RGB is 3 bytes per pixel
-
-    if (outputFile)
-    {
-        // Write the image data directly as binary
-        FileWrite(outputFile, data, rowBytes * height, FALSE);  // Write entire row
-    }
-
-    return;
-}
-
-FileHandle openOutputFile(unsigned long width, unsigned long height)
-{
-    FileHandle file;
-    char header[50] = {0};
-
-    // Use P6 format for binary output
-    file = FileCreate("output.ppm", (FCF_NATIVE | FILE_ACCESS_W | FILE_DENY_RW | FILE_CREATE_TRUNCATE), 0);
-
-    if (file)
-    {
-        // Write the PPM binary header (P6 format)
-        sprintf(header, "P6\n%lu %lu\n255\n", width, height);
-        FileWrite(file, header, strlen(header), FALSE);
-
-        return file;
-    }
-
-    return NULL;
-}
-
-void closeOutputFile(FileHandle file)
-{
-    FileClose(file, FALSE);
 }
 
 VMBlockHandle initiateOutputBitmap(VMFileHandle vmFile, unsigned long width, unsigned long height, unsigned char bitDepth)
