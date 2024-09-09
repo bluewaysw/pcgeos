@@ -9,7 +9,6 @@
 #include <file.h>
 #include <heap.h>
 
-
 // PNG-Chunks
 #define CHUNK_IHDR 0x49484452  // "IHDR"
 #define CHUNK_IDAT 0x49444154  // "IDAT"
@@ -35,6 +34,24 @@ typedef struct {
     unsigned long type;
 } ChunkHeader;
 
+// IDAT parsing state struct
+typedef struct {
+    z_stream strm;
+    MemHandle inHan;
+    unsigned char *in;
+    MemHandle outHan;
+    unsigned char *out;
+    unsigned long rowBufferOffset;
+    MemHandle previousRowHandle;
+    unsigned char *previousRow;
+    unsigned long lineNo;
+    unsigned long rowBytes;
+    unsigned long bytesPerPixel;
+    unsigned long bytesToRead;
+    unsigned long length;
+    FileHandle file;
+    IHDRData ihdr;
+} IDATState;
 
 // Structure to hold the RGB color of a palette entry
 typedef struct {
@@ -56,12 +73,14 @@ const unsigned char PNG_SIGNATURE[8] = {0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A
 #define FILTER_AVERAGE 3
 #define FILTER_PAETH   4
 
-int checkPNGHeader(FileHandle file);
+
 VMBlockHandle _pascal _export convertPNG(FileHandle fileHan, VMFileHandle vmFile);
-VMBlockHandle processPNGChunks(FileHandle file, VMFileHandle vmFile);
-//MemHandle readPLTEChunk(FileHandle file, unsigned long length);
+int checkPNGHeader(FileHandle file);
+void processPNGChunks(FileHandle file, VMFileHandle vmFile, ChunkHeader* chdr, IHDRData* ihdrData, unsigned long* idatChunkPos, VMBlockHandle* vmBlock);
 void readPLTEChunk(FileHandle file, unsigned long length, VMFileHandle vmFile, VMBlockHandle vmBlock);
-void processIDATChunks(FileHandle file, unsigned long length, IHDRData ihdr, VMFileHandle vmFile, VMBlockHandle vmBlock);
+IDATState initIDATState(FileHandle file, unsigned long idatChunkPos, unsigned long length, IHDRData ihdr);
+int processNextScanline(IDATState state, unsigned char *rowBuffer);
+void cleanupIDATState(IDATState state);
 
 VMBlockHandle initiateOutputBitmap(VMFileHandle vmFile, unsigned long width, unsigned long height, unsigned char bitDepth);
 void writePixelLine(VMFileHandle vmFile, VMBlockHandle bitmapHandle, unsigned long lineNo, unsigned char* rowData);
@@ -74,4 +93,3 @@ unsigned long calcBytesPerPixel(unsigned char colorType, unsigned char bitDepth)
 void convertRGBAtoRGB(unsigned char *data, unsigned long width);
 void convert16BitLineTo8Bit(unsigned char *line, unsigned long width);
 void unfilterRow(unsigned char *data, unsigned char *previousRow, unsigned long bytesPerPixel, unsigned long rowBytes);
-
