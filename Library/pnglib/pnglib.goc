@@ -7,7 +7,7 @@
 
 VMBlockHandle convertPNG(FileHandle fileHan, VMFileHandle vmFile)
 {
-    IHDRData ihdrData;;
+    IHDRData ihdrData;
     ChunkHeader chdr;
     VMBlockHandle vmBlock = NullHandle;
     unsigned long idatChunkPos = NULL;
@@ -29,7 +29,7 @@ VMBlockHandle convertPNG(FileHandle fileHan, VMFileHandle vmFile)
         rowBuffer = MemLock(rowBufferHan);
 
         // Process each scanline
-        while ((status = processNextScanline(state, rowBuffer)) == Z_OK)
+        while ((status = processNextScanline(&state, rowBuffer)) == Z_OK)
         {
             // Now rowBuffer contains the current scanline without the filter byte
             // Process or display rowBuffer as needed
@@ -47,11 +47,11 @@ VMBlockHandle convertPNG(FileHandle fileHan, VMFileHandle vmFile)
             }
 
             // Write the processed scanline (without the filter byte) to the VMFile
-            writePixelLine(vmFile, vmBlock, state.lineNo, rowBuffer);
+            writePixelLine(vmFile, vmBlock, state.lineNo - 1, rowBuffer);
         }
 
         // Clean up resources
-        cleanupIDATState(state);
+        cleanupIDATState(&state);
         MemFree(rowBufferHan);
 
         return vmBlock;
@@ -114,19 +114,19 @@ void processPNGChunks(FileHandle file, VMFileHandle vmFile, ChunkHeader* chdr, I
 
             case CHUNK_IDAT:
             {
-                *idatChunkPos = FilePos(file, 0, FILE_POS_RELATIVE); //FIXME prepare for multiple iIDAT Chunks, currently only the last one is catched
+                *idatChunkPos = FilePos(file, 0, FILE_POS_RELATIVE); // FIXME: rework for multiple IDAT Chunks, currently only the last one is catched
                 break;
             }
 
             case CHUNK_IEND:
             {
-                // Beende die Verarbeitung bei IEND
+                // return at IEND
                 return;
             }
 
             default:
             {
-                // Überspringe unbekannte Chunks
+                // Skip unknown chunks (for now)
                 FilePos(file, chdr->length, FILE_POS_RELATIVE);
                 break;
             }
@@ -138,40 +138,6 @@ void processPNGChunks(FileHandle file, VMFileHandle vmFile, ChunkHeader* chdr, I
 
     return;
 }
-
-void readPLTEChunk(FileHandle file, unsigned long length, VMFileHandle vmFile, VMBlockHandle vmBlock)
-{
-    byte* palette = NULL;
-    MemHandle paletteHan = NullHandle;
-    MemHandle bmmem;
-    word offset;
-    byte *bmblock;
-
-    // Make sure the length is divisible by 3 (each color is 3 bytes)
-    if (length % 3 != 0 || (length / 3) > MAX_PALETTE_ENTRIES)
-    {
-        return;  // Invalid palette length
-    }
-
-    // Create our temp. palette storage
-    paletteHan = MemAlloc(length, HF_SHARABLE | HF_SWAPABLE, HAF_ZERO_INIT);
-    palette = MemLock(paletteHan);
-
-    // Read the palette data
-    FileRead(file, palette, length, FALSE);
-
-    // Copy palette data to Bitmap VM File
-    bmblock = VMLock(vmFile, vmBlock, &bmmem);
-    offset = bmblock[0x28]+256*(bmblock[0x29]); // WHUT?!
-    offset += 0x1c;
-    memcpy(&(bmblock[offset]), palette, length);
-    VMDirty(bmmem);
-    VMUnlock(bmmem);
-
-    // Free Palette mem, no unlock needed
-    MemFree(paletteHan);
-}
-
 
 IDATState initIDATState(FileHandle file, unsigned long idatChunkPos, unsigned long length, IHDRData ihdr)
 {
@@ -210,95 +176,126 @@ IDATState initIDATState(FileHandle file, unsigned long idatChunkPos, unsigned lo
 }
 
 // Verarbeitung von IDAT-Chunks
-int processNextScanline(IDATState state, unsigned char *rowBuffer)
+int processNextScanline(IDATState* state, unsigned char *rowBuffer) // IDATState must be passed as pointer, so that changes to it can be stored!
 {
     int ret;
     unsigned long have;
     unsigned long toCopy;
     unsigned char *src;
 
-    if (state.length == 0)
+    if (state->length == 0)
     {
         // No more data to read
         return Z_STREAM_END;
     }
 
     // If we need more input data, read it from the file
-    if (state.strm.avail_in == 0)
+    if (state->strm.avail_in == 0)
     {
-        state.bytesToRead = (state.length < CHUNK_SIZE) ? state.length : CHUNK_SIZE;
+        state->bytesToRead = (state->length < CHUNK_SIZE) ? state->length : CHUNK_SIZE;
 
-        if (FileRead(state.file, &state.in, state.bytesToRead, FALSE) != state.bytesToRead)
+        if (FileRead(state->file, state->in, state->bytesToRead, FALSE) != state->bytesToRead)
         {
             // Error reading PNG data
-            inflateEnd(&state.strm);
+            inflateEnd(&state->strm);
             return Z_ERRNO;
         }
 
-        state.strm.avail_in = state.bytesToRead;
-        state.strm.next_in = state.in;
-        state.length -= state.bytesToRead;
+        state->strm.avail_in = state->bytesToRead;
+        state->strm.next_in = state->in;
+        state->length -= state->bytesToRead;
     }
 
     // Inflate until we have a complete scanline or we run out of output buffer space
     do {
-        state.strm.avail_out = CHUNK_SIZE;
-        state.strm.next_out = state.out;
-        ret = inflate(&state.strm, Z_NO_FLUSH);
+        state->strm.avail_out = CHUNK_SIZE;
+        state->strm.next_out = state->out;
+        ret = inflate(&state->strm, Z_NO_FLUSH);
 
         if (ret != Z_OK && ret != Z_STREAM_END)
         {
             // Decompression error
-            inflateEnd(&state.strm);
+            inflateEnd(&state->strm);
             return ret;
         }
 
-        have = CHUNK_SIZE - state.strm.avail_out;
+        have = CHUNK_SIZE - state->strm.avail_out;
         if (have > 0)
         {
-            src = state.out;
+            src = state->out;
             while (have > 0)
             {
-                toCopy = ((state.rowBytes + 1 - state.rowBufferOffset) < have) ? (state.rowBytes + 1 - state.rowBufferOffset) : have;
-                memcpy(rowBuffer + state.rowBufferOffset, src, toCopy);
-                state.rowBufferOffset += toCopy;
+                toCopy = ((state->rowBytes + 1 - state->rowBufferOffset) < have) ? (state->rowBytes + 1 - state->rowBufferOffset) : have;
+                memcpy(rowBuffer + state->rowBufferOffset, src, toCopy);
+                state->rowBufferOffset += toCopy;
                 src += toCopy;
                 have -= toCopy;
 
-                if (state.rowBufferOffset == state.rowBytes + 1)
+                if (state->rowBufferOffset == state->rowBytes + 1)
                 {
                     // We have a complete row with the filter byte
-                    unfilterRow(rowBuffer, state.previousRow, state.bytesPerPixel, state.rowBytes);
+                    unfilterRow(rowBuffer, state->previousRow, state->bytesPerPixel, state->rowBytes);
 
                     // Move the row data to skip the filter byte
-                    memmove(rowBuffer, rowBuffer + 1, state.rowBytes); // Skip the filter byte
+                    memmove(rowBuffer, rowBuffer + 1, state->rowBytes); // Skip the filter byte
 
                     // Copy the current row (without the filter byte) to previousRow for the next scanline
-                    memcpy(state.previousRow, rowBuffer, state.rowBytes);
+                    memcpy(state->previousRow, rowBuffer, state->rowBytes);
 
                     // next line!
-                    state.lineNo++;
+                    state->lineNo++;
 
                     // Reset for the next line
-                    state.rowBufferOffset = 0;
+                    state->rowBufferOffset = 0;
                     return Z_OK; // Processed one scanline
                 }
             }
         }
-    } while (state.strm.avail_out == 0);
+    } while (state->strm.avail_out == 0);
 
     return ret; // Return the status of the stream (Z_OK, Z_STREAM_END, etc.)
 }
 
-
-void cleanupIDATState(IDATState state)
+void cleanupIDATState(IDATState* state)
 {
-    inflateEnd(&state.strm);
-    MemFree(state.inHan);
-    MemFree(state.outHan);
-    MemFree(state.previousRowHandle);
+    inflateEnd(&state->strm);
+    MemFree(state->inHan);
+    MemFree(state->outHan);
+    MemFree(state->previousRowHandle);
 }
 
+void readPLTEChunk(FileHandle file, unsigned long length, VMFileHandle vmFile, VMBlockHandle vmBlock)
+{
+    byte* palette = NULL;
+    MemHandle paletteHan = NullHandle;
+    MemHandle bmmem;
+    word offset;
+    byte *bmblock;
+
+    // Make sure the length is divisible by 3 (each color is 3 bytes)
+    if (length % 3 != 0 || (length / 3) > MAX_PALETTE_ENTRIES)
+    {
+        return;  // Invalid palette length
+    }
+
+    // Create our temp. palette storage
+    paletteHan = MemAlloc(length, HF_SHARABLE | HF_SWAPABLE, HAF_ZERO_INIT);
+    palette = MemLock(paletteHan);
+
+    // Read the palette data
+    FileRead(file, palette, length, FALSE);
+
+    // Copy palette data to Bitmap VM File
+    bmblock = VMLock(vmFile, vmBlock, &bmmem);
+    offset = bmblock[0x28]+256*(bmblock[0x29]); // WHUT?!
+    offset += 0x1c;
+    memcpy(&(bmblock[offset]), palette, length);
+    VMDirty(bmmem);
+    VMUnlock(bmmem);
+
+    // Free Palette mem, no unlock needed
+    MemFree(paletteHan);
+}
 
 /**
  * Writing the GEOS Bitmap
@@ -331,8 +328,8 @@ VMBlockHandle initiateOutputBitmap(VMFileHandle vmFile, unsigned long width, uns
 
     vmBlock = GrCreateBitmap(
         // BMF_MONO | BMT_COMPLEX | BMT_PALETTE,
-        BMF_4BIT | BMT_COMPLEX | BMT_PALETTE,
-        // BMF_8BIT | BMT_COMPLEX | BMT_PALETTE,
+        // BMF_4BIT | BMT_COMPLEX | BMT_PALETTE,
+        BMF_8BIT | BMT_COMPLEX | BMT_PALETTE,
         // BMF_24BIT | BMT_COMPLEX,
         width, height,
         vmFile,
@@ -354,7 +351,7 @@ void writePixelLine(VMFileHandle vmFile, VMBlockHandle vmBlock, unsigned long li
     HugeArrayLock(
         vmFile,
         vmBlock,
-        (dword) lineNo - 1,
+        (dword) lineNo,
         &lineptr,
         &size
     );
