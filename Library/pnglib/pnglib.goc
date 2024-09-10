@@ -78,7 +78,7 @@ int checkPNGHeader(FileHandle file)
     return 1;
 }
 
-// Hauptfunktion zur Verarbeitung von PNG-Chunks
+// main function for processing PNG-Chunks
 void processPNGChunks(FileHandle file, VMFileHandle vmFile, IHDRData* ihdrData, IDATChunkEntry (*idatChunks)[MAX_IDAT_CHUNKS], int *idatNumChunks, VMBlockHandle* vmBlock)
 {
     ChunkHeader chdr = {0};
@@ -86,6 +86,7 @@ void processPNGChunks(FileHandle file, VMFileHandle vmFile, IHDRData* ihdrData, 
 
     while (FileRead(file, &chdr, sizeof(ChunkHeader), FALSE))
     {
+        // Swap endianness for chunk length and type
         chdr.length = swapEndian(chdr.length);
         chdr.type = swapEndian(chdr.type);
 
@@ -93,17 +94,20 @@ void processPNGChunks(FileHandle file, VMFileHandle vmFile, IHDRData* ihdrData, 
         {
             case CHUNK_IHDR:
             {
-                // Lese und speichere die IHDR-Daten
+                // Read and store IHDR data
                 if (FileRead(file, ihdrData, sizeof(IHDRData), FALSE) != sizeof(IHDRData))
                 {
-                    // Fehler beim Lesen des IHDR-Chunks.
+                    // Error reading IHDR chunk
                     return;
                 }
 
                 ihdrData->width = swapEndian(ihdrData->width);
                 ihdrData->height = swapEndian(ihdrData->height);
 
+                // Move file pointer forward by the remaining part of the IHDR chunk
                 FilePos(file, chdr.length - sizeof(IHDRData), FILE_POS_RELATIVE);
+
+                // Initialize output bitmap
                 *vmBlock = initiateOutputBitmap(vmFile, ihdrData->width, ihdrData->height, ihdrData->bitDepth);
 
                 break;
@@ -111,34 +115,47 @@ void processPNGChunks(FileHandle file, VMFileHandle vmFile, IHDRData* ihdrData, 
 
             case CHUNK_PLTE:
             {
+                // Read PLTE chunk
                 readPLTEChunk(file, chdr.length, vmFile, *vmBlock);
                 break;
             }
 
             case CHUNK_IDAT:
             {
-                (*idatChunks)[idatChunkIdx].length = chdr.length;
-                (*idatChunks)[idatChunkIdx].chunkPos = FilePos(file, 0, FILE_POS_RELATIVE); // FIXME: rework for multiple IDAT Chunks, currently only the last one is catched
-                idatChunkIdx++;
-                *idatNumChunks = idatChunkIdx;
+                if (idatChunkIdx < MAX_IDAT_CHUNKS) // Prevent buffer overflow
+                {
+                    (*idatChunks)[idatChunkIdx].length = chdr.length;
+                    (*idatChunks)[idatChunkIdx].chunkPos = FilePos(file, 0, FILE_POS_RELATIVE); // Store current position
+
+                    idatChunkIdx++;
+                    *idatNumChunks = idatChunkIdx;
+                }
+                else
+                {
+                    // Handle error: too many IDAT chunks
+                    return;
+                }
+
+                // Skip the IDAT chunk's data only, but not the CRC (CRC will be skipped outside the switch)
+                FilePos(file, chdr.length, FILE_POS_RELATIVE);
                 break;
             }
 
             case CHUNK_IEND:
             {
-                // return at IEND
+                // Stop processing at IEND
                 return;
             }
 
             default:
             {
-                // Skip unknown chunks (for now)
+                // Skip unknown chunks
                 FilePos(file, chdr.length, FILE_POS_RELATIVE);
                 break;
             }
         }
 
-        // Überspringe CRC (4 Bytes)
+        // Skip the CRC (4 bytes) for all chunks
         FilePos(file, 4, FILE_POS_RELATIVE);
     }
 
