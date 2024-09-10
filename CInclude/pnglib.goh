@@ -17,6 +17,15 @@
 
 #define CHUNK_SIZE 8192  // 8 KB Häppchen
 
+// PNG signature
+const unsigned char PNG_SIGNATURE[8] = {0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A};
+
+// max palette entries
+#define MAX_PALETTE_ENTRIES 256
+
+// max IDAT chunk entries
+#define MAX_IDAT_CHUNKS 5
+
 // Struktur für die IHDR-Daten
 typedef struct {
     unsigned long width;
@@ -33,6 +42,19 @@ typedef struct {
     unsigned long length;
     unsigned long type;
 } ChunkHeader;
+
+// Structure to hold the RGB color of a palette entry
+typedef struct {
+    unsigned char red;
+    unsigned char green;
+    unsigned char blue;
+} PaletteEntry;
+
+// IDAT Chunk entry
+typedef struct {
+    unsigned long length;
+    unsigned long chunkPos;
+} IDATChunkEntry;
 
 // IDAT parsing state struct
 typedef struct {
@@ -51,22 +73,15 @@ typedef struct {
     unsigned long length;
     unsigned long have;
     unsigned long outBufferPos;
+
+    int idatNumChunks;
+    int idatChunkIdx;
+    IDATChunkEntry idatChunks[MAX_IDAT_CHUNKS];
+
     FileHandle file;
     IHDRData ihdr;
 } IDATState;
 
-// Structure to hold the RGB color of a palette entry
-typedef struct {
-    unsigned char red;
-    unsigned char green;
-    unsigned char blue;
-} PaletteEntry;
-
-// PNG signature
-const unsigned char PNG_SIGNATURE[8] = {0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A};
-
-// max palette entries
-#define MAX_PALETTE_ENTRIES 256
 
 // Filtertypen gemäß PNG-Spezifikation
 #define FILTER_NONE    0
@@ -78,9 +93,9 @@ const unsigned char PNG_SIGNATURE[8] = {0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A
 
 VMBlockHandle _pascal _export convertPNG(FileHandle fileHan, VMFileHandle vmFile);
 int checkPNGHeader(FileHandle file);
-void processPNGChunks(FileHandle file, VMFileHandle vmFile, unsigned long* idatLength, IHDRData* ihdrData, unsigned long* idatChunkPos, VMBlockHandle* vmBlock);
+void processPNGChunks(FileHandle file, VMFileHandle vmFile, IHDRData* ihdrData, IDATChunkEntry (*idatChunks)[MAX_IDAT_CHUNKS], int *idatNumChunks, VMBlockHandle* vmBlock);
 void readPLTEChunk(FileHandle file, unsigned long length, VMFileHandle vmFile, VMBlockHandle vmBlock);
-IDATState initIDATState(FileHandle file, unsigned long idatChunkPos, unsigned long length, IHDRData ihdr);
+IDATState initIDATState(FileHandle file, IDATChunkEntry* idatChunks, int idatNumChunks, IHDRData ihdr);
 int processNextScanline(IDATState* state, unsigned char* rowBuffer);
 void cleanupIDATState(IDATState* state);
 

@@ -8,20 +8,20 @@
 VMBlockHandle convertPNG(FileHandle fileHan, VMFileHandle vmFile)
 {
     IHDRData ihdrData;
-    unsigned long idatLength;
     VMBlockHandle vmBlock = NullHandle;
-    unsigned long idatChunkPos = NULL;
-    IDATState state;
+    IDATChunkEntry idatChunks[MAX_IDAT_CHUNKS] = {0};
+    int idatNumChunks = 0;
+    IDATState state = {0};
     MemHandle rowBufferHan = NullHandle;
     unsigned char* rowBuffer;
 
     if (checkPNGHeader(fileHan))
     {
         // Read PNG Chunks, get overview
-        processPNGChunks(fileHan, vmFile, &idatLength, &ihdrData, &idatChunkPos, &vmBlock);
+        processPNGChunks(fileHan, vmFile, &ihdrData, &idatChunks, &idatNumChunks, &vmBlock);
 
         // Initialize the IDAT state
-        state = initIDATState(fileHan, idatChunkPos, idatLength, ihdrData);
+        state = initIDATState(fileHan, idatChunks, idatNumChunks, ihdrData);
 
         // Allocate memory for the rowBuffer externally
         rowBufferHan = MemAlloc(calcBytesPerRow(ihdrData.width, ihdrData.colorType, ihdrData.bitDepth) + 1, HF_SHARABLE | HF_SWAPABLE, HAF_ZERO_INIT); // +1 for filterByte
@@ -79,9 +79,10 @@ int checkPNGHeader(FileHandle file)
 }
 
 // Hauptfunktion zur Verarbeitung von PNG-Chunks
-void processPNGChunks(FileHandle file, VMFileHandle vmFile, unsigned long* idatLength, IHDRData* ihdrData, unsigned long* idatChunkPos, VMBlockHandle* vmBlock)
+void processPNGChunks(FileHandle file, VMFileHandle vmFile, IHDRData* ihdrData, IDATChunkEntry (*idatChunks)[MAX_IDAT_CHUNKS], int *idatNumChunks, VMBlockHandle* vmBlock)
 {
-    ChunkHeader chdr;
+    ChunkHeader chdr = {0};
+    int idatChunkIdx = 0;
 
     while (FileRead(file, &chdr, sizeof(ChunkHeader), FALSE))
     {
@@ -116,8 +117,10 @@ void processPNGChunks(FileHandle file, VMFileHandle vmFile, unsigned long* idatL
 
             case CHUNK_IDAT:
             {
-                *idatLength = chdr.length;
-                *idatChunkPos = FilePos(file, 0, FILE_POS_RELATIVE); // FIXME: rework for multiple IDAT Chunks, currently only the last one is catched
+                (*idatChunks)[idatChunkIdx].length = chdr.length;
+                (*idatChunks)[idatChunkIdx].chunkPos = FilePos(file, 0, FILE_POS_RELATIVE); // FIXME: rework for multiple IDAT Chunks, currently only the last one is catched
+                idatChunkIdx++;
+                *idatNumChunks = idatChunkIdx;
                 break;
             }
 
@@ -142,7 +145,7 @@ void processPNGChunks(FileHandle file, VMFileHandle vmFile, unsigned long* idatL
     return;
 }
 
-IDATState initIDATState(FileHandle file, unsigned long idatChunkPos, unsigned long length, IHDRData ihdr)
+IDATState initIDATState(FileHandle file, IDATChunkEntry* idatChunks, int idatNumChunks, IHDRData ihdr)
 {
     IDATState state;
 
@@ -170,13 +173,17 @@ IDATState initIDATState(FileHandle file, unsigned long idatChunkPos, unsigned lo
 
     state.rowBufferOffset = 0;
     state.lineNo = 0;
-    state.length = length;
     state.file = file;
     state.ihdr = ihdr;
     state.have = 0;
     state.outBufferPos = 0;
 
-    FilePos(file, idatChunkPos, FILE_POS_START);
+    state.idatNumChunks = idatNumChunks;
+    state.idatChunkIdx = 0;
+    memcpy(state.idatChunks, idatChunks, state.idatNumChunks * sizeof(IDATChunkEntry));
+
+    state.length = state.idatChunks[state.idatChunkIdx].length;
+    FilePos(file, state.idatChunks[state.idatChunkIdx].chunkPos, FILE_POS_START);
 
     return state;
 }
