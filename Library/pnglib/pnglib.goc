@@ -14,7 +14,6 @@ VMBlockHandle convertPNG(FileHandle fileHan, VMFileHandle vmFile)
     IDATState state;
     MemHandle rowBufferHan = NullHandle;
     unsigned char* rowBuffer;
-    unsigned long lineNo = 0;
 
     if (checkPNGHeader(fileHan))
     {
@@ -47,8 +46,7 @@ VMBlockHandle convertPNG(FileHandle fileHan, VMFileHandle vmFile)
             }
 
             // Write the processed scanline (without the filter byte) to the VMFile
-            writePixelLine(vmFile, vmBlock, lineNo, rowBuffer);
-            lineNo++;
+            writePixelLine(vmFile, vmBlock, state.lineNo - 1, rowBuffer);
         }
 
         // Clean up resources
@@ -186,99 +184,104 @@ IDATState initIDATState(FileHandle file, unsigned long idatChunkPos, unsigned lo
 // Verarbeitung von IDAT-Chunks
 int processNextScanline(IDATState* state, unsigned char *rowBuffer)
 {
-    unsigned long have;
-    unsigned char *src;
-    int ret;
+    unsigned long have;  // Amount of data decompressed into the output buffer
+    unsigned char *src;  // Pointer to the current position in the output buffer
+    int ret;  // Return value of the zlib inflate function
 
-    unsigned long rowBytes = state->rowBytes;  // Total bytes per row including the filter byte
+    unsigned long rowBytes = state->rowBytes;  // Total number of bytes per scanline (excluding the filter byte)
 
-    // Continue processing previously decompressed data first (if any remains)
+    // If there is previously decompressed data remaining in the output buffer, process it first
     if (state->have > 0)
     {
-        src = state->out + state->outBufferPos;  // Start from the position where we left off
-        have = state->have;                      // Remaining data in the output buffer
+        src = state->out + state->outBufferPos;  // Start processing from where we left off in the output buffer
+        have = state->have;  // Set the remaining decompressed data to be processed
 
-        // Process the remaining data
+        // Loop to process the remaining data in the output buffer
         while (have > 0)
         {
+            // Calculate how many bytes to copy into the row buffer (excluding the filter byte)
             unsigned long toCopy = (rowBytes + 1 - state->rowBufferOffset) < have ? (rowBytes + 1 - state->rowBufferOffset) : have;
-            memcpy(rowBuffer + state->rowBufferOffset, src, toCopy);
-            state->rowBufferOffset += toCopy;
-            src += toCopy;
-            have -= toCopy;
+            memcpy(rowBuffer + state->rowBufferOffset, src, toCopy);  // Copy data from output buffer to row buffer
+            state->rowBufferOffset += toCopy;  // Update the row buffer offset
+            src += toCopy;  // Move source pointer forward
+            have -= toCopy;  // Decrease the remaining data to be processed
 
-            // If a full scanline (including the filter byte) has been accumulated, process it
+            // If we have a full scanline (including the filter byte), process the scanline
             if (state->rowBufferOffset == rowBytes + 1)
             {
-                // Unfilter the scanline
+                // Unfilter the scanline using the previous row's data
                 unfilterRow(rowBuffer, state->previousRow, state->bytesPerPixel, rowBytes);
 
-                // Move the row data to skip the filter byte
-                memmove(rowBuffer, rowBuffer + 1, rowBytes);  // Skip the filter byte
+                // Move the pixel data in the row buffer to skip the filter byte
+                memmove(rowBuffer, rowBuffer + 1, rowBytes);
 
-                // Save the current scanline for the next unfilter operation
+                // Save the current scanline (after unfiltering) to use in the next unfilter operation
                 memcpy(state->previousRow, rowBuffer, rowBytes);
 
-                // Reset the buffer offset for the next scanline
+                // Reset the row buffer offset for the next scanline
                 state->rowBufferOffset = 0;
 
-                // Update the remaining data for the next call
-                state->have = have;             // Store the remaining data in the output buffer
-                state->outBufferPos = src - state->out;  // Update position in the output buffer
+                // Store the remaining data in the output buffer for the next call
+                state->have = have;
+                state->outBufferPos = src - state->out;  // Update the position in the output buffer
+
+                state->lineNo++;  // Increment the line number (note: NOT zero-based)
 
                 return 1;  // Successfully processed one scanline
             }
         }
 
-        // If all remaining decompressed data has been processed
-        state->have = 0;  // Reset remaining decompressed data counter
+        // If all remaining decompressed data has been processed, reset the state
+        state->have = 0;
         state->outBufferPos = 0;
     }
 
-    // Continue processing if there’s more input data or more data to read from the file
+    // If there is still data to read from the file or data left in the zlib stream, continue processing
     while (state->length > 0 || state->strm.avail_in > 0)
     {
-        // If no input data is available, read more compressed data from the file
+        // If there is no more input data in the zlib stream, read more from the file
         if (state->strm.avail_in == 0 && state->length > 0)
         {
             unsigned long bytesToRead = (state->length < CHUNK_SIZE) ? state->length : CHUNK_SIZE;
 
+            // Read the next chunk of compressed data from the file
             if (FileRead(state->file, state->in, bytesToRead, FALSE) != bytesToRead)
             {
-                inflateEnd(&state->strm);
-                return -1;  // Indicate an error
+                inflateEnd(&state->strm);  // Clean up if there is an error
+                return -1;  // Return error code
             }
 
+            // Set the input data for the zlib stream
             state->strm.avail_in = bytesToRead;
             state->strm.next_in = state->in;
-            state->length -= bytesToRead;
+            state->length -= bytesToRead;  // Decrease the remaining length of the compressed data
         }
 
         // Set up the output buffer for decompression
         state->strm.avail_out = CHUNK_SIZE;
         state->strm.next_out = state->out;
 
-        // Decompress the data
+        // Decompress the data from the input buffer into the output buffer
         ret = inflate(&state->strm, Z_NO_FLUSH);
         if (ret != Z_OK && ret != Z_STREAM_END)
         {
-            // Decompression error
-            inflateEnd(&state->strm);
-            return -1;  // Indicate an error
+            inflateEnd(&state->strm);  // Clean up if decompression error occurs
+            return -1;  // Return error code
         }
 
-        // How much data was decompressed
+        // Calculate how much data was decompressed
         have = CHUNK_SIZE - state->strm.avail_out;
-        src = state->out;
+        src = state->out;  // Point to the start of the decompressed data
 
-        // Process the decompressed data, copying it into the row buffer
+        // Process the decompressed data in the output buffer
         while (have > 0)
         {
+            // Calculate how many bytes to copy into the row buffer
             unsigned long toCopy = (rowBytes + 1 - state->rowBufferOffset) < have ? (rowBytes + 1 - state->rowBufferOffset) : have;
-            memcpy(rowBuffer + state->rowBufferOffset, src, toCopy);
-            state->rowBufferOffset += toCopy;
-            src += toCopy;
-            have -= toCopy;
+            memcpy(rowBuffer + state->rowBufferOffset, src, toCopy);  // Copy the decompressed data to the row buffer
+            state->rowBufferOffset += toCopy;  // Update the row buffer offset
+            src += toCopy;  // Move the source pointer forward
+            have -= toCopy;  // Decrease the remaining decompressed data to process
 
             // If a full scanline (including the filter byte) has been accumulated, process it
             if (state->rowBufferOffset == rowBytes + 1)
@@ -286,25 +289,27 @@ int processNextScanline(IDATState* state, unsigned char *rowBuffer)
                 // Unfilter the scanline
                 unfilterRow(rowBuffer, state->previousRow, state->bytesPerPixel, rowBytes);
 
-                // Move the row data to skip the filter byte
-                memmove(rowBuffer, rowBuffer + 1, rowBytes);  // Skip the filter byte
+                // Move the pixel data to skip the filter byte
+                memmove(rowBuffer, rowBuffer + 1, rowBytes);
 
-                // Save the current scanline for the next unfilter operation
+                // Save the current scanline for future unfiltering
                 memcpy(state->previousRow, rowBuffer, rowBytes);
 
-                // Reset the buffer offset for the next scanline
+                // Reset the row buffer offset for the next scanline
                 state->rowBufferOffset = 0;
 
-                // Update the remaining data for the next call
-                state->have = have;             // Store the remaining data in the output buffer
-                state->outBufferPos = src - state->out;  // Update position in the output buffer
+                // Store the remaining decompressed data for the next call
+                state->have = have;
+                state->outBufferPos = src - state->out;  // Update the position in the output buffer
+
+                state->lineNo++;  // Increment the line number (not zero-based)
 
                 return 1;  // Successfully processed one scanline
             }
         }
     }
 
-    // If no more data to process, return 0 to indicate completion
+    // Return 0 when all scanlines are processed
     return 0;
 }
 
