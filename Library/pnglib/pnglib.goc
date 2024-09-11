@@ -7,10 +7,11 @@
 
 VMBlockHandle convertPNG(FileHandle fileHan, VMFileHandle vmFile)
 {
-    IHDRData ihdrData;
+    IHDRData ihdrData = {0};
     VMBlockHandle vmBlock = NullHandle;
     IDATChunkEntry idatChunks[MAX_IDAT_CHUNKS] = {0};
     int idatNumChunks = 0;
+    PLTEChunkEntry plteChunk = {0};
     IDATState state = {0};
     MemHandle rowBufferHan = NullHandle;
     unsigned char* rowBuffer;
@@ -18,7 +19,13 @@ VMBlockHandle convertPNG(FileHandle fileHan, VMFileHandle vmFile)
     if (checkPNGHeader(fileHan))
     {
         // Read PNG Chunks, get overview
-        processPNGChunks(fileHan, vmFile, &ihdrData, &idatChunks, &idatNumChunks, &vmBlock);
+        processPNGChunks(fileHan, &ihdrData, &idatChunks, &idatNumChunks, &plteChunk);
+
+        // Initialize output bitmap
+        vmBlock = initiateOutputBitmap(vmFile, ihdrData);
+
+        // transfers only if a palette exists
+        transferPLTEChunk(fileHan, plteChunk, vmFile, vmBlock);
 
         // Initialize the IDAT state
         state = initIDATState(fileHan, idatChunks, idatNumChunks, ihdrData);
@@ -30,9 +37,6 @@ VMBlockHandle convertPNG(FileHandle fileHan, VMFileHandle vmFile)
         // Process each scanline
         while (processNextScanline(&state, rowBuffer) == 1)
         {
-            // Now rowBuffer contains the current scanline without the filter byte
-            // Process or display rowBuffer as needed
-
             // Convert RGBA to RGB if needed
             if (state.ihdr.colorType == 6)
             {
@@ -81,7 +85,7 @@ int checkPNGHeader(FileHandle file)
 }
 
 // main function for processing PNG-Chunks
-void processPNGChunks(FileHandle file, VMFileHandle vmFile, IHDRData* ihdrData, IDATChunkEntry (*idatChunks)[MAX_IDAT_CHUNKS], int *idatNumChunks, VMBlockHandle* vmBlock)
+void processPNGChunks(FileHandle file, IHDRData* ihdrData, IDATChunkEntry (*idatChunks)[MAX_IDAT_CHUNKS], int *idatNumChunks, PLTEChunkEntry* plteChunk)
 {
     ChunkHeader chdr = {0};
     int idatChunkIdx = 0;
@@ -109,16 +113,18 @@ void processPNGChunks(FileHandle file, VMFileHandle vmFile, IHDRData* ihdrData, 
                 // Move file pointer forward by the remaining part of the IHDR chunk
                 FilePos(file, chdr.length - sizeof(IHDRData), FILE_POS_RELATIVE);
 
-                // Initialize output bitmap
-                *vmBlock = initiateOutputBitmap(vmFile, ihdrData->width, ihdrData->height, ihdrData->bitDepth);
-
                 break;
             }
 
             case CHUNK_PLTE:
             {
                 // Read PLTE chunk
-                readPLTEChunk(file, chdr.length, vmFile, *vmBlock);
+                plteChunk->length = chdr.length;
+                plteChunk->chunkPos = FilePos(file, 0, FILE_POS_RELATIVE); // Store current position
+
+                // Skip the PLTE chunk's data only, but not the CRC (CRC will be skipped outside the switch)
+                FilePos(file, chdr.length, FILE_POS_RELATIVE);
+
                 break;
             }
 
@@ -365,37 +371,41 @@ void cleanupIDATState(IDATState* state)
     MemFree(state->previousRowHandle);
 }
 
-void readPLTEChunk(FileHandle file, unsigned long length, VMFileHandle vmFile, VMBlockHandle vmBlock)
+void transferPLTEChunk(FileHandle file, PLTEChunkEntry plteChunk, VMFileHandle vmFile, VMBlockHandle vmBlock)
 {
-    byte* palette = NULL;
-    MemHandle paletteHan = NullHandle;
-    MemHandle bmmem;
-    word offset;
-    byte *bmblock;
-
-    // Make sure the length is divisible by 3 (each color is 3 bytes)
-    if (length % 3 != 0 || (length / 3) > MAX_PALETTE_ENTRIES)
+    if ((plteChunk.chunkPos != 0) && (plteChunk.length != 0))
     {
-        return;  // Invalid palette length
+        byte* palette = NULL;
+        MemHandle paletteHan = NullHandle;
+        MemHandle bmmem;
+        word offset;
+        byte *bmblock;
+
+        // Make sure the length is divisible by 3 (each color is 3 bytes)
+        if (plteChunk.length % 3 != 0 || (plteChunk.length / 3) > MAX_PALETTE_ENTRIES)
+        {
+            return;  // Invalid palette length
+        }
+
+        // Create our temp. palette storage
+        paletteHan = MemAlloc(plteChunk.length, HF_SHARABLE | HF_SWAPABLE, HAF_ZERO_INIT);
+        palette = MemLock(paletteHan);
+
+        // Read the palette data
+        FilePos(file, plteChunk.chunkPos, FILE_POS_START);
+        FileRead(file, palette, plteChunk.length, FALSE);
+
+        // Copy palette data to Bitmap VM File
+        bmblock = VMLock(vmFile, vmBlock, &bmmem);
+        offset = bmblock[0x28]+256*(bmblock[0x29]); // WHUT?!
+        offset += 0x1c;
+        memcpy(&(bmblock[offset]), palette, plteChunk.length);
+        VMDirty(bmmem);
+        VMUnlock(bmmem);
+
+        // Free Palette mem, no unlock needed
+        MemFree(paletteHan);
     }
-
-    // Create our temp. palette storage
-    paletteHan = MemAlloc(length, HF_SHARABLE | HF_SWAPABLE, HAF_ZERO_INIT);
-    palette = MemLock(paletteHan);
-
-    // Read the palette data
-    FileRead(file, palette, length, FALSE);
-
-    // Copy palette data to Bitmap VM File
-    bmblock = VMLock(vmFile, vmBlock, &bmmem);
-    offset = bmblock[0x28]+256*(bmblock[0x29]); // WHUT?!
-    offset += 0x1c;
-    memcpy(&(bmblock[offset]), palette, length);
-    VMDirty(bmmem);
-    VMUnlock(bmmem);
-
-    // Free Palette mem, no unlock needed
-    MemFree(paletteHan);
 }
 
 /**
@@ -403,7 +413,7 @@ void readPLTEChunk(FileHandle file, unsigned long length, VMFileHandle vmFile, V
  ********************************************************************
  */
 
-VMBlockHandle initiateOutputBitmap(VMFileHandle vmFile, unsigned long width, unsigned long height, unsigned char bitDepth)
+VMBlockHandle initiateOutputBitmap(VMFileHandle vmFile, IHDRData ihdrData)
 {
     /*
     ; case BMT_FORMAT:
@@ -426,19 +436,43 @@ VMBlockHandle initiateOutputBitmap(VMFileHandle vmFile, unsigned long width, uns
 */
     GStateHandle bmstate;
     VMBlockHandle vmBlock;
+    unsigned int fmt;
+
+    if (ihdrData.colorType == PNG_COLOR_TYPE_RGB)
+    {
+        // case PNG_COLOR_TYPE_GREY:
+        // break;
+
+        // case :
+        //     fmt = BMF_24BIT | BMT_COMPLEX;
+        // break;
+//
+        // case PNG_COLOR_TYPE_PALETTE:
+        //     fmt = BMF_8BIT | BMT_COMPLEX | BMT_PALETTE
+        // break;
+
+        // case PNG_COLOR_TYPE_GREY_ALPHA:
+        // break;
+
+        // case PNG_COLOR_TYPE_RGBA:
+        // break;
+    }
+
+
+
 
     vmBlock = GrCreateBitmap(
         // BMF_MONO | BMT_COMPLEX | BMT_PALETTE,
         // BMF_4BIT | BMT_COMPLEX | BMT_PALETTE,
         // BMF_8BIT | BMT_COMPLEX | BMT_PALETTE,
         BMF_24BIT | BMT_COMPLEX,
-        width, height,
+        ihdrData.width, ihdrData.height,
         vmFile,
         0,
         &bmstate
     );
 
-    //GrDestroyBitmap(bmstate, BMD_LEAVE_DATA);
+    // GrDestroyBitmap(bmstate, BMD_LEAVE_DATA);
 
     return vmBlock;
 }

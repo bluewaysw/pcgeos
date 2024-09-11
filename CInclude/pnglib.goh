@@ -15,7 +15,7 @@
 #define CHUNK_IEND 0x49454E44  // "IEND"
 #define CHUNK_PLTE 0x504C5445  // "PLTE"
 
-#define CHUNK_SIZE 8192  // 8 KB Häppchen
+#define CHUNK_SIZE 4096  // 8 KB Häppchen = 8192
 
 // PNG signature
 const unsigned char PNG_SIGNATURE[8] = {0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A};
@@ -82,6 +82,11 @@ typedef struct {
     IHDRData ihdr;
 } IDATState;
 
+// PLTE Chunk entry
+typedef struct {
+    unsigned long length;
+    unsigned long chunkPos;
+} PLTEChunkEntry;
 
 // Filtertypen gemäß PNG-Spezifikation
 #define FILTER_NONE    0
@@ -90,17 +95,31 @@ typedef struct {
 #define FILTER_AVERAGE 3
 #define FILTER_PAETH   4
 
+// Color Types
+#define PNG_COLOR_TYPE_GREY        0   /* Grayscale */
+#define PNG_COLOR_TYPE_RGB         2   /* Truecolor */
+#define PNG_COLOR_TYPE_PALETTE     3   /* Indexed-color */
+#define PNG_COLOR_TYPE_GREY_ALPHA  4   /* Grayscale with alpha */
+#define PNG_COLOR_TYPE_RGBA        6   /* Truecolor with alpha */
+
+// Bit depths
+#define PNG_BIT_DEPTH_1   1   /* 1-bit depth, used in grayscale and palette images */
+#define PNG_BIT_DEPTH_2   2   /* 2-bit depth, used in grayscale and palette images */
+#define PNG_BIT_DEPTH_4   4   /* 4-bit depth, used in grayscale and palette images */
+#define PNG_BIT_DEPTH_8   8   /* 8-bit depth, used in grayscale, palette, truecolor, and grayscale-alpha images */
+#define PNG_BIT_DEPTH_16  16  /* 16-bit depth, used in grayscale, truecolor, and grayscale-alpha images */
+
 
 VMBlockHandle _pascal _export convertPNG(FileHandle fileHan, VMFileHandle vmFile);
 int checkPNGHeader(FileHandle file);
-void processPNGChunks(FileHandle file, VMFileHandle vmFile, IHDRData* ihdrData, IDATChunkEntry (*idatChunks)[MAX_IDAT_CHUNKS], int *idatNumChunks, VMBlockHandle* vmBlock);
-void readPLTEChunk(FileHandle file, unsigned long length, VMFileHandle vmFile, VMBlockHandle vmBlock);
+void processPNGChunks(FileHandle file, IHDRData* ihdrData, IDATChunkEntry (*idatChunks)[MAX_IDAT_CHUNKS], int *idatNumChunks, PLTEChunkEntry* plteChunk);
+void transferPLTEChunk(FileHandle file, PLTEChunkEntry plteChunk, VMFileHandle vmFile, VMBlockHandle vmBlock);
 IDATState initIDATState(FileHandle file, IDATChunkEntry* idatChunks, int idatNumChunks, IHDRData ihdr);
 int processNextScanline(IDATState* state, unsigned char* rowBuffer);
 int nextIDATChunk(IDATState* state);
 void cleanupIDATState(IDATState* state);
 
-VMBlockHandle initiateOutputBitmap(VMFileHandle vmFile, unsigned long width, unsigned long height, unsigned char bitDepth);
+VMBlockHandle initiateOutputBitmap(VMFileHandle vmFile, IHDRData ihdrData);
 void writePixelLine(VMFileHandle vmFile, VMBlockHandle bitmapHandle, unsigned long lineNo, unsigned char* rowData);
 
 int abs(int x);
