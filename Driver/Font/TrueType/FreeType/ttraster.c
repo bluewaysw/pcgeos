@@ -1259,24 +1259,18 @@
   static Bool _near  Convert_Glyph( RAS_ARGS int  flipped )
   {
     Short     i;
-    UShort    start;
-
+    UShort    start = 0;
     PProfile  lastProfile;
 
 
-    ras.fProfile = NULL;
-    ras.joint    = FALSE;
-    ras.fresh    = FALSE;
-
-    ras.maxBuff  = ras.sizeBuff - AlignProfileSize;
-
-    ras.numTurns = 0;
-
+    ras.fProfile         = NULL;
+    ras.joint            = FALSE;
+    ras.fresh            = FALSE;
+    ras.maxBuff          = ras.sizeBuff - AlignProfileSize;
+    ras.numTurns         = 0;
     ras.cProfile         = (PProfile)ras.top;
     ras.cProfile->offset = ras.top;
     ras.num_Profs        = 0;
-
-    start = 0;
 
     for ( i = 0; i < ras.nContours; ++i )
     {
@@ -1801,13 +1795,14 @@
 
       if ( e1 == e2 )
       {
-        bits = ras.bTarget + (y >> 3);
-        f1   = (Byte)(0x80 >> (y  & 7));
-
+        f1 = (Byte)(0x80 >> (y  & 7));
         e1 = TRUNC( e1 );
 
         if ( e1 >= 0 && e1 < ras.target.rows )
+        {
+          bits = ras.bTarget + (y >> 3);
           bits[(ras.target.rows-1 - e1) * ras.target.cols] |= f1;
+        }
       }
     }
   }
@@ -1819,15 +1814,13 @@
                                                PProfile    left,
                                                PProfile    right )
   {
-    Long  e1, e2;
+    Long  e1 = CEILING( x1 );
+    Long  e2 = FLOOR  ( x2 );
     PByte bits;
     Byte  f1;
 
 
     /* During the horizontal sweep, we only take care of drop-outs */
-
-    e1 = CEILING( x1 );
-    e2 = FLOOR  ( x2 );
 
     if ( e1 > e2 )
     {
