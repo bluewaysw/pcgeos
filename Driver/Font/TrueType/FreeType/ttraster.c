@@ -645,15 +645,12 @@
                                  Long  x2, Long  y2,
                                  Long  miny, Long  maxy )
   {
-    Long  Dx, Dy;
+    Long  Dx = x2 - x1, Dy = y2 - y1;
     Int   e1, e2, f1, f2, size;     /* XXX: is `Short' sufficient? */
     Long  Ix, Rx, Ax;
 
     PStorage  top;
 
-
-    Dx = x2 - x1;
-    Dy = y2 - y1;
 
     if ( Dy <= 0 || y2 < miny || y1 > maxy )
       return SUCCESS;
@@ -687,14 +684,10 @@
     if ( f1 > 0 )
     {
       if ( e1 == e2 ) return SUCCESS;
-      else
-      {
-        x1 += FMulDiv( Dx, ras.precision - f1, Dy );
-        e1 += 1;
-      }
+      x1 += FMulDiv( Dx, ras.precision - f1, Dy );
+      ++e1;
     }
-    else
-      if ( ras.joint )
+    else if ( ras.joint )
       {
         ras.top--;
         ras.joint = FALSE;
@@ -715,23 +708,14 @@
       return FAILURE;
     }
 
-    if ( Dx > 0 )
-    {
-      Ix = (ras.precision*Dx) / Dy;
-      Rx = (ras.precision*Dx) % Dy;
-      Dx = 1;
-    }
-    else
-    {
-      Ix = -( (ras.precision*-Dx) / Dy );
-      Rx =    (ras.precision*-Dx) % Dy;
-      Dx = -1;
-    }
+    Ix = (ras.precision * Dx) / Dy;
+    Rx = (ras.precision * Dx) % Dy;
+    Dx = (Dx > 0) ? 1 : -1;
 
     Ax  = -Dy;
     top = ras.top;
 
-    while ( size > 0 )
+    while ( size-- > 0 )
     {
       *top++ = x1;
 
@@ -744,7 +728,6 @@
         Ax -= Dy;
         x1 += Dx;
       }
-      --size;
     }
 
     ras.top = top;
