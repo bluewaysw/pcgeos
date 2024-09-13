@@ -134,8 +134,8 @@
     PProfile    link;        /* link to next profile - various purpose   */
     PStorage    offset;      /* start of profile's data in render pool   */
     Int         flow;        /* Profile orientation: Asc/Descending      */
-    Long        height;      /* profile's height in scanlines            */
-    Long        start;       /* profile's starting scanline              */
+    Short       height;      /* profile's height in scanlines            */
+    Short       start;       /* profile's starting scanline              */
 
     UShort      countL;      /* number of lines to step before this      */
                              /* profile becomes drawable                 */
