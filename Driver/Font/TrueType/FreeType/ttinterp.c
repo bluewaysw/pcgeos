@@ -5006,10 +5006,10 @@
 
     x = LINK->curs[p].x - LINK->orgs[p].x;
 
-    for ( i = p1; i < p; i++ )
+    for ( i = p1; i < p; ++i )
       LINK->curs[i].x += x;
 
-    for ( i = p + 1; i <= p2; i++ )
+    for ( i = p + 1; i <= p2; ++i )
       LINK->curs[i].x += x;
   }
 
