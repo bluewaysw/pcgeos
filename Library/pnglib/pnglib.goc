@@ -13,48 +13,54 @@ VMBlockHandle convertPNG(FileHandle fileHan, VMFileHandle vmFile)
     int idatNumChunks = 0;
     PLTEChunkEntry plteChunk = {0};
     IDATState state = {0};
+    BMFormat fmt = 0;
 
     if (checkPNGHeader(fileHan))
     {
         // Read PNG Chunks, get overview
         processPNGChunks(fileHan, &ihdrData, &idatChunks, &idatNumChunks, &plteChunk);
 
-        // Initialize output bitmap
-        vmBlock = initiateOutputBitmap(vmFile, ihdrData);
-
-        // transfers only if a palette exists
-        transferPLTEChunk(fileHan, plteChunk, vmFile, vmBlock);
-
-        // Initialize the IDAT state
-        state = initIDATState(fileHan, idatChunks, idatNumChunks, ihdrData);
-
-        // Process each scanline
-        while (processNextScanline(&state) == 1)
+        if ((fmt = pngWhatOutputFormat(ihdrData.colorType, ihdrData.bitDepth)) != 0)
         {
-            // pauseIDATProcessing(&state);
+            // Initialize output bitmap
+            vmBlock = initiateOutputBitmap(vmFile, ihdrData, fmt);
 
-            // Convert RGBA to RGB if needed
-            if (state.ihdr.colorType == 6)
+            // transfers only if a palette exists
+            transferPLTEChunk(fileHan, plteChunk, vmFile, vmBlock);
+
+            // Initialize the IDAT state
+            state = initIDATState(fileHan, idatChunks, idatNumChunks, ihdrData);
+
+            // Process each scanline
+            while (processNextScanline(&state) == 1)
             {
-                convertRGBAtoRGB(state.currentRow, state.ihdr.width);
+                // pauseIDATProcessing(&state);
+
+                // Convert RGBA to RGB if needed
+                if (state.ihdr.colorType == 6)
+                {
+                    convertRGBAtoRGB(state.currentRow, state.ihdr.width);
+                }
+
+                // Convert 16-bit to 8-bit if needed
+                if (state.bytesPerPixel == 6)
+                {
+                    convert16BitLineTo8Bit(state.currentRow, state.ihdr.width);
+                }
+
+                if (state.ihdr.bitDepth == 1 && fmt == BMF_4BIT) pad_1bit_to_4bit_inplace(state.currentRow, state.ihdr.width);
+
+                // Write the processed scanline (without the filter byte) to the VMFile
+                writePixelLine(vmFile, vmBlock, state.lineNo - 1, state.currentRow);
+
+                // resumeIDATProcessing(&state);
             }
 
-            // Convert 16-bit to 8-bit if needed
-            if (state.bytesPerPixel == 6)
-            {
-                convert16BitLineTo8Bit(state.currentRow, state.ihdr.width);
-            }
+            // Clean up resources
+            cleanupIDATState(&state);
 
-            // Write the processed scanline (without the filter byte) to the VMFile
-            writePixelLine(vmFile, vmBlock, state.lineNo - 1, state.currentRow);
-
-            // resumeIDATProcessing(&state);
+            return vmBlock;
         }
-
-        // Clean up resources
-        cleanupIDATState(&state);
-
-        return vmBlock;
     }
 
     return NullHandle;
@@ -436,59 +442,180 @@ void transferPLTEChunk(FileHandle file, PLTEChunkEntry plteChunk, VMFileHandle v
  ********************************************************************
  */
 
-VMBlockHandle initiateOutputBitmap(VMFileHandle vmFile, IHDRData ihdrData)
-{
-    /*
-    ; case BMT_FORMAT:
-    ;    BMF_MONO:   #bytes = ((width+7)>>3) * height
-    ;    BMF_4BIT:   #bytes = ((width+1)>>1) * height
-    ;    BMF_8BIT:   #bytes = width * height
-    ;    BMF_24BIT:  #bytes = width * height * 3
-
-    typedef ByteFlags BMType;
-    #define BMT_PALETTE	0x40
-    #define BMT_HUGE	0x20
-    #define BMT_MASK	0x10
-    #define BMT_COMPLEX	0x08
-    #define BMT_FORMAT	0x07
-
-    // MONO: BMF_MONO | BMT_COMPLEX | BMT_PALETTE
-    // 4 BIT: BMF_4BIT | BMT_COMPLEX | BMT_PALETTE
-    // 8 BIT: BMF_8BIT | BMT_COMPLEX | BMT_PALETTE
-    // 24 BIT: BMF_24BIT | BMT_COMPLEX
-*/
-    GStateHandle bmstate;
-    VMBlockHandle vmBlock;
-    unsigned int fmt;
-
-    if (ihdrData.colorType == PNG_COLOR_TYPE_RGB)
-    {
-        // case PNG_COLOR_TYPE_GREY:
-        // break;
-
-        // case :
-        //     fmt = BMF_24BIT | BMT_COMPLEX;
-        // break;
+// 1 BIT: BMF_MONO | BMT_COMPLEX | BMT_PALETTE
+//         black & white
 //
-        // case PNG_COLOR_TYPE_PALETTE:
-        //     fmt = BMF_8BIT | BMT_COMPLEX | BMT_PALETTE
-        // break;
+// 4 BIT: BMF_4BIT | BMT_COMPLEX | BMT_PALETTE
+//         1 bit (2 color) paletted => add padding
+//         2 bit (4 color) paletted => add padding
+//         4 bit (16 color) paletted
+//
+//         2 bit (4 level) grayscale => add padding, use grayscale palette
+//         4 bit (16 level) grayscale => use grayscale palette
+//
+//
+// 8 BIT: BMF_8BIT | BMT_COMPLEX | BMT_PALETTE
+//         8 bit (256 color) paletted
+//
+//         8 bit (256 level) grayscale => use grayscale palette
+//         16 bit (64k level) grayscale => downcycle to 8-bit, then use 8 bit grayscale palette
+//
+//         8 bit grayscale + 8 bit alpha-channel => use grayscale palette, blend with alpha
+//         16 bit grayscale + 16 bit alpha-channel  => downcycle to 8-bit, then use 8 bit grayscale palette, then blend with alpha
+//
+//
+// 24 BIT: BMF_24BIT | BMT_COMPLEX
+//         3x8 bits rgb color
+//         3x16 bits rgb color => downcycle to 8 bit
+//
+//         3x8 bits rgb color + 8 bit alpha-channel => remove alpha by blending in with white
+//         3x16 bits rgb color + 16 bit alpha-channel => downcycle to 8 bit / channel => remove alpha by blending in with white
 
-        // case PNG_COLOR_TYPE_GREY_ALPHA:
-        // break;
 
-        // case PNG_COLOR_TYPE_RGBA:
-        // break;
+BMFormat pngWhatOutputFormat(int colorType, int bitDepth)
+{
+    BMFormat fmt = 0;
+
+    switch (colorType)
+    {
+        case PNG_COLOR_TYPE_GREY:
+            switch (bitDepth)
+            {
+                case 1:
+                    // Black & white processing code
+                    fmt = BMF_MONO | BMT_COMPLEX | BMT_PALETTE;
+                break;
+                case 2:
+                    // Processing 2-bit Greyscale (4-level grayscale)
+                    // Add padding, use 4-grayscale palette
+                    //fmt = BMF_4BIT | BMT_COMPLEX | BMT_PALETTE;
+                break;
+                case 4:
+                    // Processing 4-bit Greyscale (16-level grayscale)
+                    // Use 16-grayscale palette
+                    //fmt = BMF_4BIT | BMT_COMPLEX | BMT_PALETTE;
+                break;
+                case 8:
+                    // Processing 8-bit Greyscale (256-level grayscale)
+                    // Use 256-grayscale palette
+                    //fmt = BMF_8BIT | BMT_COMPLEX | BMT_PALETTE;
+                break;
+                case 16:
+                    // Processing 16-bit Greyscale (downsample to 8-bit)
+                    // Downcycle to 8-bit
+                    // use 256-grayscale palette
+                    //fmt = BMF_8BIT | BMT_COMPLEX | BMT_PALETTE;
+                break;
+                default:
+                    // Invalid BitDepth for Greyscale
+                break;
+            }
+            break;
+
+        case PNG_COLOR_TYPE_RGB:
+            switch (bitDepth)
+            {
+                case 8:
+                    // printf("Processing 8-bit Truecolor (3x8 bits RGB)
+                    // 3x8 bits RGB color processing code
+                    fmt = BMF_24BIT | BMT_COMPLEX;
+                break;
+                case 16:
+                    // Processing 16-bit Truecolor
+                    // Downcycle to 8-bit per channel
+                    fmt = BMF_24BIT | BMT_COMPLEX;
+                break;
+                default:
+                    // Invalid BitDepth for Truecolor
+                break;
+            }
+            break;
+
+        case PNG_COLOR_TYPE_PALETTE:
+            switch (bitDepth)
+            {
+                case 1:
+                    // Processing 1-bit Indexed (2-color paletted)
+                    // Add padding
+                    fmt = BMF_4BIT | BMT_COMPLEX | BMT_PALETTE;
+                break;
+                case 2:
+                    // Processing 2-bit Indexed (4-color paletted)
+                    // Add padding
+                    fmt = BMF_4BIT | BMT_COMPLEX | BMT_PALETTE;
+                break;
+                case 4:
+                    // "Processing 4-bit Indexed (16-color paletted)
+                    fmt = BMF_4BIT | BMT_COMPLEX | BMT_PALETTE;
+                break;
+                case 8:
+                    // Processing 8-bit Indexed (256-color paletted)
+                    fmt = BMF_8BIT | BMT_COMPLEX | BMT_PALETTE;
+                break;
+                default:
+                    // Invalid BitDepth for Indexed Color
+                break;
+            }
+            break;
+
+        case PNG_COLOR_TYPE_GREY_ALPHA:
+            switch (bitDepth)
+            {
+                case 8:
+                    // Processing 8-bit Greyscale + Alpha
+                    // Use 256-grayscale palette
+                    // remove alpha channel (blend in with white)
+                    //fmt = BMF_8BIT | BMT_COMPLEX | BMT_PALETTE;
+                break;
+                case 16:
+                    // Processing 16-bit Greyscale + Alpha (downsample to 8-bit)
+                    // Downcycle to 8-bit
+                    // Use 256-grayscale palette
+                    // Remove alpha (blend with white)
+                    //fmt = BMF_8BIT | BMT_COMPLEX | BMT_PALETTE;
+                break;
+                default:
+                    // Invalid BitDepth for Greyscale with Alpha
+                break;
+            }
+            break;
+
+        case PNG_COLOR_TYPE_RGBA:
+            switch (bitDepth)
+            {
+                case 8:
+                    // Processing 8-bit Truecolor + Alpha
+                    // Remove alpha (blend with white)
+                    fmt = BMF_24BIT | BMT_COMPLEX;
+                break;
+                case 16:
+                    // Processing 16-bit Truecolor + Alpha (downsample to 8-bit)
+                    // Downcycle to 8-bit per channel
+                    // Remove alpha (blend with white)
+                    //fmt = BMF_24BIT | BMT_COMPLEX;
+                break;
+                default:
+                    // Invalid BitDepth for Truecolor with Alpha
+                break;
+            }
+        break;
+
+        default:
+            // Invalid ColorType
+        break;
     }
 
+    return fmt;
+}
 
 
+VMBlockHandle initiateOutputBitmap(VMFileHandle vmFile, IHDRData ihdrData, BMFormat fmt)
+{
+    GStateHandle bmstate;
+    VMBlockHandle vmBlock;
 
     vmBlock = GrCreateBitmap(
-        // BMF_MONO | BMT_COMPLEX | BMT_PALETTE,
-        // BMF_4BIT | BMT_COMPLEX | BMT_PALETTE,
-        // BMF_8BIT | BMT_COMPLEX | BMT_PALETTE,
-        BMF_24BIT | BMT_COMPLEX,
+        fmt,
         ihdrData.width, ihdrData.height,
         vmFile,
         0,
@@ -652,6 +779,41 @@ void convert16BitLineTo8Bit(unsigned char *line, unsigned long width)
 
     // Free the memory allocated for the destination buffer
     MemFree(dstHan);
+}
+
+void pad_1bit_to_4bit_inplace(unsigned char *buffer, unsigned long input_size)
+{
+    // Calculate the new size for the output
+    int output_size = input_size * 8 / 2;  // Each byte holds 8 1-bit values, which will expand to 4 bits each.
+
+    // Process in reverse, starting from the last byte
+    int input_index = input_size - 1;
+    int output_index = output_size - 1;
+
+    int i = 0;
+
+    while (input_index >= 0)
+    {
+        unsigned char byte = buffer[input_index];  // Get the current input byte
+
+        // Process each bit in the byte, starting from the least significant bit
+        for (i = 0; i < 8; i++)
+        {
+            unsigned char bit = (byte >> i) & 1;   // Extract each bit
+
+            // Expand the bit into a 4-bit value and place it in the output position
+            buffer[output_index--] = (bit << 3);   // Shift the bit into the 4-bit position (1000 or 0000)
+
+            // Make sure we don't write past the bounds
+            if (output_index < 0)
+            {
+                break;
+            }
+        }
+
+        // Move to the next input byte
+        input_index--;
+    }
 }
 
 // Unfilter-Funktion zur Verarbeitung der PNG-Bilddaten
