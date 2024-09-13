@@ -48,7 +48,8 @@ VMBlockHandle convertPNG(FileHandle fileHan, VMFileHandle vmFile)
                     convert16BitLineTo8Bit(state.currentRow, state.ihdr.width);
                 }
 
-                if (state.ihdr.bitDepth == 1 && fmt == BMF_4BIT) pad_1bit_to_4bit_inplace(state.currentRow, state.ihdr.width);
+                if (state.ihdr.bitDepth == 1 && fmt == BMF_4BIT) pad_1bit_to_4bit(state.currentRow, state.ihdr.width);
+                if (state.ihdr.bitDepth == 2 && fmt == BMF_4BIT) pad_2bit_to_4bit(state.currentRow, state.ihdr.width);
 
                 // Write the processed scanline (without the filter byte) to the VMFile
                 writePixelLine(vmFile, vmBlock, state.lineNo - 1, state.currentRow);
@@ -407,7 +408,7 @@ void transferPLTEChunk(FileHandle file, PLTEChunkEntry plteChunk, VMFileHandle v
         byte* palette = NULL;
         MemHandle paletteHan = NullHandle;
         MemHandle bmmem;
-        word offset;
+        unsigned int offset;
         byte *bmblock;
 
         // Make sure the length is divisible by 3 (each color is 3 bytes)
@@ -781,39 +782,102 @@ void convert16BitLineTo8Bit(unsigned char *line, unsigned long width)
     MemFree(dstHan);
 }
 
-void pad_1bit_to_4bit_inplace(unsigned char *buffer, unsigned long input_size)
+// Function to convert 1-bit packed values to 4-bit padded values
+void pad_1bit_to_4bit(unsigned char *input, unsigned int width)
 {
-    // Calculate the new size for the output
-    int output_size = input_size * 8 / 2;  // Each byte holds 8 1-bit values, which will expand to 4 bits each.
+    unsigned int in_index = 0;   // Index for the input array
+    unsigned int out_index = 0;  // Index for the output array
+    unsigned int bit;
+    unsigned int x = 0;
 
-    // Process in reverse, starting from the last byte
-    int input_index = input_size - 1;
-    int output_index = output_size - 1;
+    // Calculate the number of output bytes needed (4 bits per pixel, so 2 pixels per byte)
+    unsigned int rowBytes = (width + 1) / 2;  // Each byte holds 2 pixels in 4-bit format
 
-    int i = 0;
+    // Allocate memory for the output row
+    MemHandle outputHan = MemAlloc(rowBytes, HF_SHARABLE | HF_SWAPABLE, HAF_ZERO_INIT); // Allocate memory with zero-initialization
+    unsigned char* output = MemLock(outputHan);  // Lock the memory to access the output array
 
-    while (input_index >= 0)
+    // Process each bit in the input array
+    for (x = 0; x < width; x++)
     {
-        unsigned char byte = buffer[input_index];  // Get the current input byte
+        // Get the current bit (extract from the input byte)
+        bit = (input[in_index] >> (7 - (x % 8))) & 1;
 
-        // Process each bit in the byte, starting from the least significant bit
-        for (i = 0; i < 8; i++)
-        {
-            unsigned char bit = (byte >> i) & 1;   // Extract each bit
-
-            // Expand the bit into a 4-bit value and place it in the output position
-            buffer[output_index--] = (bit << 3);   // Shift the bit into the 4-bit position (1000 or 0000)
-
-            // Make sure we don't write past the bounds
-            if (output_index < 0)
-            {
-                break;
-            }
+        // Place the bit as a 4-bit value (0x0 or 0x1) into the correct nibble
+        if (x % 2 == 0) {
+            // If even index, put the 4-bit value in the high nibble
+            output[out_index] = bit << 4;  // 0 or 1 shifted to the high nibble
+        } else {
+            // If odd index, put the 4-bit value in the low nibble
+            output[out_index] |= bit;  // Place bit in the low nibble
+            out_index++;  // Move to the next byte in the output array after filling both nibbles
         }
 
-        // Move to the next input byte
-        input_index--;
+        // Move to the next byte in the input after processing 8 pixels (1 byte)
+        if ((x % 8) == 7) {
+            in_index++;
+        }
     }
+
+    // Copy the padded 4-bit values back to the input buffer
+    memcpy(input, output, rowBytes);
+
+    // Free the allocated memory
+    MemFree(outputHan);
+}
+
+// Function to convert 2-bit packed values to 4-bit padded values
+void pad_2bit_to_4bit(unsigned char *input, unsigned int width)
+{
+    unsigned int in_index = 0;   // Index for the input array
+    unsigned int out_index = 0;  // Index for the output array
+    unsigned int two_bit_value;
+    unsigned int x = 0;
+
+    // Calculate the number of output bytes needed (each 2-bit value expands to 4 bits)
+    unsigned int rowBytes = (width + 1) / 2;  // Each pixel takes 4 bits (1 byte holds 2 pixels)
+
+    // Allocate memory for the output row
+    MemHandle outputHan = MemAlloc(rowBytes, HF_SHARABLE | HF_SWAPABLE, HAF_ZERO_INIT); // Allocate memory with zero-initialization
+    unsigned char* output = MemLock(outputHan);  // Lock the memory to access the output array
+
+    // Process each 2-bit value in the input array
+    for (x = 0; x < width; x++)
+    {
+        // Extract the 2-bit value from the input byte
+        two_bit_value = (input[in_index] >> (6 - (x % 4) * 2)) & 0x03;
+
+        // Map the 2-bit value to a 4-bit value
+        if (x % 2 == 0) {
+            // If even index (0, 2, 4, ...), put the 4-bit value in the high nibble
+            switch (two_bit_value) {
+                case 0x0: output[out_index] = 0x00; break;
+                case 0x1: output[out_index] = 0x40; break;
+                case 0x2: output[out_index] = 0x80; break;
+                case 0x3: output[out_index] = 0xC0; break;
+            }
+        } else {
+            // If odd index (1, 3, 5, ...), put the 4-bit value in the low nibble
+            switch (two_bit_value) {
+                case 0x0: output[out_index] |= 0x00; break;
+                case 0x1: output[out_index] |= 0x04; break;
+                case 0x2: output[out_index] |= 0x08; break;
+                case 0x3: output[out_index] |= 0x0C; break;
+            }
+            out_index++;  // Move to the next byte in the output array after filling both nibbles
+        }
+
+        // Move to the next byte in the input array after 4 pixels (2 bits per pixel)
+        if ((x % 4) == 3) {
+            in_index++;
+        }
+    }
+
+    // Copy the padded 4-bit values back to the input buffer
+    memcpy(input, output, rowBytes);
+
+    // Free the allocated memory
+    MemFree(outputHan);
 }
 
 // Unfilter-Funktion zur Verarbeitung der PNG-Bilddaten
