@@ -13,8 +13,6 @@ VMBlockHandle convertPNG(FileHandle fileHan, VMFileHandle vmFile)
     int idatNumChunks = 0;
     PLTEChunkEntry plteChunk = {0};
     IDATState state = {0};
-    MemHandle rowBufferHan = NullHandle;
-    unsigned char* rowBuffer;
 
     if (checkPNGHeader(fileHan))
     {
@@ -30,32 +28,31 @@ VMBlockHandle convertPNG(FileHandle fileHan, VMFileHandle vmFile)
         // Initialize the IDAT state
         state = initIDATState(fileHan, idatChunks, idatNumChunks, ihdrData);
 
-        // Allocate memory for the rowBuffer externally
-        rowBufferHan = MemAlloc(calcBytesPerRow(ihdrData.width, ihdrData.colorType, ihdrData.bitDepth) + 1, HF_SHARABLE | HF_SWAPABLE, HAF_ZERO_INIT); // +1 for filterByte
-        rowBuffer = MemLock(rowBufferHan);
-
         // Process each scanline
-        while (processNextScanline(&state, rowBuffer) == 1)
+        while (processNextScanline(&state) == 1)
         {
+            pauseIDATProcessing(&state);
+
             // Convert RGBA to RGB if needed
             if (state.ihdr.colorType == 6)
             {
-                convertRGBAtoRGB(rowBuffer, state.ihdr.width);
+                convertRGBAtoRGB(state.currentRow, state.ihdr.width);
             }
 
             // Convert 16-bit to 8-bit if needed
             if (state.bytesPerPixel == 6)
             {
-                convert16BitLineTo8Bit(rowBuffer, state.ihdr.width);
+                convert16BitLineTo8Bit(state.currentRow, state.ihdr.width);
             }
 
             // Write the processed scanline (without the filter byte) to the VMFile
-            writePixelLine(vmFile, vmBlock, state.lineNo - 1, rowBuffer);
+            writePixelLine(vmFile, vmBlock, state.lineNo - 1, state.currentRow);
+
+            resumeIDATProcessing(&state);
         }
 
         // Clean up resources
         cleanupIDATState(&state);
-        MemFree(rowBufferHan);
 
         return vmBlock;
     }
@@ -184,17 +181,25 @@ IDATState initIDATState(FileHandle file, IDATChunkEntry* idatChunks, int idatNum
     //inflateInit2(&state.strm, 15 + 32);
     inflateInit2(&state.strm, 15);
 
+    // how many bytes in a pixel, how many bytes in a row?
+    state.rowBytes = calcBytesPerRow(ihdr.width, ihdr.colorType, ihdr.bitDepth);
+    state.bytesPerPixel = calcBytesPerPixel(ihdr.colorType, ihdr.bitDepth);
+
+    // memory for the input data from file to zlib
     state.inHan = MemAlloc(CHUNK_SIZE, HF_SHARABLE | HF_SWAPABLE, HAF_ZERO_INIT);
     state.in = MemLock(state.inHan);
 
+    // memory for what zlib decodes
     state.outHan = MemAlloc(CHUNK_SIZE, HF_SHARABLE | HF_SWAPABLE, HAF_ZERO_INIT);
     state.out = MemLock(state.outHan);
 
-    state.previousRowHandle = MemAlloc(calcBytesPerRow(ihdr.width, ihdr.colorType, ihdr.bitDepth) + 1, HF_SHARABLE | HF_SWAPABLE, HAF_ZERO_INIT);
-    state.previousRow = MemLock(state.previousRowHandle);
+    // Allocate memory for the zlib-decoded and unfiltered current row, raw pixel data
+    state.currentRowHan = MemAlloc(state.rowBytes + 1, HF_SHARABLE | HF_SWAPABLE, HAF_ZERO_INIT); // +1 for filter byte
+    state.currentRow = MemLock(state.currentRowHan);
 
-    state.rowBytes = calcBytesPerRow(ihdr.width, ihdr.colorType, ihdr.bitDepth);
-    state.bytesPerPixel = calcBytesPerPixel(ihdr.colorType, ihdr.bitDepth);
+    // Allocate memory for the previous row - needed for the PNG unfilter mechanism
+    state.previousRowHandle = MemAlloc(state.rowBytes + 1, HF_SHARABLE | HF_SWAPABLE, HAF_ZERO_INIT); // +1 for filter byte
+    state.previousRow = MemLock(state.previousRowHandle);
 
     state.rowBufferOffset = 0;
     state.lineNo = 0;
@@ -213,8 +218,25 @@ IDATState initIDATState(FileHandle file, IDATChunkEntry* idatChunks, int idatNum
     return state;
 }
 
+// temporarily unlock the memory not needed for just putting out the pixels we just decoded
+// NOTE: currentRow stays locked for further processing
+void pauseIDATProcessing(IDATState* state)
+{
+    MemUnlock(state->inHan);
+    MemUnlock(state->outHan);
+    MemUnlock(state->previousRowHandle);
+}
+
+// relock the memory needed for further IDAT chunk processing
+void resumeIDATProcessing(IDATState* state)
+{
+    state->in = MemLock(state->inHan);
+    state->out = MemLock(state->outHan);
+    state->previousRow = MemLock(state->previousRowHandle);
+}
+
 // Verarbeitung von IDAT-Chunks
-int processNextScanline(IDATState* state, unsigned char *rowBuffer)
+int processNextScanline(IDATState* state)
 {
     unsigned long have;  // Amount of data decompressed into the output buffer
     unsigned char *src;  // Pointer to the current position in the output buffer
@@ -235,7 +257,7 @@ int processNextScanline(IDATState* state, unsigned char *rowBuffer)
             {
                 // Calculate how many bytes to copy into the row buffer (excluding the filter byte)
                 unsigned long toCopy = (rowBytes + 1 - state->rowBufferOffset) < have ? (rowBytes + 1 - state->rowBufferOffset) : have;
-                memcpy(rowBuffer + state->rowBufferOffset, src, toCopy);  // Copy data from output buffer to row buffer
+                memcpy(state->currentRow + state->rowBufferOffset, src, toCopy);  // Copy data from output buffer to row buffer
                 state->rowBufferOffset += toCopy;  // Update the row buffer offset
                 src += toCopy;  // Move source pointer forward
                 have -= toCopy;  // Decrease the remaining data to be processed
@@ -244,13 +266,13 @@ int processNextScanline(IDATState* state, unsigned char *rowBuffer)
                 if (state->rowBufferOffset == rowBytes + 1)
                 {
                     // Unfilter the scanline using the previous row's data
-                    unfilterRow(rowBuffer, state->previousRow, state->bytesPerPixel, rowBytes);
+                    unfilterRow(state->currentRow, state->previousRow, state->bytesPerPixel, rowBytes);
 
                     // Move the pixel data in the row buffer to skip the filter byte
-                    memmove(rowBuffer, rowBuffer + 1, rowBytes);
+                    memmove(state->currentRow, state->currentRow + 1, rowBytes);
 
                     // Save the current scanline (after unfiltering) to use in the next unfilter operation
-                    memcpy(state->previousRow, rowBuffer, rowBytes);
+                    memcpy(state->previousRow, state->currentRow, rowBytes);
 
                     // Reset the row buffer offset for the next scanline
                     state->rowBufferOffset = 0;
@@ -313,7 +335,7 @@ int processNextScanline(IDATState* state, unsigned char *rowBuffer)
             {
                 // Calculate how many bytes to copy into the row buffer
                 unsigned long toCopy = (rowBytes + 1 - state->rowBufferOffset) < have ? (rowBytes + 1 - state->rowBufferOffset) : have;
-                memcpy(rowBuffer + state->rowBufferOffset, src, toCopy);  // Copy the decompressed data to the row buffer
+                memcpy(state->currentRow + state->rowBufferOffset, src, toCopy);  // Copy the decompressed data to the row buffer
                 state->rowBufferOffset += toCopy;  // Update the row buffer offset
                 src += toCopy;  // Move the source pointer forward
                 have -= toCopy;  // Decrease the remaining decompressed data to process
@@ -322,13 +344,13 @@ int processNextScanline(IDATState* state, unsigned char *rowBuffer)
                 if (state->rowBufferOffset == rowBytes + 1)
                 {
                     // Unfilter the scanline
-                    unfilterRow(rowBuffer, state->previousRow, state->bytesPerPixel, rowBytes);
+                    unfilterRow(state->currentRow, state->previousRow, state->bytesPerPixel, rowBytes);
 
                     // Move the pixel data to skip the filter byte
-                    memmove(rowBuffer, rowBuffer + 1, rowBytes);
+                    memmove(state->currentRow, state->currentRow + 1, rowBytes);
 
                     // Save the current scanline for future unfiltering
-                    memcpy(state->previousRow, rowBuffer, rowBytes);
+                    memcpy(state->previousRow, state->currentRow, rowBytes);
 
                     // Reset the row buffer offset for the next scanline
                     state->rowBufferOffset = 0;
@@ -368,6 +390,7 @@ void cleanupIDATState(IDATState* state)
     inflateEnd(&state->strm);
     MemFree(state->inHan);
     MemFree(state->outHan);
+    MemFree(state->currentRowHan);
     MemFree(state->previousRowHandle);
 }
 
@@ -635,7 +658,7 @@ void convert16BitLineTo8Bit(unsigned char *line, unsigned long width)
 void unfilterRow(unsigned char *data, unsigned char *previousRow, unsigned long bytesPerPixel, unsigned long rowBytes)
 {
     unsigned char *currentRow = data;
-    unsigned char filterType = *currentRow;
+    unsigned char filterType = *currentRow; // just the first byte!
     unsigned long i;
 
     // Pointer to the first byte after the filter type
