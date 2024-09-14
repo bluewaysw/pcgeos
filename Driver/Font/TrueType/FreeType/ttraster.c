@@ -941,10 +941,9 @@
       if ( y > ras.lastY )
       {
         if ( New_Profile( RAS_VARS  Ascending ) ) return FAILURE;
-      }
-      else
+      } 
+      else if ( y < ras.lastY )
       {
-        if ( y < ras.lastY )
           if ( New_Profile( RAS_VARS  Descending ) ) return FAILURE;
       }
       break;
@@ -964,29 +963,21 @@
              New_Profile( RAS_VARS  Ascending ) ) return FAILURE;
       }
       break;
-
-    default:
-      ;
     }
 
     /* Then compute the lines */
 
-    switch ( ras.state )
+    if ( ras.state == Ascending )
     {
-    case Ascending:
       if ( Line_Up ( RAS_VARS  ras.lastX, ras.lastY,
                      x, y, ras.minY, ras.maxY ) )
         return FAILURE;
-      break;
-
-    case Descending:
+    }
+    else if ( ras.state == Descending )
+    {
       if ( Line_Down( RAS_VARS ras.lastX, ras.lastY,
                       x, y, ras.minY, ras.maxY ) )
         return FAILURE;
-      break;
-
-    default:
-      ;
     }
 
     ras.lastX = x;
