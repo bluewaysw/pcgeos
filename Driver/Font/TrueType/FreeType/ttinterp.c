@@ -158,7 +158,7 @@
 
 #define COMPUTE_Funcs() Compute_Funcs( EXEC_ARG )
 
-#define NORMalize( x, y, v )  Normalize( EXEC_ARGS x, y, v )
+#define NORMalize( x, y, v )  Normalize( x, y, v )
 
 #define SET_SuperRound( scale, flags ) \
                         SetSuperRound( EXEC_ARGS scale, flags )
@@ -1509,9 +1509,9 @@
  *
  *****************************************************************/
 
-  static Bool  Normalize( EXEC_OPS TT_F26Dot6      Vx,
-                                   TT_F26Dot6      Vy,
-                                   TT_UnitVector*  R )
+  static Bool  Normalize( TT_F26Dot6      Vx,
+                          TT_F26Dot6      Vy,
+                          TT_UnitVector*  R )
   {
     TT_F26Dot6  W;
     Bool        S1, S2;
@@ -3024,7 +3024,7 @@
 /* CodeRange : $8A                         */
 /* Stack     : 3 * StkElt --> 3 * StkElt   */
 
-  static void  Ins_ROLL( INS_ARG )
+  static void  Ins_ROLL( PStorage args )
   {
     Long  A, B, C;
 
@@ -3103,7 +3103,7 @@
 /* CodeRange : $1B                         */
 /* Stack     : -->                         */
 
-  static void  Ins_ELSE( INS_ARG )
+  static void  Ins_ELSE( EXEC_OP )
   {
     Int  nIfs;
 
@@ -3242,7 +3242,7 @@
 /* CodeRange : $2D                         */
 /* Stack     : -->                         */
 
-  static void  Ins_ENDF( INS_ARG )
+  static void  Ins_ENDF( EXEC_OP )
   {
     PCallRecord  pRec;
 
@@ -3972,7 +3972,7 @@
 /* CodeRange : $80                            */
 /* Stack     : uint32... -->                  */
 
-  static void  Ins_FLIPPT( INS_ARG )
+  static void  Ins_FLIPPT( EXEC_OP )
   {
     UShort  point;
 
@@ -4138,7 +4138,7 @@
 /* CodeRange : $32-33                         */
 /* Stack     : uint32... -->                  */
 
-  static void  Ins_SHP( INS_ARG )
+  static void  Ins_SHP( EXEC_OP )
   {
     TGlyph_Zone zp;
     UShort      refp;
@@ -4703,7 +4703,7 @@
 /* CodeRange   : $3C                          */
 /* Stack       : uint32 uint32... -->         */
 
-  static void  Ins_ALIGNRP( INS_ARG )
+  static void  Ins_ALIGNRP( EXEC_OP )
   {
     UShort      point;
     TT_F26Dot6  distance;
@@ -4870,7 +4870,7 @@
 /* CodeRange   : $39                          */
 /* Stack       : uint32... -->                */
 
-  static void  Ins_IP( INS_ARG )
+  static void  Ins_IP( EXEC_OP )
   {
     TT_F26Dot6  org_a, org_b, org_x,
                 cur_a, cur_b, cur_x,
@@ -5098,7 +5098,7 @@
 /* CodeRange   : $30-$31                      */
 /* Stack       : -->                          */
 
-  static void  Ins_IUP( INS_ARG )
+  static void  Ins_IUP( EXEC_OP )
   {
     struct LOC_Ins_IUP  V;
     Byte                mask;
@@ -5370,7 +5370,7 @@
   }
 
 
-  static void  Ins_UNKNOWN( INS_ARG )
+  static void  Ins_UNKNOWN( EXEC_OP )
   {
     /* look up the current instruction in our table */
     PDefRecord  def, limit;
@@ -5922,7 +5922,7 @@
           break;
 
         case 0x1B:  /* ELSE */
-          Ins_ELSE( EXEC_ARGS  args );
+          Ins_ELSE( EXEC_ARG );
           break;
 
         case 0x1C:  /* JMPR */
@@ -5974,7 +5974,7 @@
           break;
 
         case 0x28:  /* ???? */
-          Ins_UNKNOWN( EXEC_ARGS  args );
+          Ins_UNKNOWN( EXEC_ARG );
           break;
 
         case 0x29:  /* UTP */
@@ -5994,7 +5994,7 @@
           break;
 
         case 0x2D:  /* ENDF */
-          Ins_ENDF( EXEC_ARGS  args );
+          Ins_ENDF( EXEC_ARG );
           break;
 
         case 0x2E:  /* MDAP */
@@ -6005,12 +6005,12 @@
 
         case 0x30:  /* IUP */
         case 0x31:  /* IUP */
-          Ins_IUP( EXEC_ARGS  args );
+          Ins_IUP( EXEC_ARG );
           break;
 
         case 0x32:  /* SHP */
         case 0x33:  /* SHP */
-          Ins_SHP( EXEC_ARGS  args );
+          Ins_SHP( EXEC_ARG );
           break;
 
         case 0x34:  /* SHC */
@@ -6028,7 +6028,7 @@
           break;
 
         case 0x39:  /* IP    */
-          Ins_IP( EXEC_ARGS  args );
+          Ins_IP( EXEC_ARG );
           break;
 
         case 0x3A:  /* MSIRP */
@@ -6037,7 +6037,7 @@
           break;
 
         case 0x3C:  /* AlignRP */
-          Ins_ALIGNRP( EXEC_ARGS  args );
+          Ins_ALIGNRP( EXEC_ARG );
           break;
 
         case 0x3D:  /* RTDG */
@@ -6257,7 +6257,7 @@
           break;
 
         case 0x7B:  /* ???? */
-          Ins_UNKNOWN( EXEC_ARGS  args );
+          Ins_UNKNOWN( EXEC_ARG );
           break;
 
         case 0x7C:  /* RUTG */
@@ -6274,7 +6274,7 @@
           break;
 
         case 0x80:  /* FLIPPT */
-          Ins_FLIPPT( EXEC_ARGS  args );
+          Ins_FLIPPT( EXEC_ARG );
           break;
 
         case 0x81:  /* FLIPRGON */
@@ -6287,7 +6287,7 @@
 
         case 0x83:  /* UNKNOWN */
         case 0x84:  /* UNKNOWN */
-          Ins_UNKNOWN( EXEC_ARGS  args );
+          Ins_UNKNOWN( EXEC_ARG );
           break;
 
         case 0x85:  /* SCANCTRL */
@@ -6308,7 +6308,7 @@
           break;
 
         case 0x8A:  /* ROLL */
-          Ins_ROLL( EXEC_ARGS  args );
+          Ins_ROLL( args );
           break;
 
         case 0x8B:  /* MAX */
@@ -6328,7 +6328,7 @@
           break;
 
         case 0x8F:
-          Ins_UNKNOWN( EXEC_ARGS  args );
+          Ins_UNKNOWN( EXEC_ARG );
           break;
 
         default:
@@ -6341,7 +6341,7 @@
           else if ( opcode >= 0xB0 )
             Ins_PUSHB( EXEC_ARGS  args );
           else
-            Ins_UNKNOWN( EXEC_ARGS  args );
+            Ins_UNKNOWN( EXEC_ARG );
         }
 
       }
