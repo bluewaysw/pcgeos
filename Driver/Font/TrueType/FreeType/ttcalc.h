@@ -74,13 +74,9 @@
 
 #endif /* LONG64 */
 
-  /* The two following functions are now part of the API!          */
 
-  /* TT_Long  TT_MulDiv( TT_Long  a, TT_Long  b, TT_Long  c );     */
-  /* TT_Long  TT_MulFix( TT_Long  a, TT_Long  b );                 */
-
-LOCAL_DEF void  MulDivList( TT_Long*  a, ULong  n, TT_Long  b, TT_Long  c );
-LOCAL_DEF void  TransVecList( TT_Vector*  vec, ULong  n, TT_Matrix*  matrix );
+LOCAL_DEF void  MulDivList( TT_Long*  a, UShort  n, TT_Short*  b, TT_Long  c, TT_Long  d );
+LOCAL_DEF void  TransVecList( TT_Vector*  vec, UShort  n, TT_Matrix*  matrix );
 
 #define INT_TO_F26DOT6( x )    ( (Long)(x) << 6  )
 #define INT_TO_F2DOT14( x )    ( (Long)(x) << 14 )
