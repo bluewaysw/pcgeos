@@ -161,19 +161,59 @@
                            PGlyph_Zone  target )
   {
     UShort  np;
-    Short   nc;
+
 
     np = source->n_points;
-    nc = source->n_contours;
 
     target->org   = source->org + np;
     target->cur   = source->cur + np;
     target->touch = source->touch + np;
 
-    target->contours = source->contours + nc;
+    target->contours = source->contours + source->n_contours;
 
     target->n_points   = 0;
     target->n_contours = 0;
+  }
+
+
+/*******************************************************************
+ *
+ *  Function    :  Scale_X
+ *
+ *  Description :  scale an horizontal distance from font
+ *                 units to 26.6 pixels
+ *
+ *  Input  :  metrics  pointer to metrics
+ *            x        value to scale
+ *
+ *  Output :  scaled value
+ *
+ ******************************************************************/
+
+  static TT_Pos  Scale_X( PIns_Metrics  metrics, TT_Pos  x )
+  {
+    return TT_MulDiv( x, metrics->x_scale1, metrics->x_scale2 );
+  }
+
+
+/*******************************************************************
+ *
+ *  Function    :  Scale_Y
+ *
+ *  Description :  scale a vertical distance from font
+ *                 units to 26.6 pixels
+ *
+ *  Input  :  metrics  pointer to metrics
+ *            y        value to scale
+ *
+ *  Output :  scaled value
+ *
+ ******************************************************************/
+
+  static 
+  TT_Pos  Scale_Y( PIns_Metrics  metrics, TT_Pos  y )
+  {
+    return TT_MulDiv( y, metrics->y_scale1, metrics->y_scale2 );
   }
 
 
@@ -288,11 +328,8 @@
         else
           x -= GET_Byte();
       }
-      else
-      {
-        if ( (flag[j] & 16) == 0 )
+      else if ( (flag[j] & 16) == 0 )
           x += GET_Short();
-      }
 
       vec[j].x = x;
     }
@@ -311,11 +348,8 @@
         else
           y -= GET_Byte();
       }
-      else
-      {
-        if ( (flag[j] & 32) == 0 )
+      else if ( (flag[j] & 32) == 0 )
           y += GET_Short();
-      }
 
       vec[j].y = y;
     }
@@ -382,11 +416,16 @@
         if ( n_ins > 0 )
         {
           exec->is_composite     = FALSE;
+#ifdef TT_CONFIG_OPTION_SUPPORT_PEDANTIC_HINTING
           exec->pedantic_hinting = load_flags & TTLOAD_PEDANTIC;
+#endif
 
           error = Context_Run( exec );
+
+#ifdef TT_CONFIG_OPTION_SUPPORT_PEDANTIC_HINTING
           if (error && exec->pedantic_hinting)
             return error;
+#endif
         }
       }
       else
@@ -415,13 +454,13 @@
                                 Short               n_contours,
                                 PExecution_Context  exec,
                                 PSubglyph_Record    subg,
-                                UShort              load_flags,
                                 TT_Stream           input )
   {
     DEFINE_LOAD_LOCALS( input );
 
-    UShort       k, n_ins;
     PGlyph_Zone  pts;
+    UShort       k;
+    UShort       n_ins = 0;
 
 
     if ( subg->is_hinted                    &&
@@ -447,8 +486,6 @@
       if ( error )
         return error;
     }
-    else
-      n_ins = 0;
 
 
     /* prepare the execution context */
@@ -482,11 +519,16 @@
     if ( subg->is_hinted && n_ins > 0 )
     {
       exec->is_composite     = TRUE;
+#ifdef TT_CONFIG_OPTION_SUPPORT_PEDANTIC_HINTING
       exec->pedantic_hinting = load_flags & TTLOAD_PEDANTIC;
 
       error = Context_Run( exec );
+
       if (error && exec->pedantic_hinting)
         return error;
+#else
+      Context_Run( exec );
+#endif
     }
 
     /* save glyph origin and advance points */
@@ -704,10 +746,11 @@
           UShort  advance_width;
 
 
-          Get_HMetrics( face, index,
-                        !(load_flags & TTLOAD_IGNORE_GLOBAL_ADVANCE_WIDTH),
-                        &left_bearing,
-                        &advance_width );
+          /* Get horizontal metrics in font units for a given glyph.  If `check' is true, */
+          /* take care of mono-spaced fonts by returning the advance width max.           */
+          TT_Get_Metrics( &face->horizontalHeader, index, &left_bearing, &advance_width );
+          if ( (!(load_flags & TTLOAD_IGNORE_GLOBAL_ADVANCE_WIDTH)) && face->postscript.isFixedPitch )
+            advance_width = face->horizontalHeader.advance_Width_Max;
 
           subglyph->metrics.horiBearingX = left_bearing;
           subglyph->metrics.horiAdvance  = advance_width;
@@ -873,10 +916,10 @@
 
         FORGET_Frame();
 
-        k = 1 + 1;
+        k = 2;
 
         if ( new_flags & ARGS_ARE_WORDS )
-          k *= 2;
+          k <<= 1;
 
         if ( new_flags & WE_HAVE_A_SCALE )
           k += 2;
@@ -993,14 +1036,10 @@
 
           if ( subglyph2->is_scaled )
           {
-            TT_Matrix matrix;
-            matrix.xx = subglyph->transform.xx;
-            matrix.xy = subglyph->transform.xy;
-            matrix.yx = subglyph->transform.yx;
-            matrix.yy = subglyph->transform.yy;
+            TT_Matrix* matrix = (TT_Matrix*) &subglyph->transform;
 
-            TransVecList( subglyph2->zone.cur, num_points, &matrix );
-            TransVecList( subglyph2->zone.org, num_points, &matrix );
+            TransVecList( subglyph2->zone.cur, num_points, matrix );
+            TransVecList( subglyph2->zone.org, num_points, matrix );
           }
 
           /* adjust counts */
@@ -1077,7 +1116,6 @@
                                         num_contours,
                                         exec,
                                         subglyph,
-                                        load_flags,
                                         stream );
             if ( error )
               goto Fail;

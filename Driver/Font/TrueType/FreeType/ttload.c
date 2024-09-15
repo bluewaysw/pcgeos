@@ -1113,12 +1113,12 @@
 #ifdef TT_CONFIG_OPTION_SUPPORT_OPTIONAL_FIELDS
     post->FormatType         = GET_ULong();
     post->italicAngle        = GET_ULong();
-#else
-    SKIP( 8 );
-#endif
-
     post->underlinePosition  = GET_Short();
     post->underlineThickness = GET_Short();
+#else
+    SKIP( 12 );
+#endif
+
     post->isFixedPitch       = GET_ULong();
 
 #ifdef TT_CONFIG_OPTION_SUPPORT_OPTIONAL_FIELDS

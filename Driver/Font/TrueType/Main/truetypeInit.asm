@@ -3,7 +3,7 @@ COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 	Copyright (c) blueway.Softworks 2021 -- All Rights Reserved
 
 PROJECT:	PC GEOS
-MODULE:		Init
+MODULE:		TrueType Font Driver
 FILE:		truetypeInit.asm
 
 AUTHOR:		Falk Rehwagen, Jan 24, 2021
