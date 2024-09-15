@@ -316,27 +316,27 @@
 #endif
 
   /* Rounding function, as used by the interpreter */
-  typedef TT_F26Dot6  (*TRound_Function)( EXEC_OPS TT_F26Dot6 distance,
-                                                   TT_F26Dot6 compensation );
+  typedef TT_F26Dot6  TRound_Function( EXEC_OPS TT_F26Dot6 distance,
+                                                TT_F26Dot6 compensation );
 
   /* Point displacement along the freedom vector routine, as */
   /* used by the interpreter                                 */
-  typedef void  (*TMove_Function)( EXEC_OPS PGlyph_Zone  zone,
-                                            UShort       point,
-                                            TT_F26Dot6   distance );
+  typedef void  TMove_Function( EXEC_OPS PGlyph_Zone  zone,
+                                         UShort       point,
+                                         TT_F26Dot6   distance );
 
   /* Distance projection along one of the proj. vectors, as used */
   /* by the interpreter                                          */
-  typedef TT_F26Dot6  (*TProject_Function)( EXEC_OPS TT_Vector*  v1,
-                                                     TT_Vector*  v2 );
+  typedef TT_F26Dot6  TProject_Function( EXEC_OPS TT_Vector*  v1,
+                                                  TT_Vector*  v2 );
 
   /* reading a cvt value. Take care of non-square pixels when needed */
-  typedef TT_F26Dot6  (*TGet_CVT_Function)( EXEC_OPS ULong  index );
+  typedef TT_F26Dot6  TGet_CVT_Function( EXEC_OPS UShort  index );
 
   /* setting or moving a cvt value.  Take care of non-square pixels  */
   /* when needed                                                     */
-  typedef void  (*TSet_CVT_Function)( EXEC_OPS  ULong       index,
-                                                TT_F26Dot6  value );
+  typedef void  TSet_CVT_Function ( EXEC_OPS  UShort      index,
+                                              TT_F26Dot6  value );
 
   /* subglyph transformation record */
   struct  TTransform_
@@ -708,17 +708,17 @@
 
     Long               F_dot_P;    /* dot product of freedom and projection */
                                    /* vectors                               */
-    TRound_Function    func_round; /* current rounding function             */
+    TRound_Function    _near * func_round;     /* current rounding function   */
 
-    TProject_Function  func_project,   /* current projection function */
-                       func_dualproj,  /* current dual proj. function */
-                       func_freeProj;  /* current freedom proj. func  */
+    TProject_Function  _near * func_project;   /* current projection function */
+    TProject_Function  _near * func_dualproj;  /* current dual proj. function */
+    TProject_Function  _near * func_freeProj;  /* current freedom proj. func  */
 
-    TMove_Function     func_move;      /* current point move function */
+    TMove_Function     _near * func_move;      /* current point move function */
 
-    TGet_CVT_Function  func_read_cvt;  /* read a cvt entry              */
-    TSet_CVT_Function  func_write_cvt; /* write a cvt entry (in pixels) */
-    TSet_CVT_Function  func_move_cvt;  /* incr a cvt entry (in pixels)  */
+    TGet_CVT_Function  _near * func_read_cvt;  /* read a cvt entry              */
+    TSet_CVT_Function  _near * func_write_cvt; /* write a cvt entry (in pixels) */
+    TSet_CVT_Function  _near * func_move_cvt;  /* incr a cvt entry (in pixels)  */
 
     UShort             loadSize;
     PSubglyph_Stack    loadStack;      /* loading subglyph stack */
@@ -803,15 +803,6 @@
   LOCAL_DEF
   TT_Error  Instance_Reset( PInstance  ins );
 
-
-  /********************************************************************/
-  /*                                                                  */
-  /*   Handy scaling functions                                        */
-  /*                                                                  */
-  /********************************************************************/
-
-  LOCAL_DEF TT_Pos   Scale_X( PIns_Metrics  metrics, TT_Pos  x );
-  LOCAL_DEF TT_Pos   Scale_Y( PIns_Metrics  metrics, TT_Pos  y );
 
   /********************************************************************/
   /*                                                                  */

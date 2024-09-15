@@ -294,7 +294,7 @@ EC(             ECCheckBounds( (void*)charTableEntry ) );
                                 /* If currentChar is right or left char in a kernpair set corresponding flags. */
                                 if( currentChar == kernPair->KP_charLeft )
                                         charTableEntry->CTE_flags |= CTF_IS_FIRST_KERN;
-                                else if ( currentChar == kernPair->KP_charRight )
+                                if( currentChar == kernPair->KP_charRight )
                                         charTableEntry->CTE_flags |= CTF_IS_SECOND_KERN;
 
                                 /* If currentChar is right and left char in a kernpair, it can be aborted. */
@@ -367,13 +367,14 @@ EC(             ECCheckBounds( pairs ) );
 
                 for( i = 0; i < kerningDir.tables->t.kern0.nPairs; ++i )
                 {
-                        char left   = getGeosCharForIndex( pairs[i].left );
-                        char right  = getGeosCharForIndex( pairs[i].right );
+                        char left, right;
                         
-
+                        
                         if( ABS( pairs[i].value ) < minKernValue )
                                 continue;
-
+                        
+                        getGeosCharsForKernPairs( pairs[i].left, pairs[i].right, &left, &right );
+                        
                         if( left && right )
                         {
                                 WWFixedAsDWord  scaledKernValue;
