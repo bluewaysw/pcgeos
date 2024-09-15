@@ -165,6 +165,7 @@ void processPNGChunks(FileHandle file, IHDRData* ihdrData, IDATChunkEntry (*idat
 IDATState initIDATState(FileHandle file, IDATChunkEntry* idatChunks, int idatNumChunks, IHDRData ihdr, OutputFormat of)
 {
     IDATState state;
+    unsigned long allocSize = NULL;
 
     // Initialize the zlib stream
     state.strm.zalloc = Z_NULL;
@@ -189,12 +190,30 @@ IDATState initIDATState(FileHandle file, IDATChunkEntry* idatChunks, int idatNum
     state.rowBytes = calcBytesPerRow(ihdr.width, ihdr.colorType, ihdr.bitDepth);
     state.bytesPerPixel = calcBytesPerPixel(ihdr.colorType, ihdr.bitDepth);
 
+    // determine how much memory to allocate - we need to allocate a little more
+    // for 1 and 2 bit pixel data as it gets "padded to 4"
+    if ((ihdr.colorType == PNG_COLOR_TYPE_GREY) && (ihdr.bitDepth == 2))
+    {
+        allocSize = calcBytesPerRow(ihdr.width, ihdr.colorType, 4) + 1;
+    }
+    else if (
+        ((ihdr.colorType == PNG_COLOR_TYPE_PALETTE) && (ihdr.bitDepth == 1)) ||
+        ((ihdr.colorType == PNG_COLOR_TYPE_PALETTE) && (ihdr.bitDepth == 2))
+    )
+    {
+        allocSize = calcBytesPerRow(ihdr.width, ihdr.colorType, 4) + 1;
+    }
+    else
+    {
+        allocSize = state.rowBytes + 1;
+    }
+
     // Allocate memory for the zlib-decoded and unfiltered current row, raw pixel data
-    state.currentRowHan = MemAlloc(state.rowBytes + 1, HF_SHARABLE | HF_SWAPABLE, HAF_ZERO_INIT); // +1 for filter byte
+    state.currentRowHan = MemAlloc(allocSize, HF_SHARABLE | HF_SWAPABLE, HAF_ZERO_INIT); // +1 for filter byte
     state.currentRow = MemLock(state.currentRowHan);
 
     // Allocate memory for the previous row - needed for the PNG unfilter mechanism
-    state.previousRowHandle = MemAlloc(state.rowBytes + 1, HF_SHARABLE | HF_SWAPABLE, HAF_ZERO_INIT); // +1 for filter byte
+    state.previousRowHandle = MemAlloc(allocSize, HF_SHARABLE | HF_SWAPABLE, HAF_ZERO_INIT); // +1 for filter byte
     state.previousRow = MemLock(state.previousRowHandle);
 
     state.rowBufferOffset = 0;
@@ -461,10 +480,9 @@ void transferPLTEChunk(FileHandle file, PLTEChunkEntry plteChunk, VMFileHandle v
 //         3x8 bits rgb color + 8 bit alpha-channel => remove alpha by blending in with white
 //         3x16 bits rgb color + 16 bit alpha-channel => downcycle to 8 bit / channel => remove alpha by blending in with white
 
-
 OutputFormat pngWhatOutputFormat(int colorType, int bitDepth)
 {
-    OutputFormat output = {0};
+    OutputFormat output = {0};  // Initialize to zero
 
     switch (colorType)
     {
@@ -557,6 +575,33 @@ OutputFormat pngWhatOutputFormat(int colorType, int bitDepth)
             }
             break;
 
+        case PNG_COLOR_TYPE_PALETTE:
+            switch (bitDepth)
+            {
+                case 1:
+                    // Processing 1-bit Palette (2 colors)
+                    output.fmt = BMF_4BIT | BMT_COMPLEX | BMT_PALETTE;
+                    output.transform = PNG_FT_PADDING_1_4;
+                    break;
+                case 2:
+                    // Processing 2-bit Palette (4 colors)
+                    output.fmt = BMF_4BIT | BMT_COMPLEX | BMT_PALETTE;
+                    output.transform = PNG_FT_PADDING_2_4;
+                    break;
+                case 4:
+                    // Processing 4-bit Palette (16 colors)
+                    output.fmt = BMF_4BIT | BMT_COMPLEX | BMT_PALETTE;
+                    break;
+                case 8:
+                    // Processing 8-bit Palette (256 colors)
+                    output.fmt = BMF_8BIT | BMT_COMPLEX | BMT_PALETTE;
+                    break;
+                default:
+                    // Invalid BitDepth for Palette
+                    break;
+            }
+            break;
+
         default:
             // Invalid ColorType
             break;
@@ -564,7 +609,6 @@ OutputFormat pngWhatOutputFormat(int colorType, int bitDepth)
 
     return output;
 }
-
 
 VMBlockHandle initiateOutputBitmap(VMFileHandle vmFile, IHDRData ihdrData, OutputFormat of)
 {
@@ -595,8 +639,8 @@ void applyFormatTransformations(IDATState* state, OutputFormat of)
     // Convert RGBA to RGB if needed
     if (of.transform & PNG_FT_RGB_ALPHA_REMOVE) convertRGBAtoRGB(state->currentRow, state->ihdr.width);
 
-    // if (state->ihdr.bitDepth == 1 && of.fmt == BMF_4BIT) pad_1bit_to_4bit(state->currentRow, state->ihdr.width);
-    // if (state->ihdr.bitDepth == 2 && of.fmt == BMF_4BIT) pad_2bit_to_4bit(state->currentRow, state->ihdr.width);
+    if (of.transform == PNG_FT_PADDING_1_4) pad_1bit_to_4bit(state->currentRow, state->ihdr.width);
+    if (of.transform == PNG_FT_PADDING_2_4) pad_2bit_to_4bit(state->currentRow, state->ihdr.width);
 }
 
 void writePixelLine(VMFileHandle vmFile, VMBlockHandle vmBlock, unsigned long lineNo, unsigned char* rowData)
