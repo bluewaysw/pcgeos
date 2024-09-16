@@ -630,6 +630,8 @@ VMBlockHandle initiateOutputBitmap(VMFileHandle vmFile, IHDRData ihdrData, Outpu
 
 void applyFormatTransformations(IDATState* state, OutputFormat of)
 {
+    RGBValue blendColor = {255, 255, 255};
+
     // Convert 16-bit to 8-bit if needed
     if (of.transform & PNG_FT_RGBA_16_TO_8_BIT) convert16BitLineTo8Bit(state->currentRow, state->ihdr.width, PNG_COLOR_TYPE_RGBA);
 
@@ -637,7 +639,7 @@ void applyFormatTransformations(IDATState* state, OutputFormat of)
     if (of.transform & PNG_FT_RGB_16_TO_8_BIT) convert16BitLineTo8Bit(state->currentRow, state->ihdr.width, PNG_COLOR_TYPE_RGB);
 
     // Convert RGBA to RGB if needed
-    if (of.transform & PNG_FT_RGB_ALPHA_REMOVE) convertRGBAtoRGB(state->currentRow, state->ihdr.width);
+    if (of.transform & PNG_FT_RGB_ALPHA_REMOVE) convertRGBAtoRGB(state->currentRow, state->ihdr.width, blendColor);
 
     if (of.transform == PNG_FT_PADDING_1_4) pad_1bit_to_4bit(state->currentRow, state->ihdr.width);
     if (of.transform == PNG_FT_PADDING_2_4) pad_2bit_to_4bit(state->currentRow, state->ihdr.width);
@@ -735,7 +737,7 @@ static inline unsigned char paethPredictor(int a, int b, int c)
     else return (unsigned char)c;
 }
 
-void convertRGBAtoRGB(unsigned char *data, unsigned long width)
+void convertRGBAtoRGB(unsigned char *data, unsigned long width, RGBValue blendColor)
 {
     unsigned long j;
     unsigned char *src = data;           // Start at the first pixel (RGBA)
@@ -748,10 +750,10 @@ void convertRGBAtoRGB(unsigned char *data, unsigned long width)
         unsigned char b = src[2];
         unsigned char a = src[3];  // Alpha value
 
-        // Blend the RGB values with a white background
-        dst[0] = (r * a + 255 * (255 - a)) / 255;  // Red channel
-        dst[1] = (g * a + 255 * (255 - a)) / 255;  // Green channel
-        dst[2] = (b * a + 255 * (255 - a)) / 255;  // Blue channel
+        // Blend the RGB values with the provided background color (blendColor)
+        dst[0] = (r * a + blendColor.RGB_red * (255 - a)) / 255;   // Red channel
+        dst[1] = (g * a + blendColor.RGB_green * (255 - a)) / 255; // Green channel
+        dst[2] = (b * a + blendColor.RGB_blue * (255 - a)) / 255;  // Blue channel
 
         // Move the source pointer forward by 4 (skip the alpha channel)
         src += 4;
