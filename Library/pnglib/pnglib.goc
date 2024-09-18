@@ -18,37 +18,38 @@ VMBlockHandle _pascal _export pngConvertFile(FileHandle fileHan, VMFileHandle vm
     if (pngCheckHeader(fileHan))
     {
         // Read PNG Chunks, get overview
-        pngProcessChunks(fileHan, &ihdrData, &idatChunks, &idatNumChunks, &plteChunk);
-
-        fmt = pngWhatOutputFormat(ihdrData.colorType, ihdrData.bitDepth);
-        if (fmt != 0)
+        if (pngProcessChunks(fileHan, &ihdrData, &idatChunks, &idatNumChunks, &plteChunk))
         {
-            // Initialize output bitmap
-            vmBlock = pngInitiateOutputBitmap(vmFile, ihdrData, fmt);
-
-            // transfers only if a palette exists
-            pngHandlePalette(fileHan, plteChunk, vmFile, vmBlock);
-
-            // Initialize the IDAT state
-            state = pngInitIDATProcessingState(fileHan, idatChunks, idatNumChunks, ihdrData);
-
-            // Process each scanline
-            while (pngGetNextIDATScanline(&state) == 1)
+            fmt = pngWhatOutputFormat(ihdrData.colorType, ihdrData.bitDepth);
+            if (fmt != 0)
             {
-                // pngPauseIDATProcessing(&state);
+                // Initialize output bitmap
+                vmBlock = pngInitiateOutputBitmap(vmFile, ihdrData, fmt);
 
-                pngApplyGEOSFormatTransformations(&state);
+                // transfers only if a palette exists
+                pngHandlePalette(fileHan, plteChunk, vmFile, vmBlock);
 
-                // Write the processed scanline (without the filter byte) to the VMFile
-                pngWriteScanlineToBitmap(vmFile, vmBlock, state.lineNo - 1, state.currentRow);
+                // Initialize the IDAT state
+                state = pngInitIDATProcessingState(fileHan, idatChunks, idatNumChunks, ihdrData);
 
-                // pngResumeIDATProcessing(&state);
+                // Process each scanline
+                while (pngGetNextIDATScanline(&state) == 1)
+                {
+                    pngPauseIDATProcessing(&state);
+
+                    pngApplyGEOSFormatTransformations(&state);
+
+                    // Write the processed scanline (without the filter byte) to the VMFile
+                    pngWriteScanlineToBitmap(vmFile, vmBlock, state.lineNo - 1, state.currentRow);
+
+                    pngResumeIDATProcessing(&state);
+                }
+
+                // Clean up resources
+                pngCleanupIDATProcessingState(&state);
+
+                return vmBlock;
             }
-
-            // Clean up resources
-            pngCleanupIDATProcessingState(&state);
-
-            return vmBlock;
         }
     }
 
@@ -77,7 +78,7 @@ int _pascal _export pngCheckHeader(FileHandle file)
 }
 
 // main function for processing PNG-Chunks
-void _pascal _export pngProcessChunks(FileHandle file, IHDRData* ihdrData, IDATChunkEntry (*idatChunks)[MAX_IDAT_CHUNKS], int *idatNumChunks, PLTEChunkEntry* plteChunk)
+int _pascal _export pngProcessChunks(FileHandle file, IHDRData* ihdrData, IDATChunkEntry (*idatChunks)[MAX_IDAT_CHUNKS], int *idatNumChunks, PLTEChunkEntry* plteChunk)
 {
     ChunkHeader chdr = {0};
     int idatChunkIdx = 0;
@@ -96,8 +97,10 @@ void _pascal _export pngProcessChunks(FileHandle file, IHDRData* ihdrData, IDATC
                 if (FileRead(file, ihdrData, sizeof(IHDRData), FALSE) != sizeof(IHDRData))
                 {
                     // Error reading IHDR chunk
-                    return;
+                    return 0;
                 }
+
+                if (ihdrData->interlaceMethod != 0) return 0; // we don't support interlacing
 
                 ihdrData->width = swapEndian(ihdrData->width);
                 ihdrData->height = swapEndian(ihdrData->height);
@@ -133,7 +136,7 @@ void _pascal _export pngProcessChunks(FileHandle file, IHDRData* ihdrData, IDATC
                 else
                 {
                     // Handle error: too many IDAT chunks
-                    return;
+                    return 0;
                 }
 
                 // Skip the IDAT chunk's data only, but not the CRC (CRC will be skipped outside the switch)
@@ -144,7 +147,7 @@ void _pascal _export pngProcessChunks(FileHandle file, IHDRData* ihdrData, IDATC
             case CHUNK_IEND:
             {
                 // Stop processing at IEND
-                return;
+                return 1;
             }
 
             default:
@@ -159,7 +162,7 @@ void _pascal _export pngProcessChunks(FileHandle file, IHDRData* ihdrData, IDATC
         FilePos(file, 4, FILE_POS_RELATIVE);
     }
 
-    return;
+    return 0;
 }
 
 IDATState _pascal _export pngInitIDATProcessingState(FileHandle file, IDATChunkEntry* idatChunks, int idatNumChunks, IHDRData ihdr)
