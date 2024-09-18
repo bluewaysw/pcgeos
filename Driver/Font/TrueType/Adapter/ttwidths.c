@@ -67,6 +67,8 @@ static void AdjustFontBuf( TransformMatrix*     transMatrix,
 static Boolean IsRegionNeeded( TransformMatrix* transMatrix, 
                         FontBuf*                fontBuf );
 
+static void FillKerningFlags( FontHeader* fontHeader, FontBuf* fontBuf );
+
 
 #define ROUND_WWFIXED( value )    ( value & 0xffff ? ( value >> 16 ) + 1 : value >> 16 )
 
@@ -186,10 +188,12 @@ EC(     ECCheckBounds( (void*) fontBuf ) );
         ConvertHeader( trueTypeVars, fontHeader, fontBuf );
 
         /* fill kerning pairs and kerning values */
+        InitGeosCharsInCharMap( CHAR_MAP, &fontBuf->FB_firstChar, &fontBuf->FB_lastChar );
         ConvertKernPairs( trueTypeVars, fontBuf );
 
         /* convert widths and fill CharTableEntries */
         ConvertWidths( trueTypeVars, fontHeader, fontBuf );
+        FillKerningFlags( fontHeader, fontBuf ); 
 
         /* calculate the transformation matrix and copy it into the FontBlock */
         transMatrix = (TransformMatrix*)(((byte*)fontBuf) + sizeof( FontBuf ) + fontHeader->FH_numChars * sizeof( CharTableEntry ));
@@ -227,7 +231,8 @@ Fail:
  * REVISION HISTORY:
  *      Date      Name      Description
  *      ----      ----      -----------
- *      12/02/23  JK        Initial Revision
+ *      12.02.23  JK        Initial Revision
+ *      17.09.14  JK        filling kern paris removed
  *******************************************************************/
 
 static void ConvertWidths( TRUETYPE_VARS, FontHeader* fontHeader, FontBuf* fontBuf )
@@ -282,35 +287,50 @@ EC(             ECCheckBounds( (void*)charTableEntry ) );
 
                 if( GLYPH_BBOX.yMax > fontHeader->FH_ascent )
                         charTableEntry->CTE_flags |= CTF_ABOVE_ASCENT;
-                
-
-                if( fontBuf->FB_kernCount )
-                {
-                        word       i;
-                        KernPair*  kernPair  = (KernPair*) ( ( (byte*)fontBuf ) + fontBuf->FB_kernPairs );
-
-                        for( i = 0; i < fontBuf->FB_kernCount; ++i )
-                        {
-                                /* If currentChar is right or left char in a kernpair set corresponding flags. */
-                                if( currentChar == kernPair->KP_charLeft )
-                                        charTableEntry->CTE_flags |= CTF_IS_FIRST_KERN;
-                                if( currentChar == kernPair->KP_charRight )
-                                        charTableEntry->CTE_flags |= CTF_IS_SECOND_KERN;
-
-                                /* If currentChar is right and left char in a kernpair, it can be aborted. */
-                                if( charTableEntry->CTE_flags & (CTF_IS_FIRST_KERN | CTF_IS_SECOND_KERN) == 
-                                                                        (CTF_IS_FIRST_KERN | CTF_IS_SECOND_KERN)) 
-                                        break;
-                        
-                                ++kernPair;
-                        }
-                }
 
                 ++charTableEntry;
         } 
 
         TT_Done_Glyph( GLYPH );
 }
+
+
+/********************************************************************
+ *                      FillKerningFlags
+ ********************************************************************
+ * SYNOPSIS:	  Fills chartabel entries with kerning flags.
+ * 
+ * PARAMETERS:    *fontHeader           ptr. to FontHeader.
+ *                *fontBuf              Ptr. to FontBuf structure.
+ * 
+ * RETURNS:       void
+ * 
+ * SIDE EFFECTS:  none
+ * 
+ * STRATEGY:      
+ * 
+ * REVISION HISTORY:
+ *      Date      Name      Description
+ *      ----      ----      -----------
+ *      18/09/24  JK        Initial Revision
+ *******************************************************************/
+
+static void FillKerningFlags( FontHeader* fontHeader, FontBuf* fontBuf ) 
+{
+        word       i;
+        KernPair*        kernPair       = (KernPair*) ( ( (byte*)fontBuf ) + fontBuf->FB_kernPairs );
+        CharTableEntry*  charTableEntry = (CharTableEntry*) (((byte*)fontBuf) + sizeof( FontBuf ));
+
+        for( i = 0; i < fontBuf->FB_kernCount; ++i )
+        {
+                word  indexLeftChar  = kernPair[i].KP_charLeft - fontHeader->FH_firstChar;
+                word  indexRightChar = kernPair[i].KP_charRight - fontHeader->FH_firstChar;
+
+                charTableEntry[indexLeftChar].CTE_flags  |= CTF_IS_FIRST_KERN;
+                charTableEntry[indexRightChar].CTE_flags |= CTF_IS_SECOND_KERN;
+        }
+}
+
 
 /********************************************************************
  *                      ConvertKernPairs
@@ -338,6 +358,7 @@ static void ConvertKernPairs( TRUETYPE_VARS, FontBuf* fontBuf )
         TT_Kerning        kerningDir;
         word              table;
         TT_Kern_0_Pair*   pairs;
+        
 
         KernPair*  kernPair  = (KernPair*) ( ( (byte*)fontBuf ) + fontBuf->FB_kernPairs );
         BBFixed*   kernValue = (BBFixed*) ( ( (byte*)fontBuf ) + fontBuf->FB_kernValues );
@@ -353,8 +374,9 @@ EC(     ECCheckBounds( (void*)kernValue ) );
         /* search for format 0 subtable */
         for( table = 0; table < kerningDir.nTables; ++table )
         {
-                word i;
-                word minKernValue = UNITS_PER_EM / KERN_VALUE_DIVIDENT;
+                word       i;
+                word       minKernValue = UNITS_PER_EM / KERN_VALUE_DIVIDENT;
+                
 
                 if( TT_Load_Kerning_Table( FACE, table ) )
                         return;
@@ -367,14 +389,13 @@ EC(             ECCheckBounds( pairs ) );
 
                 for( i = 0; i < kerningDir.tables->t.kern0.nPairs; ++i )
                 {
-                        char left, right;
-                        
+                        char left   = getGeosCharForIndex( pairs[i].left );
+                        char right  = getGeosCharForIndex( pairs[i].right );
+
                         
                         if( ABS( pairs[i].value ) < minKernValue )
                                 continue;
-                        
-                        getGeosCharsForKernPairs( pairs[i].left, pairs[i].right, &left, &right );
-                        
+                     
                         if( left && right )
                         {
                                 WWFixedAsDWord  scaledKernValue;

@@ -350,21 +350,25 @@ Boolean isGeosCharPair( word ttIndex_1, word ttIndex_2 )
         return FALSE;
 }
 
+void FillTTIndexesForGeosChars( word* indexPtr, TT_CharMap map, char firstChar, char lastChar )
+{
+        word currentChar;
+        word truetypeIndex;
 
-void getGeosCharsForKernPairs( word ttIndexLeft, word ttIndexRight, char *left, char *right )
+
+        for( currentChar = firstChar; currentChar <= lastChar; ++currentChar )
+                if( truetypeIndex = TT_Char_Index( map, geosCharMap[ currentChar ].unicode ) )
+                        indexPtr[currentChar - firstChar] = truetypeIndex;
+}
+
+
+char getGeosCharForIndex( word ttIndex )
 {
         word charIndex;
 
-        *left = 0;
-        *right = 0;
-
         for( charIndex = 0; charIndex < NUM_CHARMAPENTRIES; ++charIndex )
-        {
-                if( ttIndexLeft == geosCharMap[charIndex].ttIndex )
-                        *left = charIndex + C_SPACE;
-                if( ttIndexRight == geosCharMap[charIndex].ttIndex )
-                        *right = charIndex + C_SPACE;
+                if( ttIndex == geosCharMap[charIndex].ttIndex )
+                        return charIndex + C_SPACE;
 
-                if( left && right ) return;
-        }
+                return 0;
 }
