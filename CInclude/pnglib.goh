@@ -133,29 +133,31 @@ typedef struct {
     unsigned short transform; // Transformation flags
 } OutputFormat;
 
-VMBlockHandle _pascal _export convertPNG(FileHandle fileHan, VMFileHandle vmFile);
-int checkPNGHeader(FileHandle file);
-void processPNGChunks(FileHandle file, IHDRData* ihdrData, IDATChunkEntry (*idatChunks)[MAX_IDAT_CHUNKS], int *idatNumChunks, PLTEChunkEntry* plteChunk);
-void transferPLTEChunk(FileHandle file, PLTEChunkEntry plteChunk, VMFileHandle vmFile, VMBlockHandle vmBlock);
-IDATState initIDATState(FileHandle file, IDATChunkEntry* idatChunks, int idatNumChunks, IHDRData ihdr, OutputFormat of);
-void pauseIDATProcessing(IDATState* state);
-void resumeIDATProcessing(IDATState* state);
-int processNextScanline(IDATState* state);
-int nextIDATChunk(IDATState* state);
-void cleanupIDATState(IDATState* state);
+/* API */
+VMBlockHandle   _pascal _export pngConvertFile(FileHandle fileHan, VMFileHandle vmFile);
 
-OutputFormat pngWhatOutputFormat(int colorType, int bitDepth);
-void applyFormatTransformations(IDATState* state, OutputFormat of);
-VMBlockHandle initiateOutputBitmap(VMFileHandle vmFile, IHDRData ihdrData, OutputFormat of);
-void writePixelLine(VMFileHandle vmFile, VMBlockHandle bitmapHandle, unsigned long lineNo, unsigned char* rowData);
+int             _pascal _export pngCheckHeader(FileHandle file);
+void            _pascal _export pngProcessChunks(FileHandle file, IHDRData* ihdrData, IDATChunkEntry (*idatChunks)[MAX_IDAT_CHUNKS], int *idatNumChunks, PLTEChunkEntry* plteChunk);
+BMFormat        _pascal _export pngWhatOutputFormat(int colorType, int bitDepth);
+VMBlockHandle   _pascal _export pngInitiateOutputBitmap(VMFileHandle vmFile, IHDRData ihdrData, BMFormat fmt);
+void            _pascal _export pngHandlePalette(FileHandle file, PLTEChunkEntry plteChunk, VMFileHandle vmFile, VMBlockHandle vmBlock);
+IDATState       _pascal _export pngInitIDATProcessingState(FileHandle file, IDATChunkEntry* idatChunks, int idatNumChunks, IHDRData ihdr);
+int             _pascal _export pngGetNextIDATScanline(IDATState* state);
+void            _pascal _export pngPauseIDATProcessing(IDATState* state);
+void            _pascal _export pngApplyGEOSFormatTransformations(IDATState* state);
+void            _pascal _export pngWriteScanlineToBitmap(VMFileHandle vmFile, VMBlockHandle bitmapHandle, unsigned long lineNo, unsigned char* rowData);
+void            _pascal _export pngResumeIDATProcessing(IDATState* state);
+void            _pascal _export pngCleanupIDATProcessingState(IDATState* state);
 
+/* Internal */
 int abs(int x);
 unsigned long swapEndian(unsigned long val);
 static inline unsigned char paethPredictor(int a, int b, int c);
 unsigned long calcBytesPerRow(unsigned long width, unsigned char colorType, unsigned char bitDepth);
 unsigned long calcBytesPerPixel(unsigned char colorType, unsigned char bitDepth);
-void convertRGBAtoRGB(unsigned char *data, unsigned long width, RGBValue blendColor);
-void convert16BitLineTo8Bit(unsigned char *line, unsigned long width, unsigned char colorType);
-void pad_1bit_to_4bit(unsigned char *input, unsigned int width);
-void pad_2bit_to_4bit(unsigned char *input, unsigned int width);
+void removeAlphaChannel(unsigned char *data, unsigned long width, int colorType, RGBValue blendColor);
+void convert16BitLineTo8Bit(unsigned char *line, unsigned long width, unsigned char colorType, unsigned char bitDepth);
+void pad_1bit_to_4bit(unsigned char *input, unsigned int width, unsigned char colorType, unsigned char bitDepth);
+void pad_2bit_to_4bit(unsigned char *input, unsigned int width, unsigned char colorType, unsigned char bitDepth);
 void unfilterRow(unsigned char *data, unsigned char *previousRow, unsigned long bytesPerPixel, unsigned long rowBytes);
+int nextIDATChunk(IDATState* state);

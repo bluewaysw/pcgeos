@@ -5,7 +5,7 @@
  ********************************************************************
  */
 
-VMBlockHandle convertPNG(FileHandle fileHan, VMFileHandle vmFile)
+VMBlockHandle _pascal _export pngConvertFile(FileHandle fileHan, VMFileHandle vmFile)
 {
     IHDRData ihdrData = {0};
     VMBlockHandle vmBlock = NullHandle;
@@ -13,40 +13,40 @@ VMBlockHandle convertPNG(FileHandle fileHan, VMFileHandle vmFile)
     int idatNumChunks = 0;
     PLTEChunkEntry plteChunk = {0};
     IDATState state = {0};
-    OutputFormat of = {0};
+    BMFormat fmt = 0;
 
-    if (checkPNGHeader(fileHan))
+    if (pngCheckHeader(fileHan))
     {
         // Read PNG Chunks, get overview
-        processPNGChunks(fileHan, &ihdrData, &idatChunks, &idatNumChunks, &plteChunk);
+        pngProcessChunks(fileHan, &ihdrData, &idatChunks, &idatNumChunks, &plteChunk);
 
-        of = pngWhatOutputFormat(ihdrData.colorType, ihdrData.bitDepth);
-        if (of.fmt != 0)
+        fmt = pngWhatOutputFormat(ihdrData.colorType, ihdrData.bitDepth);
+        if (fmt != 0)
         {
             // Initialize output bitmap
-            vmBlock = initiateOutputBitmap(vmFile, ihdrData, of);
+            vmBlock = pngInitiateOutputBitmap(vmFile, ihdrData, fmt);
 
             // transfers only if a palette exists
-            transferPLTEChunk(fileHan, plteChunk, vmFile, vmBlock);
+            pngHandlePalette(fileHan, plteChunk, vmFile, vmBlock);
 
             // Initialize the IDAT state
-            state = initIDATState(fileHan, idatChunks, idatNumChunks, ihdrData, of);
+            state = pngInitIDATProcessingState(fileHan, idatChunks, idatNumChunks, ihdrData);
 
             // Process each scanline
-            while (processNextScanline(&state) == 1)
+            while (pngGetNextIDATScanline(&state) == 1)
             {
-                // pauseIDATProcessing(&state);
+                // pngPauseIDATProcessing(&state);
 
-                applyFormatTransformations(&state, of);
+                pngApplyGEOSFormatTransformations(&state);
 
                 // Write the processed scanline (without the filter byte) to the VMFile
-                writePixelLine(vmFile, vmBlock, state.lineNo - 1, state.currentRow);
+                pngWriteScanlineToBitmap(vmFile, vmBlock, state.lineNo - 1, state.currentRow);
 
-                // resumeIDATProcessing(&state);
+                // pngResumeIDATProcessing(&state);
             }
 
             // Clean up resources
-            cleanupIDATState(&state);
+            pngCleanupIDATProcessingState(&state);
 
             return vmBlock;
         }
@@ -56,7 +56,7 @@ VMBlockHandle convertPNG(FileHandle fileHan, VMFileHandle vmFile)
 }
 
 // Check PNG Header
-int checkPNGHeader(FileHandle file)
+int _pascal _export pngCheckHeader(FileHandle file)
 {
     unsigned char header[8];
 
@@ -77,7 +77,7 @@ int checkPNGHeader(FileHandle file)
 }
 
 // main function for processing PNG-Chunks
-void processPNGChunks(FileHandle file, IHDRData* ihdrData, IDATChunkEntry (*idatChunks)[MAX_IDAT_CHUNKS], int *idatNumChunks, PLTEChunkEntry* plteChunk)
+void _pascal _export pngProcessChunks(FileHandle file, IHDRData* ihdrData, IDATChunkEntry (*idatChunks)[MAX_IDAT_CHUNKS], int *idatNumChunks, PLTEChunkEntry* plteChunk)
 {
     ChunkHeader chdr = {0};
     int idatChunkIdx = 0;
@@ -162,7 +162,7 @@ void processPNGChunks(FileHandle file, IHDRData* ihdrData, IDATChunkEntry (*idat
     return;
 }
 
-IDATState initIDATState(FileHandle file, IDATChunkEntry* idatChunks, int idatNumChunks, IHDRData ihdr, OutputFormat of)
+IDATState _pascal _export pngInitIDATProcessingState(FileHandle file, IDATChunkEntry* idatChunks, int idatNumChunks, IHDRData ihdr)
 {
     IDATState state;
     unsigned long allocSize = NULL;
@@ -235,7 +235,7 @@ IDATState initIDATState(FileHandle file, IDATChunkEntry* idatChunks, int idatNum
 
 // temporarily unlock the memory not needed for just putting out the pixels we just decoded
 // NOTE: currentRow stays locked for further processing
-void pauseIDATProcessing(IDATState* state)
+void _pascal _export pngPauseIDATProcessing(IDATState* state)
 {
     MemUnlock(state->inHan);
     MemUnlock(state->outHan);
@@ -243,7 +243,7 @@ void pauseIDATProcessing(IDATState* state)
 }
 
 // relock the memory needed for further IDAT chunk processing
-void resumeIDATProcessing(IDATState* state)
+void _pascal _export pngResumeIDATProcessing(IDATState* state)
 {
     state->in = MemLock(state->inHan);
     state->out = MemLock(state->outHan);
@@ -251,7 +251,7 @@ void resumeIDATProcessing(IDATState* state)
 }
 
 // Verarbeitung von IDAT-Chunks
-int processNextScanline(IDATState* state)
+int _pascal _export pngGetNextIDATScanline(IDATState* state)
 {
     unsigned long have;  // Amount of data decompressed into the output buffer
     unsigned char *src;  // Pointer to the current position in the output buffer
@@ -400,7 +400,7 @@ int nextIDATChunk(IDATState* state)
     return 0;
 }
 
-void cleanupIDATState(IDATState* state)
+void _pascal _export pngCleanupIDATProcessingState(IDATState* state)
 {
     inflateEnd(&state->strm);
     MemFree(state->inHan);
@@ -409,7 +409,7 @@ void cleanupIDATState(IDATState* state)
     MemFree(state->previousRowHandle);
 }
 
-void transferPLTEChunk(FileHandle file, PLTEChunkEntry plteChunk, VMFileHandle vmFile, VMBlockHandle vmBlock)
+void _pascal _export pngHandlePalette(FileHandle file, PLTEChunkEntry plteChunk, VMFileHandle vmFile, VMBlockHandle vmBlock)
 {
     if ((plteChunk.chunkPos != 0) && (plteChunk.length != 0))
     {
@@ -480,9 +480,9 @@ void transferPLTEChunk(FileHandle file, PLTEChunkEntry plteChunk, VMFileHandle v
 //         3x8 bits rgb color + 8 bit alpha-channel => remove alpha by blending in with white
 //         3x16 bits rgb color + 16 bit alpha-channel => downcycle to 8 bit / channel => remove alpha by blending in with white
 
-OutputFormat pngWhatOutputFormat(int colorType, int bitDepth)
+BMFormat _pascal _export pngWhatOutputFormat(int colorType, int bitDepth)
 {
-    OutputFormat output = {0};  // Initialize to zero
+    BMFormat output = 0;
 
     switch (colorType)
     {
@@ -491,27 +491,19 @@ OutputFormat pngWhatOutputFormat(int colorType, int bitDepth)
             {
                 case 1:
                     // Processing 1-bit Greyscale
-                    output.fmt = BMF_MONO | BMT_COMPLEX | BMT_PALETTE;
+                    output = BMF_MONO | BMT_COMPLEX | BMT_PALETTE;
                     break;
                 case 2:
                     // Processing 2-bit Greyscale
-                    output.fmt = BMF_4BIT | BMT_COMPLEX | BMT_PALETTE;
-                    output.transform = PNG_FT_PADDING_2_4 | PNG_FT_4_GREYSCALE_PALETTE;
-                    break;
                 case 4:
                     // Processing 4-bit Greyscale
-                    output.fmt = BMF_4BIT | BMT_COMPLEX | BMT_PALETTE;
-                    output.transform = PNG_FT_16_GREYSCALE_PALETTE;
+                    output = BMF_4BIT | BMT_COMPLEX | BMT_PALETTE;
                     break;
                 case 8:
                     // Processing 8-bit Greyscale
-                    output.fmt = BMF_8BIT | BMT_COMPLEX | BMT_PALETTE;
-                    output.transform = PNG_FT_256_GREYSCALE_PALETTE;
-                    break;
                 case 16:
                     // Processing 16-bit Greyscale
-                    output.fmt = BMF_8BIT | BMT_COMPLEX | BMT_PALETTE;
-                    output.transform = PNG_FT_GREYSCALE_16_TO_8_BIT | PNG_FT_256_GREYSCALE_PALETTE;
+                    output = BMF_8BIT | BMT_COMPLEX | BMT_PALETTE;
                     break;
                 default:
                     // Invalid BitDepth for Greyscale
@@ -524,12 +516,9 @@ OutputFormat pngWhatOutputFormat(int colorType, int bitDepth)
             {
                 case 8:
                     // Processing 8-bit Truecolor
-                    output.fmt = BMF_24BIT | BMT_COMPLEX;
-                    break;
                 case 16:
                     // Processing 16-bit Truecolor
-                    output.fmt = BMF_24BIT | BMT_COMPLEX;
-                    output.transform = PNG_FT_RGB_16_TO_8_BIT;
+                    output = BMF_24BIT | BMT_COMPLEX;
                     break;
                 default:
                     // Invalid BitDepth for Truecolor
@@ -542,13 +531,9 @@ OutputFormat pngWhatOutputFormat(int colorType, int bitDepth)
             {
                 case 8:
                     // Processing 8-bit Greyscale + Alpha
-                    output.fmt = BMF_8BIT | BMT_COMPLEX | BMT_PALETTE;
-                    output.transform = PNG_FT_256_GREYSCALE_PALETTE | PNG_FT_GREYSCALE_ALPHA_REMOVE;
-                    break;
                 case 16:
                     // Processing 16-bit Greyscale + Alpha
-                    output.fmt = BMF_8BIT | BMT_COMPLEX | BMT_PALETTE;
-                    output.transform = PNG_FT_GREYSCALE_16_TO_8_BIT | PNG_FT_256_GREYSCALE_PALETTE | PNG_FT_GREYSCALE_ALPHA_REMOVE;
+                    output = BMF_8BIT | BMT_COMPLEX | BMT_PALETTE;
                     break;
                 default:
                     // Invalid BitDepth for Greyscale with Alpha
@@ -561,13 +546,9 @@ OutputFormat pngWhatOutputFormat(int colorType, int bitDepth)
             {
                 case 8:
                     // Processing 8-bit Truecolor + Alpha
-                    output.fmt = BMF_24BIT | BMT_COMPLEX;
-                    output.transform = PNG_FT_RGB_ALPHA_REMOVE;
-                    break;
                 case 16:
                     // Processing 16-bit Truecolor + Alpha
-                    output.fmt = BMF_24BIT | BMT_COMPLEX;
-                    output.transform = PNG_FT_RGBA_16_TO_8_BIT | PNG_FT_RGB_ALPHA_REMOVE;
+                    output = BMF_24BIT | BMT_COMPLEX;
                     break;
                 default:
                     // Invalid BitDepth for Truecolor with Alpha
@@ -580,21 +561,15 @@ OutputFormat pngWhatOutputFormat(int colorType, int bitDepth)
             {
                 case 1:
                     // Processing 1-bit Palette (2 colors)
-                    output.fmt = BMF_4BIT | BMT_COMPLEX | BMT_PALETTE;
-                    output.transform = PNG_FT_PADDING_1_4;
-                    break;
                 case 2:
                     // Processing 2-bit Palette (4 colors)
-                    output.fmt = BMF_4BIT | BMT_COMPLEX | BMT_PALETTE;
-                    output.transform = PNG_FT_PADDING_2_4;
-                    break;
                 case 4:
                     // Processing 4-bit Palette (16 colors)
-                    output.fmt = BMF_4BIT | BMT_COMPLEX | BMT_PALETTE;
+                    return BMF_4BIT | BMT_COMPLEX | BMT_PALETTE;
                     break;
                 case 8:
                     // Processing 8-bit Palette (256 colors)
-                    output.fmt = BMF_8BIT | BMT_COMPLEX | BMT_PALETTE;
+                    return BMF_8BIT | BMT_COMPLEX | BMT_PALETTE;
                     break;
                 default:
                     // Invalid BitDepth for Palette
@@ -610,13 +585,13 @@ OutputFormat pngWhatOutputFormat(int colorType, int bitDepth)
     return output;
 }
 
-VMBlockHandle initiateOutputBitmap(VMFileHandle vmFile, IHDRData ihdrData, OutputFormat of)
+VMBlockHandle _pascal _export pngInitiateOutputBitmap(VMFileHandle vmFile, IHDRData ihdrData, BMFormat fmt)
 {
     GStateHandle bmstate;
     VMBlockHandle vmBlock;
 
     vmBlock = GrCreateBitmap(
-        of.fmt,
+        fmt,
         ihdrData.width, ihdrData.height,
         vmFile,
         0,
@@ -628,24 +603,22 @@ VMBlockHandle initiateOutputBitmap(VMFileHandle vmFile, IHDRData ihdrData, Outpu
     return vmBlock;
 }
 
-void applyFormatTransformations(IDATState* state, OutputFormat of)
+void _pascal _export pngApplyGEOSFormatTransformations(IDATState* state)
 {
     RGBValue blendColor = {255, 255, 255};
 
     // Convert 16-bit to 8-bit if needed
-    if (of.transform & PNG_FT_RGBA_16_TO_8_BIT) convert16BitLineTo8Bit(state->currentRow, state->ihdr.width, PNG_COLOR_TYPE_RGBA);
+    convert16BitLineTo8Bit(state->currentRow, state->ihdr.width, state->ihdr.colorType, state->ihdr.bitDepth);
 
-    // Convert 16-bit alpha channel to 8-bit if needed
-    if (of.transform & PNG_FT_RGB_16_TO_8_BIT) convert16BitLineTo8Bit(state->currentRow, state->ihdr.width, PNG_COLOR_TYPE_RGB);
+    // Remove any alpha channel
+    removeAlphaChannel(state->currentRow, state->ihdr.width, state->ihdr.colorType, blendColor);
 
-    // Convert RGBA to RGB if needed
-    if (of.transform & PNG_FT_RGB_ALPHA_REMOVE) convertRGBAtoRGB(state->currentRow, state->ihdr.width, blendColor);
-
-    if (of.transform == PNG_FT_PADDING_1_4) pad_1bit_to_4bit(state->currentRow, state->ihdr.width);
-    if (of.transform == PNG_FT_PADDING_2_4) pad_2bit_to_4bit(state->currentRow, state->ihdr.width);
+    // add "padding" to 1- and 2-bitted paletted / indexed data bytes or to 2-bitted grayscale values
+    pad_1bit_to_4bit(state->currentRow, state->ihdr.width, state->ihdr.colorType, state->ihdr.bitDepth);
+    pad_2bit_to_4bit(state->currentRow, state->ihdr.width, state->ihdr.colorType, state->ihdr.bitDepth);
 }
 
-void writePixelLine(VMFileHandle vmFile, VMBlockHandle vmBlock, unsigned long lineNo, unsigned char* rowData)
+void _pascal _export pngWriteScanlineToBitmap(VMFileHandle vmFile, VMBlockHandle vmBlock, unsigned long lineNo, unsigned char* rowData)
 {
     //unsigned char *lineptr;
     void *lineptr;
@@ -737,47 +710,81 @@ static inline unsigned char paethPredictor(int a, int b, int c)
     else return (unsigned char)c;
 }
 
-void convertRGBAtoRGB(unsigned char *data, unsigned long width, RGBValue blendColor)
+void removeAlphaChannel(unsigned char *data, unsigned long width, int colorType, RGBValue blendColor)
 {
     unsigned long j;
-    unsigned char *src = data;           // Start at the first pixel (RGBA)
+    unsigned char *src = data; // Start at the first pixel
     unsigned char *dst = data;
 
-    for (j = 0; j < width; j++)
+    if (colorType == 6) // RGBA (truecolor with alpha)
     {
-        unsigned char r = src[0];
-        unsigned char g = src[1];
-        unsigned char b = src[2];
-        unsigned char a = src[3];  // Alpha value
+        for (j = 0; j < width; j++)
+        {
+            unsigned char r = src[0];
+            unsigned char g = src[1];
+            unsigned char b = src[2];
+            unsigned char a = src[3]; // Alpha value
 
-        // Blend the RGB values with the provided background color (blendColor)
-        dst[0] = (r * a + blendColor.RGB_red * (255 - a)) / 255;   // Red channel
-        dst[1] = (g * a + blendColor.RGB_green * (255 - a)) / 255; // Green channel
-        dst[2] = (b * a + blendColor.RGB_blue * (255 - a)) / 255;  // Blue channel
+            // Blend RGB with the provided background color
+            dst[0] = (r * a + blendColor.RGB_red * (255 - a)) / 255;
+            dst[1] = (g * a + blendColor.RGB_green * (255 - a)) / 255;
+            dst[2] = (b * a + blendColor.RGB_blue * (255 - a)) / 255;
 
-        // Move the source pointer forward by 4 (skip the alpha channel)
-        src += 4;
-        // Move the destination pointer forward by 3 (RGB only)
-        dst += 3;
+            // Move the source pointer forward by 4 (skip the alpha channel)
+            src += 4;
+            // Move the destination pointer forward by 3 (RGB only)
+            dst += 3;
+        }
+    }
+    else if (colorType == 4) // Grayscale with alpha
+    {
+        for (j = 0; j < width; j++)
+        {
+            unsigned char gray = src[0];
+            unsigned char a = src[1]; // Alpha value
+
+            // Blend grayscale value with the background (assume grayscale blend for simplicity)
+            unsigned char blendedGray = (gray * a + blendColor.RGB_red * (255 - a)) / 255; // Use red from blendColor
+
+            dst[0] = blendedGray; // Grayscale -> RGB, so all RGB channels are the same
+            dst[1] = blendedGray;
+            dst[2] = blendedGray;
+
+            src += 2; // Move past grayscale and alpha
+            dst += 3; // Move RGB
+        }
     }
 }
 
-void convert16BitLineTo8Bit(unsigned char *line, unsigned long width, unsigned char colorType)
+void convert16BitLineTo8Bit(unsigned char *line, unsigned long width, unsigned char colorType, unsigned char bitDepth)
 {
+    // Variable declarations
     unsigned long i;
     unsigned long bytes_per_pixel_16;
     unsigned long bytes_per_pixel_8;
+    unsigned long rowBytes;
 
-    MemHandle dstHan = NullHandle;
-    unsigned char *dst = NULL;
-    unsigned char *dstStart = NULL;
-    unsigned long rowBytes = NULL;
+    MemHandle dstHan;
+    unsigned char *dst;
+    unsigned char *dstStart;
 
-    int c = 0;
-
-    // Determine the number of channels and bytes per pixel based on colorType
+    int c;
     int channels;
 
+    // Initialize variables
+    dstHan = NullHandle;
+    dst = NULL;
+    dstStart = NULL;
+    rowBytes = 0;
+    c = 0;
+
+    // Check if the bitDepth is 16 bits. If not, return as this function only handles 16-bit channels.
+    if (bitDepth != 16)
+    {
+        return;
+    }
+
+    // Determine the number of channels and bytes per pixel based on colorType
     if (colorType == PNG_COLOR_TYPE_RGB)
     {
         channels = 3; // RGB: 3 channels
@@ -786,9 +793,17 @@ void convert16BitLineTo8Bit(unsigned char *line, unsigned long width, unsigned c
     {
         channels = 4; // RGBA: 4 channels
     }
+    else if (colorType == PNG_COLOR_TYPE_GREY)
+    {
+        channels = 1; // Grayscale: 1 channel
+    }
+    else if (colorType == PNG_COLOR_TYPE_GREY_ALPHA)
+    {
+        channels = 2; // Grayscale with alpha: 2 channels
+    }
     else
     {
-        // Invalid colorType for this function
+        // Unsupported or invalid colorType
         return;
     }
 
@@ -808,7 +823,7 @@ void convert16BitLineTo8Bit(unsigned char *line, unsigned long width, unsigned c
         unsigned long index16 = i * bytes_per_pixel_16; // Index in the 16-bit source line
         unsigned long index8 = i * bytes_per_pixel_8;   // Index in the 8-bit destination line
 
-        // Convert each channel (R, G, B, A if applicable)
+        // Convert each channel (R, G, B, A, grayscale, or alpha if applicable)
         for (c = 0; c < channels; c++)
         {
             // Combine two bytes to form the 16-bit value for the channel
@@ -828,7 +843,7 @@ void convert16BitLineTo8Bit(unsigned char *line, unsigned long width, unsigned c
 
 
 // Function to convert 1-bit packed values to 4-bit padded values
-void pad_1bit_to_4bit(unsigned char *input, unsigned int width)
+void pad_1bit_to_4bit(unsigned char *input, unsigned int width, unsigned char colorType, unsigned char bitDepth)
 {
     unsigned int in_index = 0;   // Index for the input array
     unsigned int out_index = 0;  // Index for the output array
@@ -838,9 +853,22 @@ void pad_1bit_to_4bit(unsigned char *input, unsigned int width)
     // Calculate the number of output bytes needed (4 bits per pixel, so 2 pixels per byte)
     unsigned int rowBytes = (width + 1) / 2;  // Each byte holds 2 pixels in 4-bit format
 
+    MemHandle outputHan = NullHandle;
+    unsigned char* output;
+
+    // Apply only to paletted or grayscale colorTypes and only if bitDepth is 1 (but exclude 1-bit grayscale mono)
+    if (
+        (colorType != PNG_COLOR_TYPE_PALETTE) ||
+        (colorType != PNG_COLOR_TYPE_GREY) ||
+        ((colorType == PNG_COLOR_TYPE_GREY) && (bitDepth == 1))
+    )
+    {
+        return; // Exit if the colorType or bitDepth is not supported
+    }
+
     // Allocate memory for the output row
-    MemHandle outputHan = MemAlloc(rowBytes, HF_SHARABLE | HF_SWAPABLE, HAF_ZERO_INIT); // Allocate memory with zero-initialization
-    unsigned char* output = MemLock(outputHan);  // Lock the memory to access the output array
+    outputHan = MemAlloc(rowBytes, HF_SHARABLE | HF_SWAPABLE, HAF_ZERO_INIT); // Allocate memory with zero-initialization
+    output = (unsigned char*) MemLock(outputHan);  // Lock the memory to access the output array
 
     // Process each bit in the input array
     for (x = 0; x < width; x++)
@@ -872,19 +900,27 @@ void pad_1bit_to_4bit(unsigned char *input, unsigned int width)
 }
 
 // Function to convert 2-bit packed values to 4-bit padded values
-void pad_2bit_to_4bit(unsigned char *input, unsigned int width)
+void pad_2bit_to_4bit(unsigned char *input, unsigned int width, unsigned char colorType, unsigned char bitDepth)
 {
     unsigned int in_index = 0;   // Index for the input array
     unsigned int out_index = 0;  // Index for the output array
     unsigned int pixel;
     unsigned int x = 0;
+    MemHandle outputHan = NullHandle;
+    unsigned char* output = 0;
 
     // Calculate the number of output bytes needed (4 bits per pixel, so 2 pixels per byte)
     unsigned int rowBytes = (width + 1) / 2;  // Each byte holds 2 pixels in 4-bit format
 
+    // Apply only to paletted or grayscale colorTypes and only if bitDepth is 2
+    if ((colorType != PNG_COLOR_TYPE_PALETTE && colorType != PNG_COLOR_TYPE_GREY) || bitDepth != 2)
+    {
+        return; // Exit if the colorType or bitDepth is not supported
+    }
+
     // Allocate memory for the output row
-    MemHandle outputHan = MemAlloc(rowBytes, HF_SHARABLE | HF_SWAPABLE, HAF_ZERO_INIT); // Allocate memory with zero-initialization
-    unsigned char* output = MemLock(outputHan);  // Lock the memory to access the output array
+    outputHan = MemAlloc(rowBytes, HF_SHARABLE | HF_SWAPABLE, HAF_ZERO_INIT); // Allocate memory with zero-initialization
+    output = (unsigned char*) MemLock(outputHan);  // Lock the memory to access the output array
 
     // Process each 2-bit pixel in the input array
     for (x = 0; x < width; x++)
