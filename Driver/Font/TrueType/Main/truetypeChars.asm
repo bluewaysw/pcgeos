@@ -50,7 +50,7 @@ REVISION HISTORY:
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
 
 TrueTypeGenChar	proc	far
-	uses	ax, bx, cx, dx, ds, si, di, bp
+	uses	ax, bx, cx, dx, ds, di, bp
 	.enter
 
 	mov	di, FONT_C_CODE_STACK_SPACE
@@ -61,31 +61,30 @@ TrueTypeGenChar	proc	far
 	call	MemSegmentToHandle
 	jnc	err
 
-	push	cx				; remember handle
+	push	cx			;remember handle
+	push	dx			;pass character code
 
-	push	dx				; pass character code
+	clr	ax			
+	push	es			;pass font ptr
+	push	ax			;with offset 0
 
-	push	es				; pass font ptr
-	mov	ax, 0				; with segment offset 0
-	push	ax
-
-	mov		es, bp			; es <- seg addr of gstate
+	mov	es, bp			;es <- seg addr of gstate
 
 	clr	al
 	movwbf	dxah, es:GS_fontAttr.FCA_pointsize
-	push	dx				; pass point size
+	push	dx			;pass point size
 	push 	ax
 				
 	mov	cx, es:GS_fontAttr.FCA_fontID
 	call	FontDrFindFontInfo
-	push	ds				; pass ptr to FontInfo
+	push	ds			;pass ptr to FontInfo
 	push	di
 
-	clr		ah		                   
-	mov		al, es:GS_fontAttr.FCA_textStyle
-	mov		bx, ODF_HEADER
+	clr	ah		                   
+	mov	al, es:GS_fontAttr.FCA_textStyle
+	mov	bx, ODF_HEADER
 	call	FontDrFindOutlineData
-	push	ds				; pass ptr to OutlineEntry
+	push	ds			;pass ptr to OutlineEntry
 	push	di
 
 	segmov	ds, dgroup, ax
@@ -94,12 +93,12 @@ TrueTypeGenChar	proc	far
 	call	TRUETYPE_GEN_CHARS
 
 	; deref font block (may have moved)
-	pop		bx
+	pop	bx
 	call	MemDerefES
 
 err:
         pop     di
-	call	ThreadReturnStackSpace	; (preserves flags)
+	call	ThreadReturnStackSpace	;(preserves flags)
 
 	clc
 	.leave
