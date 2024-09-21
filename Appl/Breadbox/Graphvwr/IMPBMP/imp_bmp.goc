@@ -8,6 +8,7 @@
 #include "IMPBMP/ibcommon.h"
 @include "statbar/statbar.goh"
 #include <Ansi/string.h>
+#include <pnglib.goh>
 
 #include "IMPBMP/imppcx.h"
 #include "IMPBMP/impbmp.h"
@@ -44,6 +45,11 @@ ImpBmpStatus _pascal ImpTIFFTestFile(FileHandle file);
 ImpBmpStatus _pascal ImpJPEGTestFile(FileHandle file);
 @endif  /* JPEG_SUPPORT */
 
+
+// PNG
+ImpBmpStatus _pascal ImpPngProcessFile(ImpBmpParams *params);
+ImpBmpStatus _pascal ImpPngTestFile(FileHandle file);
+
 /* Declaration of functions */
 
 /*********************************************************************/
@@ -63,6 +69,10 @@ ImpBmpStatus _pascal Imp_BmpProcessFile(ImpBmpParams *params,ImpBmpFormat format
 
   if(format == IBF_PCX)
 	 status = ImpPCXProcessFile(params);
+
+  if(format == IBF_PNG)
+	 status = ImpPngProcessFile(params);
+
 /*
   if(format == IBF_TIFF)
 	 status = ImpTIFFProcessFile(params);
@@ -77,10 +87,10 @@ ImpBmpStatus _pascal Imp_BmpProcessFile(ImpBmpParams *params,ImpBmpFormat format
 	 status = ImpGIFProcessFile(params);
 @else /* GIFLIB_SUPPORT */
   {
-    GifError stat = GE_NO_ERROR;
+	GifError stat = GE_NO_ERROR;
 
 	params->IBP_bitmap =
-    GifImportBitmapFHandle(params->IBP_source, params->IBP_dest,
+	GifImportBitmapFHandle(params->IBP_source, params->IBP_dest,
 				&stat);
    strcpy(params->IBP_impForm, ".GIF");
 
@@ -107,6 +117,10 @@ ImpBmpFormat _pascal Imp_BmpTestFile(FileHandle file)
 
   status = ImpPCXTestFile(file);
   if(status == IBS_NO_ERROR) return(IBF_PCX);
+
+  status = ImpPngTestFile(file);
+  if(status == IBS_NO_ERROR) return(IBF_PNG);
+
 /*
   status = ImpTIFFTestFile(file);
   if(status == IBS_NO_ERROR) return(IBF_TIFF);
@@ -320,5 +334,102 @@ byte read[3];
 
 };
 @endif
+
+ImpBmpStatus _pascal ImpPngProcessFile(ImpBmpParams *params)
+{
+	IHDRData ihdrData = {0};
+	IDATChunkEntry idatChunks[MAX_IDAT_CHUNKS] = {0};
+	int idatNumChunks = 0;
+	PLTEChunkEntry plteChunk = {0};
+	IDATState state = {0};
+	BMFormat fmt = 0;
+
+	FileHandle infile;        /* source file */
+	ImpBmpStatus status;
+	Boolean flag;
+
+	status = IBS_NO_ERROR;
+
+	if(params->IBP_source == 0)
+		FatalError(2000);
+
+	if(FilePos(params->IBP_source, 0, FILE_POS_START)!=0)
+		FatalError(254);
+
+    infile = params->IBP_source;
+
+	if (infile == 0)
+		FatalError(255);
+
+	/* switch in status bar */
+	if(params->IBP_status != 0)
+		@call params->IBP_status::MSG_SB_START_PROCESS();
+
+	// Read PNG Chunks, get overview
+	if (pngProcessChunks(infile, &ihdrData, &idatChunks, &idatNumChunks, &plteChunk))
+	{
+		fmt = pngWhatOutputFormat(ihdrData.colorType, ihdrData.bitDepth);
+		if (fmt != 0)
+		{
+			// Initialize output bitmap
+			params->IBP_bitmap = pngInitiateOutputBitmap(params->IBP_dest, ihdrData, fmt);
+
+			if (params->IBP_bitmap == 0)
+				FatalError(256);
+
+			params->IBP_width =  ihdrData.width;
+			params->IBP_height = ihdrData.height;
+			params->IBP_format = IBF_PNG;
+			strcpy(params->IBP_impForm, ".PNG");
+
+			// transfers only if a palette exists
+			pngHandlePalette(infile, plteChunk, params->IBP_dest, params->IBP_bitmap);
+
+			// Initialize the IDAT state
+			state = pngInitIDATProcessingState(infile, idatChunks, idatNumChunks, ihdrData);
+
+			// Process each scanline
+			while ((pngGetNextIDATScanline(&state) == 1) && (status != IBS_NO_ERROR))
+			{
+				pngPauseIDATProcessing(&state);
+
+				pngApplyGEOSFormatTransformations(&state);
+
+				// Write the processed scanline (without the filter byte) to the VMFile
+				pngWriteScanlineToBitmap(params->IBP_dest, params->IBP_bitmap, state.lineNo - 1, state.currentRow);
+
+				if (params->IBP_status != NULL)
+					flag = @call params->IBP_status::MSG_SB_SET_STATUS_VALUE(((dword)state.lineNo)*100 / params->IBP_height);
+
+				if (flag == FALSE)
+					status = IBS_IMPORT_STOPPED;
+
+				pngResumeIDATProcessing(&state);
+			}
+
+			// Clean up resources
+			pngCleanupIDATProcessingState(&state);
+		}
+	}
+
+  //FileClose(infile, FALSE);
+
+  if(params->IBP_status != NULL)
+	 @call params->IBP_status::MSG_SB_STOP_PROCESS();
+
+  return (IBS_NO_ERROR);
+}
+
+ImpBmpStatus _pascal ImpPngTestFile(FileHandle file)
+{
+  if (FilePos(file, 0, FILE_POS_START)!=0)
+	return(IBS_WRONG_FILE);
+
+  if (pngCheckHeader(file))
+	return(IBS_NO_ERROR);
+
+  return(IBS_WRONG_FORMAT);
+}
+
 
 /*********************************************************************/

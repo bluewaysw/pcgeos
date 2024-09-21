@@ -26,6 +26,8 @@ library extui
 library giflib
 exempt giflib
 
+library pnglib
+exempt pnglib
 
 library thumbdb
 library ijgjpeg
