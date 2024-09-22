@@ -10,7 +10,7 @@ tokenid    16431
 
 type appl, process, single
 
-stack 4000
+stack 6000
 
 platform geos201
 
