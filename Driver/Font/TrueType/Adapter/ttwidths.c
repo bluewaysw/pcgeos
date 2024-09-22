@@ -232,7 +232,7 @@ Fail:
  *      Date      Name      Description
  *      ----      ----      -----------
  *      12.02.23  JK        Initial Revision
- *      17.09.14  JK        filling kern paris removed
+ *      17.09.24  JK        filling kern paris removed
  *******************************************************************/
 
 static void ConvertWidths( TRUETYPE_VARS, FontHeader* fontHeader, FontBuf* fontBuf )
@@ -241,8 +241,6 @@ static void ConvertWidths( TRUETYPE_VARS, FontHeader* fontHeader, FontBuf* fontB
         CharTableEntry*  charTableEntry = (CharTableEntry*) (((byte*)fontBuf) + sizeof( FontBuf ));
         WWFixedAsDWord   scaledWidth;
 
-
-        TT_New_Glyph( FACE, &GLYPH );
 
         for( currentChar = fontHeader->FH_firstChar; currentChar <= fontHeader->FH_lastChar; ++currentChar )
         {
@@ -265,9 +263,8 @@ EC(             ECCheckBounds( (void*)charTableEntry ) );
                         continue;
                 }
                       
-                /* load glyph and metrics */
-                TT_Load_Glyph( INSTANCE, GLYPH, charIndex, 0 );
-                TT_Get_Glyph_Metrics( GLYPH, &GLYPH_METRICS );
+                /* load metrics */
+                TT_Get_Index_Metrics( FACE, charIndex, &GLYPH_METRICS );
 
                 /* fill CharTableEntry */
                 scaledWidth = GrMulWWFixed( MakeWWFixed( GLYPH_METRICS.advance), SCALE_WIDTH );
@@ -290,8 +287,6 @@ EC(             ECCheckBounds( (void*)charTableEntry ) );
 
                 ++charTableEntry;
         } 
-
-        TT_Done_Glyph( GLYPH );
 }
 
 
@@ -389,14 +384,11 @@ EC(             ECCheckBounds( pairs ) );
 
                 for( i = 0; i < kerningDir.tables->t.kern0.nPairs; ++i )
                 {
-                        char left   = getGeosCharForIndex( pairs[i].left );
-                        char right  = getGeosCharForIndex( pairs[i].right );
+                        char left = getGeosCharForIndex( pairs[i].left );
+                        char right = getGeosCharForIndex( pairs[i].right );
 
-                        
-                        if( ABS( pairs[i].value ) < minKernValue )
-                                continue;
-                     
-                        if( left && right )
+                    
+                        if( left && right && ABS( pairs[i].value ) > minKernValue )
                         {
                                 WWFixedAsDWord  scaledKernValue;
 
@@ -405,7 +397,7 @@ EC(             ECCheckBounds( pairs ) );
                                 kernPair->KP_charRight = right;
 
                                 /* save scaled kerning value */
-                                scaledKernValue = SCALE_WORD( pairs[i].value, SCALE_WIDTH );
+                                scaledKernValue = GrMulWWFixed( WORD_TO_FIXED16DOT16( pairs[i].value ), SCALE_WIDTH );
                                 kernValue->BBF_int = IntegerOf( scaledKernValue );
                                 kernValue->BBF_frac = FractionOf( scaledKernValue ) >> 8;
 
@@ -437,8 +429,8 @@ EC(             ECCheckBounds( pairs ) );
  * REVISION HISTORY:
  *      Date      Name      Description
  *      ----      ----      -----------
- *      20/07/23  JK        Initial Revision
- *      10/02/23  JK        width and weight implemented
+ *      20.12.22  JK        Initial Revision
+ *      10.02.24  JK        width and weight implemented
  *******************************************************************/
 
 static void CalcScaleForWidths( TRUETYPE_VARS, 
@@ -484,8 +476,8 @@ static void CalcScaleForWidths( TRUETYPE_VARS,
  * REVISION HISTORY:
  *      Date      Name      Description
  *      ----      ----      -----------
- *      20/12/22  JK        Initial Revision
- *      10/02/24  JK        width and weight implemented
+ *      20.12.22  JK        Initial Revision
+ *      10.02.24  JK        width and weight implemented
  *******************************************************************/
 
 static void CalcTransform( TransformMatrix*  transMatrix, 

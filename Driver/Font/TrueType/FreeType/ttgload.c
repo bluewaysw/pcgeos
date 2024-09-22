@@ -87,7 +87,7 @@
 /* Return horizontal metrics in font units for a given  */
 /* glyph.  If `check' is true, take care of mono-spaced */
 /* fonts by returning the advance width max.            */
-
+#if 0
   static void Get_HMetrics( PFace    face,
                             UShort   index,
                             Bool     check,
@@ -99,7 +99,7 @@
     if ( check && face->postscript.isFixedPitch )
       *aw = face->horizontalHeader.advance_Width_Max;
   }
-
+#endif
 
 #ifdef TT_CONFIG_OPTION_PROCESS_HDMX
 /********************************************************/
@@ -620,6 +620,7 @@
     Long  glyph_offset, offset;
 
     TT_F26Dot6  x, y;
+
 
     Fixed  xx, xy, yx, yy;
 

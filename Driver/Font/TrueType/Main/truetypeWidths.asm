@@ -53,7 +53,7 @@ REVISION HISTORY:
 	Name	Date		Description
 	----	----		-----------
 	FR	01.29.21	Initial version
-	JK	10.02.24	width and weight implement
+	JK	10.02.24	width and weight implemented
 	JK	19.09.24	cleanup
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
