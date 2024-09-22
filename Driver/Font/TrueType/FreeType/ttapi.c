@@ -51,7 +51,7 @@ extern TEngine_Instance engineInstance;
 #ifdef TT_STATIC_RASTER
 #define RAS_OPS  /* void */
 #else
-#define RAS_OPS  ((TRaster_Instance*)_engine->raster_component),
+#define RAS_OPS ((TRaster_Instance*) engineInstance.raster_component),
 #endif /* TT_STATIC_RASTER */
 
 
@@ -101,7 +101,10 @@ extern TEngine_Instance engineInstance;
 #define TT_FAIL( x )  ( error = x (_engine) ) != TT_Err_Ok
 
     /* Initalize components */
-    if ( TT_FAIL( TTFile_Init  )  ||
+    if ( 
+#ifndef __GEOS__
+         TT_FAIL( TTFile_Init  )  ||
+#endif
          TT_FAIL( TTCache_Init )  ||
 #ifdef TT_CONFIG_OPTION_EXTEND_ENGINE
          TT_FAIL( TTExtend_Init ) ||
@@ -151,7 +154,9 @@ extern TEngine_Instance engineInstance;
     TTExtend_Done( _engine );
 #endif
     TTCache_Done ( _engine );
+#ifndef __GEOS__
     TTFile_Done  ( _engine );
+#endif
 
     TTMemory_Done();
 
@@ -204,14 +209,12 @@ extern TEngine_Instance engineInstance;
     /* Set the handle */
     HANDLE_Set( *face, _face );
 
-    if ( error )
-      goto Fail;
+    if (error) {
+        TT_Close_Stream(&stream);
+        return error;
+    }
 
     return TT_Err_Ok;
-
-  Fail:
-    TT_Close_Stream( &stream );
-    return error;
   }
 
 
@@ -896,12 +899,10 @@ extern TEngine_Instance engineInstance;
                            TT_UShort    glyphIndex,
                            TT_UShort    loadFlags   )
   {
-    PInstance  _ins;
-    PGlyph     _glyph;
+    PInstance  _ins   = HANDLE_Instance( instance );
+    PGlyph     _glyph = HANDLE_Glyph( glyph );
     TT_Error   error;
 
-
-    _ins = HANDLE_Instance( instance );
 
     if ( !_ins )
       loadFlags &= ~(TTLOAD_SCALE_GLYPH | TTLOAD_HINT_GLYPH);
@@ -909,7 +910,6 @@ extern TEngine_Instance engineInstance;
     if ( (loadFlags & TTLOAD_SCALE_GLYPH) == 0 )
       _ins = 0;
 
-    _glyph = HANDLE_Glyph( glyph );
     if ( !_glyph )
       return TT_Err_Invalid_Glyph_Handle;
 
@@ -1188,9 +1188,6 @@ extern TEngine_Instance engineInstance;
   TT_Error  TT_Get_Outline_Bitmap( TT_Outline*     outline,
                                    TT_Raster_Map*  map )
   {
-    PEngine_Instance  _engine = &engineInstance;
-
-
     if ( !outline || !map )
       return TT_Err_Invalid_Argument;
 
@@ -1219,9 +1216,6 @@ EXPORT_FUNC
 TT_Error  TT_Get_Outline_Region( TT_Outline*     outline,
                                  TT_Raster_Map*  map )
 {
-  PEngine_Instance  _engine = &engineInstance;
-
-
   if ( !outline || !map )
     return TT_Err_Invalid_Argument;
 
@@ -1619,64 +1613,5 @@ TT_Error  TT_Get_Outline_Region( TT_Outline*     outline,
     return TT_Err_Ok;
   }
 
-
-/*******************************************************************
- *
- *  Function    :  TT_Get_Font_Data
- *
- *  Description :  Loads any font table into client memory.
- *
- *  Input  :  face     Face object to look for.
- *
- *            tag      Tag of table to load.  Use the value 0 if you
- *                     want to access the whole font file, else set
- *                     this parameter to a valid TrueType table tag
- *                     that you can forge with the MAKE_TT_TAG
- *                     macro.
- *
- *            offset   Starting offset in the table (or the file
- *                     if tag == 0).
- *
- *            buffer   Address of target buffer
- *
- *            length   Address of decision variable:
- *
- *                       if length == NULL:
- *                             Load the whole table.  Returns an
- *                             error if 'offset' != 0.
- *
- *                       if *length == 0 :
- *                             Exit immediately, returning the
- *                             length of the given table, or of
- *                             the font file, depending on the
- *                             value of 'tag'.
- *
- *                       if *length != 0 :
- *                             Load the next 'length' bytes of
- *                             table or font, starting at offset
- *                             'offset' (in table or font too).
- *
- *  Output :  Error code.
- *
- *  MT-Safe : YES!
- *
- ******************************************************************/
-/*
-  EXPORT_FUNC
-  TT_Error  TT_Get_Font_Data( TT_Face   face,
-                              TT_ULong  tag,
-                              TT_Long   offset,
-                              void*     buffer,
-                              TT_Long*  length )
-  {
-    PFace faze = HANDLE_Face( face );
-
-
-    if ( !faze )
-      return TT_Err_Invalid_Face_Handle;
-
-    return Load_TrueType_Any( faze, tag, offset, buffer, length );
-  }
-*/
 
 /* END */

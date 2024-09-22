@@ -134,8 +134,8 @@
     PProfile    link;        /* link to next profile - various purpose   */
     PStorage    offset;      /* start of profile's data in render pool   */
     Int         flow;        /* Profile orientation: Asc/Descending      */
-    Long        height;      /* profile's height in scanlines            */
-    Long        start;       /* profile's starting scanline              */
+    Short       height;      /* profile's height in scanlines            */
+    Short       start;       /* profile's starting scanline              */
 
     UShort      countL;      /* number of lines to step before this      */
                              /* profile becomes drawable                 */
@@ -645,15 +645,12 @@
                                  Long  x2, Long  y2,
                                  Long  miny, Long  maxy )
   {
-    Long  Dx, Dy;
+    Long  Dx = x2 - x1, Dy = y2 - y1;
     Int   e1, e2, f1, f2, size;     /* XXX: is `Short' sufficient? */
     Long  Ix, Rx, Ax;
 
     PStorage  top;
 
-
-    Dx = x2 - x1;
-    Dy = y2 - y1;
 
     if ( Dy <= 0 || y2 < miny || y1 > maxy )
       return SUCCESS;
@@ -687,14 +684,10 @@
     if ( f1 > 0 )
     {
       if ( e1 == e2 ) return SUCCESS;
-      else
-      {
-        x1 += FMulDiv( Dx, ras.precision - f1, Dy );
-        e1 += 1;
-      }
+      x1 += FMulDiv( Dx, ras.precision - f1, Dy );
+      ++e1;
     }
-    else
-      if ( ras.joint )
+    else if ( ras.joint )
       {
         ras.top--;
         ras.joint = FALSE;
@@ -715,23 +708,14 @@
       return FAILURE;
     }
 
-    if ( Dx > 0 )
-    {
-      Ix = (ras.precision*Dx) / Dy;
-      Rx = (ras.precision*Dx) % Dy;
-      Dx = 1;
-    }
-    else
-    {
-      Ix = -( (ras.precision*-Dx) / Dy );
-      Rx =    (ras.precision*-Dx) % Dy;
-      Dx = -1;
-    }
+    Ix = (ras.precision * Dx) / Dy;
+    Rx = (ras.precision * Dx) % Dy;
+    Dx = (Dx > 0) ? 1 : -1;
 
     Ax  = -Dy;
     top = ras.top;
 
-    while ( size > 0 )
+    while ( size-- > 0 )
     {
       *top++ = x1;
 
@@ -744,7 +728,6 @@
         Ax -= Dy;
         x1 += Dx;
       }
-      --size;
     }
 
     ras.top = top;
@@ -958,10 +941,9 @@
       if ( y > ras.lastY )
       {
         if ( New_Profile( RAS_VARS  Ascending ) ) return FAILURE;
-      }
-      else
+      } 
+      else if ( y < ras.lastY )
       {
-        if ( y < ras.lastY )
           if ( New_Profile( RAS_VARS  Descending ) ) return FAILURE;
       }
       break;
@@ -981,29 +963,21 @@
              New_Profile( RAS_VARS  Ascending ) ) return FAILURE;
       }
       break;
-
-    default:
-      ;
     }
 
     /* Then compute the lines */
 
-    switch ( ras.state )
+    if ( ras.state == Ascending )
     {
-    case Ascending:
       if ( Line_Up ( RAS_VARS  ras.lastX, ras.lastY,
                      x, y, ras.minY, ras.maxY ) )
         return FAILURE;
-      break;
-
-    case Descending:
+    }
+    else if ( ras.state == Descending )
+    {
       if ( Line_Down( RAS_VARS ras.lastX, ras.lastY,
                       x, y, ras.minY, ras.maxY ) )
         return FAILURE;
-      break;
-
-    default:
-      ;
     }
 
     ras.lastX = x;
@@ -1276,24 +1250,18 @@
   static Bool _near  Convert_Glyph( RAS_ARGS int  flipped )
   {
     Short     i;
-    UShort    start;
-
+    UShort    start = 0;
     PProfile  lastProfile;
 
 
-    ras.fProfile = NULL;
-    ras.joint    = FALSE;
-    ras.fresh    = FALSE;
-
-    ras.maxBuff  = ras.sizeBuff - AlignProfileSize;
-
-    ras.numTurns = 0;
-
+    ras.fProfile         = NULL;
+    ras.joint            = FALSE;
+    ras.fresh            = FALSE;
+    ras.maxBuff          = ras.sizeBuff - AlignProfileSize;
+    ras.numTurns         = 0;
     ras.cProfile         = (PProfile)ras.top;
     ras.cProfile->offset = ras.top;
     ras.num_Profs        = 0;
-
-    start = 0;
 
     for ( i = 0; i < ras.nContours; ++i )
     {
@@ -1818,13 +1786,14 @@
 
       if ( e1 == e2 )
       {
-        bits = ras.bTarget + (y >> 3);
-        f1   = (Byte)(0x80 >> (y  & 7));
-
+        f1 = (Byte)(0x80 >> (y  & 7));
         e1 = TRUNC( e1 );
 
         if ( e1 >= 0 && e1 < ras.target.rows )
+        {
+          bits = ras.bTarget + (y >> 3);
           bits[(ras.target.rows-1 - e1) * ras.target.cols] |= f1;
+        }
       }
     }
   }
@@ -1836,15 +1805,13 @@
                                                PProfile    left,
                                                PProfile    right )
   {
-    Long  e1, e2;
+    Long  e1 = CEILING( x1 );
+    Long  e2 = FLOOR  ( x2 );
     PByte bits;
     Byte  f1;
 
 
     /* During the horizontal sweep, we only take care of drop-outs */
-
-    e1 = CEILING( x1 );
-    e2 = FLOOR  ( x2 );
 
     if ( e1 > e2 )
     {

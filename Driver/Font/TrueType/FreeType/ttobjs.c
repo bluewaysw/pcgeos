@@ -850,7 +850,6 @@
 
     TT_Error  error;
     UShort    i;
-    UShort    j;
     PFace     face;
 
 
@@ -890,19 +889,15 @@
 
     /* Scale the cvt values to the new ppem.          */
     /* We use by default the y ppem to scale the CVT. */
-
-    for ( i = 0; i < ins->cvtSize; ++i )
-      ins->cvt[i] = TT_MulDiv( face->cvt[i],
-                               ins->metrics.scale1,
-                               ins->metrics.scale2 );
+    MulDivList( ins->cvt, ins->cvtSize, face->cvt, ins->metrics.scale1, ins->metrics.scale2 );
 
     /* All twilight points are originally zero */
-    for ( j = 0; j < ins->twilight.n_points; ++j )
+    for ( i = 0; i < ins->twilight.n_points; ++i )
     {
-      ins->twilight.org[j].x = 0;
-      ins->twilight.org[j].y = 0;
-      ins->twilight.cur[j].x = 0;
-      ins->twilight.cur[j].y = 0;
+      ins->twilight.org[i].x = 0;
+      ins->twilight.org[i].y = 0;
+      ins->twilight.cur[i].x = 0;
+      ins->twilight.cur[i].y = 0;
     }
 
     /* clear storage area */
@@ -1217,47 +1212,6 @@
   }
 
 
-/*******************************************************************
- *
- *  Function    :  Scale_X
- *
- *  Description :  scale an horizontal distance from font
- *                 units to 26.6 pixels
- *
- *  Input  :  metrics  pointer to metrics
- *            x        value to scale
- *
- *  Output :  scaled value
- *
- ******************************************************************/
-
-  LOCAL_FUNC
-  TT_Pos  Scale_X( PIns_Metrics  metrics, TT_Pos  x )
-  {
-    return TT_MulDiv( x, metrics->x_scale1, metrics->x_scale2 );
-  }
-
-
-/*******************************************************************
- *
- *  Function    :  Scale_Y
- *
- *  Description :  scale a vertical distance from font
- *                 units to 26.6 pixels
- *
- *  Input  :  metrics  pointer to metrics
- *            y        value to scale
- *
- *  Output :  scaled value
- *
- ******************************************************************/
-
-  LOCAL_FUNC
-  TT_Pos  Scale_Y( PIns_Metrics  metrics, TT_Pos  y )
-  {
-    return TT_MulDiv( y, metrics->y_scale1, metrics->y_scale2 );
-  }
-
 
 /*******************************************************************
  *
@@ -1329,9 +1283,6 @@
     PCache        face_cache, exec_cache;
     TT_Error      error;
 
-
-    face_cache = 0;
-    exec_cache = 0;
 
     if ( ALLOC( face_cache, sizeof ( TCache ) ) ||
          ALLOC( exec_cache, sizeof ( TCache ) ) )

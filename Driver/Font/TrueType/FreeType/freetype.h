@@ -535,10 +535,10 @@
 #ifdef TT_CONFIG_OPTION_SUPPORT_OPTIONAL_FIELDS    
     TT_Fixed  FormatType;
     TT_Fixed  italicAngle;
-#endif
-
     TT_FWord  underlinePosition;
     TT_FWord  underlineThickness;
+#endif
+
     TT_ULong  isFixedPitch;
     
 #ifdef TT_CONFIG_OPTION_SUPPORT_OPTIONAL_FIELDS
