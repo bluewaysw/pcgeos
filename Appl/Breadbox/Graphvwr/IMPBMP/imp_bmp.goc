@@ -356,17 +356,12 @@ ImpBmpStatus _pascal ImpPngProcessFile(ImpBmpParams *params)
 	if(FilePos(params->IBP_source, 0, FILE_POS_START)!=0)
 		FatalError(254);
 
-    infile = params->IBP_source;
-
-	if (infile == 0)
-		FatalError(255);
-
 	/* switch in status bar */
 	if(params->IBP_status != 0)
 		@call params->IBP_status::MSG_SB_START_PROCESS();
 
 	// Read PNG Chunks, get overview
-	if (pngProcessChunks(infile, &ihdrData, &idatChunks, &idatNumChunks, &plteChunk))
+	if (pngProcessChunks(params->IBP_source, &ihdrData, &idatChunks, &idatNumChunks, &plteChunk))
 	{
 		fmt = pngWhatOutputFormat(ihdrData.colorType, ihdrData.bitDepth);
 		if (fmt != 0)
@@ -383,15 +378,15 @@ ImpBmpStatus _pascal ImpPngProcessFile(ImpBmpParams *params)
 			strcpy(params->IBP_impForm, ".PNG");
 
 			// transfers only if a palette exists
-			pngHandlePalette(infile, plteChunk, params->IBP_dest, params->IBP_bitmap);
+			pngHandlePalette(params->IBP_source, plteChunk, params->IBP_dest, params->IBP_bitmap);
 
 			// Initialize the IDAT state
-			state = pngInitIDATProcessingState(infile, idatChunks, idatNumChunks, ihdrData);
+			state = pngInitIDATProcessingState(params->IBP_source, idatChunks, idatNumChunks, ihdrData);
 
 			// Process each scanline
 			while ((pngGetNextIDATScanline(&state) == 1) && (status != IBS_NO_ERROR))
 			{
-				pngPauseIDATProcessing(&state);
+				// pngPauseIDATProcessing(&state);
 
 				pngApplyGEOSFormatTransformations(&state);
 
@@ -404,7 +399,7 @@ ImpBmpStatus _pascal ImpPngProcessFile(ImpBmpParams *params)
 				if (flag == FALSE)
 					status = IBS_IMPORT_STOPPED;
 
-				pngResumeIDATProcessing(&state);
+				// pngResumeIDATProcessing(&state);
 			}
 
 			// Clean up resources
