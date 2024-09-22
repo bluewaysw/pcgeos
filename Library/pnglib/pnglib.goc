@@ -181,11 +181,11 @@ IDATState _pascal _export pngInitIDATProcessingState(FileHandle file, IDATChunkE
     inflateInit2(&state.strm, 15);
 
     // memory for the input data from file to zlib
-    state.inHan = MemAlloc(CHUNK_SIZE, HF_SHARABLE | HF_SWAPABLE, HAF_ZERO_INIT);
+    state.inHan = MemAlloc(CHUNK_SIZE_IN, HF_SHARABLE | HF_SWAPABLE, HAF_ZERO_INIT);
     state.in = MemLock(state.inHan);
 
     // memory for what zlib decodes
-    state.outHan = MemAlloc(CHUNK_SIZE, HF_SHARABLE | HF_SWAPABLE, HAF_ZERO_INIT);
+    state.outHan = MemAlloc(CHUNK_SIZE_OUT, HF_SHARABLE | HF_SWAPABLE, HAF_ZERO_INIT);
     state.out = MemLock(state.outHan);
 
     // how many bytes in a pixel, how many bytes in a row?
@@ -316,7 +316,7 @@ int _pascal _export pngGetNextIDATScanline(IDATState* state)
             // If there is no more input data in the zlib stream, read more from the file
             if (state->strm.avail_in == 0 && state->length > 0)
             {
-                unsigned long bytesToRead = (state->length < CHUNK_SIZE) ? state->length : CHUNK_SIZE;
+                unsigned long bytesToRead = (state->length < CHUNK_SIZE_IN) ? state->length : CHUNK_SIZE_IN;
 
                 // Read the next chunk of compressed data from the file
                 if (FileRead(state->file, state->in, bytesToRead, FALSE) != bytesToRead)
@@ -332,7 +332,7 @@ int _pascal _export pngGetNextIDATScanline(IDATState* state)
             }
 
             // Set up the output buffer for decompression
-            state->strm.avail_out = CHUNK_SIZE;
+            state->strm.avail_out = CHUNK_SIZE_OUT;
             state->strm.next_out = state->out;
 
             // Decompress the data from the input buffer into the output buffer
@@ -345,7 +345,7 @@ int _pascal _export pngGetNextIDATScanline(IDATState* state)
             }
 
             // Calculate how much data was decompressed
-            have = CHUNK_SIZE - state->strm.avail_out;
+            have = CHUNK_SIZE_OUT - state->strm.avail_out;
             src = state->out;  // Point to the start of the decompressed data
 
             // Process the decompressed data in the output buffer
@@ -483,7 +483,7 @@ void _pascal _export pngHandlePalette(FileHandle file, PLTEChunkEntry plteChunk,
 //         3x8 bits rgb color + 8 bit alpha-channel => remove alpha by blending in with white
 //         3x16 bits rgb color + 16 bit alpha-channel => downcycle to 8 bit / channel => remove alpha by blending in with white
 
-BMFormat _pascal _export pngWhatOutputFormat(int colorType, int bitDepth)
+BMFormat _pascal _export pngWhatOutputFormat(unsigned char colorType, unsigned char bitDepth)
 {
     BMFormat output = 0;
 
