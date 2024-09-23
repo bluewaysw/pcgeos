@@ -1353,6 +1353,17 @@ FileHandle BVThumbnailDB = 0;
 
 /**************************************************************************/
 
+
+
+void SwatStop()
+{
+	return;
+}
+
+
+
+
+
 @method BVProcessClass, MSG_BV_OPTION_STATE_CHANGED
 {
   if((modifiedBooleans & BV_SHOW_TOOLS) != 0)
@@ -1938,6 +1949,10 @@ PasteCommon(ClipboardItemFlags transferFlags, optr oself, word bvattrs)
   strcpy(pself->BVImpForm, srcform);
   strcpy(pself->BVName ,name);
 
+
+  SwatStop();
+
+
   if((pallen != 0)&&((type&BMT_PALETTE) != 0))
   {
 	 palmem = MemAlloc(240*3, 0, 0);
@@ -2264,11 +2279,6 @@ PasteCommon(ClipboardItemFlags transferFlags, optr oself, word bvattrs)
 
 /**************************************************************************/
 
-void SwatStop()
-{
-	return;
-}
-
 @method BVDocumentClass, MSG_GEN_DOCUMENT_ATTACH_UI_TO_DOCUMENT
 {
 	dword date, size;
@@ -2276,7 +2286,7 @@ void SwatStop()
 	ImpBmpStatus status;
 	ImpBmpParams para;
 	char string[255];
-//	VMBlockHandle bmpblock;
+	VMBlockHandle bmpblock;
 /*	GStateHandle gstate;*/
 	word count;
 /*	FileLongName tempName; */
@@ -2308,20 +2318,18 @@ void SwatStop()
 	FilePopDir();
 	para.IBP_status = @BVImportStatus;
 
-	SwatStop();
 	status = Imp_BmpProcessFile(&para, IBF_AUTO);
 
 	@send BVImportingDlg::MSG_GEN_GUP_INTERACTION_COMMAND(IC_DISMISS);
 
 	if(status == IBS_NO_ERROR)
 	{
-		// bmpblock =  GrCompactBitmap(para.IBP_dest, para.IBP_bitmap,para.IBP_dest);
+		bmpblock = GrCompactBitmap(para.IBP_dest, para.IBP_bitmap,para.IBP_dest);
 
-		//MyVMFreeVMChain(para.IBP_dest,
-		//	VMCHAIN_MAKE_FROM_VM_BLOCK( para.IBP_bitmap));
+		MyVMFreeVMChain(para.IBP_dest,
+			VMCHAIN_MAKE_FROM_VM_BLOCK( para.IBP_bitmap));
 
-
-		//para.IBP_bitmap = bmpblock;
+		para.IBP_bitmap = bmpblock;
 
 		date = FileGetDateAndTime(pself->GDI_fileHandle) ;
 		/* this doesn't work in all fs drivers (only ms4) so we'll go with...
