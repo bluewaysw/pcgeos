@@ -30,7 +30,7 @@ VMBlockHandle _pascal _export pngConvertFile(FileHandle fileHan, VMFileHandle vm
                 pngHandlePalette(fileHan, plteChunk, vmFile, vmBlock);
 
                 // Initialize the IDAT state
-                state = pngInitIDATProcessingState(fileHan, idatChunks, idatNumChunks, ihdrData);
+                pngInitIDATProcessingState(&state, fileHan, idatChunks, idatNumChunks, ihdrData);
 
                 // Process each scanline
                 while (pngGetNextIDATScanline(&state) == 1)
@@ -165,33 +165,33 @@ int _pascal _export pngProcessChunks(FileHandle file, IHDRData* ihdrData, IDATCh
     return 0;
 }
 
-IDATState _pascal _export pngInitIDATProcessingState(FileHandle file, IDATChunkEntry* idatChunks, int idatNumChunks, IHDRData ihdr)
+void _pascal _export pngInitIDATProcessingState(IDATState* state, FileHandle file, IDATChunkEntry* idatChunks, int idatNumChunks, IHDRData ihdr)
 {
-    IDATState state;
+    // how many bytes to allocate for a scanline
     unsigned long allocSize = NULL;
 
     // Initialize the zlib stream
-    state.strm.zalloc = Z_NULL;
-    state.strm.zfree = Z_NULL;
-    state.strm.opaque = Z_NULL;
-    state.strm.avail_in = 0;
-    state.strm.next_in = Z_NULL;
+    state->strm.zalloc = Z_NULL;
+    state->strm.zfree = Z_NULL;
+    state->strm.opaque = Z_NULL;
+    state->strm.avail_in = 0;
+    state->strm.next_in = Z_NULL;
 
+    inflateInit2(&state->strm, 15);
     //inflateInit2(&state.strm, 15 + 32);
-    inflateInit2(&state.strm, 15);
 
     // memory for the input data from file to zlib
-    state.inHan = MemAlloc(CHUNK_SIZE_IN, HF_SHARABLE | HF_SWAPABLE, HAF_ZERO_INIT);
-    state.in = MemLock(state.inHan);
+    state->inHan = MemAlloc(CHUNK_SIZE_IN, HF_SHARABLE | HF_SWAPABLE, HAF_ZERO_INIT);
+    state->in = MemLock(state->inHan);
 
     // memory for what zlib decodes
-    state.outHan = MemAlloc(CHUNK_SIZE_OUT, HF_SHARABLE | HF_SWAPABLE, HAF_ZERO_INIT);
-    state.out = MemLock(state.outHan);
+    state->outHan = MemAlloc(CHUNK_SIZE_OUT, HF_SHARABLE | HF_SWAPABLE, HAF_ZERO_INIT);
+    state->out = MemLock(state->outHan);
 
     // how many bytes in a pixel, how many bytes in a row?
     // TBD: how to to handle siutaions where we upgrade the bit depth afterward (padding)? - see "of"
-    state.rowBytes = calcBytesPerRow(ihdr.width, ihdr.colorType, ihdr.bitDepth);
-    state.bytesPerPixel = calcBytesPerPixel(ihdr.colorType, ihdr.bitDepth);
+    state->rowBytes = calcBytesPerRow(ihdr.width, ihdr.colorType, ihdr.bitDepth);
+    state->bytesPerPixel = calcBytesPerPixel(ihdr.colorType, ihdr.bitDepth);
 
     // determine how much memory to allocate - we need to allocate a little more
     // for 1 and 2 bit pixel data as it gets "padded to 4"
@@ -208,32 +208,30 @@ IDATState _pascal _export pngInitIDATProcessingState(FileHandle file, IDATChunkE
     }
     else
     {
-        allocSize = state.rowBytes + 1;
+        allocSize = state->rowBytes + 1;
     }
 
     // Allocate memory for the zlib-decoded and unfiltered current row, raw pixel data
-    state.currentRowHan = MemAlloc(allocSize, HF_SHARABLE | HF_SWAPABLE, HAF_ZERO_INIT); // +1 for filter byte
-    state.currentRow = MemLock(state.currentRowHan);
+    state->currentRowHan = MemAlloc(allocSize, HF_SHARABLE | HF_SWAPABLE, HAF_ZERO_INIT); // +1 for filter byte
+    state->currentRow = MemLock(state->currentRowHan);
 
     // Allocate memory for the previous row - needed for the PNG unfilter mechanism
-    state.previousRowHandle = MemAlloc(allocSize, HF_SHARABLE | HF_SWAPABLE, HAF_ZERO_INIT); // +1 for filter byte
-    state.previousRow = MemLock(state.previousRowHandle);
+    state->previousRowHandle = MemAlloc(allocSize, HF_SHARABLE | HF_SWAPABLE, HAF_ZERO_INIT); // +1 for filter byte
+    state->previousRow = MemLock(state->previousRowHandle);
 
-    state.rowBufferOffset = 0;
-    state.lineNo = 0;
-    state.file = file;
-    state.ihdr = ihdr;
-    state.have = 0;
-    state.outBufferPos = 0;
+    state->rowBufferOffset = 0;
+    state->lineNo = 0;
+    state->file = file;
+    state->ihdr = ihdr;
+    state->have = 0;
+    state->outBufferPos = 0;
 
-    state.idatNumChunks = idatNumChunks;
-    state.idatChunkIdx = 0;
-    memcpy(state.idatChunks, idatChunks, state.idatNumChunks * sizeof(IDATChunkEntry));
+    state->idatNumChunks = idatNumChunks;
+    state->idatChunkIdx = 0;
+    memcpy(state->idatChunks, idatChunks, state->idatNumChunks * sizeof(IDATChunkEntry));
 
-    state.length = state.idatChunks[state.idatChunkIdx].length;
-    FilePos(state.file, state.idatChunks[state.idatChunkIdx].chunkPos, FILE_POS_START);
-
-    return state;
+    state->length = state->idatChunks[state->idatChunkIdx].length;
+    FilePos(state->file, state->idatChunks[state->idatChunkIdx].chunkPos, FILE_POS_START);
 }
 
 // temporarily unlock the memory not needed for just putting out the pixels we just decoded
