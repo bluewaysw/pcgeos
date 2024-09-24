@@ -4,8 +4,8 @@
 ##############################################################################
 
 name            pnglib.lib
-longname        "PNG Lib Test"
-tokenchars      "png0"
+longname        "PNG Library"
+tokenchars      "PngL"
 tokenid         0
 
 type            library, single, c-api
