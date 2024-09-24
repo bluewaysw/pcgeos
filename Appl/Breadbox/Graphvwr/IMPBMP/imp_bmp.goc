@@ -351,12 +351,10 @@ ImpBmpStatus _pascal ImpPngProcessFile(ImpBmpParams *params)
 	if(params->IBP_source == 0)
 		FatalError(2000);
 
+	// skip header, apparntly FilePos is back at zero after the test image function
 	FilePos(params->IBP_source, 8, FILE_POS_START);
-	// place = FilePos(params->IBP_source, 0, FILE_POS_START);
-	// if (place != 0)
-	// 	FatalError(254);
 
-	/* switch in status bar */
+	// switch in status bar
 	if(params->IBP_status != 0)
 		@call params->IBP_status::MSG_SB_START_PROCESS();
 
@@ -384,46 +382,57 @@ ImpBmpStatus _pascal ImpPngProcessFile(ImpBmpParams *params)
 			// Process each scanline
 			while ((pngGetNextIDATScanline(&state) == 1) && (status == IBS_NO_ERROR))
 			{
-				// pngPauseIDATProcessing(&state);
+				// when not zlib decoding, give the system a little room to breathe
+				pngPauseIDATProcessing(&state);
 
+				// make sure we have data compatible with GEOS HugeBitmaps
 				pngApplyGEOSFormatTransformations(&state);
 
 				// Write the processed scanline (without the filter byte) to the VMFile
 				pngWriteScanlineToBitmap(params->IBP_dest, params->IBP_bitmap, state.lineNo - 1, state.currentRow);
 
+				// prepare the next zlib decoding work
+				pngResumeIDATProcessing(&state);
+
+				// update status of processing
 				if (params->IBP_status != NULL)
 					flag = @call params->IBP_status::MSG_SB_SET_STATUS_VALUE(((dword)state.lineNo)*100 / params->IBP_height);
 
+				// if "Stop" was pressed, make sure we abort
 				if (flag == FALSE)
+				{
 					status = IBS_IMPORT_STOPPED;
-
-				// pngResumeIDATProcessing(&state);
+				}
 			}
 
 			// Clean up resources
 			pngCleanupIDATProcessingState(&state);
 		}
+		else
+		{
+			status = IBS_WRONG_FORMAT;
+		}
+	}
+	else
+	{
+		status = IBS_WRONG_FORMAT;
 	}
 
-  //FileClose(infile, FALSE);
-
-  if(params->IBP_status != NULL)
+  if (params->IBP_status != NULL)
 	 @call params->IBP_status::MSG_SB_STOP_PROCESS();
 
-  return (IBS_NO_ERROR);
+  return (status);
 }
 
 ImpBmpStatus _pascal ImpPngTestFile(FileHandle file)
 {
   if (FilePos(file, 0, FILE_POS_START) != 0)
-	return(IBS_WRONG_FILE);
+	return (IBS_WRONG_FILE);
 
-  if (pngCheckHeader(file))
-  {
-	return(IBS_NO_ERROR);
-  }
+  if (pngCheckHeader(file) == 0)
+	return (IBS_WRONG_FORMAT);
 
-  return(IBS_WRONG_FORMAT);
+  return (IBS_NO_ERROR);
 }
 
 
