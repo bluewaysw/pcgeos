@@ -1,10 +1,15 @@
-#include <pnglib.goh>
-
 /**
- * Reading and processing the PNG file
+ ********************************************************************
+ An PNG import libray for PC/GEOS.
+ Started in 08/2024 by MeyerK for the FreeGEOS project.
+
+ The code itself was mostly created using ChatGPT.
  ********************************************************************
  */
 
+#include <pnglib.goh>
+
+// Reading and processing a complete PNG file
 VMBlockHandle _pascal _export pngConvertFile(FileHandle fileHan, VMFileHandle vmFile)
 {
     IHDRData ihdrData = {0};
@@ -26,8 +31,8 @@ VMBlockHandle _pascal _export pngConvertFile(FileHandle fileHan, VMFileHandle vm
                 // Initialize output bitmap
                 vmBlock = pngInitiateOutputBitmap(vmFile, ihdrData, fmt);
 
-                // transfers only if a palette exists
-                pngHandlePalette(fileHan, plteChunk, vmFile, vmBlock);
+                // transfers only if a palette exists, also creates palettes for grayscale images
+                pngHandlePalette(fileHan, plteChunk, vmFile, vmBlock, ihdrData.colorType, ihdrData.bitDepth);
 
                 // Initialize the IDAT state
                 pngInitIDATProcessingState(&state, fileHan, idatChunks, idatNumChunks, ihdrData);
@@ -56,7 +61,7 @@ VMBlockHandle _pascal _export pngConvertFile(FileHandle fileHan, VMFileHandle vm
     return NullHandle;
 }
 
-// Check PNG Header
+// check PNG Header
 int _pascal _export pngCheckHeader(FileHandle file)
 {
     unsigned char header[8];
@@ -165,6 +170,7 @@ int _pascal _export pngProcessChunks(FileHandle file, IHDRData* ihdrData, IDATCh
     return 0;
 }
 
+// init the IDAT processing structure
 void _pascal _export pngInitIDATProcessingState(IDATState* state, FileHandle file, IDATChunkEntry* idatChunks, int idatNumChunks, IHDRData ihdr)
 {
     // how many bytes to allocate for a scanline
@@ -251,7 +257,7 @@ void _pascal _export pngResumeIDATProcessing(IDATState* state)
     state->previousRow = MemLock(state->previousRowHandle);
 }
 
-// Verarbeitung von IDAT-Chunks
+// Processing of IDAT-Chunks
 int _pascal _export pngGetNextIDATScanline(IDATState* state)
 {
     unsigned long have;  // Amount of data decompressed into the output buffer
@@ -410,16 +416,46 @@ void _pascal _export pngCleanupIDATProcessingState(IDATState* state)
     MemFree(state->previousRowHandle);
 }
 
-void _pascal _export pngHandlePalette(FileHandle file, PLTEChunkEntry plteChunk, VMFileHandle vmFile, VMBlockHandle vmBlock)
+void _pascal _export pngHandlePalette(FileHandle file, PLTEChunkEntry plteChunk, VMFileHandle vmFile, VMBlockHandle vmBlock, unsigned char colorType, unsigned char bitDepth)
 {
-    if ((plteChunk.chunkPos != 0) && (plteChunk.length != 0))
-    {
-        byte* palette = NULL;
-        MemHandle paletteHan = NullHandle;
-        MemHandle bmmem;
-        unsigned int offset;
-        byte *bmblock;
+    RGBValue* palette = NULL;
+    char* rawPalette = NULL;
+    MemHandle paletteHan = NullHandle;
+    MemHandle bmmem = NullHandle;
+    unsigned int offset = 0;
+    char* bmblock = NULL;
+    unsigned int numColors = 0;
+    unsigned int paletteSize = 0;
 
+    // Check if the color type is grayscale (except for 1-bit mono)
+    if (
+         ((colorType == PNG_COLOR_TYPE_GREY) || (colorType == PNG_COLOR_TYPE_GREY_ALPHA)) &&
+         (bitDepth > 1)
+       )
+    {
+        // Calculate the number of colors based on bitDepth
+        if (bitDepth == 2) {
+            numColors = 4;  // 2-bit grayscale has 4 colors
+        } else if (bitDepth == 4) {
+            numColors = 16;  // 4-bit grayscale has 16 colors
+        } else if (bitDepth == 8) {
+            numColors = 256;  // 8-bit grayscale has 256 colors
+        } else {
+            return;  // Unsupported bit depth
+        }
+
+        // Allocate enough space for the palette based on the bitDepth
+        paletteHan = MemAlloc(numColors * sizeof(RGBValue), HF_SWAPABLE, HAF_ZERO_INIT);
+        palette = (RGBValue*) MemLock(paletteHan);
+
+        // Create the grayscale palette based on bitDepth and colorType
+        createGrayscalePalette(bitDepth, colorType, palette);
+
+        rawPalette = (char*) palette;
+        paletteSize = numColors * sizeof(RGBValue);
+    }
+    else if ((plteChunk.chunkPos != 0) && (plteChunk.length != 0))
+    {
         // Make sure the length is divisible by 3 (each color is 3 bytes)
         if (plteChunk.length % 3 != 0 || (plteChunk.length / 3) > MAX_PALETTE_ENTRIES)
         {
@@ -428,17 +464,21 @@ void _pascal _export pngHandlePalette(FileHandle file, PLTEChunkEntry plteChunk,
 
         // Create our temp. palette storage
         paletteHan = MemAlloc(plteChunk.length, HF_SHARABLE | HF_SWAPABLE, HAF_ZERO_INIT);
-        palette = MemLock(paletteHan);
+        rawPalette = (char*) MemLock(paletteHan);
 
         // Read the palette data
         FilePos(file, plteChunk.chunkPos, FILE_POS_START);
-        FileRead(file, palette, plteChunk.length, FALSE);
+        FileRead(file, rawPalette, plteChunk.length, FALSE);
+        paletteSize = plteChunk.length;
+    }
 
+    if (paletteHan != NullHandle)
+    {
         // Copy palette data to Bitmap VM File
         bmblock = VMLock(vmFile, vmBlock, &bmmem);
         offset = bmblock[0x28]+256*(bmblock[0x29]); // WHUT?!
         offset += 0x1c;
-        memcpy(&(bmblock[offset]), palette, plteChunk.length);
+        memcpy(&(bmblock[offset]), rawPalette, paletteSize);
         VMDirty(bmmem);
         VMUnlock(bmmem);
 
@@ -914,7 +954,7 @@ void pad_2bit_to_4bit(unsigned char *input, unsigned int width, unsigned char co
 
     // Apply only to paletted or grayscale colorTypes and only if bitDepth is 2
     if (
-         ((colorType != PNG_COLOR_TYPE_PALETTE) && (colorType != PNG_COLOR_TYPE_GREY)) ||
+         ((colorType != PNG_COLOR_TYPE_PALETTE) && (colorType != PNG_COLOR_TYPE_GREY) && (colorType != PNG_COLOR_TYPE_GREY_ALPHA)) ||
          (bitDepth != 2)
        )
     {
@@ -1007,3 +1047,37 @@ void unfilterRow(unsigned char *data, unsigned char *previousRow, unsigned long 
     }
 }
 
+// Function to create a grayscale palette based on bitwidth and PNG color type
+void createGrayscalePalette(unsigned char bitDepth, unsigned char colorType, RGBValue* palette)
+{
+    int i;
+    int numColors;
+    int grayscaleValue;
+
+    // Ensure this is only applied to grayscale color types
+    if (colorType != PNG_COLOR_TYPE_GREY && colorType != PNG_COLOR_TYPE_GREY_ALPHA) {
+        return;  // Not applicable to non-grayscale color types
+    }
+
+    // Calculate the number of colors based on bitDepth
+    if (bitDepth == 2) {
+        numColors = 4;  // 2-bit grayscale has 4 colors
+    } else if (bitDepth == 4) {
+        numColors = 16;  // 4-bit grayscale has 16 colors
+    } else if (bitDepth == 8) {
+        numColors = 256;  // 8-bit grayscale has 256 colors
+    } else {
+        return;  // Unsupported bit depth
+    }
+
+    for (i = 0; i < numColors; i++)
+    {
+        // calculate greyscale value
+        grayscaleValue = (i * 255) / (numColors - 1);
+
+        // Set the palette entry for grayscale
+        palette[i].RGB_red = grayscaleValue;
+        palette[i].RGB_green = grayscaleValue;
+        palette[i].RGB_blue = grayscaleValue;
+    }
+}
