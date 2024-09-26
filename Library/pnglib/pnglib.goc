@@ -651,14 +651,14 @@ void _pascal _export pngApplyGEOSFormatTransformations(IDATState* state)
     RGBValue blendColor = {255, 255, 255};
 
     // Convert any 16-bit channel data to 8-bit, we don't support more than 8-bit per Channel
-    convert16BitLineTo8Bit(state->currentRow, state->ihdr.width, state->ihdr.colorType, state->ihdr.bitDepth);
+    //convert16BitLineTo8Bit(state->currentRow, state->ihdr.width, state->ihdr.colorType, state->ihdr.bitDepth);
 
     // Remove any alpha channel
     removeAlphaChannel(state->currentRow, state->ihdr.width, state->ihdr.colorType, blendColor);
 
     // add "padding" to 1- and 2-bitted paletted / indexed data bytes or to 2-bitted grayscale values
-    pad_1bit_to_4bit(state->currentRow, state->ihdr.width, state->ihdr.colorType, state->ihdr.bitDepth);
-    pad_2bit_to_4bit(state->currentRow, state->ihdr.width, state->ihdr.colorType, state->ihdr.bitDepth);
+    //pad_1bit_to_4bit(state->currentRow, state->ihdr.width, state->ihdr.colorType, state->ihdr.bitDepth);
+    //pad_2bit_to_4bit(state->currentRow, state->ihdr.width, state->ihdr.colorType, state->ihdr.bitDepth);
 }
 
 void _pascal _export pngWriteScanlineToBitmap(VMFileHandle vmFile, VMBlockHandle vmBlock, unsigned long lineNo, unsigned char* rowData)
@@ -755,16 +755,16 @@ void removeAlphaChannel(unsigned char *data, unsigned long width, int colorType,
     unsigned long j;
     unsigned char *src = data; // Start at the first pixel
     unsigned char *dst = data;
-    unsigned char r, g, b, a, gray, blendedGray;
+    unsigned char gray, a, blendedGray;
 
     // RGBA (Truecolor with alpha)
     if (colorType == 6)
     {
         for (j = 0; j < width; j++)
         {
-            r = src[0];  // Red component
-            g = src[1];  // Green component
-            b = src[2];  // Blue component
+            unsigned char r = src[0];  // Red component
+            unsigned char g = src[1];  // Green component
+            unsigned char b = src[2];  // Blue component
             a = src[3];  // Alpha component
 
             // Blend RGB with the provided background color using alpha blending
@@ -782,25 +782,22 @@ void removeAlphaChannel(unsigned char *data, unsigned long width, int colorType,
     {
         for (j = 0; j < width; j++)
         {
-            gray = src[0]; // Grayscale value
-            a = src[1];    // Alpha component
+            gray = src[0];  // Grayscale value
+            a = src[1];     // Alpha component
 
-            // Blend the grayscale value with the provided background (assuming grayscale)
-            blendedGray = (gray * a + blendColor.RGB_red * (255 - a)) / 255; // Using the red channel of blendColor for simplicity
+            // Blend the grayscale value with the provided background grayscale value
+            blendedGray = (gray * a + blendColor.RGB_red * (255 - a)) / 255;  // Assume blendColor.RGB_red is used for grayscale
 
-            // Set the blended grayscale value to all RGB channels
+            // Set the blended grayscale value (single byte, no RGB expansion)
             dst[0] = blendedGray;
-            dst[1] = blendedGray;
-            dst[2] = blendedGray;
 
             // Move pointers: skip alpha for destination
             src += 2; // Move forward by 2 in the source (Grayscale + Alpha)
-            dst += 3; // Move forward by 3 in the destination (RGB)
+            dst += 1; // Move forward by 1 in the destination (Grayscale only)
         }
     }
     // If any other colorType with alpha is introduced in the future, handle it here
 }
-
 
 void convert16BitLineTo8Bit(unsigned char *line, unsigned long width, unsigned char colorType, unsigned char bitDepth)
 {
