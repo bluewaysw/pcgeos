@@ -758,46 +758,52 @@ void removeAlphaChannel(unsigned char *data, unsigned long width, int colorType,
     unsigned long j;
     unsigned char *src = data; // Start at the first pixel
     unsigned char *dst = data;
+    unsigned char r, g, b, a, gray, blendedGray;
 
-    if (colorType == 6) // RGBA (truecolor with alpha)
+    // RGBA (Truecolor with alpha)
+    if (colorType == 6)
     {
         for (j = 0; j < width; j++)
         {
-            unsigned char r = src[0];
-            unsigned char g = src[1];
-            unsigned char b = src[2];
-            unsigned char a = src[3]; // Alpha value
+            r = src[0];  // Red component
+            g = src[1];  // Green component
+            b = src[2];  // Blue component
+            a = src[3];  // Alpha component
 
-            // Blend RGB with the provided background color
+            // Blend RGB with the provided background color using alpha blending
             dst[0] = (r * a + blendColor.RGB_red * (255 - a)) / 255;
             dst[1] = (g * a + blendColor.RGB_green * (255 - a)) / 255;
             dst[2] = (b * a + blendColor.RGB_blue * (255 - a)) / 255;
 
-            // Move the source pointer forward by 4 (skip the alpha channel)
-            src += 4;
-            // Move the destination pointer forward by 3 (RGB only)
-            dst += 3;
+            // Move pointers: skip the alpha channel for the destination
+            src += 4; // Move forward by 4 in the source (RGBA)
+            dst += 3; // Move forward by 3 in the destination (RGB)
         }
     }
-    else if (colorType == 4) // Grayscale with alpha
+    // Grayscale with Alpha (colorType 4)
+    else if (colorType == 4)
     {
         for (j = 0; j < width; j++)
         {
-            unsigned char gray = src[0];
-            unsigned char a = src[1]; // Alpha value
+            gray = src[0]; // Grayscale value
+            a = src[1];    // Alpha component
 
-            // Blend grayscale value with the background (assume grayscale blend for simplicity)
-            unsigned char blendedGray = (gray * a + blendColor.RGB_red * (255 - a)) / 255; // Use red from blendColor
+            // Blend the grayscale value with the provided background (assuming grayscale)
+            blendedGray = (gray * a + blendColor.RGB_red * (255 - a)) / 255; // Using the red channel of blendColor for simplicity
 
-            dst[0] = blendedGray; // Grayscale -> RGB, so all RGB channels are the same
+            // Set the blended grayscale value to all RGB channels
+            dst[0] = blendedGray;
             dst[1] = blendedGray;
             dst[2] = blendedGray;
 
-            src += 2; // Move past grayscale and alpha
-            dst += 3; // Move RGB
+            // Move pointers: skip alpha for destination
+            src += 2; // Move forward by 2 in the source (Grayscale + Alpha)
+            dst += 3; // Move forward by 3 in the destination (RGB)
         }
     }
+    // If any other colorType with alpha is introduced in the future, handle it here
 }
+
 
 void convert16BitLineTo8Bit(unsigned char *line, unsigned long width, unsigned char colorType, unsigned char bitDepth)
 {
@@ -899,11 +905,9 @@ void pad_1bit_to_4bit(unsigned char *input, unsigned int width, unsigned char co
     MemHandle outputHan = NullHandle;
     unsigned char* output;
 
-    // Apply only to paletted or grayscale colorTypes and only if bitDepth is 1 (but exclude 1-bit grayscale mono)
+    // Apply only to paletted colorTypes and only if bitDepth is 1. PNG_COLOR_TYPE_GREY and 1bit == MONO, and GEOS knows that naturally
     if (
-        ((colorType == PNG_COLOR_TYPE_PALETTE) || (colorType == PNG_COLOR_TYPE_GREY) || (colorType == PNG_COLOR_TYPE_GREY_ALPHA)) &&
-        (!((colorType == PNG_COLOR_TYPE_GREY) && (bitDepth == 1))) &&
-        (!((colorType == PNG_COLOR_TYPE_GREY_ALPHA) && (bitDepth == 1)))
+         (colorType == PNG_COLOR_TYPE_PALETTE) && (bitDepth == 1)
        )
     {
         // Allocate memory for the output row
@@ -955,12 +959,8 @@ void pad_2bit_to_4bit(unsigned char *input, unsigned int width, unsigned char co
 
     // Apply only to paletted or grayscale colorTypes and only if bitDepth is 2
     if (
-         (
-            (colorType == PNG_COLOR_TYPE_PALETTE) ||
-            (colorType == PNG_COLOR_TYPE_GREY) ||
-            (colorType == PNG_COLOR_TYPE_GREY_ALPHA)
-         ) &&
-         (bitDepth == 2)
+         ((colorType == PNG_COLOR_TYPE_PALETTE) && (bitDepth == 2)) ||
+         ((colorType == PNG_COLOR_TYPE_GREY) && (bitDepth == 2))
        )
     {
         // Allocate memory for the output row
