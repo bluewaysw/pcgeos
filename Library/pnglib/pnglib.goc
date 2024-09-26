@@ -901,44 +901,43 @@ void pad_1bit_to_4bit(unsigned char *input, unsigned int width, unsigned char co
 
     // Apply only to paletted or grayscale colorTypes and only if bitDepth is 1 (but exclude 1-bit grayscale mono)
     if (
-        ((colorType != PNG_COLOR_TYPE_PALETTE) && (colorType != PNG_COLOR_TYPE_GREY)) ||
-        ((colorType == PNG_COLOR_TYPE_GREY) && (bitDepth == 1))
-    )
+        ((colorType == PNG_COLOR_TYPE_PALETTE) || (colorType == PNG_COLOR_TYPE_GREY) || (colorType == PNG_COLOR_TYPE_GREY_ALPHA)) &&
+        (!((colorType == PNG_COLOR_TYPE_GREY) && (bitDepth == 1))) &&
+        (!((colorType == PNG_COLOR_TYPE_GREY_ALPHA) && (bitDepth == 1)))
+       )
     {
-        return; // Exit if the colorType or bitDepth is not supported
-    }
+        // Allocate memory for the output row
+        outputHan = MemAlloc(rowBytes, HF_SHARABLE | HF_SWAPABLE, HAF_ZERO_INIT); // Allocate memory with zero-initialization
+        output = (unsigned char*) MemLock(outputHan);  // Lock the memory to access the output array
 
-    // Allocate memory for the output row
-    outputHan = MemAlloc(rowBytes, HF_SHARABLE | HF_SWAPABLE, HAF_ZERO_INIT); // Allocate memory with zero-initialization
-    output = (unsigned char*) MemLock(outputHan);  // Lock the memory to access the output array
+        // Process each bit in the input array
+        for (x = 0; x < width; x++)
+        {
+            // Get the current bit (extract from the input byte)
+            bit = (input[in_index] >> (7 - (x % 8))) & 1;
 
-    // Process each bit in the input array
-    for (x = 0; x < width; x++)
-    {
-        // Get the current bit (extract from the input byte)
-        bit = (input[in_index] >> (7 - (x % 8))) & 1;
+            // Place the bit as a 4-bit value (0x0 or 0x1) into the correct nibble
+            if (x % 2 == 0) {
+                // If even index, put the 4-bit value in the high nibble
+                output[out_index] = bit << 4;  // 0 or 1 shifted to the high nibble
+            } else {
+                // If odd index, put the 4-bit value in the low nibble
+                output[out_index] |= bit;  // Place bit in the low nibble
+                out_index++;  // Move to the next byte in the output array after filling both nibbles
+            }
 
-        // Place the bit as a 4-bit value (0x0 or 0x1) into the correct nibble
-        if (x % 2 == 0) {
-            // If even index, put the 4-bit value in the high nibble
-            output[out_index] = bit << 4;  // 0 or 1 shifted to the high nibble
-        } else {
-            // If odd index, put the 4-bit value in the low nibble
-            output[out_index] |= bit;  // Place bit in the low nibble
-            out_index++;  // Move to the next byte in the output array after filling both nibbles
+            // Move to the next byte in the input after processing 8 pixels (1 byte)
+            if ((x % 8) == 7) {
+                in_index++;
+            }
         }
 
-        // Move to the next byte in the input after processing 8 pixels (1 byte)
-        if ((x % 8) == 7) {
-            in_index++;
-        }
+        // Copy the padded 4-bit values back to the input buffer
+        memcpy(input, output, rowBytes);
+
+        // Free the allocated memory
+        MemFree(outputHan);
     }
-
-    // Copy the padded 4-bit values back to the input buffer
-    memcpy(input, output, rowBytes);
-
-    // Free the allocated memory
-    MemFree(outputHan);
 }
 
 // Function to convert 2-bit packed values to 4-bit padded values
@@ -957,51 +956,49 @@ void pad_2bit_to_4bit(unsigned char *input, unsigned int width, unsigned char co
     // Apply only to paletted or grayscale colorTypes and only if bitDepth is 2
     if (
          (
-            (colorType != PNG_COLOR_TYPE_PALETTE) &&
-            (colorType != PNG_COLOR_TYPE_GREY) &&
-            (colorType != PNG_COLOR_TYPE_GREY_ALPHA)
-         ) ||
-         (bitDepth != 2)
+            (colorType == PNG_COLOR_TYPE_PALETTE) ||
+            (colorType == PNG_COLOR_TYPE_GREY) ||
+            (colorType == PNG_COLOR_TYPE_GREY_ALPHA)
+         ) &&
+         (bitDepth == 2)
        )
     {
-        return; // Exit if the colorType or bitDepth is not supported
+        // Allocate memory for the output row
+        outputHan = MemAlloc(rowBytes, HF_SHARABLE | HF_SWAPABLE, HAF_ZERO_INIT); // Allocate memory with zero-initialization
+        output = (unsigned char*) MemLock(outputHan);  // Lock the memory to access the output array
+
+        // Process each 2-bit pixel in the input array
+        for (x = 0; x < width; x++)
+        {
+            // Get the current 2-bit pixel (extract from the input byte)
+            pixel = (input[in_index] >> (6 - (x % 4) * 2)) & 0x03;
+
+            // Place the 2-bit value as a 4-bit value (0x0 to 0x3) into the correct nibble
+            if (x % 2 == 0)
+            {
+                // If even index, put the 4-bit value in the high nibble
+                output[out_index] = pixel << 4;  // Shift 2-bit value to the high nibble
+            }
+            else
+            {
+                // If odd index, put the 4-bit value in the low nibble
+                output[out_index] |= pixel;  // Place the 2-bit value in the low nibble
+                out_index++;  // Move to the next byte in the output array after filling both nibbles
+            }
+
+            // Move to the next byte in the input after processing 4 pixels (1 byte)
+            if ((x % 4) == 3)
+            {
+                in_index++;
+            }
+        }
+
+        // Copy the padded 4-bit values back to the input buffer
+        memcpy(input, output, rowBytes);
+
+        // Free the allocated memory
+        MemFree(outputHan);
     }
-
-    // Allocate memory for the output row
-    outputHan = MemAlloc(rowBytes, HF_SHARABLE | HF_SWAPABLE, HAF_ZERO_INIT); // Allocate memory with zero-initialization
-    output = (unsigned char*) MemLock(outputHan);  // Lock the memory to access the output array
-
-    // Process each 2-bit pixel in the input array
-    for (x = 0; x < width; x++)
-    {
-        // Get the current 2-bit pixel (extract from the input byte)
-        pixel = (input[in_index] >> (6 - (x % 4) * 2)) & 0x03;
-
-        // Place the 2-bit value as a 4-bit value (0x0 to 0x3) into the correct nibble
-        if (x % 2 == 0)
-        {
-            // If even index, put the 4-bit value in the high nibble
-            output[out_index] = pixel << 4;  // Shift 2-bit value to the high nibble
-        }
-        else
-        {
-            // If odd index, put the 4-bit value in the low nibble
-            output[out_index] |= pixel;  // Place the 2-bit value in the low nibble
-            out_index++;  // Move to the next byte in the output array after filling both nibbles
-        }
-
-        // Move to the next byte in the input after processing 4 pixels (1 byte)
-        if ((x % 4) == 3)
-        {
-            in_index++;
-        }
-    }
-
-    // Copy the padded 4-bit values back to the input buffer
-    memcpy(input, output, rowBytes);
-
-    // Free the allocated memory
-    MemFree(outputHan);
 }
 
 // Unfilter-Funktion zur Verarbeitung der PNG-Bilddaten
