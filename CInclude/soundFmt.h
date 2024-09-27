@@ -231,12 +231,13 @@ typedef struct	{
 	*  intensity of the noise that is to be generated.
 	*/
 
-typedef ByteEnum NoiseType
-#define	NT_NO_NOISE		0
-#define	NT_WHITE_NOISE		1		/* cymbal crash */
-#define	NT_METAL_NOISE		2		/* snare drum hit */
+typedef enum byte {
+	NT_NO_NOISE = 0,
+	NT_WHITE_NOISE,				/* cymbal crash  */
+	NT_METAL_NOISE,				/* snare drum hit  */	
+	}NoiseType;
 
-typedef ByteFlags	NoiseSetting
+typedef ByteFlags	NoiseSetting;
 #define	NS_type			0xC0		/* metal type */
 #define	NS_partialLevel		0x3F		/* fraction for metal level */
 
@@ -248,7 +249,7 @@ typedef struct {
 	byte 		CTIEF_secondPartial;	/* fraction for 2nd intensity */
 	byte 		CTIEF_thirdPartial;	/* fraction for 3rd intensity */
 	NoiseSetting	CTIEF_noise;		/* intensity of noise */
-	} CTIEnvelopeFormat
+	} CTIEnvelopeFormat;
 
 
 /*-----------------------------------------------------------------------------
@@ -265,7 +266,7 @@ typedef struct {
 	*  the information it wants.
 	*/
 	
-typedef WordEnum	SupportedInstrumentFormat
+typedef word	SupportedInstrumentFormat;
 #define	SEF_NO_FORMAT		0
 #define	SEF_SBI_FORMAT		1
 #define	SEF_CTI_FORMAT		2
