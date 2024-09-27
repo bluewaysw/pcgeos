@@ -651,14 +651,14 @@ void _pascal _export pngApplyGEOSFormatTransformations(IDATState* state)
     RGBValue blendColor = {255, 255, 255};
 
     // Convert any 16-bit channel data to 8-bit, we don't support more than 8-bit per Channel
-    //convert16BitLineTo8Bit(state->currentRow, state->ihdr.width, state->ihdr.colorType, state->ihdr.bitDepth);
+    convert16BitLineTo8Bit(state->currentRow, state->ihdr.width, state->ihdr.colorType, state->ihdr.bitDepth);
 
     // Remove any alpha channel
     removeAlphaChannel(state->currentRow, state->ihdr.width, state->ihdr.colorType, blendColor);
 
     // add "padding" to 1- and 2-bitted paletted / indexed data bytes or to 2-bitted grayscale values
-    //pad_1bit_to_4bit(state->currentRow, state->ihdr.width, state->ihdr.colorType, state->ihdr.bitDepth);
-    //pad_2bit_to_4bit(state->currentRow, state->ihdr.width, state->ihdr.colorType, state->ihdr.bitDepth);
+    pad_1bit_to_4bit(state->currentRow, state->ihdr.width, state->ihdr.colorType, state->ihdr.bitDepth);
+    pad_2bit_to_4bit(state->currentRow, state->ihdr.width, state->ihdr.colorType, state->ihdr.bitDepth);
 }
 
 void _pascal _export pngWriteScanlineToBitmap(VMFileHandle vmFile, VMBlockHandle vmBlock, unsigned long lineNo, unsigned char* rowData)
@@ -803,23 +803,26 @@ void convert16BitLineTo8Bit(unsigned char *line, unsigned long width, unsigned c
 {
     // Variable declarations
     unsigned long i;
+    unsigned long index16;
+    unsigned long index8;
     unsigned long bytes_per_pixel_16;
     unsigned long bytes_per_pixel_8;
     unsigned long rowBytes;
-
     MemHandle dstHan;
     unsigned char *dst;
     unsigned char *dstStart;
-
-    int c;
+    unsigned short value16;
+    unsigned short grayValue16;
+    unsigned short alphaValue16;
     int channels;
+    int c;
 
     // Initialize variables
     dstHan = NullHandle;
     dst = NULL;
     dstStart = NULL;
     rowBytes = 0;
-    c = 0;
+    channels = 0;
 
     // Check if the bitDepth is 16 bits. If not, return as this function only handles 16-bit channels.
     if (bitDepth != 16)
@@ -828,26 +831,23 @@ void convert16BitLineTo8Bit(unsigned char *line, unsigned long width, unsigned c
     }
 
     // Determine the number of channels and bytes per pixel based on colorType
-    if (colorType == PNG_COLOR_TYPE_RGB)
+    switch (colorType)
     {
-        channels = 3; // RGB: 3 channels
-    }
-    else if (colorType == PNG_COLOR_TYPE_RGBA)
-    {
-        channels = 4; // RGBA: 4 channels
-    }
-    else if (colorType == PNG_COLOR_TYPE_GREY)
-    {
-        channels = 1; // Grayscale: 1 channel
-    }
-    else if (colorType == PNG_COLOR_TYPE_GREY_ALPHA)
-    {
-        channels = 2; // Grayscale with alpha: 2 channels
-    }
-    else
-    {
-        // Unsupported or invalid colorType
-        return;
+        case PNG_COLOR_TYPE_RGB:
+            channels = 3; // RGB: 3 channels (R, G, B)
+            break;
+        case PNG_COLOR_TYPE_RGBA:
+            channels = 4; // RGBA: 4 channels (R, G, B, A)
+            break;
+        case PNG_COLOR_TYPE_GREY:
+            channels = 1; // Grayscale: 1 channel
+            break;
+        case PNG_COLOR_TYPE_GREY_ALPHA:
+            channels = 2; // Grayscale with alpha: 2 channels (grayscale, alpha)
+            break;
+        default:
+            // Unsupported or invalid colorType
+            return;
     }
 
     // Calculate the number of bytes per row for both 16-bit (input) and 8-bit (output) data
@@ -857,33 +857,76 @@ void convert16BitLineTo8Bit(unsigned char *line, unsigned long width, unsigned c
 
     // Allocate memory for the destination buffer
     dstHan = MemAlloc(rowBytes, HF_SHARABLE | HF_SWAPABLE, HAF_ZERO_INIT);
+    if (dstHan == NullHandle)
+    {
+        return;
+    }
+
     dst = MemLock(dstHan);
+    if (dst == NULL)
+    {
+        MemFree(dstHan);
+        return;
+    }
+
     dstStart = dst;
 
     // Process each pixel
     for (i = 0; i < width; i++)
     {
-        unsigned long index16 = i * bytes_per_pixel_16; // Index in the 16-bit source line
-        unsigned long index8 = i * bytes_per_pixel_8;   // Index in the 8-bit destination line
+        index16 = i * bytes_per_pixel_16; // Index in the 16-bit source line
+        index8 = i * bytes_per_pixel_8;   // Index in the 8-bit destination line
 
-        // Convert each channel (R, G, B, A, grayscale, or alpha if applicable)
-        for (c = 0; c < channels; c++)
+        // Handle each colorType separately
+        if (colorType == PNG_COLOR_TYPE_GREY)
         {
-            // Combine two bytes to form the 16-bit value for the channel
-            unsigned short value16 = (line[index16 + c * 2] << 8) | line[index16 + c * 2 + 1];
+            // Combine two bytes to form the 16-bit grayscale value
+            grayValue16 = (line[index16] << 8) | line[index16 + 1];
+            // Convert to 8-bit grayscale
+            dst[index8] = grayValue16 >> 8;
+        }
+        else if (colorType == PNG_COLOR_TYPE_GREY_ALPHA)
+        {
+            // Combine two bytes to form the 16-bit grayscale value
+            grayValue16 = (line[index16] << 8) | line[index16 + 1];
+            // Convert to 8-bit grayscale
+            dst[index8] = grayValue16 >> 8;
 
-            // Convert the 16-bit value to 8-bit by right-shifting 8 bits
-            dst[index8 + c] = value16 >> 8;
+            // Combine two bytes to form the 16-bit alpha value
+            alphaValue16 = (line[index16 + 2] << 8) | line[index16 + 3];
+            // Convert to 8-bit alpha
+            dst[index8 + 1] = alphaValue16 >> 8;
+        }
+        else if (colorType == PNG_COLOR_TYPE_RGB)
+        {
+            // For RGB, we have 3 channels: R, G, B
+            for (c = 0; c < 3; c++)
+            {
+                // Combine two bytes to form the 16-bit value for each channel (R, G, or B)
+                value16 = (line[index16 + c * 2] << 8) | line[index16 + c * 2 + 1];
+                // Convert to 8-bit per channel
+                dst[index8 + c] = value16 >> 8;
+            }
+        }
+        else if (colorType == PNG_COLOR_TYPE_RGBA)
+        {
+            // For RGBA, we have 4 channels: R, G, B, A
+            for (c = 0; c < 4; c++)
+            {
+                // Combine two bytes to form the 16-bit value for each channel (R, G, B, or A)
+                value16 = (line[index16 + c * 2] << 8) | line[index16 + c * 2 + 1];
+                // Convert to 8-bit per channel
+                dst[index8 + c] = value16 >> 8;
+            }
         }
     }
 
     // Copy the converted 8-bit values back to the original buffer
-    memcpy(line, dstStart, bytes_per_pixel_8 * width);
+    memcpy(line, dstStart, rowBytes);
 
     // Free the memory allocated for the destination buffer
     MemFree(dstHan);
 }
-
 
 // Function to convert 1-bit packed values to 4-bit padded values
 void pad_1bit_to_4bit(unsigned char *input, unsigned int width, unsigned char colorType, unsigned char bitDepth)
