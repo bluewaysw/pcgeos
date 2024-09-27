@@ -432,13 +432,15 @@ void _pascal _export pngHandlePalette(FileHandle file, PLTEChunkEntry plteChunk,
          (bitDepth > 1)
        )
     {
-        // Calculate the number of colors based on bitDepth
+        // Calculate the number of "colors" based on bitDepth
         if (bitDepth == 2) {
             numColors = 4;  // 2-bit grayscale has 4 colors
         } else if (bitDepth == 4) {
             numColors = 16;  // 4-bit grayscale has 16 colors
         } else if (bitDepth == 8) {
             numColors = 256;  // 8-bit grayscale has 256 colors
+        } else if (bitDepth == 16) {
+            numColors = 256;  // 16-bit grayscale has 256 colors (after reduction later on)
         } else {
             return;  // Unsupported bit depth
         }
@@ -880,22 +882,22 @@ void convert16BitLineTo8Bit(unsigned char *line, unsigned long width, unsigned c
         // Handle each colorType separately
         if (colorType == PNG_COLOR_TYPE_GREY)
         {
-            // Combine two bytes to form the 16-bit grayscale value
+            // Combine two bytes to form the 16-bit grayscale value (endian check)
             grayValue16 = (line[index16] << 8) | line[index16 + 1];
-            // Convert to 8-bit grayscale
-            dst[index8] = grayValue16 >> 8;
+            // Scale 16-bit grayscale to 8-bit
+            dst[index8] = grayValue16 / 257;
         }
         else if (colorType == PNG_COLOR_TYPE_GREY_ALPHA)
         {
-            // Combine two bytes to form the 16-bit grayscale value
+            // Combine two bytes to form the 16-bit grayscale value (endian check)
             grayValue16 = (line[index16] << 8) | line[index16 + 1];
-            // Convert to 8-bit grayscale
-            dst[index8] = grayValue16 >> 8;
+            // Scale 16-bit grayscale to 8-bit
+            dst[index8] = grayValue16 / 257;
 
-            // Combine two bytes to form the 16-bit alpha value
+            // Combine two bytes to form the 16-bit alpha value (endian check)
             alphaValue16 = (line[index16 + 2] << 8) | line[index16 + 3];
-            // Convert to 8-bit alpha
-            dst[index8 + 1] = alphaValue16 >> 8;
+            // Scale 16-bit alpha to 8-bit
+            dst[index8 + 1] = alphaValue16 / 257;
         }
         else if (colorType == PNG_COLOR_TYPE_RGB)
         {
