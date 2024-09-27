@@ -425,9 +425,7 @@ typedef struct
  * convert value (word) to WWFixedAsDWord
  */
 #define WORD_TO_WWFIXEDASDWORD( value )          \
-        ( (WWFixedAsDWord) MakeWWFixed( value ) )
-
-#define WORD_TO_FIXED16DOT16( value ) ( (long)value << 16 )
+            ( ( (long)value ) << 16 )
 
 /*
  * convert value (TT_F26DOT6) to WWFixedAsDWord

@@ -397,7 +397,7 @@ EC(             ECCheckBounds( pairs ) );
                                 kernPair->KP_charRight = right;
 
                                 /* save scaled kerning value */
-                                scaledKernValue = GrMulWWFixed( WORD_TO_FIXED16DOT16( pairs[i].value ), SCALE_WIDTH );
+                                scaledKernValue = SCALE_WORD( pairs[i].value, SCALE_WIDTH );
                                 kernValue->BBF_int = IntegerOf( scaledKernValue );
                                 kernValue->BBF_frac = FractionOf( scaledKernValue ) >> 8;
 
