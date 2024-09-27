@@ -18,7 +18,7 @@
  ***********************************************************************/
 
 #include "ttadapter.h"
-#include "ttcharmapper.h"
+#include "ttcmap.h"
 #include <ec.h>
 #include <geode.h>
 
@@ -73,7 +73,7 @@ EC(     ECCheckFileHandle( TTFILE) );
                 goto Fin;
         if ( TT_Get_Face_Properties( FACE, &FACE_PROPERTIES ) )
                 goto Fail;
-        if ( getCharMap( trueTypeVars, &CHAR_MAP ) )
+        if ( getCharMap( FACE, &FACE_PROPERTIES, &CHAR_MAP ) )
                 goto Fail;
         if ( TT_New_Instance( FACE, &INSTANCE ) )
                 goto Fail;

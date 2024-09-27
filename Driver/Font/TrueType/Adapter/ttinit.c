@@ -296,7 +296,7 @@ EC(     ECCheckFileHandle( truetypeFile ) );
         if ( !isResourceSaving( trueTypeVars ) )
                 goto Fail;
 
-        if ( getCharMap( trueTypeVars, &CHAR_MAP ) )
+        if ( getCharMap( FACE, &FACE_PROPERTIES, &CHAR_MAP ) )
                 goto Fail;
 
         if ( getNameFromNameTable( trueTypeVars, FAMILY_NAME, FAMILY_NAME_ID ) == 0 )

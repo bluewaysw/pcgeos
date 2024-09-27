@@ -52,8 +52,6 @@ word GeosCharToUnicode( word geosChar );
 
 word InitGeosCharsInCharMap( TT_CharMap map, char* firstChar, char* lastChar );
 
-TT_Error getCharMap( TRUETYPE_VARS, TT_CharMap* charMap );
-
 CharMapFlags GeosCharMapFlag( word geosChar );
 
 char getGeosCharForIndex( word ttIndex );

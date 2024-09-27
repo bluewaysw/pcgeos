@@ -279,33 +279,6 @@ CharMapFlags GeosCharMapFlag( word geosChar )
 
 
 /*
- * Get microsoft unicode charmap in face.
- */
-TT_Error getCharMap( TRUETYPE_VARS, TT_CharMap* charMap )
-{
-        TT_UShort           platform;
-        TT_UShort           encoding;
-        int                 map;
-
-
-        TT_Get_Face_Properties( FACE, &FACE_PROPERTIES );
-
-	for ( map = 0; map < FACE_PROPERTIES.num_CharMaps; ++map ) 
-        {
-		TT_Get_CharMap_ID( FACE, map, &platform, &encoding );
-		if ( platform == TT_PLATFORM_MICROSOFT && encoding == TT_MS_ID_UNICODE_CS )
-                {
-		        TT_Get_CharMap(FACE, map, charMap);
-			break;
-		}
-	}
-
-        if ( map == FACE_PROPERTIES.num_CharMaps ) return TT_Err_CMap_Table_Missing;
-        else                                       return TT_Err_Ok;
-}
-
-
-/*
  * Counts the GEOS characters that are present in the font.
  */
 word InitGeosCharsInCharMap( TT_CharMap map, char *firstChar, char *lastChar )
