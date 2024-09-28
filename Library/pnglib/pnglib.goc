@@ -88,6 +88,8 @@ int _pascal _export pngProcessChunks(FileHandle file, IHDRData* ihdrData, MemHan
     ChunkHeader chdr = {0};
     int idatChunkIdx = 0;
     IDATChunkEntry* idatChunks;
+    unsigned int bytesRead = 0;
+    unsigned int headerSize = sizeof(IHDRData);
 
     // create memory for array of IDATChunks
     *idatChunksHan = MemAlloc(MAX_IDAT_CHUNKS * sizeof(IDATChunkEntry), HF_SWAPABLE | HF_SHARABLE, HAF_ZERO_INIT);
@@ -106,13 +108,16 @@ int _pascal _export pngProcessChunks(FileHandle file, IHDRData* ihdrData, MemHan
             case CHUNK_IHDR:
             {
                 // read file
-                if ((unsigned int) FileRead(file, ihdrData, sizeof(IHDRData), FALSE) != (unsigned int) sizeof(IHDRData))
+                bytesRead = FileRead(file, ihdrData, headerSize, FALSE);
+                if (bytesRead != headerSize)
                 {
                     // Error reading IHDR chunk
+                    if (*idatChunksHan != NullHandle) MemFree(*idatChunksHan);
                     return 0;
                 }
 
-                if (ihdrData->interlaceMethod != 0) return 0; // we don't support interlacing (yet?)
+                // we don't support interlacing (yet?)
+                if (ihdrData->interlaceMethod != 0) return 0;
 
                 ihdrData->width = swapEndian(ihdrData->width);
                 ihdrData->height = swapEndian(ihdrData->height);
@@ -150,6 +155,7 @@ int _pascal _export pngProcessChunks(FileHandle file, IHDRData* ihdrData, MemHan
                 else
                 {
                     // Handle error: too many IDAT chunks
+                    if (*idatChunksHan != NullHandle) MemFree(*idatChunksHan);
                     return 0;
                 }
 
@@ -176,6 +182,7 @@ int _pascal _export pngProcessChunks(FileHandle file, IHDRData* ihdrData, MemHan
         FilePos(file, 4, FILE_POS_RELATIVE);
     }
 
+    if (*idatChunksHan != NullHandle) MemFree(*idatChunksHan);
     return 0;
 }
 
