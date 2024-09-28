@@ -64,16 +64,16 @@ VMBlockHandle _pascal _export pngConvertFile(FileHandle fileHan, VMFileHandle vm
 // check PNG Header
 int _pascal _export pngCheckHeader(FileHandle file)
 {
-    unsigned char header[8];
+    unsigned char header[sizeof(PNG_SIGNATURE)] = {0};
 
     // Read first 8 bytes
-    if (FileRead(file, header, 8, FALSE) != 8)
+    if (FileRead(file, header, sizeof(PNG_SIGNATURE), FALSE) != sizeof(PNG_SIGNATURE))
     {
         return 0; // file not long enough, no PNG
     }
 
     // Compare first 8 bytes with PNG-signature
-    if (memcmp(header, PNG_SIGNATURE, 8) != 0)
+    if (memcmp(header, PNG_SIGNATURE, sizeof(PNG_SIGNATURE)) != 0)
     {
         return 0; // no PNG signature
     }
@@ -88,6 +88,9 @@ int _pascal _export pngProcessChunks(FileHandle file, IHDRData* ihdrData, IDATCh
     ChunkHeader chdr = {0};
     int idatChunkIdx = 0;
 
+	// make sure we start at the beginning, but after the PNG header
+	FilePos(file, sizeof(PNG_SIGNATURE), FILE_POS_START);
+
     while (FileRead(file, &chdr, sizeof(ChunkHeader), FALSE))
     {
         // Swap endianness for chunk length and type
@@ -98,14 +101,14 @@ int _pascal _export pngProcessChunks(FileHandle file, IHDRData* ihdrData, IDATCh
         {
             case CHUNK_IHDR:
             {
-                // Read and store IHDR data
-                if (FileRead(file, ihdrData, sizeof(IHDRData), FALSE) != sizeof(IHDRData))
+                // read file
+                if ((unsigned int) FileRead(file, ihdrData, sizeof(IHDRData), FALSE) != (unsigned int) sizeof(IHDRData))
                 {
                     // Error reading IHDR chunk
                     return 0;
                 }
 
-                if (ihdrData->interlaceMethod != 0) return 0; // we don't support interlacing
+                if (ihdrData->interlaceMethod != 0) return 0; // we don't support interlacing (yet?)
 
                 ihdrData->width = swapEndian(ihdrData->width);
                 ihdrData->height = swapEndian(ihdrData->height);
