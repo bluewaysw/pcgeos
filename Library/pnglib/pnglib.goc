@@ -90,9 +90,7 @@ int _pascal _export pngProcessChunks(FileHandle file, IHDRData* ihdrData, MemHan
     IDATChunkEntry* idatChunks;
     unsigned int bytesRead = 0;
     unsigned int headerSize = sizeof(IHDRData);
-
-    // create memory for array of IDATChunks
-    *idatChunksHan = MemAlloc(MAX_IDAT_CHUNKS * sizeof(IDATChunkEntry), HF_SWAPABLE | HF_SHARABLE, HAF_ZERO_INIT);
+    unsigned int lineSize = 0;
 
 	// make sure we start at the beginning, but after the PNG header
 	FilePos(file, sizeof(PNG_SIGNATURE), FILE_POS_START);
@@ -110,17 +108,21 @@ int _pascal _export pngProcessChunks(FileHandle file, IHDRData* ihdrData, MemHan
                 // read file
                 bytesRead = FileRead(file, ihdrData, headerSize, FALSE);
                 if (bytesRead != headerSize)
-                {
-                    // Error reading IHDR chunk
-                    if (*idatChunksHan != NullHandle) MemFree(*idatChunksHan);
                     return 0;
-                }
 
                 // we don't support interlacing (yet?)
-                if (ihdrData->interlaceMethod != 0) return 0;
+                if (ihdrData->interlaceMethod != 0)
+                    return 0;
 
                 ihdrData->width = swapEndian(ihdrData->width);
                 ihdrData->height = swapEndian(ihdrData->height);
+
+                lineSize = calcBytesPerRow(ihdrData->width, ihdrData->colorType, ihdrData->bitDepth);
+                if (lineSize > MAX_SCANLINE_SIZE)
+                    return 0;
+
+                // now that we seem to have a valid PNG header, create the memory for an array of IDATChunks
+                *idatChunksHan = MemAlloc(MAX_IDAT_CHUNKS * sizeof(IDATChunkEntry), HF_SWAPABLE | HF_SHARABLE, HAF_ZERO_INIT);
 
                 // Move file pointer forward by the remaining part of the IHDR chunk
                 FilePos(file, chdr.length - sizeof(IHDRData), FILE_POS_RELATIVE);
@@ -262,16 +264,16 @@ void _pascal _export pngInitIDATProcessingState(IDATState* state, FileHandle fil
 // NOTE: currentRow stays locked for further processing
 void _pascal _export pngPauseIDATProcessing(IDATState* state)
 {
-    MemUnlock(state->inHan);
-    MemUnlock(state->outHan);
+    // MemUnlock(state->inHan); // disabled as it seems to create memory overflows somewhere
+    //MemUnlock(state->outHan);
     MemUnlock(state->previousRowHandle);
 }
 
 // relock the memory needed for further IDAT chunk processing
 void _pascal _export pngResumeIDATProcessing(IDATState* state)
 {
-    state->in = MemLock(state->inHan);
-    state->out = MemLock(state->outHan);
+    // state->in = MemLock(state->inHan);
+    //state->out = MemLock(state->outHan);
     state->previousRow = MemLock(state->previousRowHandle);
 }
 
@@ -1030,7 +1032,7 @@ void pad_2bit_to_4bit(unsigned char *input, unsigned int width, unsigned char co
 }
 
 // Unfilter-Funktion zur Verarbeitung der PNG-Bilddaten
-void unfilterRow(unsigned char *data, unsigned char *previousRow, unsigned long bytesPerPixel, unsigned long rowBytes)
+static void unfilterRow(unsigned char *data, unsigned char *previousRow, unsigned long bytesPerPixel, unsigned long rowBytes)
 {
     unsigned char *currentRow = data;
     unsigned char filterType = *currentRow; // just the first byte!
@@ -1091,7 +1093,7 @@ static inline unsigned char paethPredictor(int a, int b, int c)
     else return (unsigned char)c;
 }
 
-unsigned long swapEndian(unsigned long val)
+static inline unsigned long swapEndian(unsigned long val)
 {
     return ((val >> 24) & 0x000000FF) |
            ((val >> 8) & 0x0000FF00) |
@@ -1099,7 +1101,7 @@ unsigned long swapEndian(unsigned long val)
            ((val << 24) & 0xFF000000);
 }
 
-int abs(int x)
+static inline int abs(int x)
 {
     return x >= 0 ? x : -x;
 }
