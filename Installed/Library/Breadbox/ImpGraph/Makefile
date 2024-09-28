@@ -4,20 +4,22 @@
 # If you edit it, you will lose your changes, should it be regenerated.
 #
 GEODE           = impgraph
-ASMIMP          = impgif.asm asmimpManager.asm iimpgif.def
-MAIN            = impgraph.goc awatcher.goc
-IMPBMP          = impjpeg.h impgif.h ibcommon.h impfjpeg.goc impgifc.goc\
+ASMIMP          = asmimpManager.asm impgif.asm iimpgif.def
+IMPBMP          = ibcommon.h impgif.h impjpeg.h impfjpeg.goc impgifc.goc\
                   impjpeg.goc
+MAIN            = awatcher.goc impgraph.goc
 UI_TO_RDFS      =
-OBJS            = impgraph.obj awatcher.obj impfjpeg.obj impgifc.obj\
-                  impjpeg.obj
+OBJS            = impfjpeg.obj impgifc.obj impjpeg.obj awatcher.obj\
+                  impgraph.obj
 COMMON          =
 MODULES         = ASMIMP
-CMODULES        = MAIN IMPBMP
-SRCS            = $(ASMIMP) $(MAIN) $(IMPBMP) $(COMMON)
+CMODULES        = IMPBMP MAIN
+SRCS            = $(ASMIMP) $(IMPBMP) $(MAIN) $(COMMON)
 LOBJS           =
 LIBOBJ          = $(DEVEL_DIR)/Include/$(GEODE).ldf
 LIBNAME         = impgraph
+
+PRODUCTS        = DBCS 
 
 SYSMAKEFILE     = geode.mk
 
@@ -32,4 +34,8 @@ SYSMAKEFILE     = geode.mk
 
 #if exists($(DEPFILE))
 #include "$(DEPFILE)"
+#endif
+
+#if exists(DBCS/$(DEPFILE))
+#include "DBCS/$(DEPFILE)"
 #endif
