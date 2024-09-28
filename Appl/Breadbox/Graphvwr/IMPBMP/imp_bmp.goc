@@ -338,7 +338,7 @@ byte read[3];
 ImpBmpStatus _pascal ImpPngProcessFile(ImpBmpParams *params)
 {
 	IHDRData ihdrData = {0};
-	IDATChunkEntry idatChunks[MAX_IDAT_CHUNKS] = {0};
+	MemHandle idatChunksHan = NullHandle;
 	int idatNumChunks = 0;
 	PLTEChunkEntry plteChunk = {0};
 	IDATState state = {0};
@@ -356,7 +356,7 @@ ImpBmpStatus _pascal ImpPngProcessFile(ImpBmpParams *params)
 		@call params->IBP_status::MSG_SB_START_PROCESS();
 
 	// Read PNG Chunks, get overview
-	if (pngProcessChunks(params->IBP_source, &ihdrData, &idatChunks, &idatNumChunks, &plteChunk))
+	if (pngProcessChunks(params->IBP_source, &ihdrData, &idatChunksHan, &idatNumChunks, &plteChunk))
 	{
 		fmt = pngWhatOutputFormat(ihdrData.colorType, ihdrData.bitDepth);
 		if (fmt != 0)
@@ -374,7 +374,7 @@ ImpBmpStatus _pascal ImpPngProcessFile(ImpBmpParams *params)
 			pngHandlePalette(params->IBP_source, plteChunk, params->IBP_dest, params->IBP_bitmap, ihdrData.colorType, ihdrData.bitDepth);
 
 			// Initialize the IDAT state
-			pngInitIDATProcessingState(&state, params->IBP_source, idatChunks, idatNumChunks, ihdrData);
+			pngInitIDATProcessingState(&state, params->IBP_source, idatChunksHan, idatNumChunks, ihdrData);
 
 			// Process each scanline
 			while ((pngGetNextIDATScanline(&state) == 1) && (status == IBS_NO_ERROR))

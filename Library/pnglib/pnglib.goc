@@ -14,7 +14,7 @@ VMBlockHandle _pascal _export pngConvertFile(FileHandle fileHan, VMFileHandle vm
 {
     IHDRData ihdrData = {0};
     VMBlockHandle vmBlock = NullHandle;
-    IDATChunkEntry idatChunks[MAX_IDAT_CHUNKS] = {0};
+    MemHandle idatChunksHan = NullHandle;
     int idatNumChunks = 0;
     PLTEChunkEntry plteChunk = {0};
     IDATState state = {0};
@@ -23,7 +23,7 @@ VMBlockHandle _pascal _export pngConvertFile(FileHandle fileHan, VMFileHandle vm
     if (pngCheckHeader(fileHan))
     {
         // Read PNG Chunks, get overview
-        if (pngProcessChunks(fileHan, &ihdrData, &idatChunks, &idatNumChunks, &plteChunk))
+        if (pngProcessChunks(fileHan, &ihdrData, &idatChunksHan, &idatNumChunks, &plteChunk))
         {
             fmt = pngWhatOutputFormat(ihdrData.colorType, ihdrData.bitDepth);
             if (fmt != 0)
@@ -35,7 +35,7 @@ VMBlockHandle _pascal _export pngConvertFile(FileHandle fileHan, VMFileHandle vm
                 pngHandlePalette(fileHan, plteChunk, vmFile, vmBlock, ihdrData.colorType, ihdrData.bitDepth);
 
                 // Initialize the IDAT state
-                pngInitIDATProcessingState(&state, fileHan, idatChunks, idatNumChunks, ihdrData);
+                pngInitIDATProcessingState(&state, fileHan, idatChunksHan, idatNumChunks, ihdrData);
 
                 // Process each scanline
                 while (pngGetNextIDATScanline(&state) == 1)
@@ -83,10 +83,14 @@ int _pascal _export pngCheckHeader(FileHandle file)
 }
 
 // main function for processing PNG-Chunks
-int _pascal _export pngProcessChunks(FileHandle file, IHDRData* ihdrData, IDATChunkEntry (*idatChunks)[MAX_IDAT_CHUNKS], int *idatNumChunks, PLTEChunkEntry* plteChunk)
+int _pascal _export pngProcessChunks(FileHandle file, IHDRData* ihdrData, MemHandle* idatChunksHan, int *idatNumChunks, PLTEChunkEntry* plteChunk)
 {
     ChunkHeader chdr = {0};
     int idatChunkIdx = 0;
+    IDATChunkEntry* idatChunks;
+
+    // create memory for array of IDATChunks
+    *idatChunksHan = MemAlloc(MAX_IDAT_CHUNKS * sizeof(IDATChunkEntry), HF_SWAPABLE | HF_SHARABLE, HAF_ZERO_INIT);
 
 	// make sure we start at the beginning, but after the PNG header
 	FilePos(file, sizeof(PNG_SIGNATURE), FILE_POS_START);
@@ -135,8 +139,10 @@ int _pascal _export pngProcessChunks(FileHandle file, IHDRData* ihdrData, IDATCh
             {
                 if (idatChunkIdx < MAX_IDAT_CHUNKS) // Prevent buffer overflow
                 {
-                    (*idatChunks)[idatChunkIdx].length = chdr.length;
-                    (*idatChunks)[idatChunkIdx].chunkPos = FilePos(file, 0, FILE_POS_RELATIVE); // Store current position
+                    idatChunks = MemLock(*idatChunksHan);
+                    idatChunks[idatChunkIdx].length = chdr.length;
+                    idatChunks[idatChunkIdx].chunkPos = FilePos(file, 0, FILE_POS_RELATIVE); // Store current position
+                    MemUnlock(*idatChunksHan);
 
                     idatChunkIdx++;
                     *idatNumChunks = idatChunkIdx;
@@ -174,10 +180,11 @@ int _pascal _export pngProcessChunks(FileHandle file, IHDRData* ihdrData, IDATCh
 }
 
 // init the IDAT processing structure
-void _pascal _export pngInitIDATProcessingState(IDATState* state, FileHandle file, IDATChunkEntry* idatChunks, int idatNumChunks, IHDRData ihdr)
+void _pascal _export pngInitIDATProcessingState(IDATState* state, FileHandle file, MemHandle idatChunksHan, int idatNumChunks, IHDRData ihdr)
 {
     // how many bytes to allocate for a scanline
     unsigned long allocSize = NULL;
+    IDATChunkEntry* idatChunks;
 
     // Initialize the zlib stream
     state->strm.zalloc = Z_NULL;
@@ -236,10 +243,12 @@ void _pascal _export pngInitIDATProcessingState(IDATState* state, FileHandle fil
 
     state->idatNumChunks = idatNumChunks;
     state->idatChunkIdx = 0;
-    memcpy(state->idatChunks, idatChunks, state->idatNumChunks * sizeof(IDATChunkEntry));
+    state->idatChunksHan = idatChunksHan;
 
-    state->length = state->idatChunks[state->idatChunkIdx].length;
-    FilePos(state->file, state->idatChunks[state->idatChunkIdx].chunkPos, FILE_POS_START);
+    idatChunks = MemLock(state->idatChunksHan);
+    state->length = idatChunks[state->idatChunkIdx].length;
+    FilePos(state->file, idatChunks[state->idatChunkIdx].chunkPos, FILE_POS_START);
+    MemUnlock(idatChunksHan);
 }
 
 // temporarily unlock the memory not needed for just putting out the pixels we just decoded
@@ -398,11 +407,15 @@ int _pascal _export pngGetNextIDATScanline(IDATState* state)
 
 int nextIDATChunk(IDATState* state)
 {
+    IDATChunkEntry* idatChunks;
+
     if (state->idatChunkIdx + 1 < state->idatNumChunks) // zero based!
     {
         state->idatChunkIdx++;
-        state->length = state->idatChunks[state->idatChunkIdx].length;
-        FilePos(state->file, state->idatChunks[state->idatChunkIdx].chunkPos, FILE_POS_START);
+        idatChunks = MemLock(state->idatChunksHan);
+        state->length = idatChunks[state->idatChunkIdx].length;
+        FilePos(state->file, idatChunks[state->idatChunkIdx].chunkPos, FILE_POS_START);
+        MemUnlock(state->idatChunksHan);
         return 1;
     }
 
@@ -415,6 +428,7 @@ void _pascal _export pngCleanupIDATProcessingState(IDATState* state)
     MemFree(state->inHan);
     MemFree(state->outHan);
     MemFree(state->currentRowHan);
+    MemFree(state->idatChunksHan);
     MemFree(state->previousRowHandle);
 }
 
