@@ -1,10 +1,10 @@
 /**
  ********************************************************************
- A (simple and incomplete) PNG import libray for PC/GEOS.
+ A simple and pretty incomplete PNG import libray for PC/GEOS.
  Started in 08/2024 by MeyerK for the FreeGEOS project.
 
- The code itself was written from scratch, but relying heavily
- on ChatGPT.
+ The code itself was written from scratch - relying heavily
+ on ChatGPT for the PNG-specific parts.
  ********************************************************************
  */
 
@@ -15,7 +15,7 @@ VMBlockHandle _pascal _export pngConvertFile(FileHandle fileHan, VMFileHandle vm
 {
     IHDRData ihdrData = {0};
     VMBlockHandle vmBlock = NullHandle;
-    MemHandle idatChunksHan = NullHandle;
+    MemHandle idatChunksHan = NullHandle; // this is freed via pngCleanupIDATProcessingState!
     int idatNumChunks = 0;
     PLTEChunkEntry plteChunk = {0};
     IDATState state = {0};
@@ -529,6 +529,7 @@ void _pascal _export pngHandlePalette(FileHandle file, PLTEChunkEntry plteChunk,
     }
 }
 
+// determine which GEOS bitmap format to create
 BMFormat _pascal _export pngWhatOutputFormat(unsigned char colorType, unsigned char bitDepth)
 {
     BMFormat output = 0;
@@ -614,6 +615,7 @@ BMFormat _pascal _export pngWhatOutputFormat(unsigned char colorType, unsigned c
     return output;
 }
 
+// create the GEOS Bitmap
 VMBlockHandle _pascal _export pngInitiateOutputBitmap(VMFileHandle vmFile, IHDRData ihdrData, BMFormat fmt)
 {
     GStateHandle bmstate;
@@ -632,40 +634,7 @@ VMBlockHandle _pascal _export pngInitiateOutputBitmap(VMFileHandle vmFile, IHDRD
     return vmBlock;
 }
 
-/**
- * GEOS Format Transformations
- ********************************************************************
- */
-
-// 1 BIT: BMF_MONO | BMT_COMPLEX | BMT_PALETTE
-//         black & white
-//
-// 4 BIT: BMF_4BIT | BMT_COMPLEX | BMT_PALETTE
-//         1 bit (2 color) paletted => add padding
-//         2 bit (4 color) paletted => add padding
-//         4 bit (16 color) paletted
-//
-//         2 bit (4 level) grayscale => add padding, use grayscale palette
-//         4 bit (16 level) grayscale => use grayscale palette
-//
-//
-// 8 BIT: BMF_8BIT | BMT_COMPLEX | BMT_PALETTE
-//         8 bit (256 color) paletted
-//
-//         8 bit (256 level) grayscale => use grayscale palette
-//         16 bit (64k level) grayscale => downcycle to 8-bit, then use 8 bit grayscale palette
-//
-//         8 bit grayscale + 8 bit alpha-channel => use grayscale palette, blend with alpha
-//         16 bit grayscale + 16 bit alpha-channel  => downcycle to 8-bit, then use 8 bit grayscale palette, then blend with alpha
-//
-//
-// 24 BIT: BMF_24BIT | BMT_COMPLEX
-//         3x8 bits rgb color
-//         3x16 bits rgb color => downcycle to 8 bit
-//
-//         3x8 bits rgb color + 8 bit alpha-channel => remove alpha by blending in with white
-//         3x16 bits rgb color + 16 bit alpha-channel => downcycle to 8 bit / channel => remove alpha by blending in with white
-//
+// transform the original bitmap data for the target GEOS format
 void _pascal _export pngApplyGEOSFormatTransformations(IDATState* state)
 {
     RGBValue blendColor = {255, 255, 255};
@@ -676,11 +645,12 @@ void _pascal _export pngApplyGEOSFormatTransformations(IDATState* state)
     // Remove any alpha channel
     removeAlphaChannel(state->currentRow, state->ihdr.width, state->ihdr.colorType, blendColor);
 
-    // add "padding" to 1- and 2-bitted paletted / indexed data bytes or to 2-bitted grayscale values
+    // add "padding" to 1- and 2-bitted paletted data bytes or to 2-bitted grayscale values
     pad_1bit_to_4bit(state->currentRow, state->ihdr.width, state->ihdr.colorType, state->ihdr.bitDepth);
     pad_2bit_to_4bit(state->currentRow, state->ihdr.width, state->ihdr.colorType, state->ihdr.bitDepth);
 }
 
+// write a scanline to the VMFile
 void _pascal _export pngWriteScanlineToBitmap(VMFileHandle vmFile, VMBlockHandle vmBlock, unsigned long lineNo, unsigned char* rowData)
 {
     void *lineptr;
@@ -744,6 +714,7 @@ unsigned long calcBytesPerPixel(unsigned char colorType, unsigned char bitDepth)
     return calcBytesPerRow(1, colorType, bitDepth);
 }
 
+// reduce 16 bit values to 8 bit, GEOS doesn't know about 16 bit ;-)
 void convert16BitLineTo8Bit(unsigned char *line, unsigned long width, unsigned char colorType, unsigned char bitDepth)
 {
     // Variable declarations
@@ -873,6 +844,7 @@ void convert16BitLineTo8Bit(unsigned char *line, unsigned long width, unsigned c
     MemFree(dstHan);
 }
 
+// remove the alpha channel, for now. blend it with a blendColor
 void removeAlphaChannel(unsigned char *data, unsigned long width, int colorType, RGBValue blendColor)
 {
     unsigned long j;
@@ -936,7 +908,9 @@ void pad_1bit_to_4bit(unsigned char *input, unsigned int width, unsigned char co
     MemHandle outputHan = NullHandle;
     unsigned char* output;
 
-    // Apply only to paletted colorTypes and only if bitDepth is 1. PNG_COLOR_TYPE_GREY and 1bit == MONO, and GEOS knows that naturally
+    // Apply only to paletted colorTypes and only if bitDepth is 1.
+    // we don't need to convert PNG_COLOR_TYPE_GREY at 1-bit, as this is MONO
+    // and GEOS has its own format for this
     if (
          (colorType == PNG_COLOR_TYPE_PALETTE) && (bitDepth == 1)
        )
@@ -1032,7 +1006,7 @@ void pad_2bit_to_4bit(unsigned char *input, unsigned int width, unsigned char co
     }
 }
 
-// Unfilter-Funktion zur Verarbeitung der PNG-Bilddaten
+// Unfilter-Funktion for processing PNG image data, basically the heart of PNG
 static void unfilterRow(unsigned char *data, unsigned char *previousRow, unsigned long bytesPerPixel, unsigned long rowBytes)
 {
     unsigned char *currentRow = data;
@@ -1081,7 +1055,7 @@ static void unfilterRow(unsigned char *data, unsigned char *previousRow, unsigne
     }
 }
 
-// Paeth-Prädiktor-Funktion
+// Paeth-Prädiktor-Function
 static inline unsigned char paethPredictor(int a, int b, int c)
 {
     int p = a + b - c;
@@ -1094,6 +1068,7 @@ static inline unsigned char paethPredictor(int a, int b, int c)
     else return (unsigned char)c;
 }
 
+// swap endianness
 static inline unsigned long swapEndian(unsigned long val)
 {
     return ((val >> 24) & 0x000000FF) |
@@ -1102,6 +1077,7 @@ static inline unsigned long swapEndian(unsigned long val)
            ((val << 24) & 0xFF000000);
 }
 
+// abs function, GEOS probably has one somewhere...
 static inline int abs(int x)
 {
     return x >= 0 ? x : -x;
