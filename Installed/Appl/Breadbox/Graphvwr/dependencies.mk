@@ -163,7 +163,7 @@ bmpview.eobj: stdapp.goh object.goh ui.goh Objects/metaC.goh \
                 Objects/gItemC.goh Objects/gBoolC.goh \
                 Objects/gGadgetC.goh Objects/gToolCC.goh \
                 Objects/gValueC.goh Objects/gToolGC.goh \
-                Objects/helpCC.goh Objects/gViewCC.goh \
+                Objects/helpCC.goh Objects/gViewCC.goh Objects/colorC.goh \
                 statbar/statbar.goh MAIN/strings.goh bvdirmon.goh \
                 thumbdb.h token.goh bvdirup.goh
 bmpview.obj \
@@ -180,4 +180,4 @@ bmpview.eobj: geos.h heap.h geode.h resource.h ec.h object.h lmem.h \
 quant.obj \
 quant.eobj: Ansi/string.h geos.h GRAPH/quant.h color.h heap.h
 
-graphvwrEC.geo graphvwr.geo : geos.ldf ui.ldf ansic.ldf extui.ldf giflib.ldf pnglib.ldf thumbdb.ldf ijgjpeg.ldf 
+graphvwrEC.geo graphvwr.geo : geos.ldf ui.ldf ansic.ldf extui.ldf color.ldf giflib.ldf pnglib.ldf thumbdb.ldf ijgjpeg.ldf 

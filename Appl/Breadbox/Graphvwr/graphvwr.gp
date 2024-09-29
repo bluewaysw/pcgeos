@@ -22,6 +22,7 @@ library geos
 library ui
 library ansic
 library extui
+library color
 
 library giflib
 exempt giflib

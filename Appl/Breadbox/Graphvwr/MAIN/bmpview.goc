@@ -21,6 +21,7 @@
 
 @include <stdapp.goh>
 @include <Objects/gViewCC.goh>
+@include <Objects/colorC.goh>
 #include <IMPBMP/imp_bmp.h>
 @include <statbar/statbar.goh>
 #include <Ansi/string.h>
@@ -349,32 +350,38 @@ FileHandle BVThumbnailDB = 0;
 /**************************************************************************/
 
 @object BVAppClass BVApp = {
-		  GI_visMoniker = list { @BVTextMoniker,
-										 @BVVGAMoniker,
-										 @BVHGAMoniker,
-										 @BVCGAMoniker,
-                               @BVTCMoniker
-								 };
-		  GI_comp = @BVPrimary;
+	GI_visMoniker = list {
+		@BVTextMoniker,
+		@BVVGAMoniker,
+		@BVHGAMoniker,
+		@BVCGAMoniker,
+		@BVTCMoniker
+	};
+	GI_comp = @BVPrimary;
 
-				  gcnList(MANUFACTURER_ID_GEOWORKS,MGCNLT_APP_STARTUP)
-								 = @BVDocumentControl;
-		  gcnList(MANUFACTURER_ID_GEOWORKS, GAGCNLT_WINDOWS)
-						 = @BVPrimary;
-		  gcnList(MANUFACTURER_ID_GEOWORKS, GAGCNLT_SELF_LOAD_OPTIONS)
-						 = @BVViewControl,
-												   @BVEditControl,
-												   @BVDocumentControl,
-												   @BVDisplayControl;
-		  gcnList(MANUFACTURER_ID_GEOWORKS, GAGCNLT_STARTUP_LOAD_OPTIONS)
-						 = @BVOptionGroup,
-						   @BVViewOptGroup,
-						   @BVImpFileShowTools;
+	gcnList(MANUFACTURER_ID_GEOWORKS,MGCNLT_APP_STARTUP) = @BVDocumentControl;
 
-		  gcnList(MANUFACTURER_ID_GEOWORKS, MGCNLT_ACTIVE_LIST)
-												 = @BVViewControl,
-												   @BVDocumentControl,
-												   @BVDisplayControl;
+	gcnList(MANUFACTURER_ID_GEOWORKS, GAGCNLT_WINDOWS) = @BVPrimary;
+
+	gcnList(MANUFACTURER_ID_GEOWORKS, GAGCNLT_SELF_LOAD_OPTIONS) =
+		@BVViewControl,
+		@BVEditControl,
+		@BVDocumentControl,
+		@BVDisplayControl,
+		@NoidColorControl;
+
+	gcnList(MANUFACTURER_ID_GEOWORKS, GAGCNLT_STARTUP_LOAD_OPTIONS) =
+		@BVOptionGroup,
+		@BVViewOptGroup,
+		@BVImpFileShowTools,
+		@NoidColorControl;
+
+	gcnList(MANUFACTURER_ID_GEOWORKS, MGCNLT_ACTIVE_LIST) =
+		@BVViewControl,
+		@BVDocumentControl,
+		@BVDisplayControl,
+		@NoidColorControl;
+
 
 @ifdef NEWDEAL_MEDIA_VIEWER
 		  ATTR_GEN_INIT_FILE_CATEGORY = "MediaViewer";
@@ -649,12 +656,28 @@ FileHandle BVThumbnailDB = 0;
 /**************************************************************************/
 
 @object GenInteractionClass BVOptionMenu = {
-		  GII_visibility = GIV_POPUP;
-		  GI_comp = @BVOptionGroup,
-							@BVDialogsGroup,
-							@BVOptionSaveGroup;
-		  ATTR_GEN_INTERACTION_GROUP_TYPE = (GIGT_OPTIONS_MENU);
-}
+		GII_visibility = GIV_POPUP;
+		GI_comp = 	@BVOptionGroup,
+		  		@NoidColorControl,
+				@BVDialogsGroup,
+				@BVOptionSaveGroup;
+		ATTR_GEN_INTERACTION_GROUP_TYPE = (GIGT_OPTIONS_MENU);
+};
+
+/**************************************************************************/
+@object ColorSelectorClass NoidColorControl = {
+	GI_visMoniker = "Set PNG Blend Color";
+	GI_states = @default | GS_USABLE | GS_ENABLED;
+	CSI_color = {C_WHITE, CF_INDEX, 0, 0};
+
+	GCI_output = (TO_APP_TARGET);
+	GII_visibility = GIV_DIALOG;
+	ATTR_GEN_CONTROL_PROHIBIT_UI = (CSF_OTHER |
+					CSF_PATTERN |
+					CSF_DRAW_MASK);
+	HINT_DRAW_IN_BOX;
+    	HINT_PLACE_MONIKER_ABOVE;
+};
 
 /**************************************************************************/
 
@@ -1949,10 +1972,6 @@ PasteCommon(ClipboardItemFlags transferFlags, optr oself, word bvattrs)
   strcpy(pself->BVImpForm, srcform);
   strcpy(pself->BVName ,name);
 
-
-  SwatStop();
-
-
   if((pallen != 0)&&((type&BMT_PALETTE) != 0))
   {
 	 palmem = MemAlloc(240*3, 0, 0);
@@ -2291,6 +2310,7 @@ PasteCommon(ClipboardItemFlags transferFlags, optr oself, word bvattrs)
 	word count;
 /*	FileLongName tempName; */
 /*	optr display; */
+	ColorQuad cq = {0};
 
 	MemLock(OptrToHandle(@BVImportingText));
 	strcpy(string, LMemDeref(@BVImportingText));
@@ -2317,6 +2337,11 @@ PasteCommon(ClipboardItemFlags transferFlags, optr oself, word bvattrs)
 	para.IBP_dest = VMOpen(pself->BVTempName, VMAF_FORCE_READ_WRITE, VMO_TEMP_FILE, 0);
 	FilePopDir();
 	para.IBP_status = @BVImportStatus;
+
+
+	// @call NoidColorControl::MSG_COLOR_SELECTOR_GET_COLOR(&cq);
+	// SwatStop();
+
 
 	status = Imp_BmpProcessFile(&para, IBF_AUTO);
 
