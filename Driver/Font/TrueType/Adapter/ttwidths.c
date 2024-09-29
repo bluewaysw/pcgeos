@@ -67,6 +67,8 @@ static void AdjustFontBuf( TransformMatrix*     transMatrix,
 static Boolean IsRegionNeeded( TransformMatrix* transMatrix, 
                         FontBuf*                fontBuf );
 
+extern void InitConvertHeader( TRUETYPE_VARS, FontHeader* fontHeader );
+
 static void FillKerningFlags( FontHeader* fontHeader, FontBuf* fontBuf );
 
 
@@ -158,6 +160,8 @@ EC(     ECCheckBounds( (void*)fontHeader ) );
 
         if( TrueType_Lock_Face(trueTypeVars, trueTypeOutline) )
                 goto Fail;
+
+        InitConvertHeader( trueTypeVars, fontHeader );
 
         /* alloc Block for FontBuf, CharTableEntries, KernPairs and kerning values */
         size = AllocFontBlock( sizeof( TransformMatrix ), 
@@ -590,7 +594,7 @@ static word AllocFontBlock( word        additionalSpace,
         if( *fontHandle == NullHandle )
         {
                 *fontHandle = MemAllocSetOwner( FONT_MAN_ID, MAX_FONTBUF_SIZE, 
-                        HF_SWAPABLE | HF_SHARABLE | HF_DISCARDABLE,
+                        HF_SWAPABLE | HF_SHARABLE,
                         HAF_NO_ERR | HAF_LOCK | HAF_ZERO_INIT );
 EC(             ECCheckMemHandle( *fontHandle ) );
                 HandleP( *fontHandle );

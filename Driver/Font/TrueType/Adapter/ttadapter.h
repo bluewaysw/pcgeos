@@ -341,6 +341,7 @@ typedef struct
 
 typedef struct
 {
+    Boolean                     FH_initialized;
     word                        FH_h_height;        //top of 'H'
     word                        FH_x_height;        //top of 'x'
     word                        FH_ascender;        //top of 'd'

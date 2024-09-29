@@ -57,7 +57,7 @@ static word getNameFromNameTable(
                                 char*      name, 
                                 TT_UShort  nameIndex );
 
-static void ConvertHeader(      TRUETYPE_VARS, FontHeader* fontHeader );
+void InitConvertHeader(         TRUETYPE_VARS, FontHeader* fontHeader );
 
 static char GetDefaultChar(     TRUETYPE_VARS, char firstChar );
 
@@ -379,7 +379,7 @@ EC(     ECCheckFileHandle( truetypeFile ) );
 	
                 /* fill FontHeader */
                 fontHeader = LMemDerefHandles( fontInfoBlock, fontHeaderChunk );
-                ConvertHeader( trueTypeVars, fontHeader );
+                memset(fontHeader, 0, sizeof(FontHeader));
 
 		fontInfo->FI_outlineTab = sizeof( FontInfo );
 		fontInfo->FI_outlineEnd = sizeof( FontInfo ) + sizeof( OutlineDataEntry );
@@ -440,7 +440,7 @@ EC(     ECCheckFileHandle( truetypeFile ) );
 
                 /* fill FontHeader */
                 fontHeader = LMemDerefHandles( fontInfoBlock, fontHeaderChunk );
-                ConvertHeader( trueTypeVars, fontHeader );
+                memset(fontHeader, 0, sizeof(FontHeader));
    
 		fontInfo = LMemDeref( ConstructOptr(fontInfoBlock, fontInfoChunk) );
         	fontInfo->FI_outlineEnd += sizeof( OutlineDataEntry );
@@ -819,7 +819,7 @@ static word getNameFromNameTable( TRUETYPE_VARS, char* name, TT_UShort nameID )
 
 
 /********************************************************************
- *                      ConvertHeader
+ *                      InitConvertHeader
  ********************************************************************
  * SYNOPSIS:	  Converts information from a TrueType font into a 
  *                FreeGEOS FontHeader.
@@ -840,14 +840,16 @@ static word getNameFromNameTable( TRUETYPE_VARS, char* name, TT_UShort nameID )
  *      21/01/23  JK        Initial Revision
  *******************************************************************/
 
-static void ConvertHeader( TRUETYPE_VARS, FontHeader* fontHeader )
+void InitConvertHeader( TRUETYPE_VARS, FontHeader* fontHeader )
 {
         TT_UShort           charIndex;
         word                geosChar;
 
 
 EC(     ECCheckBounds( (void*)fontHeader ) );
-        
+
+        if(fontHeader->FH_initialized) return;
+
         /* initialize min, max and avg values in fontHeader */
         fontHeader->FH_minLSB   =  9999;
         fontHeader->FH_maxBSB   = -9999;
@@ -863,7 +865,6 @@ EC(     ECCheckBounds( (void*)fontHeader ) );
         fontHeader->FH_defaultChar = GetDefaultChar( trueTypeVars, fontHeader->FH_firstChar );
         fontHeader->FH_kernCount   = GetKernCount( trueTypeVars );
 
-        TT_New_Instance( FACE, &INSTANCE );
         TT_New_Glyph( FACE, &GLYPH );
 
         for ( geosChar = fontHeader->FH_firstChar; geosChar < fontHeader->FH_lastChar; ++geosChar )
@@ -931,7 +932,6 @@ EC(     ECCheckBounds( (void*)fontHeader ) );
         }
 
         TT_Done_Glyph( GLYPH );
-        TT_Done_Instance( INSTANCE );
 
         fontHeader->FH_avgwidth   = FACE_PROPERTIES.os2->xAvgCharWidth;
         fontHeader->FH_maxwidth   = FACE_PROPERTIES.horizontal->advance_Width_Max;
@@ -947,6 +947,8 @@ EC(     ECCheckBounds( (void*)fontHeader ) );
                 fontHeader->FH_strikePos = 3 * fontHeader->FH_x_height / 5;
         else
                 fontHeader->FH_strikePos = 3 * fontHeader->FH_ascent / 5;
+
+        fontHeader->FH_initialized = TRUE;
 }
 
 
