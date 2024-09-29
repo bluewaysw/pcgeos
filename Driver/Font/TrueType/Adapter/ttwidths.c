@@ -188,7 +188,6 @@ EC(     ECCheckBounds( (void*) fontBuf ) );
         ConvertHeader( trueTypeVars, fontHeader, fontBuf );
 
         /* fill kerning pairs and kerning values */
-        InitGeosCharsInCharMap( CHAR_MAP, &fontBuf->FB_firstChar, &fontBuf->FB_lastChar );
         ConvertKernPairs( trueTypeVars, fontBuf );
 
         /* convert widths and fill CharTableEntries */
@@ -312,7 +311,7 @@ EC(             ECCheckBounds( (void*)charTableEntry ) );
 
 static void FillKerningFlags( FontHeader* fontHeader, FontBuf* fontBuf ) 
 {
-        word       i;
+        word             i;
         KernPair*        kernPair       = (KernPair*) ( ( (byte*)fontBuf ) + fontBuf->FB_kernPairs );
         CharTableEntry*  charTableEntry = (CharTableEntry*) (((byte*)fontBuf) + sizeof( FontBuf ));
 
@@ -353,6 +352,8 @@ static void ConvertKernPairs( TRUETYPE_VARS, FontBuf* fontBuf )
         TT_Kerning        kerningDir;
         word              table;
         TT_Kern_0_Pair*   pairs;
+        MemHandle         lookupTable;
+        LookupEntry*      indices;
         
 
         KernPair*  kernPair  = (KernPair*) ( ( (byte*)fontBuf ) + fontBuf->FB_kernPairs );
@@ -365,6 +366,13 @@ EC(     ECCheckBounds( (void*)kernValue ) );
         /* load kerning directory */
         if( TT_Get_Kerning_Directory( FACE, &kerningDir ) )
                 return;
+
+        /* init lookup table for mapping GEOS chars to tt indices */
+        lookupTable = CreateIndexLookupTable( CHAR_MAP );
+
+        /* get pointer to lookup table */
+        indices = GEO_LOCK( lookupTable );
+EC(     ECCheckBounds( indices ) );
 
         /* search for format 0 subtable */
         for( table = 0; table < kerningDir.nTables; ++table )
@@ -384,10 +392,9 @@ EC(             ECCheckBounds( pairs ) );
 
                 for( i = 0; i < kerningDir.tables->t.kern0.nPairs; ++i )
                 {
-                        char left = getGeosCharForIndex( pairs[i].left );
-                        char right = getGeosCharForIndex( pairs[i].right );
+                        char left = GetGEOSCharForIndex( indices, pairs[i].left );
+                        char right = GetGEOSCharForIndex( indices, pairs[i].right );
 
-                    
                         if( left && right && ABS( pairs[i].value ) > minKernValue )
                         {
                                 WWFixedAsDWord  scaledKernValue;
@@ -408,6 +415,7 @@ EC(             ECCheckBounds( pairs ) );
 
                 GEO_UNLOCK( kerningDir.tables->t.kern0.pairsBlock );
         }
+        DestroyIndexLookupTable( lookupTable );
 }
 
 /********************************************************************

@@ -20,13 +20,22 @@
 
 #include <ttcharmapper.h>
 #include <freetype.h>
+#include <ttmemory.h>
 #include <geos.h>
 #include <unicode.h>
+#include <Ansi/stdlib.h>
 
 #define NUM_CHARMAPENTRIES      ( sizeof(geosCharMap) / sizeof(CharMapEntry) )
 #define MIN_GEOS_CHAR           ( C_SPACE )
 #define MAX_GEOS_CHAR           ( NUM_CHARMAPENTRIES + MIN_GEOS_CHAR )
 #define GEOS_CHAR_INDEX( i )    ( i - MIN_GEOS_CHAR )
+
+
+/***********************************************************************
+ *      internal functions
+ ***********************************************************************/
+
+static int _pascal compareLookupEntries(const void *a, const void *b);
 
 
 //TODO: put geosCharMap into movable ressource
@@ -323,25 +332,67 @@ Boolean isGeosCharPair( word ttIndex_1, word ttIndex_2 )
         return FALSE;
 }
 
-void FillTTIndexesForGeosChars( word* indexPtr, TT_CharMap map, char firstChar, char lastChar )
+
+MemHandle CreateIndexLookupTable(TT_CharMap map )
 {
-        word currentChar;
-        word truetypeIndex;
+        MemHandle     memHandle;
+        LookupEntry*  lookupTable;
+        int           i;
 
 
-        for( currentChar = firstChar; currentChar <= lastChar; ++currentChar )
-                if( truetypeIndex = TT_Char_Index( map, geosCharMap[ currentChar ].unicode ) )
-                        indexPtr[currentChar - firstChar] = truetypeIndex;
+        memHandle = MemAlloc( NUM_CHARMAPENTRIES * sizeof( LookupEntry ),
+                              HF_SHARABLE | HF_SWAPABLE, HAF_LOCK );
+EC(     ECCheckMemHandle( memHandle ) );
+
+        lookupTable = (LookupEntry*)MemDeref( memHandle );
+EC(     ECCheckBounds( lookupTable ) );
+
+        for( i = 0; i < NUM_CHARMAPENTRIES; ++i )
+        {
+                lookupTable[i].ttindex = TT_Char_Index( map, geosCharMap[i].unicode );
+                lookupTable[i].geoscode = (char)i + C_SPACE;
+        }
+
+        qsort(lookupTable, NUM_CHARMAPENTRIES, sizeof(LookupEntry), compareLookupEntries);
+
+        MemUnlock( memHandle );
+        return memHandle;
 }
 
 
-char getGeosCharForIndex( word ttIndex )
+static int _pascal compareLookupEntries( const void *a, const void *b ) 
 {
-        word charIndex;
+    LookupEntry *entryA = (LookupEntry *)a;
+    LookupEntry *entryB = (LookupEntry *)b;
 
-        for( charIndex = 0; charIndex < NUM_CHARMAPENTRIES; ++charIndex )
-                if( ttIndex == geosCharMap[charIndex].ttIndex )
-                        return charIndex + C_SPACE;
-
-                return 0;
+    return (int)entryA->ttindex - (int)entryB->ttindex;
 }
+
+
+static int _pascal compareByIndex( const void *a, const void *b ) 
+{
+    word index = *(word *)a;
+    LookupEntry *entryB = (LookupEntry *)b;
+
+    return (int)index - (int)entryB->ttindex;
+}
+
+word  GetGEOSCharForIndex( LookupEntry* lookupTable, word index )
+{
+        //TODO: Can we use bsearch() here?
+
+    int left = 0;
+    int right = NUM_CHARMAPENTRIES - 1;
+
+    while (left <= right) {
+        int mid = left + (right - left) / 2;
+        if ( lookupTable[mid].ttindex == index )
+            return lookupTable[mid].geoscode; 
+        else if (lookupTable[mid].ttindex < index)
+            left = mid + 1;
+        else
+            right = mid - 1;
+    }
+    return 0;
+}
+
