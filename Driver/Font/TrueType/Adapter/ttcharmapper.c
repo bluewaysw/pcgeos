@@ -269,6 +269,30 @@ CharMapEntry geosCharMap[] =
 };
 
 
+/********************************************************************
+ *                      GeosCharToUnicode
+ ********************************************************************
+ * SYNOPSIS:       Converts a GEOS character code to its corresponding
+ *                 Unicode value.
+ * 
+ * PARAMETERS:     word geosChar
+ *                    The GEOS character code to be converted.
+ * 
+ * RETURNS:        word
+ *                    The corresponding Unicode value, or 0 if the input
+ *                    character code is out of bounds.
+ * 
+ * STRATEGY:       - Check if the GEOS character code is within the valid
+ *                   range.
+ *                 - If valid, retrieve the corresponding Unicode value
+ *                   from the character map.
+ * 
+ * REVISION HISTORY:
+ *      Date      Name      Description
+ *      ----      ----      -----------
+ *      30.09.24  JK        Initial Revision
+ *******************************************************************/
+
 word GeosCharToUnicode( word geosChar )
 {
         if( geosChar < MIN_GEOS_CHAR || geosChar > MAX_GEOS_CHAR )
@@ -277,6 +301,30 @@ word GeosCharToUnicode( word geosChar )
         return geosCharMap[ GEOS_CHAR_INDEX( geosChar ) ].unicode;
 }
 
+
+/********************************************************************
+ *                      GeosCharMapFlag
+ ********************************************************************
+ * SYNOPSIS:       Retrieves the character map flags for a given GEOS
+ *                 character code.
+ * 
+ * PARAMETERS:     word geosChar
+ *                    The GEOS character code for which the flags are needed.
+ * 
+ * RETURNS:        CharMapFlags
+ *                    The flags associated with the GEOS character code,
+ *                    or 0 if the input character code is out of bounds.
+ * 
+ * STRATEGY:       - Verify if the GEOS character code is within the valid
+ *                   character range.
+ *                 - If valid, return the corresponding flags from the
+ *                   character map.
+ * 
+ * REVISION HISTORY:
+ *      Date      Name      Description
+ *      ----      ----      -----------
+ *      30.09.24  JK        Initial Revision
+ *******************************************************************/
 
 CharMapFlags GeosCharMapFlag( word geosChar )
 {
@@ -333,6 +381,30 @@ Boolean isGeosCharPair( word ttIndex_1, word ttIndex_2 )
 }
 
 
+/********************************************************************
+ *                      CreateIndexLookupTable
+ ********************************************************************
+ * SYNOPSIS:       Creates a lookup table for character mapping
+ *                 information based on a given TrueType character map.
+ * 
+ * PARAMETERS:     TT_CharMap map
+ *                    The character map used to create the lookup table.
+ * 
+ * RETURNS:        MemHandle
+ *                    A memory handle for the created lookup table.
+ * 
+ * STRATEGY:       - Allocate memory for the lookup table.
+ *                 - Populate the lookup table by mapping Unicode values
+ *                   to corresponding PC/GEOS character indexes.
+ *                 - Sort the lookup table entries based on TrueType
+ *                   character index for efficient lookup.
+ * 
+ * REVISION HISTORY:
+ *      Date      Name      Description
+ *      ----      ----      -----------
+ *      30.09.24  JK        Initial Revision
+ *******************************************************************/
+
 MemHandle CreateIndexLookupTable(TT_CharMap map )
 {
         MemHandle     memHandle;
@@ -362,37 +434,64 @@ EC(     ECCheckBounds( lookupTable ) );
 
 static int _pascal compareLookupEntries( const void *a, const void *b ) 
 {
-    LookupEntry *entryA = (LookupEntry *)a;
-    LookupEntry *entryB = (LookupEntry *)b;
-
-    return (int)entryA->ttindex - (int)entryB->ttindex;
+        return (int)((LookupEntry *)a)->ttindex - (int)((LookupEntry *)b)->ttindex;
 }
 
 
 static int _pascal compareByIndex( const void *a, const void *b ) 
 {
-    word index = *(word *)a;
-    LookupEntry *entryB = (LookupEntry *)b;
-
-    return (int)index - (int)entryB->ttindex;
+        return (int)(*(word *)a) - (int)((LookupEntry *)b)->ttindex;
 }
+
+
+/********************************************************************
+ *                      GetGEOSCharForIndex
+ ********************************************************************
+ * SYNOPSIS:       Searches the lookup table for a given TrueType
+ *                 character index and returns the corresponding GEOS
+ *                 character code.
+ * 
+ * PARAMETERS:     LookupEntry* lookupTable
+ *                    Pointer to the lookup table containing character
+ *                    mapping information.
+ * 
+ *                 word index
+ *                    The TrueType character index to search for.
+ * 
+ * RETURNS:        word
+ *                    The corresponding GEOS character code, or 0 if
+ *                    the index is not found in the lookup table.
+ * 
+ * STRATEGY:       - Implement a binary search over the sorted lookup table
+ *                   to efficiently find the corresponding GEOS character.
+ *                 - The search iterates by adjusting the left and right
+ *                   bounds until the matching index is found or the search
+ *                   space is exhausted.
+ * 
+ * REVISION HISTORY:
+ *      Date      Name      Description
+ *      ----      ----      -----------
+ *      30.09.24  JK        Initial Revision
+ *******************************************************************/
 
 word  GetGEOSCharForIndex( LookupEntry* lookupTable, word index )
 {
-        //TODO: Can we use bsearch() here?
+        //TODO: Is it worth using bseach() from the stdlib here?
+        //      This function is implemented in assembler, but it would mean 
+        //      that several inter-resource calls are necessary for the search.
 
-    int left = 0;
-    int right = NUM_CHARMAPENTRIES - 1;
+        int left = 0;
+        int right = NUM_CHARMAPENTRIES - 1;
 
-    while (left <= right) {
-        int mid = left + (right - left) / 2;
-        if ( lookupTable[mid].ttindex == index )
-            return lookupTable[mid].geoscode; 
-        else if (lookupTable[mid].ttindex < index)
-            left = mid + 1;
-        else
-            right = mid - 1;
-    }
-    return 0;
+        while (left <= right) {
+                int mid = left + (right - left) >> 1;
+                if ( lookupTable[mid].ttindex == index )
+                        return lookupTable[mid].geoscode; 
+                else if (lookupTable[mid].ttindex < index)
+                        left = mid + 1;
+                else
+                        right = mid - 1;
+        }
+        return 0;
 }
 
