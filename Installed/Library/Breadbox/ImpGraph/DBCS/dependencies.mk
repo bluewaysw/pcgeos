@@ -1,11 +1,11 @@
-ASMIMP.obj \
-ASMIMP.eobj: ASMIMP/asmimpManager.asm \
+DBCS/ASMIMP.obj \
+DBCS/ASMIMP.eobj: ASMIMP/asmimpManager.asm \
                 stdapp.def geos.def geode.def resource.def ec.def lmem.def \
                 object.def graphics.def fontID.def font.def color.def \
-                gstring.def text.def char.def heap.def ui.def file.def \
-                vm.def win.def input.def hwr.def localize.def sllang.def \
-                Objects/processC.def Objects/metaC.def chunkarr.def \
-                geoworks.def gcnlist.def timedate.def \
+                gstring.def text.def char.def unicode.def heap.def ui.def \
+                file.def vm.def win.def input.def hwr.def localize.def \
+                sllang.def Objects/processC.def Objects/metaC.def \
+                chunkarr.def geoworks.def gcnlist.def timedate.def \
                 Objects/Text/tCommon.def stylesh.def iacp.def \
                 Objects/uiInputC.def Objects/visC.def Objects/vCompC.def \
                 Objects/vCntC.def Internal/vUtils.def Objects/genC.def \
@@ -28,8 +28,8 @@ ASMIMP.eobj: ASMIMP/asmimpManager.asm \
                 Objects/emomC.def Objects/emTrigC.def Internal/uProcC.def \
                 product.def iimpgif.def bitmap.def hugearr.def impgif.asm \
                 Internal/heapInt.def Internal/semInt.def sysstats.def
-impfjpeg.obj \
-impfjpeg.eobj: stdapp.goh object.goh ui.goh Objects/metaC.goh \
+DBCS/impfjpeg.obj \
+DBCS/impfjpeg.eobj: stdapp.goh object.goh ui.goh Objects/metaC.goh \
                 Objects/inputC.goh Objects/clipbrd.goh \
                 Objects/uiInputC.goh iacp.goh Objects/winC.goh \
                 Objects/gProcC.goh alb.goh Objects/processC.goh \
@@ -47,8 +47,8 @@ impfjpeg.eobj: stdapp.goh object.goh ui.goh Objects/metaC.goh \
                 Objects/gGadgetC.goh Objects/gToolCC.goh \
                 Objects/gValueC.goh Objects/gToolGC.goh \
                 Objects/helpCC.goh IMPBMP/impjpeg.h htmldrv.h
-impfjpeg.obj \
-impfjpeg.eobj: geos.h heap.h geode.h resource.h ec.h object.h lmem.h \
+DBCS/impfjpeg.obj \
+DBCS/impfjpeg.eobj: geos.h heap.h geode.h resource.h ec.h object.h lmem.h \
                 graphics.h fontID.h font.h color.h gstring.h timer.h vm.h \
                 dbase.h localize.h Ansi/ctype.h timedate.h file.h \
                 sllang.h system.h geoworks.h chunkarr.h Objects/helpCC.h \
@@ -59,8 +59,8 @@ impfjpeg.eobj: geos.h heap.h geode.h resource.h ec.h object.h lmem.h \
                 Ansi/string.h Ansi/stdlib.h product.h IMPBMP/ibcommon.h \
                 htmldrv.h math.h htmlfstr.h awatcher.h htmlprog.h \
                 initfile.h
-impgifc.obj \
-impgifc.eobj: stdapp.goh object.goh ui.goh Objects/metaC.goh \
+DBCS/impgifc.obj \
+DBCS/impgifc.eobj: stdapp.goh object.goh ui.goh Objects/metaC.goh \
                 Objects/inputC.goh Objects/clipbrd.goh \
                 Objects/uiInputC.goh iacp.goh Objects/winC.goh \
                 Objects/gProcC.goh alb.goh Objects/processC.goh \
@@ -79,8 +79,8 @@ impgifc.eobj: stdapp.goh object.goh ui.goh Objects/metaC.goh \
                 Objects/gValueC.goh Objects/gToolGC.goh \
                 Objects/helpCC.goh Ansi/stdio.h IMPBMP/impgif.h \
                 Ansi/string.h ec.h
-impgifc.obj \
-impgifc.eobj: geos.h heap.h geode.h resource.h ec.h object.h lmem.h \
+DBCS/impgifc.obj \
+DBCS/impgifc.eobj: geos.h heap.h geode.h resource.h ec.h object.h lmem.h \
                 graphics.h fontID.h font.h color.h gstring.h timer.h vm.h \
                 dbase.h localize.h Ansi/ctype.h timedate.h file.h \
                 sllang.h system.h geoworks.h chunkarr.h Objects/helpCC.h \
@@ -90,8 +90,8 @@ impgifc.eobj: geos.h heap.h geode.h resource.h ec.h object.h lmem.h \
                 parallDr.h hugearr.h fileEnum.h IMPBMP/ibcommon.h \
                 product.h htmldrv.h math.h htmlfstr.h awatcher.h \
                 htmlprog.h
-impjpeg.obj \
-impjpeg.eobj: stdapp.goh object.goh ui.goh Objects/metaC.goh \
+DBCS/impjpeg.obj \
+DBCS/impjpeg.eobj: stdapp.goh object.goh ui.goh Objects/metaC.goh \
                 Objects/inputC.goh Objects/clipbrd.goh \
                 Objects/uiInputC.goh iacp.goh Objects/winC.goh \
                 Objects/gProcC.goh alb.goh Objects/processC.goh \
@@ -109,8 +109,8 @@ impjpeg.eobj: stdapp.goh object.goh ui.goh Objects/metaC.goh \
                 Objects/gGadgetC.goh Objects/gToolCC.goh \
                 Objects/gValueC.goh Objects/gToolGC.goh \
                 Objects/helpCC.goh IMPBMP/impjpeg.h htmldrv.h
-impjpeg.obj \
-impjpeg.eobj: geos.h heap.h geode.h resource.h ec.h object.h lmem.h \
+DBCS/impjpeg.obj \
+DBCS/impjpeg.eobj: geos.h heap.h geode.h resource.h ec.h object.h lmem.h \
                 graphics.h fontID.h font.h color.h gstring.h timer.h vm.h \
                 dbase.h localize.h Ansi/ctype.h timedate.h file.h \
                 sllang.h system.h geoworks.h chunkarr.h Objects/helpCC.h \
@@ -121,8 +121,8 @@ impjpeg.eobj: geos.h heap.h geode.h resource.h ec.h object.h lmem.h \
                 product.h htmlprog.h jconfig.h jmorecfg.h Ansi/string.h \
                 Ansi/stdlib.h IMPBMP/ibcommon.h htmldrv.h math.h \
                 htmlfstr.h awatcher.h initfile.h
-awatcher.obj \
-awatcher.eobj: stdapp.goh object.goh ui.goh Objects/metaC.goh \
+DBCS/awatcher.obj \
+DBCS/awatcher.eobj: stdapp.goh object.goh ui.goh Objects/metaC.goh \
                 Objects/inputC.goh Objects/clipbrd.goh \
                 Objects/uiInputC.goh iacp.goh Objects/winC.goh \
                 Objects/gProcC.goh alb.goh Objects/processC.goh \
@@ -140,8 +140,8 @@ awatcher.eobj: stdapp.goh object.goh ui.goh Objects/metaC.goh \
                 Objects/gGadgetC.goh Objects/gToolCC.goh \
                 Objects/gValueC.goh Objects/gToolGC.goh \
                 Objects/helpCC.goh
-awatcher.obj \
-awatcher.eobj: geos.h heap.h geode.h resource.h ec.h object.h lmem.h \
+DBCS/awatcher.obj \
+DBCS/awatcher.eobj: geos.h heap.h geode.h resource.h ec.h object.h lmem.h \
                 graphics.h fontID.h font.h color.h gstring.h timer.h vm.h \
                 dbase.h localize.h Ansi/ctype.h timedate.h file.h \
                 sllang.h system.h geoworks.h chunkarr.h Objects/helpCC.h \
@@ -149,8 +149,8 @@ awatcher.eobj: geos.h heap.h geode.h resource.h ec.h object.h lmem.h \
                 Objects/gInterC.h Objects/Text/tCommon.h stylesh.h \
                 driver.h thread.h print.h Internal/spoolInt.h serialDr.h \
                 parallDr.h hugearr.h fileEnum.h awatcher.h
-impgraph.obj \
-impgraph.eobj: stdapp.goh object.goh ui.goh Objects/metaC.goh \
+DBCS/impgraph.obj \
+DBCS/impgraph.eobj: stdapp.goh object.goh ui.goh Objects/metaC.goh \
                 Objects/inputC.goh Objects/clipbrd.goh \
                 Objects/uiInputC.goh iacp.goh Objects/winC.goh \
                 Objects/gProcC.goh alb.goh Objects/processC.goh \
@@ -168,8 +168,8 @@ impgraph.eobj: stdapp.goh object.goh ui.goh Objects/metaC.goh \
                 Objects/gGadgetC.goh Objects/gToolCC.goh \
                 Objects/gValueC.goh Objects/gToolGC.goh \
                 Objects/helpCC.goh STATBAR/statbar.goh impex.goh
-impgraph.obj \
-impgraph.eobj: geos.h heap.h geode.h resource.h ec.h object.h lmem.h \
+DBCS/impgraph.obj \
+DBCS/impgraph.eobj: geos.h heap.h geode.h resource.h ec.h object.h lmem.h \
                 graphics.h fontID.h font.h color.h gstring.h timer.h vm.h \
                 dbase.h localize.h Ansi/ctype.h timedate.h file.h \
                 sllang.h system.h geoworks.h chunkarr.h Objects/helpCC.h \
@@ -181,4 +181,4 @@ impgraph.eobj: geos.h heap.h geode.h resource.h ec.h object.h lmem.h \
                 IMPBMP/impgif.h IMPBMP/ibcommon.h IMPBMP/impjpeg.h \
                 ieCommon.h xlatLib.h Ansi/string.h
 
-impgraphEC.geo impgraph.geo : geos.ldf ansic.ldf ijgjpeg.ldf 
+DBCS/impgraphEC.geo DBCS/impgraph.geo : geos.ldf ansic.ldf ijgjpeg.ldf 
