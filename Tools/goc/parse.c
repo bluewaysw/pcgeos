@@ -4291,79 +4291,80 @@ yyreduce:
 
   case 169:
 
-    { currentMPD |= RetTypeBWReg(MRBWT_AX); }
+    { currentMPD = currentMPD & !MPD_RETURN_TYPE; currentMPD |= RetTypeBWReg(MRBWT_AX); }
 
     break;
 
   case 170:
 
-    { currentMPD |= RetTypeBWReg(MRBWT_CX); }
+    { currentMPD = currentMPD & !MPD_RETURN_TYPE; currentMPD |= RetTypeBWReg(MRBWT_CX); }
 
     break;
 
   case 171:
 
-    { currentMPD |= RetTypeBWReg(MRBWT_DX); }
+    { currentMPD = currentMPD & !MPD_RETURN_TYPE; currentMPD |= RetTypeBWReg(MRBWT_DX); }
 
     break;
 
   case 172:
 
-    { currentMPD |= RetTypeBWReg(MRBWT_BP); }
+    { currentMPD = currentMPD & !MPD_RETURN_TYPE; currentMPD |= RetTypeBWReg(MRBWT_BP); }
 
     break;
 
   case 173:
 
-    { currentMPD |= RetTypeBWReg(MRBWT_AL); }
+    { currentMPD = currentMPD & !MPD_RETURN_TYPE; currentMPD |= RetTypeBWReg(MRBWT_AL); }
 
     break;
 
   case 174:
 
-    { currentMPD |= RetTypeBWReg(MRBWT_AH); }
+    { currentMPD = currentMPD & !MPD_RETURN_TYPE; currentMPD |= RetTypeBWReg(MRBWT_AH); }
 
     break;
 
   case 175:
 
-    { currentMPD |= RetTypeBWReg(MRBWT_CL); }
+    { currentMPD = currentMPD & !MPD_RETURN_TYPE; currentMPD |= RetTypeBWReg(MRBWT_CL); }
 
     break;
 
   case 176:
 
-    { currentMPD |= RetTypeBWReg(MRBWT_CH); }
+    { currentMPD = currentMPD & !MPD_RETURN_TYPE; currentMPD |= RetTypeBWReg(MRBWT_CH); }
 
     break;
 
   case 177:
 
-    { currentMPD |= RetTypeBWReg(MRBWT_DL); }
+    { currentMPD = currentMPD & !MPD_RETURN_TYPE; currentMPD |= RetTypeBWReg(MRBWT_DL); }
 
     break;
 
   case 178:
 
-    { currentMPD |= RetTypeBWReg(MRBWT_DH); }
+    { currentMPD = currentMPD & !MPD_RETURN_TYPE; currentMPD |= RetTypeBWReg(MRBWT_DH); }
 
     break;
 
   case 179:
 
-    { currentMPD |= RetTypeBWReg(MRBWT_BPL); }
+    { currentMPD = currentMPD & !MPD_RETURN_TYPE; currentMPD |= RetTypeBWReg(MRBWT_BPL); }
 
     break;
 
   case 180:
 
-    { currentMPD |= RetTypeBWReg(MRBWT_BPH); }
+    { currentMPD = currentMPD & !MPD_RETURN_TYPE; currentMPD |= RetTypeBWReg(MRBWT_BPH); }
 
     break;
 
   case 181:
 
     {
+	    currentMPD = currentMPD & !MPD_RETURN_TYPE;
 	    currentMPD |= (MRT_DWORD << MPD_RETURN_TYPE_OFFSET) |
 		    	    ((yyvsp[-2].num) << MPD_RET_DWORD_HIGH_OFFSET) |
 	    	    	    ((yyvsp[0].num) << MPD_RET_DWORD_LOW_OFFSET);
@@ -4374,6 +4375,7 @@ yyreduce:
   case 182:
 
     {
+	    currentMPD = currentMPD & !MPD_RETURN_TYPE;
 	    currentMPD |= (MRT_DWORD << MPD_RETURN_TYPE_OFFSET) |
 		    	    ((yyvsp[-2].num) << MPD_RET_DWORD_HIGH_OFFSET) |
 	    	    	    ((yyvsp[0].num) << MPD_RET_DWORD_LOW_OFFSET);
