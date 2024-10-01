@@ -24,6 +24,7 @@ typedef struct
   word          IBP_height;
   BMType        IBP_format;
   char          IBP_impForm[31];
+  RGBValue      IBP_pngBlendColor;
 } ImpBmpParams;
 
 typedef enum

@@ -20,6 +20,7 @@ VMBlockHandle _pascal _export pngConvertFile(FileHandle fileHan, VMFileHandle vm
     PLTEChunkEntry plteChunk = {0};
     IDATState state = {0};
     BMFormat fmt = 0;
+    RGBValue blendColor = {255, 255, 255};
 
     if (pngCheckHeader(fileHan))
     {
@@ -43,7 +44,7 @@ VMBlockHandle _pascal _export pngConvertFile(FileHandle fileHan, VMFileHandle vm
                 {
                     pngPauseIDATProcessing(&state);
 
-                    pngApplyGEOSFormatTransformations(&state);
+                    pngApplyGEOSFormatTransformations(&state, blendColor);
 
                     // Write the processed scanline (without the filter byte) to the VMFile
                     pngWriteScanlineToBitmap(vmFile, vmBlock, state.lineNo - 1, state.currentRow);
@@ -635,15 +636,13 @@ VMBlockHandle _pascal _export pngInitiateOutputBitmap(VMFileHandle vmFile, IHDRD
 }
 
 // transform the original bitmap data for the target GEOS format
-void _pascal _export pngApplyGEOSFormatTransformations(IDATState* state)
+void _pascal _export pngApplyGEOSFormatTransformations(IDATState* state, RGBValue pngBlendColor)
 {
-    RGBValue blendColor = {255, 255, 255};
-
     // Convert any 16-bit channel data to 8-bit, we don't support more than 8-bit per Channel
     convert16BitLineTo8Bit(state->currentRow, state->ihdr.width, state->ihdr.colorType, state->ihdr.bitDepth);
 
     // Remove any alpha channel
-    removeAlphaChannel(state->currentRow, state->ihdr.width, state->ihdr.colorType, blendColor);
+    removeAlphaChannel(state->currentRow, state->ihdr.width, state->ihdr.colorType, pngBlendColor);
 
     // add "padding" to 1- and 2-bitted paletted data bytes or to 2-bitted grayscale values
     pad_1bit_to_4bit(state->currentRow, state->ihdr.width, state->ihdr.colorType, state->ihdr.bitDepth);

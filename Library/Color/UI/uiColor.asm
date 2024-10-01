@@ -184,7 +184,6 @@ REVISION HISTORY:
 ------------------------------------------------------------------------------@
 ColorSelectorGetColor	method dynamic	ColorSelectorClass,
 					MSG_COLOR_SELECTOR_GET_COLOR
-
 	movdw	dxcx, ds:[di].CSI_color
 	clr	ax
 	mov	al, ds:[di].CSI_colorIndeterminate

@@ -147,6 +147,9 @@ word BVFileNumber = 0;
 FileHandle BVThumbnailDB = 0;
 @endif
 
+// Work-around. remove this once the ColorSelector fix is done
+RGBValue pngBlendColor = {0};
+
 /**************************************************************************/
 
 @class BVProcessClass, GenProcessClass;
@@ -670,8 +673,10 @@ FileHandle BVThumbnailDB = 0;
 	GI_states = @default | GS_USABLE | GS_ENABLED;
 	CSI_color = {C_WHITE, CF_INDEX, 0, 0};
 
-	GCI_output = (TO_APP_TARGET);
+	GCI_output = process;
 	GII_visibility = GIV_DIALOG;
+	GII_type = GIT_PROPERTIES;
+
 	ATTR_GEN_CONTROL_PROHIBIT_UI = (CSF_OTHER |
 					CSF_PATTERN |
 					CSF_DRAW_MASK);
@@ -2310,8 +2315,6 @@ PasteCommon(ClipboardItemFlags transferFlags, optr oself, word bvattrs)
 	word count;
 /*	FileLongName tempName; */
 /*	optr display; */
-	ColorQuadFixedForC cq = {0};
-	Boolean ind = 0;
 
 	MemLock(OptrToHandle(@BVImportingText));
 	strcpy(string, LMemDeref(@BVImportingText));
@@ -2338,12 +2341,11 @@ PasteCommon(ClipboardItemFlags transferFlags, optr oself, word bvattrs)
 	para.IBP_dest = VMOpen(pself->BVTempName, VMAF_FORCE_READ_WRITE, VMO_TEMP_FILE, 0);
 	FilePopDir();
 	para.IBP_status = @BVImportStatus;
-
-	// swat stop
-	SwatStop();
+	para.IBP_pngBlendColor = pngBlendColor;
 
 	// fetch selected color
-	ind = (word) @call NoidColorControl::MSG_COLOR_SELECTOR_GET_COLOR(&cq);
+	//SwatStop();
+	//ind = (word) @call NoidColorControl::MSG_COLOR_SELECTOR_GET_COLOR(&cq);
 
 	// start importing
 	status = Imp_BmpProcessFile(&para, IBF_AUTO);
@@ -2473,6 +2475,36 @@ PasteCommon(ClipboardItemFlags transferFlags, optr oself, word bvattrs)
 @method BVDocumentClass, MSG_VIS_RECALC_SIZE
 {
   return(MAKE_SIZE_DWORD(pself->BVBmpWidth, pself->BVBmpHeight));
+}
+
+@method BVProcessClass, MSG_META_COLORED_OBJECT_SET_COLOR
+{
+    // color = colorQuad;
+    // @call NoidViewOwner::MSG_GEN_VIEW_SET_COLOR(color.CQ_redOrIndex,
+ // 	                           color.CQ_info, (color.CQ_green<<8) | color.CQ_blue);
+    // if (myGstate) GrInvalRect(myGstate, 0, 0, maxX, maxY);
+
+	pngBlendColor.RGB_red = colorQuad.CQ_redOrIndex;
+	pngBlendColor.RGB_green = colorQuad.CQ_green;
+	pngBlendColor.RGB_blue = colorQuad.CQ_blue;
+
+	//@send NoidColorControl::MSG_GEN_GUP_INTERACTION_COMMAND(IC_DISMISS);
+	//InitFileWriteData("FreeCell", "tableColor", &colorQuad, sizeof(ColorQuad));
+
+
+	// event = @record null::MSG_BVDOC_PAL_STATE_CHANGED();
+	// @call BVDocumentGroup::MSG_GEN_SEND_TO_CHILDREN(event);
+	// MemLock(OptrToHandle(@BVImportStopped));
+	// UserStandardDialog(
+	//	(char *) 0,
+	//	(char *) 0,
+	//	(char *) 0,
+	//	(char *) 0,
+	//	LMemDeref(@BVImportStopped),
+	//	(GIT_NOTIFICATION << CDBF_INTERACTION_TYPE_OFFSET) |
+	//	(CDT_NOTIFICATION << CDBF_DIALOG_TYPE_OFFSET));
+	//MemUnlock(OptrToHandle(@BVImportStopped));
+
 }
 
 /**************************************************************************/
@@ -3845,6 +3877,7 @@ BVCalcDriveName(char *text, word item)
 
 			FileSetCurrentPath(SP_WASTE_BASKET, ".");
 			para.IBP_dest = VMOpen(tempname, VMAF_FORCE_READ_WRITE, VMO_TEMP_FILE, 0);
+			para.IBP_pngBlendColor = pngBlendColor;
 
 			FilePopDir();
 
