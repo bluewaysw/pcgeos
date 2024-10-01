@@ -154,7 +154,7 @@ typedef struct {
     FileExtendedAttribute   FEAD_attr;	    /* Attribute to get/set */
     void    	    	    *FEAD_value;    /* Pointer to buffer/new value */
     word    	    	    FEAD_size;	    /* Size of buffer/new value */
-    char    	    	    *FEAD_name;	    /* Null-terminated ASCII name of
+    TCHAR    	    	    *FEAD_name;	    /* Null-terminated ASCII name of
 					     * attribute if FEA_CUSTOM */
 } FileExtAttrDesc;
 
@@ -164,7 +164,7 @@ typedef struct {
     FileExtendedAttribute   FEAD_attr;	    /* Attribute to get/set */
     dword    	    	    *FEAD_value;    /* Pointer to buffer/new value */
     word    	    	    FEAD_size;	    /* Size of buffer/new value */
-    char    	    	    *FEAD_name;	    /* Null-terminated ASCII name of
+    TCHAR    	    	    *FEAD_name;	    /* Null-terminated ASCII name of
 					     * attribute if FEA_CUSTOM */
 } FileExtAttrDescLike;
 
@@ -248,17 +248,17 @@ typedef WordFlags FileOpenAndReadFlags;
 /***/
 
 extern word		/* Returns error and sets value for ThreadGetError() */	/*XXX*/
-    _pascal FileCreateDir(const char *name);
+    _pascal FileCreateDir(const TCHAR *name);
 
 /***/
 
 extern word		/* Returns error and sets value for ThreadGetError() */	/*XXX*/
-    _pascal FileCreateDirWithNativeShortName(const char *name);
+    _pascal FileCreateDirWithNativeShortName(const TCHAR *name);
 
 /***/
 
 extern word		/* Returns error and sets value for ThreadGetError() */	/*XXX*/
-    _pascal FileDeleteDir(const char *name);
+    _pascal FileDeleteDir(const TCHAR *name);
 
 /***/
 
@@ -273,7 +273,7 @@ extern void
 /***/
 
 extern DiskHandle	/*XXX*/
-    _pascal FileGetCurrentPath(char *buffer, word bufferSize);
+    _pascal FileGetCurrentPath(TCHAR *buffer, word bufferSize);
 
 /***/
 
@@ -299,15 +299,15 @@ extern void
 /***/
 
 extern DiskHandle			/* Sets value for ThreadGetError() */	/*XXX*/
-    _pascal FileSetCurrentPath(DiskHandle disk, const char *path);
+    _pascal FileSetCurrentPath(DiskHandle disk, const TCHAR *path);
 
 extern DiskHandle			/* Sets value for ThreadGetError() */	/*XXX*/
-    _pascal FileSetCurrentPathRaw(DiskHandle disk, const char *path);
+    _pascal FileSetCurrentPathRaw(DiskHandle disk, const TCHAR *path);
 
 /***/
 
 extern FileHandle			/* Sets value for ThreadGetError() */	
-    _pascal FileOpen(const char *name, FileAccessFlags flags);
+    _pascal FileOpen(const TCHAR *name, FileAccessFlags flags);
 
 /***/
 
@@ -324,7 +324,7 @@ typedef WordFlags FileCreateFlags;
 #define FCF_ACCESS  	    	    0x00ff	/* Filled with FileAccessFlags*/
 
 extern FileHandle			/* Sets value for ThreadGetError() */	
-    _pascal FileCreate(const char *name, FileCreateFlags flags, FileAttrs attributes);
+    _pascal FileCreate(const TCHAR *name, FileCreateFlags flags, FileAttrs attributes);
 
 /***/
 
@@ -341,7 +341,7 @@ extern word		/* Returns error and sets value for ThreadGetError() */	/*XXX*/
 /***/
 
 extern FileHandle			/* Sets value for ThreadGetError() */	/*XXX*/
-    _pascal FileCreateTempFile(const char *dir, 
+    _pascal FileCreateTempFile(const TCHAR *dir, 
 			       FileCreateFlags flags, 
 			       FileAttrs attributes);
 /***/
@@ -352,7 +352,7 @@ extern word	    	/* Returns error and sets value for ThreadGetError() */
 /***/
 
 extern word		/* Returns error and sets value for ThreadGetError() */	/*XXX*/
-    _pascal FileRename(const char *oldName, const char *newame);
+    _pascal FileRename(const TCHAR *oldName, const TCHAR *newame);
 
 /***/
 
@@ -482,16 +482,16 @@ extern DiskHandle			/* Sets value for ThreadGetError() */	/*XXX*/
 /***/
 
 extern FileAttrs			/* Sets value for ThreadGetError() */	/*XXX*/
-    _pascal FileGetAttributes(const char *path);
+    _pascal FileGetAttributes(const TCHAR *path);
 
 /***/
 
 extern word		/* Returns error and sets value for ThreadGetError() */	/*XXX*/
-    _pascal FileSetAttributes(const char *path, FileAttrs attr);
+    _pascal FileSetAttributes(const TCHAR *path, FileAttrs attr);
 
 /***/
 extern word    /* Returns error and sets value for ThreadGetError() */ /*XXX*/
-    _pascal FileGetPathExtAttributes(const char *path, FileExtendedAttribute attr,
+    _pascal FileGetPathExtAttributes(const TCHAR *path, FileExtendedAttribute attr,
 			     void *buffer, word bufSize);
 
 extern word    /* Returns error and sets value for ThreadGetError() */ /*XXX*/
@@ -502,7 +502,7 @@ extern MemHandle  /* Sets value for ThreadGetError() */  /*XXX*/
     _pascal FileGetHandleAllExtAttributes(FileHandle fh, word *numExtAttrs);
 
 extern word    /* Returns error and sets value for ThreadGetError() */ /*XXX*/
-    _pascal FileSetPathExtAttributes(const char *path, FileExtendedAttribute attr,
+    _pascal FileSetPathExtAttributes(const TCHAR *path, FileExtendedAttribute attr,
 			     const void *buffer, word bufSize);
 
 extern word    /* Returns error and sets value for ThreadGetError() */ /*XXX*/
@@ -563,34 +563,34 @@ extern void
 /***/
 
 extern word		/* Returns error and sets value for ThreadGetError() */
-    _pascal FileCopy(const char *source, const char *dest, 
+    _pascal FileCopy(const TCHAR *source, const TCHAR *dest, 
 		     DiskHandle sourceDisk, DiskHandle destDisk);
 
 extern word		/* Returns error and sets value for ThreadGetError() */
-    _pascal FileCopyLocal(const char *source, const char *dest, 
+    _pascal FileCopyLocal(const TCHAR *source, const TCHAR *dest, 
 			  DiskHandle sourceDisk, DiskHandle destDisk);
 
 /***/
 
 extern word		/* Returns error and sets value for ThreadGetError() */
-    _pascal FileMove(const char *source, const char *dest, 
+    _pascal FileMove(const TCHAR *source, const TCHAR *dest, 
 		     DiskHandle sourceDisk, DiskHandle destDisk);
 
 extern word		/* Returns error and sets value for ThreadGetError() */
-    _pascal FileMoveLocal(const char *source, const char *dest, 
+    _pascal FileMoveLocal(const TCHAR *source, const TCHAR *dest, 
 			  DiskHandle sourceDisk, DiskHandle destDisk);
 
 /***/
 
 extern StandardPath	/*XXX*/
-    _pascal FileParseStandardPath(DiskHandle disk, const char **path);
+    _pascal FileParseStandardPath(DiskHandle disk, const TCHAR **path);
 
 /***/
 
 extern DiskHandle	/*XXX*/
-    _pascal FileConstructFullPath(char **buffer, word bufSize,
+    _pascal FileConstructFullPath(TCHAR **buffer, word bufSize,
 					DiskHandle disk,
-					const char *tail,
+					const TCHAR *tail,
 					Boolean addDriveLetter);
 
 /***/
@@ -600,7 +600,7 @@ typedef WordFlags FileResolveStandardPathFlags;
 #define FRSPF_RETURN_FIRST_DIR	    0x0001
 
 extern DiskHandle   	/*XXX*/
-    _pascal FileResolveStandardPath(char **buffer, word bufSize, const char *tail,
+    _pascal FileResolveStandardPath(TCHAR **buffer, word bufSize, const TCHAR *tail,
 			    FileResolveStandardPathFlags flags,
 			    FileAttrs *attrsPtr);
 /***/
@@ -614,42 +614,42 @@ typedef ByteEnum PathCompareType;
 
 extern PathCompareType
  /*XXX*/
-    _pascal FileComparePaths(const char *path1, 
+    _pascal FileComparePaths(const TCHAR *path1, 
 			     	    DiskHandle disk1,
-			     	    const char *path2,
+			     	    const TCHAR *path2,
 			     	    DiskHandle disk2);
 
 extern word
-    _pascal FileCreateLink(const char *path,
+    _pascal FileCreateLink(const TCHAR *path,
 					word targetDiskHandle,
-					const char *targetPath,
+					const TCHAR *targetPath,
 					word targetAttrsFlag);
 extern DiskHandle
-    _pascal FileReadLink(const char *path, const char *targetPath);
+    _pascal FileReadLink(const TCHAR *path, const TCHAR *targetPath);
 
 extern DiskHandle
-    _pascal FileSetLinkExtraData(const char *path,
-					char *buffer,
+    _pascal FileSetLinkExtraData(const TCHAR *path,
+					TCHAR *buffer,
 					word bufSize);
 extern DiskHandle
-    _pascal FileGetLinkExtraData(const char *path,
-					char *buffer,
+    _pascal FileGetLinkExtraData(const TCHAR *path,
+					TCHAR *buffer,
 					word bufSize);
 extern DiskHandle
-    _pascal FileConstructActualPath(char **buffer,
+    _pascal FileConstructActualPath(TCHAR **buffer,
 				    	word bufSize, DiskHandle disk,
-				    	const char _far *tail,
+				    	const TCHAR _far *tail,
 				    	Boolean addDriveLetter);
 extern word  
     /*XXX*/   
- _pascal FileCopyPathExtAttributes(const char *sourcePath,
+ _pascal FileCopyPathExtAttributes(const TCHAR *sourcePath,
 				DiskHandle sourceDisk,
-				const char *destPath,
+				const TCHAR *destPath,
 				DiskHandle destDisk);
 
 extern MemHandle /*XXX*/
  _pascal FileOpenAndRead(FileOpenAndReadFlags flags,
-				const char _far *filename,
+				const TCHAR _far *filename,
 				FileHandle *fh);
 
 
