@@ -487,20 +487,28 @@ Fin:
 /********************************************************************
  *                      isFontResourceIntensive
  ********************************************************************
- * SYNOPSIS:	  Checks if Face can manage with few resources.
+ * SYNOPSIS:       Determines whether the given font is considered
+ *                 resource-intensive based on certain criteria.
  * 
- * PARAMETERS:    face            FreeType face.
+ * PARAMETERS:     TRUETYPE_VARS
+ *                    Cached variables needed by the driver.
  * 
- * RETURNS:       Boolean         TRUE if Face manages with few resources.
+ * RETURNS:        Boolean
+ *                    TRUE if the font is considered resource-intensive.
+ *                    FALSE otherwise.
  * 
- * SIDE EFFECTS:  none
- * 
- * STRATEGY:      
+ * STRATEGY:       - Currently, this function evaluates the resource 
+ *                   intensity of a font based solely on the number 
+ *                   of glyphs it contains.
+ *                 - If the number of glyphs exceeds a defined threshold 
+ *                   (MAX_NUM_GLYPHS), it returns TRUE.
+ *                 - The function is designed to be extensible, allowing 
+ *                   additional criteria to be added in the future.
  * 
  * REVISION HISTORY:
  *      Date      Name      Description
  *      ----      ----      -----------
- *      19/12/23  JK        Initial Revision
+ *      19.12.23  JK        Initial Revision
  *******************************************************************/
 static Boolean isFontResourceIntensive( TRUETYPE_VARS )
 {
@@ -733,16 +741,14 @@ static FontGroup mapFontGroup( TRUETYPE_VARS )
  * PARAMETERS:     TRUETYPE_VARS
  *                    Cached variables needed by the driver.
  *                 FontID* fontID
- *                    Pointer to store the determined or generated 
- *                    FontID.
+ *                    Pointer to store determined or generated FontID.
  * 
  * RETURNS:        Boolean
  *                    TRUE if the FontID was found in `geos.ini`,
  *                    FALSE if a new FontID was generated.
  * 
- * STRATEGY:       - First, attempts to read the `FontID` for the given 
- *                   font family name from the `geos.ini` configuration 
- *                   file.
+ * STRATEGY:       - First, attempts to read `FontID` for the given font
+ *                   family name from the `geos.ini` configuration file.
  *                 - If the `FontID` is found, it is modified by combining 
  *                   it with the TrueType marker (`FM_TRUETYPE`) to indicate 
  *                   the font type.
@@ -780,24 +786,28 @@ static Boolean getFontID( TRUETYPE_VARS, FontID* fontID )
 /********************************************************************
  *                      getFontIDAvailIndex
  ********************************************************************
- * SYNOPSIS:	  Searches all FontsAvailEntries for the passed 
- *                FontID and returns its index. If no FontsAvailEntry 
- *                is found for the FontID, -1 is returned.
+ * SYNOPSIS:       Searches for a given FontID within a list of available
+ *                 fonts and returns its index if found.
  * 
- * PARAMETERS:    fontID          Searched FontID.
- *                fontInfoBlock   Memory block with font information.
+ * PARAMETERS:     FontID fontID
+ *                    The FontID to be searched within the available fonts list.
+ *                 MemHandle fontInfoBlock
+ *                    The memory handle that contains the block of font information.
  * 
- * RETURNS:       sword           Index in FontBlock, if FontID 
- *                                was not found -1 will return.
+ * RETURNS:        sword
+ *                    The index of the FontID if it is found in the fonts available list.
+ *                    Returns -1 if the FontID is not found.
  * 
- * SIDE EFFECTS:  none
- * 
- * STRATEGY:      
+ * STRATEGY:       - Obtain the list of available fonts from the memory block.
+ *                 - Calculate the number of FontsAvailEntry elements.
+ *                 - Iterate through the list to find the matching FontID.
+ *                 - If found, return the current index.
+ *                 - If not found after the iteration, return -1.
  * 
  * REVISION HISTORY:
  *      Date      Name      Description
  *      ----      ----      -----------
- *      21/01/23  JK        Initial Revision
+ *      21.01.23  JK        Initial Revision
  *******************************************************************/
 
 static sword getFontIDAvailIndex( FontID fontID, MemHandle fontInfoBlock )
@@ -822,23 +832,36 @@ static sword getFontIDAvailIndex( FontID fontID, MemHandle fontInfoBlock )
 /********************************************************************
  *                      getNameFromNameTable
  ********************************************************************
- * SYNOPSIS:	  Searches the font's name tables for the given NameID 
- *                and returns its content.
+ * SYNOPSIS:       Extracts a specific name string from the TrueType 
+ *                 font's naming table based on a provided name ID.
  * 
- * PARAMETERS:    TRUETYPE_VARS   Pointer to truetypevar block.
- *                name*           Pointer to result string.
- *                nameID          ID to be searched.
+ * PARAMETERS:     TRUETYPE_VARS
+ *                    Cached variables needed by the driver.
+ *                 char* name
+ *                    Pointer to buffer where the name will be stored.
+ *                 TT_UShort nameID
+ *                    The identifier for the specific name entry being 
+ *                    requested (e.g., family name, style name).
  * 
- * RETURNS:       word            Length of the table entry found.
+ * RETURNS:        word
+ *                    The length of the extracted name. Returns 0 if the 
+ *                    name is not found.
  * 
- * SIDE EFFECTS:  none
- * 
- * STRATEGY:      
+ * STRATEGY:       - Iterate over all name entries in the font's name 
+ *                   table to find entries matching the given nameID.
+ *                 - Prioritize Microsoft Unicode BMP and Macintosh 
+ *                   Roman encodings for English, handling both 16-bit 
+ *                   and 8-bit encoding differences.
+ *                 - Extract the name string, converting UTF-16 to 
+ *                   ASCII where necessary.
+ *                 - If a valid name is found, store it in the buffer 
+ *                   and return its length.
+ *                 - If no match is found, return 0.
  * 
  * REVISION HISTORY:
  *      Date      Name      Description
  *      ----      ----      -----------
- *      21/01/23  JK        Initial Revision
+ *      21.01.23  JK        Initial Revision
  *******************************************************************/
 
 static word getNameFromNameTable( TRUETYPE_VARS, char* name, TT_UShort nameID )
@@ -898,29 +921,38 @@ static word getNameFromNameTable( TRUETYPE_VARS, char* name, TT_UShort nameID )
 /********************************************************************
  *                      InitConvertHeader
  ********************************************************************
- * SYNOPSIS:	  Converts information from a TrueType font into a 
- *                FreeGEOS FontHeader.
+ * SYNOPSIS:       Initializes the `FontHeader` structure with key 
+ *                 metrics from the given TrueType font. This includes
+ *                 character bounds, kerning information, ascent/descent,
+ *                 and other font properties.
  * 
- * PARAMETERS:    TRUETYPE_VARS   Pointer to truetypevar block. 
- *                fontHeader*     Pointer to FontInfo in which the
- *                                converted information is to be stored.
+ * PARAMETERS:     TRUETYPE_VARS
+ *                    Cached variables needed by the driver.
+ *                 FontHeader* fontHeader
+ *                    Pointer to the font header structure to be initialized.
  * 
- * RETURNS:       void
+ * RETURNS:        void
+ *                    No return value, modifies the provided FontHeader.
  * 
- * SIDE EFFECTS:  none
- * 
- * STRATEGY:      
+ * STRATEGY:       - Check if the font header has already been initialized.
+ *                 - Set default extreme values for character metrics.
+ *                 - Calculate the first and last valid characters in the font.
+ *                 - Retrieve the default character and kerning pair count.
+ *                 - Iterate over all valid characters, updating various 
+ *                   metrics including ascent, descent, min/max bounds, etc.
+ *                 - Compute additional metrics such as x-height, h-height, 
+ *                   and specific character positions.
  * 
  * REVISION HISTORY:
  *      Date      Name      Description
  *      ----      ----      -----------
- *      21/01/23  JK        Initial Revision
+ *      21.01.23  JK        Initial Revision
  *******************************************************************/
 
 void InitConvertHeader( TRUETYPE_VARS, FontHeader* fontHeader )
 {
-        TT_UShort           charIndex;
-        word                geosChar;
+        TT_UShort  charIndex;
+        word       geosChar;
 
 
 EC(     ECCheckBounds( (void*)fontHeader ) );
@@ -942,8 +974,6 @@ EC(     ECCheckBounds( (void*)fontHeader ) );
         fontHeader->FH_defaultChar = GetDefaultChar( trueTypeVars, fontHeader->FH_firstChar );
         fontHeader->FH_kernCount   = GetKernCount( trueTypeVars );
 
-        TT_New_Glyph( FACE, &GLYPH );
-
         for ( geosChar = fontHeader->FH_firstChar; geosChar < fontHeader->FH_lastChar; ++geosChar )
         {
                 word unicode = GeosCharToUnicode( geosChar );
@@ -956,9 +986,8 @@ EC(     ECCheckBounds( (void*)fontHeader ) );
                 if ( charIndex == 0 )
                         continue;
 
-                /* load glyph without scaling or hinting */
-                TT_Load_Glyph( INSTANCE, GLYPH, charIndex, 0 );
-                TT_Get_Glyph_Metrics( GLYPH, &GLYPH_METRICS );
+                /* load glyph metrics without scaling or hinting */
+                TT_Get_Index_Metrics( FACE, charIndex, &GLYPH_METRICS );
 
                 //h_height -> check
                 if( unicode == C_LATIN_CAPITAL_LETTER_H )
@@ -1008,8 +1037,6 @@ EC(     ECCheckBounds( (void*)fontHeader ) );
                                 fontHeader->FH_accent = GLYPH_BBOX.yMax;
         }
 
-        TT_Done_Glyph( GLYPH );
-
         fontHeader->FH_avgwidth   = FACE_PROPERTIES.os2->xAvgCharWidth;
         fontHeader->FH_maxwidth   = FACE_PROPERTIES.horizontal->advance_Width_Max;
         fontHeader->FH_accent     = fontHeader->FH_accent - fontHeader->FH_ascent;    
@@ -1032,23 +1059,30 @@ EC(     ECCheckBounds( (void*)fontHeader ) );
 /********************************************************************
  *                      GetDefaultChar
  ********************************************************************
- * SYNOPSIS:	  Returns the default character, if this is not present 
- *                in the face, the first GEOS character in the font is 
- *                the default character.
+ * SYNOPSIS:       Determines the default character for a given TrueType 
+ *                 font, verifying if the standard default character is 
+ *                 available in the font's character map.
  * 
- * PARAMETERS:    TRUETYPE_VARS   Pointer to truetypevar block.
- *                firstChar       First GEOS char in face.
+ * PARAMETERS:     TRUETYPE_VARS
+ *                    Cached variables needed by the driver.
+ *                 char firstChar
+ *                    The fallback character to use if the standard default 
+ *                    character is not present in the font.
  * 
- * RETURNS:       char
+ * RETURNS:        char
+ *                    The character to be used as the default. Returns 
+ *                    DEFAULT_DEFAULT_CHAR if it exists in the font, 
+ *                    otherwise returns firstChar.
  * 
- * SIDE EFFECTS:  none
- * 
- * STRATEGY:      
+ * STRATEGY:       - Check if the default character (DEFAULT_DEFAULT_CHAR) 
+ *                   is present in the font's character map.
+ *                 - If it exists, return DEFAULT_DEFAULT_CHAR.
+ *                 - Otherwise, return the provided firstChar as the fallback.
  * 
  * REVISION HISTORY:
  *      Date      Name      Description
  *      ----      ----      -----------
- *      23/04/23  JK        Initial Revision
+ *      23.04.23  JK        Initial Revision
  *******************************************************************/
 
 static char GetDefaultChar( TRUETYPE_VARS, char firstChar )
@@ -1063,16 +1097,27 @@ static char GetDefaultChar( TRUETYPE_VARS, char firstChar )
 /********************************************************************
  *                      GetKernCount
  ********************************************************************
- * SYNOPSIS:	  Returns the number of kernpairs with chars from 
- *                FreeGEOS char set.
+ * SYNOPSIS:       Retrieves the number of valid kerning pairs for the 
+ *                 current TrueType font, specifically focusing on pairs 
+ *                 where both characters are present in the GEOS character set.
  * 
- * PARAMETERS:    TRUETYPE_VARS   Pointer to truetypevar block.
+ * PARAMETERS:     TRUETYPE_VARS
+ *                    Cached variables needed by the driver.
  * 
- * RETURNS:       word
+ * RETURNS:        word
+ *                    The count of kerning pairs involving GEOS characters.
+ *                    Returns 0 if no valid kerning pairs are found or if 
+ *                    the kerning directory cannot be loaded.
  * 
- * SIDE EFFECTS:  none
- * 
- * STRATEGY:      
+ * STRATEGY:       - Obtain the kerning directory from the TrueType face.
+ *                 - Lock the lookup table containing character mappings.
+ *                 - Iterate through the kerning tables to find a subtable 
+ *                   in format 0.
+ *                 - Check for kerning pairs that meet a minimum threshold 
+ *                   for value, ensuring both characters are present in 
+ *                   the GEOS character set.
+ *                 - Unlock resources when finished and return the count 
+ *                   of valid kerning pairs.
  * 
  * REVISION HISTORY:
  *      Date      Name      Description
@@ -1090,6 +1135,9 @@ static word GetKernCount( TRUETYPE_VARS )
 
         if( TT_Get_Kerning_Directory( FACE, &kerningDir ) )
                 return 0;
+
+        if( kerningDir.nTables == 0 )
+                return 0;        
 
         /* get pointer to lookup table */
         indices = GEO_LOCK( LOOKUP_TABLE );

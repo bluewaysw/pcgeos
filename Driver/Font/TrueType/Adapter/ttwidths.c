@@ -429,6 +429,9 @@ EC(     ECCheckBounds( (void*)kernValue ) );
         if( TT_Get_Kerning_Directory( FACE, &kerningDir ) )
                 return;
 
+        if( kerningDir.nTables == 0 )
+                return;
+
         /* get pointer to lookup table */
         indices = GEO_LOCK( LOOKUP_TABLE );
 EC(     ECCheckBounds( indices ) );

@@ -71,7 +71,7 @@ word  CountValidGeosChars( const TT_CharMap  map,
 
 CharMapFlags  GeosCharMapFlag( const word  geosChar );
 
-MemHandle  CreateIndexLookupTable( TT_CharMap  map );
+MemHandle  CreateIndexLookupTable( const TT_CharMap  map );
 
 word  GetGEOSCharForIndex( const LookupEntry*  lookupTable, const word  index );
 
