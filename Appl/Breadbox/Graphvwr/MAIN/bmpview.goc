@@ -50,9 +50,14 @@ extern VMChain  /*XXX*/
 	_pascal MyVMCopyVMChain(VMFileHandle sourceFile,
 		  VMChain sourceChain,
 		  VMFileHandle destFile);
+
 extern VMChain  /*XXX*/
 	_pascal MyVMFreeVMChain(VMFileHandle sourceFile,
 				  VMChain sourceChain);
+
+extern RGBColorAsDWord  /*XXX*/
+	_pascal MyGrMapColorIndex(GStateHandle gs,Color c);
+
 
 /**************************************************************************/
 
@@ -146,9 +151,6 @@ word BVFileNumber = 0;
 @ifdef OLD_THUMBNAIL_DB
 FileHandle BVThumbnailDB = 0;
 @endif
-
-// Work-around. remove this once the ColorSelector fix is done
-RGBValue pngBlendColor = {0};
 
 /**************************************************************************/
 
@@ -1636,6 +1638,38 @@ CopyCommon(ClipboardItemFlags transferFlags, FileHandle bmpfile,
   }
 }
 
+static void
+getPngBlendColor(RGBValue* blendColor)
+{
+	// typedef struct {
+	// 	word 		CAFR_unused;
+	// 	Boolean 	CAFR_indeterminate;
+	// 	ColorQuad	CAFR_color;
+	// } ColorAndFlagReturn;
+	ColorAndFlagReturn cafr = {0};
+
+	@call NoidColorControl::MSG_COLOR_SELECTOR_GET_COLOR(&cafr);
+
+	// convert INDEX to RGB
+    if(cafr.CAFR_color.CQ_info==CF_INDEX)
+    {
+		RGBColorAsDWord c = MyGrMapColorIndex(0, cafr.CAFR_color.CQ_redOrIndex);
+		blendColor->RGB_red = RGB_RED(c);
+		blendColor->RGB_green = RGB_GREEN(c);
+		blendColor->RGB_blue = RGB_BLUE(c);
+	}
+	else if (cafr.CAFR_color.CQ_info == CF_RGB)
+	{
+		blendColor->RGB_red = cafr.CAFR_color.CQ_redOrIndex;
+		blendColor->RGB_green = cafr.CAFR_color.CQ_green;
+		blendColor->RGB_blue = cafr.CAFR_color.CQ_blue;
+	}
+
+	@call NoidColorControl::MSG_GEN_GUP_INTERACTION_COMMAND(IC_DISMISS);
+	//InitFileWriteData("FreeCell", "tableColor", &colorQuad, sizeof(ColorQuad));
+}
+
+
 /**************************************************************************/
 
 /*
@@ -2310,11 +2344,12 @@ PasteCommon(ClipboardItemFlags transferFlags, optr oself, word bvattrs)
 	ImpBmpStatus status;
 	ImpBmpParams para;
 	char string[255];
-	VMBlockHandle bmpblock;
-/*	GStateHandle gstate;*/
+	// VMBlockHandle bmpblock;
+	// GStateHandle gstate;
 	word count;
-/*	FileLongName tempName; */
-/*	optr display; */
+	//	FileLongName tempName;
+	//	optr display;
+	RGBValue blendColor = {0};
 
 	MemLock(OptrToHandle(@BVImportingText));
 	strcpy(string, LMemDeref(@BVImportingText));
@@ -2341,11 +2376,9 @@ PasteCommon(ClipboardItemFlags transferFlags, optr oself, word bvattrs)
 	para.IBP_dest = VMOpen(pself->BVTempName, VMAF_FORCE_READ_WRITE, VMO_TEMP_FILE, 0);
 	FilePopDir();
 	para.IBP_status = @BVImportStatus;
-	para.IBP_pngBlendColor = pngBlendColor;
 
-	// fetch selected color
-	//SwatStop();
-	//ind = (word) @call NoidColorControl::MSG_COLOR_SELECTOR_GET_COLOR(&cq);
+	getPngBlendColor(&blendColor);
+	para.IBP_pngBlendColor = blendColor;
 
 	// start importing
 	status = Imp_BmpProcessFile(&para, IBF_AUTO);
@@ -2475,36 +2508,6 @@ PasteCommon(ClipboardItemFlags transferFlags, optr oself, word bvattrs)
 @method BVDocumentClass, MSG_VIS_RECALC_SIZE
 {
   return(MAKE_SIZE_DWORD(pself->BVBmpWidth, pself->BVBmpHeight));
-}
-
-@method BVProcessClass, MSG_META_COLORED_OBJECT_SET_COLOR
-{
-    // color = colorQuad;
-    // @call NoidViewOwner::MSG_GEN_VIEW_SET_COLOR(color.CQ_redOrIndex,
- // 	                           color.CQ_info, (color.CQ_green<<8) | color.CQ_blue);
-    // if (myGstate) GrInvalRect(myGstate, 0, 0, maxX, maxY);
-
-	pngBlendColor.RGB_red = colorQuad.CQ_redOrIndex;
-	pngBlendColor.RGB_green = colorQuad.CQ_green;
-	pngBlendColor.RGB_blue = colorQuad.CQ_blue;
-
-	//@send NoidColorControl::MSG_GEN_GUP_INTERACTION_COMMAND(IC_DISMISS);
-	//InitFileWriteData("FreeCell", "tableColor", &colorQuad, sizeof(ColorQuad));
-
-
-	// event = @record null::MSG_BVDOC_PAL_STATE_CHANGED();
-	// @call BVDocumentGroup::MSG_GEN_SEND_TO_CHILDREN(event);
-	// MemLock(OptrToHandle(@BVImportStopped));
-	// UserStandardDialog(
-	//	(char *) 0,
-	//	(char *) 0,
-	//	(char *) 0,
-	//	(char *) 0,
-	//	LMemDeref(@BVImportStopped),
-	//	(GIT_NOTIFICATION << CDBF_INTERACTION_TYPE_OFFSET) |
-	//	(CDT_NOTIFICATION << CDBF_DIALOG_TYPE_OFFSET));
-	//MemUnlock(OptrToHandle(@BVImportStopped));
-
 }
 
 /**************************************************************************/
@@ -3811,6 +3814,7 @@ BVCalcDriveName(char *text, word item)
   ImpBmpStatus status;
   ImpBmpParams para;
   char string[255];
+  RGBValue blendColor = {0};
 
   if(BVFileList != 0)
   {
@@ -3877,7 +3881,9 @@ BVCalcDriveName(char *text, word item)
 
 			FileSetCurrentPath(SP_WASTE_BASKET, ".");
 			para.IBP_dest = VMOpen(tempname, VMAF_FORCE_READ_WRITE, VMO_TEMP_FILE, 0);
-			para.IBP_pngBlendColor = pngBlendColor;
+
+			getPngBlendColor(&blendColor);
+			para.IBP_pngBlendColor = blendColor;
 
 			FilePopDir();
 
