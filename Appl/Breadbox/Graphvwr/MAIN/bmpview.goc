@@ -373,19 +373,19 @@ FileHandle BVThumbnailDB = 0;
 		@BVEditControl,
 		@BVDocumentControl,
 		@BVDisplayControl,
-		@NoidColorControl;
+		@BlendColorControl;
 
 	gcnList(MANUFACTURER_ID_GEOWORKS, GAGCNLT_STARTUP_LOAD_OPTIONS) =
 		@BVOptionGroup,
 		@BVViewOptGroup,
 		@BVImpFileShowTools,
-		@NoidColorControl;
+		@BlendColorControl;
 
 	gcnList(MANUFACTURER_ID_GEOWORKS, MGCNLT_ACTIVE_LIST) =
 		@BVViewControl,
 		@BVDocumentControl,
 		@BVDisplayControl,
-		@NoidColorControl;
+		@BlendColorControl;
 
 
 @ifdef NEWDEAL_MEDIA_VIEWER
@@ -663,14 +663,14 @@ FileHandle BVThumbnailDB = 0;
 @object GenInteractionClass BVOptionMenu = {
 		GII_visibility = GIV_POPUP;
 		GI_comp = 	@BVOptionGroup,
-		  		@NoidColorControl,
+		  		@BlendColorControl,
 				@BVDialogsGroup,
 				@BVOptionSaveGroup;
 		ATTR_GEN_INTERACTION_GROUP_TYPE = (GIGT_OPTIONS_MENU);
 };
 
 /**************************************************************************/
-@object ColorSelectorClass NoidColorControl = {
+@object ColorSelectorClass BlendColorControl = {
 	GI_visMoniker = "Set PNG Blend Color";
 	GI_states = @default | GS_USABLE | GS_ENABLED;
 	CSI_color = {C_WHITE, CF_INDEX, 0, 0};
@@ -1383,17 +1383,6 @@ FileHandle BVThumbnailDB = 0;
 
 /**************************************************************************/
 
-
-
-void SwatStop()
-{
-	return;
-}
-
-
-
-
-
 @method BVProcessClass, MSG_BV_OPTION_STATE_CHANGED
 {
   if((modifiedBooleans & BV_SHOW_TOOLS) != 0)
@@ -1641,14 +1630,9 @@ CopyCommon(ClipboardItemFlags transferFlags, FileHandle bmpfile,
 static void
 getPngBlendColor(RGBValue* blendColor)
 {
-	// typedef struct {
-	// 	word 		CAFR_unused;
-	// 	Boolean 	CAFR_indeterminate;
-	// 	ColorQuad	CAFR_color;
-	// } ColorAndFlagReturn;
 	ColorAndFlagReturn cafr = {0};
 
-	@call NoidColorControl::MSG_COLOR_SELECTOR_GET_COLOR(&cafr);
+	@call BlendColorControl::MSG_COLOR_SELECTOR_GET_COLOR(&cafr);
 
 	// convert INDEX to RGB
     if(cafr.CAFR_color.CQ_info==CF_INDEX)
@@ -1664,9 +1648,6 @@ getPngBlendColor(RGBValue* blendColor)
 		blendColor->RGB_green = cafr.CAFR_color.CQ_green;
 		blendColor->RGB_blue = cafr.CAFR_color.CQ_blue;
 	}
-
-	@call NoidColorControl::MSG_GEN_GUP_INTERACTION_COMMAND(IC_DISMISS);
-	//InitFileWriteData("FreeCell", "tableColor", &colorQuad, sizeof(ColorQuad));
 }
 
 
@@ -1794,6 +1775,7 @@ PasteCommon(ClipboardItemFlags transferFlags, optr oself, word bvattrs)
   char *path;
   char path2[256];
   char path3[256];
+  ColorQuad pngBlendColor = {0};
 
   if((extraState != 0) &&
 	((attachFlags & AAF_RESTORING_FROM_STATE)!=0))
@@ -1925,6 +1907,17 @@ PasteCommon(ClipboardItemFlags transferFlags, optr oself, word bvattrs)
 
   @send BVImpFileDirDrive::MSG_GEN_ITEM_GROUP_SET_SINGLE_SELECTION(drives - count1, FALSE);
 
+@ifdef NEWDEAL_MEDIA_VIEWER
+	stat = InitFileReadDataBuffer("MediaViewer", "pngBlendColor", &pngBlendColor, sizeof(ColorQuad), 0);
+@else
+	stat = InitFileReadDataBuffer("GraphicsViewer", "pngBlendColor", &pngBlendColor, sizeof(ColorQuad), 0);
+@endif
+
+	if (!stat)
+	{
+		@send BlendColorControl::MSG_COLOR_SELECTOR_SET_COLOR(pngBlendColor, FALSE);
+	}
+
   @callsuper();
 }
 
@@ -1964,6 +1957,21 @@ PasteCommon(ClipboardItemFlags transferFlags, optr oself, word bvattrs)
   sdptr->BVSD_attrs = BVAttrs2;
   MemUnlock(extramem);
   return(extramem);
+}
+
+/**************************************************************************/
+@method BVProcessClass, MSG_META_COLORED_OBJECT_SET_COLOR
+{
+
+@ifdef NEWDEAL_MEDIA_VIEWER
+	InitFileWriteData("MediaViewer", "pngBlendColor", &colorQuad, sizeof(ColorQuad));
+@else
+	InitFileWriteData("GraphicsViewer", "pngBlendColor", &colorQuad, sizeof(ColorQuad));
+@endif
+
+  	InitFileCommit();
+
+	@send BlendColorControl::MSG_GEN_GUP_INTERACTION_COMMAND(IC_DISMISS);
 }
 
 /**************************************************************************/
@@ -3749,7 +3757,7 @@ BVCalcDriveName(char *text, word item)
 @else
   InitFileWriteString("GraphicsViewer","dlgPath",&pfad);
 @endif
-  InitFileSave();
+  InitFileCommit();
 }
 
 /**************************************************************************/
