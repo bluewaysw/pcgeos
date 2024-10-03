@@ -38,7 +38,7 @@ static void ProcessFont(        TRUETYPE_VARS,
                                 const char*  file, 
                                 MemHandle    fontInfoBlock );
 
-static Boolean isResourceSaving( TRUETYPE_VARS );
+static Boolean isFontResourceIntensive( TRUETYPE_VARS );
 
 static sword getFontIDAvailIndex( 
                                 FontID     fontID, 
@@ -77,22 +77,27 @@ static int strcmp( const char* s1, const char* s2 );
 /********************************************************************
  *                      Init_FreeType
  ********************************************************************
- * SYNOPSIS:	  Initialises the FreeType Engine with the kerning 
- *                extension. This is the adapter function for DR_INIT.
+ * SYNOPSIS:       Initializes the FreeType library and sets up
+ *                 kerning extensions for subsequent operations.
  * 
- * PARAMETERS:    void
+ * PARAMETERS:     None
  * 
- * RETURNS:       TT_Error        FreeType errorcode (see tterrid.h)
+ * RETURNS:        TT_Error
+ *                    Returns `TT_Err_Ok` on success, or an error code
+ *                    if initialization fails.
  * 
- * SIDE EFFECTS:  none
- * 
- * STRATEGY:      Initialises the FreeType engine by delegating to 
- *                TT_Init_FreeType() and TT_Init_Kerning().
+ * STRATEGY:       - Call `TT_Init_FreeType()` to initialize the core
+ *                   FreeType library.
+ *                 - If the initialization is successful, proceed to
+ *                   initialize the kerning extension using
+ *                   `TT_Init_Kerning_Extension()`.
+ *                 - Return the appropriate error code if the core
+ *                   initialization fails.
  * 
  * REVISION HISTORY:
  *      Date      Name      Description
  *      ----      ----      -----------
- *      7/15/22   JK        Initial Revision
+ *      15.07.22  JK        Initial Revision
  *******************************************************************/
 
 TT_Error _pascal Init_FreeType()
@@ -113,22 +118,22 @@ TT_Error _pascal Init_FreeType()
 /********************************************************************
  *                      Exit_FreeType
  ********************************************************************
- * SYNOPSIS:	  Deinitialises the FreeType Engine. This is the 
- *                adapter function for DR_EXIT.
+ * SYNOPSIS:       Cleans up and deinitializes the FreeType library,
+ *                 releasing all allocated resources.
  * 
- * PARAMETERS:    void
+ * PARAMETERS:     None
  * 
- * RETURNS:       TT_Error        FreeType errorcode (see tterrid.h)
+ * RETURNS:        TT_Error
+ *                    Returns `TT_Err_Ok` on successful cleanup, or an
+ *                    error code if deinitialization fails.
  * 
- * SIDE EFFECTS:  none
- * 
- * STRATEGY:      Deinitialises the FreeType engine by delegating to 
- *                TT_Done_FreeType().
+ * STRATEGY:       - Call `TT_Done_FreeType()` to clean up resources
+ *                   used by the FreeType library.
  * 
  * REVISION HISTORY:
  *      Date      Name      Description
  *      ----      ----      -----------
- *      7/15/22   JK        Initial Revision
+ *      15.07.22  JK        Initial Revision
  *******************************************************************/
 
 TT_Error _pascal Exit_FreeType() 
@@ -136,26 +141,36 @@ TT_Error _pascal Exit_FreeType()
         return TT_Done_FreeType();
 }
 
-
 /********************************************************************
  *                      TrueType_InitFonts
  ********************************************************************
- * SYNOPSIS:	  Search for TTF fonts and register them. This is the 
- *                adapter function for DR_FONT_INIT_FONTS.
+ * SYNOPSIS:       Initializes TrueType fonts by scanning the font 
+ *                 directory and processing detected font files. Updates 
+ *                 the font info and variable blocks with the detected 
+ *                 font information.
  * 
- * PARAMETERS:    fontInfoBlock   MemHandle to fontInfo.
- *                varBlock        MemHandle to truetypeVarBlock.
+ * PARAMETERS:     MemHandle fontInfoBlock
+ *                    Memory handle to the block containing font information.
  * 
- * RETURNS:       void
+ *                 MemHandle varBlock
+ *                    Memory handle to the block containing TrueType variables.
  * 
- * SIDE EFFECTS:  none
+ * RETURNS:        void
  * 
- * STRATEGY:      
+ * STRATEGY:       - Verify the validity of `fontInfoBlock` and `varBlock`.
+ *                 - Lock `varBlock` to retrieve or allocate TrueTypeVars.
+ *                 - Set the current directory to the font TrueType directory.
+ *                 - Detect available font files and enumerate them.
+ *                 - If no files are found, clean up and exit.
+ *                 - Iterate over each detected font file and attempt to
+ *                   register the font using `ProcessFont()`.
+ *                 - Clean up memory, unlock variable block, and restore
+ *                   the original directory.
  * 
  * REVISION HISTORY:
  *      Date      Name      Description
  *      ----      ----      -----------
- *      7/15/22   JK        Initial Revision
+ *      15.07.22  JK        Initial Revision
  *******************************************************************/
 
 void _pascal TrueType_InitFonts( MemHandle fontInfoBlock, MemHandle varBlock )
@@ -205,21 +220,28 @@ Fin:
 /********************************************************************
  *                      DetectFontFiles
  ********************************************************************
- * SYNOPSIS:	  Lists all file names in the current directory.
+ * SYNOPSIS:       Detects and enumerates all TrueType font files in the
+ *                 current directory, storing their information in a memory
+ *                 block.
  * 
- * PARAMETERS:    fileEnumBlock   Handle to the memory block in 
- *                                which the file names are stored.
+ * PARAMETERS:     MemHandle* fileEnumBlock
+ *                    Pointer to a memory handle that will store information
+ *                    about the detected font files.
  * 
- * RETURNS:       word
+ * RETURNS:        word
+ *                    The number of detected font files.
  * 
- * SIDE EFFECTS:  none
- * 
- * STRATEGY:      
+ * STRATEGY:       - Set up the `FileEnumParams` structure to specify
+ *                   attributes for enumeration, such as file names.
+ *                 - Configure enumeration to only search for non-GEOS files.
+ *                 - Pass the configured parameters to `FileEnum()` to detect
+ *                   and list the font files.
+ *                 - Store the results in the memory block provided by `fileEnumBlock`.
  * 
  * REVISION HISTORY:
  *      Date      Name      Description
  *      ----      ----      -----------
- *      14/4/23   JK        Initial Revision
+ *      14.04.23  JK        Initial Revision
  *******************************************************************/
 
 static word DetectFontFiles( MemHandle* fileEnumBlock )
@@ -247,23 +269,33 @@ static word DetectFontFiles( MemHandle* fileEnumBlock )
 /********************************************************************
  *                      ProcessFont
  ********************************************************************
- * SYNOPSIS:	  Registers a font with its styles as an available font.
+ * SYNOPSIS:       Processes a TrueType font file and adds its data to 
+ *                 the font information block if the font is new.
  * 
- * PARAMETERS:    TRUETYPE_VARS   Pointer to truetypevar block.
- *                fileName        Name of font file.
- *                fontInfoBlock   Handle to memory block with all
- *                                infos about aviable fonts.
+ * PARAMETERS:     TRUETYPE_VARS
+ *                    Cached variables needed by the driver.
+ *                 const char* fileName
+ *                    Pointer to the name of the TrueType font file to process.
+ *                 MemHandle fontInfoBlock
+ *                    Handle to the memory block where font information is stored.
  * 
- * RETURNS:       void
+ * RETURNS:        void
  * 
- * SIDE EFFECTS:  none
- * 
- * STRATEGY:      
+ * STRATEGY:       - Open the TrueType font file and validate its face properties.
+ *                 - Retrieve or create entries for the font header, outline,
+ *                   and other font-related data structures.
+ *                 - Allocate necessary memory chunks for font data, ensuring
+ *                   the availability of the font entry.
+ *                 - Populate font metadata, including outline entries, styles,
+ *                   and header information.
+ *                 - Append the newly created font entry or update existing
+ *                   entries in the font information block.
+ *                 - Ensure proper memory allocation and free resources on errors.
  * 
  * REVISION HISTORY:
  *      Date      Name      Description
  *      ----      ----      -----------
- *      20/01/23  JK        Initial Revision
+ *      20.01.23  JK        Initial Revision
  *******************************************************************/
 
 static void ProcessFont( TRUETYPE_VARS, const char* fileName, MemHandle fontInfoBlock )
@@ -293,7 +325,7 @@ EC(     ECCheckFileHandle( truetypeFile ) );
         if ( TT_Get_Face_Properties( FACE, &FACE_PROPERTIES ) )
                 goto Fail;
 
-        if ( !isResourceSaving( trueTypeVars ) )
+        if ( isFontResourceIntensive( trueTypeVars ) )
                 goto Fail;
 
         if ( getCharMap( FACE, &FACE_PROPERTIES, &CHAR_MAP ) )
@@ -453,7 +485,7 @@ Fin:
 
 
 /********************************************************************
- *                      isResourceSaving
+ *                      isFontResourceIntensive
  ********************************************************************
  * SYNOPSIS:	  Checks if Face can manage with few resources.
  * 
@@ -470,32 +502,41 @@ Fin:
  *      ----      ----      -----------
  *      19/12/23  JK        Initial Revision
  *******************************************************************/
-static Boolean isResourceSaving( TRUETYPE_VARS )
+static Boolean isFontResourceIntensive( TRUETYPE_VARS )
 {
         /* At the moment we are only checking the number of glyphs */
         /* in the font. Further checks can be implemented here.    */
 
-        return FACE_PROPERTIES.num_Glyphs < MAX_NUM_GLYPHS;
+        return FACE_PROPERTIES.num_Glyphs > MAX_NUM_GLYPHS;
 }
 
 
 /********************************************************************
  *                      toHash
  ********************************************************************
- * SYNOPSIS:	  Calculates the hash value of the passed string.
+ * SYNOPSIS:       Generates a hash value for a given string, which 
+ *                 is used to help uniquely identify a font.
  * 
- * PARAMETERS:    str             Pointer to the string.
+ * PARAMETERS:     const char* str
+ *                    Pointer to the string for which the hash value 
+ *                    is to be generated.
  * 
- * RETURNS:       word            Hash value for passed string.
+ * RETURNS:        word
+ *                    The computed hash value, mapped within a predefined range.
  * 
- * SIDE EFFECTS:  none
- * 
- * STRATEGY:      
+ * STRATEGY:       - Calculate the initial hash value using the length 
+ *                   of the string.
+ *                 - Iterate over each character of the string and modify 
+ *                   the hash using a multiplier of 7.
+ *                 - Limit the final hash value to a range of 9 bits (0x01f0), 
+ *                   adding 15 to ensure it fits within the designated range 
+ *                   for unique font IDs.
+ *                 - Reserve specific hash values for mapping original Nimbus fonts.
  * 
  * REVISION HISTORY:
  *      Date      Name      Description
  *      ----      ----      -----------
- *      21/01/23  JK        Initial Revision
+ *      21.01.23  JK        Initial Revision
  *******************************************************************/
 
 static word toHash( const char* str )
@@ -521,21 +562,26 @@ static word toHash( const char* str )
 /********************************************************************
  *                      mapFontWeight
  ********************************************************************
- * SYNOPSIS:	  Maps the TrueType font weight class to FreeGEOS 
- *                AdjustedWeight.
+ * SYNOPSIS:       Maps a TrueType weight class value to an internal 
+ *                 adjusted weight classification.
  * 
- * PARAMETERS:    weightClass     TrueType weight class.
+ * PARAMETERS:     TT_Short weightClass
+ *                    The weight class from the TrueType font, typically 
+ *                    ranging from 100 (thin) to 900 (black).
  * 
- * RETURNS:       AdjustedWeight  FreeGEOS AdjustedWeight.
+ * RETURNS:        AdjustedWeight
+ *                    The corresponding internal weight classification.
  * 
- * SIDE EFFECTS:  none
- * 
- * STRATEGY:      
+ * STRATEGY:       - Divide the weight class value by 100 to simplify the mapping.
+ *                 - Use a switch statement to translate the weight class into
+ *                   one of several predefined adjusted weight levels.
+ *                 - Provide default handling to classify any unexpected 
+ *                   values as `AW_ULTRA_BOLD`.
  * 
  * REVISION HISTORY:
  *      Date      Name      Description
  *      ----      ----      -----------
- *      21/01/23  JK        Initial Revision
+ *      21.01.23  JK        Initial Revision
  *******************************************************************/
 
 static AdjustedWeight mapFontWeight( TT_Short weightClass ) 
@@ -567,20 +613,28 @@ static AdjustedWeight mapFontWeight( TT_Short weightClass )
 /********************************************************************
  *                      mapTextStyle
  ********************************************************************
- * SYNOPSIS:	  Maps the TrueType subfamily to FreeGEOS TextStyle.
+ * SYNOPSIS:       Maps a font subfamily name to an internal text 
+ *                 style representation.
  * 
- * PARAMETERS:    subfamily*      String with subfamiliy name. 
+ * PARAMETERS:     const char* subfamily
+ *                    The subfamily name of the font, such as "Bold", 
+ *                    "Italic", etc.
  * 
- * RETURNS:       TextStyle       FreeGEOS TextStyle.
+ * RETURNS:        TextStyle
+ *                    The corresponding internal text style flag.
  * 
- * SIDE EFFECTS:  none
- * 
- * STRATEGY:      
+ * STRATEGY:       - Use a series of `strcmp` comparisons to determine the 
+ *                   corresponding text style based on the subfamily name.
+ *                 - Map common styles like "Regular", "Bold", "Italic", 
+ *                   and combinations like "Bold Italic" and "Oblique" 
+ *                   to their respective internal representations.
+ *                 - Default to `TS_BOLD | TS_ITALIC` for unrecognized 
+ *                   combinations like "Bold Oblique".
  * 
  * REVISION HISTORY:
  *      Date      Name      Description
  *      ----      ----      -----------
- *      21/01/23  JK        Initial Revision
+ *      21.01.23  JK        Initial Revision
  *******************************************************************/
 
 static TextStyle mapTextStyle( const char* subfamily )
@@ -604,20 +658,32 @@ static TextStyle mapTextStyle( const char* subfamily )
 /********************************************************************
  *                      mapFontGroup
  ********************************************************************
- * SYNOPSIS:	  Determines the font goup on different parameters.
+ * SYNOPSIS:       Maps TrueType font properties to an internal 
+ *                 FontGroup representation.
  * 
- * PARAMETERS:    TRUETYPE_VARS   Pointer to truetypevar block.
+ * PARAMETERS:     TRUETYPE_VARS
+ *                    Cached variables needed by the driver.
  * 
- * RETURNS:       FontGroup       Group of the given font.
+ * RETURNS:        FontGroup
+ *                    The determined internal font group classification.
  * 
- * SIDE EFFECTS:  none
- * 
- * STRATEGY:      
+ * STRATEGY:       - The function attempts to approximate the font group 
+ *                   for a TrueType font based on the `os2` properties 
+ *                   of the font, specifically the `panose` array and 
+ *                   `sFamilyClass` fields.
+ *                 - Monospaced fonts are identified if the `panose` 
+ *                   field for proportion equals 9.
+ *                 - Serif, Sans-Serif, Ornament, and Symbol fonts are 
+ *                   identified from `sFamilyClass`.
+ *                 - Script fonts are recognized from the `panose` 
+ *                   family type field.
+ *                 - If no specific group is identified, the font is 
+ *                   classified as `FG_NON_PORTABLE`.
  * 
  * REVISION HISTORY:
  *      Date      Name      Description
  *      ----      ----      -----------
- *      28/11/23  JK        Initial Revision
+ *      28.11.23  JK        Initial Revision
  *******************************************************************/
 
 #define B_FAMILY_TYPE           0
@@ -661,22 +727,33 @@ static FontGroup mapFontGroup( TRUETYPE_VARS )
 /********************************************************************
  *                      getFontID
  ********************************************************************
- * SYNOPSIS:	  If the passed font family is a mapped font, the 
- *                FontID form geos.ini is returned, otherwise we 
- *                calculate new FontID and return it.
+ * SYNOPSIS:       Determines or generates a FontID for the given 
+ *                 TrueType font family.
  * 
- * PARAMETERS:    familyName*     Font family name.
- *
- * RETURNS:       FontID          FontID found in geos.ini or calculated.
+ * PARAMETERS:     TRUETYPE_VARS
+ *                    Cached variables needed by the driver.
+ *                 FontID* fontID
+ *                    Pointer to store the determined or generated 
+ *                    FontID.
  * 
- * SIDE EFFECTS:  none
+ * RETURNS:        Boolean
+ *                    TRUE if the FontID was found in `geos.ini`,
+ *                    FALSE if a new FontID was generated.
  * 
- * STRATEGY:      
+ * STRATEGY:       - First, attempts to read the `FontID` for the given 
+ *                   font family name from the `geos.ini` configuration 
+ *                   file.
+ *                 - If the `FontID` is found, it is modified by combining 
+ *                   it with the TrueType marker (`FM_TRUETYPE`) to indicate 
+ *                   the font type.
+ *                 - If the `FontID` is not found, a new one is generated 
+ *                   using the font group (determined via `mapFontGroup`) 
+ *                   and the family name.
  * 
  * REVISION HISTORY:
  *      Date      Name      Description
  *      ----      ----      -----------
- *      21/01/23  JK        Initial Revision
+ *      21.01.23  JK        Initial Revision
  *******************************************************************/
 
 static Boolean getFontID( TRUETYPE_VARS, FontID* fontID ) 
@@ -859,9 +936,9 @@ EC(     ECCheckBounds( (void*)fontHeader ) );
         fontHeader->FH_accent   = 0;
         fontHeader->FH_ascent   = 0;
 
-        fontHeader->FH_numChars = InitGeosCharsInCharMap( CHAR_MAP, 
-                                                           &fontHeader->FH_firstChar, 
-                                                           &fontHeader->FH_lastChar ); 
+        fontHeader->FH_numChars = CountValidGeosChars( CHAR_MAP, 
+                                                       &fontHeader->FH_firstChar, 
+                                                       &fontHeader->FH_lastChar ); 
         fontHeader->FH_defaultChar = GetDefaultChar( trueTypeVars, fontHeader->FH_firstChar );
         fontHeader->FH_kernCount   = GetKernCount( trueTypeVars );
 
@@ -1009,9 +1086,14 @@ static word GetKernCount( TRUETYPE_VARS )
         word              table;
         TT_Kern_0_Pair*   pairs;
         word              numGeosKernPairs = 0;
+        LookupEntry*      indices;
 
         if( TT_Get_Kerning_Directory( FACE, &kerningDir ) )
-                goto Fail;
+                return 0;
+
+        /* get pointer to lookup table */
+        indices = GEO_LOCK( LOOKUP_TABLE );
+EC(     ECCheckBounds( indices ) );
 
         /* search for format 0 subtable */
         for( table = 0; table < kerningDir.nTables; ++table )
@@ -1020,7 +1102,7 @@ static word GetKernCount( TRUETYPE_VARS )
                 word minKernValue = UNITS_PER_EM / KERN_VALUE_DIVIDENT;
 
                 if( TT_Load_Kerning_Table( FACE, table ) )
-                        goto Fail;
+                        continue;
 
                 if( kerningDir.tables->format != 0 )
                         continue;
@@ -1032,14 +1114,15 @@ static word GetKernCount( TRUETYPE_VARS )
                         if( ABS( pairs[i].value ) < minKernValue )
                                 continue;
 
-                        if( isGeosCharPair( pairs[i].left, pairs[i].right ) )
+                        if ( GetGEOSCharForIndex( indices, pairs[i].left ) && 
+                             GetGEOSCharForIndex( indices, pairs[i].right ) )
                                 ++numGeosKernPairs;
                 }
 
                 GEO_UNLOCK( kerningDir.tables->t.kern0.pairsBlock );
         }
+        GEO_UNLOCK( LOOKUP_TABLE );
 
-Fail:
         return numGeosKernPairs;
 }
 

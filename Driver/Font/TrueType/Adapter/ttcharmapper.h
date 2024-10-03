@@ -40,7 +40,6 @@ typedef struct
 {
         word            unicode;
         CharMapFlags    flags;
-        word            ttIndex;
 } CharMapEntry;
 
 
@@ -65,17 +64,15 @@ typedef struct
  *      internal functions
  ***********************************************************************/
 
-word  GeosCharToUnicode( word  geosChar );
+word  GeosCharToUnicode( const word  geosChar );
 
-word  InitGeosCharsInCharMap( TT_CharMap  map, 
-                              char*  firstChar, char*  lastChar );
+word  CountValidGeosChars( const TT_CharMap  map, 
+                           char*  firstChar, char*  lastChar );
 
-CharMapFlags  GeosCharMapFlag( word  geosChar );
-
-Boolean  isGeosCharPair( word  ttIndex_1, word  ttIndex_2 );
+CharMapFlags  GeosCharMapFlag( const word  geosChar );
 
 MemHandle  CreateIndexLookupTable( TT_CharMap  map );
 
-word  GetGEOSCharForIndex( LookupEntry*  lookupTable, word  index );
+word  GetGEOSCharForIndex( const LookupEntry*  lookupTable, const word  index );
 
 #endif  /* _TTCHARMAPPER_H_ */
