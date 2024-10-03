@@ -513,7 +513,7 @@ Return:		dx.cx - mask % (WWFixed)
 
 Destroyed:	nothing
 
-Comments:	
+Comments:
 
 Revision History:
 
@@ -854,10 +854,10 @@ SetApplyable	proc	near
 	call	ObjMessage
 noOther:
 	pop	si
-	
+
 	;
 	; Now see if we're in delayed mode.
-	; 
+	;
 	mov	cx, GUQT_DELAYED_OPERATION
 	mov	ax, MSG_GEN_GUP_QUERY
 	call	ObjCallInstanceNoLock
@@ -866,7 +866,7 @@ noOther:
 	jnz	done			; delayed
 	;
 	; Operating in immediate mode, so send ourselves an apply.
-	; 
+	;
 	mov	ax, MSG_GEN_APPLY
 	call	ObjCallInstanceNoLock
 done:
@@ -997,7 +997,7 @@ haveMask:
 	mov	di, mask MF_FIXUP_DS
 	call	ObjMessage
 	pop	si
-	
+
 convertMask:
 	mov	bp, MSG_GEN_SET_ENABLED
 	tst	dx
@@ -1085,7 +1085,7 @@ afterPattern:
 	xchg	ax, bp
 
 afterToolboxIndex:
-	
+
 	test	ax, mask CSTF_PATTERN
 	jz	done
 
@@ -1220,7 +1220,7 @@ PASS:
 
 	ax - The message
 
-	dx.cx - spin value 
+	dx.cx - spin value
 	bp - GenValueStateFlags
 
 RETURN:
@@ -1319,13 +1319,13 @@ REVISION HISTORY:
 ------------------------------------------------------------------------------@
 ColorSelectorApply	method dynamic	ColorSelectorClass, MSG_GEN_APPLY
 	;
-	; Call superclass first, so that GenValues can get up-to-date if they 
+	; Call superclass first, so that GenValues can get up-to-date if they
 	; need to.
 	;
 	mov	di, offset ColorSelectorClass
 	call	ObjCallSuperNoLock
 
-	mov	di, ds:[si]			
+	mov	di, ds:[si]
 	add	di, ds:[di].ColorSelector_offset
 	clr	bx
 	xchg	bl, ds:[di].CSI_states
@@ -1655,7 +1655,7 @@ ColorSelectorTweakDuplicatedToolboxUI	method dynamic	ColorSelectorClass,
 	; Some set-up work
 	;
 	mov	bx, cx				;bx <- duplicated object block
-	mov	bp, dx				;bp <- features		
+	mov	bp, dx				;bp <- features
 	clr	dx				;assume not a pop-up list
 	mov	cl, ds:[di].CSI_toolboxPrefs
 	test	cl, mask CTP_IS_POPUP
@@ -1676,17 +1676,17 @@ colorMonikers:
 	andnf	cl, mask CTP_INDEX_ORIENTATION
 CheckHack <COO_AREA_ORIENTED eq 0>
 	jz	haveIndexList
-	
+
 	mov	di, offset lineColorMonikerList
 	mov	ax, offset LineColorMoniker
 	mov	bp, offset LineColorListHelp
 	cmp	cl, COO_LINE_ORIENTED shl offset CTP_INDEX_ORIENTATION
-	je	haveIndexList	
+	je	haveIndexList
 
 	mov	di, offset textColorMonikerList
 	mov	ax, offset TextColorMoniker
 	mov	bp, offset TextColorListHelp
-	
+
 haveIndexList:
 CheckHack <(length lineColorMonikerList) eq (length areaColorMonikerList)>
 CheckHack <(length textColorMonikerList) eq (length areaColorMonikerList)>
@@ -1695,7 +1695,7 @@ CheckHack <(length textColorMonikerList) eq (length areaColorMonikerList)>
 	and	ax, dx				;ax <- offset or 0
 	call	ColorItemGroupReplaceMonikers
 	pop	cx, bp				;cl <- prefs; bp <- features
-	
+
 	;
 	; Now work on the draw mask list
 	;
@@ -1710,7 +1710,7 @@ maskMonikers:
 	andnf	cl, mask CTP_DRAW_MASK_ORIENTATION
 CheckHack <COO_AREA_ORIENTED eq 0>
 	jz	haveDrawMaskList
-	
+
 	mov	di, offset lineDrawMaskMonikerList
 	mov	ax, offset LineMaskMoniker
 	mov	bp, offset LineDrawMaskListHelp
@@ -1720,7 +1720,7 @@ CheckHack <COO_AREA_ORIENTED eq 0>
 	mov	di, offset textDrawMaskMonikerList
 	mov	ax, offset TextMaskMoniker
 	mov	bp, offset TextDrawMaskListHelp
-	
+
 haveDrawMaskList:
 CheckHack <(length lineDrawMaskMonikerList) eq (length areaDrawMaskMonikerList)>
 CheckHack <(length textDrawMaskMonikerList) eq (length areaDrawMaskMonikerList)>
@@ -1729,7 +1729,7 @@ CheckHack <(length textDrawMaskMonikerList) eq (length areaDrawMaskMonikerList)>
 	and	ax, dx				;ax <- offset or 0
 	call	ColorItemGroupReplaceMonikers
 	pop	cx, bp				;cl <- prefs; bp <- features
-	
+
 	;
 	; Finally, work on the pattern list
 	;
@@ -1747,7 +1747,7 @@ CheckHack <COO_AREA_ORIENTED eq 0>
 	mov	di, offset textPatternMonikerList
 	mov	ax, offset TextPatternMoniker
 	mov	bp, offset TextPatternListHelp
-	
+
 havePatternList:
 CheckHack <(length textPatternMonikerList) eq (length areaPatternMonikerList)>
 	mov	cx, length areaPatternMonikerList
@@ -1766,7 +1766,7 @@ ColorSelectorTweakDuplicatedToolboxUI	endm
 
 COMMENT @----------------------------------------------------------------------
 
-METHOD:		ColorSelectorNotifyAddingFeature -- 
+METHOD:		ColorSelectorNotifyAddingFeature --
 		MSG_GEN_CONTROL_NOTIFY_ADDING_FEATURE for ColorSelectorClass
 
 DESCRIPTION:	We're adding a feature.
@@ -1780,7 +1780,7 @@ PASS:		*ds:si 	- instance data
 RETURN:		nothing
 		ax, cx, dx, bp - destroyed
 
-ALLOWED TO DESTROY:	
+ALLOWED TO DESTROY:
 		bx, si, di, ds, es
 
 REGISTER/STACK USAGE:
@@ -1835,7 +1835,7 @@ Return:		nothing
 
 Destroyed:	nothing
 
-Comments:	
+Comments:
 
 Revision History:
 

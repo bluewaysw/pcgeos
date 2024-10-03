@@ -3,18 +3,14 @@
 #
 # If you edit it, you will lose your changes, should it be regenerated.
 #
-GEODE           = color
-UI              = uiColor.asm uiManager.asm uiOtherColor.asm uiColor.ui\
-                  uiManager.ui
-UI_TO_RDFS      = uiManager.ui
-OBJS            =
-COMMON          = colorConstant.def colorGeode.def
-MODULES         = UI
-CMODULES        =
-SRCS            = $(UI) $(COMMON)
+GEODE           = pnglib
+ASM_TO_OBJS     =
+UI_TO_RDFS      =
+SRCS            = pnglib.goc
+OBJS            = pnglib.obj
 LOBJS           =
 LIBOBJ          = $(DEVEL_DIR)/Include/$(GEODE).ldf
-LIBNAME         = color
+LIBNAME         = pnglib
 
 SYSMAKEFILE     = geode.mk
 
