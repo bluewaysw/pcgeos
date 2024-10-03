@@ -95,6 +95,8 @@ static void CalcDriversTransformMatrix( TransformMatrix* transformMatrix,
                                         GStateHandle gstate, 
                                         WindowHandle win );
 
+extern void InitConvertHeader( TRUETYPE_VARS, FontHeader* fontHeader );
+
 
 /********************************************************************
  *                      TrueType_Gen_Path
@@ -165,6 +167,8 @@ EC(     ECCheckBounds( (void*)fontHeader ) );
         /* open face, create instance and glyph */
         if( TrueType_Lock_Face(trueTypeVars, trueTypeOutline) )
                 goto Fin;
+
+        InitConvertHeader(trueTypeVars, fontHeader);
 
         TT_New_Glyph( FACE, &GLYPH );
 
@@ -312,6 +316,8 @@ EC(     ECCheckBounds( (void*)fontHeader ) );
         /* open face, create instance */
         if( TrueType_Lock_Face(trueTypeVars, trueTypeOutline) )
                 goto Fin;
+
+        InitConvertHeader(trueTypeVars, fontHeader);
 
         /* get TT char index */
         charIndex = TT_Char_Index( CHAR_MAP, GeosCharToUnicode( character ) );
