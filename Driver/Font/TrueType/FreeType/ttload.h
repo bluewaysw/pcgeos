@@ -136,6 +136,21 @@
   #define GET_Short()   (Short) (frame.cursor += 2, \
                                  (frame.cursor[-2] << 8) | \
                                   frame.cursor[-1])
+  #define GET_Long()    (Long)  ((frame.cursor += 4, \
+                                  (Long)frame.cursor[-4] << 24) | \
+                                 ((Long)frame.cursor[-3] << 16) | \
+                                 ((Long)frame.cursor[-2] << 8 ) | \
+                                  (Long)frame.cursor[-1])
+  #define GET_ULong()    (Long) ((frame.cursor += 4, \
+                                  (Long)frame.cursor[-4] << 24) | \
+                                 ((Long)frame.cursor[-3] << 16) | \
+                                 ((Long)frame.cursor[-2] << 8 ) | \
+                                  (Long)frame.cursor[-1])
+  #define GET_Tag4()     (Long)  ((frame.cursor += 4, \
+                                  (Long)frame.cursor[-4] << 24) | \
+                                 ((Long)frame.cursor[-3] << 16) | \
+                                 ((Long)frame.cursor[-2] << 8 ) | \
+                                  (Long)frame.cursor[-1])
   #define SKIP( _size_ )        (frame.cursor += _size_ )
   
 #else
@@ -144,12 +159,11 @@
   #define GET_Char()    TT_Get_Char  ( &frame )
   #define GET_UShort()  TT_Get_UShort( &frame )
   #define GET_Short()   TT_Get_Short ( &frame )
+  #define GET_Long()    TT_Get_Long  ( &frame )
+  #define GET_ULong()   TT_Get_ULong ( &frame )
+  #define GET_Tag4()    TT_Get_ULong ( &frame )
 
 #endif
-
-#define GET_Long()    TT_Get_Long  ( &frame )
-#define GET_ULong()   TT_Get_ULong ( &frame )
-#define GET_Tag4()    TT_Get_ULong ( &frame )
 
 #define FILE_Pos()    TT_File_Pos ( stream )
 
