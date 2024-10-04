@@ -1033,9 +1033,11 @@
     face->fontPgmSize = 0;
     face->cvtPgmSize  = 0;
 
+#ifdef TT_CONFIG_OPTION_SUPPORT_GASP
     /* freeing the gasp table */
     FREE( face->gasp.gaspRanges );
     face->gasp.numRanges = 0;
+#endif
 
     /* freeing the name table */
     Free_TrueType_Names( face );
@@ -1117,7 +1119,9 @@
          LOAD_( CMap )          ||
          LOAD_( CVT )           ||
          LOAD_( Programs )      ||
+#ifdef TT_CONFIG_OPTION_SUPPORT_GASP
          LOAD_( Gasp )          ||
+#endif
          LOAD_( Names )         ||
          LOAD_( OS2 )           ||
          LOAD_( PostScript )

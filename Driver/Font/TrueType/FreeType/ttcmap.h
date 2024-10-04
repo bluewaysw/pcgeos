@@ -161,7 +161,11 @@
   UShort  CharMap_Index( PCMapTable  cmap,
                          UShort      charCode );
 
-  /* NOTE: The PFace type isn't defined at this point */
+
+  LOCAL_DEF
+  TT_Error getCharMap( TT_Face              face, 
+                       TT_Face_Properties*  faceProperties, 
+                       TT_CharMap*          charMap );
 
 #ifdef __cplusplus
   }
