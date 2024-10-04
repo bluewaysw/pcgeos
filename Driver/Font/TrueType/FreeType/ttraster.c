@@ -177,8 +177,12 @@
     { 0x80, 0xC0, 0xE0, 0xF0, 0xF8, 0xFC, 0xFE, 0xFF };
 
   /* prototypes used for sweep function dispatch */
+#ifdef TT_CONFIG_OPTION_GRAY_SCALING
   typedef void  Function_Sweep_Init( RAS_ARGS Short*  min,
                                               Short*  max );
+#else
+  typedef void  Function_Sweep_Init( RAS_ARGS Short*  min );
+#endif
 
   typedef void  Function_Sweep_Span( RAS_ARGS Short       y,
                                               TT_F26Dot6  x1,
@@ -1462,7 +1466,7 @@
 /*                                                                     */
 /***********************************************************************/
 
-  static void _near  Vertical_Sweep_Init( RAS_ARGS Short*  min, Short*  max )
+  static void _near  Vertical_Sweep_Init( RAS_ARGS Short*  min )
   {
     ras.traceOfs  = ( ras.target.rows - 1 - *min ) * ras.target.cols;
     ras.traceIncr = -ras.target.cols;
@@ -1646,9 +1650,7 @@
 /*                                                                     */
 /***********************************************************************/
 
-  static void _near  Vertical_Region_Sweep_Init( RAS_ARGS 
-                                           Short*  min, 
-                                           Short*  max )
+  static void _near  Vertical_Region_Sweep_Init( RAS_ARGS Short*  min )
   {
     ras.traceOfs         = 0;
     ras.traceIncr        = 0;
@@ -1762,7 +1764,7 @@
 /*                                                                     */
 /***********************************************************************/
 
-  static void _near  Horizontal_Sweep_Init( RAS_ARGS Short*  min, Short*  max )
+  static void _near  Horizontal_Sweep_Init( RAS_ARGS Short*  min )
   {
     /* nothing, really */
   }
@@ -1889,7 +1891,8 @@
     /* Nothing, really */
   }
 
-    static void _near Horizontal_Sweep_Finish( RAS_ARG )
+
+  static void _near Horizontal_Sweep_Finish( RAS_ARG )
   {
     /* nothing to do */
   }
@@ -2150,7 +2153,11 @@
 
     /* Now inits the sweep */
 
+#ifdef TT_CONFIG_OPTION_GRAY_SCALING
     ras.Proc_Sweep_Init( RAS_VARS  &min_Y, &max_Y );
+#else
+    ras.Proc_Sweep_Init( RAS_VARS  &min_Y );
+#endif
 
     /* Then compute the distance of each profile from min_Y */
 
