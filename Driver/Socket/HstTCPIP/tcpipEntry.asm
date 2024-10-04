@@ -162,9 +162,9 @@ udata	segment
 
 	inputQueue	optr		; input packet queue
 
-	socketBlock	hptr 		; LMem block for all socket info
-	socketList	lptr 		; chunk handle to socket list 
-	linkTable	optr 		; table of physical link connections
+	;socketBlock	hptr 		; LMem block for all socket info
+	;socketList	lptr 		; chunk handle to socket list 
+	;linkTable	optr 		; table of physical link connections
 	
 	taskSem		hptr		; mutex for tcp actions that need
 					;  to be synchronized
@@ -172,17 +172,6 @@ udata	segment
 	regSem		hptr		; mutex for registration
 	regStatus	RegisterStatus	; registration status of driver	 
 	clients		TcpipClientInfo	; info about registered clients
-
-	; DHCP variables.
-	dhcpThread	hptr		; thread for doing dhcp
-	dhcpStrategy	fptr		; Link driver entry point
-	dhcpCookie	dword		; Cookie toIPINIT keep track of our session
-	dhcpRenewTime	dword		; Seconds until renew
-	dhcpRebindTime	dword		; Seconds until rebind
-	dhcpExpireTime	dword		; Seconds until expire
-	dhcpTimerId	hptr
-	dhcpTimerHandle	hptr
-	dhcpServerIp	IPAddr		; IP of server that gave us the lease
 
 EC <	dropCount	word		; input packets dropped due to lack >
 EC <					;  of space in TCP's input queue    >
@@ -314,8 +303,7 @@ driverProcTable		fptr.far	\
 		TcpipCloseMedium,		
 		TcpipMediumConnectRequest,
 		TcpipDoNothing,			; DR_SOCKET_MEDIUM_ACTIVATED
-		TcpipSetMediumOption,
-		TcpipResolveLinkLevelAddress
+		TcpipSetMediumOption
 	
 tcpipProcTable		fptr.far	\
 		TcpipSendRawIp			; DR_TCPIP_SEND_RAW_IP		
@@ -814,7 +802,6 @@ REVISION HISTORY:
 	Name	Date			Description
 	----	----			-----------
 	jwu	7/ 7/94			Initial version
-	ed	7/10/00			Stop DHCP timers
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
 TcpipExit	proc	far
@@ -839,11 +826,11 @@ TcpipExit	proc	far
 		tst	ds:[hugeLMemBlock]
 		jz	exit
 
-		tst	ds:[socketBlock]
-		jz	freeHugeLMem		
+		;tst	ds:[socketBlock]
+		;jz	freeHugeLMem		
 
-		tst	ds:[linkTable].handle
-		jz	freeSocketBlock
+		;tst	ds:[linkTable].handle
+		;jz	freeSocketBlock
 
 EC <		tst	ds:[regStatus]					>
 EC <		WARNING_NE TCPIP_EXITING_WITH_CLIENTS_REGISTERED	>
@@ -868,15 +855,7 @@ endif
 
 		;call	LinkTableDestroyTable
 
-		mov	bx, ds:[dhcpTimerHandle]
-		tst	bx
-		jz	freeSocketBlock
-		mov	ax, ds:[dhcpTimerId]
-		call	TimerStop
-freeSocketBlock:
-		mov	bx, ds:[socketBlock]
-		call	MemFree
-freeHugeLMem:
+mfreeHugeLMem:
 		mov	bx, ds:[hugeLMemBlock]
 		call	HugeLMemDestroy		
 exit:
@@ -1327,35 +1306,8 @@ REVISION HISTORY:
 	jwu	8/ 1/96			Nonblocking, interruptible version
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
-TcpipDataConnReqCB	proc	far
-
-		;pushf
-		;push	ax, bx, cx, dx, si, di, bp, ds, es
-		;call	SysEnterInterrupt
-		;cld					;clear direction flag
-		;INT_OFF
-
-EC <		call	ECCheckStack						>
-		;push	bx, di, cx
-		mov	ds:[si].GHNCCD_result, ax
-		;mov	cx, ds:[si].GHNCCD_semaphore
-
-		inc	ds:[si].GHNCCD_semaphore2
-		;pop	bx, di, cx
-
-		;call	SysExitInterrupt
-		;pop	ax, bx, cx, dx, si, di, bp, ds, es
-		;popf
-			
-		ret
-			
-TcpipDataConnReqCB	endp
-
-
 TcpipDataConnectRequest	proc	far
 		uses	bx, cx, si, ds, es
-		
-callbackData	local	GeosHostNetConnectCallbackData
 		
 		.enter
 EC <		call	ECCheckCallerThread			>
@@ -1392,48 +1344,11 @@ EC <		call	ECCheckIPAddr				>
 	;
 	; Have driver's thread establish the connection.
 	;
-		;mov	di, bx				; di = connection handle
-		;mov	ax, MSG_TCPIP_OPEN_CONNECTION_ASM
-		;call	TcpipSendMsgToDriverThread
-
 		push	bx
-
-		; alloc semaphore 
-		mov	ax, bx
-		mov	bx, 1					; mutEx semaphore
-		call	ThreadAllocSem				 
-		
-		mov	callbackData.GHNCCD_callback.segment, cs
-		mov	callbackData.GHNCCD_callback.offset, offset cs:TcpipDataConnReqCB
-		mov	callbackData.GHNCCD_semaphore, bx
-		mov	callbackData.GHNCCD_semaphore2, 0
-
-if 0
-		push	ax
-		call	ThreadPSem			; get exclusive access
-		pop 	ax
-endif
-		mov	bx, ax
-		push	bp
-		lea	bp, callbackData
 		mov	ax, HIF_NC_CONNECT_REQUEST	; async connect
-		call	HostIfCall
-		pop	bp
-waitHere:
-                cmp     callbackData.GHNCCD_semaphore2, 0
-                je      waitHere
-if 0
-		; wait for async completion
-		mov	bx, callbackData.GHNCCD_semaphore
-		call	ThreadPSem			; get exclusive access
-endif
-		; free semaphore
-		mov	bx, callbackData.GHNCCD_semaphore
-		call	ThreadFreeSem
-		
+		call	HostIfCallAsync
 		pop	bx
-		
-		mov	ax, callbackData.GHNCCD_result
+
 		cmp	ax, 0
 		jz	ok
 		stc
@@ -1550,9 +1465,9 @@ EC <		ERROR_E TCPIP_BAD_SOCKET_STATE			>
 		cmp	al, TSS_CLOSED
 		jae	exit				; carry clear
 
-		mov	di, bx
-		mov	ax, MSG_TCPIP_RESET_CONNECTION_ASM
-		call	TcpipSendMsgToDriverThread
+		;mov	di, bx
+		;mov	ax, MSG_TCPIP_RESET_CONNECTION_ASM
+		;call	TcpipSendMsgToDriverThread
 		clc
 exit:
 		.leave
@@ -1611,158 +1526,23 @@ REVISION HISTORY:
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
 
-TcpipDisconReqCB	proc	far
-
-		;pushf
-		;push	ax, bx, cx, dx, si, di, bp, ds, es
-		;call	SysEnterInterrupt
-		;cld					;clear direction flag
-		;INT_OFF
-
-EC <		call	ECCheckStack						>
-
-		;push	bx, di, cx
-		mov	ds:[si].GHNDCD_result, ax
-		;mov	cx, ds:[si].GHNDCD_semaphore
-                inc     ds:[si].GHNDCD_semaphore2
-		;pop	bx, di, cx
-		
-		;call	SysExitInterrupt
-		;pop	ax, bx, cx, dx, si, di, bp, ds, es
-		;popf
-			
-		ret
-			
-TcpipDisconReqCB	endp
-
 TcpipDisconnectRequest	proc	far
 		uses	ax, bx, cx, dx, si, ds
-
-callbackData	local	GeosHostNetDisconnectCallbackData
 
 		.enter
 
 		push	bx
-
-		; alloc semaphore 
-		mov	cx, bx
-		mov	bx, 1					; mutEx semaphore
-		call	ThreadAllocSem				 
-		
-		mov	callbackData.GHNDCD_callback.segment, cs
-		mov	callbackData.GHNDCD_callback.offset, offset cs:TcpipDisconReqCB
-		mov	callbackData.GHNDCD_semaphore, bx
-		mov	callbackData.GHNDCD_semaphore2, 0
-		
-if 0
-		push	ax
-		call	ThreadPSem			; get exclusive access
-		pop 	ax
-endif
-		mov	bx, cx
 		
 		push	bp
-		lea	bp, callbackData
 		mov	ax, HIF_NC_DISCONNECT		; async disconnect
-		call	HostIfCall
-		pop	bp
-
-		; wait for async completion
-waitHere:
-                cmp     callbackData.GHNCCD_semaphore2, 0
-                je      waitHere
-if 0
-		mov	bx, callbackData.GHNCCD_semaphore
-		call	ThreadPSem			; get exclusive access
-endif
-
-		; free semaphore
-		mov	bx, callbackData.GHNCCD_semaphore
-		call	ThreadFreeSem
-		
+		call	HostIfCallAsync
+		pop	bp		
 		pop	bx
 		
-		mov	ax, callbackData.GHNDCD_result
 		cmp	ax, 0
 		jz	done
 		stc
 		jc	exit
-
-if 0
-		Assert	etype ax, SocketCloseType		
-
-EC <		cmp	ax, SCT_FULL				>
-EC <		jne	skipCheck				>
-EC <		call	ECCheckCallerThread			>
-EC <skipCheck:							>
-	;
-	; If connection doesn't exist, return error.
-	;
-		call	TcpipGainAccess
- 		;xchg	ax, bx			; ax = conn, bx = SocketCloseType
-		;call	TSocketFindHandle	; destroys cx	
-		;jnc	checkState
-
-		;mov	ax, SDE_INVALID_CONNECTION_HANDLE
-		;call	TcpipReleaseAccess
-		;jmp	exit
-checkState:
-	;
-	; If socket is not open, no need to do anything.  This case
-	; is NOT an error so return carry clear!
-	;
-		;call	TSocketLockInfoExcl
-		;mov	di, ax						
-		;mov	si, ds:[di]		; ds:si = TcpSocket	
-
-		;cmp	ds:[si].TS_state, TSS_OPEN
-		;je	disconnect
-		
-		;call	TSocketUnlockInfoExcl
-		;call	TcpipReleaseAccess
-		;jmp	done			
-disconnect:
-	;
-	; Set state to disconnecting and wake blocked send request
-	; on the connection, if any.
-	;
-		;mov	ds:[si].TS_state, TSS_DISCONNECTING		
-
-		;mov	cx, bx			; cx = SocketCloseType
-		;tst	ds:[si].TS_pendingData
-		;je	afterVSend
-EC <		WARNING	TCPIP_ABORTING_SEND_DATA_REQUEST		>
-		;mov	bx, ds:[si].TS_sendSem
-		;call	ThreadVSem
-afterVSend:
-	;
-	; Get sempahore to block calling thread if full close.
-	;
-		;cmp	cx, SCT_HALF
-		;je	doClose
-
-EC <	;	tst	ds:[si].TS_waiter				>
-EC <	;	ERROR_NZ TCPIP_OPERATION_IN_PROGRESS			>
-
-		;mov	ds:[si].TS_waiter, TCPIP_WAITER_EXISTS
-		;mov	bx, ds:[si].TS_sem
-doClose:
-		;call	TSocketUnlockInfoExcl
-	;
-	; Tell driver to disconnect the connection. 
-	;
-		mov	di, bx
-		mov	ax, MSG_TCPIP_CLOSE_CONNECTION_ASM
-		call	TcpipSendMsgToDriverThread
-
-		call	TcpipReleaseAccess
-	; 
-	; If full close, block until disconnect completes.
-	;
-		;cmp	cx, SCT_HALF
-		;je	exit				; carry already clear
-		;call	ThreadPSem			
-endif
 
 done:
 		mov	ax, bx
@@ -2013,8 +1793,8 @@ EC <		mov	bx, ds					>
 EC <		call	ECAssertValidFarPointerXIP		>
 EC <		pop	bx					>
 
-		mov	cx, MSG_TCPIP_SEND_DATAGRAM_ASM
-		call	TcpipSendDatagramCommon
+		;mov	cx, MSG_TCPIP_SEND_DATAGRAM_ASM
+		;call	TcpipSendDatagramCommon
 
 		.leave
 		ret
@@ -2101,10 +1881,10 @@ noSend:
 
 EC <		Assert	thread	bx				>	
 
-		mov	dx, SDE_CONNECTION_RESET
-		mov	ax, MSG_TCPIP_RESET_CONNECTION_ASM
-		mov	di, mask MF_CALL
-		call	ObjMessage
+		;mov	dx, SDE_CONNECTION_RESET
+		;mov	ax, MSG_TCPIP_RESET_CONNECTION_ASM
+		;mov	di, mask MF_CALL
+		;call	ObjMessage
 exit::
 		call	TcpipReleaseAccess
 noSocket:
@@ -2173,9 +1953,9 @@ EC <		ERROR_C TCPIP_INVALID_CONNECTION_HANDLE		>
 	;
 	; Tell the driver's thread to accept the connection, then wait.
 	;
-		mov_tr	di, ax				; di = connection handle
-		mov	ax, MSG_TCPIP_ACCEPT_CONNECTION_ASM
-		call	TcpipSendMsgToDriverThread
+		;mov_tr	di, ax				; di = connection handle
+		;mov	ax, MSG_TCPIP_ACCEPT_CONNECTION_ASM
+		;call	TcpipSendMsgToDriverThread
 
 		call	ThreadPTimedSem			; ax = SemaphoreError
 	;
@@ -2260,10 +2040,10 @@ EC <	;	ERROR_NZ TCPIP_OPERATION_IN_PROGRESS			>
 
 EC <		Assert	thread	bx				>	
 
-		mov	dx, SDE_CONNECTION_RESET
-		mov	ax, MSG_TCPIP_RESET_CONNECTION_ASM
-		mov	di, mask MF_CALL
-		call	ObjMessage
+		;mov	dx, SDE_CONNECTION_RESET
+		;mov	ax, MSG_TCPIP_RESET_CONNECTION_ASM
+		;mov	di, mask MF_CALL
+		;call	ObjMessage
 exit::
 		.leave
 		ret
@@ -3319,13 +3099,13 @@ delete:
 		cmp	cx, MAIN_LINK_DOMAIN_HANDLE
 		je	exit
 
-		movdw	bxsi, es:[linkTable]
-		call	MemLockExcl
-		mov	ds, ax
-		mov_tr	ax, cx				; ax = link handle
-		mov	cx, 1
-		call	ChunkArrayDeleteRange
-		call	MemUnlockExcl
+		;movdw	bxsi, es:[linkTable]
+		;call	MemLockExcl
+		;mov	ds, ax
+		;mov_tr	ax, cx				; ax = link handle
+		;mov	cx, 1
+		;call	ChunkArrayDeleteRange
+		;call	MemUnlockExcl
 clcExit:
 		clc
 exit:
@@ -3526,8 +3306,8 @@ if ERROR_CHECK
 		pop	bx					
 endif ; ERROR_CHECK
 
-		mov	cx, MSG_TCPIP_SEND_RAW_IP_ASM
-		call	TcpipSendDatagramCommon
+		;mov	cx, MSG_TCPIP_SEND_RAW_IP_ASM
+		;call	TcpipSendDatagramCommon
 		
 		.leave
 		ret
@@ -3742,9 +3522,9 @@ endif ; ERROR_CHECK
 
 		mov	bx, es:[driverThread]
 		Assert	thread	bx
-		mov	ax, MSG_TCPIP_RECEIVE_DATA_ASM
-		mov	di, mask MF_FORCE_QUEUE
-		call	ObjMessage
+		;mov	ax, MSG_TCPIP_RECEIVE_DATA_ASM
+		;mov	di, mask MF_FORCE_QUEUE
+		;call	ObjMessage
 exit:		
 		.leave
 		ret
@@ -4301,8 +4081,8 @@ EC <		Assert	thread	bx				>
 		mov	al, TIMER_EVENT_CONTINUAL
 		mov	cx, TCPIP_TIMEOUT_INTERVAL	; first interval
 		mov	di, cx				; same interval always
-		mov	dx, MSG_TCPIP_TIMEOUT_OCCURRED_ASM
-		mov	bp, handle 0
+		;mov	dx, MSG_TCPIP_TIMEOUT_OCCURRED_ASM
+		;mov	bp, handle 0
 		;call	TimerStartSetOwner
 
 		mov	ds:[timerHandle], bx
@@ -4375,10 +4155,10 @@ EC <		ERROR_Z	TCPIP_CANNOT_FIND_TIMER			>
 	;
 	; Destroy all Tcp connections.  MUST do it on TCP's thread.
 	;
-		mov	bx, es:[driverThread]
-		mov	ax, MSG_TCPIP_DESTROY_CONNECTIONS_ASM
-		mov	di, mask MF_CALL
-		call	ObjMessage
+		;mov	bx, es:[driverThread]
+		;mov	ax, MSG_TCPIP_DESTROY_CONNECTIONS_ASM
+		;mov	di, mask MF_CALL
+		;call	ObjMessage
 	;
 	; Finally, tell the driver's thread to self-destruct.
 	;
@@ -4650,21 +4430,6 @@ unlock:
 		pop	es, bx, cx, si				
 endif ; ERROR_CHECK
 
-	; DHCP workaround. When the time comes to send DHCP packets,
-	; the link will be open, but the link structure will be exclusively
-	; locked, therefore any attempts at checking if the link is open
-	; will cause a deadlock. So, we compare the current thread handle
-	; to the saved DHCP thread handle. If they match, then we know it's
-	; safe to jump past the attempts to gain a lock.
-	;		- Ed 6/15/00
-if 0
-		mov	ax, dgroup
-		mov	es, ax
-		mov	ax, es:[dhcpThread]
-		cmp	ax, ss:[0].TPD_threadHandle
-		je	doingDhcp
-endif
-
 	;
 	; Check PacketFlags to see if link should be forced open. 
 	;
@@ -4708,9 +4473,7 @@ sendIt:
 		mov_tr	ax, bx				; ax = msg
 		mov	bx, handle dgroup
 		call	MemDerefDS
-if 0
-sendDhcp:
-endif
+
 		mov	bx, ds:[driverThread]
 		mov	di, mask MF_CALL
 		call	ObjMessage			; ax = SocketDrError
@@ -4722,15 +4485,6 @@ bad:
 exit:		
 		.leave
 		ret
-if 0
-doingDhcp:
-		mov	bx, handle dgroup
-		call	MemDerefDS
-		mov	ax, ds
-		mov	ax, cx
-		mov	cx, ds:[dhcpDomain]
-		jmp	sendDhcp
-endif
 TcpipSendDatagramCommon	endp
 
 COMMENT @----------------------------------------------------------------
@@ -5244,44 +4998,5 @@ ECCheckCallerThread	endp
 
 
 endif	; ERROR_CHECK
-
-;
-; See comments on SocketResolveLinkLevelAddress... same pass/return
-; Currently only works if the link is already open, as I can't figure out
-; how to open it myself... - Ed 6/00
-;
-TcpipResolveLinkLevelAddress	proc	far
-		bufSize		local	word	push	bx
-		sockAddrPtr	local	fptr	push	ds, si
-		.enter
-
-		mov	bx, MAIN_LINK_DOMAIN_HANDLE
-		;call	LinkTableGetEntry	; ds:di = LCB
-		push	bx
-		mov	bl, ds:[di].LCB_state
-		mov	si, bx
-		pop	bx
-		pushdw	ds:[di].LCB_strategy
-		call	MemUnlockExcl
-		mov	di, DR_SOCKET_RESOLVE_LINK_LEVEL_ADDRESS
-		mov	bx, si
-		cmp	bl, LS_OPEN
-		jne	linkClosed
-		movdw	dssi, sockAddrPtr
-		mov	bx, bufSize
-		call	PROCCALLFIXEDORMOVABLE_PASCAL
-
-rllaDone:
-		.leave
-		ret
-
-linkClosed:
-		add	sp, 6
-		movdw	dssi, sockAddrPtr
-		mov	ax, SE_LINK_FAILED
-		jmp	rllaDone
-TcpipResolveLinkLevelAddress	endp
-
-
 
 CommonCode	ends
