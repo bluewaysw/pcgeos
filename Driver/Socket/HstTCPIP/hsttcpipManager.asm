@@ -74,7 +74,6 @@ UseLib	socket.def
 UseLib	sac.def
 UseLib	Internal/netutils.def
 UseLib	Internal/socketInt.def
-UseLib 	resolver.def
 UseLib	hostif.def
 
 ;---------------------------------------------------------------------------

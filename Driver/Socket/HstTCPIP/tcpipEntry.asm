@@ -3129,28 +3129,9 @@ doIP:
 	; Don't know how to check if a resolve is in progress so 
 	; just pass the request along.
 	;
-ifdef STATIC_LINK_RESOLVER
-	    mov bx, handle resolver
-else
-		call	TcpipLoadResolver		; ax = library handle 
-		jc	exit				;  or SocketDrError
-		push	ax
-		mov_tr	bx, ax				; bx = library handle
-endif
 
-		mov	ax, enum ResolverStopResolve
-		call	ProcGetLibraryEntry
-		call	ProcCallFixedOrMovable		
-
-ifndef STATIC_LINK_RESOLVER
-		pop	bx
-		call	GeodeFreeLibrary
-endif
 done:
 		clc
-ifndef STATIC_LINK_RESOLVER
-exit:
-endif
 		.leave
 		ret
 TcpipStopResolve	endp
@@ -4921,64 +4902,6 @@ exit:
 		.leave
 		ret
 TcpipResolveIPAddr	endp
-
-ifndef STATIC_LINK_RESOLVER
-
-
-COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-		TcpipLoadResolver
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-
-SYNOPSIS:	Load the resolver.
-
-CALLED BY:	TcpipResolveIPAddr
-
-PASS:		nothing
-
-RETURN:		carry set if error
-			ax	= SDE_DRIVER_NOT_FOUND
-		else 
-			ax 	= library handle
-
-DESTROYED:	nothing
-
-PSEUDO CODE/STRATEGY:
-
-REVISION HISTORY:
-	Name	Date			Description
-	----	----			-----------
-	jwu	4/13/95			Initial version
-
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
-EC <LocalDefNLString	resolverName, <"EC Resolver", 0>	>
-NEC<LocalDefNLString	resolverName, <"Resolver", 0>	>
-
-TcpipLoadResolver	proc	near
-		uses	bx, si, ds
-		.enter
-
-		call	FilePushDir
-
-		mov	ax, SP_SYSTEM
-		call	FileSetStandardPath
-		jc	error
-
-		clr	ax, bx
-		segmov	ds, cs, si
-		mov	si, offset resolverName
-		call	GeodeUseLibrary			; bx = handle of library
-error:
-		call	FilePopDir
-		mov	ax, SDE_DRIVER_NOT_FOUND	; just in case
-		jc	exit
-		mov_tr	ax, bx				; return handle
-exit:
-		.leave
-		ret
-TcpipLoadResolver	endp
-
-endif   ; not STATIC_LINK_RESOLVER
-
 
 
 COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
