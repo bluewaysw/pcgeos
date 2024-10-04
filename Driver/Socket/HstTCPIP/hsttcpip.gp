@@ -5,7 +5,7 @@
 #			GEOWORKS CONFIDENTIAL
 #
 # PROJECT:	PC GEOS
-# FILE:		tcpip.gp
+# FILE:		hsttcpip.gp
 #
 # AUTHOR:	Jennifer Wu, Jul  5, 1994
 #
@@ -28,13 +28,6 @@ library ansic
 library accpnt
 library hostif
 
-# Allow static linkage for the resolver library.
-ifdef STATIC_LINK_RESOLVER
-library resolver
-else
-library resolver noload
-endif
-
 #
 # Define resources other than standard discardable code
 #
@@ -42,7 +35,6 @@ resource ResidentCode 	fixed code read-only shared
 resource Strings	shared lmem read-only 
 resource IPAddrCtrlUI	ui-object read-only shared
 resource TcpipClassStructures	fixed read-only shared	
-#resource TCPIPCLASSSTRUCTURES 	fixed read-only shared
 
 # other resources
 resource InputQueue	shared lmem

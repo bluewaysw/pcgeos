@@ -115,8 +115,6 @@ DESCRIPTION:
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
 
 
-GEOS_HOST_API   = 0xA0
-
 ;---------------------------------------------------------------------------
 ;		Dgroup
 ;---------------------------------------------------------------------------
@@ -509,11 +507,11 @@ newBuffer 	local	optr
 
 closeLoop:
 	; get next receive buffer size
-		mov	ax, 1006		; get next receive close socket
-		int	GEOS_HOST_API
+		mov	ax, HIF_NC_RECV_NEXT_CLOSE	; get next receive close socket
+		call	HostIfCall
 
 		cmp	cx, 0
-		je	recvLoop		; branch, no more closed links
+		je	recvLoop			; branch, no more closed links
 
 	; send close to socket library
 
@@ -547,8 +545,8 @@ recvLoop:
 
 
 	; get next receive buffer size
-		mov	ax, 1004		; get recv buf size
-		int     GEOS_HOST_API
+		mov	ax, HIF_NC_NEXT_RECV_SIZE	; get recv buf size
+		call	HostIfCall
 
 	; done if size 0 or below
 		cmp	cx, 0
@@ -593,8 +591,8 @@ doRecv:
 		; ax is size in bytes
 
 		mov	cx, ax
-		mov	ax, 1005		; get recv buf size
-		int	GEOS_HOST_API
+		mov	ax, HIF_NC_RECV_NEXT		; get recv buf size
+		call	HostIfCall
 
 		pop	di
 
@@ -1433,8 +1431,8 @@ endif
 		mov	bx, ax
 		push	bp
 		lea	bp, callbackData
-		mov	ax, 1002			; async connect
-		int     GEOS_HOST_API
+		mov	ax, HIF_NC_CONNECT_REQUEST	; async connect
+		call	HostIfCall
 		pop	bp
 waitHere:
                 cmp     callbackData.GHNCCD_semaphore2, 0
@@ -1695,8 +1693,8 @@ endif
 		
 		push	bp
 		lea	bp, callbackData
-		mov	ax, 1008			; async connect
-		int	GEOS_HOST_API
+		mov	ax, HIF_NC_DISCONNECT		; async disconnect
+		call	HostIfCall
 		pop	bp
 
 		; wait for async completion
@@ -1894,8 +1892,8 @@ EC <		call	ECCheckCallerThread			>
 		; es:si ptr to data to sent
 		; bx connection handle
 		pop	bx
-		mov	ax, 1003
-		int	GEOS_HOST_API
+		mov	ax, HIF_NC_SEND_DATA
+		call	HostIfCall
 errDone:
 		pop	dx
 		mov		bx, dx
@@ -3061,98 +3059,6 @@ afterLink:
 		mov	di, bp			; es:di = resolved IP addr dest
 		pop	bp
 
-if 0
-	;
-	; Now resolve the IP part of the address.  If no IP address is 
-	; provided, return the default IP address.
-	;
-		jcxz	getDefault		
-
-	; alloc dos mem buffer 
-	;  bx buffer size in paragraphs
-	
-		push	bx
-		mov	bx, cx
-		add	bx, IP_ADDR_SIZE
-		shr	bx, 4		; div by 16 to have paragraphs
-		inc	bx
-
-		;call	SysAllocDOSBlock
-		pop	bx
-
-		jc	exit
-
-	; now ax = real mode, dx = selector
-	; copy string first
-	; cx is unresolved IP addr size, ds:si is addr ptr
-	; es:di should point to target yet
-
-		push	es
-		push	di
-
-		push	cx
-		push	ax
-		mov	es, dx
-		mov di, 0
-
-		rep	movsb
-		pop	ax
-		pop	cx
-
-	;
-	; setup regs
-	;
-endif
-if 0
-        ;mov     ss:[regs.PMRMR_edi], 0 
-        mov     ss:[regs.PMRMR_esi], 0 
-        ;mov     ss:[regs.PMRMR_ebp], 0 
-        ;mov     ss:[regs.PMRMR_reseverd], 0 
-        ;mov     ss:[regs.PMRMR_ebx], ebx 
-        ;mov     ss:[regs.PMRMR_edx], 0 
-        mov     ss:[regs.PMRMR_ecx], ecx 
-        mov     ss:[regs.PMRMR_eax], 1000
-        mov     ss:[regs.PMRMR_flags], 0 
-        ;mov     ss:[regs.PMRMR_es], ax 
-        mov     ss:[regs.PMRMR_ds], ax 
-		;mov     ss:[regs.PMRMR_fs], 0 
-        ;mov     ss:[regs.PMRMR_gs], 0 
-        ;mov     ss:[regs.PMRMR_ip], 0 
-        ;mov     ss:[regs.PMRMR_cs], 0 
-        mov     ss:[regs.PMRMR_sp], 0
-        mov     ss:[regs.PMRMR_ss], 0
-endif
-if 0
-		;lea	di, ss:regs
-		mov	dx, ss
-		mov	es, dx
-
-		push	bx	; link address size
-		mov	cx, 0
-		mov	bh, 0
-		mov 	bl, GEOS_HOST_API ; GEOS host
-
-		mov ax, 1000		; resolve address
-		int	GEOS_HOST_API
-		
-		;call    SysRealInterrupt		
-		pushf
-	; free dos mem buffer
-		
-		mov	dx, es
-		;call	SysFreeDOSBlock
-
-
-		;call	TcpipResolveIPAddr	; dxax = address or 
-
-		popf
-		pop	cx				; resolved link address size
-		pop	di
-		pop es
-		jc	exit			;  ax = SocketDrError
-		;mov		eax, regs.PMRMR_eax
-		;mov		edx, regs.PMRMR_edx
-endif
 	;
 	; Now resolve the IP part of the address.  If no IP address is 
 	; provided, return the default IP address.
@@ -3820,6 +3726,7 @@ REVISION HISTORY:
 	jwu	7/18/94			Initial version
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+if 0
 	SetGeosConvention
 TCPIPRECEIVEPACKET	proc	far		
 		C_GetOneDWordArg cx, dx, ax, bx
@@ -3827,7 +3734,7 @@ TCPIPRECEIVEPACKET	proc	far
 		ret
 TCPIPRECEIVEPACKET	endp
 	SetDefaultConvention
-
+endif
 
 
 COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -3837,7 +3744,6 @@ COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 SYNOPSIS:	Receive an incoming packet from the link connection.
 
 CALLED BY:	TcpipClientStrategy (SCO_RECEIVE_PACKET)
-		TCPIPRECEIVEPACKET
 
 PASS:		cxdx	= optr of packet (HugeLMem chunk)
 
@@ -5042,10 +4948,10 @@ doQuery:
 	; Query address from resolver.
 	; 
 		push	bx
-		mov	ax, 1000			; resolve address
+		mov	ax, HIF_NC_RESOLVE_ADDR		; resolve address
 							; dxbp = addr or
 							;  dx = ResolverError
-		int	GEOS_HOST_API
+		call	HostIfCall
 		
 		;lahf
 
