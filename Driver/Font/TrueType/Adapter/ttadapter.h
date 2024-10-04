@@ -394,6 +394,9 @@ typedef struct
     /* currently open face */
     FileHandle                  ttfile;
     TrueTypeOutlineEntry        entry;
+
+    /* lookuptable for truetype indices */
+    MemHandle                   lookupTable;
 } TrueTypeVars;
 
 
@@ -414,6 +417,7 @@ typedef struct
 #define SCALE_HEIGHT            trueTypeVars->scaleHeight
 #define SCALE_WIDTH             trueTypeVars->scaleWidth
 #define TTFILE                  trueTypeVars->ttfile
+#define LOOKUP_TABLE            trueTypeVars->lookupTable
 
 #define UNITS_PER_EM            FACE_PROPERTIES.header->Units_Per_EM
 
@@ -426,7 +430,7 @@ typedef struct
  * convert value (word) to WWFixedAsDWord
  */
 #define WORD_TO_WWFIXEDASDWORD( value )          \
-        ( (WWFixedAsDWord) MakeWWFixed( value ) )
+            ( ( (long)value ) << 16 )
 
 /*
  * convert value (TT_F26DOT6) to WWFixedAsDWord

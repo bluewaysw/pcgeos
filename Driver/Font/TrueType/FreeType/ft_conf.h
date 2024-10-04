@@ -204,6 +204,13 @@
 
 
 /*************************************************************************/
+/* Define TT_CONFIG_OPTION_SUPPORT_GASP if you want to support grid-     */
+/* fitting table.                                                        */
+
+#undef  TT_CONFIG_OPTION_SUPPORT_GASP
+
+
+/*************************************************************************/
 /* Define TT_CONFIG_OPTION_SUPPORT_OPTIONAL_FIELDS if you want to hold   */
 /* optional fiels in freetype structures.                                */
 

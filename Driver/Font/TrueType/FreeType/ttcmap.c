@@ -551,4 +551,47 @@
 #endif
 
 
+/*******************************************************************
+ *
+ *  Function    : getCharMap
+ *
+ *  Description : Searches for a character mapping (CharMap) in the 
+ *                given font face that matches the Microsoft Unicode 
+ *                encoding.
+ *
+ *  Input  :  face           A handle to the font face to search in.
+ *            faceProperties A pointer to the properties of the font face,
+ *                           including the number of available CharMaps.
+ *            charMap        A pointer where the resulting CharMap will 
+ *                           be stored if found.
+ *
+ *  Output :  TT_Error       Returns `TT_Err_Ok` if a matching CharMap 
+ *                           was found and set successfully.
+ *                           Returns `TT_Err_CMap_Table_Missing` if no 
+ *                           matching CharMap was found.
+ *
+ ******************************************************************/
+LOCAL_FUNC
+TT_Error getCharMap( TT_Face face, TT_Face_Properties* faceProperties, TT_CharMap* charMap )
+{
+        TT_UShort           platform;
+        TT_UShort           encoding;
+        int                 map;
+
+
+	for ( map = 0; map < faceProperties->num_CharMaps; ++map ) 
+  {
+		TT_Get_CharMap_ID( face, map, &platform, &encoding );
+
+		if ( platform == TT_PLATFORM_MICROSOFT && encoding == TT_MS_ID_UNICODE_CS )
+    {
+		  TT_Get_CharMap( face, map, charMap);
+			return TT_Err_Ok;
+		}
+	}
+
+  return TT_Err_CMap_Table_Missing;
+}
+
+
 /* END */

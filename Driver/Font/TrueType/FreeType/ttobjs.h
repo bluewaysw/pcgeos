@@ -513,7 +513,9 @@
 
     TName_Table           nameTable;            /* name table */
 
+#ifdef TT_CONFIG_OPTION_SUPPORT_GASP
     TGasp                 gasp;                 /* the 'gasp' table */
+#endif
 
     /* The directory of TrueType tables for this typeface */
     UShort          numTables;

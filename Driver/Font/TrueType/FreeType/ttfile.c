@@ -968,6 +968,7 @@
   }
 
 
+#ifndef __GEOS__
 /*******************************************************************
  *
  *  Function    :  GET_Char
@@ -986,8 +987,10 @@
 
     return (Char)(*CUR_Frame.cursor++);
   }
+#endif
 
 
+#ifndef __GEOS__
 /*******************************************************************
  *
  *  Function    :  GET_Short
@@ -1008,26 +1011,16 @@
 
     CHECK_FRAME( CUR_Frame, 2 );
 
-
-    /* Note: This assumes that the bytes in CUR_Frame.cursor are stored in the correct */
-    /* byte order for the target system's endianness.                                  */
-    /* If the system is little-endian, the bytes should be in little-endian order      */
-    /* (least significant byte first). If the system is big-endian, the bytes should be*/
-    /* in big-endian order (most significant byte first).                              */
-    
-#ifdef __GEOS__    
-    getshort = *(Short*)CUR_Frame.cursor;
-#else    
     getshort = (Short)((CUR_Frame.cursor[0] << 8) | 
                         CUR_Frame.cursor[1]);
-#endif
 
     CUR_Frame.cursor += 2;
 
     return getshort;
   }
+#endif
 
-
+#ifndef __GEOS__
 /*******************************************************************
  *
  *  Function    :  GET_Long
@@ -1057,6 +1050,7 @@
 
     return getlong;
   }
+#endif
 
 
 /* END */
