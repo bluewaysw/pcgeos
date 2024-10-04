@@ -497,7 +497,6 @@ TcpipReceiveInterrupt	endp
 
 
 TCPIPRECEIVESTART	proc	far	connection:word
-;regs		local	PMRealModeRegister
 								uses	di, si, ds
 newBuffer 	local	optr		
 		.enter
@@ -1340,21 +1339,7 @@ EC <		call	ECCheckStack						>
 		;push	bx, di, cx
 		mov	ds:[si].GHNCCD_result, ax
 		;mov	cx, ds:[si].GHNCCD_semaphore
-if 0
-		; scheduled receiving data
-		mov	ax, MSG_TCPIP_ASYNC_UNLOCK_ASM
-		
-		push	bx
-		mov	bx, handle dgroup
-		call	MemDerefDS
-		mov	bx, ds:[driverThread]
-	
-EC <		Assert	thread	bx				>		
 
-		mov	di, mask MF_FORCE_QUEUE
-		call	ObjMessage
-		pop	bx
-endif
 		inc	ds:[si].GHNCCD_semaphore2
 		;pop	bx, di, cx
 
@@ -1639,21 +1624,6 @@ EC <		call	ECCheckStack						>
 		;push	bx, di, cx
 		mov	ds:[si].GHNDCD_result, ax
 		;mov	cx, ds:[si].GHNDCD_semaphore
-if 0
-		; scheduled receiving data
-		mov	ax, MSG_TCPIP_ASYNC_UNLOCK_ASM
-		
-		push	bx
-		mov	bx, handle dgroup
-		call	MemDerefDS
-		mov	bx, ds:[driverThread]
-	
-EC <		Assert	thread	bx				>		
-
-		mov	di, mask MF_FORCE_QUEUE
-		call	ObjMessage
-		pop	bx
-endif                        
                 inc     ds:[si].GHNDCD_semaphore2
 		;pop	bx, di, cx
 		
@@ -1853,7 +1823,6 @@ REVISION HISTORY:
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
 TcpipSendData	proc	far
 savebp		local	word	push	bp
-;regs		local	PMRealModeRegister
 		uses	bx, cx, dx, ds
 		.enter
 
@@ -2991,7 +2960,6 @@ REVISION HISTORY:
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
 TcpipResolveAddr	proc	far
 savebp		local	word	push	bp
-;regs		local	PMRealModeRegister
 
 		uses	bx, dx, bp, si, ds, es
 		.enter
@@ -3709,32 +3677,6 @@ exit:
 		.leave
 		ret
 TcpipAddDomain	endp
-
-
-COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-		TcpipReceivePacket
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-
-C FUNCTION:	TcpipReceivePacket
-
-C DECLARATION:	extern void _far
-		_far _pascal TcpipReceivePacket(optr dataBuffer);
-
-REVISION HISTORY:
-	Name	Date			Description
-	----	----			-----------
-	jwu	7/18/94			Initial version
-
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
-if 0
-	SetGeosConvention
-TCPIPRECEIVEPACKET	proc	far		
-		C_GetOneDWordArg cx, dx, ax, bx
-		call	TcpipReceivePacket
-		ret
-TCPIPRECEIVEPACKET	endp
-	SetDefaultConvention
-endif
 
 
 COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
