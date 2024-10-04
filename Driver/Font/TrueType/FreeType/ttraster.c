@@ -184,7 +184,19 @@
   typedef void  Function_Sweep_Init( RAS_ARGS Short*  min );
 #endif
 
+#ifdef TT_CONFIG_OPTION_GRAY_SCALING
   typedef void  Function_Sweep_Span( RAS_ARGS Short       y,
+                                              TT_F26Dot6  x1,
+                                              TT_F26Dot6  x2,
+                                              PProfile    left,
+                                              PProfile    right );
+#else
+  typedef void  Function_Sweep_Span( RAS_ARGS Short       y,
+                                              TT_F26Dot6  x1,
+                                              TT_F26Dot6  x2 );
+#endif
+
+  typedef void  Function_Sweep_Drop( RAS_ARGS Short       y,
                                               TT_F26Dot6  x1,
                                               TT_F26Dot6  x2,
                                               PProfile    left,
@@ -278,7 +290,7 @@
 
     Function_Sweep_Init _near *    Proc_Sweep_Init;
     Function_Sweep_Span _near *    Proc_Sweep_Span;
-    Function_Sweep_Span _near *    Proc_Sweep_Drop;
+    Function_Sweep_Drop _near *    Proc_Sweep_Drop;
     Function_Sweep_Step _near *    Proc_Sweep_Step;
     Function_Sweep_Finish _near *  Proc_Sweep_Finish;
 
@@ -1475,9 +1487,7 @@
 
   static void _near  Vertical_Sweep_Span( RAS_ARGS Short       y,
                                              TT_F26Dot6  x1,
-                                             TT_F26Dot6  x2,
-                                             PProfile    left,
-                                             PProfile    right )
+                                             TT_F26Dot6  x2 )
   {
     Long   e1, e2;
     Short  c1, c2;
@@ -1659,9 +1669,7 @@
 
   static void _near  Vertical_Region_Sweep_Span( RAS_ARGS Short       y,
                                                     TT_F26Dot6  x1,
-                                                    TT_F26Dot6  x2,
-                                                    PProfile    left,
-                                                    PProfile    right )
+                                                    TT_F26Dot6  x2 )
   {
     Long    e1, e2;
     PShort  target;
@@ -1772,9 +1780,7 @@
 
   static void _near  Horizontal_Sweep_Span( RAS_ARGS Short y,
                                                TT_F26Dot6  x1,
-                                               TT_F26Dot6  x2,
-                                               PProfile    left,
-                                               PProfile    right )
+                                               TT_F26Dot6  x2 )
   {
     Long  e1, e2;
     PByte bits;
@@ -2252,8 +2258,11 @@
               goto Skip_To_Next;
             }
           }
-
+#ifdef TT_CONFIG_OPTION_GRAY_SCALING
           ras.Proc_Sweep_Span( RAS_VARS  y, x1, x2, P_Left, P_Right );
+#else
+          ras.Proc_Sweep_Span( RAS_VARS  y, x1, x2 );
+#endif
 
    Skip_To_Next:
 
