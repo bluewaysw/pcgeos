@@ -152,8 +152,11 @@ void TrueType_Free_Face(TRUETYPE_VARS)
             FileClose( TTFILE, FALSE );
             TTFILE = NullHandle;
         }
-        if( LOOKUP_TABLE )
+        if ( LOOKUP_TABLE )
+        {
             DestroyIndexLookupTable( LOOKUP_TABLE );
+            LOOKUP_TABLE = NullHandle;
+        }
 }
 
 static int strcmp( const char* s1, const char* s2 )
