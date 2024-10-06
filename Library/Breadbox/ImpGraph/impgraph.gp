@@ -15,6 +15,7 @@ ifdef PRODUCT_FJPEG
 else
 library ijgjpeg
 endif
+library pnglib
 
 export MIMEDRVGRAPHIC
 export MIMEDRVINFO
@@ -23,10 +24,6 @@ export MIMEDRVTEXT
 incminor
 
 export MIMEDRVGRAPHICEX
-
-incminor
-
-library pnglib
 
 usernotes "Copyright 1994-2002  Breadbox Computer Company LLC  All Rights Reserved"
 
