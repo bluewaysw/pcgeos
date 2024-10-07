@@ -179,8 +179,6 @@
   TT_Long   TT_MulFix( TT_Long  a, TT_Long  b )
   {
   #ifdef TT_CONFIG_OPTION_USE_ASSEMBLER_IMPLEMENTATION
-    TT_Long result;     //TODO:  How can we get rid of this?
-
     __asm {
         ; store sign of result
         mov     eax, a
@@ -216,10 +214,9 @@
         jz      positive
         neg     eax
     positive:
-        mov     result, eax      ; store final result
+        mov     edx, eax          ; store result in dx:ax
+        shr     edx, 16
     }
-
-    return result;
   #else
     long   s;
 
