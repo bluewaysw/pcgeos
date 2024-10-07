@@ -271,6 +271,23 @@
   LOCAL_FUNC
   void  Add64( TT_Int64*  x, TT_Int64*  y, TT_Int64*  z )
   {
+  #ifdef TT_CONFIG_OPTION_USE_ASSEMBLER_IMPLEMENTATION
+    __asm {
+        mov     esi, x           ; Load address of x into esi
+        mov     edi, y           ; Load address of y into edi
+        mov     ebx, z           ; Load address of z into ebx
+
+        ; Add lower 32 bits
+        mov     eax, [esi]       ; Load x->lo into eax
+        add     eax, [edi]       ; Add y->lo to eax
+        mov     [ebx], eax       ; Store result in z->lo
+
+        ; Add upper 32 bits with carry
+        mov     eax, [esi + 4]   ; Load x->hi into eax
+        adc     eax, [edi + 4]   ; Add y->hi to eax with carry
+        mov     [ebx + 4], eax   ; Store result in z->hi
+    }
+  #else
     register TT_Word32  lo, hi;
 
 
@@ -279,6 +296,7 @@
 
     z->lo = lo;
     z->hi = hi;
+  #endif
   }
 
 
