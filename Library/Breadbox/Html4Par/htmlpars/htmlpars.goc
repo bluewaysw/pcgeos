@@ -1153,15 +1153,16 @@ int _pascal _export HTMLTranslateCharNum(unsigned int num)
 
 int LOCAL TranslateChar(char *tag)
 {
-    HTMLEntityTable *xlate_table;
-    int i;
     int ret=0;
-
-    MemLock( OptrToHandle(@xlateTable) );
-    xlate_table = LMemDeref(@xlateTable);
 
     if(*tag!='\x23')                    /* tag specified by name? */
     {
+      HTMLEntityTable *xlate_table;
+      int i;
+      
+      MemLock( OptrToHandle(@xlateTable) );
+      xlate_table = LMemDeref(@xlateTable);
+
       for(i=0; xlate_table[i].num; i++)
         if( tag[0]==xlate_table[i].name[0] &&
             !STRCMPSB(xlate_table[i].name,tag) )
@@ -1169,11 +1170,36 @@ int LOCAL TranslateChar(char *tag)
           ret = xlate_table[i].c;
           break;
         }
+
+      MemUnlock( OptrToHandle(@xlateTable) );
     }
     else
-      ret = TranslateCharNum((unsigned int)(ATOISB(tag+1)));
-                                        /* convert characters to number */
-    MemUnlock( OptrToHandle(@xlateTable) );
+    {
+      unsigned int ch;
+      if(tag[1]=='x')
+      {
+	ch = 0;
+	tag += 2;
+	while(1)
+	{
+	  /* parse hex code - see htoi() in WMG3HTTP.goc */
+	  if (*tag >= '0' && *tag <= '9') {
+	    ch = ch*16 + ((*tag++)-'0');
+	  } else if (*tag >= 'a' && *tag <= 'f') {
+	    ch = ch*16 + ((*tag++)-'a')+10;
+	  } else if (*tag >= 'A' && *tag <= 'F') {
+	    ch = ch*16 + ((*tag++)-'A')+10;
+	  } else {
+	    break;
+	  }
+	}
+      }
+      else
+      {
+        ch = (unsigned int)(ATOISB(tag+1));
+      }
+      ret = TranslateCharNum(ch);       /* convert characters to number */
+    }
     return ret;
 }
 
@@ -1389,7 +1415,12 @@ int LOCAL GetText(int cc, int ce, char *buf, word formMode, MemHandle *overflowB
 	    isNum = TRUE;
             tag[q++] = (char)cn;        /* get tag name */
             cn = HTMLgetc();
-            while( isdigit(cn) && q<HTML_MAXTAG )
+            if (cn=='x')                /* entity specified by hex number */
+            {
+              tag[q++] = (char)cn;
+              cn = HTMLgetc();
+            }
+            while( isxdigit(cn) && q<HTML_MAXTAG )
             {
               tag[q++] = (char)cn;      /* get tag name */
               cn = HTMLgetc();
