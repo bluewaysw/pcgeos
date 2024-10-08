@@ -83,6 +83,7 @@ EC(     ECCheckFileHandle( TTFILE) );
 
         /* create lookup table for kernpairs if face supports kerning */
         LOOKUP_TABLE = CreateIndexLookupTable( CHAR_MAP );
+EC(     ECCheckMemHandle( LOOKUP_TABLE ) );
 
         /* font has been fully loaded */
         trueTypeVars->entry = *entry;

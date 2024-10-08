@@ -134,6 +134,60 @@
   EXPORT_FUNC
   TT_Long  TT_MulDiv( TT_Long  a, TT_Long  b, TT_Long  c )
   {
+  #ifdef TT_CONFIG_OPTION_USE_ASSEMBLER_IMPLEMENTATION
+    __asm {
+        mov     eax, a
+        mov     ebx, b
+        mov     ecx, c
+
+        ; Calculate sign
+        mov     esi, eax
+        xor     esi, ebx
+        xor     esi, ecx        ; esi now holds the sign bit
+
+        ; Take absolute values
+        test    eax, eax
+        jns     skip_abs_a
+        neg     eax
+    skip_abs_a:
+        test    ebx, ebx
+        jns     skip_abs_b
+        neg     ebx
+    skip_abs_b:
+        test    ecx, ecx
+        jns     skip_abs_c
+        neg     ecx
+    skip_abs_c:
+
+        ; Check for division by zero
+        test    ecx, ecx
+        jz      divide_by_zero
+
+        ; Perform (a * b + c/2) / c
+        mov     edx, 0          ; Clear upper 32 bits for 64-bit multiplication
+        mul     ebx             ; EDX:EAX = a * b
+        mov     edi, ecx        ; Save c in edi
+        shr     edi, 1          ; edi = c/2
+        add     eax, edi        ; Add c/2 to lower 32 bits
+        adc     edx, 0          ; Add carry to upper 32 bits
+        idiv    ecx             ; Divide EDX:EAX by c
+        jmp     apply_sign
+
+    divide_by_zero:
+        ; Handle division by zero (return max positive or min negative)
+        mov     eax, 80000000h  ; Load min negative value
+
+    apply_sign:
+        ; Apply sign
+        test    esi, 80000000h  ; Test sign bit
+        jz      done
+        neg     eax
+
+    done:
+        mov     edx, eax        ; Store result in dx:ax
+        shr     edx, 16
+    }
+  #else
     long   s;
 
 
@@ -160,6 +214,7 @@
     }
 
     return ( s < 0 ) ? -a : a;
+  #endif
   }
 
   /* The optimization for TT_MulFix is different. We could simply be     */
@@ -214,7 +269,7 @@
         jz      positive
         neg     eax
     positive:
-        mov     edx, eax          ; store result in dx:ax
+        mov     edx, eax         ; store result in dx:ax
         shr     edx, 16
     }
   #else
@@ -317,6 +372,18 @@
   LOCAL_FUNC
   void  MulTo64( TT_Int32  x, TT_Int32  y, TT_Int64*  z )
   {
+  #ifdef TT_CONFIG_OPTION_USE_ASSEMBLER_IMPLEMENTATION
+    __asm {
+        mov     eax, x           ; Load x into eax
+        mov     ecx, y           ; Load y into ecx
+        imul    ecx              ; Signed multiply eax by ecx
+                                 ; Result: edx:eax (high:low)
+
+        mov     esi, z           ; Load address of z into esi
+        mov     [esi], eax       ; Store low 32 bits (eax) into z->lo
+        mov     [esi + 4], edx   ; Store high 32 bits (edx) into z->hi
+    }
+  #else
     TT_Int32   s;
     TT_Word32  lo1, hi1, lo2, hi2, lo, hi, i1, i2;
 
@@ -356,12 +423,37 @@
     z->hi = hi;
 
     if ( s < 0 ) Neg64( z );
+  #endif
   }
 
 
   LOCAL_FUNC
   TT_Int32  Div64by32( TT_Int64*  x, TT_Int32  y )
   {
+  #ifdef TT_CONFIG_OPTION_USE_ASSEMBLER_IMPLEMENTATION
+    __asm {
+        mov     esi, x                ; Load address of x into esi
+        mov     eax, [esi]            ; Load lower 32 bits of x into eax
+        mov     edx, [esi+4]          ; Load upper 32 bits of x into edx
+        mov     ebx, y                ; Load y into ebx
+        test    ebx, ebx              ; Check if y is zero
+        jz      divide_by_zero        ; Jump to divide_by_zero if y is zero
+        idiv    ebx                   ; Signed divide EDX:EAX by EBX
+        jmp     done                  ; Jump to done after division
+
+    divide_by_zero:
+        test    edx, edx              ; Check sign of dividend (upper 32 bits of x)
+        js      negative_dividend     ; Jump if dividend is negative
+        mov     eax, 0x7FFFFFFF       ; Load maximum positive 32-bit value
+        jmp     done
+    negative_dividend:
+        mov     eax, 0x80000000       ; Load minimum negative 32-bit value
+
+    done:
+        mov     edx, eax              ; Store result in dx:ax
+        shr     edx, 16
+    }
+  #else
     TT_Int32   s;
     TT_Word32  q, r, i, lo;
 
@@ -399,6 +491,7 @@
     }
 
     return ( s < 0 ) ? -(TT_Int32)q : (TT_Int32)q;
+  #endif
   }
 
 
