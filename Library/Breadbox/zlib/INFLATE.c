@@ -228,11 +228,13 @@ int f;
       Z_STATE->sub.check.need += (uLong)NEXTBYTE;
       z->adler = Z_STATE->sub.check.need;
       Z_STATE->mode = DICT0;
+      GEOS_UNLOCK_WINDOW(Z_STATE->blocks);
       return Z_NEED_DICT;
     case DICT0:
       Z_STATE->mode = INFL_BAD;
       z->msg = (char*)"need dictionary";
       Z_STATE->sub.marker = 0;       /* can try inflateSync */
+      GEOS_UNLOCK_WINDOW(Z_STATE->blocks);
       return Z_STREAM_ERROR;
     case BLOCKS:
       r = inflate_blocks(Z_STATE->blocks, z, r);
@@ -245,7 +247,10 @@ int f;
       if (r == Z_OK)
         r = f;
       if (r != Z_STREAM_END)
+      {
+        GEOS_UNLOCK_WINDOW(Z_STATE->blocks);
         return r;
+      }
       r = f;
       inflate_blocks_reset(Z_STATE->blocks, z, &Z_STATE->sub.check.was);
       if (Z_STATE->nowrap)
@@ -279,17 +284,25 @@ int f;
       }
       Trace((stderr, "inflate: zlib check ok\n"));
       Z_STATE->mode = INFL_DONE;
+#ifdef __GEOS__
+    case INFL_DONE:
+      GEOS_UNLOCK_WINDOW(Z_STATE->blocks);
+      return Z_STREAM_END;
+    case INFL_BAD:
+      GEOS_UNLOCK_WINDOW(Z_STATE->blocks);
+      return Z_DATA_ERROR;
+    default:
+      GEOS_UNLOCK_WINDOW(Z_STATE->blocks);
+      return Z_STREAM_ERROR;
+#else
     case INFL_DONE:
       return Z_STREAM_END;
     case INFL_BAD:
       return Z_DATA_ERROR;
     default:
       return Z_STREAM_ERROR;
-  }
-
-#ifdef __GEOS__
-  GEOS_UNLOCK_WINDOW(Z_STATE->blocks);
 #endif
+  }
 
 #ifdef NEED_DUMMY_RETURN
   return Z_STREAM_ERROR;  /* Some dumb compilers complain without this */
