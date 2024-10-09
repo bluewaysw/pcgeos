@@ -76,9 +76,9 @@ struct inflate_blocks_state {
                             s->write = ((word) s->window) + s->writeOffs; }
 
   #define GEOS_UNLOCK_WINDOW(s) {MemUnlock(s->windowHan); \
-                              s->end = sizeof(s->window); \
-                              s->read = (word) s->read - (word) s->window; \
-                              s->write = (word) s->write - (word) s->window; }
+                              s->endOffs = sizeof(s->window); \
+                              s->readOffs = (word) s->read - (word) s->window; \
+                              s->writeOffs = (word) s->write - (word) s->window; }
 #endif
 
 
