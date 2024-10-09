@@ -1,12 +1,14 @@
 /* infutil.h -- types and macros common to blocks and codes
  * Copyright (C) 1995-1998 Mark Adler
- * For conditions of distribution and use, see copyright notice in zlib.h 
+ * For conditions of distribution and use, see copyright notice in zlib.h
  */
 
 /* WARNING: this file should *not* be used by applications. It is
    part of the implementation of the compression library and is
    subject to change. Applications should only use zlib.h.
  */
+
+#include "heap.h"
 
 #ifndef _INFUTIL_H
 #define _INFUTIL_H
@@ -41,7 +43,7 @@ struct inflate_blocks_state {
       inflate_huft *tb;         /* bit length decoding tree */
     } trees;            /* if DTREE, decoding info for trees */
     struct {
-      inflate_codes_statef 
+      inflate_codes_statef
          *codes;
     } decode;           /* if CODES, current state */
   } sub;                /* submode */
@@ -51,14 +53,33 @@ struct inflate_blocks_state {
   uInt bitk;            /* bits in bit buffer */
   uLong bitb;           /* bit buffer */
   inflate_huft *hufts;  /* single malloc for tree space */
+
+#ifdef __GEOS__
+    MemHandle windowHan;  /* GEOS MemHandle for sliding window*/
+    word  endOffs;
+    word  readOffs;
+    word  writeOffs;
+#endif
+
   Bytef *window;        /* sliding window */
   Bytef *end;           /* one byte after sliding window */
   Bytef *read;          /* window read pointer */
   Bytef *write;         /* window write pointer */
   check_func checkfn;   /* check function */
   uLong check;          /* check on output */
-
 };
+
+#ifdef __GEOS__
+  #define GEOS_LOCK_WINDOW(s) {s->window = (Bytef *) MemLock(s->windowHan); \
+                            s->end = ((word) s->window) + s->endOffs; \
+                            s->read = ((word) s->window) + s->readOffs; \
+                            s->write = ((word) s->window) + s->writeOffs; }
+
+  #define GEOS_UNLOCK_WINDOW(s) {MemUnlock(s->windowHan); \
+                              s->end = sizeof(s->window); \
+                              s->read = (word) s->read - (word) s->window; \
+                              s->write = (word) s->write - (word) s->window; }
+#endif
 
 
 /* defines for inflate input/output */

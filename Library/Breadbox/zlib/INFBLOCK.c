@@ -1,6 +1,6 @@
 /* infblock.c -- interpret and process block types to last block
  * Copyright (C) 1995-1998 Mark Adler
- * For conditions of distribution and use, see copyright notice in zlib.h 
+ * For conditions of distribution and use, see copyright notice in zlib.h
  */
 
 #include "zutil.h"
@@ -102,7 +102,18 @@ uInt w;
     ZFREE(z, s);
     return Z_NULL;
   }
-  if ((s->window = (Bytef *)ZALLOC(z, 1, w)) == Z_NULL)
+
+#ifdef __GEOS__
+  s->windowHan = MemAlloc(w, HF_SWAPABLE, HAF_ZERO_INIT);
+  if (s->windowHan)
+    s->window = Z_NULL;
+  else
+    s->window = (Bytef *) MemLock(s->windowHan);
+#else
+  s->window = (Bytef *)ZALLOC(z, 1, w)
+#endif
+
+  if (s->window == Z_NULL)
   {
     ZFREE(z, s->hufts);
     ZFREE(z, s);
@@ -113,6 +124,9 @@ uInt w;
   s->mode = TYPE;
   Tracev((stderr, "inflate:   blocks allocated\n"));
   inflate_blocks_reset(s, z, Z_NULL);
+#ifdef __GEOS__
+  MemUnlock(s->window);
+#endif
   return s;
 }
 
@@ -388,7 +402,7 @@ uInt  n;
 
 
 /* Returns true if inflate is currently at the end of a block generated
- * by Z_SYNC_FLUSH or Z_FULL_FLUSH. 
+ * by Z_SYNC_FLUSH or Z_FULL_FLUSH.
  * IN assertion: s != Z_NULL
  */
 int inflate_blocks_sync_point(s)
