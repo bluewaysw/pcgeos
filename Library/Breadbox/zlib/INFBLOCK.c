@@ -125,7 +125,7 @@ uInt w;
   Tracev((stderr, "inflate:   blocks allocated\n"));
   inflate_blocks_reset(s, z, Z_NULL);
 #ifdef __GEOS__
-  MemUnlock(s->window);
+  MemUnlock(s->windowHan);
 #endif
   return s;
 }

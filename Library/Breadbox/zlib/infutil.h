@@ -71,9 +71,9 @@ struct inflate_blocks_state {
 
 #ifdef __GEOS__
   #define GEOS_LOCK_WINDOW(s) {s->window = (Bytef *) MemLock(s->windowHan); \
-                            s->end = ((word) s->window) + s->endOffs; \
-                            s->read = ((word) s->window) + s->readOffs; \
-                            s->write = ((word) s->window) + s->writeOffs; }
+                            s->end = (Bytef *) s->window + s->endOffs; \
+                            s->read = (Bytef *) s->window + s->readOffs; \
+                            s->write = (Bytef *) s->window + s->writeOffs; }
 
   #define GEOS_UNLOCK_WINDOW(s) {MemUnlock(s->windowHan); \
                               s->endOffs = sizeof(s->window); \
