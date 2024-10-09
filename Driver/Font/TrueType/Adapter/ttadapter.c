@@ -156,7 +156,6 @@ void TrueType_Free_Face(TRUETYPE_VARS)
         }
         if ( LOOKUP_TABLE )
         {
-EC( ECCheckMemHandle( LOOKUP_TABLE ) );
             DestroyIndexLookupTable( LOOKUP_TABLE );
             LOOKUP_TABLE = NullHandle;
         }
