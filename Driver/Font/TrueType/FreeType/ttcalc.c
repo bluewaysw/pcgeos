@@ -354,7 +354,7 @@
   #endif
   }
 
-
+#if 0
   LOCAL_FUNC
   void  Sub64( TT_Int64*  x, TT_Int64*  y, TT_Int64*  z )
   {
@@ -367,7 +367,7 @@
     z->lo = lo;
     z->hi = hi;
   }
-
+#endif
 
   LOCAL_FUNC
   void  MulTo64( TT_Int32  x, TT_Int32  y, TT_Int64*  z )
@@ -494,7 +494,7 @@
   #endif
   }
 
-
+#if 0
   LOCAL_FUNC
   Int  Order64( TT_Int64*  z )
   {
@@ -520,11 +520,82 @@
     }
     return j-1;
   }
-
+#endif
 
   LOCAL_FUNC
   TT_Int32  Sqrt64( TT_Int64*  l )
   {
+  #ifdef TT_CONFIG_OPTION_USE_ASSEMBLER_IMPLEMENTATION
+    __asm {
+        mov     esi, Roots    ; Load address of Roots array
+        mov     eax, [l]     ; Load low 32 bits of l
+        mov     edx, [l + 4] ; Load high 32 bits of l
+
+        ; Check if l <= 0
+        or      edx, eax
+        jnz     not_zero
+        ret
+
+	  not_zero:
+        ; Check if l == 1
+        cmp     edx, 0
+        jne     not_one
+        cmp     eax, 1
+        jne     not_one
+        ret
+
+    not_one:
+        ; Integrated Order64 functionality
+        xor     ecx, ecx             ; Initialize bit count (j)
+        test    edx, edx
+        jnz     count_high
+
+    count_low:
+        bsr     ebx, eax             ; Bit Scan Reverse on low dword
+        add     ecx, ebx
+        jmp     order64_done
+
+    count_high:
+        bsr     ebx, edx             ; Bit Scan Reverse on high dword
+        add     ecx, ebx
+        add     ecx, 32
+
+    order64_done:
+        mov     eax, [esi + ecx * 4] ; Load initial r from Roots[Order64(l)] into eax
+
+        ; Main Sqrt64 loop
+    sqrt_loop:
+        mov     ebx, eax             ; s = r (store old r in ebx)
+
+        ; Compute l / r
+        mov     ecx, eax             ; Store r in ecx for division
+        mov     eax, dword ptr l
+        mov     edx, dword ptr l + 4
+        div     ecx
+
+        ; r = (r + l/r) >> 1
+        add     eax, ecx
+        rcr     edx, 1
+        rcr     eax, 1
+
+        ; Check r > s
+        cmp     eax, ebx
+        jg      sqrt_loop
+
+        ; Check r*r > l
+        mov     ecx, eax
+        mul     ecx
+        cmp     edx, dword ptr l + 4
+        ja      sqrt_loop
+        jb      done
+        cmp     eax, dword ptr l
+        ja      sqrt_loop
+
+    done:
+        mov		edx, eax
+        shr		edx, 16
+    }
+  #else
     TT_Int64  l2;
     TT_Int32  r, s;
 
@@ -546,6 +617,7 @@
     while ( r > s || (TT_Int32)l2.hi < 0 );
 
     return r;
+  #endif
   }
 
 #endif /* LONG64 */

@@ -132,7 +132,7 @@ void TrueType_Unlock_Face(TRUETYPE_VARS)
  * RETURNS:       TT_Error
  * 
  * STRATEGY:      - free resources used by instance and face
- *                - close file
+ *                - close file and free lookup table
  * 
  * REVISION HISTORY:
  *      Date      Name      Description
