@@ -293,8 +293,6 @@ int f;
       return Z_STREAM_ERROR;
   }
 
-  GEOS_UNLOCK_WINDOW(Z_STATE->blocks);
-
 #ifdef NEED_DUMMY_RETURN
   return Z_STREAM_ERROR;  /* Some dumb compilers complain without this */
 #endif

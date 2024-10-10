@@ -383,7 +383,11 @@ inflate_blocks_statef *s;
 z_streamp z;
 {
   inflate_blocks_reset(s, z, Z_NULL);
+#ifdef __GEOS__
+  MemFree(s->windowHan);
+#else
   ZFREE(z, s->window);
+#endif
   ZFREE(z, s->hufts);
   ZFREE(z, s);
   Tracev((stderr, "inflate:   blocks freed\n"));
