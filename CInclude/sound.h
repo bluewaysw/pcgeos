@@ -4,7 +4,12 @@
  *
  * PROJECT:	PC/GEOS
  * FILE:	sound.h
- * AUTHOR:	Todd Stumpf, Sept. 1992
+ 
+ * REVISION HISTORY:
+ * 	Name	Date			Description
+ * 	----	----			-----------
+ * 	Todd S.	Sept. 1992		Initial version
+ *	RainerB 9/15/2024		Drum frequencies updated
  *
  * DESCRIPTION:
  *	C version of sound.def
@@ -291,7 +296,7 @@ typedef enum {
     IP_ELECTRIC_MUTED_GUITAR,
     IP_OVERDRIVEN_GUITAR,
     IP_DISTORTION_GUITAR,
-	 IP_GUITAR_HARMONICS,
+    IP_GUITAR_HARMONICS,
     IP_ACOUSTIC_BASS,
     IP_ELECTRIC_FINGERED_BASS,
     IP_ELECTRIC_PICKED_BASS,
@@ -474,53 +479,59 @@ typedef enum {
 	;	so that our OPL2 driver works correctly.
 	;
 */
-#define FR_ACOUSTIC_BASS_DRUM			LOW_C_b
-#define FR_BASS_DRUM_1				( LOW_C / 2 )
-#define FR_SIDE_STICK				MIDDLE_G_SH
-#define FR_ACOUSTIC_SNARE			MIDDLE_C
-#define FR_HAND_CLAP				MIDDLE_C
-#define FR_ELECTRIC_SNARE			MIDDLE_C
-#define FR_LOW_FLOOR_TOM			LOW_C
-#define FR_CLOSED_HI_HAT			MIDDLE_C
-#define FR_HIGH_FLOOR_TOM			LOW_F
-#define FR_PEDAL_HI_HAT				MIDDLE_C
-#define FR_LOW_TOM				LOW_G_SH
-#define FR_OPEN_HI_HAT				MIDDLE_C
-#define FR_LOW_MID_TOM				MIDDLE_C
-#define FR_HI_MID_TOM				MIDDLE_F
-#define FR_CRASH_CYMBAL_1			MIDDLE_C
-#define FR_HIGH_TOM				MIDDLE_G_SH
-#define FR_RIDE_CYMBAL_1			MIDDLE_C
-#define FR_CHINESE_CYMBAL			MIDDLE_C
-#define FR_RIDE_BELL				MIDDLE_C
-#define FR_TAMBOURINE				MIDDLE_C
-#define FR_SPLASH_CYMBAL			MIDDLE_C
-#define FR_COWBELL				LOW_C
-#define FR_CRASH_CYMBAL_2			MIDDLE_C
-#define FR_VIBRASLAP				MIDDLE_C
-#define FR_RIDE_CYMBAL_2			MIDDLE_C
-#define FR_HI_BONGO				MIDDLE_G_SH
-#define FR_LOW_BONGO				MIDDLE_E
-#define FR_MUTE_HI_CONGA			MIDDLE_G_SH
-#define FR_OPEN_HI_CONGA			MIDDLE_G_SH
-#define FR_LOW_CONGA				MIDDLE_C
-#define FR_HI_TIMBALE				MIDDLE_C
-#define FR_LOW_TIMBALE				LOW_G_SH
-#define FR_HIGH_AGOGO				LOW_F_SH
-#define FR_LOW_AGOGO				LOW_C
-#define FR_CABASA				MIDDLE_C
-#define FR_MARACAS				MIDDLE_C
-#define FR_SHORT_WHISTLE			HIGH_G_SH
-#define FR_LONG_WHISTLE				HIGH_G_SH
-#define FR_SHORT_GUIRO				MIDDLE_C
-#define FR_LONG_GUIRO				MIDDLE_C
-#define FR_CLAVES				( HIGH_G_SH * 2 )
-#define FR_HI_WOOD_BLOCK			MIDDLE_C
-#define FR_LOW_WOOD_BLOCK			LOW_F_SH
-#define FR_MUTE_CUICA				MIDDLE_C
-#define FR_OPEN_CUICA				MIDDLE_C
-#define FR_MUTE_TRIANGLE			MIDDLE_G_SH
-#define FR_OPEN_TRIANGLE			MIDDLE_G_SH
+#define FR_ACOUSTIC_BASS_DRUM		247
+#define FR_BASS_DRUM_1			131
+#define FR_SIDE_STICK			262
+#define FR_ACOUSTIC_SNARE		233
+#define FR_HAND_CLAP			392
+#define FR_ELECTRIC_SNARE		233
+#define FR_LOW_FLOOR_TOM		98
+#define FR_CLOSED_HI_HAT		1047
+
+#define FR_HIGH_FLOOR_TOM		110
+#define FR_PEDAL_HI_HAT			156
+#define FR_LOW_TOM			87
+#define FR_OPEN_HI_HAT			523
+#define FR_LOW_MID_TOM			87
+#define FR_HI_MID_TOM			123
+#define FR_CRASH_CYMBAL_1		523
+#define FR_HIGH_TOM			87
+
+#define FR_RIDE_CYMBAL_1		1047
+#define FR_CHINESE_CYMBAL		247
+#define FR_RIDE_BELL			330
+#define FR_TAMBOURINE			1047
+#define FR_SPLASH_CYMBAL		208
+#define FR_COWBELL			233
+#define FR_CRASH_CYMBAL_2		392
+#define FR_VIBRASLAP			104
+
+#define FR_RIDE_CYMBAL_2		1047
+#define FR_HI_BONGO			131
+#define FR_LOW_BONGO			131
+#define FR_MUTE_HI_CONGA		156
+#define FR_OPEN_HI_CONGA		262
+#define FR_LOW_CONGA			131
+#define FR_HI_TIMBALE			131
+#define FR_LOW_TIMBALE			131
+
+#define FR_HIGH_AGOGO			1047
+#define FR_LOW_AGOGO			415
+#define FR_CABASA			1047
+#define FR_MARACAS			1047
+#define FR_SHORT_WHISTLE		1047
+#define FR_LONG_WHISTLE			1047
+#define FR_SHORT_GUIRO			92
+#define FR_LONG_GUIRO			87
+
+#define FR_CLAVES			104
+#define FR_HI_WOOD_BLOCK		104
+#define FR_LOW_WOOD_BLOCK		104
+#define FR_MUTE_CUICA			392
+#define FR_OPEN_CUICA			392
+#define FR_MUTE_TRIANGLE		698
+#define FR_OPEN_TRIANGLE		698
+
 /*---------------------------------------------------------------------------
                 Sound Buffer Construction Macros
 ---------------------------------------------------------------------------*/
