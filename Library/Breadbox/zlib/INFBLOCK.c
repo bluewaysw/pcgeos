@@ -108,6 +108,7 @@ uInt w;
   if (!s->windowHan)
     s->window = Z_NULL;
   else
+    s->windowSize = w;
     s->window = (Bytef *) MemLock(s->windowHan);
 #else
   s->window = (Bytef *)ZALLOC(z, 1, w)

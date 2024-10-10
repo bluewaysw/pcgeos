@@ -56,6 +56,7 @@ struct inflate_blocks_state {
 
 #ifdef __GEOS__
     MemHandle windowHan;  /* GEOS MemHandle for sliding window */
+    word  windowSize;
     word  windowEndOffs;
     word  windowReadOffs;
     word  windowWriteOffs;
@@ -78,7 +79,7 @@ struct inflate_blocks_state {
   }
 
   #define GEOS_UNLOCK_WINDOW(s) { \
-    s->windowEndOffs = sizeof(s->window); \
+    s->windowEndOffs = ((word) s->window) + ((word) s->windowSize); \
     s->windowReadOffs = ((word) s->read) - ((word) s->window); \
     s->windowWriteOffs = ((word) s->write) - ((word) s->window); \
     MemUnlock(s->windowHan); \
