@@ -173,7 +173,7 @@ int ZEXPORT inflate(z_streamp z, int f)
     r = Z_BUF_ERROR;
 
     // Lock the sliding window before processing
-    GEOS_LOCK_WINDOW(Z_STATE->blocks);
+    IF_GEOS_LOCK_SLIDING_WINDOW(Z_STATE->blocks);
 
     while (1)
     {
@@ -237,14 +237,14 @@ int ZEXPORT inflate(z_streamp z, int f)
                 z->adler = Z_STATE->sub.check.need;
                 Z_STATE->mode = DICT0;
                 // Unlock the window before returning
-                GEOS_UNLOCK_WINDOW(Z_STATE->blocks);
+                IF_GEOS_UNLOCK_SLIDING_WINDOW(Z_STATE->blocks);
                 return Z_NEED_DICT;
 
             case DICT0:
                 Z_STATE->mode = INFL_BAD;
                 z->msg = (char *)"need dictionary";
                 Z_STATE->sub.marker = 0;  // can try inflateSync
-                GEOS_UNLOCK_WINDOW(Z_STATE->blocks);
+                IF_GEOS_UNLOCK_SLIDING_WINDOW(Z_STATE->blocks);
                 return Z_STREAM_ERROR;
 
             case BLOCKS:
@@ -258,7 +258,7 @@ int ZEXPORT inflate(z_streamp z, int f)
                     r = f;
                 }
                 if (r != Z_STREAM_END) {
-                    GEOS_UNLOCK_WINDOW(Z_STATE->blocks);
+                    IF_GEOS_UNLOCK_SLIDING_WINDOW(Z_STATE->blocks);
                     return r;
                 }
                 r = f;
@@ -302,15 +302,15 @@ int ZEXPORT inflate(z_streamp z, int f)
                 break;
 
             case INFL_DONE:
-                GEOS_UNLOCK_WINDOW(Z_STATE->blocks);
+                IF_GEOS_UNLOCK_SLIDING_WINDOW(Z_STATE->blocks);
                 return Z_STREAM_END;
 
             case INFL_BAD:
-                GEOS_UNLOCK_WINDOW(Z_STATE->blocks);
+                IF_GEOS_UNLOCK_SLIDING_WINDOW(Z_STATE->blocks);
                 return Z_DATA_ERROR;
 
             default:
-                GEOS_UNLOCK_WINDOW(Z_STATE->blocks);
+                IF_GEOS_UNLOCK_SLIDING_WINDOW(Z_STATE->blocks);
                 return Z_STREAM_ERROR;
         }
     }
