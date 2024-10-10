@@ -171,9 +171,7 @@ int f;
   f = f == Z_FINISH ? Z_BUF_ERROR : Z_OK;
   r = Z_BUF_ERROR;
 
-#ifdef __GEOS__
-  GEOS_LOCK_WINDOW(Z_STATE->blocks);
-#endif
+  GEOS_LOCK_WINDOW(Z_STATE->blocks);  // expands to nothing if not GEOS
 
   while (1) switch (Z_STATE->mode)
   {
@@ -284,7 +282,6 @@ int f;
       }
       Trace((stderr, "inflate: zlib check ok\n"));
       Z_STATE->mode = INFL_DONE;
-#ifdef __GEOS__
     case INFL_DONE:
       GEOS_UNLOCK_WINDOW(Z_STATE->blocks);
       return Z_STREAM_END;
@@ -294,15 +291,9 @@ int f;
     default:
       GEOS_UNLOCK_WINDOW(Z_STATE->blocks);
       return Z_STREAM_ERROR;
-#else
-    case INFL_DONE:
-      return Z_STREAM_END;
-    case INFL_BAD:
-      return Z_DATA_ERROR;
-    default:
-      return Z_STREAM_ERROR;
-#endif
   }
+
+  GEOS_UNLOCK_WINDOW(Z_STATE->blocks);
 
 #ifdef NEED_DUMMY_RETURN
   return Z_STREAM_ERROR;  /* Some dumb compilers complain without this */
