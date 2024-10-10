@@ -55,10 +55,10 @@ struct inflate_blocks_state {
   inflate_huft *hufts;  /* single malloc for tree space */
 
 #ifdef __GEOS__
-    MemHandle windowHan;  /* GEOS MemHandle for sliding window*/
-    word  endOffs;
-    word  readOffs;
-    word  writeOffs;
+    MemHandle windowHan;  /* GEOS MemHandle for sliding window */
+    word  windowEndOffs;
+    word  windowReadOffs;
+    word  windowWriteOffs;
 #endif
 
   Bytef *window;        /* sliding window */
@@ -71,14 +71,14 @@ struct inflate_blocks_state {
 
 #ifdef __GEOS__
   #define GEOS_LOCK_WINDOW(s) {s->window = (Bytef *) MemLock(s->windowHan); \
-                            s->end = (Bytef *) s->window + s->endOffs; \
-                            s->read = (Bytef *) s->window + s->readOffs; \
-                            s->write = (Bytef *) s->window + s->writeOffs; }
+                            s->end = (Bytef *) s->window + s->windowEndOffs; \
+                            s->read = (Bytef *) s->window + s->windowReadOffs; \
+                            s->write = (Bytef *) s->window + s->windowWriteOffs; }
 
   #define GEOS_UNLOCK_WINDOW(s) {MemUnlock(s->windowHan); \
-                              s->endOffs = sizeof(s->window); \
-                              s->readOffs = (word) s->read - (word) s->window; \
-                              s->writeOffs = (word) s->write - (word) s->window; }
+                              s->windowEndOffs = sizeof(s->window); \
+                              s->windowReadOffs = (word) s->read - (word) s->window; \
+                              s->windowWriteOffs = (word) s->write - (word) s->window; }
 #endif
 
 
