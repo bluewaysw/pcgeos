@@ -65,7 +65,7 @@ StdSoundErrorBeep	segment resource
 SimpleSoundHeader 	STD_ERROR_VOICES
 
 		ChangePriority	<SP_SYSTEM_LEVEL + SP_IMMEDIATE>
-		ChangeEnvelope	0, IP_TRUMPET
+		ChangeEnvelope	0, IP_TROMBONE
 		DeltaTick	1
 		VoiceOn		0, SS_MULTIPLIER*500, VOICE_HIGH	; 3 tick beep
 		DeltaTick	3
@@ -89,9 +89,9 @@ StdSoundWarningBeep	segment resource
 SimpleSoundHeader STD_WARNING_VOICES
 
 		ChangePriority	<SP_SYSTEM_LEVEL + SP_IMMEDIATE>
-		ChangeEnvelope	0, IP_REED_ORGAN
+		ChangeEnvelope	0, IP_OBOE
 		DeltaTick	1
-		VoiceOn		0, SS_MULTIPLIER*200, VOICE_HIGH
+		VoiceOn		0, SS_MULTIPLIER*198, VOICE_HIGH
 		DeltaTick	15
 		VoiceOff	0
 		General		GE_END_OF_SONG
@@ -104,12 +104,12 @@ StdSoundNotifyBeep	segment resource
 SimpleSoundHeader STD_NOTIFY_VOICES
 
 		ChangePriority	<SP_SYSTEM_LEVEL>
-		ChangeEnvelope	0, IP_TUBULAR_BELLS
+		ChangeEnvelope	0, IP_TINKLE_BELL
 		DeltaTick	1
-		VoiceOn		0, SS_MULTIPLIER*400, VOICE_LOW	; 5 tick beep
+		VoiceOn		0, SS_MULTIPLIER*400, VOICE_HIGH	; 5 tick beep
 		DeltaTick	5
-		VoiceOff	0			; 2 tick pause
-		DeltaTick	2
+		VoiceOff	0					; 3 tick pause
+		DeltaTick	3
 		VoiceOn		0, SS_MULTIPLIER*400, VOICE_HIGH	; 5 tick beep
 		DeltaTick	5
 		VoiceOff	0
@@ -125,11 +125,11 @@ SimpleSoundHeader STD_NO_INPUT_VOICES
 		ChangePriority	<SP_SYSTEM_LEVEL>
 		ChangeEnvelope	0, IP_OVERDRIVEN_GUITAR
 		DeltaTick	1
-		VoiceOn		0, SS_MULTIPLIER*800, VOICE_LOW	; 1.25 tick beep
-		DeltaMS		20
-		VoiceOff	0			; no  pause
-		VoiceOn		0, SS_MULTIPLIER*500, VOICE_HIGH	; 1.25 tick beep
-		DeltaMS		20
+		VoiceOn		0, SS_MULTIPLIER*800, VOICE_LOW		; 1 tick beep
+		DeltaTick	1
+		VoiceOff	0					; no  pause
+		VoiceOn		0, SS_MULTIPLIER*500, VOICE_HIGH	; 1 tick beep
+		DeltaTick	1
 		VoiceOff	0
 		General		GE_END_OF_SONG
 
@@ -141,10 +141,14 @@ StdSoundKeyClick		segment resource
 SimpleSoundHeader STD_KEY_CLICK_VOICES
 
 		ChangePriority	<SP_SYSTEM_LEVEL + SP_THEME>
-		ChangeEnvelope	0, IP_REED_ORGAN
+		ChangeEnvelope	0, IP_HI_MID_TOM
 		DeltaTick	1
-		VoiceOn		0, SS_MULTIPLIER*200, VOICE_LOW	; .35 tick beep
-		DeltaMS		5
+		VoiceOn		0, SS_MULTIPLIER*400, VOICE_HIGH	; 1 tick beep
+		DeltaTick	1
+		VoiceOff	0					; 1 tick pause
+		DeltaTick	1
+		VoiceOn		0, SS_MULTIPLIER*100, VOICE_HIGH	; 1 tick beep
+		DeltaTick	1
 		VoiceOff	0
 		General		GE_END_OF_SONG
 
@@ -161,39 +165,39 @@ SimpleSoundHeader STD_ALARM_VOICES = 1
 	ChangePriority	<SP_SYSTEM_LEVEL + SP_IMMEDIATE>
         ChangeEnvelope  0, IP_FLUTE
         DeltaTick       1
-        VoiceOn         0, SS_MULTIPLIER*HIGH_A, VOICE_LOW
+        VoiceOn         0, SS_MULTIPLIER*MIDDLE_A, VOICE_LOW
         DeltaTick       8
         VoiceOff        0
         DeltaTick       2
-        VoiceOn         0, SS_MULTIPLIER*HIGH_G, VOICE_LOW
+        VoiceOn         0, SS_MULTIPLIER*MIDDLE_G, VOICE_LOW
         DeltaTick       8
         VoiceOff        0
         DeltaTick       2
-        VoiceOn         0, SS_MULTIPLIER*HIGH_F, VOICE_LOW
+        VoiceOn         0, SS_MULTIPLIER*MIDDLE_F, VOICE_LOW
         DeltaTick       8
         VoiceOff        0
         DeltaTick       2
-        VoiceOn         0, SS_MULTIPLIER*HIGH_A, VOICE_LOW
+        VoiceOn         0, SS_MULTIPLIER*MIDDLE_A, VOICE_LOW
         DeltaTick       8
         VoiceOff        0
         DeltaTick       2
-        VoiceOn         0, SS_MULTIPLIER*HIGH_G, VOICE_LOW
+        VoiceOn         0, SS_MULTIPLIER*MIDDLE_G, VOICE_LOW
         DeltaTick       8
         VoiceOff        0
         DeltaTick       2
-        VoiceOn         0, SS_MULTIPLIER*HIGH_F, VOICE_LOW
+        VoiceOn         0, SS_MULTIPLIER*MIDDLE_F, VOICE_LOW
         DeltaTick       8
         VoiceOff        0
         DeltaTick       2
-        VoiceOn         0, SS_MULTIPLIER*HIGH_A, VOICE_LOW
+        VoiceOn         0, SS_MULTIPLIER*MIDDLE_A, VOICE_LOW
         DeltaTick       8
         VoiceOff        0
         DeltaTick       2
-        VoiceOn         0, SS_MULTIPLIER*HIGH_G, VOICE_LOW
+        VoiceOn         0, SS_MULTIPLIER*MIDDLE_G, VOICE_LOW
         DeltaTick       10
         VoiceOff        0
         DeltaTick       2
-        VoiceOn         0, SS_MULTIPLIER*HIGH_F, VOICE_LOW
+        VoiceOn         0, SS_MULTIPLIER*MIDDLE_F, VOICE_LOW
         DeltaTick       12
         VoiceOff        0
         General         GE_END_OF_SONG
@@ -209,11 +213,11 @@ SimpleSoundHeader STD_NO_HELP_VOICES
 		ChangePriority	<SP_SYSTEM_LEVEL>
 		ChangeEnvelope	0, IP_OVERDRIVEN_GUITAR
 		DeltaTick	1
-		VoiceOn		0, SS_MULTIPLIER*800, VOICE_LOW	; 1.25 tick beep
-		DeltaMS		20
-		VoiceOff	0			; no  pause
-		VoiceOn		0, SS_MULTIPLIER*500, VOICE_HIGH	; 1.25 tick beep
-		DeltaMS		20
+		VoiceOn		0, SS_MULTIPLIER*600, VOICE_LOW		; 1 tick beep
+		DeltaTick	1
+		VoiceOff	0					; no  pause
+		VoiceOn		0, SS_MULTIPLIER*400, VOICE_HIGH	; 1 tick beep
+		DeltaTick	1
 		VoiceOff	0
 		General		GE_END_OF_SONG
 
