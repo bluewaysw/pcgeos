@@ -94,7 +94,12 @@ zword get_header_extension (int entry)
     zword addr;
     zword val;
 
-    if (h_extension_table == 0 || entry > hx_table_size)
+   /* if (h_extension_table == 0 || entry > hx_table_size) */
+
+   /* 29.02.24 Bariossimo:
+      Reading of h_extension_table-Entries fails in GEOS.
+      LOW_WORD (addr, val) reads random values to val
+      Because of that, use of extension_table was disabled */
     return 0;
 
     addr = h_extension_table + 2 * entry;
