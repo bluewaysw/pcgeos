@@ -177,10 +177,26 @@
     { 0x80, 0xC0, 0xE0, 0xF0, 0xF8, 0xFC, 0xFE, 0xFF };
 
   /* prototypes used for sweep function dispatch */
+#ifdef TT_CONFIG_OPTION_GRAY_SCALING
   typedef void  Function_Sweep_Init( RAS_ARGS Short*  min,
                                               Short*  max );
+#else
+  typedef void  Function_Sweep_Init( RAS_ARGS Short*  min );
+#endif
 
+#ifdef TT_CONFIG_OPTION_GRAY_SCALING
   typedef void  Function_Sweep_Span( RAS_ARGS Short       y,
+                                              TT_F26Dot6  x1,
+                                              TT_F26Dot6  x2,
+                                              PProfile    left,
+                                              PProfile    right );
+#else
+  typedef void  Function_Sweep_Span( RAS_ARGS Short       y,
+                                              TT_F26Dot6  x1,
+                                              TT_F26Dot6  x2 );
+#endif
+
+  typedef void  Function_Sweep_Drop( RAS_ARGS Short       y,
                                               TT_F26Dot6  x1,
                                               TT_F26Dot6  x2,
                                               PProfile    left,
@@ -274,7 +290,7 @@
 
     Function_Sweep_Init _near *    Proc_Sweep_Init;
     Function_Sweep_Span _near *    Proc_Sweep_Span;
-    Function_Sweep_Span _near *    Proc_Sweep_Drop;
+    Function_Sweep_Drop _near *    Proc_Sweep_Drop;
     Function_Sweep_Step _near *    Proc_Sweep_Step;
     Function_Sweep_Finish _near *  Proc_Sweep_Finish;
 
@@ -1462,7 +1478,7 @@
 /*                                                                     */
 /***********************************************************************/
 
-  static void _near  Vertical_Sweep_Init( RAS_ARGS Short*  min, Short*  max )
+  static void _near  Vertical_Sweep_Init( RAS_ARGS Short*  min )
   {
     ras.traceOfs  = ( ras.target.rows - 1 - *min ) * ras.target.cols;
     ras.traceIncr = -ras.target.cols;
@@ -1471,9 +1487,7 @@
 
   static void _near  Vertical_Sweep_Span( RAS_ARGS Short       y,
                                              TT_F26Dot6  x1,
-                                             TT_F26Dot6  x2,
-                                             PProfile    left,
-                                             PProfile    right )
+                                             TT_F26Dot6  x2 )
   {
     Long   e1, e2;
     Short  c1, c2;
@@ -1646,9 +1660,7 @@
 /*                                                                     */
 /***********************************************************************/
 
-  static void _near  Vertical_Region_Sweep_Init( RAS_ARGS 
-                                           Short*  min, 
-                                           Short*  max )
+  static void _near  Vertical_Region_Sweep_Init( RAS_ARGS Short*  min )
   {
     ras.traceOfs         = 0;
     ras.traceIncr        = 0;
@@ -1657,9 +1669,7 @@
 
   static void _near  Vertical_Region_Sweep_Span( RAS_ARGS Short       y,
                                                     TT_F26Dot6  x1,
-                                                    TT_F26Dot6  x2,
-                                                    PProfile    left,
-                                                    PProfile    right )
+                                                    TT_F26Dot6  x2 )
   {
     Long    e1, e2;
     PShort  target;
@@ -1762,7 +1772,7 @@
 /*                                                                     */
 /***********************************************************************/
 
-  static void _near  Horizontal_Sweep_Init( RAS_ARGS Short*  min, Short*  max )
+  static void _near  Horizontal_Sweep_Init( RAS_ARGS Short*  min )
   {
     /* nothing, really */
   }
@@ -1770,9 +1780,7 @@
 
   static void _near  Horizontal_Sweep_Span( RAS_ARGS Short y,
                                                TT_F26Dot6  x1,
-                                               TT_F26Dot6  x2,
-                                               PProfile    left,
-                                               PProfile    right )
+                                               TT_F26Dot6  x2 )
   {
     Long  e1, e2;
     PByte bits;
@@ -1889,7 +1897,8 @@
     /* Nothing, really */
   }
 
-    static void _near Horizontal_Sweep_Finish( RAS_ARG )
+
+  static void _near Horizontal_Sweep_Finish( RAS_ARG )
   {
     /* nothing to do */
   }
@@ -2150,7 +2159,11 @@
 
     /* Now inits the sweep */
 
+#ifdef TT_CONFIG_OPTION_GRAY_SCALING
     ras.Proc_Sweep_Init( RAS_VARS  &min_Y, &max_Y );
+#else
+    ras.Proc_Sweep_Init( RAS_VARS  &min_Y );
+#endif
 
     /* Then compute the distance of each profile from min_Y */
 
@@ -2245,8 +2258,11 @@
               goto Skip_To_Next;
             }
           }
-
+#ifdef TT_CONFIG_OPTION_GRAY_SCALING
           ras.Proc_Sweep_Span( RAS_VARS  y, x1, x2, P_Left, P_Right );
+#else
+          ras.Proc_Sweep_Span( RAS_VARS  y, x1, x2 );
+#endif
 
    Skip_To_Next:
 

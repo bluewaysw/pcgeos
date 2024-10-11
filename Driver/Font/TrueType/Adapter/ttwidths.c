@@ -297,32 +297,31 @@ EC(             ECCheckBounds( (void*)charTableEntry ) );
                         charTableEntry->CTE_width.WBF_int  = 0;
                         charTableEntry->CTE_width.WBF_frac = 0;
                         charTableEntry->CTE_usage          = 0;
-
-                        ++charTableEntry;
-                        continue;
                 }
-                      
-                /* load metrics */
-                TT_Get_Index_Metrics( FACE, charIndex, &GLYPH_METRICS );
+                else
+                {
+                        /* load metrics */
+                        TT_Get_Index_Metrics( FACE, charIndex, &GLYPH_METRICS );
 
-                /* fill CharTableEntry */
-                scaledWidth = GrMulWWFixed( MakeWWFixed( GLYPH_METRICS.advance), SCALE_WIDTH );
-                charTableEntry->CTE_width.WBF_int  = INTEGER_OF_WWFIXEDASDWORD( scaledWidth );
-                charTableEntry->CTE_width.WBF_frac = FRACTION_OF_WWFIXEDASDWORD( scaledWidth );
-                charTableEntry->CTE_dataOffset     = CHAR_NOT_BUILT;
-                charTableEntry->CTE_usage          = 0;
-                charTableEntry->CTE_flags          = 0;
+                        /* fill CharTableEntry */
+                        scaledWidth = GrMulWWFixed( MakeWWFixed( GLYPH_METRICS.advance), SCALE_WIDTH );
+                        charTableEntry->CTE_width.WBF_int  = INTEGER_OF_WWFIXEDASDWORD( scaledWidth );
+                        charTableEntry->CTE_width.WBF_frac = FRACTION_OF_WWFIXEDASDWORD( scaledWidth );
+                        charTableEntry->CTE_dataOffset     = CHAR_NOT_BUILT;
+                        charTableEntry->CTE_usage          = 0;
+                        charTableEntry->CTE_flags          = 0;
                 
                
-                /* set flags in CTE_flags if needed */
-                if( GLYPH_BBOX.xMin < 0 )
-                        charTableEntry->CTE_flags |= CTF_NEGATIVE_LSB;
+                        /* set flags in CTE_flags if needed */
+                        if( GLYPH_BBOX.xMin < 0 )
+                                charTableEntry->CTE_flags |= CTF_NEGATIVE_LSB;
                         
-                if( -GLYPH_BBOX.yMin > fontHeader->FH_descent )
-                        charTableEntry->CTE_flags |= CTF_BELOW_DESCENT;
+                        if( -GLYPH_BBOX.yMin > fontHeader->FH_descent )
+                                charTableEntry->CTE_flags |= CTF_BELOW_DESCENT;
 
-                if( GLYPH_BBOX.yMax > fontHeader->FH_ascent )
-                        charTableEntry->CTE_flags |= CTF_ABOVE_ASCENT;
+                        if( GLYPH_BBOX.yMax > fontHeader->FH_ascent )
+                                charTableEntry->CTE_flags |= CTF_ABOVE_ASCENT;
+                }
 
                 ++charTableEntry;
         } 
@@ -717,7 +716,7 @@ static word AllocFontBlock( word        additionalSpace,
         /* allocate memory for FontBuf, CharTableEntries, KernPairs and additional space */
         if( *fontHandle == NullHandle )
         {
-                *fontHandle = MemAllocSetOwner( FONT_MAN_ID, MAX_FONTBUF_SIZE, 
+                *fontHandle = MemAllocSetOwner( FONT_MAN_ID, MAX( size, MAX_FONTBUF_SIZE ), 
                         HF_SWAPABLE | HF_SHARABLE,
                         HAF_NO_ERR | HAF_LOCK | HAF_ZERO_INIT );
 EC(             ECCheckMemHandle( *fontHandle ) );
@@ -725,7 +724,7 @@ EC(             ECCheckMemHandle( *fontHandle ) );
         }
         else
         {
-                MemReAlloc( *fontHandle, MAX_FONTBUF_SIZE, HAF_NO_ERR | HAF_LOCK );
+                MemReAlloc( *fontHandle, MAX( size, MAX_FONTBUF_SIZE ), HAF_NO_ERR | HAF_LOCK );
 EC(             ECCheckMemHandle( *fontHandle ) );
         }
 
