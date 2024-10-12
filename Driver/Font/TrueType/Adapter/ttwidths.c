@@ -271,7 +271,7 @@ Fail:
  *      Date      Name      Description
  *      ----      ----      -----------
  *      12.02.23  JK        Initial Revision
- *      17.09.24  JK        filling kern paris removed
+ *      17.09.24  JK        filling kern pairs moved to separate function
  *******************************************************************/
 
 static void ConvertWidths( TRUETYPE_VARS, FontHeader* fontHeader, FontBuf* fontBuf )
