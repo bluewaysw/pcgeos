@@ -362,47 +362,52 @@ ImpBmpStatus _pascal ImpPNGProcessFile(ImpBmpParams *params)
 		{
 			// Initialize output bitmap
 			params->IBP_bitmap = pngInitiateOutputBitmap(params->IBP_dest, ihdrData, fmt);
-			if (params->IBP_bitmap == 0) FatalError(256);
-
-			params->IBP_width  = ihdrData.width;
-			params->IBP_height = ihdrData.height;
-			params->IBP_format = IBF_PNG;
-			strcpy(params->IBP_impForm, ".PNG");
-
-			// transfers only if a palette exists, also creates palettes for grayscale images
-			pngHandlePalette(params->IBP_source, plteChunk, params->IBP_dest, params->IBP_bitmap, ihdrData.colorType, ihdrData.bitDepth);
-
-			// Initialize the IDAT state
-			pngInitIDATProcessingState(&state, params->IBP_source, idatChunksHan, idatNumChunks, ihdrData);
-
-			// Process each scanline
-			while ((pngGetNextIDATScanline(&state) == 1) && (status == IBS_NO_ERROR))
+			if (params->IBP_bitmap != 0)
 			{
-				// when not zlib decoding, give the system a little room to breathe
-				pngPauseIDATProcessing(&state);
+				params->IBP_width  = ihdrData.width;
+				params->IBP_height = ihdrData.height;
+				params->IBP_format = IBF_PNG;
+				strcpy(params->IBP_impForm, ".PNG");
 
-				// make sure we have data compatible with GEOS HugeBitmaps
-				pngApplyGEOSFormatTransformations(&state, params->IBP_pngBlendColor);
+				// transfers only if a palette exists, also creates palettes for grayscale images
+				pngHandlePalette(params->IBP_source, plteChunk, params->IBP_dest, params->IBP_bitmap, ihdrData.colorType, ihdrData.bitDepth);
 
-				// Write the processed scanline (without the filter byte) to the VMFile
-				pngWriteScanlineToBitmap(params->IBP_dest, params->IBP_bitmap, state.lineNo - 1, state.currentRow);
+				// Initialize the IDAT state
+				pngInitIDATProcessingState(&state, params->IBP_source, idatChunksHan, idatNumChunks, ihdrData);
 
-				// prepare the next zlib decoding work
-				pngResumeIDATProcessing(&state);
-
-				// update status of processing
-				if (params->IBP_status != NULL)
-					flag = @call params->IBP_status::MSG_SB_SET_STATUS_VALUE(((dword)state.lineNo)*100 / params->IBP_height);
-
-				// if "Stop" was pressed, make sure we abort
-				if (flag == FALSE)
+				// Process each scanline
+				while ((pngGetNextIDATScanline(&state) == 1) && (status == IBS_NO_ERROR))
 				{
-					status = IBS_IMPORT_STOPPED;
-				}
-			}
+					// when not zlib decoding, give the system a little room to breathe
+					pngPauseIDATProcessing(&state);
 
-			// Clean up resources
-			pngCleanupIDATProcessingState(&state);
+					// make sure we have data compatible with GEOS HugeBitmaps
+					pngApplyGEOSFormatTransformations(&state, params->IBP_pngBlendColor);
+
+					// Write the processed scanline (without the filter byte) to the VMFile
+					pngWriteScanlineToBitmap(params->IBP_dest, params->IBP_bitmap, state.lineNo - 1, state.currentRow);
+
+					// prepare the next zlib decoding work
+					pngResumeIDATProcessing(&state);
+
+					// update status of processing
+					if (params->IBP_status != NULL)
+						flag = @call params->IBP_status::MSG_SB_SET_STATUS_VALUE(((dword)state.lineNo)*100 / params->IBP_height);
+
+					// if "Stop" was pressed, make sure we abort
+					if (flag == FALSE)
+					{
+						status = IBS_IMPORT_STOPPED;
+					}
+				}
+
+				// Clean up resources
+				pngCleanupIDATProcessingState(&state);
+			}
+			else
+			{
+				status = IBS_SYS_ERROR;
+			}
 		}
 		else
 		{
