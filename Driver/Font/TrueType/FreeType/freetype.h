@@ -783,13 +783,6 @@
 #define TT_Set_Instance_PointSize( ins, ptsize )   \
             TT_Set_Instance_CharSize( ins, ptsize*64L )
 
-/*
-  EXPORT_DEF
-  TT_Error  TT_Set_Instance_PixelSizes( TT_Instance  instance,
-                                        TT_UShort    pixelWidth,
-                                        TT_UShort    pixelHeight,
-                                        TT_F26Dot6   pointSize );
-*/
 
   /* This function has been deprecated!  Do not use it, as it      */
   /* doesn't work reliably.  You can perfectly control hinting     */
@@ -879,6 +872,12 @@
 
   EXPORT_DEF
   TT_Error  TT_Get_Glyph_Metrics( TT_Glyph           glyph,
+                                  TT_Glyph_Metrics*  metrics );
+
+
+  EXPORT_DEF
+  TT_Error  TT_Get_Index_Metrics( TT_Face            face,
+                                  TT_UShort          index,
                                   TT_Glyph_Metrics*  metrics );
 
 
