@@ -1126,9 +1126,15 @@ int LOCAL TranslateCharNum(unsigned int num)
     HTMLEntityTable *xlate_table;
     int i,ret=0;
 
-    if(num<128)
+    if(num<MIN_MAP_CHAR)
     {
       return (num>=32 || num==9 || num==13)? num:0;
+    }
+    else if(num<256)
+    {
+      ret = LocalCodePageToGeosChar((wchar)num, CODE_PAGE_LATIN_1, 0);
+      if(ret)
+ 	return ret;
     }
 
     MemLock( OptrToHandle(@xlateTable) );
@@ -1154,59 +1160,63 @@ int _pascal _export HTMLTranslateCharNum(unsigned int num)
 int LOCAL TranslateChar(char *tag)
 {
     int ret=0;
-
-    if(*tag!='\x23')                    /* tag specified by name? */
-    {
-      HTMLEntityTable *xlate_table;
-      int i;
+    HTMLEntityTable *xlate_table;
+    int i;
       
-      MemLock( OptrToHandle(@xlateTable) );
-      xlate_table = LMemDeref(@xlateTable);
+    MemLock( OptrToHandle(@xlateTable) );
+    xlate_table = LMemDeref(@xlateTable);
 
-      for(i=0; xlate_table[i].num; i++)
-        if( tag[0]==xlate_table[i].name[0] &&
-            !STRCMPSB(xlate_table[i].name,tag) )
-        {
-          ret = xlate_table[i].c;
+    for(i=0; xlate_table[i].num; i++)
+      if( tag[0]==xlate_table[i].name[0] &&
+          !STRCMPSB(xlate_table[i].name,tag) )
+      {
+        ret = xlate_table[i].c;
+        break;
+      }
+
+    MemUnlock( OptrToHandle(@xlateTable) );
+    return ret;
+}
+
+int LOCAL TranslateCodeChar(char *tag)
+{
+    unsigned int ch;
+    if(tag[1]=='x')
+    {
+      ch = 0;
+      tag += 2;
+      while(1)
+      {
+        /* parse hex code - see htoi() in WMG3HTTP.goc */
+        if (*tag >= '0' && *tag <= '9') {
+          ch = ch*16 + ((*tag++)-'0');
+        } else if (*tag >= 'a' && *tag <= 'f') {
+          ch = ch*16 + ((*tag++)-'a')+10;
+        } else if (*tag >= 'A' && *tag <= 'F') {
+          ch = ch*16 + ((*tag++)-'A')+10;
+        } else {
           break;
         }
-
-      MemUnlock( OptrToHandle(@xlateTable) );
+      }
     }
     else
     {
-      unsigned int ch;
-      if(tag[1]=='x')
-      {
-	ch = 0;
-	tag += 2;
-	while(1)
-	{
-	  /* parse hex code - see htoi() in WMG3HTTP.goc */
-	  if (*tag >= '0' && *tag <= '9') {
-	    ch = ch*16 + ((*tag++)-'0');
-	  } else if (*tag >= 'a' && *tag <= 'f') {
-	    ch = ch*16 + ((*tag++)-'a')+10;
-	  } else if (*tag >= 'A' && *tag <= 'F') {
-	    ch = ch*16 + ((*tag++)-'A')+10;
-	  } else {
-	    break;
-	  }
-	}
-      }
-      else
-      {
-        ch = (unsigned int)(ATOISB(tag+1));
-      }
-      ret = TranslateCharNum(ch);       /* convert characters to number */
+      ch = (unsigned int)(ATOISB(tag+1));
     }
-    return ret;
+    return TranslateCharNum(ch);        /* convert characters to number */
 }
 
 /* external version */
 int _pascal _export HTMLTranslateChar(char *entity)
 {
-    return TranslateChar(entity);
+    if(*entity!='\x23')                 /* tag specified by name? */
+    {
+      return TranslateChar(entity);
+    }
+    else
+    {
+      return TranslateCodeChar(entity);
+    }
 }
 
 word LOCAL StyleNum(char *name, SpecialTagType *spec)
@@ -1426,19 +1436,35 @@ int LOCAL GetText(int cc, int ce, char *buf, word formMode, MemHandle *overflowB
               cn = HTMLgetc();
             }
             tag[q] = 0;                 /* terminate tag */
-            c = TranslateChar(tag);
+            c = TranslateCodeChar(tag);
           }
           else                          /* entity specified by name */
           {
+	    HTMLEntityTable *xlate_table;
+	    MemLock( OptrToHandle(@xlateTable) );
+	    xlate_table = LMemDeref(@xlateTable);
             c = 0;
+	    /* abort as soon as char is known (this is bad HTML,
+	       but ok with NS) */
             while( cn!=EOF && isalnum(cn) && q<HTML_MAXTAG && !c )
             {
+	      HTMLEntityTable *p;
+	      if (q==0) {
+		/* advance to position of first character */
+		while(xlate_table->c && cn>xlate_table->name[0])
+		  xlate_table++;
+	      }
               tag[q++] = (char)cn;      /* get entity name */
               tag[q] = 0 ;
-              c = TranslateChar(tag);   /* abort as soon as char is known (this
-                                           is bad HTML, but ok with NS) */
+	      for(p=xlate_table; tag[0]==p->name[0]; p++)
+		if( !STRCMPSB(p->name, tag) )
+		{
+		  c = p->c;
+		  break;
+		}
               cn = HTMLgetc();
             }
+    	    MemUnlock( OptrToHandle(@xlateTable) );
             tag[q] = 0;                 /* make sure tag is terminated */
           }
 
@@ -1449,7 +1475,8 @@ int LOCAL GetText(int cc, int ce, char *buf, word formMode, MemHandle *overflowB
 	     care what the trailing character was, fixes 4667
 	     -- brianc 10/24/00 */
 	  /* restore leniency for numeric character entity -- brianc 11/9/00 */
-          if(c && (isNum || !isalnum(cn)))         /* found a character? */
+	  /* restore leniency for all -- mgroeber 10/11/2024 */
+          if(c)                         /* found a character? */
           {
             if(cn==';')                 /* skip over terminating ";" if any */
               cn = HTMLgetc();
@@ -2338,8 +2365,7 @@ int EXPORT ParsePlainFile(ReadHTML_getc *p_gc, dword p_data, HTMLextra *ext,
         if((unsigned int)(HTMLext->HE_codePage) < CODE_PAGE_SJIS)
 @endif
         if(c>=128)                      /* assume ISO Latin encoding */
-        {
-                                        /* translate char as in HTML file */
+        {                               /* translate char as in HTML file */
           c = TranslateCharNum((unsigned int)c);
           if(c==0) c='?';
         }
