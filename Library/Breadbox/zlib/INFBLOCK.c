@@ -387,7 +387,10 @@ z_streamp z;
   IF_GEOS_LOCK_SLIDING_WINDOW(s);
   inflate_blocks_reset(s, z, Z_NULL);
   IF_GEOS_UNLOCK_SLIDING_WINDOW(s);
-  IF_GEOS_FREE_SLDING_WINDOW(s);
+  s->windowEndOffs = 0;
+  s->windowReadOffs = 0;
+  s->windowWriteOffs = 0;
+  MemFree(s->windowHan);
   s->windowHan = NullHandle;
 #else
   inflate_blocks_reset(s, z, Z_NULL);

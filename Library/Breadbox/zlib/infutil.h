@@ -70,6 +70,16 @@ struct inflate_blocks_state {
   uLong check;          /* check on output */
 };
 
+
+
+/*
+ * Strategy:
+ * We want to use IF_GEOS_LOCK_SLIDING_WINDOW and IF_GEOS_UNLOCK_SLIDING_WINDOW
+ * as /high/ as possible in the API, so they come up mainly in inflate.c.
+ * However, allocating and freeing memory has to be done in infblock.c (which is one
+ * level down), but we try to use GEOS code there only in inflate_blocks_new
+ * and inflate_blocks_free.
+ */
 #ifdef __GEOS__
   #define IF_GEOS_LOCK_SLIDING_WINDOW(s) { \
     s->window = (Bytef *) MemLock(s->windowHan); \
@@ -84,18 +94,10 @@ struct inflate_blocks_state {
     s->windowWriteOffs = ((word) s->write) - ((word) s->window); \
     MemUnlock(s->windowHan); \
   }
-
-  #define IF_GEOS_FREE_SLDING_WINDOW(s) { \
-    s->windowEndOffs = 0; \
-    s->windowReadOffs = 0; \
-    s->windowWriteOffs = 0; \
-    MemFree(s->windowHan); \
-  }
-
 #else
-  #define IF_GEOS_LOCK_SLIDING_WINDOW(s)   // expands to nothing
-  #define IF_GEOS_UNLOCK_SLIDING_WINDOW(s) // expands to nothing
-  #define IF_GEOS_FREE_SLDING_WINDOW(s)    // expands to nothing
+  // these expand to nothing
+  #define IF_GEOS_LOCK_SLIDING_WINDOW(s)
+  #define IF_GEOS_UNLOCK_SLIDING_WINDOW(s)
 #endif
 
 
