@@ -63,11 +63,17 @@ z_streamp z;
 {
   if (z == Z_NULL || Z_STATE == Z_NULL)
     return Z_STREAM_ERROR;
+
+  IF_GEOS_LOCK_SLIDING_WINDOW(Z_STATE->blocks);
+
   z->total_in = z->total_out = 0;
   z->msg = Z_NULL;
   Z_STATE->mode = Z_STATE->nowrap ? BLOCKS : METHOD;
   inflate_blocks_reset(Z_STATE->blocks, z, Z_NULL);
   Trace((stderr, "inflate: reset\n"));
+
+  IF_GEOS_UNLOCK_SLIDING_WINDOW(Z_STATE->blocks);
+
   return Z_OK;
 }
 
@@ -330,7 +336,8 @@ uInt  dictLength;
   if (z == Z_NULL || Z_STATE == Z_NULL || Z_STATE->mode != DICT0)
     return Z_STREAM_ERROR;
 
-  if (adler32(1L, dictionary, dictLength) != z->adler) return Z_DATA_ERROR;
+  if (adler32(1L, dictionary, dictLength) != z->adler)
+    return Z_DATA_ERROR;
   z->adler = 1L;
 
   if (length >= ((uInt)1<<Z_STATE->wbits))
@@ -338,8 +345,14 @@ uInt  dictLength;
     length = (1<<Z_STATE->wbits)-1;
     dictionary += dictLength - length;
   }
+
+  IF_GEOS_LOCK_SLIDING_WINDOW(Z_STATE->blocks);
+
   inflate_set_dictionary(Z_STATE->blocks, dictionary, length);
   Z_STATE->mode = BLOCKS;
+
+  IF_GEOS_UNLOCK_SLIDING_WINDOW(Z_STATE->blocks);
+
   return Z_OK;
 }
 

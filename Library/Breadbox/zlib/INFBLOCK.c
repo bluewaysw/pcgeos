@@ -383,10 +383,14 @@ int inflate_blocks_free(s, z)
 inflate_blocks_statef *s;
 z_streamp z;
 {
-  inflate_blocks_reset(s, z, Z_NULL);
 #ifdef __GEOS__
-  MemFree(s->windowHan);
+  IF_GEOS_LOCK_SLIDING_WINDOW(s);
+  inflate_blocks_reset(s, z, Z_NULL);
+  IF_GEOS_UNLOCK_SLIDING_WINDOW(s);
+  IF_GEOS_FREE_SLDING_WINDOW(s);
+  s->windowHan = NullHandle;
 #else
+  inflate_blocks_reset(s, z, Z_NULL);
   ZFREE(z, s->window);
 #endif
   ZFREE(z, s->hufts);

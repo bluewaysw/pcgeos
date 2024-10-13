@@ -84,9 +84,18 @@ struct inflate_blocks_state {
     s->windowWriteOffs = ((word) s->write) - ((word) s->window); \
     MemUnlock(s->windowHan); \
   }
+
+  #define IF_GEOS_FREE_SLDING_WINDOW(s) { \
+    s->windowEndOffs = 0; \
+    s->windowReadOffs = 0; \
+    s->windowWriteOffs = 0; \
+    MemFree(s->windowHan); \
+  }
+
 #else
   #define IF_GEOS_LOCK_SLIDING_WINDOW(s)   // expands to nothing
   #define IF_GEOS_UNLOCK_SLIDING_WINDOW(s) // expands to nothing
+  #define IF_GEOS_FREE_SLDING_WINDOW(s)    // expands to nothing
 #endif
 
 
