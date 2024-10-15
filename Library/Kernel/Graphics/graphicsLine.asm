@@ -85,46 +85,6 @@ GrDrawVLine	endp
 
 
 COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-		SNDrawVLineAsRect
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-
-SYNOPSIS:	A simple version of GrDrawVLine that can execute without
-		loading any other kernel modules.
-
-CALLED BY:	EXTERNAL
-		DrawInsetRect
-PASS:		di	- GState handle
-		ax,bx	- first coordinate
-		dx	- y coordinate of second endpoint
-		line color set with GrSetAreaColor
-RETURN:		nothing
-DESTROYED:	nothing
-SIDE EFFECTS:	
-
-PSEUDO CODE/STRATEGY:
-		
-
-REVISION HISTORY:
-	Name	Date		Description
-	----	----		-----------
-	ayuen	1/27/99    	Initial version
-
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
-if MOTIF_COLOR_ONLY_SYSTEM and not FULL_EXECUTE_IN_PLACE
-
-SNDrawVLineAsRect	proc	near
-
-	pusha
-	mov	cx, ax
-	dec	dx			; transform doc coord to video coord
-	jmp	DrawLineAsRectCommon
-
-SNDrawVLineAsRect	endp
-
-endif	; MOTIF_COLOR_ONLY_SYSTEM and not FULL_EXECUTE_IN_PLACE
-
-
-COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 		GrDrawHLine
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
@@ -172,84 +132,6 @@ hlGString:
 		call	WriteGSElementFar
 		jmp	ExitGraphicsGseg
 GrDrawHLine	endp
-
-
-COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-		SNDrawHLineAsRect
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-
-SYNOPSIS:	A simple version of GrDrawHLine that can execute without
-		loading any other kernel modules.
-
-CALLED BY:	EXTERNAL
-		DrawInsetRect
-PASS:		di	- GState handle
-		ax,bx	- coordinates of first endpoint
-		cx	- x coordinate of second endpoint
-		line color set with GrSetAreaColor
-RETURN:		nothing
-DESTROYED:	nothing
-SIDE EFFECTS:	
-
-PSEUDO CODE/STRATEGY:
-		
-
-REVISION HISTORY:
-	Name	Date		Description
-	----	----		-----------
-	ayuen	1/27/99    	Initial version
-
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
-if MOTIF_COLOR_ONLY_SYSTEM and not FULL_EXECUTE_IN_PLACE
-
-SNDrawHLineAsRect	proc	near
-
-	pusha
-	mov	dx, bx
-	dec	cx			; transform doc coord to video coord
-	REAL_FALL_THRU	DrawLineAsRectCommon
-
-SNDrawHLineAsRect	endp
-
-endif	; MOTIF_COLOR_ONLY_SYSTEM and not FULL_EXECUTE_IN_PLACE
-
-
-COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-		DrawLineAsRectCommon
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-
-SYNOPSIS:	Call SNFillRect and restore registers from stack
-
-CALLED BY:	INTERNAL
-		SNDrawVLineAsRect, SNDrawHLineAsRect
-PASS:		di	- GState handle
-		ax,bx	- coordinates of first corner.
-		cx,dx	- coordinates of opposite corner
-		regs pushed on stack by PUSHA
-RETURN:		regs popped from stack by POPA
-DESTROYED:	nothing
-SIDE EFFECTS:	
-
-PSEUDO CODE/STRATEGY:
-		
-
-REVISION HISTORY:
-	Name	Date		Description
-	----	----		-----------
-	ayuen	1/26/99    	Initial version
-
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
-if MOTIF_COLOR_ONLY_SYSTEM and not FULL_EXECUTE_IN_PLACE
-
-DrawLineAsRectCommon	proc	near jmp
-
-	call	SNFillRect
-	popa
-
-	ret
-DrawLineAsRectCommon	endp
-
-endif	; MOTIF_COLOR_ONLY_SYSTEM and not FULL_EXECUTE_IN_PLACE
 
 
 COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%

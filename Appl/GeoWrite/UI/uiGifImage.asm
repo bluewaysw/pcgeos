@@ -360,10 +360,12 @@ GIFSetBitmapType	proc	near
 
 	; set bitmap type based on number of colors in bitmap
 
-	mov	cl, ss:[gifFileHeader].GIFFH_globalFlags
-	andnf	cl, mask GIFGF_COLORRESOLUTION
-	shr	cl, offset GIFGF_COLORRESOLUTION
-	inc	cl
+	mov	al, ss:[gifFileHeader].GIFFH_globalFlags
+	andnf	al, mask GIFGF_COLORRESOLUTION
+	mov	cl, offset GIFGF_COLORRESOLUTION
+	shr	al, cl
+	inc	al
+	mov	cl, al
 	mov	ax, 1
 	shl	ax, cl				; ax = number of color entries
 	cmp	ax, ss:[numColors]
@@ -754,7 +756,9 @@ GetNextLZWCode	proc	near
 
 	segmov	es, ss
 	mov	di, ss:[lzwDecodeVars].LZWDV_block_size
-	shr	di, 3
+	shr	di
+	shr	di
+	shr	di
 	mov	ax, {word} ss:[lzwDecodeVars].LZWDV_byte_buff[di-2]
 	lea	di, ss:[lzwDecodeVars].LZWDV_byte_buff[0]
 	stosw
@@ -771,7 +775,9 @@ GetNextLZWCode	proc	near
 	call	GIFReadGIFFileData
 	jc	done
 
-	shl	ax, 3
+	shl	ax
+	shl	ax
+	shl	ax
 	add	ss:[lzwDecodeVars].LZWDV_nbits_left, ax
 	add	ss:[lzwDecodeVars].LZWDV_block_size, ax
 	mov	ax, ss:[lzwDecodeVars].LZWDV_nbits_left
@@ -780,7 +786,9 @@ getCode:
 	mov	di, ss:[lzwDecodeVars].LZWDV_block_size
 	sub	di, ax				; di <- LZW code bit position
 	mov	cx, di				; cx <- LZW code bit position
-	shr	di, 3				; di <- LZW code byte position
+	shr	di				; di <- LZW code byte position
+	shr	di
+	shr	di
 	and	cx, 0x07			; cx <- LZW code bit offset
 	mov	ax, {word} ss:[lzwDecodeVars].LZWDV_byte_buff[di]
 	mov	di, {word} ss:[lzwDecodeVars].LZWDV_byte_buff[di+2]
@@ -870,7 +878,10 @@ write8bit::
 write4bit:
 	lodsb
 	mov	ah, al
-	shl	ah, 4
+	shl	ah
+	shl	ah
+	shl	ah
+	shl	ah
 	lodsb
 	and	al, 0x0f	
 	ornf	al, ah

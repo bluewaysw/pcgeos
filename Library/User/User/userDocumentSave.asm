@@ -79,7 +79,7 @@ UserStoreDocFileName	proc	far	uses bx, dx, ax, cx, ds
 	mov	ax, SP_PRIVATE_DATA
 	call	FileSetStandardPath
 
-	segmov	ds, dgroup
+	segmov	ds, dgroup, dx
 	mov	dx, offset recntDocName
 	mov	al, FILE_ACCESS_RW or FILE_DENY_NONE
 	call	FileOpen
@@ -543,13 +543,13 @@ UserGetRecentDocFileName	proc	far	uses ax, bx, cx, dx, ds, si
 	call	FileSetStandardPath
 
 	segmov	es, ds		; now es:si - buffer to store the fileName
-	segmov	ds, dgroup
+	segmov	ds, dgroup, dx
 	mov	dx, offset recntDocName
 	mov	al, FILE_ACCESS_R or FILE_DENY_W
 	call	FileOpen
 	pushf
 	clr	bp
-	segmov	es, 0
+	segmov	es, 0, di
 	clr	di
 	popf
 	jc	done

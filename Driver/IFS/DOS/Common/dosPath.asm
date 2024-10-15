@@ -1954,7 +1954,8 @@ if _MSLF
 	; to 8.3 format.  Then we can just use the passed name as the native
 	; name.
 	;
-		pusha
+		;pusha
+		push	ax, cx, dx, bx, bp, si, di
 		push	es
 		mov	si, dx			; ds:si = W32FD_fileName
 		segmov	es, ds
@@ -1962,7 +1963,8 @@ if _MSLF
 		clr	cx			; null-terminated
 		SBCompareStrings
 		pop	es
-		popa
+		pop	ax, cx, dx, bx, bp, si, di
+		;popa
 		je	haveDosName		; => conforms to 8.3
 generateDosName:
 else

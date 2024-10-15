@@ -77,7 +77,14 @@ SOUNDMIXERGETMASTERVOLUME	proc	far	left:fptr.word,
 	mov	es, right.segment	; ds <- song segment
 	mov	di, right.offset	; si <- song offset
 	push	ax
-	shr	ax, 8
+	shr	ax
+	shr	ax
+	shr	ax
+	shr	ax
+	shr	ax
+	shr	ax
+	shr	ax
+	shr	ax
 	mov	ds:[si], ax
 	pop	ax
 	clr	ah	

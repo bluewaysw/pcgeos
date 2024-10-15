@@ -1221,11 +1221,7 @@ endif
 	mov	ax, bx				;y, left = inset
 	sub	cx, bx				;right = width - inset + 1
 	inc	cx
-if	FULL_EXECUTE_IN_PLACE
 	call	GrDrawHLine			
-else
-	call	SNDrawHLineAsRect
-endif
 
 	;
 	; Draw left edge.
@@ -1234,11 +1230,7 @@ endif
 						;top = inset
 	sub	dx, bx				;bottom = height - inset + 1
 	inc	dx
-if	FULL_EXECUTE_IN_PLACE
 	call	GrDrawVLine			
-else
-	call	SNDrawVLineAsRect
-endif
 
 	pop	ax				;L/T color
 if	FULL_EXECUTE_IN_PLACE
@@ -1254,11 +1246,7 @@ endif
 	dec	ax
 						;top = inset
 						;bottom = height - inset + 1
-if	FULL_EXECUTE_IN_PLACE
 	call	GrDrawVLine			
-else
-	call	SNDrawVLineAsRect
-endif
 
 	;
 	; Bottom edge.
@@ -1267,11 +1255,7 @@ endif
 						;right = width - inset + 1
 	mov	bx, dx				;y = height - inset
 	dec	bx
-if	FULL_EXECUTE_IN_PLACE
 	call	GrDrawHLine			
-else
-	call	SNDrawHLineAsRect
-endif
 	.leave
 	ret
 DrawInsetRect	endp

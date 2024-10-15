@@ -4291,15 +4291,19 @@ MENU_WIN_SCROLL_DELTA	equ	23
 
 OLMenuWinUpdateUpDownScrollers	proc	far
 delayClose	local	word	push	ax	; only al used
-scrollers	local	word	push	0	; assume no scrollers needed
-upScroller	local	lptr	push	0	; assume no up scroller exists
-downScroller	local	lptr	push	0	; assume no dn scroller exists
+scrollers	local	word	;push	0	; assume no scrollers needed
+upScroller	local	lptr	;push	0	; assume no up scroller exists
+downScroller	local	lptr	;push	0	; assume no dn scroller exists
 parent		local	Rectangle
 parentWin	local	hptr
 menu		local	Rectangle
 menuWin		local	hptr
 	uses	ax,bx,cx,dx,si,di,bp,es
 	.enter
+
+	mov	scrollers, 0
+	mov	upScroller, 0
+	mov	downScroller, 0
 
 	; not needed for pinned menus
 
@@ -4576,8 +4580,9 @@ createWindow:
 	push	bx			; layer ID to use
 	push	bx			; owner to use
 	push	ss:[parentWin]		; parent window handle
-	push	0			; window region segment
-	push	0			; window region offset
+	clr	bx
+	push	bx			; window region segment
+	push	bx			; window region offset
 	push	cx			; window bottom
 	mov	ss:[menu].R_bottom, cx	; store for later
 	push	ss:[menu].R_right	; window right

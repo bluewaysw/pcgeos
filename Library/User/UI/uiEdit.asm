@@ -346,7 +346,7 @@ useAltEditKeys		char "altEditKeys",0
 SetupAlternateShortcuts	proc	near
 		uses	ax, bx, cx, dx, si, di, bp, es
 		.enter
-		segmov	es, dgroup
+		segmov	es, dgroup, cx
 	;
 	; See if we want the alternates
 	;

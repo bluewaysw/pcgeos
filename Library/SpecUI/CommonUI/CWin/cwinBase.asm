@@ -1718,13 +1718,15 @@ REVISION HISTORY:
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
 if TOOL_AREA_IS_TASK_BAR or WINDOW_LIST_ACTIVE
 OLBaseWinCreateCombinationMoniker	proc	far
-combMkr		local	optr		push	bp, 0
+combMkr		local	optr		push	bp, cx
 iconMkr		local	optr		push	bx, di
 textMkr		local	optr		push	cx, dx
 iconWidth	local	word
 iconHeight	local	word
 	uses	ax, bx, si, di, es
 	.enter
+
+	mov	combMkr, 0
 
 	movdw	bxdi, ss:[iconMkr]	;^lbx:di = moniker
 	tst	bx

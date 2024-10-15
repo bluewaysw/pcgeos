@@ -1210,7 +1210,8 @@ REVISION HISTORY:
 ResolverAddDhcpDnsServers	proc	far
 		uses	ds
 		.enter
-		pusha
+		;pusha
+		push	ax, cx, dx, bx, bp, si, di
 
 		mov	bx, handle dgroup
 		call	MemDerefDS
@@ -1222,7 +1223,8 @@ ResolverAddDhcpDnsServers	proc	far
 		movdw	ds:[dhcpDns2], ({dword}es:[di+IP_ADDR_SIZE]), ax
 
 done:
-		popa
+		pop	ax, cx, dx, bx, bp, si, di
+		;popa
 		.leave
 		ret
 ResolverAddDhcpDnsServers	endp

@@ -576,9 +576,11 @@ EthPktArpBroadcastRequest	proc	near
 	mov	cx, MIN_PACKET_SIZE
 
 retrySend:
-	pusha
+	;pusha
+	push	ax, cx, dx, bx, bp, si, di
 	call	callPacketDriver
-	popa
+	pop	ax, cx, dx, bx, bp, si, di
+	;popa
 	jnc	freeBuffer
 	dec	bx
 	jnz	retrySend
@@ -776,9 +778,11 @@ addAddr:
 	mov	ah, PDF_SEND_PKT
 
 retrySend:
-	pusha
+	;pusha
+	push	ax, cx, dx, bx, bp, si, di
 	call	callPacketDriver
-	popa
+	;popa
+	pop	ax, cx, dx, bx, bp, si, di
 	jnc	freeBuf
 	dec	bx
 	jnz	retrySend

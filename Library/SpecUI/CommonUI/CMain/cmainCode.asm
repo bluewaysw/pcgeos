@@ -1569,7 +1569,10 @@ afterAutoHide:
 	mov	ax, TBP_BOTTOM					; if value is out of bounds, set to bottom
 setTaskbarPosVal:
 	andnf	es:[taskBarPrefs], not mask TBF_POSITION	; make sure bits are clear
-	shl	ax, offset TBF_POSITION				; shift position bits to index of TBF_POSITION
+	push	cx
+	mov	cl, offset TBF_POSITION				; shift position bits to index of TBF_POSITION
+	shl	ax, cl
+	pop	cx
 	ornf	es:[taskBarPrefs], ax				; set position bits
 
 done:

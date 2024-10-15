@@ -321,7 +321,8 @@ DisableSpecificUIItems	proc	near
 		uses	es
 isISUI		local	byte
 		.enter
-		pusha
+		;pusha
+		push	ax, cx, dx, bx, bp, si, di
 
 		mov	ss:isISUI, FALSE
 		mov	cx, length motifDisableList
@@ -414,7 +415,8 @@ done:
 		mov	si, offset AppOptions1
 		call	ObjCallInstanceNoLock
 
-		popa
+		pop	ax, cx, dx, bx, bp, si, di
+		;popa
 		.leave
 		ret
 DisableSpecificUIItems	endp

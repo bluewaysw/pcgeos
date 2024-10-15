@@ -204,7 +204,8 @@ haveBlock:
 	je	haveBWidth
 
 		;assume 4 planes passed (even in 3CMY)
-	shl     ax,2                            ;now of all 4 colors.
+	shl     ax                              ;now of all 4 colors.
+	shl	ax
 EC<	cmp	cl,BMF_4CMYK					>
 EC<	je	haveBWidth					>
 EC<	cmp	cl,BMF_3CMY					>

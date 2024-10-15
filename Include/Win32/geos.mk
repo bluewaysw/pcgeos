@@ -636,7 +636,7 @@ WCCECOPTFLAGS ?=
 
 #if $(PRODUCT) == "NDO2000"
 #else
-CCOMFLAGS	+= -3
+CCOMFLAGS	+= -0
 #endif
 
 XCCOMFLAGS	?=

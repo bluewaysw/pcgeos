@@ -832,8 +832,11 @@ calcLoop:
 		mov	bl, ds:[si]
 		mov	ax, ds:[si+1]
 		xchg	al, ah
-		shr	ah, 2
-		shr	ax, 3
+		shr	ah
+		shr	ah
+		shr	ax
+		shr	ax
+		shr	ax
 		andnf	bl, 0xf8
 		ornf	ah, bl
 		stosw

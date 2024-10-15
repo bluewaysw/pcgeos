@@ -251,7 +251,9 @@ PutColor24ScanMask      proc    near
 
                 ; override mask pixel
 
-		shr     dx, 3
+		shr     dx
+		shr     dx
+		shr     dx
                 add     bx, dx                  
 
                 ; mask for testing mask
@@ -448,7 +450,9 @@ PutColor8ScanMask	proc	near
 		xchg	bx, si			; ds:bx -> mask data
 		add	si, bx
 		sub	bx, ss:[bmMaskSize]	; ds:si -> pic data
-		shr	dx, 3			; bx = index into mask
+		shr	dx			; bx = index into mask
+		shr	dx			; bx = index into mask
+		shr	dx			; bx = index into mask
 		add	bx, dx			; ds:bx -> into mask data
 		and	cl, 7
 		mov	dh, 0x80		; test bit for mask data

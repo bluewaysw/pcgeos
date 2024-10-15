@@ -905,11 +905,12 @@ TcpipDhcpParseAndSendNotification	proc	near
 		mov	ds:[0].TDND_status, TDSNT_LEASE_RENEWED
 notRenew:
 		movdw	({dword}ds:[0].TDND_ipAddr), es:[0].DM_yiaddr, ax
-		push	bx, cx, es
+		push	ax, bx, cx, es
 		push	ds
-		push	offset TDND_leaseReceived
+		mov	ax, offset TDND_leaseReceived
+		push	ax
 		call	TIMERGETDATEANDTIME
-		pop	bx, cx, es
+		pop	ax, bx, cx, es
 		
 		mov	di, offset DM_options + SIZEOF_DHCP_COOKIE
 		clr	dh	; Clear now so we can just set dl later
@@ -1070,21 +1071,27 @@ renewValid:
 
 	; Convert the seconds into TimerDateAndTime structs
 		push	ds
-		push	offset TDND_leaseReceived	; start time
+		mov	ax, offset TDND_leaseReceived	; start time
+		push	ax
 		push	ds
-		push	offset TDND_renewTime		; end time buffer
+		mov	ax, offset TDND_renewTime	; end time buffer
+		push	ax
 		pushdw	renewTime			; renewal time
 		call	TCPIPDHCPCONVERTTIME
 		push	ds
-		push	offset TDND_leaseReceived	; start time
+		mov	ax, offset TDND_leaseReceived	; start time
+		push	ax
 		push	ds
-		push	offset TDND_rebindTime		; end time buffer
+		mov	ax, offset TDND_rebindTime	; end time buffer
+		push	ax
 		pushdw	rebindTime			; rebind time
 		call	TCPIPDHCPCONVERTTIME
 		push	ds
-		push	offset TDND_leaseReceived	; start time
+		mov	ax, offset TDND_leaseReceived	; start time
+		push	ax
 		push	ds
-		push	offset TDND_expireTime		; end time buffer
+		mov	ax,offset TDND_expireTime	; end time buffer
+		push	ax
 		pushdw	expireTime			; expire time
 		call	TCPIPDHCPCONVERTTIME
 		pop	bx, es
@@ -1193,14 +1200,20 @@ REVISION HISTORY:
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
 TcpipDhcpHandleRenew	proc	far
 		uses	di, si, ds
-		recvMH		local	hptr	push	0
-		renewPacket	local	hptr	push	0
-		attempts	local	word	push	0
-		sock		local	Socket	push	0
-		phase		local	word	push	DRP_RENEW
+		recvMH		local	hptr	;push	0
+		renewPacket	local	hptr	;push	0
+		attempts	local	word	;push	0
+		sock		local	Socket	;push	0
+		phase		local	word	;push	DRP_RENEW
 		resolvedAddr	local	TcpAccPntResolvedAddress
 		sockAddr	local	SocketAddress
 		.enter
+
+		mov		recvMH, 0
+		mov		renewPacket, 0
+		mov		attempts, 0
+		mov		sock, 0
+		mov		phase, DRP_RENEW
 
 		CheckHack <offset resolvedAddr eq (offset sockAddr + size SocketAddress)>
 

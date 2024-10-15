@@ -512,10 +512,10 @@ OLButtonHintExpressMenu	proc	far
 
 if TOOL_AREA_IS_TASK_BAR
 
-	push	ds					; save ds
-	segmov	ds, dgroup				; load dgroup
+	push	ds, dx					; save ds
+	segmov	ds, dgroup, dx				; load dgroup
 	test	ds:[taskBarPrefs], mask TBF_ENABLED	; test if TBF_ENABLED is set
-	pop	ds					; restore ds
+	pop	ds, dx					; restore ds
 	jz	done					; skip if no taskbar
 
 	ret

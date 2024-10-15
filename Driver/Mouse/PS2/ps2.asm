@@ -553,7 +553,8 @@ REVISION HISTORY:
 OnOffNotifyRegUnreg	proc	far
 	uses	ds
 	.enter
-	pusha
+	;pusha
+	push	ax, cx, dx, bx, bp, si, di
 
 	mov	ax, GDDT_POWER_MANAGEMENT
 	call	GeodeGetDefaultDriver	; ax = driver handle
@@ -568,7 +569,8 @@ OnOffNotifyRegUnreg	proc	far
 	call	ds:[si].DIS_strategy	; CF set on error
 
 afterRegister:
-	popa
+	pop	ax, cx, dx, bx, bp, si, di
+	;popa
 	.leave
 	ret
 OnOffNotifyRegUnreg	endp
@@ -618,7 +620,8 @@ REVISION HISTORY:
 MouseCheckDevAfterResume	proc	far
 	uses	es
 	.enter
-	pusha
+	;pusha
+	push	ax, cx, dx, bx, bp, si, di
 
 		CheckHack <PNC_POWER_TURNING_ON eq 1>
 		CheckHack <PNC_POWER_TURNED_OFF_AND_ON eq 2>
@@ -650,7 +653,8 @@ MouseCheckDevAfterResume	proc	far
 	; on the next resume or on shutdown.
 
 done:
-	popa
+	pop	ax, cx, dx, bx, bp, si, di
+	;popa
 	.leave
 	ret
 MouseCheckDevAfterResume	endp
@@ -685,8 +689,10 @@ MouseCheckDevAfterResumeStep2	proc	far
 	mov	ax, SGIT_UI_PROCESS
 	call	SysGetInfo			;ax = ui handle
 	mov_tr	bx, ax
-	push	vseg MouseCheckDevAfterResumeStep3
-	push	offset MouseCheckDevAfterResumeStep3
+	mov	ax, vseg MouseCheckDevAfterResumeStep3
+	push 	ax
+	mov	ax, offset MouseCheckDevAfterResumeStep3
+	push	ax
 	mov	bp, sp			; ss:bp = PCRP_address
 	mov	ax, MSG_PROCESS_CALL_ROUTINE
 	mov	di, mask MF_STACK or mask MF_FORCE_QUEUE
@@ -870,7 +876,8 @@ REVISION HISTORY:
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
 DisplayMouseNotConnectedDialog	proc	far
-	pusha
+	;pusha
+	push	ax, cx, dx, bx, bp, si, di
 
 	sub	sp, size StandardDialogOptrParams
 	mov	bp, sp
@@ -886,7 +893,8 @@ DisplayMouseNotConnectedDialog	proc	far
 			ss:[bp].SDOP_helpContext.segment
 	call	UserStandardDialogOptr
 
-	popa
+	pop	ax, cx, dx, bx, bp, si, di
+	;popa
 	ret
 DisplayMouseNotConnectedDialog	endp
 

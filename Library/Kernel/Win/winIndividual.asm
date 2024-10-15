@@ -1212,7 +1212,7 @@ WOI_30:
 	pop	di
 	push	di
 
-	pusha
+	push	ax, cx, dx, bx, bp, si, di
 	mov	ax, C_BLACK
 	call	SetAreaColorInt
 
@@ -1226,7 +1226,7 @@ WOI_30:
 	ornf	es:[W_color], mask WCF_DRAW_MASK
 	call	es:[W_driverStrategy]		; make call to driver
 	andnf	es:[W_color], not mask WCF_DRAW_MASK
-	popa
+	pop	ax, cx, dx, bx, bp, si, di
 
 washDone:
 	mov	ds:[GS_window], 0

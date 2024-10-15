@@ -562,7 +562,8 @@ haveRGB:
 		add	al, bh
 		adc	ah, 0			; ax = 2R + B
 		clr	bh
-		shl	bx, 2			; bx = 4G
+		shl	bx;, 2			; bx = 4G
+		shl	bx
 		add	ax, bx			; ax = 2R + B + 4G
 		mov	bx, (255*7)/2
 		sub	bx, ax			; C set if > (255*7)/2

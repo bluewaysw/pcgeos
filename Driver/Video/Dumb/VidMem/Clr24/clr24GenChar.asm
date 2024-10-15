@@ -334,7 +334,8 @@ FastCharCommon	label  near
 	clr	ah			; only interested in how many to load
 	mov	bp, ax
 	dec	bp			; one less (so 8 pixels -> one byte)
-	shr	bp, 2			; word table, divide by 4
+	shr	bp			; word table, divide by 4
+	shr	bp			; word table, divide by 4
 	and	bp, 0xfffe		; clear low bit
 	jmp	cs:[bp][FCC_table]	; Call the routine to do the draw.
 
@@ -1146,7 +1147,9 @@ CharLarge 	label near
 		; calculate the number of data bytes we're gonna load
 
 		add	al, 7			; round up
-		shr	al, 3
+		shr	al
+		shr	al
+		shr	al
 		mov	cs:[bytesToDraw], al	; save for later
 						;
 CLlineLoop:
@@ -1269,7 +1272,9 @@ firstScanOK:
 		mov	ah, cl			; ah = bytes to draw
 		lodsb				; al = picture width (bits)
 		add	al, 7			; round up to full byte
-		shr	al, 3			;
+		shr	al			;
+		shr	al			;
+		shr	al			;
 		sub	ah, al			; ah = extra bytes
 		mov	cs:[extraBytesToDraw], ah
 		add	si, CD_data-1		; ds:si = data

@@ -508,7 +508,8 @@ quickNotifyFlags local	ClipboardQuickNotifyFlags	\
 
 	.enter
 
-	pusha				; save VM block handle, block type
+	push	ax, cx, dx, bx, bp, si, di
+					; save VM block handle, block type
 	mov	cx, ds
 	call	MemSegmentToHandle	; cx = handle
 EC <	ERROR_NC -1							>
@@ -516,7 +517,8 @@ EC <	ERROR_NC -1							>
 	mov	ax, ACTIVE_TYPE_FILE_OPERATION
 	call	DesktopMarkActive			; application will be active
 	call	MemDerefStackDS		; flags preserved
-	popa				; retrieve VM block handle, block type
+	pop	ax, cx, dx, bx, bp, si, di
+					; retrieve VM block handle, block type
 
 	LONG	jnz realExit			; detaching already, do nothing
 

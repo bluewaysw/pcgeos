@@ -161,9 +161,12 @@ largePacket:
 	mov	ah, PDF_SEND_PKT
 
 retrySend:
-	pusha
+	;pusha
+	push	ax, cx, dx, bx, bp, si, di
 	call	callPacketDriver
-	popa
+	;popa
+	pop	ax, cx, dx, bx, bp, si, di
+
 	jnc	sentPacket
 	dec	bx
 	jnz	retrySend

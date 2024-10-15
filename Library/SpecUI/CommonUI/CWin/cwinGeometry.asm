@@ -1524,7 +1524,10 @@ gotSize:
 	segmov	ds, dgroup				; get dgroup
 	mov	bx, ds:[taskBarPrefs]			; load taskBarPrefs in ax
 	andnf	bx, mask TBF_POSITION			; mask out everything but the position bits
-	shr	bx, offset TBF_POSITION
+	push	cx
+	mov	cl, offset TBF_POSITION 
+	shr	bx, cl
+	pop	cx
 	cmp	bx, TBP_TOP
 	pop	ds, bx					; restore ds
 	je	update					; skip if top position

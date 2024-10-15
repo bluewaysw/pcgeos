@@ -55,6 +55,7 @@ REVISION HISTORY:
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
 EthPktContactDriver	proc	near
 		uses	bx
+temp		local	word
 		.enter
 
 	;
@@ -86,7 +87,8 @@ trySlot:
 
 foundIt:
 	; bx = interrupt number * 4. So shift right twice and store it away.
-		shr	bx, 2
+		shr	bx
+		shr	bx
 		GetDGroup	ds, ax
 		mov	ds:[offset intInstruction + 1], bl
 
@@ -104,7 +106,10 @@ foundIt:
 		mov_tr	bx, dx
 		call	setAccessType
 		mov	cx, size word
-		pusha
+		;pusha
+		push	ax, cx, dx, bx
+		push	temp 
+		push 	bp, si, di
 		push	es
 		call	callPacketDriver
 		jc	failure
@@ -118,19 +123,31 @@ oldDriver:
 typeCheckLoop:
 		mov_tr	bx, cx
 		mov	cx, size word
-		pusha		; 16 bytes
+		;pusha		; 16 bytes
+		push	ax, cx, dx, bx
+		push	temp
+		push	bp, si, di
+
 		push	es	; 18 bytes
 		call	callPacketDriver
 		jnc	gotAccess
 		pop	es
-		popa
+		pop	bp, si, di
+		pop	temp
+		pop	ax, cx, dx, bx
+		mov	sp, temp
+		;popa
 		loop	typeCheckLoop
 		jmp	failure
 
 gotAccess:
 		mov	ds:[pktIpHandle], ax
 		pop	es
-		popa
+		pop	ax, cx, dx, bx
+		pop	temp
+		pop	bp, si, di
+		mov	sp, temp
+		;popa
 		mov	si, offset packetTypeARP
 		mov	cx, size word
 		call	callPacketDriver

@@ -49,50 +49,56 @@ REVISION HISTORY:
 	jim	10/15/92		Initial version
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+
+paletteColorRegMap	byte	0,1,2,3,4,5,20,7
+			byte	56,57,58,59,60,61,62,63
+
 SetDevicePalette	proc	near
-	uses ax, bx, cx, dx, ds
+		uses ax, bx, cx, dx, ds
 		.enter
-  jmp noPalette
-	mov	ah, 010h
-	mov	al, 13h
-	mov	bl, 0
-	mov	bh, 1
-	int	10h
-	mov	ah, 010h
-	mov	al, 13h
-	mov	bl, 1
-	mov	bh, 0
-	int	10h
+		;mov	ah, 010h
+		;mov	al, 13h
+		;mov	bl, 0
+		;mov	bh, 1
+		;int	10h
+		;mov	ah, 010h
+		;mov	al, 13h
+		;mov	bl, 1
+		;mov	bh, 0
+		;int	10h
 
-	clr	cx
-	mov	bx, offset currentPalette
-	segmov	ds, cs, ax
+		clr	cx
+		mov	bx, offset currentPalette
+		segmov	ds, cs, ax
 setPaletteLoop:
-	mov	dx, 03c8h
-	mov	al, cl
-	out	dx, al
-	mov	dx, 03c9h
-	mov	al, cs:[bx+0]
-	shr	al, 1
-	shr	al, 1
-	and	al, 63
-	out	dx, al
-	mov	al, cs:[bx+1]
-	shr	al, 1
-	shr	al, 1
-	and	al, 63
-	out	dx, al
-	mov	al, cs:[bx+2]
-	shr	al, 1
-	shr	al, 1
-	and	al, 63
-	out	dx, al
+		mov	dx, bx
+		mov	bx, cx
+		mov	al, cs:paletteColorRegMap[bx]
+		mov	bx, dx
+		mov	dx, 03c8h
+		out	dx, al
+		mov	dx, 03c9h
+		mov	al, cs:[bx]
+		shr	al, 1
+		shr	al, 1
+		and	al, 63
+		out	dx, al
+		mov	al, cs:[bx+1]
+		shr	al, 1
+		shr	al, 1
+		and	al, 63
+		out	dx, al
+		mov	al, cs:[bx+2]
+		shr	al, 1
+		shr	al, 1
+		and	al, 63
+		out	dx, al
 
-	add	bx, 3
-	inc	cx
-	cmp	cx, 16
-	jne	setPaletteLoop
-noPalette:
+		add	bx, 3
+		inc	cx
+		cmp	cx, 16
+		jne	setPaletteLoop
+
 		.leave
 		ret
 SetDevicePalette	endp
@@ -100,6 +106,7 @@ SetDevicePalette	endp
 
 
 
+if 0
 COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 		FixColorRGB
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -167,3 +174,4 @@ FixColorRGB	proc	near
 		.leave
 		ret
 FixColorRGB	endp
+endif

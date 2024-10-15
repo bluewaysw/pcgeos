@@ -809,11 +809,11 @@ if _NEWDESK
 	; If we're trying to open a window by opening an object on the
 	; desktop, then make a new window instead of trying to reuse an
 	; existing one.
-		pusha	;ax, bx, cx, dx, si, bp
+		push	ax, bx, cx, dx, si, bp
 		mov	bx, ds:[0]
 		mov	si, FOLDER_OBJECT_OFFSET
 		call	checkIfDesktop
-		popa	;ax, bx, cx, dx, si, bp
+		pop	ax, bx, cx, dx, si, bp
 		jc	openNewWindow
 if 0
 	;

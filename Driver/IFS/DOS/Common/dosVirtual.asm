@@ -4400,7 +4400,8 @@ ChooseDosLongOrShortName	proc	near
 	lds	si, ds:[FGEAD_fd]
 	add	si, offset W32FD_fileName
 
-	pusha
+	;pusha
+	push	ax, cx, dx, bx, bp, si, di
 	push	es
 	movdw	esdi, dssi
 	clr	al
@@ -4408,7 +4409,8 @@ ChooseDosLongOrShortName	proc	near
 	repne	scasb			; cx = -(length w/ null + 1)
 	cmp	cx, -((FILE_LONGNAME_LENGTH + 1) + 1)
 	pop	es
-	popa
+	pop	ax, cx, dx, bx, bp, si, di
+	;popa
 	jae	hasName			; => long name short enough, use it.
 
 	add	si, W32FD_alternateFileName - W32FD_fileName

@@ -102,7 +102,9 @@ recalcWidth:
 		add	cs:[bm_bpScan], cx		; 3* for 3 8-bit planes
 		shr	cx, 1				; # of pixels -> cx
 		push	cx
-		shr	cx, 3				; calc #bytes
+		shr	cx				; calc #bytes
+		shr	cx				; calc #bytes
+		shr	cx				; calc #bytes
 		mov	cs:[bm_bpMaskRndDwn], cx	; # bytes, rounded down
 		pop	cx
 		push	cx
@@ -110,7 +112,9 @@ recalcWidth:
 		mov	cs:[bm_nonIntegralPixels], cx	; ..non-integral pixels
 		pop	cx
 		add	cx, 7				; round up
-		shr	cx, 3				; calc #bytes
+		shr	cx				; calc #bytes
+		shr	cx				; calc #bytes
+		shr	cx				; calc #bytes
 		mov	cs:[bm_bpMask], cx		;  code
 		test	al, mask BMT_MASK		; * 2 if mask
 		jz	haveWidth
@@ -241,7 +245,9 @@ Clr24MaskInfo	proc	far
 		jz	haveWidth
 		shr	cx, 1				; assume not that big
 		add	cx, 7				; round up
-		shr	cx, 3				; calc #bytes
+		shr	cx				; calc #bytes
+		shr	cx				; calc #bytes
+		shr	cx				; calc #bytes
 		mov	es:[maskMaskSize], cx
 		add	dx, cx
 haveWidth:

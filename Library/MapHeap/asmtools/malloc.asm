@@ -90,7 +90,8 @@ REVISION HISTORY:
 _MapHeapEnter	proc	far	phyMemInfoBlk:hptr.UtilWinPhyMemInfoBlk
 	uses	ds
 	.enter
-	pusha
+	;pusha
+	push	ax, cx, dx, bx, bp, si, di
 
 	;
 	; Lock info block to get the physical addrs.
@@ -115,7 +116,8 @@ mapLoop:
 	jz	mapNext
 	mov	ax, bx			; ax = array offset
 		CheckHack <size UtilWinInfo eq 4>
-	shr	ax, 2			; ax = win #
+	shr	ax			; ax = win #
+	shr	ax
 EC <	Assert	b, ax, es:[UWPMIB_count]				>
 EC <	mov	dx, ds:[winInfo][bx].UWI_paraSize			>
 EC <	Assert	e, dx, es:[UWPMIB_info][di].UWPMI_paraSize		>
@@ -136,7 +138,8 @@ mapNext:
 	pop	bx			; ^hbx = info blk
 	call	MemUnlock
 
-	popa
+	pop	ax, cx, dx, bx, bp, si, di
+	;popa
 	.leave
 	ret
 _MapHeapEnter	endp
@@ -327,7 +330,8 @@ REVISION HISTORY:
 MapHeapCreateOneHeap	proc	near
 	uses	ds
 	.enter
-	pusha
+	;pusha
+	push	ax, cx, dx, bx, bp, si, di
 
 	mov_tr	si, ax			; si = heap seg
 
@@ -360,14 +364,18 @@ MapHeapCreateOneHeap	proc	near
 	mov	si, cx			; si = blk size in paras
 		CheckHack <size LMemBlockHeader eq (1 shl 4)>
 	dec	si			; si -= size LMemBlockHeader in paras
-	shl	si, 4			; si = free space in bytes
+	shl	si			; si = free space in bytesas
+	shl	si			; si = free space in bytesas
+	shl	si			; si = free space in bytesas
+	shl	si			; si = free space in bytes
 	mov	dx, size LMemBlockHeader
 	mov	ax, LMEM_TYPE_GENERAL
 	mov	di, mask LMF_NO_HANDLES or mask LMF_NO_ENLARGE \
 			or mask LMF_RETURN_ERRORS
 	call	LMemInitHeap
 
-	popa
+	pop	ax, cx, dx, bx, bp, si, di
+	;popa
 	.leave
 	ret
 MapHeapCreateOneHeap	endp
@@ -465,7 +473,8 @@ REVISION HISTORY:
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
 MapHeapDestroyOneHeap	proc	near
 	.enter
-	pusha
+	;pusha
+	push	ax, cx, dx, bx, bp, si, di
 
 	;
 	; Convert the memory handle for this heap back to semaphore handle.
@@ -481,7 +490,8 @@ MapHeapDestroyOneHeap	proc	near
 	;
 	call	ThreadFreeSem
 
-	popa
+	pop	ax, cx, dx, bx, bp, si, di
+	;popa
 	.leave
 	ret
 MapHeapDestroyOneHeap	endp
@@ -857,7 +867,8 @@ MapHeapWindowNumToPtr	proc	far
 EC <	cmp	bx, UTIL_WINDOW_MAX_NUM_WINDOWS				>
 EC <	ERROR_AE -1							>
 	CheckHack <size UtilWinInfo eq 4>
-	shl	bx, 2				; bx = offset in winInfo
+	shl	bx				; bx = offset in winInfo
+	shl	bx
 	mov	ax, ds:[winInfo][bx].UWI_addr	; ax = segment
 	call	VWinInfo
 
@@ -903,7 +914,8 @@ next:
 	jmp	done
 found:
 	CheckHack <size UtilWinInfo eq 4>
-	shr	bx, 2				; bx = win #
+	shr	bx				; bx = win #
+	shr	bx
 	; Carry clear from first cmp
 done:
 	call	VWinInfo

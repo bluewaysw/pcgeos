@@ -3177,11 +3177,16 @@ token	local	10 dup (char)
 	clr	ah
 	add	al, 'a'
 	push	ax
-	push	'n '
-	push	'co'
-	push	'ei'
-	push	'iv'
-	push	'dr'
+	mov	ax, 'n '
+	push	ax
+	mov	ax, 'co'
+	push	ax
+	mov	ax, 'ei'
+	push	ax
+	mov	ax, 'iv'
+	push	ax
+	mov	ax, 'dr'
+	push	ax
 
 	; read from .ini file
 
@@ -3656,11 +3661,13 @@ moniker	local	optr
 	mov	ss:[moniker].handle, bx
 	pop	ax, bx
 
+	mov	cx, (VMS_ICON shl offset VMSF_STYLE) or mask VMSF_GSTRING
+	push	cx
+	mov	cx, 0			; unused buffer size
+	push	cx
 	mov	si, di			; ax:bx:si = GeodeToken
 	mov	dh, ss:[desktopDisplayType]
 	mov	cx, ss:[moniker].handle	; allocate chunk in block
-	push	(VMS_ICON shl offset VMSF_STYLE) or mask VMSF_GSTRING
-	push	0			; unused buffer size
 	call	TokenLoadMoniker	; ^lcx:di = icon moniker
 	mov	ss:[moniker].offset, di
 	LONG jc	done

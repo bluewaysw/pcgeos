@@ -82,7 +82,7 @@ LZGCompressStack	ends
 ;		 Macros for LZG Compression
 ;------------------------------------------------------------------------------
 
-.186
+;.186
 
 
 COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -482,7 +482,8 @@ notSmall:
 	xchg	al, ah			; convert to big-endian
 	mov	bx, dx			; bx = match length
 	CheckHack <(LZG_PAIR_POSITION_BITS-8) eq 2>
-	shl	bx, 2
+	shl	bx
+	shl	bx
 	ornf	al, bl
 	stosw
 	jmp	insertPair
@@ -769,7 +770,8 @@ pair:
 	neg	bx
 	add	bx, di			; bx = position in output buffer
 	CheckHack <(LZG_PAIR_POSITION_BITS-8) eq 2>
-	shr	cl, 2			; shift out offset bits
+	shr	cl			; shift out offset bits
+	shr	cl
 	jz	longPair
 	xchg	si, bx			; ds:si = source string
 	rep	movsb es:		; copy string from dictionary (warning)
@@ -886,7 +888,8 @@ runLength:
 
 pair:
 	inc	si			; skip past low 8 bits of offset
-	shr	al, 2			; shift out offset bits
+	shr	al			; shift out offset bits
+	shr	al
 	jz	longPair
 	add	cx, ax			; update uncompressed size
 	jnc	calcSize
@@ -991,7 +994,8 @@ pair:
 	neg	bx
 	add	bx, di			; bx = position in output buffer
 	CheckHack <(LZG_PAIR_POSITION_BITS-8) eq 2>
-	shr	cl, 2			; shift out offset bits
+	shr	cl			; shift out offset bits
+	shr	cl
 	jz	longPair
 	xchg	si, bx			; ds:si = source string
 ;	rep	movsb es:		; copy string from dictionary (warning)

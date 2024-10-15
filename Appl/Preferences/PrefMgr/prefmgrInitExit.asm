@@ -132,14 +132,15 @@ PrefMgrOpenApplication	method dynamic PrefMgrClass,
 	;
 		test	cx, mask AAF_DATA_FILE_PASSED
 		jz	callSuper
-		pusha
+		;pusha
+		push	ax, cx, dx, bx, bp, si, di
 		mov	bx, handle PrefMgrPrimary
 		mov	si, offset PrefMgrPrimary
 		mov	ax, MSG_GEN_SET_NOT_USABLE
 		mov	dl, VUM_DELAYED_VIA_APP_QUEUE
 		call	ObjMessageNone
-		popa
-
+		;popa
+		pop	ax, cx, dx, bx, bp, si, di
 callSuper:
 	;
 	; Call our superclass to bring things on screen
@@ -193,8 +194,8 @@ REVISION HISTORY:
 SwitchToModuleByName	proc	near
 		uses	ds
 		.enter
-		pusha
-
+		;pusha
+		push	ax, cx, dx, bx, bp, si, di
 	;
 	; Get the module name and convert it to a module #
 	;
@@ -213,7 +214,8 @@ SwitchToModuleByName	proc	near
 		clc
 
 done:
-		popa
+		pop	ax, cx, dx, bx, bp, si, di
+		;popa
 		.leave
 		ret
 SwitchToModuleByName	endp

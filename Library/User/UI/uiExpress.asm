@@ -1905,7 +1905,7 @@ launcherBuf		local	FileLongName
 
 	.enter
 
-	pusha
+	push	ax, cx, dx, bx, bp, si, di
 	push	ds, es
 	;
 	; See which launcher we're running
@@ -1925,7 +1925,7 @@ launcherBuf		local	FileLongName
 	call	LocalCmpStrings			; check long name of App: ISDesk
 						; **Returns:** ZF - Set if strings were equal.
 	pop	ds, es
-	popa
+	pop	ax, cx, dx, bx, bp, si, di
 
 	.leave
 	ret
@@ -4627,9 +4627,12 @@ DESTROYED:	ax, cx, dx, bp
 EMCTriggerLaunchApplication	method	dynamic	EMCTriggerClass,
 					MSG_EMC_TRIGGER_LAUNCH_APPLICATION
 token		local	GeodeToken	push	bp, dx, cx
-albHandle	local	hptr		push	0
-tokenHandle	local	hptr		push	0
+albHandle	local	hptr		;push	0
+tokenHandle	local	hptr		;push	0
 	.enter
+
+	mov	albHandle, 0
+	mov	tokenHandle, 0
 
 	;
 	; create AppLaunchBlock

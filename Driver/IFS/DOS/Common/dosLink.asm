@@ -2105,7 +2105,8 @@ if _MSLF
 	; No need to prepend a leading backslash as one will be returned
 	; by DOS7.
 	;
-		push	'.' or (0 shl 8)	; ss:sp = "."
+		mov	cx,'.' or (0 shl 8)	; ss:sp = "."
+		push	cx
 		movdw	dssi, sssp		; ds:si = "."
 		segmov	es, ss
 		mov	cx, (0x80 shl 8) or MGCPNF_LONG_PATH_NAME

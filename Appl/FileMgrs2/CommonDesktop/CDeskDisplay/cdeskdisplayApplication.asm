@@ -227,10 +227,14 @@ if not _NEWDESK
 	; first check if NewDesk is running.  if so just quit.
 
 	push	es
-	push	'  '
-	push	'sk'
-	push	'de'
-	push	'is'
+	mov	ax, '  '
+	push	ax
+	mov	ax, 'sk'
+	push	ax
+	mov	ax, 'de'
+	push	ax
+	mov	ax, 'is'
+	push	ax
 	segmov	es, ss
 	mov	di, sp
 	mov	ax, 8

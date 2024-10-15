@@ -2378,7 +2378,10 @@ ToolAreaVisMoveResizeWin	method dynamic ToolAreaClass,
 	segmov	ds, dgroup				; get dgroup
 	mov	ax, ds:[taskBarPrefs]			; load taskBarPrefs in ax
 	andnf	ax, mask TBF_POSITION			; mask out everything but the position bits
-	shr	ax, offset TBF_POSITION			; retrieve position value
+	push	cx
+	mov	cl,  offset TBF_POSITION			; retrieve position value
+	shr	ax, cl
+	pop	cx
 	pop	ds					; restore ds
 
 	;
@@ -2451,7 +2454,10 @@ updatePosition:
 
 	segmov	ds, dgroup
 	andnf	ds:[taskBarPrefs], not mask TBF_POSITION
-	shl	bp, offset TBF_POSITION
+	push	cx
+	mov	cl, offset TBF_POSITION
+	shl	bp, cl
+	pop	cx
 	ornf	ds:[taskBarPrefs], bp			; update Taskbar Position flag
 	pop	ds, si
 
