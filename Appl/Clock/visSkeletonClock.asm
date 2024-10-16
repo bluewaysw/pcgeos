@@ -177,32 +177,15 @@ VSCGetWindowColor method dynamic VisSkeletonClockClass,
 		mov	ah, WinColorFlags <
 			0,		; WCF_RGB: using color index
 			0,		; WCF_TRANSPARENT: window has background color
-			1,		; WCF_PLAIN: window requires exposes
-			0,		; WCF_MASKED
-			0,		; WCF_DRAW_MASK
+			1,		; WCF_PLAIN: window doesn't require exposes
+			0,		; WCF_MASKED: internal
+			0,		; WCF_DRAW_MASK: internal
 			ColorMapMode <	; WCF_MAP_MODE
-				1,		; CMM_ON_BLACK: black is our
-						;  background color, always.
-				CMT_CLOSEST	; CM_MAP_TYPE: map to
-						;  solid, never pattern or
-						;  dither, please.
+				0,		; CMM_ON_BLACK: black is seldom our background color.
+				CMT_CLOSEST	; CM_MAP_TYPE
 			>
 		>
 
-;		mov	ah, WinColorFlags <
-;			0,		; WCF_RGB: using color index
-;			0,		; WCF_TRANSPARENT: window has
-;			0,		;  background color
-;			1,		; WCF_PLAIN: window doesn't require
-;			0,		;  exposes
-;			ColorMapMode <	; WCF_MAP_MODE
-;				0,		; CMM_ON_BLACK: black is seldom
-;						;  our background color.
-;				CMT_CLOSEST	; CM_MAP_TO_MONO: map to
-;						;  solid, never pattern or
-;						;  dither, please.
-;			>
-;		>
 		mov	al,
 			ds:[di].VDCI_colors[VDCC_TEXT*ColorQuad].CQ_redOrIndex
 		cmp	ds:[di].VDCI_colors[VDCC_TEXT*ColorQuad].CQ_info,
@@ -414,45 +397,28 @@ if PZ_PCGEOS
 		mov	ah, WinColorFlags <
 			0,		; WCF_RGB: using color index
 			0,		; WCF_TRANSPARENT: window has background color
-			1,		; WCF_PLAIN: window requires exposes
-			0,		; WCF_MASKED
-			0,		; WCF_DRAW_MASK
+			1,		; WCF_PLAIN: window doesn't require exposes
+			0,		; WCF_MASKED: internal
+			0,		; WCF_DRAW_MASK: internal
 			ColorMapMode <	; WCF_MAP_MODE
-				1,		; CMM_ON_BLACK: black is our
-						;  background color, always.
-				CMT_DITHER	; CM_MAP_TYPE: map to
-						;  solid, never pattern or
-						;  dither, please.
+				0,		; CMM_ON_BLACK: so solids
+						;  will be visible in mono
+				CMT_DITHER	;  map to dither so that
+						;  it will be easier to
+						;  see in monochrome.
 			>
 		>
-
-;		mov	ah, WinColorFlags <
-;			0,		; WCF_RGB: using color index
-;			0,		; WCF_TRANSPARENT: window has
-;			0,		;  background color
-;			1,		; WCF_PLAIN: window doesn't require
-;			0,		;  exposes
-;			ColorMapMode <	; WCF_MAP_MODE
-;				0,		; CMM_ON_BLACK: so solids
-;						;  will be visible in mono
-;				CMT_DITHER	;  map to dither so that
-;						;  it will be easier to
-;						;  see in monochrome.
-;			>
-;		>
 else
 		mov	ah, WinColorFlags <
 			0,		; WCF_RGB: using color index
-			0,		; WCF_TRANSPARENT: window has
-			0,		;  background color
-			1,		; WCF_PLAIN: window doesn't require
-			0,		;  exposes
+			0,		; WCF_TRANSPARENT: window has background color
+			1,		; WCF_PLAIN: window doesn't require exposes
+			0,		; WCF_MASKED: internal
+			0,		; WCF_DRAW_MASK: internal
 			ColorMapMode <	; WCF_MAP_MODE
 				0,		; CMM_ON_BLACK: black is seldom
-						;  our background color.
-				CMT_CLOSEST	; CM_MAP_TO_MONO: map to
-						;  solid, never pattern or
-						;  dither, please.
+						; our background color.
+				CMT_CLOSEST	; CM_MAP_TYPE
 			>
 		>
 endif
