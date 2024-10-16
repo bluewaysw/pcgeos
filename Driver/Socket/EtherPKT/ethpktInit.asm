@@ -107,6 +107,7 @@ foundIt:
 		call	setAccessType
 		mov	cx, size word
 		;pusha
+		mov	temp, sp
 		push	ax, cx, dx, bx
 		push	temp 
 		push 	bp, si, di
@@ -124,6 +125,7 @@ typeCheckLoop:
 		mov_tr	bx, cx
 		mov	cx, size word
 		;pusha		; 16 bytes
+		mov	temp, sp
 		push	ax, cx, dx, bx
 		push	temp
 		push	bp, si, di
@@ -135,7 +137,7 @@ typeCheckLoop:
 		pop	bp, si, di
 		pop	temp
 		pop	ax, cx, dx, bx
-		mov	sp, temp
+		;mov	sp, temp
 		;popa
 		loop	typeCheckLoop
 		jmp	failure
