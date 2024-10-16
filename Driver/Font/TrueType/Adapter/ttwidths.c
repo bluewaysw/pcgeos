@@ -28,7 +28,6 @@
 #include "ttinit.h"
 #include "freetype.h"
 #include "ftxkern.h"
-#include "../FreeType/ftxkern.h"
 
 
 static word  AllocFontBlock( word               additionalSpace,
@@ -607,8 +606,8 @@ static void CalcTransform( TransformMatrix*  transMatrix,
                            Byte              width,
                            Byte              weight )
 {
-        TT_Matrix  tempMatrix = { 1L << 16, 0, 0, 1L << 16 };
- 
+        TT_Matrix  styleMatrix = { 1L<<16, 0, 0, 1L<<16 };
+
 
 EC(     ECCheckBounds( (void*)transMatrix ) );
 EC(     ECCheckBounds( (void*)fontMatrix ) );
@@ -621,18 +620,18 @@ EC(     ECCheckBounds( (void*)fontMatrix ) );
 
         /* fake bold style       */
         if( stylesToImplement & TS_BOLD )
-                tempMatrix.xx = BOLD_FACTOR;
+                styleMatrix.xx = BOLD_FACTOR;
 
         /* fake italic style       */
         if( stylesToImplement & TS_ITALIC )
-                tempMatrix.yx = NEGATVE_ITALIC_FACTOR;
+                styleMatrix.xy = ITALIC_FACTOR;
 
         /* width and weight */
         if( width != FWI_MEDIUM )
-                tempMatrix.xx = MUL_100_WWFIXED( tempMatrix.xx, width );
+                styleMatrix.xx = MUL_100_WWFIXED( styleMatrix.xx, width );
 
         if( weight != FW_NORMAL )
-                tempMatrix.xx = MUL_100_WWFIXED( tempMatrix.xx, weight );
+                styleMatrix.xx = MUL_100_WWFIXED( styleMatrix.xx, weight );
 
         /* fake script style      */
         if( stylesToImplement & ( TS_SUBSCRIPT | TS_SUPERSCRIPT ) )
@@ -641,8 +640,8 @@ EC(     ECCheckBounds( (void*)fontMatrix ) );
                                               WBFIXED_TO_WWFIXEDASDWORD( fontBuf->FB_heightAdjust );
 
 
-                tempMatrix.xx = GrMulWWFixed( tempMatrix.xx, SCRIPT_FACTOR );
-                tempMatrix.yy = GrMulWWFixed( tempMatrix.yy, SCRIPT_FACTOR );
+                styleMatrix.xx = GrMulWWFixed( styleMatrix.xx, SCRIPT_FACTOR );
+                styleMatrix.yy = GrMulWWFixed( styleMatrix.yy, SCRIPT_FACTOR );
 
                 if( stylesToImplement & TS_SUBSCRIPT )
                 {
@@ -658,13 +657,23 @@ EC(     ECCheckBounds( (void*)fontMatrix ) );
                 }
         }
 
-        /* integrate fontMatrix */
-        transMatrix->TM_matrix.xx = GrMulWWFixed( tempMatrix.xx, fontMatrix->FM_11 );
-        transMatrix->TM_matrix.xy = - ( GrMulWWFixed( tempMatrix.yx, fontMatrix->FM_11 ) +
-                                    GrMulWWFixed( tempMatrix.yy, fontMatrix->FM_21 ) );
-        transMatrix->TM_matrix.yx = - ( GrMulWWFixed( tempMatrix.xx, fontMatrix->FM_12 ) +
-                                    GrMulWWFixed( tempMatrix.xy, fontMatrix->FM_22 ) );
-        transMatrix->TM_matrix.yy = GrMulWWFixed( tempMatrix.yy, fontMatrix->FM_22 );
+        transMatrix->TM_matrix.xx = GrMulWWFixed( styleMatrix.xx, fontMatrix->FM_11 );
+        transMatrix->TM_matrix.yx = 0;
+        transMatrix->TM_matrix.xy = GrMulWWFixed( styleMatrix.xy, fontMatrix->FM_11 );
+        transMatrix->TM_matrix.yy = GrMulWWFixed( styleMatrix.yy, fontMatrix->FM_22 );
+
+        if( fontMatrix->FM_flags & TF_ROTATED )
+        {
+                TT_Fixed  xy, yx;
+
+
+                xy = - ( GrMulWWFixed( styleMatrix.yy, fontMatrix->FM_21 ) );
+                yx = - ( GrMulWWFixed( styleMatrix.xx, fontMatrix->FM_12 ) +
+                         GrMulWWFixed( styleMatrix.xy, fontMatrix->FM_22 ) );
+
+                transMatrix->TM_matrix.xy = xy;
+                transMatrix->TM_matrix.yx = yx;
+        }
 }
 
 

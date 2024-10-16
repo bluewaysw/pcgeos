@@ -640,15 +640,16 @@ void  MulDivList( TT_Long*  a, UShort  n, TT_Short*  b, TT_Long  c, TT_Long  d )
 LOCAL_FUNC
 void  TransVecList( TT_Vector*  vec, UShort  n, TT_Matrix*  matrix )
 {
-    UShort  i;
+    UShort   i;
+    TT_Long  x, y;
 
     for ( i = 0; i < n; ++i )
     {
-      vec->x = TT_MulFix( vec->x, matrix->xx ) +
-               TT_MulFix( vec->y, matrix->xy );
+      x = TT_MulFix( vec->x, matrix->xx ) + TT_MulFix( vec->y, matrix->xy );
+      y = TT_MulFix( vec->x, matrix->yx ) + TT_MulFix( vec->y, matrix->yy );
 
-      vec->y = TT_MulFix( vec->x, matrix->yx ) +
-               TT_MulFix( vec->y, matrix->yy );
+      vec->x = x;
+      vec->y = y;
       ++vec;
     }  
 }
