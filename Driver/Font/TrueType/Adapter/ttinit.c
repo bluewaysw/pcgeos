@@ -1001,10 +1001,6 @@ EC(     ECCheckBounds( (void*)fontHeader ) );
                 if ( unicode == C_LATIN_SMALL_LETTER_D )
                         fontHeader->FH_ascender = GLYPH_BBOX.yMax;
 
-                //descender -> check
-                if ( unicode == C_LATIN_SMALL_LETTER_P )
-                        fontHeader->FH_descender = GLYPH_BBOX.yMin;
-                
                 /* scan xMin -> check */
                 if( fontHeader->FH_minLSB > GLYPH_BBOX.xMin )
                         fontHeader->FH_minLSB = GLYPH_BBOX.xMin;
@@ -1016,11 +1012,6 @@ EC(     ECCheckBounds( (void*)fontHeader ) );
                 /* scan yMin -> check */
                 if ( fontHeader->FH_maxBSB < -GLYPH_BBOX.yMin )
                         fontHeader->FH_maxBSB = -GLYPH_BBOX.yMin;
-                        
-                /* check */
-                if ( GeosCharMapFlag( geosChar) & CMF_DESCENT &&
-                        fontHeader->FH_descent > -GLYPH_BBOX.yMin )
-                        fontHeader->FH_descent = -GLYPH_BBOX.yMin;
 
                 /* scan yMax -> check */
                 if ( fontHeader->FH_minTSB < GLYPH_BBOX.yMax )
@@ -1037,6 +1028,8 @@ EC(     ECCheckBounds( (void*)fontHeader ) );
                                 fontHeader->FH_accent = GLYPH_BBOX.yMax;
         }
 
+        fontHeader->FH_descender  = FACE_PROPERTIES.os2->sTypoDescender;
+        fontHeader->FH_descent    = -FACE_PROPERTIES.os2->sTypoDescender;
         fontHeader->FH_avgwidth   = FACE_PROPERTIES.os2->xAvgCharWidth;
         fontHeader->FH_maxwidth   = FACE_PROPERTIES.horizontal->advance_Width_Max;
         fontHeader->FH_accent     = fontHeader->FH_accent - fontHeader->FH_ascent;    
