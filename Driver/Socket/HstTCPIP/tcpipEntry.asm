@@ -115,8 +115,6 @@ DESCRIPTION:
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
 
 
-GEOS_HOST_API   = 0xA0
-
 ;---------------------------------------------------------------------------
 ;		Dgroup
 ;---------------------------------------------------------------------------
@@ -164,9 +162,9 @@ udata	segment
 
 	inputQueue	optr		; input packet queue
 
-	socketBlock	hptr 		; LMem block for all socket info
-	socketList	lptr 		; chunk handle to socket list 
-	linkTable	optr 		; table of physical link connections
+	;socketBlock	hptr 		; LMem block for all socket info
+	;socketList	lptr 		; chunk handle to socket list 
+	;linkTable	optr 		; table of physical link connections
 	
 	taskSem		hptr		; mutex for tcp actions that need
 					;  to be synchronized
@@ -174,17 +172,6 @@ udata	segment
 	regSem		hptr		; mutex for registration
 	regStatus	RegisterStatus	; registration status of driver	 
 	clients		TcpipClientInfo	; info about registered clients
-
-	; DHCP variables.
-	dhcpThread	hptr		; thread for doing dhcp
-	dhcpStrategy	fptr		; Link driver entry point
-	dhcpCookie	dword		; Cookie toIPINIT keep track of our session
-	dhcpRenewTime	dword		; Seconds until renew
-	dhcpRebindTime	dword		; Seconds until rebind
-	dhcpExpireTime	dword		; Seconds until expire
-	dhcpTimerId	hptr
-	dhcpTimerHandle	hptr
-	dhcpServerIp	IPAddr		; IP of server that gave us the lease
 
 EC <	dropCount	word		; input packets dropped due to lack >
 EC <					;  of space in TCP's input queue    >
@@ -316,8 +303,7 @@ driverProcTable		fptr.far	\
 		TcpipCloseMedium,		
 		TcpipMediumConnectRequest,
 		TcpipDoNothing,			; DR_SOCKET_MEDIUM_ACTIVATED
-		TcpipSetMediumOption,
-		TcpipResolveLinkLevelAddress
+		TcpipSetMediumOption
 	
 tcpipProcTable		fptr.far	\
 		TcpipSendRawIp			; DR_TCPIP_SEND_RAW_IP		
@@ -499,7 +485,6 @@ TcpipReceiveInterrupt	endp
 
 
 TCPIPRECEIVESTART	proc	far	connection:word
-;regs		local	PMRealModeRegister
 								uses	di, si, ds
 newBuffer 	local	optr		
 		.enter
@@ -509,11 +494,11 @@ newBuffer 	local	optr
 
 closeLoop:
 	; get next receive buffer size
-		mov	ax, 1006		; get next receive close socket
-		int	GEOS_HOST_API
+		mov	ax, HIF_NC_RECV_NEXT_CLOSE	; get next receive close socket
+		call	HostIfCall
 
 		cmp	cx, 0
-		je	recvLoop		; branch, no more closed links
+		je	recvLoop			; branch, no more closed links
 
 	; send close to socket library
 
@@ -547,8 +532,8 @@ recvLoop:
 
 
 	; get next receive buffer size
-		mov	ax, 1004		; get recv buf size
-		int     GEOS_HOST_API
+		mov	ax, HIF_NC_NEXT_RECV_SIZE	; get recv buf size
+		call	HostIfCall
 
 	; done if size 0 or below
 		cmp	cx, 0
@@ -593,8 +578,8 @@ doRecv:
 		; ax is size in bytes
 
 		mov	cx, ax
-		mov	ax, 1005		; get recv buf size
-		int	GEOS_HOST_API
+		mov	ax, HIF_NC_RECV_NEXT		; get recv buf size
+		call	HostIfCall
 
 		pop	di
 
@@ -817,7 +802,6 @@ REVISION HISTORY:
 	Name	Date			Description
 	----	----			-----------
 	jwu	7/ 7/94			Initial version
-	ed	7/10/00			Stop DHCP timers
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
 TcpipExit	proc	far
@@ -842,11 +826,11 @@ TcpipExit	proc	far
 		tst	ds:[hugeLMemBlock]
 		jz	exit
 
-		tst	ds:[socketBlock]
-		jz	freeHugeLMem		
+		;tst	ds:[socketBlock]
+		;jz	freeHugeLMem		
 
-		tst	ds:[linkTable].handle
-		jz	freeSocketBlock
+		;tst	ds:[linkTable].handle
+		;jz	freeSocketBlock
 
 EC <		tst	ds:[regStatus]					>
 EC <		WARNING_NE TCPIP_EXITING_WITH_CLIENTS_REGISTERED	>
@@ -871,15 +855,7 @@ endif
 
 		;call	LinkTableDestroyTable
 
-		mov	bx, ds:[dhcpTimerHandle]
-		tst	bx
-		jz	freeSocketBlock
-		mov	ax, ds:[dhcpTimerId]
-		call	TimerStop
-freeSocketBlock:
-		mov	bx, ds:[socketBlock]
-		call	MemFree
-freeHugeLMem:
+mfreeHugeLMem:
 		mov	bx, ds:[hugeLMemBlock]
 		call	HugeLMemDestroy		
 exit:
@@ -1330,49 +1306,8 @@ REVISION HISTORY:
 	jwu	8/ 1/96			Nonblocking, interruptible version
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
-TcpipDataConnReqCB	proc	far
-
-		;pushf
-		;push	ax, bx, cx, dx, si, di, bp, ds, es
-		;call	SysEnterInterrupt
-		;cld					;clear direction flag
-		;INT_OFF
-
-EC <		call	ECCheckStack						>
-		;push	bx, di, cx
-		mov	ds:[si].GHNCCD_result, ax
-		;mov	cx, ds:[si].GHNCCD_semaphore
-if 0
-		; scheduled receiving data
-		mov	ax, MSG_TCPIP_ASYNC_UNLOCK_ASM
-		
-		push	bx
-		mov	bx, handle dgroup
-		call	MemDerefDS
-		mov	bx, ds:[driverThread]
-	
-EC <		Assert	thread	bx				>		
-
-		mov	di, mask MF_FORCE_QUEUE
-		call	ObjMessage
-		pop	bx
-endif
-		inc	ds:[si].GHNCCD_semaphore2
-		;pop	bx, di, cx
-
-		;call	SysExitInterrupt
-		;pop	ax, bx, cx, dx, si, di, bp, ds, es
-		;popf
-			
-		ret
-			
-TcpipDataConnReqCB	endp
-
-
 TcpipDataConnectRequest	proc	far
 		uses	bx, cx, si, ds, es
-		
-callbackData	local	GeosHostNetConnectCallbackData
 		
 		.enter
 EC <		call	ECCheckCallerThread			>
@@ -1409,48 +1344,11 @@ EC <		call	ECCheckIPAddr				>
 	;
 	; Have driver's thread establish the connection.
 	;
-		;mov	di, bx				; di = connection handle
-		;mov	ax, MSG_TCPIP_OPEN_CONNECTION_ASM
-		;call	TcpipSendMsgToDriverThread
-
 		push	bx
-
-		; alloc semaphore 
-		mov	ax, bx
-		mov	bx, 1					; mutEx semaphore
-		call	ThreadAllocSem				 
-		
-		mov	callbackData.GHNCCD_callback.segment, cs
-		mov	callbackData.GHNCCD_callback.offset, offset cs:TcpipDataConnReqCB
-		mov	callbackData.GHNCCD_semaphore, bx
-		mov	callbackData.GHNCCD_semaphore2, 0
-
-if 0
-		push	ax
-		call	ThreadPSem			; get exclusive access
-		pop 	ax
-endif
-		mov	bx, ax
-		push	bp
-		lea	bp, callbackData
-		mov	ax, 1002			; async connect
-		int     GEOS_HOST_API
-		pop	bp
-waitHere:
-                cmp     callbackData.GHNCCD_semaphore2, 0
-                je      waitHere
-if 0
-		; wait for async completion
-		mov	bx, callbackData.GHNCCD_semaphore
-		call	ThreadPSem			; get exclusive access
-endif
-		; free semaphore
-		mov	bx, callbackData.GHNCCD_semaphore
-		call	ThreadFreeSem
-		
+		mov	ax, HIF_NC_CONNECT_REQUEST	; async connect
+		call	HostIfCallAsync
 		pop	bx
-		
-		mov	ax, callbackData.GHNCCD_result
+
 		cmp	ax, 0
 		jz	ok
 		stc
@@ -1567,9 +1465,9 @@ EC <		ERROR_E TCPIP_BAD_SOCKET_STATE			>
 		cmp	al, TSS_CLOSED
 		jae	exit				; carry clear
 
-		mov	di, bx
-		mov	ax, MSG_TCPIP_RESET_CONNECTION_ASM
-		call	TcpipSendMsgToDriverThread
+		;mov	di, bx
+		;mov	ax, MSG_TCPIP_RESET_CONNECTION_ASM
+		;call	TcpipSendMsgToDriverThread
 		clc
 exit:
 		.leave
@@ -1628,173 +1526,23 @@ REVISION HISTORY:
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
 
-TcpipDisconReqCB	proc	far
-
-		;pushf
-		;push	ax, bx, cx, dx, si, di, bp, ds, es
-		;call	SysEnterInterrupt
-		;cld					;clear direction flag
-		;INT_OFF
-
-EC <		call	ECCheckStack						>
-
-		;push	bx, di, cx
-		mov	ds:[si].GHNDCD_result, ax
-		;mov	cx, ds:[si].GHNDCD_semaphore
-if 0
-		; scheduled receiving data
-		mov	ax, MSG_TCPIP_ASYNC_UNLOCK_ASM
-		
-		push	bx
-		mov	bx, handle dgroup
-		call	MemDerefDS
-		mov	bx, ds:[driverThread]
-	
-EC <		Assert	thread	bx				>		
-
-		mov	di, mask MF_FORCE_QUEUE
-		call	ObjMessage
-		pop	bx
-endif                        
-                inc     ds:[si].GHNDCD_semaphore2
-		;pop	bx, di, cx
-		
-		;call	SysExitInterrupt
-		;pop	ax, bx, cx, dx, si, di, bp, ds, es
-		;popf
-			
-		ret
-			
-TcpipDisconReqCB	endp
-
 TcpipDisconnectRequest	proc	far
 		uses	ax, bx, cx, dx, si, ds
-
-callbackData	local	GeosHostNetDisconnectCallbackData
 
 		.enter
 
 		push	bx
-
-		; alloc semaphore 
-		mov	cx, bx
-		mov	bx, 1					; mutEx semaphore
-		call	ThreadAllocSem				 
-		
-		mov	callbackData.GHNDCD_callback.segment, cs
-		mov	callbackData.GHNDCD_callback.offset, offset cs:TcpipDisconReqCB
-		mov	callbackData.GHNDCD_semaphore, bx
-		mov	callbackData.GHNDCD_semaphore2, 0
-		
-if 0
-		push	ax
-		call	ThreadPSem			; get exclusive access
-		pop 	ax
-endif
-		mov	bx, cx
 		
 		push	bp
-		lea	bp, callbackData
-		mov	ax, 1008			; async connect
-		int	GEOS_HOST_API
-		pop	bp
-
-		; wait for async completion
-waitHere:
-                cmp     callbackData.GHNCCD_semaphore2, 0
-                je      waitHere
-if 0
-		mov	bx, callbackData.GHNCCD_semaphore
-		call	ThreadPSem			; get exclusive access
-endif
-
-		; free semaphore
-		mov	bx, callbackData.GHNCCD_semaphore
-		call	ThreadFreeSem
-		
+		mov	ax, HIF_NC_DISCONNECT		; async disconnect
+		call	HostIfCallAsync
+		pop	bp		
 		pop	bx
 		
-		mov	ax, callbackData.GHNDCD_result
 		cmp	ax, 0
 		jz	done
 		stc
 		jc	exit
-
-if 0
-		Assert	etype ax, SocketCloseType		
-
-EC <		cmp	ax, SCT_FULL				>
-EC <		jne	skipCheck				>
-EC <		call	ECCheckCallerThread			>
-EC <skipCheck:							>
-	;
-	; If connection doesn't exist, return error.
-	;
-		call	TcpipGainAccess
- 		;xchg	ax, bx			; ax = conn, bx = SocketCloseType
-		;call	TSocketFindHandle	; destroys cx	
-		;jnc	checkState
-
-		;mov	ax, SDE_INVALID_CONNECTION_HANDLE
-		;call	TcpipReleaseAccess
-		;jmp	exit
-checkState:
-	;
-	; If socket is not open, no need to do anything.  This case
-	; is NOT an error so return carry clear!
-	;
-		;call	TSocketLockInfoExcl
-		;mov	di, ax						
-		;mov	si, ds:[di]		; ds:si = TcpSocket	
-
-		;cmp	ds:[si].TS_state, TSS_OPEN
-		;je	disconnect
-		
-		;call	TSocketUnlockInfoExcl
-		;call	TcpipReleaseAccess
-		;jmp	done			
-disconnect:
-	;
-	; Set state to disconnecting and wake blocked send request
-	; on the connection, if any.
-	;
-		;mov	ds:[si].TS_state, TSS_DISCONNECTING		
-
-		;mov	cx, bx			; cx = SocketCloseType
-		;tst	ds:[si].TS_pendingData
-		;je	afterVSend
-EC <		WARNING	TCPIP_ABORTING_SEND_DATA_REQUEST		>
-		;mov	bx, ds:[si].TS_sendSem
-		;call	ThreadVSem
-afterVSend:
-	;
-	; Get sempahore to block calling thread if full close.
-	;
-		;cmp	cx, SCT_HALF
-		;je	doClose
-
-EC <	;	tst	ds:[si].TS_waiter				>
-EC <	;	ERROR_NZ TCPIP_OPERATION_IN_PROGRESS			>
-
-		;mov	ds:[si].TS_waiter, TCPIP_WAITER_EXISTS
-		;mov	bx, ds:[si].TS_sem
-doClose:
-		;call	TSocketUnlockInfoExcl
-	;
-	; Tell driver to disconnect the connection. 
-	;
-		mov	di, bx
-		mov	ax, MSG_TCPIP_CLOSE_CONNECTION_ASM
-		call	TcpipSendMsgToDriverThread
-
-		call	TcpipReleaseAccess
-	; 
-	; If full close, block until disconnect completes.
-	;
-		;cmp	cx, SCT_HALF
-		;je	exit				; carry already clear
-		;call	ThreadPSem			
-endif
 
 done:
 		mov	ax, bx
@@ -1855,7 +1603,6 @@ REVISION HISTORY:
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
 TcpipSendData	proc	far
 savebp		local	word	push	bp
-;regs		local	PMRealModeRegister
 		uses	bx, cx, dx, ds
 		.enter
 
@@ -1894,8 +1641,8 @@ EC <		call	ECCheckCallerThread			>
 		; es:si ptr to data to sent
 		; bx connection handle
 		pop	bx
-		mov	ax, 1003
-		int	GEOS_HOST_API
+		mov	ax, HIF_NC_SEND_DATA
+		call	HostIfCall
 errDone:
 		pop	dx
 		mov		bx, dx
@@ -2046,8 +1793,8 @@ EC <		mov	bx, ds					>
 EC <		call	ECAssertValidFarPointerXIP		>
 EC <		pop	bx					>
 
-		mov	cx, MSG_TCPIP_SEND_DATAGRAM_ASM
-		call	TcpipSendDatagramCommon
+		;mov	cx, MSG_TCPIP_SEND_DATAGRAM_ASM
+		;call	TcpipSendDatagramCommon
 
 		.leave
 		ret
@@ -2134,10 +1881,10 @@ noSend:
 
 EC <		Assert	thread	bx				>	
 
-		mov	dx, SDE_CONNECTION_RESET
-		mov	ax, MSG_TCPIP_RESET_CONNECTION_ASM
-		mov	di, mask MF_CALL
-		call	ObjMessage
+		;mov	dx, SDE_CONNECTION_RESET
+		;mov	ax, MSG_TCPIP_RESET_CONNECTION_ASM
+		;mov	di, mask MF_CALL
+		;call	ObjMessage
 exit::
 		call	TcpipReleaseAccess
 noSocket:
@@ -2206,9 +1953,9 @@ EC <		ERROR_C TCPIP_INVALID_CONNECTION_HANDLE		>
 	;
 	; Tell the driver's thread to accept the connection, then wait.
 	;
-		mov_tr	di, ax				; di = connection handle
-		mov	ax, MSG_TCPIP_ACCEPT_CONNECTION_ASM
-		call	TcpipSendMsgToDriverThread
+		;mov_tr	di, ax				; di = connection handle
+		;mov	ax, MSG_TCPIP_ACCEPT_CONNECTION_ASM
+		;call	TcpipSendMsgToDriverThread
 
 		call	ThreadPTimedSem			; ax = SemaphoreError
 	;
@@ -2293,10 +2040,10 @@ EC <	;	ERROR_NZ TCPIP_OPERATION_IN_PROGRESS			>
 
 EC <		Assert	thread	bx				>	
 
-		mov	dx, SDE_CONNECTION_RESET
-		mov	ax, MSG_TCPIP_RESET_CONNECTION_ASM
-		mov	di, mask MF_CALL
-		call	ObjMessage
+		;mov	dx, SDE_CONNECTION_RESET
+		;mov	ax, MSG_TCPIP_RESET_CONNECTION_ASM
+		;mov	di, mask MF_CALL
+		;call	ObjMessage
 exit::
 		.leave
 		ret
@@ -2993,7 +2740,6 @@ REVISION HISTORY:
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
 TcpipResolveAddr	proc	far
 savebp		local	word	push	bp
-;regs		local	PMRealModeRegister
 
 		uses	bx, dx, bp, si, ds, es
 		.enter
@@ -3061,98 +2807,6 @@ afterLink:
 		mov	di, bp			; es:di = resolved IP addr dest
 		pop	bp
 
-if 0
-	;
-	; Now resolve the IP part of the address.  If no IP address is 
-	; provided, return the default IP address.
-	;
-		jcxz	getDefault		
-
-	; alloc dos mem buffer 
-	;  bx buffer size in paragraphs
-	
-		push	bx
-		mov	bx, cx
-		add	bx, IP_ADDR_SIZE
-		shr	bx, 4		; div by 16 to have paragraphs
-		inc	bx
-
-		;call	SysAllocDOSBlock
-		pop	bx
-
-		jc	exit
-
-	; now ax = real mode, dx = selector
-	; copy string first
-	; cx is unresolved IP addr size, ds:si is addr ptr
-	; es:di should point to target yet
-
-		push	es
-		push	di
-
-		push	cx
-		push	ax
-		mov	es, dx
-		mov di, 0
-
-		rep	movsb
-		pop	ax
-		pop	cx
-
-	;
-	; setup regs
-	;
-endif
-if 0
-        ;mov     ss:[regs.PMRMR_edi], 0 
-        mov     ss:[regs.PMRMR_esi], 0 
-        ;mov     ss:[regs.PMRMR_ebp], 0 
-        ;mov     ss:[regs.PMRMR_reseverd], 0 
-        ;mov     ss:[regs.PMRMR_ebx], ebx 
-        ;mov     ss:[regs.PMRMR_edx], 0 
-        mov     ss:[regs.PMRMR_ecx], ecx 
-        mov     ss:[regs.PMRMR_eax], 1000
-        mov     ss:[regs.PMRMR_flags], 0 
-        ;mov     ss:[regs.PMRMR_es], ax 
-        mov     ss:[regs.PMRMR_ds], ax 
-		;mov     ss:[regs.PMRMR_fs], 0 
-        ;mov     ss:[regs.PMRMR_gs], 0 
-        ;mov     ss:[regs.PMRMR_ip], 0 
-        ;mov     ss:[regs.PMRMR_cs], 0 
-        mov     ss:[regs.PMRMR_sp], 0
-        mov     ss:[regs.PMRMR_ss], 0
-endif
-if 0
-		;lea	di, ss:regs
-		mov	dx, ss
-		mov	es, dx
-
-		push	bx	; link address size
-		mov	cx, 0
-		mov	bh, 0
-		mov 	bl, GEOS_HOST_API ; GEOS host
-
-		mov ax, 1000		; resolve address
-		int	GEOS_HOST_API
-		
-		;call    SysRealInterrupt		
-		pushf
-	; free dos mem buffer
-		
-		mov	dx, es
-		;call	SysFreeDOSBlock
-
-
-		;call	TcpipResolveIPAddr	; dxax = address or 
-
-		popf
-		pop	cx				; resolved link address size
-		pop	di
-		pop es
-		jc	exit			;  ax = SocketDrError
-		;mov		eax, regs.PMRMR_eax
-		;mov		edx, regs.PMRMR_edx
-endif
 	;
 	; Now resolve the IP part of the address.  If no IP address is 
 	; provided, return the default IP address.
@@ -3255,28 +2909,9 @@ doIP:
 	; Don't know how to check if a resolve is in progress so 
 	; just pass the request along.
 	;
-ifdef STATIC_LINK_RESOLVER
-	    mov bx, handle resolver
-else
-		call	TcpipLoadResolver		; ax = library handle 
-		jc	exit				;  or SocketDrError
-		push	ax
-		mov_tr	bx, ax				; bx = library handle
-endif
 
-		mov	ax, enum ResolverStopResolve
-		call	ProcGetLibraryEntry
-		call	ProcCallFixedOrMovable		
-
-ifndef STATIC_LINK_RESOLVER
-		pop	bx
-		call	GeodeFreeLibrary
-endif
 done:
 		clc
-ifndef STATIC_LINK_RESOLVER
-exit:
-endif
 		.leave
 		ret
 TcpipStopResolve	endp
@@ -3464,13 +3099,13 @@ delete:
 		cmp	cx, MAIN_LINK_DOMAIN_HANDLE
 		je	exit
 
-		movdw	bxsi, es:[linkTable]
-		call	MemLockExcl
-		mov	ds, ax
-		mov_tr	ax, cx				; ax = link handle
-		mov	cx, 1
-		call	ChunkArrayDeleteRange
-		call	MemUnlockExcl
+		;movdw	bxsi, es:[linkTable]
+		;call	MemLockExcl
+		;mov	ds, ax
+		;mov_tr	ax, cx				; ax = link handle
+		;mov	cx, 1
+		;call	ChunkArrayDeleteRange
+		;call	MemUnlockExcl
 clcExit:
 		clc
 exit:
@@ -3671,8 +3306,8 @@ if ERROR_CHECK
 		pop	bx					
 endif ; ERROR_CHECK
 
-		mov	cx, MSG_TCPIP_SEND_RAW_IP_ASM
-		call	TcpipSendDatagramCommon
+		;mov	cx, MSG_TCPIP_SEND_RAW_IP_ASM
+		;call	TcpipSendDatagramCommon
 		
 		.leave
 		ret
@@ -3809,35 +3444,9 @@ COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 		TcpipReceivePacket
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-C FUNCTION:	TcpipReceivePacket
-
-C DECLARATION:	extern void _far
-		_far _pascal TcpipReceivePacket(optr dataBuffer);
-
-REVISION HISTORY:
-	Name	Date			Description
-	----	----			-----------
-	jwu	7/18/94			Initial version
-
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
-	SetGeosConvention
-TCPIPRECEIVEPACKET	proc	far		
-		C_GetOneDWordArg cx, dx, ax, bx
-		call	TcpipReceivePacket
-		ret
-TCPIPRECEIVEPACKET	endp
-	SetDefaultConvention
-
-
-
-COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-		TcpipReceivePacket
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-
 SYNOPSIS:	Receive an incoming packet from the link connection.
 
 CALLED BY:	TcpipClientStrategy (SCO_RECEIVE_PACKET)
-		TCPIPRECEIVEPACKET
 
 PASS:		cxdx	= optr of packet (HugeLMem chunk)
 
@@ -3913,9 +3522,9 @@ endif ; ERROR_CHECK
 
 		mov	bx, es:[driverThread]
 		Assert	thread	bx
-		mov	ax, MSG_TCPIP_RECEIVE_DATA_ASM
-		mov	di, mask MF_FORCE_QUEUE
-		call	ObjMessage
+		;mov	ax, MSG_TCPIP_RECEIVE_DATA_ASM
+		;mov	di, mask MF_FORCE_QUEUE
+		;call	ObjMessage
 exit:		
 		.leave
 		ret
@@ -4472,8 +4081,8 @@ EC <		Assert	thread	bx				>
 		mov	al, TIMER_EVENT_CONTINUAL
 		mov	cx, TCPIP_TIMEOUT_INTERVAL	; first interval
 		mov	di, cx				; same interval always
-		mov	dx, MSG_TCPIP_TIMEOUT_OCCURRED_ASM
-		mov	bp, handle 0
+		;mov	dx, MSG_TCPIP_TIMEOUT_OCCURRED_ASM
+		;mov	bp, handle 0
 		;call	TimerStartSetOwner
 
 		mov	ds:[timerHandle], bx
@@ -4546,10 +4155,10 @@ EC <		ERROR_Z	TCPIP_CANNOT_FIND_TIMER			>
 	;
 	; Destroy all Tcp connections.  MUST do it on TCP's thread.
 	;
-		mov	bx, es:[driverThread]
-		mov	ax, MSG_TCPIP_DESTROY_CONNECTIONS_ASM
-		mov	di, mask MF_CALL
-		call	ObjMessage
+		;mov	bx, es:[driverThread]
+		;mov	ax, MSG_TCPIP_DESTROY_CONNECTIONS_ASM
+		;mov	di, mask MF_CALL
+		;call	ObjMessage
 	;
 	; Finally, tell the driver's thread to self-destruct.
 	;
@@ -4821,21 +4430,6 @@ unlock:
 		pop	es, bx, cx, si				
 endif ; ERROR_CHECK
 
-	; DHCP workaround. When the time comes to send DHCP packets,
-	; the link will be open, but the link structure will be exclusively
-	; locked, therefore any attempts at checking if the link is open
-	; will cause a deadlock. So, we compare the current thread handle
-	; to the saved DHCP thread handle. If they match, then we know it's
-	; safe to jump past the attempts to gain a lock.
-	;		- Ed 6/15/00
-if 0
-		mov	ax, dgroup
-		mov	es, ax
-		mov	ax, es:[dhcpThread]
-		cmp	ax, ss:[0].TPD_threadHandle
-		je	doingDhcp
-endif
-
 	;
 	; Check PacketFlags to see if link should be forced open. 
 	;
@@ -4879,9 +4473,7 @@ sendIt:
 		mov_tr	ax, bx				; ax = msg
 		mov	bx, handle dgroup
 		call	MemDerefDS
-if 0
-sendDhcp:
-endif
+
 		mov	bx, ds:[driverThread]
 		mov	di, mask MF_CALL
 		call	ObjMessage			; ax = SocketDrError
@@ -4893,15 +4485,6 @@ bad:
 exit:		
 		.leave
 		ret
-if 0
-doingDhcp:
-		mov	bx, handle dgroup
-		call	MemDerefDS
-		mov	ax, ds
-		mov	ax, cx
-		mov	cx, ds:[dhcpDomain]
-		jmp	sendDhcp
-endif
 TcpipSendDatagramCommon	endp
 
 COMMENT @----------------------------------------------------------------
@@ -5042,10 +4625,10 @@ doQuery:
 	; Query address from resolver.
 	; 
 		push	bx
-		mov	ax, 1000			; resolve address
+		mov	ax, HIF_NC_RESOLVE_ADDR		; resolve address
 							; dxbp = addr or
 							;  dx = ResolverError
-		int	GEOS_HOST_API
+		call	HostIfCall
 		
 		;lahf
 
@@ -5073,64 +4656,6 @@ exit:
 		.leave
 		ret
 TcpipResolveIPAddr	endp
-
-ifndef STATIC_LINK_RESOLVER
-
-
-COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-		TcpipLoadResolver
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-
-SYNOPSIS:	Load the resolver.
-
-CALLED BY:	TcpipResolveIPAddr
-
-PASS:		nothing
-
-RETURN:		carry set if error
-			ax	= SDE_DRIVER_NOT_FOUND
-		else 
-			ax 	= library handle
-
-DESTROYED:	nothing
-
-PSEUDO CODE/STRATEGY:
-
-REVISION HISTORY:
-	Name	Date			Description
-	----	----			-----------
-	jwu	4/13/95			Initial version
-
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
-EC <LocalDefNLString	resolverName, <"EC Resolver", 0>	>
-NEC<LocalDefNLString	resolverName, <"Resolver", 0>	>
-
-TcpipLoadResolver	proc	near
-		uses	bx, si, ds
-		.enter
-
-		call	FilePushDir
-
-		mov	ax, SP_SYSTEM
-		call	FileSetStandardPath
-		jc	error
-
-		clr	ax, bx
-		segmov	ds, cs, si
-		mov	si, offset resolverName
-		call	GeodeUseLibrary			; bx = handle of library
-error:
-		call	FilePopDir
-		mov	ax, SDE_DRIVER_NOT_FOUND	; just in case
-		jc	exit
-		mov_tr	ax, bx				; return handle
-exit:
-		.leave
-		ret
-TcpipLoadResolver	endp
-
-endif   ; not STATIC_LINK_RESOLVER
-
 
 
 COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -5473,44 +4998,5 @@ ECCheckCallerThread	endp
 
 
 endif	; ERROR_CHECK
-
-;
-; See comments on SocketResolveLinkLevelAddress... same pass/return
-; Currently only works if the link is already open, as I can't figure out
-; how to open it myself... - Ed 6/00
-;
-TcpipResolveLinkLevelAddress	proc	far
-		bufSize		local	word	push	bx
-		sockAddrPtr	local	fptr	push	ds, si
-		.enter
-
-		mov	bx, MAIN_LINK_DOMAIN_HANDLE
-		;call	LinkTableGetEntry	; ds:di = LCB
-		push	bx
-		mov	bl, ds:[di].LCB_state
-		mov	si, bx
-		pop	bx
-		pushdw	ds:[di].LCB_strategy
-		call	MemUnlockExcl
-		mov	di, DR_SOCKET_RESOLVE_LINK_LEVEL_ADDRESS
-		mov	bx, si
-		cmp	bl, LS_OPEN
-		jne	linkClosed
-		movdw	dssi, sockAddrPtr
-		mov	bx, bufSize
-		call	PROCCALLFIXEDORMOVABLE_PASCAL
-
-rllaDone:
-		.leave
-		ret
-
-linkClosed:
-		add	sp, 6
-		movdw	dssi, sockAddrPtr
-		mov	ax, SE_LINK_FAILED
-		jmp	rllaDone
-TcpipResolveLinkLevelAddress	endp
-
-
 
 CommonCode	ends

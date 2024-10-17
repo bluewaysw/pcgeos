@@ -94,18 +94,6 @@ _PROTO		= 7.2
 #
 #GOCFLAGS	+= -CTcpipClassStructures
 
-# STATIC_LINK_RESOLVER
-#  This flag causes the resolver library to be statically linked to the
-#  driver, rather than dynamically loaded and unloaded for
-#  starting and stopping every IP address resolution.  For devices with
-#  slow file access and little or no cache, this speeds things up since
-#  GeodeUseLibrary performs a geode search by long filename on each call.
-#  (Besides, resolve's fixed memory footprint when inactive is only
-#  800 bytes...)
-
-ASMFLAGS    += -DSTATIC_LINK_RESOLVER
-LINKFLAGS   += -DSTATIC_LINK_RESOLVER
-
 #include <$(SYSMAKEFILE)>
 
 

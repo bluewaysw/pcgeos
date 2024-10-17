@@ -37,6 +37,9 @@ type	library, single
 #
 library	geos
 
+
+resource Code 	fixed code read-only shared
+
 #
 # Exported routines (and classes)
 #
@@ -44,3 +47,5 @@ export HostIfDetect
 export HOSTIFDETECT
 export HostIfCall
 export HOSTIFCALL
+export HostIfCallAsync
+export HOSTIFCALLASYNC
