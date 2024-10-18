@@ -532,7 +532,7 @@ LoaderDisplayTextAtXY	proc	near
 LoaderDisplayTextAtXY	endp
 
 
-loaderLoadingText	char	VBAR, ' Loading Ensemble... ', VBAR
+loaderLoadingText	char	VBAR, ' Loading PC/GEOS Ensemble... ', VBAR
 loaderLoadingBoxTop	char	ULCORNER
 			char	((size loaderLoadingText) - 2) dup (HBAR)
 			char	URCORNER
@@ -540,7 +540,7 @@ loaderLoadingBoxBot	char	LLCORNER
 			char	((size loaderLoadingText) - 2) dup (HBAR)
 			char	LRCORNER
 
-loaderCopyrightText	char	'Copyright (c) Breadbox Computer Company LLC 2002. All Rights Reserved'
+loaderCopyrightText	char	'Copyright (C) blueway.Softworks 2018-2024. All Rights Reserved'
 
 
 
