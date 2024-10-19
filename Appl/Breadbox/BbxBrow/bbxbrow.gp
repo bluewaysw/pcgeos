@@ -144,7 +144,7 @@ export     StatusTextClass
 export     URLEntryClass
 ## ifndef GLOBAL_INTERNET_BUILD
 ## not needed for COMPILE_OPTION_TOGGLE_BARS
-export     GlobeAnimClass
+#export     GlobeAnimClass
 ## endif
 export     WMViewControlClass
 export     WMSearchReplaceControlClass

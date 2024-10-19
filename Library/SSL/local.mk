@@ -32,8 +32,7 @@
 # -WDE          Does dgroup fixup on _export'd routines
 #
 #CCOMFLAGS	+= -K -d -X -Fs- -dc -p -WDE -rd
-CCOMFLAGS	+= -ecp -zu
-#-zc 
+CCOMFLAGS	+= -ecp -zu -zc 
 
 #
 # main options

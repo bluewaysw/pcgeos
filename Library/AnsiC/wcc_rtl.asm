@@ -105,7 +105,7 @@ WCC_TEXT        SEGMENT BYTE PUBLIC 'CODE'
 ;	cx:bx	remainder
 ;
 ; Note: This is a temporary implementation. This function must be reimplemented in 8086 assembler instructions.
-
+if 0
 	.386
 	__U4D proc far
 
@@ -130,6 +130,67 @@ WCC_TEXT        SEGMENT BYTE PUBLIC 'CODE'
 	
 	ret
 	__U4D endp
+endif
+
+__U4D proc far
+    ; Input:
+    ; dx:ax = 32-bit dividend (high:low)
+    ; cx:bx = 32-bit divisor (high:low)
+    ; Output:
+    ; dx:ax = quotient (high:low)
+    ; cx:bx = remainder (high:low)
+if 0
+    ; Save the dividend (dx:ax) and divisor (cx:bx) on the stack
+    push dx            ; Save high part of dividend
+    push ax            ; Save low part of dividend
+    push cx            ; Save high part of divisor
+    push bx            ; Save low part of divisor
+
+    ; Check if we can perform a simple 16-bit division (divisor high part = 0)
+    mov ax, cx         ; Copy high word of divisor to ax
+    or  ax, ax         ; Is the high part of the divisor (cx) zero?
+    jnz full_division  ; If not zero, perform full 32-bit division
+
+    ; Simple 16-bit division: divide dx:ax by bx (low part of divisor)
+    pop bx             ; Load low word of divisor (bx) from stack
+    xor dx, dx         ; Clear high part of dividend for 16-bit division
+    div bx             ; Divide dx:ax by bx -> ax = quotient, dx = remainder
+
+    mov cx, dx         ; Store remainder in cx
+    xor dx, dx         ; Clear high part of quotient
+    jmp end_division   ; Jump to end
+
+full_division:
+    ; Full 32-bit division
+    ; dx:ax = dividend, cx:bx = divisor
+
+    pop bx             ; Load low word of divisor (bx)
+    pop cx             ; Load high word of divisor (cx)
+
+    ; Step-by-step division using 16-bit operations
+
+    ; 1. Prepare dividend and divisor
+    push dx            ; Save high part of dividend on the stack
+    push ax            ; Save low part of dividend on the stack
+
+    ; 2. Set up for division
+    xor dx, dx         ; Clear high part of dividend for division
+    div bx             ; Divide dx:ax by bx (low word of divisor)
+
+    ; 3. Get quotient and remainder (low)
+    mov bx, ax         ; Store quotient in bx
+    mov ax, dx         ; Store remainder in ax
+    div cx             ; Divide ax (remainder) by cx (high word of divisor)
+
+    ; 4. Prepare for return
+    mov cx, ax         ; Store remainder in cx
+    mov dx, bx         ; Store quotient in dx
+
+end_division:
+endif
+    ret                ; Return
+__U4D endp
+
 
 ; __I4D
 ;
@@ -144,7 +205,7 @@ WCC_TEXT        SEGMENT BYTE PUBLIC 'CODE'
 ;	cx:bx	remainder
 ;
 ; Note: This is a temporary implementation. This function must be reimplemented in 8086 assembler instructions.
-	
+if 0
 	.386
 	__I4D proc far
 
@@ -169,6 +230,62 @@ WCC_TEXT        SEGMENT BYTE PUBLIC 'CODE'
 	
 	ret
 	__I4D endp
+endif
+
+__I4D proc far
+    ; Input:
+    ; dx:ax = 32-bit dividend (high:low)
+    ; cx:bx = 32-bit divisor (high:low)
+    ; Output:
+    ; dx:ax = quotient (high:low)
+    ; cx:bx = remainder (high:low)
+if 0
+    ; Save the dividend (dx:ax) and divisor (cx:bx) on the stack
+    push dx            ; Save high part of dividend
+    push ax            ; Save low part of dividend
+    push cx            ; Save high part of divisor
+    push bx            ; Save low part of divisor
+
+    ; Check if we can do a simple 16-bit signed division (if cx == 0)
+    or  cx, cx	       ; Check if high part of divisor is 0
+    jnz full_signed_division  ; If high part of divisor is not 0, go to full division
+
+    ; Simple 16-bit signed division: (dx:ax) / bx
+    idiv bx            ; Signed divide dx:ax by bx -> quotient in ax, remainder in dx
+
+    mov bx, dx         ; Store remainder in cx
+    xor dx, dx         ; Clear high part of quotient
+    xor cx, cx         ; Clear high part of quotient
+    jmp end_signed_division ; Jump to end
+
+full_signed_division:
+    ; Full 32-bit signed division
+    ; dx:ax = dividend, cx:bx = divisor
+
+    ; Step-by-step signed division using 16-bit operations
+
+    ; 1. Save the dividend
+    push dx            ; Save high word of dividend on the stack
+    push ax            ; Save low word of dividend on the stack
+
+    ; 2. Prepare for division
+    cwd                ; Sign-extend ax into dx:ax (needed for signed division)
+    idiv bx            ; Divide dx:ax by bx (low word of divisor)
+
+    ; 3. Get quotient and remainder (low part)
+    mov bx, ax         ; Save quotient in bx
+    mov ax, dx         ; Save remainder in ax
+    cwd                ; Sign-extend ax (remainder) into dx:ax
+    idiv cx            ; Divide remainder (ax) by cx (high word of divisor)
+
+    ; 4. Prepare results for return
+    mov cx, ax         ; Store remainder in cx
+    mov dx, bx         ; Store quotient in dx
+
+end_signed_division:
+endif
+    ret                ; Return
+__I4D endp
 
 
 ; __CHP
@@ -180,7 +297,8 @@ WCC_TEXT        SEGMENT BYTE PUBLIC 'CODE'
 	.enter
 
 	mov bp, sp
-	push 0000h					;allocate 2byte on stack
+	;push 0000h					;allocate 2byte on stack
+	sub sp, 2
 	fstcw -2[bp]				;store fpu control word
 	fwait
 	mov ax, -2[bp]				;store old fpu control word in ax

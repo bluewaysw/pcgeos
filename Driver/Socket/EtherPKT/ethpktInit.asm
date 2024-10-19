@@ -145,10 +145,10 @@ typeCheckLoop:
 gotAccess:
 		mov	ds:[pktIpHandle], ax
 		pop	es
-		pop	ax, cx, dx, bx
-		pop	temp
 		pop	bp, si, di
-		mov	sp, temp
+		pop	temp
+		pop	ax, cx, dx, bx
+		;mov	sp, temp
 		;popa
 		mov	si, offset packetTypeARP
 		mov	cx, size word
