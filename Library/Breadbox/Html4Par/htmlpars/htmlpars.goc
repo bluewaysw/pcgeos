@@ -32,11 +32,6 @@
 #include "errors.h"
 @include <initfile.h>
 
-ReadHTML_getc LOCAL getcFileURL;   /* forward */
-#if JAVASCRIPT_SUPPORT
-/*ReadHTML_getc LOCAL getcScriptURL;  */ /* forward */
-#endif
-
 /* keep blocks with arrays below this size */
 #define PARSE_ARRAY_MEM_SIZE_LIMIT 30000
 
@@ -1262,54 +1257,46 @@ int lc;
 ReadHTML_getc *gc;
 dword data;
 
-#if JAVASCRIPT_SUPPORT
-int LOCAL getcLow(ReadHTML_getc *gc,dword data)
+int LOCAL getcLow()
 {
-    register int c = EOF;  /* in case no HE_scriptSrc */
-    typedef int pcfm_getc(ReadHTML_getc *gc,dword data);
-    ScriptSrcHeader *scriptSrc;
-
+    int c;
+#if JAVASCRIPT_SUPPORT
     if(HTMLext->HE_scriptSrc) {
-	scriptSrc = LMemDeref(HTMLext->HE_scriptSrc);
+	ScriptSrcHeader *scriptSrc = LMemDeref(HTMLext->HE_scriptSrc);
 	(byte *)scriptSrc += HTMLext->HE_scriptSrcOffset;
 	if (scriptSrc->block) {
 	    c = getcScriptURL((dword)scriptSrc);
+	    if(c != EOF)
+		return c;
+	    lc = 0;  /* make sure we don't match CR/LF from script and HTML */
 	}
     }
-    if (c == EOF) {
-	lc = 0;  /* make sure we don't match CR/LF from script and HTML */
-        if(gc)
-          c = ((pcfm_getc *)ProcCallFixedOrMovable_cdecl)(gc,data);
-        else
-          c = getcFileURL(data);
+#endif
+    if(gc)
+	c = ((pcfm_getc *)ProcCallFixedOrMovable_cdecl)(gc,data);
+    else {
+        if( ((HTMLFILE *)data)->HTMLbufp >= ((HTMLFILE *)data)->HTMLbufl )
+        {
+	    ((HTMLFILE *)data)->HTMLbufl = FileRead(
+	      ((HTMLFILE *)data)->fileHTML, ((HTMLFILE *)data)->HTMLbuf,
+              HTML_READBUF, FALSE);
+	    ((HTMLFILE *)data)->HTMLbufp = 0; /* set pointer to start of buffer */
+	    if( ((HTMLFILE *)data)->HTMLbufl==0 )
+	      return EOF;               /* read against end of file */
+        }
+        return ((HTMLFILE *)data)->HTMLbuf[ ((HTMLFILE *)data)->HTMLbufp++ ];
+                                        /* return next character from file */
     }
     return c;
 }
-#endif
 
 int LOCAL HTMLgetc(void)
 {
-    register int c;
-
-#if JAVASCRIPT_SUPPORT
-    c = getcLow(gc, data);
-#else
-    if(gc)
-      c = ((pcfm_getc *)ProcCallFixedOrMovable_cdecl)(gc,data);
-    else
-      c = getcFileURL(data);
-#endif
+    int c = getcLow();
 
     /* "CR after LF" or "LF after CF": skip over "the other one" */
     if( (c=='\n' && lc=='\r') || (c=='\r' && lc=='\n') )
-#if JAVASCRIPT_SUPPORT
-      c = getcLow(gc, data);
-#else
-      if(gc)
-        c = ((pcfm_getc *)ProcCallFixedOrMovable_cdecl)(gc,data);
-      else
-        c = getcFileURL(data);
-#endif
+      c = getcLow();
 
     lc = c;                             /* remember last character read */
 
@@ -2036,21 +2023,6 @@ int getcOptrURL(dword data)  /* callback routine to get one char */
     MemUnlock( OptrToHandle(((OPTRFILE *)data)->text) );
 
     return (c!=0)?c:EOF;
-}
-
-int LOCAL getcFileURL(dword data)  /* callback routine to get one char */
-{
-    if( ((HTMLFILE *)data)->HTMLbufp >= ((HTMLFILE *)data)->HTMLbufl )
-    {
-      ((HTMLFILE *)data)->HTMLbufl = FileRead(
-        ((HTMLFILE *)data)->fileHTML, ((HTMLFILE *)data)->HTMLbuf,
-        HTML_READBUF, FALSE);
-      ((HTMLFILE *)data)->HTMLbufp = 0; /* set pointer to start of buffer */
-      if( ((HTMLFILE *)data)->HTMLbufl==0 )
-        return EOF;                     /* read against end of file */
-    }
-    return ((HTMLFILE *)data)->HTMLbuf[ ((HTMLFILE *)data)->HTMLbufp++ ];
-                                        /* return next character from file */
 }
 
 #if JAVASCRIPT_SUPPORT
