@@ -220,8 +220,8 @@ typedef struct {
 } HTMLStylesTable;
 
 typedef struct {
-  unsigned int num;
   char name[7];
+  unsigned int num;
   unsigned int c;
 } HTMLEntityTable;
 

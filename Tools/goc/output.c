@@ -1196,9 +1196,9 @@ OutputLineNumberWithCount(int lineNumber, char *fileName,Boolean print)
       case COM_MSC:
       case COM_BORL:
 	if(fileName == prevFile){/* assumes fileName is in the string table */
-	    sprintf(outputLineNumberBuf,"\n#line %d\n", lineNumber);
+	    sprintf(outputLineNumberBuf,"#line %d", lineNumber);
 	}else{
-	    sprintf(outputLineNumberBuf,"\n#line %d \"", lineNumber);
+	    sprintf(outputLineNumberBuf,"#line %d \"", lineNumber);
 	    /* copy in the filename, changing '\\' to '/' for MSC */
 	    for(from = fileName,
 		to = &outputLineNumberBuf[strlen(outputLineNumberBuf)];
@@ -1207,7 +1207,7 @@ OutputLineNumberWithCount(int lineNumber, char *fileName,Boolean print)
 		*to = (*from =='\\' && 
 			((compiler==COM_MSC) || (compiler==COM_WATCOM)))? '/' : *from;
 	    }
-	    strcpy(to,"\"\n");
+	    sprintf(to,"\"");
 	    prevFile =  fileName;
 	}
 	break;
@@ -1215,12 +1215,11 @@ OutputLineNumberWithCount(int lineNumber, char *fileName,Boolean print)
 	assert(0);
     }
     if(print){
-	length = Output("%s",outputLineNumberBuf);
+	length = Output("\n%s\n",outputLineNumberBuf);
     } else {
-	/* there are two newlines in the string, but they won't be counted */
-	/* correctly by strlen, because the different OS's will print them */
+	/* there are two newlines added, but different OS's will print them */
 	/* differently */
-	length  = strlen(outputLineNumberBuf)  -2 + 2 * NEWLINE_SIZE;
+	length  = strlen(outputLineNumberBuf) + 2 * NEWLINE_SIZE;
     }
 
     return length;
