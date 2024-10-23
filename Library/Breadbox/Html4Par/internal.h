@@ -349,6 +349,7 @@ Boolean AddCellRecord(void);
 word GetCellLevel(void);
 void AddParaCond(void);
 void AddParaCondBeforeTable(void);
+void SetDocumentCharset(char *charSet);
 
 void GetCharacterBase(VisTextCharAttr *cs);
 void GetParagraphBase(VisTextParaAttr *cs);
