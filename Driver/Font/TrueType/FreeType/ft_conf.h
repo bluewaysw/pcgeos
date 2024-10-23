@@ -116,7 +116,7 @@
 /* emerged recently on the FreeType lists.  We still do not have Apple's */
 /* opinion on the subject and will change this as soon as we have.       */
 
-#define   TT_CONFIG_OPTION_NO_INTERPRETER
+//#define   TT_CONFIG_OPTION_NO_INTERPRETER
 
 
 /*************************************************************************/
@@ -204,6 +204,13 @@
 
 
 /*************************************************************************/
+/* Define TT_CONFIG_OPTION_SUPPORT_GASP if you want to support grid-     */
+/* fitting table.                                                        */
+
+#undef  TT_CONFIG_OPTION_SUPPORT_GASP
+
+
+/*************************************************************************/
 /* Define TT_CONFIG_OPTION_SUPPORT_OPTIONAL_FIELDS if you want to hold   */
 /* optional fiels in freetype structures.                                */
 
@@ -215,6 +222,29 @@
 /* unicode ranges in OS/2 table.                                         */
 
 #undef TT_CONFIG_OPTION_SUPPORT_UNICODE_RANGES
+
+
+/*************************************************************************/
+/* Define TT_CONGIG_OPTION_SUPPORT_NON_SQUARE_PIXELS if you want to      */
+/* support displays with non square pixels.                              */
+
+#undef TT_CONGIG_OPTION_SUPPORT_NON_SQUARE_PIXELS
+
+
+/*************************************************************************/
+/* Define TT_CONFIG_OPTION_SUPPORT_PEDANTIC_HINTING if you want to use   */
+/* TrueType-compliant interpreter. Under PC/GEOS we use the more relaxed */
+/* verion of bytecode interperter.                                       */
+
+#undef TT_CONFIG_OPTION_SUPPORT_PEDANTIC_HINTING
+
+
+/*************************************************************************/
+/* Define TT_CONFIG_OPTION_USE_ASSEMBLER_IMPLEMENTATION if you want to   */
+/* use assembler implemented funcions. These implementations use regs    */
+/* and instructions of 80386 processors.                                 */
+
+#define TT_CONFIG_OPTION_USE_ASSEMBLER_IMPLEMENTATION
 
 
 /**********************************************************************/

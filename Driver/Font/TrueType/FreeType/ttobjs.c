@@ -166,7 +166,7 @@
   LOCAL_FUNC
   TT_Error  Goto_CodeRange( PExecution_Context  exec,
                             Int                 range,
-                            ULong               IP )
+                            UShort              IP )
   {
     PCodeRange  cr;
 
@@ -214,7 +214,7 @@
   TT_Error  Set_CodeRange( PExecution_Context  exec,
                            Int                 range,
                            void*               base,
-                           ULong               length )
+                           UShort              length )
   {
     if ( range < 1 || range > 3 )
       return TT_Err_Bad_Argument;
@@ -850,7 +850,6 @@
 
     TT_Error  error;
     UShort    i;
-    UShort    j;
     PFace     face;
 
 
@@ -890,19 +889,15 @@
 
     /* Scale the cvt values to the new ppem.          */
     /* We use by default the y ppem to scale the CVT. */
-
-    MulDivList( ins->cvt,
-                ins->cvtSize,
-                ins->metrics.scale1,
-                ins->metrics.scale2 );
+    MulDivList( ins->cvt, ins->cvtSize, face->cvt, ins->metrics.scale1, ins->metrics.scale2 );
 
     /* All twilight points are originally zero */
-    for ( j = 0; j < ins->twilight.n_points; ++j )
+    for ( i = 0; i < ins->twilight.n_points; ++i )
     {
-      ins->twilight.org[j].x = 0;
-      ins->twilight.org[j].y = 0;
-      ins->twilight.cur[j].x = 0;
-      ins->twilight.cur[j].y = 0;
+      ins->twilight.org[i].x = 0;
+      ins->twilight.org[i].y = 0;
+      ins->twilight.cur[i].x = 0;
+      ins->twilight.cur[i].y = 0;
     }
 
     /* clear storage area */
@@ -1038,9 +1033,11 @@
     face->fontPgmSize = 0;
     face->cvtPgmSize  = 0;
 
+#ifdef TT_CONFIG_OPTION_SUPPORT_GASP
     /* freeing the gasp table */
     FREE( face->gasp.gaspRanges );
     face->gasp.numRanges = 0;
+#endif
 
     /* freeing the name table */
     Free_TrueType_Names( face );
@@ -1122,7 +1119,9 @@
          LOAD_( CMap )          ||
          LOAD_( CVT )           ||
          LOAD_( Programs )      ||
+#ifdef TT_CONFIG_OPTION_SUPPORT_GASP
          LOAD_( Gasp )          ||
+#endif
          LOAD_( Names )         ||
          LOAD_( OS2 )           ||
          LOAD_( PostScript )
@@ -1217,47 +1216,6 @@
   }
 
 
-/*******************************************************************
- *
- *  Function    :  Scale_X
- *
- *  Description :  scale an horizontal distance from font
- *                 units to 26.6 pixels
- *
- *  Input  :  metrics  pointer to metrics
- *            x        value to scale
- *
- *  Output :  scaled value
- *
- ******************************************************************/
-
-  LOCAL_FUNC
-  TT_Pos  Scale_X( PIns_Metrics  metrics, TT_Pos  x )
-  {
-    return TT_MulDiv( x, metrics->x_scale1, metrics->x_scale2 );
-  }
-
-
-/*******************************************************************
- *
- *  Function    :  Scale_Y
- *
- *  Description :  scale a vertical distance from font
- *                 units to 26.6 pixels
- *
- *  Input  :  metrics  pointer to metrics
- *            y        value to scale
- *
- *  Output :  scaled value
- *
- ******************************************************************/
-
-  LOCAL_FUNC
-  TT_Pos  Scale_Y( PIns_Metrics  metrics, TT_Pos  y )
-  {
-    return TT_MulDiv( y, metrics->y_scale1, metrics->y_scale2 );
-  }
-
 
 /*******************************************************************
  *
@@ -1329,9 +1287,6 @@
     PCache        face_cache, exec_cache;
     TT_Error      error;
 
-
-    face_cache = 0;
-    exec_cache = 0;
 
     if ( ALLOC( face_cache, sizeof ( TCache ) ) ||
          ALLOC( exec_cache, sizeof ( TCache ) ) )

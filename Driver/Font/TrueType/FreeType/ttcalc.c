@@ -134,6 +134,60 @@
   EXPORT_FUNC
   TT_Long  TT_MulDiv( TT_Long  a, TT_Long  b, TT_Long  c )
   {
+  #ifdef TT_CONFIG_OPTION_USE_ASSEMBLER_IMPLEMENTATION
+    __asm {
+        mov     eax, a
+        mov     ebx, b
+        mov     ecx, c
+
+        ; Calculate sign
+        mov     esi, eax
+        xor     esi, ebx
+        xor     esi, ecx        ; esi now holds the sign bit
+
+        ; Take absolute values
+        test    eax, eax
+        jns     skip_abs_a
+        neg     eax
+    skip_abs_a:
+        test    ebx, ebx
+        jns     skip_abs_b
+        neg     ebx
+    skip_abs_b:
+        test    ecx, ecx
+        jns     skip_abs_c
+        neg     ecx
+    skip_abs_c:
+
+        ; Check for division by zero
+        test    ecx, ecx
+        jz      divide_by_zero
+
+        ; Perform (a * b + c/2) / c
+        mov     edx, 0          ; Clear upper 32 bits for 64-bit multiplication
+        mul     ebx             ; EDX:EAX = a * b
+        mov     edi, ecx        ; Save c in edi
+        shr     edi, 1          ; edi = c/2
+        add     eax, edi        ; Add c/2 to lower 32 bits
+        adc     edx, 0          ; Add carry to upper 32 bits
+        idiv    ecx             ; Divide EDX:EAX by c
+        jmp     apply_sign
+
+    divide_by_zero:
+        ; Handle division by zero (return max positive or min negative)
+        mov     eax, 80000000h  ; Load min negative value
+
+    apply_sign:
+        ; Apply sign
+        test    esi, 80000000h  ; Test sign bit
+        jz      done
+        neg     eax
+
+    done:
+        mov     edx, eax        ; Store result in dx:ax
+        shr     edx, 16
+    }
+  #else
     long   s;
 
 
@@ -146,7 +200,7 @@
 
     if ( a <= 46340 && b <= 46340 && c <= 176095 )
     {
-      a = ( a*b + c/2 )/c;
+      a = ( a*b + (c >> 1) )/c;
     }
     else
     {
@@ -154,12 +208,13 @@
 
       MulTo64( a, b, &temp );
       temp2.hi = (TT_Int32)(c >> 31);
-      temp2.lo = (TT_Word32)(c / 2);
+      temp2.lo = (TT_Word32)(c >> 1);
       Add64( &temp, &temp2, &temp );
       a = Div64by32( &temp, c );
     }
 
     return ( s < 0 ) ? -a : a;
+  #endif
   }
 
   /* The optimization for TT_MulFix is different. We could simply be     */
@@ -178,6 +233,46 @@
   EXPORT_FUNC
   TT_Long   TT_MulFix( TT_Long  a, TT_Long  b )
   {
+  #ifdef TT_CONFIG_OPTION_USE_ASSEMBLER_IMPLEMENTATION
+    __asm {
+        ; store sign of result
+        mov     eax, a
+        xor     eax, b
+        mov     esi, eax         ; esi = sign of result
+
+        ; calculate |a|
+        mov     eax, a
+        cdq                      ; sign extend eax into edx
+        xor     eax, edx
+        sub     eax, edx
+        mov     ebx, eax         ; ebx = |a|
+
+        ; calculate |b|
+        mov     eax, b
+        cdq
+        xor     eax, edx
+        sub     eax, edx         ; eax = |b|
+
+        ; multiply |a| * |b|
+        mul     ebx              ; edx:eax = |a| * |b|
+
+        ; add 0x8000 (rounding factor)
+        add     eax, 0x8000
+        adc     edx, 0           ; edx:eax += 0x8000
+
+        ; divide by 0x10000 (shift right by 16)
+        shrd    eax, edx, 16
+        shr     edx, 16          ; edx:eax >>= 16
+
+        ; apply sign using NEG if necessary
+        test    esi, 0x80000000  ; test the sign bit
+        jz      positive
+        neg     eax
+    positive:
+        mov     edx, eax         ; store result in dx:ax
+        shr     edx, 16
+    }
+  #else
     long   s;
 
     if ( a == 0 || b == 0x10000 )
@@ -202,6 +297,7 @@
     }
 
     return ( s < 0 ) ? -a : a;
+  #endif
   }
 
 
@@ -230,6 +326,23 @@
   LOCAL_FUNC
   void  Add64( TT_Int64*  x, TT_Int64*  y, TT_Int64*  z )
   {
+  #ifdef TT_CONFIG_OPTION_USE_ASSEMBLER_IMPLEMENTATION
+    __asm {
+        mov     esi, x           ; Load address of x into esi
+        mov     edi, y           ; Load address of y into edi
+        mov     ebx, z           ; Load address of z into ebx
+
+        ; Add lower 32 bits
+        mov     eax, [esi]       ; Load x->lo into eax
+        add     eax, [edi]       ; Add y->lo to eax
+        mov     [ebx], eax       ; Store result in z->lo
+
+        ; Add upper 32 bits with carry
+        mov     eax, [esi + 4]   ; Load x->hi into eax
+        adc     eax, [edi + 4]   ; Add y->hi to eax with carry
+        mov     [ebx + 4], eax   ; Store result in z->hi
+    }
+  #else
     register TT_Word32  lo, hi;
 
 
@@ -238,9 +351,10 @@
 
     z->lo = lo;
     z->hi = hi;
+  #endif
   }
 
-
+#if 0
   LOCAL_FUNC
   void  Sub64( TT_Int64*  x, TT_Int64*  y, TT_Int64*  z )
   {
@@ -253,11 +367,23 @@
     z->lo = lo;
     z->hi = hi;
   }
-
+#endif
 
   LOCAL_FUNC
   void  MulTo64( TT_Int32  x, TT_Int32  y, TT_Int64*  z )
   {
+  #ifdef TT_CONFIG_OPTION_USE_ASSEMBLER_IMPLEMENTATION
+    __asm {
+        mov     eax, x           ; Load x into eax
+        mov     ecx, y           ; Load y into ecx
+        imul    ecx              ; Signed multiply eax by ecx
+                                 ; Result: edx:eax (high:low)
+
+        mov     esi, z           ; Load address of z into esi
+        mov     [esi], eax       ; Store low 32 bits (eax) into z->lo
+        mov     [esi + 4], edx   ; Store high 32 bits (edx) into z->hi
+    }
+  #else
     TT_Int32   s;
     TT_Word32  lo1, hi1, lo2, hi2, lo, hi, i1, i2;
 
@@ -287,7 +413,7 @@
     /* Check carry overflow of i1 + lo */
     if ( i1 )
     {
-      if ( lo >= (TT_Word32)-(TT_Int32)i1 ) hi++;
+      if ( lo >= (TT_Word32)-(TT_Int32)i1 ) ++hi;
       lo += i1;
     }
 
@@ -297,12 +423,37 @@
     z->hi = hi;
 
     if ( s < 0 ) Neg64( z );
+  #endif
   }
 
 
   LOCAL_FUNC
   TT_Int32  Div64by32( TT_Int64*  x, TT_Int32  y )
   {
+  #ifdef TT_CONFIG_OPTION_USE_ASSEMBLER_IMPLEMENTATION
+    __asm {
+        mov     esi, x                ; Load address of x into esi
+        mov     eax, [esi]            ; Load lower 32 bits of x into eax
+        mov     edx, [esi+4]          ; Load upper 32 bits of x into edx
+        mov     ebx, y                ; Load y into ebx
+        test    ebx, ebx              ; Check if y is zero
+        jz      divide_by_zero        ; Jump to divide_by_zero if y is zero
+        idiv    ebx                   ; Signed divide EDX:EAX by EBX
+        jmp     done                  ; Jump to done after division
+
+    divide_by_zero:
+        test    edx, edx              ; Check sign of dividend (upper 32 bits of x)
+        js      negative_dividend     ; Jump if dividend is negative
+        mov     eax, 0x7FFFFFFF       ; Load maximum positive 32-bit value
+        jmp     done
+    negative_dividend:
+        mov     eax, 0x80000000       ; Load minimum negative 32-bit value
+
+    done:
+        mov     edx, eax              ; Store result in dx:ax
+        shr     edx, 16
+    }
+  #else
     TT_Int32   s;
     TT_Word32  q, r, i, lo;
 
@@ -325,7 +476,7 @@
                             /* Return Max/Min Int32 if divide overflow */
                             /* This includes division by zero!         */
     q = 0;
-    for ( i = 0; i < 32; i++ )
+    for ( i = 0; i < 32; ++i )
     {
       r <<= 1;
       q <<= 1;
@@ -340,9 +491,10 @@
     }
 
     return ( s < 0 ) ? -(TT_Int32)q : (TT_Int32)q;
+  #endif
   }
 
-
+#if 0
   LOCAL_FUNC
   Int  Order64( TT_Int64*  z )
   {
@@ -364,15 +516,86 @@
     while ( i > 0 )
     {
       i >>= 1;
-      j++;
+      ++j;
     }
     return j-1;
   }
-
+#endif
 
   LOCAL_FUNC
   TT_Int32  Sqrt64( TT_Int64*  l )
   {
+  #ifdef TT_CONFIG_OPTION_USE_ASSEMBLER_IMPLEMENTATION
+    __asm {
+        mov     esi, Roots    ; Load address of Roots array
+        mov     eax, [l]     ; Load low 32 bits of l
+        mov     edx, [l + 4] ; Load high 32 bits of l
+
+        ; Check if l <= 0
+        or      edx, eax
+        jnz     not_zero
+        ret
+
+	  not_zero:
+        ; Check if l == 1
+        cmp     edx, 0
+        jne     not_one
+        cmp     eax, 1
+        jne     not_one
+        ret
+
+    not_one:
+        ; Integrated Order64 functionality
+        xor     ecx, ecx             ; Initialize bit count (j)
+        test    edx, edx
+        jnz     count_high
+
+    count_low:
+        bsr     ebx, eax             ; Bit Scan Reverse on low dword
+        add     ecx, ebx
+        jmp     order64_done
+
+    count_high:
+        bsr     ebx, edx             ; Bit Scan Reverse on high dword
+        add     ecx, ebx
+        add     ecx, 32
+
+    order64_done:
+        mov     eax, [esi + ecx * 4] ; Load initial r from Roots[Order64(l)] into eax
+
+        ; Main Sqrt64 loop
+    sqrt_loop:
+        mov     ebx, eax             ; s = r (store old r in ebx)
+
+        ; Compute l / r
+        mov     ecx, eax             ; Store r in ecx for division
+        mov     eax, dword ptr l
+        mov     edx, dword ptr l + 4
+        div     ecx
+
+        ; r = (r + l/r) >> 1
+        add     eax, ecx
+        rcr     edx, 1
+        rcr     eax, 1
+
+        ; Check r > s
+        cmp     eax, ebx
+        jg      sqrt_loop
+
+        ; Check r*r > l
+        mov     ecx, eax
+        mul     ecx
+        cmp     edx, dword ptr l + 4
+        ja      sqrt_loop
+        jb      done
+        cmp     eax, dword ptr l
+        ja      sqrt_loop
+
+    done:
+        mov		edx, eax
+        shr		edx, 16
+    }
+  #else
     TT_Int64  l2;
     TT_Int32  r, s;
 
@@ -394,6 +617,7 @@
     while ( r > s || (TT_Int32)l2.hi < 0 );
 
     return r;
+  #endif
   }
 
 #endif /* LONG64 */
@@ -402,34 +626,30 @@
 /* Its main purpose is to reduce the number of inter-module calls in GEOS. */
 
 LOCAL_FUNC
-void  MulDivList( TT_Long*  a, ULong  n, TT_Long  b, TT_Long  c )
+void  MulDivList( TT_Long*  a, UShort  n, TT_Short*  b, TT_Long  c, TT_Long  d )
 {
-  ULong i;
+  UShort i;
 
-  for ( i = 0; i < n; i++ )
-    a[i] = TT_MulDiv( a[i], b, c );
+  for ( i = 0; i < n; ++i )
+    a[i] = TT_MulDiv( b[i], c, d );
 }
 
 /* This convenience function applies a matrix  to a list of vectors.       */
 /* Its main purpose is to reduce the number of inter-module calls in GEOS. */
 
 LOCAL_FUNC
-void  TransVecList( TT_Vector*  vec, ULong  n, TT_Matrix*  matrix )
+void  TransVecList( TT_Vector*  vec, UShort  n, TT_Matrix*  matrix )
 {
-    ULong  i;
-    TT_F26Dot6  x, y;
+    UShort  i;
 
-    for ( i = 0; i < n; i++ )
+    for ( i = 0; i < n; ++i )
     {
-      x = TT_MulFix( vec->x, matrix->xx ) +
-          TT_MulFix( vec->y, matrix->xy );
+      vec->x = TT_MulFix( vec->x, matrix->xx ) +
+               TT_MulFix( vec->y, matrix->xy );
 
-      y = TT_MulFix( vec->x, matrix->yx ) +
-          TT_MulFix( vec->y, matrix->yy );
-
-      vec->x = x;
-      vec->y = y;
-      vec++;
+      vec->y = TT_MulFix( vec->x, matrix->yx ) +
+               TT_MulFix( vec->y, matrix->yy );
+      ++vec;
     }  
 }
 
