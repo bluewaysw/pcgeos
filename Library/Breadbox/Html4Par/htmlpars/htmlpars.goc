@@ -131,6 +131,8 @@ static word scriptCount;
    (used in ApplyFontWeightWidthAndSpacingAdjustment, set in ParseHTMLFile,
    ParsePlainFile, and MSG_VIS_TEXT_GRAPHIC_VARIABLE_DRAW) */
 DosCodePage G_htmlCodePage;
+#else
+Boolean G_decodeUtf8;
 #endif
 
 /***************************************************************************
@@ -681,6 +683,53 @@ void CleanupJavaScript(long pos1, long pos2)
     if(pos>pos1)                        // found something to delete: remove it
       HugeArrayDelete(HTMLext->HE_vmFile,
         VMCHAIN_GET_VM_BLOCK(htbh->HTBH_scriptCode), (word)(pos-pos1), pos1);
+}
+
+void SetDocumentCharset(char *p)
+{
+@ifdef DO_DBCS
+    int i, j;
+    char buf[15];
+    TCHAR id[20];
+    char *idCP;
+    TCHAR *idTP;
+    DosCodePage cp;
+    word size;
+    Boolean found = FALSE;
+
+    /* this should only happen once per page, so we'll just read
+    the .ini file directly (instead of buffering .ini data) */
+    for (i = 0; i < NUM_CODE_PAGE_FONT_ADJ_ENTRIES; i++) {
+      sprintfsbcs(buf, "cp-%d", i);
+      if (!InitFileReadInteger("HTMLView", buf, (word*)&cp)) {
+	sprintfsbcs(buf, "cp%uid", cp);
+	j = 0;
+	while (!InitFileReadStringSectionBuffer("HTMLView", buf,
+						j++, (char*)id,
+						sizeof(id)/sizeof(TCHAR),
+						&size)) {
+	  /* convert ASCII-only id string to single-byte */
+	  idTP = id; idCP = (char *)id;
+	  while(*idTP) *idCP++ = *idTP++; *idCP = 0;
+	  if (!strncmpisb(p, (char*)id, 0)) {
+	    /* set new code page */
+	    HTMLext->HE_codePage = cp;
+	    G_htmlCodePage = cp;
+	    /* update base font */
+	    ApplyFontWeightWidthAndSpacingAdjustment(&vcaBase, TRUE);
+	    found = TRUE;
+	    break;
+	  }
+	}
+      }
+      if (found) break;
+    }
+@else
+    if (!strcmp(p, "UTF-8")) {
+      HTMLext->HE_decodeUtf8 = TRUE;
+      G_decodeUtf8 = TRUE;
+    }
+@endif
 }
 
 /***************************************************************************
@@ -1257,7 +1306,7 @@ int lc;
 ReadHTML_getc *gc;
 dword data;
 
-int LOCAL getcLow()
+int LOCAL HTMLgetcLow()
 {
     int c;
 #if JAVASCRIPT_SUPPORT
@@ -1292,11 +1341,54 @@ int LOCAL getcLow()
 
 int LOCAL HTMLgetc(void)
 {
-    int c = getcLow();
+    int c = HTMLgetcLow();
+
+#ifndef DO_DBCS
+    if(G_decodeUtf8) {
+      if(c!=EOF && c>0x7F) {
+	if((c & 0xE0)==0xC0) {
+	  int c2 = HTMLgetcLow();
+	  if (c2!=EOF) {
+	    if ((c2 & 0xc0)==0x80) {
+	      c &= 0x1F;
+	      c <<= 6;
+	      c |= (c2 & 0x3f);
+	    }
+	    else
+	      c = '?';
+	  }
+	  else
+	    c = EOF;
+	}
+	else if((c & 0xF0)==0xE0) {
+	  int c2 = HTMLgetcLow();
+	  if (c2!=EOF) {
+	    int c3 = HTMLgetcLow();
+	    if (c3!=EOF) {
+	      if ((c2 & 0xc0)==0x80 && (c3 & 0xc0)==0x80) {
+	        c &= 0x0f;
+	        c <<= 12;
+	        c |= (c2 & 0x3f) << 6;
+	        c |= (c3 & 0x3f);
+	      }
+	      else
+	        c = '?';
+	    }
+	    else
+	      c = EOF;
+	  }
+	  else
+	    c = EOF;
+	}
+	else
+	  c = '?';
+      }
+    }
+#endif
 
     /* "CR after LF" or "LF after CF": skip over "the other one" */
     if( (c=='\n' && lc=='\r') || (c=='\r' && lc=='\n') )
-      c = getcLow();
+      c = HTMLgetcLow();
 
     lc = c;                             /* remember last character read */
 
@@ -1600,26 +1692,26 @@ const char endScript[] = "</SCRIPT";
 
 char pbuf[3] = {0, 0, 0};  /* only accessed by single parsing thread */
 
-word HandleScriptChar(word flags, char c, char p)
+word LOCAL HandleScriptChar(word flags, int c, char p)
 {
     if (flags & CC_COMMENT) {
 @ifdef DO_DBCS
-	if (c==EOF || c==C_CARRIAGE_RETURN || c==C_LINE_FEED ||
+	if (c==C_CARRIAGE_RETURN || c==C_LINE_FEED ||
 @else
-	if (c==EOF || c==C_CR || c==C_LF ||
+	if (c==C_CR || c==C_LF ||
 @endif
 	    (pbuf[0]=='-' && pbuf[1]=='-' && p=='>')) {
 	    flags &= ~CC_COMMENT;
 	}
     } else if (flags & C_COMMENT) {
-	if (c==EOF || (c=='/' && p=='*')) {
+	if (c=='/' && p=='*') {
 	    flags &= ~C_COMMENT;
 	}
     } else if (flags & QUOTE_CHAR) {
 @ifdef DO_DBCS
-	if (c==EOF || c==C_CARRIAGE_RETURN || c==C_LINE_FEED ||
+	if (c==C_CARRIAGE_RETURN || c==C_LINE_FEED ||
 @else
-	if (c==EOF || c==C_CR || c==C_LF ||
+	if (c==C_CR || c==C_LF ||
 @endif
             (c==(flags & QUOTE_CHAR) && p!='\\')) {
 	    flags &= ~QUOTE_CHAR;
@@ -2108,6 +2200,8 @@ int EXPORT ParseHTMLFile(ReadHTML_getc *p_gc, dword p_data, HTMLextra *ext,
     HTMLext = ext;                      /* Make extra data available globally */
 #ifdef DO_DBCS
     G_htmlCodePage = HTMLext->HE_codePage;
+#else
+    G_decodeUtf8 = TRUE;
 #endif
     *item = InitTransferItem();         /* initialize & return transfer item */
     InitTagStacks(localHeap);           /* set up tag stacks */
@@ -2321,6 +2415,8 @@ int EXPORT ParsePlainFile(ReadHTML_getc *p_gc, dword p_data, HTMLextra *ext,
     HTMLext = ext;                      /* Make extra data available globally */
 #ifdef DO_DBCS
     G_htmlCodePage = HTMLext->HE_codePage;
+#else
+    G_decodeUtf8 = TRUE;
 #endif
     *item = InitTransferItem();         /* initialize & return transfer item */
     InitTagStacks(localHeap);           /* set up tag stacks */
