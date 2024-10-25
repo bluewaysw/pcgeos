@@ -436,6 +436,7 @@ static word ShiftCharData( FontBuf* fontBuf, CharData* charData )
 
 EC(     ECCheckBounds( (void*)charData ) );
 EC(     ECCheckBounds( (void*)(((byte*)charData) + dataSize ) ) );
+EC(     ECCheckBounds( (void*)(((byte*)charData) + dataSize + bytesToMove ) ) );
  
         memmove( charData, ((byte*)charData) + dataSize, bytesToMove );
 
@@ -472,6 +473,7 @@ static word ShiftRegionCharData( FontBuf* fontBuf, RegionCharData* charData )
 
 EC(     ECCheckBounds( (void*)charData ) );
 EC(     ECCheckBounds( (void*)(((byte*)charData) + dataSize ) ) );
+EC(     ECCheckBounds( (void*)(((byte*)charData) + dataSize + bytesToMove ) ) );
 
         memmove( charData, ((byte*)charData) + dataSize, bytesToMove );
 

@@ -362,7 +362,10 @@ static void FillKerningFlags( FontHeader* fontHeader, FontBuf* fontBuf )
 {
         word             i;
         KernPair*        kernPair       = (KernPair*) ( ( (byte*)fontBuf ) + fontBuf->FB_kernPairs );
-        CharTableEntry*  charTableEntry = (CharTableEntry*) (((byte*)fontBuf) + sizeof( FontBuf ));
+        CharTableEntry*  charTableEntry = (CharTableEntry*) ( ( (byte*)fontBuf ) + sizeof( FontBuf ));
+
+EC(     ECCheckBounds( kernPair ) );
+EC(     ECCheckBounds(  charTableEntry ) );
 
         for( i = 0; i < fontBuf->FB_kernCount; ++i )
         {
