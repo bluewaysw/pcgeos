@@ -361,19 +361,19 @@ EC(             ECCheckBounds( (void*)charTableEntry ) );
 static void FillKerningFlags( FontHeader* fontHeader, FontBuf* fontBuf ) 
 {
         word             i;
-        KernPair*        kernPair       = (KernPair*) ( ( (byte*)fontBuf ) + fontBuf->FB_kernPairs );
-        CharTableEntry*  charTableEntry = (CharTableEntry*) ( ( (byte*)fontBuf ) + sizeof( FontBuf ));
+        KernPair*        kernPairs        = (KernPair*) ( ( (byte*)fontBuf ) + fontBuf->FB_kernPairs );
+        CharTableEntry*  charTableEntries = (CharTableEntry*) ( ( (byte*)fontBuf ) + sizeof( FontBuf ));
 
-EC(     ECCheckBounds( kernPair ) );
-EC(     ECCheckBounds(  charTableEntry ) );
+EC(     ECCheckBounds( kernPairs ) );
+EC(     ECCheckBounds( charTableEntries ) );
 
         for( i = 0; i < fontBuf->FB_kernCount; ++i )
         {
-                word  indexLeftChar  = kernPair[i].KP_charLeft - fontHeader->FH_firstChar;
-                word  indexRightChar = kernPair[i].KP_charRight - fontHeader->FH_firstChar;
+                word  indexLeftChar  = kernPairs[i].KP_charLeft - fontHeader->FH_firstChar;
+                word  indexRightChar = kernPairs[i].KP_charRight - fontHeader->FH_firstChar;
 
-                charTableEntry[indexLeftChar].CTE_flags  |= CTF_IS_FIRST_KERN;
-                charTableEntry[indexRightChar].CTE_flags |= CTF_IS_SECOND_KERN;
+                charTableEntries[indexLeftChar].CTE_flags  |= CTF_IS_FIRST_KERN;
+                charTableEntries[indexRightChar].CTE_flags |= CTF_IS_SECOND_KERN;
         }
 }
 
