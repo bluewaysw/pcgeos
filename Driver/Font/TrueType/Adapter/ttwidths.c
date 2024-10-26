@@ -364,6 +364,7 @@ static void FillKerningFlags( FontHeader* fontHeader, FontBuf* fontBuf )
         KernPair*        kernPairs        = (KernPair*) ( ( (byte*)fontBuf ) + fontBuf->FB_kernPairs );
         CharTableEntry*  charTableEntries = (CharTableEntry*) ( ( (byte*)fontBuf ) + sizeof( FontBuf ));
 
+EC(     ECCheckStack() );
 EC(     ECCheckBounds( kernPairs ) );
 EC(     ECCheckBounds( charTableEntries ) );
 
@@ -371,6 +372,7 @@ EC(     ECCheckBounds( charTableEntries ) );
         {
                 word  indexLeftChar  = kernPairs[i].KP_charLeft - fontHeader->FH_firstChar;
                 word  indexRightChar = kernPairs[i].KP_charRight - fontHeader->FH_firstChar;
+
 
                 charTableEntries[indexLeftChar].CTE_flags  |= CTF_IS_FIRST_KERN;
                 charTableEntries[indexRightChar].CTE_flags |= CTF_IS_SECOND_KERN;
