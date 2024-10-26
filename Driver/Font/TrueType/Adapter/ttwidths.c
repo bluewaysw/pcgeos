@@ -361,18 +361,21 @@ EC(             ECCheckBounds( (void*)charTableEntry ) );
 static void FillKerningFlags( FontHeader* fontHeader, FontBuf* fontBuf ) 
 {
         word             i;
-        KernPair*        kernPairs        = (KernPair*) ( ( (byte*)fontBuf ) + fontBuf->FB_kernPairs );
-        CharTableEntry*  charTableEntries = (CharTableEntry*) ( ( (byte*)fontBuf ) + sizeof( FontBuf ));
+        const KernPair*  const kernPairs = (const KernPair*) ( ( (const byte*)fontBuf ) + fontBuf->FB_kernPairs );
+        CharTableEntry*  const charTableEntries = (CharTableEntry*) ( ( (byte*)fontBuf ) + sizeof( FontBuf ));
 
 EC(     ECCheckStack() );
-EC(     ECCheckBounds( kernPairs ) );
+EC(     ECCheckBounds( (void*)kernPairs ) );
 EC(     ECCheckBounds( charTableEntries ) );
 
         for( i = 0; i < fontBuf->FB_kernCount; ++i )
         {
-                word  indexLeftChar  = kernPairs[i].KP_charLeft - fontHeader->FH_firstChar;
-                word  indexRightChar = kernPairs[i].KP_charRight - fontHeader->FH_firstChar;
+                const unsigned char  indexLeftChar  = kernPairs[i].KP_charLeft - fontHeader->FH_firstChar;
+                const unsigned char  indexRightChar = kernPairs[i].KP_charRight - fontHeader->FH_firstChar;
 
+
+EC_ERROR_IF(    indexLeftChar  > fontHeader->FH_lastChar - fontHeader->FH_firstChar, -1 );
+EC_ERROR_IF(    indexRightChar > fontHeader->FH_lastChar - fontHeader->FH_firstChar, -1 );
 
                 charTableEntries[indexLeftChar].CTE_flags  |= CTF_IS_FIRST_KERN;
                 charTableEntries[indexRightChar].CTE_flags |= CTF_IS_SECOND_KERN;
