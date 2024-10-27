@@ -374,8 +374,8 @@ EC(     ECCheckBounds( charTableEntries ) );
                 const unsigned char  indexRightChar = kernPairs[i].KP_charRight - fontHeader->FH_firstChar;
 
 
-EC_ERROR_IF(    indexLeftChar  > fontHeader->FH_lastChar - fontHeader->FH_firstChar, -1 );
-EC_ERROR_IF(    indexRightChar > fontHeader->FH_lastChar - fontHeader->FH_firstChar, -1 );
+EC_ERROR_IF(    indexLeftChar  > fontHeader->FH_lastChar - fontHeader->FH_firstChar, CHARINDEX_OUT_OF_BOUNDS );
+EC_ERROR_IF(    indexRightChar > fontHeader->FH_lastChar - fontHeader->FH_firstChar, CHARINDEX_OUT_OF_BOUNDS );
 
                 charTableEntries[indexLeftChar].CTE_flags  |= CTF_IS_FIRST_KERN;
                 charTableEntries[indexRightChar].CTE_flags |= CTF_IS_SECOND_KERN;
@@ -445,8 +445,8 @@ EC(     ECCheckBounds( indices ) );
         /* search for format 0 subtable */
         for( table = 0; table < kerningDir.nTables; ++table )
         {
-                word       i;
-                word       minKernValue = UNITS_PER_EM / KERN_VALUE_DIVIDENT;
+                word        i;
+                const word  minKernValue = UNITS_PER_EM / KERN_VALUE_DIVIDENT;
                 
 
                 if( TT_Load_Kerning_Table( FACE, table ) )
@@ -460,8 +460,8 @@ EC(             ECCheckBounds( pairs ) );
 
                 for( i = 0; i < kerningDir.tables->t.kern0.nPairs; ++i )
                 {
-                        char left = GetGEOSCharForIndex( indices, pairs[i].left );
-                        char right = GetGEOSCharForIndex( indices, pairs[i].right );
+                        const char left = GetGEOSCharForIndex( indices, pairs[i].left );
+                        const char right = GetGEOSCharForIndex( indices, pairs[i].right );
 
                         if( left && right && ABS( pairs[i].value ) > minKernValue )
                         {
@@ -726,7 +726,7 @@ static word AllocFontBlock( word        additionalSpace,
                             word        numOfKernPairs,
                             MemHandle*  fontHandle )
 {
-        word size = sizeof( FontBuf ) + numOfCharacters * sizeof( CharTableEntry ) +
+        const word  size = sizeof( FontBuf ) + numOfCharacters * sizeof( CharTableEntry ) +
                 numOfKernPairs * ( sizeof( KernPair ) + sizeof( BBFixed ) ) +
                 additionalSpace; 
                      
