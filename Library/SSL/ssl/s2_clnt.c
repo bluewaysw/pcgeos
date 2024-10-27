@@ -68,6 +68,7 @@
 #include "objects.h"
 #include "ssl_locl.h"
 #include "evp.h"
+#include <hostif.h>
 
 #ifndef NOPROTO
 static int get_server_finished(SSL *s);
@@ -92,6 +93,10 @@ static int ssl_rsa_public_encrypt();
 
 #define BREAK	break
 
+#ifdef COMPILE_OPTION_HOST_SERVICE
+extern Boolean hostApiAvailable;
+#endif
+
 static SSL_METHOD *ssl2_get_client_method(ver)
 int ver;
 	{
@@ -107,6 +112,14 @@ SSL_METHOD* _export _pascal SSLv2_client_method()
 	static SSL_METHOD SSLv2_client_data;
 #ifdef __GEOS__
 	SSL_METHOD *ret;
+#endif
+#ifdef COMPILE_OPTION_HOST_SERVICE
+	if(hostApiAvailable)
+		{
+		return (SSL_METHOD *) HostIfCall(
+			HIF_SSL_V2_GET_CLIENT_METHOD, 
+			(dword) NULL, (dword) NULL, 0);
+		}
 #endif
 
     SSLEnter() ;

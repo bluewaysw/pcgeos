@@ -32,7 +32,7 @@
 # -WDE          Does dgroup fixup on _export'd routines
 #
 #CCOMFLAGS	+= -K -d -X -Fs- -dc -p -WDE -rd
-CCOMFLAGS	+= -ecp -zu
+CCOMFLAGS	+= -ecp -zu -zc
 #-zc 
 
 #
@@ -90,7 +90,7 @@ CCOMFLAGS += -DNO_BLOWFISH -DNO_BF -DNO_IDEA -DNO_RC2 -DNO_MD2 -DNO_CAST -DNO_RC
 # GEOS_MEM -- use GEOS heap instead of C malloc (s2 packet r/w buffers)
 # GEOS_ERROR -- integrate GEOS error handling (ThreadGetError/ThreadSetError)
 #
-CCOMFLAGS	+= -DGEOS_CLIENT -DGEOS_MEM -DGEOS_ERROR
+CCOMFLAGS	+= -DGEOS_CLIENT -DGEOS_MEM -DGEOS_ERROR -DCOMPILE_OPTION_HOST_SERVICE
 
 #
 # for bn/bnManager.asm
