@@ -215,7 +215,11 @@ EC(     ECCheckBounds( (void*) fontBuf ) );
 
         /* convert widths and fill CharTableEntries */
         ConvertWidths( trueTypeVars, fontHeader, fontBuf );
+
+        /* FIXME: We are temporarily disabling support for kerning as this causes instability in the driver. */
+#if 0
         FillKerningFlags( fontHeader, fontBuf ); 
+#endif
 
         /* calculate the transformation matrix and copy it into the FontBlock */
         transMatrix = (TransformMatrix*)(((byte*)fontBuf) + sizeof( FontBuf ) + fontHeader->FH_numChars * sizeof( CharTableEntry ));
@@ -619,6 +623,7 @@ static void CalcTransform( TransformMatrix*  transMatrix,
 
 EC(     ECCheckBounds( (void*)transMatrix ) );
 EC(     ECCheckBounds( (void*)fontMatrix ) );
+EC(     ECCheckBounds( (void*)fontBuf ) );
 
         /* initialize transMatrix */
         transMatrix->TM_heightX = 0;
