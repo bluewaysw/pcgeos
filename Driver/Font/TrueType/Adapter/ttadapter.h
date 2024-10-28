@@ -72,6 +72,7 @@ extern TEngine_Instance engineInstance;
 #define MAX_NUM_GLYPHS                      2000
 
 #define BASELINE_CORRECTION                 1
+#define MIN_BITMAP_DIMENSION                1
 
 
 /***********************************************************************

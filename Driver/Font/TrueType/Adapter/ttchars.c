@@ -129,8 +129,8 @@ EC(     ECCheckBounds( (void*)transformMatrix ) );
         GLYPH_BBOX.yMax  = ( GLYPH_BBOX.yMax + 63 ) & -64;
 
         /* compute pixel dimensions */
-        width  = (GLYPH_BBOX.xMax - GLYPH_BBOX.xMin) >> 6;
-        height = (GLYPH_BBOX.yMax - GLYPH_BBOX.yMin) >> 6;
+        width  = MAX( MIN_BITMAP_DIMENSION, (GLYPH_BBOX.xMax - GLYPH_BBOX.xMin) >> 6 );
+        height = MAX( MIN_BITMAP_DIMENSION, (GLYPH_BBOX.yMax - GLYPH_BBOX.yMin) >> 6 );
 
         if( fontBuf->FB_flags & FBF_IS_REGION )
         {
