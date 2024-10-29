@@ -292,7 +292,7 @@ CharMapEntry geosCharMap[] =
  *      ----      ----      -----------
  *      30.09.24  JK        Initial Revision
  *******************************************************************/
-
+#pragma code_seg("Resident2")
 word GeosCharToUnicode( const word  geosChar )
 {
         if( geosChar < MIN_GEOS_CHAR || geosChar > MAX_GEOS_CHAR )
@@ -300,6 +300,7 @@ word GeosCharToUnicode( const word  geosChar )
 
         return geosCharMap[ GEOS_CHAR_INDEX( geosChar ) ].unicode;
 }
+#pragma code_seg()
 
 
 /********************************************************************
@@ -326,6 +327,7 @@ word GeosCharToUnicode( const word  geosChar )
  *      30.09.24  JK        Initial Revision
  *******************************************************************/
 
+#pragma code_seg("Resident2")
 CharMapFlags GeosCharMapFlag( const word  geosChar )
 {
        if( geosChar < MIN_GEOS_CHAR || geosChar > MAX_GEOS_CHAR )
@@ -333,6 +335,7 @@ CharMapFlags GeosCharMapFlag( const word  geosChar )
 
        return geosCharMap[ GEOS_CHAR_INDEX( geosChar ) ].flags;
 }
+#pragma code_seg()
 
 
 /********************************************************************
@@ -437,7 +440,25 @@ EC(     ECCheckBounds( lookupTable ) );
                 lookupTable[i].geoscode = (char)i + C_SPACE;
         }
 
-        qsort( lookupTable, NUM_CHARMAPENTRIES, sizeof( LookupEntry ), compareLookupEntries );
+        //qsort( lookupTable, NUM_CHARMAPENTRIES, sizeof( LookupEntry ), compareLookupEntries );
+        {
+                int a = 0;
+                while(a < NUM_CHARMAPENTRIES) {
+
+                        int b = 0;
+                        while(b < NUM_CHARMAPENTRIES) {
+                                
+                                if(compareLookupEntries(&lookupTable[a], &lookupTable[b]) < 0) {
+                                        
+                                        LookupEntry temp = lookupTable[a];
+                                        lookupTable[a] = lookupTable[b];
+                                        lookupTable[b] = temp;
+                                }
+                                b++;
+                        }
+                        a++;
+                }
+        }
 
         MemUnlock( memHandle );
         return memHandle;
@@ -479,6 +500,7 @@ static int _pascal compareLookupEntries( const void *a, const void *b )
  *      ----      ----      -----------
  *      30.09.24  JK        Initial Revision
  *******************************************************************/
+#pragma code_seg("Resident2")
 
 word  GetGEOSCharForIndex( const LookupEntry* lookupTable, const word index )
 {
@@ -499,3 +521,4 @@ word  GetGEOSCharForIndex( const LookupEntry* lookupTable, const word index )
         return 0;
 }
 
+#pragma code_seg()

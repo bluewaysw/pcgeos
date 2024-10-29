@@ -371,8 +371,8 @@ static void FillKerningFlags( FontHeader* fontHeader, FontBuf* fontBuf )
                 word  indexLeftChar  = kernPair[i].KP_charLeft - fontHeader->FH_firstChar;
                 word  indexRightChar = kernPair[i].KP_charRight - fontHeader->FH_firstChar;
 
-                charTableEntry[indexLeftChar].CTE_flags  |= CTF_IS_FIRST_KERN;
-                charTableEntry[indexRightChar].CTE_flags |= CTF_IS_SECOND_KERN;
+                //charTableEntry[indexLeftChar].CTE_flags  |= CTF_IS_FIRST_KERN;
+                //charTableEntry[indexRightChar].CTE_flags |= CTF_IS_SECOND_KERN;
         }
 }
 
@@ -429,7 +429,7 @@ EC(     ECCheckBounds( (void*)kernValue ) );
         if( TT_Get_Kerning_Directory( FACE, &kerningDir ) )
                 return;
 
-        if( kerningDir.nTables == 0 )
+        if( (kerningDir.nTables == 0 ) || (kernPair == fontBuf) || (kernValue == fontBuf) )
                 return;
 
         /* get pointer to lookup table */

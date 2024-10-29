@@ -38,6 +38,10 @@ usernotes	"#FreeGEOS font driver to render TrueType fonts."
 # Define resources other than standard discardable code
 #
 resource Resident 	fixed code read-only shared
+resource Resident2 	fixed code read-only shared
+resource ttcmap_TEXT 	fixed code read-only shared
+resource ttmemory_TEXT 	fixed code read-only shared
+resource ttcalc_TEXT 	fixed code read-only shared
 resource InitMod	code read-only shared discard-only
 
 
