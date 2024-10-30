@@ -51,7 +51,7 @@ static void CalcScaleForWidths( TRUETYPE_VARS,
                         Byte                    width,
                         Byte                    weight );
 
-static void CalcTransform( 
+static void TTCalcTransform( 
                         TransformMatrix*        transMatrix,
                         FontMatrix*             fontMatrix, 
                         FontBuf*                fontBuf,
@@ -59,7 +59,7 @@ static void CalcTransform(
                         Byte                    width,
                         Byte                    weight );
 
-static void AdjustFontBuf( TransformMatrix*     transMatrix, 
+static void TTAdjustFontBuf( TransformMatrix*     transMatrix, 
                         FontMatrix*             fontMatrix, 
                         FontBuf*                fontBuf );
 
@@ -224,10 +224,10 @@ EC(     ECCheckBounds( (void*) fontBuf ) );
         /* calculate the transformation matrix and copy it into the FontBlock */
         transMatrix = (TransformMatrix*)(((byte*)fontBuf) + sizeof( FontBuf ) + fontHeader->FH_numChars * sizeof( CharTableEntry ));
 EC(     ECCheckBounds( (void*)transMatrix ) );
-        CalcTransform( transMatrix, fontMatrix, fontBuf, stylesToImplement, width, weight );
+        TTCalcTransform( transMatrix, fontMatrix, fontBuf, stylesToImplement, width, weight );
 
         /* adjust FB_height, FB_minTSB, FB_pixHeight and FB_baselinePos */
-        AdjustFontBuf( transMatrix, fontMatrix, fontBuf );
+        TTAdjustFontBuf( transMatrix, fontMatrix, fontBuf );
 
         /* Are the glyphs rendered as regions? */
         if( IsRegionNeeded( transMatrix, fontBuf ) )
@@ -611,7 +611,7 @@ static void CalcScaleForWidths( TRUETYPE_VARS,
  *      10.02.24  JK        width and weight implemented
  *******************************************************************/
 
-static void CalcTransform( TransformMatrix*  transMatrix, 
+static void TTCalcTransform( TransformMatrix*  transMatrix, 
                            FontMatrix*       fontMatrix, 
                            FontBuf*          fontBuf,
                            TextStyle         stylesToImplement,
@@ -913,7 +913,7 @@ static void ConvertHeader( TRUETYPE_VARS, FontHeader* fontHeader, FontBuf* fontB
  *      22.07.23  JK        Initial Revision
  *******************************************************************/
 
-static void AdjustFontBuf( TransformMatrix* transMatrix, 
+static void TTAdjustFontBuf( TransformMatrix* transMatrix, 
                            FontMatrix*      fontMatrix,         
                            FontBuf*         fontBuf )
 {
@@ -942,8 +942,8 @@ static void AdjustFontBuf( TransformMatrix* transMatrix,
                 if( fontMatrix->FM_flags & TF_ROTATED )
                 {
                         /* adjust scriptX and heightX */
-                        transMatrix->TM_heightX = INTEGER_OF_WWFIXEDASDWORD( GrMulWWFixed( 
-                                                        WORD_TO_WWFIXEDASDWORD( fontBuf->FB_baselinePos.WBF_int ), transMatrix->TM_matrix.yx ) );
+                        transMatrix->TM_heightX = -INTEGER_OF_WWFIXEDASDWORD( GrMulWWFixed( 
+                                                        WORD_TO_WWFIXEDASDWORD( fontBuf->FB_baselinePos.WBF_int ), transMatrix->TM_matrix.xy ) );
                         transMatrix->TM_scriptX = INTEGER_OF_WWFIXEDASDWORD( GrMulWWFixed( 
                                                         WORD_TO_WWFIXEDASDWORD( savedScriptY ), transMatrix->TM_matrix.yx ) );
                 }
