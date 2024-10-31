@@ -420,34 +420,34 @@ newRecvStack:
     mov		ds:[currentRecvBuf], si
     
     
-	;tst	ds:[saveSS]
-	;jnz	alreadyUsingStack
-	;mov	ds:[saveSS], ss
-	;mov	ds:[saveSP], sp
-	;mov	bx, ds
-	;mov	ss, bx
-	;mov	sp, offset endLocalStack
+	tst	ds:[saveSS]
+	jnz	alreadyUsingStack
+	mov	ds:[saveSS], ss
+	mov	ds:[saveSP], sp
+	mov	bx, ds
+	mov	ss, bx
+	mov	sp, offset endLocalStack
 	
 	
 	
 	
 	
-	;mov	bx, ds:[etherThread]
+	mov	bx, ds:[etherThread]
 	;Assert	ne, bx, NULL		; It may be bad to "Assert thread" at
 					;  interrupt time.
 
-	;mov	di, mask MF_FORCE_QUEUE
+	mov	di, mask MF_FORCE_QUEUE
 	;WARNING ENTER_OBJ_MESSAGE
 	;;INT_ON
-	;push	ds
-	;call	ObjMessage		; returns interrupt on
-	;pop	ds
+	push	ds
+	call	ObjMessage		; returns interrupt on
+	pop	ds
 	;WARNING LEFT_OBJ_MESSAGE
 	;INT_OFF
-	;;mov	ss, ds:[saveSS]
-	;;mov	sp, ds:[saveSP]
+	mov	ss, ds:[saveSS]
+	mov	sp, ds:[saveSP]
 	;WARNING LEFT_OBJ_MESSAGE
-	;clr	ds:[saveSS]
+	clr	ds:[saveSS]
 	;WARNING LEFT_OBJ_MESSAGE
 	;WARNING LEFT_OBJ_MESSAGE
 	jmp	exit

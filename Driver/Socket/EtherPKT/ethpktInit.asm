@@ -234,7 +234,7 @@ next:
 	mov	dx, offset EthPktRecvHandlerThread
 	mov	di, 1024
 	mov	bp, handle 0   ; owner
-	call	ThreadCreate
+	;call	ThreadCreate
 
 	ret
 EthPktInitRecvBuffers	endp
