@@ -976,7 +976,7 @@ EC(     ECCheckBounds( (void*)fontHeader ) );
 
         for ( geosChar = fontHeader->FH_firstChar; geosChar < fontHeader->FH_lastChar; ++geosChar )
         {
-                word unicode = GeosCharToUnicode( geosChar );
+                const word  unicode = GeosCharToUnicode( geosChar );
 
 
                 if( !GeosCharMapFlag( geosChar ) )
