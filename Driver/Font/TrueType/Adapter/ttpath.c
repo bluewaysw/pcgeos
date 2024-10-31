@@ -924,10 +924,6 @@ EC(             ECCheckWindowHandle( win ) );
                 windowMatrix.TM_e21.WWF_frac = 0;
                 windowMatrix.TM_e22.WWF_int  = 1;
                 windowMatrix.TM_e22.WWF_frac = 0;
-                windowMatrix.TM_e31.DWF_int  = 0;
-                windowMatrix.TM_e31.DWF_frac = 0;
-                windowMatrix.TM_e32.DWF_int  = 0;
-                windowMatrix.TM_e32.DWF_frac = 0;
         }
 
         GrGetTransform( gstate, &graphicMatrix );
