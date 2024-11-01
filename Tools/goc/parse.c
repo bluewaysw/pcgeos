@@ -4291,80 +4291,79 @@ yyreduce:
 
   case 169:
 
-    { currentMPD = currentMPD & !MPD_RETURN_TYPE; currentMPD |= RetTypeBWReg(MRBWT_AX); }
+    { currentMPD |= RetTypeBWReg(MRBWT_AX); }
 
     break;
 
   case 170:
 
-    { currentMPD = currentMPD & !MPD_RETURN_TYPE; currentMPD |= RetTypeBWReg(MRBWT_CX); }
+    { currentMPD |= RetTypeBWReg(MRBWT_CX); }
 
     break;
 
   case 171:
 
-    { currentMPD = currentMPD & !MPD_RETURN_TYPE; currentMPD |= RetTypeBWReg(MRBWT_DX); }
+    { currentMPD |= RetTypeBWReg(MRBWT_DX); }
 
     break;
 
   case 172:
 
-    { currentMPD = currentMPD & !MPD_RETURN_TYPE; currentMPD |= RetTypeBWReg(MRBWT_BP); }
+    { currentMPD |= RetTypeBWReg(MRBWT_BP); }
 
     break;
 
   case 173:
 
-    { currentMPD = currentMPD & !MPD_RETURN_TYPE; currentMPD |= RetTypeBWReg(MRBWT_AL); }
+    { currentMPD |= RetTypeBWReg(MRBWT_AL); }
 
     break;
 
   case 174:
 
-    { currentMPD = currentMPD & !MPD_RETURN_TYPE; currentMPD |= RetTypeBWReg(MRBWT_AH); }
+    { currentMPD |= RetTypeBWReg(MRBWT_AH); }
 
     break;
 
   case 175:
 
-    { currentMPD = currentMPD & !MPD_RETURN_TYPE; currentMPD |= RetTypeBWReg(MRBWT_CL); }
+    { currentMPD |= RetTypeBWReg(MRBWT_CL); }
 
     break;
 
   case 176:
 
-    { currentMPD = currentMPD & !MPD_RETURN_TYPE; currentMPD |= RetTypeBWReg(MRBWT_CH); }
+    { currentMPD |= RetTypeBWReg(MRBWT_CH); }
 
     break;
 
   case 177:
 
-    { currentMPD = currentMPD & !MPD_RETURN_TYPE; currentMPD |= RetTypeBWReg(MRBWT_DL); }
+    { currentMPD |= RetTypeBWReg(MRBWT_DL); }
 
     break;
 
   case 178:
 
-    { currentMPD = currentMPD & !MPD_RETURN_TYPE; currentMPD |= RetTypeBWReg(MRBWT_DH); }
+    { currentMPD |= RetTypeBWReg(MRBWT_DH); }
 
     break;
 
   case 179:
 
-    { currentMPD = currentMPD & !MPD_RETURN_TYPE; currentMPD |= RetTypeBWReg(MRBWT_BPL); }
+    { currentMPD |= RetTypeBWReg(MRBWT_BPL); }
 
     break;
 
   case 180:
 
-    { currentMPD = currentMPD & !MPD_RETURN_TYPE; currentMPD |= RetTypeBWReg(MRBWT_BPH); }
+    { currentMPD |= RetTypeBWReg(MRBWT_BPH); }
 
     break;
 
   case 181:
 
     {
-	    currentMPD = currentMPD & !MPD_RETURN_TYPE;
 	    currentMPD |= (MRT_DWORD << MPD_RETURN_TYPE_OFFSET) |
 		    	    ((yyvsp[-2].num) << MPD_RET_DWORD_HIGH_OFFSET) |
 	    	    	    ((yyvsp[0].num) << MPD_RET_DWORD_LOW_OFFSET);
@@ -4375,7 +4374,6 @@ yyreduce:
   case 182:
 
     {
-	    currentMPD = currentMPD & !MPD_RETURN_TYPE;
 	    currentMPD |= (MRT_DWORD << MPD_RETURN_TYPE_OFFSET) |
 		    	    ((yyvsp[-2].num) << MPD_RET_DWORD_HIGH_OFFSET) |
 	    	    	    ((yyvsp[0].num) << MPD_RET_DWORD_LOW_OFFSET);
@@ -8148,15 +8146,15 @@ GenerateMethodDef(Method *meth)
 	 */
 	switch (meth->model) {
 	    case MM_FAR:
-		Output("%sInstance *pself, ",
+		Output("%sInstance *volatile pself, ",
 		       	    meth->class->data.symClass.root);
 		break;
 	    case MM_NEAR:
-		Output("%sInstance _near *pself, ",
+		Output("%sInstance _near *volatile pself, ",
 		       	    meth->class->data.symClass.root);
 		break;
 	    case MM_BASED:
-		Output("_segment sself, %sInstance _based(sself) *pself, ",
+		Output("volatile _segment sself, volatile %sInstance _based(sself) *pself, ",
 		       	    meth->class->data.symClass.root);
 		break;
 	}

@@ -36,6 +36,7 @@
 #include "ttgload.h"
 #include "ttraster.h"
 #include "ttextend.h"
+#include "tttags.h"
 #include <geos.h>
 
 
@@ -616,84 +617,6 @@ extern TEngine_Instance engineInstance;
 
 /*******************************************************************
  *
- *  Function    :  TT_Set_Instance_CharSize
- *
- *  Description :  Resets an instance to new point size.
- *
- *  Input  :  instance      the instance handle
- *            charSize      the new character size in 26.6 char points
- *
- *  Output :  Error code.
- *
- *  Note :    There is no check for overflow; with other words,
- *            the product of glyph dimensions times the device
- *            resolution must have reasonable values.
- *
- *  MT-Note : NO!  This should be called only when setting/resetting
- *            instances, so there is no need to protect.
- *
- ******************************************************************/
-/*
-  EXPORT_FUNC
-  TT_Error  TT_Set_Instance_CharSize( TT_Instance  instance,
-                                      TT_F26Dot6   charSize )
-  {
-    return TT_Set_Instance_CharSizes( instance, charSize, charSize );
-  }
-*/
-
-/*******************************************************************
- *
- *  Function    :  TT_Set_Instance_PixelSizes
- *
- *  Description :  Resets an instance to new pixel sizes
- *
- *  Input  :  instance      the instance handle
- *            pixelWidth    the new width in pixels
- *            pixelHeight   the new height in pixels
- *
- *  Output :  Error code.
- *
- *  Note :    There is no check for overflow; with other words,
- *            the product of glyph dimensions times the device
- *            resolution must have reasonable values.
- *
- *  MT-Note : NO!  This should be called only when setting/resetting
- *            instances, so there is no need to protect.
- *
- ******************************************************************/
- /*
-  EXPORT_FUNC
-  TT_Error  TT_Set_Instance_PixelSizes( TT_Instance  instance,
-                                        TT_UShort    pixelWidth,
-                                        TT_UShort    pixelHeight,
-                                        TT_F26Dot6   pointSize )
-  {
-    PInstance  ins = HANDLE_Instance( instance );
-
-    if ( !ins )
-      return TT_Err_Invalid_Instance_Handle;
-
-    if ( pixelWidth  < 1 ) pixelWidth = 1;
-    if ( pixelHeight < 1 ) pixelHeight = 1;
-
-    ins->metrics.x_ppem    = pixelWidth;
-    ins->metrics.y_ppem    = pixelHeight;
-    ins->metrics.pointSize = pointSize;
-
-    ins->metrics.x_scale1 = ins->metrics.x_ppem * 64L;
-    ins->metrics.x_scale2 = ins->owner->fontHeader.Units_Per_EM;
-    ins->metrics.y_scale1 = ins->metrics.y_ppem * 64L;
-    ins->metrics.y_scale2 = ins->owner->fontHeader.Units_Per_EM;
-
-    ins->valid = FALSE;
-
-    return Instance_Reset( ins );
-  }
-*/
-
-/*******************************************************************
- *
  *  Function    :  TT_Set_Instance_Transform_Flags
  *
  *  Description :  Informs the interpreter about the transformations
@@ -997,36 +920,101 @@ extern TEngine_Instance engineInstance;
   }
 
 
-/*******************************************************************
- *
- *  Function    :  TT_Get_Glyph_Big_Metrics
- *
- *  Description :  Extracts the glyph's big metrics information.
- *
- *  Input  :  glyph       glyph object handle
- *            metrics     address where big metrics will be returned
- *
- *  Output :  Error code.
- *
- *  MT-Safe : NO!  Glyph containers can't be shared.
- *
- ******************************************************************/
-/*
+  /******************************************************************/
+  /*                                                                */
+  /*  Function:  TT_Get_Index_Metrics                               */
+  /*                                                                */
+  /*  Description: Returns the widths and/or heights of a given     */
+  /*               range of glyphs for a face.                      */
+  /*                                                                */
+  /*  Input   :    face     face handle                             */
+  /*               glyphId  index of glyph                          */
+  /*               metrics  ptr to metrics to fill                  */
+  /*                                                                */
+  /*  Returns:                                                      */
+  /*       Error code                                               */
+  /*                                                                */
+  /******************************************************************/
+
   EXPORT_FUNC
-  TT_Error  TT_Get_Glyph_Big_Metrics( TT_Glyph               glyph,
-                                      TT_Big_Glyph_Metrics*  metrics )
+  TT_Error  TT_Get_Index_Metrics( TT_Face            face,
+                                  TT_UShort          index,
+                                  TT_Glyph_Metrics*  metrics )
   {
-    PGlyph  _glyph = HANDLE_Glyph( glyph );
+    DEFINE_ALL_LOCALS;
+
+    PFace     faze = HANDLE_Face(face);
+    Long      table;
+    PStorage  glyphLocations;
+    Short     bearing;
+    UShort    advance;
+    Long      offset;
 
 
-    if ( !_glyph )
-      return TT_Err_Invalid_Glyph_Handle;
+    if ( !faze )
+      return TT_Err_Invalid_Face_Handle;
 
-    *metrics = _glyph->metrics;
+    if ( index >= faze->numGlyphs )
+      return TT_Err_Invalid_Argument;
 
-    return TT_Err_Ok;
+    /* find "glyf" table */
+    table = TT_LookUp_Table( faze, TTAG_glyf );
+    if ( table < 0 )
+      return TT_Err_Glyf_Table_Missing;
+
+    /* now access stream */
+    if ( USE_Stream( faze->stream, stream ) )
+      return error;
+
+    glyphLocations = GEO_LOCK( faze->glyphLocationBlock );
+
+    if ( index + 1 < faze->numLocations &&
+         glyphLocations[index] == glyphLocations[index + 1] )
+    {
+      /* as described by Frederic Loyer, these are spaces, and */
+      /* not the unknown glyph.                                */
+
+      metrics->bbox.xMin = 0;
+      metrics->bbox.xMax = 0;
+      metrics->bbox.yMin = 0;
+      metrics->bbox.yMax = 0;
+
+      goto Fin;
+    }
+
+    offset = faze->dirTables[table].Offset + glyphLocations[index];
+
+    /* read first glyph header */
+    if ( FILE_Seek( offset ) || ACCESS_Frame( 10 ) )
+      goto Fail;
+
+    SKIP( 2 );
+
+    metrics->bbox.xMin = GET_Short();
+    metrics->bbox.yMin = GET_Short();
+    metrics->bbox.xMax = GET_Short();
+    metrics->bbox.yMax = GET_Short();
+
+    FORGET_Frame();
+
+  Fin:
+    GEO_UNLOCK( faze->glyphLocationBlock );
+
+    /* Get horizontal metrics in font units for a given glyph.  If `check' is true, */
+    /* take care of mono-spaced fonts by returning the advance width max.           */
+    TT_Get_Metrics( &faze->horizontalHeader, index, &bearing, &advance );
+    if ( faze->postscript.isFixedPitch )
+      advance = faze->horizontalHeader.advance_Width_Max;
+
+    metrics->advance  = advance;
+    metrics->bearingX = bearing;
+    metrics->bearingY = 0;
+
+  Fail:
+    DONE_Stream( stream );
+    return error;
   }
-*/
+
 
 /*******************************************************************
  *
@@ -1376,7 +1364,6 @@ TT_Error  TT_Get_Outline_Region( TT_Outline*     outline,
     else
       return TT_Err_Invalid_Argument;
   }
-
 
 
   /* ----------------- character mappings support ------------- */

@@ -204,6 +204,13 @@
 
 
 /*************************************************************************/
+/* Define TT_CONFIG_OPTION_SUPPORT_GASP if you want to support grid-     */
+/* fitting table.                                                        */
+
+#undef  TT_CONFIG_OPTION_SUPPORT_GASP
+
+
+/*************************************************************************/
 /* Define TT_CONFIG_OPTION_SUPPORT_OPTIONAL_FIELDS if you want to hold   */
 /* optional fiels in freetype structures.                                */
 
@@ -230,6 +237,14 @@
 /* verion of bytecode interperter.                                       */
 
 #undef TT_CONFIG_OPTION_SUPPORT_PEDANTIC_HINTING
+
+
+/*************************************************************************/
+/* Define TT_CONFIG_OPTION_USE_ASSEMBLER_IMPLEMENTATION if you want to   */
+/* use assembler implemented funcions. These implementations use regs    */
+/* and instructions of 80386 processors.                                 */
+
+#define TT_CONFIG_OPTION_USE_ASSEMBLER_IMPLEMENTATION
 
 
 /**********************************************************************/
