@@ -19,8 +19,12 @@
 
 #include "ttadapter.h"
 #include "ttcharmapper.h"
+#include "ttcmap.h"
+#include "tttags.h"
+#include "ttmemory.h"
 #include <ec.h>
 #include <geode.h>
+#include <heap.h>
 
 static int strcmp( const char* s1, const char* s2 );
 
@@ -73,10 +77,14 @@ EC(     ECCheckFileHandle( TTFILE) );
                 goto Fin;
         if ( TT_Get_Face_Properties( FACE, &FACE_PROPERTIES ) )
                 goto Fail;
-        if ( getCharMap( trueTypeVars, &CHAR_MAP ) )
+        if ( getCharMap( FACE, &FACE_PROPERTIES, &CHAR_MAP ) )
                 goto Fail;
         if ( TT_New_Instance( FACE, &INSTANCE ) )
                 goto Fail;
+
+        /* create lookup table for kernpairs if face supports kerning */
+        LOOKUP_TABLE = CreateIndexLookupTable( CHAR_MAP );
+EC(     ECCheckMemHandle( LOOKUP_TABLE ) );
 
         /* font has been fully loaded */
         trueTypeVars->entry = *entry;
@@ -124,7 +132,7 @@ void TrueType_Unlock_Face(TRUETYPE_VARS)
  * RETURNS:       TT_Error
  * 
  * STRATEGY:      - free resources used by instance and face
- *                - close file
+ *                - close file and free lookup table
  * 
  * REVISION HISTORY:
  *      Date      Name      Description
@@ -145,6 +153,11 @@ void TrueType_Free_Face(TRUETYPE_VARS)
         {
             FileClose( TTFILE, FALSE );
             TTFILE = NullHandle;
+        }
+        if ( LOOKUP_TABLE )
+        {
+            DestroyIndexLookupTable( LOOKUP_TABLE );
+            LOOKUP_TABLE = NullHandle;
         }
 }
 

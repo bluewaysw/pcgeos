@@ -222,6 +222,7 @@
   }
 
 
+#ifdef TT_CONFIG_OPTION_SUPPORT_GASP
 /*******************************************************************
  *
  *  Function    :  Load_TrueType_Gasp
@@ -280,6 +281,7 @@
     gas->numRanges = 0;
     return error;
   }
+#endif
 
 
 /*******************************************************************

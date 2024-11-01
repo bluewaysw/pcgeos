@@ -126,9 +126,10 @@ include		../FontCom/fontcomEscape.asm
 InitMod ends
 
 include		truetypeEC.asm
-include	    ansic_runtime.asm
+include	    	ansic_runtime.asm
 include		ansic_memory.asm
 include		ttmemory_asm.asm
+include		ansic_stdlib.asm
 
 Resident segment resource	;MODULE_FIXED
 

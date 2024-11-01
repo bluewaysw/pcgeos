@@ -357,8 +357,8 @@ ExportDIB	proc	near
 	
 	; first check to make sure this is not a 24-bit Export, 
 	; as we do not support that yet
- 	cmp	dx, 24
-	je	unsupported24bit
+ 	;cmp	dx, 24
+	;je	unsupported24bit
 
 	; do we recognize the Manufacturer's ID?
 	cmp	ax, MANUFACTURER_ID_GEOWORKS
@@ -544,6 +544,8 @@ writeScanlineLoop:
 	; it to be consistent with the 0= white, 1= black paradigm
 	cmp	exportInfo.ETDFrame.EDF_exportOptions,1
 	je	invertMonochrome
+	cmp	exportInfo.ETDFrame.EDF_exportOptions,24
+	je	reorderRGB
 writeScanline:
 	mov	dx,si			;ds:dx is buffer to read from
   	clr	al			;flags=0
@@ -604,6 +606,31 @@ invertLoop:
 	pop	si,di,cx
 	jmp	writeScanline
 	
+reorderRGB:
+; the bitmap is monochrome, so flip all the bits so it will be consistent
+; with the 0=white, 1 = black Monochrome bitmap color scheme
+	push	si,di,cx
+	segmov	es,ds,dx
+	mov	di,si
+	mov	cx,exportInfo.EBInfo.EBI_scanlineSize
+reorderLoop:
+	lodsb
+	mov	dl, al
+	lodsb
+	mov	dh, al
+	lodsb
+	stosb
+	mov	al, dh
+	stosb
+	mov	al, dl
+	stosb
+	dec	cx
+	dec	cx
+	loop	reorderLoop
+
+	pop	si,di,cx
+	jmp	writeScanline
+
 errorWrite:
 	mov	ax,TE_FILE_WRITE
 	jmp	done

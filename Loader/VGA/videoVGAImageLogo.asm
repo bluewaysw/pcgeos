@@ -15,6 +15,9 @@ ifdef LOAD_VGA_IMAGE_FROM_FILE
 
 SplashScreenName	char "splash.scr", 0
 
+paletteColorRegMap	byte	0,1,2,3,4,5,20,7
+			byte	56,57,58,59,60,61,62,63
+
 palette		byte 48 dup (?)
 
 loadBlock   byte 256 dup (?)
@@ -110,24 +113,27 @@ loadPaletteLoop:
 	dec	loadCounter
 	jnz	loadPaletteLoop
 
-  jmp noPalette
-	mov	ah, 010h
-	mov	al, 13h
-	mov	bl, 0
-	mov	bh, 1
-	int	10h
-	mov	ah, 010h
-	mov	al, 13h
-	mov	bl, 1
-	mov	bh, 0
-	int	10h
+  ;jmp noPalette
+	;mov	ah, 010h
+	;mov	al, 13h
+	;mov	bl, 0
+	;mov	bh, 1
+	;int	10h
+	;mov	ah, 010h
+	;mov	al, 13h
+	;mov	bl, 1
+	;mov	bh, 0
+	;int	10h
 
 	clr	cx
 	mov	bx, offset palette
 	segmov	ds, cs, ax
 setPaletteLoop:
+	mov	dx, bx
+	mov	bx, cx
+	mov	al, cs:paletteColorRegMap[bx]
+	mov	bx, dx
 	mov	dx, 03c8h
-	mov	al, cl
 	out	dx, al
 	mov	dx, 03c9h
 	mov	al, cs:[bx+2]
@@ -151,6 +157,7 @@ setPaletteLoop:
 	cmp	cx, 16
 	jne	setPaletteLoop
 noPalette:
+
 	mov	loadCounter, 8
 	mov	ax, 0A000h
 	mov	ds, ax

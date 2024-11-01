@@ -72,6 +72,7 @@ extern TEngine_Instance engineInstance;
 #define MAX_NUM_GLYPHS                      2000
 
 #define BASELINE_CORRECTION                 1
+#define MIN_BITMAP_DIMENSION                1
 
 
 /***********************************************************************
@@ -394,6 +395,9 @@ typedef struct
     /* currently open face */
     FileHandle                  ttfile;
     TrueTypeOutlineEntry        entry;
+
+    /* lookuptable for truetype indices */
+    MemHandle                   lookupTable;
 } TrueTypeVars;
 
 
@@ -414,8 +418,20 @@ typedef struct
 #define SCALE_HEIGHT            trueTypeVars->scaleHeight
 #define SCALE_WIDTH             trueTypeVars->scaleWidth
 #define TTFILE                  trueTypeVars->ttfile
+#define LOOKUP_TABLE            trueTypeVars->lookupTable
 
 #define UNITS_PER_EM            FACE_PROPERTIES.header->Units_Per_EM
+
+
+/***********************************************************************
+ *      error codes
+ ***********************************************************************/
+
+typedef enum {
+    SYSTEM_ERROR_CODES,
+    CHARINDEX_OUT_OF_BOUNDS,
+    ERROR_BITMAP_BUFFER_OVERFLOW
+} FatalErrors;
 
 
 /***********************************************************************
@@ -426,7 +442,7 @@ typedef struct
  * convert value (word) to WWFixedAsDWord
  */
 #define WORD_TO_WWFIXEDASDWORD( value )          \
-        ( (WWFixedAsDWord) MakeWWFixed( value ) )
+            ( ( (long)value ) << 16 )
 
 /*
  * convert value (TT_F26DOT6) to WWFixedAsDWord
