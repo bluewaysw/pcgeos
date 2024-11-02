@@ -356,11 +356,11 @@ EC( ECCheckBounds( pairs ) );
 
 /*******************************************************************
  *
- *  Function    :  Kerning_Destroy
+ *  Function    :  TT_Kerning_Directory_Done
  *
  *  Description :  Destroys all kerning information.
  *
- *  Input  :  kern   pointer to the extension's kerning field
+ *  Input  :  directory   pointer to the extension's kerning field
  *
  *  Output :  error code
  *
@@ -369,20 +369,21 @@ EC( ECCheckBounds( pairs ) );
  *
  ******************************************************************/
 
-  static TT_Error  Kerning_Destroy( TT_Kerning*  kern )
+  EXPORT_FUNC
+  TT_Error  TT_Kerning_Directory_Done( TT_Kerning*  directory )
   {
     TT_Kern_Subtable*  sub;
     UShort             n;
 
 
     /* by convention */
-    if ( !kern || kern->nTables == 0 )
+    if ( !directory || directory->nTables == 0 )
       return TT_Err_Ok;
 
     /* scan the table directory and release loaded entries */
 
-    sub = kern->tables;
-    for ( n = 0; n < kern->nTables; ++n )
+    sub = directory->tables;
+    for ( n = 0; n < directory->nTables; ++n )
     {
       if ( sub->loaded )
       {
@@ -422,8 +423,8 @@ EC( ECCheckBounds( pairs ) );
       ++sub;
     }
 
-    FREE( kern->tables );
-    kern->nTables = 0;
+    FREE( directory->tables );
+    directory->nTables = 0;
 
     return TT_Err_Ok;
   }
@@ -460,13 +461,6 @@ EC( ECCheckBounds( pairs ) );
 
     /* copy directory header */
     return Kerning_Create( directory, faze );
-  }
-
-
-  EXPORT_FUNC
-  TT_Error  TT_Kerning_Directory_Done( TT_Kerning*  directory )
-  { 
-    return Kerning_Destroy( directory );
   }
 
 

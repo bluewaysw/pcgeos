@@ -163,7 +163,7 @@ extern "C" {
                                        TT_Kerning*  directory );
 
 
-  /* */
+  /* Releases all resources allocated for a kerning directory.          */
   EXPORT_DEF
   TT_Error  TT_Kerning_Directory_Done( TT_Kerning*  directory );
 
