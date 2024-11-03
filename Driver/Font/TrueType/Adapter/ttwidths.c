@@ -215,7 +215,11 @@ EC(     ECCheckBounds( (void*) fontBuf ) );
 
         /* convert widths and fill CharTableEntries */
         ConvertWidths( trueTypeVars, fontHeader, fontBuf );
+
+        /* FIXME: We are temporarily disabling support for kerning as this causes instability in the driver. */
+#if 0
         FillKerningFlags( fontHeader, fontBuf ); 
+#endif
 
         /* calculate the transformation matrix and copy it into the FontBlock */
         transMatrix = (TransformMatrix*)(((byte*)fontBuf) + sizeof( FontBuf ) + fontHeader->FH_numChars * sizeof( CharTableEntry ));
@@ -361,16 +365,24 @@ EC(             ECCheckBounds( (void*)charTableEntry ) );
 static void FillKerningFlags( FontHeader* fontHeader, FontBuf* fontBuf ) 
 {
         word             i;
-        KernPair*        kernPair       = (KernPair*) ( ( (byte*)fontBuf ) + fontBuf->FB_kernPairs );
-        CharTableEntry*  charTableEntry = (CharTableEntry*) (((byte*)fontBuf) + sizeof( FontBuf ));
+        const KernPair*  const kernPairs = (const KernPair*) ( ( (const byte*)fontBuf ) + fontBuf->FB_kernPairs );
+        CharTableEntry*  const charTableEntries = (CharTableEntry*) ( ( (byte*)fontBuf ) + sizeof( FontBuf ));
+
+EC(     ECCheckStack() );
+EC(     ECCheckBounds( (void*)kernPairs ) );
+EC(     ECCheckBounds( charTableEntries ) );
 
         for( i = 0; i < fontBuf->FB_kernCount; ++i )
         {
-                word  indexLeftChar  = kernPair[i].KP_charLeft - fontHeader->FH_firstChar;
-                word  indexRightChar = kernPair[i].KP_charRight - fontHeader->FH_firstChar;
+                const unsigned char  indexLeftChar  = kernPairs[i].KP_charLeft - fontHeader->FH_firstChar;
+                const unsigned char  indexRightChar = kernPairs[i].KP_charRight - fontHeader->FH_firstChar;
 
-                charTableEntry[indexLeftChar].CTE_flags  |= CTF_IS_FIRST_KERN;
-                charTableEntry[indexRightChar].CTE_flags |= CTF_IS_SECOND_KERN;
+
+EC_ERROR_IF(    indexLeftChar  > fontHeader->FH_lastChar - fontHeader->FH_firstChar, CHARINDEX_OUT_OF_BOUNDS );
+EC_ERROR_IF(    indexRightChar > fontHeader->FH_lastChar - fontHeader->FH_firstChar, CHARINDEX_OUT_OF_BOUNDS );
+
+                charTableEntries[indexLeftChar].CTE_flags  |= CTF_IS_FIRST_KERN;
+                charTableEntries[indexRightChar].CTE_flags |= CTF_IS_SECOND_KERN;
         }
 }
 
@@ -437,8 +449,8 @@ EC(     ECCheckBounds( indices ) );
         /* search for format 0 subtable */
         for( table = 0; table < kerningDir.nTables; ++table )
         {
-                word       i;
-                word       minKernValue = UNITS_PER_EM / KERN_VALUE_DIVIDENT;
+                word        i;
+                const word  minKernValue = UNITS_PER_EM / KERN_VALUE_DIVIDENT;
                 
 
                 if( TT_Load_Kerning_Table( FACE, table ) )
@@ -452,8 +464,8 @@ EC(             ECCheckBounds( pairs ) );
 
                 for( i = 0; i < kerningDir.tables->t.kern0.nPairs; ++i )
                 {
-                        char left = GetGEOSCharForIndex( indices, pairs[i].left );
-                        char right = GetGEOSCharForIndex( indices, pairs[i].right );
+                        const char left = GetGEOSCharForIndex( indices, pairs[i].left );
+                        const char right = GetGEOSCharForIndex( indices, pairs[i].right );
 
                         if( left && right && ABS( pairs[i].value ) > minKernValue )
                         {
@@ -611,6 +623,7 @@ static void CalcTransform( TransformMatrix*  transMatrix,
 
 EC(     ECCheckBounds( (void*)transMatrix ) );
 EC(     ECCheckBounds( (void*)fontMatrix ) );
+EC(     ECCheckBounds( (void*)fontBuf ) );
 
         /* initialize transMatrix */
         transMatrix->TM_heightX = 0;
@@ -718,7 +731,7 @@ static word AllocFontBlock( word        additionalSpace,
                             word        numOfKernPairs,
                             MemHandle*  fontHandle )
 {
-        word size = sizeof( FontBuf ) + numOfCharacters * sizeof( CharTableEntry ) +
+        const word  size = sizeof( FontBuf ) + numOfCharacters * sizeof( CharTableEntry ) +
                 numOfKernPairs * ( sizeof( KernPair ) + sizeof( BBFixed ) ) +
                 additionalSpace; 
                      
@@ -910,6 +923,7 @@ static void AdjustFontBuf( TransformMatrix* transMatrix,
         if( fontMatrix->FM_flags & TF_COMPLEX )
         {
                 sword savedScriptY = transMatrix->TM_scriptY;
+                sword savedHeightY = transMatrix->TM_heightY;
 
 
                 fontBuf->FB_flags     |= FBF_IS_COMPLEX;
@@ -929,10 +943,12 @@ static void AdjustFontBuf( TransformMatrix* transMatrix,
                 if( fontMatrix->FM_flags & TF_ROTATED )
                 {
                         /* adjust scriptX and heightX */
-                        transMatrix->TM_heightX = INTEGER_OF_WWFIXEDASDWORD( GrMulWWFixed( 
-                                                        WORD_TO_WWFIXEDASDWORD( fontBuf->FB_baselinePos.WBF_int ), transMatrix->TM_matrix.yx ) );
-                        transMatrix->TM_scriptX = INTEGER_OF_WWFIXEDASDWORD( GrMulWWFixed( 
-                                                        WORD_TO_WWFIXEDASDWORD( savedScriptY ), transMatrix->TM_matrix.yx ) );
+                        transMatrix->TM_heightX = -INTEGER_OF_WWFIXEDASDWORD( GrMulWWFixed( 
+                                                WORD_TO_WWFIXEDASDWORD( fontBuf->FB_baselinePos.WBF_int ), transMatrix->TM_matrix.xy ) );
+
+                        if( savedScriptY )
+                                transMatrix->TM_scriptX = -INTEGER_OF_WWFIXEDASDWORD( GrMulWWFixed( 
+                                                WORD_TO_WWFIXEDASDWORD( savedScriptY + savedHeightY ), transMatrix->TM_matrix.xy ) );
                 }
         }
 }
