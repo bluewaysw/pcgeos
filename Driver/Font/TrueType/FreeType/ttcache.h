@@ -87,7 +87,6 @@
 
 #include "tttypes.h"
 #include "ttconfig.h"
-#include "ttmutex.h"
 
 #ifdef __cplusplus
   extern "C" {
@@ -145,7 +144,6 @@
   {
     PEngine_Instance  engine;
     PCache_Class      clazz;      /* 'class' is a reserved word in C++ */
-    TMutex*           lock;
     TSingle_List      active;
     TSingle_List      idle;
     Long              idle_count;
@@ -168,8 +166,7 @@
   LOCAL_DEF
   TT_Error  Cache_Create( PEngine_Instance  engine,
                           PCache_Class      clazz,
-                          TCache*           cache,
-                          TMutex*           lock );
+                          TCache*           cache );
 
   /* Destroys a cache and all its listed objects */
 

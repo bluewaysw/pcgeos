@@ -190,63 +190,9 @@ Boolean			g_usePword = FALSE;
 }
 
 @object GenInteractionClass FileMenu = {
-	 GI_comp = @ImpexGroup, @AboutGroup;
+	 GI_comp = @ImpexGroup;
 	 GII_visibility = GIV_POPUP;
     ATTR_GEN_INTERACTION_GROUP_TYPE = (GIGT_FILE_MENU);
-}
-
-@object GenInteractionClass AboutGroup = {
-	GI_comp = @AboutDBox;
-	GII_visibility = GIV_SUB_GROUP;
-}
-
-@include "Art/bbxreg.goh"
-
-@object GenInteractionClass AboutDBox = {
-	 GI_visMoniker = 'b', "About";
-	 GI_comp = @AppName, @By, @BreadBoxLogo,
-				  @Visit, @Web, @AboutSpacer1,
-				  @Copyright, @BBoxLLC, @Rights, @AboutSpacer2;
-	 GII_visibility = GIV_DIALOG;
-	 GII_type = GIT_NOTIFICATION;
-	 HINT_CENTER_CHILDREN_HORIZONTALLY;
-}
-@object GenTextClass AppName = {
-    GI_attrs = @default | GA_READ_ONLY;
-    GTXI_attrs = @default | GTA_SINGLE_LINE_TEXT;
-	 GTXI_text = "Word Matcher";
-    ATTR_GEN_TEXT_CHAR_ATTR = (ChunkHandle) @AppNameCharAttrs;
-}
-@chunk VisTextCharAttr AppNameCharAttrs =
-	CHAR_ATTR_FONT_SIZE_STYLE(
-		FID_DTC_URW_SANS, 36, TS_BOLD);
-
-@object GenGlyphClass By = {
-  GI_visMoniker = "by";
-}
-@object GenGlyphClass BreadBoxLogo = {
-  GI_visMoniker = list { @BreadboxLogoMoniker}
-}
-@object GenGlyphClass Visit = {
-  GI_visMoniker = "Visit us at...";
-}
-@object GenGlyphClass Web = {
-  GI_visMoniker = "www.breadbox.com";
-}
-@object GenGlyphClass AboutSpacer1 = {
-  GI_visMoniker = "   ";
-}
-@object GenGlyphClass Copyright = {
-  GI_visMoniker = "Copyright 1994-2002";
-}
-@object GenGlyphClass BBoxLLC = {
-  GI_visMoniker = "Breadbox Computer Company LLC";
-}
-@object GenGlyphClass Rights = {
-  GI_visMoniker = "All Rights Reserved";
-}
-@object GenGlyphClass AboutSpacer2 = {
-  GI_visMoniker = "   ";
 }
 
 @object GenGlyphClass WMDummyLine2 = {
@@ -693,16 +639,6 @@ Boolean			g_usePword = FALSE;
     GTXI_maxLength = WM_MAX_SIZE_WORD;
     HINT_DEFAULT_FOCUS;
 }
-
-@chunk TCHAR DelWarnString[] = "Are you sure you want to permanently delete the word \"\001\" from the Word Matcher dictionary?";
-
-@chunk TCHAR AddInfoStr[] = "No match is found for the word for which you are searching.  Would you like to add this word to the Word Matcher dictionary?";
-@chunk TCHAR NotFoundInfoStr[] = "No words were found with that search pattern.";
-@chunk TCHAR noFoundInfoStr[] = "No matching word was found for your search";
-@chunk TCHAR ErrStr1[] = "Can't add word - no Word match data file";
-@chunk TCHAR ErrStr2[] = "Can't add word - word is too short";
-@chunk TCHAR ErrStr3[] = "Can't add word - word is too long";
-@chunk TCHAR ErrStr4[] = "Can't add word - couldn't create memory block";
 
 
 @end Interface;
@@ -1334,7 +1270,7 @@ DosCodePage	cp;
 												CONV_WIN, FALSE);
 		}
 
-	@send IPButton::MSG_GEN_USE_VIS_MONIKER(@StopMoniker, VUM_DELAYED_VIA_APP_QUEUE);
+	@send IPButton::MSG_GEN_USE_VIS_MONIKER(OptrToChunk(@StopMoniker), VUM_DELAYED_VIA_APP_QUEUE);
 	@send IPButton::MSG_STOP_SET_NOT_STOPPED();
 
 	/* Open the dialog box */
@@ -1441,18 +1377,19 @@ dword			read = 0;
 			do {
 				size = FileRead( file, &c, 1, 0 );
 
-				if (( 1 != size ) || ( '\r' == c )) {
+				if (( 1 != size ) || ( '\r' == c ) || ( 0x0a == c )) {
 					break;
 					}
-				if ( 0x0a == c ) {
-					continue;
-					}
+				
 				inWord[ i ] = c;
 				i++;
 				} while ( TRUE );
 
 			if ( 1 != size ) {
 				break;
+				}
+			if ( 0 == i) {
+				continue;
 				}
 
 			error = 0;
@@ -1503,7 +1440,7 @@ dword			read = 0;
 		FileClose( file, 0 );
 
 		@send IPButton::MSG_STOP_SET_STOPPED();
-		@send IPButton::MSG_GEN_USE_VIS_MONIKER(@OKMoniker, VUM_DELAYED_VIA_APP_QUEUE);
+		@send IPButton::MSG_GEN_USE_VIS_MONIKER(OptrToChunk(@OKMoniker), VUM_DELAYED_VIA_APP_QUEUE);
 
 		}  /* end of good words file if */
 
@@ -1525,7 +1462,7 @@ dword			read = 0;
 
 	if (!pself->GSTI_stop) {
 		pself->GSTI_stop = TRUE;
-		@send IPButton::MSG_GEN_USE_VIS_MONIKER(@CancelMoniker, VUM_DELAYED_VIA_APP_QUEUE);
+		@send IPButton::MSG_GEN_USE_VIS_MONIKER(OptrToChunk(@CancelMoniker), VUM_DELAYED_VIA_APP_QUEUE);
 		}
 
 	else {

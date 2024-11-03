@@ -29,6 +29,6 @@ wmg3ftp.eobj: geos.h heap.h geode.h resource.h ec.h object.h lmem.h \
                 parallDr.h hugearr.h fileEnum.h medium.h sockmisc.h \
                 Ansi/string.h Ansi/stdio.h Ansi/stdlib.h geoMisc.h \
                 initfile.h product.h htmlfstr.h awatcher.h htmlopt.h \
-                htmldrv.h math.h fixes.h htmlprog.h
+                htmldrv.h math.h htmlprog.h
 
 wmg3ftpEC.geo wmg3ftp.geo : geos.ldf ansic.ldf html4par.ldf socket.ldf ui.ldf 

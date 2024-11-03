@@ -1,377 +1,375 @@
-CTHUMBV.obj \
-CTHUMBV.eobj: PICALBUM.GOH STDAPP.GOH OBJECT.GOH UI.GOH \
-                OBJECTS/METAC.GOH OBJECTS/INPUTC.GOH OBJECTS/CLIPBRD.GOH \
-                OBJECTS/UIINPUTC.GOH IACP.GOH OBJECTS/WINC.GOH \
-                OBJECTS/GPROCC.GOH ALB.GOH OBJECTS/PROCESSC.GOH \
-                OBJECTS/VISC.GOH OBJECTS/VCOMPC.GOH OBJECTS/VCNTC.GOH \
-                OBJECTS/GAPPC.GOH OBJECTS/GENC.GOH OBJECTS/GINTERC.GOH \
-                OBJECTS/GPRIMC.GOH OBJECTS/GDISPC.GOH OBJECTS/GTRIGC.GOH \
-                OBJECTS/GVIEWC.GOH OBJECTS/GTEXTC.GOH OBJECTS/VTEXTC.GOH \
-                OBJECTS/GCTRLC.GOH GCNLIST.GOH SPOOL.GOH \
-                OBJECTS/GFSELC.GOH OBJECTS/GGLYPHC.GOH \
-                OBJECTS/GDOCCTRL.GOH OBJECTS/GDOCGRPC.GOH \
-                OBJECTS/GDOCC.GOH OBJECTS/GCONTC.GOH OBJECTS/GDCTRLC.GOH \
-                OBJECTS/GEDITCC.GOH OBJECTS/GBOOLGC.GOH \
-                OBJECTS/GITEMGC.GOH OBJECTS/GDLISTC.GOH \
-                OBJECTS/GITEMC.GOH OBJECTS/GBOOLC.GOH \
-                OBJECTS/GGADGETC.GOH OBJECTS/GTOOLCC.GOH \
-                OBJECTS/GVALUEC.GOH OBJECTS/GTOOLGC.GOH \
-                OBJECTS/HELPCC.GOH HTMLDRV.H EXTGRAPH.GOH
-CTHUMBV.obj \
-CTHUMBV.eobj: CLASS/CTHUMBV.GOC GEOS.H HEAP.H GEODE.H RESOURCE.H EC.H \
-                OBJECT.H LMEM.H GRAPHICS.H FONTID.H FONT.H COLOR.H \
-                GSTRING.H TIMER.H VM.H DBASE.H LOCALIZE.H ANSI/CTYPE.H \
-                TIMEDATE.H FILE.H SLLANG.H SYSTEM.H GEOWORKS.H CHUNKARR.H \
-                OBJECTS/HELPCC.H DISK.H DRIVE.H INPUT.H CHAR.H HWR.H \
-                WIN.H UDIALOG.H OBJECTS/GINTERC.H OBJECTS/TEXT/TCOMMON.H \
-                STYLESH.H DRIVER.H THREAD.H PRINT.H INTERNAL/SPOOLINT.H \
-                SERIALDR.H PARALLDR.H HUGEARR.H FILEENUM.H ANSI/STDIO.H \
-                HTMLDRV.H PRODUCT.H MATH.H FIXES.H HTMLFSTR.H AWATCHER.H \
-                HTMLPROG.H LIBRARY.H ANSI/STRING.H
-POPUPS.obj \
-POPUPS.eobj: PICALBUM.GOH STDAPP.GOH OBJECT.GOH UI.GOH \
-                OBJECTS/METAC.GOH OBJECTS/INPUTC.GOH OBJECTS/CLIPBRD.GOH \
-                OBJECTS/UIINPUTC.GOH IACP.GOH OBJECTS/WINC.GOH \
-                OBJECTS/GPROCC.GOH ALB.GOH OBJECTS/PROCESSC.GOH \
-                OBJECTS/VISC.GOH OBJECTS/VCOMPC.GOH OBJECTS/VCNTC.GOH \
-                OBJECTS/GAPPC.GOH OBJECTS/GENC.GOH OBJECTS/GINTERC.GOH \
-                OBJECTS/GPRIMC.GOH OBJECTS/GDISPC.GOH OBJECTS/GTRIGC.GOH \
-                OBJECTS/GVIEWC.GOH OBJECTS/GTEXTC.GOH OBJECTS/VTEXTC.GOH \
-                OBJECTS/GCTRLC.GOH GCNLIST.GOH SPOOL.GOH \
-                OBJECTS/GFSELC.GOH OBJECTS/GGLYPHC.GOH \
-                OBJECTS/GDOCCTRL.GOH OBJECTS/GDOCGRPC.GOH \
-                OBJECTS/GDOCC.GOH OBJECTS/GCONTC.GOH OBJECTS/GDCTRLC.GOH \
-                OBJECTS/GEDITCC.GOH OBJECTS/GBOOLGC.GOH \
-                OBJECTS/GITEMGC.GOH OBJECTS/GDLISTC.GOH \
-                OBJECTS/GITEMC.GOH OBJECTS/GBOOLC.GOH \
-                OBJECTS/GGADGETC.GOH OBJECTS/GTOOLCC.GOH \
-                OBJECTS/GVALUEC.GOH OBJECTS/GTOOLGC.GOH \
-                OBJECTS/HELPCC.GOH
-POPUPS.obj \
-POPUPS.eobj: CLASS/POPUPS.GOC GEOS.H HEAP.H GEODE.H RESOURCE.H EC.H \
-                OBJECT.H LMEM.H GRAPHICS.H FONTID.H FONT.H COLOR.H \
-                GSTRING.H TIMER.H VM.H DBASE.H LOCALIZE.H ANSI/CTYPE.H \
-                TIMEDATE.H FILE.H SLLANG.H SYSTEM.H GEOWORKS.H CHUNKARR.H \
-                OBJECTS/HELPCC.H DISK.H DRIVE.H INPUT.H CHAR.H HWR.H \
-                WIN.H UDIALOG.H OBJECTS/GINTERC.H OBJECTS/TEXT/TCOMMON.H \
-                STYLESH.H DRIVER.H THREAD.H PRINT.H INTERNAL/SPOOLINT.H \
-                SERIALDR.H PARALLDR.H HUGEARR.H FILEENUM.H
-MALBUM.obj \
-MALBUM.eobj: PICALBUM.GOH STDAPP.GOH OBJECT.GOH UI.GOH \
-                OBJECTS/METAC.GOH OBJECTS/INPUTC.GOH OBJECTS/CLIPBRD.GOH \
-                OBJECTS/UIINPUTC.GOH IACP.GOH OBJECTS/WINC.GOH \
-                OBJECTS/GPROCC.GOH ALB.GOH OBJECTS/PROCESSC.GOH \
-                OBJECTS/VISC.GOH OBJECTS/VCOMPC.GOH OBJECTS/VCNTC.GOH \
-                OBJECTS/GAPPC.GOH OBJECTS/GENC.GOH OBJECTS/GINTERC.GOH \
-                OBJECTS/GPRIMC.GOH OBJECTS/GDISPC.GOH OBJECTS/GTRIGC.GOH \
-                OBJECTS/GVIEWC.GOH OBJECTS/GTEXTC.GOH OBJECTS/VTEXTC.GOH \
-                OBJECTS/GCTRLC.GOH GCNLIST.GOH SPOOL.GOH \
-                OBJECTS/GFSELC.GOH OBJECTS/GGLYPHC.GOH \
-                OBJECTS/GDOCCTRL.GOH OBJECTS/GDOCGRPC.GOH \
-                OBJECTS/GDOCC.GOH OBJECTS/GCONTC.GOH OBJECTS/GDCTRLC.GOH \
-                OBJECTS/GEDITCC.GOH OBJECTS/GBOOLGC.GOH \
-                OBJECTS/GITEMGC.GOH OBJECTS/GDLISTC.GOH \
-                OBJECTS/GITEMC.GOH OBJECTS/GBOOLC.GOH \
-                OBJECTS/GGADGETC.GOH OBJECTS/GTOOLCC.GOH \
-                OBJECTS/GVALUEC.GOH OBJECTS/GTOOLGC.GOH \
-                OBJECTS/HELPCC.GOH
-MALBUM.obj \
-MALBUM.eobj: MAIN/MALBUM.GOC GEOS.H HEAP.H GEODE.H RESOURCE.H EC.H \
-                OBJECT.H LMEM.H GRAPHICS.H FONTID.H FONT.H COLOR.H \
-                GSTRING.H TIMER.H VM.H DBASE.H LOCALIZE.H ANSI/CTYPE.H \
-                TIMEDATE.H FILE.H SLLANG.H SYSTEM.H GEOWORKS.H CHUNKARR.H \
-                OBJECTS/HELPCC.H DISK.H DRIVE.H INPUT.H CHAR.H HWR.H \
-                WIN.H UDIALOG.H OBJECTS/GINTERC.H OBJECTS/TEXT/TCOMMON.H \
-                STYLESH.H DRIVER.H THREAD.H PRINT.H INTERNAL/SPOOLINT.H \
-                SERIALDR.H PARALLDR.H HUGEARR.H FILEENUM.H ANSI/STRING.H \
-                ANSI/STDIO.H
-MIMPORT.obj \
-MIMPORT.eobj: PICALBUM.GOH STDAPP.GOH OBJECT.GOH UI.GOH \
-                OBJECTS/METAC.GOH OBJECTS/INPUTC.GOH OBJECTS/CLIPBRD.GOH \
-                OBJECTS/UIINPUTC.GOH IACP.GOH OBJECTS/WINC.GOH \
-                OBJECTS/GPROCC.GOH ALB.GOH OBJECTS/PROCESSC.GOH \
-                OBJECTS/VISC.GOH OBJECTS/VCOMPC.GOH OBJECTS/VCNTC.GOH \
-                OBJECTS/GAPPC.GOH OBJECTS/GENC.GOH OBJECTS/GINTERC.GOH \
-                OBJECTS/GPRIMC.GOH OBJECTS/GDISPC.GOH OBJECTS/GTRIGC.GOH \
-                OBJECTS/GVIEWC.GOH OBJECTS/GTEXTC.GOH OBJECTS/VTEXTC.GOH \
-                OBJECTS/GCTRLC.GOH GCNLIST.GOH SPOOL.GOH \
-                OBJECTS/GFSELC.GOH OBJECTS/GGLYPHC.GOH \
-                OBJECTS/GDOCCTRL.GOH OBJECTS/GDOCGRPC.GOH \
-                OBJECTS/GDOCC.GOH OBJECTS/GCONTC.GOH OBJECTS/GDCTRLC.GOH \
-                OBJECTS/GEDITCC.GOH OBJECTS/GBOOLGC.GOH \
-                OBJECTS/GITEMGC.GOH OBJECTS/GDLISTC.GOH \
-                OBJECTS/GITEMC.GOH OBJECTS/GBOOLC.GOH \
-                OBJECTS/GGADGETC.GOH OBJECTS/GTOOLCC.GOH \
-                OBJECTS/GVALUEC.GOH OBJECTS/GTOOLGC.GOH \
-                OBJECTS/HELPCC.GOH HTMLDRV.H
-MIMPORT.obj \
-MIMPORT.eobj: MAIN/MIMPORT.GOC GEOS.H HEAP.H GEODE.H RESOURCE.H EC.H \
-                OBJECT.H LMEM.H GRAPHICS.H FONTID.H FONT.H COLOR.H \
-                GSTRING.H TIMER.H VM.H DBASE.H LOCALIZE.H ANSI/CTYPE.H \
-                TIMEDATE.H FILE.H SLLANG.H SYSTEM.H GEOWORKS.H CHUNKARR.H \
-                OBJECTS/HELPCC.H DISK.H DRIVE.H INPUT.H CHAR.H HWR.H \
-                WIN.H UDIALOG.H OBJECTS/GINTERC.H OBJECTS/TEXT/TCOMMON.H \
-                STYLESH.H DRIVER.H THREAD.H PRINT.H INTERNAL/SPOOLINT.H \
-                SERIALDR.H PARALLDR.H HUGEARR.H FILEENUM.H ANSI/STRING.H \
-                HTMLDRV.H PRODUCT.H MATH.H FIXES.H HTMLFSTR.H AWATCHER.H \
-                HTMLPROG.H LIBRARY.H
+cThumbV.obj \
+cThumbV.eobj: PicAlbum.goh StdApp.goh object.goh ui.goh \
+                Objects/metaC.goh Objects/inputC.goh Objects/clipbrd.goh \
+                Objects/uiInputC.goh iacp.goh Objects/winC.goh \
+                Objects/gProcC.goh alb.goh Objects/processC.goh \
+                Objects/visC.goh Objects/vCompC.goh Objects/vCntC.goh \
+                Objects/gAppC.goh Objects/genC.goh Objects/gInterC.goh \
+                Objects/gPrimC.goh Objects/gDispC.goh Objects/gTrigC.goh \
+                Objects/gViewC.goh Objects/gTextC.goh Objects/vTextC.goh \
+                Objects/gCtrlC.goh gcnlist.goh spool.goh \
+                Objects/gFSelC.goh Objects/gGlyphC.goh \
+                Objects/gDocCtrl.goh Objects/gDocGrpC.goh \
+                Objects/gDocC.goh Objects/gContC.goh Objects/gDCtrlC.goh \
+                Objects/gEditCC.goh Objects/gBoolGC.goh \
+                Objects/gItemGC.goh Objects/gDListC.goh \
+                Objects/gItemC.goh Objects/gBoolC.goh \
+                Objects/gGadgetC.goh Objects/gToolCC.goh \
+                Objects/gValueC.goh Objects/gToolGC.goh \
+                Objects/helpCC.goh htmldrv.h ExtGraph.goh
+cThumbV.obj \
+cThumbV.eobj: geos.h heap.h geode.h resource.h ec.h object.h lmem.h \
+                graphics.h fontID.h font.h color.h gstring.h timer.h vm.h \
+                dbase.h localize.h Ansi/ctype.h timedate.h file.h \
+                sllang.h system.h geoworks.h chunkarr.h Objects/helpCC.h \
+                disk.h drive.h input.h char.h hwr.h win.h uDialog.h \
+                Objects/gInterC.h Objects/Text/tCommon.h stylesh.h \
+                driver.h thread.h print.h Internal/spoolInt.h serialDr.h \
+                parallDr.h hugearr.h fileEnum.h Ansi/stdio.h product.h \
+                math.h htmlfstr.h awatcher.h htmlprog.h Library.h \
+                Ansi/string.h
+popups.obj \
+popups.eobj: PicAlbum.goh StdApp.goh object.goh ui.goh \
+                Objects/metaC.goh Objects/inputC.goh Objects/clipbrd.goh \
+                Objects/uiInputC.goh iacp.goh Objects/winC.goh \
+                Objects/gProcC.goh alb.goh Objects/processC.goh \
+                Objects/visC.goh Objects/vCompC.goh Objects/vCntC.goh \
+                Objects/gAppC.goh Objects/genC.goh Objects/gInterC.goh \
+                Objects/gPrimC.goh Objects/gDispC.goh Objects/gTrigC.goh \
+                Objects/gViewC.goh Objects/gTextC.goh Objects/vTextC.goh \
+                Objects/gCtrlC.goh gcnlist.goh spool.goh \
+                Objects/gFSelC.goh Objects/gGlyphC.goh \
+                Objects/gDocCtrl.goh Objects/gDocGrpC.goh \
+                Objects/gDocC.goh Objects/gContC.goh Objects/gDCtrlC.goh \
+                Objects/gEditCC.goh Objects/gBoolGC.goh \
+                Objects/gItemGC.goh Objects/gDListC.goh \
+                Objects/gItemC.goh Objects/gBoolC.goh \
+                Objects/gGadgetC.goh Objects/gToolCC.goh \
+                Objects/gValueC.goh Objects/gToolGC.goh \
+                Objects/helpCC.goh
+popups.obj \
+popups.eobj: geos.h heap.h geode.h resource.h ec.h object.h lmem.h \
+                graphics.h fontID.h font.h color.h gstring.h timer.h vm.h \
+                dbase.h localize.h Ansi/ctype.h timedate.h file.h \
+                sllang.h system.h geoworks.h chunkarr.h Objects/helpCC.h \
+                disk.h drive.h input.h char.h hwr.h win.h uDialog.h \
+                Objects/gInterC.h Objects/Text/tCommon.h stylesh.h \
+                driver.h thread.h print.h Internal/spoolInt.h serialDr.h \
+                parallDr.h hugearr.h fileEnum.h
+mAlbum.obj \
+mAlbum.eobj: PicAlbum.goh StdApp.goh object.goh ui.goh \
+                Objects/metaC.goh Objects/inputC.goh Objects/clipbrd.goh \
+                Objects/uiInputC.goh iacp.goh Objects/winC.goh \
+                Objects/gProcC.goh alb.goh Objects/processC.goh \
+                Objects/visC.goh Objects/vCompC.goh Objects/vCntC.goh \
+                Objects/gAppC.goh Objects/genC.goh Objects/gInterC.goh \
+                Objects/gPrimC.goh Objects/gDispC.goh Objects/gTrigC.goh \
+                Objects/gViewC.goh Objects/gTextC.goh Objects/vTextC.goh \
+                Objects/gCtrlC.goh gcnlist.goh spool.goh \
+                Objects/gFSelC.goh Objects/gGlyphC.goh \
+                Objects/gDocCtrl.goh Objects/gDocGrpC.goh \
+                Objects/gDocC.goh Objects/gContC.goh Objects/gDCtrlC.goh \
+                Objects/gEditCC.goh Objects/gBoolGC.goh \
+                Objects/gItemGC.goh Objects/gDListC.goh \
+                Objects/gItemC.goh Objects/gBoolC.goh \
+                Objects/gGadgetC.goh Objects/gToolCC.goh \
+                Objects/gValueC.goh Objects/gToolGC.goh \
+                Objects/helpCC.goh
+mAlbum.obj \
+mAlbum.eobj: geos.h heap.h geode.h resource.h ec.h object.h lmem.h \
+                graphics.h fontID.h font.h color.h gstring.h timer.h vm.h \
+                dbase.h localize.h Ansi/ctype.h timedate.h file.h \
+                sllang.h system.h geoworks.h chunkarr.h Objects/helpCC.h \
+                disk.h drive.h input.h char.h hwr.h win.h uDialog.h \
+                Objects/gInterC.h Objects/Text/tCommon.h stylesh.h \
+                driver.h thread.h print.h Internal/spoolInt.h serialDr.h \
+                parallDr.h hugearr.h fileEnum.h Ansi/string.h \
+                Ansi/stdio.h
+mImport.obj \
+mImport.eobj: PicAlbum.goh StdApp.goh object.goh ui.goh \
+                Objects/metaC.goh Objects/inputC.goh Objects/clipbrd.goh \
+                Objects/uiInputC.goh iacp.goh Objects/winC.goh \
+                Objects/gProcC.goh alb.goh Objects/processC.goh \
+                Objects/visC.goh Objects/vCompC.goh Objects/vCntC.goh \
+                Objects/gAppC.goh Objects/genC.goh Objects/gInterC.goh \
+                Objects/gPrimC.goh Objects/gDispC.goh Objects/gTrigC.goh \
+                Objects/gViewC.goh Objects/gTextC.goh Objects/vTextC.goh \
+                Objects/gCtrlC.goh gcnlist.goh spool.goh \
+                Objects/gFSelC.goh Objects/gGlyphC.goh \
+                Objects/gDocCtrl.goh Objects/gDocGrpC.goh \
+                Objects/gDocC.goh Objects/gContC.goh Objects/gDCtrlC.goh \
+                Objects/gEditCC.goh Objects/gBoolGC.goh \
+                Objects/gItemGC.goh Objects/gDListC.goh \
+                Objects/gItemC.goh Objects/gBoolC.goh \
+                Objects/gGadgetC.goh Objects/gToolCC.goh \
+                Objects/gValueC.goh Objects/gToolGC.goh \
+                Objects/helpCC.goh htmldrv.h
+mImport.obj \
+mImport.eobj: geos.h heap.h geode.h resource.h ec.h object.h lmem.h \
+                graphics.h fontID.h font.h color.h gstring.h timer.h vm.h \
+                dbase.h localize.h Ansi/ctype.h timedate.h file.h \
+                sllang.h system.h geoworks.h chunkarr.h Objects/helpCC.h \
+                disk.h drive.h input.h char.h hwr.h win.h uDialog.h \
+                Objects/gInterC.h Objects/Text/tCommon.h stylesh.h \
+                driver.h thread.h print.h Internal/spoolInt.h serialDr.h \
+                parallDr.h hugearr.h fileEnum.h Ansi/string.h product.h \
+                math.h htmlfstr.h awatcher.h htmlprog.h Library.h
 AWATCHER.obj \
-AWATCHER.eobj: STDAPP.GOH OBJECT.GOH UI.GOH OBJECTS/METAC.GOH \
-                OBJECTS/INPUTC.GOH OBJECTS/CLIPBRD.GOH \
-                OBJECTS/UIINPUTC.GOH IACP.GOH OBJECTS/WINC.GOH \
-                OBJECTS/GPROCC.GOH ALB.GOH OBJECTS/PROCESSC.GOH \
-                OBJECTS/VISC.GOH OBJECTS/VCOMPC.GOH OBJECTS/VCNTC.GOH \
-                OBJECTS/GAPPC.GOH OBJECTS/GENC.GOH OBJECTS/GINTERC.GOH \
-                OBJECTS/GPRIMC.GOH OBJECTS/GDISPC.GOH OBJECTS/GTRIGC.GOH \
-                OBJECTS/GVIEWC.GOH OBJECTS/GTEXTC.GOH OBJECTS/VTEXTC.GOH \
-                OBJECTS/GCTRLC.GOH GCNLIST.GOH SPOOL.GOH \
-                OBJECTS/GFSELC.GOH OBJECTS/GGLYPHC.GOH \
-                OBJECTS/GDOCCTRL.GOH OBJECTS/GDOCGRPC.GOH \
-                OBJECTS/GDOCC.GOH OBJECTS/GCONTC.GOH OBJECTS/GDCTRLC.GOH \
-                OBJECTS/GEDITCC.GOH OBJECTS/GBOOLGC.GOH \
-                OBJECTS/GITEMGC.GOH OBJECTS/GDLISTC.GOH \
-                OBJECTS/GITEMC.GOH OBJECTS/GBOOLC.GOH \
-                OBJECTS/GGADGETC.GOH OBJECTS/GTOOLCC.GOH \
-                OBJECTS/GVALUEC.GOH OBJECTS/GTOOLGC.GOH \
-                OBJECTS/HELPCC.GOH
+AWATCHER.eobj: stdapp.goh object.goh ui.goh Objects/metaC.goh \
+                Objects/inputC.goh Objects/clipbrd.goh \
+                Objects/uiInputC.goh iacp.goh Objects/winC.goh \
+                Objects/gProcC.goh alb.goh Objects/processC.goh \
+                Objects/visC.goh Objects/vCompC.goh Objects/vCntC.goh \
+                Objects/gAppC.goh Objects/genC.goh Objects/gInterC.goh \
+                Objects/gPrimC.goh Objects/gDispC.goh Objects/gTrigC.goh \
+                Objects/gViewC.goh Objects/gTextC.goh Objects/vTextC.goh \
+                Objects/gCtrlC.goh gcnlist.goh spool.goh \
+                Objects/gFSelC.goh Objects/gGlyphC.goh \
+                Objects/gDocCtrl.goh Objects/gDocGrpC.goh \
+                Objects/gDocC.goh Objects/gContC.goh Objects/gDCtrlC.goh \
+                Objects/gEditCC.goh Objects/gBoolGC.goh \
+                Objects/gItemGC.goh Objects/gDListC.goh \
+                Objects/gItemC.goh Objects/gBoolC.goh \
+                Objects/gGadgetC.goh Objects/gToolCC.goh \
+                Objects/gValueC.goh Objects/gToolGC.goh \
+                Objects/helpCC.goh
 AWATCHER.obj \
-AWATCHER.eobj: PROCESS/AWATCHER.GOC GEOS.H HEAP.H GEODE.H RESOURCE.H EC.H \
-                OBJECT.H LMEM.H GRAPHICS.H FONTID.H FONT.H COLOR.H \
-                GSTRING.H TIMER.H VM.H DBASE.H LOCALIZE.H ANSI/CTYPE.H \
-                TIMEDATE.H FILE.H SLLANG.H SYSTEM.H GEOWORKS.H CHUNKARR.H \
-                OBJECTS/HELPCC.H DISK.H DRIVE.H INPUT.H CHAR.H HWR.H \
-                WIN.H UDIALOG.H OBJECTS/GINTERC.H OBJECTS/TEXT/TCOMMON.H \
-                STYLESH.H DRIVER.H THREAD.H PRINT.H INTERNAL/SPOOLINT.H \
-                SERIALDR.H PARALLDR.H HUGEARR.H FILEENUM.H AWATCHER.H
-PBMPOP.obj \
-PBMPOP.eobj: PICALBUM.GOH STDAPP.GOH OBJECT.GOH UI.GOH \
-                OBJECTS/METAC.GOH OBJECTS/INPUTC.GOH OBJECTS/CLIPBRD.GOH \
-                OBJECTS/UIINPUTC.GOH IACP.GOH OBJECTS/WINC.GOH \
-                OBJECTS/GPROCC.GOH ALB.GOH OBJECTS/PROCESSC.GOH \
-                OBJECTS/VISC.GOH OBJECTS/VCOMPC.GOH OBJECTS/VCNTC.GOH \
-                OBJECTS/GAPPC.GOH OBJECTS/GENC.GOH OBJECTS/GINTERC.GOH \
-                OBJECTS/GPRIMC.GOH OBJECTS/GDISPC.GOH OBJECTS/GTRIGC.GOH \
-                OBJECTS/GVIEWC.GOH OBJECTS/GTEXTC.GOH OBJECTS/VTEXTC.GOH \
-                OBJECTS/GCTRLC.GOH GCNLIST.GOH SPOOL.GOH \
-                OBJECTS/GFSELC.GOH OBJECTS/GGLYPHC.GOH \
-                OBJECTS/GDOCCTRL.GOH OBJECTS/GDOCGRPC.GOH \
-                OBJECTS/GDOCC.GOH OBJECTS/GCONTC.GOH OBJECTS/GDCTRLC.GOH \
-                OBJECTS/GEDITCC.GOH OBJECTS/GBOOLGC.GOH \
-                OBJECTS/GITEMGC.GOH OBJECTS/GDLISTC.GOH \
-                OBJECTS/GITEMC.GOH OBJECTS/GBOOLC.GOH \
-                OBJECTS/GGADGETC.GOH OBJECTS/GTOOLCC.GOH \
-                OBJECTS/GVALUEC.GOH OBJECTS/GTOOLGC.GOH \
-                OBJECTS/HELPCC.GOH EXTGRAPH.GOH
-PBMPOP.obj \
-PBMPOP.eobj: PROCESS/PBMPOP.GOC GEOS.H HEAP.H GEODE.H RESOURCE.H EC.H \
-                OBJECT.H LMEM.H GRAPHICS.H FONTID.H FONT.H COLOR.H \
-                GSTRING.H TIMER.H VM.H DBASE.H LOCALIZE.H ANSI/CTYPE.H \
-                TIMEDATE.H FILE.H SLLANG.H SYSTEM.H GEOWORKS.H CHUNKARR.H \
-                OBJECTS/HELPCC.H DISK.H DRIVE.H INPUT.H CHAR.H HWR.H \
-                WIN.H UDIALOG.H OBJECTS/GINTERC.H OBJECTS/TEXT/TCOMMON.H \
-                STYLESH.H DRIVER.H THREAD.H PRINT.H INTERNAL/SPOOLINT.H \
-                SERIALDR.H PARALLDR.H HUGEARR.H FILEENUM.H
-PCAMERA.obj \
-PCAMERA.eobj: PICALBUM.GOH STDAPP.GOH OBJECT.GOH UI.GOH \
-                OBJECTS/METAC.GOH OBJECTS/INPUTC.GOH OBJECTS/CLIPBRD.GOH \
-                OBJECTS/UIINPUTC.GOH IACP.GOH OBJECTS/WINC.GOH \
-                OBJECTS/GPROCC.GOH ALB.GOH OBJECTS/PROCESSC.GOH \
-                OBJECTS/VISC.GOH OBJECTS/VCOMPC.GOH OBJECTS/VCNTC.GOH \
-                OBJECTS/GAPPC.GOH OBJECTS/GENC.GOH OBJECTS/GINTERC.GOH \
-                OBJECTS/GPRIMC.GOH OBJECTS/GDISPC.GOH OBJECTS/GTRIGC.GOH \
-                OBJECTS/GVIEWC.GOH OBJECTS/GTEXTC.GOH OBJECTS/VTEXTC.GOH \
-                OBJECTS/GCTRLC.GOH GCNLIST.GOH SPOOL.GOH \
-                OBJECTS/GFSELC.GOH OBJECTS/GGLYPHC.GOH \
-                OBJECTS/GDOCCTRL.GOH OBJECTS/GDOCGRPC.GOH \
-                OBJECTS/GDOCC.GOH OBJECTS/GCONTC.GOH OBJECTS/GDCTRLC.GOH \
-                OBJECTS/GEDITCC.GOH OBJECTS/GBOOLGC.GOH \
-                OBJECTS/GITEMGC.GOH OBJECTS/GDLISTC.GOH \
-                OBJECTS/GITEMC.GOH OBJECTS/GBOOLC.GOH \
-                OBJECTS/GGADGETC.GOH OBJECTS/GTOOLCC.GOH \
-                OBJECTS/GVALUEC.GOH OBJECTS/GTOOLGC.GOH \
-                OBJECTS/HELPCC.GOH
-PCAMERA.obj \
-PCAMERA.eobj: PROCESS/PCAMERA.GOC GEOS.H HEAP.H GEODE.H RESOURCE.H EC.H \
-                OBJECT.H LMEM.H GRAPHICS.H FONTID.H FONT.H COLOR.H \
-                GSTRING.H TIMER.H VM.H DBASE.H LOCALIZE.H ANSI/CTYPE.H \
-                TIMEDATE.H FILE.H SLLANG.H SYSTEM.H GEOWORKS.H CHUNKARR.H \
-                OBJECTS/HELPCC.H DISK.H DRIVE.H INPUT.H CHAR.H HWR.H \
-                WIN.H UDIALOG.H OBJECTS/GINTERC.H OBJECTS/TEXT/TCOMMON.H \
-                STYLESH.H DRIVER.H THREAD.H PRINT.H INTERNAL/SPOOLINT.H \
-                SERIALDR.H PARALLDR.H HUGEARR.H FILEENUM.H PHOTOPC.H \
-                ANSI/STDIO.H
-PMAIN.obj \
-PMAIN.eobj: PICALBUM.GOH STDAPP.GOH OBJECT.GOH UI.GOH \
-                OBJECTS/METAC.GOH OBJECTS/INPUTC.GOH OBJECTS/CLIPBRD.GOH \
-                OBJECTS/UIINPUTC.GOH IACP.GOH OBJECTS/WINC.GOH \
-                OBJECTS/GPROCC.GOH ALB.GOH OBJECTS/PROCESSC.GOH \
-                OBJECTS/VISC.GOH OBJECTS/VCOMPC.GOH OBJECTS/VCNTC.GOH \
-                OBJECTS/GAPPC.GOH OBJECTS/GENC.GOH OBJECTS/GINTERC.GOH \
-                OBJECTS/GPRIMC.GOH OBJECTS/GDISPC.GOH OBJECTS/GTRIGC.GOH \
-                OBJECTS/GVIEWC.GOH OBJECTS/GTEXTC.GOH OBJECTS/VTEXTC.GOH \
-                OBJECTS/GCTRLC.GOH GCNLIST.GOH SPOOL.GOH \
-                OBJECTS/GFSELC.GOH OBJECTS/GGLYPHC.GOH \
-                OBJECTS/GDOCCTRL.GOH OBJECTS/GDOCGRPC.GOH \
-                OBJECTS/GDOCC.GOH OBJECTS/GCONTC.GOH OBJECTS/GDCTRLC.GOH \
-                OBJECTS/GEDITCC.GOH OBJECTS/GBOOLGC.GOH \
-                OBJECTS/GITEMGC.GOH OBJECTS/GDLISTC.GOH \
-                OBJECTS/GITEMC.GOH OBJECTS/GBOOLC.GOH \
-                OBJECTS/GGADGETC.GOH OBJECTS/GTOOLCC.GOH \
-                OBJECTS/GVALUEC.GOH OBJECTS/GTOOLGC.GOH \
-                OBJECTS/HELPCC.GOH OBJECTS/GVIEWCC.GOH EXTGRAPH.GOH
-PMAIN.obj \
-PMAIN.eobj: PROCESS/PMAIN.GOC GEOS.H HEAP.H GEODE.H RESOURCE.H EC.H \
-                OBJECT.H LMEM.H GRAPHICS.H FONTID.H FONT.H COLOR.H \
-                GSTRING.H TIMER.H VM.H DBASE.H LOCALIZE.H ANSI/CTYPE.H \
-                TIMEDATE.H FILE.H SLLANG.H SYSTEM.H GEOWORKS.H CHUNKARR.H \
-                OBJECTS/HELPCC.H DISK.H DRIVE.H INPUT.H CHAR.H HWR.H \
-                WIN.H UDIALOG.H OBJECTS/GINTERC.H OBJECTS/TEXT/TCOMMON.H \
-                STYLESH.H DRIVER.H THREAD.H PRINT.H INTERNAL/SPOOLINT.H \
-                SERIALDR.H PARALLDR.H HUGEARR.H FILEENUM.H ANSI/STRING.H \
-                LIBRARY.H ANSI/STDIO.H
-PPRINT.obj \
-PPRINT.eobj: PICALBUM.GOH STDAPP.GOH OBJECT.GOH UI.GOH \
-                OBJECTS/METAC.GOH OBJECTS/INPUTC.GOH OBJECTS/CLIPBRD.GOH \
-                OBJECTS/UIINPUTC.GOH IACP.GOH OBJECTS/WINC.GOH \
-                OBJECTS/GPROCC.GOH ALB.GOH OBJECTS/PROCESSC.GOH \
-                OBJECTS/VISC.GOH OBJECTS/VCOMPC.GOH OBJECTS/VCNTC.GOH \
-                OBJECTS/GAPPC.GOH OBJECTS/GENC.GOH OBJECTS/GINTERC.GOH \
-                OBJECTS/GPRIMC.GOH OBJECTS/GDISPC.GOH OBJECTS/GTRIGC.GOH \
-                OBJECTS/GVIEWC.GOH OBJECTS/GTEXTC.GOH OBJECTS/VTEXTC.GOH \
-                OBJECTS/GCTRLC.GOH GCNLIST.GOH SPOOL.GOH \
-                OBJECTS/GFSELC.GOH OBJECTS/GGLYPHC.GOH \
-                OBJECTS/GDOCCTRL.GOH OBJECTS/GDOCGRPC.GOH \
-                OBJECTS/GDOCC.GOH OBJECTS/GCONTC.GOH OBJECTS/GDCTRLC.GOH \
-                OBJECTS/GEDITCC.GOH OBJECTS/GBOOLGC.GOH \
-                OBJECTS/GITEMGC.GOH OBJECTS/GDLISTC.GOH \
-                OBJECTS/GITEMC.GOH OBJECTS/GBOOLC.GOH \
-                OBJECTS/GGADGETC.GOH OBJECTS/GTOOLCC.GOH \
-                OBJECTS/GVALUEC.GOH OBJECTS/GTOOLGC.GOH \
-                OBJECTS/HELPCC.GOH EXTGRAPH.GOH
-PPRINT.obj \
-PPRINT.eobj: PROCESS/PPRINT.GOC GEOS.H HEAP.H GEODE.H RESOURCE.H EC.H \
-                OBJECT.H LMEM.H GRAPHICS.H FONTID.H FONT.H COLOR.H \
-                GSTRING.H TIMER.H VM.H DBASE.H LOCALIZE.H ANSI/CTYPE.H \
-                TIMEDATE.H FILE.H SLLANG.H SYSTEM.H GEOWORKS.H CHUNKARR.H \
-                OBJECTS/HELPCC.H DISK.H DRIVE.H INPUT.H CHAR.H HWR.H \
-                WIN.H UDIALOG.H OBJECTS/GINTERC.H OBJECTS/TEXT/TCOMMON.H \
-                STYLESH.H DRIVER.H THREAD.H PRINT.H INTERNAL/SPOOLINT.H \
-                SERIALDR.H PARALLDR.H HUGEARR.H FILEENUM.H
-PSLIDE.obj \
-PSLIDE.eobj: PICALBUM.GOH STDAPP.GOH OBJECT.GOH UI.GOH \
-                OBJECTS/METAC.GOH OBJECTS/INPUTC.GOH OBJECTS/CLIPBRD.GOH \
-                OBJECTS/UIINPUTC.GOH IACP.GOH OBJECTS/WINC.GOH \
-                OBJECTS/GPROCC.GOH ALB.GOH OBJECTS/PROCESSC.GOH \
-                OBJECTS/VISC.GOH OBJECTS/VCOMPC.GOH OBJECTS/VCNTC.GOH \
-                OBJECTS/GAPPC.GOH OBJECTS/GENC.GOH OBJECTS/GINTERC.GOH \
-                OBJECTS/GPRIMC.GOH OBJECTS/GDISPC.GOH OBJECTS/GTRIGC.GOH \
-                OBJECTS/GVIEWC.GOH OBJECTS/GTEXTC.GOH OBJECTS/VTEXTC.GOH \
-                OBJECTS/GCTRLC.GOH GCNLIST.GOH SPOOL.GOH \
-                OBJECTS/GFSELC.GOH OBJECTS/GGLYPHC.GOH \
-                OBJECTS/GDOCCTRL.GOH OBJECTS/GDOCGRPC.GOH \
-                OBJECTS/GDOCC.GOH OBJECTS/GCONTC.GOH OBJECTS/GDCTRLC.GOH \
-                OBJECTS/GEDITCC.GOH OBJECTS/GBOOLGC.GOH \
-                OBJECTS/GITEMGC.GOH OBJECTS/GDLISTC.GOH \
-                OBJECTS/GITEMC.GOH OBJECTS/GBOOLC.GOH \
-                OBJECTS/GGADGETC.GOH OBJECTS/GTOOLCC.GOH \
-                OBJECTS/GVALUEC.GOH OBJECTS/GTOOLGC.GOH \
-                OBJECTS/HELPCC.GOH EXTGRAPH.GOH
-PSLIDE.obj \
-PSLIDE.eobj: PROCESS/PSLIDE.GOC GEOS.H HEAP.H GEODE.H RESOURCE.H EC.H \
-                OBJECT.H LMEM.H GRAPHICS.H FONTID.H FONT.H COLOR.H \
-                GSTRING.H TIMER.H VM.H DBASE.H LOCALIZE.H ANSI/CTYPE.H \
-                TIMEDATE.H FILE.H SLLANG.H SYSTEM.H GEOWORKS.H CHUNKARR.H \
-                OBJECTS/HELPCC.H DISK.H DRIVE.H INPUT.H CHAR.H HWR.H \
-                WIN.H UDIALOG.H OBJECTS/GINTERC.H OBJECTS/TEXT/TCOMMON.H \
-                STYLESH.H DRIVER.H THREAD.H PRINT.H INTERNAL/SPOOLINT.H \
-                SERIALDR.H PARALLDR.H HUGEARR.H FILEENUM.H ANSI/STRING.H
-PUTILS.obj \
-PUTILS.eobj: PICALBUM.GOH STDAPP.GOH OBJECT.GOH UI.GOH \
-                OBJECTS/METAC.GOH OBJECTS/INPUTC.GOH OBJECTS/CLIPBRD.GOH \
-                OBJECTS/UIINPUTC.GOH IACP.GOH OBJECTS/WINC.GOH \
-                OBJECTS/GPROCC.GOH ALB.GOH OBJECTS/PROCESSC.GOH \
-                OBJECTS/VISC.GOH OBJECTS/VCOMPC.GOH OBJECTS/VCNTC.GOH \
-                OBJECTS/GAPPC.GOH OBJECTS/GENC.GOH OBJECTS/GINTERC.GOH \
-                OBJECTS/GPRIMC.GOH OBJECTS/GDISPC.GOH OBJECTS/GTRIGC.GOH \
-                OBJECTS/GVIEWC.GOH OBJECTS/GTEXTC.GOH OBJECTS/VTEXTC.GOH \
-                OBJECTS/GCTRLC.GOH GCNLIST.GOH SPOOL.GOH \
-                OBJECTS/GFSELC.GOH OBJECTS/GGLYPHC.GOH \
-                OBJECTS/GDOCCTRL.GOH OBJECTS/GDOCGRPC.GOH \
-                OBJECTS/GDOCC.GOH OBJECTS/GCONTC.GOH OBJECTS/GDCTRLC.GOH \
-                OBJECTS/GEDITCC.GOH OBJECTS/GBOOLGC.GOH \
-                OBJECTS/GITEMGC.GOH OBJECTS/GDLISTC.GOH \
-                OBJECTS/GITEMC.GOH OBJECTS/GBOOLC.GOH \
-                OBJECTS/GGADGETC.GOH OBJECTS/GTOOLCC.GOH \
-                OBJECTS/GVALUEC.GOH OBJECTS/GTOOLGC.GOH \
-                OBJECTS/HELPCC.GOH
-PUTILS.obj \
-PUTILS.eobj: PROCESS/PUTILS.GOC GEOS.H HEAP.H GEODE.H RESOURCE.H EC.H \
-                OBJECT.H LMEM.H GRAPHICS.H FONTID.H FONT.H COLOR.H \
-                GSTRING.H TIMER.H VM.H DBASE.H LOCALIZE.H ANSI/CTYPE.H \
-                TIMEDATE.H FILE.H SLLANG.H SYSTEM.H GEOWORKS.H CHUNKARR.H \
-                OBJECTS/HELPCC.H DISK.H DRIVE.H INPUT.H CHAR.H HWR.H \
-                WIN.H UDIALOG.H OBJECTS/GINTERC.H OBJECTS/TEXT/TCOMMON.H \
-                STYLESH.H DRIVER.H THREAD.H PRINT.H INTERNAL/SPOOLINT.H \
-                SERIALDR.H PARALLDR.H HUGEARR.H FILEENUM.H
-UIMAIN.obj \
-UIMAIN.eobj: PICALBUM.GOH STDAPP.GOH OBJECT.GOH UI.GOH \
-                OBJECTS/METAC.GOH OBJECTS/INPUTC.GOH OBJECTS/CLIPBRD.GOH \
-                OBJECTS/UIINPUTC.GOH IACP.GOH OBJECTS/WINC.GOH \
-                OBJECTS/GPROCC.GOH ALB.GOH OBJECTS/PROCESSC.GOH \
-                OBJECTS/VISC.GOH OBJECTS/VCOMPC.GOH OBJECTS/VCNTC.GOH \
-                OBJECTS/GAPPC.GOH OBJECTS/GENC.GOH OBJECTS/GINTERC.GOH \
-                OBJECTS/GPRIMC.GOH OBJECTS/GDISPC.GOH OBJECTS/GTRIGC.GOH \
-                OBJECTS/GVIEWC.GOH OBJECTS/GTEXTC.GOH OBJECTS/VTEXTC.GOH \
-                OBJECTS/GCTRLC.GOH GCNLIST.GOH SPOOL.GOH \
-                OBJECTS/GFSELC.GOH OBJECTS/GGLYPHC.GOH \
-                OBJECTS/GDOCCTRL.GOH OBJECTS/GDOCGRPC.GOH \
-                OBJECTS/GDOCC.GOH OBJECTS/GCONTC.GOH OBJECTS/GDCTRLC.GOH \
-                OBJECTS/GEDITCC.GOH OBJECTS/GBOOLGC.GOH \
-                OBJECTS/GITEMGC.GOH OBJECTS/GDLISTC.GOH \
-                OBJECTS/GITEMC.GOH OBJECTS/GBOOLC.GOH \
-                OBJECTS/GGADGETC.GOH OBJECTS/GTOOLCC.GOH \
-                OBJECTS/GVALUEC.GOH OBJECTS/GTOOLGC.GOH \
-                OBJECTS/HELPCC.GOH OBJECTS/GVIEWCC.GOH ART/PIC003-8.GOH \
-                ART/PIC010-8.GOH ART/PIC011-8.GOH ART/PIC012-8.GOH \
-                ART/PIC013-8.GOH ART/PIC005-8.GOH ART/PIC006-8.GOH \
-                ART/PIC007-8.GOH ART/A128-8.GOH ART/PIC014-8.GOH \
-                ART/PIC015-8.GOH ART/PIC00018.GOH ART/PIC00028.GOH
-UIMAIN.obj \
-UIMAIN.eobj: UI/UIMAIN.GOC GEOS.H HEAP.H GEODE.H RESOURCE.H EC.H \
-                OBJECT.H LMEM.H GRAPHICS.H FONTID.H FONT.H COLOR.H \
-                GSTRING.H TIMER.H VM.H DBASE.H LOCALIZE.H ANSI/CTYPE.H \
-                TIMEDATE.H FILE.H SLLANG.H SYSTEM.H GEOWORKS.H CHUNKARR.H \
-                OBJECTS/HELPCC.H DISK.H DRIVE.H INPUT.H CHAR.H HWR.H \
-                WIN.H UDIALOG.H OBJECTS/GINTERC.H OBJECTS/TEXT/TCOMMON.H \
-                STYLESH.H DRIVER.H THREAD.H PRINT.H INTERNAL/SPOOLINT.H \
-                SERIALDR.H PARALLDR.H HUGEARR.H FILEENUM.H
-UICVDLC.obj \
-UICVDLC.eobj: PICALBUM.GOH STDAPP.GOH OBJECT.GOH UI.GOH \
-                OBJECTS/METAC.GOH OBJECTS/INPUTC.GOH OBJECTS/CLIPBRD.GOH \
-                OBJECTS/UIINPUTC.GOH IACP.GOH OBJECTS/WINC.GOH \
-                OBJECTS/GPROCC.GOH ALB.GOH OBJECTS/PROCESSC.GOH \
-                OBJECTS/VISC.GOH OBJECTS/VCOMPC.GOH OBJECTS/VCNTC.GOH \
-                OBJECTS/GAPPC.GOH OBJECTS/GENC.GOH OBJECTS/GINTERC.GOH \
-                OBJECTS/GPRIMC.GOH OBJECTS/GDISPC.GOH OBJECTS/GTRIGC.GOH \
-                OBJECTS/GVIEWC.GOH OBJECTS/GTEXTC.GOH OBJECTS/VTEXTC.GOH \
-                OBJECTS/GCTRLC.GOH GCNLIST.GOH SPOOL.GOH \
-                OBJECTS/GFSELC.GOH OBJECTS/GGLYPHC.GOH \
-                OBJECTS/GDOCCTRL.GOH OBJECTS/GDOCGRPC.GOH \
-                OBJECTS/GDOCC.GOH OBJECTS/GCONTC.GOH OBJECTS/GDCTRLC.GOH \
-                OBJECTS/GEDITCC.GOH OBJECTS/GBOOLGC.GOH \
-                OBJECTS/GITEMGC.GOH OBJECTS/GDLISTC.GOH \
-                OBJECTS/GITEMC.GOH OBJECTS/GBOOLC.GOH \
-                OBJECTS/GGADGETC.GOH OBJECTS/GTOOLCC.GOH \
-                OBJECTS/GVALUEC.GOH OBJECTS/GTOOLGC.GOH \
-                OBJECTS/HELPCC.GOH
-UICVDLC.obj \
-UICVDLC.eobj: UICLASS/UICVDLC.GOC GEOS.H HEAP.H GEODE.H RESOURCE.H EC.H \
-                OBJECT.H LMEM.H GRAPHICS.H FONTID.H FONT.H COLOR.H \
-                GSTRING.H TIMER.H VM.H DBASE.H LOCALIZE.H ANSI/CTYPE.H \
-                TIMEDATE.H FILE.H SLLANG.H SYSTEM.H GEOWORKS.H CHUNKARR.H \
-                OBJECTS/HELPCC.H DISK.H DRIVE.H INPUT.H CHAR.H HWR.H \
-                WIN.H UDIALOG.H OBJECTS/GINTERC.H OBJECTS/TEXT/TCOMMON.H \
-                STYLESH.H DRIVER.H THREAD.H PRINT.H INTERNAL/SPOOLINT.H \
-                SERIALDR.H PARALLDR.H HUGEARR.H FILEENUM.H
+AWATCHER.eobj: geos.h heap.h geode.h resource.h ec.h object.h lmem.h \
+                graphics.h fontID.h font.h color.h gstring.h timer.h vm.h \
+                dbase.h localize.h Ansi/ctype.h timedate.h file.h \
+                sllang.h system.h geoworks.h chunkarr.h Objects/helpCC.h \
+                disk.h drive.h input.h char.h hwr.h win.h uDialog.h \
+                Objects/gInterC.h Objects/Text/tCommon.h stylesh.h \
+                driver.h thread.h print.h Internal/spoolInt.h serialDr.h \
+                parallDr.h hugearr.h fileEnum.h awatcher.h
+pBmpOp.obj \
+pBmpOp.eobj: PicAlbum.goh StdApp.goh object.goh ui.goh \
+                Objects/metaC.goh Objects/inputC.goh Objects/clipbrd.goh \
+                Objects/uiInputC.goh iacp.goh Objects/winC.goh \
+                Objects/gProcC.goh alb.goh Objects/processC.goh \
+                Objects/visC.goh Objects/vCompC.goh Objects/vCntC.goh \
+                Objects/gAppC.goh Objects/genC.goh Objects/gInterC.goh \
+                Objects/gPrimC.goh Objects/gDispC.goh Objects/gTrigC.goh \
+                Objects/gViewC.goh Objects/gTextC.goh Objects/vTextC.goh \
+                Objects/gCtrlC.goh gcnlist.goh spool.goh \
+                Objects/gFSelC.goh Objects/gGlyphC.goh \
+                Objects/gDocCtrl.goh Objects/gDocGrpC.goh \
+                Objects/gDocC.goh Objects/gContC.goh Objects/gDCtrlC.goh \
+                Objects/gEditCC.goh Objects/gBoolGC.goh \
+                Objects/gItemGC.goh Objects/gDListC.goh \
+                Objects/gItemC.goh Objects/gBoolC.goh \
+                Objects/gGadgetC.goh Objects/gToolCC.goh \
+                Objects/gValueC.goh Objects/gToolGC.goh \
+                Objects/helpCC.goh ExtGraph.goh
+pBmpOp.obj \
+pBmpOp.eobj: geos.h heap.h geode.h resource.h ec.h object.h lmem.h \
+                graphics.h fontID.h font.h color.h gstring.h timer.h vm.h \
+                dbase.h localize.h Ansi/ctype.h timedate.h file.h \
+                sllang.h system.h geoworks.h chunkarr.h Objects/helpCC.h \
+                disk.h drive.h input.h char.h hwr.h win.h uDialog.h \
+                Objects/gInterC.h Objects/Text/tCommon.h stylesh.h \
+                driver.h thread.h print.h Internal/spoolInt.h serialDr.h \
+                parallDr.h hugearr.h fileEnum.h
+pCamera.obj \
+pCamera.eobj: PicAlbum.goh StdApp.goh object.goh ui.goh \
+                Objects/metaC.goh Objects/inputC.goh Objects/clipbrd.goh \
+                Objects/uiInputC.goh iacp.goh Objects/winC.goh \
+                Objects/gProcC.goh alb.goh Objects/processC.goh \
+                Objects/visC.goh Objects/vCompC.goh Objects/vCntC.goh \
+                Objects/gAppC.goh Objects/genC.goh Objects/gInterC.goh \
+                Objects/gPrimC.goh Objects/gDispC.goh Objects/gTrigC.goh \
+                Objects/gViewC.goh Objects/gTextC.goh Objects/vTextC.goh \
+                Objects/gCtrlC.goh gcnlist.goh spool.goh \
+                Objects/gFSelC.goh Objects/gGlyphC.goh \
+                Objects/gDocCtrl.goh Objects/gDocGrpC.goh \
+                Objects/gDocC.goh Objects/gContC.goh Objects/gDCtrlC.goh \
+                Objects/gEditCC.goh Objects/gBoolGC.goh \
+                Objects/gItemGC.goh Objects/gDListC.goh \
+                Objects/gItemC.goh Objects/gBoolC.goh \
+                Objects/gGadgetC.goh Objects/gToolCC.goh \
+                Objects/gValueC.goh Objects/gToolGC.goh \
+                Objects/helpCC.goh
+pCamera.obj \
+pCamera.eobj: geos.h heap.h geode.h resource.h ec.h object.h lmem.h \
+                graphics.h fontID.h font.h color.h gstring.h timer.h vm.h \
+                dbase.h localize.h Ansi/ctype.h timedate.h file.h \
+                sllang.h system.h geoworks.h chunkarr.h Objects/helpCC.h \
+                disk.h drive.h input.h char.h hwr.h win.h uDialog.h \
+                Objects/gInterC.h Objects/Text/tCommon.h stylesh.h \
+                driver.h thread.h print.h Internal/spoolInt.h serialDr.h \
+                parallDr.h hugearr.h fileEnum.h photopc.h Ansi/stdio.h
+pMain.obj \
+pMain.eobj: PicAlbum.goh StdApp.goh object.goh ui.goh \
+                Objects/metaC.goh Objects/inputC.goh Objects/clipbrd.goh \
+                Objects/uiInputC.goh iacp.goh Objects/winC.goh \
+                Objects/gProcC.goh alb.goh Objects/processC.goh \
+                Objects/visC.goh Objects/vCompC.goh Objects/vCntC.goh \
+                Objects/gAppC.goh Objects/genC.goh Objects/gInterC.goh \
+                Objects/gPrimC.goh Objects/gDispC.goh Objects/gTrigC.goh \
+                Objects/gViewC.goh Objects/gTextC.goh Objects/vTextC.goh \
+                Objects/gCtrlC.goh gcnlist.goh spool.goh \
+                Objects/gFSelC.goh Objects/gGlyphC.goh \
+                Objects/gDocCtrl.goh Objects/gDocGrpC.goh \
+                Objects/gDocC.goh Objects/gContC.goh Objects/gDCtrlC.goh \
+                Objects/gEditCC.goh Objects/gBoolGC.goh \
+                Objects/gItemGC.goh Objects/gDListC.goh \
+                Objects/gItemC.goh Objects/gBoolC.goh \
+                Objects/gGadgetC.goh Objects/gToolCC.goh \
+                Objects/gValueC.goh Objects/gToolGC.goh \
+                Objects/helpCC.goh Objects/gViewCC.goh ExtGraph.goh
+pMain.obj \
+pMain.eobj: geos.h heap.h geode.h resource.h ec.h object.h lmem.h \
+                graphics.h fontID.h font.h color.h gstring.h timer.h vm.h \
+                dbase.h localize.h Ansi/ctype.h timedate.h file.h \
+                sllang.h system.h geoworks.h chunkarr.h Objects/helpCC.h \
+                disk.h drive.h input.h char.h hwr.h win.h uDialog.h \
+                Objects/gInterC.h Objects/Text/tCommon.h stylesh.h \
+                driver.h thread.h print.h Internal/spoolInt.h serialDr.h \
+                parallDr.h hugearr.h fileEnum.h Ansi/string.h library.h \
+                Ansi/stdio.h
+pPrint.obj \
+pPrint.eobj: PicAlbum.goh StdApp.goh object.goh ui.goh \
+                Objects/metaC.goh Objects/inputC.goh Objects/clipbrd.goh \
+                Objects/uiInputC.goh iacp.goh Objects/winC.goh \
+                Objects/gProcC.goh alb.goh Objects/processC.goh \
+                Objects/visC.goh Objects/vCompC.goh Objects/vCntC.goh \
+                Objects/gAppC.goh Objects/genC.goh Objects/gInterC.goh \
+                Objects/gPrimC.goh Objects/gDispC.goh Objects/gTrigC.goh \
+                Objects/gViewC.goh Objects/gTextC.goh Objects/vTextC.goh \
+                Objects/gCtrlC.goh gcnlist.goh spool.goh \
+                Objects/gFSelC.goh Objects/gGlyphC.goh \
+                Objects/gDocCtrl.goh Objects/gDocGrpC.goh \
+                Objects/gDocC.goh Objects/gContC.goh Objects/gDCtrlC.goh \
+                Objects/gEditCC.goh Objects/gBoolGC.goh \
+                Objects/gItemGC.goh Objects/gDListC.goh \
+                Objects/gItemC.goh Objects/gBoolC.goh \
+                Objects/gGadgetC.goh Objects/gToolCC.goh \
+                Objects/gValueC.goh Objects/gToolGC.goh \
+                Objects/helpCC.goh ExtGraph.goh
+pPrint.obj \
+pPrint.eobj: geos.h heap.h geode.h resource.h ec.h object.h lmem.h \
+                graphics.h fontID.h font.h color.h gstring.h timer.h vm.h \
+                dbase.h localize.h Ansi/ctype.h timedate.h file.h \
+                sllang.h system.h geoworks.h chunkarr.h Objects/helpCC.h \
+                disk.h drive.h input.h char.h hwr.h win.h uDialog.h \
+                Objects/gInterC.h Objects/Text/tCommon.h stylesh.h \
+                driver.h thread.h print.h Internal/spoolInt.h serialDr.h \
+                parallDr.h hugearr.h fileEnum.h
+pSlide.obj \
+pSlide.eobj: PicAlbum.goh StdApp.goh object.goh ui.goh \
+                Objects/metaC.goh Objects/inputC.goh Objects/clipbrd.goh \
+                Objects/uiInputC.goh iacp.goh Objects/winC.goh \
+                Objects/gProcC.goh alb.goh Objects/processC.goh \
+                Objects/visC.goh Objects/vCompC.goh Objects/vCntC.goh \
+                Objects/gAppC.goh Objects/genC.goh Objects/gInterC.goh \
+                Objects/gPrimC.goh Objects/gDispC.goh Objects/gTrigC.goh \
+                Objects/gViewC.goh Objects/gTextC.goh Objects/vTextC.goh \
+                Objects/gCtrlC.goh gcnlist.goh spool.goh \
+                Objects/gFSelC.goh Objects/gGlyphC.goh \
+                Objects/gDocCtrl.goh Objects/gDocGrpC.goh \
+                Objects/gDocC.goh Objects/gContC.goh Objects/gDCtrlC.goh \
+                Objects/gEditCC.goh Objects/gBoolGC.goh \
+                Objects/gItemGC.goh Objects/gDListC.goh \
+                Objects/gItemC.goh Objects/gBoolC.goh \
+                Objects/gGadgetC.goh Objects/gToolCC.goh \
+                Objects/gValueC.goh Objects/gToolGC.goh \
+                Objects/helpCC.goh ExtGraph.goh
+pSlide.obj \
+pSlide.eobj: geos.h heap.h geode.h resource.h ec.h object.h lmem.h \
+                graphics.h fontID.h font.h color.h gstring.h timer.h vm.h \
+                dbase.h localize.h Ansi/ctype.h timedate.h file.h \
+                sllang.h system.h geoworks.h chunkarr.h Objects/helpCC.h \
+                disk.h drive.h input.h char.h hwr.h win.h uDialog.h \
+                Objects/gInterC.h Objects/Text/tCommon.h stylesh.h \
+                driver.h thread.h print.h Internal/spoolInt.h serialDr.h \
+                parallDr.h hugearr.h fileEnum.h Ansi/string.h
+pUtils.obj \
+pUtils.eobj: PicAlbum.goh StdApp.goh object.goh ui.goh \
+                Objects/metaC.goh Objects/inputC.goh Objects/clipbrd.goh \
+                Objects/uiInputC.goh iacp.goh Objects/winC.goh \
+                Objects/gProcC.goh alb.goh Objects/processC.goh \
+                Objects/visC.goh Objects/vCompC.goh Objects/vCntC.goh \
+                Objects/gAppC.goh Objects/genC.goh Objects/gInterC.goh \
+                Objects/gPrimC.goh Objects/gDispC.goh Objects/gTrigC.goh \
+                Objects/gViewC.goh Objects/gTextC.goh Objects/vTextC.goh \
+                Objects/gCtrlC.goh gcnlist.goh spool.goh \
+                Objects/gFSelC.goh Objects/gGlyphC.goh \
+                Objects/gDocCtrl.goh Objects/gDocGrpC.goh \
+                Objects/gDocC.goh Objects/gContC.goh Objects/gDCtrlC.goh \
+                Objects/gEditCC.goh Objects/gBoolGC.goh \
+                Objects/gItemGC.goh Objects/gDListC.goh \
+                Objects/gItemC.goh Objects/gBoolC.goh \
+                Objects/gGadgetC.goh Objects/gToolCC.goh \
+                Objects/gValueC.goh Objects/gToolGC.goh \
+                Objects/helpCC.goh
+pUtils.obj \
+pUtils.eobj: geos.h heap.h geode.h resource.h ec.h object.h lmem.h \
+                graphics.h fontID.h font.h color.h gstring.h timer.h vm.h \
+                dbase.h localize.h Ansi/ctype.h timedate.h file.h \
+                sllang.h system.h geoworks.h chunkarr.h Objects/helpCC.h \
+                disk.h drive.h input.h char.h hwr.h win.h uDialog.h \
+                Objects/gInterC.h Objects/Text/tCommon.h stylesh.h \
+                driver.h thread.h print.h Internal/spoolInt.h serialDr.h \
+                parallDr.h hugearr.h fileEnum.h
+uiMain.obj \
+uiMain.eobj: PicAlbum.goh StdApp.goh object.goh ui.goh \
+                Objects/metaC.goh Objects/inputC.goh Objects/clipbrd.goh \
+                Objects/uiInputC.goh iacp.goh Objects/winC.goh \
+                Objects/gProcC.goh alb.goh Objects/processC.goh \
+                Objects/visC.goh Objects/vCompC.goh Objects/vCntC.goh \
+                Objects/gAppC.goh Objects/genC.goh Objects/gInterC.goh \
+                Objects/gPrimC.goh Objects/gDispC.goh Objects/gTrigC.goh \
+                Objects/gViewC.goh Objects/gTextC.goh Objects/vTextC.goh \
+                Objects/gCtrlC.goh gcnlist.goh spool.goh \
+                Objects/gFSelC.goh Objects/gGlyphC.goh \
+                Objects/gDocCtrl.goh Objects/gDocGrpC.goh \
+                Objects/gDocC.goh Objects/gContC.goh Objects/gDCtrlC.goh \
+                Objects/gEditCC.goh Objects/gBoolGC.goh \
+                Objects/gItemGC.goh Objects/gDListC.goh \
+                Objects/gItemC.goh Objects/gBoolC.goh \
+                Objects/gGadgetC.goh Objects/gToolCC.goh \
+                Objects/gValueC.goh Objects/gToolGC.goh \
+                Objects/helpCC.goh Objects/gViewCC.goh Art/PIC003-8.goh \
+                Art/PIC010-8.goh Art/PIC011-8.goh Art/PIC012-8.goh \
+                Art/PIC013-8.goh Art/PIC005-8.goh Art/PIC006-8.goh \
+                Art/PIC007-8.goh Art/A128-8.goh Art/PIC014-8.goh \
+                Art/PIC015-8.goh Art/PIC00018.goh Art/PIC00028.goh
+uiMain.obj \
+uiMain.eobj: geos.h heap.h geode.h resource.h ec.h object.h lmem.h \
+                graphics.h fontID.h font.h color.h gstring.h timer.h vm.h \
+                dbase.h localize.h Ansi/ctype.h timedate.h file.h \
+                sllang.h system.h geoworks.h chunkarr.h Objects/helpCC.h \
+                disk.h drive.h input.h char.h hwr.h win.h uDialog.h \
+                Objects/gInterC.h Objects/Text/tCommon.h stylesh.h \
+                driver.h thread.h print.h Internal/spoolInt.h serialDr.h \
+                parallDr.h hugearr.h fileEnum.h
+uicVDLC.obj \
+uicVDLC.eobj: PicAlbum.goh StdApp.goh object.goh ui.goh \
+                Objects/metaC.goh Objects/inputC.goh Objects/clipbrd.goh \
+                Objects/uiInputC.goh iacp.goh Objects/winC.goh \
+                Objects/gProcC.goh alb.goh Objects/processC.goh \
+                Objects/visC.goh Objects/vCompC.goh Objects/vCntC.goh \
+                Objects/gAppC.goh Objects/genC.goh Objects/gInterC.goh \
+                Objects/gPrimC.goh Objects/gDispC.goh Objects/gTrigC.goh \
+                Objects/gViewC.goh Objects/gTextC.goh Objects/vTextC.goh \
+                Objects/gCtrlC.goh gcnlist.goh spool.goh \
+                Objects/gFSelC.goh Objects/gGlyphC.goh \
+                Objects/gDocCtrl.goh Objects/gDocGrpC.goh \
+                Objects/gDocC.goh Objects/gContC.goh Objects/gDCtrlC.goh \
+                Objects/gEditCC.goh Objects/gBoolGC.goh \
+                Objects/gItemGC.goh Objects/gDListC.goh \
+                Objects/gItemC.goh Objects/gBoolC.goh \
+                Objects/gGadgetC.goh Objects/gToolCC.goh \
+                Objects/gValueC.goh Objects/gToolGC.goh \
+                Objects/helpCC.goh
+uicVDLC.obj \
+uicVDLC.eobj: geos.h heap.h geode.h resource.h ec.h object.h lmem.h \
+                graphics.h fontID.h font.h color.h gstring.h timer.h vm.h \
+                dbase.h localize.h Ansi/ctype.h timedate.h file.h \
+                sllang.h system.h geoworks.h chunkarr.h Objects/helpCC.h \
+                disk.h drive.h input.h char.h hwr.h win.h uDialog.h \
+                Objects/gInterC.h Objects/Text/tCommon.h stylesh.h \
+                driver.h thread.h print.h Internal/spoolInt.h serialDr.h \
+                parallDr.h hugearr.h fileEnum.h
 
-PicAlbumEC.geo PicAlbum.geo : GEOS.LDF UI.LDF SPOOL.LDF ANSIC.LDF EXTGRAPH.LDF PHOTOPC.LDF 
+PicAlbumEC.geo PicAlbum.geo : geos.ldf ui.ldf spool.ldf ansic.ldf extgraph.ldf photopc.ldf 

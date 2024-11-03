@@ -16,7 +16,7 @@ battle.eobj: stdapp.goh object.goh ui.goh Objects/metaC.goh \
                 Objects/gItemC.goh Objects/gBoolC.goh \
                 Objects/gGadgetC.goh Objects/gToolCC.goh \
                 Objects/gValueC.goh Objects/gToolGC.goh \
-                Objects/helpCC.goh math.goh battle.goh
+                Objects/helpCC.goh math.goh battle.goh Art/QTip1.goh
 battle.obj \
 battle.eobj: Ansi/string.h geos.h heap.h geode.h resource.h ec.h \
                 object.h lmem.h graphics.h fontID.h font.h color.h \
@@ -25,6 +25,7 @@ battle.eobj: Ansi/string.h geos.h heap.h geode.h resource.h ec.h \
                 Objects/helpCC.h disk.h drive.h input.h char.h hwr.h \
                 win.h uDialog.h Objects/gInterC.h Objects/Text/tCommon.h \
                 stylesh.h driver.h thread.h print.h Internal/spoolInt.h \
-                serialDr.h parallDr.h hugearr.h fileEnum.h math.h sound.h
+                serialDr.h parallDr.h hugearr.h fileEnum.h math.h sound.h \
+                initfile.h
 
 battleEC.geo battle.geo : geos.ldf ui.ldf math.ldf sound.ldf ansic.ldf 

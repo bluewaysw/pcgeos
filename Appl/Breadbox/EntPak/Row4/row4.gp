@@ -26,7 +26,7 @@ resource InterfaceWin1 object
 resource InterfaceWin2 object
 resource InterfaceWinC object
 resource InterfaceTie object
-#resource StringsResource lmem read-only shared discardable
+resource StringsResource lmem read-only shared discardable
 resource ResourcePictures data
 resource QTipsResource object
 

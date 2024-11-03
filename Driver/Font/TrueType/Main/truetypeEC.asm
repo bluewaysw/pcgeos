@@ -3,7 +3,7 @@ COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 	Copyright (c) blueway.Softworks 2021 -- All Rights Reserved
 
 PROJECT:	PC/GEOS
-MODULE:		truetypeEC.asm
+MODULE:		TrueType Font Driver
 FILE:		truetypeEC.asm
 
 AUTHOR:		Falk Rehwagen, Jan 1, 2021

@@ -711,7 +711,7 @@ extern void FrotzDoQuit( void );
 
 void z_quit (void)
 {
-/*#ifdef __GEOS__
+/*#ifdef __GEOS__*/
     FrotzDoQuit();
 /*#else */
     finished = 9999;

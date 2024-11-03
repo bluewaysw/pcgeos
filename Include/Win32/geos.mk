@@ -342,7 +342,20 @@ INSTALL_DIR	:= $(INSTALL_DIR:H)
 #	Obtain revision control information. Results are left in
 #	$(_REL) and $(_PROTO).
 #
-#if	defined(GEODE) && exists($(INSTALL_DIR)/$(GEODE).rev)
+#if defined(GEODE) && exists($(CURRENT_DIR)/$(GEODE).rev)
+## the .rev file is local, use it.
+REVFILE		= $(CURRENT_DIR)/$(GEODE).rev
+_GEODE 		:= $(GEODE)
+GREV		?= grev
+GREVFLAGS	=
+#
+# Don't use a branch option on a local .rev file
+# Pass the -s flag to automatically save the new revision number in the rev file
+
+_REL	!=	$(GREV) neweng $(REVFILE) $(GREVFLAGS) -R -s
+_PROTO	!=	$(GREV) getproto $(REVFILE) $(GREVFLAGS) -P
+
+#elif defined(GEODE) && exists($(INSTALL_DIR)/$(GEODE).rev)
 REVFILE		= $(INSTALL_DIR)/$(GEODE).rev
 
 #if $T == "Installed"
@@ -370,19 +383,6 @@ _REL    = $(_REL2:S/.1$/.$(GEOS_BUILD_NUMBER)/)
 #else
 _REL	= $(_REL2)
 #endif
-
-#elif defined(GEODE) && exists($(CURRENT_DIR)/$(GEODE).rev)
-## the .rev file is local, use it.
-REVFILE		= $(CURRENT_DIR)/$(GEODE).rev
-_GEODE 		:= $(GEODE)
-GREV		?= grev
-GREVFLAGS	=
-#
-# Don't use a branch option on a local .rev file
-# Pass the -s flag to automatically save the new revision number in the rev file
-
-_REL	!=	$(GREV) neweng $(REVFILE) $(GREVFLAGS) -R -s
-_PROTO	!=	$(GREV) getproto $(REVFILE) $(GREVFLAGS) -P
 
 #else
 
@@ -627,6 +627,12 @@ CCOMFLAGS += $(.INCLUDES:N*/Include*:S/\//\\/g:S/^-I/-i=/g) \
 		   	 		`$(PRODUCT_FLAGS) highc $(PRODUCT)` \
 					$(XCCOMFLAGS:S/\//\\/g:S/^-I/-i=/g)
 #endif
+
+# Addon flags to be appended to the end of the CCOMFLAGS when wcc is executed.
+# One variant for EC targets, one for NC target
+# Set here to default if not given from the outside (via local.mk)
+WCCNCOPTFLAGS ?= -ox
+WCCECOPTFLAGS ?= 
 
 #if $(PRODUCT) == "NDO2000"
 #else
@@ -894,14 +900,14 @@ LINK		: .USE
 
 
 .c.eobj		:
-	$(CCOM) -DDO_ERROR_CHECKING $(CCOMFLAGS) -fo="$(.TARGET)" "$(.IMPSRC)" $(GEOERRFL)
+	$(CCOM) -DDO_ERROR_CHECKING $(CCOMFLAGS) $(WCCECOPTFLAGS) -fo="$(.TARGET)" "$(.IMPSRC)" $(GEOERRFL)
 
 .c.obj		:
-	$(CCOM) $(CCOMFLAGS) -fo="$(.TARGET)" "$(.IMPSRC)" $(GEOERRFL)
+	$(CCOM) $(CCOMFLAGS) $(WCCNCOPTFLAGS) -fo="$(.TARGET)" "$(.IMPSRC)" $(GEOERRFL)
 
 .goc.obj	:
 	$(GOC) $(GOCFLAGS) -l -o $(.TARGET:R).nc $(.IMPSRC) $(GEOERRFL)
-	$(CCOM) $(CCOMFLAGS) -fo="$(.TARGET)" "$(.TARGET:R).nc" $(GEOERRFL)
+	$(CCOM) $(CCOMFLAGS) $(WCCNCOPTFLAGS) -fo="$(.TARGET)" "$(.TARGET:R).nc" $(GEOERRFL)
 #if $(DEVEL_DIR:T) == "Installed"
 #if defined(linux)
 	rm $(.TARGET:R).nc
@@ -912,7 +918,7 @@ LINK		: .USE
 
 .goc.eobj	:
 	$(GOC) -DDO_ERROR_CHECKING $(GOCFLAGS) -o $(.TARGET:R).ec $(.IMPSRC) $(GEOERRFL)
-	$(CCOM) -DDO_ERROR_CHECKING $(CCOMFLAGS) -fo="$(.TARGET)" "$(.TARGET:R).ec" $(GEOERRFL)
+	$(CCOM) -DDO_ERROR_CHECKING $(CCOMFLAGS) $(WCCECOPTFLAGS) -fo="$(.TARGET)" "$(.TARGET:R).ec" $(GEOERRFL)
 #if $(DEVEL_DIR:T) == "Installed"
 #if defined(linux)
 	rm $(.TARGET:R).ec

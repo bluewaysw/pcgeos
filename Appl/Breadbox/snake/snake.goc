@@ -232,7 +232,8 @@ void UpdateSound(void);
 @object SnakePrimaryClass SnakePrimary = {
 	GI_comp = @GameMenu, @OptionsMenu, @BoardInter;
 	GI_attrs = @default | GA_TARGETABLE | GA_KBD_SEARCH_PATH;
-	ATTR_GEN_HELP_CONTEXT = "TOC";
+	HINT_PRIMARY_NO_HELP_BUTTON;		/* no help file for now */
+	/*ATTR_GEN_HELP_CONTEXT = "TOC";*/	
 	HINT_CENTER_CHILDREN_HORIZONTALLY;
 	HINT_CENTER_CHILDREN_VERTICALLY;
 	HINT_SIZE_WINDOW_AS_DESIRED;
@@ -274,7 +275,7 @@ void UpdateSound(void);
 @object GenInteractionClass GameMenu = {
 	GI_visMoniker = 'G', "Game";
 	GI_attrs = @default | GA_TARGETABLE | GA_KBD_SEARCH_PATH;
-	GI_comp = @NewTrigger, @PauseTrigger, @ContinueTrigger, @HighScore, @AboutGroup;
+	GI_comp = @NewTrigger, @PauseTrigger, @ContinueTrigger, @HighScore;
 	GII_visibility = GIV_POPUP;
 	ATTR_GEN_INTERACTION_GROUP_TYPE = ( GIGT_FILE_MENU );
 }
@@ -315,59 +316,7 @@ void UpdateSound(void);
 
 @chunk char HighScoreFileName[] = "Snake High Score Table";
 
-@object GenInteractionClass AboutGroup = {
-	GI_comp = @AboutDBox;
-	GII_visibility = GIV_SUB_GROUP;
-}
 
-@include "Art/bbxreg.goh"
-
-@object GenInteractionClass AboutDBox = {
-	 GI_visMoniker = 'b', "About";
-	 GI_comp = @AppName, @By, @BreadBoxLogo,
-				  @Visit, @Web, @AboutSpacer1,
-				  @Copyright, @BBoxLLC, @Rights, @AboutSpacer2;
-	 GII_visibility = GIV_DIALOG;
-	 GII_type = GIT_NOTIFICATION;
-	 HINT_CENTER_CHILDREN_HORIZONTALLY;
-}
-@object GenTextClass AppName = {
-    GI_attrs = @default | GA_READ_ONLY;
-    GTXI_attrs = @default | GTA_SINGLE_LINE_TEXT;
-	 GTXI_text = "Snake";
-    ATTR_GEN_TEXT_CHAR_ATTR = (ChunkHandle) @AppNameCharAttrs;
-}
-@chunk VisTextCharAttr AppNameCharAttrs =
-	CHAR_ATTR_FONT_SIZE_STYLE(
-		FID_DTC_URW_SANS, 36, TS_BOLD);
-
-@object GenGlyphClass By = {
-  GI_visMoniker = "by";
-}
-@object GenGlyphClass BreadBoxLogo = {
-  GI_visMoniker = list { @BreadboxLogoMoniker}
-}
-@object GenGlyphClass Visit = {
-  GI_visMoniker = "Visit us at...";
-}
-@object GenGlyphClass Web = {
-  GI_visMoniker = "www.breadbox.com";
-}
-@object GenGlyphClass AboutSpacer1 = {
-  GI_visMoniker = "   ";
-}
-@object GenGlyphClass Copyright = {
-  GI_visMoniker = "Copyright 1994-2005";
-}
-@object GenGlyphClass BBoxLLC = {
-  GI_visMoniker = "Breadbox Computer Company LLC";
-}
-@object GenGlyphClass Rights = {
-  GI_visMoniker = "All Rights Reserved";
-}
-@object GenGlyphClass AboutSpacer2 = {
-  GI_visMoniker = "   ";
-}
 
 @object GenInteractionClass OptionsMenu = {
 	GI_visMoniker = 'O', "Options" ;
@@ -438,7 +387,7 @@ void UpdateSound(void);
 
 @end Interface
 
-@start StringsResource;
+@start StringsResource, data;
 
 @chunk char gameOverText[] = "Game Over";
 @chunk char gameWinText[] = "YOU WIN!!";
@@ -1597,11 +1546,11 @@ void DrawSnakeSeg(GStateHandle gstate, word type, word x, word y) {
  *
  *
  * DESCRIPTION:
- *
+ *	02/20/24 RainerB	Updated to allow texts wider than 120 pixels
  *
  ***********************************************************************/
 @method SnakeBoardClass, MSG_BOARD_DRAW_TEXT_BOX {
- word		width;
+ word		width, b, left;
 
 
 	if (pself->SBCI_textOptr) {
@@ -1609,15 +1558,18 @@ void DrawSnakeSeg(GStateHandle gstate, word type, word x, word y) {
 		/* get length to center justify */
 		MemLock (OptrToHandle(pself->SBCI_textOptr));
 		width = GrTextWidth(pself->SBCI_gstate, LMemDeref(pself->SBCI_textOptr), 0);
+		b = 120;
+		if (width > 100)  b = width + 20;	
+		left = (BOARD_WIDTH - b)/2;
 
 		GrSetLineWidth(pself->SBCI_gstate, MakeWWFixed(2));
 		GrSetTextColor(pself->SBCI_gstate, CF_INDEX, C_BLACK, 0, 0);
 		GrSetAreaColor(pself->SBCI_gstate, CF_INDEX, C_WHITE, 0, 0);
 		GrSetLineColor(pself->SBCI_gstate, CF_INDEX, C_BLACK, 0, 0);
-		GrFillRect(pself->SBCI_gstate, 105, 270, 225, 300);
-		GrDrawRect(pself->SBCI_gstate, 105, 270, 225, 300);
-		GrDrawText(pself->SBCI_gstate, 105 + (120 - width)/2, 280,
-										LMemDeref(pself->SBCI_textOptr), 0);
+		GrFillRect(pself->SBCI_gstate, left, 270, left + b, 300);
+		GrDrawRect(pself->SBCI_gstate, left, 270, left + b, 300);
+		GrDrawText(pself->SBCI_gstate, left + (b - width)/2, 280,
+						LMemDeref(pself->SBCI_textOptr), 0);
 		MemUnlock (OptrToHandle(pself->SBCI_textOptr));
 		@call oself::MSG_BOARD_POP_GSTATE();
       }

@@ -1,0 +1,589 @@
+/********************************************************************
+ *
+ * PROJECT:     Character Map
+ * MODULE:      Process Methods
+ * FILE:        process.goc
+ *
+ * AUTHOR:      Nathan Fiedler
+ *
+ * REVISION HISTORY:
+ *      Name    Date            Description
+ *      ----    ----            -----------
+ *      NF      9/23/96         Initial version
+ *	RainerB	11/11/2023	Add some new features, in particular 
+ *				allow different character box sizes.
+ *
+ * DESCRIPTION:
+ *      This file contains all the process methods. Mostly we just
+ *      handle the open and close messages for the application. We
+ *      want to handle the open message so we can change the font
+ *      that is used by default. In the close we make sure the mouse
+ *      pointer definition table is freed.
+ *
+ *******************************************************************/
+
+/********************************************************************
+ *              Headers
+ *******************************************************************/
+    @include <stdapp.goh>
+    #include <Ansi/string.h>
+    #include <Ansi/stdio.h>
+    @include <Objects/Text/tCtrlC.goh>
+    @include "app.goh"
+    @include "global.goh"
+    #include <initfile.h>
+
+/********************************************************************
+ *              Code for CMProcessClass
+ *******************************************************************/
+void CMPChangeUIForCaller(void);
+void CMPCopyCallerApp(AppLaunchBlock *launchB);
+void CMPAddGCNList(void);
+void CMPRemoveGCNList(void);
+extern char callerAppName[];
+extern GeodeHandle callerAppGeodeHandle;
+
+@extern chunk CMTextMonikerCallerNotSys;
+@extern chunk CMInsertTriggerMonikerNotSys;
+
+/********************************************************************
+ *              MSG_GEN_PROCESS_OPEN_APPLICATION
+ ********************************************************************
+ * SYNOPSIS:     Start up the application. We'll also do some extra
+ *               work to prepare the UI.
+ * PARAMETERS:   AppAttachFlags attachFlags
+ *               MemHandle      launchBlock
+ *               MemHandle      extraState
+ * RETURNS:      void
+ * SIDE EFFECTS: none
+ * STRATEGY:     Call the superclass to get default start-up
+ *               behavior. Then tell the text object to set the
+ *               font to the URW Symbol PS font. Also have the map
+ *               object create the pointer image definition
+ *		 and load the settings from the init file.
+ * REVISION HISTORY:
+ *      Name   	Date             Description
+ *      ----   	----             -----------
+ *      NF     	9/23/96          Initial Version
+ *      RainerB 11/2/2023        Load settings and update UI added
+ *******************************************************************/
+@extern method CMProcessClass, MSG_GEN_PROCESS_OPEN_APPLICATION {
+    
+    AppLaunchBlock *launchB;
+    word fid;			/* Inital font ID */
+
+    @callsuper();
+    /*
+     *  Check to see if the char map app is launched with other callerp
+     *  application.
+     */
+    if (launchBlock) {
+	launchB = MemLock(launchBlock);
+	if (!launchB->ALB_dataFile[0] && launchB->ALB_dataFile[1]) {
+	    CMPCopyCallerApp(launchB);
+	    CMPChangeUIForCaller();
+	    CMPAddGCNList();
+	}
+	MemUnlock(launchBlock);
+    }
+    
+    /*
+     * Load settings and update UI
+     */
+    if ( InitFileReadInteger("CharMap", "settings", &settings_g) ) {
+    	settings_g = CHARM_DEFAULT_BOX_SIZE | CHARM_DEFAULT_MORE_OPTIONS;
+    }   
+    @call CMMoreOptionsGroup::MSG_GEN_BOOLEAN_GROUP_SET_GROUP_STATE(settings_g & CHARM_MORE_OPTIONS_MASK, FALSE);
+    @call CMBoxSizeSelector::MSG_GEN_ITEM_GROUP_SET_SINGLE_SELECTION(settings_g & CHARM_MAP_BOX_SIZE_MASK, FALSE);
+    CMUpdateUIFromSettings();
+    CMUpdateMapBoxSize();
+    
+    
+    
+    @send CMPrimary::MSG_GEN_SET_USABLE(VUM_NOW);
+
+    if ( InitFileReadInteger("CharMap", "fid", &fid) ) { fid = FID_DTC_URW_MONO; }
+    @call CMCharsToCopyText::MSG_VIS_TEXT_SET_FONT_ID(fid, TEXT_ADDRESS_PAST_END, 0);
+
+@if @SUPPORT_CHECK_INTRODUCTORY_LEVEL
+    if (UserGetDefaultUILevel() == UIIL_INTRODUCTORY) {
+	/* @send CMKeystrokeText::MSG_GEN_SET_NOT_USABLE(VUM_DELAYED_VIA_UI_QUEUE); */
+	@send CMCharCodesText::MSG_GEN_SET_NOT_USABLE(VUM_DELAYED_VIA_UI_QUEUE);
+	@send CMCodeGroupBoolean::MSG_GEN_SET_NOT_USABLE(VUM_DELAYED_VIA_UI_QUEUE);
+    }
+@endif    
+
+    @send CMMap::MSG_CM_MAP_CREATE_POINTER_DEF();
+    @send CMCharsToCopyText::MSG_META_GRAB_TARGET_EXCL();
+    @send CMPrimary::MSG_META_GRAB_FOCUS_EXCL();
+    /*    @send CMFontControl::MSG_GEN_CONTROL_NOTIFY_INTERACTABLE
+	  (GCIF_CONTROLLER|GCIF_TOOLBOX_UI|GCIF_NORMAL_UI); */
+	  
+} /* MSG_GEN_PROCESS_OPEN_APPLICATION */
+
+/********************************************************************
+ *              MSG_GEN_PROCESS_CLOSE_APPLICATION
+ ********************************************************************
+ * SYNOPSIS:     Close down the application. We have to cleanup
+ *               a little before leaving.
+ * PARAMETERS:   void
+ * RETURNS:      MemHandle - Extra state block.
+ * SIDE EFFECTS: none
+ * STRATEGY:     First have the map object destroy the pointer
+ *               image definition. Save the settings and then 
+ *               call the superclass to shutdown the application.
+ * REVISION HISTORY:
+ *      Name   	Date             Description
+ *      ----   	----             -----------
+ *      NF     	10/14/96         Initial Version
+ *      RainerB 10/2/2023        Add save settings
+ *******************************************************************/
+@extern method CMProcessClass, MSG_GEN_PROCESS_CLOSE_APPLICATION {
+
+    @call CMMap::MSG_CM_MAP_DESTROY_POINTER_DEF();
+    CMPRemoveGCNList();
+    InitFileWriteInteger("CharMap", "settings", settings_g);
+
+    return( @callsuper() );
+} /* MSG_GEN_PROCESS_CLOSE_APPLICATION */
+
+/********************************************************************
+ *              MSG_GEN_PROCESS_CREATE_NEW_STATE_FILE
+ ********************************************************************
+ * SYNOPSIS:     System wants us to create a new state file and
+ *               return a memblock
+ * PARAMETERS:   MemHandle appInstanceReference
+ * RETURNS:      word (VMFileHandle) - State file
+ * SIDE EFFECTS: none
+ * STRATEGY:     Simply return a NullHandle so we don't create a
+ *               new state file.
+ *               For some strange reason the app would crash on the
+ *               OmniGo when the user pressed Ctrl-F3 to exit. By
+ *               intercepting this message we prevent the crash.
+ * REVISION HISTORY:
+ *      Name   Date             Description
+ *      ----   ----             -----------
+ *      NF     11/14/96         Initial Version
+ *******************************************************************/
+@extern method CMProcessClass, MSG_GEN_PROCESS_CREATE_NEW_STATE_FILE {
+
+    return( NullHandle );
+} /* MSG_GEN_PROCESS_CREATE_NEW_STATE_FILE */
+
+
+/********************************************************************
+ *              MSG_NOTIFY_APP_EXITED
+ ********************************************************************
+ * SYNOPSIS:     Get notified when the caller application quits
+ * PARAMETERS:   
+ * RETURNS:      
+ * SIDE EFFECTS: none
+ * STRATEGY:     
+ * REVISION HISTORY:
+ *      Name   Date             Description
+ *      ----   ----             -----------
+ *      edwin  1/18/99          Initial Version
+ *******************************************************************/
+@extern method CMProcessClass, MSG_NOTIFY_APP_EXITED 
+{
+    if (appExited == callerAppGeodeHandle) {
+	CMPRemoveGCNList();
+	@call CMCopyTrigger::MSG_GEN_REPLACE_VIS_MONIKER_OPTR
+	     (@CMCopyToClipboardMoniker, VUM_DELAYED_VIA_UI_QUEUE);
+	callerAppGeodeHandle = 0;
+    }
+    return;
+} /* MSG_GEN_PROCESS_CREATE_NEW_STATE_FILE */
+
+
+/********************************************************************
+ *              MSG_CM_PROCESS_RESIZE_WIN
+ ********************************************************************
+ * SYNOPSIS:     Resize CMPrimary to ist samllest possible size.
+ *		 For an unknown reason, this must be done in a separate method.
+ * PARAMETERS:   
+ * RETURNS:      
+ * SIDE EFFECTS: none
+ * STRATEGY:     
+ * REVISION HISTORY:
+ *      Name   	Date		Description
+ *      ----   	---- 		-----------
+ *      RainerB	11/10/2023      Initial Version
+ *******************************************************************/
+@extern method CMProcessClass, MSG_CM_PROCESS_RESIZE_WIN {
+
+    @call CMPrimary::MSG_GEN_SET_WIN_SIZE(
+			GET_MM_AND_TYPE(VUM_NOW , WPT_AT_SPECIFIC_POSITION),
+			50, 50);	/* in pixels, make it as small as possible */
+}
+/********************************************************************
+ *              MSG_CM_PROCESS_SET_DEFAULT_FONT
+ ********************************************************************
+ * SYNOPSIS:     Set up the intial font ID to use
+ * PARAMETERS:   void (word fid);    
+ * RETURNS:      
+ * SIDE EFFECTS: none
+ * STRATEGY:     
+ * REVISION HISTORY:
+ *      Name   	Date		Description
+ *      ----   	---- 		-----------
+ *      RainerB	11/10/2023      Initial Version
+ *******************************************************************/
+@extern method CMProcessClass, MSG_CM_PROCESS_SET_DEFAULT_FONT {
+
+    if (fid == 0) {
+    	/* find out the currently selected font ID */
+    	fid = @call CMMap::MSG_CM_MAP_GET_CUR_FONT();
+    }
+    	
+    InitFileWriteInteger("CharMap", "fid", fid);
+    
+}
+
+/********************************************************************
+ *              CMUpdateMapBoxSize
+ ********************************************************************
+ * SYNOPSIS:     Update char map box size according to global settings_g variable.
+ * PARAMETERS:   
+ * RETURNS:      
+ * SIDE EFFECTS: none
+ * STRATEGY:     
+ * REVISION HISTORY:
+ *      Name   	Date		Description
+ *      ----   	---- 		-----------
+ *      RainerB	11/1/2023      Initial Version
+ *******************************************************************/
+void CMUpdateMapBoxSize(void) {
+
+int f;	/* scale factor*10 */
+int s;	/* font size for CMCharsToCopyText */
+
+	/* update global variables */
+    switch (settings_g & CHARM_MAP_BOX_SIZE_MASK) {
+    case CHARM_MAP_SMALL_BOX:
+	f = 10;	s = 12;
+	break;
+    
+    case CHARM_MAP_LARGE_BOX:
+	f = 22;	s = 18;
+	break;
+    
+    case CHARM_MAP_MEDIUM_BOX:
+    default:
+	f = 16;	s = 16;
+	break;
+    
+    }
+
+	/* box sizes */	
+    charm_box_width_g = (f*CHARM_I_BOX_WIDTH)/10;	
+    charm_box_height_g = (f*CHARM_I_BOX_HEIGHT)/10;	
+    charm_mag_width_g = (f*CHARM_I_MAG_WIDTH)/10;	
+    charm_mag_height_g = (f*CHARM_I_MAG_HEIGHT)/10;	
+    	/* Text font size in point */
+    charm_map_text_point_size_g = (f*CHARM_I_MAP_TEXT_POINT_SIZE)/10;
+    charm_map_mag_text_point_size_g = (f*CHARM_I_MAP_MAG_TEXT_SIZE)/10;
+    	/* right/bottom border whole map */
+    charm_map_right_g = 	CHARM_MAP_WIDTH * charm_box_width_g;
+    charm_map_bottom_g = 	CHARM_MAP_HEIGHT * charm_box_height_g;
+    charm_map_pt_height_g = charm_map_bottom_g - CHARM_MAP_TOP;
+    charm_map_pt_width_g =  charm_map_right_g - CHARM_MAP_LEFT;
+    
+    
+    	/* udate bounds in a temporary invisble View */
+    @send CMView::MSG_GEN_SET_NOT_USABLE(VUM_DELAYED_VIA_APP_QUEUE);
+    
+    @send CMMap::MSG_VIS_SET_SIZE (charm_map_pt_width_g, charm_map_pt_height_g);
+
+    @send CMRow1::MSG_VIS_SET_POSITION (CHARM_MAP_LEFT, 0 * charm_box_height_g);
+    @send CMRow2::MSG_VIS_SET_POSITION (CHARM_MAP_LEFT, 1 * charm_box_height_g);
+    @send CMRow3::MSG_VIS_SET_POSITION (CHARM_MAP_LEFT, 2 * charm_box_height_g);
+    @send CMRow4::MSG_VIS_SET_POSITION (CHARM_MAP_LEFT, 3 * charm_box_height_g);
+    @send CMRow5::MSG_VIS_SET_POSITION (CHARM_MAP_LEFT, 4 * charm_box_height_g);
+    @send CMRow6::MSG_VIS_SET_POSITION (CHARM_MAP_LEFT, 5 * charm_box_height_g);
+    @send CMRow7::MSG_VIS_SET_POSITION (CHARM_MAP_LEFT, 6 * charm_box_height_g);
+    @send CMRow8::MSG_VIS_SET_POSITION (CHARM_MAP_LEFT, 7 * charm_box_height_g);
+    @send CMRow9::MSG_VIS_SET_POSITION (CHARM_MAP_LEFT, 8 * charm_box_height_g);
+    @send CMRow10::MSG_VIS_SET_POSITION (CHARM_MAP_LEFT, 9 * charm_box_height_g);
+    @send CMRow11::MSG_VIS_SET_POSITION (CHARM_MAP_LEFT, 10 * charm_box_height_g);
+    @send CMRow12::MSG_VIS_SET_POSITION (CHARM_MAP_LEFT, 11 * charm_box_height_g);
+    @send CMRow13::MSG_VIS_SET_POSITION (CHARM_MAP_LEFT, 12 * charm_box_height_g);
+    @send CMRow14::MSG_VIS_SET_POSITION (CHARM_MAP_LEFT, 13 * charm_box_height_g);
+					
+    @send CMRow1::MSG_VIS_SET_SIZE (charm_map_pt_width_g, charm_box_height_g);
+    @send CMRow2::MSG_VIS_SET_SIZE (charm_map_pt_width_g, charm_box_height_g);
+    @send CMRow3::MSG_VIS_SET_SIZE (charm_map_pt_width_g, charm_box_height_g);
+    @send CMRow4::MSG_VIS_SET_SIZE (charm_map_pt_width_g, charm_box_height_g);
+    @send CMRow5::MSG_VIS_SET_SIZE (charm_map_pt_width_g, charm_box_height_g);
+    @send CMRow6::MSG_VIS_SET_SIZE (charm_map_pt_width_g, charm_box_height_g);
+    @send CMRow7::MSG_VIS_SET_SIZE (charm_map_pt_width_g, charm_box_height_g);
+    @send CMRow8::MSG_VIS_SET_SIZE (charm_map_pt_width_g, charm_box_height_g);
+    @send CMRow9::MSG_VIS_SET_SIZE (charm_map_pt_width_g, charm_box_height_g);
+    @send CMRow10::MSG_VIS_SET_SIZE (charm_map_pt_width_g, charm_box_height_g);
+    @send CMRow11::MSG_VIS_SET_SIZE (charm_map_pt_width_g, charm_box_height_g);
+    @send CMRow12::MSG_VIS_SET_SIZE (charm_map_pt_width_g, charm_box_height_g);
+    @send CMRow13::MSG_VIS_SET_SIZE (charm_map_pt_width_g, charm_box_height_g);
+    @send CMRow14::MSG_VIS_SET_SIZE (charm_map_pt_width_g, charm_box_height_g);
+
+
+    	/* done. show changes */
+    @send CMView::MSG_GEN_SET_USABLE(VUM_NOW);		// <<- must be VUM_NOW or 
+    							// Primray-resizing will not work
+    
+    CMSetCopyTextPointSize(s);
+    
+}	/* CMUpdateMapBoxSize */
+
+/********************************************************************
+ *            MSG_CM_PROCESS_BOX_SIZE_CHANGED  
+ ********************************************************************
+ * SYNOPSIS:     The user has selected another font size.
+ * PARAMETERS:   (GEN_ITEM_GROUP_APPLY_MSG) 
+ *			word selection = cx,
+ *			word numSelections = bp,
+ *			GenItemGroupStateFlags stateFlags = dl);
+ * RETURNS:      
+ * SIDE EFFECTS: none
+ * STRATEGY:     
+ * REVISION HISTORY:
+ *      Name   	Date		Description
+ *      ----   	---- 		-----------
+ *      RainerB	11/1/2023      Initial Version
+ *******************************************************************/
+@extern method CMProcessClass, MSG_CM_PROCESS_BOX_SIZE_CHANGED {
+int oldSize;
+
+	/* update global settings variable */
+	oldSize = settings_g & CHARM_MAP_BOX_SIZE_MASK;
+	settings_g &= CHARM_MORE_OPTIONS_MASK;
+	settings_g |= selection;
+	
+	CMUpdateMapBoxSize();
+	
+	if ( selection < oldSize ) @send, forceQueue process::MSG_CM_PROCESS_RESIZE_WIN();
+
+}
+
+
+/********************************************************************
+ *              CMUpdateUIFromSettings
+ ********************************************************************
+ * SYNOPSIS:     Update UI according to global settings_g variable.
+ * PARAMETERS:   
+ * RETURNS:      
+ * SIDE EFFECTS: none
+ * STRATEGY:     
+ * REVISION HISTORY:
+ *      Name   	Date		Description
+ *      ----   	---- 		-----------
+ *      RainerB	11/1/2023      Initial Version
+ *******************************************************************/
+void  CMUpdateUIFromSettings(void) {
+
+
+    if (settings_g & CHARM_SHOW_FONT_MENU ) {
+	@call CMFontControl2::MSG_GEN_SET_USABLE(VUM_DELAYED_VIA_APP_QUEUE); 
+    } else {
+	@call CMFontControl2::MSG_GEN_SET_NOT_USABLE(VUM_DELAYED_VIA_APP_QUEUE); 
+    }
+
+    if (settings_g & CHARM_SHOW_CHAR_CODES ) {
+	@call CMCharCodesText::MSG_GEN_SET_USABLE(VUM_DELAYED_VIA_APP_QUEUE); 
+    } else {
+	@call CMCharCodesText::MSG_GEN_SET_NOT_USABLE(VUM_DELAYED_VIA_APP_QUEUE); 
+	@send, forceQueue process::MSG_CM_PROCESS_RESIZE_WIN();
+    }
+    
+    if (settings_g & CHARM_ALLOW_MULTIPLE_CHARS ) {
+	@call CMSelectTrigger::MSG_GEN_SET_USABLE(VUM_DELAYED_VIA_APP_QUEUE); 
+    } else {
+	@call CMSelectTrigger::MSG_GEN_SET_NOT_USABLE(VUM_DELAYED_VIA_APP_QUEUE); 
+    }
+
+}
+ 
+/********************************************************************
+ *              MSG_CM_PROCESS_MORE_OPTIONS_CHANGED
+ ********************************************************************
+ * SYNOPSIS:     The user has changed the UI setting.
+ * PARAMETERS:   (GEN_BOOLEAN_GROUP_APPLY_MSG)
+ *			word selectedBooleans = cx,
+ *			word indeterminateBooleans = dx,
+ *			word modifiedBooleans = bp);  
+ * RETURNS:      
+ * SIDE EFFECTS: none
+ * STRATEGY:     
+ * REVISION HISTORY:
+ *      Name   	Date		Description
+ *      ----   	---- 		-----------
+ *      RainerB	11/1/2023      Initial Version
+ *******************************************************************/
+@extern method CMProcessClass, MSG_CM_PROCESS_MORE_OPTIONS_CHANGED {
+
+    /* update settings variable */
+    settings_g &= CHARM_MAP_BOX_SIZE_MASK;
+    settings_g |= selectedBooleans;
+	
+    CMUpdateUIFromSettings();
+
+	/* 
+	 * Disable and resize the message dialog box. This allows the CMMessageText to resize itself
+	 * according to the passed text and to place CMMessageBox at mouse position.
+	 */
+    @call CMMessageBox::MSG_GEN_SET_NOT_USABLE(VUM_NOW);
+    @call CMMessageBox::MSG_GEN_SET_WIN_SIZE(
+			GET_MM_AND_TYPE(VUM_NOW , WPT_AT_SPECIFIC_POSITION),
+			50, 50);
+    @call CMMessageBox::MSG_GEN_SET_USABLE(VUM_NOW);
+
+	/*
+	 * Show message depending changed settings
+	 */
+    if ( (modifiedBooleans & CHARM_MAG_CHARS_BOLD) && ( selectedBooleans & CHARM_MAG_CHARS_BOLD) ) {
+	@call CMMessageText::MSG_VIS_TEXT_REPLACE_ALL_OPTR(@InfoBoldChars, 0);
+	@send CMMessageBox::MSG_GEN_INTERACTION_INITIATE();
+    }
+    
+    if ( (modifiedBooleans & CHARM_ALLOW_MULTIPLE_CHARS) && ( selectedBooleans & CHARM_ALLOW_MULTIPLE_CHARS) ) {
+	@call CMMessageText::MSG_VIS_TEXT_REPLACE_ALL_OPTR(@InfoMultipleChars, 0);
+	@send CMMessageBox::MSG_GEN_INTERACTION_INITIATE();
+    }
+ 
+    if ( (modifiedBooleans & CHARM_COPY_ALWAYS_12PT) && !(selectedBooleans & CHARM_COPY_ALWAYS_12PT) ) {
+	@call CMMessageText::MSG_VIS_TEXT_REPLACE_ALL_OPTR(@InfoDynamicPointSize, 0);
+	@send CMMessageBox::MSG_GEN_INTERACTION_INITIATE();
+    }
+ 
+ 
+ 
+}
+
+
+/********************************************************************
+ *              MSG_META_GAINED_TARGET_EXCL
+ ********************************************************************
+ * SYNOPSIS:     Program has changed the target to us.
+ * PARAMETERS:   void
+ * RETURNS:      void
+ * SIDE EFFECTS: none
+ * STRATEGY:     Lets send the target back to the text object. This
+ *               will keep the font controller active. If we didn't
+ *               do this, the font control would become disabled
+ *               when the target changed to the map object.
+ * REVISION HISTORY:
+ *      Name   Date             Description
+ *      ----   ----             -----------
+ *      edwin  1/19/99          Initial Version
+ *******************************************************************/
+@extern method CMGenPrimaryClass, MSG_META_GAINED_TARGET_EXCL
+{
+    @callsuper();
+    @send CMCharsToCopyText::MSG_META_GRAB_TARGET_EXCL();
+}
+
+
+/********************************************************************
+ *              CMPCopyCallerApp
+ ********************************************************************
+ * SYNOPSIS:     Record the caller application's information
+ * PARAMETERS:   launchBlock *
+ * RETURNS:      none
+ * SIDE EFFECTS: none
+ * STRATEGY:     
+ * REVISION HISTORY:
+ *      Name   Date             Description
+ *      ----   ----             -----------
+ *      edwin  1/18/99          Initial Version
+ *******************************************************************/
+void CMPCopyCallerApp (AppLaunchBlock *launchB)
+{
+    strcpy(callerAppName, (launchB->ALB_dataFile)+1);
+    callerAppGeodeHandle = GeodeFind
+	(callerAppName, (GEODE_NAME_SIZE + GEODE_NAME_EXT_SIZE),0,0);
+    return;
+}
+
+
+/********************************************************************
+ *              CMPChangeUIForCaller
+ ********************************************************************
+ * SYNOPSIS:     Change the UI's look accordingly.
+ * PARAMETERS:   none
+ * RETURNS:      none
+ * SIDE EFFECTS: none
+ * STRATEGY:     
+ * REVISION HISTORY:
+ *      Name   Date             Description
+ *      ----   ----             -----------
+ *      edwin  1/18/99          Initial Version
+ *******************************************************************/
+void CMPChangeUIForCaller(void)
+{
+    /*
+     *  Change the moniker of the app.
+     */
+    MemLock(OptrToHandle(@CMTextMonikerCallerNotSys));
+    @call CMCopyTrigger::MSG_GEN_REPLACE_VIS_MONIKER_TEXT
+	 (LMemDeref(@CMInsertTriggerMonikerNotSys), VUM_DELAYED_VIA_UI_QUEUE);
+    @call CMPrimary::MSG_GEN_REPLACE_VIS_MONIKER_TEXT
+	 (LMemDeref(@CMTextMonikerCallerNotSys), VUM_NOW);
+    MemUnlock(OptrToHandle(@CMTextMonikerCallerNotSys));
+    
+    @call CMPrimary:: MSG_META_ADD_VAR_DATA(ATTR_GEN_DISPLAY_NOT_MINIMIZABLE, 0, NULL);
+			
+    return;
+}
+
+/********************************************************************
+ *              GMPAddGCNList
+ ********************************************************************
+ * SYNOPSIS:     Add the app to a GCNList
+ * PARAMETERS:   none
+ * RETURNS:      none
+ * SIDE EFFECTS: none
+ * STRATEGY:     
+ * REVISION HISTORY:
+ *      Name   Date             Description
+ *      ----   ----             -----------
+ *      edwin  1/18/99          Initial Version
+ *******************************************************************/
+void CMPAddGCNList(void)
+{
+    optr procObj;
+
+    procObj = ConstructOptr( GeodeGetProcessHandle(), NullChunk );
+    GCNListAdd( procObj,
+                MANUFACTURER_ID_GEOWORKS,
+                GCNSLT_APPLICATION);
+    return;
+}
+
+
+/********************************************************************
+ *              CMPRemoveGCNList
+ ********************************************************************
+ * SYNOPSIS:     Remove from GCNList
+ * PARAMETERS:   none
+ * RETURNS:      none
+ * SIDE EFFECTS: none
+ * STRATEGY:     
+ * REVISION HISTORY:
+ *      Name   Date             Description
+ *      ----   ----             -----------
+ *      edwin  1/18/99          Initial Version
+ *******************************************************************/
+void CMPRemoveGCNList(void)
+{
+    optr procObj;
+
+    procObj = ConstructOptr( GeodeGetProcessHandle(), NullChunk );
+    GCNListRemove( procObj,
+		MANUFACTURER_ID_GEOWORKS,
+		GCNSLT_APPLICATION);
+
+    return;
+}
+
+
+	
+

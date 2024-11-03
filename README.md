@@ -67,7 +67,7 @@ Launch the target environment in dosbox:
 
 
 ## Customize target environment
-If you want to customize the target environment settings only for yourself, you should not change the file %ROOT_DIR%/bin/basbox.conf.
+If you want to customize the target environment settings only for yourself, you should not change the file %ROOT_DIR%/bin/basebox.conf.
 - Create a file called basebox_user.conf in %LOCAL_ROOT% folder.
 - Enter the new settings here. These settings overwrite those from basebox.conf. Example:
   - [cpu]
@@ -81,4 +81,4 @@ PC/GEOS comes with extensive technical documentation that describes tools, progr
 You can find a browseable, searchable version of the documentation here: https://bluewaysw.github.io/pcgeos/
 
 ##
-We are on https://bluewaysw.slack.com/ for more efficient collaboration. Please register at https://blog.bluewaysw.de for MyGEOS and use the Slack section and receive access to our developer community. Welcome!
+We are on https://discord.com/ for more efficient collaboration. Please register at https://discord.gg/qtMqgZXhf9 for blueway.Softworks or use an existing discord-account to get access to our developer community. Welcome!

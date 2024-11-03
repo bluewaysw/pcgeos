@@ -14,7 +14,7 @@
  *	12/5/22	  JK	    Initial version
  *
  * DESCRIPTION:
- *	    Structures and definitions for mapping character from FreeGEOS 
+ *	Structures and definitions for mapping character from FreeGEOS 
  *      charset zu Unicode charset.
  ***********************************************************************/
 #ifndef _TTCHARMAPPER_H_
@@ -40,21 +40,39 @@ typedef struct
 {
         word            unicode;
         CharMapFlags    flags;
-        word            ttIndex;
 } CharMapEntry;
+
+
+/*
+ * Entry for lookup table for handling truetype kernpairs.
+ */
+typedef struct
+{
+        word ttindex;
+        char geoscode;
+} LookupEntry;
+
+
+/***********************************************************************
+ *      definitions
+ ***********************************************************************/
+
+#define DestroyIndexLookupTable( memH ) ( MemFree( memH ))
 
 
 /***********************************************************************
  *      internal functions
  ***********************************************************************/
 
-word GeosCharToUnicode( word geosChar );
+word  GeosCharToUnicode( const word  geosChar );
 
-word InitGeosCharsInCharMap( TT_CharMap map, char* firstChar, char* lastChar );
+word  CountValidGeosChars( const TT_CharMap  map, 
+                           char*  firstChar, char*  lastChar );
 
-TT_Error getCharMap( TRUETYPE_VARS, TT_CharMap* charMap );
+CharMapFlags  GeosCharMapFlag( const word  geosChar );
 
-CharMapFlags GeosCharMapFlag( word geosChar );
+MemHandle  CreateIndexLookupTable( const TT_CharMap  map );
 
+word  GetGEOSCharForIndex( const LookupEntry*  lookupTable, const word  index );
 
 #endif  /* _TTCHARMAPPER_H_ */

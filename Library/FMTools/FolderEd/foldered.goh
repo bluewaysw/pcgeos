@@ -1,0 +1,196 @@
+/***********************************************************************
+	Includes
+***********************************************************************/
+@include <stdapp.goh>
+@include <fmtool.goh>
+#include <Ansi/string.h>
+#include <Ansi/stdio.h>
+
+
+/***********************************************************************
+	Classes
+***********************************************************************/
+@class  FolderEdInteractionClass, GenInteractionClass;
+
+	@message void MSG_FED_QUIT_DIALOG(int action);
+		#define ACTION_CLOSE_TOOL		1
+		#define ACTION_OPEN_CONFIG		2
+		#define ACTION_CLOSE_CONFIG_APPLY	3
+		#define ACTION_CLOSE_CONFIG_CANCEL	4
+	/*
+	 *	Handling folder list
+	 */
+	@message (GEN_DYNAMIC_LIST_QUERY_MSG) MSG_FED_QUERY_FOLDER;
+	@message (GEN_ITEM_GROUP_APPLY_MSG)   MSG_FED_APPLY_FOLDER;
+	@message (GEN_BOOLEAN_GROUP_APPLY_MSG)MSG_FED_APPLY_CHANGE_ALL;
+	
+	/*
+	 *	Handling token list
+	 */
+	@message (GEN_DYNAMIC_LIST_QUERY_MSG) MSG_FED_QUERY_TOKEN_LIST;
+	@message (GEN_ITEM_GROUP_APPLY_MSG)   MSG_FED_APPLY_TOKEN_LIST;
+	@message void MSG_FED_APPLY_TOKEN_RANGE();
+	@message (GEN_ITEM_GROUP_APPLY_MSG)   MSG_FED_APPLY_TOKEN_TYPE;
+
+	@message void MSG_FED_CHANGE_TOKEN();
+	@message void MSG_FED_CLEAR_TOKEN();
+@endc
+
+/*---------------------------------------------------------------------------
+ Klassendefinition WordValueClass  : Dialog zum éndern des Icons
+	Ein Value-Feld ,da· positive Integer bis zur Wordgrenze versteht
+	initial release.
+	Methoden arbeiten mit festen Werten mfÅr minimum und Maximum.
+  Achtung! Um die Werte zu setzen und zu lesen MSG_xx_GET / SET_VALUE nutzen
+	MSD_xx_GET / SET_INTEGER_VALUE geht in dieser Implemenetation nicht
+ ---------------------------------------------------------------------------*/
+@class	WordValueClass, GenValueClass;
+	@default	GVLI_maximum = (dword) 0xFFFF;
+	@default	GVLI_increment = (dword)1;
+@endc
+
+
+
+/***********************************************************************
+	Macros
+***********************************************************************/
+
+/* Map template object reference to real optr of dupilcated object */
+@define DialogObj(obj)	ConstructOptr(OptrToHandle(g_dialog), OptrToChunk(obj) )
+
+@define SetAttrDesc(ad,attr,value,size) ad.FEAD_attr = attr; \
+	ad.FEAD_value = value; ad.FEAD_size  = size;	ad.FEAD_name  = NULL;
+
+#ifndef ErrorBoxOptr
+#define ErrorBoxOptr(txtOp) { \
+ 		UserStandardDialogOptr ( (optr)0,(optr)0,(optr)0,(optr)0, txtOp, \
+ 		(( CDT_ERROR << CDBF_DIALOG_TYPE_OFFSET) | \
+ 		 ( GIT_NOTIFICATION << CDBF_INTERACTION_TYPE_OFFSET)) ); \
+ 		 }
+#endif
+
+#ifndef MessageBox
+	// Note: MessageBox ist not localizable. Use MessageBoxOptr for this
+#define MessageBox(txt) { \
+ 		UserStandardDialog ( (char *)0,(char *)0,(char *)0,(char *)0,txt, \
+ 		(( CDT_NOTIFICATION << CDBF_DIALOG_TYPE_OFFSET) | \
+ 		 ( GIT_NOTIFICATION << CDBF_INTERACTION_TYPE_OFFSET)) ); \
+ 		 }
+#endif
+ 
+#ifndef MessageBoxOptr
+#define MessageBoxOptr(txtOp) { \
+ 		UserStandardDialogOptr ( (optr)0,(optr)0,(optr)0,(optr)0, txtOp, \
+ 		(( CDT_NOTIFICATION << CDBF_DIALOG_TYPE_OFFSET) | \
+ 		 ( GIT_NOTIFICATION << CDBF_INTERACTION_TYPE_OFFSET)) ); \
+ 		 }
+#endif
+
+#ifndef QuestionBoxOptr
+#define QuestionBoxOptr(txtOp)  \
+ 		UserStandardDialogOptr ( (optr)0,(optr)0,(optr)0,(optr)0, txtOp, \
+ 		(( CDT_QUESTION << CDBF_DIALOG_TYPE_OFFSET) | \
+ 		 ( GIT_AFFIRMATION << CDBF_INTERACTION_TYPE_OFFSET)) ); 
+ 		 
+#endif
+
+/*
+ * Constants to configure UI
+ */
+    /*
+     *	Token list: leave room for a SuperVGA + a tiny tool moniker
+     * 	and some extras space for oversized monikers or as border
+     * 	Standard moniker size: 48x30
+     * 	SuperVGA moniker size: 64x40
+     * 	Tiny tool moniker size: 15x15
+     */
+#define	SVGA_MONIKER_SAPCE_X	(64+4)
+#define SVGA_MONIER_SPACE_Y	(40+4)
+#define TINY_MONIKER_SPACE_XY	(15+6)
+
+#define TOKEN_LIST_SVGA_MONIKER_TOP	((2*TINY_MONIKER_SPACE_XY)/3)	
+#define TOKEN_LIST_TINY_MONIKER_TOP 	(0)
+
+#define	TOKEN_LIST_ITEM_WIDTH	 	SVGA_MONIKER_SAPCE_X
+#define	TOKEN_LIST_ITEM_HIGHT		(TOKEN_LIST_TINY_MONIKER_TOP + TOKEN_LIST_SVGA_MONIKER_TOP + SVGA_MONIER_SPACE_Y)
+
+
+    /*
+     * Boolean-Identifier for config dialog and apply to all selector
+     */
+#define	FED_CFG_TINY_ICONS_IN_LIST	1
+#define	FED_CFG_TINY_ICONS_IN_DISPLAY	2
+#define	FED_CFG_HUGE_ICONS_IN_DISPLAY	4
+#define	FED_CFG_TOKEN_LIST_INFOS	8
+#define	FED_CFG_TOKEN_RANGE_GROUP	0x10
+#define	FED_CFG_TOKEN_STYLE_SELECTOR	0x20
+#define	FED_CFG_APPLY_BUTTONS_ON_TOP	0x40
+#define	FED_MAIN_CONFIG_MASK		( 1 + 2 + 4 + 8 + 0x10 + 0x20 + 0x40 )	
+
+#define	DEFAULT_FED_CONFIG		( FED_CFG_TINY_ICONS_IN_LIST | FED_CFG_TINY_ICONS_IN_DISPLAY)
+
+#define	FED_CFG_APPLY_TO_ALL		0x100
+
+
+/***********************************************************************
+	Structures
+***********************************************************************/
+
+/* Structure to simple access returned data from MSG_FM_GET_SELECTED_FILES */
+typedef struct {
+    FileQuickTransferHeader	header;
+    FileOperationInfoEntry	entry[];
+    } SelectedFilesStruct;
+
+
+/* Structure to simple access List of tokens. 6 Bytes header, folowed by an GeodeToken array */
+typedef struct {
+    word	tokenCount;	// .. in the list
+    word	firstIndex;	// .. to display in TokenList
+    word	tokensToShow;	// .. in the tokenList
+    GeodeToken	token[];	// array of GeodeToken structs
+    				// sorted by manufacturer ID
+    } TokenListStruct;
+
+
+/***********************************************************************
+	Constants
+***********************************************************************/
+#define DEFAULT_TOKEN_DISPLAY_SIZE	DS_STANDARD
+#define DEFAULT_TOKEN_STYLE		VMS_ICON
+
+
+/***********************************************************************
+	Headers
+***********************************************************************/
+// FMFetchToolsProc GetThoseTools;
+word _pascal _export GetThoseTools(FMToolStruct **tablePtr);
+
+// FMToolProc FolderEdToolStart;
+void _pascal _export FolderEdToolStart(GeodeHandle filemgr, word toolNum, word entryNum);
+
+// Configure UI
+void FEDConfigureToolUI();
+#define Fed_Ini_Category	"fm_fedtool"
+#define Fed_Ini_Key		"config"
+void CreateButtonMoniker(optr button, optr graphicMoniker, optr textMoniker);
+
+
+// Handling TokenList
+word FEDListTokens(void);
+MemHandle InternalGetTokenMonikerBlock(GeodeToken token, 
+				word dispSize, word style, word *monikerSize);
+
+// Handling Folder list
+word FEDLookForFoldersInList(void);
+
+// Display Tokens
+void FEDTokenIdToText(GeodeToken tok, int minLen, char *retBuf);
+void  FEDShowTokenMoniker(GeodeToken tok, optr monikerObj);
+void  FEDShowToken(GeodeToken tok, optr idObj, optr monikerObj, optr hugeObj, optr toolObj);
+void FEDSelectToken(GeodeToken tok, Boolean selectFirst);
+
+// Change Tokens
+Boolean FEDChangeSingleToken(char *fileName);
+void FEDChangeDosFolderToken(char *fileName);
+

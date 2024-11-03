@@ -49,6 +49,7 @@ extern TEngine_Instance engineInstance;
 #define WWFIXED_1_POINR_1                   0x00012000
 
 #define ITALIC_FACTOR                       0x0000366A
+#define NEGATVE_ITALIC_FACTOR               0xffffc996
 #define BOLD_FACTOR                         0x00012000 
 #define SCRIPT_FACTOR                       0x00008000
 #define SCRIPT_SHIFT_FACTOR                 0x00015000
@@ -65,9 +66,13 @@ extern TEngine_Instance engineInstance;
 #define FAMILY_NAME_LENGTH                  20
 #define STYLE_NAME_LENGTH                   16
 
-#define MAX_KERN_TABLE_LENGTH               6000
+#define KERN_VALUE_DIVIDENT                 100
 
 #define STANDARD_GRIDSIZE                   1000
+#define MAX_NUM_GLYPHS                      2000
+
+#define BASELINE_CORRECTION                 1
+#define MIN_BITMAP_DIMENSION                1
 
 
 /***********************************************************************
@@ -337,6 +342,7 @@ typedef struct
 
 typedef struct
 {
+    Boolean                     FH_initialized;
     word                        FH_h_height;        //top of 'H'
     word                        FH_x_height;        //top of 'x'
     word                        FH_ascender;        //top of 'd'
@@ -385,11 +391,13 @@ typedef struct
     TT_Glyph_Metrics            glyphMetrics;
     TT_CharMap                  charMap;
     TT_Outline                  outline;
-    TT_BBox                     bbox;
 
     /* currently open face */
     FileHandle                  ttfile;
     TrueTypeOutlineEntry        entry;
+
+    /* lookuptable for truetype indices */
+    MemHandle                   lookupTable;
 } TrueTypeVars;
 
 
@@ -410,8 +418,20 @@ typedef struct
 #define SCALE_HEIGHT            trueTypeVars->scaleHeight
 #define SCALE_WIDTH             trueTypeVars->scaleWidth
 #define TTFILE                  trueTypeVars->ttfile
+#define LOOKUP_TABLE            trueTypeVars->lookupTable
 
 #define UNITS_PER_EM            FACE_PROPERTIES.header->Units_Per_EM
+
+
+/***********************************************************************
+ *      error codes
+ ***********************************************************************/
+
+typedef enum {
+    SYSTEM_ERROR_CODES,
+    CHARINDEX_OUT_OF_BOUNDS,
+    ERROR_BITMAP_BUFFER_OVERFLOW
+} FatalErrors;
 
 
 /***********************************************************************
@@ -422,7 +442,7 @@ typedef struct
  * convert value (word) to WWFixedAsDWord
  */
 #define WORD_TO_WWFIXEDASDWORD( value )          \
-        ( (WWFixedAsDWord) MakeWWFixed( value ) )
+            ( ( (long)value ) << 16 )
 
 /*
  * convert value (TT_F26DOT6) to WWFixedAsDWord
@@ -475,6 +495,15 @@ typedef struct
 #define WBFIXED_TO_WWFIXEDASDWORD( value )       \
         ( (long) ( ( (long)(value.WBF_int) ) * 0x00010000 ) | ( ( (long)value.WBF_frac) << 8 ) )
 
+/*
+ * convert value (WWFixed) to WWFixedAsDWord 
+ */
+#define WWFIXED_TO_WWFIXEDASDWORD( value )       \
+        ( (long) ( ( (long)(value.WWF_int) ) * 0x00010000 ) | ( (long)value.WWF_frac) )
+
+
+#define MUL_100_WWFIXED( factor, percentage )   \
+        GrMulWWFixed( factor, GrUDivWWFixed( ((long)percentage ) << 16, 100L << 16))
 
 /***********************************************************************
  *      functions

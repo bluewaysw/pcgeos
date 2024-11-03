@@ -18,8 +18,13 @@
  ***********************************************************************/
 
 #include "ttadapter.h"
+#include "ttcharmapper.h"
+#include "ttcmap.h"
+#include "tttags.h"
+#include "ttmemory.h"
 #include <ec.h>
 #include <geode.h>
+#include <heap.h>
 
 static int strcmp( const char* s1, const char* s2 );
 
@@ -61,7 +66,9 @@ Boolean TrueType_Lock_Face(TRUETYPE_VARS, TrueTypeOutlineEntry* entry)
         FileSetCurrentPath( SP_FONT, TTF_DIRECTORY );
 
         /* get filename and load ttf file */
-        TTFILE = FileOpen( entry->TTOE_fontFileName, FILE_ACCESS_R | FILE_DENY_W );       
+        TTFILE = FileOpen( entry->TTOE_fontFileName, FILE_ACCESS_R | FILE_DENY_W );    
+EC(     ECCheckFileHandle( TTFILE) );
+
         /* change owner to ourselves, to make handle persist if application closes */
         HandleModifyOwner( (MemHandle)TTFILE, GeodeGetCodeProcessHandle() );
         FilePopDir();
@@ -70,10 +77,14 @@ Boolean TrueType_Lock_Face(TRUETYPE_VARS, TrueTypeOutlineEntry* entry)
                 goto Fin;
         if ( TT_Get_Face_Properties( FACE, &FACE_PROPERTIES ) )
                 goto Fail;
-        if ( getCharMap( trueTypeVars, &CHAR_MAP ) )
+        if ( getCharMap( FACE, &FACE_PROPERTIES, &CHAR_MAP ) )
                 goto Fail;
         if ( TT_New_Instance( FACE, &INSTANCE ) )
                 goto Fail;
+
+        /* create lookup table for kernpairs if face supports kerning */
+        LOOKUP_TABLE = CreateIndexLookupTable( CHAR_MAP );
+EC(     ECCheckMemHandle( LOOKUP_TABLE ) );
 
         /* font has been fully loaded */
         trueTypeVars->entry = *entry;
@@ -121,7 +132,7 @@ void TrueType_Unlock_Face(TRUETYPE_VARS)
  * RETURNS:       TT_Error
  * 
  * STRATEGY:      - free resources used by instance and face
- *                - close file
+ *                - close file and free lookup table
  * 
  * REVISION HISTORY:
  *      Date      Name      Description
@@ -142,6 +153,11 @@ void TrueType_Free_Face(TRUETYPE_VARS)
         {
             FileClose( TTFILE, FALSE );
             TTFILE = NullHandle;
+        }
+        if ( LOOKUP_TABLE )
+        {
+            DestroyIndexLookupTable( LOOKUP_TABLE );
+            LOOKUP_TABLE = NullHandle;
         }
 }
 

@@ -53,6 +53,7 @@
 #include <print.h>      /* These two for printing  */
 @include <spool.goh>
 @include <dirlistIcon.goh>   /* The icon information  */
+#include <timedate.h>
 
 /*
  ***************************************************************************
@@ -82,6 +83,7 @@
 @class PrintGenTextClass, GenTextClass;
 @endc
 @classdecl	PrintGenTextClass;
+
 /*
  ***************************************************************************
  *		UI Objects
@@ -116,7 +118,7 @@
 
 }
 
-@visMoniker DLTextMoniker = "DirList";
+@visMoniker DLTextMoniker = "Directory Lister";
 
 @end AppResource
 
@@ -134,63 +136,9 @@
 }
 
 @object GenInteractionClass DLFileMenu = {
-	 GI_comp = @DLPrintControl, @AboutGroup;
+	 GI_comp = @DLPrintControl;
 	 GII_visibility = GIV_POPUP;
     ATTR_GEN_INTERACTION_GROUP_TYPE = (GIGT_FILE_MENU);
-}
-
-@object GenInteractionClass AboutGroup = {
-	GI_comp = @AboutDBox;
-	GII_visibility = GIV_SUB_GROUP;
-}
-
-@include "bbxreg.goh"
-
-@object GenInteractionClass AboutDBox = {
-	 GI_visMoniker = 'b', "About";
-	 GI_comp = @AppName, @By, @BreadBoxLogo,
-				  @Visit, @Web, @AboutSpacer1,
-				  @Copyright, @BBoxLLC, @Rights, @AboutSpacer2;
-	 GII_visibility = GIV_DIALOG;
-	 GII_type = GIT_NOTIFICATION;
-	 HINT_CENTER_CHILDREN_HORIZONTALLY;
-}
-@object GenTextClass AppName = {
-    GI_attrs = @default | GA_READ_ONLY;
-    GTXI_attrs = @default | GTA_SINGLE_LINE_TEXT;
-	 GTXI_text = "Directory Lister";
-    ATTR_GEN_TEXT_CHAR_ATTR = (ChunkHandle) @AppNameCharAttrs;
-}
-@chunk VisTextCharAttr AppNameCharAttrs =
-	CHAR_ATTR_FONT_SIZE_STYLE(
-		FID_DTC_URW_SANS, 36, TS_BOLD);
-
-@object GenGlyphClass By = {
-  GI_visMoniker = "by";
-}
-@object GenGlyphClass BreadBoxLogo = {
-  GI_visMoniker = list { @BreadboxLogoMoniker}
-}
-@object GenGlyphClass Visit = {
-  GI_visMoniker = "Visit us at...";
-}
-@object GenGlyphClass Web = {
-  GI_visMoniker = "www.breadbox.com";
-}
-@object GenGlyphClass AboutSpacer1 = {
-  GI_visMoniker = "   ";
-}
-@object GenGlyphClass Copyright = {
-  GI_visMoniker = "Copyright 1994-2002";
-}
-@object GenGlyphClass BBoxLLC = {
-  GI_visMoniker = "Breadbox Computer Company LLC";
-}
-@object GenGlyphClass Rights = {
-  GI_visMoniker = "All Rights Reserved";
-}
-@object GenGlyphClass AboutSpacer2 = {
-  GI_visMoniker = "   ";
 }
 
 @object PrintGenTextClass DirListText = {                  /* the main text window */
@@ -204,7 +152,7 @@
 }
 
 @chunk VisTextCharAttr DLTextCharAttrs =
-	CHAR_ATTR_FONT_SIZE(FID_DTC_URW_MONO, 12);
+	CHAR_ATTR_FONT_SIZE(FID_DTC_URW_SANS, 12);
 
 
 @end Display
@@ -326,7 +274,7 @@
 /* declarations for getting the FileEnum info to the TextObj  */
     char *bufBaseAddress;  /* pointer derived from the MemHandle  */
     word count = 0;
-    char fileSizeString[11];     /* for the UtilHex32ToAscii routine */
+    char fileSizeString[20];     /* for the UtilHex32ToAscii routine */
     dword *fileSizeDWordAddr;
     dword fileSizeDWord;
     char *fileSizePtr;
@@ -337,9 +285,7 @@
     char lineBuffer[80];   /* one line for each dir or file */
 
  /* Declarations to get the file modification date and time   ----------  */
-    dword *modifStuffAddr;
-    dword modifStuff;
-    dword modItem;           /* used for year, month ... min, & sec */
+    FileDateAndTime *modifStuffAddr;
 
 /* declarations to set the file size tab */
 Tab DLTab = {
@@ -540,54 +486,22 @@ dword textSize;
 
   /*  Get the file's modification date and time...   */
 
-	modifStuffAddr = (dword *)((bufBaseAddress + DATE_AND_TIME_OFFSET)+(count * FEDOSINFO_SIZE));
-        modifStuff = *modifStuffAddr;
+	modifStuffAddr = (FileDateAndTime*)((bufBaseAddress + DATE_AND_TIME_OFFSET)+(count * FEDOSINFO_SIZE));
+
+      LocalFormatFileDateTime( fileSizePtr, DTF_ZERO_PADDED_SHORT, modifStuffAddr);
+
+	strcat(lineBuffer, fileSizePtr);
+	strcat(lineBuffer, "\t");
+
+      LocalFormatFileDateTime( fileSizePtr, DTF_HMS, modifStuffAddr);
+	if (fileSizePtr[1] == ':')
+          strcat(lineBuffer, "0");
+       
+	strcat(lineBuffer, fileSizePtr);
+	strcat(lineBuffer, "\t");
 
   /*  Convert to ASCII and put after file size...  */
 
-	modItem = (dword) FDATExtractHour(modifStuff);       /* the hour */
-	UtilHex32ToAscii(fileSizePtr, modItem, flags);
-	if (modItem < 10)
-	    strcat(lineBuffer, "0");
-	strcat(lineBuffer, fileSizePtr);
-	strcat(lineBuffer, ":");
-
-	modItem = (dword) FDATExtractMinute(modifStuff);      /* the minute */
-	UtilHex32ToAscii(fileSizePtr, modItem, flags);
-	if (modItem < 10)
-	    strcat(lineBuffer, "0");
-	strcat(lineBuffer, fileSizePtr);
-	strcat(lineBuffer, ":");
-
-	modItem = (dword) FDATExtractSecond(modifStuff);      /* the second */
-	UtilHex32ToAscii(fileSizePtr, modItem, flags);
-	if (modItem < 10)
-	    strcat(lineBuffer, "0");
-	strcat(lineBuffer, fileSizePtr);
-	strcat(lineBuffer, "  ");
-
-	modItem = (dword) FDATExtractMonth(modifStuff);      /* the month */
-	UtilHex32ToAscii(fileSizePtr, modItem, flags);
-	if (modItem < 10)
-	    strcat(lineBuffer, "0");
-	strcat(lineBuffer, fileSizePtr);
-	strcat(lineBuffer, "/");
-
-	modItem = (dword) FDATExtractDay(modifStuff);          /* the day */
-	UtilHex32ToAscii(fileSizePtr, modItem, flags);
-	if (modItem < 10)
-	    strcat(lineBuffer, "0");
-	strcat(lineBuffer, fileSizePtr);
-	strcat(lineBuffer, "/");
-
-	modItem = 80 + (dword) FDATExtractYear(modifStuff);  /* base year is 1980  */
-	if (modItem > 99)
-	    modItem = modItem - 100;       /* for the years 2000 and later */
-	UtilHex32ToAscii(fileSizePtr, modItem, flags);
-	if (modItem < 10)
-	    strcat(lineBuffer, "0");
-	strcat(lineBuffer, fileSizePtr);
-	strcat(lineBuffer, "  ");
 
   /*  Get the file's DOS attributes (A,S,H,R ...   */
 	if (fileAttribs & FA_ARCHIVE)              /* doess it require back-up? */

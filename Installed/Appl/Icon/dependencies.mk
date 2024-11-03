@@ -228,7 +228,7 @@ UI.eobj: UI/uiManager.asm \
                 iconGlobal.def iconFile.def iconDocument.def \
                 iconFormat.def iconViewer.def uiConstant.def \
                 uiManager.rdef uiColor.asm uiNewClasses.asm
-sourceStrings.rdef: /home/jkunze/Development/pcgeos/Appl/Icon/Source/sourceStrings.ui
+sourceStrings.rdef: Source/sourceStrings.ui
 uiManager.rdef: generic.uih product.uih bitmap.uih impex.uih grobj.uih \
                 Objects/colorC.uih Objects/styles.uih UI/uiIcon.uih \
                 UI/uiMain.ui Art/mkrIconDoc.ui UI/uiDocument.ui \

@@ -6,7 +6,7 @@
 GEODE           = maze
 ASM_TO_OBJS     =
 UI_TO_RDFS      =
-SRCS            = maze.goc Mouse.goh moves.goh icons.goh
+SRCS            = maze.goc icons.goh Mouse.goh moves.goh
 OBJS            = maze.obj
 LOBJS           =
 

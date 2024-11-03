@@ -85,7 +85,7 @@ extern Boolean /*XXX*/
 		       VisMonikerSearchFlags searchFlags,
 		       TokenMonikerInfo *tokenMonikerInfo);
 
-extern Boolean /*XXX*/
+extern Boolean
     _pascal TokenLoadMonikerBlock(dword tokenChars,
 			  ManufacturerID manufacturerID,
 			  DisplayType displayType,
@@ -93,7 +93,7 @@ extern Boolean /*XXX*/
 			  word *blockSize,
 			  MemHandle *blockHandle);
 
-extern Boolean /*XXX*/
+extern Boolean 
     _pascal TokenLoadMonikerChunk(dword tokenChars,
 			  ManufacturerID manufacturerID,
 			  DisplayType displayType,
@@ -102,7 +102,7 @@ extern Boolean /*XXX*/
 			  word *chunkSize,
 			  ChunkHandle *chunkHandle);
 
-extern Boolean /*XXX*/
+extern Boolean 
     _pascal TokenLoadMonikerBuffer(dword tokenChars,
 			   ManufacturerID manufacturerID,
 			   DisplayType displayType,
@@ -117,20 +117,20 @@ extern Boolean /*XXX*/
 extern void /*XXX*/
     _pascal TokenGetTokenStats(dword tokenChars, ManufacturerID manufacturerID);
 
-extern Boolean /*XXX*/
+extern Boolean 
     _pascal TokenLoadTokenBlock(dword tokenChars,
 			ManufacturerID manufacturerID,
 			word *blockSize,
 			MemHandle *blockHandle);
 
-extern Boolean /*XXX*/
+extern Boolean 
     _pascal TokenLoadTokenChunk(dword tokenChars,
 			ManufacturerID manufacturerID,
 			MemHandle lmemBlock,
 			word *chunkSize,
 			ChunkHandle *chunkHandle);
 
-extern Boolean /*XXX*/
+extern Boolean 
     _pascal TokenLoadTokenBuffer(dword tokenChars,
 			 ManufacturerID manufacturerID,
 			 TokenEntry *buffer);
@@ -167,7 +167,7 @@ extern dword /*XXX*/
  * Use this macro to pass the tokenChars to the above routines
  */
 #define TOKEN_CHARS(A, B, C, D) \
-    ((A) | ((B) << 8) | ((C) << 16) | ((D) << 24))
+    (((dword)(A)) | (((dword)(B)) << 8) | (((dword)(C)) << 16) | (((dword)(D)) << 24))
 
 #ifdef __HIGHC__
 pragma Alias(TokenOpenLocalTokenDB, "TOKENOPENLOCALTOKENDB");

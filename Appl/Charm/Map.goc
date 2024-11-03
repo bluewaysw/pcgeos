@@ -1,0 +1,1200 @@
+/********************************************************************
+ *
+ * PROJECT:     Character Map
+ * MODULE:      CMMapClass and CMRowClass Methods
+ * FILE:        map.goc
+ *
+ * AUTHOR:      Nathan Fiedler
+ *
+ * REVISION HISTORY:
+ *      Name    Date            Description
+ *      ----    ----            -----------
+ *      NF      9/26/96         Initial version
+ *	RainerB	11/11/2023	Add some new features, in particular 
+ *				allow different character box sizes.
+ *
+ * DESCRIPTION:
+ *      This file contains all the CMMapClass and CMRowClass methods.
+ *      These make up a lot of the functionality of the program.
+ *      Included are mouse event handling, target changing,
+ *      pointer image changing, and keyboard interception methods.
+ *
+ *******************************************************************/
+
+/********************************************************************
+ *              Headers
+ *******************************************************************/
+    @include <stdapp.goh>
+    #include <Ansi/string.h>
+    #include <Ansi/stdio.h>
+    @include "app.goh"
+    @include "global.goh"
+
+/********************************************************************
+ *              Local Function Definitions
+ *******************************************************************/
+char callerAppName[GEODE_NAME_SIZE + GEODE_NAME_EXT_SIZE + 1];
+GeodeHandle callerAppGeodeHandle = 0;
+
+
+/********************************************************************
+ *              MapFindCharFromPos
+ ********************************************************************
+ * SYNOPSIS:     Calculate the character value based on x and y
+ *               position within the map.
+ * RETURNS:      Character value
+ * SIDE EFFECTS: none
+ * STRATEGY:     Use the height and width of the boxes and map to
+ *               calculate the character value.
+ * REVISION HISTORY:
+ *      Name   Date             Description
+ *      ----   ----             -----------
+ *      NF     9/29/96          Initial Version
+ *******************************************************************/
+char
+MapFindCharFromPos( sword xPosition,
+                    sword yPosition )
+  /*
+   * xPosition - Mouse x position within map (in).
+   * yPosition - Mouse y position within map (in).
+   */
+{
+
+      /*
+       * Divide the x position by the width of the little boxes
+       * and multiply by the number of boxes in a row.
+       * Then divide the y position by the box height and add
+       * to the first result. Add in 32 because the first
+       * character displayed in the map is the space.
+       */
+    return( xPosition / charm_box_width_g +
+            yPosition / charm_box_height_g * CHARM_MAP_WIDTH + 32 );
+} /* MapFindCharFromPos */
+
+/********************************************************************
+ *              MapCalcMagCharRegion
+ ********************************************************************
+ * SYNOPSIS:     Find the region which will hold the magnified
+ *               character box.
+ * RETURNS:      void
+ * SIDE EFFECTS: none
+ * STRATEGY:     Turn the character value into an x,y position for
+ *               the character as it would be on the character map.
+ *               Make sure this fits within the map bounds.
+ *               Return the boundaries in parameter reg.
+ * REVISION HISTORY:
+ *      Name   Date             Description
+ *      ----   ----             -----------
+ *      NF     10/5/96          Initial Version
+ *******************************************************************/
+void
+MapCalcMagCharRegion( unsigned char ch,		
+                      Rectangle *   reg )
+  /*
+   * ch  - Character to find magnified region for (in).
+   *	   note about ch see MSG_META_KBD_CHAR
+   * reg - Magnified region (out).
+   */
+{
+      /*
+       * iCharXPos  - X position of magnified character.
+       * iCharYPos  - Y position of magnified character.
+       * iPointXPos - X position of top-left corner of mag char in points.
+       * iPointYPos - Y position of top-left corner of mag char in points.
+       * diffX      - Amount to adjust X position by.
+       * diffY      - Amount to adjust Y position by.
+       */
+    int  iCharXPos;
+    int  iCharYPos;
+    sword iPointXPos;
+    sword iPointYPos;
+    sword diffX;
+    sword diffY;
+
+      /*
+       * First handle the case of a null character.
+       */
+    if ( NULL == ch ) {
+        reg->R_top = 0;
+        reg->R_left = 0;
+        reg->R_right = 0;
+        reg->R_bottom = 0;
+    }
+    else {
+          /*
+           * Typecast everything so compiler doesn't do
+           * the wrong thing with the math operations.
+           *
+           * Turn the character column position into an
+           * x position in points.
+           */
+        iCharXPos = (byte)ch % (byte)CHARM_MAP_WIDTH;
+        iPointXPos = iCharXPos * (sword)charm_box_width_g +
+                     (sword)CHARM_MAP_LEFT;
+
+          /*
+           * Turn the character row position into a
+           * y position in points.
+           *
+           * Subtract two for non-existent top two rows.
+           * Those rows would be for characters 0-31.
+           */
+        iCharYPos = ( (byte)ch / (byte)CHARM_MAP_WIDTH ) - 2;
+        iPointYPos = iCharYPos * (sword)charm_box_height_g +
+                     (sword)CHARM_MAP_TOP;
+
+          /*
+           * Create the boundaries of the magnified
+           * character using the x,y position and the
+           * height/width of the magnified character.
+           * Round up the diff values to keep the shadow visible.
+           */
+        diffX = 1 + ( charm_mag_width_g - charm_box_width_g) / 2;
+        diffY = 1 + ( charm_mag_height_g - charm_box_height_g) /2;
+        reg->R_left = iPointXPos - diffX;
+        reg->R_top = iPointYPos - diffY;
+        reg->R_right = reg->R_left + charm_mag_width_g;
+        reg->R_bottom = reg->R_top + charm_mag_height_g;
+
+          /*
+           * Do some bounds checking. Make sure it
+           * doesn't overlap the edge of the content.
+           */
+        if ( 0 >= iCharXPos ) {
+            reg->R_left += diffX;
+            reg->R_right += diffX;
+        }
+        if ( ( CHARM_MAP_WIDTH - 1 ) <= iCharXPos ) {
+            reg->R_left -= diffX;
+            reg->R_right -= diffX;
+        }
+        if ( 0 >= iCharYPos ) {
+            reg->R_top += diffY;
+            reg->R_bottom += diffY;
+        }
+        if ( ( CHARM_MAP_HEIGHT - 1 ) <= iCharYPos ) {
+            reg->R_top -= diffY;
+            reg->R_bottom -= diffY;
+        }
+    }
+} /* MapCalcMagCharRegion */
+
+/********************************************************************
+ *              MapUpdateShortcut
+ ********************************************************************
+ * SYNOPSIS:     Update the shortcut text object.
+ * RETURNS:      void
+ * SIDE EFFECTS: none
+ * STRATEGY:     First check the states of the shortcut, such as
+ *               Shift, Ctrl, and Alt. And then see if the keystroke
+ *               has an "accent" character (e, i, n, u, `) which
+ *               is used to give foreign characters their accent.
+ *               Then display the real keystroke used to make the
+ *               character in question.
+ * REVISION HISTORY:
+ *      Name   	Date             Description
+ *      ----   	----             -----------
+ *      NF     	10/5/96          Initial Version
+ *	RainerB	10/11/2023	 Add Charcter codes
+ *******************************************************************/
+void
+MapUpdateShortcut( unsigned char iChar_p )
+  /*
+   * iChar_p - Character to display shortcut for.
+   */
+{
+      /*
+       * iCharTable - Index into shortcut array.
+       * cElemSize  - Size of element in shortcut array.
+       * pShortcut  - Pointer to shortcut array entry.
+       * achTemp    - Temporary string buffer.
+       */
+    word         iCharTable;
+    word         cElemSize;
+    CMCharType * pShortcut;
+    char         achTemp[2];
+    char 	 codeTxt[30];
+    word 	 o1, o2, o3;	/* octal digits */
+
+      /*
+       * Find the actual index value into the shortcut array.
+       * Lock down the array and reference the entry.
+       */
+    iCharTable = (word)iChar_p - 32;
+    ObjLockObjBlock(OptrToHandle( @CMShortcuts ) );
+    pShortcut = ChunkArrayElementToPtr( @CMShortcuts,
+                                        iCharTable,
+                                        &cElemSize );
+EC( ECCheckBounds( pShortcut ); )
+
+      /*
+       * Start building the shortcut keystroke text using the
+       * shortcut table entry. First we'll handle the shift
+       * states of the keystroke.
+       */
+    acrShortcut_g[0] = '\0';
+    if ( SS_LSHIFT & pShortcut->CMCT_states ) {
+        strcat( acrShortcut_g, "Shift+" );
+    }
+    if ( SS_LCTRL & pShortcut->CMCT_states ) {
+        strcat( acrShortcut_g, "Ctrl+" );
+    }
+    if ( SS_LALT & pShortcut->CMCT_states ) {
+        strcat( acrShortcut_g, "Alt+" );
+    }
+
+      /*
+       * Now lets look at the "accent" character,
+       * ie. the keystroke used to give the character
+       * its accent. This is usually e, i, n, u, or `.
+       * It can also be a special flag which marks
+       * unusual characters in the Ascii chart.
+       */
+    achTemp[1] = '\0';
+    if ( NULL != pShortcut->CMCT_accent ) {
+        switch ( pShortcut->CMCT_accent ) {
+            case C_SPACE :
+                strcat( acrShortcut_g, "Space" );
+                break;
+            case 0x7F :
+                strcat( acrShortcut_g, "Delete" );
+                break;
+            case 0x80 :
+                strcat( acrShortcut_g, "Undefined" );
+                break;
+            default :
+                achTemp[0] = pShortcut->CMCT_accent;
+                strcat( acrShortcut_g, achTemp );
+                strcat( acrShortcut_g, " " );
+        }
+    }
+
+      /*
+       * Now display the main keystroke used to
+       * generate the character. Sometimes this is
+       * zero because the accent character is all
+       * that is needed.
+       */
+    if ( NULL != pShortcut->CMCT_char ) {
+        if ( C_SPACE == pShortcut->CMCT_char ) {
+            strcat( acrShortcut_g, "Space" );
+        }
+        else {
+            achTemp[0] = pShortcut->CMCT_char;
+            strcat( acrShortcut_g, achTemp );
+        }
+    }
+
+      /*
+       * Send the string we've built to the keystroke
+       * text object. Also unlock the block containing
+       * the keystroke table.
+       */
+    @send CMKeystrokeText::MSG_VIS_TEXT_REPLACE_ALL_PTR(
+        acrShortcut_g,
+        0 );
+    MemUnlock( OptrToHandle( @CMShortcuts ) );
+    
+    	/*
+    	 * Build the codes text and sent it to CMCharCodesText
+    	 * Unfortunately %o (oktal) is not supported by sprintf.
+    	 */
+    o1 = iChar_p / 64;
+    o2 = (iChar_p - o1*64)/8;
+    o3 = iChar_p - o1*64 - o2*8;
+    sprintf(codeTxt,"%03udez  %2Xhex  %u%u%uokt", iChar_p, iChar_p, o1, o2, o3);
+    @call CMCharCodesText::MSG_VIS_TEXT_REPLACE_ALL_PTR(codeTxt, 0);
+    
+} /* MapUpdateShortcut */
+
+/********************************************************************
+ *              Code for CMMapClass
+ *******************************************************************/
+
+/********************************************************************
+ *              MSG_META_START_SELECT
+ ********************************************************************
+ * SYNOPSIS:     User is clicking in the content.
+ * PARAMETERS:   MouseReturnParams * retVal
+ *               sword               xPosition
+ *               sword               yPosition
+ *               word                inputState
+ * RETURNS:      void
+ * SIDE EFFECTS: none
+ * STRATEGY:     Find the character in the map that is under the
+ *               mouse. Update the shortcut text object. Then
+ *               redraw the magnified character. Grab the mouse.
+ * REVISION HISTORY:
+ *      Name   Date             Description
+ *      ----   ----             -----------
+ *      NF     9/29/96          Initial Version
+ *******************************************************************/
+@extern method CMMapClass, MSG_META_START_SELECT {
+
+      /*
+       * Save the current character as the previous.
+       * Get the character under the mouse position.
+       * We're now dragging.
+       * No longer using the cursor keys, either.
+       * Grab the mouse and the gadget.
+       */
+    pself->CMMI_crPrevious = pself->CMMI_crCurrent;
+    pself->CMMI_crCurrent = MapFindCharFromPos( xPosition, yPosition );
+    pself->CMMI_bCursoring = FALSE;
+
+    if ( inputState & BI_DOUBLE_PRESS ) {
+        pself->CMMI_bDragging = FALSE;
+        @call self::MSG_CM_MAP_SELECT_CHAR(FALSE);
+    }
+    else {
+        pself->CMMI_bDragging = TRUE;
+        @call self::MSG_VIS_TAKE_GADGET_EXCL( oself );
+        @call self::MSG_VIS_GRAB_MOUSE();
+
+          /*
+           * Update the shortcut keystroke text object.
+           * Display the magnified character.
+           */
+        MapUpdateShortcut( pself->CMMI_crCurrent );
+    }
+   @call self::MSG_CM_MAP_SELECT_CHAR(TRUE);
+
+    @send self::MSG_CM_MAP_REDRAW_MAG_CHAR();
+    retVal->flags = MRF_PROCESSED;
+} /* MSG_META_START_SELECT */
+
+/********************************************************************
+ *              MSG_META_START_MOVE_COPY
+ ********************************************************************
+ * SYNOPSIS:     User has selected a quick copy.
+ * PARAMETERS:   MouseReturnParams * retVal
+ *               sword               xPosition
+ *               sword               yPosition
+ *               word                inputState
+ * RETURNS:      void
+ * SIDE EFFECTS: none
+ * STRATEGY:     Find the character under the pointer and use it
+ *               for quick copying.
+ * REVISION HISTORY:
+ *      Name   Date             Description
+ *      ----   ----             -----------
+ *      DR     02/18/97         Initial version
+ *******************************************************************/
+@extern method CMMapClass, MSG_META_START_MOVE_COPY {
+      /*
+       * mhText - Handle of the text block.
+       * pText  - The start of the locked text block.
+       */
+    MemHandle mhText;
+    char *    pText;
+
+      /*
+       * Setup the text as needed by the clipboard.
+       * Get the character under the pointer.
+       */
+    mhText = MemAlloc( 2, HF_DYNAMIC, 0 );
+    pText = (char*)MemLock( mhText );
+    pText[0] = MapFindCharFromPos( xPosition, yPosition );
+    pText[1] = '\0';
+    MemUnlock( mhText );
+
+    ClipboardStartQuickTransfer(
+        CQTF_COPY_ONLY, CQTF_COPY, 0, 0, 0, oself );
+    CopyCommon( CIF_QUICK, mhText );
+
+    MapUpdateShortcut( pText[0] );
+    pself->CMMI_crPrevious = pself->CMMI_crCurrent;
+    pself->CMMI_crCurrent = pText[0];
+    pself->CMMI_bCursoring = FALSE;
+    @call self::MSG_CM_MAP_SELECT_CHAR(TRUE);
+    @send self::MSG_CM_MAP_REDRAW_MAG_CHAR();
+      /*
+       * Tell clipboard that the view is not pastable.
+       */
+    ClipboardSetQuickTransferFeedback( CQTF_CLEAR, inputState );
+    @send CMView::MSG_GEN_VIEW_ALLOW_GLOBAL_TRANSFER();
+    retVal->flags = MRF_PROCESSED;
+} /* MSG_META_START_MOVE_COPY */
+
+/********************************************************************
+ *              MSG_META_DRAG_SELECT
+ ********************************************************************
+ * SYNOPSIS:     User is dragging in the content.
+ * PARAMETERS:   MouseReturnParams * retVal
+ *               sword               xPosition
+ *               sword               yPosition
+ *               word                inputState
+ * RETURNS:      void
+ * SIDE EFFECTS: none
+ * STRATEGY:     Find the character in the map that is under the
+ *               mouse. Update the shortcut text object. Then
+ *               redraw the magnified character.
+ * REVISION HISTORY:
+ *      Name   Date             Description
+ *      ----   ----             -----------
+ *      NF     10/13/96         Initial Version
+ *******************************************************************/
+@extern method CMMapClass, MSG_META_DRAG_SELECT {
+      /*
+       * ch - Character under mouse position.
+       */
+    unsigned char ch;	// <-- note about ch see MSG_META_KBD_CHAR
+
+      /*
+       * Check that we are in fact dragging the mouse.
+       * Also check the bounds on the mouse.
+       * Also make sure we don't hit the same character
+       * twice or we'll screw things up.
+       */
+    ch = MapFindCharFromPos( xPosition, yPosition );
+    if ( ( TRUE == pself->CMMI_bDragging ) &&
+         ( xPosition > 0 ) &&
+         ( xPosition < charm_map_pt_width_g ) &&
+         ( yPosition > 0 ) &&
+         ( yPosition < charm_map_pt_height_g ) &&
+         ( ch != pself->CMMI_crCurrent ) ) {
+        pself->CMMI_crPrevious = pself->CMMI_crCurrent;
+        pself->CMMI_crCurrent = ch;
+	@call self::MSG_CM_MAP_SELECT_CHAR(TRUE); 
+        MapUpdateShortcut( pself->CMMI_crCurrent );
+        @send self::MSG_CM_MAP_REDRAW_MAG_CHAR();
+    }
+
+    @send self::MSG_CM_MAP_SET_POINTER_IMAGE();
+    retVal->flags = MRF_PROCESSED;
+} /* MSG_META_DRAG_SELECT */
+
+/********************************************************************
+ *              MSG_META_PTR
+ ********************************************************************
+ * SYNOPSIS:     User is moving the mouse across the map.
+ * PARAMETERS:   MouseReturnParams * retVal
+ *               sword               xPosition
+ *               sword               yPosition
+ *               word                inputState
+ * RETURNS:      void
+ * SIDE EFFECTS: none
+ * STRATEGY:     Same as for MSG_META_DRAG_SELECT.
+ * REVISION HISTORY:
+ *      Name   Date             Description
+ *      ----   ----             -----------
+ *      NF     10/13/96         Initial Version
+ *******************************************************************/
+@extern method CMMapClass, MSG_META_PTR {
+      /*
+       * ch - Character under mouse position.
+       */
+    unsigned char ch;	// <-- note about ch see MSG_META_KBD_CHAR
+
+      /*
+       * Check that we are in fact dragging the mouse.
+       * Also check the bounds on the mouse since we
+       * will get this message when we have the grab,
+       * no matter where the mouse is on the screen.
+       * Also make sure we don't hit the same character
+       * twice or we'll screw things up.
+       */
+    ch = MapFindCharFromPos( xPosition, yPosition );
+    if ( ( TRUE == pself->CMMI_bDragging ) &&
+         ( xPosition > 0 ) &&
+         ( xPosition < charm_map_pt_width_g ) &&
+         ( yPosition > 0 ) &&
+         ( yPosition < charm_map_pt_height_g ) ) {
+        if ( ch != pself->CMMI_crCurrent ) {
+            pself->CMMI_crPrevious = pself->CMMI_crCurrent;
+            pself->CMMI_crCurrent = ch;
+            MapUpdateShortcut( pself->CMMI_crCurrent );
+	    @call self::MSG_CM_MAP_SELECT_CHAR(TRUE);
+            @send self::MSG_CM_MAP_REDRAW_MAG_CHAR();
+        }
+        @send self::MSG_CM_MAP_SET_POINTER_IMAGE();
+    }
+    else {
+        @send self::MSG_CM_MAP_RESET_POINTER_IMAGE();
+    }
+    retVal->flags = MRF_PROCESSED;
+} /* MSG_META_PTR */
+
+/********************************************************************
+ *              MSG_META_END_SELECT
+ ********************************************************************
+ * SYNOPSIS:     User has released the mouse button.
+ * PARAMETERS:   MouseReturnParams * retVal
+ *               sword               xPosition
+ *               sword               yPosition
+ *               word                inputState
+ * RETURNS:      void
+ * SIDE EFFECTS: none
+ * STRATEGY:     Set the dragging flag to false. Force a redraw
+ *               with no magnified character. Release the mouse.
+ * REVISION HISTORY:
+ *      Name   Date             Description
+ *      ----   ----             -----------
+ *      NF     10/13/96         Initial Version
+ *******************************************************************/
+@extern method CMMapClass, MSG_META_END_SELECT {
+
+    pself->CMMI_crPrevious = pself->CMMI_crCurrent;
+    pself->CMMI_bDragging = FALSE;
+
+    @send self::MSG_CM_MAP_REDRAW_MAG_CHAR();
+    @call self::MSG_VIS_RELEASE_GADGET_EXCL( oself );
+
+    @send self::MSG_CM_MAP_RESET_POINTER_IMAGE();
+    retVal->flags = MRF_PROCESSED;
+} /* MSG_META_END_SELECT */
+
+/********************************************************************
+ *              MSG_META_KBD_CHAR
+ ********************************************************************
+ * SYNOPSIS:     User has pressed a key, lets process it.
+ * PARAMETERS:   word character
+ *               word flags
+ *               word state
+ * RETURNS:      void
+ * SIDE EFFECTS: none
+ * STRATEGY:     Check if the user is using the cursor keys. If so
+ *               then change the current character. If not, try
+ *               to highlight the character the user pressed.
+ * REVISION HISTORY:
+ *      Name   	Date             Description
+ *      ----  	----             -----------
+ *      NF     	10/13/96         Initial Version
+ *	RainerB	11/11/2023	 Enter selectes character
+ *******************************************************************/
+@extern method CMMapClass, MSG_META_KBD_CHAR {
+      /*
+       * ch - Working character value.
+       */
+    unsigned char ch;	// <-- note that in swat the 'p ch' command probabely displays 
+    			// the CH register, but not the local varaoable ch.
+
+      /*
+       * Only want to process keypresses, not releases.
+       */
+    if ( flags & ( CF_FIRST_PRESS | CF_REPEAT_PRESS ) ) {
+        ch = pself->CMMI_crCurrent;
+        switch ( ( character & 0x00FF ) ) {
+              /*
+               * Check the cursor keys.
+               */
+            case VC_UP :
+                if ( ch >= 48 ) {
+                    ch -= CHARM_MAP_WIDTH;
+                }
+                break;
+            case VC_DOWN :
+                if ( ch < 240 ) {
+                    ch += CHARM_MAP_WIDTH;
+                }
+                break;
+            case VC_RIGHT :
+                if ( ch < 255 ) {
+                    ch++;
+                }
+                break;
+            case VC_LEFT :
+                if ( ch > 32 ) {
+                    ch--;
+                }
+                break;
+              /*
+               * Check the Home and End keys.
+               */
+            case VC_HOME :
+                ch = ch - ( ch % CHARM_MAP_WIDTH );
+                break;
+            case VC_END :
+                ch = ch + ( CHARM_MAP_WIDTH - ch % CHARM_MAP_WIDTH ) - 1;
+                break;
+            case VC_ENTER:
+	        @call self::MSG_CM_MAP_SELECT_CHAR(FALSE);
+	        break;
+            default :
+                  /*
+                   * User pressed some other key. Try to
+                   * highlight it on the character map.
+                   *
+                   * If the CF_STATE_KEY flag is set that means
+                   * that the Shift, Ctrl, or Alt keys are being
+                   * pressed by themselves.
+                   *
+                   */
+                if ( ( character >= 32 ) &&
+                     ( ( flags & CF_STATE_KEY ) == 0 ) &&
+                     ( ( flags & ( ~( SS_LSHIFT | SS_RSHIFT ) << 8 ) )
+                         == 0 ) ) {
+                    ch = character;
+                } 
+        } /* switch */
+
+          /*
+           * We've now gone into cursoring mode.
+           * Update the character and redisplay.
+           */
+        if ( ch != pself->CMMI_crCurrent ) {
+            pself->CMMI_crPrevious = pself->CMMI_crCurrent;
+            pself->CMMI_crCurrent = ch;
+            pself->CMMI_bCursoring = TRUE;
+            MapUpdateShortcut( pself->CMMI_crCurrent );
+	    @call self::MSG_CM_MAP_SELECT_CHAR(TRUE); 
+            @send self::MSG_CM_MAP_REDRAW_MAG_CHAR();
+        }
+    }
+} /* MSG_META_KBD_CHAR */
+
+/********************************************************************
+ *              MSG_META_GAINED_TARGET_EXCL
+ ********************************************************************
+ * SYNOPSIS:     Program has changed the target to us.
+ * PARAMETERS:   void
+ * RETURNS:      void
+ * SIDE EFFECTS: none
+ * STRATEGY:     Lets send the target back to the text object. This
+ *               will keep the font controller active. If we didn't
+ *               do this, the font control would become disabled
+ *               when the target changed to the map object.
+ * REVISION HISTORY:
+ *      Name   Date             Description
+ *      ----   ----             -----------
+ *      NF     10/14/96         Initial Version
+@extern method CMMapClass, MSG_META_GAINED_TARGET_EXCL {
+
+    @callsuper();
+
+    @send CMCharsToCopyText::MSG_META_GRAB_TARGET_EXCL();
+
+}
+ *******************************************************************/
+ /* MSG_META_GAINED_TARGET_EXCL */
+
+/********************************************************************
+ *              MSG_VIS_DRAW
+ ********************************************************************
+ * SYNOPSIS:     Draw the map because the view is exposed.
+ * PARAMETERS:   DrawFlags    drawFlags
+ *               GStateHandle gstate
+ * RETURNS:      void
+ * SIDE EFFECTS: none
+ * STRATEGY:     Set the font for the gstate so the rows won't have
+ *               to. Call the superclass so it will propogate the
+ *               message downward to the rows.
+ *               Draw the vertical lines separating the columns.
+ * REVISION HISTORY:
+ *      Name   Date             Description
+ *      ----   ----             -----------
+ *      NF     9/26/96          Initial Version
+ *	RainerB	11/11/2023	 Add magnified characters in bold feature
+ *******************************************************************/
+@extern method CMMapClass, MSG_VIS_DRAW {
+      /*
+       * iXPos     - X position of vertical line. Also used
+       *             for displaying unmagnified character.
+       * iYPos     - Y position of unmagnified character.
+       * region    - Region for magnified character.
+       * charSize  - Boundary of the magnified character.
+       * charWidth - Width of currently selected character.
+       */
+    sword     iXPos;
+    sword     iYPos;
+    Rectangle region;
+    dword     charWidth;
+
+      /*
+       * Set the font for all of the row objects to use.
+       */
+    GrSetFont( gstate,
+               pself->CMMI_curFont,
+               MakeWWFixed( charm_map_text_point_size_g ) );
+
+    @callsuper();
+    pself = ObjDerefVis( oself );
+
+      /*
+       * Draw the vertical lines separating the columns.
+       */
+    for ( iXPos = CHARM_MAP_LEFT + charm_box_width_g;
+          iXPos < charm_map_right_g;
+          iXPos += charm_box_width_g ) {
+        GrDrawVLine( gstate, iXPos, CHARM_MAP_TOP, charm_map_bottom_g );
+    }
+
+      /*
+       * If we're dragging or cursoring, then we
+       * have to draw the magnified character.
+       */
+    if ( ( TRUE == pself->CMMI_bDragging ) ||
+         ( TRUE == pself->CMMI_bCursoring ) ) {
+        GrSetAreaColor( gstate, CF_INDEX, C_WHITE, 0, 0 );
+        MapCalcMagCharRegion( pself->CMMI_crCurrent, &region );
+        GrFillRect( gstate,
+                    region.R_left,
+                    region.R_top,
+                    region.R_right,
+                    region.R_bottom );
+        GrDrawRect( gstate,
+                    region.R_left,
+                    region.R_top,
+                    region.R_right,
+                    region.R_bottom );
+        GrDrawVLine( gstate,
+                     region.R_right + 1,
+                     region.R_top + 2,
+                     region.R_bottom + 2 );
+        GrDrawVLine( gstate,
+                     region.R_right + 2,
+                     region.R_top + 2,
+                     region.R_bottom + 2 );
+        GrDrawHLine( gstate,
+                     region.R_left + 2,
+                     region.R_bottom + 1,
+                     region.R_right + 2 );
+        GrDrawHLine( gstate,
+                     region.R_left + 2,
+                     region.R_bottom + 2,
+                     region.R_right + 2 );
+
+        GrSetFont( gstate,
+                   pself->CMMI_curFont,
+                   MakeWWFixed( charm_map_mag_text_point_size_g ) );
+        charWidth = GrCharWidth( gstate, pself->CMMI_crCurrent ) >> 16;
+
+	GrSaveState(gstate);
+	if ( settings_g & CHARM_MAG_CHARS_BOLD) GrSetTextStyle (gstate, TS_BOLD, 0);
+        GrDrawChar( gstate,
+                    region.R_left + ( charm_mag_width_g - charWidth ) / 2,
+                    region.R_top + ( charm_mag_height_g -
+                                     charm_map_mag_text_point_size_g ) / 2,
+                    pself->CMMI_crCurrent );
+	GrRestoreState(gstate);        
+    }
+
+      /*
+       * Otherwise, draw the character normally
+       * but with a blue highlight.
+       */
+    else {
+        iXPos = ( (byte)pself->CMMI_crCurrent %
+                  (byte)CHARM_MAP_WIDTH ) *
+                (sword)charm_box_width_g +
+                (sword)CHARM_MAP_LEFT;
+          /*
+           * Subtract two for non-existent top two rows.
+           * Those rows would be for characters 0-31.
+           */
+        iYPos = ( ( (byte)pself->CMMI_crCurrent /
+                  (byte)CHARM_MAP_WIDTH ) - 2 ) *
+                (sword)charm_box_height_g +
+                (sword)CHARM_MAP_TOP;
+        GrSetAreaColor( gstate, CF_INDEX, C_BLUE, 0, 0 );
+        GrFillRect( gstate,
+                    iXPos + 1,
+                    iYPos + 1,
+                    iXPos + charm_box_width_g - 1,
+                    iYPos + charm_box_height_g -1 );
+        GrSetLineMaskSys( gstate, SDM_50 );
+        GrSetLineColor( gstate, CF_INDEX, C_WHITE, 0, 0 );
+        GrDrawRect( gstate,
+                    iXPos + 1,
+                    iYPos + 1,
+                    iXPos + charm_box_width_g - 1,
+                    iYPos + charm_box_height_g -1 );
+        GrSetTextColor( gstate, CF_INDEX, C_WHITE, 0, 0 );
+        charWidth = GrCharWidth( gstate, pself->CMMI_crCurrent ) >> 16;
+        GrDrawChar( gstate,
+                    iXPos + ( charm_box_width_g - charWidth ) / 2,
+                    iYPos + ( charm_box_height_g -
+                              charm_map_text_point_size_g ) / 2,
+                    pself->CMMI_crCurrent );
+    }
+    
+} /* MSG_VIS_DRAW */
+
+/********************************************************************
+ *              MSG_CM_MAP_CHANGE_FONT
+ ********************************************************************
+ * SYNOPSIS:     Program wants us to change the font we're drawing
+ *               with.
+ * PARAMETERS:   FontID fid
+ * RETURNS:      void
+ * SIDE EFFECTS: Content is redrawn.
+ * STRATEGY:     Save the new font id to an instance field. Make
+ *               the content invalid so it will redraw.
+ * REVISION HISTORY:
+ *      Name   Date             Description
+ *      ----   ----             -----------
+ *      NF     9/30/96          Initial Version
+ *******************************************************************/
+@extern method CMMapClass, MSG_CM_MAP_CHANGE_FONT {
+
+    pself->CMMI_curFont = fid;
+    @send self::MSG_CM_MAP_REDRAW();
+} /* MSG_CM_MAP_CHANGE_FONT */
+
+/********************************************************************
+ *              MSG_CM_MAP_GET_CUR_FONT
+ ********************************************************************
+ * SYNOPSIS:     Return the currently selected font face.
+ * PARAMETERS:   void
+ * RETURNS:      FontID fid
+ * SIDE EFFECTS: 
+ * STRATEGY:     
+ *
+ * REVISION HISTORY:
+ *      Name   Date             Description
+ *      ----   ----             -----------
+ *      edwin  3/22/99          Initial Version
+ *******************************************************************/
+@extern method CMMapClass, MSG_CM_MAP_GET_CUR_FONT {
+    return pself->CMMI_curFont;
+} /* MSG_CM_MAP_GET_CUR_FONT */
+
+/********************************************************************
+ *              MSG_CM_MAP_REDRAW
+ ********************************************************************
+ * SYNOPSIS:     Program wants us to redraw the content.
+ * PARAMETERS:   void
+ * RETURNS:      void
+ * SIDE EFFECTS: none
+ * STRATEGY:     Force a redraw of the content by invalidating the
+ *               entire content. A MSG_META_EXPOSED will be sent.
+ * REVISION HISTORY:
+ *      Name   Date             Description
+ *      ----   ----             -----------
+ *      NF     9/30/96          Initial Version
+ *******************************************************************/
+@extern method CMMapClass, MSG_CM_MAP_REDRAW {
+      /*
+       * win    - Window to draw to.
+       * gstate - Gstate to draw to.
+       */
+    WindowHandle win;
+    GStateHandle gstate;
+
+    win = @call pself->VCNI_view::MSG_GEN_VIEW_GET_WINDOW();
+EC( ECCheckWindowHandle( win ); )
+    gstate = GrCreateState( win );
+    GrInvalRect( gstate, CHARM_MAP_LEFT, CHARM_MAP_TOP,
+                 charm_map_right_g, charm_map_bottom_g );
+    GrDestroyState( gstate );
+} /* MSG_CM_MAP_REDRAW */
+
+/********************************************************************
+ *              MSG_CM_MAP_REDRAW_MAG_CHAR
+ ********************************************************************
+ * SYNOPSIS:     Program wants us to redraw the two spots where
+ *               the magnified character was and now is.
+ * PARAMETERS:   void
+ * RETURNS:      void
+ * SIDE EFFECTS: none
+ * STRATEGY:     First get the handle of the window for this
+ *               content/view. Then create a gstate. Find the
+ *               region for the previous magchar and invalidate
+ *               it. Do the same for the current magchar.
+ * REVISION HISTORY:
+ *      Name   Date             Description
+ *      ----   ----             -----------
+ *      NF     10/10/96         Initial Version
+ *******************************************************************/
+@extern method CMMapClass, MSG_CM_MAP_REDRAW_MAG_CHAR {
+      /*
+       * region - Area to invalidate.
+       * win    - Window to draw to.
+       * gstate - Gstate to draw to.
+       */
+    Rectangle    region;
+    WindowHandle win;
+    GStateHandle gstate;
+
+    win = @call pself->VCNI_view::MSG_GEN_VIEW_GET_WINDOW();
+EC( ECCheckWindowHandle( win ); )
+    gstate = GrCreateState( win );
+    MapCalcMagCharRegion( pself->CMMI_crPrevious, &region );
+    region.R_right += 2;
+    region.R_bottom += 2;
+    GrInvalRect( gstate,
+                 region.R_left,
+                 region.R_top,
+                 region.R_right,
+                 region.R_bottom );
+    MapCalcMagCharRegion( pself->CMMI_crCurrent, &region );
+    region.R_right += 2;
+    region.R_bottom += 2;
+    GrInvalRect( gstate,
+                 region.R_left,
+                 region.R_top,
+                 region.R_right,
+                 region.R_bottom );
+    GrDestroyState( gstate );
+} /* MSG_CM_MAP_REDRAW_MAG_CHAR */
+
+/********************************************************************
+ *              MSG_CM_MAP_SELECT_CHAR
+ ********************************************************************
+ * SYNOPSIS:     User wants the currently selected character to be
+ *               copied to the "Copy" text object.
+ * PARAMETERS:   Boolean single_char_mode_only
+ * RETURNS:      void
+ * SIDE EFFECTS: none
+ * STRATEGY:     Simply pass the current character to the text
+ *               object using the append or the replace all message.
+ * REVISION HISTORY:
+ *      Name   	Date             Description
+ *      ----   	----             -----------
+ *      NF     	10/13/96         Initial Version
+ *	RainerB	11/11/2023	 Multiple char mode added
+ *******************************************************************/
+@extern method CMMapClass, MSG_CM_MAP_SELECT_CHAR {
+
+	/*
+	 * See if single_char_mode_only is passed as true.
+	 * In this case, copy the character to the text object only if 
+	 * the flag CHARM_ALLOW_MULTIPLE_CHARS is NOT set in settings_g
+	 */
+    if ( single_char_mode_only ) {
+    	if ( settings_g & CHARM_ALLOW_MULTIPLE_CHARS ) return;
+    }
+
+    @send CMCopyTrigger::MSG_GEN_SET_ENABLED(VUM_DELAYED_VIA_UI_QUEUE);
+    /* If no character in the map is highlighted, we need to ignore it */
+    if (pself->CMMI_crCurrent) {
+    	if (settings_g & CHARM_ALLOW_MULTIPLE_CHARS) {
+    	    /* Mutiple chars allowed: Append character */
+            @call CMCharsToCopyText::MSG_VIS_TEXT_APPEND_PTR(
+        	    (char*)&pself->CMMI_crCurrent, 1 );
+    	} else {
+    	    /* Singe character mode: Replace text */
+            @call CMCharsToCopyText::MSG_VIS_TEXT_REPLACE_ALL_PTR(
+        	    (char*)&pself->CMMI_crCurrent, 1 );
+    	}
+    }
+
+    /* 
+     *	Copy selected characters to clipboard, if desired.
+     */
+    if (settings_g & CHARM_AUTO_COPY_TO_CLIPBOARD ) {
+    	@send CMCharsToCopyText::MSG_CM_TEXT_COPY_TEXT();
+    }
+    
+} /* MSG_CM_MAP_SELECT_CHAR */
+
+/********************************************************************
+ *              MSG_CM_MAP_CREATE_POINTER_DEF
+ ********************************************************************
+ * SYNOPSIS:     Program wants us to create the pointer definition
+ *               table.
+ * PARAMETERS:   void
+ * RETURNS:      void
+ * SIDE EFFECTS: none
+ * STRATEGY:     Allocate an lmem heap and then allocate a chunk
+ *               inside it of PointerDef16 size. Set the pointer
+ *               size to 16x16 and fill the image with zeros.
+ * REVISION HISTORY:
+ *      Name   Date             Description
+ *      ----   ----             -----------
+ *      NF     10/13/96         Initial Version
+ *******************************************************************/
+@extern method CMMapClass, MSG_CM_MAP_CREATE_POINTER_DEF {
+      /*
+       * mhPtr     - Block containing pointer definition.
+       * chPtr     - Chunk containing pointer definition.
+       * pDefTable - Pointer to definition table.
+       * i         - For loop variable.
+       */
+    MemHandle      mhPtr;
+    ChunkHandle    chPtr;
+    PointerDef16 * pDefTable;
+    byte           i;
+
+      /*
+       * Allocate an lmem heap. Make it sharable so view
+       * can see it.
+       * Set up a PointerDef16 chunk and fill it in.
+       */
+    mhPtr = MemAllocLMem( LMEM_TYPE_GENERAL, 0 );
+EC( ECCheckMemHandle( mhPtr ); )
+    MemModifyFlags( mhPtr, HF_SHARABLE, 0 );
+    MemLock( mhPtr );
+    chPtr = LMemAlloc( mhPtr, sizeof( PointerDef16 ) );
+EC( ECCheckLMemODHandles( mhPtr, chPtr ); )
+    pself->CMMI_odPtrDef = ConstructOptr( mhPtr, chPtr );
+    pDefTable = (PointerDef16*)LMemDeref( pself->CMMI_odPtrDef );
+EC( ECCheckBounds( pDefTable ); )
+    pDefTable->PD_width = 16;
+    pDefTable->PD_height = 16;
+    pDefTable->PD_hotX = 0;
+    pDefTable->PD_hotY = 0;
+    for ( i = 0; i < STANDARD_CURSOR_IMAGE_SIZE; i++ ) {
+        pDefTable->PD_mask[i] = 0;
+        pDefTable->PD_image[i] = 0;
+    }
+    MemUnlock( mhPtr );
+} /* MSG_CM_MAP_CREATE_POINTER_DEF */
+
+/********************************************************************
+ *              MSG_CM_MAP_DESTROY_POINTER_DEF
+ ********************************************************************
+ * SYNOPSIS:     Program wants us to destroy the pointer definition
+ *               table.
+ * PARAMETERS:   void
+ * RETURNS:      void
+ * SIDE EFFECTS: none
+ * STRATEGY:     Free the block containing the pointer definition.
+ * REVISION HISTORY:
+ *      Name   Date             Description
+ *      ----   ----             -----------
+ *      NF     10/13/96         Initial Version
+ *******************************************************************/
+@extern method CMMapClass, MSG_CM_MAP_DESTROY_POINTER_DEF {
+
+    MemFree( OptrToHandle( pself->CMMI_odPtrDef ) );
+} /* MSG_CM_MAP_DESTROY_POINTER_DEF */
+
+/********************************************************************
+ *              MSG_CM_MAP_SET_POINTER_IMAGE
+ ********************************************************************
+ * SYNOPSIS:     Map wants to set the mouse pointer image to be
+ *               blank.
+ * PARAMETERS:   void
+ * RETURNS:      void
+ * SIDE EFFECTS: none
+ * STRATEGY:     Set the view's mouse pointer image to be the
+ *               image we set up in MSG_CM_MAP_CREATE_POINTER_DEF.
+ * REVISION HISTORY:
+ *      Name   Date             Description
+ *      ----   ----             -----------
+ *      NF     10/15/96         Initial Version
+ *******************************************************************/
+@extern method CMMapClass, MSG_CM_MAP_SET_POINTER_IMAGE {
+
+    @send CMView::MSG_GEN_VIEW_SET_PTR_IMAGE(
+        pself->CMMI_odPtrDef,
+        PIL_WINDOW );
+} /* MSG_CM_MAP_SET_POINTER_IMAGE */
+
+/********************************************************************
+ *              MSG_CM_MAP_RESET_POINTER_IMAGE
+ ********************************************************************
+ * SYNOPSIS:     Map wants to restore the original mouse pointer
+ *               image.
+ * PARAMETERS:   void
+ * RETURNS:      void
+ * SIDE EFFECTS: none
+ * STRATEGY:     Set the view's mouse pointer image to be one of
+ *               the defaults.
+ * REVISION HISTORY:
+ *      Name   Date             Description
+ *      ----   ----             -----------
+ *      NF     10/15/96         Initial Version
+ *******************************************************************/
+@extern method CMMapClass, MSG_CM_MAP_RESET_POINTER_IMAGE {
+
+    @send CMView::MSG_GEN_VIEW_SET_PTR_IMAGE( NullOptr, PIL_WINDOW );
+} /* MSG_CM_MAP_RESET_POINTER_IMAGE */
+
+
+/********************************************************************
+ *              MSG_CM_MAP_COPY_TO_CLIPBOARD
+ ********************************************************************
+ * SYNOPSIS:    Copy the selected character to clipboard.
+ * PARAMETERS:   void
+ * RETURNS:      void
+ * SIDE EFFECTS: none
+ * STRATEGY:
+ * REVISION HISTORY:
+ *      Name   Date             Description
+ *      ----   ----             -----------
+ *      edwin  1/19/99          Initial Version
+ *	RainerB	11/11/2023	 Add empty text handling, leave copy trigger disabled
+ *******************************************************************/
+@extern method CMMapClass, MSG_CM_MAP_COPY_TO_CLIPBOARD 
+{
+    GeodeHandle token;
+    EventHandle msg;
+    optr target;
+    
+	/* if CMCharsToCopyText is empty, copy selected char */
+    if ( @call CMCharsToCopyText::MSG_VIS_TEXT_GET_TEXT_SIZE() == 0 ) {	
+	@call self::MSG_CM_MAP_SELECT_CHAR(FALSE);
+    }
+    @call CMCharsToCopyText::MSG_CM_TEXT_COPY_TEXT();
+    if (callerAppName[0] && callerAppGeodeHandle) {
+	/*  Check to see if the caller app is still running */
+	token = GeodeFind
+	    (callerAppName, (GEODE_NAME_SIZE + GEODE_NAME_EXT_SIZE),0,0);
+	if (token) {
+	    /* Yes, it's running */
+	    target = GeodeGetAppObject(token);
+	    msg = @record token::MSG_META_CLIPBOARD_PASTE();
+	    @call target::MSG_META_SEND_CLASSED_EVENT(msg, TO_TARGET);
+	    /* @send CMApplication::MSG_META_QUIT(); */
+	}
+    } 
+      /* leave Copy trigger enabled in any case. If CMCharsToCopyText is empty, 
+       * the currently selected char will be used 
+      else {
+	@send CMCopyTrigger::MSG_GEN_SET_NOT_ENABLED
+	     (VUM_DELAYED_VIA_UI_QUEUE);
+      }
+      */
+      
+    return;
+    
+} /* MSG_CM_MAP_COPY_TO_CLIPBOARD */
+
+/********************************************************************
+ *              Code for CMRowClass
+ *******************************************************************/
+
+/********************************************************************
+ *              MSG_VIS_DRAW
+ ********************************************************************
+ * SYNOPSIS:     Draw the row because the view is exposed.
+ * PARAMETERS:   DrawFlags    drawFlags
+ *               GStateHandle gstate
+ * RETURNS:      void
+ * SIDE EFFECTS: none
+ * STRATEGY:     First draw the horizontal line along the top edge,
+ *               but only if it's not the first row (space character).
+ *               Then start drawing the characters in this row,
+ *               starting from the CMRI_crStart.
+ * NOTES:        Drawing will appear slow at first. This is because
+ *               the outline font must be rendered into a bitmap.
+ *               Once that is done it will draw very fast the next
+ *               time.
+ * REVISION HISTORY:
+ *      Name   Date             Description
+ *      ----   ----             -----------
+ *      NF     10/5/96          Initial Version
+ *******************************************************************/
+@extern method CMRowClass, MSG_VIS_DRAW {
+      /*
+       * iYPos     - Y position of character.
+       * iXPos     - X position of character.
+       * crCurChar - Current character being drawn.
+       * charWidth - Width of character in row.
+       */
+    sword          iYPos;
+    sword          iXPos;
+    unsigned char  crCurChar;
+    dword          charWidth;
+
+    iYPos = pself->VI_bounds.R_top;
+    if ( ' ' != pself->CMRI_crStart ) {
+        GrDrawHLine( gstate, CHARM_MAP_LEFT, iYPos, charm_map_right_g );
+    }
+
+    crCurChar = pself->CMRI_crStart;
+    for ( iXPos = 0;
+          iXPos < charm_map_right_g;
+          iXPos += charm_box_width_g ) {
+        charWidth = GrCharWidth( gstate, crCurChar ) >> 16;
+        GrDrawChar( gstate,
+                    iXPos + ( charm_box_width_g - charWidth ) / 2,
+                    iYPos + ( charm_box_height_g -
+                              charm_map_text_point_size_g - 4) / 2,
+                    crCurChar );
+        crCurChar++;
+    }
+} /* MSG_VIS_DRAW */
+

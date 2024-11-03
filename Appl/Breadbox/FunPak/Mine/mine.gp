@@ -76,7 +76,7 @@ resource InterfaceOptionsMenu object
 resource InterfaceDensity object
 resource InterfaceFlags object
 resource InterfaceScores object
-resource InterfaceAbout object
+# resource InterfaceAbout object
 resource StringsResource lmem shared discardable read-only
 
 export MineProcessClass

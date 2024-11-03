@@ -1,5 +1,8 @@
-sokoban.rdef:		sokoban.ui 
-
+sokoban.rdef: generic.uih product.uih game.uih Objects/colorC.uih \
+                screens.ui sokobanStrings.ui sokobanEditor.ui \
+                Art/mksok.ui Art/mkrSokobanDoc.ui
+sokobanJBitmaps.obj \
+sokobanJBitmaps.eobj: 
 sokobanManager.obj \
 sokobanManager.eobj: stdapp.def geos.def geode.def resource.def ec.def lmem.def \
                 object.def graphics.def fontID.def font.def color.def \
@@ -37,3 +40,5 @@ sokobanManager.eobj: stdapp.def geos.def geode.def resource.def ec.def lmem.def 
                 sokobanDocument.asm sokobanApplication.asm \
                 sokobanSolve.asm sokobanMove.asm sokobanSounds.asm \
                 sokobanScores.asm sokobanLevels.asm sokobanEditor.asm
+
+sokobanEC.geo sokoban.geo : geos.ldf ui.ldf game.ldf 

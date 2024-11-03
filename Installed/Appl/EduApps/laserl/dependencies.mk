@@ -16,7 +16,7 @@ laserdb.eobj: stdapp.goh object.goh ui.goh Objects/metaC.goh \
                 Objects/gItemC.goh Objects/gBoolC.goh \
                 Objects/gGadgetC.goh Objects/gToolCC.goh \
                 Objects/gValueC.goh Objects/gToolGC.goh \
-                Objects/helpCC.goh options.goh
+                Objects/helpCC.goh options.goh laserdb.goh
 laserdb.obj \
 laserdb.eobj: geos.h heap.h geode.h resource.h ec.h object.h lmem.h \
                 graphics.h fontID.h font.h color.h gstring.h timer.h vm.h \
@@ -46,13 +46,14 @@ laserl.eobj: stdapp.goh object.goh ui.goh Objects/metaC.goh \
                 Objects/gGadgetC.goh Objects/gToolCC.goh \
                 Objects/gValueC.goh Objects/gToolGC.goh \
                 Objects/helpCC.goh Objects/vLTextC.goh Ansi/string.h \
-                Ansi/stdio.h Ansi/ctype.h laserdb.goh Art/iconvga.goh \
-                Art/iconhgc.goh Art/iconcga.goh Art/iconsvga.goh \
-                Art/iconshgc.goh Art/bboxreg.goh Art/art.goh Art/base.goh \
-                Art/city.goh Art/scity.goh Art/shot.goh Art/boom.goh \
-                Art/dead.goh Art/capsule.goh Art/colbase.goh \
-                Art/colcity.goh Art/colscity.goh Art/colxplod.goh \
-                Art/colxsky.goh Art/colboom.goh Art/coldead.goh
+                Ansi/stdio.h Ansi/ctype.h initfile.h laserdb.goh \
+                Art/iconvga.goh Art/iconhgc.goh Art/iconcga.goh \
+                Art/iconsvga.goh Art/iconshgc.goh Art/art.goh \
+                Art/base.goh Art/city.goh Art/scity.goh Art/shot.goh \
+                Art/boom.goh Art/dead.goh Art/capsule.goh \
+                Art/qtipcity.goh Art/colbase.goh Art/colcity.goh \
+                Art/colscity.goh Art/colxplod.goh Art/colxsky.goh \
+                Art/colboom.goh Art/coldead.goh
 laserl.obj \
 laserl.eobj: geos.h heap.h geode.h resource.h ec.h object.h lmem.h \
                 graphics.h fontID.h font.h color.h gstring.h timer.h vm.h \

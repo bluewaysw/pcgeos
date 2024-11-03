@@ -52,7 +52,9 @@ KNOWN BUGS/SIDE EFFECTS/IDEAS:
 REVISION HISTORY:
 	Name	Date		Description
 	----	----		-----------
-	FR	29/1/21		Initial version
+	FR	01.29.21	Initial version
+	JK	10.02.24	width and weight implemented
+	JK	19.09.24	cleanup
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
 
@@ -63,57 +65,61 @@ TrueTypeGenWidths	proc	far
 	.enter
 
 	xchg	di, ax
-	mov		di, 800
+	mov	di, 800
 	call	ThreadBorrowStackSpace
 	push	di
 
-	push	ax			; pass seg addr to fontBuf
-	push	bx			; send tMatrix ptr
+	push	ax			;pass seg addr to fontBuf
+	push	bx			;send tMatrix ptr
 	push 	cx
 
 	clr	al
 	movwbf	dxah, es:GS_fontAttr.FCA_pointsize
-	push	dx			; pass point size
+	push	dx			;pass point size
 	push 	ax
+
+	clr	ah
+	mov	al, es:GS_fontAttr.FCA_width
+	push	ax			;pass width
+	mov	al, es:GS_fontAttr.FCA_weight
+	push	ax			;pass wieght
 		
 	mov	cx, es:GS_fontAttr.FCA_fontID
 	call	FontDrFindFontInfo
-	push	ds			; pass ptr to FontInfo
+	push	ds			;pass ptr to FontInfo
 	push 	di
 
-	mov	cx, ds			; save ptr to FontInfo
+	mov	cx, ds			;save ptr to FontInfo
 	mov	dx, di
 
-	clr	ah
 	mov	al, es:GS_fontAttr.FCA_textStyle
 	mov	bx, ODF_HEADER
 	call	FontDrFindOutlineData
-	push	ds			; pass ptr to OutlineEntry
+	push	ds			;pass ptr to OutlineEntry
 	push	di
 
 	mov	ds, cx
 	mov	di, dx
 
-	clr	ah
 	mov	al, es:GS_fontAttr.FCA_textStyle
 	mov	bx, ODF_PART1
 	call	FontDrFindOutlineData
-	push	ds			; pass ptr to FontHeader
+	push	ds			;pass ptr to FontHeader
 	push	di
-	push	ax			; pass stylesToImplement
+	push	ax			;pass stylesToImplement
 
 	segmov	ds, dgroup, dx
-	push	ds:variableHandle	; pass varBlock
+	push	ds:variableHandle	;pass varBlock
 	call	TRUETYPE_GEN_WIDTHS
 
-	mov	bx, ax			; mov font hdl to bx
+	mov	bx, ax			;mov font hdl to bx
 	call	MemDerefDS
 	segmov	ax, ds
 
-	pop		di
+	pop	di
 	call	ThreadReturnStackSpace
 
-	clc					;indicate no error
+	clc				;indicate no error
 
 	.leave
 	ret

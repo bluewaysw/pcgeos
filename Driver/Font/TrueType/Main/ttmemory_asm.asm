@@ -3,7 +3,7 @@ COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 	Copyright (c) Berkeley Softworks 1991 -- All Rights Reserved
 
 PROJECT:	PC/GEOS
-MODULE:		Font Driver
+MODULE:		TrueType Font Driver
 FILE:		ttmemory_asm.asm
 
 AUTHOR:		Andrew Wilson, Sep 17, 1991

@@ -9,6 +9,11 @@
  * AUTHORS:  Lawrence Hosken: Sep 21, 1992
  *           Nathan Fiedler:  Apr 1, 1995
  *           Clemens Kochinke:  December 29, 1995
+ *
+ * Other important contributors
+ * 	John Howard, Ray Kopczynski, Lee Grant
+ *	Dave Challener, Dirk Haase, Mark Tenney
+ *
  * REVISION HISTORY:
  *      Name   Date      Description
  *      ----   ----      -----------
@@ -21,6 +26,8 @@
  *      CK     5/26/96   Revision with large text object
  *      CK     2/22/97   Revision for Breadbox, added 3.2 HTML, UI db's,
  *                       user advisories.
+ *	RB     3/25/24	 Updated for Free PC/GEOS Ensemble	
+ *
  * DESCRIPTION:
  *      This is a simple web page editor based primarily on Nathan Fiedler's
  *      text file editor made for the Zoomer and other GEOS-based PDAs.
@@ -57,7 +64,6 @@
 /******************Method Declarations***********/
     @extern method HTMProcessClass, MSG_GEN_PROCESS_OPEN_APPLICATION;
     @extern method HTMProcessClass, MSG_GEN_PROCESS_CLOSE_APPLICATION;
-    @extern method HTMProcessClass, MSG_HTMP_MORE_ABOUT_INITIATE;
     @extern method HTMProcessClass, MSG_META_SAVE_OPTIONS;
     @extern method HTMProcessClass, MSG_GEN_PROCESS_TOGGLE_TOOL_BAR;
     @extern method HTMProcessClass, MSG_GEN_PROCESS_TOGGLE_BUTTON_BAR;
@@ -160,11 +166,15 @@
 @object GenInteractionClass HTMFileGroup = {
   GI_attrs = @default | GA_KBD_SEARCH_PATH;
   GI_comp =  @HTMDocumentControl, @HTMSaveTrigger,
-             @HTMPrintControl, @FileBoxToggle;
+             HTMFileSubGroup;
 /*GI_states = @default & ~GS_ENABLED; for demo version*/
   GII_visibility = GIV_POPUP;
   ATTR_GEN_INTERACTION_GROUP_TYPE = (GIGT_FILE_MENU);
   HINT_SEEK_MENU_BAR;
+}
+
+@object GenInteractionClass HTMFileSubGroup = {
+  GI_comp = @HTMPrintControl, @FileBoxToggle;
 }
 
    /**** Document control UI ****/
@@ -186,16 +196,16 @@
                      GDCF_SUPPORTS_USER_MAKING_SHARED_DOCUMENTS  |
                      GDCF_NAME_ON_PRIMARY  );
 @ifdef E
-  GDCI_dialogNewText =  "\rCreate:\rCreate a Web Page.";
+  GDCI_dialogNewText =  "Create:\rCreate a Web Page.";
 @endif
 @ifdef D
-  GDCI_dialogNewText =  "\rNeu:\rNeue Webseite anlegen.";
+  GDCI_dialogNewText =  "Neu:\rNeue Webseite anlegen.";
 @endif
 @ifdef E
-  GDCI_dialogOpenText = "\rOpen:\rOpen a Web Page.";
+  GDCI_dialogOpenText = "Open:\rOpen a Web Page.";
 @endif
 @ifdef D
-  GDCI_dialogOpenText = "\r�ffnen:\rWebseite �ffnen."; /*  Alt 133/154 */
+  GDCI_dialogOpenText = "�ffnen:\rWebseite �ffnen."; /*  Alt 133/154 */
 @endif
   GDCI_enableDisableList = HTMDocEnableList;
   GDCI_selectorType = GFST_NON_GEOS_FILES;
@@ -212,7 +222,9 @@
 @ifdef D
  GI_visMoniker = 'r', "Speichern";
 @endif
- GI_states = @default & ~GS_ENABLED;/* new in jw96*/
+/* GI_states = @default & ~GS_ENABLED; new in jw96*/
+ GI_states = @default & ~(GS_ENABLED | GS_USABLE); /* RB */
+ 				    /* Trigger obsolete? will never be enabled R.B. */
  GTI_destination = HTMDocumentControl;
  GTI_actionMsg = MSG_GEN_DOCUMENT_CONTROL_INITIATE_SAVE_DOC;
 }
@@ -224,6 +236,7 @@
  PCI_docNameOutput = @HTMDocumentGroup;
  PCI_docSizeInfo = { ( 7.5 * 72 ), ( 10 * 72 ), PT_PAPER,
          { ( 0.5 * 72 ), ( 0.5 * 72 ), ( 0.5 * 72 ), ( 0.5 * 72 ) } };
+ HINT_SAME_CATEGORY_AS_PARENT;
 }
 
 @object GenTriggerClass FileBoxToggle = {
@@ -235,6 +248,7 @@
 @endif
   GTI_destination = @FileBox;
   GTI_actionMsg = MSG_GEN_INTERACTION_INITIATE;
+  HINT_TRIGGER_BRINGS_UP_WINDOW;
 }
 
 /* --------------================GEOS GROUP===========----------- */
@@ -396,7 +410,7 @@
   GI_visMoniker = 'S', "Sizes";
 @endif
 @ifdef D
-  GI_visMoniker = '�', "Gr��e";
+  GI_visMoniker = 'r', "Gr\x9a\xa7e";
 @endif
 /* rem'd in jw96:*/ GII_visibility = GIV_POPUP;
   GI_attrs = @default | GA_KBD_SEARCH_PATH;
@@ -513,7 +527,7 @@
   GI_visMoniker = 'C', "Customize Tools";
 @endif
 @ifdef D
-  GI_visMoniker = '�', "Einstellungen �ndern"; /* alt 138 */
+  GI_visMoniker = 'E', "Einstellungen \x08andern"; /* alt 138 */
 @endif
   GI_comp = @HTMToolControl;
   GII_visibility = GIV_DIALOG;
@@ -1135,8 +1149,8 @@ Boolean ReadDataFromFile
   word            numCharsRead;    /* Size returned by FileRead. */
   MemHandle       dataBlockHandle; /* Handle to memory block. */
   unsigned char * dataBlockPtr;    /* Holds string being processed. */
-  word            numCharsLeft;    /* Characters left to process. */
-  word            curCharIndex;    /* Index into character array. */
+/*  word            numCharsLeft;     Characters left to process. */
+/*  word            curCharIndex;     Index into character array. */
      /* Set position to start of file. */
   #ifdef DEBUG
     if ( file_p == NullHandle ) {
@@ -1362,7 +1376,7 @@ Boolean WriteDataToFile
 } /* MSG_GEN_DOCUMENT_INITIALIZE_DOCUMENT_FILE */
 
 @extern method HTMDocumentClass, MSG_GEN_DOCUMENT_ATTACH_UI_TO_DOCUMENT {
-  word *               error;      /* Error value from ReadDataFromFile. */
+  word                 error;      /* Error value from ReadDataFromFile. */
   VMFileHandle         fileHan;    /* Used to set VM file for text. */
   optr                 ourText;    /* Pointer to text object. */
   optr                 textOD;     /* Pointer to HTMText. */
@@ -1416,7 +1430,7 @@ Boolean WriteDataToFile
                                              TEXT_ADDRESS_PAST_END, 0 );
   }
      /* Read in text file by calling read data function.  */
-  ReadDataFromFile( pself->GDI_fileHandle, ourText, error );
+  ReadDataFromFile( pself->GDI_fileHandle, ourText, &error );
 } /* MSG_GEN_DOCUMENT_ATTACH_UI_TO_DOCUMENT */
 
 @extern method HTMDocumentClass, MSG_GEN_DOCUMENT_DETACH_UI_FROM_DOCUMENT {
@@ -1533,4 +1547,4 @@ if (pself->HTMDI_textHandle==NullHandle){}
           @call textOD::MSG_VIS_TEXT_RECALC_AND_DRAW();
           }
 } /* CK */
-
+
