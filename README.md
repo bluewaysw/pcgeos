@@ -81,4 +81,4 @@ PC/GEOS comes with extensive technical documentation that describes tools, progr
 You can find a browseable, searchable version of the documentation here: https://bluewaysw.github.io/pcgeos/
 
 ##
-We are on https://bluewaysw.slack.com/ for more efficient collaboration. Please register at https://blog.bluewaysw.de for MyGEOS and use the Slack section and receive access to our developer community. Welcome!
+We are on https://discord.com/ for more efficient collaboration. Please register at https://discord.gg/qtMqgZXhf9 for blueway.Softworks or use an existing discord-account to get access to our developer community. Welcome!
