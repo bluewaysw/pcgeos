@@ -1,0 +1,818 @@
+/***********************************************************************
+ *
+ * PROJECT:       VConvert
+ * FILE:          HPGL.goc
+ *
+ * DESCRIPTION:   HPGL-Plotdateien in GeoWorks-Clipboard-Format umwandeln
+ *
+ * AUTHOR:        Marcus Groeber
+ *
+ ***********************************************************************/
+
+/*
+ ***************************************************************************
+ *		Include files
+ ***************************************************************************
+ */
+@include <stdapp.goh>
+
+#include <ansi/string.h>
+#include <ansi/stdio.h>
+#include <ansi/stdlib.h>
+#include <ansi/ctype.h>
+#include <math.h>
+#include <file.h>
+#include <system.h>
+#include <localize.h>
+
+#include "VConvert.h"
+
+
+/* #define DUMP */
+
+static FileHandle fPlot;
+static int NextChar,plotEOF;
+#ifdef DUMP
+  static FILE *fDump;
+#endif
+
+static int Text;                        /* Texte mit�bertragen? */
+
+typedef struct { FloatNum x,y;} Plot_Point;
+                                        /* Punkt im Plotter-Koordinatensystem */
+static Plot_Point pl_P1,pl_P2;          /* P1/P2 (Koordinatensystem-Eckpunkte) */
+static Plot_Point pl_min,pl_max;        /* Skalierungs-Eckwerte */
+static int pl_scaled;                   /* Skaliert? */
+static int pl_pendown;                  /* Zeichenmodus gesetzt */
+static word pl_pen;                     /* current pen # */
+static Plot_Point pl_cur;               /* Aktuelle Stiftposition */
+static Point pl_curg;                   /* Aktuelle Stiftposition (GW-Koord.) */
+
+static int pl_term;                     /* Label-Endmarke */
+static int n_poly;                      /* Anzahl der Punkte im Polygon */
+static WWFixedAsDWord pl_size;          /* Punktgr��e der Schrift */
+static int pl_angle;                    /* Schreibrichtung */
+static int relmode;                     /* PU/PD absolut oder relativ? */
+
+static Point *hpgl_par;                 /* Buffer for polygon corner points */
+
+#define pl_XSize 11867                  /* Ein A4-Blatt in Plotter-Koordinaten */
+#define pl_YSize 8382
+#define gw_XSize 841                    /* Ein A4-Blatt in Geos-Koordinaten */
+#define gw_YSize 594
+
+#define mm2pl   40                      /* Umrechung Millimeter -> PlotUnits */
+
+#define pl_P1x 500                      /* Standardwerte f�r Skalierungspunkte */
+#define pl_P2x (pl_XSize-pl_P1x)
+#define pl_P1y 400
+#define pl_P2y (pl_YSize-pl_P1x)
+
+static Plot_Point pl2gw={ 841.0F/11867.0F, 594.0F/8382.0F };
+                                        /* Umrechungsfaktoren f�r Standard- */
+                                        /*   einheiten (PlotUnits -> Point) */
+
+int gch(int w2c)
+/*
+   Ein Zeichen aus der Plot-Datei lesen, Whitespaces �berspringen.
+*/
+{
+        int ret;
+
+        ret=NextChar;                   /* N�chstes Zeichen zur�ckgeben */
+        if(plotEOF)                     /* Am Dateiende ewig "ZZZ" zur�ckgeben */
+          return 'Z';
+        do {
+          if(FileRead(fPlot,&NextChar,1,FALSE)==0) NextChar=EOF;
+                                        /* Ein Zeichen aus Datei lesen */
+        } while(NextChar!=EOF && (NextChar==' ' || NextChar=='\t') && w2c);
+                                        /* evtl. Whitespaces �berlesen */
+        if(NextChar=='\n')              /* CR wirkt als Trennzeichen */
+          NextChar=';';
+        if(NextChar=='\t')
+          NextChar=' ';
+        if(NextChar==EOF) {             /* Ende der Datei erreicht? */
+          plotEOF=1;                    /* Endflag setzen */
+          NextChar=';';                 /* ";" f�r korrektes Parsing simulieren */
+        }
+#ifdef DUMP
+  fwrite(&ret,1,1,fDump);
+#endif
+        return ret;
+}
+
+void gnum(FloatNum *n)
+{
+        char buf[255];
+        int i;
+
+        i=0;                            /* Anfangen am Anfang */
+        while(isnum(NextChar))          /* Numerische Zeichen in Puffer */
+          buf[i++]=(char)gch(0);
+        while(NextChar==',' || NextChar==' ')
+          gch(1);                       /* folgendes Komma �berspringen */
+        buf[i]=0;                       /* Endmarke f�r Puffer */
+        FloatAsciiToFloat(FAF_PUSH_RESULT,strlen(buf),buf,NULL);
+        FloatPopNumber(n);
+}
+
+sword gnum_int(void)
+{
+        char buf[255];
+        int i;
+
+        i=0;                            /* Anfangen am Anfang */
+        while(isnum(NextChar))          /* Numerische Zeichen in Puffer */
+          buf[i++]=(char)gch(0);
+        while(NextChar==',' || NextChar==' ')
+          gch(1);                       /* folgendes Komma �berspringen */
+        buf[i]=0;                       /* Endmarke f�r Puffer */
+        FloatAsciiToFloat(FAF_PUSH_RESULT,strlen(buf),buf,NULL);
+        return (sword)FloatFloatToDword();
+}
+
+void gpoint(Plot_Point *p,int rel)
+{
+        gnum(&p->x);                    /* Beide Koordinaten des Punktes holen */
+        gnum(&p->y);
+        if(rel) {                       /* Relative Koordinaten? */
+          FloatPushNumber(&pl_cur.x);
+          FloatPushNumber(&p->x);       /* Relative in absolute Koordinaten */
+            FloatAdd();
+            FloatPopNumber(&p->x);
+          FloatPushNumber(&pl_cur.y);
+          FloatPushNumber(&p->y);
+            FloatAdd();
+            FloatPopNumber(&p->y);
+        }                               
+#ifdef DUMP
+  {
+  char buf[256];
+  sprintf(buf,"<%d,%d>\n",(sword)p->x,(sword)p->y);
+  fwrite(buf,strlen(buf),1,fDump);
+  }
+#endif
+}
+
+int scale(Plot_Point *p,Point *gp)
+/*
+   Punkt p von Plotter-/Anwender-Koordinaten in Meta-Koordinaten (gp)
+   �bertragen und pr�fen. R�ckgabe 1, falls au�erhalb des Plotfeldes.
+*/
+{
+        if(pl_scaled) {                 /* Koordinaten vorskalieren? */
+          FloatPushNumber(&p->x);       /* Anwender- in Plotter-Koordinaten */
+          FloatPushNumber(&pl_min.x);
+            FloatSub();
+          FloatPushNumber(&pl_P2.x);
+          FloatPushNumber(&pl_P1.x);
+            FloatSub();
+              FloatMultiply();
+            FloatPushNumber(&pl_max.x);
+            FloatPushNumber(&pl_min.x);
+              FloatSub();
+                FloatDivide();
+              FloatPushNumber(&pl_P1.x);
+                FloatAdd();
+                gp->P_x=(sword)FloatFloatToDword();
+
+          FloatPushNumber(&p->y);
+          FloatPushNumber(&pl_min.y);
+            FloatSub();
+          FloatPushNumber(&pl_P2.y);
+          FloatPushNumber(&pl_P1.y);
+            FloatSub();
+              FloatMultiply();
+            FloatPushNumber(&pl_max.y);
+            FloatPushNumber(&pl_min.y);
+              FloatSub();
+                FloatDivide();
+              FloatPushNumber(&pl_P1.y);
+                FloatAdd();
+                gp->P_y=(sword)FloatFloatToDword();
+        }                               
+        else {                          /* Koordinaten einfach �bernehmen */
+          FloatPushNumber(&p->x);
+          gp->P_x=(sword)FloatFloatToDword();
+          FloatPushNumber(&p->y);
+          gp->P_y=(sword)FloatFloatToDword();
+        }
+
+        if( !_between(gp->P_x,-pl_XSize,2*pl_XSize) ||
+            !_between(gp->P_y,-pl_YSize,2*pl_YSize) )
+          return 1;                     /* Fehler: ung�ltige Koordinaten */
+#ifdef DUMP
+  {
+  char buf[256];
+  sprintf(buf,"[-> %d,%d]",(sword)p->x,(sword)p->y);
+  fwrite(buf,strlen(buf),1,fDump);
+  }
+#endif
+        return 0;
+}
+
+void ClosePoly(void)
+/*
+   Polygon schlie�en (falls offen) und ausgeben
+*/
+{
+        if(!n_poly) return;             /* Kein Polygon offen - Das war's schon */
+        Meta_Polyline(hpgl_par,n_poly); /* output polygon or line */
+        n_poly=0;                       /* Neue Polygon anfangen */
+}
+
+void MovePlotTo(Plot_Point *p)
+/*
+   Stift zum Punkt p bewegen und entweder zeichnen oder nicht. Dabei werden
+   Linien so lange es geht zu Polygonen zusammengefa�t, au�erdem werden
+   mehrfach gezeichnete horizontale/vertikale Linien so weit wie m�glich
+   eliminiert (z.B. erforderlich f�r die Ausgaben von Harvard Graphics, die
+   wirklich _entsetzlich_ sind). Auf diese Weise kann eine Grafik leicht
+   auf 50% ihrer unkomprimierten Gr��e schrumpfen.
+*/
+{
+        Point s,d,*p1,*p2;       /* Anfangs-/Endpunkt */
+        Point s_,d_;             /* Vorhergehender Anfangs-/Endpunkt */
+        int i,j,fi,fj;
+
+        s=pl_curg;                      /* Aktuelle Position (Geos-Koord.) */
+        if(scale(p,&d)) return;         /* Punkt in Geos-Koordinaten */
+        pl_cur=*p;                      /* Punkt in Plot-Koordinaten merken */
+        pl_curg=d;                      /* Punkt in Geos-Koordinaten merken */
+
+        if(pl_pendown) {                /* Malen? */
+          if(n_poly>=2) {               /* Schon eine Linie vorhanden */
+/*
+   F�r den Fall, da� schon eine Linie vorhanden ist, folgt jetzt ein wenig
+   Optimiererei: Waagerechte/senkrechte Linien, die sich teilweise mit der
+   vorhergehenden Linie �berlappen (d.h. einer der beiden Punkte liegt auf
+   der alten Linie) werden mit dieser zu einer Linie zusammengefa�t.
+*/
+            int t;
+
+            s_=hpgl_par[n_poly-2];      /* Koordinaten der letzten Linie */
+            d_=hpgl_par[n_poly-1];
+            /* vertikal */
+            if(s.P_x==d.P_x && s_.P_x==d_.P_x && s.P_x==d_.P_x
+               && (_between(s.P_y,d_.P_y,s_.P_y) ||
+                   _between(d.P_y,d_.P_y,s_.P_y))) {
+              t=min(s_.P_y,min(d_.P_y,min(s.P_y,d.P_y)));
+              d.P_y=max(s_.P_y,max(d_.P_y,max(s.P_y,d.P_y)));
+              s.P_y=t;
+              n_poly--;                 /* Eine Linie entfernen */
+              if(n_poly==1) n_poly=0;   /* Letzte Linie? Polygon ganz weg */
+            }
+            /* horizontal */
+            else if(s.P_y==d.P_y && s_.P_y==d_.P_y && s.P_y==d_.P_y
+                    && (_between(s.P_x,d_.P_x,s_.P_x) ||
+                        _between(d.P_x,d_.P_x,s_.P_x))) {
+              t=min(s_.P_x,min(d_.P_x,min(s.P_x,d.P_x)));
+              d.P_x=max(s_.P_x,max(d_.P_x,max(s.P_x,d.P_x)));
+              s.P_x=t;
+              n_poly--;                 /* Eine Linie entfernen */
+              if(n_poly==1) n_poly=0;   /* Letzte Linie? Polygon ganz weg */
+            }
+          }
+
+          if(n_poly) {                  /* Polygon offen? */
+            fi=fj=-1;                   /* Noch keine passende Kombination */
+            for(i=0,p1=&s;i<2;i++,p1=&d)/* Alle Kombinationen durchprobieren */
+              for(j=0,p2=&hpgl_par[n_poly-1];j<2;j++,p2=&hpgl_par[0])
+                if(p1->P_x==p2->P_x && p1->P_y==p2->P_y) {
+                                        /* Passende Punkte gefunden? */
+                  fi=i;
+                  fj=j;
+                }
+            if(fi>0)                    /* Endpunkt der neuen Linie pa�t? */
+              memswap(&s,&d,sizeof(Point));
+                                        /* Ja: Linie umdrehen */
+            if(fj>0)                    /* Anfangspunkt des alten Polygons pa�t? */
+              for(i=0;i<n_poly/2;i++)   /* Ja: ganzes Polygon umdrehen */
+                memswap(&hpgl_par[i],&hpgl_par[n_poly-1-i],sizeof(Point));
+            if(fi==-1 || n_poly>=MAX_POINTS)
+                                        /* Line pa�t nicht an Polygon? */
+              ClosePoly();              /* Polygon abschlie�en */
+          }
+          if(!n_poly) {                 /* Kein Polygon/neues Polygon? */
+            hpgl_par[n_poly].P_x=s.P_x; /* Anfangspunkt des Polygons definieren */
+            hpgl_par[n_poly++].P_y=s.P_y;
+          }
+          hpgl_par[n_poly].P_x=d.P_x;   /* Neuen Endpunkt an Polygon anf�gen */
+          hpgl_par[n_poly++].P_y=d.P_y;
+        }
+}
+
+void Cmd_IN(void)
+/*
+    Kommando: IN
+
+    Plotter initialisieren
+*/
+{
+        ClosePoly();                    /* first close any open polygon */
+        FloatDwordToFloat(pl_P1x); FloatPopNumber(&pl_P1.x);
+        FloatDwordToFloat(pl_P1y); FloatPopNumber(&pl_P1.y);
+        FloatDwordToFloat(pl_P2x); FloatPopNumber(&pl_P2.x);
+        FloatDwordToFloat(pl_P2y); FloatPopNumber(&pl_P2.y);
+                                        /* Standardwerte f�r einen A4-Plotter */
+        pl_scaled=0;                    /* Keine Skalierung verwenden */
+        pl_term='\3';                   /* Endmarke: Ctrl-C */
+        pl_pendown=0;                   /* Pen Up */
+        Meta_SetLineColor(CF_INDEX,pl_pen=0,0,0);
+                                        /* default pen */
+        Meta_SetScaling(0,0,(sword)pl_XSize-1,(sword)pl_YSize-1,
+          (sword)gw_XSize,(sword)gw_YSize);
+                                        /* Skalierung */
+        pl_size=MakeWWFixed(10);        /* Standardschrift: 10 Punkt */
+        pl_angle=0;                     /* Schreibrichtung horizontal */
+        relmode=0;                      /* PU/PD absolute Koordinaten */
+        MovePlotTo(&pl_P1);             /* Am Anfang steht der Plotter auf P1 */
+}
+
+void Cmd_SC(void)
+/*
+    Kommando: SC{<x1>,<x2>,<y1>,<y2>}
+
+    Setzt die Eckpunkte der Skalierung - ohne Parameter: hebt Skalierung auf
+*/
+{
+        if(!isnum(NextChar))            /* Folgen keine numerischen Parameter? */
+          pl_scaled=0;                  /* Keine Parameter: Skalierung aus */
+        else {
+          pl_scaled=1;                  /* Skalierungsparameter setzen */
+          gnum(&pl_min.x);
+          gnum(&pl_max.x);
+          gnum(&pl_min.y);
+          gnum(&pl_max.y);              /* Eckpunkte speichern */
+        }
+}
+
+void Cmd_IP(void)
+/*
+    Kommando: IP{<x1>,<x2>,{<y1>,<y2>}}
+
+    Setzt die Eckpunkte der Skalierung - ohne Parameter: hebt Skalierung auf
+*/
+{
+        if(!isnum(NextChar)) {            /* Folgen keine numerischen Parameter */
+          FloatDwordToFloat(pl_P1x); FloatPopNumber(&pl_P1.x);
+          FloatDwordToFloat(pl_P1y); FloatPopNumber(&pl_P1.y);
+          FloatDwordToFloat(pl_P2x); FloatPopNumber(&pl_P2.x);
+          FloatDwordToFloat(pl_P2y); FloatPopNumber(&pl_P2.y);
+                                        /* Standardwerte f�r einen A4-Plotter */
+        }
+        else {
+          gpoint(&pl_P1,0);             /* Punkt P1 holen */
+          if(!isnum(NextChar)) {        /* Keine weiteren Parameter? */
+            FloatPushNumber(&pl_P1.x);  /* P2 um den gleichen Betrag schieben */
+            FloatDwordToFloat(pl_P2x-pl_P1x);
+            FloatAdd();
+            FloatPopNumber(&pl_P2.x);
+            FloatPushNumber(&pl_P1.y);
+            FloatDwordToFloat(pl_P2y-pl_P1y);
+            FloatAdd();
+            FloatPopNumber(&pl_P2.y);
+          }
+          else
+            gpoint(&pl_P2,0);           /* Punkt P2 holen */
+        }
+}
+
+void Cmd_PAR(int rel)
+/*
+    Kommando: PA{<x>,<y>,{<x2>,<y2>,...}}
+              PR{<x>,<y>,{<x2>,<y2>,...}}
+
+    Plot Absolute/Relative - Stift zu absoluten/relativen Koordinaten bewegen
+*/
+{
+        Plot_Point p;
+
+        relmode=rel;                    /* N�chstes PU/PD im gleichen Modus */
+        while(isnum(NextChar)) {        /* Solange weitere Ziffern folgen */
+          gpoint(&p,rel);               /* Punktkoordinaten holen */
+          MovePlotTo(&p);               /* Zeichen/Bewegen zu diesem Punkt */
+        }
+}
+
+void Cmd_PU(void)
+/*
+    Kommando: PU{<x>,<y>,{<x2>,<y2>,...}}
+
+    Pen Up - mit Parameter: Pen Up und Move Absolute
+*/
+{
+        pl_pendown=0;                   /* Nicht zeichnen */
+        Cmd_PAR(relmode);               /* Parameter wie Plot Absolute auswerten */
+}
+
+void Cmd_PD(void)
+/*
+    Kommando: PU{<x>,<y>,{<x2>,<y2>,...}}
+
+    Pen Down - mit Parameter: Pen Down und Move Absolute
+*/
+{
+        pl_pendown=1;                   /* Zeichnen */
+        Cmd_PAR(relmode);               /* Parameter wie Plot Absolute auswerten */
+}
+
+void Cmd_EAR(int rel)
+/*
+    Kommando: EA<x>,<y>
+              ER<x>,<y>
+
+    Rechteckumri� absolut/relativ zeichnen
+*/
+{
+        Plot_Point p;
+        Point p2;
+
+        if(isnum(NextChar)) {           /* Falls Parameter da */
+          gpoint(&p,rel);               /* Punkt relativ/absolut holen */
+          if(scale(&p,&p2)) return;     /* Punkt in Geoworks-Koordinaten */
+          if(pl_pendown) {              /* Malen? */
+            ClosePoly();                /* first close any open polygon */
+            Meta_Rect(pl_curg.P_x,pl_curg.P_y,p2.P_x,p2.P_y,FALSE,TRUE);
+                                        /* Rechteck-Umri� zeichnen */
+          }
+        }
+}
+
+void Cmd_RAR(int rel)
+/*
+    Kommando: RA<x>,<y>
+              RR<x>,<y>
+
+    Rechteck absolut/relativ f�llen
+*/
+{
+        Plot_Point p;
+        Point p2;
+
+        if(isnum(NextChar)) {           /* Falls Parameter da */
+          gpoint(&p,rel);               /* Punkt relativ/absolut holen */
+          if(scale(&p,&p2)) return;     /* Punkt in Geoworks-Koordinaten */
+          ClosePoly();                  /* Erst mal Polygon schlie�en */
+          Meta_Rect(pl_curg.P_x,pl_curg.P_y,p2.P_x,p2.P_y,TRUE,FALSE);
+                                        /* Rechteck f�llen */
+        }
+}
+
+/*
+    Command: CI<radius>
+
+    Draw a circle
+*/
+void Cmd_CI(void)
+{
+        FloatNum r;
+        Plot_Point c1,c2;
+        Point c1g,c2g;
+
+        if(isnum(NextChar)) {           /* Falls Parameter da */
+          gnum(&r);                     /* Radius holen */
+          FloatPushNumber(&pl_cur.x);   /* Eckpunkte des Kreises berechnen */
+          FloatPushNumber(&r);
+            FloatSub();
+            FloatPopNumber(&c1.x);
+          FloatPushNumber(&pl_cur.y);
+          FloatPushNumber(&r);
+            FloatSub();
+            FloatPopNumber(&c1.y);
+          FloatPushNumber(&pl_cur.x);
+          FloatPushNumber(&r);
+            FloatAdd();
+            FloatPopNumber(&c2.x);
+          FloatPushNumber(&pl_cur.y);
+          FloatPushNumber(&r);
+            FloatAdd();
+            FloatPopNumber(&c2.y);
+          if(scale(&c1,&c1g) || scale(&c2,&c2g)) return;
+                                        /* Kreis-Eckppunkte skalieren */
+          ClosePoly();                  /* close any open polygon */
+          Meta_Ellipse((c1g.P_x+c2g.P_x)/2,(c1g.P_y+c2g.P_y)/2,
+                       abs(c2g.P_x-c1g.P_x),abs(c2g.P_y-c1g.P_y),0,
+                       FALSE,TRUE);     /* draw circle outline */
+        }
+}
+
+void Cmd_LB(void)
+/*
+    Kommando: LB<string><endmarke>
+
+    Text ausgeben
+*/
+{
+        char s[80];
+        int i;
+
+        ClosePoly();                    /* Evtl. Polygon schlie�en */
+        for(i=0;NextChar!=pl_term && !plotEOF;i++)
+          if(i<sizeof(s)-2)             /* String�berlauf verhindern */
+            s[i]=(char)gch(0);          /* Zeichen bis Endmarke einlesen */
+        if(pl_term>=' ')                /* Druckbare Endmarke: Wird ausgegeben */
+          s[i++]=(char)pl_term;
+        s[i]='\0';                      /* Stringende */
+        if(i)                           /* �berhaupt irgendwas da? */
+          Meta_TextAt(pl_curg.P_x,pl_curg.P_y,s,pl_size,pl_angle);
+        gch(0);                         /* Endmarke �berlesen */
+}
+
+void Cmd_SI(void)
+/*
+    Kommando: SI<b>,<h>
+
+    Absolute Zeichengr��e (b=Breite, h=H�he)
+*/
+{
+        FloatNum b,h;
+
+        if(!isnum(NextChar)) return;    /* Nicht genug Parameter: ignorieren */
+        gnum(&b);
+        if(!isnum(NextChar)) return;
+        gnum(&h);
+
+        FloatPushNumber(&h);            /* Zeichenh�he (cm) -> Punktgr��e */
+        Float10();
+          FloatMultiply();
+          FloatDwordToFloat(mm2pl);
+            FloatMultiply();
+            FloatPushNumber(&pl2gw.y);
+              FloatMultiply();
+              FloatDwordToFloat( (sdword)(12*65536/10) );
+                FloatMultiply();
+        pl_size=(WWFixedAsDWord)FloatFloatToDword();
+}
+
+void Cmd_SR(void)
+/*
+    Kommando: SR<b>,<h>
+
+    Relative Zeichengr��e (b=Breite, h=H�he)
+*/
+{
+        FloatNum b,h;
+
+        if(isnum(NextChar)) {
+          gnum(&b);
+          if(!isnum(NextChar)) return;  /* Nicht genug Parameter: ignorieren */
+          gnum(&h);
+        }
+        else {
+          FloatDwordToFloat(16);        /* Standardh�he: 1.6 cm */
+          Float10();
+            FloatDivide();
+            FloatPopNumber(&h);
+        }
+        FloatPushNumber(&pl_P2.x);      /* Zeichenh�he -> Punktgr��e */
+        FloatPushNumber(&pl_P1.x);
+          FloatSub();
+          FloatPushNumber(&h);          
+            FloatMultiply();
+            FloatDwordToFloat(100);
+              FloatDivide();
+              FloatPushNumber(&pl2gw.x);
+                FloatMultiply();
+                FloatDwordToFloat( (sdword)(12*65536/10) );
+                  FloatMultiply();
+        pl_size=(WWFixedAsDWord)FloatFloatToDword();
+}
+
+void SetDirection(FloatNum *s,FloatNum *a)
+{
+#if 0
+        if(*s==0)                       /* Senkrechte Schrift */
+          pl_angle=((*a)<0)?-90:90;
+        else {
+          pl_angle=(unsigned)(atan((*a)/(*s))*180/3.14159);
+                                        /* Winkel der Schrift (-90..90) */
+          if((*s)<0)                    /* Liegt im 2./3. Quadranten? */
+            pl_angle+=180;              /* Dann Winkel korrigieren */
+        }
+#endif
+}
+
+void Cmd_DI(void)
+/*
+    Kommando: DI<s>,<a>
+
+    Absolute Schreibrichtung (s=Strecke, a=Anstieg)
+*/
+{
+        FloatNum s,a;
+
+        if(isnum(NextChar)) {
+          gnum(&s);
+          if(!isnum(NextChar)) return;  /* Nicht genug Parameter: ignorieren */
+          gnum(&a);
+        }
+        else {                          /* default: horizontal schreiben */
+          Float1(); FloatPopNumber(&s);
+          Float0(); FloatPopNumber(&a);
+        }
+        SetDirection(&s,&a);            /* Schreibrichtung einstellen */
+}
+
+void Cmd_DR(void)
+/*
+    Kommando: DR<s>,<a>
+
+    Relative Schreibrichtung (s=Strecke, a=Anstieg)
+*/
+{
+        FloatNum s,a;
+
+        if(isnum(NextChar)) {
+          gnum(&s);
+          if(!isnum(NextChar)) return;  /* Nicht genug Parameter: ignorieren */
+          gnum(&a);
+          FloatPushNumber(&pl_P2.x);
+          FloatPushNumber(&pl_P1.x);
+            FloatSub();
+            FloatPushNumber(&s);
+              FloatMultiply();
+              FloatPopNumber(&s);
+          FloatPushNumber(&pl_P2.y);
+          FloatPushNumber(&pl_P1.y);
+            FloatSub();
+            FloatPushNumber(&a);
+              FloatMultiply();
+              FloatPopNumber(&a);
+        }
+        else {                          /* default: horizontal schreiben */
+          Float1(); FloatPopNumber(&s);
+          Float0(); FloatPopNumber(&a);
+        }
+        SetDirection(&s,&a);            /* Schreibrichtung einstellen */
+}
+
+void Cmd_SP(void)
+/*
+    Kommando: SP{<n>}
+
+    Stift n verwenden
+*/
+{
+        sword p;
+
+        if(!isnum(NextChar))            /* Kein Parameter: default-Pen */
+          p=0;
+        else
+          p=gnum_int()-1;               /* sonst Stiftnummer holen */
+
+        if(p!=pl_pen) ClosePoly();      /* pen changed: close open polygon */
+        if(p>=0 && p<=15)               /* valid pen? set palette color */
+          Meta_SetLineColor(CF_INDEX,pl_pen=p,0,0);
+        else
+          pl_pendown=0;
+}
+
+void Cmd_LT(void)
+/*
+    Kommando: LT{<n>}
+
+    Linientyp n verwenden
+*/
+{
+        sword n;
+        char l;
+
+        if(!isnum(NextChar))            /* Kein Parameter: default-Pen */
+          n=-1;
+        else
+          n=gnum_int();                 /* sonst Stiftnummer holen */
+
+        switch(n) {                     /* Linientypen �bersetzen */
+          case 1: l=LS_DOTTED; break;
+          case 2: l=LS_DASHED; break;
+          case 3: l=LS_DASHDDOT; break;
+          case 4: l=LS_DASHDOT; break;
+          default:l=LS_SOLID;
+        }
+        ClosePoly();                    /* close any open polygon */
+        Meta_SetLineStyle(l);           /* change line style */
+}
+
+void Cmd_FT(void)
+/*
+    Kommando: FT{<s>{,<l>{,<a>}}}
+
+    Select fill type
+*/
+{
+        FloatNum l;
+        sword s,a;
+        char fill;
+
+        s=1; a=0;
+        if(isnum(NextChar)) {            /* Soviele Parameter holen, wie da */
+          s=gnum_int();
+          if(isnum(NextChar)) {
+            gnum(&l);
+            if(isnum(NextChar)) {
+              a=gnum_int();
+            }
+          }
+        }
+        fill=(char)((s<=2)?SDM_100:      /* Solid-F�llung */
+             (char)((s==4)?0x09:         /* Kreuzschraffur */
+                          (a>+22)?0x04:  /* Parallel slash */
+                          (a<-22)?0x05:  /* Parallel backslash */
+                                  0x17));/* Parallel horizontal */
+        ClosePoly();                    /* close any open polygon */
+        Meta_SetAreaFill(fill);         /* change area fill style */
+}
+
+#define CODE(c1,c2) ((int)(c1)+(int)(c2)*256)
+
+int ReadHPGL(FileHandle srcFile,word settings)
+{
+        dword size,pos;
+        word cnt;
+        Boolean abort;
+        int op1,op2;                    /* Befehlszeichen 1/2 */
+        MemHandle h_mp;                 /* handle to array for polylines */
+
+        Text=settings & SETTINGS_DOTEXT;/* convert text items? */
+
+        h_mp = MemAlloc(MAX_POINTS*sizeof(Point), HF_DYNAMIC|HF_SHARABLE, 0);
+        if(!h_mp)                       /* allocation error: abort */
+          return ERR_OUT_OF_MEMORY;             
+        hpgl_par = (Point *)MemLock(h_mp);
+                                        /* point array */
+
+        fPlot=srcFile;                  /* handle of source file */
+        size=FileSize(fPlot);           /* check file size (for progress) */
+
+#ifdef DUMP
+  fDump=fopen("dump","w");
+#endif
+
+        n_poly=0;                       /* Noch keine Punkte im Polygon */
+        Cmd_IN();                       /* Initialisieren des "Plotters" */
+
+        plotEOF=0;                      /* noch kein Ende gefunden */
+        cnt=0;
+        abort=FALSE;
+        gch(0);                         /* Erstes Zeichen holen */
+        while(!plotEOF) {               /* Bis zum Dateiende wiederholen */
+          op2=0;                        /* Noch nichts gelesen */
+          do {
+            op1=op2;                    /* Ein Zeichen weiterschieben */
+            op2=toupper(gch(0));        /* Ein Zeichen lesen */
+          } while(op1<'A' || op1>'Z' || op2<'A' || op2>'Z');
+                                        /* Bis zwei g�ltige Buchstaben gefunden */
+          if(NextChar==' ') gch(1);     /* evtl. Whitespaces nach Befehl weg */
+          switch(CODE(op1,op2)) {       /* Befehl analysieren */
+            case CODE('I','N'): Cmd_IN();   break;
+            case CODE('S','C'): Cmd_SC();   break;
+            case CODE('I','P'): Cmd_IP();   break;
+            case CODE('P','U'): Cmd_PU();   break;
+            case CODE('P','D'): Cmd_PD();   break;
+            case CODE('P','A'): Cmd_PAR(0); break;
+            case CODE('P','R'): Cmd_PAR(1); break;
+            case CODE('E','A'): Cmd_EAR(0); break;
+            case CODE('E','R'): Cmd_EAR(1); break;
+            case CODE('R','A'): Cmd_RAR(0); break;
+            case CODE('R','R'): Cmd_RAR(1); break;
+            case CODE('C','I'): Cmd_CI();   break;
+            case CODE('L','B'): Cmd_LB();   break;
+            case CODE('S','I'): Cmd_SI();   break;
+            case CODE('S','R'): Cmd_SR();   break;
+            case CODE('D','I'): Cmd_DI();   break;
+            case CODE('D','R'): Cmd_DR();   break;
+            case CODE('S','P'): Cmd_SP();   break;
+            case CODE('L','T'): Cmd_LT();   break;
+            case CODE('F','T'): Cmd_FT();   break;
+            case CODE('V','S'):         /* Plotgeschwindigkeit... */
+            case CODE('P','G'):         /* Ausgeben der Seite (?)... */
+            case CODE('P','T'):         /* Pen thickness... */
+            case CODE('P','S'):         /* Paper size... (immer A4) */
+            case CODE('I','W'):         /* Clipping-Bereich... (keiner) */
+            case CODE('Z','Z'): break;  /* Dateiende - ignorieren */
+            default:                    /* Unbekannter Befehl */
+              ;
+          }
+          if(++cnt>=20) {               /* update position every 20 commands */
+            pos=FilePos(fPlot,0,FILE_POS_RELATIVE);
+                                        /* get current position */
+            if( UpdateProgressPct((word)(size?(pos*100/size):0)) ) {
+              abort=TRUE;               /* aborted? set flag... */
+              break;                    /* stop drawing */
+            }
+            cnt=0;                      /* clear counter */
+          }                             
+        }
+        ClosePoly();                    /* Letztes Polygon schlie�en */
+
+#ifdef DUMP
+  fclose(fDump);
+#endif
+
+        MemUnlock(h_mp);                /* free point array */
+        MemFree(h_mp);
+
+        return abort?ERR_ABORTED:ERR_NONE;
+                                        /* not aborted: no error */
+}

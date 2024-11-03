@@ -1,0 +1,788 @@
+/***********************************************************************
+ *
+ * PROJECT:       VConvert
+ * FILE:          VConvert.goc
+ *
+ * AUTHOR:        Marcus Gr�ber
+ *
+ ***********************************************************************/
+
+/*
+ ***************************************************************************
+ *		Include files
+ ***************************************************************************
+ */
+@include <stdapp.goh>
+@include <Objects/clipbrd.goh>
+@include <Objects/gViewCC.goh>
+@include <Objects/text/tCtrlC.goh>
+
+#include <ansi/string.h>
+#include <ansi/stdio.h>
+#include <ansi/stdlib.h>
+#include <ansi/ctype.h>
+
+#include <graphics.h>
+#include <vm.h>
+#include <gstring.h>
+#include <math.h>
+#include <file.h>
+#include <system.h>
+#include <initfile.h>
+
+#include "VConvert.h"
+
+optr Create_GrBody(VMFileHandle vmf);
+int Finish_GrBody(
+  optr body,VMFileHandle vmf,VMBlockHandle *gsh,VMBlockHandle *grobjh,
+  RectDWord *bounds);
+
+
+/* @define ADD_RULERS */
+
+#define VIEW_MARGIN 18          /* margin around image in view (in pt) */
+#define RULER_WIDTH 20          /* thickness of rulers on screen */
+
+#define CLIPBOARD_NAME "Image converted by V-Convert"
+
+#define GRAPH_FORMAT FormatIDFromManufacturerAndType(MANUFACTURER_ID_GEOWORKS,\
+                                                     CIF_GRAPHICS_STRING)
+
+/*
+ ***************************************************************************
+ *		Class & Message Definitions
+ ***************************************************************************
+ */
+@class  VConvProcessClass, GenProcessClass;
+    @message (GEN_FILE_SELECTOR_NOTIFICATION_MSG) MSG_VConv_CONVERT_FILE;
+    @message (GEN_TEXT_APPLY_MSG) MSG_VConv_MASK_CHANGED;
+    @message (GEN_ITEM_GROUP_APPLY_MSG) MSG_VConv_FORMAT_CHANGED;
+    @message void MSG_VConv_CONVERT_TRIGGER();
+    @message void MSG_VConv_TEST();
+@endc
+
+@class VConvApplicationClass GenApplicationClass;
+@ifdef ADD_RULERS
+    @message (RULER_SHOW_CONTROL_NOTIFY) MSG_VConv_UPDATE_RULERS;
+@endif
+    @message (GEN_BOOLEAN_GROUP_APPLY_MSG) MSG_VConv_SETTINGS_CHANGED;
+    @message void MSG_VConv_ABORT_TRIGGER();
+@endc
+
+@classdecl      VConvProcessClass, neverSaved;
+@classdecl      VConvApplicationClass;
+
+/*
+ ***************************************************************************
+ *		UI Objects
+ ***************************************************************************
+ */
+
+@include "vconv\vconv_ui.goh"           /* Application's GenTree */
+
+@start AppResource;
+  @visMoniker VConvTextMoniker = "V-Convert";
+@end   AppResource;
+
+@start VConvMonikerResource, data;      /* Icons */
+  @include "art\beta.goh"
+@end   VConvMonikerResource;
+
+@start VConvTitleResource, data;        /* Application Logo */
+  @include "art\appicon.goh"
+@end   VConvTitleResource;
+
+/*
+ ***************************************************************************
+ *              Code for VConvProcessClass
+ ***************************************************************************
+ */
+/***********************************************************************
+ *                             SysNotifyWithData
+ ***********************************************************************
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	ardeb	7/29/92		Initial Revision
+ *      marcusg                 Generic GCN notification routine...
+ *
+ ***********************************************************************/
+static void
+SysNotifyWithData(void *Ptr,word size,word notificationType, word listType)
+{
+    MemHandle data;                     /* Extra data block sent along with the
+					 * notification. */
+    void *dataPtr;                      /* The extra data block, locked */
+    EventHandle	notifyEvent;	    	/* Recorded notification event for
+					 * the GCN list */
+
+    data = MemAlloc(size, HF_DYNAMIC|HF_SHARABLE, 0);
+                                        /* allocate space for data item */
+
+    dataPtr = (void *)MemLock(data);
+    memcpy(dataPtr,Ptr,size);           /* transfer data into shared memory */
+    MemUnlock(data);
+
+    MemInitRefCount(data, 1);
+
+    notifyEvent = @record null::MSG_META_NOTIFY_WITH_DATA_BLOCK
+                        (MANUFACTURER_ID_GEOWORKS,notificationType,
+                         data);
+    @call application::MSG_META_GCN_LIST_SEND
+	(GCNLSF_SET_STATUS,
+	 notifyEvent,
+	 data,
+         listType,
+	 MANUFACTURER_ID_GEOWORKS);
+}
+
+GStateHandle contentGS;                 /* handle to gstring of current image */
+VMBlockHandle contentGSBlock,contentGOBlock;
+                                        /* handle of transfer format roots */
+VMFileHandle contentFile;               /* Handle of VM file housing image GS */
+Rectangle csrect;                       /* bounds of current image */
+char contentName[PATH_BUFFER_SIZE];     /* name of current image */
+char temp_path[PATH_BUFFER_SIZE];       /* path of file with gstring */
+Boolean abortRequest;                   /* set to true by "stop" trigger */
+
+char *Mask[3]={"","*.PLT","*.CGM"};
+
+/***********************************************************************
+ *                              ContentDestroy
+ ***********************************************************************/
+void
+ContentDestroy(void)
+{
+    if(contentGS) {                     /* can only destroy existing image... */
+      GrDestroyGString(contentGS,0,GSKT_KILL_DATA);
+      contentGS = NULL_HANDLE;          /* no image loaded */
+      contentGSBlock = NULL_HANDLE;     /* destroyed data block */
+    }
+    if(contentGOBlock) {                /* is there a grobj representation? */
+       VMFreeVMChain(contentFile,VMCHAIN_MAKE_FROM_VM_BLOCK(contentGOBlock));
+       contentGOBlock = NULL_HANDLE;    /* destroy grobj content */
+    }
+    if(contentFile) {
+      VMClose(contentFile,FILE_NO_ERRORS);
+      contentFile = NULL_HANDLE;        /* no image loaded */
+      FileDelete(temp_path);
+    }
+}
+
+/***********************************************************************
+ *                              ContentCreate
+ ***********************************************************************/
+
+Boolean
+UpdateProgressPct(word pct)
+{
+    char percent[16];
+    static word last_pct=0xFFFF;
+
+    if(last_pct!=pct) {                 /* only if value has changed */
+      sprintf(percent,"Completed: %d%%",last_pct=pct);
+                                        /* format percentage */
+      @call ProgressPct::MSG_GEN_REPLACE_VIS_MONIKER_TEXT(percent,VUM_NOW);
+                                        /* update dialog box */
+    }
+    return abortRequest;                /* did user request "stop"? */
+}
+
+void
+ContentCreate(char *path)
+{
+    int ret;
+    char *err;
+    RectDWord rd;
+    PointDWFixed org;
+    FileHandle srcFile;
+    VMBlockHandle objBlock;
+    word objCIF;
+    word settings;
+    optr body;
+    GStateHandle tempGS;
+
+    ContentDestroy();                   /* destroy image if one is loaded */
+
+    contentFile=VMOpen(temp_path,VMAF_FORCE_READ_WRITE,VMO_CREATE_TRUNCATE,50);
+
+    UpdateProgressPct(0);               /* nothing is completed yet... */
+    abortRequest=FALSE;                 /* user did not request "stop" yet */
+    @send ProgressDlg::MSG_GEN_INTERACTION_INITIATE();
+
+    if( !(srcFile=FileOpen(path,FILE_ACCESS_R | FILE_DENY_W)) )
+      ret = ERR_OPEN_FAILED;            /* attempt to open source file */
+    else
+    {
+      settings = @call SettingsBoolGroup::
+        MSG_GEN_BOOLEAN_GROUP_GET_SELECTED_BOOLEANS();
+
+      if(settings & SETTINGS_CREATE_GROBJ)
+      {
+        body = Create_GrBody(contentFile);
+        tempGS = NULL_HANDLE;
+      }
+      else
+      {
+        body = NULL;
+        tempGS = GrCreateGString(contentFile, GST_VMEM, &contentGSBlock);
+      }
+
+      Meta_Start(settings,tempGS,body,contentFile);
+                                        /* initialize drawing system */
+
+      /* which format was chosen? */
+      switch( @call FormatList::MSG_GEN_ITEM_GROUP_GET_SELECTION() )
+      {
+        case FORMAT_HPGL:               
+          ret = ReadHPGL(srcFile, settings);
+          break;
+        case FORMAT_CGM:
+          ret = ReadCGM(srcFile, settings);
+          break;
+        default:
+          ret = ERR_INVALID_FORMAT;     /* No gstring was created */
+      }
+
+      Meta_End();                       /* closing drawing system */
+      FileClose(srcFile,TRUE);          /* close source file */
+
+      UpdateProgressPct(100);           /* We're finished... */
+
+      if(!ret)                          /* no error */
+      {
+        if(settings & SETTINGS_CREATE_GROBJ)
+        {
+          Finish_GrBody(body,contentFile,&contentGSBlock,&contentGOBlock,&rd);
+          contentGS = GrLoadGString(contentFile, GST_VMEM, contentGSBlock);
+                                        /* load gstring version */
+        }
+        else
+        {
+          GrEndGString(tempGS);
+          GrSetGStringPos(tempGS, GSSPT_BEGINNING, 0);
+          GrGetGStringBoundsDWord(tempGS, 0, 0, &rd);
+          contentGOBlock = NULL_HANDLE;
+          contentGS = tempGS;
+        }
+      }
+
+      csrect.R_top = (sword)rd.RD_top;  /* assign content data */
+      csrect.R_bottom = (sword)rd.RD_bottom;
+      csrect.R_left = (sword)rd.RD_left;
+      csrect.R_right = (sword)rd.RD_right;
+      strcpy(contentName,CLIPBOARD_NAME);
+                                        /* assign a default name to image */
+    }
+
+    @send ProgressDlg::MSG_GEN_GUP_INTERACTION_COMMAND(IC_DISMISS);
+                                        /* close progress dialog */
+
+    if(ret)                             /* error occured during conversion? */
+    {
+      ContentDestroy();                 /* destroy half-finished gstring */
+      switch(ret)
+      {
+        case ERR_OPEN_FAILED: err="File could not be opened"; break;
+        case ERR_INVALID_FORMAT: err="Unknown file format"; break;
+        case ERR_UNSUPPORTED_VARIANT: err="Unsupported format version"; break;
+        case ERR_OUT_OF_MEMORY: err="Not enough memory"; break;
+        case ERR_ABORTED: err=NULL; break;
+        default: err="Error converting file";
+      }
+      if(err)                           /* error message defined? */
+        UserStandardDialog(             /* notify user */
+           (char *)NULL, (char *)NULL, (char *)NULL, (char *)NULL, err,
+           (CDT_ERROR << CDBF_DIALOG_TYPE_OFFSET) |
+           (GIT_NOTIFICATION << CDBF_INTERACTION_TYPE_OFFSET));
+    }
+}
+
+/***********************************************************************
+ *                              ContentDraw
+ ***********************************************************************/
+void
+ContentDraw(GStateHandle gstate)
+{
+    GrSetGStringBounds(gstate,
+        csrect.R_left,csrect.R_top,csrect.R_right,csrect.R_bottom);
+    GrDrawGString(gstate,contentGS,0,0,0,NULL);
+}
+
+/***********************************************************************
+ *                              RedrawContent
+ ***********************************************************************/
+static void
+RedrawContent(void)
+{
+    NotifySelectStateChange nssc;
+@ifdef ADD_RULERS
+    RulerTypeNotificationBlock rtnb;
+@endif
+
+    /* inform the world if we have a graphics item waiting for "Cut" */
+    nssc.NSSC_selectionType = SDT_GRAPHICS;
+    nssc.NSSC_clipboardableSelection = contentGS?TRUE:FALSE;
+    nssc.NSSC_deleteableSelection = FALSE;
+    nssc.NSSC_selectAllAvailable = FALSE;
+    nssc.NSSC_pasteable = FALSE;
+    SysNotifyWithData(&nssc,sizeof(nssc),
+                      GWNT_SELECT_STATE_CHANGE,
+                      GAGCNLT_APP_TARGET_NOTIFY_SELECT_STATE_CHANGE);
+
+@ifdef ADD_RULERS
+    /* notify about current ruler type... */
+    rtnb.RTNB_type = @call VRuleVis::MSG_VIS_RULER_GET_TYPE();
+                                        /* get current ruler type */
+    SysNotifyWithData(&rtnb,sizeof(rtnb),
+                      GWNT_RULER_TYPE_CHANGE,
+                      GAGCNLT_APP_TARGET_NOTIFY_RULER_TYPE_CHANGE);
+@endif
+
+/*** calculate size of content ***/
+    /* set content size */
+    if(contentGS) {
+      @send VConvView::MSG_GEN_VIEW_SET_DOC_BOUNDS
+          (csrect.R_bottom+VIEW_MARGIN,csrect.R_right+VIEW_MARGIN,
+           csrect.R_top-VIEW_MARGIN,csrect.R_left-VIEW_MARGIN);
+      @send VConvView::MSG_GEN_VIEW_REDRAW_CONTENT();
+      @send AppLogo::MSG_GEN_SET_NOT_USABLE(VUM_NOW);
+      @send ViewGroup::MSG_GEN_SET_USABLE(VUM_NOW);
+    }
+    else {
+      @send ViewGroup::MSG_GEN_SET_NOT_USABLE(VUM_NOW);
+      @send AppLogo::MSG_GEN_SET_USABLE(VUM_NOW);
+    }
+
+    @send VConvView::MSG_META_GRAB_TARGET_EXCL();
+                                        /* workaround: update view controller */
+}
+
+/***********************************************************************
+ *                               CopyCommon
+ ***********************************************************************/
+static void CopyCommon(ClipboardItemFlags flags)
+{
+    VMFileHandle      transferVMFile;  /* VM file handle of Transfer VM File */
+    VMBlockHandle     headerVMBlock;   /* VM handle of attached header block */
+    ClipboardItemHeader *headerMem;    /* ClipboardItemHeader for the VM file */
+    MemHandle         headerMemHandle; /* handle of ClipboardItemHeader block */
+
+    /*** Get the transfer VM file. ++*/
+    transferVMFile = ClipboardGetClipboardFile();
+
+    /*** Now, allocate and fill in the transfer item header block. ***/
+    headerVMBlock = VMAlloc(transferVMFile, sizeof(ClipboardItemHeader), 1111);
+    headerMem = (ClipboardItemHeader *)VMLock(transferVMFile, headerVMBlock,
+							&headerMemHandle);
+    headerMem->CIH_owner = (optr) (((dword)GeodeGetProcessHandle()<<16) | 0);
+    headerMem->CIH_flags = 0;           /* Normal transfer; no flags. */
+    headerMem->CIH_sourceID = 0;
+    strncpy(headerMem->CIH_name, contentName, CLIPBOARD_ITEM_NAME_LENGTH);
+    headerMem->CIH_name[CLIPBOARD_ITEM_NAME_LENGTH]=0;
+
+    /*** Copy and describe GString format. ***/
+    headerMem->CIH_formats[0].CIFI_format =
+      FormatIDFromManufacturerAndType(MANUFACTURER_ID_GEOWORKS,
+        CIF_GRAPHICS_STRING);
+    headerMem->CIH_formats[0].CIFI_vmChain = VMCopyVMChain(
+      contentFile,VMCHAIN_MAKE_FROM_VM_BLOCK(contentGSBlock),transferVMFile);
+    headerMem->CIH_formats[0].CIFI_extra1 = (csrect.R_right-csrect.R_left);
+    headerMem->CIH_formats[0].CIFI_extra2 = (csrect.R_bottom-csrect.R_top);
+                                        /* size of objects must be put here */
+    headerMem->CIH_formatCount=1;       /* we have at least one format.. */
+
+    /*** Copy and describe GrObj format. ***/
+    if(contentGOBlock) {                /* only if format is available */
+      headerMem->CIH_formats[1].CIFI_format =
+        FormatIDFromManufacturerAndType(MANUFACTURER_ID_GEOWORKS,CIF_GROBJ);
+      headerMem->CIH_formats[1].CIFI_vmChain = VMCopyVMChain(
+        contentFile,VMCHAIN_MAKE_FROM_VM_BLOCK(contentGOBlock),transferVMFile);
+      headerMem->CIH_formats[1].CIFI_extra1 = 0;
+      headerMem->CIH_formats[1].CIFI_extra2 = 0;
+      (headerMem->CIH_formatCount)++;   /* one format was added */
+    }
+
+    VMUnlock(headerMemHandle);
+
+    /* Now register the transfer item with the Clipboard. This will actually
+     * put the transfer item and its header into the Clipboard. */
+
+    ClipboardRegisterItem(BlockIDFromFileAndBlock(transferVMFile,headerVMBlock),
+                          flags);
+}
+
+char *FormatInitKey(int selection)
+{
+        static char s[12];
+
+        if(!selection)                  /* get format selection if not known */
+          selection=@call FormatList::MSG_GEN_ITEM_GROUP_GET_SELECTION();
+        sprintf(s,"Format%dPath",selection);
+                                        /* create string from current format */
+        return s;                       /* return pointer to key */
+}
+
+void SelectorUpdate(int selection)
+{
+        char name[PATH_BUFFER_SIZE],*p;
+        word len;
+
+        if(!selection)                  /* get format selection if not known */
+          selection=@call FormatList::MSG_GEN_ITEM_GROUP_GET_SELECTION();
+
+        InitFileReadStringBuffer("VConvert",FormatInitKey(selection),name,
+          IFCC_INTACT | IFRF_FIRST_ONLY | sizeof(name),&len);
+                                        /* read path and mask */
+        @call ConvFileS::MSG_GEN_FILE_SELECTOR_SUSPEND();
+                                        /* keep it calm... */
+
+        if(name[0] &&
+           (name[1]!=':' || DiskRegisterDiskSilently(toupper(name[0])-'A')) )
+                                        /* workaround for EC version: invalid
+                                           drive would cause KR-06 */
+          @call ConvFileS::MSG_GEN_FILE_SELECTOR_SET_FULL_SELECTION_PATH
+            (name,SP_NOT_STANDARD_PATH);/* restore last used data path */
+
+        p=strrchr(name,'\\');           /* isolate last component of path */
+        if(p) {                         /* successful? */
+          @call ConvFileMask::MSG_VIS_TEXT_REPLACE_ALL_PTR(p+1,0);
+          @call ConvFileS::MSG_GEN_FILE_SELECTOR_SET_MASK(p+1);
+                                        /* set mask of file selector */
+        }
+        else {                          /* set mask */
+          @call ConvFileMask::MSG_VIS_TEXT_REPLACE_ALL_PTR(Mask[selection],0);
+          @call ConvFileS::MSG_GEN_FILE_SELECTOR_SET_MASK(Mask[selection]);
+        }
+        @call ConvFileS::MSG_GEN_FILE_SELECTOR_END_SUSPEND();
+}
+
+void ConvertAction(void)
+{
+    char name[PATH_BUFFER_SIZE],*p,fullname[PATH_BUFFER_SIZE];
+    dword ret;
+
+    @send OpenDialog::MSG_GEN_GUP_INTERACTION_COMMAND(IC_DISMISS);
+    @send OpenDialog::MSG_GEN_SET_NOT_ENABLED(VUM_NOW);
+                                        /* no further open during conversion */
+
+    ret=@call ConvFileS::MSG_GEN_FILE_SELECTOR_GET_FULL_SELECTION_PATH(name);
+    p=fullname;                         /* make double indirection clean */
+    FileConstructFullPath(&p,PATH_BUFFER_SIZE,
+      GFS_GET_FULL_SELECTION_PATH_DISK_HANDLE(ret),name,TRUE);
+
+    strcpy(name,fullname);              /* copy fullname for manipulation */
+    p=strrchr(name,'\\');               /* isolate last component of path */
+    if(p) {                             /* successful? */
+      @call ConvFileMask::MSG_VIS_TEXT_GET_ALL_PTR(p+1);
+                                        /* add mask to filename in buffer */
+      InitFileWriteString("VConvert",FormatInitKey(0),name);
+                                        /* save filename/mask to INI file */
+    }
+
+    ContentDestroy();                   /* delete currently loaded image */
+    RedrawContent();                    /* update screen */
+    ContentCreate(fullname);            /* do all the work! */
+    ret=@call ConvFileS::MSG_GEN_FILE_SELECTOR_GET_SELECTION(contentName);
+                                        /* get name for clipboard */
+
+    @send OpenDialog::MSG_GEN_SET_ENABLED(VUM_NOW);
+                                        /* re-enable open dialog */
+
+    if(contentGS)                       /* if image was loaded, force redraw */
+      RedrawContent();
+}
+
+/***********************************************************************
+ *                Open/Close methods for VConvProcessClass
+ ***********************************************************************/
+void CheckClipboardType(void);
+
+@method VConvProcessClass, MSG_GEN_PROCESS_OPEN_APPLICATION
+{
+    char *pc;
+
+    @callsuper();                       /* !!! */
+    pc=temp_path;                       /* make double indirection clean */
+    FileConstructFullPath(&pc,PATH_BUFFER_SIZE,SP_PRIVATE_DATA,
+      "V-Convert temporary",TRUE);      /* absolute path to temporary file */
+    contentGS = contentGSBlock = contentGOBlock = contentFile = NULL_HANDLE;
+                                        /* no image loaded yet */
+    RedrawContent();
+    SelectorUpdate(0);                  /* update file selector mask and path */
+
+    /*
+     * Add ourselves to the clipboard notification list.
+     */
+    ClipboardAddToNotificationList(HandleToOptr(GeodeGetProcessHandle()));
+    CheckClipboardType();               /* see if we can use the current item */
+}
+
+@method VConvProcessClass, MSG_GEN_PROCESS_CLOSE_APPLICATION
+{
+    @callsuper();                       /* !!! */
+    ContentDestroy();                   /* destroy content and free resources */
+    return NULL;                        /* no permanent memory block */
+}
+
+/***********************************************************************
+ *              MSG_META_EXPOSED for VConvProcessClass
+ ***********************************************************************
+ * SYNOPSIS:	    Redraw the recently-exposed portion of the View
+ * PARAMETERS:	    void (WindowHandle win)
+ * SIDE EFFECTS:    the invalid region of the window is cleared out
+ *
+ * STRATEGY:	    This message is sent by the windowing system when a
+ *	    	    portion of the GenView has become invalid, either
+ *	    	    because a window that was obscuring it has been moved,
+ *	    	    or because some called GrInvalRect.
+ *
+ *	    	    We redraw the entire document, after telling the
+ *		    graphics system we're drawing to the invalid portion
+ *		    of the window.
+ *
+ ***********************************************************************/
+@method VConvProcessClass,MSG_META_EXPOSED
+{
+    GStateHandle gstate;
+
+    gstate = GrCreateState(win);
+    GrBeginUpdate(gstate);
+    if(contentGS)
+      ContentDraw(gstate);
+    GrEndUpdate(gstate);
+    GrDestroyState(gstate);
+}
+
+/***********************************************************************
+ *           Various messages for VConvProcessClass
+ ***********************************************************************/
+@method VConvProcessClass, MSG_VConv_CONVERT_FILE
+{
+    if(GFS_GET_ENTRY_TYPE(entryFlags)==GFSET_FILE && (entryFlags & GFSEF_OPEN))
+                                        /* user has double-clicked a file */
+      ConvertAction();                  /* convert it! */
+
+/* conditionally enable "convert" trigger if current selection is a file */
+    if(GFS_GET_ENTRY_TYPE(entryFlags)==GFSET_FILE)
+      @send ConvTrigger::MSG_GEN_SET_ENABLED(VUM_NOW);
+    else
+      @send ConvTrigger::MSG_GEN_SET_NOT_ENABLED(VUM_NOW);
+}
+
+@method VConvProcessClass, MSG_VConv_MASK_CHANGED
+{
+    char mask[13];              /* buffer for file mask */
+
+    @call ConvFileMask::MSG_VIS_TEXT_GET_ALL_PTR(mask);
+                                        /* get new mask into buffer */
+    @call ConvFileS::MSG_GEN_FILE_SELECTOR_SET_MASK(mask);
+                                        /* set mask of file selector */
+}
+
+@method VConvProcessClass, MSG_VConv_FORMAT_CHANGED
+{
+    SelectorUpdate(selection);          /* update file selector mask and path */
+}
+
+@method VConvProcessClass, MSG_VConv_CONVERT_TRIGGER
+{
+    GenFileSelectorEntryFlags entryFlags;
+
+    entryFlags = GFS_GET_ENTRY_FLAGS(
+      @call ConvFileS::MSG_GEN_FILE_SELECTOR_GET_SELECTION(NULL));
+                                        /* get flags of current selection */
+    if(GFS_GET_ENTRY_TYPE(entryFlags)==GFSET_FILE)
+      ConvertAction();                  /* a file is selected: convert it! */
+}
+
+/***********************************************************************
+ *              Routines and methods to interact with Clipboard
+ ***********************************************************************/
+static Boolean
+CheckPasteable(ClipboardItemFlags transferFlags)
+{
+    ClipboardQueryArgs  query;
+    Boolean 	pasteable = FALSE;
+
+    /*
+     * Fetch the info on the specified item.
+     */
+    ClipboardQueryItem(transferFlags, &query);
+    /*
+     * If it has at least one format, and one of them is the TEXT_FORMAT
+     * (defined above), we can paste it. Otherwise, not.
+     */
+    pasteable = (query.CQA_numFormats &&
+                 ClipboardTestItemFormat(query.CQA_header, GRAPH_FORMAT));
+
+    /*
+     * Let the clipboard code know we're done with the item, so it can biff it
+     * if it was replaced while we were looking at it.
+     */
+    ClipboardDoneWithItem(query.CQA_header);
+
+    return pasteable;
+}
+
+void CheckClipboardType(void)
+{
+    NotifySelectStateChange nssc;
+
+    /* inform the world if we have a graphics item waiting for "Cut" */
+    nssc.NSSC_selectionType = SDT_GRAPHICS;
+    nssc.NSSC_clipboardableSelection = (contentGS!=0)?TRUE:FALSE;
+    nssc.NSSC_deleteableSelection = FALSE;
+    nssc.NSSC_selectAllAvailable = FALSE;
+    nssc.NSSC_pasteable = CheckPasteable(TIF_NORMAL);
+    SysNotifyWithData(&nssc,sizeof(nssc),
+                      GWNT_SELECT_STATE_CHANGE,
+                      GAGCNLT_APP_TARGET_NOTIFY_SELECT_STATE_CHANGE);
+}
+
+static ClipboardQuickNotifyFlags
+PasteCommon(ClipboardItemFlags transferFlags)
+{
+    GStateHandle            gs;         /* Handle to GString in clipboard */
+    ClipboardQueryArgs      q;          /* Info on the indicated transfer item
+                                         * returned here. */
+    ClipboardRequestArgs    request;    /* Address of requested format returned
+                                         * here */
+    ClipboardQuickNotifyFlags ret;
+
+    /*
+     * First, find out if the indicated clipboard item (normal or
+     * quick-transfer) supports the gstring format.
+     */
+    ClipboardQueryItem(transferFlags, &q);
+
+    ret = CQNF_NO_OPERATION;            /* default: couldn't do anything */
+
+    if(q.CQA_numFormats && ClipboardTestItemFormat(q.CQA_header,GRAPH_FORMAT))
+    {
+      /*
+       * Fetch the file/block handle of transfer format
+       */
+      ClipboardRequestItemFormat(GRAPH_FORMAT, q.CQA_header, &request);
+
+      /*
+       * Open GString for working with it
+       */
+      gs = GrLoadGString(request.CRA_file,GST_VMEM,
+                         VMCHAIN_GET_VM_BLOCK(request.CRA_data));
+
+      ExportGString(gs);                /* protoype export routine */
+
+      /*
+       * Kill GString leaving intact the data on the clipboard
+       */
+      GrDestroyGString(gs,NULL,GSKT_LEAVE_DATA);
+    }
+
+    /*
+     * Tell the clipboard we're done with this item, so it can throw away
+     * the data, if necessary.
+     */
+    ClipboardDoneWithItem(q.CQA_header);
+
+    return ret;
+}
+
+/***********************************************************************
+ *              MSG_META_PTR for VConvProcessClass
+ ***********************************************************************/
+@method VConvProcessClass, MSG_META_PTR
+{
+    /*
+     * Check if doing quick-transfer. If not, there's nothing else we have
+     * to do.
+     */
+    if ((GET_UI_FUNCTIONS_ACTIVE(inputState) & UIFA_MOVE_COPY) &&
+	ClipboardGetQuickTransferStatus())
+    {
+        ClipboardSetQuickTransferFeedback((CheckPasteable(CIF_QUICK) ?
+				    CQTF_COPY :
+				    CQTF_CLEAR),
+				   inputState);
+    }
+    retVal->flags = MRF_PROCESSED;	/* this event processed */
+}
+
+/***********************************************************************
+ *              MSG_META_END_MOVE_COPY for VConvProcessClass
+ ***********************************************************************/
+@method VConvProcessClass, MSG_META_END_MOVE_COPY
+{
+    /*
+     * paste the thing, PasteCommon returns ClipboardQuickNotifyFlags to pass to
+     * ClipboardEndQuickTransfer
+     */
+    ClipboardEndQuickTransfer(PasteCommon(CIF_QUICK));
+    retVal->flags = MRF_PROCESSED;	/* this event processed */
+}
+
+/***********************************************************************
+ *              MSG_META_CLIPBOARD_PASTE for VConvProcessClass
+ ***********************************************************************/
+@method VConvProcessClass, MSG_META_CLIPBOARD_PASTE
+{
+    PasteCommon(TIF_NORMAL);
+}
+
+/***********************************************************************
+ *	MSG_META_CLIPBOARD_NOTIFY_NORMAL_TRANSFER_ITEM_CHANGED for
+ *                         VConvProcessClass
+ ***********************************************************************/
+@method VConvProcessClass,
+        MSG_META_CLIPBOARD_NOTIFY_NORMAL_TRANSFER_ITEM_CHANGED
+{
+    CheckClipboardType();               /* see if we can use the current item */
+}
+
+/***********************************************************************
+ *              MSG_META_CLIPBOARD_COPY for VConvProcessClass
+ ***********************************************************************/
+@method VConvProcessClass,MSG_META_CLIPBOARD_COPY
+{
+    CopyCommon(TIF_NORMAL);             /* copy object to clipboard */
+}
+
+/***********************************************************************
+ *           MSG_META_START_MOVE_COPY for VConvProcessClass
+ ***********************************************************************/
+@method VConvProcessClass,MSG_META_START_MOVE_COPY
+{
+    if( ClipboardStartQuickTransfer(CQTF_COPY_ONLY,CQTF_COPY,0,0,0,oself) ) {
+      CopyCommon(CIF_QUICK);            /* create transfer object */
+      @send VConvView::MSG_GEN_VIEW_ALLOW_GLOBAL_TRANSFER();
+    }
+    retVal->flags = MRF_PROCESSED;      /* even was processed */
+}
+
+/***********************************************************************
+ *           Various messages for VConvApplicationClass
+ ***********************************************************************/
+@ifdef ADD_RULERS
+/* this code is taken from the Ruler Object section of the SDK documentation */
+@method VConvApplicationClass, MSG_VConv_UPDATE_RULERS
+{
+    if (attrs & RSCA_SHOW_VERTICAL)
+      @call VRuleView::MSG_GEN_SET_USABLE(VUM_NOW);
+    else
+      @call VRuleView::MSG_GEN_SET_NOT_USABLE(VUM_NOW);
+    if (attrs & RSCA_SHOW_HORIZONTAL)
+      @call HRuleView::MSG_GEN_SET_USABLE(VUM_NOW);
+    else
+      @call HRuleView::MSG_GEN_SET_NOT_USABLE(VUM_NOW);
+    if ((attrs & RSCA_SHOW_HORIZONTAL) && (attrs & RSCA_SHOW_VERTICAL))
+      @call CornerView::MSG_GEN_SET_USABLE(VUM_NOW);
+    else
+      @call CornerView::MSG_GEN_SET_NOT_USABLE(VUM_NOW);
+}
+@endif
+
+@method VConvApplicationClass, MSG_VConv_ABORT_TRIGGER
+{
+        abortRequest=TRUE;              /* can't do more than this... */
+}

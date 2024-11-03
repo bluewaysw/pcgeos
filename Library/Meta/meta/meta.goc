@@ -1,0 +1,1103 @@
+/***********************************************************************
+ *
+ * PROJECT:       META
+ * FILE:          META.goc
+ *
+ * DESCRIPTION:   Abstract "meta" drawing commands that can be mapped
+ *                to various styles of GString output...
+ *
+ * AUTHOR:        Marcus Groeber
+ *
+ ***********************************************************************/
+
+/*
+ ***************************************************************************
+ *		Include files
+ ***************************************************************************
+ */
+@include <stdapp.goh>
+@include <grobj.goh>
+@include <objects/splineC.goh>
+
+#include <ansi/string.h>
+#include <ansi/stdio.h>
+#include <ansi/stdlib.h>
+#include <graphics.h>
+#include <gstring.h>
+#include <math.h>
+
+#include <meta.h>
+#include "metaint.h"
+
+/*----------------------------------------------------------------------------*/
+Boolean meta_Text,               /* attempt to convert text items? */
+        meta_Arcs,               /* attempt to convert arc items? */
+        meta_Splines,            /* create articial splines? */
+        meta_GrObj;              /* create GrObj rather than gstrings? */
+GStateHandle meta_GS;            /* GState for data output */
+VMBlockHandle meta_gstringBlock; /* block handle of output GString */
+optr meta_body;                  /* GrObjBody */
+VMFileHandle meta_vmf;           /* file for GrObj storage */
+
+/*----------------------------------------------------------------------------*/
+/* requested settings */
+ColorQuad meta_PatternBack;
+ColorQuad meta_LineColor;
+LineStyle meta_LineStyle;
+WWFixedAsDWord meta_LineWidth;
+SystemDrawMask meta_LineFill;
+ColorQuad meta_AreaColor;
+SystemDrawMask meta_AreaFill;
+
+Point _meta_world1,_meta_world2;
+sword _meta_undersc;
+WWFixedAsDWord _meta_scale;             Boolean meta_scale_c;
+word _meta_in_path;
+sword _meta_clip_x1,_meta_clip_y1,_meta_clip_x2,_meta_clip_y2;
+                                        Boolean meta_clip_c;
+Boolean _meta_transparency;
+
+RegionFillRule meta_windingRule;
+
+/*----------------------------------------------------------------------------*/
+WWFixedAsDWord _export _pascal rad(sword vx,sword vy)
+{
+            FloatWordToFloat(vx);
+            FloatSqr();
+            FloatWordToFloat(vy);
+            FloatSqr();
+          FloatAdd();
+          FloatSqrt();
+          FloatDwordToFloat(65536);     /* convert to WWFixed */
+        FloatMultiply();
+        return (WWFixedAsDWord)FloatFloatToDword();
+}
+
+WWFixedAsDWord _export _pascal phi(sword vx,sword vy)
+{
+                FloatWordToFloat(vx);
+                FloatWordToFloat(vy);
+              FloatArcTan2();
+              FloatWordToFloat(180);
+            FloatMultiply();
+            FloatPi();
+          FloatDivide();
+          FloatDwordToFloat(65536);     /* convert to WWFixed */
+        FloatMultiply();
+        return (WWFixedAsDWord)FloatFloatToDword();
+}
+
+sword _xlate_angle2(sword angle,WWFixedAsDWord sc)
+{
+        if(angle==0 || abs(angle)==90 || sc==MakeWWFixed(sc))
+          return angle;
+
+                  FloatWordToFloat(angle);
+                  FloatPi();
+                FloatMultiply();
+                FloatWordToFloat(180);
+              FloatDivide();
+              FloatTan();
+                FloatDwordToFloat(sc);
+                FloatDwordToFloat(65536);
+              FloatDivide();
+            FloatDivide();
+            FloatArcTan();
+            FloatWordToFloat(180);
+          FloatMultiply();
+          FloatPi();
+        FloatDivide();
+        return (sword)FloatFloatToDword();
+}
+
+sword _xlate_angle(sword angle,WWFixedAsDWord sc)
+{
+        if(angle<0) angle+=360;
+        angle=angle%360;
+        if(angle<=90)
+          return _xlate_angle2(angle,sc);
+        if(angle<=270)
+          return 180-_xlate_angle2(180-angle,sc);
+        return _xlate_angle2(angle-360,sc)+360;
+}
+
+void _Meta_chk(sword x,sword y,sword *vx,sword *vy)
+{
+        Point p;
+
+        p.P_x=x;                        /* copy original coordinates */
+        p.P_y=y;
+
+        /* special fix for incorrect coordinates (outside VDU and wrapped
+           from positive into negative signed integer range) as emitted,
+           for example, by HiJaak: */
+
+        if(p.P_x<_meta_world1.P_x &&
+           ((sdword)_meta_world1.P_x-(sdword)p.P_x) > 24576)
+                                        /* wrapped into negative coordinates? */
+          p.P_x=_meta_world2.P_x;       /* clip to positive edge */
+
+        if(p.P_y<_meta_world1.P_y &&
+           ((sdword)_meta_world1.P_y-(sdword)p.P_y) > 24576)
+                                        /* wrapped into negative coordinates? */
+          p.P_y=_meta_world2.P_y;       /* clip to positive edge */
+
+        *vx=p.P_x/_meta_undersc;
+        *vy=p.P_y/_meta_undersc;        /* return modified coordinates */
+}
+
+word _Meta_chkPolyline(Point *p,word np)
+{
+        word n_poly,n;
+
+        n_poly=0;
+        for(n=0; n<np; n++)
+          if(n_poly==0 ||
+             p[n_poly-1].P_x!=p[n].P_x || p[n_poly-1].P_y!=p[n].P_y)
+          {
+            _Meta_chk(p[n].P_x,p[n].P_y,&p[n_poly].P_x,&p[n_poly].P_y);
+                                        /* check and copy point */
+            n_poly++;                   /* count points */
+          }
+        return n_poly;
+}
+
+int cq_compare(ColorQuad *q1,ColorQuad *q2)
+{
+        return q1->CQ_info!=q2->CQ_info || q1->CQ_redOrIndex!=q2->CQ_redOrIndex
+               || (q1->CQ_info==CF_RGB
+                   && (q1->CQ_green!=q2->CQ_green || q1->CQ_blue!=q2->CQ_blue));
+                                        /* compare relevant parts of cquad */
+}
+
+void ConvertToRGB(ColorQuad *cq)
+{
+    if(cq->CQ_info==CF_INDEX)           /* convert INDEX to "mixable" RGB */
+    {
+      RGBColorAsDWord c = My_GrMapColorIndex(0,cq->CQ_redOrIndex);
+
+      cq->CQ_info=CF_RGB;
+      cq->CQ_redOrIndex=RGB_RED(c);
+      cq->CQ_green=RGB_GREEN(c);
+      cq->CQ_blue=RGB_BLUE(c);
+    }
+    else if(cq->CQ_info==CF_GRAY)       /* convert GRAY to "mixable" RGB */
+    {
+      cq->CQ_info=CF_RGB;
+      cq->CQ_green=cq->CQ_blue=cq->CQ_redOrIndex;
+    }
+}
+
+/*----------------------------------------------------------------------------
+   Utility routines for GString output
+  ----------------------------------------------------------------------------*/
+/* variables indicating whether line/area attribute state is known */
+Boolean meta_line_indef,meta_area_indef;
+
+/* current state of graphics system */
+ColorQuad meta_c_PatternBack;
+ColorQuad meta_c_LineColor;
+LineStyle meta_c_LineStyle;
+WWFixedAsDWord meta_c_LineWidth;
+SystemDrawMask meta_c_LineFill;
+ColorQuad meta_c_AreaColor;
+SystemDrawMask meta_c_AreaFill;
+
+void static _Meta_UpdateLineBack(void)
+{
+        if(cq_compare(&meta_c_LineColor,&meta_PatternBack)
+           || meta_line_indef) {
+          GrSetLineColor(meta_GS,
+            meta_PatternBack.CQ_info,meta_PatternBack.CQ_redOrIndex,
+            meta_PatternBack.CQ_green,meta_PatternBack.CQ_blue);
+          meta_c_LineColor=meta_PatternBack;
+        }
+        if(meta_c_LineStyle!=LS_SOLID || meta_line_indef) {
+          GrSetLineStyle(meta_GS,LS_SOLID,0,NULL,0);
+          meta_c_LineStyle=LS_SOLID;
+        }
+        if(meta_c_LineWidth!=meta_LineWidth || meta_line_indef) {
+          GrSetLineWidth(meta_GS,meta_LineWidth);
+          meta_c_LineWidth=meta_LineWidth;
+        }
+        if(meta_c_LineFill!=meta_LineFill || meta_line_indef) {
+          GrSetLineMaskSys(meta_GS,SDM_100);
+          meta_c_LineFill=meta_LineFill;
+        }
+        meta_line_indef=FALSE;          /* line state is known now */
+}
+
+void static _Meta_UpdateLine(void)
+{
+        if(_meta_in_path) return;       /* delay updates while drawing a path */
+
+        if(cq_compare(&meta_c_LineColor,&meta_LineColor)
+           || meta_line_indef) {
+          GrSetLineColor(meta_GS,
+            meta_LineColor.CQ_info,meta_LineColor.CQ_redOrIndex,
+            meta_LineColor.CQ_green,meta_LineColor.CQ_blue);
+          meta_c_LineColor=meta_LineColor;
+                                        /* line color has been updated */
+        }
+        if(meta_c_LineStyle!=meta_LineStyle || meta_line_indef) {
+          GrSetLineStyle(meta_GS,meta_LineStyle,0,NULL,0);
+          meta_c_LineStyle=meta_LineStyle;
+                                        /* line style has been updated */
+        }
+        if(meta_c_LineWidth!=meta_LineWidth || meta_line_indef) {
+          GrSetLineWidth(meta_GS,meta_LineWidth);
+          meta_c_LineWidth=meta_LineWidth;
+                                        /* line style has been updated */
+        }
+        if(meta_c_LineFill!=meta_LineFill || meta_line_indef) {
+          GrSetLineMaskSys(meta_GS,meta_LineFill);
+          meta_c_LineFill=meta_LineFill;/* line style has been updated */
+        }
+        meta_line_indef=FALSE;          /* line state is known now */
+}
+
+void static _Meta_UpdateAreaBack(void)
+{
+        if(cq_compare(&meta_c_AreaColor,&meta_PatternBack)
+           || meta_area_indef) {
+          GrSetAreaColor(meta_GS,
+            meta_PatternBack.CQ_info,meta_PatternBack.CQ_redOrIndex,
+            meta_PatternBack.CQ_green,meta_PatternBack.CQ_blue);
+          meta_c_AreaColor=meta_PatternBack;
+        }
+        if(meta_c_AreaFill!=SDM_100 || meta_area_indef) {
+          GrSetAreaMaskSys(meta_GS,SDM_100);
+          meta_c_AreaFill=SDM_100;
+        }
+        meta_area_indef=FALSE;          /* area state is known now */
+}
+
+void static _Meta_UpdateArea(void)
+{
+        if(_meta_in_path) return;       /* delay updates while drawing a path */
+
+        if(cq_compare(&meta_c_AreaColor,&meta_AreaColor)
+           || meta_area_indef) {
+          GrSetAreaColor(meta_GS,
+            meta_AreaColor.CQ_info,meta_AreaColor.CQ_redOrIndex,
+            meta_AreaColor.CQ_green,meta_AreaColor.CQ_blue);
+          meta_c_AreaColor=meta_AreaColor;
+                                        /* area color has been updated */
+        }
+        if(meta_c_AreaFill!=meta_AreaFill || meta_area_indef) {
+          GrSetAreaMaskSys(meta_GS,meta_AreaFill);
+          meta_c_AreaFill=meta_AreaFill;/* area style has been updated */
+        }
+        meta_area_indef=FALSE;          /* area state is known now */
+}
+
+void static _Meta_UpdateEnvironment(void)
+{
+        if(meta_scale_c) {
+          GrApplyScale(meta_GS,
+            _meta_scale*_meta_undersc,-_meta_scale*_meta_undersc);
+          meta_scale_c=FALSE;           /* scale has been updated */
+        }
+        if(meta_clip_c) {
+          if(_meta_clip_x1==_meta_clip_x2 || _meta_clip_y1==_meta_clip_y2)
+            GrSetClipRect(meta_GS,PCT_NULL,0,0,0,0);
+          else
+            GrSetClipRect(meta_GS,PCT_REPLACE,
+              _meta_clip_x1,_meta_clip_y1,_meta_clip_x2,_meta_clip_y2);
+          meta_clip_c=FALSE;            /* clipping has been updated */
+        }
+}
+
+/*----------------------------------------------------------------------------
+   Utility routines for GrObj output
+  ----------------------------------------------------------------------------*/
+optr Create_GrObj(sword x1,sword y1,sword x2,sword y2,ClassStruct *class,
+                  Boolean area,Boolean area_in,Boolean area_edges)
+{
+        GrObjInitializeData data;
+        GrObjBaseLineAttrElement la;
+        GrObjBaseAreaAttrElement aa;
+        optr obj;
+        ColorQuad cq;
+
+        obj = @call meta_body::MSG_GB_INSTANTIATE_GROBJ(class);
+                                        /* create instance of object */
+
+        *(WWFixedAsDWord *)&data.GOID_width=MakeWWFixed(x2-x1);
+        *(WWFixedAsDWord *)&data.GOID_height=MakeWWFixed(y2-y1);
+        data.GOID_position.PDF_x.DWF_int=x1;
+        data.GOID_position.PDF_x.DWF_frac=0;
+        data.GOID_position.PDF_y.DWF_int=y1;
+        data.GOID_position.PDF_y.DWF_frac=0;
+        @call obj::MSG_GO_INITIALIZE(&data);
+                                        /* set position & size */
+
+        cq=meta_AreaColor;
+        ConvertToRGB(&cq);              /* make sure colors are RGB */
+        aa.GOBAAE_r=cq.CQ_redOrIndex;
+        aa.GOBAAE_g=cq.CQ_green;
+        aa.GOBAAE_b=cq.CQ_blue;
+
+        aa.GOBAAE_mask=(area_in)?meta_AreaFill:SDM_0;
+        aa.GOBAAE_drawMode=MM_COPY;
+        aa.GOBAEE_pattern.HP_type=PT_SOLID;
+        aa.GOBAEE_pattern.HP_data=0;
+
+        cq=meta_PatternBack;
+        ConvertToRGB(&cq);              /* make sure colors are RGB */
+        aa.GOBAEE_backR=cq.CQ_redOrIndex;
+        aa.GOBAEE_backG=cq.CQ_green;
+        aa.GOBAEE_backB=cq.CQ_blue;
+
+        aa.GOBAEE_aaeType=(byte)GOAAET_BASE;
+        aa.GOBAAE_areaInfo=
+          (_meta_transparency || !area_in)?GOAAIR_TRANSPARENT:0;
+        aa.GOBAAE_reserved=aa.GOBAAE_reservedByte=0;
+        @call obj::MSG_GO_SET_AREA_ATTR((GrObjBaseAreaAttrElement *)&aa);
+
+        cq=meta_LineColor;
+        ConvertToRGB(&cq);              /* make sure colors are RGB */
+        la.GOBLAE_r=cq.CQ_redOrIndex;
+        la.GOBLAE_g=cq.CQ_green;
+        la.GOBLAE_b=cq.CQ_blue;
+
+        la.GOBLAE_end=LE_ROUNDCAP;
+        la.GOBLAE_join=LJ_ROUND;
+        *(WWFixedAsDWord *)&la.GOBLAE_width=meta_LineWidth;
+        la.GOBLAE_mask=(area_edges || !area)?meta_LineFill:SDM_0;
+        la.GOBLAE_style=meta_LineStyle;
+        la.GOBLAE_drawMode=MM_COPY;
+        *(WWFixedAsDWord *)&la.GOBLAE_miterLimit=MakeWWFixed(1);
+        la.GOBLAE_laeType=GOLAET_BASE;
+        la.GOBLAE_lineInfo=0;
+        la.GOBLAE_arrowheadAngle=la.GOBLAE_arrowheadLength=0;
+        la.GOBLAE_reserved=0;
+        @call obj::MSG_GO_SET_LINE_ATTR(&la);
+
+        return obj;                     /* return newly created object */
+}
+
+int Add_GrObj(optr obj)
+{
+        TransMatrix tm;
+
+        memset(&tm,0,sizeof(tm));
+        *(WWFixedAsDWord *)&tm.TM_e11=_meta_scale*_meta_undersc;
+        *(WWFixedAsDWord *)&tm.TM_e22=-_meta_scale*_meta_undersc;
+        @call obj::MSG_GO_TRANSFORM(&tm);
+
+        @call obj::MSG_GO_NOTIFY_GROBJ_VALID();
+        @call meta_body::MSG_GB_ADD_GROBJ(obj,GOBAGOR_FIRST);
+                                        /* add object to body */
+        @call obj::MSG_GO_BECOME_SELECTED(HUM_MANUAL);
+                                        /* select it (for transfer format) */
+        return 0;                       /* no errors */
+}
+
+/*----------------------------------------------------------------------------*/
+void _export _pascal
+Meta_SetLineColor(ColorFlag flag,word redOrIndex,word green,word blue)
+{
+        meta_LineColor.CQ_info=flag;  /* store new line color */
+        meta_LineColor.CQ_redOrIndex=(byte)redOrIndex;
+        meta_LineColor.CQ_green=(byte)green;
+        meta_LineColor.CQ_blue=(byte)blue;
+}
+
+void _export _pascal
+Meta_SetAreaColor(ColorFlag flag,word redOrIndex,word green,word blue)
+{
+        meta_AreaColor.CQ_info=flag;    /* store new line color */
+        meta_AreaColor.CQ_redOrIndex=(byte)redOrIndex;
+        meta_AreaColor.CQ_green=(byte)green;
+        meta_AreaColor.CQ_blue=(byte)blue;
+}
+
+void _export _pascal Meta_SetFillRule(RegionFillRule windingRule)
+{
+        meta_windingRule=windingRule;   /* store fill rule for polygons */
+}
+
+void _export _pascal Meta_SetLineStyle(LineStyle ls)
+{
+        meta_LineStyle=ls;              /* store line style */
+}
+
+void _export _pascal Meta_SetLineWidth(WWFixedAsDWord lw)
+{
+        meta_LineWidth=lw;              /* store line width */
+}
+
+void _export _pascal Meta_SetAreaFill(SystemDrawMask sdm)
+{
+        meta_AreaFill=sdm;              /* store draw mask */
+}
+
+void _export _pascal Meta_SetLineFill(SystemDrawMask sdm)
+{
+        meta_LineFill=sdm;              /* store draw mask */
+}
+
+void _export _pascal
+Meta_SetScaling(sword w_x1,sword w_y1,sword w_x2,sword w_y2,
+                word g_x,word g_y)
+{
+        word mc;
+
+        _meta_world1.P_x=min(w_x1,w_x2);
+        _meta_world1.P_y=min(w_y1,w_y2);
+        _meta_world2.P_x=max(w_x1,w_x2);
+        _meta_world2.P_y=max(w_y1,w_y2);
+
+        mc=max(
+          max(abs(_meta_world1.P_x),abs(_meta_world2.P_x)),
+          max(abs(_meta_world1.P_y),abs(_meta_world2.P_y)));
+        _meta_undersc=(mc>16383)?4:(mc>8191)?2:1;
+                                        /* use underscaling to circumvent bugs
+                                           in certain drawing functions */
+
+        _meta_scale=GrSDivWWFixed(
+          MakeWWFixed( g_x/_meta_undersc ),
+          MakeWWFixed((sword)(
+            ((sdword)_meta_world2.P_x-(sdword)_meta_world1.P_x)/_meta_undersc)
+          ));
+        g_y=g_y;                        /* to satisfy the compiler... */
+        meta_scale_c=TRUE;
+}
+
+WWFixedAsDWord _export _pascal Meta_GetScaling(void)
+{
+        return _meta_scale;             /* return main scaling factor */
+}
+
+void _export _pascal Meta_SetClipRect(sword x1,sword y1,sword x2,sword y2)
+{
+        _Meta_chk(x1,y1,&_meta_clip_x1,&_meta_clip_y1);
+        _Meta_chk(x2,y2,&_meta_clip_x2,&_meta_clip_y2);
+        meta_clip_c=TRUE;               /* clipping mode has changed */
+}
+
+void _export _pascal
+Meta_SetPatternBack(ColorFlag flag,word redOrIndex,word green,word blue)
+{
+        meta_PatternBack.CQ_info=flag;/* store new pattern back color */
+        meta_PatternBack.CQ_redOrIndex=(byte)redOrIndex;
+        meta_PatternBack.CQ_green=(byte)green;
+        meta_PatternBack.CQ_blue=(byte)blue;
+}
+
+void _export _pascal Meta_SetTransparency(Boolean flag)
+{
+        _meta_transparency=flag;
+}
+
+/*----------------------------------------------------------------------------*/
+void _export _pascal Meta_Line(sword x1,sword y1,sword x2,sword y2)
+{
+        optr obj;
+
+        _Meta_chk(x1,y1,&x1,&y1);       /* check point */
+        _Meta_chk(x2,y2,&x2,&y2);       /* check point */
+
+        if(meta_GrObj) {                /*** GrObj output */
+          obj = Create_GrObj(x1,y1,x2,y2,(ClassStruct *)&LineClass,
+            FALSE,FALSE,FALSE);
+          Add_GrObj(obj);
+        }
+        else {                          /*** GString output */
+          _Meta_UpdateEnvironment();    /* update general data */
+          if(!_meta_transparency && !_meta_in_path &&
+             (meta_LineFill!=SDM_100 || meta_LineStyle!=LS_SOLID)) {
+            _Meta_UpdateLineBack();     /* affected by line settings */
+            _Meta_optimizedLine(meta_GS,x1,y1,x2,y2);
+          }
+          _Meta_UpdateLine();           /* affected by line settings */
+          _Meta_optimizedLine(meta_GS,x1,y1,x2,y2);
+        }
+}
+
+/*
+ * Create optimized GString representation of shape drawn by _cmd.
+ *
+ * If no line background and interior is required (first case - background is
+ * transparent or invisible, or there is only an outline), the shape outline
+ * is painted directly.
+ * For any more complex case, the shape is drawn/filled by first creating a
+ * path and then redrawing it multiple times with the proper attributes.
+ */
+#define _optimize(_in,_edges,_cmd)\
+{\
+  if( (_edges) && !(_in) && (_meta_transparency ||\
+        (meta_LineFill==SDM_100 && meta_LineStyle==LS_SOLID)) )\
+  {\
+    _Meta_UpdateEnvironment();\
+    _Meta_UpdateLine();\
+    _cmd;\
+  }\
+  else if( (_edges) || (_in) )\
+  {\
+    Meta_BeginPath();\
+    _cmd;\
+    Meta_EndPath(_in,_edges);\
+  }\
+}
+
+/*
+ * Create optimized GString representation of shape drawn by _cmdDraw and
+ * filled by _cmdFill.
+ *
+ * This works like _optimize2, but it also handles the special case where a
+ * single command can also be used for filling the shape.
+ */
+#define _optimize2(_in,_edges,_cmdDraw,_cmdFill)\
+{\
+  if( !(_edges) && (_in) && (_meta_transparency || meta_AreaFill==SDM_100) )\
+  {\
+    _Meta_UpdateEnvironment();\
+    _Meta_UpdateArea();\
+    _cmdFill;\
+  }\
+  else\
+    _optimize(_in,_edges,_cmdDraw);\
+}
+
+void _export _pascal Meta_Polyline(Point *p,word np)
+{
+        optr obj,obj2;
+        SplineSetPointParams params;
+
+        if(np==2)                       /* exactly two points: make a line */
+        {
+          Meta_Line(p[0].P_x,p[0].P_y,p[1].P_x,p[1].P_y);
+          return;
+        }
+
+        np = _Meta_chkPolyline(p,np);   /* Polygon optimieren */
+        if(np<2) return;                /* too few points: don't draw */
+
+        if(meta_GrObj) {                /*** GrObj output */
+          params.SSPP_flags = SSPT_POINT;
+          params.SSPP_numPoints = np;
+          params.SSPP_points = p;
+
+          obj = Create_GrObj(0,0,1,1,
+            (ClassStruct *)&SplineGuardianClass,FALSE,FALSE,TRUE);
+          obj2=@call obj::MSG_GOVG_GET_VIS_WARD_OD();
+          @call obj2::MSG_SPLINE_SET_POINTS(params);
+          @call obj2::MSG_SPLINE_OPEN_CURVE();
+          Add_GrObj(obj);
+        }
+        else                            /*** GString output */
+        {
+          if( _meta_transparency ||
+              (meta_LineFill==SDM_100 && meta_LineStyle==LS_SOLID) )
+          {
+            _Meta_UpdateEnvironment();
+            _Meta_UpdateLine();
+            _Meta_optimizedPolyline(meta_GS,p,np,FALSE);
+          }
+          else
+          {
+            Meta_BeginPath();
+            _Meta_optimizedPolyline(meta_GS,p,np,FALSE);
+            Meta_EndPath(FALSE,TRUE);
+          }
+        }
+}
+
+void _export _pascal Meta_Polygon(Point *p,word np,Boolean in,Boolean edges)
+{
+        optr obj,obj2;
+        SplineSetPointParams params;
+
+        np=_Meta_chkPolyline(p,np);     /* Polygon optimieren */
+        if(np<2) return;                /* too few points: don't draw */
+
+        if(np==2)                       /* exactly two points: make a line */
+        {
+          if(edges)                     /* only edges make a difference */
+            Meta_Line(p[0].P_x,p[0].P_y,p[1].P_x,p[1].P_y);
+          return;
+        }
+
+        if(meta_GrObj) {                /*** GrObj output */
+          params.SSPP_flags = SSPT_POINT;
+          params.SSPP_numPoints = np;
+          params.SSPP_points = p;
+
+          obj = Create_GrObj(0,0,1,1,
+            (ClassStruct *)&SplineGuardianClass,TRUE,in,edges);
+          obj2=@call obj::MSG_GOVG_GET_VIS_WARD_OD();
+          @call obj2::MSG_SPLINE_SET_POINTS(params);
+          @call obj2::MSG_SPLINE_CLOSE_CURVE();
+          Add_GrObj(obj);
+        }
+        else                            /*** GString output */
+          _optimize( in, edges,
+            _Meta_optimizedPolyline(meta_GS,p,np,TRUE));
+}
+
+void _export _pascal
+Meta_Rect(sword x1,sword y1,sword x2,sword y2,Boolean in,Boolean edges)
+{
+        optr obj;
+
+        _Meta_chk(x1,y1,&x1,&y1);       /* check point */
+        _Meta_chk(x2,y2,&x2,&y2);       /* check point */
+
+        if(meta_GrObj) {                /*** GrObj output */
+          obj = Create_GrObj(x1,y1,x2,y2,(ClassStruct *)&RectClass,
+            TRUE,in,edges);
+          Add_GrObj(obj);
+        }
+        else                            /*** GString output */
+          _optimize2( in, edges,
+            GrDrawRect(meta_GS,x1,y1,x2,y2),
+            GrFillRect(meta_GS,x1,y1,x2,y2));
+}
+
+void _export _pascal
+Meta_Ellipse(sword cex,sword cey,sword rx,sword ry,sword angle,
+             Boolean in,Boolean edges)
+{
+        sword x1,y1,x2,y2;
+        optr obj;
+
+        _Meta_chk(cex-rx,cey-ry,&x1,&y1); /* check point */
+        _Meta_chk(cex+rx,cey+ry,&x2,&y2); /* check point */
+        _Meta_chk(cex,cey,&cex,&cey);
+        _Meta_chk(rx,ry,&rx,&ry);
+
+        if(meta_GrObj) {                /*** GrObj output */
+          obj = Create_GrObj(x1,y1,x2,y2,(ClassStruct *)&EllipseClass,
+            TRUE,in,edges);
+          if(angle && rx!=ry)
+            @call obj::MSG_GO_ROTATE(HANDLE_CENTER,MakeWWFixed(-angle));
+          Add_GrObj(obj);
+        }
+        else if(in || edges)            /*** GString output */
+        {
+          _Meta_UpdateEnvironment();    /* update general data */
+
+          if(angle && rx!=ry && (in || edges))
+          {
+            GrSaveTransform(meta_GS);
+            GrApplyTranslation(meta_GS,MakeWWFixed(cex),MakeWWFixed(cey));
+            x1-=cex; y1-=cey; x2-=cex; y2-=cey;
+            GrApplyRotation(meta_GS,MakeWWFixed(-angle));
+          }
+
+          _optimize2( in, edges,
+            GrDrawEllipse(meta_GS,x1,y1,x2,y2),
+            GrFillEllipse(meta_GS,x1,y1,x2,y2));
+
+          if(angle && rx!=ry && (in || edges))
+          {
+            GrRestoreTransform(meta_GS);
+          }
+        }
+}
+
+void _export _pascal
+Meta_EllipticalArc(sword cex,sword cey,sword rx,sword ry,sword angle,
+                   sword sa,sword ea,ArcCloseType act,
+                   Boolean in,Boolean edges)
+{
+        ThreePointArcParams tpa;
+        word ma;
+        sword x1,y1,x2,y2;
+        WWFixedAsDWord yscale;
+        optr obj;
+
+        if((sa+360)%360==(ea+360)%360)  /* start angle equals end angle? */
+        {
+          Meta_Ellipse(cex,cey,rx,ry,angle,in,edges);
+          return;                       /* draw full ellipse/circle */
+        }
+        if(!meta_Arcs) return;          /* abort if arc supression requested */
+
+        _Meta_chk(cex-rx,cey-ry,&x1,&y1); /* check point */
+        _Meta_chk(cex+rx,cey+ry,&x2,&y2); /* check point */
+        _Meta_chk(cex,cey,&cex,&cey);
+        _Meta_chk(rx,ry,&rx,&ry);
+        yscale=GrSDivWWFixed(MakeWWFixed(ry),MakeWWFixed(rx));
+
+        if(meta_GrObj) {                /*** GrObj output */
+          sa=_xlate_angle(sa,yscale);   /* translate angles for "squishing" */
+          ea=_xlate_angle(ea,yscale);
+
+          obj = Create_GrObj(x1,y1,x2,y2,(ClassStruct *)&ArcClass,
+            TRUE,in,edges);
+          @call obj::MSG_ARC_SET_START_ANGLE(MakeWWFixed(0));
+          @call obj::MSG_ARC_SET_END_ANGLE(MakeWWFixed(357));
+                                        /* use center of full ellipse */
+          if(angle)                     /* rotated arc? */
+          {
+            angle=(angle+360)%360;      /* normalize rotation */
+            if(angle>=180)              /* turn up to maximum of 179 degrees */
+            {
+              angle-=180;
+              ea+=180;                  /* compensate start/end angle */
+              sa+=180;
+            }
+            @call obj::MSG_GO_ROTATE(HANDLE_CENTER,MakeWWFixed(-angle));
+                                        /* rotate by given angle */
+          }
+          Add_GrObj(obj);
+          @call obj::MSG_ARC_SET_START_ANGLE(MakeWWFixed(sa));
+          @call obj::MSG_ARC_SET_END_ANGLE(MakeWWFixed(ea));
+          @call obj::MSG_ARC_SET_ARC_CLOSE_TYPE(act);
+        }
+        else if(in || edges)            /*** GString output */
+        {
+          _Meta_UpdateEnvironment();    /* update general data */
+
+          if((angle || yscale!=MakeWWFixed(1)) && (in || edges))
+          {
+            GrSaveTransform(meta_GS);
+            GrApplyTranslation(meta_GS,MakeWWFixed(cex),MakeWWFixed(cey));
+            x1-=cex; y1-=cey; x2-=cex; y2-=cey;
+            cex=0; cey=0;
+            if(angle) GrApplyRotation(meta_GS,MakeWWFixed(-angle));
+            GrApplyScale(meta_GS,MakeWWFixed(1),yscale);
+          }
+
+          /*
+            Translate start/end angles for scaling - this is necessary because
+            are given in terms of an unscaled coordinate system while
+            elliptical arcs are drawn by scaling *circular* arcs into
+            elliptical shapes. Apparently, this is also done by the internal
+            routines of the GrObj system.
+           */
+          sa=_xlate_angle(sa,yscale);
+          ea=_xlate_angle(ea,yscale);
+          ma=sa+ea;                     /* average*2 (to avoid loss of .5) */
+          if(sa>ea) ma+=360;            /* force 2nd point onto arc */
+                                        /* note that ma is from [0..720] */
+
+#if 0
+          _optimize2( in, edges,
+            GrDrawArc(meta_GS,x1,y1,x2,y2,sa,ea,act),
+            GrFillArc(meta_GS,x1,y1,x2,y2,sa,ea,act));
+#else
+          tpa.TPAP_close=act;           /* use specified close type */
+          *(WWFixedAsDWord *)&tpa.TPAP_point1.PF_x=MakeWWFixed(cex)+GrMulWWFixed(MakeWWFixed(rx),GrQuickCosine(MakeWWFixed(sa)));
+          *(WWFixedAsDWord *)&tpa.TPAP_point1.PF_y=MakeWWFixed(cey)+GrMulWWFixed(MakeWWFixed(rx),GrQuickSine(MakeWWFixed(sa)));
+          *(WWFixedAsDWord *)&tpa.TPAP_point2.PF_x=MakeWWFixed(cex)+GrMulWWFixed(MakeWWFixed(rx),GrQuickCosine(MakeWWFixed(ma)>>1));
+          *(WWFixedAsDWord *)&tpa.TPAP_point2.PF_y=MakeWWFixed(cey)+GrMulWWFixed(MakeWWFixed(rx),GrQuickSine(MakeWWFixed(ma)>>1));
+          *(WWFixedAsDWord *)&tpa.TPAP_point3.PF_x=MakeWWFixed(cex)+GrMulWWFixed(MakeWWFixed(rx),GrQuickCosine(MakeWWFixed(ea)));
+          *(WWFixedAsDWord *)&tpa.TPAP_point3.PF_y=MakeWWFixed(cey)+GrMulWWFixed(MakeWWFixed(rx),GrQuickSine(MakeWWFixed(ea)));
+          _optimize2( in, edges,
+            GrDrawArc3Point(meta_GS,&tpa),
+            GrFillArc3Point(meta_GS,&tpa));
+#endif
+
+          if((angle || yscale!=MakeWWFixed(1)) && (in || edges))
+          {
+            GrRestoreTransform(meta_GS);
+          }
+        }
+}
+
+void _export _pascal
+Meta_ArcThreePoint(Point *p,ArcCloseType act,Boolean in,Boolean edges)
+{
+        #define sq(v) ((v)*(v))
+        #define x1 p[0].P_x
+        #define y1 p[0].P_y
+        #define x2 p[1].P_x
+        #define y2 p[1].P_y
+        #define x3 p[2].P_x
+        #define y3 p[2].P_y
+
+        ThreePointArcParams tpa;
+        FloatNum disc;
+        sword cex,cey,r;
+
+        if(!meta_Arcs) return;          /* abort if arc supression requested */
+
+        if(meta_GrObj) {
+
+/*
+ * center of circle from 3 points
+ */
+          /* disc = 2 * (x1 * (y2 - y3) + x2 * (y3 - y1) + x3 * (y1 - y2)); */
+          FloatDwordToFloat(y2);
+          FloatDwordToFloat(y3);
+            FloatSub();
+            FloatDwordToFloat(x1);
+              FloatMultiply();
+          FloatDwordToFloat(y3);
+          FloatDwordToFloat(y1);
+            FloatSub();
+            FloatDwordToFloat(x2);
+              FloatMultiply();
+                FloatAdd();
+            FloatDwordToFloat(y1);
+            FloatDwordToFloat(y2);
+              FloatSub();
+              FloatDwordToFloat(x3);
+                FloatMultiply();
+                  FloatAdd();
+                  FloatMultiply2();
+          FloatPopNumber(&disc);
+
+          FloatPushNumber(&disc);
+          if(FloatEq0()) return;        /* linear dependent: no circle */
+
+          /* cex = (sq(x1) * (y2 - y3) + sq(x2) * (y3 - y1) +
+               (y1 - y2) * (sq(x3) + (y2 - y3) * (y1 - y3)))/disc; */
+          FloatDwordToFloat(y2);
+          FloatDwordToFloat(y3);
+            FloatSub();
+            FloatDwordToFloat(x1); FloatSqr();
+              FloatMultiply();
+
+          FloatDwordToFloat(y3);
+          FloatDwordToFloat(y1);
+            FloatSub();
+            FloatDwordToFloat(x2); FloatSqr();
+              FloatMultiply();
+                FloatAdd();
+
+            FloatDwordToFloat(y1);
+            FloatDwordToFloat(y2);
+              FloatSub();
+          FloatDwordToFloat(x3); FloatSqr();
+        FloatDwordToFloat(y2);
+        FloatDwordToFloat(y3);
+          FloatSub();
+        FloatDwordToFloat(y1);
+        FloatDwordToFloat(y3);
+          FloatSub();
+            FloatMultiply();
+              FloatAdd();
+                FloatMultiply();
+                  FloatAdd();
+                  FloatPushNumber(&disc);
+                    FloatDivide();
+          cex=(sword)FloatFloatToDword();
+
+          /* cey = -(sq(x1) * (x2 - x3) +
+                     (-x1) * (sq(x2) + (-sq(x3)) + sq(y2) + (-sq(y3))) +
+                     sq(x2) * x3 +
+                     (-x2) * (sq(x3) + (-sq(y1)) + sq(y3)) +
+                     x3 * (sq(y2) + (-sq(y1)))
+                   )/disc; */
+          FloatDwordToFloat(x2);
+          FloatDwordToFloat(x3);
+            FloatSub();
+            FloatDwordToFloat(x1); FloatSqr();
+              FloatMultiply();
+
+          FloatDwordToFloat(x2); FloatSqr(); 
+          FloatDwordToFloat(x3); FloatSqr();
+            FloatSub();
+        FloatDwordToFloat(y2); FloatSqr();
+        FloatDwordToFloat(y3); FloatSqr();
+          FloatSub();
+            FloatAdd();
+            FloatDwordToFloat(x1); FloatNegate();
+              FloatMultiply();
+                FloatAdd();
+
+              FloatDwordToFloat(x2); FloatSqr();
+              FloatDwordToFloat(x3);
+                FloatMultiply();
+                  FloatAdd();
+
+            FloatDwordToFloat(x3); FloatSqr();
+            FloatDwordToFloat(y1); FloatSqr();
+              FloatSub();
+              FloatDwordToFloat(y3); FloatSqr();
+                FloatAdd();
+                FloatDwordToFloat(x2); FloatNegate();
+                  FloatMultiply();
+                    FloatAdd();
+
+              FloatDwordToFloat(y2); FloatSqr();
+              FloatDwordToFloat(y1); FloatSqr();
+                FloatSub();
+                FloatDwordToFloat(x3);
+                    FloatMultiply();
+                      FloatAdd();
+
+                      FloatPushNumber(&disc);
+                        FloatDivide();
+                        FloatNegate();
+          cey=(sword)FloatFloatToDword();
+
+          r = IntegerOf( rad(x1-cex,y1-cey) );
+                                        /* diameter/2 of circle */
+
+          Meta_EllipticalArc(
+            cex,cey,r,r, 0,
+            IntegerOf(phi(x1-cex,y1-cey)),
+            IntegerOf(phi(x3-cex,y3-cey)),
+            act,in,edges);              /* draw as elliptical arc */
+        }
+        else if(in || edges)
+        {
+          _Meta_chk(p[0].P_x,p[0].P_y,&p[0].P_x,&p[0].P_y);
+          _Meta_chk(p[1].P_x,p[1].P_y,&p[1].P_x,&p[1].P_y);
+          _Meta_chk(p[2].P_x,p[2].P_y,&p[2].P_x,&p[2].P_y);
+                                        /* check points */
+
+          tpa.TPAP_close=act;           /* use specified close type */
+          *(WWFixedAsDWord *)&tpa.TPAP_point1.PF_x=MakeWWFixed(p[0].P_x);
+          *(WWFixedAsDWord *)&tpa.TPAP_point1.PF_y=MakeWWFixed(p[0].P_y);
+          *(WWFixedAsDWord *)&tpa.TPAP_point2.PF_x=MakeWWFixed(p[1].P_x);
+          *(WWFixedAsDWord *)&tpa.TPAP_point2.PF_y=MakeWWFixed(p[1].P_y);
+          *(WWFixedAsDWord *)&tpa.TPAP_point3.PF_x=MakeWWFixed(p[2].P_x);
+          *(WWFixedAsDWord *)&tpa.TPAP_point3.PF_y=MakeWWFixed(p[2].P_y);
+
+          _optimize2( in, edges,
+            GrDrawArc3Point(meta_GS,&tpa),
+            GrFillArc3Point(meta_GS,&tpa));
+        }
+
+        #undef x1
+        #undef y1
+        #undef x2
+        #undef y2
+        #undef x3
+        #undef y3
+}
+
+void _export _pascal Meta_BeginPath(void)
+{
+        if(meta_GrObj) return;          /* not implemented for GrObj's yet */
+        if(_meta_in_path++)             /* yes, we're drawing a path */
+          return;                       /* no nested paths, please */
+        _Meta_UpdateEnvironment();
+        GrBeginPath(meta_GS,PCT_REPLACE);
+}
+
+void _export _pascal Meta_EndPath(Boolean in,Boolean edges)
+{
+        if(meta_GrObj) return;          /* not implemented for GrObj's yet */
+        GrEndPath(meta_GS);
+        if(--_meta_in_path)             /* path drawing has ended */
+          return;                       /* close only on last nesting level */
+
+        if(in)                          /* draw interior if visible */
+        {                        
+          _Meta_UpdateEnvironment();    /* update general data */
+          if(!_meta_transparency && meta_AreaFill!=SDM_100)
+          {
+            _Meta_UpdateAreaBack();     /* affected by area settings */
+            GrFillPath(meta_GS,meta_windingRule);
+                                        /* fill interior of path */
+          }
+          _Meta_UpdateArea();           /* affected by area settings */
+          GrFillPath(meta_GS,meta_windingRule);
+                                        /* fill interior of path */
+        }
+
+        if(edges)                       /* draw edges if visible */
+        {
+          _Meta_UpdateEnvironment();    /* update general data */
+          if(!_meta_transparency &&
+             (meta_LineFill!=SDM_100 || meta_LineStyle!=LS_SOLID))
+          {
+            _Meta_UpdateLineBack();     /* affected by line settings */
+            GrDrawPath(meta_GS);
+          }
+          _Meta_UpdateLine();           /* affected by line settings */
+          GrDrawPath(meta_GS);
+        }
+}
+
+void _export _pascal Meta_TextAt(int x,int y,char *s,WWFixedAsDWord size,sword angle)
+{
+        TextAttr ta={C_BLACK,CF_INDEX,0,0,
+                     SDM_100,
+                     PT_SOLID,0,
+                     0,~0,
+                     TM_DRAW_BASE,TM_DRAW_OPTIONAL_HYPHENS,
+                     0,0,
+                     0,
+                     0,0,
+                     0,
+                     100,
+                     100};
+
+        if(!meta_Text || meta_GrObj) return;
+                                        /* Text unterdr�cken? Tsch�ss... */
+
+        _Meta_chk(x,y,(sword *)&x,(sword *)&y);
+                                        /* check point */
+        LocalCodePageToGeos(s,strlen(s),CODE_PAGE_US,'.');
+                                        /* Zeichensatz umwandeln */
+
+        _Meta_UpdateEnvironment();      /* update general data (scaling etc.) */
+        GrSaveState(meta_GS);
+        GrApplyTranslation(meta_GS,MakeWWFixed(x),MakeWWFixed(y));
+        GrApplyScale(meta_GS,
+           GrSDivWWFixed(MakeWWFixed(1),_meta_scale*_meta_undersc),
+          -GrSDivWWFixed(MakeWWFixed(1),_meta_scale*_meta_undersc));
+        GrApplyRotation(meta_GS,MakeWWFixed(angle));
+
+        ta.TA_font = FID_DTC_URW_MONO;  /* Font ist immer URW Mono */
+        ta.TA_size.WBF_frac = (byte)(FractionOf(size)/256);
+        ta.TA_size.WBF_int = IntegerOf(size);
+        GrSetTextAttr(meta_GS,(TextAttr *)&ta);
+        GrDrawText(meta_GS,0,0,s,0);    /* Text ausgeben */
+
+        GrRestoreState(meta_GS);
+}
+
+/*----------------------------------------------------------------------------*/
+word _export _pascal Meta_Start(
+  word settings,GStateHandle gs,optr body,VMFileHandle vmf)
+{
+        meta_vmf=vmf;
+        meta_GS=gs;
+        meta_body=body;
+
+        meta_Text=(settings & SETTINGS_DOTEXT);
+                                        /* convert text items? */
+        meta_GrObj=(settings & SETTINGS_CREATE_GROBJ);
+                                        /* create editable GrObj's? */
+        meta_Arcs=(settings & SETTINGS_DOARCS);
+                                        /* convert arc items? */
+        meta_Splines=(settings & SETTINGS_OPT_SPLINES);
+                                        /* create artifical splines? */
+
+        Meta_SetLineColor(CF_INDEX,0,0,0);      /* set default line color */
+        Meta_SetAreaColor(CF_INDEX,0,0,0);      /* set default area color */
+        Meta_SetLineWidth(MakeWWFixed(1));      /* Liniendicke: 1 pt */
+        Meta_SetLineColor(CF_INDEX,0,0,0);      /* default-Pen: Schwarz */
+        Meta_SetAreaFill(SDM_100);              /* Solid-F�llung */
+        Meta_SetLineStyle(LS_SOLID);            /* default linestyle */
+        Meta_SetLineFill(SDM_100);              /* Solid-F�llung */
+        Meta_SetFillRule(ODD_EVEN);     /* default filling rule for polygons */
+        meta_line_indef=meta_area_indef=TRUE;   /* current states are unknown */
+
+        _meta_world1.P_x=_meta_world1.P_y=-32768;
+        _meta_world2.P_x=_meta_world2.P_y=32767;
+        _meta_scale=MakeWWFixed(1);     /* default scaling: none */
+        _meta_clip_x1=_meta_clip_y1=_meta_clip_x2=_meta_clip_y2=0;
+        meta_clip_c=meta_scale_c=FALSE; /* don't emit rescale opcodes */
+        _meta_in_path=0;                /* not currently drawing complex path */
+
+        /* initialize storage for graphics objects: */
+        if(!meta_GrObj)                 /* only for GStrings */
+        {
+          GrSetMixMode(meta_GS,MM_COPY);           /* draw opaque */
+          GrSetLineColorMap(meta_GS,CMT_DITHER);   /* enable dithering */
+          GrSetAreaColorMap(meta_GS,CMT_DITHER);
+          GrSetLineJoin(meta_GS,LJ_ROUND);
+          GrSetLineEnd(meta_GS,LE_ROUNDCAP);
+        }
+
+        return 0;                       /* no errors */
+}
+
+int _export _pascal Meta_End(void)
+{
+        if(_meta_in_path)               /* close any open path */
+          Meta_EndPath(FALSE,FALSE);
+
+        return 0;                       /* no errors */
+}
