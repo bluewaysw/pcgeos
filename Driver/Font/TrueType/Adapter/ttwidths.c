@@ -28,7 +28,6 @@
 #include "ttinit.h"
 #include "freetype.h"
 #include "ftxkern.h"
-#include "../FreeType/ftxkern.h"
 
 
 static word  AllocFontBlock( word               additionalSpace,
@@ -216,7 +215,11 @@ EC(     ECCheckBounds( (void*) fontBuf ) );
 
         /* convert widths and fill CharTableEntries */
         ConvertWidths( trueTypeVars, fontHeader, fontBuf );
+
+        /* FIXME: We are temporarily disabling support for kerning as this causes instability in the driver. */
+#if 0
         FillKerningFlags( fontHeader, fontBuf ); 
+#endif
 
         /* calculate the transformation matrix and copy it into the FontBlock */
         transMatrix = (TransformMatrix*)(((byte*)fontBuf) + sizeof( FontBuf ) + fontHeader->FH_numChars * sizeof( CharTableEntry ));
@@ -271,7 +274,7 @@ Fail:
  *      Date      Name      Description
  *      ----      ----      -----------
  *      12.02.23  JK        Initial Revision
- *      17.09.24  JK        filling kern paris removed
+ *      17.09.24  JK        filling kern pairs moved to separate function
  *******************************************************************/
 
 static void ConvertWidths( TRUETYPE_VARS, FontHeader* fontHeader, FontBuf* fontBuf )
@@ -362,16 +365,24 @@ EC(             ECCheckBounds( (void*)charTableEntry ) );
 static void FillKerningFlags( FontHeader* fontHeader, FontBuf* fontBuf ) 
 {
         word             i;
-        KernPair*        kernPair       = (KernPair*) ( ( (byte*)fontBuf ) + fontBuf->FB_kernPairs );
-        CharTableEntry*  charTableEntry = (CharTableEntry*) (((byte*)fontBuf) + sizeof( FontBuf ));
+        const KernPair*  const kernPairs = (const KernPair*) ( ( (const byte*)fontBuf ) + fontBuf->FB_kernPairs );
+        CharTableEntry*  const charTableEntries = (CharTableEntry*) ( ( (byte*)fontBuf ) + sizeof( FontBuf ));
+
+EC(     ECCheckStack() );
+EC(     ECCheckBounds( (void*)kernPairs ) );
+EC(     ECCheckBounds( charTableEntries ) );
 
         for( i = 0; i < fontBuf->FB_kernCount; ++i )
         {
-                word  indexLeftChar  = kernPair[i].KP_charLeft - fontHeader->FH_firstChar;
-                word  indexRightChar = kernPair[i].KP_charRight - fontHeader->FH_firstChar;
+                const unsigned char  indexLeftChar  = kernPairs[i].KP_charLeft - fontHeader->FH_firstChar;
+                const unsigned char  indexRightChar = kernPairs[i].KP_charRight - fontHeader->FH_firstChar;
 
-                charTableEntry[indexLeftChar].CTE_flags  |= CTF_IS_FIRST_KERN;
-                charTableEntry[indexRightChar].CTE_flags |= CTF_IS_SECOND_KERN;
+
+EC_ERROR_IF(    indexLeftChar  > fontHeader->FH_lastChar - fontHeader->FH_firstChar, CHARINDEX_OUT_OF_BOUNDS );
+EC_ERROR_IF(    indexRightChar > fontHeader->FH_lastChar - fontHeader->FH_firstChar, CHARINDEX_OUT_OF_BOUNDS );
+
+                charTableEntries[indexLeftChar].CTE_flags  |= CTF_IS_FIRST_KERN;
+                charTableEntries[indexRightChar].CTE_flags |= CTF_IS_SECOND_KERN;
         }
 }
 
@@ -438,8 +449,8 @@ EC(     ECCheckBounds( indices ) );
         /* search for format 0 subtable */
         for( table = 0; table < kerningDir.nTables; ++table )
         {
-                word       i;
-                word       minKernValue = UNITS_PER_EM / KERN_VALUE_DIVIDENT;
+                word        i;
+                const word  minKernValue = UNITS_PER_EM / KERN_VALUE_DIVIDENT;
                 
 
                 if( TT_Load_Kerning_Table( FACE, table ) )
@@ -453,8 +464,8 @@ EC(             ECCheckBounds( pairs ) );
 
                 for( i = 0; i < kerningDir.tables->t.kern0.nPairs; ++i )
                 {
-                        char left = GetGEOSCharForIndex( indices, pairs[i].left );
-                        char right = GetGEOSCharForIndex( indices, pairs[i].right );
+                        const char left = GetGEOSCharForIndex( indices, pairs[i].left );
+                        const char right = GetGEOSCharForIndex( indices, pairs[i].right );
 
                         if( left && right && ABS( pairs[i].value ) > minKernValue )
                         {
@@ -607,11 +618,12 @@ static void CalcTransform( TransformMatrix*  transMatrix,
                            Byte              width,
                            Byte              weight )
 {
-        TT_Matrix  tempMatrix = { 1L << 16, 0, 0, 1L << 16 };
- 
+        TT_Matrix  styleMatrix = { 1L<<16, 0, 0, 1L<<16 };
+
 
 EC(     ECCheckBounds( (void*)transMatrix ) );
 EC(     ECCheckBounds( (void*)fontMatrix ) );
+EC(     ECCheckBounds( (void*)fontBuf ) );
 
         /* initialize transMatrix */
         transMatrix->TM_heightX = 0;
@@ -621,18 +633,18 @@ EC(     ECCheckBounds( (void*)fontMatrix ) );
 
         /* fake bold style       */
         if( stylesToImplement & TS_BOLD )
-                tempMatrix.xx = BOLD_FACTOR;
+                styleMatrix.xx = BOLD_FACTOR;
 
         /* fake italic style       */
         if( stylesToImplement & TS_ITALIC )
-                tempMatrix.yx = NEGATVE_ITALIC_FACTOR;
+                styleMatrix.xy = ITALIC_FACTOR;
 
         /* width and weight */
         if( width != FWI_MEDIUM )
-                tempMatrix.xx = MUL_100_WWFIXED( tempMatrix.xx, width );
+                styleMatrix.xx = MUL_100_WWFIXED( styleMatrix.xx, width );
 
         if( weight != FW_NORMAL )
-                tempMatrix.xx = MUL_100_WWFIXED( tempMatrix.xx, weight );
+                styleMatrix.xx = MUL_100_WWFIXED( styleMatrix.xx, weight );
 
         /* fake script style      */
         if( stylesToImplement & ( TS_SUBSCRIPT | TS_SUPERSCRIPT ) )
@@ -641,8 +653,8 @@ EC(     ECCheckBounds( (void*)fontMatrix ) );
                                               WBFIXED_TO_WWFIXEDASDWORD( fontBuf->FB_heightAdjust );
 
 
-                tempMatrix.xx = GrMulWWFixed( tempMatrix.xx, SCRIPT_FACTOR );
-                tempMatrix.yy = GrMulWWFixed( tempMatrix.yy, SCRIPT_FACTOR );
+                styleMatrix.xx = GrMulWWFixed( styleMatrix.xx, SCRIPT_FACTOR );
+                styleMatrix.yy = GrMulWWFixed( styleMatrix.yy, SCRIPT_FACTOR );
 
                 if( stylesToImplement & TS_SUBSCRIPT )
                 {
@@ -658,13 +670,23 @@ EC(     ECCheckBounds( (void*)fontMatrix ) );
                 }
         }
 
-        /* integrate fontMatrix */
-        transMatrix->TM_matrix.xx = GrMulWWFixed( tempMatrix.xx, fontMatrix->FM_11 );
-        transMatrix->TM_matrix.xy = - ( GrMulWWFixed( tempMatrix.yx, fontMatrix->FM_11 ) +
-                                    GrMulWWFixed( tempMatrix.yy, fontMatrix->FM_21 ) );
-        transMatrix->TM_matrix.yx = - ( GrMulWWFixed( tempMatrix.xx, fontMatrix->FM_12 ) +
-                                    GrMulWWFixed( tempMatrix.xy, fontMatrix->FM_22 ) );
-        transMatrix->TM_matrix.yy = GrMulWWFixed( tempMatrix.yy, fontMatrix->FM_22 );
+        transMatrix->TM_matrix.xx = GrMulWWFixed( styleMatrix.xx, fontMatrix->FM_11 );
+        transMatrix->TM_matrix.yx = 0;
+        transMatrix->TM_matrix.xy = GrMulWWFixed( styleMatrix.xy, fontMatrix->FM_11 );
+        transMatrix->TM_matrix.yy = GrMulWWFixed( styleMatrix.yy, fontMatrix->FM_22 );
+
+        if( fontMatrix->FM_flags & TF_ROTATED )
+        {
+                TT_Fixed  xy, yx;
+
+
+                xy = - ( GrMulWWFixed( styleMatrix.yy, fontMatrix->FM_21 ) );
+                yx = - ( GrMulWWFixed( styleMatrix.xx, fontMatrix->FM_12 ) +
+                         GrMulWWFixed( styleMatrix.xy, fontMatrix->FM_22 ) );
+
+                transMatrix->TM_matrix.xy = xy;
+                transMatrix->TM_matrix.yx = yx;
+        }
 }
 
 
@@ -709,7 +731,7 @@ static word AllocFontBlock( word        additionalSpace,
                             word        numOfKernPairs,
                             MemHandle*  fontHandle )
 {
-        word size = sizeof( FontBuf ) + numOfCharacters * sizeof( CharTableEntry ) +
+        const word  size = sizeof( FontBuf ) + numOfCharacters * sizeof( CharTableEntry ) +
                 numOfKernPairs * ( sizeof( KernPair ) + sizeof( BBFixed ) ) +
                 additionalSpace; 
                      
@@ -901,6 +923,7 @@ static void AdjustFontBuf( TransformMatrix* transMatrix,
         if( fontMatrix->FM_flags & TF_COMPLEX )
         {
                 sword savedScriptY = transMatrix->TM_scriptY;
+                sword savedHeightY = transMatrix->TM_heightY;
 
 
                 fontBuf->FB_flags     |= FBF_IS_COMPLEX;
@@ -920,10 +943,12 @@ static void AdjustFontBuf( TransformMatrix* transMatrix,
                 if( fontMatrix->FM_flags & TF_ROTATED )
                 {
                         /* adjust scriptX and heightX */
-                        transMatrix->TM_scriptX = -INTEGER_OF_WWFIXEDASDWORD( GrMulWWFixed( 
-                                                        WORD_TO_WWFIXEDASDWORD( savedScriptY ), transMatrix->TM_matrix.xy ) );
                         transMatrix->TM_heightX = -INTEGER_OF_WWFIXEDASDWORD( GrMulWWFixed( 
-                                                        WORD_TO_WWFIXEDASDWORD( fontBuf->FB_baselinePos.WBF_int ), transMatrix->TM_matrix.xy ) );
+                                                WORD_TO_WWFIXEDASDWORD( fontBuf->FB_baselinePos.WBF_int ), transMatrix->TM_matrix.xy ) );
+
+                        if( savedScriptY )
+                                transMatrix->TM_scriptX = -INTEGER_OF_WWFIXEDASDWORD( GrMulWWFixed( 
+                                                WORD_TO_WWFIXEDASDWORD( savedScriptY + savedHeightY ), transMatrix->TM_matrix.xy ) );
                 }
         }
 }

@@ -907,12 +907,26 @@ static void CalcDriversTransformMatrix( TransformMatrix* transformMatrix, GState
 
 EC(     ECCheckBounds( transformMatrix ) );
 EC(     ECCheckGStateHandle( gstate) );
-EC(     ECCheckWindowHandle( win ) );
 
 
-        WinGetTransform( win, &windowMatrix );
+        if( win )
+        {
+EC(             ECCheckWindowHandle( win ) );
+                WinGetTransform( win, &windowMatrix );
+        }
+        else
+        {
+                windowMatrix.TM_e11.WWF_int  = 1;
+                windowMatrix.TM_e11.WWF_frac = 0;
+                windowMatrix.TM_e12.WWF_int  = 0;
+                windowMatrix.TM_e12.WWF_frac = 0;
+                windowMatrix.TM_e21.WWF_int  = 0;
+                windowMatrix.TM_e21.WWF_frac = 0;
+                windowMatrix.TM_e22.WWF_int  = 1;
+                windowMatrix.TM_e22.WWF_frac = 0;
+        }
+
         GrGetTransform( gstate, &graphicMatrix );
-
 
         temp_e11 = GrMulWWFixed( transformMatrix->TM_matrix.xx, WWFIXED_TO_WWFIXEDASDWORD( graphicMatrix.TM_e11 ) ) 
                         + GrMulWWFixed( transformMatrix->TM_matrix.xy, WWFIXED_TO_WWFIXEDASDWORD( graphicMatrix.TM_e21 ) );
