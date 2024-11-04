@@ -290,11 +290,21 @@ ImpBmpStatus ImpJPG(TCHAR *file, VMFileHandle vmf, ImageAdditionalData *iad,
  * no PROGRESS_DISPLAY and no SCANLINE_COMPRESS (for now)
  ********************************************************************
  */
+
+
+#if PROGRESS_DISPLAY
+ImpBmpStatus ImpPNG(TCHAR *file, VMFileHandle vmf, ImageAdditionalData *iad,
+          MimeRes resolution, AllocWatcherHandle watcher, dword *usedMem,
+          Boolean doCompress, ImpBmpParams *params, Boolean *isCompacted,
+          VMBlockHandle *bmVMBlock, ImportProgressData *importProgressDataP,
+          MimeStatus *mimeStatus)
+#else
 ImpBmpStatus ImpPNG(TCHAR *file, VMFileHandle vmf, ImageAdditionalData *iad,
           MimeRes resolution, AllocWatcherHandle watcher, dword *usedMem,
           Boolean doCompress, ImpBmpParams *params, Boolean *isCompacted,
           VMBlockHandle *bmVMBlock,
           MimeStatus *mimeStatus)
+#endif
 {
     ImpBmpStatus status;
 
@@ -312,6 +322,22 @@ ImpBmpStatus ImpPNG(TCHAR *file, VMFileHandle vmf, ImageAdditionalData *iad,
 #if SCANLINE_COMPRESS
     Boolean scanlineCompress = TRUE;
 #endif
+
+#if PROGRESS_DISPLAY
+/* number of scanlines per import progress update */
+#define SLICE_HEIGHT 10
+    _LoadProgressParams_;
+    //Boolean status = FALSE;
+    Boolean onErrorDontKeepPartial = TRUE ;
+
+    /* point to load progress data, if any */
+    if (importProgressDataP && importProgressDataP->IPD_callback) {
+        loadProgressDataP = importProgressDataP->IPD_loadProgressDataP;
+    } else {
+        loadProgressDataP = NULL;
+    }
+#endif
+
 
     /* we don't override scanlineCompress even if no progress display
        as it still seems faster than GrCompactBitmap */
@@ -375,6 +401,45 @@ ImpBmpStatus ImpPNG(TCHAR *file, VMFileHandle vmf, ImageAdditionalData *iad,
                         // prepare the next zlib decoding work
                         pngResumeIDATProcessing(&state);
 
+#if PROGRESS_DISPLAY
+                        /* send out progress if desired number of scanlines have been seen */
+                        if (importProgressDataP && importProgressDataP->IPD_callback &&
+                            (((state.lineNo % SLICE_HEIGHT) == 0) || (state.lineNo - 1 == ihdrData.height))) 
+                        {
+                            importProgressDataP->IPD_bitmap = *bmVMBlock;
+                            importProgressDataP->IPD_iad.IAD_size.XYS_width = ihdrData.width;
+                            importProgressDataP->IPD_iad.IAD_size.XYS_height = ihdrData.height;
+                            /* this invalidates too much for the last partial slice, but
+                            it doesn't matter */
+                            importProgressDataP->IPD_firstLine = state.lineNo-1-SLICE_HEIGHT;
+                            importProgressDataP->IPD_lastLine = state.lineNo-1-1;
+                            ((pcfm_ImportProgressCallback *)ProcCallFixedOrMovable_pascal)
+                                    (importProgressDataP, importProgressDataP->IPD_callback);
+                        }
+
+                        /* mark the graphic as completed, if so */
+                        if ((state.lineNo - 1) == ihdrData.height)
+                            iad->IAD_completeGraphic = TRUE ;
+
+                        /* Stop here if we are aborting and we're NOT progressive */
+                        // if (mimeStatus->MS_mimeFlags & MIME_STATUS_ABORT)  {
+                        //     if ((loadProgressDataP) && (importProgressDataP->IPD_bitmap != NullHandle))  
+                        //     {
+                        //         flag = FALSE ; // FIXME
+                        //         /* But keep the partial image we have (we don't need a big red X) */
+                        //         /* We aren't complete either */
+                        //         onErrorDontKeepPartial = FALSE ;
+                        //     } else 
+                        //     {
+                        //         flag = TRUE ; //FIXME
+                        //     }
+                        //     break ;
+                        // }
+#else /* !PROGRESS_DISPLAY */
+                        /* Stop here if we are aborting */
+                        //if (mimeStatus->MS_mimeFlags & MIME_STATUS_ABORT)
+                        //    break ; //FIXME: what to send to browser?
+#endif
                         // PROGRESS_DISPLAY...
                         // update status of processing
                         //if (params->IBP_status != NULL)
@@ -529,28 +594,34 @@ VMBlockHandle _pascal _export MimeDrvGraphicEx(_MimeGraphicParams_, dword extFla
 #define IMP_JPG_PARAMS file, vmf, iad, resolution, watcher, usedMem, \
           locCompress, &params, IMP_SCANLINE_PARAM &bmVMBlock IMP_PROGRESS_PARAM \
           , mimeStatus
-
-// FIXME: add support for SCANLINE_COMPRESS and PROGRESS_DISPLAY
 #define IMP_PNG_PARAMS file, vmf, iad, resolution, watcher, usedMem, \
-                       locCompress, &params, FALSE, &bmVMBlock, \
-                       mimeStatus
+          locCompress, &params, IMP_SCANLINE_PARAM &bmVMBlock IMP_PROGRESS_PARAM \
+          , mimeStatus
+
 
     if (strcmp(mimeType, _TEXT("image/gif")) == 0)
     {
         status = ImpGIF(IMP_GIF_PARAMS);
         if (status == IBS_UNKNOWN_FORMAT)
             status = ImpJPG(IMP_JPG_PARAMS);
+        if (status == IBS_UNKNOWN_FORMAT)
+            status = ImpPNG(IMP_PNG_PARAMS);
     }
     else if (strcmp(mimeType, _TEXT("image/jpeg")) == 0)
     {
         status = ImpJPG(IMP_JPG_PARAMS);
+        if (status == IBS_UNKNOWN_FORMAT)
+            status = ImpPNG(IMP_JPG_PARAMS);
         if (status == IBS_UNKNOWN_FORMAT)
             status = ImpGIF(IMP_GIF_PARAMS);
     }
     else if (strcmp(mimeType, _TEXT("image/png")) == 0)
     {
         status = ImpPNG(IMP_PNG_PARAMS);
-        // FIXME: fix fallback
+        if (status == IBS_UNKNOWN_FORMAT)
+            status = ImpJPG(IMP_JPG_PARAMS);
+        if (status == IBS_UNKNOWN_FORMAT)
+            status = ImpGIF(IMP_GIF_PARAMS);
     }
 
 
