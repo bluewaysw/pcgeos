@@ -954,6 +954,26 @@ static void AdjustFontBuf( TransformMatrix* transMatrix,
 }
 
 
+static void AdjustTransMatrix( TransformMatrix*  transMatrix )
+{
+        // resX = SQRT( xx² + xy² ) * 72dpi
+        // resY = SQRT( yy² + yx² ) * 72dpi
+        WWFixedAsDWord  scaleX = GrSqrRootWWFixed( GrMulWWFixed( transMatrix->TM_matrix.xx, transMatrix->TM_matrix.xx ) +
+                                                   GrMulWWFixed( transMatrix->TM_matrix.xy, transMatrix->TM_matrix.xy ) );
+        WWFixedAsDWord  scaleY = GrSqrRootWWFixed( GrMulWWFixed( transMatrix->TM_matrix.yy, transMatrix->TM_matrix.yy ) +
+                                                   GrMulWWFixed( transMatrix->TM_matrix.yx, transMatrix->TM_matrix.yx ) );
+
+        transMatix->TM_resX = INTEGER_OF_WWFIXEDASDWORD( GrMulWWFixed( WORD_TO_WWFIXEDASDWORD( 72 ), scaleX ) );
+        transMatix->TM_resY = INTEGER_OF_WWFIXEDASDWORD( GrMulWWFixed( WORD_TO_WWFIXEDASDWORD( 72 ), scaleY ) );
+
+        // adjust matrix
+        transMatrix->TM_matrix.xx = GrSDivWWFixed( transMatrix->TM_matrix.xx, scaleX );
+        transMatrix->TM_matrix.xy = GrSDivWWFixed( transMatrix->TM_matrix.xy, scaleX );
+        transMatrix->TM_matrix.yy = GrSDivWWFixed( transMatrix->TM_matrix.yy, scaleY );
+        transMatrix->TM_matrix.yx = GrSDivWWFixed( transMatrix->TM_matrix.yx, scaleY );
+}
+
+
 /********************************************************************
  *                      IsRegionNeeded
  ********************************************************************
