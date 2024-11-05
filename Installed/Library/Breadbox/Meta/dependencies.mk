@@ -1,7 +1,3 @@
-asmtools.obj \
-asmtools.eobj: asmtools/asmtoolsManager.asm \
-                geos.def resource.def gstring.def graphics.def fontID.def \
-                font.def color.def text.def char.def
 meta.obj \
 meta.eobj: stdapp.goh object.goh ui.goh Objects/metaC.goh \
                 Objects/inputC.goh Objects/clipbrd.goh \

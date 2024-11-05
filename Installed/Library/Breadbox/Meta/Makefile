@@ -4,15 +4,14 @@
 # If you edit it, you will lose your changes, should it be regenerated.
 #
 GEODE           = meta
-ASMTOOLS        = asmtoolsManager.asm
 META            = meta.goc
 SPLINEOP        = splineop.goc
 UI_TO_RDFS      =
 OBJS            = meta.obj splineop.obj
 COMMON          = metaint.h
-MODULES         = asmtools
+MODULES         =
 CMODULES        = meta splineop
-SRCS            = $(ASMTOOLS) $(META) $(SPLINEOP) $(COMMON)
+SRCS            = $(META) $(SPLINEOP) $(COMMON)
 LOBJS           =
 LIBOBJ          = $(DEVEL_DIR)/Include/$(GEODE).ldf
 LIBNAME         = meta
