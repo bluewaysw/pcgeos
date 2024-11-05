@@ -210,10 +210,12 @@ void _pascal _export pngInitIDATProcessingState(IDATState* state, FileHandle fil
     // memory for the input data from file to zlib
     state->inHan = MemAlloc(CHUNK_SIZE_IN, HF_SHARABLE | HF_SWAPABLE, HAF_ZERO_INIT);
     state->in = MemLock(state->inHan);
+    state->inOff = 0;
 
     // memory for what zlib decodes
     state->outHan = MemAlloc(CHUNK_SIZE_OUT, HF_SHARABLE | HF_SWAPABLE, HAF_ZERO_INIT);
     state->out = MemLock(state->outHan);
+    state->outOff = 0;
 
     // how many bytes in a pixel, how many bytes in a row?
     state->rowBytes = calcBytesPerRow(ihdr.width, ihdr.colorType, ihdr.bitDepth);
@@ -266,19 +268,23 @@ void _pascal _export pngInitIDATProcessingState(IDATState* state, FileHandle fil
 // NOTE: currentRow stays locked for further processing
 void _pascal _export pngPauseIDATProcessing(IDATState* state)
 {
-    // MemUnlock(state->inHan); // disabled as it seems to create memory overflows somewhere
-    // MemUnlock(state->outHan);
+    state->inOff = state->strm.next_in - MemDeref(state->inHan);
+    MemUnlock(state->inHan); // disabled as it seems to create memory overflows somewhere
+    
+    state->outOff = state->strm.next_out - MemDeref(state->outHan);
+    MemUnlock(state->outHan);
+    
     MemUnlock(state->previousRowHandle);
 }
 
 // relock the memory needed for further IDAT chunk processing
 void _pascal _export pngResumeIDATProcessing(IDATState* state)
 {
-    //state->in = MemLock(state->inHan);
-    //state->strm.next_in = state->in;
+    state->in = MemLock(state->inHan);
+    state->strm.next_in = state->in + state->inOff;
 
-    //state->out = MemLock(state->outHan);
-    //state->strm.next_out = state->out;
+    state->out = MemLock(state->outHan);
+    state->strm.next_out = state->out + state->outOff;
 
     state->previousRow = MemLock(state->previousRowHandle);
 }
