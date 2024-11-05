@@ -96,7 +96,7 @@
 /* by the engine and need no extensions, undefine this configuration     */
 /* macro to save a few more bytes.                                       */
 
-#define  TT_CONFIG_OPTION_EXTEND_ENGINE
+//#define  TT_CONFIG_OPTION_EXTEND_ENGINE
 
 
 /*************************************************************************/

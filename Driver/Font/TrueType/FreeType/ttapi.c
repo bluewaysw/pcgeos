@@ -35,7 +35,6 @@
 #include "ttload.h"
 #include "ttgload.h"
 #include "ttraster.h"
-#include "ttextend.h"
 #include "tttags.h"
 #include <geos.h>
 

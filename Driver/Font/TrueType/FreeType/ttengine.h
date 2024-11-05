@@ -60,7 +60,6 @@
                                /* context objects                */
 
      void*   raster_component;     /* ttraster implementation depedent    */
-     void*   extension_component;  /* extensions dependent */
   };
 
   /* NOTE : The raster's lock is only acquired by the Render_Glyph and     */
