@@ -106,10 +106,14 @@ uInt w;
 #ifdef __GEOS__
   s->windowHan = MemAlloc(w, HF_SWAPABLE, HAF_ZERO_INIT);
   if (!s->windowHan)
+  {
     s->window = Z_NULL;
+  }
   else
+  {
     s->windowSize = w;
     s->window = (Bytef *) MemLock(s->windowHan);
+  }
 #else
   s->window = (Bytef *)ZALLOC(z, 1, w);
 #endif
