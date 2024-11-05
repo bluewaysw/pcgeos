@@ -70,6 +70,8 @@ extern void InitConvertHeader( TRUETYPE_VARS, FontHeader* fontHeader );
 
 static void FillKerningFlags( FontHeader* fontHeader, FontBuf* fontBuf );
 
+static void AdjustTransMatrix( TransformMatrix*  transMatrix );
+
 
 #define ROUND_WWFIXED( value )    ( value & 0xffff ? ( value >> 16 ) + 1 : value >> 16 )
 
@@ -956,19 +958,45 @@ static void AdjustFontBuf( TransformMatrix* transMatrix,
 }
 
 
+/********************************************************************
+ *                      AdjustTransMatrix
+ ********************************************************************
+ * SYNOPSIS:       Adjusts the transformation matrix by calculating and 
+ *                 applying scaling factors for the horizontal and 
+ *                 vertical axes.
+ * 
+ * PARAMETERS:     TransformMatrix* transMatrix - Pointer to the
+ *                 transformation matrix to be adjusted. The structure
+ *                 includes scale factors and resolution values for x 
+ *                 and y axes.
+ * 
+ * RETURNS:        void
+ * 
+ * STRATEGY:       - Calculate scale factors 
+ *                 - Set the horizontal and vertical resolution based
+ *                   on 72 dpi.
+ *                 - Normalize the transformation matrix values to ensure
+ *                   proper scaling.
+ * 
+ * REVISION HISTORY:
+ *      Date      Name      Description
+ *      ----      ----      -----------
+ *      05.11.24  JK        Initial Revision
+ *******************************************************************/
+
 static void AdjustTransMatrix( TransformMatrix*  transMatrix )
 {
-        // resX = SQRT( xx² + xy² ) * 72dpi
-        // resY = SQRT( yy² + yx² ) * 72dpi
+        /* calculate horizontal and vertical scale factors */
         WWFixedAsDWord  scaleX = GrSqrRootWWFixed( GrMulWWFixed( transMatrix->TM_matrix.xx, transMatrix->TM_matrix.xx ) +
                                                    GrMulWWFixed( transMatrix->TM_matrix.xy, transMatrix->TM_matrix.xy ) );
         WWFixedAsDWord  scaleY = GrSqrRootWWFixed( GrMulWWFixed( transMatrix->TM_matrix.yy, transMatrix->TM_matrix.yy ) +
                                                    GrMulWWFixed( transMatrix->TM_matrix.yx, transMatrix->TM_matrix.yx ) );
 
-        transMatix->TM_resX = INTEGER_OF_WWFIXEDASDWORD( GrMulWWFixed( WORD_TO_WWFIXEDASDWORD( 72 ), scaleX ) );
-        transMatix->TM_resY = INTEGER_OF_WWFIXEDASDWORD( GrMulWWFixed( WORD_TO_WWFIXEDASDWORD( 72 ), scaleY ) );
+        /* set horizontal and vertical resolution based on 72 dpi */
+        transMatrix->TM_resX = INTEGER_OF_WWFIXEDASDWORD( GrMulWWFixed( WORD_TO_WWFIXEDASDWORD( 72 ), scaleX ) );
+        transMatrix->TM_resY = INTEGER_OF_WWFIXEDASDWORD( GrMulWWFixed( WORD_TO_WWFIXEDASDWORD( 72 ), scaleY ) );
 
-        // adjust matrix
+        /* normalize transformation matrix values */
         transMatrix->TM_matrix.xx = GrSDivWWFixed( transMatrix->TM_matrix.xx, scaleX );
         transMatrix->TM_matrix.xy = GrSDivWWFixed( transMatrix->TM_matrix.xy, scaleX );
         transMatrix->TM_matrix.yy = GrSDivWWFixed( transMatrix->TM_matrix.yy, scaleY );
