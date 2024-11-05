@@ -436,7 +436,7 @@ EC(     ECCheckBounds( (void*)kernPair ) );
 EC(     ECCheckBounds( (void*)kernValue ) );
 
         /* load kerning directory */
-        if( TT_Get_Kerning_Directory( FACE, &kerningDir ) )
+        if( TT_Load_Kerning_Directory( FACE, &kerningDir ) )
                 return;
 
         if( kerningDir.nTables == 0 )
@@ -453,12 +453,13 @@ EC(     ECCheckBounds( indices ) );
                 const word  minKernValue = UNITS_PER_EM / KERN_VALUE_DIVIDENT;
                 
 
-                if( TT_Load_Kerning_Table( FACE, table ) )
+                if( TT_Load_Kerning_Table( FACE, &kerningDir, table ) )
                         continue;
 
                 if( kerningDir.tables->format != 0 )
                         continue;
 
+EC(             ECCheckMemHandle( kerningDir.tables->t.kern0.pairsBlock ) );
                 pairs = GEO_LOCK( kerningDir.tables->t.kern0.pairsBlock );
 EC(             ECCheckBounds( pairs ) );
 
@@ -485,6 +486,7 @@ EC(             ECCheckBounds( pairs ) );
                         }
                 }
                 GEO_UNLOCK( kerningDir.tables->t.kern0.pairsBlock );
+                TT_Kerning_Directory_Done( &kerningDir );
         }
         GEO_UNLOCK( LOOKUP_TABLE );
 }
