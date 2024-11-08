@@ -762,11 +762,11 @@
 
   /* Set device resolution for a given instance.  The values are      */
   /* given in dpi (Dots Per Inch).  Default is 96 in both directions. */
-/*
+
   EXPORT_DEF
   TT_Error  TT_Set_Instance_Resolutions( TT_Instance  instance,
                                          TT_UShort    xResolution,
-                                         TT_UShort    yResolution ); */
+                                         TT_UShort    yResolution );
 
 
   /* Set the pointsize for a given instance.  Default is 10pt. */
@@ -987,10 +987,11 @@
 
   /* Apply a transformation to a vector. */
 
+/*
   EXPORT_DEF
   void  TT_Transform_Vector( TT_F26Dot6*  x,
                              TT_F26Dot6*  y,
-                             TT_Matrix*   matrix );
+                             TT_Matrix*   matrix ); */
 
 
   /* Compute A*B/C with 64 bits intermediate precision. */

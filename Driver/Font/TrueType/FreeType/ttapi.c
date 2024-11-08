@@ -532,7 +532,7 @@ extern TEngine_Instance engineInstance;
  *            Happily, 99.99% will do just that :-)
  *
  ******************************************************************/
-/*
+
   EXPORT_FUNC
   TT_Error  TT_Set_Instance_Resolutions( TT_Instance  instance,
                                          TT_UShort    xResolution,
@@ -546,7 +546,7 @@ extern TEngine_Instance engineInstance;
 
     ins->metrics.x_resolution = xResolution;
     ins->metrics.y_resolution = yResolution;
-    ins->valid                = FALSE; */
+    ins->valid                = FALSE;
 
     /* In the case of a thread-safe implementation, we immediately    */
     /* call Instance_Reset in order to change the instance's variable */
@@ -555,8 +555,8 @@ extern TEngine_Instance engineInstance;
     /* flag to FALSE, which will force the instance's resetting at    */
     /* the next glyph loading                                         */
 
-/*    return TT_Err_Ok;
-  } */
+    return TT_Err_Ok;
+  }
 
 
 /*******************************************************************
@@ -1253,7 +1253,7 @@ TT_Error  TT_Get_Outline_Region( TT_Outline*     outline,
  *  MT-Safe : YES!
  *
  ******************************************************************/
-
+/*
   EXPORT_FUNC
   void  TT_Transform_Vector( TT_F26Dot6*  x,
                              TT_F26Dot6*  y,
@@ -1270,7 +1270,7 @@ TT_Error  TT_Get_Outline_Region( TT_Outline*     outline,
 
     *x = xz;
     *y = yz;
-  }
+  } */
 
 
 /*******************************************************************
