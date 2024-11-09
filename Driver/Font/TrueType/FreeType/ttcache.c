@@ -337,7 +337,7 @@
     PList_Element  element;
     PList_Element  prev;
     PFinalizer     finalize;
-    Long           limit;
+    Short          limit;
     Bool           destroy;
 
 
