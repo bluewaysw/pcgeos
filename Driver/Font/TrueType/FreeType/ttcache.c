@@ -313,8 +313,6 @@
   {
     PList_Element  element;
     PList_Element  prev;
-    Short          limit;
-    Bool           destroy;
 
 
     element = cache->active;
@@ -337,10 +335,7 @@
 
   Suite:
 
-    limit   = cache->clazz->idle_limit;
-    destroy = (cache->idle_count >= limit);
-
-    if ( destroy )
+    if ( cache->idle_count >= cache->clazz->idle_limit )
     {
       /* destroy the object when the cache is full */
 #ifdef __GEOS__

@@ -97,9 +97,6 @@
 
   typedef TT_Error  TDestructor ( void*  object );
 
-  typedef TConstructor  TRefresher;
-  typedef TDestructor   TFinalizer;
-
   typedef TConstructor*  PConstructor;
   typedef TDestructor*   PDestructor;
 
