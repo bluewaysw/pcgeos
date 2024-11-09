@@ -1237,9 +1237,7 @@
     sizeof ( TFace ),
     -1,
     Face_Create,
-    Face_Destroy,
-    NULL,
-    NULL
+    Face_Destroy
   };
 
   static
@@ -1248,9 +1246,7 @@
     sizeof ( TInstance ),
     -1,
     Instance_Create,
-    Instance_Destroy,
-    NULL,
-    NULL
+    Instance_Destroy
   };
 
   /* Note that we use a cache size of 1 for the execution context.  */
@@ -1264,9 +1260,7 @@
     sizeof ( TExecution_Context ),
     1,
     Context_Create,
-    Context_Destroy,
-    NULL,
-    NULL
+    Context_Destroy
   };
 
   static
@@ -1275,9 +1269,7 @@
     sizeof ( TGlyph ),
     -1,
     Glyph_Create,
-    Glyph_Destroy,
-    NULL,
-    NULL
+    Glyph_Destroy
   };
 
 

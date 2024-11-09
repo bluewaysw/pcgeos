@@ -102,8 +102,6 @@
 
   typedef TConstructor*  PConstructor;
   typedef TDestructor*   PDestructor;
-  typedef TRefresher*    PRefresher;
-  typedef TFinalizer*    PFinalizer;
 
 
   /* A Cache class record holds the data necessary to define */
@@ -114,8 +112,6 @@
     Short         idle_limit;
     PConstructor  init;
     PDestructor   done;
-    PRefresher    reset;
-    PFinalizer    finalize;
   };
 
   typedef struct TCache_Class_  TCache_Class;
