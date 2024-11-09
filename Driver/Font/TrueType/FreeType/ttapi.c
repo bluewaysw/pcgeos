@@ -532,7 +532,7 @@ extern TEngine_Instance engineInstance;
  *            Happily, 99.99% will do just that :-)
  *
  ******************************************************************/
-
+#if 0
   EXPORT_FUNC
   TT_Error  TT_Set_Instance_Resolutions( TT_Instance  instance,
                                          TT_UShort    xResolution,
@@ -557,7 +557,7 @@ extern TEngine_Instance engineInstance;
 
     return TT_Err_Ok;
   }
-
+#endif
 
 /*******************************************************************
  *
@@ -580,14 +580,20 @@ extern TEngine_Instance engineInstance;
  ******************************************************************/
 
   EXPORT_FUNC
-  TT_Error  TT_Set_Instance_CharSize( TT_Instance  instance,
-                                       TT_F26Dot6   charSize )
+  TT_Error  TT_Set_Instance_CharSize_And_Resolutions( TT_Instance  instance,
+                                                      TT_F26Dot6   charSize,
+                                                      TT_UShort    xResolution,
+                                                      TT_UShort    yResolution )
   {
     PInstance  ins = HANDLE_Instance( instance );
 
 
     if ( !ins )
       return TT_Err_Invalid_Instance_Handle;
+
+    ins->metrics.x_resolution = xResolution;
+    ins->metrics.y_resolution = yResolution;
+    ins->valid                = FALSE;
 
     if ( charSize < 1 * 64 )
       charSize = 1 * 64;
@@ -671,7 +677,7 @@ extern TEngine_Instance engineInstance;
  *  MT-Note : YES!  Reads only semi-permanent data.
  *
  ******************************************************************/
-
+#if 0
   EXPORT_FUNC
   TT_Error  TT_Get_Instance_Metrics( TT_Instance           instance,
                                      TT_Instance_Metrics*  metrics )
@@ -702,7 +708,7 @@ extern TEngine_Instance engineInstance;
 
     return TT_Err_Ok;
   }
-
+#endif
 
 /*******************************************************************
  *
