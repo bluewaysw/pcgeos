@@ -25,8 +25,7 @@
 #include <system.h>
 #include <localize.h>
 
-#include "VConvert.h"
-
+#include <meta.h>
 
 /* #define DUMP */
 
@@ -35,6 +34,23 @@ static int NextChar,plotEOF;
 #ifdef DUMP
   static FILE *fDump;
 #endif
+
+/* Type-independent minimum, maximum, absolute value: */
+#define min(a,b) ((a)<(b)?(a):(b))
+#define max(a,b) ((a)>(b)?(a):(b))
+#define abs(a)   (((a)>0)?(a):-(a))
+
+/* Check if value is inside a given interval [b1,b2]: */
+#define _between(a,b1,b2) (((a)>=(b1) && (a)<=(b2)) || ((a)<=(b1) && (a)>=(b2)))
+
+/* Test character for being valid part of a floating point number: */
+#define isnum(c) (((c)>='0' && (c)<='9') || (c)=='.' || (c)=='-' || (c)=='+')
+
+/* Bytewise swapping of two areas of memory: */
+#define memswap(d,s,n) { int _i; char t; for(_i=0;_i<(n);_i++)\
+                         {t=((char *)(s))[_i];\
+                          ((char *)(s))[_i]=((char *)(d))[_i];\
+                          ((char *)(d))[_i]=t;} }
 
 static int Text;                        /* Texte mit�bertragen? */
 
@@ -726,10 +742,12 @@ void Cmd_FT(void)
 
 #define CODE(c1,c2) ((int)(c1)+(int)(c2)*256)
 
-int ReadHPGL(FileHandle srcFile,word settings)
+int _export _pascal ReadHPGL(FileHandle srcFile,word settings,
+  ProgressCallback *callback)
 {
         dword size,pos;
         word cnt;
+	word pct;
         Boolean abort;
         int op1,op2;                    /* Befehlszeichen 1/2 */
         MemHandle h_mp;                 /* handle to array for polylines */
@@ -797,7 +815,8 @@ int ReadHPGL(FileHandle srcFile,word settings)
           if(++cnt>=20) {               /* update position every 20 commands */
             pos=FilePos(fPlot,0,FILE_POS_RELATIVE);
                                         /* get current position */
-            if( UpdateProgressPct((word)(size?(pos*100/size):0)) ) {
+            pct=(word)(size?(pos*100/size):0);
+	    if( ((pcfm_ProgressCallback *)ProcCallFixedOrMovable_pascal)(pct,callback) ) {
               abort=TRUE;               /* aborted? set flag... */
               break;                    /* stop drawing */
             }

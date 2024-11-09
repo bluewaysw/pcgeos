@@ -5,19 +5,15 @@
 #
 GEODE           = vconvert
 ASMTOOLS        = asmtoolsManager.asm
-CGM             = cgm.h cgm.goc cgmraw.goc
 EXPORT          = expobj.goc export.goc
 GROBJ           = grobj.goc
-HPGL            = hpgl.goc
 VCONV           = vconv.goc vconv_ui.goh
 UI_TO_RDFS      =
-OBJS            = cgm.obj cgmraw.obj expobj.obj export.obj grobj.obj\
-                  hpgl.obj vconv.obj
+OBJS            = expobj.obj export.obj grobj.obj vconv.obj
 COMMON          = VCExport.h VConvert.h vconv_ui.h
 MODULES         = asmtools
-CMODULES        = CGM export grobj HPGL vconv
-SRCS            = $(ASMTOOLS) $(CGM) $(EXPORT) $(GROBJ) $(HPGL) $(VCONV)\
-                  $(COMMON)
+CMODULES        = export grobj vconv
+SRCS            = $(ASMTOOLS) $(EXPORT) $(GROBJ) $(VCONV) $(COMMON)
 LOBJS           =
 
 SYSMAKEFILE     = geode.mk

@@ -4,16 +4,14 @@
 # If you edit it, you will lose your changes, should it be regenerated.
 #
 GEODE           = vcimpex
-CGM             = cgm.h cgm.goc cgmraw.goc
-HPGL            = hpgl.goc
 IMPTPROC        = imptproc.goc
 VCIMPEX         = vcimpexManager.asm vcimpex_ui.goc
 UI_TO_RDFS      =
-OBJS            = cgm.obj cgmraw.obj hpgl.obj imptproc.obj vcimpex_ui.obj
-COMMON          = VConvert.h vconv_ui.h
+OBJS            = imptproc.obj vcimpex_ui.obj
+COMMON          = vconv_ui.h
 MODULES         = VCImpex
-CMODULES        = CGM HPGL imptproc VCImpex
-SRCS            = $(CGM) $(HPGL) $(IMPTPROC) $(VCIMPEX) $(COMMON)
+CMODULES        = imptproc VCImpex
+SRCS            = $(IMPTPROC) $(VCIMPEX) $(COMMON)
 LOBJS           =
 LIBOBJ          = $(DEVEL_DIR)/Include/$(GEODE).ldf
 LIBNAME         = vcimpex

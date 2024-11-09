@@ -4,14 +4,16 @@
 # If you edit it, you will lose your changes, should it be regenerated.
 #
 GEODE           = meta
+CGM             = cgm.h cgm.goc cgmraw.goc
+HPGL            = hpgl.goc
 META            = meta.goc
 SPLINEOP        = splineop.goc
 UI_TO_RDFS      =
-OBJS            = meta.obj splineop.obj
+OBJS            = cgm.obj cgmraw.obj hpgl.obj meta.obj splineop.obj
 COMMON          = metaint.h
 MODULES         =
-CMODULES        = meta splineop
-SRCS            = $(META) $(SPLINEOP) $(COMMON)
+CMODULES        = CGM HPGL meta splineop
+SRCS            = $(CGM) $(HPGL) $(META) $(SPLINEOP) $(COMMON)
 LOBJS           =
 LIBOBJ          = $(DEVEL_DIR)/Include/$(GEODE).ldf
 LIBNAME         = meta

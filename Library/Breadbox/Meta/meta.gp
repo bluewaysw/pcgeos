@@ -46,3 +46,6 @@ export META_ENDPATH
 export META_TEXTAT
 export META_START
 export META_END
+
+export READHPGL
+export READCGM

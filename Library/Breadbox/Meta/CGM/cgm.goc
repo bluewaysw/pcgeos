@@ -26,7 +26,8 @@
 #include <system.h>
 #include <localize.h>
 
-#include "VConvert.h"
+#include <meta.h>
+
 #include "cgm.h"
 
 #ifdef DUMP
@@ -473,10 +474,12 @@ struct _cgm_commands CGMcmds[] = {
 };
 
 /*----------------------------------------------------------------------------*/
-int ReadCGM(FileHandle srcFile,word settings)
+int _export _pascal ReadCGM(FileHandle srcFile,word settings,
+  ProgressCallback *callback)
 {
         dword size,pos;
         word cnt;
+	word pct;
         Boolean abort;
         int ret;
 
@@ -513,7 +516,8 @@ int ReadCGM(FileHandle srcFile,word settings)
           if(++cnt>=20) {               /* update position every 20 commands */
             pos=FilePos(fCGM,0,FILE_POS_RELATIVE);
                                         /* get current position */
-            if( UpdateProgressPct((word)(size?(pos*100/size):0)) )
+            pct=(word)(size?(pos*100/size):0);
+	    if( ((pcfm_ProgressCallback *)ProcCallFixedOrMovable_pascal)(pct,callback) )
               abort=TRUE;               /* aborted? set flag... */
             cnt=0;                      /* clear counter */
           }
