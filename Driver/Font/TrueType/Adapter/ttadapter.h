@@ -72,6 +72,7 @@ extern TEngine_Instance engineInstance;
 #define MAX_NUM_GLYPHS                      2000
 
 #define BASELINE_CORRECTION                 1
+#define MIN_BITMAP_DIMENSION                1
 
 
 /***********************************************************************
@@ -282,6 +283,8 @@ typedef struct
     sword                       TM_heightX;
     sword                       TM_scriptY;
     sword                       TM_heightY;
+    word                        TM_resX;
+    word                        TM_resY;
 } TransformMatrix;
 
 typedef ByteFlags TransFlags;
@@ -420,6 +423,17 @@ typedef struct
 #define LOOKUP_TABLE            trueTypeVars->lookupTable
 
 #define UNITS_PER_EM            FACE_PROPERTIES.header->Units_Per_EM
+
+
+/***********************************************************************
+ *      error codes
+ ***********************************************************************/
+
+typedef enum {
+    SYSTEM_ERROR_CODES,
+    CHARINDEX_OUT_OF_BOUNDS,
+    ERROR_BITMAP_BUFFER_OVERFLOW
+} FatalErrors;
 
 
 /***********************************************************************

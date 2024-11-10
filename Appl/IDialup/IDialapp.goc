@@ -134,7 +134,8 @@ static void SendFlashNotification(void);
 @method IDialupAppClass, MSG_IDA_VIEW_CONNECTION
 {
   TCHAR *str;
-
+  int type;
+  
   MemLock(OptrToHandle(@idialStr));
   str = LMemDeref(@idialStr);
   @call IDInfoGroup::MSG_GEN_SET_NOT_USABLE(VUM_DELAYED_VIA_UI_QUEUE);
@@ -143,10 +144,24 @@ static void SendFlashNotification(void);
 
   @call IDConnectionGroup::MSG_GEN_SET_USABLE(VUM_DELAYED_VIA_UI_QUEUE);
   @send IDialupPrimary::MSG_GEN_RESET_TO_INITIAL_SIZE(VUM_DELAYED_VIA_UI_QUEUE);
+
+  if (AccessPointGetIntegerPropertyDirect(currentAccpnt, "netType", (int*) &type))
+	  type = 0 ;
+  /* enable delete and modify only if there are access points defined that are
+   * editable, type 2 is host-network type, so not editable */
+  if( connectionNum && ( type != 2 ) ) 
+  {
+    @call IDModifyConnectionButton::MSG_GEN_SET_ENABLED(VUM_DELAYED_VIA_UI_QUEUE);
+    @call IDDeleteConnectionButton::MSG_GEN_SET_ENABLED(VUM_DELAYED_VIA_UI_QUEUE);
+  }
+  else
+  {
+    @call IDModifyConnectionButton::MSG_GEN_SET_NOT_ENABLED(VUM_DELAYED_VIA_UI_QUEUE);
+    @call IDDeleteConnectionButton::MSG_GEN_SET_NOT_ENABLED(VUM_DELAYED_VIA_UI_QUEUE);
+  }
+
   if(connectionNum)
     {
-      @call IDModifyConnectionButton::MSG_GEN_SET_ENABLED(VUM_DELAYED_VIA_UI_QUEUE);
-      @call IDDeleteConnectionButton::MSG_GEN_SET_ENABLED(VUM_DELAYED_VIA_UI_QUEUE);
       @call IDConnectButton::MSG_GEN_SET_ENABLED(VUM_DELAYED_VIA_UI_QUEUE);
 /*#if _NDO2000
 /*#else
@@ -155,8 +170,6 @@ static void SendFlashNotification(void);
     }
   else
     {
-      @call IDModifyConnectionButton::MSG_GEN_SET_NOT_ENABLED(VUM_DELAYED_VIA_UI_QUEUE);
-      @call IDDeleteConnectionButton::MSG_GEN_SET_NOT_ENABLED(VUM_DELAYED_VIA_UI_QUEUE);
       @call IDConnectButton::MSG_GEN_SET_NOT_ENABLED(VUM_DELAYED_VIA_UI_QUEUE);
 /*#if _NDO2000
 /*#else

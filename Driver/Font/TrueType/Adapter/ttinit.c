@@ -54,8 +54,8 @@ static FontGroup mapFontGroup( TRUETYPE_VARS );
 
 static word getNameFromNameTable( 
                                 TRUETYPE_VARS,
-                                char*      name, 
-                                TT_UShort  nameIndex );
+                                char*            name, 
+                                const TT_UShort  nameIndex );
 
 void InitConvertHeader(         TRUETYPE_VARS, FontHeader* fontHeader );
 
@@ -88,9 +88,6 @@ static int strcmp( const char* s1, const char* s2 );
  * 
  * STRATEGY:       - Call `TT_Init_FreeType()` to initialize the core
  *                   FreeType library.
- *                 - If the initialization is successful, proceed to
- *                   initialize the kerning extension using
- *                   `TT_Init_Kerning_Extension()`.
  *                 - Return the appropriate error code if the core
  *                   initialization fails.
  * 
@@ -108,8 +105,6 @@ TT_Error _pascal Init_FreeType()
         error = TT_Init_FreeType();
         if ( error != TT_Err_Ok )
                 return error;
-
-        TT_Init_Kerning_Extension();
 
         return TT_Err_Ok;
 }
@@ -864,7 +859,7 @@ static sword getFontIDAvailIndex( FontID fontID, MemHandle fontInfoBlock )
  *      21.01.23  JK        Initial Revision
  *******************************************************************/
 
-static word getNameFromNameTable( TRUETYPE_VARS, char* name, TT_UShort nameID )
+static word getNameFromNameTable( TRUETYPE_VARS, char* name, const TT_UShort nameID )
 {
         TT_UShort           platformID;
         TT_UShort           encodingID;
@@ -976,7 +971,7 @@ EC(     ECCheckBounds( (void*)fontHeader ) );
 
         for ( geosChar = fontHeader->FH_firstChar; geosChar < fontHeader->FH_lastChar; ++geosChar )
         {
-                word unicode = GeosCharToUnicode( geosChar );
+                const word  unicode = GeosCharToUnicode( geosChar );
 
 
                 if( !GeosCharMapFlag( geosChar ) )
@@ -1001,10 +996,6 @@ EC(     ECCheckBounds( (void*)fontHeader ) );
                 if ( unicode == C_LATIN_SMALL_LETTER_D )
                         fontHeader->FH_ascender = GLYPH_BBOX.yMax;
 
-                //descender -> check
-                if ( unicode == C_LATIN_SMALL_LETTER_P )
-                        fontHeader->FH_descender = GLYPH_BBOX.yMin;
-                
                 /* scan xMin -> check */
                 if( fontHeader->FH_minLSB > GLYPH_BBOX.xMin )
                         fontHeader->FH_minLSB = GLYPH_BBOX.xMin;
@@ -1016,11 +1007,6 @@ EC(     ECCheckBounds( (void*)fontHeader ) );
                 /* scan yMin -> check */
                 if ( fontHeader->FH_maxBSB < -GLYPH_BBOX.yMin )
                         fontHeader->FH_maxBSB = -GLYPH_BBOX.yMin;
-                        
-                /* check */
-                if ( GeosCharMapFlag( geosChar) & CMF_DESCENT &&
-                        fontHeader->FH_descent > -GLYPH_BBOX.yMin )
-                        fontHeader->FH_descent = -GLYPH_BBOX.yMin;
 
                 /* scan yMax -> check */
                 if ( fontHeader->FH_minTSB < GLYPH_BBOX.yMax )
@@ -1037,6 +1023,8 @@ EC(     ECCheckBounds( (void*)fontHeader ) );
                                 fontHeader->FH_accent = GLYPH_BBOX.yMax;
         }
 
+        fontHeader->FH_descender  = FACE_PROPERTIES.os2->sTypoDescender;
+        fontHeader->FH_descent    = -FACE_PROPERTIES.os2->sTypoDescender;
         fontHeader->FH_avgwidth   = FACE_PROPERTIES.os2->xAvgCharWidth;
         fontHeader->FH_maxwidth   = FACE_PROPERTIES.horizontal->advance_Width_Max;
         fontHeader->FH_accent     = fontHeader->FH_accent - fontHeader->FH_ascent;    
@@ -1133,7 +1121,7 @@ static word GetKernCount( TRUETYPE_VARS )
         word              numGeosKernPairs = 0;
         LookupEntry*      indices;
 
-        if( TT_Get_Kerning_Directory( FACE, &kerningDir ) )
+        if( TT_Load_Kerning_Directory( FACE, &kerningDir ) )
                 return 0;
 
         if( kerningDir.nTables == 0 )
@@ -1149,7 +1137,7 @@ EC(     ECCheckBounds( indices ) );
                 word i;
                 word minKernValue = UNITS_PER_EM / KERN_VALUE_DIVIDENT;
 
-                if( TT_Load_Kerning_Table( FACE, table ) )
+                if( TT_Load_Kerning_Table( FACE, &kerningDir, table ) )
                         continue;
 
                 if( kerningDir.tables->format != 0 )
@@ -1170,6 +1158,7 @@ EC(     ECCheckBounds( indices ) );
                 GEO_UNLOCK( kerningDir.tables->t.kern0.pairsBlock );
         }
         GEO_UNLOCK( LOOKUP_TABLE );
+        TT_Kerning_Directory_Done( &kerningDir );
 
         return numGeosKernPairs;
 }

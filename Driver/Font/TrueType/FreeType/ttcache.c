@@ -235,7 +235,6 @@
     TT_Error       error;
     PList_Element  current;
     PConstructor   build;
-    PRefresher     reset;
     void*          object;
 
 
@@ -244,27 +243,6 @@
     {
       cache->idle = current->next;
       cache->idle_count--;
-    }
-
-    if ( current )
-    {
-      object = current->data;
-      reset  = cache->clazz->reset;
-      if ( reset )
-      {
-#ifdef __GEOS__
-        error = ProcCallFixedOrMovable_cdecl( reset, object, parent_object );
-#else
-        error = reset( object, parent_object );
-#endif  /* __GEOS__ */
-        if ( error )
-        {
-          current->next = cache->idle;
-          cache->idle   = current;
-          cache->idle_count++;
-          goto Exit;
-        }
-      }
     }
     else
     {
@@ -333,12 +311,8 @@
   LOCAL_FUNC
   TT_Error  Cache_Done( TCache*  cache, void*  data )
   {
-    TT_Error       error;
     PList_Element  element;
     PList_Element  prev;
-    PFinalizer     finalize;
-    Long           limit;
-    Bool           destroy;
 
 
     element = cache->active;
@@ -361,10 +335,7 @@
 
   Suite:
 
-    limit   = cache->clazz->idle_limit;
-    destroy = (cache->idle_count >= limit);
-
-    if ( destroy )
+    if ( cache->idle_count >= cache->clazz->idle_limit )
     {
       /* destroy the object when the cache is full */
 #ifdef __GEOS__
@@ -379,34 +350,11 @@
     {
       /* Finalize the object before adding it to the   */
       /* idle list.  Return the error if any is found. */
-
-      finalize = cache->clazz->finalize;
-      if ( finalize )
-      {
-#ifdef __GEOS__
-        error = ProcCallFixedOrMovable_cdecl( finalize, element->data );
-#else
-        error = finalize( element->data );
-#endif  /* __GEOS__ */
-        if ( error )
-          goto Exit;
-
-        /* Note: a failure at finalize time is a severe bug in     */
-        /*       the engine, which is why we allow ourselves to    */
-        /*       lose the object in this case.  A finalizer should */
-        /*       have its own error codes to spot this kind of     */
-        /*       problems easily.                                  */
-      }
-
       element->next = cache->idle;
       cache->idle   = element;
       cache->idle_count++;
     }
-
-    error = TT_Err_Ok;
-
-  Exit:
-    return error;
+    return TT_Err_Ok;
   }
 
 

@@ -1,7 +1,7 @@
 /* Cookie routines */
-optr _pascal CookieFind(TCHAR *anchorPath, TCHAR *anchorHost, Boolean secure) ;
-void _pascal CookieParse(TCHAR *anchorPath, TCHAR *anchorHost, char *cTxt) ;
-void _pascal CookieSet(
+optr _pascal _export CookieFind(TCHAR *anchorPath, TCHAR *anchorHost, Boolean secure) ;
+void _pascal _export CookieParse(TCHAR *anchorPath, TCHAR *anchorHost, char *cTxt) ;
+void _pascal _export CookieSet(
     TCHAR *anchorPath, 
     TCHAR *anchorHost,
     const char *name, 
@@ -10,8 +10,8 @@ void _pascal CookieSet(
     const char *path, 
     const char *domain, 
     Boolean secure) ;
-void _pascal CookiesWrite(void) ;
+void _pascal _export CookiesWrite(void) ;
 //void _pascal CookiesCleanup(void) ;
 
 /* Utility routines */
-void _pascal CookieParseTime(char *p, TimerDateAndTime *t) ;
+void _pascal _export CookieParseTime(char *p, TimerDateAndTime *t) ;
