@@ -121,6 +121,37 @@ DBCS/impjpeg.eobj: geos.h heap.h geode.h resource.h ec.h object.h lmem.h \
                 product.h htmlprog.h jconfig.h jmorecfg.h Ansi/string.h \
                 Ansi/stdlib.h IMPBMP/ibcommon.h htmldrv.h math.h \
                 htmlfstr.h awatcher.h initfile.h
+DBCS/imppng.obj \
+DBCS/imppng.eobj: stdapp.goh object.goh ui.goh Objects/metaC.goh \
+                Objects/inputC.goh Objects/clipbrd.goh \
+                Objects/uiInputC.goh iacp.goh Objects/winC.goh \
+                Objects/gProcC.goh alb.goh Objects/processC.goh \
+                Objects/visC.goh Objects/vCompC.goh Objects/vCntC.goh \
+                Objects/gAppC.goh Objects/genC.goh Objects/gInterC.goh \
+                Objects/gPrimC.goh Objects/gDispC.goh Objects/gTrigC.goh \
+                Objects/gViewC.goh Objects/gTextC.goh Objects/vTextC.goh \
+                Objects/gCtrlC.goh gcnlist.goh spool.goh \
+                Objects/gFSelC.goh Objects/gGlyphC.goh \
+                Objects/gDocCtrl.goh Objects/gDocGrpC.goh \
+                Objects/gDocC.goh Objects/gContC.goh Objects/gDCtrlC.goh \
+                Objects/gEditCC.goh Objects/gBoolGC.goh \
+                Objects/gItemGC.goh Objects/gDListC.goh \
+                Objects/gItemC.goh Objects/gBoolC.goh \
+                Objects/gGadgetC.goh Objects/gToolCC.goh \
+                Objects/gValueC.goh Objects/gToolGC.goh \
+                Objects/helpCC.goh IMPBMP/imppng.h htmldrv.h
+DBCS/imppng.obj \
+DBCS/imppng.eobj: geos.h heap.h geode.h resource.h ec.h object.h lmem.h \
+                graphics.h fontID.h font.h color.h gstring.h timer.h vm.h \
+                dbase.h localize.h Ansi/ctype.h timedate.h file.h \
+                sllang.h system.h geoworks.h chunkarr.h Objects/helpCC.h \
+                disk.h drive.h input.h char.h hwr.h win.h uDialog.h \
+                Objects/gInterC.h Objects/Text/tCommon.h stylesh.h \
+                driver.h thread.h print.h Internal/spoolInt.h serialDr.h \
+                parallDr.h hugearr.h fileEnum.h Ansi/stdio.h \
+                Ansi/string.h Ansi/stdlib.h zlib.h zconf.h \
+                IMPBMP/ibcommon.h product.h htmldrv.h math.h htmlfstr.h \
+                awatcher.h htmlprog.h initfile.h
 DBCS/awatcher.obj \
 DBCS/awatcher.eobj: stdapp.goh object.goh ui.goh Objects/metaC.goh \
                 Objects/inputC.goh Objects/clipbrd.goh \
@@ -179,7 +210,7 @@ DBCS/impgraph.eobj: geos.h heap.h geode.h resource.h ec.h object.h lmem.h \
                 parallDr.h hugearr.h fileEnum.h initfile.h htmldrv.h \
                 product.h math.h htmlfstr.h awatcher.h htmlprog.h \
                 IMPBMP/impgif.h IMPBMP/ibcommon.h IMPBMP/impjpeg.h \
-                Ansi/stdio.h Ansi/stdlib.h Ansi/string.h zlib.h zconf.h \
-                ieCommon.h xlatLib.h
+                IMPBMP/imppng.h Ansi/stdio.h Ansi/stdlib.h Ansi/string.h \
+                zlib.h zconf.h ieCommon.h xlatLib.h
 
 DBCS/impgraphEC.geo DBCS/impgraph.geo : geos.ldf ansic.ldf ijgjpeg.ldf pnglib.ldf 

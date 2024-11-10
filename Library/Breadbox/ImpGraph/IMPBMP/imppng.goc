@@ -1,0 +1,179 @@
+@include <stdapp.goh>
+#include <Ansi/stdio.h>
+#include <gstring.h>
+#include <Ansi/string.h>
+#include <Ansi/stdlib.h>
+@include "IMPBMP/imppng.h"
+#include <initfile.h>
+@include <htmldrv.h>
+
+
+VMBlockHandle PngImport(
+    TCHAR *file,
+    VMFileHandle vmf,
+    XYSize *picsize,
+    MimeRes resolution,
+    AllocWatcherHandle watcher,
+    dword *usedMem, 
+#if SCANLINE_COMPRESS
+    Boolean scanlineCompress, 
+#endif
+    Boolean *p_completeGraphic
+#if PROGRESS_DISPLAY
+    , _ImportProgressParams_
+#endif  
+    , MimeStatus *mimeStatus
+)
+{
+    // new for PNG
+	IHDRData ihdrData = {0};
+	MemHandle idatChunksHan = NullHandle;
+	int idatNumChunks = 0;
+	PLTEChunkEntry plteChunk = {0};
+	IDATState state = {0};
+	BMFormat fmt = 0;
+	Boolean errorFlag = FALSE;
+    RGBValue pngBlendColor = {255, 255, 255};
+    FileHandle filehan = NullHandle;
+    VMBlockHandle bmVMBlock = NullHandle;
+
+#if PROGRESS_DISPLAY
+/* number of scanlines per import progress update */
+#define SLICE_HEIGHT 10
+//    Boolean status = FALSE;
+    _LoadProgressParams_;
+    Boolean onErrorDontKeepPartial = TRUE ;
+    // point to load progress data, if any
+    if (importProgressDataP && importProgressDataP->IPD_callback) {
+        loadProgressDataP = importProgressDataP->IPD_loadProgressDataP;
+    } else {
+        loadProgressDataP = NULL;
+    }
+#endif
+
+    *usedMem = 0; // FIXME
+    *p_completeGraphic = FALSE ;
+
+    filehan = FileOpen(file, FILE_ACCESS_R | FILE_DENY_W);
+    if(filehan)
+    {
+        // Read PNG Chunks, get overview
+        if (pngProcessChunks(filehan, &ihdrData, &idatChunksHan, &idatNumChunks, &plteChunk))
+        {
+            picsize->XYS_width = ihdrData.width;
+            picsize->XYS_height = ihdrData.height;
+
+            fmt = pngWhatOutputFormat(ihdrData.colorType, ihdrData.bitDepth);
+            if (fmt != 0)
+            {
+                // Initialize output bitmap
+                bmVMBlock = pngInitiateOutputBitmap(vmf, ihdrData, fmt);
+                if (bmVMBlock != NullHandle)
+                {
+                    // transfers only if a palette exists, also creates palettes for grayscale images
+                    pngHandlePalette(filehan, plteChunk, vmf, bmVMBlock, ihdrData.colorType, ihdrData.bitDepth);
+
+                    // Initialize the IDAT state
+                    pngInitIDATProcessingState(&state, filehan, idatChunksHan, idatNumChunks, ihdrData);
+
+                    // Process each scanline
+                    while (pngGetNextIDATScanline(&state) == 1)
+                    {
+                        // when not zlib decoding, give the system a little room to breathe
+                        pngPauseIDATProcessing(&state);
+
+                        // make sure we have data compatible with GEOS HugeBitmaps
+                        pngApplyGEOSFormatTransformations(&state, pngBlendColor);
+
+#if SCANLINE_COMPRESS
+// handle SCANLINE_COMPRESS here?    
+#endif
+
+                        // Write the processed scanline (without the filter byte) to the VMFile
+                        pngWriteScanlineToBitmap(vmf, bmVMBlock, state.lineNo - 1, state.currentRow);
+
+                        // prepare the next zlib decoding work
+                        pngResumeIDATProcessing(&state);
+
+#if PROGRESS_DISPLAY
+                        /* send out progress if desired number of scanlines have been seen */
+                        if (importProgressDataP && importProgressDataP->IPD_callback &&
+                            (((state.lineNo % SLICE_HEIGHT) == 0) || (state.lineNo == ihdrData.height))) 
+                        {
+                            importProgressDataP->IPD_bitmap = bmVMBlock;
+                            importProgressDataP->IPD_iad.IAD_size.XYS_width = ihdrData.width;
+                            importProgressDataP->IPD_iad.IAD_size.XYS_height = ihdrData.height;
+                            /* this invalidates too much for the last partial slice, but
+                            it doesn't matter */
+                            importProgressDataP->IPD_firstLine = state.lineNo-1-SLICE_HEIGHT;
+                            importProgressDataP->IPD_lastLine = state.lineNo-1-1;
+                            ((pcfm_ImportProgressCallback *)ProcCallFixedOrMovable_pascal)
+                                    (importProgressDataP, importProgressDataP->IPD_callback);
+                        }
+
+                        /* mark the graphic as completed, if so */
+                        if ((state.lineNo) == ihdrData.height)
+                            *p_completeGraphic = TRUE;
+
+                        /* Stop here if we are aborting and we're NOT progressive (???) */
+                        if (mimeStatus->MS_mimeFlags & MIME_STATUS_ABORT)  
+                        {
+                            if ((loadProgressDataP) && (importProgressDataP->IPD_bitmap != NullHandle))  
+                            {
+                                errorFlag = FALSE ; // FIXME
+                                /* But keep the partial image we have (we don't need a big red X) */
+                                /* We aren't complete either */
+                                onErrorDontKeepPartial = FALSE ;
+                            } 
+                            else 
+                            {
+                                errorFlag = TRUE;
+                            }
+                            break;
+                        }
+#else /* !PROGRESS_DISPLAY */
+                        /* Stop here if we are aborting */
+                        if (mimeStatus->MS_mimeFlags & MIME_STATUS_ABORT)
+                        {
+                            errorFlag = TRUE;
+                            break;
+                        }
+#endif
+                    }
+
+                    // Clean up resources
+                    pngCleanupIDATProcessingState(&state);
+
+                    // if (!errorFlag)
+                    // {
+                    //     // params->IBP_width  = ihdrData.width;
+                    //     // params->IBP_height = ihdrData.height;
+                    //     // params->IBP_format = IBF_PNG;
+                    //     // strcpy(params->IBP_impForm, ".PNG");
+// 
+                    //     //iad->IAD_size.XYS_width = params->IBP_width;
+                    //     //iad->IAD_size.XYS_height = params->IBP_height;
+                    //     // *p_completeGraphic = TRUE;
+                    //     //iad->IAD_type = IAD_TYPE_BITMAP;
+                    //     //iad->IAD_origin.P_x = iad->IAD_origin.P_y = 0;
+                    // }
+                }
+            }
+        }
+
+        FileClose(filehan, TRUE);   /* close source file */
+    }
+
+
+    /* Free the existing data if we have any */ 
+    if (errorFlag)
+    {
+        if (onErrorDontKeepPartial)  
+        {
+            VMFreeVMChain(vmf, VMCHAIN_MAKE_FROM_VM_BLOCK(bmVMBlock));
+            bmVMBlock = 0;
+        }
+    }
+
+    return bmVMBlock;
+}
