@@ -400,6 +400,10 @@ typedef struct
     /* currently open face */
     FileHandle                  ttfile;
     TrueTypeOutlineEntry        entry;
+
+    /* cache file handle */
+    VMFileHandle                cacheFile;
+    
 } TrueTypeVars;
 
 
