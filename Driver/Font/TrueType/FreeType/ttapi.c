@@ -35,7 +35,6 @@
 #include "ttload.h"
 #include "ttgload.h"
 #include "ttraster.h"
-#include "ttextend.h"
 #include "tttags.h"
 #include <geos.h>
 
@@ -533,7 +532,7 @@ extern TEngine_Instance engineInstance;
  *            Happily, 99.99% will do just that :-)
  *
  ******************************************************************/
-/*
+#if 0
   EXPORT_FUNC
   TT_Error  TT_Set_Instance_Resolutions( TT_Instance  instance,
                                          TT_UShort    xResolution,
@@ -547,7 +546,7 @@ extern TEngine_Instance engineInstance;
 
     ins->metrics.x_resolution = xResolution;
     ins->metrics.y_resolution = yResolution;
-    ins->valid                = FALSE; */
+    ins->valid                = FALSE;
 
     /* In the case of a thread-safe implementation, we immediately    */
     /* call Instance_Reset in order to change the instance's variable */
@@ -556,9 +555,9 @@ extern TEngine_Instance engineInstance;
     /* flag to FALSE, which will force the instance's resetting at    */
     /* the next glyph loading                                         */
 
-/*    return TT_Err_Ok;
-  } */
-
+    return TT_Err_Ok;
+  }
+#endif
 
 /*******************************************************************
  *
@@ -581,14 +580,20 @@ extern TEngine_Instance engineInstance;
  ******************************************************************/
 
   EXPORT_FUNC
-  TT_Error  TT_Set_Instance_CharSize( TT_Instance  instance,
-                                       TT_F26Dot6   charSize )
+  TT_Error  TT_Set_Instance_CharSize_And_Resolutions( TT_Instance  instance,
+                                                      TT_F26Dot6   charSize,
+                                                      TT_UShort    xResolution,
+                                                      TT_UShort    yResolution )
   {
     PInstance  ins = HANDLE_Instance( instance );
 
 
     if ( !ins )
       return TT_Err_Invalid_Instance_Handle;
+
+    ins->metrics.x_resolution = xResolution;
+    ins->metrics.y_resolution = yResolution;
+    ins->valid                = FALSE;
 
     if ( charSize < 1 * 64 )
       charSize = 1 * 64;
@@ -672,7 +677,7 @@ extern TEngine_Instance engineInstance;
  *  MT-Note : YES!  Reads only semi-permanent data.
  *
  ******************************************************************/
-
+#if 0
   EXPORT_FUNC
   TT_Error  TT_Get_Instance_Metrics( TT_Instance           instance,
                                      TT_Instance_Metrics*  metrics )
@@ -703,7 +708,7 @@ extern TEngine_Instance engineInstance;
 
     return TT_Err_Ok;
   }
-
+#endif
 
 /*******************************************************************
  *
@@ -1254,7 +1259,7 @@ TT_Error  TT_Get_Outline_Region( TT_Outline*     outline,
  *  MT-Safe : YES!
  *
  ******************************************************************/
-
+/*
   EXPORT_FUNC
   void  TT_Transform_Vector( TT_F26Dot6*  x,
                              TT_F26Dot6*  y,
@@ -1271,7 +1276,7 @@ TT_Error  TT_Get_Outline_Region( TT_Outline*     outline,
 
     *x = xz;
     *y = yz;
-  }
+  } */
 
 
 /*******************************************************************

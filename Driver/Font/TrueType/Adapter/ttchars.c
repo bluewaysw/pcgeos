@@ -104,19 +104,20 @@ EC(     ECCheckBounds( (void*)trueTypeOutline ) );
         if( charIndex == 0 )
                 goto Fail;
 
+        /* get transformmatrix */
+        transformMatrix = (TransformMatrix*)(((byte*)fontBuf) + sizeof( FontBuf ) + ( fontBuf->FB_lastChar - fontBuf->FB_firstChar + 1 ) * sizeof( CharTableEntry ));
+EC(     ECCheckBounds( (void*)transformMatrix ) );
+
+        /* set pointsize and resolution */
+        TT_Set_Instance_CharSize_And_Resolutions( INSTANCE, pointSize >> 10, transformMatrix->TM_resX, transformMatrix->TM_resY );
+
         /* create new glyph */
         TT_New_Glyph( FACE, &GLYPH );
-
-        /* set pointsize and get metrics */
-        TT_Set_Instance_CharSize( INSTANCE, ( pointSize >> 10 ) );
 
         /* load glyph and load glyphs outline */
         TT_Load_Glyph( INSTANCE, GLYPH, charIndex, TTLOAD_DEFAULT );
         TT_Get_Glyph_Outline( GLYPH, &OUTLINE );
 
-        /* get transformmatrix */
-        transformMatrix = (TransformMatrix*)(((byte*)fontBuf) + sizeof( FontBuf ) + ( fontBuf->FB_lastChar - fontBuf->FB_firstChar + 1 ) * sizeof( CharTableEntry ));
-EC(     ECCheckBounds( (void*)transformMatrix ) );
         TT_Transform_Outline( &OUTLINE, &transformMatrix->TM_matrix );
 
         /* get glyphs boundig box */
