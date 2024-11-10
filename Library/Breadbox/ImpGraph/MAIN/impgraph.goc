@@ -315,7 +315,7 @@ ImpBmpStatus ImpPNG(TCHAR *file, VMFileHandle vmf, ImageAdditionalData *iad,
 	PLTEChunkEntry plteChunk = {0};
 	IDATState state = {0};
 	BMFormat fmt = 0;
-	Boolean flag;
+	Boolean errorFlag = FALSE;
     RGBValue pngBlendColor = {255, 255, 255};
     FileHandle filehan = NullHandle;
 
@@ -326,16 +326,15 @@ ImpBmpStatus ImpPNG(TCHAR *file, VMFileHandle vmf, ImageAdditionalData *iad,
 #if PROGRESS_DISPLAY
 /* number of scanlines per import progress update */
 #define SLICE_HEIGHT 10
-    // _LoadProgressParams_;
-    //Boolean status = FALSE;
+//    Boolean status = FALSE;
+    _LoadProgressParams_;
     Boolean onErrorDontKeepPartial = TRUE ;
-
-    /* point to load progress data, if any */
-    // if (importProgressDataP && importProgressDataP->IPD_callback) {
-    //     loadProgressDataP = importProgressDataP->IPD_loadProgressDataP;
-    // } else {
-    //     loadProgressDataP = NULL;
-    // }
+    // point to load progress data, if any
+    if (importProgressDataP && importProgressDataP->IPD_callback) {
+        loadProgressDataP = importProgressDataP->IPD_loadProgressDataP;
+    } else {
+        loadProgressDataP = NULL;
+    }
 #endif
 
 
@@ -422,48 +421,47 @@ ImpBmpStatus ImpPNG(TCHAR *file, VMFileHandle vmf, ImageAdditionalData *iad,
                             iad->IAD_completeGraphic = TRUE ;
 
                         /* Stop here if we are aborting and we're NOT progressive */
-                        // if (mimeStatus->MS_mimeFlags & MIME_STATUS_ABORT)  {
-                        //     if ((loadProgressDataP) && (importProgressDataP->IPD_bitmap != NullHandle))  
-                        //     {
-                        //         flag = FALSE ; // FIXME
-                        //         /* But keep the partial image we have (we don't need a big red X) */
-                        //         /* We aren't complete either */
-                        //         onErrorDontKeepPartial = FALSE ;
-                        //     } else 
-                        //     {
-                        //         flag = TRUE ; //FIXME
-                        //     }
-                        //     break ;
-                        // }
+                        if (mimeStatus->MS_mimeFlags & MIME_STATUS_ABORT)  
+                        {
+                            if ((loadProgressDataP) && (importProgressDataP->IPD_bitmap != NullHandle))  
+                            {
+                                errorFlag = FALSE ; // FIXME
+                                /* But keep the partial image we have (we don't need a big red X) */
+                                /* We aren't complete either */
+                                onErrorDontKeepPartial = FALSE ;
+                            } 
+                            else 
+                            {
+                                errorFlag = TRUE ; //FIXME
+                            }
+                            break ;
+                        }
 #else /* !PROGRESS_DISPLAY */
                         /* Stop here if we are aborting */
-                        //if (mimeStatus->MS_mimeFlags & MIME_STATUS_ABORT)
-                        //    break ; //FIXME: what to send to browser?
+                        if (mimeStatus->MS_mimeFlags & MIME_STATUS_ABORT)
+                        {
+                            errorFlag = TRUE;
+                            break ; //FIXME: what to send to browser?
+                        }
 #endif
-                        // PROGRESS_DISPLAY...
-                        // update status of processing
-                        //if (params->IBP_status != NULL)
-                        //	flag = @call params->IBP_status::MSG_SB_SET_STATUS_VALUE(((dword)state.lineNo)*100 / params->IBP_height);
-                        //// if "Stop" was pressed, make sure we abort
-                        //if (flag == FALSE)
-                        //{
-                        //	status = IBS_IMPORT_STOPPED;
-                        //}
                     }
 
                     // Clean up resources
                     pngCleanupIDATProcessingState(&state);
 
-                    params->IBP_width  = ihdrData.width;
-                    params->IBP_height = ihdrData.height;
-                    params->IBP_format = IBF_PNG;
-                    strcpy(params->IBP_impForm, ".PNG");
+                    if (!errorFlag)
+                    {
+                        params->IBP_width  = ihdrData.width;
+                        params->IBP_height = ihdrData.height;
+                        params->IBP_format = IBF_PNG;
+                        strcpy(params->IBP_impForm, ".PNG");
 
-                    iad->IAD_size.XYS_width = params->IBP_width;
-                    iad->IAD_size.XYS_height = params->IBP_height;
-                    iad->IAD_completeGraphic = TRUE;
-	                iad->IAD_type = IAD_TYPE_BITMAP;
-                    iad->IAD_origin.P_x = iad->IAD_origin.P_y = 0;
+                        iad->IAD_size.XYS_width = params->IBP_width;
+                        iad->IAD_size.XYS_height = params->IBP_height;
+                        iad->IAD_completeGraphic = TRUE;
+                        iad->IAD_type = IAD_TYPE_BITMAP;
+                        iad->IAD_origin.P_x = iad->IAD_origin.P_y = 0;
+                    }
                 }
             }
         }
@@ -475,14 +473,20 @@ ImpBmpStatus ImpPNG(TCHAR *file, VMFileHandle vmf, ImageAdditionalData *iad,
      if (scanlineCompress) *isCompacted = FALSE;
 #endif
 
-    if (*bmVMBlock)
+    if (*bmVMBlock && (!errorFlag))
     {
       status = IBS_NO_ERROR;
       params->IBP_bitmap = *bmVMBlock;
     }
     else
-      status = IBS_UNKNOWN_FORMAT;
+    {
+        VMFreeVMChain(vmf, VMCHAIN_MAKE_FROM_VM_BLOCK(bmVMBlock));
+        *bmVMBlock = 0;
+        params->IBP_bitmap = *bmVMBlock;
+        status = IBS_UNKNOWN_FORMAT;
 
+    }
+    
     return status;
 }
 
