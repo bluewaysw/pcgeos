@@ -6061,10 +6061,6 @@
           DO_WS
           break;
 
-    Set_Invalid_Ref:
-          CUR.error = TT_Err_Invalid_Reference;
-          break;
-
         case 0x43:  /* RS */
           DO_RS
           break;
