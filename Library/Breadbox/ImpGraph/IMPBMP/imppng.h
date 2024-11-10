@@ -1,14 +1,8 @@
 #ifndef __IMPPNG_H
 #define __IMPPNG_H
 
-#include <geos.h>
-#include <graphics.h>
-#include <gstring.h>
-#include <pnglib.goh>
 #include "IMPBMP/ibcommon.h"
-#include <htmldrv.h>
-#include <Ansi/stdlib.h>
-
+#include <pnglib.goh>
 
 VMBlockHandle
 PngImport(

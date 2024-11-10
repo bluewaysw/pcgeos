@@ -139,7 +139,7 @@ DBCS/imppng.eobj: stdapp.goh object.goh ui.goh Objects/metaC.goh \
                 Objects/gItemC.goh Objects/gBoolC.goh \
                 Objects/gGadgetC.goh Objects/gToolCC.goh \
                 Objects/gValueC.goh Objects/gToolGC.goh \
-                Objects/helpCC.goh IMPBMP/imppng.h htmldrv.h
+                Objects/helpCC.goh IMPBMP/imppng.h
 DBCS/imppng.obj \
 DBCS/imppng.eobj: geos.h heap.h geode.h resource.h ec.h object.h lmem.h \
                 graphics.h fontID.h font.h color.h gstring.h timer.h vm.h \
@@ -148,10 +148,10 @@ DBCS/imppng.eobj: geos.h heap.h geode.h resource.h ec.h object.h lmem.h \
                 disk.h drive.h input.h char.h hwr.h win.h uDialog.h \
                 Objects/gInterC.h Objects/Text/tCommon.h stylesh.h \
                 driver.h thread.h print.h Internal/spoolInt.h serialDr.h \
-                parallDr.h hugearr.h fileEnum.h Ansi/stdio.h \
-                Ansi/string.h Ansi/stdlib.h zlib.h zconf.h \
-                IMPBMP/ibcommon.h product.h htmldrv.h math.h htmlfstr.h \
-                awatcher.h htmlprog.h initfile.h
+                parallDr.h hugearr.h fileEnum.h IMPBMP/ibcommon.h \
+                product.h htmldrv.h math.h htmlfstr.h awatcher.h \
+                htmlprog.h Ansi/stdio.h Ansi/stdlib.h Ansi/string.h \
+                zlib.h zconf.h
 DBCS/awatcher.obj \
 DBCS/awatcher.eobj: stdapp.goh object.goh ui.goh Objects/metaC.goh \
                 Objects/inputC.goh Objects/clipbrd.goh \
