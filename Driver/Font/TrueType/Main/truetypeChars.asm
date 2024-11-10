@@ -74,7 +74,13 @@ TrueTypeGenChar	proc	far
 	movwbf	dxah, es:GS_fontAttr.FCA_pointsize
 	push	dx			;pass point size
 	push 	ax
-				
+
+	clr	ah
+	mov	al, es:GS_fontAttr.FCA_width
+	push	ax			;pass width
+	mov	al, es:GS_fontAttr.FCA_weight
+	push	ax			;pass wieght
+
 	mov	cx, es:GS_fontAttr.FCA_fontID
 	call	FontDrFindFontInfo
 	push	ds			;pass ptr to FontInfo
@@ -86,6 +92,7 @@ TrueTypeGenChar	proc	far
 	call	FontDrFindOutlineData
 	push	ds			;pass ptr to OutlineEntry
 	push	di
+	push	ax			;pass styleToImplement
 
 	segmov	ds, dgroup, ax
 	push	ds:bitmapHandle

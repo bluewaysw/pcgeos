@@ -19,6 +19,7 @@
 
 #include "ttinit.h"
 #include "ttadapter.h"
+#include "ttacache.h"
 #include "ttcharmapper.h"
 #include "ttmemory.h"
 #include "ftxkern.h"
@@ -104,7 +105,6 @@ TT_Error _pascal Init_FreeType()
 {
         TT_Error        error;
  
- 
         error = TT_Init_FreeType();
         if ( error != TT_Err_Ok )
                 return error;
@@ -121,7 +121,8 @@ TT_Error _pascal Init_FreeType()
  * SYNOPSIS:       Cleans up and deinitializes the FreeType library,
  *                 releasing all allocated resources.
  * 
- * PARAMETERS:     None
+ * PARAMETERS:     MemHandle varBlock
+ *                    Memory handle to the block containing TrueType variables.None
  * 
  * RETURNS:        TT_Error
  *                    Returns `TT_Err_Ok` on successful cleanup, or an
@@ -136,8 +137,21 @@ TT_Error _pascal Init_FreeType()
  *      15.07.22  JK        Initial Revision
  *******************************************************************/
 
-TT_Error _pascal Exit_FreeType() 
+TT_Error _pascal Exit_FreeType(MemHandle varBlock) 
 {
+        if ( varBlock != NullHandle ) {
+
+            TrueTypeVars*          trueTypeVars;
+    
+            trueTypeVars = MemLock( varBlock );
+EC(         ECCheckBounds( (void*)trueTypeVars ) );
+    
+            if( trueTypeVars->cacheFile != NullHandle ) {
+                TrueType_Cache_Exit( trueTypeVars->cacheFile );
+            }
+            MemUnlock( varBlock );
+        }
+
         return TT_Done_FreeType();
 }
 
@@ -959,6 +973,20 @@ EC(     ECCheckBounds( (void*)fontHeader ) );
 
         if(fontHeader->FH_initialized) return;
 
+        /* not initialized try loading cache */
+        if(trueTypeVars->cacheFile == NullHandle) {
+                trueTypeVars->cacheFile = TrueType_Cache_Init();
+        }
+
+        if(trueTypeVars->cacheFile != NullHandle) {
+            /* try loading header from cache */
+            if(TrueType_Cache_ReadHeader( 
+                                        trueTypeVars->cacheFile, 
+                                        trueTypeVars->entry.TTOE_fontFileName, 
+                                        fontHeader)) 
+                return;	    
+        }
+
         /* initialize min, max and avg values in fontHeader */
         fontHeader->FH_minLSB   =  9999;
         fontHeader->FH_maxBSB   = -9999;
@@ -1046,6 +1074,11 @@ EC(     ECCheckBounds( (void*)fontHeader ) );
                 fontHeader->FH_strikePos = 3 * fontHeader->FH_ascent / 5;
 
         fontHeader->FH_initialized = TRUE;
+
+        TrueType_Cache_WriteHeader(
+                                trueTypeVars->cacheFile, 
+                                trueTypeVars->entry.TTOE_fontFileName, 
+                                fontHeader);
 }
 
 
@@ -1152,7 +1185,7 @@ EC(     ECCheckBounds( indices ) );
 
                 for( i = 0; i < kerningDir.tables->t.kern0.nPairs; ++i )
                 {
-                        if( ABS( pairs[i].value ) < minKernValue )
+                        if( ABS( pairs[i].value ) <= minKernValue )
                                 continue;
 
                         if ( GetGEOSCharForIndex( indices, pairs[i].left ) && 
