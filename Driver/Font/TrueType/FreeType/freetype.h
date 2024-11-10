@@ -762,26 +762,28 @@
 
   /* Set device resolution for a given instance.  The values are      */
   /* given in dpi (Dots Per Inch).  Default is 96 in both directions. */
-/*
-  EXPORT_DEF
+
+  /*EXPORT_DEF
   TT_Error  TT_Set_Instance_Resolutions( TT_Instance  instance,
                                          TT_UShort    xResolution,
-                                         TT_UShort    yResolution ); */
+                                         TT_UShort    yResolution );*/
 
 
   /* Set the pointsize for a given instance.  Default is 10pt. */
 
   EXPORT_DEF
-  TT_Error  TT_Set_Instance_CharSize( TT_Instance  instance,
-                                      TT_F26Dot6   charSize );
+  TT_Error  TT_Set_Instance_CharSize_And_Resolutions( TT_Instance  instance,
+                                                      TT_F26Dot6   charSize,
+                                                      TT_UShort    xResolution,
+                                                      TT_UShort    yResolution );
   /*
   EXPORT_DEF
   TT_Error  TT_Set_Instance_CharSizes( TT_Instance  instance,
                                        TT_F26Dot6   charWidth,
                                        TT_F26Dot6   charHeight ); */
 
-#define TT_Set_Instance_PointSize( ins, ptsize )   \
-            TT_Set_Instance_CharSize( ins, ptsize*64L )
+/*#define TT_Set_Instance_PointSize( ins, ptsize )   \
+            TT_Set_Instance_CharSize( ins, ptsize*64L )*/
 
 
   /* This function has been deprecated!  Do not use it, as it      */
@@ -795,10 +797,10 @@
 */
 
   /* Return instance metrics in `metrics'. */
-
+/*
   EXPORT_DEF
   TT_Error  TT_Get_Instance_Metrics( TT_Instance           instance,
-                                     TT_Instance_Metrics*  metrics );
+                                     TT_Instance_Metrics*  metrics ); */
 
 
   /* Close a given instance object, destroying all associated data. */
@@ -987,10 +989,11 @@
 
   /* Apply a transformation to a vector. */
 
+/*
   EXPORT_DEF
   void  TT_Transform_Vector( TT_F26Dot6*  x,
                              TT_F26Dot6*  y,
-                             TT_Matrix*   matrix );
+                             TT_Matrix*   matrix ); */
 
 
   /* Compute A*B/C with 64 bits intermediate precision. */

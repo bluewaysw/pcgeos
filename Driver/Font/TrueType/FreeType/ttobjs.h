@@ -746,7 +746,6 @@
   {
     TT_Stream         stream;     /* input stream                */
     PEngine_Instance  engine;     /* parent engine instance      */
-
   };
 
   typedef struct TFont_Input_  TFont_Input;
