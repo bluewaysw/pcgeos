@@ -97,25 +97,18 @@
 
   typedef TT_Error  TDestructor ( void*  object );
 
-  typedef TConstructor  TRefresher;
-  typedef TDestructor   TFinalizer;
-
   typedef TConstructor*  PConstructor;
   typedef TDestructor*   PDestructor;
-  typedef TRefresher*    PRefresher;
-  typedef TFinalizer*    PFinalizer;
 
 
   /* A Cache class record holds the data necessary to define */
   /* a cache kind.                                           */
   struct  TCache_Class_
   {
-    ULong         object_size;
-    Long          idle_limit;
+    UShort        object_size;
+    Short         idle_limit;
     PConstructor  init;
     PDestructor   done;
-    PRefresher    reset;
-    PFinalizer    finalize;
   };
 
   typedef struct TCache_Class_  TCache_Class;
@@ -146,7 +139,7 @@
     PCache_Class      clazz;      /* 'class' is a reserved word in C++ */
     TSingle_List      active;
     TSingle_List      idle;
-    Long              idle_count;
+    Short             idle_count;
   };
 
   typedef struct TCache_  TCache;
