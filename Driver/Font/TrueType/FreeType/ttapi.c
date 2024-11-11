@@ -425,7 +425,7 @@ extern TEngine_Instance engineInstance;
     TT_Close_Stream( &_face->stream );
 
     /* delete the face object -- this is thread-safe */
-    return CACHE_Done( _face->engine->objs_face_cache, _face );
+    return CACHE_Done( engineInstance.objs_face_cache, _face );
   }
 
 

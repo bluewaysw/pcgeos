@@ -475,7 +475,7 @@
   struct  TFace_
   {
     /* parent engine instance for the face object */
-    PEngine_Instance  engine;
+    //PEngine_Instance  engine;
 
     /* i/o stream */
     TT_Stream  stream;
