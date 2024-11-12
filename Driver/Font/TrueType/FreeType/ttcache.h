@@ -135,7 +135,7 @@
 
   struct  TCache_
   {
-    PEngine_Instance  engine;
+    //PEngine_Instance  engine;
     PCache_Class      clazz;      /* 'class' is a reserved word in C++ */
     TSingle_List      active;
     TSingle_List      idle;
@@ -157,7 +157,7 @@
   /* doesn't need protection                                        */
 
   LOCAL_DEF
-  TT_Error  Cache_Create( PEngine_Instance  engine,
+  TT_Error  Cache_Create( /*PEngine_Instance  engine,*/
                           PCache_Class      clazz,
                           TCache*           cache );
 
@@ -190,10 +190,10 @@
 
 
   LOCAL_DEF
-  TT_Error  TTCache_Init( PEngine_Instance  engine );
+  TT_Error  TTCache_Init( );
 
   LOCAL_DEF
-  TT_Error  TTCache_Done( PEngine_Instance  engine );
+  TT_Error  TTCache_Done( );
 
 
 #ifdef __cplusplus

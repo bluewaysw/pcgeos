@@ -1083,12 +1083,10 @@ extern TEngine_Instance engineInstance;
 
     face->stream = input->stream;
 
-    Cache_Create( &engineInstance,
-                  engineInstance.objs_instance_class,
+    Cache_Create( engineInstance.objs_instance_class,
                   &face->instances );
 
-    Cache_Create( &engineInstance,
-                  engineInstance.objs_glyph_class,
+    Cache_Create( engineInstance.objs_glyph_class,
                   &face->glyphs );
 
     /* Load collection directory if present, then font directory */
@@ -1269,7 +1267,7 @@ extern TEngine_Instance engineInstance;
 
 
   LOCAL_FUNC
-  TT_Error  TTObjs_Init( PEngine_Instance  engine )
+  TT_Error  TTObjs_Init( )
   {
     PCache        face_cache, exec_cache;
     TT_Error      error;
@@ -1280,22 +1278,22 @@ extern TEngine_Instance engineInstance;
       goto Fail;
 
     /* create face cache */
-    error = Cache_Create( engine, (PCache_Class)&objs_face_class, face_cache );
+    error = Cache_Create( (PCache_Class)&objs_face_class, face_cache );
     if ( error )
       goto Fail;
 
-    engine->objs_face_cache = face_cache;
+    engineInstance.objs_face_cache = face_cache;
 
-    error = Cache_Create( engine, (PCache_Class)&objs_exec_class, exec_cache );
+    error = Cache_Create( (PCache_Class)&objs_exec_class, exec_cache );
     if ( error )
       goto Fail;
 
-    engine->objs_exec_cache = exec_cache;
+    engineInstance.objs_exec_cache = exec_cache;
 
-    engine->objs_face_class      = (PCache_Class)&objs_face_class;
-    engine->objs_instance_class  = (PCache_Class)&objs_instance_class;
-    engine->objs_execution_class = (PCache_Class)&objs_exec_class;
-    engine->objs_glyph_class     = (PCache_Class)&objs_glyph_class;
+    engineInstance.objs_face_class      = (PCache_Class)&objs_face_class;
+    engineInstance.objs_instance_class  = (PCache_Class)&objs_instance_class;
+    engineInstance.objs_execution_class = (PCache_Class)&objs_exec_class;
+    engineInstance.objs_glyph_class     = (PCache_Class)&objs_glyph_class;
 
     goto Exit;
 
@@ -1321,16 +1319,16 @@ extern TEngine_Instance engineInstance;
  ******************************************************************/
 
   LOCAL_FUNC
-  TT_Error  TTObjs_Done( PEngine_Instance  engine )
+  TT_Error  TTObjs_Done( )
   {
     /* destroy all active faces and contexts before releasing the */
     /* caches                                                     */
-    Cache_Destroy( (TCache*)engine->objs_exec_cache );
-    Cache_Destroy( (TCache*)engine->objs_face_cache );
+    Cache_Destroy( (TCache*)engineInstance.objs_exec_cache );
+    Cache_Destroy( (TCache*)engineInstance.objs_face_cache );
 
     /* Now frees caches and cache classes */
-    FREE( engine->objs_exec_cache );
-    FREE( engine->objs_face_cache );
+    FREE( engineInstance.objs_exec_cache );
+    FREE( engineInstance.objs_face_cache );
 
     return TT_Err_Ok;
   }

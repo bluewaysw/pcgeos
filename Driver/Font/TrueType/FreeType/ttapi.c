@@ -88,7 +88,6 @@ extern TEngine_Instance engineInstance;
   EXPORT_FUNC
   TT_Error  TT_Init_FreeType( void )
   {
-    PEngine_Instance  _engine = &engineInstance;
     TT_Error          error;
 
 
@@ -98,13 +97,10 @@ extern TEngine_Instance engineInstance;
       return error;
 
 #undef  TT_FAIL
-#define TT_FAIL( x )  ( error = x (_engine) ) != TT_Err_Ok
+#define TT_FAIL( x )  ( error = x () ) != TT_Err_Ok
 
     /* Initalize components */
     if ( 
-#ifndef __GEOS__
-         TT_FAIL( TTFile_Init  )  ||
-#endif
          TT_FAIL( TTCache_Init )  ||
 #ifdef TT_CONFIG_OPTION_EXTEND_ENGINE
          TT_FAIL( TTExtend_Init ) ||
@@ -145,19 +141,12 @@ extern TEngine_Instance engineInstance;
   EXPORT_FUNC
   TT_Error  TT_Done_FreeType( void )
   {
-    PEngine_Instance  _engine = &engineInstance;
-
-
-    TTRaster_Done( _engine );
-    TTObjs_Done  ( _engine );
+    TTRaster_Done();
+    TTObjs_Done  ();
 #ifdef TT_CONFIG_OPTION_EXTEND_ENGINE
-    TTExtend_Done( _engine );
+    TTExtend_Done();
 #endif
-    TTCache_Done ( _engine );
-#ifndef __GEOS__
-    TTFile_Done  ( _engine );
-#endif
-
+    TTCache_Done ();
     TTMemory_Done();
 
     return TT_Err_Ok;
@@ -185,8 +174,6 @@ extern TEngine_Instance engineInstance;
   TT_Error  TT_Open_Face( const FileHandle  file,
                           TT_Face*          face )
   {
-    PEngine_Instance  _engine = &engineInstance;
-
     TFont_Input  input;
     TT_Error     error;
     TT_Stream    stream;
@@ -199,10 +186,9 @@ extern TEngine_Instance engineInstance;
       return error;
 
     input.stream    = stream;
-    input.engine    = _engine;
 
     /* Create and load the new face object - this is thread-safe */
-    error = CACHE_New( _engine->objs_face_cache,
+    error = CACHE_New( engineInstance.objs_face_cache,
                        _face,
                        &input );
 
