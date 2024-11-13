@@ -51,42 +51,42 @@ VMBlockHandle PngImport(
     if(filehan)
     {
         // Read PNG Chunks, get overview
-        if (pngProcessChunks(filehan, &ihdrData, &idatChunksHan, &idatNumChunks, &plteChunk))
+        if (pngImportProcessChunks(filehan, &ihdrData, &idatChunksHan, &idatNumChunks, &plteChunk))
         {
             picsize->XYS_width = ihdrData.width;
             picsize->XYS_height = ihdrData.height;
 
-            fmt = pngWhatOutputFormat(ihdrData.colorType, ihdrData.bitDepth);
+            fmt = pngImportWhatOutputFormat(ihdrData.colorType, ihdrData.bitDepth);
             if (fmt != 0)
             {
                 // Initialize output bitmap
-                bmVMBlock = pngInitiateOutputBitmap(vmf, ihdrData, fmt);
+                bmVMBlock = pngImportInitiateOutputBitmap(vmf, ihdrData, fmt);
                 if (bmVMBlock != NullHandle)
                 {
                     // transfers only if a palette exists, also creates palettes for grayscale images
-                    pngHandlePalette(filehan, plteChunk, vmf, bmVMBlock, ihdrData.colorType, ihdrData.bitDepth);
+                    pngImportHandlePalette(filehan, plteChunk, vmf, bmVMBlock, ihdrData.colorType, ihdrData.bitDepth);
 
                     // Initialize the IDAT state
-                    pngInitIDATProcessingState(&state, filehan, idatChunksHan, idatNumChunks, ihdrData);
+                    pngImportInitIDATProcessingState(&state, filehan, idatChunksHan, idatNumChunks, ihdrData);
 
                     // Process each scanline
-                    while (pngGetNextIDATScanline(&state) == 1)
+                    while (pngImportGetNextIDATScanline(&state) == 1)
                     {
                         // when not zlib decoding, give the system a little room to breathe
-                        pngPauseIDATProcessing(&state);
+                        pngImportPauseIDATProcessing(&state);
 
                         // make sure we have data compatible with GEOS HugeBitmaps
-                        pngApplyGEOSFormatTransformations(&state, pngBlendColor);
+                        pngImportApplyGEOSFormatTransformations(&state, pngBlendColor);
 
 #if SCANLINE_COMPRESS
 // handle SCANLINE_COMPRESS here?    
 #endif
 
                         // Write the processed scanline (without the filter byte) to the VMFile
-                        pngWriteScanlineToBitmap(vmf, bmVMBlock, state.lineNo - 1, state.currentRow);
+                        pngImportWriteScanlineToBitmap(vmf, bmVMBlock, state.lineNo - 1, state.currentRow);
 
                         // prepare the next zlib decoding work
-                        pngResumeIDATProcessing(&state);
+                        pngImportResumeIDATProcessing(&state);
 
 #if PROGRESS_DISPLAY
                         /* send out progress if desired number of scanlines have been seen */
@@ -135,7 +135,7 @@ VMBlockHandle PngImport(
                     }
 
                     // Clean up resources
-                    pngCleanupIDATProcessingState(&state);
+                    pngImportCleanupIDATProcessingState(&state);
                 }
             }
         }

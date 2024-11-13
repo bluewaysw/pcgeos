@@ -355,13 +355,13 @@ ImpBmpStatus _pascal ImpPNGProcessFile(ImpBmpParams *params)
 		@call params->IBP_status::MSG_SB_START_PROCESS();
 
 	// Read PNG Chunks, get overview
-	if (pngProcessChunks(params->IBP_source, &ihdrData, &idatChunksHan, &idatNumChunks, &plteChunk))
+	if (pngImportProcessChunks(params->IBP_source, &ihdrData, &idatChunksHan, &idatNumChunks, &plteChunk))
 	{
-		fmt = pngWhatOutputFormat(ihdrData.colorType, ihdrData.bitDepth);
+		fmt = pngImportWhatOutputFormat(ihdrData.colorType, ihdrData.bitDepth);
 		if (fmt != 0)
 		{
 			// Initialize output bitmap
-			params->IBP_bitmap = pngInitiateOutputBitmap(params->IBP_dest, ihdrData, fmt);
+			params->IBP_bitmap = pngImportInitiateOutputBitmap(params->IBP_dest, ihdrData, fmt);
 			if (params->IBP_bitmap != 0)
 			{
 				params->IBP_width  = ihdrData.width;
@@ -370,25 +370,25 @@ ImpBmpStatus _pascal ImpPNGProcessFile(ImpBmpParams *params)
 				strcpy(params->IBP_impForm, ".PNG");
 
 				// transfers only if a palette exists, also creates palettes for grayscale images
-				pngHandlePalette(params->IBP_source, plteChunk, params->IBP_dest, params->IBP_bitmap, ihdrData.colorType, ihdrData.bitDepth);
+				pngImportHandlePalette(params->IBP_source, plteChunk, params->IBP_dest, params->IBP_bitmap, ihdrData.colorType, ihdrData.bitDepth);
 
 				// Initialize the IDAT state
-				pngInitIDATProcessingState(&state, params->IBP_source, idatChunksHan, idatNumChunks, ihdrData);
+				pngImportInitIDATProcessingState(&state, params->IBP_source, idatChunksHan, idatNumChunks, ihdrData);
 
 				// Process each scanline
-				while ((pngGetNextIDATScanline(&state) == 1) && (status == IBS_NO_ERROR))
+				while ((pngImportGetNextIDATScanline(&state) == 1) && (status == IBS_NO_ERROR))
 				{
 					// when not zlib decoding, give the system a little room to breathe
-					pngPauseIDATProcessing(&state);
+					pngImportPauseIDATProcessing(&state);
 
 					// make sure we have data compatible with GEOS HugeBitmaps
-					pngApplyGEOSFormatTransformations(&state, params->IBP_pngBlendColor);
+					pngImportApplyGEOSFormatTransformations(&state, params->IBP_pngBlendColor);
 
 					// Write the processed scanline (without the filter byte) to the VMFile
-					pngWriteScanlineToBitmap(params->IBP_dest, params->IBP_bitmap, state.lineNo - 1, state.currentRow);
+					pngImportWriteScanlineToBitmap(params->IBP_dest, params->IBP_bitmap, state.lineNo - 1, state.currentRow);
 
 					// prepare the next zlib decoding work
-					pngResumeIDATProcessing(&state);
+					pngImportResumeIDATProcessing(&state);
 
 					// update status of processing
 					if (params->IBP_status != NULL)
@@ -402,7 +402,7 @@ ImpBmpStatus _pascal ImpPNGProcessFile(ImpBmpParams *params)
 				}
 
 				// Clean up resources
-				pngCleanupIDATProcessingState(&state);
+				pngImportCleanupIDATProcessingState(&state);
 			}
 			else
 			{
@@ -430,7 +430,7 @@ ImpBmpStatus _pascal ImpPNGTestFile(FileHandle file)
   if (FilePos(file, 0, FILE_POS_START) != 0)
 	return (IBS_WRONG_FILE);
 
-  if (pngCheckHeader(file) == 0)
+  if (pngImportCheckHeader(file) == 0)
 	return (IBS_WRONG_FORMAT);
 
   return (IBS_NO_ERROR);

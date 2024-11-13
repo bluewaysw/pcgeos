@@ -11,49 +11,49 @@
 #include <pnglib.goh>
 
 // Reading and processing a complete PNG file
-VMBlockHandle _pascal _export pngConvertFile(FileHandle fileHan, VMFileHandle vmFile)
+VMBlockHandle _pascal _export pngImportConvertFile(FileHandle fileHan, VMFileHandle vmFile)
 {
     IHDRData ihdrData = {0};
     VMBlockHandle vmBlock = NullHandle;
-    MemHandle idatChunksHan = NullHandle; // this is freed via pngCleanupIDATProcessingState!
+    MemHandle idatChunksHan = NullHandle; // this is freed via pngImportCleanupIDATProcessingState!
     int idatNumChunks = 0;
     PLTEChunkEntry plteChunk = {0};
     IDATState state = {0};
     BMFormat fmt = 0;
     RGBValue blendColor = {255, 255, 255};
 
-    if (pngCheckHeader(fileHan))
+    if (pngImportCheckHeader(fileHan))
     {
         // Read PNG Chunks, get overview
-        if (pngProcessChunks(fileHan, &ihdrData, &idatChunksHan, &idatNumChunks, &plteChunk))
+        if (pngImportProcessChunks(fileHan, &ihdrData, &idatChunksHan, &idatNumChunks, &plteChunk))
         {
-            fmt = pngWhatOutputFormat(ihdrData.colorType, ihdrData.bitDepth);
+            fmt = pngImportWhatOutputFormat(ihdrData.colorType, ihdrData.bitDepth);
             if (fmt != 0)
             {
                 // Initialize output bitmap
-                vmBlock = pngInitiateOutputBitmap(vmFile, ihdrData, fmt);
+                vmBlock = pngImportInitiateOutputBitmap(vmFile, ihdrData, fmt);
 
                 // transfers only if a palette exists, also creates palettes for grayscale images
-                pngHandlePalette(fileHan, plteChunk, vmFile, vmBlock, ihdrData.colorType, ihdrData.bitDepth);
+                pngImportHandlePalette(fileHan, plteChunk, vmFile, vmBlock, ihdrData.colorType, ihdrData.bitDepth);
 
                 // Initialize the IDAT state
-                pngInitIDATProcessingState(&state, fileHan, idatChunksHan, idatNumChunks, ihdrData);
+                pngImportInitIDATProcessingState(&state, fileHan, idatChunksHan, idatNumChunks, ihdrData);
 
                 // Process each scanline
-                while (pngGetNextIDATScanline(&state) == 1)
+                while (pngImportGetNextIDATScanline(&state) == 1)
                 {
-                    pngPauseIDATProcessing(&state);
+                    pngImportPauseIDATProcessing(&state);
 
-                    pngApplyGEOSFormatTransformations(&state, blendColor);
+                    pngImportApplyGEOSFormatTransformations(&state, blendColor);
 
                     // Write the processed scanline (without the filter byte) to the VMFile
-                    pngWriteScanlineToBitmap(vmFile, vmBlock, state.lineNo - 1, state.currentRow);
+                    pngImportWriteScanlineToBitmap(vmFile, vmBlock, state.lineNo - 1, state.currentRow);
 
-                    pngResumeIDATProcessing(&state);
+                    pngImportResumeIDATProcessing(&state);
                 }
 
                 // Clean up resources
-                pngCleanupIDATProcessingState(&state);
+                pngImportCleanupIDATProcessingState(&state);
 
                 return vmBlock;
             }
@@ -64,7 +64,7 @@ VMBlockHandle _pascal _export pngConvertFile(FileHandle fileHan, VMFileHandle vm
 }
 
 // check PNG Header
-int _pascal _export pngCheckHeader(FileHandle file)
+int _pascal _export pngImportCheckHeader(FileHandle file)
 {
     unsigned char header[sizeof(PNG_SIGNATURE)] = {0};
 
@@ -85,7 +85,7 @@ int _pascal _export pngCheckHeader(FileHandle file)
 }
 
 // main function for processing PNG-Chunks
-int _pascal _export pngProcessChunks(FileHandle file, IHDRData* ihdrData, MemHandle* idatChunksHan, int *idatNumChunks, PLTEChunkEntry* plteChunk)
+int _pascal _export pngImportProcessChunks(FileHandle file, IHDRData* ihdrData, MemHandle* idatChunksHan, int *idatNumChunks, PLTEChunkEntry* plteChunk)
 {
     ChunkHeader chdr = {0};
     int idatChunkIdx = 0;
@@ -191,7 +191,7 @@ int _pascal _export pngProcessChunks(FileHandle file, IHDRData* ihdrData, MemHan
 }
 
 // init the IDAT processing structure
-void _pascal _export pngInitIDATProcessingState(IDATState* state, FileHandle file, MemHandle idatChunksHan, int idatNumChunks, IHDRData ihdr)
+void _pascal _export pngImportInitIDATProcessingState(IDATState* state, FileHandle file, MemHandle idatChunksHan, int idatNumChunks, IHDRData ihdr)
 {
     // how many bytes to allocate for a scanline
     unsigned long allocSize = NULL;
@@ -266,7 +266,7 @@ void _pascal _export pngInitIDATProcessingState(IDATState* state, FileHandle fil
 
 // temporarily unlock the memory not needed for just putting out the pixels we just decoded
 // NOTE: currentRow stays locked for further processing
-void _pascal _export pngPauseIDATProcessing(IDATState* state)
+void _pascal _export pngImportPauseIDATProcessing(IDATState* state)
 {
     state->inOff = state->strm.next_in - MemDeref(state->inHan);
     MemUnlock(state->inHan); // disabled as it seems to create memory overflows somewhere
@@ -278,7 +278,7 @@ void _pascal _export pngPauseIDATProcessing(IDATState* state)
 }
 
 // relock the memory needed for further IDAT chunk processing
-void _pascal _export pngResumeIDATProcessing(IDATState* state)
+void _pascal _export pngImportResumeIDATProcessing(IDATState* state)
 {
     state->in = MemLock(state->inHan);
     state->strm.next_in = state->in + state->inOff;
@@ -290,7 +290,7 @@ void _pascal _export pngResumeIDATProcessing(IDATState* state)
 }
 
 // Processing of IDAT-Chunks
-int _pascal _export pngGetNextIDATScanline(IDATState* state)
+int _pascal _export pngImportGetNextIDATScanline(IDATState* state)
 {
     unsigned long have;  // Amount of data decompressed into the output buffer
     unsigned char *src;  // Pointer to the current position in the output buffer
@@ -443,7 +443,7 @@ int nextIDATChunk(IDATState* state)
     return 0;
 }
 
-void _pascal _export pngCleanupIDATProcessingState(IDATState* state)
+void _pascal _export pngImportCleanupIDATProcessingState(IDATState* state)
 {
     inflateEnd(&state->strm);
     MemFree(state->inHan);
@@ -453,7 +453,7 @@ void _pascal _export pngCleanupIDATProcessingState(IDATState* state)
     MemFree(state->previousRowHandle);
 }
 
-void _pascal _export pngHandlePalette(FileHandle file, PLTEChunkEntry plteChunk, VMFileHandle vmFile, VMBlockHandle vmBlock, unsigned char colorType, unsigned char bitDepth)
+void _pascal _export pngImportHandlePalette(FileHandle file, PLTEChunkEntry plteChunk, VMFileHandle vmFile, VMBlockHandle vmBlock, unsigned char colorType, unsigned char bitDepth)
 {
     RGBValue* palette = NULL;
     char* rawPalette = NULL;
@@ -541,7 +541,7 @@ void _pascal _export pngHandlePalette(FileHandle file, PLTEChunkEntry plteChunk,
 }
 
 // determine which GEOS bitmap format to create
-BMFormat _pascal _export pngWhatOutputFormat(unsigned char colorType, unsigned char bitDepth)
+BMFormat _pascal _export pngImportWhatOutputFormat(unsigned char colorType, unsigned char bitDepth)
 {
     BMFormat output = 0;
 
@@ -627,7 +627,7 @@ BMFormat _pascal _export pngWhatOutputFormat(unsigned char colorType, unsigned c
 }
 
 // create the GEOS Bitmap
-VMBlockHandle _pascal _export pngInitiateOutputBitmap(VMFileHandle vmFile, IHDRData ihdrData, BMFormat fmt)
+VMBlockHandle _pascal _export pngImportInitiateOutputBitmap(VMFileHandle vmFile, IHDRData ihdrData, BMFormat fmt)
 {
     GStateHandle bmstate;
     VMBlockHandle vmBlock = NullHandle;
@@ -646,7 +646,7 @@ VMBlockHandle _pascal _export pngInitiateOutputBitmap(VMFileHandle vmFile, IHDRD
 }
 
 // transform the original bitmap data for the target GEOS format
-void _pascal _export pngApplyGEOSFormatTransformations(IDATState* state, RGBValue pngBlendColor)
+void _pascal _export pngImportApplyGEOSFormatTransformations(IDATState* state, RGBValue pngBlendColor)
 {
     // Convert any 16-bit channel data to 8-bit, we don't support more than 8-bit per Channel
     convert16BitLineTo8Bit(state->currentRow, state->ihdr.width, state->ihdr.colorType, state->ihdr.bitDepth);
@@ -660,7 +660,7 @@ void _pascal _export pngApplyGEOSFormatTransformations(IDATState* state, RGBValu
 }
 
 // write a scanline to the VMFile
-void _pascal _export pngWriteScanlineToBitmap(VMFileHandle vmFile, VMBlockHandle vmBlock, unsigned long lineNo, unsigned char* rowData)
+void _pascal _export pngImportWriteScanlineToBitmap(VMFileHandle vmFile, VMBlockHandle vmBlock, unsigned long lineNo, unsigned char* rowData)
 {
     void *lineptr;
     word size;
