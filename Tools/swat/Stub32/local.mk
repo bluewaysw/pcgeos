@@ -60,7 +60,8 @@ NO_EC		= si, senor
 # symbol indicating the stub type. E.g. Low/kernel.obj generates a -DLOW.
 # Default to -DLOWMEM if target not in a subdir (e.g. dependencies.mk)
 #
-ASMFLAGS        := -i $(INCDIRS:S|^|-I|g) $(ASMFLAGS:N*.INCLUDES*) #-DWINCOM
+ASMFLAGS        := -i $(INCDIRS:S|^|-I|g) $(ASMFLAGS:N*.INCLUDES*) \
+		-D`perl -e "print uc '$(SUBDIRS)'"` -DPRODUCT_GEOS32
 #                   "-D`expr $(.TARGET) : '\([^/]*\)/' \| LOWMEM : '\(LOWMEM\)' | tr a-z A-Z`"
 
 

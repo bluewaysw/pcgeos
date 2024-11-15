@@ -62,16 +62,30 @@ MAKESTUB:	.USE
 	$(MAKE) -k -I..\$(.TARGET:S/\//\\/g)
 #endif
 
+MAKESTUB32:	.USE
+#if defined(linux)
+	mkdir -p ../$(.TARGET)
+	cd ../$(.TARGET)
+	cd ..
+	export SUBDIRS=$(.TARGET:X*\/Stub32\/\\[*\\])
+	$(MAKE) -k -I../$(.TARGET)
+#else
+	if not exist  ..\$(.TARGET:S/\//\\/g) mkdir ..\$(.TARGET:S/\//\\/g)
+	cd ..\$(.TARGET:S/\//\\/g)
+	cd ..
+	set  SUBDIRS=$(.TARGET:X*\/Stub32\/\\[*\\])
+	$(MAKE) -k -I..\$(.TARGET:S/\//\\/g)
+#endif
 
 minimal		: minimalLoader minimalLibrary minimalDriver minimalAppl \
 		  otherEnsemble minimalStub
 
-minimalLoader	: textLoader VGALoader
+minimalLoader	: textLoader VGALoader textLoader32
 
 #
 # Stubs
 #
-minimalStub	: stub stub_netware stub_wincom
+minimalStub	: stub stub_netware stub_wincom stub32 stub32_netware stub32_wincom
 
 stub		: Installed/Tools/swat/Stub/LowMem
 Installed/Tools/swat/Stub/LowMem:	MAKESTUB
@@ -82,6 +96,14 @@ Installed/Tools/swat/Stub/NetWare:	MAKESTUB
 stub_wincom	: Installed/Tools/swat/Stub/WinCom
 Installed/Tools/swat/Stub/WinCom:	MAKESTUB
 
+stub32		: Installed/Tools/swat/Stub32/LowMem
+Installed/Tools/swat/Stub32/LowMem:	MAKESTUB32
+
+stub32_netware	: Installed/Tools/swat/Stub32/NetWare
+Installed/Tools/swat/Stub32/NetWare:	MAKESTUB32
+
+stub32_wincom	: Installed/Tools/swat/Stub32/WinCom
+Installed/Tools/swat/Stub32/WinCom:	MAKESTUB32
 
 #
 # Libraries
@@ -188,6 +210,9 @@ printerDriver	: deskjet dj500c lbp mercury pcl4 quietjet canon48 \
 
 textLoader	:	Installed/Loader/Text
 Installed/Loader/Text	:	MAKETOOL
+
+textLoader32	:	Installed/Loader32/Text
+Installed/Loader32/Text	:	MAKETOOL
 
 VGALoader	:	Installed/Loader/VGA
 Installed/Loader/VGA	: 	MAKETOOL

@@ -29,7 +29,7 @@
 
 #define DEBUG_OUTPUT_RPC_DATA_TO_FILE  0
 
-#define GEOS32  0
+#define GEOS32  1
 
 #if GEOS32
 #  define SEGMENT_SHIFT     16
