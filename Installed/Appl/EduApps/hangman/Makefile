@@ -6,9 +6,9 @@
 GEODE           = hangman
 ASM_TO_OBJS     =
 UI_TO_RDFS      =
-SRCS            = process.goc Import.goc hangman.goc hmicon.goh bboxreg.goh\
-                  externs.goh hangman.goh
-OBJS            = process.obj Import.obj hangman.obj
+SRCS            = hangman.goc Import.goc process.goc externs.goh\
+                  hangman.goh hmicon.goh
+OBJS            = hangman.obj Import.obj process.obj
 LOBJS           =
 
 SYSMAKEFILE     = geode.mk

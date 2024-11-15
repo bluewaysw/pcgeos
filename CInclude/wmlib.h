@@ -1,4 +1,7 @@
 
+/*---------------------------------------------------------------------------
+	Some times ago:	Initial release, used by WordMatcher and Hangman App
+ ---------------------------------------------------------------------------*/
 #define WM_MAX_SIZE_WORD 20
 
 #define WME_NONE		0
@@ -19,8 +22,29 @@ typedef struct {
     Boolean       WMPS_searchDone ;
 } WMParamsStruct ;
 
-word WMAddWord(WMParamsStruct *wmStruct) ;
-Boolean WMFindWord(WMParamsStruct *wmStruct, Boolean newSearch) ;
-void WMRenameWord(WMParamsStruct *wmStruct, Boolean doSearch) ;
-void WMDeleteWord(WMParamsStruct *wmStruct, Boolean doSearch) ;
+word _pascal _export WMAddWord(WMParamsStruct *wmStruct) ;
+Boolean _pascal _export WMFindWord(WMParamsStruct *wmStruct, Boolean newSearch) ;
+void _pascal _export WMRenameWord(WMParamsStruct *wmStruct, Boolean doSearch) ;
+void _pascal _export WMDeleteWord(WMParamsStruct *wmStruct, Boolean doSearch) ;
 
+/*---------------------------------------------------------------------------
+	2024-07-01	RainerB	- quick creation of a new wordlist added 
+			Uses by "Word List Creator" Application stored in
+			pcgeos/Appl/Tools/WListGen
+ ---------------------------------------------------------------------------*/
+
+/*--------------------- WMCreateNewDB ---------------------
+ *	Purpose:	Start building a new, empty word list data base.
+ ---------------------------------------------------------------------------*/
+void _pascal _export WMCreateNewDB(VMFileHandle fh, Boolean compressed);
+
+/*--------------------- WMAddWordToNewDBUnchecked ---------------------
+ *	Purpose:	Add a word to new database, created with WMCreateNewDB
+ *			For perfomance, it is not checked whether the word already exists!
+---------------------------------------------------------------------------*/
+Boolean _pascal _export WMAddWordToNewDBUnchecked(VMFileHandle fh, char *newWord);
+
+/*--------------------- WMFinishNewDB ---------------------
+ *	Purpose:	Finish building the new word list data base.
+ ---------------------------------------------------------------------------*/
+Boolean _pascal _export WMFinishNewDB(VMFileHandle fh, Boolean closeFile);

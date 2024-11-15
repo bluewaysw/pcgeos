@@ -3,7 +3,7 @@ COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 	Copyright (c) GeoWorks 1990 -- All Rights Reserved
 
 PROJECT:	PC GEOS
-MODULE:		MetricsMod
+MODULE:		TrueType Font Driver
 FILE:		truetypeMetrics.asm
 
 AUTHOR:		Falk Rehwagen, Jan  29, 2021

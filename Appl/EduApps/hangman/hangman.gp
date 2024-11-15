@@ -47,7 +47,6 @@ platform geos201
 # Resources:
 resource AppResource ui-object
 resource Interface ui-object
-resource LOGORESOURCE data object
 resource Appicons data object
 resource Strings data object
 #

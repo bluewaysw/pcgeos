@@ -35,7 +35,8 @@
 #include "ttload.h"
 #include "ttgload.h"
 #include "ttraster.h"
-#include "ttextend.h"
+#include "tttags.h"
+#include <geos.h>
 
 
 /* required by the tracing mode */
@@ -50,7 +51,7 @@ extern TEngine_Instance engineInstance;
 #ifdef TT_STATIC_RASTER
 #define RAS_OPS  /* void */
 #else
-#define RAS_OPS  ((TRaster_Instance*)_engine->raster_component),
+#define RAS_OPS ((TRaster_Instance*) engineInstance.raster_component),
 #endif /* TT_STATIC_RASTER */
 
 
@@ -100,7 +101,10 @@ extern TEngine_Instance engineInstance;
 #define TT_FAIL( x )  ( error = x (_engine) ) != TT_Err_Ok
 
     /* Initalize components */
-    if ( TT_FAIL( TTFile_Init  )  ||
+    if ( 
+#ifndef __GEOS__
+         TT_FAIL( TTFile_Init  )  ||
+#endif
          TT_FAIL( TTCache_Init )  ||
 #ifdef TT_CONFIG_OPTION_EXTEND_ENGINE
          TT_FAIL( TTExtend_Init ) ||
@@ -144,16 +148,15 @@ extern TEngine_Instance engineInstance;
     PEngine_Instance  _engine = &engineInstance;
 
 
-    if ( !_engine )
-      return TT_Err_Ok;
-
     TTRaster_Done( _engine );
     TTObjs_Done  ( _engine );
 #ifdef TT_CONFIG_OPTION_EXTEND_ENGINE
     TTExtend_Done( _engine );
 #endif
     TTCache_Done ( _engine );
+#ifndef __GEOS__
     TTFile_Done  ( _engine );
+#endif
 
     TTMemory_Done();
 
@@ -190,9 +193,6 @@ extern TEngine_Instance engineInstance;
     PFace        _face;
 
 
-    if ( !_engine )
-      return TT_Err_Invalid_Engine;
-
     /* open the file */
     error = TT_Open_Stream( file, &stream );
     if ( error )
@@ -209,14 +209,12 @@ extern TEngine_Instance engineInstance;
     /* Set the handle */
     HANDLE_Set( *face, _face );
 
-    if ( error )
-      goto Fail;
+    if (error) {
+        TT_Close_Stream(&stream);
+        return error;
+    }
 
     return TT_Err_Ok;
-
-  Fail:
-    TT_Close_Stream( &stream );
-    return error;
   }
 
 
@@ -256,19 +254,25 @@ extern TEngine_Instance engineInstance;
     properties->header       = &_face->fontHeader;
     properties->horizontal   = &_face->horizontalHeader;
 
+#ifdef TT_CONFIG_OPTION_PROCESS_VMTX
     if ( _face->verticalInfo )
       properties->vertical   = &_face->verticalHeader;
     else
       properties->vertical   = NULL;
+#endif
 
     properties->os2          = &_face->os2;
     properties->postscript   = &_face->postscript;
+
+  #ifdef TT_CONFIG_OPTION_PROCESS_HDMX
     properties->hdmx         = &_face->hdmx;
+  #endif
 
     return TT_Err_Ok;
   }
 
 
+#ifndef __GEOS__
 /*******************************************************************
  *
  *  Function    :  TT_Get_Face_Metrics
@@ -323,7 +327,7 @@ extern TEngine_Instance engineInstance;
  *  MT-Note : YES!  Reads only permanent data.
  *
  ******************************************************************/
-/*
+
   EXPORT_FUNC
   TT_Error  TT_Get_Face_Metrics( TT_Face     face,
                                  TT_UShort   firstGlyph,
@@ -353,7 +357,7 @@ extern TEngine_Instance engineInstance;
       UShort  advance_width;
 
 
-      for ( n = 0; n <= num; n++ )
+      for ( n = 0; n <= num; ++n )
       {
         TT_Get_Metrics( &_face->horizontalHeader,
                         firstGlyph + n, &left_bearing, &advance_width );
@@ -376,7 +380,7 @@ extern TEngine_Instance engineInstance;
       Short   top_bearing;
       UShort  advance_height;
 
-      for ( n = 0; n <= num; n++ )
+      for ( n = 0; n <= num; ++n )
       {
         TT_Get_Metrics( (TT_Horizontal_Header*)&_face->verticalHeader,
                         firstGlyph + n, &top_bearing, &advance_height );
@@ -388,7 +392,8 @@ extern TEngine_Instance engineInstance;
 
     return TT_Err_Ok;
   }
-*/
+#endif  /* __GEOS__ */
+
 
 /*******************************************************************
  *
@@ -527,7 +532,7 @@ extern TEngine_Instance engineInstance;
  *            Happily, 99.99% will do just that :-)
  *
  ******************************************************************/
-/*
+#if 0
   EXPORT_FUNC
   TT_Error  TT_Set_Instance_Resolutions( TT_Instance  instance,
                                          TT_UShort    xResolution,
@@ -541,7 +546,7 @@ extern TEngine_Instance engineInstance;
 
     ins->metrics.x_resolution = xResolution;
     ins->metrics.y_resolution = yResolution;
-    ins->valid                = FALSE; */
+    ins->valid                = FALSE;
 
     /* In the case of a thread-safe implementation, we immediately    */
     /* call Instance_Reset in order to change the instance's variable */
@@ -550,9 +555,9 @@ extern TEngine_Instance engineInstance;
     /* flag to FALSE, which will force the instance's resetting at    */
     /* the next glyph loading                                         */
 
-/*    return TT_Err_Ok;
-  } */
-
+    return TT_Err_Ok;
+  }
+#endif
 
 /*******************************************************************
  *
@@ -575,14 +580,20 @@ extern TEngine_Instance engineInstance;
  ******************************************************************/
 
   EXPORT_FUNC
-  TT_Error  TT_Set_Instance_CharSize( TT_Instance  instance,
-                                       TT_F26Dot6   charSize )
+  TT_Error  TT_Set_Instance_CharSize_And_Resolutions( TT_Instance  instance,
+                                                      TT_F26Dot6   charSize,
+                                                      TT_UShort    xResolution,
+                                                      TT_UShort    yResolution )
   {
     PInstance  ins = HANDLE_Instance( instance );
 
 
     if ( !ins )
       return TT_Err_Invalid_Instance_Handle;
+
+    ins->metrics.x_resolution = xResolution;
+    ins->metrics.y_resolution = yResolution;
+    ins->valid                = FALSE;
 
     if ( charSize < 1 * 64 )
       charSize = 1 * 64;
@@ -608,84 +619,6 @@ extern TEngine_Instance engineInstance;
     return Instance_Reset( ins );
   }
 
-
-/*******************************************************************
- *
- *  Function    :  TT_Set_Instance_CharSize
- *
- *  Description :  Resets an instance to new point size.
- *
- *  Input  :  instance      the instance handle
- *            charSize      the new character size in 26.6 char points
- *
- *  Output :  Error code.
- *
- *  Note :    There is no check for overflow; with other words,
- *            the product of glyph dimensions times the device
- *            resolution must have reasonable values.
- *
- *  MT-Note : NO!  This should be called only when setting/resetting
- *            instances, so there is no need to protect.
- *
- ******************************************************************/
-/*
-  EXPORT_FUNC
-  TT_Error  TT_Set_Instance_CharSize( TT_Instance  instance,
-                                      TT_F26Dot6   charSize )
-  {
-    return TT_Set_Instance_CharSizes( instance, charSize, charSize );
-  }
-*/
-
-/*******************************************************************
- *
- *  Function    :  TT_Set_Instance_PixelSizes
- *
- *  Description :  Resets an instance to new pixel sizes
- *
- *  Input  :  instance      the instance handle
- *            pixelWidth    the new width in pixels
- *            pixelHeight   the new height in pixels
- *
- *  Output :  Error code.
- *
- *  Note :    There is no check for overflow; with other words,
- *            the product of glyph dimensions times the device
- *            resolution must have reasonable values.
- *
- *  MT-Note : NO!  This should be called only when setting/resetting
- *            instances, so there is no need to protect.
- *
- ******************************************************************/
- /*
-  EXPORT_FUNC
-  TT_Error  TT_Set_Instance_PixelSizes( TT_Instance  instance,
-                                        TT_UShort    pixelWidth,
-                                        TT_UShort    pixelHeight,
-                                        TT_F26Dot6   pointSize )
-  {
-    PInstance  ins = HANDLE_Instance( instance );
-
-    if ( !ins )
-      return TT_Err_Invalid_Instance_Handle;
-
-    if ( pixelWidth  < 1 ) pixelWidth = 1;
-    if ( pixelHeight < 1 ) pixelHeight = 1;
-
-    ins->metrics.x_ppem    = pixelWidth;
-    ins->metrics.y_ppem    = pixelHeight;
-    ins->metrics.pointSize = pointSize;
-
-    ins->metrics.x_scale1 = ins->metrics.x_ppem * 64L;
-    ins->metrics.x_scale2 = ins->owner->fontHeader.Units_Per_EM;
-    ins->metrics.y_scale1 = ins->metrics.y_ppem * 64L;
-    ins->metrics.y_scale2 = ins->owner->fontHeader.Units_Per_EM;
-
-    ins->valid = FALSE;
-
-    return Instance_Reset( ins );
-  }
-*/
 
 /*******************************************************************
  *
@@ -744,7 +677,7 @@ extern TEngine_Instance engineInstance;
  *  MT-Note : YES!  Reads only semi-permanent data.
  *
  ******************************************************************/
-
+#if 0
   EXPORT_FUNC
   TT_Error  TT_Get_Instance_Metrics( TT_Instance           instance,
                                      TT_Instance_Metrics*  metrics )
@@ -775,7 +708,7 @@ extern TEngine_Instance engineInstance;
 
     return TT_Err_Ok;
   }
-
+#endif
 
 /*******************************************************************
  *
@@ -894,12 +827,10 @@ extern TEngine_Instance engineInstance;
                            TT_UShort    glyphIndex,
                            TT_UShort    loadFlags   )
   {
-    PInstance  _ins;
-    PGlyph     _glyph;
+    PInstance  _ins   = HANDLE_Instance( instance );
+    PGlyph     _glyph = HANDLE_Glyph( glyph );
     TT_Error   error;
 
-
-    _ins = HANDLE_Instance( instance );
 
     if ( !_ins )
       loadFlags &= ~(TTLOAD_SCALE_GLYPH | TTLOAD_HINT_GLYPH);
@@ -907,7 +838,6 @@ extern TEngine_Instance engineInstance;
     if ( (loadFlags & TTLOAD_SCALE_GLYPH) == 0 )
       _ins = 0;
 
-    _glyph = HANDLE_Glyph( glyph );
     if ( !_glyph )
       return TT_Err_Invalid_Glyph_Handle;
 
@@ -995,36 +925,101 @@ extern TEngine_Instance engineInstance;
   }
 
 
-/*******************************************************************
- *
- *  Function    :  TT_Get_Glyph_Big_Metrics
- *
- *  Description :  Extracts the glyph's big metrics information.
- *
- *  Input  :  glyph       glyph object handle
- *            metrics     address where big metrics will be returned
- *
- *  Output :  Error code.
- *
- *  MT-Safe : NO!  Glyph containers can't be shared.
- *
- ******************************************************************/
-/*
+  /******************************************************************/
+  /*                                                                */
+  /*  Function:  TT_Get_Index_Metrics                               */
+  /*                                                                */
+  /*  Description: Returns the widths and/or heights of a given     */
+  /*               range of glyphs for a face.                      */
+  /*                                                                */
+  /*  Input   :    face     face handle                             */
+  /*               glyphId  index of glyph                          */
+  /*               metrics  ptr to metrics to fill                  */
+  /*                                                                */
+  /*  Returns:                                                      */
+  /*       Error code                                               */
+  /*                                                                */
+  /******************************************************************/
+
   EXPORT_FUNC
-  TT_Error  TT_Get_Glyph_Big_Metrics( TT_Glyph               glyph,
-                                      TT_Big_Glyph_Metrics*  metrics )
+  TT_Error  TT_Get_Index_Metrics( TT_Face            face,
+                                  TT_UShort          index,
+                                  TT_Glyph_Metrics*  metrics )
   {
-    PGlyph  _glyph = HANDLE_Glyph( glyph );
+    DEFINE_ALL_LOCALS;
+
+    PFace     faze = HANDLE_Face(face);
+    Long      table;
+    PStorage  glyphLocations;
+    Short     bearing;
+    UShort    advance;
+    Long      offset;
 
 
-    if ( !_glyph )
-      return TT_Err_Invalid_Glyph_Handle;
+    if ( !faze )
+      return TT_Err_Invalid_Face_Handle;
 
-    *metrics = _glyph->metrics;
+    if ( index >= faze->numGlyphs )
+      return TT_Err_Invalid_Argument;
 
-    return TT_Err_Ok;
+    /* find "glyf" table */
+    table = TT_LookUp_Table( faze, TTAG_glyf );
+    if ( table < 0 )
+      return TT_Err_Glyf_Table_Missing;
+
+    /* now access stream */
+    if ( USE_Stream( faze->stream, stream ) )
+      return error;
+
+    glyphLocations = GEO_LOCK( faze->glyphLocationBlock );
+
+    if ( index + 1 < faze->numLocations &&
+         glyphLocations[index] == glyphLocations[index + 1] )
+    {
+      /* as described by Frederic Loyer, these are spaces, and */
+      /* not the unknown glyph.                                */
+
+      metrics->bbox.xMin = 0;
+      metrics->bbox.xMax = 0;
+      metrics->bbox.yMin = 0;
+      metrics->bbox.yMax = 0;
+
+      goto Fin;
+    }
+
+    offset = faze->dirTables[table].Offset + glyphLocations[index];
+
+    /* read first glyph header */
+    if ( FILE_Seek( offset ) || ACCESS_Frame( 10 ) )
+      goto Fail;
+
+    SKIP( 2 );
+
+    metrics->bbox.xMin = GET_Short();
+    metrics->bbox.yMin = GET_Short();
+    metrics->bbox.xMax = GET_Short();
+    metrics->bbox.yMax = GET_Short();
+
+    FORGET_Frame();
+
+  Fin:
+    GEO_UNLOCK( faze->glyphLocationBlock );
+
+    /* Get horizontal metrics in font units for a given glyph.  If `check' is true, */
+    /* take care of mono-spaced fonts by returning the advance width max.           */
+    TT_Get_Metrics( &faze->horizontalHeader, index, &bearing, &advance );
+    if ( faze->postscript.isFixedPitch )
+      advance = faze->horizontalHeader.advance_Width_Max;
+
+    metrics->advance  = advance;
+    metrics->bearingX = bearing;
+    metrics->bearingY = 0;
+
+  Fail:
+    DONE_Stream( stream );
+    return error;
   }
-*/
+
 
 /*******************************************************************
  *
@@ -1077,125 +1072,6 @@ extern TEngine_Instance engineInstance;
     return error;
   }
 */
-
-#ifdef __GEOS__
-
-
-/*******************************************************************
- *
- *  Function    :  TT_Get_Glyph_Region
- *
- *  Description :  Produces a region from a glyph outline.
- *
- *  Input  :  glyph      the glyph container's handle
- *            map        target region description block
- *            xOffset    x offset in fractional pixels (26.6 format)
- *            yOffset    y offset in fractional pixels (26.6 format)
- *
- *  Output :  Error code.
- *
- *  Note : Only use integer pixel offsets to preserve the fine
- *         hinting of the glyph and the 'correct' anti-aliasing
- *         (where vertical and horizontal stems aren't grayed).
- *         This means that xOffset and yOffset must be multiples
- *         of 64!
- *
- *         You can experiment with offsets of +32 to get 'blurred'
- *         versions of the glyphs (a nice effect at large sizes that
- *         some graphic designers may appreciate :)
- *
- *  MT-Safe : NO!  Glyph containers can't be shared.
- *
- ******************************************************************/
-/*
-  EXPORT_FUNC
-  TT_Error  TT_Get_Glyph_Region( TT_Glyph        glyph,
-                                 TT_Raster_Map*  map,
-                                 TT_F26Dot6      xOffset,
-                                 TT_F26Dot6      yOffset )
-  {
-    PEngine_Instance  _engine;
-    TT_Error          error;
-    PGlyph            _glyph = HANDLE_Glyph( glyph );
-    TT_Matrix         flipmatrix = HORIZONTAL_FLIP_MATRIX; 
-
-    TT_Outline  outline;
-
-
-    if ( !_glyph )
-      return TT_Err_Invalid_Glyph_Handle;
-
-    _engine = _glyph->face->engine;
-
-    outline = _glyph->outline;
-    // XXX : For now, use only dropout mode 2
-    // outline.dropout_mode = _glyph->scan_type;
-    outline.dropout_mode = 2;
-
-    TT_Transform_Outline( &outline, &flipmatrix );
-    TT_Translate_Outline( &outline, xOffset, yOffset + map->rows * 64 );
-    error = TT_Get_Outline_Region( &outline, map );
-    TT_Translate_Outline( &outline, -xOffset, - ( yOffset + map->rows * 64 ) );
-    TT_Transform_Outline( &outline, &flipmatrix );
-
-    return error;
-  }
-*/
-
- /*******************************************************************
-  *
-  *  Function    :  TT_Get_Glyph_In_Region
-  *
-  *  Description :  Renders a glyph into the given region path.
-  *
-  *  Input  :  glyph         the glyph container's handle
-  *            bitmapBlock   handle 
-  *            regionPath    handle into the outline is to be written
-  *
-  *  Output :  Error code.
-  *
-  *  MT-Safe : NO!  Glyph containers can't be shared.
-  *
-  ******************************************************************/
-/*
-  EXPORT_FUNC
-  TT_Error  TT_Get_Glyph_In_Region( TT_Glyph      glyph,
-                                    MemHandle     bitmapBlock,
-                                    Handle        regionPath )
-  {
-    PEngine_Instance  _engine;
-    TT_Error          error;
-    PGlyph            _glyph = HANDLE_Glyph( glyph );
-
-    TT_Outline  outline;
-
-    if ( !_glyph )
-      return TT_Err_Invalid_Glyph_Handle;
-
-    _engine = _glyph->face->engine;
-
-    outline = _glyph->outline;
-
-    // calc region size
-
-    // alloc bitmapBlock and init regionPath --> GrRegionPathInit
-
-    // translate by current x,y position
-
-    // iterate over contours
-
-      // iterate over segments of current contour
-
-        // switch over current segment
-
-          // LINE_SEGMENT --> GrRegionAddLineAtCP
-          // CURVE_SEGMENT --> GrRegionAddBezierAtCP
-          // ...
-
-    return TT_Err_Ok;
-  }
-*/
-#endif /* __GEOS__ */
 
 
   static const TT_Outline  null_outline
@@ -1305,12 +1181,6 @@ extern TEngine_Instance engineInstance;
   TT_Error  TT_Get_Outline_Bitmap( TT_Outline*     outline,
                                    TT_Raster_Map*  map )
   {
-    PEngine_Instance  _engine = &engineInstance;
-
-
-    if ( !_engine )
-      return TT_Err_Invalid_Engine;
-
     if ( !outline || !map )
       return TT_Err_Invalid_Argument;
 
@@ -1339,12 +1209,6 @@ EXPORT_FUNC
 TT_Error  TT_Get_Outline_Region( TT_Outline*     outline,
                                  TT_Raster_Map*  map )
 {
-  PEngine_Instance  _engine = &engineInstance;
-
-
-  if ( !_engine )
-    return TT_Err_Invalid_Engine;
-
   if ( !outline || !map )
     return TT_Err_Invalid_Argument;
 
@@ -1395,7 +1259,7 @@ TT_Error  TT_Get_Outline_Region( TT_Outline*     outline,
  *  MT-Safe : YES!
  *
  ******************************************************************/
-
+/*
   EXPORT_FUNC
   void  TT_Transform_Vector( TT_F26Dot6*  x,
                              TT_F26Dot6*  y,
@@ -1412,7 +1276,7 @@ TT_Error  TT_Get_Outline_Region( TT_Outline*     outline,
 
     *x = xz;
     *y = yz;
-  }
+  } */
 
 
 /*******************************************************************
@@ -1440,11 +1304,11 @@ TT_Error  TT_Get_Outline_Region( TT_Outline*     outline,
     TT_Vector*  vec = outline->points;
 
 
-    for ( n = 0; n < outline->n_points; n++ )
+    for ( n = 0; n < outline->n_points; ++n )
     {
       vec->x += xOffset;
       vec->y += yOffset;
-      vec++;
+      ++vec;
     }
   }
 
@@ -1487,9 +1351,9 @@ TT_Error  TT_Get_Outline_Region( TT_Outline*     outline,
 
         bbox->xMin = bbox->xMax = vec->x;
         bbox->yMin = bbox->yMax = vec->y;
-        vec++;
+        ++vec;
 
-        for ( k = 1; k < outline->n_points; k++ )
+        for ( k = 1; k < outline->n_points; ++k )
         {
           x = vec->x;
           if ( x < bbox->xMin ) bbox->xMin = x;
@@ -1497,7 +1361,7 @@ TT_Error  TT_Get_Outline_Region( TT_Outline*     outline,
           y = vec->y;
           if ( y < bbox->yMin ) bbox->yMin = y;
           if ( y > bbox->yMax ) bbox->yMax = y;
-          vec++;
+          ++vec;
         }
       }
       return TT_Err_Ok;
@@ -1505,7 +1369,6 @@ TT_Error  TT_Get_Outline_Region( TT_Outline*     outline,
     else
       return TT_Err_Invalid_Argument;
   }
-
 
 
   /* ----------------- character mappings support ------------- */
@@ -1742,64 +1605,5 @@ TT_Error  TT_Get_Outline_Region( TT_Outline*     outline,
     return TT_Err_Ok;
   }
 
-
-/*******************************************************************
- *
- *  Function    :  TT_Get_Font_Data
- *
- *  Description :  Loads any font table into client memory.
- *
- *  Input  :  face     Face object to look for.
- *
- *            tag      Tag of table to load.  Use the value 0 if you
- *                     want to access the whole font file, else set
- *                     this parameter to a valid TrueType table tag
- *                     that you can forge with the MAKE_TT_TAG
- *                     macro.
- *
- *            offset   Starting offset in the table (or the file
- *                     if tag == 0).
- *
- *            buffer   Address of target buffer
- *
- *            length   Address of decision variable:
- *
- *                       if length == NULL:
- *                             Load the whole table.  Returns an
- *                             error if 'offset' != 0.
- *
- *                       if *length == 0 :
- *                             Exit immediately, returning the
- *                             length of the given table, or of
- *                             the font file, depending on the
- *                             value of 'tag'.
- *
- *                       if *length != 0 :
- *                             Load the next 'length' bytes of
- *                             table or font, starting at offset
- *                             'offset' (in table or font too).
- *
- *  Output :  Error code.
- *
- *  MT-Safe : YES!
- *
- ******************************************************************/
-/*
-  EXPORT_FUNC
-  TT_Error  TT_Get_Font_Data( TT_Face   face,
-                              TT_ULong  tag,
-                              TT_Long   offset,
-                              void*     buffer,
-                              TT_Long*  length )
-  {
-    PFace faze = HANDLE_Face( face );
-
-
-    if ( !faze )
-      return TT_Err_Invalid_Face_Handle;
-
-    return Load_TrueType_Any( faze, tag, offset, buffer, length );
-  }
-*/
 
 /* END */

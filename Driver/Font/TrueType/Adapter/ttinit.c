@@ -20,6 +20,7 @@
 #include "ttinit.h"
 #include "ttadapter.h"
 #include "ttcharmapper.h"
+#include "ttmemory.h"
 #include "ftxkern.h"
 #include <fileEnum.h>
 #include <geos.h>
@@ -28,6 +29,7 @@
 #include <ec.h>
 #include <initfile.h>
 #include <unicode.h>
+#include <fontID.h>
 
 
 static word DetectFontFiles(    MemHandle*  fileEnumBlock );
@@ -36,7 +38,7 @@ static void ProcessFont(        TRUETYPE_VARS,
                                 const char*  file, 
                                 MemHandle    fontInfoBlock );
 
-static Boolean isResourceSaving( TRUETYPE_VARS );
+static Boolean isFontResourceIntensive( TRUETYPE_VARS );
 
 static sword getFontIDAvailIndex( 
                                 FontID     fontID, 
@@ -52,10 +54,10 @@ static FontGroup mapFontGroup( TRUETYPE_VARS );
 
 static word getNameFromNameTable( 
                                 TRUETYPE_VARS,
-                                char*      name, 
-                                TT_UShort  nameIndex );
+                                char*            name, 
+                                const TT_UShort  nameIndex );
 
-static void ConvertHeader(      TRUETYPE_VARS, FontHeader* fontHeader );
+void InitConvertHeader(         TRUETYPE_VARS, FontHeader* fontHeader );
 
 static char GetDefaultChar(     TRUETYPE_VARS, char firstChar );
 
@@ -63,9 +65,9 @@ static word GetKernCount(       TRUETYPE_VARS );
 
 static word toHash( const char* str );
 
-static int  strlen( const char* str );
+static word strlen( const char* str );
 
-static void strcpy( char* dest, const char* source );
+static char* strcpy( char* dest, const char* source );
 
 static void strcpyname( char* dest, const char* source );
 
@@ -75,22 +77,24 @@ static int strcmp( const char* s1, const char* s2 );
 /********************************************************************
  *                      Init_FreeType
  ********************************************************************
- * SYNOPSIS:	  Initialises the FreeType Engine with the kerning 
- *                extension. This is the adapter function for DR_INIT.
+ * SYNOPSIS:       Initializes the FreeType library and sets up
+ *                 kerning extensions for subsequent operations.
  * 
- * PARAMETERS:    void
+ * PARAMETERS:     None
  * 
- * RETURNS:       TT_Error        FreeType errorcode (see tterrid.h)
+ * RETURNS:        TT_Error
+ *                    Returns `TT_Err_Ok` on success, or an error code
+ *                    if initialization fails.
  * 
- * SIDE EFFECTS:  none
- * 
- * STRATEGY:      Initialises the FreeType engine by delegating to 
- *                TT_Init_FreeType() and TT_Init_Kerning().
+ * STRATEGY:       - Call `TT_Init_FreeType()` to initialize the core
+ *                   FreeType library.
+ *                 - Return the appropriate error code if the core
+ *                   initialization fails.
  * 
  * REVISION HISTORY:
  *      Date      Name      Description
  *      ----      ----      -----------
- *      7/15/22   JK        Initial Revision
+ *      15.07.22  JK        Initial Revision
  *******************************************************************/
 
 TT_Error _pascal Init_FreeType()
@@ -102,8 +106,6 @@ TT_Error _pascal Init_FreeType()
         if ( error != TT_Err_Ok )
                 return error;
 
-        TT_Init_Kerning_Extension();
-
         return TT_Err_Ok;
 }
 
@@ -111,22 +113,22 @@ TT_Error _pascal Init_FreeType()
 /********************************************************************
  *                      Exit_FreeType
  ********************************************************************
- * SYNOPSIS:	  Deinitialises the FreeType Engine. This is the 
- *                adapter function for DR_EXIT.
+ * SYNOPSIS:       Cleans up and deinitializes the FreeType library,
+ *                 releasing all allocated resources.
  * 
- * PARAMETERS:    void
+ * PARAMETERS:     None
  * 
- * RETURNS:       TT_Error        FreeType errorcode (see tterrid.h)
+ * RETURNS:        TT_Error
+ *                    Returns `TT_Err_Ok` on successful cleanup, or an
+ *                    error code if deinitialization fails.
  * 
- * SIDE EFFECTS:  none
- * 
- * STRATEGY:      Deinitialises the FreeType engine by delegating to 
- *                TT_Done_FreeType().
+ * STRATEGY:       - Call `TT_Done_FreeType()` to clean up resources
+ *                   used by the FreeType library.
  * 
  * REVISION HISTORY:
  *      Date      Name      Description
  *      ----      ----      -----------
- *      7/15/22   JK        Initial Revision
+ *      15.07.22  JK        Initial Revision
  *******************************************************************/
 
 TT_Error _pascal Exit_FreeType() 
@@ -134,26 +136,36 @@ TT_Error _pascal Exit_FreeType()
         return TT_Done_FreeType();
 }
 
-
 /********************************************************************
  *                      TrueType_InitFonts
  ********************************************************************
- * SYNOPSIS:	  Search for TTF fonts and register them. This is the 
- *                adapter function for DR_FONT_INIT_FONTS.
+ * SYNOPSIS:       Initializes TrueType fonts by scanning the font 
+ *                 directory and processing detected font files. Updates 
+ *                 the font info and variable blocks with the detected 
+ *                 font information.
  * 
- * PARAMETERS:    fontInfoBlock   MemHandle to fontInfo.
- *                varBlock        MemHandle to truetypeVarBlock.
+ * PARAMETERS:     MemHandle fontInfoBlock
+ *                    Memory handle to the block containing font information.
  * 
- * RETURNS:       void
+ *                 MemHandle varBlock
+ *                    Memory handle to the block containing TrueType variables.
  * 
- * SIDE EFFECTS:  none
+ * RETURNS:        void
  * 
- * STRATEGY:      
+ * STRATEGY:       - Verify the validity of `fontInfoBlock` and `varBlock`.
+ *                 - Lock `varBlock` to retrieve or allocate TrueTypeVars.
+ *                 - Set the current directory to the font TrueType directory.
+ *                 - Detect available font files and enumerate them.
+ *                 - If no files are found, clean up and exit.
+ *                 - Iterate over each detected font file and attempt to
+ *                   register the font using `ProcessFont()`.
+ *                 - Clean up memory, unlock variable block, and restore
+ *                   the original directory.
  * 
  * REVISION HISTORY:
  *      Date      Name      Description
  *      ----      ----      -----------
- *      7/15/22   JK        Initial Revision
+ *      15.07.22  JK        Initial Revision
  *******************************************************************/
 
 void _pascal TrueType_InitFonts( MemHandle fontInfoBlock, MemHandle varBlock )
@@ -203,21 +215,28 @@ Fin:
 /********************************************************************
  *                      DetectFontFiles
  ********************************************************************
- * SYNOPSIS:	  Lists all file names in the current directory.
+ * SYNOPSIS:       Detects and enumerates all TrueType font files in the
+ *                 current directory, storing their information in a memory
+ *                 block.
  * 
- * PARAMETERS:    fileEnumBlock   Handle to the memory block in 
- *                                which the file names are stored.
+ * PARAMETERS:     MemHandle* fileEnumBlock
+ *                    Pointer to a memory handle that will store information
+ *                    about the detected font files.
  * 
- * RETURNS:       word
+ * RETURNS:        word
+ *                    The number of detected font files.
  * 
- * SIDE EFFECTS:  none
- * 
- * STRATEGY:      
+ * STRATEGY:       - Set up the `FileEnumParams` structure to specify
+ *                   attributes for enumeration, such as file names.
+ *                 - Configure enumeration to only search for non-GEOS files.
+ *                 - Pass the configured parameters to `FileEnum()` to detect
+ *                   and list the font files.
+ *                 - Store the results in the memory block provided by `fileEnumBlock`.
  * 
  * REVISION HISTORY:
  *      Date      Name      Description
  *      ----      ----      -----------
- *      14/4/23   JK        Initial Revision
+ *      14.04.23  JK        Initial Revision
  *******************************************************************/
 
 static word DetectFontFiles( MemHandle* fileEnumBlock )
@@ -245,23 +264,33 @@ static word DetectFontFiles( MemHandle* fileEnumBlock )
 /********************************************************************
  *                      ProcessFont
  ********************************************************************
- * SYNOPSIS:	  Registers a font with its styles as an available font.
+ * SYNOPSIS:       Processes a TrueType font file and adds its data to 
+ *                 the font information block if the font is new.
  * 
- * PARAMETERS:    TRUETYPE_VARS   Pointer to truetypevar block.
- *                fileName        Name of font file.
- *                fontInfoBlock   Handle to memory block with all
- *                                infos about aviable fonts.
+ * PARAMETERS:     TRUETYPE_VARS
+ *                    Cached variables needed by the driver.
+ *                 const char* fileName
+ *                    Pointer to the name of the TrueType font file to process.
+ *                 MemHandle fontInfoBlock
+ *                    Handle to the memory block where font information is stored.
  * 
- * RETURNS:       void
+ * RETURNS:        void
  * 
- * SIDE EFFECTS:  none
- * 
- * STRATEGY:      
+ * STRATEGY:       - Open the TrueType font file and validate its face properties.
+ *                 - Retrieve or create entries for the font header, outline,
+ *                   and other font-related data structures.
+ *                 - Allocate necessary memory chunks for font data, ensuring
+ *                   the availability of the font entry.
+ *                 - Populate font metadata, including outline entries, styles,
+ *                   and header information.
+ *                 - Append the newly created font entry or update existing
+ *                   entries in the font information block.
+ *                 - Ensure proper memory allocation and free resources on errors.
  * 
  * REVISION HISTORY:
  *      Date      Name      Description
  *      ----      ----      -----------
- *      20/01/23  JK        Initial Revision
+ *      20.01.23  JK        Initial Revision
  *******************************************************************/
 
 static void ProcessFont( TRUETYPE_VARS, const char* fileName, MemHandle fontInfoBlock )
@@ -291,10 +320,10 @@ EC(     ECCheckFileHandle( truetypeFile ) );
         if ( TT_Get_Face_Properties( FACE, &FACE_PROPERTIES ) )
                 goto Fail;
 
-        if ( !isResourceSaving( trueTypeVars ) )
+        if ( isFontResourceIntensive( trueTypeVars ) )
                 goto Fail;
 
-        if ( getCharMap( trueTypeVars, &CHAR_MAP ) )
+        if ( getCharMap( FACE, &FACE_PROPERTIES, &CHAR_MAP ) )
                 goto Fail;
 
         if ( getNameFromNameTable( trueTypeVars, FAMILY_NAME, FAMILY_NAME_ID ) == 0 )
@@ -377,7 +406,7 @@ EC(     ECCheckFileHandle( truetypeFile ) );
 	
                 /* fill FontHeader */
                 fontHeader = LMemDerefHandles( fontInfoBlock, fontHeaderChunk );
-                ConvertHeader( trueTypeVars, fontHeader );
+                memset(fontHeader, 0, sizeof(FontHeader));
 
 		fontInfo->FI_outlineTab = sizeof( FontInfo );
 		fontInfo->FI_outlineEnd = sizeof( FontInfo ) + sizeof( OutlineDataEntry );
@@ -438,7 +467,7 @@ EC(     ECCheckFileHandle( truetypeFile ) );
 
                 /* fill FontHeader */
                 fontHeader = LMemDerefHandles( fontInfoBlock, fontHeaderChunk );
-                ConvertHeader( trueTypeVars, fontHeader );
+                memset(fontHeader, 0, sizeof(FontHeader));
    
 		fontInfo = LMemDeref( ConstructOptr(fontInfoBlock, fontInfoChunk) );
         	fontInfo->FI_outlineEnd += sizeof( OutlineDataEntry );
@@ -451,49 +480,66 @@ Fin:
 
 
 /********************************************************************
- *                      isResourceSaving
+ *                      isFontResourceIntensive
  ********************************************************************
- * SYNOPSIS:	  Checks if Face can manage with few resources.
+ * SYNOPSIS:       Determines whether the given font is considered
+ *                 resource-intensive based on certain criteria.
  * 
- * PARAMETERS:    face            FreeType face.
+ * PARAMETERS:     TRUETYPE_VARS
+ *                    Cached variables needed by the driver.
  * 
- * RETURNS:       Boolean         TRUE if Face manages with few resources.
+ * RETURNS:        Boolean
+ *                    TRUE if the font is considered resource-intensive.
+ *                    FALSE otherwise.
  * 
- * SIDE EFFECTS:  none
- * 
- * STRATEGY:      
+ * STRATEGY:       - Currently, this function evaluates the resource 
+ *                   intensity of a font based solely on the number 
+ *                   of glyphs it contains.
+ *                 - If the number of glyphs exceeds a defined threshold 
+ *                   (MAX_NUM_GLYPHS), it returns TRUE.
+ *                 - The function is designed to be extensible, allowing 
+ *                   additional criteria to be added in the future.
  * 
  * REVISION HISTORY:
  *      Date      Name      Description
  *      ----      ----      -----------
- *      19/12/23  JK        Initial Revision
+ *      19.12.23  JK        Initial Revision
  *******************************************************************/
-static Boolean isResourceSaving( TRUETYPE_VARS )
+static Boolean isFontResourceIntensive( TRUETYPE_VARS )
 {
         /* At the moment we are only checking the number of glyphs */
         /* in the font. Further checks can be implemented here.    */
 
-        return FACE_PROPERTIES.num_Glyphs < MAX_NUM_GLYPHS;
+        return FACE_PROPERTIES.num_Glyphs > MAX_NUM_GLYPHS;
 }
 
 
 /********************************************************************
  *                      toHash
  ********************************************************************
- * SYNOPSIS:	  Calculates the hash value of the passed string.
+ * SYNOPSIS:       Generates a hash value for a given string, which 
+ *                 is used to help uniquely identify a font.
  * 
- * PARAMETERS:    str             Pointer to the string.
+ * PARAMETERS:     const char* str
+ *                    Pointer to the string for which the hash value 
+ *                    is to be generated.
  * 
- * RETURNS:       word            Hash value for passed string.
+ * RETURNS:        word
+ *                    The computed hash value, mapped within a predefined range.
  * 
- * SIDE EFFECTS:  none
- * 
- * STRATEGY:      
+ * STRATEGY:       - Calculate the initial hash value using the length 
+ *                   of the string.
+ *                 - Iterate over each character of the string and modify 
+ *                   the hash using a multiplier of 7.
+ *                 - Limit the final hash value to a range of 9 bits (0x01f0), 
+ *                   adding 15 to ensure it fits within the designated range 
+ *                   for unique font IDs.
+ *                 - Reserve specific hash values for mapping original Nimbus fonts.
  * 
  * REVISION HISTORY:
  *      Date      Name      Description
  *      ----      ----      -----------
- *      21/01/23  JK        Initial Revision
+ *      21.01.23  JK        Initial Revision
  *******************************************************************/
 
 static word toHash( const char* str )
@@ -519,21 +565,26 @@ static word toHash( const char* str )
 /********************************************************************
  *                      mapFontWeight
  ********************************************************************
- * SYNOPSIS:	  Maps the TrueType font weight class to FreeGEOS 
- *                AdjustedWeight.
+ * SYNOPSIS:       Maps a TrueType weight class value to an internal 
+ *                 adjusted weight classification.
  * 
- * PARAMETERS:    weightClass     TrueType weight class.
+ * PARAMETERS:     TT_Short weightClass
+ *                    The weight class from the TrueType font, typically 
+ *                    ranging from 100 (thin) to 900 (black).
  * 
- * RETURNS:       AdjustedWeight  FreeGEOS AdjustedWeight.
+ * RETURNS:        AdjustedWeight
+ *                    The corresponding internal weight classification.
  * 
- * SIDE EFFECTS:  none
- * 
- * STRATEGY:      
+ * STRATEGY:       - Divide the weight class value by 100 to simplify the mapping.
+ *                 - Use a switch statement to translate the weight class into
+ *                   one of several predefined adjusted weight levels.
+ *                 - Provide default handling to classify any unexpected 
+ *                   values as `AW_ULTRA_BOLD`.
  * 
  * REVISION HISTORY:
  *      Date      Name      Description
  *      ----      ----      -----------
- *      21/01/23  JK        Initial Revision
+ *      21.01.23  JK        Initial Revision
  *******************************************************************/
 
 static AdjustedWeight mapFontWeight( TT_Short weightClass ) 
@@ -565,20 +616,28 @@ static AdjustedWeight mapFontWeight( TT_Short weightClass )
 /********************************************************************
  *                      mapTextStyle
  ********************************************************************
- * SYNOPSIS:	  Maps the TrueType subfamily to FreeGEOS TextStyle.
+ * SYNOPSIS:       Maps a font subfamily name to an internal text 
+ *                 style representation.
  * 
- * PARAMETERS:    subfamily*      String with subfamiliy name. 
+ * PARAMETERS:     const char* subfamily
+ *                    The subfamily name of the font, such as "Bold", 
+ *                    "Italic", etc.
  * 
- * RETURNS:       TextStyle       FreeGEOS TextStyle.
+ * RETURNS:        TextStyle
+ *                    The corresponding internal text style flag.
  * 
- * SIDE EFFECTS:  none
- * 
- * STRATEGY:      
+ * STRATEGY:       - Use a series of `strcmp` comparisons to determine the 
+ *                   corresponding text style based on the subfamily name.
+ *                 - Map common styles like "Regular", "Bold", "Italic", 
+ *                   and combinations like "Bold Italic" and "Oblique" 
+ *                   to their respective internal representations.
+ *                 - Default to `TS_BOLD | TS_ITALIC` for unrecognized 
+ *                   combinations like "Bold Oblique".
  * 
  * REVISION HISTORY:
  *      Date      Name      Description
  *      ----      ----      -----------
- *      21/01/23  JK        Initial Revision
+ *      21.01.23  JK        Initial Revision
  *******************************************************************/
 
 static TextStyle mapTextStyle( const char* subfamily )
@@ -602,20 +661,32 @@ static TextStyle mapTextStyle( const char* subfamily )
 /********************************************************************
  *                      mapFontGroup
  ********************************************************************
- * SYNOPSIS:	  Determines the font goup on different parameters.
+ * SYNOPSIS:       Maps TrueType font properties to an internal 
+ *                 FontGroup representation.
  * 
- * PARAMETERS:    TRUETYPE_VARS   Pointer to truetypevar block.
+ * PARAMETERS:     TRUETYPE_VARS
+ *                    Cached variables needed by the driver.
  * 
- * RETURNS:       FontGroup       Group of the given font.
+ * RETURNS:        FontGroup
+ *                    The determined internal font group classification.
  * 
- * SIDE EFFECTS:  none
- * 
- * STRATEGY:      
+ * STRATEGY:       - The function attempts to approximate the font group 
+ *                   for a TrueType font based on the `os2` properties 
+ *                   of the font, specifically the `panose` array and 
+ *                   `sFamilyClass` fields.
+ *                 - Monospaced fonts are identified if the `panose` 
+ *                   field for proportion equals 9.
+ *                 - Serif, Sans-Serif, Ornament, and Symbol fonts are 
+ *                   identified from `sFamilyClass`.
+ *                 - Script fonts are recognized from the `panose` 
+ *                   family type field.
+ *                 - If no specific group is identified, the font is 
+ *                   classified as `FG_NON_PORTABLE`.
  * 
  * REVISION HISTORY:
  *      Date      Name      Description
  *      ----      ----      -----------
- *      28/11/23  JK        Initial Revision
+ *      28.11.23  JK        Initial Revision
  *******************************************************************/
 
 #define B_FAMILY_TYPE           0
@@ -659,22 +730,31 @@ static FontGroup mapFontGroup( TRUETYPE_VARS )
 /********************************************************************
  *                      getFontID
  ********************************************************************
- * SYNOPSIS:	  If the passed font family is a mapped font, the 
- *                FontID form geos.ini is returned, otherwise we 
- *                calculate new FontID and return it.
+ * SYNOPSIS:       Determines or generates a FontID for the given 
+ *                 TrueType font family.
  * 
- * PARAMETERS:    familyName*     Font family name.
- *
- * RETURNS:       FontID          FontID found in geos.ini or calculated.
+ * PARAMETERS:     TRUETYPE_VARS
+ *                    Cached variables needed by the driver.
+ *                 FontID* fontID
+ *                    Pointer to store determined or generated FontID.
  * 
- * SIDE EFFECTS:  none
+ * RETURNS:        Boolean
+ *                    TRUE if the FontID was found in `geos.ini`,
+ *                    FALSE if a new FontID was generated.
  * 
- * STRATEGY:      
+ * STRATEGY:       - First, attempts to read `FontID` for the given font
+ *                   family name from the `geos.ini` configuration file.
+ *                 - If the `FontID` is found, it is modified by combining 
+ *                   it with the TrueType marker (`FM_TRUETYPE`) to indicate 
+ *                   the font type.
+ *                 - If the `FontID` is not found, a new one is generated 
+ *                   using the font group (determined via `mapFontGroup`) 
+ *                   and the family name.
  * 
  * REVISION HISTORY:
  *      Date      Name      Description
  *      ----      ----      -----------
- *      21/01/23  JK        Initial Revision
+ *      21.01.23  JK        Initial Revision
  *******************************************************************/
 
 static Boolean getFontID( TRUETYPE_VARS, FontID* fontID ) 
@@ -701,24 +781,28 @@ static Boolean getFontID( TRUETYPE_VARS, FontID* fontID )
 /********************************************************************
  *                      getFontIDAvailIndex
  ********************************************************************
- * SYNOPSIS:	  Searches all FontsAvailEntries for the passed 
- *                FontID and returns its index. If no FontsAvailEntry 
- *                is found for the FontID, -1 is returned.
+ * SYNOPSIS:       Searches for a given FontID within a list of available
+ *                 fonts and returns its index if found.
  * 
- * PARAMETERS:    fontID          Searched FontID.
- *                fontInfoBlock   Memory block with font information.
+ * PARAMETERS:     FontID fontID
+ *                    The FontID to be searched within the available fonts list.
+ *                 MemHandle fontInfoBlock
+ *                    The memory handle that contains the block of font information.
  * 
- * RETURNS:       sword           Index in FontBlock, if FontID 
- *                                was not found -1 will return.
+ * RETURNS:        sword
+ *                    The index of the FontID if it is found in the fonts available list.
+ *                    Returns -1 if the FontID is not found.
  * 
- * SIDE EFFECTS:  none
- * 
- * STRATEGY:      
+ * STRATEGY:       - Obtain the list of available fonts from the memory block.
+ *                 - Calculate the number of FontsAvailEntry elements.
+ *                 - Iterate through the list to find the matching FontID.
+ *                 - If found, return the current index.
+ *                 - If not found after the iteration, return -1.
  * 
  * REVISION HISTORY:
  *      Date      Name      Description
  *      ----      ----      -----------
- *      21/01/23  JK        Initial Revision
+ *      21.01.23  JK        Initial Revision
  *******************************************************************/
 
 static sword getFontIDAvailIndex( FontID fontID, MemHandle fontInfoBlock )
@@ -732,7 +816,7 @@ static sword getFontIDAvailIndex( FontID fontID, MemHandle fontInfoBlock )
 			ConstructOptr( fontInfoBlock, sizeof(LMemBlockHeader))) );
         elements = LMemGetChunkSizePtr( fontsAvailEntrys ) / sizeof( FontsAvailEntry );
 
-        for( element = 0; element < elements; element++ )
+        for( element = 0; element < elements; ++element )
                 if( fontsAvailEntrys[element].FAE_fontID == fontID )
                         return element;
 
@@ -743,26 +827,39 @@ static sword getFontIDAvailIndex( FontID fontID, MemHandle fontInfoBlock )
 /********************************************************************
  *                      getNameFromNameTable
  ********************************************************************
- * SYNOPSIS:	  Searches the font's name tables for the given NameID 
- *                and returns its content.
+ * SYNOPSIS:       Extracts a specific name string from the TrueType 
+ *                 font's naming table based on a provided name ID.
  * 
- * PARAMETERS:    TRUETYPE_VARS   Pointer to truetypevar block.
- *                name*           Pointer to result string.
- *                nameID          ID to be searched.
+ * PARAMETERS:     TRUETYPE_VARS
+ *                    Cached variables needed by the driver.
+ *                 char* name
+ *                    Pointer to buffer where the name will be stored.
+ *                 TT_UShort nameID
+ *                    The identifier for the specific name entry being 
+ *                    requested (e.g., family name, style name).
  * 
- * RETURNS:       word            Length of the table entry found.
+ * RETURNS:        word
+ *                    The length of the extracted name. Returns 0 if the 
+ *                    name is not found.
  * 
- * SIDE EFFECTS:  none
- * 
- * STRATEGY:      
+ * STRATEGY:       - Iterate over all name entries in the font's name 
+ *                   table to find entries matching the given nameID.
+ *                 - Prioritize Microsoft Unicode BMP and Macintosh 
+ *                   Roman encodings for English, handling both 16-bit 
+ *                   and 8-bit encoding differences.
+ *                 - Extract the name string, converting UTF-16 to 
+ *                   ASCII where necessary.
+ *                 - If a valid name is found, store it in the buffer 
+ *                   and return its length.
+ *                 - If no match is found, return 0.
  * 
  * REVISION HISTORY:
  *      Date      Name      Description
  *      ----      ----      -----------
- *      21/01/23  JK        Initial Revision
+ *      21.01.23  JK        Initial Revision
  *******************************************************************/
 
-static word getNameFromNameTable( TRUETYPE_VARS, char* name, TT_UShort nameID )
+static word getNameFromNameTable( TRUETYPE_VARS, char* name, const TT_UShort nameID )
 {
         TT_UShort           platformID;
         TT_UShort           encodingID;
@@ -817,35 +914,46 @@ static word getNameFromNameTable( TRUETYPE_VARS, char* name, TT_UShort nameID )
 
 
 /********************************************************************
- *                      ConvertHeader
+ *                      InitConvertHeader
  ********************************************************************
- * SYNOPSIS:	  Converts information from a TrueType font into a 
- *                FreeGEOS FontHeader.
+ * SYNOPSIS:       Initializes the `FontHeader` structure with key 
+ *                 metrics from the given TrueType font. This includes
+ *                 character bounds, kerning information, ascent/descent,
+ *                 and other font properties.
  * 
- * PARAMETERS:    TRUETYPE_VARS   Pointer to truetypevar block. 
- *                fontHeader*     Pointer to FontInfo in which the
- *                                converted information is to be stored.
+ * PARAMETERS:     TRUETYPE_VARS
+ *                    Cached variables needed by the driver.
+ *                 FontHeader* fontHeader
+ *                    Pointer to the font header structure to be initialized.
  * 
- * RETURNS:       void
+ * RETURNS:        void
+ *                    No return value, modifies the provided FontHeader.
  * 
- * SIDE EFFECTS:  none
- * 
- * STRATEGY:      
+ * STRATEGY:       - Check if the font header has already been initialized.
+ *                 - Set default extreme values for character metrics.
+ *                 - Calculate the first and last valid characters in the font.
+ *                 - Retrieve the default character and kerning pair count.
+ *                 - Iterate over all valid characters, updating various 
+ *                   metrics including ascent, descent, min/max bounds, etc.
+ *                 - Compute additional metrics such as x-height, h-height, 
+ *                   and specific character positions.
  * 
  * REVISION HISTORY:
  *      Date      Name      Description
  *      ----      ----      -----------
- *      21/01/23  JK        Initial Revision
+ *      21.01.23  JK        Initial Revision
  *******************************************************************/
 
-static void ConvertHeader( TRUETYPE_VARS, FontHeader* fontHeader )
+void InitConvertHeader( TRUETYPE_VARS, FontHeader* fontHeader )
 {
-        TT_UShort           charIndex;
-        word                geosChar;
+        TT_UShort  charIndex;
+        word       geosChar;
 
 
 EC(     ECCheckBounds( (void*)fontHeader ) );
-        
+
+        if(fontHeader->FH_initialized) return;
+
         /* initialize min, max and avg values in fontHeader */
         fontHeader->FH_minLSB   =  9999;
         fontHeader->FH_maxBSB   = -9999;
@@ -855,18 +963,15 @@ EC(     ECCheckBounds( (void*)fontHeader ) );
         fontHeader->FH_accent   = 0;
         fontHeader->FH_ascent   = 0;
 
-        fontHeader->FH_numChars = InitGeosCharsInCharMap( CHAR_MAP, 
-                                                           &fontHeader->FH_firstChar, 
-                                                           &fontHeader->FH_lastChar ); 
+        fontHeader->FH_numChars = CountValidGeosChars( CHAR_MAP, 
+                                                       &fontHeader->FH_firstChar, 
+                                                       &fontHeader->FH_lastChar ); 
         fontHeader->FH_defaultChar = GetDefaultChar( trueTypeVars, fontHeader->FH_firstChar );
         fontHeader->FH_kernCount   = GetKernCount( trueTypeVars );
 
-        TT_New_Instance( FACE, &INSTANCE );
-        TT_New_Glyph( FACE, &GLYPH );
-
         for ( geosChar = fontHeader->FH_firstChar; geosChar < fontHeader->FH_lastChar; ++geosChar )
         {
-                word unicode = GeosCharToUnicode( geosChar );
+                const word  unicode = GeosCharToUnicode( geosChar );
 
 
                 if( !GeosCharMapFlag( geosChar ) )
@@ -876,9 +981,8 @@ EC(     ECCheckBounds( (void*)fontHeader ) );
                 if ( charIndex == 0 )
                         continue;
 
-                /* load glyph without scaling or hinting */
-                TT_Load_Glyph( INSTANCE, GLYPH, charIndex, 0 );
-                TT_Get_Glyph_Metrics( GLYPH, &GLYPH_METRICS );
+                /* load glyph metrics without scaling or hinting */
+                TT_Get_Index_Metrics( FACE, charIndex, &GLYPH_METRICS );
 
                 //h_height -> check
                 if( unicode == C_LATIN_CAPITAL_LETTER_H )
@@ -892,10 +996,6 @@ EC(     ECCheckBounds( (void*)fontHeader ) );
                 if ( unicode == C_LATIN_SMALL_LETTER_D )
                         fontHeader->FH_ascender = GLYPH_BBOX.yMax;
 
-                //descender -> check
-                if ( unicode == C_LATIN_SMALL_LETTER_P )
-                        fontHeader->FH_descender = GLYPH_BBOX.yMin;
-                
                 /* scan xMin -> check */
                 if( fontHeader->FH_minLSB > GLYPH_BBOX.xMin )
                         fontHeader->FH_minLSB = GLYPH_BBOX.xMin;
@@ -907,11 +1007,6 @@ EC(     ECCheckBounds( (void*)fontHeader ) );
                 /* scan yMin -> check */
                 if ( fontHeader->FH_maxBSB < -GLYPH_BBOX.yMin )
                         fontHeader->FH_maxBSB = -GLYPH_BBOX.yMin;
-                        
-                /* check */
-                if ( GeosCharMapFlag( geosChar) & CMF_DESCENT &&
-                        fontHeader->FH_descent > -GLYPH_BBOX.yMin )
-                        fontHeader->FH_descent = -GLYPH_BBOX.yMin;
 
                 /* scan yMax -> check */
                 if ( fontHeader->FH_minTSB < GLYPH_BBOX.yMax )
@@ -928,9 +1023,8 @@ EC(     ECCheckBounds( (void*)fontHeader ) );
                                 fontHeader->FH_accent = GLYPH_BBOX.yMax;
         }
 
-        TT_Done_Glyph( GLYPH );
-        TT_Done_Instance( INSTANCE );
-
+        fontHeader->FH_descender  = FACE_PROPERTIES.os2->sTypoDescender;
+        fontHeader->FH_descent    = -FACE_PROPERTIES.os2->sTypoDescender;
         fontHeader->FH_avgwidth   = FACE_PROPERTIES.os2->xAvgCharWidth;
         fontHeader->FH_maxwidth   = FACE_PROPERTIES.horizontal->advance_Width_Max;
         fontHeader->FH_accent     = fontHeader->FH_accent - fontHeader->FH_ascent;    
@@ -945,29 +1039,38 @@ EC(     ECCheckBounds( (void*)fontHeader ) );
                 fontHeader->FH_strikePos = 3 * fontHeader->FH_x_height / 5;
         else
                 fontHeader->FH_strikePos = 3 * fontHeader->FH_ascent / 5;
+
+        fontHeader->FH_initialized = TRUE;
 }
 
 
 /********************************************************************
  *                      GetDefaultChar
  ********************************************************************
- * SYNOPSIS:	  Returns the default character, if this is not present 
- *                in the face, the first GEOS character in the font is 
- *                the default character.
+ * SYNOPSIS:       Determines the default character for a given TrueType 
+ *                 font, verifying if the standard default character is 
+ *                 available in the font's character map.
  * 
- * PARAMETERS:    TRUETYPE_VARS   Pointer to truetypevar block.
- *                firstChar       First GEOS char in face.
+ * PARAMETERS:     TRUETYPE_VARS
+ *                    Cached variables needed by the driver.
+ *                 char firstChar
+ *                    The fallback character to use if the standard default 
+ *                    character is not present in the font.
  * 
- * RETURNS:       char
+ * RETURNS:        char
+ *                    The character to be used as the default. Returns 
+ *                    DEFAULT_DEFAULT_CHAR if it exists in the font, 
+ *                    otherwise returns firstChar.
  * 
- * SIDE EFFECTS:  none
- * 
- * STRATEGY:      
+ * STRATEGY:       - Check if the default character (DEFAULT_DEFAULT_CHAR) 
+ *                   is present in the font's character map.
+ *                 - If it exists, return DEFAULT_DEFAULT_CHAR.
+ *                 - Otherwise, return the provided firstChar as the fallback.
  * 
  * REVISION HISTORY:
  *      Date      Name      Description
  *      ----      ----      -----------
- *      23/04/23  JK        Initial Revision
+ *      23.04.23  JK        Initial Revision
  *******************************************************************/
 
 static char GetDefaultChar( TRUETYPE_VARS, char firstChar )
@@ -982,16 +1085,27 @@ static char GetDefaultChar( TRUETYPE_VARS, char firstChar )
 /********************************************************************
  *                      GetKernCount
  ********************************************************************
- * SYNOPSIS:	  Returns the number of kernpairs with chars from 
- *                FreeGEOS char set.
+ * SYNOPSIS:       Retrieves the number of valid kerning pairs for the 
+ *                 current TrueType font, specifically focusing on pairs 
+ *                 where both characters are present in the GEOS character set.
  * 
- * PARAMETERS:    TRUETYPE_VARS   Pointer to truetypevar block.
+ * PARAMETERS:     TRUETYPE_VARS
+ *                    Cached variables needed by the driver.
  * 
- * RETURNS:       word
+ * RETURNS:        word
+ *                    The count of kerning pairs involving GEOS characters.
+ *                    Returns 0 if no valid kerning pairs are found or if 
+ *                    the kerning directory cannot be loaded.
  * 
- * SIDE EFFECTS:  none
- * 
- * STRATEGY:      
+ * STRATEGY:       - Obtain the kerning directory from the TrueType face.
+ *                 - Lock the lookup table containing character mappings.
+ *                 - Iterate through the kerning tables to find a subtable 
+ *                   in format 0.
+ *                 - Check for kerning pairs that meet a minimum threshold 
+ *                   for value, ensuring both characters are present in 
+ *                   the GEOS character set.
+ *                 - Unlock resources when finished and return the count 
+ *                   of valid kerning pairs.
  * 
  * REVISION HISTORY:
  *      Date      Name      Description
@@ -1003,35 +1117,49 @@ static word GetKernCount( TRUETYPE_VARS )
 {
         TT_Kerning        kerningDir;
         word              table;
+        TT_Kern_0_Pair*   pairs;
         word              numGeosKernPairs = 0;
+        LookupEntry*      indices;
 
-        if( TT_Get_Kerning_Directory( FACE, &kerningDir ) )
-                goto Fail;
+        if( TT_Load_Kerning_Directory( FACE, &kerningDir ) )
+                return 0;
+
+        if( kerningDir.nTables == 0 )
+                return 0;        
+
+        /* get pointer to lookup table */
+        indices = GEO_LOCK( LOOKUP_TABLE );
+EC(     ECCheckBounds( indices ) );
 
         /* search for format 0 subtable */
         for( table = 0; table < kerningDir.nTables; ++table )
         {
                 word i;
+                word minKernValue = UNITS_PER_EM / KERN_VALUE_DIVIDENT;
 
-                if( TT_Load_Kerning_Table( FACE, table ) )
-                        goto Fail;
+                if( TT_Load_Kerning_Table( FACE, &kerningDir, table ) )
+                        continue;
 
                 if( kerningDir.tables->format != 0 )
                         continue;
 
-                /* We only support decreasing the character spacing.*/
-                if( kerningDir.tables->t.kern0.pairs[i].value > 0 )
-                        continue;
+                pairs = GEO_LOCK( kerningDir.tables->t.kern0.pairsBlock );
 
                 for( i = 0; i < kerningDir.tables->t.kern0.nPairs; ++i )
                 {
-                        if( isGeosCharPair( kerningDir.tables->t.kern0.pairs[i].left,
-                                        kerningDir.tables->t.kern0.pairs[i].right ) )
+                        if( ABS( pairs[i].value ) < minKernValue )
+                                continue;
+
+                        if ( GetGEOSCharForIndex( indices, pairs[i].left ) && 
+                             GetGEOSCharForIndex( indices, pairs[i].right ) )
                                 ++numGeosKernPairs;
                 }
-        }
 
-Fail:
+                GEO_UNLOCK( kerningDir.tables->t.kern0.pairsBlock );
+        }
+        GEO_UNLOCK( LOOKUP_TABLE );
+        TT_Kerning_Directory_Done( &kerningDir );
+
         return numGeosKernPairs;
 }
 
@@ -1041,19 +1169,20 @@ Fail:
 /* cycle. Therefore, the required functions are reimplemented here.*/
 /*******************************************************************/
 
-static int strlen( const char* str )
+static word strlen( const char* str )
 {
         const char  *s;
 
         for ( s = str; *s; ++s )
                 ;
-        return( s - str );
+        return( s - str );  
 }
 
 
-static void strcpy( char* dest, const char* source )
+static char* strcpy( char* dest, const char* source )
 {
         while( (*dest++ = *source++) != '\0' );
+        return dest;
 }
 
 

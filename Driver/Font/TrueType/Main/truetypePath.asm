@@ -3,7 +3,7 @@ COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 	Copyright (c) GeoWorks 1991 -- All Rights Reserved
 
 PROJECT:	PC GEOS
-MODULE:		GeoCalc
+MODULE:		TrueType Font Driver
 FILE:		truetypePath.asm
 
 AUTHOR:		Falk Rehwagen, Jan 29, 2021

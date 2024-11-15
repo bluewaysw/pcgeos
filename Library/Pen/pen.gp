@@ -49,7 +49,7 @@ resource C_Pen	code read-only shared
 resource InkCommon	code read-only shared
 resource InkEdit	code read-only shared
 resource InkFile	code read-only shared
-resource Strings shared ui-object read-only
+resource Strings shared lmem read-only
 resource Cursors lmem read-only shared
 resource AppTCMonikerResource  lmem read-only shared
 resource AppTMMonikerResource  lmem read-only shared
@@ -57,7 +57,6 @@ resource AppTCGAMonikerResource  lmem read-only shared
 resource InkControlUI ui-object read-only shared
 resource InkControlToolboxUI ui-object read-only shared
 resource ControlStrings lmem read-only shared
-resource Strings shared ui-object read-only
 resource PenClassStructures	fixed read-only shared
 
 

@@ -7,10 +7,16 @@ library geos
 library ansic
 library compress
 entry WORDMATCHERCENTRY
-export WMAddWord
-export WMDeleteWord
-export WMRenameWord
-export WMFindWord
+export WMADDWORD
+export WMDELETEWORD
+export WMRENAMEWORD
+export WMFINDWORD
+
+incminor
+
+export WMCREATENEWDB
+export WMADDWORDTONEWDBUNCHECKED
+export WMFINISHNEWDB
 
 usernotes "Copyright 1994-2002  Breadbox Computer Company LLC  All Rights Reserved"
 

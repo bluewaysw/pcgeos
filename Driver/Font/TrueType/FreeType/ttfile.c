@@ -279,7 +279,7 @@
  ******************************************************************/
 
   EXPORT_FUNC
-  TT_Error  TT_Access_Frame( STREAM_ARGS FRAME_ARGS Long  size )
+  TT_Error  TT_Access_Frame( STREAM_ARGS FRAME_ARGS Short  size )
   {
     TT_Error  error;
 
@@ -346,7 +346,7 @@
  ******************************************************************/
 
   EXPORT_FUNC
-  TT_Error  TT_Check_And_Access_Frame( STREAM_ARGS FRAME_ARGS Long  size )
+  TT_Error  TT_Check_And_Access_Frame( STREAM_ARGS FRAME_ARGS Short  size )
   {
     TT_Error  error;
     Long      readBytes, requested;
@@ -433,6 +433,8 @@
 #define STREAM_VAR   stream
 
 
+#ifndef __GEOS__
+
 /*******************************************************************
  *
  *  Function    :  TTFile_Init
@@ -461,6 +463,8 @@
   {
     return TT_Err_Ok;
   }
+  
+#endif
 
 
 /*******************************************************************
@@ -528,7 +532,7 @@
  ******************************************************************/
 
   EXPORT_FUNC
-  TT_Error  TT_Access_Frame( STREAM_ARGS FRAME_ARGS Long  size )
+  TT_Error  TT_Access_Frame( STREAM_ARGS FRAME_ARGS Short  size )
   {
     TT_Error  error;
 
@@ -584,7 +588,7 @@
  ******************************************************************/
 
   EXPORT_FUNC
-  TT_Error  TT_Check_And_Access_Frame( STREAM_ARGS FRAME_ARGS Long  size )
+  TT_Error  TT_Check_And_Access_Frame( STREAM_ARGS FRAME_ARGS Short  size )
   {
     TT_Error  error;
     Long      readBytes;
@@ -762,7 +766,6 @@
   TT_Error  TT_Open_Stream( const FileHandle  file,
                             TT_Stream*        stream )
   {
-    Int          len;
     TT_Error     error;
     PStream_Rec  stream_rec;
 
@@ -911,9 +914,9 @@
  ******************************************************************/
 
   EXPORT_FUNC
-  TT_Error  TT_Read_File( STREAM_ARGS void*  buffer, Long  count )
+  TT_Error  TT_Read_File( STREAM_ARGS void*  buffer, Short  count )
   {
-    if ( FileRead( CUR_Stream->file, buffer, count, FALSE ) != (ULong)count )
+    if ( FileRead( CUR_Stream->file, buffer, count, FALSE ) != count )
       return TT_Err_Invalid_File_Read;
 
     return TT_Err_Ok;
@@ -937,7 +940,7 @@
   EXPORT_FUNC
   TT_Error  TT_Read_At_File( STREAM_ARGS Long   position,
                                          void*  buffer,
-                                         Long   count )
+                                         Short  count )
   {
     TT_Error  error;
 
@@ -969,6 +972,7 @@
   }
 
 
+#ifndef __GEOS__
 /*******************************************************************
  *
  *  Function    :  GET_Char
@@ -987,8 +991,10 @@
 
     return (Char)(*CUR_Frame.cursor++);
   }
+#endif
 
 
+#ifndef __GEOS__
 /*******************************************************************
  *
  *  Function    :  GET_Short
@@ -1009,15 +1015,16 @@
 
     CHECK_FRAME( CUR_Frame, 2 );
 
-    getshort = (Short)((CUR_Frame.cursor[0] << 8) |
+    getshort = (Short)((CUR_Frame.cursor[0] << 8) | 
                         CUR_Frame.cursor[1]);
 
     CUR_Frame.cursor += 2;
 
     return getshort;
   }
+#endif
 
-
+#ifndef __GEOS__
 /*******************************************************************
  *
  *  Function    :  GET_Long
@@ -1047,6 +1054,7 @@
 
     return getlong;
   }
+#endif
 
 
 /* END */

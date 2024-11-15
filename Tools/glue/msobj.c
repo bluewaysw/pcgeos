@@ -288,6 +288,24 @@ MSObj_ReadRecord(FILE	*stream,    /* Stream from which to read */
     if ((sum == 0) && (rectype == MO_LEDATA || rectype == MO_LIDATA || rectype == MO_LEDATA32 || rectype == MO_LIDATA32 )) {
 	byte	nextRecord = getc(stream);
 
+	/* WATCOM adds a COMENT block between data and fixup if const data structures need fixups are used.
+	 * The COMENT records content doesn't seem to be used otherwise, so we transparent skip the record here. 
+	 */
+	if (nextRecord == MO_COMENT) {
+	    byte	lenLow, lenHigh, data;
+	    word	fixLen;
+
+	    lenLow = getc(stream);
+	    lenHigh = getc(stream);
+
+	    fixLen = lenLow | (lenHigh << 8);
+	    while(fixLen > 0) {
+		data = getc(stream);
+		fixLen--;
+	    }
+	    nextRecord = getc(stream);
+	}
+
 	if (nextRecord == MO_FIXUPP) {
 	    byte	lenLow, lenHigh;
 	    word	fixLen;

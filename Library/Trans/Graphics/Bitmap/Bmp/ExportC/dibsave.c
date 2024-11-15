@@ -520,7 +520,7 @@ HSISaveBMP20 ( FILE * szInfile, FILE * szOutfile,LPCNVOPTION szOpt)
 /*
    lpStr = (LPSTR)GlobalLock ( hHandle );
 */
-   lpStr = (LPSTR)MemLock ( hHandle );
+   lpStr = (LPSTR)MemDeref ( hHandle );
    if ( !lpStr )
        {
 /*

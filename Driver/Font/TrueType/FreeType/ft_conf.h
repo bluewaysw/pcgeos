@@ -96,7 +96,7 @@
 /* by the engine and need no extensions, undefine this configuration     */
 /* macro to save a few more bytes.                                       */
 
-#define  TT_CONFIG_OPTION_EXTEND_ENGINE
+//#define  TT_CONFIG_OPTION_EXTEND_ENGINE
 
 
 /*************************************************************************/
@@ -116,7 +116,7 @@
 /* emerged recently on the FreeType lists.  We still do not have Apple's */
 /* opinion on the subject and will change this as soon as we have.       */
 
-#define   TT_CONFIG_OPTION_NO_INTERPRETER
+//#define   TT_CONFIG_OPTION_NO_INTERPRETER
 
 
 /*************************************************************************/
@@ -156,6 +156,95 @@
 /* version of the library.                                               */
 
 #define  TT_CONFIG_OPTION_THREAD_SAFE
+
+
+/*************************************************************************/
+/* Define TT_CONFIG_OPTION_PROCESS_HDMX if you want to process optional  */
+/* hdmx table. The PC/Geos ttf driver does not need any information from */
+/* the hdmx table.                                                       */
+
+#undef  TT_CONFIG_OPTION_PROCESS_HDMX
+
+
+/*************************************************************************/
+/* Define TT_CONFIG_OPTION_PROCESS_VMTX if you want to process optional  */
+/* vtmx table. The PC/Geos ttf driver does not need any information from */
+/* the vtmx table.                                                       */
+
+#undef  TT_CONFIG_OPTION_PROCESS_VMTX
+
+
+/*************************************************************************/
+/* Define TT_CONFIG_OPTION_SUPPORT_CMAP2 if you want to support cmap 0   */
+/* char mapping. Charmapping type 0 is now out of date.                  */
+
+#undef  TT_CONFIG_OPTION_SUPPORT_CMAP0
+
+
+/*************************************************************************/
+/* Define TT_CONFIG_OPTION_SUPPORT_CMAP2 if you want to support cmap 2   */
+/* char mapping. Charmapping type 2 is now out of date.                  */
+
+#undef  TT_CONFIG_OPTION_SUPPORT_CMAP2
+
+
+/*************************************************************************/
+/* Define TT_CONFIG_OPTION_SUPPORT_CMAP6 if you want to support cmap 6   */
+/* char mapping. In ttf fonts charmap 4 is the standard for char mapping.*/
+
+#undef  TT_CONFIG_OPTION_SUPPORT_CMAP6
+
+
+/*************************************************************************/
+/* Define TT_CONFIG_OPTION_SUPPORT_KERN2 if you want to support kerning  */
+/* format 1. The ttf driver only supports format 0 because it is very    */
+/* simple and common.                                                    */
+
+#undef  TT_CONFIG_OPTION_SUPPORT_KERN2
+
+
+/*************************************************************************/
+/* Define TT_CONFIG_OPTION_SUPPORT_GASP if you want to support grid-     */
+/* fitting table.                                                        */
+
+#undef  TT_CONFIG_OPTION_SUPPORT_GASP
+
+
+/*************************************************************************/
+/* Define TT_CONFIG_OPTION_SUPPORT_OPTIONAL_FIELDS if you want to hold   */
+/* optional fiels in freetype structures.                                */
+
+#undef  TT_CONFIG_OPTION_SUPPORT_OPTIONAL_FIELDS
+
+
+/*************************************************************************/
+/* Define TT_CONFIG_OPTION_SUPPORT_UNICODE_RANGES if you want to hold    */
+/* unicode ranges in OS/2 table.                                         */
+
+#undef TT_CONFIG_OPTION_SUPPORT_UNICODE_RANGES
+
+
+/*************************************************************************/
+/* Define TT_CONGIG_OPTION_SUPPORT_NON_SQUARE_PIXELS if you want to      */
+/* support displays with non square pixels.                              */
+
+#undef TT_CONGIG_OPTION_SUPPORT_NON_SQUARE_PIXELS
+
+
+/*************************************************************************/
+/* Define TT_CONFIG_OPTION_SUPPORT_PEDANTIC_HINTING if you want to use   */
+/* TrueType-compliant interpreter. Under PC/GEOS we use the more relaxed */
+/* verion of bytecode interperter.                                       */
+
+#undef TT_CONFIG_OPTION_SUPPORT_PEDANTIC_HINTING
+
+
+/*************************************************************************/
+/* Define TT_CONFIG_OPTION_USE_ASSEMBLER_IMPLEMENTATION if you want to   */
+/* use assembler implemented funcions. These implementations use regs    */
+/* and instructions of 80386 processors.                                 */
+
+#define TT_CONFIG_OPTION_USE_ASSEMBLER_IMPLEMENTATION
 
 
 /**********************************************************************/
