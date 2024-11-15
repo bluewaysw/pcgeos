@@ -11,6 +11,8 @@
 #ifndef __META_H
 #define __META_H
 
+#include <xlatLib.h>
+
 /* masks for conversion options */
 #define SETTINGS_DOTEXT       1         /* convert text objects? */
 #define SETTINGS_CREATE_GROBJ 2         /* create GrObjs, not GString */
@@ -79,23 +81,15 @@ word _export _pascal Meta_Start(
   word settings,GStateHandle gs,optr body,VMFileHandle vmf);
 int _export _pascal Meta_End(void);
 
-/* result codes for converters */
-#define ERR_NONE 0                      /* no problems encountered */
-#define ERR_OPEN_FAILED 1               /* file could not be opened */
-#define ERR_INVALID_FORMAT 2            /* file is not the type it should be */
-#define ERR_UNSUPPORTED_VARIANT 3       /* file contains unsupported features */
-#define ERR_OUT_OF_MEMORY 4             /* not enough memory */
-#define ERR_ABORTED 255                 /* user aborted conversion */
-
 typedef Boolean _pascal ProgressCallback(word percent);
 typedef Boolean _pascal pcfm_ProgressCallback(word percent, void *pf);
 
 /*
  * prototypes for available converters
  */
-int _export _pascal ReadHPGL(FileHandle srcFile,word settings,
+TransError _export _pascal ReadHPGL(FileHandle srcFile,word settings,
   ProgressCallback *callback);
-int _export _pascal ReadCGM(FileHandle srcFile,word settings,
+TransError _export _pascal ReadCGM(FileHandle srcFile,word settings,
   ProgressCallback *callback);
 
 #endif

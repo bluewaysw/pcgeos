@@ -83,6 +83,7 @@ vcimpex_ui.eobj: geos.h heap.h geode.h resource.h ec.h object.h lmem.h \
                 disk.h drive.h input.h char.h hwr.h win.h uDialog.h \
                 Objects/gInterC.h Objects/Text/tCommon.h stylesh.h \
                 driver.h thread.h print.h Internal/spoolInt.h serialDr.h \
-                parallDr.h hugearr.h fileEnum.h meta.h vconv_ui.h
+                parallDr.h hugearr.h fileEnum.h meta.h xlatLib.h \
+                vconv_ui.h
 
 vcimpexEC.geo vcimpex.geo : geos.ldf ui.ldf impex.ldf ansic.ldf math.ldf meta.ldf 
