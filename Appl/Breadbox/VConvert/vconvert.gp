@@ -3,11 +3,11 @@
 # PROJECT:      VConvert
 # FILE:         VConvert.gp
 #
-# AUTHOR:       Marcus Gr�ber
+# AUTHOR:       Marcus Groeber
 #
 ##############################################################################
 
-name VConvert.app
+name vconvert.app
 longname "V-Convert"
 
 type   appl, process, single

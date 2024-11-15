@@ -14,6 +14,10 @@
 */Library/Translation/*				GEO	SYSTEM/IMPEX
 */Library/FMTools/*				GEO	SYSTEM/FILEMGR
 */Library/Net/*					GEO	SYSTEM
+*/Library/Breadbox/Impex/*			GEO	SYSTEM/IMPEX
+*/Library/Breadbox/ImpDoc/*			GEO	SYSTEM/IMPEX
+*/Library/Breadbox/ImpGraph/*			GEO	SYSTEM/IMPEX
+*/Library/Breadbox/UrlDrv/*			GEO	SYSTEM/WWW
 */Library/*					GEO	SYSTEM
 */Driver/IFS/* 					GEO	SYSTEM/FS
 */Driver/Comm/*					GEO	SYSTEM
