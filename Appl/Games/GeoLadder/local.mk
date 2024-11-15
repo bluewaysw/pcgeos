@@ -15,7 +15,6 @@
 
 # Do not create an EC version
 # NO_EC = 1
-NO_EC = 1
 
 
 # ::: XCCOMFLAGS ::: (will be passed to the C compiler)
