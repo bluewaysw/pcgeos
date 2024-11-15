@@ -1,0 +1,279 @@
+COMMENT @----------------------------------------------------------------------
+
+	Copyright (c) GeoWorks 1991 -- All Rights Reserved
+
+PROJECT:	PC GEOS
+MODULE:		Loader -- PC/GEOS kernel loader
+FILE:		loader.def
+
+AUTHOR:		Tony Requist
+
+REVISION HISTORY:
+	Name	Date	Description
+	----	----	-----------
+	tony	1/11/91	Initial Revision
+
+DESCRIPTION:
+	This program loads the PC/GEOS kernel.
+
+	$Id: loader.def,v 1.1 97/04/04 17:26:56 newdeal Exp $
+
+
+-----------------------------------------------------------------------------@
+
+HARD_CODED_PATH = FALSE
+; If this constant is true, the top level and bootup path are
+; hard-coded.  This is useful on systems with small RAM disks.
+
+
+LOAD_DOS_EXTENDER	= 0
+; Set to 1 if you want to load dosext.exe as a DOS extender that gets
+; called to install itself as a DPMI handler.  0 otherwise.
+
+
+REQUIRE_STRINGS_FILE	=	FALSE
+
+LOADER_STACK_SIZE	equ	1024
+DPMI_BUFFER_SIZE	equ	32684
+		;1024
+MAX_INI_SIZE		equ	25000
+MAX_STRING_FILE_SIZE	equ	8000
+MAX_PATH_BLOCK_SIZE	equ	5000
+MINIMUM_HEAP_SIZE	equ	65535		;even that would be amazing
+
+DEFAULT_NUMBER_OF_HANDLES	equ	2500
+
+MSDOS_TEXT_FILE_EOF	=	26
+INIT_FILE_COMMENT	=	';'
+
+LOADER_ID		=	0xabcd		;ID of loader (used temporarily
+						;for HM_owner field)
+
+;
+; ANSI character codes, used when displaying a text splash screen.
+;
+ULCORNER		= 	218
+URCORNER		= 	191
+LLCORNER		= 	192
+LRCORNER		= 	217
+HBAR			= 	196
+VBAR			= 	179
+
+;------------------------------------------------------------------------------
+;	Kernel strings file definitions
+;------------------------------------------------------------------------------
+
+MAX_STRING_IN_STRING_FILE_LENGTH	equ	55
+MAX_ERROR_PREFIX_SIZE			equ	25
+
+LoaderStrings	etype	word
+LS_ERROR_PREFIX					enum	LoaderStrings
+LS_CANNOT_LOCATE_KERNEL				enum	LoaderStrings
+LS_CANNOT_OPEN_STRINGS_FILE			enum	LoaderStrings
+LS_INIT_FILE_CANNOT_OPEN_FILE			enum	LoaderStrings
+LS_INIT_FILE_CANNOT_READ_FILE			enum	LoaderStrings
+LS_INIT_FILE_CORRUPT				enum	LoaderStrings
+LS_INIT_FILE_TOO_LARGE				enum	LoaderStrings
+LS_CANNOT_LOAD_KERNEL				enum	LoaderStrings
+LS_NOT_ENOUGH_MEMORY				enum	LoaderStrings
+LS_MALFORMED_PATH_SPEC				enum	LoaderStrings
+LS_INVALID_MEMORY_ARGUMENT			enum	LoaderStrings
+LS_GPMI_COULD_NOT_START				enum	LoaderStrings
+LS_GENERAL_PROTECTION_ERROR			enum	LoaderStrings
+
+if LOAD_DOS_EXTENDER
+LS_CANNOT_LOAD_DOS_EXTENDER			enum	LoaderStrings
+endif
+
+NUMBER_OF_STRINGS_IN_STRINGS_FILE		equ	LoaderStrings
+
+;fatal errors (not in the strings file)
+
+ifidn	HARDWARE_TYPE, <PC>
+LS_CANNOT_LOAD_XIP_KERNEL_WITH_STANDARD_LOADER	enum	LoaderStrings
+endif
+
+if	ERROR_CHECK
+TOO_MANY_SIMPLE_ALLOCS				enum	LoaderStrings
+ERROR_IN_SIMPLE_ALLOC				enum	LoaderStrings
+INIT_FILE_BAD_BLOB				enum	LoaderStrings
+BIOS_RETURNED_A_WEIRD_TEXT_MODE_VALUE		enum	LoaderStrings
+XIP_MAP_ERROR					enum	LoaderStrings
+XIP_IMAGE_ERROR					enum	LoaderStrings
+TOP_OF_MEMORY_DIFFERS_FROM_CONSTANT		enum	LoaderStrings
+endif
+
+;-----------------------------------------------------------------------------
+
+SCRUB_DESIRED_PERCENTAGE= 10		; Desired percentage of heap size used
+					;  to determine the size to which
+					;  boundary block should be brought
+					;  when scrubbing is done 
+SCRUB_MIN_DESIRED_SIZE	= DANGER_LEVEL + (10 * 1024)
+
+;--------------------------------------------------------------------------
+
+ERROR	macro	en
+	mov	ax, en
+	call	LoaderError
+	.unreached
+endm
+
+
+ERROR_C	macro	en
+	local	foo
+	jnc	foo
+	ERROR	en
+foo:
+endm
+
+ERROR_NC	macro	en
+	local	foo
+	jc	foo
+	ERROR	en
+foo:
+endm
+
+
+ERROR_Z	macro	en
+	local	foo
+	jnz	foo
+	ERROR	en
+foo:
+endm
+
+
+ERROR_NZ	macro	en
+	local	foo
+	jz	foo
+	ERROR	en
+foo:
+endm
+
+
+ERROR_E	macro	en
+	local	foo
+	jne	foo
+	ERROR	en
+foo:
+endm
+
+
+ERROR_NE	macro	en
+	local	foo
+	je	foo
+	ERROR	en
+foo:
+endm
+
+
+ERROR_A	macro	en
+	local	foo
+	jbe	foo
+	ERROR	en
+foo:
+endm
+
+ERROR_AE	macro	en
+	local	foo
+	jb	foo
+	ERROR	en
+foo:
+endm
+
+ERROR_B	macro	en
+	local	foo
+	jae	foo
+	ERROR	en
+foo:
+endm
+
+
+EC	macro	line
+	if	ERROR_CHECK
+line
+	endif
+endm
+
+
+NEC	macro	line
+	ife	ERROR_CHECK
+line
+	endif
+endm
+
+;
+; Instead of us generating the correct code, we'll just let esp do it with
+; warnings turned off temporarily
+
+LONG	macro	opcode, label
+	.warn -jmp
+	opcode label
+	.warn @jmp
+endm
+
+;
+; Interrupt macros that are bit clearer then the opcodes...
+INT_OFF	equ	<cli>
+INT_ON	equ	<sti>
+
+;-----------------------------------------------------------------------------
+; The loader changes slightly depending upon the hardware platform that
+; is used. Define the platform below, and use the macros for compile-time
+; changes.
+;-----------------------------------------------------------------------------
+
+ifndef HARDWARE_TYPE
+HARDWARE_TYPE	equ	<PC>		; Choices include:
+						;	PC
+endif
+
+
+
+; Hardware macros, for specific platforms
+;
+PC		macro	line
+ifidn		HARDWARE_TYPE, <PC>
+		line
+endif
+endm
+
+;-----------------------------------------------------------------------------
+; The following segments are defined solely for Swat to use. This allows us to
+; refer to these areas of memory by name (rather than 0e8c6, say) and not
+; have to create symbols for them.
+;-----------------------------------------------------------------------------
+DOSSeg		segment at 40h
+DOS		label	far
+ForceRef	DOS
+DOSSeg		ends
+
+SwatSeg		segment at 1400h		; Or thereabouts...
+Swat		label	far
+ForceRef	Swat
+SwatSeg		ends
+
+BIOSSeg		segment at 0f000h
+BIOS		label	far
+ForceRef	BIOS
+		org	0fff0h
+BIOSSeg		ends
+
+PSP		segment	at 1300h		; Or thereabouts
+PSPBase		label	far
+ForceRef	PSPBase
+PSP		ends
+
+LoaderStackSeg  segment at 01600h               ; Or thereabouts
+LoaderStack     label	far
+ForceRef	LoaderStack
+LoaderStackSeg  ends
+
+
+LoaderDS	macro
+	mov	ds, cs:loaderDSSelector
+endm
+
+LoaderES	macro
+	mov	es, cs:loaderDSSelector
+endm

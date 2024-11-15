@@ -56,4 +56,5 @@ IF EXIST "%USERPROFILE%\swat.rc" (
 ) ELSE (
    set CUSTOM_TCL_LOCATION=
 )
-swat -net 00000000:7F000001%IPX_PORT%:003F
+sleep 20
+swat
