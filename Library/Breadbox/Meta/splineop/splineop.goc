@@ -1,0 +1,195 @@
+/***********************************************************************
+ *
+ * PROJECT:       META
+ * FILE:          SPLINEOP.goc
+ *
+ * DESCRIPTION:   Polyline Optimizer
+ *
+ * AUTHOR:        Marcus Gr”ber
+ *
+ ***********************************************************************/
+@include <stdapp.goh>
+#include <float.h>
+
+#include "metaint.h"
+
+extern Boolean meta_Splines;            /* create artificial splines? */
+
+void _Meta_optimizedLineTo(GStateHandle gs,sword x1,sword y1,sword x2,sword y2)
+{
+    if(x1==x2)                          /* optimize horizontal lines */
+      GrDrawVLineTo(gs,y2);
+    else if(y1==y2)                     /* optimize vertical lines */
+      GrDrawHLineTo(gs,x2);
+    else
+      GrDrawLineTo(gs,x2,y2);
+}
+
+void _Meta_optimizedLine(GStateHandle gs,sword x1,sword y1,sword x2,sword y2)
+{
+    GrMoveTo(gs,x1,y1);
+    _Meta_optimizedLineTo(gs,x1,y1,x2,y2);
+}
+
+void SplineInterpol(sword a,sword j_,sword x,sword k_,sword y,sword i_,sword b,
+                    sword *p1, sword *p2)
+{
+    float i = i_;
+    float j = j_/i, k = k_/i;
+    float h = (3 * j * k * (j + (-1)) * (j + (-k)) * (k + (-1)));
+
+    *p1 = (sword)((k * k * x * (k + (-1)) + (-j * j * y * (j + (-1))) + (j +
+          (-k)) * (a * (k + (-1)) * (j * (2 * k + (-1)) + (-k)) * (j + (-1)) +
+          b * j * j * k * k)) / h);
+
+    *p2 = (sword)((k * x * (k + (-1)) * (k + (-1)) + (-j * y * (j + (-1))) *
+          (j + (-1)) + (j + (-k)) * (a * (k + (-1)) * (k + (-1)) * (j + (-1))
+          * (j + (-1)) + b * j * k * (j * (2 * k + (-1)) + (-k)))) / h);
+}
+
+sword SplinePoly(sdword a, sdword b, sdword c, sdword d, sword tp, sword tq)
+{
+    FloatDwordToFloat(tp);
+    FloatDwordToFloat(tq);
+    FloatDivide();
+    FloatDup();
+    FloatDup();
+
+    FloatDwordToFloat(-a);
+    FloatDwordToFloat(3*b);
+    FloatDwordToFloat(-3*c);
+    FloatDwordToFloat(d);
+    FloatAdd(); FloatAdd(); FloatAdd(); FloatMultiply();
+
+    FloatDwordToFloat(3*a);
+    FloatDwordToFloat(-6*b);
+    FloatDwordToFloat(3*c);
+    FloatAdd(); FloatAdd(); FloatAdd(); FloatMultiply();
+
+    FloatDwordToFloat(-3*a);
+    FloatDwordToFloat(3*b);
+    FloatAdd(); FloatAdd(); FloatMultiply();
+
+    return (sword)(FloatFloatToDword()+a);
+/*
+    t=tp/q;
+    return (sword)
+      (t * (t * (t * ((-a) + 3 * b + (-3) * c + d)
+                 + (3 * a + (-6) * b + 3 * c))
+            + (-3 * a + 3 * b))
+       + a);
+*/
+}
+
+// "virtual" point index with wraparound to make closing polygons easier
+#define Q(_i) p[(_i<np)?(_i):((_i)-np)]
+
+#define MAX_SP_POINTS 128
+Point splinePoints[MAX_SP_POINTS];
+
+Boolean _Meta_optimizedPolyline(GStateHandle gs,Point *p,word np,Boolean close)
+{
+    word n,i,j,k,s,s2,sp;
+    int fail;
+    sword q1,r1,q2,r2,x,y;
+    sdword d;
+    Point cp[3],cur;
+
+    if(np==2)                           /* two dots can only make a line... */
+    {
+      _Meta_optimizedLine(gs,p[0].P_x,p[0].P_y,p[1].P_x,p[1].P_y);
+      return FALSE;                     /* no optimization performed */
+    }
+
+    if(!meta_Splines || np<=4)
+    {
+      if(close)
+        GrDrawPolygon(gs,p,np);
+      else
+        GrDrawPolyline(gs,p,np);
+      return FALSE;
+    }
+
+    sp=0;                               /* no points in spline yet */
+
+    n = np;                             /* number of points we're using */
+    if(close && (p[np-1].P_x!=p[0].P_x || p[np-1].P_y!=p[0].P_y))
+      n++;                              /* simulate closure by extra point */
+
+    cur=p[0];
+    GrMoveTo(gs,cur.P_x,cur.P_y);
+    GrDrawLineTo(gs,cur.P_x,cur.P_y);
+    s = 0;
+    while(s < n-1)
+    {
+      s2 = s + 1;
+      fail = 0;
+      for(i = 4; i + s <= n - 1 && fail < 2; i++)
+      {
+        j = i / 3;
+        k = i * 2 / 3;
+
+        SplineInterpol( Q(s  ).P_x,
+                    j , Q(s+j).P_x,
+                    k , Q(s+k).P_x,
+                    i , Q(s+i).P_x, &q1, &r1);
+
+        SplineInterpol( Q(s  ).P_y,
+                    j , Q(s+j).P_y,
+                    k , Q(s+k).P_y,
+                    i , Q(s+i).P_y, &q2, &r2);
+
+        for(j = 1; j < i; j++)
+        {
+          x = SplinePoly(Q(s).P_x, q1, r1, Q(s+i).P_x, j, i);
+          y = SplinePoly(Q(s).P_y, q2, r2, Q(s+i).P_y, j, i);
+          d = ((sdword)x-Q(s+j).P_x)*((sdword)x-Q(s+j).P_x)
+            + ((sdword)y-Q(s+j).P_y)*((sdword)y-Q(s+j).P_y);
+          if(d >= 5 * 5)
+          {
+            fail++;                     // count bad interpolations
+            break;
+          }
+        }
+
+        if(j==i)                        // made it to the end without errors?
+        {
+          s2 = s + i;
+          cp[0].P_x = q1; cp[0].P_y = q2;
+          cp[1].P_x = r1; cp[1].P_y = r2;
+          cp[2] = Q(s2);                // draw curve to endpoint
+          fail = 0;
+        }
+      }
+
+      if(s2 - s > 1)
+      {
+        if(sp>MAX_SP_POINTS-3)          // spline full?
+        {
+          GrDrawSplineTo(gs,splinePoints,sp);
+          sp=0;
+        }
+        splinePoints[sp++] = cp[0];
+        splinePoints[sp++] = cp[1];
+        cur = splinePoints[sp++] = cp[2];
+                                        // store spline points
+      }
+      else
+      {
+        if(sp)                          // spline pending?
+        {
+          GrDrawSplineTo(gs,splinePoints,sp);
+          sp=0;
+        }
+        _Meta_optimizedLineTo(gs,cur.P_x,cur.P_y,Q(s2).P_x,Q(s2).P_y);
+        cur = Q(s2);
+      }
+
+      s = s2;
+    }
+
+    if(sp)                              // spline pending?
+      GrDrawSplineTo(gs,splinePoints,sp);
+
+    return TRUE;
+}

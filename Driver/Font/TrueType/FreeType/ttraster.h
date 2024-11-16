@@ -119,11 +119,11 @@ extern "C" {
 
   /* Initialize rasterizer */
   LOCAL_DEF
-  TT_Error  TTRaster_Init( PEngine_Instance  engine );
+  TT_Error  TTRaster_Init( );
 
   /* Finalize it */
   LOCAL_DEF
-  TT_Error  TTRaster_Done( PEngine_Instance  engine );
+  TT_Error  TTRaster_Done( );
 
 
 #ifdef __cplusplus
