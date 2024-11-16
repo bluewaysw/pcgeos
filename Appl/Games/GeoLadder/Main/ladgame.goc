@@ -1,0 +1,1791 @@
+/*
+ ***************************************************************************
+ * Copyright 2019 Andreas Bollhalder
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ ***************************************************************************
+ */
+
+
+/*
+ ***************************************************************************
+ * Copyright (c) 2010-2024 by YoYu-Productions
+ *
+ * PROJECT:     GeoLadder
+ * MODULE:      GOC code file
+ * FILE:        Main\ladgame.goc
+ *
+ * AUTHOR:      Andreas Bollhalder
+ ***************************************************************************
+ */
+
+
+/*
+ ***************************************************************************
+ *                  COMPILER SWITCHES
+ ***************************************************************************
+ */
+
+#pragma disable_message(303)
+
+
+/*
+ ***************************************************************************
+ *                  INCLUDE FILES
+ ***************************************************************************
+ */
+
+@include <stdapp.goh>
+
+@include <ladder.goh>
+@include <UI/appui.goh>
+@include <Main/sndwork.goh>
+
+#include <math.h>
+#include <sound.h>
+#include <Ansi/string.h>
+
+
+/*
+ ***************************************************************************
+ *                  EXTERNAL DECLARATIONS (see PROCESS.GOC)
+ ***************************************************************************
+ */
+
+extern void _pascal StopTimer(void);
+
+
+/*
+ ***************************************************************************
+ *                  LOCAL DECLARATIONS
+ ***************************************************************************
+ */
+
+// Lookup table for Lad dying characters
+static char LDC[] =
+{
+  '!', '@', '#', '/', '+', '%', '?', '\\', '*', 'b'
+};
+
+word _pascal Random(word max);
+static word _pascal LevelAndTimeReductionByRound(word round);
+static byte _pascal NewLadByScoreIncrease(word incr);
+static void _pascal IncreaseLads(void);
+static void _pascal IncreaseScore(word incr);
+static byte _pascal CanMove(word cpos, word npos);
+static byte _pascal CanStay(word pos);
+static byte _pascal LadCanClimb(void);
+static byte _pascal LadCanStartJump(void);
+static byte _pascal DerCanChangeOver(word cpos, sbyte dir);
+static byte _pascal DerCanDescend(word cpos);
+static void _pascal MoveLad(void);
+static void _pascal MoveDers(void);
+
+/*
+ ***************************************************************************
+ *                  GLOBAL VARIABLES
+ ***************************************************************************
+ */
+
+GLGlobals g;
+
+
+/*
+ ***************************************************************************
+ *                  FUNCTIONS
+ ***************************************************************************
+ */
+
+/***********************************************************************
+ *                  Random
+ ***********************************************************************
+ * SYNOPSIS:        Generate a random number in the range from 0 to
+ *                  max exclusiv.
+ * CALLED BY:       Internal
+ * PARAMETERS:      word ( word max )
+ * RETURN:          A word containing the random number.
+ * SIDE EFFECTS:    none
+ *
+ * STRATEGY:        1/ Put the max value onto the floating point stack.
+ *                  2/ Call the FloatRandomN() function.
+ *                  3/ Return the random number from the FP stack.
+ *
+ * REVISION HISTORY:
+ *      Name    Date          Description
+ *      ----    ----          -----------
+ *      boa     2011-01-18    Initial Revision
+ *
+ ***********************************************************************/
+word _pascal Random(word max)
+{
+  // Calculate a random number
+  FloatWordToFloat(max); // S1 = m
+  FloatRandomN();        // S1 = rnd(m)
+  // Return the result from the FP stack
+  return FloatFloatToDword();
+}
+
+/***********************************************************************
+ *                  LevelAndTimeReductionByRound
+ ***********************************************************************
+ * SYNOPSIS:        Calculate the level number and time reduction from
+ *                  the round value.
+ * CALLED BY:       Internal
+ * PARAMETERS:      word ( word round )
+ * RETURN:          A word containing the time reduction in the high
+ *                  byte and the level in the low byte.
+ * SIDE EFFECTS:    none
+ *
+ * STRATEGY:        1/ Iterate from 1 to round to get the level number.
+ *                  2/ Store the level number.
+ *                  3/ Iterate again.
+ *                  4/ Return the level number and time reduction.
+ *
+ * REVISION HISTORY:
+ *      Name    Date          Description
+ *      ----    ----          -----------
+ *      boa     2011-01-18    Initial Revision
+ *
+ ***********************************************************************/
+static word _pascal LevelAndTimeReductionByRound(word round)
+{
+  word i, f, l, m, t;
+  f = 0;
+  DoAgain:
+  l = 1; m = 1; t = 0;
+  for (i = 1; i <= round; i++)
+  {
+    l++;
+    if (l > m)
+    {
+      l = 1; m++;
+    }
+    if (f == l)
+    {
+      t += 2;
+    }
+  }
+  if (f == 0)
+  {
+    f = l;
+    goto DoAgain;
+  }
+  t -= 2;
+  if (t > 10)
+  {
+    t = 10;
+  }
+  // Return the value
+  return (t << 8) | l;
+}
+
+/***********************************************************************
+ *                  NewLadByScoreIncrease
+ ***********************************************************************
+ * SYNOPSIS:        Calculate if a new lad is awarded.
+ * CALLED BY:       Internal
+ * PARAMETERS:      byte ( word incr )
+ * RETURN:          A byte indicating if a new lad is awarded.
+ * SIDE EFFECTS:    The global variable "g.ss.game.score" must contain the
+ *                  current score.
+ *                  Multiple awarded lads are not supported.
+ *
+ * STRATEGY:        1/ Calculate if we got over the boundary for a new lad.
+ *                  2/ Return L_TRUE or L_FALSE
+ *
+ * REVISION HISTORY:
+ *      Name    Date          Description
+ *      ----    ----          -----------
+ *      boa     2011-01-18    Initial Revision
+ *
+ ***********************************************************************/
+static byte _pascal NewLadByScoreIncrease(word incr)
+{
+  sword l;
+  l = (g.ss.game.score % PNT_LAD) + incr - (PNT_LAD - 1);
+  if (l > 0)
+  {
+    return L_TRUE;
+  }
+  return L_FALSE;
+}
+
+/***********************************************************************
+ *                  IncreaseLads
+ ***********************************************************************
+ * SYNOPSIS:        Increase the lads if not at maximum.
+ * CALLED BY:       Internal
+ * PARAMETERS:      void ( void )
+ * RETURN:          nothing
+ * SIDE EFFECTS:    The global variable "g.ss.game.lads" must contain the
+ *                  current lads.
+ *
+ * STRATEGY:        1/ Increase the lads by one if not at maximum lads.
+ *
+ * REVISION HISTORY:
+ *      Name    Date          Description
+ *      ----    ----          -----------
+ *      boa     2024-07-22    Initial Revision
+ *
+ ***********************************************************************/
+static void _pascal IncreaseLads(void)
+{
+  if (g.ss.game.lads < LADS_MAX) g.ss.game.lads++;
+}
+
+/***********************************************************************
+ *                  IncreaseScore
+ ***********************************************************************
+ * SYNOPSIS:        Increase the score if not at maximum.
+ * CALLED BY:       Internal
+ * PARAMETERS:      void ( word incr )
+ * RETURN:          nothing
+ * SIDE EFFECTS:    The global variable "g.ss.game.score" must contain the
+ *                  current score.
+ *
+ * STRATEGY:        1/ Increase the score by the increment from the
+ *                     parameter if not at maximum score.
+ *
+ * REVISION HISTORY:
+ *      Name    Date          Description
+ *      ----    ----          -----------
+ *      boa     2024-07-22    Initial Revision
+ *
+ ***********************************************************************/
+static void _pascal IncreaseScore(word incr)
+{
+  if (PNTS_MAX - g.ss.game.score > incr)
+  {
+    g.ss.game.score += incr;
+  }
+  else
+  {
+    g.ss.game.score = PNTS_MAX;
+  }
+}
+
+/*
+ ***************************************************************************
+ *                  FUNCTIONS for Lad and Ders
+ ***************************************************************************
+ */
+
+/***********************************************************************
+ *                  CanMove
+ ***********************************************************************
+ * SYNOPSIS:        Check if an actor can move from the current to the
+ *                  next position.
+ * CALLED BY:       Internal
+ * PARAMETERS:      byte ( word cpos,
+ *                         word npos )
+ * RETURN:          A byte indicating if the actor can move to the next
+ *                  position or not.
+ * SIDE EFFECTS:    none
+ *
+ * STRATEGY:        1/ Return false if the next position is outside
+ *                     the level.
+ *                  2/ Return false if the actor will cross the left
+ *                     or right border.
+ *                  3/ Return false if the next position is a solid
+ *                     element (bases and wall).
+ *                  4/ Otherwise return true.
+ *
+ * REVISION HISTORY:
+ *      Name    Date          Description
+ *      ----    ----          -----------
+ *      boa     2011-01-18    Initial Revision
+ *
+ ***********************************************************************/
+static byte _pascal CanMove(word cpos, word npos)
+{
+  char t;
+  sword d;
+  // Check for outside of play field
+  if (npos >= (LVL_COLS * (LVL_ROWS - 1)))
+  {
+    return L_FALSE;
+  }
+  // Check for left and right border overflow
+  d = (cpos % LVL_COLS) - (npos % LVL_COLS);
+  if ((d > 1) || (d < -1))
+  {
+    return L_FALSE;
+  }
+  // Get the target character
+  t = *(g.ns.levelBuffer + npos);
+  // Check for solids
+  if ((t == LSD_C_BASE) || (t == LSD_C_BASE2) || (t == LSD_C_WALL))
+  {
+    return L_FALSE;
+  }
+  // Default
+  return L_TRUE;
+}
+
+/***********************************************************************
+ *                  CanStay
+ ***********************************************************************
+ * SYNOPSIS:        Check if an actor can stay on its position.
+ * CALLED BY:       Internal
+ * PARAMETERS:      byte ( word pos )
+ * RETURN:          A byte indicating if the actor can stay on its
+ *                  current position or not.
+ * SIDE EFFECTS:    A Der can not stay on a Ladder.
+ *
+ * STRATEGY:        1/ Return true if the actor is on a Ladder.
+ *                  2/ Return true if the actor is on a solid element
+ *                     (bases and wall).
+ *                  3/ Otherwise return false.
+ *
+ * REVISION HISTORY:
+ *      Name    Date          Description
+ *      ----    ----          -----------
+ *      boa     2011-01-18    Initial Revision
+ *
+ ***********************************************************************/
+static byte _pascal CanStay(word pos)
+{
+  char t;
+  // Get the target character
+  t = *(g.ns.levelBuffer + pos);
+  // Check for on ladder
+  if (t == LSD_C_LADDER)
+  {
+    return L_TRUE;
+  }
+  // Get the target character
+  t = *(g.ns.levelBuffer + pos + LVL_COLS);
+  // Check for solids
+  if ((t == LSD_C_BASE) || (t == LSD_C_BASE2) || (t == LSD_C_WALL))
+  {
+    return L_TRUE;
+  }
+  // Default
+  return L_FALSE;
+}
+
+/*
+ ***************************************************************************
+ *                  FUNCTIONS for Lad
+ ***************************************************************************
+ */
+
+/***********************************************************************
+ *                  LadCanClimb
+ ***********************************************************************
+ * SYNOPSIS:        Check if the Lad can climb on a Ladder.
+ * CALLED BY:       Internal
+ * PARAMETERS:      byte ( void )
+ * RETURN:          A byte indicating if the Lad can climb a Ladder
+ *                  or not.
+ * SIDE EFFECTS:    none
+ *
+ * STRATEGY:        1/ Return false if the Lad is on the top line of
+ *                     the level or isn't on a Ladder.
+ *                  2/ Return true if the level element above is a
+ *                     Ladder or the level exit.
+ *                  3/ Otherwise return false.
+ *
+ * REVISION HISTORY:
+ *      Name    Date          Description
+ *      ----    ----          -----------
+ *      boa     2011-01-18    Initial Revision
+ *
+ ***********************************************************************/
+static byte _pascal LadCanClimb(void)
+{
+  char t;
+  // Check for top row or not on ladder
+  if ((g.ss.lad.cpos < LVL_COLS) || (*(g.ns.levelBuffer + g.ss.lad.cpos) != LSD_C_LADDER))
+  {
+    return L_FALSE;
+  }
+  // Get the target character
+  t = *(g.ns.levelBuffer + g.ss.lad.cpos - LVL_COLS);
+  // Check for ladder or exit
+  if ((t == LSD_C_LADDER) || (t == LSD_C_EXIT))
+  {
+    return L_TRUE;
+  }
+  // Default
+  return L_FALSE;
+}
+
+/***********************************************************************
+ *                  LadCanStartJump
+ ***********************************************************************
+ * SYNOPSIS:        Check if the Lad can start a jump.
+ * CALLED BY:       Internal
+ * PARAMETERS:      byte ( void )
+ * RETURN:          A byte indicating if the Lad can start a jump
+ *                  or not.
+ * SIDE EFFECTS:    none
+ *
+ * STRATEGY:        1/ Return true if the Lad is on a ball or it is not
+ *                     on a Ladder and can stay on its position.
+ *                  2/ Otherwise return false.
+ *
+ * REVISION HISTORY:
+ *      Name    Date          Description
+ *      ----    ----          -----------
+ *      boa     2011-01-18    Initial Revision
+ *
+ ***********************************************************************/
+static byte _pascal LadCanStartJump(void)
+{
+  // Check for rubber ball or not on ladder and Lad can stay
+  if ((*(g.ns.levelBuffer + g.ss.lad.cpos) == LSD_C_BALL) || (CanStay(g.ss.lad.cpos) == L_TRUE))
+  {
+    return L_TRUE;
+  }
+  // Default
+  return L_FALSE;
+}
+
+
+/*
+ ***************************************************************************
+ *                  FUNCTIONS for Ders
+ ***************************************************************************
+ */
+
+/***********************************************************************
+ *                  DerCanChangeOver
+ ***********************************************************************
+ * SYNOPSIS:        Check if a Der can switch its direction at a Ladder.
+ * CALLED BY:       Internal
+ * PARAMETERS:      byte ( word cpos,
+ *                         sbyte dir )
+ * RETURN:          A byte indicating if the Der can switch its
+ *                  direction or not.
+ * SIDE EFFECTS:    none
+ *
+ * STRATEGY:        1/ Return false if the Der will cross the left
+ *                     or right border.
+ *                  2/ Return true if the next position of the Der is
+ *                     a Ladder.
+ *                  3/ Otherwise return false.
+ *
+ * REVISION HISTORY:
+ *      Name    Date          Description
+ *      ----    ----          -----------
+ *      boa     2011-01-18    Initial Revision
+ *
+ ***********************************************************************/
+static byte _pascal DerCanChangeOver(word cpos, sbyte dir)
+{
+  sword d;
+  word npos;
+  npos = cpos + dir;
+  // Check for left and right border overflow
+  d = (cpos % LVL_COLS) - (npos % LVL_COLS);
+  if ((d > 1) || (d < -1))
+  {
+    return L_FALSE;
+  }
+  // Check for ladder
+  if (*(g.ns.levelBuffer + npos) == LSD_C_LADDER)
+  {
+    return L_TRUE;
+  }
+  // Default
+  return L_FALSE;
+}
+
+/***********************************************************************
+ *                  DerCanDescend
+ ***********************************************************************
+ * SYNOPSIS:        Check if a Der can descend on a Ladder.
+ * CALLED BY:       Internal
+ * PARAMETERS:      byte ( word cpos )
+ * RETURN:          A byte indicating if the Der can descend or not.
+ * SIDE EFFECTS:    none
+ *
+ * STRATEGY:        1/ Return true if the level element below the Der
+ *                     is a Ladder.
+ *                  2/ Otherwise return false.
+ *
+ * REVISION HISTORY:
+ *      Name    Date          Description
+ *      ----    ----          -----------
+ *      boa     2011-01-18    Initial Revision
+ *
+ ***********************************************************************/
+static byte _pascal DerCanDescend(word cpos)
+{
+  // Check for ladder
+  if (*(g.ns.levelBuffer + cpos + LVL_COLS) == LSD_C_LADDER)
+  {
+    return L_TRUE;
+  }
+  // Default
+  return L_FALSE;
+}
+
+/*
+ ***************************************************************************
+ *                  FUNCTIONS for Movement
+ ***************************************************************************
+ */
+
+/***********************************************************************
+ *                  MoveLad
+ ***********************************************************************
+ * SYNOPSIS:        Move the Lad in the level and update the face,
+ *                  direction and position.
+ * CALLED BY:       Internal
+ * PARAMETERS:      void ( void )
+ * RETURN:          nothing
+ * SIDE EFFECTS:    none
+ *
+ * STRATEGY:        1/ Handle jump start and end.
+ *                   * The Lad can start a jump if all of the following
+ *                     conditions are true:
+ *                      - A jump is requested by the user.
+ *                      - The Lad is on a rubber ball or can stay at the
+ *                        current position.
+ *                      - The Lad can not climb on a Ladder and the next
+ *                        direction is none, up or down.
+ *                   * A jump of the Lad end when the value of the jump
+ *                     counter is higher then the last one.
+ *                  2/ Handle jump.
+ *                   * The Lad is in a jump, if the jump counter is
+ *                     higher then 0. In a jump, we have to handle the
+ *                     changes of the direction and jump aborts.
+ *                     Changing the direction during a jump to up or
+ *                     down is invalid. Therefore, only none, left and
+ *                     right are allowed.
+ *                   * To calculate the next position, we try to fulfill
+ *                     a direction change. Otherwise we try to use the
+ *                     current direction. If none of them are valid, we
+ *                     end up with none.
+ *                   * A jump is aborted if either one of the following
+ *                     conditions are true:
+ *                      - The Lad can not move to the next position.
+ *                      - The Lad has changed his direction and can stay
+ *                        and the jump has not been started right now.
+ *                  3/ Handle move.
+ *                   * If the Lad is not in a jump, will have to move it
+ *                     according the current and next position. If the
+ *                     Lad can not move to the position of the next
+ *                     direction, we move it into the current direction
+ *                     until it can change the direction.
+ *                   * If the Lad can not move into the current or next
+ *                     direction, it will stop.
+ *                   * If the Lad can not stay on his current position,
+ *                     it will fall down. We preserve the current and
+ *                     next directions, so the Lad will continue to move
+ *                     into the direction when it can stay again on its
+ *                     position.
+ *
+ * REVISION HISTORY:
+ *      Name    Date          Description
+ *      ----    ----          -----------
+ *      boa     2011-01-18    Initial Revision
+ *
+ ***********************************************************************/
+static void _pascal MoveLad(void)
+{
+  char face;
+  sbyte cdir, ndir;
+  word cpos, npos;
+  // Get the temporaries
+  cdir = g.ss.lad.cdir;
+  ndir = g.ss.lad.ndir;
+  cpos = g.ss.lad.cpos;
+  // Set default face
+  face = LAD_C_STAY;
+  // ::: HANDLE JUMP START :::
+  if
+  (
+    (g.ss.lad.njump == L_TRUE)
+ && (LadCanStartJump() == L_TRUE)
+ && !(
+      (ndir != DIR_E) && (ndir != DIR_W) && (LadCanClimb() == L_TRUE)
+    )
+  )
+  {
+    g.ss.lad.cjump = 1;
+    // Set next jump to false
+    g.ss.lad.njump = L_FALSE;
+  }
+  // ::: HANDLE JUMP END :::
+  if (g.ss.lad.cjump > 6)
+  {
+    g.ss.lad.cjump = 0;
+  }
+  // ::: HANDLE JUMP :::
+  if (g.ss.lad.cjump > 0)
+  {
+    // Calculate next position
+    if ((ndir != DIR_N) && (ndir != DIR_S))
+    {
+      npos = cpos + ndir;
+      // Change of direction
+      cdir = ndir;
+    }
+    else if ((cdir != DIR_N) && (cdir != DIR_S))
+    {
+      npos = cpos + cdir;
+    }
+    switch (g.ss.lad.cjump)
+    {
+    case 1: case 2:
+      npos += DIR_N;
+      break;
+    case 5: case 6:
+      npos += DIR_S;
+//    break;
+    }
+    // ::: HANDLE JUMP ABORT :::
+    // Can not move further or can jump on a Ladder
+    if
+    (
+      (CanMove(cpos, npos) == L_FALSE)
+   || (
+        ((ndir == DIR_N) || (ndir == DIR_S))
+     && (CanStay(cpos) == L_TRUE)
+     && (g.ss.lad.cjump > 1)
+      )
+    )
+    {
+      g.ss.lad.cjump = 0;
+    }
+    // Advance jump
+    else
+    {
+      g.ss.lad.cjump++;
+    }
+  }
+  // ::: HANDLE MOVE :::
+  if (g.ss.lad.cjump == 0)
+  {
+    // ::: HANDLE FALL :::
+    if (CanStay(cpos) == L_FALSE)
+    {
+      g.ss.lad.lpos = cpos;
+      g.ss.lad.cpos = cpos + DIR_S;
+      g.ss.lad.face = LAD_C_FALL;
+      return;
+    }
+    // ::: HANDLE STOP :::
+    if (ndir == DIR_NONE)
+    {
+      cdir = DIR_NONE;
+    }
+    // ::: HANDLE CLIMB :::
+    else if (ndir == DIR_N)
+    {
+      if (LadCanClimb() == L_TRUE)
+      {
+        cdir = DIR_N;
+      }
+      else if (cdir == DIR_N)
+      {
+        cdir = DIR_NONE;
+      }
+    }
+    // ::: HANDLE NEXT :::
+    else if (CanMove(cpos, cpos + ndir) == L_TRUE)
+    {
+      cdir = ndir;
+    }
+    // ::: HANDLE MOVE :::
+    if (CanMove(cpos, cpos + cdir) == L_FALSE)
+    {
+      cdir = DIR_NONE;
+    }
+    // Calculate next position
+    npos = cpos + cdir;
+  }
+  // Update face
+  switch (cdir)
+  {
+  case DIR_NONE:
+    face = LAD_C_STAY;
+    break;
+  case DIR_E:
+    face = LAD_C_RIGHT;
+    break;
+  case DIR_W:
+    face = LAD_C_LEFT;
+//  break;
+  }
+  // Update the Lad
+  g.ss.lad.cdir = cdir;
+  if (cdir == DIR_NONE)
+  {
+    g.ss.lad.ndir = DIR_NONE;
+  }
+  g.ss.lad.lpos = cpos;
+  g.ss.lad.cpos = npos;
+  g.ss.lad.face = face;
+}
+
+/***********************************************************************
+ *                  MoveDers
+ ***********************************************************************
+ * SYNOPSIS:        Move the Ders in the level and update their
+ *                  directions and positions.
+ * CALLED BY:       Internal
+ * PARAMETERS:      void ( void )
+ * RETURN:          nothing
+ * SIDE EFFECTS:    The levels must be designed to make sure a Der can
+ *                  never be at a position where it can't move in any
+ *                  direction. Otherwise we loop forever.
+ *
+ * STRATEGY:        1/ Loop over all Ders of the level.
+ *                  2/ Handle the different states of a Der.
+ *                  3/ Handle Der falling down.
+ *                  4/ Handle Der moving down a Ladder.
+ *                  5/ Handle Der changing direction on a Ladder.
+ *                  6/ Do the movement. If a Der can not move into the
+ *                     current direction, change the direction until
+ *                     the Der can move.
+ *
+ * REVISION HISTORY:
+ *      Name    Date          Description
+ *      ----    ----          -----------
+ *      boa     2011-01-18    Initial Revision
+ *      boa     2011-01-21    Reworked logic and implemented temporaries
+ *
+ ***********************************************************************/
+static void _pascal MoveDers(void)
+{
+  sbyte dir;
+  word i, cpos, npos;
+  // Iterate over the Ders
+  for (i = 0; i < g.ss.level.ders; i++)
+  {
+    // Handle the different states
+    switch (g.ss.ders[i].state)
+    {
+    case DER_S_MOVE:
+      break;
+    // ::: HANDLE ARMED ::: (to leave an emitter)
+    case DER_S_ARMED:
+      g.ss.ders[i].cpos = g.ss.level.emts.pos[Random(g.ss.level.emts.num)];
+      g.ss.ders[i].dir = DIR_S;
+      g.ss.ders[i].state = DER_S_READY;
+      continue;
+    // ::: HANDLE READY ::: (to leave an emitter)
+    case DER_S_READY:
+    // ::: HANDLE LEAVE ::: (an emitter)
+    case DER_S_LEAVE:
+      g.ss.ders[i].state--;
+      // Add "Der release" sound
+      @send SoundWorker::MSG_SOUND_WORKER_NOISE_ADD_MULTI(7);
+      break;
+    // ::: HANDLE RECYCLE ::: (by an emitter)
+    case DER_S_RECYCLE:
+      g.ss.ders[i].cpos = POS_NONE;
+      g.ss.ders[i].lpos = POS_NONE;
+      g.ss.ders[i].state = g.ss.level.ders;
+      // Add "Der recycle" sound
+      @send SoundWorker::MSG_SOUND_WORKER_NOISE_ADD_MULTI(8);
+      continue;
+    // ::: HANDLE ARMED :::
+    default:
+      g.ss.ders[i].state--;
+      continue;
+    }
+    // Set the temporaries
+    dir = g.ss.ders[i].dir;
+    cpos = g.ss.ders[i].cpos;
+    // Check for not descending
+    if (dir != DIR_S)
+    {
+      // ::: HANDLE FALL :::
+      if (CanStay(cpos) == L_FALSE)
+      {
+        dir = DIR_S;
+      }
+      // ::: HANDLE START DESCEND ::: (on ladder)
+      else if (DerCanDescend(cpos) == L_TRUE)
+      {
+        if (Random(2) == 1)
+        {
+          dir = DIR_S;
+        }
+      }
+      // ::: HANDLE CHANGE OVER ::: (at ladder)
+      else if (DerCanChangeOver(cpos, dir) == L_TRUE)
+      {
+        if (Random(2) == 1)
+        {
+          dir = -dir;
+        }
+      }
+    }
+    // ::: HANDLE WALK :::
+    while (1)
+    {
+      // Get next position
+      npos = cpos + dir;
+      // Check next position
+      if (CanMove(cpos, npos) == L_TRUE)
+      {
+        break;
+      }
+      // Get new direction
+      if (dir == DIR_S)
+      {
+        dir = (Random(2) == 1) ? DIR_E : DIR_W;
+      }
+      else
+      {
+        dir = -dir;
+      }
+    }
+    g.ss.ders[i].dir = dir;
+    g.ss.ders[i].lpos = cpos;
+    g.ss.ders[i].cpos = npos;
+  }
+}
+
+
+/*
+ ***************************************************************************
+ *                  CODE for LadderProcessClass
+ ***************************************************************************
+ */
+
+/***********************************************************************
+ *                  MSG_LAD_DEMO_LOAD_HEAD, MSG_LAD_PLAY_LOAD_HEAD
+ *                  for LadderProcessClass
+ ***********************************************************************
+ * SYNOPSIS:        Load the level header and show the loading screen
+ *                  or load the level data.
+ * CALLED BY:       (a) MSG_LAD_DEMO_LOAD_HEAD:
+ *                      from MSG_LAD_DEMO
+ *                  (b) MSG_LAD_PLAY_LOAD_HEAD
+ *                      from MSG_LAD_PLAY or MSG_LAD_PLAY_NEXT
+ * PARAMETERS:      void ( void )
+ * RETURN:          nothing
+ * SIDE EFFECTS:    none
+ *
+ * STRATEGY:        1/ Load the level header.
+ *                  2/ Cntinue with loading screen or load level data
+ *
+ * REVISION HISTORY:
+ *      Name    Date          Description
+ *      ----    ----          -----------
+ *      boa     2024-07-13    Initial Revision
+ *
+ ***********************************************************************/
+@extern method LadderProcessClass, MSG_LAD_DEMO_LOAD_HEAD,
+                                   MSG_LAD_PLAY_LOAD_HEAD
+{
+  // Load the level headers
+  MemLock(OptrToHandle(@GameLevels));
+  ChunkArrayGetElement(@GameLevels, g.ss.game.level - 1, &g.ss.level);
+  MemUnlock(OptrToHandle(@GameLevels));
+  // Handle message type
+  switch (message)
+  {
+  case MSG_LAD_DEMO_LOAD_HEAD:
+    // Load the level data
+    @send process::MSG_LAD_DEMO_LOAD_DATA();
+    break;
+  case MSG_LAD_PLAY_LOAD_HEAD:
+    // Reset hooka state
+    g.ss.hookaState = L_FALSE;
+    // Show the loading screen
+    g.ss.restorePoint = MSG_LAD_PLAY_LOAD_SHOW;
+    @send process::MSG_LAD_PLAY_LOAD_SHOW();
+//  break;
+  }
+}
+
+/***********************************************************************
+ *                  MSG_LAD_PLAY_LOAD_SHOW
+ *                  for LadderProcessClass
+ ***********************************************************************
+ * SYNOPSIS:        Load the level header and show the loading screen.
+ * CALLED BY:       MSG_LAD_PLAY or MSG_LAD_PLAY_NEXT
+ * PARAMETERS:      void ( void )
+ * RETURN:          nothing
+ * SIDE EFFECTS:    none
+ *
+ * STRATEGY:        1/ Set round and level.
+ *                  2/ Load and set level name.
+ *                  3/ Show loading screen.
+ *                  4/ Continue with level data.
+ *
+ * REVISION HISTORY:
+ *      Name    Date          Description
+ *      ----    ----          -----------
+ *      boa     2011-01-18    Initial Revision
+ *
+ ***********************************************************************/
+@extern method LadderProcessClass, MSG_LAD_PLAY_LOAD_SHOW
+{
+  // Set the value of the current round
+  @send LadderLoadRound::MSG_VAL_SET_VALUE(g.ss.game.round);
+  // Set the value of the current level
+  @send LadderLoadLevel::MSG_VAL_SET_VALUE(g.ss.game.level);
+  // Lock the level headers
+  MemLock(OptrToHandle(@GameLevels));
+  // Set the text of the level name
+  @call LadderLoadName::MSG_TXT_SET_TEXT(ConstructOptr(OptrToHandle(@GameLevels), g.ss.level.name));
+  // Unlock the level headers
+  MemUnlock(OptrToHandle(@GameLevels));
+  // Show the loading screen
+  @send LadderView::MSG_GEN_VIEW_SET_CONTENT(@LadderLoad);
+  // Load the level data
+  g.ss.restorePoint = MSG_LAD_PLAY_LOAD_DATA;
+  @send process::MSG_LAD_PLAY_LOAD_DATA();
+}
+
+/***********************************************************************
+ *                  MSG_LAD_DEMO_LOAD_DATA, MSG_LAD_PLAY_LOAD_DATA
+ *                  for LadderProcessClass
+ ***********************************************************************
+ * SYNOPSIS:        Load the level data.
+ * CALLED BY:       (a) MSG_LAD_DEMO_LOAD_DATA:
+ *                      from MSG_LAD_DEMO_LOAD_HEAD
+ *                  (b) MSG_LAD_PLAY_LOAD_DATA:
+ *                      from MSG_LAD_PLAY_LOAD_HEAD
+ * PARAMETERS:      void ( void )
+ * RETURN:          nothing
+ * SIDE EFFECTS:    none
+ *
+ * STRATEGY:        1/ Load the level data.
+ *                  2/ Set values on the screen.
+ *
+ * REVISION HISTORY:
+ *      Name    Date          Description
+ *      ----    ----          -----------
+ *      boa     2011-01-18    Initial Revision
+ *
+ ***********************************************************************/
+@extern method LadderProcessClass, MSG_LAD_DEMO_LOAD_DATA,
+                                   MSG_LAD_PLAY_LOAD_DATA
+{
+  // Load the level data
+  MemLock(OptrToHandle(@GameLevels));
+  // No need to MemLock because the resource is already locked
+  @call LadderGameLevel::MSG_LVL_LOAD_LEVEL(ConstructOptr(OptrToHandle(@GameLevels), g.ss.level.data));
+  MemUnlock(OptrToHandle(@GameLevels));
+  // Calculate the bonus time
+  g.ss.level.time -= LevelAndTimeReductionByRound(g.ss.game.round) >> 8;
+  // Handle message type
+  switch (message)
+  {
+  case MSG_LAD_DEMO_LOAD_DATA:
+    // Start the demo initialization
+    @send process::MSG_LAD_DEMO_INIT();
+    break;
+  case MSG_LAD_PLAY_LOAD_DATA:
+    // Start the timer for the initialization of the round
+    g.ss.restorePoint = MSG_LAD_PLAY_INIT;
+    g.ns.timerHandle = TimerStart(TIMER_EVENT_ONE_SHOT, oself, DLY_T_LOAD, MSG_LAD_PLAY_INIT, 0, &g.ns.timerId);
+//  break;
+  }
+}
+
+/***********************************************************************
+ *                  MSG_LAD_DEMO_INIT, MSG_LAD_PLAY_INIT
+ *                  for LadderProcessClass
+ ***********************************************************************
+ * SYNOPSIS:        Initialize the round.
+ * CALLED BY:       (a) MSG_LAD_DEMO_INIT:
+ *                      from MSG_LAD_DEMO_LOAD_DATA
+ *                  (b) MSG_LAD_PLAY_INIT:
+ *                      One shot timer from MSG_LAD_PLAY_LOAD_DATA or
+ *                      MSG_LAD_PLAY_CLEAR
+ * PARAMETERS:      void ( void )
+ * RETURN:          nothing
+ * SIDE EFFECTS:    none
+ *
+ * STRATEGY:        1/ Initialize the Lad.
+ *                  2/ Initialize the Ders.
+ *                  3/ Initialize the start time.
+ *
+ * REVISION HISTORY:
+ *      Name    Date          Description
+ *      ----    ----          -----------
+ *      boa     2011-01-18    Initial Revision
+ *
+ ***********************************************************************/
+@extern method LadderProcessClass, MSG_LAD_DEMO_INIT,
+                                   MSG_LAD_PLAY_INIT
+{
+  word i;
+  // Initialize Lad
+  g.ss.lad.cpos = g.ss.level.spos;
+  g.ss.lad.lpos = g.ss.level.spos;
+  g.ss.lad.cdir = DIR_NONE;
+  g.ss.lad.ndir = DIR_NONE;
+  g.ss.lad.cjump = 0;
+  g.ss.lad.njump = L_FALSE;
+  g.ss.lad.face = LAD_C_STAY;
+  // Initialize Ders
+  for (i = 0; i < g.ss.level.ders; i++)
+  {
+    g.ss.ders[i].cpos = POS_NONE;
+    g.ss.ders[i].lpos = POS_NONE;
+    g.ss.ders[i].dir = DIR_S;
+    g.ss.ders[i].state = i + DER_S_ARMED;
+  }
+  // Reset the ticks
+  g.ss.game.ticks = 0;
+  // Clear the actors
+  @send LadderGameActors::MSG_ACT_RESET();
+  // Add the lad to the actors
+  @send LadderGameActors::MSG_ACT_ADD(POS_NONE, 0, g.ss.lad.cpos, g.ss.lad.face);
+  // Show the play screen
+  @send LadderView::MSG_GEN_VIEW_SET_CONTENT(@LadderGame);
+  // Update the values of the current lads, round and score
+  @send LadderGameLads::MSG_VAL_UPDATE_VALUE(g.ss.game.lads);
+  @send LadderGameRound::MSG_VAL_UPDATE_VALUE(g.ss.game.round);
+  @send LadderGameScore::MSG_VAL_UPDATE_VALUE(g.ss.game.score);
+  // Update the value of the current bonus time
+  g.ss.game.time = g.ss.level.time;
+  @send LadderGameTime::MSG_VAL_UPDATE_VALUE(g.ss.game.time);
+  // Draw the Lad
+  @send LadderGameActors::MSG_ACT_DRAW();
+  // Handle message type
+  switch (message)
+  {
+  case MSG_LAD_DEMO_INIT:
+    // Initialize counter of demo moves
+    g.ns.moveIndex = 0;
+    // Skip get ready, directly start the demo
+    @send process::MSG_LAD_DEMO_START();
+    break;
+  case MSG_LAD_PLAY_INIT:
+    // Do the get ready
+    g.ss.restorePoint = MSG_LAD_PLAY_READY;
+    @send process::MSG_LAD_PLAY_READY();
+//  break;
+  }
+}
+
+/***********************************************************************
+ *                  MSG_LAD_PLAY_READY
+ *                  for LadderProcessClass
+ ***********************************************************************
+ * SYNOPSIS:        Show get ready message.
+ * CALLED BY:       MSG_LAD_PLAY_INIT
+ * PARAMETERS:      void ( void )
+ * RETURN:          nothing
+ * SIDE EFFECTS:    none
+ *
+ * STRATEGY:        1/ Show the get ready text in the info line.
+ *                  2/ Hide mouse pointer.
+ *                  2/ Start get ready count down.
+ *
+ * REVISION HISTORY:
+ *      Name    Date          Description
+ *      ----    ----          -----------
+ *      boa     2011-01-18    Initial Revision
+ *      boa     2024-08-30    Splited for count down
+ *
+ ***********************************************************************/
+@extern method LadderProcessClass, MSG_LAD_PLAY_READY
+{
+  // Check if we should cancel the execution
+  if (g.ss.cancelExecution == L_TRUE)
+  {
+    // Set restore point and pause the game
+    g.ss.restorePoint = MSG_LAD_PLAY_HOLD;
+    @send process::MSG_LAD_PLAY_HOLD();
+    return;
+  }
+  // Update the info line with the get ready text
+  @send LadderInfo::MSG_TXT_UPDATE_TEXT(@PlayReady);
+  // Hide mouse pointer by setting an empty pointer image if not maximized
+  if (g.ss.windowState != WIN_S_MAXI)
+  {
+    MemLock(OptrToHandle(@LadderHidePointer));
+    @call LadderView::MSG_GEN_VIEW_SET_PTR_IMAGE(@LadderHidePointer, PIL_WINDOW);
+    MemUnlock(OptrToHandle(@LadderHidePointer));
+  }
+  // Initialize the get ready counter
+  g.ns.readyCount = CNT_S_READY;
+  // Set the input state for the handling of key presses
+  g.ss.inputState = INP_S_PLAY;
+  // Start get ready count down
+  @send process::MSG_LAD_PLAY_READY_EXEC();
+}
+
+/***********************************************************************
+ *                  MSG_LAD_PLAY_READY_EXEC
+ *                  for LadderProcessClass
+ ***********************************************************************
+ * SYNOPSIS:        Do count down and start the game.
+ * CALLED BY:       MSG_LAD_PLAY_READY
+ * PARAMETERS:      void ( void )
+ * RETURN:          nothing
+ * SIDE EFFECTS:    none
+
+ *
+ * STRATEGY:        1/ Check the count down.
+ *                  2/ If count down has not finished play count down 
+ *                     sound and continue with count down.
+ *                  3/ If count down has finished play count down finish
+ *                     sound and start the game.
+ *
+ * REVISION HISTORY:
+ *      Name    Date          Description
+ *      ----    ----          -----------
+ *      boa     2024-08-30    Initial Revision
+ *
+ ***********************************************************************/
+@extern method LadderProcessClass, MSG_LAD_PLAY_READY_EXEC
+{
+  // Check if we should cancel the execution
+  if (g.ss.cancelExecution == L_TRUE)
+  {
+    // Set restore point and pause the game
+    g.ss.restorePoint = MSG_LAD_PLAY_HOLD;
+    @send process::MSG_LAD_PLAY_HOLD();
+    return;
+  }
+  // Start the play when the count down has reached 1
+  if (g.ns.readyCount == 1)
+  {
+    // Initialize ready ticks
+    g.ns.readyTicks = 0;
+    // Set restore point and start the game
+    g.ss.restorePoint = MSG_LAD_PLAY_START;
+    @send process::MSG_LAD_PLAY_START();
+    return;
+  }
+  // Either show or clear the get ready message
+  if (g.ns.readyCount % 2 == 1)
+  {
+    // Update the info line with the get ready text
+    @send LadderInfo::MSG_TXT_UPDATE_TEXT(@PlayReady);
+    // Play "Get ready" sound
+    @send SoundWorker::MSG_SOUND_WORKER_NOISE_PLAY_SINGLE(2);
+  }
+  else
+  {
+    // Clear the text in the info line
+    @send LadderInfo::MSG_TXT_UPDATE_TEXT(NullOptr);
+  }
+  // Decrement count down
+  g.ns.readyCount--;
+  // Start the timer to continue with the count down
+  g.ns.timerHandle = TimerStart(TIMER_EVENT_ONE_SHOT, oself, DLY_B_READY + 2 * g.ss.game.delay, message, 0, &g.ns.timerId);
+}
+
+
+/***********************************************************************
+ *                  MSG_LAD_DEMO_START, MSG_LAD_PLAY_START
+ *                  for LadderProcessClass
+ ***********************************************************************
+ * SYNOPSIS:        Clear info line and start the round execution.
+ * CALLED BY:       (a) MSG_LAD_DEMO_START:
+ *                      from MSG_LAD_DEMO_INIT
+ *                  (b) MSG_LAD_PLAY_START:
+ *                      from MSG_LAD_PLAY_READY_EXEC or user by
+ *                      pressing the key 'ENTER' when game is paused.
+ * PARAMETERS:      void ( void )
+ * RETURN:          nothing
+ * SIDE EFFECTS:    none
+ *
+ * STRATEGY:        1/ Clear the info line.
+ *                  2/ Start the execution of the round.
+ *
+ * REVISION HISTORY:
+ *      Name    Date          Description
+ *      ----    ----          -----------
+ *      boa     2011-01-18    Initial Revision
+ *
+ ***********************************************************************/
+@extern method LadderProcessClass, MSG_LAD_DEMO_START,
+                                   MSG_LAD_PLAY_START
+{
+  Message msg = NULL;
+  // Handle message type
+  switch (message)
+  {
+  case MSG_LAD_DEMO_START:
+    // Set the text in the info line
+    @send LadderInfo::MSG_TXT_UPDATE_TEXT(@DemoInfo);
+    // Start the execution of the demo
+    msg = MSG_LAD_DEMO_EXEC;
+    break;
+  case MSG_LAD_PLAY_START:
+    // Set the input state for the handling of key presses
+    g.ss.inputState = INP_S_EXEC;
+    // Update the info line with the go text
+    @send LadderInfo::MSG_TXT_UPDATE_TEXT(@PlayGo);
+    // Play "Start" sound
+    @send SoundWorker::MSG_SOUND_WORKER_NOISE_PLAY_SINGLE(3);
+    // Set restore point and start the execution of the play
+    g.ss.restorePoint = MSG_LAD_PLAY_EXEC;
+    msg = MSG_LAD_PLAY_EXEC;
+//  break;
+  }
+  g.ns.timerHandle = TimerStart(TIMER_EVENT_CONTINUAL, oself, 0, msg, g.ss.game.delay, &g.ns.timerId);
+}
+
+/***********************************************************************
+ *                  MSG_LAD_DEMO_EXEC, MSG_LAD_PLAY_EXEC
+ *                  for LadderProcessClass
+ ***********************************************************************
+ * SYNOPSIS:        Execute a frame of the round.
+ * CALLED BY:       (a) MSG_LAD_DEMO_EXEC:
+ *                      Continual timer from MSG_LAD_DEMO_START
+ *                  (b) MSG_LAD_PLAY_EXEC:
+ *                      Continual timer from MSG_LAD_PLAY_START
+ * PARAMETERS:      void ( void )
+ * RETURN:          nothing
+ * SIDE EFFECTS:    none
+ *
+ * STRATEGY:        1/ Move the Lad and Ders.
+ *                  2/ Handle level elements.
+ *                  3/ Handle collision of Lad and Ders.
+ *                  4/ Check for running out of bonus time.
+ *
+ * REVISION HISTORY:
+ *      Name    Date          Description
+ *      ----    ----          -----------
+ *      boa     2011-01-18    Initial Revision
+ *
+ ***********************************************************************/
+@extern method LadderProcessClass, MSG_LAD_DEMO_EXEC,
+                                   MSG_LAD_PLAY_EXEC
+{
+  char f;
+  word i, pnts, secs;
+  Message msg;
+  // Set the default message to nothing
+  msg = NULL;
+  // Set the earning points to zero
+  pnts = 0;
+  // Return if we don't have a valid TimerHandle or the input state is not DEMO or EXEC
+  if ((g.ns.timerHandle == NullHandle) || ((g.ss.inputState != INP_S_DEMO) && (g.ss.inputState != INP_S_EXEC)))
+  {
+    return;
+  }
+  // Check if we should cancel the execution
+  if (g.ss.cancelExecution == L_TRUE)
+  {
+    switch (message)
+    {
+    case MSG_LAD_DEMO_EXEC:
+      // Stop the demo
+      @send process::MSG_LAD_DEMO_STOP();
+      break;
+    case MSG_LAD_PLAY_EXEC:
+      // Set restore point and the pause the game
+      g.ss.restorePoint = MSG_LAD_PLAY_HOLD;
+      @send process::MSG_LAD_PLAY_HOLD();
+//    break;
+    }
+    return;
+  }
+  // Reset the actors
+  @send LadderGameActors::MSG_ACT_RESET();
+  // Handle demo moves
+  if (message == MSG_LAD_DEMO_EXEC)
+  {
+    optr o;
+    o = ConstructOptr(OptrToHandle(@GameDemos), g.ns.moves);
+    // Lock the demo moves
+    MemLock(OptrToHandle(o));
+    // Verify we don't read beyond
+    if (g.ns.moveIndex < (LMemGetChunkSize(o) / sizeof(GLMove)))
+    {
+      GLMove *move;
+      // Get the pointer of the demo moves
+      move = LMemDeref(o);
+      // Check if we are at the right position
+      if (g.ss.lad.cpos == move[g.ns.moveIndex].tpos)
+      {
+        // Update Lad movement
+        g.ss.lad.ndir = move[g.ns.moveIndex].ndir;
+        g.ss.lad.njump = move[g.ns.moveIndex].njump;
+        // Point to the next move
+        g.ns.moveIndex++;
+      }
+    }
+    // Unlock the demo move
+    MemUnlock(OptrToHandle(o));
+  }
+  // Cleanup ready go
+  if (message == MSG_LAD_PLAY_EXEC)
+  {
+    // Check if ready go message is active
+    if (g.ns.readyCount > 0)
+    {
+      // Increase our counter by the passed ticks
+      g.ns.readyTicks += g.ss.game.delay;
+      // Check if the ready time passed away
+      if (g.ns.readyTicks > DLY_T_READY_GO)
+      {
+        // Clear the text in the info line
+        @send LadderInfo::MSG_TXT_UPDATE_TEXT(NullOptr);
+        // Set ready counter to 0 to finish handling
+        g.ns.readyCount = 0;
+      }
+    }
+  }
+  // Lock the level buffer
+  MemLock(OptrToHandle(@GameLevelBuffer));
+  // Get the pointer of the level buffer
+  g.ns.levelBuffer = LMemDeref(@GameLevelBuffer);
+  // ::: HANDLE LAD :::
+  // Move the Lad
+  MoveLad();
+  // Handle disappearing floor
+  if (*(g.ns.levelBuffer + g.ss.lad.lpos + LVL_COLS) == LSD_C_BASE2)
+  {
+    *(g.ns.levelBuffer + g.ss.lad.lpos + LVL_COLS) = LSD_C_SPACE;
+    @send LadderGameActors::MSG_ACT_ADD(POS_NONE, 0, g.ss.lad.lpos + LVL_COLS, LSD_C_SPACE);
+  }
+  // Handle gold statue, exit, trap and ball
+  switch (*(g.ns.levelBuffer + g.ss.lad.cpos))
+  {
+  case LSD_C_GOLD:
+    pnts += PNT_GOLD;
+    *(g.ns.levelBuffer + g.ss.lad.cpos) = LSD_C_SPACE;
+    // Add "Earn gold statue" sound
+    @send SoundWorker::MSG_SOUND_WORKER_NOISE_ADD_MULTI(4);
+    break;
+  case LSD_C_EXIT:
+    // Set restore point and message to do the hooka
+    g.ss.restorePoint = MSG_LAD_PLAY_HOOKA;
+    msg = MSG_LAD_PLAY_HOOKA;
+    break;
+  case LSD_C_TRAP:
+    // Set restore point and message to stop play
+    g.ss.restorePoint = MSG_LAD_PLAY_FAIL;
+    msg = MSG_LAD_PLAY_FAIL;
+    break;
+  case LSD_C_BALL:
+    if (g.ss.lad.cjump == 0)
+    {
+      g.ss.lad.cjump = Random(2);
+      g.ss.lad.ndir = (Random(2) == 1) ? DIR_E : DIR_W;
+    }
+  }
+  // Add the Lad and its last background to the actors
+  f = *(g.ns.levelBuffer + g.ss.lad.lpos);
+  @send LadderGameActors::MSG_ACT_ADD(g.ss.lad.lpos, f, g.ss.lad.cpos, g.ss.lad.face);
+  // ::: HANDLE DERS :::
+  // Move the Ders
+  MoveDers();
+  // ::: HANDLE LAD AND DERS :::
+  for (i = 0; i < g.ss.level.ders; i++)
+  {
+    // Handle receiver
+    if (*(g.ns.levelBuffer + g.ss.ders[i].cpos) == LSD_C_RECV)
+    {
+      g.ss.ders[i].state = DER_S_RECYCLE;
+    }
+    // Handle Lad over Der
+    if ((g.ss.lad.cpos + LVL_COLS == g.ss.ders[i].cpos) ||
+        (g.ss.lad.cpos + 2 * LVL_COLS == g.ss.ders[i].cpos) ||
+        (g.ss.lad.cpos + LVL_COLS == g.ss.ders[i].lpos) ||
+        (g.ss.lad.cpos + 2 * LVL_COLS == g.ss.ders[i].lpos) ||
+        (g.ss.lad.lpos + LVL_COLS == g.ss.ders[i].cpos) ||
+        (g.ss.lad.lpos + 2 * LVL_COLS == g.ss.ders[i].cpos))
+    {
+      pnts += PNT_DER;
+      // Add "Jump over Der" sound
+      @send SoundWorker::MSG_SOUND_WORKER_NOISE_ADD_MULTI(5);
+    }
+    // Handle collision of Lad and Der
+    if (g.ss.lad.cpos == g.ss.ders[i].cpos)
+    {
+      g.ss.restorePoint = MSG_LAD_PLAY_FAIL;
+      msg = MSG_LAD_PLAY_FAIL;
+    }
+    if ((g.ss.lad.cpos == g.ss.ders[i].lpos) && (g.ss.lad.lpos == g.ss.ders[i].cpos))
+    {
+      g.ss.ders[i].cpos = g.ss.ders[i].lpos;
+//      g.ss.lad.cpos = g.ss.lad.lpos;
+      g.ss.restorePoint = MSG_LAD_PLAY_FAIL;
+      msg = MSG_LAD_PLAY_FAIL;
+    }
+    // Add the Der and its last background to the actors
+    f = *(g.ns.levelBuffer + g.ss.ders[i].lpos);
+    switch (g.ss.ders[i].state)
+    {
+    case DER_S_LEAVE:
+      @send LadderGameActors::MSG_ACT_ADD(POS_NONE, 0, g.ss.ders[i].cpos, DER_C);
+      break;
+    case DER_S_MOVE:
+      @send LadderGameActors::MSG_ACT_ADD(g.ss.ders[i].lpos, f, g.ss.ders[i].cpos, DER_C);
+      break;
+    case DER_S_RECYCLE:
+      @send LadderGameActors::MSG_ACT_ADD(g.ss.ders[i].lpos, f, POS_NONE, 0);
+//    break;
+    }
+  }
+  // Unlock the level buffer
+  MemUnlock(OptrToHandle(@GameLevelBuffer));
+  // Draw the actors
+  @send LadderGameActors::MSG_ACT_DRAW();
+  // ::: HANDLE POINTS :::
+  // Update score and lads
+  if (pnts > 0)
+  {
+    if (NewLadByScoreIncrease(pnts) == L_TRUE)
+    {
+      IncreaseLads();
+      @send LadderGameLads::MSG_VAL_UPDATE_VALUE(g.ss.game.lads);
+    }
+    IncreaseScore(pnts);
+    @send LadderGameScore::MSG_VAL_UPDATE_VALUE(g.ss.game.score);
+  }
+  // ::: HANDLE BONUS TIME :::
+  // Process the bonus time
+  g.ss.game.ticks += g.ss.game.delay;
+  secs = g.ss.game.ticks / GEOS_TICKS_P_SEC;
+  if (g.ss.game.time != (g.ss.level.time - secs))
+  {
+    g.ss.game.time = g.ss.level.time - secs;
+    @send LadderGameTime::MSG_VAL_UPDATE_VALUE(g.ss.game.time);
+    if (g.ss.game.time < 10)
+    {
+      // Add "Last seconds" sound
+      @send SoundWorker::MSG_SOUND_WORKER_NOISE_ADD_MULTI(6);
+      if (message == MSG_LAD_PLAY_EXEC)
+      {
+        if (g.ss.game.time % 2 == 1)
+        {
+          // Update the info line with the hurry up text
+          @send LadderInfo::MSG_TXT_UPDATE_TEXT(@PlayHurry);
+        }
+        else
+        {
+          // Clear the info line
+          @send LadderInfo::MSG_TXT_UPDATE_TEXT(NullOptr);
+        }
+      }
+    }
+  }
+  // Check for bonus time exhausted
+  if (g.ss.game.time == 0)
+  {
+    g.ss.restorePoint = MSG_LAD_PLAY_FAIL;
+    msg = MSG_LAD_PLAY_FAIL;
+  }
+  // ::: HANDLE HOOKA, FAIL, DEMO STOP and PLAY HOLD :::
+  // Handle the message
+  if (msg != NULL)
+  {
+    // Stop the our continual timer
+    StopTimer();
+    // Handle additional tasks
+    switch (message)
+    {
+    case MSG_LAD_DEMO_EXEC:
+      // Stop the demo in all cases
+      msg = MSG_LAD_DEMO_STOP;
+      break;
+    case MSG_LAD_PLAY_EXEC:
+      // Set input state
+      g.ss.inputState = INP_S_PLAY;
+//    break;
+    }
+    // Send the message
+    @send process::{MSG_LAD_PROTO} msg();
+  }
+  // Play all added noises
+  @send SoundWorker::MSG_SOUND_WORKER_NOISE_PLAY_MULTI();
+}
+
+/***********************************************************************
+ *                  MSG_LAD_PLAY_HOLD
+ *                  for LadderProcessClass
+ ***********************************************************************
+ * SYNOPSIS:        Pause the game.
+ * CALLED BY:       User by pressing the key 'p' during the game.
+ * PARAMETERS:      void ( void )
+ * RETURN:          nothing
+ * SIDE EFFECTS:    none
+ *
+ * STRATEGY:        1/ Stop the contimual timer.
+ *                  2/ Show waiting message in the info line.
+ *
+ * REVISION HISTORY:
+ *      Name    Date          Description
+ *      ----    ----          -----------
+ *      boa     2011-01-18    Initial Revision
+ *
+ ***********************************************************************/
+@extern method LadderProcessClass, MSG_LAD_PLAY_HOLD
+{
+  // Stop the play timer
+  StopTimer();
+  // Reset cancel execution
+  g.ss.cancelExecution = L_FALSE;
+  // Set the input state for the handling of key presses
+  g.ss.inputState = INP_S_HOLD;
+  // Reset the image of the mouse cursor / pointer if not maximized
+  if (g.ss.windowState != WIN_S_MAXI)
+  {
+    @call LadderView::MSG_GEN_VIEW_SET_PTR_IMAGE(NullOptr, PIL_WINDOW);
+  }
+  // Update the info line with the wait message
+  @send LadderInfo::MSG_TXT_UPDATE_TEXT(@PlayContinue);
+}
+
+/***********************************************************************
+ *                  MSG_LAD_PLAY_FAIL
+ *                  for LadderProcessClass
+ ***********************************************************************
+ * SYNOPSIS:        The Lad collided with a Der, touched a trap or run
+ *                  out of bonus time.
+ * CALLED BY:       MSG_LAD_PLAY_EXEC
+ * PARAMETERS:      void ( void )
+ * RETURN:          nothing
+ * SIDE EFFECTS:    none
+ *
+ * STRATEGY:        1/ Decrease the Lad counter.
+ *                  2/ Reset the actors.
+ *                  3/ Let the Lad die.
+ *
+ * REVISION HISTORY:
+ *      Name    Date          Description
+ *      ----    ----          -----------
+ *      boa     2011-01-18    Initial Revision
+ *
+ ***********************************************************************/
+@extern method LadderProcessClass, MSG_LAD_PLAY_FAIL
+{
+  // Decrease the Lads
+  g.ss.game.lads--;
+  // Reset the Lad state
+  g.ss.lad.die = 0;
+  // Clear the actors
+  @send LadderGameActors::MSG_ACT_RESET();
+  // Set restore point and do the dying Lad
+  g.ss.restorePoint = MSG_LAD_PLAY_DIES;
+  @send process::MSG_LAD_PLAY_DIES();
+}
+
+/***********************************************************************
+ *                  MSG_LAD_PLAY_DIES
+ *                  for LadderProcessClass
+ ***********************************************************************
+ * SYNOPSIS:        The Lad has died.
+ * CALLED BY:       MSG_LAD_PLAY_FAIL
+ * PARAMETERS:      void ( void )
+ * RETURN:          nothing
+ * SIDE EFFECTS:    none
+ *
+ * STRATEGY:        1/ Show the dying sequence.
+ *                  2/ If Lad are left, restart the round.
+ *                  3/ Else the game has ended.
+ *
+ * REVISION HISTORY:
+ *      Name    Date          Description
+ *      ----    ----          -----------
+ *      boa     2011-01-18    Initial Revision
+ *
+ ***********************************************************************/
+@extern method LadderProcessClass, MSG_LAD_PLAY_DIES
+{
+  Message msg;
+  // Check the Lad state
+  if (g.ss.lad.die < sizeof(LDC))
+  {
+    // Add the Lad to the actors
+    @send LadderGameActors::MSG_ACT_ADD(POS_NONE, 0, g.ss.lad.cpos, LDC[g.ss.lad.die]);
+    // Draw the Lad
+    @send LadderGameActors::MSG_ACT_DRAW();
+    // Increase the state
+    g.ss.lad.die++;
+    // Play "Lad dies" sound
+    @send SoundWorker::MSG_SOUND_WORKER_NOISE_PLAY_SINGLE(10);
+    // Call our self
+    g.ns.timerHandle = TimerStart(TIMER_EVENT_ONE_SHOT, oself, DLY_B_DIES + g.ss.game.delay, message, 0, &g.ns.timerId);
+    // Return from method
+    return;
+  }
+  // Check if we still have Lads left
+  if (g.ss.game.lads > 0)
+  {
+    // Set restore point and message to clear the actors in the level
+    g.ss.restorePoint = MSG_LAD_PLAY_CLEAR;
+    msg = MSG_LAD_PLAY_CLEAR;
+  }
+  else
+  {
+    // Set restore point and message to show the game over
+    g.ss.restorePoint = MSG_LAD_PLAY_OVER;
+    msg = MSG_LAD_PLAY_OVER;
+  }
+  g.ns.timerHandle = TimerStart(TIMER_EVENT_ONE_SHOT, oself, DLY_B_READY + 2 * g.ss.game.delay, msg, 0, &g.ns.timerId);
+}
+
+/***********************************************************************
+ *                  MSG_LAD_PLAY_CLEAR
+ *                  for LadderProcessClass
+ ***********************************************************************
+ * SYNOPSIS:        Reset and clear the actors.
+ * CALLED BY:       MSG_LAD_PLAY_DIES
+ * PARAMETERS:      void ( void )
+ * RETURN:          nothing
+ * SIDE EFFECTS:    none
+ *
+ * STRATEGY:        1/ Reset the state of the actors.
+ *                  2/ Restore the background of the actors.
+ *                  3/ Initialize the round.
+ *
+ * REVISION HISTORY:
+ *      Name    Date          Description
+ *      ----    ----          -----------
+ *      boa     2011-01-18    Initial Revision
+ *
+ ***********************************************************************/
+@extern method LadderProcessClass, MSG_LAD_PLAY_CLEAR
+{
+  char *p_level;
+  word i;
+  // Reset the actors
+  @send LadderGameActors::MSG_ACT_RESET();
+  // Lock and dereference the level buffer
+  MemLock(OptrToHandle(@GameLevelBuffer));
+  p_level = LMemDeref(@GameLevelBuffer);
+  // Restore background of Ders
+  for (i = 0; i < g.ss.level.ders; i++)
+  {
+    if (g.ss.ders[i].state == DER_S_MOVE)
+    {
+      @send LadderGameActors::MSG_ACT_ADD(POS_NONE, 0, g.ss.ders[i].cpos, *(p_level + g.ss.ders[i].cpos));
+    }
+  }
+  // Restore background of Lad
+  @send LadderGameActors::MSG_ACT_ADD(POS_NONE, 0, g.ss.lad.cpos, *(p_level + g.ss.lad.cpos));
+  // Unlock the level buffer
+  MemUnlock(OptrToHandle(@GameLevelBuffer));
+  // Draw the background of the actors
+  @send LadderGameActors::MSG_ACT_DRAW();
+  // Set restore point and initialize the level
+  g.ss.restorePoint = MSG_LAD_PLAY_INIT;
+  @send process::MSG_LAD_PLAY_INIT();
+}
+
+/***********************************************************************
+ *                  MSG_LAD_PLAY_HOOKA
+ *                  for LadderProcessClass
+ ***********************************************************************
+ * SYNOPSIS:        Handle bonus time.
+ * CALLED BY:       MSG_LAD_PLAY_EXEC or one shot timer from self
+ * PARAMETERS:      void ( void )
+ * RETURN:          nothing
+ * SIDE EFFECTS:    none
+ *
+ * STRATEGY:        1/ Decrease the bonus time and increase the score.
+ *                  2/ Update the values on screen
+ *                  3/ Show or clear the message in the info line.
+ *                  4/ If no bonus time is left, start the next round.
+ *
+ * REVISION HISTORY:
+ *      Name    Date          Description
+ *      ----    ----          -----------
+ *      boa     2011-01-18    Initial Revision
+ *
+ ***********************************************************************/
+@extern method LadderProcessClass, MSG_LAD_PLAY_HOOKA
+{
+  optr o;
+  // Do the hooka
+  if (g.ss.game.time > 0)
+  {
+    // Update lads
+    if (NewLadByScoreIncrease(PNT_TIME) == L_TRUE)
+    {
+      IncreaseLads();
+      @send LadderGameLads::MSG_VAL_UPDATE_VALUE(g.ss.game.lads);
+    }
+    // Increase and update score
+    IncreaseScore(PNT_TIME);
+    @send LadderGameScore::MSG_VAL_UPDATE_VALUE(g.ss.game.score);
+    // Decrease and update bonus time
+    g.ss.game.time--;
+    @send LadderGameTime::MSG_VAL_UPDATE_VALUE(g.ss.game.time);
+    // Clear the info line
+    o = NullOptr;
+    // Update hooka state
+    if (g.ss.hookaState == L_FALSE)
+    {
+      g.ss.hookaState = L_TRUE;
+      // Update the info line with the hooka text
+      o = @PlayHooka;
+    }
+    else
+    {
+      g.ss.hookaState = L_FALSE;
+    }
+    // Update the status line
+    @send LadderInfo::MSG_TXT_UPDATE_TEXT(o);
+    // Play "Lad hooka" sound
+    @send SoundWorker::MSG_SOUND_WORKER_NOISE_PLAY_SINGLE(9);
+    // Start the timer for our self
+    g.ss.restorePoint = MSG_LAD_PLAY_HOOKA;
+    g.ns.timerHandle = TimerStart(TIMER_EVENT_ONE_SHOT, oself, DLY_B_HOOKA + g.ss.game.delay, message, 0, &g.ns.timerId);
+  }
+  else
+  {
+    // Set restore point and start the next level
+    g.ss.restorePoint = MSG_LAD_PLAY_NEXT;
+    @send process::MSG_LAD_PLAY_NEXT();
+  }
+}
+
+/***********************************************************************
+ *                  MSG_LAD_PLAY_NEXT
+ *                  for LadderProcessClass
+ ***********************************************************************
+ * SYNOPSIS:        Prepare the next round.
+ * CALLED BY:       MSG_LAD_PLAY_HOOKA
+ * PARAMETERS:      void ( void )
+ * RETURN:          nothing
+ * SIDE EFFECTS:    none
+ *
+ * STRATEGY:        1/ Increase the round.
+ *                  2/ Get level and time reduction.
+ *                  3/ Load next level or end game if no more left.
+ *
+ * REVISION HISTORY:
+ *      Name    Date          Description
+ *      ----    ----          -----------
+ *      boa     2011-01-18    Initial Revision
+ *
+ ***********************************************************************/
+@extern method LadderProcessClass, MSG_LAD_PLAY_NEXT
+{
+  // Increase the round
+  g.ss.game.round++;
+  // Get the level for the current round
+  g.ss.game.level = LevelAndTimeReductionByRound(g.ss.game.round) & 0x0F;
+  // Check if there are no more levels
+  MemLock(OptrToHandle(@GameLevels));  
+  if (g.ss.game.level > ChunkArrayGetCount(@GameLevels))
+  {
+    // Set restore point and show the last screen
+    g.ss.restorePoint = MSG_LAD_PLAY_DONE;
+    @send process::MSG_LAD_PLAY_DONE();
+  }
+  else
+  {
+    // Set restore point and load the header of next level
+    g.ss.restorePoint = MSG_LAD_PLAY_LOAD_HEAD;
+    @send process::MSG_LAD_PLAY_LOAD_HEAD();
+  }
+  MemUnlock(OptrToHandle(@GameLevels));
+}
+
+
+/* End of 'ladgame.goc' */

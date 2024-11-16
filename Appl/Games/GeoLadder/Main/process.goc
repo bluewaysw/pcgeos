@@ -1,0 +1,1658 @@
+/*
+ ***************************************************************************
+ * Copyright 2019 Andreas Bollhalder
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ ***************************************************************************
+ */
+
+
+/*
+ ***************************************************************************
+ * Copyright (c) 2010-2024 by YoYu-Productions
+ *
+ * PROJECT:     GeoLadder
+ * MODULE:      GOC code file
+ * FILE:        Main\process.goc
+ *
+ * AUTHOR:      Andreas Bollhalder
+ ***************************************************************************
+ */
+
+
+/*
+ ***************************************************************************
+ *                  COMPILER SWITCHES
+ ***************************************************************************
+ */
+
+#pragma disable_message(303)
+
+
+/*
+ ***************************************************************************
+ *                  INCLUDE FILES
+ ***************************************************************************
+ */
+
+@include <stdapp.goh>
+
+@include <ladder.goh>
+@include <UI/appui.goh>
+@include <Main/sndwork.goh>
+
+#include "initfile.h"
+#include <sound.h>
+#include <Ansi/ctype.h>
+#include <Ansi/stdio.h>
+#include <Ansi/string.h>
+
+
+/*
+ ***************************************************************************
+ *                  EXTERNAL DECLARATIONS (see LADPALY.GOC)
+ ***************************************************************************
+ */
+
+extern GLGlobals g;
+
+extern word _pascal Random(word max);
+static void _pascal MenuSoundSetMode(word mode);
+
+
+/*
+ ***************************************************************************
+ *                  LOCAL DECLARATIONS
+ ***************************************************************************
+ */
+
+static char ICA[] = INI_CAT_APP;
+static char IKF[] = INI_KEY_FONT;
+static char IKD[] = INI_KEY_DIFF;
+static char IKS[] = INI_KEY_SOUND;
+
+static char ICU[] = INI_CAT_UI;
+static char IKP[] = INI_KEY_PRODUCT;
+
+
+void _pascal StopTimer(void);
+static word _pascal TicksByDifficulty(word diff);
+
+
+/*
+ ***************************************************************************
+ *                  FUNCTIONS
+ ***************************************************************************
+ */
+
+/***********************************************************************
+ *                  StopTimer
+ ***********************************************************************
+ * SYNOPSIS:        Stop a running timer and reset the global variables
+ *                  of the timer.
+ * CALLED BY:       Internal
+ * PARAMETERS:      void ( void )
+ * RETURN:          nothing
+ * SIDE EFFECTS:    We do not flush the message queue which could
+ *                  contain an already sent message.
+ *
+ * STRATEGY:        1/ Check if the global TimerHandle is not a
+ *                     NullHandle.
+ *                  2/ Stop the timer referenced by the global
+ *                     TimerHandle.
+ *                  3/ Set the global TimerHandle to a NullHandle.
+ *                  4/ Set the global TimerID to 0.
+ *
+ * REVISION HISTORY:
+ *      Name    Date          Description
+ *      ----    ----          -----------
+ *      boa     2011-01-18    Initial Revision
+ *
+ ***********************************************************************/
+void _pascal StopTimer(void)
+{
+  if (g.ns.timerHandle != NullHandle)
+  {
+    TimerStop(g.ns.timerHandle, g.ns.timerId);
+    g.ns.timerHandle = NullHandle;
+    g.ns.timerId = 0;
+  }
+}
+
+/***********************************************************************
+ *                  TicksByDifficulty
+ ***********************************************************************
+ * SYNOPSIS:        Calculate the ticks between two frames from the
+ *                  difficulty set by the user.
+ * FORMULA:         ticks = abs(diff - CFG_DIFF_MAX) + 5
+ * CALLED BY:       Internal
+ * PARAMETERS:      word ( word diff )
+ * RETURN:          A word containing the number of ticks.
+ * SIDE EFFECTS:    none
+ *
+ * STRATEGY:        1/ Implement the formula without FP usage.
+ *
+ * REVISION HISTORY:
+ *      Name    Date          Description
+ *      ----    ----          -----------
+ *      boa     2011-01-18    Initial Revision
+ *      boa     2024-08-29    Increase base ticks from 4 to 5
+ *
+ ***********************************************************************/
+static word _pascal TicksByDifficulty(word diff)
+{
+  sword d;
+  d = diff - CFG_DIFF_MAX;
+  if (d < 0)
+  {
+    d = -d;
+  }
+  return d + 5;
+}
+
+/***********************************************************************
+ *                  InitFontConfig
+ ***********************************************************************
+ * SYNOPSIS:        Verify that the requested font size can be used
+ *                  with the window mode.
+ * CALLED BY:       Internal
+ * PARAMETERS:      void ( word index )
+ * RETURN:          nothing
+ * SIDE EFFECTS:    none
+ *
+ * STRATEGY:        1/ Search the smallest font config.
+ *                  2/ Search the 40% font config for smallest window mode.
+ *                  3/ Search the 80% font config for largest window mode.
+ *                  4/ Search the largest font config for fullscreen mode.
+ *                  5/ Do fallback for 40% and 80% font sizes if none found.
+ *
+ * REVISION HISTORY:
+ *      Name    Date          Description
+ *      ----    ----          -----------
+ *      boa     2024-08-28    Initial Revision
+ *
+ ***********************************************************************/
+void _pascal InitFontConfig(word index)
+{
+  word i;
+  word min = FNT_R_NONE;
+  GLFont font;
+  MemLock(OptrToHandle(@FontConfigs));
+  for (i = 0; i < ChunkArrayGetCount(@FontConfigs); i++)
+  {
+    ChunkArrayGetElement(@FontConfigs, i, &font);
+    if ((font.width * SCN_COLS > g.ns.screen.R_right)
+         && (font.height * SCN_ROWS > g.ns.screen.R_bottom))
+    {
+      min = i;
+      break;
+    }
+  }
+  // Search smallest font size for window mode with at least 40% of screen
+  g.ns.fontWinMin = FNT_R_NONE;
+  for (i = 0; i < ChunkArrayGetCount(@FontConfigs); i++)
+  {
+    ChunkArrayGetElement(@FontConfigs, i, &font);
+    if ((font.width * SCN_COLS > g.ns.screen.R_right * 0.4)
+         && (font.height * SCN_ROWS > g.ns.screen.R_bottom * 0.4))
+    {
+      g.ns.fontWinMin = i;
+      break;
+    }
+  }
+  // Search largest font size for window mode with at most 80% of screen
+  g.ns.fontWinMax = FNT_R_NONE;
+  for (i = ChunkArrayGetCount(@FontConfigs); i > 0; i--)
+  {
+    ChunkArrayGetElement(@FontConfigs, i - 1, &font);
+    if ((font.width * SCN_COLS < g.ns.screen.R_right * 0.8)
+         && (font.height * SCN_ROWS < g.ns.screen.R_bottom * 0.8))
+    {
+      g.ns.fontWinMax = i - 1;
+      break;
+    }
+  }
+  // Search largest font size for fullscreen mode
+  g.ns.fontFull = FNT_R_NONE;
+  for (i = ChunkArrayGetCount(@FontConfigs); i > 0; i--)
+  {
+    ChunkArrayGetElement(@FontConfigs, i - 1, &font);
+    if ((font.width * SCN_COLS < g.ns.screen.R_right)
+         && (font.height * SCN_ROWS < g.ns.screen.R_bottom))
+    {
+      g.ns.fontFull = i - 1;
+      break;
+    }
+  }
+  // There must be found always at least the font for fullscreen mode
+  if (g.ns.fontFull != FNT_R_NONE)
+  {
+    // If we haven't found a 40% font we allow the absolute smallest
+    if (g.ns.fontWinMin == FNT_R_NONE)
+    {
+      g.ns.fontWinMin = min;
+    }
+    // If we haven't found a 80% font we allow the largest
+    if (g.ns.fontWinMax == FNT_R_NONE)
+    {
+      g.ns.fontWinMax = g.ns.fontFull;
+    }
+    // Return the requested font if in range or the middle one
+    if ((index >= g.ns.fontWinMin) && (index <= g.ns.fontWinMax))
+    {
+      g.is.fontCurrent = index;
+    }
+    else
+    {
+      g.is.fontCurrent = (g.ns.fontWinMin + g.ns.fontWinMax) / 2;
+    }
+  }
+  // No font found for fullscreen mode (we should terminate in this case...)  
+  else
+  {
+    g.is.fontCurrent = FNT_R_NONE;
+  }
+  MemUnlock(OptrToHandle(@FontConfigs));
+}
+
+/***********************************************************************
+ *                  LoadFontConfig
+ ***********************************************************************
+ * SYNOPSIS:        Verify that the requested font size can be used
+ *                  with the window mode.
+ * CALLED BY:       Internal
+ * PARAMETERS:      word ( word index )
+ * RETURN:          A word containing the font index if we could load it
+ *                  or the constant 'FNT_R_NONE' if not.
+ * SIDE EFFECTS:    none
+ *
+ * STRATEGY:        1/ Check index is in range.
+ *                  2/ Load the font data into the globals and set the index.
+ *
+ * REVISION HISTORY:
+ *      Name    Date          Description
+ *      ----    ----          -----------
+ *      boa     2024-08-06    Initial Revision
+ *      boa     2024-08-28    Rewrite for new font handling
+ *
+ ***********************************************************************/
+word _pascal LoadFontConfig(word index)
+{
+  // Check index for out of bound
+  if (((index >= g.ns.fontWinMin)
+       && (index <= g.ns.fontWinMax))
+       || (g.ss.windowState == WIN_S_MAXI) && (index == g.ns.fontFull))
+  {
+    // Get the font config
+    MemLock(OptrToHandle(@FontConfigs));
+    ChunkArrayGetElement(@FontConfigs, index, &g.ns.font);
+    MemUnlock(OptrToHandle(@FontConfigs));
+    g.is.fontCurrent = index;
+    return index;
+  }
+  return FNT_R_NONE;
+}
+
+/***********************************************************************
+ *                  MenuSoundSetMode
+ ***********************************************************************
+ * SYNOPSIS:        Set the global variable, update the menu sound text
+ *                  and switch the sound mode depending the capabilities
+ *                  of the sound driver. 
+ * CALLED BY:       Internal
+ * PARAMETERS:      void ( word mode )
+ * RETURN:          nothing
+ * SIDE EFFECTS:    none
+ *
+ * STRATEGY:        1/ If no sound capabilities are available, set the
+ *                     menu sound text to not available.
+ *                  2/ Depending the capabilities switch to the requested
+ *                     sound mode if possible.
+ *
+ * REVISION HISTORY:
+ *      Name    Date          Description
+ *      ----    ----          -----------
+ *      boa     2024-11-07    Initial Revision
+ *
+ ***********************************************************************/
+static void _pascal MenuSoundSetMode(word mode)
+{
+  word c = SW_CAPABILITY_NONE;
+  optr o = NullOptr;
+  // Get the sound capabilities
+  c = @call SoundWorker::MSG_SOUND_WORKER_GET_CAPABILITIES();
+  // Verify we have sound support
+  if (c == SW_CAPABILITY_NONE)
+  {
+    // No sound supported
+    g.is.sound = CFG_SND_OFF;
+    o = @MenuSoundUnavailable;
+  }
+  else
+  {
+    // Try to fulfill the requested mode, fallback to noise only or disable sound
+    switch (mode)
+    {
+    case CFG_SND_BOTH:
+      if (c & SW_CAPABILITY_MUSIC)
+      {
+        g.is.sound = CFG_SND_BOTH;
+        o = @MenuSoundBoth;
+        @call SoundWorker::MSG_SOUND_WORKER_INIT_MODES(SW_MODE_NOISE | SW_MODE_MUSIC);
+        break;
+      }
+    case CFG_SND_NOISE:
+      if (c & SW_CAPABILITY_NOISE && mode != CFG_SND_BOTH)
+      {
+        g.is.sound = CFG_SND_NOISE;
+        o = @MenuSoundNoise;
+        @call SoundWorker::MSG_SOUND_WORKER_INIT_MODES(SW_MODE_NOISE);
+        break;
+      }
+    default:
+      g.is.sound = CFG_SND_OFF;
+      o = @MenuSoundOff;
+      @call SoundWorker::MSG_SOUND_WORKER_INIT_MODES(SW_MODE_OFF);
+//    break;
+    }
+  }
+  // Update the text on screen
+  @send LadderMenuSound::MSG_TXT_UPDATE_TEXT(o);
+}
+
+
+/*
+ ***************************************************************************
+ *                  CODE for LadderProcessClass
+ ***************************************************************************
+ */
+
+@classdecl LadderProcessClass, neverSaved;
+
+@extern method LadderProcessClass, MSG_LAD_DEMO_LOAD_HEAD, MSG_LAD_PLAY_LOAD_HEAD;
+@extern method LadderProcessClass, MSG_LAD_DEMO_LOAD_DATA, MSG_LAD_PLAY_LOAD_DATA;
+@extern method LadderProcessClass, MSG_LAD_PLAY_LOAD_SHOW;
+@extern method LadderProcessClass, MSG_LAD_DEMO_INIT, MSG_LAD_PLAY_INIT;
+@extern method LadderProcessClass, MSG_LAD_PLAY_READY;
+@extern method LadderProcessClass, MSG_LAD_PLAY_READY_EXEC;
+@extern method LadderProcessClass, MSG_LAD_DEMO_START, MSG_LAD_PLAY_START;
+@extern method LadderProcessClass, MSG_LAD_DEMO_EXEC, MSG_LAD_PLAY_EXEC;
+@extern method LadderProcessClass, MSG_LAD_PLAY_HOLD;
+@extern method LadderProcessClass, MSG_LAD_PLAY_FAIL;
+@extern method LadderProcessClass, MSG_LAD_PLAY_DIES;
+@extern method LadderProcessClass, MSG_LAD_PLAY_CLEAR;
+@extern method LadderProcessClass, MSG_LAD_PLAY_HOOKA;
+@extern method LadderProcessClass, MSG_LAD_PLAY_NEXT;
+@extern method LadderProcessClass, MSG_LAD_FONT_SET_SIZE;
+@extern method LadderProcessClass, MSG_LAD_FONT_DEC_SIZE;
+@extern method LadderProcessClass, MSG_LAD_FONT_INC_SIZE;
+@extern method LadderProcessClass, MSG_LAD_RESIZE_WINDOW;
+
+
+/***********************************************************************
+ *                  MSG_GEN_PROCESS_OPEN_APPLICATION
+ *                  for LadderProcessClass
+ ***********************************************************************
+ * SYNOPSIS:        Setup the memory and initialize values.
+ * CALLED BY:       Startup
+ * PARAMETERS:      void ( AppAttachFlags attachFlags,
+ *                         MemHandle launchBlock,
+ *                         MemHandle extraState )
+ * RETURN:          nothing
+ * SUPER:           Must be called before any visible actions.
+ * SIDE EFFECTS:    If the reallocation of memory for the level buffer
+ *                  fails, unexpected behaviour will happen.
+ *
+ * STRATEGY:        1/ Set the help file name from localized chunk.
+ *                  2/ Get the our version number from the system.
+ *                  3/ Get the GEOS product name from the INI file.
+ *                  4/ Reallocate level buffer to the full space.
+ *                  5/ Initialize SoundWorker object.
+ *                  6/ Load the difficulty, sound and last score from
+ *                     the INI file and set the objects to display them.
+ *                     If the values can't be read from the INI file,
+ *                     set default values.
+ *                  7/ Send message to the LadderRank object to read in
+ *                     the ranking list from his file.
+ *                  8/ Call super to do the default behaviour.
+ *                  9/ Start the menu.
+ *
+ * REVISION HISTORY:
+ *      Name    Date          Description
+ *      ----    ----          -----------
+ *      boa     2011-01-18    Initial Revision
+ *
+ ***********************************************************************/
+@method LadderProcessClass, MSG_GEN_PROCESS_OPEN_APPLICATION
+{
+  static char buf[32] = "";
+  word size;
+  GenReturnParams grp;
+  DisplayScheme ds;
+  MemHandle mh;
+  ReleaseNumber rn;
+  // Set the menu as the default
+  Message msg = MSG_LAD_MENU;
+  // Initialize error state
+  g.ns.startupError = L_FALSE;
+  // Set the help file name
+  MemLock(OptrToHandle(@LadderHelpFile));
+  memcpy(&buf, LMemDeref(@LadderHelpFile), LMemGetChunkSize(@LadderHelpFile));
+  @call application::MSG_META_SET_HELP_FILE(buf);
+  MemUnlock(OptrToHandle(@LadderHelpFile));
+  // Get and set the version number
+  GeodeGetInfo(GeodeGetProcessHandle(), GGIT_GEODE_RELEASE, &rn);
+  MemLock(OptrToHandle(@MenuVersion));
+  LMemReAlloc(@MenuVersion, 24);
+  sprintf(LMemDeref(@MenuVersion), "%u.%u %u-%u", rn.RN_major, rn.RN_minor, rn.RN_change, rn.RN_engineering);
+  MemUnlock(OptrToHandle(@MenuVersion));
+  // Get the product name and set it as the terminal name
+  // There is _NO_ null terminator!
+  if (!InitFileReadStringBlock(&ICU, &IKP, &mh, 0, &size))
+  {
+    if (size > 23) size = 23;
+    MemLock(OptrToHandle(@MenuTerminal));
+    LMemReAlloc(@MenuTerminal, size + 1);
+    sprintf(LMemDeref(@MenuTerminal), "%s", MemLock(mh));
+   // Free the memory handle, no need for unlock
+    MemFree(mh);
+    MemUnlock(OptrToHandle(@MenuTerminal));
+  }
+  // Resize the level buffer
+  MemLock(OptrToHandle(@GameLevelBuffer));
+  LMemReAlloc(@GameLevelBuffer, LVL_M_SIZE);
+  MemUnlock(OptrToHandle(@GameLevelBuffer));
+  // Handle restore from state file
+  if ((attachFlags & AAF_RESTORING_FROM_STATE) && extraState)
+  {
+    GLExtraState *es;
+    // Get the extra state
+    es = (GLExtraState *) MemLock(extraState);
+    // Restore the global state
+    g.ss = es->saveState;
+    // Restore execution state
+    switch (g.ss.executionState)
+    {
+    case EXE_S_HELP:
+      msg = MSG_LAD_HELP;
+      break;
+    case EXE_S_PLAY:
+      // Restore the level buffer
+      MemLock(OptrToHandle(@GameLevelBuffer));
+      memcpy(LMemDeref(@GameLevelBuffer), es->buffer, LVL_M_SIZE);
+      MemUnlock(OptrToHandle(@GameLevelBuffer));
+      // Set the message where we leaved the game play
+      msg = g.ss.restorePoint;
+//    break;
+    }
+    // Unlock the extra state
+    MemUnlock(extraState);
+  }
+  else
+  {
+    g.ss.cancelExecution = L_FALSE;
+  }
+  // Get the font size from the INI file
+  if (InitFileReadInteger(&ICA, &IKF, &g.is.fontCurrent))
+  {
+    // No entry found, set defaults
+    g.is.fontCurrent = FNT_R_NONE;
+  }
+  // Get the difficulty from the INI file
+  if (InitFileReadInteger(&ICA, &IKD, &g.is.diff))
+  {
+    // No entry found, set defaults
+    g.is.diff = 1;
+  }
+  // Get the sound from the INI file
+  if (InitFileReadInteger(&ICA, &IKS, &g.is.sound))
+  {
+    // No entry found, set defaults
+    g.is.sound = CFG_SND_OFF;
+  }
+  // Get the video resolution
+  @call application::MSG_GEN_GUP_QUERY(&grp, GUQT_FIELD);
+  WinGetWinScreenBounds(grp.GRP_bp, &g.ns.screen);
+  // Setup colors according the available ones (monochrome)
+  g.ns.areaColor = C_BLACK;
+  @call application::MSG_GEN_APPLICATION_GET_DISPLAY_SCHEME(&ds);
+  g.ns.textColor = ((ds.DS_displayType & DT_DISP_CLASS) > DC_COLOR_2)
+    ? C_LIGHT_GREEN
+    : C_WHITE;
+  // Clear global GState
+  g.ns.gstateHandle = NullHandle;
+  // Warn user if current video resolution is too small
+  InitFontConfig(g.is.fontCurrent);
+  // No MemLock / MemUnlock needed as the function does it for us
+  if (g.is.fontCurrent == FNT_R_NONE)
+  {
+    UserStandardDialogOptr(
+      NullOptr, NullOptr, NullOptr, NullOptr,
+      @LadderWarnVideoTooSmall,
+      (GIT_NOTIFICATION << CDBF_INTERACTION_TYPE_OFFSET) | (CDT_ERROR << CDBF_DIALOG_TYPE_OFFSET)
+    );
+    g.ns.startupError = L_TRUE;
+  }
+  else
+  {
+    LoadFontConfig(g.is.fontCurrent);
+  }
+  // Setup user interface if no error has occurred
+  if (g.ns.startupError == L_FALSE)
+  {
+    optr o;
+    // Initialize the sound worker object
+    @call SoundWorker::MSG_META_INITIALIZE();
+    // Set the difficulty
+    MemLock(OptrToHandle(@MenuDiffTexts));
+    ChunkArrayGetElement(@MenuDiffTexts, g.is.diff - 1, &o);
+    MemUnlock(OptrToHandle(@MenuDiffTexts));
+    @send LadderMenuDiff::MSG_TXT_SET_TEXT(o);
+    // Set the sound mode
+    MenuSoundSetMode(g.is.sound);
+    // Load the high and last scores from the file
+    @send LadderMenuRank::MSG_RNK_LOAD();
+    @send process::{MSG_LAD_PROTO} msg();
+    // Do super
+    @callsuper();
+    // Force update of view and primary
+    @send process::MSG_LAD_RESIZE_WINDOW();
+  }
+  else
+  {
+    // Do super
+    @callsuper();
+    // Send quit message to application
+    @send application::MSG_META_QUIT();
+  }
+}
+
+/***********************************************************************
+ *                  MSG_GEN_PROCESS_CLOSE_APPLICATION
+ *                  for LadderProcessClass
+ ***********************************************************************
+ * SYNOPSIS:        Stop and release self allocated resources, save
+ *                  state values.
+ * CALLED BY:       Shutdown
+ * PARAMETERS:      MemHandle ( void )
+ * RETURN:          NullHandle
+ * SUPER:           Must be called after releasing any self allocated
+ *                  resources.
+ * SIDE EFFECTS:    none
+ *
+ * STRATEGY:        1/ Stop any potentially running timer.
+ *                  2/ Stop and free the MemHandle for playing noises.
+ *                  3/ Save the difficulty and sound state to the
+ *                     INI file.
+ *                  4/ Call super to do the default behaviour.
+ *                  5/ Return a NullHandle to indicate we don't have
+ *                     any extra state.
+ *
+ * REVISION HISTORY:
+ *      Name    Date          Description
+ *      ----    ----          -----------
+ *      boa     2011-01-18    Initial Revision
+ *
+ ***********************************************************************/
+@method LadderProcessClass, MSG_GEN_PROCESS_CLOSE_APPLICATION
+{
+  GLExtraState *es;
+  MemHandle mh;
+  // In we are called due to an error during startup, simply return without saving any states
+  if (g.ns.startupError == L_TRUE)
+  {
+    return NullHandle;
+  }
+  // Stop the current timer
+  StopTimer();
+  // Stop the music and free noise voices
+  @call SoundWorker::MSG_SOUND_WORKER_INIT_MODES(SW_MODE_OFF);
+  // Return to not maximized
+  if (g.ss.windowState == WIN_S_MAXI)
+  {
+    g.is.fontCurrent = g.ns.fontSaved;
+    g.ss.windowState = WIN_S_NORM;
+  }
+  // Write the font size to the INI file
+  InitFileWriteInteger(&ICA, &IKF, g.is.fontCurrent);
+  // Write the difficulty and sound state to the INI file
+  InitFileWriteInteger(&ICA, &IKD, g.is.diff);
+  InitFileWriteInteger(&ICA, &IKS, g.is.sound);
+  // Do super
+  @callsuper();
+  // Allocate memory for our struct to save the extra state
+  mh = MemAlloc(sizeof(GLExtraState), HF_DYNAMIC | HF_SHARABLE, 0);
+  es = (GLExtraState *) MemLock(mh);
+  // Save the global state
+  es->saveState = g.ss;
+  // Save the visible objects and the level buffer if we are in a play
+  if (g.ss.executionState == EXE_S_PLAY)
+  {
+    optr o;
+    // Mark the visible objects dirty
+    o = @call LadderView::MSG_GEN_VIEW_GET_CONTENT();
+    @call o::MSG_SCN_MARK_DIRTY();
+    // Save the level buffer
+    MemLock(OptrToHandle(@GameLevelBuffer));
+    memcpy(es->buffer, LMemDeref(@GameLevelBuffer), LVL_M_SIZE);
+    MemUnlock(OptrToHandle(@GameLevelBuffer));
+  }
+  // Unlock memory of extra state
+  MemUnlock(mh);
+  // Return our extra state
+  return mh;
+ }
+
+/***********************************************************************
+ *                  MSG_LAD_MENU
+ *                  for LadderProcessClass
+ ***********************************************************************
+ * SYNOPSIS:        Initialize and load the menu screen.
+ * CALLED BY:       Startup or when returning from help or play.
+ * PARAMETERS:      void ( void )
+ * RETURN:          nothing
+ * SIDE EFFECTS:    none
+ *
+ * STRATEGY:        1/ Set the global states.
+ *                  2/ Clear the info line.
+ *                  3/ Set the content.
+ *                  4/ Disarm the jokes or demo.
+ *
+ * REVISION HISTORY:
+ *      Name    Date          Description
+ *      ----    ----          -----------
+ *      boa     2011-01-18    Initial Revision
+ *
+ ***********************************************************************/
+@method LadderProcessClass, MSG_LAD_MENU
+{
+  // Set the input state for the handling of key presses
+  g.ss.inputState = INP_S_MENU;
+  // Set the execution state
+  g.ss.executionState = EXE_S_MENU;
+  // Reset the control state
+  g.ns.menuCount = CNT_S_MENU;
+  // Clear the text in the info line
+  @send LadderMenuInfo::MSG_TXT_UPDATE_TEXT(NullOptr);
+  // Show the menu screen
+  @send LadderView::MSG_GEN_VIEW_SET_CONTENT(@LadderMenu);
+  // Handle window minimized
+  if (g.ss.windowState == WIN_S_MINI)
+  {
+    // Arm the jokes or demo
+    @send process::MSG_LAD_MENU_STOP();
+  }
+  else
+  {
+    // Do the jokes and demos
+    @send process::MSG_LAD_MENU_EXEC();
+  }
+}
+
+
+/***********************************************************************
+ *                  MSG_LAD_MENU_DIFF, MSG_LAD_MENU_SOUND
+ *                  for LadderProcessClass
+ ***********************************************************************
+ * SYNOPSIS:        Change the difficulty or enable / disable the sound.
+ * CALLED BY:       (a) MSG_LAD_MENU_DIFF:
+ *                      User by pressing the key 'd' in the menu.
+ *                  (b) MSG_LAD_MENU_SOUND:
+ *                      User by pressing the key 's' in the menu.
+ * PARAMETERS:      void ( void )
+ * RETURN:          nothing
+ * SIDE EFFECTS:    none
+ *
+ * STRATEGY:        1/ Stop the jokes or demo.
+ *                  2/ (a) MSG_LAD_MENU_DIFF:
+ *                         Increase the difficulty. If we are over the
+ *                         maximum difficulty, set it to the minimum.
+ *                         Update the screen.
+ *                  3/ (b) MSG_LAD_MENU_SOUND:
+ *                         Enable or disable the sound.
+ *                         Update the screen.
+ *                  4/ Disarm the jokes or demo.
+ *
+ * REVISION HISTORY:
+ *      Name    Date          Description
+ *      ----    ----          -----------
+ *      boa     2011-01-18    Initial Revision
+ *
+ ***********************************************************************/
+@method LadderProcessClass, MSG_LAD_MENU_DIFF,
+                            MSG_LAD_MENU_SOUND
+{
+  optr o;
+  // Stop the jokes or demo
+  @send process::MSG_LAD_MENU_STOP();
+  // Handle message type
+  switch (message)
+  {
+  case MSG_LAD_MENU_DIFF:
+    // Increase the difficulty
+    g.is.diff++;
+    // On overflow set it to the minimum
+    if (g.is.diff > CFG_DIFF_MAX)
+    {
+      g.is.diff = CFG_DIFF_MIN;
+    }
+    // Play "Difficulty" sound
+    @send SoundWorker::MSG_SOUND_WORKER_NOISE_PLAY_SINGLE(1);
+    // Update the text on screen
+    MemLock(OptrToHandle(@MenuDiffTexts));
+    ChunkArrayGetElement(@MenuDiffTexts, g.is.diff - 1, &o);
+    MemUnlock(OptrToHandle(@MenuDiffTexts));
+    @send LadderMenuDiff::MSG_TXT_UPDATE_TEXT(o);
+    break;
+  case MSG_LAD_MENU_SOUND:
+    // Try to switch to the next higher sound state
+    MenuSoundSetMode(g.is.sound + 1);
+    // Play a noise for the current sound state
+    switch (g.is.sound)
+    {
+    case CFG_SND_NOISE:
+      // Play "Noise" sound
+      @send SoundWorker::MSG_SOUND_WORKER_NOISE_PLAY_SINGLE(0);
+      break;
+    case CFG_SND_BOTH:
+      // Play the menu music
+      @send SoundWorker::MSG_SOUND_WORKER_MUSIC_PLAY(@MenuSong);
+//    break;
+    }
+//  break;
+  }
+  // Disarm the jokes or demo
+  @send process::MSG_LAD_MENU();
+}
+
+/***********************************************************************
+ *                  MSG_LAD_EXIT
+ *                  for LadderProcessClass
+ ***********************************************************************
+ * SYNOPSIS:        Close the application.
+ * CALLED BY:       User by pressing the key 'e' in the menu.
+ * PARAMETERS:      void ( void )
+ * RETURN:          nothing
+ * SIDE EFFECTS:    none
+ *
+ * STRATEGY:        1/ Stop any running timer.
+ *                  2/ Set the input state.
+ *                  3/ Set the text in the info line.
+ *                  4/ Use a timer to send MSG_META_QUIT to the
+ *                     application.
+ *
+ * REVISION HISTORY:
+ *      Name    Date          Description
+ *      ----    ----          -----------
+ *      boa     2011-01-18    Initial Revision
+ *
+ ***********************************************************************/
+@method LadderProcessClass, MSG_LAD_EXIT
+{
+  // Stop the timer
+  StopTimer();
+  // Set the input state for the handling of key presses
+  g.ss.inputState = INP_S_NONE;
+  // Set the execution state
+  g.ss.executionState = EXE_S_NONE;
+  // Update the info line with the exit text
+  @send LadderMenuInfo::MSG_TXT_UPDATE_TEXT(@MenuExit);
+  // Start the timer for the exit
+  TimerStart(TIMER_EVENT_ONE_SHOT, @LadderApplication, DLY_T_EXIT, MSG_META_QUIT, 0, &g.ns.timerId);
+}
+
+/***********************************************************************
+ *                  MSG_LAD_MENU_EXEC
+ *                  for LadderProcessClass
+ ***********************************************************************
+ * SYNOPSIS:        Start a demo game or show a random joke in the info
+ *                  line.
+ * CALLED BY:       Internal or by our self
+ * PARAMETERS:      void ( void )
+ * RETURN:          nothing
+ * SIDE EFFECTS:    none
+ *
+ * STRATEGY:        1/ Depending on the global state:
+ *                     (a) show a random joke in the info line
+ *                     (b) clear the info line
+ *                     (c) start a demo
+ *                     When called the first time, we wait a longer
+ *                     time.
+ *                  2/ Use a timer to call our self.
+ *
+ * REVISION HISTORY:
+ *      Name    Date          Description
+ *      ----    ----          -----------
+ *      boa     2011-01-18    Initial Revision
+ *
+ ***********************************************************************/
+@method LadderProcessClass, MSG_LAD_MENU_EXEC
+{
+  word d;
+  optr o;
+  // Check if we should cancel the execution
+  if (g.ss.cancelExecution == L_TRUE)
+  {
+    @send process::MSG_LAD_MENU_STOP();
+    return;
+  }
+  // Set default delay
+  d = DLY_T_MENU;
+  // Set default empty text
+  o = NullOptr;
+  // Handle menu counter
+  switch (g.ns.menuCount)
+  {
+  // Demo time
+  case 0:
+    // Reset control state
+    g.ns.menuCount = CNT_S_MENU;
+    // Start the timer to run the demo
+    @send process::MSG_LAD_DEMO();
+    return;
+  // Clear bored
+  case 1:
+    d = DLY_B_READY + 2 * g.ss.game.delay;
+    break;
+  // We got bored
+  case 2:
+    // Set the delay
+    d = DLY_T_BORED;
+    // Set the text in the info line
+    o = @MenuBored;
+//  break;
+  }
+  // Handle delay and jokes
+  if (g.ns.menuCount > 2 && g.ns.menuCount < CNT_S_MENU)
+  {
+    // Calculate the delay
+    d = DLY_T_MENU_MIN + Random(DLY_T_MENU_RND);
+    if (g.ns.menuCount % 2 == 0)
+    {
+      // Set the text of a random joke
+      MemLock(OptrToHandle(@MenuJokes));
+      ChunkArrayGetElement(@MenuJokes, Random(ChunkArrayGetCount(@MenuJokes)), &o);
+      MemUnlock(OptrToHandle(@MenuJokes));
+    }
+  }
+  // Decrement control state
+  g.ns.menuCount--;
+  // Set the text in the info line
+  @send LadderMenuInfo::MSG_TXT_UPDATE_TEXT(o);
+  // Start the timer
+  g.ns.timerHandle = TimerStart(TIMER_EVENT_ONE_SHOT, oself, d, message, 0, &g.ns.timerId);
+}
+
+/***********************************************************************
+ *                  MSG_LAD_MENU_STOP
+ *                  for LadderProcessClass
+ ***********************************************************************
+ * SYNOPSIS:        Stop the jokes or demo.
+ * CALLED BY:       Internal
+ * PARAMETERS:      void ( void )
+ * RETURN:          nothing
+ * SIDE EFFECTS:    none
+ *
+ * STRATEGY:        1/ Stop any potentially running timer.
+ *                  2/ Reset the control state.
+ *                  3/ Clear the info line.
+ *
+ * REVISION HISTORY:
+ *      Name    Date          Description
+ *      ----    ----          -----------
+ *      boa     2011-01-18    Initial Revision
+ *
+ ***********************************************************************/
+@method LadderProcessClass, MSG_LAD_MENU_STOP
+{
+  // Stop the timer
+  StopTimer();
+  // Reset cancel execution
+  g.ss.cancelExecution = L_FALSE;
+  // Clear the text in the info line
+  @send LadderMenuInfo::MSG_TXT_UPDATE_TEXT(NullOptr);
+}
+
+/***********************************************************************
+ *                  MSG_LAD_HELP
+ *                  for LadderProcessClass
+ ***********************************************************************
+ * SYNOPSIS:        Load the instruction screen.
+ * CALLED BY:       User by pressing the key 'i' in the menu.
+ * PARAMETERS:      void ( void )
+ * RETURN:          nothing
+ * SIDE EFFECTS:    none
+ *
+ * STRATEGY:        1/ Stop any potentially running timer.
+ *                  2/ Set the input state.
+ *                  3/ Set the content.
+ *
+ * REVISION HISTORY:
+ *      Name    Date          Description
+ *      ----    ----          -----------
+ *      boa     2011-01-18    Initial Revision
+ *
+ ***********************************************************************/
+@method LadderProcessClass, MSG_LAD_HELP
+{
+  // Stop the timer
+  StopTimer();
+  // Set the input state for the handling of key presses
+  g.ss.inputState = INP_S_HELP;
+  // Set the execution state
+  g.ss.executionState = EXE_S_HELP;
+  // Show the help screen
+  @send LadderView::MSG_GEN_VIEW_SET_CONTENT(@LadderHelp);
+  // Set the text of the info line
+  @send LadderInfo::MSG_TXT_UPDATE_TEXT(@HelpInfo);
+}
+
+/***********************************************************************
+ *                  MSG_LAD_DEMO, MSG_LAD_PLAY
+ *                  for LadderProcessClass
+ ***********************************************************************
+ * SYNOPSIS:        Start the demo or a new game.
+ * CALLED BY:       (a) MSG_LAD_DEMO:
+ *                      from MSG_LAD_MENU_EXEC
+ *                  (b) MSG_LAD_PLAY:
+ *                      User by pressing the key 'p' in the menu.
+ * PARAMETERS:      void ( void )
+ * RETURN:          nothing
+ * SIDE EFFECTS:    none
+ *
+ * STRATEGY:        1/ Stop any potentially running timer.
+ *                  2/ Reset the input state.
+ *                  3/ Initialize the global variabels.
+ *                  4/ Start loading the level info.
+ *
+ * REVISION HISTORY:
+ *      Name    Date          Description
+ *      ----    ----          -----------
+ *      boa     2011-01-18    Initial Revision
+ *
+ ***********************************************************************/
+@method LadderProcessClass, MSG_LAD_DEMO,
+                            MSG_LAD_PLAY
+{
+  // Our demo
+  GLDemo d;
+  // Stop the timer
+  StopTimer();
+  // Initialize the game
+  g.ss.game.lads = LAD_D_LIVES;
+  g.ss.game.score = 0;
+  g.ss.game.delay = TicksByDifficulty(g.is.diff);
+  // Handle message type
+  switch (message)
+  {
+  case MSG_LAD_DEMO:
+    // Set the input state for the handling of key presses
+    g.ss.inputState = INP_S_DEMO;
+    // XXX: Set the execution state
+    g.ss.executionState = EXE_S_DEMO;
+    // Load a random game demo
+    MemLock(OptrToHandle(@GameDemos));
+    ChunkArrayGetElement(@GameDemos, Random(ChunkArrayGetCount(@GameDemos)), &d);
+    MemUnlock(OptrToHandle(@GameDemos));
+    // Set the round, level and moves
+    g.ss.game.round = d.round;
+    g.ss.game.level = d.level;
+    g.ns.moves = d.moves;
+    // Start the demo level
+    @send process::MSG_LAD_DEMO_LOAD_HEAD();
+    break;
+  case MSG_LAD_PLAY:
+    // Set the input state for the handling of key presses
+    g.ss.inputState = INP_S_PLAY;
+    // Set the execution state
+    g.ss.executionState = EXE_S_PLAY;
+    // Initialize the round and level
+    g.ss.game.round = 1; // 1, 2, 5, 9, 14, 20, 27
+    g.ss.game.level = 1; // 1, 2, 3, 4, 5, 6, 7
+    // Hide mouse pointer by setting an empty pointer image if not maximized
+    if (g.ss.windowState != WIN_S_MAXI)
+    {
+      MemLock(OptrToHandle(@LadderHidePointer));
+      @call LadderView::MSG_GEN_VIEW_SET_PTR_IMAGE(@LadderHidePointer, PIL_WINDOW);
+      MemUnlock(OptrToHandle(@LadderHidePointer));
+    }
+    // Set restore point and start the first level
+    g.ss.restorePoint = MSG_LAD_PLAY_LOAD_HEAD;
+    @send process::MSG_LAD_PLAY_LOAD_HEAD();
+//  break;
+  }
+}
+
+/***********************************************************************
+ *                  MSG_LAD_DEMO_STOP, MSG_LAD_PLAY_STOP
+ *                  for LadderProcessClass
+ ***********************************************************************
+ * SYNOPSIS:        Abort the demo or a game.
+ * CALLED BY:       (a) MSG_LAD_DEMO_STOP:
+ *                      from MSG_LAD_DEMO_EXEC or user by pressing the
+ *                      kex 'ESC' during the demo
+ *                  (b) MSG_LAD_PLAY_STOP:
+ *                      User by pressing the key 'ESC' during a game or
+ *                      when returning from a finished game.
+ * PARAMETERS:      void ( void )
+ * RETURN:          nothing
+ * SIDE EFFECTS:    none
+ *
+ * STRATEGY:        1/ Stop any potentially running timer.
+ *                  2/ Update the last score.
+ *                  3/ Load the menu screen.
+ *
+ * REVISION HISTORY:
+ *      Name    Date          Description
+ *      ----    ----          -----------
+ *      boa     2011-01-18    Initial Revision
+ *
+ ***********************************************************************/
+@method LadderProcessClass, MSG_LAD_DEMO_STOP,
+                            MSG_LAD_PLAY_STOP
+{
+  // Stop the game timer
+  StopTimer();
+  // Reset cancel execution
+  g.ss.cancelExecution = L_FALSE;
+  // Set the input state for the handling of key presses
+  g.ss.inputState = INP_S_NONE;
+  // Handle message type
+  if (message == MSG_LAD_PLAY_STOP)
+  {
+    // Stop the music
+    @call SoundWorker::MSG_SOUND_WORKER_MUSIC_STOP();
+    // Update last score
+    @send LadderMenuRank::MSG_RNK_SAVE_LAST(g.ss.game.score);
+    // Reset the image of the mouse cursor / pointer if not maximized
+    if (g.ss.windowState != WIN_S_MAXI)
+    {
+      @call LadderView::MSG_GEN_VIEW_SET_PTR_IMAGE(NullOptr, PIL_WINDOW);
+    }
+  }
+  // Return to main menu
+  @send process::MSG_LAD_MENU();
+}
+
+/***********************************************************************
+ *                  MSG_LAD_PLAY_DONE
+ *                  for LadderProcessClass
+ ***********************************************************************
+ * SYNOPSIS:        The user finished the last level.
+ * CALLED BY:       Internal
+ * PARAMETERS:      void ( void )
+ * RETURN:          nothing
+ * SIDE EFFECTS:    none
+ *
+ * STRATEGY:        1/ Set the input state.
+ *                  2/ Load the game end screen.
+ *
+ * REVISION HISTORY:
+ *      Name    Date          Description
+ *      ----    ----          -----------
+ *      boa     2011-01-18    Initial Revision
+ *
+ ***********************************************************************/
+@method LadderProcessClass, MSG_LAD_PLAY_DONE
+{
+  // Set the input state for the handling of key presses
+  g.ss.inputState = INP_S_DONE;
+  // Show the game done screen
+  @send LadderView::MSG_GEN_VIEW_SET_CONTENT(@LadderDone);
+  // Set the text of the info line
+  @send LadderInfo::MSG_TXT_UPDATE_TEXT(@DoneInfo);
+  // Play the game done music
+  @send SoundWorker::MSG_SOUND_WORKER_MUSIC_PLAY(@DoneSong);
+}
+
+/***********************************************************************
+ *                  MSG_LAD_PLAY_OVER
+ *                  for LadderProcessClass
+ ***********************************************************************
+ * SYNOPSIS:        The user lost the game.
+ * CALLED BY:       Internal
+ * PARAMETERS:      void ( void )
+ * RETURN:          nothing
+ * SIDE EFFECTS:    none
+ *
+ * STRATEGY:        1/ Set the input state.
+ *                  2/ Load the game over screen.
+ *
+ * REVISION HISTORY:
+ *      Name    Date          Description
+ *      ----    ----          -----------
+ *      boa     2011-01-18    Initial Revision
+ *
+ ***********************************************************************/
+@method LadderProcessClass, MSG_LAD_PLAY_OVER
+{
+  // Set the input state for the handling of key presses
+  g.ss.inputState = INP_S_OVER;
+  // Show the game over screen
+  @send LadderView::MSG_GEN_VIEW_SET_CONTENT(@LadderOver);
+  // Set the text of the info line
+  @send LadderInfo::MSG_TXT_UPDATE_TEXT(@OverInfo);
+}
+
+/***********************************************************************
+ *                  MSG_LAD_PLAY_HIGH
+ *                  for LadderProcessClass
+ ***********************************************************************
+ * SYNOPSIS:        We have a new high score.
+ * CALLED BY:       Internal
+ * PARAMETERS:      void ( void )
+ * RETURN:          nothing
+ * SIDE EFFECTS:    none
+ *
+ * STRATEGY:        1/ Set the input state.
+ *                  2/ Reset the input which reads the name.
+ *                  3/ Clear the info line.
+ *                  4/ Show the compliment for the score.
+ *                  5/ Load the high score screen.
+ *
+ * REVISION HISTORY:
+ *      Name    Date          Description
+ *      ----    ----          -----------
+ *      boa     2011-01-18    Initial Revision
+ *
+ ***********************************************************************/
+@method LadderProcessClass, MSG_LAD_PLAY_HIGH
+{
+  word i;
+  GLRate r;
+  // Set the input state for the handling of key presses
+  g.ss.inputState = INP_S_HIGH;
+  // Clear the info line
+  @send LadderInfo::MSG_TXT_SET_TEXT(NullOptr);
+  // Find the compliment message for the score
+  MemLock(OptrToHandle(@HighRatings));
+  for (i = ChunkArrayGetCount(@HighRatings); i > 0; i--)
+  {
+    ChunkArrayGetElement(@HighRatings, i - 1, &r);
+    if (g.ss.game.score >= r.points)
+    {
+      // Set the text of the compliment
+      @send LadderHighCompliment::MSG_TXT_SET_TEXT(r.compliment);
+      break;
+    }
+  }
+  MemUnlock(OptrToHandle(@HighRatings));
+  // Show the high score screen
+  @send LadderView::MSG_GEN_VIEW_SET_CONTENT(@LadderHigh);
+  // Set the text of the info line
+  @send LadderInfo::MSG_TXT_UPDATE_TEXT(@HighInfo);
+  // Play the high score music
+  @send SoundWorker::MSG_SOUND_WORKER_MUSIC_PLAY(@HighSong);
+}
+
+/***********************************************************************
+ *                  MSG_LAD_PLAY_SAVE
+ *                  for LadderProcessClass
+ ***********************************************************************
+ * SYNOPSIS:        Save the high score.
+ * CALLED BY:       User by pressing the key 'ENTER' in the high score.
+ * PARAMETERS:      void ( void )
+ * RETURN:          nothing
+ * SIDE EFFECTS:    none
+ *
+ * STRATEGY:        1/ Update the info line.
+ *                  2/ Copy the name from the input und update the
+ *                     ranking list.
+ *                  3/ Start a timer to return to the menu.
+ *
+ * REVISION HISTORY:
+ *      Name    Date          Description
+ *      ----    ----          -----------
+ *      boa     2011-01-18    Initial Revision
+ *
+ ***********************************************************************/
+@method LadderProcessClass, MSG_LAD_PLAY_SAVE
+{
+  static char lhs[RNK_NAME_LEN];
+  // Set the text of the info line
+  @send LadderInfo::MSG_TXT_UPDATE_TEXT(@HighSave);
+  // Get the name from the imput
+  @call LadderHighName::MSG_INP_GET_INPUT(&lhs);
+  // Add the rank to the ranks
+  @call LadderMenuRank::MSG_RNK_SAVE_HIGH(g.ss.game.score, &lhs);
+  // Start the timer to quit to main menu
+  g.ns.timerHandle = TimerStart(TIMER_EVENT_ONE_SHOT, oself, DLY_T_SAVE, MSG_LAD_PLAY_STOP, 0, &g.ns.timerId);
+}
+
+/***********************************************************************
+ *                  MSG_LAD_FONT_SET_SIZE
+ *                  for LadderProcessClass
+ ***********************************************************************
+ * SYNOPSIS:        Handle font size changes.
+
+ * CALLED BY:       Internal by intercepted messages:
+ *                  MSG_GEN_DISPLAY_SET_MAXIMIZED
+ *                  MSG_GEN_DISPLAY_SET_NOT_MAXIMIZED
+ *                  MSG_LAD_FONT_DEC_SIZE
+ *                  MSG_LAD_FONT_INC_SIZE
+ * PARAMETERS:      void ( word index )
+ * RETURN:          nothing
+ * SIDE EFFECTS:    none
+ *
+ * STRATEGY:        1/ Verify if font can changed.
+ *                  2/ Send messages to redraw view and primary.
+ *
+ * REVISION HISTORY:
+ *      Name    Date          Description
+ *      ----    ----          -----------
+ *      boa     2024-08-02    Initial Revision
+ *
+ ***********************************************************************/
+@method LadderProcessClass, MSG_LAD_FONT_SET_SIZE
+{
+  word cur = g.is.fontCurrent;
+  word ret;
+  // Try to change the font size
+  ret = LoadFontConfig(index);
+  // Update only if the font has changed
+  if ((ret != FNT_R_NONE) && (ret != cur))
+  {
+    // Resize the window to reflect new font size
+    @send process::MSG_LAD_RESIZE_WINDOW();
+  }
+}
+
+/***********************************************************************
+ *                  MSG_LAD_FONT_DEC_SIZE
+ *                  for LadderProcessClass
+ ***********************************************************************
+ * SYNOPSIS:        Handle font size decrement.
+
+ * CALLED BY:       Internal by intercepted messages:
+ *                  MSG_META_KBD_CHAR
+ * PARAMETERS:      void ( void )
+ * RETURN:          nothing
+ * SIDE EFFECTS:    none
+ *
+ * STRATEGY:        1/ Verify if font can decreased.
+ *                  2/ Send messages to resize font.
+ *
+ * REVISION HISTORY:
+ *      Name    Date          Description
+ *      ----    ----          -----------
+ *      boa     2024-08-29    Initial Revision
+ *
+ ***********************************************************************/
+@method LadderProcessClass, MSG_LAD_FONT_DEC_SIZE
+{
+  if (g.is.fontCurrent > g.ns.fontWinMin)
+  {
+    @send process::MSG_LAD_FONT_SET_SIZE(g.is.fontCurrent - 1);
+  }
+}
+
+/***********************************************************************
+ *                  MSG_LAD_FONT_INC_SIZE
+ *                  for LadderProcessClass
+ ***********************************************************************
+ * SYNOPSIS:        Handle font size increment.
+
+ * CALLED BY:       Internal by intercepted messages:
+ *                  MSG_META_KBD_CHAR
+ * PARAMETERS:      void ( void )
+ * RETURN:          nothing
+ * SIDE EFFECTS:    none
+ *
+ * STRATEGY:        1/ Verify if font can increased.
+ *                  2/ Send messages to resize font.
+ *
+ * REVISION HISTORY:
+ *      Name    Date          Description
+ *      ----    ----          -----------
+ *      boa     2024-08-29    Initial Revision
+ *
+ ***********************************************************************/
+@method LadderProcessClass, MSG_LAD_FONT_INC_SIZE
+{
+  if (g.is.fontCurrent < g.ns.fontWinMax)
+  {
+    @send process::MSG_LAD_FONT_SET_SIZE(g.is.fontCurrent + 1);
+  }
+}
+
+/***********************************************************************
+ *                  MSG_LAD_RESIZE_WINDOW
+ *                  for LadderProcessClass
+ ***********************************************************************
+ * SYNOPSIS:        Resize view and primary after font size change.
+
+ * CALLED BY:       Internal by intercepted messages:
+ *                  MSG_GEN_PROCESS_OPEN_APPLICATION
+ *                  MSG_LAD_FONT_SET_SIZE
+ * PARAMETERS:      void ( void )
+ * RETURN:          nothing
+ * SIDE EFFECTS:    none
+ *
+ * STRATEGY:        1/ Resize view.
+ *                  2/ Force resize of primary.
+ *
+ * REVISION HISTORY:
+ *      Name    Date          Description
+ *      ----    ----          -----------
+ *      boa     2024-08-07    Initial Revision
+ *
+ ***********************************************************************/
+@method LadderProcessClass, MSG_LAD_RESIZE_WINDOW
+{
+  // Set fixed size hint
+  @send LadderView::MSG_GEN_SET_FIXED_SIZE(
+    VUM_DELAYED_VIA_APP_QUEUE, 0, SCN_ROWS * g.ns.font.height + 2, SCN_COLS * g.ns.font.width
+  );
+  // Don't resize primary if in full screen mode
+  if (g.ss.windowState == WIN_S_MAXI)
+  {
+    return;
+  }
+  // Resize primary window
+  @send LadderPrimary::MSG_GEN_SET_WIN_SIZE(
+    GET_MM_AND_TYPE(VUM_DELAYED_VIA_APP_QUEUE, WST_AS_DESIRED), 0, 0
+  );
+}
+
+
+/*
+ ***************************************************************************
+ *                  CODE for LadderApplicationClass
+ ***************************************************************************
+ */
+
+@classdecl LadderApplicationClass;
+
+/***********************************************************************
+ *                  MSG_META_KBD_CHAR
+ *                  for LadderApplicationClass
+ ***********************************************************************
+ * SYNOPSIS:        Handle key presses sent to our application object.
+ * CALLED BY:       Internal
+ * PARAMETERS:      void ( word character,
+ *                         word flags,
+ *                         word state )
+ * RETURN:          nothing
+ * SIDE EFFECTS:    none
+ *
+ * STRATEGY:        1/ Check if we have a key press and not a release.
+ *                  2/ Handle the escape key globaly.
+ *                  3/ Handle the other keys depending the application
+ *                     state.
+ *                  4/ If the key press has not been handled, put it
+ *                     upward.
+ *
+ * REVISION HISTORY:
+ *      Name    Date          Description
+ *      ----    ----          -----------
+ *      boa     2011-01-18    Initial Revision
+ *
+ ***********************************************************************/
+@method LadderApplicationClass, MSG_META_KBD_CHAR
+{
+  Message msg;
+  // Handle key presses during dedicated input states
+  if (!(flags & CF_RELEASE) && (g.ss.inputState != INP_S_NONE) && !(g.ss.windowState == WIN_S_MINI))
+  {
+    // Set the default message to nothing
+    msg = NULL;
+    // Handle escape key
+    if (character == 0xFF1B)
+    {
+      switch (g.ss.executionState)
+      {
+      case EXE_S_DEMO:
+        // Stop demo
+        msg = MSG_LAD_DEMO_STOP;
+        break;
+      case EXE_S_PLAY:
+        // Set restore point and message to stop the game
+        g.ss.restorePoint = MSG_LAD_PLAY_STOP;
+        msg = MSG_LAD_PLAY_STOP;
+        break;
+      default:
+        // Return to menu
+        msg = MSG_LAD_MENU;
+//      break;
+      }
+    }
+    // Handle change font size
+    if ((flags >> 8) & (SS_LCTRL | SS_RCTRL))
+    {
+      switch (character)
+      {
+      case C_ONE:
+        if (g.ss.windowState != WIN_S_MAXI)
+        {
+          @send process::MSG_LAD_FONT_DEC_SIZE();
+        }
+        return;
+      case C_TWO:
+        if (g.ss.windowState != WIN_S_MAXI)
+        {
+          @send process::MSG_LAD_FONT_INC_SIZE();
+        }
+        return;
+      case C_ZERO:
+        if (g.ss.windowState == WIN_S_MAXI)
+        {
+          @send LadderPrimary::MSG_GEN_DISPLAY_SET_NOT_MAXIMIZED();
+        }
+        else
+        {
+          @send LadderPrimary::MSG_GEN_DISPLAY_SET_MAXIMIZED();
+        }
+        return;
+      }
+    }
+    // Handle the keys according the application states
+    switch (g.ss.inputState)
+    {
+    case INP_S_EXEC:
+      // Handle the key press
+      switch (character)
+      {
+      // Key 'Arrow Up'
+      case 0xFF90:
+        g.ss.lad.ndir = DIR_N;
+        return;
+      // Key 'Arrow Right'
+      case 0xFF92:
+        g.ss.lad.ndir = DIR_E;
+        return;
+      // Key 'Arrow Down'
+      case 0xFF91:
+        g.ss.lad.ndir = DIR_S;
+        return;
+      // Key 'Arrow Left'
+      case 0xFF93:
+        g.ss.lad.ndir = DIR_W;
+        return;
+      case C_SPACE:
+        g.ss.lad.njump = L_TRUE;
+        return;
+      case C_SMALL_P:
+      case C_CAP_P:
+        // Set restore point and message to pause the game
+        g.ss.restorePoint = MSG_LAD_PLAY_HOLD;
+        msg = MSG_LAD_PLAY_HOLD;
+        break;
+      // Any other key
+      default:
+        // Check for printable character
+        if ((character < 255) && isprint(character))
+        {
+          g.ss.lad.ndir = DIR_NONE;
+          return;
+        }
+//      break;
+      }
+      break;
+    case INP_S_MENU:
+      // Handle the key press
+      switch (tolower(character & 0xFF))
+      {
+      case C_SMALL_D:
+        msg = MSG_LAD_MENU_DIFF;
+        break;
+      case C_SMALL_S:
+        msg = MSG_LAD_MENU_SOUND;
+        break;
+      case C_SMALL_P:
+        msg = MSG_LAD_PLAY;
+        break;
+      case C_SMALL_I:
+        msg = MSG_LAD_HELP;
+        break;
+      case C_SMALL_E:
+        msg = MSG_LAD_EXIT;
+//      break;
+      }
+      break;
+    case INP_S_HOLD:
+      // Key 'Enter'
+      if (character == 0xFF0D)
+      {
+        // Set restore point and message to do the get ready
+        g.ss.restorePoint = MSG_LAD_PLAY_READY;
+        msg = MSG_LAD_PLAY_READY;
+      }
+      break;
+    case INP_S_HIGH:
+      // Handle the key press
+      switch (character)
+      {
+      // Key 'Enter'
+      case 0xFF0D:
+        // Set restore point and message to save the game
+        g.ss.restorePoint = MSG_LAD_PLAY_SAVE;
+        msg = MSG_LAD_PLAY_SAVE;
+        break;
+      // Key 'Backspace'
+      case 0xFF08:
+      case C_DELETE:
+        @send LadderHighName::MSG_INP_DEL_CHAR();
+        return;
+      default:
+        // Check for printable character
+        if ((character < 255) && isprint(character))
+        {
+          @send LadderHighName::MSG_INP_ADD_CHAR(character);
+          return;
+        }
+//      break;
+      }
+      break;
+    case INP_S_DONE:
+    case INP_S_OVER:
+      // Key 'Enter'
+      if (character == 0xFF0D)
+      {
+        // Check for new high score
+        if (@call LadderMenuRank::MSG_RNK_IS_NEW_RANK(g.ss.game.score) == L_TRUE)
+        {
+          // Reset the input
+          @send LadderHighName::MSG_INP_RESET();
+          // Set restore point and message to show high score
+          g.ss.restorePoint = MSG_LAD_PLAY_HIGH;
+          msg = MSG_LAD_PLAY_HIGH;
+        }
+        else
+        {
+          // Set restore point and message to stop the game
+          g.ss.restorePoint = MSG_LAD_PLAY_STOP;
+          msg = MSG_LAD_PLAY_STOP;
+        }
+      }
+//    break;
+    }
+    // We have a message
+    if (msg != NULL)
+    {
+      // Stop a potentially running timer
+      StopTimer();
+      // Send the message
+      @send process::{MSG_LAD_PROTO} msg();
+      return;
+    }
+  }
+  // Not handled, put the key press upstream
+//  @send oself::MSG_META_FUP_KBD_CHAR(character, flags, state);
+  @callsuper();
+}
+
+/***********************************************************************
+ *                  MSG_META_LOST_FOCUS_EXCL
+
+ *                  for LadderApplicationClass
+ ***********************************************************************
+ * SYNOPSIS:        Handle lost of focus of the application object.
+ * CALLED BY:       Internal
+ * PARAMETERS:      void ( void )
+ * RETURN:          nothing
+ * SIDE EFFECTS:    none
+ *
+
+ * STRATEGY:        1/ Send a message to the process that we lost the
+ *                     focus and save the state in a global variable.
+ *                  2/ Call super for default actions.
+ *
+ * REVISION HISTORY:
+ *      Name    Date          Description
+ *      ----    ----          -----------
+ *      boa     2024-07-16    Initial Revision
+ *
+ ***********************************************************************/
+@method LadderApplicationClass, MSG_META_LOST_FOCUS_EXCL
+{
+  // Update the global state
+  g.ss.focusState = FOC_S_LOST;
+  // Inform the game to stop at the next possible moment
+  if (g.ss.executionState == EXE_S_PLAY)
+  {
+    g.ss.cancelExecution = L_TRUE;
+  }
+  // Do super
+  @callsuper();
+}
+
+/***********************************************************************
+ *                  MSG_META_GAINED_FOCUS_EXCL
+ *                  for LadderApplicationClass
+ ***********************************************************************
+ * SYNOPSIS:        Handle gain of focus of the application object.
+ * CALLED BY:       Internal
+ * PARAMETERS:      void ( void )
+ * RETURN:          nothing
+ * SIDE EFFECTS:    none
+ *
+ * STRATEGY:        1/ Send a message to the process that we gained the
+ *                     focus and save the state in a global variable.
+ *                  2/ Call super for default actions.
+ *
+ * REVISION HISTORY:
+ *      Name    Date          Description
+ *      ----    ----          -----------
+ *      boa     2024-07-16    Initial Revision
+ *
+ ***********************************************************************/
+@method LadderApplicationClass, MSG_META_GAINED_FOCUS_EXCL
+{
+  // Update the global state
+  g.ss.focusState = FOC_S_GAIN;
+  // Do super
+  @callsuper();
+}
+
+
+/* End of 'process.goc' */
