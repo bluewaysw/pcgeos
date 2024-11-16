@@ -39,6 +39,7 @@
   extern "C" {
 #endif
 
+#ifndef __GEOS__
   /* Initialize file component */
   LOCAL_DEF
   TT_Error  TTFile_Init( PEngine_Instance  engine );
@@ -46,7 +47,7 @@
   /* Done with file component */
   LOCAL_DEF
   TT_Error  TTFile_Done( PEngine_Instance  engine );
-
+#endif
 
   /**********************************************************************/
   /*                                                                    */
