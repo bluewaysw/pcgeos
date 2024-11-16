@@ -1,0 +1,121 @@
+@include <stdapp.goh>
+
+#include <graphics.h>
+#include <gstring.h>
+
+#include <ansi/string.h>
+#include <ansi/stdio.h>
+#include <ansi/stdlib.h>
+
+#include "VConvert.h"
+#include "VCExport.h"
+
+Boolean VCExportObj(VCExportObjDesc *obj,VCExportState *state)
+{
+        char buf[256];
+        word i;
+
+        switch(obj->type)
+        {
+          case VC_OBJ_INIT:
+#if 0
+            sprintf(buf,"screen 11\r\nwindow screen (%ld,%ld)-(%ld,%ld)\r\n",
+#else
+            sprintf(buf,"%ld,%ld,%ld,%ld\r\n",
+#endif
+              obj->d.OBJ_INIT.bounds.RD_left,
+              obj->d.OBJ_INIT.bounds.RD_top,
+              obj->d.OBJ_INIT.bounds.RD_right,
+              obj->d.OBJ_INIT.bounds.RD_bottom);
+              fwrite(buf,strlen(buf),1,(FILE *)(state->VCES_private));
+            break;
+
+#if 0
+          case VC_OBJ_LINE:
+            sprintf(buf,"Line (%d,%d)-(%d,%d),%d\r\n",
+              obj->d.OBJ_LINE.p1.PF_x.WWF_int, obj->d.OBJ_LINE.p1.PF_y.WWF_int,
+              obj->d.OBJ_LINE.p2.PF_x.WWF_int, obj->d.OBJ_LINE.p2.PF_y.WWF_int,
+              state->VCES_la.LA_width.WWF_int);
+              fwrite(buf,strlen(buf),1,(FILE *)(state->VCES_private));
+            break;
+
+          case VC_OBJ_RECT:
+            if(obj->fill)
+            {
+              sprintf(buf,"'Filled\r\n");
+              fwrite(buf,strlen(buf),1,(FILE *)(state->VCES_private));
+            }
+            else
+            {
+              sprintf(buf,"'Unfilled\r\n");
+              fwrite(buf,strlen(buf),1,(FILE *)(state->VCES_private));
+            }
+            sprintf(buf,"Line (%d,%d)-(%d,%d),%d\r\n",
+              obj->d.OBJ_RECT.p1.PF_x.WWF_int, obj->d.OBJ_RECT.p1.PF_y.WWF_int,
+              obj->d.OBJ_RECT.p2.PF_x.WWF_int, obj->d.OBJ_RECT.p2.PF_y.WWF_int,
+              state->VCES_la.LA_width.WWF_int);
+            fwrite(buf,strlen(buf),1,(FILE *)(state->VCES_private));
+
+            sprintf(buf,"Line -(%d,%d),%d\r\n",
+              obj->d.OBJ_RECT.p3.PF_x.WWF_int, obj->d.OBJ_RECT.p3.PF_y.WWF_int,
+              state->VCES_la.LA_width.WWF_int);
+            fwrite(buf,strlen(buf),1,(FILE *)(state->VCES_private));
+
+            sprintf(buf,"Line -(%d,%d),%d\r\n",
+              obj->d.OBJ_RECT.p4.PF_x.WWF_int, obj->d.OBJ_RECT.p4.PF_y.WWF_int,
+              state->VCES_la.LA_width.WWF_int);
+            fwrite(buf,strlen(buf),1,(FILE *)(state->VCES_private));
+
+            sprintf(buf,"Line -(%d,%d),%d\r\n",
+              obj->d.OBJ_RECT.p1.PF_x.WWF_int, obj->d.OBJ_RECT.p1.PF_y.WWF_int,
+              state->VCES_la.LA_width.WWF_int);
+            fwrite(buf,strlen(buf),1,(FILE *)(state->VCES_private));
+            break;
+#endif
+          case VC_OBJ_POLYLINE:
+          case VC_OBJ_POLYGON:
+#if 0
+            if(obj->fill)
+            {
+              sprintf(buf,"'Filled\r\n");
+              fwrite(buf,strlen(buf),1,(FILE *)(state->VCES_private));
+            }
+            else
+            {
+              sprintf(buf,"'Unfilled\r\n");
+              fwrite(buf,strlen(buf),1,(FILE *)(state->VCES_private));
+            }
+            sprintf(buf,"Line (%d,%d)-(%d,%d),%d\r\n",
+              obj->d.OBJ_POLY.p[0].P_x,obj->d.OBJ_POLY.p[0].P_y,
+              obj->d.OBJ_POLY.p[1].P_x,obj->d.OBJ_POLY.p[1].P_y,
+              state->VCES_la.LA_width.WWF_int);
+            fwrite(buf,strlen(buf),1,(FILE *)(state->VCES_private));
+            for(i=2; i<obj->d.OBJ_POLY.numPoints; i++)
+            {
+              sprintf(buf,"Line -(%d,%d),%d\r\n",
+                obj->d.OBJ_POLY.p[i].P_x,obj->d.OBJ_POLY.p[i].P_y,
+                state->VCES_la.LA_width.WWF_int);
+              fwrite(buf,strlen(buf),1,(FILE *)(state->VCES_private));
+            }
+            if(obj->type==VC_OBJ_POLYGON)
+            {
+              sprintf(buf,"Line -(%d,%d),%d\r\n",
+                obj->d.OBJ_POLY.p[0].P_x,obj->d.OBJ_POLY.p[0].P_y,
+                state->VCES_la.LA_width.WWF_int);
+              fwrite(buf,strlen(buf),1,(FILE *)(state->VCES_private));
+            }
+            break;
+#else
+            for(i=0; i<obj->d.OBJ_POLY.numPoints; i++)
+            {
+              sprintf(buf,"%d,%d\r\n",
+                obj->d.OBJ_POLY.p[i].P_x,obj->d.OBJ_POLY.p[i].P_y);
+              fwrite(buf,strlen(buf),1,(FILE *)(state->VCES_private));
+            }
+            sprintf(buf,"32768,32768\r\n");
+            fwrite(buf,strlen(buf),1,(FILE *)(state->VCES_private));
+#endif
+        }
+
+        return TRUE;                    /* no error */
+}

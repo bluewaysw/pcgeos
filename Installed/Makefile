@@ -108,7 +108,7 @@ prefLibs	: prefvid prefts preftd \
 
 # Geos impex libraries
 impex_libs	: dib bmp clp ico pcx tif \
-		  dbase3 dbase4 htmlpars htmlimpx
+		  dbase3 dbase4 htmlimpx vcimpex
 #lot123 msmword msword wordperf5
 
 
@@ -155,7 +155,7 @@ minimalTools	: prntscrn
 
 otherEnsemble	: conview reader term tedit geofile dirls  \
 		  graphvwr macror dump perf bim ffind bbxcd webbox \
-		  hinv10 bbg10
+		  hinv10 bbg10 vconvert
 #geocon3
 
 #
@@ -1814,3 +1814,14 @@ Installed/Appl/Tools/Localize:		ui text spool MAKEAPPL
 
 wlgen	: Installed/Appl/Tools/WListGen
 Installed/Appl/Tools/WListGen:			ui ansic wmlib MAKEAPPL
+
+# Vector graphics import/export
+
+meta    : Installed/Library/Breadbox/Meta
+Installed/Library/Breadbox/Meta:		ui ansic grobj math MAKELIB
+
+vcimpex : Installed/Library/Breadbox/Impex/VCImpex
+Installed/Library/Breadbox/Impex/VCImpex:	ui impex ansic math meta MAKELIB
+
+vconvert: Installed/Appl/Breadbox/VConvert
+Installed/Appl/Breadbox/VConvert:		ui ansic grobj text math meta MAKEAPPL
