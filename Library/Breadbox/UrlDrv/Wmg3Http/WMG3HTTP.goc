@@ -403,9 +403,9 @@ int SocketRecvNice(
 }
 
 #ifdef PERSISTANT_CONNECTIONS
-int htoi(char *str)
+sdword htoi(char *str)
 {
-    int val = 0;
+    sdword val = 0;
 
     while(1) {
 	if (*str >= '0' && *str <= '9') {
@@ -458,7 +458,7 @@ int SocketGetBlock(
 	    }
 	}
 	if (readSize > (*pp_conn)->chunkSize) {
-	    readSize = (*pp_conn)->chunkSize;
+	    readSize = (int)((*pp_conn)->chunkSize);
 	}
 	if (readSize) {
 	    ConnectionUnlock(conn);
@@ -643,16 +643,14 @@ void SocketMyClose(Socket sock)
 
 @end    StatusResource;
 
-@include "userpass.goh"
-
-/* a glue bug presents us from putting the above include in the AuthCode
-   segment */
-
 #ifdef __WATCOMC__
 #pragma code_seg("AuthCode")
 #else
 #pragma codeseg AuthCode
 #endif
+
+/* defined in userpass.goc */
+Boolean GetUserPassword(char *p_site, char *p_buffer);
 
 void base64encode(TCHAR *in, char *out)
 {
@@ -1052,16 +1050,19 @@ long header(HTTPConnectionHandle conn, long *clret, word *responseCode)
                 contentlength = CL_UNKNOWN;
 #endif
         } else if (LocalCmpStringsNoCaseSBCS(p, strn("Content-Type:")) == 0) {
-            ChunkStrcpySBCS(p_conn->heap, &(p_conn->mimeTypeChunk), s);
+            /* ignore content type for "Not Modified" (WebOne proxy) */
+	    if (*responseCode != 304) {
+              ChunkStrcpySBCS(p_conn->heap, &(p_conn->mimeTypeChunk), s);
 #if PROGRESS_DISPLAY
-            /* get mime type from HTTP header */
-            if (p_conn->loadProgressDataP)
+              /* get mime type from HTTP header */
+              if (p_conn->loadProgressDataP)
 @ifdef DO_DBCS
-                xstrncpysbcstodbcs(p_conn->loadProgressDataP->LPD_mimeType, s, sizeof(p_conn->loadProgressDataP->LPD_mimeType)/sizeof(TCHAR));
+                  xstrncpysbcstodbcs(p_conn->loadProgressDataP->LPD_mimeType, s, sizeof(p_conn->loadProgressDataP->LPD_mimeType)/sizeof(TCHAR));
 @else
-                xstrncpy(p_conn->loadProgressDataP->LPD_mimeType, s, sizeof(p_conn->loadProgressDataP->LPD_mimeType));
+                  xstrncpy(p_conn->loadProgressDataP->LPD_mimeType, s, sizeof(p_conn->loadProgressDataP->LPD_mimeType));
 @endif
 #endif
+	    }
         } else if (LocalCmpStringsNoCaseSBCS(p, strn("Location:")) == 0) {
             if (*responseCode == 301 || *responseCode == 302) {
                 ChunkStrcpySBCS(p_conn->heap, &(p_conn->urlChunk), s);

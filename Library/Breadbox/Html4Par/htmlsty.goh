@@ -389,7 +389,12 @@
     SPEC_NONE,
     TAG_IS_CHAR_STYLE,
         },
-  {"TABLE",     OptrToChunk(@vcdReset), OptrToChunk(@vpdReset),
+  {"SVG",       OptrToChunk(@vcdNone), OptrToChunk(@vpdNone),
+    SPEC_NONE,
+        TAG_IS_PAR_STYLE|TAG_NO_FORMATTING|TAG_FLUSH_TEXT|TAG_IGNORE_TAGS,
+        },				/* ignore because of <title> inside */
+
+   {"TABLE",     OptrToChunk(@vcdReset), OptrToChunk(@vpdReset),
         SPEC_TABLE,
         TAG_IS_PAR_STYLE,
         },
@@ -399,6 +404,10 @@
   {"TD",        OptrToChunk(@vcdNone), OptrToChunk(@vpdNone),
         SPEC_TD,
         TAG_IS_PAR_STYLE,
+        },
+  {"TEMPLATE",  OptrToChunk(@vcdNone), OptrToChunk(@vpdNone),
+        SPEC_NONE,
+        TAG_IS_PAR_STYLE|TAG_FLUSH_TEXT|TAG_IGNORE_TAGS,
         },
   {"TEXTAREA",  OptrToChunk(@vcdNone), OptrToChunk(@vpdNone),
         SPEC_TEXTAREA,
@@ -456,320 +465,275 @@
  * https://www.key-shortcut.com/html-entities/alle-entitaeten/
  * https://www.w3.org/wiki/Common_HTML_entities_used_for_typography
  * https://www.code-knacker.de/ansi.htm
+ *
+ * Note: Table must be lexically sorted by entity names
+ *
  **************************************************************************/
 
 @start EntityResource, data;
 
+@chunk HTMLEntityTable xlateTable[] =
+{
 @ifdef DO_DBCS
-@chunk HTMLEntityTable xlateTable[] =
-{
-  /* regular ASCII characters which have an entity name */
-  {9,   "tab",   C_HORIZONTAL_TABULATION   },
-  {34,  "quot",  C_QUOTATION_MARK },
-  {38,  "amp",   C_AMPERSAND },
-  {60,  "lt",    C_LESS_THAN_SIGN },
-  {62,  "gt",    C_GREATER_THAN_SIGN },
-
-  /* Extensions based on Windows/ANSI characters set */
-  {130, "",      0xE2},   /* single opening quote, low */
-  {131, "",      0xC4},   /* italic "f" currency symbol (?) */
-  {132, "",      0xE3},   /* double opening quote, low */
-  {133, "",      C_HORIZONTAL_ELLIPSIS},   /* ellipsis */
-  {134, "",      C_DAGGER},   /* dagger */
-  {135, "",      C_DOUBLE_DAGGER},   /* double dagger */
-  {136, "",      0xF6},   /* circonflex */
-  {137, "",      C_PER_MILLE_SIGN},   /* "per mille" symbol */
-  {138, "",      C_LATIN_CAPITAL_LETTER_S_HACEK },   /* S-hacek */
-  {139, "",      0xDC},   /* single opening french quote */
-  {140, "",      C_LATIN_CAPITAL_LETTER_O_E},   /* OE ligature */
-  {145, "",      C_SINGLE_TURNED_COMMA_QUOTATION_MARK},   /* single opening quote, high */
-  {146, "",      C_SINGLE_COMMA_QUOTATION_MARK},   /* single closing quote, high */
-  {8217, "",     C_SINGLE_COMMA_QUOTATION_MARK},   /* add'l single closing quote, high (apostrophe) */
-  {147, "",      C_DOUBLE_TURNED_COMMA_QUOTATION_MARK},   /* double opening quote, high */
-  {148, "",      C_DOUBLE_COMMA_QUOTATION_MARK},   /* double closing quote */
-//  {149, "",      C_BULLET},   /* bullet */
-//  {8226, "",     C_BULLET},   /* additional bullet */
-//C_BULLET don't exist in DBCS encodings, use alternative
-  {149, "",      C_KATAKANA_MIDDLE_DOT},   /* bullet */
-  {8226, "",     C_KATAKANA_MIDDLE_DOT},   /* additional bullet */
-  {150, "",      C_EN_DASH},   /* En dash */
-  {151, "",      C_EM_DASH},   /* Em dash */
-  {8212, "",     C_EM_DASH},   /* additional Em dash */
-  {152, "",      0xF7},   /* tilde accent (?) */
-  {153, "",      C_TRADEMARK},   /* trademark symbol */
-  {154, "",      C_LATIN_SMALL_LETTER_S_HACEK },   /* s-hacek */
-  {155, "",      0xDD},   /* single closing french quote */
-  {156, "",      C_LATIN_SMALL_LETTER_O_E},   /* oe ligature */
-  {159, "",      C_LATIN_CAPITAL_LETTER_Y_DIAERESIS},   /* Y-umlaut (?) */
-
-  /* Regular ISO Latin character set */
-  {160, "nbsp",  C_NON_BREAKING_SPACE},
-  {161, "iexcl", C_INVERTED_EXCLAMATION_MARK},
-  {162, "cent",  C_CENT_SIGN},
-  {163, "pound", C_POUND_SIGN},
-  {164, "curren",C_CURRENCY_SIGN},
-  {165, "yen",   C_YEN_SIGN},
-  {166, "brvbar",C_BROKEN_VERTICAL_BAR},
-  {167, "sect",  C_SECTION_SIGN},
-  {168, "uml",   C_SPACING_DIAERESIS},
-  {169, "copy",  C_COPYRIGHT_SIGN},
-  {170, "ordf",  C_FEMININE_ORDINAL_INDICATOR},
-  {171, "laquo", C_LEFT_POINTING_GUILLEMET},
-  {172, "not",   C_NOT_SIGN},
-  {173, "shy",   C_SOFT_HYPHEN},
-  {174, "reg",   C_REGISTERED_TRADE_MARK_SIGN},
-  {175, "macro", C_SPACING_MACRON},
-  {176, "deg",   C_DEGREE_SIGN},
-  {177, "plusm", C_PLUS_OR_MINUS_SIGN},
-//{178, "sup2",  C_SUPERSCRIPT_DIGIT_TWO },
-//{179, "sup3",  C_SUPERSCRIPT_DIGIT_TRHEE },
-  {180, "acute", C_SPACING_ACUTE},
-  {181, "micro", C_MICRO_SIGN},
-  {182, "para",  C_PARAGRAPH_SIGN},
-  {183, "middot",C_MIDDLE_DOT},
-  {184, "cedil", C_SPACING_CEDILLA},
-//{185, "sup1",  C_SUPERSCRIPT_DIGIT_ONE },
-  {186, "ordm",  C_MASCULINE_ORDINAL_INDICATOR},
-  {187, "raquo", C_RIGHT_POINTING_GUILLEMET},
-//{188, "frac14",C_FRACTION_ONE_QUARTER },
-//{189, "frac12",C_FRACTION_ONE_HALF },
-//{190, "frac34",C_FRACTION_THREE_QUARTERS },
-  {191, "iquest",C_INVERTED_QUESTION_MARK},
-  {192, "Agrave",C_LATIN_CAPITAL_LETTER_A_GRAVE},
-  {193, "Aacute",C_LATIN_CAPITAL_LETTER_A_ACUTE},
-  {194, "Acirc", C_LATIN_CAPITAL_LETTER_A_CIRCUMFLEX},
-  {195, "Atilde",C_LATIN_CAPITAL_LETTER_A_TILDE},
-  {196, "Auml",  C_LATIN_CAPITAL_LETTER_A_DIAERESIS},
-  {197, "Aring", C_LATIN_CAPITAL_LETTER_A_RING},
-  {198, "AElig", C_LATIN_CAPITAL_LETTER_A_E},
-  {199, "Ccedil",C_LATIN_CAPITAL_LETTER_C_CEDILLA},
-  {200, "Egrave",C_LATIN_CAPITAL_LETTER_E_GRAVE},
-  {201, "Eacute",C_LATIN_CAPITAL_LETTER_E_ACUTE},
-  {202, "Ecirc", C_LATIN_CAPITAL_LETTER_E_CIRCUMFLEX},
-  {203, "Euml",  C_LATIN_CAPITAL_LETTER_E_DIAERESIS},
-  {204, "Igrave",C_LATIN_CAPITAL_LETTER_I_GRAVE},
-  {205, "Iacute",C_LATIN_CAPITAL_LETTER_I_ACUTE},
-  {206, "Icirc", C_LATIN_CAPITAL_LETTER_I_CIRCUMFLEX},
-  {207, "Iuml",  C_LATIN_CAPITAL_LETTER_I_DIAERESIS},
-//{208, "ETH",   C_LATIN_CAPITAL_LETTER_ETH },
-  {209, "Ntilde",C_LATIN_CAPITAL_LETTER_N_TILDE},
-  {210, "Ograve",C_LATIN_CAPITAL_LETTER_O_GRAVE},
-  {211, "Oacute",C_LATIN_CAPITAL_LETTER_O_ACUTE},
-  {212, "Ocirc", C_LATIN_CAPITAL_LETTER_O_CIRCUMFLEX},
-  {213, "Otilde",C_LATIN_CAPITAL_LETTER_O_TILDE},
-  {214, "Ouml",  C_LATIN_CAPITAL_LETTER_O_DIAERESIS},
-//{215, "times", C_MULTIPLICATION_SIGN},
-  {216, "Oslash",C_LATIN_CAPITAL_LETTER_O_SLASH},
-  {217, "Ugrave",C_LATIN_CAPITAL_LETTER_O_GRAVE},
-  {218, "Uacute",C_LATIN_CAPITAL_LETTER_U_ACUTE},
-  {219, "Ucirc", C_LATIN_CAPITAL_LETTER_U_CIRCUMFLEX},
-  {220, "Uuml",  C_LATIN_CAPITAL_LETTER_U_DIAERESIS},
-  {221, "Yacute",C_LATIN_CAPITAL_LETTER_Y_ACUTE},
-//{222, "THORN", C_LATIN_CAPITAL_LETTER_THORN },
-  {223, "szlig", C_LATIN_SMALL_LETTER_SHARP_S},
-  {224, "agrave",C_LATIN_SMALL_LETTER_A_GRAVE},
-  {225, "aacute",C_LATIN_SMALL_LETTER_A_ACUTE},
-  {226, "acirc", C_LATIN_SMALL_LETTER_A_CIRCUMFLEX},
-  {227, "atilde",C_LATIN_SMALL_LETTER_A_TILDE},
-  {228, "auml",  C_LATIN_SMALL_LETTER_A_DIAERESIS},
-  {229, "aring", C_LATIN_SMALL_LETTER_A_RING},
-  {230, "aelig", C_LATIN_SMALL_LETTER_A_E},
-  {231, "ccedil",C_LATIN_SMALL_LETTER_C_CEDILLA},
-  {232, "egrave",C_LATIN_SMALL_LETTER_E_GRAVE},
-  {233, "eacute",C_LATIN_SMALL_LETTER_E_ACUTE},
-  {234, "ecirc", C_LATIN_SMALL_LETTER_E_CIRCUMFLEX},
-  {235, "euml",  C_LATIN_SMALL_LETTER_E_DIAERESIS},
-  {236, "igrave",C_LATIN_SMALL_LETTER_I_GRAVE},
-  {237, "iacute",C_LATIN_SMALL_LETTER_I_ACUTE},
-  {238, "icirc", C_LATIN_SMALL_LETTER_I_CIRCUMFLEX},
-  {239, "iuml",  C_LATIN_SMALL_LETTER_I_DIAERESIS},
-//{240, "eth",   C_LATIN_SMALL_LETTER_ETH },
-  {241, "ntilde",C_LATIN_SMALL_LETTER_N_TILDE},
-  {242, "ograve",C_LATIN_SMALL_LETTER_O_GRAVE},
-  {243, "oacute",C_LATIN_SMALL_LETTER_O_ACUTE},
-  {244, "ocirc", C_LATIN_SMALL_LETTER_O_CIRCUMFLEX},
-  {245, "otilde",C_LATIN_SMALL_LETTER_O_TILDE},
-  {246, "ouml",  C_LATIN_SMALL_LETTER_O_DIAERESIS},
-  {247, "divide",C_DIVISION_SIGN},
-  {248, "oslash",C_LATIN_SMALL_LETTER_O_SLASH},
-  {249, "ugrave",C_LATIN_SMALL_LETTER_U_GRAVE},
-  {250, "uacute",C_LATIN_SMALL_LETTER_U_ACUTE},
-  {251, "ucirc", C_LATIN_SMALL_LETTER_U_CIRCUMFLEX},
-  {252, "uuml",  C_LATIN_SMALL_LETTER_U_DIAERESIS},
-  {253, "yacute",C_LATIN_SMALL_LETTER_Y_ACUTE},
-//{254, "thorn", C_LATIN_SMALL_LETTER_THORN },
-  {255, "yuml",  C_LATIN_SMALL_LETTER_Y_DIAERESIS},
-
-  /* Fake characters that get expanded into strings */
-  {175, "macr", HTML_SPECIAL_ENTITY_BASE},
-  {185, "sup1", HTML_SPECIAL_ENTITY_BASE+2},
-  {178, "sup2", HTML_SPECIAL_ENTITY_BASE+3},
-  {179, "sup3", HTML_SPECIAL_ENTITY_BASE+4},
-  {188, "frac14", HTML_SPECIAL_ENTITY_BASE+5},
-  {189, "frac12", HTML_SPECIAL_ENTITY_BASE+6},
-  {190, "frac34", HTML_SPECIAL_ENTITY_BASE+7},
-  {208, "ETH", HTML_SPECIAL_ENTITY_BASE+8},
-  {240, "eth", HTML_SPECIAL_ENTITY_BASE+9},
-  {222, "THORN", HTML_SPECIAL_ENTITY_BASE+10},
-  {254, "thorn", HTML_SPECIAL_ENTITY_BASE+11},
-  {215, "times", HTML_SPECIAL_ENTITY_BASE+12},
-
-  {0,   "",      0   }    /* end of list */
-};
+  {"",      130, 0xE2},   /* single opening quote, low */
+  {"",      131, 0xC4},   /* italic "f" currency symbol (?) */
+  {"",      132, 0xE3},   /* double opening quote, low */
+  {"",      133, C_HORIZONTAL_ELLIPSIS},   /* ellipsis */
+  {"",      134, C_DAGGER},   /* dagger */
+  {"",      135, C_DOUBLE_DAGGER},   /* double dagger */
+  {"",      136, 0xF6},   /* circonflex */
+  {"",      137, C_PER_MILLE_SIGN},   /* "per mille" symbol */
+  {"",      138, C_LATIN_CAPITAL_LETTER_S_HACEK },   /* S-hacek */
+  {"",      139, 0xDC},   /* single opening french quote */
+  {"",      140, C_LATIN_CAPITAL_LETTER_O_E},   /* OE ligature */
+  {"",      145, C_SINGLE_TURNED_COMMA_QUOTATION_MARK},   /* single opening quote, high */
+  {"",      146, C_SINGLE_COMMA_QUOTATION_MARK},   /* single closing quote, high */
+  {"",      147, C_DOUBLE_TURNED_COMMA_QUOTATION_MARK},   /* double opening quote, high */
+  {"",      148, C_DOUBLE_COMMA_QUOTATION_MARK},   /* double closing quote */
+  {"",      149, C_KATAKANA_MIDDLE_DOT},   /* C_BULLET don't exist in DBCS encodings, use alternative */
+  {"",      150, C_EN_DASH},   /* En dash */
+  {"",      151, C_EM_DASH},   /* Em dash */
+  {"",      152, 0xF7},   /* tilde accent (?) */
+  {"",      153, C_TRADEMARK},   /* trademark symbol */
+  {"",      154, C_LATIN_SMALL_LETTER_S_HACEK },   /* s-hacek */
+  {"",      155, 0xDD},   /* single closing french quote */
+  {"",      156, C_LATIN_SMALL_LETTER_O_E},   /* oe ligature */
+  {"",      159, C_LATIN_CAPITAL_LETTER_Y_DIAERESIS},   /* Y-umlaut (?) */
+  {"",      8212,C_EM_DASH},   /* additional Em dash */
+  {"",      8217,C_SINGLE_COMMA_QUOTATION_MARK},   /* add'l single closing quote, high (apostrophe) */
+  {"",      8226,C_KATAKANA_MIDDLE_DOT},   /* additional bullet */
+  {"AElig", 198, C_LATIN_CAPITAL_LETTER_A_E},
+  {"Aacute",193, C_LATIN_CAPITAL_LETTER_A_ACUTE},
+  {"Acirc", 194, C_LATIN_CAPITAL_LETTER_A_CIRCUMFLEX},
+  {"Agrave",192, C_LATIN_CAPITAL_LETTER_A_GRAVE},
+  {"Aring", 197, C_LATIN_CAPITAL_LETTER_A_RING},
+  {"Atilde",195, C_LATIN_CAPITAL_LETTER_A_TILDE},
+  {"Auml",  196, C_LATIN_CAPITAL_LETTER_A_DIAERESIS},
+  {"Ccedil",199, C_LATIN_CAPITAL_LETTER_C_CEDILLA},
+  {"ETH",   208, HTML_SPECIAL_ENTITY_BASE+8},
+  {"Eacute",201, C_LATIN_CAPITAL_LETTER_E_ACUTE},
+  {"Ecirc", 202, C_LATIN_CAPITAL_LETTER_E_CIRCUMFLEX},
+  {"Egrave",200, C_LATIN_CAPITAL_LETTER_E_GRAVE},
+  {"Euml",  203, C_LATIN_CAPITAL_LETTER_E_DIAERESIS},
+  {"Iacute",205, C_LATIN_CAPITAL_LETTER_I_ACUTE},
+  {"Icirc", 206, C_LATIN_CAPITAL_LETTER_I_CIRCUMFLEX},
+  {"Igrave",204, C_LATIN_CAPITAL_LETTER_I_GRAVE},
+  {"Iuml",  207, C_LATIN_CAPITAL_LETTER_I_DIAERESIS},
+  {"Ntilde",209, C_LATIN_CAPITAL_LETTER_N_TILDE},
+  {"Oacute",211, C_LATIN_CAPITAL_LETTER_O_ACUTE},
+  {"Ocirc", 212, C_LATIN_CAPITAL_LETTER_O_CIRCUMFLEX},
+  {"Ograve",210, C_LATIN_CAPITAL_LETTER_O_GRAVE},
+  {"Oslash",216, C_LATIN_CAPITAL_LETTER_O_SLASH},
+  {"Otilde",213, C_LATIN_CAPITAL_LETTER_O_TILDE},
+  {"Ouml",  214, C_LATIN_CAPITAL_LETTER_O_DIAERESIS},
+  {"THORN", 222, HTML_SPECIAL_ENTITY_BASE+10},
+  {"Uacute",218, C_LATIN_CAPITAL_LETTER_U_ACUTE},
+  {"Ucirc", 219, C_LATIN_CAPITAL_LETTER_U_CIRCUMFLEX},
+  {"Ugrave",217, C_LATIN_CAPITAL_LETTER_O_GRAVE},
+  {"Uuml",  220, C_LATIN_CAPITAL_LETTER_U_DIAERESIS},
+  {"Yacute",221, C_LATIN_CAPITAL_LETTER_Y_ACUTE},
+  {"aacute",225, C_LATIN_SMALL_LETTER_A_ACUTE},
+  {"acirc", 226, C_LATIN_SMALL_LETTER_A_CIRCUMFLEX},
+  {"acute", 180, C_SPACING_ACUTE},
+  {"aelig", 230, C_LATIN_SMALL_LETTER_A_E},
+  {"agrave",224, C_LATIN_SMALL_LETTER_A_GRAVE},
+  {"amp",   38,  C_AMPERSAND },
+  {"aring", 229, C_LATIN_SMALL_LETTER_A_RING},
+  {"atilde",227, C_LATIN_SMALL_LETTER_A_TILDE},
+  {"auml",  228, C_LATIN_SMALL_LETTER_A_DIAERESIS},
+  {"brvbar",166, C_BROKEN_VERTICAL_BAR},
+  {"ccedil",231, C_LATIN_SMALL_LETTER_C_CEDILLA},
+  {"cedil", 184, C_SPACING_CEDILLA},
+  {"cent",  162, C_CENT_SIGN},
+  {"copy",  169, C_COPYRIGHT_SIGN},
+  {"curren",164, C_CURRENCY_SIGN},
+  {"deg",   176, C_DEGREE_SIGN},
+  {"divide",247, C_DIVISION_SIGN},
+  {"eacute",233, C_LATIN_SMALL_LETTER_E_ACUTE},
+  {"ecirc", 234, C_LATIN_SMALL_LETTER_E_CIRCUMFLEX},
+  {"egrave",232, C_LATIN_SMALL_LETTER_E_GRAVE},
+  {"eth",   240, HTML_SPECIAL_ENTITY_BASE+9},
+  {"euml",  235, C_LATIN_SMALL_LETTER_E_DIAERESIS},
+  {"frac12",189, HTML_SPECIAL_ENTITY_BASE+6},
+  {"frac14",188, HTML_SPECIAL_ENTITY_BASE+5},
+  {"frac34",190, HTML_SPECIAL_ENTITY_BASE+7},
+  {"gt",    62,  C_GREATER_THAN_SIGN },
+  {"iacute",237, C_LATIN_SMALL_LETTER_I_ACUTE},
+  {"icirc", 238, C_LATIN_SMALL_LETTER_I_CIRCUMFLEX},
+  {"iexcl", 161, C_INVERTED_EXCLAMATION_MARK},
+  {"igrave",236, C_LATIN_SMALL_LETTER_I_GRAVE},
+  {"iquest",191, C_INVERTED_QUESTION_MARK},
+  {"iuml",  239, C_LATIN_SMALL_LETTER_I_DIAERESIS},
+  {"laquo", 171, C_LEFT_POINTING_GUILLEMET},
+  {"lt",    60,  C_LESS_THAN_SIGN },
+  {"macr",  175, C_SPACING_MACRON},
+  {"micro", 181, C_MICRO_SIGN},
+  {"middot",183, C_MIDDLE_DOT},
+  {"nbsp",  160, C_NON_BREAKING_SPACE},
+  {"not",   172, C_NOT_SIGN},
+  {"ntilde",241, C_LATIN_SMALL_LETTER_N_TILDE},
+  {"oacute",243, C_LATIN_SMALL_LETTER_O_ACUTE},
+  {"ocirc", 244, C_LATIN_SMALL_LETTER_O_CIRCUMFLEX},
+  {"ograve",242, C_LATIN_SMALL_LETTER_O_GRAVE},
+  {"ordf",  170, C_FEMININE_ORDINAL_INDICATOR},
+  {"ordm",  186, C_MASCULINE_ORDINAL_INDICATOR},
+  {"oslash",248, C_LATIN_SMALL_LETTER_O_SLASH},
+  {"otilde",245, C_LATIN_SMALL_LETTER_O_TILDE},
+  {"ouml",  246, C_LATIN_SMALL_LETTER_O_DIAERESIS},
+  {"para",  182, C_PARAGRAPH_SIGN},
+  {"plusm", 177, C_PLUS_OR_MINUS_SIGN},
+  {"pound", 163, C_POUND_SIGN},
+  {"quot",  34,  C_QUOTATION_MARK },
+  {"raquo", 187, C_RIGHT_POINTING_GUILLEMET},
+  {"reg",   174, C_REGISTERED_TRADE_MARK_SIGN},
+  {"sect",  167, C_SECTION_SIGN},
+  {"shy",   173, C_SOFT_HYPHEN},
+  {"sup1",  185, HTML_SPECIAL_ENTITY_BASE+2},
+  {"sup2",  178, HTML_SPECIAL_ENTITY_BASE+3},
+  {"sup3",  179, HTML_SPECIAL_ENTITY_BASE+4},
+  {"szlig", 223, C_LATIN_SMALL_LETTER_SHARP_S},
+  {"tab",   9,   C_HORIZONTAL_TABULATION },
+  {"thorn", 254, HTML_SPECIAL_ENTITY_BASE+11},
+  {"times", 215, HTML_SPECIAL_ENTITY_BASE+12},
+  {"uacute",250, C_LATIN_SMALL_LETTER_U_ACUTE},
+  {"ucirc", 251, C_LATIN_SMALL_LETTER_U_CIRCUMFLEX},
+  {"ugrave",249, C_LATIN_SMALL_LETTER_U_GRAVE},
+  {"uml",   168, C_SPACING_DIAERESIS},
+  {"uuml",  252, C_LATIN_SMALL_LETTER_U_DIAERESIS},
+  {"yacute",253, C_LATIN_SMALL_LETTER_Y_ACUTE},
+  {"yen",   165, C_YEN_SIGN},
+  {"yuml",  255, C_LATIN_SMALL_LETTER_Y_DIAERESIS},
 @else
-@chunk HTMLEntityTable xlateTable[] =
-{
-  /* regular ASCII characters which have an entity name */
-  {9,   "tab",   9   },
-  {34,  "quot",  '"' },
-  {38,  "amp",   '&' },
-  {60,  "lt",    '<' },
-  {62,  "gt",    '>' },
-
-  /* Extensions based on Windows/ANSI characters set */
-  {130, "sbquo",      0xE2},   /* single opening quote, low */
-  {131, "fnof",      0xC4},   /* italic "f" currency symbol (?) */
-  {132, "bdquo",      0xE3},   /* double opening quote, low */
-  {133, "hellip",      0xC9},   /* ellipsis */
-  {134, "dagger",      0xA0},   /* dagger */
-  {135, "Dagger",      0xE0},   /* double dagger */
-  {136, "circ",      0xF6},   /* circonflex */
-  {137, "permil",      0xE4},   /* "per mille" symbol */
-//{138, "",      '?' },   /* S-hacek (?) */
-  {139, "lsaquo",      0xDC},   /* single opening french quote */
-  {140, "OElig",      0xCE},   /* OE ligature */
-  {145, "lsquo",      0xD4},   /* single opening quote, high */
-  {146, "rsquo",      0xD5},   /* single closing quote, high */
-// {8217, "",      0xD5},   /* add'l single closing quote, high (apostrophe) */
-  {147, "ldquo",      0xD2},   /* double opening quote, high */
-  {148, "rdquo",      0xD3},   /* double closing quote */
-  {149, "bull",      0xA5},   /* bullet */
-//  {8226, "",      0xA5},   /* additional bullet */
-  {150, "ndash",      0xD0},   /* En dash */
-  {151, "mdash",      0xD1},   /* Em dash */
-// {8212, "",      0xD1},   /* additional Em dash */
-  {152, "tilde",      0xF7},   /* tilde accent (?) */
-  {153, "trade",      0xAA},   /* trademark symbol */
-//{154, "",      '?' },   /* s-hacek (?) */
-  {155, "rsaquo",      0xDD},   /* single closing french quote */
-  {156, "oelig",      0xCF},   /* oe ligature */
-  {159, "Yuml",      0xD9},   /* Y-umlaut (?) */
-
-  /* Regular ISO Latin character set */
-  {160, "nbsp",  0xCA},
-  {161, "iexcl", 0xC1},
-  {162, "cent",  0xA2},
-  {163, "pound", 0xA3},
-  {164, "curren",0xDB},
-  {165, "yen",   0xB4},
-  {166, "brvbar",0x7C},
-  {167, "sect",  0xA4},
-  {168, "uml",   0xFD},
-  {169, "copy",  0xA9},
-  {170, "ordf",  0xBB},
-  {171, "laquo", 0xC7},
-  {172, "not",   0xC2},
-  {173, "shy",   0x1F},
-  {174, "reg",   0xA8},
-  {175, "macro", 0xF8},
-  {176, "deg",   0xA1},
-  {177, "plusm", 0xB1},
-//{178, "sup2",  '?' },   /* ??? */
-//{179, "sup3",  '?' },   /* ??? */
-  {180, "acute", 0xAB},
-  {181, "micro", 0xB5},
-  {182, "para",  0xA6},
-  {183, "middot",0xE1},
-  {184, "cedil", 0xFE},
-//{185, "sup1",  '?' },   /* ??? */
-  {186, "ordm",  0xBC},
-  {187, "raquo", 0xC8},
-//{188, "frac14",'?' },   /* ??? */
-//{189, "frac12",'?' },   /* ??? */
-//{190, "frac34",'?' },   /* ??? */
-  {191, "iquest",0xC0},
-  {192, "Agrave",0xCB},
-  {193, "Aacute",0xE7},
-  {194, "Acirc", 0xE5},
-  {195, "Atilde",0xCC},
-  {196, "Auml",  0x80},
-  {197, "Aring", 0x81},
-  {198, "AElig", 0xAE},
-  {199, "Ccedil",0x82},
-  {200, "Egrave",0xE9},
-  {201, "Eacute",0x83},
-  {202, "Ecirc", 0xE6},
-  {203, "Euml",  0xE8},
-  {204, "Igrave",0xED},
-  {205, "Iacute",0xEA},
-  {206, "Icirc", 0xEB},
-  {207, "Iuml",  0xEC},
-//{208, "ETH",   '?' },   /* ??? */
-  {209, "Ntilde",0x84},
-  {210, "Ograve",0xF1},
-  {211, "Oacute",0xEE},
-  {212, "Ocirc", 0xEF},
-  {213, "Otilde",0xCD},
-  {214, "Ouml",  0x85},
-//{215, "times", 0x78},   /* ??? */
-  {216, "Oslash",0xAF},
-  {217, "Ugrave",0xF4},
-  {218, "Uacute",0xF2},
-  {219, "Ucirc", 0xF3},
-  {220, "Uuml",  0x86},
-  {221, "Yacute",0xDF},
-//{222, "THORN", '?' },   /* ??? */
-  {223, "szlig", 0xA7},
-  {224, "agrave",0x88},
-  {225, "aacute",0x87},
-  {226, "acirc", 0x89},
-  {227, "atilde",0x8B},
-  {228, "auml",  0x8A},
-  {229, "aring", 0x8C},
-  {230, "aelig", 0xBE},
-  {231, "ccedil",0x8D},
-  {232, "egrave",0x8F},
-  {233, "eacute",0x8E},
-  {234, "ecirc", 0x90},
-  {235, "euml",  0x91},
-  {236, "igrave",0x93},
-  {237, "iacute",0x92},
-  {238, "icirc", 0x94},
-  {239, "iuml",  0x95},
-//{240, "eth",   '?' },   /* ??? */
-  {241, "ntilde",0x96},
-  {242, "ograve",0x98},
-  {243, "oacute",0x97},
-  {244, "ocirc", 0x99},
-  {245, "otilde",0x9B},
-  {246, "ouml",  0x9A},
-  {247, "divide",0xD6},
-  {248, "oslash",0xBF},
-  {249, "ugrave",0x9D},
-  {250, "uacute",0x9C},
-  {251, "ucirc", 0x9E},
-  {252, "uuml",  0x9F},
-  {253, "yacute",0xDE},
-//{254, "thorn", '?' },   /* ??? */
-  {255, "yuml",  0xD8},
-
-  /* Fake characters that get expanded into strings */
-  {175, "macr", HTML_SPECIAL_ENTITY_BASE},
-  {185, "sup1", HTML_SPECIAL_ENTITY_BASE+2},
-  {178, "sup2", HTML_SPECIAL_ENTITY_BASE+3},
-  {179, "sup3", HTML_SPECIAL_ENTITY_BASE+4},
-  {188, "frac14", HTML_SPECIAL_ENTITY_BASE+5},
-  {189, "frac12", HTML_SPECIAL_ENTITY_BASE+6},
-  {190, "frac34", HTML_SPECIAL_ENTITY_BASE+7},
-  {208, "ETH", HTML_SPECIAL_ENTITY_BASE+8},
-  {240, "eth", HTML_SPECIAL_ENTITY_BASE+9},
-  {222, "THORN", HTML_SPECIAL_ENTITY_BASE+10},
-  {254, "thorn", HTML_SPECIAL_ENTITY_BASE+11},
-  {215, "times", HTML_SPECIAL_ENTITY_BASE+12},
-
-  {0,   "",      0   }    /* end of list */
-};
+  {"",	    8212,0xD1},   /* additional Em dash */
+  {"",      8217,0xD5},   /* add'l single closing quote, high (apostrophe) */
+  {"",      8226,0xA5},   /* additional bullet */
+  {"AElig", 198, 0xAE},
+  {"Aacute",193, 0xE7},
+  {"Acirc", 194, 0xE5},
+  {"Agrave",192, 0xCB},
+  {"Aring", 197, 0x81},
+  {"Atilde",195, 0xCC},
+  {"Auml",  196, 0x80},
+  {"Ccedil",199, 0x82},
+  {"Dagger",135, 0xE0},   /* double dagger */
+  {"ETH",   208, HTML_SPECIAL_ENTITY_BASE+8},
+  {"Eacute",201, 0x83},
+  {"Ecirc", 202, 0xE6},
+  {"Egrave",200, 0xE9},
+  {"Euml",  203, 0xE8},
+  {"Iacute",205, 0xEA},
+  {"Icirc", 206, 0xEB},
+  {"Igrave",204, 0xED},
+  {"Iuml",  207, 0xEC},
+  {"Ntilde",209, 0x84},
+  {"OElig", 140, 0xCE},   /* OE ligature */
+  {"Oacute",211, 0xEE},
+  {"Ocirc", 212, 0xEF},
+  {"Ograve",210, 0xF1},
+  {"Oslash",216, 0xAF},
+  {"Otilde",213, 0xCD},
+  {"Ouml",  214, 0x85},
+  {"THORN", 222, HTML_SPECIAL_ENTITY_BASE+10},
+  {"Uacute",218, 0xF2},
+  {"Ucirc", 219, 0xF3},
+  {"Ugrave",217, 0xF4},
+  {"Uuml",  220, 0x86},
+  {"Yacute",221, 0xDF},
+  {"Yuml",  159, 0xD9},   /* Y-umlaut (?) */
+  {"aacute",225, 0x87},
+  {"acirc", 226, 0x89},
+  {"acute", 180, 0xAB},
+  {"aelig", 230, 0xBE},
+  {"agrave",224, 0x88},
+  {"amp",   38,  '&' },
+  {"aring", 229, 0x8C},
+  {"atilde",227, 0x8B},
+  {"auml",  228, 0x8A},
+  {"bdquo", 132, 0xE3},   /* double opening quote, low */
+  {"brvbar",166, 0x7C},
+  {"bull",  149, 0xA5},   /* bullet */
+  {"ccedil",231, 0x8D},
+  {"cedil", 184, 0xFE},
+  {"cent",  162, 0xA2},
+  {"circ",  136, 0xF6},   /* circonflex */
+  {"copy",  169, 0xA9},
+  {"curren",164, 0xDB},
+  {"dagger",134, 0xA0},   /* dagger */
+  {"deg",   176, 0xA1},
+  {"divide",247, 0xD6},
+  {"eacute",233, 0x8E},
+  {"ecirc", 234, 0x90},
+  {"egrave",232, 0x8F},
+  {"eth",   240, HTML_SPECIAL_ENTITY_BASE+9},
+  {"euml",  235, 0x91},
+  {"fnof",  131, 0xC4},   /* italic "f" currency symbol (?) */
+  {"frac12",189, HTML_SPECIAL_ENTITY_BASE+6},
+  {"frac14",188, HTML_SPECIAL_ENTITY_BASE+5},
+  {"frac34",190, HTML_SPECIAL_ENTITY_BASE+7},
+  {"gt",    62,  '>' },
+  {"hellip",133, 0xC9},   /* ellipsis */
+  {"iacute",237, 0x92},
+  {"icirc", 238, 0x94},
+  {"iexcl", 161, 0xC1},
+  {"igrave",236, 0x93},
+  {"iquest",191, 0xC0},
+  {"iuml",  239, 0x95},
+  {"laquo", 171, 0xC7},
+  {"ldquo", 147, 0xD2},   /* double opening quote, high */
+  {"lsaquo",139, 0xDC},   /* single opening french quote */
+  {"lsquo", 145, 0xD4},   /* single opening quote, high */
+  {"lt",    60,  '<' },
+  {"macr",  175, 0xF8},
+  {"mdash", 151, 0xD1},   /* Em dash */
+  {"micro", 181, 0xB5},
+  {"middot",183, 0xE1},
+  {"nbsp",  160, 0xCA},
+  {"ndash", 150, 0xD0},   /* En dash */
+  {"not",   172, 0xC2},
+  {"ntilde",241, 0x96},
+  {"oacute",243, 0x97},
+  {"ocirc", 244, 0x99},
+  {"oelig", 156, 0xCF},   /* oe ligature */
+  {"ograve",242, 0x98},
+  {"ordf",  170, 0xBB},
+  {"ordm",  186, 0xBC},
+  {"oslash",248, 0xBF},
+  {"otilde",245, 0x9B},
+  {"ouml",  246, 0x9A},
+  {"para",  182, 0xA6},
+  {"permil",137, 0xE4},   /* "per mille" symbol */
+  {"plusm", 177, 0xB1},
+  {"pound", 163, 0xA3},
+  {"quot",  34,  '"' },
+  {"raquo", 187, 0xC8},
+  {"rdquo", 148, 0xD3},   /* double closing quote */
+  {"reg",   174, 0xA8},
+  {"rsaquo",155, 0xDD},   /* single closing french quote */
+  {"rsquo", 146, 0xD5},   /* single closing quote, high */
+  {"sbquo", 130, 0xE2},   /* single opening quote, low */
+  {"sect",  167, 0xA4},
+  {"shy",   173, 0x1F},
+  {"sup1",  185, HTML_SPECIAL_ENTITY_BASE+2},
+  {"sup2",  178, HTML_SPECIAL_ENTITY_BASE+3},
+  {"sup3",  179, HTML_SPECIAL_ENTITY_BASE+4},
+  {"szlig", 223, 0xA7},
+  {"tab",   9,   9   },
+  {"thorn", 254, HTML_SPECIAL_ENTITY_BASE+11},
+  {"tilde", 152, 0xF7},   /* tilde accent (?) */
+  {"times", 215, HTML_SPECIAL_ENTITY_BASE+12},
+  {"trade", 153, 0xAA},   /* trademark symbol */
+  {"uacute",250, 0x9C},
+  {"ucirc", 251, 0x9E},
+  {"ugrave",249, 0x9D},
+  {"uml",   168, 0xFD},
+  {"uuml",  252, 0x9F},
+  {"yacute",253, 0xDE},
+  {"yen",   165, 0xB4},
+  {"yuml",  255, 0xD8},
 @endif
+
+  {"",      0,   0   }    /* end of list */
+};
 
 @chunk HTMLEntityString EntityStringArray[] = {
     { "-"   },   /* &macr */
