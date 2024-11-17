@@ -1086,10 +1086,40 @@ static char GetDefaultChar( TRUETYPE_VARS, char firstChar )
 }
 
 
+/********************************************************************
+ *                      activateBytecodeInterpreter
+ ********************************************************************
+ * SYNOPSIS:       Activates or determines if the bytecode interpreter 
+ *                 should be active for the TrueType font driver. Reads 
+ *                 the configuration setting from geos.ini.
+ * 
+ * PARAMETERS:     None
+ * 
+ * RETURNS:        Boolean
+ *                    TRUE if the bytecode interpreter should be active 
+ *                    (default behavior) or the value retrieved from the 
+ *                    initialization file if it is successfully read.
+ * 
+ * STRATEGY:       - Attempt to read the BYTECODEINTERPRETER_KEY from the 
+ *                   initialization file under the TTFDRIVER_CATEGORY.
+ *                 - If the key is successfully read, return the retrieved value.
+ *                 - If reading fails, return TRUE as the default behavior.
+ * 
+ * REVISION HISTORY:
+ *      Date      Name      Description
+ *      ----      ----      -----------
+ *      17.11.24  jk        Initial Revision
+ *******************************************************************/
+
 static Boolean activateBytecodeInterpreter()
 {
-        return TRUE;
+        Boolean  bytecodeInterpreterActive;
 
+
+        if( InitFileReadBoolean( TTFDRIVER_CATEGORY, BYTECODEINTERPRETER_KEY, &bytecodeInterpreterActive ) )
+                return bytecodeInterpreterActive;
+
+        return TRUE;
 }
 
 
