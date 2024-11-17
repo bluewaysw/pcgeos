@@ -60,7 +60,7 @@
                                     /* context objects                */
 
      void*   raster_component;      /* ttraster implementation depedent    */
-     Boolean interpreterActiv;      /* is bytecodeinterpreter aktiv?  */
+     Boolean interpreterActive;     /* is bytecodeinterpreter aktive?  */
   };
 
   /* NOTE : The raster's lock is only acquired by the Render_Glyph and     */

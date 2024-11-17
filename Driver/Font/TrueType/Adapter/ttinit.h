@@ -34,7 +34,7 @@
 
 #define FONTMAPPING_CATEGORY            "FontMapping" 
 #define TTFDRIVER_CATEGORY              "TtfDriver"
-#define BYTECODEINTERPRETER_KEY         "bytecodeInterpreterActiv"
+#define BYTECODEINTERPRETER_KEY         "bytecodeInterpreterActive"
 
 
 /***********************************************************************

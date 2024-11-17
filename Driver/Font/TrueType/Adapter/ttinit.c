@@ -108,7 +108,7 @@ TT_Error _pascal Init_FreeType()
         if ( error != TT_Err_Ok )
                 return error;
 
-        engineInstance.interpreterActiv = activateBytecodeInterpreter();
+        engineInstance.interpreterActive = activateBytecodeInterpreter();
 
         return TT_Err_Ok;
 }
