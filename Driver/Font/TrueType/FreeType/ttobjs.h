@@ -315,6 +315,8 @@
 
 #endif
 
+#define CALL_INTERPRETER  engineInstance.interpreterActive ? RunIns( exec ) : TT_Err_Ok
+
   /* Rounding function, as used by the interpreter */
   typedef TT_F26Dot6  TRound_Function( EXEC_OPS TT_F26Dot6 distance,
                                                 TT_F26Dot6 compensation );
