@@ -73,6 +73,8 @@ static void strcpyname( char* dest, const char* source );
 
 static int strcmp( const char* s1, const char* s2 );
 
+static Boolean activateBytecodeInterpreter();
+
 
 /********************************************************************
  *                      Init_FreeType
@@ -105,6 +107,8 @@ TT_Error _pascal Init_FreeType()
         error = TT_Init_FreeType();
         if ( error != TT_Err_Ok )
                 return error;
+
+        engineInstance.interpreterActiv = activateBytecodeInterpreter();
 
         return TT_Err_Ok;
 }
@@ -1079,6 +1083,13 @@ static char GetDefaultChar( TRUETYPE_VARS, char firstChar )
                 return firstChar;  
 
         return DEFAULT_DEFAULT_CHAR; 
+}
+
+
+static Boolean activateBytecodeInterpreter()
+{
+        return TRUE;
+
 }
 
 

@@ -32,7 +32,8 @@
  *      constants for font mapping
  ***********************************************************************/
 
-#define FONTMAPPING_CATEGORY            "FontMapping"   
+#define FONTMAPPING_CATEGORY            "FontMapping" 
+#define BYTECODEINTERPRETER_CATEGORY    "BytecodeInterpreter" 
 
 
 /***********************************************************************
@@ -77,6 +78,13 @@
  ***********************************************************************/
 
 #define MAKE_FONTID( fontGroup, familyName )   ( FM_TRUETYPE | fontGroup | ( 0x01ff & toHash ( familyName )))
+
+
+/***********************************************************************
+ *      drivers engineInstance
+ ***********************************************************************/
+
+extern TEngine_Instance engineInstance;
 
 
 /***********************************************************************
