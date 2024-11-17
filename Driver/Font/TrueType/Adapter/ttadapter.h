@@ -63,15 +63,16 @@ extern TEngine_Instance engineInstance;
 #define INITIAL_BITMAP_BLOCKSIZE            2 * 1024
 #define REGION_SAFETY                       400
 
-#define FAMILY_NAME_LENGTH                  20
+#define FAMILY_NAME_LENGTH                  35
 #define STYLE_NAME_LENGTH                   16
 
-#define KERN_VALUE_DIVIDENT                 100
+#define KERN_VALUE_DIVIDENT                 30
 
 #define STANDARD_GRIDSIZE                   1000
 #define MAX_NUM_GLYPHS                      2000
 
 #define BASELINE_CORRECTION                 1
+#define MIN_BITMAP_DIMENSION                1
 
 
 /***********************************************************************
@@ -397,6 +398,10 @@ typedef struct
 
     /* lookuptable for truetype indices */
     MemHandle                   lookupTable;
+
+    /* cache file handle */
+    VMFileHandle		cacheFile;
+    
 } TrueTypeVars;
 
 
@@ -420,6 +425,17 @@ typedef struct
 #define LOOKUP_TABLE            trueTypeVars->lookupTable
 
 #define UNITS_PER_EM            FACE_PROPERTIES.header->Units_Per_EM
+
+
+/***********************************************************************
+ *      error codes
+ ***********************************************************************/
+
+typedef enum {
+    SYSTEM_ERROR_CODES,
+    CHARINDEX_OUT_OF_BOUNDS,
+    ERROR_BITMAP_BUFFER_OVERFLOW
+} FatalErrors;
 
 
 /***********************************************************************
