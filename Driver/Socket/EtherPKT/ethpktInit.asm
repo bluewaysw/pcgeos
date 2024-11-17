@@ -27,9 +27,6 @@ DESCRIPTION:
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
 
 
-;global EthPktRecvHandlerThread
-
-
 InitCode		segment	resource
 
 pktSignatureString	byte	"PKT DRVR",0
@@ -207,15 +204,6 @@ next:
 	; Null-terminate the last array entry.
 	;
 	mov	ds:[di].RB_nextLink, NULL
-
-	mov	al, PRIORITY_HIGH
-
-	mov	bx, ds     ; thread function parameter
-	mov	cx, segment EthPktRecvHandlerThread
-	mov	dx, offset EthPktRecvHandlerThread
-	mov	di, 1024
-	mov	bp, handle 0   ; owner
-	call	ThreadCreate
 
 	ret
 EthPktInitRecvBuffers	endp
