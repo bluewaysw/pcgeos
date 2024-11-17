@@ -220,8 +220,8 @@ typedef struct {
 } HTMLStylesTable;
 
 typedef struct {
-  unsigned int num;
   char name[7];
+  unsigned int num;
   unsigned int c;
 } HTMLEntityTable;
 
@@ -349,6 +349,7 @@ Boolean AddCellRecord(void);
 word GetCellLevel(void);
 void AddParaCond(void);
 void AddParaCondBeforeTable(void);
+void SetDocumentCharset(char *charSet);
 
 void GetCharacterBase(VisTextCharAttr *cs);
 void GetParagraphBase(VisTextParaAttr *cs);
