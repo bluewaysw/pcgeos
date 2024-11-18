@@ -29,11 +29,11 @@
 
 
 /***********************************************************************
- *      constants for font mapping
+ *      constants for access to geos.ini
  ***********************************************************************/
 
 #define FONTMAPPING_CATEGORY            "FontMapping" 
-#define TTFDRIVER_CATEGORY              "TtfDriver"
+#define TTFDRIVER_CATEGORY              "ttfDriver"
 #define BYTECODEINTERPRETER_KEY         "bytecodeInterpreterActive"
 
 
