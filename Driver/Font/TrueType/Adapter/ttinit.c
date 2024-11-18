@@ -1116,7 +1116,7 @@ static Boolean activateBytecodeInterpreter()
         Boolean  bytecodeInterpreterActive;
 
 
-        if( InitFileReadBoolean( TTFDRIVER_CATEGORY, BYTECODEINTERPRETER_KEY, &bytecodeInterpreterActive ) )
+        if( !InitFileReadBoolean( TTFDRIVER_CATEGORY, BYTECODEINTERPRETER_KEY, &bytecodeInterpreterActive ) )
                 return bytecodeInterpreterActive;
 
         return TRUE;
