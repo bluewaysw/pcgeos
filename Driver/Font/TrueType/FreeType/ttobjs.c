@@ -579,7 +579,7 @@ extern TEngine_Instance engineInstance;
     exec->top     = 0;
     exec->callTop = 0;
 
-    return RunIns( exec );
+    return CALL_INTERPRETER;
   }
 
 
@@ -813,7 +813,7 @@ extern TEngine_Instance engineInstance;
       if ( error )
         goto Fin;
 
-      error = RunIns( exec );
+      error = CALL_INTERPRETER;
     }
     else
       error = TT_Err_Ok;
@@ -934,7 +934,7 @@ extern TEngine_Instance engineInstance;
       if ( error )
         goto Fin;
 
-      error = RunIns( exec );
+      error = CALL_INTERPRETER;
     }
     else
       error = TT_Err_Ok;
