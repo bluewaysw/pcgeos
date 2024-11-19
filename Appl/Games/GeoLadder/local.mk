@@ -56,8 +56,8 @@
 # On WCC:
 # -O and -Z not supported, eventually use -zc
 # -Op and -Os has no effect
-#XCCOMFLAGS += -zc
-XCCOMFLAGS += -ox
+XCCOMFLAGS += -zc
+#XCCOMFLAGS += -ox
 
 
 # ::: LINKFLAGS ::: (will be passed to the GLUE linker)
