@@ -137,7 +137,7 @@ minimalTools    : resedit wlgen
 
 minimalGame	: solitaire cword amateur bjack hearts gwpoker \
                   pyramid sokoban uki mine column battle \
-                  row4 munchers vacman snake frcell
+                  row4 munchers vacman snake frcell ladder
 
 extraGame	: taipei column2 mine2 follow treas mazerun \
 		  blkbox hiho magicboard  scode noid paddle \
@@ -1029,6 +1029,9 @@ Installed/Appl/Games/Taipei:	ui game MAKEAPPL
 
 uki	: Installed/Appl/Games/Uki
 Installed/Appl/Games/Uki:	ui sound text MAKEAPPL
+
+ladder	: Installed/Appl/Games/GeoLadder
+Installed/Appl/Games/GeoLadder:	ui sound MAKEAPPL
 
 column2	: Installed/Appl/Breadbox/Column
 Installed/Appl/Breadbox/Column:	ui game MAKEAPPL
