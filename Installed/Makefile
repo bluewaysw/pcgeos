@@ -1031,7 +1031,7 @@ uki	: Installed/Appl/Games/Uki
 Installed/Appl/Games/Uki:	ui sound text MAKEAPPL
 
 ladder	: Installed/Appl/Games/GeoLadder
-Installed/Appl/Games/GeoLadder:	ui sound MAKEAPPL
+Installed/Appl/Games/GeoLadder:	ui sound ansic math MAKEAPPL
 
 column2	: Installed/Appl/Breadbox/Column
 Installed/Appl/Breadbox/Column:	ui game MAKEAPPL
