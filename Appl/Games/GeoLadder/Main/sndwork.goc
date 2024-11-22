@@ -261,7 +261,6 @@ static const SWNoise SW_NOISES[] =
  ***********************************************************************/
 @method SoundWorkerClass, MSG_SOUND_WORKER_MUSIC_PLAY
 {
-  return;
   // Verify that music is enabled
   if (!(pself->SWI_modes & SW_MODE_MUSIC))
   {
@@ -313,11 +312,9 @@ static const SWNoise SW_NOISES[] =
   // Stop an already playing music
   @call oself::MSG_SOUND_WORKER_MUSIC_STOP();
   // Get the object pointer of the music part to play
+  // We'll unlock in MSG_SOUND_WORKER_MUSIC_STOP() called explicitly or by notification at the end of the song
   MemLock(OptrToHandle(pself->SWI_musicData));
   ChunkArrayGetElement(pself->SWI_musicData, pself->SWI_musicPartIndex, &pself->SWI_musicPart);
-  MemUnlock(OptrToHandle(pself->SWI_musicData));
-  // We'll unlock in MSG_SOUND_WORKER_MUSIC_STOP() called explicitly or by notification at the end of the song
-  MemLock(OptrToHandle(pself->SWI_musicPart));
   p_music = LMemDeref(pself->SWI_musicPart);
   // Patch message and object pointer (handle and chunk) for end of song notification
   e = LMemGetChunkSize(pself->SWI_musicPart) / 2;
@@ -379,7 +376,7 @@ static const SWNoise SW_NOISES[] =
   if (pself->SWI_musicPart != NullOptr)
   {
     // We've locked in MSG_SOUND_WORKER_MUSIC_PLAY_EXEC()
-    MemUnlock(OptrToHandle(pself->SWI_musicPart));
+    MemUnlock(OptrToHandle(pself->SWI_musicData));
     pself->SWI_musicPart = NullOptr;
   }
 }
