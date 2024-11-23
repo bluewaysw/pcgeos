@@ -269,10 +269,10 @@ static const SWNoise SW_NOISES[] =
   // Save the object pointer of the music and set the index to the first element
   pself->SWI_musicData = music;
   pself->SWI_musicPartIndex = 0;
-  // Get and save the total number of music parts
+  // We'll unlock in MSG_SOUND_WORKER_MUSIC_STOP() called explicitly or by notification at the end of the song
   MemLock(OptrToHandle(pself->SWI_musicData));
+  // Get and save the total number of music parts
   pself->SWI_musicPartCount = ChunkArrayGetCount(pself->SWI_musicData);
-  MemUnlock(OptrToHandle(pself->SWI_musicData));
   // Play the first music part
   @send oself::MSG_SOUND_WORKER_MUSIC_PLAY_EXEC();
 }
@@ -312,8 +312,7 @@ static const SWNoise SW_NOISES[] =
   // Stop an already playing music
   @call oself::MSG_SOUND_WORKER_MUSIC_STOP();
   // Get the object pointer of the music part to play
-  // We'll unlock in MSG_SOUND_WORKER_MUSIC_STOP() called explicitly or by notification at the end of the song
-  MemLock(OptrToHandle(pself->SWI_musicData));
+  // We've locked in MSG_SOUND_WORKER_MUSIC_PLAY() and we'll unlock in MSG_SOUND_WORKER_MUSIC_STOP()
   ChunkArrayGetElement(pself->SWI_musicData, pself->SWI_musicPartIndex, &pself->SWI_musicPart);
   p_music = LMemDeref(pself->SWI_musicPart);
   // Patch message and object pointer (handle and chunk) for end of song notification
@@ -375,8 +374,9 @@ static const SWNoise SW_NOISES[] =
   }
   if (pself->SWI_musicPart != NullOptr)
   {
-    // We've locked in MSG_SOUND_WORKER_MUSIC_PLAY_EXEC()
+    // We've locked in MSG_SOUND_WORKER_MUSIC_PLAY()
     MemUnlock(OptrToHandle(pself->SWI_musicData));
+    pself->SWI_musicData = NullOptr;
     pself->SWI_musicPart = NullOptr;
   }
 }
