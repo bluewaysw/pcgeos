@@ -141,11 +141,27 @@ REVISION HISTORY:
 	Name	Date		Description
 	----	----		-----------
 	Tony	10/88		Initial version
+	dhunter	11/14/00	GPMI version
 -------------------------------------------------------------------------------@
 
 ReplaceMovableVector	proc	far
 	INT_OFF
+ifdef PRODUCT_GEOS32
+	; loop to set up all interrupts
 
+	mov	bl, RESOURCE_CALL_INT_BASE
+RMV_loop:
+	mov	dx, offset ResourceCallInt
+	mov	cx, segment ResourceCallInt
+	call	GPMISetInterruptHandlerFar
+
+	inc	bl
+	
+	cmp	bl, RESOURCE_CALL_INT_BASE + 16
+	jb	RMV_loop
+
+	mov	ds:[installedMovableVectors], TRUE
+else
 	push	si, es
 
 	clr	ax
@@ -170,6 +186,7 @@ RMV_loop:
 	mov	ds:[installedMovableVectors], TRUE
 
 	pop	si, es
+endif
 	INT_ON
 	ret
 

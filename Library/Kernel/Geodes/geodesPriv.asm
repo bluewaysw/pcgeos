@@ -91,16 +91,21 @@ EC <	call	NullES							>
 	call	MemPLock			;lock private data block
 	mov	ds, ax				;DS:SI <- src
 	pop	ax				;AX = offset to end of block
-	mov	es, destSeg
+	sub	ax, si				;AX = # bytes in block from si
 	mov	cx, len				;CX = # of words of data to get
+	shr	ax, 1				;ax = # words to read from block
+	cmp	cx, ax				;limit cx to available data
+	jbe	gotcx				;branch if within bound
+	mov	cx, ax
+gotcx:
+	mov	es, destSeg
 	rep	movsw				;copy out data
-	sub	si, ax				;flags same as "cmp  si,ax"
-	jbe	storeDone			;if end still in block, done
-	mov	cx, si				;CX = # of bytes past end
-	sub	di, cx				;backup pointer
-	clr	al				;& fill over w/zeroes
-	rep	stosb
-storeDone:
+	mov	cx, len
+	sub	cx, ax				;CX = # words not written
+	jbe	unlock				;branch if all data output
+	clr	ax				;fill over w/zeroes
+	rep	stosw
+unlock:
 	call	MemUnlockV
 exit:
 	call	PopAll

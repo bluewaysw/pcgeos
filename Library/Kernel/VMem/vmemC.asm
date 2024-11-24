@@ -798,6 +798,10 @@ VMFREEVMCHAIN	proc	far	fileHan:hptr, chainHan:dword
 ;	DON'T DO THIS - It trashes BP first
 ;	movdw	bpax, chainHan
 
+ifdef PRODUCT_GEOS32
+	clr	ax
+	mov	es, ax
+endif
 	mov	ax, chainHan.high
 	mov	bp, chainHan.low
 	call	VMFreeVMChain

@@ -139,6 +139,38 @@ HeapCongestion	etype	word
     HC_DESPERATE	enum HeapCongestion	; Heap is perilously close
 						;  to overflowing. Nuke stuff
 						;  *now*.
+ifdef PRODUCT_GEOS32
+NULL_SEGMENT	=	0x0000
+;
+; When a locked segment becomes unlocked, and EC SEGMENT is on, then
+; either DS or ES will be set to this value if they had previously
+; pointed to a block that was locked.  This normally occurs when calls
+; to MemUnlock, VMUnlock, or DBUnlock are made.  This selector value
+; will definitely cause a general protection fault when used.
+; 
+; This value should also be stored in segment registers in place of
+; the selector of a block that is about to be freed.
+;
+
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+	SYNOPSIS:
+		Store NULL_SEGMENT in a segment register.  This is required
+		in protected mode before freeing a block, as loading a
+		segment register (e.g., pop ds) with an invalid selector will
+		cause a GPF or other bad error.
+	PASS:
+		destSeg	-- segment register to nullify
+		useReg	-- (optional) register to use for fast version
+	DESTROYS:
+		nothing (useReg destroyed if that option chosen)
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+segnull		macro	destSeg, useReg
+segmov	destSeg, NULL_SEGMENT, useReg
+endm
+endif 
 
 ;------------------------------------------------------------------------------
 ;	Paramters to MemGetInfo

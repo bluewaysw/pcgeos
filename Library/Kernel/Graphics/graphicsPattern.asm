@@ -1536,7 +1536,6 @@ ECCheckPatternInfo	proc	far
 	
 		; First check the PatternType
 		;
-		mov	ds, dx			; custom pattern=>DS:SI
 		cmp	al, PatternType		; check PatternType
 		ERROR_AE GRAPHICS_PATTERN_ILLEGAL_PATTERN_TYPE	
 		cmp	al, PT_SOLID		; solid pattern ??
@@ -1550,9 +1549,11 @@ ECCheckPatternInfo	proc	far
 		ERROR_A	GRAPHICS_PATTERN_CUSTOM_PATTERN_TOO_BIG	
 		cmp	al, PT_CUSTOM_BITMAP
 		je	customBitmap
+		mov	ds, dx			; custom pattern=>DS:SI
 		call	ECCheckHatchPattern	; verify HatchPattern
 		jmp	done
 customBitmap:
+		mov	ds, dx			; custom bitmap=>DS:SI
 		call	ECCheckBitmap		; verify Bitmap
 		jmp	done
 

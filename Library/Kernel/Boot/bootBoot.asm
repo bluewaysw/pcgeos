@@ -28,7 +28,11 @@ DESCRIPTION:
 
 	; Debugger hook from LoadResourceLow routine
 
-idata	segment
+ifdef PRODUCT_GEOS32
+kcode		segment
+else
+idata		segment
+endif
 
 if	SINGLE_STEP_PROFILING
 FarDebugProcess	proc	far
@@ -88,11 +92,11 @@ WritableFatalError	proc	far
 	ret
 WritableFatalError	endp
 endif
+
+ifndef PRODUCT_GEOS32
 idata	ends
 kcode		segment
-
-
-
+endif
 
 COMMENT @----------------------------------------------------------------------
 
@@ -235,6 +239,61 @@ DEBUG_MEMORY_ROUTINE	equ	FarDebugMemory
 DEBUG_LOAD_RESOURCE_ROUTINE	equ	FarDebugLoadResource
 endif
 
+ifdef PRODUCT_GEOS32
+swatVectorTable	SwatVectorTable <
+	offset	currentThread,
+	offset	geodeListPtr,
+	offset	threadListPtr,
+	offset	biosLock,
+	offset	heapSem,
+	offset	DEBUG_LOAD_RESOURCE_ROUTINE,
+	offset	DEBUG_MEMORY_ROUTINE,
+	offset	DEBUG_PROCESS_ROUTINE,
+	offset	MemLock,
+	offset	EndGeos,
+	offset	BlockOnLongQueue,
+	offset	FileReadSwat,
+	offset	FilePosSwat,
+	sysECBlockOffset,
+	sysECChecksumOffset,
+	sysECLevelOffset,
+	offset	systemCounter,
+	offset  errorFlag,
+	offset	ResourceCallInt,
+	offset	ResourceCallInt_end,
+	offset	FatalError,
+	offset	FatalError_end,
+	offset	SendMessage,
+	offset	SendMessage_end,
+	offset	CallFixed,
+	offset	CallFixed_end,
+	offset	ObjCallMethodTable,
+	offset	ObjCallMethodTable_end,
+	offset	CallMethodCommonLoadESDI,
+	offset	CallMethodCommonLoadESDI_end,
+	offset	ObjCallMethodTableSaveBXSI,
+	offset	ObjCallMethodTableSaveBXSI_end,
+	offset	CallMethodCommon,
+	offset	CallMethodCommon_end,
+	offset	MessageDispatchDefaultCallBack,
+	offset	MessageDispatchDefaultCallBack_end,
+	offset	MessageProcess,
+	offset	MessageProcess_end,
+	offset	OCCC_callInstanceCommon,
+	offset	OCCC_callInstanceCommon_end,
+	offset	OCCC_no_save_no_test,
+	offset	OCCC_no_save_no_test_end,
+	offset	OCCC_save_no_test, 
+	offset	OCCC_save_no_test_end,
+	offset	Idle,
+	offset	Idle_end,
+	curXIPPageOffset,
+	MapXIPPageFarOffset,
+	MAPPING_PAGE_SIZE,
+	offset	SCS_iretSetup,
+	offset	contextSwitching
+>
+else
 swatVectorTable	SwatVectorTable <
 	offset	currentThread,
 	offset	geodeListPtr,
@@ -286,6 +345,7 @@ swatVectorTable	SwatVectorTable <
 	MapXIPPageFarOffset,
 	MAPPING_PAGE_SIZE
 >
+endif
 
 
 
@@ -1049,8 +1109,10 @@ endif
 	call	ResetWatchdog
 	call	ExitFSD
 
+ifndef PRODUCT_GEOS32
 	call	RestoreMovableInt	;reset INT
-	
+endif
+
 EndGeosDoubleFault label near
 	cmp	ds:errorFlag, 1
 	jg	tripleFault	; => died exiting system geodes

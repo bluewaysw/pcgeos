@@ -136,26 +136,36 @@ REVISION HISTORY:
 	Tony	10/88		Initial version
 -------------------------------------------------------------------------------@
 
-SetTimerInterrupt	proc	near	uses es
+SetTimerInterrupt	proc	near
 	.enter
 
 	; save old interrupt vector
-
+ifdef PRODUCT_GEOS32
+	mov	bl, TIMER_INTERRUPT
+	call	GPMIGetInterruptHandlerFar	;cx:dx = vector
+	mov	ds:timerSave.offset,dx		;save old vector
+	mov	ds:timerSave.segment,cx
+else
 	clr	ax
 	mov	es, ax
 	mov	ax, es:[TIMER_INTERRUPT_VECTOR].offset	;save old vector
 	mov	ds:timerSave.offset,ax
 	mov	ax, es:[TIMER_INTERRUPT_VECTOR].segment
 	mov	ds:timerSave.segment,ax
-	
+endif	
 	push	ds:[runQueue]			;save pass value of runQueue
 
 	;set temporary vector for speed test
 
 	INT_OFF
+ifdef PRODUCT_GEOS32
+	mov	cx, cs
+	mov	dx, offset STI_tempVector
+	call	GPMISetInterruptHandlerFar
+else
 	mov	es:[TIMER_INTERRUPT_VECTOR].offset, offset STI_tempVector
 	mov	es:[TIMER_INTERRUPT_VECTOR].segment,cs
-
+endif
 	; enable interrupts for Timer1
 
 
@@ -169,7 +179,12 @@ SetTimerInterrupt	proc	near	uses es
 	call	ComputeDispatchLoopSpeed
 
 	; set up real interrupt handler
-
+ifdef PRODUCT_GEOS32
+	mov	bl, TIMER_INTERRUPT
+	mov	cx, segment TimerInterrupt
+	mov	dx, offset TimerInterrupt
+	call	GPMISetInterruptHandlerFar
+else
 	INT_OFF
 	clr	ax
 	mov	es, ax
@@ -177,6 +192,7 @@ SetTimerInterrupt	proc	near	uses es
 	mov	es:[TIMER_INTERRUPT_VECTOR].segment, segment TimerInterrupt
 	
 	INT_ON
+endif
 
 	; reset tickCount and runQueue
 
@@ -288,9 +304,6 @@ REVISION HISTORY:
 	Name	Date		Description
 	----	----		-----------
 	Tony	1/91		Initial version
-	Falk	7/16/09	overflow check to fix fast CPU bug
-	Falk	7/18/09	make Perf report correct speed
-	Falk	7/26/09	limit the fix to Breadbox Ensemble
 
 ------------------------------------------------------------------------------@
 
@@ -299,9 +312,6 @@ REVISION HISTORY:
 	; the wrong result.  This seems to give the right result.
 
 BASE_XT_TOTAL_COUNT_DIV_BY_30_MUL_10_DIV_16	=	2817
-
-versionKeyStr		char	"version", 0
-versionCategoryStr	char	"system", 0
 
 ComputeCPUSpeed	proc	near
 
@@ -317,9 +327,16 @@ if not KERNEL_EXECUTE_IN_PLACE and (not FULL_EXECUTE_IN_PLACE)
 
 	; need to move the loop backward ax bytes
 
-	push	ds
+	push	ds, es
 	segmov	ds, cs
+ifdef PRODUCT_GEOS32
+	mov	bx, cs
+	call	GPMIAliasFar			;bx = writable cs
+	mov	es, bx
+else
 	segmov	es, cs
+endif
+
 	mov	si, offset countLoop		;source = countLoop
 	mov	di, si
 	sub	di, ax				;compute dest
@@ -331,7 +348,12 @@ if not KERNEL_EXECUTE_IN_PLACE and (not FULL_EXECUTE_IN_PLACE)
 	mov	cx, ax
 	mov	ax, 0x90		;nop
 	rep	stosb
-	pop	ds
+
+ifdef PRODUCT_GEOS32
+	segmov	es, NULL_SEGMENT, ax
+	call	GPMIFreeAliasFar
+endif
+	pop	ds, es
 noMoveNecessary:
 endif
 	mov	bx,offset runQueue	;for testing...
@@ -402,26 +424,6 @@ endCountLoop:
 	rcl	dx
 	loop	10$
 
-	; FIX_START
-	; check for right kernel version - looks for version 4x
-	push	ds, ax, dx
-	segmov	ds, cs, cx
-	mov	si, offset versionCategoryStr
-	mov	dx, offset versionKeyStr		
-	call	InitFileReadInteger
-	jnc	gotValue
-
-	pop	ds, ax, dx
-	jmp	versionError	
-gotValue:
-	dec	ax
-	dec	ax
-	dec	ax
-	dec	ax
-	tst	ax
-	pop	ds, ax, dx
-	jne	versionError
-
 	; check for overflow on fast CPU before hand
 	; fix fast CPU bug
 	cmp	dx, 0x0b00
@@ -429,25 +431,20 @@ gotValue:
 
 	mov	dx, 0x0b00
 	mov	ax, 0xffff
-	
+
 noOverflow:
-versionError:
-	; FIX_END
 
 	mov	cx, BASE_XT_TOTAL_COUNT_DIV_BY_30_MUL_10_DIV_16
+	
 	div	cx
 	cmp	dx, BASE_XT_TOTAL_COUNT_DIV_BY_30_MUL_10_DIV_16/2
 	jbe	noRound
 	inc	ax
 noRound:
-
-	; need this FIX for Perf to show correct speed
 	tst	ax
 	jnz	notNull
 	dec	ax
 notNull:
-	; end of Perf FIX
-
 	mov	ds:[cpuSpeed], ax
 
 	ret
@@ -503,7 +500,13 @@ if not KERNEL_EXECUTE_IN_PLACE and (not FULL_EXECUTE_IN_PLACE)
 
 	push	ds
 	segmov	ds, cs
+ifdef PRODUCT_GEOS32
+	mov	bx, cs
+	call	GPMIAliasFar			;bx = writable cs
+	mov	es, bx
+else
 	segmov	es, cs
+endif
 	mov	si, offset countLoop		;source = countLoop
 	mov	di, si
 	sub	di, ax				;compute dest
@@ -515,6 +518,10 @@ if not KERNEL_EXECUTE_IN_PLACE and (not FULL_EXECUTE_IN_PLACE)
 	mov	cx, ax
 	mov	ax, 0x90		;nop
 	rep	stosb
+ifdef PRODUCT_GEOS32
+	segmov	es, NULL_SEGMENT, ax
+	call	GPMIFreeAliasFar
+endif
 	pop	ds
 noMoveNecessary:
 endif

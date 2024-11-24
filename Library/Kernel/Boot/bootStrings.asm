@@ -97,11 +97,7 @@ DefString KS_TE_SYSTEM_ERROR, <"System Error Code: ", 0>
 
 DefString KS_FATAL_ERROR_IN, <"Undefined error in ", 0>
 
-ifdef	GPC
 DefString KS_CODE_EQUALS, <": KRX-", 0>
-else
-DefString KS_CODE_EQUALS, <". Error Code: KRX-", 0>
-endif
 DefString KS_KERNEL, <"kernel", 0>
 
 ifdef	GPC
@@ -207,9 +203,9 @@ LocalDefString	errorStringBE2	<'restarting your computer.', 0>
 
 LocalDefString	errorStringE	<'"E" to exit cleanly',0>
 
-LocalDefString	errorStringRB	<'"R" to retry, "B" to reboot Ensemble', 0>
+LocalDefString	errorStringRB	<'"R" to retry, "B" to reboot PC/GEOS', 0>
 
-LocalDefString	errorStringB	<'"B" to reboot Ensemble', 0>
+LocalDefString	errorStringB	<'"B" to reboot PC/GEOS', 0>
 
 LocalDefString	errorKeys	<"BARE", 0>
 
@@ -295,11 +291,9 @@ endif	; !ERROR_CHECK
 
 LocalDefString noSpaceForIniString1 <"No room to write GEOS.INI. Please", 0>
 LocalDefString noSpaceForIniString2 <"make room, now. (KR-36)", 0>
-
 ; pulled non-localizable string from sysmisc.geo - jfh 12/04/03
 LocalDefString	PowerOffString <'You may now safely turn off the computer',0>
   localize "the power off message (displayed in DOS) after shutting down Geos"
-
 MovableStrings	ends
 
 ;----------------------------------------------------------------------------

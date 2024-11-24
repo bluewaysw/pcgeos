@@ -356,13 +356,21 @@ EC <		ERROR_E	GASP_CHOKE_WHEEZE				>
 	; 
 		push	ds
 		push	ax
+ifdef PRODUCT_GEOS32
+		segmov	ds, IRQCode, ax
+		assume	ds:IRQCode
+else
 		LoadVarSeg	ds, ax
+endif
 		mov	ax, ds:dosAddr.segment
 		mov	ss:TPD_callTemporary, ax
 		mov	ax, ds:dosAddr.offset
 		mov	ss:TPD_callVector.segment, ax
 		pop	ax
 		pop	ds
+ifdef PRODUCT_GEOS32
+		assume	ds:dgroup
+endif
 	;
 	; Emulate interrupt
 	;

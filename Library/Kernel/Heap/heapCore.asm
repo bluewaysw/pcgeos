@@ -36,6 +36,11 @@ DESCRIPTION:
 
 -------------------------------------------------------------------------------@
 
+
+if SUPPORT_32BIT_DATA_REGS
+.386					; enable 386 instructions
+endif
+
 COMMENT @-----------------------------------------------------------------------
 
 FUNCTION:	FindFree
@@ -1202,7 +1207,9 @@ REVISION HISTORY:
 -------------------------------------------------------------------------------@
 
 SwapUsedFree	proc	near
+ifndef PRODUCT_GEOS32
 EC <	call	CheckBX_SIAdjacent					>
+endif
 EC <	call	AssertHeapMine						>
 
 	mov	ax,ds:[bx][HM_size]		;swap sizes (they will be
@@ -1773,7 +1780,9 @@ REVISION HISTORY:
 
 -------------------------------------------------------------------------------@
 CombineBlocks	proc	near
+ifndef PRODUCT_GEOS32
 EC <	call	CheckBX_SIAdjacent					>
+endif
 EC <	call	AssertHeapMine						>
 
 	; don't combine last the block with the first
@@ -2692,6 +2701,10 @@ REVISION HISTORY:
 ContractBlock	proc	far
 	mov	cx, LCT_ALWAYS_COMPACT
 	call	ContractNoNotify
+
+EC <	cmp	dx, handle 0						>
+EC <	WARNING_Z BLOCK_ALLOCATED_WITH_NO_FLAGS				>
+
 	mov	ds:[bx][HM_addr],dx
 	jnc	noNotify
 	mov	al, DEBUG_REALLOC		;notify debugger of block
@@ -2733,6 +2746,7 @@ REVISION HISTORY:
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
 ContractNoNotify proc	near
+	uses	dx
 	.enter
 	mov	di, ds				; preserve kdata
 
@@ -2778,8 +2792,7 @@ EC <	ERROR_NZ ODD_LMEM_TOTAL_FREE_SIZE				>
 	mov	si, cx				;si <- new total size.
 	mov	ds, di				; restore kdata
 	add	si, 15				;si = min para size
-	mov	cl, 4				;
-	shr	si, cl				;
+	shr	si, 4				;
 	cmp	ax, si				;can it be made smaller ?
 EC <	ERROR_B	CORRUPTED_HEAP			;new block can't be bigger>
 	jz	done				;
@@ -2793,8 +2806,13 @@ EC <	ERROR_B	CORRUPTED_HEAP			;new block can't be bigger>
 CNN_LMemBlockContract label near		; needed for "showcalls -l"
 	ForceRef	CNN_LMemBlockContract
 
+ifdef PRODUCT_GEOS32
+	;clr	dx
+	mov	ch, mask HAF_NO_ERR
+	call	DoReAlloc2			;make block new size.
+else
 	call	SplitBlockFreeRemainder
-
+endif
 	;
 	; do some VM File stuff..  for monitoring the dirty size
 	;
@@ -2840,6 +2858,7 @@ done:
 ContractNoNotify endp
 
 ifdef PRODUCT_GEOS32
+
 include gpmi.def
 
 ; Pass
@@ -2856,6 +2875,14 @@ GPMIAllocateBlock  proc    near
                 ret
 GPMIAllocateBlock       endp
 
+GPMIAliasFar	proc	far
+		push	ds
+		LoadVarSeg	ds
+		call	GPMIAlias
+		pop	ds
+		ret
+GPMIAliasFar	endp
+
 GPMIAlias       proc    near
                 push    es
 		push	si
@@ -2865,6 +2892,14 @@ GPMIAlias       proc    near
                 pop     es
                 ret
 GPMIAlias       endp
+
+GPMIFreeAliasFar	proc	far
+		push	ds
+		LoadVarSeg	ds
+		call	GPMIFreeAlias
+		pop	ds
+		ret
+GPMIFreeAliasFar	endp
 
 GPMIFreeAlias       proc    near
                 push    es
@@ -2886,7 +2921,45 @@ GPMIAccessRealSegment       proc    near
                 ret
 GPMIAccessRealSegment       endp
 
-if 0
+GPMIMapRealSegment       proc    near
+                push    es
+		push	si
+                les     si, ds:[loaderVars].KLV_GPMIVectorTable
+                call    {fptr}es:[si+GPMI_CALL_MAP_REAL_SEGMENT]
+		pop	si
+                pop     es
+                ret
+GPMIMapRealSegment       endp
+
+GPMIRealModeCallbackFar	proc	far
+				push	es
+				LoadVarSeg	es
+				push	di
+                les     di, es:[loaderVars].KLV_GPMIVectorTable
+                call    {fptr}es:[di+GPMI_CALL_ALLOCATE_REAL_MODE_CALLBACK]
+				pop		di
+                pop     es
+                ret
+GPMIRealModeCallbackFar	endp
+
+GPMIFreeRealModeCallbackFar	proc	far
+		push	ds
+		LoadVarSeg	ds
+		call	GPMIFreeAlias
+		pop	ds
+		ret
+GPMIFreeRealModeCallbackFar	endp
+
+GPMIFreeRealModeCallback       proc    near
+                push    es
+		push	si
+                les     si, ds:[loaderVars].KLV_GPMIVectorTable
+                call    {fptr}es:[si+GPMI_CALL_FREE_ALIAS]
+		pop	si
+                pop     es
+                ret
+GPMIFreeRealModeCallback       endp
+
 GPMIResizeBlock	proc near
                 push    es
 		push	si
@@ -2896,7 +2969,39 @@ GPMIResizeBlock	proc near
                 pop     es
                 ret
 GPMIResizeBlock	endp
-endif
+
+GPMIFreeBlock	proc near
+                push    es
+		push	si
+                les     si, ds:[loaderVars].KLV_GPMIVectorTable
+                call    {fptr}es:[si+GPMI_CALL_FREE_BLOCK]
+		pop	si
+                pop     es
+                ret
+GPMIFreeBlock	endp
+
+GPMIConvertToCodeBlockFar	proc far
+		call	GPMIConvertToCodeBlock
+		ret
+GPMIConvertToCodeBlockFar	endp
+
+GPMIConvertToCodeBlock proc near
+                push    es
+		push	si
+                les     si, ds:[loaderVars].KLV_GPMIVectorTable
+                call    {fptr}es:[si+GPMI_CALL_CONVERT_TO_CODE_BLOCK]
+		pop	si
+                pop     es
+                ret
+GPMIConvertToCodeBlock endp
+
+GPMIGetInterruptHandlerFar	proc far
+		push	ds
+		LoadVarSeg	ds
+		call	GPMIGetInterruptHandler
+		pop	ds
+		ret
+GPMIGetInterruptHandlerFar	endp
 
 GPMIGetInterruptHandler	proc near
                 push    es
@@ -2908,6 +3013,78 @@ GPMIGetInterruptHandler	proc near
                 ret
 GPMIGetInterruptHandler	endp
 
+GPMISetInterruptHandlerFar	proc far
+		push	ds
+		LoadVarSeg	ds
+		call	GPMISetInterruptHandler
+		pop	ds
+		ret
+GPMISetInterruptHandlerFar	endp
+
+GPMIRealInterrupt	proc near
+		push    es               ; use fs because es is a parameter
+                                         ; to be passed into
+                push    dx
+                mov     dx, es
+		push	si
+		les     si, ds:[loaderVars].KLV_GPMIVectorTable
+		call    {fptr}es:[si+GPMI_CALL_REAL_INTERRUPT]
+		pop	si
+                pop     dx
+		pop     es
+		ret
+GPMIRealInterrupt	endp
+
+GPMIRealInterruptFar	proc far
+		push	ds
+		LoadVarSeg	ds
+		call	GPMIRealInterrupt
+		pop	ds
+		ret
+GPMIRealInterruptFar	endp
+
+; Pass
+;   bx = size of block in paragraphs (16-byte blocks)
+; Return
+;   ax = real mode segment (if carry clear)
+;   dx = selector (if carry clear)
+GPMIAllocateDOSBlock  proc    near
+                push    es
+		push	si
+                les     si, ds:[loaderVars].KLV_GPMIVectorTable
+                call    {fptr}es:[si+GPMI_CALL_ALLOCATE_DOS_BLOCK]
+		pop	si
+                pop     es
+                ret
+GPMIAllocateDOSBlock       endp
+
+GPMIAllocDOSBlockFar	proc far
+		push	ds
+		LoadVarSeg	ds
+		call	GPMIAllocateDOSBlock
+		pop	ds
+		ret
+GPMIAllocDOSBlockFar	endp
+
+GPMIFreeDOSBlock	proc near
+                push    es
+		push	si
+                les     si, ds:[loaderVars].KLV_GPMIVectorTable
+                call    {fptr}es:[si+GPMI_CALL_FREE_DOS_BLOCK]
+		pop	si
+                pop     es
+                ret
+GPMIFreeDOSBlock	endp
+
+GPMIFreeDOSBlockFar	proc far
+		push	ds
+		LoadVarSeg	ds
+		call	GPMIFreeDOSBlock
+		pop	ds
+		ret
+GPMIFreeDOSBlockFar	endp
+
+
 GPMISetInterruptHandler	proc near
                 push    es
 		push	si
@@ -2917,16 +3094,6 @@ GPMISetInterruptHandler	proc near
                 pop     es
                 ret
 GPMISetInterruptHandler	endp
-
-GPMIReleaseSegmentAccess	proc near
-                push    es
-		push	si
-                les     si, ds:[loaderVars].KLV_GPMIVectorTable
-                call    {fptr}es:[si+GPMI_CALL_RELEASE_SEGMENT_ACCESS]
-		pop	si
-                pop     es
-                ret
-GPMIReleaseSegmentAccess	endp
 
 GPMIIsSelector16Bit     proc near
                 push    es
@@ -2938,6 +3105,24 @@ GPMIIsSelector16Bit     proc near
                 ret
 GPMIIsSelector16Bit     endp
 
+GPMISelectorGetLimitFar	proc far
+		push	ds
+		LoadVarSeg	ds
+		call	GPMISelectorGetLimit
+		pop	ds
+		ret
+GPMISelectorGetLimitFar	endp
+
+GPMISelectorGetLimit proc near
+                push    es
+		push	si
+                les     si, ds:[loaderVars].KLV_GPMIVectorTable
+                call    {fptr}es:[si+GPMI_CALL_SELECTOR_GET_LIMIT]
+		pop	si
+                pop     es
+                ret
+GPMISelectorGetLimit endp
+
 GPMISelectorCheckLimits proc near
                 push    es
 		push	si
@@ -2947,4 +3132,100 @@ GPMISelectorCheckLimits proc near
                 pop     es
                 ret
 GPMISelectorCheckLimits endp
-endif
+
+GPMIAllocateNotPresentBlock proc near
+                push    es
+		push	si
+                les     si, ds:[loaderVars].KLV_GPMIVectorTable
+                call    {fptr}es:[si+GPMI_CALL_ALLOCATE_NOT_PRESENT_BLOCK]
+		pop	si
+                pop     es
+                ret
+GPMIAllocateNotPresentBlock endp
+
+GPMIMakePresent proc near
+                push    es
+		push	si
+                les     si, ds:[loaderVars].KLV_GPMIVectorTable
+                call    {fptr}es:[si+GPMI_CALL_MAKE_PRESENT]
+		pop	si
+                pop     es
+                ret
+GPMIMakePresent endp
+
+GPMIMakeNotPresent proc near
+                push    es
+		push	si
+                les     si, ds:[loaderVars].KLV_GPMIVectorTable
+                call    {fptr}es:[si+GPMI_CALL_MAKE_NOT_PRESENT]
+		pop	si
+                pop     es
+                ret
+GPMIMakeNotPresent endp
+
+GPMIGetInfoFar	proc far
+                push    es
+		push	si
+                les     si, ds:[loaderVars].KLV_GPMIVectorTable
+                call    {fptr}es:[si+GPMI_CALL_GET_INFO]
+		pop	si
+                pop     es
+                ret
+GPMIGetInfoFar	endp
+endif	; PRODUCT_GEOS32
+
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		NullDS
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	Force DS to be NULL_SEGMENT
+
+CALLED BY:	(EXTERNAL)
+PASS:		nothing
+RETURN:		ds	= NULL_SEGMENT
+DESTROYED:	nothing (flags preserved)
+SIDE EFFECTS:	
+
+PSEUDO CODE/STRATEGY:
+		
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	ardeb	4/17/94		Initial version
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+nullSeg		word	NULL_SEGMENT
+NullDS		proc	far
+		mov	ds, cs:[nullSeg]
+		ret
+NullDS		endp
+
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		NullES
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	Force ES to be NULL_SEGMENT
+
+CALLED BY:	(EXTERNAL)
+PASS:		nothing
+RETURN:		es	= NULL_SEGMENT
+DESTROYED:	nothing (flags preserved)
+SIDE EFFECTS:	
+
+PSEUDO CODE/STRATEGY:
+		
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	ardeb	4/17/94		Initial version
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+NullES		proc	far
+		mov	es, cs:[nullSeg]
+		ret
+NullES		endp
+

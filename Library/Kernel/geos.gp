@@ -64,6 +64,9 @@ endif
 
 resource kcode fixed code read-only
 
+ifdef PRODUCT_GEOS32
+resource IRQCode fixed code read-only
+endif
 
 ifdef	GP_SYS_HAS_BITMAPS
 resource SysBitmapResource fixed lmem read-only
@@ -2557,3 +2560,16 @@ export GRSETTEXTDIRECTION
 endif
 
 incminor MouseWheelSupport
+
+incminor ProtectedMode
+ifdef PRODUCT_GEOS32
+export SysMapRealSegment
+export SysAllocCodeAlias
+export SysFreeCodeAlias
+export SysUnmapRealSegment
+export SysRealInterrupt
+export SysAllocDOSBlock
+export SysFreeDOSBlock
+export SysAllocRealModeCallback
+export SysFreeRealModeCallback
+endif

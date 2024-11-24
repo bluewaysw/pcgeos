@@ -964,13 +964,17 @@ EC<	call	ECAssertValidTrueFarPointerXIP			>
 EC<	pop	bx						>
 endif
 
-
 	;
 	; Deal with source string being absolute. If stdPath indicates the
 	; thing was preceded by a standard path, the absolute path means
 	; nothing. Otherwise, we shift our destination focus back to the
 	; start of the buffer (this for FCFP with bx==0 on a non-std path).
 	; 
+ifdef PRODUCT_GEOS32
+		mov	ax, ds
+		tst	ax
+		jz	startCopy
+endif
 		LocalCmpChar ds:[si], C_BACKSLASH
 		jne	startCopy
 		mov	di, ss:[stdPathEnd]
@@ -998,9 +1002,21 @@ EC <		ERROR_NE FILE_CONSTRUCTED_PATH_DOESNT_END_IN_BACKSLASH	>
 	; In no case do we go back before bufStart when compressing out ..,
 	; however...
 	; 
+ifndef PRODUCT_GEOS32
 		cmp	dx, ss:[bufStart]
 		jae	copyLoop
 		mov	dx, ss:[bufStart]
+else
+		cmp	dx, ss:[bufStart]
+		jae	gotDX
+		mov	dx, ss:[bufStart]
+gotDX:
+SBCS <		mov	bx, ds						>
+DBCS <		mov	ax, ds						>
+SBCS <		tst	bx						>
+DBCS <		tst	ax						>
+		jz	copyDone
+endif
 copyLoop:
 		LocalGetChar	ax, dssi
 	;
@@ -4633,6 +4649,10 @@ notNested:
 	;
 	test	al, mask SPF_NUKE_ME
 	jz	done
+ifdef PRODUCT_GEOS32
+	clr	bx
+	mov	ds, bx
+endif
 	call	FilePopDir
 
 done:

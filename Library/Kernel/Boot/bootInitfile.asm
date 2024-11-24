@@ -639,9 +639,12 @@ REVISION HISTORY:
 	Cheng	12/89		Initial version
 
 -------------------------------------------------------------------------------@
+ifndef PRODUCT_GEOS32
 nomemFlag	char	'nomem', 0
+endif
 
 LoadMemoryDriver	proc	near
+ifndef PRODUCT_GEOS32 ; XXX: Load only the disk swap driver? -dhunter 11/25/00
 	;
 	; if /nomem passed, load only the disk swap driver.
 	;
@@ -656,11 +659,12 @@ LoadMemoryDriver	proc	near
 	call	LoadEMS				;load EMS if present
 	call	LoadXMS				;load XMS if present
 	call	LoadExtMem			;load ExtMem if present
+endif
 	
-loadDiskDriver:
+loadDiskDriver::
 	mov	si, offset cs:[defaultMemoryName]
 	segmov	ds, cs
-load:
+load::
 	clr	bp				; no callback
 	mov	di, SP_SWAP_DRIVERS
 	mov	cx, SWAP_PROTO_MAJOR
@@ -672,6 +676,7 @@ load:
 LoadMemoryDriver	endp
 
 
+ifndef PRODUCT_GEOS32 ; XXX: Load only the disk swap driver? -dhunter 11/25/00
 
 COMMENT @-----------------------------------------------------------------------
 
@@ -852,7 +857,7 @@ done:
 		.leave
 		ret
 LoadExtMem	endp
-
+endif
 
 
 COMMENT @-----------------------------------------------------------------------

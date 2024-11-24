@@ -20,13 +20,14 @@ DOSAPPL         = dosapplC.asm dosapplLocate.asm dosapplMain.asm\
 DRIVE           = driveC.asm driveEC.asm driveHigh.asm driveInit.asm\
                   driveLow.asm driveManager.asm driveConstant.def\
                   driveVariable.def
+FILE            = fileC.asm fileEC.asm fileEnum.asm fileFile.asm\
+                  fileInit.asm fileIO.asm fileLink.asm fileList.asm\
+                  fileManager.asm fileOpenClose.asm filePath.asm\
+                  fileSync.asm fileUtils.asm fileConstant.def fileMacro.def\
+                  fileVariable.def
 FSD             = fsdDisk.asm fsdDrive.asm fsdEC.asm fsdFile.asm\
                   fsdInit.asm fsdManager.asm fsdSkeleton.asm fsdUtils.asm\
                   fsdConstant.def fsdMacro.def fsdVariable.def
-FILE            = fileC.asm fileEC.asm fileEnum.asm fileFile.asm fileIO.asm\
-                  fileInit.asm fileLink.asm fileList.asm fileManager.asm\
-                  fileOpenClose.asm filePath.asm fileSync.asm fileUtils.asm\
-                  fileConstant.def fileMacro.def fileVariable.def
 GEODES          = geodesAccess.asm geodesAnalysis.asm geodesC.asm\
                   geodesDriver.asm geodesErrorCheck.asm geodesEvent.asm\
                   geodesHandle.asm geodesInit.asm geodesLibrary.asm\
@@ -43,7 +44,7 @@ GRAPHICS        = graphicsArc.asm graphicsArcLow.asm\
                   graphicsChars.asm graphicsColor.asm graphicsEllipse.asm\
                   graphicsEllipseLow.asm graphicsFatLine.asm\
                   graphicsFont.asm graphicsFontC.asm graphicsFontDriver.asm\
-                  graphicsGStringC.asm graphicsGetState.asm\
+                  graphicsGetState.asm graphicsGStringC.asm\
                   graphicsImage.asm graphicsInit.asm graphicsLine.asm\
                   graphicsLineStyles.asm graphicsManager.asm\
                   graphicsMath.asm graphicsMathObscure.asm\
@@ -70,8 +71,8 @@ HEAP            = heapC.asm heapCompress.asm heapCore.asm\
                   heapInit.asm heapLow.asm heapManager.asm heapScrub.asm\
                   heapSwap.asm heapConstant.def heapMacro.def\
                   heapVariable.def
-IM              = imInit.asm imManager.asm imMisc.asm imPen.asm imPtr.asm\
-                  imScreenSaver.asm imMonitors.asm imConstant.def\
+IM              = imInit.asm imManager.asm imMisc.asm imMonitors.asm\
+                  imPen.asm imPtr.asm imScreenSaver.asm imConstant.def\
                   imMacro.def imVariable.def
 INITFILE        = initfileBBRTable.asm initfileC.asm initfileConstruct.asm\
                   initfileEC.asm initfileHash.asm initfileHigh.asm\
@@ -126,17 +127,19 @@ OBJS            =
 COMMON          = kernelConstant.def kernelErrors.def kernelFS.def\
                   kernelGeode.def kernelGlobal.def kernelMacro.def\
                   kernelResource.def
-MODULES         = Boot DBase Disk Dosappl Drive FSD File Geodes Graphics\
+MODULES         = Boot DBase Disk Dosappl Drive File FSD Geodes Graphics\
                   Heap IM Initfile LMem Local Object Sys Thread Timer VMem\
                   Win
 CMODULES        =
-SRCS            = $(BOOT) $(DBASE) $(DISK) $(DOSAPPL) $(DRIVE) $(FSD)\
-                  $(FILE) $(GEODES) $(GRAPHICS) $(HEAP) $(IM) $(INITFILE)\
+SRCS            = $(BOOT) $(DBASE) $(DISK) $(DOSAPPL) $(DRIVE) $(FILE)\
+                  $(FSD) $(GEODES) $(GRAPHICS) $(HEAP) $(IM) $(INITFILE)\
                   $(LMEM) $(LOCAL) $(OBJECT) $(SYS) $(THREAD) $(TIMER)\
                   $(VMEM) $(WIN) $(COMMON)
 LOBJS           =
 LIBOBJ          = $(DEVEL_DIR)/Include/$(GEODE).ldf
 LIBNAME         = geos
+
+PRODUCTS        = GEOS32 
 
 SYSMAKEFILE     = geode.mk
 
@@ -151,4 +154,8 @@ SYSMAKEFILE     = geode.mk
 
 #if exists($(DEPFILE))
 #include "$(DEPFILE)"
+#endif
+
+#if exists(GEOS32/$(DEPFILE))
+#include "GEOS32/$(DEPFILE)"
 #endif

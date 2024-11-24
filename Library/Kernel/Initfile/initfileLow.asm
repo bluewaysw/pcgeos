@@ -413,7 +413,7 @@ ExitInitfile	proc	far	uses bx, ds
 		segmov	ds,dgroup,bx
 		mov	bx, ds:[loaderVars].KLV_initFileBufHan
 		call	MemUnlock
-EC <		mov	ds:[initFileBufSegAddr], 0xa000	; Point at video memory>
+EC <		mov	ds:[initFileBufSegAddr], NULL_SEGMENT		>
 	;
 	; Release exclusive access to file.
 	;
@@ -472,7 +472,7 @@ noClearCache:
 		jz	noUnlock
 		call	MemUnlock
 noUnlock:
-EC <		mov	ds:[initFileBufSegAddr], 0xa000	; Point at video memory>
+EC <		mov	ds:[initFileBufSegAddr], NULL_SEGMENT		>
 	;
 	; Release exclusive access to file.
 	;

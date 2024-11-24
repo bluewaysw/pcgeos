@@ -758,6 +758,12 @@ EC <	call	ECCheckGStateHandle					>
 	; graphics state passed -- destroy it
 
 	push	ds:[GS_window]		;save window to destroy
+	
+ifdef PRODUCT_GEOS32
+	clr		bx					; clean state segment for
+								; GPMI version
+	mov		ds, bx
+endif	
 	call	GrDestroyState		;destroy graphics state
 	pop	bx
 	jmp	short WC_doClose

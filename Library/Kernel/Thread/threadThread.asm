@@ -639,6 +639,12 @@ REVISION HISTORY:
 	Doug	6/92		Added ability to pass "si" on through
 
 ------------------------------------------------------------------------------@
+ifdef PRODUCT_GEOS32
+udata	segment
+threadDestroyTemp	word
+udata	ends
+endif
+
 ThreadDestroy	proc	far	jmp
 	push	si, cx, dx, bp		;save parameters
 
@@ -787,10 +793,26 @@ noQueue:
 	mov	si, ss:[TPD_blockHandle] ;si = stack handle
 	pop	bx			;recover current thread
 
+ifndef PRODUCT_GEOS32
 	pop	ax, di, es		;(ax, di, es) hold notification message
+else
+	INT_OFF
+
+	;
+	; NOTE:  This code originally was popping a handle into ES!
+	; we can't do that in protected mode.  To make matters worse,
+	; all registers are in use holding something when we switch to
+	; the kernel. -- lshields 12/12/2000
+	;
+
+	pop	ax, di, ds:[threadDestroyTemp]
+					;(ax, di, es) hold notification message
+endif
 	pop	cx, dx, bp		;recover exit code, OD
 
+ifndef PRODUCT_GEOS32
 	INT_OFF
+endif
 	pop	ds:[TPD_dataAX]		;get "data to pass in BP" into a 
 					;a safe harbor
 	;
@@ -801,7 +823,12 @@ noQueue:
 	; absolutely none of the stack is preserved.   -- Doug 6/9/92
 	;
 	call	SwitchToKernel		;ds <- idata
+ifndef PRODUCT_GEOS32
 	push	ax, di, es		;save notification message
+else
+	push	ax, di, ds:[threadDestroyTemp]		
+					;save notification message
+endif
 	push	ds:[TPD_dataAX]		;place "data to pass in BP" back on
 					;stack
 	INT_ON

@@ -111,8 +111,16 @@ waitForSomething:
 		push	ax
 
 		PTimedSem	ds, scrubSem, SCRUB_TIMEOUT, TRASH_AX_BX_CX
+ifndef PRODUCT_GEOS32
 		jc	compactLoop	; Timeout => not in danger
-
+else
+	;
+	; XXX: I've commented out the timeout branch and added the jmp back
+	; to scrubLoop, because the routines called below don't do the right
+	; think yet. -dhunter 12/20/00
+	;
+		jmp	scrubLoop
+endif
 if	IDLE_UPDATE_ASYNC_VM
 		call	HeapIdleUpdateVM
 endif	; IDLE_UPDATE_ASYNC_VM

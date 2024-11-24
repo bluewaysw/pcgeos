@@ -130,6 +130,11 @@ notLowEnd:
 	; always 0 in real mode on a 286, but alterable on a 386 even in
 	; real mode).
 	;
+
+		; FR 2009/04/22
+		; this code crashes a FreeDOS with HDPMI16 within a VMWARE in a DualCore 
+		; Pentium
+if 0
 		ornf	bx, 0xf000
 		push	bx
 		popf
@@ -138,7 +143,7 @@ notLowEnd:
 		test	ax, 0xf000	; still all zero?
 		mov	al, SPT_80286	; assume so
 		jz	storePT		; yup => 286
-
+endif
 	;
 	; Now for the fun part. It's at least a 386, but we'd like to determine
 	; if it's a 486. The 486 has a bit that will cause a fault if an
@@ -293,6 +298,14 @@ IS30:
 	; Try for the model byte at f000:fffe first, though
 	;
 		mov	bx, 0f000h
+ifdef PRODUCT_GEOS32
+		push	ax, cx
+		mov	ax, bx
+		mov	cx, -1
+		call	SysMapRealSegment
+		mov	bx, ax
+		pop	ax, cx
+endif
 		mov	es, bx
 		mov	bx, 0fffeh
 		mov	di, es:[bx]
@@ -438,19 +451,37 @@ interceptHardwareIRQs:
 endif
 
 		mov	ds:[lastIntercept], dx
+ifdef PRODUCT_GEOS32
+		mov	bx, segment IRQCode
+		push	bx
+		call	GPMIAliasFar		;bx = writable alias
+		mov	es, bx
+		pop	bx			;bx = IRQCode
+else
 		mov	bx, ds
 		mov	es, bx
+endif
 interceptLoop:
 		push	ax
 		mov	di, cx
 		add	di, IRQ_INTERCEPT_OLD_VECTOR_OFFSET
 		call	SysCatchDeviceInterruptInternal	; nukes ax, di, bx
 		mov	di, cx
+ifdef PRODUCT_GEOS32
+		movdw	es:[di+IRQ_INTERCEPT_DOS_VECTOR_OFFSET], \
+			es:[di+IRQ_INTERCEPT_OLD_VECTOR_OFFSET], \
+			ax
+else
 		movdw	ds:[di+IRQ_INTERCEPT_DOS_VECTOR_OFFSET], \
 			ds:[di+IRQ_INTERCEPT_OLD_VECTOR_OFFSET], \
 			ax
+endif
 		pop	ax
+ifdef PRODUCT_GEOS32
+		mov	bx, segment IRQCode
+else
 		mov	bx, ds
+endif
 		inc	ax
 		add	cx, IRQ_INTERCEPT_SIZE
 		cmp	ax, dx
@@ -464,10 +495,6 @@ endif
 	;
 	; Stop intercepting swat's interrupt, if we can find it and we're
 	; running under the stub...The stub is running on either IRQ3 or IRQ4.
-	; We determine which one by seeing which points to the space between
-	; our PSP and kcode.
-	; XXX: WON'T WORK IF STUB IS RELOCATED TO HIGHER MEMORY (e.g. in the
-	; Dave board).
 	;
 		test	ds:[sysConfig], mask SCF_UNDER_SWAT
 		jz	allocSysNotifyQueue
@@ -476,17 +503,36 @@ endif
 
 		mov	di, offset Irq3Intercept+IRQ_INTERCEPT_OLD_VECTOR_OFFSET
 		mov	ax, 3
+ifdef PRODUCT_GEOS32
+		mov	cx, es:[di].segment
+		cmp	cx, ds:[loaderVars].KLV_swatKcode
+else
 		mov	cx, ds:[di].segment
 		cmp	cx, ds:[loaderVars].KLV_swatKcodePtr.segment
+endif
 		je	replaceSwatIRQ
 
 		mov	di, offset Irq4Intercept+IRQ_INTERCEPT_OLD_VECTOR_OFFSET
 		mov	ax, 4
+ifdef PRODUCT_GEOS32
+		mov	cx, es:[di].segment
+		cmp	cx, ds:[loaderVars].KLV_swatKcode
+else
 		mov	cx, ds:[di].segment
 		cmp	cx, ds:[loaderVars].KLV_swatKcodePtr.segment
+endif
 		jne	allocSysNotifyQueue
 replaceSwatIRQ:
 		call	SysResetDeviceInterruptInternal
+
+ifdef PRODUCT_GEOS32
+	;
+	; All done with modifying IRQCode.
+	;
+		mov	bx, es
+		segmov	es, NULL_SEGMENT, ax
+		call	GPMIFreeAliasFar
+endif
 
 allocSysNotifyQueue:
 		call	GeodeAllocQueue
@@ -495,7 +541,21 @@ if	USE_MOUSE_TO_REPLY_TO_SYS_ERROR_BOX
 else
 		mov	ds:[errorKbdQueue], bx
 endif
-		
+ifdef PRODUCT_GEOS32
+	;
+	; Trap the debug exception, which we're temporarily using to
+	; cause context switches.
+	;
+		test	ds:[sysConfig], mask SCF_UNDER_SWAT
+		jnz	checkRestartedArg
+		mov	bl, 1
+		mov	cx, segment SysContextSwitchReflector
+		mov	dx, offset SysContextSwitchReflector
+                les     si, ds:[loaderVars].KLV_GPMIVectorTable
+                call    {fptr}es:[si+GPMI_CALL_SET_EXCEPTION_HANDLER]
+
+checkRestartedArg:		
+endif
 		mov	si, offset restartedArg
 		call	SysCheckArg
 		jnc	done

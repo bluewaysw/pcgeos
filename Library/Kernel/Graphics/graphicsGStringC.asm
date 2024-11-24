@@ -53,9 +53,12 @@ GRDRAWGSTRING	proc	far	gstate:hptr, gstring:hptr, px:sword, py:sword,
 	mov	dx, flags
 	call	GrDrawGString
 	mov_trash	ax, dx
+	mov si, lastElement.segment
+	tst si
+	jz	done
 	lds	si, lastElement
 	mov	ds:[si], cx
-
+done:
 	.leave
 	ret
 

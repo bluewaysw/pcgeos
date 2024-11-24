@@ -660,7 +660,10 @@ REVISION HISTORY:
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
 MeasureLMemCompaction		proc	far
+		uses	es
 		.enter
+		LoadVarSeg	es
+		
 		; check out the amount of free space in the block
 		; don't do statistics on directory blocks.
 
@@ -671,26 +674,26 @@ MeasureLMemCompaction		proc	far
 		mov	cx, ds:[LMBH_totalFree]
 		mov	ax, ds:[LMBH_blockSize]
 
-		incdw	cs:[totalChecked]
-		incdw	cs:[totalZero]
+		incdw	es:[totalChecked]
+		incdw	es:[totalZero]
 		jcxz	accounted
-		decdw	cs:[totalZero]
-		incdw	cs:[totalMoreHalf]
+		decdw	es:[totalZero]
+		incdw	es:[totalMoreHalf]
 		shl	cx, 1			; see if > 50%
 		cmp	cx, ax	
 		ja	accounted
-		decdw	cs:[totalMoreHalf]
-		incdw	cs:[totalHalf]
+		decdw	es:[totalMoreHalf]
+		incdw	es:[totalHalf]
 		shl	cx, 1			; see if > 25%
 		cmp	cx, ax
 		ja	accounted
-		decdw	cs:[totalHalf]
-		incdw	cs:[totalQuarter]
+		decdw	es:[totalHalf]
+		incdw	es:[totalQuarter]
 		shl	cx, 1			; see if > 12.5%
 		cmp	cx, ax
 		ja	accounted
-		decdw	cs:[totalQuarter]
-		incdw	cs:[totalEigth]
+		decdw	es:[totalQuarter]
+		incdw	es:[totalEigth]
 accounted:
 		pop	ax, cx
 done:			
@@ -699,10 +702,14 @@ done:
 MeasureLMemCompaction		endp
 
 CountLMemContracts	proc	far
-		inc	cs:[countLMemContract]
+		push	ds
+		LoadVarSeg	ds
+		inc	ds:[countLMemContract]
+		pop	ds
 		ret
 CountLMemContracts	endp
 
+idata	segment
 totalChecked	dword	0
 totalZero	dword	0
 totalEigth	dword	0
@@ -711,6 +718,7 @@ totalHalf	dword	0
 totalMoreHalf	dword	0
 
 countLMemContract	word 0
+idata	ends
 endif
 
 kcode ends
