@@ -252,6 +252,7 @@ extern TEngine_Instance engineInstance;
                                   /* == precision_shift+1 for pixmaps */
 
     PStorage  buff;                 /* The profiles buffer          */
+    MemHandle buffer;
     PStorage  sizeBuff;             /* Render pool size             */
     PStorage  maxBuff;              /* Profiles buffer size         */
     PStorage  top;                  /* Current cursor in buffer     */
@@ -329,7 +330,7 @@ extern TEngine_Instance engineInstance;
 
 /************************************************************************/
 /*                                                                      */
-/* Function:    Set_High_Precision                                      */
+/* Function:    Set_Resolution                                          */
 /*                                                                      */
 /* Description: Sets precision variables according to param flag.       */
 /*                                                                      */
@@ -338,9 +339,9 @@ extern TEngine_Instance engineInstance;
 /*                                                                      */
 /************************************************************************/
 
-  static void _near  Set_High_Precision( RAS_ARGS Bool  High )
+  static void _near  Set_Resolution( RAS_ARGS TT_UShort  y_ppem )
   {
-    if ( High )
+    if ( y_ppem < 24 )
     {
       ras.precision_bits   = 10;
       ras.precision_step   = 128;
@@ -2443,6 +2444,10 @@ Scan_DropOuts :
     TT_Error  error;
 
 
+    //TEST
+    Lock_Render_Pool( RAS_VARS  glyph );
+
+
     if ( glyph->n_points == 0 || glyph->n_contours <= 0 )
       return TT_Err_Ok;
 
@@ -2467,7 +2472,7 @@ Scan_DropOuts :
     ras.nContours = glyph->n_contours;
     ras.coords    = glyph->points;
 
-    Set_High_Precision( RAS_VARS glyph->high_precision );
+    Set_Resolution( RAS_VARS glyph->y_ppem );
     ras.scale_shift    = ras.precision_shift;
     ras.dropOutControl = glyph->dropout_mode;
     ras.second_pass    = glyph->second_pass;
@@ -2507,6 +2512,9 @@ Scan_DropOuts :
       if ( (error = Render_Single_Pass( RAS_VARS  1 )) != 0 )
         return error;
     }
+
+    //TEST
+    Unlock_Render_Pool( RAS_VAR );
 
     return TT_Err_Ok;
   }
@@ -2560,7 +2568,7 @@ TT_Error  Render_Region_Glyph( RAS_ARGS TT_Outline*     glyph,
   ras.nContours = glyph->n_contours;
   ras.coords    = glyph->points;
 
-  Set_High_Precision( RAS_VARS glyph->high_precision );
+  Set_Resolution( RAS_VARS glyph->y_ppem );
   ras.scale_shift    = ras.precision_shift;
   ras.dropOutControl = glyph->dropout_mode;
   ras.second_pass    = glyph->second_pass;
@@ -2605,6 +2613,23 @@ static void Render_Region_Empty_Glyph( RAS_ARG )
 #endif  /* __GEOS__ */
 
 
+static void Lock_Render_Pool( RAS_ARGS  TT_Outline*  glyph )
+{
+  if( !ras.buffer )
+    GEO_MEM_ALLOC( raster->buffer, RASTER_RENDER_POOL );
+
+  ras.buff = GEO_LOCK( ras.buffer );
+  ras.sizeBuff   = ras.buff + ( RASTER_RENDER_POOL/sizeof(long) );
+  
+}
+
+static void Unlock_Render_Pool( RAS_ARG )
+{
+  GEO_UNLOCK( ras.buffer );
+
+}
+
+
 /************************************************/
 /*                                              */
 /* InitRasterizer                               */
@@ -2626,7 +2651,8 @@ static void Render_Region_Empty_Glyph( RAS_ARG )
     if ( !ras )
       return TT_Err_Ok;
 
-    FREE( ras->buff );
+    //FREE( ras->buff );
+    GEO_FREE( ras->buffer);
 
 #ifndef TT_CONFIG_OPTION_STATIC_RASTER
     FREE( engineInstance.raster_component );
@@ -2652,10 +2678,11 @@ static void Render_Region_Empty_Glyph( RAS_ARG )
     ras = (TRaster_Instance*)engineInstance.raster_component;
 #endif
 
-    if ( ALLOC( ras->buff, RASTER_RENDER_POOL ) )
-       return error;
+  //  if ( ALLOC( ras->buff, RASTER_RENDER_POOL ) )
+  //     return error;
 
-    ras->sizeBuff   = ras->buff + ( RASTER_RENDER_POOL/sizeof(long) );
+  //  ras->sizeBuff   = ras->buff + ( RASTER_RENDER_POOL/sizeof(long) );
+    ras->buffer = NullHandle; //TEST
 
     ras->dropOutControl = 2;
     ras->error          = Raster_Err_None;
