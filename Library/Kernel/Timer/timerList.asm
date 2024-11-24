@@ -593,7 +593,11 @@ InsertTimedAction	proc	near	uses cx, si, di
 EC <	push	ax							>
 EC <	pushf								>
 EC <	pop	ax							>
-EC <	test	ax, mask CPU_INTERRUPT or mask CPU_DIRECTION		>
+ifndef PRODUCT_GEOS32
+EC <	test	ax, mask CPU_INTERRUPT or mask CPU_DIRECTION					>
+else
+EC <	test	ax, mask CPU_DIRECTION					>
+endif
 EC <	ERROR_NZ	INSERT_TIME_BAD_FLAGS				>
 EC <	pop	ax							>
 

@@ -29,6 +29,7 @@ HARDWARE_TYPE	equ	<PC>		; Choices include:
 endif
 
 include kernelGeode.def
+include kernelGlobal.def
 
 ;--------------------------------------
 ;	Include files
@@ -43,6 +44,7 @@ include Objects/metaC.def
 include Objects/winC.def
 include Objects/inputC.def
 include gcnlist.def
+include gpmi.def
 
 include Internal/im.def
 UseDriver Internal/powerDr.def

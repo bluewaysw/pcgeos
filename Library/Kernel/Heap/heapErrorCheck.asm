@@ -45,6 +45,7 @@ FarLoadVarSegDS	proc	far
 	ret
 FarLoadVarSegDS	endp
 endif	;ERROR_CHECK
+
 kcode	ends
 
 ECCode	segment
@@ -675,6 +676,12 @@ NullSegmentRegisters	proc	far
 	mov	ax, es
 	call	NullSeg
 	mov	es, ax
+	mov	ax, fs
+	call	NullSeg
+	mov	fs, ax
+	mov	ax, gs
+	call	NullSeg
+	mov	gs, ax
 	pop	ax
 
 done:
@@ -684,12 +691,14 @@ done:
 NullSegmentRegisters	endp
 
 NullSeg		proc	near
+ifndef PRODUCT_GEOS32
+	cmp	ax, 0xffff		;HACK FOR THE WINDOW SYSTEM
+	jz	done
+else
+	.assert	NULL_SEGMENT eq 0
 	tst	ax
 	jz	done
-	cmp	ax, NULL_SEGMENT
-	jz	done
-;;	cmp	ax, 0xffff		;HACK FOR THE WINDOW SYSTEM
-;;	jz	done
+endif
 
 
 	push	cx, ds
@@ -798,62 +807,6 @@ done:
 	ret
 NullSeg		endp
 
-
-
-COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-		NullDS
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-
-SYNOPSIS:	Force DS to be NULL_SEGMENT
-
-CALLED BY:	(EXTERNAL)
-PASS:		nothing
-RETURN:		ds	= NULL_SEGMENT
-DESTROYED:	nothing (flags preserved)
-SIDE EFFECTS:	
-
-PSEUDO CODE/STRATEGY:
-		
-
-REVISION HISTORY:
-	Name	Date		Description
-	----	----		-----------
-	ardeb	4/17/94		Initial version
-
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
-nullSeg		word	NULL_SEGMENT
-NullDS		proc	far
-		mov	ds, cs:[nullSeg]
-		ret
-NullDS		endp
-
-
-COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-		NullES
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-
-SYNOPSIS:	Force ES to be NULL_SEGMENT
-
-CALLED BY:	(EXTERNAL)
-PASS:		nothing
-RETURN:		es	= NULL_SEGMENT
-DESTROYED:	nothing (flags preserved)
-SIDE EFFECTS:	
-
-PSEUDO CODE/STRATEGY:
-		
-
-REVISION HISTORY:
-	Name	Date		Description
-	----	----		-----------
-	ardeb	4/17/94		Initial version
-
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
-NullES		proc	far
-		mov	es, cs:[nullSeg]
-		ret
-NullES		endp
-
 
 COMMENT @----------------------------------------------------------------------
 
@@ -926,7 +879,7 @@ semOK	label	near
 
 CheckToP	endp
 
-
+ifndef PRODUCT_GEOS32	; No such thing in GEOS32 -dhunter 11/22/00
 
 COMMENT @----------------------------------------------------------------------
 
@@ -1011,7 +964,7 @@ CheckBX	proc	far
 	ret
 
 CheckBX	endp
-
+endif
 
 
 COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -1126,6 +1079,7 @@ REVISION HISTORY:
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
 CheckHeapHandleSW	proc	far
+ifndef PRODUCT_GEOS32	; Pardon my hacks -dhunter 11/21/00
 	pushf
 	INT_OFF
 	push	ds
@@ -1136,8 +1090,8 @@ CheckHeapHandleSW	proc	far
 10$:
 	pop	ds
 	popf
+endif
 	ret
-
 CheckHeapHandleSW	endp
 
 
@@ -1167,6 +1121,9 @@ REVISION HISTORY:
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
 CheckHeapHandle	proc	far
+ifdef PRODUCT_GEOS32
+	ret
+else
 	push	ax
 	push	ds
 	LoadVarSeg	ds
@@ -1175,9 +1132,6 @@ CheckHeapHandle	proc	far
 	jz	corrupt
 	; Resonably sized?
 	cmp	ds:[bx][HM_size],0
-ifdef PRODUCT_GEOS32   ; GEOS32 doesn't have a heap of linear memory
-        jnz     11$
-else
 	jz	corrupt
 
 	; Stretches to next block?
@@ -1199,13 +1153,10 @@ else
 	sub	ax, ds:[bx].HM_addr
 	cmp	ax, ds:[bx].HM_size
 	je	11$
-endif   ; defined(PRODUCT_GEOS32) 
 corrupt:
 	ERROR	CORRUPTED_HEAP
-ifndef PRODUCT_GEOS32   ; GEOS32 doesn't have a heap of linear memory
 10$:
 	pop	bx
-endif   ; defined(PRODUCT_GEOS32) 
 11$:
 
 	; Check flag validity
@@ -1264,6 +1215,7 @@ if	0
 corruptLMem:
 	ERROR	CORRUPTED_LMEM_BLOCK
 endif
+endif ; PRODUCT_GEOS32
 
 CheckHeapHandle	endp
 

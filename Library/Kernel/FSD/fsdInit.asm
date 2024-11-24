@@ -54,7 +54,11 @@ REVISION HISTORY:
 	tony	5/91		Initial version
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+ifdef PRODUCT_GEOS32
+IRQCode	segment resource
+else
 idata	segment
+endif
 
 I21IFrame struct
     I21IF_bp	word
@@ -82,8 +86,15 @@ SSP <	call	RestoreSingleStepping			>
 	ret	2	; return flags from DOS, not from entry!
 Int21Intercept	endp
 
-idata	ends
+ifdef PRODUCT_GEOS32
+dosAddr		fptr.far ?	;initial value of int 21 vector. Used so app
+				;can take over int 21 to provide emulation for
+				;DOS program, if we ever get around to it...
 
+IRQCode	ends
+else
+idata	ends
+endif
 kinit	segment	resource
 
 
@@ -140,13 +151,27 @@ endif
 	; DOS application if the thing is "well-behaved". We'll see if it
 	; ever happens.
 	;
+ifdef PRODUCT_GEOS32
+		mov	bx, segment IRQCode
+		push	bx
+		call	GPMIAliasFar		;bx = writable alias
+		mov	es, bx
+		mov	di, offset dosAddr	;place to store old vector
+		pop	bx
+		mov	cx, offset Int21Intercept
+		mov	ax, 21h
+		call	SysCatchInterrupt
+		mov	bx, es
+		segmov	es, NULL_SEGMENT, ax
+		call	GPMIFreeAliasFar
+else
 		segmov	es, ds
 		mov	di, offset dosAddr	;place to store old vector
 		mov	bx, ds
 		mov	cx, offset Int21Intercept
 		mov	ax, 21h
 		call	SysCatchInterrupt
-
+endif
 	;
 	; Fetch the DOS version so we know what primary FS driver to load in
 	; LoadFSDriver, and to deal with various version dependencies
@@ -391,7 +416,12 @@ loadIniDrivers:
 		mov	cx, FS_PROTO_MAJOR
 		mov	dx, FS_PROTO_MINOR
 		call	ProcessStartupList
-		
+ifdef PRODUCT_GEOS32
+		; ds is initialized to ini key value and the segments
+		; is going to be destroyed here, with will end in an
+		; protection fault.		
+		LoadVarSeg	ds,bx
+endif
 		call	DoneWithString
 
 checkSecondaries:
@@ -1042,14 +1072,27 @@ REVISION HISTORY:
 FSDUnsuspend		proc	near
 		uses	es, di, bx, cx, ax
 		.enter
-
+ifdef PRODUCT_GEOS32
+		mov	bx, segment IRQCode
+		push	bx
+		call	GPMIAliasFar		;bx = writable alias
+		mov	es, bx
+		mov	di, offset dosAddr	;place to store old vector
+		pop	bx
+		mov	cx, offset Int21Intercept
+		mov	ax, 21h
+		call	SysCatchInterrupt
+		mov	bx, es
+		segmov	es, NULL_SEGMENT, ax
+		call	GPMIFreeAliasFar
+else
 		segmov	es, dgroup, ax
 		mov	di, offset dosAddr	;place to store old vector
 		mov	bx, es
 		mov	cx, offset Int21Intercept
 		mov	ax, 21h
 		call	SysCatchInterrupt
-
+endif
 		.leave
 		ret
 FSDUnsuspend		endp
@@ -1159,6 +1202,20 @@ REVISION HISTORY:
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
 ResetInt21		proc	near
+ifdef PRODUCT_GEOS32
+		uses	bx
+		.enter
+
+		mov	bx, segment IRQCode
+		call	GPMIAliasFar		;bx = writable alias
+		mov	es, bx
+		mov	di, offset dosAddr
+		mov	ax, 21h
+		call	SysResetInterrupt
+		mov	bx, es
+		segmov	es, NULL_SEGMENT, ax
+		call	GPMIFreeAliasFar
+else 
 		.enter
 
 		segmov	es, ds
@@ -1166,6 +1223,7 @@ ResetInt21		proc	near
 		mov	ax, 21h
 		call	SysResetInterrupt
 
+endif
 		.leave
 		ret
 ResetInt21		endp

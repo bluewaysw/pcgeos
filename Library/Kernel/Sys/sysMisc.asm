@@ -2048,9 +2048,353 @@ endif
 	ret
 SysSetECLevel	endp
 
-Filemisc	segment
+
+ifdef PRODUCT_GEOS32
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		SysMapRealSegment
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	Return a writable data selector to a given real-mode segment.
+
+CALLED BY:	GLOBAL
+PASS:		ax - real-mode segment
+		cx - limit of segment in bytes
+
+RETURN:		ax - selector
+
+DESTROYED:	none
+
+PSEUDO CODE/STRATEGY:
+		Call GPMI to map the thing
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	dhunter 11/23/00    	Initial version
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+SysMapRealSegment	proc	far
+		push	ds
+		LoadVarSeg	ds
+		xchg	ax, bx		; bx = segment, ax = old bx
+		call	GPMIMapRealSegment
+		ERROR_C	SYS_MAP_REAL_SEGMENT_FAILED
+		xchg	ax, bx		; ax = selector, bx restored
+		pop	ds
+		ret
+SysMapRealSegment	endp
 
 
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		SysUnapRealSegment
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	Free a selector previously allocated by SysMapRealSegment.
+
+CALLED BY:	GLOBAL
+PASS:		ax - selector
+
+RETURN:		carry clear if success, else set if failed
+
+DESTROYED:	none
+
+PSEUDO CODE/STRATEGY:
+		Call GPMI to free the thing
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	dhunter 1/17/01   	Initial version
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+SysUnmapRealSegment	proc	far
+		uses	si, ax, ds, es
+		.enter
+		LoadVarSeg	ds
+		mov_tr	ax, bx		; ax = selector
+                les     si, ds:[loaderVars].KLV_GPMIVectorTable
+                call    {fptr}es:[si+GPMI_CALL_UNMAP_REAL_SEGMENT]
+		.leave
+		ret
+SysUnmapRealSegment	endp
+
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		SysAllocCodeAlias
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	Setup a full read/write access descriptor for a given
+		descriptor.  MUST BE A CODE SEGMENT TO WORK.
+CALLED BY:	Loader, Kernel
+PASS:		bx	= descriptor
+RETURN:		bx	= new aliased descriptor
+		carry	= clear if success, else set if failed
+DESTROYED:	
+
+PSEUDO CODE/STRATEGY:
+	Tell the GPMI to make an alias selector
+
+KNOWN BUGS/SIDE EFFECTS/IDEAS:
+		
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	LES	12/5/2000	Initial version
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+SysAllocCodeAlias	proc	far
+		push	ds
+		LoadVarSeg ds
+		call	GPMIAliasFar
+		pop	ds
+		ret
+SysAllocCodeAlias	endp
+
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		SysFreeCodeAlias
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	Destroy a previous created code alias
+CALLED BY:	Loader, Kernel
+PASS:		bx	= descriptor to alias
+RETURN:		carry	= clear if success, else set if failed
+DESTROYED:	
+
+PSEUDO CODE/STRATEGY:
+	Tell the GPMI to destroy it's existing alias
+
+KNOWN BUGS/SIDE EFFECTS/IDEAS:
+		
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	LES	12/5/2000	Initial version
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+SysFreeCodeAlias	proc	far
+		push	ds
+		LoadVarSeg ds
+		call	GPMIFreeAliasFar
+		pop	ds
+		ret
+SysFreeCodeAlias	endp
+
+
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		SysAllocRealModeCallback
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	Allocates an real mode address that is forwarded to a
+			protected mode callback to be supplied to interrupts.
+CALLED BY:	Loader, Kernel
+PASS:		DS:ESI = selector:offset of protected mode procedure to call
+			(ES:EDI) CX:EDX = selector:offset of 32H-byte buffer for real mode 
+			         register data structure to be used when calling 
+			         callback routine.
+RETURN:		CX:DX = segment:offset of real mode callback
+			carry	= clear if success, else set if failed
+DESTROYED:	
+
+PSEUDO CODE/STRATEGY:
+	Let GPMI create a real mode callback alias
+
+KNOWN BUGS/SIDE EFFECTS/IDEAS:
+		
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	FR	12/5/2009	Initial version
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+SysAllocRealModeCallback	proc	far
+		call	GPMIRealModeCallbackFar
+		ret
+SysAllocRealModeCallback	endp
+
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		SysFreeRealModeCallback
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	Destroy a previous created real mode callback alias
+CALLED BY:	Loader, Kernel
+PASS:		CX:DX = segment:offset of real mode callback
+RETURN:		carry	= clear if success, else set if failed
+DESTROYED:	
+
+PSEUDO CODE/STRATEGY:
+	Tell the GPMI to destroy it's existing callback alias
+
+KNOWN BUGS/SIDE EFFECTS/IDEAS:
+		
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	FR	12/5/2009	Initial version
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+SysFreeRealModeCallback	proc	far
+		push	ds
+		LoadVarSeg ds
+		call	GPMIFreeRealModeCallbackFar
+		pop	ds
+		ret
+SysFreeRealModeCallback	endp
+
+
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		SysRealInterrupt
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	Setup a full read/write access descriptor for a given
+		descriptor.  MUST BE A CODE SEGMENT TO WORK.
+CALLED BY:	Loader, Kernel
+PASS:		es:di	= register structures
+		cx	= bytes from stack to copy
+		bh	= flags
+		bl	= interrupt to call
+
+RETURN:		bx	= new aliased descriptor
+		carry	= clear if success, else set if failed
+DESTROYED:	
+
+PSEUDO CODE/STRATEGY:
+	Tell the GPMI to make an alias selector
+
+KNOWN BUGS/SIDE EFFECTS/IDEAS:
+		
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	FR	24/4/2009	Initial version
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+SysRealInterrupt	proc	far
+                uses    ds, ax
+
+		.enter
+
+		LoadVarSeg ds
+		call	GPMIRealInterruptFar
+                
+		.leave
+		ret
+
+SysRealInterrupt	endp
+
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		SysAllocDOSBlock
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	Allocate a data block of memory in DOS area.
+
+CALLED BY:	GLOBAL
+PASS:		bx	= number of 16 byte paragraphs to be allicated
+
+RETURN:		carry	= cleared if success, else set
+		ax	= real mode segment
+		dx 	= selector of allocated block
+
+DESTROYED:	none
+
+PSEUDO CODE/STRATEGY:
+		Call GPMI to free the thing
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	dhunter 1/17/01   	Initial version
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+SysAllocDOSBlock	proc	far
+		uses	ds
+		.enter
+		LoadVarSeg ds
+		call	GPMIAllocDOSBlockFar
+		.leave
+		ret
+SysAllocDOSBlock         endp
+
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		SysFreeDOSBlock
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	Free a selector previously allocated by SysMapRealSegment.
+
+CALLED BY:	GLOBAL
+PASS:		ax - selector
+
+RETURN:		carry clear if success, else set if failed
+
+DESTROYED:	none
+
+PSEUDO CODE/STRATEGY:
+		Call GPMI to free the thing
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	dhunter 1/17/01   	Initial version
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+SysFreeDOSBlock proc	far
+		uses	ds
+		.enter
+		LoadVarSeg ds
+		call	GPMIFreeDOSBlockFar
+		.leave
+		ret
+SysFreeDOSBlock endp
+endif ; PRODUCT_GEOS32
+
+
+
+Filemisc	segment
+ifdef PRODUCT_GEOS32
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		SysCheckSegmentValid
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	Check of supplied segment descriptor is valid
+
+CALLED BY:	GLOBAL
+PASS:		ax - selector
+
+RETURN:		carry clear if valid, else set if failed
+
+DESTROYED:	none
+
+PSEUDO CODE/STRATEGY:
+		Call GPMI to check selector
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	dhunter 1/17/01   	Initial version
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+SysCheckSegmentValid proc	far
+		uses	ds,eax
+		.enter
+		LoadVarSeg ds
+		call	GPMISelectorGetLimitFar
+		.leave
+		ret
+SysCheckSegmentValid endp
+endif ; PRODUCT_GEOS32
+
+
+
 COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 		SysGetDosEnvironment
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%

@@ -2153,7 +2153,7 @@ PASS:		bx - VM file handle
 
 RETURN:		nothing
 
-DESTROYED:	nothing
+DESTROYED:	ds, es, fs, gs - nulled if pointing to VM block
 
 PSEUDO CODE/STRATEGY:
 
@@ -2168,6 +2168,21 @@ REVISION HISTORY:
 -------------------------------------------------------------------------------@
 
 VMFree	proc	far
+ifdef PRODUCT_GEOS32
+	;
+	; Ensure we don't later pop the selector we're going to free.
+	;
+	push	ax, cx, di
+	call	VMInfo			; ax = segment or carry set
+	jc	segRegsSafe		; branch if handle invalid
+	tst	ax
+	jz	segRegsSafe		; branch if no assoc. MemHandle
+	xchg	ax, bx			; ax = VM file, bx = mem
+	call	SafeNullSegmentRegsFar
+	mov_tr	bx, ax			; bx = VM file
+segRegsSafe:
+	pop	ax, cx, di
+endif	
 	call	VMPush_EnterVMFileFar
 
 EC <	call	FarAssertInterruptsEnabled				>
@@ -2388,8 +2403,10 @@ REVISION HISTORY:
 
 -------------------------------------------------------------------------------@
 
-VMClose	proc	far	uses	cx, dx, si, di, bp, es, ds
+VMClose	proc	far	uses	cx, dx, si, di, bp
 	.enter
+	push	es
+	push	ds
 
 EC <	tst	al							>
 EC <	jz	10$							>
@@ -2495,6 +2512,8 @@ EC <	mov	ds:[bx].HF_otherInfo, 0	; avoid EC death in FileClose	>
 	call	VvmSemFar		;release vmSem
 	clc				; no error
 done:
+	SafePop	ds, cx
+	SafePop	es, cx
 	.leave
 	ret
 
@@ -5130,6 +5149,9 @@ undoDone:
 		jmp	finish
 		
 closeIt:
+		clr	ax
+		mov	ds, ax   ; unattach ds segment for GPMI
+
 		mov	al, FILE_NO_ERRORS
 		call	VMClose
 		retn

@@ -300,8 +300,7 @@ EC <	jc	wasNotResident		;if not enough handles, exit with error>
 EC <	push	ds:[bx].HM_addr		;save original address		>
 
 	add	ax,15			;compute # of paragraphs
-	mov	cl,4
-	shr	ax,cl
+	shr	ax,4
 
 	; some vmem stuff..  in case we are changing the size of a
 	; vmem block..
@@ -426,7 +425,7 @@ RETURN:
 	none
 
 DESTROYED:
-	bx
+	ds, es, fs, gs - nulled if pointing to block
 
 REGISTER/STACK USAGE:
 
@@ -447,6 +446,12 @@ MemFree	proc	far
 EC <	call	AssertInterruptsEnabled					>
 EC <	call	ECCheckMemHandleFar					>
 	push	dx
+
+ifdef PRODUCT_GEOS32
+	; Ensure we don't later pop the selector we're going to free.
+	call	SafeNullSegmentRegs
+endif
+
 	call	EnterHeap		;do generic entry stuff
 	push	ax
 
@@ -462,7 +467,7 @@ EC <	pop	bx							>
 EC <	ERROR_Z	MEM_FREE_PASSED_A_BLOCK_IN_A_VM_FILE			>
 
 	call	DoFree
-
+	
 	pop	ax
 	jmp	ExitHeap		;do generic exit stuff
 
@@ -3056,9 +3061,8 @@ GetByteSize	proc	near
 GetByteSize	endp
 
 ParaToByteAX	proc	near
-	mov	cl,4			;shift left four times to multiply by
-	shl	ax,cl			;16 to get number of bytes
-	mov	cx,ax
+	shl	ax,4			;shift left four times to multiply by
+	mov	cx,ax			;16 to get number of bytes
 	ret
 
 ParaToByteAX	endp

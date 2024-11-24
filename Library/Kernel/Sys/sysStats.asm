@@ -108,7 +108,9 @@ globalSysGetInfoTable	nptr	\
 	SGI_SystemDisk,				;SGIT_SYSTEM_DISK
 	SGI_UIProcess,				;SGIT_UI_PROCESS
 	SGI_CounterAtLastInput,			;SGIT_COUNTER_AT_LAST_INPUT
-	SGI_ScreenSaverDelay			;SGIT_SCREEN_SAVER_DELAY
+	SGI_ScreenSaverDelay,			;SGIT_SCREEN_SAVER_DELAY
+	SGI_PhysMemTotal,			;SGIT_PHYS_MEM_TOTAL
+	SGI_PhysMemUsed				;SGIT_PHYS_MEM_USED
 
 internalSysGetInfoTable	nptr	\
 	SGI_HandleTableStart,			;SGIT_HANDLE_TABLE_START
@@ -332,6 +334,23 @@ SGI_HeapFreeSize	proc	near
 		shldw	dxax
 		ret
 SGI_HeapFreeSize	endp
+
+
+SGI_PhysMemTotal	proc	near
+		clr	dx
+		mov	ax, 50
+		ret
+SGI_PhysMemTotal	endp
+
+SGI_PhysMemUsed		proc	near
+ifdef PRODUCT_GEOS32
+		mov	bx, GPMI_INFO_PHYS_MEM_USED
+		call	GPMIGetInfoFar
+		mov	dx, bx
+		mov	ax, cx
+endif
+		ret
+SGI_PhysMemUsed		endp
 
 kcode	ends
 

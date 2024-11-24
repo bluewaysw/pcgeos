@@ -1386,7 +1386,11 @@ SingleStepUnhookVideo	proc	far
 SingleStepUnhookVideo	endp
 SSProfile ends
 
+ifdef PRODUCT_GEOS32
+IRQCode	segment resource
+else
 idata	segment
+endif
 
 COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 		VideoBiosHandler
@@ -1426,8 +1430,11 @@ VideoBiosHandler	proc	far
 	iret
 VideoBiosHandler	endp
 
+ifdef PRODUCT_GEOS32
+IRQCode	ends
+else
 idata	ends
-
+endif
 
 SSMovable	segment	resource
 

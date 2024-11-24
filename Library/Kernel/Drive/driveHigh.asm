@@ -974,6 +974,9 @@ DriveLocateByNameReal	 proc	far
 	; See if path has a drive specifier on it.
 	; 
 		mov	si, dx
+		mov	ax, ds
+		tst	ax
+		jz	noDriveSpecifier
 findSpecLoop:
 		LocalGetChar	ax, dssi
 		LocalIsNull	ax

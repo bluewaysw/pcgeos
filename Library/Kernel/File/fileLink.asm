@@ -803,6 +803,14 @@ gotFlags:
 	; Should also construct the full path if we were passed a NULL
 	; path, or a path that only contains a backslash.
 	;
+ifdef PRODUCT_GEOS32
+	push	ax
+	mov	ax, ds			; test segment = NULL
+	tst	ax
+	pop	ax
+	jz	constructFull
+endif
+
 SBCS <	cmp	{byte} ds:[si], 0					>
 DBCS <	cmp	{wchar} ds:[si], 0					>
 	je	constructFull

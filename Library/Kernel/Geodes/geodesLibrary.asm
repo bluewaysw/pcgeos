@@ -139,7 +139,7 @@ EC <	ERROR_NC	GEODE_FREE_LIBRARY_CALLER_UNKNOWN		>
 	
 freeTheThing:
 	call	NearUnlock
-EC <	call	NullES							>
+	call	NullES
 	call	FreeGeode
 	call	PopAll
 	ret

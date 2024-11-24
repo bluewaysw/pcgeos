@@ -1596,7 +1596,7 @@ DosExecPrepareForRestart proc	far
 	; 
 		mov	ax, (DosExecPrepareForRestart-DosExecRestartSystem) + \
 				size DosExecLoaderInfo + RESTART_STACK_SIZE
-		mov	cx, ALLOC_FIXED
+		mov	cx, ALLOC_FIXED or (mask HAF_CODE shl 8)
 		mov	bx, handle 0
 		call	MemAllocSetOwnerFar
 		jc	done

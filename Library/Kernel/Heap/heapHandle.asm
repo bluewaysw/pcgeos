@@ -57,7 +57,8 @@ PASS:
 			1 - BLOCK_PRIO_STANDARD
 			2 - BLOCK_PRIO_HIGH
 			3 - BLOCK_PRIO_HIGHEST
-
+	ch - heap allocation flag, checking for HAF_CODE
+	
 RETURN:
 	bx - handle with -> lock count = 0
 			 -> HM_otherInfo = 1
@@ -88,7 +89,15 @@ AllocateMemHandle	proc	near
 EC <	call	AssertDSKdata					>
 EC <	call	AssertHeapMine					>
 
+	test	ch, mask HAF_CODE
+	jz	noCode
+	
+	call	AllocateHandleCode
+	jmp	allocDone
+		
+noCode:
 	call	AllocateHandle
+allocDone:
 
 	mov	ds:[bx][HM_flags],cl	;save flags
 	mov	ds:[bx][HM_lockCount],0	;save lock count
@@ -142,11 +151,24 @@ REVISION HISTORY:
 
 -------------------------------------------------------------------------------@
 
+AllocateHandleCode	proc	near
+
+	pushf
+EC <	call	AssertDSKdata					>
+	push	ax
+	mov	ax, 1			;signal code mem
+	jmp	AllocHandleCommon
+	
+AllocateHandleCode	endp
+
 AllocateHandle	proc	near
 
 	pushf
 EC <	call	AssertDSKdata					>
 	push	ax
+	clr	ax			;signal no code mem
+
+AllocHandleCommon   label	near
 	INT_OFF
 	push	bx			;save owner
 
@@ -156,9 +178,41 @@ EC <	call	AssertDSKdata					>
 	jz	AH_error
 EC <	cmp	ds:[bx].HG_type, SIG_FREE				>
 EC <	ERROR_NZ NON_FREE_HANDLE_ON_FREE_LIST				>
+
+	tst	ax
+	jz	handleValid
+
+	test	bx, 0F0h
+	jnz	handleValid    
+
+	; for code handles we need to check for XX00 handles, because those
+	; are not properly handles using virtual resource call because DOSEMU
+	; doesn't support int 080h hook
+tryNext:
+	tst	bx
+	jz	AH_error
+
+	mov	ax, bx	
+	mov	bx, ds:[bx].HM_next
+
+	test	bx, 0F0h
+	jz	tryNext    
+	
+	; remove handle from linked list of free handles	
+	push	di
+	mov	di, ax			    	; get previous handle to di
+	mov	ax, ds:[bx].HM_next	    ; get next free handle
+	mov	ds:[di].HM_next, ax	    ; store next free handle
+	pop	di
+	
+	jmp	gotHandle
+	
+handleValid:
+
 					;save new free list pointer
 	mov	ax, ds:[bx].HM_next	; was HM_nextFree
 	mov	ds:[loaderVars].KLV_handleFreePtr, ax
+gotHandle:
 
 	; clear out the handle. This may look inefficient, but the jockeying of
 	; registers required to get to a rep stosw takes 57 more cycles (180

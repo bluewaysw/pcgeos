@@ -1628,6 +1628,9 @@ if	ERROR_CHECK
 	; ensure that interrupts are on here...
 
 AssertInterruptsEnabled	proc	near
+ifndef PRODUCT_GEOS32
+	; Can't do this under DPMI implementation where CLI/STI are
+	; emulated but interrupts are always on/off in real CPU flags.
 	pushf
 	push	ax
 
@@ -1640,6 +1643,7 @@ AssertInterruptsEnabled	proc	near
 
 	pop	ax
 	popf
+endif
 	ret
 
 AssertInterruptsEnabled	endp
@@ -3111,10 +3115,12 @@ REVISION HISTORY:
 	Name	Date		Description
 	----	----		-----------
 	Tony	4/88		Initial version
+	dhunter 11/14/00	GPMI version
 
 -------------------------------------------------------------------------------@
 
 RestoreMovableInt	proc	far
+ifndef PRODUCT_GEOS32
 	INT_OFF
 	push	si, di, es
 	clr	ax
@@ -3136,6 +3142,12 @@ RestoreMovableInt	proc	far
 done:
 	pop	si, di, es
 	INT_ON
+else
+	; Don't bother actually restoring the vectors, we'll be out of PM
+	; soon enough.  Just reset the flag.
+
+	mov	ds:[installedMovableVectors], FALSE
+endif
 	ret
 
 RestoreMovableInt	endp

@@ -1371,10 +1371,11 @@ notTough:
 30$:
 	mov	di, ax				;ES:DI <- ptr to dest
 	mov	cx, dx				; cx <- number of words to move
-	shr	cx, 1				;
+	;shr	cx, 1				;
+	dec	cx				;    don't move size word.
 	dec	cx				;    don't move size word.
 	mov	dx, si				; save ptr to old block for free
-	rep	movsw				; move data.
+	rep	movsb				; move data.
 	mov	si, dx				; ds:si == ptr to block to free
 	mov_trash di, ax			; ds:di <- ptr to new block
 
@@ -1826,6 +1827,7 @@ scanFreeLoop2:
 	mov	si, cx				; ds:si = source
 	mov_tr	cx, ax
 	shr	cx
+	dec	cx				; no need to copy size
 	rep	movsw
 	pop	si				; si = new block
 

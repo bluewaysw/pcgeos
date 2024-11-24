@@ -1024,6 +1024,7 @@ if	not NEVER_ENFORCE_HEAPSPACE_LIMITS
 heapSpace	local word			;Temp variable for HeapSpace
 endif	; not NEVER_ENFORCE_HEAPSPACE_LIMITS
 currentGeode	local hptr
+resFlags	local nptr			;resource flags on stack
 	uses	cx, dx, si, di, es, ds
 
 	ForceRef valueToPass2
@@ -1039,6 +1040,7 @@ if	not NEVER_ENFORCE_HEAPSPACE_LIMITS
 	ForceRef heapSpace			;Temp variable fo HeapSpace
 endif	; not NEVER_ENFORCE_HEAPSPACE_LIMITS
 	ForceRef currentGeode
+	ForceRef resFlags
 
 	.enter
 
@@ -3149,6 +3151,7 @@ endif
 	mov	dx,sp
 	sub	sp,cx
 	mov	di,sp			;allocate local variables, di = BOTTOM
+	mov	ss:[resFlags],di	;save ptr to flags
 	push	dx			;save stack ptr before locals
 
 	push	ds			;read into stack
@@ -3517,6 +3520,8 @@ FXIP <loadDgroup:							>
 	LONG jz	PLR_ret
 	mov	ss:[temporary],cx	;counter
 	mov	si,4			;skip core block and dgroup
+	mov	di,ss:[resFlags]	;di = resource flags
+	add	di,4			;same skip as above
 
 	;For each resource:
 	;	Load resource if not discarded
@@ -3652,7 +3657,21 @@ if USE_PATCHES
 	pop	si
 endif
 
-
+ifdef PRODUCT_GEOS32
+	;
+	; Having finished loading the resource, convert it to a code
+	; resource now to keep protected mode happy.
+	;
+	test	{HeapAllocFlags}ss:[di+1], mask HAF_CODE ;HAF in upper byte
+	jz	notCode
+	xchg	ax, bx			; bx = selector, ax = handle
+	call	swapESDS		; ds = core block, es = kdata
+	call	GPMIConvertToCodeBlockFar
+	call	swapESDS		; es = core block, ds = kdata
+	xchg	ax, bx			; back again
+notCode:
+endif
+	
 if FAULT_IN_EXECUTABLES_ON_FLOPPIES
 
 	; If the executable is on removable media then we must make sure
@@ -3675,6 +3694,8 @@ noLoad::
 loaded:
 	inc	si
 	inc	si
+	inc	di
+	inc	di
 	dec	ss:[temporary]
 	LONG jnz loadLoop
 

@@ -36,6 +36,12 @@ DESCRIPTION:
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
 
+ifdef PRODUCT_GEOS32
+include	gpmi.def
+
+.386 
+endif
+
 ;
 ; Not needed globally -- just declare them here
 ;
@@ -391,6 +397,12 @@ SysExitInterruptVerifyRegs endp
 
 endif
 
+ifdef PRODUCT_GEOS32
+idata	segment
+contextSwitching	byte	0
+idata	ends
+endif
+
 SysExitInterrupt	proc	far
 			
 	push	ds
@@ -433,7 +445,7 @@ endif
 	tst	ds:[intWakeUpAborted]
 	jz	SEI_done
 	mov	ds:[intWakeUpAborted], 0
-
+ifndef PRODUCT_GEOS32
 	; a potential wake-up was aborted because interrupt code was running
 	; make sure that the highest priority thread is running
 
@@ -466,6 +478,126 @@ SEI_done:
 	ret
 SysExitInterrupt	endp
 
+else ; PRODUCT_GEOS32
+
+EC <	cmp	ds:[runQueue],0						>
+EC <	ERROR_Z	SYS_EXIT_INTERRUPT_RUN_QUEUE_IS_ZERO			>
+
+	;
+	; HACK ALERT: DPMI requires interrupt handlers to return on the
+	; same stack on which they are called.  However, we may need to
+	; switch stack to that of the highest priority thread.  DPMI doesn't
+	; describe the layout of the interrupt stack, leaving its layout up
+	; to the implementor.  But by observation, we can figure out a few
+	; useful tidbits:
+	;
+	; Note: These apply to the NTVDM DPMI (DOSX) only.
+	;
+	; If the interrupt occurred in protected mode, the stack will
+	; look like this:
+	;
+	; SS:0ffeh	Flags (at point of interrupt)
+	; SS:0ffch	CS (at point of interrupt)
+	; SS:0ffah	IP (at point of interrupt)
+	; SS:0ff8h	Flags     (normal interrupt frame)
+	; SS:0ff6h	Return CS            "
+	; SS:0ff4h TOS>	Return IP            "
+
+	push	ax
+	mov	ax, ss
+	cmp	ax, 017fh
+	pop	ax
+	jne	SEI_done
+	cmp	ss:[0ffch], 0c7h
+	je	SEI_done
+
+SEI_switch	label near
+	ForceRef SEI_switch
+	ornf	ss:[0ffeh], mask CPU_TRAP
+	inc	ds:[contextSwitching]
+		
+SEI_done:
+	call	SafePopf	; restore initial interrupt state w/o
+				;  tickling 286 bug
+	pop	ds
+	ret
+SysExitInterrupt	endp
+
+ExceptionFrame	STRUC
+    except_retIP	word
+    except_retCS	word
+    except_error	word
+    except_ip		word
+    except_cs		word
+    except_flags	word
+    except_sp		word
+    except_ss		word
+ExceptionFrame	ENDS
+
+SysContextSwitchReflector	proc	far
+	;
+	; Load DS with our dgroup.
+	;
+		push	ds, ax, bx, bp, si
+	;
+	; Save CS:IP and error code of excepting process.
+	;
+		mov	bp, sp			; ss:bp+10 = ExceptionFrame
+		add	bp, 10			; ss:bp = ExceptionFrame
+		mov	ds, ss:[bp].except_ss
+		mov	ax, ss:[bp].except_cs
+		mov	ds:[TPD_SCSVector].segment, ax
+		mov	ax, ss:[bp].except_ip
+		mov	ds:[TPD_SCSVector].offset, ax
+		and	ss:[bp].except_flags, not mask CPU_TRAP
+	;
+	; Change CS:IP to SysContextSwitch.
+	;
+		.assert	segment SysContextSwitch eq @CurSeg
+		mov	ss:[bp].except_cs, cs
+		mov	ss:[bp].except_ip, offset SysContextSwitch
+
+		pop	ds, ax, bx, bp, si
+		retf
+SysContextSwitchReflector	endp
+
+SysContextSwitch	proc	far
+	pushf
+	push	ss:[TPD_SCSVector].segment
+	push	ss:[TPD_SCSVector].offset
+
+SCS_iretSetup	label	near
+	INT_OFF
+	push	ds, ax
+	LoadVarSeg	ds
+	tst	ds:[contextSwitching]
+	jz	done
+	dec	ds:[contextSwitching]
+	
+	; a potential wake-up was aborted because interrupt code was running
+	; make sure that the highest priority thread is running
+
+	; Notify the power management driver that a thread will be woken
+	; up when we exit the interrupt
+
+	tst	ds:defaultDrivers.DDT_power
+	jz	noPowerDriver
+	clr	ax
+	xchg	al, ds:[idleCalled]
+	tst	al
+	jz	noPowerDriver
+	push	di
+	mov	di, DR_POWER_NOT_IDLE_ON_INTERRUPT_COMPLETION
+	call	ds:powerStrategy
+	pop	di
+noPowerDriver:
+
+	call	WakeUpRunQueue
+done:
+	pop	ds, ax
+	iret
+SysContextSwitch	endp
+endif ; PRODUCT_GEOS32
 
 
 COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -493,6 +625,7 @@ REVISION HISTORY:
 	Name	Date		Description
 	----	----		-----------
 	ardeb	5/17/89		Initial version
+	dhunter	11/19/00	GPMI version
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
 SysCatchInterrupt proc	far
@@ -507,6 +640,27 @@ EC <		call	ECAssertValidTrueFarPointerXIP		>
 EC <		pop	bx, si					>
 endif
 		push	ds
+ifdef PRODUCT_GEOS32
+		push	cx, edx
+		push	bx
+
+		cld
+
+		INT_OFF			; No interrupts while changing vector
+
+		push	cx
+		mov	bl, al
+		call	GPMIGetInterruptHandlerFar	; cx:edx = old vector
+		
+		mov	es:[di], dx	; Store offset portion in passed
+					;  buffer.
+		mov	es:[di+2], cx	; Store segment portion
+		pop	dx
+		pop	cx		; cx:dx = new vector
+		call	GPMISetInterruptHandlerFar
+
+		pop	cx, edx
+else ; PRODUCT_GEOS32
 		push	bx
 		clr	bx		; Interrupt table at segment 0
 		mov	ds, bx
@@ -526,7 +680,7 @@ endif
 		mov	ax, ds:2[bx]
 		stosw			; Store segment portion
 		pop	ds:2[bx]	; Store passed segment
-
+endif ; PRODUCT_GEOS32
 		jmp	popDS_popf_ret
 SysCatchInterrupt endp
 
@@ -554,6 +708,7 @@ REVISION HISTORY:
 	Name	Date		Description
 	----	----		-----------
 	ardeb	5/17/89		Initial version
+	dhunter	11/19/00	GPMI version
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
 SysResetInterrupt proc	far
@@ -568,6 +723,17 @@ endif
 
 		push	ds
 		push	bx
+ifdef PRODUCT_GEOS32
+		push	cx, edx
+
+		INT_OFF
+		mov	bl, al			; al = interrupt
+		mov	dx, es:[di]
+		mov	cx, es:[di+2]		; cx:dx = old vector
+		call	GPMISetInterruptHandlerFar
+
+		pop	cx, edx
+else
 
 		clr	bx		; Point DS at interrupt table
 		mov	ds, bx
@@ -581,7 +747,7 @@ endif
 		mov	ds:[bx], ax	; Store it back
 		mov	ax, es:2[di]	; Fetch segment portion
 		mov	ds:2[bx], ax	; Store it back
-
+endif
 		pop	bx
 
 popDS_popf_ret	label	near
@@ -755,9 +921,18 @@ SysCatchDeviceInterrupt	proc	far
 	xchg	ds:[bx].segment, ax	; Store passed segment
 	stosw				; Store segment portion in passed
 					;  buffer
-
+ifdef PRODUCT_GEOS32
+	mov	bx, ds
+	pop	ds			; ds gets invalid here, so 
+					; revert it first
+	call	GPMIFreeAliasFar
+	
+	call	SafePopf	; Restore IF w/o possible interrupt
+					;  from buggy '286
+	ret
+else
 	jmp	popDS_popf_ret
-
+endif
 SysCatchDeviceInterrupt	endp
 
 
@@ -785,7 +960,24 @@ REVISION HISTORY:
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
 SysResetDeviceInterrupt	proc	far
+ifdef PRODUCT_GEOS32
+	pushf
+	push	bx
+	push	ds
 
+	call	CatchResetLocateVectorCommon
+	movdw	ds:[bx], es:[di], ax
+
+	mov	bx, ds
+	pop	ds			; ds gets invalid here, so 
+					; revert it first
+	call	GPMIFreeAliasFar
+	pop	bx
+
+	call	SafePopf	; Restore IF w/o possible interrupt
+					;  from buggy '286
+	ret
+else
 	pushf
 	push	ds
 
@@ -795,7 +987,7 @@ SysResetDeviceInterrupt	proc	far
 	pop	bx
 
 	jmp	popDS_popf_ret
-
+endif
 SysResetDeviceInterrupt	endp
 
 
@@ -823,8 +1015,13 @@ REVISION HISTORY:
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
 CatchResetLocateVectorCommon	proc	near
+ifdef PRODUCT_GEOS32
+	mov	bx, segment IRQCode
+	call	GPMIAliasFar		;bx = writable alias
+	mov	ds, bx
+else
 	LoadVarSeg	ds
-
+endif
 	; Do not use "Assert" here, since it uses "popf" which is unsafe.
 EC <	cmp	ax, FIRST_IRQ_INTERCEPT_LEVEL				>
 EC <	ERROR_B	NO_SUCH_INTERRUPT					>
@@ -944,6 +1141,7 @@ REVISION HISTORY:
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
 SysSwapIntercepts proc near
+ifndef PRODUCT_GEOS32  ; Is this still necessary? -dhunter 11/16/00
 		.enter
 		clr	ax
 		mov	es, ax
@@ -983,6 +1181,7 @@ if	not HARDWARE_INT_CONTROL_8259
 
 endif
 		.leave
+endif
 		ret
 SysSwapIntercepts endp
 

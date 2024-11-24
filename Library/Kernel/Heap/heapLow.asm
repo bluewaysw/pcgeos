@@ -160,8 +160,9 @@ FullLockNoReload	proc	near
 	call	PHeap				;get semaphore for special case
 EC <	call	CheckHeapHandleSW					>
 	mov	ax,ds:[bx][HM_addr]		;get address
-	or	ax,ax				;test for not in memory
-	jnz	doneComp
+	test	ds:[bx][HM_flags], mask HF_DISCARDED or mask HF_SWAPPED
+						;test for not in memory
+	jz	doneComp
 
 	test	ds:[bx][HM_flags],mask HF_DISCARDED
 	stc
@@ -278,8 +279,8 @@ FullLockReload	proc	near
 						;routines
 EC <	call	CheckHeapHandleSW					>
 	mov	ax,ds:[bx][HM_addr]		;get address
-	tst	ax				;test for not in memory
-	jnz	doneComp
+	test	ds:[bx][HM_flags], mask HF_DISCARDED or mask HF_SWAPPED
+	jz	doneComp
 
 	push	cx, si, di
 
@@ -290,6 +291,7 @@ EC <	call	CheckHeapHandleSW					>
 	mov	di, cx
 
 	mov	ch,HAF_STANDARD_NO_ERR
+	clr	ax				;use size given by handle
 	call	DoReAlloc
 
 	pop	di
@@ -505,14 +507,52 @@ EC <validOwner:								>
 EC <	test	ch, mask HAF_LOCK					>
 EC <	ERROR_NZ ALLOC_BAD_FLAGS					>
 
+	;
+	; Allocate a handle and give it a not-present selector.
+	; If the allocation is for a code block (HAF_CODE), convert
+	; the selector to a code selector now.
+	;
 	push	ax			;allocate discarded -- get a handle
 	call	AllocateMemHandle
+ifndef PRODUCT_GEOS32
 	pop	ds:[bx][HM_size]	;set size
+else
+	mov_tr	ax, cx			;ax = flags
+	pop	cx			;ax=size in paragraphs
+	mov	ds:[bx][HM_size], cx	;set size
+	mov	bp, bx			;bp = handle
+	clr	bx
+	shld	bx, cx, 4
+	shl	cx, 4			;bx:cx = size in bytes
+	call	GPMIAllocateNotPresentBlock
+	jc	error
+EC <	cmp	bx, handle 0 >
+EC <	WARNING_Z	BLOCK_ALLOCATED_WITH_NO_FLAGS >
+	mov	ds:[bp][HM_addr], bx
+
+	test	ah, mask HAF_CODE	;Code block?
+	jz	discDone		; branch if not
+	call	GPMIConvertToCodeBlock
+discDone:
+	mov_tr	ax, bx			;ax = segment
+	mov_tr	bx, bp			;bx = handle
+endif ; PRODUCT_GEOS32
 	jmp	done
+
 alloc:
 	call	AllocHandleAndBytes	;allocate a handle and bytes for it
 	jc	error			;if error then don't try to lock it
-
+ifdef PRODUCT_GEOS32
+	test	ch, mask HAF_CODE	;Code block?
+	jz	alloc2		; branch if not
+	push	bx
+	mov	bx,ds:[bx][HM_addr]
+	call	GPMIConvertToCodeBlock
+	mov_tr	ax, bx			;ax = segment
+	pop	bx
+	mov	ds:[bx][HM_addr], ax
+alloc2:
+endif ; PRODUCT_GEOS32
 	mov	ax,ds:[bx][HM_addr]
 	test	ch,mask HAF_LOCK	;check for lock also
 	jz	done
@@ -736,6 +776,36 @@ retry:
         pop     ax, bx, cx
 	jnc	found			;if found then continue
 
+	mov	di,offset swapTable
+
+	; always throw out a fair amount (or else it is not worth our while)
+
+	push	cx
+if	INI_SETTABLE_HEAP_THRESHOLDS
+	push	dx, ds
+	mov	dx, segment minSpaceToThrowOut
+	mov	ds, dx
+	cmp	ax, ds:minSpaceToThrowOut
+	pop	dx, ds
+else
+	cmp	ax, MIN_SPACE_TO_THROW_OUT
+endif
+	jae	10$
+if	INI_SETTABLE_HEAP_THRESHOLDS
+	push	dx, ds
+	mov	dx, segment minSpaceToThrowOut
+	mov	ds, dx
+	mov	ax, ds:minSpaceToThrowOut
+	pop	dx, ds
+else
+	mov	ax, MIN_SPACE_TO_THROW_OUT
+endif
+10$:
+	push	bp
+	call	ThrowOutBlocks
+	pop	bp
+	pop	cx
+
 	; if not found then loop, sleeping between tries
 	; we only want to loop if HAF_NO_ERR was passed
 	test	ch, mask HAF_NO_ERR
@@ -766,10 +836,10 @@ found:
         ; Link in the block to the heap list
         mov     di, ds:[loaderVars].KLV_handleBottomBlock
         mov     si, ds:[di].HM_prev
-        mov     ds:[bx].HM_prev, di
-        mov     ds:[bx].HM_next, si
-        mov     ds:[di].HM_next, bx
-        mov     ds:[si].HM_prev, bx
+        mov     ds:[bx].HM_prev, si
+        mov     ds:[bx].HM_next, di
+        mov     ds:[si].HM_next, bx
+        mov     ds:[di].HM_prev, bx
 
         ; Do we need to zero out the memory?
 	test	ch, mask HAF_ZERO_INIT
@@ -1103,6 +1173,7 @@ REVISION HISTORY:
 	Name	Date		Description
 	----	----		-----------
 	Tony	4/88		Initial version
+	dhunter	11/20/00	GPMI version
 
 -------------------------------------------------------------------------------@
 
@@ -1122,8 +1193,8 @@ EC <	call	AssertHeapMine						>
 	mov	ax,ds:[bx][HM_size]	;if so then get size
 diffSize:
 	mov	cl,ds:[bx][HM_flags]
-	cmp	ds:[bx].HM_addr,0
-	jnz	inMem
+	test	cl, mask HF_DISCARDED or mask HF_SWAPPED
+	jz	inMem
 	test	cl,mask HF_DISCARDED
 	jnz	discarded
 
@@ -1139,6 +1210,57 @@ inMem:
 	cmp	ax,ds:[bx][HM_size]	;compare to current size
 
 	jz	doneGood		;if same then do nothing
+
+ifdef  PRODUCT_GEOS32
+	mov	dx, NUMBER_OF_ALLOCATION_RETRIES
+tryAgain:	
+	push	bx, cx, dx
+	mov	bx, ds:[bx][HM_addr]
+	clr	cx
+	mov	dx, ax
+	shld	cx, dx, 4
+	shl	dx, 4
+	call	GPMIResizeBlock
+	pop	bx, cx, dx
+	jnc	doneZeroInit
+
+	test	ch, mask HAF_NO_ERR
+	stc
+	jz	done
+	;
+	; If HAF_NO_ERROR was passed try sleeping before putting up
+	; and error dialog box.
+	;	
+	tst	dx
+	jz 	error
+	call	AllocationFailure
+	jmp	tryAgain
+error:
+	call	NotifyAllocError
+	jmp	tryAgain
+
+doneZeroInit:
+	xchg	ax,ds:[bx][HM_size]	;store new size, ax = orig. size
+	;
+	; If the block grew, zero-initialize the new bit if requested.
+	;
+	test	ch, mask HAF_ZERO_INIT
+	jz	doneGood
+
+	cmp	ax, ds:[bx][HM_size]	;compare orig size to new size
+	ja	doneGood		;if larger, block shrunk, do nothing
+
+	push	es
+	shl	ax, 4
+	mov	di, ax			;di = start of new bit
+	mov	es,ds:[bx][HM_addr]	;get segment address in es
+	call	GetByteSize
+	sub	cx, di			;cx = size of new bit
+	shr	cx,1			;convert to words
+	clr	ax			;store zeros
+	rep stosw
+	pop	es
+else ; PRODUCT_GEOS32
 	ja	makeLarger		;if more then branch to make larger
 
 	; allocating a block smaller -- split it into two blocks
@@ -1148,6 +1270,8 @@ inMem:
 	xchg	ds:[bx].HM_addr, dx
 	call	SplitBlockFreeRemainder
 	xchg	ds:[bx].HM_addr, dx
+endif ; PRODUCT_GEOS32
+
 doneGood:
 	tst	ds:[bx].HM_lockCount	; If block is locked, don't muck with
 	jnz	done			;  the usage value, as it would screw
@@ -1165,6 +1289,35 @@ done:
 	; block is discarded -- allocate new bytes for it
 
 discarded:
+ifdef PRODUCT_GEOS32
+	push	cx			;save flags
+	push	dx, bx, di
+	mov	cl, ds:[bx].HM_flags
+
+;	Do not discard or swap this block
+
+	andnf	cl, not (mask HF_DISCARDABLE or mask HF_SWAPABLE)
+	mov	ds:[bx].HM_flags, cl
+	mov	bx, ds:[bx][HM_addr]
+	shl	ax, 4			;ax = size (in bytes)
+	mov_tr	dx, ax
+	clr	cx			;cx:dx = size
+	call	GPMIMakePresent		;ax = code/data flag
+
+	pop	dx, bx, di
+	jc	doneRestoreFlags
+
+	tst	dx			;callback function ?
+	jz	noCallBack
+	inc	ds:[bx].HM_lockCount	;ensure new memory remains resident,
+					; in case callback must release heapSem
+					; -- ardeb 8/11/92
+	mov	si, bx			;use same block all around
+	push	ax
+	call	dx
+	pop	ax
+	dec	ds:[bx].HM_lockCount
+else
 	call	allocRoom
 	jc	done
 
@@ -1176,7 +1329,34 @@ discardedHaveRoom:
 					; -- ardeb 8/11/92
 	call	dx
 	dec	ds:[si].HM_lockCount
+endif 
 noCallBack:
+ifdef PRODUCT_GEOS32
+	;
+	; Now that we've finished modifying the block, restore its status
+	; to a code block if it was once one.
+	;
+	cmp	ax, GPMI_MAKE_PRESENT_ORIGINALLY_CODE_BLOCK
+	jne	doneRestoreFlags
+	push	bx
+	mov	bx, ds:[bx][HM_addr]
+	call	GPMIConvertToCodeBlock
+	pop	bx
+doneRestoreFlags:
+	pop	cx			;cl = flags
+	BitClr	cl, HF_DISCARDED
+	mov	ds:[bx].HM_flags, cl
+
+	; Link in the block to the heap list
+        mov     di, ds:[loaderVars].KLV_handleBottomBlock
+        mov     si, ds:[di].HM_prev
+        mov     ds:[bx].HM_prev, si
+        mov     ds:[bx].HM_next, di
+        mov     ds:[si].HM_next, bx
+        mov     ds:[di].HM_prev, bx
+
+	jmp	short done
+else ; PRODUCT_GEOS32
 	cmp	ds:[si].HM_lockCount, LOCK_COUNT_MOVABLE_PERMANENTLY_FIXED
 	pushf	
 	call	SwapHandles		;assign memory to correct handle
@@ -1312,8 +1492,153 @@ allocRoom:
 	mov	ds:[bx].HM_flags, dl
 	pop	dx
 	retn
+endif ; PRODUCT_GEOS32
 DoReAlloc	endp
 
+ifdef PRODUCT_GEOS32
+; dx is address, not callback 
+DoReAlloc2	proc	near
+	InsertGenericProfileEntry PET_HEAP, 1, PMF_HEAP, bx
+	push	cx
+EC <	call	AssertHeapMine						>
+	or	ax,ax			;test for allocate same size
+	jnz	diffSize
+	mov	ax,ds:[bx][HM_size]	;if so then get size
+diffSize:
+	mov	cl,ds:[bx][HM_flags]
+	test	cl, mask HF_DISCARDED or mask HF_SWAPPED
+	jz	inMem
+	test	cl,mask HF_DISCARDED
+	jnz	discarded
+
+	push	ax, cx, di
+	call	MemSwapIn
+	pop	ax, cx, di
+
+	; Check if the block went from swapped to discarded.
+	test	ds:[bx][HM_flags],mask HF_DISCARDED
+	jnz	discarded
+
+inMem:
+	cmp	ax,ds:[bx][HM_size]	;compare to current size
+
+	jz	doneGood		;if same then do nothing
+
+	;mov	dx, NUMBER_OF_ALLOCATION_RETRIES
+tryAgain:	
+	push	bx, cx, dx
+	mov	ds:[bx][HM_addr], dx
+	mov	bx, ds:[bx][HM_addr]
+	clr	cx
+	mov	dx, ax
+	shld	cx, dx, 4
+	shl	dx, 4
+	call	GPMIResizeBlock
+	pop	bx, cx, dx
+	jnc	doneZeroInit
+
+	test	ch, mask HAF_NO_ERR
+	stc
+	jz	done
+	;
+	; If HAF_NO_ERROR was passed try sleeping before putting up
+	; and error dialog box.
+	;	
+	;tst	dx
+	jz 	error
+	call	AllocationFailure
+	jmp	tryAgain
+error:
+	call	NotifyAllocError
+	jmp	tryAgain
+
+doneZeroInit:
+	xchg	ax,ds:[bx][HM_size]	;store new size, ax = orig. size
+	;
+	; If the block grew, zero-initialize the new bit if requested.
+	;
+	test	ch, mask HAF_ZERO_INIT
+	jz	doneGood
+
+	cmp	ax, ds:[bx][HM_size]	;compare orig size to new size
+	ja	doneGood		;if larger, block shrunk, do nothing
+
+	push	es
+	shl	ax, 4
+	mov	di, ax			;di = start of new bit
+	mov	ds:[bx][HM_addr], dx
+	mov	es,ds:[bx][HM_addr]	;get segment address in es
+	call	GetByteSize
+	sub	cx, di			;cx = size of new bit
+	shr	cx,1			;convert to words
+	clr	ax			;store zeros
+	rep stosw
+	pop	es
+	
+doneGood:
+	tst	ds:[bx].HM_lockCount	; If block is locked, don't muck with
+	jnz	done			;  the usage value, as it would screw
+					;  up thread-grabbed blocks (tst
+					;  clears the carry)
+
+	mov	ax, ds:[systemCounter.low];Else set the usageValue for the block
+	mov	ds:[bx].HM_usageValue, ax;  so it doesn't get discarded or
+					;   swapped right away.
+done:
+	pop	cx
+	InsertGenericProfileEntry PET_HEAP, 0, PMF_HEAP, bx
+	ret
+
+	; block is discarded -- allocate new bytes for it
+
+discarded:
+	push	cx			;save flags
+	push	dx, bx, di
+	mov	cl, ds:[bx].HM_flags
+
+;	Do not discard or swap this block
+
+	andnf	cl, not (mask HF_DISCARDABLE or mask HF_SWAPABLE)
+	mov	ds:[bx].HM_flags, cl
+	mov	ds:[bx][HM_addr], dx
+	mov	bx, ds:[bx][HM_addr]
+	shl	ax, 4			;ax = size (in bytes)
+	mov_tr	dx, ax
+	clr	cx			;cx:dx = size
+	call	GPMIMakePresent		;ax = code/data flag
+
+	pop	dx, bx, di
+	jc	doneRestoreFlags
+
+	;
+	; Now that we've finished modifying the block, restore its status
+	; to a code block if it was once one.
+	;
+	cmp	ax, GPMI_MAKE_PRESENT_ORIGINALLY_CODE_BLOCK
+	jne	doneRestoreFlags
+	push	bx
+	mov	ds:[bx][HM_addr], dx
+	mov	bx, ds:[bx][HM_addr]
+	call	GPMIConvertToCodeBlock
+	pop	bx
+doneRestoreFlags:
+	pop	cx			;cl = flags
+	BitClr	cl, HF_DISCARDED
+	mov	ds:[bx].HM_flags, cl
+
+	; Link in the block to the heap list
+        mov     di, ds:[loaderVars].KLV_handleBottomBlock
+        mov     si, ds:[di].HM_prev
+        mov     ds:[bx].HM_prev, si
+        mov     ds:[bx].HM_next, di
+        mov     ds:[si].HM_next, bx
+        mov     ds:[di].HM_prev, bx
+
+	jmp	short done
+DoReAlloc2	endp
+endif ; PRODUCT_GEOS32
+
+ifndef PRODUCT_GEOS32	; Not much point in this for PM -dhunter 11/20/00
 
 COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 		TryExpand
@@ -1717,6 +2042,7 @@ done:
 		.leave
 		ret
 ExpandToBothNeighbors endp
+endif
 
 
 COMMENT @-----------------------------------------------------------------------
@@ -1857,6 +2183,7 @@ REVISION HISTORY:
 	Name	Date		Description
 	----	----		-----------
 	ardeb	6/26/90		Initial version
+	dhunter	11/20/00	GPMI version
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
 DoFreeNoDeleteSwap	proc	near
@@ -1868,6 +2195,23 @@ EC <	call	AssertHeapMine						>
 	mov	al,DEBUG_FREE		;notify debugger of freeing block
 	call	FarDebugMemory
 
+ifdef PRODUCT_GEOS32
+	;check for memory associated with handle
+	test	ds:[bx][HM_flags], mask HF_DISCARDED or mask HF_SWAPPED
+	jnz	noMem
+
+	; free the memory allocated to this block
+
+	push	bx
+	mov	bx, ds:[bx][HM_addr]	;bx = selector
+	mov	ax, es
+	cmp	ax, bx
+	jnz	doIt
+	call	NullES
+doIt:
+	call	GPMIFreeBlock
+	pop	bx
+else
 	cmp	ds:[bx][HM_addr],0	;check for memory associated with
 	jz	noMem		;handle
 EC <	call	CheckBX							>
@@ -1880,13 +2224,25 @@ NEC <	mov	{word} ds:[0], 0xcccc					>
 NEC <	pop	ds							>
 
 EC <	call	ECFillCCCC						>
+endif
 
 	mov	ds:[bx][HM_owner],0	;mark as free
 	mov	{word}ds:[bx][HM_flags],0	;zero flags and lock count
 	mov	ax, ds:[bx].HM_size
 	add	ds:[loaderVars].KLV_heapFreeSize, ax
 
+ifdef PRODUCT_GEOS32
+	; Unlink the handle from the heap list and free it.
+	push	si, di
+	mov	si, ds:[bx][HM_prev]	;si = prev block
+	mov	di, ds:[bx][HM_next]	;di = next block
+	mov	ds:[si][HM_next], di	;prev points to next
+	mov	ds:[di][HM_prev], si	; and next points to prev
+	pop	si, di
+	call	FreeHandle
+else
 	call	CombineBX
+endif
 	ret
 
 noMem:
@@ -2129,11 +2485,13 @@ FreeBlockData	proc	near
 	push	si
 EC <	call	AssertHeapMine						>
 
+ifndef PRODUCT_GEOS32
 	call	DupHandle		;new handle returned in bx, old in si
 	mov	ds:[bx][HM_addr],dx
 	andnf	ds:[bx].HM_flags, not mask HF_DEBUG	; Swat can't be
 							;  interested...
 	call	FixLinks		;put new block in list
+endif
 
 ; I can see no reason for not clearing both these bits (it used to just clear
 ; HF_SWAPPED, formerly HF_MEM_SWAP), but only if HF_DISCARDED wasn't passed in.
@@ -2157,9 +2515,15 @@ EC <	call	AssertHeapMine						>
 ;10$:
 	ornf	ds:[si][HM_flags],al	;mark as discarded or swapped
 
+ifdef PRODUCT_GEOS32
+	;mov	bx, ds:[si][HM_addr]
+	mov		bx, dx
+	call	GPMIMakeNotPresent
+else
 	mov	ds:[si][HM_addr],0	;mark as not associated with memory
 
 	call	DoFreeNoDeleteSwap	;free memory
+endif
 
 	clc				;just in case anyone cares
 	mov	bx,si
@@ -2313,3 +2677,73 @@ next:
 		.leave
 		ret
 SGI_SwapFreeSize	endp
+
+
+ifdef PRODUCT_GEOS32
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		SafeNullSegmentRegs
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	Given a block that's about to be freed, null any segment
+		registers that contain that block's selector.
+
+CALLED BY:	INTERNAL
+		VMFree, MemFree
+
+PASS:		bx - handle of block being freed
+
+RETURN:		nothing
+
+DESTROYED:	ds, es, fs, gs - nulled if == ax
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	dhunter 12/20/00    	Initial version
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+SafeNullSegmentRegsFar	proc	far
+		call	SafeNullSegmentRegs
+		ret
+SafeNullSegmentRegsFar	endp	
+
+SafeNullSegmentRegs	proc	near
+		uses	ax, bx
+		.enter
+
+		INT_OFF			; ensure consistency
+		push	ds
+		LoadVarSeg	ds
+		mov	ax, ds:[bx].HM_addr
+		pop	ds
+
+		mov	bx, ds
+		cmp	ax, bx
+		jne	gotDS
+		clr	bx
+gotDS:
+		mov	ds, bx
+		mov	bx, es
+		cmp	ax, bx
+		jne	gotES
+		clr	bx
+gotES:
+		mov	es, bx
+		mov	bx, fs
+		cmp	ax, bx
+		jne	gotFS
+		clr	bx
+gotFS:
+		mov	fs, bx
+		mov	bx, gs
+		cmp	ax, bx
+		jne	gotGS
+		clr	bx
+gotGS:
+		mov	gs, bx
+
+		INT_ON
+		.leave
+		ret
+SafeNullSegmentRegs	endp
+endif

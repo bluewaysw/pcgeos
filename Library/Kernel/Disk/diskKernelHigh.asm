@@ -160,28 +160,7 @@ RETURN:		carry set if couldn't lock the disk in the drive (drive
 DESTROYED:	ax, bx, di
 
 PSEUDO CODE/STRATEGY:
-	12/27/00 ayuen: This routine used to grab/release DSE_lockSem around
-	calls to DR_FS_DISK_LOCK.  However, this could cause deadlock with
-	some DOS IFS drivers between DSE_lockSem and DDPD_aliasLock on a
-	one-floppy-drive machine in the following scenario:
-	- Thread 1 locks a disk in a floppy drive on a one-drive machine.  It
-	  grabs DSE_lockSem, calls DR_FS_DISK_LOCK which grabs DDPD_aliasLock,
-	  then releases DSE_lockSem.
-	- Thread 2 tries to lock the same disk.  It grabs DSE_lockSem, calls
-	  DR_FS_DISK_LOCK which tries to grab DDPD_aliasLock, and blocks.
-	- Thread 1 tries to lock the same disk a second time.  It tries to
-	  grab DSE_lockSem, and blocks.
-	- Deadlock.
-
-	Usually a thread doesn't lock the disk twice, but some VMem code
-	bypasses the file system and does this for optimization purpose.  (See
-	VMAddExtraDiskLock / VMReleaseExtraDiskLock.)
-
-	To solve this problem, this routine is changed such that it no longer
-	grabs/releases DSE_lockSem, and multiple threads can be calling
-	DR_FS_DISK_LOCK at the same time.  It is then up to the IFS driver to
-	decide whether or not, or when, to enforce mutual-exclusion within its
-	routine, optionally using DSE_lockSem.
+		
 
 KNOWN BUGS/SIDE EFFECTS/IDEAS:
 		
@@ -200,6 +179,12 @@ DiskLockCommon proc	far
 		mov	di, bp
 		mov	bp, es:[bp].DSE_fsd
 	;
+	; Gain exclusive access to the driver for this function call
+	; 
+		push	ax
+		PSem	es, [di].DSE_lockSem, TRASH_AX_BX
+		pop	ax
+	;
 	; If the disk is always valid, don't call the FSD.
 	; 
 		test	es:[si].DD_flags, mask DF_ALWAYS_VALID
@@ -212,15 +197,14 @@ DiskLockCommon proc	far
 		call	es:[bp].FSD_strategy
 		pop	bp			; es:bp - FSDriver
 		mov	di, es:[si].DD_drive
-		jc	exit
+		jc	releaseLock
 	;
 	; Record the disk just locked as the last disk known to be in the
 	; drive, storing the low word of the system counter as the last-access
 	; time. This will also be set when the drive is unlocked, but doing
-	; so allows another thread that was blocked on the DSE_lockSem (if
-	; the IFS driver enforces mutual-exclusion) to continue quickly
-	; without also checking the disk...
-	;
+	; so allows another thread that was blocked on the DSE_lockSem to
+	; continue quickly without also checking the disk...
+	; 
 setDisk:
 		mov	es:[di].DSE_lastDisk, si
 		
@@ -239,7 +223,8 @@ setDisk:
 		pop	ds
 
 		clc
-exit:
+releaseLock:
+		VSem	es, [di].DSE_lockSem, TRASH_AX_BX
 
 		.leave
 		ret

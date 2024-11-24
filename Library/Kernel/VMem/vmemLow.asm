@@ -102,10 +102,12 @@ REVISION HISTORY:
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
 VM_HANDLE_HIGH_WATER_MARK_	equ	250
+;VM_HANDLE_HIGH_WATER_MARK_	equ	500
 ; The maximum number of handles we want to allow in use by a VM file - this
 ; number could be increased
 
 VM_HANDLE_LOW_WATER_MARK_	equ	150
+;VM_HANDLE_LOW_WATER_MARK_	equ	400
 ; When the # handles in use passes VM_HANDLE_HIGH_WATER_MARK, we try to reduce
 ; it to VM_HANDLE_LOW_WATER_MARK.
 

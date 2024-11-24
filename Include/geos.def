@@ -126,10 +126,10 @@ DESCRIPTION:
 ------------------------------------------------------------------------------@
 
 ;-----------------------------------------------------------------------------
-;		Enable .186 Instructions
+;		Enable .386 Instructions
 ;-----------------------------------------------------------------------------
 
-.186
+.386
 
 ;-----------------------------------------------------------------------------
 ;		Access Control Support
@@ -724,6 +724,38 @@ DoPop	macro	ar1, ar2, ar3, ar4, ar5, ar6, ar7, ar8, ar9, ar10, ar11, ar12
 	pop	ar1
 	DoPop	ar2, ar3, ar4, ar5, ar6, ar7, ar8, ar9, ar10, ar11, ar12
     endif	
+endm
+
+
+
+COMMENT @----------------------------------------------------------------------
+
+	SafePop
+
+	FUNCTION:
+		pops the argument safe, so pops NULL if segment is invalid
+
+-------------------------------------------------------------------------------@
+SafePop	macro	ar1, ar2
+	local exists
+ifdef PRODUCT_GEOS32
+	pop		ar2
+ifdif <ar2>, <bx>
+	push	bx
+	mov		bx, ar2
+endif
+	call	GPMISelectorGetLimitFar
+	jnc		exists
+	clr		ar2
+exists:
+	
+ifdif <ar2>, <bx>
+	pop		bx
+endif
+	mov		ar1, ar2
+else
+	pop		ar1
+endif
 endm
 
 

@@ -46,6 +46,12 @@ sysSemaphoreFile	char	'GEOS_ACT.IVE',0
 ; Our drivers override these things, but the SysEnterInterrupt protects
 ; already-resident device drivers from context switching
 
+ifdef PRODUCT_GEOS32
+idata	ends
+
+IRQCode	segment resource
+endif
+
 SysInterruptHandler	macro	n
 
 Irq&n&Intercept		proc	far
@@ -62,7 +68,6 @@ if	CATCH_MISSED_COM1_INTERRUPTS
 		mov	cs:[IrqCountStart&n], ax
 		pop	ax
 endif
-
 if	n eq FIRST_IRQ_INTERCEPT_LEVEL
 Irq&n&OldVector	label	near
 endif
@@ -70,11 +75,22 @@ endif
 
 if	CATCH_MISSED_COM1_INTERRUPTS
 		push	ax
+ifndef PRODUCT_GEOS32
 		mov	ax, cs:[curStats].SS_interrupts
 		mov	cs:[IrqCountEnd&n], ax
 		pushf
 		pop	ax
 		mov	cs:[IrqFlags&n], ax
+else		
+		push	ds
+		mov	ds, idata
+		mov	ax, ds:[curStats].SS_interrupts
+		mov	ds:[IrqCountEnd&n], ax
+		pushf
+		pop	ax
+		mov	ds:[IrqFlags&n], ax
+		pop	ds
+endif
 		pop	ax
 		call	LookForMissedCom1Interrupt
 endif
@@ -116,17 +132,19 @@ else
 
 endif
 
-lastIntercept	word		; Last IRQ intercepted...
-
 __n	= FIRST_IRQ_INTERCEPT_LEVEL
 rept	(LAST_IRQ_INTERCEPT_LEVEL-FIRST_IRQ_INTERCEPT_LEVEL)+1
 	SysInterruptHandler	%__n
 __n	= __n + 1
 endm
 
-; Add special handler for Zoomer IRQ0 (Pen Digitizer Timer), as we can't
-; intercept IRQ1 (we'd loop endlessly).
+ifdef PRODUCT_GEOS32
+IRQCode	ends
 
+idata	segment
+endif
+
+lastIntercept	word		; Last IRQ intercepted...
 
 if	CATCH_MISSED_COM1_INTERRUPTS
 
