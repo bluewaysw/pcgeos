@@ -47,6 +47,8 @@
 
 
 #ifdef __GEOS__
+#include <geode.h>
+
 extern TEngine_Instance engineInstance;
 #endif  /* __GEOS__ */
 
@@ -55,8 +57,8 @@ extern TEngine_Instance engineInstance;
 #define TT_COMPONENT      trace_raster
 
 
-/* The default render pool size */
-#define  RASTER_RENDER_POOL   4096
+/* render pool size */
+#define  RASTER_RENDER_POOL_INITIAL    1
 
 
 #define Raster_Err_None              TT_Err_Ok
@@ -2444,14 +2446,10 @@ Scan_DropOuts :
     TT_Error  error;
 
 
-    //TEST
-    Lock_Render_Pool( RAS_VARS  glyph );
-
-
     if ( glyph->n_points == 0 || glyph->n_contours <= 0 )
       return TT_Err_Ok;
 
-    if ( !ras.buff )
+    if ( !ras.buffer )
     {
       ras.error = Raster_Err_Not_Ini;
       return ras.error;
@@ -2462,6 +2460,9 @@ Scan_DropOuts :
       ras.error = TT_Err_Too_Many_Points;
       return ras.error;
     }
+
+    /* lock renderpool cache */
+    Lock_Render_Pool( RAS_VARS  glyph );
 
     if ( target_map )
       ras.target = *target_map;
@@ -2493,7 +2494,7 @@ Scan_DropOuts :
     ras.bTarget = (Byte*)ras.target.bitmap;
 
     if ( (error = Render_Single_Pass( RAS_VARS 0 )) != 0 )
-      return error;
+      goto Fin;
 
     /* Horizontal Sweep */
 
@@ -2510,13 +2511,13 @@ Scan_DropOuts :
       ras.band_stack[0].y_max = ras.target.width - 1;
 
       if ( (error = Render_Single_Pass( RAS_VARS  1 )) != 0 )
-        return error;
+        goto Fin;
     }
 
-    //TEST
+    Fin:
     Unlock_Render_Pool( RAS_VAR );
 
-    return TT_Err_Ok;
+    return error;
   }
 
 
@@ -2541,13 +2542,14 @@ TT_Error  Render_Region_Glyph( RAS_ARGS TT_Outline*     glyph,
 {
   TT_Error  error;
 
+
   if ( glyph->n_points == 0 || glyph->n_contours <= 0 )
   {
     Render_Region_Empty_Glyph( raster );
     return TT_Err_Ok;
   }
 
-  if ( !ras.buff )
+  if ( !ras.buffer )
   {
     ras.error = Raster_Err_Not_Ini;
     return ras.error;
@@ -2558,6 +2560,8 @@ TT_Error  Render_Region_Glyph( RAS_ARGS TT_Outline*     glyph,
     ras.error = TT_Err_Too_Many_Points;
     return ras.error;
   }
+      /* lock renderpool cache */
+    Lock_Render_Pool( RAS_VARS  glyph );
 
   if ( map )
     ras.target = *map;
@@ -2590,9 +2594,12 @@ TT_Error  Render_Region_Glyph( RAS_ARGS TT_Outline*     glyph,
   ras.bTarget = (PByte)ras.target.bitmap;
 
   if ( (error = Render_Single_Pass( RAS_VARS 0 )) != 0 )
-    return error;
+    goto Fin;
 
   map->size = ras.target.size;
+
+  Fin:
+    Unlock_Render_Pool( RAS_VAR );
 
   return TT_Err_Ok;
 }
@@ -2615,18 +2622,20 @@ static void Render_Region_Empty_Glyph( RAS_ARG )
 
 static void Lock_Render_Pool( RAS_ARGS  TT_Outline*  glyph )
 {
-  if( !ras.buffer )
-    GEO_MEM_ALLOC( raster->buffer, RASTER_RENDER_POOL );
+  /* estimated size of the renderpool */
+  TT_UShort   renderpoolSize = ( glyph->y_ppem * 10 ) & ~15;
 
-  ras.buff = GEO_LOCK( ras.buffer );
-  ras.sizeBuff   = ras.buff + ( RASTER_RENDER_POOL/sizeof(long) );
-  
+
+  if( MemGetInfo( ras.buffer, MGIT_SIZE ) != renderpoolSize )
+    MemReAlloc( ras.buffer, renderpoolSize, HAF_NO_ERR );
+
+  ras.buff     = MemLock( ras.buffer );
+  ras.sizeBuff = ras.buff + ( renderpoolSize / sizeof(long) );
 }
 
 static void Unlock_Render_Pool( RAS_ARG )
 {
-  GEO_UNLOCK( ras.buffer );
-
+  MemUnlock( ras.buffer );
 }
 
 
@@ -2651,7 +2660,6 @@ static void Unlock_Render_Pool( RAS_ARG )
     if ( !ras )
       return TT_Err_Ok;
 
-    //FREE( ras->buff );
     GEO_FREE( ras->buffer);
 
 #ifndef TT_CONFIG_OPTION_STATIC_RASTER
@@ -2678,13 +2686,12 @@ static void Unlock_Render_Pool( RAS_ARG )
     ras = (TRaster_Instance*)engineInstance.raster_component;
 #endif
 
-  //  if ( ALLOC( ras->buff, RASTER_RENDER_POOL ) )
-  //     return error;
+    ras->buffer = MemAllocSetOwner( GeodeGetCodeProcessHandle(), 
+                      RASTER_RENDER_POOL_INITIAL,
+                      HF_DISCARDABLE | HF_DISCARDED | HF_SHARABLE | HF_SWAPABLE, 
+                      HAF_NO_ERR );
 
-  //  ras->sizeBuff   = ras->buff + ( RASTER_RENDER_POOL/sizeof(long) );
-    ras->buffer = NullHandle; //TEST
-
-    ras->dropOutControl = 2;
+    //ras->dropOutControl = 2;
     ras->error          = Raster_Err_None;
 
     return TT_Err_Ok;
