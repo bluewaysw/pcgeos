@@ -2085,7 +2085,7 @@ HandleResLoad(Rpc_Message   msg,    	    /* Message to which to reply */
      * loaded, even if we've never expressed interest in the handle)
      */
     if (HandleValid(hp)) {
-	hp->segment = (Address)(la->la_dataAddress << 4);
+	hp->segment = MakeAddress(la->la_dataAddress, 0);
 	hp->state |= HANDLE_IN;
 	hp->state &= ~HANDLE_DISCARDED;
 	
