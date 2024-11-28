@@ -58,7 +58,8 @@ extern TEngine_Instance engineInstance;
 
 
 /* render pool size */
-#define  RASTER_RENDER_POOL_INITIAL    1
+#define  RASTER_RENDER_POOL_INITIAL     1
+#define  RASTER_RENDER_POOL_SAFETY    256
 
 
 #define Raster_Err_None              TT_Err_Ok
@@ -253,8 +254,7 @@ extern TEngine_Instance engineInstance;
     Int       scale_shift;        /* == precision_shift   for bitmaps */
                                   /* == precision_shift+1 for pixmaps */
 
-    PStorage  buff;                 /* The profiles buffer          */
-    MemHandle buffer;
+    MemHandle buffer;               /* The profiles bufferblock     */
     PStorage  sizeBuff;             /* Render pool size             */
     PStorage  maxBuff;              /* Profiles buffer size         */
     PStorage  top;                  /* Current cursor in buffer     */
@@ -2384,7 +2384,7 @@ Scan_DropOuts :
       ras.maxY = (Long)ras.band_stack[ras.band_top].y_max * ras.precision;
       ras.minY = (Long)ras.band_stack[ras.band_top].y_min * ras.precision;
 
-      ras.top = ras.buff;
+      ras.top = MemDeref( ras.buffer );
 
       ras.error = Raster_Err_None;
 
@@ -2428,7 +2428,7 @@ Scan_DropOuts :
 
 /****************************************************************************/
 /*                                                                          */
-/* Function:    Render_Glyph                                                */
+/* Function:    Render_Bitmap_Glyph                                         */
 /*                                                                          */
 /* Description: Renders a glyph in a bitmap.  Sub-banding if needed.        */
 /*                                                                          */
@@ -2440,7 +2440,7 @@ Scan_DropOuts :
 /****************************************************************************/
 
   LOCAL_FUNC
-  TT_Error  Render_Glyph( RAS_ARGS TT_Outline*     glyph,
+  TT_Error  Render_Bitmap_Glyph( RAS_ARGS TT_Outline*     glyph,
                                    TT_Raster_Map*  target_map )
   {
     TT_Error  error;
@@ -2623,14 +2623,13 @@ static void Render_Region_Empty_Glyph( RAS_ARG )
 static void Lock_Render_Pool( RAS_ARGS  TT_Outline*  glyph )
 {
   /* estimated size of the renderpool */
-  TT_UShort   renderpoolSize = ( glyph->y_ppem * 10 ) & ~15;
+  TT_UShort   renderpoolSize = ( glyph->y_ppem * 12 + RASTER_RENDER_POOL_SAFETY ) & ~15;
 
 
   if( MemGetInfo( ras.buffer, MGIT_SIZE ) != renderpoolSize )
     MemReAlloc( ras.buffer, renderpoolSize, HAF_NO_ERR );
 
-  ras.buff     = MemLock( ras.buffer );
-  ras.sizeBuff = ras.buff + ( renderpoolSize / sizeof(long) );
+  ras.sizeBuff = (PStorage)MemLock( ras.buffer ) + ( renderpoolSize / sizeof(long) );
 }
 
 static void Unlock_Render_Pool( RAS_ARG )
@@ -2691,7 +2690,6 @@ static void Unlock_Render_Pool( RAS_ARG )
                       HF_DISCARDABLE | HF_DISCARDED | HF_SHARABLE | HF_SWAPABLE, 
                       HAF_NO_ERR );
 
-    //ras->dropOutControl = 2;
     ras->error          = Raster_Err_None;
 
     return TT_Err_Ok;
