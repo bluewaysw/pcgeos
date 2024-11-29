@@ -1497,7 +1497,7 @@ extern TEngine_Instance engineInstance;
                                              TT_F26Dot6  x1,
                                              TT_F26Dot6  x2 )
   {
-    Long   e1, e2;
+    Short  e1, e2;
     Short  c1, c2;
     Short  f1, f2;
     Byte*  target;
@@ -1679,7 +1679,7 @@ extern TEngine_Instance engineInstance;
                                                     TT_F26Dot6  x1,
                                                     TT_F26Dot6  x2 )
   {
-    Long    e1, e2;
+    Short   e1, e2;
     PShort  target;
 
 
@@ -2450,16 +2450,10 @@ Scan_DropOuts :
       return TT_Err_Ok;
 
     if ( !ras.buffer )
-    {
-      ras.error = Raster_Err_Not_Ini;
-      return ras.error;
-    }
+      return Raster_Err_Not_Ini;
 
     if ( glyph->n_points < glyph->contours[glyph->n_contours - 1] )
-    {
-      ras.error = TT_Err_Too_Many_Points;
-      return ras.error;
-    }
+      return TT_Err_Too_Many_Points;
 
     /* lock renderpool cache */
     Lock_Render_Pool( RAS_VARS  glyph );
@@ -2514,7 +2508,7 @@ Scan_DropOuts :
         goto Fin;
     }
 
-    Fin:
+  Fin:
     Unlock_Render_Pool( RAS_VAR );
 
     return error;
@@ -2550,18 +2544,10 @@ TT_Error  Render_Region_Glyph( RAS_ARGS TT_Outline*     glyph,
   }
 
   if ( !ras.buffer )
-  {
-    ras.error = Raster_Err_Not_Ini;
-    return ras.error;
-  }
+    return Raster_Err_Not_Ini;
 
   if ( glyph->n_points < glyph->contours[glyph->n_contours - 1] )
-  {
-    ras.error = TT_Err_Too_Many_Points;
-    return ras.error;
-  }
-      /* lock renderpool cache */
-    Lock_Render_Pool( RAS_VARS  glyph );
+    return TT_Err_Too_Many_Points;
 
   if ( map )
     ras.target = *map;
@@ -2593,15 +2579,19 @@ TT_Error  Render_Region_Glyph( RAS_ARGS TT_Outline*     glyph,
   ras.bWidth  = ras.target.cols;
   ras.bTarget = (PByte)ras.target.bitmap;
 
+
+  /* lock renderpool cache */
+  Lock_Render_Pool( RAS_VARS  glyph );
+
   if ( (error = Render_Single_Pass( RAS_VARS 0 )) != 0 )
     goto Fin;
 
   map->size = ras.target.size;
 
-  Fin:
-    Unlock_Render_Pool( RAS_VAR );
+Fin:
+  Unlock_Render_Pool( RAS_VAR );
 
-  return TT_Err_Ok;
+  return error;
 }
 
 
