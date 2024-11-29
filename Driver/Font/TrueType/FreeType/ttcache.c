@@ -25,6 +25,10 @@
 #include "ttcache.h"
 #include "ttobjs.h"
 
+#ifdef __GEOS__
+extern TEngine_Instance engineInstance;
+#endif  /* __GEOS__ */
+
 /* required by the tracing mode */
 #undef  TT_COMPONENT
 #define TT_COMPONENT  trace_cache
@@ -33,7 +37,7 @@
 
 /* The macro FREE_Elements aliases the current engine instance's */
 /* free list_elements recycle list.                              */
-#define FREE_Elements  ( engine->list_free_elements )
+#define FREE_Elements  ( engineInstance.list_free_elements )
 
 
 /*******************************************************************
@@ -50,7 +54,7 @@
  ******************************************************************/
 
   static
-  PList_Element  Element_New( PEngine_Instance  engine )
+  PList_Element  Element_New( )
   {
     PList_Element  element;
 
@@ -88,8 +92,7 @@
  ******************************************************************/
 
   static
-  void  Element_Done( PEngine_Instance  engine,
-                      PList_Element     element )
+  void  Element_Done( PList_Element     element )
   {
     /* Simply add the list element to the recycle list */
     element->next = (PList_Element)FREE_Elements;
@@ -116,11 +119,9 @@
  ******************************************************************/
 
   LOCAL_FUNC
-  TT_Error  Cache_Create( PEngine_Instance  engine,
-                          PCache_Class      clazz,
+  TT_Error  Cache_Create( PCache_Class      clazz,
                           TCache*           cache )
   {
-    cache->engine     = engine;
     cache->clazz      = clazz;
     cache->idle_count = 0;
 
@@ -173,7 +174,7 @@
 #endif  /* __GEOS__ */  
       FREE( current->data );
 
-      Element_Done( cache->engine, current );
+      Element_Done( current );
       current = next;
     }
     ZERO_List(cache->active);
@@ -190,7 +191,7 @@
 #endif
       FREE( current->data );
 
-      Element_Done( cache->engine, current );
+      Element_Done( current );
       current = next;
     }
     ZERO_List(cache->idle);
@@ -252,7 +253,7 @@
       if ( MEM_Alloc( object, cache->clazz->object_size ) )
         goto Memory_Fail;
 
-      current = Element_New( cache->engine );
+      current = Element_New( );
       if ( !current )
         goto Memory_Fail;
 
@@ -265,7 +266,7 @@
 #endif    /* __GEOS__ */
       if ( error )
       {
-        Element_Done( cache->engine, current );
+        Element_Done( current );
         goto Fail;
       }
     }
@@ -344,7 +345,7 @@
       cache->clazz->done( element->data );
 #endif  /* __GEOS__ */
       FREE( element->data );
-      Element_Done( cache->engine, element );
+      Element_Done( element );
     }
     else
     {
@@ -359,7 +360,7 @@
 
 
   LOCAL_FUNC
-  TT_Error  TTCache_Init( PEngine_Instance  engine )
+  TT_Error  TTCache_Init( )
   {
     /* Create list elements mutex */
     FREE_Elements = NULL;
@@ -368,7 +369,7 @@
 
 
   LOCAL_FUNC
-  TT_Error  TTCache_Done( PEngine_Instance  engine )
+  TT_Error  TTCache_Done( )
   {
     /* We don't protect this function, as this is the end of the engine's */
     /* execution..                                                        */

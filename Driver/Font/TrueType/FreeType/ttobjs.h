@@ -315,6 +315,8 @@
 
 #endif
 
+#define CALL_INTERPRETER  ( engineInstance.interpreterActive ? RunIns( exec ) : TT_Err_Ok )
+
   /* Rounding function, as used by the interpreter */
   typedef TT_F26Dot6  TRound_Function( EXEC_OPS TT_F26Dot6 distance,
                                                 TT_F26Dot6 compensation );
@@ -474,9 +476,6 @@
 
   struct  TFace_
   {
-    /* parent engine instance for the face object */
-    PEngine_Instance  engine;
-
     /* i/o stream */
     TT_Stream  stream;
 
@@ -745,7 +744,6 @@
   struct  TFont_Input_
   {
     TT_Stream         stream;     /* input stream                */
-    PEngine_Instance  engine;     /* parent engine instance      */
   };
 
   typedef struct TFont_Input_  TFont_Input;
@@ -813,8 +811,8 @@
   /*                                                                  */
   /********************************************************************/
 
-  LOCAL_DEF TT_Error  TTObjs_Init( PEngine_Instance  engine );
-  LOCAL_DEF TT_Error  TTObjs_Done( PEngine_Instance  engine );
+  LOCAL_DEF TT_Error  TTObjs_Init( );
+  LOCAL_DEF TT_Error  TTObjs_Done( );
 
 #ifdef __cplusplus
   }

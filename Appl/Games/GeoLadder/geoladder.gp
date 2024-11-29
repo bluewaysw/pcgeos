@@ -52,9 +52,11 @@ library sound
 resource APPLICATION ui-object
 resource INTERFACE ui-object
 resource ICON ui-object read-only shared
+resource SOUND object
 resource GAME lmem
 resource SONG_DONE lmem
 resource SONG_HIGH lmem
+resource SONG_MENU lmem
 resource TEXT lmem
 
 export LadderApplicationClass

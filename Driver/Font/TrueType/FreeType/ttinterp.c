@@ -3921,19 +3921,7 @@
     if ( (args[0] & 0x100) != 0 && CUR.metrics.pointSize <= A )
       CUR.GS.scan_control = TRUE;
 
-    if ( (args[0] & 0x200) != 0 && FALSE ) //rotated
-      CUR.GS.scan_control = TRUE;
-
-    if ( (args[0] & 0x400) != 0 && FALSE ) //stetched
-      CUR.GS.scan_control = TRUE;
-
     if ( (args[0] & 0x800) != 0 && CUR.metrics.pointSize > A )
-      CUR.GS.scan_control = FALSE;
-
-    if ( (args[0] & 0x1000) != 0 && FALSE ) //rotated
-      CUR.GS.scan_control = FALSE;
-
-    if ( (args[0] & 0x2000) != 0 && FALSE ) //stretched
       CUR.GS.scan_control = FALSE;
 }
 
@@ -6059,10 +6047,6 @@
 
         case 0x42:  /* WS */
           DO_WS
-          break;
-
-    Set_Invalid_Ref:
-          CUR.error = TT_Err_Invalid_Reference;
           break;
 
         case 0x43:  /* RS */
