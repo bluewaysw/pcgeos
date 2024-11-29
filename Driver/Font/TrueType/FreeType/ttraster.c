@@ -1344,7 +1344,7 @@ extern TEngine_Instance engineInstance;
 /************************************************/
 
   static void _near  InsNew( PProfileList  list,
-                       PProfile      profile )
+                             PProfile      profile )
   {
     PProfile  *old, current;
     Long       x;
@@ -1376,7 +1376,7 @@ extern TEngine_Instance engineInstance;
 /*************************************************/
 
   static void _near  DelOld( PProfileList  list,
-                       PProfile      profile )
+                             PProfile      profile )
   {
     PProfile  *old, current;
 
@@ -2441,16 +2441,15 @@ Scan_DropOuts :
 
   LOCAL_FUNC
   TT_Error  Render_Bitmap_Glyph( RAS_ARGS TT_Outline*     glyph,
-                                   TT_Raster_Map*  target_map )
+                                          TT_Raster_Map*  target_map )
   {
     TT_Error  error;
 
 
+EC(   ECCheckMemHandle( ras.buffer ) );
+
     if ( glyph->n_points == 0 || glyph->n_contours <= 0 )
       return TT_Err_Ok;
-
-    if ( !ras.buffer )
-      return Raster_Err_Not_Ini;
 
     if ( glyph->n_points < glyph->contours[glyph->n_contours - 1] )
       return TT_Err_Too_Many_Points;
@@ -2537,14 +2536,13 @@ TT_Error  Render_Region_Glyph( RAS_ARGS TT_Outline*     glyph,
   TT_Error  error;
 
 
+EC( ECCheckMemHandle( ras.buffer ) );
+
   if ( glyph->n_points == 0 || glyph->n_contours <= 0 )
   {
     Render_Region_Empty_Glyph( raster );
     return TT_Err_Ok;
   }
-
-  if ( !ras.buffer )
-    return Raster_Err_Not_Ini;
 
   if ( glyph->n_points < glyph->contours[glyph->n_contours - 1] )
     return TT_Err_Too_Many_Points;
