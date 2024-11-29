@@ -87,7 +87,7 @@ vidTestRoutines	label	nptr
 
 	; this table holds the offsets to the test routines for the devices
 vidSetRoutines	label	nptr
-		nptr	offset VidSetVGA		; VD_VGA
+		nptr	offset VidSetDefaultPalette	; VD_VGA
 		nptr	offset VidSet16GrayScale	; VD_VGA_16_GRAY
 		nptr	offset VidSet8GrayScale		; VD_VGA_8_GRAY
 		nptr	offset VidSet4GrayScale		; VD_VGA_4_GRAY
