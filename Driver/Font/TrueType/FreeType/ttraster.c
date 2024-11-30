@@ -45,6 +45,11 @@
 
 #include "ttmemory.h"    /* only used to allocate memory on engine init */
 
+
+#ifdef __GEOS__
+extern TEngine_Instance engineInstance;
+#endif  /* __GEOS__ */
+
 /* required by the tracing mode */
 #undef  TT_COMPONENT
 #define TT_COMPONENT      trace_raster
@@ -2613,9 +2618,9 @@ static void Render_Region_Empty_Glyph( RAS_ARG )
 #undef ras
 
   LOCAL_FUNC
-  TT_Error  TTRaster_Done( PEngine_Instance  engine )
+  TT_Error  TTRaster_Done( )
   {
-    TRaster_Instance*  ras = (TRaster_Instance*)engine->raster_component;
+    TRaster_Instance*  ras = (TRaster_Instance*)engineInstance.raster_component;
 
 
     if ( !ras )
@@ -2624,7 +2629,7 @@ static void Render_Region_Empty_Glyph( RAS_ARG )
     FREE( ras->buff );
 
 #ifndef TT_CONFIG_OPTION_STATIC_RASTER
-    FREE( engine->raster_component );
+    FREE( engineInstance.raster_component );
 #endif
 
     return TT_Err_Ok;
@@ -2632,19 +2637,19 @@ static void Render_Region_Empty_Glyph( RAS_ARG )
 
 
   LOCAL_FUNC
-  TT_Error  TTRaster_Init( PEngine_Instance  engine )
+  TT_Error  TTRaster_Init( )
   {
     TT_Error           error;
     TRaster_Instance*  ras;
 
 
 #ifdef TT_CONFIG_OPTION_STATIC_RASTER
-    ras = engine->raster_component = &cur_ras;
+    ras = engineInstance.raster_component = &cur_ras;
 #else
-    if ( ALLOC( engine->raster_component, sizeof ( TRaster_Instance ) ) )
+    if ( ALLOC( engineInstance.raster_component, sizeof ( TRaster_Instance ) ) )
       return error;
 
-    ras = (TRaster_Instance*)engine->raster_component;
+    ras = (TRaster_Instance*)engineInstance.raster_component;
 #endif
 
     if ( ALLOC( ras->buff, RASTER_RENDER_POOL ) )

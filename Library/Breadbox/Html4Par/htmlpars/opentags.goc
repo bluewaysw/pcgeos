@@ -1580,25 +1580,18 @@ void _pascal Open_META(TagOpenArguments *arg)
 {
     char *p;
     HTMLmetaData meta;
-@ifdef DO_DBCS
     Boolean contentType = FALSE;
-@endif
 
     meta.HMD_flags = 0;
 
     p = GetParamValue(arg->paramArray, "HTTP-EQUIV");
     if(!p || !*p)
       p = GetParamValue(arg->paramArray, "NAME");
-    else
-@ifdef DO_DBCS
-      {
-        /* check charset */
-        contentType = !strncmpisb(p, "content-type", 0);
-        meta.HMD_flags |= HTML_META_FLAGS_HTTP_EQUIV;
-      }
-@else
+    else {
+      /* check charset */
+      contentType = !STRNCMPISB(p, "content-type", 0);
       meta.HMD_flags |= HTML_META_FLAGS_HTTP_EQUIV;
-@endif
+    }
 
     if(p && *p)
       meta.HMD_name = NamePoolTokenizeDOS(NamePool, p, FALSE);
@@ -1606,65 +1599,31 @@ void _pascal Open_META(TagOpenArguments *arg)
       meta.HMD_name = NAME_POOL_NONE;
 
     p = GetParamValue(arg->paramArray, "CONTENT");
-    if(p && *p)
-@ifdef DO_DBCS
-      {
-        meta.HMD_content = NamePoolTokenizeDOS(NamePool, p, FALSE);
-	/* handle charset */
-	if (contentType) {
-	  struprsb(p);  /* okay to modify param array element */
-	  p = strstrsbcs(p, "CHARSET=");
-	  if (p) {
-	    int i, j;
-	    char buf[15];
-	    TCHAR id[20];
-	    char *idCP;
-	    TCHAR *idTP;
-	    DosCodePage cp;
-	    word size;
-	    Boolean found = FALSE;
-            extern DosCodePage G_htmlCodePage;
-	    extern void ApplyFontWeightWidthAndSpacingAdjustment(VisTextCharAttr *p_cs, Boolean useCodePage);
-
-	    p+= 8;  /* skip CHARSET= */
-	    /* this should only happen once per page, so we'll just read
-	       the .ini file directly (instead of buffering .ini data) */
-	    for (i = 0; i < NUM_CODE_PAGE_FONT_ADJ_ENTRIES; i++) {
-	      sprintfsbcs(buf, "cp-%d", i);
-	      if (!InitFileReadInteger("HTMLView", buf, (word*)&cp)) {
-		sprintfsbcs(buf, "cp%uid", cp);
-		j = 0;
-		while (!InitFileReadStringSectionBuffer("HTMLView", buf,
-							j++, (char*)id,
-							sizeof(id)/sizeof(TCHAR),
-							&size)) {
-		  /* convert ASCII-only id string to single-byte */
-		  idTP = id; idCP = (char *)id;
-		  while(*idTP) *idCP++ = *idTP++; *idCP = 0;
-		  if (!strncmpisb(p, (char*)id, 0)) {
-		    /* set new code page */
-		    HTMLext->HE_codePage = cp;
-		    G_htmlCodePage = cp;
-		    /* update base font */
-		    ApplyFontWeightWidthAndSpacingAdjustment(&vcaBase, TRUE);
-		    found = TRUE;
-		    break;
-		  }
-		}
-	      }
-	      if (found) break;
-	    }
-	  }
+    if(p && *p) {
+      meta.HMD_content = NamePoolTokenizeDOS(NamePool, p, FALSE);
+      /* handle charset in content-type directly */
+      if (contentType) {
+	STRUPRSB(p);  			/* okay to modify param array element */
+	p = strstr(p, "CHARSET=");
+	if (p) {
+	  p += 8;  			/* skip CHARSET= */
+	  SetDocumentCharset(p);
 	}
       }
-@else
-      meta.HMD_content = NamePoolTokenizeDOS(NamePool, p, FALSE);
-@endif
+    }
     else
       meta.HMD_content = NAME_POOL_NONE;
 
-    ModifyHypertextArray(HTA_META_ARRAY, &meta, sizeof(HTMLmetaData),
-      CA_NULL_ELEMENT);             /* append element */
+    p = GetParamValue(arg->paramArray, "CHARSET");
+    if(p && *p) {
+      STRUPRSB(p); 			/* okay to modify param array element */
+      SetDocumentCharset(p);
+    }
+
+    if(meta.HMD_name != NAME_POOL_NONE) {
+      ModifyHypertextArray(HTA_META_ARRAY, &meta, sizeof(HTMLmetaData),
+        CA_NULL_ELEMENT);               /* append element */
+    }
 }
 
 void _pascal Open_OL(TagOpenArguments *arg)
