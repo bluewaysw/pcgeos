@@ -99,6 +99,10 @@ extern TEngine_Instance engineInstance;
 #endif
 
 
+#define LOCK_RENDER_POOL    Lock_Render_Pool( RAS_VARS  glyph )
+#define UNLOCK_RENDER_POOL  MemUnlock( ras.buffer )
+
+
 /* The rasterizer is a very general purpose component, please leave */
 /* the following redefinitions there (you never know your target    */
 /* environment).                                                    */
@@ -486,8 +490,7 @@ extern TEngine_Instance engineInstance;
 /*                                                                          */
 /****************************************************************************/
 
-  static
-  Bool Insert_Y_Turn( RAS_ARGS  Int  y )
+  static Bool _near  Insert_Y_Turn( RAS_ARGS  Int  y )
   {
     PStorage  y_turns;
     Int       y2, n;
@@ -537,8 +540,7 @@ extern TEngine_Instance engineInstance;
 /*                                                                          */
 /****************************************************************************/
 
-  static
-  Bool Finalize_Profile_Table( RAS_ARG )
+  static Bool _near  Finalize_Profile_Table( RAS_ARG )
   {
     Int       bottom, top;
     UShort    n;
@@ -1140,8 +1142,8 @@ extern TEngine_Instance engineInstance;
 #define SWAP_(x,y)  { Long swap = x; x = y; y = swap; }
 
   static Bool _near  Decompose_Curve( RAS_ARGS UShort  first,
-                                         UShort  last,
-                                         Bool    flipped )
+                                               UShort  last,
+                                               Bool    flipped )
   {
     Long   x,  y;   /* current point                */
     Long   cx, cy;  /* current Bezier control point */
@@ -1346,24 +1348,17 @@ extern TEngine_Instance engineInstance;
   static void _near  InsNew( PProfileList  list,
                              PProfile      profile )
   {
-    PProfile  *old, current;
-    Long       x;
+    PProfile* insert_point = list;
+    PProfile current = *insert_point;
 
 
-    old     = list;
-    current = *old;
-    x       = profile->X;
-
-    while ( current )
-    {
-      if ( x < current->X )
-        break;
-      old     = &current->link;
-      current = *old;
+    while (current && current->X < profile->X) {
+        insert_point = &current->link;
+        current = *insert_point;
     }
 
     profile->link = current;
-    *old          = profile;
+    *insert_point = profile;
   }
 
 
@@ -1378,22 +1373,18 @@ extern TEngine_Instance engineInstance;
   static void _near  DelOld( PProfileList  list,
                              PProfile      profile )
   {
-    PProfile  *old, current;
+    PProfile* previous = list;
+    PProfile current = *previous;
 
 
-    old     = list;
-    current = *old;
+    while (current) {
+        if (current == profile) {
+            *previous = current->link;
+            return;
+        }
 
-    while ( current )
-    {
-      if ( current == profile )
-      {
-        *old = current->link;
-        return;
-      }
-
-      old     = &current->link;
-      current = *old;
+        previous = &current->link;
+        current = *previous;
     }
 
     /* we should never get there, unless the Profile was not part of */
@@ -1411,15 +1402,11 @@ extern TEngine_Instance engineInstance;
 
   static void _near  Update( PProfile  first )
   {
-    PProfile  current = first;
-
-
-    while ( current )
-    {
-      current->X       = *current->offset;
-      current->offset += current->flow;
-      current->height--;
-      current = current->link;
+    while (first) {
+        first->X = *first->offset;
+        first->offset += first->flow;
+        first->height--;
+        first = first->link;
     }
   }
 
@@ -1494,8 +1481,8 @@ extern TEngine_Instance engineInstance;
 
 
   static void _near  Vertical_Sweep_Span( RAS_ARGS Short       y,
-                                             TT_F26Dot6  x1,
-                                             TT_F26Dot6  x2 )
+                                                   TT_F26Dot6  x1,
+                                                   TT_F26Dot6  x2 )
   {
     Short  e1, e2;
     Short  c1, c2;
@@ -1541,10 +1528,10 @@ extern TEngine_Instance engineInstance;
 
 
   static void _near  Vertical_Sweep_Drop( RAS_ARGS Short       y,
-                                             TT_F26Dot6  x1,
-                                             TT_F26Dot6  x2,
-                                             PProfile    left,
-                                             PProfile    right )
+                                                   TT_F26Dot6  x1,
+                                                   TT_F26Dot6  x2,
+                                                   PProfile    left,
+                                                   PProfile    right )
   {
     Long   e1, e2;
     Short  c1, f1;
@@ -1676,8 +1663,8 @@ extern TEngine_Instance engineInstance;
   }
 
   static void _near  Vertical_Region_Sweep_Span( RAS_ARGS Short       y,
-                                                    TT_F26Dot6  x1,
-                                                    TT_F26Dot6  x2 )
+                                                          TT_F26Dot6  x1,
+                                                          TT_F26Dot6  x2 )
   {
     Short   e1, e2;
     PShort  target;
@@ -1708,10 +1695,10 @@ extern TEngine_Instance engineInstance;
   }
 
   static void _near  Vertical_Region_Sweep_Drop( RAS_ARGS Short       y,
-                                                    TT_F26Dot6  x1,
-                                                    TT_F26Dot6  x2,
-                                                    PProfile    left,
-                                                    PProfile    right )
+                                                          TT_F26Dot6  x1,
+                                                          TT_F26Dot6  x2,
+                                                          PProfile    left,
+                                                          PProfile    right )
   {
     /* nothing to do */
   } 
@@ -1787,8 +1774,8 @@ extern TEngine_Instance engineInstance;
 
 
   static void _near  Horizontal_Sweep_Span( RAS_ARGS Short y,
-                                               TT_F26Dot6  x1,
-                                               TT_F26Dot6  x2 )
+                                                     TT_F26Dot6  x1,
+                                                     TT_F26Dot6  x2 )
   {
     Long  e1, e2;
     PByte bits;
@@ -1816,10 +1803,10 @@ extern TEngine_Instance engineInstance;
 
 
   static void _near  Horizontal_Sweep_Drop( RAS_ARGS Short y,
-                                               TT_F26Dot6  x1,
-                                               TT_F26Dot6  x2,
-                                               PProfile    left,
-                                               PProfile    right )
+                                                     TT_F26Dot6  x1,
+                                                     TT_F26Dot6  x2,
+                                                     PProfile    left,
+                                                     PProfile    right )
   {
     Long  e1 = CEILING( x1 );
     Long  e2 = FLOOR  ( x2 );
@@ -2446,7 +2433,7 @@ Scan_DropOuts :
     TT_Error  error;
 
 
-EC(   ECCheckMemHandle( ras.buffer ) );
+EC( ECCheckMemHandle( ras.buffer ) );
 
     if ( glyph->n_points == 0 || glyph->n_contours <= 0 )
       return TT_Err_Ok;
@@ -2455,7 +2442,7 @@ EC(   ECCheckMemHandle( ras.buffer ) );
       return TT_Err_Too_Many_Points;
 
     /* lock renderpool cache */
-    Lock_Render_Pool( RAS_VARS  glyph );
+    LOCK_RENDER_POOL;
 
     if ( target_map )
       ras.target = *target_map;
@@ -2508,8 +2495,7 @@ EC(   ECCheckMemHandle( ras.buffer ) );
     }
 
   Fin:
-    Unlock_Render_Pool( RAS_VAR );
-
+    UNLOCK_RENDER_POOL;
     return error;
   }
 
@@ -2529,81 +2515,71 @@ EC(   ECCheckMemHandle( ras.buffer ) );
 /*                                                                          */
 /****************************************************************************/
 
-LOCAL_FUNC
-TT_Error  Render_Region_Glyph( RAS_ARGS TT_Outline*     glyph,
+  LOCAL_FUNC
+  TT_Error  Render_Region_Glyph( RAS_ARGS TT_Outline*     glyph,
                                         TT_Raster_Map*  map )
-{
-  TT_Error  error;
+  {
+    TT_Error  error;
 
 
 EC( ECCheckMemHandle( ras.buffer ) );
 
-  if ( glyph->n_points == 0 || glyph->n_contours <= 0 )
-  {
-    Render_Region_Empty_Glyph( raster );
-    return TT_Err_Ok;
-  }
+    if ( glyph->n_points == 0 || glyph->n_contours <= 0 )
+    {
+      /* render empty glyph */
+      ((Short*)(ras).bTarget)[0] = (Short)EOREGREC;
+      ((Short*)(ras).bTarget)[1] = (Short)EOREGREC;
+      (ras).target.size = 2 * sizeof(Short); 
 
-  if ( glyph->n_points < glyph->contours[glyph->n_contours - 1] )
-    return TT_Err_Too_Many_Points;
+      return TT_Err_Ok;
+    }
 
-  if ( map )
-    ras.target = *map;
+    if ( glyph->n_points < glyph->contours[glyph->n_contours - 1] )
+      return TT_Err_Too_Many_Points;
 
-  ras.outs      = glyph->contours;
-  ras.flags     = glyph->flags;
-  ras.nPoints   = glyph->n_points;
-  ras.nContours = glyph->n_contours;
-  ras.coords    = glyph->points;
+    if ( map )
+      ras.target = *map;
 
-  Set_Resolution( RAS_VARS glyph->y_ppem );
-  ras.scale_shift    = ras.precision_shift;
-  ras.dropOutControl = glyph->dropout_mode;
-  ras.second_pass    = glyph->second_pass;
+    ras.outs      = glyph->contours;
+    ras.flags     = glyph->flags;
+    ras.nPoints   = glyph->n_points;
+    ras.nContours = glyph->n_contours;
+    ras.coords    = glyph->points;
 
-  /* Vertical Sweep */
+    Set_Resolution( RAS_VARS glyph->y_ppem );
+    ras.scale_shift    = ras.precision_shift;
+    ras.dropOutControl = glyph->dropout_mode;
+    ras.second_pass    = glyph->second_pass;
+
+    /* Vertical Sweep */
   
-  ras.Proc_Sweep_Init   = Vertical_Region_Sweep_Init;
-  ras.Proc_Sweep_Span   = Vertical_Region_Sweep_Span;
-  ras.Proc_Sweep_Drop   = Vertical_Region_Sweep_Drop;
-  ras.Proc_Sweep_Step   = Vertical_Region_Sweep_Step;
-  ras.Proc_Sweep_Finish = Vertical_Region_Sweep_Finish;
+    ras.Proc_Sweep_Init   = Vertical_Region_Sweep_Init;
+    ras.Proc_Sweep_Span   = Vertical_Region_Sweep_Span;
+    ras.Proc_Sweep_Drop   = Vertical_Region_Sweep_Drop;
+    ras.Proc_Sweep_Step   = Vertical_Region_Sweep_Step;
+    ras.Proc_Sweep_Finish = Vertical_Region_Sweep_Finish;
 
 
-  ras.band_top            = 0;
-  ras.band_stack[0].y_min = 0;
-  ras.band_stack[0].y_max = ras.target.rows - 1;
+    ras.band_top            = 0;
+    ras.band_stack[0].y_min = 0;
+    ras.band_stack[0].y_max = ras.target.rows - 1;
 
-  ras.bWidth  = ras.target.cols;
-  ras.bTarget = (PByte)ras.target.bitmap;
-
-
-  /* lock renderpool cache */
-  Lock_Render_Pool( RAS_VARS  glyph );
-
-  if ( (error = Render_Single_Pass( RAS_VARS 0 )) != 0 )
-    goto Fin;
-
-  map->size = ras.target.size;
-
-Fin:
-  Unlock_Render_Pool( RAS_VAR );
-
-  return error;
-}
+    ras.bWidth  = ras.target.cols;
+    ras.bTarget = (PByte)ras.target.bitmap;
 
 
-static void Render_Region_Empty_Glyph( RAS_ARG )
-{
-    PShort  target = (PShort)ras.bTarget;
+    /* lock renderpool cache */
+    LOCK_RENDER_POOL;
 
+    if ( (error = Render_Single_Pass( RAS_VARS 0 )) != 0 )
+      goto Fin;
 
-    /* complete a region */
+    map->size = ras.target.size;
 
-    target[0] = (Short)EOREGREC;
-    target[1] = (Short)EOREGREC;
-    ras.target.size = 2 * sizeof( Short );
-}
+  Fin:
+    UNLOCK_RENDER_POOL;
+    return error;
+  }
 
 #endif  /* __GEOS__ */
 
@@ -2618,11 +2594,6 @@ static void Lock_Render_Pool( RAS_ARGS  TT_Outline*  glyph )
     MemReAlloc( ras.buffer, renderpoolSize, HAF_NO_ERR );
 
   ras.sizeBuff = (PStorage)MemLock( ras.buffer ) + ( renderpoolSize / sizeof(long) );
-}
-
-static void Unlock_Render_Pool( RAS_ARG )
-{
-  MemUnlock( ras.buffer );
 }
 
 
