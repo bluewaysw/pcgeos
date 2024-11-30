@@ -39,6 +39,7 @@
   extern "C" {
 #endif
 
+#ifndef __GEOS__
   /* Initialize file component */
   LOCAL_DEF
   TT_Error  TTFile_Init( PEngine_Instance  engine );
@@ -46,7 +47,7 @@
   /* Done with file component */
   LOCAL_DEF
   TT_Error  TTFile_Done( PEngine_Instance  engine );
-
+#endif
 
   /**********************************************************************/
   /*                                                                    */
@@ -129,7 +130,7 @@
 
   EXPORT_DEF
   TT_Error  TT_Read_File( STREAM_ARGS void*   buffer,
-                                      Long    count );
+                                      Short   count );
 
 
   /* Seek file cursor to a given position */
@@ -149,7 +150,7 @@
   EXPORT_DEF
   TT_Error  TT_Read_At_File( STREAM_ARGS Long   position,
                                          void*  buffer,
-                                         Long   count );
+                                         Short  count );
 
   /* Return current file position */
 
@@ -177,7 +178,7 @@
   {
     Byte*  address;  /* frame buffer                     */
     Byte*  cursor;   /* current cursor position in frame */
-    Long   size;     /* frame size                       */
+    Short  size;     /* frame size                       */
   };
 
   typedef struct TFileFrame_  TFileFrame;
@@ -223,7 +224,7 @@
   /* Fails if all bytes cannot be read/accessed.         */
 
   EXPORT_DEF
-  TT_Error  TT_Access_Frame( STREAM_ARGS FRAME_ARGS Long  size );
+  TT_Error  TT_Access_Frame( STREAM_ARGS FRAME_ARGS Short  size );
 
 
   /* Access the bytes located in the next 'size' bytes of the file. */
@@ -231,7 +232,7 @@
   /* at the end of the file).                                       */
 
   EXPORT_DEF
-  TT_Error  TT_Check_And_Access_Frame( STREAM_ARGS FRAME_ARGS Long  size );
+  TT_Error  TT_Check_And_Access_Frame( STREAM_ARGS FRAME_ARGS Short  size );
 
   /* Forget frame */
 

@@ -315,6 +315,18 @@ VidSetVGAII		proc	near	uses	dx
 	ret
 VidSetVGAII		endp
 
+VidSetDefaultPalette	proc	near	uses	dx
+	.enter
+	call	VidSetVGA
+
+;	Now, set the palette appropriately
+
+	mov	dx, offset defVGAPalette
+	call	SetPalette
+	.leave
+	ret
+VidSetDefaultPalette	endp
+
 
 COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 		SetPalette
@@ -431,5 +443,23 @@ PaletteVGAII	byte	00, 00, 00	; entry 0 -- black
 		byte	63, 21, 63
 		byte	63, 63, 21
 		byte	63, 63, 63	; entry 15 -- white
+
+defVGAPalette	label	byte
+		byte	0x00, 0x00, 0x00
+		byte	0x00, 0x00, 0x2a
+		byte	0x00, 0x2a, 0x00
+		byte	0x00, 0x2a, 0x2a
+		byte	0x2a, 0x00, 0x00
+		byte	0x2a, 0x00, 0x2a
+		byte	0x2a, 0x15, 0x00
+		byte	0x2a, 0x2a, 0x2a
+		byte	0x15, 0x15, 0x15
+		byte	0x15, 0x15, 0x3f
+		byte	0x15, 0x3f, 0x15
+		byte	0x15, 0x3f, 0x3f
+		byte	0x3f, 0x15, 0x15
+		byte	0x3f, 0x15, 0x3f
+		byte	0x3f, 0x3f, 0x15
+		byte	0x3f, 0x3f, 0x3f
 
 VideoMisc	ends

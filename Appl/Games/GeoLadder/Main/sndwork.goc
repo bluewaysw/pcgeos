@@ -1,0 +1,659 @@
+/*
+ ***************************************************************************
+ * Copyright 2024 Andreas Bollhalder
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ ***************************************************************************
+ */
+
+
+/*
+ ***************************************************************************
+ * Copyright (c) 2010-2024 by YoYu-Productions
+ *
+ * PROJECT:     GeoLadder
+ * MODULE:      GOC code file
+ * FILE:        Main\sndwork.goc
+ *
+ * AUTHOR:      Andreas Bollhalder
+ ***************************************************************************
+ */
+
+
+/*
+ ***************************************************************************
+ *                  COMPILER SWITCHES
+ ***************************************************************************
+ */
+
+#pragma disable_message(303)
+
+
+/*
+ ***************************************************************************
+ *                  INCLUDE FILES
+ ***************************************************************************
+ */
+
+@include <stdapp.goh>
+
+#include <sound.h>
+
+@include <Main/sndwork.goh>
+
+
+/*
+ ***************************************************************************
+ *                  DEFINITIONS
+ ***************************************************************************
+ */
+
+#define SW_NOISE_VOICE_STATE_NULL     0
+#define SW_NOISE_VOICE_STATE_FREE     1
+#define SW_NOISE_VOICE_STATE_ADDED    2
+#define SW_NOISE_VOICE_STATE_PLAYING  3
+
+
+#define SW_NOISE_NUM_NOISES          12
+
+
+/*
+ ***************************************************************************
+ *                  LOCAL DECLARATIONS
+ ***************************************************************************
+ */
+
+static const SWNoise SW_NOISES[] =
+{
+  { IP_OPEN_CUICA,     MIDDLE_C,    DYNAMIC_FFF, 1, 30 },  // Menu sound noise
+  { IP_HI_MID_TOM,     MIDDLE_F,    DYNAMIC_FFF, 1, 24 },  // Menu difficulty
+  { IP_LOW_BONGO,      MIDDLE_E,    DYNAMIC_FFF, 1, 21 },  // Play get ready
+  { IP_LOW_BONGO,      MIDDLE_G_SH, DYNAMIC_FFF, 1, 21 },  // Play ready go
+  { IP_RIDE_BELL,      MIDDLE_C,    DYNAMIC_FFF, 2, 57 },  // Play earn gold statue
+  { IP_MUTE_CUICA,     MIDDLE_C,    DYNAMIC_FFF, 3, 24 },  // Play jump over Der
+  { IP_HIGH_AGOGO,     LOW_F_SH,    DYNAMIC_FFF, 1, 36 },  // Play last seconds
+  { IP_BASS_DRUM_1,    LOW_C / 2,   DYNAMIC_FFF, 4, 78 },  // Play Der release
+  { IP_SIDE_STICK,     MIDDLE_G_SH, DYNAMIC_FFF, 5, 21 },  // Play Der recycle
+  { IP_VIBRASLAP,      MIDDLE_C,    DYNAMIC_FFF, 3, 75 },  // Play Lad hooka
+  { IP_ELECTRIC_SNARE, MIDDLE_C,    DYNAMIC_FFF, 1, 30 },  // Play Lad dies
+  { IP_RIDE_BELL,      MIDDLE_C,    DYNAMIC_FFF, 2, 57 }   // Play Lad new -> XXX: still to be found...
+};
+
+
+/*
+ ***************************************************************************
+ *                  RESOURCE Sound
+ ***************************************************************************
+ */
+
+@start SOUND;
+
+@object SoundWorkerClass SoundWorker = {
+}
+
+@end SOUND;
+
+
+/*
+ ***************************************************************************
+ *                  CODE for SoundWorkerClass
+ ***************************************************************************
+ */
+
+@classdecl SoundWorkerClass;
+
+/***********************************************************************
+ *                  MSG_META_INITIALIZE
+ *                  for SoundWorkerClass
+ ***********************************************************************
+ * SYNOPSIS:        Initialize the SoundWorker object.
+ * CALLED BY:       Internal
+ * PARAMETERS:      void ( void )
+ * RETURN:          nothing
+ * SIDE EFFECTS:    none
+ *
+ * STRATEGY:        1/ Call super for default actions.
+ *                  2/ Get the available number of voices from the sound
+ *                     synth driver.
+ *                  3/ Store the number of synth voices in the instance
+ *                     variable.
+ *
+ * REVISION HISTORY:
+ *      Name    Date          Description
+ *      ----    ----          -----------
+ *      boa     2024-11-01    Initial Revision
+ *
+ ***********************************************************************/
+@method SoundWorkerClass, MSG_META_INITIALIZE
+{
+  word v;
+  SupportedEnvelopeFormat f;
+  SoundDriverCapability c;
+  // Do super
+  @callsuper();
+  // Get infos from synth driver
+  SoundSynthDriverInfo(&v, &f, &c);
+  // Save number of available voices
+  pself->SWI_availableVoices = v;
+  // Determine capabilities and set the bits for music and/or noise
+  pself->SWI_capabilities |= (v >= SW_MUSIC_MIN_VOICES)
+    ? SW_CAPABILITY_MUSIC
+    : 0;
+  pself->SWI_capabilities |= (v > 0)
+    ? SW_CAPABILITY_NOISE
+    : 0;
+  // Determine number of voices for multi noise
+  pself->SWI_numNoiseVoices = (v > SW_NOISE_MAX_SIMULTAN_NOISES)
+    ? SW_NOISE_MAX_SIMULTAN_NOISES
+    : v;
+}
+
+/***********************************************************************
+ *                  MSG_SOUND_WORKER_GET_CAPABILITIES
+ *                  for SoundWorkerClass
+ ***********************************************************************
+ * SYNOPSIS:        Return the sound capabilities.
+ * CALLED BY:       Internal
+ * PARAMETERS:      word ( void )
+ * RETURN:          A word containing the capabilities.
+ * SIDE EFFECTS:    none
+ *
+ * STRATEGY:        1/ Return the sound capabilities storend in the
+ *                     instance variable.
+ *
+ * REVISION HISTORY:
+ *      Name    Date          Description
+ *      ----    ----          -----------
+ *      boa     2024-11-07    Initial Revision
+ *
+ ***********************************************************************/
+@method SoundWorkerClass, MSG_SOUND_WORKER_GET_CAPABILITIES
+{
+  return pself->SWI_capabilities;
+}
+
+/***********************************************************************
+ *                  MSG_SOUND_WORKER_INIT_MODES
+ *                  for SoundWorkerClass
+ ***********************************************************************
+ * SYNOPSIS:        Setup the requested sound modes dependeing of the
+ *                  supported capabilities and update the instance
+ *                  variable of it.
+ * CALLED BY:       Internal
+ * PARAMETERS:      void ( word modes )
+ * RETURN:          nothing
+ * SIDE EFFECTS:    none
+ *
+ * STRATEGY:        1/ Handle sound off.
+ *                  2/ Handle noise modes.
+ *                  3/ Handle music mode.
+ *
+ * REVISION HISTORY:
+ *      Name    Date          Description
+ *      ----    ----          -----------
+ *      boa     2024-11-07    Initial Revision
+ *
+ ***********************************************************************/
+@method SoundWorkerClass, MSG_SOUND_WORKER_INIT_MODES
+{
+  // Handle sound off
+  if (modes == SW_MODE_OFF)
+  {
+    pself->SWI_modes = SW_MODE_OFF;
+    @call oself::MSG_SOUND_WORKER_MUSIC_STOP();
+    @call oself::MSG_SOUND_WORKER_NOISE_FREE_VOICES();
+    return;
+  }
+  // Handle noise modes
+  if ((modes & SW_MODE_NOISE) && (pself->SWI_capabilities & SW_CAPABILITY_NOISE))
+  {
+    pself->SWI_modes |= SW_MODE_NOISE;
+    @call oself::MSG_SOUND_WORKER_NOISE_INIT_VOICES();
+  }
+  else
+  {
+    pself->SWI_modes &= ~SW_MODE_NOISE;
+    @call oself::MSG_SOUND_WORKER_NOISE_FREE_VOICES();
+  }
+  // Handle music mode
+  if ((modes & SW_MODE_MUSIC) && (pself->SWI_capabilities & SW_CAPABILITY_MUSIC))
+  { 
+    pself->SWI_modes |= SW_MODE_MUSIC;
+  }
+  else
+  {
+    pself->SWI_modes &= ~SW_MODE_MUSIC;
+  }
+}
+
+/***********************************************************************
+ *                  MSG_SOUND_WORKER_MUSIC_PLAY
+ *                  for SoundWorkerClass
+ ***********************************************************************
+ * SYNOPSIS:        Get and store the number of music part. Initialize
+ *                  and start playing the first music part.
+ * CALLED BY:       Internal
+ * PARAMETERS:      void ( optr music )
+ * RETURN:          nothing
+ * SIDE EFFECTS:    none
+ *
+ * STRATEGY:        1/ Store the object pointer of the music data in
+ *                     the instance variable.
+ *                  2/ Set the part index to the first element.
+ *                  3/ Get the total number of music parts.
+ *                  4/ Start playing first music part.
+ *
+ * REVISION HISTORY:
+ *      Name    Date          Description
+ *      ----    ----          -----------
+ *      boa     2024-11-01    Initial Revision
+ *
+ ***********************************************************************/
+@method SoundWorkerClass, MSG_SOUND_WORKER_MUSIC_PLAY
+{
+  // Verify that music is enabled
+  if (!(pself->SWI_modes & SW_MODE_MUSIC))
+  {
+    return;
+  }
+  // Stop an already playing music
+  @call oself::MSG_SOUND_WORKER_MUSIC_STOP();
+  // Save the object pointer of the music and set the index to the first element
+  pself->SWI_musicData = music;
+  pself->SWI_musicPartIndex = 0;
+  // We'll unlock in MSG_SOUND_WORKER_MUSIC_STOP() called explicitly or by notification at the end of the song
+  MemLock(OptrToHandle(pself->SWI_musicData));
+  // Get and save the total number of music parts
+  pself->SWI_musicPartCount = ChunkArrayGetCount(pself->SWI_musicData);
+  // Play the first music part
+  @send oself::MSG_SOUND_WORKER_MUSIC_PLAY_EXEC();
+}
+
+/***********************************************************************
+ *                  MSG_SOUND_WORKER_MUSIC_PLAY_EXEC
+ *                  for SoundWorkerClass
+ ***********************************************************************
+ * SYNOPSIS:        Lock the current music part. Patch the notification
+ *                  message. Play the music part.
+ * CALLED BY:       MSG_SOUND_WORKER_MUSIC_PLAY for first part, then
+ *                  by patched notification in music data.
+ * PARAMETERS:      void ( void )
+ * RETURN:          nothing
+ * SIDE EFFECTS:    none
+ *
+ * STRATEGY:        1/ Stop the playing of a potential music part.
+ *                  2/ Get the object pointer of the current music part
+ *                     and store it in the instance variable..
+ *                  3/ Lock the music part.
+ *                  4/ Patch the notification message.
+ *                  5/ Play the music part and store the music handle in
+ *                     the instance variable.
+ *                  6/ Increase the part index or set it to zero if last.
+ *
+ * REVISION HISTORY:
+ *      Name    Date          Description
+ *      ----    ----          -----------
+ *      boa     2024-11-01    Initial Revision
+ *
+ ***********************************************************************/
+@method SoundWorkerClass, MSG_SOUND_WORKER_MUSIC_PLAY_EXEC
+{
+  word e;
+  word *p_music;
+  Message msg;
+  // Get the object pointer of the music part to play
+  // We've locked in MSG_SOUND_WORKER_MUSIC_PLAY() and we'll unlock in MSG_SOUND_WORKER_MUSIC_STOP()
+  ChunkArrayGetElement(pself->SWI_musicData, pself->SWI_musicPartIndex, &pself->SWI_musicPart);
+  p_music = LMemDeref(pself->SWI_musicPart);
+  // Patch message and object pointer (handle and chunk) for end of song notification
+  e = LMemGetChunkSize(pself->SWI_musicPart) / 2;
+  // Get the message to patch
+  msg = ((pself->SWI_musicPartIndex + 1) < pself->SWI_musicPartCount)
+    ? MSG_SOUND_WORKER_MUSIC_PLAY_EXEC
+    : MSG_SOUND_WORKER_MUSIC_STOP;
+  // Search the position
+  while (e > 0)
+  {
+    e--;
+    if (*(p_music + e) == SSE_GENERAL && *(p_music + e + 1) == GE_SEND_NOTIFICATION)
+    {
+      *(p_music + e + 2) = (word) msg;
+      *(p_music + e + 3) = (word) OptrToHandle(@SoundWorker);
+      *(p_music + e + 4) = (word) OptrToChunk(@SoundWorker);
+      break;
+    }
+  }
+  // Play the music part
+  SoundAllocMusic(p_music, SW_MUSIC_MIN_VOICES, &pself->SWI_musicHandle);
+  SoundPlayMusic(pself->SWI_musicHandle, SP_STANDARD + SP_IMMEDIATE, EIGHTH, UNLOCK_ON_EOS);  // DESTROY_ON_EOS
+  // Increase the part index or set it to 0 if we reached the last one
+  pself->SWI_musicPartIndex = ((pself->SWI_musicPartIndex + 1) < pself->SWI_musicPartCount)
+    ? pself->SWI_musicPartIndex + 1
+    : 0;
+}
+
+/***********************************************************************
+ *                  MSG_SOUND_WORKER_MUSIC_STOP
+ *                  for SoundWorkerClass
+ ***********************************************************************
+ * SYNOPSIS:        Stop playing the music and unlock the music part.
+ * CALLED BY:       Internal or by patched notification in music data.
+ * PARAMETERS:      void ( void )
+ * RETURN:          nothing
+ * SIDE EFFECTS:    none
+ *
+ * STRATEGY:        1/ Stop playing the music.
+ *                  2/ Free the music handle.
+ *                  3/ Set the instance variable of the music handle to null.
+ *                  4/ Unlock the music part.
+ *                  5/ Set the instance variable of the music part to null.
+ *
+ * REVISION HISTORY:
+ *      Name    Date          Description
+ *      ----    ----          -----------
+ *      boa     2024-11-01    Initial Revision
+ *
+ ***********************************************************************/
+@method SoundWorkerClass, MSG_SOUND_WORKER_MUSIC_STOP
+{
+  if (pself->SWI_musicHandle != NullHandle)
+  {
+    SoundStopMusic(pself->SWI_musicHandle);
+    SoundFreeMusic(pself->SWI_musicHandle);
+    pself->SWI_musicHandle = NullHandle;
+  }
+  if (pself->SWI_musicData != NullOptr)
+  {
+    // We've locked in MSG_SOUND_WORKER_MUSIC_PLAY()
+    MemUnlock(OptrToHandle(pself->SWI_musicData));
+    pself->SWI_musicData = NullOptr;
+    pself->SWI_musicPart = NullOptr;
+  }
+}
+
+/***********************************************************************
+ *                  MSG_SOUND_WORKER_NOISE_INIT_VOICES
+ *                  for SoundWorkerClass
+ ***********************************************************************
+ * SYNOPSIS:        Allocate the number of voices.
+ * CALLED BY:       Internal
+ * PARAMETERS:      void ( void )
+ * RETURN:          nothing
+ * SIDE EFFECTS:    none
+ *
+ * STRATEGY:        1/ Stop and free all allocated voices.
+ *                  2/ Verify the limits of voices.
+ *                  3/ Initialize the voices and store them in the
+ *                     instance variable.
+ *                  4/ Save the number of allocated voices in the
+ *                     instance variable.
+ *
+ * REVISION HISTORY:
+ *      Name    Date          Description
+ *      ----    ----          -----------
+ *      boa     2024-11-01    Initial Revision
+ *
+ ***********************************************************************/
+@method SoundWorkerClass, MSG_SOUND_WORKER_NOISE_INIT_VOICES
+{
+  word i;
+  SWNoiseVoice *v;
+  // Free all voices to prevent handle leak
+  @call oself::MSG_SOUND_WORKER_NOISE_FREE_VOICES();
+  // Initialize the voices
+  for (i = 0; i < pself->SWI_numNoiseVoices; i++)
+  {
+    v = &pself->SWI_noiseVoices[i];
+    SoundAllocMusicNote(0, 0, 0, 0, 0, 0, &v->soundHandle);
+    v->state = SW_NOISE_VOICE_STATE_FREE;
+    v->noise = 0;
+    v->startTicks = 0;
+  }
+}
+
+/***********************************************************************
+ *                  MSG_SOUND_WORKER_NOISE_FREE_VOICES
+ *                  for SoundWorkerClass
+ ***********************************************************************
+ * SYNOPSIS:        Stop and free all allocated voices.
+ * CALLED BY:       Internal
+ * PARAMETERS:      void ( void )
+ * RETURN:          nothing
+ * SIDE EFFECTS:    none
+ *
+ * STRATEGY:        1/ Stop and free all allocated voices.
+ *                  2/ Reset the voices and store them in the
+ *                     instance variable.
+ *
+ * REVISION HISTORY:
+ *      Name    Date          Description
+ *      ----    ----          -----------
+ *      boa     2024-11-01    Initial Revision
+ *
+ ***********************************************************************/
+@method SoundWorkerClass, MSG_SOUND_WORKER_NOISE_FREE_VOICES
+{
+  word i;
+  SWNoiseVoice *v;
+  // Free all voices
+  for (i = 0; i < pself->SWI_numNoiseVoices; i++)
+  {
+    v = &pself->SWI_noiseVoices[i];
+    if (v->soundHandle != NullHandle)
+    {
+      SoundStopMusicNote(v->soundHandle);
+      SoundFreeMusicNote(v->soundHandle);
+    }
+    v->soundHandle = NullHandle;
+    v->state = SW_NOISE_VOICE_STATE_NULL;
+    v->noise = 0;
+    v->startTicks = 0;
+  }
+}
+
+/***********************************************************************
+ *                  MSG_SOUND_WORKER_NOISE_ADD_MULTI
+ *                  for SoundWorkerClass
+ ***********************************************************************
+ * SYNOPSIS:        Add a noise to the voices.
+ * CALLED BY:       Internal
+ * PARAMETERS:      void ( word noise )
+ * RETURN:          nothing
+ * SIDE EFFECTS:    none
+ *
+ * STRATEGY:        1/ Verify mode and that the noise is one in our list.
+ *                  2/ Get the current time.
+ *                  3/ Loop through the voices and free them if the
+ *                     containing noise is expired.
+ *                  4/ Loop through the voices and search for an empty
+ *                     one to place the noise.
+ *                  5/ Loop through the voices and search for an equal
+ *                     noise to replace.
+ *                  6/ Loop through the voices and search for an noise
+ *                     with lower priority to replace.
+ *
+ * REVISION HISTORY:
+ *      Name    Date          Description
+ *      ----    ----          -----------
+ *      boa     2024-11-01    Initial Revision
+ *
+ ***********************************************************************/
+@method SoundWorkerClass, MSG_SOUND_WORKER_NOISE_ADD_MULTI
+{
+  dword currentTicks;
+  word i;
+  SWNoiseVoice *v;
+  // Verify that multi noise is enabled
+  if (!(pself->SWI_modes & SW_MODE_NOISE))
+  {
+    return;
+  }
+  // Verify noise
+  if (!(noise < SW_NOISE_NUM_NOISES))
+  {
+    return;
+  }
+  // Get current up time ticks
+  currentTicks = TimerGetCount();
+  // Free voices with finished noises
+  for (i = 0; i < pself->SWI_numNoiseVoices; i++)
+  {
+    v = &pself->SWI_noiseVoices[i];
+    if (v->state == SW_NOISE_VOICE_STATE_PLAYING && ((currentTicks - v->startTicks) > SW_NOISES[v->noise].duration))
+    {
+      v->state = SW_NOISE_VOICE_STATE_FREE;
+      v->noise = 0;  // XXX: Unneeded?
+      v->startTicks = 0;  // XXX: Unneeded?
+    }
+  }
+  // Never play multiple noises of the same type at the same time
+  for (i = 0; i < pself->SWI_numNoiseVoices; i++)
+  {
+    v = &pself->SWI_noiseVoices[i];
+    if (v->noise == noise && v->state == SW_NOISE_VOICE_STATE_ADDED)
+    {
+      return;
+    }
+  }
+  // Search for a free voice
+  for (i = 0; i < pself->SWI_numNoiseVoices; i++)
+  {
+    v = &pself->SWI_noiseVoices[i];
+    if (v->state == SW_NOISE_VOICE_STATE_FREE)
+    {
+      v->state = SW_NOISE_VOICE_STATE_ADDED;
+      v->noise = noise;
+      v->startTicks = currentTicks;
+      return;
+    }
+  }
+  // Search for an equal playing noise to replace
+  for (i = 0; i < pself->SWI_numNoiseVoices; i++)
+  {
+    v = &pself->SWI_noiseVoices[i];
+    if (v->noise == noise)
+    {
+      v->state = SW_NOISE_VOICE_STATE_ADDED;
+      v->startTicks = currentTicks;
+      return;
+    }
+  }
+  // Search for a lower priority noise to replace
+  for (i = 0; i < pself->SWI_numNoiseVoices; i++)
+  {
+    v = &pself->SWI_noiseVoices[i];
+    if (SW_NOISES[v->noise].priority > SW_NOISES[noise].priority)
+    {
+      v->state = SW_NOISE_VOICE_STATE_ADDED;
+      v->noise = noise;
+      v->startTicks = currentTicks;
+      return;
+    }
+  }
+}
+
+/***********************************************************************
+ *                  MSG_SOUND_WORKER_NOISE_PLAY_MULTI
+ *                  for SoundWorkerClass
+ ***********************************************************************
+ * SYNOPSIS:        Play all voices with newly added noise.
+ * CALLED BY:       Internal
+ * PARAMETERS:      void ( void )
+ * RETURN:          nothing
+ * SIDE EFFECTS:    none
+ *
+ * STRATEGY:        1/ Loop through the voices and search for added
+ *                     noises.
+ *                  2/ If newly added, allocate noise handle and play
+ *                     the noise.
+ *                  3/ Set state of the voice to be played.
+ *
+ * REVISION HISTORY:
+ *      Name    Date          Description
+ *      ----    ----          -----------
+ *      boa     2024-11-01    Initial Revision
+ *
+ ***********************************************************************/
+@method SoundWorkerClass, MSG_SOUND_WORKER_NOISE_PLAY_MULTI
+{
+  word i;
+  const SWNoise *n;
+  SWNoiseVoice *v;
+  // Verify that multi noise is enabled
+  if (!(pself->SWI_modes & SW_MODE_NOISE))
+  {
+    return;
+  }
+  for (i = 0; i < pself->SWI_numNoiseVoices; i++)
+  {
+    v = &pself->SWI_noiseVoices[i];
+    if (v->state == SW_NOISE_VOICE_STATE_ADDED)
+    {
+      if (v->soundHandle == NullHandle)
+      {
+        continue;
+      }
+      SoundStopMusicNote(v->soundHandle);
+      n = &SW_NOISES[v->noise];
+      SoundReallocMusicNote(v->soundHandle, n->frequency, n->loudness, SSDTT_TICKS, n->duration, n->instrument, IT_STANDARD_TABLE);
+      SoundPlayMusicNote(v->soundHandle, SP_STANDARD + SP_IMMEDIATE, 0, UNLOCK_ON_EOS);
+      v->state = SW_NOISE_VOICE_STATE_PLAYING;
+    }
+  }
+}
+
+/***********************************************************************
+ *                  MSG_SOUND_WORKER_NOISE_PLAY_SINGLE
+ *                  for SoundWorkerClass
+ ***********************************************************************
+ * SYNOPSIS:        Immediately play a single noise on first voice.
+ * CALLED BY:       Internal
+ * PARAMETERS:      void ( word noise )
+ * RETURN:          nothing
+ * SIDE EFFECTS:    none
+ *
+ * STRATEGY:        1/ Get sound handle of first voice and verify it is
+ *                     allocated.
+ *                  2/ Stop an already playing noise.
+ *                  3/ Reallocated noise handle and play the noise.
+ *
+ * REVISION HISTORY:
+ *      Name    Date          Description
+ *      ----    ----          -----------
+ *      boa     2024-11-01    Initial Revision
+ *
+ ***********************************************************************/
+@method SoundWorkerClass, MSG_SOUND_WORKER_NOISE_PLAY_SINGLE
+{
+  const SWNoise *n;
+  SWNoiseVoice *v;
+  // Verify that single noise is enabled
+  if (!(pself->SWI_modes & SW_MODE_NOISE))
+  {
+    return;
+  }
+  // Verify we have a valid sound handle
+  v = &pself->SWI_noiseVoices[0];
+  if (v->soundHandle == NullHandle)
+  {
+    return;
+  }
+  // Make sure no other noise is playing
+  SoundStopMusicNote(v->soundHandle);
+  // Get the noise and play it
+  n = &SW_NOISES[noise];
+  SoundReallocMusicNote(v->soundHandle, n->frequency, n->loudness, SSDTT_TICKS, n->duration, n->instrument, IT_STANDARD_TABLE);
+  SoundPlayMusicNote(v->soundHandle, SP_STANDARD + SP_IMMEDIATE, 0, UNLOCK_ON_EOS);
+  v->state = SW_NOISE_VOICE_STATE_PLAYING;
+}
+

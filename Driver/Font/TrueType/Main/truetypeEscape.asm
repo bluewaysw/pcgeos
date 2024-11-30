@@ -3,7 +3,7 @@ COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 	Copyright (c) blueway.Softworks 2021 -- All Rights Reserved
 
 PROJECT:	PC/GEOS
-MODULE:		truetypeEscape.asm
+MODULE:		TrueType Font Driver
 FILE:		truetypeEscape.asm
 
 AUTHOR:		Falk Rehwagen, Jan 24, 2021

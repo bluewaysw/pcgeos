@@ -2086,7 +2086,19 @@ application.
 
 ----------
 
-### 9.2.31 ui
+### 9.2.31 ttfDriver
+
+`bytecodeInterpreterActive = <Boolean>`
+
+If false, this key tells the ttf driver that the bytecode interpreter should not 
+be used. The default value is true.
+
+	bytecodeInterpreterActive = true
+	bytecodeInterpreterActive = false
+
+----------
+
+### 9.2.32 ui
 
 #### autosave
 
@@ -2400,7 +2412,7 @@ primarily when developing for small-screen platforms such as Zoomer.
 
 ----------
 
-### 9.2.32 *specific ui name*
+### 9.2.33 *specific ui name*
 
 Each specific UI may have a category with options; this category should be 
 named after the specific UI, e.g. [motif].
@@ -2421,7 +2433,7 @@ when drawing text monikers for gadgets such as menus and buttons.
 
 ----------
 
-### 9.2.33 ui features
+### 9.2.34 ui features
 
 The ui features category defines the UI configuration used by the 
 environment application (e.g. Welcome) and all applications on the 
@@ -2732,7 +2744,7 @@ is closed.
 
 ----------
 
-### 9.2.34 welcome
+### 9.2.35 welcome
 
 The welcome category defines configuration and usage characteristics of the 
 Welcome environment application. Its keys may be useful to you during 

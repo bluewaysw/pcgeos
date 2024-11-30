@@ -21,7 +21,7 @@ name ntaker.app
 #
 longname "Note Taker"
 #
-type	appl, process, single
+type	appl, process
 #
 class	NTakerProcessClass
 #
@@ -39,33 +39,34 @@ library	pen
 library text
 library	spool
 #
-resource APPRESOURCE ui-object
-resource INTERFACE ui-object
-resource DISPLAYUI ui-object
-resource DIALOGUI ui-object
-#resource InkDialogUI ui-object
-#resource UserLevelUI ui-object
-resource STRINGS data
+resource AppResource ui-object
+resource Interface ui-object
+resource DisplayUI ui-object
+resource DialogUI ui-object
+resource InkDialogUI ui-object
+resource UserLevelUI ui-object
+resource Strings lmem read-only shared
 
-resource DOCUMENTUI object
+resource DocumentUI object
 
-# resource AppSCGAMonikerResource lmem read-only shared
-# resource AppLCGAMonikerResource lmem read-only shared
-# resource AppSMMonikerResource   lmem read-only shared
-# resource AppSCMonikerResource   lmem read-only shared
-# resource AppLMMonikerResource   lmem read-only shared
-# resource AppLCMonikerResource  lmem read-only shared
-# resource AppTCMonikerResource  lmem read-only shared
-# resource AppTCGAMonikerResource  lmem read-only shared
-# resource AppTMMonikerResource  lmem read-only shared
+resource AppSCGAMonikerResource lmem read-only shared
+resource AppLCGAMonikerResource lmem read-only shared
+resource AppSMMonikerResource   lmem read-only shared
+resource AppSCMonikerResource   lmem read-only shared
+resource AppTCMonikerResource   lmem read-only shared
+resource AppLMMonikerResource   lmem read-only shared
+resource AppLCMonikerResource  lmem read-only shared
+resource AppTCMonikerResource  lmem read-only shared
+resource AppTCGAMonikerResource  lmem read-only shared
+resource AppTMMonikerResource  lmem read-only shared
 
 #
 # Exported entry points
 #
 export NTakerDocumentClass
-#export NTakerInkClass
+export NTakerInkClass
 export NTakerProcessClass
-#export NTakerTextClass
+export NTakerTextClass
 export NTakerDisplayClass
 export NTakerApplicationClass
-#export TitledGenTriggerClass
+export TitledGenTriggerClass

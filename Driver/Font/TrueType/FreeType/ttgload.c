@@ -62,22 +62,24 @@
                         Short*                 bearing,
                         UShort*                advance )
   {
-    PLongMetrics  longs_m;
-
-    UShort  k = header->number_Of_HMetrics;
+    PLongMetrics  longs_m  = (PLongMetrics)GEO_LOCK( header->long_metrics_block );
+    PShortMetrics shorts_m = (PShortMetrics)GEO_LOCK( header->short_metrics_block );
+    UShort        k        = header->number_Of_HMetrics;
 
 
     if ( index < k )
     {
-      longs_m = (PLongMetrics)header->long_metrics + index;
-      *bearing = longs_m->bearing;
-      *advance = longs_m->advance;
+      *bearing = longs_m[index].bearing;
+      *advance = longs_m[index].advance;
     }
     else
     {
-      *bearing = ((PShortMetrics)header->short_metrics)[index - k];
-      *advance = ((PLongMetrics)header->long_metrics)[k - 1].advance;
+      *bearing = shorts_m[index - k];
+      *advance = longs_m[k - 1].advance;
     }
+
+    GEO_UNLOCK( header->long_metrics_block );
+    GEO_UNLOCK( header->short_metrics_block );
   }
 
 
@@ -85,7 +87,7 @@
 /* Return horizontal metrics in font units for a given  */
 /* glyph.  If `check' is true, take care of mono-spaced */
 /* fonts by returning the advance width max.            */
-
+#if 0
   static void Get_HMetrics( PFace    face,
                             UShort   index,
                             Bool     check,
@@ -97,8 +99,9 @@
     if ( check && face->postscript.isFixedPitch )
       *aw = face->horizontalHeader.advance_Width_Max;
   }
+#endif
 
-
+#ifdef TT_CONFIG_OPTION_PROCESS_HDMX
 /********************************************************/
 /* Return advance width table for a given pixel size    */
 /* if it is found in the font's `hdmx' table (if any).  */
@@ -115,6 +118,7 @@
 
     return NULL;
   }
+#endif
 
 
 /********************************************************/
@@ -157,19 +161,59 @@
                            PGlyph_Zone  target )
   {
     UShort  np;
-    Short   nc;
+
 
     np = source->n_points;
-    nc = source->n_contours;
 
     target->org   = source->org + np;
     target->cur   = source->cur + np;
     target->touch = source->touch + np;
 
-    target->contours = source->contours + nc;
+    target->contours = source->contours + source->n_contours;
 
     target->n_points   = 0;
     target->n_contours = 0;
+  }
+
+
+/*******************************************************************
+ *
+ *  Function    :  Scale_X
+ *
+ *  Description :  scale an horizontal distance from font
+ *                 units to 26.6 pixels
+ *
+ *  Input  :  metrics  pointer to metrics
+ *            x        value to scale
+ *
+ *  Output :  scaled value
+ *
+ ******************************************************************/
+
+  static TT_Pos  Scale_X( PIns_Metrics  metrics, TT_Pos  x )
+  {
+    return TT_MulDiv( x, metrics->x_scale1, metrics->x_scale2 );
+  }
+
+
+/*******************************************************************
+ *
+ *  Function    :  Scale_Y
+ *
+ *  Description :  scale a vertical distance from font
+ *                 units to 26.6 pixels
+ *
+ *  Input  :  metrics  pointer to metrics
+ *            y        value to scale
+ *
+ *  Output :  scaled value
+ *
+ ******************************************************************/
+
+  static 
+  TT_Pos  Scale_Y( PIns_Metrics  metrics, TT_Pos  y )
+  {
+    return TT_MulDiv( y, metrics->y_scale1, metrics->y_scale2 );
   }
 
 
@@ -246,7 +290,7 @@
 
     /* read the flags */
 
-    if ( CHECK_ACCESS_Frame( n_points * 5L ) )
+    if ( CHECK_ACCESS_Frame( n_points * 5 ) )
       return error;
 
     j    = 0;
@@ -284,11 +328,8 @@
         else
           x -= GET_Byte();
       }
-      else
-      {
-        if ( (flag[j] & 16) == 0 )
+      else if ( (flag[j] & 16) == 0 )
           x += GET_Short();
-      }
 
       vec[j].x = x;
     }
@@ -307,11 +348,8 @@
         else
           y -= GET_Byte();
       }
-      else
-      {
-        if ( (flag[j] & 32) == 0 )
+      else if ( (flag[j] & 32) == 0 )
           y += GET_Short();
-      }
 
       vec[j].y = y;
     }
@@ -378,11 +416,16 @@
         if ( n_ins > 0 )
         {
           exec->is_composite     = FALSE;
+#ifdef TT_CONFIG_OPTION_SUPPORT_PEDANTIC_HINTING
           exec->pedantic_hinting = load_flags & TTLOAD_PEDANTIC;
+#endif
 
-          error = Context_Run( exec, FALSE );
+          error = Context_Run( exec );
+
+#ifdef TT_CONFIG_OPTION_SUPPORT_PEDANTIC_HINTING
           if (error && exec->pedantic_hinting)
             return error;
+#endif
         }
       }
       else
@@ -411,19 +454,19 @@
                                 Short               n_contours,
                                 PExecution_Context  exec,
                                 PSubglyph_Record    subg,
-                                UShort              load_flags,
                                 TT_Stream           input )
   {
     DEFINE_LOAD_LOCALS( input );
 
-    UShort       k, n_ins;
     PGlyph_Zone  pts;
+    UShort       k;
+    UShort       n_ins = 0;
 
 
     if ( subg->is_hinted                    &&
          subg->element_flag & WE_HAVE_INSTR )
     {
-      if ( ACCESS_Frame( 2L ) )
+      if ( ACCESS_Frame( 2 ) )
         return error;
 
       n_ins = GET_UShort();     /* read size of instructions */
@@ -443,8 +486,6 @@
       if ( error )
         return error;
     }
-    else
-      n_ins = 0;
 
 
     /* prepare the execution context */
@@ -478,11 +519,16 @@
     if ( subg->is_hinted && n_ins > 0 )
     {
       exec->is_composite     = TRUE;
+#ifdef TT_CONFIG_OPTION_SUPPORT_PEDANTIC_HINTING
       exec->pedantic_hinting = load_flags & TTLOAD_PEDANTIC;
 
-      error = Context_Run( exec, FALSE );
+      error = Context_Run( exec );
+
       if (error && exec->pedantic_hinting)
         return error;
+#else
+      Context_Run( exec );
+#endif
     }
 
     /* save glyph origin and advance points */
@@ -575,6 +621,7 @@
 
     TT_F26Dot6  x, y;
 
+
     Fixed  xx, xy, yx, yy;
 
     PExecution_Context  exec;
@@ -584,7 +631,12 @@
     TGlyph_Zone base_pts;
 
     TPhases     phase;
+
+#ifdef TT_CONFIG_OPTION_PROCESS_HDMX
     PByte       widths;
+#endif
+
+    PStorage    glyphLocations;
 
 
     /* first of all, check arguments */
@@ -611,11 +663,7 @@
     glyph_offset = face->dirTables[table].Offset;
 
     /* query new execution context */
-
-    if ( instance && instance->debug )
-      exec = instance->context;
-    else
-      exec = New_Context( face );
+    exec = New_Context( face );
 
     if ( !exec )
       return TT_Err_Could_Not_Find_Context;
@@ -699,10 +747,11 @@
           UShort  advance_width;
 
 
-          Get_HMetrics( face, index,
-                        !(load_flags & TTLOAD_IGNORE_GLOBAL_ADVANCE_WIDTH),
-                        &left_bearing,
-                        &advance_width );
+          /* Get horizontal metrics in font units for a given glyph.  If `check' is true, */
+          /* take care of mono-spaced fonts by returning the advance width max.           */
+          TT_Get_Metrics( &face->horizontalHeader, index, &left_bearing, &advance_width );
+          if ( (!(load_flags & TTLOAD_IGNORE_GLOBAL_ADVANCE_WIDTH)) && face->postscript.isFixedPitch )
+            advance_width = face->horizontalHeader.advance_Width_Max;
 
           subglyph->metrics.horiBearingX = left_bearing;
           subglyph->metrics.horiAdvance  = advance_width;
@@ -725,8 +774,10 @@
 
       case Load_Header: /* load glyph */
 
+        glyphLocations = GEO_LOCK( face->glyphLocationBlock );
+
         if ( index + 1 < face->numLocations &&
-             face->glyphLocations[index] == face->glyphLocations[index + 1] )
+             glyphLocations[index] == glyphLocations[index + 1] )
         {
           /* as described by Frederic Loyer, these are spaces, and */
           /* not the unknown glyph.                                */
@@ -746,14 +797,16 @@
 
           exec->glyphSize = 0;
           phase = Load_End;
+          GEO_UNLOCK( face->glyphLocationBlock );
           break;
         }
 
-        offset = glyph_offset + face->glyphLocations[index];
+        offset = glyph_offset + glyphLocations[index];
+        GEO_UNLOCK( face->glyphLocationBlock );
 
         /* read first glyph header */
         if ( FILE_Seek( offset ) ||
-             ACCESS_Frame( 10L ) )
+             ACCESS_Frame( 10 ) )
           goto Fail_File;
 
         num_contours = GET_Short();
@@ -855,7 +908,7 @@
 
         /* now read composite header */
 
-        if ( ACCESS_Frame( 4L ) )
+        if ( ACCESS_Frame( 4 ) )
           goto Fail_File;
 
         subglyph->element_flag = new_flags = GET_UShort();
@@ -864,10 +917,10 @@
 
         FORGET_Frame();
 
-        k = 1 + 1;
+        k = 2;
 
         if ( new_flags & ARGS_ARE_WORDS )
-          k *= 2;
+          k <<= 1;
 
         if ( new_flags & WE_HAVE_A_SCALE )
           k += 2;
@@ -984,14 +1037,10 @@
 
           if ( subglyph2->is_scaled )
           {
-            TT_Matrix matrix;
-            matrix.xx = subglyph->transform.xx;
-            matrix.xy = subglyph->transform.xy;
-            matrix.yx = subglyph->transform.yx;
-            matrix.yy = subglyph->transform.yy;
+            TT_Matrix* matrix = (TT_Matrix*) &subglyph->transform;
 
-            TransVecList( subglyph2->zone.cur, num_points, &matrix );
-            TransVecList( subglyph2->zone.org, num_points, &matrix );
+            TransVecList( subglyph2->zone.cur, num_points, matrix );
+            TransVecList( subglyph2->zone.org, num_points, matrix );
           }
 
           /* adjust counts */
@@ -1068,7 +1117,6 @@
                                         num_contours,
                                         exec,
                                         subglyph,
-                                        load_flags,
                                         stream );
             if ( error )
               goto Fail;
@@ -1162,6 +1210,7 @@
       TT_Pos  advance;  /* scaled vertical advance height             */
 
 
+#ifdef TT_CONFIG_OPTION_PROCESS_VMTX
       /* Get the unscaled `tsb' and `ah' values */
       if ( face->verticalInfo                          &&
            face->verticalHeader.number_Of_VMetrics > 0 )
@@ -1175,6 +1224,7 @@
                         &advance_height );
       }
       else
+#endif
       {
         /* Make up the distances from the horizontal header..     */
 
@@ -1234,6 +1284,7 @@
       glyph->metrics.vertAdvance  = advance;
     }
 
+#ifdef TT_CONFIG_OPTION_PROCESS_HDMX
     /* Adjust advance width to the value contained in the hdmx table. */
     if ( !exec->face->postscript.isFixedPitch && instance &&
          subglyph->is_hinted )
@@ -1243,6 +1294,7 @@
       if ( widths )
         glyph->metrics.horiAdvance = widths[glyph_index] << 6;
     }
+#endif
 
     glyph->outline.dropout_mode = (Char)exec->GS.scan_type;
 
@@ -1257,8 +1309,7 @@
     /* reset the execution context */
     exec->pts = base_pts;
 
-    if ( !instance || !instance->debug )
-      Done_Context( exec );
+    Done_Context( exec );
 
     return error;
   }

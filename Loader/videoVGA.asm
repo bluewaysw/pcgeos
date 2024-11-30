@@ -79,10 +79,10 @@ LoaderDisplayVGA	proc	near
 	;(Can't do this before setting the video mode.)
 	;	(from VGAlike/VGA/vgaAdmin.asm::VidScreenOff)
 
-;;	mov	ah, ALT_SELECT		; choose BIOS function number
-;;	mov	bl, VIDEO_SCREEN_ON_OFF ; choose sub-function number
-;;	mov	al, VGA_DISABLE_VIDEO	; disable it this time
-;;	int	VIDEO_BIOS
+	mov	ah, ALT_SELECT		; choose BIOS function number
+	mov	bl, VIDEO_SCREEN_ON_OFF ; choose sub-function number
+	mov	al, VGA_DISABLE_VIDEO	; disable it this time
+	int	VIDEO_BIOS
 
 	; If we have an image to blast up, skip the text options.
 	; j- 4/16/93

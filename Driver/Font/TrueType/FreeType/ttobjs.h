@@ -23,6 +23,7 @@
 #include "ttcache.h"
 #include "tttables.h"
 #include "ttcmap.h"
+#include <heap.h>
 
 #ifdef __cplusplus
   extern "C" {
@@ -232,8 +233,8 @@
 
   struct  TCodeRange_
   {
-    PByte  Base;
-    ULong  Size;
+    PByte   Base;
+    UShort  Size;
   };
 
   typedef struct TCodeRange_  TCodeRange;
@@ -255,7 +256,7 @@
   struct  TDefRecord_
   {
     Int    Range;     /* in which code range is it located ? */
-    ULong  Start;     /* where does it start ?               */
+    UShort Start;     /* where does it start ?               */
     Int    Opc;       /* function #, or instruction code     */
     Bool   Active;    /* is it active ?                      */
   };
@@ -269,9 +270,9 @@
   struct  TCallRecord_
   {
     Int    Caller_Range;
-    ULong  Caller_IP;
-    Long   Cur_Count;
-    ULong  Cur_Restart;
+    UShort Caller_IP;
+    Short  Cur_Count;
+    UShort Cur_Restart;
   };
 
   typedef struct TCallRecord_  TCallRecord;
@@ -314,28 +315,30 @@
 
 #endif
 
+#define CALL_INTERPRETER  ( engineInstance.interpreterActive ? RunIns( exec ) : TT_Err_Ok )
+
   /* Rounding function, as used by the interpreter */
-  typedef TT_F26Dot6  (*TRound_Function)( EXEC_OPS TT_F26Dot6 distance,
-                                                   TT_F26Dot6 compensation );
+  typedef TT_F26Dot6  TRound_Function( EXEC_OPS TT_F26Dot6 distance,
+                                                TT_F26Dot6 compensation );
 
   /* Point displacement along the freedom vector routine, as */
   /* used by the interpreter                                 */
-  typedef void  (*TMove_Function)( EXEC_OPS PGlyph_Zone  zone,
-                                            UShort       point,
-                                            TT_F26Dot6   distance );
+  typedef void  TMove_Function( EXEC_OPS PGlyph_Zone  zone,
+                                         UShort       point,
+                                         TT_F26Dot6   distance );
 
   /* Distance projection along one of the proj. vectors, as used */
   /* by the interpreter                                          */
-  typedef TT_F26Dot6  (*TProject_Function)( EXEC_OPS TT_Vector*  v1,
-                                                     TT_Vector*  v2 );
+  typedef TT_F26Dot6  TProject_Function( EXEC_OPS TT_Vector*  v1,
+                                                  TT_Vector*  v2 );
 
   /* reading a cvt value. Take care of non-square pixels when needed */
-  typedef TT_F26Dot6  (*TGet_CVT_Function)( EXEC_OPS ULong  index );
+  typedef TT_F26Dot6  TGet_CVT_Function( EXEC_OPS UShort  index );
 
   /* setting or moving a cvt value.  Take care of non-square pixels  */
   /* when needed                                                     */
-  typedef void  (*TSet_CVT_Function)( EXEC_OPS  ULong       index,
-                                                TT_F26Dot6  value );
+  typedef void  TSet_CVT_Function ( EXEC_OPS  UShort      index,
+                                              TT_F26Dot6  value );
 
   /* subglyph transformation record */
   struct  TTransform_
@@ -473,9 +476,6 @@
 
   struct  TFace_
   {
-    /* parent engine instance for the face object */
-    PEngine_Instance  engine;
-
     /* i/o stream */
     TT_Stream  stream;
 
@@ -497,18 +497,24 @@
                                                 /* found in the TTF file */
     TT_Horizontal_Header  horizontalHeader;     /* the horizontal header */
 
+#ifdef TT_CONFIG_OPTION_PROCESS_VMTX
     Bool                  verticalInfo;         /* True when vertical table */
     TT_Vertical_Header    verticalHeader;       /* is present in the font   */
+#endif
 
     TT_OS2                os2;                  /* 'OS/2' table */
 
     TT_Postscript         postscript;           /* 'Post' table */
 
+#ifdef TT_CONFIG_OPTION_PROCESS_HDMX
     TT_Hdmx               hdmx;                 /* 'Hdmx' table */
+#endif
 
     TName_Table           nameTable;            /* name table */
 
+#ifdef TT_CONFIG_OPTION_SUPPORT_GASP
     TGasp                 gasp;                 /* the 'gasp' table */
+#endif
 
     /* The directory of TrueType tables for this typeface */
     UShort          numTables;
@@ -520,25 +526,21 @@
     PCMapTable  cMaps;
 
     /* The glyph locations table */
-    ULong     numLocations;         /* UShort is not enough */
-#ifndef TT_HUGE_PTR
-    PStorage  glyphLocations;
-#else
-    Storage TT_HUGE_PTR * glyphLocations;
-#endif
+    UShort    numLocations;
+    MemHandle glyphLocationBlock;
 
     /* NOTE : The "hmtx" is now part of the horizontal header */
 
     /* the font program, if any */
-    ULong   fontPgmSize;
+    UShort  fontPgmSize;
     PByte   fontProgram;
 
     /* the cvt program, if any */
-    ULong   cvtPgmSize;
+    UShort  cvtPgmSize;
     PByte   cvtProgram;
 
     /* the original, unscaled, control value table */
-    ULong   cvtSize;
+    UShort  cvtSize;
     PShort  cvt;
 
     /* The following values _must_ be set by the */
@@ -556,15 +558,12 @@
     TCache  instances;   /* current instances for this face */
     TCache  glyphs;      /* current glyph containers for this face */
 
-
     /* A typeless pointer to the face object extensions defined */
     /* in the 'ttextend.*' files.                               */
+  #ifdef TT_CONFIG_OPTION_EXTEND_ENGINE
     void*  extension;
     Int    n_extensions;    /* number of extensions */
-
-    /* Use extensions to provide additional capabilities to the */
-    /* engine.  Read the developer's guide in the documentation */
-    /* directory to know how to do that.                        */
+  #endif
   };
 
 
@@ -599,22 +598,13 @@
     TGraphicsState   GS;
     TGraphicsState   default_GS;
 
-    ULong            cvtSize;   /* the scaled control value table */
+    UShort           cvtSize;   /* the scaled control value table */
     PLong            cvt;
 
-    ULong            storeSize; /* The storage area is now part of the */
+    UShort           storeSize; /* The storage area is now part of the */
     PLong            storage;   /* instance                            */
 
     TGlyph_Zone      twilight;  /* The instance's twilight zone */
-
-    /* debugging variables */
-
-    /* When using the debugger, we must keep the */
-    /* execution context tied to the instance    */
-    /* object rather than asking it on demand    */
-
-    Bool                debug;
-    PExecution_Context  context;
   };
 
 
@@ -633,13 +623,13 @@
 
     TT_Error        error;     /* last execution error */
 
-    Long            top;        /* top of exec. stack  */
+    Short           top;        /* top of exec. stack  */
 
-    ULong           stackSize;  /* size of exec. stack */
+    UShort          stackSize;  /* size of exec. stack */
     PStorage        stack;      /* current exec. stack */
 
     Long            args;
-    ULong           new_top;    /* new top after exec.    */
+    UShort          new_top;    /* new top after exec.    */
 
     TGlyph_Zone     zp0,            /* zone records */
                     zp1,
@@ -653,18 +643,18 @@
 
     Int             curRange;  /* current code range number   */
     PByte           code;      /* current code range          */
-    ULong           IP;        /* current instruction pointer */
-    ULong           codeSize;  /* size of current range       */
+    UShort          IP;        /* current instruction pointer */
+    UShort          codeSize;  /* size of current range       */
 
     Byte            opcode;    /* current opcode              */
     Int             length;    /* length of current opcode    */
 
     Bool            step_ins;  /* true if the interpreter must */
                                /* increment IP after ins. exec */
-    ULong           cvtSize;
+    UShort          cvtSize;
     PLong           cvt;
 
-    ULong           glyphSize; /* glyph instructions buffer size */
+    UShort          glyphSize; /* glyph instructions buffer size */
     PByte           glyphIns;  /* glyph instructions buffer */
 
     UShort          numFDefs;  /* number of function defs         */
@@ -689,17 +679,13 @@
     TCodeRangeTable codeRangeTable;  /* table of valid coderanges */
                                      /* useful for the debugger   */
 
-    ULong           storeSize;  /* size of current storage */
+    UShort          storeSize;  /* size of current storage */
     PLong           storage;    /* storage area            */
 
     TT_F26Dot6      period;     /* values used for the */
     TT_F26Dot6      phase;      /* 'SuperRounding'     */
     TT_F26Dot6      threshold;
 
-    /* this seems to be unused */
-#if 0
-    Int             cur_ppem;       /* ppem along the current proj vector */
-#endif
     Long            scale1;         /* scaling values along the current   */
     Long            scale2;         /* projection vector too..            */
     Bool            cached_metrics; /* the ppem is computed lazily. used  */
@@ -712,26 +698,27 @@
                                    /* the prep program               */
     Bool            is_composite;  /* ture if the glyph is composite */
 
-    Bool            pedantic_hinting;  /* if true, read and write array   */
-                                       /* bounds faults halt the hinting  */
+#ifdef TT_CONFIG_OPTION_SUPPORT_PEDANTIC_HINTING
+   Bool            pedantic_hinting;  /* if true, read and write array   */
+#endif                                /* bounds faults halt the hinting  */
 
     /* latest interpreter additions */
 
     Long               F_dot_P;    /* dot product of freedom and projection */
                                    /* vectors                               */
-    TRound_Function    func_round; /* current rounding function             */
+    TRound_Function    _near * func_round;     /* current rounding function   */
 
-    TProject_Function  func_project,   /* current projection function */
-                       func_dualproj,  /* current dual proj. function */
-                       func_freeProj;  /* current freedom proj. func  */
+    TProject_Function  _near * func_project;   /* current projection function */
+    TProject_Function  _near * func_dualproj;  /* current dual proj. function */
+    TProject_Function  _near * func_freeProj;  /* current freedom proj. func  */
 
-    TMove_Function     func_move;      /* current point move function */
+    TMove_Function     _near * func_move;      /* current point move function */
 
-    TGet_CVT_Function  func_read_cvt;  /* read a cvt entry              */
-    TSet_CVT_Function  func_write_cvt; /* write a cvt entry (in pixels) */
-    TSet_CVT_Function  func_move_cvt;  /* incr a cvt entry (in pixels)  */
+    TGet_CVT_Function  _near * func_read_cvt;  /* read a cvt entry              */
+    TSet_CVT_Function  _near * func_write_cvt; /* write a cvt entry (in pixels) */
+    TSet_CVT_Function  _near * func_move_cvt;  /* incr a cvt entry (in pixels)  */
 
-    ULong              loadSize;
+    UShort             loadSize;
     PSubglyph_Stack    loadStack;      /* loading subglyph stack */
 
   };
@@ -757,8 +744,6 @@
   struct  TFont_Input_
   {
     TT_Stream         stream;     /* input stream                */
-    PEngine_Instance  engine;     /* parent engine instance      */
-
   };
 
   typedef struct TFont_Input_  TFont_Input;
@@ -774,22 +759,15 @@
   LOCAL_DEF
   TT_Error  Goto_CodeRange( PExecution_Context  exec,
                             Int                 range,
-                            ULong               IP );
+                            UShort              IP );
 
-#if 0
-  /* Return a pointer to a given coderange record. */
-  /* Used only by the debugger.                    */
-  LOCAL_DEF
-  PCodeRange  Get_CodeRange( PExecution_Context  exec,
-                             Int                 range );
-#endif
 
   /* Set a given code range properties */
   LOCAL_DEF
   TT_Error  Set_CodeRange( PExecution_Context  exec,
                            Int                 range,
                            void*               base,
-                           ULong               length );
+                           UShort              length );
 
   /* Clear a given coderange */
   LOCAL_DEF
@@ -813,8 +791,7 @@
                           PInstance           ins );
 
   LOCAL_DEF
-  TT_Error  Context_Run( PExecution_Context  exec,
-                         Bool                debug );
+  TT_Error  Context_Run( PExecution_Context  exec );
 
   LOCAL_DEF
   TT_Error  Instance_Init( PInstance  ins );
@@ -822,15 +799,6 @@
   LOCAL_DEF
   TT_Error  Instance_Reset( PInstance  ins );
 
-
-  /********************************************************************/
-  /*                                                                  */
-  /*   Handy scaling functions                                        */
-  /*                                                                  */
-  /********************************************************************/
-
-  LOCAL_DEF TT_Pos   Scale_X( PIns_Metrics  metrics, TT_Pos  x );
-  LOCAL_DEF TT_Pos   Scale_Y( PIns_Metrics  metrics, TT_Pos  y );
 
   /********************************************************************/
   /*                                                                  */
@@ -843,8 +811,8 @@
   /*                                                                  */
   /********************************************************************/
 
-  LOCAL_DEF TT_Error  TTObjs_Init( PEngine_Instance  engine );
-  LOCAL_DEF TT_Error  TTObjs_Done( PEngine_Instance  engine );
+  LOCAL_DEF TT_Error  TTObjs_Init( );
+  LOCAL_DEF TT_Error  TTObjs_Done( );
 
 #ifdef __cplusplus
   }

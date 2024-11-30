@@ -1,0 +1,2102 @@
+/*
+ ***************************************************************************
+ * Copyright 2019 Andreas Bollhalder
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ ***************************************************************************
+ */
+
+
+/*
+ ***************************************************************************
+ * Copyright (c) 2010-2024 by YoYu-Productions
+ *
+ * PROJECT:     GeoLadder
+ * MODULE:      GOC code file
+ * FILE:        UI\appui.goc
+ *
+ * AUTHOR:      Andreas Bollhalder
+ ***************************************************************************
+ */
+
+
+/*
+ ***************************************************************************
+ *                  INCLUDE FILES
+ ***************************************************************************
+ */
+
+@include <stdapp.goh>
+
+@include <ladder.goh>
+@include <Art/appmon.goh>
+@include <Art/songs.goh>
+
+#include <sound.h>
+
+
+/*
+ ***************************************************************************
+ *                  DEFINITIONS
+ ***************************************************************************
+ */
+
+// Makro to handle generic position, r = row, c = column
+#define GPOS(r, c) ((r) * LVL_COLS + (c))
+
+// Makro to handle text string position, r = row, c = column
+#define TSPOS(r, c) ((TSP_T_SET) | ((((r) * LVL_COLS + (c)) >> 8) & TSP_M_HI)), (((r) * LVL_COLS + (c)) & TSP_M_LO)
+
+// Makro to handle level string command, direction and position, r = row, c = column
+#define LSPOS(p, r, c) ((p) | ((((r) * LVL_COLS + (c)) >> 8) & LSP_M_HI)), (((r) * LVL_COLS + (c)) & LSP_M_LO)
+
+
+/*
+ ***************************************************************************
+ *                  RESOURCE Application
+ ***************************************************************************
+ */
+
+@start APPLICATION;
+
+@object LadderApplicationClass LadderApplication = {
+  GI_visMoniker = list {
+    @LadderTextMoniker,
+    @LadderIcon15x15x1,
+    @LadderIcon15x15x4,
+    @LadderIcon48x30x1,
+    @LadderIcon48x30x4
+  }
+  GI_comp = @LadderPrimary;
+  gcnList(MANUFACTURER_ID_GEOWORKS, GAGCNLT_WINDOWS) = @LadderPrimary;
+//  ATTR_GEN_HELP_FILE = "GeoLadder Help";
+  HINT_APP_IS_ENTERTAINING;
+}
+
+@visMoniker LadderTextMoniker = "GeoLadder";
+@localize "The GeoLadder application name";
+
+@end APPLICATION;
+
+
+/*
+ ***************************************************************************
+ *                  RESOURCE Interface
+ ***************************************************************************
+ */
+
+@start INTERFACE;
+
+@object LadderPrimaryClass LadderPrimary = {
+  GI_comp = @LadderView;
+  ATTR_GEN_HELP_CONTEXT = "TOC";
+  HINT_DISPLAY_NOT_RESIZABLE;
+  HINT_PRIMARY_NO_FILE_MENU;
+  HINT_CENTER_CHILDREN_VERTICALLY;
+  HINT_CENTER_CHILDREN_HORIZONTALLY;
+  HINT_SIZE_WINDOW_AS_DESIRED;
+}
+
+@object GenViewClass LadderView = {
+  GVI_attrs = @default
+    | GVA_NO_WIN_FRAME
+    | GVA_DONT_SEND_KBD_RELEASES
+    | GVA_DONT_SEND_PTR_EVENTS;
+  GVI_color = { C_BLACK, 0, 0, 0 };
+}
+
+// Menu
+@object LadderScreenClass LadderMenu = {
+  VCI_comp =
+    @LadderMenuDiff, @LadderMenuSound,
+    @LadderMenuRank,
+    @LadderMenuInfo;
+  LSI_screen = @ScreenMenu;
+  LSI_chunks = @ScreenMenuStrings;
+}
+
+@object LadderTextClass LadderMenuDiff = {
+  LTI_position = GPOS(11, 23);
+  LTI_length = 15;
+  LTI_text = @MenuDiff1;
+}
+
+@object LadderTextClass LadderMenuSound = {
+  LTI_position = GPOS(12, 23);
+  LTI_length = 15;
+  LTI_text = @MenuSoundOff;
+}
+
+@object LadderRankClass LadderMenuRank = {
+  LRI_positionHigh = GPOS(15, 41); 
+  LRI_positionLast = GPOS(21, 72);
+  LRI_noname = @HighNoName;
+}
+
+@object LadderTextClass LadderMenuInfo = {
+  LTI_position = GPOS(SCN_ROWS - 1, 1);
+  LTI_length = SCN_COLS - 2;
+}
+
+// Instruction
+@object LadderScreenClass LadderHelp = {
+  VCI_comp =
+    @LadderInfo;
+  LSI_screen = @ScreenHelp;
+  LSI_chunks = @ScreenHelpStrings;
+}
+
+// Load level
+@object LadderScreenClass LadderLoad = {
+  VCI_comp =
+    @LadderLoadRound, @LadderLoadLevel,
+    @LadderLoadName;
+  LSI_screen = @ScreenLoad;
+  LSI_chunks = @ScreenLoadStrings;
+}
+
+@object LadderTextClass LadderLoadName = {
+  LTI_position = GPOS(9, SCN_MID_COL);
+  LTI_length = 22;
+  LTI_alignment = TSD_A_CENTER;
+}
+
+@object LadderValueClass LadderLoadRound = {
+  LVI_position = GPOS(12, 46);
+  LVI_length = 2;
+  LVI_value = 1;
+}
+
+@object LadderValueClass LadderLoadLevel = {
+  LVI_position = GPOS(13, 46);
+  LVI_length = 2;
+  LVI_value = 1;
+}
+
+// Game
+@object LadderScreenClass LadderGame = {
+  VCI_comp =
+    @LadderGameLevel, @LadderGameActors,
+    @LadderGameLads, @LadderGameRound,
+    @LadderGameScore, @LadderGameTime,
+    @LadderInfo;
+  LSI_screen = @ScreenGame;
+  LSI_chunks = @ScreenGameStrings;
+}
+
+@object LadderLevelClass LadderGameLevel = {
+  LLI_buffer = @GameLevelBuffer;
+}
+
+@object LadderActorsClass LadderGameActors = {
+  LAI_count = 0;
+}
+
+@object LadderValueClass LadderGameLads = {
+  LVI_position = GPOS(20, 9);
+  LVI_length = 2;
+  LVI_value = LAD_D_LIVES;
+}
+
+@object LadderValueClass LadderGameRound = {
+  LVI_position = GPOS(20, 25);
+  LVI_length = 2;
+  LVI_value = 1;
+}
+
+@object LadderValueClass LadderGameScore = {
+  LVI_position = GPOS(20, 47);
+  LVI_length = 7;  // Maximum '65535' + suffix '00'
+  LVI_value = 0;
+  LVI_suffix = L_TRUE;
+}
+
+@object LadderValueClass LadderGameTime = {
+  LVI_position = GPOS(20, 77);
+  LVI_length = 4;  // Maximum '99' + suffix '00'
+  LVI_value = 32;
+  LVI_suffix = L_TRUE;
+}
+
+// Game end
+@object LadderScreenClass LadderDone = {
+  VCI_comp =
+    @LadderInfo;
+  LSI_screen = @ScreenDone;
+  LSI_chunks = @ScreenDoneStrings;
+}
+
+// Game over
+@object LadderScreenClass LadderOver = {
+  VCI_comp =
+    @LadderInfo;
+  LSI_screen = @ScreenOver;
+  LSI_chunks = @ScreenOverStrings;
+}
+
+// High score
+@object LadderScreenClass LadderHigh = {
+  VCI_comp =
+    @LadderHighCompliment, @LadderHighName,
+    @LadderInfo;
+  LSI_screen = @ScreenHigh;
+  LSI_chunks = @ScreenHighStrings;
+}
+
+@object LadderTextClass LadderHighCompliment = {
+  LTI_position = GPOS(9, SCN_MID_COL);
+  LTI_length = 77;
+  LTI_alignment = TSD_A_CENTER;
+}
+
+@object LadderInputClass LadderHighName = {
+  LII_position = GPOS(12, 41);
+}
+
+// This object is used by multiple screen object
+@object LadderTextClass LadderInfo = {
+  LTI_position = GPOS(SCN_ROWS - 2, 1);
+  LTI_length = SCN_COLS - 2;
+}
+
+@end INTERFACE;
+
+
+/*
+ ***************************************************************************
+ *                  RESOURCE Text
+ ***************************************************************************
+ */
+
+@start TEXT, data;
+
+// Translatable strings in Ladder menu screen
+@chunk char MenuText0[] = "Original is (c) in 1982, 1983 Yahoo Software";
+@localize { "The original copyright claim" 3-77 };
+@chunk char MenuText1[] = "Adapted in 2011, 2024 by Andreas Bollhalder and the FreeGEOS team";
+@localize { "The adaption claim" 3-77 };
+@chunk char MenuText2[] = "Version";
+@localize { "The version label" 3-9 };
+// This chunk is only a place holder. It will be resized and filled during startup.
+@chunk char MenuVersion[] = "";
+@localize not;
+@chunk char MenuText4[] = "Terminal";
+@localize { "The terminal label" 3-9 };
+// This chunk will be resized and filled during startup if the product name is found in the INI file
+@chunk char MenuTerminal[] = "Not found";
+@localize { "The terminal name if no product name is found in the INI file" 3-23 };
+@chunk char MenuText6[] = "Difficulty Level";
+@localize { "The difficulty level label" 3-19 };
+@chunk char MenuText7[] = "Sound Output";
+@localize { "The sound output label" 3-19 };
+@chunk char MenuText8[] = "Play Game";
+@localize { "The play game label" 3-33 };
+@chunk char MenuText9[] = "Change Difficulty";
+@localize { "The change difficulty label" 3-33 };
+@chunk char MenuText10[] = "Change Sound";
+@localize { "The change sound label" 3-33 };
+@chunk char MenuText11[] = "Show Instructions";
+@localize { "The show instructions label" 3-33 };
+@chunk char MenuText12[] = "Exit GeoLadder";
+@localize { "The exit GeLadder label" 3-33 };
+@chunk char MenuText13[] = "Enter one of the above:";
+@localize { "The enter one of the above label" 3-37 };
+@chunk char MenuText14[] = "High Scores";
+@localize { "The high scores label" 3-37 };
+@chunk char MenuText15[] = "Last Score";
+@localize { "The last score label" 3-14 };
+
+// Lookup table for translatable strings in Ladder menu screen
+@chunkArray optr ScreenMenuStrings =
+{
+  @MenuText0, @MenuText1, @MenuText2, @MenuVersion, @MenuText4, @MenuTerminal, @MenuText6,
+  @MenuText7, @MenuText8, @MenuText9, @MenuText10, @MenuText11,
+  @MenuText12, @MenuText13, @MenuText14, @MenuText15
+};
+
+@chunk byte ScreenMenu[] = {
+  // Title
+  TSPOS(0, 14),
+  TSD_T_CHAR + 2, 'L', // Text "LL"
+  TSP_T_MOVE, 21,
+  TSD_T_CHAR + 2, 'd', // Text "dd"
+  TSP_T_MOVE + 7,
+  TSD_T_CHAR + 2, 'd', // Text "dd"
+  TSPOS(1, 14),
+  TSD_T_CHAR + 2, 'L', // Text "LL"
+  TSP_T_MOVE, 21,
+  TSD_T_CHAR + 2, 'd', // Text "dd"
+  TSP_T_MOVE + 7,
+  TSD_T_CHAR + 2, 'd', // Text "dd"
+  TSP_T_MOVE, 22,
+  TSD_T_TEXT + 2, 't', 'm', // Text "tm"
+  TSPOS(2, 14),
+  TSD_T_CHAR + 2, 'L', // Text "LL"
+  TSP_T_MOVE + 9,
+  TSD_T_CHAR + 4, 'a', // Text "aaaa"
+  TSP_T_MOVE + 5,
+  TSD_T_CHAR + 5, 'd', // Text "ddddd"
+  TSP_T_MOVE + 4,
+  TSD_T_CHAR + 5, 'd', // Text "ddddd"
+  TSP_T_MOVE + 4,
+  TSD_T_CHAR + 4, 'e', // Text "eeee"
+  TSP_T_MOVE + 3,
+  TSD_T_CHAR + 7, 'r', // Text "rrrrrrr"
+  TSPOS(3, 14),
+  TSD_T_CHAR + 2, 'L', // Text "LL"
+  TSP_T_MOVE + 8,
+  TSD_T_CHAR + 2, 'a', // Text "aa"
+  TSP_T_MOVE + 2,
+  TSD_T_CHAR + 2, 'a', // Text "aa"
+  TSP_T_MOVE + 3,
+  TSD_T_CHAR + 2, 'd', // Text "dd"
+  TSP_T_MOVE + 2,
+  TSD_T_CHAR + 2, 'd', // Text "dd"
+  TSP_T_MOVE + 3,
+  TSD_T_CHAR + 2, 'd', // Text "dd"
+  TSP_T_MOVE + 2,
+  TSD_T_CHAR + 2, 'd', // Text "dd"
+  TSP_T_MOVE + 3,
+  TSD_T_CHAR + 2, 'e', // Text "ee"
+  TSP_T_MOVE + 2,
+  TSD_T_CHAR + 2, 'e', // Text "ee"
+  TSP_T_MOVE + 2,
+  TSD_T_CHAR + 2, 'r', // Text "rr"
+  TSP_T_MOVE + 4,
+  TSD_T_CHAR + 2, 'r', // Text "rr"
+  TSPOS(4, 14),
+  TSD_T_CHAR + 2, 'L', // Text "LL"
+  TSP_T_MOVE + 8,
+  TSD_T_CHAR + 2, 'a', // Text "aa"
+  TSP_T_MOVE + 2,
+  TSD_T_CHAR + 2, 'a', // Text "aa"
+  TSP_T_MOVE + 3,
+  TSD_T_CHAR + 2, 'd', // Text "dd"
+  TSP_T_MOVE + 2,
+  TSD_T_CHAR + 2, 'd', // Text "dd"
+  TSP_T_MOVE + 3,
+  TSD_T_CHAR + 2, 'd', // Text "dd"
+  TSP_T_MOVE + 2,
+  TSD_T_CHAR + 2, 'd', // Text "dd"
+  TSP_T_MOVE + 3,
+  TSD_T_CHAR + 6, 'e', // Text "eeeeee"
+  TSP_T_MOVE + 2,
+  TSD_T_CHAR + 2, 'r', // Text "rr"
+  TSPOS(5, 14),
+  TSD_T_CHAR + 2, 'L', // Text "LL"
+  TSP_T_MOVE + 8,
+  TSD_T_CHAR + 2, 'a', // Text "aa"
+  TSP_T_MOVE + 2,
+  TSD_T_CHAR + 2, 'a', // Text "aa"
+  TSP_T_MOVE + 3,
+  TSD_T_CHAR + 2, 'd', // Text "dd"
+  TSP_T_MOVE + 2,
+  TSD_T_CHAR + 2, 'd', // Text "dd"
+  TSP_T_MOVE + 3,
+  TSD_T_CHAR + 2, 'd', // Text "dd"
+  TSP_T_MOVE + 2,
+  TSD_T_CHAR + 2, 'd', // Text "dd"
+  TSP_T_MOVE + 3,
+  TSD_T_CHAR + 2, 'e', // Text "ee"
+  TSP_T_MOVE + 6,
+  TSD_T_CHAR + 2, 'r', // Text "rr"
+  TSPOS(6, 14),
+  TSD_T_CHAR + 8, 'L', // Text "LLLLLLLL"
+  TSP_T_MOVE + 3,
+  TSD_T_CHAR + 3, 'a', // Text "aaa"
+  TSP_T_MOVE + 1,
+  TSD_T_CHAR + 2, 'a', // Text "aa"
+  TSP_T_MOVE + 3,
+  TSD_T_CHAR + 3, 'd', // Text "ddd"
+  TSP_T_MOVE + 1,
+  TSD_T_CHAR + 2, 'd', // Text "dd"
+  TSP_T_MOVE + 3,
+  TSD_T_CHAR + 3, 'd', // Text "ddd"
+  TSP_T_MOVE + 1,
+  TSD_T_CHAR + 2, 'd', // Text "dd"
+  TSP_T_MOVE + 3,
+  TSD_T_CHAR + 4, 'e', // Text "eeee"
+  TSP_T_MOVE + 3,
+  TSD_T_CHAR + 2, 'r', // Text "rr"
+  // Informations
+  TSPOS(8, 1),
+  TSD_T_CHNK, 0, // ScreenMenuStrings[0] / Text "Original is (c) in 1982, 1983 Yahoo Software"
+  TSPOS(9, 1),
+  TSD_T_CHNK, 1, // ScreenMenuStrings[1] / Text "Adapted for PC/GEOS in 2011 by Andreas Bollhalder"
+  TSPOS(11, 1),
+  TSD_T_CHNK, 6, // ScreenMenuStrings[6] / Text "Difficulty Level"
+  TSPOS(11, 21),
+  TSD_T_CHAR + 1, ':', // Text ":"
+  TSPOS(11, 41),
+  TSD_T_CHNK, 2, // ScreenMenuStrings[2] / Text "Version"
+  TSPOS(11, 53),
+  TSD_T_CHAR + 1, ':', // Text ":"
+  TSPOS(11, 55),
+  TSD_T_CHNK, 3, // ScreenMenuStrings[3] / Text "0.5 0-22"
+  TSPOS(12, 1),
+  TSD_T_CHNK, 7, // ScreenMenuStrings[7] / Text "Sound Output"
+  TSPOS(12, 21),
+  TSD_T_CHAR + 1, ':', // Text ":"
+  TSPOS(12, 41),
+  TSD_T_CHNK, 4, // ScreenMenuStrings[4] / Text "Terminal"
+  TSPOS(12, 53),
+  TSD_T_CHAR + 1, ':', // Text ":"
+  TSPOS(12, 55),
+  TSD_T_CHNK, 5, // ScreenMenuStrings[5] / Text "PC/GEOS"
+  // Main menu
+  TSPOS(14, 1),
+  TSD_T_TEXT + 3,
+    'P', ' ', '=',
+  TSPOS(14, 5),
+  TSD_T_CHNK, 8, // ScreenMenuStrings[8] / Text "Play Game"
+  TSPOS(15, 1),
+  TSD_T_TEXT + 3,
+    'D', ' ', '=',
+  TSPOS(15, 5),
+  TSD_T_CHNK, 9, // ScreenMenuStrings[9] / Text "Change Difficulty"
+  TSPOS(16, 1),
+  TSD_T_TEXT + 3,
+    'S', ' ', '=',
+  TSPOS(16, 5),
+  TSD_T_CHNK, 10, // ScreenMenuStrings[10] / Text "Change Sound"
+  TSPOS(17, 1),
+  TSD_T_TEXT + 3,
+    'I', ' ', '=',
+  TSPOS(17, 5),
+  TSD_T_CHNK, 11, // ScreenMenuStrings[11] / Text "Show Instructions"
+  TSPOS(19, 1),
+  TSD_T_TEXT + 3,
+    'E', ' ', '=',
+  TSPOS(19, 5),
+  TSD_T_CHNK, 12, // ScreenMenuStrings[12] / Text "Exit GeoLadder"
+  TSPOS(21, 1),
+  TSD_T_CHNK, 13, // ScreenMenuStrings[13] / Text "Enter one of the above:"
+  // Ranking list and last score
+  TSPOS(14, 41),
+  TSD_T_CHNK, 14, // ScreenMenuStrings[14] / Text "High Scores"
+  TSPOS(21, 41),
+  TSD_T_CHNK, 15, // ScreenMenuStrings[15] / Text "Last Score:"
+  TSPOS(21, 64),
+  TSD_T_CHAR + 1, ':', // Text ":"
+  TSP_T_END
+};
+
+
+@chunk char MenuDiff1[] = "Novice";
+@localize { "The difficulty novice text" 1-15 };
+
+@chunk char MenuDiff2[] = "Beginner";
+@localize { "The difficulty beginner text" 1-15 };
+
+@chunk char MenuDiff3[] = "Expert";
+@localize { "The difficulty expert text" 1-15 };
+
+@chunk char MenuDiff4[] = "Veteran";
+@localize { "The difficulty veteran text" 1-15 };
+
+@chunk char MenuDiff5[] = "Hyper";
+@localize { "The difficulty hyper text" 1-15 };
+
+// Difficulty
+@chunkArray optr MenuDiffTexts =
+{
+  @MenuDiff1, @MenuDiff2, @MenuDiff3, @MenuDiff4, @MenuDiff5
+};
+
+@chunk char MenuSoundUnavailable[] = "n/a";
+@localize { "The sound not available text" 1-15 };
+
+@chunk char MenuSoundOff[] = "Off";
+@localize { "The sound off text" 1-15 };
+
+@chunk char MenuSoundNoise[] = "Noise";
+@localize { "The sound noise only text" 1-15 };
+
+@chunk char MenuSoundBoth[] = "Noise & Music";
+@localize { "The sound noise and music text" 1-15 };
+
+// Sound
+@chunkArray optr MenuSoundTexts =
+{
+  @MenuSoundOff, @MenuSoundNoise, @MenuSoundBoth
+};
+
+@chunk char MenuJoke1[] = "You eat quiche!";
+@localize { "The 1st joke" 3-77 };
+
+@chunk char MenuJoke2[] = "Come on, we don\'t have all day!";
+@localize { "The 2nd joke" 3-77 };
+
+@chunk char MenuJoke3[] = "Let\'s go!";
+@localize { "The 3rd joke" 3-77 };
+
+@chunk char MenuJoke4[] = "Don\'t wait for GEOS32, play with me!";
+@localize { "The 4th joke" 3-77 };
+
+@chunk char MenuJoke5[] = "To Lad or Der is not a question!";
+@localize { "The 5th joke" 3-77 };
+
+// Joke
+@chunkArray optr MenuJokes =
+{
+  @MenuJoke1, @MenuJoke2, @MenuJoke3, @MenuJoke4, @MenuJoke5
+};
+
+@chunk char MenuBored[] = "I\'m so bored...";
+@localize { "The bored text" 3-77 };
+
+@chunk char MenuExit[] = "Exiting...";
+@localize { "The exiting text" 3-77 };
+
+
+// Translatable strings in Ladder help screen
+@chunk char HelpText0[] = "You are a Lad trapped in a maze.  Your mission is to explore the";
+@localize { "The 1st line in the help screen" 0-77 };
+@chunk char HelpText1[] = "dark corridors never before seen by human eyes and find hidden";
+@localize { "The 2nd line in the help screen" 0-77 };
+@chunk char HelpText2[] = "treasures and riches.";
+@localize { "The 3rd line in the help screen" 0-77 };
+@chunk char HelpText3[] = " ";
+@localize { "The 4th line in the help screen" 0-77 };
+@chunk char HelpText4[] = "You control Lad by typing the direction buttons and jumping by";
+@localize { "The 5th line in the help screen" 0-77 };
+@chunk char HelpText5[] = "typing SPACE.  Type any other key to stop Lad.  But beware of";
+@localize { "The 6th line in the help screen" 0-77 };
+@chunk char HelpText6[] = "the falling rocks called Der rocks.  You must find and grasp the";
+@localize { "The 7th line in the help screen" 0-77 };
+@chunk char HelpText7[] = "treasure (shown as $) BEFORE the bonus time runs out.";
+@localize { "The 8th line in the help screen" 0-77 };
+@chunk char HelpText8[] = " ";
+@localize { "The 9th line in the help screen" 0-77 };
+@chunk char HelpText9[] = "A new Lad will be awarded for every 10\'000 points.  Extra points";
+@localize { "The 10th line in the help screen" 0-77 };
+@chunk char HelpText10[] = "are awarded for touching the gold statues (shown as &).  You";
+@localize { "The 11th line in the help screen" 0-77 };
+@chunk char HelpText11[] = "will receive the bonus time points that are left when you have";
+@localize { "The 12th line in the help screen" 0-77 };
+@chunk char HelpText12[] = "finished the level.";
+@localize { "The 13th line in the help screen" 0-77 };
+@chunk char HelpText13[] = " ";
+@localize { "The 14th line in the help screen" 0-77 };
+@chunk char HelpText14[] = "Remember, there is more than one way to skin a cat. (Chum)";
+@localize { "The 15th line in the help screen" 0-77 };
+@chunk char HelpText15[] = " ";
+@localize { "The 16th line in the help screen" 0-77 };
+@chunk char HelpText16[] = "Type a P to pause the game or an ESCape to end it.  Use CTRL-1 and";
+@localize { "The 17th line in the help screen" 0-77 };
+@chunk char HelpText17[] = "CTRL-2 to change font size or CTRL-0 to enter or leave fullscreen.";
+@localize { "The 18th line in the help screen" 0-77 };
+@chunk char HelpTextWish[] = "Good luck Lad.";
+@localize { "The good wishes text" 3-77 };
+
+// Lookup table for translatable strings in Ladder help screen
+@chunkArray optr ScreenHelpStrings =
+{
+  @HelpText0, @HelpText1, @HelpText2, @HelpText3, @HelpText4,
+  @HelpText5, @HelpText6, @HelpText7, @HelpText8, @HelpText9,
+  @HelpText10, @HelpText11, @HelpText12, @HelpText13, @HelpText14,
+  @HelpText15, @HelpText16, @HelpText17, @HelpTextWish
+};
+
+@chunk byte ScreenHelp[] = {
+  TSPOS(1, 1),
+  TSD_T_CHNK, 0, // ScreenHelpStrings[0] / Text "You are a Lad trapped in a maze.  Your mission is to explore the"
+  TSPOS(2, 1),
+  TSD_T_CHNK, 1, // ScreenHelpStrings[1] / Text "dark corridors never before seen by human eyes and find hidden"
+  TSPOS(3, 1),
+  TSD_T_CHNK, 2, // ScreenHelpStrings[2] / Text "treasures and riches."
+  TSPOS(4, 1),
+  TSD_T_CHNK, 3, // ScreenHelpStrings[3] / Text " "
+  TSPOS(5, 1),
+  TSD_T_CHNK, 4, // ScreenHelpStrings[4] / Text "You control Lad by typing the direction buttons and jumping by"
+  TSPOS(6, 1),
+  TSD_T_CHNK, 5, // ScreenHelpStrings[5] / Text "typing SPACE.  Type any other key to stop Lad.  But beware of"
+  TSPOS(7, 1),
+  TSD_T_CHNK, 6, // ScreenHelpStrings[6] / Text "the falling rocks called Der rocks.  You must find and grasp the"
+  TSPOS(8, 1),
+  TSD_T_CHNK, 7, // ScreenHelpStrings[7] / Text "treasure (shown as $) BEFORE the bonus time runs out."
+  TSPOS(9, 1),
+  TSD_T_CHNK, 8, // ScreenHelpStrings[8] / Text " "
+  TSPOS(10, 1),
+  TSD_T_CHNK, 9, // ScreenHelpStrings[9] / Text "A new Lad will be awarded for every 10\'000 points.  Extra points"
+  TSPOS(11, 1),
+  TSD_T_CHNK, 10, // ScreenHelpStrings[10] / Text "are awarded for touching the gold statues (shown as &).  You"
+  TSPOS(12, 1),
+  TSD_T_CHNK, 11, // ScreenHelpStrings[11] / Text "will receive the bonus time points that are left when you have"
+  TSPOS(13, 1),
+  TSD_T_CHNK, 12, // ScreenHelpStrings[12] / Text "finished the level."
+  TSPOS(14, 1),
+  TSD_T_CHNK, 13, // ScreenHelpStrings[13] / Text " "
+  TSPOS(15, 1),
+  TSD_T_CHNK, 14, // ScreenHelpStrings[14] / Text "Remember, there is more than one way to skin a cat. (Chum)"
+  TSPOS(16, 1),
+  TSD_T_CHNK, 15, // ScreenHelpStrings[15] / Text " "
+  TSPOS(17, 1),
+  TSD_T_CHNK, 16, // ScreenHelpStrings[16] / Text "Type a P to pause the game or an ESCape to end it."
+  TSPOS(18, 1),
+  TSD_T_CHNK, 17, // ScreenHelpStrings[17] / Text " "
+  TSPOS(20, 1),
+  TSD_T_CHNK, 18, // ScreenHelpStrings[18] / Text "Good luck Lad."
+  TSP_T_END
+};
+
+@chunk char HelpInfo[] = "Type ESC to return to main menu:";
+@localize { "The type ESC to return to main menu text" 3-77 };
+
+
+// Translatable strings in Ladder game over screen
+@chunk char OverText0[] = "You lost all lads before you reached the ultimate treasure.  Hence you";
+@localize { "The 1st line of text in the game over screen" 0-77 };
+
+@chunk char OverText1[] = "stay trapped in the maze and must try again from the beginning.";
+@localize { "The 2nd line of text in the game over screen" 0-77 };
+
+@chunk char OverText2[] = " ";
+@localize { "The 3rd line of text in the game over screen" 0-77 };
+
+// Lookup table for translatable strings in Ladder game over screen
+@chunkArray optr ScreenOverStrings =
+{
+  @OverText0, @OverText1, @OverText2
+};
+
+@chunk byte ScreenOver[] = {
+  // Title
+  TSPOS(1, 10),
+  TSD_T_CHAR + 4, 'G', // Text 'GGGG'
+  TSP_T_MOVE, 30,
+  TSD_T_CHAR + 4, 'O', // Text 'OOOO'
+  TSPOS(2, 8),
+  TSD_T_CHAR + 2, 'G', // Text 'GG'
+  TSP_T_MOVE + 4,
+  TSD_T_CHAR + 2, 'G', // Text 'GG'
+  TSP_T_MOVE, 26,
+  TSD_T_CHAR + 2, 'O', // Text 'OO'
+  TSP_T_MOVE + 4,
+  TSD_T_CHAR + 2, 'O', // Text 'OO'
+  TSPOS(3, 8),
+  TSD_T_CHAR + 2, 'G', // Text 'GG'
+  TSP_T_MOVE + 10,
+  TSD_T_CHAR + 1, 'A',
+  TSP_T_MOVE + 4,
+  TSD_T_CHAR + 1, 'M',
+  TSP_T_MOVE + 3,
+  TSD_T_CHAR + 1, 'M',
+  TSP_T_MOVE + 2,
+  TSD_T_CHAR + 5, 'E', // Text 'EEEEE'
+  TSP_T_MOVE + 5,
+  TSD_T_CHAR + 2, 'O', // Text 'OO'
+  TSP_T_MOVE + 4,
+  TSD_T_CHAR + 2, 'O', // Text 'OO'
+  TSP_T_MOVE + 2,
+  TSD_T_CHAR + 1, 'V',
+  TSP_T_MOVE + 3,
+  TSD_T_CHAR + 1, 'V',
+  TSP_T_MOVE + 2,
+  TSD_T_CHAR + 5, 'E', // Text 'EEEEE'
+  TSP_T_MOVE + 2,
+  TSD_T_CHAR + 4, 'R', // Text 'RRRR'
+  TSPOS(4, 8),
+  TSD_T_CHAR + 2, 'G', // Text 'GG'
+  TSP_T_MOVE + 2,
+  TSD_T_CHAR + 3, 'G', // Text 'GGG'
+  TSP_T_MOVE + 4,
+  TSD_T_CHAR + 1, 'A',
+  TSP_T_MOVE + 1,
+  TSD_T_CHAR + 1, 'A',
+  TSP_T_MOVE + 3,
+  TSD_T_CHAR + 2, 'M', // Text 'MM'
+  TSP_T_MOVE + 1,
+  TSD_T_CHAR + 2, 'M', // Text 'MM'
+  TSP_T_MOVE + 2,
+  TSD_T_CHAR + 1, 'E',
+  TSP_T_MOVE + 9,
+  TSD_T_CHAR + 2, 'O', // Text 'OO'
+  TSP_T_MOVE + 4,
+  TSD_T_CHAR + 2, 'O', // Text 'OO'
+  TSP_T_MOVE + 2,
+  TSD_T_CHAR + 1, 'V',
+  TSP_T_MOVE + 3,
+  TSD_T_CHAR + 1, 'V',
+  TSP_T_MOVE + 2,
+  TSD_T_CHAR + 1, 'E',
+  TSP_T_MOVE + 6,
+  TSD_T_CHAR + 1, 'R',
+  TSP_T_MOVE + 3,
+  TSD_T_CHAR + 1, 'R',
+  TSPOS(5, 8),
+  TSD_T_CHAR + 2, 'G', // Text 'GG'
+  TSP_T_MOVE + 4,
+  TSD_T_CHAR + 2, 'G', // Text 'GG'
+  TSP_T_MOVE + 3,
+  TSD_T_CHAR + 3, 'A', // Text 'AAA'
+  TSP_T_MOVE + 3,
+  TSD_T_CHAR + 1, 'M',
+  TSP_T_MOVE + 1,
+  TSD_T_CHAR + 1, 'M',
+  TSP_T_MOVE + 1,
+  TSD_T_CHAR + 1, 'M',
+  TSP_T_MOVE + 2,
+  TSD_T_CHAR + 4, 'E', // Text 'EEEE'
+  TSP_T_MOVE + 6,
+  TSD_T_CHAR + 2, 'O', // Text 'OO'
+  TSP_T_MOVE + 4,
+  TSD_T_CHAR + 2, 'O', // Text 'OO'
+  TSP_T_MOVE + 3,
+  TSD_T_CHAR + 1, 'V',
+  TSP_T_MOVE + 1,
+  TSD_T_CHAR + 1, 'V',
+  TSP_T_MOVE + 3,
+  TSD_T_CHAR + 4, 'E', // Text 'EEEE'
+  TSP_T_MOVE + 3,
+  TSD_T_CHAR + 4, 'R', // Text 'RRRR'
+  TSPOS(6, 8),
+  TSD_T_CHAR + 2, 'G', // Text 'GG'
+  TSP_T_MOVE + 4,
+  TSD_T_CHAR + 2, 'G', // Text 'GG'
+  TSP_T_MOVE, 2,
+  TSD_T_CHAR + 1, 'A',
+  TSP_T_MOVE + 3,
+  TSD_T_CHAR + 1, 'A',
+  TSP_T_MOVE + 2,
+  TSD_T_CHAR + 1, 'M',
+  TSP_T_MOVE + 3,
+  TSD_T_CHAR + 1, 'M',
+  TSP_T_MOVE + 2,
+  TSD_T_CHAR + 1, 'E',
+  TSP_T_MOVE + 9,
+  TSD_T_CHAR + 2, 'O', // Text 'OO'
+  TSP_T_MOVE + 4,
+  TSD_T_CHAR + 2, 'O', // Text 'OO'
+  TSP_T_MOVE + 3,
+  TSD_T_CHAR + 1, 'V',
+  TSP_T_MOVE + 1,
+  TSD_T_CHAR + 1, 'V',
+  TSP_T_MOVE + 3,
+  TSD_T_CHAR + 1, 'E',
+  TSP_T_MOVE + 6,
+  TSD_T_CHAR + 1, 'R',
+  TSP_T_MOVE + 2,
+  TSD_T_CHAR + 1, 'R',
+  TSPOS(7, 10),
+  TSD_T_CHAR + 4, 'G', // Text 'GGGG'
+  TSP_T_MOVE, 4,
+  TSD_T_CHAR + 1, 'A',
+  TSP_T_MOVE, 3,
+  TSD_T_CHAR + 1, 'A',
+  TSP_T_MOVE, 2,
+  TSD_T_CHAR + 1, 'M',
+  TSP_T_MOVE, 3,
+  TSD_T_CHAR + 1, 'M',
+  TSP_T_MOVE, 2,
+  TSD_T_CHAR + 5, 'E', // Text 'EEEEE'
+  TSP_T_MOVE, 7,
+  TSD_T_CHAR + 4, 'O', // Text 'OOOO'
+  TSP_T_MOVE, 6,
+  TSD_T_CHAR + 1, 'V',
+  TSP_T_MOVE, 4,
+  TSD_T_CHAR + 5, 'E', // Text 'EEEEE'
+  TSP_T_MOVE, 2,
+  TSD_T_CHAR + 1, 'R',
+  TSP_T_MOVE, 3,
+  TSD_T_CHAR + 1, 'R',
+  // Text
+  TSPOS(10, 1),
+  TSD_T_CHNK, 0, // ScreenOverStrings[0] / Text "You lost all lads before you reached the ultimate treasure.  Hence you"
+  TSPOS(11, 1),
+  TSD_T_CHNK, 1, // ScreenOverStrings[1] / Text "stay trapped in the maze and must try again from the beginning."
+  TSPOS(12, 1),
+  TSD_T_CHNK, 2, // ScreenOverStrings[2] / Text " "
+  TSP_T_END
+};
+
+@chunk char OverInfo[] = "Type RETURN to continue:";
+@localize { "The type RETURN to contiune text in the game over screen" 3-77 };
+
+
+// Translatable strings in Ladder done screen
+@chunk char DoneText0[] = "You escaped the maze and are free again.  While leaving the maze,";
+@localize { "The 1st line in the done screen" 0-77 };
+@chunk char DoneText1[] = "it imploded into a wonderful green sparkling geode.";
+@localize { "The 2nd line in the done screen" 0-77 };
+@chunk char DoneText2[] = " ";
+@localize { "The 3rd line in the done screen" 0-77 };
+@chunk char DoneText3[] = "With the treasures and riches you bought an old factory of ladders.";
+@localize { "The 4th line in the done screen" 0-77 };
+@chunk char DoneText4[] = "There you will assemble ladders until the end of time.";
+@localize { "The 5th line in the done screen" 0-77 };
+@chunk char DoneText5[] = " ";
+@localize { "The 6th line in the done screen" 0-77 };
+
+// Lookup table for translatable strings in Ladder done screen
+@chunkArray optr ScreenDoneStrings =
+{
+  @DoneText0, @DoneText1, @DoneText2, @DoneText3, @DoneText4, @DoneText5
+};
+
+@chunk byte ScreenDone[] = {
+  // Title
+  TSPOS(1, 15),
+  TSD_T_CHAR + 8, 'T', // Text "TTTTTTTT"
+  TSP_T_MOVE + 2,
+  TSD_T_CHAR + 1, 'H', // Text "H"
+  TSP_T_MOVE + 3,
+  TSD_T_CHAR + 1, 'H', // Text "H"
+  TSP_T_MOVE + 2,
+  TSD_T_CHAR + 5, 'E', // Text "EEEEE"
+  TSP_T_MOVE + 5,
+  TSD_T_CHAR + 8, 'E', // Text "EEEEEEEE"
+  TSP_T_MOVE + 2,
+  TSD_T_CHAR + 1, 'N', // Text "N"
+  TSP_T_MOVE + 3,
+  TSD_T_CHAR + 1, 'N', // Text "N"
+  TSP_T_MOVE + 2,
+  TSD_T_CHAR + 4, 'D', // Text "DDDD"
+  TSPOS(2, 18),
+  TSD_T_CHAR + 2, 'T', // Text "TT"
+  TSP_T_MOVE + 5,
+  TSD_T_CHAR + 1, 'H', // Text "H"
+  TSP_T_MOVE + 3,
+  TSD_T_CHAR + 1, 'H', // Text "H"
+  TSP_T_MOVE + 2,
+  TSD_T_CHAR + 1, 'E', // Text "E"
+  TSP_T_MOVE + 9,
+  TSD_T_CHAR + 2, 'E', // Text "EE"
+  TSP_T_MOVE + 8,
+  TSD_T_CHAR + 2, 'N', // Text "NN"
+  TSP_T_MOVE + 2,
+  TSD_T_CHAR + 1, 'N', // Text "N"
+  TSP_T_MOVE + 2,
+  TSD_T_CHAR + 1, 'D', // Text "D"
+  TSP_T_MOVE + 3,
+  TSD_T_CHAR + 1, 'D', // Text "D"
+  TSPOS(3, 18),
+  TSD_T_CHAR + 2, 'T', // Text "TT"
+  TSP_T_MOVE + 5,
+  TSD_T_CHAR + 5, 'H', // Text "HHHHH"
+  TSP_T_MOVE + 2,
+  TSD_T_CHAR + 4, 'E', // Text "EEEE"
+  TSP_T_MOVE + 6,
+  TSD_T_CHAR + 2, 'E', // Text "EE"
+  TSP_T_MOVE + 8,
+  TSD_T_TEXT + 5,
+    'N', ' ', 'N', ' ', 'N',
+  TSP_T_MOVE + 2,
+  TSD_T_CHAR + 1, 'D', // Text "D"
+  TSP_T_MOVE + 3,
+  TSD_T_CHAR + 1, 'D', // Text "D"
+  TSPOS(4, 18),
+  TSD_T_CHAR + 2, 'T', // Text "TT"
+  TSP_T_MOVE + 5,
+  TSD_T_CHAR + 1, 'H', // Text "H"
+  TSP_T_MOVE + 3,
+  TSD_T_CHAR + 1, 'H', // Text "H"
+  TSP_T_MOVE + 2,
+  TSD_T_CHAR + 1, 'E', // Text "E"
+  TSP_T_MOVE + 9,
+  TSD_T_CHAR + 6, 'E', // Text "EEEEEEEE"
+  TSP_T_MOVE + 4,
+  TSD_T_CHAR + 1, 'N', // Text "N"
+  TSP_T_MOVE + 2,
+  TSD_T_CHAR + 2, 'N', // Text "NN"
+  TSP_T_MOVE + 2,
+  TSD_T_CHAR + 1, 'D', // Text "D"
+  TSP_T_MOVE + 3,
+  TSD_T_CHAR + 1, 'D', // Text "D"
+  TSPOS(5, 18),
+  TSD_T_CHAR + 2, 'T', // Text "TT"
+  TSP_T_MOVE + 5,
+  TSD_T_CHAR + 1, 'H', // Text "H"
+  TSP_T_MOVE + 3,
+  TSD_T_CHAR + 1, 'H', // Text "H"
+  TSP_T_MOVE + 2,
+  TSD_T_CHAR + 5, 'E', // Text "EEEEE"
+  TSP_T_MOVE + 5,
+  TSD_T_CHAR + 2, 'E', // Text "EE"
+  TSP_T_MOVE + 8,
+  TSD_T_CHAR + 1, 'N', // Text "N"
+  TSP_T_MOVE + 3,
+  TSD_T_CHAR + 1, 'N', // Text "N"
+  TSP_T_MOVE + 2,
+  TSD_T_CHAR + 4, 'D', // Text "DDDD"
+  TSPOS(6, 18),
+  TSD_T_CHAR + 2, 'T', // Text "TT"
+  TSP_T_MOVE, 22,
+  TSD_T_CHAR + 2, 'E', // Text "EE"
+  TSPOS(7, 18),
+  TSD_T_CHAR + 2, 'T', // Text "TT"
+  TSP_T_MOVE, 22,
+  TSD_T_CHAR + 8, 'E', // Text "EE"
+  // Text
+  TSPOS(10, 1),
+  TSD_T_CHNK, 0, // ScreenDoneStrings[0] / Text "You escaped the maze and are free again.  While leaving the maze,"
+  TSPOS(11, 1),
+  TSD_T_CHNK, 1, // ScreenDoneStrings[1] / Text "it imploded into a wonderful green sparkling geode."
+  TSPOS(12, 1),
+  TSD_T_CHNK, 2, // ScreenDoneStrings[2] / Text " "
+  TSPOS(13, 1),
+  TSD_T_CHNK, 3, // ScreenDoneStrings[3] / Text "With the treasures and riches you bought an old factory of ladders."
+  TSPOS(14, 1),
+  TSD_T_CHNK, 4, // ScreenDoneStrings[4] / Text "There you will assemble ladders until the end of time."
+  TSPOS(15, 1),
+  TSD_T_CHNK, 5, // ScreenDoneStrings[5] / Text " "
+  TSP_T_END
+};
+
+@chunk char DoneInfo[] = "Type RETURN to continue:";
+@localize { "The type RETURN to contiune text in the done screen" 3-77 };
+
+
+// Translatable strings in Ladder high score screen
+@chunk char HighText0[] = "YAHOO! YAHOO! YAHOO! YAHOO! YAHOO! YAHOO! YAHOO!";
+//@localize { "The YAHOO text in the high score screen" 45-55 };
+@localize not;
+
+@chunk char HighText1[] = "Enter your name";
+@localize { "The enter your name label in the high score screen" 3-21 };
+
+// Lookup table for translatable strings in Ladder high score screen
+@chunkArray optr ScreenHighStrings =
+{
+  @HighText0, @HighText1
+};
+
+@chunk byte ScreenHigh[] = {
+  // Title
+  TSPOS(6, SCN_MID_COL),
+  TSD_T_CHNK | TSD_A_CENTER, 0, // ScreenHighStrings[0] / Text "YAHOO! YAHOO! YAHOO! YAHOO! YAHOO! YAHOO! YAHOO!"
+  // Text
+  TSPOS(12, 37),
+  TSD_T_CHNK | TSD_A_RIGHT, 1, // ScreenHighStrings[1] / Text "Enter your name"
+  TSPOS(12, 39),
+  TSD_T_CHAR + 1, ':', // Text ":"
+  TSP_T_END
+};
+
+@chunk char HighInfo[] = "Type RETURN to save or type ESC to skip:";
+@localize { "The type RETURN to save or ESC to skip text in the high score screen" 3-77 };
+
+
+@chunk char HighCompliment1[] = "You really don\'t deserve this but...";
+@localize { "The 1st level of compliment text in the high score screen" 3-77 };
+
+@chunk char HighCompliment2[] = "Not bad for a young Lad.";
+@localize { "The 2nd level of compliment text in the high score screen" 3-77 };
+
+@chunk char HighCompliment3[] = "Amazing!  You rate!!";
+@localize { "The 3rd level of compliment text in the high score screen" 3-77 };
+
+@chunk char HighCompliment4[] = "Looks like we have a Lad-Der here!";
+@localize { "The 4th level of compliment text in the high score screen" 3-77 };
+
+@chunk char HighCompliment5[] = "Yeah!  Now you are a Lad-Wiz!";
+@localize { "The 5th level of compliment text in the high score screen" 3-77 };
+
+@chunk char HighCompliment6[] = "Wow!  You are now a Lad-Guru!";
+@localize { "The 6th level of compliment text in the high score screen" 3-77 };
+
+@chunk char HighCompliment7[] = "You are a true Lad-Master!!!";
+@localize { "The 7th level of compliment text in the high score screen" 3-77 };
+
+// Points, Compliment
+@chunkArray GLRate HighRatings =
+{
+  {
+    0, @HighCompliment1
+  },
+  {
+    100, @HighCompliment2
+  },
+  {
+    200, @HighCompliment3
+  },
+  {
+    500, @HighCompliment4
+  },
+  {
+    1000, @HighCompliment5
+  },
+  {
+    2000, @HighCompliment6
+  },
+  {
+    5000, @HighCompliment7
+  }
+};
+
+@chunk char HighNoName[] = "No name";
+@localize { "The no name text in the high score list" 3-20 };
+
+@chunk char HighSave[] = "Updating high scores...";
+@localize { "The updating high scores text in the high score screen" 3-77 };
+
+@end TEXT;
+
+
+/*
+ ***************************************************************************
+ *                  RESOURCE Game
+ ***************************************************************************
+ */
+
+@start GAME, data;
+
+// Type, Size, Width, Height
+@chunkArray GLFont FontConfigs =
+{
+  {
+    FID_BISON, MakeWWFixed(9.0), 7, 12
+  },
+  {
+    FID_BISON, MakeWWFixed(12.0), 8, 16
+  },
+  {
+    FID_BISON, MakeWWFixed(14.0), 10, 20
+  }
+};
+
+@chunk char LadderHelpFile[] = "GeoLadder Help";
+@localize { "The GeoLadder help file name" 3-32 };
+
+@chunk char LadderWarnVideoTooSmall[] = "The current video resolution is too small! We need at least 640 x 350 pixel.";
+@localize "The current video resolution too small warning";
+
+@chunk char DemoInfo[] = "Type ESC to abort the demonstration:";
+@localize { "The type ESC to abort the demonstration text in the play screen" 3-77 };
+
+
+// Translatable strings in Ladder load screen
+@chunk char LoadText0[] = ".:: LOADING LEVEL ::.";
+@localize { "The loading level text in the load screen" 18-25 };
+
+@chunk char LoadText1[] = "Round";
+@localize { "The round label in the load screen" 3-8 };
+
+@chunk char LoadText2[] = "Level";
+@localize { "The level label in the load screen" 3-8 };
+
+@chunk char LoadText3[] = "Please wait...";
+@localize { "The please wait text in the load screen" 3-15 };
+
+// Lookup table for translatable strings in Ladder load screen
+@chunkArray optr ScreenLoadStrings =
+{
+  @LoadText0, @LoadText1, @LoadText2, @LoadText3
+};
+
+@chunk byte ScreenLoad[] = {
+  TSPOS(6, SCN_MID_COL),
+  TSD_T_CHNK | TSD_A_CENTER, 0, // ScreenLoadStrings[0] / Text ".:: LOADING LEVEL ::."
+  TSPOS(9, 23),
+  TSD_T_CHAR + 3, '<', // Text "<<<"
+  TSPOS(9, 54),
+  TSD_T_CHAR + 3, '>', // Text ">>>"
+  TSPOS(12, 33),
+  TSD_T_CHNK, 1, // ScreenLoadStrings[1] / Text "Round:"
+  TSPOS(12, 43),
+  TSD_T_CHAR + 1, ':', // Text ":"
+  TSPOS(13, 33),
+  TSD_T_CHNK, 2, // ScreenLoadStrings[2] / Text "Level:"
+  TSPOS(13, 43),
+  TSD_T_CHAR + 1, ':', // Text ":"
+  TSPOS(18, SCN_MID_COL),
+  TSD_T_CHNK | TSD_A_CENTER, 3, // ScreenLoadStrings[0] / Text "Please wait..."
+  TSP_T_END
+};
+
+
+// Translatable strings in Ladder play screen
+@chunk char PlayLads[] = "Lads";
+@localize { "The Lads label in the play screen" 3-5 };
+
+@chunk char PlayRound[] = "Round";
+@localize { "The round label in the play screen" 3-8 };
+
+@chunk char PlayScore[] = "Score";
+@localize { "The score label in the play screen" 3-8 };
+
+@chunk char PlayBonusTime[] = "Bonus time";
+@localize { "The bonus time label in the play screen" 3-12 };
+
+// Lookup table for translatable strings in Ladder play screen
+@chunkArray optr ScreenGameStrings =
+{
+  @PlayLads, @PlayRound, @PlayScore, @PlayBonusTime
+};
+
+@chunk byte ScreenGame[] = {
+  TSPOS(20, 1),
+  TSD_T_CHNK, 0, // ScreenGameStrings[0] / Text "Lads"
+  TSPOS(20, 21),
+  TSD_T_CHNK | TSD_A_RIGHT, 1, // ScreenGameStrings[1] / Text "Round"
+  TSPOS(20, 37),
+  TSD_T_CHNK | TSD_A_RIGHT, 2, // ScreenGameStrings[2] / Text "Score"
+  TSPOS(20, 71),
+  TSD_T_CHNK | TSD_A_RIGHT, 3, // ScreenGameStrings[3] / Text "Bonus time"
+  TSP_T_END
+};
+
+@chunk char PlayReady[] = "Get ready!";
+@localize { "The get ready text in the play screen" 3-77 };
+
+@chunk char PlayGo[] = "GO! GO! GO!";
+@localize { "The go text in the play screen" 3-77 };
+
+@chunk char PlayHurry[] = "HURRY UP!!!";
+@localize { "The hurry up text in the play screen" 3-77 };
+
+@chunk char PlayHooka[] = "Hooka!";
+@localize { "The hooka text in the play screen" 3-77 };
+
+@chunk char PlayContinue[] = "Type RETURN to continue:";
+@localize { "The type RETURN to contiune text in the play screen" 3-77 };
+
+
+@chunk char GameLevel1Name[] = "Easy Street";
+@localize { "The name of the 1st level" 3-25 };
+
+@chunk char GameLevel2Name[] = "Long Island";
+@localize { "The name of the 2nd level" 3-25 };
+
+@chunk char GameLevel3Name[] = "Ghost Town";
+@localize { "The name of the 3rd level" 3-25 };
+
+@chunk char GameLevel4Name[] = "Tunnel Vision";
+@localize { "The name of the 4th level" 3-25 };
+
+@chunk char GameLevel5Name[] = "Point of No Return";
+@localize { "The name of the 5th level" 3-25 };
+
+@chunk char GameLevel6Name[] = "Bug City";
+@localize { "The name of the 6th level" 3-25 };
+
+@chunk char GameLevel7Name[] = "Gang Land";
+@localize { "The name of the 7th level" 3-25 };
+
+
+// Data of Level 1
+@chunk byte GameLevel1Data[] = {
+  // Horizontal drawings
+  LSPOS(LSP_T_SET | LSO_T_H, 0, 39),
+  LSD_T_EMIT + 1,
+  LSPOS(LSP_T_SET | LSO_T_H, 3, 7),
+  LSD_T_BASE, 60,
+  LSPOS(LSP_T_SET | LSO_T_H, 7, 0),
+  LSD_T_BASE, 46,
+  LSP_T_MOVE + 3,
+  LSD_T_BASE, 30,
+  LSPOS(LSP_T_SET | LSO_T_H, 8, 68),
+  LSD_T_WALL + 1,
+  LSP_T_MOVE + 7,
+  LSD_T_WALL + 1,
+  LSPOS(LSP_T_SET | LSO_T_H, 9, 67),
+  LSD_T_TEXT + 11, 'E', 'a', 's', 'y', ' ', 'S', 't', 'r', 'e', 'e', 't',
+  LSPOS(LSP_T_SET | LSO_T_H, 11, 7),
+  LSD_T_BASE, 30,
+  LSP_T_MOVE + 2,
+  LSD_T_BASE, 23,
+  LSPOS(LSP_T_SET | LSO_T_H, 15, 0),
+  LSD_T_BASE, 23,
+  LSP_T_MOVE + 1,
+  LSD_T_BASE, 22,
+  LSP_T_MOVE + 1,
+  LSD_T_BASE, 24,
+  LSPOS(LSP_T_SET | LSO_T_H, 18, 0),
+  LSD_T_RECV + 1,
+  LSPOS(LSP_T_SET | LSO_T_H, 18, 78),
+  LSD_T_RECV + 1,
+  // Vertical drawings
+  LSPOS(LSP_T_SET | LSO_T_V, 2, 16),
+  LSD_T_LADDER + 6,
+  LSD_T_GOLD + 1,
+  LSP_T_MOVE + 1,
+  LSD_T_LADDER + 5,
+  LSPOS(LSP_T_SET | LSO_T_V, 6, 27),
+  LSD_T_LADDER + 3,
+  LSP_T_MOVE + 2,
+  LSD_T_LADDER + 1,
+  LSPOS(LSP_T_SET | LSO_T_V, 0, 57),
+  LSD_T_EXIT + 1,
+  LSD_T_LADDER + 2,
+  LSP_T_MOVE + 3,
+  LSD_T_LADDER + 5,
+  LSP_T_MOVE + 3,
+  LSD_T_LADDER + 5,
+  LSP_T_END
+};
+
+// Data of Level 2
+@chunk byte GameLevel2Data[] = {
+  // Horizontal drawings
+  LSPOS(LSP_T_SET | LSO_T_H, 1, 67),
+  LSD_T_GOLD + 1,
+  LSPOS(LSP_T_SET | LSO_T_H, 2, 12),
+  LSD_T_WALL + 1,
+  LSD_T_EMIT + 1,
+  LSPOS(LSP_T_SET | LSO_T_H, 2, 67),
+  LSD_T_EMIT + 1,
+  LSD_T_WALL + 1,
+  LSPOS(LSP_T_SET | LSO_T_H, 3, 0),
+  LSD_T_BASE, 28,
+  LSP_T_MOVE + 1,
+  LSD_T_BASE, 25,
+  LSP_T_MOVE + 1,
+  LSD_T_BASE, 22,
+  LSPOS(LSP_T_SET | LSO_T_H, 6, 25),
+  LSD_T_GOLD + 1,
+  LSP_T_MOVE + 1,
+  LSD_T_WALL + 1,
+  LSPOS(LSP_T_SET | LSO_T_H, 6, 53),
+  LSD_T_BALL + 1,
+  LSP_T_MOVE + 1,
+  LSD_T_BALL + 1,
+  LSPOS(LSP_T_SET | LSO_T_H, 7, 0),
+  LSD_T_BASE, 26,
+  LSP_T_MOVE + 1,
+  LSD_T_BASE + 6,
+  LSP_T_MOVE + 2,
+  LSD_T_BASE, 19,
+  LSP_T_MOVE + 1,
+  LSD_T_BASE, 22,
+  LSPOS(LSP_T_SET | LSO_T_H, 10, 52),
+  LSD_T_BALL + 1,
+  LSP_T_MOVE + 2,
+  LSD_T_BALL + 1,
+  LSPOS(LSP_T_SET | LSO_T_H, 11, 0),
+  LSD_T_BASE, 26,
+  LSP_T_MOVE + 3,
+  LSD_T_BASE + 6,
+  LSP_T_MOVE + 2,
+  LSD_T_BASE, 16,
+  LSP_T_MOVE + 2,
+  LSD_T_BASE, 22,
+  LSPOS(LSP_T_SET | LSO_T_H, 14, 52),
+  LSD_T_BALL + 1,
+  LSP_T_MOVE + 3,
+  LSD_T_BALL + 1,
+  LSPOS(LSP_T_SET | LSO_T_H, 15, 0),
+  LSD_T_BASE, 25,
+  LSP_T_MOVE + 2,
+  LSD_T_BASE + 8,
+  LSP_T_MOVE + 4,
+  LSD_T_BASE + 14,
+  LSP_T_MOVE + 3,
+  LSD_T_BASE, 21,
+  LSPOS(LSP_T_SET | LSO_T_H, 17, 0),
+  LSD_T_BASE + 14,
+  LSPOS(LSP_T_SET | LSO_T_H, 18, 1),
+  LSD_T_TEXT + 11, 'L', 'o', 'n', 'g', ' ', 'I', 's', 'l', 'a', 'n', 'd',
+  LSP_T_MOVE + 1,
+  LSD_T_WALL + 1,
+  LSP_T_MOVE + 13,
+  LSD_T_RECV + 1,
+  LSPOS(LSP_T_SET | LSO_T_H, 18, 54),
+  LSD_T_RECV + 1,
+  // Vertical drawings
+  LSPOS(LSP_T_SET | LSO_T_V, 2, 4),
+  LSD_T_LADDER + 5,
+  LSP_T_MOVE + 3,
+  LSD_T_LADDER + 5,
+  LSPOS(LSP_T_SET | LSO_T_V, 13, 27),
+  LSD_T_WALL + 2,
+  LSPOS(LSP_T_SET | LSO_T_V, 9, 34),
+  LSD_T_WALL + 2,
+  LSPOS(LSP_T_SET | LSO_T_V, 17, 36),
+  LSD_T_WALL + 2,
+  LSPOS(LSP_T_SET | LSO_T_V, 0, 74),
+  LSD_T_EXIT + 1,
+  LSD_T_LADDER + 2,
+  LSP_T_MOVE + 3,
+  LSD_T_LADDER + 5,
+  LSP_T_MOVE + 3,
+  LSD_T_LADDER + 5,
+  LSP_T_END
+};
+
+// Data of Level 3
+@chunk byte GameLevel3Data[] = {
+  // Horizontal drawings
+  LSPOS(LSP_T_SET | LSO_T_H, 0, 28),
+  LSD_T_EMIT + 1,
+  LSPOS(LSP_T_SET | LSO_T_H, 0, 44),
+  LSD_T_EMIT + 1,
+  LSP_T_MOVE + 11,
+  LSD_T_EMIT + 1,
+  LSPOS(LSP_T_SET | LSO_T_H, 0, 72),
+  LSD_T_EXIT + 1,
+  LSPOS(LSP_T_SET | LSO_T_H, 1, 71),
+  LSD_T_EXIT + 3,
+  LSPOS(LSP_T_SET | LSO_T_H, 2, 70),
+  LSD_T_EXIT + 5,
+  LSPOS(LSP_T_SET | LSO_T_H, 3, 0),
+  LSD_T_BASE + 14,
+  LSPOS(LSP_T_SET | LSO_T_H, 3, 62),
+  LSD_T_BASE, 16,
+  LSPOS(LSP_T_SET | LSO_T_H, 5, 41),
+  LSD_T_GOLD + 1,
+  LSPOS(LSP_T_SET | LSO_T_H, 6, 5),
+  LSD_T_BASE + 14,
+  LSP_T_MOVE + 3,
+  LSD_T_BASE + 4,
+  LSP_T_MOVE + 5,
+  LSD_T_BASE + 1,
+  LSP_T_MOVE + 4,
+  LSD_T_BASE + 6,
+  LSP_T_MOVE + 4,
+  LSD_T_BASE + 1,
+  LSP_T_MOVE + 3,
+  LSD_T_BASE + 4,
+  LSP_T_MOVE + 4,
+  LSD_T_BASE + 11,
+  LSPOS(LSP_T_SET | LSO_T_H, 7, 19),
+  LSD_T_TRAP + 3,
+  LSP_T_MOVE + 4,
+  LSD_T_TRAP + 5,
+  LSP_T_MOVE + 1,
+  LSD_T_TRAP + 4,
+  LSP_T_MOVE + 6,
+  LSD_T_TRAP + 4,
+  LSP_T_MOVE + 1,
+  LSD_T_TRAP + 3,
+  LSP_T_MOVE + 4,
+  LSD_T_TRAP + 3,
+  LSPOS(LSP_T_SET | LSO_T_H, 9, 10),
+  LSD_T_WALL + 1,
+  LSPOS(LSP_T_SET | LSO_T_H, 9, 62),
+  LSD_T_GOLD + 1,
+  LSPOS(LSP_T_SET | LSO_T_H, 10, 10),
+  LSD_T_BASE, 53,
+  LSP_T_MOVE + 1,
+  LSD_T_BASE + 11,
+  LSPOS(LSP_T_SET | LSO_T_H, 11, 13),
+  LSD_T_GOLD + 1,
+  LSPOS(LSP_T_SET | LSO_T_H, 13, 14),
+  LSD_T_WALL + 1,
+  LSPOS(LSP_T_SET | LSO_T_H, 14, 14),
+  LSD_T_BASE, 64,
+  LSPOS(LSP_T_SET | LSO_T_H, 17, 32),
+  LSD_T_TRAP + 1,
+  LSPOS(LSP_T_SET | LSO_T_H, 18, 0),
+  LSD_T_RECV + 1,
+  LSPOS(LSP_T_SET | LSO_T_H, 18, 31),
+  LSD_T_TRAP + 3,
+  LSPOS(LSP_T_SET | LSO_T_H, 18, 78),
+  LSD_T_RECV + 1,
+  // Vertical drawings
+  LSPOS(LSP_T_SET | LSO_T_V, 7, 4),
+  LSD_T_TEXT + 5, 'G', 'h', 'o', 's', 't',
+  LSP_T_MOVE + 2,
+  LSD_T_TEXT + 4, 'T', 'o', 'w', 'n',
+  LSPOS(LSP_T_SET | LSO_T_V, 2, 10),
+  LSD_T_LADDER + 4,
+  LSPOS(LSP_T_SET | LSO_T_V, 9, 32),
+  LSD_T_LADDER + 6,
+  LSPOS(LSP_T_SET | LSO_T_V, 13, 50),
+  LSD_T_LADDER + 3,
+  LSPOS(LSP_T_SET | LSO_T_V, 2, 63),
+  LSD_T_LADDER + 5,
+  LSPOS(LSP_T_SET | LSO_T_V, 8, 70),
+  LSD_T_WALL + 2,
+  LSP_T_MOVE + 3,
+  LSD_T_LADDER + 6,
+  LSPOS(LSP_T_SET | LSO_T_V, 2, 78),
+  LSD_T_LADDER + 5,
+  LSD_T_EXIT + 1,
+  LSP_T_END
+};
+
+// Data of Level 4
+@chunk byte GameLevel4Data[] = {
+  // Horizontal drawings
+  LSPOS(LSP_T_SET | LSO_T_H, 0, 44),
+  LSD_T_EMIT + 1,
+  LSPOS(LSP_T_SET | LSO_T_H, 0, 68),
+  LSD_T_EMIT + 1,
+  LSPOS(LSP_T_SET | LSO_T_H, 2, 45),
+  LSD_T_WALL + 1,
+  LSPOS(LSP_T_SET | LSO_T_H, 3, 0),
+  LSD_T_BASE + 11,
+  LSD_T_BASE2 + 2,
+  LSD_T_BASE, 33,
+  LSP_T_MOVE + 5,
+  LSD_T_BASE + 3,
+  LSD_T_BASE2 + 4,
+  LSD_T_BASE, 16,
+  LSPOS(LSP_T_SET | LSO_T_H, 4, 36),
+  LSD_T_WALL + 1,
+  LSD_T_GOLD + 2,
+  LSPOS(LSP_T_SET | LSO_T_H, 5, 36),
+  LSD_T_BASE, 18,
+  LSPOS(LSP_T_SET | LSO_T_H, 6, 43),
+  LSD_T_TEXT + 6, 'T', 'u', 'n', 'n', 'e', 'l',
+  LSPOS(LSP_T_SET | LSO_T_H, 7, 17),
+  LSD_T_BASE + 7,
+  LSD_T_BASE2 + 3,
+  LSD_T_BASE + 3,
+  LSD_T_BASE2 + 4,
+  LSD_T_BASE, 19,
+  LSPOS(LSP_T_SET | LSO_T_H, 8, 15),
+  LSD_T_WALL + 1,
+  LSPOS(LSP_T_SET | LSO_T_H, 8, 43),
+  LSD_T_TEXT + 6, 'V', 'i', 's', 'i', 'o', 'n',
+  LSPOS(LSP_T_SET | LSO_T_H, 9, 15),
+  LSD_T_BASE + 9,
+  LSD_T_BASE2 + 3,
+  LSD_T_GOLD + 1,
+  LSP_T_MOVE + 6,
+  LSD_T_BASE2 + 5,
+  LSD_T_BASE + 12,
+  LSPOS(LSP_T_SET | LSO_T_H, 10, 53),
+  LSD_T_WALL + 1,
+  LSPOS(LSP_T_SET | LSO_T_H, 11, 18),
+  LSD_T_BASE + 9,
+  LSD_T_BASE2 + 4,
+  LSD_T_BASE + 3,
+  LSD_T_BASE2 + 4,
+  LSD_T_BASE, 16,
+  LSP_T_MOVE + 11,
+  LSD_T_BASE + 14,
+  LSPOS(LSP_T_SET | LSO_T_H, 14, 0),
+  LSD_T_BASE + 4,
+  LSD_T_BASE2 + 3,
+  LSD_T_BASE + 4,
+  LSPOS(LSP_T_SET | LSO_T_H, 15, 15),
+  LSD_T_BASE, 16,
+  LSD_T_BASE2 + 3,
+  LSD_T_BASE + 3,
+  LSD_T_BASE2 + 3,
+  LSD_T_BASE, 19,
+  LSPOS(LSP_T_SET | LSO_T_H, 16, 4),
+  LSD_T_BASE + 3,
+  LSPOS(LSP_T_SET | LSO_T_H, 17, 5),
+  LSD_T_EXIT + 1,
+  LSPOS(LSP_T_SET | LSO_T_H, 17, 68),
+  LSD_T_BASE + 11,
+  LSPOS(LSP_T_SET | LSO_T_H, 18, 1),
+  LSD_T_RECV + 1,
+  LSP_T_MOVE + 2,
+  LSD_T_EXIT + 3,
+  LSP_T_MOVE + 2,
+  LSD_T_RECV + 1,
+  LSP_T_MOVE + 4,
+  LSD_T_RECV + 1,
+  LSPOS(LSP_T_SET | LSO_T_H, 18, 31),
+  LSD_T_RECV + 1,
+  LSP_T_MOVE + 7,
+  LSD_T_RECV + 1,
+  LSPOS(LSP_T_SET | LSO_T_H, 18, 61),
+  LSD_T_RECV + 1,
+  LSP_T_MOVE + 8,
+  LSD_T_RECV + 1,
+  // Vertical drawings
+  LSPOS(LSP_T_SET | LSO_T_V, 15, 0),
+  LSD_T_WALL + 4,
+  LSPOS(LSP_T_SET | LSO_T_V, 2, 5),
+  LSD_T_LADDER + 10,
+  LSPOS(LSP_T_SET | LSO_T_V, 15, 10),
+  LSD_T_WALL + 4,
+  LSPOS(LSP_T_SET | LSO_T_V, 10, 17),
+  LSD_T_LADDER + 5,
+  LSPOS(LSP_T_SET | LSO_T_V, 2, 19),
+  LSD_T_LADDER + 5,
+  LSPOS(LSP_T_SET | LSO_T_V, 6, 51),
+  LSD_T_LADDER + 5,
+  LSPOS(LSP_T_SET | LSO_T_V, 12, 58),
+  LSD_T_GOLD + 1,
+  LSD_T_WALL + 2,
+  LSPOS(LSP_T_SET | LSO_T_V, 2, 62),
+  LSD_T_LADDER, 17,
+  LSPOS(LSP_T_SET | LSO_T_V, 16, 71),
+  LSD_T_LADDER + 3,
+  LSPOS(LSP_T_SET | LSO_T_V, 7, 74),
+  LSD_T_LADDER + 4,
+  LSP_T_END
+};
+
+// Data of Level 5
+@chunk byte GameLevel5Data[] = {
+  // Horizontal drawings
+  LSPOS(LSP_T_SET | LSO_T_H, 1, 61),
+  LSD_T_EMIT + 1,
+  LSPOS(LSP_T_SET | LSO_T_H, 3, 10),
+  LSD_T_LADDER + 12,
+  LSP_T_MOVE + 5,
+  LSD_T_BALL + 1,
+  LSD_T_LADDER + 13,
+  LSPOS(LSP_T_SET | LSO_T_H, 4, 29),
+  LSD_T_EMIT + 1,
+  LSPOS(LSP_T_SET | LSO_T_H, 4, 66),
+  LSD_T_BASE + 13,
+  LSPOS(LSP_T_SET | LSO_T_H, 6, 50),
+  LSD_T_BALL + 1,
+  LSPOS(LSP_T_SET | LSO_T_H, 7, 0),
+  LSD_T_BASE, 18,
+  LSD_T_BASE2 + 11,
+  LSD_T_BASE, 17,
+  LSPOS(LSP_T_SET | LSO_T_H, 9, 53),
+  LSD_T_BASE, 20,
+  LSPOS(LSP_T_SET | LSO_T_H, 11, 18),
+  LSD_T_GOLD + 1,
+  LSD_T_BALL + 2,
+  LSD_T_TRAP + 3,
+  LSD_T_BALL + 5,
+  LSD_T_TRAP + 1,
+  LSD_T_BALL + 2,
+  LSD_T_TRAP + 1,
+  LSP_T_MOVE + 1,
+  LSD_T_BALL + 1,
+  LSP_T_MOVE + 1,
+  LSD_T_TRAP + 2,
+  LSP_T_MOVE + 4,
+  LSD_T_BASE + 2,
+  LSD_T_BASE2 + 9,
+  LSPOS(LSP_T_SET | LSO_T_H, 12, 13),
+  LSD_T_BASE, 28,
+  LSP_T_MOVE + 5,
+  LSD_T_GOLD + 1,
+  LSPOS(LSP_T_SET | LSO_T_H, 13, 13),
+  LSD_T_BASE + 3,
+  LSP_T_MOVE + 6,
+  LSD_T_BASE + 3,
+  LSP_T_MOVE + 6,
+  LSD_T_BASE + 3,
+  LSP_T_MOVE + 12,
+  LSD_T_BASE2 + 9,
+  LSD_T_BASE, 24,
+  LSPOS(LSP_T_SET | LSO_T_H, 15, 30),
+  LSD_T_GOLD + 1,
+  LSPOS(LSP_T_SET | LSO_T_H, 15, 52),
+  LSD_T_GOLD + 1,
+  LSPOS(LSP_T_SET | LSO_T_H, 16, 3),
+  LSD_T_BASE + 10,
+  LSD_T_BASE2, 25,
+  LSD_T_BASE + 7,
+  LSD_T_BASE2 + 10,
+  LSD_T_BASE, 19,
+  LSPOS(LSP_T_SET | LSO_T_H, 18, 0),
+  LSD_T_TRAP + 3,
+  LSD_T_RECV + 1,
+  LSP_T_MOVE + 9,
+  LSD_T_TRAP, 25,
+  LSD_T_RECV + 1,
+  LSP_T_MOVE + 5,
+  LSD_T_RECV + 1,
+  LSD_T_TRAP + 10,
+  LSD_T_RECV + 1,
+  LSD_T_TEXT, 18, 'P', 'o', 'i', 'n', 't', ' ', 'o', 'f', ' ', 'N', 'o', ' ', 'R', 'e', 't', 'u', 'r', 'n',
+  LSD_T_RECV + 1,
+  LSD_T_TRAP + 4,
+  // Vertical drawings
+  LSPOS(LSP_T_SET | LSO_T_V, 6, 3),
+  LSD_T_LADDER + 10,
+  LSPOS(LSP_T_SET | LSO_T_V, 0, 9),
+  LSD_T_EXIT + 1,
+  LSD_T_LADDER + 3,
+  LSD_T_GOLD + 1,
+  LSPOS(LSP_T_SET | LSO_T_V, 3, 41),
+  LSD_T_LADDER + 5,
+  LSP_T_MOVE + 2,
+  LSD_T_LADDER + 6,
+  LSPOS(LSP_T_SET | LSO_T_V, 8, 58),
+  LSD_T_LADDER + 5,
+  LSPOS(LSP_T_SET | LSO_T_V, 3, 68),
+  LSD_T_LADDER + 6,
+  LSPOS(LSP_T_SET | LSO_T_V, 12, 72),
+  LSD_T_LADDER + 4,
+  LSP_T_END
+};
+
+// Data of Level 6
+@chunk byte GameLevel6Data[] = {
+  // Horizontal drawings
+  LSPOS(LSP_T_SET | LSO_T_H, 0, 8),
+  LSD_T_TEXT + 8, 'B', 'u', 'g', ' ', 'C', 'i', 't', 'y',
+  LSP_T_MOVE + 13,
+  LSD_T_LADDER + 8,
+  LSPOS(LSP_T_SET | LSO_T_H, 0, 63),
+  LSD_T_EMIT + 1,
+  LSPOS(LSP_T_SET | LSO_T_H, 1, 27),
+  LSD_T_LADDER + 3,
+  LSP_T_MOVE + 6,
+  LSD_T_LADDER + 3,
+  LSPOS(LSP_T_SET_AND_DRAW | LSO_T_H, 2, 46), '>',
+  LSD_T_CHAR + 8, 'm',
+  LSPOS(LSP_T_SET | LSO_T_H, 3, 4),
+  LSD_T_BASE + 15,
+  LSPOS(LSP_T_SET | LSO_T_H, 3, 38),
+  LSD_T_BASE, 20,
+  LSPOS(LSP_T_SET | LSO_T_H, 4, 18),
+  LSD_T_WALL + 1,
+  LSD_T_BASE + 5,
+  LSPOS(LSP_T_SET | LSO_T_H, 4, 63),
+  LSD_T_BASE, 16,
+  LSPOS(LSP_T_SET | LSO_T_H, 8, 11),
+  LSD_T_BASE + 12,
+  LSPOS(LSP_T_SET | LSO_T_H, 8, 45),
+  LSD_T_GOLD + 1,
+  LSPOS(LSP_T_SET | LSO_T_H, 9, 29),
+  LSD_T_BASE, 22,
+  LSP_T_MOVE + 12,
+  LSD_T_BASE + 6,
+  LSPOS(LSP_T_SET | LSO_T_H, 11, 67),
+  LSD_T_BASE + 10,
+  LSPOS(LSP_T_SET | LSO_T_H, 12, 0),
+  LSD_T_BASE + 7,
+  LSD_T_GOLD + 1,
+  LSP_T_MOVE + 15,
+  LSD_T_BASE, 21,
+  LSPOS(LSP_T_SET | LSO_T_H, 15, 9),
+  LSD_T_BASE + 10,
+  LSP_T_MOVE + 3,
+  LSD_T_BASE + 7,
+  LSP_T_MOVE + 9,
+  LSD_T_TEXT + 2, '<', '>',
+  LSPOS(LSP_T_SET | LSO_T_H, 16, 34),
+  LSD_T_BASE + 10,
+  LSP_T_MOVE + 7,
+  LSD_T_BASE + 5,
+  LSP_T_MOVE + 5,
+  LSD_T_BASE + 1,
+  LSP_T_MOVE + 5,
+  LSD_T_BASE + 12,
+  LSPOS(LSP_T_SET_AND_DRAW | LSO_T_H, 17, 5), 'i',
+  LSPOS(LSP_T_SET | LSO_T_H, 18, 0),
+  LSD_T_RECV + 1,
+  LSPOS(LSP_T_SET | LSO_T_H, 18, 78),
+  LSD_T_RECV + 1,
+  // Vertical drawings
+  LSPOS(LSP_T_SET | LSO_T_V, 2, 3),
+  LSD_T_LADDER + 11,
+  LSPOS(LSP_T_SET | LSO_T_V, 7, 15),
+  LSD_T_LADDER + 9,
+  LSPOS(LSP_T_SET | LSO_T_V, 10, 22),
+  LSD_T_GOLD + 2,
+  LSPOS(LSP_T_SET | LSO_T_V, 10, 23),
+  LSD_T_WALL + 2,
+  LSPOS(LSP_T_SET | LSO_T_V, 4, 33),
+  LSD_T_CHAR + 2, '/',
+  LSPOS(LSP_T_SET | LSO_T_V, 15, 33),
+  LSD_T_LADDER + 4,
+  LSPOS(LSP_T_SET | LSO_T_V, 4, 44),
+  LSD_T_EMIT + 1,
+  LSP_T_MOVE + 1,
+  LSD_T_WALL + 3,
+  LSP_T_MOVE + 2,
+  LSD_T_LADDER + 4,
+  LSD_T_GOLD + 1,
+  LSPOS(LSP_T_SET | LSO_T_V, 6, 46),
+  LSD_T_EXIT + 1,
+  LSD_T_LADDER + 2,
+  LSPOS(LSP_T_SET | LSO_T_V, 8, 51),
+  LSD_T_LADDER + 6,
+  LSD_T_GOLD + 1,
+  LSPOS(LSP_T_SET | LSO_T_V, 3, 68),
+  LSD_T_LADDER + 6,
+  LSPOS(LSP_T_SET | LSO_T_V, 10, 72),
+  LSD_T_LADDER + 6,
+  LSP_T_END
+};
+
+// Data of Level 7
+@chunk byte GameLevel7Data[] = {
+  // Horizontal drawings
+  LSPOS(LSP_T_SET | LSO_T_H, 0, 20),
+  LSD_T_BASE + 1,
+  LSD_T_TEXT + 9, 'G', 'a', 'n', 'g', ' ', 'L', 'a', 'n', 'd',
+  LSD_T_BASE + 1,
+  LSPOS(LSP_T_SET | LSO_T_H, 1, 19),
+  LSD_T_BASE + 2,
+  LSP_T_MOVE + 9,
+  LSD_T_BASE + 2,
+  LSPOS(LSP_T_SET | LSO_T_H, 2, 23),
+  LSD_T_TEXT + 2, '[', ']',
+  LSPOS(LSP_T_SET | LSO_T_H, 2, 49),
+  LSD_T_GOLD + 1,
+  LSPOS(LSP_T_SET | LSO_T_H, 3, 0),
+  LSD_T_BASE + 11,
+  LSPOS(LSP_T_SET | LSO_T_H, 3, 48),
+  LSD_T_BASE + 3,
+  LSP_T_MOVE + 3,
+  LSD_T_BASE, 19,
+  LSPOS(LSP_T_SET | LSO_T_H, 4, 6),
+  LSD_T_EMIT + 1,
+  LSP_T_MOVE + 13,
+  LSD_T_BASE + 13,
+  LSP_T_MOVE + 6,
+  LSD_T_BASE + 6,
+  LSPOS(LSP_T_SET | LSO_T_H, 7, 20),
+  LSD_T_TRAP + 3,
+  LSD_T_GOLD + 2,
+  LSD_T_TRAP + 3,
+  LSP_T_MOVE + 1,
+  LSD_T_GOLD + 1,
+  LSP_T_MOVE + 1,
+  LSD_T_TRAP + 1,
+  LSP_T_MOVE + 2,
+  LSD_T_TRAP + 3,
+  LSPOS(LSP_T_SET | LSO_T_H, 7, 60),
+  LSD_T_BASE + 13,
+  LSPOS(LSP_T_SET | LSO_T_H, 8, 5),
+  LSD_T_BASE + 6,
+  LSP_T_MOVE + 4,
+  LSD_T_BASE, 41,
+  LSP_T_MOVE + 10,
+  LSD_T_GOLD + 1,
+  LSPOS(LSP_T_SET | LSO_T_H, 9, 65),
+  LSD_T_GOLD + 3,
+  LSPOS(LSP_T_SET | LSO_T_H, 10, 64),
+  LSD_T_GOLD + 5,
+  LSPOS(LSP_T_SET | LSO_T_H, 11, 60),
+  LSD_T_BASE + 13,
+  LSPOS(LSP_T_SET | LSO_T_H, 12, 14),
+  LSD_T_BASE + 5,
+  LSD_T_BASE2 + 6,
+  LSD_T_BASE, 17,
+  LSPOS(LSP_T_SET | LSO_T_H, 12, 63),
+  LSD_T_EXIT + 1,
+  LSP_T_MOVE + 5,
+  LSD_T_EXIT + 1,
+  LSPOS(LSP_T_SET | LSO_T_H, 13, 62),
+  LSD_T_EXIT + 3,
+  LSP_T_MOVE + 3,
+  LSD_T_EXIT + 3,
+  LSPOS(LSP_T_SET | LSO_T_H, 14, 0),
+  LSD_T_BASE + 4,
+  LSD_T_BASE2 + 6,
+  LSD_T_BASE + 3,
+  LSPOS(LSP_T_SET | LSO_T_H, 14, 61),
+  LSD_T_EXIT + 5,
+  LSP_T_MOVE + 1,
+  LSD_T_EXIT + 5,
+  LSPOS(LSP_T_SET | LSO_T_H, 15, 43),
+  LSD_T_BASE + 13,
+  LSP_T_MOVE + 4,
+  LSD_T_BASE + 13,  // In the original it is only 12
+  LSPOS(LSP_T_SET | LSO_T_H, 16, 42),
+  LSD_T_TRAP + 1,
+  LSP_T_MOVE + 10,
+  LSD_T_GOLD + 1,
+  LSPOS(LSP_T_SET | LSO_T_H, 17, 13),
+  LSD_T_TRAP + 14,
+  LSPOS(LSP_T_SET | LSO_T_H, 17, 50),
+  LSD_T_BASE + 6,
+  LSPOS(LSP_T_SET | LSO_T_H, 18, 0),
+  LSD_T_RECV + 1,
+  LSPOS(LSP_T_SET | LSO_T_H, 18, 20),
+  LSD_T_BALL + 1,
+  LSP_T_MOVE + 6,
+  LSD_T_GOLD + 1,
+  LSP_T_MOVE + 3,
+  LSD_T_TRAP + 1,
+  LSP_T_MOVE + 2,
+  LSD_T_RECV + 1,
+  LSPOS(LSP_T_SET | LSO_T_H, 18, 56),
+  LSD_T_TRAP + 1,
+  LSP_T_MOVE + 2,
+  LSD_T_TRAP + 1,
+  LSP_T_MOVE + 7,
+  LSD_T_TRAP + 12,
+  // Vertical drawings
+  LSPOS(LSP_T_SET | LSO_T_V, 7, 4),
+  LSD_T_LADDER + 5,
+  LSPOS(LSP_T_SET | LSO_T_V, 2, 11),
+  LSD_T_LADDER + 7,
+  LSPOS(LSP_T_SET | LSO_T_V, 15, 12),
+  LSD_T_WALL + 3,
+  LSPOS(LSP_T_SET | LSO_T_V, 2, 20),
+  LSD_T_WALL + 2,
+  LSP_T_MOVE + 11,
+  LSD_T_BASE + 1,
+  LSD_T_EXIT + 1,
+  LSPOS(LSP_T_SET | LSO_T_V, 2, 26),
+  LSD_T_WALL + 2,
+  LSPOS(LSP_T_SET | LSO_T_V, 1, 27),
+  LSD_T_CHAR + 3, '_',
+  LSPOS(LSP_T_SET | LSO_T_V, 2, 28),
+  LSD_T_WALL + 2,
+  LSPOS(LSP_T_SET | LSO_T_V, 2, 30),
+  LSD_T_WALL + 2,
+  LSPOS(LSP_T_SET | LSO_T_V, 17, 33),
+  LSD_T_EXIT + 1,
+  LSD_T_LADDER + 1,
+  LSPOS(LSP_T_SET | LSO_T_V, 17, 35),
+  LSD_T_TRAP + 2,
+  LSPOS(LSP_T_SET | LSO_T_V, 3, 38),
+  LSD_T_LADDER + 9,
+  LSPOS(LSP_T_SET | LSO_T_V, 13, 41),
+  LSD_T_WALL + 3,
+  LSPOS(LSP_T_SET | LSO_T_V, 7, 50),
+  LSD_T_LADDER + 8,
+  LSPOS(LSP_T_SET | LSO_T_V, 6, 55),
+  LSD_T_WALL + 2,
+  LSP_T_MOVE + 1,
+  LSD_T_WALL + 6,
+  LSPOS(LSP_T_SET | LSO_T_V, 0, 60),
+  LSD_T_EMIT + 1,
+  LSP_T_MOVE + 4,
+  LSD_T_GOLD + 1,
+  LSD_T_WALL + 1,
+  LSPOS(LSP_T_SET | LSO_T_V, 1, 70),
+  LSD_T_BALL + 2,
+  LSPOS(LSP_T_SET | LSO_T_V, 2, 73),  // Fixed wrong 72 to 73
+  LSD_T_LADDER + 10,
+  LSP_T_END
+};
+
+// Name, Bonus Time, Lad Start Position,
+// { Number of Emitters, { Positions of Emitters } },
+// Maximum Ders,
+// Level Data
+@chunkArray GLLevel GameLevels =
+{
+  {
+    OptrToChunk(@GameLevel1Name), 39, GPOS(18,5),  // Old time 35
+    {
+      1, { GPOS(0,39) }
+    },
+    5,
+    OptrToChunk(@GameLevel1Data)
+  },
+  {
+    OptrToChunk(@GameLevel2Name), 49, GPOS(18,17),  // Old time 45
+    {
+      2, { GPOS(2,13), GPOS(2,67) }
+    },
+    8,
+    OptrToChunk(@GameLevel2Data)
+  },
+  {
+    OptrToChunk(@GameLevel3Name), 37, GPOS(2,5),  // Old time 33
+    {
+      3, { GPOS(0,28), GPOS(0,44), GPOS(0,56) }
+    },
+    5,
+    OptrToChunk(@GameLevel3Data)
+  },
+  {
+    OptrToChunk(@GameLevel4Name), 36, GPOS(16,77),  // Old time 32
+    {
+      2, { GPOS(0,44), GPOS(0,68) }
+    },
+    5,
+    OptrToChunk(@GameLevel4Data)
+  },
+  {
+    OptrToChunk(@GameLevel5Name), 29, GPOS(3,74),  // Old time 29
+    {
+      2, { GPOS(1,61), GPOS(4,29) }
+    },
+    7,
+    OptrToChunk(@GameLevel5Data)
+  },
+  {
+    OptrToChunk(@GameLevel6Name), 32, GPOS(8,33),  // Old time 29
+    {
+      2, { GPOS(0,63), GPOS(4,44) }
+    },
+    6,
+    OptrToChunk(@GameLevel6Data)
+  },
+  {
+    OptrToChunk(@GameLevel7Name), 27, GPOS(2,6),  // Old time 22
+    {
+      2, { GPOS(0,60), GPOS(4,6) }
+    },
+    6,
+    OptrToChunk(@GameLevel7Data)
+  }
+};
+
+
+// Moves of Demo 1 - Level 1 - Straight Forward
+@chunk GLMove GameDemo1Moves[] = {
+  { GPOS(18,5), DIR_E, L_FALSE }, { GPOS(18,57), DIR_N, L_FALSE },
+  { GPOS(14,57), DIR_W, L_FALSE }, { GPOS(14,48), DIR_W, L_TRUE },
+  { GPOS(14,25), DIR_W, L_TRUE }, { GPOS(14,16), DIR_N, L_FALSE },
+  { GPOS(10,16), DIR_E, L_FALSE }, { GPOS(10,24), DIR_N, L_TRUE },
+  { GPOS(6,27), DIR_W, L_FALSE }, { GPOS(6,16), DIR_N, L_FALSE },
+  { GPOS(2,16), DIR_E, L_FALSE }, { GPOS(2,57), DIR_N, L_FALSE }
+};
+
+// Moves of Demo 2 - Level 1 - Rich Way
+@chunk GLMove GameDemo2Moves[] = {
+  { GPOS(18,5), DIR_E, L_FALSE }, { GPOS(18,55), DIR_N, L_TRUE },
+  { GPOS(16,57), DIR_N, L_FALSE }, { GPOS(14,57), DIR_W, L_FALSE },
+  { GPOS(14,49), DIR_W, L_TRUE }, { GPOS(14,26), DIR_W, L_TRUE },
+  { GPOS(14,18), DIR_N, L_TRUE }, { GPOS(10,16), DIR_NONE, L_TRUE },
+  { GPOS(10,16), DIR_E, L_FALSE }, { GPOS(10,25), DIR_N, L_TRUE },
+  { GPOS(6,27), DIR_W, L_FALSE }, { GPOS(6,18), DIR_N, L_TRUE },
+  { GPOS(2,16), DIR_E, L_FALSE }, { GPOS(2,37), DIR_E, L_TRUE },
+  { GPOS(2,55), DIR_N, L_TRUE }
+};
+
+// Moves of Demo 3 - Level 1 - Long Run
+@chunk GLMove GameDemo3Moves[] = {
+  { GPOS(18,5), DIR_E, L_FALSE }, { GPOS(18,20), DIR_E, L_TRUE },
+  { GPOS(18,43), DIR_E, L_TRUE }, { GPOS(18,57), DIR_N, L_FALSE },
+  { GPOS(14,57), DIR_W, L_FALSE }, { GPOS(14,48), DIR_W, L_TRUE },
+  { GPOS(14,25), DIR_W, L_TRUE }, { GPOS(14,16), DIR_N, L_FALSE },
+  { GPOS(10,16), DIR_NONE, L_TRUE }, { GPOS(10,16), DIR_E, L_FALSE },
+  { GPOS(10,26), DIR_E, L_TRUE }, { GPOS(10,35), DIR_E, L_TRUE },
+  { GPOS(10,45), DIR_E, L_TRUE }, { GPOS(10,57), DIR_N, L_FALSE },
+  { GPOS(6,57), DIR_W, L_FALSE }, { GPOS(6,49), DIR_W, L_TRUE },
+  { GPOS(6,29), DIR_W, L_TRUE }, { GPOS(6,16), DIR_N, L_FALSE },
+  { GPOS(2,16), DIR_E, L_FALSE }, { GPOS(2,35), DIR_E, L_TRUE },
+  { GPOS(2,57), DIR_N, L_FALSE }
+};
+
+// Moves of Demo 4 - Level 1 - Crazy Lad
+@chunk GLMove GameDemo4Moves[] = {
+  { GPOS(18,5), DIR_E, L_FALSE }, { GPOS(18,11), DIR_E, L_TRUE },
+  { GPOS(18,21), DIR_E, L_TRUE }, { GPOS(18,31), DIR_E, L_TRUE },
+  { GPOS(18,44), DIR_E, L_TRUE }, { GPOS(18,60), DIR_W, L_TRUE },
+  { GPOS(16,57), DIR_N, L_FALSE }, { GPOS(14,57), DIR_W, L_FALSE },
+  { GPOS(14,47), DIR_W, L_TRUE }, { GPOS(14,39), DIR_W, L_TRUE },
+  { GPOS(14,24), DIR_W, L_TRUE }, { GPOS(14,13), DIR_E, L_TRUE },
+  { GPOS(12,16), DIR_N, L_FALSE }, { GPOS(10,16), DIR_W, L_FALSE },
+  { GPOS(10,14), DIR_E, L_TRUE }, { GPOS(10,26), DIR_E, L_TRUE },
+  { GPOS(10,35), DIR_E, L_TRUE }, { GPOS(10,45), DIR_E, L_TRUE },
+  { GPOS(10,59), DIR_W, L_TRUE }, { GPOS(8,57), DIR_N, L_FALSE },
+  { GPOS(6,57), DIR_W, L_FALSE }, { GPOS(6,50), DIR_W, L_TRUE },
+  { GPOS(6,41), DIR_W, L_TRUE }, { GPOS(6,29), DIR_W, L_TRUE },
+  { GPOS(6,13), DIR_E, L_TRUE }, { GPOS(4,16), DIR_N, L_FALSE },
+  { GPOS(2,16), DIR_W, L_FALSE }, { GPOS(2,14), DIR_E, L_TRUE },
+  { GPOS(2,36), DIR_E, L_TRUE }, { GPOS(2,60), DIR_W, L_TRUE }
+};
+
+// Moves of Demo 5 - Level 2 - Straight Forward
+@chunk GLMove GameDemo5Moves[] = {
+  { GPOS(18,17), DIR_E, L_FALSE }, { GPOS(18,33), DIR_E, L_TRUE },
+  { GPOS(16,36), DIR_NONE, L_FALSE }, { GPOS(16,36), DIR_W, L_TRUE },
+  { GPOS(14,30), DIR_W, L_TRUE }, { GPOS(12,27), DIR_NONE, L_FALSE },
+  { GPOS(12,27), DIR_NONE, L_TRUE }, { GPOS(12,27), DIR_NONE, L_FALSE },
+  { GPOS(12,27), DIR_NONE, L_TRUE }, { GPOS(12,27), DIR_NONE, L_FALSE },
+  { GPOS(12,27), DIR_E, L_TRUE }, { GPOS(10,31), DIR_E, L_TRUE },
+  { GPOS(8,34), DIR_NONE, L_FALSE }, { GPOS(8,34), DIR_W, L_TRUE },
+  { GPOS(6,29), DIR_W, L_TRUE }, { GPOS(6,4), DIR_N, L_FALSE },
+  { GPOS(2,4), DIR_E, L_FALSE }, { GPOS(2,10), DIR_E, L_TRUE },
+  { GPOS(2,25), DIR_E, L_TRUE }, { GPOS(2,51), DIR_E, L_TRUE },
+  { GPOS(2,64), DIR_E, L_TRUE }, { GPOS(2,72), DIR_E, L_TRUE }
+};
+
+// Moves of Demo 6 - Level 2 - Rich Way
+@chunk GLMove GameDemo6Moves[] = {
+  { GPOS(18,17), DIR_E, L_FALSE }, { GPOS(18,32), DIR_E, L_TRUE },
+  { GPOS(16,36), DIR_W, L_TRUE }, { GPOS(14,31), DIR_W, L_TRUE },
+  { GPOS(12,27), DIR_E, L_TRUE }, { GPOS(10,30), DIR_E, L_TRUE },
+  { GPOS(8,34), DIR_W, L_TRUE }, { GPOS(6,31), DIR_W, L_TRUE },
+  { GPOS(6,7), DIR_W, L_TRUE }, { GPOS(4,4), DIR_N, L_FALSE },
+  { GPOS(2,4), DIR_E, L_FALSE }, { GPOS(2,11), DIR_E, L_TRUE },
+  { GPOS(2,26), DIR_E, L_TRUE }, { GPOS(2,53), DIR_E, L_TRUE },
+  { GPOS(2,60), DIR_E, L_TRUE }, { GPOS(2,66), DIR_E, L_TRUE },
+  { GPOS(2,72), DIR_E, L_TRUE }
+};
+
+// Moves of Demo 7 - Level 2 - Long Run
+@chunk GLMove GameDemo7Moves[] = {
+  { GPOS(18,17), DIR_E, L_FALSE }, { GPOS(18,25), DIR_E, L_TRUE },
+  { GPOS(18,34), DIR_E, L_TRUE }, { GPOS(18,52), DIR_E, L_TRUE },
+  { GPOS(18,74), DIR_N, L_FALSE }, { GPOS(14,74), DIR_W, L_FALSE },
+  { GPOS(14,57), DIR_W, L_TRUE }, { GPOS(14,40), DIR_W, L_TRUE },
+  { GPOS(14,30), DIR_W, L_TRUE }, { GPOS(14,4), DIR_N, L_FALSE },
+  { GPOS(10,4), DIR_E, L_FALSE }, { GPOS(10,25), DIR_E, L_TRUE },
+  { GPOS(10,32), DIR_E, L_TRUE }, { GPOS(10,52), DIR_E, L_TRUE },
+  { GPOS(10,74), DIR_N, L_FALSE }, { GPOS(6,74), DIR_W, L_FALSE },
+  { GPOS(6,56), DIR_W, L_TRUE }, { GPOS(6,37), DIR_W, L_TRUE },
+  { GPOS(6,30), DIR_W, L_TRUE }, { GPOS(6,4), DIR_N, L_FALSE },
+  { GPOS(2,4), DIR_E, L_FALSE }, { GPOS(2,11), DIR_E, L_TRUE },
+  { GPOS(2,27), DIR_E, L_TRUE }, { GPOS(2,52), DIR_E, L_TRUE },
+  { GPOS(2,63), DIR_E, L_TRUE }, { GPOS(2,71), DIR_E, L_TRUE }
+};
+
+// Moves of Demo 8 - Level 3 - Straight Forward
+@chunk GLMove GameDemo8Moves[] = {
+  { GPOS(2,5), DIR_E, L_FALSE }, { GPOS(2,9), DIR_E, L_TRUE },
+  { GPOS(5,16), DIR_E, L_TRUE }, { GPOS(5,25), DIR_E, L_TRUE },
+  { GPOS(5,31), DIR_E, L_TRUE }, { GPOS(5,40), DIR_E, L_TRUE },
+  { GPOS(5,46), DIR_E, L_TRUE }, { GPOS(5,52), DIR_E, L_TRUE },
+  { GPOS(5,63), DIR_N, L_FALSE }, { GPOS(2,63), DIR_E, L_FALSE }
+};
+
+// Moves of Demo 9 - Level 3 - Rich Way
+@chunk GLMove GameDemo9Moves[] = {
+  { GPOS(2,5), DIR_E, L_FALSE }, { GPOS(2,10), DIR_E, L_TRUE },
+  { GPOS(5,17), DIR_E, L_TRUE }, { GPOS(5,25), DIR_E, L_TRUE },
+  { GPOS(5,31), DIR_E, L_TRUE }, { GPOS(5,41), DIR_W, L_FALSE },
+  { GPOS(5,40), DIR_E, L_TRUE }, { GPOS(5,46), DIR_E, L_TRUE },
+  { GPOS(5,53), DIR_E, L_TRUE }, { GPOS(9,69), DIR_W, L_TRUE },
+  { GPOS(13,57), DIR_W, L_TRUE }, { GPOS(13,48), DIR_W, L_TRUE },
+  { GPOS(13,39), DIR_W, L_TRUE }, { GPOS(13,30), DIR_W, L_TRUE },
+  { GPOS(13,23), DIR_W, L_TRUE }, { GPOS(13,16), DIR_W, L_TRUE },
+  { GPOS(11,13), DIR_E, L_FALSE }, { GPOS(13,21), DIR_E, L_TRUE },
+  { GPOS(13,28), DIR_E, L_TRUE }, { GPOS(11,32), DIR_N, L_FALSE },
+  { GPOS(9,32), DIR_E, L_FALSE }, { GPOS(9,35), DIR_E, L_TRUE },
+  { GPOS(9,48), DIR_E, L_TRUE }, { GPOS(9,56), DIR_E, L_TRUE },
+  { GPOS(9,62), DIR_E, L_TRUE }, { GPOS(9,68), DIR_E, L_TRUE },
+  { GPOS(9,74), DIR_E, L_TRUE }
+};
+
+// Moves of Demo 10 - Level 4 - Straight Forward
+@chunk GLMove GameDemo10Moves[] = {
+  { GPOS(16,77), DIR_W, L_FALSE }, { GPOS(16,72), DIR_W, L_TRUE },
+  { GPOS(18,66), DIR_W, L_TRUE }, { GPOS(16,62), DIR_N, L_FALSE },
+  { GPOS(14,62), DIR_W, L_TRUE }, { GPOS(14,51), DIR_W, L_TRUE },
+  { GPOS(14,43), DIR_W, L_TRUE }, { GPOS(14,33), DIR_W, L_TRUE },
+  { GPOS(14,23), DIR_W, L_TRUE }, { GPOS(14,15), DIR_W, L_TRUE },
+  { GPOS(13,4), DIR_E, L_FALSE }, { GPOS(18,7), DIR_W, L_FALSE }
+};
+
+// Round, Level, Demo Moves
+@chunkArray GLDemo GameDemos =
+{
+  {
+    1, 1, OptrToChunk(@GameDemo1Moves)
+  },
+  {
+    1, 1, OptrToChunk(@GameDemo2Moves)
+  },
+  {
+    1, 1, OptrToChunk(@GameDemo3Moves)
+  },
+  {
+    1, 1, OptrToChunk(@GameDemo4Moves)
+  },
+  {
+    2, 2, OptrToChunk(@GameDemo5Moves)
+  },
+  {
+    2, 2, OptrToChunk(@GameDemo6Moves)
+  },
+  {
+    2, 2, OptrToChunk(@GameDemo7Moves)
+  },
+  {
+    5, 3, OptrToChunk(@GameDemo8Moves)
+  },
+  {
+    5, 3, OptrToChunk(@GameDemo9Moves)
+  },
+  {
+    9, 4, OptrToChunk(@GameDemo10Moves)
+  }
+};
+
+
+// This chunk is only a place holder. It will be resized during startup.
+@chunk char GameLevelBuffer[] = "";
+@localize not;
+
+@end GAME;
+
+
+/* End of 'appui.goc' */

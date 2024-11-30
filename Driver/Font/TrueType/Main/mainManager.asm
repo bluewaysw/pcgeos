@@ -4,7 +4,7 @@ COMMENT @----------------------------------------------------------------------
 
 
 PROJECT:	PC GEOS
-MODULE:		Font Driver
+MODULE:		TrueType Font Driver
 FILE:		truetype.asm
 
 AUTHOR:		Gene Anderson
@@ -85,23 +85,11 @@ include		truetypeMacros.def
 
 WidthMod segment resource
 include		truetypeWidths.asm
-;include		nimbusUtils.asm
-;include		nimbusSetTrans.asm
-include		../FontCom/fontcomUtils.asm
 WidthMod ends
 
 CharMod segment resource
 include			truetypeChars.asm
-;include		nimbusRegions.asm
-;include		nimbusLoadFont.asm
-;include		nimbusBig.asm
-;include		nimbusBitmap.asm
 NimbusStart	label	near
-;include		nimbusMakechar.asm
-;include		nimbusSegments.asm
-;include		nimbusTrans.asm
-;include		nimbusMul.asm
-;include		nimbusContinuity.asm
 AA_NIMBUS_SIZE equ $-NimbusStart
 CharMod ends
 
@@ -138,9 +126,10 @@ include		../FontCom/fontcomEscape.asm
 InitMod ends
 
 include		truetypeEC.asm
-include	    ansic_runtime.asm
+include	    	ansic_runtime.asm
 include		ansic_memory.asm
 include		ttmemory_asm.asm
+include		ansic_stdlib.asm
 
 Resident segment resource	;MODULE_FIXED
 
@@ -158,14 +147,14 @@ PASS:
 	di - one of the following function codes:
 	Function #		routine called		Function
 	----------		--------------		--------
-	DR_INIT			NimbusInit		initialize
-	DR_EXIT			NimbusExit		exit
-	DR_FONT_GEN_CHAR	NimbusGenChar		generate one char
-	DR_FONT_GEN_WIDTHS	NimbusGenWidths		generate char widths
-	DR_FONT_CHAR_METRICS	NimbusCharMetrics	return character metrics
-	DR_FONT_INIT_FONTS	NimbusInitFonts		init non-GEOS fonts
-	DR_FONT_GEN_PATH	NimbusGenPath		generate outline path
-	DR_FONT_GEN_IN_REGION	NimbusGenInRegion 	gen in passed region
+	DR_INIT			TrueTypeInit		initialize
+	DR_EXIT			TrueTypeExit		exit
+	DR_FONT_GEN_CHAR	TrueTypeGenChar		generate one char
+	DR_FONT_GEN_WIDTHS	TrueTypeGenWidths	generate char widths
+	DR_FONT_CHAR_METRICS	TrueTypeCharMetrics	return character metrics
+	DR_FONT_INIT_FONTS	TrueTypeInitFonts	init non-GEOS fonts
+	DR_FONT_GEN_PATH	TrueTypeGenPath		generate outline path
+	DR_FONT_GEN_IN_REGION	TrueTypeGenInRegion 	gen in passed region
 
 RETURN:
 	depends on function called

@@ -403,9 +403,9 @@ int SocketRecvNice(
 }
 
 #ifdef PERSISTANT_CONNECTIONS
-int htoi(char *str)
+sdword htoi(char *str)
 {
-    int val = 0;
+    sdword val = 0;
 
     while(1) {
 	if (*str >= '0' && *str <= '9') {
@@ -458,7 +458,7 @@ int SocketGetBlock(
 	    }
 	}
 	if (readSize > (*pp_conn)->chunkSize) {
-	    readSize = (*pp_conn)->chunkSize;
+	    readSize = (int)((*pp_conn)->chunkSize);
 	}
 	if (readSize) {
 	    ConnectionUnlock(conn);
@@ -643,14 +643,16 @@ void SocketMyClose(Socket sock)
 
 @end    StatusResource;
 
-@include "userpass.goh"
-
-/* a glue bug presents us from putting the above include in the AuthCode
-   segment */
-
+#ifdef __WATCOMC__
+#pragma code_seg("AuthCode")
+#else
 #pragma codeseg AuthCode
+#endif
 
-    void base64encode(TCHAR *in, char *out)
+/* defined in userpass.goc */
+Boolean GetUserPassword(char *p_site, char *p_buffer);
+
+void base64encode(TCHAR *in, char *out)
 {
     const char basis_64[] =
         "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
@@ -696,7 +698,11 @@ void SocketMyClose(Socket sock)
     *out = '\0';
 }
 
+#ifdef __WATCOMC__
+#pragma code_seg()
+#else
 #pragma codeseg
+#endif
 
 int sock_getline(HTTPConnectionHandle conn, T_HTTPConnection **retptr)
 {
@@ -781,7 +787,11 @@ word sock_printf(T_HTTPConnection *p_conn, char *buffer, char *fmt, ...)
     return SOCK_SEND_NO_ERR;
 }
 
+#ifdef __WATCOMC__
+#pragma code_seg("HeaderCode")
+#else
 #pragma codeseg HeaderCode
+#endif
 
 /* rarely called from main code resource */
 Boolean HeaderlessHTML(T_HTTPConnection *p_conn)
@@ -1040,16 +1050,19 @@ long header(HTTPConnectionHandle conn, long *clret, word *responseCode)
                 contentlength = CL_UNKNOWN;
 #endif
         } else if (LocalCmpStringsNoCaseSBCS(p, strn("Content-Type:")) == 0) {
-            ChunkStrcpySBCS(p_conn->heap, &(p_conn->mimeTypeChunk), s);
+            /* ignore content type for "Not Modified" (WebOne proxy) */
+	    if (*responseCode != 304) {
+              ChunkStrcpySBCS(p_conn->heap, &(p_conn->mimeTypeChunk), s);
 #if PROGRESS_DISPLAY
-            /* get mime type from HTTP header */
-            if (p_conn->loadProgressDataP)
+              /* get mime type from HTTP header */
+              if (p_conn->loadProgressDataP)
 @ifdef DO_DBCS
-                xstrncpysbcstodbcs(p_conn->loadProgressDataP->LPD_mimeType, s, sizeof(p_conn->loadProgressDataP->LPD_mimeType)/sizeof(TCHAR));
+                  xstrncpysbcstodbcs(p_conn->loadProgressDataP->LPD_mimeType, s, sizeof(p_conn->loadProgressDataP->LPD_mimeType)/sizeof(TCHAR));
 @else
-                xstrncpy(p_conn->loadProgressDataP->LPD_mimeType, s, sizeof(p_conn->loadProgressDataP->LPD_mimeType));
+                  xstrncpy(p_conn->loadProgressDataP->LPD_mimeType, s, sizeof(p_conn->loadProgressDataP->LPD_mimeType));
 @endif
 #endif
+	    }
         } else if (LocalCmpStringsNoCaseSBCS(p, strn("Location:")) == 0) {
             if (*responseCode == 301 || *responseCode == 302) {
                 ChunkStrcpySBCS(p_conn->heap, &(p_conn->urlChunk), s);
@@ -1128,7 +1141,8 @@ long header(HTTPConnectionHandle conn, long *clret, word *responseCode)
 	    }
 	}
 	/* detected chunked encodings */
-	else if (LocalCmpStringsNoCaseSBCS(p, strn("Transfer-Encoding: chunked")) == 0) {
+	else if ((LocalCmpStringsNoCaseSBCS(p, strn("Transfer-Encoding:")) == 0) && 
+                                (LocalCmpStringsNoCaseSBCS(s, strn("chunked")) == 0)) {
 	    p_conn->chunked = TRUE;
 	    p_conn->chunkSize = 0;  /* ready for first chunk */
 	}
@@ -1231,9 +1245,17 @@ long header(HTTPConnectionHandle conn, long *clret, word *responseCode)
     return URLRequestMakeRet(URL_RET_FILE) | (noCache ? URB_RF_NOCACHE : 0);
 }
 
+#ifdef __WATCOMC__
+#pragma code_seg()
+#else
 #pragma codeseg
+#endif
 
+#ifdef __WATCOMC__
+#pragma code_seg("cookies_TEXT")
+#else
 #pragma codeseg COOKIES_TEXT
+#endif
 
 #ifdef COOKIE_ENABLE
 /*
@@ -1282,9 +1304,17 @@ word SendCookies(T_HTTPConnection *p_conn)
 }
 #endif
 
+#ifdef __WATCOMC__
+#pragma code_seg()
+#else
 #pragma codeseg
+#endif
 
+#ifdef __WATCOMC__
+#pragma code_seg("CacheCode")
+#else
 #pragma codeseg CacheCode
+#endif
 
 #ifdef PERSISTANT_CONNECTIONS
 Boolean FindAndUseSocket(T_HTTPConnection *p_conn)
@@ -1396,7 +1426,11 @@ Boolean PutSocketInCache(T_HTTPConnection *p_conn)
 }
 #endif
 
+#ifdef __WATCOMC__
+#pragma code_seg()
+#else
 #pragma codeseg
+#endif
 
 #ifdef PERSISTANT_CONNECTIONS
 void HandleErrorFunc(T_HTTPConnection *p_conn, Boolean *retry)
@@ -1729,10 +1763,13 @@ word HTTPGet(HTTPConnectionHandle conn)
 
         if (p_conn->aborted)                     /* abort signal? */
             handle_error(URL_RET_ABORTED);
-
+	    
 #ifdef SSL_ENABLE
         if ((p_conn->secure) && (err == SE_NORMAL) && (p_conn->ssl)) {
 	    void *sslP = p_conn->ssl;
+
+	    SSL_set_fd(p_conn->ssl, p_conn->sock);
+	    SSL_set_tlsext_host_name(p_conn->ssl, (char*) hostname.UTA_ip);
 
 	    if (p_conn->useProxy) {
 #if 1
@@ -2869,7 +2906,11 @@ word _pascal _export URLDrvMain(_URLMainParams_)
     return rcode;                       /* pass back return data type */
 }
 
+#ifdef __WATCOMC__
+#pragma code_seg("MiscCode")
+#else
 #pragma codeseg MiscCode
+#endif
 
 /* entry_URLDrvAbort URLDrvAbort */
 void _pascal _export URLDrvAbort(_URLAbortParams_)
@@ -3107,4 +3148,8 @@ Boolean _pascal _export WMG3HTTPEntry(LibraryCallType ty, GeodeHandle client)
     return FALSE;
 }
 
+#ifdef __WATCOMC__
+#pragma code_seg()
+#else
 #pragma codeseg
+#endif
