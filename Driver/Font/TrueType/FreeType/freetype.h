@@ -181,7 +181,7 @@
     /*                                                                   */
     /*  Most of the engine's users will safely ignore these fields...    */
 
-    TT_Bool          high_precision;  /* high precision rendering */
+    TT_UShort        y_ppem;          /* vertical resolution      */
     TT_Bool          second_pass;     /* two sweeps rendering     */
     TT_Char          dropout_mode;    /* dropout mode             */
   };
