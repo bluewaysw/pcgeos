@@ -56,14 +56,14 @@
 # On WCC:
 # -O and -Z not supported, eventually use -zc
 # -Op and -Os has no effect
-#XCCOMFLAGS += -zc
-XCCOMFLAGS += -ox
+XCCOMFLAGS += -zc
+#XCCOMFLAGS += -ox
 
 
 # ::: LINKFLAGS ::: (will be passed to the GLUE linker)
 
 # Set the copyrigth notice
-LINKFLAGS += -N "©2010 by YoYu-Productions"
+LINKFLAGS += -N "(C)2010 by YoYu-Productions"
 
 #include <$(SYSMAKEFILE)>
 

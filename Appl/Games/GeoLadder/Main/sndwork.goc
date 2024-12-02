@@ -73,20 +73,20 @@
  ***************************************************************************
  */
 
-static SWNoise SW_NOISES[] =
+static const SWNoise SW_NOISES[] =
 {
-  { IP_OPEN_CUICA,     FR_OPEN_CUICA,     DYNAMIC_FFF, 1, 30 },  // Menu sound noise
-  { IP_HI_MID_TOM,     FR_HI_MID_TOM,     DYNAMIC_FFF, 1, 24 },  // Menu difficulty
-  { IP_LOW_BONGO,      FR_LOW_BONGO,      DYNAMIC_FFF, 1, 21 },  // Play get ready
-  { IP_LOW_BONGO,      FR_HI_BONGO,       DYNAMIC_FFF, 1, 21 },  // Play ready go
-  { IP_RIDE_BELL,      FR_RIDE_BELL,      DYNAMIC_FFF, 2, 57 },  // Play earn gold statue
-  { IP_MUTE_CUICA,     FR_MUTE_CUICA,     DYNAMIC_FFF, 3, 24 },  // Play jump over Der
-  { IP_HIGH_AGOGO,     FR_HIGH_AGOGO,     DYNAMIC_FFF, 1, 36 },  // Play last seconds
-  { IP_BASS_DRUM_1,    FR_BASS_DRUM_1,    DYNAMIC_FFF, 4, 78 },  // Play Der release
-  { IP_SIDE_STICK,     FR_SIDE_STICK,     DYNAMIC_FFF, 5, 21 },  // Play Der recycle
-  { IP_VIBRASLAP,      FR_VIBRASLAP,      DYNAMIC_FFF, 1, 75 },  // Play Lad hooka
-  { IP_ELECTRIC_SNARE, FR_ELECTRIC_SNARE, DYNAMIC_FFF, 1, 30 },  // Play Lad dies
-  { IP_RIDE_BELL,      FR_RIDE_BELL,      DYNAMIC_FFF, 2, 57 }   // Play Lad new -> XXX: still to be found...
+  { IP_OPEN_CUICA,     MIDDLE_C,    DYNAMIC_FFF, 1, 30 },  // Menu sound noise
+  { IP_HI_MID_TOM,     MIDDLE_F,    DYNAMIC_FFF, 1, 24 },  // Menu difficulty
+  { IP_LOW_BONGO,      MIDDLE_E,    DYNAMIC_FFF, 1, 21 },  // Play get ready
+  { IP_LOW_BONGO,      MIDDLE_G_SH, DYNAMIC_FFF, 1, 21 },  // Play ready go
+  { IP_RIDE_BELL,      MIDDLE_C,    DYNAMIC_FFF, 2, 57 },  // Play earn gold statue
+  { IP_MUTE_CUICA,     MIDDLE_C,    DYNAMIC_FFF, 3, 24 },  // Play jump over Der
+  { IP_HIGH_AGOGO,     LOW_F_SH,    DYNAMIC_FFF, 1, 36 },  // Play last seconds
+  { IP_BASS_DRUM_1,    LOW_C / 2,   DYNAMIC_FFF, 4, 78 },  // Play Der release
+  { IP_SIDE_STICK,     MIDDLE_G_SH, DYNAMIC_FFF, 5, 21 },  // Play Der recycle
+  { IP_VIBRASLAP,      MIDDLE_C,    DYNAMIC_FFF, 3, 75 },  // Play Lad hooka
+  { IP_ELECTRIC_SNARE, MIDDLE_C,    DYNAMIC_FFF, 1, 30 },  // Play Lad dies
+  { IP_RIDE_BELL,      MIDDLE_C,    DYNAMIC_FFF, 2, 57 }   // Play Lad new -> XXX: still to be found...
 };
 
 
@@ -110,7 +110,7 @@ static SWNoise SW_NOISES[] =
  ***************************************************************************
  */
 
-@classdecl SoundWorkerClass, neverSaved;
+@classdecl SoundWorkerClass;
 
 /***********************************************************************
  *                  MSG_META_INITIALIZE
@@ -266,13 +266,15 @@ static SWNoise SW_NOISES[] =
   {
     return;
   }
+  // Stop an already playing music
+  @call oself::MSG_SOUND_WORKER_MUSIC_STOP();
   // Save the object pointer of the music and set the index to the first element
   pself->SWI_musicData = music;
   pself->SWI_musicPartIndex = 0;
-  // Get and save the total number of music parts
+  // We'll unlock in MSG_SOUND_WORKER_MUSIC_STOP() called explicitly or by notification at the end of the song
   MemLock(OptrToHandle(pself->SWI_musicData));
+  // Get and save the total number of music parts
   pself->SWI_musicPartCount = ChunkArrayGetCount(pself->SWI_musicData);
-  MemUnlock(OptrToHandle(pself->SWI_musicData));
   // Play the first music part
   @send oself::MSG_SOUND_WORKER_MUSIC_PLAY_EXEC();
 }
@@ -309,14 +311,9 @@ static SWNoise SW_NOISES[] =
   word e;
   word *p_music;
   Message msg;
-  // Stop an already playing music
-  @call oself::MSG_SOUND_WORKER_MUSIC_STOP();
   // Get the object pointer of the music part to play
-  MemLock(OptrToHandle(pself->SWI_musicData));
+  // We've locked in MSG_SOUND_WORKER_MUSIC_PLAY() and we'll unlock in MSG_SOUND_WORKER_MUSIC_STOP()
   ChunkArrayGetElement(pself->SWI_musicData, pself->SWI_musicPartIndex, &pself->SWI_musicPart);
-  MemUnlock(OptrToHandle(pself->SWI_musicData));
-  // We'll unlock in MSG_SOUND_WORKER_MUSIC_STOP() called explicitly or by notification at the end of the song
-  MemLock(OptrToHandle(pself->SWI_musicPart));
   p_music = LMemDeref(pself->SWI_musicPart);
   // Patch message and object pointer (handle and chunk) for end of song notification
   e = LMemGetChunkSize(pself->SWI_musicPart) / 2;
@@ -375,10 +372,11 @@ static SWNoise SW_NOISES[] =
     SoundFreeMusic(pself->SWI_musicHandle);
     pself->SWI_musicHandle = NullHandle;
   }
-  if (pself->SWI_musicPart != NullOptr)
+  if (pself->SWI_musicData != NullOptr)
   {
-    // We've locked in MSG_SOUND_WORKER_MUSIC_PLAY_EXEC()
-    MemUnlock(OptrToHandle(pself->SWI_musicPart));
+    // We've locked in MSG_SOUND_WORKER_MUSIC_PLAY()
+    MemUnlock(OptrToHandle(pself->SWI_musicData));
+    pself->SWI_musicData = NullOptr;
     pself->SWI_musicPart = NullOptr;
   }
 }
@@ -518,6 +516,15 @@ static SWNoise SW_NOISES[] =
       v->startTicks = 0;  // XXX: Unneeded?
     }
   }
+  // Never play multiple noises of the same type at the same time
+  for (i = 0; i < pself->SWI_numNoiseVoices; i++)
+  {
+    v = &pself->SWI_noiseVoices[i];
+    if (v->noise == noise && v->state == SW_NOISE_VOICE_STATE_ADDED)
+    {
+      return;
+    }
+  }
   // Search for a free voice
   for (i = 0; i < pself->SWI_numNoiseVoices; i++)
   {
@@ -530,7 +537,7 @@ static SWNoise SW_NOISES[] =
       return;
     }
   }
-  // Search for an equal noise to replace
+  // Search for an equal playing noise to replace
   for (i = 0; i < pself->SWI_numNoiseVoices; i++)
   {
     v = &pself->SWI_noiseVoices[i];
@@ -580,7 +587,7 @@ static SWNoise SW_NOISES[] =
 @method SoundWorkerClass, MSG_SOUND_WORKER_NOISE_PLAY_MULTI
 {
   word i;
-  SWNoise *n;
+  const SWNoise *n;
   SWNoiseVoice *v;
   // Verify that multi noise is enabled
   if (!(pself->SWI_modes & SW_MODE_NOISE))
@@ -628,7 +635,7 @@ static SWNoise SW_NOISES[] =
  ***********************************************************************/
 @method SoundWorkerClass, MSG_SOUND_WORKER_NOISE_PLAY_SINGLE
 {
-  SWNoise *n;
+  const SWNoise *n;
   SWNoiseVoice *v;
   // Verify that single noise is enabled
   if (!(pself->SWI_modes & SW_MODE_NOISE))
@@ -643,7 +650,7 @@ static SWNoise SW_NOISES[] =
   }
   // Make sure no other noise is playing
   SoundStopMusicNote(v->soundHandle);
-  // Get the nois and play it
+  // Get the noise and play it
   n = &SW_NOISES[noise];
   SoundReallocMusicNote(v->soundHandle, n->frequency, n->loudness, SSDTT_TICKS, n->duration, n->instrument, IT_STANDARD_TABLE);
   SoundPlayMusicNote(v->soundHandle, SP_STANDARD + SP_IMMEDIATE, 0, UNLOCK_ON_EOS);

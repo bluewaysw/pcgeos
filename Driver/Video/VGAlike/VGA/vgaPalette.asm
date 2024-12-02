@@ -52,53 +52,12 @@ REVISION HISTORY:
 SetDevicePalette	proc	near
 	uses ax, bx, cx, dx, ds
 		.enter
-  jmp noPalette
-	mov	ah, 010h
-	mov	al, 13h
-	mov	bl, 0
-	mov	bh, 1
-	int	10h
-	mov	ah, 010h
-	mov	al, 13h
-	mov	bl, 1
-	mov	bh, 0
-	int	10h
-
-	clr	cx
-	mov	bx, offset currentPalette
-	segmov	ds, cs, ax
-setPaletteLoop:
-	mov	dx, 03c8h
-	mov	al, cl
-	out	dx, al
-	mov	dx, 03c9h
-	mov	al, cs:[bx+0]
-	shr	al, 1
-	shr	al, 1
-	and	al, 63
-	out	dx, al
-	mov	al, cs:[bx+1]
-	shr	al, 1
-	shr	al, 1
-	and	al, 63
-	out	dx, al
-	mov	al, cs:[bx+2]
-	shr	al, 1
-	shr	al, 1
-	and	al, 63
-	out	dx, al
-
-	add	bx, 3
-	inc	cx
-	cmp	cx, 16
-	jne	setPaletteLoop
-noPalette:
 		.leave
 		ret
 SetDevicePalette	endp
 
 
-
+if (0)
 
 COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 		FixColorRGB
@@ -167,3 +126,4 @@ FixColorRGB	proc	near
 		.leave
 		ret
 FixColorRGB	endp
+endif
