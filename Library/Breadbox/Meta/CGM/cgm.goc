@@ -1,0 +1,532 @@
+/***********************************************************************
+ *
+ * PROJECT:       VConvert
+ * FILE:          CGM.goc
+ *
+ * DESCRIPTION:   Convert CGM files into PC/Geos clipboard file
+ *
+ * AUTHOR:        Marcus Groeber
+ *
+ ***********************************************************************/
+
+/*
+ ***************************************************************************
+ *		Include files
+ ***************************************************************************
+ */
+@include <stdapp.goh>
+
+#include <ansi/string.h>
+#include <ansi/stdio.h>
+#include <ansi/stdlib.h>
+#include <graphics.h>
+#include <gstring.h>
+#include <math.h>
+#include <file.h>
+#include <system.h>
+#include <localize.h>
+
+#include <meta.h>
+
+#include "cgm.h"
+
+#ifdef DUMP
+FILE *fDump;
+#endif
+
+#define VDC_XSIZE 639L
+#define VDC_YSIZE 479L
+
+static Boolean cgm_edgevis;             /* R�nder von Objekten sichtbar? */
+static struct _cgm_rgb cgm_linecolor,cgm_edgecolor,
+                                        /* line/edge color settings */
+                       cgm_auxcolor;    /* auxiliary color setting */
+static word cgm_intstyle;               /* interior style setting */
+static SystemDrawMask cgm_hatchpat,     /* pattern for "hatch" interior */
+                      cgm_patpat;       /* pattern for "pattern" interior */
+static LineStyle cgm_linetype,cgm_edgetype;
+                                        /* line/edge style */
+static WWFixedAsDWord cgm_linewidth,cgm_edgewidth;
+
+struct _cgm_point cgm_c1,cgm_c2;        /* clipping rectangle */
+
+/*----------------------------------------------------------------------------*/
+void cgm_SetAreaStyle(void)
+{
+        struct _cgm_rgb *c;
+
+        c=cgm_color_deref(&cgm_edgecolor);
+        Meta_SetLineColor(CF_RGB,c->r,c->g,c->b);
+        c=cgm_color_deref(&cgm_auxcolor);
+        Meta_SetPatternBack(CF_RGB,c->r,c->g,c->b);
+        Meta_SetLineStyle(cgm_edgetype);
+        Meta_SetAreaFill((cgm_intstyle==0)?SDM_0:
+                         (cgm_intstyle==1)?SDM_100:
+                         (cgm_intstyle==2)?cgm_patpat:
+                         (cgm_intstyle==3)?cgm_hatchpat:
+                         (cgm_intstyle==4)?SDM_0:
+                                           SDM_100);
+        Meta_SetLineWidth(cgm_edgewidth);
+}
+
+void cgm_SetLineStyle(void)
+{
+        struct _cgm_rgb *c;
+
+        c=cgm_color_deref(&cgm_linecolor);
+        Meta_SetLineColor(CF_RGB,c->r,c->g,c->b);
+        c=cgm_color_deref(&cgm_auxcolor);
+        Meta_SetPatternBack(CF_RGB,c->r,c->g,c->b);
+        Meta_SetLineStyle(cgm_linetype);
+        Meta_SetLineWidth(cgm_linewidth);
+}
+
+/*----------------------------------------------------------------------------*/
+#pragma warn -par                       /* not all handlers have arguments */
+
+int _pascal CGM_cmd_VDCExtent(word opcode,word argc,union U_args *_argv)
+{
+        Meta_SetScaling((sword)argv(0)->point.p.x,(sword)argv(0)->point.p.y,
+                        (sword)argv(1)->point.p.x,(sword)argv(1)->point.p.y,
+                        VDC_XSIZE,VDC_YSIZE);
+        return 0;                       /* no error */
+}
+
+int _pascal CGM_cmd_AuxColor(word opcode,word argc,union U_args *_argv)
+{
+        cgm_auxcolor=argv(0)->rgb;      /* set auxiliary color */
+        return 0;                       /* no error */
+}
+
+int _pascal CGM_cmd_Transparency(word opcode,word argc,union U_args *_argv)
+{
+        Meta_SetTransparency((argv(0)->uval?TRUE:FALSE));
+                                        /* set transparency mode */
+        return 0;                       /* no error */
+}
+
+int _pascal CGM_cmd_ClipRectangle(word opcode,word argc,union U_args *_argv)
+{
+        cgm_c1=argv(0)->point.p;        /* store coordinates of clipping rect */
+        cgm_c2=argv(1)->point.p;
+        return 0;                       /* no error */
+}
+
+int _pascal CGM_cmd_ClipIndicator(word opcode,word argc,union U_args *_argv)
+{
+        if(argv(0)->uval)               /* turn clipping on or off? */
+          Meta_SetClipRect(
+            (sword)cgm_c1.x,(sword)cgm_c1.y,(sword)cgm_c2.x,(sword)cgm_c2.y);
+                                        /* enable clipping with current rect */
+        else
+          Meta_SetClipRect(0,0,0,0);    /* disable clipping */
+        return 0;                       /* no error */
+}
+
+int _pascal CGM_cmd_Polygon_Polyline(word opcode,word argc,union U_args *_argv)
+{
+        word i,j;
+        Point *cgm_par;                 /* buffer for polygon corner points */
+        MemHandle h_mp;                 /* handle to array for polylines */
+
+        if(argc>MAX_POINTS)             /* reduce corner points if necessary */
+          argc=MAX_POINTS;
+
+        h_mp = MemAlloc(argc*sizeof(Point), HF_DYNAMIC|HF_SHARABLE, 0);
+        if(!h_mp)                       /* allocation error: abort */
+          return 1;
+        cgm_par = (Point *)MemLock(h_mp);
+                                        /* point array */
+
+        for(i=0;i<argc;i++) {           /* convert corner points */
+          cgm_par[i].P_x=(sword)argv(i)->point.p.x;
+          cgm_par[i].P_y=(sword)argv(i)->point.p.y;
+        }
+        switch(opcode) {
+          case OPCODE(4,1):
+            cgm_SetLineStyle();         /* transfer line settings */
+            Meta_Polyline(cgm_par,argc);
+            break;
+          case OPCODE(4,2):
+            cgm_SetLineStyle();         /* transfer line settings */
+            for(i=0;i<argc;i+=2)        /* take points two by two */
+              Meta_Line(cgm_par[i].P_x,cgm_par[i].P_y,
+                cgm_par[i+1].P_x,cgm_par[i+1].P_y);
+                                        /* draw line between each pair */
+            break;
+          case OPCODE(4,7):
+            cgm_SetAreaStyle();         /* transfer area settings */
+            Meta_Polygon(cgm_par,argc,(cgm_intstyle!=0 && cgm_intstyle!=4),
+                         cgm_edgevis);
+            break;
+          case OPCODE(4,8):
+            cgm_SetAreaStyle();         /* transfer area settings */
+            j=0;
+            Meta_BeginPath();           /* Polygons form a compound object */
+            for(i=0;i<argc;i++)
+              if(argv(i)->point.flag!=1) {
+                                        /* end of polygon */
+                Meta_Polygon(cgm_par+j,i-j+1,FALSE,TRUE);
+                                        /* draw next polygon */
+                j=i+1;                  /* start of next polygon */
+              }
+            Meta_EndPath((cgm_intstyle!=0 && cgm_intstyle!=4),cgm_edgevis);
+                                        /* draw entire object */
+            break;
+        }
+
+        MemUnlock(h_mp);                /* free point array */
+        MemFree(h_mp);
+
+        return 0;                       /* no error */
+}
+
+int _pascal CGM_cmd_Rectangle(word opcode,word argc,union U_args *_argv)
+{
+        cgm_SetAreaStyle();             /* transfer area settings */
+        Meta_Rect(
+          (sword)argv(0)->point.p.x,(sword)argv(0)->point.p.y,
+          (sword)argv(1)->point.p.x,(sword)argv(1)->point.p.y,
+          (cgm_intstyle!=0 && cgm_intstyle!=4),
+          cgm_edgevis);                 /* draw rectangle */
+        return 0;                       /* no error */
+}
+
+int _pascal CGM_cmd_Circle(word opcode,word argc,union U_args *_argv)
+{
+        Point p,r;
+
+        p.P_x=(sword)argv(0)->point.p.x;
+        p.P_y=(sword)argv(0)->point.p.y;
+        r.P_x=(sword)argv(1)->point.p.x;
+        r.P_y=(sword)argv(1)->point.p.y;
+
+        cgm_SetAreaStyle();             /* transfer area settings */
+        Meta_Ellipse(p.P_x,p.P_y,r.P_x,r.P_y,0,
+          (cgm_intstyle!=0 && cgm_intstyle!=4),cgm_edgevis);
+        return 0;                       /* no error */
+}
+
+int _pascal CGM_cmd_CircularArc3(word opcode,word argc,union U_args *_argv)
+{
+        Point p[3];
+
+        p[0].P_x=(sword)argv(0)->point.p.x;
+        p[0].P_y=(sword)argv(0)->point.p.y;
+        p[1].P_x=(sword)argv(1)->point.p.x;
+        p[1].P_y=(sword)argv(1)->point.p.y;
+        p[2].P_x=(sword)argv(2)->point.p.x;
+        p[2].P_y=(sword)argv(2)->point.p.y;
+
+        if(opcode==OPCODE(4,14)) {      /* close type specified in last arg? */
+          cgm_SetAreaStyle();           /* transfer area settings */
+          Meta_ArcThreePoint(p,(argv(argc-1)->uval)?ACT_CHORD:ACT_PIE,
+            (cgm_intstyle!=0 && cgm_intstyle!=4),cgm_edgevis);
+        }
+        else {                          /* no: draw "open" arc */
+          cgm_SetLineStyle();           /* this is a "line type" object */
+          Meta_ArcThreePoint(p,ACT_OPEN,FALSE,TRUE);
+        }
+        return 0;                       /* no error */
+}
+
+int _pascal CGM_cmd_CircularArc(word opcode,word argc,union U_args *_argv)
+{
+        Point c,r;
+        word sa,ea;
+
+        c.P_x=(sword)argv(0)->point.p.x;
+        c.P_y=(sword)argv(0)->point.p.y;
+        r.P_x=(sword)argv(3)->point.p.x;
+        r.P_y=(sword)argv(3)->point.p.y;
+
+        sa=IntegerOf(phi((sword)argv(1)->point.p.x,(sword)argv(1)->point.p.y));
+        ea=IntegerOf(phi((sword)argv(2)->point.p.x,(sword)argv(2)->point.p.y));
+                                        /* calculate first and last angle */
+
+        if(opcode==OPCODE(4,16)) {      /* close type specified in last arg? */
+          cgm_SetAreaStyle();           /* transfer area settings */
+          Meta_EllipticalArc(c.P_x,c.P_y, r.P_x,r.P_y, 0,
+            sa,ea,(argv(argc-1)->uval)?ACT_CHORD:ACT_PIE,
+            (cgm_intstyle!=0 && cgm_intstyle!=4),cgm_edgevis);
+        }
+        else {
+          cgm_SetLineStyle();           /* this is a "line type" object */
+          Meta_EllipticalArc(c.P_x,c.P_y, r.P_x,r.P_y, 0,
+            sa,ea,ACT_OPEN,FALSE,TRUE);
+                                        /* draw as "open" elliptical arc */
+        }
+        return 0;                       /* no error */
+}
+
+int _pascal CGM_cmd_Ellipse(word opcode,word argc,union U_args *_argv)
+{
+        Point p;
+
+        p.P_x=(sword)argv(0)->point.p.x;
+        p.P_y=(sword)argv(0)->point.p.y;
+
+        cgm_SetAreaStyle();             /* transfer area settings */
+        Meta_Ellipse(
+          p.P_x,p.P_y,
+          IntegerOf(rad(
+            (sword)argv(1)->point.p.x-p.P_x,(sword)argv(1)->point.p.y-p.P_y)),
+          IntegerOf(rad(
+            (sword)argv(2)->point.p.x-p.P_x,(sword)argv(2)->point.p.y-p.P_y)),
+          IntegerOf(phi(
+            (sword)argv(1)->point.p.x-p.P_x,(sword)argv(1)->point.p.y-p.P_y)),
+          (cgm_intstyle!=0 && cgm_intstyle!=4),cgm_edgevis);
+        return 0;                       /* no error */
+}
+
+int _pascal CGM_cmd_EllipticalArc(word opcode,word argc,union U_args *_argv)
+{
+        Point p;
+        word sa,ea,angle;
+
+        p.P_x=(sword)argv(0)->point.p.x;
+        p.P_y=(sword)argv(0)->point.p.y;
+
+        sa=IntegerOf(phi((sword)argv(3)->point.p.x,(sword)argv(3)->point.p.y));
+        ea=IntegerOf(phi((sword)argv(4)->point.p.x,(sword)argv(4)->point.p.y));
+                                        /* calculate first and last angle */
+        angle=IntegerOf(phi(
+          (sword)argv(1)->point.p.x-p.P_x,(sword)argv(1)->point.p.y-p.P_y));
+
+#ifdef DUMP
+{
+        char buf[80];
+        sprintf(buf,"{Elliptical Arc <%d/%d,%d..%d>}",angle,
+          IntegerOf(phi((sword)argv(2)->point.p.x-p.P_x,(sword)argv(2)->point.p.y-p.P_y)),sa,ea);
+        fwrite(buf,strlen(buf),1,fDump);
+}
+#endif
+
+        if(opcode==OPCODE(4,19)) {      /* close type specified in last arg? */
+          cgm_SetAreaStyle();           /* transfer area settings */
+          Meta_EllipticalArc(
+            p.P_x,p.P_y,
+            IntegerOf(rad(
+              (sword)argv(1)->point.p.x-p.P_x,(sword)argv(1)->point.p.y-p.P_y)),
+            IntegerOf(rad(
+              (sword)argv(2)->point.p.x-p.P_x,(sword)argv(2)->point.p.y-p.P_y)),
+            angle,sa-angle,ea-angle,(argv(argc-1)->uval)?ACT_CHORD:ACT_PIE,
+            (cgm_intstyle!=0 && cgm_intstyle!=4),cgm_edgevis);
+        }
+        else {
+          cgm_SetLineStyle();           /* this is a "line type" object */
+          Meta_EllipticalArc(
+            p.P_x,p.P_y,
+            IntegerOf(rad(
+              (sword)argv(1)->point.p.x-p.P_x,(sword)argv(1)->point.p.y-p.P_y)),
+            IntegerOf(rad(
+              (sword)argv(2)->point.p.x-p.P_x,(sword)argv(2)->point.p.y-p.P_y)),
+            angle,sa-angle,ea-angle,ACT_OPEN,FALSE,TRUE);
+                                        /* draw as "open" elliptical arc */
+        }
+        return 0;                       /* no error */
+}
+
+int _pascal CGM_cmd_LineEdgeType(word opcode,word argc,union U_args *_argv)
+{
+        LineStyle ls;
+
+        ls=(argv(0)->sval ==  1)? LS_SOLID:
+           (argv(0)->sval ==  2)? LS_DASHED:
+           (argv(0)->sval ==  3)? LS_DOTTED:
+           (argv(0)->sval ==  4)? LS_DASHDOT:
+           (argv(0)->sval ==  5)? LS_DASHDDOT:
+                                  LS_SOLID;
+                                        /* Map line types */
+        if(opcode==OPCODE(5,2))         /* Line Type */
+          cgm_linetype=ls;
+        else                            /* Edge Type */
+          cgm_edgetype=ls;
+        return 0;                       /* no error */
+}
+
+int _pascal CGM_cmd_LineColor(word opcode,word argc,union U_args *_argv)
+{
+        cgm_linecolor=argv(0)->rgb;
+        return 0;                       /* no error */
+}
+
+int _pascal CGM_cmd_EdgeColor(word opcode,word argc,union U_args *_argv)
+{
+        cgm_edgecolor=argv(0)->rgb;
+        return 0;                       /* no error */
+}
+
+int _pascal CGM_cmd_InteriorStyle(word opcode,word argc,union U_args *_argv)
+{
+        cgm_intstyle=(word)argv(0)->uval;
+        return 0;                       /* no error */
+}
+
+int _pascal CGM_cmd_FillColor(word opcode,word argc,union U_args *_argv)
+{
+        struct _cgm_rgb *c=cgm_color_deref(&argv(0)->rgb);
+
+        Meta_SetAreaColor(CF_RGB,c->r,c->g,c->b);
+        return 0;                       /* no error */
+}
+
+int _pascal CGM_cmd_HatchIndex(word opcode,word argc,union U_args *_argv)
+{
+        cgm_hatchpat=(argv(0)->sval ==  1)? 23:  /* undoc: hor */
+                     (argv(0)->sval ==  2)? 24:  /* undoc: vert */
+                     (argv(0)->sval ==  3)? SDM_DIAG_NE:
+                     (argv(0)->sval ==  4)? SDM_DIAG_NW:
+                     (argv(0)->sval ==  5)? SDM_BIG_GRID:
+                     (argv(0)->sval ==  6)? SDM_TILE:
+                     (argv(0)->sval == -1)? SDM_SLANT_BRICK:
+                     (argv(0)->sval == -2)? 18:
+                     (argv(0)->sval == -3)? 14:
+                     (argv(0)->sval == -4)? 15:  /* undoc: weave */
+                     (argv(0)->sval == -5)? 16:  /* undoc: roof */
+                     (argv(0)->sval == -6)? SDM_HORIZONTAL:
+                     (argv(0)->sval == -7)? SDM_VERTICAL:
+                     (argv(0)->sval == -8)? 10:
+                     (argv(0)->sval == -9)? 11:
+                     (argv(0)->sval ==-10)? SDM_GRID:
+                     (argv(0)->sval ==-11)? 20:
+                     (argv(0)->sval ==-12)? 21:
+                     (argv(0)->sval ==-13)? 87:
+                     (argv(0)->sval ==-14)? 85:
+                     (argv(0)->sval ==-15)? SDM_12_5:
+                     (argv(0)->sval ==-16)? SDM_25:
+                     (argv(0)->sval ==-17)? SDM_50:
+                     (argv(0)->sval ==-18)? SDM_75:
+                     (argv(0)->sval ==-19)? SDM_100:
+                     (argv(0)->sval ==-20)? 22:
+                                            SDM_100;
+                                        /* map pattern values */
+        return 0;                       /* no error */
+}
+
+int _pascal CGM_cmd_PatternIndex(word opcode,word argc,union U_args *_argv)
+{
+        cgm_patpat=SDM_100;
+        return 0;                       /* no error */
+}
+
+int _pascal CGM_cmd_EdgeVis(word opcode,word argc,union U_args *_argv)
+{
+        cgm_edgevis=(Boolean)argv(0)->uval;
+        return 0;                       /* no error */
+}
+
+int _pascal CGM_cmd_LineWidth(word opcode,word argc,union U_args *_argv)
+{
+        cgm_linewidth=
+          GrMulWWFixed( MakeWWFixed(argv(0)->uval),Meta_GetScaling() );
+        return 0;                       /* no error */
+}
+
+int _pascal CGM_cmd_EdgeWidth(word opcode,word argc,union U_args *_argv)
+{
+        cgm_edgewidth=
+          GrMulWWFixed( MakeWWFixed(argv(0)->uval),Meta_GetScaling() );
+        return 0;                       /* no error */
+}
+
+int _pascal CGM_cmd_NOP(word opcode,word argc,union U_args *_argv)
+{
+    /* "do nothing" handler */
+	return 0;
+}
+
+#pragma warn .par
+
+/*----------------------------------------------------------------------------*/
+struct _cgm_commands CGMcmds[] = {
+  { OPCODE(2,6),  "PP",        CGM_cmd_VDCExtent },
+  { OPCODE(3,3),  "C",         CGM_cmd_AuxColor },
+  { OPCODE(3,4),  "I",         CGM_cmd_Transparency },
+  { OPCODE(3,5),  "PP",        CGM_cmd_ClipRectangle },
+  { OPCODE(3,6),  "I",         CGM_cmd_ClipIndicator },
+  { OPCODE(4,1),  "*P",        CGM_cmd_Polygon_Polyline },
+  { OPCODE(4,2),  "*P",        CGM_cmd_Polygon_Polyline },
+  { OPCODE(4,7),  "*P",        CGM_cmd_Polygon_Polyline },
+  { OPCODE(4,8),  "*F",        CGM_cmd_Polygon_Polyline },
+  { OPCODE(4,11), "PP",        CGM_cmd_Rectangle },
+  { OPCODE(4,12), "PV",        CGM_cmd_Circle },
+  { OPCODE(4,13), "PPP",       CGM_cmd_CircularArc3 },
+  { OPCODE(4,14), "PPPI",      CGM_cmd_CircularArc3 },
+  { OPCODE(4,15), "PPPV",      CGM_cmd_CircularArc },
+  { OPCODE(4,16), "PPPVI",     CGM_cmd_CircularArc },
+  { OPCODE(4,17), "PPP",       CGM_cmd_Ellipse },
+  { OPCODE(4,18), "PPPPP",     CGM_cmd_EllipticalArc },
+  { OPCODE(4,19), "PPPPPI",    CGM_cmd_EllipticalArc },
+  { OPCODE(5,2),  "I",         CGM_cmd_LineEdgeType },
+  { OPCODE(5,3),  "I",         CGM_cmd_LineWidth },
+  { OPCODE(5,4),  "C",         CGM_cmd_LineColor },
+  { OPCODE(5,22), "I",         CGM_cmd_InteriorStyle },
+  { OPCODE(5,23), "C",         CGM_cmd_FillColor },
+  { OPCODE(5,24), "I",         CGM_cmd_HatchIndex },
+  { OPCODE(5,25), "I",         CGM_cmd_PatternIndex },
+  { OPCODE(5,27), "I",         CGM_cmd_LineEdgeType },
+  { OPCODE(5,28), "I",         CGM_cmd_EdgeWidth },
+  { OPCODE(5,29), "C",         CGM_cmd_EdgeColor },
+  { OPCODE(5,30), "I",         CGM_cmd_EdgeVis },
+  { OPCODE(6,1),  "",          CGM_cmd_NOP },       /* ESCAPE: ignored */
+  { OPCODE(7,2),  "",          CGM_cmd_NOP },       /* Application data: ignored */
+};
+
+/*----------------------------------------------------------------------------*/
+int _export _pascal ReadCGM(FileHandle srcFile,word settings,
+  ProgressCallback *callback)
+{
+        dword size,pos;
+        word cnt;
+	word pct;
+        Boolean abort;
+        int ret;
+
+        if(CGM_raw_Start()) {           /* initialize CGM lowlevel reader */
+          return TE_OUT_OF_MEMORY;     /* error: not enough memory */
+        }
+
+        fCGM=srcFile;                   /* handle of source file */
+        size=FileSize(fCGM);            /* check file size (for progress) */
+
+#ifdef DUMP
+  fDump=fopen("dump","w");
+#endif
+
+        Meta_SetScaling(-32768,-32768,32767,32767,VDC_XSIZE,VDC_YSIZE);
+        cgm_intstyle=0;
+        cgm_hatchpat=cgm_patpat=SDM_100;
+        cgm_linecolor.r=cgm_edgecolor.r=cgm_linecolor.g=cgm_edgecolor.g=
+          cgm_linecolor.b=cgm_edgecolor.b=0;
+        cgm_edgewidth=cgm_linewidth=MakeWWFixed(1);
+        cgm_edgetype=cgm_linetype=LS_SOLID;
+        cgm_auxcolor.r=cgm_auxcolor.g=cgm_auxcolor.b=255;
+        cgm_c1.x=-32768; cgm_c1.y=-32768;
+        cgm_c2.x=32767;  cgm_c2.y=32767;
+        Meta_SetTransparency(TRUE);
+
+        cnt=0;
+        abort=FALSE;
+        ret=TE_NO_ERROR;
+
+        while( CGM_docommand(CGMcmds,sizeof(CGMcmds)/sizeof(CGMcmds[0]),&ret)
+               && !abort && ret==TE_NO_ERROR ) {
+                                        /* process commands ins file */
+          if(++cnt>=20) {               /* update position every 20 commands */
+            pos=FilePos(fCGM,0,FILE_POS_RELATIVE);
+                                        /* get current position */
+            pct=(word)(size?(pos*100/size):0);
+	    if( ((pcfm_ProgressCallback *)ProcCallFixedOrMovable_pascal)(pct,callback) )
+              abort=TRUE;               /* aborted? set flag... */
+            cnt=0;                      /* clear counter */
+          }
+        }
+
+#ifdef DUMP
+  fclose(fDump);
+#endif
+
+        CGM_raw_End();                  /* close CGM lowlevel reader */
+        return abort?TE_ERROR:ret;   /* not aborted: return last result */
+}

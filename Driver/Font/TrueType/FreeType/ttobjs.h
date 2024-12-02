@@ -315,6 +315,8 @@
 
 #endif
 
+#define CALL_INTERPRETER  ( engineInstance.interpreterActive ? RunIns( exec ) : TT_Err_Ok )
+
   /* Rounding function, as used by the interpreter */
   typedef TT_F26Dot6  TRound_Function( EXEC_OPS TT_F26Dot6 distance,
                                                 TT_F26Dot6 compensation );
@@ -474,9 +476,6 @@
 
   struct  TFace_
   {
-    /* parent engine instance for the face object */
-    PEngine_Instance  engine;
-
     /* i/o stream */
     TT_Stream  stream;
 
@@ -559,15 +558,12 @@
     TCache  instances;   /* current instances for this face */
     TCache  glyphs;      /* current glyph containers for this face */
 
-
     /* A typeless pointer to the face object extensions defined */
     /* in the 'ttextend.*' files.                               */
+  #ifdef TT_CONFIG_OPTION_EXTEND_ENGINE
     void*  extension;
     Int    n_extensions;    /* number of extensions */
-
-    /* Use extensions to provide additional capabilities to the */
-    /* engine.  Read the developer's guide in the documentation */
-    /* directory to know how to do that.                        */
+  #endif
   };
 
 
@@ -748,8 +744,6 @@
   struct  TFont_Input_
   {
     TT_Stream         stream;     /* input stream                */
-    PEngine_Instance  engine;     /* parent engine instance      */
-
   };
 
   typedef struct TFont_Input_  TFont_Input;
@@ -817,8 +811,8 @@
   /*                                                                  */
   /********************************************************************/
 
-  LOCAL_DEF TT_Error  TTObjs_Init( PEngine_Instance  engine );
-  LOCAL_DEF TT_Error  TTObjs_Done( PEngine_Instance  engine );
+  LOCAL_DEF TT_Error  TTObjs_Init( );
+  LOCAL_DEF TT_Error  TTObjs_Done( );
 
 #ifdef __cplusplus
   }

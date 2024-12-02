@@ -1,0 +1,88 @@
+@include <stdapp.goh>
+@include <grobj.goh>
+
+#include <meta.h>
+#include "VConvert.h"
+
+
+@start HeadResource;
+  @object GrObjHeadClass  MetaHead = { }
+@end   HeadResource;
+
+@start BodyGOAM, notDetachable;
+  @object GrObjBodyClass MetaBody = {
+      GBI_bounds = {-32768,-32768,32767,32767};
+      GBI_goam = MetaOAM;
+  }
+  @object GrObjAttributeManagerClass MetaOAM = {
+      GOAMI_bodyList = GOAMBodyList;
+  }
+  @chunkArray optr GOAMBodyList = {@MetaBody};
+@end BodyGOAM;
+
+
+optr Create_GrBody(VMFileHandle vmf)
+{
+        VMBlockHandle dupBlock;
+        MemHandle     dupMem;
+        optr          body;
+
+        VMSetAttributes(vmf,VMA_SYNC_UPDATE | VMA_OBJECT_ATTRS,0);
+                                        /* necessary for object storage */
+
+        /*
+         * Duplicate GrObjBody template (taken from DupGrObj sample)
+         */
+        dupMem = ObjDuplicateResource( OptrToHandle(@MetaBody),
+          0, ProcInfo(GeodeGetProcessHandle()) );
+
+        dupBlock = VMAttach( vmf, 0, dupMem );
+
+        VMPreserveBlocksHandle( vmf, dupBlock );
+        /* VMSetExecThread( vmf, ProcInfo(GeodeGetProcessHandle()) ); */
+
+        @call process::MSG_GEN_PROCESS_UNDO_SET_CONTEXT(1);
+        @call process::MSG_GEN_PROCESS_UNDO_IGNORE_ACTIONS(TRUE);
+
+        @call ConstructOptr(dupMem, OptrToChunk(@MetaOAM))::
+          MSG_GOAM_CREATE_ALL_ARRAYS();
+        body = ConstructOptr(dupMem, OptrToChunk(@MetaBody));
+        @call body::MSG_GB_ATTACH_UI( @MetaHead );
+                                        /* initialize body/head/OAM */
+
+        return body;                    /* pass back handle to object created */
+}
+
+int Finish_GrBody(
+  optr body,VMFileHandle vmf,VMBlockHandle *gsh,VMBlockHandle *grobjh,
+  RectDWord *bounds)
+{
+        PointDWFixed org;
+
+        @call body::MSG_GB_GET_BOUNDS_OF_SELECTED_GROBJS(bounds);
+        @call body::MSG_GB_SET_BOUNDS(bounds);
+                                        /* force calculation of total size */
+
+        /*** Create GString transfer format ***/
+        org.PDF_x.DWF_int=bounds->RD_left;
+        org.PDF_x.DWF_frac=0;
+        org.PDF_y.DWF_int=bounds->RD_top;
+        org.PDF_y.DWF_frac=0;           /* this way, we can use grobj bounds */
+
+        *gsh = My_GB_CreateGStringTransferFormat(body, vmf, &org);
+                                        /* create GString from objects */
+
+        /*** Create GrObj transfer format ***/
+        org.PDF_x.DWF_int=(bounds->RD_left+bounds->RD_right)/2;
+        org.PDF_x.DWF_frac=0;
+        org.PDF_y.DWF_int=(bounds->RD_top+bounds->RD_bottom)/2;
+        org.PDF_y.DWF_frac=0;           /* for correctly positined pasting */
+
+        *grobjh = My_GB_CreateGrObjTransferFormat(body, vmf, &org);
+                                        /* create GrObj tree from objects */
+
+	@call process::MSG_GEN_PROCESS_UNDO_ACCEPT_ACTIONS();
+        @call process::MSG_GEN_PROCESS_UNDO_SET_CONTEXT(NULL_UNDO_CONTEXT);
+
+        return 0;                       /* no errors */
+}

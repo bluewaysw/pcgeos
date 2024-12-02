@@ -149,10 +149,6 @@ extern "C" {
 
   /***************** high-level API extension **************************/
 
-  /* Initialize Kerning extension, must be called after                 */
-  /* TT_Init_FreeType(). There is no need for a finalizer               */
-  EXPORT_DEF
-  TT_Error  TT_Init_Kerning_Extension( void );
 
   /* Note on the implemented mechanism:                                 */
 
@@ -163,15 +159,23 @@ extern "C" {
 
   /* Queries a pointer to the kerning directory for the face object     */
   EXPORT_DEF
-  TT_Error  TT_Get_Kerning_Directory( TT_Face      face,
-                                      TT_Kerning*  directory );
+  TT_Error  TT_Load_Kerning_Directory( TT_Face      face,
+                                       TT_Kerning*  directory );
+
+
+  /* Releases all resources allocated for a kerning directory.          */
+  EXPORT_DEF
+  TT_Error  TT_Kerning_Directory_Done( TT_Kerning*  directory );
+
 
   /* Load the kerning table number `kern_index' in the kerning          */
   /* directory.  The table will stay in memory until the `face'         */
   /* face is destroyed.                                                 */
   EXPORT_DEF
-  TT_Error  TT_Load_Kerning_Table( TT_Face    face,
-                                   TT_UShort  kern_index );
+  TT_Error  TT_Load_Kerning_Table( TT_Face      face,
+                                   TT_Kerning*  directory,
+                                   TT_UShort    kern_index );
+
 
 #ifdef __cplusplus
 }

@@ -70,6 +70,10 @@ extern void InitConvertHeader( TRUETYPE_VARS, FontHeader* fontHeader );
 
 static void FillKerningFlags( FontHeader* fontHeader, FontBuf* fontBuf );
 
+static void AdjustTransMatrix( TransformMatrix*  transMatrix );
+
+static WWFixedAsDWord SqrtWWFixed( WWFixedAsDWord value );
+
 
 #define ROUND_WWFIXED( value )    ( value & 0xffff ? ( value >> 16 ) + 1 : value >> 16 )
 
@@ -116,14 +120,14 @@ static void FillKerningFlags( FontHeader* fontHeader, FontBuf* fontBuf );
  *                    A handle to the memory block containing font block.
  * 
  * STRATEGY:       - Validates all input handles and pointers.
- *                 - Locks and dereferences the TrueType variables, font information, 
- *                   and outline entries.
+ *                 - Locks and dereferences the TrueType variables, 
+ *                   font information, and outline entries.
  *                 - Opens the TrueType face and initializes the conversion header.
  *                 - Allocates the memory block for `FontBuf`, including character 
  *                   entries, kerning pairs, and kerning values.
  *                 - Initializes fields in `FontBuf` that are not scale-dependent.
- *                 - Calculates the scale factor and fills `FontBuf` with the converted 
- *                   header, widths, and kerning information.
+ *                 - Calculates the scale factor and fills `FontBuf` with
+ *                   the converted header, widths, and kerning information.
  *                 - Calculates the transformation matrix and adjusts the final 
  *                   metrics for `FontBuf`.
  *                 - Determines if the glyphs are rendered as regions and adjusts 
@@ -233,6 +237,7 @@ EC(     ECCheckBounds( (void*)transMatrix ) );
         if( IsRegionNeeded( transMatrix, fontBuf ) )
                 fontBuf->FB_flags |= FBF_IS_REGION;
 
+        AdjustTransMatrix( transMatrix );
         TrueType_Unlock_Face( trueTypeVars );
 Fail:        
         MemUnlock( varBlock );
@@ -348,13 +353,12 @@ EC(             ECCheckBounds( (void*)charTableEntry ) );
  * 
  * RETURNS:        void
  * 
- * STRATEGY:       - Retrieve the kerning pairs and character table entries
- *                   from the font buffer.
- *                 - Iterate over each kerning pair to find the left and
- *                   right characters involved.
- *                 - Set the appropriate flags (`CTF_IS_FIRST_KERN` and
- *                   `CTF_IS_SECOND_KERN`) in the corresponding character
- *                   table entries.
+ * STRATEGY:       - Retrieve the kerning pairs and character table 
+ *                   entries from the font buffer.
+ *                 - Iterate over each kerning pair to find the left 
+ *                   and right characters involved.
+ *                 - Set the appropriate flags in the corresponding 
+ *                   character table entries.
  * 
  * REVISION HISTORY:
  *      Date      Name      Description
@@ -436,7 +440,7 @@ EC(     ECCheckBounds( (void*)kernPair ) );
 EC(     ECCheckBounds( (void*)kernValue ) );
 
         /* load kerning directory */
-        if( TT_Get_Kerning_Directory( FACE, &kerningDir ) )
+        if( TT_Load_Kerning_Directory( FACE, &kerningDir ) )
                 return;
 
         if( kerningDir.nTables == 0 )
@@ -453,12 +457,13 @@ EC(     ECCheckBounds( indices ) );
                 const word  minKernValue = UNITS_PER_EM / KERN_VALUE_DIVIDENT;
                 
 
-                if( TT_Load_Kerning_Table( FACE, table ) )
+                if( TT_Load_Kerning_Table( FACE, &kerningDir, table ) )
                         continue;
 
                 if( kerningDir.tables->format != 0 )
                         continue;
 
+EC(             ECCheckMemHandle( kerningDir.tables->t.kern0.pairsBlock ) );
                 pairs = GEO_LOCK( kerningDir.tables->t.kern0.pairsBlock );
 EC(             ECCheckBounds( pairs ) );
 
@@ -485,6 +490,7 @@ EC(             ECCheckBounds( pairs ) );
                         }
                 }
                 GEO_UNLOCK( kerningDir.tables->t.kern0.pairsBlock );
+                TT_Kerning_Directory_Done( &kerningDir );
         }
         GEO_UNLOCK( LOOKUP_TABLE );
 }
@@ -513,18 +519,16 @@ EC(             ECCheckBounds( pairs ) );
  * 
  * RETURNS:        void
  * 
- * STRATEGY:       - Calculate the initial height scaling factor (`SCALE_HEIGHT`)
- *                   using the given point size and the font's units per EM.
- *                 - Initialize `SCALE_WIDTH` to match `SCALE_HEIGHT` initially.
- *                 - Adjust `SCALE_WIDTH` if the bold style (`TS_BOLD`) is present,
+ * STRATEGY:       - Calculate the initial height scaling factor using
+ *                   the given point size and the font's units per EM.
+ *                 - Initialize `SCALE_WIDTH` and `SCALE_HEIGHT`.
+ *                 - Adjust `SCALE_WIDTH` if the bold style is present,
  *                   scaling it slightly wider by a factor of `1.1`.
- *                 - Further adjust `SCALE_WIDTH` if subscript or superscript
- *                   styles (`TS_SUBSCRIPT` or `TS_SUPERSCRIPT`) are specified, 
- *                   reducing it by half.
+ *                 - Further adjust `SCALE_WIDTH` if subscript or 
+ *                   superscript styles are specified, reducing it by half.
  *                 - Implement additional scaling for width and weight if they
- *                   are different from the default values (`FWI_MEDIUM` and 
- *                   `FW_NORMAL` respectively), applying corresponding scaling 
- *                   multipliers.
+ *                   are different from the default values, applying 
+ *                   corresponding scaling multipliers.
  * 
  * REVISION HISTORY:
  *      Date      Name      Description
@@ -584,19 +588,15 @@ static void CalcScaleForWidths( TRUETYPE_VARS,
  * RETURNS:        void
  * 
  * STRATEGY:       - The function begins by initializing the transformation
- *                   matrix (`tempMatrix`) to a default identity matrix.
- *                 - The `transMatrix` values (`TM_heightX`, `TM_scriptX`, 
- *                   `TM_heightY`, `TM_scriptY`) are initially set to zero.
- *                 - If the bold style is requested (`TS_BOLD`), the width
- *                   scaling factor (`tempMatrix.xx`) is modified by the 
- *                   `BOLD_FACTOR`.
- *                 - For italic style (`TS_ITALIC`), a shear transformation
- *                   (`tempMatrix.yx`) is applied using `NEGATIVE_ITALIC_FACTOR`.
- *                 - Width and weight adjustments are applied to the scaling 
- *                   matrix.
- *                 - If subscript or superscript styles (`TS_SUBSCRIPT` or 
- *                   `TS_SUPERSCRIPT`) are required, additional scaling and 
- *                   script offset calculations are performed.
+ *                   matrix to a default identity matrix.
+ *                 - If the bold style is requested, the width scaling
+ *                   factor is modified by BOLD_FACTOR.
+ *                 - For italic style, a shear transformation is applied.
+ *                 - Width and weight adjustments are applied to the 
+ *                   scaling matrix.
+ *                 - If subscript or superscript styles are required, 
+ *                   additional scaling and script offset calculations
+ *                   are performed.
  *                   - The script offset is computed based on the font height
  *                     and height adjustments.
  *                   - Subscript and superscript styles are handled separately,
@@ -713,8 +713,7 @@ EC(     ECCheckBounds( (void*)fontBuf ) );
  * RETURNS:        word
  *                    The total size of the allocated or reallocated memory block.
  * 
- * STRATEGY:       - Calculate the total memory size needed for the font buffer,
- *                   character table entries, kerning pairs, and additional space.
+ * STRATEGY:       - Calculate the total memory size needed for the font buffer.
  *                 - If `fontHandle` is `NullHandle`, allocate a new memory block.
  *                   Otherwise, reallocate the existing block to the required size.
  *                 - Use error-checking macros to ensure that memory allocation
@@ -772,15 +771,11 @@ EC(             ECCheckMemHandle( *fontHandle ) );
  * 
  * RETURNS:        void
  * 
- * STRATEGY:       - This function reads font metrics from `fontHeader`, scales
- *                   them using previously calculated scaling factors (`SCALE_WIDTH`
- *                   and `SCALE_HEIGHT`), and writes the results to `fontBuf`.
- *                 - For each font metric (like `average width`, `height`, etc.), 
- *                   the scaling is applied using `SCALE_WORD`, and the result 
- *                   is then split into integer and fractional parts.
- *                 - Several font metrics, such as `baseline position`, 
- *                   `underline position`, and `strike-through position`, are 
- *                   calculated with specific adjustments to ensure visual accuracy.
+ * STRATEGY:       - This function reads font metrics from `fontHeader`
+ *                   and scales them.
+ *                 - For each font metric, the scaling is applied.
+ *                 - Several font metrics, are calculated with 
+ *                   specific adjustments to ensure visual accuracy.
  * 
  * REVISION HISTORY:
  *      Date      Name      Description
@@ -901,11 +896,10 @@ static void ConvertHeader( TRUETYPE_VARS, FontHeader* fontHeader, FontBuf* fontB
  *                   the baseline position with a correction factor
  *                   (`BASELINE_CORRECTION`).
  *                 - If the `FontMatrix` flags indicate a complex 
- *                   transformation (`TF_COMPLEX`), additional scaling and 
- *                   adjustments are applied to various metrics.
+ *                   transformation, additional scaling and adjustments
+ *                   are applied to various metrics.
  *                 - For rotated fonts, horizontal transformations 
- *                   (`TM_scriptX`, `TM_heightX`) are also adjusted to
- *                   account for the rotation.
+ *                   are also adjusted to account for the rotation.
  * 
  * REVISION HISTORY:
  *      Date      Name      Description
@@ -953,6 +947,88 @@ static void AdjustFontBuf( TransformMatrix* transMatrix,
         }
 }
 
+
+/********************************************************************
+ *                      AdjustTransMatrix
+ ********************************************************************
+ * SYNOPSIS:       Adjusts the transformation matrix by calculating and 
+ *                 applying scaling factors for the horizontal and 
+ *                 vertical axes.
+ * 
+ * PARAMETERS:     TransformMatrix* transMatrix 
+ *                    Pointer to the transformation matrix to be adjusted. 
+ *                    The structure includes scale factors and resolution 
+ *                    values for x and y axes.
+ * 
+ * RETURNS:        void
+ * 
+ * STRATEGY:       - Calculate scale factors 
+ *                 - Set the horizontal and vertical resolution based
+ *                   on 72 dpi.
+ *                 - Normalize the transformation matrix values to ensure
+ *                   proper scaling.
+ * 
+ * REVISION HISTORY:
+ *      Date      Name      Description
+ *      ----      ----      -----------
+ *      05.11.24  JK        Initial Revision
+ *******************************************************************/
+
+static void AdjustTransMatrix( TransformMatrix*  transMatrix )
+{
+        /* calculate horizontal and vertical scale factors */
+        WWFixedAsDWord  scaleX = SqrtWWFixed( GrMulWWFixed( transMatrix->TM_matrix.xx, transMatrix->TM_matrix.xx ) +
+                                                   GrMulWWFixed( transMatrix->TM_matrix.xy, transMatrix->TM_matrix.xy ) );
+        WWFixedAsDWord  scaleY = SqrtWWFixed( GrMulWWFixed( transMatrix->TM_matrix.yy, transMatrix->TM_matrix.yy ) +
+                                                   GrMulWWFixed( transMatrix->TM_matrix.yx, transMatrix->TM_matrix.yx ) );
+
+        /* set horizontal and vertical resolution based on 72 dpi */
+        transMatrix->TM_resX = INTEGER_OF_WWFIXEDASDWORD( GrMulWWFixed( WORD_TO_WWFIXEDASDWORD( 72 ), scaleX ) );
+        transMatrix->TM_resY = INTEGER_OF_WWFIXEDASDWORD( GrMulWWFixed( WORD_TO_WWFIXEDASDWORD( 72 ), scaleY ) );
+
+        /* normalize transformation matrix values */
+        transMatrix->TM_matrix.xx = GrSDivWWFixed( transMatrix->TM_matrix.xx, scaleX );
+        transMatrix->TM_matrix.xy = GrSDivWWFixed( transMatrix->TM_matrix.xy, scaleX );
+        transMatrix->TM_matrix.yy = GrSDivWWFixed( transMatrix->TM_matrix.yy, scaleY );
+        transMatrix->TM_matrix.yx = GrSDivWWFixed( transMatrix->TM_matrix.yx, scaleY );
+}
+
+
+/********************************************************************
+ *                      SqrtWWFixed
+ ********************************************************************
+ * SYNOPSIS:       Approximates the square root of a fixed-point value.
+ * 
+ * PARAMETERS:     WWFixedAsDWord value
+ *                    The fixedpoint value for which the square root 
+ *                    is computed.
+ * 
+ * RETURNS:        WWFixedAsDWord
+ *                    Approximation of the square root.
+ * 
+ * STRATEGY:       Uses an iterative method to approximate the square root 
+ *                 by repeatedly refining the estimate. Initial estimate is 
+ *                 half the input value. The approximation loop runs 10 times.
+ * 
+ * REVISION HISTORY:
+ *      Date      Name      Description
+ *      ----      ----      -----------
+ *      08.11.24  User      Initial Revision
+ *******************************************************************/
+
+static WWFixedAsDWord SqrtWWFixed(WWFixedAsDWord value)
+{
+    int            i;
+    WWFixedAsDWord approx = value >> 1; 
+
+
+    if (value <= 0) return 0;
+
+    for (i = 0; i < 10; ++i)
+        approx = ( approx + ( GrUDivWWFixed( value, approx) ) ) >> 1;
+
+    return approx;
+}
 
 /********************************************************************
  *                      IsRegionNeeded

@@ -3,7 +3,7 @@
 #
 # If you edit it, you will lose your changes, should it be regenerated.
 #
-GEODE           = sblaster
+GEODE           = soundblaster
 ASM_TO_OBJS     = soundblasterManager.asm
 UI_TO_RDFS      =
 SRCS            = soundblasterDAC.asm soundblasterError.asm\
