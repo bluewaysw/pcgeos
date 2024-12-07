@@ -13,19 +13,18 @@ MAIN            = truetypeEscape.asm ansic_runtime.asm mainManager.asm\
 ADAPTER         = ttchars.c ttinit.c ttmetrics.c ttcharmapper.c ttadapter.c\
                   ttwidths.c ttpath.c ttcharmapper.h ttpath.h ttchars.h\
                   ttwidths.h ttinit.h ttmetrics.h ttadapter.h
-FREETYPE        = ttcache.c ttraster.c ttgload.c ttextend.c ttcalc.c\
-                  ttapi.c ftxkern.c ttinterp.c ttload.c ttfile.c ttcmap.c\
-                  ttobjs.c ttmemory.c ttcache.h ttcmap.h ttconfig.h\
-                  freetype.h ttgload.h ttfile.h ttinterp.h ttload.h\
-                  tttables.h ttobjs.h fterrid.h ttraster.h ttengine.h\
-                  tttypes.h ft_conf.h ttextend.h ftnameid.h ttcalc.h\
-                  ftxkern.h ttmemory.h tttags.h
+FREETYPE        = ttcache.c ttraster.c ttgload.c ttcalc.c ttapi.c ftxkern.c\
+                  ttinterp.c ttload.c ttfile.c ttcmap.c ttobjs.c ttmemory.c\
+                  ttcache.h ttcmap.h ttconfig.h freetype.h ttgload.h\
+                  ttfile.h ttinterp.h ttload.h tttables.h ttobjs.h\
+                  fterrid.h ttraster.h ttengine.h tttypes.h ft_conf.h\
+                  ftnameid.h ttcalc.h ftxkern.h ttmemory.h tttags.h
 UI_TO_RDFS      =
 OBJS            = ttchars.obj ttinit.obj ttmetrics.obj ttcharmapper.obj\
                   ttadapter.obj ttwidths.obj ttpath.obj ttcache.obj\
-                  ttraster.obj ttgload.obj ttextend.obj ttcalc.obj\
-                  ttapi.obj ftxkern.obj ttinterp.obj ttload.obj ttfile.obj\
-                  ttcmap.obj ttobjs.obj ttmemory.obj
+                  ttraster.obj ttgload.obj ttcalc.obj ttapi.obj ftxkern.obj\
+                  ttinterp.obj ttload.obj ttfile.obj ttcmap.obj ttobjs.obj\
+                  ttmemory.obj
 COMMON          =
 MODULES         = Main
 CMODULES        = Adapter FreeType

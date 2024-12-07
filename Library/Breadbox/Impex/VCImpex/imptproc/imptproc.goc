@@ -1,0 +1,75 @@
+/***********************************************************************
+ *
+ * PROJECT:       ImpTProc
+ * FILE:          ImpTProc.goc
+ *
+ * AUTHOR:        Marcus Groeber
+ *
+ ***********************************************************************/
+
+/*
+ ***************************************************************************
+ *		Include files
+ ***************************************************************************
+ */
+@include <stdapp.goh>
+@include <Objects/clipbrd.goh>
+@include <impex.goh>
+#include <vm.h>
+#include <graphics.h>
+#include <gstring.h>
+#include <xlatLib.h>
+
+#include <meta.h>
+#include "vconv_ui.h"
+
+Boolean _export _pascal UpdateProgressPct(word pct)
+{
+        return !ImpexUpdateImportExportStatus(NULL,pct);
+}
+
+dword _export _pascal ImportProcedure(ImportFrame *ieb,VMChain *vmc)
+{
+        word cif;
+        int ret;
+        struct ie_uidata *uidata;
+        VMBlockHandle gsblock;
+        GStateHandle tempGS;
+
+        ImpexUpdateImportExportStatus("File is being converted",-1);
+
+        uidata = (struct ie_uidata *)MemLock( ieb->IF_importOptions );
+
+        tempGS = GrCreateGString( ieb->IF_transferVMFile, GST_VMEM, &gsblock );
+        Meta_Start( uidata->booleanOptions, tempGS, NULL,
+          ieb->IF_transferVMFile );     /* initialize drawing system */
+
+        switch( ieb->IF_formatNumber )
+        {
+          case 0:
+            ret = ReadCGM( ieb->IF_sourceFile, uidata->booleanOptions,
+	      UpdateProgressPct );
+            break;
+          case 1:
+            ret = ReadHPGL( ieb->IF_sourceFile, uidata->booleanOptions,
+	      UpdateProgressPct );
+            break;
+          default:
+            ret = TE_INVALID_FORMAT;
+        }
+
+        Meta_End();                     /* closing drawing system */
+        GrEndGString(tempGS);           /* close target gstring */
+        GrDestroyGString( tempGS, 0, GSKT_LEAVE_DATA );
+
+        cif = CIF_GRAPHICS_STRING;      /* we have created a gstring */
+
+        MemUnlock( ieb->IF_importOptions );
+        *vmc = VMCHAIN_MAKE_FROM_VM_BLOCK(gsblock);
+                                        /* return head of VMChain for item */
+
+        if(ret!=TE_NO_ERROR) {
+	  return ret;
+	}
+        return TE_NO_ERROR+(((dword)cif)<<16);
+}

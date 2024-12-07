@@ -55,12 +55,12 @@
      void*   objs_execution_class;  /* the context cache class  */
      void*   objs_glyph_class;      /* the glyph cache class    */
 
-     void*   objs_face_cache;  /* these caches are used to track */
-     void*   objs_exec_cache;  /* the current face and execution */
-                               /* context objects                */
+     void*   objs_face_cache;       /* these caches are used to track */
+     void*   objs_exec_cache;       /* the current face and execution */
+                                    /* context objects                */
 
-     void*   raster_component;     /* ttraster implementation depedent    */
-     void*   extension_component;  /* extensions dependent */
+     void*   raster_component;      /* ttraster implementation depedent    */
+     Boolean interpreterActive;     /* is bytecodeinterpreter aktive?  */
   };
 
   /* NOTE : The raster's lock is only acquired by the Render_Glyph and     */

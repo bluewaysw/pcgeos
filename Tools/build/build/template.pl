@@ -257,6 +257,10 @@ sub ParseTemplateFileAndSend {
         # Handle "LANG" commands.
 	s/LANG\(([^,\)]*),([^,\)]*)\)/&LangInclude("$1","$2")/e;
 
+	# Handle [] () replacement
+	s/\\\[/(/g;
+	s/\\\]/)/g;
+
 	# Write out line.
 
 	&DebugPrint("parsetemplate", "OUT: $_");
