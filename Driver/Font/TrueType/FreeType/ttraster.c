@@ -1348,7 +1348,7 @@ extern TEngine_Instance engineInstance;
   static void _near  InsNew( PProfileList  list,
                              PProfile      profile )
   {
-    /*PProfile* insert_point = list;
+    PProfile* insert_point = list;
     PProfile current = *insert_point;
 
 
@@ -1358,25 +1358,7 @@ extern TEngine_Instance engineInstance;
     }
 
     profile->link = current;
-    *insert_point = profile;*/
-
-    PProfile  *old, current;
-    Long       x;
-
-
-    old     = list;
-    current = *old;
-    x       = profile->X;
-    while ( current )
-    {
-      if ( x < current->X )
-        break;
-      old     = &current->link;
-      current = *old;
-    }
-
-    profile->link = current;
-    *old          = profile;
+    *insert_point = profile;
   }
 
 
@@ -1391,7 +1373,7 @@ extern TEngine_Instance engineInstance;
   static void _near  DelOld( PProfileList  list,
                              PProfile      profile )
   {
-    /*PProfile* previous = list;
+    PProfile* previous = list;
     PProfile current = *previous;
 
 
@@ -1403,27 +1385,10 @@ extern TEngine_Instance engineInstance;
 
         previous = &current->link;
         current = *previous;
-    }*/
+    }
 
     /* we should never get there, unless the Profile was not part of */
     /* the list.                                                     */
-
-        PProfile  *old, current;
-
-    old     = list;
-    current = *old;
-
-    while ( current )
-    {
-      if ( current == profile )
-      {
-        *old = current->link;
-        return;
-      }
-
-      old     = &current->link;
-      current = *old;
-    }
   }
 
 
@@ -1437,20 +1402,11 @@ extern TEngine_Instance engineInstance;
 
   static void _near  Update( PProfile  first )
   {
-    /*while (first) {
+    while (first) {
         first->X = *first->offset;
         first->offset += first->flow;
         first->height--;
         first = first->link;
-    }*/
-
-    PProfile  current = first;
-    while ( current )
-    {
-      current->X       = *current->offset;
-      current->offset += current->flow;
-      current->height--;
-      current = current->link;
     }
   }
 
