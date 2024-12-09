@@ -762,8 +762,8 @@ extern TEngine_Instance engineInstance;
 
 
   static Bool _near  Line_Down( RAS_ARGS Long  x1, Long  y1,
-                                   Long  x2, Long  y2,
-                                   Long  miny, Long  maxy )
+                                         Long  x2, Long  y2,
+                                         Long  miny, Long  maxy )
   {
     Bool result, fresh;
 
@@ -2415,7 +2415,7 @@ Scan_DropOuts :
         }
         else
         {
-          ras.Proc_Sweep_Finish( RAS_VAR );
+          ras.Proc_Sweep_Init( RAS_VAR, 0 );
           ras.Proc_Sweep_Finish( RAS_VAR );
         }
         --ras.band_top;
