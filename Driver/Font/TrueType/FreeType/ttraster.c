@@ -1489,6 +1489,8 @@ extern TEngine_Instance engineInstance;
     Short  f1, f2;
     Byte*  target;
 
+    (void)y;
+
 
     /* Drop-out control */
 
@@ -1634,13 +1636,15 @@ extern TEngine_Instance engineInstance;
 
   static void _near Vertical_Sweep_Step( RAS_ARGS Short y )
   {
+    (void)y;
+
     ras.traceOfs += ras.traceIncr;
   }
 
 
   static void _near Vertical_Sweep_Finish( RAS_ARG )
   {
-    /* nothing to do */
+    (void)raster;
   }
 
 
@@ -1657,6 +1661,8 @@ extern TEngine_Instance engineInstance;
 
   static void _near  Vertical_Region_Sweep_Init( RAS_ARGS Short*  min )
   {
+    (void)min;
+
     ras.traceOfs         = 0;
     ras.traceIncr        = 0;
     ras.traceOfsLastLine = -1;
@@ -1700,7 +1706,7 @@ extern TEngine_Instance engineInstance;
                                                           PProfile    left,
                                                           PProfile    right )
   {
-    /* nothing to do */
+    (void)raster, (void)y, (void)x1, (void)x2, (void)left, (void)right;
   } 
 
   static void _near  Vertical_Region_Sweep_Step( RAS_ARGS Short y )
@@ -1769,7 +1775,7 @@ extern TEngine_Instance engineInstance;
 
   static void _near  Horizontal_Sweep_Init( RAS_ARGS Short*  min )
   {
-    /* nothing, really */
+    (void)raster, (void)min;
   }
 
 
@@ -1889,13 +1895,13 @@ extern TEngine_Instance engineInstance;
 
   static void _near Horizontal_Sweep_Step( RAS_ARGS Short y )
   {
-    /* Nothing, really */
+    (void)raster, (void) y;
   }
 
 
   static void _near Horizontal_Sweep_Finish( RAS_ARG )
   {
-    /* nothing to do */
+    (void)raster;
   }
 
 
@@ -2476,7 +2482,7 @@ EC( ECCheckMemHandle( ras.buffer ) );
 
     ras.bWidth  = ras.target.width;
     ras.bTarget = (Byte*)ras.target.bitmap;
-    
+
     /* lock renderpool cache */
     LOCK_RENDER_POOL;
 
