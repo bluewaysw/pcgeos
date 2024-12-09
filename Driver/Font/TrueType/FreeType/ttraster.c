@@ -2404,7 +2404,14 @@ Scan_DropOuts :
       else
       {
         if ( ras.fProfile )
+        {
           if ( Draw_Sweep( RAS_VAR ) ) return ras.error;
+        }
+        else
+        {
+          ras.Proc_Sweep_Finish( RAS_VAR );
+          ras.Proc_Sweep_Finish( RAS_VAR );
+        }
         --ras.band_top;
       }
     }
@@ -2441,9 +2448,6 @@ EC( ECCheckMemHandle( ras.buffer ) );
     if ( glyph->n_points < glyph->contours[glyph->n_contours - 1] )
       return TT_Err_Too_Many_Points;
 
-    /* lock renderpool cache */
-    LOCK_RENDER_POOL;
-
     if ( target_map )
       ras.target = *target_map;
 
@@ -2472,6 +2476,9 @@ EC( ECCheckMemHandle( ras.buffer ) );
 
     ras.bWidth  = ras.target.width;
     ras.bTarget = (Byte*)ras.target.bitmap;
+    
+    /* lock renderpool cache */
+    LOCK_RENDER_POOL;
 
     if ( (error = Render_Single_Pass( RAS_VARS 0 )) != 0 )
       goto Fin;
@@ -2517,7 +2524,7 @@ EC( ECCheckMemHandle( ras.buffer ) );
 
   LOCAL_FUNC
   TT_Error  Render_Region_Glyph( RAS_ARGS TT_Outline*     glyph,
-                                        TT_Raster_Map*  map )
+                                          TT_Raster_Map*  map )
   {
     TT_Error  error;
 
