@@ -56,14 +56,10 @@ extern TEngine_Instance engineInstance;
 
 
 #define RENDER_Glyph( glyph, target ) \
-          Render_Glyph( RAS_OPS  glyph, target )
-
-#define RENDER_Gray_Glyph( glyph, target, palette ) \
-          Render_Gray_Glyph( RAS_OPS  glyph, target, palette )
+          Render_Bitmap_Glyph( RAS_OPS  glyph, target )
 
 #define RENDER_Region_Glyph( glyph, target ) \
           Render_Region_Glyph( RAS_OPS glyph, target )
-
 
 
 /*******************************************************************

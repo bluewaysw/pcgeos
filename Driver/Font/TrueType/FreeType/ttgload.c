@@ -678,7 +678,7 @@
         exec->GS = instance->GS;
       /* load default graphics state */
 
-      glyph->outline.high_precision = ( instance->metrics.y_ppem < 24 );
+      glyph->outline.y_ppem = ( instance->metrics.y_ppem );
     }
 
     /* save its critical pointers, as they'll be modified during load */
