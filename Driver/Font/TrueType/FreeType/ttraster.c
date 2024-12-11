@@ -59,7 +59,8 @@ extern TEngine_Instance engineInstance;
 
 /* render pool size */
 #define  RASTER_RENDER_POOL_INITIAL     1
-#define  RASTER_RENDER_POOL_SAFETY    256
+#define  RASTER_RENDER_POOL_FACTOR    256
+#define  RASTER_RENDER_POOL_MIN_SIZE 1024
 
 
 #define Raster_Err_None              TT_Err_Ok
@@ -2503,8 +2504,7 @@ EC( ECCheckMemHandle( ras.buffer ) );
       ras.band_stack[0].y_min = 0;
       ras.band_stack[0].y_max = ras.target.width - 1;
 
-      if ( (error = Render_Single_Pass( RAS_VARS  1 )) != 0 )
-        goto Fin;
+      error = Render_Single_Pass( RAS_VARS  1 );
     }
 
   Fin:
@@ -2593,7 +2593,8 @@ EC( ECCheckMemHandle( ras.buffer ) );
 static void Lock_Render_Pool( RAS_ARGS  TT_Outline*  glyph )
 {
   /* estimated size of the renderpool */
-  TT_UShort   renderpoolSize = ( glyph->y_ppem * 12 + RASTER_RENDER_POOL_SAFETY ) & ~15;
+  TT_UShort   renderpoolSize = ( glyph->y_ppem >> 3 ) * RASTER_RENDER_POOL_FACTOR 
+                                                      + RASTER_RENDER_POOL_MIN_SIZE;
 
 
   if( MemGetInfo( ras.buffer, MGIT_SIZE ) != renderpoolSize )
