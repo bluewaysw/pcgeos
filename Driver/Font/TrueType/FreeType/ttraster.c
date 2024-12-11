@@ -59,7 +59,8 @@ extern TEngine_Instance engineInstance;
 
 /* render pool size */
 #define  RASTER_RENDER_POOL_INITIAL     1
-#define  RASTER_RENDER_POOL_SAFETY    256
+#define  RASTER_RENDER_POOL_FACTOR    256
+#define  RASTER_RENDER_POOL_MIN_SIZE 1024
 
 
 #define Raster_Err_None              TT_Err_Ok
@@ -762,8 +763,8 @@ extern TEngine_Instance engineInstance;
 
 
   static Bool _near  Line_Down( RAS_ARGS Long  x1, Long  y1,
-                                   Long  x2, Long  y2,
-                                   Long  miny, Long  maxy )
+                                         Long  x2, Long  y2,
+                                         Long  miny, Long  maxy )
   {
     Bool result, fresh;
 
@@ -1489,6 +1490,8 @@ extern TEngine_Instance engineInstance;
     Short  f1, f2;
     Byte*  target;
 
+    (void)y;
+
 
     /* Drop-out control */
 
@@ -1634,13 +1637,15 @@ extern TEngine_Instance engineInstance;
 
   static void _near Vertical_Sweep_Step( RAS_ARGS Short y )
   {
+    (void)y;
+
     ras.traceOfs += ras.traceIncr;
   }
 
 
   static void _near Vertical_Sweep_Finish( RAS_ARG )
   {
-    /* nothing to do */
+    (void)raster;
   }
 
 
@@ -1657,6 +1662,8 @@ extern TEngine_Instance engineInstance;
 
   static void _near  Vertical_Region_Sweep_Init( RAS_ARGS Short*  min )
   {
+    (void)min;
+
     ras.traceOfs         = 0;
     ras.traceIncr        = 0;
     ras.traceOfsLastLine = -1;
@@ -1700,7 +1707,7 @@ extern TEngine_Instance engineInstance;
                                                           PProfile    left,
                                                           PProfile    right )
   {
-    /* nothing to do */
+    (void)raster, (void)y, (void)x1, (void)x2, (void)left, (void)right;
   } 
 
   static void _near  Vertical_Region_Sweep_Step( RAS_ARGS Short y )
@@ -1769,7 +1776,7 @@ extern TEngine_Instance engineInstance;
 
   static void _near  Horizontal_Sweep_Init( RAS_ARGS Short*  min )
   {
-    /* nothing, really */
+    (void)raster, (void)min;
   }
 
 
@@ -1889,13 +1896,13 @@ extern TEngine_Instance engineInstance;
 
   static void _near Horizontal_Sweep_Step( RAS_ARGS Short y )
   {
-    /* Nothing, really */
+    (void)raster, (void) y;
   }
 
 
   static void _near Horizontal_Sweep_Finish( RAS_ARG )
   {
-    /* nothing to do */
+    (void)raster;
   }
 
 
@@ -2404,7 +2411,14 @@ Scan_DropOuts :
       else
       {
         if ( ras.fProfile )
+        {
           if ( Draw_Sweep( RAS_VAR ) ) return ras.error;
+        }
+        else
+        {
+          ras.Proc_Sweep_Init( RAS_VAR, 0 );
+          ras.Proc_Sweep_Finish( RAS_VAR );
+        }
         --ras.band_top;
       }
     }
@@ -2441,9 +2455,6 @@ EC( ECCheckMemHandle( ras.buffer ) );
     if ( glyph->n_points < glyph->contours[glyph->n_contours - 1] )
       return TT_Err_Too_Many_Points;
 
-    /* lock renderpool cache */
-    LOCK_RENDER_POOL;
-
     if ( target_map )
       ras.target = *target_map;
 
@@ -2473,6 +2484,9 @@ EC( ECCheckMemHandle( ras.buffer ) );
     ras.bWidth  = ras.target.width;
     ras.bTarget = (Byte*)ras.target.bitmap;
 
+    /* lock renderpool cache */
+    LOCK_RENDER_POOL;
+
     if ( (error = Render_Single_Pass( RAS_VARS 0 )) != 0 )
       goto Fin;
 
@@ -2490,8 +2504,7 @@ EC( ECCheckMemHandle( ras.buffer ) );
       ras.band_stack[0].y_min = 0;
       ras.band_stack[0].y_max = ras.target.width - 1;
 
-      if ( (error = Render_Single_Pass( RAS_VARS  1 )) != 0 )
-        goto Fin;
+      error = Render_Single_Pass( RAS_VARS  1 );
     }
 
   Fin:
@@ -2517,7 +2530,7 @@ EC( ECCheckMemHandle( ras.buffer ) );
 
   LOCAL_FUNC
   TT_Error  Render_Region_Glyph( RAS_ARGS TT_Outline*     glyph,
-                                        TT_Raster_Map*  map )
+                                          TT_Raster_Map*  map )
   {
     TT_Error  error;
 
@@ -2525,14 +2538,7 @@ EC( ECCheckMemHandle( ras.buffer ) );
 EC( ECCheckMemHandle( ras.buffer ) );
 
     if ( glyph->n_points == 0 || glyph->n_contours <= 0 )
-    {
-      /* render empty glyph */
-      ((Short*)(ras).bTarget)[0] = (Short)EOREGREC;
-      ((Short*)(ras).bTarget)[1] = (Short)EOREGREC;
-      (ras).target.size = 2 * sizeof(Short); 
-
       return TT_Err_Ok;
-    }
 
     if ( glyph->n_points < glyph->contours[glyph->n_contours - 1] )
       return TT_Err_Too_Many_Points;
@@ -2587,7 +2593,8 @@ EC( ECCheckMemHandle( ras.buffer ) );
 static void Lock_Render_Pool( RAS_ARGS  TT_Outline*  glyph )
 {
   /* estimated size of the renderpool */
-  TT_UShort   renderpoolSize = ( glyph->y_ppem * 12 + RASTER_RENDER_POOL_SAFETY ) & ~15;
+  TT_UShort   renderpoolSize = ( glyph->y_ppem >> 3 ) * RASTER_RENDER_POOL_FACTOR 
+                                                      + RASTER_RENDER_POOL_MIN_SIZE;
 
 
   if( MemGetInfo( ras.buffer, MGIT_SIZE ) != renderpoolSize )

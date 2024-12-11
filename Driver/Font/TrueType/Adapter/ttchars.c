@@ -130,12 +130,13 @@ EC(     ECCheckBounds( (void*)transformMatrix ) );
         GLYPH_BBOX.yMax  = ( GLYPH_BBOX.yMax + 63 ) & -64;
 
         /* compute pixel dimensions */
-        width  = MAX( MIN_BITMAP_DIMENSION, (GLYPH_BBOX.xMax - GLYPH_BBOX.xMin) >> 6 );
-        height = MAX( MIN_BITMAP_DIMENSION, (GLYPH_BBOX.yMax - GLYPH_BBOX.yMin) >> 6 );
+        width  = (GLYPH_BBOX.xMax - GLYPH_BBOX.xMin) >> 6;
+        height = (GLYPH_BBOX.yMax - GLYPH_BBOX.yMin) >> 6;
 
         if( fontBuf->FB_flags & FBF_IS_REGION )
         {
-                TT_Matrix         flipmatrix = HORIZONTAL_FLIP_MATRIX; 
+                TT_Matrix         flipmatrix = HORIZONTAL_FLIP_MATRIX;
+
 
                 /* We calculate with an average of 4 on/off points, line number and line end code. */
                 size = height * 6 * sizeof( word ) + REGION_SAFETY + SIZE_REGION_HEADER; 
@@ -172,6 +173,13 @@ EC_ERROR_IF(    size < RASTER_MAP.size, ERROR_BITMAP_BUFFER_OVERFLOW );
         }
         else
         {      
+                /* Avoid widths or heights of 0 pixels */
+                if( height == 0 && width > 0 )
+                        height = 1;
+
+                if( width == 0 && height > 0 )
+                        width = 0;
+
                 size = height * ( ( width + 7 ) >> 3 ) + SIZE_CHAR_HEADER;
 
                 /* get pointer to bitmapBlock */
