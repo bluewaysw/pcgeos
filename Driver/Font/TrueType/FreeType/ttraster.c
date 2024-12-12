@@ -254,7 +254,6 @@ extern TEngine_Instance engineInstance;
     Int       precision_half;
     Int       precision_shift;
     Int       precision_step;
-    Int       precision_jitter;
 
     Int       scale_shift;        /* == precision_shift   for bitmaps */
                                   /* == precision_shift+1 for pixmaps */
@@ -352,13 +351,11 @@ extern TEngine_Instance engineInstance;
     {
       ras.precision_bits   = 10;
       ras.precision_step   = 128;
-      ras.precision_jitter = 24;
     }
     else
     {
       ras.precision_bits   = 6;
       ras.precision_step   = 32;
-      ras.precision_jitter = 2;
     }
 
     ras.precision       = 1 << ras.precision_bits;
@@ -1496,11 +1493,7 @@ extern TEngine_Instance engineInstance;
     /* Drop-out control */
 
     e1 = TRUNC( CEILING( x1 ) );
-
-    if ( x2-x1-ras.precision <= ras.precision_jitter )
-      e2 = e1;
-    else
-      e2 = TRUNC( FLOOR( x2 ) );
+    e2 = TRUNC( FLOOR( x2 ) );
 
     if ( e2 >= 0 && e1 < ras.bWidth )
     {
@@ -1680,11 +1673,7 @@ extern TEngine_Instance engineInstance;
     /* Drop-out control */
 
     e1 = TRUNC( CEILING( x1 ) );
-
-    if ( x2-x1-ras.precision <= ras.precision_jitter )
-      e2 = e1;
-    else
-      e2 = TRUNC( FLOOR( x2 ) );
+    e2 = TRUNC( FLOOR( x2 ) );
 
     target = ( (PShort)ras.bTarget ) + ras.traceOfs;
 
