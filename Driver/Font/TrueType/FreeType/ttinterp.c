@@ -5178,14 +5178,13 @@
 
   static void  Ins_DELTAP( INS_ARG )
   {
-    ULong   nump, k;
+    UShort  nump, k;
     UShort  A;
     ULong   C;
     Long    B;
 
 
-    nump = (ULong)args[0];      /* some points theoretically may occur more
-                                   than once, thus UShort isn't enough */
+    nump = (UShort)args[0]; 
 
     for ( k = 1; k <= nump; ++k )
     {
