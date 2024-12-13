@@ -318,7 +318,6 @@ extern TEngine_Instance engineInstance;
     TPoint    arcs[2 * MaxBezier + 1];      /* The Bezier stack */
 
     TBand     band_stack[16];       /* band stack used for sub-banding */
-    Int       band_top;             /* band stack top                  */
   };
 
 
@@ -742,8 +741,6 @@ extern TEngine_Instance engineInstance;
     while ( size-- > 0 )
     {
       *top++ = x1;
-
-      DEBUG_PSET;
 
       x1 += Ix;
       Ax += Rx;
@@ -2360,12 +2357,13 @@ Scan_DropOuts :
   static TT_Error  Render_Single_Pass( RAS_ARGS Bool  flipped )
   {
     Short  i, j, k;
+    Int    band_top = 0;
 
 
-    while ( ras.band_top >= 0 )
+    while ( band_top >= 0 )
     {
-      ras.maxY = (Long)ras.band_stack[ras.band_top].y_max * ras.precision;
-      ras.minY = (Long)ras.band_stack[ras.band_top].y_min * ras.precision;
+      ras.maxY = (Long)ras.band_stack[band_top].y_max * ras.precision;
+      ras.minY = (Long)ras.band_stack[band_top].y_min * ras.precision;
 
       ras.top = MemDeref( ras.buffer );
 
@@ -2379,23 +2377,23 @@ Scan_DropOuts :
 
         /* sub-banding */
 
-        i = ras.band_stack[ras.band_top].y_min;
-        j = ras.band_stack[ras.band_top].y_max;
+        i = ras.band_stack[band_top].y_min;
+        j = ras.band_stack[band_top].y_max;
 
         k = ( i + j ) >> 1;
 
-        if ( ras.band_top >= 7 || k < i )
+        if ( band_top >= 7 || k < i )
         {
-          ras.band_top     = 0;
+          band_top     = 0;
           ras.error = Raster_Err_Invalid;
           return ras.error;
         }
 
-        ras.band_stack[ras.band_top+1].y_min = k;
-        ras.band_stack[ras.band_top+1].y_max = j;
-        ras.band_stack[ras.band_top].y_max = k - 1;
+        ras.band_stack[band_top+1].y_min = k;
+        ras.band_stack[band_top+1].y_max = j;
+        ras.band_stack[band_top].y_max = k - 1;
 
-        ++ras.band_top;
+        ++band_top;
       }
       else
       {
@@ -2408,7 +2406,7 @@ Scan_DropOuts :
           ras.Proc_Sweep_Init( RAS_VAR, 0 );
           ras.Proc_Sweep_Finish( RAS_VAR );
         }
-        --ras.band_top;
+        --band_top;
       }
     }
 
@@ -2466,7 +2464,6 @@ EC( ECCheckMemHandle( ras.buffer ) );
     ras.Proc_Sweep_Step   = Vertical_Sweep_Step;
     ras.Proc_Sweep_Finish = Vertical_Sweep_Finish;
 
-    ras.band_top            = 0;
     ras.band_stack[0].y_min = 0;
     ras.band_stack[0].y_max = ras.target.rows - 1;
 
@@ -2489,7 +2486,6 @@ EC( ECCheckMemHandle( ras.buffer ) );
       ras.Proc_Sweep_Step   = Horizontal_Sweep_Step;
       ras.Proc_Sweep_Finish = Horizontal_Sweep_Finish;
 
-      ras.band_top            = 0;
       ras.band_stack[0].y_min = 0;
       ras.band_stack[0].y_max = ras.target.width - 1;
 
@@ -2554,8 +2550,6 @@ EC( ECCheckMemHandle( ras.buffer ) );
     ras.Proc_Sweep_Step   = Vertical_Region_Sweep_Step;
     ras.Proc_Sweep_Finish = Vertical_Region_Sweep_Finish;
 
-
-    ras.band_top            = 0;
     ras.band_stack[0].y_min = 0;
     ras.band_stack[0].y_max = ras.target.rows - 1;
 
