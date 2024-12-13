@@ -226,7 +226,7 @@ extern TEngine_Instance engineInstance;
 #define CEILING( x )  ( ((x) + ras.precision - 1) & -ras.precision )
 #define TRUNC( x )    ( (signed long)(x) >> ras.precision_bits )
 #define FRAC( x )     ( (x) & (ras.precision - 1) )
-#define SCALED( x )   ( ((x) << ras.scale_shift) - ras.precision_half )
+#define SCALED( x )   ( ((x) << ras.precision_shift) - ras.precision_half )
 
 #ifdef DEBUG_RASTER
 #define DEBUG_PSET  Pset()
@@ -254,9 +254,6 @@ extern TEngine_Instance engineInstance;
     Int       precision_half;
     Int       precision_shift;
     Int       precision_step;
-
-    Int       scale_shift;        /* == precision_shift   for bitmaps */
-                                  /* == precision_shift+1 for pixmaps */
 
     MemHandle buffer;               /* The profiles bufferblock     */
     PStorage  sizeBuff;             /* Render pool size             */
@@ -2452,7 +2449,6 @@ EC( ECCheckMemHandle( ras.buffer ) );
     ras.coords    = glyph->points;
 
     Set_Resolution( RAS_VARS glyph->y_ppem );
-    ras.scale_shift    = ras.precision_shift;
     ras.dropOutControl = glyph->dropout_mode;
     ras.second_pass    = glyph->second_pass;
 
@@ -2538,7 +2534,6 @@ EC( ECCheckMemHandle( ras.buffer ) );
     ras.coords    = glyph->points;
 
     Set_Resolution( RAS_VARS glyph->y_ppem );
-    ras.scale_shift    = ras.precision_shift;
     ras.dropOutControl = glyph->dropout_mode;
     ras.second_pass    = glyph->second_pass;
 
