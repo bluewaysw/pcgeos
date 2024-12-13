@@ -307,11 +307,6 @@ extern TEngine_Instance engineInstance;
 
     Byte      dropOutControl;       /* current drop_out control method */
 
-    Bool      second_pass;      /* indicates wether a horizontal pass      */
-                                /* should be performed to control drop-out */
-                                /* accurately when calling Render_Glyph.   */
-                                /* Note that there is no horizontal pass   */
-                                /* during gray rendering.                  */
     TPoint    arcs[2 * MaxBezier + 1];      /* The Bezier stack */
 
     TBand     band_stack[16];       /* band stack used for sub-banding */
@@ -2450,8 +2445,6 @@ EC( ECCheckMemHandle( ras.buffer ) );
 
     Set_Resolution( RAS_VARS glyph->y_ppem );
     ras.dropOutControl = glyph->dropout_mode;
-    ras.second_pass    = glyph->second_pass;
-
 
     /* Vertical Sweep */
     ras.Proc_Sweep_Init   = Vertical_Sweep_Init;
@@ -2474,7 +2467,7 @@ EC( ECCheckMemHandle( ras.buffer ) );
 
     /* Horizontal Sweep */
 
-    if ( ras.second_pass && ras.dropOutControl != 0 )
+    if ( glyph->second_pass && ras.dropOutControl != 0 )
     {
       ras.Proc_Sweep_Init   = Horizontal_Sweep_Init;
       ras.Proc_Sweep_Span   = Horizontal_Sweep_Span;
@@ -2535,7 +2528,6 @@ EC( ECCheckMemHandle( ras.buffer ) );
 
     Set_Resolution( RAS_VARS glyph->y_ppem );
     ras.dropOutControl = glyph->dropout_mode;
-    ras.second_pass    = glyph->second_pass;
 
     /* Vertical Sweep */
   
