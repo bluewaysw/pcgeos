@@ -1312,20 +1312,6 @@ extern TEngine_Instance engineInstance;
 
 /************************************************/
 /*                                              */
-/*  Init_Linked                                 */
-/*                                              */
-/*    Inits an empty linked list.               */
-/*                                              */
-/************************************************/
-
-  static void _near  Init_Linked( TProfileList*  l )
-  {
-    *l = NULL;
-  }
-
-
-/************************************************/
-/*                                              */
 /*  InsNew :                                    */
 /*                                              */
 /*    Inserts a new Profile in a linked list.   */
@@ -1518,8 +1504,7 @@ extern TEngine_Instance engineInstance;
                                                    PProfile    left,
                                                    PProfile    right )
   {
-    Short  e1, e2;
-    Short  c1, f1;
+    Short  e1, e2, c1;
 
 
     /* Drop-out control */
@@ -1584,10 +1569,9 @@ extern TEngine_Instance engineInstance;
           e1 = TRUNC( e1 );
 
           c1 = (Short)(e1 >> 3);
-          f1 = e1 &  7;
 
           if ( e1 >= 0 && e1 < ras.bWidth &&
-               ras.bTarget[ras.traceOfs + c1] & (0x80 >> f1) )
+               ras.bTarget[ras.traceOfs + c1] & (0x80 >> ( e1 & 7 )))
             return;
 
           if ( ras.dropOutControl == 2 )
@@ -1610,9 +1594,8 @@ extern TEngine_Instance engineInstance;
     if ( e1 >= 0 && e1 < ras.bWidth )
     {
       c1 = (Short)(e1 >> 3);
-      f1 = e1 & 7;
 
-      ras.bTarget[ras.traceOfs + c1] |= (Char)(0x80 >> f1);
+      ras.bTarget[ras.traceOfs + c1] |= (Char)(0x80 >> ( e1 & 7 ));
     }
   }
 
@@ -1764,7 +1747,7 @@ extern TEngine_Instance engineInstance;
   {
     Short  e1, e2;
     PByte bits;
-    Byte  f1;
+    //Byte  f1;
 
 
     if ( x2-x1 < ras.precision )
@@ -1774,13 +1757,13 @@ extern TEngine_Instance engineInstance;
 
       if ( e1 == e2 )
       {
-        f1 = (Byte)(0x80 >> (y  & 7));
+        //f1 = (Byte)(0x80 >> (y  & 7));
         e1 = TRUNC( e1 );
 
         if ( e1 >= 0 && e1 < ras.target.rows )
         {
           bits = ras.bTarget + (y >> 3);
-          bits[(ras.target.rows-1 - e1) * ras.target.cols] |= f1;
+          bits[(ras.target.rows-1 - e1) * ras.target.cols] |= ((Byte)(0x80 >> (y  & 7)));
         }
       }
     }
@@ -1796,7 +1779,7 @@ extern TEngine_Instance engineInstance;
     Short  e1 = CEILING( x1 );
     Short  e2 = FLOOR  ( x2 );
     PByte  bits;
-    Byte   f1;
+    //Byte   f1;
 
 
     /* During the horizontal sweep, we only take care of drop-outs */
@@ -1838,13 +1821,13 @@ extern TEngine_Instance engineInstance;
           e1 = TRUNC( e1 );
 
           bits = ras.bTarget + (y >> 3);
-          f1   = (Byte)(0x80 >> (y &  7));
+          //f1   = (Byte)(0x80 >> (y &  7));
 
           bits += (ras.target.rows-1-e1) * ras.target.cols;
 
           if ( e1 >= 0              &&
                e1 < ras.target.rows &&
-               *bits & f1 )
+               *bits & ((Byte)(0x80 >> (y &  7))) )
             return;
 
           if ( ras.dropOutControl == 2 )
@@ -1863,12 +1846,11 @@ extern TEngine_Instance engineInstance;
     }
 
     bits = ras.bTarget + (y >> 3);
-    f1   = (Byte)(0x80 >> (y  & 7));
 
     e1 = TRUNC( e1 );
 
     if ( e1 >= 0 && e1 < ras.target.rows )
-        bits[(ras.target.rows-1-e1) * ras.target.cols] |= f1;
+        bits[(ras.target.rows-1-e1) * ras.target.cols] |= (Byte)(0x80 >> (y  & 7));
   }
 
 
@@ -2098,16 +2080,10 @@ extern TEngine_Instance engineInstance;
     Long  x1, x2, xs;
     Short e1, e2;
 
-    TProfileList  wait;
-    TProfileList  draw_left, draw_right;
+    TProfileList  wait       = NULL;
+    TProfileList  draw_left  = NULL;
+    TProfileList  draw_right = NULL;
 
-
-    /* Init empty linked lists */
-
-    Init_Linked( &wait );
-
-    Init_Linked( &draw_left  );
-    Init_Linked( &draw_right );
 
     /* first, compute min and max Y */
 
