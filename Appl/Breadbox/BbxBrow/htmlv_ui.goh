@@ -297,7 +297,8 @@
 
 /*
  * load other icons
- * FIXME: find out what we really need in which UI
+ * FIXME: find out which icons we really need
+ * in which UI
  */
 @include "icons/icons.goh"
 
@@ -375,11 +376,12 @@
 @endif
 @ifdef GLOBAL_INTERNET_BUILD
 @ifdef COMPILE_OPTION_SIMPLE_BUTTON_TOOLBAR
+@if defined(COMPILE_OPTION_SIMPLE_BUTTON_TOOLBAR) && (!defined(COMPILE_OPTION_FREEGEOS_BUTTON_TOOLBAR))
              ,@JumpDialog
 @endif
              ,@HelpWindow
 @endif
-@if defined(COMPILE_OPTION_TOGGLE_BARS) && defined(COMPILE_OPTION_SIMPLE_BUTTON_TOOLBAR)
+@if defined(COMPILE_OPTION_TOGGLE_BARS) && defined(COMPILE_OPTION_SIMPLE_BUTTON_TOOLBAR) && (!defined(COMPILE_OPTION_FREEGEOS_BUTTON_TOOLBAR))
              ,@GotoDialog
 @endif
 @ifdef COMPILE_OPTION_PARENTAL_CONTROL
@@ -392,9 +394,7 @@
              ,@IDialControl
 @endif
              ,@CacheCleanupDialog
-             ,@DownloadDlg
-           //,@ExpireDialog
-             ;
+             ,@DownloadDlg;
     HINT_PRIMARY_FULL_SCREEN ;
     ATTR_GEN_WINDOW_KBD_OVERRIDE = KO_KEYBOARD_REQUIRED;
 }
@@ -576,128 +576,16 @@
 @endif
 
 /*
- * main UI wrapper: top bar, display group, status bar
- */
- @object GenInteractionClass MainWrapper = {
-    GI_attrs = @default | GA_TARGETABLE;
-    HINT_EXPAND_WIDTH_TO_FIT_PARENT;
-    HINT_EXPAND_HEIGHT_TO_FIT_PARENT;
-    HINT_ORIENT_CHILDREN_VERTICALLY;
-    GI_comp = @htmlv_top_bar, @HTMLDisplayGroup, @StatusBar;
-}
-
-/*
- * construct top bar from topbarLeft + spinning globe (or not)
- */
-@object GenInteractionClass htmlv_top_bar = {
-@ifndef COMPILE_OPTION_TURN_OFF_LOGO
-    GI_comp = @htmlv_top_bar_left, @SpinningLogo ;
-@else
-    GI_comp = @htmlv_top_bar_left ;
-@endif
-@ifdef COMPILE_OPTION_BIG_BUTTON_TOOLBAR
-    HINT_BOTTOM_JUSTIFY_CHILDREN;
-@else
-    HINT_CENTER_CHILDREN_VERTICALLY ;
-@endif
-    HINT_ORIENT_CHILDREN_HORIZONTALLY ;
-    HINT_EXPAND_WIDTH_TO_FIT_PARENT ;
-    //HINT_ALLOW_CHILDREN_TO_WRAP;
-    HINT_TOOLBOX;
-}
-
-/*
- * left side of the top bar: navigational buttons and URL bar
- */
-@object GenInteractionClass htmlv_top_bar_left = {
-@ifdef COMPILE_OPTION_SIMPLE_BUTTON_TOOLBAR
+    now put together the main UI area, consisting of 
+    the toolbar(s), HTMLDisplayGroup and the status bar(s).
+    To introduce some sanity, we differentiate pre- and post-
+    FreeGEOS era, so we can assemble the UI with less 
+    compile flags in the FreeGEOS variant...
+*/
 @ifdef COMPILE_OPTION_FREEGEOS_BUTTON_TOOLBAR
-    GI_comp = @SimpleToolbar, @SimpleURLToolbar, @SecureStatus
-@ifdef COMPILE_OPTION_PARENTAL_CONTROL
-     ,@ParentalControlStatus
-@endif
-    ;
-    HINT_ORIENT_CHILDREN_HORIZONTALLY;
-    HINT_CENTER_CHILDREN_VERTICALLY;
+    @include "htmlv_ui_main_wrapper_fg.goh"
 @else
-    GI_comp = @SimpleToolbar, @SimpleURLToolbar;
-    HINT_ORIENT_CHILDREN_VERTICALLY;
-@endif
-    HINT_CUSTOM_CHILD_SPACING = { SST_PIXELS | 10 };
-@endif
-@ifdef COMPILE_OPTION_LITTLE_BUTTON_TOOLBAR
-     GI_comp = @MainToolbar, @URLToolbar;
-@endif
-@ifdef COMPILE_OPTION_BIG_BUTTON_TOOLBAR
-     GI_comp = @IconBar, @URLToolbar;
-     HINT_CUSTOM_CHILD_SPACING = { SST_PIXELS|0 };
-@endif
-    HINT_EXPAND_WIDTH_TO_FIT_PARENT;
-    HINT_EXPAND_HEIGHT_TO_FIT_PARENT;
-}
-
-/*
- * The HTML Content area
- */
-@object GenDisplayGroupClass HTMLDisplayGroup = {
-    HINT_INITIAL_SIZE = {
-        SST_PCT_OF_FIELD_WIDTH | PCT_70,
-        SST_PCT_OF_FIELD_HEIGHT | PCT_55,
-        0
-    };
-    HINT_DEFAULT_FOCUS;
-    HINT_DEFAULT_TARGET;
-    HINT_DISPLAY_GROUP_TILE_VERTICALLY;
-}
-
-/*
- * the status bar
- */
-
-@ifdef COMPILE_OPTION_FREEGEOS_BUTTON_TOOLBAR
-@object GenInteractionClass AdditionalStatusbarToolbar = {
-    HINT_ORIENT_CHILDREN_HORIZONTALLY;
-    HINT_CENTER_CHILDREN_VERTICALLY;
-    //HINT_EXPAND_WIDTH_TO_FIT_PARENT;
-    HINT_TOOLBOX;
-    GI_comp = @SimpleToolbarViewGroup
-             ,@SimpleToolbarPrint;
-}
-
-@object GenInteractionClass StatusBar = {
-    HINT_ORIENT_CHILDREN_HORIZONTALLY;
-    HINT_CENTER_CHILDREN_VERTICALLY;
-    HINT_EXPAND_WIDTH_TO_FIT_PARENT;
-    HINT_TOOLBOX;
-    GI_comp = @ProgressIndicatorBox
-             ,@LinkTextBox
-@ifdef COMPILE_OPTION_SHOW_ALLOC_WATCHER_READ_OUT
-             ,@AllocWatcherReadout
-@endif
-             ,@AdditionalStatusbarToolbar;
-}
-@endif
-
-@ifndef COMPILE_OPTION_FREEGEOS_BUTTON_TOOLBAR
-@object GenInteractionClass StatusBar = {
-    HINT_ORIENT_CHILDREN_HORIZONTALLY;
-    HINT_CENTER_CHILDREN_VERTICALLY;
-    HINT_EXPAND_WIDTH_TO_FIT_PARENT;
-    HINT_TOOLBOX;
-    GI_comp = @LinkTextBox
-@ifndef COMPILE_OPTION_TOGGLE_BARS
-@ifdef COMPILE_OPTION_SECURE_STATUS
-	      ,@SecureStatus
-@endif
-@ifdef COMPILE_OPTION_PARENTAL_CONTROL
-	      ,@ParentalControlStatus
-@endif
-@endif
-@ifdef COMPILE_OPTION_SHOW_ALLOC_WATCHER_READ_OUT
-          ,@AllocWatcherReadout
-@endif
-          ;
-}
+    @include "htmlv_ui_main_wrapper.goh"
 @endif
 
 /*
