@@ -158,6 +158,8 @@ ifndef PRODUCT_WIN_DEMO
 		nptr    offset VidTestVESA_800x480_16	; VD_VESA_800x480_16
 		nptr    offset VidTestVESA_832x624_16	; VD_VESA_832x624_16
 		nptr    offset VidTestVESA_848x480_16	; VD_VESA_848x480_16
+		nptr    offset VidTestVESA_960x540_16	; VD_VESA_960x540_16
+		nptr    offset VidTestVESA_960x600_16	; VD_VESA_960x600_16
 		nptr    offset VidTestVESA_1024_600_16	; VD_VESA_1024_600_16
 		
 		nptr    offset VidTestUVGA16            ; VD_VESA_1Kx768_16
@@ -198,6 +200,8 @@ ifndef PRODUCT_WIN_DEMO
 		nptr    offset VidSetVESA		; VD_VESA_800x480_16
 		nptr    offset VidSetVESA		; VD_VESA_832x624_16
 		nptr    offset VidSetVESA		; VD_VESA_848x480_16
+		nptr    offset VidSetVESA		; VD_VESA_960x540_16
+		nptr    offset VidSetVESA		; VD_VESA_960x600_16
 		nptr    offset VidSetVESA		; VD_VESA_1024_600_16
 		
 		nptr    offset VidSetVESA               ; VD_VESA_1Kx768_16
