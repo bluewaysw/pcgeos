@@ -621,29 +621,6 @@ extern TEngine_Instance engineInstance;
 
 /****************************************************************************/
 /*                                                                          */
-/* Function:    Push_Bezier                                                 */
-/*                                                                          */
-/* Description: Clears the Bezier stack and pushes a new arc on top of it.  */
-/*                                                                          */
-/* Input:       x1,y1 x2,y2 x3,y3  new Bezier arc                           */
-/*                                                                          */
-/* Returns:     None.                                                       */
-/*                                                                          */
-/****************************************************************************/
-
-  static void _near  Push_Bezier( RAS_ARGS Long  x1, Long  y1,
-                                     Long  x2, Long  y2,
-                                     Long  x3, Long  y3 )
-  {
-    ras.arc      = ras.arcs;
-    ras.arc[2].x = x1; ras.arc[2].y = y1;
-    ras.arc[1].x = x2; ras.arc[1].y = y2;
-    ras.arc[0].x = x3; ras.arc[0].y = y3;
-  }
-
-
-/****************************************************************************/
-/*                                                                          */
 /* Function:    Line_Up                                                     */
 /*                                                                          */
 /* Description: Computes the x-coordinates of an ascending line segment     */
@@ -1023,7 +1000,10 @@ extern TEngine_Instance engineInstance;
     TStates  state_bez;
 
 
-    Push_Bezier( RAS_VARS ras.lastX, ras.lastY, cx, cy, x, y );
+    ras.arc      = ras.arcs;
+    ras.arc[2].x = ras.lastX; ras.arc[2].y = ras.lastY;
+    ras.arc[1].x = cx;        ras.arc[1].y = cy;
+    ras.arc[0].x = x;         ras.arc[0].y = y;
 
     do
     {
@@ -1093,9 +1073,6 @@ extern TEngine_Instance engineInstance;
           if ( Bezier_Down( RAS_VARS ras.minY, ras.maxY ) )
             return FAILURE;
           break;
-
-        default:
-          ;
         }
       }
     } while ( ras.arc >= ras.arcs );
