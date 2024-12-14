@@ -1746,8 +1746,7 @@ extern TEngine_Instance engineInstance;
                                                      TT_F26Dot6  x2 )
   {
     Short  e1, e2;
-    PByte bits;
-    //Byte  f1;
+    PByte  bits;
 
 
     if ( x2-x1 < ras.precision )
@@ -1757,7 +1756,6 @@ extern TEngine_Instance engineInstance;
 
       if ( e1 == e2 )
       {
-        //f1 = (Byte)(0x80 >> (y  & 7));
         e1 = TRUNC( e1 );
 
         if ( e1 >= 0 && e1 < ras.target.rows )
@@ -1779,7 +1777,6 @@ extern TEngine_Instance engineInstance;
     Short  e1 = CEILING( x1 );
     Short  e2 = FLOOR  ( x2 );
     PByte  bits;
-    //Byte   f1;
 
 
     /* During the horizontal sweep, we only take care of drop-outs */
@@ -1821,7 +1818,6 @@ extern TEngine_Instance engineInstance;
           e1 = TRUNC( e1 );
 
           bits = ras.bTarget + (y >> 3);
-          //f1   = (Byte)(0x80 >> (y &  7));
 
           bits += (ras.target.rows-1-e1) * ras.target.cols;
 
@@ -2354,8 +2350,7 @@ Scan_DropOuts :
         if ( band_top >= 7 || k < i )
         {
           band_top     = 0;
-          ras.error = Raster_Err_Invalid;
-          return ras.error;
+          return Raster_Err_Invalid;
         }
 
         ras.band_stack[band_top+1].y_min = k;
