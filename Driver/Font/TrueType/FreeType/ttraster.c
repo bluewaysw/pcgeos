@@ -1518,7 +1518,7 @@ extern TEngine_Instance engineInstance;
                                                    PProfile    left,
                                                    PProfile    right )
   {
-    Long   e1, e2;
+    Short  e1, e2;
     Short  c1, f1;
 
 
@@ -1762,7 +1762,7 @@ extern TEngine_Instance engineInstance;
                                                      TT_F26Dot6  x1,
                                                      TT_F26Dot6  x2 )
   {
-    Long  e1, e2;
+    Short  e1, e2;
     PByte bits;
     Byte  f1;
 
@@ -1793,10 +1793,10 @@ extern TEngine_Instance engineInstance;
                                                      PProfile    left,
                                                      PProfile    right )
   {
-    Long  e1 = CEILING( x1 );
-    Long  e2 = FLOOR  ( x2 );
-    PByte bits;
-    Byte  f1;
+    Short  e1 = CEILING( x1 );
+    Short  e2 = FLOOR  ( x2 );
+    PByte  bits;
+    Byte   f1;
 
 
     /* During the horizontal sweep, we only take care of drop-outs */
@@ -2095,7 +2095,8 @@ extern TEngine_Instance engineInstance;
 
     Short  min_Y, max_Y, top, bottom, dropouts;
 
-    Long  x1, x2, xs, e1, e2;
+    Long  x1, x2, xs;
+    Short e1, e2;
 
     TProfileList  wait;
     TProfileList  draw_left, draw_right;
