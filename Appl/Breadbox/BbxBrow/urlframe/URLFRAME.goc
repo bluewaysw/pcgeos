@@ -15,7 +15,7 @@
  * PROJECT:       HTMLView
  * FILE:          URLFrame.goc
  *
- * AUTHOR:        Marcus Gröber
+ * AUTHOR:        Marcus Gr�ber
  *
  ***********************************************************************/
 
@@ -130,25 +130,24 @@ extern jseVariable globalObject;
 
 @method URLFrameClass, MSG_URL_FRAME_CREATE_CHILD
 {
-
     MemHandle textBlock, frameBlock, viewBlock;
     optr textObj, frameObj, viewObj;
     optr interactionObj, contObj, docObj;
     MemHandle uiThread;
 
-    // create text
+    /* create text */
     textBlock = ObjDuplicateResource(OptrToHandle(@URLText), 0, 0);
     textObj = ConstructOptr(textBlock, OptrToChunk(@URLText));
-    // create frame
+    /* create frame */
     frameBlock = ObjDuplicateResource(OptrToHandle(@FrameTemplate), 0, 0);
     frameObj = ConstructOptr(frameBlock, OptrToChunk(@FrameTemplate));
-    // point frame to document object
+    /* point frame to document object */
     @call HTMLDocumentGroup::MSG_META_GET_MODEL_EXCL(&docObj);
     @send frameObj::MSG_URL_FRAME_SET_DOCUMENT_OBJ(docObj);
-    // hook text object to frame and vice versa
+    /* hook text object to frame and vice versa */
     @send frameObj::MSG_URL_FRAME_SET_TEXT_OBJ(textObj);
     @send textObj::MSG_URL_TEXT_SET_FRAME_OBJ(frameObj);
-    // Tell HTML Text object about the file to store its data in.
+    /* Tell HTML Text object about the file to store its data in. */
 @ifdef GLOBAL_INTERNET_BUILD
     @send textObj::MSG_HTML_TEXT_INIT_STORAGE(textObjFile);
 @else
@@ -158,20 +157,20 @@ extern jseVariable globalObject;
 @ifdef COMPILE_OPTION_PAGE_SIZE_CONTROL
     @send textObj::MSG_HTML_TEXT_SET_PAGE_SIZE_CONTROLLER(@PageSizeControl) ;
 @endif
-    // attach new frame as child
+    /* attach new frame as child */
     ObjCompAddChild(oself, frameObj,
                     CCO_LAST,
                     0,
                     word_offsetof(URLFrameInstance, UFI_comp),
                     word_offsetof(URLFrameInstance, UFI_link));
-    // create associated view
+    /* create associated view */
     uiThread = MemGetInfo(OptrToHandle(@HTMLVApp), MGIT_EXEC_THREAD);
     viewBlock = ObjDuplicateResource(OptrToHandle(@ViewTemplate), 0, uiThread);
     viewObj = ConstructOptr(viewBlock, OptrToChunk(@ViewTemplate));
-    // attach to our associated interaction obj
+    /* attach to our associated interaction obj */
     interactionObj = @call oself::MSG_URL_FRAME_GET_INTERACTION_OBJ();
     @call interactionObj::MSG_GEN_ADD_CHILD(viewObj, CCO_LAST);
-    // hook view, content, and frame together
+    /* hook view, content, and frame together */
     contObj = ConstructOptr(OptrToHandle(textObj), OptrToChunk(@URLContent));
     @call viewObj::MSG_GEN_VIEW_SET_CONTENT(contObj);
     @call frameObj::MSG_URL_FRAME_SET_INTERACTION_OBJ(viewObj);
@@ -187,27 +186,27 @@ extern jseVariable globalObject;
     MemHandle uiThread;
 
     textObj = @call self::MSG_URL_FRAME_GET_TEXT_OBJ();
-    // all done if already a group
+    /* all done if already a group */
     if (textObj) {
         viewObj = @call self::MSG_URL_FRAME_GET_INTERACTION_OBJ();
-        // unhook content object from view
+        /* unhook content object from view */
         @call viewObj::MSG_GEN_VIEW_SET_CONTENT(NullOptr);
-        // detach text object from the page it is showing
+        /* detach text object from the page it is showing */
         @call self::MSG_URL_FRAME_FLIP_PAGE(OCT_NULL, FALSE);
-        // unhook text object from frame
+        /* unhook text object from frame */
         @call self::MSG_URL_FRAME_SET_TEXT_OBJ(NullOptr);
-        // free text object block
+        /* free text object block */
         @send, forceQueue textObj::MSG_URL_TEXT_SELF_DESTRUCT();
-        // destroy current view
+        /* destroy current view */
         parentObj = @call viewObj::MSG_GEN_FIND_PARENT();
         parentPos = @call parentObj::MSG_GEN_FIND_CHILD(viewObj);
         @send, forceQueue viewObj::MSG_GEN_DESTROY_AND_FREE_BLOCK();
-        // create new one
+        /* create new one */
         uiThread = MemGetInfo(OptrToHandle(@HTMLVApp), MGIT_EXEC_THREAD);
         groupBlock = ObjDuplicateResource(OptrToHandle(@ViewGroupTemplate), 0,
-                                          uiThread);
+                        uiThread);
         groupObj = ConstructOptr(groupBlock, OptrToChunk(@ViewGroupTemplate));
-        // set as interaction object
+        /* set as interaction object */
         @call parentObj::MSG_GEN_ADD_CHILD(groupObj, parentPos);
         @call groupObj::MSG_GEN_SET_USABLE(VUM_NOW);
         @call oself::MSG_URL_FRAME_SET_INTERACTION_OBJ(groupObj);
@@ -240,8 +239,8 @@ extern jseVariable globalObject;
 @endif
 
     textObj = @call self::MSG_URL_FRAME_GET_TEXT_OBJ();
-    if (textObj)
-    {
+    if (textObj) {
+
         @call self::MSG_URL_FRAME_FLIP_PAGE(OCT_NULL, FALSE);
         @call textObj::MSG_URL_TEXT_SELF_DESTRUCT();
     }
@@ -301,7 +300,8 @@ extern jseVariable globalObject;
     /* This case should only occur for non-execute, i.e. preview requests: */
     if(link == NAME_POOL_NONE)          /* cursor off link? */
     {
-      @CallStatusUpdate(_TEXT(""), HTML_STATUS_TYPE_URL_HIGHLIGHT);
+      @CallStatusUpdate(_TEXT(""), 
+        HTML_STATUS_TYPE_URL_HIGHLIGHT);
       return;
     }
 
@@ -332,7 +332,7 @@ extern jseVariable globalObject;
             try = top;
     }
     else if(NamePoolTestEqualI(namePool, target, _TEXT("_top")))
-    {                                     /* link to top */
+    {                                   /* link to top */
         try = top;                        /* only try top frame */
     }
 @ifdef GLOBAL_INTERNET_BUILD
@@ -385,7 +385,8 @@ extern jseVariable globalObject;
         /* heuristic to allow cache detection when we've got
             a request generated by a form: check for agruments,
             but no anchor */
-        if ((dirMode == DIR_ABSOLUTE) && strchr(p, '?') && (strchr(p, '#') == 0)) {
+        if ((dirMode == DIR_ABSOLUTE) && strchr(p, '?') && 
+        (strchr(p, '#') == 0)) {
             dirMode = DIR_ABSOLUTE_GO;
         }
         /* Stop any previously processing items */
@@ -397,7 +398,8 @@ extern jseVariable globalObject;
 
         /* Clear out the current highlighted selection to show we are */
         /* doing something else */
-        @CallStatusUpdate(_TEXT(""), HTML_STATUS_TYPE_URL_HIGHLIGHT);
+        @CallStatusUpdate(_TEXT(""),
+          HTML_STATUS_TYPE_URL_HIGHLIGHT);
 
         absURL = NamePoolTokenize(namePool, p, TRUE);
         /* build referer data, can re-use 'name' buffer now (marked in-use) */
@@ -422,7 +424,8 @@ extern jseVariable globalObject;
     }
     else                                /* just preview it... */
     {
-      @CallStatusUpdate(p, HTML_STATUS_TYPE_URL_HIGHLIGHT);
+      @CallStatusUpdate(p,
+        HTML_STATUS_TYPE_URL_HIGHLIGHT);
     }
 
     NamePoolDestroyIfDynamic(p);
@@ -509,7 +512,7 @@ extern jseVariable globalObject;
     {
         parent = @call self::MSG_URL_FRAME_FIND_PARENT();
 
-        /*  Complete possible relative URLs based on specified direction.
+        /* Complete possible relative URLs based on specified direction.
             Determine if the new URL demands actual reloading or not. */
 
         /* max possible length is this */
@@ -560,7 +563,8 @@ extern jseVariable globalObject;
        of our text object, so we'd better unwind the call stack before
        this happens. */
     NamePoolUseToken(namePool, referer);
-    @send,forceQueue self::MSG_URL_FRAME_REQUEST_URL(0, absURL, anchor, dir, postData, referer);
+    @send,forceQueue self::MSG_URL_FRAME_REQUEST_URL(
+        0, absURL, anchor, dir, postData, referer);
 
     NamePoolDestroyIfDynamic(newP);     /* free dynamic buffer if any */
 
@@ -596,7 +600,6 @@ extern jseVariable globalObject;
         @call self::MSG_URL_FRAME_SET_URL_TITLE_BASE_TARGET(
             frec->HF_url, frec->HF_title, frec->HF_base, frec->HF_target,
             frec->HF_referrer);
-
     @call self::MSG_URL_FRAME_SET_REFRESH(frec->HF_refreshURL, frec->HF_refreshTime) ;
 
 @ifdef COMPILE_OPTION_LOCAL_PAGES
@@ -605,7 +608,8 @@ extern jseVariable globalObject;
        correspondence to the local page without checking if we happened
        to get in line with a new one. */
 
-    if(dir != DIR_RELOAD && dir != DIR_SAVE && dir != DIR_FRAME && dir != DIR_FRAME_FORCE_RELOAD)
+    if(dir != DIR_RELOAD && dir != DIR_SAVE && dir != DIR_FRAME &&
+    dir != DIR_FRAME_FORCE_RELOAD)
         @call document::MSG_URL_DOCUMENT_SET_LOCAL_PAGE(NAME_POOL_NONE);
 @endif
 
@@ -644,7 +648,8 @@ extern jseVariable globalObject;
      */
     if(framePtr)
     {
-        @call self::MSG_URL_FRAME_SET_FLAGS_SIZE_NAME(frec->HF_flags, frec->HF_size, frec->HF_name);
+        @call self::MSG_URL_FRAME_SET_FLAGS_SIZE_NAME(
+            frec->HF_flags, frec->HF_size, frec->HF_name);
     }
     else
     {
@@ -849,21 +854,12 @@ extern jseVariable globalObject;
         }
     }
     else
-    {                                // level specifying a URL frame
-        /*
-        @call self::MSG_URL_FRAME_GOT_PAGE_NOFRAME(
-            vmf,
-            VMCHAIN_GET_VM_BLOCK(frec->HFRWI_item),
-            NAME_POOL_NONE,
-            GUF_CACHABLE,
-            FALSE,
-            0);
-        */
+    {                                /* level specifying a URL frame */
 
         @call self::MSG_URL_FRAME_GOT_PAGE_NOFRAME(
             VMCHAIN_GET_VM_BLOCK(frec->HFRWI_item),
             NAME_POOL_NONE,
-            GUF_RELOAD, // GUF_CACHABLE = not defined?
+            GUF_RELOAD, /* GUF_CACHABLE = not defined? */
             FALSE);
     }
 }
@@ -1350,7 +1346,8 @@ EC_ERROR_IF(!NamePoolIsDynamic(*buf), -1);
         /* Only query active dummy levels if they know a text object... */
         child = @call self::MSG_URL_FRAME_FIND_CHILD(i);
         state = @call child::MSG_URL_FRAME_GET_STATE();
-        if((state & (FS_ACTIVE | FS_DUMMY)) == (FS_ACTIVE | FS_DUMMY) || !(state & FS_DUMMY))
+        if( (state & (FS_ACTIVE | FS_DUMMY)) == (FS_ACTIVE | FS_DUMMY) ||
+        !(state & FS_DUMMY) )
             obj = @call child::MSG_URL_FRAME_FIND_TEXT_OBJECT();
     }
     return obj;
@@ -1439,7 +1436,8 @@ EC_ERROR_IF(!NamePoolIsDynamic(*buf), -1);
     }
     pself->UFI_refreshURL = url;
     pself->UFI_refreshTime = secs ;
-    if(url != NAME_POOL_NONE) NamePoolUseToken(namePool, url);
+    if(url != NAME_POOL_NONE)
+      NamePoolUseToken(namePool, url);
 
     /* launch timer if requested */
     if(secs)
@@ -1470,7 +1468,8 @@ EC_ERROR_IF(!NamePoolIsDynamic(*buf), -1);
     if(pself->UFI_refreshURL)
     {
         /* use DIR_ABSOLUTE_GO as must still refresh if same URL */
-        @call self::MSG_URL_FRAME_FETCH_URL(pself->UFI_refreshURL, DIR_ABSOLUTE_GO, 0, NAME_POOL_NONE);
+        @call self::MSG_URL_FRAME_FETCH_URL(pself->UFI_refreshURL,
+          DIR_ABSOLUTE_GO, 0, NAME_POOL_NONE);
     }
     else
         @call self::MSG_URL_FRAME_RELOAD();
@@ -1548,25 +1547,23 @@ EC_ERROR_IF(!NamePoolIsDynamic(*buf), -1);
 
     /* If someone aborted, then we need to check if we */
     /* have a blank page and put up an abort message if we do. */
-    if (G_stopped)
-    {
+    if (G_stopped)  {
         G_stopped = FALSE ;
         isEmpty = @call text::MSG_HTML_TEXT_IS_EMPTY() ;
-        if (isEmpty)
-        {
+        if (isEmpty)  {
             mem = MemAlloc(
                     sizeof(URLFetchResult),
                     HF_DYNAMIC | HF_SHARABLE,
                     HAF_ZERO_INIT) ;
-            if (mem)
-            {
+            if (mem)  {
                 p_urlResult = MemLock(mem) ;
                 p_urlResult->url = @call oself::MSG_URL_FRAME_GET_URL();
                 strcpy(p_urlResult->mimeType, _TEXT("text/html")) ;
                 p_urlResult->retType = URLRequestMakeRet(URL_RET_MESSAGE) ;
                 p_urlResult->htmlMsg = @MsgAborted ;
                 p_urlResult->anchor = NAME_POOL_NONE;
-                requestState = URLFetchExtraMemoryAlloc(sizeof(HTMLV_URLRequestState)) ;
+                requestState = URLFetchExtraMemoryAlloc(
+                                    sizeof(HTMLV_URLRequestState)) ;
                 URLFetchExtraMemoryLock(requestState) ;
                 p_requestState = URLFetchExtraMemoryDeref(requestState) ;
                 p_requestState->requestToken = NAME_POOL_NONE ;
@@ -1656,7 +1653,8 @@ EC_ERROR_IF(!NamePoolIsDynamic(*buf), -1);
 
 @ifdef COMPILE_OPTION_PARENTAL_CONTROL
 
-void PCAddRemoveHostFromURL(TCHAR *url, ParentalControlFlags *pcFlags, Boolean add)
+void PCAddRemoveHostFromURL(TCHAR *url, ParentalControlFlags *pcFlags,
+            Boolean add)
 {
     TCHAR hostBuf[URL_MAX_SERVER+1], *hostEnd;
     TCHAR *host = hostBuf;
@@ -1666,34 +1664,30 @@ void PCAddRemoveHostFromURL(TCHAR *url, ParentalControlFlags *pcFlags, Boolean a
     /* get host */
     ToolsParseURL(url, NULL, host, NULL);
     hostEnd = host+strlen(host);
-    if (*host)
-    {
+    if (*host) {
         TCHAR *h1 = 0, *h2 = 0;
         h1 = strrchr(host, '.');
-        if (h1 && h1!=host)
-        {
+        if (h1 && h1!=host) {
             *h1 = C_NULL;
             h2 = strrchr(host, '.');
             *h1 = '.';
         }
-
         if (h1 && h2) host = h2;  /* .myturn.com instead of www.myturn.com */
         /* add if not there */
         there = ParentalControlFindURL(host, hostEnd, &position);
-        if ((add && !there) || (!add && there))
-        {
+        if ((add && !there) || (!add && there)) {
             /* determine if we need to ask for password */
-            if ((*pcFlags & PCF_REQUIRE_PASSWORD) && !(*pcFlags & PCF_GOT_PASSWORD))
-            {
-                if (@call PCRoot::MSG_PC_CHECK_PASSWORD_DB(PC_WWW) == IC_OK)
-                {
+            if ((*pcFlags & PCF_REQUIRE_PASSWORD) &&
+            !(*pcFlags & PCF_GOT_PASSWORD)) {
+                if (@call PCRoot::MSG_PC_CHECK_PASSWORD_DB(PC_WWW) == IC_OK) {
                     *pcFlags |= PCF_GOT_PASSWORD;
                 } else {
                     *pcFlags |= PCF_ABORT_PASSWORD;
                 }
             }
-            if (!(*pcFlags & PCF_ABORT_PASSWORD) && (!(*pcFlags & PCF_REQUIRE_PASSWORD) || (*pcFlags & PCF_GOT_PASSWORD)))
-            {
+            if (!(*pcFlags & PCF_ABORT_PASSWORD) && 
+            (!(*pcFlags & PCF_REQUIRE_PASSWORD) ||
+            (*pcFlags & PCF_GOT_PASSWORD))) {
                 if (add) {
                     /* add it */
                     (void)ParentalControlStoreURL(host, hostEnd);
@@ -1702,8 +1696,7 @@ void PCAddRemoveHostFromURL(TCHAR *url, ParentalControlFlags *pcFlags, Boolean a
                     /* XXX: there is a small synchornization hole here, if
                        someone adds or removes a site between our find and
                        delete */
-                    if (ParentalControlFindURL(host, hostEnd, &position))
-                    {
+                    if (ParentalControlFindURL(host, hostEnd, &position)) {
                         (void)ParentalControlDeleteURL(position);
                     }
                 }
@@ -1724,11 +1717,9 @@ void PCAddRemoveHostFromURL(TCHAR *url, ParentalControlFlags *pcFlags, Boolean a
 {
     TCHAR urlbuf[HTML_STATIC_BUF], *url;
 
-    if (pself->UFI_frameState & FS_ACTIVE)
-    {
+    if (pself->UFI_frameState & FS_ACTIVE) {
         /* get current URL */
-        if (NamePoolInitializeDynamic(urlbuf, sizeof(urlbuf), 0, &url))
-        {
+        if (NamePoolInitializeDynamic(urlbuf, sizeof(urlbuf), 0, &url)) {
             @call self::MSG_URL_FRAME_COMPLETE_URL(&url);
             PCAddRemoveHostFromURL(url, pcFlags, TRUE);
             NamePoolDestroyIfDynamic(url);
@@ -1752,11 +1743,9 @@ void PCAddRemoveHostFromURL(TCHAR *url, ParentalControlFlags *pcFlags, Boolean a
 {
     TCHAR urlbuf[HTML_STATIC_BUF], *url;
 
-    if (pself->UFI_frameState & FS_ACTIVE)
-    {
+    if (pself->UFI_frameState & FS_ACTIVE) {
         /* get current URL */
-        if (NamePoolInitializeDynamic(urlbuf, sizeof(urlbuf), 0, &url))
-        {
+        if (NamePoolInitializeDynamic(urlbuf, sizeof(urlbuf), 0, &url)) {
             @call self::MSG_URL_FRAME_COMPLETE_URL(&url);
             PCAddRemoveHostFromURL(url, pcFlags, FALSE);
             NamePoolDestroyIfDynamic(url);
@@ -1937,8 +1926,7 @@ void GetEventName(char *evtname, NameToken code, optr frame)
     if(pself->UFI_hasScriptContext)
     {
         pself->UFI_hasScriptContext = FALSE;
-        if (jsecontext)
-        {
+        if (jsecontext) {
             jseEnter();
 
             /* remove events from global object for this frame */
@@ -1964,8 +1952,7 @@ void GetEventName(char *evtname, NameToken code, optr frame)
        clear up memory as much as possible between pages */
     if (fullDestroy && jsecontext) {
         document = @call oself::MSG_URL_FRAME_GET_DOCUMENT_OBJ();
-        if (document && (oself == @call document::MSG_URL_DOCUMENT_GET_TOP_FRAME()))
-        {
+        if (document && (oself == @call document::MSG_URL_DOCUMENT_GET_TOP_FRAME())) {
             /* clear flag all the way down the tree */
             @call oself::MSG_URL_FRAME_CLEAR_SCRIPT_CONTEXT_STATE();
             ExitBrowserJS();
@@ -2005,7 +1992,8 @@ void GetEventName(char *evtname, NameToken code, optr frame)
 
     jseEnter();
     ret = browserInterpret(jsecontext, (struct BrowserWindow *)oself, ref);
-    if(ret) jseDestroyVariable(jsecontext, ret);
+    if(ret) 
+      jseDestroyVariable(jsecontext, ret);
 
     /* after running, clean up memory as much as possible */
 #ifdef EXTRA_GC
@@ -2065,7 +2053,8 @@ void GetEventName(char *evtname, NameToken code, optr frame)
     if (GetJSError(oself)) return FALSE;
 
     /* let's get all the way down here before we abort */
-    if (!(@call HTMLSettingsBoolGroup::MSG_GEN_BOOLEAN_GROUP_GET_SELECTED_BOOLEANS() & HTML_JAVASCRIPT))
+    if (!(@call HTMLSettingsBoolGroup::
+    MSG_GEN_BOOLEAN_GROUP_GET_SELECTED_BOOLEANS() & HTML_JAVASCRIPT))
         return TRUE;  /* execute event (i.e. submit) */
 
     /* Back up over dummy levels, if any */
@@ -2141,7 +2130,8 @@ void GetEventName(char *evtname, NameToken code, optr frame)
         len = strlen(p)+1;  /* include null */
         LocalGeosToDos(p, p, &len, DEFCHAR, &cp, 0, &status, &backup);
 @endif
-        func = browserEventHandler(jsecontext, (struct BrowserWindow *)oself, evtname, p, globalObject);
+        func = browserEventHandler(jsecontext, (struct BrowserWindow *)oself,
+          evtname, p, globalObject);
         NamePoolDestroyIfDynamic(p);
         /* add to our list of event handlers */
         pself = ObjDeref(oself, 0);
@@ -2258,8 +2248,7 @@ typedef struct {
     MemHandle mem = OptrToHandle(oself) ;
     ChunkHandle array ;
 
-    if (codeToRun != NAME_POOL_NONE)
-    {
+    if (codeToRun != NAME_POOL_NONE)  {
         /* If we don't have a list yet, we'll need to create it */
         if (!pself->UFI_timeoutList)  {
             array = ChunkArrayCreate(mem, sizeof(ScriptTimer), sizeof(ScriptTimersHeader), 0) ;
@@ -2271,8 +2260,7 @@ typedef struct {
 
         /* Create another timer spot */
         p_timer = ChunkArrayAppendHandles(mem, pself->UFI_timeoutList, 1) ;
-        if (p_timer)
-        {
+        if (p_timer)  {
             /* Allocation my invalidate pself */
             pself = ObjDeref(oself, 0);
 
@@ -2332,18 +2320,14 @@ typedef struct {
     word size ;
 
     /* Find the timer's structure */
-    if (pself->UFI_timeoutList)
-    {
+    if (pself->UFI_timeoutList)  {
         array = ConstructOptr(OptrToHandle(oself), pself->UFI_timeoutList) ;
         n = ChunkArrayGetCount(array) ;
-        for (i=0; i<n; i++)
-        {
+        for (i=0; i<n; i++)  {
             p_timer = ChunkArrayElementToPtr(array, i, &size) ;
-            if (p_timer->ST_uniqueID == uniqueTimerID)
-            {
+            if (p_timer->ST_uniqueID == uniqueTimerID)  {
                 /* stop the timer (if not already gone) */
-                if (p_timer->ST_timer)
-                {
+                if (p_timer->ST_timer)  {
                     TimerStop(
                             p_timer->ST_timer,
                             p_timer->ST_timerID) ;
@@ -2351,8 +2335,7 @@ typedef struct {
                 }
 
                 /* Release associated code */
-                if (p_timer->ST_codeToRun)
-                {
+                if (p_timer->ST_codeToRun)  {
                     NamePoolReleaseToken(namePool, p_timer->ST_codeToRun) ;
                     p_timer->ST_codeToRun = NULL ;
                 }
@@ -2392,15 +2375,12 @@ typedef struct {
     word size ;
 
     /* Find the timer's structure */
-    if (pself->UFI_timeoutList)
-    {
+    if (pself->UFI_timeoutList)  {
         array = ConstructOptr(OptrToHandle(oself), pself->UFI_timeoutList) ;
         n = ChunkArrayGetCount(array) ;
-        for (i=0; i<n; i++)
-        {
+        for (i=0; i<n; i++)  {
             p_timer = ChunkArrayElementToPtr(array, i, &size) ;
-            if (p_timer->ST_timerID == timerID)
-            {
+            if (p_timer->ST_timerID == timerID)  {
                 /* Mark the timer as dead */
                 p_timer->ST_timer = NullHandle ;
 
@@ -2409,8 +2389,7 @@ typedef struct {
 
                 /* Deref again in case something changed in the frame */
                 p_timer = ChunkArrayElementToPtr(array, i, &size) ;
-                if (p_timer->ST_isIntervalTimer)
-                {
+                if (p_timer->ST_isIntervalTimer)  {
                     /* Start the timer (again) */
                     p_timer->ST_timer =
                         TimerStart(
@@ -2463,17 +2442,16 @@ typedef struct {
     word i, n ;
 
     /* Keep pulling them off the front until they are all gone */
-    if (pself->UFI_timeoutList)
-    {
-        array = ConstructOptr(OptrToHandle(oself), pself->UFI_timeoutList) ;
+    if (pself->UFI_timeoutList)  {
+        array = ConstructOptr(
+            OptrToHandle(oself),
+            pself->UFI_timeoutList) ;
         n = ChunkArrayGetCount(array) ;
-        for (i=0; i<n; i++)
-        {
+        for (i=0; i<n; i++)  {
             p_timer = ChunkArrayElementToPtr(array, 0, &size) ;
 
             /* stop the timer (if not already gone) */
-            if (p_timer->ST_timer)
-            {
+            if (p_timer->ST_timer)  {
                 TimerStop(
                         p_timer->ST_timer,
                         p_timer->ST_timerID) ;
@@ -2481,8 +2459,7 @@ typedef struct {
             }
 
             /* Release associated code */
-            if (p_timer->ST_codeToRun)
-            {
+            if (p_timer->ST_codeToRun)  {
                 NamePoolReleaseToken(namePool, p_timer->ST_codeToRun) ;
                 p_timer->ST_codeToRun = NULL ;
             }
