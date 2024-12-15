@@ -923,10 +923,8 @@
 
     if ( distance >= 0 )
     {
-      val = distance + compensation + 32;
-      if ( val > 0 )
-        val &= ~63;
-      else
+      val = (distance + compensation + 32) & (-64);
+      if ( val < 0 )
         val = 0;
     }
     else
