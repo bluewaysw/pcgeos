@@ -726,12 +726,8 @@ extern TEngine_Instance engineInstance;
                                          Long  x2, Long  y2,
                                          Long  miny, Long  maxy )
   {
-    Bool result, fresh;
-
-
-    fresh  = ras.fresh;
-
-    result = Line_Up( RAS_VARS x1, -y1, x2, -y2, -maxy, -miny );
+    Bool  fresh  = ras.fresh;
+    Bool  result = Line_Up( RAS_VARS x1, -y1, x2, -y2, -maxy, -miny );
 
     if ( fresh && !ras.fresh )
       ras.cProfile->start = -ras.cProfile->start;
@@ -756,19 +752,16 @@ extern TEngine_Instance engineInstance;
 
   static Bool _near  Bezier_Up( RAS_ARGS Long  miny, Long  maxy )
   {
-    Long   y1, y2, e, e2, e0;
-    Short  f1;
+    Long     y1, y2, e, e2, e0;
+    Short    f1;
 
-    TPoint*  arc;
     TPoint*  start_arc;
+    TPoint*  arc = ras.arc;
+    PStorage top = ras.top;
 
-    PStorage top;
 
-
-    arc = ras.arc;
     y1  = arc[2].y;
     y2  = arc[0].y;
-    top = ras.top;
 
     if ( y2 < miny || y1 > maxy )
       goto Fin;
@@ -841,7 +834,6 @@ extern TEngine_Instance engineInstance;
           *top++ = arc[2].x + FMulDiv( arc[0].x - arc[2].x,
                                        e - y1,
                                        y2 - y1 );
-          DEBUG_PSET;
 
           arc -= 2;
           e   += ras.precision;
@@ -853,8 +845,6 @@ extern TEngine_Instance engineInstance;
         {
           ras.joint  = TRUE;
           *top++     = arc[0].x;
-
-          DEBUG_PSET;
 
           e += ras.precision;
         }
@@ -1262,10 +1252,10 @@ extern TEngine_Instance engineInstance;
 
       /* We must now see if the extreme arcs join or not */
       if ( ( FRAC( ras.lastY ) == 0 &&
-             ras.lastY >= ras.minY      &&
+             ras.lastY >= ras.minY  &&
              ras.lastY <= ras.maxY ) )
         if ( ras.gProfile && ras.gProfile->flow == ras.cProfile->flow )
-          ras.top--;
+          --ras.top;
         /* Note that ras.gProfile can be nil if the contour was too small */
         /* to be drawn.                                                   */
 
@@ -1296,7 +1286,7 @@ extern TEngine_Instance engineInstance;
                              PProfile      profile )
   {
     PProfile* insert_point = list;
-    PProfile current = *insert_point;
+    PProfile  current      = *insert_point;
 
 
     while (current && current->X < profile->X) {
@@ -1433,7 +1423,6 @@ extern TEngine_Instance engineInstance;
   {
     Short  e1, e2;
     Short  c1, c2;
-    Short  f1, f2;
     Byte*  target;
 
     (void)y;
@@ -1452,22 +1441,19 @@ extern TEngine_Instance engineInstance;
       c1 = (Short)(e1 >> 3);
       c2 = (Short)(e2 >> 3);
 
-      f1 = e1 & 7;
-      f2 = e2 & 7;
-
       target = ras.bTarget + ras.traceOfs + c1;
 
       if ( c1 != c2 )
       {
-        *target |= LMask[f1];
+        *target |= LMask[e1 & 7];
 
         if ( c2 > c1 + 1 )
           MEM_Set( target + 1, 0xFF, c2 - c1 - 1 );
 
-        target[c2 - c1] |= RMask[f2];
+        target[c2 - c1] |= RMask[e2 & 7];
       }
       else
-        *target |= ( LMask[f1] & RMask[f2] );
+        *target |= ( LMask[e1 & 7] & RMask[e2 & 7] );
     }
   }
 
@@ -1478,7 +1464,7 @@ extern TEngine_Instance engineInstance;
                                                    PProfile    left,
                                                    PProfile    right )
   {
-    Short  e1, e2, c1;
+    Short  e1, e2;
 
 
     /* Drop-out control */
@@ -1542,10 +1528,8 @@ extern TEngine_Instance engineInstance;
 
           e1 = TRUNC( e1 );
 
-          c1 = (Short)(e1 >> 3);
-
           if ( e1 >= 0 && e1 < ras.bWidth &&
-               ras.bTarget[ras.traceOfs + c1] & (0x80 >> ( e1 & 7 )))
+               ras.bTarget[ras.traceOfs + (e1 >> 3)] & (0x80 >> ( e1 & 7 )))
             return;
 
           if ( ras.dropOutControl == 2 )
@@ -1566,11 +1550,7 @@ extern TEngine_Instance engineInstance;
     e1 = TRUNC( e1 );
 
     if ( e1 >= 0 && e1 < ras.bWidth )
-    {
-      c1 = (Short)(e1 >> 3);
-
-      ras.bTarget[ras.traceOfs + c1] |= (Char)(0x80 >> ( e1 & 7 ));
-    }
+      ras.bTarget[ras.traceOfs + (e1 >> 3)] |= (Char)(0x80 >> ( e1 & 7 ));
   }
 
 
@@ -1606,16 +1586,10 @@ extern TEngine_Instance engineInstance;
                                                           TT_F26Dot6  x1,
                                                           TT_F26Dot6  x2 )
   {
-    Short   e1, e2;
-    PShort  target;
+    Short   e1     = TRUNC( CEILING( x1 ) );
+    Short   e2     = TRUNC( FLOOR( x2 ) );
+    PShort  target = ( (PShort)ras.bTarget ) + ras.traceOfs;;
 
-
-    /* Drop-out control */
-
-    e1 = TRUNC( CEILING( x1 ) );
-    e2 = TRUNC( FLOOR( x2 ) );
-
-    target = ( (PShort)ras.bTarget ) + ras.traceOfs;
 
     if ( ras.traceIncr == 0 )
       target[ras.traceIncr++] = y;
@@ -1641,12 +1615,8 @@ extern TEngine_Instance engineInstance;
 
   static void _near  Vertical_Region_Sweep_Step( RAS_ARGS Short y )
   {
-    PShort  target;
-    PShort  targetLastLine;
-
-
-    target         = ( (PShort)ras.bTarget ) + ras.traceOfs;
-    targetLastLine = ( (PShort)ras.bTarget ) + ras.traceOfsLastLine;
+    PShort  target         = ( (PShort)ras.bTarget ) + ras.traceOfs;
+    PShort  targetLastLine = ( (PShort)ras.bTarget ) + ras.traceOfsLastLine;
 
 
     /* special case: the current line was empty */
@@ -1680,12 +1650,8 @@ extern TEngine_Instance engineInstance;
 
   static void _near  Region_Sweep_Finish( RAS_ARG )
   {
-    Short*  target;
+    Short*  target = ( (PShort)ras.bTarget ) + ras.traceOfs;
 
-
-    /* complete a region */
-
-    target =  ( (PShort)ras.bTarget ) + ras.traceOfs;
 
     target[ras.traceIncr++] = (Short)EOREGREC;
     ras.target.size = ( ras.traceOfs + ras.traceIncr ) * sizeof( Short );
@@ -2527,7 +2493,7 @@ static void Lock_Render_Pool( RAS_ARGS  TT_Outline*  glyph )
     GEO_FREE( ras->buffer);
 
 #ifndef TT_CONFIG_OPTION_STATIC_RASTER
-    FREE( engineInstance.raster_component );
+    FREE( ras );
 #endif
 
     return TT_Err_Ok;
@@ -2555,7 +2521,7 @@ static void Lock_Render_Pool( RAS_ARGS  TT_Outline*  glyph )
                       HF_DISCARDABLE | HF_DISCARDED | HF_SHARABLE | HF_SWAPABLE, 
                       HAF_NO_ERR );
 
-    ras->error          = Raster_Err_None;
+    ras->error  = Raster_Err_None;
 
     return TT_Err_Ok;
   }
