@@ -50,14 +50,16 @@
 
 @method URLDocumentControlClass, MSG_URL_DOC_CONTROL_CLOSE_AND_OPEN
 {
-    /*
+    
     EventHandle evt ;
 
     evt = @record URLDocumentClass::MSG_GEN_DOCUMENT_CLOSE(NullHandle) ;
     @call oself::MSG_META_SEND_CLASSED_EVENT(evt, TO_APP_MODEL); // orginally: //@call application::...
     @send oself::MSG_GEN_DOCUMENT_CONTROL_INITIATE_OPEN_DOC() ;
-    */
+    
 }
+
+@ifdef COMPILE_OPTION_NO_NEW_OPEN_DIALOG
 
 /*
 @method URLDocumentControlClass, MSG_GEN_DOCUMENT_CONTROL_DISPLAY_DIALOG
@@ -74,7 +76,6 @@
 
 
 /*
-//@if 1
 @method URLDocumentControlClass, MSG_GEN_DOCUMENT_CONTROL_DISPLAY_DIALOG
 {
     TempGenControlInstance tempData;
@@ -94,9 +95,9 @@
     else if (openDialogInit)
     {
         // Respond to subsequent file menu requests.
-//@ifdef COMPILE_OPTION_FILE_OPEN_MENU
+@ifdef COMPILE_OPTION_FILE_OPEN_MENU
         @call oself::MSG_URL_DOC_CONTROL_CLOSE_AND_OPEN();
-//@endif
+@endif
         openDialogInit = 0;
     }
     else
@@ -106,10 +107,7 @@
 }
 */
 
-//@else
-
 /*
-//@ifdef COMPILE_OPTION_NO_NEW_OPEN_DIALOG
 @method URLDocumentControlClass, MSG_GEN_DOCUMENT_CONTROL_DISPLAY_DIALOG
 {
     TempGenControlInstance tempData;
@@ -128,16 +126,48 @@
     @call oself::MSG_GEN_DOCUMENT_CONTROL_INITIATE_NEW_DOC();
     @callsuper();
 }
-//@endif
-//@endif
 */
+
+
+@method URLDocumentControlClass, MSG_GEN_DOCUMENT_CONTROL_DISPLAY_DIALOG
+{
+    EventHandle evt ;
+    TempGenControlInstance tempData;
+
+    // make sure we dont't have a dialog when starting up, we want
+    // a webpage immediately.
+    if ((@call oself::MSG_META_GET_VAR_DATA(TEMP_GEN_CONTROL_INSTANCE,
+                                            sizeof(tempData),
+                                            &tempData) == 0xffff) ||
+                                            !(tempData.TGCI_interactableFlags & GCIF_CONTROLLER))
+    {
+        // this closes the doc already in the process of being opened.
+        // However MSG_GEN_DOCUMENT_GROUP_NEW_DOC is called in 
+        // MSG_META_SEND_CLASSED_EVENT, so we have a doc in the end...
+        // (see below)
+        // (meyerk 12/2024)
+        evt = @record URLDocumentClass::MSG_GEN_DOCUMENT_CLOSE(NullHandle) ;
+        @call oself::MSG_META_SEND_CLASSED_EVENT(evt, TO_APP_MODEL);        
+        
+        // not calling @callsuper will prevent the New/Open dialog
+        return;
+    }
+    else
+    {
+        // if the browser is not just starting up, we want the New/Open dialog
+        @callsuper();        
+    }
+}
+
+@endif
+
 
 
 /***************************************************************************
  *              URL document group class
  ***************************************************************************/
 @classdecl URLDocumentGroupClass;
-/*
+
 @method URLDocumentGroupClass, MSG_META_SEND_CLASSED_EVENT
 {
 
@@ -158,4 +188,3 @@
 
     @callsuper();
 }
-*/
