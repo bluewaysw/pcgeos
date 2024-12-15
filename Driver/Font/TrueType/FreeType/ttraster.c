@@ -217,8 +217,6 @@ extern TEngine_Instance engineInstance;
 
   typedef void  Function_Sweep_Step( RAS_ARGS Short y );
 
-  typedef void  Function_Sweep_Finish( RAS_ARG );
-
 
 /* NOTE: These operations are only valid on 2's complement processors */
 
@@ -301,7 +299,6 @@ extern TEngine_Instance engineInstance;
     Function_Sweep_Span _near *    Proc_Sweep_Span;
     Function_Sweep_Drop _near *    Proc_Sweep_Drop;
     Function_Sweep_Step _near *    Proc_Sweep_Step;
-    Function_Sweep_Finish _near *  Proc_Sweep_Finish;
 
     TT_Vector*  coords;
 
@@ -1585,12 +1582,6 @@ extern TEngine_Instance engineInstance;
   }
 
 
-  static void _near Vertical_Sweep_Finish( RAS_ARG )
-  {
-    (void)raster;
-  }
-
-
 #ifdef __GEOS__
 
 /***********************************************************************/
@@ -1687,7 +1678,7 @@ extern TEngine_Instance engineInstance;
     ras.traceIncr        = 0;
   }
 
-  static void _near  Vertical_Region_Sweep_Finish( RAS_ARG )
+  static void _near  Region_Sweep_Finish( RAS_ARG )
   {
     Short*  target;
 
@@ -1830,12 +1821,6 @@ extern TEngine_Instance engineInstance;
   static void _near Horizontal_Sweep_Step( RAS_ARGS Short y )
   {
     (void)raster, (void) y;
-  }
-
-
-  static void _near Horizontal_Sweep_Finish( RAS_ARG )
-  {
-    (void)raster;
   }
 
 
@@ -2255,7 +2240,6 @@ extern TEngine_Instance engineInstance;
     }
 #endif
 
-    ras.Proc_Sweep_Finish( RAS_VAR );
     return SUCCESS;
 
 Scan_DropOuts :
@@ -2343,10 +2327,8 @@ Scan_DropOuts :
           if ( Draw_Sweep( RAS_VAR ) ) return ras.error;
         }
         else
-        {
           ras.Proc_Sweep_Init( RAS_VAR, 0 );
-          ras.Proc_Sweep_Finish( RAS_VAR );
-        }
+
         --band_top;
       }
     }
@@ -2400,7 +2382,6 @@ EC( ECCheckMemHandle( ras.buffer ) );
     ras.Proc_Sweep_Span   = Vertical_Sweep_Span;
     ras.Proc_Sweep_Drop   = Vertical_Sweep_Drop;
     ras.Proc_Sweep_Step   = Vertical_Sweep_Step;
-    ras.Proc_Sweep_Finish = Vertical_Sweep_Finish;
 
     ras.band_stack[0].y_min = 0;
     ras.band_stack[0].y_max = ras.target.rows - 1;
@@ -2422,7 +2403,6 @@ EC( ECCheckMemHandle( ras.buffer ) );
       ras.Proc_Sweep_Span   = Horizontal_Sweep_Span;
       ras.Proc_Sweep_Drop   = Horizontal_Sweep_Drop;
       ras.Proc_Sweep_Step   = Horizontal_Sweep_Step;
-      ras.Proc_Sweep_Finish = Horizontal_Sweep_Finish;
 
       ras.band_stack[0].y_min = 0;
       ras.band_stack[0].y_max = ras.target.width - 1;
@@ -2484,7 +2464,6 @@ EC( ECCheckMemHandle( ras.buffer ) );
     ras.Proc_Sweep_Span   = Vertical_Region_Sweep_Span;
     ras.Proc_Sweep_Drop   = Vertical_Region_Sweep_Drop;
     ras.Proc_Sweep_Step   = Vertical_Region_Sweep_Step;
-    ras.Proc_Sweep_Finish = Vertical_Region_Sweep_Finish;
 
     ras.band_stack[0].y_min = 0;
     ras.band_stack[0].y_max = ras.target.rows - 1;
@@ -2499,6 +2478,7 @@ EC( ECCheckMemHandle( ras.buffer ) );
     if ( (error = Render_Single_Pass( RAS_VARS 0 )) != 0 )
       goto Fin;
 
+    Region_Sweep_Finish( RAS_VAR );
     map->size = ras.target.size;
 
   Fin:
