@@ -99,7 +99,6 @@ export     FavoriteCreateDialogClass
 export     FavoriteCreateGroupDialogClass
 endif
 
-#resource   ExpireDialogResource ui-object
 ifdef COMPILE_OPTION_LOCAL_PAGES
 resource   LocalUIResource      ui-object
 endif
@@ -122,7 +121,6 @@ export     URLFrameClass
 export     URLTextClass
 export     URLFetchEngineClass
 export     ImportThreadEngineClass
-#export     ExpireDialogClass
 export     StatusTextClass
 export     URLEntryClass
 
