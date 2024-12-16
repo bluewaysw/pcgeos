@@ -354,7 +354,7 @@
   #endif
   }
 
-#if 0
+#ifndef TT_CONFIG_OPTION_USE_ASSEMBLER_IMPLEMENTATION
   LOCAL_FUNC
   void  Sub64( TT_Int64*  x, TT_Int64*  y, TT_Int64*  z )
   {
@@ -494,7 +494,7 @@
   #endif
   }
 
-#if 0
+#ifndef TT_CONFIG_OPTION_USE_ASSEMBLER_IMPLEMENTATION
   LOCAL_FUNC
   Int  Order64( TT_Int64*  z )
   {
