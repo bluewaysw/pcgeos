@@ -1437,8 +1437,8 @@
       else
       {
         CUR.func_freeProj = Free_Project;
-        CUR.F_dot_P = (Long)CUR.GS.projVector.x * ( CUR.GS.freeVector.x << 2 ) +
-                      (Long)CUR.GS.projVector.y * ( CUR.GS.freeVector.y << 2 );
+        CUR.F_dot_P = (Long)CUR.GS.projVector.x * CUR.GS.freeVector.x << 2 +
+                      (Long)CUR.GS.projVector.y * CUR.GS.freeVector.y << 2;
       }
     }
 
