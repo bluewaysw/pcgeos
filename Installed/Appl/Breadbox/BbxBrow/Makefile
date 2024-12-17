@@ -36,10 +36,10 @@ COMMON          = bookclas.goh bookmark.goh bookui.goh favorcls.goh\
                   htmlv_ui_men_view.goh htmlv_ui_toolb_big.goh\
                   htmlv_ui_toolb_simple.goh htmlv_ui_toolb_small.goh\
                   localui.goh htmlv_ui.goh htmlv_ui_dlg_kidguard.goh\
-                  htmlv_ui_main_wrapper.goh htmlv_ui_main_wrapper_fg.goh\
+                  htmlv_ui_main_wrapper.goh htmlv_ui_url.goh htmlview.goh\
+                  importg.goh prodgpc.goh htmlv_ui_main_wrapper_fg.goh\
                   htmlv_ui_men_file.goh htmlv_ui_status_indctrs.goh\
-                  htmlv_ui_toolb_simple_fg.goh htmlv_ui_url.goh\
-                  htmlview.goh importg.goh options.goh prodgpc.goh
+                  htmlv_ui_toolb_simple_fg.goh options.goh
 MODULES         = ASMTOOLS
 CMODULES        = htmlview init js navigate urldoc urldocct urlfetch\
                   urlframe urltext
