@@ -596,31 +596,33 @@
         shr		edx, 16
     }
   #else
-    TT_Int64  l2;
-    TT_Int32  r, s;
-
-
-    if ( (TT_Int32)l->hi < 0          ||
-        (l->hi == 0 && l->lo == 0) )  return 0;
-
-    s = Order64( l );
-    if ( s == 0 ) return 1;
-
-    r = Roots[s];
-    do
+	  long  x = l->hi ? l->hi >> 1 : l->lo >> 1;
+	
+    if (l->hi == 0 )
     {
-      s = r;
-      r = ( r + Div64by32(l,r) ) >> 1;
-      MulTo64( r, r,   &l2 );
-      Sub64  ( l, &l2, &l2 );
+      if ( l->lo == 0 ) return 0;
+      if ( l->hi == 1 ) return 1;
     }
-    while ( r > s || (TT_Int32)l2.hi < 0 );
+        	
 
-    return r;
+    /* Newton-Raphson iteration for square root approximation */
+    while (1) 
+    {
+      // Combined calculation: (x + value/x) / 2
+      long next = (x + Div64by32( l, x )) >> 1;
+
+      // Check for convergence
+      if (next >= x)
+        return x;
+
+      // Update approximation
+      x = next;
+    }
   #endif
   }
 
 #endif /* LONG64 */
+
 
 /* This convenience function applies TT_MulDiv to a list.                  */
 /* Its main purpose is to reduce the number of inter-module calls in GEOS. */
