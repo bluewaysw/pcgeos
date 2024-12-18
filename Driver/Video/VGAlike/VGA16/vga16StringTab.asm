@@ -32,6 +32,8 @@ VD_VESA_720x400_16              enum    VideoDevice
 VD_VESA_800x480_16              enum    VideoDevice
 VD_VESA_832x624_16              enum    VideoDevice
 VD_VESA_848x480_16              enum    VideoDevice
+VD_VESA_960x540_16              enum    VideoDevice
+VD_VESA_960x600_16              enum    VideoDevice
 VD_VESA_1024_600_16             enum    VideoDevice
 
 VD_VESA_1Kx768_16               enum    VideoDevice
@@ -82,6 +84,8 @@ ifndef PRODUCT_WIN_DEMO
 			VGA800_480String,
 			VGA832_624String,
 			VGA848_480String,
+			VGA960_540String,
+			VGA960_600String,
 			VGA1024_600String,
 			UVGAString,                     ; VD_VESA_1Kx768_16
 			VGA1152_864String,
@@ -120,6 +124,8 @@ LocalDefString VGA720_400String <"VESA Compatible SuperVGA: 720x400 64K-color",0
 LocalDefString VGA800_480String <"VESA Compatible SuperVGA: 800x480 64K-color",0>
 LocalDefString VGA832_624String <"VESA Compatible SuperVGA: 832x624 64K-color",0>
 LocalDefString VGA848_480String <"VESA Compatible SuperVGA: 848x480 64K-color",0>
+LocalDefString VGA960_540String <"VESA Compatible SuperVGA: 960x540 64K-color",0>
+LocalDefString VGA960_600String <"VESA Compatible SuperVGA: 960x600 64K-color",0>
 LocalDefString VGA1024_600String <"VESA Compatible SuperVGA: 1024x600 64K-color",0>
 
 LocalDefString UVGAString <"VESA Compatible SuperVGA: 1024x768 64K-color",0>

@@ -86,7 +86,7 @@ static const SWNoise SW_NOISES[] =
   { IP_SIDE_STICK,     MIDDLE_G_SH, DYNAMIC_FFF, 5, 21 },  // Play Der recycle
   { IP_VIBRASLAP,      MIDDLE_C,    DYNAMIC_FFF, 3, 75 },  // Play Lad hooka
   { IP_ELECTRIC_SNARE, MIDDLE_C,    DYNAMIC_FFF, 1, 30 },  // Play Lad dies
-  { IP_RIDE_BELL,      MIDDLE_C,    DYNAMIC_FFF, 2, 57 }   // Play Lad new -> XXX: still to be found...
+  { IP_SHORT_GUIRO,    LOW_E / 4,   DYNAMIC_FFF, 2, 42 }   // Play Lad new
 };
 
 
@@ -310,13 +310,14 @@ static const SWNoise SW_NOISES[] =
 {
   word e;
   word *p_music;
+  optr musicPart = NullOptr;
   Message msg;
   // Get the object pointer of the music part to play
   // We've locked in MSG_SOUND_WORKER_MUSIC_PLAY() and we'll unlock in MSG_SOUND_WORKER_MUSIC_STOP()
-  ChunkArrayGetElement(pself->SWI_musicData, pself->SWI_musicPartIndex, &pself->SWI_musicPart);
-  p_music = LMemDeref(pself->SWI_musicPart);
+  ChunkArrayGetElement(pself->SWI_musicData, pself->SWI_musicPartIndex, &musicPart);
+  p_music = LMemDeref(musicPart);
   // Patch message and object pointer (handle and chunk) for end of song notification
-  e = LMemGetChunkSize(pself->SWI_musicPart) / 2;
+  e = LMemGetChunkSize(musicPart) / 2;
   // Get the message to patch
   msg = ((pself->SWI_musicPartIndex + 1) < pself->SWI_musicPartCount)
     ? MSG_SOUND_WORKER_MUSIC_PLAY_EXEC
@@ -346,7 +347,7 @@ static const SWNoise SW_NOISES[] =
  *                  MSG_SOUND_WORKER_MUSIC_STOP
  *                  for SoundWorkerClass
  ***********************************************************************
- * SYNOPSIS:        Stop playing the music and unlock the music part.
+ * SYNOPSIS:        Stop playing the music and unlock the music data.
  * CALLED BY:       Internal or by patched notification in music data.
  * PARAMETERS:      void ( void )
  * RETURN:          nothing
@@ -355,8 +356,8 @@ static const SWNoise SW_NOISES[] =
  * STRATEGY:        1/ Stop playing the music.
  *                  2/ Free the music handle.
  *                  3/ Set the instance variable of the music handle to null.
- *                  4/ Unlock the music part.
- *                  5/ Set the instance variable of the music part to null.
+ *                  4/ Unlock the music data.
+ *                  5/ Set the instance variable of the music data to null.
  *
  * REVISION HISTORY:
  *      Name    Date          Description
@@ -377,7 +378,6 @@ static const SWNoise SW_NOISES[] =
     // We've locked in MSG_SOUND_WORKER_MUSIC_PLAY()
     MemUnlock(OptrToHandle(pself->SWI_musicData));
     pself->SWI_musicData = NullOptr;
-    pself->SWI_musicPart = NullOptr;
   }
 }
 
@@ -512,15 +512,13 @@ static const SWNoise SW_NOISES[] =
     if (v->state == SW_NOISE_VOICE_STATE_PLAYING && ((currentTicks - v->startTicks) > SW_NOISES[v->noise].duration))
     {
       v->state = SW_NOISE_VOICE_STATE_FREE;
-      v->noise = 0;  // XXX: Unneeded?
-      v->startTicks = 0;  // XXX: Unneeded?
     }
   }
   // Never play multiple noises of the same type at the same time
   for (i = 0; i < pself->SWI_numNoiseVoices; i++)
   {
     v = &pself->SWI_noiseVoices[i];
-    if (v->noise == noise && v->state == SW_NOISE_VOICE_STATE_ADDED)
+    if (v->state == SW_NOISE_VOICE_STATE_ADDED && v->noise == noise)
     {
       return;
     }
@@ -533,7 +531,6 @@ static const SWNoise SW_NOISES[] =
     {
       v->state = SW_NOISE_VOICE_STATE_ADDED;
       v->noise = noise;
-      v->startTicks = currentTicks;
       return;
     }
   }
@@ -544,7 +541,6 @@ static const SWNoise SW_NOISES[] =
     if (v->noise == noise)
     {
       v->state = SW_NOISE_VOICE_STATE_ADDED;
-      v->startTicks = currentTicks;
       return;
     }
   }
@@ -556,7 +552,6 @@ static const SWNoise SW_NOISES[] =
     {
       v->state = SW_NOISE_VOICE_STATE_ADDED;
       v->noise = noise;
-      v->startTicks = currentTicks;
       return;
     }
   }
@@ -586,6 +581,7 @@ static const SWNoise SW_NOISES[] =
  ***********************************************************************/
 @method SoundWorkerClass, MSG_SOUND_WORKER_NOISE_PLAY_MULTI
 {
+  dword currentTicks;
   word i;
   const SWNoise *n;
   SWNoiseVoice *v;
@@ -594,20 +590,29 @@ static const SWNoise SW_NOISES[] =
   {
     return;
   }
+  // Get current up time ticks
+  currentTicks = TimerGetCount();
+  // Search and play all noises
   for (i = 0; i < pself->SWI_numNoiseVoices; i++)
   {
+    // Get a pointer to our voice
     v = &pself->SWI_noiseVoices[i];
+    // We only play voices with the added state
     if (v->state == SW_NOISE_VOICE_STATE_ADDED)
     {
+      // Verify we have a valid sound handle
       if (v->soundHandle == NullHandle)
       {
         continue;
       }
+      // Make sure no other noise is playing
       SoundStopMusicNote(v->soundHandle);
+      // Get the noise and play it
       n = &SW_NOISES[v->noise];
       SoundReallocMusicNote(v->soundHandle, n->frequency, n->loudness, SSDTT_TICKS, n->duration, n->instrument, IT_STANDARD_TABLE);
       SoundPlayMusicNote(v->soundHandle, SP_STANDARD + SP_IMMEDIATE, 0, UNLOCK_ON_EOS);
       v->state = SW_NOISE_VOICE_STATE_PLAYING;
+      v->startTicks = currentTicks;
     }
   }
 }
@@ -642,8 +647,9 @@ static const SWNoise SW_NOISES[] =
   {
     return;
   }
-  // Verify we have a valid sound handle
+  // Get a pointer to our voice
   v = &pself->SWI_noiseVoices[0];
+  // Verify we have a valid sound handle
   if (v->soundHandle == NullHandle)
   {
     return;
