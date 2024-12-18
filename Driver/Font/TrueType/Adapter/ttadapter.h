@@ -394,12 +394,12 @@ typedef struct
     TT_CharMap                  charMap;
     TT_Outline                  outline;
 
+    /* lookuptable for truetype indices */
+    MemHandle                   lookupTable;
+
     /* currently open face */
     FileHandle                  ttfile;
     TrueTypeOutlineEntry        entry;
-
-    /* lookuptable for truetype indices */
-    MemHandle                   lookupTable;
 } TrueTypeVars;
 
 

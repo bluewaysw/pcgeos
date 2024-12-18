@@ -38,7 +38,6 @@
 #define DIV_64( x, y )     ( (x) / (y) )
 
 #define SQRT_64( x )       Sqrt64( x )
-#define SQRT_32( x )       Sqrt32( x )
 
   LOCAL_DEF TT_Int32  Sqrt64( TT_Int64  l );
 
@@ -53,23 +52,13 @@
   typedef struct TT_Int64_  TT_Int64;
 
 #define ADD_64( x, y, z )  Add64( &x, &y, &z )
-#define SUB_64( x, y, z )  Sub64( &x, &y, &z )
 #define MUL_64( x, y, z )  MulTo64( x, y, &z )
-
 #define DIV_64( x, y )     Div64by32( &x, y )
-
 #define SQRT_64( x )       Sqrt64( &x )
-#define SQRT_32( x )       Sqrt32( x )
 
   LOCAL_DEF void  Add64( TT_Int64*  x, TT_Int64*  y, TT_Int64*  z );
-  LOCAL_DEF void  Sub64( TT_Int64*  x, TT_Int64*  y, TT_Int64*  z );
-
   LOCAL_DEF void  MulTo64( TT_Int32  x, TT_Int32  y, TT_Int64*  z );
-
   LOCAL_DEF TT_Int32  Div64by32( TT_Int64*  x, TT_Int32  y );
-
-  LOCAL_DEF int  Order64( TT_Int64*  z );
-
   LOCAL_DEF TT_Int32  Sqrt64( TT_Int64*  l );
 
 #endif /* LONG64 */
