@@ -5,9 +5,9 @@
 #
 GEODE           = bbxbrow
 ASMTOOLS        = asmtoolsManager.asm
-HTMLVIEW        = AWATCHER.goc GLBANIM.goc StatText.goc HTMLVIEW.goc\
-                  ImportG.goc LoadURL.goc OpenClos.goc UIAction.goc\
-                  UIOften.goc scrapbk.goc UIRare.goc
+HTMLVIEW        = AWATCHER.goc GLBANIM.goc HTMLVIEW.goc ImportG.goc\
+                  LoadURL.goc OpenClos.goc UIAction.goc scrapbk.goc\
+                  UIRare.goc StatText.goc UIOften.goc
 INIT            = INIT.goc
 JS              = browser.goc sebrowse.goc
 NAVIGATE        = BOOKCLAS.goc FAVORCLS.goc FAVORITE.goc NAVCACHE.goc\
@@ -18,9 +18,9 @@ URLFETCH        = URLFETCH.goc
 URLFRAME        = FRFETCH.goc URLFRAME.goc
 URLTEXT         = URLTEXT.goc URLTEXT2.goc
 UI_TO_RDFS      =
-OBJS            = AWATCHER.obj GLBANIM.obj StatText.obj HTMLVIEW.obj\
-                  ImportG.obj LoadURL.obj OpenClos.obj UIAction.obj\
-                  UIOften.obj scrapbk.obj UIRare.obj INIT.obj browser.obj\
+OBJS            = AWATCHER.obj GLBANIM.obj HTMLVIEW.obj ImportG.obj\
+                  LoadURL.obj OpenClos.obj UIAction.obj scrapbk.obj\
+                  UIRare.obj StatText.obj UIOften.obj INIT.obj browser.obj\
                   sebrowse.obj BOOKCLAS.obj FAVORCLS.obj FAVORITE.obj\
                   NAVCACHE.obj BOOKMARK.obj NAVIGATE.obj LOCALPAG.obj\
                   URLDOC.obj URLDOCCT.obj URLFETCH.obj FRFETCH.obj\
