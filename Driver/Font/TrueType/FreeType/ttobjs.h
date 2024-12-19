@@ -184,7 +184,7 @@
     TT_UnitVector  projVector;
     TT_UnitVector  freeVector;
 
-    Long           loop;
+    Int            loop;
     TT_F26Dot6     minimum_distance;
     Int            round_state;
 
@@ -628,7 +628,7 @@
     UShort          stackSize;  /* size of exec. stack */
     PStorage        stack;      /* current exec. stack */
 
-    Long            args;
+    Short           args;
     UShort          new_top;    /* new top after exec.    */
 
     TGlyph_Zone     zp0,            /* zone records */

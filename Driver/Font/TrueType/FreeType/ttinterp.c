@@ -880,7 +880,7 @@
  ******************************************************************/
 
   static TT_F26Dot6 _near Round_None( EXEC_OPS TT_F26Dot6  distance,
-                                          TT_F26Dot6  compensation )
+                                               TT_F26Dot6  compensation )
   {
     TT_F26Dot6  val;
 
@@ -916,17 +916,15 @@
  *****************************************************************/
 
   static TT_F26Dot6 _near Round_To_Grid( EXEC_OPS TT_F26Dot6  distance,
-                                             TT_F26Dot6  compensation )
+                                                  TT_F26Dot6  compensation )
   {
     TT_F26Dot6  val;
 
 
     if ( distance >= 0 )
     {
-      val = distance + compensation + 32;
-      if ( val > 0 )
-        val &= ~63;
-      else
+      val = (distance + compensation + 32) & (-64);
+      if ( val < 0 )
         val = 0;
     }
     else
@@ -955,7 +953,7 @@
  *****************************************************************/
 
   static TT_F26Dot6 _near Round_To_Half_Grid( EXEC_OPS TT_F26Dot6  distance,
-                                                  TT_F26Dot6  compensation )
+                                                       TT_F26Dot6  compensation )
   {
     TT_F26Dot6  val;
 
@@ -992,17 +990,15 @@
  *****************************************************************/
 
   static TT_F26Dot6 _near Round_Down_To_Grid( EXEC_OPS TT_F26Dot6  distance,
-                                                  TT_F26Dot6  compensation )
+                                                       TT_F26Dot6  compensation )
   {
     TT_F26Dot6  val;
 
 
     if ( distance >= 0 )
     {
-      val = distance + compensation;
-      if ( val > 0 )
-        val &= ~63;
-      else
+      val = (distance + compensation) & (-64);
+      if ( val < 0 )
         val = 0;
     }
     else
@@ -1031,17 +1027,15 @@
  *****************************************************************/
 
   static TT_F26Dot6 _near Round_Up_To_Grid( EXEC_OPS TT_F26Dot6  distance,
-                                                TT_F26Dot6  compensation )
+                                                     TT_F26Dot6  compensation )
   {
     TT_F26Dot6  val;
 
 
     if ( distance >= 0 )
     {
-      val = distance + compensation + 63;
-      if ( val > 0 )
-        val &= ~63;
-      else
+      val = (distance + compensation + 63) & (-64);
+      if ( val < 0 )
         val = 0;
     }
     else
@@ -1070,17 +1064,15 @@
  *****************************************************************/
 
   static TT_F26Dot6 _near Round_To_Double_Grid( EXEC_OPS TT_F26Dot6  distance,
-                                                    TT_F26Dot6  compensation )
+                                                         TT_F26Dot6  compensation )
   {
     TT_F26Dot6 val;
 
 
     if ( distance >= 0 )
     {
-      val = distance + compensation + 16;
-      if ( val > 0 )
-        val &= ~31;
-      else
+      val = (distance + compensation + 16) & (-32);
+      if ( val < 0 )
         val = 0;
     }
     else
@@ -1114,7 +1106,7 @@
  *****************************************************************/
 
   static TT_F26Dot6 _near Round_Super( EXEC_OPS TT_F26Dot6  distance,
-                                           TT_F26Dot6  compensation )
+                                                TT_F26Dot6  compensation )
   {
     TT_F26Dot6  val;
 
@@ -1158,7 +1150,7 @@
  *****************************************************************/
 
   static TT_F26Dot6 _near Round_Super_45( EXEC_OPS TT_F26Dot6  distance,
-                                              TT_F26Dot6  compensation )
+                                                   TT_F26Dot6  compensation )
   {
     TT_F26Dot6  val;
 
@@ -1309,7 +1301,7 @@
  *****************************************************************/
 
   static TT_F26Dot6 _near Project( EXEC_OPS TT_Vector*  v1,
-                                       TT_Vector*  v2 )
+                                            TT_Vector*  v2 )
   {
     TT_Int64  T1, T2;
 
@@ -1337,7 +1329,7 @@
  *****************************************************************/
 
   static TT_F26Dot6 _near Dual_Project( EXEC_OPS TT_Vector*  v1,
-                                            TT_Vector*  v2 )
+                                                 TT_Vector*  v2 )
   {
     TT_Int64  T1, T2;
 
@@ -1365,7 +1357,7 @@
  *****************************************************************/
 
   static TT_F26Dot6 _near Free_Project( EXEC_OPS TT_Vector*  v1,
-                                            TT_Vector*  v2 )
+                                                 TT_Vector*  v2 )
   {
     TT_Int64  T1, T2;
 
@@ -1392,7 +1384,7 @@
  *****************************************************************/
 
   static TT_F26Dot6 _near Project_x( EXEC_OPS TT_Vector*  v1,
-                                         TT_Vector*  v2 )
+                                              TT_Vector*  v2 )
   {
     return (v1->x - v2->x);
   }
@@ -1411,7 +1403,7 @@
  *****************************************************************/
 
   static TT_F26Dot6 _near Project_y( EXEC_OPS TT_Vector*  v1,
-                                         TT_Vector*  v2 )
+                                              TT_Vector*  v2 )
   {
     return (v1->y - v2->y);
   }
@@ -1445,8 +1437,8 @@
       else
       {
         CUR.func_freeProj = Free_Project;
-        CUR.F_dot_P = (Long)CUR.GS.projVector.x * ( CUR.GS.freeVector.x >> 2 ) +
-                      (Long)CUR.GS.projVector.y * ( CUR.GS.freeVector.y >> 2 );
+        CUR.F_dot_P = (Long)CUR.GS.projVector.x * CUR.GS.freeVector.x << 2 +
+                      (Long)CUR.GS.projVector.y * CUR.GS.freeVector.y << 2;
       }
     }
 
@@ -5178,14 +5170,13 @@
 
   static void  Ins_DELTAP( INS_ARG )
   {
-    ULong   nump, k;
+    UShort  nump, k;
     UShort  A;
     ULong   C;
     Long    B;
 
 
-    nump = (ULong)args[0];      /* some points theoretically may occur more
-                                   than once, thus UShort isn't enough */
+    nump = (UShort)args[0]; 
 
     for ( k = 1; k <= nump; ++k )
     {
