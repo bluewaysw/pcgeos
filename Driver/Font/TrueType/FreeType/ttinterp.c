@@ -4940,11 +4940,9 @@
 
   static void  Ins_UTP( INS_ARG )
   {
-    UShort  point;
-    Byte    mask;
+    UShort  point = (UShort)args[0];
+    Byte    mask  = 0xFF;
 
-
-    point = (UShort)args[0];
 
     if ( BOUNDS( point, CUR.zp0.n_points ) )
     {
@@ -4954,8 +4952,6 @@
 #endif
       return;
     }
-
-    mask = 0xFF;
 
     if ( CUR.GS.freeVector.x != 0 )
       mask &= ~TT_Flag_Touched_X;
@@ -5245,13 +5241,11 @@
 
   static void  Ins_DELTAC( INS_ARG )
   {
-    ULong  nump, k;
-    UShort A;
+    UShort nump = (UShort)args[0];
+    UShort A, k;
     ULong  C;
     Long   B;
 
-
-    nump = (ULong)args[0];
 
     for ( k = 1; k <= nump; ++k )
     {
@@ -6083,7 +6077,9 @@
           break;
 
         case 0x4F:  /* DEBUG */
+        #ifdef TT_CONFIG_OPTION_SUPPORT_OBSOLET_INSTRUCTIONS
           DO_DEBUG
+        #endif
           break;
 
         case 0x50:  /* LT */
