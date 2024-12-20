@@ -354,20 +354,6 @@
   #endif
   }
 
-#if 0 //ndef TT_CONFIG_OPTION_USE_ASSEMBLER_IMPLEMENTATION
-  LOCAL_FUNC
-  void  Sub64( TT_Int64*  x, TT_Int64*  y, TT_Int64*  z )
-  {
-    register TT_Word32  lo, hi;
-
-
-    lo = x->lo - y->lo;
-    hi = x->hi - y->hi - ( (TT_Int32)lo < 0 );
-
-    z->lo = lo;
-    z->hi = hi;
-  }
-#endif
 
   LOCAL_FUNC
   void  MulTo64( TT_Int32  x, TT_Int32  y, TT_Int64*  z )
