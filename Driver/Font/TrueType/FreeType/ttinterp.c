@@ -1423,20 +1423,15 @@
   static void  Compute_Funcs( EXEC_OP )
   {
     if ( CUR.GS.freeVector.x == 0x4000 )
-    {
-      CUR.func_freeProj = Project_x;
-      CUR.F_dot_P       = CUR.GS.projVector.x * 0x10000L;
-    }
+      CUR.F_dot_P   = CUR.GS.projVector.x * 0x10000L;
     else
     {
       if ( CUR.GS.freeVector.y == 0x4000 )
       {
-        CUR.func_freeProj = Project_y;
-        CUR.F_dot_P       = CUR.GS.projVector.y * 0x10000L;
+        CUR.F_dot_P = CUR.GS.projVector.y * 0x10000L;
       }
       else
       {
-        CUR.func_freeProj = Free_Project;
         CUR.F_dot_P = (Long)CUR.GS.projVector.x * CUR.GS.freeVector.x << 2 +
                       (Long)CUR.GS.projVector.y * CUR.GS.freeVector.y << 2;
       }
