@@ -102,6 +102,10 @@ extern Boolean G_progressStatus;
 @extern object SimpleToolbarHome ;
 @extern object SimpleToolbarStop ;
 @extern object SimpleToolbar ;
+@extern object SimpleToolbarPrint ;
+@ifdef COMPILE_OPTION_NAVIGATE_MENU
+@extern object NavigateMenu ;
+@endif
 @endif
 
 @ifdef COMPILE_OPTION_LOCAL_PAGES
@@ -199,13 +203,17 @@ void UpdateNavigation(WordFlags flags)
 @endif
 
 /*
- * Navigate Menu - mostly unused, but still in...
+ * Navigate Menu - use with COMPILE_OPTION_SIMPLE_BUTTON_TOOLBAR
+ * to enable / disable the navigate menu when showing/hiding the
+ * navigation toolbar
  */
+ @ifdef COMPILE_OPTION_NAVIGATE_MENU
     EnabledOrNot(@NavigateBack,         (flags & HTML_HIST_BACK));
     EnabledOrNot(@NavigateForward,      (flags & HTML_HIST_FORWARD));
     EnabledOrNot(@NavigateReload,       (flags & HTML_HIST_CURRENT));
     EnabledOrNot(@NavigateHome,         (flags & HTML_HIST_HOME));
     EnabledOrNot(@newHomeTrigger,       (flags & HTML_HIST_CURRENT));
+@endif
 
 @ifdef COMPILE_OPTION_HTML_EDITOR
     EnabledOrNot(@EditTrigger,          (flags & HTML_HIST_CURRENT));
@@ -236,6 +244,9 @@ void UpdateToolbar(Boolean enabled)
 @endif
 @ifdef COMPILE_OPTION_SIMPLE_BUTTON_TOOLBAR
     UsableOrNot(@SimpleToolbar, enabled);
+@ifdef COMPILE_OPTION_NAVIGATE_MENU
+    UsableOrNot(@NavigateMenu, !enabled);
+@endif
 @endif
 @ifdef COMPILE_OPTION_SHOW_HIDE_TOOLBAR
     UsableOrNot(@ShowToolbarTrigger,   !enabled);
@@ -251,7 +262,15 @@ void UpdateStatusbar(Boolean enabled)
 void UpdateUrlbar(Boolean enabled)
 {
     UsableOrNot(@SimpleURLToolbar, enabled);
+    UsableOrNot(@SimpleToolbarGoto, !enabled);    
 }
+
+@ifdef COMPILE_OPTION_SIMPLE_BUTTON_TOOLBAR
+void UpdatePrintButtonInSimpleToolbar(Boolean enabled)
+{
+    UsableOrNot(@SimpleToolbarPrint, enabled);
+}
+@endif
 
 @if defined(COMPILE_OPTION_TOGGLE_BARS) && defined(COMPILE_OPTION_SIMPLE_BUTTON_TOOLBAR)
 void UpdateToggleBars(word toggleBars)
@@ -764,6 +783,11 @@ void UpdateStop(Boolean enabled)
 
     if(modifiedBooleans & HTMLV_ENABLE_URLBAR) 
       UpdateUrlbar(selectedBooleans & HTMLV_ENABLE_URLBAR);
+
+@ifdef COMPILE_OPTION_SIMPLE_BUTTON_TOOLBAR
+    if(modifiedBooleans & HTMLV_ENABLE_TOOLBAR_PRINT)
+      UpdatePrintButtonInSimpleToolbar(selectedBooleans & HTMLV_ENABLE_TOOLBAR_PRINT);
+@endif
 
     HWChecksumCheck() ;
 }
