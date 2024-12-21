@@ -366,15 +366,15 @@ HTMLVIEW.eobj: stdapp.goh object.goh ui.goh Objects/metaC.goh \
                 htmlv_ui_men_history.goh htmlv_ui_men_kidguard.goh \
                 htmlv_ui_men_autobrowse.goh htmlv_ui_men_js.goh \
                 favorui.goh favorcls.goh htmlv_ui_men_html.goh \
-                htmlv_ui_men_search.goh htmlv_ui_dlg_dwnl.goh \
-                htmlv_ui_status_indctrs.goh Art/lock.goh Art/unlock.goh \
-                htmlv_ui_url.goh htmlv_ui_toolb_simple.goh \
-                Art/toolicon.goh icons/icons.goh Art/GI001_8.goh \
-                Art/GI002_8.goh Art/GI003_8.goh Art/GI004_8.goh \
-                Art/GI005_8.goh Art/A111_8.goh Art/A113_8.goh \
-                Art/A114_8.goh Art/GI009_8.goh Art/GI010_8.goh \
-                Art/GI011_8.goh Art/GI012_8.goh Art/GI013_8.goh \
-                Art/GI014_8.goh htmlv_ui_main_wrapper_fg.goh
+                htmlv_ui_dlg_dwnl.goh htmlv_ui_status_indctrs.goh \
+                Art/lock.goh Art/unlock.goh htmlv_ui_url.goh \
+                htmlv_ui_toolb_simple.goh Art/toolicon.goh \
+                icons/icons.goh Art/GI001_8.goh Art/GI002_8.goh \
+                Art/GI003_8.goh Art/GI004_8.goh Art/GI005_8.goh \
+                Art/A111_8.goh Art/A113_8.goh Art/A114_8.goh \
+                Art/GI009_8.goh Art/GI010_8.goh Art/GI011_8.goh \
+                Art/GI012_8.goh Art/GI013_8.goh Art/GI014_8.goh \
+                htmlv_ui_main_wrapper_fg.goh
 HTMLVIEW.obj \
 HTMLVIEW.eobj: geos.h heap.h geode.h resource.h ec.h object.h lmem.h \
                 graphics.h fontID.h font.h color.h gstring.h timer.h vm.h \
