@@ -4,13 +4,11 @@
 
 @object GenInteractionClass SimpleToolbar = {
     GI_comp =
-        @SimpleToolbarNavigateGroup
-       ,@SimpleToolbarViewGroup         /* this group is pulled in from the indicators */
-@ifdef COMPILE_OPTION_PROGRESS_INDICATOR /* FIXME: remove this flag altogether */
-       ,@ProgressIndicatorBox
-@endif
-       ,@StatusIndicators               /* these are pulled in from the indicators */
-          ;
+         @SimpleToolbarNavigateGroup
+        ,@SimpleToolbarViewGroup         /* this group is pulled in from the indicators */
+        ,@SimpleToolbarPrint
+        ,@StatusIndicators;               /* these are pulled in from the indicators */
+
     HINT_EXPAND_WIDTH_TO_FIT_PARENT ;
     HINT_CUSTOM_CHILD_SPACING = { SST_PIXELS | 2 } ;  /* 2 doesn't override toolbox */
     HINT_ORIENT_CHILDREN_HORIZONTALLY ;
@@ -20,13 +18,16 @@
     HINT_TOOLBOX ;
 }
 
+/*
+ * Navigational buttons
+ */
 @object GenInteractionClass SimpleToolbarNavigateGroup = {
     GI_comp =
-@ifdef COMPILE_OPTION_TOGGLE_BARS
-@ifdef COMPILE_OPTION_TOGGLE_GOTO_BAR
+// @ifdef COMPILE_OPTION_TOGGLE_BARS
+// @ifdef COMPILE_OPTION_TOGGLE_GOTO_BAR
         @SimpleToolbarGoto,
-@endif
-@endif
+// @endif
+// @endif
         @SimpleToolbarBack,
         @SimpleToolbarNext,
         @SimpleToolbarReload,
@@ -36,11 +37,11 @@
     HINT_ORIENT_CHILDREN_HORIZONTALLY ;
 }
 
-@ifdef COMPILE_OPTION_TOGGLE_BARS
-@ifdef COMPILE_OPTION_TOGGLE_GOTO_BAR
-
-/* Goto button in toolbar */
+/* 
+ * Goto button in toolbar 
+ */
 @object GenTriggerClass SimpleToolbarGoto = {
+    GI_states = @default & ~GS_USABLE;    
     GI_visMoniker = list { @SimpleToolbarGotoMoniker, @GPCGoIconMoniker } ;
     GTI_destination = @GotoDialog;
     GTI_actionMsg = MSG_GEN_INTERACTION_INITIATE;
@@ -49,40 +50,6 @@
 }
 @visMoniker SimpleToolbarGotoMoniker = "Goto" ;
 @chunk TCHAR SimpleToolbarGotoHelp[] = _TEXT("Goto a Web Page") ;
-@endif
-
-/* Goto dialog for Goto button in toolbar */
-@object GenInteractionClass GotoDialog = {
-    GI_visMoniker = "Goto";
-    GI_comp = @GotoPrompt, @GotoEntry, @GotoGoto, @GotoDont;
-    GII_visibility = GIV_DIALOG;
-    GII_attrs = @default  | GIA_NOT_USER_INITIATABLE | GIA_MODAL;
-}
-@object GenTextClass GotoPrompt = {
-    GTXI_text = "Enter a Web Site to Goto:";
-    GI_attrs = @default | GA_READ_ONLY;
-}
-@object GenTextClass GotoEntry = {
-    GTXI_text = "";
-    GTXI_maxLength = HTML_MAX_BUF-1;
-    GTXI_attrs = @default | GTA_SINGLE_LINE_TEXT;
-    HINT_DEFAULT_FOCUS;
-    HINT_FIXED_SIZE = { SST_AVG_CHAR_WIDTHS|50, 0 };
-}
-@object GenTriggerClass GotoGoto = {
-    GI_visMoniker = "Goto";
-    GI_attrs = @default | GA_SIGNAL_INTERACTION_COMPLETE;
-    GTI_destination = process;
-    GTI_actionMsg = MSG_HMLVP_GOTO;
-    HINT_SEEK_REPLY_BAR;
-    HINT_DEFAULT_DEFAULT_ACTION;
-}
-@object GenTriggerClass GotoDont = {
-    GI_visMoniker = "Don't Goto";
-    GI_attrs = @default | GA_SIGNAL_INTERACTION_COMPLETE;
-    HINT_SEEK_REPLY_BAR;
-}
-@endif
 
 @object GenTriggerClass SimpleToolbarHome = {
     GI_visMoniker = list { @HomeMoniker, @GPCHomeIconMoniker } ;
@@ -127,6 +94,54 @@
     ATTR_GEN_FOCUS_HELP = @StopHelp ;
     HINT_USE_ICON_TEXT_COMBINATION_MONIKER = { 0, 2 } ;
 }
+
+/* 
+ * Goto dialog for Goto button in toolbar 
+ */
+@object GenInteractionClass GotoDialog = {
+    GI_visMoniker = "Goto";
+    GI_comp = @GotoPrompt, @GotoEntry, @GotoGoto, @GotoDont;
+    GII_visibility = GIV_DIALOG;
+    GII_attrs = @default  | GIA_NOT_USER_INITIATABLE | GIA_MODAL;
+}
+@object GenTextClass GotoPrompt = {
+    GTXI_text = "Enter a Web Site to Goto:";
+    GI_attrs = @default | GA_READ_ONLY;
+}
+@object GenTextClass GotoEntry = {
+    GTXI_text = "";
+    GTXI_maxLength = HTML_MAX_BUF-1;
+    GTXI_attrs = @default | GTA_SINGLE_LINE_TEXT;
+    HINT_DEFAULT_FOCUS;
+    HINT_FIXED_SIZE = { SST_AVG_CHAR_WIDTHS|50, 0 };
+}
+@object GenTriggerClass GotoGoto = {
+    GI_visMoniker = "Goto";
+    GI_attrs = @default | GA_SIGNAL_INTERACTION_COMPLETE;
+    GTI_destination = process;
+    GTI_actionMsg = MSG_HMLVP_GOTO;
+    HINT_SEEK_REPLY_BAR;
+    HINT_DEFAULT_DEFAULT_ACTION;
+}
+@object GenTriggerClass GotoDont = {
+    GI_visMoniker = "Don't Goto";
+    GI_attrs = @default | GA_SIGNAL_INTERACTION_COMPLETE;
+    HINT_SEEK_REPLY_BAR;
+}
+
+/* 
+ * Print button in toolbar 
+ */
+ @object GenTriggerClass SimpleToolbarPrint = {
+    GI_states = (@default) & ~GS_USABLE;
+    GI_visMoniker = list { @GPCPrintIconMoniker, @PrintMoniker } ;
+    GTI_destination = @PrintControl ;
+    GTI_actionMsg = MSG_PRINT_CONTROL_INITIATE_PRINT ;
+    
+    HINT_USE_ICON_TEXT_COMBINATION_MONIKER = { 0, 2 } ;
+    ATTR_GEN_FOCUS_HELP = @PrintHelp ;
+}
+@chunk TCHAR PrintHelp[] = _TEXT("Send copy of current page to the printer") ;
 
 @ifdef GLOBAL_INTERNET_BUILD
 @object GenTriggerClass SimpleToolbarJump = {
