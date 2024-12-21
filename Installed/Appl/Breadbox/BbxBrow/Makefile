@@ -39,8 +39,7 @@ COMMON          = bookclas.goh bookmark.goh bookui.goh favorcls.goh\
                   htmlv_ui_main_wrapper_fg.goh htmlv_ui_men_file.goh\
                   htmlv_ui_status_indctrs.goh htmlv_ui.goh\
                   htmlv_ui_men_edit.goh htmlv_ui_men_options.goh\
-                  htmlv_ui_men_view.goh htmlv_ui_toolb_simple_fg.goh\
-                  htmlview.goh options.goh
+                  htmlv_ui_men_view.goh htmlview.goh options.goh
 MODULES         = ASMTOOLS
 CMODULES        = htmlview init js navigate urldoc urldocct urlfetch\
                   urlframe urltext
