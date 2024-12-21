@@ -3011,16 +3011,11 @@
 
   static void  Ins_ROLL( PStorage args )
   {
-    Long  A, B, C;
+    Long temp = args[2];
 
-
-    A = args[2];
-    B = args[1];
-    C = args[0];
-
-    args[2] = C;
-    args[1] = A;
-    args[0] = B;
+    args[2] = args[0];
+    args[0] = args[1];
+    args[1] = temp;
   }
 
 
