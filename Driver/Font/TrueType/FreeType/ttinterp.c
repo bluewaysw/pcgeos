@@ -3085,10 +3085,7 @@
 
   static void  Ins_ELSE( EXEC_OP )
   {
-    Int  nIfs;
-
-
-    nIfs = 1;
+    Int  nIfs = 1;
 
     do
     {
@@ -3311,13 +3308,12 @@
 
   static void  Ins_LOOPCALL( INS_ARG )
   {
-    Int          n;
-    Long         count;
+    Int          n      = (Int)args[1];
+    Short        count  = (Short)args[0];
     PDefRecord   def;
     PCallRecord  pTCR;
 
 
-    n = (Int)args[1];
     def = Locate_FDef( EXEC_ARGS n, FALSE );
     if ( !def )
     {
@@ -3331,7 +3327,6 @@
       return;
     }
 
-    count = (Long)args[0];
     if ( count <= 0 )
       return;
 
@@ -3540,11 +3535,9 @@
 
   static void  Ins_GC( INS_ARG )
   {
-    ULong       L;
+    UShort      L = (UShort)args[0];
     TT_F26Dot6  R;
 
-
-    L = (ULong)args[0];
 
     if ( BOUNDS( L, CUR.zp2.n_points ) )
     {
@@ -3849,11 +3842,9 @@
 
   static void  Ins_INSTCTRL( INS_ARG )
   {
-    Long  K, L;
+    Short  K = (Short)args[1];
+    Short  L = (Short)args[0];
 
-
-    K = args[1];
-    L = args[0];
 
     if ( K < 1 || K > 2 )
     {
