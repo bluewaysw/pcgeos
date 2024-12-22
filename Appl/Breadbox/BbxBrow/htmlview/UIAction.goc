@@ -79,19 +79,6 @@ extern Boolean G_progressStatus;
 @extern object HistoryList2 ;
 @extern object PrintControl ;
 
-@ifdef COMPILE_OPTION_TOGGLE_BARS
-@ifdef COMPILE_OPTION_TOGGLE_GOTO_BAR
-@extern chunk HideGotoBarMoniker ;
-@extern chunk ShowGotoBarMoniker ;
-@extern object ToggleGotoBar ;
-@endif
-@ifdef COMPILE_OPTION_TOGGLE_STATUS_BAR
-@extern chunk HideStatusBarMoniker ;
-@extern chunk ShowStatusBarMoniker ;
-@extern object ToggleStatusBar ;
-@endif
-@endif
-
 @ifdef COMPILE_OPTION_JUMP_FEATURE
 @extern object JumpEntry ;
 @endif
@@ -251,10 +238,6 @@ void UpdateToolbar(Boolean enabled)
     UsableOrNot(@NavigateMenu, !enabled);
 @endif
 @endif
-@ifdef COMPILE_OPTION_SHOW_HIDE_TOOLBAR
-    UsableOrNot(@ShowToolbarTrigger,   !enabled);
-    UsableOrNot(@HideToolbarTrigger,   enabled);
-@endif
 }
 
 void UpdateStatusbar(Boolean enabled)
@@ -272,52 +255,6 @@ void UpdateUrlbar(Boolean enabled)
 void UpdatePrintButtonInSimpleToolbar(Boolean enabled)
 {
     UsableOrNot(@SimpleToolbarPrint, enabled);
-}
-@endif
-
-@if defined(COMPILE_OPTION_TOGGLE_BARS) && defined(COMPILE_OPTION_SIMPLE_BUTTON_TOOLBAR)
-void UpdateToggleBars(word toggleBars)
-{
-    /* Goto bar */
-@ifdef COMPILE_OPTION_TOGGLE_GOTO_BAR
-    if (toggleBars & TOGGLE_BARS_GOTO_ON) {
-        /* update moniker */
-        @send ToggleGotoBar::MSG_GEN_USE_VIS_MONIKER(
-            OptrToChunk(@HideGotoBarMoniker), VUM_DELAYED_VIA_APP_QUEUE);
-        /* add URL toolbar */
-        @send SimpleURLToolbar::MSG_GEN_SET_USABLE(VUM_DELAYED_VIA_APP_QUEUE);
-@if (!defined(COMPILE_OPTION_FREEGEOS_BUTTON_TOOLBAR))
-        /* remove Goto button in toolbar */
-        @send SimpleToolbarGoto::MSG_GEN_SET_NOT_USABLE(VUM_DELAYED_VIA_APP_QUEUE);
-@endif
-    } else {
-        /* update moniker */
-        @send ToggleGotoBar::MSG_GEN_USE_VIS_MONIKER(
-            OptrToChunk(@ShowGotoBarMoniker), VUM_DELAYED_VIA_APP_QUEUE);
-        /* remove URL toolbar */
-        @send SimpleURLToolbar::MSG_GEN_SET_NOT_USABLE(VUM_DELAYED_VIA_APP_QUEUE);
-        /* add Goto button in toolbar */
-@if (!defined(COMPILE_OPTION_FREEGEOS_BUTTON_TOOLBAR))
-        @send SimpleToolbarGoto::MSG_GEN_SET_USABLE(VUM_DELAYED_VIA_APP_QUEUE);
-@endif
-    }
-@endif
-@ifdef COMPILE_OPTION_TOGGLE_STATUS_BAR
-    /* status bar */
-    if (toggleBars & TOGGLE_BARS_STATUS_ON) {
-        /* update moniker */
-        @send ToggleStatusBar::MSG_GEN_USE_VIS_MONIKER(
-            OptrToChunk(@HideStatusBarMoniker), VUM_DELAYED_VIA_APP_QUEUE);
-        /* add status bar */
-        @send StatusBar::MSG_GEN_SET_USABLE(VUM_DELAYED_VIA_APP_QUEUE);
-    } else {
-        /* update moniker */
-        @send ToggleStatusBar::MSG_GEN_USE_VIS_MONIKER(
-            OptrToChunk(@ShowStatusBarMoniker), VUM_NOW);
-        /* remove status bar */
-        @send StatusBar::MSG_GEN_SET_NOT_USABLE(VUM_DELAYED_VIA_APP_QUEUE);
-    }
-@endif
 }
 @endif
 
@@ -751,31 +688,6 @@ void UpdateStop(Boolean enabled)
 @endif
 }
 
-
-@if defined(COMPILE_OPTION_TOGGLE_BARS) && defined(COMPILE_OPTION_SIMPLE_BUTTON_TOOLBAR)
-@extern method HTMLVProcessClass, MSG_HMLVP_TOGGLE_GOTO_BAR, MSG_HMLVP_TOGGLE_STATUS_BAR
-{
-    word toggleBars = 0;
-
-    /* get current bar states */
-    if (@call SimpleURLToolbar::MSG_GEN_GET_USABLE()) {
-        toggleBars |= TOGGLE_BARS_GOTO_ON;
-    }
-    if (@call StatusBar::MSG_GEN_GET_USABLE()) {
-        toggleBars |= TOGGLE_BARS_STATUS_ON;
-    }
-    /* toggle desired one */
-    if (message == MSG_HMLVP_TOGGLE_GOTO_BAR) {
-        toggleBars ^= TOGGLE_BARS_GOTO_ON;
-    } else {
-        toggleBars ^= TOGGLE_BARS_STATUS_ON;
-    }
-    /* update with new bar state */
-    UpdateToggleBars(toggleBars);
-}
-@endif
-
-@ifndef COMPILE_OPTION_SHOW_HIDE_TOOLBAR
 @extern method HTMLVProcessClass, MSG_HMLVP_OPTIONS_CHANGED
 {
     HWChecksumCheck() ;
@@ -796,4 +708,4 @@ void UpdateStop(Boolean enabled)
 
     HWChecksumCheck() ;
 }
-@endif
+
