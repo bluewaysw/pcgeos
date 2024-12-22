@@ -2461,8 +2461,9 @@ static void Lock_Render_Pool( RAS_ARGS  TT_Outline*  glyph )
   TT_UShort   renderpoolSize = ( glyph->y_ppem >> 3 ) * RASTER_RENDER_POOL_FACTOR 
                                                       + RASTER_RENDER_POOL_MIN_SIZE;
 
-
-  if( MemGetInfo( ras.buffer, MGIT_SIZE ) != renderpoolSize )
+  /* discarded or not the necessary size */
+  if( MemGetInfo( ras.buffer, MGIT_FLAGS_AND_LOCK_COUNT ) & HF_DISCARDED ||
+      MemGetInfo( ras.buffer, MGIT_SIZE ) != renderpoolSize )
     MemReAlloc( ras.buffer, renderpoolSize, HAF_NO_ERR );
 
   ras.sizeBuff = (PStorage)MemLock( ras.buffer ) + ( renderpoolSize / sizeof(long) );
