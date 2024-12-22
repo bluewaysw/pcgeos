@@ -710,7 +710,6 @@
 
     TProject_Function  _near * func_project;   /* current projection function */
     TProject_Function  _near * func_dualproj;  /* current dual proj. function */
-    TProject_Function  _near * func_freeProj;  /* current freedom proj. func  */
 
     TMove_Function     _near * func_move;      /* current point move function */
 

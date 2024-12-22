@@ -173,8 +173,6 @@
 
 #define CUR_Func_dualproj( x, y )  CUR.func_dualproj( EXEC_ARGS x, y )
 
-#define CUR_Func_freeProj( x, y )  CUR.func_freeProj( EXEC_ARGS x, y )
-
 #define CUR_Func_round( d, c )     CUR.func_round( EXEC_ARGS d, c )
 
 #define CUR_Func_read_cvt( index )  CUR.func_read_cvt( EXEC_ARGS index )
@@ -1423,20 +1421,15 @@
   static void  Compute_Funcs( EXEC_OP )
   {
     if ( CUR.GS.freeVector.x == 0x4000 )
-    {
-      CUR.func_freeProj = Project_x;
-      CUR.F_dot_P       = CUR.GS.projVector.x * 0x10000L;
-    }
+      CUR.F_dot_P   = CUR.GS.projVector.x * 0x10000L;
     else
     {
       if ( CUR.GS.freeVector.y == 0x4000 )
       {
-        CUR.func_freeProj = Project_y;
-        CUR.F_dot_P       = CUR.GS.projVector.y * 0x10000L;
+        CUR.F_dot_P = CUR.GS.projVector.y * 0x10000L;
       }
       else
       {
-        CUR.func_freeProj = Free_Project;
         CUR.F_dot_P = (Long)CUR.GS.projVector.x * CUR.GS.freeVector.x << 2 +
                       (Long)CUR.GS.projVector.y * CUR.GS.freeVector.y << 2;
       }
@@ -3018,16 +3011,11 @@
 
   static void  Ins_ROLL( PStorage args )
   {
-    Long  A, B, C;
+    Long temp = args[2];
 
-
-    A = args[2];
-    B = args[1];
-    C = args[0];
-
-    args[2] = C;
-    args[1] = A;
-    args[0] = B;
+    args[2] = args[0];
+    args[0] = args[1];
+    args[1] = temp;
   }
 
 
@@ -3097,10 +3085,7 @@
 
   static void  Ins_ELSE( EXEC_OP )
   {
-    Int  nIfs;
-
-
-    nIfs = 1;
+    Int  nIfs = 1;
 
     do
     {
@@ -3323,13 +3308,12 @@
 
   static void  Ins_LOOPCALL( INS_ARG )
   {
-    Int          n;
-    Long         count;
+    Int          n      = (Int)args[1];
+    Short        count  = (Short)args[0];
     PDefRecord   def;
     PCallRecord  pTCR;
 
 
-    n = (Int)args[1];
     def = Locate_FDef( EXEC_ARGS n, FALSE );
     if ( !def )
     {
@@ -3343,7 +3327,6 @@
       return;
     }
 
-    count = (Long)args[0];
     if ( count <= 0 )
       return;
 
@@ -3552,11 +3535,9 @@
 
   static void  Ins_GC( INS_ARG )
   {
-    ULong       L;
+    UShort      L = (UShort)args[0];
     TT_F26Dot6  R;
 
-
-    L = (ULong)args[0];
 
     if ( BOUNDS( L, CUR.zp2.n_points ) )
     {
@@ -3861,11 +3842,9 @@
 
   static void  Ins_INSTCTRL( INS_ARG )
   {
-    Long  K, L;
+    Short  K = (Short)args[1];
+    Short  L = (Short)args[0];
 
-
-    K = args[1];
-    L = args[0];
 
     if ( K < 1 || K > 2 )
     {
@@ -4940,11 +4919,9 @@
 
   static void  Ins_UTP( INS_ARG )
   {
-    UShort  point;
-    Byte    mask;
+    UShort  point = (UShort)args[0];
+    Byte    mask  = 0xFF;
 
-
-    point = (UShort)args[0];
 
     if ( BOUNDS( point, CUR.zp0.n_points ) )
     {
@@ -4954,8 +4931,6 @@
 #endif
       return;
     }
-
-    mask = 0xFF;
 
     if ( CUR.GS.freeVector.x != 0 )
       mask &= ~TT_Flag_Touched_X;
@@ -5245,13 +5220,11 @@
 
   static void  Ins_DELTAC( INS_ARG )
   {
-    ULong  nump, k;
-    UShort A;
+    UShort nump = (UShort)args[0];
+    UShort A, k;
     ULong  C;
     Long   B;
 
-
-    nump = (ULong)args[0];
 
     for ( k = 1; k <= nump; ++k )
     {
@@ -5327,25 +5300,8 @@
 
   static void  Ins_GETINFO( INS_ARG )
   {
-    Long  K;
-
-
-    K = 0;
-
-    /* We return then Windows 3.1 version number */
-    /* for the font scaler                       */
-    if ( (args[0] & 1) != 0 )
-      K = 3;
-
-    /* Has the glyph been rotated ? */
-/*    if ( CUR.metrics.rotated )
-      K |= 0x80; */
-
-    /* Has the glyph been stretched ? */
- /*   if ( CUR.metrics.stretched )
-      K |= 0x100; */
-
-    args[0] = K;
+    /* Return the Windows 3.1 version number for the font scaler */
+    args[0] = (args[0] & 1) ? 3 : 0;
   }
 
 
@@ -6083,7 +6039,9 @@
           break;
 
         case 0x4F:  /* DEBUG */
+        #ifdef TT_CONFIG_OPTION_SUPPORT_OBSOLET_INSTRUCTIONS
           DO_DEBUG
+        #endif
           break;
 
         case 0x50:  /* LT */
