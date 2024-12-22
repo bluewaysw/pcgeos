@@ -302,7 +302,7 @@ HTMLVIEW.eobj: stdapp.goh object.goh ui.goh Objects/metaC.goh \
                 Art/A111_8.goh Art/A113_8.goh Art/A114_8.goh \
                 Art/GI009_8.goh Art/GI010_8.goh Art/GI011_8.goh \
                 Art/GI012_8.goh Art/GI013_8.goh Art/GI014_8.goh \
-                htmlv_ui_main_wrapper_fg.goh
+                htmlv_ui_main_wrapper.goh
 HTMLVIEW.obj \
 HTMLVIEW.eobj: geos.h heap.h geode.h resource.h ec.h object.h lmem.h \
                 graphics.h fontID.h font.h color.h gstring.h timer.h vm.h \
