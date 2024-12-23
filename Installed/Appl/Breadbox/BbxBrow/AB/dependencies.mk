@@ -76,7 +76,7 @@ AB/GLBANIM.eobj: stdapp.goh object.goh ui.goh Objects/metaC.goh \
                 Objects/gItemC.goh Objects/gBoolC.goh \
                 Objects/gGadgetC.goh Objects/gToolCC.goh \
                 Objects/gValueC.goh Objects/gToolGC.goh \
-                Objects/helpCC.goh options.goh
+                Objects/helpCC.goh options.goh product.goh
 AB/GLBANIM.obj \
 AB/GLBANIM.eobj: geos.h heap.h geode.h resource.h ec.h object.h lmem.h \
                 graphics.h fontID.h font.h color.h gstring.h timer.h vm.h \
@@ -85,7 +85,7 @@ AB/GLBANIM.eobj: geos.h heap.h geode.h resource.h ec.h object.h lmem.h \
                 disk.h drive.h input.h char.h hwr.h win.h uDialog.h \
                 Objects/gInterC.h Objects/Text/tCommon.h stylesh.h \
                 driver.h thread.h print.h Internal/spoolInt.h serialDr.h \
-                parallDr.h hugearr.h fileEnum.h
+                parallDr.h hugearr.h fileEnum.h product.h
 AB/ImportG.obj \
 AB/ImportG.eobj: stdapp.goh object.goh ui.goh Objects/metaC.goh \
                 Objects/inputC.goh Objects/clipbrd.goh \
@@ -548,7 +548,7 @@ AB/BOOKCLAS.eobj: stdapp.goh object.goh ui.goh Objects/metaC.goh \
                 Objects/gItemC.goh Objects/gBoolC.goh \
                 Objects/gGadgetC.goh Objects/gToolCC.goh \
                 Objects/gValueC.goh Objects/gToolGC.goh \
-                Objects/helpCC.goh options.goh
+                Objects/helpCC.goh options.goh product.goh
 AB/BOOKCLAS.obj \
 AB/BOOKCLAS.eobj: geos.h heap.h geode.h resource.h ec.h object.h lmem.h \
                 graphics.h fontID.h font.h color.h gstring.h timer.h vm.h \
@@ -557,7 +557,7 @@ AB/BOOKCLAS.eobj: geos.h heap.h geode.h resource.h ec.h object.h lmem.h \
                 disk.h drive.h input.h char.h hwr.h win.h uDialog.h \
                 Objects/gInterC.h Objects/Text/tCommon.h stylesh.h \
                 driver.h thread.h print.h Internal/spoolInt.h serialDr.h \
-                parallDr.h hugearr.h fileEnum.h
+                parallDr.h hugearr.h fileEnum.h product.h
 AB/FAVORCLS.obj \
 AB/FAVORCLS.eobj: stdapp.goh object.goh ui.goh Objects/metaC.goh \
                 Objects/inputC.goh Objects/clipbrd.goh \
@@ -576,11 +576,11 @@ AB/FAVORCLS.eobj: stdapp.goh object.goh ui.goh Objects/metaC.goh \
                 Objects/gItemC.goh Objects/gBoolC.goh \
                 Objects/gGadgetC.goh Objects/gToolCC.goh \
                 Objects/gValueC.goh Objects/gToolGC.goh \
-                Objects/helpCC.goh Ansi/string.h options.goh favorcls.goh \
-                favorite.goh htmlview.goh product.goh Objects/gViewCC.goh \
-                html4par.goh Objects/vLTextC.goh htmlstat.goh \
-                stattext.goh urlfetch.goh mailhub.goh socket.goh \
-                sockmisc.h Objects/Text/tCtrlC.goh ruler.goh \
+                Objects/helpCC.goh Ansi/string.h options.goh product.goh \
+                favorcls.goh favorite.goh htmlview.goh \
+                Objects/gViewCC.goh html4par.goh Objects/vLTextC.goh \
+                htmlstat.goh stattext.goh urlfetch.goh mailhub.goh \
+                socket.goh sockmisc.h Objects/Text/tCtrlC.goh ruler.goh \
                 Objects/colorC.goh Objects/styles.goh
 AB/FAVORCLS.obj \
 AB/FAVORCLS.eobj: geos.h heap.h geode.h resource.h ec.h object.h lmem.h \
@@ -612,7 +612,7 @@ AB/FAVORITE.eobj: stdapp.goh object.goh ui.goh Objects/metaC.goh \
                 Objects/gGadgetC.goh Objects/gToolCC.goh \
                 Objects/gValueC.goh Objects/gToolGC.goh \
                 Objects/helpCC.goh Ansi/string.h initfile.h options.goh \
-                favorite.goh ibtree.goh ibdll.goh ibms.goh
+                product.goh favorite.goh ibtree.goh ibdll.goh ibms.goh
 AB/FAVORITE.obj \
 AB/FAVORITE.eobj: geos.h heap.h geode.h resource.h ec.h object.h lmem.h \
                 graphics.h fontID.h font.h color.h gstring.h timer.h vm.h \
@@ -621,7 +621,7 @@ AB/FAVORITE.eobj: geos.h heap.h geode.h resource.h ec.h object.h lmem.h \
                 disk.h drive.h input.h char.h hwr.h win.h uDialog.h \
                 Objects/gInterC.h Objects/Text/tCommon.h stylesh.h \
                 driver.h thread.h print.h Internal/spoolInt.h serialDr.h \
-                parallDr.h hugearr.h fileEnum.h
+                parallDr.h hugearr.h fileEnum.h product.h
 AB/NAVCACHE.obj \
 AB/NAVCACHE.eobj: stdapp.goh object.goh ui.goh Objects/metaC.goh \
                 Objects/inputC.goh Objects/clipbrd.goh \
@@ -676,7 +676,7 @@ AB/BOOKMARK.eobj: stdapp.goh object.goh ui.goh Objects/metaC.goh \
                 Objects/gItemC.goh Objects/gBoolC.goh \
                 Objects/gGadgetC.goh Objects/gToolCC.goh \
                 Objects/gValueC.goh Objects/gToolGC.goh \
-                Objects/helpCC.goh Ansi/string.h options.goh
+                Objects/helpCC.goh Ansi/string.h options.goh product.goh
 AB/BOOKMARK.obj \
 AB/BOOKMARK.eobj: geos.h heap.h geode.h resource.h ec.h object.h lmem.h \
                 graphics.h fontID.h font.h color.h gstring.h timer.h vm.h \
@@ -685,7 +685,7 @@ AB/BOOKMARK.eobj: geos.h heap.h geode.h resource.h ec.h object.h lmem.h \
                 disk.h drive.h input.h char.h hwr.h win.h uDialog.h \
                 Objects/gInterC.h Objects/Text/tCommon.h stylesh.h \
                 driver.h thread.h print.h Internal/spoolInt.h serialDr.h \
-                parallDr.h hugearr.h fileEnum.h
+                parallDr.h hugearr.h fileEnum.h product.h
 AB/NAVIGATE.obj \
 AB/NAVIGATE.eobj: stdapp.goh object.goh ui.goh Objects/metaC.goh \
                 Objects/inputC.goh Objects/clipbrd.goh \
@@ -862,9 +862,9 @@ AB/URLFETCH.eobj: geos.h heap.h geode.h resource.h ec.h object.h lmem.h \
                 disk.h drive.h input.h char.h hwr.h win.h uDialog.h \
                 Objects/gInterC.h Objects/Text/tCommon.h stylesh.h \
                 driver.h thread.h print.h Internal/spoolInt.h serialDr.h \
-                parallDr.h hugearr.h fileEnum.h product.h library.h \
-                Ansi/stdio.h htmlfstr.h awatcher.h htmlopt.h htmldrv.h \
-                math.h htmlprog.h hwlib.h medium.h
+                parallDr.h hugearr.h fileEnum.h library.h product.h \
+                htmlfstr.h awatcher.h htmlopt.h htmldrv.h math.h \
+                htmlprog.h hwlib.h medium.h
 AB/FRFETCH.obj \
 AB/FRFETCH.eobj: stdapp.goh object.goh ui.goh Objects/metaC.goh \
                 Objects/inputC.goh Objects/clipbrd.goh \
