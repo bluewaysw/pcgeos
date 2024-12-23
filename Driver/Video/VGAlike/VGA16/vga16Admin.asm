@@ -361,6 +361,18 @@ VidTestVESA_848x480_16	proc	near
 		ret
 VidTestVESA_848x480_16	endp
 
+VidTestVESA_960x540_16	proc	near
+		mov	ax, VD_VESA_960x540_16
+		call	VidTestVESA
+		ret
+VidTestVESA_960x540_16	endp
+
+VidTestVESA_960x600_16	proc	near
+		mov	ax, VD_VESA_960x600_16
+		call	VidTestVESA
+		ret
+VidTestVESA_960x600_16	endp
+
 VidTestVESA_1024_600_16	proc	near
 		mov	ax, VD_VESA_1024_600_16
 		call	VidTestVESA
@@ -894,6 +906,8 @@ ifndef PRODUCT_WIN_DEMO
 		word	480		; VD_VESA_800x480_16
 		word	624		; VD_VESA_832x624_16
 		word	480		; VD_VESA_848x480_16
+		word	540		; VD_VESA_960x540_16
+		word	600		; VD_VESA_960x600_16
 		word	600		; VD_VESA_1024_600_16
 
 		word	768		; VD_VESA_1Kx768_16
@@ -933,6 +947,8 @@ ifndef PRODUCT_WIN_DEMO
 		word	800		; VD_VESA_800x480_16
 		word	832		; VD_VESA_832x624_16
 		word	848		; VD_VESA_848x480_16
+		word	960		; VD_VESA_960x540_16
+		word	960		; VD_VESA_960x600_16
 		word	1024		; VD_VESA_1024_600_16
 
 		word	1024		; VD_VESA_1Kx768_16
