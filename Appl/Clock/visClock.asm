@@ -3,7 +3,7 @@ COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 	Copyright (c) GeoWorks 1991 -- All Rights Reserved
 
 PROJECT:	PC GEOS
-MODULE:		
+MODULE:
 FILE:		visClock.asm
 
 AUTHOR:		Adam de Boor, Sep 13, 1991
@@ -12,7 +12,7 @@ ROUTINES:
 	Name			Description
 	----			-----------
 
-	
+
 REVISION HISTORY:
 	Name	Date		Description
 	----	----		-----------
@@ -29,7 +29,7 @@ DESCRIPTION:
 	window under the field, ensuring it remains on top, allowing the user
 	to move the clock around, saving its position, when the application
 	is shut down, etc.
-		
+
 
 	$Id: visClock.asm,v 1.1 97/04/04 14:51:05 newdeal Exp $
 
@@ -47,7 +47,7 @@ idata	segment
 
 ;
 ; Field window dimensions, for ease of positioning.
-; 
+;
 fieldWinWidth	sword	0
 fieldWinHeight	sword	0
 
@@ -77,7 +77,7 @@ PSEUDO CODE/STRATEGY:
 		list.
 
 KNOWN BUGS/SIDE EFFECTS/IDEAS:
-		
+
 
 REVISION HISTORY:
 	Name	Date		Description
@@ -120,10 +120,10 @@ RETURN:		ds:di	= VisClockInstance
 DESTROYED:	nothing
 
 PSEUDO CODE/STRATEGY:
-		
+
 
 KNOWN BUGS/SIDE EFFECTS/IDEAS:
-		
+
 
 REVISION HISTORY:
 	Name	Date		Description
@@ -140,12 +140,12 @@ VCEnsureColorGroup proc	near
 	;
 	; Have a color array. See if we've got an options tree, as we'll need
 	; one to set the colors.
-	; 
+	;
 		tst	ds:[di].VCI_optionTree.handle
 		jnz	haveOptionTree
 	;
 	; No option tree yet, so duplicate one.
-	; 
+	;
 		push	si
 		mov	cx, ds:[LMBH_handle]
 		clr	dx		; no parent yet
@@ -166,12 +166,12 @@ haveOptionTree:
 	;
 	; We've got an option tree, so see if we've already build ourselves
 	; a color group.
-	; 
+	;
 		tst	ds:[di].VCI_colorGroup.handle
 		LONG jnz done		; yes, so done
 	;
 	; Not yet. Duplicate the group.
-	; 
+	;
 		push	si
 		mov	cx, ds:[di].VCI_optionTree.handle
 		mov	dx, ds:[di].VCI_optionTree.chunk
@@ -186,7 +186,7 @@ haveOptionTree:
 	;
 	; Locate the new OD of the color list so we can keep it up-to-date;
 	; it is the second child of the group
-	; 
+	;
 		mov	cx, 1		; 2d child, 0-origin
 		mov	ax, MSG_GEN_FIND_CHILD_AT_POSITION
 		mov	di, mask MF_CALL or mask MF_FIXUP_DS
@@ -196,7 +196,7 @@ EC <		ERROR_C	VIS_CLOCK_COULD_NOT_FIND_COLOR_LIST		>
 		pop	si
 	;
 	; Save the two optrs away in our instance data.
-	; 
+	;
 		mov	di, ds:[si]
 		add	di, ds:[di].VisClock_offset
 		mov	ds:[di].VCI_colorGroup.handle, bx
@@ -206,12 +206,12 @@ EC <		ERROR_C	VIS_CLOCK_COULD_NOT_FIND_COLOR_LIST		>
 		call	ObjMarkDirty
 	;
 	; Now create the children of the list.
-	; 
+	;
 		call	VCCreateColorListChildren
 	;
 	; "Set" our selected part to what we've got already so the color
 	; list is set correctly.
-	; 
+	;
 		mov	di, ds:[si]
 		add	di, ds:[di].VisClock_offset
 		mov	cx, ds:[di].VCI_selectedPart
@@ -219,7 +219,7 @@ EC <		ERROR_C	VIS_CLOCK_COULD_NOT_FIND_COLOR_LIST		>
 		call	ObjCallInstanceNoLock
 	;
 	; Dereference ourselves for our caller.
-	; 
+	;
 		mov	di, ds:[si]
 		add	di, ds:[di].VisClock_offset
 done:
@@ -243,7 +243,7 @@ DESTROYED:	ax, cx, dx, bp, di
 SIDE EFFECTS:	One GenItem object is created for each clock part string.
 
 PSEUDO CODE/STRATEGY:
-		
+
 
 REVISION HISTORY:
 	Name	Date		Description
@@ -270,7 +270,7 @@ VCCreateColorListChildren proc	near
 childLoop:
 	;
 	; Create the GenItem child.
-	; 
+	;
 		mov	di, offset GenItemClass
 		push	si		; save item group chunk
 		call	ObjInstantiate	; ^lbx:si <- GenItem
@@ -278,7 +278,7 @@ childLoop:
 		push	cx, dx, ax, bp
 	;
 	; Create the moniker for the child from the string optr we have (*ds:dx)
-	; 
+	;
 		sub	sp, size ReplaceVisMonikerFrame
 		mov	bp, sp
 		mov	ax, ds:[LMBH_handle]
@@ -299,7 +299,7 @@ childLoop:
 	;
 	; Moniker created. Set the identifier for the new item so we can
 	; distinguish things.
-	; 
+	;
 		pop	cx			; cx <- identifier
 		mov	ax, MSG_GEN_ITEM_SET_IDENTIFIER
 		mov	di, mask MF_FIXUP_DS
@@ -307,7 +307,7 @@ childLoop:
 						;  don't use MF_CALL)
 	;
 	; Add the item as the last child of the item group.
-	; 
+	;
 		mov	bp, cx			; bp <- identifier (while we get
 						;  the item group off the stack)
 		movdw	cxdx, bxsi		; ^lcx:dx <- child
@@ -319,7 +319,7 @@ childLoop:
 		call	ObjMessage
 	;
 	; Set the item usable, finally.
-	; 
+	;
 		push	si
 		mov	si, dx
 		mov	ax, MSG_GEN_SET_USABLE
@@ -329,7 +329,7 @@ childLoop:
 		pop	si
 	;
 	; Now advance to the next string/identifier and loop if more to create.
-	; 
+	;
 		pop	cx, dx, bp
 		inc	bp
 		inc	dx
@@ -337,7 +337,7 @@ childLoop:
 		loop	childLoop
 	;
 	; Set the selected part as the selected thing in the list.
-	; 
+	;
 		pop	cx
 		clr	dx
 		mov	ax, MSG_GEN_ITEM_GROUP_SET_SINGLE_SELECTION
@@ -362,10 +362,10 @@ RETURN:		nothing
 DESTROYED:	ax, cx, dx, bp
 
 PSEUDO CODE/STRATEGY:
-		
+
 
 KNOWN BUGS/SIDE EFFECTS/IDEAS:
-		
+
 
 REVISION HISTORY:
 	Name	Date		Description
@@ -378,11 +378,11 @@ VCAttach	method dynamic VisClockClass, MSG_META_ATTACH
 	;
 	; Make sure we've got a color list and option tree if we've got
 	; an array of colors.
-	; 
+	;
 		call	VCEnsureColorGroup
 	;
 	; Get the current fixed position & interval from the application.
-	; 
+	;
 		mov	ax, MSG_CAPP_GET_INITIAL_INFO
 		call	GenCallApplication
 		mov	di, ds:[si]
@@ -390,20 +390,20 @@ VCAttach	method dynamic VisClockClass, MSG_META_ATTACH
 		mov	ds:[di].VCI_fixedPosition.P_x, cx
 		mov	ds:[di].VCI_fixedPosition.P_y, dx
 		mov	{word}ds:[di].VCI_horizJust, bp
-		
+
 		mov	cx, 60
 		mul	cx		; convert from seconds to ticks
 		mov	ds:[di].VCI_interval, ax
 
 	;
 	; Find the field on which the application is located.
-	; 
+	;
 		mov	cx, GUQT_FIELD
 		mov	ax, MSG_GEN_GUP_QUERY
 		call	UserCallApplication
 	;
 	; Make the clock a visible child of the application.
-	; 
+	;
 		mov	dx, si
 		mov	cx, ds:[LMBH_handle]
 		mov	ax, MSG_VIS_ADD_CHILD
@@ -413,27 +413,27 @@ VCAttach	method dynamic VisClockClass, MSG_META_ATTACH
 		call	UserCallApplication
 	;
 	; If we've got an option tree, tell the application object where it is
-	; 
+	;
 		mov	di, ds:[si]
 		add	di, ds:[di].VisClock_offset
 		movdw	cxdx, ds:[di].VCI_optionTree
 		jcxz	makeVisible
-		
+
 		mov	ax, MSG_CAPP_ADD_OPTIONS
 		call	UserCallApplication
 
 makeVisible:
 	;
-	; Force-queue a message to ourselves to load options, since the app 
+	; Force-queue a message to ourselves to load options, since the app
 	; won't send us one (we're not on any list...)
-	; 
+	;
 		mov	ax, MSG_META_LOAD_OPTIONS
 		mov	bx, ds:[LMBH_handle]
 		mov	di, mask MF_FORCE_QUEUE or mask MF_FIXUP_DS
 		call	ObjMessage
 	;
 	; Bring ourselves up onto the screen.
-	; 
+	;
 		mov	ax, MSG_VIS_SET_ATTRS
 		mov	cx, mask VA_VISIBLE
 		mov	dl, VUM_MANUAL
@@ -441,7 +441,7 @@ makeVisible:
 	;
 	; Invalidate our geometry so we recalculate. We delay the update
 	; via the UI queue just to be safe...
-	; 
+	;
 		mov	cl, mask VOF_GEOMETRY_INVALID
 		mov	dl, VUM_DELAYED_VIA_UI_QUEUE
 		call	VisClockMarkInvalid
@@ -467,10 +467,10 @@ RETURN:		nothing
 DESTROYED:	?
 
 PSEUDO CODE/STRATEGY:
-		
+
 
 KNOWN BUGS/SIDE EFFECTS/IDEAS:
-		
+
 
 REVISION HISTORY:
 	Name	Date		Description
@@ -482,44 +482,44 @@ VCDetach	method dynamic VisClockClass, MSG_META_DETACH
 		.enter
 	;
 	; Set up to complete detach when WIN_DEAD message is received.
-	; 
+	;
 		call	ObjInitDetach
 
 ; 11/29/92: WIN_DEAD no longer exists, so let's see if the in-use count problems
 ; we had before exist in 2.0
 ;		call	ObjIncDetach
-		
+
 	;
 	; Set ourselves not visible. VIS_REMOVE just clears VA_REALIZED, not
 	; VA_VISIBLE, so if a delayed update is queued, it will try and
 	; realize the object again, which will fail, since there will be no
 	; parent.
-	; 
+	;
 		mov	ax, MSG_VIS_SET_ATTRS
 		mov	cx, mask VA_VISIBLE shl 8
 		mov	dl, VUM_NOW
 		call	ObjCallInstanceNoLock
 	;
 	; Close and remove ourselves from the application.
-	; 
+	;
 		mov	ax, MSG_VIS_REMOVE
 		call	ObjCallInstanceNoLock
 	;
 	; If we've got options, detach them as well.
-	; 
+	;
 		mov	di, ds:[si]
 		add	di, ds:[di].VisClock_offset
 		mov	bx, ds:[di].VCI_optionTree.handle
 		tst	bx
 		jz	optionsDetached
-		
+
 		push	si
 		mov	si, ds:[di].VCI_optionTree.chunk
 		mov	ax, MSG_GEN_SET_NOT_USABLE
 		mov	dl, VUM_DELAYED_VIA_UI_QUEUE
 		mov	di, mask MF_CALL or mask MF_FIXUP_DS
 		call	ObjMessage
-		
+
 		mov	ax, MSG_GEN_FIND_PARENT
 		mov	di, mask MF_CALL or mask MF_FIXUP_DS
 		call	ObjMessage
@@ -532,7 +532,7 @@ VCDetach	method dynamic VisClockClass, MSG_META_DETACH
 		call	ObjMessage
 	;
 	; Reset the geometry of our former parent.
-	; 
+	;
 		push	bx, si
 		mov	ax, MSG_VIS_RESET_TO_INITIAL_SIZE
 		mov	dl, VUM_DELAYED_VIA_UI_QUEUE
@@ -552,16 +552,16 @@ optionsDetached:
 	;
 	; Now deal with a timer event that might be in the queue by queueing
 	; a MSG_META_ACK to ourselves.
-	; 
+	;
 		call	ObjIncDetach
 		mov	ax, MSG_META_ACK
 		mov	bx, ds:[LMBH_handle]
 		mov	di, mask MF_FORCE_QUEUE
 		call	ObjMessage
-		
+
 	;
 	; Finally, allow detach to complete
-	; 
+	;
 		call	ObjEnableDetach
 		.leave
 		ret
@@ -583,10 +583,10 @@ RETURN:		nothing
 DESTROYED:	nothing
 
 PSEUDO CODE/STRATEGY:
-		
+
 
 KNOWN BUGS/SIDE EFFECTS/IDEAS:
-		
+
 
 REVISION HISTORY:
 	Name	Date		Description
@@ -598,19 +598,19 @@ VCDisconnect	method dynamic VisClockClass, MSG_VC_DISCONNECT
 		.enter
 	;
 	; Tell the app object to take us off its list.
-	; 
+	;
 		mov	ax, MSG_META_GCN_LIST_REMOVE
 		mov	cx, GAGCNLT_SELF_LOAD_OPTIONS
 		call	VCAddRemoveToFromGCNList
 	;
 	; Tell the application to remove us from the active list.
-	; 
+	;
 		mov	ax, MSG_META_GCN_LIST_REMOVE
 		mov	cx, MGCNLT_ACTIVE_LIST
 		call	VCAddRemoveToFromGCNList
 	;
 	; Now detach ourselves normally.
-	; 
+	;
 		clr	cx
 		mov	dx, cx
 		mov	bp, cx
@@ -634,10 +634,10 @@ RETURN:		nothing
 DESTROYED:	?
 
 PSEUDO CODE/STRATEGY:
-		
+
 
 KNOWN BUGS/SIDE EFFECTS/IDEAS:
-		
+
 
 REVISION HISTORY:
 	Name	Date		Description
@@ -649,25 +649,25 @@ VCVisOpen	method dynamic VisClockClass, MSG_VIS_OPEN
 		.enter
 	;
 	; Let our superclass do its thing, first.
-	; 
+	;
 		mov	di, offset VisClockClass
 		CallSuper	MSG_VIS_OPEN
 	;
 	; Add ourselves to the App object's list of people to notify.
-	; 
+	;
 		mov	ax, MSG_META_GCN_LIST_ADD
 		mov	cx, GAGCNLT_SELF_LOAD_OPTIONS
 		call	VCAddRemoveToFromGCNList
 	;
 	; Make sure we're on the active list.
-	; 
+	;
 		mov	ax, MSG_META_GCN_LIST_ADD
 		mov	cx, MGCNLT_ACTIVE_LIST
 		call	VCAddRemoveToFromGCNList
 	;
 	; Hook into the general-change notification list so we force an update
 	; when someone else changes the time.
-	; 
+	;
 		mov	bx, MANUFACTURER_ID_GEOWORKS
 		mov	ax, GCNSLT_DATE_TIME
 		mov	cx, ds:[LMBH_handle]
@@ -675,7 +675,7 @@ VCVisOpen	method dynamic VisClockClass, MSG_VIS_OPEN
 		call	GCNListAdd
 	;
 	; Now start the timer off
-	; 
+	;
 		call	VCStartTimer
 		.leave
 		ret
@@ -699,10 +699,10 @@ RETURN:		object with visual bounds adjusted properly
 DESTROYED:	ax
 
 PSEUDO CODE/STRATEGY:
-		
+
 
 KNOWN BUGS/SIDE EFFECTS/IDEAS:
-		
+
 
 REVISION HISTORY:
 	Name	Date		Description
@@ -719,7 +719,7 @@ VCFixUpPosition	proc	near
 
 	;
 	; Constrain the fixed position to be on-screen.
-	; 
+	;
 		mov	cx, ds:[di].VCI_fixedPosition.P_x
 		mov	dx, ds:[di].VCI_fixedPosition.P_y
 		cmp	cx, es:[fieldWinWidth]
@@ -742,7 +742,7 @@ fixedYOK:
 	; Now deal with the horizontal, setting the R_left or R_right
 	; bound to match the constrained fixed point and adjusting the
 	; other appropriately.
-	; 
+	;
 		mov	al, ds:[di].VCI_horizJust
 		cmp	al, J_RIGHT
 		je	rightHoriz
@@ -775,7 +775,7 @@ doVert:
 	; Now deal with the vertical, setting the R_top or R_bottom
 	; bound to match the constrained fixed point and adjusting the
 	; other appropriately.
-	; 
+	;
 		mov	al, ds:[di].VCI_vertJust
 		cmp	al, J_BOTTOM
 		je	bottomVert
@@ -824,10 +824,10 @@ RETURN:		bp	= handle of opened window.
 DESTROYED:	ax, cx, dx
 
 PSEUDO CODE/STRATEGY:
-		
+
 
 KNOWN BUGS/SIDE EFFECTS/IDEAS:
-		
+
 
 REVISION HISTORY:
 	Name	Date		Description
@@ -843,38 +843,38 @@ EC <		ERROR_Z	VC_FIELD_WINDOW_NOT_PASSED			>
 	;
 	; Figure the dimensions of our parent window, so we can handle
 	; positioning the window more easily.
-	; 
+	;
 		push	di
 		mov	di, bp
 		call	WinGetWinScreenBounds
 		sub	cx, ax
 		inc	cx
 		mov	es:[fieldWinWidth], cx
-		sub	dx, bx 
+		sub	dx, bx
 		inc	dx
 		mov	es:[fieldWinHeight], dx
 		pop	di
 	;
 	; Now make sure our bounds are appropriate to the fixed position and
 	; justification we've got.
-	; 
+	;
 		call	VCFixUpPosition
 
 		push	si		; save object chunk
 
 	;
 	; Set up stack parameters for WinOpen.
-	; 
+	;
 		clr	ax
 		push	ax		; layer ID (not used)
 
 		call	GeodeGetProcessHandle
 		push	bx		; owner for window (our app, not ui)
 		push	bp		; parent window
-		
+
 	;
 	; set ax:bx to region pointer. ax already 0 from pushing of layer ID.
-	; 
+	;
 		mov	bx, ds:[di].VCI_region
 		tst	bx
 		jz	pushRegionAddr
@@ -885,7 +885,7 @@ pushRegionAddr:
 		push	bx
 	;
 	; Fetch the parameters for the region/corners of the window to open.
-	; 
+	;
 		mov	ax, MSG_VC_GET_REGION_PARAMS
 		call	ObjCallInstanceNoLock
 		push	dx
@@ -894,7 +894,7 @@ pushRegionAddr:
 		push	ax
 	;
 	; Set up the register parameters for WinOpen.
-	; 
+	;
 		mov	ax, MSG_VC_GET_WINDOW_COLOR
 		call	ObjCallInstanceNoLock
 		mov	bx, dx		; bx = color info
@@ -909,10 +909,10 @@ pushRegionAddr:
 		>			; si <- WinPassFlags, only WPF_PRIORITY
 					;  needs to be set for this window...
 		call	WinOpen
-		
+
 	;
 	; Store the window in our instance data.
-	; 
+	;
 		pop	si
 		mov	di, ds:[si]
 		add	di, ds:[di].Vis_offset
@@ -938,10 +938,10 @@ RETURN:		ah	= WinColorFlags
 DESTROYED:	nothing
 
 PSEUDO CODE/STRATEGY:
-		
+
 
 KNOWN BUGS/SIDE EFFECTS/IDEAS:
-		
+
 
 REVISION HISTORY:
 	Name	Date		Description
@@ -953,8 +953,7 @@ VCGetWindowColor method dynamic VisClockClass, MSG_VC_GET_WINDOW_COLOR
 		.enter
 		mov	ax, (WinColorFlags <
 			0,		; WCF_RGB: using color index
-			0,		; WCF_TRANSPARENT: window has
-					;  background color
+			0,		; WCF_TRANSPARENT: window has background color
 			0,		; WCF_PLAIN: window requires exposes
 			0,		; WCF_MASKED
 			0,		; WCF_DRAW_MASK
@@ -969,7 +968,7 @@ VCGetWindowColor method dynamic VisClockClass, MSG_VC_GET_WINDOW_COLOR
 		.leave
 		ret
 VCGetWindowColor endm
-		
+
 
 
 COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -985,10 +984,10 @@ RETURN:		nothing
 DESTROYED:	ax, cx, dx, bp
 
 PSEUDO CODE/STRATEGY:
-		
+
 
 KNOWN BUGS/SIDE EFFECTS/IDEAS:
-		
+
 
 REVISION HISTORY:
 	Name	Date		Description
@@ -1002,30 +1001,30 @@ VCMoveResizeWin	method dynamic VisClockClass, MSG_VIS_MOVE_RESIZE_WIN
 	; Ensure justification is obeyed here. We need to do this to deal
 	; with resizing of the window. The END_SELECT handler will set things
 	; up so the user's desired position is properly obeyed...
-	; 
+	;
 		call	VCFixUpPosition
 	;
 	; Push flag indicating move/resize is absolute
-	; 
+	;
 		mov	ax, mask WPF_ABS
 		push	ax
 	;
 	; Push the window & region handles for later...
-	; 
+	;
 		add	bx, ds:[bx].Vis_offset
 		push	ds:[bx].VCI_window
 		push	ds:[di].VCI_region
-		
+
 		mov	ax, MSG_VC_GET_REGION_PARAMS
 		call	ObjCallInstanceNoLock
 		mov	bx, bp		; bx <- top
-		
+
 		pop	si		; si <- region handle
 		pop	di		; di <- window handle
 
 	;
 	; See if actual region being used and dereference it if so.
-	; 
+	;
 		clr	bp		; assume rectangular
 		tst	si
 		jz	doResize
@@ -1034,7 +1033,7 @@ VCMoveResizeWin	method dynamic VisClockClass, MSG_VIS_MOVE_RESIZE_WIN
 		mov	bp, ds
 doResize:
 		call	WinResize
-		
+
 		.leave
 		ret
 VCMoveResizeWin	endm
@@ -1055,10 +1054,10 @@ RETURN:		ax	= left
 DESTROYED:	nothing
 
 PSEUDO CODE/STRATEGY:
-		
+
 
 KNOWN BUGS/SIDE EFFECTS/IDEAS:
-		
+
 
 REVISION HISTORY:
 	Name	Date		Description
@@ -1089,10 +1088,10 @@ RETURN:		nothing
 DESTROYED:	ax, cx, dx, bp
 
 PSEUDO CODE/STRATEGY:
-		
+
 
 KNOWN BUGS/SIDE EFFECTS/IDEAS:
-		
+
 
 REVISION HISTORY:
 	Name	Date		Description
@@ -1104,22 +1103,22 @@ VCSetInterval	method dynamic VisClockClass, MSG_VC_SET_INTERVAL
 		.enter
 	;
 	; Stop any existing timer.
-	; 
+	;
 		call	VCStopTimer
 	;
 	; Convert seconds to ticks
-	; 
+	;
 		mov	ax, 60
 		mul	cx
 	;
 	; Store the interval away.
-	; 
+	;
 		mov	ds:[di].VCI_interval, ax
 		call	ObjMarkDirty
-		
+
 	;
 	; Start the timer if we've been realized.
-	; 
+	;
 		mov	di, ds:[si]
 		add	di, ds:[di].Vis_offset
 		test	ds:[di].VI_attrs, mask VA_REALIZED
@@ -1145,10 +1144,10 @@ RETURN:		nothing
 DESTROYED:	ax, bx, cx, dx, di
 
 PSEUDO CODE/STRATEGY:
-		
+
 
 KNOWN BUGS/SIDE EFFECTS/IDEAS:
-		
+
 
 REVISION HISTORY:
 	Name	Date		Description
@@ -1162,7 +1161,7 @@ VCStartTimer	proc	far
 	;
 	; Start a continual event timer to send us a MSG_VC_CLOCK_TICK
 	; message at the prescribed interval.
-	; 
+	;
 		mov	di, ds:[si]
 		add	di, ds:[di].VisClock_offset
 		mov	cx, ds:[di].VCI_interval
@@ -1173,7 +1172,7 @@ VCStartTimer	proc	far
 		call	TimerStart
 	;
 	; Store the handle and ID away in our instance data.
-	; 
+	;
 		mov	di, ds:[si]
 		add	di, ds:[di].VisClock_offset
 		mov	ds:[di].VCI_timerID, ax
@@ -1196,10 +1195,10 @@ RETURN:		nothing
 DESTROYED:	ax, bx, di
 
 PSEUDO CODE/STRATEGY:
-		
+
 
 KNOWN BUGS/SIDE EFFECTS/IDEAS:
-		
+
 
 REVISION HISTORY:
 	Name	Date		Description
@@ -1238,11 +1237,11 @@ RETURN:		nothing
 DESTROYED:	ax, cx, dx, bp
 
 PSEUDO CODE/STRATEGY:
-		
+
 
 KNOWN BUGS/SIDE EFFECTS/IDEAS:
 		need to save current position.
-		
+
 
 REVISION HISTORY:
 	Name	Date		Description
@@ -1254,11 +1253,11 @@ VCVisClose	method dynamic VisClockClass, MSG_VIS_CLOSE
 		.enter
 	;
 	; Stop any timer first
-	; 
+	;
 		call	VCStopTimer
 	;
 	; Remove ourselves from the general-change notification list.
-	; 
+	;
 		mov	bx, MANUFACTURER_ID_GEOWORKS
 		mov	ax, GCNSLT_DATE_TIME
 		mov	cx, ds:[LMBH_handle]
@@ -1266,7 +1265,7 @@ VCVisClose	method dynamic VisClockClass, MSG_VIS_CLOSE
 		call	GCNListRemove
 	;
 	; Then give our superclass a shot at the message.
-	; 
+	;
 		mov	ax, MSG_VIS_CLOSE
 		mov	di, offset VisClockClass
 		CallSuper	MSG_VIS_CLOSE
@@ -1288,10 +1287,10 @@ RETURN:		nothing
 DESTROYED:	anything
 
 PSEUDO CODE/STRATEGY:
-		
+
 
 KNOWN BUGS/SIDE EFFECTS/IDEAS:
-		
+
 
 REVISION HISTORY:
 	Name	Date		Description
@@ -1303,15 +1302,15 @@ VCClockTick	method dynamic VisClockClass, MSG_VC_CLOCK_TICK
 		.enter
 	;
 	; Create a gstate for drawing the beast.
-	; 
+	;
 		mov	ax, MSG_VIS_VUP_CREATE_GSTATE
 		call	ObjCallInstanceNoLock
-		
+
 		tst	bp		; any come back?
 		jz	done		; no => don't draw
 	;
 	; Call MSG_VIS_DRAW on ourselves...
-	; 
+	;
 		clr	cl		; XXX: what about DF_DISPLAY_TYPE?
 					;  doesn't seem to be set on
 					;  MSG_META_EXPOSED, so...
@@ -1321,7 +1320,7 @@ VCClockTick	method dynamic VisClockClass, MSG_VC_CLOCK_TICK
 		call	ObjCallInstanceNoLock
 	;
 	; Nuke the gstate.
-	; 
+	;
 		pop	di
 		call	GrDestroyState
 done:
@@ -1343,10 +1342,10 @@ RETURN:		nothing
 DESTROYED:	?
 
 PSEUDO CODE/STRATEGY:
-		
+
 
 KNOWN BUGS/SIDE EFFECTS/IDEAS:
-		
+
 
 REVISION HISTORY:
 	Name	Date		Description
@@ -1358,7 +1357,7 @@ VCNotifyDateTimeChange method dynamic VisClockClass, MSG_NOTIFY_DATE_TIME_CHANGE
 		.enter
 	;
 	; Pretend the timer just fired and update the display.
-	; 
+	;
 		mov	ax, MSG_VC_CLOCK_TICK
 		call	ObjCallInstanceNoLock
 
@@ -1376,7 +1375,7 @@ SYNOPSIS:	Grab the mouse when the user clicks in our window.
 
 CALLED BY:	MSG_META_START_SELECT
 PASS:		*ds:si	= object
-		cx	= ptr X position 
+		cx	= ptr X position
 		dx	= ptr Y position
 		bp.low	= ButtonInfo
 		bp.high	= UIFunctionsActive
@@ -1384,10 +1383,10 @@ RETURN:		ax	= MouseReturnFlags
 DESTROYED:	nothing
 
 PSEUDO CODE/STRATEGY:
-		
+
 
 KNOWN BUGS/SIDE EFFECTS/IDEAS:
-		
+
 
 REVISION HISTORY:
 	Name	Date		Description
@@ -1404,7 +1403,7 @@ VCStartSelect	method dynamic VisClockClass, MSG_META_START_SELECT,
 	; us to start moving the clock) and grab the mouse. We don't much care
 	; for pointer events, so leave it in the default state of not sending
 	; them...
-	; 
+	;
 		andnf	ds:[di].VCI_flags, not mask VCF_MOVING
 		mov	ds:[di].VCI_clickPoint.P_x, cx
 		mov	ds:[di].VCI_clickPoint.P_y, dx
@@ -1437,10 +1436,10 @@ RETURN:		ax	= MouseReturnFlags
 DESTROYED:	cx, dx, bp
 
 PSEUDO CODE/STRATEGY:
-		
+
 
 KNOWN BUGS/SIDE EFFECTS/IDEAS:
-		
+
 
 REVISION HISTORY:
 	Name	Date		Description
@@ -1458,7 +1457,7 @@ VCEndSelect	method dynamic VisClockClass, MSG_META_END_SELECT,
 	; Bring our application to the top, in case it wasn't there before.
 	; This will also bring the primary up if it's been banished.
 	; YYY: STILL TRUE?
-	; 
+	;
 		mov	ax, MSG_META_NOTIFY_TASK_SELECTED
 		call	GenCallApplication
 
@@ -1472,12 +1471,12 @@ done:
 endMove:
 	;
 	; Flag no longer moving.
-	; 
+	;
 		andnf	ds:[di].VCI_flags, not mask VCF_MOVING
 
 	;
 	; Call the IM to stop the xor.
-	; 
+	;
 		push	cx, dx, di
 		call	ImStopMoveResize	; XXX: returns (left,top) in
 						; (cx,dx)... perhaps we should
@@ -1485,7 +1484,7 @@ endMove:
 	;
 	; Free the region block, now we know the thing isn't being used by the
 	; video driver.
-	; 
+	;
 		clr	bx
 		xchg	bx, ds:[di].VCI_regionCopy
 		tst	bx
@@ -1495,33 +1494,33 @@ xorStopped:
 		pop	cx, dx, di
 	;
 	; Figure difference from start to now.
-	; 
+	;
 		sub	cx, ds:[di].VCI_clickPoint.P_x
 		sub	dx, ds:[di].VCI_clickPoint.P_y
 	;
 	; Add current (left,top) to that.
-	; 
+	;
 		mov	bx, ds:[si]
 		add	bx, ds:[bx].Vis_offset
 		add	cx, ds:[bx].VI_bounds.R_left
 		add	dx, ds:[bx].VI_bounds.R_top
 	;
 	; Move there, bub.
-	; 
+	;
 		mov	ax, MSG_VIS_POSITION_BRANCH
 		call	ObjCallInstanceNoLock
 	;
 	; Now figure appropriate justification and fixed position.
-	; 
+	;
 		mov	bx, ds:[si]
 		mov	di, bx
 		add	bx, ds:[bx].Vis_offset
 		add	di, ds:[di].VisClock_offset
-		
+
 	;
 	; If horizontal is more than 1/2 screen distance, set right
 	; justification
-	; 
+	;
 		mov	ax, es:[fieldWinWidth]
 		shr	ax
 		cmp	ds:[bx].VI_bounds.R_right, ax
@@ -1536,7 +1535,7 @@ setFixedX:
 		mov	ds:[di].VCI_fixedPosition.P_x, ax
 	;
 	; Ditto for the vertical.
-	; 
+	;
 		mov	ax, es:[fieldWinHeight]
 		shr	ax
 		cmp	ds:[bx].VI_bounds.R_bottom, ax
@@ -1551,11 +1550,11 @@ setFixedY:
 		mov	ds:[di].VCI_fixedPosition.P_y, ax
 	;
 	; Mark ourselves dirty so the new position goes to state.
-	; 
+	;
 		call	ObjMarkDirty
 	;
 	; Notify the application of our status.
-	; 
+	;
 		mov	cx, ds:[di].VCI_fixedPosition.P_x
 		mov	dx, ax
 		mov	bp, {word}ds:[di].VCI_horizJust
@@ -1563,7 +1562,7 @@ setFixedY:
 		call	GenCallApplication
 	;
 	; Geez. You'd think MSG_VIS_SET_POSITION would move the window, wouldn't you?
-	; 
+	;
 		mov	ax, MSG_VIS_MOVE_RESIZE_WIN
 		call	ObjCallInstanceNoLock
 
@@ -1581,14 +1580,14 @@ CALLED BY:	MSG_META_DRAG_SELECT
 PASS:		*ds:si	= VisClock object
 		cx	= ptr X position (window coords)
 		dx	= ptr Y position (window coords)
-RETURN:		
-DESTROYED:	
+RETURN:
+DESTROYED:
 
 PSEUDO CODE/STRATEGY:
-		
+
 
 KNOWN BUGS/SIDE EFFECTS/IDEAS:
-		
+
 
 REVISION HISTORY:
 	Name	Date		Description
@@ -1601,22 +1600,22 @@ VCDragSelect	method dynamic VisClockClass, MSG_META_DRAG_SELECT,
 		.enter
 	;
 	; Set flag to indicate move in progress.
-	; 
+	;
 		ornf	ds:[di].VCI_flags, mask VCF_MOVING
 	;
 	; Pass ptr position to ImStartMoveResize.
-	; 
+	;
 		push	ds:[di].VCI_clickPoint.P_x,
 			ds:[di].VCI_clickPoint.P_y
 	;
 	; Duplicate the region, since it might move and ImStartMoveResize needs
 	; ^hbx:ax...
-	; 
+	;
 		mov	bx, ds:[di].VCI_region
 		mov	ax, bx		; assume no region
 		tst	bx
 		LONG jz	allocRectRegion
-		
+
 		ChunkSizeHandle	ds, bx, ax	; ax <- # bytes to alloc
 		mov	cx, ALLOC_DYNAMIC_LOCK or mask HF_SHARABLE
 		push	ax
@@ -1633,7 +1632,7 @@ VCDragSelect	method dynamic VisClockClass, MSG_META_DRAG_SELECT,
 		pop	si
 	;
 	; Set bounding box of region.
-	; 
+	;
 		mov	es:[R_left], cx
 		mov	es:[R_top], cx
 		call	VisGetSize
@@ -1659,7 +1658,7 @@ haveRegion:
 	; Adjust them to be window-relative. Do not use vis bounds, as those
 	; could well not correspond to the origin of the window, if the region
 	; we gave WinResize had a non-zero left- or top-edge minimum.
-	; 
+	;
 		call	VisQueryWindow	; di <- window handle
 		push	ax, bx, cx, dx
 		call	WinGetWinScreenBounds
@@ -1677,13 +1676,13 @@ haveRegion:
 		add	di, ds:[di].Vis_offset
 	;
 	; Get the window and set the action that ends the move.
-	; 
+	;
 		mov	di, ds:[di].VCI_window
 		mov	si, mask XF_END_MATCH_ACTION
 		andnf	bp, mask BI_BUTTON
 	;
 	; Finally...start the move.
-	; 
+	;
 		call	ImStartMoveResize
 
 		mov	ax, mask MRF_PROCESSED
@@ -1695,7 +1694,7 @@ allocRectRegion:
 	; Input manager is hosed as far as rubber-banding a rectangle is
 	; concerned, so allocate a rectangular region + bounding box
 	; ourselves.
-	; 
+	;
 		mov	ax, size RectRegion + size Rectangle
 		mov	cx, ALLOC_DYNAMIC_LOCK or mask HF_SHARABLE
 		call	MemAlloc
@@ -1711,7 +1710,7 @@ allocRectRegion:
 		mov	es:[size Rectangle].RR_x2, PARAM_2
 		mov	es:[size Rectangle].RR_eo2, EOREGREC
 		mov	es:[size Rectangle].RR_eo3, EOREGREC
-		jmp	haveRegion		
+		jmp	haveRegion
 VCDragSelect	endm
 
 
@@ -1735,10 +1734,10 @@ RETURN:		nothing
 DESTROYED:	ax, cx, dx, bp
 
 PSEUDO CODE/STRATEGY:
-		
+
 
 KNOWN BUGS/SIDE EFFECTS/IDEAS:
-		
+
 
 REVISION HISTORY:
 	Name	Date		Description
@@ -1750,18 +1749,18 @@ VCSetFixedPosition method dynamic VisClockClass, MSG_VC_SET_FIXED_POSITION
 		.enter
 	;
 	; Set the new position and justification.
-	; 
+	;
 		mov	ds:[di].VCI_fixedPosition.P_x, cx
 		mov	ds:[di].VCI_fixedPosition.P_y, dx
 		CheckHack <offset VCI_vertJust eq offset VCI_horizJust+1>
 		mov	{word}ds:[di].VCI_horizJust, bp
 	;
 	; Mark ourselves dirty so the new position gets saved to state.
-	; 
+	;
 		call	ObjMarkDirty
 	;
 	; And tell ourselves to move it there, if we're realized...
-	; 
+	;
 		add	bx, ds:[bx].Vis_offset
 		test	ds:[bx].VI_attrs, mask VA_REALIZED
 		jz	done
@@ -1787,10 +1786,10 @@ RETURN:		nothing
 DESTROYED:	anything
 
 PSEUDO CODE/STRATEGY:
-		
+
 
 KNOWN BUGS/SIDE EFFECTS/IDEAS:
-		
+
 
 REVISION HISTORY:
 	Name	Date		Description
@@ -1805,16 +1804,16 @@ VCSaveOptions	method dynamic VisClockClass, MSG_META_SAVE_OPTIONS
 		.enter
 	;
 	; If no category defined, can't save things.
-	; 
+	;
 		mov	si, ds:[di].VCI_category
 		tst	si
 		jz	done
 	;
 	; If no color array defined, can't save things.
-	; 
+	;
 		tst	ds:[di].VCI_colorsPtr
 		jz	done
-		
+
 		mov	si, ds:[si]
 		mov	cx, cs
 		mov	dx, offset colorsString
@@ -1846,10 +1845,10 @@ RETURN:		nothing
 DESTROYED:	anything
 
 PSEUDO CODE/STRATEGY:
-		
+
 
 KNOWN BUGS/SIDE EFFECTS/IDEAS:
-		
+
 
 REVISION HISTORY:
 	Name	Date		Description
@@ -1873,12 +1872,12 @@ VCRestoreOptions method dynamic VisClockClass, MSG_META_LOAD_OPTIONS
 		jz	updateOnly
 	;
 	; If no color array defined, then nothing to restore.
-	; 
+	;
 		tst	ds:[di].VCI_colorsPtr
 		jz	checkOptionTree
 	;
 	; Else fetch our color table from the ini file, if it's there.
-	; 
+	;
 		push	si
 		mov	si, ds:[bx]
 		mov	cx, cs
@@ -1892,10 +1891,10 @@ VCRestoreOptions method dynamic VisClockClass, MSG_META_LOAD_OPTIONS
 		call	InitFileReadData
 		pop	si
 		jc	update		; => not there, just update
-		
+
 	;
 	; Mark our image invalid so we get redrawn with the new color set.
-	; 
+	;
 		mov	cx, mask VOF_IMAGE_INVALID
 		mov	dl, VUM_DELAYED_VIA_UI_QUEUE
 		call	VisClockMarkInvalid
@@ -1903,12 +1902,12 @@ update:
 	;
 	; "Set" our selected part to what we've got already so the color
 	; list is set correctly.
-	; 
+	;
 		call	updateColor
 checkOptionTree:
 	;
 	; Propagate LOAD_OPTIONS to option tree, if we've got one.
-	; 
+	;
 		tst	ds:[di].VCI_optionTree.handle
 		jz	done
 		movdw	bxsi, ds:[di].VCI_optionTree
@@ -1931,7 +1930,7 @@ updateColor	label	near
 		mov	ax, MSG_VC_SET_PART
 		call	ObjCallInstanceNoLock
 		retn
-	
+
 VCRestoreOptions endm
 
 
@@ -1951,10 +1950,10 @@ RETURN:		nothing
 DESTROYED:	nothing
 
 PSEUDO CODE/STRATEGY:
-		
+
 
 KNOWN BUGS/SIDE EFFECTS/IDEAS:
-		
+
 
 REVISION HISTORY:
 	Name	Date		Description
@@ -1970,9 +1969,9 @@ EC <		ERROR_AE	VIS_CLOCK_PART_OUT_OF_BOUNDS		>
 
 	;
 	; Now set the color list appropriately.
-	; 
+	;
 		mov	bx, ds:[di].VCI_colorList.handle
-		mov	si, ds:[di].VCI_colorList.chunk	
+		mov	si, ds:[di].VCI_colorList.chunk
 		tst	bx				; built yet?
 		jz	colorListSet			; no
 
@@ -2007,10 +2006,10 @@ RETURN:		nothing
 DESTROYED:	?
 
 PSEUDO CODE/STRATEGY:
-		
+
 
 KNOWN BUGS/SIDE EFFECTS/IDEAS:
-		
+
 
 REVISION HISTORY:
 	Name	Date		Description
@@ -2024,7 +2023,7 @@ EC <		tst	ds:[di].VCI_colorsPtr				>
 EC <		ERROR_Z	VIS_CLOCK_CANNOT_SET_COLOR_IF_NO_COLOR_ARRAY_DEFINED>
 	;
 	; Store the color away...
-	; 
+	;
    		mov	bx, ds:[di].VCI_selectedPart
 		add	di, ds:[di].VCI_colorsPtr
 			CheckHack <size ColorQuad eq 4>
@@ -2033,7 +2032,7 @@ EC <		ERROR_Z	VIS_CLOCK_CANNOT_SET_COLOR_IF_NO_COLOR_ARRAY_DEFINED>
 		movdw	({dword}ds:[di][bx]), dxcx
 	;
 	; And mark the whole image invalid, so it all gets redrawn.
-	; 
+	;
 		mov	cx, mask VOF_IMAGE_INVALID
 		mov	dl, VUM_NOW
 		call	VisClockMarkInvalid
@@ -2057,10 +2056,10 @@ RETURN:		carry set on error
 DESTROYED:	anything
 
 PSEUDO CODE/STRATEGY:
-		
+
 
 KNOWN BUGS/SIDE EFFECTS/IDEAS:
-		
+
 
 REVISION HISTORY:
 	Name	Date		Description
@@ -2072,7 +2071,7 @@ VCRelocOrUnReloc method dynamic VisClockClass, reloc
 	;
 	; If unrelocating, set the VCF_RESTORED flag so we know not to
 	; load options when the app is restored from state.
-	; 
+	;
 		cmp	ax, MSG_META_RELOCATE
 		je	done
 		ornf	ds:[di].VCI_flags, mask VCF_RESTORED
@@ -2095,10 +2094,10 @@ PASS:		*ds:si	= VisClock object
 		dl	= VisUpdateMode
 RETURN:		nothing
 DESTROYED:	ax, cx, dx, bp, di
-SIDE EFFECTS:	
+SIDE EFFECTS:
 
 PSEUDO CODE/STRATEGY:
-		
+
 
 REVISION HISTORY:
 	Name	Date		Description

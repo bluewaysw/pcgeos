@@ -3,7 +3,7 @@ COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 	Copyright (c) GeoWorks 1992 -- All Rights Reserved
 
 PROJECT:	PC GEOS
-MODULE:		
+MODULE:
 FILE:		visSkeletonClock.asm
 
 AUTHOR:		Adam de Boor, Mar  7, 1992
@@ -12,7 +12,7 @@ ROUTINES:
 	Name			Description
 	----			-----------
 
-	
+
 REVISION HISTORY:
 	Name	Date		Description
 	----	----		-----------
@@ -21,7 +21,7 @@ REVISION HISTORY:
 
 DESCRIPTION:
 	Implementation of a skeleton digital clock.
-		
+
 
 	$Id: visSkeletonClock.asm,v 1.1 97/04/04 14:50:24 newdeal Exp $
 
@@ -33,7 +33,7 @@ include	clock.def
 include	Internal/window.def
 include Internal/grWinInt.def
 include Objects/winC.def
-	
+
 idata	segment
 	VisSkeletonClockClass
 
@@ -55,10 +55,10 @@ RETURN:		?
 DESTROYED:	?
 
 PSEUDO CODE/STRATEGY:
-		
+
 
 KNOWN BUGS/SIDE EFFECTS/IDEAS:
-		
+
 
 REVISION HISTORY:
 	Name	Date		Description
@@ -66,14 +66,14 @@ REVISION HISTORY:
 	ardeb	3/ 7/92		Initial version
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
-VSCCalcWindowRegion method dynamic VisSkeletonClockClass, 
+VSCCalcWindowRegion method dynamic VisSkeletonClockClass,
 		    		MSG_VIS_MOVE_RESIZE_WIN,
 				MSG_VIS_OPEN_WIN
 		uses	ax, cx, dx, bp
 		.enter
 	;
 	; Free the current region.
-	; 
+	;
 		mov	ax, ds:[di].VCI_region
 		tst	ax
 		jz	oldRegionFreed
@@ -82,7 +82,7 @@ oldRegionFreed:
 	;
 	; Make sure the text always shows up, even if C_BLACK is chosen,
 	; by forcing the text color to be C_WHITE for the duration.
-	; 
+	;
 		push	{word}ds:[di].VDCI_colors[VDCC_TEXT*ColorQuad]
 		CheckHack <CF_INDEX eq 0 and CQ_info eq 1 and \
 				CQ_redOrIndex eq 0>
@@ -90,14 +90,14 @@ oldRegionFreed:
 				C_WHITE
 	;
 	; Start the definition of a new one.
-	; 
+	;
 		call	VisGetSize
 		call	CRCreate
 		push	bx		; save token for destruction
 	;
 	; Set default attributes for the gstate, most notably to map
 	; colors to solid.
-	; 
+	;
 		mov	ax, ColorMapMode <
 			1,			; CMM_ON_BLACK: yup
 			CMT_CLOSEST		; CMM_MAP_TYPE
@@ -107,7 +107,7 @@ oldRegionFreed:
 		call	GrSetTextColorMap
 	;
 	; Call our superclass to draw itself with the gstate we've got.
-	; 
+	;
 		mov	bp, di			; bp <- gstate
 		mov	ax, MSG_VIS_DRAW
 		mov	di, offset VisSkeletonClockClass
@@ -117,12 +117,12 @@ oldRegionFreed:
 		pop	di
 	;
 	; Convert the result into a region.
-	; 
+	;
 		mov	ax, mask CRCM_PARAMETERIZE
 		call	CRConvert
 	;
 	; Destroy the ClockRegion stuff.
-	; 
+	;
 		pop	bx		; bx <- token for CRDestroy
 		push	ax		; save region chunk
 		call	CRDestroy
@@ -132,12 +132,12 @@ oldRegionFreed:
 		mov	ds:[di].VCI_region, ax
 	;
 	; Restore text color.
-	; 
+	;
 		pop	{word}ds:[di].VDCI_colors[VDCC_TEXT*ColorQuad]
 		.leave
 	;
 	; Call the superclass, now the region has been established.
-	; 
+	;
 		mov	di, offset VisSkeletonClockClass
 		GOTO	ObjCallSuperNoLock
 VSCCalcWindowRegion endm
@@ -160,10 +160,10 @@ RETURN:		ah	= WinColorFlags
 DESTROYED:	nothing
 
 PSEUDO CODE/STRATEGY:
-		
+
 
 KNOWN BUGS/SIDE EFFECTS/IDEAS:
-		
+
 
 REVISION HISTORY:
 	Name	Date		Description
@@ -176,19 +176,16 @@ VSCGetWindowColor method dynamic VisSkeletonClockClass,
 		.enter
 		mov	ah, WinColorFlags <
 			0,		; WCF_RGB: using color index
-			0,		; WCF_TRANSPARENT: window has
-					;  background color
-			1,		; WCF_PLAIN: window doesn't require
-					;  exposes
+			0,		; WCF_TRANSPARENT: window has background color
+			1,		; WCF_PLAIN: window doesn't require exposes
+			0,		; WCF_MASKED: internal
+			0,		; WCF_DRAW_MASK: internal
 			ColorMapMode <	; WCF_MAP_MODE
-				0,		; CMM_ON_BLACK: black is seldom
-						;  our background color.
-				CMT_CLOSEST	; CM_MAP_TO_MONO: map to
-						;  solid, never pattern or
-						;  dither, please.
+				0,		; CMM_ON_BLACK: black is seldom our background color.
+				CMT_CLOSEST	; CM_MAP_TYPE
 			>
 		>
-		mov	al, 
+		mov	al,
 			ds:[di].VDCI_colors[VDCC_TEXT*ColorQuad].CQ_redOrIndex
 		cmp	ds:[di].VDCI_colors[VDCC_TEXT*ColorQuad].CQ_info,
 				CF_INDEX
@@ -227,10 +224,10 @@ RETURN:		nothing
 DESTROYED:	?
 
 PSEUDO CODE/STRATEGY:
-		
+
 
 KNOWN BUGS/SIDE EFFECTS/IDEAS:
-		
+
 
 REVISION HISTORY:
 	Name	Date		Description
@@ -247,7 +244,7 @@ VSCClockTick	method dynamic VisSkeletonClockClass, MSG_VC_CLOCK_TICK
 	; window will cause the screen to unsave (as a MSG_META_WIN_CHANGE will
 	; be sent out), and in the latter case, there's no need to waste
 	; the energy.
-	; 
+	;
 		call	VisQueryWindow
 		tst	di
 		jz	done
@@ -268,7 +265,7 @@ VSCClockTick	method dynamic VisSkeletonClockClass, MSG_VC_CLOCK_TICK
 	;
 	; Just send a MOVE_RESIZE_WIN message to ourselves. This will use the
 	; current time to set the window's region properly.
-	; 
+	;
 		mov	ax, MSG_VIS_MOVE_RESIZE_WIN
 		call	ObjCallInstanceNoLock
 done:
@@ -283,7 +280,7 @@ ensureExposures:
 	; ourselves and change the window to not be plain, so we get a
 	; MSG_META_EXPOSED when the screen is unsaved, the user re-enters our
 	; field, whatever, and can update the display immediately.
-	; 
+	;
 		mov	ax, MSG_VC_GET_WINDOW_COLOR
 		push	bx
 		call	ObjCallInstanceNoLock
@@ -313,10 +310,10 @@ RETURN:		nothing
 DESTROYED:	?
 
 PSEUDO CODE/STRATEGY:
-		
+
 
 KNOWN BUGS/SIDE EFFECTS/IDEAS:
-		
+
 
 REVISION HISTORY:
 	Name	Date		Description
@@ -328,7 +325,7 @@ VSCExposed	method dynamic VisSkeletonClockClass, MSG_META_EXPOSED
 		.enter
 	;
 	; Get the actual color flags for the window.
-	; 
+	;
 		push	cx
 		mov	ax, MSG_VC_GET_WINDOW_COLOR
 		call	ObjCallInstanceNoLock
@@ -336,21 +333,21 @@ VSCExposed	method dynamic VisSkeletonClockClass, MSG_META_EXPOSED
 		mov	bx, dx			; bx = green/blue
 	;
 	; And set them.
-	; 
+	;
 		push	si
 		mov	si, WIT_COLOR
 		call	WinSetInfo
 		pop	si
 	;
 	; Clear the inval region.
-	; 
+	;
 		call	GrCreateState
 		call	GrBeginUpdate
 		call	GrEndUpdate
 		call	GrDestroyState
 	;
 	; And change our region to correspond to the current time.
-	; 
+	;
 		mov	ax, MSG_VIS_MOVE_RESIZE_WIN
 		call	ObjCallInstanceNoLock
 		.leave
@@ -372,10 +369,10 @@ RETURN:		nothing
 DESTROYED:	?
 
 PSEUDO CODE/STRATEGY:
-		
+
 
 KNOWN BUGS/SIDE EFFECTS/IDEAS:
-		
+
 
 REVISION HISTORY:
 	Name	Date		Description
@@ -394,18 +391,18 @@ VSCSetPartColor method dynamic VisSkeletonClockClass, MSG_META_COLORED_OBJECT_SE
 	;
 	; Form arguments for WinSetInfo using the new text color as the
 	; background color of the window.
-	; 
+	;
 if PZ_PCGEOS
 		mov	ah, WinColorFlags <
 			0,		; WCF_RGB: using color index
-			0,		; WCF_TRANSPARENT: window has
-					;  background color
-			1,		; WCF_PLAIN: window doesn't require
-					;  exposes
+			0,		; WCF_TRANSPARENT: window has background color
+			1,		; WCF_PLAIN: window doesn't require exposes
+			0,		; WCF_MASKED: internal
+			0,		; WCF_DRAW_MASK: internal
 			ColorMapMode <	; WCF_MAP_MODE
 				0,		; CMM_ON_BLACK: so solids
 						;  will be visible in mono
-				CMT_DITHER	;  map to dither so that 
+				CMT_DITHER	;  map to dither so that
 						;  it will be easier to
 						;  see in monochrome.
 			>
@@ -413,16 +410,14 @@ if PZ_PCGEOS
 else
 		mov	ah, WinColorFlags <
 			0,		; WCF_RGB: using color index
-			0,		; WCF_TRANSPARENT: window has
-					;  background color
-			1,		; WCF_PLAIN: window doesn't require
-					;  exposes
+			0,		; WCF_TRANSPARENT: window has background color
+			1,		; WCF_PLAIN: window doesn't require exposes
+			0,		; WCF_MASKED: internal
+			0,		; WCF_DRAW_MASK: internal
 			ColorMapMode <	; WCF_MAP_MODE
 				0,		; CMM_ON_BLACK: black is seldom
-						;  our background color.
-				CMT_CLOSEST	; CM_MAP_TO_MONO: map to
-						;  solid, never pattern or
-						;  dither, please.
+						; our background color.
+				CMT_CLOSEST	; CM_MAP_TYPE
 			>
 		>
 endif
@@ -447,7 +442,7 @@ setWinColor:
 	;
 	; Pass the message up to our superclass to actually store the
 	; color and invalidate the window.
-	; 
+	;
 		mov	ax, MSG_META_COLORED_OBJECT_SET_COLOR
 		pop	cx
 passItUp:
