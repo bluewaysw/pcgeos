@@ -427,7 +427,7 @@ extern TEngine_Instance engineInstance;
 
   static Bool _near  End_Profile( RAS_ARG )
   {
-    Long      h;
+    Short     h;
     PProfile  oldProfile;
 
 
