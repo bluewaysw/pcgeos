@@ -4,41 +4,51 @@
 # If you edit it, you will lose your changes, should it be regenerated.
 #
 GEODE           = bbxbrow
-JS              = browser.goc sebrowse.goc
-URLFRAME        = FRFETCH.goc URLFRAME.goc
-URLTEXT         = URLTEXT2.goc URLTEXT.goc
 ASMTOOLS        = asmtoolsManager.asm
-INIT            = EXPIRE.goc INIT.goc expireui.goh
-URLFETCH        = URLFETCH.goc
-URLDOCCT        = URLDOCCT.goc
-NAVIGATE        = NAVIGATE.goc FAVORCLS.goc FAVORITE.goc BOOKMARK.goc\
-                  NAVCACHE.goc BOOKCLAS.goc
+HTMLVIEW        = AWATCHER.goc GLBANIM.goc ImportG.goc LoadURL.goc\
+                  scrapbk.goc StatText.goc UIOften.goc HTMLVIEW.goc\
+                  OpenClos.goc UIAction.goc UIRare.goc
+INIT            = INIT.goc
+JS              = browser.goc sebrowse.goc
+NAVIGATE        = BOOKCLAS.goc FAVORCLS.goc FAVORITE.goc NAVCACHE.goc\
+                  BOOKMARK.goc NAVIGATE.goc
 URLDOC          = LOCALPAG.goc URLDOC.goc
-HTMLVIEW        = scrapbk.goc StatText.goc UIRare.goc GLBANIM.goc\
-                  AWATCHER.goc HTMLVIEW.goc ImportG.goc UIAction.goc\
-                  LoadURL.goc OpenClos.goc UIOften.goc
+URLDOCCT        = URLDOCCT.goc
+URLFETCH        = URLFETCH.goc
+URLFRAME        = FRFETCH.goc URLFRAME.goc
+URLTEXT         = URLTEXT.goc URLTEXT2.goc
 UI_TO_RDFS      =
-OBJS            = browser.obj sebrowse.obj FRFETCH.obj URLFRAME.obj\
-                  URLTEXT2.obj URLTEXT.obj EXPIRE.obj INIT.obj URLFETCH.obj\
-                  URLDOCCT.obj NAVIGATE.obj FAVORCLS.obj FAVORITE.obj\
-                  BOOKMARK.obj NAVCACHE.obj BOOKCLAS.obj LOCALPAG.obj\
-                  URLDOC.obj scrapbk.obj StatText.obj UIRare.obj\
-                  GLBANIM.obj AWATCHER.obj HTMLVIEW.obj ImportG.obj\
-                  UIAction.obj LoadURL.obj OpenClos.obj UIOften.obj
-COMMON          = expire.goh htmlview.goh htmlv_ui.goh javascr.h\
-                  favorite.goh stattext.goh options.goh bookclas.goh\
-                  urlfetch.goh favorcls.goh prodgpc.goh bookui.goh\
-                  prodndo.goh glbanim.goh localui.goh favorui.goh\
-                  sebrowse.h bookmark.goh importg.goh
+OBJS            = AWATCHER.obj GLBANIM.obj ImportG.obj LoadURL.obj\
+                  scrapbk.obj StatText.obj UIOften.obj HTMLVIEW.obj\
+                  OpenClos.obj UIAction.obj UIRare.obj INIT.obj browser.obj\
+                  sebrowse.obj BOOKCLAS.obj FAVORCLS.obj FAVORITE.obj\
+                  NAVCACHE.obj BOOKMARK.obj NAVIGATE.obj LOCALPAG.obj\
+                  URLDOC.obj URLDOCCT.obj URLFETCH.obj FRFETCH.obj\
+                  URLFRAME.obj URLTEXT.obj URLTEXT2.obj
+COMMON          = bookclas.goh bookmark.goh bookui.goh favorcls.goh\
+                  favorite.goh glbanim.goh javascr.h prodndo.goh sebrowse.h\
+                  stattext.goh urlfetch.goh favorui.goh\
+                  htmlv_ui_dlg_dwnl.goh htmlv_ui_men_autobrowse.goh\
+                  htmlv_ui_men_history.goh htmlv_ui_men_html.goh\
+                  htmlv_ui_men_js.goh htmlv_ui_men_kidguard.goh\
+                  htmlv_ui_men_nav.goh htmlv_ui_men_search.goh\
+                  htmlv_ui_toolb_big.goh htmlv_ui_toolb_small.goh\
+                  localui.goh htmlv_ui_dlg_kidguard.goh\
+                  htmlv_ui_main_wrapper.goh htmlv_ui_url.goh importg.goh\
+                  prodgpc.goh htmlv_ui_status_indctrs.goh\
+                  htmlv_ui_men_edit.goh htmlv_ui.goh\
+                  htmlv_ui_men_options.goh htmlv_ui_men_view.goh\
+                  htmlv_ui_toolb_simple.goh htmlview.goh prodbbx.goh\
+                  htmlv_ui_men_file.goh options.goh
 MODULES         = ASMTOOLS
-CMODULES        = js urlframe urltext init urlfetch urldocct navigate\
-                  urldoc htmlview
-SRCS            = $(JS) $(URLFRAME) $(URLTEXT) $(ASMTOOLS) $(INIT)\
-                  $(URLFETCH) $(URLDOCCT) $(NAVIGATE) $(URLDOC) $(HTMLVIEW)\
+CMODULES        = htmlview init js navigate urldoc urldocct urlfetch\
+                  urlframe urltext
+SRCS            = $(ASMTOOLS) $(HTMLVIEW) $(INIT) $(JS) $(NAVIGATE)\
+                  $(URLDOC) $(URLDOCCT) $(URLFETCH) $(URLFRAME) $(URLTEXT)\
                   $(COMMON)
 LOBJS           =
 
-PRODUCTS        = 
+PRODUCTS        = AB JSAB 
 
 SYSMAKEFILE     = geode.mk
 
