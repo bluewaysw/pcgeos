@@ -95,7 +95,7 @@ extern "C" {
   /* Render one glyph in the target bitmap, using drop-out control */
   /* mode 'scan'.                                                  */
   LOCAL_DEF
-  TT_Error  Render_Glyph( RAS_ARGS TT_Outline*     glyph,
+  TT_Error  Render_Bitmap_Glyph( RAS_ARGS TT_Outline*     glyph,
                                    TT_Raster_Map*  target );
 
 #ifdef TT_CONFIG_OPTION_GRAY_SCALING
@@ -119,11 +119,11 @@ extern "C" {
 
   /* Initialize rasterizer */
   LOCAL_DEF
-  TT_Error  TTRaster_Init( PEngine_Instance  engine );
+  TT_Error  TTRaster_Init( );
 
   /* Finalize it */
   LOCAL_DEF
-  TT_Error  TTRaster_Done( PEngine_Instance  engine );
+  TT_Error  TTRaster_Done( );
 
 
 #ifdef __cplusplus

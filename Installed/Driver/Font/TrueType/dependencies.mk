@@ -74,7 +74,9 @@ ttadapter.eobj: Adapter/ttadapter.h geos.h ec.h fontID.h file.h graphics.h \
                 Adapter/../FreeType/ttconfig.h \
                 Adapter/../FreeType/ft_conf.h resource.h heap.h lmem.h \
                 Ansi/stdlib.h Adapter/../FreeType/ttcalc.h \
+                Adapter/ttcharmapper.h FreeType/freetype.h \
                 FreeType/ttcmap.h FreeType/ttconfig.h FreeType/tttypes.h \
+                FreeType/tttags.h FreeType/ttmemory.h Ansi/string.h \
                 geode.h
 ttwidths.obj \
 ttwidths.eobj: geos.h ec.h unicode.h graphics.h fontID.h font.h color.h \
@@ -89,7 +91,7 @@ ttwidths.eobj: geos.h ec.h unicode.h graphics.h fontID.h font.h color.h \
                 Adapter/ttcharmapper.h FreeType/freetype.h \
                 FreeType/ttmemory.h FreeType/ttconfig.h \
                 FreeType/tttypes.h Ansi/string.h Adapter/ttinit.h \
-                FreeType/ftxkern.h Adapter/../FreeType/ftxkern.h
+                FreeType/ftxkern.h
 ttpath.obj \
 ttpath.eobj: Adapter/ttadapter.h geos.h ec.h fontID.h file.h graphics.h \
                 font.h color.h Adapter/../FreeType/freetype.h \
@@ -128,14 +130,6 @@ ttgload.eobj: FreeType/tttypes.h FreeType/ttconfig.h FreeType/ft_conf.h \
                 FreeType/ttcache.h FreeType/ttcmap.h FreeType/ttgload.h \
                 FreeType/ttmemory.h Ansi/string.h FreeType/tttags.h \
                 FreeType/ttload.h
-ttextend.obj \
-ttextend.eobj: FreeType/ttextend.h FreeType/ttconfig.h FreeType/ft_conf.h \
-                geos.h file.h resource.h graphics.h fontID.h font.h \
-                color.h heap.h lmem.h ec.h Ansi/stdlib.h \
-                FreeType/tttypes.h FreeType/freetype.h FreeType/fterrid.h \
-                FreeType/ftnameid.h FreeType/ttobjs.h FreeType/ttengine.h \
-                FreeType/ttcache.h FreeType/tttables.h FreeType/ttcmap.h \
-                FreeType/ttmemory.h Ansi/string.h
 ttcalc.obj \
 ttcalc.eobj: FreeType/ttcalc.h FreeType/ttconfig.h FreeType/ft_conf.h \
                 geos.h file.h resource.h graphics.h fontID.h font.h \
@@ -152,17 +146,16 @@ ttapi.eobj: FreeType/ttconfig.h FreeType/ft_conf.h geos.h file.h \
                 FreeType/ttmemory.h Ansi/string.h FreeType/ttcache.h \
                 FreeType/ttfile.h FreeType/ttobjs.h FreeType/tttables.h \
                 FreeType/ttcmap.h FreeType/ttload.h FreeType/ttgload.h \
-                FreeType/ttraster.h FreeType/ttextend.h FreeType/tttags.h
+                FreeType/ttraster.h FreeType/tttags.h
 ftxkern.obj \
 ftxkern.eobj: FreeType/ftxkern.h FreeType/freetype.h FreeType/fterrid.h \
-                FreeType/ftnameid.h geos.h heap.h FreeType/ttextend.h \
+                FreeType/ftnameid.h geos.h heap.h FreeType/tttypes.h \
                 FreeType/ttconfig.h FreeType/ft_conf.h file.h resource.h \
                 graphics.h fontID.h font.h color.h lmem.h ec.h \
-                Ansi/stdlib.h FreeType/tttypes.h FreeType/ttobjs.h \
-                FreeType/ttengine.h FreeType/ttcache.h \
-                FreeType/tttables.h FreeType/ttcmap.h FreeType/ttmemory.h \
-                Ansi/string.h FreeType/ttfile.h FreeType/ttload.h \
-                FreeType/tttags.h
+                Ansi/stdlib.h FreeType/ttmemory.h Ansi/string.h \
+                FreeType/ttfile.h FreeType/ttengine.h FreeType/ttobjs.h \
+                FreeType/ttcache.h FreeType/tttables.h FreeType/ttcmap.h \
+                FreeType/ttload.h FreeType/tttags.h
 ttinterp.obj \
 ttinterp.eobj: FreeType/freetype.h FreeType/fterrid.h FreeType/ftnameid.h \
                 geos.h FreeType/tttypes.h FreeType/ttconfig.h \
@@ -205,7 +198,7 @@ ttobjs.eobj: FreeType/ttobjs.h FreeType/ttconfig.h FreeType/ft_conf.h \
                 FreeType/ftnameid.h FreeType/ttcache.h \
                 FreeType/tttables.h FreeType/ttcmap.h FreeType/ttfile.h \
                 FreeType/ttcalc.h FreeType/ttmemory.h Ansi/string.h \
-                FreeType/ttload.h FreeType/ttinterp.h FreeType/ttextend.h
+                FreeType/ttload.h FreeType/ttinterp.h
 ttmemory.obj \
 ttmemory.eobj: FreeType/ttmemory.h FreeType/ttconfig.h FreeType/ft_conf.h \
                 geos.h file.h resource.h graphics.h fontID.h font.h \

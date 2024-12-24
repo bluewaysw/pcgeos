@@ -1,0 +1,286 @@
+/***********************************************************************
+ *
+ * PROJECT:       VConvert
+ * FILE:          Export.goc
+ *
+ * DESCRIPTION:   Geos metafile export design study
+ *
+ * AUTHOR:        Marcus Groeber
+ *
+ ***********************************************************************/
+
+/*
+ ***************************************************************************
+ *		Include files
+ ***************************************************************************
+ */
+@include <stdapp.goh>
+
+#include <graphics.h>
+#include <gstring.h>
+
+#include <ansi/string.h>
+#include <ansi/stdio.h>
+#include <ansi/stdlib.h>
+
+#include "VConvert.h"
+#include "VCExport.h"
+
+struct {
+  GStringElement elm;
+  union {
+    struct { Point p1,p2; } DRAW_LINE;
+    struct { Point p; } DRAW_LINE_TO;
+    struct { PointWWFixed p; } DRAW_REL_LINE_TO;
+    struct { Point p; sword xy; } DRAW_HVLINE;
+    struct { sword xy; } DRAW_HVLINE_TO;
+    struct { Point p1,p2; } DRAW_RECT;
+    struct { Point p; } DRAW_RECT_TO;
+    struct { word numPoints; Point p[MAX_POINTS]; } DRAW_POLY;
+    struct { word numPoints; RegionFillRule rule; Point p[MAX_POINTS]; } FILL_POLYGON;
+    byte gen[511];
+  } d;
+} element;
+
+
+#define VCES_LINE 0x01
+#define VCES_AREA 0x02
+#define VCES_TEXT 0x04
+
+void LoadState(GStateHandle gstate,VCExportState *vces,WordFlags which)
+{
+    if(which & VCES_LINE)               /* update line state? */
+    {
+      *(WWFixedAsDWord *)&(vces->VCES_la.LA_width) = GrGetLineWidth(gstate);
+    }
+}
+
+
+#define WWF_DW(_n) (*((WWFixedAsDWord *)&(_n)))
+
+void TrPt_I(GStateHandle gstate,Point *p)
+{
+    XYValueAsDWord xy = GrTransform(gstate,p->P_x,p->P_y);
+    p->P_x=DWORD_X(xy);
+    p->P_y=DWORD_Y(xy);
+}
+
+void TrPt_IF(GStateHandle gstate,Point *p,PointWWFixed *p2)
+{
+    XYValueAsDWord xy = GrTransform(gstate,p->P_x,p->P_y);
+    p2->PF_x.WWF_int=DWORD_X(xy);
+    p2->PF_y.WWF_int=DWORD_Y(xy);
+    p2->PF_x.WWF_frac=p2->PF_y.WWF_frac=0;
+}
+
+void TrPt_F(GStateHandle gstate,PointWWFixed *p)
+{
+    GrTransformWWFixed(gstate,WWF_DW(p->PF_x),WWF_DW(p->PF_y),p);
+}
+
+void TrPt_FF(GStateHandle gstate,PointWWFixed *p,PointWWFixed *p2)
+{
+    GrTransformWWFixed(gstate,WWF_DW(p->PF_x),WWF_DW(p->PF_y),p2);
+}
+
+void TrPt_RFF(GStateHandle gstate,PointWWFixed *p,PointWWFixed *p2)
+{
+    PointWWFixed CP;
+
+    GrGetCurPosWWFixed(gstate,&CP);     /* get current position */
+    WWF_DW(CP.PF_x)+=WWF_DW(p->PF_x);   /* relative -> absolute */
+    WWF_DW(CP.PF_y)+=WWF_DW(p->PF_y);
+    GrTransformWWFixed(gstate,WWF_DW(CP.PF_x),WWF_DW(CP.PF_y),p2);
+}
+
+void InitExport(GStateHandle gstate,VCExportState *vces)
+{
+    VCExportObjDesc vcobj;
+    RectDWord bounds;
+
+    vces->VCES_private=fopen("c:\\export.bas","wV");
+
+    vcobj.type=VC_OBJ_INIT;
+    GrGetGStringBoundsDWord(gstate,0,0,&vcobj.d.OBJ_INIT.bounds);
+    VCExportObj(&vcobj,vces);
+}
+
+void ExitExport(VCExportState *vces)
+{
+    VCExportObjDesc vcobj;
+
+    VCExportObj(&vcobj,vces);
+    fclose( (FILE *)(vces->VCES_private) );
+}
+
+void ExportGString(GStateHandle gstate2)
+{
+    GStateHandle gstate;
+    word elm,elm_last,elmsize;
+    GSRetType gsr;
+    MemHandle grblock;
+    ChunkHandle dataBlock;
+    VCExportState vces;
+    Point p;
+    PointWWFixed CP;
+    VCExportObjDesc vcobj;
+    word i;
+    Boolean inPath;                     /* true while drawing to path */
+    MemHandle mh;
+
+
+    InitExport(gstate2,&vces);          /* initialize export file */
+
+    inPath = FALSE;                     /* we're not currently in a path */
+
+    grblock = MemAllocLMem(LMEM_TYPE_GENERAL,sizeof(LMemBlockHeader));
+    gstate = GrCreateGString(grblock, GST_CHUNK, (word*)&dataBlock);
+
+    for(gsr = GrDrawGString(gstate,gstate2,0,0,GSC_ONE,&elm);
+        gsr == GSRT_ONE;
+        gsr = GrDrawGString(gstate,gstate2,0,0,GSC_ONE,&elm))
+    {
+      GrGetGStringElement(gstate,gstate2,sizeof(element),&element,&elmsize);
+      if( (elm>=GR_APPLY_ROTATION && elm<=GR_XFORM_1F) ||
+          (elm>=GR_SAVE_STATE && elm<=GR_ATTR_9F) )
+        ;                               /* pass through transformation and
+                                           attribute/state commands unchanged */
+
+      else
+      {
+//       if(!inPath)                      /* convert drawing cmds outside path */
+       {
+        GrGetCurPosWWFixed(gstate,&CP); /* get current position */
+
+        /*** Line opcodes ***/
+        if(elm>=GR_DRAW_LINE && elm<=GR_DRAW_VLINE_TO)
+        {
+          switch(elm)
+          {
+          case GR_DRAW_LINE:
+            TrPt_IF (gstate,&element.d.DRAW_LINE.p1,&vcobj.d.OBJ_LINE.p1);
+            TrPt_IF (gstate,&element.d.DRAW_LINE.p2,&vcobj.d.OBJ_LINE.p2);
+            break;
+          case GR_DRAW_REL_LINE_TO:
+            TrPt_FF (gstate,&CP,&vcobj.d.OBJ_LINE.p1);
+            TrPt_RFF(gstate,&element.d.DRAW_REL_LINE_TO.p,&vcobj.d.OBJ_LINE.p2);
+            break;
+          case GR_DRAW_HLINE:
+            TrPt_IF (gstate,&element.d.DRAW_HVLINE.p,&vcobj.d.OBJ_LINE.p1);
+            WWF_DW(CP.PF_x) = MakeWWFixed(element.d.DRAW_HVLINE.xy);
+            TrPt_FF (gstate,&CP,&vcobj.d.OBJ_LINE.p2);
+            break;
+          case GR_DRAW_VLINE:
+            TrPt_IF (gstate,&element.d.DRAW_HVLINE.p,&vcobj.d.OBJ_LINE.p1);
+            WWF_DW(CP.PF_y) = MakeWWFixed(element.d.DRAW_HVLINE.xy);
+            TrPt_FF (gstate,&CP,&vcobj.d.OBJ_LINE.p2);
+            break;
+          case GR_DRAW_HLINE_TO:
+            TrPt_FF (gstate,&CP,&vcobj.d.OBJ_LINE.p1);
+            WWF_DW(CP.PF_x) = MakeWWFixed(element.d.DRAW_HVLINE_TO.xy);
+            TrPt_FF (gstate,&CP,&vcobj.d.OBJ_LINE.p2);
+            break;
+          case GR_DRAW_VLINE_TO:
+            TrPt_FF (gstate,&CP,&vcobj.d.OBJ_LINE.p1);
+            WWF_DW(CP.PF_y) = MakeWWFixed(element.d.DRAW_HVLINE_TO.xy);
+            TrPt_FF (gstate,&CP,&vcobj.d.OBJ_LINE.p2);
+            break;
+          }
+
+          vcobj.type = VC_OBJ_LINE;     /* create line object */
+          vcobj.fill = FALSE;           /* not filled :-) */
+          LoadState(gstate,&vces,VCES_LINE);
+                                        /* get line settings */
+          VCExportObj(&vcobj,&vces);    /* write object to destination */
+        }
+
+        /*** Rect opcodes ***/
+        else if(elm==GR_DRAW_RECT || elm==GR_DRAW_RECT_TO ||
+                elm==GR_FILL_RECT || elm==GR_FILL_RECT_TO)
+        {
+          switch(elm)
+          {
+          case GR_DRAW_RECT:
+          case GR_FILL_RECT:
+            TrPt_IF (gstate,&element.d.DRAW_RECT.p1,&vcobj.d.OBJ_RECT.p1);
+            TrPt_IF (gstate,&element.d.DRAW_RECT.p2,&vcobj.d.OBJ_RECT.p3);
+            p.P_x = element.d.DRAW_RECT.p1.P_x;
+            p.P_y = element.d.DRAW_RECT.p2.P_y;
+            TrPt_IF (gstate,&p,&vcobj.d.OBJ_RECT.p2);
+            p.P_x = element.d.DRAW_RECT.p2.P_x;
+            p.P_y = element.d.DRAW_RECT.p1.P_y;
+            TrPt_IF (gstate,&p,&vcobj.d.OBJ_RECT.p4);
+            break;
+          case GR_DRAW_RECT_TO:
+          case GR_FILL_RECT_TO:
+            TrPt_FF (gstate,&CP,&vcobj.d.OBJ_RECT.p1);
+            TrPt_IF (gstate,&element.d.DRAW_RECT_TO.p,&vcobj.d.OBJ_RECT.p3);
+            p.P_x = CP.PF_x.WWF_int;
+            p.P_y = element.d.DRAW_RECT_TO.p.P_y;
+            TrPt_IF (gstate,&p,&vcobj.d.OBJ_RECT.p2);
+            p.P_x = element.d.DRAW_RECT_TO.p.P_x;
+            p.P_y = CP.PF_y.WWF_int;
+            TrPt_IF (gstate,&p,&vcobj.d.OBJ_RECT.p4);
+            break;
+          }
+
+          vcobj.type = VC_OBJ_RECT;     /* object type */
+          vcobj.fill = (elm==GR_FILL_RECT || elm==GR_FILL_RECT_TO);
+                                        /* draw or fill rectangle? */
+          LoadState(gstate,&vces,VCES_LINE | VCES_AREA);
+                                        /* get line settings */
+          VCExportObj(&vcobj,&vces);    /* write object to destination */
+        }
+
+        /*** Polygon/polyline opcodes ***/
+        else if(elm==GR_DRAW_POLYGON || elm==GR_DRAW_POLYLINE ||
+                elm==GR_FILL_POLYGON)
+        {
+          vcobj.type = (elm==GR_DRAW_POLYLINE)?VC_OBJ_POLYLINE:VC_OBJ_POLYGON;
+                                        /* object type */
+          switch(elm)
+          {
+          case GR_DRAW_POLYGON:
+          case GR_DRAW_POLYLINE:
+            vcobj.d.OBJ_POLY.numPoints=element.d.DRAW_POLY.numPoints;
+            vcobj.d.OBJ_POLY.p=element.d.DRAW_POLY.p;
+            vcobj.fill = FALSE;
+            break;
+          case GR_FILL_POLYGON:
+            vcobj.d.OBJ_POLY.numPoints=element.d.FILL_POLYGON.numPoints;
+            vcobj.d.OBJ_POLY.p=element.d.FILL_POLYGON.p;
+            vcobj.fill = FALSE;
+            break;
+          }
+
+          for(i=0; i<vcobj.d.OBJ_POLY.numPoints; i++)
+            TrPt_I(gstate,&vcobj.d.OBJ_POLY.p[i]);
+                                        /* transform points */
+
+          LoadState(gstate,&vces,VCES_LINE | VCES_AREA);
+                                        /* get line/area settings */
+          VCExportObj(&vcobj,&vces);    /* write object to destination */
+        }
+
+        else if(elm==GR_DRAW_PATH || elm==GR_FILL_PATH)
+        {
+/*
+          mh=GrGetPathPoints(gstate,72);
+          if(mh) MemFree(mh);
+*/
+        }
+       }
+
+       /*** The following commands are handled in or outside of a path */
+       if(elm==GR_BEGIN_PATH)           /* start a path */
+         inPath=TRUE;                   /* don't create objects */
+       else if(elm==GR_END_PATH)        /* ended a path */
+         inPath=FALSE;                  /* stop swallowing commands */
+      }
+    }
+
+    GrDestroyGString(gstate,0,GSKT_KILL_DATA);
+    MemFree(grblock);
+
+    ExitExport(&vces);                  /* finish export file */
+}

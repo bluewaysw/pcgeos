@@ -104,19 +104,20 @@ EC(     ECCheckBounds( (void*)trueTypeOutline ) );
         if( charIndex == 0 )
                 goto Fail;
 
+        /* get transformmatrix */
+        transformMatrix = (TransformMatrix*)(((byte*)fontBuf) + sizeof( FontBuf ) + ( fontBuf->FB_lastChar - fontBuf->FB_firstChar + 1 ) * sizeof( CharTableEntry ));
+EC(     ECCheckBounds( (void*)transformMatrix ) );
+
+        /* set pointsize and resolution */
+        TT_Set_Instance_CharSize_And_Resolutions( INSTANCE, pointSize >> 10, transformMatrix->TM_resX, transformMatrix->TM_resY );
+
         /* create new glyph */
         TT_New_Glyph( FACE, &GLYPH );
-
-        /* set pointsize and get metrics */
-        TT_Set_Instance_CharSize( INSTANCE, ( pointSize >> 10 ) );
 
         /* load glyph and load glyphs outline */
         TT_Load_Glyph( INSTANCE, GLYPH, charIndex, TTLOAD_DEFAULT );
         TT_Get_Glyph_Outline( GLYPH, &OUTLINE );
 
-        /* get transformmatrix */
-        transformMatrix = (TransformMatrix*)(((byte*)fontBuf) + sizeof( FontBuf ) + ( fontBuf->FB_lastChar - fontBuf->FB_firstChar + 1 ) * sizeof( CharTableEntry ));
-EC(     ECCheckBounds( (void*)transformMatrix ) );
         TT_Transform_Outline( &OUTLINE, &transformMatrix->TM_matrix );
 
         /* get glyphs boundig box */
@@ -129,12 +130,13 @@ EC(     ECCheckBounds( (void*)transformMatrix ) );
         GLYPH_BBOX.yMax  = ( GLYPH_BBOX.yMax + 63 ) & -64;
 
         /* compute pixel dimensions */
-        width  = MAX( MIN_BITMAP_DIMENSION, (GLYPH_BBOX.xMax - GLYPH_BBOX.xMin) >> 6 );
-        height = MAX( MIN_BITMAP_DIMENSION, (GLYPH_BBOX.yMax - GLYPH_BBOX.yMin) >> 6 );
+        width  = (GLYPH_BBOX.xMax - GLYPH_BBOX.xMin) >> 6;
+        height = (GLYPH_BBOX.yMax - GLYPH_BBOX.yMin) >> 6;
 
         if( fontBuf->FB_flags & FBF_IS_REGION )
         {
-                TT_Matrix         flipmatrix = HORIZONTAL_FLIP_MATRIX; 
+                TT_Matrix         flipmatrix = HORIZONTAL_FLIP_MATRIX;
+
 
                 /* We calculate with an average of 4 on/off points, line number and line end code. */
                 size = height * 6 * sizeof( word ) + REGION_SAFETY + SIZE_REGION_HEADER; 
@@ -171,6 +173,13 @@ EC_ERROR_IF(    size < RASTER_MAP.size, ERROR_BITMAP_BUFFER_OVERFLOW );
         }
         else
         {      
+                /* Avoid widths or heights of 0 pixels */
+                if( height == 0 && width > 0 )
+                        height = 1;
+
+                if( width == 0 && height > 0 )
+                        width = 0;
+
                 size = height * ( ( width + 7 ) >> 3 ) + SIZE_CHAR_HEADER;
 
                 /* get pointer to bitmapBlock */

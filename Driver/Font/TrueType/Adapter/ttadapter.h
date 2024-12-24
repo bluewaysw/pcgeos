@@ -283,6 +283,8 @@ typedef struct
     sword                       TM_heightX;
     sword                       TM_scriptY;
     sword                       TM_heightY;
+    word                        TM_resX;
+    word                        TM_resY;
 } TransformMatrix;
 
 typedef ByteFlags TransFlags;
@@ -392,12 +394,12 @@ typedef struct
     TT_CharMap                  charMap;
     TT_Outline                  outline;
 
+    /* lookuptable for truetype indices */
+    MemHandle                   lookupTable;
+
     /* currently open face */
     FileHandle                  ttfile;
     TrueTypeOutlineEntry        entry;
-
-    /* lookuptable for truetype indices */
-    MemHandle                   lookupTable;
 } TrueTypeVars;
 
 
@@ -504,6 +506,7 @@ typedef enum {
 
 #define MUL_100_WWFIXED( factor, percentage )   \
         GrMulWWFixed( factor, GrUDivWWFixed( ((long)percentage ) << 16, 100L << 16))
+
 
 /***********************************************************************
  *      functions

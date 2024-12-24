@@ -214,60 +214,6 @@ MovableCode		ends
 
 ResidentCode	segment	resource
 
-EthPktRecvHandlerThread	proc	far
-
-	GetDGroup	ds, ax
-again:
-	tst	ds:[currentRecvBuf]
-	jz	done
-	
-	INT_OFF
-	
-	mov	si, ds:[currentRecvBuf]
-	mov	ds:[currentRecvBuf], 0
-	
-	INT_ON
-doNext:
-	movdw	dxcx, dssi		; dx:cx = buffer
-	mov	ax, MSG_EP_PROCESS_IP_PACKET
-	cmp	ds:[si].RB_macHeader.MACH_type, PACKET_TYPE_IP
-	je	sendMsg
-	mov	ax, MSG_EP_PROCESS_ARP_PACKET
-	cmp	ds:[si].RB_macHeader.MACH_type, PACKET_TYPE_ARP
-	je	sendMsg
-
-	; free buffer, should not happen	
-	jmp	done2
-
-sendMsg: 
-
-	mov bx, ds:[si].RB_nextLink
-	push bx
-	mov	bx, ds:[etherThread]
-	Assert	ne, bx, NULL		; It may be bad to "Assert thread" at
-					;  interrupt time.
-
-	mov	di, mask MF_FORCE_QUEUE
-	;WARNING ENTER_OBJ_MESSAGE
-	push	ds
-	push	si
-	call	ObjMessage		; returns interrupt on
-	pop		si
-	pop	ds
-	;WARNING LEFT_OBJ_MESSAGE
-	pop		bx
-
-done2:
-	mov	si, bx
-	cmp	si, 0
-	jne	doNext
-
-done:
-    ; wait some time
-    
-	jmp	again
-
-EthPktRecvHandlerThread	endp
 
 
 COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -306,18 +252,8 @@ REVISION HISTORY:
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
 EthPktRecvHandler	proc	far
 	uses ds
-
-	; no defined stack on call in
-    ; test system (DosEMU) enters with interrupts of
-    
-	;GetDGroup	ss, di
-
-	; setup own stack
-	;mov	sp, offset endLocalStack
 	
 	.enter
-	;call	SysEnterInterrupt
-    ;WARNING	ENTER_RECEIVE
 
 ifdef	LOG
 		pusha
@@ -374,10 +310,6 @@ ifdef	LOG
 		pop	ds
 		popa
 endif
-
-    ;WARNING	LEAVE_RECEIVE
-	;INT_ON
-	;call	SysExitInterrupt
 	.leave
 	ret
 
@@ -404,49 +336,34 @@ receiveComplete:
 	mov	ds:[si].RB_nextLink, ax
 	jmp	exit
 sendMsg:
-	clr	bx
-    tst		ds:[currentRecvBuf]
-    jz		newRecvStack
+	;clr	bx
+    	;tst	ds:[currentRecvBuf]
+    	;jz	newRecvStack
+	;mov	bx, ds:[currentRecvBuf]   
+;newRecvStack:
+	;cmp	bx, si
+	;mov	ds:[si].RB_nextLink, bx
+    	;mov	ds:[currentRecvBuf], si
     
-	mov	bx, ds:[currentRecvBuf]
-    
-newRecvStack:
-	cmp	bx, si
-    ;WARNING_Z	ENTER_RECEIVE
-	mov	ds:[si].RB_nextLink, bx
-    mov		ds:[currentRecvBuf], si
-    
-    
-	;tst	ds:[saveSS]
-	;jnz	alreadyUsingStack
-	;mov	ds:[saveSS], ss
-	;mov	ds:[saveSP], sp
-	;mov	bx, ds
-	;mov	ss, bx
-	;mov	sp, offset endLocalStack
-	
-	
-	
-	
-	
-	;mov	bx, ds:[etherThread]
+	tst	ds:[saveSS]
+	jnz	alreadyUsingStack
+	mov	ds:[saveSS], ss
+	mov	ds:[saveSP], sp
+	mov	bx, ds
+	mov	ss, bx
+	mov	sp, offset endLocalStack
+		
+	mov	bx, ds:[etherThread]
 	;Assert	ne, bx, NULL		; It may be bad to "Assert thread" at
 					;  interrupt time.
 
-	;mov	di, mask MF_FORCE_QUEUE
-	;WARNING ENTER_OBJ_MESSAGE
-	;;INT_ON
-	;push	ds
-	;call	ObjMessage		; returns interrupt on
-	;pop	ds
-	;WARNING LEFT_OBJ_MESSAGE
-	;INT_OFF
-	;;mov	ss, ds:[saveSS]
-	;;mov	sp, ds:[saveSP]
-	;WARNING LEFT_OBJ_MESSAGE
-	;clr	ds:[saveSS]
-	;WARNING LEFT_OBJ_MESSAGE
-	;WARNING LEFT_OBJ_MESSAGE
+	mov	di, mask MF_FORCE_QUEUE
+	push	ds
+	call	ObjMessage		; returns interrupt on
+	pop	ds
+	mov	ss, ds:[saveSS]
+	mov	sp, ds:[saveSP]
+	clr	ds:[saveSS]
 	jmp	exit
 
 alreadyUsingStack:

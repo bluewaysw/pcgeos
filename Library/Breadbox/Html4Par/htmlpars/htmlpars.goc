@@ -32,11 +32,6 @@
 #include "errors.h"
 @include <initfile.h>
 
-ReadHTML_getc LOCAL getcFileURL;   /* forward */
-#if JAVASCRIPT_SUPPORT
-/*ReadHTML_getc LOCAL getcScriptURL;  */ /* forward */
-#endif
-
 /* keep blocks with arrays below this size */
 #define PARSE_ARRAY_MEM_SIZE_LIMIT 30000
 
@@ -136,6 +131,8 @@ static word scriptCount;
    (used in ApplyFontWeightWidthAndSpacingAdjustment, set in ParseHTMLFile,
    ParsePlainFile, and MSG_VIS_TEXT_GRAPHIC_VARIABLE_DRAW) */
 DosCodePage G_htmlCodePage;
+#else
+Boolean G_decodeUtf8;
 #endif
 
 /***************************************************************************
@@ -688,6 +685,53 @@ void CleanupJavaScript(long pos1, long pos2)
         VMCHAIN_GET_VM_BLOCK(htbh->HTBH_scriptCode), (word)(pos-pos1), pos1);
 }
 
+void SetDocumentCharset(char *p)
+{
+@ifdef DO_DBCS
+    int i, j;
+    char buf[15];
+    TCHAR id[20];
+    char *idCP;
+    TCHAR *idTP;
+    DosCodePage cp;
+    word size;
+    Boolean found = FALSE;
+
+    /* this should only happen once per page, so we'll just read
+    the .ini file directly (instead of buffering .ini data) */
+    for (i = 0; i < NUM_CODE_PAGE_FONT_ADJ_ENTRIES; i++) {
+      sprintfsbcs(buf, "cp-%d", i);
+      if (!InitFileReadInteger("HTMLView", buf, (word*)&cp)) {
+	sprintfsbcs(buf, "cp%uid", cp);
+	j = 0;
+	while (!InitFileReadStringSectionBuffer("HTMLView", buf,
+						j++, (char*)id,
+						sizeof(id)/sizeof(TCHAR),
+						&size)) {
+	  /* convert ASCII-only id string to single-byte */
+	  idTP = id; idCP = (char *)id;
+	  while(*idTP) *idCP++ = *idTP++; *idCP = 0;
+	  if (!strncmpisb(p, (char*)id, 0)) {
+	    /* set new code page */
+	    HTMLext->HE_codePage = cp;
+	    G_htmlCodePage = cp;
+	    /* update base font */
+	    ApplyFontWeightWidthAndSpacingAdjustment(&vcaBase, TRUE);
+	    found = TRUE;
+	    break;
+	  }
+	}
+      }
+      if (found) break;
+    }
+@else
+    if (!strcmp(p, "UTF-8")) {
+      HTMLext->HE_decodeUtf8 = TRUE;
+      G_decodeUtf8 = TRUE;
+    }
+@endif
+}
+
 /***************************************************************************
  *              High-level transfer item manipulation
  ***************************************************************************/
@@ -1010,7 +1054,7 @@ void AddParaCond(void)
         STRCPYSB(insertPrepend,"\t");     /* make sure it's indented */
 
       if(*insertPrepend)                /* prepend text to paragraph? */
-        AddText(&vcaBase, insertPrepend);
+        AddText(&currentCS, insertPrepend);
 
       FixupStartPos(pos);               /* fixup tag starting positions on
                                            stack to after prepended text */
@@ -1126,9 +1170,15 @@ int LOCAL TranslateCharNum(unsigned int num)
     HTMLEntityTable *xlate_table;
     int i,ret=0;
 
-    if(num<128)
+    if(num<MIN_MAP_CHAR)
     {
       return (num>=32 || num==9 || num==13)? num:0;
+    }
+    else if(num<256)
+    {
+      ret = LocalCodePageToGeosChar((wchar)num, CODE_PAGE_LATIN_1, 0);
+      if(ret)
+ 	return ret;
     }
 
     MemLock( OptrToHandle(@xlateTable) );
@@ -1153,34 +1203,64 @@ int _pascal _export HTMLTranslateCharNum(unsigned int num)
 
 int LOCAL TranslateChar(char *tag)
 {
+    int ret=0;
     HTMLEntityTable *xlate_table;
     int i;
-    int ret=0;
-
+      
     MemLock( OptrToHandle(@xlateTable) );
     xlate_table = LMemDeref(@xlateTable);
 
-    if(*tag!='\x23')                    /* tag specified by name? */
-    {
-      for(i=0; xlate_table[i].num; i++)
-        if( tag[0]==xlate_table[i].name[0] &&
-            !STRCMPSB(xlate_table[i].name,tag) )
-        {
-          ret = xlate_table[i].c;
-          break;
-        }
-    }
-    else
-      ret = TranslateCharNum((unsigned int)(ATOISB(tag+1)));
-                                        /* convert characters to number */
+    for(i=0; xlate_table[i].num; i++)
+      if( tag[0]==xlate_table[i].name[0] &&
+          !STRCMPSB(xlate_table[i].name,tag) )
+      {
+        ret = xlate_table[i].c;
+        break;
+      }
+
     MemUnlock( OptrToHandle(@xlateTable) );
     return ret;
+}
+
+int LOCAL TranslateCodeChar(char *tag)
+{
+    unsigned int ch;
+    if(tag[1]=='x')
+    {
+      ch = 0;
+      tag += 2;
+      while(1)
+      {
+        /* parse hex code - see htoi() in WMG3HTTP.goc */
+        if (*tag >= '0' && *tag <= '9') {
+          ch = ch*16 + ((*tag++)-'0');
+        } else if (*tag >= 'a' && *tag <= 'f') {
+          ch = ch*16 + ((*tag++)-'a')+10;
+        } else if (*tag >= 'A' && *tag <= 'F') {
+          ch = ch*16 + ((*tag++)-'A')+10;
+        } else {
+          break;
+        }
+      }
+    }
+    else
+    {
+      ch = (unsigned int)(ATOISB(tag+1));
+    }
+    return TranslateCharNum(ch);        /* convert characters to number */
 }
 
 /* external version */
 int _pascal _export HTMLTranslateChar(char *entity)
 {
-    return TranslateChar(entity);
+    if(*entity!='\x23')                 /* tag specified by name? */
+    {
+      return TranslateChar(entity);
+    }
+    else
+    {
+      return TranslateCodeChar(entity);
+    }
 }
 
 word LOCAL StyleNum(char *name, SpecialTagType *spec)
@@ -1226,54 +1306,89 @@ int lc;
 ReadHTML_getc *gc;
 dword data;
 
-#if JAVASCRIPT_SUPPORT
-int LOCAL getcLow(ReadHTML_getc *gc,dword data)
+int LOCAL HTMLgetcLow()
 {
-    register int c = EOF;  /* in case no HE_scriptSrc */
-    typedef int pcfm_getc(ReadHTML_getc *gc,dword data);
-    ScriptSrcHeader *scriptSrc;
-
+    int c;
+#if JAVASCRIPT_SUPPORT
     if(HTMLext->HE_scriptSrc) {
-	scriptSrc = LMemDeref(HTMLext->HE_scriptSrc);
+	ScriptSrcHeader *scriptSrc = LMemDeref(HTMLext->HE_scriptSrc);
 	(byte *)scriptSrc += HTMLext->HE_scriptSrcOffset;
 	if (scriptSrc->block) {
 	    c = getcScriptURL((dword)scriptSrc);
+	    if(c != EOF)
+		return c;
+	    lc = 0;  /* make sure we don't match CR/LF from script and HTML */
 	}
     }
-    if (c == EOF) {
-	lc = 0;  /* make sure we don't match CR/LF from script and HTML */
-        if(gc)
-          c = ((pcfm_getc *)ProcCallFixedOrMovable_cdecl)(gc,data);
-        else
-          c = getcFileURL(data);
+#endif
+    if(gc)
+	c = ((pcfm_getc *)ProcCallFixedOrMovable_cdecl)(gc,data);
+    else {
+        if( ((HTMLFILE *)data)->HTMLbufp >= ((HTMLFILE *)data)->HTMLbufl )
+        {
+	    ((HTMLFILE *)data)->HTMLbufl = FileRead(
+	      ((HTMLFILE *)data)->fileHTML, ((HTMLFILE *)data)->HTMLbuf,
+              HTML_READBUF, FALSE);
+	    ((HTMLFILE *)data)->HTMLbufp = 0; /* set pointer to start of buffer */
+	    if( ((HTMLFILE *)data)->HTMLbufl==0 )
+	      return EOF;               /* read against end of file */
+        }
+        return ((HTMLFILE *)data)->HTMLbuf[ ((HTMLFILE *)data)->HTMLbufp++ ];
+                                        /* return next character from file */
     }
     return c;
 }
-#endif
 
 int LOCAL HTMLgetc(void)
 {
-    register int c;
+    int c = HTMLgetcLow();
 
-#if JAVASCRIPT_SUPPORT
-    c = getcLow(gc, data);
-#else
-    if(gc)
-      c = ((pcfm_getc *)ProcCallFixedOrMovable_cdecl)(gc,data);
-    else
-      c = getcFileURL(data);
+#ifndef DO_DBCS
+    if(G_decodeUtf8) {
+      if(c!=EOF && c>0x7F) {
+	if((c & 0xE0)==0xC0) {
+	  int c2 = HTMLgetcLow();
+	  if (c2!=EOF) {
+	    if ((c2 & 0xc0)==0x80) {
+	      c &= 0x1F;
+	      c <<= 6;
+	      c |= (c2 & 0x3f);
+	    }
+	    else
+	      c = '?';
+	  }
+	  else
+	    c = EOF;
+	}
+	else if((c & 0xF0)==0xE0) {
+	  int c2 = HTMLgetcLow();
+	  if (c2!=EOF) {
+	    int c3 = HTMLgetcLow();
+	    if (c3!=EOF) {
+	      if ((c2 & 0xc0)==0x80 && (c3 & 0xc0)==0x80) {
+	        c &= 0x0f;
+	        c <<= 12;
+	        c |= (c2 & 0x3f) << 6;
+	        c |= (c3 & 0x3f);
+	      }
+	      else
+	        c = '?';
+	    }
+	    else
+	      c = EOF;
+	  }
+	  else
+	    c = EOF;
+	}
+	else
+	  c = '?';
+      }
+    }
 #endif
 
     /* "CR after LF" or "LF after CF": skip over "the other one" */
     if( (c=='\n' && lc=='\r') || (c=='\r' && lc=='\n') )
-#if JAVASCRIPT_SUPPORT
-      c = getcLow(gc, data);
-#else
-      if(gc)
-        c = ((pcfm_getc *)ProcCallFixedOrMovable_cdecl)(gc,data);
-      else
-        c = getcFileURL(data);
-#endif
+      c = HTMLgetcLow();
 
     lc = c;                             /* remember last character read */
 
@@ -1389,25 +1504,46 @@ int LOCAL GetText(int cc, int ce, char *buf, word formMode, MemHandle *overflowB
 	    isNum = TRUE;
             tag[q++] = (char)cn;        /* get tag name */
             cn = HTMLgetc();
-            while( isdigit(cn) && q<HTML_MAXTAG )
+            if (cn=='x')                /* entity specified by hex number */
+            {
+              tag[q++] = (char)cn;
+              cn = HTMLgetc();
+            }
+            while( isxdigit(cn) && q<HTML_MAXTAG )
             {
               tag[q++] = (char)cn;      /* get tag name */
               cn = HTMLgetc();
             }
             tag[q] = 0;                 /* terminate tag */
-            c = TranslateChar(tag);
+            c = TranslateCodeChar(tag);
           }
           else                          /* entity specified by name */
           {
+	    HTMLEntityTable *xlate_table;
+	    MemLock( OptrToHandle(@xlateTable) );
+	    xlate_table = LMemDeref(@xlateTable);
             c = 0;
+	    /* abort as soon as char is known (this is bad HTML,
+	       but ok with NS) */
             while( cn!=EOF && isalnum(cn) && q<HTML_MAXTAG && !c )
             {
+	      HTMLEntityTable *p;
+	      if (q==0) {
+		/* advance to position of first character */
+		while(xlate_table->c && cn>xlate_table->name[0])
+		  xlate_table++;
+	      }
               tag[q++] = (char)cn;      /* get entity name */
               tag[q] = 0 ;
-              c = TranslateChar(tag);   /* abort as soon as char is known (this
-                                           is bad HTML, but ok with NS) */
+	      for(p=xlate_table; tag[0]==p->name[0]; p++)
+		if( !STRCMPSB(p->name, tag) )
+		{
+		  c = p->c;
+		  break;
+		}
               cn = HTMLgetc();
             }
+    	    MemUnlock( OptrToHandle(@xlateTable) );
             tag[q] = 0;                 /* make sure tag is terminated */
           }
 
@@ -1418,7 +1554,8 @@ int LOCAL GetText(int cc, int ce, char *buf, word formMode, MemHandle *overflowB
 	     care what the trailing character was, fixes 4667
 	     -- brianc 10/24/00 */
 	  /* restore leniency for numeric character entity -- brianc 11/9/00 */
-          if(c && (isNum || !isalnum(cn)))         /* found a character? */
+	  /* restore leniency for all -- mgroeber 10/11/2024 */
+          if(c)                         /* found a character? */
           {
             if(cn==';')                 /* skip over terminating ";" if any */
               cn = HTMLgetc();
@@ -1555,26 +1692,26 @@ const char endScript[] = "</SCRIPT";
 
 char pbuf[3] = {0, 0, 0};  /* only accessed by single parsing thread */
 
-word HandleScriptChar(word flags, char c, char p)
+word LOCAL HandleScriptChar(word flags, int c, char p)
 {
     if (flags & CC_COMMENT) {
 @ifdef DO_DBCS
-	if (c==EOF || c==C_CARRIAGE_RETURN || c==C_LINE_FEED ||
+	if (c==C_CARRIAGE_RETURN || c==C_LINE_FEED ||
 @else
-	if (c==EOF || c==C_CR || c==C_LF ||
+	if (c==C_CR || c==C_LF ||
 @endif
 	    (pbuf[0]=='-' && pbuf[1]=='-' && p=='>')) {
 	    flags &= ~CC_COMMENT;
 	}
     } else if (flags & C_COMMENT) {
-	if (c==EOF || (c=='/' && p=='*')) {
+	if (c=='/' && p=='*') {
 	    flags &= ~C_COMMENT;
 	}
     } else if (flags & QUOTE_CHAR) {
 @ifdef DO_DBCS
-	if (c==EOF || c==C_CARRIAGE_RETURN || c==C_LINE_FEED ||
+	if (c==C_CARRIAGE_RETURN || c==C_LINE_FEED ||
 @else
-	if (c==EOF || c==C_CR || c==C_LF ||
+	if (c==C_CR || c==C_LF ||
 @endif
             (c==(flags & QUOTE_CHAR) && p!='\\')) {
 	    flags &= ~QUOTE_CHAR;
@@ -1622,7 +1759,7 @@ int LOCAL HandleScript(int c, Boolean accept)
         n = 0;                          // characters have been dealt with
       }
       
-      while ((c != EOF) && (toupper(c)==endScript[n]))
+      while (c!=EOF && c<128 && (toupper(c)==endScript[n]))
       {
         buf[n++] = (char)c;
 	pbuf[0] = pbuf[1]; pbuf[1] = pbuf[2]; pbuf[2] = p = c;
@@ -1980,21 +2117,6 @@ int getcOptrURL(dword data)  /* callback routine to get one char */
     return (c!=0)?c:EOF;
 }
 
-int LOCAL getcFileURL(dword data)  /* callback routine to get one char */
-{
-    if( ((HTMLFILE *)data)->HTMLbufp >= ((HTMLFILE *)data)->HTMLbufl )
-    {
-      ((HTMLFILE *)data)->HTMLbufl = FileRead(
-        ((HTMLFILE *)data)->fileHTML, ((HTMLFILE *)data)->HTMLbuf,
-        HTML_READBUF, FALSE);
-      ((HTMLFILE *)data)->HTMLbufp = 0; /* set pointer to start of buffer */
-      if( ((HTMLFILE *)data)->HTMLbufl==0 )
-        return EOF;                     /* read against end of file */
-    }
-    return ((HTMLFILE *)data)->HTMLbuf[ ((HTMLFILE *)data)->HTMLbufp++ ];
-                                        /* return next character from file */
-}
-
 #if JAVASCRIPT_SUPPORT
 int /*LOCAL*/ getcScriptURL(dword data)
 {
@@ -2078,6 +2200,8 @@ int EXPORT ParseHTMLFile(ReadHTML_getc *p_gc, dword p_data, HTMLextra *ext,
     HTMLext = ext;                      /* Make extra data available globally */
 #ifdef DO_DBCS
     G_htmlCodePage = HTMLext->HE_codePage;
+#else
+    G_decodeUtf8 = HTMLext->HE_decodeUtf8;
 #endif
     *item = InitTransferItem();         /* initialize & return transfer item */
     InitTagStacks(localHeap);           /* set up tag stacks */
@@ -2291,6 +2415,8 @@ int EXPORT ParsePlainFile(ReadHTML_getc *p_gc, dword p_data, HTMLextra *ext,
     HTMLext = ext;                      /* Make extra data available globally */
 #ifdef DO_DBCS
     G_htmlCodePage = HTMLext->HE_codePage;
+#else
+    G_decodeUtf8 = HTMLext->HE_decodeUtf8;
 #endif
     *item = InitTransferItem();         /* initialize & return transfer item */
     InitTagStacks(localHeap);           /* set up tag stacks */
@@ -2307,8 +2433,7 @@ int EXPORT ParsePlainFile(ReadHTML_getc *p_gc, dword p_data, HTMLextra *ext,
         if((unsigned int)(HTMLext->HE_codePage) < CODE_PAGE_SJIS)
 @endif
         if(c>=128)                      /* assume ISO Latin encoding */
-        {
-                                        /* translate char as in HTML file */
+        {                               /* translate char as in HTML file */
           c = TranslateCharNum((unsigned int)c);
           if(c==0) c='?';
         }
