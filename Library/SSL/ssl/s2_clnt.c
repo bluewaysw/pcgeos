@@ -93,6 +93,8 @@ static int ssl_rsa_public_encrypt();
 
 #define BREAK	break
 
+#ifndef COMPILE_OPTION_HOST_SERVICE_ONLY
+
 #ifdef COMPILE_OPTION_HOST_SERVICE
 extern Boolean hostApiAvailable;
 #endif
@@ -1040,3 +1042,22 @@ end:
 	return(i);
 	}
 
+#else
+
+extern Boolean hostApiAvailable;
+
+SSL_METHOD* _export _pascal SSLv2_client_method()
+	{
+	static SSL_METHOD SSLv2_client_data;
+	SSL_METHOD *ret;
+	if(hostApiAvailable)
+		{
+		return (SSL_METHOD *) HostIfCall(
+			HIF_SSL_V2_GET_CLIENT_METHOD, 
+			(dword) NULL, (dword) NULL, 0);
+		}
+	ret = &SSLv2_client_data ;
+	return(ret);
+	}
+
+#endif
