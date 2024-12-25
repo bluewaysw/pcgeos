@@ -32,31 +32,67 @@
 #ifndef GLOBAL_INTERNET_BUILD
 #define GLOBAL_INTERNET_BUILD
 #endif
-// The GLOBAL_INTERNET_BUiLD flag is now the global
-// default for all major products including:
-//    <default>, GPC1999, and NDO2000.
-// For older builds, undef it explictly.
-
-/* Old -- Choose one of the following */
-//#define YAGO_2_BUILD
-//@define YAGO_2_BUILD
-//#define WEBMAGIC_FOR_GEOS_3
-//@define WEBMAGIC_FOR_GEOS_3
-//#define WEBMAGIC_FOR_GEOS_2
-//@define WEBMAGIC_FOR_GEOS_2
-
-// #if _NDO2000
 /*
-* Use "Skipper" for all browser app monikers
-* in the NewDeal build.
-*/
-// #define SKIPPER_VERSION
-// #endif
+The GLOBAL_INTERNET_BUILD flag is now the global
+default for all major products including:
+<default>, GPC1999, and NDO2000
+... and FreeGEOS (meyerk 12/2024)
+For older builds, undef it explictly.
 
-@ifdef GLOBAL_INTERNET_BUILD
+Older builds are:
+#define YAGO_2_BUILD
+@define YAGO_2_BUILD
 #define WEBMAGIC_FOR_GEOS_3
 @define WEBMAGIC_FOR_GEOS_3
-@endif
+#define WEBMAGIC_FOR_GEOS_2
+@define WEBMAGIC_FOR_GEOS_2
+
+FIXME: for FreeGEOS, we should remove the GLOBAL_INTERNET_BUILD
+at some point and make the behaviour behind it the default.
+*/
+
+/*
+ * Cache-related
+ ********************************************************************
+ */
+
+#define DEFAULT_SOURCE_CACHE_LIMIT    1024
+#define DEFAULT_OBJECT_CACHE_LIMIT    1024
+
+@define COMPILE_OPTION_SOURCE_CACHE_LIMIT       16384
+@define COMPILE_OPTION_SOURCE_CACHE_MIN_LIMIT   0
+@define COMPILE_OPTION_FORMATTING_CACHE_ON
+
+#define COMPILE_OPTION_CACHE_ENTRY_SIZE_LIMIT  8192
+
+#define NUM_CACHE_DIRS 5
+#define NUM_VMCACHE_FILES 5
+/* define this to limit number of cache files per directory */
+
+//@ifdef GLOBAL_INTERNET_BUILD
+///#define ALT_SRC_CACHE
+//@define ALT_SRC_CACHE
+//@endif
+//#define SRCCACHEARRAY srcCacheArray
+//#define SRCCACHESIZE srcCacheSize
+/* use alternate source cache for certain hosts
+   - Investigate if still needed (meyerk 12/2024) */
+
+@define CACHE_ALL
+/* set to allow specifying "cacheAll" mode in .ini, so that everything
+   will be cached, even those pages specifying no-cache; for creating
+   local copy of demo pages */
+
+@define POST_DATA_CACHE
+/* in lieu of a correct implementation for association the original post
+   data with each frame (by storing a reference in the HTMLframeRec), we
+   keep a simple cache of post data blocks, indexed by url.  This simple
+   scheme matches the history list behavior of only keeping one copy of
+   multiple URLs that only differ by post data */
+
+#define CACHE_VALIDATION
+/* cache validation mechanism */
+
 
 /*
  * Document Management.
@@ -103,7 +139,7 @@
 /* somewhat broken */
 
 // @define COMPILE_OPTION_SHOW_ALLOC_WATCHER_READ_OUT
-/* The alloc watcher */
+/* The alloc watcher debug display, not the watcher itself */
 
 @define COMPILE_OPTION_GOTO_HOTKEY
 /* Enable Alt-G to warp to the Goto entry field. */
@@ -111,7 +147,8 @@
 // @define COMPILE_OPTION_16_COLOR_ICONS
 // @define COMPILE_OPTION_256_COLOR_ICONS
 @define COMPILE_OPTION_GPC_ICONS
-/* what icons to use: GPC, 16, 256 */
+/* what icons to use: GPC, 16, 256
+   COMPILE_OPTION_GPC_ICONS is used with the simple toolbar */
 
 // @define COMPILE_OPTION_JUMP_FEATURE
 /* this feature is broken and was probably
@@ -151,7 +188,7 @@
 // @define COMPILE_OPTION_LOCAL_PAGES
 // #define COMPILE_OPTION_LOCAL_PAGES
 /* Turn on to add support for saving/loading of local pages
-   broken, has apparently never been adopted to later changes (meyerk 2022) */
+   - broken, has apparently never been adopted to later changes (meyerk 2022) */
 
 @define COMPILE_OPTION_HTML_MENU
 /* Turn on to add HTML menu */
@@ -169,7 +206,7 @@
 
 // @define COMPILE_OPTION_SEARCH_MENU
 /* have a special search menu
-   this feature is possibly broken, so we leave it off (meyerk 12/2024) */
+   - this feature is possibly broken, so we leave it off (meyerk 12/2024) */
 
 // @define COMPILE_OPTION_PARENTAL_CONTROL
 /* Turn on to use ParentalControl aka KidGuard */
@@ -216,47 +253,53 @@ shown in the menu bar
 
 
 /*
- * Cache-related
+ * Options menu
  ********************************************************************
  */
-@define COMPILE_OPTION_SOURCE_CACHE_LIMIT       16384
-@define COMPILE_OPTION_SOURCE_CACHE_MIN_LIMIT   0
-@define COMPILE_OPTION_FORMATTING_CACHE_ON
 
-#define COMPILE_OPTION_CACHE_ENTRY_SIZE_LIMIT  8192
+@define COMPILE_OPTION_ENABLE_NUMCONN_OPTION
+/* enable the "Allow multiple connections" toggle in "Options"
+   allows multiple threads for fetching */
 
-#define NUM_CACHE_DIRS 5
-#define NUM_VMCACHE_FILES 5
-/* define this to limit number of cache files per directory */
+@ifdef COMPILE_OPTION_FORMATTING_CACHE_ON
+#define DEFAULT_VARIOUS_SETTINGS ( \
+               HTMLV_SOURCE_CACHE | \
+               HTMLV_OBJECT_CACHE | \
+               HTMLV_ENABLE_TOOLBAR | \
+               HTMLV_ENABLE_STATUSBAR | \
+               HTMLV_ENABLE_URLBAR)
+@else
+#define DEFAULT_VARIOUS_SETTINGS ( \
+               HTMLV_SOURCE_CACHE | \
+               HTMLV_ENABLE_TOOLBAR | \
+               HTMLV_ENABLE_STATUSBAR | \
+               HTMLV_ENABLE_URLBAR)
+@endif
 
-//@ifdef GLOBAL_INTERNET_BUILD
-///#define ALT_SRC_CACHE
-//@define ALT_SRC_CACHE
-//@endif
-//#define SRCCACHEARRAY srcCacheArray
-//#define SRCCACHESIZE srcCacheSize
-/* use alternate source cache for certain hosts - Investigate if still needed*/
-
-@define CACHE_ALL
-/* set to allow specifying "cacheAll" mode in .ini, so that everything
-   will be cached, even those pages specifying no-cache; for creating
-   local copy of demo pages */
-
-@define POST_DATA_CACHE
-/* in lieu of a correct implementation for association the original post
-   data with each frame (by storing a reference in the HTMLframeRec), we
-   keep a simple cache of post data blocks, indexed by url.  This simple
-   scheme matches the history list behavior of only keeping one copy of
-   multiple URLs that only differ by post data */
-
-#define CACHE_VALIDATION
-/* cache validation mechanism */
+#ifdef JAVASCRIPT_SUPPORT
+#define DEFAULT_HTML_OPTIONS ( \
+               HTML_NO_BACKGROUND | \
+               HTML_MONOCHROME | \
+               HTML_ADD_MARGIN | \
+               HTML_JAVASCRIPT )
+#else
+#define DEFAULT_HTML_OPTIONS ( \
+               HTML_NO_BACKGROUND | \
+               HTML_MONOCHROME | \
+               HTML_ADD_MARGIN )
+#endif
 
 
 /*
- * Browser Behaviour, other Options
+ * Browser Behaviour
  ********************************************************************
  */
+
+#define DEFAULT_ALLOCATE_WATCHER_LIMIT 4000
+/* limit for the allocation watcher */
+
+#define HTML_VIEW_INI_VERSION_NUMBER   302
+/* internal browser version */
 
 #define COMPILE_OPTION_LIMIT_SCALING
 /* Maximum scaling */
@@ -264,10 +307,6 @@ shown in the menu bar
 #define COMPILE_OPTION_MIN_ZOOM  DEFAULT_ZOOM_MINIMUM
 #define COMPILE_OPTION_MAX_ZOOM  400
 /* Maximum and minimum zoom */
-
-@define COMPILE_OPTION_ENABLE_NUMCONN_OPTION
-/* enable the "Allow multiple connections" toggle in "Options"
-   allows multiple threads for fetching */
 
 @define COMPILE_OPTION_DRAG_COPY_WEB_PAGES
 /* guess... */
@@ -374,14 +413,13 @@ shown in the menu bar
 
 // @define HANDLE_SCRIPTS_DURING_PARSING
 /*
-   * Enables handling of scripts during parsing to allow support for
-   * document.write.  We still need to make a script pass at the end
-   * to fixup stuff that depended on having the browser object tree
-   * available.  Even with this off, we get some document.write
-   * support by in the form of document.open/document.write/document.close
-   *
-   * disabled by default, we don't do JavaScript (yet?) (meyerk 12/2024)
-   */
+   Enables handling of scripts during parsing to allow support for
+   document.write.  We still need to make a script pass at the end
+   to fixup stuff that depended on having the browser object tree
+   available.  Even with this off, we get some document.write
+   support by in the form of document.open/document.write/document.close
+
+   - disabled by default, we don't do JavaScript ATM (meyerk 12/2024) */
 
 // @define JS_ERROR_DIALOG
 /* Turn on to report JS error in dialog box automatically.  Leave off
@@ -389,44 +427,6 @@ shown in the menu bar
    is turned off).  If off, double-clicking on error in status bar will
    show error dialog. */
 
-
-/***********************************************************************
- *      Internal option mangling...
- ***********************************************************************/
-
-#define HTML_VIEW_INI_VERSION_NUMBER     302
-
-#define DEFAULT_ALLOCATE_WATCHER_LIMIT 4000
-#define DEFAULT_SOURCE_CACHE_LIMIT    1024
-#define DEFAULT_OBJECT_CACHE_LIMIT    1024
-
-@ifdef COMPILE_OPTION_FORMATTING_CACHE_ON
-#define DEFAULT_VARIOUS_SETTINGS ( \
-              HTMLV_SOURCE_CACHE | \
-              HTMLV_OBJECT_CACHE | \
-              HTMLV_ENABLE_TOOLBAR | \
-              HTMLV_ENABLE_STATUSBAR | \
-              HTMLV_ENABLE_URLBAR)
-@else
-#define DEFAULT_VARIOUS_SETTINGS ( \
-              HTMLV_SOURCE_CACHE | \
-              HTMLV_ENABLE_TOOLBAR | \
-              HTMLV_ENABLE_STATUSBAR | \
-              HTMLV_ENABLE_URLBAR)
-@endif
-
-#ifdef JAVASCRIPT_SUPPORT
-#define DEFAULT_HTML_OPTIONS ( \
-             HTML_NO_BACKGROUND | \
-             HTML_MONOCHROME | \
-             HTML_ADD_MARGIN | \
-             HTML_JAVASCRIPT )
-#else
-#define DEFAULT_HTML_OPTIONS ( \
-             HTML_NO_BACKGROUND | \
-             HTML_MONOCHROME | \
-             HTML_ADD_MARGIN )
-#endif
 
 /********************************************************************
 Dead flags
@@ -437,9 +437,8 @@ Dead flags
 
 // @define COMPILE_OPTION_SHOW_HIDE_TOOLBAR
 /* Turn on to enable/disable toolbar by a menu item that changes its name
- * thrown out as we have a different way of enabling / disabling toolbars now (meyerk 12/2024)
- * (the default way in GEOS is via an Options menu and this is what is active now)
- */
+   thrown out as we have a different way of enabling / disabling toolbars now (meyerk 12/2024)
+   (the default way in GEOS is via an Options menu and this is what is active now) */
 
 // COMPILE_OPTION_TOGGLE_BARS
 /*
@@ -464,8 +463,8 @@ Dead flags
 @define COMPILE_OPTION_TOGGLE_STATUS_BAR
 @endif
 /* thrown out, together with the underlying code, as we have a different way of
- * enabling / disabling toolbars now, using "HTMLView / settings" in GEOS.INI (meyerk 12/2024)
- */
+   enabling / disabling toolbars now, using "HTMLView / settings"
+   in GEOS.INI (meyerk 12/2024) */
 
 // @define COMPILE_OPTION_EXPIRE_ON 0
 /* this was used by the EXPIRE (Shareware) module which is now gone */
