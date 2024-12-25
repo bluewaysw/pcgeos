@@ -16,7 +16,7 @@ URLDOC          = LOCALPAG.goc URLDOC.goc
 URLDOCCT        = URLDOCCT.goc
 URLFETCH        = URLFETCH.goc
 URLFRAME        = FRFETCH.goc URLFRAME.goc
-URLTEXT         = URLTEXT.goc URLTEXT2.goc
+URLTEXT         = URLTEXT2.goc URLTEXT.goc
 UI_TO_RDFS      =
 OBJS            = AWATCHER.obj GLBANIM.obj ImportG.obj LoadURL.obj\
                   scrapbk.obj StatText.obj UIOften.obj HTMLVIEW.obj\
@@ -24,7 +24,7 @@ OBJS            = AWATCHER.obj GLBANIM.obj ImportG.obj LoadURL.obj\
                   sebrowse.obj BOOKCLAS.obj FAVORCLS.obj FAVORITE.obj\
                   NAVCACHE.obj BOOKMARK.obj NAVIGATE.obj LOCALPAG.obj\
                   URLDOC.obj URLDOCCT.obj URLFETCH.obj FRFETCH.obj\
-                  URLFRAME.obj URLTEXT.obj URLTEXT2.obj
+                  URLFRAME.obj URLTEXT2.obj URLTEXT.obj
 COMMON          = bookclas.goh bookmark.goh bookui.goh favorcls.goh\
                   favorite.goh glbanim.goh javascr.h prodndo.goh sebrowse.h\
                   stattext.goh urlfetch.goh favorui.goh\
