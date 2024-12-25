@@ -87,6 +87,9 @@ typedef struct ssl_session_asn1_st
  * SSLerr(SSL_F_D2I_SSL_SESSION,SSL_R_UNSUPPORTED_CIPHER);
  */
 
+ #ifndef COMPILE_OPTION_HOST_SERVICE_ONLY
+
+
 int i2d_SSL_SESSION(in,pp)
 SSL_SESSION *in;
 unsigned char **pp;
@@ -323,3 +326,4 @@ long length;
 	M_ASN1_D2I_Finish(a,SSL_SESSION_free,SSL_F_D2I_SSL_SESSION);
 	}
 
+#endif

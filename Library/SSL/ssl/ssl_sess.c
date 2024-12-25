@@ -73,6 +73,8 @@ static void SSL_SESSION_list_remove();
 static void SSL_SESSION_list_add();
 #endif
 
+#ifndef COMPILE_OPTION_HOST_SERVICE_ONLY
+
 static ssl_session_num=0;
 static STACK *ssl_session_meth=NULL;
 
@@ -613,3 +615,4 @@ SSL_SESSION *s;
 		}
 	}
 
+#endif

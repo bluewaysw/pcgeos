@@ -56,6 +56,8 @@
  * [including the GNU Public Licence.]
  */
 
+#ifndef COMPILE_OPTION_HOST_SERVICE_ONLY
+
 #ifdef __GEOS__
 #include <Ansi/stdio.h>
 #else
@@ -448,3 +450,4 @@ int offset;
 	ERR_add_error_data(4,"address=",buf1," offset=",buf2);
 	}
 
+#endif

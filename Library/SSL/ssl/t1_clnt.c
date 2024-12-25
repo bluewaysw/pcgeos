@@ -68,6 +68,8 @@
 #include "evp.h"
 #include "ssl_locl.h"
 
+#ifndef COMPILE_OPTION_HOST_SERVICE_ONLY
+
 static SSL_METHOD *tls1_get_client_method(ver)
 int ver;
 	{
@@ -93,3 +95,4 @@ SSL_METHOD _export _pascal *TLSv1_client_method()
 	return(&TLSv1_client_data);
 	}
 
+#endif

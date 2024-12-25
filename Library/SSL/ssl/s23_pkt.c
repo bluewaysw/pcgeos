@@ -67,6 +67,8 @@
 #include "buffer.h"
 #include "ssl_locl.h"
 
+#ifndef COMPILE_OPTION_HOST_SERVICE_ONLY
+
 int ssl23_write_bytes(s)
 SSL *s;
 	{
@@ -122,3 +124,4 @@ int n;
 	return(n);
 	}
 
+#endif

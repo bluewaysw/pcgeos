@@ -56,6 +56,8 @@
  * [including the GNU Public Licence.]
  */
 
+#ifndef COMPILE_OPTION_HOST_SERVICE_ONLY
+
 #ifdef __GEOS__
 #include <Ansi/stdio.h>
 #else
@@ -128,3 +130,5 @@ ASN1_OBJECT *b;
 	if (ret) return(ret);
 	return(memcmp(a->data,b->data,a->length));
 	}
+
+#endif

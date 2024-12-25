@@ -56,6 +56,8 @@
  * [including the GNU Public Licence.]
  */
 
+#ifndef COMPILE_OPTION_HOST_SERVICE_ONLY
+
 #ifdef __GEOS__
 #include <Ansi/stdio.h>
 #else
@@ -224,3 +226,4 @@ int loc;
 	return(X509v3_add_ext(&(x->extensions),ex,loc) != NULL);
 	}
 
+#endif

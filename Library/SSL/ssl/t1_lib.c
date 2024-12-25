@@ -64,6 +64,8 @@
 #include "objects.h"
 #include "ssl_locl.h"
 
+#ifndef COMPILE_OPTION_HOST_SERVICE_ONLY
+
 char *tls1_version_str="TLSv1 part of SSLeay 0.9.0b 29-Jun-1998";
 
 #ifndef NO_PROTO
@@ -160,4 +162,6 @@ char *parg;
 	{
 	return(0);
 	}
+#endif
+
 #endif
