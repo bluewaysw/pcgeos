@@ -56,6 +56,8 @@
  * [including the GNU Public Licence.]
  */
 
+#ifndef COMPILE_OPTION_HOST_SERVICE_ONLY
+
 #ifdef __GEOS__
 #include <Ansi/stdio.h>
 #else
@@ -238,3 +240,5 @@ time_t t;
 	s->type=V_ASN1_UTCTIME;
 	return(s);
 	}
+
+#endif

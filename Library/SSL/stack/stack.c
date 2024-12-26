@@ -65,6 +65,9 @@
  *
  * 1.0 eay - First version 29/07/92
  */
+
+#ifndef COMPILE_OPTION_HOST_SERVICE_ONLY
+
 #ifdef __GEOS__
 #include <Ansi/stdio.h>
 #else
@@ -331,3 +334,4 @@ STACK *st;
 	Free((char *)st);
 	}
 
+#endif

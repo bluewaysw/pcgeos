@@ -56,6 +56,8 @@
  * [including the GNU Public Licence.]
  */
 
+#ifndef COMPILE_OPTION_HOST_SERVICE_ONLY
+
 #if !defined(NO_SOCK) || defined(BIO_FD)
 
 #ifdef __GEOS__
@@ -499,4 +501,6 @@ int err;
 		}
 	return(0);
 	}
+#endif
+
 #endif
