@@ -64,6 +64,8 @@
 #include "objects.h"
 #include "ssl_locl.h"
 
+#ifndef COMPILE_OPTION_HOST_SERVICE_ONLY
+
 static SSL_METHOD *tls1_get_method(ver)
 int ver;
 	{
@@ -94,3 +96,4 @@ SSL_METHOD *TLSv1_method()
 	return(&TLSv1_data);
 	}
 
+#endif

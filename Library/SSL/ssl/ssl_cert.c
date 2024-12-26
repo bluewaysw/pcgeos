@@ -66,6 +66,8 @@
 #include "pem.h"
 #include "ssl_locl.h"
 
+#ifndef COMPILE_OPTION_HOST_SERVICE_ONLY
+
 CERT *ssl_cert_new()
 	{
 	CERT *ret;
@@ -338,3 +340,5 @@ err:
 #endif
 
 #endif /* GEOS_CLIENT */
+
+#endif

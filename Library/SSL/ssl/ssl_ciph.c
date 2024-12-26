@@ -64,6 +64,8 @@
 #include "objects.h"
 #include "ssl_locl.h"
 
+#ifndef COMPILE_OPTION_HOST_SERVICE_ONLY
+
 #define SSL_ENC_DES_IDX		0
 #define SSL_ENC_3DES_IDX	1
 #define SSL_ENC_RC4_IDX		2
@@ -800,3 +802,4 @@ int *alg_bits;
 	return(ret);
 	}
 
+#endif

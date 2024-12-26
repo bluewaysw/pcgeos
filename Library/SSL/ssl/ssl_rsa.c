@@ -69,6 +69,8 @@
 #include "pem.h"
 #include "ssl_locl.h"
 
+#ifndef COMPILE_OPTION_HOST_SERVICE_ONLY
+
 #ifndef NOPROTO
 static int ssl_set_cert(CERT *c, X509 *x509);
 static int ssl_set_pkey(CERT *c, EVP_PKEY *pkey);
@@ -833,4 +835,5 @@ long len;
 	return(ret);
 	}
 
+#endif
 

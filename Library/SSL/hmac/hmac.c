@@ -55,6 +55,9 @@
  * copied and put under another distribution licence
  * [including the GNU Public Licence.]
  */
+
+#ifndef COMPILE_OPTION_HOST_SERVICE_ONLY
+
 #ifdef __GEOS__
 #include <Ansi/stdio.h>
 #include <Ansi/stdlib.h>
@@ -169,3 +172,4 @@ unsigned int *md_len;
 	return(md);
 	}
 
+#endif

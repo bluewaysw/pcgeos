@@ -84,6 +84,8 @@ static int write_pending();
 static int ssl_mt_error();
 #endif
 
+#ifndef COMPILE_OPTION_HOST_SERVICE_ONLY
+
 #ifndef GEOS_CLIENT
 
 int ssl2_peek(s,buf,len)
@@ -848,3 +850,5 @@ int n;
 		}
 	return(ret);
 	}
+
+#endif
