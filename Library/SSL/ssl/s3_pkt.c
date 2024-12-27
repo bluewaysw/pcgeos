@@ -101,6 +101,8 @@ static int do_uncompress();
 static int do_change_cipher_spec();
 #endif
 
+#ifndef COMPILE_OPTION_HOST_SERVICE_ONLY
+
 static int ssl3_read_n(s,n,max,extend)
 SSL *s;
 int n;
@@ -1109,3 +1111,4 @@ SSL *s;
 	return(i);
 	}
 
+#endif

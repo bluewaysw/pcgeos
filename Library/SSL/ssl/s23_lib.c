@@ -82,6 +82,8 @@ static int ssl23_put_cipher_by_char();
 static SSL_CIPHER *ssl23_get_cipher_by_char();
 #endif
 
+#ifndef COMPILE_OPTION_HOST_SERVICE_ONLY
+
 char *SSL23_version_str="SSLv2/3 compatablity part of SSLeay 0.7.0 30-Jan-1997";
 
 static SSL_METHOD SSLv23_data= {
@@ -235,3 +237,5 @@ int len;
 		return(-1);
 		}
 	}
+
+#endif
