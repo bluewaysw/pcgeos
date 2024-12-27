@@ -13,8 +13,8 @@
 ; limitations under the License.
 
 
-ttcalc_TEXT	SEGMENT BYTE PUBLIC 'CODE'
-                ASSUME  CS:ttcalc_TEXT
+ResidentMath	SEGMENT BYTE PUBLIC 'CODE'
+                ASSUME  CS:ResidentMath
 
 	public __U4M
 	public __U4D
@@ -145,4 +145,4 @@ ttcalc_TEXT	SEGMENT BYTE PUBLIC 'CODE'
 	__I4D endp
 
 	
-ttcalc_TEXT        ENDS
+ResidentMath        ENDS

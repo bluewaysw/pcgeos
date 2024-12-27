@@ -14,7 +14,7 @@
  *  understand and accept it fully.
  *
  *
- *  Changes between 3.1 and 3.0:
+ *  Changes between 3.1 and 3.0:TT_MulDiv
  *
  *  - A more relaxed version of the interpreter.  It is now able to
  *    ignore errors like out-of-bound array access and writes in order
@@ -38,6 +38,8 @@
 
 #ifdef TT_CONFIG_OPTION_NO_INTERPRETER
 
+#pragma code_seg(InterpreterEntry)
+
   LOCAL_FUNC
   TT_Error  RunIns( PExecution_Context  exc )
   {
@@ -45,6 +47,8 @@
     (void)exc;
     return TT_Err_Ok;
   }
+
+#pragma code_seg()
 
 #else
 
@@ -200,6 +204,77 @@
 
 #define BOUNDS( x, n )  ( (x) >= (n) )
 
+#pragma code_seg(InterpreterEntry)
+  TT_Long   TT_MulFixLocal( TT_Long  a, TT_Long  b )
+  {
+  #ifdef TT_CONFIG_OPTION_USE_ASSEMBLER_IMPLEMENTATION
+    __asm {
+        ; store sign of result
+        mov     eax, a
+        xor     eax, b
+        mov     esi, eax         ; esi = sign of result
+
+        ; calculate |a|
+        mov     eax, a
+        cdq                      ; sign extend eax into edx
+        xor     eax, edx
+        sub     eax, edx
+        mov     ebx, eax         ; ebx = |a|
+
+        ; calculate |b|
+        mov     eax, b
+        cdq
+        xor     eax, edx
+        sub     eax, edx         ; eax = |b|
+
+        ; multiply |a| * |b|
+        mul     ebx              ; edx:eax = |a| * |b|
+
+        ; add 0x8000 (rounding factor)
+        add     eax, 0x8000
+        adc     edx, 0           ; edx:eax += 0x8000
+
+        ; divide by 0x10000 (shift right by 16)
+        shrd    eax, edx, 16
+        shr     edx, 16          ; edx:eax >>= 16
+
+        ; apply sign using NEG if necessary
+        test    esi, 0x80000000  ; test the sign bit
+        jz      positive
+        neg     eax
+    positive:
+        mov     edx, eax         ; store result in dx:ax
+        shr     edx, 16
+    }
+  #else
+    long   s;
+
+    if ( a == 0 || b == 0x10000 )
+      return a;
+
+    s  = a; a = ABS( a );
+    s ^= b; b = ABS( b );
+
+    if ( a <= 1024 && b <= 2097151 )
+    {
+      a = ( a*b + 0x8000 ) >> 16;
+    }
+    else
+    {
+      TT_Int64  temp, temp2;
+
+      MulTo64( a, b, &temp );
+      temp2.hi = 0;
+      temp2.lo = 0x8000;
+      Add64( &temp, &temp2, &temp );
+      a = Div64by32( &temp, 0x10000 );
+    }
+
+    return ( s < 0 ) ? -a : a;
+  #endif
+  }
+
+#pragma code_seg()
 
 
 /*********************************************************************/
@@ -510,6 +585,8 @@
 #undef  NULL_Vector
 #define NULL_Vector (TT_Vector*)&Null_Vector
 
+#pragma code_seg(InterpreterExtra)
+
 /*******************************************************************
  *
  *  Function    :  Norm
@@ -556,6 +633,9 @@
   }
 
 
+#pragma code_seg(InterpreterEntry)
+
+
 /*******************************************************************
  *
  *  Function    :  Current_Ratio
@@ -597,7 +677,7 @@
 
   static Long  Current_Ppem( EXEC_OP )
   {
-    return TT_MulFix( CUR.metrics.ppem, CURRENT_Ratio() );
+    return TT_MulFixLocal( CUR.metrics.ppem, CURRENT_Ratio() );
   }
 
 
@@ -605,6 +685,8 @@
   {
     return CUR.cvt[index];
   }
+
+#pragma code_seg()
 
 #ifdef TT_CONGIG_OPTION_SUPPORT_NON_SQUARE_PIXELS
   static TT_F26Dot6  _near Read_CVT_Stretched( EXEC_OPS UShort  index )
@@ -614,10 +696,12 @@
 #endif
 
 
+#pragma code_seg(InterpreterEntry)
   static void  _near Write_CVT( EXEC_OPS UShort  index, TT_F26Dot6  value )
   {
     CUR.cvt[index] = value;
   }
+#pragma code_seg()
 
 #ifdef TT_CONGIG_OPTION_SUPPORT_NON_SQUARE_PIXELS
   static void  _near Write_CVT_Stretched( EXEC_OPS UShort  index, TT_F26Dot6  value )
@@ -626,10 +710,14 @@
   }
 #endif
 
+#pragma code_seg(InterpreterEntry)
+
   static void  _near Move_CVT( EXEC_OPS UShort  index, TT_F26Dot6  value )
   {
     CUR.cvt[index] += value;
   }
+
+#pragma code_seg()
 
 #ifdef TT_CONGIG_OPTION_SUPPORT_NON_SQUARE_PIXELS
   static void  __near Move_CVT_Stretched( EXEC_OPS UShort  index, TT_F26Dot6  value )
@@ -637,6 +725,8 @@
     CUR.cvt[index] += TT_MulDiv( value, 0x10000, CURRENT_Ratio() );
   }
 #endif
+
+#pragma code_seg(InterpreterEntry)
 
 /******************************************************************
  *
@@ -701,6 +791,10 @@
     return SUCCESS;
   }
 
+#pragma code_seg()
+
+
+#pragma code_seg(InterpreterEntry)
 
 /*******************************************************************
  *
@@ -776,6 +870,7 @@
 
     return SUCCESS;
   }
+#pragma code_seg()
 
 
 /*******************************************************************
@@ -858,7 +953,6 @@
     zone->touch[point] |= TT_Flag_Touched_Y;
   }
 
-
 /*******************************************************************
  *
  *  Function    :  Round_None
@@ -876,7 +970,6 @@
  *         should add the compensation before rounding.
  *
  ******************************************************************/
-
   static TT_F26Dot6 _near Round_None( EXEC_OPS TT_F26Dot6  distance,
                                                TT_F26Dot6  compensation )
   {
@@ -896,6 +989,12 @@
     }
 
     return val;
+  }
+
+  static TT_F26Dot6 _far FarRound_None( EXEC_OPS TT_F26Dot6  distance,
+                                               TT_F26Dot6  compensation )
+  {
+	return Round_None( EXEC_ARGS distance, compensation);
   }
 
 
@@ -1173,6 +1272,7 @@
     return val;
   }
 
+#pragma code_seg(InterpreterExtra)
 
 /*******************************************************************
  * Compute_Round
@@ -1216,7 +1316,6 @@
       break;
     }
   }
-
 
 /*******************************************************************
  *
@@ -1284,6 +1383,29 @@
     CUR.threshold >>= 8;
   }
 
+
+#pragma code_seg()
+
+  static TT_F26Dot6 _far FarCUR_Func_round(EXEC_OPS TT_F26Dot6  distance,
+                                                   TT_F26Dot6  compensation)
+{
+	return CUR.func_round(EXEC_ARGS distance, compensation);
+}
+
+  static void _far FarCUR_Func_move(EXEC_OPS PGlyph_Zone zone,
+                                     UShort      point,
+                                     TT_F26Dot6  distance)
+{
+	CUR.func_move(EXEC_ARGS zone, point, distance);
+}
+
+#pragma code_seg(InterpreterEntry)
+
+  static TT_F26Dot6 _far FarCUR_Func_read_cvt(EXEC_OPS UShort index)
+{
+	return CUR.func_read_cvt(EXEC_ARGS index);
+}
+#pragma code_seg()
 
 /*******************************************************************
  *
@@ -1406,6 +1528,7 @@
     return (v1->y - v2->y);
   }
 
+#pragma code_seg(InterpreterExtra)
 
 /*******************************************************************
  *
@@ -1479,7 +1602,6 @@
     /* Disable cached aspect ratio */
     CUR.metrics.ratio = 0;
   }
-
 
 /*******************************************************************
  *
@@ -1629,6 +1751,8 @@
     NORMalize( A, B, Vec );
     return SUCCESS;
   }
+
+#pragma code_seg()
 
 
 /* When not using the big switch statements, the interpreter uses a */
@@ -2144,7 +2268,7 @@
 
 
 #define DO_NROUND                                                         \
-    args[0] = Round_None( EXEC_ARGS                                       \
+    args[0] = FarRound_None( EXEC_ARGS                                       \
                           args[0],                                        \
                           CUR.metrics.compensations[CUR.opcode - 0x6C] );
 
@@ -2974,6 +3098,7 @@
 #endif  /* !TT_CONFIG_OPTION_INTERPRETER_SWITCH */
 
 
+#pragma code_seg(InterpreterExtra)
 /* The following functions are called as is within the switch statement */
 
 /*******************************************/
@@ -3003,6 +3128,7 @@
     CUR.stack[CUR.args - 1] = K;
   }
 
+#pragma code_seg(InterpreterEntry)
 
 /*******************************************/
 /* ROLL[]    : roll top three elements     */
@@ -3039,6 +3165,7 @@
     CUR.error = TT_Err_Code_Overflow;
     return FAILURE;
   }
+
 
 
 /*******************************************/
@@ -3213,7 +3340,6 @@
     }
   }
 
-
 /*******************************************/
 /* ENDF[]    : END Function definition     */
 /* CodeRange : $2D                         */
@@ -3300,6 +3426,7 @@
     CUR.step_ins = FALSE;
   }
 
+#pragma code_seg(InterpreterInfrequent)
 
 /*******************************************/
 /* LOOPCALL[]: LOOP and CALL function      */
@@ -3413,6 +3540,8 @@
 /*                                                              */
 /****************************************************************/
 
+#pragma code_seg(InterpreterInfrequent)
+
 /*******************************************/
 /* NPUSHB[]  : PUSH N Bytes                */
 /* CodeRange : $40                         */
@@ -3465,6 +3594,7 @@
     CUR.new_top += L;
   }
 
+#pragma code_seg(InterpreterEntry)
 
 /*******************************************/
 /* PUSHB[abc]: PUSH Bytes                  */
@@ -3515,6 +3645,7 @@
     CUR.step_ins = FALSE;
   }
 
+#pragma code_seg()
 
 
 /****************************************************************/
@@ -3649,6 +3780,7 @@
     args[0] = D;
   }
 
+#pragma code_seg(InterpreterExtra)
 
 /*******************************************/
 /* SDPVTL[a] : Set Dual PVector to Line    */
@@ -3742,6 +3874,7 @@
     CUR.GS.gep0 = (UShort)args[0];
   }
 
+#pragma code_seg(InterpreterExtra)
 
 /*******************************************/
 /* SZP1[]    : Set Zone Pointer 1          */
@@ -3862,6 +3995,7 @@
       (Byte)( CUR.GS.instruct_control & ~(Byte)K ) | (Byte)L;
   }
 
+#pragma code_seg(InterpreterExtra)
 
 /*******************************************/
 /* SCANCTRL[]: SCAN ConTRol                */
@@ -4025,7 +4159,14 @@
     for ( I = L; I <= K; ++I )
       CUR.pts.touch[I] &= ~TT_Flag_On_Curve;
   }
+#pragma code_seg()
 
+REMOTE_Func_project( EXEC_OPS TT_Vector*  v1, TT_Vector*  v2 )
+{   
+    CUR_Func_project( v1, v2 );
+}
+
+#pragma code_seg(InterpreterInfrequent)
 
   static Bool  Compute_Point_Displacement( EXEC_OPS
                                            PCoordinates  x,
@@ -4061,14 +4202,13 @@
     *zone = zp;
     *refp = p;
 
-    d = CUR_Func_project( zp.cur + p, zp.org + p );
+    d = REMOTE_Func_project( EXEC_ARGS zp.cur + p, zp.org + p );
 
     *x = TT_MulDiv(d, (Long)CUR.GS.freeVector.x * 0x10000L, CUR.F_dot_P );
     *y = TT_MulDiv(d, (Long)CUR.GS.freeVector.y * 0x10000L, CUR.F_dot_P );
 
     return SUCCESS;
   }
-
 
   static void  Move_Zp2_Point( EXEC_OPS
                                UShort      point,
@@ -4289,7 +4429,7 @@
     CUR.GS.loop = 1;
     CUR.new_top = CUR.args;
   }
-
+#pragma code_seg();
 
 /**********************************************/
 /* MSIRP[a]  : Move Stack Indirect Relative   */
@@ -4566,7 +4706,7 @@
     if ( !cvtEntry )
       cvt_dist = 0;
     else
-      cvt_dist = CUR_Func_read_cvt( cvtEntry - 1 );
+      cvt_dist = FarCUR_Func_read_cvt( EXEC_ARGS cvtEntry - 1 );
 
     /* single width test */
 
@@ -4709,7 +4849,7 @@
     CUR.new_top = CUR.args;
   }
 
-
+#pragma code_seg(InterpreterInfrequent)
 /**********************************************/
 /* ISECT[]     : moves point to InterSECTion  */
 /* CodeRange   : $0F                          */
@@ -4790,6 +4930,7 @@
                                CUR.zp0.cur[b1].y ) >> 2;
     }
   }
+#pragma code_seg()
 
 
 /**********************************************/
@@ -4911,6 +5052,7 @@
     CUR.new_top = CUR.args;
   }
 
+#pragma code_seg(InterpreterInfrequent)
 
 /**********************************************/
 /* UTP[a]      : UnTouch Point                */
@@ -4967,7 +5109,6 @@
     for ( i = p + 1; i <= p2; ++i )
       LINK->curs[i].x += x;
   }
-
 
   static void  Interp( UShort               p1,
                        UShort               p2,
@@ -5199,7 +5340,7 @@
             ++B;
           B = B * 64L / (1L << CUR.GS.delta_shift);
 
-          CUR_Func_move( &CUR.zp0, A, B );
+          FarCUR_Func_move( EXEC_ARGS &CUR.zp0, A, B );
         }
       }
 #ifdef TT_CONFIG_OPTION_SUPPORT_PEDANTIC_HINTING
@@ -5282,7 +5423,6 @@
   }
 
 
-
 /****************************************************************/
 /*                                                              */
 /* MISC. INSTRUCTIONS                                           */
@@ -5304,6 +5444,7 @@
     args[0] = (args[0] & 1) ? 3 : 0;
   }
 
+#pragma code_seg()
 
   static void  Ins_UNKNOWN( EXEC_OP )
   {
@@ -5627,6 +5768,8 @@
     /*  MIRP[31]  */  Ins_MIRP
   };
 #endif
+
+#pragma code_seg(InterpreterEntry)
 
 
 /****************************************************************/
@@ -6687,6 +6830,7 @@
 
     return error;
   }
+#pragma code_seg()
 
 #endif /* DEBUG_INTERPRETER */
 
