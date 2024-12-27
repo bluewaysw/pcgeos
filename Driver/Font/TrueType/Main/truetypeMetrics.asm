@@ -56,9 +56,14 @@ REVISION HISTORY:
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
 
 TrueTypeCharMetrics	proc	far
-	uses	bx, cx, si, di, ds
+	uses	cx, si, ds
 
 resultDXAX	local	dword
+
+	push	bx, di
+	mov	di, FONT_C_CODE_STACK_SPACE
+	call	ThreadBorrowStackSpace
+	push	di
 
 	.enter
 
@@ -107,6 +112,11 @@ resultDXAX	local	dword
 done:
 	clc
 	.leave
+
+	pop	di
+	call	ThreadReturnStackSpace	; (preserves flags)
+	pop	bx, di
+	
 	ret
 
 roundToInt:

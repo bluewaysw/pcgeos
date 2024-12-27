@@ -45,6 +45,7 @@
     2147483647
   };
 
+#pragma code_seg(ResidentMath)
 
   EXPORT_FUNC
   TT_Long  TT_MulDiv( TT_Long  a, TT_Long  b, TT_Long  c )
@@ -216,6 +217,8 @@
     return ( s < 0 ) ? -a : a;
   #endif
   }
+
+#pragma code_seg()
 
   /* The optimization for TT_MulFix is different. We could simply be     */
   /* happy by applying the same principles than with TT_MulDiv, because  */
