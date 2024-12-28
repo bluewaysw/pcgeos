@@ -83,6 +83,8 @@ char *ssl2_version_str="SSLv2 part of SSLeay 0.9.0b 29-Jun-1998";
 #pragma option -dc-
 #endif
 
+#ifndef COMPILE_OPTION_HOST_SERVICE_ONLY
+
 SSL_CIPHER ssl2_ciphers[]={
 /* NULL_WITH_MD5 v3 */
 #if 0
@@ -494,3 +496,4 @@ SSL *s;
 	return(1);
 	}
 
+#endif

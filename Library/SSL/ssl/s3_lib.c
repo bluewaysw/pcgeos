@@ -78,6 +78,8 @@ static long ssl3_default_timeout();
 #pragma option -dc-
 #endif
 
+#ifndef COMPILE_OPTION_HOST_SERVICE_ONLY
+
 SSL_CIPHER ssl3_ciphers[]={
 /* The RSA ciphers */
 /* Cipher 01 */
@@ -979,3 +981,4 @@ need to go to SSL_ST_ACCEPT.
 	}
 
 
+#endif

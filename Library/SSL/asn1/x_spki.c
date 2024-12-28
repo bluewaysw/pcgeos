@@ -60,6 +60,8 @@
   * wrote it.  It is under my Copyright with his permision
   */
 
+#ifndef COMPILE_OPTION_HOST_SERVICE_ONLY
+
 #ifdef __GEOS__
 #include <Ansi/stdio.h>
 #else
@@ -183,3 +185,4 @@ NETSCAPE_SPKI *a;
 	Free((char *)a);
 	}
 
+#endif

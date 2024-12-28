@@ -63,6 +63,8 @@
 #endif
 #include "ssl_locl.h"
 
+#ifndef COMPILE_OPTION_HOST_SERVICE_ONLY
+
 int ssl2_enc_init(s, client)
 SSL *s;
 int client;
@@ -193,3 +195,4 @@ int send;
 	/* some would say I should zero the md context */
 	}
 
+#endif
