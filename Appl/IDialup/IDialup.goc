@@ -832,272 +832,287 @@ AccessPointLocalDialingOptions GetLocalDialingOptions (void)
  ***********************************************************************/
 @method IDialupProcessClass, MSG_IDP_EDIT_OK
 {
-  MemHandle mh;
-  MemHandle hanDNS1, hanDNS2;
-  word sel;
-  optr item;
-  TCHAR *str;
-  Boolean dns1Valid, dns2Valid;
-  word type = @call IDEditConnectionType::MSG_GEN_ITEM_GROUP_GET_SELECTION() ;
+    MemHandle mh;
+    MemHandle hanDNS1, hanDNS2;
+    word sel;
+    optr item;
+    TCHAR *str;
+    Boolean dns1Valid, dns2Valid;
+    word type = @call IDEditConnectionType::MSG_GEN_ITEM_GROUP_GET_SELECTION() ;
 
-  // Before we can commit the changes to or addition of this Connection, we
-  // need to validate the IP addresses entered in the DNS fields.
-  //
-  hanDNS1 = @call IDEditDNS1::MSG_VIS_TEXT_GET_ALL_BLOCK(0);
-  hanDNS2 = @call IDEditDNS2::MSG_VIS_TEXT_GET_ALL_BLOCK(0);
+    // Before we can commit the changes to or addition of this Connection, we
+    // need to validate the IP addresses entered in the DNS fields.
+    //
+    hanDNS1 = @call IDEditDNS1::MSG_VIS_TEXT_GET_ALL_BLOCK(0);
+    hanDNS2 = @call IDEditDNS2::MSG_VIS_TEXT_GET_ALL_BLOCK(0);
 
-  dns1Valid = CheckValidIPAddress( hanDNS1 );
-  dns2Valid = CheckValidIPAddress( hanDNS2 );
+    dns1Valid = CheckValidIPAddress( hanDNS1 );
+    dns2Valid = CheckValidIPAddress( hanDNS2 );
 
-  if ( !dns1Valid || !dns2Valid )
-  {
-      MemLock( OptrToHandle( @invalidDNS1Str ) );
-      str = LMemDeref( (dns1Valid) ? @invalidDNS2Str : @invalidDNS1Str );
-
-      // Small hack: this will send a grab focus message to
-      // the field that had the error.  It has to be done after
-      // the dialog box goes down or else the focus is changed
-      // by the invalidation of the edit dialog.  The message
-      // normally sent by doStandardDialog passes one argument (in cx)
-      // which we don't care about and grab focus takes no args so
-      // this is OK.
-
-      @call IDialupApp::MSG_GEN_APPLICATION_DO_STANDARD_DIALOG(
-	  MSG_META_GRAB_FOCUS_EXCL,
-	  (dns1Valid ? @IDEditDNS2 : @IDEditDNS1), 0,
-	  (char *)0, (char *)0, (char *)0,
-	  str,
-	  (CDT_ERROR << CDBF_DIALOG_TYPE_OFFSET) |
-	  (GIT_NOTIFICATION << CDBF_INTERACTION_TYPE_OFFSET) |
-	  CDBF_SYSTEM_MODAL);
-      MemUnlock( OptrToHandle( @invalidDNS1Str ) );
-
-      MemFree( hanDNS1 );
-      MemFree( hanDNS2 );
-      return;
-  }
-
-/*#ifndef PRODUCT_NDO2000  */
-  /* If the user has modified the phone number or the local dialing
-   * options, put up a dialog showing the full number as it will be
-   * dialed by the modem, and ask them to verify it before proceeding.
-   */
-  if ((@call IDEditPhoneNumber::MSG_GEN_TEXT_IS_MODIFIED()
-      || editDialOptionsChanged) && (type == NET_TYPE_PPP))
-  {
-      MemHandle phoneHan, phoneWithOptionsHan;
-
-      /* Get the current phone number. */
-      phoneHan = @call IDEditPhoneNumber::MSG_VIS_TEXT_GET_ALL_BLOCK(0);
-      if (phoneHan != NullHandle)
-      {
-	  /* Generate the full phone number with dialing options applied. */
-	  phoneWithOptionsHan = GetPhoneStringWithOptions(phoneHan,
-	      GetLocalDialingOptions());
-	  if (phoneWithOptionsHan != NullHandle)
-	  {
-	      TCHAR *phoneStr = MemLock(phoneWithOptionsHan);
-	      if (phoneStr[0] != '\0')
-		  phoneStr ++;	/* always skip the T/P character */
-	      @call IDVPNumberGlyph::
-		  MSG_GEN_REPLACE_VIS_MONIKER_TEXT(phoneStr, VUM_NOW);
-	      MemFree(phoneWithOptionsHan);
-	  }
-	  if (UserDoDialog(@IDVerifyPhoneGroup) == IC_NO)
-	  {
-	      /* The user wishes to change the number.  Have the phone
-	       * field grab the focus and allow the user to continue
-	       * editing.
-	       */
-	      @send IDEditPhoneNumber::MSG_META_GRAB_FOCUS_EXCL();
-	      return;
-	  }
-      }
-  }
-/*#endif */
-
-  /* If the password field is blank, ask the user to verify that they
-   * indeed have no password. */
-  if ((@call IDEditPassword::MSG_VIS_TEXT_GET_TEXT_SIZE() == 0) && (type == NET_TYPE_PPP))
-  {
-	 /*  if (*/UserStandardDialogOptr(NULL, NULL, NullOptr,
-	 NullOptr,
-	 @verifyBlankPwdStr,
-			  ((CDT_NOTIFICATION << CDBF_DIALOG_TYPE_OFFSET) |
-			  (GIT_NOTIFICATION << CDBF_INTERACTION_TYPE_OFFSET)));
- /*     {
-	  @send IDEditPassword::MSG_META_GRAB_FOCUS_EXCL();
-	  return;
-      }  */
-  }
-
-  if(creatingConnection)
+    if ( !dns1Valid || !dns2Valid )
     {
-      // create a new accesspoint
-      /* jfh - there is no method for this msg !?!? */
-		@call IDialupApp::MSG_IDA_SAVE_CURRENT_PASSWORD();
-      currentAccpnt = AccessPointCreateEntry(1, APT_INTERNET);
-      // Indicate that this access point should use the dialing
-      // options.
-      AccessPointSetIntegerPropertyDirect(currentAccpnt,
-		(char*)APSP_USE_DIALING_OPTIONS, 1);
+        MemLock( OptrToHandle( @invalidDNS1Str ) );
+        str = LMemDeref( (dns1Valid) ? @invalidDNS2Str : @invalidDNS1Str );
+
+        // Small hack: this will send a grab focus message to
+        // the field that had the error.  It has to be done after
+        // the dialog box goes down or else the focus is changed
+        // by the invalidation of the edit dialog.  The message
+        // normally sent by doStandardDialog passes one argument (in cx)
+        // which we don't care about and grab focus takes no args so
+        // this is OK.
+
+        @call IDialupApp::MSG_GEN_APPLICATION_DO_STANDARD_DIALOG(
+            MSG_META_GRAB_FOCUS_EXCL,
+            (dns1Valid ? @IDEditDNS2 : @IDEditDNS1), 0,
+            (char *)0, (char *)0, (char *)0,
+            str,
+            (CDT_ERROR << CDBF_DIALOG_TYPE_OFFSET) |
+            (GIT_NOTIFICATION << CDBF_INTERACTION_TYPE_OFFSET) |
+            CDBF_SYSTEM_MODAL);
+            MemUnlock( OptrToHandle( @invalidDNS1Str )
+        );
+
+        MemFree( hanDNS1 );
+        MemFree( hanDNS2 );
+        return;
     }
 
-  mh = @call IDEditUserName::MSG_VIS_TEXT_GET_ALL_BLOCK(0);
-  if(mh)
+    if (type == NET_TYPE_PPP)
     {
-      str = MemLock(mh);
-      if(strlen(str))
-	{
-	  AccessPointSetStringPropertyDirect(currentAccpnt, (char*)APSP_USER,
-				   str);
-	}
-      MemFree(mh);
-    }
-
-  mh = @call IDEditPassword::MSG_VIS_TEXT_GET_ALL_BLOCK(0);
-  if(mh)
-    {
-      str = MemLock(mh);
-      if (strlen(str))
+        /* If the user has modified the phone number or the local dialing
+        * options, put up a dialog showing the full number as it will be
+        * dialed by the modem, and ask them to verify it before proceeding.
+        */
+        if (@call IDEditPhoneNumber::MSG_GEN_TEXT_IS_MODIFIED() || editDialOptionsChanged)
         {
-			 AccessPointSetStringPropertyDirect(currentAccpnt, (char*)APSP_SECRET,
-					str);
-			 AccessPointDestroyPropertyDirect(currentAccpnt, (char*)APSP_PROMPT_SECRET);
-	}
-	else
-	{
-	  AccessPointDestroyPropertyDirect(currentAccpnt, (char*)APSP_SECRET);
-	  /* this makes the accpt lib ask for a pword at logon */
-	  AccessPointSetIntegerPropertyDirect(currentAccpnt, (char*)APSP_PROMPT_SECRET,
-					1);
-	}
+            MemHandle phoneHan, phoneWithOptionsHan;
 
-      MemFree(mh);
+            /* Get the current phone number. */
+            phoneHan = @call IDEditPhoneNumber::MSG_VIS_TEXT_GET_ALL_BLOCK(0);
+            if (phoneHan != NullHandle)
+            {
+                /* Generate the full phone number with dialing options applied. */
+                phoneWithOptionsHan = GetPhoneStringWithOptions(phoneHan, GetLocalDialingOptions());
+                if (phoneWithOptionsHan != NullHandle)
+                {
+                    TCHAR *phoneStr = MemLock(phoneWithOptionsHan);
+                    if (phoneStr[0] != '\0')
+                    phoneStr ++;	/* always skip the T/P character */
+                    @call IDVPNumberGlyph::
+                    MSG_GEN_REPLACE_VIS_MONIKER_TEXT(phoneStr, VUM_NOW);
+                    MemFree(phoneWithOptionsHan);
+                }
+                if (UserDoDialog(@IDVerifyPhoneGroup) == IC_NO)
+                {
+                    /* The user wishes to change the number.  Have the phone
+                    * field grab the focus and allow the user to continue
+                    * editing.
+                    */
+                    @send IDEditPhoneNumber::MSG_META_GRAB_FOCUS_EXCL();
+                    return;
+                }
+            }
+        }
+
+        /* If the password field is blank, ask the user to verify that they
+        * indeed have no password. */
+        if (@call IDEditPassword::MSG_VIS_TEXT_GET_TEXT_SIZE() == 0)
+        {
+            /*  if (*/UserStandardDialogOptr(NULL, NULL, NullOptr,
+            NullOptr,
+            @verifyBlankPwdStr,
+                    ((CDT_NOTIFICATION << CDBF_DIALOG_TYPE_OFFSET) |
+                    (GIT_NOTIFICATION << CDBF_INTERACTION_TYPE_OFFSET)));
+        /*     {
+            @send IDEditPassword::MSG_META_GRAB_FOCUS_EXCL();
+            return;
+            }  */
+        }
     }
 
-  mh = @call IDEditPhoneNumber::MSG_VIS_TEXT_GET_ALL_BLOCK(0);
-  if(mh)
+    // create a new accesspoint
+    if(creatingConnection)
     {
-      str = MemLock(mh);
-      if(strlen(str))
-	{
-	  AccessPointSetStringPropertyDirect(currentAccpnt, (char*)APSP_PHONE,
-				   str);
-	}
-      MemFree(mh);
+        /* jfh - there is no method for this msg !?!? */
+        /* - can't find one either (meyerk 12/2024) */
+        @call IDialupApp::MSG_IDA_SAVE_CURRENT_PASSWORD();
+
+        currentAccpnt = AccessPointCreateEntry(1, APT_INTERNET);
+        if (type == NET_TYPE_PPP)
+        {
+            // Indicate that this access point should use the dialing
+            // options.
+            AccessPointSetIntegerPropertyDirect(
+                currentAccpnt,
+                (char*)APSP_USE_DIALING_OPTIONS,
+                1
+            );
+        }
+        else
+        {
+            // Packet or ODI driver
+
+            /* no global dialing options */
+            AccessPointSetIntegerPropertyDirect(
+                currentAccpnt,
+                (char*)APSP_USE_DIALING_OPTIONS,
+                0
+            );
+
+            /* no local dialing options */
+            AccessPointSetIntegerPropertyDirect(
+                currentAccpnt,
+                (char*)APSP_LOCAL_DIALING_OPTIONS,
+                0
+            );
+
+            /* never prompt for a password */
+            AccessPointSetIntegerPropertyDirect(currentAccpnt, (char*)APSP_PROMPT_SECRET, 0);
+
+            /* dummy phone number - apparently always needed, but why? */
+            AccessPointSetStringPropertyDirect(currentAccpnt, (char*)APSP_PHONE, _TEXT("+"));
+        }
     }
 
-  AccessPointSetIntegerPropertyDirect(currentAccpnt, (char*)APSP_LOCAL_DIALING_OPTIONS,
-				      GetLocalDialingOptions());
-
-/*#if _NDO2000 */
-  mh = @call IDEditIP::MSG_VIS_TEXT_GET_ALL_BLOCK(0);
-  if(mh)
+    if (type == NET_TYPE_PPP)
     {
-      str = MemLock(mh);
-      if(strlen(str))
-	{
-	  AccessPointSetStringPropertyDirect(currentAccpnt,
-                                             (char*)APSP_ADDRESS, str);
-	}
-      MemFree(mh);
+        mh = @call IDEditUserName::MSG_VIS_TEXT_GET_ALL_BLOCK(0);
+        if (mh)
+        {
+            str = MemLock(mh);
+            if (strlen(str)) {
+                AccessPointSetStringPropertyDirect(currentAccpnt, (char*)APSP_USER, str);
+            }
+            MemFree(mh);
+        }
+
+        mh = @call IDEditPassword::MSG_VIS_TEXT_GET_ALL_BLOCK(0);
+        if (mh)
+        {
+            str = MemLock(mh);
+            if (strlen(str))
+            {
+                AccessPointSetStringPropertyDirect(currentAccpnt, (char*)APSP_SECRET, str);
+                AccessPointDestroyPropertyDirect(currentAccpnt, (char*)APSP_PROMPT_SECRET);
+            }
+            else
+            {
+                AccessPointDestroyPropertyDirect(currentAccpnt, (char*)APSP_SECRET);
+                /* this makes the accpt lib ask for a pword at logon */
+                AccessPointSetIntegerPropertyDirect(currentAccpnt, (char*)APSP_PROMPT_SECRET, 1);
+            }
+            MemFree(mh);
+        }
+
+        mh = @call IDEditPhoneNumber::MSG_VIS_TEXT_GET_ALL_BLOCK(0);
+        if (mh)
+        {
+            str = MemLock(mh);
+            if (strlen(str)) {
+                AccessPointSetStringPropertyDirect(currentAccpnt, (char*)APSP_PHONE, str);
+            }
+            MemFree(mh);
+        }
+
+        AccessPointSetIntegerPropertyDirect(
+            currentAccpnt,
+            (char*)APSP_LOCAL_DIALING_OPTIONS,
+            GetLocalDialingOptions()
+        );
     }
 
-  mh = @call IDEditGateway::MSG_VIS_TEXT_GET_ALL_BLOCK(0);
-  if(mh)
+    mh = @call IDEditIP::MSG_VIS_TEXT_GET_ALL_BLOCK(0);
+    if(mh)
     {
-      str = MemLock(mh);
-      if(strlen(str))
-	{
-	  AccessPointSetStringPropertyDirect(currentAccpnt,
-                                             (char*)APSP_GATEWAY, str);
-	}
-      MemFree(mh);
+        str = MemLock(mh);
+        if (strlen(str)) {
+            AccessPointSetStringPropertyDirect(currentAccpnt, (char*)APSP_ADDRESS, str);
+        }
+        MemFree(mh);
     }
 
-  mh = @call IDEditMask::MSG_VIS_TEXT_GET_ALL_BLOCK(0);
-  if(mh)
+    mh = @call IDEditGateway::MSG_VIS_TEXT_GET_ALL_BLOCK(0);
+    if(mh)
     {
-      str = MemLock(mh);
-      if(strlen(str))
-	{
-	  AccessPointSetStringPropertyDirect(currentAccpnt,
-                                             (char*)APSP_MASK, str);
-	}
-      MemFree(mh);
+        str = MemLock(mh);
+        if (strlen(str)) {
+            AccessPointSetStringPropertyDirect(currentAccpnt, (char*)APSP_GATEWAY, str);
+        }
+        MemFree(mh);
     }
-/*#endif */
 
-  mh = hanDNS1;
-  if(mh)
+    mh = @call IDEditMask::MSG_VIS_TEXT_GET_ALL_BLOCK(0);
+    if(mh)
     {
-      str = MemLock(mh);
-      if(strlen(str))
-	{
-	  AccessPointSetStringPropertyDirect(currentAccpnt, (char*)APSP_DNS1,
-				   str);
-	}
-	else
-	{
-	    AccessPointDestroyPropertyDirect(currentAccpnt, (char*)APSP_DNS1);
-	}
-      MemFree(mh);
-      hanDNS1 = NULL;
+        str = MemLock(mh);
+        if (strlen(str)) {
+            AccessPointSetStringPropertyDirect(currentAccpnt, (char*)APSP_MASK, str);
+        }
+        MemFree(mh);
     }
 
-  mh = hanDNS2;
-  if(mh)
+    mh = hanDNS1;
+    if(mh)
     {
-      str = MemLock(mh);
-      if(strlen(str))
-	{
-	  AccessPointSetStringPropertyDirect(currentAccpnt, (char*)APSP_DNS2,
-				   str);
-	}
-	else
-	{
-	    AccessPointDestroyPropertyDirect(currentAccpnt, (char*)APSP_DNS2);
-	}
-      MemFree(mh);
-      hanDNS2 = NULL;
+        str = MemLock(mh);
+        if (strlen(str)) {
+            AccessPointSetStringPropertyDirect(currentAccpnt, (char*)APSP_DNS1, str);
+        }
+        else {
+            AccessPointDestroyPropertyDirect(currentAccpnt, (char*)APSP_DNS1);
+        }
+        MemFree(mh);
+        hanDNS1 = NULL;
     }
 
-  mh = @call IDEditConnectionName::MSG_VIS_TEXT_GET_ALL_BLOCK(0);
-  if(mh)
+    mh = hanDNS2;
+    if(mh)
     {
-      str = MemLock(mh);
-      if(strlen(str))
-	{
-	  AccessPointSetStringPropertyDirect(currentAccpnt, (char*)APSP_NAME,
-				   str);
-	  // change the name in the connection list
-	  sel = @call IDConnectionList::MSG_GEN_ITEM_GROUP_GET_SELECTION();
-	  item = @call IDConnectionList::MSG_GEN_ITEM_GROUP_GET_ITEM_OPTR(sel);
-	  @call item::MSG_GEN_REPLACE_VIS_MONIKER_TEXT(str, VUM_NOW);
-	}
-      MemFree(mh);
+        str = MemLock(mh);
+        if (strlen(str)) {
+            AccessPointSetStringPropertyDirect(currentAccpnt, (char*)APSP_DNS2, str);
+        }
+        else {
+            AccessPointDestroyPropertyDirect(currentAccpnt, (char*)APSP_DNS2);
+        }
+        MemFree(mh);
+        hanDNS2 = NULL;
     }
 
-  AccessPointSetIntegerPropertyDirect(currentAccpnt, "netType", type);
-
-  AccessPointCommit();
-
-  if(creatingConnection)
+    mh = @call IDEditConnectionName::MSG_VIS_TEXT_GET_ALL_BLOCK(0);
+    if(mh)
     {
-      creatingConnection = FALSE;
-      @call self::MSG_IDP_INITIALIZE_CONNECTION();
-    }
-  else
-    {
-      // change the current connection display
-      @call self::MSG_IDP_CONNECTION_SET_CURRENT();
+        str = MemLock(mh);
+        if (strlen(str))
+        {
+            AccessPointSetStringPropertyDirect(currentAccpnt, (char*)APSP_NAME, str);
+            // change the name in the connection list
+            sel = @call IDConnectionList::MSG_GEN_ITEM_GROUP_GET_SELECTION();
+            item = @call IDConnectionList::MSG_GEN_ITEM_GROUP_GET_ITEM_OPTR(sel);
+            @call item::MSG_GEN_REPLACE_VIS_MONIKER_TEXT(str, VUM_NOW);
+        }
+        MemFree(mh);
     }
 
-  // We no longer automatically do this via GI_attrs since we may not
-  // want to bring down the dialog if the DNS entry is invalid.
-  @send IDEditGroup::MSG_GEN_INTERACTION_ACTIVATE_COMMAND(
-      IC_INTERACTION_COMPLETE);
+    AccessPointSetIntegerPropertyDirect(currentAccpnt, "netType", type);
+
+    AccessPointCommit();
+
+    if(creatingConnection)
+    {
+        creatingConnection = FALSE;
+        @call self::MSG_IDP_INITIALIZE_CONNECTION();
+    }
+    else
+    {
+        // change the current connection display
+        @call self::MSG_IDP_CONNECTION_SET_CURRENT();
+    }
+
+    // We no longer automatically do this via GI_attrs since we may not
+    // want to bring down the dialog if the DNS entry is invalid.
+    @send IDEditGroup::MSG_GEN_INTERACTION_ACTIVATE_COMMAND(IC_INTERACTION_COMPLETE);
 }
 
 /***********************************************************************
