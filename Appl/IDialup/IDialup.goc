@@ -1894,122 +1894,125 @@ void IDialupUpdateEditOKButton(void)
  ***********************************************************************/
 @method IDialupProcessClass, MSG_IDP_CONNECT
 {
-	word netType = 0 ;
-	char buffer[80] ;
-	word size ;
-	Boolean changed = FALSE ;
+    word netType = 0 ;
+    char buffer[80] ;
+    word size ;
+    Boolean changed = FALSE ;
 
-  connectSent = TRUE;
-  disconnectRequested = FALSE;
+    connectSent = TRUE;
+    disconnectRequested = FALSE;
 
-  /* Unregister if we are not connected */
-  if (G_registered)  {
-	  UnregisterToPPP();
+    /* Unregister if we are not connected */
+    if (G_registered)  {
+        UnregisterToPPP();
 
-	  UnloadPPPDriver();
-	  G_registered = FALSE ;
-  }
+        UnloadPPPDriver();
+        G_registered = FALSE ;
+    }
 
-  AccessPointSetActivePoint(currentAccpnt, APT_INTERNET);
-  AccessPointCommit();
+    AccessPointSetActivePoint(currentAccpnt, APT_INTERNET);
+    AccessPointCommit();
 
-  // true if error => in this case, set netType to NET_TYPE_PPP
-  if (AccessPointGetIntegerPropertyDirect(currentAccpnt, "netType", (int*) &netType))
-	  netType = NET_TYPE_PPP ;
+    // true if error => in this case, set netType to NET_TYPE_PPP
+    if (AccessPointGetIntegerPropertyDirect(currentAccpnt, "netType", (int*) &netType)) {
+        netType = NET_TYPE_PPP ;
+    }
 
-  InitFileReadStringBuffer("tcpip", "driver", buffer, sizeof(buffer)-1, &size) ;
-  buffer[size] = '\0' ;
-  if( netType == NET_TYPE_HOST )
-  {
-	NEC(char *driver = "Host TCP/IP Driver" ; )
-	EC(char *driver = "EC Host TCP/IP Driver" ; )
-	if ((strlen(buffer)) && (strcmp(driver, buffer)!=0)) changed = TRUE ;
-	InitFileWriteString("tcpip", "driver", driver) ;
+    InitFileReadStringBuffer("tcpip", "driver", buffer, sizeof(buffer)-1, &size) ;
+    buffer[size] = '\0' ;
+    if( netType == NET_TYPE_HOST )
+    {
+        NEC(char *driver = "Host TCP/IP Driver" ; )
+        EC(char *driver = "EC Host TCP/IP Driver" ; )
+        if ((strlen(buffer)) && (strcmp(driver, buffer)!=0)) changed = TRUE ;
+        InitFileWriteString("tcpip", "driver", driver) ;
 
-	InitFileDeleteEntry("tcpip", "link") ;
-	InitFileWriteString("tcpip", "linkDomain", "Host") ;
-	InitFileDeleteEntry("tcpip", "linkPermname") ;
-  }
-  else
-  {
-	NEC(char *driver = "TCP/IP Driver" ; )
-	EC(char *driver = "EC TCP/IP Driver" ; )
-	if ((strlen(buffer)) && (strcmp(driver, buffer)!=0)) changed = TRUE ;
-	InitFileWriteString("tcpip", "driver", driver) ;
+        InitFileDeleteEntry("tcpip", "link") ;
+        InitFileWriteString("tcpip", "linkDomain", "Host") ;
+        InitFileDeleteEntry("tcpip", "linkPermname") ;
+    }
+    else
+    {
+        NEC(char *driver = "TCP/IP Driver" ; )
+        EC(char *driver = "EC TCP/IP Driver" ; )
+        if ((strlen(buffer)) && (strcmp(driver, buffer)!=0)) changed = TRUE ;
+        InitFileWriteString("tcpip", "driver", driver) ;
 
-	InitFileReadStringBuffer("tcpip", "link", buffer, sizeof(buffer)-1, &size) ;
-	buffer[size] = '\0' ;
-	if (netType == NET_TYPE_ODI)
+        InitFileReadStringBuffer("tcpip", "link", buffer, sizeof(buffer)-1, &size) ;
+        buffer[size] = '\0' ;
+        if (netType == NET_TYPE_ODI)
         {
-	    NEC(char *link = "ODI Ethernet Driver" ; )
-	    EC(char *link = "EC ODI Ethernet Driver" ; )
-	    if ((strlen(buffer)) && (strcmp(link, buffer)!=0)) changed = TRUE ;
-	    InitFileWriteString("tcpip", "link", link) ;
-	    InitFileWriteString("tcpip", "linkDomain", "EtherODI") ;
-	    InitFileDeleteEntry("tcpip", "linkPermname") ;
-	}
+            NEC(char *link = "ODI Ethernet Driver" ; )
+            EC(char *link = "EC ODI Ethernet Driver" ; )
+            if ((strlen(buffer)) && (strcmp(link, buffer)!=0)) changed = TRUE ;
+            InitFileWriteString("tcpip", "link", link) ;
+            InitFileWriteString("tcpip", "linkDomain", "EtherODI") ;
+            InitFileDeleteEntry("tcpip", "linkPermname") ;
+        }
         else if (netType == NET_TYPE_PKT)
         {
-	    NEC(char *link = "Packet Ethernet Driver" ; )
-	    EC(char *link = "EC Packet Ethernet Driver" ; )
-	    if ((strlen(buffer)) && (strcmp(link, buffer)!=0)) changed = TRUE ;
-	    InitFileWriteString("tcpip", "link", link) ;
-	    InitFileWriteString("tcpip", "linkDomain", link) ;
-	    InitFileDeleteEntry("tcpip", "linkPermname") ;
+            NEC(char *link = "Packet Ethernet Driver" ; )
+            EC(char *link = "EC Packet Ethernet Driver" ; )
+            if ((strlen(buffer)) && (strcmp(link, buffer)!=0)) changed = TRUE ;
+            InitFileWriteString("tcpip", "link", link) ;
+            InitFileWriteString("tcpip", "linkDomain", "EtherPKT") ;
+            InitFileDeleteEntry("tcpip", "linkPermname") ;
         }
         else
         {
-	    NEC(char *ppplink = "PPP Driver" ; )
-	    EC(char *ppplink = "EC PPP Driver" ; )
-	    if ((strlen(buffer)) && (strcmp(ppplink, buffer)!=0)) changed = TRUE ;
-	    InitFileWriteString("tcpip", "link", ppplink) ;
-	    InitFileWriteString("tcpip", "linkDomain", "PPP") ;
-	    InitFileWriteString("tcpip", "linkPermname", "ppp") ;
-	}
-  }
+            NEC(char *ppplink = "PPP Driver" ; )
+            EC(char *ppplink = "EC PPP Driver" ; )
+            if ((strlen(buffer)) && (strcmp(ppplink, buffer)!=0)) changed = TRUE ;
+            InitFileWriteString("tcpip", "link", ppplink) ;
+            InitFileWriteString("tcpip", "linkDomain", "PPP") ;
+            InitFileWriteString("tcpip", "linkPermname", "ppp") ;
+        }
+    }
 
-  if (changed)  {
-      UserStandardDialogOptr(
-        0,
-        0,
-        0,
-        0,
-        @mustRestart,
-        (CDT_ERROR<<CDBF_DIALOG_TYPE_OFFSET)|(GIT_NOTIFICATION<<CDBF_INTERACTION_TYPE_OFFSET)) ;
-      SysShutdown(SST_RESTART) ;
-  } else {
-      @call IDConnectButton::MSG_GEN_SET_NOT_ENABLED(VUM_DELAYED_VIA_UI_QUEUE);
-      @call IDDisconnectButton::MSG_GEN_SET_NOT_ENABLED(VUM_NOW);
-      @call IDInfoGroup::MSG_IDI_RESET();		/* Make sure stats are 0'd */
-      @call IDialupApp::MSG_IDA_VIEW_INFO();
+    if (changed)
+    {
+        UserStandardDialogOptr(
+            0,
+            0,
+            0,
+            0,
+            @mustRestart,
+            (CDT_ERROR<<CDBF_DIALOG_TYPE_OFFSET)|(GIT_NOTIFICATION<<CDBF_INTERACTION_TYPE_OFFSET)) ;
+        SysShutdown(SST_RESTART) ;
+    }
+    else
+    {
+        @call IDConnectButton::MSG_GEN_SET_NOT_ENABLED(VUM_DELAYED_VIA_UI_QUEUE);
+        @call IDDisconnectButton::MSG_GEN_SET_NOT_ENABLED(VUM_NOW);
+        @call IDInfoGroup::MSG_IDI_RESET();		/* Make sure stats are 0'd */
+        @call IDialupApp::MSG_IDA_VIEW_INFO();
 
-      /* Register for a connection */
-      if (!G_registered)  {
-          LoadPPPDriver();
+        /* Register for a connection */
+        if (!G_registered)  {
+            LoadPPPDriver();
 
-          RegisterToPPP();
-	      G_registered = TRUE ;
-      }
+            RegisterToPPP();
+            G_registered = TRUE ;
+        }
 
-
-      if(!IDialupConnect())
+        if(!IDialupConnect())
         {
-          /* something wrong, should notify the user */
-          if ( !disconnectRequested )
-	      EC(EC_WARNING(-1);)
+            /* something wrong, should notify the user */
+            if ( !disconnectRequested )
+            EC(EC_WARNING(-1);)
 
-          /*
-           * If connectSent wasn't cleared, we never got to PPP_STATUS_OPENING,
-           * so take care of that and restore the connection view.  Otherwise,
-           * PPP_STATUS_CLOSED will eventually do all this for us.
-           */
-          if (connectSent)
-          {
-	      connectSent = FALSE;
-	      disconnectRequested = FALSE;
+            /*
+            * If connectSent wasn't cleared, we never got to PPP_STATUS_OPENING,
+            * so take care of that and restore the connection view.  Otherwise,
+            * PPP_STATUS_CLOSED will eventually do all this for us.
+            */
+            if (connectSent)
+            {
+                connectSent = FALSE;
+                disconnectRequested = FALSE;
 
-	      @call IDialupApp::MSG_IDA_VIEW_CONNECTION();
-          }
+                @call IDialupApp::MSG_IDA_VIEW_CONNECTION();
+            }
         }
     }
 }
