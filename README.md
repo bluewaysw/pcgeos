@@ -52,22 +52,24 @@ Build the target environment:
   - the answers to the questions from the above perl-script are:
     - nt (for the platform)
     - y (for the EC version)
-    - n (for the DBCS)
+      - Alternatively, reply "n" for the NC ("release") version that is faster and corresponds to the actual release
+      - The EC ("debug") version has stricter error checking and is better suited for debugging
+    - n (as the build for Double-Byte Character Sets is not yet fully functional)
     - y (for the geodes)
     - n (for the VM files)
-    - and then you'll have to enter the path to a "gbuild"-folder in your LOCAL_ROOT-folder.
+    - and then you'll have to enter the path to a "gbuild.ec"-folder in your LOCAL_ROOT-folder (or accept the default).
   - BTW: It's expected that the current version of the perl-script creates several "Could not find file _name_ in any of the source trees."-messages.
 
 Launch the target environment in dosbox:
 - make sure dosbox is added to your path variable, or [pcgeos-basebox](https://github.com/bluewaysw/pcgeos-basebox/tags) is installed and configured using BASEBOX environmental variable
-- `%ROOT_DIR%/bin/target`
+- `%ROOT_DIR%/bin/target` to launch the EC ("debug") version
   - the "swat" debugger stops immediately after the first stage of the boot process
   - enter `quit` at the "=>" prompt to detach the debugger and launch PC/GEOS stand-alone
     - or: enter `c` to launch with the debugger running in the background (slower)
-
+- Alternatively, adding the `-n` option to the `target` command launches the NC ("release") version
 
 ## Customize target environment
-If you want to customize the target environment settings only for yourself, you should not change the file %ROOT_DIR%/bin/basebox.conf.
+If you want to customize the target environment settings only for yourself, you should not change the file `%ROOT_DIR%/bin/basebox.conf`.
 - Create a file called basebox_user.conf in %LOCAL_ROOT% folder.
 - Enter the new settings here. These settings overwrite those from basebox.conf. Example:
   - [cpu]

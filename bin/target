@@ -14,23 +14,32 @@
 #	fr	26/10/20	Initial Revision
 #
 # DESCRIPTION:
-#	A script to start the target basebox and optionally
-#       connect swat.
+#	A script to start the target basebox and connect swat.
 #
-#	Usage: target [path] [-swat]
+#	Usage: target [-n]
 #
-#	If you give the argument "no", then the things that would be
-#	removed will be printed, but not removed.
+#	If you give the argument "-n", the target in gbuild.nc is launched,
+#  otherwise the target in gbuild.
 #
 #	$Id: clean,v 1.18 97/02/12 17:08:40 stevey Exp $
 #
 ###############################################################################
+# Parse command line arguments
+TARGET=gbuild.ec
+while [ "$#" -gt 0 ]; do
+  case "$1" in
+    -n)
+      TARGET=gbuild.nc
+      ;;
+  esac
+  shift
+done
 if [ "$BASEBOX" = "" ]; then
     BASEBOX=dosbox
 fi
 OLD_PATH=$PWD
-cd ${LOCAL_ROOT}/gbuild/localpc
-rm $LOCAL_ROOT/gbuild/localpc/IPX_STAT.TXT
+cd ${LOCAL_ROOT}/${TARGET}/localpc
+rm $LOCAL_ROOT/${TARGET}/localpc/IPX_STAT.TXT
 rm ensemble/init.bat
 if [ "$GEOS_CENTRAL_STORAGE" != "" ]; then
    echo mount s: %GEOS_CENTRAL_STORAGE% >> ensemble/init.bat
@@ -51,6 +60,6 @@ set +m
 cd $OLD_PATH
 
 clear
-while [ ! -f $LOCAL_ROOT/gbuild/localpc/IPX_STAT.TXT ]; do sleep 1; printf "."; done
-IPX_PORT=$(grep "127.0.0.1 from port" $LOCAL_ROOT/gbuild/localpc/IPX_STAT.TXT | perl -e 'my $status = <>; $status =~  m/(\d+)\r/; printf("%04X", $1);')
+while [ ! -f $LOCAL_ROOT/${TARGET}/localpc/IPX_STAT.TXT ]; do sleep 1; printf "."; done
+IPX_PORT=$(grep "127.0.0.1 from port" $LOCAL_ROOT/${TARGET}/localpc/IPX_STAT.TXT | perl -e 'my $status = <>; $status =~  m/(\d+)\r/; printf("%04X", $1);')
 swat -net 00000000:7F000001${IPX_PORT}:003F
