@@ -665,8 +665,9 @@ void IDialupEnsureDefaultConnection(void);
   creatingConnection = FALSE;
 
   // set to PPP if netType not set...
-  if (AccessPointGetIntegerPropertyDirect(currentAccpnt, "netType", (int*) &type))
+  if (AccessPointGetIntegerPropertyDirect(currentAccpnt, "netType", (int*) &type)) {
 	  type = NET_TYPE_PPP ;
+  }
   @call IDEditConnectionType::MSG_GEN_ITEM_GROUP_SET_SINGLE_SELECTION(type, FALSE) ;
   @call oself::MSG_IDP_EDIT_TYPE_UPDATE() ;
 
@@ -869,9 +870,10 @@ AccessPointLocalDialingOptions GetLocalDialingOptions (void)
             str,
             (CDT_ERROR << CDBF_DIALOG_TYPE_OFFSET) |
             (GIT_NOTIFICATION << CDBF_INTERACTION_TYPE_OFFSET) |
-            CDBF_SYSTEM_MODAL);
-            MemUnlock( OptrToHandle( @invalidDNS1Str )
+            CDBF_SYSTEM_MODAL
         );
+
+        MemUnlock( OptrToHandle( @invalidDNS1Str ));
 
         MemFree( hanDNS1 );
         MemFree( hanDNS2 );
@@ -970,7 +972,7 @@ AccessPointLocalDialingOptions GetLocalDialingOptions (void)
             /* never prompt for a password */
             AccessPointSetIntegerPropertyDirect(currentAccpnt, (char*)APSP_PROMPT_SECRET, 0);
 
-            /* dummy phone number - apparently always needed, but why? */
+            /* dummy phone number */
             AccessPointSetStringPropertyDirect(currentAccpnt, (char*)APSP_PHONE, _TEXT("+"));
         }
     }
@@ -1147,13 +1149,11 @@ AccessPointLocalDialingOptions GetLocalDialingOptions (void)
 
   @call IDEditConnectionName::MSG_VIS_TEXT_DELETE_ALL();
 
-/*#if _NDO2000 */
   @call IDEditIP::MSG_VIS_TEXT_DELETE_ALL();
 
   @call IDEditMask::MSG_VIS_TEXT_DELETE_ALL();
 
   @call IDEditGateway::MSG_VIS_TEXT_DELETE_ALL();
-/*#endif */
 
   @call IDEditDNS1::MSG_VIS_TEXT_DELETE_ALL();
 
@@ -1444,9 +1444,12 @@ AccessPointLocalDialingOptions GetLocalDialingOptions (void)
   MemHandle mh;
   int type;
 
-  if (AccessPointGetIntegerPropertyDirect(currentAccpnt, "netType", (int*) &type))
-	type = NET_TYPE_PPP ;
-  if( connectionNum && ( type != NET_TYPE_HOST ) )
+  if (AccessPointGetIntegerPropertyDirect(currentAccpnt, "netType", (int*) &type)) {
+	  type = NET_TYPE_PPP ;
+  }
+
+  // FIXME: check for connectionNum but its not available here
+  if( type != NET_TYPE_HOST )
   {
     @call IDModifyConnectionButton::MSG_GEN_SET_ENABLED(VUM_DELAYED_VIA_UI_QUEUE);
     @call IDDeleteConnectionButton::MSG_GEN_SET_ENABLED(VUM_DELAYED_VIA_UI_QUEUE);
@@ -1456,7 +1459,6 @@ AccessPointLocalDialingOptions GetLocalDialingOptions (void)
     @call IDModifyConnectionButton::MSG_GEN_SET_NOT_ENABLED(VUM_DELAYED_VIA_UI_QUEUE);
     @call IDDeleteConnectionButton::MSG_GEN_SET_NOT_ENABLED(VUM_DELAYED_VIA_UI_QUEUE);
   }
-
 
   if(!AccessPointGetIntegerPropertyDirect(currentAccpnt, DEFAULT_KEY, (int*) &datalen)
      && datalen != 0)
@@ -1532,6 +1534,16 @@ AccessPointLocalDialingOptions GetLocalDialingOptions (void)
   }
   @send IDConnectionPhoneNumber::MSG_VIS_MARK_INVALID(VOF_GEOMETRY_INVALID, VUM_NOW);
   @send IDConnectionPhoneNumber::MSG_GEN_SET_USABLE(VUM_NOW);
+
+  // FIXME: change button moniker and usability according to type and activation state
+  // if (type == NET_TYPE_PPP) {
+  //   @send IDConnectionPhoneAndLogin::MSG_GEN_SET_USABLE(VUM_DELAYED_VIA_UI_QUEUE);
+  // }
+  // else {
+  //   @send IDConnectionPhoneAndLogin::MSG_GEN_SET_NOT_USABLE(VUM_DELAYED_VIA_UI_QUEUE);
+  // }
+
+  @send IDialupPrimary::MSG_GEN_RESET_TO_INITIAL_SIZE(VUM_DELAYED_VIA_UI_QUEUE);
 }
 
 /***********************************************************************
