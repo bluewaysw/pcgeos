@@ -26,8 +26,8 @@ bereich.eobj: geos.h heap.h geode.h resource.h ec.h object.h lmem.h \
                 disk.h drive.h input.h char.h hwr.h win.h uDialog.h \
                 Objects/gInterC.h Objects/Text/tCommon.h stylesh.h \
                 driver.h thread.h print.h Internal/spoolInt.h serialDr.h \
-                parallDr.h hugearr.h fileEnum.h ansi/stdio.h \
-                ansi/string.h parse.h math.h initfile.h
+                parallDr.h hugearr.h fileEnum.h Ansi/stdio.h \
+                Ansi/string.h parse.h math.h initfile.h
 edit.obj \
 edit.eobj: stdapp.goh object.goh ui.goh Objects/metaC.goh \
                 Objects/inputC.goh Objects/clipbrd.goh \
@@ -56,8 +56,8 @@ edit.eobj: geos.h heap.h geode.h resource.h ec.h object.h lmem.h \
                 disk.h drive.h input.h char.h hwr.h win.h uDialog.h \
                 Objects/gInterC.h Objects/Text/tCommon.h stylesh.h \
                 driver.h thread.h print.h Internal/spoolInt.h serialDr.h \
-                parallDr.h hugearr.h fileEnum.h ansi/stdio.h \
-                ansi/string.h parse.h math.h initfile.h
+                parallDr.h hugearr.h fileEnum.h Ansi/stdio.h \
+                Ansi/string.h parse.h math.h initfile.h
 Funktion.obj \
 Funktion.eobj: stdapp.goh object.goh ui.goh Objects/metaC.goh \
                 Objects/inputC.goh Objects/clipbrd.goh \
@@ -86,8 +86,8 @@ Funktion.eobj: geos.h heap.h geode.h resource.h ec.h object.h lmem.h \
                 disk.h drive.h input.h char.h hwr.h win.h uDialog.h \
                 Objects/gInterC.h Objects/Text/tCommon.h stylesh.h \
                 driver.h thread.h print.h Internal/spoolInt.h serialDr.h \
-                parallDr.h hugearr.h fileEnum.h ansi/stdio.h \
-                ansi/string.h parse.h math.h initfile.h
+                parallDr.h hugearr.h fileEnum.h Ansi/stdio.h \
+                Ansi/string.h parse.h math.h initfile.h
 grprop.obj \
 grprop.eobj: stdapp.goh object.goh ui.goh Objects/metaC.goh \
                 Objects/inputC.goh Objects/clipbrd.goh \
@@ -116,8 +116,8 @@ grprop.eobj: geos.h heap.h geode.h resource.h ec.h object.h lmem.h \
                 disk.h drive.h input.h char.h hwr.h win.h uDialog.h \
                 Objects/gInterC.h Objects/Text/tCommon.h stylesh.h \
                 driver.h thread.h print.h Internal/spoolInt.h serialDr.h \
-                parallDr.h hugearr.h fileEnum.h ansi/stdio.h \
-                ansi/string.h parse.h math.h initfile.h
+                parallDr.h hugearr.h fileEnum.h Ansi/stdio.h \
+                Ansi/string.h parse.h math.h initfile.h
 Keyboard.obj \
 Keyboard.eobj: stdapp.goh object.goh ui.goh Objects/metaC.goh \
                 Objects/inputC.goh Objects/clipbrd.goh \
@@ -147,8 +147,8 @@ Keyboard.eobj: geos.h heap.h geode.h resource.h ec.h object.h lmem.h \
                 disk.h drive.h input.h char.h hwr.h win.h uDialog.h \
                 Objects/gInterC.h Objects/Text/tCommon.h stylesh.h \
                 driver.h thread.h print.h Internal/spoolInt.h serialDr.h \
-                parallDr.h hugearr.h fileEnum.h ansi/stdio.h \
-                ansi/string.h parse.h math.h initfile.h
+                parallDr.h hugearr.h fileEnum.h Ansi/stdio.h \
+                Ansi/string.h parse.h math.h initfile.h
 Options.obj \
 Options.eobj: stdapp.goh object.goh ui.goh Objects/metaC.goh \
                 Objects/inputC.goh Objects/clipbrd.goh \
@@ -177,8 +177,8 @@ Options.eobj: geos.h heap.h geode.h resource.h ec.h object.h lmem.h \
                 disk.h drive.h input.h char.h hwr.h win.h uDialog.h \
                 Objects/gInterC.h Objects/Text/tCommon.h stylesh.h \
                 driver.h thread.h print.h Internal/spoolInt.h serialDr.h \
-                parallDr.h hugearr.h fileEnum.h ansi/stdio.h \
-                ansi/string.h parse.h math.h initfile.h
+                parallDr.h hugearr.h fileEnum.h Ansi/stdio.h \
+                Ansi/string.h parse.h math.h initfile.h
 process.obj \
 process.eobj: stdapp.goh object.goh ui.goh Objects/metaC.goh \
                 Objects/inputC.goh Objects/clipbrd.goh \
@@ -209,8 +209,7 @@ process.eobj: geos.h heap.h geode.h resource.h ec.h object.h lmem.h \
                 Objects/gInterC.h Objects/Text/tCommon.h stylesh.h \
                 driver.h thread.h print.h Internal/spoolInt.h serialDr.h \
                 parallDr.h hugearr.h fileEnum.h Ansi/stdlib.h \
-                Ansi/stdio.h Ansi/string.h ansi/stdio.h ansi/string.h \
-                parse.h math.h initfile.h
+                Ansi/stdio.h Ansi/string.h parse.h math.h initfile.h
 view.obj \
 view.eobj: stdapp.goh object.goh ui.goh Objects/metaC.goh \
                 Objects/inputC.goh Objects/clipbrd.goh \
@@ -239,8 +238,8 @@ view.eobj: geos.h heap.h geode.h resource.h ec.h object.h lmem.h \
                 disk.h drive.h input.h char.h hwr.h win.h uDialog.h \
                 Objects/gInterC.h Objects/Text/tCommon.h stylesh.h \
                 driver.h thread.h print.h Internal/spoolInt.h serialDr.h \
-                parallDr.h hugearr.h fileEnum.h ansi/stdio.h \
-                ansi/string.h parse.h math.h initfile.h
+                parallDr.h hugearr.h fileEnum.h Ansi/stdio.h \
+                Ansi/string.h parse.h math.h initfile.h
 appui.obj \
 appui.eobj: stdapp.goh object.goh ui.goh Objects/metaC.goh \
                 Objects/inputC.goh Objects/clipbrd.goh \
@@ -269,7 +268,7 @@ appui.eobj: geos.h heap.h geode.h resource.h ec.h object.h lmem.h \
                 disk.h drive.h input.h char.h hwr.h win.h uDialog.h \
                 Objects/gInterC.h Objects/Text/tCommon.h stylesh.h \
                 driver.h thread.h print.h Internal/spoolInt.h serialDr.h \
-                parallDr.h hugearr.h fileEnum.h ansi/stdio.h \
-                ansi/string.h parse.h math.h initfile.h
+                parallDr.h hugearr.h fileEnum.h Ansi/stdio.h \
+                Ansi/string.h parse.h math.h initfile.h
 
 grafcalcEC.geo grafcalc.geo : geos.ldf ui.ldf parse.ldf math.ldf ansic.ldf color.ldf 
