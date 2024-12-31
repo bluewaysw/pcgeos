@@ -62,6 +62,7 @@ ChunkHandle iAppChunk;
 word connectionNum = 0;
 word currentAccpnt=0;
 word defaultAccpnt=0;
+word lastActiveNetType=0;
 
 word tempAccpnt = 0;
 #define TEMPORARY_KEY "temp"
@@ -168,6 +169,17 @@ void IDialupEnsureDefaultConnection(void);
     // last one discovered (the one set by MSG_IDP_INITIALIZE_CONNECTION) is the
     // desired default.
     IDialupEnsureDefaultConnection();
+
+    // Make sure to store the netType that's active when we start up
+    // so we can check out which buttons (Activate / Connect) should be active
+    // and if a reboot is needed when switching netTypes respectively...
+    // This is only ever set once, right here, because:
+    // if we switch to an accpnt that's of a different netType, we'll
+    // reboot and end up here again. And if we switch to another PPP accpnt,
+    // no netType change occurs.
+    if (AccessPointGetIntegerPropertyDirect(currentAccpnt, "netType", (int*) &lastActiveNetType)) {
+      lastActiveNetType = NET_TYPE_PPP;
+    }
 
     @callsuper();
 
@@ -1256,6 +1268,10 @@ AccessPointLocalDialingOptions GetLocalDialingOptions (void)
 
       // reset the current accesspoint
       currentAccpnt = 0;
+
+      // this tries to read the current accpnt from geos.ini.
+      // But there is none, so it will set the current accpnt
+      // to the first one in the list?
       @send self::MSG_IDP_INITIALIZE_CONNECTION();
     }
 }
@@ -1278,146 +1294,147 @@ AccessPointLocalDialingOptions GetLocalDialingOptions (void)
  ***********************************************************************/
 @method IDialupProcessClass, MSG_IDP_INITIALIZE_CONNECTION
 {
-  word *id, datalen, i, defaultItem=0;
-  word tmpAccpnt=0, tmpItem=0;
+    word *id, datalen, i, defaultItem=0;
+    word tmpAccpnt=0, tmpItem=0;
+    word *hidden;
 
-  if(connectionHandle)
+    if(connectionHandle)
     {
-		if(connectionChunk)
-			{
-			MemLock(connectionHandle);
-			ChunkArrayZeroHandles(connectionHandle, connectionChunk);
-			MemUnlock(connectionHandle);
-			}
+        if(connectionChunk)
+        {
+            MemLock(connectionHandle);
+            ChunkArrayZeroHandles(connectionHandle, connectionChunk);
+            MemUnlock(connectionHandle);
+        }
     }
-  else
+    else
     {
-      connectionHandle = MemAllocLMem(LMEM_TYPE_GENERAL, sizeof(LMemBlockHeader));
-    }
-
-  MemLock(connectionHandle);
-  connectionChunk = AccessPointGetEntries(connectionHandle, 0, APT_INTERNET);
-
-  currentAccpnt = 0;
-  defaultAccpnt = 0;
-
-  if(connectionChunk)
-		{
-		connectionNum = ChunkArrayGetCountHandles(connectionHandle, connectionChunk);
-		if(!connectionNum)
-			{
-			// the ini file wrong
-			EC(EC_ERROR(-1);)
-			}
-		else
-			{
-			word *hidden;
-
-			// the accesspoint0001 is protected from being used, and its APT_INTERNET
-			for(i=0; i<connectionNum; i++)
-				{
-				id = ChunkArrayElementToPtrHandles(connectionHandle, connectionChunk, i, &datalen);
-
-				if(*id == HIDDEN_INTERNET_ACCPNT)
-					{
-					hidden = id;
-					continue;
-					}
-				if(!currentAccpnt)
-					{
-					tmpAccpnt = *id;
-					tmpItem = i;
-					}
-				else if(currentAccpnt == *id)
-					{
-					tmpItem = i;
-					}
-
-				if(!AccessPointGetIntegerPropertyDirect(*id, DEFAULT_KEY, (int*) &datalen)
-																	&& datalen != 0)
-					{
-					defaultAccpnt = *id;
-					defaultItem = i;
-					}
-
-			// Hack to flag for deletion the temporary access point created by signup,
-			// just in case signup crashes and fails to clean up after itself.
-			// The actual removal occurs in MSG_GEN_PROCESS_OPEN_APPLICATION.
-			// (dhunter 1/13/2000)
-				if (!AccessPointGetIntegerPropertyDirect(*id, TEMPORARY_KEY, (int*) &datalen)
-																	&& datalen == 1)
-					tempAccpnt = *id;
-				}
-
-			if(hidden)
-				{
-				ChunkArrayDeleteHandle(connectionChunk, hidden);
-				}
-			else
-				{
-				// the ini file wrong
-				EC(EC_ERROR(-1);)
-				}
-			}
-		}
-	 else
-		{
-		MemUnlock(connectionHandle);
-		EC(EC_ERROR(-1);)
-		return;
-		}
-
-  connectionNum = ChunkArrayGetCountHandles(connectionHandle, connectionChunk);
-
-  MemUnlock(connectionHandle);
-
-  @call IDConnectionList::MSG_GEN_DYNAMIC_LIST_INITIALIZE(connectionNum);
-
-  if(connectionNum)
-    {
-/*#if _NDO2000
-/*#else
-      @call IDNewNumbers::MSG_GEN_SET_ENABLED(VUM_DELAYED_VIA_UI_QUEUE);
-/*#endif */
-		@call IDConnectButton::MSG_GEN_SET_ENABLED(VUM_NOW);
-	 }
-  else
-    {
-/*#if _NDO2000
-/*#else
-      @call IDNewNumbers::MSG_GEN_SET_NOT_ENABLED(VUM_DELAYED_VIA_UI_QUEUE);
-/*#endif */
-      @call IDConnectButton::MSG_GEN_SET_NOT_ENABLED(VUM_NOW);
+        connectionHandle = MemAllocLMem(LMEM_TYPE_GENERAL, sizeof(LMemBlockHeader));
     }
 
-  if(!currentAccpnt)
+    MemLock(connectionHandle);
+    connectionChunk = AccessPointGetEntries(connectionHandle, 0, APT_INTERNET);
+
+    if (!connectionChunk)
     {
-	 if(defaultAccpnt)
-		{
-		currentAccpnt = defaultAccpnt;
-		@send IDConnectionList::MSG_GEN_ITEM_GROUP_SET_SINGLE_SELECTION(defaultItem, 0);
-		}
-	 else if(tmpAccpnt)
-		{
-		currentAccpnt = tmpAccpnt;
-		@send IDConnectionList::MSG_GEN_ITEM_GROUP_SET_SINGLE_SELECTION(tmpItem, 0);
-		}
-	 }
-  else
-    {
-	 @send IDConnectionList::MSG_GEN_ITEM_GROUP_SET_SINGLE_SELECTION(tmpItem, 0);
+        MemUnlock(connectionHandle);
+        EC(EC_ERROR(-1);)
+        return;
     }
 
-	/* if there is only 1 access point then let's make it the default
-	  access point automagically...  jfh 2/19/02 */
-	if ((connectionNum == 1) && !defaultAccpnt) {
-		@call IDConnectionDefaultBoxGroup::MSG_GEN_BOOLEAN_GROUP_SET_BOOLEAN_STATE(1, TRUE);
-		@call self::MSG_IDP_SET_DEFAULT_CONNECTION();
-		}
+    connectionNum = ChunkArrayGetCountHandles(connectionHandle, connectionChunk);
+    if(!connectionNum)
+    {
+        // the ini file wrong
+        MemUnlock(connectionHandle);
+        EC(EC_ERROR(-1);)
+        return;
+    }
 
-  AccessPointSetActivePoint(defaultAccpnt, APT_INTERNET);
-  AccessPointCommit();
-  @send self::MSG_IDP_CONNECTION_SET_CURRENT();
+    currentAccpnt = AccessPointGetActivePoint(APT_INTERNET);
+    defaultAccpnt = 0;
+
+    for(i=0; i<connectionNum; i++)
+    {
+        id = ChunkArrayElementToPtrHandles(connectionHandle, connectionChunk, i, &datalen);
+
+        // the accesspoint0001 is protected from being used, prepare for removal from the list
+        if(*id == HIDDEN_INTERNET_ACCPNT)
+        {
+            hidden = id;
+            continue;
+        }
+
+        // if we don't have a valid accpnt just yet, we will use the first one we stumple upon
+        if(!currentAccpnt)
+        {
+            tmpAccpnt = *id;
+            tmpItem = i;
+        }
+        else if(currentAccpnt == *id)
+        {   // if we have a valid accpnt, store its "i" to be used as the active list item
+            tmpItem = i;
+        }
+
+        // test if this is the default access point
+        if(!AccessPointGetIntegerPropertyDirect(
+            *id,
+            DEFAULT_KEY,
+            (int*) &datalen) && datalen != 0)
+        {
+            defaultAccpnt = *id;
+            defaultItem = i;
+        }
+
+        // Hack to flag for deletion the temporary access point created by signup,
+        // just in case signup crashes and fails to clean up after itself.
+        // The actual removal occurs in MSG_GEN_PROCESS_OPEN_APPLICATION.
+        // (dhunter 1/13/2000)
+        if (!AccessPointGetIntegerPropertyDirect(
+            *id,
+            TEMPORARY_KEY,
+            (int*) &datalen) && datalen == 1)
+        {
+            tempAccpnt = *id; // don't confuse with tmpAccpnt!
+        }
+    }
+
+    if(hidden)
+    {   // delete the hidden access point from the list
+        ChunkArrayDeleteHandle(connectionChunk, hidden);
+    }
+    else
+    {
+        // if we have no hidden accpnt as of now, the ini file is broken
+        EC(EC_ERROR(-1);)
+    }
+
+    // rescan needed, as we have removed the hidden access point from the list, so the count is off
+    connectionNum = ChunkArrayGetCountHandles(connectionHandle, connectionChunk);
+
+    MemUnlock(connectionHandle);
+
+    @call IDConnectionList::MSG_GEN_DYNAMIC_LIST_INITIALIZE(connectionNum);
+
+    // if no connection at all, disable the connect button
+    // FIXME: should only be done if the connection is not a HOST/EtherODI/EtherPKT connection
+    if(connectionNum)
+    {
+        @call IDConnectButton::MSG_GEN_SET_ENABLED(VUM_NOW);
+    }
+    else
+    {
+        @call IDConnectButton::MSG_GEN_SET_NOT_ENABLED(VUM_NOW);
+    }
+
+    if(!currentAccpnt)
+    {
+        if(defaultAccpnt)
+        {
+            currentAccpnt = defaultAccpnt;
+            @send IDConnectionList::MSG_GEN_ITEM_GROUP_SET_SINGLE_SELECTION(defaultItem, 0);
+        }
+        else if(tmpAccpnt)
+        {
+            currentAccpnt = tmpAccpnt;
+            @send IDConnectionList::MSG_GEN_ITEM_GROUP_SET_SINGLE_SELECTION(tmpItem, 0);
+        }
+    }
+    else
+    {
+        @send IDConnectionList::MSG_GEN_ITEM_GROUP_SET_SINGLE_SELECTION(tmpItem, 0);
+    }
+
+    /* if there is only 1 access point then let's make it the default
+    access point automagically...  jfh 2/19/02 */
+    if ((connectionNum == 1) && !defaultAccpnt)
+    {
+        @call IDConnectionDefaultBoxGroup::MSG_GEN_BOOLEAN_GROUP_SET_BOOLEAN_STATE(1, TRUE);
+        @call self::MSG_IDP_SET_DEFAULT_CONNECTION();
+    }
+
+    // now update the rest of the UI
+    @send self::MSG_IDP_CONNECTION_SET_CURRENT();
 }
 
 /***********************************************************************
@@ -1448,8 +1465,7 @@ AccessPointLocalDialingOptions GetLocalDialingOptions (void)
 	  type = NET_TYPE_PPP ;
   }
 
-  // FIXME: check for connectionNum but its not available here
-  if( type != NET_TYPE_HOST )
+  if( (connectionNum) && (type != NET_TYPE_HOST ) )
   {
     @call IDModifyConnectionButton::MSG_GEN_SET_ENABLED(VUM_DELAYED_VIA_UI_QUEUE);
     @call IDDeleteConnectionButton::MSG_GEN_SET_ENABLED(VUM_DELAYED_VIA_UI_QUEUE);
@@ -1495,7 +1511,7 @@ AccessPointLocalDialingOptions GetLocalDialingOptions (void)
       @call IDConnectionDefaultBoxGroup::MSG_GEN_SET_NOT_ENABLED(VUM_NOW);
   }
 
-  AccessPointSetActivePoint(currentAccpnt, APT_INTERNET);
+  // AccessPointSetActivePoint(currentAccpnt, APT_INTERNET);
   /*
   if(AccessPointGetIntegerPropertyDirect(currentAccpnt, "hours", &tHours))
     tHours = 0;
@@ -1535,13 +1551,19 @@ AccessPointLocalDialingOptions GetLocalDialingOptions (void)
   @send IDConnectionPhoneNumber::MSG_VIS_MARK_INVALID(VOF_GEOMETRY_INVALID, VUM_NOW);
   @send IDConnectionPhoneNumber::MSG_GEN_SET_USABLE(VUM_NOW);
 
-  // FIXME: change button moniker and usability according to type and activation state
-  // if (type == NET_TYPE_PPP) {
-  //   @send IDConnectionPhoneAndLogin::MSG_GEN_SET_USABLE(VUM_DELAYED_VIA_UI_QUEUE);
-  // }
-  // else {
-  //   @send IDConnectionPhoneAndLogin::MSG_GEN_SET_NOT_USABLE(VUM_DELAYED_VIA_UI_QUEUE);
-  // }
+  if (type == lastActiveNetType) {
+    @send IDConnectionActivateBox::MSG_GEN_SET_NOT_USABLE(VUM_DELAYED_VIA_UI_QUEUE);
+  }
+  else {
+    @send IDConnectionActivateBox::MSG_GEN_SET_USABLE(VUM_DELAYED_VIA_UI_QUEUE);
+  }
+
+  if ((type == NET_TYPE_PPP) && (type == lastActiveNetType)) {
+    @send IDConnectionPhoneAndLogin::MSG_GEN_SET_USABLE(VUM_DELAYED_VIA_UI_QUEUE);
+  }
+  else {
+    @send IDConnectionPhoneAndLogin::MSG_GEN_SET_NOT_USABLE(VUM_DELAYED_VIA_UI_QUEUE);
+  }
 
   @send IDialupPrimary::MSG_GEN_RESET_TO_INITIAL_SIZE(VUM_DELAYED_VIA_UI_QUEUE);
 }
@@ -1904,13 +1926,105 @@ void IDialupUpdateEditOKButton(void)
  *	mzhu	11/23/98	Initial Revision
  *
  ***********************************************************************/
-@method IDialupProcessClass, MSG_IDP_CONNECT
+@method IDialupProcessClass, MSG_IDP_ACTIVATE
 {
     word netType = 0 ;
     char buffer[80] ;
     word size ;
-    Boolean changed = FALSE ;
 
+    /* make sure to unregister, just in case... */
+    if (G_registered)  {
+        UnregisterToPPP();
+
+        UnloadPPPDriver();
+        G_registered = FALSE ;
+    }
+
+    AccessPointSetActivePoint(currentAccpnt, APT_INTERNET);
+    AccessPointCommit();
+
+    if (AccessPointGetIntegerPropertyDirect(currentAccpnt, "netType", (int*) &netType)) {
+        netType = NET_TYPE_PPP ;
+    }
+
+    InitFileReadStringBuffer("tcpip", "driver", buffer, sizeof(buffer)-1, &size) ;
+    buffer[size] = '\0' ;
+    if( netType == NET_TYPE_HOST )
+    {
+        NEC(char *driver = "Host TCP/IP Driver" ; )
+        EC(char *driver = "EC Host TCP/IP Driver" ; )
+        InitFileWriteString("tcpip", "driver", driver) ;
+
+        InitFileDeleteEntry("tcpip", "link") ;
+        InitFileWriteString("tcpip", "linkDomain", "Host") ;
+        InitFileDeleteEntry("tcpip", "linkPermname") ;
+    }
+    else
+    {
+        NEC(char *driver = "TCP/IP Driver" ; )
+        EC(char *driver = "EC TCP/IP Driver" ; )
+        InitFileWriteString("tcpip", "driver", driver) ;
+
+        InitFileReadStringBuffer("tcpip", "link", buffer, sizeof(buffer)-1, &size) ;
+        buffer[size] = '\0' ;
+        if (netType == NET_TYPE_ODI)
+        {
+            NEC(char *link = "ODI Ethernet Driver" ; )
+            EC(char *link = "EC ODI Ethernet Driver" ; )
+            InitFileWriteString("tcpip", "link", link) ;
+            InitFileWriteString("tcpip", "linkDomain", "EtherODI") ;
+            InitFileDeleteEntry("tcpip", "linkPermname") ;
+        }
+        else if (netType == NET_TYPE_PKT)
+        {
+            NEC(char *link = "Packet Ethernet Driver" ; )
+            EC(char *link = "EC Packet Ethernet Driver" ; )
+            InitFileWriteString("tcpip", "link", link) ;
+            InitFileWriteString("tcpip", "linkDomain", "EtherPKT") ;
+            InitFileDeleteEntry("tcpip", "linkPermname") ;
+        }
+        else
+        {
+            NEC(char *ppplink = "PPP Driver" ; )
+            EC(char *ppplink = "EC PPP Driver" ; )
+            InitFileWriteString("tcpip", "link", ppplink) ;
+            InitFileWriteString("tcpip", "linkDomain", "PPP") ;
+            InitFileWriteString("tcpip", "linkPermname", "ppp") ;
+        }
+    }
+
+    UserStandardDialogOptr(
+        0,
+        0,
+        0,
+        0,
+        @mustRestart,
+        (CDT_ERROR<<CDBF_DIALOG_TYPE_OFFSET)|(GIT_NOTIFICATION<<CDBF_INTERACTION_TYPE_OFFSET)) ;
+
+    SysShutdown(SST_RESTART) ;
+}
+
+
+
+/***********************************************************************
+ *	MSG_IDP_CONNECT for IDialupProcessClass
+ ***********************************************************************
+ * SYNOPSIS:     open the ppp connection.
+ *
+ * PARAMETERS:
+ *
+ * SIDE EFFECTS:
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	mzhu	11/23/98	Initial Revision
+ *
+ ***********************************************************************/
+@method IDialupProcessClass, MSG_IDP_CONNECT
+{
     connectSent = TRUE;
     disconnectRequested = FALSE;
 
@@ -1922,109 +2036,40 @@ void IDialupUpdateEditOKButton(void)
         G_registered = FALSE ;
     }
 
+    // at this point in time, currentAccpnt should always be of type NET_TYPE_PPP
     AccessPointSetActivePoint(currentAccpnt, APT_INTERNET);
     AccessPointCommit();
 
-    // true if error => in this case, set netType to NET_TYPE_PPP
-    if (AccessPointGetIntegerPropertyDirect(currentAccpnt, "netType", (int*) &netType)) {
-        netType = NET_TYPE_PPP ;
+    @call IDConnectButton::MSG_GEN_SET_NOT_ENABLED(VUM_DELAYED_VIA_UI_QUEUE);
+    @call IDDisconnectButton::MSG_GEN_SET_NOT_ENABLED(VUM_NOW);
+    @call IDInfoGroup::MSG_IDI_RESET();		/* Make sure stats are 0'd */
+    @call IDialupApp::MSG_IDA_VIEW_INFO();
+
+    /* Register for a connection */
+    if (!G_registered)  {
+        LoadPPPDriver();
+
+        RegisterToPPP();
+        G_registered = TRUE ;
     }
 
-    InitFileReadStringBuffer("tcpip", "driver", buffer, sizeof(buffer)-1, &size) ;
-    buffer[size] = '\0' ;
-    if( netType == NET_TYPE_HOST )
+    if(!IDialupConnect())
     {
-        NEC(char *driver = "Host TCP/IP Driver" ; )
-        EC(char *driver = "EC Host TCP/IP Driver" ; )
-        if ((strlen(buffer)) && (strcmp(driver, buffer)!=0)) changed = TRUE ;
-        InitFileWriteString("tcpip", "driver", driver) ;
+        /* something wrong, should notify the user */
+        if ( !disconnectRequested )
+        EC(EC_WARNING(-1);)
 
-        InitFileDeleteEntry("tcpip", "link") ;
-        InitFileWriteString("tcpip", "linkDomain", "Host") ;
-        InitFileDeleteEntry("tcpip", "linkPermname") ;
-    }
-    else
-    {
-        NEC(char *driver = "TCP/IP Driver" ; )
-        EC(char *driver = "EC TCP/IP Driver" ; )
-        if ((strlen(buffer)) && (strcmp(driver, buffer)!=0)) changed = TRUE ;
-        InitFileWriteString("tcpip", "driver", driver) ;
-
-        InitFileReadStringBuffer("tcpip", "link", buffer, sizeof(buffer)-1, &size) ;
-        buffer[size] = '\0' ;
-        if (netType == NET_TYPE_ODI)
+        /*
+        * If connectSent wasn't cleared, we never got to PPP_STATUS_OPENING,
+        * so take care of that and restore the connection view.  Otherwise,
+        * PPP_STATUS_CLOSED will eventually do all this for us.
+        */
+        if (connectSent)
         {
-            NEC(char *link = "ODI Ethernet Driver" ; )
-            EC(char *link = "EC ODI Ethernet Driver" ; )
-            if ((strlen(buffer)) && (strcmp(link, buffer)!=0)) changed = TRUE ;
-            InitFileWriteString("tcpip", "link", link) ;
-            InitFileWriteString("tcpip", "linkDomain", "EtherODI") ;
-            InitFileDeleteEntry("tcpip", "linkPermname") ;
-        }
-        else if (netType == NET_TYPE_PKT)
-        {
-            NEC(char *link = "Packet Ethernet Driver" ; )
-            EC(char *link = "EC Packet Ethernet Driver" ; )
-            if ((strlen(buffer)) && (strcmp(link, buffer)!=0)) changed = TRUE ;
-            InitFileWriteString("tcpip", "link", link) ;
-            InitFileWriteString("tcpip", "linkDomain", "EtherPKT") ;
-            InitFileDeleteEntry("tcpip", "linkPermname") ;
-        }
-        else
-        {
-            NEC(char *ppplink = "PPP Driver" ; )
-            EC(char *ppplink = "EC PPP Driver" ; )
-            if ((strlen(buffer)) && (strcmp(ppplink, buffer)!=0)) changed = TRUE ;
-            InitFileWriteString("tcpip", "link", ppplink) ;
-            InitFileWriteString("tcpip", "linkDomain", "PPP") ;
-            InitFileWriteString("tcpip", "linkPermname", "ppp") ;
-        }
-    }
+            connectSent = FALSE;
+            disconnectRequested = FALSE;
 
-    if (changed)
-    {
-        UserStandardDialogOptr(
-            0,
-            0,
-            0,
-            0,
-            @mustRestart,
-            (CDT_ERROR<<CDBF_DIALOG_TYPE_OFFSET)|(GIT_NOTIFICATION<<CDBF_INTERACTION_TYPE_OFFSET)) ;
-        SysShutdown(SST_RESTART) ;
-    }
-    else
-    {
-        @call IDConnectButton::MSG_GEN_SET_NOT_ENABLED(VUM_DELAYED_VIA_UI_QUEUE);
-        @call IDDisconnectButton::MSG_GEN_SET_NOT_ENABLED(VUM_NOW);
-        @call IDInfoGroup::MSG_IDI_RESET();		/* Make sure stats are 0'd */
-        @call IDialupApp::MSG_IDA_VIEW_INFO();
-
-        /* Register for a connection */
-        if (!G_registered)  {
-            LoadPPPDriver();
-
-            RegisterToPPP();
-            G_registered = TRUE ;
-        }
-
-        if(!IDialupConnect())
-        {
-            /* something wrong, should notify the user */
-            if ( !disconnectRequested )
-            EC(EC_WARNING(-1);)
-
-            /*
-            * If connectSent wasn't cleared, we never got to PPP_STATUS_OPENING,
-            * so take care of that and restore the connection view.  Otherwise,
-            * PPP_STATUS_CLOSED will eventually do all this for us.
-            */
-            if (connectSent)
-            {
-                connectSent = FALSE;
-                disconnectRequested = FALSE;
-
-                @call IDialupApp::MSG_IDA_VIEW_CONNECTION();
-            }
+            @call IDialupApp::MSG_IDA_VIEW_CONNECTION();
         }
     }
 }
