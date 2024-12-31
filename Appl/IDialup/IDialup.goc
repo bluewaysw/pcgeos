@@ -62,7 +62,6 @@ ChunkHandle iAppChunk;
 word connectionNum = 0;
 word currentAccpnt=0;
 word defaultAccpnt=0;
-word lastActiveNetType=0;
 
 word tempAccpnt = 0;
 #define TEMPORARY_KEY "temp"
@@ -131,6 +130,8 @@ void IDialupEnsureDefaultConnection(void);
     TCHAR *ptr, *names;
     char *p;
     Boolean bShowDetails = FALSE; /* this must match the object default */
+    int lastActiveNetType = 0;
+
 
     pppStatus = PPP_STATUS_CLOSED;
 
@@ -182,6 +183,10 @@ void IDialupEnsureDefaultConnection(void);
     }
 
     @callsuper();
+
+    InitFileWriteInteger(IDIAL_CATEGORY, "lastActiveNetType", (word) lastActiveNetType);
+    InitFileCommit();
+
 
     if(launchBlock)
       {
@@ -1459,11 +1464,13 @@ AccessPointLocalDialingOptions GetLocalDialingOptions (void)
   word datalen;
   TCHAR name[MAX_TEXT_LEN];
   MemHandle mh;
-  int type;
+  int type = 0;
+  int lastActiveNetType = 0;
 
   if (AccessPointGetIntegerPropertyDirect(currentAccpnt, "netType", (int*) &type)) {
 	  type = NET_TYPE_PPP ;
   }
+  (void) InitFileReadInteger(IDIAL_CATEGORY, "lastActiveNetType", (word*) &lastActiveNetType);
 
   if( (connectionNum) && (type != NET_TYPE_HOST ) )
   {
@@ -1551,18 +1558,21 @@ AccessPointLocalDialingOptions GetLocalDialingOptions (void)
   @send IDConnectionPhoneNumber::MSG_VIS_MARK_INVALID(VOF_GEOMETRY_INVALID, VUM_NOW);
   @send IDConnectionPhoneNumber::MSG_GEN_SET_USABLE(VUM_NOW);
 
+  InitFileWriteInteger("currentAccpnt", "lastActiveNetType2", lastActiveNetType);
+
+
   if (type == lastActiveNetType) {
-    @send IDConnectionActivateBox::MSG_GEN_SET_NOT_USABLE(VUM_DELAYED_VIA_UI_QUEUE);
+    @send IDConnectionActivateBox::MSG_GEN_SET_NOT_USABLE(VUM_NOW);
   }
   else {
-    @send IDConnectionActivateBox::MSG_GEN_SET_USABLE(VUM_DELAYED_VIA_UI_QUEUE);
+    @send IDConnectionActivateBox::MSG_GEN_SET_USABLE(VUM_NOW);
   }
 
   if ((type == NET_TYPE_PPP) && (type == lastActiveNetType)) {
-    @send IDConnectionPhoneAndLogin::MSG_GEN_SET_USABLE(VUM_DELAYED_VIA_UI_QUEUE);
+    @send IDConnectionPhoneAndLogin::MSG_GEN_SET_USABLE(VUM_NOW);
   }
   else {
-    @send IDConnectionPhoneAndLogin::MSG_GEN_SET_NOT_USABLE(VUM_DELAYED_VIA_UI_QUEUE);
+    @send IDConnectionPhoneAndLogin::MSG_GEN_SET_NOT_USABLE(VUM_NOW);
   }
 
   @send IDialupPrimary::MSG_GEN_RESET_TO_INITIAL_SIZE(VUM_DELAYED_VIA_UI_QUEUE);
