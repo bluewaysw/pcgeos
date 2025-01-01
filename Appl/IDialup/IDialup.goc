@@ -1452,142 +1452,161 @@ AccessPointLocalDialingOptions GetLocalDialingOptions (void)
  ***********************************************************************/
 @method IDialupProcessClass, MSG_IDP_UPDATE_UI_FOR_SELECTED_ACCPNT
 {
-  word datalen;
-  TCHAR name[MAX_TEXT_LEN];
-  MemHandle mh;
-  int type = 0;
+    word datalen;
+    TCHAR name[MAX_TEXT_LEN];
+    MemHandle mh;
+    int type = 0;
 
-  if (AccessPointGetIntegerPropertyDirect(currentAccpnt, "netType", (int*) &type)) {
-	  type = NET_TYPE_PPP ;
-  }
+    if (AccessPointGetIntegerPropertyDirect(currentAccpnt, "netType", (int*) &type)) {
+        type = NET_TYPE_PPP ;
+    }
 
-  switch (type)
-  {
-    case NET_TYPE_HOST:
-        @call IDConnectionTitle::MSG_GEN_REPLACE_VIS_MONIKER_OPTR(@netTypeHostStr, VUM_NOW);
-    break;
+    switch (type)
+    {
+        case NET_TYPE_PKT:
+            @call IDConnectionNetType::MSG_GEN_REPLACE_VIS_MONIKER_OPTR(@netTypePktStr, VUM_NOW);
+        break;
 
-    case NET_TYPE_ODI:
-      @call IDConnectionTitle::MSG_GEN_REPLACE_VIS_MONIKER_OPTR(@netTypeOdiStr, VUM_NOW);
-    break;
+        case NET_TYPE_HOST:
+            @call IDConnectionNetType::MSG_GEN_REPLACE_VIS_MONIKER_OPTR(@netTypeHostStr, VUM_NOW);
+        break;
 
-    case NET_TYPE_PKT:
-      @call IDConnectionTitle::MSG_GEN_REPLACE_VIS_MONIKER_OPTR(@netTypePktStr, VUM_NOW);
-    break;
+        case NET_TYPE_ODI:
+            @call IDConnectionNetType::MSG_GEN_REPLACE_VIS_MONIKER_OPTR(@netTypeOdiStr, VUM_NOW);
+        break;
 
-    default: //NET_TYPE_PPP:
-      @call IDConnectionTitle::MSG_GEN_REPLACE_VIS_MONIKER_OPTR(@netTypePppStr, VUM_NOW);
-    break;
-  }
+        default: //NET_TYPE_PPP:
+            @call IDConnectionNetType::MSG_GEN_REPLACE_VIS_MONIKER_OPTR(@netTypePppStr, VUM_NOW);
+        break;
+    }
 
-  if(
-      // only if we have list items...
-      (connectionNum) &&
-      // never if we have a HOST connection...
-      (type != NET_TYPE_HOST) &&
-      // only if we are not the current connection...
-      (G_lastActiveAccpnt != currentAccpnt)
+    if (
+        // only if we have list items...
+        (connectionNum) &&
+        // never if we have a HOST connection...
+        (type != NET_TYPE_HOST) &&
+        // only if we are not the current connection...
+        (G_lastActiveAccpnt != currentAccpnt)
     )
-  {
-      @call IDModifyConnectionButton::MSG_GEN_SET_ENABLED(VUM_DELAYED_VIA_UI_QUEUE);
-      @call IDDeleteConnectionButton::MSG_GEN_SET_ENABLED(VUM_DELAYED_VIA_UI_QUEUE);
-  }
-  else
-  {
-    @call IDModifyConnectionButton::MSG_GEN_SET_NOT_ENABLED(VUM_DELAYED_VIA_UI_QUEUE);
-    @call IDDeleteConnectionButton::MSG_GEN_SET_NOT_ENABLED(VUM_DELAYED_VIA_UI_QUEUE);
-  }
-
-  if(!AccessPointGetIntegerPropertyDirect(currentAccpnt, DEFAULT_KEY, (int*) &datalen)
-     && datalen != 0)
     {
-      @call IDConnectionDefaultBoxGroup::MSG_GEN_BOOLEAN_GROUP_SET_BOOLEAN_STATE
-	 (1, TRUE);
+        @call IDModifyConnectionButton::MSG_GEN_SET_ENABLED(VUM_DELAYED_VIA_UI_QUEUE);
+        @call IDDeleteConnectionButton::MSG_GEN_SET_ENABLED(VUM_DELAYED_VIA_UI_QUEUE);
     }
-  else
+    else
     {
-      @call IDConnectionDefaultBoxGroup::MSG_GEN_BOOLEAN_GROUP_SET_BOOLEAN_STATE
-	 (1, FALSE);
+        @call IDModifyConnectionButton::MSG_GEN_SET_NOT_ENABLED(VUM_DELAYED_VIA_UI_QUEUE);
+        @call IDDeleteConnectionButton::MSG_GEN_SET_NOT_ENABLED(VUM_DELAYED_VIA_UI_QUEUE);
     }
 
-  datalen = MAX_TEXT_LEN*sizeof(TCHAR);
-  memset(name, 0, sizeof(TCHAR)*MAX_TEXT_LEN);
-  @send IDConnectionUserName::MSG_GEN_SET_NOT_USABLE(VUM_NOW);
-  if(!AccessPointGetStringPropertyBufferDirect(currentAccpnt,
-					 (char*)APSP_USER, name, (int*) &datalen))
+    if(!AccessPointGetIntegerPropertyDirect(currentAccpnt, DEFAULT_KEY, (int*) &datalen) &&
+        datalen != 0)
     {
-      @call IDConnectionUserName::MSG_VIS_TEXT_REPLACE_ALL_PTR(name, datalen);
+        @call IDConnectionDefaultBoxGroup::MSG_GEN_BOOLEAN_GROUP_SET_BOOLEAN_STATE(1, TRUE);
     }
-  else
+    else
     {
-      @call IDConnectionUserName::MSG_VIS_TEXT_DELETE_ALL();
+        @call IDConnectionDefaultBoxGroup::MSG_GEN_BOOLEAN_GROUP_SET_BOOLEAN_STATE(1, FALSE);
     }
-  @send IDConnectionUserName::MSG_VIS_MARK_INVALID(VOF_GEOMETRY_INVALID, VUM_NOW);
-  @send IDConnectionUserName::MSG_GEN_SET_USABLE(VUM_NOW);
 
-  if(connectionNum) {
-      @call IDConnectButton::MSG_GEN_SET_ENABLED(VUM_DELAYED_VIA_UI_QUEUE);
-      @call IDConnectionDefaultBoxGroup::MSG_GEN_SET_ENABLED(VUM_NOW);
-  } else {
-      @call IDConnectionDefaultBoxGroup::MSG_GEN_SET_NOT_ENABLED(VUM_DELAYED_VIA_UI_QUEUE);
-      @call IDConnectionDefaultBoxGroup::MSG_GEN_SET_NOT_ENABLED(VUM_NOW);
-  }
+    datalen = MAX_TEXT_LEN*sizeof(TCHAR);
+    memset(name, 0, sizeof(TCHAR)*MAX_TEXT_LEN);
+    @send IDConnectionUserName::MSG_GEN_SET_NOT_USABLE(VUM_NOW);
+    if (!AccessPointGetStringPropertyBufferDirect(
+        currentAccpnt,
+        (char*)APSP_USER,
+        name,
+        (int*) &datalen))
+    {
+        @call IDConnectionUserName::MSG_VIS_TEXT_REPLACE_ALL_PTR(name, datalen);
+    }
+    else
+    {
+        @call IDConnectionUserName::MSG_VIS_TEXT_DELETE_ALL();
+    }
+    @send IDConnectionUserName::MSG_VIS_MARK_INVALID(VOF_GEOMETRY_INVALID, VUM_NOW);
+    @send IDConnectionUserName::MSG_GEN_SET_USABLE(VUM_NOW);
 
-  // AccessPointSetActivePoint(currentAccpnt, APT_INTERNET);
-  /*
-  if(AccessPointGetIntegerPropertyDirect(currentAccpnt, "hours", &tHours))
-    tHours = 0;
-  if(AccessPointGetIntegerPropertyDirect(currentAccpnt, "minutes", &tMinutes))
-    tMinutes = 0;
-  if(AccessPointGetIntegerPropertyDirect(currentAccpnt, "seconds", &tSeconds))
-    tSeconds = 0;
-  */
+    if(connectionNum)
+    {
+        @call IDConnectButton::MSG_GEN_SET_ENABLED(VUM_DELAYED_VIA_UI_QUEUE);
+        @call IDConnectionDefaultBoxGroup::MSG_GEN_SET_ENABLED(VUM_NOW);
+    }
+    else
+    {
+        @call IDConnectionDefaultBoxGroup::MSG_GEN_SET_NOT_ENABLED(VUM_DELAYED_VIA_UI_QUEUE);
+        @call IDConnectionDefaultBoxGroup::MSG_GEN_SET_NOT_ENABLED(VUM_NOW);
+    }
 
-  datalen = MAX_TEXT_LEN;
-  memset(name, 0, sizeof(TCHAR)*MAX_TEXT_LEN);
-  mh = NULL;
-  @send IDConnectionPhoneNumber::MSG_GEN_SET_NOT_USABLE(VUM_NOW);
-  if ( AccessPointGetPhoneStringWithOptions( currentAccpnt, &mh, (int*) &datalen ) )
-  {
-      TCHAR *str;
-      str = MemLock( mh );
-      if ( str )
-      {
-	  if ( *str == 'T' || *str == 'P' )
-	      ++str;
-      }
-      @call IDConnectionPhoneNumber::MSG_VIS_TEXT_REPLACE_ALL_PTR(str, 0 /*NULL term*/);
-      MemUnlock( mh );
-      MemFree( mh );
-  }
+    // AccessPointSetActivePoint(currentAccpnt, APT_INTERNET);
+    /*
+    if(AccessPointGetIntegerPropertyDirect(currentAccpnt, "hours", &tHours))
+        tHours = 0;
+    if(AccessPointGetIntegerPropertyDirect(currentAccpnt, "minutes", &tMinutes))
+        tMinutes = 0;
+    if(AccessPointGetIntegerPropertyDirect(currentAccpnt, "seconds", &tSeconds))
+        tSeconds = 0;
+    */
 
-  else if( !AccessPointGetStringPropertyBufferDirect(currentAccpnt,
-					 (char*)APSP_PHONE, name, (int*) &datalen) )
-  {
-      @call IDConnectionPhoneNumber::MSG_VIS_TEXT_REPLACE_ALL_PTR(name, datalen);
-  }
-  else
-  {
-      @call IDConnectionPhoneNumber::MSG_VIS_TEXT_DELETE_ALL();
-  }
-  @send IDConnectionPhoneNumber::MSG_VIS_MARK_INVALID(VOF_GEOMETRY_INVALID, VUM_NOW);
-  @send IDConnectionPhoneNumber::MSG_GEN_SET_USABLE(VUM_NOW);
+    datalen = MAX_TEXT_LEN;
+    memset(name, 0, sizeof(TCHAR)*MAX_TEXT_LEN);
+    mh = NULL;
+    @send IDConnectionPhoneNumber::MSG_GEN_SET_NOT_USABLE(VUM_NOW);
+    if ( AccessPointGetPhoneStringWithOptions(currentAccpnt, &mh, (int*) &datalen))
+    {
+        TCHAR *str;
+        str = MemLock( mh );
+        if ( str )
+        {
+            if ( *str == 'T' || *str == 'P' )
+                ++str;
+        }
+        @call IDConnectionPhoneNumber::MSG_VIS_TEXT_REPLACE_ALL_PTR(str, 0 /*NULL term*/);
+        MemUnlock( mh );
+        MemFree( mh );
+    }
+    else if (!AccessPointGetStringPropertyBufferDirect(
+        currentAccpnt,
+        (char*)APSP_PHONE,
+        name,
+        (int*) &datalen))
+    {
+        @call IDConnectionPhoneNumber::MSG_VIS_TEXT_REPLACE_ALL_PTR(name, datalen);
+    }
+    else
+    {
+        @call IDConnectionPhoneNumber::MSG_VIS_TEXT_DELETE_ALL();
+    }
+    @send IDConnectionPhoneNumber::MSG_VIS_MARK_INVALID(VOF_GEOMETRY_INVALID, VUM_NOW);
+    @send IDConnectionPhoneNumber::MSG_GEN_SET_USABLE(VUM_NOW);
 
-  if (currentAccpnt != G_lastActiveAccpnt) {
-    @send IDConnectionActivateBox::MSG_GEN_SET_USABLE(VUM_NOW);
-  }
-  else {
-    @send IDConnectionActivateBox::MSG_GEN_SET_NOT_USABLE(VUM_NOW);
-  }
+    if (currentAccpnt != G_lastActiveAccpnt)
+    {
+        @send IDConnectionActivateBox::MSG_GEN_SET_USABLE(VUM_NOW);
+        @send IDConnectionActiveStateBox::MSG_GEN_SET_NOT_USABLE(VUM_NOW);
+    }
+    else
+    {
+        @send IDConnectionActivateBox::MSG_GEN_SET_NOT_USABLE(VUM_NOW);
+        if (type != NET_TYPE_PPP)
+        {
+            @send IDConnectionActiveStateBox::MSG_GEN_SET_USABLE(VUM_NOW);
+        }
+        else
+        {
+            @send IDConnectionActiveStateBox::MSG_GEN_SET_NOT_USABLE(VUM_NOW);
+        }
+    }
 
-  if ((type == NET_TYPE_PPP) && (type == G_lastActiveNetType)) {
-    @send IDConnectionPhoneAndLogin::MSG_GEN_SET_USABLE(VUM_NOW);
-  }
-  else {
-    @send IDConnectionPhoneAndLogin::MSG_GEN_SET_NOT_USABLE(VUM_NOW);
-  }
+    if ((type == NET_TYPE_PPP) && (type == G_lastActiveNetType))
+    {
+        @send IDConnectionPhoneAndLogin::MSG_GEN_SET_USABLE(VUM_NOW);
+    }
+    else
+    {
+        @send IDConnectionPhoneAndLogin::MSG_GEN_SET_NOT_USABLE(VUM_NOW);
+    }
 
-  @send IDialupPrimary::MSG_GEN_RESET_TO_INITIAL_SIZE(VUM_DELAYED_VIA_UI_QUEUE);
+    @send IDialupPrimary::MSG_GEN_RESET_TO_INITIAL_SIZE(VUM_DELAYED_VIA_UI_QUEUE);
 }
 
 /***********************************************************************
