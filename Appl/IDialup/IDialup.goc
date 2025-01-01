@@ -151,7 +151,7 @@ void IDialupEnsureDefaultConnection(void);
 	  G_registered = TRUE ;
   }
 
-    @call self::MSG_IDP_INITIALIZE_CONNECTION();
+    @call self::MSG_IDP_READ_ACCPNT_AND_ACCPNT_LIST();
 
     // Hack to delete the temporary access point created by signup, just in case
     // signup crashes and fails to clean up after itself. (dhunter 1/13/2000)
@@ -162,12 +162,12 @@ void IDialupEnsureDefaultConnection(void);
         AccessPointCommit();
 
         // Reload the accpnt list.
-        @call self::MSG_IDP_INITIALIZE_CONNECTION();
+        @call self::MSG_IDP_READ_ACCPNT_AND_ACCPNT_LIST();
     }
 
     // Ensure that there is only one default access point.  We do this because
     // Welcome can add a new default without un-defaulting the old one.  The
-    // last one discovered (the one set by MSG_IDP_INITIALIZE_CONNECTION) is the
+    // last one discovered (the one set by MSG_IDP_READ_ACCPNT_AND_ACCPNT_LIST) is the
     // desired default.
     IDialupEnsureDefaultConnection();
 
@@ -183,7 +183,7 @@ void IDialupEnsureDefaultConnection(void);
     }
     G_lastActiveAccpnt = currentAccpnt;
 
-    @call self::MSG_IDP_CONNECTION_SET_CURRENT();
+    @call self::MSG_IDP_UPDATE_UI_FOR_SELECTED_ACCPNT();
 
 
     @callsuper();
@@ -1121,13 +1121,13 @@ AccessPointLocalDialingOptions GetLocalDialingOptions (void)
     if(creatingConnection)
     {
         creatingConnection = FALSE;
-        @call self::MSG_IDP_INITIALIZE_CONNECTION();
-        @call self::MSG_IDP_CONNECTION_SET_CURRENT();
+        @call self::MSG_IDP_READ_ACCPNT_AND_ACCPNT_LIST();
+        @call self::MSG_IDP_UPDATE_UI_FOR_SELECTED_ACCPNT();
     }
     else
     {
         // change the current connection display
-        @call self::MSG_IDP_CONNECTION_SET_CURRENT();
+        @call self::MSG_IDP_UPDATE_UI_FOR_SELECTED_ACCPNT();
     }
 
     // We no longer automatically do this via GI_attrs since we may not
@@ -1278,13 +1278,13 @@ AccessPointLocalDialingOptions GetLocalDialingOptions (void)
       // this tries to read the current accpnt from geos.ini.
       // But there is none, so it will set the current accpnt
       // to the first one in the list?
-      @call self::MSG_IDP_INITIALIZE_CONNECTION();
-      @call self::MSG_IDP_CONNECTION_SET_CURRENT();
+      @call self::MSG_IDP_READ_ACCPNT_AND_ACCPNT_LIST();
+      @call self::MSG_IDP_UPDATE_UI_FOR_SELECTED_ACCPNT();
     }
 }
 
 /***********************************************************************
- *		MSG_IDP_INITIALIZE_CONNECTION
+ *		MSG_IDP_READ_ACCPNT_AND_ACCPNT_LIST
  ***********************************************************************
  *
  * SYNOPSIS:	Initialize UI and Connection settings.
@@ -1299,7 +1299,7 @@ AccessPointLocalDialingOptions GetLocalDialingOptions (void)
  *	mzhu    	12/03/98   	Initial Revision
  *
  ***********************************************************************/
-@method IDialupProcessClass, MSG_IDP_INITIALIZE_CONNECTION
+@method IDialupProcessClass, MSG_IDP_READ_ACCPNT_AND_ACCPNT_LIST
 {
     word *id, datalen, i, defaultItem=0;
     word tmpAccpnt=0, tmpItem=0;
@@ -1428,13 +1428,13 @@ AccessPointLocalDialingOptions GetLocalDialingOptions (void)
     }
 
     // init / update the list UI, the rest of the UI must be updated separately by
-    // manually calling MSG_IDP_CONNECTION_SET_CURRENT
+    // manually calling MSG_IDP_UPDATE_UI_FOR_SELECTED_ACCPNT
     @call IDConnectionList::MSG_GEN_DYNAMIC_LIST_INITIALIZE(connectionNum);
     @send IDConnectionList::MSG_GEN_ITEM_GROUP_SET_SINGLE_SELECTION(currentListItem, 0);
 }
 
 /***********************************************************************
- *	MSG_IDP_CONNECTION_SET_CURRENT for IDialupProcessClass
+ *	MSG_IDP_UPDATE_UI_FOR_SELECTED_ACCPNT for IDialupProcessClass
  ***********************************************************************
  * SYNOPSIS:     Edit the current CONNECTION setting.
  *
@@ -1450,7 +1450,7 @@ AccessPointLocalDialingOptions GetLocalDialingOptions (void)
  *	mzhu	11/23/98	Initial Revision
  *
  ***********************************************************************/
-@method IDialupProcessClass, MSG_IDP_CONNECTION_SET_CURRENT
+@method IDialupProcessClass, MSG_IDP_UPDATE_UI_FOR_SELECTED_ACCPNT
 {
   word datalen;
   TCHAR name[MAX_TEXT_LEN];
@@ -1927,7 +1927,7 @@ void IDialupUpdateEditOKButton(void)
 	    IC_INTERACTION_COMPLETE);
 
 	/* Update the UI since the number is shown with dialer options. */
-	@call self::MSG_IDP_CONNECTION_SET_CURRENT();
+	@call self::MSG_IDP_UPDATE_UI_FOR_SELECTED_ACCPNT();
     }
 }
 
