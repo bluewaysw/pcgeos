@@ -59,9 +59,10 @@ MemHandle connectionHandle;
 ChunkHandle connectionChunk;
 ChunkHandle iAppChunk;
 
-word connectionNum = 0;
-word currentAccpnt=0;
-word defaultAccpnt=0;
+word  connectionNum = 0;
+word  currentAccpnt=0;
+word  defaultAccpnt=0;
+int   G_lastActiveNetType = 0;
 
 word tempAccpnt = 0;
 #define TEMPORARY_KEY "temp"
@@ -130,8 +131,6 @@ void IDialupEnsureDefaultConnection(void);
     TCHAR *ptr, *names;
     char *p;
     Boolean bShowDetails = FALSE; /* this must match the object default */
-    int lastActiveNetType = 0;
-
 
     pppStatus = PPP_STATUS_CLOSED;
 
@@ -171,8 +170,6 @@ void IDialupEnsureDefaultConnection(void);
     // desired default.
     IDialupEnsureDefaultConnection();
 
-    @callsuper();
-
     // Make sure to store the netType that's active when we start up
     // so we can check out which buttons (Activate / Connect) should be active
     // and if a reboot is needed when switching netTypes respectively...
@@ -180,12 +177,16 @@ void IDialupEnsureDefaultConnection(void);
     // if we switch to an accpnt that's of a different netType, we'll
     // reboot and end up here again. And if we switch to another PPP accpnt,
     // no netType change occurs.
-    if (AccessPointGetIntegerPropertyDirect(currentAccpnt, "netType", (int*) &lastActiveNetType)) {
-      lastActiveNetType = NET_TYPE_PPP;
+    if (AccessPointGetIntegerPropertyDirect(currentAccpnt, "netType", (int*) &G_lastActiveNetType)) {
+      G_lastActiveNetType = NET_TYPE_PPP;
     }
+    // AccessPointSetIntegerPropertyDirect(currentAccpnt, "lastActiveNetType1", G_lastActiveNetType);
+    // AccessPointCommit();
 
-    InitFileWriteInteger(IDIAL_CATEGORY, "lastActiveNetType", (word) lastActiveNetType);
-    InitFileCommit();
+    @call self::MSG_IDP_CONNECTION_SET_CURRENT();
+
+
+    @callsuper();
 
     if(launchBlock)
       {
@@ -1121,6 +1122,7 @@ AccessPointLocalDialingOptions GetLocalDialingOptions (void)
     {
         creatingConnection = FALSE;
         @call self::MSG_IDP_INITIALIZE_CONNECTION();
+        @call self::MSG_IDP_CONNECTION_SET_CURRENT();
     }
     else
     {
@@ -1276,7 +1278,8 @@ AccessPointLocalDialingOptions GetLocalDialingOptions (void)
       // this tries to read the current accpnt from geos.ini.
       // But there is none, so it will set the current accpnt
       // to the first one in the list?
-      @send self::MSG_IDP_INITIALIZE_CONNECTION();
+      @call self::MSG_IDP_INITIALIZE_CONNECTION();
+      @call self::MSG_IDP_CONNECTION_SET_CURRENT();
     }
 }
 
@@ -1301,6 +1304,7 @@ AccessPointLocalDialingOptions GetLocalDialingOptions (void)
     word *id, datalen, i, defaultItem=0;
     word tmpAccpnt=0, tmpItem=0;
     word *hidden;
+    word  currentListItem=0;
 
     if(connectionHandle)
     {
@@ -1398,47 +1402,35 @@ AccessPointLocalDialingOptions GetLocalDialingOptions (void)
 
     MemUnlock(connectionHandle);
 
-    @call IDConnectionList::MSG_GEN_DYNAMIC_LIST_INITIALIZE(connectionNum);
-
-    // if no connection at all, disable the connect button
-    // FIXME: should only be done if the connection is not a HOST/EtherODI/EtherPKT connection
-    if(connectionNum)
-    {
-        @call IDConnectButton::MSG_GEN_SET_ENABLED(VUM_NOW);
-    }
-    else
-    {
-        @call IDConnectButton::MSG_GEN_SET_NOT_ENABLED(VUM_NOW);
-    }
-
     if(!currentAccpnt)
     {
         if(defaultAccpnt)
         {
             currentAccpnt = defaultAccpnt;
-            @send IDConnectionList::MSG_GEN_ITEM_GROUP_SET_SINGLE_SELECTION(defaultItem, 0);
+            currentListItem = defaultItem;
         }
         else if(tmpAccpnt)
         {
             currentAccpnt = tmpAccpnt;
-            @send IDConnectionList::MSG_GEN_ITEM_GROUP_SET_SINGLE_SELECTION(tmpItem, 0);
+            currentListItem = tmpItem;
         }
     }
     else
     {
-        @send IDConnectionList::MSG_GEN_ITEM_GROUP_SET_SINGLE_SELECTION(tmpItem, 0);
+        currentListItem = tmpItem;
     }
 
     /* if there is only 1 access point then let's make it the default
     access point automagically...  jfh 2/19/02 */
     if ((connectionNum == 1) && !defaultAccpnt)
     {
-        @call IDConnectionDefaultBoxGroup::MSG_GEN_BOOLEAN_GROUP_SET_BOOLEAN_STATE(1, TRUE);
         @call self::MSG_IDP_SET_DEFAULT_CONNECTION();
     }
 
-    // now update the rest of the UI
-    @send self::MSG_IDP_CONNECTION_SET_CURRENT();
+    // init / update the list UI, the rest of the UI must be updated separately by
+    // manually calling MSG_IDP_CONNECTION_SET_CURRENT
+    @call IDConnectionList::MSG_GEN_DYNAMIC_LIST_INITIALIZE(connectionNum);
+    @send IDConnectionList::MSG_GEN_ITEM_GROUP_SET_SINGLE_SELECTION(currentListItem, 0);
 }
 
 /***********************************************************************
@@ -1464,12 +1456,26 @@ AccessPointLocalDialingOptions GetLocalDialingOptions (void)
   TCHAR name[MAX_TEXT_LEN];
   MemHandle mh;
   int type = 0;
-  int lastActiveNetType = 0;
 
   if (AccessPointGetIntegerPropertyDirect(currentAccpnt, "netType", (int*) &type)) {
 	  type = NET_TYPE_PPP ;
   }
-  (void) InitFileReadInteger(IDIAL_CATEGORY, "lastActiveNetType", (word*) &lastActiveNetType);
+
+    // if no connection at all, disable the connect button
+    // FIXME: should only be done if the connection is not a HOST/EtherODI/EtherPKT connection
+    if(connectionNum) {
+        @call IDConnectButton::MSG_GEN_SET_ENABLED(VUM_NOW);
+    }
+    else {
+        @call IDConnectButton::MSG_GEN_SET_NOT_ENABLED(VUM_NOW);
+    }
+
+    /* if there is only 1 access point then let's make it the default
+    access point automagically...  jfh 2/19/02 */
+    // if (currentAccpnt == defaultAccpnt)
+    // {
+    //     @call IDConnectionDefaultBoxGroup::MSG_GEN_BOOLEAN_GROUP_SET_BOOLEAN_STATE(1, TRUE);
+    // }
 
   if( (connectionNum) && (type != NET_TYPE_HOST ) )
   {
@@ -1557,17 +1563,14 @@ AccessPointLocalDialingOptions GetLocalDialingOptions (void)
   @send IDConnectionPhoneNumber::MSG_VIS_MARK_INVALID(VOF_GEOMETRY_INVALID, VUM_NOW);
   @send IDConnectionPhoneNumber::MSG_GEN_SET_USABLE(VUM_NOW);
 
-  InitFileWriteInteger("currentAccpnt", "lastActiveNetType2", lastActiveNetType);
-
-
-  if (type == lastActiveNetType) {
+  if (type == G_lastActiveNetType) {
     @send IDConnectionActivateBox::MSG_GEN_SET_NOT_USABLE(VUM_NOW);
   }
   else {
     @send IDConnectionActivateBox::MSG_GEN_SET_USABLE(VUM_NOW);
   }
 
-  if ((type == NET_TYPE_PPP) && (type == lastActiveNetType)) {
+  if ((type == NET_TYPE_PPP) && (type == G_lastActiveNetType)) {
     @send IDConnectionPhoneAndLogin::MSG_GEN_SET_USABLE(VUM_NOW);
   }
   else {
@@ -1914,7 +1917,7 @@ void IDialupUpdateEditOKButton(void)
 	    IC_INTERACTION_COMPLETE);
 
 	/* Update the UI since the number is shown with dialer options. */
-	@send self::MSG_IDP_CONNECTION_SET_CURRENT();
+	@call self::MSG_IDP_CONNECTION_SET_CURRENT();
     }
 }
 
