@@ -180,8 +180,6 @@ void IDialupEnsureDefaultConnection(void);
     if (AccessPointGetIntegerPropertyDirect(currentAccpnt, "netType", (int*) &G_lastActiveNetType)) {
       G_lastActiveNetType = NET_TYPE_PPP;
     }
-    // AccessPointSetIntegerPropertyDirect(currentAccpnt, "lastActiveNetType1", G_lastActiveNetType);
-    // AccessPointCommit();
 
     @call self::MSG_IDP_CONNECTION_SET_CURRENT();
 
@@ -1463,12 +1461,12 @@ AccessPointLocalDialingOptions GetLocalDialingOptions (void)
 
     // if no connection at all, disable the connect button
     // FIXME: should only be done if the connection is not a HOST/EtherODI/EtherPKT connection
-    if(connectionNum) {
-        @call IDConnectButton::MSG_GEN_SET_ENABLED(VUM_NOW);
-    }
-    else {
-        @call IDConnectButton::MSG_GEN_SET_NOT_ENABLED(VUM_NOW);
-    }
+    // if(connectionNum) {
+    //     @call IDConnectButton::MSG_GEN_SET_ENABLED(VUM_NOW);
+    // }
+    // else {
+    //     @call IDConnectButton::MSG_GEN_SET_NOT_ENABLED(VUM_NOW);
+    // }
 
     /* if there is only 1 access point then let's make it the default
     access point automagically...  jfh 2/19/02 */
@@ -1477,10 +1475,27 @@ AccessPointLocalDialingOptions GetLocalDialingOptions (void)
     //     @call IDConnectionDefaultBoxGroup::MSG_GEN_BOOLEAN_GROUP_SET_BOOLEAN_STATE(1, TRUE);
     // }
 
-  if( (connectionNum) && (type != NET_TYPE_HOST ) )
+  if(
+      // only if we have list items...
+      (connectionNum) &&
+      // never if we have a HOST connection...
+      (type != NET_TYPE_HOST)
+    )
   {
     @call IDModifyConnectionButton::MSG_GEN_SET_ENABLED(VUM_DELAYED_VIA_UI_QUEUE);
-    @call IDDeleteConnectionButton::MSG_GEN_SET_ENABLED(VUM_DELAYED_VIA_UI_QUEUE);
+
+    // only if we have a PPP connection or if the currently selected connection
+    // type is different from the active connection type...
+    // Background: PPP connections are not persistent, so we can modify them
+    // if not dialed in. Other connection types are persistent, so we shouldn't
+    // be able to modify them while they are active.
+    // FIXME: this basically prevents us from removing any connection other than PPP.
+    // Also, if we have multiple, say, packet or ODI based connections, we can't modify
+    // them while one of them is active.
+    if ((type == NET_TYPE_PPP) || (type != G_lastActiveNetType))
+    {
+      @call IDDeleteConnectionButton::MSG_GEN_SET_ENABLED(VUM_DELAYED_VIA_UI_QUEUE);
+    }
   }
   else
   {
