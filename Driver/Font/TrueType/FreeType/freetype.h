@@ -258,11 +258,13 @@
     /* values are better used to compute accumulated positioning      */
     /* distances.                                                     */
 
+  #ifdef TT_CONFIG_OPTION_SUPPORT_OPTIONAL_FIELDS
     TT_Pos   linearHoriBearingX;  /* linearly scaled horizontal lsb     */
     TT_Pos   linearHoriAdvance;   /* linearly scaled horizontal advance */
 
     TT_Pos   linearVertBearingY;  /* linearly scaled vertical tsb     */
     TT_Pos   linearVertAdvance;   /* linearly scaled vertical advance */
+  #endif
   };
 
   typedef struct TT_Big_Glyph_Metrics_  TT_Big_Glyph_Metrics;

@@ -87,7 +87,9 @@
 
   struct  TMaxProfile_
   {
+#ifdef TT_CONFIG_OPTION_SUPPORT_OPTIONAL_FIELDS
     TT_Fixed  version;
+#endif
     UShort    numGlyphs,
               maxPoints,
               maxContours,

@@ -1188,8 +1188,10 @@
         advance      = Scale_X( &exec->metrics, advance      );
       }
 
+#ifdef TT_CONFIG_OPTION_SUPPORT_OPTIONAL_FIELDS
       glyph->metrics.linearHoriBearingX = left_bearing;
       glyph->metrics.linearHoriAdvance  = advance;
+#endif
     }
 
     glyph->metrics.horiBearingX = glyph->metrics.bbox.xMin;
@@ -1263,8 +1265,10 @@
         advance = advance_height;
       }
 
+#ifdef TT_CONFIG_OPTION_SUPPORT_OPTIONAL_FIELDS
       glyph->metrics.linearVertBearingY = Top;
       glyph->metrics.linearVertAdvance  = advance;
+#endif
 
       /* XXX : for now, we have no better algo for the lsb, but it should */
       /*       work ok..                                                  */

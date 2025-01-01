@@ -168,7 +168,11 @@
       return error;
 
     /* read frame data into face table */
+#ifdef TT_CONFIG_OPTION_SUPPORT_OPTIONAL_FIELDS
     maxProfile->version               = GET_ULong();
+#else
+    SKIP( 4 );
+#endif
 
     maxProfile->numGlyphs             = GET_UShort();
 
