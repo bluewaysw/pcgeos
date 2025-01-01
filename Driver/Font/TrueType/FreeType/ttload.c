@@ -505,7 +505,11 @@
          ACCESS_Frame( 36 ) )
       return error;
 
+#ifdef TT_CONFIG_OPTION_SUPPORT_OPTIONAL_FIELDS
     header->Version   = GET_ULong();
+#else
+    SKIP( 4 );
+#endif
     header->Ascender  = GET_Short();
     header->Descender = GET_Short();
     header->Line_Gap  = GET_Short();

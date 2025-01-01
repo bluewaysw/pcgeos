@@ -389,7 +389,9 @@
 
   struct  TT_Horizontal_Header_
   {
+#ifdef TT_CONFIG_OPTION_SUPPORT_OPTIONAL_FIELDS
     TT_Fixed   Version;
+#endif
     TT_FWord   Ascender;
     TT_FWord   Descender;
     TT_FWord   Line_Gap;
@@ -433,7 +435,9 @@
 
   struct  TT_Vertical_Header_
   {
+#ifdef TT_CONFIG_OPTION_SUPPORT_OPTIONAL_FIELDS
     TT_Fixed   Version;
+#endif
     TT_FWord   Ascender;
     TT_FWord   Descender;
     TT_FWord   Line_Gap;
