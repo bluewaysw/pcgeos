@@ -51,7 +51,9 @@ usernotes       "based on SSLeay 0.9.0b 29-Jun-1998"
 # Code resources
 #
 nosort
+ifndef COMPILE_OPTION_HOST_SERVICE_ONLY
 resource FixedCallbacks		fixed read-only code shared
+endif
 
 #
 # exported routines

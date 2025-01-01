@@ -55,7 +55,7 @@
  * copied and put under another distribution licence
  * [including the GNU Public Licence.]
  */
-
+#ifndef COMPILE_OPTION_HOST_SERVICE_ONLY
 #ifdef __GEOS__
 #include <Ansi/stdio.h>
 #else
@@ -205,4 +205,6 @@ int n;
 		return(0);
 	return((a->data[w]&v) != 0);
 	}
+
+#endif /* COMPILE_OPTION_HOST_SERVICE_ONLY */
 

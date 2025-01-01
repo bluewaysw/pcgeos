@@ -184,7 +184,7 @@
     TT_UnitVector  projVector;
     TT_UnitVector  freeVector;
 
-    Long           loop;
+    Int            loop;
     TT_F26Dot6     minimum_distance;
     Int            round_state;
 
@@ -628,7 +628,7 @@
     UShort          stackSize;  /* size of exec. stack */
     PStorage        stack;      /* current exec. stack */
 
-    Long            args;
+    Short           args;
     UShort          new_top;    /* new top after exec.    */
 
     TGlyph_Zone     zp0,            /* zone records */
@@ -710,7 +710,6 @@
 
     TProject_Function  _near * func_project;   /* current projection function */
     TProject_Function  _near * func_dualproj;  /* current dual proj. function */
-    TProject_Function  _near * func_freeProj;  /* current freedom proj. func  */
 
     TMove_Function     _near * func_move;      /* current point move function */
 

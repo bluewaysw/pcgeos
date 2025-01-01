@@ -135,7 +135,6 @@
 
   struct  TCache_
   {
-    //PEngine_Instance  engine;
     PCache_Class      clazz;      /* 'class' is a reserved word in C++ */
     TSingle_List      active;
     TSingle_List      idle;
