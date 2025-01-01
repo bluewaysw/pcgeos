@@ -63,6 +63,7 @@ word  connectionNum = 0;
 word  currentAccpnt=0;
 word  defaultAccpnt=0;
 int   G_lastActiveNetType = 0;
+int   G_lastActiveAccpnt = 0;
 
 word tempAccpnt = 0;
 #define TEMPORARY_KEY "temp"
@@ -175,11 +176,12 @@ void IDialupEnsureDefaultConnection(void);
     // and if a reboot is needed when switching netTypes respectively...
     // This is only ever set once, right here, because:
     // if we switch to an accpnt that's of a different netType, we'll
-    // reboot and end up here again. And if we switch to another PPP accpnt,
-    // no netType change occurs.
+    // reboot and end up here again. And if we switch to another accpnt of the same,
+    // netType, no netType change occurs.
     if (AccessPointGetIntegerPropertyDirect(currentAccpnt, "netType", (int*) &G_lastActiveNetType)) {
       G_lastActiveNetType = NET_TYPE_PPP;
     }
+    G_lastActiveAccpnt = currentAccpnt;
 
     @call self::MSG_IDP_CONNECTION_SET_CURRENT();
 
@@ -1478,36 +1480,13 @@ AccessPointLocalDialingOptions GetLocalDialingOptions (void)
     break;
   }
 
-
-    // if no connection at all, disable the connect button
-    // FIXME: should only be done if the connection is not a HOST/EtherODI/EtherPKT connection
-    // if(connectionNum) {
-    //     @call IDConnectButton::MSG_GEN_SET_ENABLED(VUM_NOW);
-    // }
-    // else {
-    //     @call IDConnectButton::MSG_GEN_SET_NOT_ENABLED(VUM_NOW);
-    // }
-
-    /* if there is only 1 access point then let's make it the default
-    access point automagically...  jfh 2/19/02 */
-    // if (currentAccpnt == defaultAccpnt)
-    // {
-    //     @call IDConnectionDefaultBoxGroup::MSG_GEN_BOOLEAN_GROUP_SET_BOOLEAN_STATE(1, TRUE);
-    // }
-
   if(
       // only if we have list items...
       (connectionNum) &&
       // never if we have a HOST connection...
       (type != NET_TYPE_HOST) &&
-      // only if we have a PPP connection or if the currently selected connection
-      // type is different from the active connection type...
-      // Background: PPP connections are not persistent, so we can modify them
-      // if not dialed in. Other connection types are persistent, so we shouldn't
-      // be able to modify them while they are active.
-      // FIXME: if we have multiple, say, PACKET or ODI based connections, we
-      // can't modify any of them, while one of them is active.
-      ((type == NET_TYPE_PPP) || (type != G_lastActiveNetType))
+      // only if we are not the current connection...
+      (G_lastActiveAccpnt != currentAccpnt)
     )
   {
       @call IDModifyConnectionButton::MSG_GEN_SET_ENABLED(VUM_DELAYED_VIA_UI_QUEUE);
@@ -2079,7 +2058,7 @@ void IDialupUpdateEditOKButton(void)
         G_registered = FALSE ;
     }
 
-    // at this point in time, currentAccpnt should always be of type NET_TYPE_PPP
+    // currentAccpnt should usually be of type NET_TYPE_PPP
     AccessPointSetActivePoint(currentAccpnt, APT_INTERNET);
     AccessPointCommit();
 
@@ -2114,6 +2093,12 @@ void IDialupUpdateEditOKButton(void)
 
             @call IDialupApp::MSG_IDA_VIEW_CONNECTION();
         }
+    }
+    else
+    {
+      // We assume a successfull connection from here on up,
+      // so we can set G_lastActiveAccpnt to currentAccpnt.
+      G_lastActiveAccpnt = currentAccpnt;
     }
 }
 
