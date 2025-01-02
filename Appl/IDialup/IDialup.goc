@@ -556,6 +556,15 @@ void IDialupEnsureDefaultConnection(void);
   word dialOptions = DEFAULT_DIAL_OPTIONS;
   word type ;
 
+  if (currentAccpnt == G_lastActiveAccpnt)
+  {
+    UserStandardDialogOptr(
+        0, 0, 0, 0,
+        @noEdit,
+        (CDT_WARNING<<CDBF_DIALOG_TYPE_OFFSET)|(GIT_NOTIFICATION<<CDBF_INTERACTION_TYPE_OFFSET)) ;
+    return;
+  }
+
   datalen = MAX_TEXT_LEN*sizeof(TCHAR);
   memset(name, 0, sizeof(TCHAR)*MAX_TEXT_LEN);
   if(!AccessPointGetStringPropertyBufferDirect(currentAccpnt,
@@ -1223,6 +1232,15 @@ AccessPointLocalDialingOptions GetLocalDialingOptions (void)
   TCHAR *tptr;
   word datalen = NAME_LEN;
 
+  if (currentAccpnt == G_lastActiveAccpnt)
+  {
+    UserStandardDialogOptr(
+        0, 0, 0, 0,
+        @noEdit,
+        (CDT_WARNING<<CDBF_DIALOG_TYPE_OFFSET)|(GIT_NOTIFICATION<<CDBF_INTERACTION_TYPE_OFFSET)) ;
+    return;
+  }
+
   if(AccessPointGetStringPropertyBufferDirect(currentAccpnt, (char*)APSP_NAME, name, (int*) &datalen))
     AccessPointGetStringPropertyBufferDirect(currentAccpnt, (char*)APSP_PHONE, name, (int*) &datalen);
 
@@ -1484,18 +1502,16 @@ AccessPointLocalDialingOptions GetLocalDialingOptions (void)
         // only if we have list items...
         (connectionNum) &&
         // never if we have a HOST connection...
-        (type != NET_TYPE_HOST) &&
-        // only if we are not the current connection...
-        (G_lastActiveAccpnt != currentAccpnt)
+        (type != NET_TYPE_HOST)
     )
     {
-        @call IDModifyConnectionButton::MSG_GEN_SET_ENABLED(VUM_DELAYED_VIA_UI_QUEUE);
-        @call IDDeleteConnectionButton::MSG_GEN_SET_ENABLED(VUM_DELAYED_VIA_UI_QUEUE);
+        @call IDModifyConnectionButton::MSG_GEN_SET_ENABLED(VUM_DELAYED_VIA_APP_QUEUE);
+        @call IDDeleteConnectionButton::MSG_GEN_SET_ENABLED(VUM_DELAYED_VIA_APP_QUEUE);
     }
     else
     {
-        @call IDModifyConnectionButton::MSG_GEN_SET_NOT_ENABLED(VUM_DELAYED_VIA_UI_QUEUE);
-        @call IDDeleteConnectionButton::MSG_GEN_SET_NOT_ENABLED(VUM_DELAYED_VIA_UI_QUEUE);
+        @call IDModifyConnectionButton::MSG_GEN_SET_NOT_ENABLED(VUM_DELAYED_VIA_APP_QUEUE);
+        @call IDDeleteConnectionButton::MSG_GEN_SET_NOT_ENABLED(VUM_DELAYED_VIA_APP_QUEUE);
     }
 
     if(!AccessPointGetIntegerPropertyDirect(currentAccpnt, DEFAULT_KEY, (int*) &datalen) &&
