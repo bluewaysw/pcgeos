@@ -125,7 +125,7 @@ export     StatusTextClass
 export     URLEntryClass
 
 #if NOT COMPILE_OPTION_TURN_OFF_LOGO... ifndef doesn't work
-#export     GlobeAnimClass
+export     GlobeAnimClass
 
 export     WMViewControlClass
 export     WMSearchReplaceControlClass
