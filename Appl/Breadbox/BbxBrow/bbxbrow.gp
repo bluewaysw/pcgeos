@@ -44,9 +44,7 @@ endif
 #library     bboxlog
 
 # Only needed for COMPILE_OPTION_PARENTAL_CONTROL
-ifdef COMPILE_OPTION_PARENTAL_CONTROL
 library	   parentc
-endif
 
 # Only needed for COMPILE_OPTION_IDIAL_CONTROL
 library	   idialc
@@ -139,10 +137,8 @@ endif
 #
 #these two only needed for COMPILE_OPTION_PARENTAL_CONTROL
 #
-ifdef COMPILE_OPTION_PARENTAL_CONTROL
 resource   PCResource		ui-object
 resource   PCRootResource	object
-endif
 
 resource   ViewGroupTemplateResource    ui-object
 resource   ViewTemplateResource         ui-object

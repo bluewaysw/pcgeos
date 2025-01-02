@@ -81,7 +81,8 @@ AB/LoadURL.eobj: stdapp.goh object.goh ui.goh Objects/metaC.goh \
                 Objects/vLTextC.goh htmlstat.goh stattext.goh \
                 urlfetch.goh mailhub.goh socket.goh sockmisc.h \
                 Objects/Text/tCtrlC.goh ruler.goh Objects/colorC.goh \
-                Objects/styles.goh dialogt.goh glbanim.goh sem.h
+                Objects/styles.goh parentc.goh dialogt.goh glbanim.goh \
+                sem.h
 AB/LoadURL.obj \
 AB/LoadURL.eobj: geos.h heap.h geode.h resource.h ec.h object.h lmem.h \
                 graphics.h fontID.h font.h color.h gstring.h timer.h vm.h \
@@ -153,20 +154,23 @@ AB/HTMLVIEW.eobj: stdapp.goh object.goh ui.goh Objects/metaC.goh \
                 product.goh Objects/gViewCC.goh options.goh html4par.goh \
                 Objects/vLTextC.goh htmlstat.goh stattext.goh \
                 urlfetch.goh mailhub.goh socket.goh sockmisc.h \
-                favorite.goh importg.goh htmlv_ui.goh glbanim.goh \
-                Objects/iDialCC.goh Art/appicon.goh ui/menuFile.goh \
-                ui/menuEdit.goh ui/menuView.goh ui/menuOptions.goh \
-                ui/menuNavigation.goh ui/menuHistory.goh \
-                ui/menuKidguard.goh ui/menuAutobrowse.goh ui/menuJs.goh \
-                ui/favorui.goh favorcls.goh ui/menuHtml.goh \
-                ui/dialogDownload.goh ui/statusIndicators.goh \
-                Art/lock.goh Art/unlock.goh ui/toolbarUrl.goh \
-                ui/toolbarSimple.goh Art/toolicon.goh icons/icons.goh \
-                Art/GI001_8.goh Art/GI002_8.goh Art/GI003_8.goh \
-                Art/GI004_8.goh Art/GI005_8.goh Art/A111_8.goh \
-                Art/A113_8.goh Art/A114_8.goh Art/GI009_8.goh \
-                Art/GI010_8.goh Art/GI011_8.goh Art/GI012_8.goh \
-                Art/GI013_8.goh Art/GI014_8.goh ui/mainWrapper.goh
+                parentc.goh favorite.goh importg.goh htmlv_ui.goh \
+                glbanim.goh Objects/iDialCC.goh Art/appicon.goh \
+                ui/menuFile.goh ui/menuEdit.goh ui/menuView.goh \
+                ui/menuOptions.goh ui/menuNavigation.goh \
+                ui/menuHistory.goh ui/menuKidguard.goh \
+                ui/menuAutobrowse.goh ui/menuJs.goh ui/favorui.goh \
+                favorcls.goh ui/menuHtml.goh ui/dialogDownload.goh \
+                ui/statusIndicators.goh Art/lock.goh Art/unlock.goh \
+                Art/green.goh Art/red.goh Art/yellow.goh \
+                ui/toolbarUrl.goh ui/toolbarSimple.goh \
+                ui/dialogKidguard.goh Art/red2.goh Art/green2.goh \
+                Art/toolicon.goh icons/icons.goh Art/GI001_8.goh \
+                Art/GI002_8.goh Art/GI003_8.goh Art/GI004_8.goh \
+                Art/GI005_8.goh Art/A111_8.goh Art/A113_8.goh \
+                Art/A114_8.goh Art/GI009_8.goh Art/GI010_8.goh \
+                Art/GI011_8.goh Art/GI012_8.goh Art/GI013_8.goh \
+                Art/GI014_8.goh ui/mainWrapper.goh
 AB/HTMLVIEW.obj \
 AB/HTMLVIEW.eobj: geos.h heap.h geode.h resource.h ec.h object.h lmem.h \
                 graphics.h fontID.h font.h color.h gstring.h timer.h vm.h \
@@ -202,7 +206,7 @@ AB/ImportG.eobj: stdapp.goh object.goh ui.goh Objects/metaC.goh \
                 Objects/vLTextC.goh htmlstat.goh stattext.goh \
                 urlfetch.goh mailhub.goh socket.goh sockmisc.h \
                 Objects/Text/tCtrlC.goh ruler.goh Objects/colorC.goh \
-                Objects/styles.goh importg.goh
+                Objects/styles.goh parentc.goh importg.goh
 AB/ImportG.obj \
 AB/ImportG.eobj: geos.h heap.h geode.h resource.h ec.h object.h lmem.h \
                 graphics.h fontID.h font.h color.h gstring.h timer.h vm.h \
@@ -237,7 +241,8 @@ AB/OpenClos.eobj: stdapp.goh object.goh ui.goh Objects/metaC.goh \
                 product.goh Objects/gViewCC.goh options.goh html4par.goh \
                 Objects/vLTextC.goh htmlstat.goh stattext.goh \
                 urlfetch.goh mailhub.goh socket.goh sockmisc.h \
-                favorite.goh importg.goh iapp.h
+                parentc.goh favorite.goh importg.goh iapp.h \
+                Objects/gSysC.goh
 AB/OpenClos.obj \
 AB/OpenClos.eobj: geos.h heap.h geode.h resource.h ec.h object.h lmem.h \
                 graphics.h fontID.h font.h color.h gstring.h timer.h vm.h \
@@ -273,7 +278,7 @@ AB/StatText.eobj: stdapp.goh object.goh ui.goh Objects/metaC.goh \
                 html4par.goh Objects/vLTextC.goh htmlstat.goh \
                 urlfetch.goh mailhub.goh socket.goh sockmisc.h \
                 Objects/Text/tCtrlC.goh ruler.goh Objects/colorC.goh \
-                Objects/styles.goh
+                Objects/styles.goh parentc.goh
 AB/StatText.obj \
 AB/StatText.eobj: geos.h heap.h geode.h resource.h ec.h object.h lmem.h \
                 graphics.h fontID.h font.h color.h gstring.h timer.h vm.h \
@@ -308,7 +313,7 @@ AB/UIAction.eobj: stdapp.goh object.goh ui.goh Objects/metaC.goh \
                 product.goh Objects/gViewCC.goh options.goh html4par.goh \
                 Objects/vLTextC.goh htmlstat.goh stattext.goh \
                 urlfetch.goh mailhub.goh socket.goh sockmisc.h \
-                favorite.goh importg.goh
+                parentc.goh favorite.goh importg.goh
 AB/UIAction.obj \
 AB/UIAction.eobj: geos.h heap.h geode.h resource.h ec.h object.h lmem.h \
                 graphics.h fontID.h font.h color.h gstring.h timer.h vm.h \
@@ -344,7 +349,7 @@ AB/UIOften.eobj: stdapp.goh object.goh ui.goh Objects/metaC.goh \
                 product.goh Objects/gViewCC.goh options.goh html4par.goh \
                 Objects/vLTextC.goh htmlstat.goh stattext.goh \
                 urlfetch.goh mailhub.goh socket.goh sockmisc.h \
-                favorite.goh importg.goh
+                parentc.goh favorite.goh importg.goh Objects/gSysC.goh
 AB/UIOften.obj \
 AB/UIOften.eobj: geos.h heap.h geode.h resource.h ec.h object.h lmem.h \
                 graphics.h fontID.h font.h color.h gstring.h timer.h vm.h \
@@ -380,7 +385,8 @@ AB/UIRare.eobj: stdapp.goh object.goh ui.goh Objects/metaC.goh \
                 product.goh Objects/gViewCC.goh options.goh html4par.goh \
                 Objects/vLTextC.goh htmlstat.goh stattext.goh \
                 urlfetch.goh mailhub.goh socket.goh sockmisc.h \
-                favorite.goh importg.goh glbanim.goh
+                parentc.goh favorite.goh importg.goh glbanim.goh \
+                Objects/gSysC.goh
 AB/UIRare.obj \
 AB/UIRare.eobj: geos.h heap.h geode.h resource.h ec.h object.h lmem.h \
                 graphics.h fontID.h font.h color.h gstring.h timer.h vm.h \
@@ -416,7 +422,7 @@ AB/scrapbk.eobj: stdapp.goh object.goh ui.goh Objects/metaC.goh \
                 product.goh Objects/gViewCC.goh options.goh html4par.goh \
                 Objects/vLTextC.goh htmlstat.goh stattext.goh \
                 urlfetch.goh mailhub.goh socket.goh sockmisc.h \
-                favorite.goh importg.goh
+                parentc.goh favorite.goh importg.goh
 AB/scrapbk.obj \
 AB/scrapbk.eobj: geos.h heap.h geode.h resource.h ec.h object.h lmem.h \
                 graphics.h fontID.h font.h color.h gstring.h timer.h vm.h \
@@ -452,7 +458,7 @@ AB/INIT.eobj: stdapp.goh object.goh ui.goh Objects/metaC.goh \
                 Objects/vLTextC.goh htmlstat.goh stattext.goh \
                 urlfetch.goh mailhub.goh socket.goh sockmisc.h \
                 Objects/Text/tCtrlC.goh ruler.goh Objects/colorC.goh \
-                Objects/styles.goh
+                Objects/styles.goh parentc.goh
 AB/INIT.obj \
 AB/INIT.eobj: geos.h heap.h geode.h resource.h ec.h object.h lmem.h \
                 graphics.h fontID.h font.h color.h gstring.h timer.h vm.h \
@@ -488,7 +494,7 @@ AB/browser.eobj: stdapp.goh object.goh ui.goh Objects/metaC.goh \
                 Objects/vLTextC.goh htmlstat.goh stattext.goh \
                 urlfetch.goh mailhub.goh socket.goh sockmisc.h \
                 Objects/Text/tCtrlC.goh ruler.goh Objects/colorC.goh \
-                Objects/styles.goh
+                Objects/styles.goh parentc.goh
 AB/browser.obj \
 AB/browser.eobj: geos.h heap.h geode.h resource.h ec.h object.h lmem.h \
                 graphics.h fontID.h font.h color.h gstring.h timer.h vm.h \
@@ -524,7 +530,7 @@ AB/sebrowse.eobj: stdapp.goh object.goh ui.goh Objects/metaC.goh \
                 Objects/vLTextC.goh htmlstat.goh stattext.goh \
                 urlfetch.goh mailhub.goh socket.goh sockmisc.h \
                 Objects/Text/tCtrlC.goh ruler.goh Objects/colorC.goh \
-                Objects/styles.goh
+                Objects/styles.goh parentc.goh
 AB/sebrowse.obj \
 AB/sebrowse.eobj: geos.h heap.h geode.h resource.h ec.h object.h lmem.h \
                 graphics.h fontID.h font.h color.h gstring.h timer.h vm.h \
@@ -587,7 +593,7 @@ AB/FAVORCLS.eobj: stdapp.goh object.goh ui.goh Objects/metaC.goh \
                 Objects/gViewCC.goh html4par.goh Objects/vLTextC.goh \
                 htmlstat.goh stattext.goh urlfetch.goh mailhub.goh \
                 socket.goh sockmisc.h Objects/Text/tCtrlC.goh ruler.goh \
-                Objects/colorC.goh Objects/styles.goh
+                Objects/colorC.goh Objects/styles.goh parentc.goh
 AB/FAVORCLS.obj \
 AB/FAVORCLS.eobj: geos.h heap.h geode.h resource.h ec.h object.h lmem.h \
                 graphics.h fontID.h font.h color.h gstring.h timer.h vm.h \
@@ -651,7 +657,8 @@ AB/NAVCACHE.eobj: stdapp.goh object.goh ui.goh Objects/metaC.goh \
                 Objects/vLTextC.goh htmlstat.goh stattext.goh \
                 urlfetch.goh mailhub.goh socket.goh sockmisc.h \
                 Objects/Text/tCtrlC.goh ruler.goh Objects/colorC.goh \
-                Objects/styles.goh dialogt.goh glbanim.goh sem.h
+                Objects/styles.goh parentc.goh dialogt.goh glbanim.goh \
+                sem.h
 AB/NAVCACHE.obj \
 AB/NAVCACHE.eobj: geos.h heap.h geode.h resource.h ec.h object.h lmem.h \
                 graphics.h fontID.h font.h color.h gstring.h timer.h vm.h \
@@ -715,7 +722,8 @@ AB/NAVIGATE.eobj: stdapp.goh object.goh ui.goh Objects/metaC.goh \
                 Objects/vLTextC.goh htmlstat.goh stattext.goh \
                 urlfetch.goh mailhub.goh socket.goh sockmisc.h \
                 Objects/Text/tCtrlC.goh ruler.goh Objects/colorC.goh \
-                Objects/styles.goh dialogt.goh glbanim.goh sem.h
+                Objects/styles.goh parentc.goh dialogt.goh glbanim.goh \
+                sem.h
 AB/NAVIGATE.obj \
 AB/NAVIGATE.eobj: geos.h heap.h geode.h resource.h ec.h object.h lmem.h \
                 graphics.h fontID.h font.h color.h gstring.h timer.h vm.h \
@@ -751,7 +759,7 @@ AB/LOCALPAG.eobj: stdapp.goh object.goh ui.goh Objects/metaC.goh \
                 Objects/vLTextC.goh htmlstat.goh stattext.goh \
                 urlfetch.goh mailhub.goh socket.goh sockmisc.h \
                 Objects/Text/tCtrlC.goh ruler.goh Objects/colorC.goh \
-                Objects/styles.goh
+                Objects/styles.goh parentc.goh
 AB/LOCALPAG.obj \
 AB/LOCALPAG.eobj: geos.h heap.h geode.h resource.h ec.h object.h lmem.h \
                 graphics.h fontID.h font.h color.h gstring.h timer.h vm.h \
@@ -787,7 +795,7 @@ AB/URLDOC.eobj: stdapp.goh object.goh ui.goh Objects/metaC.goh \
                 Objects/vLTextC.goh htmlstat.goh stattext.goh \
                 urlfetch.goh mailhub.goh socket.goh sockmisc.h \
                 Objects/Text/tCtrlC.goh ruler.goh Objects/colorC.goh \
-                Objects/styles.goh favorite.goh
+                Objects/styles.goh parentc.goh favorite.goh
 AB/URLDOC.obj \
 AB/URLDOC.eobj: geos.h heap.h geode.h resource.h ec.h object.h lmem.h \
                 graphics.h fontID.h font.h color.h gstring.h timer.h vm.h \
@@ -823,7 +831,7 @@ AB/URLDOCCT.eobj: stdapp.goh object.goh ui.goh Objects/metaC.goh \
                 Objects/vLTextC.goh htmlstat.goh stattext.goh \
                 urlfetch.goh mailhub.goh socket.goh sockmisc.h \
                 Objects/Text/tCtrlC.goh ruler.goh Objects/colorC.goh \
-                Objects/styles.goh
+                Objects/styles.goh parentc.goh
 AB/URLDOCCT.obj \
 AB/URLDOCCT.eobj: geos.h heap.h geode.h resource.h ec.h object.h lmem.h \
                 graphics.h fontID.h font.h color.h gstring.h timer.h vm.h \
@@ -859,7 +867,7 @@ AB/URLFETCH.eobj: stdapp.goh object.goh ui.goh Objects/metaC.goh \
                 options.goh html4par.goh Objects/vLTextC.goh htmlstat.goh \
                 stattext.goh urlfetch.goh mailhub.goh socket.goh \
                 sockmisc.h Objects/Text/tCtrlC.goh ruler.goh \
-                Objects/colorC.goh Objects/styles.goh
+                Objects/colorC.goh Objects/styles.goh parentc.goh
 AB/URLFETCH.obj \
 AB/URLFETCH.eobj: geos.h heap.h geode.h resource.h ec.h object.h lmem.h \
                 graphics.h fontID.h font.h color.h gstring.h timer.h vm.h \
@@ -894,7 +902,7 @@ AB/FRFETCH.eobj: stdapp.goh object.goh ui.goh Objects/metaC.goh \
                 Objects/vLTextC.goh htmlstat.goh stattext.goh \
                 urlfetch.goh mailhub.goh socket.goh sockmisc.h \
                 Objects/Text/tCtrlC.goh ruler.goh Objects/colorC.goh \
-                Objects/styles.goh wav.goh
+                Objects/styles.goh parentc.goh wav.goh
 AB/FRFETCH.obj \
 AB/FRFETCH.eobj: geos.h heap.h geode.h resource.h ec.h object.h lmem.h \
                 graphics.h fontID.h font.h color.h gstring.h timer.h vm.h \
@@ -930,7 +938,7 @@ AB/URLFRAME.eobj: stdapp.goh object.goh ui.goh Objects/metaC.goh \
                 Objects/vLTextC.goh htmlstat.goh stattext.goh \
                 urlfetch.goh mailhub.goh socket.goh sockmisc.h \
                 Objects/Text/tCtrlC.goh ruler.goh Objects/colorC.goh \
-                Objects/styles.goh
+                Objects/styles.goh parentc.goh
 AB/URLFRAME.obj \
 AB/URLFRAME.eobj: geos.h heap.h geode.h resource.h ec.h object.h lmem.h \
                 graphics.h fontID.h font.h color.h gstring.h timer.h vm.h \
@@ -966,7 +974,7 @@ AB/URLTEXT2.eobj: stdapp.goh object.goh ui.goh Objects/metaC.goh \
                 Objects/vLTextC.goh htmlstat.goh stattext.goh \
                 urlfetch.goh mailhub.goh socket.goh sockmisc.h \
                 Objects/Text/tCtrlC.goh ruler.goh Objects/colorC.goh \
-                Objects/styles.goh
+                Objects/styles.goh parentc.goh
 AB/URLTEXT2.obj \
 AB/URLTEXT2.eobj: geos.h heap.h geode.h resource.h ec.h object.h lmem.h \
                 graphics.h fontID.h font.h color.h gstring.h timer.h vm.h \
@@ -1002,7 +1010,7 @@ AB/URLTEXT.eobj: stdapp.goh object.goh ui.goh Objects/metaC.goh \
                 Objects/vLTextC.goh htmlstat.goh stattext.goh \
                 urlfetch.goh mailhub.goh socket.goh sockmisc.h \
                 Objects/Text/tCtrlC.goh ruler.goh Objects/colorC.goh \
-                Objects/styles.goh importg.goh
+                Objects/styles.goh parentc.goh importg.goh
 AB/URLTEXT.obj \
 AB/URLTEXT.eobj: geos.h heap.h geode.h resource.h ec.h object.h lmem.h \
                 graphics.h fontID.h font.h color.h gstring.h timer.h vm.h \
