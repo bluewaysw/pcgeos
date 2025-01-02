@@ -129,7 +129,7 @@ minimalAppl	: minimalGame minimalUtils minimalTools minimalSavers \
 		  bbxchat bbxmail \
 		  newsread geozip sclock trayapps\
  	  	  hmbase pdfvu  bnkr30 ftpc \
- 	  	  instc instf foldered
+ 	  	  instc instf foldered grafcalc
 
 minimalUtils	: prefmgr
 
@@ -962,6 +962,9 @@ Installed/Library/FMTools/OpenWith:	ui ansic MAKEAPPL
 
 foldered: Installed/Library/FMTools/FolderEd
 Installed/Library/FMTools/FolderEd:	ui ansic MAKEAPPL
+
+grafcalc: Installed/Appl/GrafCalc
+Installed/Appl/GrafCalc:	ui ansic cell parse color math MAKEAPPL
 
 homebase:
 #	No need to do this because this is sync'ed by morning make script.
