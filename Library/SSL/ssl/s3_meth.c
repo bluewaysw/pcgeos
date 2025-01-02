@@ -64,6 +64,8 @@
 #include "objects.h"
 #include "ssl_locl.h"
 
+#ifndef COMPILE_OPTION_HOST_SERVICE_ONLY
+
 static SSL_METHOD *ssl3_get_method(ver)
 int ver;
 	{
@@ -94,3 +96,4 @@ SSL_METHOD *SSLv3_method()
 	return(&SSLv3_data);
 	}
 
+#endif

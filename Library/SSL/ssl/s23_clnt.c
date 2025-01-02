@@ -77,6 +77,8 @@ static int ssl23_client_hello();
 static int ssl23_get_server_hello();
 #endif
 
+#ifndef COMPILE_OPTION_HOST_SERVICE_ONLY
+
 static SSL_METHOD *ssl23_get_client_method(ver)
 int ver;
 	{
@@ -525,3 +527,13 @@ err:
 	return(-1);
 	}
 
+#else 
+
+SSL_METHOD* _export _pascal SSLv23_client_method()
+	{
+	static SSL_METHOD SSLv23_client_data;
+
+	return(&SSLv23_client_data);
+	}
+
+#endif

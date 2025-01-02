@@ -427,7 +427,7 @@ extern TEngine_Instance engineInstance;
 
   static Bool _near  End_Profile( RAS_ARG )
   {
-    Long      h;
+    Short     h;
     PProfile  oldProfile;
 
 
@@ -1431,7 +1431,11 @@ extern TEngine_Instance engineInstance;
     /* Drop-out control */
 
     e1 = TRUNC( CEILING( x1 ) );
-    e2 = TRUNC( FLOOR( x2 ) );
+
+    if ( x2-x1-ras.precision <= 1 )
+      e2 = e1;
+    else
+      e2 = TRUNC( FLOOR( x2 ) );
 
     if ( e2 >= 0 && e1 < ras.bWidth )
     {

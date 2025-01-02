@@ -65,6 +65,8 @@
 #include "hmac.h"
 #include "ssl_locl.h"
 
+#ifndef COMPILE_OPTION_HOST_SERVICE_ONLY
+
 static void tls1_P_hash(md,sec,sec_len,seed,seed_len,out,olen)
 EVP_MD *md;
 unsigned char *sec;
@@ -641,3 +643,4 @@ int code;
 		}
 	}
 
+#endif

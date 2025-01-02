@@ -56,6 +56,8 @@
  * [including the GNU Public Licence.]
  */
 
+#ifndef COMPILE_OPTION_HOST_SERVICE_ONLY
+
 #include "rc4.h"
 #include "rc4_locl.h"
 
@@ -133,3 +135,5 @@ unsigned char *outdata;
 	key->x=x;     
 	key->y=y;
 	}
+
+#endif

@@ -56,6 +56,8 @@
  * [including the GNU Public Licence.]
  */
 
+#ifndef COMPILE_OPTION_HOST_SERVICE_ONLY
+
 #ifndef NO_RC4
 
 #ifdef __GEOS__
@@ -128,4 +130,6 @@ unsigned int inl;
 	{
 	RC4(&(ctx->c.rc4.ks),inl,in,out);
 	}
+#endif
+
 #endif
