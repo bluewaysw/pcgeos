@@ -3,37 +3,19 @@
 # PROJECT:      gpcbrow
 # FILE:         WebMagi2.gp
 #
-# AUTHOR:       Marcus Gr�ber and Lysle Shields
+# AUTHOR:       Marcus Gröber and Lysle Shields
 #
 ##############################################################################
 
-ifdef PRODUCT_NDO2000
-name browser.app
-longname   "Skipper"
-
-else
 name bbxbrow.app
-#name       webmagi2.app
-#name       skipper.app
-
-#Use this name for GlobeHopper release
-#longname   "Web Browser"
-#longname   "Skipper Pro"
-#longname   "Web Magick 2"
-#longname   "Global Internet"
-#longname   "WebMagick 3.0"
 longname   "WebMagick"
-endif
 
 type       appl, process, single
 class      HTMLVProcessClass
 export     HTMLVApplicationClass
 appobj     HTMLVApp
 
-#tokenchars "GlbI"
-#tokenchars "WMK2"
 tokenchars "WMK3"
-#tokenchars "Skip"
 tokenid    16431
 
 heapspace  64k
@@ -84,7 +66,6 @@ resource   StatusResource       ui-object
 resource   ToolbarResource      ui-object
 resource   SearchResource       ui-object
 resource   DownloadDialogResource ui-object
-resource   BboxLogoResource     ui-object
 resource   FileResource         ui-object
 resource   EditResource         ui-object
 resource   ViewResource         ui-object
@@ -116,17 +97,16 @@ export     FavoriteCreateDialogClass
 export     FavoriteCreateGroupDialogClass
 endif
 
-resource   ExpireDialogResource ui-object
+ifdef COMPILE_OPTION_LOCAL_PAGES
 resource   LocalUIResource      ui-object
+endif
 resource   HTMLMenuResource     ui-object
 
 resource   TopIcons1Resource    ui-object
 resource   TopIcons2Resource    ui-object
 resource   TopIcons3Resource    ui-object
 resource   TopIcons4Resource    lmem read-only shared
-resource   IconBarResource      ui-object
-
-resource   SimpleToolbarResource ui-object
+resource   ToolMonikerResource   ui-object
 
 ifdef GLOBAL_INTERNET_BUILD
 resource   HelpUIResource       ui-object
@@ -139,13 +119,12 @@ export     URLFrameClass
 export     URLTextClass
 export     URLFetchEngineClass
 export     ImportThreadEngineClass
-export     ExpireDialogClass
 export     StatusTextClass
 export     URLEntryClass
-## ifndef GLOBAL_INTERNET_BUILD
-## not needed for COMPILE_OPTION_TOGGLE_BARS
+
+#if NOT COMPILE_OPTION_TURN_OFF_LOGO... ifndef doesn't work
 export     GlobeAnimClass
-## endif
+
 export     WMViewControlClass
 export     WMSearchReplaceControlClass
 
@@ -168,6 +147,7 @@ resource   FrameTemplateResource        object
 resource   CacheCleanupDialogResource   ui-object
 # only needed for COMPILE_OPTION_DOWNLOAD_PROGRESS_DIALOG
 resource   DownloadProgressDialogResource ui-object
+
 
 export     URLDocumentGroupClass
 export	   FastStatusClass

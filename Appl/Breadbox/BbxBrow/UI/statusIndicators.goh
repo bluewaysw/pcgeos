@@ -1,0 +1,190 @@
+/*
+ * The status indicators, to be used in the status bar or elsewhere
+ */
+
+/*
+ * Link Text: "Locating", "Loading,...", "Page done" etc.
+ */
+@object GenInteractionClass LinkTextBox = {
+    GI_comp = @LinkText;
+
+    HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+    HINT_ORIENT_CHILDREN_HORIZONTALLY;
+    HINT_FIXED_SIZE = {0, 1 | SST_LINES_OF_TEXT, 0};
+}
+
+@object FastStatusClass LinkText = {
+@ifdef JAVASCRIPT_SUPPORT
+@ifndef JS_ERROR_DIALOG
+    FSI_dblClickMsg = MSG_HMLVP_REPORT_JS_ERROR;
+    FSI_destination = process;
+@endif
+@endif
+    HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+    HINT_EXPAND_HEIGHT_TO_FIT_PARENT;
+}
+
+@object StatusTextClass LinkStatus = {
+    STI_textLink = @LinkText ;
+}
+
+/*
+ * The simple, yet fantastic progress bar
+ */
+@ifdef COMPILE_OPTION_PROGRESS_INDICATOR
+@object GenInteractionClass ProgressIndicatorBox = {
+    GI_states = @default & ~GS_ENABLED;
+    GI_comp = @ProgressIndicator;
+    HINT_FIXED_SIZE = {50|SST_PIXELS, 11|SST_PIXELS, 0};
+    //HINT_FIXED_SIZE = {SST_PCT_OF_FIELD_WIDTH | PCT_5, 0, 0};
+    //HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+    //HINT_EXPAND_HEIGHT_TO_FIT_PARENT;
+    //HINT_SEEK_TITLE_BAR_RIGHT;
+}
+
+@object FastStatusClass ProgressIndicator = {
+    FSI_boxed = TRUE;
+
+    HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+    HINT_EXPAND_HEIGHT_TO_FIT_PARENT;
+}
+
+@endif
+
+/*
+ * Zoom indicators / toolbar items for simple toolbar
+ */
+@ifdef COMPILE_OPTION_SIMPLE_BUTTON_TOOLBAR
+@object GenInteractionClass SimpleToolbarViewGroup = {
+    GI_comp =
+        @SimpleToolbarZoomOut,
+        @SimpleToolbarZoomHundred,
+        @SimpleToolbarZoomIn;
+    HINT_CUSTOM_CHILD_SPACING = { SST_PIXELS | 0 } ;
+    HINT_ORIENT_CHILDREN_HORIZONTALLY ;
+}
+@object GenTriggerClass SimpleToolbarZoomIn = {
+    GI_visMoniker = list { @GPCZoomInIconMoniker } ;
+    GTI_destination = @ViewControl ;
+    GTI_actionMsg = MSG_GVC_ZOOM_IN ;
+    ATTR_GEN_FOCUS_HELP = @ZoomInHelp ;
+}
+@chunk TCHAR ZoomInHelp[] = _TEXT("Increase the size of the current page") ;
+
+@object GenTriggerClass SimpleToolbarZoomHundred = {
+    GI_visMoniker = list { @GPCZoom100IconMoniker } ;
+    GTI_destination = @ViewControl ;
+    GTI_actionMsg = MSG_GVC_SET_SCALE ;
+/*    ATTR_GEN_TRIGGER_ACTION_DATA = MakeWWFixed(100.0) ; */
+    ATTR_GEN_TRIGGER_ACTION_TWO_WORDS = { 0, 100 } ;
+    ATTR_GEN_FOCUS_HELP = @ZoomHundredHelp ;
+}
+@chunk TCHAR ZoomHundredHelp[] = _TEXT("Show current page at normal size") ;
+
+@object GenTriggerClass SimpleToolbarZoomOut = {
+    GI_visMoniker = list { @GPCZoomOutIconMoniker } ;
+    GTI_destination = @ViewControl ;
+    GTI_actionMsg = MSG_GVC_ZOOM_OUT ;
+    ATTR_GEN_FOCUS_HELP = @ZoomOutHelp;
+}
+@chunk TCHAR ZoomOutHelp[] = _TEXT("Decrease the size of the current page") ;
+@endif
+
+/*
+ * Allocation watcher
+ * but does it work?
+ */
+@ifdef COMPILE_OPTION_SHOW_ALLOC_WATCHER_READ_OUT
+@object GenTextClass AllocWatcherReadout = {
+    GI_attrs = (@default | GA_READ_ONLY) & ~GA_TARGETABLE;
+    GTXI_maxLength = 15 ;
+    GTXI_attrs = @default | GTA_SINGLE_LINE_TEXT;
+    HINT_FIXED_SIZE = {100, 0, 0} ;
+    HINT_TEXT_FRAME;
+}
+@endif
+
+/*
+ * Secure status, showing if SSL connection or not
+ */
+@ifdef COMPILE_OPTION_SECURE_STATUS
+@include "Art/lock.goh"
+@include "Art/unlock.goh"
+@chunk TCHAR SecureStatusOnHelp[] = _TEXT("Page is secure");
+@chunk TCHAR SecureStatusOffHelp[] = _TEXT("Page is not secure");
+@object GenTriggerClass SecureStatus = {
+    GI_visMoniker = @SecureStatusOffMoniker;
+    HINT_NO_BORDERS_ON_MONIKERS;
+    ATTR_GEN_FOCUS_HELP = @SecureStatusOffHelp;
+@ifdef TITLE_BAR_STATUS
+    HINT_GADGET_BACKGROUND_COLORS = {
+        C_LIGHT_GREY, C_LIGHT_GREY,
+        C_LIGHT_GREY, C_LIGHT_GREY
+    };
+@endif
+}
+@endif
+
+/*
+ * the Parental Control "status light"
+ */
+@ifdef COMPILE_OPTION_PARENTAL_CONTROL
+@object GenInteractionClass ParentalControlStatus = {
+    GI_states = @default & ~GS_USABLE;
+    GI_comp = @PCStatusLight;
+    HINT_ORIENT_CHILDREN_HORIZONTALLY;
+    HINT_CENTER_CHILDREN_VERTICALLY;
+}
+@include "Art/green.goh"
+@include "Art/red.goh"
+@include "Art/yellow.goh"
+@ifdef GLOBAL_INTERNET_BUILD
+@chunk TCHAR PCStatusLightOnHelp[] = _TEXT("KidGuard is On");
+@chunk TCHAR PCStatusLightOffHelp[] = _TEXT("KidGuard is Off");
+@chunk TCHAR PCStatusLightLimitedHelp[] = _TEXT("KidGuard is On (Limited Access)");
+@else
+@chunk TCHAR PCStatusLightOnHelp[] = _TEXT("Parental Control is On");
+@chunk TCHAR PCStatusLightOffHelp[] = _TEXT("Parental Control is Off");
+@chunk TCHAR PCStatusLightLimitedHelp[] = _TEXT("Parental Control is On (Limited Access)");
+@endif
+@object GenTriggerClass PCStatusLight = {
+    GI_visMoniker = @PCStatusLightOffMoniker;
+    GTI_actionMsg = MSG_HMLVP_PC_TOGGLE;
+    GTI_destination = process;
+    HINT_NO_BORDERS_ON_MONIKERS;
+    ATTR_GEN_FOCUS_HELP = @PCStatusLightOffHelp;
+@ifdef TITLE_BAR_STATUS
+    HINT_GADGET_BACKGROUND_COLORS = {
+        C_LIGHT_GREY, C_LIGHT_GREY,
+        C_LIGHT_GREY, C_LIGHT_GREY
+    };
+@endif
+}
+@endif
+
+
+/*
+ * all the status indicators in one group without
+ * pogress indicator as this may reside elsewhere...
+ */
+@object GenInteractionClass StatusIndicators = {
+@ifdef TITLE_BAR_STATUS
+    GI_states = @default & ~GS_USABLE;
+@endif
+    GI_comp =
+@ifdef COMPILE_OPTION_SECURE_STATUS
+             @SecureStatus
+@endif
+@ifdef COMPILE_OPTION_PARENTAL_CONTROL
+            ,@ParentalControlStatus
+@endif
+@ifdef COMPILE_OPTION_SHOW_ALLOC_WATCHER_READ_OUT
+            ,@AllocWatcherReadout
+@endif
+                ;
+@ifdef TITLE_BAR_STATUS
+    HINT_SEEK_TITLE_BAR_RIGHT;  /* dynamically removed for non-TV */
+@endif
+    HINT_ORIENT_CHILDREN_HORIZONTALLY;
+    HINT_CENTER_CHILDREN_VERTICALLY;
+}

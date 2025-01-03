@@ -1,1 +1,0 @@
-xcopy /s *.* d:\prg\pcgeos\lshields\appl\webmagi2\.
