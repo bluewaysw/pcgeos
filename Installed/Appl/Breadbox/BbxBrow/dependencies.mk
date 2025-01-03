@@ -156,21 +156,21 @@ HTMLVIEW.eobj: stdapp.goh object.goh ui.goh Objects/metaC.goh \
                 urlfetch.goh mailhub.goh socket.goh sockmisc.h \
                 parentc.goh favorite.goh importg.goh htmlv_ui.goh \
                 glbanim.goh Objects/iDialCC.goh Art/appicon.goh \
-                ui/menuFile.goh ui/menuEdit.goh ui/menuView.goh \
-                ui/menuOptions.goh ui/menuNavigation.goh \
-                ui/menuHistory.goh ui/menuKidguard.goh \
-                ui/menuAutobrowse.goh ui/menuJs.goh ui/favorui.goh \
-                favorcls.goh ui/menuHtml.goh ui/dialogDownload.goh \
-                ui/statusIndicators.goh Art/lock.goh Art/unlock.goh \
+                UI/menuFile.goh UI/menuEdit.goh UI/menuView.goh \
+                UI/menuOptions.goh UI/menuNavigation.goh \
+                UI/menuHistory.goh UI/menuKidguard.goh \
+                UI/menuAutobrowse.goh UI/menuJs.goh UI/favorui.goh \
+                favorcls.goh UI/menuHtml.goh UI/dialogDownload.goh \
+                UI/statusIndicators.goh Art/lock.goh Art/unlock.goh \
                 Art/green.goh Art/red.goh Art/yellow.goh \
-                ui/toolbarUrl.goh ui/toolbarSimple.goh \
-                ui/dialogKidguard.goh Art/red2.goh Art/green2.goh \
+                UI/toolbarUrl.goh UI/toolbarSimple.goh \
+                UI/dialogKidguard.goh Art/red2.goh Art/green2.goh \
                 Art/toolicon.goh icons/icons.goh Art/GI001_8.goh \
                 Art/GI002_8.goh Art/GI003_8.goh Art/GI004_8.goh \
                 Art/GI005_8.goh Art/A111_8.goh Art/A113_8.goh \
                 Art/A114_8.goh Art/GI009_8.goh Art/GI010_8.goh \
                 Art/GI011_8.goh Art/GI012_8.goh Art/GI013_8.goh \
-                Art/GI014_8.goh ui/mainWrapper.goh
+                Art/GI014_8.goh UI/mainWrapper.goh
 HTMLVIEW.obj \
 HTMLVIEW.eobj: geos.h heap.h geode.h resource.h ec.h object.h lmem.h \
                 graphics.h fontID.h font.h color.h gstring.h timer.h vm.h \
