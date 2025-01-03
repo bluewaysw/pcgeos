@@ -23,6 +23,8 @@
 #define TT_COMPONENT      trace_calc
 
 
+#pragma code_seg(Resident)
+
 /* Support for 1-complement arithmetic has been totally dropped in this */
 /* release.  You can still write your own code if you need it...        */
 
@@ -44,7 +46,6 @@
      536870912,  759250125, 1073741824, 1518500250,
     2147483647
   };
-
 
   EXPORT_FUNC
   TT_Long  TT_MulDiv( TT_Long  a, TT_Long  b, TT_Long  c )
@@ -216,6 +217,8 @@
     return ( s < 0 ) ? -a : a;
   #endif
   }
+
+#pragma code_seg()
 
   /* The optimization for TT_MulFix is different. We could simply be     */
   /* happy by applying the same principles than with TT_MulDiv, because  */

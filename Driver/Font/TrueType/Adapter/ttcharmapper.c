@@ -22,6 +22,7 @@
 #include <freetype.h>
 #include <ttmemory.h>
 #include <geos.h>
+#include <geode.h>
 #include <unicode.h>
 #include <Ansi/stdlib.h>
 
@@ -424,8 +425,9 @@ MemHandle CreateIndexLookupTable( const TT_CharMap  map )
         int           i;
 
 
-        memHandle = MemAlloc( NUM_CHARMAPENTRIES * sizeof( LookupEntry ),
-                              HF_SHARABLE | HF_SWAPABLE, HAF_LOCK );
+        memHandle = MemAllocSetOwner( GeodeGetCodeProcessHandle(), 
+                                NUM_CHARMAPENTRIES * sizeof( LookupEntry ),
+                              	HF_SHARABLE | HF_SWAPABLE, HAF_LOCK | HAF_NO_ERR);
 EC(     ECCheckMemHandle( memHandle ) );
 
         lookupTable = (LookupEntry*)MemDeref( memHandle );
