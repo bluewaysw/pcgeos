@@ -2458,19 +2458,18 @@ EC( ECCheckMemHandle( ras.buffer ) );
 
 #endif  /* __GEOS__ */
 
-#define  RASTER_RENDER_POOL_SAFETY    256
 static void Lock_Render_Pool( RAS_ARGS  TT_Outline*  glyph )
 {
   /* estimated size of the renderpool */
   TT_UShort   renderpoolSize = ( glyph->y_ppem >> 3 ) * RASTER_RENDER_POOL_FACTOR 
                                                       + RASTER_RENDER_POOL_MIN_SIZE;
 
-  //if( MemGetInfo( ras.buffer, MGIT_SIZE ) != renderpoolSize )
-    MemReAlloc( ras.buffer, renderpoolSize, HAF_NO_ERR | HAF_LOCK );
+  /* discarded or not the necessary size */
+  /*if( MemGetInfo( ras.buffer, MGIT_FLAGS_AND_LOCK_COUNT ) & HF_DISCARDED ||
+      MemGetInfo( ras.buffer, MGIT_SIZE ) != renderpoolSize )*/
+    MemReAlloc( ras.buffer, renderpoolSize, HAF_NO_ERR | HAF_LOCK);
 
   ras.sizeBuff = (PStorage)MemDeref( ras.buffer ) + ( renderpoolSize / sizeof(long) );
-
-  EC_ERROR_IF(ras.sizeBuff == 0, -1);
 }
 
 

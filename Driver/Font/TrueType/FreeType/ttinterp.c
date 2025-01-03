@@ -38,8 +38,9 @@
 
 #ifdef TT_CONFIG_OPTION_NO_INTERPRETER
 
-#pragma code_seg(InterpreterEntry)
-
+#ifdef TT_CONFIG_GEOS_REAL_MODE_SEGMENTING
+#pragma code_seg(InterpEntry)
+#endif
   LOCAL_FUNC
   TT_Error  RunIns( PExecution_Context  exc )
   {
@@ -48,7 +49,9 @@
     return TT_Err_Ok;
   }
 
+#ifdef TT_CONFIG_GEOS_REAL_MODE_SEGMENTING
 #pragma code_seg()
+#endif 
 
 #else
 
@@ -204,8 +207,13 @@
 
 #define BOUNDS( x, n )  ( (x) >= (n) )
 
-#pragma code_seg(InterpreterEntry)
-  TT_Long   TT_MulFixLocal( TT_Long  a, TT_Long  b )
+#ifdef TT_CONFIG_GEOS_REAL_MODE_SEGMENTING
+#pragma code_seg(InterpEntry)
+#endif
+
+  /* Implementation copy to enable fast _near call */
+
+  static TT_Long  _near TT_MulFixLocal( TT_Long  a, TT_Long  b )
   {
   #ifdef TT_CONFIG_OPTION_USE_ASSEMBLER_IMPLEMENTATION
     __asm {
@@ -274,8 +282,9 @@
   #endif
   }
 
+#ifdef TT_CONFIG_GEOS_REAL_MODE_SEGMENTING
 #pragma code_seg()
-
+#endif
 
 /*********************************************************************/
 /*                                                                   */
@@ -585,7 +594,9 @@
 #undef  NULL_Vector
 #define NULL_Vector (TT_Vector*)&Null_Vector
 
-#pragma code_seg(InterpreterExtra)
+#ifdef TT_CONFIG_GEOS_REAL_MODE_SEGMENTING
+#pragma code_seg(InterpExtra)
+#endif
 
 /*******************************************************************
  *
@@ -632,9 +643,9 @@
                       CUR.metrics.scale2 );
   }
 
-
-#pragma code_seg(InterpreterEntry)
-
+#ifdef TT_CONFIG_GEOS_REAL_MODE_SEGMENTING
+#pragma code_seg(InterpEntry)
+#endif
 
 /*******************************************************************
  *
@@ -686,8 +697,6 @@
     return CUR.cvt[index];
   }
 
-#pragma code_seg()
-
 #ifdef TT_CONGIG_OPTION_SUPPORT_NON_SQUARE_PIXELS
   static TT_F26Dot6  _near Read_CVT_Stretched( EXEC_OPS UShort  index )
   {
@@ -695,13 +704,10 @@
   }
 #endif
 
-
-#pragma code_seg(InterpreterEntry)
   static void  _near Write_CVT( EXEC_OPS UShort  index, TT_F26Dot6  value )
   {
     CUR.cvt[index] = value;
   }
-#pragma code_seg()
 
 #ifdef TT_CONGIG_OPTION_SUPPORT_NON_SQUARE_PIXELS
   static void  _near Write_CVT_Stretched( EXEC_OPS UShort  index, TT_F26Dot6  value )
@@ -710,14 +716,10 @@
   }
 #endif
 
-#pragma code_seg(InterpreterEntry)
-
   static void  _near Move_CVT( EXEC_OPS UShort  index, TT_F26Dot6  value )
   {
     CUR.cvt[index] += value;
   }
-
-#pragma code_seg()
 
 #ifdef TT_CONGIG_OPTION_SUPPORT_NON_SQUARE_PIXELS
   static void  __near Move_CVT_Stretched( EXEC_OPS UShort  index, TT_F26Dot6  value )
@@ -725,8 +727,6 @@
     CUR.cvt[index] += TT_MulDiv( value, 0x10000, CURRENT_Ratio() );
   }
 #endif
-
-#pragma code_seg(InterpreterEntry)
 
 /******************************************************************
  *
@@ -791,10 +791,6 @@
     return SUCCESS;
   }
 
-#pragma code_seg()
-
-
-#pragma code_seg(InterpreterEntry)
 
 /*******************************************************************
  *
@@ -870,8 +866,10 @@
 
     return SUCCESS;
   }
-#pragma code_seg()
 
+#ifdef TT_CONFIG_GEOS_REAL_MODE_SEGMENTING
+#pragma code_seg()
+#endif
 
 /*******************************************************************
  *
@@ -1272,7 +1270,9 @@
     return val;
   }
 
-#pragma code_seg(InterpreterExtra)
+#ifdef TT_CONFIG_GEOS_REAL_MODE_SEGMENTING
+#pragma code_seg(InterpExtra)
+#endif
 
 /*******************************************************************
  * Compute_Round
@@ -1383,29 +1383,35 @@
     CUR.threshold >>= 8;
   }
 
-
+#ifdef TT_CONFIG_GEOS_REAL_MODE_SEGMENTING
 #pragma code_seg()
+#endif
 
   static TT_F26Dot6 _far FarCUR_Func_round(EXEC_OPS TT_F26Dot6  distance,
                                                    TT_F26Dot6  compensation)
-{
-	return CUR.func_round(EXEC_ARGS distance, compensation);
-}
+  {
+    return CUR.func_round(EXEC_ARGS distance, compensation);
+  }
 
   static void _far FarCUR_Func_move(EXEC_OPS PGlyph_Zone zone,
                                      UShort      point,
                                      TT_F26Dot6  distance)
-{
-	CUR.func_move(EXEC_ARGS zone, point, distance);
-}
+  {
+    CUR.func_move(EXEC_ARGS zone, point, distance);
+  }
 
-#pragma code_seg(InterpreterEntry)
+#ifdef TT_CONFIG_GEOS_REAL_MODE_SEGMENTING
+#pragma code_seg(InterpEntry)
+#endif
 
   static TT_F26Dot6 _far FarCUR_Func_read_cvt(EXEC_OPS UShort index)
-{
-	return CUR.func_read_cvt(EXEC_ARGS index);
-}
+  {
+    return CUR.func_read_cvt(EXEC_ARGS index);
+  }
+
+#ifdef TT_CONFIG_GEOS_REAL_MODE_SEGMENTING
 #pragma code_seg()
+#endif
 
 /*******************************************************************
  *
@@ -1528,7 +1534,9 @@
     return (v1->y - v2->y);
   }
 
-#pragma code_seg(InterpreterExtra)
+#ifdef TT_CONFIG_GEOS_REAL_MODE_SEGMENTING
+#pragma code_seg(InterpExtra)
+#endif
 
 /*******************************************************************
  *
@@ -1752,8 +1760,9 @@
     return SUCCESS;
   }
 
+#ifdef TT_CONFIG_GEOS_REAL_MODE_SEGMENTING
 #pragma code_seg()
-
+#endif
 
 /* When not using the big switch statements, the interpreter uses a */
 /* call table defined later below in this source.  Each opcode must */
@@ -3097,8 +3106,10 @@
 
 #endif  /* !TT_CONFIG_OPTION_INTERPRETER_SWITCH */
 
+#ifdef TT_CONFIG_GEOS_REAL_MODE_SEGMENTING
+#pragma code_seg(InterpExtra)
+#endif
 
-#pragma code_seg(InterpreterExtra)
 /* The following functions are called as is within the switch statement */
 
 /*******************************************/
@@ -3128,7 +3139,9 @@
     CUR.stack[CUR.args - 1] = K;
   }
 
-#pragma code_seg(InterpreterEntry)
+#ifdef TT_CONFIG_GEOS_REAL_MODE_SEGMENTING
+#pragma code_seg(InterpEntry)
+#endif
 
 /*******************************************/
 /* ROLL[]    : roll top three elements     */
@@ -3426,7 +3439,9 @@
     CUR.step_ins = FALSE;
   }
 
-#pragma code_seg(InterpreterInfrequent)
+#ifdef TT_CONFIG_GEOS_REAL_MODE_SEGMENTING
+#pragma code_seg(InterpInfreq)
+#endif
 
 /*******************************************/
 /* LOOPCALL[]: LOOP and CALL function      */
@@ -3540,7 +3555,9 @@
 /*                                                              */
 /****************************************************************/
 
-#pragma code_seg(InterpreterInfrequent)
+#ifdef TT_CONFIG_GEOS_REAL_MODE_SEGMENTING
+#pragma code_seg(InterpInfreq)
+#endif
 
 /*******************************************/
 /* NPUSHB[]  : PUSH N Bytes                */
@@ -3594,7 +3611,9 @@
     CUR.new_top += L;
   }
 
-#pragma code_seg(InterpreterEntry)
+#ifdef TT_CONFIG_GEOS_REAL_MODE_SEGMENTING
+#pragma code_seg(InterpEntry)
+#endif
 
 /*******************************************/
 /* PUSHB[abc]: PUSH Bytes                  */
@@ -3645,8 +3664,9 @@
     CUR.step_ins = FALSE;
   }
 
+#ifdef TT_CONFIG_GEOS_REAL_MODE_SEGMENTING
 #pragma code_seg()
-
+#endif
 
 /****************************************************************/
 /*                                                              */
@@ -3780,7 +3800,9 @@
     args[0] = D;
   }
 
-#pragma code_seg(InterpreterExtra)
+#ifdef TT_CONFIG_GEOS_REAL_MODE_SEGMENTING
+#pragma code_seg(InterpExtra)
+#endif
 
 /*******************************************/
 /* SDPVTL[a] : Set Dual PVector to Line    */
@@ -3874,7 +3896,9 @@
     CUR.GS.gep0 = (UShort)args[0];
   }
 
-#pragma code_seg(InterpreterExtra)
+#ifdef TT_CONFIG_GEOS_REAL_MODE_SEGMENTING
+#pragma code_seg(InterpExtra)
+#endif
 
 /*******************************************/
 /* SZP1[]    : Set Zone Pointer 1          */
@@ -3994,8 +4018,6 @@
     CUR.GS.instruct_control = 
       (Byte)( CUR.GS.instruct_control & ~(Byte)K ) | (Byte)L;
   }
-
-#pragma code_seg(InterpreterExtra)
 
 /*******************************************/
 /* SCANCTRL[]: SCAN ConTRol                */
@@ -4159,14 +4181,19 @@
     for ( I = L; I <= K; ++I )
       CUR.pts.touch[I] &= ~TT_Flag_On_Curve;
   }
-#pragma code_seg()
 
-REMOTE_Func_project( EXEC_OPS TT_Vector*  v1, TT_Vector*  v2 )
+#ifdef TT_CONFIG_GEOS_REAL_MODE_SEGMENTING
+#pragma code_seg()
+#endif
+
+static TT_F26Dot6 _far FarCUR_Func_project( EXEC_OPS TT_Vector*  v1, TT_Vector*  v2 )
 {   
-    CUR_Func_project( v1, v2 );
+    return CUR_Func_project( v1, v2 );
 }
 
-#pragma code_seg(InterpreterInfrequent)
+#ifdef TT_CONFIG_GEOS_REAL_MODE_SEGMENTING
+#pragma code_seg(InterpInfreq)
+#endif
 
   static Bool  Compute_Point_Displacement( EXEC_OPS
                                            PCoordinates  x,
@@ -4202,7 +4229,7 @@ REMOTE_Func_project( EXEC_OPS TT_Vector*  v1, TT_Vector*  v2 )
     *zone = zp;
     *refp = p;
 
-    d = REMOTE_Func_project( EXEC_ARGS zp.cur + p, zp.org + p );
+    d = FarCUR_Func_project( EXEC_ARGS zp.cur + p, zp.org + p );
 
     *x = TT_MulDiv(d, (Long)CUR.GS.freeVector.x * 0x10000L, CUR.F_dot_P );
     *y = TT_MulDiv(d, (Long)CUR.GS.freeVector.y * 0x10000L, CUR.F_dot_P );
@@ -4429,7 +4456,10 @@ REMOTE_Func_project( EXEC_OPS TT_Vector*  v1, TT_Vector*  v2 )
     CUR.GS.loop = 1;
     CUR.new_top = CUR.args;
   }
+
+#ifdef TT_CONFIG_GEOS_REAL_MODE_SEGMENTING
 #pragma code_seg();
+#endif
 
 /**********************************************/
 /* MSIRP[a]  : Move Stack Indirect Relative   */
@@ -4849,7 +4879,10 @@ REMOTE_Func_project( EXEC_OPS TT_Vector*  v1, TT_Vector*  v2 )
     CUR.new_top = CUR.args;
   }
 
-#pragma code_seg(InterpreterInfrequent)
+#ifdef TT_CONFIG_GEOS_REAL_MODE_SEGMENTING
+#pragma code_seg(InterpInfreq)
+#endif
+
 /**********************************************/
 /* ISECT[]     : moves point to InterSECTion  */
 /* CodeRange   : $0F                          */
@@ -4930,8 +4963,10 @@ REMOTE_Func_project( EXEC_OPS TT_Vector*  v1, TT_Vector*  v2 )
                                CUR.zp0.cur[b1].y ) >> 2;
     }
   }
-#pragma code_seg()
 
+#ifdef TT_CONFIG_GEOS_REAL_MODE_SEGMENTING
+#pragma code_seg()
+#endif
 
 /**********************************************/
 /* ALIGNPTS[]  : ALIGN PoinTS                 */
@@ -5052,7 +5087,9 @@ REMOTE_Func_project( EXEC_OPS TT_Vector*  v1, TT_Vector*  v2 )
     CUR.new_top = CUR.args;
   }
 
-#pragma code_seg(InterpreterInfrequent)
+#ifdef TT_CONFIG_GEOS_REAL_MODE_SEGMENTING
+#pragma code_seg(InterpInfreq)
+#endif
 
 /**********************************************/
 /* UTP[a]      : UnTouch Point                */
@@ -5444,7 +5481,9 @@ REMOTE_Func_project( EXEC_OPS TT_Vector*  v1, TT_Vector*  v2 )
     args[0] = (args[0] & 1) ? 3 : 0;
   }
 
+#ifdef TT_CONFIG_GEOS_REAL_MODE_SEGMENTING
 #pragma code_seg()
+#endif
 
   static void  Ins_UNKNOWN( EXEC_OP )
   {
@@ -5769,8 +5808,9 @@ REMOTE_Func_project( EXEC_OPS TT_Vector*  v1, TT_Vector*  v2 )
   };
 #endif
 
-#pragma code_seg(InterpreterEntry)
-
+#ifdef TT_CONFIG_GEOS_REAL_MODE_SEGMENTING
+#pragma code_seg(InterpEntry)
+#endif
 
 /****************************************************************/
 /*                                                              */
@@ -6830,10 +6870,12 @@ REMOTE_Func_project( EXEC_OPS TT_Vector*  v1, TT_Vector*  v2 )
 
     return error;
   }
-#pragma code_seg()
 
 #endif /* DEBUG_INTERPRETER */
 
+#ifdef TT_CONFIG_GEOS_REAL_MODE_SEGMENTING
+#pragma code_seg()
+#endif
 
 #endif /* TT_CONFIG_OPTION_NO_INTERPRETER */
 
