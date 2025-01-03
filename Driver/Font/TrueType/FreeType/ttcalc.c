@@ -23,6 +23,8 @@
 #define TT_COMPONENT      trace_calc
 
 
+#pragma code_seg(Resident)
+
 /* Support for 1-complement arithmetic has been totally dropped in this */
 /* release.  You can still write your own code if you need it...        */
 
@@ -44,8 +46,6 @@
      536870912,  759250125, 1073741824, 1518500250,
     2147483647
   };
-
-#pragma code_seg(ResidentMath)
 
   EXPORT_FUNC
   TT_Long  TT_MulDiv( TT_Long  a, TT_Long  b, TT_Long  c )

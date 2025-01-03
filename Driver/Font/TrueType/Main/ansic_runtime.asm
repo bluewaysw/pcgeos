@@ -13,8 +13,8 @@
 ; limitations under the License.
 
 
-ResidentMath	SEGMENT BYTE PUBLIC 'CODE'
-                ASSUME  CS:ResidentMath
+Resident	segment	public	'CODE'
+                ASSUME  CS:Resident
 
 	public __U4M
 	public __U4D
@@ -145,4 +145,4 @@ ResidentMath	SEGMENT BYTE PUBLIC 'CODE'
 	__I4D endp
 
 	
-ResidentMath        ENDS
+Resident        ENDS

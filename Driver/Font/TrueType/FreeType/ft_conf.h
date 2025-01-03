@@ -253,6 +253,29 @@
 
 #undef TT_CONFIG_OPTION_SUPPORT_OBSOLET_INSTRUCTIONS
 
+/*************************************************************************/
+/* When compiled for GEOS real mode target code segments need to be      */
+/* below 8K in size. Usually there is 1 code files ending up in one      */
+/* segment. Especially the interpreter is quite large and produces       */
+/* 17K code segment (32K for EC build). This config flag when set        */
+/* force smaller segments to be used.                                    */
+/*                                                                       */
+/* Segmenting has impact on function beeing near or far, so when working */
+/* with pointer we need to take care especially. The segmenting concept  */
+/* introduces 4 level for the interpreter:                               */
+/* - entry: Entry code and main-look/switch with all direct opcode       */
+/*          handlers                                                     */
+/*          "InterpEntry" - Callbacks (_near): Read/Write/Move_CVT       */
+/* - main:  Central code part that stay in interp_TEXT segment, far      */
+/*          from then entry (and the others)                             */
+/*          Callbacks (_near): Round_*, Direct_Move_*, Round_*, Project_ */
+/* - infrequent: Function that are called no often, that are specific    */
+/*               "InterpInfreq"                                          */
+/* - extra: Other infrequent called functions that are independent       */
+/*          "InterpExtra"                                                */
+
+#define   TT_CONFIG_GEOS_REAL_MODE_SEGMENTING
+
 /**********************************************************************/
 /*                                                                    */
 /*  The following macros are used to define the debug level, as well  */

@@ -131,7 +131,7 @@ include		ansic_memory.asm
 include		ttmemory_asm.asm
 include		ansic_stdlib.asm
 
-Resident segment resource	;MODULE_FIXED
+Resident segment	public	'CODE'	;MODULE_FIXED
 
 
 COMMENT }----------------------------------------------------------------------
