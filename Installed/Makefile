@@ -1425,15 +1425,13 @@ Installed/Library/SSL:				ansic socket mapheap hostif MAKELIB
 
 # product-specific dependency on fjpeg
 impgraph	: Installed/Library/Breadbox/ImpGraph
-Installed/Library/Breadbox/ImpGraph:		ansic ijgjpeg MAKELIB #fjpeg
+Installed/Library/Breadbox/ImpGraph:		ansic ijgjpeg fjpeg MAKELIB
 
 ijgjpeg	: 	Installed/Library/Breadbox/Ijgjpeg
 Installed/Library/Breadbox/Ijgjpeg:		ui ansic MAKELIB
 
-#fjpeg	: 	Installed/Library/Breadbox/fjpeg
-#Installed/Library/Breadbox/fjpeg:		ui ansic MAKELIB
-#	mdcd %ROOT_DIR%\
-#	$(MAKE) -I$(ROOT_DIR)\Library\Breadbox\fjpeg lib full
+fjpeg	: 	Installed/Library/Breadbox/Fjpeg
+Installed/Library/Breadbox/Fjpeg:		ui ansic MAKELIB
 
 impdoc	: 	Installed/Library/Breadbox/ImpDoc
 Installed/Library/Breadbox/ImpDoc:		ui ansic MAKELIB
