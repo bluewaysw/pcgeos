@@ -106,7 +106,7 @@ meta.eobj: stdapp.goh object.goh ui.goh Objects/metaC.goh \
                 Objects/gValueC.goh Objects/gToolGC.goh \
                 Objects/helpCC.goh grobj.goh Objects/colorC.goh \
                 Objects/styles.goh Objects/bitmapC.goh \
-                objects/splineC.goh
+                Objects/splineC.goh
 meta.obj \
 meta.eobj: geos.h heap.h geode.h resource.h ec.h object.h lmem.h \
                 graphics.h fontID.h font.h color.h gstring.h timer.h vm.h \
