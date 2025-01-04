@@ -25,8 +25,8 @@ cgm.eobj: geos.h heap.h geode.h resource.h ec.h object.h lmem.h \
                 disk.h drive.h input.h char.h hwr.h win.h uDialog.h \
                 Objects/gInterC.h Objects/Text/tCommon.h stylesh.h \
                 driver.h thread.h print.h Internal/spoolInt.h serialDr.h \
-                parallDr.h hugearr.h fileEnum.h ansi/string.h \
-                ansi/stdio.h ansi/stdlib.h math.h meta.h xlatLib.h \
+                parallDr.h hugearr.h fileEnum.h Ansi/string.h \
+                Ansi/stdio.h Ansi/stdlib.h math.h meta.h xlatLib.h \
                 CGM/cgm.h
 cgmraw.obj \
 cgmraw.eobj: stdapp.goh object.goh ui.goh Objects/metaC.goh \
@@ -55,8 +55,8 @@ cgmraw.eobj: geos.h heap.h geode.h resource.h ec.h object.h lmem.h \
                 disk.h drive.h input.h char.h hwr.h win.h uDialog.h \
                 Objects/gInterC.h Objects/Text/tCommon.h stylesh.h \
                 driver.h thread.h print.h Internal/spoolInt.h serialDr.h \
-                parallDr.h hugearr.h fileEnum.h ansi/string.h \
-                ansi/stdio.h ansi/stdlib.h meta.h xlatLib.h cgm/cgm.h
+                parallDr.h hugearr.h fileEnum.h Ansi/string.h \
+                Ansi/stdio.h Ansi/stdlib.h meta.h xlatLib.h cgm/cgm.h
 hpgl.obj \
 hpgl.eobj: stdapp.goh object.goh ui.goh Objects/metaC.goh \
                 Objects/inputC.goh Objects/clipbrd.goh \
@@ -84,9 +84,8 @@ hpgl.eobj: geos.h heap.h geode.h resource.h ec.h object.h lmem.h \
                 disk.h drive.h input.h char.h hwr.h win.h uDialog.h \
                 Objects/gInterC.h Objects/Text/tCommon.h stylesh.h \
                 driver.h thread.h print.h Internal/spoolInt.h serialDr.h \
-                parallDr.h hugearr.h fileEnum.h ansi/string.h \
-                ansi/stdio.h ansi/stdlib.h ansi/ctype.h math.h meta.h \
-                xlatLib.h
+                parallDr.h hugearr.h fileEnum.h Ansi/string.h \
+                Ansi/stdio.h Ansi/stdlib.h math.h meta.h xlatLib.h
 meta.obj \
 meta.eobj: stdapp.goh object.goh ui.goh Objects/metaC.goh \
                 Objects/inputC.goh Objects/clipbrd.goh \
@@ -116,8 +115,8 @@ meta.eobj: geos.h heap.h geode.h resource.h ec.h object.h lmem.h \
                 disk.h drive.h input.h char.h hwr.h win.h uDialog.h \
                 Objects/gInterC.h Objects/Text/tCommon.h stylesh.h \
                 driver.h thread.h print.h Internal/spoolInt.h serialDr.h \
-                parallDr.h hugearr.h fileEnum.h ansi/string.h \
-                ansi/stdio.h ansi/stdlib.h math.h meta.h xlatLib.h \
+                parallDr.h hugearr.h fileEnum.h Ansi/string.h \
+                Ansi/stdio.h Ansi/stdlib.h math.h meta.h xlatLib.h \
                 metaint.h
 splineop.obj \
 splineop.eobj: stdapp.goh object.goh ui.goh Objects/metaC.goh \
