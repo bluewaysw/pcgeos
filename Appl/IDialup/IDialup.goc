@@ -2472,3 +2472,97 @@ void IDialupUpdateEditOKButton(void)
     IDialupUpdateEditOKButton();
 }
 
+
+/***********************************************************************
+ *	MSG_IDP_CONNECTION_LIST_MONIKER_QUERY for IDialupAppClass
+ ***********************************************************************
+ * SYNOPSIS:     Edit the current Network Connection setting.
+ *
+ * PARAMETERS:   void (optr list, word item)
+ *
+ * SIDE EFFECTS:
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	mzhu	11/23/98	Initial Revision
+ *
+ ***********************************************************************/
+@method IDialupProcessClass, MSG_IDP_CONNECTION_LIST_MONIKER_QUERY
+{
+  word *id, datalen;
+  TCHAR name[MAX_TEXT_LEN];
+  TCHAR *aas;
+
+  if (connectionHandle) {
+
+      MemLock(connectionHandle);
+
+      id = ChunkArrayElementToPtrHandles(connectionHandle, connectionChunk, item, &datalen);
+
+      datalen = MAX_TEXT_LEN;
+      memset(name, 0, sizeof(TCHAR)*MAX_TEXT_LEN);
+
+      if(AccessPointGetStringPropertyBufferDirect(*id, (char*)APSP_NAME, name, (int*) &datalen))
+      {
+        AccessPointGetStringPropertyBufferDirect(*id, (char*)APSP_PHONE, name, (int*) &datalen);
+      }
+
+      if (*id == (word) G_lastActiveAccpnt)
+      {
+        MemLock(OptrToHandle(@activeAppendStr));
+        aas = LMemDeref(@activeAppendStr);
+        strcat(name, aas);
+        MemUnlock(OptrToHandle(@activeAppendStr));
+      }
+
+      if(name && datalen)
+      {
+        @call list::MSG_GEN_DYNAMIC_LIST_REPLACE_ITEM_TEXT(item, name);
+      }
+
+      MemUnlock(connectionHandle);
+  }
+
+}
+
+
+/***********************************************************************
+ *	MSG_IDP_CONNECTION_LIST_APPLY for IDialupAppClass
+ ***********************************************************************
+ * SYNOPSIS:     Edit the current Network Connection setting.
+ *
+ * PARAMETERS:
+ *    	    word selection = cx,
+ *	    word numSelections = bp,
+ *	    GenItemGroupStateFlags stateFlags = dl
+ *
+ * SIDE EFFECTS:
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	mzhu	11/23/98	Initial Revision
+ *
+ ***********************************************************************/
+@method IDialupProcessClass, MSG_IDP_CONNECTION_LIST_APPLY
+{
+  word *id, datalen;
+
+  // now display the new selection
+  MemLock(connectionHandle);
+
+  id = ChunkArrayElementToPtrHandles(connectionHandle, connectionChunk, selection, &datalen);
+
+  currentAccpnt = *id;
+
+  MemUnlock(connectionHandle);
+
+  @send process::MSG_IDP_UPDATE_UI_FOR_SELECTED_ACCPNT();
+}
+
+
