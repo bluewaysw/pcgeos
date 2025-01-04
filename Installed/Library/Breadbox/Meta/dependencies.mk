@@ -56,7 +56,7 @@ cgmraw.eobj: geos.h heap.h geode.h resource.h ec.h object.h lmem.h \
                 Objects/gInterC.h Objects/Text/tCommon.h stylesh.h \
                 driver.h thread.h print.h Internal/spoolInt.h serialDr.h \
                 parallDr.h hugearr.h fileEnum.h Ansi/string.h \
-                Ansi/stdio.h Ansi/stdlib.h meta.h xlatLib.h cgm/cgm.h
+                Ansi/stdio.h Ansi/stdlib.h meta.h xlatLib.h CGM/cgm.h
 hpgl.obj \
 hpgl.eobj: stdapp.goh object.goh ui.goh Objects/metaC.goh \
                 Objects/inputC.goh Objects/clipbrd.goh \
