@@ -963,7 +963,7 @@ AccessPointLocalDialingOptions GetLocalDialingOptions (void)
     if(creatingConnection)
     {
         /* jfh - there is no method for this msg !?!? */
-        /* - can't find one either (meyerk 12/2024) */
+        /* - can't find one either (meyerk 12/2024)!?!?!? */
         @call IDialupApp::MSG_IDA_SAVE_CURRENT_PASSWORD();
 
         currentAccpnt = AccessPointCreateEntry(1, APT_INTERNET);
@@ -1133,7 +1133,7 @@ AccessPointLocalDialingOptions GetLocalDialingOptions (void)
     }
 
     // update everything
-    @call self::MSG_IDP_READ_ACCPNT_AND_ACCPNT_LIST();
+    @call self::MSG_IDP_READ_ACCPNT_AND_ACCPNT_LIST(); // this will reset currentAccpnt to whatever was active last!
     @call self::MSG_IDP_UPDATE_UI_FOR_SELECTED_ACCPNT();
 
     // We no longer automatically do this via GI_attrs since we may not
@@ -1292,7 +1292,7 @@ AccessPointLocalDialingOptions GetLocalDialingOptions (void)
 
       // this tries to read the current accpnt from geos.ini.
       // But there is none, so it will set the current accpnt
-      // to the first one in the list?
+      // to the first one in the list.
       @call self::MSG_IDP_READ_ACCPNT_AND_ACCPNT_LIST();
       @call self::MSG_IDP_UPDATE_UI_FOR_SELECTED_ACCPNT();
     }
@@ -1592,40 +1592,19 @@ AccessPointLocalDialingOptions GetLocalDialingOptions (void)
     @send IDConnectionPhoneNumber::MSG_VIS_MARK_INVALID(VOF_GEOMETRY_INVALID, VUM_DELAYED_VIA_APP_QUEUE);
     @send IDConnectionPhoneNumber::MSG_GEN_SET_USABLE(VUM_DELAYED_VIA_APP_QUEUE);
 
+    @send IDConnectionPhoneAndLogin::MSG_GEN_SET_NOT_USABLE(VUM_DELAYED_VIA_APP_QUEUE);
 
-    if ( (type != NET_TYPE_PPP) &&
-         (currentAccpnt == G_lastActiveAccpnt) )
+    if (currentAccpnt != G_lastActiveAccpnt)
     {
-        @send IDConnectionActiveStateBox::MSG_GEN_SET_USABLE(VUM_DELAYED_VIA_APP_QUEUE);
+        @send IDConnectionActivateBox::MSG_GEN_SET_USABLE(VUM_DELAYED_VIA_APP_QUEUE);
     }
     else
-    {
-        @send IDConnectionActiveStateBox::MSG_GEN_SET_NOT_USABLE(VUM_DELAYED_VIA_APP_QUEUE);
-    }
-
-    if ( (type == NET_TYPE_PPP) && (type == G_lastActiveNetType) )
     {
         @send IDConnectionActivateBox::MSG_GEN_SET_NOT_USABLE(VUM_DELAYED_VIA_APP_QUEUE);
-    }
-    else
-    {
-        if (currentAccpnt != G_lastActiveAccpnt)
+        if (type == NET_TYPE_PPP)
         {
-            @send IDConnectionActivateBox::MSG_GEN_SET_USABLE(VUM_DELAYED_VIA_APP_QUEUE);
+            @send IDConnectionPhoneAndLogin::MSG_GEN_SET_USABLE(VUM_DELAYED_VIA_APP_QUEUE);
         }
-        else
-        {
-            @send IDConnectionActivateBox::MSG_GEN_SET_NOT_USABLE(VUM_DELAYED_VIA_APP_QUEUE);
-        }
-    }
-
-    if ( (type == NET_TYPE_PPP) && (type == G_lastActiveNetType) )
-    {
-        @send IDConnectionPhoneAndLogin::MSG_GEN_SET_USABLE(VUM_DELAYED_VIA_APP_QUEUE);
-    }
-    else
-    {
-        @send IDConnectionPhoneAndLogin::MSG_GEN_SET_NOT_USABLE(VUM_DELAYED_VIA_APP_QUEUE);
     }
 
     @send IDialupPrimary::MSG_GEN_RESET_TO_INITIAL_SIZE(VUM_DELAYED_VIA_APP_QUEUE);
@@ -1992,7 +1971,6 @@ void IDialupUpdateEditOKButton(void)
 @method IDialupProcessClass, MSG_IDP_ACTIVATE
 {
     word netType = 0 ;
-    char buffer[80] ;
     word size ;
     Boolean toPPP = FALSE ;
 
@@ -2004,6 +1982,11 @@ void IDialupUpdateEditOKButton(void)
         G_registered = FALSE ;
     }
 
+    // Set active access point to the current one
+    // note: we don't need to set G_lastActiveAccpnt here,
+    // as we will reboot the system anyway and G_lastActiveAccpnt
+    // will be set to currentAccpnt after the reboot in
+    // MSG_GEN_PROCESS_OPEN_APPLICATION.
     AccessPointSetActivePoint(currentAccpnt, APT_INTERNET);
     AccessPointCommit();
 
@@ -2011,69 +1994,77 @@ void IDialupUpdateEditOKButton(void)
         netType = NET_TYPE_PPP ;
     }
 
-    InitFileReadStringBuffer("tcpip", "driver", buffer, sizeof(buffer)-1, &size) ;
-    buffer[size] = '\0' ;
-    if( netType == NET_TYPE_HOST )
+    if (netType != G_lastActiveNetType)
     {
-        NEC(char *driver = "Host TCP/IP Driver" ; )
-        EC(char *driver = "EC Host TCP/IP Driver" ; )
-        InitFileWriteString("tcpip", "driver", driver) ;
 
-        InitFileDeleteEntry("tcpip", "link") ;
-        InitFileWriteString("tcpip", "linkDomain", "Host") ;
-        InitFileDeleteEntry("tcpip", "linkPermname") ;
-    }
-    else
-    {
-        NEC(char *driver = "TCP/IP Driver" ; )
-        EC(char *driver = "EC TCP/IP Driver" ; )
-        InitFileWriteString("tcpip", "driver", driver) ;
+        if( netType == NET_TYPE_HOST )
+        {
+            NEC(char *driver = "Host TCP/IP Driver" ; )
+            EC(char *driver = "EC Host TCP/IP Driver" ; )
+            InitFileWriteString("tcpip", "driver", driver) ;
 
-        InitFileReadStringBuffer("tcpip", "link", buffer, sizeof(buffer)-1, &size) ;
-        buffer[size] = '\0' ;
-        if (netType == NET_TYPE_ODI)
-        {
-            NEC(char *link = "ODI Ethernet Driver" ; )
-            EC(char *link = "EC ODI Ethernet Driver" ; )
-            InitFileWriteString("tcpip", "link", link) ;
-            InitFileWriteString("tcpip", "linkDomain", "EtherODI") ;
-            InitFileDeleteEntry("tcpip", "linkPermname") ;
-        }
-        else if (netType == NET_TYPE_PKT)
-        {
-            NEC(char *link = "Packet Ethernet Driver" ; )
-            EC(char *link = "EC Packet Ethernet Driver" ; )
-            InitFileWriteString("tcpip", "link", link) ;
-            InitFileWriteString("tcpip", "linkDomain", "EtherPKT") ;
+            InitFileDeleteEntry("tcpip", "link") ;
+            InitFileWriteString("tcpip", "linkDomain", "Host") ;
             InitFileDeleteEntry("tcpip", "linkPermname") ;
         }
         else
         {
-            NEC(char *ppplink = "PPP Driver" ; )
-            EC(char *ppplink = "EC PPP Driver" ; )
-            InitFileWriteString("tcpip", "link", ppplink) ;
-            InitFileWriteString("tcpip", "linkDomain", "PPP") ;
-            InitFileWriteString("tcpip", "linkPermname", "ppp") ;
-            toPPP = TRUE ;
-        }
-    }
+            NEC(char *driver = "TCP/IP Driver" ; )
+            EC(char *driver = "EC TCP/IP Driver" ; )
+            InitFileWriteString("tcpip", "driver", driver) ;
 
-    if (toPPP)
-    {
-        UserStandardDialogOptr(
-            0, 0, 0, 0,
-            @mustRestartPPP,
-            (CDT_WARNING<<CDBF_DIALOG_TYPE_OFFSET)|(GIT_NOTIFICATION<<CDBF_INTERACTION_TYPE_OFFSET)) ;
+            if (netType == NET_TYPE_ODI)
+            {
+                NEC(char *link = "ODI Ethernet Driver" ; )
+                EC(char *link = "EC ODI Ethernet Driver" ; )
+                InitFileWriteString("tcpip", "link", link) ;
+                InitFileWriteString("tcpip", "linkDomain", "EtherODI") ;
+                InitFileDeleteEntry("tcpip", "linkPermname") ;
+            }
+            else if (netType == NET_TYPE_PKT)
+            {
+                NEC(char *link = "Packet Ethernet Driver" ; )
+                EC(char *link = "EC Packet Ethernet Driver" ; )
+                InitFileWriteString("tcpip", "link", link) ;
+                InitFileWriteString("tcpip", "linkDomain", "EtherPKT") ;
+                InitFileDeleteEntry("tcpip", "linkPermname") ;
+            }
+            else
+            {
+                NEC(char *ppplink = "PPP Driver" ; )
+                EC(char *ppplink = "EC PPP Driver" ; )
+                InitFileWriteString("tcpip", "link", ppplink) ;
+                InitFileWriteString("tcpip", "linkDomain", "PPP") ;
+                InitFileWriteString("tcpip", "linkPermname", "ppp") ;
+                toPPP = TRUE ;
+            }
+        }
+
+        if (toPPP)
+        {
+            UserStandardDialogOptr(
+                0, 0, 0, 0,
+                @mustRestartPPP,
+                (CDT_WARNING<<CDBF_DIALOG_TYPE_OFFSET)|(GIT_NOTIFICATION<<CDBF_INTERACTION_TYPE_OFFSET)
+            );
+        }
+        else
+        {
+            UserStandardDialogOptr(
+                0, 0, 0, 0,
+                @mustRestart,
+                (CDT_WARNING<<CDBF_DIALOG_TYPE_OFFSET)|(GIT_NOTIFICATION<<CDBF_INTERACTION_TYPE_OFFSET)
+            );
+        }
+
+        SysShutdown(SST_RESTART) ;
     }
     else
     {
-        UserStandardDialogOptr(
-            0, 0, 0, 0,
-            @mustRestart,
-            (CDT_WARNING<<CDBF_DIALOG_TYPE_OFFSET)|(GIT_NOTIFICATION<<CDBF_INTERACTION_TYPE_OFFSET)) ;
+        G_lastActiveAccpnt = currentAccpnt;
+        @send process::MSG_IDP_READ_ACCPNT_AND_ACCPNT_LIST();
+        @send process::MSG_IDP_UPDATE_UI_FOR_SELECTED_ACCPNT();
     }
-
-    SysShutdown(SST_RESTART) ;
 }
 
 
@@ -2108,10 +2099,6 @@ void IDialupUpdateEditOKButton(void)
         G_registered = FALSE ;
     }
 
-    // currentAccpnt should usually be of type NET_TYPE_PPP
-    AccessPointSetActivePoint(currentAccpnt, APT_INTERNET);
-    AccessPointCommit();
-
     @call IDConnectButton::MSG_GEN_SET_NOT_ENABLED(VUM_DELAYED_VIA_UI_QUEUE);
     @call IDDisconnectButton::MSG_GEN_SET_NOT_ENABLED(VUM_NOW);
     @call IDInfoGroup::MSG_IDI_RESET();		/* Make sure stats are 0'd */
@@ -2143,12 +2130,6 @@ void IDialupUpdateEditOKButton(void)
 
             @call IDialupApp::MSG_IDA_VIEW_CONNECTION();
         }
-    }
-    else
-    {
-      // We assume a successfull connection from here on up,
-      // so we can set G_lastActiveAccpnt to currentAccpnt.
-      G_lastActiveAccpnt = currentAccpnt;
     }
 }
 
