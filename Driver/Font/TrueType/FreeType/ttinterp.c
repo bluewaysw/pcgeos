@@ -992,7 +992,7 @@
   static TT_F26Dot6 _far FarRound_None( EXEC_OPS TT_F26Dot6  distance,
                                                TT_F26Dot6  compensation )
   {
-	return Round_None( EXEC_ARGS distance, compensation);
+    return Round_None( EXEC_ARGS distance, compensation);
   }
 
 
@@ -1407,6 +1407,11 @@
   static TT_F26Dot6 _far FarCUR_Func_read_cvt(EXEC_OPS UShort index)
   {
     return CUR.func_read_cvt(EXEC_ARGS index);
+  }
+
+  static void _far FarCUR_Func_move_cvt(EXEC_OPS UShort index, TT_F26Dot6  value)
+  {
+    CUR.func_move_cvt(EXEC_ARGS index, value);
   }
 
 #ifdef TT_CONFIG_GEOS_REAL_MODE_SEGMENTING
@@ -2085,11 +2090,11 @@
 
 
 #define DO_ODD  \
-    args[0] = ( (CUR_Func_round( args[0], 0 ) & 127) == 64 );
+    args[0] = ( (FarCUR_Func_round(EXEC_ARGS args[0], 0 ) & 127) == 64 );
 
 
 #define DO_EVEN  \
-    args[0] = ( (CUR_Func_round( args[0], 0 ) & 127) == 0 );
+    args[0] = ( (FarCUR_Func_round( EXEC_ARGS args[0], 0 ) & 127) == 0 );
 
 
 #define DO_AND  \
@@ -2272,7 +2277,7 @@
 
 
 #define DO_ROUND                                                            \
-    args[0] = CUR_Func_round( args[0],                                      \
+    args[0] = FarCUR_Func_round( EXEC_ARGS args[0],                                      \
                               CUR.metrics.compensations[CUR.opcode-0x68] );
 
 
@@ -4593,7 +4598,7 @@ static TT_F26Dot6 _far FarCUR_Func_project( EXEC_OPS TT_Vector*  v1, TT_Vector* 
     /* twilight zone. This is a bad hack, but it seems   */
     /* to work.                                          */
 
-    distance = CUR_Func_read_cvt( cvtEntry );
+    distance = FarCUR_Func_read_cvt( EXEC_ARGS cvtEntry );
 
     if ( CUR.GS.gep0 == 0 )   /* If in twilight zone */
     {
@@ -5451,7 +5456,7 @@ static TT_F26Dot6 _far FarCUR_Func_project( EXEC_OPS TT_Vector*  v1, TT_Vector* 
             ++B;
           B = (B << 6) / (1L << CUR.GS.delta_shift);
 
-          CUR_Func_move_cvt( A, B );
+          FarCUR_Func_move_cvt( EXEC_ARGS A, B );
         }
       }
     }
