@@ -181,4 +181,4 @@ DBCS/impgraph.eobj: geos.h heap.h geode.h resource.h ec.h object.h lmem.h \
                 IMPBMP/impgif.h IMPBMP/ibcommon.h IMPBMP/impjpeg.h \
                 ieCommon.h xlatLib.h Ansi/string.h
 
-DBCS/impgraphEC.geo DBCS/impgraph.geo : geos.ldf ansic.ldf ijgjpeg.ldf 
+DBCS/impgraphEC.geo DBCS/impgraph.geo : geos.ldf ansic.ldf fjpeg.ldf ijgjpeg.ldf ijgjpeg.ldf 
