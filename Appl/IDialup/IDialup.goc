@@ -63,10 +63,10 @@ word  connectionNum = 0;
 word  currentAccpnt=0;
 word  defaultAccpnt=0;
 int   G_lastActiveNetType = 0;
-int   G_lastActiveAccpnt = 0;
+int   G_activeAccpnt = 0;
 
-word tempAccpnt = 0;
-#define TEMPORARY_KEY "temp"
+// word tempAccpnt = 0;
+// #define TEMPORARY_KEY "temp"
 
 static SemaphoreHandle wait;
 static Boolean creatingConnection = FALSE;
@@ -151,19 +151,23 @@ void IDialupEnsureDefaultConnection(void);
 	  G_registered = TRUE ;
   }
 
+    // read the currently active Accpnt from the INI into currentAccpnt
+    // and G_activeAccpnt also init internal Accpnt List.
     @call self::MSG_IDP_READ_ACCPNT_AND_ACCPNT_LIST();
 
     // Hack to delete the temporary access point created by signup, just in case
     // signup crashes and fails to clean up after itself. (dhunter 1/13/2000)
-    if (tempAccpnt)
-    {
-        AccessPointDestroyEntryDirect(tempAccpnt);
-        tempAccpnt = 0;
-        AccessPointCommit();
-
-        // Reload the accpnt list.
-        @call self::MSG_IDP_READ_ACCPNT_AND_ACCPNT_LIST();
-    }
+    //
+    // Disabled for FreeGEOS edition of PC/GEOS (meyerk 01/2025)
+    //if (tempAccpnt)
+    //{
+    //    AccessPointDestroyEntryDirect(tempAccpnt);
+    //    tempAccpnt = 0;
+    //    AccessPointCommit();
+    //
+    //    // Reload the accpnt list.
+    //    @call self::MSG_IDP_READ_ACCPNT_AND_ACCPNT_LIST();
+    //}
 
     // Ensure that there is only one default access point.  We do this because
     // Welcome can add a new default without un-defaulting the old one.  The
@@ -172,19 +176,17 @@ void IDialupEnsureDefaultConnection(void);
     IDialupEnsureDefaultConnection();
 
     // Make sure to store the netType that's active when we start up
-    // so we can check out which buttons (Activate / Connect) should be active
-    // and if a reboot is needed when switching netTypes respectively...
-    // This is only ever set once, right here, because:
+    // so we can check out if a reboot is needed when switching
+    // Accpnts. This is only ever set once, right here, because:
     // if we switch to an accpnt that's of a different netType, we'll
     // reboot and end up here again. And if we switch to another accpnt of the same
-    // netType, no netType change occurs.
+    // netType - no netType change occurs...
     if (AccessPointGetIntegerPropertyDirect(currentAccpnt, "netType", (int*) &G_lastActiveNetType)) {
       G_lastActiveNetType = NET_TYPE_PPP;
     }
-    G_lastActiveAccpnt = currentAccpnt;
 
+    // update UI
     @call self::MSG_IDP_UPDATE_UI_FOR_SELECTED_ACCPNT();
-
 
     @callsuper();
 
@@ -574,7 +576,7 @@ void IDialupEnsureDefaultConnection(void);
   word dialOptions = DEFAULT_DIAL_OPTIONS;
   word type ;
 
-  if (currentAccpnt == G_lastActiveAccpnt)
+  if (currentAccpnt == G_activeAccpnt)
   {
     UserStandardDialogOptr(
         0, 0, 0, 0,
@@ -981,7 +983,7 @@ AccessPointLocalDialingOptions GetLocalDialingOptions (void)
     if(creatingConnection)
     {
         /* jfh - there is no method for this msg !?!? */
-        /* - can't find one either (meyerk 12/2024)!?!?!? */
+        /* - can't find one either !?!?!? (meyerk 12/2024)*/
         @call IDialupApp::MSG_IDA_SAVE_CURRENT_PASSWORD();
 
         currentAccpnt = AccessPointCreateEntry(1, APT_INTERNET);
@@ -1247,7 +1249,7 @@ AccessPointLocalDialingOptions GetLocalDialingOptions (void)
   TCHAR *tptr;
   word datalen = NAME_LEN;
 
-  if (currentAccpnt == G_lastActiveAccpnt)
+  if (currentAccpnt == G_activeAccpnt)
   {
     UserStandardDialogOptr(
         0, 0, 0, 0,
@@ -1308,9 +1310,8 @@ AccessPointLocalDialingOptions GetLocalDialingOptions (void)
       // reset the current accesspoint
       currentAccpnt = 0;
 
-      // this tries to read the current accpnt from geos.ini.
-      // But there is none, so it will set the current accpnt
-      // to the first one in the list.
+      // read active AccPnt from the ini
+      // - the active AccPnt can't have been deleted
       @call self::MSG_IDP_READ_ACCPNT_AND_ACCPNT_LIST();
       @call self::MSG_IDP_UPDATE_UI_FOR_SELECTED_ACCPNT();
     }
@@ -1411,13 +1412,16 @@ AccessPointLocalDialingOptions GetLocalDialingOptions (void)
         // just in case signup crashes and fails to clean up after itself.
         // The actual removal occurs in MSG_GEN_PROCESS_OPEN_APPLICATION.
         // (dhunter 1/13/2000)
-        if (!AccessPointGetIntegerPropertyDirect(
-            *id,
-            TEMPORARY_KEY,
-            (int*) &datalen) && datalen == 1)
-        {
-            tempAccpnt = *id; // don't confuse with tmpAccpnt!
-        }
+        // There is no "Welcome" or "Signup" application in the FreeGEOS Version of
+        // PC/GEOS, so let's disable this hack.
+        // (meyerk 01/2025)
+        // if (!AccessPointGetIntegerPropertyDirect(
+        //     *id,
+        //     TEMPORARY_KEY,
+        //     (int*) &datalen) && datalen == 1)
+        // {
+        //     tempAccpnt = *id; // don't confuse with tmpAccpnt!
+        // }
     }
 
     if(hidden)
@@ -1453,11 +1457,15 @@ AccessPointLocalDialingOptions GetLocalDialingOptions (void)
         currentListItem = tmpItem;
     }
 
-    /* if there is only 1 access point then let's make it the default
-    access point automagically...  jfh 2/19/02 */
+    /* store currentAccpnt also in G_activeAccpnt */
+    G_activeAccpnt = currentAccpnt;
+
+    /* if there is only 1 access point and no default accpnt
+       then let's make it the default access point automagically...
+       (jfh 2/19/02) */
     if ((connectionNum == 1) && !defaultAccpnt)
     {
-        @call self::MSG_IDP_SET_DEFAULT_CONNECTION();
+        IDialupMakeCurrentAccpntActiveAndDefault();
     }
 
     // init / update the list UI, the rest of the UI must be updated separately by
@@ -1529,6 +1537,7 @@ AccessPointLocalDialingOptions GetLocalDialingOptions (void)
         @call IDDeleteConnectionButton::MSG_GEN_SET_NOT_ENABLED(VUM_DELAYED_VIA_APP_QUEUE);
     }
 
+/*
     if(!AccessPointGetIntegerPropertyDirect(currentAccpnt, DEFAULT_KEY, (int*) &datalen) &&
         datalen != 0)
     {
@@ -1538,6 +1547,7 @@ AccessPointLocalDialingOptions GetLocalDialingOptions (void)
     {
         @call IDConnectionDefaultBoxGroup::MSG_GEN_BOOLEAN_GROUP_SET_BOOLEAN_STATE(1, FALSE);
     }
+*/
 
     datalen = MAX_TEXT_LEN*sizeof(TCHAR);
     memset(name, 0, sizeof(TCHAR)*MAX_TEXT_LEN);
@@ -1560,12 +1570,11 @@ AccessPointLocalDialingOptions GetLocalDialingOptions (void)
     if(connectionNum)
     {
         @call IDConnectButton::MSG_GEN_SET_ENABLED(VUM_DELAYED_VIA_APP_QUEUE);
-        @call IDConnectionDefaultBoxGroup::MSG_GEN_SET_ENABLED(VUM_DELAYED_VIA_APP_QUEUE);
+        //@call IDConnectionDefaultBoxGroup::MSG_GEN_SET_ENABLED(VUM_DELAYED_VIA_APP_QUEUE);
     }
     else
     {
-        @call IDConnectionDefaultBoxGroup::MSG_GEN_SET_NOT_ENABLED(VUM_DELAYED_VIA_UI_QUEUE);
-        @call IDConnectionDefaultBoxGroup::MSG_GEN_SET_NOT_ENABLED(VUM_DELAYED_VIA_APP_QUEUE);
+        @call IDConnectButton::MSG_GEN_SET_NOT_ENABLED(VUM_DELAYED_VIA_APP_QUEUE);
     }
 
     /*
@@ -1611,7 +1620,7 @@ AccessPointLocalDialingOptions GetLocalDialingOptions (void)
 
     @send IDConnectionPhoneAndLogin::MSG_GEN_SET_NOT_USABLE(VUM_DELAYED_VIA_APP_QUEUE);
 
-    if (currentAccpnt != G_lastActiveAccpnt)
+    if (currentAccpnt != G_activeAccpnt)
     {
         @send IDConnectionActivateBox::MSG_GEN_SET_USABLE(VUM_DELAYED_VIA_APP_QUEUE);
     }
@@ -1679,6 +1688,7 @@ void IDialupEnsureDefaultConnection(void)
  *	mzhu	11/23/98	Initial Revision
  *
  ***********************************************************************/
+/*
 @method IDialupProcessClass, MSG_IDP_SET_DEFAULT_CONNECTION
 {
   if(@call IDConnectionDefaultBoxGroup::MSG_GEN_BOOLEAN_GROUP_GET_SELECTED_BOOLEANS())
@@ -1697,6 +1707,7 @@ void IDialupEnsureDefaultConnection(void)
   AccessPointSetActivePoint(defaultAccpnt, APT_INTERNET);
   AccessPointCommit();
 }
+*/
 
 /***********************************************************************
  *	IDialupUpdateEditOKButton
@@ -1969,9 +1980,44 @@ void IDialupUpdateEditOKButton(void)
 }
 
 /***********************************************************************
- *	MSG_IDP_CONNECT for IDialupProcessClass
+ *	IDialupMakeCurrentAccpntActiveAndDefault
  ***********************************************************************
- * SYNOPSIS:     activate the selected netType (Host, PPP, ODI, PKT...)
+ * SYNOPSIS: Make sure that the "netType"
+ *           hasn't changed before calling this function...
+ *
+ * PARAMETERS:
+ *
+ * SIDE EFFECTS:
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	meyerk	2025/01	    Initial Revision
+ *
+ ***********************************************************************/
+void IDialupMakeCurrentAccpntActiveAndDefault()
+{
+    // set G_activeAccpnt
+    G_activeAccpnt = currentAccpnt;
+
+    // set default Accpnt
+    AccessPointSetIntegerPropertyDirect(currentAccpnt, DEFAULT_KEY, 1);
+    defaultAccpnt = currentAccpnt;
+    IDialupEnsureDefaultConnection();
+
+    // make point active
+    AccessPointSetActivePoint(currentAccpnt, APT_INTERNET);
+    AccessPointCommit();
+}
+
+
+/***********************************************************************
+ *	MSG_IDP_ACTIVATE for IDialupProcessClass
+ ***********************************************************************
+ * SYNOPSIS:     activate the selected access point,
+ *               reboot if netType changed (Host, PPP, ODI, PKT...)
  *
  * PARAMETERS:
  *
@@ -2000,12 +2046,7 @@ void IDialupUpdateEditOKButton(void)
     }
 
     // Set active access point to the current one
-    // note: we don't need to set G_lastActiveAccpnt here,
-    // as we will reboot the system anyway and G_lastActiveAccpnt
-    // will be set to currentAccpnt after the reboot in
-    // MSG_GEN_PROCESS_OPEN_APPLICATION.
-    AccessPointSetActivePoint(currentAccpnt, APT_INTERNET);
-    AccessPointCommit();
+    IDialupMakeCurrentAccpntActiveAndDefault();
 
     if (AccessPointGetIntegerPropertyDirect(currentAccpnt, "netType", (int*) &netType)) {
         netType = NET_TYPE_PPP ;
@@ -2013,6 +2054,7 @@ void IDialupUpdateEditOKButton(void)
 
     if (netType != G_lastActiveNetType)
     {
+        // note: G_lastActiveNetType doesn't need to be updated, as we will reboot now
 
         if( netType == NET_TYPE_HOST )
         {
@@ -2078,7 +2120,6 @@ void IDialupUpdateEditOKButton(void)
     }
     else
     {
-        G_lastActiveAccpnt = currentAccpnt;
         @send process::MSG_IDP_READ_ACCPNT_AND_ACCPNT_LIST();
         @send process::MSG_IDP_UPDATE_UI_FOR_SELECTED_ACCPNT();
     }
@@ -2508,7 +2549,7 @@ void IDialupUpdateEditOKButton(void)
         AccessPointGetStringPropertyBufferDirect(*id, (char*)APSP_PHONE, name, (int*) &datalen);
       }
 
-      if (*id == (word) G_lastActiveAccpnt)
+      if (*id == (word) G_activeAccpnt)
       {
         MemLock(OptrToHandle(@activeAppendStr));
         aas = LMemDeref(@activeAppendStr);
