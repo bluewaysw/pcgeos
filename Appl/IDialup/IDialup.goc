@@ -881,6 +881,7 @@ AccessPointLocalDialingOptions GetLocalDialingOptions (void)
     optr item;
     TCHAR *str;
     Boolean dns1Valid, dns2Valid;
+    word newAccpnt = 0;
     word type = @call IDEditConnectionType::MSG_GEN_ITEM_GROUP_GET_SELECTION() ;
 
     // Before we can commit the changes to or addition of this Connection, we
@@ -1146,11 +1147,23 @@ AccessPointLocalDialingOptions GetLocalDialingOptions (void)
     if(creatingConnection)
     {
         creatingConnection = FALSE;
-    }
 
-    // update everything
-    @call self::MSG_IDP_READ_ACCPNT_AND_ACCPNT_LIST(); // this will reset currentAccpnt to whatever was active last!
-    @call self::MSG_IDP_UPDATE_UI_FOR_SELECTED_ACCPNT();
+        // MSG_IDP_READ_ACCPNT_AND_ACCPNT_LIST will reset currentAccpnt
+        // to the currently active Accpnt, so we need to backup our new
+        // accpnt...
+        newAccpnt = currentAccpnt;
+        @call self::MSG_IDP_READ_ACCPNT_AND_ACCPNT_LIST();
+        currentAccpnt = newAccpnt;
+        // assuming that the last list (new) item equals connectionNum-1...
+        @send IDConnectionList::MSG_GEN_ITEM_GROUP_SET_SINGLE_SELECTION((connectionNum - 1), 0);
+        @send IDConnectionList::MSG_GEN_ITEM_GROUP_MAKE_ITEM_VISIBLE((connectionNum - 1));
+        @call self::MSG_IDP_UPDATE_UI_FOR_SELECTED_ACCPNT();
+    }
+    else
+    {
+        @call self::MSG_IDP_READ_ACCPNT_AND_ACCPNT_LIST();
+        @call self::MSG_IDP_UPDATE_UI_FOR_SELECTED_ACCPNT();
+    }
 
     // We no longer automatically do this via GI_attrs since we may not
     // want to bring down the dialog if the DNS entry is invalid.
@@ -1573,6 +1586,7 @@ AccessPointLocalDialingOptions GetLocalDialingOptions (void)
     else
     {
         @call IDConnectButton::MSG_GEN_SET_NOT_ENABLED(VUM_DELAYED_VIA_APP_QUEUE);
+        //@call IDConnectionDefaultBoxGroup::MSG_GEN_SET_NOT_ENABLED(VUM_DELAYED_VIA_APP_QUEUE);
     }
 
     /*
