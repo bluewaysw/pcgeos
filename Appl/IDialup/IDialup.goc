@@ -576,15 +576,6 @@ void IDialupEnsureDefaultConnection(void);
   word dialOptions = DEFAULT_DIAL_OPTIONS;
   word type ;
 
-  if (currentAccpnt == G_activeAccpnt)
-  {
-    UserStandardDialogOptr(
-        0, 0, 0, 0,
-        @noEdit,
-        (CDT_WARNING<<CDBF_DIALOG_TYPE_OFFSET)|(GIT_NOTIFICATION<<CDBF_INTERACTION_TYPE_OFFSET)) ;
-    return;
-  }
-
   datalen = MAX_TEXT_LEN*sizeof(TCHAR);
   memset(name, 0, sizeof(TCHAR)*MAX_TEXT_LEN);
   if(!AccessPointGetStringPropertyBufferDirect(currentAccpnt,
@@ -712,10 +703,15 @@ void IDialupEnsureDefaultConnection(void);
 
   // set to PPP if netType not set...
   if (AccessPointGetIntegerPropertyDirect(currentAccpnt, "netType", (int*) &type)) {
-	  type = NET_TYPE_PPP ;
+      type = NET_TYPE_PPP ;
   }
   @call IDEditConnectionType::MSG_GEN_ITEM_GROUP_SET_SINGLE_SELECTION(type, FALSE) ;
   @call oself::MSG_IDP_EDIT_TYPE_UPDATE() ;
+
+  if (currentAccpnt == G_activeAccpnt)
+  {
+    @call IDEditConnectionType::MSG_GEN_SET_NOT_ENABLED(VUM_DELAYED_VIA_APP_QUEUE);
+  }
 
   // This message is force-queued to allow the process thread to flush out
   // all of the MSG_META_TEXT_EMPTY_STATUS_CHANGED messages that might have
@@ -1182,6 +1178,8 @@ AccessPointLocalDialingOptions GetLocalDialingOptions (void)
 {
   TCHAR *str;
 
+  @call IDEditConnectionType::MSG_GEN_SET_ENABLED(VUM_DELAYED_VIA_APP_QUEUE);
+
   @call IDEditPhoneNumber::MSG_VIS_TEXT_DELETE_ALL();
 
   @call IDEditDialingOptionsGroup::
@@ -1206,14 +1204,14 @@ AccessPointLocalDialingOptions GetLocalDialingOptions (void)
   MemLock(OptrToHandle(@addConnectionStr));
 
   str = LMemDeref(@addConnectionStr);
-  @call IDEditGroup::MSG_GEN_REPLACE_VIS_MONIKER_TEXT(str, VUM_DELAYED_VIA_UI_QUEUE);
+  @call IDEditGroup::MSG_GEN_REPLACE_VIS_MONIKER_TEXT(str, VUM_DELAYED_VIA_APP_QUEUE);
 
   str = LMemDeref(@addStr);
-  @call IDEditOkButton::MSG_GEN_REPLACE_VIS_MONIKER_TEXT(str, VUM_DELAYED_VIA_UI_QUEUE);
-  @call IDEditOkButton::MSG_GEN_SET_NOT_ENABLED(VUM_DELAYED_VIA_UI_QUEUE);
+  @call IDEditOkButton::MSG_GEN_REPLACE_VIS_MONIKER_TEXT(str, VUM_DELAYED_VIA_APP_QUEUE);
+  @call IDEditOkButton::MSG_GEN_SET_NOT_ENABLED(VUM_DELAYED_VIA_APP_QUEUE);
 
   str = LMemDeref(@cancelStr);
-  @call IDEditCancelButton::MSG_GEN_REPLACE_VIS_MONIKER_TEXT(str, VUM_NOW);
+  @call IDEditCancelButton::MSG_GEN_REPLACE_VIS_MONIKER_TEXT(str, VUM_DELAYED_VIA_APP_QUEUE);
 
   MemUnlock(OptrToHandle(@addConnectionStr));
 
