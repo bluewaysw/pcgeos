@@ -893,7 +893,7 @@ AccessPointLocalDialingOptions GetLocalDialingOptions (void)
     optr item;
     TCHAR *str;
     Boolean dns1Valid, dns2Valid;
-    word newAccpnt = 0;
+    word accpntBackup = 0;
     word type = @call IDEditConnectionType::MSG_GEN_ITEM_GROUP_GET_SELECTION() ;
 
     // Before we can commit the changes to or addition of this Connection, we
@@ -1156,27 +1156,26 @@ AccessPointLocalDialingOptions GetLocalDialingOptions (void)
 
     AccessPointCommit();
 
+    // we must re-read the accpnt list, but
+    // MSG_IDP_READ_ACCPNT_AND_ACCPNT_LIST will reset currentAccpnt
+    // to the currently active Accpnt, so we need to backup the
+    // currentAccpnt and the list selection first and restore afterwards...
+    accpntBackup = currentAccpnt;
+    sel = @call IDConnectionList::MSG_GEN_ITEM_GROUP_GET_SELECTION();
+    @call self::MSG_IDP_READ_ACCPNT_AND_ACCPNT_LIST();
+    currentAccpnt = accpntBackup;
+
     if(creatingConnection)
     {
         creatingConnection = FALSE;
-
-        // we must re-read the accpnt list, but
-        // MSG_IDP_READ_ACCPNT_AND_ACCPNT_LIST will reset currentAccpnt
-        // to the currently active Accpnt, so we need to backup our new
-        // accpnt first and restore it afterwards...
-        newAccpnt = currentAccpnt;
-        @call self::MSG_IDP_READ_ACCPNT_AND_ACCPNT_LIST();
-        currentAccpnt = newAccpnt;
-        // assuming that the new accpnt is last in list and equals connectionNum-1...
         @send IDConnectionList::MSG_GEN_ITEM_GROUP_SET_SINGLE_SELECTION((connectionNum - 1), 0);
-        @send IDConnectionList::MSG_GEN_ITEM_GROUP_MAKE_ITEM_VISIBLE((connectionNum - 1));
-        @call self::MSG_IDP_UPDATE_UI_FOR_SELECTED_ACCPNT();
     }
     else
     {
-        @call self::MSG_IDP_READ_ACCPNT_AND_ACCPNT_LIST();
-        @call self::MSG_IDP_UPDATE_UI_FOR_SELECTED_ACCPNT();
+        @send IDConnectionList::MSG_GEN_ITEM_GROUP_SET_SINGLE_SELECTION(sel, 0);
     }
+
+    @call self::MSG_IDP_UPDATE_UI_FOR_SELECTED_ACCPNT();
 
     // We no longer automatically do this via GI_attrs since we may not
     // want to bring down the dialog if the DNS entry is invalid.
