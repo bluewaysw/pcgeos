@@ -1,0 +1,206 @@
+/*
+*              View Menu
+*/
+
+@object WMViewControlClass ViewControl = {
+    GI_attrs = @default | GA_KBD_SEARCH_PATH;
+    GVCI_minZoom = COMPILE_OPTION_MIN_ZOOM ;
+    GVCI_maxZoom = COMPILE_OPTION_MAX_ZOOM ; /* increase maximum zoom to 400% */
+
+    ATTR_GEN_CONTROL_PROHIBIT_TOOLBOX_UI =
+        GVCTF_APPLY_TO_ALL | GVCTF_SCALE_TO_FIT
+@ifndef COMPILE_OPTION_ALLOW_HIDE_SCROLL_BARS
+        | GVCTF_SHOW_HORIZONTAL | GVCTF_SHOW_VERTICAL
+@endif
+        ;
+
+    HINT_GEN_CONTROL_SCALABLE_UI_DATA [2]   =
+    {
+        {
+            GCSUIC_SET_NORMAL_FEATURES_IF_APP_LEVEL,
+            UIIL_INTRODUCTORY,
+            GVCF_ZOOM_IN | GVCF_ZOOM_OUT | GVCF_MAIN_100
+@ifdef COMPILE_OPTION_ALLOW_HIDE_SCROLL_BARS
+            | GVCF_SHOW_HORIZONTAL | GVCF_SHOW_VERTICAL
+@endif
+        },
+        {
+            GCSUIC_SET_NORMAL_FEATURES_IF_APP_LEVEL,
+            UIIL_BEGINNING,
+            GVCF_ZOOM_IN | GVCF_ZOOM_OUT | GVCF_MAIN_100
+            | GVCF_CUSTOM_SCALE | GVCF_REDUCE | GVCF_100 | GVCF_ENLARGE
+            | GVCF_BIG_ENLARGE
+@ifdef COMPILE_OPTION_ALLOW_HIDE_SCROLL_BARS
+            | GVCF_SHOW_HORIZONTAL | GVCF_SHOW_VERTICAL
+@endif
+        }
+    };
+}
+
+@object GenInteractionClass HTMLSettingsGroup = {
+    GI_attrs = @default | GA_KBD_SEARCH_PATH;
+    GI_comp = @HTMLSettingsBoolGroup;
+
+    ATTR_GEN_INIT_FILE_PROPAGATE_TO_CHILDREN;
+    HINT_SAME_CATEGORY_AS_PARENT;
+}
+
+@object GenBooleanGroupClass HTMLSettingsBoolGroup = {
+    GBGI_selectedBooleans = DEFAULT_HTML_OPTIONS ;
+@if defined(JAVASCRIPT_SUPPORT) || defined(COMPILE_OPTION_AUTO_BROWSE)
+    GBGI_applyMsg = MSG_HMLVP_HTML_OPTIONS_CHANGED;
+    GBGI_destination = process;
+@endif
+    ATTR_GEN_INIT_FILE_KEY = "htmlSettings";
+    GI_comp =
+@ifdef COMPILE_OPTION_FAST_MODE_ON
+                @FastModeOpt ,
+@endif
+@ifdef COMPILE_OPTION_ADD_MARGIN_ON
+                @AddMarginOpt ,
+@endif
+                @viewTextColors,
+                @viewBackgroundImages
+@if defined(JAVASCRIPT_SUPPORT) || defined(COMPILE_OPTION_AUTO_BROWSE)
+            , @enableJavaScript
+@endif
+                ;
+}
+
+@ifdef COMPILE_OPTION_FAST_MODE_ON
+@object GenBooleanClass FastModeOpt = {
+    GI_visMoniker = 'F',"Fast Mode (no styles)";
+    GBI_identifier = HTML_READ_FAST;
+}
+@endif
+
+@ifdef COMPILE_OPTION_ADD_MARGIN_ON
+@object GenBooleanClass AddMarginOpt = {
+    GI_visMoniker = 'M',"Add Margin";
+    GBI_identifier = HTML_ADD_MARGIN;
+}
+@endif
+
+@object GenBooleanClass viewTextColors = {
+    GI_visMoniker = 'C',"View Text Colors";
+    GBI_identifier = HTML_MONOCHROME;
+}
+
+@object GenBooleanClass viewBackgroundImages = {
+    GI_visMoniker = 'B',"View Background Images";
+    GBI_identifier = HTML_NO_BACKGROUND;
+}
+
+@if defined(JAVASCRIPT_SUPPORT) || defined(COMPILE_OPTION_AUTO_BROWSE)
+@object GenBooleanClass enableJavaScript = {
+    GI_visMoniker = 'J',"Enable JavaScript";
+    GBI_identifier = HTML_JAVASCRIPT;
+}
+@endif
+
+@object GenInteractionClass LoadGraphicsGroup = {
+    GI_attrs = @default | GA_KBD_SEARCH_PATH;
+@ifdef TV_BW_OPTION
+    GI_comp = @NavigateTVBW,
+    @NavigateLoadGraphics,@NavigateLoadGraphicsNow
+@else
+    GI_comp = @NavigateLoadGraphics,@NavigateLoadGraphicsNow
+@endif
+@ifdef DO_DBCS
+    ,@EncodingMenu;
+@else
+    ;
+@endif
+    HINT_SAME_CATEGORY_AS_PARENT;
+    ATTR_GEN_INIT_FILE_PROPAGATE_TO_CHILDREN;
+}
+
+@ifdef TV_BW_OPTION
+@object GenBooleanGroupClass NavigateTVBW = {
+    GI_states = @default & ~GS_USABLE;  /* initially not usable */
+    GBGI_selectedBooleans = FALSE;
+    GBGI_destination = process;
+    GBGI_applyMsg = MSG_HMLVP_TV_BW_CHANGED;
+    ATTR_GEN_INIT_FILE_KEY = "tvBW";
+    GI_comp = @NavigateTVBWToggle;
+}
+@object GenBooleanClass NavigateTVBWToggle = {
+    GI_visMoniker = "View as Black & White";
+    GBI_identifier = TRUE;
+}
+@endif
+
+@object GenBooleanGroupClass NavigateLoadGraphics = {
+    GBGI_selectedBooleans = TRUE;
+    GBGI_destination = process;
+    GBGI_applyMsg = MSG_HMLVP_LOAD_GRAPHICS_CHANGED;
+    ATTR_GEN_INIT_FILE_KEY = "loadGraphics";
+    GI_comp = @NavigateLoadGraphicsToggle;
+}
+
+@object GenBooleanClass NavigateLoadGraphicsToggle = {
+    GI_visMoniker = 'A',"Load Graphics Automatically";
+    GBI_identifier = TRUE;
+}
+
+@object GenTriggerClass NavigateLoadGraphicsNow = {
+    GI_attrs = @default | GA_KBD_SEARCH_PATH;
+    GI_states = @default & ~GS_ENABLED;
+    GI_visMoniker = 'G',"Load Graphics Now";
+    GI_kbdAccelerator = control 'G';
+    GTI_actionMsg = MSG_URL_DOCUMENT_LOAD_GRAPHICS;
+    GTI_destination = (TO_APP_MODEL);
+    ATTR_GEN_DESTINATION_CLASS = { (ClassStruct *)&URLDocumentClass };
+}
+
+@object GenTriggerClass NavigateReload = {
+    GI_attrs = @default | GA_KBD_SEARCH_PATH;
+    GI_visMoniker = 'R',"Reload";
+    GI_kbdAccelerator = control 'R';
+    GI_states = @default & ~GS_ENABLED;
+    GTI_actionMsg = MSG_URL_DOCUMENT_RELOAD;
+    GTI_destination = (TO_APP_MODEL);
+    ATTR_GEN_DESTINATION_CLASS = { (ClassStruct *)&URLDocumentClass };
+}
+
+@ifdef COMPILE_OPTION_RECALCULATE_BUTTON_ON
+@object GenTriggerClass RecalculateButton = {
+    GI_visMoniker = 'R',"Redraw" ;
+    GTI_destination = (TO_APP_MODEL) ;
+    GTI_actionMsg = MSG_URL_DOCUMENT_RECALCULATE ;
+}
+@endif
+
+@ifdef DO_DBCS
+@object GenInteractionClass EncodingMenu = {
+    GI_visMoniker = "Character Set";
+    GI_comp = @EncodingList;
+    GI_states = @default & ~GS_USABLE;
+    GII_visibility = GIV_POPUP;
+}
+@object GenItemGroupClass EncodingList = {
+    GI_comp = @Encoding0, @Encoding1, @Encoding2, @Encoding3,
+    @Encoding4, @Encoding5;
+    GIGI_applyMsg = MSG_HMLVP_CHANGE_ENCODING;
+    GIGI_destination = process;
+}
+@object GenItemClass Encoding0 = {
+}
+@object GenItemClass Encoding1 = {
+}
+@object GenItemClass Encoding2 = {
+}
+@object GenItemClass Encoding3 = {
+}
+@object GenItemClass Encoding4 = {
+}
+@object GenItemClass Encoding5 = {
+}
+@endif
+
+@object GenInteractionClass GraphicsGroup = {
+    GI_attrs = @default | GA_KBD_SEARCH_PATH;
+    GI_comp = @HTMLSettingsGroup, @LoadGraphicsGroup;
+    ATTR_GEN_INIT_FILE_PROPAGATE_TO_CHILDREN;
+}
+
