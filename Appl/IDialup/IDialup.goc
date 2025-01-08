@@ -95,9 +95,7 @@ Boolean disconnectRequested = FALSE;
 
 Boolean bStealthLIAFlag = FALSE;
 
-/*#ifndef PRODUCT_NDO2000 */
 Boolean editDialOptionsChanged;
-/*#endif */
 
 Boolean G_registered = FALSE ;
 
@@ -111,6 +109,7 @@ extern void UnregisterToPPP(void);
 extern Boolean IAppRunning(void);
 extern void SendPing(void);
 void IDialupEnsureDefaultConnection(void);
+void IDialupMakeCurrentAccpntActiveAndDefault(void);
 
 /*
  ***************************************************************************
@@ -164,35 +163,37 @@ void IDialupEnsureDefaultConnection(void);
   }
 
     // read the currently active Accpnt from the INI into currentAccpnt
-    // and G_activeAccpnt also init internal Accpnt List.
+    // and G_activeAccpnt; also init internal Accpnt List.
     @call self::MSG_IDP_READ_ACCPNT_AND_ACCPNT_LIST();
 
-    // Hack to delete the temporary access point created by signup, just in case
-    // signup crashes and fails to clean up after itself. (dhunter 1/13/2000)
-    //
-    // Disabled for FreeGEOS edition of PC/GEOS (meyerk 01/2025)
-    //if (tempAccpnt)
-    //{
-    //    AccessPointDestroyEntryDirect(tempAccpnt);
-    //    tempAccpnt = 0;
-    //    AccessPointCommit();
-    //
-    //    // Reload the accpnt list.
-    //    @call self::MSG_IDP_READ_ACCPNT_AND_ACCPNT_LIST();
-    //}
+    /*
+     Hack to delete the temporary access point created by signup, just in case
+     signup crashes and fails to clean up after itself. (dhunter 1/13/2000)
 
-    // Ensure that there is only one default access point.  We do this because
-    // Welcome can add a new default without un-defaulting the old one.  The
-    // last one discovered (the one set by MSG_IDP_READ_ACCPNT_AND_ACCPNT_LIST) is the
-    // desired default.
+     Disabled for FreeGEOS edition of PC/GEOS (meyerk 01/2025)
+    if (tempAccpnt)
+    {
+        AccessPointDestroyEntryDirect(tempAccpnt);
+        tempAccpnt = 0;
+        AccessPointCommit();
+
+        // Reload the accpnt list.
+        @call self::MSG_IDP_READ_ACCPNT_AND_ACCPNT_LIST();
+    }
+    */
+
+    /* Ensure that there is only one default access point.  We do this because
+       Welcome can add a new default without un-defaulting the old one.  The
+       last one discovered (the one set by MSG_IDP_READ_ACCPNT_AND_ACCPNT_LIST) is the
+       desired default. */
     IDialupEnsureDefaultConnection();
 
-    // Make sure to store the netType that's active when we start up
-    // so we can check out if a reboot is needed when switching
-    // Accpnts. This is only ever set once, right here, because:
-    // if we switch to an accpnt that's of a different netType, we'll
-    // reboot and end up here again. And if we switch to another accpnt of the same
-    // netType - no netType change occurs...
+    /*  Make sure to store the netType that's active when we start up
+        so we can check out if a reboot is needed when switching
+        Accpnts. This is only ever set once, right here, because:
+        if we switch to an accpnt that's of a different netType, we'll
+        reboot and end up here again. And if we switch to another accpnt of the same
+        netType - no netType change occurs...*/
     if (AccessPointGetIntegerPropertyDirect(currentAccpnt, "netType", (int*) &G_lastActiveNetType)) {
       G_lastActiveNetType = NET_TYPE_PPP;
     }
@@ -405,51 +406,9 @@ void IDialupEnsureDefaultConnection(void);
 
       ThreadVSem(wait);
 
-      // otherwise, we need to ask the user to choose one
-      /*
-      @call IDConnectionMenu::MSG_GEN_SET_NOT_ENABLED(VUM_DELAYED_VIA_UI_QUEUE);
-      @call IDConnectButton::MSG_GEN_SET_NOT_USABLE(VUM_DELAYED_VIA_UI_QUEUE);
-      @call IDContinueButton::MSG_GEN_SET_USABLE(VUM_NOW);
-      @call IDialupPrimary::MSG_GEN_DISPLAY_SET_NOT_MINIMIZED();
-      @call IDialupApp::MSG_GEN_APPLICATION_BRING_WINDOW_TO_TOP(@IDialupPrimary);
-      */
-
       @call IDialupApp::MSG_IDA_VIEW_INFO();
     }
 }
-
-/***********************************************************************
- *	MSG_IDP_SELECT_CONTINUE for IDialupProcessClass
- ***********************************************************************
- * SYNOPSIS:
- *
- * PARAMETERS:
- *
- * SIDE EFFECTS:
- *
- * STRATEGY:
- *
- * REVISION HISTORY:
- *	Name	Date		Description
- *	----	----		-----------
- *	mzhu	11/23/98	Initial Revision
- *
- ***********************************************************************/
-/*
-@method IDialupProcessClass, MSG_IDP_SELECT_CONTINUE
-{
-  AccessPointSetActivePoint(currentAccpnt, APT_INTERNET);
-  AccessPointCommit();
-
-  @call IDialupPrimary::MSG_GEN_DISPLAY_SET_MINIMIZED();
-
-  @send IDConnectionMenu::MSG_GEN_SET_ENABLED(VUM_DELAYED_VIA_UI_QUEUE);
-  @send IDContinueButton::MSG_GEN_SET_NOT_USABLE(VUM_DELAYED_VIA_UI_QUEUE);
-  @send IDConnectButton::MSG_GEN_SET_USABLE(VUM_NOW);
-
-  ThreadVSem(wait);
-}
-*/
 
 
 /***********************************************************************
@@ -524,43 +483,6 @@ void IDialupEnsureDefaultConnection(void);
 @method IDialupProcessClass, MSG_GEN_PROCESS_CREATE_NEW_STATE_FILE
 {
   return 0;
-}
-
-/***********************************************************************
- *	MSG_IDP_NEW_NUMBERS for IDialupProcessClass
- ***********************************************************************
- * SYNOPSIS:     Get new local numbers.
- *
- * PARAMETERS:
- *
- * SIDE EFFECTS:
- *
- * STRATEGY:
- *
- * REVISION HISTORY:
- *	Name	Date		Description
- *	----	----		-----------
- *	brianc	12/5/00         Initial Revision
- *
- ***********************************************************************/
-/*@method IDialupProcessClass, MSG_IDP_NEW_NUMBERS
-{
-    MemHandle launchBlk;
-    IACPConnection iacpConnectionToken;
-    word serverCount;
-    GeodeToken welcomeToken = {'G', 'P', 'C', 's', 0};
-
-    InitFileWriteBoolean("welcome", "changePop", TRUE);
-    launchBlk = IACPCreateDefaultLaunchBlock(MSG_GEN_PROCESS_OPEN_APPLICATION);
-    iacpConnectionToken = IACPConnect(&welcomeToken,
-				      IACPCF_FIRST_ONLY |
-				      IACPSM_USER_INTERACTIBLE,
-				      launchBlk, NullOptr, &serverCount);
-    if (iacpConnectionToken != IACP_NO_CONNECTION) {
-	IACPShutdown(iacpConnectionToken, NullOptr);
-    }
-    @call process::MSG_IDP_DISCONNECT();
-    @send, forceQueue IDialupApp::MSG_META_QUIT();
 }
 
 /***********************************************************************
@@ -1156,10 +1078,10 @@ AccessPointLocalDialingOptions GetLocalDialingOptions (void)
 
     AccessPointCommit();
 
-    // we must re-read the accpnt list, but
-    // MSG_IDP_READ_ACCPNT_AND_ACCPNT_LIST will reset currentAccpnt
-    // to the currently active Accpnt, so we need to backup the
-    // currentAccpnt and the list selection first and restore afterwards...
+    /*  We must re-read the accpnt list, but
+        MSG_IDP_READ_ACCPNT_AND_ACCPNT_LIST will reset currentAccpnt
+        to the currently active Accpnt, so we need to backup the
+        currentAccpnt and the list selection first and restore afterwards... */
     accpntBackup = currentAccpnt;
     sel = @call IDConnectionList::MSG_GEN_ITEM_GROUP_GET_SELECTION();
     @call self::MSG_IDP_READ_ACCPNT_AND_ACCPNT_LIST();
@@ -1432,20 +1354,22 @@ AccessPointLocalDialingOptions GetLocalDialingOptions (void)
             defaultItem = i;
         }
 
-        // Hack to flag for deletion the temporary access point created by signup,
-        // just in case signup crashes and fails to clean up after itself.
-        // The actual removal occurs in MSG_GEN_PROCESS_OPEN_APPLICATION.
-        // (dhunter 1/13/2000)
-        // There is no "Welcome" or "Signup" application in the FreeGEOS Version of
-        // PC/GEOS, so let's disable this hack.
-        // (meyerk 01/2025)
-        // if (!AccessPointGetIntegerPropertyDirect(
-        //     *id,
-        //     TEMPORARY_KEY,
-        //     (int*) &datalen) && datalen == 1)
-        // {
-        //     tempAccpnt = *id; // don't confuse with tmpAccpnt!
-        // }
+        /*  Hack to flag for deletion the temporary access point created by signup,
+            just in case signup crashes and fails to clean up after itself.
+            The actual removal occurs in MSG_GEN_PROCESS_OPEN_APPLICATION.
+            (dhunter 1/13/2000)
+            There is no "Welcome" or "Signup" application in the FreeGEOS Version of
+            PC/GEOS, so let's disable this hack.
+            (meyerk 01/2025)
+
+            if (!AccessPointGetIntegerPropertyDirect(
+                *id,
+                TEMPORARY_KEY,
+                (int*) &datalen) && datalen == 1)
+            {
+                tempAccpnt = *id; // don't confuse with tmpAccpnt!
+            }
+            */
     }
 
     if(hidden)
@@ -1561,18 +1485,6 @@ AccessPointLocalDialingOptions GetLocalDialingOptions (void)
         @call IDDeleteConnectionButton::MSG_GEN_SET_NOT_ENABLED(VUM_DELAYED_VIA_APP_QUEUE);
     }
 
-/*
-    if(!AccessPointGetIntegerPropertyDirect(currentAccpnt, DEFAULT_KEY, (int*) &datalen) &&
-        datalen != 0)
-    {
-        @call IDConnectionDefaultBoxGroup::MSG_GEN_BOOLEAN_GROUP_SET_BOOLEAN_STATE(1, TRUE);
-    }
-    else
-    {
-        @call IDConnectionDefaultBoxGroup::MSG_GEN_BOOLEAN_GROUP_SET_BOOLEAN_STATE(1, FALSE);
-    }
-*/
-
     datalen = MAX_TEXT_LEN*sizeof(TCHAR);
     memset(name, 0, sizeof(TCHAR)*MAX_TEXT_LEN);
     @send IDConnectionUserName::MSG_GEN_SET_NOT_USABLE(VUM_DELAYED_VIA_APP_QUEUE);
@@ -1594,22 +1506,11 @@ AccessPointLocalDialingOptions GetLocalDialingOptions (void)
     if(connectionNum)
     {
         @call IDConnectButton::MSG_GEN_SET_ENABLED(VUM_DELAYED_VIA_APP_QUEUE);
-        //@call IDConnectionDefaultBoxGroup::MSG_GEN_SET_ENABLED(VUM_DELAYED_VIA_APP_QUEUE);
     }
     else
     {
         @call IDConnectButton::MSG_GEN_SET_NOT_ENABLED(VUM_DELAYED_VIA_APP_QUEUE);
-        //@call IDConnectionDefaultBoxGroup::MSG_GEN_SET_NOT_ENABLED(VUM_DELAYED_VIA_APP_QUEUE);
     }
-
-    /*
-    if(AccessPointGetIntegerPropertyDirect(currentAccpnt, "hours", &tHours))
-        tHours = 0;
-    if(AccessPointGetIntegerPropertyDirect(currentAccpnt, "minutes", &tMinutes))
-        tMinutes = 0;
-    if(AccessPointGetIntegerPropertyDirect(currentAccpnt, "seconds", &tSeconds))
-        tSeconds = 0;
-    */
 
     datalen = MAX_TEXT_LEN;
     memset(name, 0, sizeof(TCHAR)*MAX_TEXT_LEN);
@@ -1695,44 +1596,6 @@ void IDialupEnsureDefaultConnection(void)
   }
   MemUnlock(connectionHandle);
 }
-
-/***********************************************************************
- *	MSG_IDP_SET_DEFAULT_CONNECTION for IDialupProcessClass
- ***********************************************************************
- * SYNOPSIS:     Create a new current connection setting.
- *
- * PARAMETERS:
- *
- * SIDE EFFECTS:
- *
- * STRATEGY:
- *
- * REVISION HISTORY:
- *	Name	Date		Description
- *	----	----		-----------
- *	mzhu	11/23/98	Initial Revision
- *
- ***********************************************************************/
-/*
-@method IDialupProcessClass, MSG_IDP_SET_DEFAULT_CONNECTION
-{
-  if(@call IDConnectionDefaultBoxGroup::MSG_GEN_BOOLEAN_GROUP_GET_SELECTED_BOOLEANS())
-    {
-      AccessPointSetIntegerPropertyDirect(currentAccpnt, DEFAULT_KEY, 1);
-      defaultAccpnt = currentAccpnt;
-
-      IDialupEnsureDefaultConnection();
-    }
-  else
-    {
-      AccessPointSetIntegerPropertyDirect(currentAccpnt, DEFAULT_KEY, 0);
-      defaultAccpnt = 0;
-    }
-
-  AccessPointSetActivePoint(defaultAccpnt, APT_INTERNET);
-  AccessPointCommit();
-}
-*/
 
 /***********************************************************************
  *	IDialupUpdateEditOKButton
@@ -1858,11 +1721,9 @@ void IDialupUpdateEditOKButton(void)
  ***********************************************************************/
 @method IDialupProcessClass, MSG_IDP_EDIT_DIALING_OPTIONS_CHANGED
 {
-/*#ifndef PRODUCT_NDO2000 */
-	 editDialOptionsChanged = TRUE;
-/*#endif  */
+	editDialOptionsChanged = TRUE;
     IDialupUpdateEditOKButton();
-}	/* End of MSG_IDP_EDIT_OPTIONS_CHANGED.	*/
+}
 
 
 /***********************************************************************
@@ -1885,13 +1746,6 @@ void IDialupUpdateEditOKButton(void)
 @method IDialupProcessClass, MSG_IDP_DIALING_OPTIONS
 {
     AccessPointDialingOptions options;
-/*@if defined(PRODUCT_NDO2000)
-    Boolean lqm;
-
-    if (InitFileReadBoolean("ppp", "lqm", &lqm)) lqm = TRUE;
-    @call IDDOMiscOptionsGroup::MSG_GEN_BOOLEAN_GROUP_SET_GROUP_STATE(
-	(lqm ? 1 : 0), 0);
-/*@endif  */
 
     AccessPointGetDialingOptions( &options );
 
@@ -1937,9 +1791,6 @@ void IDialupUpdateEditOKButton(void)
     AccessPointDialingOptions options;
     MemHandle mh;
     word nAreaCodeLen;
-/*@if defined(PRODUCT_NDO2000)
-    Boolean lqm;
-/*@endif */
 
     if ((nAreaCodeLen = @call IDDOAreaCode::MSG_VIS_TEXT_GET_TEXT_SIZE()) > 0
       && nAreaCodeLen != 3)
@@ -1989,12 +1840,6 @@ void IDialupUpdateEditOKButton(void)
 	    MSG_GEN_BOOLEAN_GROUP_GET_SELECTED_BOOLEANS() == 1) ? TRUE : FALSE;
 
 	AccessPointSetDialingOptions( &options );
-
-/*@if defined(PRODUCT_NDO2000)
-	lqm = (@call IDDOMiscOptionsGroup::
-	    MSG_GEN_BOOLEAN_GROUP_GET_SELECTED_BOOLEANS() == 1) ? TRUE : FALSE;
-        InitFileWriteBoolean("ppp", "lqm", lqm);
-/*@endif */
 
 	@send IDDialingOptionsDialog::MSG_GEN_INTERACTION_ACTIVATE_COMMAND(
 	    IC_INTERACTION_COMPLETE);
@@ -2059,7 +1904,6 @@ void IDialupMakeCurrentAccpntActiveAndDefault()
 @method IDialupProcessClass, MSG_IDP_ACTIVATE
 {
     word netType = 0 ;
-    word size ;
     Boolean toPPP = FALSE ;
 
     /* make sure to unregister, just in case... */
@@ -2070,7 +1914,7 @@ void IDialupMakeCurrentAccpntActiveAndDefault()
         G_registered = FALSE ;
     }
 
-    // Set active access point to the current one
+    // Set active access point to the current one and make it the default
     IDialupMakeCurrentAccpntActiveAndDefault();
 
     if (AccessPointGetIntegerPropertyDirect(currentAccpnt, "netType", (int*) &netType)) {
@@ -2124,22 +1968,11 @@ void IDialupMakeCurrentAccpntActiveAndDefault()
             }
         }
 
-        if (toPPP)
-        {
-            UserStandardDialogOptr(
-                0, 0, 0, 0,
-                @mustRestartPPP,
-                (CDT_WARNING<<CDBF_DIALOG_TYPE_OFFSET)|(GIT_NOTIFICATION<<CDBF_INTERACTION_TYPE_OFFSET)
-            );
-        }
-        else
-        {
-            UserStandardDialogOptr(
-                0, 0, 0, 0,
-                @mustRestart,
-                (CDT_WARNING<<CDBF_DIALOG_TYPE_OFFSET)|(GIT_NOTIFICATION<<CDBF_INTERACTION_TYPE_OFFSET)
-            );
-        }
+        UserStandardDialogOptr(
+            0, 0, 0, 0,
+            (toPPP ? @mustRestartPPP : @mustRestart),
+            (CDT_WARNING<<CDBF_DIALOG_TYPE_OFFSET)|(GIT_NOTIFICATION<<CDBF_INTERACTION_TYPE_OFFSET)
+        );
 
         SysShutdown(SST_RESTART) ;
     }
