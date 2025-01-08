@@ -2458,7 +2458,6 @@ EC( ECCheckMemHandle( ras.buffer ) );
 
 #endif  /* __GEOS__ */
 
-
 static void Lock_Render_Pool( RAS_ARGS  TT_Outline*  glyph )
 {
   /* estimated size of the renderpool */
@@ -2466,11 +2465,11 @@ static void Lock_Render_Pool( RAS_ARGS  TT_Outline*  glyph )
                                                       + RASTER_RENDER_POOL_MIN_SIZE;
 
   /* discarded or not the necessary size */
-  if( MemGetInfo( ras.buffer, MGIT_FLAGS_AND_LOCK_COUNT ) & HF_DISCARDED ||
-      MemGetInfo( ras.buffer, MGIT_SIZE ) != renderpoolSize )
-    MemReAlloc( ras.buffer, renderpoolSize, HAF_NO_ERR );
+  /*if( MemGetInfo( ras.buffer, MGIT_FLAGS_AND_LOCK_COUNT ) & HF_DISCARDED ||
+      MemGetInfo( ras.buffer, MGIT_SIZE ) != renderpoolSize )*/
+    MemReAlloc( ras.buffer, renderpoolSize, HAF_NO_ERR | HAF_LOCK);
 
-  ras.sizeBuff = (PStorage)MemLock( ras.buffer ) + ( renderpoolSize / sizeof(long) );
+  ras.sizeBuff = (PStorage)MemDeref( ras.buffer ) + ( renderpoolSize / sizeof(long) );
 }
 
 

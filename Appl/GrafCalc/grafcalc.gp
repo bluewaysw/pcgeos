@@ -1,6 +1,8 @@
 name grafcalc.app
 longname "GrafCalc"
+
 tokenchars "GCal"
+
 tokenid 16484
 type	appl, process, single
 
@@ -13,21 +15,20 @@ heapspace 2300
 
 library	geos
 library	ui
-library 	parse
-#library 	ssheet
-library 	math
-library 	ansic
-library 	color
+library parse
+library math
+library ansic
+library color
 
-resource AppResource ui-object
-resource Interface ui-object
-resource FunktionInterface ui-object
-resource TabellenInterface ui-object
-resource DiagramResource ui-object
-resource ToolMonikerResource lmem read-only shared
-resource IconResource lmem read-only shared
+resource APPRESOURCE ui-object
+resource INTERFACE ui-object
+resource FUNKTIONINTERFACE ui-object
+resource TABELLENINTERFACE ui-object
+resource DIAGRAMRESOURCE ui-object
+resource TOOLMONIKERRESOURCE	 lmem read-only shared
+resource ICONRESOURCE lmem read-only shared
 
 export TriggerDataTriggerClass
 export GCalcTextClass
 
-usernotes "Copyright 2015 - Wilfried Konczynski"
+usernotes "Copyright 2024 - Wilfried Konczynski"

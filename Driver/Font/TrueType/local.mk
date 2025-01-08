@@ -15,6 +15,7 @@
 ###############################################################################
 #ASMFLAGS	+= -i
 ASMFLAGS        += -i -DFULL_EXECUTE_IN_PLACE=1 -DSUPPORT_32BIT_DATA_REGS=0
+WCCNCOPTFLAGS	:= -obimlrs
 
 _PROTO = 3.0
 

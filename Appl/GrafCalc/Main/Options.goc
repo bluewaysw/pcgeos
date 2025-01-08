@@ -1,17 +1,18 @@
 @include <stdapp.goh>
 @include "grafcalc.goh"
-@include "Ui/appui.goh"
+@include "UI/appui.goh"
 #include <initfile.h>
 
 extern byte hintergrund;
 extern byte x_achsen_teilung;
 extern byte ko_achsen;
 extern int winkelmass;
-extern long double digits;
+extern double digits;
 extern char speicher[90];
 extern LocalNumericFormat  *dez_format;
 extern FloatFloatToAsciiFormatFlags format;
 extern byte z_format;
+extern word arbeitsbereich;
 
 @extern method GCalcProcessClass, MSG_WINKELMASS_EINSTELLEN
 {
@@ -21,6 +22,8 @@ extern byte z_format;
          @call InfotextAngle::MSG_VIS_TEXT_REPLACE_ALL_PTR("DEG",0);
      else
          @call InfotextAngle::MSG_VIS_TEXT_REPLACE_ALL_PTR("RAD",0);
+     if (arbeitsbereich==3)  @call self::MSG_INVALIDATE_VIEW();
+     @call self::MSG_ARBEITSBEREICH_EINSTELLEN(arbeitsbereich);
 }
 @extern method GCalcProcessClass, MSG_NACHKOMMASTELLEN_EINSTELLEN
 {
@@ -31,19 +34,19 @@ extern byte z_format;
       
        if (anzahl==1) Text_incrementieren(zahl_str,1,0,8,0); else Text_incrementieren(zahl_str,-1,0,8,0);     
        FloatAsciiToFloat(FAF_PUSH_RESULT, strlen(zahl_str),zahl_str,0);
-       FloatPopNumber(&digits);  
+       //FloatPopNumber(&digits); 
+        FloatGeos80ToIEEE64(&digits);
       @call Nachkommastellen::MSG_VIS_TEXT_REPLACE_ALL_PTR(zahl_str, 0);
        strcat(d,zahl_str);
       @call InfotextDigits::MSG_VIS_TEXT_REPLACE_ALL_PTR(d,0);
-//MessageBox(zahl_str);
-       
-       //MessageNumberBox(digits);
+      @call self::MSG_ARBEITSBEREICH_EINSTELLEN(arbeitsbereich);
 }
 @extern method GCalcProcessClass, MSG_ZAHLDARSTELLUNG_EINSTELLEN
 {
-       if (zahlenformat==NORMAL) format=FFAF_DONT_USE_SCIENTIFIC;		/*zahlenformat ist Übergabeparameter*/
+       if (zahlenformat==2) format=FFAF_DONT_USE_SCIENTIFIC;		/*zahlenformat ist ï¿½bergabeparameter*/
        else format=FFAF_SCIENTIFIC;
        z_format=zahlenformat; 
+        @call self::MSG_ARBEITSBEREICH_EINSTELLEN(arbeitsbereich); 
 }
 @extern method GCalcProcessClass, MSG_DIAGRAM_CHANGED
 {
@@ -84,7 +87,7 @@ extern byte z_format;
       InitFileWriteInteger("gcalc","Format",format);
       InitFileSave();
       InitFileCommit();
- //@send GCalcApp::MSG_META_SAVE_OPTIONS();  // Für Controller
+ //@send GCalcApp::MSG_META_SAVE_OPTIONS();  // Fï¿½r Controller
 }
 @extern method GCalcProcessClass, MSG_OPTIONEN_LADEN
 {
@@ -94,7 +97,8 @@ extern byte z_format;
       char d[4]="FD ";
       selections selectionDiagram;
  
-      err = InitFileReadInteger("gcalc","angle", (unsigned short *) &winkelmass);
+      // err = InitFileReadInteger("gcalc","angle", &winkelmass);
+       err = InitFileReadInteger("gcalc","angle", (unsigned short *) &winkelmass);
       if ( err ) winkelmass = BOGENMASS;
       @call Winkelmass::MSG_GEN_ITEM_GROUP_SET_SINGLE_SELECTION(winkelmass,0);
      @call Winkelmass::MSG_GEN_ITEM_GROUP_SET_MODIFIED_STATE(TRUE);
@@ -104,7 +108,7 @@ extern byte z_format;
      else
          @call InfotextAngle::MSG_VIS_TEXT_REPLACE_ALL_PTR("RAD",0);
     /*-------------------------------------------------------------------------------------------------------------------*/
-    /*Die Reihenfolge der Befehle darf nicht verändert werden, da sie sich gegenseitig beeinflussen. Keine Ahnung warum*/
+    /*Die Reihenfolge der Befehle darf nicht verï¿½ndert werden, da sie sich gegenseitig beeinflussen. Keine Ahnung warum*/
      err = InitFileReadStringBuffer("gcalc","frac_digits",digit_str,2,&groesse);
      if (err)
      {
@@ -117,7 +121,8 @@ extern byte z_format;
       {
          @call Nachkommastellen::MSG_VIS_TEXT_REPLACE_ALL_PTR(digit_str,0);         
          FloatAsciiToFloat(FAF_PUSH_RESULT, strlen(digit_str),digit_str,0);
-         FloatPopNumber(&digits);
+         //FloatPopNumber(&digits);
+         FloatGeos80ToIEEE64(&digits);
          strcat(d,digit_str);
       }
      @call InfotextDigits::MSG_VIS_TEXT_REPLACE_ALL_PTR(d,0);
@@ -128,7 +133,7 @@ extern byte z_format;
       @call Diagramm::MSG_GEN_BOOLEAN_GROUP_SET_GROUP_STATE(selectionDiagram,0);
       @call self::MSG_DIAGRAM_CHANGED();
       err = InitFileReadInteger("gcalc","Format",&format);
-      if (err) format=512;	/*512 für FFAF_DONT_USE_SCIENTIFIC*/
+      if (err) format=512;	/*512 fï¿½r FFAF_DONT_USE_SCIENTIFIC*/
       if (format==512) 
       {        
             @call Zahlenformat::MSG_GEN_ITEM_GROUP_SET_SINGLE_SELECTION(NORMAL,0);  
