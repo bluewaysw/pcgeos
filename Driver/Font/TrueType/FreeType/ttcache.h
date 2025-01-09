@@ -156,8 +156,7 @@
   /* doesn't need protection                                        */
 
   LOCAL_DEF
-  TT_Error  Cache_Create( /*PEngine_Instance  engine,*/
-                          PCache_Class      clazz,
+  TT_Error  Cache_Create( PCache_Class      clazz,
                           TCache*           cache );
 
   /* Destroys a cache and all its listed objects */
