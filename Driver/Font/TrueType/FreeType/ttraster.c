@@ -427,7 +427,7 @@ extern TEngine_Instance engineInstance;
 
   static Bool _near  End_Profile( RAS_ARG )
   {
-    Long      h;
+    Short     h;
     PProfile  oldProfile;
 
 
@@ -1431,7 +1431,11 @@ extern TEngine_Instance engineInstance;
     /* Drop-out control */
 
     e1 = TRUNC( CEILING( x1 ) );
-    e2 = TRUNC( FLOOR( x2 ) );
+
+    if ( x2-x1-ras.precision <= 1 )
+      e2 = e1;
+    else
+      e2 = TRUNC( FLOOR( x2 ) );
 
     if ( e2 >= 0 && e1 < ras.bWidth )
     {
@@ -2454,7 +2458,6 @@ EC( ECCheckMemHandle( ras.buffer ) );
 
 #endif  /* __GEOS__ */
 
-
 static void Lock_Render_Pool( RAS_ARGS  TT_Outline*  glyph )
 {
   /* estimated size of the renderpool */
@@ -2462,11 +2465,11 @@ static void Lock_Render_Pool( RAS_ARGS  TT_Outline*  glyph )
                                                       + RASTER_RENDER_POOL_MIN_SIZE;
 
   /* discarded or not the necessary size */
-  if( MemGetInfo( ras.buffer, MGIT_FLAGS_AND_LOCK_COUNT ) & HF_DISCARDED ||
-      MemGetInfo( ras.buffer, MGIT_SIZE ) != renderpoolSize )
-    MemReAlloc( ras.buffer, renderpoolSize, HAF_NO_ERR );
+  /*if( MemGetInfo( ras.buffer, MGIT_FLAGS_AND_LOCK_COUNT ) & HF_DISCARDED ||
+      MemGetInfo( ras.buffer, MGIT_SIZE ) != renderpoolSize )*/
+    MemReAlloc( ras.buffer, renderpoolSize, HAF_NO_ERR | HAF_LOCK);
 
-  ras.sizeBuff = (PStorage)MemLock( ras.buffer ) + ( renderpoolSize / sizeof(long) );
+  ras.sizeBuff = (PStorage)MemDeref( ras.buffer ) + ( renderpoolSize / sizeof(long) );
 }
 
 

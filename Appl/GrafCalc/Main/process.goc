@@ -3,10 +3,11 @@
 #include <Ansi/stdio.h>
 #include <Ansi/string.h>
 @include "grafcalc.goh"
-@include "Ui/appui.goh"
+@include "UI/appui.goh"
 @include <Objects/clipbrd.goh>
 @include <Objects/gViewCC.goh>
 #include <initfile.h>
+@include <math.goh>
 
 @classdecl GCalcProcessClass, neverSaved;
 
@@ -61,12 +62,12 @@
 @classdecl TriggerDataTriggerClass;
 
 C_CallbackStruct cbStruct;
-byte result[90] ={ 0 };
-char ergebnis[90];
-char entry[90];
+/*byte result[100] ={ 0 };*/
+char ergebnis[100];
+char entry[100];
 int winkelmass;
-long double digits;
-char speicher[90];
+double digits;
+char speicher[100];
 //char wurzel[3];
 word arbeitsbereich=1;
 word arbeitsbereich_vorher=1;
@@ -85,10 +86,11 @@ byte hintergrund;
 byte x_achsen_teilung;
 byte ko_achsen;
 byte zeilenzahl;
-LocalNumericFormat  *dez_format;
+LocalNumericFormat  dez_format;
 char dez_zeichen;
 FloatFloatToAsciiFormatFlags format;
 byte z_format;
+int f_fehler; /*Fehler bei der Funktionswertberechnung*/
 
 static void
 SysNotifyWithData(void *Ptr,word size,word notificationType,word listType);
@@ -105,7 +107,7 @@ int TextGetCursorPosition()
   return retVal;
 }
 
-void __pascal 
+void _pascal
 ParserCallback (C_CallbackStruct *cbStruct)
 {
     byte callbacktyp;
@@ -119,7 +121,7 @@ ParserCallback (C_CallbackStruct *cbStruct)
 		EvalParameters	     *CE_params;
 		DependencyParameters *DP_params;
     	} C_params;
-   	 word    	    	    C_returnDS;
+   	 	word    	    	    C_returnDS;
     	C_CallbackUnion    	    C_u;
 
     	// align word... so we need a throwaway byte.
@@ -127,7 +129,7 @@ ParserCallback (C_CallbackStruct *cbStruct)
        } C_CallbackStruct;*/
 
    /*C_callbackType*/
-   InfoBox("cbStruct->C_callbackType \01",cbStruct->C_callbackType,"");		/*CT_CHECK_NAME_EXISTS 2 wird stets übergeben*/
+   /*InfoBox("cbStruct->C_callbackType \01",cbStruct->C_callbackType,"");*/		/*CT_CHECK_NAME_EXISTS 2 wird meistens ï¿½bergeben*/
     callbacktyp=cbStruct->C_callbackType;
 
    /*union - ParserParameters  (Format-, Eval- und DependencyParameters erscheinen mir unwichtig)*/
@@ -150,8 +152,8 @@ ParserCallback (C_CallbackStruct *cbStruct)
      /*InfoBox("cbStruct->C_params.CP_params->PP_common.CP_column \01",cbStruct->C_params.CP_params->PP_common.CP_column,"");*/
      /*InfoBox("cbStruct->C_params.CP_params->PP_common.CP_maxRow \01",cbStruct->C_params.CP_params->PP_common.CP_maxRow,"");*/
      /*InfoBox("cbStruct->C_params.CP_params->PP_common.CP_maxColumn \01",cbStruct->C_params.CP_params->PP_common.CP_maxColumn,"");*/
-     /* void *      CP_callback;*/	/*weiß nicht, wie diese Komponente kontrolliert werden kann*/
-     /* void *      CP_cellParams;*/	  /* ptr to an instance of SpreadsheetClass */  /*Diese Komponente ist für mich wohl unwichtig.*/
+     /* void *      CP_callback;*/	/*weiï¿½ nicht, wie diese Komponente kontrolliert werden kann*/
+     /* void *      CP_cellParams;*/	  /* ptr to an instance of SpreadsheetClass */  /*Diese Komponente ist fï¿½r mich wohl unwichtig.*/
 
            /*PP_parserBufferSize*/
      /*InfoBox("cbStruct->C_params.CP_params->PP_parserBufferSize \01",cbStruct->C_params.CP_params->PP_parserBufferSize,"");*/
@@ -179,7 +181,7 @@ ParserCallback (C_CallbackStruct *cbStruct)
      /*InfoBox("cbStruct->C_params.CP_params->PP_currentToken.ST_data.STD_operator.STOD_operatorID \01",cbStruct->C_params.CP_params->PP_currentToken.ST_data.STD_operator.STOD_operatorID,"");*/
 
 //MessageBox("lookAheadToken:");
-          /*PP_lookAheadToken*/	/*Müssen diese Werte vielleicht gesetzt werden? Sind das die gesuchten Rückgabewerte?*/
+          /*PP_lookAheadToken*/	/*Mï¿½ssen diese Werte vielleicht gesetzt werden? Sind das die gesuchten Rï¿½ckgabewerte?*/
      	/*ScannerTokenType*/
      /*InfoBox("cbStruct->C_params.CP_params->PP_lookAheadToken.ST_type \0",cbStruct->C_params.CP_params->PP_lookAheadToken.ST_type,"");*/
      /*cbStruct->C_params.CP_params->PP_lookAheadToken.ST_type=6;*/
@@ -187,12 +189,12 @@ ParserCallback (C_CallbackStruct *cbStruct)
 		/*ScannerTokenNumberData*/
      /*InfoBox("cbStruct->C_params.CP_params->PP_lookAheadToken.ST_data.STD_number.STND_value \01",cbStruct->C_params.CP_params->PP_lookAheadToken.ST_data.STD_number.STND_value,"");*/
      /*cbStruct->C_params.CP_params->PP_lookAheadToken.ST_data.STD_number.STND_value=0;*/
-		/*ScannerTokenStringData*/ 
+		/*ScannerTokenStringData*/
      /*InfoBox("cbStruct->C_params.CP_params->PP_lookAheadToken.ST_data.STD_string.STSD_start \01",cbStruct->C_params.CP_params->PP_lookAheadToken.ST_data.STD_string.STSD_start,"");*/
      /*cbStruct->C_params.CP_params->PP_lookAheadToken.ST_data.STD_string.STSD_start=0;*/
      /*InfoBox("cbStruct->C_params.CP_params->PP_lookAheadToken.ST_data.STD_string.STSD_length \01",cbStruct->C_params.CP_params->PP_lookAheadToken.ST_data.STD_string.STSD_length,"");*/
      /*cbStruct->C_params.CP_params->PP_lookAheadToken.ST_data.STD_string.STSD_length=0;*/
-     
+
      		/*ScannerTokenCellData*/
      /*InfoBox("cbStruct->C_params.CP_params->PP_lookAheadToken.ST_data.STD_cell.STCD_cellRef.CR_row \0",cbStruct->C_params.CP_params->PP_lookAheadToken.ST_data.STD_cell.STCD_cellRef.CR_row,"");*/
      /*cbStruct->C_params.CP_params->PP_lookAheadToken.ST_data.STD_cell.STCD_cellRef.CR_row=0;*/
@@ -203,10 +205,10 @@ ParserCallback (C_CallbackStruct *cbStruct)
      /*cbStruct->C_params.CP_params->PP_currentToken.ST_data.STD_identifier.STID_start=0;*/
 		/*ScannerTokenOperatorData*/
      /*InfoBox("cbStruct->C_params.CP_params->PP_lookAheadToken.ST_data.STD_operator.STOD_operatorID \01",cbStruct->C_params.CP_params->PP_currentToken.ST_data.STD_operator.STOD_operatorID,"");*/
- 
+
 
           /*PP_error*/
-     /*InfoBox("cbStruct->C_params.CP_params->PP_error \01",cbStruct->C_params.CP_params->PP_error,"");*/		/*meist wird 10 (Bad Expression) übergeben*/
+     /*InfoBox("cbStruct->C_params.CP_params->PP_error \01",cbStruct->C_params.CP_params->PP_error,"");*/		/*meist wird 10 (Bad Expression) ï¿½bergeben*/
           /*PP_tokenStart*/
      /*InfoBox("cbStruct->C_params.CP_params->PP_tokenStart \01",cbStruct->C_params.CP_params->PP_tokenStart,"");*/
      /*cbStruct->C_params.CP_params->PP_tokenStart=0;*/
@@ -214,41 +216,48 @@ ParserCallback (C_CallbackStruct *cbStruct)
     /* InfoBox("cbStruct->C_params.CP_params->PP_tokenEnd \01",cbStruct->C_params.CP_params->PP_tokenEnd,"");*/
     /*cbStruct->C_params.CP_params->PP_tokenEnd=0;*/
    /*C_returnDS*/
-   InfoBox("cbStruct->C_returnDS \01",cbStruct->C_returnDS,"");
+   /*InfoBox("cbStruct->C_returnDS \01",cbStruct->C_returnDS,"");*/
    /*cbStruct->C_returnDS=0;*/
 
-   /*C_CallbackUnion C_u*  (nur Rückgabewerte)*/
+   /*C_CallbackUnion C_u*  (nur Rï¿½ckgabewerte)*/
     switch (callbacktyp)
     {
         case 0:				/*CT_FUNCTION_TO_TOKEN*/
- 	cbStruct->C_u.CT_ftt.isFunctionName=0;
-    	cbStruct->C_u.CT_ftt.funcID=0;
+ 			cbStruct->C_u.CT_ftt.isFunctionName=0;
+    		cbStruct->C_u.CT_ftt.funcID=0;
+			break;
         case 1:				/*CT_NAME_TO_TOKEN*/
-	cbStruct->C_u.CT_ntt.nameID=0;
-    	cbStruct->C_u.CT_ntt.errorOccurred=1;
-   	cbStruct->C_u.CT_ntt.error=10;
+			cbStruct->C_u.CT_ntt.nameID=0;
+    		cbStruct->C_u.CT_ntt.errorOccurred=1;
+   			cbStruct->C_u.CT_ntt.error=10;
+			break;
         case 2:				/*CT_CHECK_NAME_EXISTS*/
-	cbStruct->C_u.CT_cne.nameExists=0; 
+			cbStruct->C_u.CT_cne.nameExists=0;
+			/*cbStruct->C_u.CT_cne.length=0;
+			cbStruct->C_u.CT_cne.text=NULL;*/
+			break;
         case 4:				/*CT_EVAL_FUNCTION*/
-	cbStruct->C_u.CT_ef.errorOccurred=1;
-    	cbStruct->C_u.CT_ef.error=10;
-        case 14:				/*CT_SPECIAL_FUNCTION*/    
-    	cbStruct->C_u.CT_sf.newArgStack=NULL;
-    	cbStruct->C_u.CT_sf.errorOccurred=1;
-    	cbStruct->C_u.CT_sf.error=10;
-     } 
-   
-   MessageBox("You entered a very bad expression! \r Geos will crash now");
+			cbStruct->C_u.CT_ef.errorOccurred=1;
+    		cbStruct->C_u.CT_ef.error=10;
+			break;
+        case 14:				/*CT_SPECIAL_FUNCTION*/
+    		cbStruct->C_u.CT_sf.newArgStack=NULL;
+    		cbStruct->C_u.CT_sf.errorOccurred=1;
+    		cbStruct->C_u.CT_sf.error=10;
+     }
+
+   /*MessageBox("You entered a very bad expression! \r Geos will crash now");*/
+
 }
 
-int Parser_anwenden(char buf[100], char ergebnis[100], byte nachkommastellen)
+int Parser_anwenden(char buf[100], byte nachkommastellen)
 {
     char bufh[100];
     char bufkopie[100];
     byte token[100];
     byte scratch[100];
     byte result[100];
-    byte result_eval[100];
+    //byte result_eval[100];
     CParserStruct pParams;
     CParserReturnStruct rVal;
     char *rPtr;
@@ -259,13 +268,14 @@ int Parser_anwenden(char buf[100], char ergebnis[100], byte nachkommastellen)
     //int parserfunktionswert=0;
     byte fehlernr=0;
     int err,fehler;
-    long double ergebniszahl;
-    
+    double ergebniszahl;
+
+
     /*-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
     laenge=strlen(buf);j=0;
     for (i=0;i<laenge;i++) 				/*Mal-Zeichen einsetzen, z.B. 2x wird zu 2*x, damit der Parser 2x versteht*/
     {
-         if ((((buf[i]>47) && (buf[i]<58) || (buf[i]==')') || (buf[i]==-71) || (buf[i]=='e')) && ((buf[i+1]=='e') || (buf[i+1]=='a') || (buf[i+1]=='c') || (buf[i+1]=='f') || (buf[i+1]=='s') || (buf[i+1]=='t') || (buf[i+1]=='(') || (buf[i+1]=='l') || (buf[i+1]==-71)))
+         if (( ((buf[i]>47) && (buf[i]<58) || (buf[i]==')') || (buf[i]==-71) || (buf[i]=='e')) && ((buf[i+1]=='e') || (buf[i+1]=='a') || (buf[i+1]=='c') || (buf[i+1]=='f') || (buf[i+1]=='s') || (buf[i+1]=='t') || (buf[i+1]=='(') || (buf[i+1]=='l') || (buf[i+1]==-71) ))
            || ((buf[i]==')') && ((buf[i+1]>47) && (buf[i+1]<58) || (buf[i+1]=='('))))           /*pi entspricht dem Code -71?*/
          {
 	bufh[j]=buf[i];
@@ -277,13 +287,11 @@ int Parser_anwenden(char buf[100], char ergebnis[100], byte nachkommastellen)
          {
               bufh[j]=buf[i];
               j++;
-         }         
+         }
     }
     bufh[j]='\0';
-    strcpy(buf,bufh); 
-    
+    strcpy(buf,bufh);
     /*-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-                           //MessageBox("Begin eulersche Zahl");
 	       if (strchr(buf,'e'))
                            {
                                j=0;					//Eulersche Zahl e
@@ -304,7 +312,6 @@ int Parser_anwenden(char buf[100], char ergebnis[100], byte nachkommastellen)
 	           if (gefunden==1) strcpy(buf,bufh);
 	           strcpy(bufh,"");
                            }
-                            //MessageBox("Ende eulersche Zahl");
     //--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 	       j=0;					//Ans durch Ergebnis ersetzen
 
@@ -319,12 +326,11 @@ int Parser_anwenden(char buf[100], char ergebnis[100], byte nachkommastellen)
 	           {
 	               strncpy(bufh,bufkopie,rPtr-bufkopie);     //Zeichen vor Ans kopieren
 	               //MessageBox(bufh);
-	               strcat(bufh,(char *) result);     //Ergebnis für Ans anhängen
-	               if (strlen(bufkopie)>rPtr-buf+3)         //Wenn vorhanden, Resttext anhängen
+	               strcat(bufh,(char *) result);     //Ergebnis fï¿½r Ans anhï¿½ngen
+	               if (strlen(bufkopie)>rPtr-buf+3)         //Wenn vorhanden, Resttext anhï¿½ngen
 	               {
 	                   rPtr++;rPtr++;rPtr++;
 	                   strcat(bufh,rPtr);
-	                   //MessageBox(bufh);
 	                   strcpy(bufkopie,rPtr);
 	                }
 	             }
@@ -339,7 +345,6 @@ int Parser_anwenden(char buf[100], char ergebnis[100], byte nachkommastellen)
 	          strcpy(buf,bufh);
 	        }  //End if
 
-
     //---------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 	     while (strchr(buf,185) != NULL)        		//Zeichen fr pi durch 'PI()' ersetzen
 	      {
@@ -349,9 +354,9 @@ int Parser_anwenden(char buf[100], char ergebnis[100], byte nachkommastellen)
 	             strncpy(bufh,buf,rPtr-buf); //Teilstring vor 185 kopieren
 	             bufh[rPtr-buf] = '\0';               //Stringterminierung setzen (notwendig? Ja!)
 	             strcat(bufh,"PI()");                 //185 ersetzen durch PI()
-	             if (strlen(buf)>rPtr-buf)          //Wenn buf nach 185 noch nicht zu Ende, dann Reststring anhängen*
+	             if (strlen(buf)>rPtr-buf)          //Wenn buf nach 185 noch nicht zu Ende, dann Reststring anhï¿½ngen*
 	               strcat(bufh,++rPtr);
-	              strcpy(buf,bufh);                   //Rückkopie
+	              strcpy(buf,bufh);                   //Rï¿½ckkopie
 	             }
 	             else
 	              {
@@ -410,11 +415,11 @@ int Parser_anwenden(char buf[100], char ergebnis[100], byte nachkommastellen)
 	           while (i<=laenge)
 	           {
 	                 if ((buf[i]=='a' && buf[i+1]=='s' ) ||  (buf[i]=='a' && buf[i+1]=='c' && buf[i+2] == 'o') || (buf[i]=='a' && buf[i+1]=='t' ))
-	                 {    // Übereinstimmung von f_ac_t und ac_os vermeiden (ac)
+	                 {    // ï¿½bereinstimmung von f_ac_t und ac_os vermeiden (ac)
 	                      bufh[j]='d';j++;bufh[j]='e';j++;bufh[j]='g';j++;bufh[j]='r';j++;bufh[j]='e';j++;bufh[j]='e';j++;bufh[j]='s';j++;bufh[j]='(';j++;
-	                      //bufh[j]='\0';MessageBox(bufh);
+
 	                      bufh[j]=buf[i];i++;j++;bufh[j]=buf[i];i++;j++;bufh[j]=buf[i];i++;j++;bufh[j]=buf[i];
-	                      //bufh[j]='\0';MessageBox(bufh);
+
 	                      klammer_auf=1;
 	                      while (klammer_auf>0 && i<laenge)
 	                      {
@@ -424,8 +429,7 @@ int Parser_anwenden(char buf[100], char ergebnis[100], byte nachkommastellen)
 	                           bufh[j]=buf[i];
 	                       }
 	                       bufh[j]=')';
-	                       //LocalFixedToAscii(wert,MakeWWFixed(j),0);
-	                       //MessageBox(wert);
+
 	                 }
 	                 else
 	                     bufh[j]=buf[i];
@@ -434,7 +438,6 @@ int Parser_anwenden(char buf[100], char ergebnis[100], byte nachkommastellen)
 	           }
 	           bufh[j]='\0';
 	           strcpy(buf,bufh);
-	           //MessageBox(buf);
 	      }
     //-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 	      //Initialize the parameters that are sent to ParserParseString:			//Parser
@@ -448,25 +451,22 @@ int Parser_anwenden(char buf[100], char ergebnis[100], byte nachkommastellen)
 	    pParams.C_parameters.PP_common.CP_maxRow = 0;
 	    pParams.C_parameters.PP_common.CP_maxColumn = 0;
 	    pParams.C_parameters.PP_common.CP_cellParams = NULL;
-	    pParams.C_parameters.PP_parserBufferSize = 300;	/*100 ist zu wenig, führt schnell auf Fehler 7: "Too many Tokens"*/
+	    pParams.C_parameters.PP_parserBufferSize = 500;	/*100 ist zu wenig, fï¿½hrt schnell auf Fehler 7: "Too many Tokens"*/
 	    pParams.C_parameters.PP_flags = PF_OPERATORS | PF_NUMBERS | PF_FUNCTIONS ;
 
 	      // It also needs a callback function that never actually gets called,
 	      // unless the string contains symbols that the parser doesn''t understand
 
-	    pParams.C_callbackPtr = ParserCallback;	
+	    pParams.C_callbackPtr = ParserCallback;
 	    /*pParams.C_callbackPtr = NULL;*/ /*funktioniert nicht*/
-	    //MessageBox("Callback gerufen");
+
 
 	     // parse the string and check for an error
                         //MessageBox("vor dem erstenParseraufruf");
                         //MessageBox(buf);
 
 	    err = ParserParseString(buf, token, &pParams, &rVal);
-                        //MessageNumberBox(err);
-	    //LocalFixedToAscii(wert,MakeWWFixed(parserfunktionswert),0);
-	    //MessageBox("parserfunktionswert:");
-	    //MessageBox(token);  ergibt Fehlermeldung
+
 
 	    if (!(err))		//Kein Fehler beim Parsen
 	    {
@@ -482,20 +482,18 @@ int Parser_anwenden(char buf[100], char ergebnis[100], byte nachkommastellen)
 	         eParams.CE_parameters.EP_flags = 0;
 	         eParams.CE_callbackPtr = ParserCallback;
 
-	         // Check for an error and let it be known to the user
 
-	        strcpy(ergebnis,"");
-                            //MessageBox("vor dem zweiten Parseraufruf");
                             fehler=ParserEvalExpression(token, scratch, result, 100, &eParams);
+
 
 	        if (fehler)  strcpy(ergebnis,"Error occured!");
 	        else
 	        {
 	            //    No error, so let''s get the result
-	            
+
 	            FloatNum dummy;
 	            EvalStackArgumentType vType;
-	            /*FloatFloatToAsciiFormatFlags format=FFAF_SCIENTIFIC;*/
+
 	            ArgumentStackElement *eElement;
 
 	            //  We think that the result is on the fp stack, but we should
@@ -506,22 +504,31 @@ int Parser_anwenden(char buf[100], char ergebnis[100], byte nachkommastellen)
 
 	            eElement = (ArgumentStackElement *)result;
 	            vType = eElement->ASE_type;
-	            
+
 	            if( (vType & ESAT_NUMBER) && ((vType & ESAT_NUM_TYPE) == NT_VALUE))
 	            {
-	                 for (i=0;i<100;i++) result_eval[i]=result[i];	/*Sicherung von result*/
-                                     /*Umwandlung von result in den Ergebnisstring*/
-    	                 FloatFloatToAscii_StdFormat((char *)result, &dummy, format, 15, /*nachkommastellen*/5);	//15: Anzahl der Vorkommastellen
+	                 //for (i=0;i<99;i++) result_eval[i]=result[i];	//Sicherung von result
+                                     //Umwandlung von result in den Ergebnisstring
+    	                 FloatFloatToAscii_StdFormat((char *)result, &dummy, format, 15, nachkommastellen);	//15: Anzahl der Vorkommastellen
 	                 strcpy(ergebnis,(char *)result);
-                                     /*Umwandlung des Ergebnisstrings in Dezimalzahl*/
+	                 /*Umwandlung des Ergebnisstrings in Dezimalzahl*/
+//MessageBox("Ergebnis umwandeln");
 	                 FloatAsciiToFloat(FAF_PUSH_RESULT, strlen(ergebnis),ergebnis,0);
-   	                 FloatPopNumber(&ergebniszahl);
+   	                 //FloatPopNumber(&ergebniszahl);
+   	                 FloatGeos80ToIEEE64(&ergebniszahl);
 
-	                 if (((ergebniszahl>(1E+13)) || (ergebniszahl<-(1E+13)) || ((ergebniszahl<0.0001) && (ergebniszahl>-0.0001))) && (z_format==NORMAL)) 
-                                           format=FFAF_SCIENTIFIC; 
-                                     else format=FFAF_DONT_USE_SCIENTIFIC;
-	                 FloatFloatToAscii_StdFormat((char *)result_eval, &dummy, format, 15, nachkommastellen);	//15: Anzahl der Vorkommastellen
-	                 strcpy(ergebnis,(char *)result);//	MessageBox(ergebnis);
+//MessageBox("Ergebnis umgewandelt");
+                                     fehler=ParserEvalExpression(token, scratch, result, 100, &eParams);	//2.Aufruf, um result wieder auf den Stack zu bringen, sonst funktioniert die Konvertierung nicht.
+	                 if (((ergebniszahl>(1E+13)) || (ergebniszahl<-(1E+13)) || ((ergebniszahl<0.0001) && (ergebniszahl>-0.0001))) && (z_format==NORMAL))
+                                           format=FFAF_SCIENTIFIC;
+                                     else
+	                 {
+                                          if (z_format==SCIENTIFIC) format=FFAF_DONT_USE_SCIENTIFIC;
+                                          else format=FFAF_SCIENTIFIC;
+	                 }
+	                 FloatFloatToAscii_StdFormat((char *)result, &dummy, format, 15, nachkommastellen);	//15: Anzahl der Gesamtstellen
+	                 strcpy(ergebnis,(char *)result);
+
 	            }
 	            else
 
@@ -542,16 +549,16 @@ int Parser_anwenden(char buf[100], char ergebnis[100], byte nachkommastellen)
 
 	       fehlernr = rVal.PRS_errorCode;
 	       LocalFixedToAscii(wert,MakeWWFixed(fehlernr),0);
-	       strcat(fehlercode,wert);	      
+	       strcat(fehlercode,wert);
 	        /*switch (fehlernr)
 	        {
-	            case 5:	               
+	            case 5:
 	               strcpy(ergebnis,"Bad Expression");
 	               break;
-	            case 8:	               
+	            case 8:
 	               strcpy(ergebnis,"Error in Parantheses");
 	               break;
-	            case 9:	               
+	            case 9:
 	               strcpy(ergebnis,"Error in Parantheses");
 	               break;
 	            case 10:
@@ -564,8 +571,9 @@ int Parser_anwenden(char buf[100], char ergebnis[100], byte nachkommastellen)
 	               MessageBox(fehlercode);
 	               strcpy(ergebnis,"Error");
 	        }*/
-	         strcpy(ergebnis,"Error");
+	         strcpy(ergebnis,"Error in expression");
                         }
+
                        if (fehlernr) return fehlernr;else return 0;
 }
 
@@ -602,23 +610,23 @@ int Parser_anwenden(char buf[100], char ergebnis[100], byte nachkommastellen)
     if (arbeitsbereich==TABLE)
         @call self::MSG_FUNKTIONSWERTE_BERECHNEN();
     else
-    {          
+    {
         flags = 0;
-       @call Rechenfenster::MSG_VIS_TEXT_DO_KEY_FUNCTION(VTKF_END_OF_TEXT,0); 
-      
-      
+       @call Rechenfenster::MSG_VIS_TEXT_DO_KEY_FUNCTION(VTKF_END_OF_TEXT,0);
+
+
       @call Rechenfenster::MSG_VIS_TEXT_GET_ALL_PTR(buf);
        rPtr =strrchr(buf, '\r');
-       if (rPtr!=NULL) {	//nur den Teilstring nach dem letzten \r übernehmen
+       if (rPtr!=NULL) {	//nur den Teilstring nach dem letzten \r ï¿½bernehmen
             rPtr++;
            strcpy(buf,rPtr);
        }
-       strcpy(entry,buf); 		//Eingabe für Entry-Button kopieren
+       strcpy(entry,buf); 		//Eingabe fï¿½r Entry-Button kopieren
        laenge=strlen(buf);
        if (laenge != 0)		// Nur wenn wirklich eine Eingabe erfolgt ist
-       {          
+       {
           @call Rechenfenster::MSG_VIS_TEXT_APPEND_PTR("\r",0);
-          Parser_anwenden(buf,ergebnis, digits);
+          Parser_anwenden(buf,/*ergebnis, */digits);
 
           /*@call Rechenfenster::MSG_VIS_TEXT_ADD_PARA_ATTR(J_RIGHT << VTDPA_JUSTIFICATION_OFFSET);*/
 
@@ -626,9 +634,9 @@ int Parser_anwenden(char buf[100], char ergebnis[100], byte nachkommastellen)
 
           @call Rechenfenster::MSG_VIS_TEXT_GET_PARA_ATTR(flags,&diffs,&attrs,range.VTR_end,range.VTR_start);
 
-          attrs.VTMPA_paraAttr.VTPA_attributes = (J_RIGHT << VTDPA_JUSTIFICATION_OFFSET);         
+          attrs.VTMPA_paraAttr.VTPA_attributes = (J_RIGHT << VTDPA_JUSTIFICATION_OFFSET);
           @call Rechenfenster::MSG_VIS_TEXT_SET_PARA_ATTR(&attrs.VTMPA_paraAttr,range.VTR_end,range.VTR_start);
-          
+
           @call Rechenfenster::MSG_VIS_TEXT_APPEND_PTR(ergebnis, 0);
           @call Rechenfenster::MSG_VIS_TEXT_APPEND_PTR("\r",0);
           @call Rechenfenster::MSG_VIS_TEXT_DO_KEY_FUNCTION(VTKF_END_OF_TEXT,0);
@@ -639,24 +647,24 @@ int Parser_anwenden(char buf[100], char ergebnis[100], byte nachkommastellen)
           @call Rechenfenster::MSG_GEN_SET_NOT_USABLE(VUM_DELAYED_VIA_APP_QUEUE);
           @call Rechenfenster::MSG_VIS_TEXT_SET_PARA_ATTR(&attrs.VTMPA_paraAttr,range.VTR_end,range.VTR_start);
           @call Rechenfenster::MSG_GEN_SET_USABLE(VUM_NOW);
-          
-          /*Wie viele Zeilen sind schon beschrieben?*/          
+
+          /*Wie viele Zeilen sind schon beschrieben?*/
           lineNumber = @call Rechenfenster::MSG_VIS_TEXT_GET_TEXT_SIZE()-1;
           /*InfoBox("MSG_VIS_TEXT_GET_TEXT_SIZE()-1 \01",lineNumber,""); */
           lineNumber = @call Rechenfenster::MSG_VIS_TEXT_GET_LINE_FROM_OFFSET(lineNumber)+1;
           /*InfoBox("MSG_VIS_TEXT_GET_LINE_FROM_OFFSET \01",lineNumber,"");           */
-          
+
           if (lineNumber>=6)		//Text mindestens 2 Zeilen nach oben scrollen
-          {	
+          {
                  for (i=1;i<=lineNumber-6;i++)
-                 {   
+                 {
 	@call Rechenfenster::MSG_VIS_TEXT_DO_KEY_FUNCTION(VTKF_START_OF_TEXT,0);
                     @call Rechenfenster::MSG_VIS_TEXT_DO_KEY_FUNCTION(VTKF_DELETE_LINE,0);
 	@call Rechenfenster::MSG_VIS_TEXT_DO_KEY_FUNCTION(VTKF_DELETE_CHAR,0);
-                 }				
+                 }
                  @call Rechenfenster::MSG_VIS_TEXT_DO_KEY_FUNCTION(VTKF_START_OF_TEXT,0);
-          }	
-           @call Rechenfenster::MSG_VIS_TEXT_DO_KEY_FUNCTION(VTKF_END_OF_TEXT,0);           
+          }
+           @call Rechenfenster::MSG_VIS_TEXT_DO_KEY_FUNCTION(VTKF_END_OF_TEXT,0);
        }
      }
 }
@@ -667,7 +675,7 @@ int Parser_anwenden(char buf[100], char ergebnis[100], byte nachkommastellen)
     char *rPtr;
     char buf[200];
     char str_zahl[20];
-    byte dezimalzeichen_vorhanden=0;    
+    byte dezimalzeichen_vorhanden=0;
 
     if ((arbeitsbereich==CALCULATOR) || (arbeitsbereich==Y_EDITOR))
     {
@@ -675,49 +683,49 @@ int Parser_anwenden(char buf[100], char ergebnis[100], byte nachkommastellen)
     	@call aktives_Textobjekt::MSG_VIS_TEXT_GET_ALL_PTR(buf);
     	rPtr =strrchr(buf, '\r');
     	// Eingaben nur in der aktuellen Eingabezeile
-    	if ((rPtr!=NULL) && (rPtr-buf == pos-1 ) && !(strchr(ergebnis,'o')) && ((strchr(ms.MS_ziffer,'+')) || (strchr(ms.MS_ziffer,'-')) || (strchr(ms.MS_ziffer,'*')) || (strchr(ms.MS_ziffer,'/')) || (strchr(ms.MS_ziffer,'^')) ) )                         
-	/*strchr(ergebnis,'o') steht für das nicht funktionierende ergebnis=="Error"*/
-                    {       MessageBox(ergebnis);	    
+    	if ((rPtr!=NULL) && (rPtr-buf == pos-1 ) && !(strchr(ergebnis,'o')) && ((strchr(ms.MS_ziffer,'+')) || (strchr(ms.MS_ziffer,'-')) || (strchr(ms.MS_ziffer,'*')) || (strchr(ms.MS_ziffer,'/')) || (strchr(ms.MS_ziffer,'^')) ) )
+	/*strchr(ergebnis,'o') steht fï¿½r das nicht funktionierende ergebnis=="Error"*/
+                    {       MessageBox(ergebnis);
                              strcpy(str_zahl,ergebnis);
 	         strcat(str_zahl,ms.MS_ziffer);
-                             @call aktives_Textobjekt::MSG_VIS_TEXT_REPLACE_SELECTION_PTR(str_zahl, 0);                                                      
+                             @call aktives_Textobjekt::MSG_VIS_TEXT_REPLACE_SELECTION_PTR(str_zahl, 0);
                      }
     	else
                          if ((strchr(ms.MS_ziffer,'E')) || (strchr(ms.MS_ziffer,'.')) || (strchr(ms.MS_ziffer,',')))
                          {
-                              
+
 	          if  (strchr(ms.MS_ziffer,'E'))  	/*E nur zulassen, wenn vorher Ziffer eingegeben*/
-                             {   
+                             {
                                    if ((buf[pos-1]=='0') || (buf[pos-1]=='1') || (buf[pos-1]=='2') || (buf[pos-1]=='3') || (buf[pos-1]=='4') || (buf[pos-1]=='5') || (buf[pos-1]=='6') || (buf[pos-1]=='7') || (buf[pos-1]=='8') || (buf[pos-1]=='0'))
                                           @call aktives_Textobjekt::MSG_VIS_TEXT_REPLACE_SELECTION_PTR(ms.MS_ziffer, 0);
                              }
                              else		/*Dezimalzeichen nur zulassen, wenn in der aktuellen Zahl noch keiner gesetzt ist*/
-                             {	
-		dezimalzeichen_vorhanden=0;               	               
+                             {
+		dezimalzeichen_vorhanden=0;
                                         ms.MS_ziffer[0]=dez_zeichen;		/*Anpassung an lokales Dezimaltrennzeichen*/
-		i=pos;	/* Zahl nach links durchlaufen*/      		
-                                        while ((i>0) && ((buf[i-1]=='0') || (buf[i-1]=='1') || (buf[i-1]=='2') || (buf[i-1]=='3') || (buf[i-1]=='4') || (buf[i-1]=='5') || (buf[i-1]=='6') || (buf[i-1]=='7') || (buf[i-1]=='8') || (buf[i-1]=='9')))                                                                                    
+		i=pos;	/* Zahl nach links durchlaufen*/
+                                        while ((i>0) && ((buf[i-1]=='0') || (buf[i-1]=='1') || (buf[i-1]=='2') || (buf[i-1]=='3') || (buf[i-1]=='4') || (buf[i-1]=='5') || (buf[i-1]=='6') || (buf[i-1]=='7') || (buf[i-1]=='8') || (buf[i-1]=='9')))
 		{
-                                              i--;                                              		      
+                                              i--;
 		}
 		if (buf[i-1]==dez_zeichen) dezimalzeichen_vorhanden=1;
 
-		
+
                                         i=pos;	/*Zahl nach rechts durchlaufen*/
-		while ((buf[i]=='0') || (buf[i]=='1') || (buf[i]=='2') || (buf[i]=='3') || (buf[i]=='4') || (buf[i]=='5') || (buf[i]=='6') || (buf[i]=='7') || (buf[i]=='8') || (buf[i]=='9'))                                                                                    
+		while ((buf[i]=='0') || (buf[i]=='1') || (buf[i]=='2') || (buf[i]=='3') || (buf[i]=='4') || (buf[i]=='5') || (buf[i]=='6') || (buf[i]=='7') || (buf[i]=='8') || (buf[i]=='9'))
 		{
-                                              i++;  		      
+                                              i++;
 		}
 		if (buf[i]==dez_zeichen) dezimalzeichen_vorhanden=1;
-              
-                                        if (dezimalzeichen_vorhanden==0)				     		
-	                         @call aktives_Textobjekt::MSG_VIS_TEXT_REPLACE_SELECTION_PTR(ms.MS_ziffer, 0);		
+
+                                        if (dezimalzeichen_vorhanden==0)
+	                         @call aktives_Textobjekt::MSG_VIS_TEXT_REPLACE_SELECTION_PTR(ms.MS_ziffer, 0);
                                 }
                          }
-                         else  	     		
+                         else
 	           @call aktives_Textobjekt::MSG_VIS_TEXT_REPLACE_SELECTION_PTR(ms.MS_ziffer, 0);
-			    
-      }                                    
+
+      }
        if (arbeitsbereich==TABLE)
        {
                       @call aktives_Textobjekt::MSG_VIS_TEXT_GET_ALL_PTR(str_zahl);
@@ -739,7 +747,7 @@ int Parser_anwenden(char buf[100], char ergebnis[100], byte nachkommastellen)
 	     }
                          else
                          {
-                             if ((strchr(ms.MS_ziffer,'.')) || (strchr(ms.MS_ziffer,','))) ms.MS_ziffer[0]=dez_zeichen;   
+                             if ((strchr(ms.MS_ziffer,'.')) || (strchr(ms.MS_ziffer,','))) ms.MS_ziffer[0]=dez_zeichen;
                              @call aktives_Textobjekt::MSG_VIS_TEXT_REPLACE_SELECTION_PTR(ms.MS_ziffer, 0);
                          }
     }
@@ -765,12 +773,12 @@ int Parser_anwenden(char buf[100], char ergebnis[100], byte nachkommastellen)
 
 @method GCalcProcessClass, MSG_GEN_PROCESS_OPEN_APPLICATION
 {
-     
+
      word groesse;
      Boolean err;
      char term[100];
      selections selectionCheck;
-     
+
      selections selectionDotCon;
      word selectionLinienMuster;
      word selectionLM[5];
@@ -780,20 +788,20 @@ int Parser_anwenden(char buf[100], char ergebnis[100], byte nachkommastellen)
 
      @callsuper();
 
-      LocalGetNumericFormat(dez_format);
+     LocalGetNumericFormat(&dez_format);
 /*typedef struct {
     byte	numberFormatFlags;
     byte	decimalDigits;
     wchar	thousandsSeparator;
     wchar	decimalSeparator;
     wchar	listSeparator;
-} LocalNumericFormat;*/   
-     //MessageNumberBox(dez_format->decimalSeparator);
-     dez_zeichen=dez_format->decimalSeparator;		/*Anpassung an lokales Dezimaltrennzeichen*/
+} LocalNumericFormat;*/
+     //MessageNumberBox(dez_format.decimalSeparator);
+     dez_zeichen=dez_format.decimalSeparator;		/*Anpassung an lokales Dezimaltrennzeichen*/
      if (dez_zeichen=='.') @call Taste_Dezimalpunkt::MSG_GEN_USE_VIS_MONIKER(OptrToChunk(@Dezimalpunkt),VUM_NOW);
      else @call Taste_Dezimalpunkt::MSG_GEN_USE_VIS_MONIKER(OptrToChunk(@Dezimalkomma),VUM_NOW);
-     //wurzel[0]=195;wurzel[1]='(';     
-     
+     //wurzel[0]=195;wurzel[1]='(';
+
      err = InitFileReadStringBuffer("gcalc","Function1",term,100,&groesse);
      if (!err)@call Funktionsterm1::MSG_VIS_TEXT_REPLACE_ALL_PTR(term,0);
      err = InitFileReadStringBuffer("gcalc","Function2",term,100,&groesse);
@@ -803,7 +811,7 @@ int Parser_anwenden(char buf[100], char ergebnis[100], byte nachkommastellen)
      err = InitFileReadStringBuffer("gcalc","Function4",term,100,&groesse);
      if (!err)@call Funktionsterm4::MSG_VIS_TEXT_REPLACE_ALL_PTR(term,0);
      err = InitFileReadStringBuffer("gcalc","Function5",term,100,&groesse);
-     if (!err)@call Funktionsterm5::MSG_VIS_TEXT_REPLACE_ALL_PTR(term,0);         
+     if (!err)@call Funktionsterm5::MSG_VIS_TEXT_REPLACE_ALL_PTR(term,0);
 
      err = InitFileReadStringBuffer("gcalc","memory", speicher , 100, &groesse);
      if (err) strcpy(speicher,"0");
@@ -878,26 +886,32 @@ int Parser_anwenden(char buf[100], char ergebnis[100], byte nachkommastellen)
             LocalFixedToAscii(zahl_str,MakeWWFixed(zahl),0);
             @call LinienDicke1::MSG_VIS_TEXT_REPLACE_ALL_PTR(zahl_str,0);
        }
-       err = InitFileReadInteger("gcalc","col1", (unsigned short *) &farbindex[0]);
+       //err = InitFileReadInteger("gcalc","col1",&farbindex[0]);
+        err = InitFileReadInteger("gcalc","col3", (unsigned short *) &farbindex[2]);
        if (err) farbindex[0]=0;
        @call Farbauswahl1::MSG_GEN_ITEM_GROUP_SET_SINGLE_SELECTION(farbindex[0],0);
 
-       err = InitFileReadInteger("gcalc","col2", (unsigned short *) &farbindex[1]);
+       //err = InitFileReadInteger("gcalc","col2",&farbindex[1]);
+       err = InitFileReadInteger("gcalc","col2",(unsigned short *) &farbindex[1]);
        if (err) farbindex[1]=2;
        @call Farbauswahl2::MSG_GEN_ITEM_GROUP_SET_SINGLE_SELECTION(farbindex[1],0);
 
+       //err = InitFileReadInteger("gcalc","col3",&farbindex[2]);
        err = InitFileReadInteger("gcalc","col3", (unsigned short *) &farbindex[2]);
        if (err) farbindex[2]=3;
        @call Farbauswahl3::MSG_GEN_ITEM_GROUP_SET_SINGLE_SELECTION(farbindex[2],0);
 
-       err = InitFileReadInteger("gcalc","col4", (unsigned short *) &farbindex[3]);
+       //err = InitFileReadInteger("gcalc","col4",&farbindex[3]);
+       err = InitFileReadInteger("gcalc","col4",(unsigned short *) &farbindex[3]);
        if (err)farbindex[3]=9;
        @call Farbauswahl4::MSG_GEN_ITEM_GROUP_SET_SINGLE_SELECTION(farbindex[3],0);
 
+       //err = InitFileReadInteger("gcalc","col5",&farbindex[4]);
        err = InitFileReadInteger("gcalc","col5", (unsigned short *) &farbindex[4]);
        if (err) farbindex[4]=12;
-       @call Farbauswahl5::MSG_GEN_ITEM_GROUP_SET_SINGLE_SELECTION(farbindex[4],0);       
+       @call Farbauswahl5::MSG_GEN_ITEM_GROUP_SET_SINGLE_SELECTION(farbindex[4],0);
 
+       //err = InitFileReadInteger("gcalc","memory", &zahl);
        err = InitFileReadInteger("gcalc","memory", (unsigned short *) &zahl);
        if ((err) || (zahl==0))
            @call InfotextSpeicher::MSG_VIS_TEXT_DELETE_ALL();
@@ -942,11 +956,13 @@ int Parser_anwenden(char buf[100], char ergebnis[100], byte nachkommastellen)
          selectionLinienMuster=selectionLinienMuster + 10*selectionLM[1];
         @call LinienDicke1::MSG_VIS_TEXT_GET_ALL_PTR(dicke_str);
          FloatAsciiToFloat(FAF_PUSH_RESULT, strlen(dicke_str),dicke_str,0);
-         FloatPopNumber(&breite);
+         //FloatPopNumber(&breite);
+         FloatGeos80ToIEEE64(&breite);
          selectionLinienDicke = (int)breite;
          @call LinienDicke2::MSG_VIS_TEXT_GET_ALL_PTR(dicke_str);
          FloatAsciiToFloat(FAF_PUSH_RESULT, strlen(dicke_str),dicke_str,0);
-         FloatPopNumber(&breite);
+         //FloatPopNumber(&breite);
+         FloatGeos80ToIEEE64(&breite);
          selectionLinienDicke=selectionLinienDicke + (int)10*breite;
          @call Funktionsterm3::MSG_VIS_TEXT_GET_ALL_PTR(term);
          if (strlen(term)>0)
@@ -959,7 +975,8 @@ int Parser_anwenden(char buf[100], char ergebnis[100], byte nachkommastellen)
          selectionLinienMuster=selectionLinienMuster + 100*selectionLM[2];
          @call LinienDicke3::MSG_VIS_TEXT_GET_ALL_PTR(dicke_str);
          FloatAsciiToFloat(FAF_PUSH_RESULT, strlen(dicke_str),dicke_str,0);
-         FloatPopNumber(&breite);
+         //FloatPopNumber(&breite);
+         FloatGeos80ToIEEE64(&breite);
          selectionLinienDicke=selectionLinienDicke + (int)100*breite;
          @call Funktionsterm4::MSG_VIS_TEXT_GET_ALL_PTR(term);
          if (strlen(term)>0)
@@ -972,7 +989,8 @@ int Parser_anwenden(char buf[100], char ergebnis[100], byte nachkommastellen)
          selectionLinienMuster=selectionLinienMuster + 1000*selectionLM[3];
          @call LinienDicke4::MSG_VIS_TEXT_GET_ALL_PTR(dicke_str);
          FloatAsciiToFloat(FAF_PUSH_RESULT, strlen(dicke_str),dicke_str,0);
-         FloatPopNumber(&breite);
+         //FloatPopNumber(&breite);
+         FloatGeos80ToIEEE64(&breite);
          selectionLinienDicke=selectionLinienDicke + (int)1000*breite;
          @call Funktionsterm5::MSG_VIS_TEXT_GET_ALL_PTR(term);
          if (strlen(term)>0)
@@ -985,7 +1003,8 @@ int Parser_anwenden(char buf[100], char ergebnis[100], byte nachkommastellen)
          selectionLinienMuster=selectionLinienMuster + 10000*selectionLM[4];
          @call LinienDicke5::MSG_VIS_TEXT_GET_ALL_PTR(dicke_str);
          FloatAsciiToFloat(FAF_PUSH_RESULT, strlen(dicke_str),dicke_str,0);
-         FloatPopNumber(&breite);
+         //FloatPopNumber(&breite);
+         FloatGeos80ToIEEE64(&breite);
          selectionLinienDicke=selectionLinienDicke + (int)10000*breite;
          selectionCheck=@call F_Check::MSG_GEN_BOOLEAN_GROUP_GET_SELECTED_BOOLEANS();
          InitFileWriteInteger("gcalc","F_active",selectionCheck);
@@ -1080,6 +1099,7 @@ int Parser_anwenden(char buf[100], char ergebnis[100], byte nachkommastellen)
     //ourWindow=win;			//sind win und ourWindow irgendwo definiert?
     gstate = GrCreateState(ourWindow);  //warum nicht win?
     GrBeginUpdate(gstate);
+//MessageBox("Grafen zeichnen");
     Diagramm_zeichnen(gstate);
     Grafen_zeichnen(gstate);
 //MessageBox("Grafen_zeichnen beendet");

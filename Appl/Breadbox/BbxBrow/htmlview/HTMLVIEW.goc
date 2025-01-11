@@ -45,7 +45,6 @@
 @endif
 @include "urlfetch.goh"
 @include "importg.goh"
-@include "expire.goh"
 @include "stattext.goh"
 #include "javascr.h"
 //#include <hlfind.h>
@@ -62,8 +61,7 @@
 @include "htmlv_ui.goh"                 /* User interface, App object */
 
 @include "Art/toolicon.goh"
-//@include "bboxsmal.goh"
-@include "breadbox.goh"
+
 
 @extern chunk MsgNoEdit;
 @extern chunk MsgBadEdit;
@@ -121,13 +119,6 @@ Boolean G_allowFileDownloadStatus = FALSE;
 @ifdef TV_BW_OPTION
 @extern method HTMLVProcessClass, MSG_HMLVP_TV_BW_CHANGED ;
 @endif
-@ifdef COMPILE_OPTION_SHOW_HIDE_TOOLBAR
-@extern method HTMLVProcessClass, MSG_HMLVP_SHOW_TOOLBAR ;
-@extern method HTMLVProcessClass, MSG_HMLVP_HIDE_TOOLBAR
-@endif
-@ifdef COMPILE_OPTION_TOGGLE_GOTO_BAR
-@extern method HTMLVProcessClass, MSG_HMLVP_TOGGLE_GOTO_BAR ;
-@endif
 @ifdef COMPILE_OPTION_PARENTAL_CONTROL
 @extern method HTMLVProcessClass, MSG_HMLVP_PC_ADD_SITE ;
 @extern method HTMLVProcessClass, MSG_HMLVP_PC_REMOVE_SITE ;
@@ -149,7 +140,9 @@ Boolean G_allowFileDownloadStatus = FALSE;
 @endif
 
 /* In HTMLVIEW/UIOften.goc */
+@ifdef COMPILE_OPTION_PARENTAL_CONTROL
 @extern method HTMLVProcessClass, MSG_META_NOTIFY ;
+@endif
 @ifdef COMPILE_OPTION_SHOW_ALLOC_WATCHER_READ_OUT
 @extern method HTMLVProcessClass, MSG_HMLVP_UPDATE_ALLOC_WATCHER_READ_OUT ;
 @endif
@@ -178,19 +171,18 @@ Boolean G_allowFileDownloadStatus = FALSE;
 @extern method HTMLVProcessClass, MSG_CUSTOM_OPEN_HTML_DOC;
 @extern method HTMLVProcessClass, MSG_CUSTOM_OPEN_SELECTOR_ACTION;
 @extern method HTMLVProcessClass, MSG_HMLVP_HOME_TRIGGER ;
-@ifdef COMPILE_OPTION_TOGGLE_GOTO_BAR
+
+@ifdef COMPILE_OPTION_SIMPLE_BUTTON_TOOLBAR
 @extern method HTMLVProcessClass, MSG_HMLVP_GOTO ;
-@endif
-@ifdef GLOBAL_INTERNET_BUILD
+@ifdef COMPILE_OPTION_JUMP_FEATURE
 @extern method HTMLVProcessClass, MSG_HMLVP_JUMP ;
+@endif
+@ifdef COMPILE_OPTION_SEARCH_MENU
 @extern method HTMLVProcessClass, MSG_HMLVP_SEARCH ;
 @endif
-@ifdef COMPILE_OPTION_TOGGLE_STATUS_BAR
-@extern method HTMLVProcessClass, MSG_HMLVP_TOGGLE_GOTO_BAR, MSG_HMLVP_TOGGLE_STATUS_BAR ;
 @endif
-@ifndef COMPILE_OPTION_SHOW_HIDE_TOOLBAR
 @extern method HTMLVProcessClass, MSG_HMLVP_OPTIONS_CHANGED ;
-@endif
+
 @ifdef COMPILE_OPTION_ENABLE_NUMCONN_OPTION
 @extern method HTMLVProcessClass, MSG_HMLVP_NUMCONN_OPTION_CHANGED;
 @endif
@@ -204,24 +196,24 @@ Boolean G_allowFileDownloadStatus = FALSE;
 
     if(localPage != NAME_POOL_NONE)     /* page specified? */
     {
-      MemLock(OptrToHandle(localPageArray));
-      count = ChunkArrayGetCount(localPageArray);
-      for(i=0; i<count; i++)
-      {
-        page = ChunkArrayElementToPtr(localPageArray, i, NULL);
-        if(*page==localPage)
+        MemLock(OptrToHandle(localPageArray));
+        count = ChunkArrayGetCount(localPageArray);
+        for(i=0; i<count; i++)
         {
-          sel = i;
-          break;
+            page = ChunkArrayElementToPtr(localPageArray, i, NULL);
+            if(*page==localPage)
+            {
+            sel = i;
+            break;
+            }
         }
-      }
-      MemUnlock(OptrToHandle(localPageArray));
+        MemUnlock(OptrToHandle(localPageArray));
     }
 
     if(sel != CA_NULL_ELEMENT)          /* found page in current list? select */
-      @send LocalOpenList::MSG_GEN_ITEM_GROUP_SET_SINGLE_SELECTION(sel, FALSE);
+        @send LocalOpenList::MSG_GEN_ITEM_GROUP_SET_SINGLE_SELECTION(sel, FALSE);
     else
-      @send LocalOpenList::MSG_GEN_ITEM_GROUP_SET_NONE_SELECTED(FALSE);
+        @send LocalOpenList::MSG_GEN_ITEM_GROUP_SET_NONE_SELECTED(FALSE);
 
     /* enable Update trigger if there is something to update */
     EnabledOrNot(@LocalUpdateTrigger, (sel != CA_NULL_ELEMENT));
@@ -255,20 +247,20 @@ void RestoreTVBW(void)
     @call LinkStatus::MSG_STATUS_TEXT_DEINITIALIZE() ;
 
 @ifdef EMAIL_ACCT_CMD
-     GCNListRemove(ConstructOptr(GeodeGetProcessHandle(), 0),
-		   MANUFACTURER_ID_GEOWORKS, GCNSLT_APPLICATION);
+    GCNListRemove(ConstructOptr(GeodeGetProcessHandle(), 0),
+                MANUFACTURER_ID_GEOWORKS, GCNSLT_APPLICATION);
 @endif
 
     DeInitNavigation();                 /* History, Cache File etc. */
 
 @ifdef COMPILE_OPTION_PARENTAL_CONTROL
-     /* remove from notification lists */
-     GCNListRemove(ConstructOptr(GeodeGetProcessHandle(), 0),
-		   MANUFACTURER_ID_GEOWORKS, GCNSLT_PARENTAL_CONTROL_CHANGE);
-     GCNListRemove(ConstructOptr(GeodeGetProcessHandle(), 0),
-		   MANUFACTURER_ID_GEOWORKS, GCNSLT_PARENTAL_CONTROL_WEBSITE_LIST_CHANGES);
-     /* close site file */
-     ParentalControlCloseData();
+    /* remove from notification lists */
+    GCNListRemove(ConstructOptr(GeodeGetProcessHandle(), 0),
+                MANUFACTURER_ID_GEOWORKS, GCNSLT_PARENTAL_CONTROL_CHANGE);
+    GCNListRemove(ConstructOptr(GeodeGetProcessHandle(), 0),
+                MANUFACTURER_ID_GEOWORKS, GCNSLT_PARENTAL_CONTROL_WEBSITE_LIST_CHANGES);
+    /* close site file */
+    ParentalControlCloseData();
 @endif
 
     /* Stop the import thread */
@@ -302,7 +294,7 @@ void RestoreTVBW(void)
 /* Completely disable the state file for this application. */
 @method HTMLVProcessClass, MSG_GEN_PROCESS_CREATE_NEW_STATE_FILE
 {
-        return (NullHandle);
+    return (NullHandle);
 }
 //pragma codeseg
 
@@ -318,7 +310,9 @@ void RestoreTVBW(void)
 @extern method HTMLVApplicationClass, MSG_HMLVA_ABORT_OPERATION ;
 @extern method HTMLVApplicationClass, MSG_HMLVA_END_OPERATION ;
 @extern method HTMLVApplicationClass, MSG_HMLVA_REQUEST_DETACH ;
+@ifdef COMPILE_OPTION_PARENTAL_CONTROL
 @extern method HTMLVApplicationClass, MSG_META_IMPLIED_WIN_CHANGE ;
+@endif
 
 /* Methods in HTMLVIEW/UIOften.goc */
 @extern method HTMLVApplicationClass, MSG_HMLVA_SET_CONNECTION_ERROR ;
@@ -364,22 +358,22 @@ void RestoreTVBW(void)
 
     if(item==0 && HistoryGetEntryNum()==0)
     {                                   /* special text for empty list */
-      @call list::
-        MSG_GEN_DYNAMIC_LIST_REPLACE_ITEM_MONIKER_OPTR(item, @HistoryEmpty);
+        @call list::
+          MSG_GEN_DYNAMIC_LIST_REPLACE_ITEM_MONIKER_OPTR(item, @HistoryEmpty);
     }
     else
     {
-      name = HistoryGetEntryName(item); /* request item name to buffer */
-      NamePoolCopy(namePool, buf, sizeof(buf), name, &p);
-      NamePoolReleaseToken(namePool, name);
-      if(strlen(p)>HISTORY_MAXLEN)      /* item name too long? */
-      {
-        p[HISTORY_MAXLEN-3] = 0;        /* terminate name */
-        strcat(p,_TEXT("..."));                /* show that it has been truncated */
-      }
-      @call list::MSG_GEN_DYNAMIC_LIST_REPLACE_ITEM_TEXT(item, p);
-                                        /* set list entry */
-      NamePoolDestroyIfDynamic(p);
+        name = HistoryGetEntryName(item); /* request item name to buffer */
+        NamePoolCopy(namePool, buf, sizeof(buf), name, &p);
+        NamePoolReleaseToken(namePool, name);
+        if(strlen(p)>HISTORY_MAXLEN)      /* item name too long? */
+        {
+            p[HISTORY_MAXLEN-3] = 0;        /* terminate name */
+            strcat(p,_TEXT("..."));                /* show that it has been truncated */
+        }
+        @call list::MSG_GEN_DYNAMIC_LIST_REPLACE_ITEM_TEXT(item, p);
+                                            /* set list entry */
+        NamePoolDestroyIfDynamic(p);
     }
 }
 
@@ -448,23 +442,23 @@ void RestoreTVBW(void)
 
     if(type==URL_RET_MESSAGE)           /* returned some kind of message */
     {
-      /* Discard block if it contains nothing but this message. */
-      if( OptrToChunk(ret)==0 )
-        MemFree(OptrToHandle(ret));
-      UserStandardDialogOptr(           /* notify user */
-        0, 0, 0, 0, @MsgBadFile,
-        (CDT_ERROR << CDBF_DIALOG_TYPE_OFFSET) |
-        (GIT_NOTIFICATION << CDBF_INTERACTION_TYPE_OFFSET));
-      MemFree(bufH);
-      return;
+        /* Discard block if it contains nothing but this message. */
+        if( OptrToChunk(ret)==0 )
+          MemFree(OptrToHandle(ret));
+        UserStandardDialogOptr(           /* notify user */
+            0, 0, 0, 0, @MsgBadFile,
+            (CDT_ERROR << CDBF_DIALOG_TYPE_OFFSET) |
+            (GIT_NOTIFICATION << CDBF_INTERACTION_TYPE_OFFSET));
+        MemFree(bufH);
+        return;
     }
 
     bufP = tempname;/*MemLock(bufH);*/
     filePtr = strrchr(bufP,'\\');        /* separate filename from path */
     if(!filePtr)
-      filePtr = bufP;
+        filePtr = bufP;
     else
-      *(filePtr++) = 0;
+        *(filePtr++) = 0;
 
     pathPtr = bufP;
     dh = ToolsParseDiskOrStandardPath(&pathPtr);
@@ -484,10 +478,10 @@ void RestoreTVBW(void)
 
     err = -1;                           /* this is not an error code */
     app = UserLoadApplication(
-      0, 0,
-      albHandle,
-      editor, SP_APPLICATION,
-      &err);
+        0, 0,
+        albHandle,
+        editor, SP_APPLICATION,
+        &err);
 
     if(app==NullHandle || err!=-1)      /* see LoadURLByDriver() */
     {
@@ -502,9 +496,9 @@ void RestoreTVBW(void)
 @method HTMLVProcessClass, MSG_HMLVP_CLEAR_CACHE
 {
     const StandardDialog2ResponseTriggerTable responseTable = {
-      2,
-      {@ClearCacheReset, IC_YES},
-      {@ClearCacheDont, IC_NO}
+        2,
+        {@ClearCacheReset, IC_YES},
+        {@ClearCacheDont, IC_NO}
     };
 
     if(UserStandardDialogOptr(           /* notify user */
@@ -512,16 +506,16 @@ void RestoreTVBW(void)
         (CDT_WARNING << CDBF_DIALOG_TYPE_OFFSET) |
         (GIT_MULTIPLE_RESPONSE << CDBF_INTERACTION_TYPE_OFFSET)) == IC_YES)
     {
-      HWChecksumCheck() ;
+        HWChecksumCheck() ;
 
-      /* Do all the work to actually clear out the cache */
-      @call application::MSG_GEN_APPLICATION_MARK_BUSY();
-      SrcCacheClear() ;
-      ObjCacheClear() ;
-      @call application::MSG_GEN_APPLICATION_MARK_NOT_BUSY();
-      HWChecksumCheck() ;
+        /* Do all the work to actually clear out the cache */
+        @call application::MSG_GEN_APPLICATION_MARK_BUSY();
+        SrcCacheClear() ;
+        ObjCacheClear() ;
+        @call application::MSG_GEN_APPLICATION_MARK_NOT_BUSY();
+        HWChecksumCheck() ;
 @ifdef COMPILE_OPTION_SHOW_ALLOC_WATCHER_READ_OUT
-      @call oself::MSG_HMLVP_UPDATE_ALLOC_WATCHER_READ_OUT() ;
+        @call oself::MSG_HMLVP_UPDATE_ALLOC_WATCHER_READ_OUT() ;
 @endif
     }
 }
@@ -556,15 +550,15 @@ void RestoreTVBW(void)
       {{ FEA_TOKEN, &pageToken, sizeof(GeodeToken), NULL },
        { FEA_END_OF_LIST, 0, 0, NULL }};
     static FileEnumParams findLocalFEP=
-      {FESF_GEOS_NON_EXECS,
-       (void *)FESRT_NAME,
-       FILE_LONGNAME_BUFFER_SIZE,
-       findLocalFEAD,
-       FILE_LONGNAME_BUFFER_SIZE * LOCAL_PAGE_LIMIT,
-       0,
-       NULL,
-       NULL,0,0,
-       0};
+       {FESF_GEOS_NON_EXECS,
+        (void *)FESRT_NAME,
+        FILE_LONGNAME_BUFFER_SIZE,
+        findLocalFEAD,
+        FILE_LONGNAME_BUFFER_SIZE * LOCAL_PAGE_LIMIT,
+        0,
+        NULL,
+        NULL,0,0,
+        0};
 
     word n, i;
     NameToken *name;
@@ -572,7 +566,7 @@ void RestoreTVBW(void)
     word found, notHandled;
     EventHandle evt;
     struct {
-      FileLongName FLR_name;
+        FileLongName FLR_name;
     } *findLocalRet;
 
     MemLock(OptrToHandle(localPageArray));
@@ -580,8 +574,8 @@ void RestoreTVBW(void)
     n = ChunkArrayGetCount(localPageArray);
     for(i=0; i<n; i++)                  /* free currently allocated tokens */
     {
-      name = ChunkArrayElementToPtr(localPageArray, i, NULL);
-      NamePoolReleaseToken(namePool, *name);
+        name = ChunkArrayElementToPtr(localPageArray, i, NULL);
+        NamePoolReleaseToken(namePool, *name);
     }
     ChunkArrayZero(localPageArray);     /* destory existing array contents */
 
@@ -593,13 +587,13 @@ void RestoreTVBW(void)
 
     if(found)
     {
-      findLocalRet = MemLock(mh);       /* access search results */
-      for(i=0; i<found; i++)            /* tokenize found names into array */
-      {
-        name = ChunkArrayAppend(localPageArray, 0);
-        *name = NamePoolTokenize(namePool, findLocalRet[i].FLR_name, TRUE);
-      }
-      MemUnlock(mh);
+        findLocalRet = MemLock(mh);       /* access search results */
+        for(i=0; i<found; i++)            /* tokenize found names into array */
+        {
+            name = ChunkArrayAppend(localPageArray, 0);
+            *name = NamePoolTokenize(namePool, findLocalRet[i].FLR_name, TRUE);
+        }
+        MemUnlock(mh);
     }
 
     MemUnlock(OptrToHandle(localPageArray));
@@ -645,9 +639,9 @@ void RestoreTVBW(void)
 @method HTMLVProcessClass, MSG_HMLVP_ANALYZE_JS
 {
     if (jsecontext) {
-	jseEnter();
-	jseGarbageCollect(jsecontext, JSE_COLLECT_AND_ANALYZE);
-	jseLeave();
+        jseEnter();
+        jseGarbageCollect(jsecontext, JSE_COLLECT_AND_ANALYZE);
+        jseLeave();
     }
 }
 @endif
@@ -717,10 +711,10 @@ void RestoreTVBW(void)
     /* forward to HTML area if there is one */
     display = @call HTMLDisplayGroup::MSG_GEN_FIND_CHILD_AT_POSITION(0);
     if (display) {
-	/* make HTML area active */
-	@call HTMLDisplayGroup::MSG_META_GRAB_TARGET_EXCL();
-	/* now, just do a search from top */
-	@send SearchReplaceControl::MSG_SRC_FIND_FROM_TOP();
+        /* make HTML area active */
+        @call HTMLDisplayGroup::MSG_META_GRAB_TARGET_EXCL();
+        /* now, just do a search from top */
+        @send SearchReplaceControl::MSG_SRC_FIND_FROM_TOP();
     }
 }
 @endif
@@ -740,8 +734,8 @@ void RestoreTVBW(void)
     lParams.VTGLIP_line = 0;  /* get first line */
     /* contrary to docs, 0 is returned on success */
     if ((@call oself::MSG_VIS_TEXT_GET_LINE_INFO(&lRet, &lParams)) == 0) {
-	offsetParams.VTCOP_offset = 0;
-	@call oself::MSG_VIS_TEXT_CONVERT_OFFSET_TO_COORDINATE(&offsetParams);
-	@call oself::MSG_VIS_TEXT_SCROLL_ONE_LINE(offsetParams.VTCOP_xPos);
+        offsetParams.VTCOP_offset = 0;
+        @call oself::MSG_VIS_TEXT_CONVERT_OFFSET_TO_COORDINATE(&offsetParams);
+        @call oself::MSG_VIS_TEXT_SCROLL_ONE_LINE(offsetParams.VTCOP_xPos);
     }
 }
