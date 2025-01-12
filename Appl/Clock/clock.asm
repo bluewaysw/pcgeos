@@ -59,6 +59,24 @@ include	clock.rdef
 ;			Variables
 ;------------------------------------------------------------------------------
 
+ForceRef DigitalBackgroundString
+
+ForceRef AnalogBackgroundString
+ForceRef AnalogHourHandString
+ForceRef AnalogMinuteHandString
+ForceRef AnalogSecondHandString
+ForceRef AnalogTickMarksString
+ForceRef AnalogSecondaryTicksString
+
+ForceRef HermanLeftEyebrow
+ForceRef HermanRightEyebrow
+ForceRef HermanLeftEye
+ForceRef HermanRightEye
+ForceRef HermanNose
+ForceRef HermanMustache
+ForceRef HermanMinuteHand
+ForceRef HermanHourHand
+
 idata	segment
 
 ClockClass	mask CLASSF_NEVER_SAVED		;process class
@@ -86,10 +104,10 @@ RETURN:		nothing
 DESTROYED:	everything
 
 PSEUDO CODE/STRATEGY:
-		
+
 
 KNOWN BUGS/SIDE EFFECTS/IDEAS:
-		
+
 
 REVISION HISTORY:
 	Name	Date		Description
@@ -101,7 +119,7 @@ ClockBanishPrimary method dynamic ClockClass, MSG_CLOCK_BANISH_PRIMARY
 		.enter
 	;
 	; First take the primary off-screen so it gives up the app exclusive, &c
-	; 
+	;
 		GetResourceHandleNS	ClockPrimary, bx
 		mov	si, offset ClockPrimary
 		mov	ax, MSG_GEN_SET_NOT_USABLE
@@ -111,7 +129,7 @@ ClockBanishPrimary method dynamic ClockClass, MSG_CLOCK_BANISH_PRIMARY
 
 	;
 	; Set the application non-focusable and non-targetable.
-	; 
+	;
 		mov	ax, MSG_GEN_SET_ATTRS
 		GetResourceHandleNS	ClockAppObj, bx
 		mov	cx, mask GA_TARGETABLE shl 8	; clear this bit
@@ -149,10 +167,10 @@ CALLED BY:	MSG_GEN_CONTROL_GENERATE_UI
 PASS:		?
 RETURN:		?
 DESTROYED:	?
-SIDE EFFECTS:	
+SIDE EFFECTS:
 
 PSEUDO CODE/STRATEGY:
-		
+
 
 REVISION HISTORY:
 	Name	Date		Description
