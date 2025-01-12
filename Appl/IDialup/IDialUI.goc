@@ -3,7 +3,7 @@
  *	Copyright (c) GlobalPC 1998 -- All Rights Reserved
  *
  * PROJECT:	Internet Dial-up and configure application.
- * MODULE:	
+ * MODULE:
  * FILE:	IDialup.goc
  *
  * AUTHOR:	Mingzhe Zhu, Nov 20, 1998
@@ -46,7 +46,7 @@
 
 @object IDialupAppClass IDialupApp = {
 
-    GI_visMoniker = list { 
+    GI_visMoniker = list {
       @IDialupTextMoniker,
       @DialAppSCMoniker,
    //   @DialAppSMMoniker,
@@ -56,7 +56,7 @@
     gcnList(MANUFACTURER_ID_GEOWORKS,GAGCNLT_WINDOWS) = @IDialupPrimary;
     ATTR_GEN_HELP_FILE = "dialup";
 }
-@visMoniker IDialupTextMoniker = "Internet Dial-up";
+@visMoniker IDialupTextMoniker = "Internet Dial-Up & Configure";
 
 @end	AppResource
 
@@ -100,12 +100,7 @@
 
 @object GenInteractionClass IDOptionsMenu = {
         GI_visMoniker = 'O', "Options";
-/*@if defined(PRODUCT_NDO2000) */
 	GI_comp = @IDDialingOptionsButton, @IDShowDetailsGroup;
-/*@else
-	GI_comp = @IDDialingOptionsButton, @IDShowDetailsGroup,
-	@IDNewNumbersGroup;
-/*@endif  */
 	GI_attrs = @default | GA_KBD_SEARCH_PATH;
 	GII_visibility = GIV_POPUP;
 }
@@ -123,58 +118,45 @@
 }
 
 @object GenBooleanClass IDShowDetailsCheckBox = {
-  GI_visMoniker = 'S',"Show Connection Details";
+  GI_visMoniker = 'S',"Show Connection Details For Dial-Up";
   GBI_identifier = 1;
   HINT_PLACE_MONIKER_TO_LEFT;
 }
 
-/*@object GenInteractionClass IDNewNumbersGroup = {
-    GI_comp = @IDNewNumbers;
-}
-
-@object GenTriggerClass IDNewNumbers = {
-    GI_visMoniker = 'N', "Get New Local Numbers";
-    GTI_destination = process;
-	 GTI_actionMsg = MSG_IDP_NEW_NUMBERS;
-}
-*/
 @object GenTriggerClass IDModifyConnectionButton = {
     GI_visMoniker = 'M', "Modify Connection...";
-    GTI_destination = process; 
+    GTI_destination = process;
     GTI_actionMsg = MSG_IDP_EDIT_CONNECTION;
     HINT_SEEK_MENU_BAR;
 }
 
 @object GenTriggerClass IDAddConnectionButton = {
     GI_visMoniker = 'A', "Add New Connection...";
-    GTI_destination = process; 
+    GTI_destination = process;
     GTI_actionMsg = MSG_IDP_CREATE_CONNECTION ;
     HINT_SEEK_MENU_BAR;
 }
 
 @object GenTriggerClass IDDeleteConnectionButton = {
     GI_visMoniker = 'D', "Delete Connection...";
-    GTI_destination = process; 
+    GTI_destination = process;
     GTI_actionMsg = MSG_IDP_DELETE_CONNECTION;
     HINT_SEEK_MENU_BAR;
 }
 
 @object GenInteractionClass IDConnectionGroup = {
-    GI_comp = @IDConnectionTitle, 
-              @IDConnectionListGroup, 
-              @IDConnectionPhoneAndLogin, 
-              @IDConnectionBottomBox;
+    GI_visMoniker = "Network Connection";
+    GI_comp = @IDConnectionListGroup,
+              @IDConnectionNetType,
+              @IDConnectionActivateBox,
+              @IDConnectionPhoneAndLogin;
     HINT_ORIENT_CHILDREN_VERTICALLY;
-    HINT_CENTER_CHILDREN_HORIZONTALLY;
+    HINT_LEFT_JUSTIFY_CHILDREN;
     HINT_DRAW_IN_BOX;
 }
 
-@object GenGlyphClass IDConnectionTitle = {
-    GI_visMoniker = "Network Connection:";
-}
-
 @object GenInteractionClass IDConnectionListGroup = {
-    GI_comp = @IDConnectionList, @IDConnectionDefaultBoxGroup;
+    GI_comp = @IDConnectionList;
     HINT_ORIENT_CHILDREN_HORIZONTALLY;
     HINT_FULL_JUSTIFY_CHILDREN_HORIZONTALLY;
     HINT_DONT_INCLUDE_ENDS_IN_CHILD_SPACING;
@@ -182,33 +164,46 @@
 }
 
 @object GenDynamicListClass IDConnectionList = {
-    GIGI_destination = @IDialupApp;
-    GIGI_applyMsg = MSG_IDA_CONNECTION_LIST_APPLY;
-    GDLI_queryMsg = MSG_IDA_CONNECTION_LIST_MONIKER_QUERY;
+    GIGI_destination = process;
+    GIGI_applyMsg = MSG_IDP_CONNECTION_LIST_APPLY;
+    GDLI_queryMsg = MSG_IDP_CONNECTION_LIST_MONIKER_QUERY;
     GIGI_behaviorType = GIGBT_EXCLUSIVE;
     HINT_ITEM_GROUP_MINIMIZE_SIZE;
     HINT_ITEM_GROUP_DISPLAY_CURRENT_SELECTION;
-    HINT_FIXED_SIZE = {SST_AVG_CHAR_WIDTHS|23, SST_LINES_OF_TEXT|1};
+    HINT_FIXED_SIZE = {SST_AVG_CHAR_WIDTHS|60, SST_LINES_OF_TEXT|1};
 }
 
-@object GenBooleanGroupClass IDConnectionDefaultBoxGroup = {
-  GI_comp = @IDConnectionDefaultCheckBox;
-  GBGI_destination = process;
-  GBGI_applyMsg = MSG_IDP_SET_DEFAULT_CONNECTION;
-  HINT_BOOLEAN_GROUP_CHECKBOX_STYLE;
+@object GenGlyphClass IDConnectionNetType = {
+    GI_visMoniker = list { @netTypeDefaultStr };
 }
 
-@object GenBooleanClass IDConnectionDefaultCheckBox = {
-  GI_visMoniker = 'S',"Set as the default Connection";
-  GBI_identifier = 1;
-  HINT_PLACE_MONIKER_TO_LEFT;
+@object GenInteractionClass IDConnectionActivateBox = {
+    GI_states = @default & ~GS_USABLE;
+    GI_comp = @IDConnectionActivateTrigger;
+
+    HINT_ORIENT_CHILDREN_HORIZONTALLY;
+    HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+    HINT_CENTER_CHILDREN_HORIZONTALLY;
+    HINT_CENTER_CHILDREN_VERTICALLY;
+    HINT_DRAW_IN_BOX;
+}
+
+@object GenTriggerClass IDConnectionActivateTrigger = {
+    GI_visMoniker = "Activate";
+    GTI_destination = process;
+    GTI_actionMsg = MSG_IDP_ACTIVATE;
+    HINT_DEFAULT_DEFAULT_ACTION;
 }
 
 @object GenInteractionClass IDConnectionPhoneAndLogin = {
-    GI_comp = @IDConnectionPhoneNumberBox, @IDConnectionUserNameBox;
+    GI_visMoniker = "Active Access Point";
+    GI_states = @default & ~GS_USABLE;
+    GI_comp = @IDConnectionPhoneNumberBox, @IDConnectionUserNameBox, @IDConnectionBottomBox;
     HINT_ORIENT_CHILDREN_HORIZONTALLY;
     HINT_EXPAND_WIDTH_TO_FIT_PARENT;
     HINT_FULL_JUSTIFY_CHILDREN_HORIZONTALLY;
+    HINT_CENTER_CHILDREN_VERTICALLY;
+    HINT_DRAW_IN_BOX;
 }
 
 @object GenInteractionClass IDConnectionPhoneNumberBox = {
@@ -217,7 +212,7 @@
     HINT_DRAW_IN_BOX;
     HINT_CENTER_CHILDREN_HORIZONTALLY;
     HINT_FIXED_SIZE = {SST_AVG_CHAR_WIDTHS|24, SST_LINES_OF_TEXT|2};
-}    
+}
 
 @object GenTextClass IDConnectionPhoneNumber = {
     GTXI_text = "";
@@ -231,7 +226,7 @@
     HINT_DRAW_IN_BOX;
     HINT_CENTER_CHILDREN_HORIZONTALLY;
     HINT_FIXED_SIZE = {SST_AVG_CHAR_WIDTHS|24, SST_LINES_OF_TEXT|2};
-}    
+}
 
 @object GenTextClass IDConnectionUserName = {
     GTXI_text = "";
@@ -240,7 +235,7 @@
 }
 
 @object GenInteractionClass IDConnectionBottomBox = {
-    GI_comp = @IDConnectButton, @IDContinueButton;
+    GI_comp = @IDConnectButton;
     HINT_ORIENT_CHILDREN_HORIZONTALLY;
     HINT_EXPAND_WIDTH_TO_FIT_PARENT;
     HINT_CENTER_CHILDREN_HORIZONTALLY;
@@ -248,16 +243,8 @@
 
 @object GenTriggerClass IDConnectButton = {
     GI_visMoniker = "Connect";
-    GTI_destination = process; 
+    GTI_destination = process;
     GTI_actionMsg = MSG_IDP_CONNECT;
-    HINT_DEFAULT_DEFAULT_ACTION;
-}
-
-@object GenTriggerClass IDContinueButton = {
-    GI_visMoniker = "Please select a Connection and press here to continue...";
-    GI_states = @default & ~GS_USABLE;
-    GTI_destination = process; 
-    GTI_actionMsg = MSG_IDP_SELECT_CONTINUE;
 }
 
 @end Interface
@@ -266,11 +253,9 @@
 
 @object GenInteractionClass IDEditGroup = {
     GI_comp = @IDEditConnectionName, @IDEditConnectionType, @IDEditPhoneNumber, @IDEditDialingOptionsGroup,
-/*@if defined(PRODUCT_NDO2000) */
-              @IDEditIP, @IDEditGateway, @IDEditMask, 
-/*@endif */
-              @IDEditDNS1, @IDEditDNS2, 
-				  @IDEditUserName, @IDEditPassword,
+              @IDEditIP, @IDEditGateway, @IDEditMask,
+              @IDEditDNS1, @IDEditDNS2,
+			  @IDEditUserName, @IDEditPassword,
               @IDEditOkButton, @IDEditCancelButton;
     GII_visibility = GIV_DIALOG;
     GII_type = GIT_COMMAND;
@@ -284,23 +269,37 @@
 
 @object GenItemGroupClass IDEditConnectionType = {
 	GI_visMoniker = "Type:" ;
-	GI_comp = @IDEditTypeDialUp, @IDEditTypeODINetwork ;
+	GI_comp = @IDEditTypeDialUp, @IDEditTypePacketDriver, @IDEditTypeODINetwork ;
 	GIGI_selection = 0 ;
-	HINT_PLACE_MONIKER_TO_LEFT;
-	HINT_ITEM_GROUP_RADIO_BUTTON_STYLE ;
+
+    HINT_PLACE_MONIKER_ABOVE;
+    HINT_ITEM_GROUP_TOOLBOX_STYLE ;
 	HINT_ITEM_GROUP_DISPLAY_CURRENT_SELECTION;
+    HINT_FULL_JUSTIFY_CHILDREN_HORIZONTALLY;
+    HINT_EXPAND_WIDTH_TO_FIT_PARENT;
 	GIGI_destination = process ;
 	ATTR_GEN_ITEM_GROUP_STATUS_MSG = MSG_IDP_EDIT_TYPE_MODIFIED ;
 }
 
 @object GenItemClass IDEditTypeDialUp = {
-	GI_visMoniker = "Dial up ISP" ;
-	GII_identifier = 0 ;
+	GI_visMoniker = "Dial-Up ISP" ;
+	GII_identifier = NET_TYPE_PPP ;
+    HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+    HINT_CENTER_MONIKER;
 }
 
-@object GenItemClass @IDEditTypeODINetwork = {
+@object GenItemClass IDEditTypeODINetwork = {
 	GI_visMoniker = "ODI Network" ;
-	GII_identifier = 1 ;
+	GII_identifier = NET_TYPE_ODI ;
+    HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+    HINT_CENTER_MONIKER;
+}
+
+@object GenItemClass IDEditTypePacketDriver = {
+	GI_visMoniker = "Packet Driver" ;
+	GII_identifier = NET_TYPE_PKT ;
+    HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+    HINT_CENTER_MONIKER;
 }
 
 @object GenTextClass IDEditConnectionName = {
@@ -319,7 +318,7 @@
     GTXI_destination = process;
 }
 
-@chunk	VisTextCharAttr PasswordStyle = 
+@chunk	VisTextCharAttr PasswordStyle =
     CHAR_ATTR_FONT_SIZE(FID_BISON, 13);
 
 @object GenTextClass IDEditPassword = {
@@ -374,7 +373,7 @@
     GTXI_maxLength = 60;
     HINT_FIXED_SIZE = {SST_AVG_CHAR_WIDTHS|20, SST_LINES_OF_TEXT|1};
     GTXI_destination = process;
-    ATTR_GEN_TEXT_CUSTOM_FILTER = {@PhoneFilterArray};
+    ATTR_GEN_TEXT_CUSTOM_FILTER = (ChunkHandle) @PhoneFilterArray;
 }
 
 @object GenBooleanGroupClass IDEditDialingOptionsGroup = {
@@ -394,9 +393,8 @@
     GBI_identifier = IDEDO_ONE_FOR_LD;
 }
 
-/*@if defined(PRODUCT_NDO2000) */
 @object IDialupIPTextClass IDEditIP = {
-    GI_visMoniker = "IP Address:";
+    GI_visMoniker = "IP Address (0.0.0.0 = DHCP):";
     GTXI_attrs = @default | GTA_SINGLE_LINE_TEXT;
     GTXI_maxLength = MAX_IP_DECIMAL_ADDR_LENGTH;
     HINT_FIXED_SIZE = {SST_AVG_CHAR_WIDTHS|20, SST_LINES_OF_TEXT|1};
@@ -416,7 +414,6 @@
     HINT_FIXED_SIZE = {SST_AVG_CHAR_WIDTHS|20, SST_LINES_OF_TEXT|1};
     GTXI_destination = process;
 }
-/*@endif */
 
 @object IDialupIPTextClass IDEditDNS1 = {
     GI_visMoniker = "Primary DNS:";
@@ -435,7 +432,7 @@
 
 @object GenTriggerClass IDEditOkButton = {
     GI_visMoniker = "OK";
-    GTI_destination = process; 
+    GTI_destination = process;
     GTI_actionMsg = MSG_IDP_EDIT_OK;
     GI_attrs =  @default;
     HINT_SEEK_REPLY_BAR;
@@ -535,7 +532,7 @@
     GTXI_attrs = @default | GTA_SINGLE_LINE_TEXT;
     GTXI_maxLength = APDO_OUTSIDE_LINE_LEN;
     HINT_FIXED_SIZE = {SST_AVG_CHAR_WIDTHS|20, SST_LINES_OF_TEXT|1};
-    ATTR_GEN_TEXT_CUSTOM_FILTER = {@PhoneFilterArray};
+    ATTR_GEN_TEXT_CUSTOM_FILTER = (ChunkHandle) @PhoneFilterArray;
 }
 
 @object GenTextClass IDDOCallWaiting = {
@@ -543,7 +540,7 @@
     GTXI_attrs = @default | GTA_SINGLE_LINE_TEXT;
     GTXI_maxLength = APDO_CALL_WAITING_LEN;
     HINT_FIXED_SIZE = {SST_AVG_CHAR_WIDTHS|20, SST_LINES_OF_TEXT|1};
-    ATTR_GEN_TEXT_CUSTOM_FILTER = {@PhoneFilterArray};
+    ATTR_GEN_TEXT_CUSTOM_FILTER = (ChunkHandle) @PhoneFilterArray;
 }
 
 @object GenItemGroupClass IDDODialTypeGroup = {
@@ -590,7 +587,7 @@
 @else
     GI_visMoniker = "Change";
 @endif
-    GTI_destination = process; 
+    GTI_destination = process;
     GTI_actionMsg = MSG_IDP_DIALING_OPTIONS_CHANGE;
     GI_attrs =  @default;
     HINT_SEEK_REPLY_BAR;
@@ -625,12 +622,12 @@
 @chunk TCHAR receivedStr[] = _TEXT("Bytes received : ");
 
 @object IDialupInfoClass IDInfoGroup = {
-  
+
   IDI_speed = 0;
-  
+
   IDI_status_x = 0;
   IDI_status_y = 0;
-  
+
   IDI_time_x = 0;
 
   IDI_speed_x = 0;
@@ -680,7 +677,7 @@
 
 @object IDialupInteractionClass IDIdleNotifyDialog = {
     GI_visMoniker = "Idle Connection";
-    GI_comp = @IDINText1, @IDINBox, 
+    GI_comp = @IDINText1, @IDINBox,
               @IDINKeepConnectionButton, @IDINDisconnectButton;
     GII_visibility = GIV_DIALOG;
     GII_type = GIT_COMMAND;
@@ -710,7 +707,7 @@
 
 @object GenTriggerClass IDINDisconnectButton = {
     GI_visMoniker = "Disconnect";
-    GTI_destination = process; 
+    GTI_destination = process;
     GTI_actionMsg = MSG_IDP_IDLE_DISCONNECT;
     GI_attrs =  @default | GA_SIGNAL_INTERACTION_COMPLETE;
     HINT_SEEK_REPLY_BAR;
@@ -733,7 +730,7 @@
 }
 
 @object IDialupInteractionClass IDLIANotifyDialog = {
-    GI_comp = @IDLIANotifyText, 
+    GI_comp = @IDLIANotifyText,
               @IDLIAKeepConnectionButton, @IDLIADisconnectButton;
     GII_visibility = GIV_DIALOG;
     GII_type = GIT_COMMAND;
@@ -752,7 +749,7 @@
 
 @object GenTriggerClass IDLIADisconnectButton = {
     GI_visMoniker = "Disconnect";
-    GTI_destination = process; 
+    GTI_destination = process;
     GTI_actionMsg = MSG_IDP_IDLE_DISCONNECT;
     GI_attrs =  @default | GA_SIGNAL_INTERACTION_COMPLETE;
     HINT_SEEK_REPLY_BAR;
@@ -792,7 +789,7 @@
 
 @object GenTriggerClass IDSNDisconnectButton = {
     GI_visMoniker = "Disconnect";
-    GTI_destination = process; 
+    GTI_destination = process;
     GTI_actionMsg = MSG_IDP_IDLE_DISCONNECT;
     GI_attrs =  @default | GA_SIGNAL_INTERACTION_COMPLETE;
     HINT_SEEK_REPLY_BAR;
@@ -848,11 +845,7 @@
 @chunk TCHAR noCarrierStr[] = _TEXT("Cannot connect. Please check your phone line and the phone number, and try again.");
 @chunk TCHAR noAnswerStr[] = _TEXT("Cannot connect. Please check the phone number.");
 
-/*@if defined(PRODUCT_NDO2000) */
 @chunk TCHAR authFailedStr[] = _TEXT("The password or user name for this account is incorrect.");
-/*@else
-@chunk TCHAR authFailedStr[] = _TEXT("The password or user name for this account is incorrect. If you are using a MyTurn account, please contact customer support.");
-/*@endif  */
 
 @chunk TCHAR deviceBusyStr[] = _TEXT("Cannot dial. The modem appears to already be in use.");
 @chunk TCHAR deviceErrorStr[] = _TEXT("Cannot dial. The modem does not appear to be responding.");
@@ -862,17 +855,8 @@
 
 @chunk TCHAR setDefaultConnectionStr[] = _TEXT("Please set the default Network Connection or connect here.");
 
-/*@if defined(PRODUCT_NDO2000) */
 @chunk TCHAR timeoutStr[] = _TEXT("Timeout. The server stopped responding while \
 trying to connect. Please try again later.");
-/*@else
-@chunk TCHAR timeoutStr[] = _TEXT("Timeout. The server stopped responding while \
-trying to connect. Please try again later, or try connecting with your \
-MyTurn.com(2) number, if you have one. To do this, click Manage Internet Settings, \
-then click inside the list box on the left side of the window, directly below \
-\"Internet Service Provider \(ISP):\". Select MyTurn.com(2) (if available) from \
-the list, then click Connect.");
-/*@endif  */
 
 @chunk TCHAR invalidDNS1Str[] = _TEXT("The primary DNS address entered is not a valid IP address.  Please either check and re-enter the address or leave the field blank if this Network Connection did not provide a primary DNS server address.");
 @chunk TCHAR invalidDNS2Str[] = _TEXT("The secondary DNS address entered is not a valid IP address.  Please either check and re-enter the address or leave the field blank if this Network Connection did not provide a secondary DNS server address.");
@@ -895,10 +879,22 @@ the list, then click Connect.");
 
 @chunk TCHAR verifyBlankPwdStr[] = _TEXT("You have not entered a password.  You will be asked to enter your password whenever you log on to this connection.");
 
-@chunk TCHAR mustRestart[] = _TEXT("The type of network connection has changed.  GEOS must restart to continue.") ;
+@chunk TCHAR mustRestart[] = _TEXT("The type of network connection has changed. A restart is needed to continue.") ;
+@chunk TCHAR mustRestartPPP[] = _TEXT("The network connection type has changed to Dial-Up (PPP). A restart is required to proceed.\r\rAfter restarting, return to this screen and click \"Connect\" to establish a connection with the selected Internet Service Provider.") ;
+
+@chunk TCHAR noEdit[] = _TEXT("The currently active Connection cannot be deleted. Please activate a different Connection first.") ;
+
+@chunk TCHAR activeAppendStr[] = _TEXT(" (Active)");
 
 @visMoniker fieldChangeCloseConnYesVisMoniker = "Yes, Disconnect";
 @visMoniker fieldChangeCloseConnNoVisMoniker = "No, Stay Connected";
+
+@visMoniker netTypeDefaultStr = "Connection Type";
+@visMoniker netTypeHostStr = "Type: Host Network";
+@visMoniker netTypePppStr = "Type: Dial-Up ISP (PPP)";
+@visMoniker netTypeOdiStr = "Type: ODI Network";
+@visMoniker netTypePktStr = "Type: Packet Driver";
+
 
 /* This and all of the strings below are used to produce some error
  * that may be useful to tech support if PPP produces an unusual error.
