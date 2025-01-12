@@ -36,10 +36,11 @@
 @endif
 @include "urlfetch.goh"
 @include "importg.goh"
-@include "expire.goh"
 @include "stattext.goh"
 @include "glbanim.goh"
+@ifndef COMPILE_OPTION_TURN_OFF_LOGO
 @extern object SpinningLogo ;
+@endif
 
 @ifdef COMPILE_OPTION_PARENTAL_CONTROL
 @include <Objects/gSysC.goh>
@@ -70,6 +71,15 @@
 @extern object SimpleToolbarZoomOut ;
 @extern object SimpleToolbarZoomHundred ;
 
+@extern object MainWrapper ;
+@extern object HTMLDisplayGroup ;
+@extern object HtmlVTopBar ;
+@extern object SimpleToolbar ;
+@extern object SimpleToolbarStop ;
+@extern object SimpleToolbarReload ;
+
+@extern object ProgressIndicatorBox ;
+
 @ifdef COMPILE_OPTION_ENABLE_NUMCONN_OPTION
 @extern chunk MsgChangeRequiresRestart;
 @endif
@@ -81,21 +91,21 @@ void UpdateTitleAndURL(NameToken title, NameToken url)
 
     if(title != NAME_POOL_NONE) {
 @ifdef COPY_TO_SCRAPBOOK
-      NamePoolCopy(namePool, G_curTitle, sizeof(G_curTitle), title, NULL);
+        NamePoolCopy(namePool, G_curTitle, sizeof(G_curTitle), title, NULL);
 @endif
-      NamePoolReleaseToken(namePool, title);
+        NamePoolReleaseToken(namePool, title);
     }
 
     if(url != NAME_POOL_NONE &&
        /* don't wipe out user entry */
        (@call CurrentURLText::MSG_VIS_TEXT_GET_USER_MODIFIED_STATE() == FALSE))
     {
-      NamePoolCopy(namePool, buf, sizeof(buf), url, &p);
+        NamePoolCopy(namePool, buf, sizeof(buf), url, &p);
                                         /* get current URL */
-      @call CurrentURLText::MSG_VIS_TEXT_REPLACE_ALL_PTR(p, 0);
+        @call CurrentURLText::MSG_VIS_TEXT_REPLACE_ALL_PTR(p, 0);
                                         /* update current URL */
-      NamePoolDestroyIfDynamic(p);      /* release buffer, if any */
-      NamePoolReleaseToken(namePool, url);
+        NamePoolDestroyIfDynamic(p);      /* release buffer, if any */
+        NamePoolReleaseToken(namePool, url);
     }
 }
 
@@ -126,10 +136,10 @@ void UpdateTitleAndURL(NameToken title, NameToken url)
      */
     if(UserGetDefaultUILevel()==UIIL_INTRODUCTORY)
     {
-      noRed = FALSE;                    /* default: allow reduced sizes */
-      InitFileReadBoolean(HTMLVIEW_CATEGORY, "introNoReducedSizes", &noRed);
-      if(noRed)
-        ext->HE_options |= HTML_NO_REDUCED_SIZES;
+        noRed = FALSE;                    /* default: allow reduced sizes */
+        InitFileReadBoolean(HTMLVIEW_CATEGORY, "introNoReducedSizes", &noRed);
+        if(noRed)
+            ext->HE_options |= HTML_NO_REDUCED_SIZES;
     }
 
     ext->HE_options |= HTML_ADD_HYPERLINKS;
@@ -154,8 +164,8 @@ void UpdateTitleAndURL(NameToken title, NameToken url)
 
     if(selectedBooleans)                /* enabled loading of graphics? */
     {                                   /* load them in the current document */
-      evt = @record URLDocumentClass::MSG_URL_DOCUMENT_LOAD_GRAPHICS();
-      @call application::MSG_META_SEND_CLASSED_EVENT(evt, TO_APP_MODEL);
+        evt = @record URLDocumentClass::MSG_URL_DOCUMENT_LOAD_GRAPHICS();
+        @call application::MSG_META_SEND_CLASSED_EVENT(evt, TO_APP_MODEL);
     }
 }
 
@@ -164,18 +174,6 @@ void UpdateTitleAndURL(NameToken title, NameToken url)
 {
     /* no effect if not on TV */
     SetVidBW(selectedBooleans);
-}
-@endif
-
-@ifdef COMPILE_OPTION_SHOW_HIDE_TOOLBAR
-@extern method HTMLVProcessClass, MSG_HMLVP_SHOW_TOOLBAR
-{
-    UpdateToolbar(TRUE);
-}
-
-@extern method HTMLVProcessClass, MSG_HMLVP_HIDE_TOOLBAR
-{
-    UpdateToolbar(FALSE);
 }
 @endif
 
@@ -205,11 +203,11 @@ void UpdateTitleAndURL(NameToken title, NameToken url)
     access = ParentalControlGetAccessInfo();
     if ((!(access & AF_WWWBROWSING) && !(access & AF_WWWLIMITED)) ||
     G_pcBypassed) {
-    /* PC is off, bring up "turn it on" dialog */
-    @send PCToggleOnDlg::MSG_GEN_INTERACTION_INITIATE();
+        /* PC is off, bring up "turn it on" dialog */
+        @send PCToggleOnDlg::MSG_GEN_INTERACTION_INITIATE();
     } else {
-    /* PC is on, bring up "turn if off" dialog */
-    @send PCToggleOffDlg::MSG_GEN_INTERACTION_INITIATE();
+        /* PC is on, bring up "turn if off" dialog */
+        @send PCToggleOffDlg::MSG_GEN_INTERACTION_INITIATE();
     }
 }
 
@@ -259,15 +257,15 @@ void PCIndicateStatus()
 
     access = ParentalControlGetAccessInfo();
     if ((!(access & AF_WWWBROWSING) && !(access & AF_WWWLIMITED)) ||
-	G_pcBypassed) {
-	/* PC is off */
-	PCIndicateOff();
+        G_pcBypassed) {
+        /* PC is off */
+        PCIndicateOff();
     } else if (access & AF_WWWLIMITED) {
-	/* PC is limited access */
-	PCIndicateLimited();
+        /* PC is limited access */
+        PCIndicateLimited();
     } else {
-	/* PC is on */
-	PCIndicateOn();
+        /* PC is on */
+        PCIndicateOn();
     }
 }
 
@@ -290,32 +288,32 @@ void PCIndicateStatus()
     /* if one-time bypass active, just turn off bypass to restore
        previous PC on state */
     if (G_pcBypassed) {
-	G_pcBypassed = FALSE;
-	PCIndicateOn();
-	/* parental control turned on, clear object cache in
-	   case cached sites are now disallowed */
-	ObjCacheClear();
-	return;
+        G_pcBypassed = FALSE;
+        PCIndicateOn();
+        /* parental control turned on, clear object cache in
+           case cached sites are now disallowed */
+        ObjCacheClear();
+        return;
     }
 
     /* launch Parental Control pref module */
     alb = IACPCreateDefaultLaunchBlock(MSG_GEN_PROCESS_OPEN_APPLICATION);
     if (alb) {
-	albP = MemLock(alb);
-	if (albP) {
-	    strcpy(albP->ALB_dataFile, _TEXT("KidGuard Module"));
-	    MemUnlock(alb);
-	    pcIACP = IACPConnect(&pcToken,
-				 (IACPCF_FIRST_ONLY |
-				  IACPSM_USER_INTERACTIBLE),
-				 alb, NullOptr, &numServers);
-	    if (pcIACP) {
-		IACPShutdown(pcIACP, NullOptr);
-	    }
-	} else {
-	    /* memory error, silently abort operation */
-	    MemFree(alb);
-	}
+        albP = MemLock(alb);
+        if (albP) {
+            strcpy(albP->ALB_dataFile, _TEXT("KidGuard Module"));
+            MemUnlock(alb);
+            pcIACP = IACPConnect(&pcToken,
+                                 (IACPCF_FIRST_ONLY |
+                                  IACPSM_USER_INTERACTIBLE),
+                                 alb, NullOptr, &numServers);
+            if (pcIACP) {
+                IACPShutdown(pcIACP, NullOptr);
+            }
+        } else {
+            /* memory error, silently abort operation */
+            MemFree(alb);
+        }
     }
 }
 @endif /* COMPILE_OPTION_PARENTAL_CONTROL */
@@ -329,9 +327,9 @@ void PCIndicateStatus()
     if (arg1) a1 = msg+arg1;
     if (arg2) a2 = msg+arg2;
     @call application::MSG_GEN_APPLICATION_DO_STANDARD_DIALOG(
-	0, 0,
-	0, 0, a2, a1, msg,
-	dialogFlags);
+        0, 0,
+        0, 0, a2, a1, msg,
+        dialogFlags);
     MemFree(strBlock);
 }
 
@@ -341,15 +339,15 @@ extern MemHandle jsErrorString;
 @extern method HTMLVProcessClass, MSG_HMLVP_REPORT_JS_ERROR
 {
     if (jsErrorString) {
-	MemLock(jsErrorString);
-	MemLock(OptrToHandle(@MsgScriptError));
-	@call application::MSG_GEN_APPLICATION_DO_STANDARD_DIALOG(
-	    0, 0,
-	    0, 0, 0, MemDeref(jsErrorString), LMemDeref(@MsgScriptError),
-	    (CDT_ERROR << CDBF_DIALOG_TYPE_OFFSET) |
-	    (GIT_NOTIFICATION << CDBF_INTERACTION_TYPE_OFFSET));
-	MemUnlock(OptrToHandle(@MsgScriptError));
-	MemUnlock(jsErrorString);
+        MemLock(jsErrorString);
+        MemLock(OptrToHandle(@MsgScriptError));
+        @call application::MSG_GEN_APPLICATION_DO_STANDARD_DIALOG(
+            0, 0,
+            0, 0, 0, MemDeref(jsErrorString), LMemDeref(@MsgScriptError),
+            (CDT_ERROR << CDBF_DIALOG_TYPE_OFFSET) |
+            (GIT_NOTIFICATION << CDBF_INTERACTION_TYPE_OFFSET));
+        MemUnlock(OptrToHandle(@MsgScriptError));
+        MemUnlock(jsErrorString);
     }
 }
 @endif
@@ -365,11 +363,11 @@ extern MemHandle jsErrorString;
     /* if JavaScript changed, reload */
     if (modifiedBooleans & HTML_JAVASCRIPT) {
 @ifdef JAVASCRIPT_SUPPORT
-	evt = @record URLDocumentClass::MSG_URL_DOCUMENT_CLEAR_OBJ_CACHE();
-	@send application::MSG_META_SEND_CLASSED_EVENT(evt, TO_APP_MODEL);
+        evt = @record URLDocumentClass::MSG_URL_DOCUMENT_CLEAR_OBJ_CACHE();
+        @send application::MSG_META_SEND_CLASSED_EVENT(evt, TO_APP_MODEL);
 @endif
-	evt = @record URLDocumentClass::MSG_URL_DOCUMENT_RELOAD();
-	@send application::MSG_META_SEND_CLASSED_EVENT(evt, TO_APP_MODEL);
+        evt = @record URLDocumentClass::MSG_URL_DOCUMENT_RELOAD();
+        @send application::MSG_META_SEND_CLASSED_EVENT(evt, TO_APP_MODEL);
     }
 }
 @endif
@@ -388,39 +386,13 @@ extern MemHandle jsErrorString;
 
 @extern method HTMLVApplicationClass, MSG_META_SAVE_OPTIONS
 {
-@ifdef COMPILE_OPTION_SHOW_HIDE_TOOLBAR
-    Boolean toolbarShown;
-@endif
-@ifdef COMPILE_OPTION_TOGGLE_BARS
-    word toggleBars = 0;
-@endif
-
     @callsuper();                       /* do all the standard processing */
 
 @ifdef COMPILE_OPTION_FONT_AND_SIZE_CONTROL_ON
     InitFileWriteInteger( HTMLVIEW_CATEGORY, "defaultFont",
-      @call CurrentURLText::MSG_URL_ENTRY_GET_FONT_ID() );
+        @call CurrentURLText::MSG_URL_ENTRY_GET_FONT_ID() );
     InitFileWriteInteger( HTMLVIEW_CATEGORY, "defaultPointSize",
-      IntegerOf( @call CurrentURLText::MSG_URL_ENTRY_GET_POINT_SIZE() ) ) ;
-@endif
-
-@ifdef COMPILE_OPTION_SHOW_HIDE_TOOLBAR
-    toolbarShown = @call HideToolbarTrigger::MSG_GEN_GET_USABLE();
-    InitFileWriteBoolean( HTMLVIEW_CATEGORY, "toolbarShown", toolbarShown);
-@endif
-
-@ifdef COMPILE_OPTION_TOGGLE_BARS
-     /* get current bar states */
-    if (@call SimpleURLToolbar::MSG_GEN_GET_USABLE()) {
-	toggleBars |= TOGGLE_BARS_GOTO_ON;
-    }
-    if (@call StatusBar::MSG_GEN_GET_USABLE()) {
-	toggleBars |= TOGGLE_BARS_STATUS_ON;
-    }
-    InitFileWriteInteger(HTMLVIEW_CATEGORY,
-			 (UserGetDefaultUILevel() == UIIL_INTRODUCTORY) ?
-			 "toggleBarsCUI" : "toggleBarsAUI",
-			 toggleBars);
+        IntegerOf( @call CurrentURLText::MSG_URL_ENTRY_GET_POINT_SIZE() ) ) ;
 @endif
 }
 
@@ -456,31 +428,30 @@ extern MemHandle jsErrorString;
 
     if( (++pself->HVAI_operationLevel) == 1 )
     {                                   /* starting a new operation */
-      LOG(LogPrintfLine("-Begin loading page");)
+        LOG(LogPrintfLine("-Begin loading page");)
 
-      HWChecksumCheck() ;
-      UpdateStop(TRUE);
+        HWChecksumCheck() ;
+        UpdateStop(TRUE);
 
 @ifndef COMPILE_OPTION_TURN_OFF_LOGO
-      /* Read init file for globe setting.  */
-      /* Not OFF is default if not found. */
-      InitFileReadBoolean(HTMLVIEW_CATEGORY, "globeOff", &isGlobeOff) ;
-      if (!isGlobeOff)
-         @send SpinningLogo::MSG_GLBANIM_AUTO_RUN(TRUE);
+        /* Read init file for globe setting.  */
+        /* Not OFF is default if not found. */
+        InitFileReadBoolean(HTMLVIEW_CATEGORY, "globeOff", &isGlobeOff) ;
+        if (!isGlobeOff)
+            @send SpinningLogo::MSG_GLBANIM_AUTO_RUN(TRUE);
 @endif
+        @SendStatusUpdateOptr(
+            @StatusLineLoading, HTML_STATUS_TYPE_LOADING);
+        HWChecksumCheck() ;
 
-      @SendStatusUpdateOptr(
-        @StatusLineLoading, HTML_STATUS_TYPE_LOADING);
-      HWChecksumCheck() ;
-
-     if (!isBusyOff)
-	 @send HTMLVApp::MSG_HMLVA_MARK_BUSY();
+        if (!isBusyOff)
+            @send HTMLVApp::MSG_HMLVA_MARK_BUSY();
 
 @ifdef COMPILE_OPTION_PROGRESS_INDICATOR
-     @SendUpdateProgress(PI_START, 0);
+        @SendUpdateProgress(PI_START, 0);
 @endif
-     /* clear error state when operation is started */
-     @call self::MSG_HMLVA_CLEAR_CONNECTION_ERROR();
+        /* clear error state when operation is started */
+        @call self::MSG_HMLVA_CLEAR_CONNECTION_ERROR();
     }
 }
 
@@ -500,18 +471,18 @@ extern MemHandle jsErrorString;
 
     if(pself->HVAI_operationLevel)      /* only if inside operation */
     {
-      /* Have the fetch engine stop fetching */
-      URLFetchEngineAbortAll(ignoreStopMsg) ;
-      /* Stop import thread */
-      ImportThreadAbortAll() ;
-      /* clear error state when operation is finished, so next operation
-         will start anew */
-      @call self::MSG_HMLVA_CLEAR_CONNECTION_ERROR();
+        /* Have the fetch engine stop fetching */
+        URLFetchEngineAbortAll(ignoreStopMsg) ;
+        /* Stop import thread */
+        ImportThreadAbortAll() ;
+        /* clear error state when operation is finished, so next operation
+            will start anew */
+        @call self::MSG_HMLVA_CLEAR_CONNECTION_ERROR();
     }
 
     if (!dontSendDocumentStopMessage)  {
-	event = @record URLDocumentClass::MSG_URL_DOCUMENT_STOP(frame) ;
-	@call oself::MSG_META_SEND_CLASSED_EVENT(event, TO_APP_MODEL);
+        event = @record URLDocumentClass::MSG_URL_DOCUMENT_STOP(frame) ;
+        @call oself::MSG_META_SEND_CLASSED_EVENT(event, TO_APP_MODEL);
     }
     HWChecksumCheck() ;
 }
@@ -524,60 +495,57 @@ extern MemHandle jsErrorString;
     if( (pself->HVAI_operationLevel--)==1 )
     {                                   /* finally ending an operation */
 @ifdef COMPILE_OPTION_AUTO_BROWSE
-       if (didAutoTest)  {
-	 ABLog("done\r\n");
-	 if (@call AutoBrowseOptions::MSG_GEN_BOOLEAN_GROUP_GET_SELECTED_BOOLEANS() & AB_OPTION_DELAY) {
-	     (void)TimerStart(TIMER_EVENT_ONE_SHOT,
-			      ConstructOptr(GeodeGetProcessHandle(), 0),
-			      AB_BROWSE_DELAY,
-			      MSG_HMLVP_DO_AUTO_BROWSE,
-			      0, &abTimerID);
-	 } else {
-	     @send,forceQueue process::MSG_HMLVP_DO_AUTO_BROWSE();
-	 }
-       }
+        if (didAutoTest)  {
+            ABLog("done\r\n");
+            if (@call AutoBrowseOptions::MSG_GEN_BOOLEAN_GROUP_GET_SELECTED_BOOLEANS() & AB_OPTION_DELAY) {
+                (void)TimerStart(TIMER_EVENT_ONE_SHOT,
+                                ConstructOptr(GeodeGetProcessHandle(), 0),
+                                AB_BROWSE_DELAY,
+                                MSG_HMLVP_DO_AUTO_BROWSE,
+                                0, &abTimerID);
+            } else {
+                @send,forceQueue process::MSG_HMLVP_DO_AUTO_BROWSE();
+            }
+        }
 @endif
-      HWChecksumCheck() ;
-      UpdateStop(FALSE);
+        HWChecksumCheck() ;
+        UpdateStop(FALSE);
 @ifndef COMPILE_OPTION_TURN_OFF_LOGO
-      @send SpinningLogo::MSG_GLBANIM_AUTO_RUN(FALSE);
+        @send SpinningLogo::MSG_GLBANIM_AUTO_RUN(FALSE);
 @endif
-      @SendStatusUpdateOptr(
-        @MsgBlank, HTML_STATUS_TYPE_FORMATTING);
-      @SendStatusUpdateOptr(
-        @MsgBlank, HTML_STATUS_TYPE_LOADING);
-      /* clear URL link status until user moves mouse */
-      @SendStatusUpdateOptr(
-        @MsgBlank, HTML_STATUS_TYPE_URL_HIGHLIGHT);
+        @SendStatusUpdateOptr(@MsgBlank, HTML_STATUS_TYPE_FORMATTING);
+        @SendStatusUpdateOptr(@MsgBlank, HTML_STATUS_TYPE_LOADING);
+        /* clear URL link status until user moves mouse */
+        @SendStatusUpdateOptr(@MsgBlank, HTML_STATUS_TYPE_URL_HIGHLIGHT);
 
-      if (!isBusyOff)
-	  @send HTMLVApp::MSG_HMLVA_MARK_NOT_BUSY();
+        if (!isBusyOff)
+            @send HTMLVApp::MSG_HMLVA_MARK_NOT_BUSY();
 
-      LOG(LogPrintfLine("-End loading page");)
+        LOG(LogPrintfLine("-End loading page");)
 
-      pself = ObjDerefGen(oself);
-      if(pself->HVAI_doomed)            /* pending close? Do it now... */
-      {
-        @call self::MSG_GEN_APPLICATION_ACCEPT_INPUT();
-        @send self::MSG_META_QUIT();
-      }
-      if(pself->HVAI_detaching)         /* pending detach? Do it now... */
-      {
-        @call self::MSG_GEN_APPLICATION_ACCEPT_INPUT();
-        @send process::
-          MSG_META_DETACH(pself->HVAI_callerID, pself->HVAI_caller);
-      }
+        pself = ObjDerefGen(oself);
+        if(pself->HVAI_doomed)            /* pending close? Do it now... */
+        {
+            @call self::MSG_GEN_APPLICATION_ACCEPT_INPUT();
+            @send self::MSG_META_QUIT();
+        }
+        if(pself->HVAI_detaching)         /* pending detach? Do it now... */
+        {
+            @call self::MSG_GEN_APPLICATION_ACCEPT_INPUT();
+            @send process::
+              MSG_META_DETACH(pself->HVAI_callerID, pself->HVAI_caller);
+        }
 @ifdef COMPILE_OPTION_PROGRESS_INDICATOR
-     @SendUpdateProgress(PI_DONE, 0);
+        @SendUpdateProgress(PI_DONE, 0);
 @endif
 @ifdef COMPILE_OPTION_IGNORE_INPUT_DURING_LOADING
-     @call application::MSG_HMLVA_ACCEPT_INPUT();
+        @call application::MSG_HMLVA_ACCEPT_INPUT();
 @endif
-     /* clear error state when operation is finished */
-     @call self::MSG_HMLVA_CLEAR_CONNECTION_ERROR();
+        /* clear error state when operation is finished */
+        @call self::MSG_HMLVA_CLEAR_CONNECTION_ERROR();
 #ifdef HEAP_LEAK_CHECKING
-    HLFUpdate() ;
-    HLFReport(1) ;
+        HLFUpdate() ;
+        HLFReport(1) ;
 #endif
     }
     HWChecksumCheck() ;
@@ -587,14 +555,14 @@ extern MemHandle jsErrorString;
 {
     if(pself->HVAI_operationLevel)      /* still active loading a page? */
     {
-      pself->HVAI_detaching = TRUE;     /* defer detaching */
-      pself->HVAI_callerID = callerID;
-      pself->HVAI_caller = caller;
-      @AbortOperation(FALSE, FALSE, 0);
-      @call self::MSG_GEN_APPLICATION_IGNORE_INPUT();
-      @call self::MSG_GEN_APPLICATION_MARK_BUSY();
+        pself->HVAI_detaching = TRUE;     /* defer detaching */
+        pself->HVAI_callerID = callerID;
+        pself->HVAI_caller = caller;
+        @AbortOperation(FALSE, FALSE, 0);
+        @call self::MSG_GEN_APPLICATION_IGNORE_INPUT();
+        @call self::MSG_GEN_APPLICATION_MARK_BUSY();
                                         /* abort operation, prevent new one */
-      return FALSE;                     /* we cannot detach safely yet */
+        return FALSE;                     /* we cannot detach safely yet */
     }
 
     return TRUE;                        /* yes, we may detach now */
@@ -612,14 +580,14 @@ extern MemHandle jsErrorString;
     @callsuper();
     /* if modal parental control dialog is up, clear busy cursor */
     if (G_startupPassword &&
-	inputObj &&
-	ObjTestIfObjBlockRunByCurThread(OptrToHandle(inputObj)) &&
-	@call inputObj::MSG_META_IS_OBJECT_IN_CLASS(&GenInteractionClass) &&
-	(@call inputObj::MSG_GEN_INTERACTION_GET_ATTRS() & GIA_MODAL)) {
-	WinGeodeSetPtrImage(GeodeGetProcessHandle(), 0);
-	evt = @record GenClass::MSG_GEN_SYSTEM_SET_PTR_IMAGE(0, PIL_SYSTEM);
-	@call self::MSG_GEN_CALL_SYSTEM(evt);
-    }
+        inputObj &&
+        ObjTestIfObjBlockRunByCurThread(OptrToHandle(inputObj)) &&
+        @call inputObj::MSG_META_IS_OBJECT_IN_CLASS(&GenInteractionClass) &&
+        (@call inputObj::MSG_GEN_INTERACTION_GET_ATTRS() & GIA_MODAL)) {
+            WinGeodeSetPtrImage(GeodeGetProcessHandle(), 0);
+            evt = @record GenClass::MSG_GEN_SYSTEM_SET_PTR_IMAGE(0, PIL_SYSTEM);
+            @call self::MSG_GEN_CALL_SYSTEM(evt);
+        }
 }
 
 @endif
@@ -643,7 +611,7 @@ extern MemHandle jsErrorString;
 @method WMViewControlClass, MSG_GEN_CONTROL_ENABLE_DISABLE
 {
     if (msg == MSG_GEN_SET_ENABLED) {
-	@callsuper();
+        @callsuper();
     }
 }
 
@@ -672,6 +640,7 @@ extern MemHandle jsErrorString;
  *-----------------------------------------------------------------------*/
 @method WMViewControlClass, MSG_META_NOTIFY_WITH_DATA_BLOCK
 {
+@ifdef COMPILE_OPTION_SIMPLE_BUTTON_TOOLBAR
     if (manufID == MANUFACTURER_ID_GEOWORKS)  {
         if (notificationType == GWNT_VIEW_STATE_CHANGE)  {
             if (pself->GVCI_scale >= pself->GVCI_maxZoom)  {
@@ -693,6 +662,7 @@ extern MemHandle jsErrorString;
             }
         }
     }
+@endif
 
     /* Do whatever we normally do anyways since we don't replaced */
     /* functionality from occuring elsewhere. */
@@ -711,7 +681,7 @@ extern MemHandle jsErrorString;
 @method WMSearchReplaceControlClass, MSG_GEN_CONTROL_ENABLE_DISABLE
 {
     if (msg == MSG_GEN_SET_ENABLED) {
-	@callsuper();
+        @callsuper();
     }
 }
 @endif
@@ -723,9 +693,9 @@ extern MemHandle jsErrorString;
     InitFileWriteInteger(HTMLVIEW_CATEGORY, "numConn", selectedBooleans + 1);
 
     UserStandardDialogOptr(0, 0, 0, 0, @MsgChangeRequiresRestart,
-			   ((CDT_NOTIFICATION << CDBF_DIALOG_TYPE_OFFSET) |
-			    (GIT_NOTIFICATION <<
-			     CDBF_INTERACTION_TYPE_OFFSET)));
+                           ((CDT_NOTIFICATION << CDBF_DIALOG_TYPE_OFFSET) |
+                            (GIT_NOTIFICATION <<
+                             CDBF_INTERACTION_TYPE_OFFSET)));
 }
 
 @endif

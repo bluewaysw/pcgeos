@@ -1,6 +1,6 @@
 include stdapp.def
 include vm.def
-include objects\gCtrlC.def
+include Objects/gCtrlC.def
 
 UseLib math.def
 

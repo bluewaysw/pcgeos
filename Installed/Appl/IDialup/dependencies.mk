@@ -1,5 +1,5 @@
-IDialup.obj \
-IDialup.eobj: stdapp.goh object.goh ui.goh Objects/metaC.goh \
+IDInfo.obj \
+IDInfo.eobj: stdapp.goh object.goh ui.goh Objects/metaC.goh \
                 Objects/inputC.goh Objects/clipbrd.goh \
                 Objects/uiInputC.goh iacp.goh Objects/winC.goh \
                 Objects/gProcC.goh alb.goh Objects/processC.goh \
@@ -18,18 +18,17 @@ IDialup.eobj: stdapp.goh object.goh ui.goh Objects/metaC.goh \
                 Objects/gValueC.goh Objects/gToolGC.goh \
                 Objects/helpCC.goh system.h geoMisc.h socket.goh \
                 IDialup.goh accpnt.goh IDialUI.goh
-IDialup.obj \
-IDialup.eobj: product.h geos.h heap.h geode.h resource.h ec.h object.h \
-                lmem.h graphics.h fontID.h font.h color.h gstring.h \
-                timer.h vm.h dbase.h localize.h Ansi/ctype.h timedate.h \
-                file.h sllang.h system.h geoworks.h chunkarr.h \
-                Objects/helpCC.h disk.h drive.h input.h char.h hwr.h \
-                win.h uDialog.h Objects/gInterC.h Objects/Text/tCommon.h \
-                stylesh.h driver.h thread.h print.h Internal/spoolInt.h \
-                serialDr.h parallDr.h hugearr.h fileEnum.h medium.h \
-                sockmisc.h Ansi/stdio.h Ansi/string.h Internal/ppp.h \
-                IDialppp.h Ansi/stdlib.h Internal/socketDr.h initfile.h \
-                sem.h Internal/geodeStr.h
+IDInfo.obj \
+IDInfo.eobj: geos.h heap.h geode.h resource.h ec.h object.h lmem.h \
+                graphics.h fontID.h font.h color.h gstring.h timer.h vm.h \
+                dbase.h localize.h Ansi/ctype.h timedate.h file.h \
+                sllang.h system.h geoworks.h chunkarr.h Objects/helpCC.h \
+                disk.h drive.h input.h char.h hwr.h win.h uDialog.h \
+                Objects/gInterC.h Objects/Text/tCommon.h stylesh.h \
+                driver.h thread.h print.h Internal/spoolInt.h serialDr.h \
+                parallDr.h hugearr.h fileEnum.h medium.h sockmisc.h \
+                Ansi/stdio.h Ansi/string.h Internal/ppp.h product.h \
+                IDialppp.h Ansi/stdlib.h Internal/socketDr.h
 IDialapp.obj \
 IDialapp.eobj: stdapp.goh object.goh ui.goh Objects/metaC.goh \
                 Objects/inputC.goh Objects/clipbrd.goh \
@@ -62,8 +61,8 @@ IDialapp.eobj: geos.h heap.h geode.h resource.h ec.h object.h lmem.h \
                 Ansi/stdio.h Ansi/string.h Internal/ppp.h product.h \
                 IDialppp.h Ansi/stdlib.h Internal/socketDr.h initfile.h \
                 sem.h
-IDInfo.obj \
-IDInfo.eobj: stdapp.goh object.goh ui.goh Objects/metaC.goh \
+IDialup.obj \
+IDialup.eobj: stdapp.goh object.goh ui.goh Objects/metaC.goh \
                 Objects/inputC.goh Objects/clipbrd.goh \
                 Objects/uiInputC.goh iacp.goh Objects/winC.goh \
                 Objects/gProcC.goh alb.goh Objects/processC.goh \
@@ -82,17 +81,18 @@ IDInfo.eobj: stdapp.goh object.goh ui.goh Objects/metaC.goh \
                 Objects/gValueC.goh Objects/gToolGC.goh \
                 Objects/helpCC.goh system.h geoMisc.h socket.goh \
                 IDialup.goh accpnt.goh IDialUI.goh
-IDInfo.obj \
-IDInfo.eobj: geos.h heap.h geode.h resource.h ec.h object.h lmem.h \
-                graphics.h fontID.h font.h color.h gstring.h timer.h vm.h \
-                dbase.h localize.h Ansi/ctype.h timedate.h file.h \
-                sllang.h system.h geoworks.h chunkarr.h Objects/helpCC.h \
-                disk.h drive.h input.h char.h hwr.h win.h uDialog.h \
-                Objects/gInterC.h Objects/Text/tCommon.h stylesh.h \
-                driver.h thread.h print.h Internal/spoolInt.h serialDr.h \
-                parallDr.h hugearr.h fileEnum.h medium.h sockmisc.h \
-                Ansi/stdio.h Ansi/string.h Internal/ppp.h product.h \
-                IDialppp.h Ansi/stdlib.h Internal/socketDr.h
+IDialup.obj \
+IDialup.eobj: product.h geos.h heap.h geode.h resource.h ec.h object.h \
+                lmem.h graphics.h fontID.h font.h color.h gstring.h \
+                timer.h vm.h dbase.h localize.h Ansi/ctype.h timedate.h \
+                file.h sllang.h system.h geoworks.h chunkarr.h \
+                Objects/helpCC.h disk.h drive.h input.h char.h hwr.h \
+                win.h uDialog.h Objects/gInterC.h Objects/Text/tCommon.h \
+                stylesh.h driver.h thread.h print.h Internal/spoolInt.h \
+                serialDr.h parallDr.h hugearr.h fileEnum.h medium.h \
+                sockmisc.h Ansi/stdio.h Ansi/string.h Internal/ppp.h \
+                IDialppp.h Ansi/stdlib.h Internal/socketDr.h initfile.h \
+                sem.h Internal/geodeStr.h
 IDialUI.obj \
 IDialUI.eobj: product.goh stdapp.goh object.goh ui.goh Objects/metaC.goh \
                 Objects/inputC.goh Objects/clipbrd.goh \

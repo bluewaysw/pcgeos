@@ -103,6 +103,8 @@ static int ssl3_get_server_certificate();
 static int ssl3_check_cert_and_algorithm();
 #endif
 
+#ifndef COMPILE_OPTION_HOST_SERVICE_ONLY
+
 static SSL_METHOD *ssl3_get_client_method(ver)
 int ver;
 	{
@@ -1764,4 +1766,13 @@ f_err:
 err:
 	return(0);
 	}
+#else
 
+SSL_METHOD*  _export _pascal SSLv3_client_method()
+	{
+	static SSL_METHOD SSLv3_client_data;
+
+	return(&SSLv3_client_data);
+	}
+
+#endif

@@ -66,7 +66,7 @@ and manipulation easier in Swat. These operators are shown below (in order
 of highest precedence to lowest):
 
 ^h
- The carat-h is used to dereference a memory handle when representing 
+ The caret-h is used to dereference a memory handle when representing 
  an address as a handle:offset pair (this is also known as a "heap pointer" 
  representation) or when accessing a particular block of memory. It is 
  often used in the situation when a memory handle is in one register (such 
@@ -95,7 +95,7 @@ of highest precedence to lowest):
 
 
 ^l
- The carat-l is used to dereference an optr, a pointer in the form 
+ The caret-l is used to dereference an optr, a pointer in the form 
  handle:chunk-handle (this is also known as a "local memory pointer"). 
  This is similar to the ^h operator, but ^l requires a chunk handle rather 
  than an offset. If an optr is stored in CX:DX, for example, the ^l operator 
@@ -127,7 +127,7 @@ of highest precedence to lowest):
 
 
 ^v
- The carat-v is the virtual memory operator, used to get to the base of a 
+ The caret-v is the virtual memory operator, used to get to the base of a 
  block that is in a Virtual Memory file given the file handle and VM block 
  handle. The correct usage of the ^v operator is:
 
