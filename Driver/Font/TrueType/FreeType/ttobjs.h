@@ -451,10 +451,6 @@
     Long        y_scale1;
     Long        y_scale2;    /* used to scale FUnits to fractional pixels */
 
-    /* for non-square pixels */
-    Long        x_ratio;
-    Long        y_ratio;
-
     UShort      ppem;        /* maximum ppem size */
     Long        ratio;       /* current ratio     */
     Long        scale1;

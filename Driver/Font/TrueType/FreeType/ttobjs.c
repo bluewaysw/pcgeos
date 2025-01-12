@@ -871,20 +871,12 @@ extern TEngine_Instance engineInstance;
       ins->metrics.scale1  = ins->metrics.x_scale1;
       ins->metrics.scale2  = ins->metrics.x_scale2;
       ins->metrics.ppem    = ins->metrics.x_ppem;
-      ins->metrics.x_ratio = 1L << 16;
-      ins->metrics.y_ratio = TT_MulDiv( ins->metrics.y_ppem,
-                                        0x10000,
-                                        ins->metrics.x_ppem );
     }
     else
     {
       ins->metrics.scale1  = ins->metrics.y_scale1;
       ins->metrics.scale2  = ins->metrics.y_scale2;
       ins->metrics.ppem    = ins->metrics.y_ppem;
-      ins->metrics.x_ratio = TT_MulDiv( ins->metrics.x_ppem,
-                                        0x10000,
-                                        ins->metrics.y_ppem );
-      ins->metrics.y_ratio = 1L << 16;
     }
 
     /* Scale the cvt values to the new ppem.          */
