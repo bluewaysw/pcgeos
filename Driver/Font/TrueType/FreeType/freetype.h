@@ -279,9 +279,6 @@
     TT_UShort   x_ppem;        /* horizontal pixels per EM square */
     TT_UShort   y_ppem;        /* vertical pixels per EM square   */
 
-    TT_Fixed    x_scale;     /* 16.16 to convert from EM units to 26.6 pix */
-    TT_Fixed    y_scale;     /* 16.16 to convert from EM units to 26.6 pix */
-
     TT_UShort   x_resolution;  /* device horizontal resolution in dpi */
     TT_UShort   y_resolution;  /* device vertical resolution in dpi   */
   };
