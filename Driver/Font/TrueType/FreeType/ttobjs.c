@@ -776,18 +776,17 @@ extern TEngine_Instance engineInstance;
       PIns_Metrics  metrics = &exec->metrics;
 
 
-      metrics->x_ppem    = 0;
-      metrics->y_ppem    = 0;
-      metrics->pointSize = 0;
-      metrics->x_scale1  = 0;
-      metrics->x_scale2  = 1;
-      metrics->y_scale1  = 0;
-      metrics->y_scale2  = 1;
+      metrics->x_ppem       = 0;
+      metrics->y_ppem       = 0;
+      metrics->pointSize    = 0;
+      metrics->x_scale1     = 0;
+      metrics->units_per_em = 1;
+      metrics->y_scale1     = 0;
 
-      metrics->ppem      = 0;
-      metrics->scale1    = 0;
-      metrics->scale2    = 1;
-      metrics->ratio     = 1L << 16;
+      metrics->ppem         = 0;
+      metrics->scale1       = 0;
+      metrics->scale2       = 1;
+      metrics->ratio        = 1L << 16;
     }
 
     exec->instruction_trap = FALSE;
@@ -869,15 +868,14 @@ extern TEngine_Instance engineInstance;
     if ( ins->metrics.x_ppem >= ins->metrics.y_ppem )
     {
       ins->metrics.scale1  = ins->metrics.x_scale1;
-      ins->metrics.scale2  = ins->metrics.x_scale2;
       ins->metrics.ppem    = ins->metrics.x_ppem;
     }
     else
     {
       ins->metrics.scale1  = ins->metrics.y_scale1;
-      ins->metrics.scale2  = ins->metrics.y_scale2;
       ins->metrics.ppem    = ins->metrics.y_ppem;
     }
+    ins->metrics.scale2 = ins->metrics.units_per_em;
 
     /* Scale the cvt values to the new ppem.          */
     /* We use by default the y ppem to scale the CVT. */

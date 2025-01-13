@@ -446,10 +446,9 @@
     UShort      y_ppem;         /* vertical pixels per EM   */
 
     Long        x_scale1;
-    Long        x_scale2;    /* used to scale FUnits to fractional pixels */
-
     Long        y_scale1;
-    Long        y_scale2;    /* used to scale FUnits to fractional pixels */
+
+    Long        units_per_em;
 
     UShort      ppem;        /* maximum ppem size */
     Long        ratio;       /* current ratio     */

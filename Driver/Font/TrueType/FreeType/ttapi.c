@@ -498,11 +498,9 @@ extern TEngine_Instance engineInstance;
     if ( charSize < 1 * 64 )
       charSize = 1 * 64;
 
-    ins->metrics.x_scale1 = ( charSize * ins->metrics.x_resolution ) / 72;
-    ins->metrics.x_scale2 = ins->owner->fontHeader.Units_Per_EM;
-
-    ins->metrics.y_scale1 = ( charSize * ins->metrics.y_resolution ) / 72;
-    ins->metrics.y_scale2 = ins->owner->fontHeader.Units_Per_EM;
+    ins->metrics.x_scale1     = ( charSize * ins->metrics.x_resolution ) / 72;
+    ins->metrics.y_scale1     = ( charSize * ins->metrics.y_resolution ) / 72;
+    ins->metrics.units_per_em = ins->owner->fontHeader.Units_Per_EM;
 
     if ( ins->owner->fontHeader.Flags & 8 )
     {
