@@ -21,6 +21,7 @@
 
 @include <stdapp.goh>
 @include <Objects/gViewCC.goh>
+@include <Objects/colorC.goh>
 #include <IMPBMP/imp_bmp.h>
 @include <statbar/statbar.goh>
 #include <Ansi/string.h>
@@ -49,6 +50,7 @@ extern VMChain  /*XXX*/
 	_pascal MyVMCopyVMChain(VMFileHandle sourceFile,
 		  VMChain sourceChain,
 		  VMFileHandle destFile);
+
 extern VMChain  /*XXX*/
 	_pascal MyVMFreeVMChain(VMFileHandle sourceFile,
 				  VMChain sourceChain);
@@ -127,6 +129,7 @@ static void SendSelectNotify(VMBlockHandle bmpblock);
 #define BV_SHOW_PCX         3
 #define BV_SHOW_GIF         4
 #define BV_SHOW_JPEG        5
+#define BV_SHOW_PNG         6
 
 /**************************************************************************/
 
@@ -319,8 +322,7 @@ FileHandle BVThumbnailDB = 0;
 
 	if(pself->TII_folderflag)
 	{
-	  gstring = GrLoadGString(OptrToHandle(@BVDirMoniker), GST_CHUNK,
-				  OptrToChunk(@BVDirMoniker));
+	  gstring = GrLoadGString(OptrToHandle(@BVDirMoniker), GST_CHUNK, (word) OptrToChunk(@BVDirMoniker));
 	  GrDrawGString(gstate, gstring, visptr->VI_bounds.R_left+18,
 				visptr->VI_bounds.R_top+17,0,0);
 	  GrDestroyGString(gstring, 0, GSKT_LEAVE_DATA);
@@ -333,7 +335,7 @@ FileHandle BVThumbnailDB = 0;
 							 pself->TII_date) != TE_NO_ERROR)
 		{
 			  gstring = GrLoadGString(OptrToHandle(@BVUnknownMoniker), GST_CHUNK,
-						  OptrToChunk(@BVUnknownMoniker));
+						  (word) OptrToChunk(@BVUnknownMoniker));
 			  GrDrawGString(gstate, gstring, visptr->VI_bounds.R_left+21,
 						visptr->VI_bounds.R_top+14,0,0);
 			  GrDestroyGString(gstring, 0, GSKT_LEAVE_DATA);
@@ -349,32 +351,38 @@ FileHandle BVThumbnailDB = 0;
 /**************************************************************************/
 
 @object BVAppClass BVApp = {
-		  GI_visMoniker = list { @BVTextMoniker,
-										 @BVVGAMoniker,
-										 @BVHGAMoniker,
-										 @BVCGAMoniker,
-                               @BVTCMoniker
-								 };
-		  GI_comp = @BVPrimary;
+	GI_visMoniker = list {
+		@BVTextMoniker,
+		@BVVGAMoniker,
+		@BVHGAMoniker,
+		@BVCGAMoniker,
+		@BVTCMoniker
+	};
+	GI_comp = @BVPrimary;
 
-				  gcnList(MANUFACTURER_ID_GEOWORKS,MGCNLT_APP_STARTUP)
-								 = @BVDocumentControl;
-		  gcnList(MANUFACTURER_ID_GEOWORKS, GAGCNLT_WINDOWS)
-						 = @BVPrimary;
-		  gcnList(MANUFACTURER_ID_GEOWORKS, GAGCNLT_SELF_LOAD_OPTIONS)
-						 = @BVViewControl,
-												   @BVEditControl,
-												   @BVDocumentControl,
-												   @BVDisplayControl;
-		  gcnList(MANUFACTURER_ID_GEOWORKS, GAGCNLT_STARTUP_LOAD_OPTIONS)
-						 = @BVOptionGroup,
-						   @BVViewOptGroup,
-						   @BVImpFileShowTools;
+	gcnList(MANUFACTURER_ID_GEOWORKS,MGCNLT_APP_STARTUP) = @BVDocumentControl;
 
-		  gcnList(MANUFACTURER_ID_GEOWORKS, MGCNLT_ACTIVE_LIST)
-												 = @BVViewControl,
-												   @BVDocumentControl,
-												   @BVDisplayControl;
+	gcnList(MANUFACTURER_ID_GEOWORKS, GAGCNLT_WINDOWS) = @BVPrimary;
+
+	gcnList(MANUFACTURER_ID_GEOWORKS, GAGCNLT_SELF_LOAD_OPTIONS) =
+		@BVViewControl,
+		@BVEditControl,
+		@BVDocumentControl,
+		@BVDisplayControl,
+		@BlendColorControl;
+
+	gcnList(MANUFACTURER_ID_GEOWORKS, GAGCNLT_STARTUP_LOAD_OPTIONS) =
+		@BVOptionGroup,
+		@BVViewOptGroup,
+		@BVImpFileShowTools,
+		@BlendColorControl;
+
+	gcnList(MANUFACTURER_ID_GEOWORKS, MGCNLT_ACTIVE_LIST) =
+		@BVViewControl,
+		@BVDocumentControl,
+		@BVDisplayControl,
+		@BlendColorControl;
+
 
 @ifdef NEWDEAL_MEDIA_VIEWER
 		  ATTR_GEN_INIT_FILE_CATEGORY = "MediaViewer";
@@ -649,12 +657,29 @@ FileHandle BVThumbnailDB = 0;
 /**************************************************************************/
 
 @object GenInteractionClass BVOptionMenu = {
-		  GII_visibility = GIV_POPUP;
-		  GI_comp = @BVOptionGroup,
-							@BVDialogsGroup,
-							@BVOptionSaveGroup;
-		  ATTR_GEN_INTERACTION_GROUP_TYPE = (GIGT_OPTIONS_MENU);
-}
+		GII_visibility = GIV_POPUP;
+		GI_comp = 	@BVOptionGroup,
+		  		@BlendColorControl,
+				@BVDialogsGroup,
+				@BVOptionSaveGroup;
+		ATTR_GEN_INTERACTION_GROUP_TYPE = (GIGT_OPTIONS_MENU);
+};
+
+/**************************************************************************/
+@object ColorSelectorClass BlendColorControl = {
+	GI_visMoniker = "Set PNG Blend Color";
+	GI_states = @default | GS_USABLE | GS_ENABLED;
+	CSI_color = {C_WHITE, CF_INDEX, 0, 0};
+
+	GCI_output = process;
+	GII_visibility = GIV_DIALOG;
+	GII_type = GIT_PROPERTIES;
+
+	ATTR_GEN_CONTROL_REQUIRE_UI = (CSF_RGB | CSF_INDEX | CSF_OTHER);
+	ATTR_GEN_CONTROL_PROHIBIT_UI = (CSF_PATTERN | CSF_DRAW_MASK);
+	HINT_DRAW_IN_BOX;
+    	HINT_PLACE_MONIKER_ABOVE;
+};
 
 /**************************************************************************/
 
@@ -1136,6 +1161,7 @@ FileHandle BVThumbnailDB = 0;
 				  @BVImpFileShowAllMedia,
 				  @BVImpFileShowBMP,
 				  @BVImpFileShowPCX,
+				  @BVImpFileShowPNG,
 @ifdef JPEG_SUPPORT
 				  @BVImpFileShowGIF,
 				  @BVImpFileShowJPEG;
@@ -1176,6 +1202,13 @@ FileHandle BVThumbnailDB = 0;
 @object GenItemClass BVImpFileShowPCX = {
 		GI_visMoniker = 'P', "Show .PCX Files";
 		GII_identifier = BV_SHOW_PCX;
+}
+
+/**************************************************************************/
+
+@object GenItemClass BVImpFileShowPNG = {
+		GI_visMoniker = 'P', "Show .PNG Files";
+		GII_identifier = BV_SHOW_PNG;
 }
 
 /**************************************************************************/
@@ -1423,6 +1456,10 @@ FileHandle BVThumbnailDB = 0;
 		strcpy(mask, "*.PCX");
 		break;
 
+	 case IBF_PNG:
+		strcpy(mask, "*.PNG");
+		break;
+
 	 case IBF_GIF:
 		strcpy(mask, "*.GIF");
 		break;
@@ -1585,6 +1622,37 @@ CopyCommon(ClipboardItemFlags transferFlags, FileHandle bmpfile,
   }
 }
 
+static void
+getPngBlendColor(RGBValue* blendColor)
+{
+	ColorAndFlagReturn cafr = {0};
+
+	@call BlendColorControl::MSG_COLOR_SELECTOR_GET_COLOR(&cafr);
+
+	// convert INDEX to RGB
+	if(cafr.CAFR_color.CQ_info == CF_INDEX)
+	{
+		RGBColorAsDWord c = GrMapColorIndex(0, cafr.CAFR_color.CQ_redOrIndex);
+		blendColor->RGB_red = RGB_RED(c);
+		blendColor->RGB_green = RGB_GREEN(c);
+		blendColor->RGB_blue = RGB_BLUE(c);
+	}
+	else if (cafr.CAFR_color.CQ_info == CF_RGB)
+	{
+		blendColor->RGB_red = cafr.CAFR_color.CQ_redOrIndex;
+		blendColor->RGB_green = cafr.CAFR_color.CQ_green;
+		blendColor->RGB_blue = cafr.CAFR_color.CQ_blue;
+	}
+	else if (cafr.CAFR_color.CQ_info == CF_GRAY)
+	{
+		blendColor->RGB_red = cafr.CAFR_color.CQ_redOrIndex;
+		blendColor->RGB_green = cafr.CAFR_color.CQ_redOrIndex;
+		blendColor->RGB_blue = cafr.CAFR_color.CQ_redOrIndex;
+	}
+
+}
+
+
 /**************************************************************************/
 
 /*
@@ -1709,6 +1777,7 @@ PasteCommon(ClipboardItemFlags transferFlags, optr oself, word bvattrs)
   char *path;
   char path2[256];
   char path3[256];
+  ColorQuad pngBlendColor = {0};
 
   if((extraState != 0) &&
 	((attachFlags & AAF_RESTORING_FROM_STATE)!=0))
@@ -1716,11 +1785,10 @@ PasteCommon(ClipboardItemFlags transferFlags, optr oself, word bvattrs)
 	sdptr = MemLock(extraState);
 	path = &(path2[0]);
 
-	disk = FileConstructFullPath(&path,255,
-									0,&(sdptr->BVSD_path[0]), FALSE);
+	disk = FileConstructFullPath(&path,255,0,&(sdptr->BVSD_path[0]), FALSE);
 
 	path = &(path2[0]);
-	BVCurrentDisk = FileParseStandardPath(disk, &path);
+	BVCurrentDisk = FileParseStandardPath(disk, (const char**) &path);
 	strcpy(BVCurrentPath, path);
 	if(BVCurrentDisk == SP_NOT_STANDARD_PATH)
 	  BVCurrentDisk = disk;
@@ -1744,10 +1812,9 @@ PasteCommon(ClipboardItemFlags transferFlags, optr oself, word bvattrs)
 	{
 	  path = &(path2[0]);
 
-	  disk = FileConstructFullPath(&path,255,
-									0,&(path3[0]), FALSE);
+	  disk = FileConstructFullPath(&path,255,0,&(path3[0]), FALSE);
 	  path = &(path2[0]);
-	  BVCurrentDisk = FileParseStandardPath(disk, &path);
+	  BVCurrentDisk = FileParseStandardPath(disk, (const char**) &path);
 	  strcpy(BVCurrentPath, path);
 	  if(BVCurrentDisk == SP_NOT_STANDARD_PATH)
 		BVCurrentDisk = disk;
@@ -1842,6 +1909,17 @@ PasteCommon(ClipboardItemFlags transferFlags, optr oself, word bvattrs)
 
   @send BVImpFileDirDrive::MSG_GEN_ITEM_GROUP_SET_SINGLE_SELECTION(drives - count1, FALSE);
 
+@ifdef NEWDEAL_MEDIA_VIEWER
+	stat = InitFileReadDataBuffer("MediaViewer", "pngBlendColor", &pngBlendColor, sizeof(ColorQuad), 0);
+@else
+	stat = InitFileReadDataBuffer("GraphicsViewer", "pngBlendColor", &pngBlendColor, sizeof(ColorQuad), 0);
+@endif
+
+	if (!stat)
+	{
+		@send BlendColorControl::MSG_COLOR_SELECTOR_SET_COLOR(pngBlendColor, FALSE);
+	}
+
   @callsuper();
 }
 
@@ -1881,6 +1959,21 @@ PasteCommon(ClipboardItemFlags transferFlags, optr oself, word bvattrs)
   sdptr->BVSD_attrs = BVAttrs2;
   MemUnlock(extramem);
   return(extramem);
+}
+
+/**************************************************************************/
+@method BVProcessClass, MSG_META_COLORED_OBJECT_SET_COLOR
+{
+
+@ifdef NEWDEAL_MEDIA_VIEWER
+	InitFileWriteData("MediaViewer", "pngBlendColor", &colorQuad, sizeof(ColorQuad));
+@else
+	InitFileWriteData("GraphicsViewer", "pngBlendColor", &colorQuad, sizeof(ColorQuad));
+@endif
+
+  	InitFileCommit();
+
+	@send BlendColorControl::MSG_GEN_GUP_INTERACTION_COMMAND(IC_DISMISS);
 }
 
 /**************************************************************************/
@@ -2261,11 +2354,12 @@ PasteCommon(ClipboardItemFlags transferFlags, optr oself, word bvattrs)
 	ImpBmpStatus status;
 	ImpBmpParams para;
 	char string[255];
-	VMBlockHandle bmpblock;
-/*	GStateHandle gstate;*/
+	// VMBlockHandle bmpblock;
+	// GStateHandle gstate;
 	word count;
-/*	FileLongName tempName; */
-/*	optr display; */
+	//	FileLongName tempName;
+	//	optr display;
+	RGBValue blendColor = {0};
 
 	MemLock(OptrToHandle(@BVImportingText));
 	strcpy(string, LMemDeref(@BVImportingText));
@@ -2293,19 +2387,22 @@ PasteCommon(ClipboardItemFlags transferFlags, optr oself, word bvattrs)
 	FilePopDir();
 	para.IBP_status = @BVImportStatus;
 
+	getPngBlendColor(&blendColor);
+	para.IBP_pngBlendColor = blendColor;
+
+	// start importing
 	status = Imp_BmpProcessFile(&para, IBF_AUTO);
 
 	@send BVImportingDlg::MSG_GEN_GUP_INTERACTION_COMMAND(IC_DISMISS);
 
 	if(status == IBS_NO_ERROR)
 	{
-		bmpblock =  GrCompactBitmap(para.IBP_dest, para.IBP_bitmap,para.IBP_dest);
-
-		MyVMFreeVMChain(para.IBP_dest,
-			VMCHAIN_MAKE_FROM_VM_BLOCK( para.IBP_bitmap));
-
-
-		para.IBP_bitmap = bmpblock;
+		// the following lines compact the bitmap after importing, but they
+		// also sloooooooooow down displaying the image dramatically,
+		// so let's how it goes when disabling them - meyerk 2024-10-03
+		// bmpblock = GrCompactBitmap(para.IBP_dest, para.IBP_bitmap, para.IBP_dest);
+		// MyVMFreeVMChain(para.IBP_dest, VMCHAIN_MAKE_FROM_VM_BLOCK(para.IBP_bitmap));
+		// para.IBP_bitmap = bmpblock;
 
 		date = FileGetDateAndTime(pself->GDI_fileHandle) ;
 		/* this doesn't work in all fs drivers (only ms4) so we'll go with...
@@ -2314,7 +2411,7 @@ PasteCommon(ClipboardItemFlags transferFlags, optr oself, word bvattrs)
 		size = FileSize(pself->GDI_fileHandle);
 
 		stat = @call BVOptionGroup::MSG_GEN_BOOLEAN_GROUP_IS_BOOLEAN_SELECTED(BV_AUTOCREAT_THUMB);
-        if(stat != FALSE)
+        	if(stat != FALSE)
 			@call process::MSG_BV_CREATE_THUMBNAIL(pself->GDI_fileName, size, date,
 				para.IBP_dest, para.IBP_bitmap);
 
@@ -2537,7 +2634,7 @@ PasteCommon(ClipboardItemFlags transferFlags, optr oself, word bvattrs)
 		break;
 
 	 case BMF_24BIT:
-				strcpy(string, "65536K");
+				strcpy(string, "16.7M");
 		break;
 
 	 default:
@@ -2716,14 +2813,22 @@ Boolean StrEnd(char *text, char *endstr)
 							filelist[count1] = filelist[count2];
 							count1++;
 						}
-@ifdef JPEG_SUPPORT
 						else
-							if(StrEnd(&filelist[count2].BVFA_name, ".JPG") && ((sel == BV_SHOW_JPEG)
+							if(StrEnd(&filelist[count2].BVFA_name, ".PNG") && ((sel == BV_SHOW_PNG)
 								|| (sel == BV_SHOW_ALL_MEDIA)))
 							{
 								filelist[count1] = filelist[count2];
 								count1++;
 							}
+
+@ifdef JPEG_SUPPORT
+							else
+								if(StrEnd(&filelist[count2].BVFA_name, ".JPG") && ((sel == BV_SHOW_JPEG)
+									|| (sel == BV_SHOW_ALL_MEDIA)))
+								{
+									filelist[count1] = filelist[count2];
+									count1++;
+								}
 @endif
 			}
 			else
@@ -3287,7 +3392,7 @@ BVCalcDriveName(char *text, word item)
 	  strcat(BVCurrentPath, filelist[selection].BVFA_name);
 
 	  pathptr = &(BVCurrentPath[0]);
-	  disk = FileParseStandardPath(BVCurrentDisk, &pathptr);
+	  disk = FileParseStandardPath(BVCurrentDisk, (const char**) &pathptr);
 	  if(disk != 0)
 		BVCurrentDisk = disk;
 	  strcpy(BVCurrentPath, pathptr);
@@ -3324,7 +3429,7 @@ BVCalcDriveName(char *text, word item)
 	};
   }
   pathptr = &(path[0]);
-  BVCurrentDisk = FileParseStandardPath(disk, &pathptr);
+  BVCurrentDisk = FileParseStandardPath(disk, (const char**) &pathptr);
 
   if(BVCurrentDisk == SP_NOT_STANDARD_PATH)
 	BVCurrentDisk = disk;
@@ -3457,7 +3562,7 @@ BVCalcDriveName(char *text, word item)
   };
 
   pathptr = &(path[0]);
-  BVCurrentDisk = FileParseStandardPath(disk, &pathptr);
+  BVCurrentDisk = FileParseStandardPath(disk, (const char**) &pathptr);
 
   if(BVCurrentDisk == SP_NOT_STANDARD_PATH)
 	BVCurrentDisk = disk;
@@ -3655,7 +3760,7 @@ BVCalcDriveName(char *text, word item)
 @else
   InitFileWriteString("GraphicsViewer","dlgPath",&pfad);
 @endif
-  InitFileSave();
+  InitFileCommit();
 }
 
 /**************************************************************************/
@@ -3720,6 +3825,7 @@ BVCalcDriveName(char *text, word item)
   ImpBmpStatus status;
   ImpBmpParams para;
   char string[255];
+  RGBValue blendColor = {0};
 
   if(BVFileList != 0)
   {
@@ -3786,6 +3892,9 @@ BVCalcDriveName(char *text, word item)
 
 			FileSetCurrentPath(SP_WASTE_BASKET, ".");
 			para.IBP_dest = VMOpen(tempname, VMAF_FORCE_READ_WRITE, VMO_TEMP_FILE, 0);
+
+			getPngBlendColor(&blendColor);
+			para.IBP_pngBlendColor = blendColor;
 
 			FilePopDir();
 

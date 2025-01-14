@@ -37,7 +37,7 @@ SRCS            = $(ASMTOOLS) $(HTMLVIEW) $(INIT) $(JS) $(NAVIGATE)\
                   $(COMMON)
 LOBJS           =
 
-PRODUCTS        = AB JSAB 
+PRODUCTS        = AB JSAB
 
 SYSMAKEFILE     = geode.mk
 

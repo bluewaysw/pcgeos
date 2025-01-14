@@ -272,6 +272,9 @@ Installed/Library/GrObj:	ui text bitmap ruler spline color \
 hash	: Installed/Library/Hash
 Installed/Library/Hash:	kernel MAKELIB
 
+pnglib	: Installed/Library/PngLib
+Installed/Library/PngLib:	ansic zlib MAKELIB
+
 impex	: Installed/Library/Impex
 Installed/Library/Impex: 	ui MAKELIB
 
@@ -1425,7 +1428,7 @@ Installed/Library/SSL:				ansic socket mapheap hostif MAKELIB
 
 # product-specific dependency on fjpeg
 impgraph	: Installed/Library/Breadbox/ImpGraph
-Installed/Library/Breadbox/ImpGraph:		ansic ijgjpeg fjpeg MAKELIB
+Installed/Library/Breadbox/ImpGraph:		ansic ijgjpeg pnglib fjpeg MAKELIB
 
 ijgjpeg	: 	Installed/Library/Breadbox/Ijgjpeg
 Installed/Library/Breadbox/Ijgjpeg:		ui ansic MAKELIB
@@ -1567,7 +1570,7 @@ Installed/Appl/Breadbox/BBGrmt:			ui ansic spool text MAKEAPPL
 #Installed/Appl/Breadbox/Geocon3:		ui ansic color MAKEAPPL
 
 graphvwr : Installed/Appl/Breadbox/Graphvwr
-Installed/Appl/Breadbox/Graphvwr:	ui ansic extui giflib thumbdb ijgjpeg \
+Installed/Appl/Breadbox/Graphvwr:	ui ansic extui giflib thumbdb ijgjpeg pnglib \
 					MAKEAPPL
 
 macror	: Installed/Appl/Breadbox/MacroR

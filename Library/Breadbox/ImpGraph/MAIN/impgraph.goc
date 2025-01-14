@@ -7,6 +7,7 @@
 
 #include "IMPBMP/impgif.h"
 #include "IMPBMP/impjpeg.h"
+#include "IMPBMP/imppng.h"
 
 @include <impex.goh>
 #include <Ansi/string.h>
@@ -20,7 +21,7 @@ extern void _pascal ImpGIFDestroy(ImpGIFHandle mem) ;
  *****************************************************************************/
 
 Boolean initGlobals = FALSE;
-Boolean compress = TRUE;
+Boolean doCompress = TRUE;
 Boolean useSysPal = TRUE;
 Boolean allowAnimations = TRUE;
 
@@ -28,13 +29,13 @@ void InitGlobals(void)
 {
   DisplayClass displayClass ;
   DisplayScheme display ;
- 
+
   if(!initGlobals)                      // init global variables only once
   {
     initGlobals = TRUE;
 
     /* if TRUE, we'll compress bitmap */
-    InitFileReadBoolean("impgraph", "compress", &compress);
+    InitFileReadBoolean("impgraph", "compress", &doCompress);
 
     /* Only use the system palette if we are in a video mode that is */
     /* 256 or less. */
@@ -209,13 +210,13 @@ ImpBmpStatus ImpGIF(TCHAR *file, VMFileHandle vmf, ImageAdditionalData *iad,
 #if PROGRESS_DISPLAY
 ImpBmpStatus ImpJPG(TCHAR *file, VMFileHandle vmf, ImageAdditionalData *iad,
           MimeRes resolution, AllocWatcherHandle watcher, dword *usedMem,
-          Boolean compress, ImpBmpParams *params, Boolean *isCompacted,
-          VMBlockHandle *bmVMBlock, ImportProgressData *importProgressDataP, 
+          Boolean doCompress, ImpBmpParams *params, Boolean *isCompacted,
+          VMBlockHandle *bmVMBlock, ImportProgressData *importProgressDataP,
           MimeStatus *mimeStatus)
 #else
 ImpBmpStatus ImpJPG(TCHAR *file, VMFileHandle vmf, ImageAdditionalData *iad,
           MimeRes resolution, AllocWatcherHandle watcher, dword *usedMem,
-          Boolean compress, ImpBmpParams *params, Boolean *isCompacted,
+          Boolean doCompress, ImpBmpParams *params, Boolean *isCompacted,
           VMBlockHandle *bmVMBlock,
           MimeStatus *mimeStatus)
 #endif
@@ -224,11 +225,11 @@ ImpBmpStatus ImpJPG(TCHAR *file, VMFileHandle vmf, ImageAdditionalData *iad,
 #if SCANLINE_COMPRESS
     Boolean scanlineCompress = TRUE;
 #endif
-    
+
     /* we don't override scanlineCompress even if no progress display
        as it still seems faster than GrCompactBitmap */
 #if SCANLINE_COMPRESS
-    if (compress) {
+    if (doCompress) {
 	/* if TRUE, we'll compress per-scanline */
 	InitFileReadBoolean("impgraph", "scanlineCompress", &scanlineCompress);
     } else {
@@ -252,7 +253,7 @@ ImpBmpStatus ImpJPG(TCHAR *file, VMFileHandle vmf, ImageAdditionalData *iad,
            );
 
     /* if fast import failed, try using IJGJPEG library */
-    if(!(*bmVMBlock)) 
+    if(!(*bmVMBlock))
     {
 @endif
         *bmVMBlock =
@@ -283,6 +284,80 @@ ImpBmpStatus ImpJPG(TCHAR *file, VMFileHandle vmf, ImageAdditionalData *iad,
     return status;
 }
 
+/**
+ * ImpPNG
+ * FIXME: no SCANLINE_COMPRESS and no MimeRes handling (for now)
+ ********************************************************************
+ */
+
+#if PROGRESS_DISPLAY
+ImpBmpStatus ImpPNG(TCHAR *file, VMFileHandle vmf, ImageAdditionalData *iad,
+          MimeRes resolution, AllocWatcherHandle watcher, dword *usedMem,
+          Boolean doCompress, ImpBmpParams *params, Boolean *isCompacted,
+          VMBlockHandle *bmVMBlock, ImportProgressData *importProgressDataP,
+          MimeStatus *mimeStatus)
+#else
+ImpBmpStatus ImpPNG(TCHAR *file, VMFileHandle vmf, ImageAdditionalData *iad,
+          MimeRes resolution, AllocWatcherHandle watcher, dword *usedMem,
+          Boolean doCompress, ImpBmpParams *params, Boolean *isCompacted,
+          VMBlockHandle *bmVMBlock,
+          MimeStatus *mimeStatus)
+#endif
+{
+    ImpBmpStatus status;
+
+#if SCANLINE_COMPRESS
+    Boolean scanlineCompress = TRUE;
+#endif
+
+    /* we don't override scanlineCompress even if no progress display
+       as it still seems faster than GrCompactBitmap */
+// #if SCANLINE_COMPRESS
+//     if (doCompress) {
+// 	/* if TRUE, we'll compress per-scanline */
+// 	InitFileReadBoolean("impgraph", "scanlineCompress", &scanlineCompress);
+//     } else {
+// 	scanlineCompress = FALSE;
+//     }
+// #endif
+
+
+    *bmVMBlock = PngImport(file, vmf, &(iad->IAD_size), resolution, watcher, usedMem,
+#if SCANLINE_COMPRESS
+	scanlineCompress,
+#endif
+    &iad->IAD_completeGraphic
+#if PROGRESS_DISPLAY
+	, importProgressDataP
+#endif
+    , mimeStatus
+    );
+
+	status = IBS_NO_ERROR;
+
+#if SCANLINE_COMPRESS
+//
+// FIXME: we don't do scanline compression as of now, so we return false
+// and GrCompactBitmap will at least take care of it.
+//
+     if (scanlineCompress) *isCompacted = FALSE;
+#endif
+
+    if (*bmVMBlock) 
+    {
+      status = IBS_NO_ERROR;
+      params->IBP_bitmap = *bmVMBlock;
+    }
+    else
+    {
+      status = IBS_UNKNOWN_FORMAT;
+      params->IBP_bitmap = NullHandle;
+    }
+
+    return status;
+}
+
+
 /*****************************************************************************
  *  Common code for GIF and JPEG formats                                     *
  *****************************************************************************/
@@ -305,11 +380,11 @@ void FreeViaProgress(_ImportProgressParams_, VMFileHandle vmFile, VMBlockHandle 
 	{
 	    VMFileHandle oldFile = importProgressDataP->IPD_vmFile;
 	    VMBlockHandle oldBitmap = importProgressDataP->IPD_bitmap;
-	    
+
 	    if(oldFile == vmFile && oldBitmap == bitmap)
 		dofree = FALSE;
-	} 
-	
+	}
+
 	if(dofree)
 	  VMFreeVMChain(vmFile, VMCHAIN_MAKE_FROM_VM_BLOCK(bitmap));
     }
@@ -328,27 +403,27 @@ VMBlockHandle _pascal _export MimeDrvGraphicEx(_MimeGraphicParams_, dword extFla
 	Boolean locCompress;
     ImpBmpParams params;
     ImpBmpStatus status;
-    VMBlockHandle dataVMBlock,bmVMBlock;
+    VMBlockHandle dataVMBlock,bmVMBlock = NullHandle;
     Boolean isAnimation = FALSE ;
     Boolean isCompacted = FALSE ;
 #if PROGRESS_DISPLAY
-    VMFileHandle destFile = vmf;
+    VMFileHandle destFile = vmf;    
 #endif
-    
+
     InitGlobals();                      /* Handled cached INI entries */
 
 	locAllowAnimations = allowAnimations;
-	locCompress = compress;
+	locCompress = doCompress;
 
 	if(extFlags & MIME_GREX_NO_ANIMATIONS) {
-	
+
 		locAllowAnimations = FALSE;
 	}
 	if(extFlags & MIME_GREX_NO_SCANLINE_COMPRESS) {
 
 		locCompress = FALSE;
 	}
-    
+
     params.IBP_mimeStatus = mimeStatus ;
 #if PROGRESS_DISPLAY
     /* use local work file, if available */
@@ -361,10 +436,10 @@ VMBlockHandle _pascal _export MimeDrvGraphicEx(_MimeGraphicParams_, dword extFla
 	    /* make sure progress handler knows we're using this file */
 	    importProgressDataP->IPD_vmFile = vmf;
 	}
-        
+
         /* initialize complete structure for standard case: */
         importProgressDataP->IPD_iad.IAD_type = IAD_TYPE_BITMAP;
-        importProgressDataP->IPD_iad.IAD_origin.P_x = 
+        importProgressDataP->IPD_iad.IAD_origin.P_x =
           importProgressDataP->IPD_iad.IAD_origin.P_y = 0;
         importProgressDataP->IPD_iad.IAD_completeGraphic = FALSE;
     }
@@ -390,19 +465,36 @@ VMBlockHandle _pascal _export MimeDrvGraphicEx(_MimeGraphicParams_, dword extFla
 #define IMP_JPG_PARAMS file, vmf, iad, resolution, watcher, usedMem, \
           locCompress, &params, IMP_SCANLINE_PARAM &bmVMBlock IMP_PROGRESS_PARAM \
           , mimeStatus
-       
-    if(strcmp(mimeType, _TEXT("image/gif")) == 0)
+#define IMP_PNG_PARAMS file, vmf, iad, resolution, watcher, usedMem, \
+          locCompress, &params, IMP_SCANLINE_PARAM &bmVMBlock IMP_PROGRESS_PARAM \
+          , mimeStatus
+
+
+    if (strcmp(mimeType, _TEXT("image/gif")) == 0)
     {
         status = ImpGIF(IMP_GIF_PARAMS);
         if (status == IBS_UNKNOWN_FORMAT)
             status = ImpJPG(IMP_JPG_PARAMS);
+        if (status == IBS_UNKNOWN_FORMAT)
+            status = ImpPNG(IMP_PNG_PARAMS);
     }
-    else
+    else if (strcmp(mimeType, _TEXT("image/jpeg")) == 0)
     {
         status = ImpJPG(IMP_JPG_PARAMS);
         if (status == IBS_UNKNOWN_FORMAT)
             status = ImpGIF(IMP_GIF_PARAMS);
+        if (status == IBS_UNKNOWN_FORMAT)
+            status = ImpPNG(IMP_PNG_PARAMS);
     }
+    else if (strcmp(mimeType, _TEXT("image/png")) == 0)
+    {
+        status = ImpPNG(IMP_PNG_PARAMS);
+        if (status == IBS_UNKNOWN_FORMAT)
+            status = ImpJPG(IMP_JPG_PARAMS);
+        if (status == IBS_UNKNOWN_FORMAT)
+            status = ImpGIF(IMP_GIF_PARAMS);
+    }
+
 
     if (bmVMBlock)                       /* check if import successful */
     {
@@ -446,6 +538,9 @@ char * _pascal _export MimeDrvInfo(_MimeInfoParams_)
                     _TEXT("image/jpeg\0") \
                       _TEXT("JPG\0") \
                       _TEXT("\0") \
+                    _TEXT("image/png\0") \
+                      _TEXT("PNG\0") \
+                      _TEXT("\0") \
                     _TEXT("\0")                /* end of format list */
 
     /* Return list of supported formats */
@@ -466,14 +561,14 @@ char * _pascal _export MimeDrvText(_MimeTextParams_)
 VMBlockHandle _pascal _export MimeDrvGraphic(_MimeGraphicParams_)
 {
 	return MimeDrvGraphicEx(
-            mimeType, 
-            file, 
-            vmf, 
-            iad, 
-            resolution, 
-            watcher, 
-            usedMem, 
-            mimeStatus, 
+            mimeType,
+            file,
+            vmf,
+            iad,
+            resolution,
+            watcher,
+            usedMem,
+            mimeStatus,
 #ifdef PROGRESS_DISPLAY
 			importProgressDataP,
 #endif
