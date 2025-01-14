@@ -305,11 +305,8 @@ Installed/Library/Trans/Text/Ascii: 	ui text MAKELIB
 msword	: Installed/Library/Trans/Text/MicrosoftWord
 Installed/Library/Trans/Text/MicrosoftWord: 	ui ansic impex msmfile MAKELIB
 
-htmlpars : Installed/Library/Breadbox/HtmlPars
-Installed/Library/Breadbox/HtmlPars: kernel ansic text MAKELIB
-
 htmlimpx : Installed/Library/Trans/Web/HtmlImpx
-Installed/Library/Trans/Web/HtmlImpx: htmlpars ansic text impex ui MAKELIB
+Installed/Library/Trans/Web/HtmlImpx: html4par ansic text impex ui MAKELIB
 
 sstor	: Installed/Library/Breadbox/SStor
 Installed/Library/Breadbox/SStor: 	kernel ansic MAKELIB
@@ -1383,10 +1380,6 @@ Installed/Appl/Breadbox/BbxBrow:	ui ansic text spool \
 #	$(MAKE) -I$(ROOT_DIR)\Appl\Breadbox\bbxbrow full
 
 # webmagick libs
-
-#html3par	: ui ansic text extgraph
-#	mdcd %ROOT_DIR%\Installed\Library\Breadbox\html3par
-#	$(MAKE) -I$(ROOT_DIR)\Library\Breadbox\html3par lib full
 
 html4par	: Installed/Library/Breadbox/Html4Par
 Installed/Library/Breadbox/Html4Par:	kernel ui ansic text extgraph MAKELIB
