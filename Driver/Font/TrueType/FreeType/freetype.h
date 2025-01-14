@@ -371,7 +371,9 @@
 #endif
 
     TT_Short   Index_To_Loc_Format;
+#ifdef TT_CONFIG_OPTION_SUPPORT_OPTIONAL_FIELDS
     TT_Short   Glyph_Data_Format;
+#endif
   };
 
   typedef struct TT_Header_  TT_Header;
@@ -706,42 +708,12 @@
                                     TT_Face_Properties*  properties );
 
 
-  /* Close a face's file handle to save system resources.  The file */
-  /* will be re-opened automatically on the next disk access.       */
-/*
-  EXPORT_DEF
-  TT_Error  TT_Flush_Face( TT_Face  face );
-*/
-  /* Get a face's glyph metrics expressed in font units.  Returns any    */
-  /* number of arrays.  Set the fields to NULL if you are not interested */
-  /* by a given array.                                                   */
-/*
-  EXPORT_DEF
-  TT_Error  TT_Get_Face_Metrics( TT_Face     face,
-                                 TT_UShort   firstGlyph,
-                                 TT_UShort   lastGlyph,
-                                 TT_Short*   leftBearings,
-                                 TT_UShort*  widths,
-                                 TT_Short*   topBearings,
-                                 TT_UShort*  heights );
-*/
-
   /* Close a given font object, destroying all associated */
   /* instances.                                           */
 
   EXPORT_DEF
   TT_Error  TT_Close_Face( TT_Face  face );
 
-
-  /* Get font or table data. */
-/*
-  EXPORT_DEF
-  TT_Error  TT_Get_Font_Data( TT_Face   face,
-                              TT_ULong  tag,
-                              TT_Long   offset,
-                              void*     buffer,
-                              TT_Long*  length );
-*/
 
 /* A simple macro to build table tags from ASCII chars */
 
@@ -763,15 +735,6 @@
                              TT_Instance*  instance );
 
 
-  /* Set device resolution for a given instance.  The values are      */
-  /* given in dpi (Dots Per Inch).  Default is 96 in both directions. */
-
-  /*EXPORT_DEF
-  TT_Error  TT_Set_Instance_Resolutions( TT_Instance  instance,
-                                         TT_UShort    xResolution,
-                                         TT_UShort    yResolution );*/
-
-
   /* Set the pointsize for a given instance.  Default is 10pt. */
 
   EXPORT_DEF
@@ -779,32 +742,7 @@
                                                       TT_F26Dot6   charSize,
                                                       TT_UShort    xResolution,
                                                       TT_UShort    yResolution );
-  /*
-  EXPORT_DEF
-  TT_Error  TT_Set_Instance_CharSizes( TT_Instance  instance,
-                                       TT_F26Dot6   charWidth,
-                                       TT_F26Dot6   charHeight ); */
-
-/*#define TT_Set_Instance_PointSize( ins, ptsize )   \
-            TT_Set_Instance_CharSize( ins, ptsize*64L )*/
-
-
-  /* This function has been deprecated!  Do not use it, as it      */
-  /* doesn't work reliably.  You can perfectly control hinting     */
-  /* yourself when loading glyphs, then apply transforms as usual. */
-/*
-  EXPORT_DEF
-  TT_Error  TT_Set_Instance_Transform_Flags( TT_Instance  instance,
-                                             TT_Bool      rotated,
-                                             TT_Bool      stretched );
-*/
-
-  /* Return instance metrics in `metrics'. */
-/*
-  EXPORT_DEF
-  TT_Error  TT_Get_Instance_Metrics( TT_Instance           instance,
-                                     TT_Instance_Metrics*  metrics ); */
-
+  
 
   /* Close a given instance object, destroying all associated data. */
 
@@ -886,14 +824,6 @@
                                   TT_Glyph_Metrics*  metrics );
 
 
-  /* Copy the glyph's big metrics into `metrics'. */
-  /* Necessary to obtain vertical metrics.        */
-/*
-  EXPORT_DEF
-  TT_Error  TT_Get_Glyph_Big_Metrics( TT_Glyph               glyph,
-                                      TT_Big_Glyph_Metrics*  metrics );
-*/
-
   /* Render the glyph into a bitmap, with given position offsets.     */
   /*                                                                  */
   /* Note: Only use integer pixel offsets to preserve the fine        */
@@ -907,29 +837,6 @@
                                  TT_Raster_Map*  map,
                                  TT_F26Dot6      xOffset,
                                  TT_F26Dot6      yOffset );*/
-
-
-  /* Render the glyph into a region, with given position offsets.     */
-  /*                                                                  */
-  /* Note: Only use integer pixel offsets to preserve the fine        */
-  /*       hinting of the glyph and the `correct' anti-aliasing       */
-  /*       (where vertical and horizontal stems aren't grayed).  This */
-  /*       means that `xOffset' and `yOffset' must be multiples       */
-  /*       of 64!                                                     */
-  /*
-  EXPORT_DEF
-  TT_Error  TT_Get_Glyph_Region( TT_Glyph          glyph,
-                                 TT_Raster_Map*    map,
-                                 TT_F26Dot6        xOffset,
-                                 TT_F26Dot6        yOffset ); */
-
-
-  /* Render the glyph into the passed GEOS regionpath.                */
-  /*
-  EXPORT_DEF
-  TT_Error  TT_Get_Glyph_In_Region( TT_Glyph      glyph,
-                                    MemHandle     bitmapBlock,
-                                    Handle        regionPath ); */
 
 
   /* ----------------------- outline support ------------------------ */
@@ -988,15 +895,6 @@
   void  TT_Translate_Outline( TT_Outline*  outline,
                               TT_F26Dot6   xOffset,
                               TT_F26Dot6   yOffset );
-
-
-  /* Apply a transformation to a vector. */
-
-/*
-  EXPORT_DEF
-  void  TT_Transform_Vector( TT_F26Dot6*  x,
-                             TT_F26Dot6*  y,
-                             TT_Matrix*   matrix ); */
 
 
   /* Compute A*B/C with 64 bits intermediate precision. */
