@@ -6,10 +6,10 @@
 GEODE           = idialup
 ASM_TO_OBJS     = IDialppp.asm
 UI_TO_RDFS      =
-SRCS            = IDialppp.asm IDialppp.def IDialppp.h IDialup.goc\
-                  IDialapp.goc IDInfo.goc IDialUI.goc IDialUI.goh\
+SRCS            = IDialppp.asm IDialppp.def IDialppp.h IDInfo.goc\
+                  IDialapp.goc IDialup.goc IDialUI.goc IDialUI.goh\
                   IDialup.goh
-OBJS            = IDialppp.obj IDialup.obj IDialapp.obj IDInfo.obj\
+OBJS            = IDialppp.obj IDInfo.obj IDialapp.obj IDialup.obj\
                   IDialUI.obj
 LOBJS           =
 

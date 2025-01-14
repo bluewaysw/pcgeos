@@ -213,4 +213,4 @@ DBCS/impgraph.eobj: geos.h heap.h geode.h resource.h ec.h object.h lmem.h \
                 IMPBMP/imppng.h Ansi/stdio.h Ansi/stdlib.h Ansi/string.h \
                 zlib.h zconf.h ieCommon.h xlatLib.h
 
-DBCS/impgraphEC.geo DBCS/impgraph.geo : geos.ldf ansic.ldf ijgjpeg.ldf pnglib.ldf 
+DBCS/impgraphEC.geo DBCS/impgraph.geo : geos.ldf ansic.ldf fjpeg.ldf ijgjpeg.ldf ijgjpeg.ldf pnglib.ldf

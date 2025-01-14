@@ -19,7 +19,7 @@ LOBJS           =
 LIBOBJ          = $(DEVEL_DIR)/Include/$(GEODE).ldf
 LIBNAME         = impgraph
 
-PRODUCTS        = DBCS 
+PRODUCTS        = DBCS FJPEG
 
 SYSMAKEFILE     = geode.mk
 
@@ -38,4 +38,8 @@ SYSMAKEFILE     = geode.mk
 
 #if exists(DBCS/$(DEPFILE))
 #include "DBCS/$(DEPFILE)"
+#endif
+
+#if exists(FJPEG/$(DEPFILE))
+#include "FJPEG/$(DEPFILE)"
 #endif

@@ -14,7 +14,7 @@
  *  understand and accept it fully.
  *
  *
- *  Changes between 3.1 and 3.0:
+ *  Changes between 3.1 and 3.0:TT_MulDiv
  *
  *  - A more relaxed version of the interpreter.  It is now able to
  *    ignore errors like out-of-bound array access and writes in order
@@ -38,6 +38,9 @@
 
 #ifdef TT_CONFIG_OPTION_NO_INTERPRETER
 
+#ifdef TT_CONFIG_GEOS_REAL_MODE_SEGMENTING
+#pragma code_seg(InterpEntry)
+#endif
   LOCAL_FUNC
   TT_Error  RunIns( PExecution_Context  exc )
   {
@@ -45,6 +48,10 @@
     (void)exc;
     return TT_Err_Ok;
   }
+
+#ifdef TT_CONFIG_GEOS_REAL_MODE_SEGMENTING
+#pragma code_seg()
+#endif 
 
 #else
 
@@ -200,7 +207,84 @@
 
 #define BOUNDS( x, n )  ( (x) >= (n) )
 
+#ifdef TT_CONFIG_GEOS_REAL_MODE_SEGMENTING
+#pragma code_seg(InterpEntry)
+#endif
 
+  /* Implementation copy to enable fast _near call */
+
+  static TT_Long  _near TT_MulFixLocal( TT_Long  a, TT_Long  b )
+  {
+  #ifdef TT_CONFIG_OPTION_USE_ASSEMBLER_IMPLEMENTATION
+    __asm {
+        ; store sign of result
+        mov     eax, a
+        xor     eax, b
+        mov     esi, eax         ; esi = sign of result
+
+        ; calculate |a|
+        mov     eax, a
+        cdq                      ; sign extend eax into edx
+        xor     eax, edx
+        sub     eax, edx
+        mov     ebx, eax         ; ebx = |a|
+
+        ; calculate |b|
+        mov     eax, b
+        cdq
+        xor     eax, edx
+        sub     eax, edx         ; eax = |b|
+
+        ; multiply |a| * |b|
+        mul     ebx              ; edx:eax = |a| * |b|
+
+        ; add 0x8000 (rounding factor)
+        add     eax, 0x8000
+        adc     edx, 0           ; edx:eax += 0x8000
+
+        ; divide by 0x10000 (shift right by 16)
+        shrd    eax, edx, 16
+        shr     edx, 16          ; edx:eax >>= 16
+
+        ; apply sign using NEG if necessary
+        test    esi, 0x80000000  ; test the sign bit
+        jz      positive
+        neg     eax
+    positive:
+        mov     edx, eax         ; store result in dx:ax
+        shr     edx, 16
+    }
+  #else
+    long   s;
+
+    if ( a == 0 || b == 0x10000 )
+      return a;
+
+    s  = a; a = ABS( a );
+    s ^= b; b = ABS( b );
+
+    if ( a <= 1024 && b <= 2097151 )
+    {
+      a = ( a*b + 0x8000 ) >> 16;
+    }
+    else
+    {
+      TT_Int64  temp, temp2;
+
+      MulTo64( a, b, &temp );
+      temp2.hi = 0;
+      temp2.lo = 0x8000;
+      Add64( &temp, &temp2, &temp );
+      a = Div64by32( &temp, 0x10000 );
+    }
+
+    return ( s < 0 ) ? -a : a;
+  #endif
+  }
+
+#ifdef TT_CONFIG_GEOS_REAL_MODE_SEGMENTING
+#pragma code_seg()
+#endif
 
 /*********************************************************************/
 /*                                                                   */
@@ -510,6 +594,10 @@
 #undef  NULL_Vector
 #define NULL_Vector (TT_Vector*)&Null_Vector
 
+#ifdef TT_CONFIG_GEOS_REAL_MODE_SEGMENTING
+#pragma code_seg(InterpExtra)
+#endif
+
 /*******************************************************************
  *
  *  Function    :  Norm
@@ -555,6 +643,9 @@
                       CUR.metrics.scale2 );
   }
 
+#ifdef TT_CONFIG_GEOS_REAL_MODE_SEGMENTING
+#pragma code_seg(InterpEntry)
+#endif
 
 /*******************************************************************
  *
@@ -597,7 +688,7 @@
 
   static Long  Current_Ppem( EXEC_OP )
   {
-    return TT_MulFix( CUR.metrics.ppem, CURRENT_Ratio() );
+    return TT_MulFixLocal( CUR.metrics.ppem, CURRENT_Ratio() );
   }
 
 
@@ -612,7 +703,6 @@
     return TT_MulFix( CUR.cvt[index], CURRENT_Ratio() );
   }
 #endif
-
 
   static void  _near Write_CVT( EXEC_OPS UShort  index, TT_F26Dot6  value )
   {
@@ -777,6 +867,9 @@
     return SUCCESS;
   }
 
+#ifdef TT_CONFIG_GEOS_REAL_MODE_SEGMENTING
+#pragma code_seg()
+#endif
 
 /*******************************************************************
  *
@@ -858,7 +951,6 @@
     zone->touch[point] |= TT_Flag_Touched_Y;
   }
 
-
 /*******************************************************************
  *
  *  Function    :  Round_None
@@ -876,7 +968,6 @@
  *         should add the compensation before rounding.
  *
  ******************************************************************/
-
   static TT_F26Dot6 _near Round_None( EXEC_OPS TT_F26Dot6  distance,
                                                TT_F26Dot6  compensation )
   {
@@ -896,6 +987,12 @@
     }
 
     return val;
+  }
+
+  static TT_F26Dot6 _far FarRound_None( EXEC_OPS TT_F26Dot6  distance,
+                                               TT_F26Dot6  compensation )
+  {
+    return Round_None( EXEC_ARGS distance, compensation);
   }
 
 
@@ -1173,6 +1270,9 @@
     return val;
   }
 
+#ifdef TT_CONFIG_GEOS_REAL_MODE_SEGMENTING
+#pragma code_seg(InterpExtra)
+#endif
 
 /*******************************************************************
  * Compute_Round
@@ -1216,7 +1316,6 @@
       break;
     }
   }
-
 
 /*******************************************************************
  *
@@ -1284,6 +1383,40 @@
     CUR.threshold >>= 8;
   }
 
+#ifdef TT_CONFIG_GEOS_REAL_MODE_SEGMENTING
+#pragma code_seg()
+#endif
+
+  static TT_F26Dot6 _far FarCUR_Func_round(EXEC_OPS TT_F26Dot6  distance,
+                                                   TT_F26Dot6  compensation)
+  {
+    return CUR.func_round(EXEC_ARGS distance, compensation);
+  }
+
+  static void _far FarCUR_Func_move(EXEC_OPS PGlyph_Zone zone,
+                                     UShort      point,
+                                     TT_F26Dot6  distance)
+  {
+    CUR.func_move(EXEC_ARGS zone, point, distance);
+  }
+
+#ifdef TT_CONFIG_GEOS_REAL_MODE_SEGMENTING
+#pragma code_seg(InterpEntry)
+#endif
+
+  static TT_F26Dot6 _far FarCUR_Func_read_cvt(EXEC_OPS UShort index)
+  {
+    return CUR.func_read_cvt(EXEC_ARGS index);
+  }
+
+  static void _far FarCUR_Func_move_cvt(EXEC_OPS UShort index, TT_F26Dot6  value)
+  {
+    CUR.func_move_cvt(EXEC_ARGS index, value);
+  }
+
+#ifdef TT_CONFIG_GEOS_REAL_MODE_SEGMENTING
+#pragma code_seg()
+#endif
 
 /*******************************************************************
  *
@@ -1406,6 +1539,9 @@
     return (v1->y - v2->y);
   }
 
+#ifdef TT_CONFIG_GEOS_REAL_MODE_SEGMENTING
+#pragma code_seg(InterpExtra)
+#endif
 
 /*******************************************************************
  *
@@ -1479,7 +1615,6 @@
     /* Disable cached aspect ratio */
     CUR.metrics.ratio = 0;
   }
-
 
 /*******************************************************************
  *
@@ -1630,6 +1765,9 @@
     return SUCCESS;
   }
 
+#ifdef TT_CONFIG_GEOS_REAL_MODE_SEGMENTING
+#pragma code_seg()
+#endif
 
 /* When not using the big switch statements, the interpreter uses a */
 /* call table defined later below in this source.  Each opcode must */
@@ -1952,11 +2090,11 @@
 
 
 #define DO_ODD  \
-    args[0] = ( (CUR_Func_round( args[0], 0 ) & 127) == 64 );
+    args[0] = ( (FarCUR_Func_round(EXEC_ARGS args[0], 0 ) & 127) == 64 );
 
 
 #define DO_EVEN  \
-    args[0] = ( (CUR_Func_round( args[0], 0 ) & 127) == 0 );
+    args[0] = ( (FarCUR_Func_round( EXEC_ARGS args[0], 0 ) & 127) == 0 );
 
 
 #define DO_AND  \
@@ -2139,12 +2277,12 @@
 
 
 #define DO_ROUND                                                            \
-    args[0] = CUR_Func_round( args[0],                                      \
+    args[0] = FarCUR_Func_round( EXEC_ARGS args[0],                                      \
                               CUR.metrics.compensations[CUR.opcode-0x68] );
 
 
 #define DO_NROUND                                                         \
-    args[0] = Round_None( EXEC_ARGS                                       \
+    args[0] = FarRound_None( EXEC_ARGS                                       \
                           args[0],                                        \
                           CUR.metrics.compensations[CUR.opcode - 0x6C] );
 
@@ -2973,6 +3111,9 @@
 
 #endif  /* !TT_CONFIG_OPTION_INTERPRETER_SWITCH */
 
+#ifdef TT_CONFIG_GEOS_REAL_MODE_SEGMENTING
+#pragma code_seg(InterpExtra)
+#endif
 
 /* The following functions are called as is within the switch statement */
 
@@ -3003,6 +3144,9 @@
     CUR.stack[CUR.args - 1] = K;
   }
 
+#ifdef TT_CONFIG_GEOS_REAL_MODE_SEGMENTING
+#pragma code_seg(InterpEntry)
+#endif
 
 /*******************************************/
 /* ROLL[]    : roll top three elements     */
@@ -3039,6 +3183,7 @@
     CUR.error = TT_Err_Code_Overflow;
     return FAILURE;
   }
+
 
 
 /*******************************************/
@@ -3213,7 +3358,6 @@
     }
   }
 
-
 /*******************************************/
 /* ENDF[]    : END Function definition     */
 /* CodeRange : $2D                         */
@@ -3300,6 +3444,9 @@
     CUR.step_ins = FALSE;
   }
 
+#ifdef TT_CONFIG_GEOS_REAL_MODE_SEGMENTING
+#pragma code_seg(InterpInfreq)
+#endif
 
 /*******************************************/
 /* LOOPCALL[]: LOOP and CALL function      */
@@ -3413,6 +3560,10 @@
 /*                                                              */
 /****************************************************************/
 
+#ifdef TT_CONFIG_GEOS_REAL_MODE_SEGMENTING
+#pragma code_seg(InterpInfreq)
+#endif
+
 /*******************************************/
 /* NPUSHB[]  : PUSH N Bytes                */
 /* CodeRange : $40                         */
@@ -3465,6 +3616,9 @@
     CUR.new_top += L;
   }
 
+#ifdef TT_CONFIG_GEOS_REAL_MODE_SEGMENTING
+#pragma code_seg(InterpEntry)
+#endif
 
 /*******************************************/
 /* PUSHB[abc]: PUSH Bytes                  */
@@ -3515,7 +3669,9 @@
     CUR.step_ins = FALSE;
   }
 
-
+#ifdef TT_CONFIG_GEOS_REAL_MODE_SEGMENTING
+#pragma code_seg()
+#endif
 
 /****************************************************************/
 /*                                                              */
@@ -3649,6 +3805,9 @@
     args[0] = D;
   }
 
+#ifdef TT_CONFIG_GEOS_REAL_MODE_SEGMENTING
+#pragma code_seg(InterpExtra)
+#endif
 
 /*******************************************/
 /* SDPVTL[a] : Set Dual PVector to Line    */
@@ -3742,6 +3901,9 @@
     CUR.GS.gep0 = (UShort)args[0];
   }
 
+#ifdef TT_CONFIG_GEOS_REAL_MODE_SEGMENTING
+#pragma code_seg(InterpExtra)
+#endif
 
 /*******************************************/
 /* SZP1[]    : Set Zone Pointer 1          */
@@ -3861,7 +4023,6 @@
     CUR.GS.instruct_control = 
       (Byte)( CUR.GS.instruct_control & ~(Byte)K ) | (Byte)L;
   }
-
 
 /*******************************************/
 /* SCANCTRL[]: SCAN ConTRol                */
@@ -4026,6 +4187,18 @@
       CUR.pts.touch[I] &= ~TT_Flag_On_Curve;
   }
 
+#ifdef TT_CONFIG_GEOS_REAL_MODE_SEGMENTING
+#pragma code_seg()
+#endif
+
+static TT_F26Dot6 _far FarCUR_Func_project( EXEC_OPS TT_Vector*  v1, TT_Vector*  v2 )
+{   
+    return CUR_Func_project( v1, v2 );
+}
+
+#ifdef TT_CONFIG_GEOS_REAL_MODE_SEGMENTING
+#pragma code_seg(InterpInfreq)
+#endif
 
   static Bool  Compute_Point_Displacement( EXEC_OPS
                                            PCoordinates  x,
@@ -4061,14 +4234,13 @@
     *zone = zp;
     *refp = p;
 
-    d = CUR_Func_project( zp.cur + p, zp.org + p );
+    d = FarCUR_Func_project( EXEC_ARGS zp.cur + p, zp.org + p );
 
     *x = TT_MulDiv(d, (Long)CUR.GS.freeVector.x * 0x10000L, CUR.F_dot_P );
     *y = TT_MulDiv(d, (Long)CUR.GS.freeVector.y * 0x10000L, CUR.F_dot_P );
 
     return SUCCESS;
   }
-
 
   static void  Move_Zp2_Point( EXEC_OPS
                                UShort      point,
@@ -4290,6 +4462,9 @@
     CUR.new_top = CUR.args;
   }
 
+#ifdef TT_CONFIG_GEOS_REAL_MODE_SEGMENTING
+#pragma code_seg();
+#endif
 
 /**********************************************/
 /* MSIRP[a]  : Move Stack Indirect Relative   */
@@ -4423,7 +4598,7 @@
     /* twilight zone. This is a bad hack, but it seems   */
     /* to work.                                          */
 
-    distance = CUR_Func_read_cvt( cvtEntry );
+    distance = FarCUR_Func_read_cvt( EXEC_ARGS cvtEntry );
 
     if ( CUR.GS.gep0 == 0 )   /* If in twilight zone */
     {
@@ -4566,7 +4741,7 @@
     if ( !cvtEntry )
       cvt_dist = 0;
     else
-      cvt_dist = CUR_Func_read_cvt( cvtEntry - 1 );
+      cvt_dist = FarCUR_Func_read_cvt( EXEC_ARGS cvtEntry - 1 );
 
     /* single width test */
 
@@ -4709,6 +4884,9 @@
     CUR.new_top = CUR.args;
   }
 
+#ifdef TT_CONFIG_GEOS_REAL_MODE_SEGMENTING
+#pragma code_seg(InterpInfreq)
+#endif
 
 /**********************************************/
 /* ISECT[]     : moves point to InterSECTion  */
@@ -4791,6 +4969,9 @@
     }
   }
 
+#ifdef TT_CONFIG_GEOS_REAL_MODE_SEGMENTING
+#pragma code_seg()
+#endif
 
 /**********************************************/
 /* ALIGNPTS[]  : ALIGN PoinTS                 */
@@ -4911,6 +5092,9 @@
     CUR.new_top = CUR.args;
   }
 
+#ifdef TT_CONFIG_GEOS_REAL_MODE_SEGMENTING
+#pragma code_seg(InterpInfreq)
+#endif
 
 /**********************************************/
 /* UTP[a]      : UnTouch Point                */
@@ -4967,7 +5151,6 @@
     for ( i = p + 1; i <= p2; ++i )
       LINK->curs[i].x += x;
   }
-
 
   static void  Interp( UShort               p1,
                        UShort               p2,
@@ -5199,7 +5382,7 @@
             ++B;
           B = B * 64L / (1L << CUR.GS.delta_shift);
 
-          CUR_Func_move( &CUR.zp0, A, B );
+          FarCUR_Func_move( EXEC_ARGS &CUR.zp0, A, B );
         }
       }
 #ifdef TT_CONFIG_OPTION_SUPPORT_PEDANTIC_HINTING
@@ -5273,14 +5456,13 @@
             ++B;
           B = (B << 6) / (1L << CUR.GS.delta_shift);
 
-          CUR_Func_move_cvt( A, B );
+          FarCUR_Func_move_cvt( EXEC_ARGS A, B );
         }
       }
     }
 
     CUR.new_top = CUR.args;
   }
-
 
 
 /****************************************************************/
@@ -5304,6 +5486,9 @@
     args[0] = (args[0] & 1) ? 3 : 0;
   }
 
+#ifdef TT_CONFIG_GEOS_REAL_MODE_SEGMENTING
+#pragma code_seg()
+#endif
 
   static void  Ins_UNKNOWN( EXEC_OP )
   {
@@ -5628,6 +5813,9 @@
   };
 #endif
 
+#ifdef TT_CONFIG_GEOS_REAL_MODE_SEGMENTING
+#pragma code_seg(InterpEntry)
+#endif
 
 /****************************************************************/
 /*                                                              */
@@ -6690,6 +6878,9 @@
 
 #endif /* DEBUG_INTERPRETER */
 
+#ifdef TT_CONFIG_GEOS_REAL_MODE_SEGMENTING
+#pragma code_seg()
+#endif
 
 #endif /* TT_CONFIG_OPTION_NO_INTERPRETER */
 
