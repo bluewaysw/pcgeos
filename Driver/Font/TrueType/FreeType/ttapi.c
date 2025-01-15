@@ -1224,7 +1224,7 @@ TT_Error  TT_Get_Outline_Region( TT_Outline*     outline,
  *  MT-Safe : YES!
  *
  ******************************************************************/
-
+  #pragma code_seg(ttcmap_TEXT)
   EXPORT_FUNC
   TT_UShort  TT_Char_Index( TT_CharMap  charMap,
                             TT_UShort   charCode )
@@ -1237,7 +1237,7 @@ TT_Error  TT_Get_Outline_Region( TT_Outline*     outline,
 
     return CharMap_Index( cmap, charCode );
   }
-
+#pragma code_seg()
 
 /*******************************************************************
  *

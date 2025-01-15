@@ -43,7 +43,7 @@ static void ConvertWidths( TRUETYPE_VARS,
                         FontHeader*             fontHeader, 
                         FontBuf*                fontBuf );
             
-static void ConvertKernPairs( TRUETYPE_VARS, FontBuf* fontBuf );
+void ConvertKernPairs( TRUETYPE_VARS, FontBuf* fontBuf );
 
 static void CalcScaleForWidths( TRUETYPE_VARS,
                         WWFixedAsDWord          pointSize,
@@ -423,8 +423,8 @@ EC_ERROR_IF(    indexRightChar > fontHeader->FH_lastChar - fontHeader->FH_firstC
  *      ----      ----      -----------
  *      20.12.22  JK        Initial Revision
  *******************************************************************/
-
-static void ConvertKernPairs( TRUETYPE_VARS, FontBuf* fontBuf )
+#pragma code_seg(ttcharmapper_TEXT)
+void ConvertKernPairs( TRUETYPE_VARS, FontBuf* fontBuf )
 {
         TT_Kerning        kerningDir;
         word              table;
@@ -494,7 +494,7 @@ EC(             ECCheckBounds( pairs ) );
         }
         GEO_UNLOCK( LOOKUP_TABLE );
 }
-
+#pragma code_seg()
 
 /********************************************************************
  *                      CalcScaleForWidths
