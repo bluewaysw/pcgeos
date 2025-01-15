@@ -440,6 +440,11 @@ typedef enum {
  *      macros
  ***********************************************************************/
 
+#define GrMulWWFixed    TrueType_GrMulWWFixed
+
+extern WWFixedAsDWord
+		    _pascal TrueType_GrMulWWFixed(WWFixedAsDWord i,
+							WWFixedAsDWord j);
 /*
  * convert value (word) to WWFixedAsDWord
  */

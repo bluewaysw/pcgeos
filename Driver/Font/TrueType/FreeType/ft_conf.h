@@ -126,7 +126,9 @@
 /* configuration macro will generate the appropriate C jump table in     */
 /* ttinterp.c. If you use an optimizing compiler, you should leave it    */
 /* defined for better performance and code compactness..                 */
-
+/* Usable for PC/GEOS but requires as is more code space and doesn't     */
+/* seem to give performance benefits                                     */
+/*                                                                       */
 #define  TT_CONFIG_OPTION_INTERPRETER_SWITCH
 
 

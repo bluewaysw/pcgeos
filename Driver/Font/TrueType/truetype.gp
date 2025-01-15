@@ -40,6 +40,12 @@ usernotes	"#FreeGEOS font driver to render TrueType fonts."
 resource Resident 	fixed code read-only shared
 resource InitMod	code read-only shared discard-only
 
+# Optionally make to segemnt fixed, to save even more inter-resource
+# calls to movable resources
+# Disabled by default, not much impact
+#resource ttmemory_TEXT	fixed code read-only shared
+#resource ttfile_TEXT 	fixed code read-only shared
+
 resource InterpEntry	code read-only shared
 resource InterpInfreq	code read-only shared
 resource InterpExtra	code read-only shared
