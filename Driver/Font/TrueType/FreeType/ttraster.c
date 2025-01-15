@@ -2279,10 +2279,7 @@ Scan_DropOuts :
         k = ( i + j ) >> 1;
 
         if ( band_top >= 7 || k < i )
-        {
-          band_top     = 0;
           return Raster_Err_Invalid;
-        }
 
         ras.band_stack[band_top+1].y_min = k;
         ras.band_stack[band_top+1].y_max = j;
@@ -2329,11 +2326,6 @@ Scan_DropOuts :
 
 EC( ECCheckMemHandle( ras.buffer ) );
 
-    if ( glyph->n_points == 0 || glyph->n_contours <= 0 )
-      return TT_Err_Ok;
-
-    if ( glyph->n_points < glyph->contours[glyph->n_contours - 1] )
-      return TT_Err_Too_Many_Points;
 
     if ( target_map )
       ras.target = *target_map;
@@ -2410,11 +2402,6 @@ EC( ECCheckMemHandle( ras.buffer ) );
 
 EC( ECCheckMemHandle( ras.buffer ) );
 
-    if ( glyph->n_points == 0 || glyph->n_contours <= 0 )
-      return TT_Err_Ok;
-
-    if ( glyph->n_points < glyph->contours[glyph->n_contours - 1] )
-      return TT_Err_Too_Many_Points;
 
     if ( map )
       ras.target = *map;
@@ -2466,7 +2453,7 @@ static void Lock_Render_Pool( RAS_ARGS  TT_Outline*  glyph )
 
   MemReAlloc( ras.buffer, renderpoolSize, HAF_NO_ERR | HAF_LOCK);
 
-  ras.sizeBuff = (PStorage)MemDeref( ras.buffer ) + ( renderpoolSize / sizeof(long) );
+  ras.sizeBuff = (PStorage)MemDeref( ras.buffer ) + ( renderpoolSize >> 2 );
 }
 
 

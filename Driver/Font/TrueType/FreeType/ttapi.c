@@ -939,6 +939,12 @@ extern TEngine_Instance engineInstance;
     if ( !outline || !map )
       return TT_Err_Invalid_Argument;
 
+    if ( outline->n_points == 0 || outline->n_contours <= 0 )
+      return TT_Err_Ok; 
+
+    if ( outline->n_points < outline->contours[outline->n_contours - 1] )
+      return TT_Err_Too_Many_Points; 
+
     return RENDER_Glyph( outline, map );
   }
 
@@ -966,6 +972,12 @@ TT_Error  TT_Get_Outline_Region( TT_Outline*     outline,
 {
   if ( !outline || !map )
     return TT_Err_Invalid_Argument;
+
+  if ( outline->n_points == 0 || outline->n_contours <= 0 )
+    return TT_Err_Ok;
+
+  if ( outline->n_points < outline->contours[outline->n_contours - 1] )
+      return TT_Err_Too_Many_Points; 
 
   return RENDER_Region_Glyph( outline, map );
 }
