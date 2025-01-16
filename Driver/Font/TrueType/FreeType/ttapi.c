@@ -191,12 +191,10 @@ extern TEngine_Instance engineInstance;
     /* Set the handle */
     HANDLE_Set( *face, _face );
 
-    if (error) {
-        TT_Close_Stream(&stream);
-        return error;
-    }
+    if (error)
+      TT_Close_Stream(&stream);
 
-    return TT_Err_Ok;
+    return error;
   }
 
 
@@ -511,8 +509,6 @@ extern TEngine_Instance engineInstance;
     ins->metrics.x_ppem = ins->metrics.x_scale1 >> 6;
     ins->metrics.y_ppem = ins->metrics.y_scale1 >> 6;
     ins->metrics.pointSize = charSize;
-
-    ins->valid  = FALSE;
 
     return Instance_Reset( ins );
   }
@@ -863,6 +859,7 @@ extern TEngine_Instance engineInstance;
       return TT_Err_Invalid_Argument;
 
     *outline = null_outline;
+    outline->owner = TRUE;
 
     if ( ALLOC( outline->points,   numPoints*2*sizeof ( TT_F26Dot6 ) ) ||
          ALLOC( outline->flags,    numPoints  *sizeof ( Byte )       ) ||
@@ -871,11 +868,9 @@ extern TEngine_Instance engineInstance;
 
     outline->n_points   = numPoints;
     outline->n_contours = numContours;
-    outline->owner      = TRUE;
     return TT_Err_Ok;
 
   Fail:
-    outline->owner = TRUE;
     TT_Done_Outline( outline );
     return error;
   }
