@@ -331,7 +331,7 @@
   static UShort  code_to_index2( UShort  charCode, PCMap2  cmap2 );
 #endif
 
-  static UShort  code_to_index4( UShort  charCode, PCMap4  cmap4 );
+  UShort  code_to_index4( UShort  charCode, PCMap4  cmap4 );
 
 #ifdef TT_CONFIG_OPTION_SUPPORT_CMAP6
   static UShort  code_to_index6( UShort  charCode, PCMap6  cmap6 );
@@ -469,7 +469,7 @@
  *
  ******************************************************************/
 
-  static UShort  code_to_index4( UShort  charCode,
+  UShort  code_to_index4( UShort  charCode,
                                  PCMap4  cmap4 )
   {
     UShort         index1, segCount;
