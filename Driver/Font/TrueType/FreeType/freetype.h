@@ -824,21 +824,6 @@
                                   TT_Glyph_Metrics*  metrics );
 
 
-  /* Render the glyph into a bitmap, with given position offsets.     */
-  /*                                                                  */
-  /* Note: Only use integer pixel offsets to preserve the fine        */
-  /*       hinting of the glyph and the `correct' anti-aliasing       */
-  /*       (where vertical and horizontal stems aren't grayed).  This */
-  /*       means that `xOffset' and `yOffset' must be multiples       */
-  /*       of 64!                                                     */
-/*
-  EXPORT_DEF
-  TT_Error  TT_Get_Glyph_Bitmap( TT_Glyph        glyph,
-                                 TT_Raster_Map*  map,
-                                 TT_F26Dot6      xOffset,
-                                 TT_F26Dot6      yOffset );*/
-
-
   /* ----------------------- outline support ------------------------ */
 
   /* Allocate a new outline.  Reserve space for `numPoints' and */

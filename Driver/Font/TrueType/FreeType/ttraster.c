@@ -2303,6 +2303,19 @@ Scan_DropOuts :
     return TT_Err_Ok;
   }
 
+  LOCAL_FUNC
+  static void Initialize_Raster_Instance( RAS_ARGS TT_Outline*  glyph )
+  {
+    ras.outs      = glyph->contours;
+    ras.flags     = glyph->flags;
+    ras.nPoints   = glyph->n_points;
+    ras.nContours = glyph->n_contours;
+    ras.coords    = glyph->points;
+
+    Set_Resolution( RAS_VARS glyph->y_ppem );
+    ras.dropOutControl = glyph->dropout_mode;
+  }
+
 
 /****************************************************************************/
 /*                                                                          */
@@ -2325,19 +2338,12 @@ Scan_DropOuts :
 
 
 EC( ECCheckMemHandle( ras.buffer ) );
+EC( ECCheckBounds( (void*)target_map ) );
 
 
-    if ( target_map )
-      ras.target = *target_map;
+    ras.target = *target_map;
 
-    ras.outs      = glyph->contours;
-    ras.flags     = glyph->flags;
-    ras.nPoints   = glyph->n_points;
-    ras.nContours = glyph->n_contours;
-    ras.coords    = glyph->points;
-
-    Set_Resolution( RAS_VARS glyph->y_ppem );
-    ras.dropOutControl = glyph->dropout_mode;
+    Initialize_Raster_Instance( RAS_VARS glyph );
 
     /* Vertical Sweep */
     ras.Proc_Sweep_Init   = Vertical_Sweep_Init;
@@ -2401,19 +2407,12 @@ EC( ECCheckMemHandle( ras.buffer ) );
 
 
 EC( ECCheckMemHandle( ras.buffer ) );
+EC( ECCheckBounds( (void*)map ) );
 
 
-    if ( map )
-      ras.target = *map;
+    ras.target = *map;
 
-    ras.outs      = glyph->contours;
-    ras.flags     = glyph->flags;
-    ras.nPoints   = glyph->n_points;
-    ras.nContours = glyph->n_contours;
-    ras.coords    = glyph->points;
-
-    Set_Resolution( RAS_VARS glyph->y_ppem );
-    ras.dropOutControl = glyph->dropout_mode;
+    Initialize_Raster_Instance( RAS_VARS glyph );
 
     /* Vertical Sweep */
   
