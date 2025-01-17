@@ -52,7 +52,7 @@
   Short  TT_LookUp_Table( PFace  face,
                          ULong  tag  )
   {
-    UShort  i;
+    Short  i;
 
 
     for ( i = 0; i < face->numTables; ++i )
@@ -517,10 +517,10 @@
 
     header->advance_Width_Max = GET_UShort();
 
+#ifdef TT_CONFIG_OPTION_SUPPORT_OPTIONAL_FIELDS
     header->min_Left_Side_Bearing  = GET_Short();
     header->min_Right_Side_Bearing = GET_Short();
 
-#ifdef TT_CONFIG_OPTION_SUPPORT_OPTIONAL_FIELDS
     header->xMax_Extent            = GET_Short();
     header->caret_Slope_Rise       = GET_Short();
     header->caret_Slope_Run        = GET_Short();
@@ -532,7 +532,7 @@
     header->Reserved3 = GET_Short();
     header->Reserved4 = GET_Short();
 #else
-    SKIP( 16 );
+    SKIP( 20 );
 #endif
 
     header->metric_Data_Format = GET_Short();
