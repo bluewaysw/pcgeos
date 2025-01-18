@@ -203,7 +203,7 @@
 #define CUR_Ppem()  Cur_PPEM( EXEC_ARG )
 
   /* Instruction dispatch function, as used by the interpreter */
-  typedef void  (*TInstruction_Function)( INS_ARG );
+  typedef void (_near *TInstruction_Function)( INS_ARG );
 
 #define BOUNDS( x, n )  ( (x) >= (n) )
 
@@ -2298,7 +2298,7 @@
 
 
 #ifndef TT_CONFIG_OPTION_INTERPRETER_SWITCH
-
+#pragma code_seg(InterpEntry)
 
 #undef  ARRAY_BOUND_ERROR
 #define ARRAY_BOUND_ERROR                    \
@@ -2313,7 +2313,7 @@
 /* CodeRange : $00-$01                     */
 /* Stack     : -->                         */
 
-  static void  Ins_SVTCA( INS_ARG )
+  static void _near Ins_SVTCA( INS_ARG )
   {
     DO_SVTCA
   }
@@ -2324,7 +2324,7 @@
 /* CodeRange : $02-$03                     */
 /* Stack     : -->                         */
 
-  static void  Ins_SPVTCA( INS_ARG )
+  static void _near Ins_SPVTCA( INS_ARG )
   {
     DO_SPVTCA
   }
@@ -2335,7 +2335,7 @@
 /* CodeRange : $04-$05                     */
 /* Stack     : -->                         */
 
-  static void  Ins_SFVTCA( INS_ARG )
+  static void _near Ins_SFVTCA( INS_ARG )
   {
     DO_SFVTCA
   }
@@ -2345,7 +2345,7 @@
 /* CodeRange : $06-$07                     */
 /* Stack     : uint32 uint32 -->           */
 
-  static void  Ins_SPVTL( INS_ARG )
+  static void _near Ins_SPVTL( INS_ARG )
   {
     DO_SPVTL
   }
@@ -2356,7 +2356,7 @@
 /* CodeRange : $08-$09                     */
 /* Stack     : uint32 uint32 -->           */
 
-  static void  Ins_SFVTL( INS_ARG )
+  static void _near Ins_SFVTL( INS_ARG )
   {
     DO_SFVTL
   }
@@ -2367,7 +2367,7 @@
 /* CodeRange : $0E                         */
 /* Stack     : -->                         */
 
-  static void  Ins_SFVTPV( INS_ARG )
+  static void _near Ins_SFVTPV( INS_ARG )
   {
     DO_SFVTPV
   }
@@ -2378,7 +2378,7 @@
 /* CodeRange : $0A                         */
 /* Stack     : f2.14 f2.14 -->             */
 
-  static void  Ins_SPVFS( INS_ARG )
+  static void _near Ins_SPVFS( INS_ARG )
   {
     DO_SPVFS
   }
@@ -2389,7 +2389,7 @@
 /* CodeRange : $0B                         */
 /* Stack     : f2.14 f2.14 -->             */
 
-  static void  Ins_SFVFS( INS_ARG )
+  static void _near Ins_SFVFS( INS_ARG )
   {
     DO_SFVFS
   }
@@ -2400,7 +2400,7 @@
 /* CodeRange : $0C                         */
 /* Stack     : ef2.14 --> ef2.14           */
 
-  static void  Ins_GPV( INS_ARG )
+  static void _near Ins_GPV( INS_ARG )
   {
     DO_GPV
   }
@@ -2411,7 +2411,7 @@
 /* CodeRange : $0D                         */
 /* Stack     : ef2.14 --> ef2.14           */
 
-  static void  Ins_GFV( INS_ARG )
+  static void _near Ins_GFV( INS_ARG )
   {
     DO_GFV
   }
@@ -2422,7 +2422,7 @@
 /* CodeRange : $10                         */
 /* Stack     : uint32 -->                  */
 
-  static void  Ins_SRP0( INS_ARG )
+  static void _near Ins_SRP0( INS_ARG )
   {
     DO_SRP0
   }
@@ -2433,7 +2433,7 @@
 /* CodeRange : $11                         */
 /* Stack     : uint32 -->                  */
 
-  static void  Ins_SRP1( INS_ARG )
+  static void _near Ins_SRP1( INS_ARG )
   {
     DO_SRP1
   }
@@ -2444,7 +2444,7 @@
 /* CodeRange : $12                         */
 /* Stack     : uint32 -->                  */
 
-  static void  Ins_SRP2( INS_ARG )
+  static void _near Ins_SRP2( INS_ARG )
   {
     DO_SRP2
   }
@@ -2455,7 +2455,7 @@
 /* CodeRange : $19                         */
 /* Stack     : -->                         */
 
-  static void  Ins_RTHG( INS_ARG )
+  static void _near Ins_RTHG( INS_ARG )
   {
     DO_RTHG
   }
@@ -2466,7 +2466,7 @@
 /* CodeRange : $18                         */
 /* Stack     : -->                         */
 
-  static void  Ins_RTG( INS_ARG )
+  static void _near Ins_RTG( INS_ARG )
   {
     DO_RTG
   }
@@ -2477,7 +2477,7 @@
 /* CodeRange : $3D                         */
 /* Stack     : -->                         */
 
-  static void  Ins_RTDG( INS_ARG )
+  static void _near Ins_RTDG( INS_ARG )
   {
     DO_RTDG
   }
@@ -2488,7 +2488,7 @@
 /* CodeRange : $7C                         */
 /* Stack     : -->                         */
 
-  static void  Ins_RUTG( INS_ARG )
+  static void _near Ins_RUTG( INS_ARG )
   {
     DO_RUTG
   }
@@ -2499,7 +2499,7 @@
 /* CodeRange : $7D                         */
 /* Stack     : -->                         */
 
-  static void  Ins_RDTG( INS_ARG )
+  static void _near Ins_RDTG( INS_ARG )
   {
     DO_RDTG
   }
@@ -2510,7 +2510,7 @@
 /* CodeRange : $7A                         */
 /* Stack     : -->                         */
 
-  static void  Ins_ROFF( INS_ARG )
+  static void _near Ins_ROFF( INS_ARG )
   {
     DO_ROFF
   }
@@ -2521,7 +2521,7 @@
 /* CodeRange : $76                         */
 /* Stack     : Eint8 -->                   */
 
-  static void  Ins_SROUND( INS_ARG )
+  static void _near Ins_SROUND( INS_ARG )
   {
     DO_SROUND
   }
@@ -2532,7 +2532,7 @@
 /* CodeRange : $77                         */
 /* Stack     : uint32 -->                  */
 
-  static void  Ins_S45ROUND( INS_ARG )
+  static void _near Ins_S45ROUND( INS_ARG )
   {
     DO_S45ROUND
   }
@@ -2543,7 +2543,7 @@
 /* CodeRange : $17                         */
 /* Stack     : int32? -->                  */
 
-  static void  Ins_SLOOP( INS_ARG )
+  static void _near Ins_SLOOP( INS_ARG )
   {
     DO_SLOOP
   }
@@ -2554,7 +2554,7 @@
 /* CodeRange : $1A                         */
 /* Stack     : f26.6 -->                   */
 
-  static void  Ins_SMD( INS_ARG )
+  static void _near Ins_SMD( INS_ARG )
   {
     DO_SMD
   }
@@ -2565,7 +2565,7 @@
 /* CodeRange : $1D                            */
 /* Stack     : f26.6 -->                      */
 
-  static void  Ins_SCVTCI( INS_ARG )
+  static void _near Ins_SCVTCI( INS_ARG )
   {
     DO_SCVTCI
   }
@@ -2576,7 +2576,7 @@
 /* CodeRange : $1E                            */
 /* Stack     : f26.6 -->                      */
 
-  static void  Ins_SSWCI( INS_ARG )
+  static void _near Ins_SSWCI( INS_ARG )
   {
     DO_SSWCI
   }
@@ -2587,7 +2587,7 @@
 /* CodeRange : $1F                            */
 /* Stack     : int32? -->                     */
 
-  static void  Ins_SSW( INS_ARG )
+  static void _near Ins_SSW( INS_ARG )
   {
     DO_SSW
   }
@@ -2598,7 +2598,7 @@
 /* CodeRange : $4D                            */
 /* Stack     : -->                            */
 
-  static void  Ins_FLIPON( INS_ARG )
+  static void _near Ins_FLIPON( INS_ARG )
   {
     DO_FLIPON
   }
@@ -2609,7 +2609,7 @@
 /* CodeRange : $4E                            */
 /* Stack     : -->                            */
 
-  static void  Ins_FLIPOFF( INS_ARG )
+  static void _near Ins_FLIPOFF( INS_ARG )
   {
     DO_FLIPOFF
   }
@@ -2620,7 +2620,7 @@
 /* CodeRange : $7E                            */
 /* Stack     : uint32 -->                     */
 
-  static void  Ins_SANGW( INS_ARG )
+  static void _near Ins_SANGW( INS_ARG )
   {
     /* instruction not supported anymore */
   }
@@ -2631,7 +2631,7 @@
 /* CodeRange : $5E                            */
 /* Stack     : uint32 -->                     */
 
-  static void  Ins_SDB( INS_ARG )
+  static void _near Ins_SDB( INS_ARG )
   {
     DO_SDB
   }
@@ -2642,7 +2642,7 @@
 /* CodeRange : $5F                            */
 /* Stack     : uint32 -->                     */
 
-  static void  Ins_SDS( INS_ARG )
+  static void _near Ins_SDS( INS_ARG )
   {
     DO_SDS
   }
@@ -2653,7 +2653,7 @@
 /* CodeRange : $4B                            */
 /* Stack     : --> Euint16                    */
 
-  static void  Ins_MPPEM( INS_ARG )
+  static void _near Ins_MPPEM( INS_ARG )
   {
     DO_MPPEM
   }
@@ -2664,7 +2664,7 @@
 /* CodeRange : $4C                            */
 /* Stack     : --> Euint16                    */
 
-  static void  Ins_MPS( INS_ARG )
+  static void _near Ins_MPS( INS_ARG )
   {
     DO_MPS
   }
@@ -2674,7 +2674,7 @@
 /* CodeRange : $20                         */
 /* Stack     : StkElt --> StkElt StkElt    */
 
-  static void  Ins_DUP( INS_ARG )
+  static void _near Ins_DUP( INS_ARG )
   {
     DO_DUP
   }
@@ -2685,7 +2685,7 @@
 /* CodeRange : $21                         */
 /* Stack     : StkElt -->                  */
 
-  static void  Ins_POP( INS_ARG )
+  static void _near Ins_POP( INS_ARG )
   {
     /* nothing to do */
   }
@@ -2696,7 +2696,7 @@
 /* CodeRange : $22                         */
 /* Stack     : StkElt... -->               */
 
-  static void  Ins_CLEAR( INS_ARG )
+  static void _near Ins_CLEAR( INS_ARG )
   {
     DO_CLEAR
   }
@@ -2707,7 +2707,7 @@
 /* CodeRange : $23                         */
 /* Stack     : 2 * StkElt --> 2 * StkElt   */
 
-  static void  Ins_SWAP( INS_ARG )
+  static void _near Ins_SWAP( INS_ARG )
   {
     DO_SWAP
   }
@@ -2718,7 +2718,7 @@
 /* CodeRange : $24                         */
 /* Stack     : --> uint32                  */
 
-  static void  Ins_DEPTH( INS_ARG )
+  static void _near Ins_DEPTH( INS_ARG )
   {
     DO_DEPTH
   }
@@ -2729,7 +2729,7 @@
 /* CodeRange : $25                         */
 /* Stack     : int32 --> StkElt            */
 
-  static void  Ins_CINDEX( INS_ARG )
+  static void _near Ins_CINDEX( INS_ARG )
   {
     DO_CINDEX
   }
@@ -2740,7 +2740,7 @@
 /* CodeRange : $59                         */
 /* Stack     : -->                         */
 
-  static void  Ins_EIF( INS_ARG )
+  static void _near Ins_EIF( INS_ARG )
   {
     /* nothing to do */
   }
@@ -2751,7 +2751,7 @@
 /* CodeRange : $78                         */
 /* Stack     : StkElt int32 -->            */
 
-  static void  Ins_JROT( INS_ARG )
+  static void _near Ins_JROT( INS_ARG )
   {
     DO_JROT
   }
@@ -2762,7 +2762,7 @@
 /* CodeRange : $1C                         */
 /* Stack     : int32 -->                   */
 
-  static void  Ins_JMPR( INS_ARG )
+  static void _near Ins_JMPR( INS_ARG )
   {
     DO_JMPR
   }
@@ -2773,7 +2773,7 @@
 /* CodeRange : $79                         */
 /* Stack     : StkElt int32 -->            */
 
-  static void  Ins_JROF( INS_ARG )
+  static void _near Ins_JROF( INS_ARG )
   {
     DO_JROF
   }
@@ -2784,7 +2784,7 @@
 /* CodeRange : $50                         */
 /* Stack     : int32? int32? --> bool      */
 
-  static void  Ins_LT( INS_ARG )
+  static void _near Ins_LT( INS_ARG )
   {
     DO_LT
   }
@@ -2795,7 +2795,7 @@
 /* CodeRange : $51                         */
 /* Stack     : int32? int32? --> bool      */
 
-  static void  Ins_LTEQ( INS_ARG )
+  static void _near Ins_LTEQ( INS_ARG )
   {
     DO_LTEQ
   }
@@ -2806,7 +2806,7 @@
 /* CodeRange : $52                         */
 /* Stack     : int32? int32? --> bool      */
 
-  static void  Ins_GT( INS_ARG )
+  static void _near Ins_GT( INS_ARG )
   {
     DO_GT
   }
@@ -2817,7 +2817,7 @@
 /* CodeRange : $53                         */
 /* Stack     : int32? int32? --> bool      */
 
-  static void  Ins_GTEQ( INS_ARG )
+  static void _near Ins_GTEQ( INS_ARG )
   {
     DO_GTEQ
   }
@@ -2828,7 +2828,7 @@
 /* CodeRange : $54                         */
 /* Stack     : StkElt StkElt --> bool      */
 
-  static void  Ins_EQ( INS_ARG )
+  static void _near Ins_EQ( INS_ARG )
   {
     DO_EQ
   }
@@ -2839,7 +2839,7 @@
 /* CodeRange : $55                         */
 /* Stack     : StkElt StkElt --> bool      */
 
-  static void  Ins_NEQ( INS_ARG )
+  static void _near Ins_NEQ( INS_ARG )
   {
     DO_NEQ
   }
@@ -2850,7 +2850,7 @@
 /* CodeRange : $56                         */
 /* Stack     : f26.6 --> bool              */
 
-  static void  Ins_ODD( INS_ARG )
+  static void _near Ins_ODD( INS_ARG )
   {
     DO_ODD
   }
@@ -2861,7 +2861,7 @@
 /* CodeRange : $57                         */
 /* Stack     : f26.6 --> bool              */
 
-  static void  Ins_EVEN( INS_ARG )
+  static void _near Ins_EVEN( INS_ARG )
   {
     DO_EVEN
   }
@@ -2872,7 +2872,7 @@
 /* CodeRange : $5A                         */
 /* Stack     : uint32 uint32 --> uint32    */
 
-  static void  Ins_AND( INS_ARG )
+  static void _near Ins_AND( INS_ARG )
   {
     DO_AND
   }
@@ -2883,7 +2883,7 @@
 /* CodeRange : $5B                         */
 /* Stack     : uint32 uint32 --> uint32    */
 
-  static void  Ins_OR( INS_ARG )
+  static void _near Ins_OR( INS_ARG )
   {
     DO_OR
   }
@@ -2894,7 +2894,7 @@
 /* CodeRange : $5C                         */
 /* Stack     : StkElt --> uint32           */
 
-  static void  Ins_NOT( INS_ARG )
+  static void _near Ins_NOT( INS_ARG )
   {
     DO_NOT
   }
@@ -2905,7 +2905,7 @@
 /* CodeRange : $60                         */
 /* Stack     : f26.6 f26.6 --> f26.6       */
 
-  static void  Ins_ADD( INS_ARG )
+  static void _near Ins_ADD( INS_ARG )
   {
     DO_ADD
   }
@@ -2916,7 +2916,7 @@
 /* CodeRange : $61                         */
 /* Stack     : f26.6 f26.6 --> f26.6       */
 
-  static void  Ins_SUB( INS_ARG )
+  static void _near Ins_SUB( INS_ARG )
   {
     DO_SUB
   }
@@ -2927,7 +2927,7 @@
 /* CodeRange : $62                         */
 /* Stack     : f26.6 f26.6 --> f26.6       */
 
-  static void  Ins_DIV( INS_ARG )
+  static void _near Ins_DIV( INS_ARG )
   {
     DO_DIV
   }
@@ -2938,7 +2938,7 @@
 /* CodeRange : $63                         */
 /* Stack     : f26.6 f26.6 --> f26.6       */
 
-  static void  Ins_MUL( INS_ARG )
+  static void _near Ins_MUL( INS_ARG )
   {
     DO_MUL
   }
@@ -2949,7 +2949,7 @@
 /* CodeRange : $64                         */
 /* Stack     : f26.6 --> f26.6             */
 
-  static void  Ins_ABS( INS_ARG )
+  static void _near Ins_ABS( INS_ARG )
   {
     DO_ABS
   }
@@ -2960,7 +2960,7 @@
 /* CodeRange : $65                         */
 /* Stack     : f26.6 --> f26.6             */
 
-  static void  Ins_NEG( INS_ARG )
+  static void _near Ins_NEG( INS_ARG )
   {
     DO_NEG
   }
@@ -2971,7 +2971,7 @@
 /* CodeRange : $66                         */
 /* Stack     : f26.6 --> f26.6             */
 
-  static void  Ins_FLOOR( INS_ARG )
+  static void _near Ins_FLOOR( INS_ARG )
   {
     DO_FLOOR
   }
@@ -2982,7 +2982,7 @@
 /* CodeRange : $67                         */
 /* f26.6 --> f26.6                         */
 
-  static void  Ins_CEILING( INS_ARG )
+  static void _near Ins_CEILING( INS_ARG )
   {
     DO_CEILING
   }
@@ -2992,7 +2992,7 @@
 /* CodeRange : $43                         */
 /* Stack     : uint32 --> uint32           */
 
-  static void  Ins_RS( INS_ARG )
+  static void _near Ins_RS( INS_ARG )
   {
     DO_RS
   }
@@ -3003,7 +3003,7 @@
 /* CodeRange : $42                         */
 /* Stack     : uint32 uint32 -->           */
 
-  static void  Ins_WS( INS_ARG )
+  static void _near Ins_WS( INS_ARG )
   {
     DO_WS
   }
@@ -3014,7 +3014,7 @@
 /* CodeRange : $44                         */
 /* Stack     : f26.6 uint32 -->            */
 
-  static void  Ins_WCVTP( INS_ARG )
+  static void _near Ins_WCVTP( INS_ARG )
   {
     DO_WCVTP
   }
@@ -3025,7 +3025,7 @@
 /* CodeRange : $70                         */
 /* Stack     : uint32 uint32 -->           */
 
-  static void  Ins_WCVTF( INS_ARG )
+  static void _near Ins_WCVTF( INS_ARG )
   {
     DO_WCVTF
   }
@@ -3036,7 +3036,7 @@
 /* CodeRange : $45                         */
 /* Stack     : uint32 --> f26.6            */
 
-  static void  Ins_RCVT( INS_ARG )
+  static void _near Ins_RCVT( INS_ARG )
   {
     DO_RCVT
   }
@@ -3047,7 +3047,7 @@
 /* CodeRange   : $7F                        */
 /* Stack       : uint32 -->                 */
 
-  static void  Ins_AA( INS_ARG )
+  static void _near Ins_AA( INS_ARG )
   {
     /* Intentional - no longer supported */
   }
@@ -3060,7 +3060,7 @@
 
 /* NOTE : The original instruction pops a value from the stack */
 
-  static void  Ins_DEBUG( INS_ARG )
+  static void _near Ins_DEBUG( INS_ARG )
   {
     DO_DEBUG
   }
@@ -3070,7 +3070,7 @@
 /* CodeRange : $68-$6B                     */
 /* Stack     : f26.6 --> f26.6             */
 
-  static void  Ins_ROUND( INS_ARG )
+  static void _near Ins_ROUND( INS_ARG )
   {
     DO_ROUND
   }
@@ -3080,7 +3080,7 @@
 /* CodeRange : $6C-$6F                     */
 /* Stack     : f26.6 --> f26.6             */
 
-  static void  Ins_NROUND( INS_ARG )
+  static void _near Ins_NROUND( INS_ARG )
   {
     DO_NROUND
   }
@@ -3092,7 +3092,7 @@
 /* CodeRange : $68                         */
 /* Stack     : int32? int32? --> int32     */
 
-  static void  Ins_MAX( INS_ARG )
+  static void _near Ins_MAX( INS_ARG )
   {
     DO_MAX
   }
@@ -3103,11 +3103,201 @@
 /* CodeRange : $69                         */
 /* Stack     : int32? int32? --> int32     */
 
-  static void  Ins_MIN( INS_ARG )
+  static void _near Ins_MIN( INS_ARG )
   {
     DO_MIN
   }
 
+
+  static void _near LocalIns_FLIPPT( EXEC_OP )
+  {
+    Ins_FLIPPT( EXEC_ARG );
+  }
+
+  static void _near LocalIns_ISECT( INS_ARG )
+  {
+    Ins_ISECT( EXEC_ARGS args );
+  }
+
+  static void _near LocalIns_SZP0( INS_ARG )
+  {
+    Ins_SZP0( EXEC_ARGS args );
+  }
+
+  static void _near LocalIns_SZP1( INS_ARG )
+  {
+    Ins_SZP1( EXEC_ARGS args );
+  }
+
+  static void _near LocalIns_SZP2( INS_ARG )
+  {
+    Ins_SZP2( EXEC_ARGS args );
+  }
+
+  static void _near LocalIns_SZPS( INS_ARG )
+  {
+    Ins_SZPS( EXEC_ARGS args );
+  }
+
+  static void _near LocalIns_MINDEX( INS_ARG )
+  {
+    Ins_MINDEX( EXEC_ARGS args );
+  }
+
+  static void _near LocalIns_ALIGNPTS( INS_ARG )
+  {
+    Ins_ALIGNPTS( EXEC_ARGS args );
+  }
+
+  static void _near LocalIns_UTP( INS_ARG )
+  {
+    Ins_UTP( EXEC_ARGS args );
+  }
+
+  static void _near LocalIns_LOOPCALL( INS_ARG )
+  {
+    Ins_LOOPCALL( EXEC_ARGS args );
+  }
+
+  static void _near LocalIns_MDAP( INS_ARG )
+  {
+    Ins_MDAP( EXEC_ARGS args );
+  }
+
+  static void _near LocalIns_SHC( INS_ARG )
+  {
+    Ins_SHC( EXEC_ARGS args );
+  }
+
+  static void _near LocalIns_SHZ( INS_ARG )
+  {
+    Ins_SHZ( EXEC_ARGS args );
+  }
+
+  static void _near LocalIns_SHPIX( INS_ARG )
+  {
+    Ins_SHPIX( EXEC_ARGS args );
+  }
+
+  static void _near LocalIns_MSIRP( INS_ARG )
+  {
+    Ins_MSIRP( EXEC_ARGS args );
+  }
+
+  static void _near LocalIns_MIAP( INS_ARG )
+  {
+    Ins_MIAP( EXEC_ARGS args );
+  }
+
+  static void _near LocalIns_NPUSHB( INS_ARG )
+  {
+    Ins_NPUSHB( EXEC_ARGS args );
+  }
+
+  static void _near LocalIns_NPUSHW( INS_ARG )
+  {
+    Ins_NPUSHW( EXEC_ARGS args );
+  }
+
+  static void _near LocalIns_GC( INS_ARG )
+  {
+    Ins_GC( EXEC_ARGS args );
+  }
+
+  static void _near LocalIns_SCFS( INS_ARG )
+  {
+    Ins_SCFS( EXEC_ARGS args );
+  }
+
+  static void _near LocalIns_MD( INS_ARG )
+  {
+    Ins_MD( EXEC_ARGS args );
+  }
+
+  static void _near LocalIns_DELTAP( INS_ARG )
+  {
+    Ins_DELTAP( EXEC_ARGS args );
+  }
+
+  static void _near LocalIns_DELTAC( INS_ARG )
+  {
+    Ins_DELTAC( EXEC_ARGS args );
+  }
+
+  static void _near LocalIns_FLIPRGON( INS_ARG )
+  {
+    Ins_FLIPRGON( EXEC_ARGS args );
+  }
+
+  static void _near LocalIns_FLIPRGOFF( INS_ARG )
+  {
+    Ins_FLIPRGOFF( EXEC_ARGS args );
+  }
+
+  static void _near LocalIns_SCANCTRL( INS_ARG )
+  {
+    Ins_SCANCTRL( EXEC_ARGS args );
+  }
+
+  static void _near LocalIns_SDPVTL( INS_ARG )
+  {
+    Ins_SDPVTL( EXEC_ARGS args );
+  }
+
+  static void _near LocalIns_GETINFO( INS_ARG )
+  {
+    Ins_GETINFO( EXEC_ARGS args );
+  }
+
+  static void _near LocalIns_IDEF( INS_ARG )
+  {
+    Ins_IDEF( EXEC_ARGS args );
+  }
+
+  static void _near LocalIns_INSTCTRL( INS_ARG )
+  {
+    Ins_INSTCTRL( EXEC_ARGS args );
+  }
+
+  static void _near LocalIns_SCANTYPE( INS_ARG )
+  {
+    Ins_SCANTYPE( EXEC_ARGS args );
+  }
+
+  static void _near LocalIns_MDRP( INS_ARG )
+  {
+    Ins_MDRP( EXEC_ARGS args );
+  }
+
+  static void _near LocalIns_MIRP( INS_ARG )
+  {
+    Ins_MIRP( EXEC_ARGS args );
+  }
+
+  static void _near LocalIns_IUP( EXEC_OP )
+  {
+    Ins_IUP( EXEC_ARG );
+  }
+
+  static void _near LocalIns_SHP( EXEC_OP )
+  {
+    Ins_SHP( EXEC_ARG );
+  }
+
+  static void _near LocalIns_IP( EXEC_OP )
+  {
+    Ins_IP( EXEC_ARG );
+  }
+
+  static void _near LocalIns_ALIGNRP( EXEC_OP )
+  {
+    Ins_ALIGNRP( EXEC_ARG );
+  }
+
+  static void _near LocalIns_UNKNOWN( EXEC_OP )
+  {
+    Ins_UNKNOWN( EXEC_ARG );
+  }
 
 #endif  /* !TT_CONFIG_OPTION_INTERPRETER_SWITCH */
 
@@ -3153,7 +3343,7 @@
 /* CodeRange : $8A                         */
 /* Stack     : 3 * StkElt --> 3 * StkElt   */
 
-  static void  Ins_ROLL( PStorage args )
+  static void _near Ins_ROLL( INS_ARG )
   {
     Long temp = args[2];
 
@@ -3191,7 +3381,7 @@
 /* CodeRange : $58                         */
 /* Stack     : StkElt -->                  */
 
-  static void  Ins_IF( INS_ARG )
+  static void _near  Ins_IF( INS_ARG )
   {
     Int   nIfs = 1;
 
@@ -3228,7 +3418,7 @@
 /* CodeRange : $1B                         */
 /* Stack     : -->                         */
 
-  static void  Ins_ELSE( EXEC_OP )
+  static void _near  Ins_ELSE( EXEC_OP )
   {
     Int  nIfs = 1;
 
@@ -3296,7 +3486,7 @@
 /* CodeRange : $2C                         */
 /* Stack     : uint32 -->                  */
 
-  static void  Ins_FDEF( INS_ARG )
+  static void _near Ins_FDEF( INS_ARG )
   {
     Int         n;
     PDefRecord  def;
@@ -3363,7 +3553,7 @@
 /* CodeRange : $2D                         */
 /* Stack     : -->                         */
 
-  static void  Ins_ENDF( EXEC_OP )
+  static void _near  Ins_ENDF( EXEC_OP )
   {
     PCallRecord  pRec;
 
@@ -3407,7 +3597,7 @@
 /* CodeRange : $2B                         */
 /* Stack     : uint32? -->                 */
 
-  static void  Ins_CALL( INS_ARG )
+  static void _near  Ins_CALL( INS_ARG )
   {
     Int          n;
     PDefRecord   def;
@@ -3625,7 +3815,7 @@
 /* CodeRange : $B0-$B7                     */
 /* Stack     : --> uint32...               */
 
-  static void  Ins_PUSHB( INS_ARG )
+  static void _near  Ins_PUSHB( INS_ARG )
   {
     UShort  L, K;
 
@@ -3648,7 +3838,7 @@
 /* CodeRange : $B8-$BF                     */
 /* Stack     : --> int32...                */
 
-  static void  Ins_PUSHW( INS_ARG )
+  static void _near Ins_PUSHW( INS_ARG )
   {
     UShort  L, K;
 
@@ -5554,20 +5744,20 @@ static TT_F26Dot6 _far FarCUR_Func_project( EXEC_OPS TT_Vector*  v1, TT_Vector* 
     /*  GPV       */  Ins_GPV,
     /*  GFV       */  Ins_GFV,
     /*  SFvTPv    */  Ins_SFVTPV,
-    /*  ISECT     */  Ins_ISECT,
+    /*  ISECT     */  LocalIns_ISECT,
 
     /*  SRP0      */  Ins_SRP0,
     /*  SRP1      */  Ins_SRP1,
     /*  SRP2      */  Ins_SRP2,
-    /*  SZP0      */  Ins_SZP0,
-    /*  SZP1      */  Ins_SZP1,
-    /*  SZP2      */  Ins_SZP2,
-    /*  SZPS      */  Ins_SZPS,
+    /*  SZP0      */  LocalIns_SZP0,
+    /*  SZP1      */  LocalIns_SZP1,
+    /*  SZP2      */  LocalIns_SZP2,
+    /*  SZPS      */  LocalIns_SZPS,
     /*  SLOOP     */  Ins_SLOOP,
     /*  RTG       */  Ins_RTG,
     /*  RTHG      */  Ins_RTHG,
     /*  SMD       */  Ins_SMD,
-    /*  ELSE      */  Ins_ELSE,
+    /*  ELSE      */  (TInstruction_Function) Ins_ELSE,
     /*  JMPR      */  Ins_JMPR,
     /*  SCvTCi    */  Ins_SCVTCI,
     /*  SSwCi     */  Ins_SSWCI,
@@ -5579,45 +5769,45 @@ static TT_F26Dot6 _far FarCUR_Func_project( EXEC_OPS TT_Vector*  v1, TT_Vector* 
     /*  SWAP      */  Ins_SWAP,
     /*  DEPTH     */  Ins_DEPTH,
     /*  CINDEX    */  Ins_CINDEX,
-    /*  MINDEX    */  Ins_MINDEX,
-    /*  AlignPTS  */  Ins_ALIGNPTS,
-    /*  INS_$28   */  Ins_UNKNOWN,
-    /*  UTP       */  Ins_UTP,
-    /*  LOOPCALL  */  Ins_LOOPCALL,
+    /*  MINDEX    */  LocalIns_MINDEX,
+    /*  AlignPTS  */  LocalIns_ALIGNPTS,
+    /*  INS_$28   */  (TInstruction_Function) LocalIns_UNKNOWN,
+    /*  UTP       */  LocalIns_UTP,
+    /*  LOOPCALL  */  LocalIns_LOOPCALL,
     /*  CALL      */  Ins_CALL,
     /*  FDEF      */  Ins_FDEF,
-    /*  ENDF      */  Ins_ENDF,
-    /*  MDAP[0]   */  Ins_MDAP,
-    /*  MDAP[1]   */  Ins_MDAP,
+    /*  ENDF      */  (TInstruction_Function) Ins_ENDF,
+    /*  MDAP[0]   */  LocalIns_MDAP,
+    /*  MDAP[1]   */  LocalIns_MDAP,
 
-    /*  IUP[0]    */  Ins_IUP,
-    /*  IUP[1]    */  Ins_IUP,
-    /*  SHP[0]    */  Ins_SHP,
-    /*  SHP[1]    */  Ins_SHP,
-    /*  SHC[0]    */  Ins_SHC,
-    /*  SHC[1]    */  Ins_SHC,
-    /*  SHZ[0]    */  Ins_SHZ,
-    /*  SHZ[1]    */  Ins_SHZ,
-    /*  SHPIX     */  Ins_SHPIX,
-    /*  IP        */  Ins_IP,
-    /*  MSIRP[0]  */  Ins_MSIRP,
-    /*  MSIRP[1]  */  Ins_MSIRP,
-    /*  AlignRP   */  Ins_ALIGNRP,
+    /*  IUP[0]    */  (TInstruction_Function) LocalIns_IUP,
+    /*  IUP[1]    */  (TInstruction_Function) LocalIns_IUP,
+    /*  SHP[0]    */  (TInstruction_Function) LocalIns_SHP,
+    /*  SHP[1]    */  (TInstruction_Function) LocalIns_SHP,
+    /*  SHC[0]    */  LocalIns_SHC,
+    /*  SHC[1]    */  LocalIns_SHC,
+    /*  SHZ[0]    */  LocalIns_SHZ,
+    /*  SHZ[1]    */  LocalIns_SHZ,
+    /*  SHPIX     */  LocalIns_SHPIX,
+    /*  IP        */  (TInstruction_Function) LocalIns_IP,
+    /*  MSIRP[0]  */  LocalIns_MSIRP,
+    /*  MSIRP[1]  */  LocalIns_MSIRP,
+    /*  AlignRP   */  (TInstruction_Function) LocalIns_ALIGNRP,
     /*  RTDG      */  Ins_RTDG,
-    /*  MIAP[0]   */  Ins_MIAP,
-    /*  MIAP[1]   */  Ins_MIAP,
+    /*  MIAP[0]   */  LocalIns_MIAP,
+    /*  MIAP[1]   */  LocalIns_MIAP,
 
-    /*  NPushB    */  Ins_NPUSHB,
-    /*  NPushW    */  Ins_NPUSHW,
+    /*  NPushB    */  LocalIns_NPUSHB,
+    /*  NPushW    */  LocalIns_NPUSHW,
     /*  WS        */  Ins_WS,
     /*  RS        */  Ins_RS,
     /*  WCvtP     */  Ins_WCVTP,
     /*  RCvt      */  Ins_RCVT,
-    /*  GC[0]     */  Ins_GC,
-    /*  GC[1]     */  Ins_GC,
-    /*  SCFS      */  Ins_SCFS,
-    /*  MD[0]     */  Ins_MD,
-    /*  MD[1]     */  Ins_MD,
+    /*  GC[0]     */  LocalIns_GC,
+    /*  GC[1]     */  LocalIns_GC,
+    /*  SCFS      */  LocalIns_SCFS,
+    /*  MD[0]     */  LocalIns_MD,
+    /*  MD[1]     */  LocalIns_MD,
     /*  MPPEM     */  Ins_MPPEM,
     /*  MPS       */  Ins_MPS,
     /*  FlipON    */  Ins_FLIPON,
@@ -5637,7 +5827,7 @@ static TT_F26Dot6 _far FarCUR_Func_project( EXEC_OPS TT_Vector*  v1, TT_Vector* 
     /*  AND       */  Ins_AND,
     /*  OR        */  Ins_OR,
     /*  NOT       */  Ins_NOT,
-    /*  DeltaP1   */  Ins_DELTAP,
+    /*  DeltaP1   */  LocalIns_DELTAP,
     /*  SDB       */  Ins_SDB,
     /*  SDS       */  Ins_SDS,
 
@@ -5659,72 +5849,72 @@ static TT_F26Dot6 _far FarCUR_Func_project( EXEC_OPS TT_Vector*  v1, TT_Vector* 
     /*  NROUND[3] */  Ins_NROUND,
 
     /*  WCvtF     */  Ins_WCVTF,
-    /*  DeltaP2   */  Ins_DELTAP,
-    /*  DeltaP3   */  Ins_DELTAP,
-    /*  DeltaCn[0] */ Ins_DELTAC,
-    /*  DeltaCn[1] */ Ins_DELTAC,
-    /*  DeltaCn[2] */ Ins_DELTAC,
+    /*  DeltaP2   */  LocalIns_DELTAP,
+    /*  DeltaP3   */  LocalIns_DELTAP,
+    /*  DeltaCn[0] */ LocalIns_DELTAC,
+    /*  DeltaCn[1] */ LocalIns_DELTAC,
+    /*  DeltaCn[2] */ LocalIns_DELTAC,
     /*  SROUND    */  Ins_SROUND,
     /*  S45Round  */  Ins_S45ROUND,
     /*  JROT      */  Ins_JROT,
     /*  JROF      */  Ins_JROF,
     /*  ROFF      */  Ins_ROFF,
-    /*  INS_$7B   */  Ins_UNKNOWN,
+    /*  INS_$7B   */  (TInstruction_Function) LocalIns_UNKNOWN,
     /*  RUTG      */  Ins_RUTG,
     /*  RDTG      */  Ins_RDTG,
     /*  SANGW     */  Ins_SANGW,
     /*  AA        */  Ins_AA,
 
-    /*  FlipPT    */  Ins_FLIPPT,
-    /*  FlipRgON  */  Ins_FLIPRGON,
-    /*  FlipRgOFF */  Ins_FLIPRGOFF,
-    /*  INS_$83   */  Ins_UNKNOWN,
-    /*  INS_$84   */  Ins_UNKNOWN,
-    /*  ScanCTRL  */  Ins_SCANCTRL,
-    /*  SDPVTL[0] */  Ins_SDPVTL,
-    /*  SDPVTL[1] */  Ins_SDPVTL,
-    /*  GetINFO   */  Ins_GETINFO,
-    /*  IDEF      */  Ins_IDEF,
-    /*  ROLL      */  Ins_ROLL,
+    /*  FlipPT    */  (TInstruction_Function) LocalIns_FLIPPT,
+    /*  FlipRgON  */  LocalIns_FLIPRGON,
+    /*  FlipRgOFF */  LocalIns_FLIPRGOFF,
+    /*  INS_$83   */  (TInstruction_Function) LocalIns_UNKNOWN,
+    /*  INS_$84   */  (TInstruction_Function) LocalIns_UNKNOWN,
+    /*  ScanCTRL  */  LocalIns_SCANCTRL,
+    /*  SDPVTL[0] */  LocalIns_SDPVTL,
+    /*  SDPVTL[1] */  LocalIns_SDPVTL,
+    /*  GetINFO   */  LocalIns_GETINFO,
+    /*  IDEF      */  LocalIns_IDEF,
+    /*  ROLL      */  (TInstruction_Function) Ins_ROLL,
     /*  MAX       */  Ins_MAX,
     /*  MIN       */  Ins_MIN,
-    /*  ScanTYPE  */  Ins_SCANTYPE,
-    /*  InstCTRL  */  Ins_INSTCTRL,
-    /*  INS_$8F   */  Ins_UNKNOWN,
+    /*  ScanTYPE  */  LocalIns_SCANTYPE,
+    /*  InstCTRL  */  LocalIns_INSTCTRL,
+    /*  INS_$8F   */  (TInstruction_Function) LocalIns_UNKNOWN,
 
-    /*  INS_$90  */   Ins_UNKNOWN,
-    /*  INS_$91  */   Ins_UNKNOWN,
-    /*  INS_$92  */   Ins_UNKNOWN,
-    /*  INS_$93  */   Ins_UNKNOWN,
-    /*  INS_$94  */   Ins_UNKNOWN,
-    /*  INS_$95  */   Ins_UNKNOWN,
-    /*  INS_$96  */   Ins_UNKNOWN,
-    /*  INS_$97  */   Ins_UNKNOWN,
-    /*  INS_$98  */   Ins_UNKNOWN,
-    /*  INS_$99  */   Ins_UNKNOWN,
-    /*  INS_$9A  */   Ins_UNKNOWN,
-    /*  INS_$9B  */   Ins_UNKNOWN,
-    /*  INS_$9C  */   Ins_UNKNOWN,
-    /*  INS_$9D  */   Ins_UNKNOWN,
-    /*  INS_$9E  */   Ins_UNKNOWN,
-    /*  INS_$9F  */   Ins_UNKNOWN,
+    /*  INS_$90  */   (TInstruction_Function) LocalIns_UNKNOWN,
+    /*  INS_$91  */   (TInstruction_Function) LocalIns_UNKNOWN,
+    /*  INS_$92  */   (TInstruction_Function) LocalIns_UNKNOWN,
+    /*  INS_$93  */   (TInstruction_Function) LocalIns_UNKNOWN,
+    /*  INS_$94  */   (TInstruction_Function) LocalIns_UNKNOWN,
+    /*  INS_$95  */   (TInstruction_Function) LocalIns_UNKNOWN,
+    /*  INS_$96  */   (TInstruction_Function) LocalIns_UNKNOWN,
+    /*  INS_$97  */   (TInstruction_Function) LocalIns_UNKNOWN,
+    /*  INS_$98  */   (TInstruction_Function) LocalIns_UNKNOWN,
+    /*  INS_$99  */   (TInstruction_Function) LocalIns_UNKNOWN,
+    /*  INS_$9A  */   (TInstruction_Function) LocalIns_UNKNOWN,
+    /*  INS_$9B  */   (TInstruction_Function) LocalIns_UNKNOWN,
+    /*  INS_$9C  */   (TInstruction_Function) LocalIns_UNKNOWN,
+    /*  INS_$9D  */   (TInstruction_Function) LocalIns_UNKNOWN,
+    /*  INS_$9E  */   (TInstruction_Function) LocalIns_UNKNOWN,
+    /*  INS_$9F  */   (TInstruction_Function) LocalIns_UNKNOWN,
 
-    /*  INS_$A0  */   Ins_UNKNOWN,
-    /*  INS_$A1  */   Ins_UNKNOWN,
-    /*  INS_$A2  */   Ins_UNKNOWN,
-    /*  INS_$A3  */   Ins_UNKNOWN,
-    /*  INS_$A4  */   Ins_UNKNOWN,
-    /*  INS_$A5  */   Ins_UNKNOWN,
-    /*  INS_$A6  */   Ins_UNKNOWN,
-    /*  INS_$A7  */   Ins_UNKNOWN,
-    /*  INS_$A8  */   Ins_UNKNOWN,
-    /*  INS_$A9  */   Ins_UNKNOWN,
-    /*  INS_$AA  */   Ins_UNKNOWN,
-    /*  INS_$AB  */   Ins_UNKNOWN,
-    /*  INS_$AC  */   Ins_UNKNOWN,
-    /*  INS_$AD  */   Ins_UNKNOWN,
-    /*  INS_$AE  */   Ins_UNKNOWN,
-    /*  INS_$AF  */   Ins_UNKNOWN,
+    /*  INS_$A0  */   (TInstruction_Function) LocalIns_UNKNOWN,
+    /*  INS_$A1  */   (TInstruction_Function) LocalIns_UNKNOWN,
+    /*  INS_$A2  */   (TInstruction_Function) LocalIns_UNKNOWN,
+    /*  INS_$A3  */   (TInstruction_Function) LocalIns_UNKNOWN,
+    /*  INS_$A4  */   (TInstruction_Function) LocalIns_UNKNOWN,
+    /*  INS_$A5  */   (TInstruction_Function) LocalIns_UNKNOWN,
+    /*  INS_$A6  */   (TInstruction_Function) LocalIns_UNKNOWN,
+    /*  INS_$A7  */   (TInstruction_Function) LocalIns_UNKNOWN,
+    /*  INS_$A8  */   (TInstruction_Function) LocalIns_UNKNOWN,
+    /*  INS_$A9  */   (TInstruction_Function) LocalIns_UNKNOWN,
+    /*  INS_$AA  */   (TInstruction_Function) LocalIns_UNKNOWN,
+    /*  INS_$AB  */   (TInstruction_Function) LocalIns_UNKNOWN,
+    /*  INS_$AC  */   (TInstruction_Function) LocalIns_UNKNOWN,
+    /*  INS_$AD  */   (TInstruction_Function) LocalIns_UNKNOWN,
+    /*  INS_$AE  */   (TInstruction_Function) LocalIns_UNKNOWN,
+    /*  INS_$AF  */   (TInstruction_Function) LocalIns_UNKNOWN,
 
     /*  PushB[0]  */  Ins_PUSHB,
     /*  PushB[1]  */  Ins_PUSHB,
@@ -5743,73 +5933,73 @@ static TT_F26Dot6 _far FarCUR_Func_project( EXEC_OPS TT_Vector*  v1, TT_Vector* 
     /*  PushW[6]  */  Ins_PUSHW,
     /*  PushW[7]  */  Ins_PUSHW,
 
-    /*  MDRP[00]  */  Ins_MDRP,
-    /*  MDRP[01]  */  Ins_MDRP,
-    /*  MDRP[02]  */  Ins_MDRP,
-    /*  MDRP[03]  */  Ins_MDRP,
-    /*  MDRP[04]  */  Ins_MDRP,
-    /*  MDRP[05]  */  Ins_MDRP,
-    /*  MDRP[06]  */  Ins_MDRP,
-    /*  MDRP[07]  */  Ins_MDRP,
-    /*  MDRP[08]  */  Ins_MDRP,
-    /*  MDRP[09]  */  Ins_MDRP,
-    /*  MDRP[10]  */  Ins_MDRP,
-    /*  MDRP[11]  */  Ins_MDRP,
-    /*  MDRP[12]  */  Ins_MDRP,
-    /*  MDRP[13]  */  Ins_MDRP,
-    /*  MDRP[14]  */  Ins_MDRP,
-    /*  MDRP[15]  */  Ins_MDRP,
+    /*  MDRP[00]  */  LocalIns_MDRP,
+    /*  MDRP[01]  */  LocalIns_MDRP,
+    /*  MDRP[02]  */  LocalIns_MDRP,
+    /*  MDRP[03]  */  LocalIns_MDRP,
+    /*  MDRP[04]  */  LocalIns_MDRP,
+    /*  MDRP[05]  */  LocalIns_MDRP,
+    /*  MDRP[06]  */  LocalIns_MDRP,
+    /*  MDRP[07]  */  LocalIns_MDRP,
+    /*  MDRP[08]  */  LocalIns_MDRP,
+    /*  MDRP[09]  */  LocalIns_MDRP,
+    /*  MDRP[10]  */  LocalIns_MDRP,
+    /*  MDRP[11]  */  LocalIns_MDRP,
+    /*  MDRP[12]  */  LocalIns_MDRP,
+    /*  MDRP[13]  */  LocalIns_MDRP,
+    /*  MDRP[14]  */  LocalIns_MDRP,
+    /*  MDRP[15]  */  LocalIns_MDRP,
 
-    /*  MDRP[16]  */  Ins_MDRP,
-    /*  MDRP[17]  */  Ins_MDRP,
-    /*  MDRP[18]  */  Ins_MDRP,
-    /*  MDRP[19]  */  Ins_MDRP,
-    /*  MDRP[20]  */  Ins_MDRP,
-    /*  MDRP[21]  */  Ins_MDRP,
-    /*  MDRP[22]  */  Ins_MDRP,
-    /*  MDRP[23]  */  Ins_MDRP,
-    /*  MDRP[24]  */  Ins_MDRP,
-    /*  MDRP[25]  */  Ins_MDRP,
-    /*  MDRP[26]  */  Ins_MDRP,
-    /*  MDRP[27]  */  Ins_MDRP,
-    /*  MDRP[28]  */  Ins_MDRP,
-    /*  MDRP[29]  */  Ins_MDRP,
-    /*  MDRP[30]  */  Ins_MDRP,
-    /*  MDRP[31]  */  Ins_MDRP,
+    /*  MDRP[16]  */  LocalIns_MDRP,
+    /*  MDRP[17]  */  LocalIns_MDRP,
+    /*  MDRP[18]  */  LocalIns_MDRP,
+    /*  MDRP[19]  */  LocalIns_MDRP,
+    /*  MDRP[20]  */  LocalIns_MDRP,
+    /*  MDRP[21]  */  LocalIns_MDRP,
+    /*  MDRP[22]  */  LocalIns_MDRP,
+    /*  MDRP[23]  */  LocalIns_MDRP,
+    /*  MDRP[24]  */  LocalIns_MDRP,
+    /*  MDRP[25]  */  LocalIns_MDRP,
+    /*  MDRP[26]  */  LocalIns_MDRP,
+    /*  MDRP[27]  */  LocalIns_MDRP,
+    /*  MDRP[28]  */  LocalIns_MDRP,
+    /*  MDRP[29]  */  LocalIns_MDRP,
+    /*  MDRP[30]  */  LocalIns_MDRP,
+    /*  MDRP[31]  */  LocalIns_MDRP,
 
-    /*  MIRP[00]  */  Ins_MIRP,
-    /*  MIRP[01]  */  Ins_MIRP,
-    /*  MIRP[02]  */  Ins_MIRP,
-    /*  MIRP[03]  */  Ins_MIRP,
-    /*  MIRP[04]  */  Ins_MIRP,
-    /*  MIRP[05]  */  Ins_MIRP,
-    /*  MIRP[06]  */  Ins_MIRP,
-    /*  MIRP[07]  */  Ins_MIRP,
-    /*  MIRP[08]  */  Ins_MIRP,
-    /*  MIRP[09]  */  Ins_MIRP,
-    /*  MIRP[10]  */  Ins_MIRP,
-    /*  MIRP[11]  */  Ins_MIRP,
-    /*  MIRP[12]  */  Ins_MIRP,
-    /*  MIRP[13]  */  Ins_MIRP,
-    /*  MIRP[14]  */  Ins_MIRP,
-    /*  MIRP[15]  */  Ins_MIRP,
+    /*  MIRP[00]  */  LocalIns_MIRP,
+    /*  MIRP[01]  */  LocalIns_MIRP,
+    /*  MIRP[02]  */  LocalIns_MIRP,
+    /*  MIRP[03]  */  LocalIns_MIRP,
+    /*  MIRP[04]  */  LocalIns_MIRP,
+    /*  MIRP[05]  */  LocalIns_MIRP,
+    /*  MIRP[06]  */  LocalIns_MIRP,
+    /*  MIRP[07]  */  LocalIns_MIRP,
+    /*  MIRP[08]  */  LocalIns_MIRP,
+    /*  MIRP[09]  */  LocalIns_MIRP,
+    /*  MIRP[10]  */  LocalIns_MIRP,
+    /*  MIRP[11]  */  LocalIns_MIRP,
+    /*  MIRP[12]  */  LocalIns_MIRP,
+    /*  MIRP[13]  */  LocalIns_MIRP,
+    /*  MIRP[14]  */  LocalIns_MIRP,
+    /*  MIRP[15]  */  LocalIns_MIRP,
 
-    /*  MIRP[16]  */  Ins_MIRP,
-    /*  MIRP[17]  */  Ins_MIRP,
-    /*  MIRP[18]  */  Ins_MIRP,
-    /*  MIRP[19]  */  Ins_MIRP,
-    /*  MIRP[20]  */  Ins_MIRP,
-    /*  MIRP[21]  */  Ins_MIRP,
-    /*  MIRP[22]  */  Ins_MIRP,
-    /*  MIRP[23]  */  Ins_MIRP,
-    /*  MIRP[24]  */  Ins_MIRP,
-    /*  MIRP[25]  */  Ins_MIRP,
-    /*  MIRP[26]  */  Ins_MIRP,
-    /*  MIRP[27]  */  Ins_MIRP,
-    /*  MIRP[28]  */  Ins_MIRP,
-    /*  MIRP[29]  */  Ins_MIRP,
-    /*  MIRP[30]  */  Ins_MIRP,
-    /*  MIRP[31]  */  Ins_MIRP
+    /*  MIRP[16]  */  LocalIns_MIRP,
+    /*  MIRP[17]  */  LocalIns_MIRP,
+    /*  MIRP[18]  */  LocalIns_MIRP,
+    /*  MIRP[19]  */  LocalIns_MIRP,
+    /*  MIRP[20]  */  LocalIns_MIRP,
+    /*  MIRP[21]  */  LocalIns_MIRP,
+    /*  MIRP[22]  */  LocalIns_MIRP,
+    /*  MIRP[23]  */  LocalIns_MIRP,
+    /*  MIRP[24]  */  LocalIns_MIRP,
+    /*  MIRP[25]  */  LocalIns_MIRP,
+    /*  MIRP[26]  */  LocalIns_MIRP,
+    /*  MIRP[27]  */  LocalIns_MIRP,
+    /*  MIRP[28]  */  LocalIns_MIRP,
+    /*  MIRP[29]  */  LocalIns_MIRP,
+    /*  MIRP[30]  */  LocalIns_MIRP,
+    /*  MIRP[31]  */  LocalIns_MIRP
   };
 #endif
 
@@ -6429,7 +6619,7 @@ static TT_F26Dot6 _far FarCUR_Func_project( EXEC_OPS TT_Vector*  v1, TT_Vector* 
           break;
 
         case 0x8A:  /* ROLL */
-          Ins_ROLL( args );
+          Ins_ROLL( EXEC_ARGS args );
           break;
 
         case 0x8B:  /* MAX */
