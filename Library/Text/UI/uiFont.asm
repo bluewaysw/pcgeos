@@ -197,6 +197,8 @@ REVISION HISTORY:
 	Tony	11/12/91		Initial version
 
 ------------------------------------------------------------------------------@
+FID_FAMILY_MASK	equ	0FFFh
+
 FontControlUpdateUI	method dynamic FontControlClass,
 				MSG_GEN_CONTROL_UPDATE_UI
 
@@ -220,8 +222,35 @@ common:
 	call	MemUnlock
 	pop	ds
 
-	; set toolbox list
+	; map non existing font id's, it it is one
+	; check for given font id availability first
+	mov	ax, cx
+	push	dx		; keep indeterminate flag
+	mov	dl, mask FEF_OUTLINES; match exact font id in cx
+	call	GrCheckFontAvail
+	pop	dx
+	cmp	cx, FID_INVALID
+	jne	fontResolved
 
+	; find a mapped font id
+	and	ax, FID_FAMILY_MASK
+tryNext:
+	push	ax
+	push	dx		; keep indeterminate flag
+	mov	dl, mask FEF_OUTLINES 	; match exact font id in cx
+	mov	cx, ax
+	call	GrCheckFontAvail
+	pop	dx
+	pop	ax
+	cmp	cx, FID_INVALID
+	jne	fontResolved
+
+	add	ax, FID_MAKER_DIVISIONS
+	jnc	tryNext
+	mov	cx, -1		; signal invalid FID, no selection
+
+	; set toolbox list
+fontResolved:
 	test	ss:[bp].GCUUIP_toolboxFeatures,	mask FCTF_TOOL_LIST
 	jz	noToolboxList
 	mov	bx, ss:[bp].GCUUIP_toolBlock
