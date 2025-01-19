@@ -7,14 +7,14 @@ VMBlockHandle PngImport(
     XYSize *picsize,
     MimeRes resolution,
     AllocWatcherHandle watcher,
-    dword *usedMem, 
+    dword *usedMem,
 #if SCANLINE_COMPRESS
-    Boolean scanlineCompress, 
+    Boolean scanlineCompress,
 #endif
     Boolean *p_completeGraphic
 #if PROGRESS_DISPLAY
     , _ImportProgressParams_
-#endif  
+#endif
     , MimeStatus *mimeStatus
 )
 {
@@ -29,6 +29,9 @@ VMBlockHandle PngImport(
     RGBValue pngBlendColor = {255, 255, 255};
     FileHandle filehan = NullHandle;
     VMBlockHandle bmVMBlock = NullHandle;
+    dword requiredMemory = 0;
+    Boolean gotAlloc = FALSE ;
+
 
 #if PROGRESS_DISPLAY
 /* number of scanlines per import progress update */
@@ -56,86 +59,92 @@ VMBlockHandle PngImport(
             picsize->XYS_width = ihdrData.width;
             picsize->XYS_height = ihdrData.height;
 
-            fmt = pngImportWhatOutputFormat(ihdrData.colorType, ihdrData.bitDepth);
-            if (fmt != 0)
+            /* Only create the bitmap if we have enough memory */
+            requiredMemory = pngCalcLineAllocSize(ihdrData.width, ihdrData.colorType, ihdrData.bitDepth) * ihdrData.height;
+            gotAlloc = AllocWatcherAllocate(watcher, requiredMemory);
+            if (gotAlloc)
             {
-                // Initialize output bitmap
-                bmVMBlock = pngImportInitiateOutputBitmap(vmf, ihdrData, fmt);
-                if (bmVMBlock != NullHandle)
+                fmt = pngImportWhatOutputFormat(ihdrData.colorType, ihdrData.bitDepth);
+                if (fmt != 0)
                 {
-                    // transfers only if a palette exists, also creates palettes for grayscale images
-                    pngImportHandlePalette(filehan, plteChunk, vmf, bmVMBlock, ihdrData.colorType, ihdrData.bitDepth);
-
-                    // Initialize the IDAT state
-                    pngImportInitIDATProcessingState(&state, filehan, idatChunksHan, idatNumChunks, ihdrData);
-
-                    // Process each scanline
-                    while (pngImportGetNextIDATScanline(&state) == 1)
+                    // Initialize output bitmap
+                    bmVMBlock = pngImportInitiateOutputBitmap(vmf, ihdrData, fmt);
+                    if (bmVMBlock != NullHandle)
                     {
-                        // when not zlib decoding, give the system a little room to breathe
-                        pngImportPauseIDATProcessing(&state);
+                        // transfers only if a palette exists, also creates palettes for grayscale images
+                        pngImportHandlePalette(filehan, plteChunk, vmf, bmVMBlock, ihdrData.colorType, ihdrData.bitDepth);
 
-                        // make sure we have data compatible with GEOS HugeBitmaps
-                        pngImportApplyGEOSFormatTransformations(&state, pngBlendColor);
+                        // Initialize the IDAT state
+                        pngImportInitIDATProcessingState(&state, filehan, idatChunksHan, idatNumChunks, ihdrData);
+
+                        // Process each scanline
+                        while (pngImportGetNextIDATScanline(&state) == 1)
+                        {
+                            // when not zlib decoding, give the system a little room to breathe
+                            pngImportPauseIDATProcessing(&state);
+
+                            // make sure we have data compatible with GEOS HugeBitmaps
+                            pngImportApplyGEOSFormatTransformations(&state, pngBlendColor);
 
 #if SCANLINE_COMPRESS
-// handle SCANLINE_COMPRESS here?    
+// handle SCANLINE_COMPRESS here?
 #endif
 
-                        // Write the processed scanline (without the filter byte) to the VMFile
-                        pngImportWriteScanlineToBitmap(vmf, bmVMBlock, state.lineNo - 1, state.currentRow);
+                            // Write the processed scanline (without the filter byte) to the VMFile
+                            pngImportWriteScanlineToBitmap(vmf, bmVMBlock, state.lineNo - 1, state.currentRow);
 
-                        // prepare the next zlib decoding work
-                        pngImportResumeIDATProcessing(&state);
+                            // prepare the next zlib decoding work
+                            pngImportResumeIDATProcessing(&state);
 
 #if PROGRESS_DISPLAY
-                        /* send out progress if desired number of scanlines have been seen */
-                        if (importProgressDataP && importProgressDataP->IPD_callback &&
-                            (((state.lineNo % SLICE_HEIGHT) == 0) || (state.lineNo == ihdrData.height))) 
-                        {
-                            importProgressDataP->IPD_bitmap = bmVMBlock;
-                            importProgressDataP->IPD_iad.IAD_size.XYS_width = ihdrData.width;
-                            importProgressDataP->IPD_iad.IAD_size.XYS_height = ihdrData.height;
-                            /* this invalidates too much for the last partial slice, but
-                            it doesn't matter */
-                            importProgressDataP->IPD_firstLine = state.lineNo-1-SLICE_HEIGHT;
-                            importProgressDataP->IPD_lastLine = state.lineNo-1-1;
-                            ((pcfm_ImportProgressCallback *)ProcCallFixedOrMovable_pascal)
-                                    (importProgressDataP, importProgressDataP->IPD_callback);
-                        }
-
-                        /* mark the graphic as completed, if so */
-                        if ((state.lineNo) == ihdrData.height)
-                            *p_completeGraphic = TRUE;
-
-                        /* Stop here if we are aborting and we're NOT progressive (???) */
-                        if (mimeStatus->MS_mimeFlags & MIME_STATUS_ABORT)  
-                        {
-                            if ((loadProgressDataP) && (importProgressDataP->IPD_bitmap != NullHandle))  
+                            /* send out progress if desired number of scanlines have been seen */
+                            if (importProgressDataP && importProgressDataP->IPD_callback &&
+                                (((state.lineNo % SLICE_HEIGHT) == 0) || (state.lineNo == ihdrData.height)))
                             {
-                                errorFlag = FALSE ; // FIXME
-                                /* But keep the partial image we have (we don't need a big red X) */
-                                /* We aren't complete either */
-                                onErrorDontKeepPartial = FALSE ;
-                            } 
-                            else 
+                                importProgressDataP->IPD_bitmap = bmVMBlock;
+                                importProgressDataP->IPD_iad.IAD_size.XYS_width = ihdrData.width;
+                                importProgressDataP->IPD_iad.IAD_size.XYS_height = ihdrData.height;
+                                /* this invalidates too much for the last partial slice, but
+                                it doesn't matter */
+                                importProgressDataP->IPD_firstLine = state.lineNo-1-SLICE_HEIGHT;
+                                importProgressDataP->IPD_lastLine = state.lineNo-1-1;
+                                ((pcfm_ImportProgressCallback *)ProcCallFixedOrMovable_pascal)
+                                        (importProgressDataP, importProgressDataP->IPD_callback);
+                            }
+
+                            /* mark the graphic as completed, if so */
+                            if ((state.lineNo) == ihdrData.height)
+                                *p_completeGraphic = TRUE;
+
+                            /* Stop here if we are aborting and we're NOT progressive (???) */
+                            if (mimeStatus->MS_mimeFlags & MIME_STATUS_ABORT)
+                            {
+                                if ((loadProgressDataP) && (importProgressDataP->IPD_bitmap != NullHandle))
+                                {
+                                    errorFlag = FALSE ; // FIXME
+                                    /* But keep the partial image we have (we don't need a big red X) */
+                                    /* We aren't complete either */
+                                    onErrorDontKeepPartial = FALSE ;
+                                }
+                                else
+                                {
+                                    errorFlag = TRUE;
+                                }
+                                break;
+                            }
+#else /* !PROGRESS_DISPLAY */
+                            /* Stop here if we are aborting */
+                            if (mimeStatus->MS_mimeFlags & MIME_STATUS_ABORT)
                             {
                                 errorFlag = TRUE;
+                                break;
                             }
-                            break;
-                        }
-#else /* !PROGRESS_DISPLAY */
-                        /* Stop here if we are aborting */
-                        if (mimeStatus->MS_mimeFlags & MIME_STATUS_ABORT)
-                        {
-                            errorFlag = TRUE;
-                            break;
-                        }
 #endif
-                    }
+                        }
 
-                    // Clean up resources
-                    pngImportCleanupIDATProcessingState(&state);
+                        // Clean up resources
+                        pngImportCleanupIDATProcessingState(&state);
+                    }
                 }
             }
         }
@@ -144,14 +153,25 @@ VMBlockHandle PngImport(
     }
 
 
-    /* Free the existing data if we have any */ 
+#if PROGRESS_DISPLAY
+    /* Free the existing data if we have any */
     if (errorFlag)
     {
-        if (onErrorDontKeepPartial)  
+        if (onErrorDontKeepPartial)
         {
             VMFreeVMChain(vmf, VMCHAIN_MAKE_FROM_VM_BLOCK(bmVMBlock));
             bmVMBlock = 0;
         }
+    }
+#endif
+
+    if ((bmVMBlock == 0) && (gotAlloc))
+    {
+        AllocWatcherFree(watcher, requiredMemory);
+    }
+    else
+    {
+        *usedMem = requiredMemory;
     }
 
     return bmVMBlock;

@@ -1,12 +1,10 @@
-/**
- ********************************************************************
+/********************************************************************
  A simple and pretty incomplete PNG import libray for PC/GEOS.
  Started in 08/2024 by MeyerK for the FreeGEOS project.
 
  The code itself was written from scratch - relying heavily
  on ChatGPT for the PNG-specific parts.
- ********************************************************************
- */
+ *******************************************************************/
 
 #include <pnglib.goh>
 
@@ -218,26 +216,12 @@ void _pascal _export pngImportInitIDATProcessingState(IDATState* state, FileHand
     state->outOff = 0;
 
     // how many bytes in a pixel, how many bytes in a row?
-    state->rowBytes = pngCalcBytesPerRow(ihdr.width, ihdr.colorType, ihdr.bitDepth);
     state->bytesPerPixel = pngCalcBytesPerPixel(ihdr.colorType, ihdr.bitDepth);
+    state->rowBytes = pngCalcBytesPerRow(ihdr.width, ihdr.colorType, ihdr.bitDepth);
 
-    // determine how much memory to allocate - we need to allocate a little more
-    // for 1 and 2 bit pixel data as it gets "padded to 4"
-    if ((ihdr.colorType == PNG_COLOR_TYPE_GREY) && (ihdr.bitDepth == 2))
-    {
-        allocSize = pngCalcBytesPerRow(ihdr.width, ihdr.colorType, 4) + 1;
-    }
-    else if (
-        ((ihdr.colorType == PNG_COLOR_TYPE_PALETTE) && (ihdr.bitDepth == 1)) ||
-        ((ihdr.colorType == PNG_COLOR_TYPE_PALETTE) && (ihdr.bitDepth == 2))
-    )
-    {
-        allocSize = pngCalcBytesPerRow(ihdr.width, ihdr.colorType, 4) + 1;
-    }
-    else
-    {
-        allocSize = state->rowBytes + 1;
-    }
+    // determine how much memory to allocate per line, this is NOT always the same
+    // as "rowBytes"
+    allocSize = pngCalcLineAllocSize(ihdr.width, ihdr.colorType, ihdr.bitDepth);
 
     // Allocate memory for the zlib-decoded and unfiltered current row, raw pixel data
     state->currentRowHan = MemAlloc(allocSize, HF_SHARABLE | HF_SWAPABLE, HAF_ZERO_INIT); // +1 for filter byte
@@ -721,6 +705,31 @@ unsigned long _pascal _export pngCalcBytesPerRow(unsigned long width, unsigned c
 unsigned long _pascal _export pngCalcBytesPerPixel(unsigned char colorType, unsigned char bitDepth)
 {
     return pngCalcBytesPerRow(1, colorType, bitDepth);
+}
+
+// determine how much memory to allocate - we need to allocate a little more
+// for 1 and 2 bit pixel data as it gets "padded to 4"
+unsigned long _pascal _export pngCalcLineAllocSize(unsigned long width, unsigned char colorType, unsigned char bitDepth)
+{
+    unsigned long allocSize = 0;
+
+    if ((colorType == PNG_COLOR_TYPE_GREY) && (bitDepth == 2))
+    {
+        allocSize = pngCalcBytesPerRow(width, colorType, 4) + 1;
+    }
+    else if (
+        ((colorType == PNG_COLOR_TYPE_PALETTE) && (bitDepth == 1)) ||
+        ((colorType == PNG_COLOR_TYPE_PALETTE) && (bitDepth == 2))
+    )
+    {
+        allocSize = pngCalcBytesPerRow(width, colorType, 4) + 1;
+    }
+    else
+    {
+        allocSize = pngCalcBytesPerRow(width, colorType, bitDepth) + 1;
+    }
+
+    return allocSize;
 }
 
 // reduce 16 bit values to 8 bit, GEOS doesn't know about 16 bit ;-)
