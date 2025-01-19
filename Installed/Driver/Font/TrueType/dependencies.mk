@@ -40,8 +40,6 @@ ttcalc.obj \
 ttcalc.eobj: 
 ttcmap.obj \
 ttcmap.eobj: 
-ttextend.obj \
-ttextend.eobj: 
 ttfile.obj \
 ttfile.eobj: 
 ttgload.obj \

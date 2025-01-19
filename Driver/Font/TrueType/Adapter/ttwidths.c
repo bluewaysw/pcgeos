@@ -240,7 +240,9 @@ EC(             ECCheckBounds( (void*)transMatrix ) );
                 if( IsRegionNeeded( transMatrix, fontBuf ) )
                         fontBuf->FB_flags |= FBF_IS_REGION;
 
-                if( !(fontMatrix->FM_flags & TF_COMPLEX) ) {
+        	AdjustTransMatrix( transMatrix );
+                
+		if( !(fontMatrix->FM_flags & TF_COMPLEX) ) {
 	
                         TrueType_Cache_UpdateFontBlock(
                                 trueTypeVars->cacheFile,
