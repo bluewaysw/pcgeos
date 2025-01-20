@@ -4,9 +4,6 @@ longname "HTML Translator"
 tokenchars "TLTX"
 tokenid 0
 
-platform geos20
-exempt htmlpars
-
 type library, single
 
 entry LibraryEntry
@@ -16,7 +13,7 @@ library ui
 library impex
 library text
 library ansic
-library htmlpars
+library html4par
 
 export TransGetImportUI
 export TransGetExportUI
