@@ -2279,10 +2279,7 @@ Scan_DropOuts :
         k = ( i + j ) >> 1;
 
         if ( band_top >= 7 || k < i )
-        {
-          band_top     = 0;
           return Raster_Err_Invalid;
-        }
 
         ras.band_stack[band_top+1].y_min = k;
         ras.band_stack[band_top+1].y_max = j;
@@ -2304,6 +2301,19 @@ Scan_DropOuts :
     }
 
     return TT_Err_Ok;
+  }
+
+  LOCAL_FUNC
+  static void Initialize_Raster_Instance( RAS_ARGS TT_Outline*  glyph )
+  {
+    ras.outs      = glyph->contours;
+    ras.flags     = glyph->flags;
+    ras.nPoints   = glyph->n_points;
+    ras.nContours = glyph->n_contours;
+    ras.coords    = glyph->points;
+
+    Set_Resolution( RAS_VARS glyph->y_ppem );
+    ras.dropOutControl = glyph->dropout_mode;
   }
 
 
@@ -2328,24 +2338,12 @@ Scan_DropOuts :
 
 
 EC( ECCheckMemHandle( ras.buffer ) );
+EC( ECCheckBounds( (void*)target_map ) );
 
-    if ( glyph->n_points == 0 || glyph->n_contours <= 0 )
-      return TT_Err_Ok;
 
-    if ( glyph->n_points < glyph->contours[glyph->n_contours - 1] )
-      return TT_Err_Too_Many_Points;
+    ras.target = *target_map;
 
-    if ( target_map )
-      ras.target = *target_map;
-
-    ras.outs      = glyph->contours;
-    ras.flags     = glyph->flags;
-    ras.nPoints   = glyph->n_points;
-    ras.nContours = glyph->n_contours;
-    ras.coords    = glyph->points;
-
-    Set_Resolution( RAS_VARS glyph->y_ppem );
-    ras.dropOutControl = glyph->dropout_mode;
+    Initialize_Raster_Instance( RAS_VARS glyph );
 
     /* Vertical Sweep */
     ras.Proc_Sweep_Init   = Vertical_Sweep_Init;
@@ -2409,24 +2407,12 @@ EC( ECCheckMemHandle( ras.buffer ) );
 
 
 EC( ECCheckMemHandle( ras.buffer ) );
+EC( ECCheckBounds( (void*)map ) );
 
-    if ( glyph->n_points == 0 || glyph->n_contours <= 0 )
-      return TT_Err_Ok;
 
-    if ( glyph->n_points < glyph->contours[glyph->n_contours - 1] )
-      return TT_Err_Too_Many_Points;
+    ras.target = *map;
 
-    if ( map )
-      ras.target = *map;
-
-    ras.outs      = glyph->contours;
-    ras.flags     = glyph->flags;
-    ras.nPoints   = glyph->n_points;
-    ras.nContours = glyph->n_contours;
-    ras.coords    = glyph->points;
-
-    Set_Resolution( RAS_VARS glyph->y_ppem );
-    ras.dropOutControl = glyph->dropout_mode;
+    Initialize_Raster_Instance( RAS_VARS glyph );
 
     /* Vertical Sweep */
   
@@ -2464,12 +2450,9 @@ static void Lock_Render_Pool( RAS_ARGS  TT_Outline*  glyph )
   TT_UShort   renderpoolSize = ( glyph->y_ppem >> 3 ) * RASTER_RENDER_POOL_FACTOR 
                                                       + RASTER_RENDER_POOL_MIN_SIZE;
 
-  /* discarded or not the necessary size */
-  /*if( MemGetInfo( ras.buffer, MGIT_FLAGS_AND_LOCK_COUNT ) & HF_DISCARDED ||
-      MemGetInfo( ras.buffer, MGIT_SIZE ) != renderpoolSize )*/
-    MemReAlloc( ras.buffer, renderpoolSize, HAF_NO_ERR | HAF_LOCK);
+  MemReAlloc( ras.buffer, renderpoolSize, HAF_NO_ERR | HAF_LOCK);
 
-  ras.sizeBuff = (PStorage)MemDeref( ras.buffer ) + ( renderpoolSize / sizeof(long) );
+  ras.sizeBuff = (PStorage)MemDeref( ras.buffer ) + ( renderpoolSize >> 2 );
 }
 
 
