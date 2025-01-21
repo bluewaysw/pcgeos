@@ -10,28 +10,28 @@
 #include <heap.h>
 
 // PNG-Chunks
-#define CHUNK_IHDR 0x49484452  // "IHDR"
-#define CHUNK_IDAT 0x49444154  // "IDAT"
-#define CHUNK_IEND 0x49454E44  // "IEND"
-#define CHUNK_PLTE 0x504C5445  // "PLTE"
+#define PNG_CHUNK_IHDR 0x49484452  // "IHDR"
+#define PNG_CHUNK_IDAT 0x49444154  // "IDAT"
+#define PNG_CHUNK_IEND 0x49454E44  // "IEND"
+#define PNG_CHUNK_PLTE 0x504C5445  // "PLTE"
 
 // buffers for ZLIB
-#define CHUNK_SIZE_IN  2048     // 2048 4096
-#define CHUNK_SIZE_OUT 4096     // 4096 8192
+#define PNG_CHUNK_SIZE_IN  2048     // 2048 4096
+#define PNG_CHUNK_SIZE_OUT 4096     // 4096 8192
 
 // PNG signature
 const unsigned char PNG_SIGNATURE[8] = {0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A};
 
 // max palette entries
-#define MAX_PALETTE_ENTRIES 256
+#define PNG_MAX_PALETTE_ENTRIES 256
 
 // max IDAT chunk entries
-#define MAX_IDAT_CHUNKS 100
+#define PNG_MAX_IDAT_CHUNKS 100
 
 // mximum scanline size
 // 8192 = 8KB limit, equals 2048px width in RGBA and 1024px in 16-bit RGBA.
 // 6144 = 6KB limit, equals 1536px width in RGBA and 768px in 16-bit RGBA.
-#define MAX_SCANLINE_SIZE 6144
+#define PNG_MAX_SCANLINE_SIZE 6144
 
 // Struktur für die IHDR-Daten
 typedef struct {
@@ -42,19 +42,19 @@ typedef struct {
     unsigned char compressionMethod;
     unsigned char filterMethod;
     unsigned char interlaceMethod;
-} IHDRData;
+} pngIHDRData;
 
-// Struktur für den ChunkHeader
+// Struktur für den pngChunkHeader
 typedef struct {
     unsigned long length;
     unsigned long type;
-} ChunkHeader;
+} pngChunkHeader;
 
 // IDAT Chunk entry
 typedef struct {
     unsigned long length;
     unsigned long chunkPos;
-} IDATChunkEntry;
+} pngIDATChunkEntry;
 
 // IDAT parsing state struct
 typedef struct {
@@ -83,21 +83,21 @@ typedef struct {
     int idatChunkIdx;
 
     FileHandle file;
-    IHDRData ihdr;
-} IDATState;
+    pngIHDRData ihdr;
+} pngIDATState;
 
 // PLTE Chunk entry
 typedef struct {
     unsigned long length;
     unsigned long chunkPos;
-} PLTEChunkEntry;
+} pngPLTEChunkEntry;
 
 // Filtertypen gemäß PNG-Spezifikation
-#define FILTER_NONE    0
-#define FILTER_SUB     1
-#define FILTER_UP      2
-#define FILTER_AVERAGE 3
-#define FILTER_PAETH   4
+#define PNG_FILTER_NONE    0
+#define PNG_FILTER_SUB     1
+#define PNG_FILTER_UP      2
+#define PNG_FILTER_AVERAGE 3
+#define PNG_FILTER_PAETH   4
 
 // Color Types
 #define PNG_COLOR_TYPE_GREY        0   /* Grayscale */
@@ -117,17 +117,17 @@ typedef struct {
 VMBlockHandle   _pascal _export pngImportConvertFile(FileHandle fileHan, VMFileHandle vmFile);
 
 int             _pascal _export pngImportCheckHeader(FileHandle file);
-int             _pascal _export pngImportProcessChunks(FileHandle file, IHDRData* ihdrData, MemHandle* idatChunksHan, int *idatNumChunks, PLTEChunkEntry* plteChunk);
+int             _pascal _export pngImportProcessChunks(FileHandle file, pngIHDRData* ihdrData, MemHandle* idatChunksHan, int *idatNumChunks, pngPLTEChunkEntry* plteChunk);
 BMFormat        _pascal _export pngImportWhatOutputFormat(unsigned char colorType, unsigned char bitDepth);
-VMBlockHandle   _pascal _export pngImportInitiateOutputBitmap(VMFileHandle vmFile, IHDRData ihdrData, BMFormat fmt);
-void            _pascal _export pngImportHandlePalette(FileHandle file, PLTEChunkEntry plteChunk, VMFileHandle vmFile, VMBlockHandle vmBlock, unsigned char colorType, unsigned char bitDepth);
-void            _pascal _export pngImportInitIDATProcessingState(IDATState* state, FileHandle file, MemHandle idatChunksHan, int idatNumChunks, IHDRData ihdr);
-int             _pascal _export pngImportGetNextIDATScanline(IDATState* state);
-void            _pascal _export pngImportPauseIDATProcessing(IDATState* state);
-void            _pascal _export pngImportApplyGEOSFormatTransformations(IDATState* state, RGBValue pngBlendColor);
+VMBlockHandle   _pascal _export pngImportInitiateOutputBitmap(VMFileHandle vmFile, pngIHDRData ihdrData, BMFormat fmt);
+void            _pascal _export pngImportHandlePalette(FileHandle file, pngPLTEChunkEntry plteChunk, VMFileHandle vmFile, VMBlockHandle vmBlock, unsigned char colorType, unsigned char bitDepth);
+void            _pascal _export pngImportInitIDATProcessingState(pngIDATState* state, FileHandle file, MemHandle idatChunksHan, int idatNumChunks, pngIHDRData ihdr);
+int             _pascal _export pngImportGetNextIDATScanline(pngIDATState* state);
+void            _pascal _export pngImportPauseIDATProcessing(pngIDATState* state);
+void            _pascal _export pngImportApplyGEOSFormatTransformations(pngIDATState* state, RGBValue pngBlendColor);
 void            _pascal _export pngImportWriteScanlineToBitmap(VMFileHandle vmFile, VMBlockHandle bitmapHandle, unsigned long lineNo, unsigned char* rowData);
-void            _pascal _export pngImportResumeIDATProcessing(IDATState* state);
-void            _pascal _export pngImportCleanupIDATProcessingState(IDATState* state);
+void            _pascal _export pngImportResumeIDATProcessing(pngIDATState* state);
+void            _pascal _export pngImportCleanupIDATProcessingState(pngIDATState* state);
 
 /* In a way internal, but sometimes helpful to access from outside */
 unsigned long   _pascal _export pngCalcBytesPerRow(unsigned long width, unsigned char colorType, unsigned char bitDepth);
@@ -139,7 +139,7 @@ void            _pascal _export pngPad1BitTo4Bit(unsigned char *input, unsigned 
 void            _pascal _export pngPad2BitTo4Bit(unsigned char *input, unsigned int width, unsigned char colorType, unsigned char bitDepth);
 
 /* Internal */
-int nextIDATChunk(IDATState* state);
+int nextIDATChunk(pngIDATState* state);
 static void unfilterRow(unsigned char *data, unsigned char *previousRow, unsigned long bytesPerPixel, unsigned long rowBytes);
 static inline unsigned char paethPredictor(int a, int b, int c);
 static inline int abs(int x);

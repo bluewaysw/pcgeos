@@ -11,12 +11,12 @@
 // Reading and processing a complete PNG file
 VMBlockHandle _pascal _export pngImportConvertFile(FileHandle fileHan, VMFileHandle vmFile)
 {
-    IHDRData ihdrData = {0};
+    pngIHDRData ihdrData = {0};
     VMBlockHandle vmBlock = NullHandle;
     MemHandle idatChunksHan = NullHandle; // this is freed via pngImportCleanupIDATProcessingState!
     int idatNumChunks = 0;
-    PLTEChunkEntry plteChunk = {0};
-    IDATState state = {0};
+    pngPLTEChunkEntry plteChunk = {0};
+    pngIDATState state = {0};
     BMFormat fmt = 0;
     RGBValue blendColor = {255, 255, 255};
 
@@ -83,19 +83,19 @@ int _pascal _export pngImportCheckHeader(FileHandle file)
 }
 
 // main function for processing PNG-Chunks
-int _pascal _export pngImportProcessChunks(FileHandle file, IHDRData* ihdrData, MemHandle* idatChunksHan, int *idatNumChunks, PLTEChunkEntry* plteChunk)
+int _pascal _export pngImportProcessChunks(FileHandle file, pngIHDRData* ihdrData, MemHandle* idatChunksHan, int *idatNumChunks, pngPLTEChunkEntry* plteChunk)
 {
-    ChunkHeader chdr = {0};
+    pngChunkHeader chdr = {0};
     int idatChunkIdx = 0;
-    IDATChunkEntry* idatChunks;
+    pngIDATChunkEntry* idatChunks;
     unsigned int bytesRead = 0;
-    unsigned int headerSize = sizeof(IHDRData);
+    unsigned int headerSize = sizeof(pngIHDRData);
     unsigned int lineSize = 0;
 
 	// make sure we start at the beginning, but after the PNG header
 	FilePos(file, sizeof(PNG_SIGNATURE), FILE_POS_START);
 
-    while (FileRead(file, &chdr, sizeof(ChunkHeader), FALSE))
+    while (FileRead(file, &chdr, sizeof(pngChunkHeader), FALSE))
     {
         // Swap endianness for chunk length and type
         chdr.length = swapEndian(chdr.length);
@@ -103,7 +103,7 @@ int _pascal _export pngImportProcessChunks(FileHandle file, IHDRData* ihdrData, 
 
         switch (chdr.type)
         {
-            case CHUNK_IHDR:
+            case PNG_CHUNK_IHDR:
             {
                 // read file
                 bytesRead = FileRead(file, ihdrData, headerSize, FALSE);
@@ -118,19 +118,19 @@ int _pascal _export pngImportProcessChunks(FileHandle file, IHDRData* ihdrData, 
                 ihdrData->height = swapEndian(ihdrData->height);
 
                 lineSize = pngCalcBytesPerRow(ihdrData->width, ihdrData->colorType, ihdrData->bitDepth);
-                if (lineSize > MAX_SCANLINE_SIZE)
+                if (lineSize > PNG_MAX_SCANLINE_SIZE)
                     return 0;
 
                 // now that we seem to have a valid IHDR, create the memory for an array of IDATChunks
-                *idatChunksHan = MemAlloc(MAX_IDAT_CHUNKS * sizeof(IDATChunkEntry), HF_SWAPABLE | HF_SHARABLE, HAF_ZERO_INIT);
+                *idatChunksHan = MemAlloc(PNG_MAX_IDAT_CHUNKS * sizeof(pngIDATChunkEntry), HF_SWAPABLE | HF_SHARABLE, HAF_ZERO_INIT);
 
                 // Move file pointer forward by the remaining part of the IHDR chunk
-                FilePos(file, chdr.length - sizeof(IHDRData), FILE_POS_RELATIVE);
+                FilePos(file, chdr.length - sizeof(pngIHDRData), FILE_POS_RELATIVE);
 
                 break;
             }
 
-            case CHUNK_PLTE:
+            case PNG_CHUNK_PLTE:
             {
                 // Read PLTE chunk
                 plteChunk->length = chdr.length;
@@ -142,9 +142,9 @@ int _pascal _export pngImportProcessChunks(FileHandle file, IHDRData* ihdrData, 
                 break;
             }
 
-            case CHUNK_IDAT:
+            case PNG_CHUNK_IDAT:
             {
-                if (idatChunkIdx < MAX_IDAT_CHUNKS) // Prevent buffer overflow
+                if (idatChunkIdx < PNG_MAX_IDAT_CHUNKS) // Prevent buffer overflow
                 {
                     idatChunks = MemLock(*idatChunksHan);
                     idatChunks[idatChunkIdx].length = chdr.length;
@@ -166,7 +166,7 @@ int _pascal _export pngImportProcessChunks(FileHandle file, IHDRData* ihdrData, 
                 break;
             }
 
-            case CHUNK_IEND:
+            case PNG_CHUNK_IEND:
             {
                 // Stop processing at IEND
                 return 1;
@@ -189,11 +189,11 @@ int _pascal _export pngImportProcessChunks(FileHandle file, IHDRData* ihdrData, 
 }
 
 // init the IDAT processing structure
-void _pascal _export pngImportInitIDATProcessingState(IDATState* state, FileHandle file, MemHandle idatChunksHan, int idatNumChunks, IHDRData ihdr)
+void _pascal _export pngImportInitIDATProcessingState(pngIDATState* state, FileHandle file, MemHandle idatChunksHan, int idatNumChunks, pngIHDRData ihdr)
 {
     // how many bytes to allocate for a scanline
     unsigned long allocSize = NULL;
-    IDATChunkEntry* idatChunks;
+    pngIDATChunkEntry* idatChunks;
 
     // Initialize the zlib stream
     state->strm.zalloc = Z_NULL;
@@ -206,12 +206,12 @@ void _pascal _export pngImportInitIDATProcessingState(IDATState* state, FileHand
     //inflateInit2(&state.strm, 15 + 32);
 
     // memory for the input data from file to zlib
-    state->inHan = MemAlloc(CHUNK_SIZE_IN, HF_SHARABLE | HF_SWAPABLE, HAF_ZERO_INIT);
+    state->inHan = MemAlloc(PNG_CHUNK_SIZE_IN, HF_SHARABLE | HF_SWAPABLE, HAF_ZERO_INIT);
     state->in = MemLock(state->inHan);
     state->inOff = 0;
 
     // memory for what zlib decodes
-    state->outHan = MemAlloc(CHUNK_SIZE_OUT, HF_SHARABLE | HF_SWAPABLE, HAF_ZERO_INIT);
+    state->outHan = MemAlloc(PNG_CHUNK_SIZE_OUT, HF_SHARABLE | HF_SWAPABLE, HAF_ZERO_INIT);
     state->out = MemLock(state->outHan);
     state->outOff = 0;
 
@@ -250,7 +250,7 @@ void _pascal _export pngImportInitIDATProcessingState(IDATState* state, FileHand
 
 // temporarily unlock the memory not needed for just putting out the pixels we just decoded
 // NOTE: currentRow stays locked for further processing
-void _pascal _export pngImportPauseIDATProcessing(IDATState* state)
+void _pascal _export pngImportPauseIDATProcessing(pngIDATState* state)
 {
     state->inOff = state->strm.next_in - MemDeref(state->inHan);
     MemUnlock(state->inHan); // disabled as it seems to create memory overflows somewhere
@@ -262,7 +262,7 @@ void _pascal _export pngImportPauseIDATProcessing(IDATState* state)
 }
 
 // relock the memory needed for further IDAT chunk processing
-void _pascal _export pngImportResumeIDATProcessing(IDATState* state)
+void _pascal _export pngImportResumeIDATProcessing(pngIDATState* state)
 {
     state->in = MemLock(state->inHan);
     state->strm.next_in = state->in + state->inOff;
@@ -274,7 +274,7 @@ void _pascal _export pngImportResumeIDATProcessing(IDATState* state)
 }
 
 // Processing of IDAT-Chunks
-int _pascal _export pngImportGetNextIDATScanline(IDATState* state)
+int _pascal _export pngImportGetNextIDATScanline(pngIDATState* state)
 {
     unsigned long have;  // Amount of data decompressed into the output buffer
     unsigned char *src;  // Pointer to the current position in the output buffer
@@ -336,7 +336,7 @@ int _pascal _export pngImportGetNextIDATScanline(IDATState* state)
             // If there is no more input data in the zlib stream, read more from the file
             if (state->strm.avail_in == 0 && state->length > 0)
             {
-                unsigned long bytesToRead = (state->length < CHUNK_SIZE_IN) ? state->length : CHUNK_SIZE_IN;
+                unsigned long bytesToRead = (state->length < PNG_CHUNK_SIZE_IN) ? state->length : PNG_CHUNK_SIZE_IN;
 
                 // Read the next chunk of compressed data from the file
                 if (FileRead(state->file, state->in, bytesToRead, FALSE) != bytesToRead)
@@ -352,7 +352,7 @@ int _pascal _export pngImportGetNextIDATScanline(IDATState* state)
             }
 
             // Set up the output buffer for decompression
-            state->strm.avail_out = CHUNK_SIZE_OUT;
+            state->strm.avail_out = PNG_CHUNK_SIZE_OUT;
             state->strm.next_out = state->out;
 
             // Decompress the data from the input buffer into the output buffer
@@ -365,7 +365,7 @@ int _pascal _export pngImportGetNextIDATScanline(IDATState* state)
             }
 
             // Calculate how much data was decompressed
-            have = CHUNK_SIZE_OUT - state->strm.avail_out;
+            have = PNG_CHUNK_SIZE_OUT - state->strm.avail_out;
             src = state->out;  // Point to the start of the decompressed data
 
             // Process the decompressed data in the output buffer
@@ -410,9 +410,9 @@ int _pascal _export pngImportGetNextIDATScanline(IDATState* state)
     return 0;
 }
 
-int nextIDATChunk(IDATState* state)
+int nextIDATChunk(pngIDATState* state)
 {
-    IDATChunkEntry* idatChunks;
+    pngIDATChunkEntry* idatChunks;
 
     if (state->idatChunkIdx + 1 < state->idatNumChunks) // zero based!
     {
@@ -427,7 +427,7 @@ int nextIDATChunk(IDATState* state)
     return 0;
 }
 
-void _pascal _export pngImportCleanupIDATProcessingState(IDATState* state)
+void _pascal _export pngImportCleanupIDATProcessingState(pngIDATState* state)
 {
     inflateEnd(&state->strm);
     MemFree(state->inHan);
@@ -437,7 +437,7 @@ void _pascal _export pngImportCleanupIDATProcessingState(IDATState* state)
     MemFree(state->previousRowHandle);
 }
 
-void _pascal _export pngImportHandlePalette(FileHandle file, PLTEChunkEntry plteChunk, VMFileHandle vmFile, VMBlockHandle vmBlock, unsigned char colorType, unsigned char bitDepth)
+void _pascal _export pngImportHandlePalette(FileHandle file, pngPLTEChunkEntry plteChunk, VMFileHandle vmFile, VMBlockHandle vmBlock, unsigned char colorType, unsigned char bitDepth)
 {
     RGBValue* palette = NULL;
     char* rawPalette = NULL;
@@ -493,7 +493,7 @@ void _pascal _export pngImportHandlePalette(FileHandle file, PLTEChunkEntry plte
     else if ((plteChunk.chunkPos != 0) && (plteChunk.length != 0))
     {
         // Make sure the length is divisible by 3 (each color is 3 bytes)
-        if (plteChunk.length % 3 != 0 || (plteChunk.length / 3) > MAX_PALETTE_ENTRIES)
+        if (plteChunk.length % 3 != 0 || (plteChunk.length / 3) > PNG_MAX_PALETTE_ENTRIES)
         {
             return;  // Invalid palette length
         }
@@ -611,7 +611,7 @@ BMFormat _pascal _export pngImportWhatOutputFormat(unsigned char colorType, unsi
 }
 
 // create the GEOS Bitmap
-VMBlockHandle _pascal _export pngImportInitiateOutputBitmap(VMFileHandle vmFile, IHDRData ihdrData, BMFormat fmt)
+VMBlockHandle _pascal _export pngImportInitiateOutputBitmap(VMFileHandle vmFile, pngIHDRData ihdrData, BMFormat fmt)
 {
     GStateHandle bmstate;
     VMBlockHandle vmBlock = NullHandle;
@@ -630,7 +630,7 @@ VMBlockHandle _pascal _export pngImportInitiateOutputBitmap(VMFileHandle vmFile,
 }
 
 // transform the original bitmap data for the target GEOS format
-void _pascal _export pngImportApplyGEOSFormatTransformations(IDATState* state, RGBValue pngBlendColor)
+void _pascal _export pngImportApplyGEOSFormatTransformations(pngIDATState* state, RGBValue pngBlendColor)
 {
     // Convert any 16-bit channel data to 8-bit, we don't support more than 8-bit per Channel
     pngConvert16BitLineTo8Bit(state->currentRow, state->ihdr.width, state->ihdr.colorType, state->ihdr.bitDepth);
@@ -1037,20 +1037,20 @@ static void unfilterRow(unsigned char *data, unsigned char *previousRow, unsigne
     // Apply the filter
     switch (filterType)
     {
-        case FILTER_NONE:
+        case PNG_FILTER_NONE:
             // No filter, data is already in place
             break;
-        case FILTER_SUB:
+        case PNG_FILTER_SUB:
             for (i = bytesPerPixel; i < rowBytes; i++) {
                 currentRow[i] += currentRow[i - bytesPerPixel];
             }
             break;
-        case FILTER_UP:
+        case PNG_FILTER_UP:
             for (i = 0; i < rowBytes; i++) {
                 currentRow[i] += previousRow[i];
             }
             break;
-        case FILTER_AVERAGE:
+        case PNG_FILTER_AVERAGE:
             for (i = 0; i < rowBytes; i++)
             {
                 unsigned char left = (i >= bytesPerPixel) ? currentRow[i - bytesPerPixel] : 0;
@@ -1058,7 +1058,7 @@ static void unfilterRow(unsigned char *data, unsigned char *previousRow, unsigne
                 currentRow[i] += (left + up) / 2;
             }
             break;
-        case FILTER_PAETH:
+        case PNG_FILTER_PAETH:
             for (i = 0; i < rowBytes; i++)
             {
                 unsigned char left = (i >= bytesPerPixel) ? currentRow[i - bytesPerPixel] : 0;
