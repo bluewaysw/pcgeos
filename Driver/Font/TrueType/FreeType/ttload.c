@@ -52,7 +52,7 @@
   Short  TT_LookUp_Table( PFace  face,
                          ULong  tag  )
   {
-    UShort  i;
+    Short  i;
 
 
     for ( i = 0; i < face->numTables; ++i )
@@ -168,7 +168,11 @@
       return error;
 
     /* read frame data into face table */
+#ifdef TT_CONFIG_OPTION_SUPPORT_OPTIONAL_FIELDS
     maxProfile->version               = GET_ULong();
+#else
+    SKIP( 4 );
+#endif
 
     maxProfile->numGlyphs             = GET_UShort();
 
@@ -352,8 +356,9 @@
 #endif
 
     header->Index_To_Loc_Format = GET_Short();
+#ifdef TT_CONFIG_OPTION_SUPPORT_OPTIONAL_FIELDS
     header->Glyph_Data_Format   = GET_Short();
-
+#endif
     FORGET_Frame();
 
     return TT_Err_Ok;
@@ -501,17 +506,21 @@
          ACCESS_Frame( 36 ) )
       return error;
 
+#ifdef TT_CONFIG_OPTION_SUPPORT_OPTIONAL_FIELDS
     header->Version   = GET_ULong();
+#else
+    SKIP( 4 );
+#endif
     header->Ascender  = GET_Short();
     header->Descender = GET_Short();
     header->Line_Gap  = GET_Short();
 
     header->advance_Width_Max = GET_UShort();
 
+#ifdef TT_CONFIG_OPTION_SUPPORT_OPTIONAL_FIELDS
     header->min_Left_Side_Bearing  = GET_Short();
     header->min_Right_Side_Bearing = GET_Short();
 
-#ifdef TT_CONFIG_OPTION_SUPPORT_OPTIONAL_FIELDS
     header->xMax_Extent            = GET_Short();
     header->caret_Slope_Rise       = GET_Short();
     header->caret_Slope_Run        = GET_Short();
@@ -523,7 +532,7 @@
     header->Reserved3 = GET_Short();
     header->Reserved4 = GET_Short();
 #else
-    SKIP( 16 );
+    SKIP( 20 );
 #endif
 
     header->metric_Data_Format = GET_Short();
@@ -1263,90 +1272,5 @@
   }
 #endif
 
-
-/*******************************************************************
- *
- *  Function    :  Load_TrueType_Any
- *
- *  Description :  Loads any font table into client memory. Used by
- *                 the TT_Get_Font_Data() API function.
- *
- *  Input  :  face     face object to look for
- *
- *            tag      tag of table to load. Use the value 0 if you
- *                     want to access the whole font file, else set
- *                     this parameter to a valid TrueType table tag
- *                     that you can forge with the MAKE_TT_TAG
- *                     macro.
- *
- *            offset   starting offset in the table (or the file
- *                     if tag == 0 )
- *
- *            buffer   address of target buffer
- *
- *            length   address of decision variable :
- *
- *                       if length == NULL :
- *                             load the whole table. returns an
- *                             an error if 'offset' == 0 !!
- *
- *                       if *length == 0 :
- *                             exit immediately, returning the
- *                             length of the given table, or of
- *                             the font file, depending on the
- *                             value of 'tag'
- *
- *                       if *length != 0 :
- *                             load the next 'length' bytes of
- *                             table or font, starting at offset
- *                             'offset' (in table or font too).
- *
- *  Output :  Error condition
- *
- ******************************************************************/
-/*
-  LOCAL_FUNC
-  TT_Error  Load_TrueType_Any( PFace  face,
-                               ULong  tag,
-                               Long   offset,
-                               void*  buffer,
-                               Long*  length )
-  {
-    TT_Stream  stream;
-    TT_Error   error;
-    Long       table;
-    ULong      size;
-
-
-    if ( tag != 0 )
-    {
-      // look for tag in font directory
-      table = TT_LookUp_Table( face, tag );
-      if ( table < 0 )
-        return TT_Err_Table_Missing;
-
-      offset += face->dirTables[table].Offset;
-      size    = face->dirTables[table].Length;
-    }
-    else
-      // tag = 0 -- the use want to access the font file directly
-      size = TT_Stream_Size( face->stream );
-
-    if ( length && *length == 0 )
-    {
-      *length = size;
-      return TT_Err_Ok;
-    }
-
-    if ( length )
-      size = *length;
-
-    if ( !USE_Stream( face->stream, stream ) )
-      (void)FILE_Read_At( offset, buffer, size );
-    DONE_Stream( stream );
-
-    return error;
-  }
-*/
 
 /* END */
