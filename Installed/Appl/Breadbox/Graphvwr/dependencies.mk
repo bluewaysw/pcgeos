@@ -141,7 +141,7 @@ imp_bmp.eobj: geos.h heap.h geode.h resource.h ec.h object.h lmem.h \
                 Objects/gInterC.h Objects/Text/tCommon.h stylesh.h \
                 driver.h thread.h print.h Internal/spoolInt.h serialDr.h \
                 parallDr.h hugearr.h fileEnum.h IMPBMP/imp_bmp.h \
-                IMPBMP/ibcommon.h Ansi/string.h Ansi/stdio.h \
+                IMPBMP/ibcommon.h Ansi/string.h pnglib.h Ansi/stdio.h \
                 Ansi/stdlib.h zlib.h zconf.h IMPBMP/imppcx.h \
                 IMPBMP/impbmp.h jpeglib.h product.h htmlprog.h jconfig.h \
                 jmorecfg.h

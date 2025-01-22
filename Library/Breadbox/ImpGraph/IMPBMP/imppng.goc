@@ -1,5 +1,10 @@
 @include <stdapp.goh>
-@include "IMPBMP/imppng.h"
+#include "IMPBMP/imppng.h"
+
+/*
+  no SCANLINE_COMPRESS support and no inline reduction of colors
+  as in the JPEG converters. Also, no temp loading for PROGRESS_DISPLAY.
+ */
 
 VMBlockHandle PngImport(
     TCHAR *file,
@@ -8,9 +13,6 @@ VMBlockHandle PngImport(
     MimeRes resolution,
     AllocWatcherHandle watcher,
     dword *usedMem,
-#if SCANLINE_COMPRESS
-    Boolean scanlineCompress,
-#endif
     Boolean *p_completeGraphic
 #if PROGRESS_DISPLAY
     , _ImportProgressParams_
@@ -47,7 +49,7 @@ VMBlockHandle PngImport(
     }
 #endif
 
-    *usedMem = 0; // FIXME
+    *usedMem = 0;
     *p_completeGraphic = FALSE ;
 
     filehan = FileOpen(file, FILE_ACCESS_R | FILE_DENY_W);
@@ -85,10 +87,6 @@ VMBlockHandle PngImport(
 
                             // make sure we have data compatible with GEOS HugeBitmaps
                             pngImportApplyGEOSFormatTransformations(&state, pngBlendColor);
-
-#if SCANLINE_COMPRESS
-// handle SCANLINE_COMPRESS here?
-#endif
 
                             // Write the processed scanline (without the filter byte) to the VMFile
                             pngImportWriteScanlineToBitmap(vmf, bmVMBlock, state.lineNo - 1, state.currentRow);

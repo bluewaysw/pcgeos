@@ -1,3 +1,6 @@
+#ifndef __PNGLIB_H
+#define __PNGLIB_H
+
 #include <geos.h>
 #include <stdio.h>
 #include <Ansi/stdlib.h>
@@ -144,3 +147,5 @@ static void unfilterRow(unsigned char *data, unsigned char *previousRow, unsigne
 static inline unsigned char paethPredictor(int a, int b, int c);
 static inline int abs(int x);
 static inline unsigned long swapEndian(unsigned long val);
+
+#endif

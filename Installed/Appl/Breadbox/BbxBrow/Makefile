@@ -28,7 +28,7 @@ OBJS            = AWATCHER.obj LoadURL.obj GLBANIM.obj HTMLVIEW.obj\
 COMMON          = bookclas.goh bookmark.goh favorcls.goh favorite.goh\
                   javascr.h prodndo.goh sebrowse.h stattext.goh\
                   urlfetch.goh importg.goh prodgpc.goh glbanim.goh\
-                  htmlv_ui.goh htmlview.goh options.goh prodbbx.goh
+                  htmlview.goh options.goh prodbbx.goh htmlv_ui.goh
 MODULES         = ASMTOOLS
 CMODULES        = htmlview init js navigate urldoc urldocct urlfetch\
                   urlframe urltext
@@ -37,7 +37,7 @@ SRCS            = $(ASMTOOLS) $(HTMLVIEW) $(INIT) $(JS) $(NAVIGATE)\
                   $(COMMON)
 LOBJS           =
 
-PRODUCTS        = AB JSAB
+PRODUCTS        = AB JSAB 
 
 SYSMAKEFILE     = geode.mk
 

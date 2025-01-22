@@ -284,11 +284,9 @@ ImpBmpStatus ImpJPG(TCHAR *file, VMFileHandle vmf, ImageAdditionalData *iad,
     return status;
 }
 
-/**
- * ImpPNG
- * FIXME: no SCANLINE_COMPRESS and no MimeRes handling (for now)
- ********************************************************************
- */
+/********************************************************************
+ ImpPNG
+ *******************************************************************/
 
 #if PROGRESS_DISPLAY
 ImpBmpStatus ImpPNG(TCHAR *file, VMFileHandle vmf, ImageAdditionalData *iad,
@@ -306,26 +304,7 @@ ImpBmpStatus ImpPNG(TCHAR *file, VMFileHandle vmf, ImageAdditionalData *iad,
 {
     ImpBmpStatus status;
 
-#if SCANLINE_COMPRESS
-    Boolean scanlineCompress = TRUE;
-#endif
-
-    /* we don't override scanlineCompress even if no progress display
-       as it still seems faster than GrCompactBitmap */
-// #if SCANLINE_COMPRESS
-//     if (doCompress) {
-// 	/* if TRUE, we'll compress per-scanline */
-// 	InitFileReadBoolean("impgraph", "scanlineCompress", &scanlineCompress);
-//     } else {
-// 	scanlineCompress = FALSE;
-//     }
-// #endif
-
-
     *bmVMBlock = PngImport(file, vmf, &(iad->IAD_size), resolution, watcher, usedMem,
-#if SCANLINE_COMPRESS
-	scanlineCompress,
-#endif
     &iad->IAD_completeGraphic
 #if PROGRESS_DISPLAY
 	, importProgressDataP
@@ -335,15 +314,17 @@ ImpBmpStatus ImpPNG(TCHAR *file, VMFileHandle vmf, ImageAdditionalData *iad,
 
 	status = IBS_NO_ERROR;
 
-#if SCANLINE_COMPRESS
-//
-// FIXME: we don't do scanline compression as of now, so we return false
-// and GrCompactBitmap will at least take care of it.
-//
-     if (scanlineCompress) *isCompacted = FALSE;
-#endif
+/*
+    FIXME: SCANLINE_COMPRESS
+    We don't do the improved scanline compression as of now
+    (see "doCompress" in ImpJPG).
+    So we return false in "isCompacted" and at least the
+    (painfully slow) GrCompactBitmap will be called on
+    the bitmap in our caller...
+*/
+    *isCompacted = FALSE;
 
-    if (*bmVMBlock) 
+    if (*bmVMBlock)
     {
       status = IBS_NO_ERROR;
       params->IBP_bitmap = *bmVMBlock;
@@ -407,7 +388,7 @@ VMBlockHandle _pascal _export MimeDrvGraphicEx(_MimeGraphicParams_, dword extFla
     Boolean isAnimation = FALSE ;
     Boolean isCompacted = FALSE ;
 #if PROGRESS_DISPLAY
-    VMFileHandle destFile = vmf;    
+    VMFileHandle destFile = vmf;
 #endif
 
     InitGlobals();                      /* Handled cached INI entries */
@@ -453,20 +434,14 @@ VMBlockHandle _pascal _export MimeDrvGraphicEx(_MimeGraphicParams_, dword extFla
   #define IMP_PROGRESS_PARAM
 #endif
 
-#if SCANLINE_COMPRESS
-  #define IMP_SCANLINE_PARAM &isCompacted,
-#else
-  #define IMP_SCANLINE_PARAM FALSE,
-#endif
-
 #define IMP_GIF_PARAMS file, vmf, iad, resolution, watcher, usedMem, \
-          &params, &isAnimation, IMP_SCANLINE_PARAM &bmVMBlock \
+          &params, &isAnimation, &isCompacted, &bmVMBlock \
           IMP_DESTFILE_PARAM IMP_PROGRESS_PARAM, locAllowAnimations
 #define IMP_JPG_PARAMS file, vmf, iad, resolution, watcher, usedMem, \
-          locCompress, &params, IMP_SCANLINE_PARAM &bmVMBlock IMP_PROGRESS_PARAM \
+          locCompress, &params, &isCompacted, &bmVMBlock IMP_PROGRESS_PARAM \
           , mimeStatus
 #define IMP_PNG_PARAMS file, vmf, iad, resolution, watcher, usedMem, \
-          locCompress, &params, IMP_SCANLINE_PARAM &bmVMBlock IMP_PROGRESS_PARAM \
+          locCompress, &params, &isCompacted, &bmVMBlock IMP_PROGRESS_PARAM \
           , mimeStatus
 
 

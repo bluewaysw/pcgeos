@@ -6,7 +6,7 @@
 
 name            pnglib.lib
 longname        "PNG Library"
-tokenchars      "PngL"
+tokenchars      "PNGL"
 tokenid         0
 
 type            library, single, c-api

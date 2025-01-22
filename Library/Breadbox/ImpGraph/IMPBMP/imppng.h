@@ -2,7 +2,7 @@
 #define __IMPPNG_H
 
 #include "IMPBMP/ibcommon.h"
-#include <pnglib.goh>
+#include "pnglib.h"
 
 VMBlockHandle
 PngImport(
@@ -11,14 +11,11 @@ PngImport(
     XYSize *picsize,
     MimeRes resolution,
     AllocWatcherHandle watcher,
-    dword *usedMem, 
-#if SCANLINE_COMPRESS
-    Boolean scanlineCompress, 
-#endif
+    dword *usedMem,
     Boolean *p_completeGraphic
 #if PROGRESS_DISPLAY
     , _ImportProgressParams_
-#endif  
+#endif
     , MimeStatus *mimeStatus
 );
 
