@@ -740,7 +740,6 @@ defaultColorLists nptr \
 	defGreyAndGreenColors,
 	defMeadowsColors
 
-
 CheckHack <length defaultColorLists eq ConfigUIDefaultColorScheme>
 
 defaultISUIColors	Color \
