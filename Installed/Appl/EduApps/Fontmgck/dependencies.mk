@@ -79,7 +79,7 @@ fontm.eobj: stdapp.goh object.goh ui.goh Objects/metaC.goh \
                 Objects/helpCC.goh Objects/gViewCC.goh \
                 Objects/Text/tCtrlC.goh ruler.goh Objects/colorC.goh \
                 Objects/styles.goh charset.goh FONTM/font_ui.goh \
-                breadbox.goh ART/appicon.goh ART/monikers.goh
+                ART/appicon.goh ART/monikers.goh
 fontm.obj \
 fontm.eobj: geos.h heap.h geode.h resource.h ec.h object.h lmem.h \
                 graphics.h fontID.h font.h color.h gstring.h timer.h vm.h \
