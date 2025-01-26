@@ -50,7 +50,6 @@ extern VMChain  /*XXX*/
 	_pascal MyVMCopyVMChain(VMFileHandle sourceFile,
 		  VMChain sourceChain,
 		  VMFileHandle destFile);
-
 extern VMChain  /*XXX*/
 	_pascal MyVMFreeVMChain(VMFileHandle sourceFile,
 				  VMChain sourceChain);
@@ -2354,11 +2353,8 @@ PasteCommon(ClipboardItemFlags transferFlags, optr oself, word bvattrs)
 	ImpBmpStatus status;
 	ImpBmpParams para;
 	char string[255];
-	// VMBlockHandle bmpblock;
-	// GStateHandle gstate;
+	VMBlockHandle bmpblock;
 	word count;
-	//	FileLongName tempName;
-	//	optr display;
 	RGBValue blendColor = {0};
 
 	MemLock(OptrToHandle(@BVImportingText));
@@ -2397,12 +2393,9 @@ PasteCommon(ClipboardItemFlags transferFlags, optr oself, word bvattrs)
 
 	if(status == IBS_NO_ERROR)
 	{
-		// the following lines compact the bitmap after importing, but they
-		// also sloooooooooow down displaying the image dramatically,
-		// so let's how it goes when disabling them - meyerk 2024-10-03
-		// bmpblock = GrCompactBitmap(para.IBP_dest, para.IBP_bitmap, para.IBP_dest);
-		// MyVMFreeVMChain(para.IBP_dest, VMCHAIN_MAKE_FROM_VM_BLOCK(para.IBP_bitmap));
-		// para.IBP_bitmap = bmpblock;
+		bmpblock = GrCompactBitmap(para.IBP_dest, para.IBP_bitmap, para.IBP_dest);
+		MyVMFreeVMChain(para.IBP_dest, VMCHAIN_MAKE_FROM_VM_BLOCK(para.IBP_bitmap));
+		para.IBP_bitmap = bmpblock;
 
 		date = FileGetDateAndTime(pself->GDI_fileHandle) ;
 		/* this doesn't work in all fs drivers (only ms4) so we'll go with...
