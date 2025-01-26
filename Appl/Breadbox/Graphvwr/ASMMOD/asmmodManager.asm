@@ -1,9 +1,7 @@
 include stdapp.def
 
-
 EspCode segment
 
-; public routines defined in this module
 global MYVMCOPYVMCHAIN:far
 global MYVMFREEVMCHAIN:far
 
@@ -14,7 +12,7 @@ MYVMCOPYVMCHAIN  proc    far     sourceFile:word,
                                  sourceChainL:word,
                                  sourceChainH:word,
                                  destFile:word
-
+                          
 	.enter
 
         mov     dx, destFile
@@ -32,7 +30,7 @@ MYVMCOPYVMCHAIN  endp
 MYVMFREEVMCHAIN  proc    far     sourceFile:word,
                                  sourceChainL:word,
                                  sourceChainH:word
-
+                          
 	.enter
 
         mov     bx, sourceFile

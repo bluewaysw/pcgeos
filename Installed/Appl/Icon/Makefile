@@ -4,36 +4,36 @@
 # If you edit it, you will lose your changes, should it be regenerated.
 #
 GEODE           = icon
-DOCUMENT        = documentAddIcon.asm documentApplication.asm\
-                  documentDatabase.asm documentDocument.asm\
-                  documentIcon.asm documentImpex.asm documentManager.asm\
-                  documentOptions.asm documentSaveIcon.asm\
-                  documentToken.asm documentTransfer.asm documentUI.asm\
-                  documentUtils.asm documentVisBitmap.asm\
-                  documentConstant.def
-FORMAT          = formatFlip.asm formatFormat.asm formatManager.asm\
-                  formatTransform.asm formatUI.asm formatVMFile.asm\
+SOURCE          = sourceSource.asm sourceUtils.asm sourceLarge.asm\
+                  sourcePointer.asm sourceManager.asm sourceConstant.def\
+                  sourceStrings.ui
+VIEWER          = viewerMain.asm viewerKbd.asm viewerUI.asm\
+                  viewerVisIcon.asm viewerManager.asm viewerConstant.def
+FORMAT          = formatUI.asm formatManager.asm formatFormat.asm\
+                  formatFlip.asm formatVMFile.asm formatTransform.asm\
                   formatConstant.def
 PREVIEW         = previewManager.asm previewPreview.asm
-SOURCE          = sourceLarge.asm sourceManager.asm sourcePointer.asm\
-                  sourceSource.asm sourceUtils.asm sourceConstant.def\
-                  sourceStrings.ui
-UI              = uiColor.asm uiManager.asm uiNewClasses.asm uiConstant.def\
-                  uiAddIcon.ui uiDocument.ui uiFormatMenu.ui uiGraphics.ui\
-                  uiIconMenu.ui uiMain.ui uiManager.ui uiOptions.ui\
-                  uiPreview.ui uiStrings.ui uiTokenDB.ui uiTransform.ui\
-                  uiWriteSource.ui
-VIEWER          = viewerKbd.asm viewerMain.asm viewerManager.asm\
-                  viewerUI.asm viewerVisIcon.asm viewerConstant.def
+DOCUMENT        = documentDocument.asm documentVisBitmap.asm\
+                  documentManager.asm documentUI.asm documentImpex.asm\
+                  documentOptions.asm documentSaveIcon.asm documentIcon.asm\
+                  documentApplication.asm documentToken.asm\
+                  documentUtils.asm documentDatabase.asm\
+                  documentAddIcon.asm documentTransfer.asm\
+                  documentConstant.def
+UI              = uiManager.asm uiNewClasses.asm uiColor.asm uiConstant.def\
+                  uiDocument.ui uiMain.ui uiStrings.ui uiTokenDB.ui\
+                  uiTransform.ui uiFormatMenu.ui uiWriteSource.ui\
+                  uiManager.ui uiAddIcon.ui uiOptions.ui uiIconMenu.ui\
+                  uiPreview.ui uiGraphics.ui
 UI_TO_RDFS      = sourceStrings.ui uiManager.ui
 OBJS            =
-COMMON          = iconConstant.def iconDocument.def iconFile.def\
-                  iconFormat.def iconGeode.def iconGlobal.def\
-                  iconViewer.def
-MODULES         = Document Format Preview Source UI Viewer
+COMMON          = iconGeode.def iconFile.def iconDocument.def\
+                  iconFormat.def iconViewer.def iconGlobal.def\
+                  iconConstant.def
+MODULES         = Source Viewer Format Preview Document UI
 CMODULES        =
-SRCS            = $(DOCUMENT) $(FORMAT) $(PREVIEW) $(SOURCE) $(UI)\
-                  $(VIEWER) $(COMMON)
+SRCS            = $(SOURCE) $(VIEWER) $(FORMAT) $(PREVIEW) $(DOCUMENT)\
+                  $(UI) $(COMMON)
 LOBJS           =
 
 SYSMAKEFILE     = geode.mk
