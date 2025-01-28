@@ -1108,7 +1108,9 @@ handleDir:
 		lea	dx, es:[di].TAN_name		;ds:dx <- dir name
 		call	FileSetCurrentPath
 		pop	bx, dx, ds
+		jc	folderError
 		call	FindGEOSNames
+folderError:
 		call	FilePopDir
 		jmp	afterDir
 FindGEOSNames	endp
