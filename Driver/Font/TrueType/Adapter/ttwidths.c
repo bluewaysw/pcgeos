@@ -190,7 +190,10 @@ EC(     ECCheckBounds( (void*)fontHeader ) );
         bufSpec.TTCBS_stylesToImplement = stylesToImplement;
 
         if((fontMatrix->FM_flags & TF_COMPLEX) || !TrueType_Cache_LoadFontBlock(
-                trueTypeVars->cacheFile, trueTypeVars->entry.TTOE_fontFileName, &bufSpec,
+                trueTypeVars->cacheFile, trueTypeVars->entry.TTOE_fontFileName, 
+		trueTypeVars->entry.TTOE_fontFileSize,
+		trueTypeVars->entry.TTOE_magicWord,
+		&bufSpec,
                 &fontHandle		
         )) {
                 size = AllocFontBlock( sizeof( TransformMatrix ), 
@@ -246,7 +249,9 @@ EC(             ECCheckBounds( (void*)transMatrix ) );
 	
                         TrueType_Cache_UpdateFontBlock(
                                 trueTypeVars->cacheFile,
-                                trueTypeVars->entry.TTOE_fontFileName, 
+                                trueTypeVars->entry.TTOE_fontFileName,
+				trueTypeVars->entry.TTOE_fontFileSize,
+				trueTypeVars->entry.TTOE_magicWord,
                                 &bufSpec, fontHandle		
 		        );		
                 }

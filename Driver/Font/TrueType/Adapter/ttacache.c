@@ -5,24 +5,48 @@
 #include "ttacache.h"
 #include <Ansi/string.h>
 
+#define TTF_CACHE_MAJOR_VERSION 2
+#define TTF_CACHE_MINOR_VERSION 0
+
 VMFileHandle _pascal TrueType_Cache_Init() {
 
-	VMFileHandle cacheFile;
-	TCHAR cacheFileName[] = "TTF Cache";
+        VMFileHandle cacheFile;
+        TCHAR cacheFileName[] = "TTF Cache";
 
-	/* Try to open/create TTF cache VM file */
-	FilePushDir();
-	FileSetStandardPath(SP_PRIVATE_DATA);
-	cacheFile = VMOpen(cacheFileName, VMAF_FORCE_READ_WRITE, VMO_OPEN, 0);
-	if( cacheFile == NullHandle ) {
-		cacheFile = VMOpen(cacheFileName, VMAF_FORCE_READ_WRITE, VMO_CREATE, 0);
-	}
-	if( cacheFile != NullHandle ) {
-		HandleModifyOwner(cacheFile, GeodeGetCodeProcessHandle());
-	}
-	FilePopDir();
+        /* Try to open/create TTF cache VM file */
+        FilePushDir();
+        FileSetStandardPath(SP_PRIVATE_DATA);
+        cacheFile = VMOpen(cacheFileName, VMAF_FORCE_READ_WRITE, VMO_OPEN, 0);
+        if( cacheFile != NullHandle ) {
+	    /* check the cache file protocol */
+            ProtocolNumber protocol;
+	    word err = FileGetHandleExtAttributes(cacheFile, FEA_PROTOCOL,
+                                &protocol, sizeof(protocol));
+	    if(err
+                || protocol.PN_major != TTF_CACHE_MAJOR_VERSION
+                || protocol.PN_minor != TTF_CACHE_MINOR_VERSION) {
+                /* wrong protocal, no migration strategy, delete and recreate */
+                VMClose(cacheFile, FILE_NO_ERRORS);	
+                FileDelete(cacheFileName);
+                cacheFile = NullHandle;
+            }
+        }
+        if( cacheFile == NullHandle ) {
+            cacheFile = VMOpen(cacheFileName, VMAF_FORCE_READ_WRITE, VMO_CREATE_TRUNCATE, 0);
+            if( cacheFile != NullHandle ) {
+                ProtocolNumber protocol;
+                protocol.PN_major = TTF_CACHE_MAJOR_VERSION;
+                protocol.PN_minor = TTF_CACHE_MINOR_VERSION;
+                FileSetHandleExtAttributes(cacheFile, FEA_PROTOCOL,
+                                        &protocol, sizeof(protocol));
+            }
+        }
+        if( cacheFile != NullHandle ) {
+            HandleModifyOwner(cacheFile, GeodeGetCodeProcessHandle());
+        }
+        FilePopDir();
 
-	return cacheFile;
+        return cacheFile;
 }
 
 static char* strcpy( char* dest, const char* source )
@@ -47,7 +71,7 @@ void _pascal TrueType_Cache_Exit(VMFileHandle cacheFile) {
 }
 
 Boolean _pascal TrueType_Cache_LoadFontBlock(VMFileHandle cacheFile, const TCHAR* fontFileName,
-		TrueTypeCacheBufSpec* bufSpec, MemHandle* fontHandle) {
+		dword fontFileSize, word fontFileMagic, TrueTypeCacheBufSpec* bufSpec, MemHandle* fontHandle) {
     VMBlockHandle dirBlock;
 
     dirBlock = VMGetMapBlock(cacheFile);
@@ -66,7 +90,9 @@ Boolean _pascal TrueType_Cache_LoadFontBlock(VMFileHandle cacheFile, const TCHAR
 	
 	    while( loopCount < entryCount ) {
 
-		if( strcmp(dirEntry[loopCount].TTCE_ttfFileName, fontFileName) == 0 ) {
+		if( strcmp(dirEntry[loopCount].TTCE_ttfFileName, fontFileName) == 0 
+                        && dirEntry[loopCount].TTCE_ttfFileSize == fontFileSize
+                        && dirEntry[loopCount].TTCE_magicWord == fontFileMagic ) {
 
 		    word loopCount2 = 0;
 
@@ -122,6 +148,7 @@ EC(             		ECCheckMemHandle( *fontHandle ) );
 }
 
 void _pascal TrueType_Cache_UpdateFontBlock(VMFileHandle cacheFile, const TCHAR* fontFileName,
+                dword fontFileSize, word fontFileMagic, 
 		TrueTypeCacheBufSpec* bufSpec, MemHandle fontBuf) {
 
     VMBlockHandle dirBlock;
@@ -142,7 +169,9 @@ void _pascal TrueType_Cache_UpdateFontBlock(VMFileHandle cacheFile, const TCHAR*
 	
 		while( loopCount < entryCount ) {
 
-		if( strcmp(dirEntry[loopCount].TTCE_ttfFileName, fontFileName) == 0 ) {
+		if( strcmp(dirEntry[loopCount].TTCE_ttfFileName, fontFileName) == 0
+                        && dirEntry[loopCount].TTCE_ttfFileSize == fontFileSize
+                        && dirEntry[loopCount].TTCE_magicWord == fontFileMagic ) {
 
 			word loopCount2 = 0;
 			word memSize = MemGetInfo(fontBuf, MGIT_SIZE);
@@ -218,7 +247,8 @@ void _pascal TrueType_Cache_UpdateFontBlock(VMFileHandle cacheFile, const TCHAR*
     }
 }
 
-Boolean _pascal TrueType_Cache_ReadHeader(VMFileHandle cacheFile, const TCHAR* fontFileName, FontHeader* headerPtr) {
+Boolean _pascal TrueType_Cache_ReadHeader(VMFileHandle cacheFile, const TCHAR* fontFileName, 
+                dword fontFileSize, word fontMagic, FontHeader* headerPtr) {
     
     VMBlockHandle dirBlock;
     Boolean result = FALSE;
@@ -238,7 +268,9 @@ Boolean _pascal TrueType_Cache_ReadHeader(VMFileHandle cacheFile, const TCHAR* f
 
 	    while( loopCount < entryCount ) {
 
-		if( strcmp(dirEntry[loopCount].TTCE_ttfFileName, fontFileName) == 0 ){
+		if( strcmp(dirEntry[loopCount].TTCE_ttfFileName, fontFileName) == 0 
+                        && dirEntry[loopCount].TTCE_ttfFileSize == fontFileSize
+                        && dirEntry[loopCount].TTCE_magicWord == fontMagic ){
 
 			*headerPtr = dirEntry[loopCount].TTCE_fontHeader;
 			result = TRUE;
@@ -253,7 +285,8 @@ Boolean _pascal TrueType_Cache_ReadHeader(VMFileHandle cacheFile, const TCHAR* f
     return result;
 }
 
-void _pascal TrueType_Cache_WriteHeader(VMFileHandle cacheFile, const TCHAR* fontFileName, FontHeader* headerPtr) {
+void _pascal TrueType_Cache_WriteHeader(VMFileHandle cacheFile, const TCHAR* fontFileName, 
+                        dword fontFileSize, word fontMagic, FontHeader* headerPtr) {
     
     VMBlockHandle dirBlock;
 
@@ -292,6 +325,8 @@ void _pascal TrueType_Cache_WriteHeader(VMFileHandle cacheFile, const TCHAR* fon
 	    dirEntry = MemDeref(dirMem);
 	    
 	    strcpy(dirEntry[entryCount].TTCE_ttfFileName, fontFileName);
+            dirEntry[entryCount].TTCE_ttfFileSize = fontFileSize;
+            dirEntry[entryCount].TTCE_magicWord = fontMagic;
 	    dirEntry[entryCount].TTCE_fontHeader = *headerPtr;
 	    
 	    VMDirty(dirMem);

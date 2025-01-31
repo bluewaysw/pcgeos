@@ -414,7 +414,9 @@ EC(     ECCheckFileHandle( truetypeFile ) );
 
                 /* fill TrueTypeOutlineEntry */
                 strcpy( trueTypeOutlineEntry->TTOE_fontFileName, fileName );
-                
+            	trueTypeOutlineEntry->TTOE_fontFileSize = FileSize(truetypeFile);
+		trueTypeOutlineEntry->TTOE_magicWord = 0;
+    
                 /* fill OutlineDataEntry */
                 outlineDataEntry = (OutlineDataEntry*) (fontInfo + 1);
                 outlineDataEntry->ODE_style  = mapTextStyle( STYLE_NAME );
@@ -474,6 +476,8 @@ EC(     ECCheckFileHandle( truetypeFile ) );
                 /* fill TrueTypeOutlineEntry */
                 trueTypeOutlineEntry = LMemDerefHandles( fontInfoBlock, trueTypeOutlineChunk );
                 strcpy( trueTypeOutlineEntry->TTOE_fontFileName, fileName );
+		trueTypeOutlineEntry->TTOE_fontFileSize = FileSize(truetypeFile);
+		trueTypeOutlineEntry->TTOE_magicWord = 0;
                 
                 /* fill OutlineDataEntry */
                 fontInfo = LMemDeref( ConstructOptr(fontInfoBlock, fontInfoChunk) );
@@ -982,6 +986,8 @@ EC(     ECCheckBounds( (void*)fontHeader ) );
             if(TrueType_Cache_ReadHeader( 
                                         trueTypeVars->cacheFile, 
                                         trueTypeVars->entry.TTOE_fontFileName, 
+					trueTypeVars->entry.TTOE_fontFileSize,
+					trueTypeVars->entry.TTOE_magicWord,
                                         fontHeader)) 
                 return;	    
         }
@@ -1077,6 +1083,8 @@ EC(     ECCheckBounds( (void*)fontHeader ) );
         TrueType_Cache_WriteHeader(
                                 trueTypeVars->cacheFile, 
                                 trueTypeVars->entry.TTOE_fontFileName, 
+				trueTypeVars->entry.TTOE_fontFileSize,
+				trueTypeVars->entry.TTOE_magicWord,
                                 fontHeader);
 }
 #pragma code_seg()

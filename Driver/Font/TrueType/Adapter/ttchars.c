@@ -244,6 +244,8 @@ EC(             ECCheckBounds( (void*)fontBuf ) );
             TrueType_Cache_UpdateFontBlock(
                 trueTypeVars->cacheFile,
                 trueTypeVars->entry.TTOE_fontFileName, 
+		trueTypeVars->entry.TTOE_fontFileSize,
+		trueTypeVars->entry.TTOE_magicWord,
                 &bufSpec, fontBufHandle		
             );		
         }

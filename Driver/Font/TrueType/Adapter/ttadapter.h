@@ -129,6 +129,8 @@ typedef struct
 #else
     char                        TTOE_fontFileName[FILE_LONGNAME_BUFFER_SIZE];
 #endif
+    dword			TTOE_fontFileSize;
+    word			TTOE_magicWord;
 } TrueTypeOutlineEntry;
 
 
@@ -341,7 +343,9 @@ typedef struct
 
 #define SIZE_REGION_HEADER	    ( sizeof( RegionCharData) - 2 )
 
-
+/* This data type is used as part of the cache files structures.
+ * If changes are needed here, take care to update the cache file protocol.
+ */
 typedef struct
 {
     Boolean                     FH_initialized;

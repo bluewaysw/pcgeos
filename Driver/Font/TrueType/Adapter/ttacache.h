@@ -21,6 +21,8 @@ typedef struct {
 
 typedef struct {
     TCHAR			TTCE_ttfFileName[FILE_LONGNAME_BUFFER_SIZE];
+    dword			TTCE_ttfFileSize;
+    word			TTCE_magicWord;
     FontHeader			TTCE_fontHeader;
     byte			TTCE_bufEntryCount;
     TrueTypeCacheBufEntry	TTCE_bufEntry[TRUETYPE_CACHE_MAX_BUF_ENTRIES];
@@ -33,14 +35,18 @@ void _pascal TrueType_Cache_Exit(VMFileHandle cacheFile);
 
 Boolean _pascal TrueType_Cache_LoadFontBlock(
 		VMFileHandle cacheFile, const TCHAR* fontFileName,
+		dword fontFileSize, word fontFileMagic, 
 		TrueTypeCacheBufSpec* bufSpec, MemHandle *fontHandle
 );
 
 void _pascal TrueType_Cache_UpdateFontBlock(VMFileHandle cacheFile, const TCHAR* fontFileName,
+		dword fontFileSize, word fontFileMagic, 
 		TrueTypeCacheBufSpec* bufSpec, MemHandle fontBuf);
 
-Boolean _pascal TrueType_Cache_ReadHeader(VMFileHandle cacheFile, const TCHAR* fontFileName, FontHeader* headerPtr);
+Boolean _pascal TrueType_Cache_ReadHeader(VMFileHandle cacheFile, const TCHAR* fontFileName, 
+		dword fontFileSize, word fontMagic, FontHeader* headerPtr);
 
-void _pascal TrueType_Cache_WriteHeader();
+void _pascal TrueType_Cache_WriteHeader(VMFileHandle cacheFile, const TCHAR* fontFileName, 
+                        dword fontFileSize, word fontMagic, FontHeader* headerPtr);
 
 #endif /* _TTCACHE_H_ */
