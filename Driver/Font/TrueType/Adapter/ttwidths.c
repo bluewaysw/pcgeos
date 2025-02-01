@@ -73,8 +73,6 @@ static void FillKerningFlags( FontHeader* fontHeader, FontBuf* fontBuf );
 static void AdjustTransMatrix( TransformMatrix* transMatrix, 
                                FontMatrix* graphicMatrix );
 
-static WWFixedAsDWord SqrtWWFixed( WWFixedAsDWord value );
-
 
 #define ROUND_WWFIXED( value )    ( value & 0xffff ? ( value >> 16 ) + 1 : value >> 16 )
 
