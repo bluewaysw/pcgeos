@@ -974,8 +974,8 @@ static void AdjustFontBuf( TransformMatrix* transMatrix,
 
 static void AdjustTransMatrix( TransformMatrix* transMatrix, FontMatrix* graphicMatrix )
 {
-        WWFixedAsDWord  scaleX = GrUDivWWFixed( transMatrix->TM_matrix.xx, graphicMatrix->FM_11 );
-        WWFixedAsDWord  scaleY = GrUDivWWFixed( transMatrix->TM_matrix.yy, graphicMatrix->FM_22 );
+        WWFixedAsDWord  scaleX = ABS( GrSDivWWFixed( transMatrix->TM_matrix.xx, graphicMatrix->FM_11 ) );
+        WWFixedAsDWord  scaleY = ABS( GrSDivWWFixed( transMatrix->TM_matrix.yy, graphicMatrix->FM_22 ) );
 
         /* set horizontal and vertical resolution based on 72 dpi */
         transMatrix->TM_resX = INTEGER_OF_WWFIXEDASDWORD( TrueType_GrMulWWFixed( WORD_TO_WWFIXEDASDWORD( 72 ), scaleX ) );
