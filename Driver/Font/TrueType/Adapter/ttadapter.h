@@ -464,7 +464,7 @@ extern WWFixedAsDWord
  * scale value (word) by factor (WWFixedAsDWord)
  */
 #define SCALE_WORD( value, factor )              \
-        ( GrMulWWFixed( WORD_TO_WWFIXEDASDWORD( value ), factor ) )
+        ( TrueType_GrMulWWFixed( WORD_TO_WWFIXEDASDWORD( value ), factor ) )
 
 /*
  * round value (WWFixedAsDWord) to nearest word
@@ -510,7 +510,7 @@ extern WWFixedAsDWord
 
 
 #define MUL_100_WWFIXED( factor, percentage )   \
-        GrMulWWFixed( factor, GrUDivWWFixed( ((long)percentage ) << 16, 100L << 16))
+        TrueType_GrMulWWFixed( factor, GrUDivWWFixed( ((long)percentage ) << 16, 100L << 16))
 
 
 /***********************************************************************
