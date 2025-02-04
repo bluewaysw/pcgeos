@@ -1,29 +1,40 @@
-/*  Standard include files */
 @include <stdapp.goh>
-@include <Ansi/stdlib.h>
-@include <Ansi/stdio.h>
-@include <Ansi/string.h>
+@include <ansi\stdlib.h>
+@include <ansi\stdio.h>
+@include <ansi\string.h>
+//#include <localize.h>
+@include "main/grafcalc.goh"
+@include "UI\appui.goh"
+//@include "main/lmacros.goh"
 
-@include "grafcalc.goh"
-@include "UI/appui.goh"
 
 @classdecl GCalcTextClass;
 
 extern word arbeitsbereich;
 extern optr aktives_Textobjekt;
-extern char dez_zeichen;
+extern wchar dez_zeichen;
+
 
 @method GCalcTextClass, MSG_META_KBD_CHAR
-{
+{ 
+   //LocalNumericFormat  *dez_format;   
+   char zeichen[] = {'1','2','a','c'};
+   
+   if (character==-128) @callsuper();
+//MessageNumberBox(character);
+
+    /* LocalGetNumericFormat(dez_format); 
+     dez_zeichen=dez_format->decimalSeparator;*/
+
+ 
   if (arbeitsbereich==TABLE)
   {
   if (flags & CF_FIRST_PRESS)
-  {
-
+  {  
    switch (character)
    {
      case '1':
-     case '1' + 0xFF00:
+     case '1' + 0xFF00:   
         @send Ziffer_Eins ::MSG_GEN_TRIGGER_SEND_ACTION(FALSE);
         break;
      case '2':
@@ -49,12 +60,16 @@ extern char dez_zeichen;
      case '7':
      case '7' + 0xFF00:
         @send Ziffer_Sieben ::MSG_GEN_TRIGGER_SEND_ACTION(FALSE);
+        
         break;
      case '8':
      case '8' + 0xFF00:
         @send Ziffer_Acht ::MSG_GEN_TRIGGER_SEND_ACTION(FALSE);
+        //@call Rechenfenster::MSG_META_GRAB_FOCUS_EXCL();
         break;
      case '9':
+        @send Ziffer_Neun ::MSG_GEN_TRIGGER_SEND_ACTION(FALSE);
+        break;
      case '9' + 0xFF00:
         @send Ziffer_Neun ::MSG_GEN_TRIGGER_SEND_ACTION(FALSE);
         break;
@@ -63,16 +78,54 @@ extern char dez_zeichen;
         @send Taste_Null ::MSG_GEN_TRIGGER_SEND_ACTION(FALSE);
         break;
      case '.':
-                    character=dez_zeichen;
-        	@send Taste_Dezimalpunkt ::MSG_GEN_TRIGGER_SEND_ACTION(FALSE);
-        	break;
+        character=dez_zeichen;
+        @send Taste_Dezimalpunkt ::MSG_GEN_TRIGGER_SEND_ACTION(FALSE);
+        break;
      case '-':
         @send Taste_Minus ::MSG_GEN_TRIGGER_SEND_ACTION(FALSE);
         break;
+     default:
+     	if (character==-229) @send FensterwechselBlock::MSG_META_GRAB_FOCUS_EXCL();
+        @callsuper();
    }
  }
 }
- else @callsuper();
+ else
+ if ((arbeitsbereich==CALCULATOR) || (arbeitsbereich==Y_EDITOR))
+ {
+ 	// -248 Löschen links, -102 Löschen rechts
+ 	// -109 Cursor links, -110 Cursor rechts
+ 	// -32  Alt, -30 Strg, -247 Tab, -229 Esc, -128 F1
+	//if (strchr(zeichen,character)!=NULL)
+	if ((character>47) && (character<58) || (character<-199) && (character>-208) || 
+	    (character=='.') && (character==dez_zeichen) || (character==',') && (character==dez_zeichen) ||
+	    (character=='a') || (character=='b') || (character=='c') || (character==-109) ||  (character==-110) || (character==-248) || (character==-102) ||
+	    (character=='e') || (character=='f') || (character=='i') || (character=='g') || (character==  'l') || (character=='n') || (character=='o') || 
+	    (character=='q') || (character=='r') || (character=='s') || (character==-32) || (character==-30) || (character==-247) || (character==185) ||
+	    (character=='t') || (character=='+') || (character=='-') || (character=='*') || (character=='/') || (character==-209) || (character=='p') ||
+	    (character==-243) || (character=='(') || (character==')') || (character=='^') || (character==-229) || (character=='x')  || (character==-213) ||
+	    (character==-211) || (character==-214) || (character=='E'))
+	{
+	//MessageNumberBox(character);
+ 	//@send process::MSG_ZIFFERN(ms); //Adresse ist richtig, Parameter liefert noch unsinn, wahrscheinlich wegen ms.MS_ziffer[6]
+	 if (character==-243) 
+	 {	
+ 		character=-246;	//Enter, aber nur LF
+		@send Entertaste ::MSG_GEN_TRIGGER_SEND_ACTION(FALSE);
+ 		//@send process::MSG_GCALC_PROCESS_CALCULATE();
+	 }
+	 if (character==-229) 
+	 {
+	 	@send FensterwechselBlock::MSG_META_GRAB_FOCUS_EXCL();
+	 }
+	 if (character=='p') character=185; 
+ 	 if (character=='x')
+ 	    {if (arbeitsbereich==Y_EDITOR) @callsuper();}
+ 	 else   
+ 	    @callsuper();
+ 	 }
+  }
+	
 }
 /*@method GCalcTextClass, MSG_META_START_SELECT
 {
