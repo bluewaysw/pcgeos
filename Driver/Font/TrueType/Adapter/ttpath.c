@@ -182,7 +182,7 @@ EC(     ECCheckBounds( (void*)fontHeader ) );
                 GrSaveState( gstate );
 
         /* load glyph and scale its outline to 1000 units per em */
-        TT_Load_Glyph( INSTANCE, GLYPH, charIndex, 0 );
+        TT_Load_Glyph( INSTANCE, GLYPH, charIndex, TTLOAD_HINT_GLYPH );
         TT_Get_Glyph_Outline( GLYPH, &OUTLINE );
         CalcScaleAndScaleOutline( trueTypeVars );
 
@@ -336,12 +336,13 @@ EC(     ECCheckBounds( (void*)fontHeader ) );
         /* get current cursor position */
         cursorPos = GrGetCurPos( gstate );
         result = GrTransform( gstate, DWORD_X(cursorPos), DWORD_Y(cursorPos) );
-        
+
         /* transform glyphs outline */
         TT_Transform_Outline( &OUTLINE, &transform.TM_matrix );
         TT_Transform_Outline( &OUTLINE, &flipMatrix );
         TT_Translate_Outline( &OUTLINE, DWORD_X(result) + transform.TM_heightX + transform.TM_scriptX, 
                                         DWORD_Y(result) + transform.TM_heightY + transform.TM_scriptY );
+
         /* set render functions */
         renderFunctions.Proc_MoveTo  = RegionPathMoveTo;
         renderFunctions.Proc_LineTo  = RegionPathLineTo;
@@ -948,8 +949,8 @@ EC(             ECCheckWindowHandle( win ) );
 
 
         transformMatrix->TM_heightX = INTEGER_OF_WWFIXEDASDWORD( GrMulWWFixed( 
-                        WORD_TO_WWFIXEDASDWORD( transformMatrix->TM_heightY ), WWFIXED_TO_WWFIXEDASDWORD( graphicMatrix.TM_e21 ) ) );
+                        WORD_TO_WWFIXEDASDWORD( transformMatrix->TM_heightY ), transformMatrix->TM_matrix.yx ) );
         transformMatrix->TM_heightY = INTEGER_OF_WWFIXEDASDWORD( GrMulWWFixed( 
-                        WORD_TO_WWFIXEDASDWORD( transformMatrix->TM_heightY ), WWFIXED_TO_WWFIXEDASDWORD( graphicMatrix.TM_e22 ) ) );
+                        WORD_TO_WWFIXEDASDWORD( transformMatrix->TM_heightY ), WWFIXED_TO_WWFIXEDASDWORD( windowMatrix.TM_e22 ) ) );
 }
 
