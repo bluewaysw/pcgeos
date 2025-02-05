@@ -155,7 +155,7 @@ void AdjustTrackKerning(VisTextCharAttr *vtca)
 
 void GetCharacterBase(VisTextCharAttr *cs)
 {
-    sword *fontRamp = (HTMLext->HE_options & HTML_NO_REDUCED_SIZES)?
+    sword const *fontRamp = (HTMLext->HE_options & HTML_NO_REDUCED_SIZES)?
       fontRampNoSmall : fontRampDefault;
 
     *cs = vcaBase;
@@ -1052,6 +1052,8 @@ void AddParaCond(void)
 
       if((currentFlags & TAG_PREPEND) && !*insertPrepend)
         STRCPYSB(insertPrepend,"\t");     /* make sure it's indented */
+      if(!(currentFlags & TAG_PREPEND))
+        *insertPrepend = 0;
 
       if(*insertPrepend)                /* prepend text to paragraph? */
         AddText(&currentCS, insertPrepend);
@@ -1916,7 +1918,7 @@ int LOCAL HandleTag(MemHandle localHeap)
     register int c,p;
     int ce,q;
     char *e;
-    Boolean endTag;
+    Boolean openTag,closeTag;
     word tagStyle;
     HTMLStylesTable tagStyleEntry;
     optr paramArray;
@@ -1927,14 +1929,17 @@ int LOCAL HandleTag(MemHandle localHeap)
     if(c=='/')
     {
       c=HTMLgetc();
-      endTag=TRUE;
+      closeTag=TRUE;
+      openTag=FALSE;
+    } else {
+      closeTag=FALSE;
+      openTag=TRUE;
     }
-    else
-      endTag=FALSE;
 
     /* get tag name */
     p=0;                                /* start tag */
-    while( c!='>' && c!='<' && c!='=' && c!=' ' && c!='\r' && c!='\t' && c!=EOF )
+    while( c!='>' && c!='<' && c!='=' && c!='/' && c!=' ' && 
+           c!='\r' && c!='\t' && c!=EOF )
     {
       if(p<HTML_MAXTAG)
         tag[p++]=(char)((c>='a' && c<='z')?(c-32):c);
@@ -1976,8 +1981,8 @@ int LOCAL HandleTag(MemHandle localHeap)
     /* get tag arguments if any (but not while ignoring, e.g. in a script) */
     if(!(currentFlags & TAG_IGNORE_TAGS))
     {
-      while( c!='>' && c!='<' && c!=EOF)/* while tag has more data in it... */
-      {                                   
+      while( c!='/' && c!='>' && c!='<' && c!=EOF)
+      {                                   /* while tag has more data in it... */
         /* buf -- room for PARSE_BUF_LEN + one entity expansion */
         char arg[HTML_MAXTAG+1],buf[PARSE_BUF_LEN+HTML_MAXTAG];
 	MemHandle overflowBuf = 0;
@@ -1988,7 +1993,7 @@ int LOCAL HandleTag(MemHandle localHeap)
         /* get argument name */
         p=0;                            /* start tag */
         while( c!='=' && c!=' ' && c!='\r' && c!='\t' && c!='>' && c!='<' &&
-               c!=EOF )
+               c!='/' && c!=EOF )
         {
           if(p<HTML_MAXTAG)
             arg[p++]=(char)((c>='a' && c<='z')?(c-32):c);
@@ -2055,39 +2060,46 @@ int LOCAL HandleTag(MemHandle localHeap)
       while( c!='>' && c!='<' && c!=EOF) c=HTMLgetc();
     }
 
+    if(c=='/') {
+      c=HTMLgetc();
+      closeTag = TRUE;
+    }
+
     /* copy entry from HTML tag style definitions: */
     MemLock( OptrToHandle(@HTMLStylesChunk) );
     tagStyle = StyleNum(tag,&spec);     /* find if tag has an assigned style */
     tagStyleEntry = ((HTMLStylesTable *)LMemDeref(@HTMLStylesChunk))[tagStyle];
     MemUnlock( OptrToHandle(@HTMLStylesChunk) );
 
-    if(endTag) {                        /* opening/closing a tag? */
-        /* ignore if should ignore enclosed tags */
-        if ((tagStyleEntry.flags & TAG_IGNORE_TAGS) ||
-	    /* or NOEMBED inside OBJECT */
-	    (tagStyleEntry.spec == SPEC_NOEMBED &&
-	     EnclosingCount(SPEC_OBJECT, NULL))) {
-            /* don't allow bad HTML to underflow us */
-	    if (ignoreTags)
-		ignoreTags-- ;
-        }
-        if (!ignoreTags) {
-            CloseTag( tagStyle, &tagStyleEntry, paramArray );
-        }
-    } else {
+    if(openTag) {                       /* opening a tag */
         if (!ignoreTags) {
             if(tagStyleEntry.spec==SPEC_SCRIPT)
             {
-               c = Open_SCRIPT(paramArray, c);
+              c = Open_SCRIPT(paramArray, c);
               tagStyleEntry.flags &= ~TAG_IGNORE_TAGS;
             }
             else
               OpenTag( tagStyle, &tagStyleEntry, paramArray );
         }
         if ((tagStyleEntry.flags & TAG_IGNORE_TAGS) ||
-	    (tagStyleEntry.spec == SPEC_NOEMBED &&
-	        EnclosingCount(SPEC_OBJECT, NULL))) {
+            (tagStyleEntry.spec == SPEC_NOEMBED &&
+                EnclosingCount(SPEC_OBJECT, NULL))) {
             ignoreTags++ ;
+        }
+	paramArray = NullOptr;		/* params were consumed */
+    }
+    if(closeTag) {                      /* closing a tag? */
+        /* ignore if should ignore enclosed tags */
+        if ((tagStyleEntry.flags & TAG_IGNORE_TAGS) ||
+            /* or NOEMBED inside OBJECT */
+            (tagStyleEntry.spec == SPEC_NOEMBED &&
+             EnclosingCount(SPEC_OBJECT, NULL))) {
+            /* don't allow bad HTML to underflow us */
+            if (ignoreTags)
+              ignoreTags-- ;
+        }
+        if (!ignoreTags) {
+            CloseTag( tagStyle, &tagStyleEntry, paramArray );
         }
     }
 
