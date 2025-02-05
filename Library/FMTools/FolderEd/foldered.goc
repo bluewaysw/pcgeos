@@ -46,7 +46,6 @@ static 	word 		g_configBits = DEFAULT_FED_CONFIG;
 @extern visMoniker SettingOKImageMoniker;
 @extern visMoniker DefaultImageMoniker;
 
-
 /*+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
   +                                                                         +
   +	Initialize and exit the tool			            	    +
@@ -142,16 +141,8 @@ Boolean err;
     tok.GT_chars[3]='R'; tok.GT_manufID=0;
     FEDShowToken(tok, 0, @DialogObj(@TokenDefaultDisplay), 0, @DialogObj(@TokenDefaultTool));
 
-
-    /*
-     * Combine icon and text moniker into a single combination moniker.
-     * I use my own routine. Perhaps, UserCreateIconTextMoniker() is also possible.
-     */
-    CreateButtonMoniker(@DialogObj(@SelectCancelTrigger), @CloseImageMoniker, @CloseTextMoniker);
-    CreateButtonMoniker(@DialogObj(@SelectOkTrigger2), @SettingOKImageMoniker, @ApplyIconTextMoniker);
-    CreateButtonMoniker(@DialogObj(@ClearTokenTrigger2), @DefaultImageMoniker, @DefaultIconTextMoniker);
-    CreateButtonMoniker(@DialogObj(@SelectSettingsTrigger), @SettingsImageMoniker, @SettingsTextMoniker);
-
+    InternalCreateButtonMonikers();	
+    
     /*
      * Figure out the selected folders
      */
@@ -207,6 +198,25 @@ Boolean err;
      * Finally, open dialog box
      */
     @send g_dialog::MSG_GEN_INTERACTION_INITIATE();
+
+}
+
+/*-------------------------------------------------------------
+ * InternalCreateButtonMonikers
+ *-------------------------------------------------------------
+ *	Setup dialog button monikers.
+ *	Used twice.
+-------------------------------------------------------------*/
+void InternalCreateButtonMonikers(void) {
+
+    /*
+     * Combine icon and text moniker into a single combination moniker.
+     * I use my own routine. Perhaps, UserCreateIconTextMoniker() is also possible.
+     */
+    CreateButtonMoniker(@DialogObj(@SelectCancelTrigger), @CloseImageMoniker, @CloseTextMoniker);
+    CreateButtonMoniker(@DialogObj(@SelectOkTrigger2), @SettingOKImageMoniker, @ApplyIconTextMoniker);
+    CreateButtonMoniker(@DialogObj(@ClearTokenTrigger2), @DefaultImageMoniker, @DefaultIconTextMoniker);
+    CreateButtonMoniker(@DialogObj(@SelectSettingsTrigger), @SettingsImageMoniker, @SettingsTextMoniker);
 
 }
 
@@ -323,9 +333,23 @@ Handle		monikerGString;
 byte 		*bPtr;
 VisMonikerWithGString	*monikerPtr;
 int		w, h, tw, th, y;
+word 	fontID, fSize, size, flags;
+Boolean err;
+FileLongName	fontName;
 Rectangle r;
 
 
+    if ( g_configBits & FFED_CFG_HIDE_BUTTON_ICONS)  {
+    
+        /*
+         * Send text-only moniker to buttons
+         */
+         
+        MemLock(OptrToHandle(textMoniker));
+        @call button::MSG_GEN_REPLACE_VIS_MONIKER_TEXT(LMemDeref(textMoniker), VUM_NOW);
+        MemUnlock(OptrToHandle(textMoniker));
+        return;
+        }   
 
     /*
      * Create Gstring to hold Images
@@ -352,6 +376,21 @@ Rectangle r;
     GrDrawGString(gsState, monikerGString, 0, 0, 0, &lElem);
     GrDestroyGString(monikerGString, NULL, GSKT_LEAVE_DATA);
     MemUnlock(OptrToHandle(graphicMoniker));
+    
+    /*
+     * Set correct font and size
+     */
+    err = InitFileReadInteger ("ui", "fontSize", &fSize);
+    if (err) fSize = 12;
+
+    memset(fontName, 0, sizeof(FileLongName));
+    flags = (IFCC_INTACT << IFRF_CHAR_CONVERT_OFFSET) | sizeof(FileLongName);	// pass buffer size and convert method
+    if ( InitFileReadStringBuffer("ui", "fontid", fontName, flags, &size) ) strcpy(fontName, "Berkeley");
+    fontID = GrCheckFontAvailName(FEF_BITMAPS | FEF_OUTLINES | FEF_STRING, 0, fontName);
+    if ( !fontID ) fontID = FID_BERKELEY;
+    
+    GrSetFont(gsState, fontID, MakeWWFixed(fSize));
+    
     
     /*
      * Lock the text and draw it vertically centerd on the right of the graphic
@@ -397,6 +436,7 @@ Rectangle r;
 // stop in foldered::FolderEdInteractionFED_QUIT_DIALOG
 @method FolderEdInteractionClass, MSG_FED_QUIT_DIALOG {
 optr 	applyTrigger, cancelTrigger;
+word oldBits;
 
     switch (action) {
     case ACTION_OPEN_CONFIG:
@@ -407,7 +447,7 @@ optr 	applyTrigger, cancelTrigger;
     	
         @send applyTrigger::MSG_GEN_TRIGGER_SET_DESTINATION(g_dialog);
         @send cancelTrigger::MSG_GEN_TRIGGER_SET_DESTINATION(g_dialog);
-	CreateButtonMoniker(applyTrigger, @SettingOKImageMoniker, @ConfigApplyTextMoniker);
+ 	CreateButtonMoniker(applyTrigger, @SettingOKImageMoniker, @ConfigApplyTextMoniker);
 	CreateButtonMoniker(cancelTrigger, @CloseImageMoniker, @ConfigCancelTextMoniker);
 	@send ConstructOptr(OptrToHandle(g_configDialog), OptrToChunk(@ConfigOptions))::MSG_GEN_BOOLEAN_GROUP_SET_GROUP_STATE(g_configBits & FED_MAIN_CONFIG_MASK, 0);
     	@send g_configDialog::MSG_GEN_INTERACTION_INITIATE();
@@ -415,9 +455,11 @@ optr 	applyTrigger, cancelTrigger;
     	break;
     	
     case ACTION_CLOSE_CONFIG_APPLY:
+        oldBits = g_configBits;
     	g_configBits = @call ConstructOptr(OptrToHandle(g_configDialog), OptrToChunk(@ConfigOptions))::MSG_GEN_BOOLEAN_GROUP_GET_SELECTED_BOOLEANS();
     	g_configBits |= @call @DialogObj(@FEDApplyToAllSelector)::MSG_GEN_BOOLEAN_GROUP_GET_SELECTED_BOOLEANS();
     	FEDConfigureToolUI();
+    	if ((oldBits ^ g_configBits) & FFED_CFG_HIDE_BUTTON_ICONS) InternalCreateButtonMonikers();
     	
     case ACTION_CLOSE_CONFIG_CANCEL:
     	if (g_configDialog) {

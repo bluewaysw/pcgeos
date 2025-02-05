@@ -306,7 +306,11 @@ DOSVirtCheckPossibleGeosFile proc	near
 		jnz	success
 
 		add	di, offset FFD_name
-		mov	cx, size FFD_name
+
+		LocalStrLength
+		mov	di, dx
+		add	di, offset FFD_name
+
 		mov	al, '.'
 		repne	scasb
 		jne	fail
@@ -1821,7 +1825,9 @@ doFind:
 	; skip this file, as we checked it during the first pass.
 	; 
 		lea	di, ds:[mapDTA].FFD_name
-		mov	cx, size FFD_name
+		LocalStrLength
+		lea	di, ds:[mapDTA].FFD_name
+
 		mov	al, '.'
 		repne	scasb
 		mov	al, 0

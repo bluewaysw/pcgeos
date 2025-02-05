@@ -737,7 +737,8 @@ defaultColorLists nptr \
 	defGreySkyColors,
 	defCuppaJoeColors,
 	defGreyAndRedColors,
-	defGreyAndGreenColors
+	defGreyAndGreenColors,
+	defMeadowsColors
 
 CheckHack <length defaultColorLists eq ConfigUIDefaultColorScheme>
 
@@ -902,6 +903,15 @@ defGreyAndGreenColors Color \
 	27,				;file folder
 	254,				;help BG color
 	60				;selection
+
+defMeadowsColors Color \
+	8,				;title bar
+	8,				;title bar gradient
+	C_DARK_GRAY,			;dark color
+	C_LIGHT_GRAY,			;light color
+	C_WHITE,			;file folder
+	254,				;help BG color
+	135				;selection
 
 PrefUICSetDefaultColor	method dynamic ConfigUIDialogClass,
 					MSG_CUID_SET_DEFAULT_COLORS
@@ -2297,6 +2307,7 @@ ForceRef SLDI16
 ForceRef SLDI17
 ForceRef SLDI18
 ForceRef SLDI19
+ForceRef SLDI20
 
 ConfigUICGetSchemeMoniker	method dynamic ConfigUICSchemeListClass,
 					MSG_PREF_ITEM_GROUP_GET_ITEM_MONIKER
