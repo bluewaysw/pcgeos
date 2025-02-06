@@ -55,6 +55,8 @@
  * copied and put under another distribution licence
  * [including the GNU Public Licence.]
  */
+#ifndef COMPILE_OPTION_HOST_SERVICE_ONLY
+
 
 #ifndef GEOS_CLIENT
 char *lh_version="lhash part of SSLeay 0.9.0b 29-Jun-1998";
@@ -572,3 +574,4 @@ char *c;
 	return((ret>>16)^ret);
 	}
 
+#endif

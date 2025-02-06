@@ -43,7 +43,7 @@ static void ConvertWidths( TRUETYPE_VARS,
                         FontHeader*             fontHeader, 
                         FontBuf*                fontBuf );
             
-static void ConvertKernPairs( TRUETYPE_VARS, FontBuf* fontBuf );
+void ConvertKernPairs( TRUETYPE_VARS, FontBuf* fontBuf );
 
 static void CalcScaleForWidths( TRUETYPE_VARS,
                         WWFixedAsDWord          pointSize,
@@ -70,9 +70,8 @@ extern void InitConvertHeader( TRUETYPE_VARS, FontHeader* fontHeader );
 
 static void FillKerningFlags( FontHeader* fontHeader, FontBuf* fontBuf );
 
-static void AdjustTransMatrix( TransformMatrix*  transMatrix );
-
-static WWFixedAsDWord SqrtWWFixed( WWFixedAsDWord value );
+static void AdjustTransMatrix( TransformMatrix* transMatrix, 
+                               FontMatrix* graphicMatrix );
 
 
 #define ROUND_WWFIXED( value )    ( value & 0xffff ? ( value >> 16 ) + 1 : value >> 16 )
@@ -144,6 +143,7 @@ static WWFixedAsDWord SqrtWWFixed( WWFixedAsDWord value );
 MemHandle _pascal TrueType_Gen_Widths(
                         MemHandle            fontHandle,
                         FontMatrix*          fontMatrix,
+                        FontMatrix*          graphicMatrix,
                         WWFixedAsDWord       pointSize,
                         Byte                 width,
                         Byte                 weight,
@@ -237,7 +237,7 @@ EC(     ECCheckBounds( (void*)transMatrix ) );
         if( IsRegionNeeded( transMatrix, fontBuf ) )
                 fontBuf->FB_flags |= FBF_IS_REGION;
 
-        AdjustTransMatrix( transMatrix );
+        AdjustTransMatrix( transMatrix, graphicMatrix );
         TrueType_Unlock_Face( trueTypeVars );
 Fail:        
         MemUnlock( varBlock );
@@ -423,8 +423,8 @@ EC_ERROR_IF(    indexRightChar > fontHeader->FH_lastChar - fontHeader->FH_firstC
  *      ----      ----      -----------
  *      20.12.22  JK        Initial Revision
  *******************************************************************/
-
-static void ConvertKernPairs( TRUETYPE_VARS, FontBuf* fontBuf )
+#pragma code_seg(ttcharmapper_TEXT)
+void ConvertKernPairs( TRUETYPE_VARS, FontBuf* fontBuf )
 {
         TT_Kerning        kerningDir;
         word              table;
@@ -494,7 +494,7 @@ EC(             ECCheckBounds( pairs ) );
         }
         GEO_UNLOCK( LOOKUP_TABLE );
 }
-
+#pragma code_seg()
 
 /********************************************************************
  *                      CalcScaleForWidths
@@ -653,36 +653,36 @@ EC(     ECCheckBounds( (void*)fontBuf ) );
                                               WBFIXED_TO_WWFIXEDASDWORD( fontBuf->FB_heightAdjust );
 
 
-                styleMatrix.xx = GrMulWWFixed( styleMatrix.xx, SCRIPT_FACTOR );
-                styleMatrix.yy = GrMulWWFixed( styleMatrix.yy, SCRIPT_FACTOR );
+                styleMatrix.xx = TrueType_GrMulWWFixed( styleMatrix.xx, SCRIPT_FACTOR );
+                styleMatrix.yy = TrueType_GrMulWWFixed( styleMatrix.yy, SCRIPT_FACTOR );
 
                 if( stylesToImplement & TS_SUBSCRIPT )
                 {
                         //TODO: Is rounding necessary here?
-                        transMatrix->TM_scriptY = GrMulWWFixed( scriptOffset, SUBSCRIPT_OFFSET ) >> 16;
+                        transMatrix->TM_scriptY = TrueType_GrMulWWFixed( scriptOffset, SUBSCRIPT_OFFSET ) >> 16;
                 }
                 else
                 {
                         //TODO: Is rounding necessary here?
-                        transMatrix->TM_scriptY = ( GrMulWWFixed( scriptOffset, SUPERSCRIPT_OFFSET) -
+                        transMatrix->TM_scriptY = ( TrueType_GrMulWWFixed( scriptOffset, SUPERSCRIPT_OFFSET) -
                                                 WBFIXED_TO_WWFIXEDASDWORD( fontBuf->FB_baselinePos ) -
                                                 WBFIXED_TO_WWFIXEDASDWORD( fontBuf->FB_baseAdjust ) ) >> 16;
                 }
         }
 
-        transMatrix->TM_matrix.xx = GrMulWWFixed( styleMatrix.xx, fontMatrix->FM_11 );
+        transMatrix->TM_matrix.xx = TrueType_GrMulWWFixed( styleMatrix.xx, fontMatrix->FM_11 );
         transMatrix->TM_matrix.yx = 0;
-        transMatrix->TM_matrix.xy = GrMulWWFixed( styleMatrix.xy, fontMatrix->FM_11 );
-        transMatrix->TM_matrix.yy = GrMulWWFixed( styleMatrix.yy, fontMatrix->FM_22 );
+        transMatrix->TM_matrix.xy = TrueType_GrMulWWFixed( styleMatrix.xy, fontMatrix->FM_11 );
+        transMatrix->TM_matrix.yy = TrueType_GrMulWWFixed( styleMatrix.yy, fontMatrix->FM_22 );
 
         if( fontMatrix->FM_flags & TF_ROTATED )
         {
                 TT_Fixed  xy, yx;
 
 
-                xy = - ( GrMulWWFixed( styleMatrix.yy, fontMatrix->FM_21 ) );
-                yx = - ( GrMulWWFixed( styleMatrix.xx, fontMatrix->FM_12 ) +
-                         GrMulWWFixed( styleMatrix.xy, fontMatrix->FM_22 ) );
+                xy = - ( TrueType_GrMulWWFixed( styleMatrix.yy, fontMatrix->FM_21 ) );
+                yx = - ( TrueType_GrMulWWFixed( styleMatrix.xx, fontMatrix->FM_12 ) +
+                         TrueType_GrMulWWFixed( styleMatrix.xy, fontMatrix->FM_22 ) );
 
                 transMatrix->TM_matrix.xy = xy;
                 transMatrix->TM_matrix.yx = yx;
@@ -951,84 +951,43 @@ static void AdjustFontBuf( TransformMatrix* transMatrix,
 /********************************************************************
  *                      AdjustTransMatrix
  ********************************************************************
- * SYNOPSIS:       Adjusts the transformation matrix by calculating and 
- *                 applying scaling factors for the horizontal and 
- *                 vertical axes.
+ * SYNOPSIS:       Adjusts the transformation matrix based on the 
+ *                 provided font matrix.
  * 
- * PARAMETERS:     TransformMatrix* transMatrix 
- *                    Pointer to the transformation matrix to be adjusted. 
- *                    The structure includes scale factors and resolution 
- *                    values for x and y axes.
+ * PARAMETERS:     transMatrix     
+ *                    Pointer to the transformation matrix to be adjusted.
+ *                 graphicMatrix 
+ *                    Pointer to the font matrix used for scaling.
  * 
  * RETURNS:        void
  * 
- * STRATEGY:       - Calculate scale factors 
- *                 - Set the horizontal and vertical resolution based
- *                   on 72 dpi.
- *                 - Normalize the transformation matrix values to ensure
- *                   proper scaling.
+ * STRATEGY:       - Computes scale factors for the x and y axes using the 
+ *                   transformation and font matrices.
+ *                 - Sets the horizontal and vertical resolution based on 72 dpi.
+ *                 - Scales the transformation matrix elements accordingly.
  * 
  * REVISION HISTORY:
  *      Date      Name      Description
  *      ----      ----      -----------
- *      05.11.24  JK        Initial Revision
+ *      01.02.25  JK        Initial Revision
  *******************************************************************/
 
-static void AdjustTransMatrix( TransformMatrix*  transMatrix )
+static void AdjustTransMatrix( TransformMatrix* transMatrix, FontMatrix* graphicMatrix )
 {
-        /* calculate horizontal and vertical scale factors */
-        WWFixedAsDWord  scaleX = SqrtWWFixed( GrMulWWFixed( transMatrix->TM_matrix.xx, transMatrix->TM_matrix.xx ) +
-                                                   GrMulWWFixed( transMatrix->TM_matrix.xy, transMatrix->TM_matrix.xy ) );
-        WWFixedAsDWord  scaleY = SqrtWWFixed( GrMulWWFixed( transMatrix->TM_matrix.yy, transMatrix->TM_matrix.yy ) +
-                                                   GrMulWWFixed( transMatrix->TM_matrix.yx, transMatrix->TM_matrix.yx ) );
+        WWFixedAsDWord  scaleX = ABS( GrSDivWWFixed( transMatrix->TM_matrix.xx, graphicMatrix->FM_11 ) );
+        WWFixedAsDWord  scaleY = ABS( GrSDivWWFixed( transMatrix->TM_matrix.yy, graphicMatrix->FM_22 ) );
 
         /* set horizontal and vertical resolution based on 72 dpi */
-        transMatrix->TM_resX = INTEGER_OF_WWFIXEDASDWORD( GrMulWWFixed( WORD_TO_WWFIXEDASDWORD( 72 ), scaleX ) );
-        transMatrix->TM_resY = INTEGER_OF_WWFIXEDASDWORD( GrMulWWFixed( WORD_TO_WWFIXEDASDWORD( 72 ), scaleY ) );
+        transMatrix->TM_resX = INTEGER_OF_WWFIXEDASDWORD( TrueType_GrMulWWFixed( WORD_TO_WWFIXEDASDWORD( 72 ), scaleX ) );
+        transMatrix->TM_resY = INTEGER_OF_WWFIXEDASDWORD( TrueType_GrMulWWFixed( WORD_TO_WWFIXEDASDWORD( 72 ), scaleY ) );
 
-        /* normalize transformation matrix values */
+        /* scale transMatrix by scaleX and scaleY */
         transMatrix->TM_matrix.xx = GrSDivWWFixed( transMatrix->TM_matrix.xx, scaleX );
         transMatrix->TM_matrix.xy = GrSDivWWFixed( transMatrix->TM_matrix.xy, scaleX );
         transMatrix->TM_matrix.yy = GrSDivWWFixed( transMatrix->TM_matrix.yy, scaleY );
         transMatrix->TM_matrix.yx = GrSDivWWFixed( transMatrix->TM_matrix.yx, scaleY );
 }
 
-
-/********************************************************************
- *                      SqrtWWFixed
- ********************************************************************
- * SYNOPSIS:       Approximates the square root of a fixed-point value.
- * 
- * PARAMETERS:     WWFixedAsDWord value
- *                    The fixedpoint value for which the square root 
- *                    is computed.
- * 
- * RETURNS:        WWFixedAsDWord
- *                    Approximation of the square root.
- * 
- * STRATEGY:       Uses an iterative method to approximate the square root 
- *                 by repeatedly refining the estimate. Initial estimate is 
- *                 half the input value. The approximation loop runs 10 times.
- * 
- * REVISION HISTORY:
- *      Date      Name      Description
- *      ----      ----      -----------
- *      08.11.24  User      Initial Revision
- *******************************************************************/
-
-static WWFixedAsDWord SqrtWWFixed(WWFixedAsDWord value)
-{
-    int            i;
-    WWFixedAsDWord approx = value >> 1; 
-
-
-    if (value <= 0) return 0;
-
-    for (i = 0; i < 10; ++i)
-        approx = ( approx + ( GrUDivWWFixed( value, approx) ) ) >> 1;
-
-    return approx;
-}
 
 /********************************************************************
  *                      IsRegionNeeded
@@ -1070,13 +1029,13 @@ static Boolean IsRegionNeeded( TransformMatrix* transMatrix, FontBuf* fontBuf )
         sword param2;
 
 
-        param1 = IntegerOf( GrMulWWFixed( transMatrix->TM_matrix.xx, WORD_TO_WWFIXEDASDWORD( fontBuf->FB_pixHeight ) ) );
-        param2 = IntegerOf( GrMulWWFixed( transMatrix->TM_matrix.yx, WORD_TO_WWFIXEDASDWORD( fontBuf->FB_pixHeight ) ) );
+        param1 = IntegerOf( TrueType_GrMulWWFixed( transMatrix->TM_matrix.xx, WORD_TO_WWFIXEDASDWORD( fontBuf->FB_pixHeight ) ) );
+        param2 = IntegerOf( TrueType_GrMulWWFixed( transMatrix->TM_matrix.yx, WORD_TO_WWFIXEDASDWORD( fontBuf->FB_pixHeight ) ) );
         if( ( ABS( param1 ) + ABS( param2 ) ) > MAX_BITMAP_SIZE )
                 return TRUE;
 
-        param1 = IntegerOf( GrMulWWFixed( transMatrix->TM_matrix.xy, WORD_TO_WWFIXEDASDWORD( fontBuf->FB_pixHeight ) ) );
-        param2 = IntegerOf( GrMulWWFixed( transMatrix->TM_matrix.yy, WORD_TO_WWFIXEDASDWORD( fontBuf->FB_pixHeight ) ) );
+        param1 = IntegerOf( TrueType_GrMulWWFixed( transMatrix->TM_matrix.xy, WORD_TO_WWFIXEDASDWORD( fontBuf->FB_pixHeight ) ) );
+        param2 = IntegerOf( TrueType_GrMulWWFixed( transMatrix->TM_matrix.yy, WORD_TO_WWFIXEDASDWORD( fontBuf->FB_pixHeight ) ) );
         if( ( ABS( param1 ) + ABS( param2 ) ) > MAX_BITMAP_SIZE )
                 return TRUE;
 

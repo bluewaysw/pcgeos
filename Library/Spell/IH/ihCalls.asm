@@ -64,6 +64,7 @@ HyphenOpen	proc	far
 	uses	bx,cx,dx,si,di,bp,ds,es
  	.enter
 
+	call 	FILEPUSHDIR			; push the directory
 	jmp	markStatusError
 	
 	call	HyphenSetPath			; set the directory

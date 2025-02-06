@@ -22,6 +22,7 @@
 #include <freetype.h>
 #include <ttmemory.h>
 #include <geos.h>
+#include <geode.h>
 #include <unicode.h>
 #include <Ansi/stdlib.h>
 
@@ -35,7 +36,7 @@
  *      internal functions
  ***********************************************************************/
 
-static int _pascal compareLookupEntries(const void *a, const void *b);
+int _pascal compareLookupEntries(const void *a, const void *b);
 
 
 //TODO: put geosCharMap into movable ressource
@@ -369,7 +370,7 @@ CharMapFlags GeosCharMapFlag( const word  geosChar )
  *      ----      ----      -----------
  *      06.12.22  JK        Initial Revision
  *******************************************************************/
-
+#pragma code_seg(ttcmap_TEXT)
 word CountValidGeosChars( const TT_CharMap  map, char*  firstChar, char*  lastChar )
 {
         word  charIndex;
@@ -391,7 +392,7 @@ word CountValidGeosChars( const TT_CharMap  map, char*  firstChar, char*  lastCh
 
         return (*firstChar <= *lastChar) ? (1 + *lastChar - *firstChar) : 0;
 }
-
+#pragma code_seg()
 
 /********************************************************************
  *                      CreateIndexLookupTable
@@ -416,7 +417,7 @@ word CountValidGeosChars( const TT_CharMap  map, char*  firstChar, char*  lastCh
  *      ----      ----      -----------
  *      30.09.24  JK        Initial Revision
  *******************************************************************/
-
+#pragma code_seg(ttcmap_TEXT)
 MemHandle CreateIndexLookupTable( const TT_CharMap  map )
 {
         MemHandle     memHandle;
@@ -424,8 +425,9 @@ MemHandle CreateIndexLookupTable( const TT_CharMap  map )
         int           i;
 
 
-        memHandle = MemAlloc( NUM_CHARMAPENTRIES * sizeof( LookupEntry ),
-                              HF_SHARABLE | HF_SWAPABLE, HAF_LOCK );
+        memHandle = MemAllocSetOwner( GeodeGetCodeProcessHandle(), 
+                                NUM_CHARMAPENTRIES * sizeof( LookupEntry ),
+                              	HF_SHARABLE | HF_SWAPABLE, HAF_LOCK | HAF_NO_ERR);
 EC(     ECCheckMemHandle( memHandle ) );
 
         lookupTable = (LookupEntry*)MemDeref( memHandle );
@@ -444,11 +446,11 @@ EC(     ECCheckBounds( lookupTable ) );
 }
 
 
-static int _pascal compareLookupEntries( const void *a, const void *b ) 
+int _pascal compareLookupEntries( const void *a, const void *b ) 
 {
         return (int)((LookupEntry *)a)->ttindex - (int)((LookupEntry *)b)->ttindex;
 }
-
+#pragma code_seg()
 
 /********************************************************************
  *                      GetGEOSCharForIndex

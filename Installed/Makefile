@@ -129,7 +129,7 @@ minimalAppl	: minimalGame minimalUtils minimalTools minimalSavers \
 		  bbxchat bbxmail \
 		  newsread geozip sclock trayapps\
  	  	  hmbase pdfvu  bnkr30 ftpc \
- 	  	  instc instf foldered
+ 	  	  instc instf foldered grafcalc
 
 minimalUtils	: prefmgr
 
@@ -305,11 +305,8 @@ Installed/Library/Trans/Text/Ascii: 	ui text MAKELIB
 msword	: Installed/Library/Trans/Text/MicrosoftWord
 Installed/Library/Trans/Text/MicrosoftWord: 	ui ansic impex msmfile MAKELIB
 
-htmlpars : Installed/Library/Breadbox/HtmlPars
-Installed/Library/Breadbox/HtmlPars: kernel ansic text MAKELIB
-
 htmlimpx : Installed/Library/Trans/Web/HtmlImpx
-Installed/Library/Trans/Web/HtmlImpx: htmlpars ansic text impex ui MAKELIB
+Installed/Library/Trans/Web/HtmlImpx: html4par ansic text impex ui MAKELIB
 
 sstor	: Installed/Library/Breadbox/SStor
 Installed/Library/Breadbox/SStor: 	kernel ansic MAKELIB
@@ -960,6 +957,9 @@ Installed/Library/FMTools/OpenWith:	ui ansic MAKEAPPL
 foldered: Installed/Library/FMTools/FolderEd
 Installed/Library/FMTools/FolderEd:	ui ansic MAKEAPPL
 
+grafcalc: Installed/Appl/GrafCalc
+Installed/Appl/GrafCalc:	ui ansic cell parse color math MAKEAPPL
+
 homebase:
 #	No need to do this because this is sync'ed by morning make script.
 #	p4 sync -f //depot/pcgeos/Appl/Breadbox/Homebase/...
@@ -1381,10 +1381,6 @@ Installed/Appl/Breadbox/BbxBrow:	ui ansic text spool \
 
 # webmagick libs
 
-#html3par	: ui ansic text extgraph
-#	mdcd %ROOT_DIR%\Installed\Library\Breadbox\html3par
-#	$(MAKE) -I$(ROOT_DIR)\Library\Breadbox\html3par lib full
-
 html4par	: Installed/Library/Breadbox/Html4Par
 Installed/Library/Breadbox/Html4Par:	kernel ui ansic text extgraph MAKELIB
 
@@ -1422,15 +1418,13 @@ Installed/Library/SSL:				ansic socket mapheap hostif MAKELIB
 
 # product-specific dependency on fjpeg
 impgraph	: Installed/Library/Breadbox/ImpGraph
-Installed/Library/Breadbox/ImpGraph:		ansic ijgjpeg MAKELIB #fjpeg
+Installed/Library/Breadbox/ImpGraph:		ansic ijgjpeg fjpeg MAKELIB
 
 ijgjpeg	: 	Installed/Library/Breadbox/Ijgjpeg
 Installed/Library/Breadbox/Ijgjpeg:		ui ansic MAKELIB
 
-#fjpeg	: 	Installed/Library/Breadbox/fjpeg
-#Installed/Library/Breadbox/fjpeg:		ui ansic MAKELIB
-#	mdcd %ROOT_DIR%\
-#	$(MAKE) -I$(ROOT_DIR)\Library\Breadbox\fjpeg lib full
+fjpeg	: 	Installed/Library/Breadbox/Fjpeg
+Installed/Library/Breadbox/Fjpeg:		ui ansic MAKELIB
 
 impdoc	: 	Installed/Library/Breadbox/ImpDoc
 Installed/Library/Breadbox/ImpDoc:		ui ansic MAKELIB

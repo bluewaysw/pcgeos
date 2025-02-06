@@ -45,7 +45,7 @@ exptproc.eobj: stdapp.goh object.goh ui.goh Objects/metaC.goh \
                 Objects/gItemC.goh Objects/gBoolC.goh \
                 Objects/gGadgetC.goh Objects/gToolCC.goh \
                 Objects/gValueC.goh Objects/gToolGC.goh \
-                Objects/helpCC.goh impex.goh htmlpars.goh \
+                Objects/helpCC.goh impex.goh html4par.goh product.goh \
                 Objects/vLTextC.goh
 exptproc.obj \
 exptproc.eobj: geos.h heap.h geode.h resource.h ec.h object.h lmem.h \
@@ -56,7 +56,8 @@ exptproc.eobj: geos.h heap.h geode.h resource.h ec.h object.h lmem.h \
                 Objects/gInterC.h Objects/Text/tCommon.h stylesh.h \
                 driver.h thread.h print.h Internal/spoolInt.h serialDr.h \
                 parallDr.h hugearr.h fileEnum.h ieCommon.h xlatLib.h \
-                Ansi/string.h Ansi/stdio.h htmlopt.h
+                Ansi/string.h Ansi/stdio.h product.h htmlfstr.h \
+                awatcher.h htmlopt.h
 imptproc.obj \
 imptproc.eobj: stdapp.goh object.goh ui.goh Objects/metaC.goh \
                 Objects/inputC.goh Objects/clipbrd.goh \
@@ -75,7 +76,7 @@ imptproc.eobj: stdapp.goh object.goh ui.goh Objects/metaC.goh \
                 Objects/gItemC.goh Objects/gBoolC.goh \
                 Objects/gGadgetC.goh Objects/gToolCC.goh \
                 Objects/gValueC.goh Objects/gToolGC.goh \
-                Objects/helpCC.goh impex.goh htmlpars.goh \
+                Objects/helpCC.goh impex.goh html4par.goh product.goh \
                 Objects/vLTextC.goh
 imptproc.obj \
 imptproc.eobj: geos.h heap.h geode.h resource.h ec.h object.h lmem.h \
@@ -86,7 +87,7 @@ imptproc.eobj: geos.h heap.h geode.h resource.h ec.h object.h lmem.h \
                 Objects/gInterC.h Objects/Text/tCommon.h stylesh.h \
                 driver.h thread.h print.h Internal/spoolInt.h serialDr.h \
                 parallDr.h hugearr.h fileEnum.h ieCommon.h xlatLib.h \
-                Ansi/string.h htmlopt.h
+                Ansi/string.h product.h htmlfstr.h awatcher.h htmlopt.h
 htmlimpt.rdef: generic.uih product.uih
 
-htmlimpxEC.geo htmlimpx.geo : geos.ldf ui.ldf impex.ldf text.ldf ansic.ldf htmlpars.ldf 
+htmlimpxEC.geo htmlimpx.geo : geos.ldf ui.ldf impex.ldf text.ldf ansic.ldf html4par.ldf 

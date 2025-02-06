@@ -3,8 +3,8 @@
  *	Copyright (c) GlobalPC 1998 -- All Rights Reserved
  *
  * PROJECT:	Internet Dial-up & Configure  Applications
- * MODULE:	
- * FILE:	
+ * MODULE:
+ * FILE:
  *
  * AUTHOR:	mzhu: Nov 23, 1998
  *
@@ -77,11 +77,11 @@ void IDialupNotifyIdle(dword total);
  ***********************************************************************
  * SYNOPSIS:     Timer handler
  *
- * PARAMETERS:  
+ * PARAMETERS:
  *
- * SIDE EFFECTS:    
+ * SIDE EFFECTS:
  *
- * STRATEGY:	    
+ * STRATEGY:
  *	Get the number of bytes sent and received via PPP.
  *	If either byte count has changed...
  *	  Store new byte counts.
@@ -108,7 +108,7 @@ void IDialupNotifyIdle(dword total);
 @extern method IDialupProcessClass, MSG_IDP_TIMER_HANDLE
 {
   dword total;
-    
+
   if(!windowDownDelay) {
     @send IDialupPrimary::MSG_GEN_DISPLAY_SET_MINIMIZED();
     windowDownDelay = -1;
@@ -123,7 +123,7 @@ void IDialupNotifyIdle(dword total);
   total = TimerGetCount() - startTime; //total ticks
 
   if(bytesS > bytesSent || bytesR > bytesReceived)
-    {  
+    {
       idleTime = total/60;
       // This is now taken care of by MSG_NOTIFY_APP_STARTED & _APP_EXITED
       //     iAppRunning = TRUE;
@@ -183,7 +183,7 @@ void IDialupNotifyIdle(dword total);
 	  IDialupNotifyIdle(total);
 	}
     }
-  
+
 // caculate the time passed
   total = total / 60;             //total seconds
   seconds = total % 60;
@@ -199,14 +199,14 @@ void IDialupNotifyIdle(dword total);
   // start the timer again
   if(timerHandle && pppStatus == PPP_STATUS_OPEN)
     {
-      timerHandle = TimerStart(TIMER_EVENT_ONE_SHOT, 
+      timerHandle = TimerStart(TIMER_EVENT_ONE_SHOT,
 			       oself,
 			       UPDATE_TIME,
 			       MSG_IDP_TIMER_HANDLE,
-			       0, 
+			       0,
 			       &timerId) ;
-    } 
-  else 
+    }
+  else
     {
       timerHandle = 0;
       timerId = 0;
@@ -229,9 +229,9 @@ void IDialupNotifyIdle(dword total);
  * CALLED BY:	MSG_IDP_TIMER_HANDLE
  * RETURN:	nothing
  * SIDE EFFECTS:
- *	
+ *
  * STRATEGY:	You'll see...
- *	
+ *
  * REVISION HISTORY:
  *	Name	Date		Description
  *	----	----		-----------
@@ -252,7 +252,7 @@ IDialupNotifyIdle (dword total)
     MemLock(OptrToHandle(@idleStr1));
     @call IDINText1::MSG_VIS_TEXT_REPLACE_ALL_PTR(LMemDeref(@idleStr1), 0);
     if(idleTimeout > 3600) {
-	sprintf(str, _TEXT("%u%s%u%s"), idleTimeout/3600, LMemDeref(@hourStr), 
+	sprintf(str, _TEXT("%u%s%u%s"), idleTimeout/3600, LMemDeref(@hourStr),
 		(idleTimeout%3600)/60, LMemDeref(@idleStr2));
     } else {
 	sprintf(str, _TEXT("%u%s"), idleTimeout/60, LMemDeref(@idleStr2));
@@ -284,7 +284,7 @@ void ABLog(char *fmt, ...)
     va_list arg;
     TimerDateAndTime tdat;
     static FileHandle abLog = NullHandle;
-    
+
     if (!abLog) {
 	FilePushDir();
 	FileSetStandardPath(SP_TOP);
@@ -329,9 +329,9 @@ void ABLog(char *fmt, ...)
  *		word notificationType = dx,
  *		word data = bp
  *
- * SIDE EFFECTS:    
+ * SIDE EFFECTS:
  *
- * STRATEGY:	    
+ * STRATEGY:
  *
  * REVISION HISTORY:
  *	Name	Date		Description
@@ -350,7 +350,7 @@ void ABLog(char *fmt, ...)
   Boolean oldDisconnectRequested = disconnectRequested;
 
   if(manufID == MANUFACTURER_ID_GEOWORKS &&
-     notificationType == GWNT_PPP_STATUS_NOTIFICATION) 
+     notificationType == GWNT_PPP_STATUS_NOTIFICATION)
     {
       // Don't record hacked message to AUI to flash icon!
       // Just get the heck out of here!
@@ -421,19 +421,19 @@ void ABLog(char *fmt, ...)
 
 	    @call IDInfoGroup::MSG_IDI_DRAW_STATUS();
 
-	    // get the baud rate 
+	    // get the baud rate
 	    r = GetBaudRate();
 #ifdef PRODUCT_LOGGING
 	    ABLog(_TEXT("connect speed: %d\r\n"), r);
 #endif
 	    @call IDInfoGroup::MSG_IDI_DRAW_SPEED(r);
 
-	    // start the timer 
-	    timerHandle = TimerStart(TIMER_EVENT_ONE_SHOT, 
+	    // start the timer
+	    timerHandle = TimerStart(TIMER_EVENT_ONE_SHOT,
 				     ConstructOptr(GeodeGetProcessHandle(), 0),
 				     UPDATE_TIME,
 				     MSG_IDP_TIMER_HANDLE,
-				     0, 
+				     0,
 				     &timerId) ;
 
 	    // remember the starting time
@@ -453,7 +453,7 @@ void ABLog(char *fmt, ...)
 	    bConnectionWasFullyOpen = TRUE;
 
 	    break;
-	  } 
+	  }
 	case PPP_STATUS_CLOSING:
 	  {
 	    @call IDInfoGroup::MSG_IDI_DRAW_STATUS();
@@ -470,6 +470,16 @@ void ABLog(char *fmt, ...)
 	    @send IDIdleNotifyDialog::MSG_GEN_INTERACTION_ACTIVATE_COMMAND(IC_DISMISS);
 	    @send IDIdleNotifyDialog::MSG_GEN_SET_NOT_USABLE(VUM_NOW);
 	    @send IDLIANotifyDialog::MSG_GEN_INTERACTION_ACTIVATE_COMMAND(IC_DISMISS);
+
+			/* The following line resets the active accpnt to defaultAccpnt
+				 as it may have been chnaged in MSG_IDP_SELECT_ACCPNT.
+				 However, MSG_IDP_SELECT_ACCPNT is only called when the dialer
+				 is launched by other applications - which is apparently (?) not
+				 happening in FreeGEOS. So resetting the active accpnt to defaultAccpnt
+				 is potentialy breaking things in the reworked UI. However,
+				 as defaultAccpnt is usually set via IDialupMakeCurrentAccpntActiveAndDefault
+				 the defaultAccpnt should equal the last activeAccpnt and should be
+				 alright. */
 
 	    AccessPointSetActivePoint(defaultAccpnt, APT_INTERNET);
 
@@ -556,7 +566,7 @@ void ABLog(char *fmt, ...)
 		  case SSDE_NO_USERNAME:    // no username and password, prompting used
 		      argPtr = LMemDeref( @err_ssde_no_username );
 		      break;
-		  case SSDE_CANCEL:         // user cancelled 
+		  case SSDE_CANCEL:         // user cancelled
 		      argPtr = LMemDeref( @err_ssde_cancel );
 		      break;
 		  case SSDE_INVALID_ACCPNT: // invalid access point
@@ -603,13 +613,13 @@ void ABLog(char *fmt, ...)
 		      case SDE_MEDIUM_BUSY:          //active connection outside
 			  argPtr = LMemDeref( @err_sde_medium_busy );
 			  break;
-		      case SDE_INSUFFICIENT_MEMORY:  
+		      case SDE_INSUFFICIENT_MEMORY:
 			  argPtr = LMemDeref( @err_sde_insufficient_memory );
 			  break;
 		      case SDE_NOT_REGISTERED:	 //client has not reg with dr
 			  argPtr = LMemDeref( @err_sde_not_registered );
 			  break;
-		      case SDE_ALREADY_REGISTERED:   //same client registering 2x 
+		      case SDE_ALREADY_REGISTERED:   //same client registering 2x
 			  argPtr = LMemDeref( @err_sde_already_registered );
 			  break;
 		      case SDE_CONNECTION_EXISTS:	 //opening duplicate conn.
@@ -618,7 +628,7 @@ void ABLog(char *fmt, ...)
 		      case SDE_LINK_OPEN_FAILED:	 //couldn't open any links
 			  argPtr = LMemDeref( @err_sde_link_open_failed );
 			  break;
-		      case SDE_DRIVER_NOT_FOUND: 
+		      case SDE_DRIVER_NOT_FOUND:
 			  argPtr = LMemDeref( @err_sde_driver_not_found );
 			  break;
 		      case SDE_DESTINATION_UNREACHABLE:
@@ -695,7 +705,7 @@ void ABLog(char *fmt, ...)
 		    @call IDialupApp::MSG_GEN_BRING_TO_TOP();
 
 		    @call self::MSG_GEN_APPLICATION_DO_STANDARD_DIALOG
-		       (MSG_IDA_ERROR_DIALOG_DISMISSED, oself, 0, 
+		       (MSG_IDA_ERROR_DIALOG_DISMISSED, oself, 0,
 			(char *)0, (char *)0, argPtr,
 			ptr,
 			(CDT_NOTIFICATION << CDBF_DIALOG_TYPE_OFFSET) |
@@ -727,14 +737,14 @@ void ABLog(char *fmt, ...)
 
 	    // Otherwise, if we're not quitting, go back to the ISP view.
 
-	    if ((oldDisconnectRequested && bConnectionWasFullyOpen) || 
+	    if ((oldDisconnectRequested && bConnectionWasFullyOpen) ||
 		@call IDialupPrimary::MSG_GEN_DISPLAY_GET_MINIMIZED())
 		    @send, forceQueue application::MSG_META_QUIT();
 	    else
 	    {
 		@call IDConnectButton::MSG_GEN_SET_ENABLED(VUM_DELAYED_VIA_UI_QUEUE);
 		@call IDDisconnectButton::MSG_GEN_SET_NOT_ENABLED(VUM_NOW);
-		
+
 		@call self::MSG_IDA_VIEW_CONNECTION();
 	    }
 
@@ -745,7 +755,7 @@ void ABLog(char *fmt, ...)
       POPDS;
     }
     else if ( manufID == MANUFACTURER_ID_GEOWORKS &&
-	      notificationType == GWNT_CONFIRM_FIELD_CHANGE ) 
+	      notificationType == GWNT_CONFIRM_FIELD_CHANGE )
     {
 	PUSHDS;
 	SET_DS_LIB_DGROUP;
@@ -773,7 +783,7 @@ void ABLog(char *fmt, ...)
 		    sendFieldChangeConfirm = TRUE;
 		    ptr = LMemDeref( @fieldChangeAlreadyClosingStr );
 		    @call self::MSG_GEN_APPLICATION_DO_STANDARD_DIALOG
-			 (0, 0, 0, 
+			 (0, 0, 0,
 			  (char *)0, (char *)0, (char *)0,
 			  ptr,
 			  (CDT_NOTIFICATION << CDBF_DIALOG_TYPE_OFFSET) |
@@ -800,8 +810,8 @@ void ABLog(char *fmt, ...)
 
 		    ptr = LMemDeref( @fieldChangeCloseConnStr );
 		    @call self::MSG_GEN_APPLICATION_DO_STANDARD_DIALOG
-			 (MSG_IDP_FIELD_CHANGE_CONFIRM, 
-			  HandleToOptr(GeodeGetProcessHandle()), 0, 
+			 (MSG_IDP_FIELD_CHANGE_CONFIRM,
+			  HandleToOptr(GeodeGetProcessHandle()), 0,
 			  (char *)customTriggerTable, (char *)0, (char *)0,
 			  ptr,
 			  (CDT_QUESTION << CDBF_DIALOG_TYPE_OFFSET) |
@@ -815,7 +825,7 @@ void ABLog(char *fmt, ...)
 		{
 		    ptr = LMemDeref( @dontChangeFieldNowStr );
 		    @call self::MSG_GEN_APPLICATION_DO_STANDARD_DIALOG
-			 (0, 0, 0, 
+			 (0, 0, 0,
 			  (char *)0, (char *)0, (char *)0,
 			  ptr,
 			  (CDT_NOTIFICATION << CDBF_DIALOG_TYPE_OFFSET) |
@@ -832,7 +842,7 @@ void ABLog(char *fmt, ...)
 	POPDS;
     }
     else if (manufID == MANUFACTURER_ID_GEOWORKS &&
-	     notificationType == GWNT_INSTANT_SUSPEND_RESUME_NOTIFICATION) 
+	     notificationType == GWNT_INSTANT_SUSPEND_RESUME_NOTIFICATION)
     {
 	if (data == ISRT_SUSPEND_REFUSED && pppStatus != PPP_STATUS_CLOSED) {
 	    @call IDSuspendNotifyDialog::MSG_GEN_INTERACTION_INITIATE();
@@ -853,11 +863,11 @@ void ABLog(char *fmt, ...)
  ***********************************************************************
  * SYNOPSIS:     Save the gstat
  *
- * PARAMETERS:   
+ * PARAMETERS:
  *
- * SIDE EFFECTS:    
+ * SIDE EFFECTS:
  *
- * STRATEGY:	    
+ * STRATEGY:
  *
  * REVISION HISTORY:
  *	Name	Date		Description
@@ -877,11 +887,11 @@ void ABLog(char *fmt, ...)
  ***********************************************************************
  * SYNOPSIS:     Save the gstat
  *
- * PARAMETERS:   
+ * PARAMETERS:
  *
- * SIDE EFFECTS:    
+ * SIDE EFFECTS:
  *
- * STRATEGY:	    
+ * STRATEGY:
  *
  * REVISION HISTORY:
  *	Name	Date		Description
@@ -925,11 +935,11 @@ void ABLog(char *fmt, ...)
 
 	@self->IDI_text_left = (rect.R_right*3 + rect.R_left)/5;
 	@self->IDI_text_width = rect.R_right - @self->IDI_text_left - 10;
-	
+
 	str = LMemDeref(@statusStr);
 	@self->IDI_status_x = (rect.R_right*3 + rect.R_left)/5 - GrTextWidth(gstate, str, strlen(str));
 	@self->IDI_status_y = rect.R_top + @self->IDI_text_height/2;
-	
+
 	str = LMemDeref(@timeStr);
 	@self->IDI_time_x = (rect.R_right*3 + rect.R_left)/5 - GrTextWidth(gstate, str, strlen(str));
     }
@@ -943,7 +953,7 @@ void ABLog(char *fmt, ...)
 	str = LMemDeref(@speedStr);
 	@self->IDI_speed_x = (rect.R_right*2 + rect.R_left)/3 - GrTextWidth(gstate, str, strlen(str));
 	@self->IDI_speed_y = rect.R_top + @self->IDI_text_height;
-	
+
 	str = LMemDeref(@sentStr);
 	@self->IDI_sent_x = (rect.R_right*2 + rect.R_left)/3 - GrTextWidth(gstate, str, strlen(str));
 
@@ -954,7 +964,7 @@ void ABLog(char *fmt, ...)
 	@self->IDI_speed_x = @self->IDI_sent_x = @self->IDI_received_x = 0;
   }
 
-  // draw the saved data 
+  // draw the saved data
   @call self::MSG_IDI_DRAW_STATUS();
   @call self::MSG_IDI_DRAW_TIME();
   @call self::MSG_IDI_DRAW_SPEED(-1);
@@ -967,12 +977,12 @@ void ABLog(char *fmt, ...)
  ***********************************************************************
  * SYNOPSIS:     draw the status
  *
- * PARAMETERS:   
+ * PARAMETERS:
  *
- * SIDE EFFECTS:    
+ * SIDE EFFECTS:
  *
  * STRATEGY:	 we save the status and draw the text
- *              
+ *
  *
  * REVISION HISTORY:
  *	Name	Date		Description
@@ -993,7 +1003,7 @@ void ABLog(char *fmt, ...)
 
   // firstly, let's clean up the mess
   GrFillRect(gstate, @self->IDI_text_left, @self->IDI_status_y,
-             @self->IDI_text_left + @self->IDI_text_width, 
+             @self->IDI_text_left + @self->IDI_text_width,
              @self->IDI_status_y + @self->IDI_text_height);
 
   str = LMemDeref(@statusStr);
@@ -1021,7 +1031,7 @@ void ABLog(char *fmt, ...)
   default:
     return;
   }
-    
+
   GrDrawTextAtCP(gstate, str, strlen(str));
 
   GrDestroyState(gstate);
@@ -1032,12 +1042,12 @@ void ABLog(char *fmt, ...)
  ***********************************************************************
  * SYNOPSIS:     draw the connection time
  *
- * PARAMETERS:   
+ * PARAMETERS:
  *
- * SIDE EFFECTS:    
+ * SIDE EFFECTS:
  *
  * STRATEGY:	 we save and draw the time
- *              
+ *
  *
  * REVISION HISTORY:
  *	Name	Date		Description
@@ -1058,11 +1068,11 @@ void ABLog(char *fmt, ...)
 
   // firstly, let's clean up the mess
   GrFillRect(gstate, @self->IDI_text_left, @self->IDI_status_y + @self->IDI_text_height + 3,
-             @self->IDI_text_left + @self->IDI_text_width, 
+             @self->IDI_text_left + @self->IDI_text_width,
              @self->IDI_status_y + @self->IDI_text_height * 2 + 3);
 
   str = LMemDeref(@timeStr);
-  GrDrawText(gstate, @self->IDI_time_x, @self->IDI_status_y + @self->IDI_text_height + 3, 
+  GrDrawText(gstate, @self->IDI_time_x, @self->IDI_status_y + @self->IDI_text_height + 3,
 	     str, strlen(str));
   GrDrawCharAtCP(gstate, hours/10+'0');
   GrDrawCharAtCP(gstate, hours%10+'0');
@@ -1083,10 +1093,10 @@ void ABLog(char *fmt, ...)
  *
  * PARAMETERS:   word speed
  *
- * SIDE EFFECTS:    
+ * SIDE EFFECTS:
  *
  * STRATEGY:	 we save and draw the speed
- *              
+ *
  *
  * REVISION HISTORY:
  *	Name	Date		Description
@@ -1111,7 +1121,7 @@ void ABLog(char *fmt, ...)
 
   // firstly, let's clean up the mess
   GrFillRect(gstate, @self->IDI_text_left, @self->IDI_speed_y,
-             @self->IDI_text_left + @self->IDI_text_width, 
+             @self->IDI_text_left + @self->IDI_text_width,
              @self->IDI_speed_y + @self->IDI_text_height);
 
   str = LMemDeref(@speedStr);
@@ -1130,12 +1140,12 @@ void ABLog(char *fmt, ...)
  ***********************************************************************
  * SYNOPSIS:     draw the bytes sent
  *
- * PARAMETERS:   
+ * PARAMETERS:
  *
- * SIDE EFFECTS:    
+ * SIDE EFFECTS:
  *
  * STRATEGY:	 we save and draw the bytes
- *              
+ *
  *
  * REVISION HISTORY:
  *	Name	Date		Description
@@ -1156,7 +1166,7 @@ void ABLog(char *fmt, ...)
 
   // firstly, let's clean up the mess
   GrFillRect(gstate, @self->IDI_text_left, @self->IDI_speed_y + @self->IDI_text_height,
-             @self->IDI_text_left + @self->IDI_text_width, 
+             @self->IDI_text_left + @self->IDI_text_width,
              @self->IDI_speed_y + @self->IDI_text_height * 2);
 
   str = LMemDeref(@sentStr);
@@ -1175,12 +1185,12 @@ void ABLog(char *fmt, ...)
  ***********************************************************************
  * SYNOPSIS:     draw the bytes received
  *
- * PARAMETERS:   
+ * PARAMETERS:
  *
- * SIDE EFFECTS:    
+ * SIDE EFFECTS:
  *
  * STRATEGY:	 we save and draw the bytes
- *              
+ *
  *
  * REVISION HISTORY:
  *	Name	Date		Description
@@ -1201,13 +1211,13 @@ void ABLog(char *fmt, ...)
 
   // firstly, let's clean up the mess
   GrFillRect(gstate, @self->IDI_text_left, @self->IDI_speed_y + @self->IDI_text_height * 2,
-             @self->IDI_text_left + @self->IDI_text_width, 
+             @self->IDI_text_left + @self->IDI_text_width,
              @self->IDI_speed_y + @self->IDI_text_height * 3);
 
   str = LMemDeref(@receivedStr);
-  GrDrawText(gstate, @self->IDI_received_x, @self->IDI_speed_y + @self->IDI_text_height * 2, 
+  GrDrawText(gstate, @self->IDI_received_x, @self->IDI_speed_y + @self->IDI_text_height * 2,
 	     str, strlen(str));
-  
+
   memset(text, 0, sizeof(TCHAR)*10);
   sprintf(text,_TEXT("%lu"), bytesReceived);
   GrDrawTextAtCP(gstate, text, strlen(text));

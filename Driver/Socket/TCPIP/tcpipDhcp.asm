@@ -503,6 +503,7 @@ TcpipDhcpBuildPacket	proc	far
 
 		clr	si
 		mov	ds:[si].DM_op, BO_REQUEST
+		mov	ds:[si].DM_flags.low, (mask DMF_BROADCAST shr 8)
 
 		cmpdw	es:[dhcpCookie], 0
 		jne	alreadyHaveCookie

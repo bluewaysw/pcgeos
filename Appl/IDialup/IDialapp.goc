@@ -3,8 +3,8 @@
  *	Copyright (c) GlobalPC 1998 -- All Rights Reserved
  *
  * PROJECT:	Internet Dial-up & Configure  Applications
- * MODULE:	
- * FILE:	
+ * MODULE:
+ * FILE:
  *
  * AUTHOR:	mzhu: Nov 23, 1998
  *
@@ -78,11 +78,11 @@ static void SendFlashNotification(void);
  ***********************************************************************
  * SYNOPSIS:     open statistics view
  *
- * PARAMETERS:  
+ * PARAMETERS:
  *
- * SIDE EFFECTS:    
+ * SIDE EFFECTS:
  *
- * STRATEGY:	    
+ * STRATEGY:
  *
  * REVISION HISTORY:
  *	Name	Date		Description
@@ -108,10 +108,6 @@ static void SendFlashNotification(void);
   @send IDAddConnectionButton::MSG_GEN_SET_NOT_ENABLED(VUM_DELAYED_VIA_UI_QUEUE);
   @send IDDeleteConnectionButton::MSG_GEN_SET_NOT_ENABLED(VUM_NOW);
   @call IDDialingOptionsButton::MSG_GEN_SET_NOT_ENABLED(VUM_NOW);
-/*#if _NDO2000
-/*#else
-  @call IDNewNumbers::MSG_GEN_SET_NOT_ENABLED(VUM_NOW);
-/*#endif  */
 }
 
 /***********************************************************************
@@ -119,11 +115,11 @@ static void SendFlashNotification(void);
  ***********************************************************************
  * SYNOPSIS:     open connection setting view
  *
- * PARAMETERS:  
+ * PARAMETERS:
  *
- * SIDE EFFECTS:    
+ * SIDE EFFECTS:
  *
- * STRATEGY:	    
+ * STRATEGY:
  *
  * REVISION HISTORY:
  *	Name	Date		Description
@@ -135,7 +131,7 @@ static void SendFlashNotification(void);
 {
   TCHAR *str;
   int type;
-  
+
   MemLock(OptrToHandle(@idialStr));
   str = LMemDeref(@idialStr);
   @call IDInfoGroup::MSG_GEN_SET_NOT_USABLE(VUM_DELAYED_VIA_UI_QUEUE);
@@ -145,11 +141,12 @@ static void SendFlashNotification(void);
   @call IDConnectionGroup::MSG_GEN_SET_USABLE(VUM_DELAYED_VIA_UI_QUEUE);
   @send IDialupPrimary::MSG_GEN_RESET_TO_INITIAL_SIZE(VUM_DELAYED_VIA_UI_QUEUE);
 
-  if (AccessPointGetIntegerPropertyDirect(currentAccpnt, "netType", (int*) &type))
-	  type = 0 ;
+  if (AccessPointGetIntegerPropertyDirect(currentAccpnt, "netType", (int*) &type)) {
+	  type = NET_TYPE_PPP;
+  }
   /* enable delete and modify only if there are access points defined that are
    * editable, type 2 is host-network type, so not editable */
-  if( connectionNum && ( type != 2 ) ) 
+  if( connectionNum && ( type != NET_TYPE_HOST ) )
   {
     @call IDModifyConnectionButton::MSG_GEN_SET_ENABLED(VUM_DELAYED_VIA_UI_QUEUE);
     @call IDDeleteConnectionButton::MSG_GEN_SET_ENABLED(VUM_DELAYED_VIA_UI_QUEUE);
@@ -163,18 +160,10 @@ static void SendFlashNotification(void);
   if(connectionNum)
     {
       @call IDConnectButton::MSG_GEN_SET_ENABLED(VUM_DELAYED_VIA_UI_QUEUE);
-/*#if _NDO2000
-/*#else
-      @call IDNewNumbers::MSG_GEN_SET_ENABLED(VUM_DELAYED_VIA_UI_QUEUE);
-/*#endif */
     }
   else
     {
       @call IDConnectButton::MSG_GEN_SET_NOT_ENABLED(VUM_DELAYED_VIA_UI_QUEUE);
-/*#if _NDO2000
-/*#else
-      @call IDNewNumbers::MSG_GEN_SET_NOT_ENABLED(VUM_DELAYED_VIA_UI_QUEUE);
-/*#endif */
     }
   @call IDAddConnectionButton::MSG_GEN_SET_ENABLED(VUM_DELAYED_VIA_UI_QUEUE);
   @call IDDialingOptionsButton::MSG_GEN_SET_ENABLED(VUM_NOW);
@@ -202,11 +191,11 @@ SendFlashNotification()
  ***********************************************************************
  * SYNOPSIS:     Quit or hide the application.
  *
- * PARAMETERS:  
+ * PARAMETERS:
  *
- * SIDE EFFECTS:    
+ * SIDE EFFECTS:
  *
- * STRATEGY:	    
+ * STRATEGY:
  *
  * REVISION HISTORY:
  *	Name	Date		Description
@@ -235,88 +224,6 @@ SendFlashNotification()
 }
 
 /***********************************************************************
- *	MSG_IDA_CONNECTION_LIST_MONIKER_QUERY for IDialupAppClass
- ***********************************************************************
- * SYNOPSIS:     Edit the current Network Connection setting.
- *
- * PARAMETERS:   void (optr list, word item)
- *
- * SIDE EFFECTS:    
- *
- * STRATEGY:	    
- *
- * REVISION HISTORY:
- *	Name	Date		Description
- *	----	----		-----------
- *	mzhu	11/23/98	Initial Revision
- *
- ***********************************************************************/
-@method IDialupAppClass, MSG_IDA_CONNECTION_LIST_MONIKER_QUERY
-{
-  word *id, datalen;
-  TCHAR name[MAX_TEXT_LEN];
-
-  if (connectionHandle) {
-
-      MemLock(connectionHandle);
-  
-      id = ChunkArrayElementToPtrHandles(connectionHandle, connectionChunk, item, &datalen);
-
-      datalen = MAX_TEXT_LEN;
-      memset(name, 0, sizeof(TCHAR)*MAX_TEXT_LEN);
-
-      if(AccessPointGetStringPropertyBufferDirect(*id, (char*)APSP_NAME, name, (int*) &datalen))
-	  AccessPointGetStringPropertyBufferDirect(*id, (char*)APSP_PHONE, name, (int*) &datalen);
-
-      MemUnlock(connectionHandle);
-
-      if(name && datalen)
-      {
-	  @call list::MSG_GEN_DYNAMIC_LIST_REPLACE_ITEM_TEXT(item, name);
-      }
-
-  }
-
-}
-
-
-/***********************************************************************
- *	MSG_IDA_CONNECTION_LIST_APPLY for IDialupAppClass
- ***********************************************************************
- * SYNOPSIS:     Edit the current Network Connection setting.
- *
- * PARAMETERS:  
- *    	    word selection = cx,
- *	    word numSelections = bp,
- *	    GenItemGroupStateFlags stateFlags = dl
- *
- * SIDE EFFECTS:    
- *
- * STRATEGY:	    
- *
- * REVISION HISTORY:
- *	Name	Date		Description
- *	----	----		-----------
- *	mzhu	11/23/98	Initial Revision
- *
- ***********************************************************************/
-@method IDialupAppClass, MSG_IDA_CONNECTION_LIST_APPLY
-{
-  word *id, datalen;
-
-  // now display the new selection
-  MemLock(connectionHandle);
-  
-  id = ChunkArrayElementToPtrHandles(connectionHandle, connectionChunk, selection, &datalen);
-
-  MemUnlock(connectionHandle);
-
-  currentAccpnt = *id;
-
-  @send process::MSG_IDP_CONNECTION_SET_CURRENT();
-}
-
-/***********************************************************************
  *	MSG_IDA_DISCONNECT for IDialupAppClass
  ***********************************************************************
  * SYNOPSIS:     Handle the disconnect (handled on UI thread).
@@ -324,11 +231,11 @@ SendFlashNotification()
  *		 thread will do it with IDP_DISCONNECT.  This is only
  *		 here to help disconnecting when dialing.
  *
- * PARAMETERS:   word accpnt 
+ * PARAMETERS:   word accpnt
  *
- * SIDE EFFECTS:    
+ * SIDE EFFECTS:
  *
- * STRATEGY:	    
+ * STRATEGY:
  *
  * REVISION HISTORY:
  *	Name	Date		Description
@@ -370,11 +277,11 @@ SendFlashNotification()
  ***********************************************************************
  * SYNOPSIS:     Flash for AUI
  *
- * PARAMETERS:   
+ * PARAMETERS:
  *
- * SIDE EFFECTS:    
+ * SIDE EFFECTS:
  *
- * STRATEGY:	    
+ * STRATEGY:
  *
  * REVISION HISTORY:
  *	Name	Date		Description
@@ -453,17 +360,17 @@ SendFlashNotification()
  *		IDialupConnect
  ***********************************************************************
  *
- * SYNOPSIS:	
- * CALLED BY:	
+ * SYNOPSIS:
+ * CALLED BY:
  * RETURN:	TRUE if link is up else FALSE.
- *	
- * STRATEGY:	
- *	
+ *
+ * STRATEGY:
+ *
  * REVISION HISTORY:
  *	Name		Date		Description
  *	----		----		-----------
  *	mzhu    	12/03/98   	Initial Revision
- *	
+ *
  ***********************************************************************/
 Boolean _pascal
 IDialupConnect ()
@@ -504,17 +411,17 @@ IDialupConnect ()
  *		IDialupDisConnect
  ***********************************************************************
  *
- * SYNOPSIS:	
- * CALLED BY:	
- * RETURN:	
- *	
- * STRATEGY:	
- *	
+ * SYNOPSIS:
+ * CALLED BY:
+ * RETURN:
+ *
+ * STRATEGY:
+ *
  * REVISION HISTORY:
  *	Name		Date		Description
  *	----		----		-----------
  *	mzhu    	12/03/98   	Initial Revision
- *	
+ *
  ***********************************************************************/
 Boolean _pascal
 IDialupDisconnect ()
@@ -554,16 +461,16 @@ IDialupDisconnect ()
  ***********************************************************************
  *
  * SYNOPSIS:	send nothing to keep connection alive
- * CALLED BY:	
- * RETURN:	
- *	
- * STRATEGY:	
- *	
+ * CALLED BY:
+ * RETURN:
+ *
+ * STRATEGY:
+ *
  * REVISION HISTORY:
  *	Name		Date		Description
  *	----		----		-----------
  *	brianc    	8/02/99   	Initial Revision
- *	
+ *
  ***********************************************************************/
 void SendPing()
 {
@@ -620,17 +527,17 @@ void SendPing()
  *		IAppRunning
  ***********************************************************************
  *
- * SYNOPSIS:	
- * CALLED BY:	
- * RETURN:	
- *	
- * STRATEGY:	
- *	
+ * SYNOPSIS:
+ * CALLED BY:
+ * RETURN:
+ *
+ * STRATEGY:
+ *
  * REVISION HISTORY:
  *	Name		Date		Description
  *	----		----		-----------
  *	mzhu    	12/03/98   	Initial Revision
- *	
+ *
  ***********************************************************************/
 Boolean IAppRunning()
 {
@@ -667,17 +574,17 @@ Boolean IAppRunning()
  *		GetBaudRate
  ***********************************************************************
  *
- * SYNOPSIS:	
- * CALLED BY:	
- * RETURN:	
- *	
- * STRATEGY:	
- *	
+ * SYNOPSIS:
+ * CALLED BY:
+ * RETURN:
+ *
+ * STRATEGY:
+ *
  * REVISION HISTORY:
  *	Name		Date		Description
  *	----		----		-----------
  *	mzhu    	12/03/98   	Initial Revision
- *	
+ *
  ***********************************************************************/
 word GetBaudRate()
 {
@@ -692,17 +599,17 @@ word GetBaudRate()
  *		RegisterToPPP
  ***********************************************************************
  *
- * SYNOPSIS:	
- * CALLED BY:	
- * RETURN:	
- *	
- * STRATEGY:	
- *	
+ * SYNOPSIS:
+ * CALLED BY:
+ * RETURN:
+ *
+ * STRATEGY:
+ *
  * REVISION HISTORY:
  *	Name		Date		Description
  *	----		----		-----------
  *	mzhu    	12/03/98   	Initial Revision
- *	
+ *
  ***********************************************************************/
 void RegisterToPPP()
 {
@@ -712,17 +619,17 @@ void RegisterToPPP()
  *		UnregisterToPPP
  ***********************************************************************
  *
- * SYNOPSIS:	
- * CALLED BY:	
- * RETURN:	
- *	
- * STRATEGY:	
- *	
+ * SYNOPSIS:
+ * CALLED BY:
+ * RETURN:
+ *
+ * STRATEGY:
+ *
  * REVISION HISTORY:
  *	Name		Date		Description
  *	----		----		-----------
  *	mzhu    	12/03/98   	Initial Revision
- *	
+ *
  ***********************************************************************/
 void UnregisterToPPP()
 {

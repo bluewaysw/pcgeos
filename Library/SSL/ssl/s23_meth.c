@@ -64,6 +64,8 @@
 #include "objects.h"
 #include "ssl_locl.h"
 
+#ifndef COMPILE_OPTION_HOST_SERVICE_ONLY
+
 static SSL_METHOD *ssl23_get_method(ver)
 int ver;
 	{
@@ -98,3 +100,4 @@ SSL_METHOD _export _pascal *SSLv23_method()
 	return(&SSLv23_data);
 	}
 
+#endif

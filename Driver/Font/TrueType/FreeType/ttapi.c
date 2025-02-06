@@ -191,12 +191,10 @@ extern TEngine_Instance engineInstance;
     /* Set the handle */
     HANDLE_Set( *face, _face );
 
-    if (error) {
-        TT_Close_Stream(&stream);
-        return error;
-    }
+    if (error)
+      TT_Close_Stream(&stream);
 
-    return TT_Err_Ok;
+    return error;
   }
 
 
@@ -498,11 +496,9 @@ extern TEngine_Instance engineInstance;
     if ( charSize < 1 * 64 )
       charSize = 1 * 64;
 
-    ins->metrics.x_scale1 = ( charSize * ins->metrics.x_resolution ) / 72;
-    ins->metrics.x_scale2 = ins->owner->fontHeader.Units_Per_EM;
-
-    ins->metrics.y_scale1 = ( charSize * ins->metrics.y_resolution ) / 72;
-    ins->metrics.y_scale2 = ins->owner->fontHeader.Units_Per_EM;
+    ins->metrics.x_scale1     = ( charSize * ins->metrics.x_resolution ) / 72;
+    ins->metrics.y_scale1     = ( charSize * ins->metrics.y_resolution ) / 72;
+    ins->metrics.units_per_em = ins->owner->fontHeader.Units_Per_EM;
 
     if ( ins->owner->fontHeader.Flags & 8 )
     {
@@ -513,8 +509,6 @@ extern TEngine_Instance engineInstance;
     ins->metrics.x_ppem = ins->metrics.x_scale1 >> 6;
     ins->metrics.y_ppem = ins->metrics.y_scale1 >> 6;
     ins->metrics.pointSize = charSize;
-
-    ins->valid  = FALSE;
 
     return Instance_Reset( ins );
   }
@@ -865,6 +859,7 @@ extern TEngine_Instance engineInstance;
       return TT_Err_Invalid_Argument;
 
     *outline = null_outline;
+    outline->owner = TRUE;
 
     if ( ALLOC( outline->points,   numPoints*2*sizeof ( TT_F26Dot6 ) ) ||
          ALLOC( outline->flags,    numPoints  *sizeof ( Byte )       ) ||
@@ -873,11 +868,9 @@ extern TEngine_Instance engineInstance;
 
     outline->n_points   = numPoints;
     outline->n_contours = numContours;
-    outline->owner      = TRUE;
     return TT_Err_Ok;
 
   Fail:
-    outline->owner = TRUE;
     TT_Done_Outline( outline );
     return error;
   }
@@ -940,6 +933,12 @@ extern TEngine_Instance engineInstance;
   {
     if ( !outline || !map )
       return TT_Err_Invalid_Argument;
+
+    if ( outline->n_points == 0 || outline->n_contours <= 0 )
+      return TT_Err_Ok; 
+
+    if ( outline->n_points < outline->contours[outline->n_contours - 1] )
+      return TT_Err_Too_Many_Points; 
 
     return RENDER_Glyph( outline, map );
   }
@@ -1214,7 +1213,7 @@ TT_Error  TT_Get_Outline_Region( TT_Outline*     outline,
  *  MT-Safe : YES!
  *
  ******************************************************************/
-
+  #pragma code_seg(ttcmap_TEXT)
   EXPORT_FUNC
   TT_UShort  TT_Char_Index( TT_CharMap  charMap,
                             TT_UShort   charCode )
@@ -1227,7 +1226,7 @@ TT_Error  TT_Get_Outline_Region( TT_Outline*     outline,
 
     return CharMap_Index( cmap, charCode );
   }
-
+#pragma code_seg()
 
 /*******************************************************************
  *

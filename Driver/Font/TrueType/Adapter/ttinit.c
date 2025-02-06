@@ -61,7 +61,7 @@ void InitConvertHeader(         TRUETYPE_VARS, FontHeader* fontHeader );
 
 static char GetDefaultChar(     TRUETYPE_VARS, char firstChar );
 
-static word GetKernCount(       TRUETYPE_VARS );
+word GetKernCount(       TRUETYPE_VARS );
 
 static word toHash( const char* str );
 
@@ -947,7 +947,7 @@ static word getNameFromNameTable( TRUETYPE_VARS, char* name, const TT_UShort nam
  *      ----      ----      -----------
  *      21.01.23  JK        Initial Revision
  *******************************************************************/
-
+#pragma code_seg(ttcharmapper_TEXT)
 void InitConvertHeader( TRUETYPE_VARS, FontHeader* fontHeader )
 {
         TT_UShort  charIndex;
@@ -1046,7 +1046,7 @@ EC(     ECCheckBounds( (void*)fontHeader ) );
 
         fontHeader->FH_initialized = TRUE;
 }
-
+#pragma code_seg()
 
 /********************************************************************
  *                      GetDefaultChar
@@ -1153,8 +1153,8 @@ static Boolean activateBytecodeInterpreter()
  *      ----      ----      -----------
  *      11/08/23  JK        Initial Revision
  *******************************************************************/
-
-static word GetKernCount( TRUETYPE_VARS )
+#pragma code_seg(ttcharmapper_TEXT)
+word GetKernCount( TRUETYPE_VARS )
 {
         TT_Kerning        kerningDir;
         word              table;
@@ -1203,7 +1203,7 @@ EC(     ECCheckBounds( indices ) );
 
         return numGeosKernPairs;
 }
-
+#pragma code_seg()
 
 /*******************************************************************/
 /* We cannot use functions from the Ansic library, which causes a  */

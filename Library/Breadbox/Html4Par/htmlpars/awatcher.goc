@@ -122,12 +122,16 @@ Boolean AllocWatcherAllocate(AllocWatcherHandle watch, dword amount)
     AllocationWatcher *p_watch ;
     Boolean result = FALSE ;
 
-    p_watch = IGrabWatcher(watch) ;
-    if (amount <= p_watch->AW_amount)  {
-        p_watch->AW_amount -= amount ;
-        result = TRUE ;
+    if (watch) {
+        p_watch = IGrabWatcher(watch) ;
+        if (amount <= p_watch->AW_amount)  {
+            p_watch->AW_amount -= amount ;
+            result = TRUE ;
+        }
+        IReleaseWatcher(watch) ;
     }
-    IReleaseWatcher(watch) ;
+    else
+        result = TRUE;
 
     return result ;
 }
@@ -154,17 +158,18 @@ void AllocWatcherFree(AllocWatcherHandle watch, dword amount)
     AllocationWatcher *p_watch ;
     dword newAmount ;
 
-    p_watch = IGrabWatcher(watch) ;
-    newAmount = p_watch->AW_amount + amount ;
-    if (newAmount > p_watch->AW_maximum)  {
-        /* Crash in EC if we tried to free more than we allocated */
-        EC_ERROR_IF(newAmount > p_watch->AW_maximum, -1) ;
-        p_watch->AW_amount = p_watch->AW_maximum ;
-    } else {
-        p_watch->AW_amount = newAmount ;
+    if (watch) {
+        p_watch = IGrabWatcher(watch) ;
+        newAmount = p_watch->AW_amount + amount ;
+        if (newAmount > p_watch->AW_maximum)  {
+            /* Crash in EC if we tried to free more than we allocated */
+            EC_ERROR_IF(newAmount > p_watch->AW_maximum, -1) ;
+            p_watch->AW_amount = p_watch->AW_maximum ;
+        } else {
+            p_watch->AW_amount = newAmount ;
+        }
+        IReleaseWatcher(watch) ;
     }
-
-    IReleaseWatcher(watch) ;
 }
 
 /*-------------------------------------------------------------------------
@@ -191,9 +196,13 @@ dword AllocWatcherGetRemaining(AllocWatcherHandle watch)
     AllocationWatcher *p_watch ;
     dword result = FALSE ;
 
-    p_watch = IGrabWatcher(watch) ;
-    result = p_watch->AW_amount ;
-    IReleaseWatcher(watch) ;
+    if (watch) {
+        p_watch = IGrabWatcher(watch) ;
+        result = p_watch->AW_amount ;
+        IReleaseWatcher(watch) ;
+    }
+    else
+        result = 0;
 
     return result ;
 }

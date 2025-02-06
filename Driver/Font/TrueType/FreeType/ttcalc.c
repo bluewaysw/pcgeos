@@ -23,6 +23,8 @@
 #define TT_COMPONENT      trace_calc
 
 
+#pragma code_seg(Resident)
+
 /* Support for 1-complement arithmetic has been totally dropped in this */
 /* release.  You can still write your own code if you need it...        */
 
@@ -44,7 +46,6 @@
      536870912,  759250125, 1073741824, 1518500250,
     2147483647
   };
-
 
   EXPORT_FUNC
   TT_Long  TT_MulDiv( TT_Long  a, TT_Long  b, TT_Long  c )
@@ -217,6 +218,8 @@
   #endif
   }
 
+#pragma code_seg()
+
   /* The optimization for TT_MulFix is different. We could simply be     */
   /* happy by applying the same principles than with TT_MulDiv, because  */
   /*                                                                     */
@@ -354,20 +357,6 @@
   #endif
   }
 
-#if 0 //ndef TT_CONFIG_OPTION_USE_ASSEMBLER_IMPLEMENTATION
-  LOCAL_FUNC
-  void  Sub64( TT_Int64*  x, TT_Int64*  y, TT_Int64*  z )
-  {
-    register TT_Word32  lo, hi;
-
-
-    lo = x->lo - y->lo;
-    hi = x->hi - y->hi - ( (TT_Int32)lo < 0 );
-
-    z->lo = lo;
-    z->hi = hi;
-  }
-#endif
 
   LOCAL_FUNC
   void  MulTo64( TT_Int32  x, TT_Int32  y, TT_Int64*  z )
