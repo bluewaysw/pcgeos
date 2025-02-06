@@ -1369,7 +1369,7 @@ USERCREATEICONTEXTMONIKER	proc	far	params:CreateIconTextMonikerParams
 
 	;popdw	bxcx			; bxcx = return address
 	;call	UserCreateIconTextMoniker
-	;pushdw	bxcx			; restore retuen address
+	;pushdw	bxcx			; restore return address
 	;ret	@ArgSize
 
 	; lock icon moniker lmem block, as UserCreateIconTextMoniker expects one
