@@ -1367,11 +1367,6 @@ global USERCREATEICONTEXTMONIKER:far
 USERCREATEICONTEXTMONIKER	proc	far	params:CreateIconTextMonikerParams
 	ForceRef params
 
-	;popdw	bxcx			; bxcx = return address
-	;call	UserCreateIconTextMoniker
-	;pushdw	bxcx			; restore return address
-	;ret	@ArgSize
-
 	; lock icon moniker lmem block, as UserCreateIconTextMoniker expects one
 	mov 	cx, bp
 	mov 	bp, sp
