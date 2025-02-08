@@ -831,19 +831,14 @@ endif
 	call	MemLock
 	mov	es, ax				;es <- seg addr of GState
 	;
-	; See if the font is even available
-	;
-	mov	cx, es:GS_fontAttr.FCA_fontID	;cx <- current font
-	mov	dl, mask FEF_OUTLINES		;dl <- FontEnumFlags
-	call	GrCheckFontAvail			;font available?
-	jcxz	notAvailable			;branch if not available
-	;
 	; Call the corresponding driver
 	;
 	pop	dx				;dx <- character (Chars)
 	mov	cx, si				;cx <- GCM_info
 	mov	ax, DR_FONT_CHAR_METRICS	;ax <- FontFunction
 	call	GrCallFontDriver
+	jnc	done
+	clr	ax, dx				;dx:ax <- font not available
 done:
 	;
 	; Unlock the GState
@@ -854,11 +849,6 @@ done:
 	.leave
 	ret
 
-notAvailable:
-	pop	ax
-	clr	ax, dx				;dx:ax <- font not available
-	stc					;carry <- error
-	jmp	done
 GrCharMetrics	endp
 
 
