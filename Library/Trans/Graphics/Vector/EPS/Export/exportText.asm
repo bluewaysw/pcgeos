@@ -1506,7 +1506,7 @@ tryAgain:
 		mov	si, ds:[si]		; dereference chunk handle
 		push	ax
 		mov	ax, cx
-		and	ax, 0FFFh
+		and	ah, not FID_MAKER_BITS	; clear maker bits
 		mov	dx, ax			; dx = desired font id
 		pop	ax
 		mov	cx, ds:[si].PF_count	; get entry count
@@ -1515,7 +1515,7 @@ entryLoop:
 		add	si, size PageFont	; bump past scratch space
 		push	ax
 		mov	ax,ds:[si].PF_id	; id match ?
-		and	ax, 0FFFh
+		and	ah, not FID_MAKER_BITS	; clear maker bits
 		cmp	dx, ax
 		pop	ax
 		jne	nextEntry
@@ -2805,8 +2805,6 @@ checkPS:
 
 		; map the font id and style combinations to see how far the 
 		; font driver will go for us...
-		; For 2.0, we want to try to map better for styles.  For
-		; 1.2, we're going to punt and do all the style in PostScript
 
 		mov	cx, es:[di].PF_id	; get font id
 		mov	dl, es:[di].PF_style	; tack on style bits
@@ -3237,13 +3235,8 @@ tgs		local	TGSLocals
 		clr	ax
 		call	GrSetFont
 
-		; for 1.2 we're going to simulate ALL style in PostScript.
-		; For 2.0, we'll want to change this and get the largest 
-		; subset of styles that the actual outline data supports.
-
-		;mov	ax, 0xff00			; restore style bits
-		pop	ax
-		mov	ah, 0xff
+		pop	ax				; font style
+		mov	ah, 0xff			; set as it is
 		call	GrSetTextStyle
 
 		; initialize the various variables we keep track of
