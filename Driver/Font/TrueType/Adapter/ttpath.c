@@ -202,7 +202,7 @@ EC(     ECCheckBounds( (void*)fontHeader ) );
 	/* in reverse order. Step 5 is, of course, already in the GState.  */
 
         /* calculate baseline for further use */
-        baseline = fontHeader->FH_accent + fontHeader->FH_ascent;
+        baseline = fontHeader->FH_accent + fontHeader->FH_ascent + BASELINE_CORRECTION;
 
         /* translate by current cursor position */
         cursorPos = GrGetCurPos( gstate );
@@ -835,7 +835,7 @@ EC(     ECCheckBounds( (void*)trueTypeVars ) );
         transMatrix->TM_matrix.yx = 0L;
         transMatrix->TM_matrix.yy = scaleFactor;
         transMatrix->TM_heightX   = 0L;
-        transMatrix->TM_heightY   = ROUND_WWFIXED( SCALE_WORD( fontHeader->FH_ascent + fontHeader->FH_accent, scaleFactor ) ) + BASELINE_CORRECTION;
+        transMatrix->TM_heightY   = fontHeader->FH_ascent + fontHeader->FH_accent;
         transMatrix->TM_scriptX   = 0L;
         transMatrix->TM_scriptY   = 0L;
 
@@ -947,10 +947,9 @@ EC(             ECCheckWindowHandle( win ) );
         transformMatrix->TM_matrix.yy = GrMulWWFixed( temp_e21, WWFIXED_TO_WWFIXEDASDWORD( windowMatrix.TM_e12 ) ) 
                         + GrMulWWFixed( temp_e22, WWFIXED_TO_WWFIXEDASDWORD( windowMatrix.TM_e22 ) );
 
-
-        transformMatrix->TM_heightX = INTEGER_OF_WWFIXEDASDWORD( GrMulWWFixed( 
-                        WORD_TO_WWFIXEDASDWORD( transformMatrix->TM_heightY ), transformMatrix->TM_matrix.yx ) );
+        transformMatrix->TM_heightX = -INTEGER_OF_WWFIXEDASDWORD( GrMulWWFixed( 
+                        WORD_TO_WWFIXEDASDWORD( transformMatrix->TM_heightY ), transformMatrix->TM_matrix.xy ) );
         transformMatrix->TM_heightY = INTEGER_OF_WWFIXEDASDWORD( GrMulWWFixed( 
-                        WORD_TO_WWFIXEDASDWORD( transformMatrix->TM_heightY ), WWFIXED_TO_WWFIXEDASDWORD( windowMatrix.TM_e22 ) ) );
+                        WORD_TO_WWFIXEDASDWORD( transformMatrix->TM_heightY ), transformMatrix->TM_matrix.xx ) ) + BASELINE_CORRECTION;
 }
 
