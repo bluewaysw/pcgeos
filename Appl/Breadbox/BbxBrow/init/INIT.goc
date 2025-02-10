@@ -929,7 +929,7 @@ void EnsureINISettings(AppAttachFlags attachFlags)
     static char cat[] = HTMLVIEW_CATEGORY ;
     word version = 0 ;
     MemHandle homeH;
-    Boolean autoOpen ;
+    Boolean autoOpen = FALSE;
 @ifdef COMPILE_OPTION_GOTO_PAGE_IN_INFO_SERV
     TCHAR home[200] ;
     word size ;
@@ -972,12 +972,6 @@ void EnsureINISettings(AppAttachFlags attachFlags)
     }
     HWChecksumCheck() ;
 
-@ifdef COMPILE_OPTION_START_WITH_NEW
-    autoOpen = TRUE;
-@else
-    autoOpen = FALSE;
-@endif
-
 @ifdef COMPILE_OPTION_GOTO_PAGE_IN_INFO_SERV
     /* Copy over the home page from the infoServ area if there is one. */
     home[0] = '\0' ;
@@ -985,7 +979,6 @@ void EnsureINISettings(AppAttachFlags attachFlags)
     if (home[0])  {
         InitFileDeleteEntry("infoServ", "homePage") ;
         NavigateSetHome(home) ;
-        autoOpen = TRUE;
     }
     /* Copy over the home page from the Webbrowser area if there is one. */
     home[0] = '\0' ;
@@ -993,19 +986,26 @@ void EnsureINISettings(AppAttachFlags attachFlags)
     if (home[0])  {
         InitFileDeleteEntry("WebBrowser", "homepage") ;
         NavigateSetHome(home) ;
-        autoOpen = TRUE;
     }
 @endif
 
-    /* Copy the home page UI name into the current URL text, if no datafile */
-     if (!(attachFlags & AAF_DATA_FILE_PASSED) &&
-         !(@call application::MSG_HMLVA_GET_LAUNCH_URL())) {
-         NavigateGetHome(&homeH) ;
-         if(homeH)
-         {
-           @call CurrentURLText::MSG_VIS_TEXT_REPLACE_ALL_BLOCK(homeH, 0) ;
-           MemFree(homeH);
-         }
+     /* Copy the home page UI name into the current URL text, if no datafile.
+        Otherwise, do not open a second page, as this crashes in single doc. */
+     if (!(attachFlags & AAF_DATA_FILE_PASSED)) {
+        if (@call application::MSG_HMLVA_GET_LAUNCH_URL()) {
+            autoOpen = TRUE;
+        }
+        else {
+            NavigateGetHome(&homeH) ;
+            if(homeH)
+            {
+               @call CurrentURLText::MSG_VIS_TEXT_REPLACE_ALL_BLOCK(homeH, 0) ;
+               MemFree(homeH);
+            }
+@ifdef COMPILE_OPTION_START_WITH_NEW
+            autoOpen = TRUE;
+@endif
+        }
      }
 
     if(autoOpen)

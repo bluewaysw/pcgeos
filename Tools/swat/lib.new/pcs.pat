@@ -8,10 +8,10 @@
 */Library/Saver/				GEO	WORLD
 */Library/Saver/*/				GEO	SYSTEM/SAVERS
 */Library/Pref/*				GEO	SYSTEM/PREF
-*/Library/Translation/Graphics/Bitmap/Dib/ 	GEO	SYSTEM
-*/Library/Translation/Graphics/Vector/Wmf/ 	GEO	SYSTEM
-*/Library/Translation/Text/MSMFile/		GEO	SYSTEM
-*/Library/Translation/*				GEO	SYSTEM/IMPEX
+*/Library/Trans/Graphics/Bitmap/Dib/ 		GEO	SYSTEM
+*/Library/Trans/Graphics/Vector/Wmf/ 		GEO	SYSTEM
+*/Library/Trans/Text/MSMFile/			GEO	SYSTEM
+*/Library/Trans/*				GEO	SYSTEM/IMPEX
 */Library/FMTools/*				GEO	SYSTEM/FILEMGR
 */Library/Net/*					GEO	SYSTEM
 */Library/Breadbox/Impex/*			GEO	SYSTEM/IMPEX

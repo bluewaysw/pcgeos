@@ -58,18 +58,14 @@ REVISION HISTORY:
 TrueTypeCharMetrics	proc	far
 	uses	cx, si, ds
 
-resultDXAX	local	dword
-
 	push	bx, di
 	mov	di, FONT_C_CODE_STACK_SPACE
 	call	ThreadBorrowStackSpace
 	push	di
 
-	.enter
+resultDXAX	local	dword
 
-	mov	di, FONT_C_CODE_STACK_SPACE
-	call 	ThreadBorrowStackSpace
-	push	di
+	.enter
 
 	mov	si, cx
 	push	dx		; pass character code
@@ -114,8 +110,6 @@ resultDXAX	local	dword
 	jnz	roundToInt
 	rndwwbf dxax
 
-	pop	di
-	call 	ThreadReturnStackSpace
 done:
 	clc
 	.leave

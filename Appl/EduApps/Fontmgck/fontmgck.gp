@@ -3,12 +3,12 @@
 # PROJECT:      FontMagick
 # FILE:         FontMagi.gp
 #
-# AUTHOR:       Marcus Gr�ber
+# AUTHOR:       Marcus Gröber
 #
 ##############################################################################
 
 name FontMgck.app
-longname "FontMagick 1.0"
+longname "FontMagick"
 
 type   appl, process, single
 class  FontMProcessClass
@@ -37,5 +37,3 @@ export CharsetClass
 resource AppResource                    ui-object
 resource Interface                      ui-object
 resource FontMagickMonikerResource      lmem read-only shared
-resource BREADBOXMONIKERRESOURCE        lmem read-only shared
-resource BREADBOXMONIKERRESOURCE2       lmem read-only shared
