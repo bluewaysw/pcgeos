@@ -819,11 +819,7 @@ static void ConvertHeader( TRUETYPE_VARS, FontHeader* fontHeader, FontBuf* fontB
         fontBuf->FB_baseAdjust.WBF_int  = INTEGER_OF_WWFIXEDASDWORD( ttfElement );
         fontBuf->FB_baseAdjust.WBF_frac = 0;
 
-        ttfElement = SCALE_WORD( fontHeader->FH_ascent, scaleHeight );
-        fontBuf->FB_baselinePos.WBF_int  = ROUND_WWFIXED( ttfElement );
-        fontBuf->FB_baselinePos.WBF_frac = 0;
-
-	ttfElement = ttfElement/*MakeWWFixed(fontBuf->FB_baselinePos.WBF_int, 0)*/ + SCALE_WORD( fontHeader->FH_accent, scaleHeight );;
+        ttfElement = SCALE_WORD( fontHeader->FH_ascent + fontHeader->FH_accent, scaleHeight );
         fontBuf->FB_baselinePos.WBF_int  = ROUND_WWFIXED( ttfElement );
         fontBuf->FB_baselinePos.WBF_frac = 0;
 
