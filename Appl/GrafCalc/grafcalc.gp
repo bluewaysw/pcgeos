@@ -31,10 +31,11 @@ resource FUNKTIONINTERFACE ui-object
 resource TABELLENINTERFACE ui-object
 resource DIAGRAMRESOURCE ui-object
 resource TOOLMONIKERRESOURCE	 lmem read-only shared
-#resource ICONRESOURCE lmem read-only shared
+resource ICONRESOURCE lmem read-only shared
 
+export GCalcInteractionClass
 export TriggerDataTriggerClass
 export GCalcTextClass
-export GCalcInteractionClass
+
 
 usernotes "Copyright 2015-2025 Wilfried Konczynski"
