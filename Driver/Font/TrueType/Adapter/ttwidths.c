@@ -74,10 +74,6 @@ static void AdjustTransMatrix( TransformMatrix* transMatrix,
                                FontMatrix* graphicMatrix );
 
 
-#define ROUND_WWFIXED( value )    ( value & 0xffff ? ( value >> 16 ) + 1 : value >> 16 )
-
-#define ROUND_WBFIXED( value )    ( value.WBF_frac ? ( value.WBF_int + 1 ) : value.WBF_int )
-
 #define OFFSET_KERN_PAIRS         ( sizeof(FontBuf) +                                   \
                                     fontHeader->FH_numChars * sizeof( CharTableEntry) + \
                                     sizeof( TransformMatrix ) )
@@ -823,7 +819,11 @@ static void ConvertHeader( TRUETYPE_VARS, FontHeader* fontHeader, FontBuf* fontB
         fontBuf->FB_baseAdjust.WBF_int  = INTEGER_OF_WWFIXEDASDWORD( ttfElement );
         fontBuf->FB_baseAdjust.WBF_frac = 0;
 
-        ttfElement = SCALE_WORD( fontHeader->FH_ascent + fontHeader->FH_accent, scaleHeight );
+        ttfElement = SCALE_WORD( fontHeader->FH_ascent, scaleHeight );
+        fontBuf->FB_baselinePos.WBF_int  = ROUND_WWFIXED( ttfElement );
+        fontBuf->FB_baselinePos.WBF_frac = 0;
+
+	ttfElement = ttfElement/*MakeWWFixed(fontBuf->FB_baselinePos.WBF_int, 0)*/ + SCALE_WORD( fontHeader->FH_accent, scaleHeight );;
         fontBuf->FB_baselinePos.WBF_int  = ROUND_WWFIXED( ttfElement );
         fontBuf->FB_baselinePos.WBF_frac = 0;
 
