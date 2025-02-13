@@ -1029,22 +1029,26 @@ UICombo	struct
 	UIC_launcher	nptr.TCHAR
 	UIC_font	FontID
 	UIC_hasTaskbar	word
+	UIC_disBGRender word
 UICombo ends
 
 uicombos UICombo <
 	offset MotifStr,
 	offset GeoManagerStr,
 	offset BerkeleyStr,
+	FALSE,
 	FALSE
 >,<
 	offset ISUIStr,
 	offset ISDeskStr,
 	offset EsquireStr,
+	TRUE,
 	TRUE
 >,<
 	offset MotifStr,
 	offset ISDeskStr,
 	offset BerkeleyStr,
+	TRUE,
 	TRUE
 >
 
@@ -1054,6 +1058,7 @@ fontIDKey 		char "fontid", 0
 systemCat 		char "system", 0
 editableTextFontIDKey 	char "editableTextFontID", 0
 taskBarEnabledKey 	char "taskBarEnabled", 0
+backgroundDisabledOnField char "backgroundDisabledOnField", 0
 
 if ERROR_CHECK
 LocalDefNLString MotifStr <"motifec.geo", 0>
@@ -1132,6 +1137,16 @@ SetUIOptions	proc	near
 		mov	ax, cs:uicombos[di].UIC_hasTaskbar
 		call	InitFileWriteBoolean
 		pop	di, ax
+
+	;
+	; handle [ui] backgroundDisabledOnField = key
+	;
+		push	di
+		mov	si, offset uiCategory
+		mov	dx, offset backgroundDisabledOnField
+		mov	ax, cs:uicombos[di].UIC_disBGRender
+		call	InitFileWriteBoolean
+		pop	di
 
 	;
 	; restore ds for the correct object at ds:si
