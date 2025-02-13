@@ -1533,7 +1533,7 @@ OLS <	mov	al, es:[moCS_dsLightColor]				>
 	;CUA/Motif: grab color value from color scheme variables in idata
 CUAS <	mov	al, es:[moCS_screenBG]					>
 exit:
-	mov	ah, CMT_CLOSEST or mask CMM_ON_BLACK
+	mov	ah, CMT_CLOSEST or mask CMM_ON_BLACK 
 	.leave
 	ret
 
