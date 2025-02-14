@@ -74,10 +74,6 @@ static void AdjustTransMatrix( TransformMatrix* transMatrix,
                                FontMatrix* graphicMatrix );
 
 
-#define ROUND_WWFIXED( value )    ( value & 0xffff ? ( value >> 16 ) + 1 : value >> 16 )
-
-#define ROUND_WBFIXED( value )    ( value.WBF_frac ? ( value.WBF_int + 1 ) : value.WBF_int )
-
 #define OFFSET_KERN_PAIRS         ( sizeof(FontBuf) +                                   \
                                     fontHeader->FH_numChars * sizeof( CharTableEntry) + \
                                     sizeof( TransformMatrix ) )
@@ -974,12 +970,12 @@ static void AdjustFontBuf( TransformMatrix* transMatrix,
 
 static void AdjustTransMatrix( TransformMatrix* transMatrix, FontMatrix* graphicMatrix )
 {
-        WWFixedAsDWord  scaleX = ABS( GrSDivWWFixed( transMatrix->TM_matrix.xx, graphicMatrix->FM_11 ) );
-        WWFixedAsDWord  scaleY = ABS( GrSDivWWFixed( transMatrix->TM_matrix.yy, graphicMatrix->FM_22 ) );
+        WWFixedAsDWord  scaleX = GrSDivWWFixed( transMatrix->TM_matrix.xx, graphicMatrix->FM_11 );
+        WWFixedAsDWord  scaleY = GrSDivWWFixed( transMatrix->TM_matrix.yy, graphicMatrix->FM_22 );
 
         /* set horizontal and vertical resolution based on 72 dpi */
-        transMatrix->TM_resX = INTEGER_OF_WWFIXEDASDWORD( TrueType_GrMulWWFixed( WORD_TO_WWFIXEDASDWORD( 72 ), scaleX ) );
-        transMatrix->TM_resY = INTEGER_OF_WWFIXEDASDWORD( TrueType_GrMulWWFixed( WORD_TO_WWFIXEDASDWORD( 72 ), scaleY ) );
+        transMatrix->TM_resX = ABS( INTEGER_OF_WWFIXEDASDWORD( TrueType_GrMulWWFixed( WORD_TO_WWFIXEDASDWORD( 72 ), scaleX ) ) );
+        transMatrix->TM_resY = ABS( INTEGER_OF_WWFIXEDASDWORD( TrueType_GrMulWWFixed( WORD_TO_WWFIXEDASDWORD( 72 ), scaleY ) ) );
 
         /* scale transMatrix by scaleX and scaleY */
         transMatrix->TM_matrix.xx = GrSDivWWFixed( transMatrix->TM_matrix.xx, scaleX );

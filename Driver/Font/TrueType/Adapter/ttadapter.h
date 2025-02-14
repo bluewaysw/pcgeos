@@ -446,6 +446,16 @@ extern WWFixedAsDWord
 		    _pascal TrueType_GrMulWWFixed(WWFixedAsDWord i,
 							WWFixedAsDWord j);
 /*
+ * macros
+ */
+
+#define ROUND_WWFIXED( value )    ( ((word) value) < 0x8000 ? \
+		( value >> 16 ) : \
+			(((word) value) > 0x8000 || !((value>>16) & 0x8000)) ? \
+				(value >> 16) + 1 : \
+				 value >> 16)
+
+/*
  * convert value (word) to WWFixedAsDWord
  */
 #define WORD_TO_WWFIXEDASDWORD( value )          \
@@ -465,24 +475,6 @@ extern WWFixedAsDWord
  */
 #define SCALE_WORD( value, factor )              \
         ( TrueType_GrMulWWFixed( WORD_TO_WWFIXEDASDWORD( value ), factor ) )
-
-/*
- * round value (WWFixedAsDWord) to nearest word
- */
-#define ROUND_WWFIXEDASDWORD( value )            \
-        ( value & 0x8000 ?                       \
-            ( value & 0x0080 ? ( ( (sword)(value >> 16) ) - 1 ) : ( (sword)(value >> 16) ) ) : \
-            ( value & 0x0080 ? ( ( (sword)(value >> 16) ) + 1 ) : ( (sword)(value >> 16) ) ) )
-
-/*
- * round value (WWFixedAsDWord) to negativ infinity (word) 
- */
-#define CEIL_WWFIXEDASDWORD( value )             \
-        ( value & 0x8000 ?                       \
-            ( value & 0x00ff ? ( ( value >> 16 ) - 1 ) : ( ( value >> 16 ) ) ) : \
-            ( value >> 16 ) )
-
-#define CEIL( value )       ( value & 0x000000ff ? ( value >> 16 ) + 1 : ( value ) ) 
 
 /*
  * get integral part of value (WWFixedAsDWord)

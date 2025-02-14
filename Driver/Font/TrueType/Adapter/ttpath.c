@@ -25,14 +25,6 @@
 
 
 /*
- * macros
- */
-
-#define WW_FIXED_TO_WWFIXEDASDWORD( value )     ( (dword) ( (((dword)value.WWF_int) << 16) | value.WWF_frac ) )
-
-#define ROUND_WWFIXED( value )    ( value & 0xffff ? ( value >> 16 ) + 1 : value >> 16 )
-
-/*
  * types
  */
 
@@ -182,7 +174,7 @@ EC(     ECCheckBounds( (void*)fontHeader ) );
                 GrSaveState( gstate );
 
         /* load glyph and scale its outline to 1000 units per em */
-        TT_Load_Glyph( INSTANCE, GLYPH, charIndex, 0 );
+        TT_Load_Glyph( INSTANCE, GLYPH, charIndex, TTLOAD_HINT_GLYPH );
         TT_Get_Glyph_Outline( GLYPH, &OUTLINE );
         CalcScaleAndScaleOutline( trueTypeVars );
 
@@ -202,7 +194,7 @@ EC(     ECCheckBounds( (void*)fontHeader ) );
 	/* in reverse order. Step 5 is, of course, already in the GState.  */
 
         /* calculate baseline for further use */
-        baseline = fontHeader->FH_accent + fontHeader->FH_ascent;
+        baseline = fontHeader->FH_accent + fontHeader->FH_ascent + BASELINE_CORRECTION;
 
         /* translate by current cursor position */
         cursorPos = GrGetCurPos( gstate );
@@ -336,12 +328,13 @@ EC(     ECCheckBounds( (void*)fontHeader ) );
         /* get current cursor position */
         cursorPos = GrGetCurPos( gstate );
         result = GrTransform( gstate, DWORD_X(cursorPos), DWORD_Y(cursorPos) );
-        
+
         /* transform glyphs outline */
         TT_Transform_Outline( &OUTLINE, &transform.TM_matrix );
         TT_Transform_Outline( &OUTLINE, &flipMatrix );
         TT_Translate_Outline( &OUTLINE, DWORD_X(result) + transform.TM_heightX + transform.TM_scriptX, 
                                         DWORD_Y(result) + transform.TM_heightY + transform.TM_scriptY );
+
         /* set render functions */
         renderFunctions.Proc_MoveTo  = RegionPathMoveTo;
         renderFunctions.Proc_LineTo  = RegionPathLineTo;
@@ -834,7 +827,7 @@ EC(     ECCheckBounds( (void*)trueTypeVars ) );
         transMatrix->TM_matrix.yx = 0L;
         transMatrix->TM_matrix.yy = scaleFactor;
         transMatrix->TM_heightX   = 0L;
-        transMatrix->TM_heightY   = ROUND_WWFIXED( SCALE_WORD( fontHeader->FH_ascent + fontHeader->FH_accent, scaleFactor ) ) + BASELINE_CORRECTION;
+        transMatrix->TM_heightY   = fontHeader->FH_ascent + fontHeader->FH_accent;
         transMatrix->TM_scriptX   = 0L;
         transMatrix->TM_scriptY   = 0L;
 
@@ -946,10 +939,9 @@ EC(             ECCheckWindowHandle( win ) );
         transformMatrix->TM_matrix.yy = GrMulWWFixed( temp_e21, WWFIXED_TO_WWFIXEDASDWORD( windowMatrix.TM_e12 ) ) 
                         + GrMulWWFixed( temp_e22, WWFIXED_TO_WWFIXEDASDWORD( windowMatrix.TM_e22 ) );
 
-
-        transformMatrix->TM_heightX = INTEGER_OF_WWFIXEDASDWORD( GrMulWWFixed( 
-                        WORD_TO_WWFIXEDASDWORD( transformMatrix->TM_heightY ), WWFIXED_TO_WWFIXEDASDWORD( graphicMatrix.TM_e21 ) ) );
+        transformMatrix->TM_heightX = -INTEGER_OF_WWFIXEDASDWORD( GrMulWWFixed( 
+                        WORD_TO_WWFIXEDASDWORD( transformMatrix->TM_heightY ), transformMatrix->TM_matrix.xy ) );
         transformMatrix->TM_heightY = INTEGER_OF_WWFIXEDASDWORD( GrMulWWFixed( 
-                        WORD_TO_WWFIXEDASDWORD( transformMatrix->TM_heightY ), WWFIXED_TO_WWFIXEDASDWORD( graphicMatrix.TM_e22 ) ) );
+                        WORD_TO_WWFIXEDASDWORD( transformMatrix->TM_heightY ), transformMatrix->TM_matrix.xx ) ) + BASELINE_CORRECTION;
 }
 
