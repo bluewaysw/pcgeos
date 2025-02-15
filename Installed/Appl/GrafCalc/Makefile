@@ -4,13 +4,16 @@
 # If you edit it, you will lose your changes, should it be regenerated.
 #
 GEODE           = grafcalc
-MAIN            = bereich.goc edit.goc Funktion.goc grprop.goc Keyboard.goc\
-                  Options.goc process.goc view.goc
+MAIN            = Bereich.goc Calcvalue.goc Edit.goc Funktion.goc\
+                  Grprop.goc Keyboard.goc Options.goc Parser.goc\
+                  Process.goc Sprachenwahl.goc View.goc grafcalc.goh\
+                  lmacros.goh
 UI              = appui.goc appui.goh
 UI_TO_RDFS      =
-OBJS            = bereich.obj edit.obj Funktion.obj grprop.obj Keyboard.obj\
-                  Options.obj process.obj view.obj appui.obj
-COMMON          = grafcalc.goh lmacros.goh mathfunc.goh
+OBJS            = Bereich.obj Calcvalue.obj Edit.obj Funktion.obj\
+                  Grprop.obj Keyboard.obj Options.obj Parser.obj\
+                  Process.obj Sprachenwahl.obj View.obj appui.obj
+COMMON          =
 MODULES         =
 CMODULES        = Main UI
 SRCS            = $(MAIN) $(UI) $(COMMON)
