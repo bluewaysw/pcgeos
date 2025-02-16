@@ -907,7 +907,7 @@ static void AdjustFontBuf( TransformMatrix* transMatrix,
                            FontMatrix*      fontMatrix,         
                            FontBuf*         fontBuf )
 {
-        transMatrix->TM_heightY = fontBuf->FB_baselinePos.WBF_int + BASELINE_CORRECTION;
+        transMatrix->TM_heightY = fontBuf->FB_baselinePos.WBF_int;
 
         /* transformation if rotated or scaled */
         if( fontMatrix->FM_flags & TF_COMPLEX )
@@ -941,6 +941,7 @@ static void AdjustFontBuf( TransformMatrix* transMatrix,
                                                 WORD_TO_WWFIXEDASDWORD( savedScriptY + savedHeightY ), transMatrix->TM_matrix.xy ) );
                 }
         }
+        transMatrix->TM_heightY += BASELINE_CORRECTION;
 }
 
 
