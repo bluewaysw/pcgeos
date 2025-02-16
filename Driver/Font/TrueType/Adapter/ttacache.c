@@ -195,6 +195,7 @@ void _pascal TrueType_Cache_UpdateFontBlock(VMFileHandle cacheFile, const TCHAR*
 					VMUnlock(dirMem);
 
 					VMLock(cacheFile, thisBlock, &blockMem);
+					EC_ERROR_IF( memSize > 10000, -1);
 					MemReAlloc(blockMem, memSize, HAF_NO_ERR);
 					{
 						byte* destPtr = MemDeref(blockMem);
@@ -303,6 +304,8 @@ void _pascal TrueType_Cache_WriteHeader(VMFileHandle cacheFile, const TCHAR* fon
 	dirEntry = VMLock(cacheFile, dirBlock, &dirMem);
 	dirEntry->TTCE_bufEntryCount = 0;
 	strcpy(dirEntry->TTCE_ttfFileName, fontFileName);
+	dirEntry->TTCE_ttfFileSize = fontFileSize;
+	dirEntry->TTCE_magicWord = fontMagic;
 	dirEntry->TTCE_fontHeader = *headerPtr;
 
 	VMDirty(dirMem);

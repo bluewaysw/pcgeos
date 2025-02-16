@@ -279,6 +279,25 @@ static word DetectFontFiles( MemHandle* fileEnumBlock )
 }
 
 
+static word CalcMagicNumber(FileHandle fontFile, dword fontFileSize) 
+{
+	/* zero magic for now
+	word magicNumber = 0;
+	MemHandle mem;
+	mem = MemAlloc();
+	buf = MemDeref(mem);
+
+	FilePos();
+	FileRead();
+
+	
+
+	MemFree(mem);
+	return magicNumber;
+	*/
+	retrun 0;
+}
+
 /********************************************************************
  *                      ProcessFont
  ********************************************************************
@@ -415,7 +434,8 @@ EC(     ECCheckFileHandle( truetypeFile ) );
                 /* fill TrueTypeOutlineEntry */
                 strcpy( trueTypeOutlineEntry->TTOE_fontFileName, fileName );
             	trueTypeOutlineEntry->TTOE_fontFileSize = FileSize(truetypeFile);
-		trueTypeOutlineEntry->TTOE_magicWord = 0;
+		trueTypeOutlineEntry->TTOE_magicWord = CalcMagicNumber(truetypeFile, 
+							trueTypeOutlineEntry->TTOE_fontFileSize);
     
                 /* fill OutlineDataEntry */
                 outlineDataEntry = (OutlineDataEntry*) (fontInfo + 1);
@@ -477,7 +497,8 @@ EC(     ECCheckFileHandle( truetypeFile ) );
                 trueTypeOutlineEntry = LMemDerefHandles( fontInfoBlock, trueTypeOutlineChunk );
                 strcpy( trueTypeOutlineEntry->TTOE_fontFileName, fileName );
 		trueTypeOutlineEntry->TTOE_fontFileSize = FileSize(truetypeFile);
-		trueTypeOutlineEntry->TTOE_magicWord = 0;
+		trueTypeOutlineEntry->TTOE_magicWord = CalcMagicNumber(truetypeFile, 
+							trueTypeOutlineEntry->TTOE_fontFileSize);
                 
                 /* fill OutlineDataEntry */
                 fontInfo = LMemDeref( ConstructOptr(fontInfoBlock, fontInfoChunk) );
