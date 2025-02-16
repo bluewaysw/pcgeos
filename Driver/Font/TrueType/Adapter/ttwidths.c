@@ -144,7 +144,7 @@ MemHandle _pascal TrueType_Gen_Widths(
                         WWFixedAsDWord       pointSize,
                         Byte                 width,
                         Byte                 weight,
-			const FontInfo*      fontInfo, 
+                        const FontInfo*      fontInfo, 
                         const OutlineEntry*  headerEntry,
                         const OutlineEntry*  firstEntry,
                         TextStyle            stylesToImplement,
@@ -191,9 +191,9 @@ EC(     ECCheckBounds( (void*)fontHeader ) );
 
         if((fontMatrix->FM_flags & TF_COMPLEX) || !TrueType_Cache_LoadFontBlock(
                 trueTypeVars->cacheFile, trueTypeVars->entry.TTOE_fontFileName, 
-		trueTypeVars->entry.TTOE_fontFileSize,
-		trueTypeVars->entry.TTOE_magicWord,
-		&bufSpec,
+                trueTypeVars->entry.TTOE_fontFileSize,
+                trueTypeVars->entry.TTOE_magicWord,
+                &bufSpec,
                 &fontHandle		
         )) {
                 size = AllocFontBlock( sizeof( TransformMatrix ), 
@@ -243,17 +243,15 @@ EC(             ECCheckBounds( (void*)transMatrix ) );
                 if( IsRegionNeeded( transMatrix, fontBuf ) )
                         fontBuf->FB_flags |= FBF_IS_REGION;
 
-        	AdjustTransMatrix( transMatrix );
-                
-		if( !(fontMatrix->FM_flags & TF_COMPLEX) ) {
-	
+                if( !(fontMatrix->FM_flags & TF_COMPLEX) ) {
+
                         TrueType_Cache_UpdateFontBlock(
                                 trueTypeVars->cacheFile,
                                 trueTypeVars->entry.TTOE_fontFileName,
-				trueTypeVars->entry.TTOE_fontFileSize,
-				trueTypeVars->entry.TTOE_magicWord,
+                                trueTypeVars->entry.TTOE_fontFileSize,
+                                trueTypeVars->entry.TTOE_magicWord,
                                 &bufSpec, fontHandle		
-		        );		
+                        );
                 }
         }
         AdjustTransMatrix( transMatrix, graphicMatrix );
