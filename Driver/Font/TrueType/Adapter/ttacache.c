@@ -113,7 +113,7 @@ Boolean _pascal TrueType_Cache_LoadFontBlock(VMFileHandle cacheFile, const TCHAR
 			    /* found block, alloc */
 			    if( *fontHandle == NullHandle )
 			    {
-				*fontHandle = MemAllocSetOwner( FONT_MAN_ID, MAX( size, MAX_FONTBUF_SIZE ), 
+				*fontHandle = MemAllocSetOwner( FONT_MAN_ID, size, 
 						HF_SWAPABLE | HF_SHARABLE,
 						HAF_NO_ERR | HAF_LOCK | HAF_ZERO_INIT );
 EC(             		ECCheckMemHandle( *fontHandle ) );
@@ -121,7 +121,7 @@ EC(             		ECCheckMemHandle( *fontHandle ) );
 			    }
 			    else
 			    {
-				MemReAlloc( *fontHandle, MAX( size, MAX_FONTBUF_SIZE ), HAF_NO_ERR | HAF_LOCK );
+				MemReAlloc( *fontHandle, size, HAF_NO_ERR | HAF_LOCK );
 EC(             		ECCheckMemHandle( *fontHandle ) );
 			    }
 
@@ -195,7 +195,7 @@ void _pascal TrueType_Cache_UpdateFontBlock(VMFileHandle cacheFile, const TCHAR*
 					VMUnlock(dirMem);
 
 					VMLock(cacheFile, thisBlock, &blockMem);
-					EC_ERROR_IF( memSize > 10000, -1);
+					EC_ERROR_IF( memSize > 13000, -1);
 					MemReAlloc(blockMem, memSize, HAF_NO_ERR);
 					{
 						byte* destPtr = MemDeref(blockMem);
@@ -205,7 +205,6 @@ void _pascal TrueType_Cache_UpdateFontBlock(VMFileHandle cacheFile, const TCHAR*
 						MemUnlock(fontBuf);
 						VMDirty(blockMem);
 						VMUnlock(blockMem);
-						VMSave(cacheFile);
 					}
 				} else {
 					VMUnlock(dirMem);

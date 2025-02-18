@@ -194,7 +194,7 @@ EC(     ECCheckBounds( (void*)fontHeader ) );
                 trueTypeVars->entry.TTOE_fontFileSize,
                 trueTypeVars->entry.TTOE_magicWord,
                 &bufSpec,
-                &fontHandle		
+                &fontHandle	
         )) {
                 size = AllocFontBlock( sizeof( TransformMatrix ), 
                                 fontHeader->FH_numChars, 
@@ -243,6 +243,8 @@ EC(             ECCheckBounds( (void*)transMatrix ) );
                 if( IsRegionNeeded( transMatrix, fontBuf ) )
                         fontBuf->FB_flags |= FBF_IS_REGION;
 
+                AdjustTransMatrix( transMatrix, graphicMatrix );
+
                 if( !(fontMatrix->FM_flags & TF_COMPLEX) ) {
 
                         TrueType_Cache_UpdateFontBlock(
@@ -254,7 +256,6 @@ EC(             ECCheckBounds( (void*)transMatrix ) );
                         );
                 }
         }
-        AdjustTransMatrix( transMatrix, graphicMatrix );
         TrueType_Unlock_Face( trueTypeVars );
 Fail:        
         MemUnlock( varBlock );

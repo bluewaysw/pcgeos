@@ -65,7 +65,7 @@ TrueTypeGenWidths	proc	far
 	.enter
 
 	xchg	di, ax
-	mov	di, 1100
+	mov	di, 800
 	call	ThreadBorrowStackSpace
 	push	di
 

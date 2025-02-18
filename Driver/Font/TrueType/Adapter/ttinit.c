@@ -295,7 +295,7 @@ static word CalcMagicNumber(FileHandle fontFile, dword fontFileSize)
 	MemFree(mem);
 	return magicNumber;
 	*/
-	retrun 0;
+	return 0;
 }
 
 /********************************************************************
