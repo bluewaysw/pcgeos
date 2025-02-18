@@ -173,10 +173,10 @@ void _pascal TrueType_Cache_UpdateFontBlock(VMFileHandle cacheFile, const TCHAR*
                         && dirEntry[loopCount].TTCE_ttfFileSize == fontFileSize
                         && dirEntry[loopCount].TTCE_magicWord == fontFileMagic ) {
 
-			word loopCount2 = 0;
-			word memSize = MemGetInfo(fontBuf, MGIT_SIZE);
+		    word loopCount2 = 0;
+		    word memSize = MemGetInfo(fontBuf, MGIT_SIZE);
 
-			while(loopCount2 < dirEntry[loopCount].TTCE_bufEntryCount) {
+		    while(loopCount2 < dirEntry[loopCount].TTCE_bufEntryCount) {
 
 			if( (dirEntry[loopCount].TTCE_bufEntry[loopCount2].TTCBE_spec.TTCBS_pointSize == bufSpec->TTCBS_pointSize) &&
 				(dirEntry[loopCount].TTCE_bufEntry[loopCount2].TTCBE_spec.TTCBS_width == bufSpec->TTCBS_width) &&
@@ -184,64 +184,64 @@ void _pascal TrueType_Cache_UpdateFontBlock(VMFileHandle cacheFile, const TCHAR*
 				(dirEntry[loopCount].TTCE_bufEntry[loopCount2].TTCBE_spec.TTCBS_stylesToImplement == bufSpec->TTCBS_stylesToImplement) 
 			) {
 
-				/* update if new/current block is large*/
-				if(memSize > dirEntry[loopCount].TTCE_bufEntry[loopCount2].TTCBE_bufSize) {
-					
-					VMBlockHandle thisBlock = dirEntry[loopCount].TTCE_bufEntry[loopCount2].TTCBE_block;
-					MemHandle blockMem;
+			    /* update if new/current block is larger */
+			    if(memSize > dirEntry[loopCount].TTCE_bufEntry[loopCount2].TTCBE_bufSize) {
+						
+				VMBlockHandle thisBlock = dirEntry[loopCount].TTCE_bufEntry[loopCount2].TTCBE_block;
+				MemHandle blockMem;
 
-					dirEntry[loopCount].TTCE_bufEntry[loopCount2].TTCBE_bufSize = memSize;
-					VMDirty(dirMem);
-					VMUnlock(dirMem);
+				dirEntry[loopCount].TTCE_bufEntry[loopCount2].TTCBE_bufSize = memSize;
+				VMDirty(dirMem);
+				VMUnlock(dirMem);
 
-					VMLock(cacheFile, thisBlock, &blockMem);
-					EC_ERROR_IF( memSize > 13000, -1);
-					MemReAlloc(blockMem, memSize, HAF_NO_ERR);
-					{
-						byte* destPtr = MemDeref(blockMem);
+				VMLock(cacheFile, thisBlock, &blockMem);
+				EC_ERROR_IF( memSize > 13000, -1);
+				MemReAlloc(blockMem, memSize, HAF_NO_ERR);
+				{
+				    byte* destPtr = MemDeref(blockMem);
 
-						byte* srcPtr = MemLock(fontBuf);
-						memcpy(destPtr, srcPtr, memSize);
-						MemUnlock(fontBuf);
-						VMDirty(blockMem);
-						VMUnlock(blockMem);
-					}
-				} else {
-					VMUnlock(dirMem);
+				    byte* srcPtr = MemLock(fontBuf);
+				    memcpy(destPtr, srcPtr, memSize);
+				    MemUnlock(fontBuf);
+				    VMDirty(blockMem);
+				    VMUnlock(blockMem);
 				}
-				return;
+			    } else {
+				VMUnlock(dirMem);
+			    }
+			    return;
 			}
 			loopCount2++;
-			}		
-			/* not found append entry if free slots*/
-			if(loopCount2 < TRUETYPE_CACHE_MAX_BUF_ENTRIES) {
+		    }		
+		    /* not found append entry if free slots*/
+		    if(loopCount2 < TRUETYPE_CACHE_MAX_BUF_ENTRIES) {
 
 			VMBlockHandle newBlock = VMAlloc(cacheFile, memSize, 0);
 			if( newBlock != NullHandle ) {
-				dirEntry[loopCount].TTCE_bufEntry[loopCount2].TTCBE_spec = *bufSpec;
-				dirEntry[loopCount].TTCE_bufEntry[loopCount2].TTCBE_block = newBlock;
-				dirEntry[loopCount].TTCE_bufEntry[loopCount2].TTCBE_bufSize = memSize;
-				dirEntry[loopCount].TTCE_bufEntryCount++;
-				VMDirty(dirMem);
+			    dirEntry[loopCount].TTCE_bufEntry[loopCount2].TTCBE_spec = *bufSpec;
+			    dirEntry[loopCount].TTCE_bufEntry[loopCount2].TTCBE_block = newBlock;
+			    dirEntry[loopCount].TTCE_bufEntry[loopCount2].TTCBE_bufSize = memSize;
+			    dirEntry[loopCount].TTCE_bufEntryCount++;
+			    VMDirty(dirMem);
 			}
 			VMUnlock(dirMem);
 			if( newBlock != NullHandle ) {
 
-				MemHandle newBlockMem;
-				byte* destPtr = VMLock(cacheFile, newBlock, &newBlockMem);
-				/* fill in the block */
-				byte* srcPtr = MemLock(fontBuf);
-				memcpy(destPtr, srcPtr, memSize);
-				MemUnlock(fontBuf);
-				VMDirty(newBlockMem);
-				VMUnlock(newBlockMem);
+			    MemHandle newBlockMem;
+			    byte* destPtr = VMLock(cacheFile, newBlock, &newBlockMem);
+			    /* fill in the block */
+			    byte* srcPtr = MemLock(fontBuf);
+			    memcpy(destPtr, srcPtr, memSize);
+			    MemUnlock(fontBuf);
+			    VMDirty(newBlockMem);
+			    VMUnlock(newBlockMem);
 			}
 			return;
-			}
-			break;
+		    }
+		    break;
 		}
 		loopCount++;
-		}
+	    }
 	    VMUnlock(dirMem);
 	}
     }
@@ -318,21 +318,24 @@ void _pascal TrueType_Cache_WriteHeader(VMFileHandle cacheFile, const TCHAR* fon
 	    
 	    TrueTypeCacheDirEntry* dirEntry;
 	    MemHandle dirMem;
-	    word entryCount = vmInfo.size / sizeof(TrueTypeCacheDirEntry);
+	    if(vmInfo.size < 4096) {
+		
+		word entryCount = vmInfo.size / sizeof(TrueTypeCacheDirEntry);
 
-	    VMLock(cacheFile, dirBlock, &dirMem);
+		VMLock(cacheFile, dirBlock, &dirMem);
 
-	    /* handle append */
-	    MemReAlloc(dirMem, sizeof(TrueTypeCacheDirEntry) * (entryCount + 1), HAF_NO_ERR | HAF_ZERO_INIT);
-	    dirEntry = MemDeref(dirMem);
+		/* handle append */
+		MemReAlloc(dirMem, sizeof(TrueTypeCacheDirEntry) * (entryCount + 1), HAF_NO_ERR | HAF_ZERO_INIT);
+		dirEntry = MemDeref(dirMem);
 	    
-	    strcpy(dirEntry[entryCount].TTCE_ttfFileName, fontFileName);
-            dirEntry[entryCount].TTCE_ttfFileSize = fontFileSize;
-            dirEntry[entryCount].TTCE_magicWord = fontMagic;
-	    dirEntry[entryCount].TTCE_fontHeader = *headerPtr;
+		strcpy(dirEntry[entryCount].TTCE_ttfFileName, fontFileName);
+        	dirEntry[entryCount].TTCE_ttfFileSize = fontFileSize;
+        	dirEntry[entryCount].TTCE_magicWord = fontMagic;
+		dirEntry[entryCount].TTCE_fontHeader = *headerPtr;
 	    
-	    VMDirty(dirMem);
-	    VMUnlock(dirMem);
+		VMDirty(dirMem);
+		VMUnlock(dirMem);
+	    }
 	}
     }
 }
