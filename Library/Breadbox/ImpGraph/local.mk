@@ -27,4 +27,14 @@ ASMFLAGS        += $(.TARGET:MFJPEGDBCS*:S/$(.TARGET)/-DPRODUCT_FJPEG -DHARDWARE
 GOCFLAGS        += $(.TARGET:MFJPEGDBCS*:S/$(.TARGET)/-DPRODUCT_FJPEG -DHARDWARE_TYPE=PC/)
 LINKFLAGS        += $(.TARGET:MFJPEGDBCS*:S/$(.TARGET)/-DPRODUCT_FJPEG -DHARDWARE_TYPE=PC/)
 
-
+# NOTE NOTE NOTE:
+# when calling mkmf / pmake depend and compiling afterwards,
+# you might see an error like:
+# "pmake: Can't figure out how to make impfjpeg.cpp. Stop"
+#
+# You have to manually edit dependencies.mk and remove:
+#
+# impfjpeg.obj \
+# impfjpeg.eobj: impfjpeg.cpp
+#
+# ... this is a bug. (meyerk 01/2025)

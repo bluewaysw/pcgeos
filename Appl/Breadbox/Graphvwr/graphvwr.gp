@@ -10,7 +10,7 @@ tokenid    16431
 
 type appl, process, single
 
-stack 4000
+stack 6000
 
 platform geos201
 
@@ -22,10 +22,13 @@ library geos
 library ui
 library ansic
 library extui
+library color
 
 library giflib
 exempt giflib
 
+library pnglib
+exempt pnglib
 
 library thumbdb
 library ijgjpeg

@@ -6,15 +6,13 @@
 GEODE           = zlib
 ASM_TO_OBJS     =
 UI_TO_RDFS      =
-SRCS            = INFFAST.c CRC32.c INFLATE.c INFTREES.c INFBLOCK.c\
-                  INFCODES.c ZUTIL.c INFUTIL.c GZIO.c UNCOMPR.c ADLER32.c\
-                  TREES.c DEFLATE.c COMPRESS.c inffixed.h infutil.h\
-                  deflate.h zutil.h inffast.h inftrees.h infcodes.h trees.h\
-                  infblock.h
-OBJS            = INFFAST.obj CRC32.obj INFLATE.obj INFTREES.obj\
-                  INFBLOCK.obj INFCODES.obj ZUTIL.obj INFUTIL.obj GZIO.obj\
-                  UNCOMPR.obj ADLER32.obj TREES.obj DEFLATE.obj\
-                  COMPRESS.obj
+SRCS            = ADLER32.c COMPRESS.c CRC32.c DEFLATE.c GZIO.c INFCODES.c\
+                  INFFAST.c INFTREES.c INFUTIL.c TREES.c UNCOMPR.c ZUTIL.c\
+                  INFBLOCK.c INFLATE.c deflate.h infblock.h infcodes.h\
+                  inffast.h inffixed.h inftrees.h trees.h zutil.h infutil.h
+OBJS            = ADLER32.obj COMPRESS.obj CRC32.obj DEFLATE.obj GZIO.obj\
+                  INFCODES.obj INFFAST.obj INFTREES.obj INFUTIL.obj\
+                  TREES.obj UNCOMPR.obj ZUTIL.obj INFBLOCK.obj INFLATE.obj
 LOBJS           =
 LIBOBJ          = $(DEVEL_DIR)/Include/$(GEODE).ldf
 LIBNAME         = zlib

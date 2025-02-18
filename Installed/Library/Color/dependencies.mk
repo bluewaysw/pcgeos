@@ -30,4 +30,11 @@ UI.eobj: UI/uiManager.asm \
                 colorConstant.def Objects/colorC.def \
                 Internal/prodFeatures.def uiManager.rdef uiColor.asm \
                 uiOtherColor.asm
-rdef: 
+uiManager.rdef: generic.uih product.uih Objects/colorC.uih \
+                Internal/prodFeatures.uih UI/uiColor.ui \
+                Art/mkrAreaColor.ui Art/mkrAreaMask.ui \
+                Art/mkrAreaPattern.ui Art/mkrLineColor.ui \
+                Art/mkrLineMask.ui Art/mkrTextColor.ui Art/mkrTextMask.ui \
+                Art/mkrTextPattern.ui
+
+colorEC.geo color.geo : geos.ldf ui.ldf 
