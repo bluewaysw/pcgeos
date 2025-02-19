@@ -4,31 +4,33 @@
 # If you edit it, you will lose your changes, should it be regenerated.
 #
 GEODE           = truetype
-MAIN            = truetypeEscape.asm ansic_runtime.asm mainManager.asm\
-                  ttmemory_asm.asm truetypeWidths.asm ansic_stdlib.asm\
-                  ansic_memory.asm truetypeMetrics.asm truetypeInit.asm\
-                  truetypeEC.asm truetypeChars.asm truetypePath.asm\
-                  truetypeMacros.def ansicGeode.def truetypeVariable.def\
-                  truetypeConstant.def
-ADAPTER         = ttchars.c ttinit.c ttmetrics.c ttcharmapper.c ttadapter.c\
-                  ttwidths.c ttpath.c ttcharmapper.h ttpath.h ttchars.h\
-                  ttwidths.h ttinit.h ttmetrics.h ttadapter.h
-FREETYPE        = ttcache.c ttraster.c ttgload.c ttcalc.c ttapi.c ftxkern.c\
-                  ttinterp.c ttload.c ttfile.c ttcmap.c ttobjs.c ttmemory.c\
-                  ttcache.h ttcmap.h ttconfig.h freetype.h ttgload.h\
-                  ttfile.h ttinterp.h ttload.h tttables.h ttobjs.h\
-                  fterrid.h ttraster.h ttengine.h tttypes.h ft_conf.h\
-                  ftnameid.h ttcalc.h ftxkern.h ttmemory.h tttags.h
+ADAPTER         = ttacache.c ttadapter.c ttcharmapper.c ttchars.c ttinit.c\
+                  ttmetrics.c ttpath.c ttwidths.c ttacache.h ttadapter.h\
+                  ttcharmapper.h ttchars.h ttinit.h ttmetrics.h ttpath.h\
+                  ttwidths.h
+FREETYPE        = ftxkern.c ttapi.c ttcache.c ttcalc.c ttcmap.c ttfile.c\
+                  ttgload.c ttinterp.c ttload.c ttmemory.c ttobjs.c\
+                  ttraster.c freetype.h fterrid.h ftnameid.h ftxkern.h\
+                  ft_conf.h ttcache.h ttcalc.h ttcmap.h ttconfig.h\
+                  ttengine.h ttfile.h ttgload.h ttinterp.h ttload.h\
+                  ttmemory.h ttobjs.h ttraster.h tttables.h tttags.h\
+                  tttypes.h
+MAIN            = ansic_memory.asm ansic_runtime.asm ansic_stdlib.asm\
+                  mainManager.asm truetypeChars.asm truetypeEC.asm\
+                  truetypeEscape.asm truetypeInit.asm truetypeMetrics.asm\
+                  truetypePath.asm truetypeWidths.asm ttmemory_asm.asm\
+                  ansicGeode.def truetypeConstant.def truetypeMacros.def\
+                  truetypeVariable.def
 UI_TO_RDFS      =
-OBJS            = ttchars.obj ttinit.obj ttmetrics.obj ttcharmapper.obj\
-                  ttadapter.obj ttwidths.obj ttpath.obj ttcache.obj\
-                  ttraster.obj ttgload.obj ttcalc.obj ttapi.obj ftxkern.obj\
-                  ttinterp.obj ttload.obj ttfile.obj ttcmap.obj ttobjs.obj\
-                  ttmemory.obj
+OBJS            = ttacache.obj ttadapter.obj ttcharmapper.obj ttchars.obj\
+                  ttinit.obj ttmetrics.obj ttpath.obj ttwidths.obj\
+                  ftxkern.obj ttapi.obj ttcache.obj ttcalc.obj ttcmap.obj\
+                  ttfile.obj ttgload.obj ttinterp.obj ttload.obj\
+                  ttmemory.obj ttobjs.obj ttraster.obj
 COMMON          =
 MODULES         = Main
 CMODULES        = Adapter FreeType
-SRCS            = $(MAIN) $(ADAPTER) $(FREETYPE) $(COMMON)
+SRCS            = $(ADAPTER) $(FREETYPE) $(MAIN) $(COMMON)
 LOBJS           =
 
 SYSMAKEFILE     = geode.mk
