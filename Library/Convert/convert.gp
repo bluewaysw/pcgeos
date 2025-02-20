@@ -2,14 +2,14 @@
 #
 #	Copyright (c) GeoWorks 1992 -- All Rights Reserved
 #
-# PROJECT:	
+# PROJECT:
 # MODULE:	Geode Parameters
 # FILE:		convert.gp
 #
 # AUTHOR:	Adam de Boor, Aug 26, 1992
 #
 #
-# 
+#
 #
 #	$Id: convert.gp,v 1.1 97/04/04 17:52:29 newdeal Exp $
 #
@@ -19,7 +19,8 @@ name convert.lib
 type library, single
 
 #
-# Token must be FMTL for file manager to find us
+# this library has the code for converting 1.x documents to 2.x and above
+# the related file manager plugin is called CvtTool and under FMTools...
 #
 tokenchars "CVRT"
 tokenid 0
