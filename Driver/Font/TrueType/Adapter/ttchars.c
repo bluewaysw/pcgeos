@@ -241,13 +241,15 @@ EC(             ECCheckBounds( (void*)fontBuf ) );
             bufSpec.TTCBS_weight = weight;
             bufSpec.TTCBS_stylesToImplement = stylesToImplement;
 
-            TrueType_Cache_UpdateFontBlock(
-                trueTypeVars->cacheFile,
-                trueTypeVars->entry.TTOE_fontFileName, 
-		trueTypeVars->entry.TTOE_fontFileSize,
-		trueTypeVars->entry.TTOE_magicWord,
-                &bufSpec, fontBufHandle		
-            );		
+            if( !(fontBuf->FB_flags & FBF_IS_COMPLEX) ) {
+                TrueType_Cache_UpdateFontBlock(
+                    trueTypeVars->cacheFile,
+                    trueTypeVars->entry.TTOE_fontFileName, 
+                    trueTypeVars->entry.TTOE_fontFileSize,
+                    trueTypeVars->entry.TTOE_magicWord,
+                    &bufSpec, fontBufHandle		
+                );
+            }		
         }
 Fail:        
         TrueType_Unlock_Face( trueTypeVars );
