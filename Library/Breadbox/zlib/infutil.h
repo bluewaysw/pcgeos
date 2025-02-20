@@ -1,12 +1,14 @@
 /* infutil.h -- types and macros common to blocks and codes
  * Copyright (C) 1995-1998 Mark Adler
- * For conditions of distribution and use, see copyright notice in zlib.h 
+ * For conditions of distribution and use, see copyright notice in zlib.h
  */
 
 /* WARNING: this file should *not* be used by applications. It is
    part of the implementation of the compression library and is
    subject to change. Applications should only use zlib.h.
  */
+
+#include "heap.h"
 
 #ifndef _INFUTIL_H
 #define _INFUTIL_H
@@ -41,7 +43,7 @@ struct inflate_blocks_state {
       inflate_huft *tb;         /* bit length decoding tree */
     } trees;            /* if DTREE, decoding info for trees */
     struct {
-      inflate_codes_statef 
+      inflate_codes_statef
          *codes;
     } decode;           /* if CODES, current state */
   } sub;                /* submode */
@@ -51,14 +53,52 @@ struct inflate_blocks_state {
   uInt bitk;            /* bits in bit buffer */
   uLong bitb;           /* bit buffer */
   inflate_huft *hufts;  /* single malloc for tree space */
+
+#ifdef __GEOS__
+    MemHandle windowHan;  /* GEOS MemHandle for sliding window */
+    word  windowSize;
+    word  windowEndOffs;
+    word  windowReadOffs;
+    word  windowWriteOffs;
+#endif
+
   Bytef *window;        /* sliding window */
   Bytef *end;           /* one byte after sliding window */
   Bytef *read;          /* window read pointer */
   Bytef *write;         /* window write pointer */
   check_func checkfn;   /* check function */
   uLong check;          /* check on output */
-
 };
+
+
+
+/*
+ * Strategy:
+ * We want to use IF_GEOS_LOCK_SLIDING_WINDOW and IF_GEOS_UNLOCK_SLIDING_WINDOW
+ * as /high/ as possible in the API, so they come up mainly in inflate.c.
+ * However, allocating and freeing memory has to be done in infblock.c (which is one
+ * level down), but we try to use GEOS code there only in inflate_blocks_new
+ * and inflate_blocks_free.
+ */
+#ifdef __GEOS__
+  #define IF_GEOS_LOCK_SLIDING_WINDOW(s) { \
+    s->window = (Bytef *) MemLock(s->windowHan); \
+    s->end = (Bytef *) (s->window + s->windowEndOffs); \
+    s->read = (Bytef *) (s->window + s->windowReadOffs); \
+    s->write = (Bytef *) (s->window + s->windowWriteOffs); \
+  }
+
+  #define IF_GEOS_UNLOCK_SLIDING_WINDOW(s) { \
+    s->windowEndOffs = ((word) s->window) + ((word) s->windowSize); \
+    s->windowReadOffs = ((word) s->read) - ((word) s->window); \
+    s->windowWriteOffs = ((word) s->write) - ((word) s->window); \
+    MemUnlock(s->windowHan); \
+  }
+#else
+  // these expand to nothing
+  #define IF_GEOS_LOCK_SLIDING_WINDOW(s)
+  #define IF_GEOS_UNLOCK_SLIDING_WINDOW(s)
+#endif
 
 
 /* defines for inflate input/output */
