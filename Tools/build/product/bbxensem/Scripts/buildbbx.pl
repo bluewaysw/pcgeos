@@ -144,8 +144,7 @@ $CommonConfigFile = "$LocalDir/$CONFIG_FILE_ROOT/$CONFIG_FILE_ROOT";
 		"dbcs" => "n",
 		"mapblock" => "e8000",
 		"romwindows" => "c8000 128k",
-		"destdirnc" => "$LocalDir/$DEST_SUB_DIRECTORY.nc",
-		"destdirec" => "$LocalDir/$DEST_SUB_DIRECTORY.ec",
+		"destdir" => "$LocalDir/$DEST_SUB_DIRECTORY",
 		"shipfiles" => "y",
 		"vm" => "n",
 		"patching" => "n",
@@ -479,14 +478,9 @@ ReadTargetInputFromCache();
 # Since we are not making xip images, this is not the temporary directory, 
 # it is the destination directory for the demo.
 #
-if ( $RealInfo{ec} eq "y" ) {
-    $DefaultDestDir = $DefaultInfo{destdirec}
-} else {
-    $DefaultDestDir = $DefaultInfo{destdirnc}
-}
+print "Directory to put target files in (default = $DefaultInfo{destdir}): ";
+$RealInfo{destdir} = FormatPath( ReadUserInput( $DefaultInfo{destdir} ), 0 );
 
-print "Directory to put target files in (default = $DefaultDestDir): ";
-$RealInfo{destdir} = FormatPath( ReadUserInput( $DefaultDestDir ), 0 );
 AddGbuildArg( "desttree", $RealInfo{destdir} );
 
 ##############################################################################

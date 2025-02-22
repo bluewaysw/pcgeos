@@ -57,7 +57,7 @@ Build the target environment:
     - n (as the build for Double-Byte Character Sets is not yet fully functional)
     - y (for the geodes)
     - n (for the VM files)
-    - and then you'll have to enter the path to a "gbuild.ec"-folder in your LOCAL_ROOT-folder (or accept the default).
+    - and then you'll have to enter the path to a "gbuild"-folder in your LOCAL_ROOT-folder.
   - BTW: It's expected that the current version of the perl-script creates several "Could not find file _name_ in any of the source trees."-messages.
 
 Launch the target environment in dosbox:
