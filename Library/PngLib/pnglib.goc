@@ -6,7 +6,16 @@
  on ChatGPT for the PNG-specific parts.
  *******************************************************************/
 
+// Include our API
 #include "pnglib.h"
+
+// some internal functions defined below, but declared here...
+int nextIDATChunk(pngIDATState* state);
+static void unfilterRow(unsigned char *data, unsigned char *previousRow, unsigned long bytesPerPixel, unsigned long rowBytes);
+static inline unsigned char paethPredictor(int a, int b, int c);
+static inline int abs(int x);
+static inline unsigned long swapEndian(unsigned long val);
+
 
 // Reading and processing a complete PNG file
 VMBlockHandle _pascal _export pngImportConvertFile(FileHandle fileHan, VMFileHandle vmFile)
@@ -40,14 +49,14 @@ VMBlockHandle _pascal _export pngImportConvertFile(FileHandle fileHan, VMFileHan
                 // Process each scanline
                 while (pngImportGetNextIDATScanline(&state) == 1)
                 {
-                    pngImportPauseIDATProcessing(&state);
+                    pngImportIDATProcessingUnlockHandles(&state);
 
                     pngImportApplyGEOSFormatTransformations(&state, blendColor);
 
                     // Write the processed scanline (without the filter byte) to the VMFile
                     pngImportWriteScanlineToBitmap(vmFile, vmBlock, state.lineNo - 1, state.currentRow);
 
-                    pngImportResumeIDATProcessing(&state);
+                    pngImportIDATProcessingLockHandles(&state);
                 }
 
                 // Clean up resources
@@ -250,7 +259,7 @@ void _pascal _export pngImportInitIDATProcessingState(pngIDATState* state, FileH
 
 // temporarily unlock the memory not needed for just putting out the pixels we just decoded
 // NOTE: currentRow stays locked for further processing
-void _pascal _export pngImportPauseIDATProcessing(pngIDATState* state)
+void _pascal _export pngImportIDATProcessingUnlockHandles(pngIDATState* state)
 {
     state->inOff = state->strm.next_in - MemDeref(state->inHan);
     MemUnlock(state->inHan); // disabled as it seems to create memory overflows somewhere
@@ -262,7 +271,7 @@ void _pascal _export pngImportPauseIDATProcessing(pngIDATState* state)
 }
 
 // relock the memory needed for further IDAT chunk processing
-void _pascal _export pngImportResumeIDATProcessing(pngIDATState* state)
+void _pascal _export pngImportIDATProcessingLockHandles(pngIDATState* state)
 {
     state->in = MemLock(state->inHan);
     state->strm.next_in = state->in + state->inOff;
@@ -675,20 +684,21 @@ unsigned long _pascal _export pngCalcBytesPerRow(unsigned long width, unsigned c
     unsigned long bitsPerPixel;
     unsigned long rowBytes;
 
-    switch (colorType) {
-        case 0: // Grayscale
+    switch (colorType)
+    {
+        case PNG_COLOR_TYPE_GREY: // Grayscale
             bitsPerPixel = bitDepth;
             break;
-        case 2: // Truecolor (RGB)
+        case PNG_COLOR_TYPE_RGB: // Truecolor (RGB)
             bitsPerPixel = 3 * bitDepth;
             break;
-        case 3: // Indexed color
+        case PNG_COLOR_TYPE_PALETTE: // Indexed color
             bitsPerPixel = bitDepth;
             break;
-        case 4: // Grayscale with Alpha
+        case PNG_COLOR_TYPE_GREY_ALPHA: // Grayscale with Alpha
             bitsPerPixel = 2 * bitDepth;
             break;
-        case 6: // Truecolor with Alpha (RGBA)
+        case PNG_COLOR_TYPE_RGBA: // Truecolor with Alpha (RGBA)
             bitsPerPixel = 4 * bitDepth;
             break;
         default:
@@ -871,7 +881,7 @@ void _pascal _export pngRemoveAlphaChannel(unsigned char *data, unsigned long wi
     unsigned char gray, a, blendedGray;
 
     // RGBA (Truecolor with alpha)
-    if (colorType == 6)
+    if (colorType == PNG_COLOR_TYPE_RGBA)
     {
         for (j = 0; j < width; j++)
         {
@@ -891,7 +901,7 @@ void _pascal _export pngRemoveAlphaChannel(unsigned char *data, unsigned long wi
         }
     }
     // Grayscale with Alpha (colorType 4)
-    else if (colorType == 4)
+    else if (colorType == PNG_COLOR_TYPE_GREY_ALPHA)
     {
         for (j = 0; j < width; j++)
         {
@@ -967,7 +977,7 @@ void _pascal _export pngPad1BitTo4Bit(unsigned char *input, unsigned int width, 
     }
 }
 
-// Function to convert 2-bit packed values to 4-bit padded values
+// function to convert 2-bit packed values to 4-bit padded values
 void _pascal _export pngPad2BitTo4Bit(unsigned char *input, unsigned int width, unsigned char colorType, unsigned char bitDepth)
 {
     unsigned int in_index = 0;   // Index for the input array
@@ -1024,7 +1034,7 @@ void _pascal _export pngPad2BitTo4Bit(unsigned char *input, unsigned int width, 
     }
 }
 
-// Unfilter-Funktion for processing PNG image data, basically the heart of PNG
+// Unfilter-Function for processing PNG image data, basically the heart of PNG
 static void unfilterRow(unsigned char *data, unsigned char *previousRow, unsigned long bytesPerPixel, unsigned long rowBytes)
 {
     unsigned char *currentRow = data;
@@ -1073,7 +1083,7 @@ static void unfilterRow(unsigned char *data, unsigned char *previousRow, unsigne
     }
 }
 
-// Paeth-Prädiktor-Function
+// Paeth-Predictor-Function
 static inline unsigned char paethPredictor(int a, int b, int c)
 {
     int p = a + b - c;
