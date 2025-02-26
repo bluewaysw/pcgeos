@@ -162,7 +162,14 @@ int stream_size;
 }
 
 
-#define NEEDBYTE {if(z->avail_in==0)return r;r=f;}
+#define NEEDBYTE { \
+  if (z->avail_in == 0) { \
+    IF_GEOS_UNLOCK_SLIDING_WINDOW(Z_STATE->blocks); \
+    return r; \
+  } \
+  r=f; \
+}
+
 #define NEXTBYTE (z->avail_in--,z->total_in++,*z->next_in++)
 
 int ZEXPORT inflate(z_streamp z, int f)
