@@ -55,14 +55,14 @@ static FontGroup mapFontGroup( TRUETYPE_VARS );
 
 static word getNameFromNameTable( 
                                 TRUETYPE_VARS,
-                                char*      name, 
-                                TT_UShort  nameIndex );
+                                char*            name, 
+                                const TT_UShort  nameIndex );
 
 void InitConvertHeader(         TRUETYPE_VARS, FontHeader* fontHeader );
 
 static char GetDefaultChar(     TRUETYPE_VARS, char firstChar );
 
-static word GetKernCount(       TRUETYPE_VARS );
+word GetKernCount(       TRUETYPE_VARS );
 
 static word toHash( const char* str );
 
@@ -73,6 +73,8 @@ static char* strcpy( char* dest, const char* source );
 static void strcpyname( char* dest, const char* source );
 
 static int strcmp( const char* s1, const char* s2 );
+
+static Boolean activateBytecodeInterpreter();
 
 
 /********************************************************************
@@ -89,9 +91,6 @@ static int strcmp( const char* s1, const char* s2 );
  * 
  * STRATEGY:       - Call `TT_Init_FreeType()` to initialize the core
  *                   FreeType library.
- *                 - If the initialization is successful, proceed to
- *                   initialize the kerning extension using
- *                   `TT_Init_Kerning_Extension()`.
  *                 - Return the appropriate error code if the core
  *                   initialization fails.
  * 
@@ -109,7 +108,7 @@ TT_Error _pascal Init_FreeType()
         if ( error != TT_Err_Ok )
                 return error;
 
-        TT_Init_Kerning_Extension();
+        engineInstance.interpreterActive = activateBytecodeInterpreter();
 
         return TT_Err_Ok;
 }
@@ -139,18 +138,18 @@ TT_Error _pascal Init_FreeType()
 
 TT_Error _pascal Exit_FreeType(MemHandle varBlock) 
 {
-	if ( varBlock != NullHandle ) {
+        if ( varBlock != NullHandle ) {
 
-	    TrueTypeVars*          trueTypeVars;
-            
-	    trueTypeVars = MemLock( varBlock );
+            TrueTypeVars*          trueTypeVars;
+    
+            trueTypeVars = MemLock( varBlock );
 EC(         ECCheckBounds( (void*)trueTypeVars ) );
-	    
-	    if( trueTypeVars->cacheFile != NullHandle ) {
-		TrueType_Cache_Exit( trueTypeVars->cacheFile );
-	    }
-	    MemUnlock( varBlock );
-	}
+    
+            if( trueTypeVars->cacheFile != NullHandle ) {
+                TrueType_Cache_Exit( trueTypeVars->cacheFile );
+            }
+            MemUnlock( varBlock );
+        }
 
         return TT_Done_FreeType();
 }
@@ -279,6 +278,25 @@ static word DetectFontFiles( MemHandle* fileEnumBlock )
         return FileEnum( &ttfEnumParams, fileEnumBlock, &numOtherFiles );
 }
 
+
+static word CalcMagicNumber(FileHandle fontFile, dword fontFileSize) 
+{
+	/* zero magic for now
+	word magicNumber = 0;
+	MemHandle mem;
+	mem = MemAlloc();
+	buf = MemDeref(mem);
+
+	FilePos();
+	FileRead();
+
+	
+
+	MemFree(mem);
+	return magicNumber;
+	*/
+	return 0;
+}
 
 /********************************************************************
  *                      ProcessFont
@@ -415,7 +433,10 @@ EC(     ECCheckFileHandle( truetypeFile ) );
 
                 /* fill TrueTypeOutlineEntry */
                 strcpy( trueTypeOutlineEntry->TTOE_fontFileName, fileName );
-                
+            	trueTypeOutlineEntry->TTOE_fontFileSize = FileSize(truetypeFile);
+		trueTypeOutlineEntry->TTOE_magicWord = CalcMagicNumber(truetypeFile, 
+							trueTypeOutlineEntry->TTOE_fontFileSize);
+    
                 /* fill OutlineDataEntry */
                 outlineDataEntry = (OutlineDataEntry*) (fontInfo + 1);
                 outlineDataEntry->ODE_style  = mapTextStyle( STYLE_NAME );
@@ -475,6 +496,9 @@ EC(     ECCheckFileHandle( truetypeFile ) );
                 /* fill TrueTypeOutlineEntry */
                 trueTypeOutlineEntry = LMemDerefHandles( fontInfoBlock, trueTypeOutlineChunk );
                 strcpy( trueTypeOutlineEntry->TTOE_fontFileName, fileName );
+		trueTypeOutlineEntry->TTOE_fontFileSize = FileSize(truetypeFile);
+		trueTypeOutlineEntry->TTOE_magicWord = CalcMagicNumber(truetypeFile, 
+							trueTypeOutlineEntry->TTOE_fontFileSize);
                 
                 /* fill OutlineDataEntry */
                 fontInfo = LMemDeref( ConstructOptr(fontInfoBlock, fontInfoChunk) );
@@ -878,7 +902,7 @@ static sword getFontIDAvailIndex( FontID fontID, MemHandle fontInfoBlock )
  *      21.01.23  JK        Initial Revision
  *******************************************************************/
 
-static word getNameFromNameTable( TRUETYPE_VARS, char* name, TT_UShort nameID )
+static word getNameFromNameTable( TRUETYPE_VARS, char* name, const TT_UShort nameID )
 {
         TT_UShort           platformID;
         TT_UShort           encodingID;
@@ -962,7 +986,7 @@ static word getNameFromNameTable( TRUETYPE_VARS, char* name, TT_UShort nameID )
  *      ----      ----      -----------
  *      21.01.23  JK        Initial Revision
  *******************************************************************/
-
+#pragma code_seg(ttcharmapper_TEXT)
 void InitConvertHeader( TRUETYPE_VARS, FontHeader* fontHeader )
 {
         TT_UShort  charIndex;
@@ -973,19 +997,21 @@ EC(     ECCheckBounds( (void*)fontHeader ) );
 
         if(fontHeader->FH_initialized) return;
 
-	/* not initialized try loading cache */
-	if(trueTypeVars->cacheFile == NullHandle) {
-		trueTypeVars->cacheFile = TrueType_Cache_Init();
-	}
+        /* not initialized try loading cache */
+        if(trueTypeVars->cacheFile == NullHandle) {
+                trueTypeVars->cacheFile = TrueType_Cache_Init();
+        }
 
-	if(trueTypeVars->cacheFile != NullHandle) {
-	    /* try loading header from cache */
+        if(trueTypeVars->cacheFile != NullHandle) {
+            /* try loading header from cache */
             if(TrueType_Cache_ReadHeader( 
-					trueTypeVars->cacheFile, 
-	    				trueTypeVars->entry.TTOE_fontFileName, 
-					fontHeader)) 
-		return;	    
-	}
+                                        trueTypeVars->cacheFile, 
+                                        trueTypeVars->entry.TTOE_fontFileName, 
+					trueTypeVars->entry.TTOE_fontFileSize,
+					trueTypeVars->entry.TTOE_magicWord,
+                                        fontHeader)) 
+                return;	    
+        }
 
         /* initialize min, max and avg values in fontHeader */
         fontHeader->FH_minLSB   =  9999;
@@ -1076,11 +1102,13 @@ EC(     ECCheckBounds( (void*)fontHeader ) );
         fontHeader->FH_initialized = TRUE;
 
         TrueType_Cache_WriteHeader(
-				trueTypeVars->cacheFile, 
-				trueTypeVars->entry.TTOE_fontFileName, 
-				fontHeader);
+                                trueTypeVars->cacheFile, 
+                                trueTypeVars->entry.TTOE_fontFileName, 
+				trueTypeVars->entry.TTOE_fontFileSize,
+				trueTypeVars->entry.TTOE_magicWord,
+                                fontHeader);
 }
-
+#pragma code_seg()
 
 /********************************************************************
  *                      GetDefaultChar
@@ -1121,6 +1149,43 @@ static char GetDefaultChar( TRUETYPE_VARS, char firstChar )
 
 
 /********************************************************************
+ *                      activateBytecodeInterpreter
+ ********************************************************************
+ * SYNOPSIS:       Activates or determines if the bytecode interpreter 
+ *                 should be active for the TrueType font driver. Reads 
+ *                 the configuration setting from geos.ini.
+ * 
+ * PARAMETERS:     None
+ * 
+ * RETURNS:        Boolean
+ *                    TRUE if the bytecode interpreter should be active 
+ *                    (default behavior) or the value retrieved from the 
+ *                    initialization file if it is successfully read.
+ * 
+ * STRATEGY:       - Attempt to read the BYTECODEINTERPRETER_KEY from the 
+ *                   initialization file under the TTFDRIVER_CATEGORY.
+ *                 - If the key is successfully read, return the retrieved value.
+ *                 - If reading fails, return TRUE as the default behavior.
+ * 
+ * REVISION HISTORY:
+ *      Date      Name      Description
+ *      ----      ----      -----------
+ *      17.11.24  jk        Initial Revision
+ *******************************************************************/
+
+static Boolean activateBytecodeInterpreter()
+{
+        Boolean  bytecodeInterpreterActive;
+
+
+        if( !InitFileReadBoolean( TTFDRIVER_CATEGORY, BYTECODEINTERPRETER_KEY, &bytecodeInterpreterActive ) )
+                return bytecodeInterpreterActive;
+
+        return TRUE;
+}
+
+
+/********************************************************************
  *                      GetKernCount
  ********************************************************************
  * SYNOPSIS:       Retrieves the number of valid kerning pairs for the 
@@ -1150,8 +1215,8 @@ static char GetDefaultChar( TRUETYPE_VARS, char firstChar )
  *      ----      ----      -----------
  *      11/08/23  JK        Initial Revision
  *******************************************************************/
-
-static word GetKernCount( TRUETYPE_VARS )
+#pragma code_seg(ttcharmapper_TEXT)
+word GetKernCount( TRUETYPE_VARS )
 {
         TT_Kerning        kerningDir;
         word              table;
@@ -1159,7 +1224,7 @@ static word GetKernCount( TRUETYPE_VARS )
         word              numGeosKernPairs = 0;
         LookupEntry*      indices;
 
-        if( TT_Get_Kerning_Directory( FACE, &kerningDir ) )
+        if( TT_Load_Kerning_Directory( FACE, &kerningDir ) )
                 return 0;
 
         if( kerningDir.nTables == 0 )
@@ -1175,7 +1240,7 @@ EC(     ECCheckBounds( indices ) );
                 word i;
                 word minKernValue = UNITS_PER_EM / KERN_VALUE_DIVIDENT;
 
-                if( TT_Load_Kerning_Table( FACE, table ) )
+                if( TT_Load_Kerning_Table( FACE, &kerningDir, table ) )
                         continue;
 
                 if( kerningDir.tables->format != 0 )
@@ -1196,10 +1261,11 @@ EC(     ECCheckBounds( indices ) );
                 GEO_UNLOCK( kerningDir.tables->t.kern0.pairsBlock );
         }
         GEO_UNLOCK( LOOKUP_TABLE );
+        TT_Kerning_Directory_Done( &kerningDir );
 
         return numGeosKernPairs;
 }
-
+#pragma code_seg()
 
 /*******************************************************************/
 /* We cannot use functions from the Ansic library, which causes a  */

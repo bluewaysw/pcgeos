@@ -28,6 +28,12 @@
 #include "ttextend.h"
 #endif
 
+
+#ifdef __GEOS__
+extern TEngine_Instance engineInstance;
+#endif  /* __GEOS__ */
+
+
 /* Required by tracing mode */
 #undef   TT_COMPONENT
 #define  TT_COMPONENT  trace_objs
@@ -44,15 +50,13 @@
   LOCAL_FUNC
   PExecution_Context  New_Context( PFace  face )
   {
-    PEngine_Instance    engine;
     PExecution_Context  exec;
 
 
     if ( !face )
       return NULL;
 
-    engine = face->engine;
-    CACHE_New( engine->objs_exec_cache, exec, face );
+    CACHE_New( engineInstance.objs_exec_cache, exec, face );
     return exec;
   }
 
@@ -68,14 +72,10 @@
   LOCAL_FUNC
   TT_Error  Done_Context( PExecution_Context  exec )
   {
-    PEngine_Instance  engine;
-
-
     if ( !exec )
       return TT_Err_Ok;
 
-    engine = exec->face->engine;
-    return CACHE_Done( engine->objs_exec_cache, exec );
+    return CACHE_Done( engineInstance.objs_exec_cache, exec );
   }
 
 
@@ -579,7 +579,7 @@
     exec->top     = 0;
     exec->callTop = 0;
 
-    return RunIns( exec );
+    return CALL_INTERPRETER;
   }
 
 
@@ -776,18 +776,17 @@
       PIns_Metrics  metrics = &exec->metrics;
 
 
-      metrics->x_ppem    = 0;
-      metrics->y_ppem    = 0;
-      metrics->pointSize = 0;
-      metrics->x_scale1  = 0;
-      metrics->x_scale2  = 1;
-      metrics->y_scale1  = 0;
-      metrics->y_scale2  = 1;
+      metrics->x_ppem       = 0;
+      metrics->y_ppem       = 0;
+      metrics->pointSize    = 0;
+      metrics->x_scale1     = 0;
+      metrics->units_per_em = 1;
+      metrics->y_scale1     = 0;
 
-      metrics->ppem      = 0;
-      metrics->scale1    = 0;
-      metrics->scale2    = 1;
-      metrics->ratio     = 1L << 16;
+      metrics->ppem         = 0;
+      metrics->scale1       = 0;
+      metrics->scale2       = 1;
+      metrics->ratio        = 1L << 16;
     }
 
     exec->instruction_trap = FALSE;
@@ -813,7 +812,7 @@
       if ( error )
         goto Fin;
 
-      error = RunIns( exec );
+      error = CALL_INTERPRETER;
     }
     else
       error = TT_Err_Ok;
@@ -869,23 +868,14 @@
     if ( ins->metrics.x_ppem >= ins->metrics.y_ppem )
     {
       ins->metrics.scale1  = ins->metrics.x_scale1;
-      ins->metrics.scale2  = ins->metrics.x_scale2;
       ins->metrics.ppem    = ins->metrics.x_ppem;
-      ins->metrics.x_ratio = 1L << 16;
-      ins->metrics.y_ratio = TT_MulDiv( ins->metrics.y_ppem,
-                                        0x10000,
-                                        ins->metrics.x_ppem );
     }
     else
     {
       ins->metrics.scale1  = ins->metrics.y_scale1;
-      ins->metrics.scale2  = ins->metrics.y_scale2;
       ins->metrics.ppem    = ins->metrics.y_ppem;
-      ins->metrics.x_ratio = TT_MulDiv( ins->metrics.x_ppem,
-                                        0x10000,
-                                        ins->metrics.y_ppem );
-      ins->metrics.y_ratio = 1L << 16;
     }
+    ins->metrics.scale2 = ins->metrics.units_per_em;
 
     /* Scale the cvt values to the new ppem.          */
     /* We use by default the y ppem to scale the CVT. */
@@ -934,7 +924,7 @@
       if ( error )
         goto Fin;
 
-      error = RunIns( exec );
+      error = CALL_INTERPRETER;
     }
     else
       error = TT_Err_Ok;
@@ -1076,24 +1066,17 @@
   TT_Error  Face_Create( void*  _face,
                          void*  _input )
   {
-    PEngine_Instance  engine;
-
     TFont_Input*  input = (TFont_Input*)_input;
     PFace         face  = (PFace)_face;
     TT_Error      error;
 
 
     face->stream = input->stream;
-    face->engine = input->engine;
 
-    engine = face->engine;
-
-    Cache_Create( engine,
-                  engine->objs_instance_class,
+    Cache_Create( engineInstance.objs_instance_class,
                   &face->instances );
 
-    Cache_Create( engine,
-                  engine->objs_glyph_class,
+    Cache_Create( engineInstance.objs_glyph_class,
                   &face->glyphs );
 
     /* Load collection directory if present, then font directory */
@@ -1237,9 +1220,7 @@
     sizeof ( TFace ),
     -1,
     Face_Create,
-    Face_Destroy,
-    NULL,
-    NULL
+    Face_Destroy
   };
 
   static
@@ -1248,9 +1229,7 @@
     sizeof ( TInstance ),
     -1,
     Instance_Create,
-    Instance_Destroy,
-    NULL,
-    NULL
+    Instance_Destroy
   };
 
   /* Note that we use a cache size of 1 for the execution context.  */
@@ -1264,9 +1243,7 @@
     sizeof ( TExecution_Context ),
     1,
     Context_Create,
-    Context_Destroy,
-    NULL,
-    NULL
+    Context_Destroy
   };
 
   static
@@ -1275,14 +1252,12 @@
     sizeof ( TGlyph ),
     -1,
     Glyph_Create,
-    Glyph_Destroy,
-    NULL,
-    NULL
+    Glyph_Destroy
   };
 
 
   LOCAL_FUNC
-  TT_Error  TTObjs_Init( PEngine_Instance  engine )
+  TT_Error  TTObjs_Init( )
   {
     PCache        face_cache, exec_cache;
     TT_Error      error;
@@ -1293,22 +1268,22 @@
       goto Fail;
 
     /* create face cache */
-    error = Cache_Create( engine, (PCache_Class)&objs_face_class, face_cache );
+    error = Cache_Create( (PCache_Class)&objs_face_class, face_cache );
     if ( error )
       goto Fail;
 
-    engine->objs_face_cache = face_cache;
+    engineInstance.objs_face_cache = face_cache;
 
-    error = Cache_Create( engine, (PCache_Class)&objs_exec_class, exec_cache );
+    error = Cache_Create( (PCache_Class)&objs_exec_class, exec_cache );
     if ( error )
       goto Fail;
 
-    engine->objs_exec_cache = exec_cache;
+    engineInstance.objs_exec_cache = exec_cache;
 
-    engine->objs_face_class      = (PCache_Class)&objs_face_class;
-    engine->objs_instance_class  = (PCache_Class)&objs_instance_class;
-    engine->objs_execution_class = (PCache_Class)&objs_exec_class;
-    engine->objs_glyph_class     = (PCache_Class)&objs_glyph_class;
+    engineInstance.objs_face_class      = (PCache_Class)&objs_face_class;
+    engineInstance.objs_instance_class  = (PCache_Class)&objs_instance_class;
+    engineInstance.objs_execution_class = (PCache_Class)&objs_exec_class;
+    engineInstance.objs_glyph_class     = (PCache_Class)&objs_glyph_class;
 
     goto Exit;
 
@@ -1334,16 +1309,16 @@
  ******************************************************************/
 
   LOCAL_FUNC
-  TT_Error  TTObjs_Done( PEngine_Instance  engine )
+  TT_Error  TTObjs_Done( )
   {
     /* destroy all active faces and contexts before releasing the */
     /* caches                                                     */
-    Cache_Destroy( (TCache*)engine->objs_exec_cache );
-    Cache_Destroy( (TCache*)engine->objs_face_cache );
+    Cache_Destroy( (TCache*)engineInstance.objs_exec_cache );
+    Cache_Destroy( (TCache*)engineInstance.objs_face_cache );
 
     /* Now frees caches and cache classes */
-    FREE( engine->objs_exec_cache );
-    FREE( engine->objs_face_cache );
+    FREE( engineInstance.objs_exec_cache );
+    FREE( engineInstance.objs_face_cache );
 
     return TT_Err_Ok;
   }

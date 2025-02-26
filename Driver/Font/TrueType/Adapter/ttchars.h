@@ -37,11 +37,11 @@ extern word       bitmapSize;
 void _pascal  TrueType_Gen_Chars( word                 character, 
                                   FontBuf*             fontBuf,
                                   WWFixedAsDWord       pointSize,
-        	                  Byte                 width,
-	                          Byte                 weight,
-			          const FontInfo*      fontInfo, 
+                                  Byte                 width,
+                                  Byte                 weight,
+                                  const FontInfo*      fontInfo, 
                                   const OutlineEntry*  outlineEntry,
-				  TextStyle	       stylesToImplement,
+                                  TextStyle	       stylesToImplement,
                                   MemHandle            bitmapBlock,
                                   MemHandle            varBlock );
 

@@ -65,7 +65,7 @@ TrueTypeGenWidths	proc	far
 	.enter
 
 	xchg	di, ax
-	mov	di, 1400
+	mov	di, 800
 	call	ThreadBorrowStackSpace
 	push	di
 
@@ -73,6 +73,9 @@ TrueTypeGenWidths	proc	far
 	push	bx			;send tMatrix ptr
 	push 	cx
 
+	push	es			;pass ptr to gstates
+	mov 	dx, GS_TMatrix		;graphic matrix
+	push	dx
 	clr	al
 	movwbf	dxah, es:GS_fontAttr.FCA_pointsize
 	push	dx			;pass point size

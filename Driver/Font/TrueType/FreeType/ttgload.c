@@ -192,7 +192,7 @@
 
   static TT_Pos  Scale_X( PIns_Metrics  metrics, TT_Pos  x )
   {
-    return TT_MulDiv( x, metrics->x_scale1, metrics->x_scale2 );
+    return TT_MulDiv( x, metrics->x_scale1, metrics->units_per_em );
   }
 
 
@@ -213,7 +213,7 @@
   static 
   TT_Pos  Scale_Y( PIns_Metrics  metrics, TT_Pos  y )
   {
-    return TT_MulDiv( y, metrics->y_scale1, metrics->y_scale2 );
+    return TT_MulDiv( y, metrics->y_scale1, metrics->units_per_em );
   }
 
 
@@ -678,7 +678,7 @@
         exec->GS = instance->GS;
       /* load default graphics state */
 
-      glyph->outline.high_precision = ( instance->metrics.y_ppem < 24 );
+      glyph->outline.y_ppem = ( instance->metrics.y_ppem );
     }
 
     /* save its critical pointers, as they'll be modified during load */
@@ -1188,8 +1188,10 @@
         advance      = Scale_X( &exec->metrics, advance      );
       }
 
+#ifdef TT_CONFIG_OPTION_SUPPORT_OPTIONAL_FIELDS
       glyph->metrics.linearHoriBearingX = left_bearing;
       glyph->metrics.linearHoriAdvance  = advance;
+#endif
     }
 
     glyph->metrics.horiBearingX = glyph->metrics.bbox.xMin;
@@ -1263,8 +1265,10 @@
         advance = advance_height;
       }
 
+#ifdef TT_CONFIG_OPTION_SUPPORT_OPTIONAL_FIELDS
       glyph->metrics.linearVertBearingY = Top;
       glyph->metrics.linearVertAdvance  = advance;
+#endif
 
       /* XXX : for now, we have no better algo for the lsb, but it should */
       /*       work ok..                                                  */

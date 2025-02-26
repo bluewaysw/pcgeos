@@ -24,6 +24,7 @@
 #include "ttmemory.h"
 #include <ec.h>
 #include <geode.h>
+#include <heap.h>
 
 static int strcmp( const char* s1, const char* s2 );
 
@@ -83,6 +84,7 @@ EC(     ECCheckFileHandle( TTFILE) );
 
         /* create lookup table for kernpairs if face supports kerning */
         LOOKUP_TABLE = CreateIndexLookupTable( CHAR_MAP );
+EC(     ECCheckMemHandle( LOOKUP_TABLE ) );
 
         /* font has been fully loaded */
         trueTypeVars->entry = *entry;
@@ -130,7 +132,7 @@ void TrueType_Unlock_Face(TRUETYPE_VARS)
  * RETURNS:       TT_Error
  * 
  * STRATEGY:      - free resources used by instance and face
- *                - close file
+ *                - close file and free lookup table
  * 
  * REVISION HISTORY:
  *      Date      Name      Description
@@ -152,8 +154,11 @@ void TrueType_Free_Face(TRUETYPE_VARS)
             FileClose( TTFILE, FALSE );
             TTFILE = NullHandle;
         }
-        if( LOOKUP_TABLE )
+        if ( LOOKUP_TABLE )
+        {
             DestroyIndexLookupTable( LOOKUP_TABLE );
+            LOOKUP_TABLE = NullHandle;
+        }
 }
 
 static int strcmp( const char* s1, const char* s2 )

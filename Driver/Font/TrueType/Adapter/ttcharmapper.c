@@ -22,6 +22,7 @@
 #include <freetype.h>
 #include <ttmemory.h>
 #include <geos.h>
+#include <geode.h>
 #include <unicode.h>
 #include <Ansi/stdlib.h>
 
@@ -35,7 +36,7 @@
  *      internal functions
  ***********************************************************************/
 
-static int _pascal compareLookupEntries(const void *a, const void *b);
+int _pascal compareLookupEntries(const void *a, const void *b);
 
 
 //TODO: put geosCharMap into movable ressource
@@ -292,7 +293,7 @@ CharMapEntry geosCharMap[] =
  *      ----      ----      -----------
  *      30.09.24  JK        Initial Revision
  *******************************************************************/
-#pragma code_seg("Resident2")
+
 word GeosCharToUnicode( const word  geosChar )
 {
         if( geosChar < MIN_GEOS_CHAR || geosChar > MAX_GEOS_CHAR )
@@ -300,7 +301,6 @@ word GeosCharToUnicode( const word  geosChar )
 
         return geosCharMap[ GEOS_CHAR_INDEX( geosChar ) ].unicode;
 }
-#pragma code_seg()
 
 
 /********************************************************************
@@ -327,7 +327,6 @@ word GeosCharToUnicode( const word  geosChar )
  *      30.09.24  JK        Initial Revision
  *******************************************************************/
 
-#pragma code_seg("Resident2")
 CharMapFlags GeosCharMapFlag( const word  geosChar )
 {
        if( geosChar < MIN_GEOS_CHAR || geosChar > MAX_GEOS_CHAR )
@@ -335,7 +334,6 @@ CharMapFlags GeosCharMapFlag( const word  geosChar )
 
        return geosCharMap[ GEOS_CHAR_INDEX( geosChar ) ].flags;
 }
-#pragma code_seg()
 
 
 /********************************************************************
@@ -372,7 +370,7 @@ CharMapFlags GeosCharMapFlag( const word  geosChar )
  *      ----      ----      -----------
  *      06.12.22  JK        Initial Revision
  *******************************************************************/
-
+#pragma code_seg(ttcmap_TEXT)
 word CountValidGeosChars( const TT_CharMap  map, char*  firstChar, char*  lastChar )
 {
         word  charIndex;
@@ -394,7 +392,7 @@ word CountValidGeosChars( const TT_CharMap  map, char*  firstChar, char*  lastCh
 
         return (*firstChar <= *lastChar) ? (1 + *lastChar - *firstChar) : 0;
 }
-
+#pragma code_seg()
 
 /********************************************************************
  *                      CreateIndexLookupTable
@@ -419,7 +417,7 @@ word CountValidGeosChars( const TT_CharMap  map, char*  firstChar, char*  lastCh
  *      ----      ----      -----------
  *      30.09.24  JK        Initial Revision
  *******************************************************************/
-
+#pragma code_seg(ttcmap_TEXT)
 MemHandle CreateIndexLookupTable( const TT_CharMap  map )
 {
         MemHandle     memHandle;
@@ -427,8 +425,9 @@ MemHandle CreateIndexLookupTable( const TT_CharMap  map )
         int           i;
 
 
-        memHandle = MemAlloc( NUM_CHARMAPENTRIES * sizeof( LookupEntry ),
-                              HF_SHARABLE | HF_SWAPABLE, HAF_LOCK );
+        memHandle = MemAllocSetOwner( GeodeGetCodeProcessHandle(), 
+                                NUM_CHARMAPENTRIES * sizeof( LookupEntry ),
+                              	HF_SHARABLE | HF_SWAPABLE, HAF_LOCK | HAF_NO_ERR);
 EC(     ECCheckMemHandle( memHandle ) );
 
         lookupTable = (LookupEntry*)MemDeref( memHandle );
@@ -440,36 +439,18 @@ EC(     ECCheckBounds( lookupTable ) );
                 lookupTable[i].geoscode = (char)i + C_SPACE;
         }
 
-        //qsort( lookupTable, NUM_CHARMAPENTRIES, sizeof( LookupEntry ), compareLookupEntries );
-        {
-                int a = 0;
-                while(a < NUM_CHARMAPENTRIES) {
-
-                        int b = 0;
-                        while(b < NUM_CHARMAPENTRIES) {
-                                
-                                if(compareLookupEntries(&lookupTable[a], &lookupTable[b]) < 0) {
-                                        
-                                        LookupEntry temp = lookupTable[a];
-                                        lookupTable[a] = lookupTable[b];
-                                        lookupTable[b] = temp;
-                                }
-                                b++;
-                        }
-                        a++;
-                }
-        }
+        qsort( lookupTable, NUM_CHARMAPENTRIES, sizeof( LookupEntry ), compareLookupEntries );
 
         MemUnlock( memHandle );
         return memHandle;
 }
 
 
-static int _pascal compareLookupEntries( const void *a, const void *b ) 
+int _pascal compareLookupEntries( const void *a, const void *b ) 
 {
         return (int)((LookupEntry *)a)->ttindex - (int)((LookupEntry *)b)->ttindex;
 }
-
+#pragma code_seg()
 
 /********************************************************************
  *                      GetGEOSCharForIndex
@@ -500,7 +481,6 @@ static int _pascal compareLookupEntries( const void *a, const void *b )
  *      ----      ----      -----------
  *      30.09.24  JK        Initial Revision
  *******************************************************************/
-#pragma code_seg("Resident2")
 
 word  GetGEOSCharForIndex( const LookupEntry* lookupTable, const word index )
 {
@@ -521,4 +501,3 @@ word  GetGEOSCharForIndex( const LookupEntry* lookupTable, const word index )
         return 0;
 }
 
-#pragma code_seg()

@@ -71,9 +71,9 @@ void _pascal TrueType_Gen_Chars(
                         WWFixedAsDWord       pointSize,
                         Byte                 widthIn,
                         Byte                 weight,
-			const FontInfo*      fontInfo, 
+                        const FontInfo*      fontInfo, 
                         const OutlineEntry*  outlineEntry,
-			TextStyle	     stylesToImplement,
+                        TextStyle            stylesToImplement,
                         MemHandle            bitmapHandle,
                         MemHandle            varBlock ) 
 {
@@ -83,7 +83,7 @@ void _pascal TrueType_Gen_Chars(
         TrueTypeVars*          trueTypeVars;
         TransformMatrix*       transformMatrix;
         void*                  charData;
-        sword                  width, height, size, memSize;
+        sword                  width, height, size;
 
 
 EC(     ECCheckBounds( (void*)fontBuf ) );
@@ -108,19 +108,20 @@ EC(     ECCheckBounds( (void*)trueTypeOutline ) );
         if( charIndex == 0 )
                 goto Fail;
 
+        /* get transformmatrix */
+        transformMatrix = (TransformMatrix*)(((byte*)fontBuf) + sizeof( FontBuf ) + ( fontBuf->FB_lastChar - fontBuf->FB_firstChar + 1 ) * sizeof( CharTableEntry ));
+EC(     ECCheckBounds( (void*)transformMatrix ) );
+
+        /* set pointsize and resolution */
+        TT_Set_Instance_CharSize_And_Resolutions( INSTANCE, pointSize >> 10, transformMatrix->TM_resX, transformMatrix->TM_resY );
+
         /* create new glyph */
         TT_New_Glyph( FACE, &GLYPH );
-
-        /* set pointsize and get metrics */
-        TT_Set_Instance_CharSize( INSTANCE, ( pointSize >> 10 ) );
 
         /* load glyph and load glyphs outline */
         TT_Load_Glyph( INSTANCE, GLYPH, charIndex, TTLOAD_DEFAULT );
         TT_Get_Glyph_Outline( GLYPH, &OUTLINE );
 
-        /* get transformmatrix */
-        transformMatrix = (TransformMatrix*)(((byte*)fontBuf) + sizeof( FontBuf ) + ( fontBuf->FB_lastChar - fontBuf->FB_firstChar + 1 ) * sizeof( CharTableEntry ));
-EC(     ECCheckBounds( (void*)transformMatrix ) );
         TT_Transform_Outline( &OUTLINE, &transformMatrix->TM_matrix );
 
         /* get glyphs boundig box */
@@ -133,15 +134,16 @@ EC(     ECCheckBounds( (void*)transformMatrix ) );
         GLYPH_BBOX.yMax  = ( GLYPH_BBOX.yMax + 63 ) & -64;
 
         /* compute pixel dimensions */
-        width  = MAX( MIN_BITMAP_DIMENSION, (GLYPH_BBOX.xMax - GLYPH_BBOX.xMin) >> 6 );
-        height = MAX( MIN_BITMAP_DIMENSION, (GLYPH_BBOX.yMax - GLYPH_BBOX.yMin) >> 6 );
+        width  = (GLYPH_BBOX.xMax - GLYPH_BBOX.xMin) >> 6;
+        height = (GLYPH_BBOX.yMax - GLYPH_BBOX.yMin) >> 6;
 
         if( fontBuf->FB_flags & FBF_IS_REGION )
         {
-                TT_Matrix         flipmatrix = HORIZONTAL_FLIP_MATRIX; 
+                TT_Matrix         flipmatrix = HORIZONTAL_FLIP_MATRIX;
 
-                /* We calculate with an average of 4 on/off points, line number and line end code. */
-                size = height * 6 * sizeof( word ) + REGION_SAFETY + SIZE_REGION_HEADER; 
+
+                /* We calculate with an average of 6 on/off points, line number and line end code. */
+                size = height * 8 * sizeof( word ) + REGION_SAFETY + SIZE_REGION_HEADER; 
 
                 /* get pointer to bitmapBlock */
                 charData = EnsureBitmapBlock( bitmapHandle, size );
@@ -175,6 +177,13 @@ EC_ERROR_IF(    size < RASTER_MAP.size, ERROR_BITMAP_BUFFER_OVERFLOW );
         }
         else
         {      
+                /* Avoid widths or heights of 0 pixels */
+                if( height == 0 && width > 0 )
+                        height = 1;
+
+                if( width == 0 && height > 0 )
+                        width = 0;
+
                 size = height * ( ( width + 7 ) >> 3 ) + SIZE_CHAR_HEADER;
 
                 /* get pointer to bitmapBlock */
@@ -211,37 +220,37 @@ EC_ERROR_IF(    size < RASTER_MAP.size, ERROR_BITMAP_BUFFER_OVERFLOW );
         /* realloc FontBuf if necessary */
         fontBufHandle = MemPtrToHandle( fontBuf );
 EC(     ECCheckMemHandle( fontBufHandle ) );
-memSize =MemGetInfo( fontBufHandle, MGIT_SIZE );
-        if( memSize < fontBuf->FB_dataSize + size )
+        if( MemGetInfo( fontBufHandle, MGIT_SIZE ) < fontBuf->FB_dataSize + size )
         {
                 MemReAlloc( fontBufHandle, fontBuf->FB_dataSize + size, HAF_STANDARD_NO_ERR );
 EC(             ECCheckMemHandle( fontBufHandle) );
                 fontBuf = MemDeref( fontBufHandle );
 EC(             ECCheckBounds( (void*)fontBuf ) );
-        /* add rendered glyph to fontbuf */
-        CopyChar( fontBuf, character, charData, size );
         }
-	else {
+
         /* add rendered glyph to fontbuf */
         CopyChar( fontBuf, character, charData, size );
-	}
 
         /* cleanup */
         MemUnlock( bitmapHandle );
-	{
-	    TrueTypeCacheBufSpec   bufSpec;
+        {
+            TrueTypeCacheBufSpec   bufSpec;
 
-	    bufSpec.TTCBS_pointSize = pointSize;
-	    bufSpec.TTCBS_width = widthIn;
-	    bufSpec.TTCBS_weight = weight;
-	    bufSpec.TTCBS_stylesToImplement = stylesToImplement;
+            bufSpec.TTCBS_pointSize = pointSize;
+            bufSpec.TTCBS_width = widthIn;
+            bufSpec.TTCBS_weight = weight;
+            bufSpec.TTCBS_stylesToImplement = stylesToImplement;
 
-	    TrueType_Cache_UpdateFontBlock(
-		trueTypeVars->cacheFile,
-		trueTypeVars->entry.TTOE_fontFileName, 
-		&bufSpec, fontBufHandle		
-	    );		
-	}
+            if( !(fontBuf->FB_flags & FBF_IS_COMPLEX) ) {
+                TrueType_Cache_UpdateFontBlock(
+                    trueTypeVars->cacheFile,
+                    trueTypeVars->entry.TTOE_fontFileName, 
+                    trueTypeVars->entry.TTOE_fontFileSize,
+                    trueTypeVars->entry.TTOE_magicWord,
+                    &bufSpec, fontBufHandle		
+                );
+            }
+        }
 Fail:        
         TrueType_Unlock_Face( trueTypeVars );
 Fin:

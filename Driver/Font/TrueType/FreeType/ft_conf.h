@@ -96,7 +96,7 @@
 /* by the engine and need no extensions, undefine this configuration     */
 /* macro to save a few more bytes.                                       */
 
-#define  TT_CONFIG_OPTION_EXTEND_ENGINE
+//#define  TT_CONFIG_OPTION_EXTEND_ENGINE
 
 
 /*************************************************************************/
@@ -116,7 +116,7 @@
 /* emerged recently on the FreeType lists.  We still do not have Apple's */
 /* opinion on the subject and will change this as soon as we have.       */
 
-#define   TT_CONFIG_OPTION_NO_INTERPRETER
+//#define   TT_CONFIG_OPTION_NO_INTERPRETER
 
 
 /*************************************************************************/
@@ -126,7 +126,9 @@
 /* configuration macro will generate the appropriate C jump table in     */
 /* ttinterp.c. If you use an optimizing compiler, you should leave it    */
 /* defined for better performance and code compactness..                 */
-
+/* Usable for PC/GEOS but requires as is more code space and doesn't     */
+/* seem to give performance benefits                                     */
+/*                                                                       */
 #define  TT_CONFIG_OPTION_INTERPRETER_SWITCH
 
 
@@ -238,6 +240,43 @@
 
 #undef TT_CONFIG_OPTION_SUPPORT_PEDANTIC_HINTING
 
+
+/*************************************************************************/
+/* Define TT_CONFIG_OPTION_USE_ASSEMBLER_IMPLEMENTATION if you want to   */
+/* use assembler implemented funcions. These implementations use regs    */
+/* and instructions of 80386 processors.                                 */
+
+#//define TT_CONFIG_OPTION_USE_ASSEMBLER_IMPLEMENTATION
+
+
+/*************************************************************************/
+/* Define this option to enable support for obsolete bytecode            */
+/* instructions. These instructions are no longer commonly used.         */
+
+#undef TT_CONFIG_OPTION_SUPPORT_OBSOLET_INSTRUCTIONS
+
+/*************************************************************************/
+/* When compiled for GEOS real mode target code segments need to be      */
+/* below 8K in size. Usually there is 1 code files ending up in one      */
+/* segment. Especially the interpreter is quite large and produces       */
+/* 17K code segment (32K for EC build). This config flag when set        */
+/* force smaller segments to be used.                                    */
+/*                                                                       */
+/* Segmenting has impact on function beeing near or far, so when working */
+/* with pointer we need to take care especially. The segmenting concept  */
+/* introduces 4 level for the interpreter:                               */
+/* - entry: Entry code and main-look/switch with all direct opcode       */
+/*          handlers                                                     */
+/*          "InterpEntry" - Callbacks (_near): Read/Write/Move_CVT       */
+/* - main:  Central code part that stay in interp_TEXT segment, far      */
+/*          from then entry (and the others)                             */
+/*          Callbacks (_near): Round_*, Direct_Move_*, Round_*, Project_ */
+/* - infrequent: Function that are called no often, that are specific    */
+/*               "InterpInfreq"                                          */
+/* - extra: Other infrequent called functions that are independent       */
+/*          "InterpExtra"                                                */
+
+#define   TT_CONFIG_GEOS_REAL_MODE_SEGMENTING
 
 /**********************************************************************/
 /*                                                                    */

@@ -57,7 +57,7 @@ typedef struct
  *      definitions
  ***********************************************************************/
 
-#define DestroyIndexLookupTable( memH ) ( GEO_FREE( memH ))
+#define DestroyIndexLookupTable( memH ) ( MemFree( memH ))
 
 
 /***********************************************************************
