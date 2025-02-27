@@ -73,9 +73,6 @@ TrueTypeGenWidths	proc	far
 	push	bx			;send tMatrix ptr
 	push 	cx
 
-	push	es			;pass ptr to gstates
-	push 	GS_TMatrix		;graphic matrix
-
 	clr	al
 	movwbf	dxah, es:GS_fontAttr.FCA_pointsize
 	push	dx			;pass point size
@@ -111,6 +108,19 @@ TrueTypeGenWidths	proc	far
 	push	di
 	push	ax			;pass stylesToImplement
 
+	mov 	bx, es:GS_window
+	tst	bx
+	jnz	pass_matrix
+	push	0			;pass null ptr
+	push	0
+	jmp	pass_varblock
+
+pass_matrix:	
+	call	MemDerefDS
+	push 	ds			;pass ptr to window matrix
+	push 	W_TMatrix
+
+pass_varblock:
 	segmov	ds, dgroup, dx
 	push	ds:variableHandle	;pass varBlock
 	call	TRUETYPE_GEN_WIDTHS

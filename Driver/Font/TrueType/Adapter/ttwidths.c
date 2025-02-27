@@ -139,7 +139,6 @@ static void AdjustTransMatrix( TransformMatrix* transMatrix,
 MemHandle _pascal TrueType_Gen_Widths(
                         MemHandle            fontHandle,
                         FontMatrix*          fontMatrix,
-                        FontMatrix*          graphicMatrix,
                         WWFixedAsDWord       pointSize,
                         Byte                 width,
                         Byte                 weight,
@@ -147,6 +146,7 @@ MemHandle _pascal TrueType_Gen_Widths(
                         const OutlineEntry*  headerEntry,
                         const OutlineEntry*  firstEntry,
                         TextStyle            stylesToImplement,
+                        FontMatrix*          graphicMatrix,
                         MemHandle            varBlock ) 
 {
         TrueTypeOutlineEntry*  trueTypeOutline;
@@ -971,18 +971,23 @@ static void AdjustFontBuf( TransformMatrix* transMatrix,
 
 static void AdjustTransMatrix( TransformMatrix* transMatrix, FontMatrix* graphicMatrix )
 {
-        WWFixedAsDWord  scaleX = GrSDivWWFixed( transMatrix->TM_matrix.xx, graphicMatrix->FM_11 );
-        WWFixedAsDWord  scaleY = GrSDivWWFixed( transMatrix->TM_matrix.yy, graphicMatrix->FM_22 );
+        if( graphicMatrix == NULL )
+        {
+                transMatrix->TM_resX = 72;
+                transMatrix->TM_resY = 72;
+
+                return;
+        }
 
         /* set horizontal and vertical resolution based on 72 dpi */
-        transMatrix->TM_resX = ABS( INTEGER_OF_WWFIXEDASDWORD( TrueType_GrMulWWFixed( WORD_TO_WWFIXEDASDWORD( 72 ), scaleX ) ) );
-        transMatrix->TM_resY = ABS( INTEGER_OF_WWFIXEDASDWORD( TrueType_GrMulWWFixed( WORD_TO_WWFIXEDASDWORD( 72 ), scaleY ) ) );
+        transMatrix->TM_resX = INTEGER_OF_WWFIXEDASDWORD( GrMulWWFixed( WORD_TO_WWFIXEDASDWORD( 72 ), graphicMatrix->FM_11 ) );
+        transMatrix->TM_resY = INTEGER_OF_WWFIXEDASDWORD( GrMulWWFixed( WORD_TO_WWFIXEDASDWORD( 72 ), graphicMatrix->FM_22 ) );
 
-        /* scale transMatrix by scaleX and scaleY */
-        transMatrix->TM_matrix.xx = GrSDivWWFixed( transMatrix->TM_matrix.xx, scaleX );
-        transMatrix->TM_matrix.xy = GrSDivWWFixed( transMatrix->TM_matrix.xy, scaleX );
-        transMatrix->TM_matrix.yy = GrSDivWWFixed( transMatrix->TM_matrix.yy, scaleY );
-        transMatrix->TM_matrix.yx = GrSDivWWFixed( transMatrix->TM_matrix.yx, scaleY );
+        /* normalize transformation matrix values */
+        transMatrix->TM_matrix.xx = GrSDivWWFixed( transMatrix->TM_matrix.xx, graphicMatrix->FM_11 );
+        transMatrix->TM_matrix.xy = GrSDivWWFixed( transMatrix->TM_matrix.xy, graphicMatrix->FM_11 );
+        transMatrix->TM_matrix.yy = GrSDivWWFixed( transMatrix->TM_matrix.yy, graphicMatrix->FM_22 );
+        transMatrix->TM_matrix.yx = GrSDivWWFixed( transMatrix->TM_matrix.yx, graphicMatrix->FM_22 );
 }
 
 
