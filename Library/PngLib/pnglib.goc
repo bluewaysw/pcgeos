@@ -452,12 +452,12 @@ void _pascal _export pngImportHandlePalette(FileHandle file, pngPLTEChunkEntry p
     char* rawPalette = NULL;
     MemHandle paletteHan = NullHandle;
     MemHandle bmmem = NullHandle;
-    unsigned int offset = 0;
-    char* bmblock = NULL;
+    EditableBitmap* bmblock = NULL;
     unsigned int numColors = 0;
     unsigned int paletteSize = 0;
     int i;
     int grayscaleValue;
+    byte* palPtr;
 
     // Check if the color type is grayscale (except for 1-bit mono)
     if (
@@ -520,11 +520,26 @@ void _pascal _export pngImportHandlePalette(FileHandle file, pngPLTEChunkEntry p
 
     if (paletteHan != NullHandle)
     {
-        // Copy palette data to Bitmap VM File
-        bmblock = VMLock(vmFile, vmBlock, &bmmem);
-        offset = bmblock[0x28]+256*(bmblock[0x29]); // WHUT?!
-        offset += 0x1c;
-        memcpy(&(bmblock[offset]), rawPalette, paletteSize);
+        // Copy palette data to Bitmap VM File - hacked version
+        // We leave this version in here as there are other places
+        // in the source where this is done that way, so a grep
+        // will reveal the "clean" version below...
+        //
+        // bmblock = VMLock(vmFile, vmBlock, &bmmem);
+        // offset = bmblock[0x28]+256*(bmblock[0x29]); // WHUT?!
+        // offset += 0x1c;
+        // memcpy(&(bmblock[offset]), rawPalette, paletteSize);
+
+        // Copy palette data to Bitmap VM File - clean version
+        bmblock = (EditableBitmap*) VMLock(vmFile, vmBlock, &bmmem);
+        palPtr  =   (byte*) bmblock +
+                            sizeof(bmblock->EB_header) +
+                            bmblock->EB_bm.CB_palette +
+                            sizeof(word); /* Number of entries entry */;
+
+        /* Now copy over the new palette */
+        memcpy(palPtr, rawPalette, paletteSize);
+
         VMDirty(bmmem);
         VMUnlock(bmmem);
 

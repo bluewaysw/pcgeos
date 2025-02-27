@@ -11,6 +11,7 @@
 #include <zlib.h>
 #include <file.h>
 #include <heap.h>
+#include <htmldrv.h>
 
 // PNG-Chunks
 #define PNG_CHUNK_IHDR 0x49484452  // "IHDR"
