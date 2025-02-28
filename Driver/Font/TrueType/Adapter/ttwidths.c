@@ -71,7 +71,7 @@ extern void InitConvertHeader( TRUETYPE_VARS, FontHeader* fontHeader );
 static void FillKerningFlags( FontHeader* fontHeader, FontBuf* fontBuf );
 
 static void AdjustTransMatrix( TransformMatrix* transMatrix, 
-                               FontMatrix* graphicMatrix );
+                               FontMatrix* windowMatrix );
 
 
 #define OFFSET_KERN_PAIRS         ( sizeof(FontBuf) +                                   \
@@ -146,7 +146,7 @@ MemHandle _pascal TrueType_Gen_Widths(
                         const OutlineEntry*  headerEntry,
                         const OutlineEntry*  firstEntry,
                         TextStyle            stylesToImplement,
-                        FontMatrix*          graphicMatrix,
+                        FontMatrix*          windowMatrix,
                         MemHandle            varBlock ) 
 {
         TrueTypeOutlineEntry*  trueTypeOutline;
@@ -233,7 +233,7 @@ EC(     ECCheckBounds( (void*)transMatrix ) );
         if( IsRegionNeeded( transMatrix, fontBuf ) )
                 fontBuf->FB_flags |= FBF_IS_REGION;
 
-        AdjustTransMatrix( transMatrix, graphicMatrix );
+        AdjustTransMatrix( transMatrix, windowMatrix );
         TrueType_Unlock_Face( trueTypeVars );
 Fail:        
         MemUnlock( varBlock );
@@ -626,6 +626,8 @@ EC(     ECCheckBounds( (void*)fontBuf ) );
         transMatrix->TM_scriptX = 0;
         transMatrix->TM_heightY = 0;
         transMatrix->TM_scriptY = 0;
+        transMatrix->TM_resX    = 72;
+        transMatrix->TM_resY    = 72;
 
         /* fake bold style       */
         if( stylesToImplement & TS_BOLD )
@@ -953,7 +955,7 @@ static void AdjustFontBuf( TransformMatrix* transMatrix,
  * 
  * PARAMETERS:     transMatrix     
  *                    Pointer to the transformation matrix to be adjusted.
- *                 graphicMatrix 
+ *                 windowMatrix 
  *                    Pointer to the font matrix used for scaling.
  * 
  * RETURNS:        void
@@ -969,25 +971,20 @@ static void AdjustFontBuf( TransformMatrix* transMatrix,
  *      01.02.25  JK        Initial Revision
  *******************************************************************/
 
-static void AdjustTransMatrix( TransformMatrix* transMatrix, FontMatrix* graphicMatrix )
+static void AdjustTransMatrix( TransformMatrix* transMatrix, FontMatrix* windowMatrix )
 {
-        if( graphicMatrix == NULL )
-        {
-                transMatrix->TM_resX = 72;
-                transMatrix->TM_resY = 72;
-
+        if( windowMatrix == NULL )
                 return;
-        }
 
         /* set horizontal and vertical resolution based on 72 dpi */
-        transMatrix->TM_resX = INTEGER_OF_WWFIXEDASDWORD( GrMulWWFixed( WORD_TO_WWFIXEDASDWORD( 72 ), graphicMatrix->FM_11 ) );
-        transMatrix->TM_resY = INTEGER_OF_WWFIXEDASDWORD( GrMulWWFixed( WORD_TO_WWFIXEDASDWORD( 72 ), graphicMatrix->FM_22 ) );
+        transMatrix->TM_resX = INTEGER_OF_WWFIXEDASDWORD( GrMulWWFixed( WORD_TO_WWFIXEDASDWORD( 72 ), windowMatrix->FM_11 ) );
+        transMatrix->TM_resY = INTEGER_OF_WWFIXEDASDWORD( GrMulWWFixed( WORD_TO_WWFIXEDASDWORD( 72 ), windowMatrix->FM_22 ) );
 
         /* normalize transformation matrix values */
-        transMatrix->TM_matrix.xx = GrSDivWWFixed( transMatrix->TM_matrix.xx, graphicMatrix->FM_11 );
-        transMatrix->TM_matrix.xy = GrSDivWWFixed( transMatrix->TM_matrix.xy, graphicMatrix->FM_11 );
-        transMatrix->TM_matrix.yy = GrSDivWWFixed( transMatrix->TM_matrix.yy, graphicMatrix->FM_22 );
-        transMatrix->TM_matrix.yx = GrSDivWWFixed( transMatrix->TM_matrix.yx, graphicMatrix->FM_22 );
+        transMatrix->TM_matrix.xx = GrSDivWWFixed( transMatrix->TM_matrix.xx, windowMatrix->FM_11 );
+        transMatrix->TM_matrix.xy = GrSDivWWFixed( transMatrix->TM_matrix.xy, windowMatrix->FM_11 );
+        transMatrix->TM_matrix.yy = GrSDivWWFixed( transMatrix->TM_matrix.yy, windowMatrix->FM_22 );
+        transMatrix->TM_matrix.yx = GrSDivWWFixed( transMatrix->TM_matrix.yx, windowMatrix->FM_22 );
 }
 
 
