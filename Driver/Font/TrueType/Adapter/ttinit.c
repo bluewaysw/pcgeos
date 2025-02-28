@@ -19,6 +19,7 @@
 
 #include "ttinit.h"
 #include "ttadapter.h"
+#include "ttacache.h"
 #include "ttcharmapper.h"
 #include "ttmemory.h"
 #include "ftxkern.h"
@@ -103,7 +104,6 @@ TT_Error _pascal Init_FreeType()
 {
         TT_Error        error;
  
- 
         error = TT_Init_FreeType();
         if ( error != TT_Err_Ok )
                 return error;
@@ -120,7 +120,8 @@ TT_Error _pascal Init_FreeType()
  * SYNOPSIS:       Cleans up and deinitializes the FreeType library,
  *                 releasing all allocated resources.
  * 
- * PARAMETERS:     None
+ * PARAMETERS:     MemHandle varBlock
+ *                    Memory handle to the block containing TrueType variables.None
  * 
  * RETURNS:        TT_Error
  *                    Returns `TT_Err_Ok` on successful cleanup, or an
@@ -135,8 +136,21 @@ TT_Error _pascal Init_FreeType()
  *      15.07.22  JK        Initial Revision
  *******************************************************************/
 
-TT_Error _pascal Exit_FreeType() 
+TT_Error _pascal Exit_FreeType(MemHandle varBlock) 
 {
+        if ( varBlock != NullHandle ) {
+
+            TrueTypeVars*          trueTypeVars;
+    
+            trueTypeVars = MemLock( varBlock );
+EC(         ECCheckBounds( (void*)trueTypeVars ) );
+    
+            if( trueTypeVars->cacheFile != NullHandle ) {
+                TrueType_Cache_Exit( trueTypeVars->cacheFile );
+            }
+            MemUnlock( varBlock );
+        }
+
         return TT_Done_FreeType();
 }
 
@@ -264,6 +278,25 @@ static word DetectFontFiles( MemHandle* fileEnumBlock )
         return FileEnum( &ttfEnumParams, fileEnumBlock, &numOtherFiles );
 }
 
+
+static word CalcMagicNumber(FileHandle fontFile, dword fontFileSize) 
+{
+	/* zero magic for now
+	word magicNumber = 0;
+	MemHandle mem;
+	mem = MemAlloc();
+	buf = MemDeref(mem);
+
+	FilePos();
+	FileRead();
+
+	
+
+	MemFree(mem);
+	return magicNumber;
+	*/
+	return 0;
+}
 
 /********************************************************************
  *                      ProcessFont
@@ -400,7 +433,10 @@ EC(     ECCheckFileHandle( truetypeFile ) );
 
                 /* fill TrueTypeOutlineEntry */
                 strcpy( trueTypeOutlineEntry->TTOE_fontFileName, fileName );
-                
+            	trueTypeOutlineEntry->TTOE_fontFileSize = FileSize(truetypeFile);
+		trueTypeOutlineEntry->TTOE_magicWord = CalcMagicNumber(truetypeFile, 
+							trueTypeOutlineEntry->TTOE_fontFileSize);
+    
                 /* fill OutlineDataEntry */
                 outlineDataEntry = (OutlineDataEntry*) (fontInfo + 1);
                 outlineDataEntry->ODE_style  = mapTextStyle( STYLE_NAME );
@@ -460,6 +496,9 @@ EC(     ECCheckFileHandle( truetypeFile ) );
                 /* fill TrueTypeOutlineEntry */
                 trueTypeOutlineEntry = LMemDerefHandles( fontInfoBlock, trueTypeOutlineChunk );
                 strcpy( trueTypeOutlineEntry->TTOE_fontFileName, fileName );
+		trueTypeOutlineEntry->TTOE_fontFileSize = FileSize(truetypeFile);
+		trueTypeOutlineEntry->TTOE_magicWord = CalcMagicNumber(truetypeFile, 
+							trueTypeOutlineEntry->TTOE_fontFileSize);
                 
                 /* fill OutlineDataEntry */
                 fontInfo = LMemDeref( ConstructOptr(fontInfoBlock, fontInfoChunk) );
@@ -958,6 +997,22 @@ EC(     ECCheckBounds( (void*)fontHeader ) );
 
         if(fontHeader->FH_initialized) return;
 
+        /* not initialized try loading cache */
+        if(trueTypeVars->cacheFile == NullHandle) {
+                trueTypeVars->cacheFile = TrueType_Cache_Init();
+        }
+
+        if(trueTypeVars->cacheFile != NullHandle) {
+            /* try loading header from cache */
+            if(TrueType_Cache_ReadHeader( 
+                                        trueTypeVars->cacheFile, 
+                                        trueTypeVars->entry.TTOE_fontFileName, 
+					trueTypeVars->entry.TTOE_fontFileSize,
+					trueTypeVars->entry.TTOE_magicWord,
+                                        fontHeader)) 
+                return;	    
+        }
+
         /* initialize min, max and avg values in fontHeader */
         fontHeader->FH_minLSB   =  9999;
         fontHeader->FH_maxBSB   = -9999;
@@ -1045,6 +1100,13 @@ EC(     ECCheckBounds( (void*)fontHeader ) );
                 fontHeader->FH_strikePos = 3 * fontHeader->FH_ascent / 5;
 
         fontHeader->FH_initialized = TRUE;
+
+        TrueType_Cache_WriteHeader(
+                                trueTypeVars->cacheFile, 
+                                trueTypeVars->entry.TTOE_fontFileName, 
+				trueTypeVars->entry.TTOE_fontFileSize,
+				trueTypeVars->entry.TTOE_magicWord,
+                                fontHeader);
 }
 #pragma code_seg()
 
@@ -1188,7 +1250,7 @@ EC(     ECCheckBounds( indices ) );
 
                 for( i = 0; i < kerningDir.tables->t.kern0.nPairs; ++i )
                 {
-                        if( ABS( pairs[i].value ) < minKernValue )
+                        if( ABS( pairs[i].value ) <= minKernValue )
                                 continue;
 
                         if ( GetGEOSCharForIndex( indices, pairs[i].left ) && 

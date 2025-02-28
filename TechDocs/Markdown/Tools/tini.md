@@ -2156,6 +2156,17 @@ color to be used.
 	backgroundcolor = 0
 	backgroundcolor = 12
 
+#### backgroundDisabledOnField
+
+`backgroundDisabledOnField = <Boolean>`
+
+If true, this key tells GEOS no to render the configured background image
+on the field. This is useful if ISDesk is used as launcher which is fullscreen
+and renders the background image itself.
+
+	backgroundDisabledOnField = true
+	backgroundDisabledOnField = false
+
 #### deleteStateFilesAfterCrash
 
 `deleteStateFilesAfterCrash = <Boolean>`
