@@ -79,17 +79,10 @@ struct inflate_blocks_state {
  * level down), but we try to use GEOS code there only in inflate_blocks_new
  * and inflate_blocks_free.
  */
-/*
-    EC({); \
-    EC(word win = (word) s->window;); \
-
-    EC_ERROR_IF(((word) s->window != (word) 0), -1);
-*/
-
-/* if s->window is NOT 0 as of now, something is wrong, fatal error */
 
  #ifdef __GEOS__
   #define IF_GEOS_LOCK_SLIDING_WINDOW(s) { \
+    /* if s->window is NOT 0 as of now, something is wrong, fatal error */ \
     EC_ERROR_IF(((word) s->window != (word) 0), -1); \
     s->window = (Bytef *) MemLock(s->windowHan); \
     s->end = (Bytef *) (s->window + s->windowSize); \
@@ -98,7 +91,8 @@ struct inflate_blocks_state {
   }
 
   #define IF_GEOS_UNLOCK_SLIDING_WINDOW(s) { \
-    EC_ERROR_IF(((Bytef*) s->window == (Bytef*) 0), -1); /* if s->window is 0, something is wrong, fatal error*/ \
+    /* if s->window is 0, something is wrong, fatal error*/ \
+    EC_ERROR_IF(((Bytef*) s->window == (Bytef*) 0), -1); \
     s->windowReadOffs = ((word) s->read) - ((word) s->window); \
     s->windowWriteOffs = ((word) s->write) - ((word) s->window); \
     MemUnlock(s->windowHan); \
