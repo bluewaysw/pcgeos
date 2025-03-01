@@ -388,10 +388,11 @@ inflate_blocks_statef *s;
 z_streamp z;
 {
 #ifdef __GEOS__
-  IF_GEOS_LOCK_SLIDING_WINDOW(s);
+  // while this may use the wrong adress for s->window
+  // when not calling IF_GEOS_LOCK_WINDOW before,
+  // we don't have a problem, as the window will be freed
+  // anyways shortly after...
   inflate_blocks_reset(s, z, Z_NULL);
-  IF_GEOS_UNLOCK_SLIDING_WINDOW(s);
-  s->windowEndOffs = 0;
   s->windowReadOffs = 0;
   s->windowWriteOffs = 0;
   MemFree(s->windowHan);

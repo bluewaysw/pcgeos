@@ -161,14 +161,17 @@ int stream_size;
   return inflateInit2_(z, DEF_WBITS, version, stream_size);
 }
 
-
-#define NEEDBYTE { \
-  if (z->avail_in == 0) { \
-    IF_GEOS_UNLOCK_SLIDING_WINDOW(Z_STATE->blocks); \
-    return r; \
-  } \
-  r=f; \
-}
+#ifdef __GEOS__
+  #define NEEDBYTE { \
+    if (z->avail_in == 0) { \
+      IF_GEOS_UNLOCK_SLIDING_WINDOW(Z_STATE->blocks); \
+      return r; \
+    } \
+    r=f; \
+  }
+#else
+  #define NEEDBYTE {if(z->avail_in==0)return r;r=f;}
+#endif
 
 #define NEXTBYTE (z->avail_in--,z->total_in++,*z->next_in++)
 
