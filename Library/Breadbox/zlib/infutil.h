@@ -81,6 +81,7 @@ struct inflate_blocks_state {
  */
 #ifdef __GEOS__
   #define IF_GEOS_LOCK_SLIDING_WINDOW(s) { \
+    EC_ERROR_IF(s->window != 0, -1); \
     s->window = (Bytef *) MemLock(s->windowHan); \
     s->end = (Bytef *) (s->window + s->windowSize); \
     s->read = (Bytef *) (s->window + s->windowReadOffs); \
@@ -88,9 +89,11 @@ struct inflate_blocks_state {
   }
 
   #define IF_GEOS_UNLOCK_SLIDING_WINDOW(s) { \
+    EC_ERROR_IF(s->window == 0, -1); \
     s->windowReadOffs = ((word) s->read) - ((word) s->window); \
     s->windowWriteOffs = ((word) s->write) - ((word) s->window); \
     MemUnlock(s->windowHan); \
+    EC(s->window = 0); \
   }
 #else
   // these expand to nothing
