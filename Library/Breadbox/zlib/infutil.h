@@ -10,6 +10,10 @@
 
 #include "heap.h"
 
+#ifdef __GEOS__
+#include <ec.h>
+#endif
+
 #ifndef _INFUTIL_H
 #define _INFUTIL_H
 
@@ -81,9 +85,18 @@ struct inflate_blocks_state {
  */
 
  #ifdef __GEOS__
+
+  typedef enum {
+    /* Stream access while the window buf is already locked, which is unexpected. */
+    ERROR_SLIDING_WINDOW_ALREAEDY_LOCKED,
+    /* Stream access while the window buf is not locked, which is required. */
+    ERROR_SLIDING_WINDOW_UNLOCKED
+  } FatalErrors;
+  extern FatalErrors shme;  /* For swat to use. */
+
   #define IF_GEOS_LOCK_SLIDING_WINDOW(s) { \
     /* if s->window is NOT 0 as of now, something is wrong, fatal error */ \
-    EC_ERROR_IF(((word) s->window != (word) 0), -1); \
+    EC_ERROR_IF(s->window != (Bytef*) 0, ERROR_SLIDING_WINDOW_ALREAEDY_LOCKED); \
     s->window = (Bytef *) MemLock(s->windowHan); \
     s->end = (Bytef *) (s->window + s->windowSize); \
     s->read = (Bytef *) (s->window + s->windowReadOffs); \
@@ -92,7 +105,7 @@ struct inflate_blocks_state {
 
   #define IF_GEOS_UNLOCK_SLIDING_WINDOW(s) { \
     /* if s->window is 0, something is wrong, fatal error*/ \
-    EC_ERROR_IF(((Bytef*) s->window == (Bytef*) 0), -1); \
+    EC_ERROR_IF(s->window == (Bytef*) 0, ERROR_SLIDING_WINDOW_UNLOCKED); \
     s->windowReadOffs = ((word) s->read) - ((word) s->window); \
     s->windowWriteOffs = ((word) s->write) - ((word) s->window); \
     MemUnlock(s->windowHan); \

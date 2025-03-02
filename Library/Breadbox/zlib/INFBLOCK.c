@@ -131,6 +131,7 @@ uInt w;
   inflate_blocks_reset(s, z, Z_NULL);
 #ifdef __GEOS__
   MemUnlock(s->windowHan);
+  EC(s->window = NULL);
 #endif
   return s;
 }
