@@ -123,13 +123,15 @@ minimalAppl	: minimalGame minimalUtils minimalTools minimalSavers \
  	  	  extraGame \
 		  minimalEdu calendar geodex geocalc geodraw geowrite \
 		  scrapbk clock bigcalc geopoint \
-		  email manager isdesk linktool openwith setup \
+		  email manager isdesk \
+		  linktool openwith foldered cvttool \
+		  setup \
 		  launcher webmagick idialup \
 		  charm wordmat banner \
 		  bbxchat bbxmail \
 		  newsread geozip sclock trayapps\
- 	  	  hmbase pdfvu  bnkr30 ftpc \
- 	  	  instc instf foldered grafcalc
+ 	  	  hmbase pdfvu bnkr30 ftpc \
+ 	  	  instc instf grafcalc
 
 minimalUtils	: prefmgr
 
@@ -957,6 +959,9 @@ Installed/Library/FMTools/OpenWith:	ui ansic MAKEAPPL
 foldered: Installed/Library/FMTools/FolderEd
 Installed/Library/FMTools/FolderEd:	ui ansic MAKEAPPL
 
+cvttool: Installed/Library/FMTools/CvtTool
+Installed/Library/FMTools/CvtTool:	ui convert MAKELIB
+
 grafcalc: Installed/Appl/GrafCalc
 Installed/Appl/GrafCalc:	ui ansic cell parse color math MAKEAPPL
 
@@ -1658,7 +1663,7 @@ ndorest:  regis run legos 	\
 	  irlap loopback slip 		\
 	  vid_drivers	\
 	  impex_libs bestsnd mp3snd rfsd	\
-	  print_drivers extras taskmax cvttool more_prefs	\
+	  print_drivers extras taskmax more_prefs	\
 	  faxsendtd geosafari slides
 
 ms3     : Installed/Driver/IFS/DOS/MS3
@@ -1684,9 +1689,6 @@ Installed/Driver/Task/TaskMax:			ui text MAKEDRV
 
 bnf : Installed/Driver/Task/BNF
 Installed/Driver/Task/BNF:				ui text MAKEDRV
-
-cvttool	: Installed/Library/FMTools/CvtTool
-Installed/Library/FMTools/CvtTool:		ui convert MAKELIB
 
 faxsendtd	: Installed/Driver/Mailbox/Transport/Faxsendtd
 Installed/Driver/Mailbox/Transport/Faxsendtd:	mailbox faxfile faxctrl ui \

@@ -25,14 +25,6 @@
 
 
 /*
- * macros
- */
-
-#define WW_FIXED_TO_WWFIXEDASDWORD( value )     ( (dword) ( (((dword)value.WWF_int) << 16) | value.WWF_frac ) )
-
-#define ROUND_WWFIXED( value )    ( value & 0xffff ? ( value >> 16 ) + 1 : value >> 16 )
-
-/*
  * types
  */
 
