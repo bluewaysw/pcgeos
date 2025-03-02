@@ -37,7 +37,6 @@
 MemHandle _pascal TrueType_Gen_Widths(
                                 MemHandle            fontHandle,
                                 FontMatrix*          fontMatrix,
-                                FontMatrix*          graphicMatrix,
                                 WWFixedAsDWord       pointSize,
                                 Byte                 width,
                                 Byte                 weight,
@@ -45,6 +44,7 @@ MemHandle _pascal TrueType_Gen_Widths(
                                 const OutlineEntry*  headerEntry,
                                 const OutlineEntry*  firstEntry,
                                 TextStyle            stylesToImplement,
+                                FontMatrix*          windowMatrix,
                                 MemHandle            varBlock
 );
 
