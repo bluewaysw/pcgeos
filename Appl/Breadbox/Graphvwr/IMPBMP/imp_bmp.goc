@@ -8,6 +8,7 @@
 #include "IMPBMP/ibcommon.h"
 @include "statbar/statbar.goh"
 #include <Ansi/string.h>
+#include "pnglib.h"
 
 #include "IMPBMP/imppcx.h"
 #include "IMPBMP/impbmp.h"
@@ -44,6 +45,11 @@ ImpBmpStatus _pascal ImpTIFFTestFile(FileHandle file);
 ImpBmpStatus _pascal ImpJPEGTestFile(FileHandle file);
 @endif  /* JPEG_SUPPORT */
 
+
+// PNG
+ImpBmpStatus _pascal ImpPNGProcessFile(ImpBmpParams *params);
+ImpBmpStatus _pascal ImpPNGTestFile(FileHandle file);
+
 /* Declaration of functions */
 
 /*********************************************************************/
@@ -63,6 +69,10 @@ ImpBmpStatus _pascal Imp_BmpProcessFile(ImpBmpParams *params,ImpBmpFormat format
 
   if(format == IBF_PCX)
 	 status = ImpPCXProcessFile(params);
+
+  if(format == IBF_PNG)
+	 status = ImpPNGProcessFile(params);
+
 /*
   if(format == IBF_TIFF)
 	 status = ImpTIFFProcessFile(params);
@@ -77,10 +87,10 @@ ImpBmpStatus _pascal Imp_BmpProcessFile(ImpBmpParams *params,ImpBmpFormat format
 	 status = ImpGIFProcessFile(params);
 @else /* GIFLIB_SUPPORT */
   {
-    GifError stat = GE_NO_ERROR;
+	GifError stat = GE_NO_ERROR;
 
 	params->IBP_bitmap =
-    GifImportBitmapFHandle(params->IBP_source, params->IBP_dest,
+	GifImportBitmapFHandle(params->IBP_source, params->IBP_dest,
 				&stat);
    strcpy(params->IBP_impForm, ".GIF");
 
@@ -107,6 +117,10 @@ ImpBmpFormat _pascal Imp_BmpTestFile(FileHandle file)
 
   status = ImpPCXTestFile(file);
   if(status == IBS_NO_ERROR) return(IBF_PCX);
+
+  status = ImpPNGTestFile(file);
+  if(status == IBS_NO_ERROR) return(IBF_PNG);
+
 /*
   status = ImpTIFFTestFile(file);
   if(status == IBS_NO_ERROR) return(IBF_TIFF);
@@ -154,7 +168,6 @@ ImpBmpStatus _pascal ImpJPEGProcessFile(ImpBmpParams *params)
   FILE * infile;        /* source file */
   JSAMPARRAY buffer;        /* Output row buffer */
   int row_stride;       /* physical row width in output buffer */
-  int x;
 
   ImpBmpStatus status;
   GStateHandle bmstate;
@@ -320,5 +333,108 @@ byte read[3];
 
 };
 @endif
+
+ImpBmpStatus _pascal ImpPNGProcessFile(ImpBmpParams *params)
+{
+	pngIHDRData ihdrData = {0};
+	MemHandle idatChunksHan = NullHandle;
+	int idatNumChunks = 0;
+	pngPLTEChunkEntry plteChunk = {0};
+	pngIDATState state = {0};
+	BMFormat fmt = 0;
+	ImpBmpStatus status;
+	Boolean flag = TRUE;
+
+	status = IBS_NO_ERROR;
+
+	if(params->IBP_source == 0)
+		FatalError(2000);
+
+	// switch in status bar
+	if(params->IBP_status != 0)
+		@call params->IBP_status::MSG_SB_START_PROCESS();
+
+	// Read PNG Chunks, get overview
+	if (pngImportProcessChunks(params->IBP_source, &ihdrData, &idatChunksHan, &idatNumChunks, &plteChunk))
+	{
+		fmt = pngImportWhatOutputFormat(ihdrData.colorType, ihdrData.bitDepth);
+		if (fmt != 0)
+		{
+			// Initialize output bitmap
+			params->IBP_bitmap = pngImportInitiateOutputBitmap(params->IBP_dest, ihdrData, fmt);
+			if (params->IBP_bitmap != 0)
+			{
+				params->IBP_width  = ihdrData.width;
+				params->IBP_height = ihdrData.height;
+				params->IBP_format = IBF_PNG;
+				strcpy(params->IBP_impForm, ".PNG");
+
+				// transfers only if a palette exists, also creates palettes for grayscale images
+				pngImportHandlePalette(params->IBP_source, plteChunk, params->IBP_dest, params->IBP_bitmap, ihdrData.colorType, ihdrData.bitDepth);
+
+				// Initialize the IDAT state
+				pngImportInitIDATProcessingState(&state, params->IBP_source, idatChunksHan, idatNumChunks, ihdrData);
+
+				// Process each scanline
+				while ((pngImportGetNextIDATScanline(&state) == 1) && (status == IBS_NO_ERROR))
+				{
+					// when not zlib decoding, give the system a little room to breathe
+					pngImportIDATProcessingUnlockHandles(&state);
+
+					// make sure we have data compatible with GEOS HugeBitmaps
+					pngImportApplyGEOSFormatTransformations(&state, params->IBP_pngBlendColor);
+
+					// Write the processed scanline (without the filter byte) to the VMFile
+					pngImportWriteScanlineToBitmap(params->IBP_dest, params->IBP_bitmap, state.lineNo - 1, state.currentRow);
+
+					// prepare the next zlib decoding work
+					pngImportIDATProcessingLockHandles(&state);
+
+					// update status of processing
+					if (params->IBP_status != NULL)
+						flag = @call params->IBP_status::MSG_SB_SET_STATUS_VALUE(((dword)state.lineNo)*100 / params->IBP_height);
+
+					// if "Stop" was pressed, make sure we abort
+					if (flag == FALSE)
+					{
+						status = IBS_IMPORT_STOPPED;
+					}
+				}
+
+				// Clean up resources
+				pngImportCleanupIDATProcessingState(&state);
+			}
+			else
+			{
+				status = IBS_SYS_ERROR;
+			}
+		}
+		else
+		{
+			status = IBS_WRONG_FORMAT;
+		}
+	}
+	else
+	{
+		status = IBS_WRONG_FORMAT;
+	}
+
+  	if (params->IBP_status != NULL)
+		@call params->IBP_status::MSG_SB_STOP_PROCESS();
+
+  	return (status);
+}
+
+ImpBmpStatus _pascal ImpPNGTestFile(FileHandle file)
+{
+  if (FilePos(file, 0, FILE_POS_START) != 0)
+	return (IBS_WRONG_FILE);
+
+  if (pngImportCheckHeader(file) == 0)
+	return (IBS_WRONG_FORMAT);
+
+  return (IBS_NO_ERROR);
+}
+
 
 /*********************************************************************/

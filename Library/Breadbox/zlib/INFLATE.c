@@ -1,6 +1,6 @@
 /* inflate.c -- zlib interface to inflate modules
  * Copyright (C) 1995-1998 Mark Adler
- * For conditions of distribution and use, see copyright notice in zlib.h 
+ * For conditions of distribution and use, see copyright notice in zlib.h
  */
 
 #include "zutil.h"
@@ -51,7 +51,7 @@ struct inf_internal_state {
   /* mode independent information */
   int  nowrap;          /* flag for no wrapper */
   uInt wbits;           /* log2(window size)  (8..15, defaults to 15) */
-  inflate_blocks_statef 
+  inflate_blocks_statef
     *blocks;            /* current inflate_blocks state */
 
 };
@@ -63,11 +63,17 @@ z_streamp z;
 {
   if (z == Z_NULL || Z_STATE == Z_NULL)
     return Z_STREAM_ERROR;
+
+  IF_GEOS_LOCK_SLIDING_WINDOW(Z_STATE->blocks);
+
   z->total_in = z->total_out = 0;
   z->msg = Z_NULL;
   Z_STATE->mode = Z_STATE->nowrap ? BLOCKS : METHOD;
   inflate_blocks_reset(Z_STATE->blocks, z, Z_NULL);
   Trace((stderr, "inflate: reset\n"));
+
+  IF_GEOS_UNLOCK_SLIDING_WINDOW(Z_STATE->blocks);
+
   return Z_OK;
 }
 
@@ -155,137 +161,180 @@ int stream_size;
   return inflateInit2_(z, DEF_WBITS, version, stream_size);
 }
 
+#ifdef __GEOS__
+  #define NEEDBYTE { \
+    if (z->avail_in == 0) { \
+      IF_GEOS_UNLOCK_SLIDING_WINDOW(Z_STATE->blocks); \
+      return r; \
+    } \
+    r=f; \
+  }
+#else
+  #define NEEDBYTE {if(z->avail_in==0)return r;r=f;}
+#endif
 
-#define NEEDBYTE {if(z->avail_in==0)return r;r=f;}
 #define NEXTBYTE (z->avail_in--,z->total_in++,*z->next_in++)
 
-int ZEXPORT inflate(z, f)
-z_streamp z;
-int f;
+int ZEXPORT inflate(z_streamp z, int f)
 {
-  int r;
-  uInt b;
+    int r;
+    uInt b;
 
-  if (z == Z_NULL || Z_STATE == Z_NULL || z->next_in == Z_NULL)
-    return Z_STREAM_ERROR;
-  f = f == Z_FINISH ? Z_BUF_ERROR : Z_OK;
-  r = Z_BUF_ERROR;
-  while (1) switch (Z_STATE->mode)
-  {
-    case METHOD:
-      NEEDBYTE
-      if (((Z_STATE->sub.method = NEXTBYTE) & 0xf) != Z_DEFLATED)
-      {
-        Z_STATE->mode = INFL_BAD;
-        z->msg = (char*)"unknown compression method";
-        Z_STATE->sub.marker = 5;       /* can't try inflateSync */
-        break;
-      }
-      if ((Z_STATE->sub.method >> 4) + 8 > Z_STATE->wbits)
-      {
-        Z_STATE->mode = INFL_BAD;
-        z->msg = (char*)"invalid window size";
-        Z_STATE->sub.marker = 5;       /* can't try inflateSync */
-        break;
-      }
-      Z_STATE->mode = FLAG;
-    case FLAG:
-      NEEDBYTE
-      b = NEXTBYTE;
-      if (((Z_STATE->sub.method << 8) + b) % 31)
-      {
-        Z_STATE->mode = INFL_BAD;
-        z->msg = (char*)"incorrect header check";
-        Z_STATE->sub.marker = 5;       /* can't try inflateSync */
-        break;
-      }
-      Tracev((stderr, "inflate: zlib header ok\n"));
-      if (!(b & PRESET_DICT))
-      {
-        Z_STATE->mode = BLOCKS;
-	break;
-      }
-      Z_STATE->mode = DICT4;
-    case DICT4:
-      NEEDBYTE
-      Z_STATE->sub.check.need = (uLong)NEXTBYTE << 24;
-      Z_STATE->mode = DICT3;
-    case DICT3:
-      NEEDBYTE
-      Z_STATE->sub.check.need += (uLong)NEXTBYTE << 16;
-      Z_STATE->mode = DICT2;
-    case DICT2:
-      NEEDBYTE
-      Z_STATE->sub.check.need += (uLong)NEXTBYTE << 8;
-      Z_STATE->mode = DICT1;
-    case DICT1:
-      NEEDBYTE
-      Z_STATE->sub.check.need += (uLong)NEXTBYTE;
-      z->adler = Z_STATE->sub.check.need;
-      Z_STATE->mode = DICT0;
-      return Z_NEED_DICT;
-    case DICT0:
-      Z_STATE->mode = INFL_BAD;
-      z->msg = (char*)"need dictionary";
-      Z_STATE->sub.marker = 0;       /* can try inflateSync */
-      return Z_STREAM_ERROR;
-    case BLOCKS:
-      r = inflate_blocks(Z_STATE->blocks, z, r);
-      if (r == Z_DATA_ERROR)
-      {
-        Z_STATE->mode = INFL_BAD;
-        Z_STATE->sub.marker = 0;       /* can try inflateSync */
-        break;
-      }
-      if (r == Z_OK)
-        r = f;
-      if (r != Z_STREAM_END)
-        return r;
-      r = f;
-      inflate_blocks_reset(Z_STATE->blocks, z, &Z_STATE->sub.check.was);
-      if (Z_STATE->nowrap)
-      {
-        Z_STATE->mode = INFL_DONE;
-        break;
-      }
-      Z_STATE->mode = CHECK4;
-    case CHECK4:
-      NEEDBYTE
-      Z_STATE->sub.check.need = (uLong)NEXTBYTE << 24;
-      Z_STATE->mode = CHECK3;
-    case CHECK3:
-      NEEDBYTE
-      Z_STATE->sub.check.need += (uLong)NEXTBYTE << 16;
-      Z_STATE->mode = CHECK2;
-    case CHECK2:
-      NEEDBYTE
-      Z_STATE->sub.check.need += (uLong)NEXTBYTE << 8;
-      Z_STATE->mode = CHECK1;
-    case CHECK1:
-      NEEDBYTE
-      Z_STATE->sub.check.need += (uLong)NEXTBYTE;
+    // Variable initialization
+    if (z == Z_NULL || Z_STATE == Z_NULL || z->next_in == Z_NULL) {
+        return Z_STREAM_ERROR;
+    }
 
-      if (Z_STATE->sub.check.was != Z_STATE->sub.check.need)
-      {
-        Z_STATE->mode = INFL_BAD;
-        z->msg = (char*)"incorrect data check";
-        Z_STATE->sub.marker = 5;       /* can't try inflateSync */
-        break;
-      }
-      Trace((stderr, "inflate: zlib check ok\n"));
-      Z_STATE->mode = INFL_DONE;
-    case INFL_DONE:
-      return Z_STREAM_END;
-    case INFL_BAD:
-      return Z_DATA_ERROR;
-    default:
-      return Z_STREAM_ERROR;
-  }
+    f = (f == Z_FINISH) ? Z_BUF_ERROR : Z_OK;
+    r = Z_BUF_ERROR;
+
+    // Lock the sliding window before processing
+    IF_GEOS_LOCK_SLIDING_WINDOW(Z_STATE->blocks);
+
+    while (1)
+    {
+        switch (Z_STATE->mode)
+        {
+            case METHOD:
+                NEEDBYTE;
+                if (((Z_STATE->sub.method = NEXTBYTE) & 0xf) != Z_DEFLATED) {
+                    Z_STATE->mode = INFL_BAD;
+                    z->msg = (char *)"unknown compression method";
+                    Z_STATE->sub.marker = 5;  // can't try inflateSync
+                    break;
+                }
+                if ((Z_STATE->sub.method >> 4) + 8 > Z_STATE->wbits) {
+                    Z_STATE->mode = INFL_BAD;
+                    z->msg = (char *)"invalid window size";
+                    Z_STATE->sub.marker = 5;  // can't try inflateSync
+                    break;
+                }
+                Z_STATE->mode = FLAG;
+                break;
+
+            case FLAG:
+                NEEDBYTE;
+                b = NEXTBYTE;
+                if (((Z_STATE->sub.method << 8) + b) % 31) {
+                    Z_STATE->mode = INFL_BAD;
+                    z->msg = (char *)"incorrect header check";
+                    Z_STATE->sub.marker = 5;  // can't try inflateSync
+                    break;
+                }
+                Tracev((stderr, "inflate: zlib header ok\n"));
+                if (!(b & PRESET_DICT)) {
+                    Z_STATE->mode = BLOCKS;
+                    break;
+                }
+                Z_STATE->mode = DICT4;
+                break;
+
+            case DICT4:
+                NEEDBYTE;
+                Z_STATE->sub.check.need = (uLong)NEXTBYTE << 24;
+                Z_STATE->mode = DICT3;
+                break;
+
+            case DICT3:
+                NEEDBYTE;
+                Z_STATE->sub.check.need += (uLong)NEXTBYTE << 16;
+                Z_STATE->mode = DICT2;
+                break;
+
+            case DICT2:
+                NEEDBYTE;
+                Z_STATE->sub.check.need += (uLong)NEXTBYTE << 8;
+                Z_STATE->mode = DICT1;
+                break;
+
+            case DICT1:
+                NEEDBYTE;
+                Z_STATE->sub.check.need += (uLong)NEXTBYTE;
+                z->adler = Z_STATE->sub.check.need;
+                Z_STATE->mode = DICT0;
+                // Unlock the window before returning
+                IF_GEOS_UNLOCK_SLIDING_WINDOW(Z_STATE->blocks);
+                return Z_NEED_DICT;
+
+            case DICT0:
+                Z_STATE->mode = INFL_BAD;
+                z->msg = (char *)"need dictionary";
+                Z_STATE->sub.marker = 0;  // can try inflateSync
+                IF_GEOS_UNLOCK_SLIDING_WINDOW(Z_STATE->blocks);
+                return Z_STREAM_ERROR;
+
+            case BLOCKS:
+                r = inflate_blocks(Z_STATE->blocks, z, r);
+                if (r == Z_DATA_ERROR) {
+                    Z_STATE->mode = INFL_BAD;
+                    Z_STATE->sub.marker = 0;  // can try inflateSync
+                    break;
+                }
+                if (r == Z_OK) {
+                    r = f;
+                }
+                if (r != Z_STREAM_END) {
+                    IF_GEOS_UNLOCK_SLIDING_WINDOW(Z_STATE->blocks);
+                    return r;
+                }
+                r = f;
+                inflate_blocks_reset(Z_STATE->blocks, z, &Z_STATE->sub.check.was);
+                if (Z_STATE->nowrap) {
+                    Z_STATE->mode = INFL_DONE;
+                    break;
+                }
+                Z_STATE->mode = CHECK4;
+                break;
+
+            case CHECK4:
+                NEEDBYTE;
+                Z_STATE->sub.check.need = (uLong)NEXTBYTE << 24;
+                Z_STATE->mode = CHECK3;
+                break;
+
+            case CHECK3:
+                NEEDBYTE;
+                Z_STATE->sub.check.need += (uLong)NEXTBYTE << 16;
+                Z_STATE->mode = CHECK2;
+                break;
+
+            case CHECK2:
+                NEEDBYTE;
+                Z_STATE->sub.check.need += (uLong)NEXTBYTE << 8;
+                Z_STATE->mode = CHECK1;
+                break;
+
+            case CHECK1:
+                NEEDBYTE;
+                Z_STATE->sub.check.need += (uLong)NEXTBYTE;
+                if (Z_STATE->sub.check.was != Z_STATE->sub.check.need) {
+                    Z_STATE->mode = INFL_BAD;
+                    z->msg = (char *)"incorrect data check";
+                    Z_STATE->sub.marker = 5;  // can't try inflateSync
+                    break;
+                }
+                Trace((stderr, "inflate: zlib check ok\n"));
+                Z_STATE->mode = INFL_DONE;
+                break;
+
+            case INFL_DONE:
+                IF_GEOS_UNLOCK_SLIDING_WINDOW(Z_STATE->blocks);
+                return Z_STREAM_END;
+
+            case INFL_BAD:
+                IF_GEOS_UNLOCK_SLIDING_WINDOW(Z_STATE->blocks);
+                return Z_DATA_ERROR;
+
+            default:
+                IF_GEOS_UNLOCK_SLIDING_WINDOW(Z_STATE->blocks);
+                return Z_STREAM_ERROR;
+        }
+    }
+
 #ifdef NEED_DUMMY_RETURN
-  return Z_STREAM_ERROR;  /* Some dumb compilers complain without this */
+    return Z_STREAM_ERROR;  // Some dumb compilers complain without this
 #endif
 }
-
 
 int ZEXPORT inflateSetDictionary(z, dictionary, dictLength)
 z_streamp z;
@@ -297,7 +346,8 @@ uInt  dictLength;
   if (z == Z_NULL || Z_STATE == Z_NULL || Z_STATE->mode != DICT0)
     return Z_STREAM_ERROR;
 
-  if (adler32(1L, dictionary, dictLength) != z->adler) return Z_DATA_ERROR;
+  if (adler32(1L, dictionary, dictLength) != z->adler)
+    return Z_DATA_ERROR;
   z->adler = 1L;
 
   if (length >= ((uInt)1<<Z_STATE->wbits))
@@ -305,8 +355,14 @@ uInt  dictLength;
     length = (1<<Z_STATE->wbits)-1;
     dictionary += dictLength - length;
   }
+
+  IF_GEOS_LOCK_SLIDING_WINDOW(Z_STATE->blocks);
+
   inflate_set_dictionary(Z_STATE->blocks, dictionary, length);
   Z_STATE->mode = BLOCKS;
+
+  IF_GEOS_UNLOCK_SLIDING_WINDOW(Z_STATE->blocks);
+
   return Z_OK;
 }
 
