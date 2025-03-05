@@ -4,14 +4,14 @@
 # If you edit it, you will lose your changes, should it be regenerated.
 #
 GEODE           = gif
+XLAT            = impgif.h IMPGIF.goc EXPGIF.goc
 API             = apiManager.asm gif.def
-XLAT            = impgif.h EXPGIF.goc IMPGIF.goc
 UI_TO_RDFS      = manager.ui
-OBJS            = EXPGIF.obj IMPGIF.obj
+OBJS            = IMPGIF.obj EXPGIF.obj
 COMMON          =
 MODULES         = API
 CMODULES        = XLAT
-SRCS            = $(API) $(XLAT) $(COMMON)
+SRCS            = $(XLAT) $(API) $(COMMON)
 LOBJS           =
 LIBOBJ          = $(DEVEL_DIR)/Include/$(GEODE).ldf
 LIBNAME         = gif
