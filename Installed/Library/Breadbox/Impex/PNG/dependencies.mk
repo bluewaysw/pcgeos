@@ -26,8 +26,7 @@ API.eobj: API/apiManager.asm \
                 Objects/gValueC.def Objects/gToolGC.def \
                 Internal/gUtils.def Objects/helpCC.def Objects/eMenuC.def \
                 Objects/emomC.def Objects/emTrigC.def Internal/uProcC.def \
-                library.def math.def API/png.def Internal/heapInt.def \
-                Internal/semInt.def sysstats.def manager.rdef
+                library.def API/png.def manager.rdef
 imppng.obj \
 imppng.eobj: stdapp.goh object.goh ui.goh Objects/metaC.goh \
                 Objects/inputC.goh Objects/clipbrd.goh \
@@ -55,10 +54,10 @@ imppng.eobj: geos.h heap.h geode.h resource.h ec.h object.h lmem.h \
                 disk.h drive.h input.h char.h hwr.h win.h uDialog.h \
                 Objects/gInterC.h Objects/Text/tCommon.h stylesh.h \
                 driver.h thread.h print.h Internal/spoolInt.h serialDr.h \
-                parallDr.h hugearr.h fileEnum.h Ansi/stdio.h \
-                Ansi/stdlib.h pnglib.h Ansi/string.h zlib.h zconf.h \
-                htmldrv.h product.h math.h htmlfstr.h awatcher.h \
-                htmlprog.h ieCommon.h xlatLib.h initfile.h
+                parallDr.h hugearr.h fileEnum.h ieCommon.h xlatLib.h \
+                pnglib.h Ansi/stdio.h Ansi/stdlib.h Ansi/string.h zlib.h \
+                zconf.h htmldrv.h product.h math.h htmlfstr.h awatcher.h \
+                htmlprog.h
 manager.rdef: generic.uih product.uih
 
-pngEC.geo png.geo : geos.ldf ui.ldf impex.ldf ansic.ldf pnglib.ldf 
+pngEC.geo png.geo : geos.ldf ui.ldf impex.ldf pnglib.ldf 

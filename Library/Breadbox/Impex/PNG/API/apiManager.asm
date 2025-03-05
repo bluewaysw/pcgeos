@@ -1,14 +1,10 @@
 include stdapp.def
 include vm.def
-include Objects/gCtrlC.def
 include library.def
 include resource.def    ; idata/udata, ProcCallFixedOrMovable etc.
-include gstring.def
 
-UseLib math.def
 DefLib API/png.def
 
-include Internal/heapInt.def
 include manager.rdef
 
 ; global functions implemented in C
