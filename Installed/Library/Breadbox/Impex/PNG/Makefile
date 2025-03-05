@@ -3,18 +3,18 @@
 #
 # If you edit it, you will lose your changes, should it be regenerated.
 #
-GEODE           = gif
-API             = apiManager.asm gif.def
-XLAT            = impgif.h EXPGIF.goc IMPGIF.goc
+GEODE           = png
+XLAT            = imppng.goc
+API             = apiManager.asm png.def
 UI_TO_RDFS      = manager.ui
-OBJS            = EXPGIF.obj IMPGIF.obj
+OBJS            = imppng.obj
 COMMON          =
 MODULES         = API
-CMODULES        = XLAT
-SRCS            = $(API) $(XLAT) $(COMMON)
+CMODULES        = Xlat
+SRCS            = $(XLAT) $(API) $(COMMON)
 LOBJS           =
 LIBOBJ          = $(DEVEL_DIR)/Include/$(GEODE).ldf
-LIBNAME         = gif
+LIBNAME         = png
 
 SYSMAKEFILE     = geode.mk
 
