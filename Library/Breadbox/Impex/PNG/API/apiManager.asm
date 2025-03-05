@@ -26,7 +26,7 @@ INIT    segment resource
 
 	db	"OK"
 	dw	InfoResource            ; resource containing format names
-	dw	1                       ; contains two sub-formats
+	dw	1                       ; contains one sub-format
 	dw	4000h                   ; this is a graphics translator
 	db	"OK"
 
@@ -44,6 +44,7 @@ INIT    ends
 ASM     segment resource
 	assume cs:ASM
 
+
 ;--------------------------------------------------------------------------------
 
 TransExport proc far
@@ -54,11 +55,11 @@ TransExport proc far
 
 		mov     ax,idata              ; DS=dgroup
 		mov     ds,ax
-		mov     ax,25                 ; Allocate default float stack size
-		mov     bl,FLOAT_STACK_GROW
-		call    FloatInit
+		;mov     ax,25                 ; Allocate default float stack size
+		;mov     bl,FLOAT_STACK_GROW
+		;call    FloatInit
 		call    PNGEXPORT            ; Call high-level procedure to do work
-		call    FloatExit
+		;call    FloatExit
 		mov     bx,dx                 ; BX:AX returns error code or format ID
 		.leave
 		ret
@@ -78,11 +79,11 @@ _vmc    local   dword
 
 		mov     ax,idata              ; DS=dgroup
 		mov     ds,ax
-		mov     ax,25                 ; Allocate default float stack size
-		mov     bl,FLOAT_STACK_GROW
-		call    FloatInit
+		;mov     ax,25                 ; Allocate default float stack size
+		;mov     bl,FLOAT_STACK_GROW
+		;call    FloatInit
 		call    PNGIMPORT            ; Call high-level procedure to do work
-		call    FloatExit
+		;call    FloatExit
 		mov     bx,dx                 ; BX:AX returns error code or format ID
 		movdw   dxcx,_vmc             ; VMChain of object returned in DX:CX
 		.leave
@@ -99,11 +100,11 @@ TransGetFormat proc far
 
 		mov     ax,idata              ; DS=dgroup
 		mov     ds,ax
-		mov     ax,25                 ; Allocate default float stack size
-		mov     bl,FLOAT_STACK_GROW
-		call    FloatInit
+		;mov     ax,25                 ; Allocate default float stack size
+		;mov     bl,FLOAT_STACK_GROW
+		;call    FloatInit
 		call    PNGTESTFILE          ; Call high-level procedure to do work
-		call    FloatExit
+		;call    FloatExit
 
 		mov     cx, ax
 		xor     ax, ax
@@ -158,45 +159,10 @@ TransGetExportUI proc far
 		ret
 TransGetExportUI endp
 
+;--------------------------------------------------------------------------------
+
 TransGetImportOptions proc far
-		push    ax                             ; 01ED 50
-		push    cx                             ; 01EE 51
-		push    bx                             ; 01EF 53
-		push    bp                             ; 01F0 55
-		push    si                             ; 01F1 56
-		push    di                             ; 01F2 57
-		push    ds                             ; 01F3 1E
-
-comment %
-		mov     ax,MSG_GEN_ITEM_GROUP_GET_SELECTION
-		mov     bx,dx
-		mov     si,offset BmpExpBitFormGroup
-		mov     di,mask MF_CALL
-		call    ObjMessage
-
-%
-		push    ax
-		mov     ax,00002h
-		mov     cl,050h
-		mov     ch,040h
-		call    MemAlloc
 		xor     dx,dx
-		jc      iopt_err
-		push    ax
-		pop     ds
-		pop     ax
-		mov     [ds:00000h],ax          ; booleanOptions
-		call    MemUnlock
-		mov     dx,bx
-		clc
-iopt_err:
-		pop     ds                             ; 0236 1F
-		pop     di                             ; 0237 5F
-		pop     si                             ; 0238 5E
-		pop     bp                             ; 0239 5D
-		pop     bx                             ; 023A 5B
-		pop     cx                             ; 023B 59
-		pop     ax                             ; 023C 58
 		ret
 TransGetImportOptions endp
 
