@@ -154,7 +154,7 @@ resource   JSUIResource                 ui-object
 endif
 
 ifdef COMPILE_OPTION_PROFILING_ON
-library profpnt
+#library profpnt
 endif
 
 ifdef JAVASCRIPT_SUPPORT
