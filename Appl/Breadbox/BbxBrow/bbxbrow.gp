@@ -32,10 +32,6 @@ library    ibms
 library    netutils
 library    cookies
 
-ifdef JAVASCRIPT_SUPPORT
-  library    js
-endif
-
 # Uncomment the following when building a version with strong heap checking:
 #library    hwlib
 
