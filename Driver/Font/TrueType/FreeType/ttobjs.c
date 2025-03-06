@@ -266,7 +266,7 @@ extern TEngine_Instance engineInstance;
  *  Function    :  Context_Destroy
  *
  *****************************************************************/
-
+  #pragma code_seg(ttcache_TEXT)
   LOCAL_FUNC
   TT_Error  Context_Destroy( void*  _context )
   {
@@ -302,6 +302,7 @@ extern TEngine_Instance engineInstance;
 
     return TT_Err_Ok;
   }
+  #pragma code_seg()
 
 
 /*******************************************************************
@@ -309,7 +310,7 @@ extern TEngine_Instance engineInstance;
  *  Function    :  Context_Create
  *
  *****************************************************************/
-
+  #pragma code_seg(ttcache_TEXT)
   LOCAL_FUNC
   TT_Error  Context_Create( void*  _context, void*  _face )
   {
@@ -348,6 +349,7 @@ extern TEngine_Instance engineInstance;
     Context_Destroy( exec );
     return error;
   }
+  #pragma code_seg()
 
 
 /*******************************************************************
@@ -615,7 +617,7 @@ extern TEngine_Instance engineInstance;
  *  Output :  error code.
  *
  ******************************************************************/
-
+#pragma code_seg(ttcache_TEXT)
   LOCAL_FUNC
   TT_Error  Instance_Destroy( void* _instance )
   {
@@ -650,6 +652,7 @@ extern TEngine_Instance engineInstance;
 
     return TT_Err_Ok;
   }
+#pragma code_seg()
 
 
 /*******************************************************************
@@ -665,7 +668,7 @@ extern TEngine_Instance engineInstance;
  *            released on error.
  *
  ******************************************************************/
-
+#pragma code_seg(ttcache_TEXT)
   LOCAL_FUNC
   TT_Error  Instance_Create( void*  _instance,
                              void*  _face )
@@ -726,6 +729,7 @@ extern TEngine_Instance engineInstance;
     Instance_Destroy( ins );
     return error;
   }
+#pragma code_seg()
 
 
 /*******************************************************************
@@ -964,7 +968,7 @@ extern TEngine_Instance engineInstance;
  *  Output :  Error code.
  *
  ******************************************************************/
-
+  #pragma code_seg(ttcache_TEXT)
   LOCAL_FUNC
   TT_Error  Face_Destroy( void*  _face )
   {
@@ -1039,6 +1043,7 @@ extern TEngine_Instance engineInstance;
 
     return TT_Err_Ok;
   }
+  #pragma code_seg()
 
 
 /*******************************************************************
@@ -1061,7 +1066,7 @@ extern TEngine_Instance engineInstance;
 #define LOAD_( table ) \
           (error = Load_TrueType_##table (face)) != TT_Err_Ok
 
-
+  #pragma code_seg(ttcache_TEXT)
   LOCAL_FUNC
   TT_Error  Face_Create( void*  _face,
                          void*  _input )
@@ -1133,7 +1138,7 @@ extern TEngine_Instance engineInstance;
     Face_Destroy( face );
     return error;
   }
-
+#pragma code_seg()
 #undef LOAD_
 
 
@@ -1148,7 +1153,7 @@ extern TEngine_Instance engineInstance;
  *  Output :  Error code.
  *
  ******************************************************************/
-
+  #pragma code_seg(ttcache_TEXT)
   LOCAL_FUNC
   TT_Error  Glyph_Destroy( void*  _glyph )
   {
@@ -1161,6 +1166,7 @@ extern TEngine_Instance engineInstance;
     glyph->outline.owner = TRUE;
     return TT_Done_Outline( &glyph->outline );
   }
+  #pragma code_seg()
 
 
 /*******************************************************************
@@ -1175,7 +1181,7 @@ extern TEngine_Instance engineInstance;
  *  Output :  Error code.
  *
  ******************************************************************/
-
+  #pragma code_seg(ttcache_TEXT)
   LOCAL_FUNC
   TT_Error  Glyph_Create( void*  _glyph,
                           void*  _face )
@@ -1197,7 +1203,7 @@ extern TEngine_Instance engineInstance;
                            glyph->face->maxContours,
                            &glyph->outline );
   }
-
+  #pragma code_seg()
 
 
 /*******************************************************************
