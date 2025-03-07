@@ -1,0 +1,568 @@
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+	Copyright (c) Geoworks 1994 -- All Rights Reserved
+
+PROJECT:	Gopher Client 	
+MODULE:		UI
+FILE:		ui.goc
+
+AUTHOR:		Alvin Cham, Aug 11, 1994
+
+ROUTINES:
+	Name			Description
+	----			-----------
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	AC	8/11/94   	Initial version.
+
+DESCRIPTION:
+	This file contains the UI for the gopher client application.
+
+	$Id: ui.goc,v 1.1 97/04/04 15:10:23 newdeal Exp $
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+
+/*
+ ***************************************************************************
+ *		Include files
+ ***************************************************************************
+ */
+
+@define __GCLIENT_UI_GOC
+@include "gclient.goh"
+@include "process.goh"
+@include "gClientC.goh"
+
+/*
+  ***************************************************************************
+ *		Defines
+ ***************************************************************************
+ */
+
+/* dimension for the VisText object */
+#define	GCT_WIDTH	550
+#define	GCT_HEIGHT	500	 
+
+@class	GClientTextClass, GenTextClass;
+
+@endc
+
+@classdecl GClientTextClass;
+
+
+/*
+ ***************************************************************************
+ *		Application Object -- the AppResource Resource
+ ***************************************************************************
+ */
+@start	AppResource;
+
+@object GenApplicationClass GClientApp = {
+
+    GI_visMoniker = list { @GClientTextMoniker }
+
+    GI_comp = @GClientPrimary;
+
+    gcnList(MANUFACTURER_ID_GEOWORKS,GAGCNLT_WINDOWS) 
+	= @GClientPrimary;
+
+    gcnList(MANUFACTURER_ID_GEOWORKS,MGCNLT_ACTIVE_LIST) 
+	= @GClientList, @GClientNavigate;
+
+    gcnList(MANUFACTURER_ID_GEOWORKS,GAGCNLT_SELF_LOAD_OPTIONS) 
+	= @GClientNavigate;
+
+}
+
+@visMoniker GClientTextMoniker = "Gopher Client Application";
+
+@end	AppResource;
+
+
+/***************************************************************************
+ *		UI Objects -- the Interface Resource
+ ***************************************************************************/
+
+@start	Interface;		/* this resource is for misc UI objects */
+
+/***************************************************************************
+ *	the primary
+ ***************************************************************************/
+@object GenPrimaryClass GClientPrimary  = {
+
+    GI_comp = @GClientTitle, @GClientDisplay, @GClientDialogBoxes,
+	@GClientNavTool, @GClientNavMenu;
+
+    ATTR_GEN_DISPLAY_NOT_MINIMIZABLE;	/* The window may not be iconified */
+}
+
+
+@object GenViewClass GClientView = {
+    /* initially not usable */
+    GI_states = @default & ~GS_USABLE;
+
+    GVI_content = GClientContent;
+
+    GVI_docBounds = {0, 0, GCT_WIDTH, GCT_HEIGHT};
+    GVI_vertAttrs = @default | GVDA_SCROLLABLE;
+    GVI_horizAttrs = @default | GVDA_SCROLLABLE;
+}
+
+/*************************************************************************
+ *	the title
+ *************************************************************************/
+@object	GenGlyphClass GClientTitle = {
+GI_visMoniker = "Defined Gopher Items";
+
+	HINT_CENTER_MONIKER;
+	HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+}
+
+@object GenInteractionClass GClientDisplay = {
+	GI_comp = @GClientList, @GClientOption;	
+
+	HINT_ORIENT_CHILDREN_HORIZONTALLY;
+	HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+	HINT_EXPAND_HEIGHT_TO_FIT_PARENT;
+} 
+
+/*************************************************************************
+ *	GenDynamicListObject -- This is the object that handles the menu
+ *		items list
+ *************************************************************************/
+@object GenDynamicListClass GClientList = {
+
+	/* GenItemGroupClass instances */
+	GIGI_behaviorType = GIGBT_EXCLUSIVE;
+	GIGI_stateFlags = 0;
+	GIGI_selection = GIGS_NONE;
+	GIGI_numSelections = 1;
+	GIGI_destination = process;
+
+	/* GenDynamicListClass instances */
+	GDLI_numItems = 0;
+	GDLI_queryMsg = MSG_GCP_QUERY_MENU_ITEM_MONIKER;
+
+	HINT_ITEM_GROUP_SCROLLABLE;
+	HINT_EXPAND_HEIGHT_TO_FIT_PARENT;
+	HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+}
+
+/*************************************************************************
+ *	VisTextObject -- This is the object that displays the text file
+ *************************************************************************/
+
+@object VisContentClass GClientContent = {
+	VCI_comp = @GClientText;
+
+}
+
+@object VisTextClass	GClientText = {
+	VI_bounds = {0, 0, GCT_WIDTH, GCT_HEIGHT};
+
+	VTI_text = "";		/* no text initially */
+
+	VI_attrs = @default;
+}
+
+/*************************************************************************
+ *	Gopher Connection Parameter Menu
+ *************************************************************************/
+@object	GenInteractionClass GClientConMenu = {
+	GI_comp = @GClientItemText, @GClientTypeText,
+		@GClientHostText, @GClientPortText,
+		@GClientSelectorText, @GClientPlusText;
+
+	GI_states = @default & ~GS_USABLE;
+
+	HINT_ORIENT_CHILDREN_VERTICALLY;
+	HINT_EXPAND_WIDTH_TO_FIT_PARENT;	
+}
+
+@object GClientTextClass GClientItemText = {
+	GI_visMoniker = "Item description";
+
+	GTXI_attrs = @default | GTA_SINGLE_LINE_TEXT | GTA_TAIL_ORIENTED;
+	HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+}
+@object GClientTextClass GClientTypeText = {
+	GI_visMoniker = "Type";
+
+	GTXI_attrs = @default | GTA_SINGLE_LINE_TEXT | GTA_TAIL_ORIENTED;
+	HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+}
+@object GClientTextClass GClientHostText = {
+	GI_visMoniker = "Host";
+
+	GTXI_attrs = @default | GTA_SINGLE_LINE_TEXT | GTA_TAIL_ORIENTED;
+	HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+}
+@object GClientTextClass GClientPortText = {
+	GI_visMoniker = "Port";
+
+	GTXI_attrs = @default | GTA_SINGLE_LINE_TEXT | GTA_TAIL_ORIENTED;
+	HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+}
+@object GClientTextClass GClientSelectorText = {
+	GI_visMoniker = "Selector";
+
+	GTXI_attrs = @default | GTA_SINGLE_LINE_TEXT | GTA_TAIL_ORIENTED;
+	HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+}
+
+@object GClientTextClass GClientPlusText = {
+	GI_visMoniker = "Gopher+";
+
+	GTXI_attrs = @default | GTA_SINGLE_LINE_TEXT | GTA_TAIL_ORIENTED;
+	HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+}
+
+/*************************************************************************
+ *	Gopher Plus display information objects
+ *************************************************************************/
+@object	GenInteractionClass GClientPlusDisplayInfo = {
+	GI_comp = @GClientPlusTitleText, @GClientPlusAdminText,
+		@GClientPlusModifiedText, @GClientPlusSizeText,
+		@GClientPlusAbstractText;
+
+	GI_states = @default & ~GS_USABLE;
+
+	HINT_ORIENT_CHILDREN_VERTICALLY;
+	HINT_EXPAND_WIDTH_TO_FIT_PARENT;	
+}
+
+@object GClientTextClass GClientPlusTitleText = {
+	GI_visMoniker = "Gopher+ information about:";
+	GTXI_text = "";
+
+	GTXI_attrs = @default | GTA_SINGLE_LINE_TEXT | GTA_TAIL_ORIENTED;
+	HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+}
+@object GClientTextClass GClientPlusAdminText = {
+	GI_visMoniker = "Administered by:";
+	GTXI_text = "";
+
+	GTXI_attrs = @default | GTA_SINGLE_LINE_TEXT | GTA_TAIL_ORIENTED;
+	HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+}
+
+@object GClientTextClass GClientPlusModifiedText = {
+	GI_visMoniker = "Last modified:";
+	GTXI_text = "";
+
+	GTXI_attrs = @default | GTA_SINGLE_LINE_TEXT | GTA_TAIL_ORIENTED;
+	HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+}
+@object GClientTextClass GClientPlusSizeText = {
+	GI_visMoniker = "Appr. size:";
+	GTXI_text = "";
+
+	GTXI_attrs = @default | GTA_SINGLE_LINE_TEXT | GTA_TAIL_ORIENTED;
+	HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+}
+@object GClientTextClass GClientPlusAbstractText = {
+	GI_visMoniker = "Abstract";
+	GTXI_text = "";
+
+	GTXI_attrs = @default | GTA_TAIL_ORIENTED;
+	HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+}
+
+/*************************************************************************
+ *	The following objects has to do with the option menu.
+ *************************************************************************/
+@object	GenInteractionClass	GClientOption = {
+	GI_comp = @GClientConnect, @GClientTools, 
+		  @GClientNoMenu, @GClientEnd;
+
+	HINT_FIXED_SIZE = {
+		SST_WIDE_CHAR_WIDTHS | MAX_OPTION_SIZE,
+		SST_LINES_OF_TEXT | NUM_OF_TRIGGER_OPTIONS,
+		4
+	};
+	HINT_DIVIDE_HEIGHT_EQUALLY;
+	HINT_EXPAND_HEIGHT_TO_FIT_PARENT;
+}
+
+@object GenTriggerClass	GClientConnect = {
+	GI_visMoniker = "Connect";
+
+	GTI_destination = @GClient;
+	GTI_actionMsg = MSG_GC_OPEN_CONNECTION;
+
+/* use the following for testing right now */
+/*	GTI_actionMsg = MSG_GC_FETCH_NEXT_MENU;*/
+
+	HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+}
+
+@object GenTriggerClass	GClientTools = {
+	GI_visMoniker = "Connection Tools";
+
+	GTI_destination = @GClient;
+	GTI_actionMsg = MSG_GC_CONNECTION_TOOLS;
+
+	HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+}
+
+@object GenTriggerClass	GClientNoMenu = {
+	GI_visMoniker = "";
+
+	GI_states = @default & ~GS_ENABLED;
+
+	HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+}
+
+@object GenTriggerClass	GClientEnd = {
+	GI_visMoniker = "End gopher session";
+
+	GTI_destination = @GClient;
+	GTI_actionMsg = MSG_GC_END_CONNECTION;
+
+	HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+}
+
+@object GenTriggerClass	GClientOpen = {
+	GI_visMoniker = "Open";
+	GI_states = @default & ~GS_USABLE;
+
+	GTI_destination = @GClient;
+	GTI_actionMsg = MSG_GC_FETCH_NEXT_MENU;
+
+	HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+}
+
+@object GenTriggerClass	GClientSaveToBookmark = {
+	GI_visMoniker = "Save as bookmark";
+	GI_states = @default & ~GS_USABLE;
+
+	GTI_destination = @GClient;
+	GTI_actionMsg = MSG_GC_ADD_BOOKMARK_ENTRY;
+
+	HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+}
+
+@object GenTriggerClass	GClientBookmark = {
+	GI_visMoniker = "Bookmarks";
+	GI_states = @default & ~GS_USABLE;
+
+	GTI_destination = @GClient;
+	GTI_actionMsg = MSG_GC_DISPLAY_BOOKMARK_ITEMS;
+
+	HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+}
+
+@object GenTriggerClass	GClientNoMenu2 = {
+	GI_visMoniker = "";
+
+	GI_states = @default & ~GS_ENABLED & ~GS_USABLE;
+
+	HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+}
+
+@object GenTriggerClass	GClientNoMenu3 = {
+	GI_visMoniker = "";
+
+	GI_states = @default & ~GS_ENABLED & ~GS_USABLE;
+
+	HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+}
+
+@object GenTriggerClass	GClientEdit = {
+	GI_visMoniker = "Edit";
+
+	GTI_destination = @GClient;
+	GTI_actionMsg = MSG_GC_EDIT_CONNECTION;
+	GI_states = @default & ~GS_USABLE;
+
+	HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+}
+
+@object GenTriggerClass	GClientEditChange = {
+	GI_visMoniker = "Change";
+
+	GTI_destination = @GClient;
+	GTI_actionMsg = MSG_GC_EDIT_CHANGE;
+	GI_states = @default & ~GS_USABLE;
+
+	HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+}
+
+@object GenTriggerClass GClientOKChange = {
+	GI_visMoniker = "OK";
+	
+	GTI_destination = @GClient;
+	GTI_actionMsg = MSG_GC_OK_CHANGE;
+	GI_states = @default & ~GS_USABLE;
+
+	HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+}
+
+@object GenTriggerClass	GClientEditClose = {
+	GI_visMoniker = "Close";
+
+	GTI_destination = @GClient;
+	GTI_actionMsg = MSG_GC_EDIT_CLOSE;
+	GI_states = @default & ~GS_USABLE;
+
+	HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+}
+
+@object GenTriggerClass	GClientCreate = {
+	GI_visMoniker = "Create/New";
+
+	GTI_destination = @GClient;
+	GTI_actionMsg = MSG_GC_CREATE_CONNECTION;
+	GI_states = @default & ~GS_USABLE;
+
+	HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+}
+
+@object GenTriggerClass	GClientDelete = {
+	GI_visMoniker = "Delete";
+
+	GTI_destination = @GClient;
+	GTI_actionMsg = MSG_GC_DELETE_CONNECTION;
+	GI_states = @default & ~GS_USABLE;
+
+	HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+}
+
+@object GenTriggerClass	GClientClose = {
+	GI_visMoniker = "Close";
+
+	GTI_destination = @GClient;
+	GTI_actionMsg = MSG_GC_CLOSE_CONNECTION;
+	GI_states = @default & ~GS_USABLE;
+
+	HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+}
+
+@object GenTriggerClass	GClientDeleteOK = {
+	GI_visMoniker = "OK";
+
+	GTI_destination = @GClient;
+	GTI_actionMsg = MSG_GC_OK_DELETE_CONNECTION;
+	GI_states = @default & ~GS_USABLE;
+
+	HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+}
+
+@object GenTriggerClass	GClientDeleteCancel = {
+	GI_visMoniker = "Cancel";
+
+	GTI_destination = @GClient;
+	GTI_actionMsg = MSG_GC_CANCEL_DELETE_CONNECTION;
+	GI_states = @default & ~GS_USABLE;
+
+	HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+}
+
+/***************************************************************************
+ *		Dialog Boxes
+ ***************************************************************************/
+@object GenInteractionClass GClientDialogBoxes = {
+/* 
+ * organizes all children of dialog boxes used for this application 
+ */
+	GI_comp = @ConnectionBox, @DisconnectionBox, @DeleteBox;
+	GII_type = GIT_ORGANIZATIONAL;
+	GII_visibility = GIV_DIALOG;
+	GII_attrs = @default | GIA_SYS_MODAL;
+}
+ 
+@object	GenInteractionClass ConnectionBox = {
+	GI_visMoniker = "Connection";
+	GI_comp = @ConnectionGlyph;
+	GII_visibility = GIV_DIALOG;
+	GII_type = GIT_PROGRESS;
+	GII_attrs = @default | GIA_MODAL | GIA_INITIATED_VIA_USER_DO_DIALOG |
+		GIA_NOT_USER_INITIATABLE;
+}
+	
+@object GenGlyphClass ConnectionGlyph = {
+	GI_visMoniker = "Preparing internet connection...";
+
+	HINT_CENTER_MONIKER;
+};
+
+@object	GenInteractionClass DisconnectionBox = {
+	GI_visMoniker = "Disconnection";
+	GI_comp = @DisconnectionGlyph;
+	GII_visibility = GIV_DIALOG;
+	GII_type = GIT_PROGRESS;
+	GII_attrs = @default | GIA_MODAL | GIA_INITIATED_VIA_USER_DO_DIALOG |
+		GIA_NOT_USER_INITIATABLE;
+}
+
+@object GenGlyphClass DisconnectionGlyph = {
+	GI_visMoniker = "Disconnecting from internet...";
+
+	HINT_CENTER_MONIKER;
+}
+
+@object GenInteractionClass DeleteBox = {
+	GI_visMoniker = "Deleting item";
+	GII_visibility = GIV_DIALOG;
+	GII_type = GIT_AFFIRMATION;
+	GII_attrs = @default | GIA_MODAL | GIA_INITIATED_VIA_USER_DO_DIALOG |
+		GIA_NOT_USER_INITIATABLE;
+}
+
+/***************************************************************************
+ *		Navigate Objects
+ ***************************************************************************/
+@object	GenInteractionClass GClientNavMenu = {
+	GI_visMoniker = "Navigate";
+	GII_visibility = GIV_POPUP;
+	GI_comp = @GClientNavigate;	
+}
+
+@object NavigateControlClass GClientNavigate = {
+	GCI_output = @GClient;	
+	GI_visMoniker = "Navigate";
+
+	ATTR_GEN_CONTROL_REQUIRE_UI = (NCF_HISTORY | NCF_BACK | NCF_FORWARD);
+	ATTR_GEN_CONTROL_PROHIBIT_UI = (NCF_MAIN_PAGE |	NCF_PREV_NEXT);
+	ATTR_GEN_CONTROL_REQUIRE_TOOLBOX_UI = (NCF_HISTORY | 
+					       NCF_BACK | 
+					       NCF_FORWARD);
+	ATTR_GEN_CONTROL_PROHIBIT_TOOLBOX_UI = (NCF_MAIN_PAGE |	NCF_PREV_NEXT);
+}
+
+@object GenInteractionClass GClientNavTool = {
+    GI_comp = @GClientNavToolGroup;
+}
+
+@object GenToolGroupClass GClientNavToolGroup = {
+    GTGI_controller = @GClientNavigate;
+
+    HINT_ORIENT_CHILDREN_HORIZONTALLY;
+}
+
+@end Interface;
+
+@start	GClientResource;
+
+/***************************************************************************
+ *		The Gopher object
+ ***************************************************************************/
+@object	GClientClass GClient = {
+}
+
+@end GClientResource;
+
+
+@start ItemText, data;
+
+@chunk char ItemDescriptionText[] = "gopher menu";
+@chunk char TypeText[] = "Menu";
+@chunk char HostText[] = "";
+@chunk char PortText[] = "gopher port";
+@chunk char SelectorText[] = "";
+@chunk char GopherPlusText[] = "No";
+
+@end ItemText
+

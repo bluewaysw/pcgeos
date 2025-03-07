@@ -1,0 +1,973 @@
+
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+	Copyright (c) Geoworks 1994 -- All Rights Reserved
+
+PROJECT:	Gopher library
+MODULE:		PARSER
+FILE:		gopherParse.goc
+
+AUTHOR:		Alvin Cham, Oct 17, 1994
+
+ROUTINES:
+	Name			Description
+	----			-----------
+
+	GopherLineFeedToEnter	
+				- convert all 'line feed' characters to enter
+
+	GopherShiftBufferContent
+				- shift the content of the data buffer 
+ 
+	GopherScanNextTabPos	
+				- look for the position of the next appearance
+				of a TAB character
+
+	GopherDirectorySeparatorFound
+				- find a directory separator
+
+	GopherExtractVisibleName
+				- extract the visible name field of a menu item
+
+	GopherExtractSelectorString
+				- extract the selector string field of a menu
+				item
+
+	GopherExtractHostname
+				- extract the hostname field of a menu item
+
+	GopherExtractPortNumber
+				- extract the port number field of a menu item
+
+	GopherExtractGopherPlusInfo
+				- extract the gopher+ info field of a menu
+				item
+
+	GopherParseDirectoryItem
+				- parse a directory item
+
+	GopherParseDirectory
+				- parse a directory item server response
+
+	GopherPlusParseInfo	
+				- parse a gopher+ info response
+
+	GopherPlusExtractEmailAddr
+				- extract the e-mail address of the 
+				administrator of a gopher item
+
+	GopherPlusExtractModDateInfo
+				- extract the info of the modification date
+				 of a gopher item
+
+	GopherPlusExtractModDate
+				- extract the modification date of a gopher 
+				item
+
+	GopherPlusParseAdmin
+				- parse the +ADMIN block of the gopher+ info
+
+	GopherPlusParseView
+				- parse the +VIEW block of the gopher+ info
+
+	GopherPlusParseAbstract	
+				- parse the +ABSTRACT block of the gopher+
+				info
+
+	GopherParseGopherPlus
+				- parse the gopher+ info server response
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	AC	10/17/94   	Initial version.
+
+DESCRIPTION:
+	Parsing procedures for the gopher library
+
+	$Id: gopherParse.goc,v 1.1 97/04/04 18:04:50 newdeal Exp $
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+
+@include <gopherC.goh>
+
+@ifndef	__GOPHER_PARSE_GOC
+@define __GOPHER_PARSE_GOC
+
+
+/***********************************************************************
+ *		GopherLineFeedToEnter
+ ***********************************************************************
+ * SYNOPSIS:	Convert line feeds to enter
+ * CALLED BY:	MSG_GOPHER_RECV_DATA
+ * RETURN:	none
+ * SIDE EFFECTS:none
+ *	
+ * STRATEGY:
+ *	
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	AC	12/15/94   	Initial Revision
+ *
+ ***********************************************************************/
+void
+GopherLineFeedToEnter (byte *buffer, word bytes)
+{
+	word i;
+
+	for (i = 0; i < bytes; i++) {
+	    if (buffer[i] == C_LINEFEED)
+		buffer[i] = C_ENTER;
+	}
+}	/* End of GopherLineFeedToEnter.	*/
+
+
+/***********************************************************************
+ *		GopherShiftBufferContent
+ ***********************************************************************
+ * SYNOPSIS:	Shifting the content of the buffer by some number of bytes.
+ * CALLED BY:	MSG_GOPHER_RECV_DATA
+ * 	PASS:	buffer	- buffer to be shifted
+ *		pos	- number of positions shifted
+ *		times	- number of characters shifted
+ * 	RETURN:	none
+ * SIDE EFFECTS:none
+ *		
+ * STRATEGY:	(1)  Shift "times" number of bytes over
+ *
+ ***********************************************************************/
+void
+GopherShiftBufferContent (byte *buffer, word pos, word times)
+{
+	word i;
+
+	for (i = 0; i < times; i++) {
+	    buffer[i] = buffer[pos+i];
+	}
+}	/* End of GopherShiftBufferContent.	*/
+
+
+/***********************************************************************
+ *		GopherScanNextTabPos
+ ***********************************************************************
+ * SYNOPSIS:	Scan for the next TAB character in the buffer, and returns
+ *		its position, relative to the present position.
+ * CALLED BY:	Different "extract" routines.
+ * RETURN:	the position of the next TAB character relative to present.
+ * SIDE EFFECTS:none.
+ *	
+ * STRATEGY:	Scan for the next TAB character in the buffer.
+ *	
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	AC	9/14/94   	Initial Revision
+ *
+ ***********************************************************************/
+word
+GopherScanNextTabPos (byte *buffer)
+{
+	word size;
+
+	for (size = 0; (buffer[size] != C_TAB); size++);
+
+	/* something is wrong, if we read more than a buffer's full of data */
+	EC_ERROR_IF((size > GOPHER_READ_BUFFER_SIZE), 
+		    ERROR_OVERREADING_BUFFER);
+
+	return size;
+}	/* End of GopherScanNextTabPos.	*/
+
+
+/***********************************************************************
+ *		GopherDirectorySeparatorFound
+ ***********************************************************************
+ * SYNOPSIS:	Check to see if we can find an item separator for directory
+ *		items.
+ * CALLED BY:	GopherParseDirectory, GopherParseFile
+ * PASS:	byte *buffer		- buffer to check
+ *		word numBytes		- number of bytes to check
+ * RETURN: 	the # of bytes to get to the next separator
+ *		0 if none exists
+ * SIDE EFFECTS:EOF may be set to TRUE
+ *	
+ * STRATEGY:	(1)  Look for newline character in the next "numBytes".
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	AC	9/12/94   	Initial Revision
+ *
+ ***********************************************************************/
+word
+GopherDirectorySeparatorFound (byte *buffer, word numBytes, optr gopherObj) 
+{
+	word i;
+
+	for (i = 0; i < numBytes; i++) {
+	    if (buffer[i] == C_ENTER) {
+		if ((buffer[i-1] == C_PERIOD) && (i == 1)) {
+		    /* mark eof here */
+		    @call gopherObj::MSG_GOPHER_SET_EOF(TRUE);
+		}
+		return i+1;
+	    }
+	}
+
+	return 0;	/* no separator found */
+}	/* End of GopherDirectorySeparatorFound.	*/
+
+
+/***********************************************************************
+ *		GopherExtractVisibleName
+ ***********************************************************************
+ * SYNOPSIS:	Extract the visible portion of a gopher menu item.
+ * CALLED BY:	GopherParseDirectory
+ *	PASS:	byte	*buffer		- buffer to parse
+ *		optr	gopherObj	- the gopher object
+ *		GopherItem *item	- gopher item structure
+ *
+ * 	RETURN:	the length of the buffer that was parsed
+ * SIDE EFFECTS:none
+ *		
+ * STRATEGY: 	(1) Keep reading until we see a TAB
+ *		(2) Call GopherCreateStringChunk to allocate a chunk 
+ *		to store the string into "item", a temporary structure
+ *		that will eventually be written into the chunk array.
+ *		(3) Return the number of bytes read.
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	AC	9/ 1/94   	Initial Revision
+ *
+ ***********************************************************************/
+word
+GopherExtractVisibleName (byte *buffer, optr gopherObj, GopherItem *item)
+{
+	word	size;			/* bytes parsed */
+
+	size = GopherScanNextTabPos(buffer);
+
+	item->GI_userVisibleName = GopherCreateStringChunk(gopherObj, 
+							   buffer, 
+							   size);
+
+	return size;
+}	/* End of GopherExtractVisibleName.	*/
+
+
+/***********************************************************************
+ *		GopherExtractSelectorString
+ ***********************************************************************
+ * SYNOPSIS:	Extract the selector string of a gopher menu item.
+ * CALLED BY:	GopherParseDirectory
+ *	PASS:	byte	*buffer		- buffer to parse
+ *		optr	gopherObj	- the gopher object
+ *		GopherItem< *item	- gopher item structure
+ *
+ * 	RETURN:	the length of characters parsed
+ * SIDE EFFECTS:none
+ *	
+ * STRATEGY: 	(1) Keep reading until we see a TAB
+ *		(2) Call GopherCreateStringChunk to allocate a chunk 
+ *		to store the string into "item", a temporary structure
+ *		that will eventually be written into the chunk array.
+ *		(3) Return the number of bytes read.
+ *	
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	AC	9/ 1/94   	Initial Revision
+ *
+ ***********************************************************************/
+word
+GopherExtractSelectorString (byte *buffer, optr gopherObj, GopherItem *item)
+{
+	word	size;		/* bytes parsed */
+
+	size = GopherScanNextTabPos(buffer);
+
+	item->GI_selectorString = GopherCreateStringChunk(gopherObj, 
+							  buffer, 
+							  size);
+
+	return size;
+}	/* End of GopherExtractSelectorString.	*/
+
+
+/***********************************************************************
+ *		GopherExtractHostname
+ ***********************************************************************
+ * SYNOPSIS:	Extract the host name of a gopher menu item.
+ * CALLED BY:	GopherParseDirectory
+ *	PASS:	byte	*buffer		- buffer to parse
+ *		optr	gopherObj	- the gopher object
+ *		GopherItem *item	- gopher item structure
+ *
+ * 	RETURN:	length of characters parsed
+ * SIDE EFFECTS:none.
+ *	
+ * STRATEGY: 	(1) Keep reading until we see a TAB
+ *		(2) Call GopherCreateStringChunk to allocate a chunk 
+ *		to store the string into "item", a temporary structure
+ *		that will eventually be written into the chunk array.
+ *		(3) Return the number of bytes read.
+ *	
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	AC	9/ 1/94   	Initial Revision
+ *
+ ***********************************************************************/
+word
+GopherExtractHostname (byte *buffer, optr gopherObj, GopherItem *item)
+{
+	word	size;		/* bytes parsed */
+
+	size = GopherScanNextTabPos(buffer);
+
+	item->GI_hostname = GopherCreateStringChunk(gopherObj, buffer, size);
+
+	return size;
+}	/* End of GopherExtractHostname.	*/
+
+
+/***********************************************************************
+ *		GopherExtractPortNumber
+ ***********************************************************************
+ * SYNOPSIS:	Extract the port number of a gopher menu item.	
+ * CALLED BY:	GopherParseDirectory
+ *	PASS:	byte	*buffer		- buffer to parse
+ *		optr	gopherObj	- the gopher object
+ *		GopherItem *item	- gopher item structure
+ *
+ * 	RETURN:	length of characters parsed.
+ * SIDE EFFECTS:none
+ *	
+ * STRATEGY:	(1) Look for the next newline or TAB
+ *		(2) Store the string
+ *		(3) Convert the string to integer
+ *		(4) Store that value into "item", a temporary structure
+ *		that will eventually be written into the chunk array
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	AC	9/ 1/94   	Initial Revision
+ *
+ ***********************************************************************/
+word
+GopherExtractPortNumber (byte *buffer, optr gopherObj, GopherItem *item)
+{
+	word		size;
+	char		*stringPtr;
+	MemHandle	tmpBlock;	/* temporary storing for string */
+
+	/* 
+	 * look for the next TAB or ENTER, since it may not 
+	 * have gopher+ attributes.  Then, allocate a temporary block
+	 * to hold the string (the port number in characters).  Copy
+	 * the port number in the allocated string, and then convert it
+	 * into an integer, after null-terminated the string.  Store
+	 * the integer value of the port number, and discard the allocated
+	 * string.
+	 */
+ 	for (size = 0; 
+	     ((buffer[size] != C_TAB) && (buffer[size] != C_ENTER)); 
+	     size++); 
+	EC_ERROR_IF((size > GOPHER_READ_BUFFER_SIZE), 
+		    ERROR_OVERREADING_BUFFER);
+	
+	tmpBlock = GopherAllocBlockWithLock(size+1);
+	EC_ERROR_IF((tmpBlock == NullHandle), 
+		    ERROR_NO_MEMORY_TO_ALLOC_TMP_BLOCK);
+	stringPtr = MemDeref(tmpBlock);
+
+	/* copy the string into the temporary block */
+	strncpy(stringPtr, (char *)buffer, size);
+	
+	/* null terminate the string */
+	stringPtr[size] = '\0';
+
+	item->GI_portNumber = atoi(stringPtr);
+
+	MemFree(tmpBlock);
+
+	return size;
+}	/* End of GopherExtractPortNumber.	*/
+
+
+/***********************************************************************
+ *		GopherExtractGopherPlusInfo
+ ***********************************************************************
+ * SYNOPSIS:	Extract the gopher plus infomation from a gopher item
+ * CALLED BY:	GopherParseDirectory
+ *	PASS:	byte	*buffer		- buffer to parse
+ *		optr	gopherObj	- the gopher object
+ *		GopherItem *item	- gopher item structure
+ *
+ * RETURN:	
+ * SIDE EFFECTS:
+ *	
+ * STRATEGY:
+ *	
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	AC	9/ 1/94   	Initial Revision
+ *
+ ***********************************************************************/
+word
+GopherExtractGopherPlusInfo (byte *buffer, optr gopherObj, GopherItem *item)
+{
+	word	count = 0;
+
+	EC_ERROR_IF((*buffer != GOPHER_PLUS_INDICATOR), 
+		    ERROR_INVALID_GOPHER_PLUS_INDICATOR);
+
+	for (count = 0; buffer[count] != C_ENTER; count++);
+	return count;
+}	/* End of GopherExtractGopherPlusInfo.	*/
+
+
+/***********************************************************************
+ *		GopherParseDirectoryItem
+ ***********************************************************************
+ * SYNOPSIS:	Parse a directory item.
+ * CALLED BY:	GopherParseDirectory, GopherPlusParseInfo
+ * RETURN:	length of bytes parsed
+ * SIDE EFFECTS:none
+ *	
+ * STRATEGY:	none
+ *	
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	AC	10/18/94   	Initial Revision
+ *
+ ***********************************************************************/
+word
+GopherParseDirectoryItem (byte *buffer, optr gopherObj, GopherItem *tmpItem)
+{
+	word count = 0;
+
+    	tmpItem->GI_type = (GopherParseItemType) buffer[count] - '0';
+	count++;	/* skip the item type indicator */
+
+	count += GopherExtractVisibleName
+			(&buffer[count], gopherObj, tmpItem);
+    	count++;	/* skip the tab */
+
+	count += GopherExtractSelectorString
+			(&buffer[count], gopherObj, tmpItem);
+	count++;	/* skip the tab */
+
+	count += GopherExtractHostname
+			(&buffer[count], gopherObj, tmpItem);
+	count++;	/* skip the tab */
+
+	count += GopherExtractPortNumber
+			(&buffer[count], gopherObj, tmpItem);
+	count++;	/* skip the tab or maybe a newline*/
+
+	/* if it is not a newline, then we have gopher+ information */
+	if (buffer[count-1] != C_ENTER) {
+	    tmpItem->GI_gopherPlusInfo = TRUE;
+	    count += GopherExtractGopherPlusInfo
+			(&buffer[count], gopherObj, tmpItem);
+	    count++;	/* skip the newline */
+	} else {	/* no gopher+ materials */
+	    tmpItem->GI_gopherPlusInfo = FALSE;
+	}
+
+	return count;
+}	/* End of GopherParseDirectoryItem.	*/
+
+
+/***********************************************************************
+ *		GopherParseDirectory
+ ***********************************************************************
+ * SYNOPSIS:	Parse a directory gopher menu item	
+ * CALLED BY:	MSG_GOPHER_PARSE_ITEM
+ * 	PASS:	byte *buffer	- the buffer to parse
+ *		dword numBytes	- number of bytes remain to parse
+ *		optr *gopherObj	- the gopher object
+ * 	RETURN:	the length of buffer that got parsed or
+ * SIDE EFFECTS:none
+ *	
+ * STRATEGY:	(1) Look for component separators and extract component 
+ *		by component.
+ *	
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	AC	8/31/94   	Initial Revision
+ *
+ ***********************************************************************/
+void
+GopherParseDirectory (byte *buffer, dword numBytes, optr gopherObj)
+{
+	dword		count = 0;	/* the length of parsed input */
+	GopherItem	*elementAddr;
+	MemHandle	infoBlock;
+	ChunkHandle	array;
+ 	GopherItem	tmpItem;	/* temporary item structure */
+
+	while (count < numBytes) {
+	    count += GopherParseDirectoryItem(&buffer[count], 
+					      gopherObj, 
+					      &tmpItem);
+
+	    /* we have finished parsing an item */
+    	    @call gopherObj::MSG_GOPHER_INC_ITEM_PARSED();
+
+	    /*
+	     * Here, we want to update the chunk array by appending the parsed
+	     * gopher item into the chunk array
+	     */
+	    infoBlock = @call gopherObj::MSG_GOPHER_GET_INFO_BLOCK();
+	    array = @call gopherObj::MSG_GOPHER_GET_MENU_ITEM_ARRAY_CHUNK();
+
+	    MemLock(infoBlock);
+
+	    elementAddr = ChunkArrayAppendHandles(infoBlock,
+						  array, 
+						  sizeof(GopherItem));
+
+	    /* copying the contents */
+	    memcpy(elementAddr, &tmpItem, sizeof(GopherItem));
+
+	    MemUnlock(infoBlock);
+	}
+	EC_ERROR_IF((count != numBytes), 
+		    ERROR_UNEQUAL_PARSED_LENGTH_WITH_BUFFER_LENGTH);
+}	/* End of GopherParseDirectory.	*/
+
+
+/***********************************************************************
+ *		GopherPlusParseInfo
+ ***********************************************************************
+ * SYNOPSIS:	Parsing the +INFO attribute of a gopher+ item.
+ * CALLED BY:	GopherParseGopherPlus
+ * RETURN:	none
+ * SIDE EFFECTS:none
+ *	
+ * STRATEGY:
+ *	
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	AC	10/18/94   	Initial Revision
+ *
+ ***********************************************************************/
+word
+GopherPlusParseInfo (byte *buffer, optr gopherObj)
+{
+	GopherPlusItemAttrInfo item;
+	word	count;
+
+	count = GopherParseDirectoryItem(buffer, 
+					 gopherObj, 
+					 (GopherItem *) &item);	
+	@call gopherObj::MSG_GOPHER_PLUS_UPDATE_INFO_ATTR(item);
+
+	return (dword) count;
+}	/* End of GopherPlusParseInfo.	*/
+
+
+/***********************************************************************
+ *		GopherExtractEmailAddr
+ ***********************************************************************
+ * SYNOPSIS:	Extract the e-mail address of the administrator of a
+ *		gopher+ item. 
+ * CALLED BY:	GopherPlusParseAdmin
+ * RETURN:	the length of bytes parsed
+ * SIDE EFFECTS:none
+ *	
+ * STRATEGY:	(1)	Find the start/end indicator of the string
+ *		(2)	Allocate a string chunk
+ *		(3)	update the record field
+ *	
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	AC	10/19/94   	Initial Revision
+ *
+ ***********************************************************************/
+word
+GopherPlusExtractEmailAddr 
+(byte *buffer, optr gopherObj, GopherPlusItemAttrAdmin *record)
+{
+	word count = 0;
+	word start, end;
+	ChunkHandle	newChunk;
+
+	/* find the start and end indicators */
+	for (start = count; 
+	     buffer[start] != GOPHER_INFO_START_INDICATOR; 
+	     start++);
+
+	for (end = start; 
+	     buffer[end] != GOPHER_INFO_END_INDICATOR; 
+	     end++);
+
+	newChunk = GopherCreateStringChunk(gopherObj, 
+					   &buffer[start+1],
+					   (end-start)-1);
+
+	record->GPIAA_email = (GopherPlusItemAttrAdminInfo) newChunk;
+	return (GopherLookForNextLine(buffer));
+}	/* End of GopherExtractEmailAddr.	*/
+
+
+/***********************************************************************
+ *		GopherPlusExtractModDateInfo
+ ***********************************************************************
+ * SYNOPSIS:	Extract the infomation of the last modification date of a 
+ *		gopher+
+ *		item.
+ * CALLED BY:	GopherPlusExtractModDate
+ * RETURN:	the information needed
+ * SIDE EFFECTS:none
+ *	
+ * STRATEGY:	none
+ *	
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	AC	10/19/94   	Initial Revision
+ *
+ ***********************************************************************/
+word
+GopherPlusExtractModDateInfo (byte *buffer, word length)
+{
+	word info;
+	MemHandle tmpBlock;
+	byte *pointer;
+
+	tmpBlock = GopherAllocBlockWithLock(length+1);
+	EC_ERROR_IF((tmpBlock == NullHandle), 
+		    ERROR_NO_MEMORY_TO_ALLOC_TMP_BLOCK);
+	pointer = MemDeref(tmpBlock);
+	memcpy(pointer, buffer, length);
+	pointer[length] = '\0';	/* null terminate it */
+
+	info = atoi((char *)pointer);	/* the value in integer */
+	MemFree(tmpBlock);
+
+	return info;
+}	/* End of GopherPlusExtractModDateInfo.	*/
+
+
+/***********************************************************************
+ *		GopherExtractModDate
+ ***********************************************************************
+ * SYNOPSIS:	Extract the last modification date of a gopher+ item. 
+ * CALLED BY:	GopherPlusParseAdmin
+ * RETURN:	the length of bytes parsed
+ *	
+ * STRATEGY:	(1)	find the start/end indicator
+ *		(2)	Extract field by field the info needed
+ *		(3)	Update the record fields
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	AC	10/19/94   	Initial Revision
+ *
+ ***********************************************************************/
+word
+GopherPlusExtractModDate 
+(byte *buffer, optr gopherObj, GopherPlusItemAttrAdmin *record)
+{
+	word start, end;
+
+	/* find the start and end indicators */
+	for (start = 0; 
+	     buffer[start] != GOPHER_INFO_START_INDICATOR; 
+	     start++);
+
+	for (end = start; 
+	     buffer[end] != GOPHER_INFO_END_INDICATOR; 
+	     end++);
+	/* the length should have a fix length */
+	EC_ERROR_IF((end-start-1 != GOPHER_LENGTH_OF_DATE), 
+		    ERROR_INCOMPATIBLE_DATE_LENGTH);
+
+	/* the position of the buffer are important */
+	record->GPIAA_modDate.GPIADI_year = 
+		GopherPlusExtractModDateInfo(&buffer[start+1], 4);
+	record->GPIAA_modDate.GPIADI_month = 
+		GopherPlusExtractModDateInfo(&buffer[start+5], 2);
+	record->GPIAA_modDate.GPIADI_day = 
+		GopherPlusExtractModDateInfo(&buffer[start+7], 2);
+	record->GPIAA_modDate.GPIADI_hour = 
+		GopherPlusExtractModDateInfo(&buffer[start+9], 2);
+	record->GPIAA_modDate.GPIADI_minute = 
+		GopherPlusExtractModDateInfo(&buffer[start+11], 2);
+	record->GPIAA_modDate.GPIADI_second = 
+		GopherPlusExtractModDateInfo(&buffer[start+13], 2);
+
+	return (GopherLookForNextLine(buffer));
+}	/* End of GopherExtractModDate.	*/
+
+
+/***********************************************************************
+ *		GopherPlusParseAdmin
+ ***********************************************************************
+ * SYNOPSIS:	Parsing the +ADMIN attribute of a gopher+ item.
+ * CALLED BY:	GopherParseGopherPlus
+ * RETURN:	none
+ * SIDE EFFECTS:none
+ *	
+ * STRATEGY:
+ *	
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	AC	10/18/94   	Initial Revision
+ *
+ ***********************************************************************/
+word
+GopherPlusParseAdmin (byte *buffer, optr gopherObj)
+{
+	word	count = 0;
+	MemHandle	tmpBlock;	/* temporary block for storage */
+	byte	*fieldString = NULL;
+	word	stringSize;
+	GopherPlusItemAttrAdmin	adminInfo;
+
+	/* 
+	 * we are still in the block as long as the first character of a 
+	 * line is a space 
+	 */
+	while (buffer[count] == C_SPACE) {
+	    count++; 	/* skip the space */
+	    /* 
+	     * (1) allocate a block with token size length
+	     * (2) compare the attribute field
+	     * (3) extract the information of the field accordingly
+	     */
+	    stringSize = GopherFindTokenLength(&buffer[count]);
+	    tmpBlock = GopherAllocBlockWithLock(stringSize);
+	    EC_ERROR_IF((tmpBlock == NullHandle), 
+			ERROR_NO_MEMORY_TO_ALLOC_TMP_BLOCK);
+	    fieldString = MemDeref(tmpBlock);
+	    memcpy(fieldString, &buffer[count], stringSize);
+	    fieldString[stringSize] = '\0';	/* null-terminate it */
+
+	    if (!(strcmp((char *)fieldString, "Admin"))) {
+		/* extract the e-mail address here */
+		count += GopherPlusExtractEmailAddr(&buffer[count], 
+						    gopherObj,
+						    &adminInfo);
+	    } else if (!(strcmp((char *)fieldString, "Mod-Date"))) {
+		/* extract the modification date here */
+		count += GopherPlusExtractModDate(&buffer[count], 
+					  	  gopherObj,
+					  	  &adminInfo);
+	    } else {
+		/* skip this line */
+		count += GopherLookForNextLine(&buffer[count]);
+	    }
+	    MemFree(tmpBlock);
+	}
+
+	@call gopherObj::MSG_GOPHER_PLUS_UPDATE_ADMIN_ATTR(adminInfo);
+
+	return count;
+}	/* End of GopherPlusParseAdmin.	*/
+
+
+/***********************************************************************
+ *		GopherPlusParseView
+ ***********************************************************************
+ * SYNOPSIS:	Parsing the +VIEW attribute of a gopher+ item.
+ * CALLED BY:	GopherParseGopherPlus
+ * RETURN:	none
+ * SIDE EFFECTS:none
+ *	
+ * STRATEGY:	(1) Create a chunk array
+ *		(2) while there are different views,
+ *			a) extract pieces of information
+ *			b) insert information into chunk array
+ *	
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	AC	10/18/94   	Initial Revision
+ *
+ ***********************************************************************/
+word
+GopherPlusParseView (byte *buffer, optr gopherObj)
+{
+	ChunkHandle arrayChunk;
+	ChunkHandle infoChunk;
+	MemHandle infoBlock;
+	word	count = 0;
+	GopherPlusItemAttrView *elementAddr;
+	word	length;
+
+	infoBlock = @call gopherObj::MSG_GOPHER_GET_INFO_BLOCK();
+	MemLock(infoBlock);
+
+	if ((arrayChunk = ChunkArrayCreate(infoBlock,
+					   sizeof(GopherPlusItemAttrView),
+					   0,
+					   0)) == NullHandle) {
+	    MemUnlock(infoBlock);
+	    /* cannot allocate a chunk */
+	    return 0;
+	}
+
+	@call gopherObj::MSG_GOPHER_PLUS_SET_VIEW_CHUNK(arrayChunk);
+	while (buffer[count] == C_SPACE) {
+	    count++;	/* skip the space */
+	
+	    length = GopherLookForNextLine(&buffer[count]);
+
+	    /* don't want the extra newline character at the end */
+	    infoChunk = GopherCreateStringChunk(gopherObj, 
+						&buffer[count],
+						length-1); 
+
+	    /* insert the element into the chunk array */
+	    elementAddr = ChunkArrayAppendHandles(infoBlock, arrayChunk, 
+				sizeof(GopherPlusItemAttrView));
+	    *elementAddr = (GopherPlusItemAttrView) infoChunk;
+	    count += length;
+	}
+	MemUnlock(infoBlock);
+
+	return count;
+}	/* End of GopherPlusParseView.	*/
+
+/***********************************************************************
+ *		GopherPlusParseAbstract
+ ***********************************************************************
+ * SYNOPSIS:	Parsing the +Abstract attribute of a gopher+ item.
+ * CALLED BY:	GopherParseGopherPlus
+ * RETURN:	none
+ * SIDE EFFECTS:none
+ *	
+ * STRATEGY:	(1)	find the length of text
+ *		(2)	allocate a string chunk for it
+ *		(3)	update into the instance field
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	AC	10/18/94   	Initial Revision
+ *
+ ***********************************************************************/
+word
+GopherPlusParseAbstract (byte *buffer, optr gopherObj)
+{
+	word	count = 0;
+	word	offset = 0;
+	word	length, chunkSize;
+	MemHandle	infoBlock;
+	GopherPlusItemAttrAbstract	newChunk = NullHandle;
+	Boolean	firstTimeFlag	= TRUE;
+	byte	*string;
+
+	infoBlock = @call gopherObj::MSG_GOPHER_GET_INFO_BLOCK();
+	MemLock(infoBlock);
+
+	while (buffer[count] == C_SPACE) {
+	    count++;	/* skip the space */
+
+	    length = GopherLookForNextLine(&buffer[count]);
+
+	    /* allocate a new chunk, or re-allocate an existing chunk */
+	    if (firstTimeFlag) {
+		chunkSize = length;
+		newChunk = (GopherPlusItemAttrAbstract) 
+				LMemAlloc(infoBlock, chunkSize+1);
+		firstTimeFlag = FALSE;
+	    } else {
+		chunkSize += length;
+		EC_ERROR_IF((newChunk == NullHandle), 
+			    ERROR_NO_MEMORY_TO_ALLOC_CHUNK);
+		LMemReAllocHandles(infoBlock, 
+				   (ChunkHandle)newChunk, 	
+				   chunkSize+1);
+	    }  
+
+	    string = LMemDerefHandles(infoBlock, (ChunkHandle) newChunk);
+	    memcpy(&string[offset], &buffer[count], length);
+	
+	    offset += length;
+	    count += length;
+	}
+	string[offset] = '\0';	/* null-terminate it */
+	@call gopherObj::MSG_GOPHER_PLUS_UPDATE_ABSTRACT_ATTR(newChunk);
+
+	MemUnlock(infoBlock);
+	return count;
+}	/* End of GopherPlusParseAbstract.	*/
+
+
+/***********************************************************************
+ *		GopherParseGopherPlus
+ ***********************************************************************
+ * SYNOPSIS:	Parses a gopher plus server response.
+ * CALLED BY:	MSG_GOPHER_PARSE_ITEM
+ * RETURN:	none
+ * SIDE EFFECTS:none
+ *	
+ * STRATEGY:	(1) Read the cached file, and extract the 
+ *		information piece by piece. 
+ *	
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	AC	10/18/94   	Initial Revision
+ *
+ ***********************************************************************/
+void
+GopherParseGopherPlus (byte *buffer, dword numBytes, optr gopherObj)
+{
+	dword	count = 0;		/* length of stream parsed */
+	GopherPlusItemAttrInfoType	attrType;
+	
+	while (count < numBytes) {
+	    count += GopherPlusFindBlockType(&buffer[count], &attrType);
+
+	    switch (attrType) {
+		case GPIAIT_INFO:
+		    count += 2;	/* a hack, skipping the ':' and the space */
+		    count += GopherPlusParseInfo(&buffer[count], gopherObj);
+		    break;
+		case GPIAIT_ADMIN:
+		    count += GopherLookForNextLine(&buffer[count]);
+		    count += GopherPlusParseAdmin(&buffer[count], gopherObj);
+		    break;
+		case GPIAIT_VIEWS:
+		    count += GopherLookForNextLine(&buffer[count]);
+		    count += GopherPlusParseView(&buffer[count], gopherObj);
+		    break;
+		case GPIAIT_ABSTRACT:
+		    count += GopherLookForNextLine(&buffer[count]);
+		    count += GopherPlusParseAbstract(&buffer[count], 
+						     gopherObj);
+		    break;
+		default:
+		    break;
+	    }
+	}
+
+	/* we have finished parsing an item */
+	@call gopherObj::MSG_GOPHER_INC_ITEM_PARSED();
+
+}	/* End of GopherParseGopherPlus.	*/
+
+@endif	/* __GOPHER_PARSE_GOC */
+
+
+
+
+
+
+
+

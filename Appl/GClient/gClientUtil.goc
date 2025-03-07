@@ -1,0 +1,1146 @@
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+	Copyright (c) Geoworks 1994 -- All Rights Reserved
+
+PROJECT:	Gopher Client
+MODULE:		The Client (utility routines)
+FILE:		gClientUtil.goc
+
+AUTHOR:		Alvin Cham, Oct 24, 1994
+
+ROUTINES:
+	Name			Description
+	----			-----------
+
+	GCUpdateDisplayScreenUI
+				- update the UI screen to appropriate item
+				type
+
+	GCRemoveOptions
+				- remove the current option buttons
+
+	GCAddOptions
+				- add a new set of option triggers
+
+	GCFetchMenu	
+				- fetch a menu
+
+	GCWriteToTextObj
+				- write text to a text object
+
+	GCConstructModifyDateString
+				- convert the modification date to a string
+
+	GCPadMonth	
+				- convert a number to the associated 
+				month, and pad the string
+
+	GCPadDayOrHourOrYear
+				- pad other modification date attributes
+
+	GCPadMinuteOrSecond	- pad other modification date attributes
+
+	GCPadChar		- pad a character
+
+	GCDisplayViewSize	
+				- extract the size of a view of a item
+
+	GCLanguageMatch	
+				- match a language
+
+	GCWriteSizeToTextObj
+				- pad the size of the VIEW to a text object
+
+	GCDisplayAttributesToTextObj
+				- extract attributes of a gopher item and write
+				them to diff. text objects
+
+	GCExtractAttribute
+				- extract an attribute
+
+	GCExtractItemType
+				- extract the item type
+
+	GCFindNextTabOrNewLine
+				- find the position of the next ENTER or TAB
+				character
+
+	GCFillTextObjWithDefaults
+				- fill the text objects with default values
+
+	GCCreateNewConnectionItem
+				- create a new connection item
+
+	GCBuildItemFromParameters
+				- build a gopher item based on the connection
+				tool parameters
+
+	GCBuildItemType
+				- build the item type part of a gopher item
+
+	GCBuildAttribute
+				- build other attributes of a gopher item
+
+	GCBuildGopherPlus	
+				- build the gopher plus part of a gopher item
+
+	GCEditConnectionItem
+				- edit a connection item
+
+
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	AC	10/24/94   	Initial version.
+
+DESCRIPTION:
+	Utility procedures for the application.
+
+	$Id: gClientUtil.goc,v 1.1 97/04/04 15:10:19 newdeal Exp $
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+
+@include "gClientC.goh"
+
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		Procedures
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+
+
+/***********************************************************************
+ *		GCUpdateDisplayScreenUI
+ ***********************************************************************
+ * SYNOPSIS:	Insert the display screen object into the generic tree.
+ * CALLED BY:	UTILITY
+ * RETURN:	none
+ * SIDE EFFECTS:generic tree hierarchy changed
+ *	
+ * STRATEGY:	(1)  check to see if the object is already in the generic
+ *		tree.  If not, then we do the changed.
+ *	
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	AC	11/10/94   	Initial Revision
+ *
+ ***********************************************************************/
+void
+GCUpdateDisplayScreenUI (optr displayObj)
+{
+	word found;		/* whether the object is already there */
+
+	found = @call GClientDisplay::MSG_GEN_FIND_CHILD(displayObj);
+
+	if (found == -1) {	/* not found */
+	    optr tmpObj;	/* the old object, to be replaced */
+
+	    tmpObj = @call GClientDisplay::
+				MSG_GEN_FIND_CHILD_AT_POSITION(0);
+	    @call tmpObj::MSG_GEN_SET_NOT_USABLE(VUM_NOW);
+	    @call GClientDisplay::MSG_GEN_REMOVE_CHILD
+			(tmpObj, CCO_FIRST);
+	    @call GClientDisplay::MSG_GEN_ADD_CHILD
+			(displayObj, CCO_FIRST);
+	    @call displayObj::MSG_GEN_SET_USABLE(VUM_NOW);
+	}	
+}	/* End of GCUpdateDisplayScreenUI.	*/
+
+
+/***********************************************************************
+ *		GCRemoveOptions
+ ***********************************************************************
+ * SYNOPSIS:	Remove the GenTrigger objects from the generic tree.
+ * CALLED BY:	UTILITY
+ * RETURN:	none
+ * SIDE EFFECTS:generic tree hierarchy changed
+ *	
+ * STRATEGY:	(1) Remove the objects from the generic tree.
+ *	
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	AC	8/16/94   	Initial Revision
+ *
+ ***********************************************************************/
+void
+GCRemoveOptions ()
+{
+	optr child1, child2, child3, child4;
+
+	/*
+	 * find the current four children under the options menu.
+	 */
+	child1 = @call GClientOption::MSG_GEN_FIND_CHILD_AT_POSITION(0);
+	child2 = @call GClientOption::MSG_GEN_FIND_CHILD_AT_POSITION(1);
+	child3 = @call GClientOption::MSG_GEN_FIND_CHILD_AT_POSITION(2);
+	child4 = @call GClientOption::MSG_GEN_FIND_CHILD_AT_POSITION(3);
+
+	/* before removing the objects, we must set them to be not usable. */
+	@call child1::MSG_GEN_SET_NOT_USABLE(VUM_NOW);
+	@call child2::MSG_GEN_SET_NOT_USABLE(VUM_NOW);
+	@call child3::MSG_GEN_SET_NOT_USABLE(VUM_NOW);
+	@call child4::MSG_GEN_SET_NOT_USABLE(VUM_NOW);
+
+	/* remove the children one by one, note that the position matters. */
+	@call GClientOption::MSG_GEN_REMOVE_CHILD(child1, CCO_FIRST);
+	@call GClientOption::MSG_GEN_REMOVE_CHILD(child2, CCO_FIRST);
+	@call GClientOption::MSG_GEN_REMOVE_CHILD(child3, CCO_FIRST);
+	@call GClientOption::MSG_GEN_REMOVE_CHILD(child4, CCO_FIRST);
+
+}	/* End of GCRemoveOptions.	*/
+
+
+/***********************************************************************
+ *		GCAddOptions
+ ***********************************************************************
+ * SYNOPSIS:	Add the GenTrigger objects from the generic tree.
+ * CALLED BY:	UTILITY
+ * RETURN:	none
+ * SIDE EFFECTS:generic tree hierarchy changed
+ *	
+ * STRATEGY:	(1) Add the objects into the generic tree.
+ *	
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	AC	8/16/94   	Initial Revision
+ *
+ ***********************************************************************/
+void
+GCAddOptions (optr child1, optr child2, optr child3, optr child4)
+{
+	/*
+	 * add the children one by one, note that we are adding in the
+	 * reverse order, but "child1" will still end up being the 
+	 * first child of the tree.
+	 */
+	@call GClientOption::MSG_GEN_ADD_CHILD(child4, CCO_FIRST);
+	@call GClientOption::MSG_GEN_ADD_CHILD(child3, CCO_FIRST);
+	@call GClientOption::MSG_GEN_ADD_CHILD(child2, CCO_FIRST);
+	@call GClientOption::MSG_GEN_ADD_CHILD(child1, CCO_FIRST);
+
+	/*
+	 * need to make sure that the children are all usable after
+	 * adding it to the generic tree.  Some children may not be
+	 * usable initially, since we might have set them to not usable
+	 * previously.
+	 */
+	@call child1::MSG_GEN_SET_USABLE(VUM_NOW);
+	@call child2::MSG_GEN_SET_USABLE(VUM_NOW);
+	@call child3::MSG_GEN_SET_USABLE(VUM_NOW);
+	@call child4::MSG_GEN_SET_USABLE(VUM_NOW);
+
+}	/* End of GCAddOptions.	*/
+
+
+/***********************************************************************
+ *		GCFetchMenu
+ ***********************************************************************
+ * SYNOPSIS:	Fetching a menu
+ * CALLED BY:	UTILITY
+ * RETURN:	none
+ * SIDE EFFECTS:none
+ *	
+ * STRATEGY:	(1)  Allocate a chunk to store a history list element 
+ *		information.
+ *	
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	AC	11/ 2/94   	Initial Revision
+ *
+ ***********************************************************************/
+void
+GCFetchMenu (GopherParseItemType type, word selection, optr gopherObj)
+{
+	MemHandle infoBlock;
+	GCHistoryListElement *element;
+	ChunkHandle newChunk;
+
+	infoBlock = @call gopherObj::MSG_GOPHER_GET_INFO_BLOCK();
+	MemLock(infoBlock);
+
+	/* Create a chunk to store the selection's chunk information */
+	if ((newChunk = GCAllocHistElementChunk(infoBlock)) == NullHandle) {
+	    /* can't allocate a chunk */
+	    MemUnlock(infoBlock);
+	    return;
+	}
+
+	element = (GCHistoryListElement *)LMemDerefHandles(infoBlock, 
+							   newChunk);
+
+	/* get the "item" field of element */
+	GCUpdateHistElementItemInfo(&(element->GCHLE_item), 
+				    selection, gopherObj);
+
+	/* construct the request for the next menu fetch */
+	@call gopherObj::MSG_GOPHER_CONSTRUCT_REQUEST(GCR_NORMAL, selection,0);
+
+	/* we want to update the history list */
+	@call gopherObj::MSG_GC_SET_UPDATE_HLIST(TRUE);
+
+	/* clear the previous menu item materials */
+	@call gopherObj::MSG_GOPHER_FETCH_NEW_DISPLAY(type);
+
+	/* 
+	 * save this chunk so that when we are done parsing, we can retrieve
+	 * the information to update the history list 
+	 */
+	@call gopherObj::MSG_GC_SET_HLIST_ELEMENT_CHUNK(newChunk);
+
+	MemUnlock(infoBlock);
+}	/* End of GCFetchMenu.	*/
+
+
+/***********************************************************************
+ *		GCWriteToTextObj
+ ***********************************************************************
+ * SYNOPSIS:	Write the text into the the txtObj
+ * CALLED BY:	UTILITY
+ * RETURN:	none
+ * SIDE EFFECTS:none
+ *	
+ * STRATEGY:	(1)  clear previous text
+ *		(2)  write new text
+ *	
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	AC	11/14/94   	Initial Revision
+ *
+ ***********************************************************************/
+void
+GCWriteToTextObj (optr txtObj, char *text)
+{
+	/* erase previous text */
+	@call txtObj::MSG_VIS_TEXT_REPLACE_ALL_PTR("", 0);
+
+	@call txtObj::MSG_VIS_TEXT_APPEND_PTR(text, strlen(text));
+}	/* End of GCWriteToTextObj.	*/
+
+
+/***********************************************************************
+ *		GCConstructModifyDateString
+ ***********************************************************************
+ * SYNOPSIS:	Build a temporary string to display the last modification
+ *		time of the gopher+ item.
+ * CALLED BY:	UTILITY
+ * RETURN:	none
+ * SIDE EFFECTS:none
+ *	
+ * STRATEGY:	(1)  Get the info, piece by piece, and build the string
+ *		piece by piece.
+ *	
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	AC	11/14/94   	Initial Revision
+ *
+ ***********************************************************************/
+void
+GCConstructModifyDateString (GopherPlusItemAttrDateInfo info)
+{
+	char infoString[GOPHER_MOD_DATE_STRING_LENGTH];
+	word length = 0;
+
+	length += GCPadMonth(&infoString[length], info.GPIADI_month);
+	length += GCPadChar(&infoString[length], C_SPACE);
+	length += GCPadDayOrHourOrYear(&infoString[length], info.GPIADI_day);
+	length += GCPadChar(&infoString[length], C_SPACE);
+	length += GCPadDayOrHourOrYear(&infoString[length], info.GPIADI_hour);
+	length += GCPadChar(&infoString[length], C_COLON);
+	length += GCPadMinuteOrSecond(&infoString[length], info.GPIADI_minute);
+	length += GCPadChar(&infoString[length], C_COLON);
+	length += GCPadMinuteOrSecond(&infoString[length], info.GPIADI_second);
+	length += GCPadChar(&infoString[length], C_SPACE);
+	length += GCPadDayOrHourOrYear(&infoString[length], info.GPIADI_year);
+	length += GCPadChar(&infoString[length], C_NULL);
+
+	GCWriteToTextObj(@GClientPlusModifiedText, infoString);
+
+}	/* End of GCConstructModifyDateString.	*/
+
+
+/***********************************************************************
+ *		GCPadMonth
+ ***********************************************************************
+ * SYNOPSIS:	
+ * CALLED BY:	
+ * RETURN:	
+ * SIDE EFFECTS:
+ *	
+ * STRATEGY:
+ *	
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	AC	11/14/94   	Initial Revision
+ *
+ ***********************************************************************/
+word
+GCPadMonth (char *string, word value)
+{
+	switch (value) {
+	    case 1: strcpy(string, "Jan");
+	    break;
+	    case 2: strcpy(string, "Feb");
+	    break;
+	    case 3: strcpy(string, "Mar");
+	    break;
+	    case 4: strcpy(string, "Apr");
+	    break;
+	    case 5: strcpy(string, "May");
+	    break;
+	    case 6: strcpy(string, "Jun");
+	    break;
+	    case 7: strcpy(string, "Jul");
+	    break;
+	    case 8: strcpy(string, "Aug");
+	    break;
+	    case 9: strcpy(string, "Sep");
+	    break;
+	    case 10: strcpy(string, "Oct");
+	    break;
+	    case 11: strcpy(string, "Nov");
+	    break;
+	    case 12: strcpy(string, "Dec");
+	    break;
+	    default:
+		/* some error */
+	    break;
+	}
+	return 3;
+}	/* End of GCPadMonth.	*/
+
+
+/***********************************************************************
+ *		GCPadDayOrHourOrYear
+ ***********************************************************************
+ * SYNOPSIS:	
+ * CALLED BY:	
+ * RETURN:	
+ * SIDE EFFECTS:
+ *	
+ * STRATEGY:
+ *	
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	AC	11/14/94   	Initial Revision
+ *
+ ***********************************************************************/
+word
+GCPadDayOrHourOrYear (char *string, word value)
+{
+	word i, length = 0;
+
+	while (value > 10) {
+	    string[length] = (char) (value % 10) + '0';
+	    value /= 10;
+	    length++; 
+	}
+	string[length] = (char) value + '0'; 
+	
+	/* do a reverse on the characters */
+	for (i = 0; i < ((length+1) / 2); i++) {
+	    char tmp;
+
+	    tmp = string[i];
+	    string[i] = string[length-i];
+	    string[length-i] = tmp;
+	}
+
+	return length+1;
+}	/* End of GCPadDayOrHourOrYear.	*/
+
+
+/***********************************************************************
+ *		GCPadMinuteOrSecond
+ ***********************************************************************
+ * SYNOPSIS:	
+ * CALLED BY:	
+ * RETURN:	
+ * SIDE EFFECTS:
+ *	
+ * STRATEGY:
+ *	
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	AC	11/14/94   	Initial Revision
+ *
+ ***********************************************************************/
+word
+GCPadMinuteOrSecond (char *string, word value)
+{
+	if (value < 10) {
+	    /* want to pad a '0' if it's less than 10, make it look nicer */
+	    *string = '0';
+	    string[1] = (char) value + '0';
+	    return 2;
+	} 	
+	return GCPadDayOrHourOrYear(string, value);
+}	/* End of GCPadMinuteOrSecond */
+
+
+/***********************************************************************
+ *		GCPadChar
+ ***********************************************************************
+ * SYNOPSIS:	Pad a character
+ * CALLED BY:	
+ * RETURN:	length of characters pad.
+ * SIDE EFFECTS:none
+ *	
+ * STRATEGY:	none
+ *	
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	AC	11/14/94   	Initial Revision
+ *
+ ***********************************************************************/
+word
+GCPadChar (char *string, char ch)
+{
+	*string = ch;
+	return 1;
+}	/* End of GCPadChar.	*/
+
+
+/***********************************************************************
+ *		GCDisplayViewSize
+ ***********************************************************************
+ * SYNOPSIS:	Extracting the size of the view of the item
+ * CALLED BY:	UTILITY
+ * RETURN:	none
+ * SIDE EFFECTS:none
+ *	
+ * STRATEGY:	(1)  Look into the "view" chunk array
+ *		(2)  For each element, find the language that fits
+ *		(3)  if found, then, return the size
+ *		(4)  otherwise, return the size of the first element 
+ *	
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	AC	11/15/94   	Initial Revision
+ *
+ ***********************************************************************/
+void
+GCDisplayViewSize (optr gopherObj)
+{
+	MemHandle infoBlock;
+	ChunkHandle viewArray;
+	word numOfElements;	/* number of elements of the chunk array */
+	word i;	/* counter */
+	char *string;		/* string of the information */
+	GopherPlusItemAttrView chunk;
+
+	infoBlock = @call gopherObj::MSG_GOPHER_GET_INFO_BLOCK();
+	MemLock(infoBlock);
+
+	viewArray = @call gopherObj::MSG_GOPHER_PLUS_GET_VIEW_CHUNK();
+	numOfElements = ChunkArrayGetCountHandles(infoBlock, viewArray);
+
+	EC_ERROR_IF((numOfElements == 0), 0);
+	for (i = 0; i < numOfElements; i++) {
+	    ChunkArrayGetElementHandles(infoBlock, viewArray, i, &chunk);
+	    string = (char *)LMemDerefHandles(infoBlock, (ChunkHandle) chunk);
+	    if (GCLanguageMatch(string, gopherObj)) {
+		GCWriteSizeToTextObj(string);
+		break;
+	    }
+	}
+
+	/* 
+	 * we can't find a view that fits the language, then we just
+	 * just the default, the first element of the array.
+	 */
+	if (i == numOfElements) {
+	    ChunkArrayGetElementHandles(infoBlock, viewArray, 0, &chunk);
+	    string = (char *)LMemDerefHandles(infoBlock, chunk);
+	    GCWriteSizeToTextObj(string);	    
+	}
+
+	MemUnlock(infoBlock);
+}	/* End of GCDisplayViewSize.	*/
+
+
+/***********************************************************************
+ *		GCLanguageMatch
+ ***********************************************************************
+ * SYNOPSIS:	Determine whether the language of the view matches with
+ *		the default one.
+ * CALLED BY:	UTILITY
+ * RETURN:	TRUE - if it matches
+ *		FALSE - otherwise
+ * SIDE EFFECTS:
+ *	
+ * STRATEGY:	(1)  To see if the string contains the sub-string of the 
+ *		default language.
+ *	
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	AC	11/15/94   	Initial Revision
+ *
+ ***********************************************************************/
+Boolean
+GCLanguageMatch (char *string, optr gopherObj)
+{
+	char 	buffer[] = "\0\0\0\0\0\0";
+	GopherLanguageType language;
+
+	language = @call gopherObj::MSG_GOPHER_GET_LANGUAGE();
+	
+	GopherLanguageMapToString(language, buffer);
+	if (strstr(string, buffer) == NULL) {
+	    return FALSE;
+	}
+	return TRUE;
+}	/* End of GCLanguageMatch.	*/
+
+
+/***********************************************************************
+ *		GCWriteSizeToTextObj
+ ***********************************************************************
+ * SYNOPSIS:	Pad the size of the View to the textObj
+ * CALLED BY:   UTILITY
+ * RETURN:	none
+ * SIDE EFFECTS:none
+ *	
+ * STRATEGY:	
+ *	
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	AC	11/15/94   	Initial Revision
+ *
+ ***********************************************************************/
+void
+GCWriteSizeToTextObj (char *string)
+{
+	char *infoString = strchr(string, GOPHER_INFO_START_INDICATOR);
+
+	GCWriteToTextObj(@GClientPlusSizeText, infoString);
+}	/* End of GCWriteSizeToTextObj.	*/
+
+
+/***********************************************************************
+ *		GCDisplayAttributesToTextObj
+ ***********************************************************************
+ * SYNOPSIS:	Extracting the attributes of a gopher item and write them
+ *		into text objects.
+ * CALLED BY:	UTILITY
+ * RETURN:	none
+ * SIDE EFFECTS:none
+ *	
+ * STRATEGY:	(1)  Extract bits by bits of information.
+ *	
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	AC	11/17/94   	Initial Revision
+ *
+ ***********************************************************************/
+void
+GCDisplayAttributesToTextObj (char *string)
+{
+	word offset;
+
+	GCExtractItemType(string[0]);
+	offset = 1;	/* skip the menu type indicator */
+	offset += GCExtractAttribute(&string[offset], @GClientItemText);
+	offset++;	/* skip the tab */
+	offset += GCExtractAttribute(&string[offset], 
+				     @GClientSelectorText);
+	offset++;	/* skip the tab */
+	offset += GCExtractAttribute(&string[offset], @GClientHostText);
+	offset++;	/* skip the tab */
+	offset += GCExtractAttribute(&string[offset], @GClientPortText);
+	if (string[offset] == C_ENTER) {
+		/* no gopher plus */ 
+		GCWriteToTextObj(@GClientPlusText, "No");
+	} else {
+		EC_ERROR_IF((string[offset+1] != GOPHER_PLUS_INDICATOR), 0);
+		GCWriteToTextObj(@GClientPlusText, "Yes");
+	}
+}	/* End of GCDisplayAttributesToTextObj.	*/
+
+
+/***********************************************************************
+ *		GCExtractAttribute
+ ***********************************************************************
+ * SYNOPSIS:	Extract one field of gopher item attribute, and display it
+ *		to the corresponding text object.
+ * CALLED BY:	UTILITY
+ * RETURN:	the length of the string.
+ * SIDE EFFECTS:none
+ *	
+ * STRATEGY:	
+ *	
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	AC	11/17/94   	Initial Revision
+ *
+ ***********************************************************************/
+word
+GCExtractAttribute (char *string, optr txtObj)
+{
+	word length;
+	char ch;
+
+	length = GCFindNextTabOrNewLine(string);
+	
+	/* 
+	 * replace the saved character with the null and write it into the
+	 * text object.  After that, we replace it back.
+	 */
+	ch = string[length];	/* save this character, TAB or LINEFEED */
+	string[length] = '\0';	/* null-terminate the string */
+	GCWriteToTextObj(txtObj, string); 
+	string[length] = ch;	/* write the character back */
+
+	return length;
+}	/* End of GCExtractAttribute.	*/
+
+
+/***********************************************************************
+ *		GCExtractItemType
+ ***********************************************************************
+ * SYNOPSIS:	Extract the type of the gopher item and display to the
+ *		corresponding text object.
+ * CALLED BY:	UTILITY
+ * RETURN:	none
+ * SIDE EFFECTS:none
+ *	
+ * STRATEGY:	a switch stmt.
+ *	
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	AC	11/17/94   	Initial Revision
+ *
+ ***********************************************************************/
+void
+GCExtractItemType (char ch)
+{
+	switch (ch) {
+	    case '0': 
+		GCWriteToTextObj(@GClientTypeText, "Text");
+		break; 
+	    case '1': 
+		GCWriteToTextObj(@GClientTypeText, "Menu");
+		break; 
+	    case '7': 
+		GCWriteToTextObj(@GClientTypeText, "Add-on SW");
+		break; 
+	    case '8': 
+		GCWriteToTextObj(@GClientTypeText, "Telnet");
+		break; 
+	    default:
+		/* other may be added later */
+		break; 
+	}
+}	/* End of GCExtractItemType.	*/
+
+
+/***********************************************************************
+ *		GCFindNextTabOrNewLine
+ ***********************************************************************
+ * SYNOPSIS:	Find the next TAB or the newline character
+ * CALLED BY:	UTILITY
+ * RETURN:	the length of the string before we see either character.
+ * SIDE EFFECTS:none
+ *	
+ * STRATEGY:	search for the first instance of either character
+ *	
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	AC	11/17/94   	Initial Revision
+ *
+ ***********************************************************************/
+word
+GCFindNextTabOrNewLine (char *string)
+{
+	word i = 0;
+
+	while ((string[i] != C_TAB) && (string[i] != C_ENTER)) {
+	    i++;
+	}
+	return i;
+}	/* End of GCFindNextTabOrNewLine.	*/
+
+
+/***********************************************************************
+ *		GCFillTextObjWithDefaults
+ ***********************************************************************
+ * SYNOPSIS:	Fill the connection parameter text objects with default
+ *		values.
+ * CALLED BY:	UTILITY -- MSG_GC_CREATE_CONNECTION
+ * RETURN:	none
+ * SIDE EFFECTS:none
+ *	
+ * STRATEGY:	fill 'em up.
+ *	
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	AC	11/21/94   	Initial Revision
+ *
+ ***********************************************************************/
+void
+GCFillTextObjWithDefaults ()
+{
+	MemHandle handle;
+	char *text;
+
+	handle = OptrToHandle(@ItemDescriptionText);
+	MemLock(handle);
+	text = (char *) LMemDerefHandles(handle, 
+					 OptrToChunk(@ItemDescriptionText));
+	GCWriteToTextObj(@GClientItemText, text);
+
+	text = (char *) LMemDerefHandles(handle, 
+					 OptrToChunk(@TypeText));
+	GCWriteToTextObj(@GClientTypeText, text);
+
+	text = (char *) LMemDerefHandles(handle, 
+					 OptrToChunk(@HostText));
+	GCWriteToTextObj(@GClientHostText, text);
+
+	text = (char *) LMemDerefHandles(handle, 
+					 OptrToChunk(@PortText));
+	GCWriteToTextObj(@GClientPortText, text);
+
+	text = (char *) LMemDerefHandles(handle, 
+					 OptrToChunk(@SelectorText));
+	GCWriteToTextObj(@GClientSelectorText, text);
+
+	text = (char *) LMemDerefHandles(handle, 
+					 OptrToChunk(@GopherPlusText));
+	GCWriteToTextObj(@GClientPlusText, text);
+	MemUnlock(handle);
+}	/* End of GCFillTextObjWithDefaults.	*/
+
+
+/***********************************************************************
+ *		GCCreateNewConnectionItem
+ ***********************************************************************
+ * SYNOPSIS:	Creating a new connection item.
+ * CALLED BY:	UTILITY -- MSG_GC_OK_CHANGE
+ * RETURN:	none
+ * SIDE EFFECTS:none
+ *	
+ * STRATEGY:	(1) Construct an item
+ *		(2) Append it to the end of the bookmark file.
+ *	
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	AC	11/21/94   	Initial Revision
+ *
+ ***********************************************************************/
+void
+GCCreateNewConnectionItem ()
+{
+	MemHandle tmpBlock;
+	FileHandle file;
+	dword fileSize;
+	char *itemString;
+
+	if ((tmpBlock = GCBuildItemFromParameters()) == NullHandle) {
+	    return;
+	}
+
+	itemString = (char *)MemDeref(tmpBlock);
+	
+	/* open the bookmark file and append the item string to it */
+	if ((file = GopherCacheFileSetUp(GOPHER_BOOKMARK_FILENAME, 
+				     	 &fileSize,
+     				     	 (FILE_ACCESS_W | FILE_DENY_W)))
+		== NullHandle) {
+	    	/* some error */
+	    	return;
+	}
+	FilePos(file, 0, FILE_POS_END);
+	FileWrite(file, itemString, strlen(itemString), TRUE);
+	
+	MemFree(tmpBlock);
+	
+	if (!GopherCacheFileEnd(file)) {
+	    /* some error occurred in file close */
+	    return;
+	}
+}	/* End of GCCreateNewConnectionItem.	*/
+
+
+/***********************************************************************
+ *		GCBuildItemFromParameters
+ ***********************************************************************
+ * SYNOPSIS:	Building a gopher item based on the connection tool parameters
+ * CALLED BY:	UTILITY
+ * RETURN:	MemHandle tmpBlock;
+ * SIDE EFFECTS:the allocate block will be locked, so we either need to
+ *		unlock it later, or simply free it.
+ *	
+ * STRATEGY:	(1)  Allocate a block to store the text of the text objects.
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	AC	11/21/94   	Initial Revision
+ *
+ ***********************************************************************/
+MemHandle
+GCBuildItemFromParameters ()
+{
+	MemHandle tmpBlock;
+	char 	*pointer;
+	word	offset = 0;
+
+	tmpBlock = GopherAllocBlockWithLock(GOPHER_ITEM_INFORMATION_SIZE+1);
+	pointer = (char *)MemDeref(tmpBlock);
+
+	offset += GCBuildItemType(&pointer[offset]);
+	offset += GCBuildItemAttribute(@GClientItemText, &pointer[offset]);
+	pointer[offset] = C_TAB;	/* add tab after the visible string */
+	offset++;
+
+	offset += GCBuildItemAttribute(@GClientSelectorText,
+				       &pointer[offset]);
+	pointer[offset] = C_TAB;	/* add tab after the visible string */
+	offset++;
+
+	offset += GCBuildItemAttribute(@GClientHostText, &pointer[offset]);
+	pointer[offset] = C_TAB;	/* add tab after the visible string */
+	offset++;
+
+	
+	offset += GCBuildItemAttribute(@GClientPortText, &pointer[offset]);
+	
+	offset += GCBuildGopherPlus(&pointer[offset]);
+	pointer[offset] = C_ENTER;	/* a newline character */
+	pointer[offset+1] = '\0';	/* null-terminate it */
+
+	return tmpBlock;
+}	/* End of GCBuildItemFromParameters.	*/
+
+
+/***********************************************************************
+ *		GCBuildItemType
+ ***********************************************************************
+ * SYNOPSIS:	Build the item type part of a gopher item.
+ * CALLED BY:	UTILITY
+ * RETURN:	the length of the text, which is 1.
+ * SIDE EFFECTS:none
+ *	
+ * STRATEGY:	none
+ *	
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	AC	11/21/94   	Initial Revision
+ *
+ ***********************************************************************/
+word
+GCBuildItemType (char *itemText)
+{
+	word textLength;
+	char text[GOPHER_ITEM_INFORMATION_SIZE];
+
+	textLength = @call GClientTypeText::MSG_VIS_TEXT_GET_ALL_PTR(text);
+
+	/* very brute force for now */
+	if (!strcmp("Menu", text)) {
+	    strcpy(itemText, "1");
+	} else { 
+	    strcpy(itemText, "7"); 
+	}	
+	return 1;
+}	/* End of GCBuildItemType.	*/
+
+
+/***********************************************************************
+ *		GCBuildItemAttribute
+ ***********************************************************************
+ * SYNOPSIS:	Build certain attribute for a certain part of a gopher item.
+ * CALLED BY:	UTILITY
+ * RETURN:	the length of text
+ * SIDE EFFECTS:none
+ *	
+ * STRATEGY:	(1)  Get the text from the textObj and copy it into the string.
+ *	
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	AC	11/21/94   	Initial Revision
+ *
+ ***********************************************************************/
+word
+GCBuildItemAttribute (optr txtObj, char *itemText)
+{
+	word textLength;
+	char text[GOPHER_ITEM_INFORMATION_SIZE];
+
+	textLength = @call txtObj::MSG_VIS_TEXT_GET_ALL_PTR(text);
+	strncpy(itemText, text, textLength);
+	return textLength;
+}	/* End of GCBuildItemAttribute.	*/	
+
+
+/***********************************************************************
+ *		GCBuildGopherPlus
+ ***********************************************************************
+ * SYNOPSIS:	Build the gopher plus part of a gopher item.
+ * CALLED BY:	UTILITY
+ * RETURN:	the length of text
+ * SIDE EFFECTS:none
+ *	
+ * STRATEGY:	(1)  Get the text from the text object.
+ *		(2)  If it's yes, then we add a tab followed by a '+' 
+ *		character, otherwise, we do nothing.
+ *	
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	AC	11/21/94   	Initial Revision
+ *
+ ***********************************************************************/
+word
+GCBuildGopherPlus (char *itemText)
+{	
+	word textLength;
+	char text[GOPHER_ITEM_INFORMATION_SIZE];
+
+	textLength = @call GClientPlusText::MSG_VIS_TEXT_GET_ALL_PTR(text);
+	if (!strcmp("Yes", text)) {
+	    itemText[0] = C_TAB;
+	    itemText[1] = GOPHER_PLUS_INDICATOR;
+	    return 2;
+	}
+	return 0;
+}	/* End of GCBuildGopherPlus.	*/
+
+
+/***********************************************************************
+ *		GCEditConnectionItem
+ ***********************************************************************
+ * SYNOPSIS:	Edit a connection item.
+ * CALLED BY:	UTILITY
+ * RETURN:	none
+ * SIDE EFFECTS:none
+ *	
+ * STRATEGY:	(1)  Allocate a block for the item.
+ *		(2)  Open the bookmark file and find the right place to 
+ *		edit the file.
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	AC	11/21/94   	Initial Revision
+ *
+ ***********************************************************************/
+void
+GCEditConnectionItem (word selection, Boolean edit)
+{
+	MemHandle tmpBlock = NullHandle;
+	MemHandle tmpFileBlock;
+	FileHandle file;
+	dword fileSize;
+	char *itemString;
+	byte *fileBuffer;
+	word lineNum;
+	word fileOffset1; 	/* marks the end of the first portion */
+	word fileOffset2 = 0;	/* marks the beginning of the second portion */
+
+	/* build the item based on the newly edited text objects. */
+	if (edit) {
+	    if ((tmpBlock = GCBuildItemFromParameters()) == NullHandle) {
+	    	return;
+	    }
+	    itemString = (char *)MemDeref(tmpBlock);
+	} else {
+	    *itemString = '\0';	/* because we are actually removing */
+	}
+	
+	/* 
+	 * (1)  open the bookmark file.
+	 * (2)  copy the file into a buffer.
+	 * (3)  truncate the whole file.
+	 * (4)  find the first cut off place (items before selection)
+	 *	and copy it into the file.
+	 * (5)  append the newly builded item info file.
+	 * (6)  append the remaining items (items after selection) to 	
+	 * 	the file.
+	 */
+	if ((file = GopherCacheFileSetUp(GOPHER_BOOKMARK_FILENAME, 
+				     	 &fileSize,
+     				     	 (FILE_ACCESS_RW | FILE_DENY_W)))
+		== NullHandle) {
+	    	/* some error */
+	    	return;
+	}
+
+	/* make sure that the bookmark file is not empty */
+	if (!fileSize) {
+	    if (!GopherCacheFileEnd(file)) {
+	    	/* some error occurred in file close */
+	    	return;
+	    }
+	}    
+	
+	/* transfer the content of the file into a buffer */
+	if ((tmpFileBlock = GopherCopyFileToBlock(file, fileSize)) 
+		== NullHandle) {
+	    if (tmpBlock) MemFree(tmpBlock);
+	    if (!GopherCacheFileEnd(file)) {
+	    	/* some error occurred in file close */
+	    	return;
+	    }
+	    return;
+	}
+	fileBuffer = MemDeref(tmpFileBlock);
+
+	FileTruncate(file, 0, TRUE);
+
+	/* finding the two offsets */
+	for (lineNum = 0; lineNum < selection+1; lineNum++) {
+	    fileOffset1 = fileOffset2;
+	    fileOffset2 += GopherLookForNextLine(&fileBuffer[fileOffset1]);
+	    EC_ERROR_IF((fileOffset1 > fileSize), 0);
+	}	
+
+	/* copy the contents now */
+	FileWrite(file, fileBuffer, fileOffset1, TRUE);
+	FileWrite(file, itemString, strlen(itemString), TRUE);
+	FileWrite(file, &fileBuffer[fileOffset2], fileSize-fileOffset2, TRUE);
+	
+	if (tmpBlock) MemFree(tmpBlock);
+	MemFree(tmpFileBlock);
+	
+	if (!GopherCacheFileEnd(file)) {
+	    /* some error occurred in file close */
+	    return;
+	}
+}	/* End of GCEditConnectionItem.	*/
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
