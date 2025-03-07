@@ -152,9 +152,9 @@ extern TEngine_Instance engineInstance;
   LOCAL_FUNC
   TT_Error  Cache_Destroy( TCache*  cache )
   {
-    PDestructor    destroy;
-    PList_Element  current;
-    PList_Element  next;
+    TDestructor _near*  destroy;
+    PList_Element       current;
+    PList_Element       next;
 
 
     /* now destroy all active and idle listed objects */
@@ -167,11 +167,8 @@ extern TEngine_Instance engineInstance;
     while ( current )
     {
       next = current->next;
-#ifdef __GEOS__
-      ProcCallFixedOrMovable_cdecl( destroy, current->data );
-#else
+
       destroy( current->data );
-#endif  /* __GEOS__ */  
       FREE( current->data );
 
       Element_Done( current );
@@ -184,11 +181,8 @@ extern TEngine_Instance engineInstance;
     while ( current )
     {
       next = current->next;
-#ifdef __GEOS__
-      ProcCallFixedOrMovable_cdecl( destroy, current->data );
-#else
+
       destroy( current->data );
-#endif
       FREE( current->data );
 
       Element_Done( current );
@@ -233,10 +227,10 @@ extern TEngine_Instance engineInstance;
                        void**   new_object,
                        void*    parent_object )
   {
-    TT_Error       error;
-    PList_Element  current;
-    PConstructor   build;
-    void*          object;
+    TT_Error             error;
+    PList_Element        current;
+    TConstructor _near*  build;
+    void*                object;
 
 
     current = cache->idle;
@@ -259,11 +253,8 @@ extern TEngine_Instance engineInstance;
 
       current->data = object;
 
-#ifdef __GEOS__
-      error = ProcCallFixedOrMovable_cdecl( build, object, parent_object );
-#else
       error = build( object, parent_object );
-#endif    /* __GEOS__ */
+
       if ( error )
       {
         Element_Done( current );
@@ -339,11 +330,8 @@ extern TEngine_Instance engineInstance;
     if ( cache->idle_count >= cache->clazz->idle_limit )
     {
       /* destroy the object when the cache is full */
-#ifdef __GEOS__
-      ProcCallFixedOrMovable_cdecl( cache->clazz->done, element->data );
-#else
       cache->clazz->done( element->data );
-#endif  /* __GEOS__ */
+
       FREE( element->data );
       Element_Done( element );
     }
