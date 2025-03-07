@@ -97,9 +97,6 @@
 
   typedef TT_Error  TDestructor ( void*  object );
 
-  typedef TConstructor*  PConstructor;
-  typedef TDestructor*   PDestructor;
-
 
   /* A Cache class record holds the data necessary to define */
   /* a cache kind.                                           */
@@ -107,8 +104,8 @@
   {
     UShort        object_size;
     Short         idle_limit;
-    PConstructor  init;
-    PDestructor   done;
+    TConstructor _near * init;
+    TDestructor  _near * done;
   };
 
   typedef struct TCache_Class_  TCache_Class;
