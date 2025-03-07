@@ -1,0 +1,1229 @@
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+	Copyright (c) Geoworks 1994 -- All Rights Reserved
+
+PROJECT:	Gopher Library
+MODULE:		GopherClass code
+FILE:		gopher.goc
+
+AUTHOR:		Alvin Cham, Aug  9, 1994
+
+ROUTINES:
+	Name			Description
+	----			-----------
+
+	MSG_GOPHER_INITIALIZE	
+				initializes the states of the gopher object
+
+	MSG_GOPHER_FETCH_NEW_DISPLAY
+				fetch the next display screen
+
+	MSG_GOPHER_SHUT_DOWN	
+				shuts downs the gopher object for the 
+				application
+
+	MSG_GOPHER_PARSE_ITEM	
+				parses the stream that is sent from the
+				gopher server to some structure.
+
+	MSG_GOPHER_DISPLAY
+				display different item types
+
+	MSG_GOPHER_CONSTRUCT_REQUEST
+				constructs a client's request, based on
+				the user's command, into something that	
+				the gopher server would comprehend.
+
+	MSG_GOPHER_SET_LANGUAGE
+				set the language used
+
+	MSG_GOPHER_GET_LANGUAGE
+				get the language used
+
+	MSG_GOPHER_SET_DATA_BUFFER_CHUNK
+				set the chunk for the data buffer
+
+	MSG_GOPHER_GET_DATA_BUFFER_CHUNK
+				get the chunk for the data buffer
+
+	MSG_GOPHER_SET_DATA_BUFFER_POS
+				set the position for the data buffer
+
+	MSG_GOPHER_GET_DATA_BUFFER_POS
+				get the position for the data buffer
+
+	MSG_GOPHER_SET_INFO_BLOCK
+				set the information block handle
+
+	MSG_GOPHER_GET_INFO_BLOCK
+				get the information block handle
+
+	MSG_GOPHER_SET_MENU_ITEM_ARRAY_CHUNK
+				set the chunk for menu item array
+
+	MSG_GOPHER_GET_MENU_ITEM_ARRAY_CHUNK
+				get the chunk for menu item array
+
+	MSG_GOPHER_SET_CUR_MENU_TYPE
+				set the current menu type
+
+	MSG_GOPHER_GET_CUR_MENU_TYPE
+				get the current menu type
+
+	MSG_GOPHER_SET_CACHE_FILE_ARRAY_CHUNK
+				set the chunk for cache file array
+
+	MSG_GOPHER_GET_CACHE_FILE_ARRAY_CHUNK
+				get the chunk for cache file array
+
+	MSG_GOPHER_SET_CACHE_FILE_INDEX
+				set the index for cache file array
+
+	MSG_GOPHER_GET_CACHE_FILE_INDEX
+				get the index for cache file array
+
+	MSG_GOPHER_SET_CACHE_FILE_ID
+				set the ID for cache file array
+
+	MSG_GOPHER_GET_CACHE_FILE_ID
+				get the ID for cache file array
+
+	MSG_GOPHER_SET_CUR_CACHE_FILE_NAME
+				set the current cache file name
+
+	MSG_GOPHER_GET_CUR_CACHE_FILE_NAME_CHUNK
+				get the chunk of the current cache file name
+
+	MSG_GOPHER_INC_ITEM_PARSED
+				increment the # of item parsed
+
+	MSG_GOPHER_SET_EOF
+				set the EOF flag
+
+	MSG_GOPHER_GET_EOF
+				get the EOF flag
+
+	MSG_GOPHER_PLUS_UPDATE_INFO_ATTR
+				update various fields for the gopher+ +INFO
+				attributes
+
+	MSG_GOPHER_PLUS_GET_INFO_ATTR
+				get various fields for the gopher+ +INFO
+				attributes
+
+	MSG_GOPHER_PLUS_UPDATE_ADMIN_ATTR
+				update various fields for the gopher+ +ADMIN
+				attributes
+
+	MSG_GOPHER_PLUS_GET_ADMIN_ATTR
+				get various fields for the gopher+ +ADMIN
+				attributes
+
+	MSG_GOPHER_PLUS_SET_VIEW_CHUNK
+				set the chunk for the +VIEW array
+
+	MSG_GOPHER_PLUS_GET_VIEW_CHUNK
+				get the chunk for the +VIEW array
+
+	MSG_GOPHER_PLUS_UPDATE_ABSTRACT_ATTR
+				update the gopher+ +ABSTRACT attributes
+
+	MSG_GOPHER_PLUS_GET_ABSTRACT_ATTR
+				get the gopher+ +ABSTRACT attributes
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	AC	8/ 9/94   	Initial version.
+
+DESCRIPTION:
+	This file contains the class methods for GopherClass.
+
+	$Id: gopher.goc,v 1.1 97/04/04 18:04:52 newdeal Exp $
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+
+
+/*
+ ******************************************************************
+ *		Include files
+ ******************************************************************
+ */
+@include <gopherC.goh>
+
+@ifndef	__GOPHER_GOC
+@define __GOPHER_GOC
+
+/*
+ ******************************************************************
+ *		Class Declaration
+ ******************************************************************
+ */
+@classdecl	GopherClass;
+
+/*
+ ******************************************************************
+ *		Messages
+ ******************************************************************
+ */
+
+
+/***********************************************************************
+ *		MSG_GOPHER_INITIALIZE for GopherClass
+ ***********************************************************************
+ * SYNOPSIS:	Handles all initializtion of the gopher object.
+ * PARAMETERS:	none
+ * SIDE EFFECTS:none
+ *
+ * STRATEGY:	(1) Allocate an information block.
+ *		(2) Allocate a chunk for the text buffer.
+ *		(3) Initialize the chunk array of gopher items
+ *		(4) Initialize the cache file array
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	AC	8/23/94   	Initial Revision
+ *
+ ***********************************************************************/
+@method GopherClass, MSG_GOPHER_INITIALIZE
+{
+	MemHandle	newBlock;
+	ChunkHandle	newChunk;
+
+	/* 
+	 * create a block for storing all the chunks
+	 */
+	if ((newBlock = MemAllocLMem(LMEM_TYPE_GENERAL, 0)) == NullHandle) {
+	    /* cannot allocate a block */
+
+	    return;
+	}
+	@call self::MSG_GOPHER_SET_INFO_BLOCK(newBlock);	
+	MemLock(newBlock);
+
+	/* create a chunk for the text buffer */
+	if ((newChunk = LMemAlloc(newBlock, 
+				  GOPHER_READ_BUFFER_SIZE)) == 
+	     NullHandle) {
+	    /* cannot allocate a chunk */
+	    MemUnlock(newBlock);	
+	    return;
+	}
+	@call self::MSG_GOPHER_SET_DATA_BUFFER_CHUNK(newChunk);
+
+	/* create a chunk array of menu items */
+	if ((newChunk = ChunkArrayCreate(newBlock, 
+					 sizeof(GopherItem),
+					 0,
+					 0)) == NullHandle) {
+	    /* can't create the chunk array */
+	    MemUnlock(newBlock);
+	    return;
+	}
+	@call self::MSG_GOPHER_SET_MENU_ITEM_ARRAY_CHUNK(newChunk);
+
+	if ((newChunk = GopherInitCacheFileArray(newBlock)) == NullHandle) {
+	    /* can't create the chunk */
+	    MemUnlock(newBlock);
+	    FatalError(0);
+	}
+
+	@call self::MSG_GOPHER_SET_CACHE_FILE_ARRAY_CHUNK(newChunk);
+
+	MemUnlock(newBlock);
+		
+}	/* End of MSG_GOPHER_INITIALIZE.	*/
+
+
+/***********************************************************************
+ *		MSG_GOPHER_FETCH_NEW_DISPLAY for GopherClass
+ ***********************************************************************
+ * SYNOPSIS:	Perform tasks for fetching the next display screen    
+ * PARAMETERS:	GopherParseItemType newType;
+ * SIDE EFFECTS:none    
+ *
+ * STRATEGY:	(1)  Frees up previous storage for previous display
+ *		(2)  Re-initializes storage space for the next display
+ *		(3)  Updates the new current menu type.
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	AC	10/27/94   	Initial Revision
+ *
+ ***********************************************************************/
+@method GopherClass, MSG_GOPHER_FETCH_NEW_DISPLAY
+{
+	switch (pself->GI_curMenuType) {
+	    case GPIT_DIRECTORY: case GPIT_BOOKMARK: 
+		MemHandle infoBlock;
+		ChunkHandle array;
+
+		infoBlock = pself->GI_infoBlock;
+		array = pself->GI_menuItemArray;
+		MemLock(infoBlock);
+
+		/* 
+		 * we delete all elements in the array only if we are not
+		 * fetching the gopher+ information of that item. (i.e. we
+		 * still need to reserve the item's information.
+		 */
+		if (newType != GPIT_GOPHER_PLUS) {
+		    ChunkArrayDeleteRange(ConstructOptr(infoBlock,array), 
+					  0, 
+					  -1);
+		}
+		MemUnlock(infoBlock);
+		break;
+	    case GPIT_GOPHER_PLUS:
+		/* delete those chunks */
+		GopherPlusFreeInfoChunks(oself);
+		break;
+	    case GPIT_FILE:    
+		
+
+		break;
+	    default:
+		break;
+	}
+
+	/* update the new menu type */
+	pself->GI_curMenuType = newType;
+}	/* End of MSG_GOPHER_FETCH_NEW_DISPLAY.	*/
+
+
+/***********************************************************************
+ *		MSG_GOPHER_SHUT_DOWN for GopherClass
+ ***********************************************************************
+ * SYNOPSIS:    Handles all shut down procedures.
+ * PARAMETERS:	none	    
+ * SIDE EFFECTS:none
+ *
+ * STRATEGY:	(1) Delete all the cached files
+ *		(2) Free up memory spaces allocated for its instance 
+ *		variables.
+ *		(3) Let its subclasses handle the rest.
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	AC	8/23/94   	Initial Revision
+ *
+ ***********************************************************************/
+@method GopherClass, MSG_GOPHER_SHUT_DOWN
+{
+	MemHandle infoBlock = pself->GI_infoBlock;
+	ChunkHandle cacheFileArray = pself->GI_cacheFileArray;
+	word i;
+
+	MemLock(infoBlock);
+
+	for (i =0; i < GOPHER_CACHE_FILE_ARRAY_SIZE; i++) {
+	    GopherDeleteCacheFileAtIndex(infoBlock, cacheFileArray, i);
+	}		    
+
+	MemFree(infoBlock);
+}	/* End of MSG_GOPHER_SHUT_DOWN.	*/
+
+
+/***********************************************************************
+ *		MSG_GOPHER_PARSE_ITEM for GopherClass
+ ***********************************************************************
+ * SYNOPSIS:	Parses an gopher item.
+ * PARAMETERS:	
+ *	PASS:	byte 	*buffer	-- buffer to parse
+ *		dword	numBytes-- number of bytes to remain
+ *		char	*filename -- the filename to be cached, or the cached
+ *					filename
+ *		Boolean	cached	-- is this a cached item?
+ *	RETURN:	word 	count 	-- length of buffer that just got parsed
+ *				-- -1 if we have reached EOF	
+ * SIDE EFFECTS:none
+ *
+ * STRATEGY:	(1) Cache the incoming stream into a file
+ *		(2) if we are done reading then, parse it accordingly to its
+ *		 menu item 
+ *		(3) Returns the number of bytes parsed 
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	AC	8/10/94   	Initial Revision
+ *
+ ***********************************************************************/
+@method GopherClass, MSG_GOPHER_PARSE_ITEM{
+	word	count = 0;
+    	FileHandle tmpFileHandle;
+	byte *fileBuffer;
+	dword filesize;	
+	MemHandle tmpBlock;
+
+	/* 
+	 * copy everything into the temporary file, except for the cached 
+	 * file. NOTE: bookmark file is a cached file.
+	 */
+	if (!cached) {
+	    count = GopherCacheStreamToFile(buffer, numBytes, oself, filename);
+	}
+	pself = ObjDeref(oself,0);
+	if ((pself->GI_eof) || (cached)) { 
+	    /* a giant switch statement for various menu item types */
+	    switch(pself->GI_curMenuType) {
+	        case GPIT_FILE: 
+		    return count;
+	        case GPIT_DIRECTORY: case GPIT_GOPHER_PLUS: 
+		case GPIT_BOOKMARK: { 
+		    /* do some set up stuff */
+		    if ((tmpFileHandle = GopherCacheFileSetUp
+					(filename, &filesize, 
+					 (FILE_ACCESS_R | FILE_DENY_W)))
+				== NullHandle) {
+			/* some error */
+			return -1; 
+		    }
+
+		    /* allocate the block to store the buffer */
+		    if (filesize) {
+		    	tmpBlock = GopherAllocBlockWithLock(filesize);
+		    	EC_ERROR_IF((tmpBlock == NullHandle), 
+				    ERROR_NO_MEMORY_TO_ALLOC_TMP_BLOCK);
+		    	fileBuffer = MemDeref(tmpBlock);
+
+		    	/* read it */
+	    	    	if (FileRead(tmpFileHandle, fileBuffer, filesize, 
+				     TRUE) == -1) {
+			    /* error on fileread */
+			    MemFree(tmpBlock);
+			    return -1;
+	    	    	}
+
+		    	if (pself->GI_curMenuType == GPIT_GOPHER_PLUS) {
+			    /* don't want to parse the last line */
+			    GopherParseGopherPlus(fileBuffer, filesize-2, 
+						  oself);
+		    	} else if (pself->GI_curMenuType == GPIT_BOOKMARK) {
+			    /* 
+			     * bookmark is a type of a directory file, but has 
+			     * no file terminator.
+			     */ 
+		    	    GopherParseDirectory(fileBuffer, filesize, oself);
+		    	} else {
+			    /* don't want to parse the last line */
+		    	    GopherParseDirectory(fileBuffer, filesize-2, 
+						 oself);
+		    	}
+		    	MemFree(tmpBlock);
+		    }
+
+		    /* clean up */
+		    if (GopherCacheFileEnd(tmpFileHandle)) {
+		    	return count;
+	    	    } else {	/* some kind of error in closing */
+			return -1;
+		    }
+		}
+	        default:	/* something weird */
+		    return count;
+	    }
+	} else {
+	    return count;
+	}
+}	/* End of MSG_GOPHER_PARSING_ITEM.	*/
+
+
+/***********************************************************************
+ *		MSG_GOPHER_DISPLAY for GopherClass
+ ***********************************************************************
+ * SYNOPSIS:	Handler for displaying different types of menu items.    
+ * PARAMETERS:	none    
+ * SIDE EFFECTS:none    
+ *
+ * STRATEGY:	(1)  Based on the menu item, it will in turn calls other
+ *		message handler to display that particular item.
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	AC	11/10/94   	Initial Revision
+ *
+ ***********************************************************************/
+@method GopherClass, MSG_GOPHER_DISPLAY
+{
+	switch (pself->GI_curMenuType) {
+	    /* bookmark display is really a directory display */
+	    case GPIT_DIRECTORY: case GPIT_BOOKMARK:
+		@call self::MSG_GOPHER_DISPLAY_DIRECTORY();
+		break;
+	    case GPIT_FILE:
+		@call self::MSG_GOPHER_DISPLAY_TEXT_FILE();
+		break;
+	    case GPIT_GOPHER_PLUS:
+		@call self::MSG_GOPHER_DISPLAY_GOPHER_PLUS_INFO();
+		break;
+	    /* other will be added later */
+	    default:
+		break;
+	}
+}	/* End of MSG_GOPHER_DISPLAY.	*/
+
+
+/***********************************************************************
+ *		MSG_GOPHER_CONSTRUCT_REQUEST for GopherClass
+ ***********************************************************************
+ * SYNOPSIS:	Constructing a request and send it to the server    
+ * PARAMETERS:	GopherClientRequest	*requestRecord    
+ *		word			itemSelection
+ *		word			viewSelection
+ *
+ * SIDE EFFECTS:none    
+ *
+ * STRATEGY:	(1)	Check the request type
+ *		(2)	If it's normal gopher stuff, then just do the
+ *			normal stuff.
+ *		(3)	If it's gopher plus, then open the cached gopher+
+ *			file and parse it
+ *		(4)	If the request is GCR_ATTR_INFO, then parse the
+ *			whole file
+ *		(5)	Otherwise, only parse the part about views, and
+ *			displays the available views for the user to 
+ *			select.
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	AC	8/10/94   	Initial Revision
+ *
+ ***********************************************************************/
+@method GopherClass, MSG_GOPHER_CONSTRUCT_REQUEST
+{
+	/* check whether it's a normal/gopher+ request */
+	switch (requestRecord) {
+	    case GCR_NORMAL:
+	    	GopherConstructNormalRequest(itemSelection, oself);
+	    	break;
+		
+	    case GCR_ATTR_INFO:
+	    	GopherConstructGetAttrInfoRequest(itemSelection, oself);
+	    	break;
+
+	    case GCR_GOPHER_PLUS:
+		GopherConstructGopherPlusRequest(itemSelection, 
+						 viewSelection, 
+						 oself);
+		break;
+	    default:
+		break;
+	}
+}	/* End of MSG_GOPHER_CONSTRUCT_REQUEST.	*/
+
+/*
+ ******************************************************************
+ *		Get's and Set's messages
+ ******************************************************************
+ */
+
+
+/***********************************************************************
+ *		MSG_GOPHER_SET_LANGUAGE for GopherClass
+ ***********************************************************************
+ * SYNOPSIS:	Set the language to be used by gopher.    
+ * PARAMETERS:	GopherLanguageType language    
+ * SIDE EFFECTS:none    
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	AC	12/19/94   	Initial Revision
+ *
+ ***********************************************************************/
+@method GopherClass, MSG_GOPHER_SET_LANGUAGE
+{
+	pself->GI_language = language;
+}	/* End of MSG_GOPHER_SET_LANGUAGE.	*/
+
+
+/***********************************************************************
+ *		MSG_GOPHER_GET_LANGUAGE for GopherClass
+ ***********************************************************************
+ * SYNOPSIS:	Get the language that gopher is using.    
+ * PARAMETERS:	none    
+ * SIDE EFFECTS:none    
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	AC	12/19/94   	Initial Revision
+ *
+ ***********************************************************************/
+@method GopherClass, MSG_GOPHER_GET_LANGUAGE
+{
+	return pself->GI_language;
+}	/* End of MSG_GOPHER_GET_LANGUAGE.	*/
+
+
+/***********************************************************************
+ *		MSG_GOPHER_SET_DATA_BUFFER_CHUNK for GopherClass
+ ***********************************************************************
+ * SYNOPSIS:	Set the chunk of the data buffer    
+ * PARAMETERS:	ChunkHandle chunk
+ * SIDE EFFECTS:none    
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	AC	12/15/94   	Initial Revision
+ *
+ ***********************************************************************/
+@method GopherClass, MSG_GOPHER_SET_DATA_BUFFER_CHUNK
+{
+	pself->GI_dataBuffer = chunk;
+}	/* End of MSG_GOPHER_SET_DATA_BUFFER_CHUNK.	*/
+
+
+/***********************************************************************
+ *		MSG_GOPHER_GET_DATA_BUFFER_CHUNK for GopherClass
+ ***********************************************************************
+ * SYNOPSIS:	Get the chunk of the data buffer    
+ * PARAMETERS:	none    
+ * SIDE EFFECTS:none    
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	AC	12/15/94   	Initial Revision
+ *
+ ***********************************************************************/
+@method GopherClass, MSG_GOPHER_GET_DATA_BUFFER_CHUNK
+{
+	return pself->GI_dataBuffer;
+}	/* End of MSG_GOPHER_GET_DATA_BUFFER_CHUNK.	*/
+
+
+/***********************************************************************
+ *		MSG_GOPHER_SET_DATA_BUFFER_POS for GopherClass
+ ***********************************************************************
+ * SYNOPSIS:	Set the data buffer next reading position.    
+ * PARAMETERS:	word position    
+ * SIDE EFFECTS:none    
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	AC	12/15/94   	Initial Revision
+ *
+ ***********************************************************************/
+@method GopherClass, MSG_GOPHER_SET_DATA_BUFFER_POS
+{
+	pself->GI_dataBufferPos = position;
+}	/* End of MSG_GOPHER_SET_DATA_BUFFER_POS.	*/
+
+
+/***********************************************************************
+ *		MSG_GOPHER_GET_DATA_BUFFER_POS for GopherClass
+ ***********************************************************************
+ * SYNOPSIS:	Get the data buffer position.
+ * PARAMETERS:	none    
+ * SIDE EFFECTS:none    
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	AC	12/15/94   	Initial Revision
+ *
+ ***********************************************************************/
+@method GopherClass, MSG_GOPHER_GET_DATA_BUFFER_POS
+{
+	return pself->GI_dataBufferPos;
+}	/* End of MSG_GOPHER_GET_DATA_BUFFER_POS.	*/
+
+
+/***********************************************************************
+ *		MSG_GOPHER_GET_INFO_BLOCK for GopherClass
+ ***********************************************************************
+ * SYNOPSIS:	Get the MemHandle of the information block    
+ * PARAMETERS:	none    
+ * SIDE EFFECTS:none    
+ *
+ * STRATEGY:	none
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	AC	11/10/94   	Initial Revision
+ *
+ ***********************************************************************/
+@method GopherClass, MSG_GOPHER_GET_INFO_BLOCK
+{
+	return pself->GI_infoBlock;
+}	/* End of MSG_GOPHER_GET_INFO_BLOCK.	*/
+
+
+/***********************************************************************
+ *		MSG_GOPHER_SET_INFO_BLOCK for GopherClass
+ ***********************************************************************
+ * SYNOPSIS:	Set the information block     
+ * PARAMETERS:	MemHandle block    
+ * SIDE EFFECTS:none    
+ *
+ * STRATEGY:	none
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	AC	11/10/94   	Initial Revision
+ *
+ ***********************************************************************/
+@method GopherClass, MSG_GOPHER_SET_INFO_BLOCK
+{
+	pself->GI_infoBlock = block;
+}	/* End of MSG_GOPHER_SET_INFO_BLOCK.	*/
+
+
+/***********************************************************************
+ *		MSG_GOPHER_GET_MENU_ITEM_ARRAY_CHUNK for GopherClass
+ ***********************************************************************
+ * SYNOPSIS:	Get the chunk of the chunk array    
+ * PARAMETERS:	none    
+ * SIDE EFFECTS:none    
+ *
+ * STRATEGY:	none
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	AC	11/10/94   	Initial Revision
+ *
+ ***********************************************************************/
+@method GopherClass, MSG_GOPHER_GET_MENU_ITEM_ARRAY_CHUNK
+{
+	return pself->GI_menuItemArray;
+}	/* End of MSG_GOPHER_GET_MENU_ITEM_ARRAY_CHUNK.	*/
+
+
+/***********************************************************************
+ *		MSG_GOPHER_SET_MENU_ITEM_ARRAY_CHUNK for GopherClass
+ ***********************************************************************
+ * SYNOPSIS:		Set the chunk of the chunk array.	    
+ * PARAMETERS:	    	optr	array
+ * SIDE EFFECTS:    	none
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	AC	11/10/94   	Initial Revision
+ *
+ ***********************************************************************/
+@method GopherClass, MSG_GOPHER_SET_MENU_ITEM_ARRAY_CHUNK
+{
+	pself->GI_menuItemArray = array;
+}	/* End of MSG_GOPHER_SET_MENU_ITEM_ARRAY_CHUNK.	*/
+
+
+/***********************************************************************
+ *		MSG_GOPHER_GET_CUR_MENU_TYPE for GopherClass
+ ***********************************************************************
+ * SYNOPSIS:		Get the current menu item type.	    
+ * PARAMETERS:	    	none
+ * SIDE EFFECTS:    	none
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	AC	9/14/94   	Initial Revision
+ *
+ ***********************************************************************/
+@method GopherClass, MSG_GOPHER_GET_CUR_MENU_TYPE
+{
+	return pself->GI_curMenuType;
+}	/* End of MSG_GOPHER_GET_CUR_MENU_TYPE.	*/
+
+
+/***********************************************************************
+ *		MSG_GOPHER_SET_CUR_MENU_TYPE for GopherClass
+ ***********************************************************************
+ * SYNOPSIS:		Set the current menu item type.
+ * PARAMETERS:		GopherParseItemType type
+ * SIDE EFFECTS:	none.
+ *
+ * STRATEGY:		none
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	AC	9/14/94   	Initial Revision
+ *
+ ***********************************************************************/
+@method GopherClass, MSG_GOPHER_SET_CUR_MENU_TYPE
+{
+	pself->GI_curMenuType = type;
+}	/* End of MSG_GOPHER_SET_CUR_MENU_TYPE.	*/
+
+
+/***********************************************************************
+ *		MSG_GOPHER_SET_CACHE_FILE_ARRAY_CHUNK for GopherClass
+ ***********************************************************************
+ * SYNOPSIS:	Set the chunk for the cache file array    
+ * PARAMETERS:	ChunkHandle cacheFileArray    
+ * SIDE EFFECTS:none    
+ *
+ * STRATEGY:	none
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	AC	1/ 9/95   	Initial Revision
+ *
+ ***********************************************************************/
+@method GopherClass, MSG_GOPHER_SET_CACHE_FILE_ARRAY_CHUNK
+{
+	pself->GI_cacheFileArray = cacheFileArray;
+}	/* End of MSG_GOPHER_SET_CACHE_FILE_ARRAY_CHUNK.	*/
+
+
+/***********************************************************************
+ *		MSG_GOPHER_GET_CACHE_FILE_ARRAY_CHUNK for GopherClass
+ ***********************************************************************
+ * SYNOPSIS:	Get the chunk for the cache file array    
+ * PARAMETERS:	none    
+ * SIDE EFFECTS:none    
+ *
+ * STRATEGY:	none
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	AC	1/ 9/95   	Initial Revision
+ *
+ ***********************************************************************/
+@method GopherClass, MSG_GOPHER_GET_CACHE_FILE_ARRAY_CHUNK
+{
+	return pself->GI_cacheFileArray;
+}	/* End of MSG_GOPHER_GET_CACHE_FILE_ARRAY_CHUNK.	*/
+
+
+/***********************************************************************
+ *		MSG_GOPHER_SET_CACHE_FILE_INDEX for GopherClass
+ ***********************************************************************
+ * SYNOPSIS:	Set the index for the cache file array    
+ * PARAMETERS:	word	newIndex    
+ * SIDE EFFECTS:none    
+ *
+ * STRATEGY:	none
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	AC	1/ 9/95   	Initial Revision
+ *
+ ***********************************************************************/
+@method GopherClass, MSG_GOPHER_SET_CACHE_FILE_INDEX
+{
+	pself->GI_cacheFileIndex = newIndex;
+}	/* End of MSG_GOPHER_SET_CACHE_FILE_INDEX.	*/
+
+
+/***********************************************************************
+ *		MSG_GOPHER_GET_CACHE_FILE_INDEX for GopherClass
+ ***********************************************************************
+ * SYNOPSIS:	Get the index of cache file array     
+ * PARAMETERS:	none    
+ * SIDE EFFECTS:none    
+ *
+ * STRATEGY:	none
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	AC	1/ 9/95   	Initial Revision
+ *
+ ***********************************************************************/
+@method GopherClass, MSG_GOPHER_GET_CACHE_FILE_INDEX
+{
+	return pself->GI_cacheFileIndex;
+}	/* End of MSG_GOPHER_GET_CACHE_FILE_INDEX.	*/
+
+
+/***********************************************************************
+ *		MSG_GOPHER_INC_CACHE_FILE_ID for GopherClass
+ ***********************************************************************
+ * SYNOPSIS:	Distinguish each cache file by incrment the ID count.    
+ * PARAMETERS:	none    
+ * SIDE EFFECTS:none    
+ *
+ * STRATEGY:	none
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	AC	1/10/95   	Initial Revision
+ *
+ ***********************************************************************/
+@method GopherClass, MSG_GOPHER_INC_CACHE_FILE_ID
+{
+	pself->GI_cacheFileID++;
+}	/* End of MSG_GOPHER_INC_CACHE_FILE_ID.	*/
+
+
+/***********************************************************************
+ *		MSG_GOPHER_GET_CACHE_FILE_ID for GopherClass
+ ***********************************************************************
+ * SYNOPSIS:	Get the next available cache file ID    
+ * PARAMETERS:	none    
+ * SIDE EFFECTS:none    
+ *
+ * STRATEGY:	none
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	AC	1/10/95   	Initial Revision
+ *
+ ***********************************************************************/
+@method GopherClass, MSG_GOPHER_GET_CACHE_FILE_ID
+{
+	return pself->GI_cacheFileID;
+}	/* End of MSG_GOPHER_GET_CACHE_FILE_ID.	*/
+
+
+/***********************************************************************
+ *		MSG_GOPHER_SET_CUR_CACHE_FILE_NAME for GopherClass
+ ***********************************************************************
+ * SYNOPSIS:	Set/Update the current cached filename for the current menu.
+ * PARAMETERS:	char *filename    
+ * SIDE EFFECTS:none    
+ *
+ * STRATEGY:	(1)  Check if a chunk has been allocated
+ *		(2)  If so, free the previous chunk
+ *		(3)  Allocate a new chunk
+ *		(4)  string copy into that new chunk
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	AC	11/14/94   	Initial Revision
+ *
+ ***********************************************************************/
+@method GopherClass, MSG_GOPHER_SET_CUR_CACHE_FILE_NAME
+{
+	char *string;
+	word length = strlen(filename);
+
+	MemLock(pself->GI_infoBlock);
+
+	if (pself->GI_curCacheFileName) {	
+	    /* we already had a chunk for this already */
+	    LMemReAllocHandles(pself->GI_infoBlock, 
+			       pself->GI_curCacheFileName,
+			       length+1);
+	    pself = ObjDeref(oself, 0);
+	} else {
+	    /* no chunk previously, so we need to allocate a new one */
+	    ChunkHandle newChunk;
+
+	    newChunk = LMemAlloc(pself->GI_infoBlock,
+				 length+1);
+	    pself = ObjDeref(oself, 0);
+	    pself->GI_curCacheFileName = newChunk;
+	}
+
+	string = (char *)LMemDerefHandles(pself->GI_infoBlock,
+				  	  pself->GI_curCacheFileName);
+
+	strncpy(string, filename, length);
+	string[length] = '\0';	/* null-terminate it */
+
+	MemUnlock(pself->GI_infoBlock);
+}	/* End of MSG_GOPHER_SET_CUR_CACHE_FILE_NAME.	*/
+
+
+/***********************************************************************
+ *		MSG_GOPHER_GET_CUR_CACHE_FILE_NAME_CHUNK for GopherClass
+ ***********************************************************************
+ * SYNOPSIS:	Get the chunk of the current cached filename for the 
+ *		current menu.
+ * PARAMETERS:	none
+ * SIDE EFFECTS:
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	AC	11/14/94   	Initial Revision
+ *
+ ***********************************************************************/
+@method GopherClass, MSG_GOPHER_GET_CUR_CACHE_FILE_NAME_CHUNK
+{
+	/* fatal error if there is no chunk !! */
+	EC_ERROR_IF((pself->GI_curCacheFileName == NullHandle), 
+		    ERROR_UNDEFINED_CACHE_FILE_CHUNK);
+
+	return pself->GI_curCacheFileName;
+}	/* End of MSG_GOPHER_GET_CUR_CACHE_FILE_NAME_CHUNK.	*/
+
+
+/***********************************************************************
+ *		MSG_GOPHER_INC_ITEM_PARSED for GopherClass
+ ***********************************************************************
+ * SYNOPSIS:	    Increment the number of item parsed
+ * PARAMETERS:	    none
+ * SIDE EFFECTS:    none
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	AC	9/12/94   	Initial Revision
+ *
+ ***********************************************************************/
+@method GopherClass, MSG_GOPHER_INC_ITEM_PARSED
+{
+	pself->GI_itemParsed++;
+}	/* End of MSG_GOPHER_INC_ITEM_PARSED.	*/
+
+
+/***********************************************************************
+ *		MSG_GOPHER_SET_EOF for GopherClass
+ ***********************************************************************
+ * SYNOPSIS:	Set the EOF flag
+ * PARAMETERS:	Boolean	EOF_flag    
+ * SIDE EFFECTS:none
+ *
+ * STRATEGY:	none
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	AC	9/19/94   	Initial Revision
+ *
+ ***********************************************************************/
+@method GopherClass, MSG_GOPHER_SET_EOF
+{
+	pself->GI_eof = EOF_flag;
+}	/* End of MSG_GOPHER_SET_EOF.	*/
+
+
+/***********************************************************************
+ *		MSG_GOPHER_GET_EOF for GopherClass
+ ***********************************************************************
+ * SYNOPSIS:	Get the EOF flag
+ * PARAMETERS:	none    
+ * SIDE EFFECTS:none    
+ *
+ * STRATEGY:	none
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	AC	9/19/94   	Initial Revision
+ *
+ ***********************************************************************/
+@method GopherClass, MSG_GOPHER_GET_EOF
+{
+	return pself->GI_eof;
+}	/* End of MSG_GOPHER_GET_EOF.	*/
+
+
+/***********************************************************************
+ *		MSG_GOPHER_PLUS_UPDATE_INFO_ATTR for GopherClass
+ ***********************************************************************
+ * SYNOPSIS:	    Update the various fields for the +INFO attributes
+ * PARAMETERS:	    GopherPlusItemAttrInfo	record
+ * SIDE EFFECTS:    none
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	AC	10/19/94   	Initial Revision
+ *
+ ***********************************************************************/
+@method GopherClass, MSG_GOPHER_PLUS_UPDATE_INFO_ATTR
+{
+	memcpy(&pself->GI_info, &record, sizeof(GopherPlusItemAttrInfo));
+
+}	/* End of MSG_GOPHER_PLUS_UPDATE_INFO_ATTR.	*/
+
+/***********************************************************************
+ *		MSG_GOPHER_PLUS_GET_INFO_ATTR for GopherClass
+ ***********************************************************************
+ * SYNOPSIS:	Get the gopher plus information attributes.    
+ * PARAMETERS:	GopherPlusItemAttrInfo *record    
+ * SIDE EFFECTS:none    
+ *
+ * STRATEGY:	none
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	AC	11/28/94   	Initial Revision
+ *
+ ***********************************************************************/
+@method GopherClass, MSG_GOPHER_PLUS_GET_INFO_ATTR
+{
+	memcpy(record, &pself->GI_info, sizeof(GopherPlusItemAttrInfo));
+}	/* End of MSG_GOPHER_PLUS_GET_INFO_ATTR.	*/
+
+
+/***********************************************************************
+ *		MSG_GOPHER_PLUS_UPDATE_ADMIN_ATTR for GopherClass
+ ***********************************************************************
+ * SYNOPSIS:	    Update the various fields for the +ADMIN attributes
+ * PARAMETERS:	    GopherPlusItemAttrAdmin	record
+ * SIDE EFFECTS:    none
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	AC	10/19/94   	Initial Revision
+ *
+ ***********************************************************************/
+@method GopherClass, MSG_GOPHER_PLUS_UPDATE_ADMIN_ATTR
+{
+	memcpy(&pself->GI_admin, &record, sizeof(GopherPlusItemAttrAdmin));
+}	/* End of MSG_GOPHER_PLUS_UPDATE_ADMIN_ATTR.	*/
+
+
+/***********************************************************************
+ *		MSG_GOPHER_PLUS_GET_ADMIN_ATTR for GopherClass
+ ***********************************************************************
+ * SYNOPSIS:	Get the gopher plus admin information attributes.	    
+ * PARAMETERS:	GopherPlusItemAttrAdmin *record    
+ * SIDE EFFECTS:none    
+ *
+ * STRATEGY:	none
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	AC	11/28/94   	Initial Revision
+ *
+ ***********************************************************************/
+@method GopherClass, MSG_GOPHER_PLUS_GET_ADMIN_ATTR
+{
+	memcpy(record, &pself->GI_admin, sizeof(GopherPlusItemAttrAdmin));
+}	/* End of MSG_GOPHER_PLUS_GET_ADMIN_ATTR.	*/
+
+
+/***********************************************************************
+ *		MSG_GOPHER_PLUS_SET_VIEW_CHUNK for GopherClass
+ ***********************************************************************
+ * SYNOPSIS:	Set the chunkhandle of the +VIEW chunk array    
+ * PARAMETERS:	ChunkHandle	chunk
+ * SIDE EFFECTS:none
+ *
+ * STRATEGY:	none
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	AC	10/19/94   	Initial Revision
+ *
+ ***********************************************************************/
+@method GopherClass, MSG_GOPHER_PLUS_SET_VIEW_CHUNK
+{
+	pself->GI_view = chunk;
+}	/* End of MSG_GOPHER_PLUS_SET_VIEW_CHUNK.	*/
+
+
+/***********************************************************************
+ *		MSG_GOPHER_PLUS_GET_VIEW_CHUNK for GopherClass
+ ***********************************************************************
+ * SYNOPSIS:	Get the +VIEW chunk array chunkhandle
+ * PARAMETERS:	none    
+ * SIDE EFFECTS:none 
+ *
+ * STRATEGY:	none
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	AC	10/19/94   	Initial Revision
+ *
+ ***********************************************************************/
+@method GopherClass, MSG_GOPHER_PLUS_GET_VIEW_CHUNK
+{
+	return pself->GI_view;
+}	/* End of MSG_GOPHER_PLUS_GET_VIEW_CHUNK.	*/
+
+
+/***********************************************************************
+ *		MSG_GOPHER_PLUS_UPDATE_ABSTRACT_ATTR for GopherClass
+ ***********************************************************************
+ * SYNOPSIS:	Update the +ABSTRACT chunkhandle
+ * PARAMETERS:	GopherPlusItemAttrAbstract	chunk
+ * SIDE EFFECTS:none 
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	AC	10/20/94   	Initial Revision
+ *
+ ***********************************************************************/
+@method GopherClass, MSG_GOPHER_PLUS_UPDATE_ABSTRACT_ATTR
+{
+	pself->GI_abstract = chunk;
+}	/* End of MSG_GOPHER_PLUS_UPDATE_ABSTRACT_ATTR.	*/
+
+
+/***********************************************************************
+ *		MSG_GOPHER_PLUS_GET_ABSTRACT_ATTR for GopherClass
+ ***********************************************************************
+ * SYNOPSIS:	Get the gopher plus abstract attribute.    
+ * PARAMETERS:	GopherPlusItemAttrAbstract *chunk    
+ * SIDE EFFECTS:none
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	AC	11/28/94   	Initial Revision
+ *
+ ***********************************************************************/
+@method GopherClass, MSG_GOPHER_PLUS_GET_ABSTRACT_ATTR
+{
+	*chunk = pself->GI_abstract; 
+}	/* End of MSG_GOPHER_PLUS_GET_ABSTRACT_ATTR.	*/
+
+@endif	/* __GOPHER_GOC */
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

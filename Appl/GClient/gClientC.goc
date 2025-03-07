@@ -1,0 +1,1462 @@
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+	Copyright (c) Geoworks 1994 -- All Rights Reserved
+
+PROJECT:	Gopher Client	
+MODULE:		Code for GClientClass
+FILE:		gClientC.goc
+
+AUTHOR:		Alvin Cham, Aug 12, 1994
+
+ROUTINES:
+	Name			Description
+	----			-----------
+	
+	MSG_GOPHER_INITIALIZE
+				- initialize the gopher object
+
+	MSG_GOPHER_DISPLAY_DIRECTORY
+				- display directory items
+
+	MSG_GOPHER_DISPLAY_TEXT_FILE
+				- display text files items
+
+	MSG_GOPHER_DISPLAY_GOPHER_PLUS
+				- display gopher+ attribute
+
+	MSG_GOPHER_RECV_DATA
+				- receive incoming data
+
+	MSG_GOPHER_PARSE_ITEM
+				- parse an item
+
+	MSG_META_NOTIFY_WITH_DATA_BLOCK
+				- perform operations after an entry change
+				from the history list.
+
+	MSG_GC_ADD_BOOKMARK_ENTRY
+				- add an entry to the bookmark 
+
+	MSG_GC_REMOVE_BOOKMARK_ENTRY
+				- remove an entry to the bookmark 
+
+	MSG_GC_DISPLAY_BOOKMARK_ITEMS
+				- display the bookmark
+
+	MSG_GC_SET_HLIST_ELEMENT_CHUNK
+				- set the chunk for the history element
+				structre
+
+	MSG_GC_GET_HLIST_ELEMENT_CHUNK
+				- get the chunk for the history element
+				structre
+
+	MSG_GC_SET_UPDATE_HLIST
+				- set the flag for updating history list
+				status
+
+	MSG_GC_GET_UPDATE_HLIST
+				- get the flag for updating history list
+				status
+
+	MSG_GC_OPEN_CONNECTION
+				- open the connection to the server, 
+				triggered by 'Connect'
+				
+	MSG_GC_FETCH_NEXT_MENU
+				- fetch the next menu, triggered by 'open'
+
+	MSG_GC_CONNECTION_TOOLS
+				- open the connection tools menu, triggered
+				by 'Connection Tools'
+
+	MSG_GC_EDIT_CONNECTION
+				- edit an item under the connection tools 
+				menu, triggered by 'Edit'
+	
+	MSG_GC_EDIT_CHANGE
+				- change an item under the connection tools 
+				menu, triggered by 'Change'
+
+	MSG_GC_OK_CHANGE
+				- confirm a change, triggered by 'OK'
+
+	MSG_GC_EDIT_CLOSE
+				- quit the editing session under the 
+				connection tools menu, triggered by 'Close'
+
+	MSG_GC_CREATE_CONNECTION	
+				- create a connection settings under the
+				connection tools menu, triggered by 'Create'
+
+	MSG_GC_DELETE_CONNECTION	
+				- delete a connection settings under the
+				connection tools menu, triggered by 'Delete'
+
+	MSG_GC_OK_DELETE_CONNECTION	
+				- confirm to delete a connection settings 
+				under the, triggered by 'Delete'
+
+	MSG_GC_CANCEL_DELETE_CONNECTION	
+				- cancel to delete a connection settings 
+				under the, triggered by 'Cancel'
+			
+	MSG_GC_CLOSE_CONNECTION
+				- close the server connection
+
+	MSG_GC_END_CONNECTION
+				- end the connection
+
+	MSG_GC_UPDATE_HISTORY_LIST
+				- update the history list	
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	AC	8/12/94   	Initial version.
+
+DESCRIPTION:
+	This file contains the code for the gopher client in the 
+	application.
+
+	$Id: gClientC.goc,v 1.1 97/04/04 15:10:15 newdeal Exp $
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+
+@include "gClientC.goh"
+@include <geoworks.h>
+
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		Class declarations
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+@classdecl	GClientClass;
+
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		Methods for GClientClass
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+
+
+/***********************************************************************
+ *		MSG_GOPHER_INITIALIZE for GClientClass
+ ***********************************************************************
+ * SYNOPSIS:	Handles the initialization of the application.
+ * PARAMETERS:	none    
+ * SIDE EFFECTS:none    
+ *
+ * STRATEGY:	(1)  Allocate a block for information storage
+ *		(2)  Initialize the history chunk array
+ *		(3)  Create a bookmark file, if it doesn't exist 
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	AC	10/30/94   	Initial Revision
+ *
+ ***********************************************************************/
+@method GClientClass, MSG_GOPHER_INITIALIZE
+{
+	dword 		fileSize;
+	FileHandle	file;
+
+	/* let its superclass do its things first */
+	@callsuper();
+
+	/* create the bookmark file, if it doesn't exist */
+	if ((file = GopherCacheFileSetUp(GOPHER_BOOKMARK_FILENAME,
+					 &fileSize,
+					 (FILE_ACCESS_RW | FILE_DENY_W)))
+		== NullHandle) {
+	    /* 
+	     * check if the error is whether the file doesn't exist
+	     * if so, then we create the file.
+	     */
+	    if (ThreadGetError() == ERROR_FILE_NOT_FOUND) {
+		if ((file = FileCreate(GOPHER_BOOKMARK_FILENAME,
+				       ((FILE_CREATE_TRUNCATE) |
+					(FILE_ACCESS_RW | FILE_DENY_W)),
+					FILE_ATTR_NORMAL)) == NullHandle) {
+		    /* can't create the file */
+		    return;
+		} else {
+		    /* can't open the file somehow */
+		}
+	    }
+	}
+
+	/* closes the file here */
+	if (!GopherCacheFileEnd(file)) {
+	    /* something is wrong in closing the file */
+	}	
+}	/* End of MSG_GOPHER_INITIALIZE.	*/
+
+
+/***********************************************************************
+ *		MSG_GOPHER_DISPLAY_DIRECTORY for GClientClass
+ ***********************************************************************
+ * SYNOPSIS:	Displaying a directory item.    
+ * PARAMETERS:	none    
+ * SIDE EFFECTS:none    
+ *
+ * STRATEGY:	none
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	AC	11/10/94   	Initial Revision
+ *
+ ***********************************************************************/
+@method GClientClass, MSG_GOPHER_DISPLAY_DIRECTORY
+{
+	word	numOfItems;
+
+	/* some generic tree manipulation */
+	GCUpdateDisplayScreenUI(@GClientList);
+	/* 
+	 * keep adding onto the dynamic, as long as we still have menu 
+	 * items to be added
+	 */
+	while (pself->GI_itemParsed) {
+	    numOfItems = @call GClientList::
+				MSG_GEN_DYNAMIC_LIST_GET_NUM_ITEMS();
+
+    	    @call GClientList::MSG_GEN_DYNAMIC_LIST_ADD_ITEMS
+		(numOfItems, 1);
+	    pself = ObjDeref(oself, 0);
+	    pself->GI_itemParsed--;
+	}
+}	/* End of MSG_GOPHER_DISPLAY_DIRECTORY.	*/
+
+
+/***********************************************************************
+ *		MSG_GOPHER_DISPLAY_TEXT_FILE for GClientClass
+ ***********************************************************************
+ * SYNOPSIS:	Displaying a text file.
+ * PARAMETERS:	none    
+ * SIDE EFFECTS:none    
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	AC	11/10/94   	Initial Revision
+ *
+ ***********************************************************************/
+@method GClientClass, MSG_GOPHER_DISPLAY_TEXT_FILE
+{
+    	char	tmpBuffer[GOPHER_READ_BUFFER_SIZE];
+	FileHandle file;
+	ChunkHandle cachedFileChunk;
+	char *filename;
+	dword fileSize;
+	MemHandle infoBlock = pself->GI_infoBlock;
+
+	/* some generic tree manipulation */
+	GCUpdateDisplayScreenUI(@GClientView);
+
+	/* 
+	 * find the current cached file, open it, and write it to the text
+	 * object.
+	 */
+	MemLock(infoBlock);
+	cachedFileChunk = @call self::
+				MSG_GOPHER_GET_CUR_CACHE_FILE_NAME_CHUNK();
+	filename = LMemDerefHandles(infoBlock, cachedFileChunk);
+	if ((file = GopherCacheFileSetUp(filename, 
+				     	 &fileSize,
+				     	 (FILE_ACCESS_R | FILE_DENY_W))) 
+		== NullHandle) {
+	    /* some error */
+	    return;
+    	}
+	MemUnlock(infoBlock);
+
+	/* clear previous text */
+	@call GClientText::MSG_VIS_TEXT_REPLACE_ALL_PTR("", 0);
+
+	/* write a certain amount of character each time, until we finish */
+	while (fileSize > 0) {
+	    word bytesToCopy, bytesRead;
+
+	    if (fileSize > GOPHER_READ_BUFFER_SIZE) {
+		bytesToCopy = GOPHER_READ_BUFFER_SIZE;
+	    } else {
+		bytesToCopy = fileSize; 	    
+	    }
+
+	    if ((bytesRead = FileRead(file, tmpBuffer, bytesToCopy, FALSE))
+			== -1) {
+		/* some kind of error */
+	    }
+	    fileSize -= bytesRead;
+
+	    /* append to vistext object here */
+	    @call GClientText::MSG_VIS_TEXT_APPEND_PTR
+		(tmpBuffer, bytesRead);
+	}
+
+	if (!GopherCacheFileEnd(file)) {
+	    /* some error occurred in file close */
+	    return;
+    	}
+}	/* End of MSG_GOPHER_DISPLAY_TEXT_FILE.	*/
+
+
+/***********************************************************************
+ *		MSG_GOPHER_DISPLAY_GOPHER_PLUS_INFO for GClientClass
+ ***********************************************************************
+ * SYNOPSIS:	Displaying a gopher+ information screen.    
+ * PARAMETERS:	none    
+ * SIDE EFFECTS:none    
+ *
+ * STRATEGY:	(1)  Extract the chunks piece by piece and display them onto
+ * 		the text objects.
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	AC	11/14/94   	Initial Revision
+ *
+ ***********************************************************************/
+@method GClientClass, MSG_GOPHER_DISPLAY_GOPHER_PLUS_INFO
+{
+	char *text;
+	MemHandle infoBlock = pself->GI_infoBlock;
+
+	pself->GI_itemParsed = 0;	/* reset-back to zero */
+
+	/* the size */
+	GCDisplayViewSize(oself);
+
+	/* some generic tree manipulation */
+	GCUpdateDisplayScreenUI(@GClientPlusDisplayInfo);
+
+	MemLock(infoBlock);
+	
+	pself = ObjDeref(oself, 0);
+
+	/* if there is a chunk, get and write the title to the text object*/
+	if (pself->GI_info.GI_userVisibleName) {
+	    text = (char *)LMemDerefHandles(infoBlock, 
+			  		    pself->GI_info.GI_userVisibleName);
+	    GCWriteToTextObj(@GClientPlusTitleText, text);
+	}
+
+	pself = ObjDeref(oself, 0);
+	
+	/* the administrator e-mail address and last modification date */
+	if (pself->GI_admin.GPIAA_email) {
+	    text = (char *)LMemDerefHandles(infoBlock, 
+					    pself->GI_admin.GPIAA_email);
+	    GCWriteToTextObj(@GClientPlusAdminText, text);
+	    GCConstructModifyDateString(pself->GI_admin.GPIAA_modDate);
+	}
+
+	pself = ObjDeref(oself, 0);
+
+	/* the abstract */
+	if (pself->GI_abstract) {
+	    text = (char *)LMemDerefHandles(infoBlock, 
+					    pself->GI_abstract);
+	    GCWriteToTextObj(@GClientPlusAbstractText, text);
+	}
+	MemUnlock(infoBlock);	
+
+
+}	/* End of MSG_GOPHER_DISPLAY_GOPHER_PLUS_INFO.	*/
+
+
+/***********************************************************************
+ *		MSG_GOPHER_RECV_DATA for GClientClass
+ ***********************************************************************
+ * SYNOPSIS:	Reading the text from the gopher server, and deal
+ *		with it.    
+ * PARAMETERS:	byte *data
+ *		word bytesRead
+ * SIDE EFFECTS:none.
+ *
+ * STRATEGY:	(1)  Find out if we have any item parsed, if so
+ *		display them into the list object.
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	AC	9/14/94   	Initial Revision
+ *
+ ***********************************************************************/
+@method GClientClass, MSG_GOPHER_RECV_DATA
+{
+    /* let's its superclass to its things */
+    @callsuper();
+
+    pself = ObjDeref(oself,0);
+
+    /* 
+     * check if we have finished parsing anything, if so, we want to: 
+     * (1)  display the item 
+     * (2)  update the history list
+     */
+
+/* \\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\ 
+ * NOTE: due to different communication strategy, we check for different
+ *  conditions for finished parsed items 
+ * ///////////////////////////////////////////////////////////////////*/
+
+#if TEST_SOCKET
+    if (pself->GI_eof) {
+#elif TEST_SERIAL
+    if (pself->GI_itemParsed) {
+#endif
+	MemHandle infoBlock = pself->GI_infoBlock;
+	GCHistoryListElement *element;
+	ChunkHandle hListElementChunk, cachedFileChunk;
+	char *tmpFileName;
+	Boolean	updateHList = pself->GCI_updateHList;
+
+	/* display the stuff */
+	@call self::MSG_GOPHER_DISPLAY();
+
+	pself = ObjDeref(oself, 0);
+	
+	/* no need to update history list, if we are fetching gopher+ info */
+	if (pself->GI_curMenuType == GPIT_GOPHER_PLUS) 
+	    return;
+
+    	MemLock(infoBlock);
+
+	/* 
+	 * To update the history list, there are two different scenario's.
+	 * Since things are different when we first connected to the server,
+	 * (we had no previous attributes to obtain the item information, so
+	 * we had to build the history list element after the first server's
+	 * response, instead of before (like other cases.)
+	 */
+
+	pself = ObjDeref(oself, 0);
+	if (pself->GCI_justConnected) {	/* first time */
+	    pself->GCI_justConnected = FALSE;
+
+	    /* 
+	     * (1)  Create a chunk to store the selection's chunk information
+	     * (2)  Find the gopher item information from the menu item chunk
+	     * array, and copy that into this new chunk. 
+	     */
+	    if ((hListElementChunk = GCAllocHistElementChunk(infoBlock))
+		== NullHandle) {
+	    	/* can't allocate chunk */
+	    	MemUnlock(infoBlock);
+	    	return;
+	    }
+
+	    element = (GCHistoryListElement *)
+			LMemDerefHandles(infoBlock, hListElementChunk);
+
+	    /* get the element's info */
+	    GCUpdateHistElementItemInfo(&(element->GCHLE_item), 0, oself);
+	    
+	    /* 
+	     * a special case, we want this history list element to be a 
+	     * directory item.
+	     */
+	    element->GCHLE_item.GI_type = GPIT_DIRECTORY;
+	} else {	/* not the first fetch from server */
+	    /* our element has already been built before the request */	    
+	    hListElementChunk = @call self::MSG_GC_GET_HLIST_ELEMENT_CHUNK();
+	    element = (GCHistoryListElement *)
+			LMemDerefHandles(infoBlock, hListElementChunk);
+	}
+
+	/* 
+	 * update the cache filename field of history element 
+	 * and update the history list 
+	 */
+
+	cachedFileChunk = @call self::
+				MSG_GOPHER_GET_CUR_CACHE_FILE_NAME_CHUNK();
+	tmpFileName = LMemDerefHandles(infoBlock, cachedFileChunk);
+	GCUpdateHistElementFileNameInfo(element->GCHLE_filename, 
+					tmpFileName);
+	GCUpdateHistElementFileIDInfo(&(element->GCHLE_fileID), 
+				      oself);
+	if (updateHList) {
+	    @call self::MSG_GC_UPDATE_HISTORY_LIST(element, hListElementChunk);
+	}
+	MemUnlock(infoBlock);
+    }
+}	/* End of MSG_GOPHER_RECV_DATA.	*/
+
+
+/***********************************************************************
+ *		MSG_GOPHER_PARSE_ITEM for GClientClass
+ ***********************************************************************
+ * SYNOPSIS:	Handler for parsing an item for the application    
+ * PARAMETERS:	byte	*buffer
+ *		dword	numBytes
+ *		char	*filename
+ *		Boolean	cached    
+ * SIDE EFFECTS:word	count    
+ *
+ * STRATEGY:	(1) call its superclass, 
+ *		(2) and update the cached filename
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	AC	11/ 9/94   	Initial Revision
+ *
+ ***********************************************************************/
+@method GClientClass, MSG_GOPHER_PARSE_ITEM
+{
+	@call self::MSG_GOPHER_SET_CUR_CACHE_FILE_NAME(filename);
+
+	return @callsuper();
+}	/* End of MSG_GOPHER_PARSE_ITEM.	*/
+
+
+/***********************************************************************
+ *		MSG_GC_SET_HLIST_ELEMENT_CHUNK for GClientClass
+ ***********************************************************************
+ * SYNOPSIS:	Set the history list element chunk.    
+ * PARAMETERS:	ChunkHandle hListElementChunk    
+ * SIDE EFFECTS:none    
+ *
+ * STRATEGY:	none
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	AC	12/22/94   	Initial Revision
+ *
+ ***********************************************************************/
+@method GClientClass, MSG_GC_SET_HLIST_ELEMENT_CHUNK
+{
+	pself->GCI_hListElementChunk = hListElementChunk;
+}	/* End of MSG_GC_SET_HLIST_ELEMENT_CHUNK.	*/
+
+
+/***********************************************************************
+ *		MSG_GC_GET_HLIST_ELEMENT_CHUNK for GClientClass
+ ***********************************************************************
+ * SYNOPSIS:	Get the history list element chunk.    
+ * PARAMETERS:	none    
+ * SIDE EFFECTS:none    
+ *
+ * STRATEGY:	none
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	AC	12/22/94   	Initial Revision
+ *
+ ***********************************************************************/
+@method GClientClass, MSG_GC_GET_HLIST_ELEMENT_CHUNK
+{
+	return pself->GCI_hListElementChunk;
+}	/* End of MSG_GC_GET_HLIST_ELEMENT_CHUNK.	*/
+
+
+/***********************************************************************
+ *		MSG_GC_SET_UPDATE_HLIST for GClientClass
+ ***********************************************************************
+ * SYNOPSIS:	Set the flag for the status of updating the history list    
+ * PARAMETERS:	Boolean flag    
+ * SIDE EFFECTS:none    
+ *
+ * STRATEGY:	none
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	AC	1/10/95   	Initial Revision
+ *
+ ***********************************************************************/
+@method GClientClass, MSG_GC_SET_UPDATE_HLIST
+{
+	pself->GCI_updateHList = flag;
+}	/* End of MSG_GC_SET_UPDATE_HLIST.	*/
+
+
+/***********************************************************************
+ *		MSG_GC_GET_UPDATE_HLIST for GClientClass
+ ***********************************************************************
+ * SYNOPSIS:	Get the flag for the status of updating the history list    
+ * PARAMETERS:	none    
+ * SIDE EFFECTS:none    
+ *
+ * STRATEGY:	none
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	AC	1/10/95   	Initial Revision
+ *
+ ***********************************************************************/
+@method GClientClass, MSG_GC_GET_UPDATE_HLIST
+{
+	return pself->GCI_updateHList;
+}	/* End of MSG_GC_GET_UPDATE_HLIST.	*/
+
+
+/***********************************************************************
+ *		MSG_GC_OPEN_CONNECTION for GClientClass
+ ***********************************************************************
+ * SYNOPSIS:	Connection to the gopher server
+ * PARAMETERS:	none    
+ * SIDE EFFECTS:
+ *
+ * STRATEGY:	Sends an empty line to the server.
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	AC	8/15/94   	Initial Revision
+ *
+ ***********************************************************************/
+@method GClientClass, MSG_GC_OPEN_CONNECTION
+{
+	/* NOTE: the message will append a newline at the end of the request */
+	@call self::MSG_GOPHER_SEND_REQUEST("",
+					    DEFAULT_GOPHER_SERVER_HOST,
+					    DEFAULT_GOPHER_SERVER_PORT);
+
+	/* we want to update history list */
+	@call self::MSG_GC_SET_UPDATE_HLIST(TRUE);
+
+	/* replace the old options with the new ones */
+	GCRemoveOptions();
+	GCAddOptions(@GClientOpen, @GClientSaveToBookmark,
+		 @GClientBookmark, @GClientEnd);
+
+}	/* End of MSG_GC_OPEN_CONNECTION. */
+
+
+/***********************************************************************
+ *		MSG_GC_FETCH_NEXT_MENU for GClientClass
+ ***********************************************************************
+ * SYNOPSIS:	Perform tasks that will fetch the next menu from the server.
+ * PARAMETERS:	none    
+ * SIDE EFFECTS:none    
+ *
+ * STRATEGY:	(1)  Record the selection's chunk infomation.
+ *		(2)  Clear the last menu stuff
+ *		(3)  construct the request
+ *		(4)  Updates the history list
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	AC	10/27/94   	Initial Revision
+ *
+ ***********************************************************************/
+@method GClientClass, MSG_GC_FETCH_NEXT_MENU
+{
+	MemHandle infoBlock;
+	ChunkHandle menuItemArray;
+	GopherItem item;
+
+	/* there is no selection while we are at the gopher+ display screen */
+	if (pself->GI_curMenuType != GPIT_GOPHER_PLUS) {
+	    pself->GCI_selection = 
+		@call GClientList::MSG_GEN_ITEM_GROUP_GET_SELECTION();
+	}
+
+	pself = ObjDeref(oself, 0);
+	if (pself->GCI_selection == -1) {
+	    /* no selection */
+	    return;
+	}
+
+	/* here, we need to get the chunk array of the menu item, and
+	 * extract the type of the thing we are going to fetch.
+	 */
+	infoBlock = pself->GI_infoBlock;
+	MemLock(infoBlock);
+	menuItemArray = pself->GI_menuItemArray;
+	ChunkArrayGetElementHandles(infoBlock, menuItemArray, 
+				    pself->GCI_selection, (void *) &item);
+
+	/* 
+	 * check if we are enabling gopher+ displays, if so, we need to do
+	 * a gopher+ info pre-fetch, before the actual thing, otherwise, we
+	 * can just go ahead and fetch the next item menu.  NOTE: if we are
+	 * already in the gopher+ display screen, then we can go ahead and
+	 * fetch the item.
+	 */ 
+	if (item.GI_gopherPlusInfo && 
+	    (pself->GI_curMenuType != GPIT_GOPHER_PLUS)) {	
+	    @call self::MSG_GOPHER_CONSTRUCT_REQUEST(GCR_ATTR_INFO,
+						     pself->GCI_selection, 
+						     0);
+	    @call self::MSG_GOPHER_FETCH_NEW_DISPLAY(GPIT_GOPHER_PLUS);
+	}  else { 
+   	    GCFetchMenu(item.GI_type, pself->GCI_selection, oself);
+	} 
+	MemUnlock(infoBlock);
+
+	/* update option buttons */
+	GCRemoveOptions();
+
+	/*
+	 * we bring up different triggers if we have just fetched gopher+
+	 * display.
+	 */
+	pself = ObjDeref(oself, 0);
+	if (pself->GI_curMenuType != GPIT_GOPHER_PLUS) {
+	    GCAddOptions(@GClientOpen, @GClientSaveToBookmark,
+		 	 @GClientBookmark, @GClientEnd);
+	} else {
+	    GCAddOptions(@GClientOpen, @GClientNoMenu,
+		 	 @GClientNoMenu2, @GClientNoMenu3);
+	}
+}	/* End of MSG_GC_FETCH_NEXT_MENU.	*/
+
+
+/***********************************************************************
+ *		MSG_GC_CONNECTION_TOOLS for GClientClass
+ ***********************************************************************
+ * SYNOPSIS:	Display the connection tools with parameters     
+ * PARAMETERS:	none    
+ * SIDE EFFECTS:none    
+ *
+ * STRATEGY: 	(1)  Update option buttons.
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	AC	8/15/94   	Initial Revision
+ *
+ ***********************************************************************/
+@method GClientClass, MSG_GC_CONNECTION_TOOLS
+{
+	/* replace the old options with the new ones */
+	GCRemoveOptions();
+
+	/* add the new ones */
+	GCAddOptions(@GClientEdit, @GClientCreate,
+		 @GClientDelete, @GClientClose);
+
+}	/* End of MSG_GC_CONNECTION_TOOLS.	*/
+
+
+/***********************************************************************
+ *		MSG_GC_EDIT_CONNECTION for GClientClass
+ ***********************************************************************
+ * SYNOPSIS:	Editing the connection tools parameters.    
+ * PARAMETERS:	none    
+ * SIDE EFFECTS:none    
+ *
+ * STRATEGY:	(1)  Bring the connection parameter menu to screen
+		(2)  Based on the selection of the item, load in the current
+ *		values of each parameter into the text objects.
+ *		(3)  Update option buttons.
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	AC	8/15/94   	Initial Revision
+	 *
+ ***********************************************************************/
+@method GClientClass, MSG_GC_EDIT_CONNECTION
+{
+	MemHandle tmpBlock;	/* the item information */
+	char *item;
+
+	pself->GCI_selection = 
+		@call GClientList::MSG_GEN_ITEM_GROUP_GET_SELECTION();
+
+	pself = ObjDeref(oself, 0);
+	if (pself->GCI_selection == -1) {
+	    /* no selection */
+	    return;
+	}
+
+	/* brings the connection menu to screen */
+	GCUpdateDisplayScreenUI(@GClientConMenu);
+
+	tmpBlock = GopherGetCachedFileLine(pself->GCI_selection, 
+				       	   GOPHER_BOOKMARK_FILENAME);
+	
+	item = (char *) MemDeref(tmpBlock);
+	
+	/* load the item's information into the text objects for display */
+	GCDisplayAttributesToTextObj(item);
+
+	MemFree(tmpBlock);	/* free the block */
+
+	/* replace the old options with the new ones */
+	GCRemoveOptions();
+	GCAddOptions(@GClientEditChange, @GClientNoMenu,
+		@GClientNoMenu2, @GClientEditClose);
+}	/* End of MSG_GC_EDIT_CONNECTION.	*/
+
+
+/***********************************************************************
+ *		MSG_GC_CREATE_CONNECTION for GClientClass
+ ***********************************************************************
+ * SYNOPSIS:	Create a parameter file for a gopher connection.    
+ * PARAMETERS:	none    
+ * SIDE EFFECTS:none    
+ *
+ * STRATEGY:	(1)  Adjust the UI
+ *		
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	AC	8/15/94   	Initial Revision
+ *
+ ***********************************************************************/
+@method GClientClass, MSG_GC_CREATE_CONNECTION
+{
+	/* 
+	 * set the selection value to -1, to distinguish creating from 
+	 * editing 
+	 */
+	pself->GCI_selection = -1;
+
+	/* fill the connection parameters with default values */
+	GCFillTextObjWithDefaults();
+
+	/* updating the display screen */
+	GCUpdateDisplayScreenUI(@GClientConMenu);
+
+	/* the option screen */
+	GCRemoveOptions();
+	GCAddOptions(@GClientEditChange, @GClientNoMenu,
+		@GClientNoMenu2, @GClientEditClose);
+
+}	/* End of MSG_GC_CREATE_CONECTION.	*/
+
+
+/***********************************************************************
+ *		MSG_GC_EDIT_CHANGE for GClientClass
+ ***********************************************************************
+ * SYNOPSIS:	Changing a parameter for the connection display menu    
+ * PARAMETERS:	none    
+ * SIDE EFFECTS:none    
+ *
+ * STRATEGY:	(1)  Update the option buttons
+ *		
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	AC	8/17/94   	Initial Revision
+ *
+ ***********************************************************************/
+@method GClientClass, MSG_GC_EDIT_CHANGE
+{
+	/* update the option menu */
+	@call GClientEditChange::MSG_GEN_SET_NOT_USABLE(VUM_NOW);
+	@call GClientOption::MSG_GEN_REMOVE_CHILD
+		(@GClientEditChange, CCO_FIRST);
+	@call GClientOption::MSG_GEN_ADD_CHILD
+		(@GClientOKChange, CCO_FIRST);
+	@call GClientOKChange::MSG_GEN_SET_USABLE(VUM_NOW);
+}	/* End of MSG_GC_EDIT_CHANGE.	*/
+
+
+/***********************************************************************
+ *		MSG_GC_OK_CHANGE for GClientClass
+ ***********************************************************************
+ * SYNOPSIS:	Commit the changes of a connection tool parameter.    
+ * PARAMETERS:	none    
+ * SIDE EFFECTS:none    
+ *
+ * STRATEGY:	(1) Update option menu
+ *		(2) Write changes to file
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	AC	9/23/94   	Initial Revision
+ *
+ *****************************	******************************************/
+@method GClientClass, MSG_GC_OK_CHANGE
+{
+	if (pself->GCI_selection == -1) {
+	    GCCreateNewConnectionItem();
+	} else {
+	    /* we are editing one */
+	    GCEditConnectionItem(pself->GCI_selection, TRUE);
+	}
+
+	/* just do the rest of the stuff, as if we are quitting the changes */
+	@call self::MSG_GC_EDIT_CLOSE();
+
+}	/* End of MSG_GC_OK_CHANGE.	*/
+
+
+/***********************************************************************
+ *		MSG_GC_EDIT_CLOSE for GClientClass
+ ***********************************************************************
+ * SYNOPSIS:	Closing the edit option for the connection tool display.    
+ * PARAMETERS:	none    
+ * SIDE EFFECTS:none    
+ *
+ * STRATEGY:	(1)  Bring the menu item display back on screen
+ *		(2)  Re-load the bookmark file.
+ *		(3)  Update option buttons.
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	AC	8/17/94   	Initial Revision
+ *
+ ***********************************************************************/
+@method GClientClass, MSG_GC_EDIT_CLOSE
+{
+	/* the display screen */
+	GCUpdateDisplayScreenUI(@GClientList);
+
+	/* erase what we had before, and re-load bookmark file */
+	@call self::MSG_GOPHER_FETCH_NEW_DISPLAY(GPIT_BOOKMARK);
+	@call self::MSG_GOPHER_PARSE_ITEM((byte *)"", (dword) 0,
+					  GOPHER_BOOKMARK_FILENAME, TRUE);
+	@call self::MSG_GOPHER_DISPLAY();
+
+	/* replace the old options with the new ones */
+	GCRemoveOptions();
+	GCAddOptions(@GClientOpen, @GClientTools,
+		 @GClientNoMenu, @GClientEnd);
+
+}	/* End of MSG_GC_EDIT_CLOSE.	*/
+
+
+/***********************************************************************
+ *		MSG_GC_DELETE_CONNECTION for GClientClass
+ ***********************************************************************
+ * SYNOPSIS:	Deleting an item.    
+ * PARAMETERS:	none    
+ * SIDE EFFECTS:none    
+ *
+ * STRATEGY:	(1) Display dialog box that asks for confirmation.
+ *		(2) Updates option menus
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	AC	8/15/94   	Initial Revision
+ *
+ ***********************************************************************/
+@method GClientClass, MSG_GC_DELETE_CONNECTION
+{
+	/* pop up the affirmation dialog box of "deleting" an item */
+	UserDoDialog(@DeleteBox);
+
+	/* replace the old options with the new ones */
+	GCRemoveOptions();
+
+	GCAddOptions(@GClientDeleteOK, @GClientNoMenu,
+		@GClientNoMenu2, @GClientDeleteCancel);
+
+}	/* End of MSG_GC_DELETE_CONNECTION.	*/
+
+
+/***********************************************************************
+ *		MSG_GC_OK_DELETE_CONNECTION for GClientClass
+ ***********************************************************************
+ * SYNOPSIS:	Deleting a defined item    
+ * PARAMETERS:	none    
+ * SIDE EFFECTS:none   
+ *
+ * STRATEGY:	(1) remove a bookmark item.
+ *		(2) update option menu.
+ *		(3) re-display the bookmark page.
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	AC	8/16/94   	Initial Revision
+ *
+ ***********************************************************************/
+@method GClientClass, MSG_GC_OK_DELETE_CONNECTION
+{
+
+	@call self::MSG_GC_REMOVE_BOOKMARK_ENTRY();
+
+	/* erase what we had before, and re-load bookmark file */
+	@call self::MSG_GOPHER_FETCH_NEW_DISPLAY(GPIT_BOOKMARK);
+	@call self::MSG_GOPHER_PARSE_ITEM((byte *)"", (dword) 0,
+					  GOPHER_BOOKMARK_FILENAME, TRUE);
+
+	/* replace the old options with the new ones */
+	GCRemoveOptions();
+	GCAddOptions(@GClientEdit, @GClientCreate,
+		 @GClientDelete, @GClientClose);
+}	/* End of MSG_GC_OK_DELETE_CONNECTION.	*/
+
+
+/***********************************************************************
+ *		MSG_GC_CANCEL_DELETE_CONNECTION for GClientClass
+ ***********************************************************************
+ * SYNOPSIS:	Cancelling the delete command.    
+ * PARAMETERS:	none    
+ * SIDE EFFECTS:none    
+ *
+ * STRATEGY:	(1) update option menus and do nothing else.
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	AC	8/16/94   	Initial Revision
+ *
+ ***********************************************************************/
+@method GClientClass, MSG_GC_CANCEL_DELETE_CONNECTION
+{
+	/* replace the old options with the new ones */
+	GCRemoveOptions();
+
+	GCAddOptions(@GClientEdit, @GClientCreate,
+		 @GClientDelete, @GClientClose);
+}	/* End of MSG_GC_CANCEL_DELETE_CONNECTION.	*/
+
+
+/***********************************************************************
+ *		MSG_GC_CLOSE_CONNETCION for GClientClass
+ ***********************************************************************
+ * SYNOPSIS:	    
+ * PARAMETERS:	    
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	AC	8/15/94   	Initial Revision
+ *
+ ***********************************************************************/
+@method GClientClass, MSG_GC_CLOSE_CONNECTION
+{
+	/* replace the old options with the new ones */
+	GCRemoveOptions();
+	GCAddOptions(@GClientConnect, @GClientTools,
+		@GClientNoMenu, @GClientEnd);
+
+}	/* End of MSG_GC_CLOSE_CONNECTION.	*/
+
+
+/***********************************************************************
+ *		MSG_GC_END_CONNECTION for GClientClass
+ ***********************************************************************
+ * SYNOPSIS:	Disconnect from the server.    
+ * PARAMETERS:	none    
+ * SIDE EFFECTS:none    
+ *
+ * STRATEGY:	none
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	AC	8/15/94   	Initial Revision
+ *
+ ***********************************************************************/
+@method GClientClass, MSG_GC_END_CONNECTION
+{
+	UserDoDialog(@DisconnectionBox);
+
+	/* do the disconnection here */
+
+}	/* End of MSG_GC_END_CONNECTION.	*/
+
+
+/***********************************************************************
+ *		MSG_GC_ADD_BOOKMARK_ENTRY for GClientClass
+ ***********************************************************************
+ * SYNOPSIS:	Adding an entry to the bookmark display
+ * PARAMETERS:	none
+ * SIDE EFFECTS:none
+ *
+ * STRATEGY:	(1)  Get the selection-th line of the cached (current) file
+ *		(2)  append the string into the bookmark file
+ *		
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	AC	10/24/94   	Initial Revision
+ *
+ ***********************************************************************/
+@method GClientClass, MSG_GC_ADD_BOOKMARK_ENTRY
+{
+	FileHandle file;
+	MemHandle tmpBlock, infoBlock;
+	ChunkHandle cachedFileChunk;
+	char *newItemString;
+	dword fileSize;
+	char *filename;
+
+	pself->GCI_selection = 
+		@call GClientList::MSG_GEN_ITEM_GROUP_GET_SELECTION();
+
+	pself = ObjDeref(oself, 0);
+	if (pself->GCI_selection == -1) {
+	    /* no selection */
+	    return;
+	}
+
+	infoBlock = pself->GI_infoBlock;
+	MemLock(infoBlock);
+	cachedFileChunk = @call self::
+				MSG_GOPHER_GET_CUR_CACHE_FILE_NAME_CHUNK();
+	filename = LMemDerefHandles(infoBlock, cachedFileChunk);
+	if ((tmpBlock = GopherGetCachedFileLine(pself->GCI_selection, 
+					    	filename)) 
+		== NullHandle) {
+	    /* can't allocate block */
+	    return;
+	}
+	newItemString = (char *) MemDeref(tmpBlock);
+	MemUnlock(infoBlock);
+
+	if ((file = GopherCacheFileSetUp(GOPHER_BOOKMARK_FILENAME, 
+				     	 &fileSize,
+				     	 (FILE_ACCESS_RW | FILE_DENY_W))) 
+		== NullHandle) {
+	    /* error in opening bookmark file here */
+	    MemFree(tmpBlock);
+	    return;
+	}
+
+	/* appending the file */
+	FilePos(file, 0, FILE_POS_END);		
+	FileWrite(file, newItemString, strlen(newItemString), TRUE);
+
+	MemFree(tmpBlock);
+
+	if (!GopherCacheFileEnd(file)) {
+	    /* some error occurred in file close */
+	    return;
+	}
+}	/* End of MSG_GC_ADD_BOOKMARK_ENTRY.	*/
+
+
+/***********************************************************************
+ *		MSG_GC_REMOVE_BOOKMARK_ENTRY for GClientClass
+ ***********************************************************************
+ * SYNOPSIS:	Remove a bookmark entry 
+ * PARAMETERS:	none
+ * SIDE EFFECTS:none
+ *
+ * STRATEGY:	(1)  Remove the selection-th line of the bookmark file
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	AC	10/24/94   	Initial Revision
+ *
+ ***********************************************************************/
+@method GClientClass, MSG_GC_REMOVE_BOOKMARK_ENTRY
+{
+	pself->GCI_selection = 
+		@call GClientList::MSG_GEN_ITEM_GROUP_GET_SELECTION();
+
+	pself = ObjDeref(oself, 0);
+	if (pself->GCI_selection == -1) {
+	    /* no selection */
+	    return;
+	}
+
+	/* we are removing, instead of editing */
+	GCEditConnectionItem(pself->GCI_selection, FALSE);	
+}	/* End of MSG_GC_REMOVE_BOOKMARK_ENTRY.	*/
+
+
+/***********************************************************************
+ *		MSG_GC_DISPLAY_BOOKMARK_ITEMS for GClientClass
+ ***********************************************************************
+ * SYNOPSIS:	Displaying bookmark menu
+ * PARAMETERS:	none    
+ * SIDE EFFECTS:none    
+ *
+ * STRATEGY:	
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	AC	10/24/94   	Initial Revision
+ *
+ ***********************************************************************/
+@method GClientClass, MSG_GC_DISPLAY_BOOKMARK_ITEMS
+{
+	MemHandle infoBlock;
+	ChunkHandle hListElementChunk;
+	GCHistoryListElement *element;
+
+	infoBlock = @call self::MSG_GOPHER_GET_INFO_BLOCK();
+	MemLock(infoBlock);
+
+	if ((hListElementChunk = GCAllocHistElementChunk(infoBlock)) 
+		== NullHandle) {
+	    /* can't allocate a chunk */
+	    MemUnlock(infoBlock);
+	    return;
+	}
+
+	/* clear the previous menu item materials */
+	@call self::MSG_GOPHER_FETCH_NEW_DISPLAY(GPIT_BOOKMARK);
+	
+	/* 
+	 * (1) Deref the chunk
+	 * (2) just copy the filename field, no need to fill in the item 
+	 * field, since the bookmark file is a cached file.
+	 * (3) Parse the cached bookmark file
+	 * (4) Display it
+	 * (5) Finally, update the history list.
+	 * (6) Update our history chunk array
+	 */ 
+	element = (GCHistoryListElement *)LMemDerefHandles(infoBlock, 
+							   hListElementChunk);
+	GCUpdateHistElementFileNameInfo(element->GCHLE_filename,
+					GOPHER_BOOKMARK_FILENAME);
+	@call self::MSG_GOPHER_PARSE_ITEM
+		((byte *)"", (dword) 0, GOPHER_BOOKMARK_FILENAME, TRUE);
+	@call self::MSG_GOPHER_DISPLAY();
+	@call self::MSG_GC_UPDATE_HISTORY_LIST(element, hListElementChunk);
+
+	MemUnlock(infoBlock);	
+	
+	/* replace the old options with the new ones */
+	GCRemoveOptions();
+	GCAddOptions(@GClientOpen, @GClientTools,
+		@GClientNoMenu, @GClientEnd);
+
+}	/* End of MSG_GC_DISPLAY_BOOKMARK_ITEMS.	*/
+
+
+/***********************************************************************
+ *		MSG_GOPHER_FETCH_NEW_DISPLAY for GClientClass
+ ***********************************************************************
+ * SYNOPSIS:	Perform tasks for fetching the next display screen    
+ * PARAMETERS:	GopherParseItemType newType;
+ * SIDE EFFECTS:none    
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	AC	10/27/94   	Initial Revision
+ *
+ ***********************************************************************/
+@method GClientClass, MSG_GOPHER_FETCH_NEW_DISPLAY
+{
+	switch (pself->GI_curMenuType) {
+	    case GPIT_DIRECTORY: case GPIT_BOOKMARK: 
+		word numOfItems;
+
+		/* remove all items from the dynamic list */
+		numOfItems = @call GClientList::
+				MSG_GEN_DYNAMIC_LIST_GET_NUM_ITEMS();
+
+		@call GClientList::MSG_GEN_DYNAMIC_LIST_REMOVE_ITEMS
+				(0, numOfItems);
+		break;
+	    case GPIT_GOPHER_PLUS:
+		/* nothing to handle in particular */
+		break;
+	    case GPIT_FILE:
+
+		break;
+	    default:
+		break;
+	}
+
+	/* calls its superclass */
+	@callsuper();
+
+}	/* End of MSG_GOPHER_FETCH_NEW_DISPLAY.	*/
+
+
+/***********************************************************************
+ *		MSG_GC_UPDATE_HISTORY_LIST for GClientClass
+ ***********************************************************************
+ * SYNOPSIS:	Inserting a link to the history list    
+ * PARAMETERS:	GCHistoryListElement *element, word chunk
+ * SIDE EFFECTS:none    
+ *
+ * STRATEGY:	(1) add an element to the history list info chunk array
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	AC	10/30/94   	Initial Revision
+ *
+ ***********************************************************************/
+@method GClientClass, MSG_GC_UPDATE_HISTORY_LIST
+{
+	char *entryString;
+	MemHandle infoBlock;
+
+	infoBlock = @call self::MSG_GOPHER_GET_INFO_BLOCK();
+	MemLock(infoBlock);
+
+	pself = ObjDeref(oself, 0);
+	/* a hack!!
+	 * we need to check whether this is a bookmark menu.  If it is, since
+	 * we didn't update the "item" field of "element", we need to display
+	 * something else in the history list entry.
+	 */
+	if (pself->GI_curMenuType == GPIT_BOOKMARK) {
+	    entryString = "bookmark menu";
+	} else {
+	    entryString = LMemDerefHandles(infoBlock,
+				element->GCHLE_item.GI_userVisibleName);
+	}
+	@call GClientNavigate::MSG_NC_INSERT_ENTRY(entryString, chunk);
+	MemUnlock(infoBlock);
+}	/* End of MSG_GC_UPDATE_HISTORY_LIST.	*/
+
+
+/***********************************************************************
+ *		MSG_META_NOTIFY_WITH_DATA_BLOCK for GClientClass
+ ***********************************************************************
+ * SYNOPSIS:	Handles the task of the output object for the navigation
+ *		controller.    
+ * PARAMETERS:  (ManufacturerID manufID, word notificationType, 
+ *		 MemHandle data)	    
+ * SIDE EFFECTS:(1)  De-refencing the chunk
+ *		(2)  clear the last array entries
+ *		(3)  look for a cached file, if found, then we can simply
+ *			re-parse that file.
+ *		(4)  otherwise, we need to build a request from the element's
+ *			information.
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	AC	11/ 1/94   	Initial Revision
+ *
+ ***********************************************************************/
+@method GClientClass, MSG_META_NOTIFY_WITH_DATA_BLOCK
+{
+	NavigateHistoryListInfo *info;
+	ChunkHandle chunk;
+	MemHandle infoBlock, tmpBlock;
+	FileHandle file;
+	dword	fileSize;
+	byte	*buffer;
+
+	infoBlock = pself->GI_infoBlock;
+
+	/* de-reference the chunk */
+	info = MemDeref(data);
+	chunk = info->NHLI_selector;	
+	MemLock(infoBlock);
+	
+	if (notificationType == GWNT_NAVIGATE_ENTRY_CHANGE) {
+	    GCHistoryListElement *element;
+
+	    element = LMemDerefHandles(infoBlock, chunk);
+	    /* 
+	     * here, we want to lookup the cached file, if there is one,
+	     * otherwise, we need to look at the gopher item's attribute to
+	     * retrieve back the information.  The bookmark file is always 
+	     * cached.
+	     */
+	    if (!strcmp((char *)element->GCHLE_filename, 
+		    	GOPHER_BOOKMARK_FILENAME)) {
+	    	/* clear the last array entries */
+	    	@call self::MSG_GOPHER_FETCH_NEW_DISPLAY(GPIT_BOOKMARK);
+	    	@call self::MSG_GOPHER_PARSE_ITEM
+			((byte *)"", (dword)0, GOPHER_BOOKMARK_FILENAME, TRUE);
+
+	    	/* replace the old options with the new ones */
+	    	GCRemoveOptions();
+	    	GCAddOptions(@GClientOpen, @GClientTools,
+			     @GClientNoMenu, @GClientEnd);
+	    } else {
+		if (!(GopherCacheFileFound(element->GCHLE_fileID, oself))) {
+		    /* no cached file found */
+		    char *request, *hostname;
+
+		    request = LMemDerefHandles(infoBlock,
+				element->GCHLE_item.GI_selectorString);
+		    hostname = LMemDerefHandles(infoBlock,
+				element->GCHLE_item.GI_hostname);
+		
+		    /* 
+		     * send a request to the server and again wait for 
+		     * response.
+		     */
+		    @call self::MSG_GOPHER_SEND_REQUEST
+			(request, hostname, element->GCHLE_item.GI_portNumber);
+
+		    /* we don't want to update the history list */
+		    @call self::MSG_GC_SET_UPDATE_HLIST(FALSE);
+
+		    /* clear previous menu item materials */
+		    @call self::MSG_GOPHER_FETCH_NEW_DISPLAY
+			(element->GCHLE_item.GI_type);
+
+		    /* update the most current referenced element chunk */
+		    @call self::MSG_GC_SET_HLIST_ELEMENT_CHUNK(chunk);
+	        } else {
+		    /* cached file found */
+	            file = GopherCacheFileSetUp(
+				(char *)element->GCHLE_filename,
+				&fileSize,
+				(FILE_ACCESS_R | FILE_DENY_W));
+	    	    @call self::MSG_GOPHER_FETCH_NEW_DISPLAY
+					(element->GCHLE_item.GI_type);
+ 	    	    EC_ERROR_IF((fileSize == 0), 0);
+
+	    	    /* transfer the content of the file into a buffer */
+	    	    tmpBlock = GopherAllocBlockWithLock(fileSize);
+	    	    EC_ERROR_IF((tmpBlock == NullHandle), 0);
+	    	    buffer = MemDeref(tmpBlock);
+	
+	    	    if (FileRead(file, buffer, fileSize, TRUE) == -1) {
+	            	/* error on fileread */
+	            	MemFree(tmpBlock);
+		    	MemUnlock(infoBlock);
+		    	MemFree(data);
+	            	return;
+	    	    }
+
+	    	    @call self::MSG_GOPHER_PARSE_ITEM(buffer, fileSize, 
+				element->GCHLE_filename, TRUE);
+	    	    MemFree(tmpBlock);
+	    	
+		    if (!GopherCacheFileEnd(file)) {
+	    	        /* some error occurred in file close */
+		        MemUnlock(infoBlock);
+		        MemFree(data);
+	    	        return;
+	            }
+	    	}
+
+	    	/* replace the old options with the new ones */
+	    	GCRemoveOptions();
+	    	GCAddOptions(@GClientOpen, @GClientSaveToBookmark,
+		 	     @GClientBookmark, @GClientEnd);
+	    }
+    	    /* display the stuff */
+    	    @call self::MSG_GOPHER_DISPLAY();
+	} else {
+	    /* we want to free the chunk since this is a deleted entry */
+	    LMemFreeHandles(infoBlock, chunk);
+	}
+
+    	MemUnlock(infoBlock);
+	MemFree(data);
+}	/* End of MSG_META_NOTIFY_WITH_DATA_BLOCK.	*/
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

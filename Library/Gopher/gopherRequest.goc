@@ -1,0 +1,263 @@
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+	Copyright (c) Geoworks 1994 -- All Rights Reserved
+
+PROJECT:	Gopher Library
+MODULE:		REQUEST
+FILE:		gopherRequest.goc
+
+AUTHOR:		Alvin Cham, Oct 17, 1994
+
+ROUTINES:
+	Name			Description
+	----			-----------
+
+	GopherConstructNormalRequest
+				- construct a normal client request
+
+	GopherConstructGetAttrInfoRequest
+				- construct a request for displaying gopher+
+				info
+
+	GopherConstructGopherPlusRequest
+				- construct a gopher plus request
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	AC	10/17/94   	Initial version.
+
+DESCRIPTION:
+	Procedures dealing with constructing client requests to the server.
+
+	$Id: gopherRequest.goc,v 1.1 97/04/04 18:04:55 newdeal Exp $
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+
+@include <gopherC.goh>
+
+@ifndef	__GOPHER_REQUEST_GOC
+@define __GOPHER_REQUEST_GOC
+
+
+/***********************************************************************
+ *		GopherConstructNormalRequest
+ ***********************************************************************
+ * SYNOPSIS:	Constructing a normal (old) gopher request
+ * CALLED BY:	MSG_GOPHER_CONSTRUCT_REQUEST
+ * RETURN:	none
+ * SIDE EFFECTS:none
+ *	
+ * STRATEGY:	(1)	Get the chunk array handle
+ *		(2)	extract the information based on "selection"
+ *		(3)	Build the request
+ *		(4)	Send it
+ *	
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	AC	10/17/94   	Initial Revision
+ *
+ ***********************************************************************/
+void
+GopherConstructNormalRequest (word selection, optr gopherObj)
+{
+	MemHandle infoBlock;
+	ChunkHandle	array;	/* the chunk array */
+	GopherItem *elementAddr;/* pointer to chunk array element */
+	word	elementSize;	
+	char	*request;	/* pointer to request */
+	char	*hostname;	/* pointer to the hostname */	
+
+	/* 
+	 * get the chunk array element, and obtain the info. from the element.
+	 * Request is simply the selector string, so things are a lot simpler,
+	 * there is no need for allocating other string for the request.
+	 */
+	infoBlock = @call gopherObj::MSG_GOPHER_GET_INFO_BLOCK();
+	array = @call gopherObj::MSG_GOPHER_GET_MENU_ITEM_ARRAY_CHUNK();
+	MemLock(infoBlock);
+	elementAddr = (GopherItem *)ChunkArrayElementToPtrHandles(infoBlock, 
+					array, selection, &elementSize);
+	request = LMemDerefHandles(infoBlock,
+					  elementAddr->GI_selectorString);
+	hostname = LMemDerefHandles(infoBlock,
+				    elementAddr->GI_hostname);
+
+	@call gopherObj::MSG_GOPHER_SEND_REQUEST
+		(request, hostname, elementAddr->GI_portNumber);
+
+	MemUnlock(infoBlock);
+}	/* End of GopherConstructNormalRequest.	*/
+
+
+/***********************************************************************
+ *		GopherConstructGetAttrInfoRequest
+ ***********************************************************************
+ * SYNOPSIS:	Constructing a gopher+ request that retrieve all attribute
+ *		fields of a gopher+ item.
+ * CALLED BY:	MSG_GOPHER_CONSTRUCT_REQUEST
+ * RETURN:	nothing
+ * SIDE EFFECTS:none
+ *	
+ * STRATEGY:	(1)	Get the chunk array handle
+ *		(2)	extract the information based on "selection"
+ *		(3)	Build the request
+ *		(4)	Send it
+ *	
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	AC	10/17/94   	Initial Revision
+ *
+ ***********************************************************************/
+void
+GopherConstructGetAttrInfoRequest (word selection, optr gopherObj)
+{
+	MemHandle	tmpBlock;	/* block to hold request */
+	GopherItem 	*elementAddr;	/* pointer to chunk array element */
+	MemHandle	infoBlock;
+	ChunkHandle	array;		/* the chunk array */
+	word	elementSize;	
+	word	strSize;	/* size of the request string */
+	char	*request;	/* pointer to request */
+	char	*hostname;	/* pointer to the hostname */	
+	char	*selectorString;/* pointer to the selector string */	
+	
+	/* 
+	 * get the chunk array element, create a block to hold the 
+	 * request buffer, and copy the selector string into request.
+	 */
+	infoBlock = @call gopherObj::MSG_GOPHER_GET_INFO_BLOCK(); 
+	array = @call gopherObj::MSG_GOPHER_GET_MENU_ITEM_ARRAY_CHUNK();
+	MemLock(infoBlock);
+	elementAddr = (GopherItem *)ChunkArrayElementToPtrHandles(infoBlock,
+					array, selection, &elementSize);
+	selectorString = LMemDerefHandles(infoBlock,
+					  elementAddr->GI_selectorString);
+	hostname = LMemDerefHandles(infoBlock,
+				    elementAddr->GI_hostname);
+	strSize = strlen(selectorString);
+
+	/* build the request */
+	tmpBlock = GopherAllocBlockWithLock(strSize+3);
+	EC_ERROR_IF((tmpBlock == NullHandle), 
+		    ERROR_NO_MEMORY_TO_ALLOC_TMP_BLOCK);
+	request = MemDeref(tmpBlock);
+	memcpy(request, selectorString, strSize);
+
+	/* some hard-coded stuff */
+	request[strSize] = C_TAB;
+	request[strSize+1] = '!';
+	request[strSize+2] = '\0';	/* null-terminate it */
+
+	@call gopherObj::MSG_GOPHER_SEND_REQUEST
+		(request, hostname, elementAddr->GI_portNumber);
+
+	MemFree(tmpBlock);
+	MemUnlock(infoBlock);
+}	/* End of GopherConstructGetAttrInfoRequest.	*/
+
+
+/***********************************************************************
+ *		GopherConstructGopherPlusRequest
+ ***********************************************************************
+ * SYNOPSIS:	Constructing a gopher+ request.
+ * CALLED BY:	MSG_GOPHER_CONSTRUCT_REQUEST
+ * RETURN:	none
+ * SIDE EFFECTS:none
+ *	
+ * STRATEGY:	(1)	Get the chunk array handle
+ *		(2)	extract the selector string based on "itemSelection"
+ *		(3)	Get the View chunk array handle
+ *		(4)	extract the information based on "viewSelection"
+ *		(3)	Build the request
+ *		(4)	Send it
+ *		(5)	Update GI_curMenuType according to the item's type
+ *
+ *	Need to handle datablock later
+ *	
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	AC	10/17/94   	Initial Revision
+ *
+ ***********************************************************************/
+void
+GopherConstructGopherPlusRequest 
+(word itemSelection, word viewSelection, optr gopherObj)
+{
+	MemHandle	tmpBlock;	/* block to hold request */
+	GopherItem 	*itemElementAddr;/* pointer to chunk array element */
+	GopherPlusItemAttrView *viewElementAddr;
+	MemHandle	infoBlock;
+	ChunkHandle	itemArray;	/* the item chunk array */
+	word	elementSize;	
+	word	itemStrSize;	/* size of the selector string */
+	word	viewStrSize;	/* size of the representation string */
+	char	*request;	/* pointer to request */
+	char	*hostname;	/* pointer to the hostname */	
+	char	*selectorString;/* pointer to the selector string */	
+	char	*viewString;	/* pointer to view string */
+	ChunkHandle	viewChunk;	
+	GopherParseItemType	type;	
+
+	/* get the item chunk array element */
+	infoBlock = @call gopherObj::MSG_GOPHER_GET_INFO_BLOCK();
+	itemArray = @call gopherObj::MSG_GOPHER_GET_MENU_ITEM_ARRAY_CHUNK();
+	MemLock(infoBlock);
+	itemElementAddr = (GopherItem *)ChunkArrayElementToPtrHandles
+				(infoBlock, itemArray, itemSelection, 
+				 &elementSize);
+	selectorString = LMemDerefHandles(infoBlock,
+					  itemElementAddr->GI_selectorString);
+	hostname = LMemDerefHandles(infoBlock,
+				    itemElementAddr->GI_hostname);
+	type = itemElementAddr->GI_type;
+	itemStrSize = strlen(selectorString);
+
+	/* get the view chunk array element */
+	viewChunk = @call gopherObj::MSG_GOPHER_PLUS_GET_VIEW_CHUNK();
+	viewElementAddr = (GopherPlusItemAttrView *)
+		ChunkArrayElementToPtrHandles(infoBlock, viewChunk, 
+			viewSelection, &elementSize);
+	viewString = LMemDerefHandles(infoBlock,
+				      (ChunkHandle) *viewElementAddr);
+	viewStrSize = GopherFindTokenLength((byte *)viewString);
+
+	/* allocate a block to hold the request */
+	elementSize = itemStrSize + viewStrSize;
+	tmpBlock = GopherAllocBlockWithLock(elementSize+3);
+	EC_ERROR_IF((tmpBlock == NullHandle), 
+		    ERROR_NO_MEMORY_TO_ALLOC_TMP_BLOCK);
+	request = MemDeref(tmpBlock);
+	memcpy(request, selectorString, itemStrSize);
+	
+	/* some hard-coded stuff */
+	request[itemStrSize] = C_TAB;
+	request[itemStrSize+1] = '+';
+
+	memcpy(&request[itemStrSize+2], viewString, viewStrSize);
+	request[elementSize] = '\0';	/* null-terminate it */
+
+	@call gopherObj::MSG_GOPHER_SEND_REQUEST
+		(request, hostname, itemElementAddr->GI_portNumber);
+
+	/* update the type */
+	@call gopherObj::MSG_GOPHER_SET_CUR_MENU_TYPE(type);
+
+	/* clean up */
+	MemFree(tmpBlock);
+	MemUnlock(infoBlock);
+
+}	/* End of GopherConstructGopherPlusRequest.	*/
+
+@endif /* __GOPHER_REQUEST_GOC */
+
+
+
+
+
+
+
+
