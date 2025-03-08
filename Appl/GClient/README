@@ -1,0 +1,191 @@
+/***********************************************************************
+ *
+ *	Copyright (c) Geoworks 1991-92 -- All Rights Reserved
+ *
+ * PROJECT:	  Sample Gopher Client
+ * MODULE:	  Documentation
+ * FILE:	  README
+ *
+ * AUTHOR:	  Alvin Cham, Dec. 5, 1994
+ *
+ * REVISION HISTORY:
+ *	Date	  Name	    Description
+ *	----	  ----	    -----------
+ *	12/5/94   acham	    Initial version
+ *
+ * DESCRIPTION:
+ *	Documentation to a sample gopher client application that utilizes
+ *	the gopher library.
+ *
+ *	$Id: README,v 1.1.4.1 97/03/29 10:55:13 canavese Exp $
+ *
+ ***********************************************************************/
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+The Gopher Client
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+Contents:
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+Contents
+Synopsis
+Notes
+Class hierarchy
+Data structures
+Tasks + features
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+Synopsis:
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+This sample gopher client application provides an example of how to use the
+gopher library.  In additional to using this library, it also shows how to
+include additional features (bookmark + history list features) that are not
+included in the gopher library.  The application basically includes the
+primitives features of what a gopher client needs to handle.
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+Misc. notes
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+(1)  DO NOT launch the application itself, if using the socket channel for
+communication.  To launch this application, make sure that the gopher server
+application is already running, and launch this client application from there.
+Please refer to the gopher server application documentation for details on 
+how to launch the client.
+
+(2)  To switch the communication channel:
+
+	(a) In file gclient.h:
+		-- comment out the corresponding strategy
+	(b) In file gClientC.goh: 
+		-- comment out the corresponding superclass
+		   for GClientClass 
+
+(3)  Compile the application on the trunk, not the branch because some of
+of the socket stuff has yet been updated there.
+
+(4)  My Advice: you'll find that the serial version is very unstable, due
+to the unstable environment provided by the serial driver.  Don't use it.
+Stick with the sockets, and you'll be a lot happier.
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+Class hierarchy:
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+GClientClass -- It is a subclass of a class defined in the gopher library
+(GopherSocketClass)  This class inherits all of the build-in attributes 
+provided by the gopher library, plus certain application-specific (history
+list, bookmarks) features which are defined in this class itself.  
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+Data structures (instance data)
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+	-sword			GCI_selection
+	This value is to store the current selection of the gopher item menu.
+	This information can provide the information of which element from
+	the menu item array to retrieve.
+
+	-Boolean		GCI_justConnected
+	This flag is set when we've just connected to the server, and unset
+	afterwards.  We need a way to distinguish the first client request
+	(to connect to the server) from any consequent client request, 
+	because we need to handle things quite differently (i.e.  we don't
+	have any information about the item we're retrieving.)
+
+	-ChunkHandle		GCI_hListElementChunk
+	This is the chunk that the history list is accessing.  This needs 
+	to be updated whenever we change the access entry of the history list.
+	This chunk has the type 'GCHistoryListElement' and stores the 
+	following information:
+
+		-FileLongName	GCHLE_filename
+		a string to store the filename, so that we can retrieve the
+		filename of a possible existing cache file when we hunt around
+		the history list.
+
+		-GopherItem	GCHLE_item 	
+		the information of the entry (selector string, port number,
+		hostname, etc.)  Just in case there is no cache file found,
+		we can send a request to the server to re-fetch the item.
+
+		-word		GCHLE_fileID
+		the file ID for the cache file.  This is to check whether
+		we have found a cache file for the item.
+
+	-Boolean	GCI_updateHList
+	a boolean flag to determine whether we should update the history 
+	list after fetching a file.  In most cases, we do, but when we 
+	stroll backward on the history list, we don't really want to update
+	the history list, since the entry is already there.	
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+Tasks + features
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+(1)  Using the navigate controller library, the application supports the 
+history list feature.  The following methods/procedures, in addition to the 
+controller, completes the implementation of the history list.
+
+-MSG_GC_UPDATE_HISTORY_LIST 	- provides the interface with the navigate
+				controller library
+
+
+-MSG_GC_SET_HLIST_ELEMENT_CHUNK	 
+-MSG_GC_GET_HLIST_ELEMENT_CHUNK	- provides access to the current history
+				list entry
+
+-MSG_GC_SET_UPDATE_HLIST
+-MSG_GC_GET_UPDATE_HLIST	- determines when we should update the list
+
+GCUpdateHistElementItemInfo
+GCUpdateHistElementFileNameInfo
+GCUpdateHistElementFileIDInfo
+GCAllocHistElementChunk		- handles operations of the history element
+				chunk
+
+(2) The application provides a bookmark display for the client.  The
+bookmark information is stored in a permanent cache file.  The methods/
+procedures that supports this feature include:
+
+-MSG_GC_ADD_BOOKMARK_ENTRY
+-MSG_GC_REMOVE_BOOKMARK_ENTRY
+-MSG_GC_DISPLAY_BOOKMARK_ITEMS
+
+(3) Connection tools to allow the user to change the attribute fields of a
+gopher item.  The utility procedures that handle this include:
+
+-GCDisplayAttributesToTextObj
+-GCExtractItemType
+-GCExtractAttribute
+-GCFillConTextObjWithDefaults
+-GCCreateNewConnectionItem
+-GCBuildItemFromParameters
+-GCBuildItemType
+-GCBuildItemAttribute
+-GCBuildGopherPlus
+-GCEditConnectionItem
+
+(4) Translates user commands into gopher client language.  The following
+messages handle this:
+
+-MSG_GC_OPEN_CONNECTION
+-MSG_GC_FETCH_NEXT_MENU
+-MSG_GC_CONNECTION_TOOLS
+-MSG_GC_EDIT_CONNECTION
+-MSG_GC_EDIT_CHANGE
+-MSG_GC_OK_CHANGE
+-MSG_GC_EDIT_CLOSE
+-MSG_GC_CREATE_CONNECTION
+-MSG_GC_DELETE_CONNECTION
+-MSG_GC_OK_DELETE_CONNECTION
+-MSG_GC_CANCEL_DELETE_CONNECTION
+-MSG_GC_CLOSE_CONNECTION
+-MSG_GC_END_CONNECTION
+
+
+
+
