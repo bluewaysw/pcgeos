@@ -274,6 +274,9 @@ Installed/Library/GrObj:	ui text bitmap ruler spline color \
 hash	: Installed/Library/Hash
 Installed/Library/Hash:	kernel MAKELIB
 
+pnglib	: Installed/Library/PngLib
+Installed/Library/PngLib:	ansic zlib MAKELIB
+
 impex	: Installed/Library/Impex
 Installed/Library/Impex: 	ui MAKELIB
 
@@ -1364,7 +1367,7 @@ Installed/Appl/Breadbox/BbxBrow:	ui ansic text spool \
 					impgraph impdoc \
 					modem \
 					ibms parentc wav mailhub socket \
-					js netutils cookies idialc \
+					netutils cookies idialc \
 					ppp  tcpip hsttcpip MAKEAPPL
 
 # sorry, executing CLEAN in the global makefile is not only bad style, it forces
@@ -1391,9 +1394,6 @@ Installed/Library/Breadbox/Html4Par:	kernel ui ansic text extgraph MAKELIB
 
 profpnt		: Installed/Library/ProfPnt
 Installed/Library/ProfPnt:		ansic MAKELIB
-
-js              : Installed/Library/JS
-Installed/Library/JS:		ansic math borlandc mapheap profpnt MAKELIB
 
 ibms    : Installed/Library/Breadbox/Ibms
 Installed/Library/Breadbox/Ibms:	ansic MAKELIB
@@ -1423,7 +1423,7 @@ Installed/Library/SSL:				ansic socket mapheap hostif MAKELIB
 
 # product-specific dependency on fjpeg
 impgraph	: Installed/Library/Breadbox/ImpGraph
-Installed/Library/Breadbox/ImpGraph:		ansic ijgjpeg fjpeg MAKELIB
+Installed/Library/Breadbox/ImpGraph:		ansic ijgjpeg pnglib fjpeg MAKELIB
 
 ijgjpeg	: 	Installed/Library/Breadbox/Ijgjpeg
 Installed/Library/Breadbox/Ijgjpeg:		ui ansic MAKELIB
@@ -1565,7 +1565,7 @@ Installed/Appl/Breadbox/BBGrmt:			ui ansic spool text MAKEAPPL
 #Installed/Appl/Breadbox/Geocon3:		ui ansic color MAKEAPPL
 
 graphvwr : Installed/Appl/Breadbox/Graphvwr
-Installed/Appl/Breadbox/Graphvwr:	ui ansic extui giflib thumbdb ijgjpeg \
+Installed/Appl/Breadbox/Graphvwr:	ui ansic extui giflib thumbdb ijgjpeg pnglib \
 					MAKEAPPL
 
 macror	: Installed/Appl/Breadbox/MacroR

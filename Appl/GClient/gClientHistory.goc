@@ -1,0 +1,177 @@
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+	Copyright (c) Geoworks 1994 -- All Rights Reserved
+
+PROJECT:	Gopher Client
+MODULE:		History List
+FILE:		gClientHistory.goc
+
+AUTHOR:		Alvin Cham, Oct 30, 1994
+
+ROUTINES:
+	Name			Description
+	----			-----------
+
+	GCUpdateHistElementItemInfo
+				- update the 'item' field of a history
+				element information
+
+	GCUpdateHistElementFileNameInfo
+				- update the 'filename' field of a history
+				element information
+
+	GCUpdateHistElementFileIDInfo
+				- update the 'fileID' field of a history
+				element information
+
+	GCAllocHistElementChunk
+				- allocate a history element chunk
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	AC	10/30/94   	Initial version.
+
+DESCRIPTION:
+	This file contains procedures that handles the operations of the
+	history list.
+
+	$Id: gClientHistory.goc,v 1.1 97/04/04 15:10:11 newdeal Exp $
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+
+@include "gClientC.goh"
+
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		Procedures
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+
+
+/***********************************************************************
+ *		GCUpdateHistElementItemInfo
+ ***********************************************************************
+ * SYNOPSIS:	Update the information of the gopher item that is currently
+ *		being selected into the history list
+ * CALLED BY:	UTILITY -- MSG_GC_FETCH_NEXT_MENU
+ *			-- MSG_GC_OPEN_CONNECTION
+ * RETURN:	none
+ * SIDE EFFECTS:none
+ *	
+ * STRATEGY:
+ *	
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	AC	11/ 2/94   	Initial Revision
+ *
+ ***********************************************************************/
+void
+GCUpdateHistElementItemInfo 
+(GopherItem *item, word selection, optr gopherObj)
+{
+	MemHandle infoBlock;
+	ChunkHandle array;
+	GopherItem gopherItem;
+
+	/* 
+	 * get the chunk that stores the gopher item and copy that information
+	 * into the history array chunk.
+	 */
+	infoBlock = @call gopherObj::MSG_GOPHER_GET_INFO_BLOCK();
+	array = @call gopherObj::MSG_GOPHER_GET_MENU_ITEM_ARRAY_CHUNK();
+	MemLock(infoBlock);
+	ChunkArrayGetElementHandles(infoBlock, 
+				    array, 
+				    selection, 
+				    (void *) &gopherItem);
+	memcpy(item, &gopherItem, sizeof(GopherItem));
+	MemUnlock(infoBlock);
+
+}	/* End of GCUpdateHistElementItemInfo.	*/
+
+
+/***********************************************************************
+ *		GCUpdateHistElementFileNameInfo
+ ***********************************************************************
+ * SYNOPSIS:	Update the information of the cached file that is currently
+ *		being selected into the history list
+ * CALLED BY:	UTILITY -- MSG_GC_FETCH_NEXT_MENU
+ *			-- MSG_GC_OPEN_CONNECTION
+ * RETURN:	none
+ * SIDE EFFECTS:none
+ *	
+ * STRATEGY:	(1)  copy the filename into the filename field of the
+ *		element structure.
+ *	
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	AC	11/ 2/94   	Initial Revision
+ *
+ ***********************************************************************/
+void
+GCUpdateHistElementFileNameInfo 
+(FileLongName name, const char* filename)
+{
+	word fileNameLength;
+
+	/* update the filename field for the element */
+	fileNameLength = strlen(filename);
+
+	/* the length of the file name better be shorter than the maximum */
+	EC_ERROR_IF((sizeof(FileLongName) < fileNameLength), 0); 
+
+	strcpy(name, filename);
+}	/* End of GCUpdateHistElementFileNameInfo.	*/
+
+
+/***********************************************************************
+ *		GCUpdateHistElementFileIDInfo
+ ***********************************************************************
+ * SYNOPSIS:	Update the information of the cached file that is currently
+ *		being selected into the history list
+ * CALLED BY:	UTILITY
+ * RETURN:	none
+ * SIDE EFFECTS:none
+ *	
+ * STRATEGY:	(1)  Copy the appropriate file ID to the element field
+ *	
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	AC	1/10/95   	Initial Revision
+ *
+ ***********************************************************************/
+void
+GCUpdateHistElementFileIDInfo (word *fileID, optr gopherObj)
+{
+	word id;
+
+	id = @call gopherObj::MSG_GOPHER_GET_CACHE_FILE_ID();
+	*fileID = id;
+}	/* End of GCUpdateHistElementFileIDInfo.	*/
+
+
+/***********************************************************************
+ *		GCAllocHistElementChunk
+ ***********************************************************************
+ * SYNOPSIS:	Allocating an history element 	
+ * CALLED BY:	UTILITY
+ * RETURN:	the newChunk storing the history element.
+ * SIDE EFFECTS:
+ *	Pre-condition: "infoBlock" should already have been locked
+ *	
+ * STRATEGY:	
+ *	
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	AC	12/22/94   	Initial Revision
+ *
+ ***********************************************************************/
+ChunkHandle
+GCAllocHistElementChunk (MemHandle infoBlock)
+{
+	return (LMemAlloc(infoBlock, sizeof(GCHistoryListElement)));
+}	/* End of GCAllocHistElementChunk.	*/
+

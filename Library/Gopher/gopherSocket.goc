@@ -1,0 +1,629 @@
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+	Copyright (c) Geoworks 1994 -- All Rights Reserved
+
+PROJECT:	Gopher Client
+MODULE:		GopherSocketClass code
+FILE:		gopherSocket.goc
+
+AUTHOR:		Alvin Cham, Nov 29, 1994
+
+ROUTINES:
+	Name			Description
+	----			-----------
+
+	for GopherSocketClass:
+	----------------------
+
+	MSG_GOPHER_INITIALIZE
+				- initialize the states of the gopher object
+
+	MSG_GOPHER_SHUT_DOWN
+				- perform the necessary clean-up of the gopher
+				object
+
+	MSG_GOPHER_RECV_DATA
+				- receives data from the incoming socket
+
+	MSG_GOPHER_SEND_REQUEST
+				- send data over the socket to the server
+
+	MSG_GOPHER_SOCKET_SET_DATA_SOCKET
+				- set the value for the data socket
+
+	MSG_GOPHER_SOCKET_GET_DATA_SOCKET
+				- get the value for the data socket
+
+	MSG_GOPHER_SOCKET_SET_LISTEN_SOCKET
+				- set the value for the listen socket
+
+	MSG_GOPHER_SOCKET_GET_LISTEN_SOCKET
+				- get the value for the listen socket
+
+	MSG_GOPHER_SOCKET_SET_THREAD_HANDLE
+				- set the value for the thread handle
+
+	MSG_GOPHER_SOCKET_GET_THREAD_HANDLE
+				- get the value for the thread handle
+
+	MSG_GOPHER_CHANNEL_SET_UP
+				- set up the socket channel
+
+	MSG_GOPHER_CHANNEL_TEAR_DOWN
+				- tear down the channel
+
+	for GopherSocketThreadClass:
+	----------------------------
+
+	MSG_GOPHER_SOCKET_THREAD_LISTEN
+				- listen for connection
+
+	MSG_GOPHER_SOCKET_THREAD_RECV
+				- start the receive loop 
+	
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	AC	11/29/94   	Initial version.
+
+DESCRIPTION:
+	This file contains the messages and functions for the 
+	GopherSocketClass
+
+	$Id: gopherSocket.goc,v 1.1 97/04/04 18:04:59 newdeal Exp $
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+
+#define __GOPHER_SOCKET_CODE
+
+@include <stdapp.goh>
+@include <gopherSocketC.goh>
+
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+	Testing strategy
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+
+#ifndef TEST_IRLAP
+#define TEST_IRLAP 0
+#endif
+
+#ifndef TEST_TCPIP
+#define TEST_TCPIP 0
+#endif
+
+#if  ! ( TEST_IRLAP || TEST_TCPIP )
+#define TEST_LOOPBACK 1
+#endif
+
+#ifndef TEST_LOOPBACK
+#define TEST_LOOPBACK 0
+#endif
+
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		Class declarations
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+@classdecl	GopherSocketClass;
+@classdecl	GopherSocketThreadClass;
+
+
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		Localizable Constants
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+
+@start	GopherSocketConstantData, data;
+
+@chunk	GopherSocketAddress theAddress = 
+	{
+		{
+			{3,MANUFACTURER_ID_SOCKET_16BIT_PORT},
+			#if TEST_TCPIP
+				(sizeof TCP_DOMAIN - 1),
+				TCP_DOMAIN,
+				4
+			#elif TEST_IRLAP
+				(sizeof IRLAP_DOMAIN - 1),
+				IRLAP_DOMAIN,
+        			5
+			#elif TEST_LOOPBACK
+				(sizeof LOOPBACK_DOMAIN - 1),
+				LOOPBACK_DOMAIN,
+        			5
+			#endif
+    		},
+
+		#if TEST_TCPIP
+		    	{198,211,209,150,0}
+		#elif TEST_IRLAP
+    			{'l','e','f','t',0}
+		#elif TEST_LOOPBACK
+    			{'n','o','n','e',0}
+		#endif
+	};
+
+@end	GopherSocketConstantData;
+
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		Methods and procedures
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+
+
+/***********************************************************************
+ *		MSG_GOPHER_INITIALIZE for GopherSocketClass
+ ***********************************************************************
+ * SYNOPSIS:	Initialize the socket connections.    
+ * PARAMETERS:	none    
+ * SIDE EFFECTS:none    
+ *
+ * STRATEGY:	(1)  Create an extra thread for receiving data.
+ *		(2)  Set up the channel
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	AC	12/ 2/94   	Initial Revision
+ *
+ ***********************************************************************/
+@method GopherSocketClass, MSG_GOPHER_INITIALIZE
+{
+	@callsuper();
+
+	@call self::MSG_GOPHER_CHANNEL_SET_UP();
+
+}	/* End of MSG_GOPHER_INITIALIZE.	*/
+
+
+/***********************************************************************
+ *		MSG_GOPHER_SHUT_DOWN for GopherSocketClass
+ ***********************************************************************
+ * SYNOPSIS:	Perform all application shutdown duties.    
+ * PARAMETERS:	none    
+ * SIDE EFFECTS:none    
+ *
+ * STRATEGY:    (1)  Tear down the socket channel.
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	AC	12/ 2/94   	Initial Revision
+ *
+ ***********************************************************************/
+@method GopherSocketClass, MSG_GOPHER_SHUT_DOWN
+{
+	ThreadHandle thread = pself->GSI_thread;
+
+	/* let its superclass do its stuff */
+	@callsuper();
+
+	/* Shutdown the communication channel */
+	@call self::MSG_GOPHER_CHANNEL_TEAR_DOWN();
+
+	@send thread, NullChunk::MSG_META_DETACH(0, NullOptr);
+
+}	/* End of MSG_GOPHER_SHUT_DOWN.	*/
+
+
+/***********************************************************************
+ *		MSG_GOPHER_RECV_DATA for GopherSocketClass
+ ***********************************************************************
+ * SYNOPSIS:	Receiving in the text from the communication channel and
+ *		store it into the buffer, that leads to parsing the buffer.    
+ * PARAMETERS:	byte *data    
+ *		word bytesRead
+ * SIDE EFFECTS:none    
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	AC	12/15/94   	Initial Revision
+ *
+ ***********************************************************************/
+@method GopherSocketClass, MSG_GOPHER_RECV_DATA
+{
+	word		pos, totalLength, lengthSoFar;
+	Boolean		eof;
+	FileHandle	file;
+	char		tmpFileName[GOPHER_TMP_FILENAME_TEMPLATE_LENGTH];
+	byte		*readBufPtr;
+	ChunkHandle 	cachedFileChunk;
+	char		*cachedFileName;
+	MemHandle	infoBlock = pself->GI_infoBlock;
+
+	eof = @call self::MSG_GOPHER_GET_EOF();
+	if (eof) {
+	    @call self::MSG_GOPHER_SET_EOF(FALSE);
+
+	    strncpy(tmpFileName, 
+		    GOPHER_TMP_FILENAME_TEMPLATE,
+		    GOPHER_TMP_FILENAME_TEMPLATE_LENGTH);
+
+	    FilePushDir();
+	    FileSetStandardPath(SP_PRIVATE_DATA);
+	    file = FileCreateTempFile(tmpFileName,
+				      ((FILE_CREATE_TRUNCATE) |
+				       (FILE_ACCESS_RW | FILE_DENY_RW)),
+				      FILE_ATTR_NORMAL);
+	    GopherUpdateCacheFileArray(tmpFileName, oself);
+	    FileClose(file, TRUE);			
+	    @call self::MSG_GOPHER_SET_CUR_CACHE_FILE_NAME(tmpFileName);
+	    FilePopDir();
+	}
+
+	GopherLineFeedToEnter(data, bytesRead);
+
+	/* 
+	 * keep the total length of the useful contents, we'll re-allocate 
+	 * the chunk size of the buffer to store the size of the content, 
+	 * and then we'll parse an item and returns the number of bytes 
+	 * that have been parsed,we keep on doing it until we can't parse 
+	 * anymore items, then we need to shift the contents by the number
+	 * of bytes parsed, so that we can update the position at where 
+	 * to append more bytes next time when we read in more bytes 
+	 * from the serial line. 
+	 */
+
+	pos = @call self::MSG_GOPHER_GET_DATA_BUFFER_POS();
+	totalLength = bytesRead + pos;
+
+	MemLock(infoBlock);
+	pself = ObjDeref(oself, 0);
+    	if (LMemReAllocHandles(infoBlock,
+			       pself->GI_dataBuffer,
+		    	       totalLength)) {
+	    /* can't re-alloc more space */
+	    MemUnlock(infoBlock);
+	    return;
+	}	
+	pself = ObjDeref(oself, 0);
+	readBufPtr = LMemDerefHandles(infoBlock, pself->GI_dataBuffer);
+
+    	/* append the new stuff to the end of the chunk */
+	memcpy(&readBufPtr[pos], data, bytesRead);
+	
+	/* get the cached file name */
+	cachedFileChunk = @call self::
+				MSG_GOPHER_GET_CUR_CACHE_FILE_NAME_CHUNK();
+	cachedFileName = LMemDerefHandles(infoBlock, cachedFileChunk);
+
+	/* length of parsed bytes */
+	for (lengthSoFar = 0; lengthSoFar < totalLength;) {
+	    pos = @call self::MSG_GOPHER_PARSE_ITEM
+			(&readBufPtr[lengthSoFar], 
+			 (dword)totalLength-lengthSoFar,
+			 cachedFileName,
+			 FALSE);
+	    if (!pos) {
+		break;
+	    }
+	    lengthSoFar += pos;
+
+	    /* can't parse more than what we have */
+	    EC_ERROR_IF((lengthSoFar > totalLength), 0);
+	}
+    	
+	if (lengthSoFar) {
+	    GopherShiftBufferContent(readBufPtr, 
+				     lengthSoFar, 
+				     totalLength-lengthSoFar);
+	}
+
+        /* re-set our position for next time */
+	@call self::MSG_GOPHER_SET_DATA_BUFFER_POS
+			(totalLength-lengthSoFar);
+	MemUnlock(infoBlock);	
+}	/* End of MSG_GOPHER_RECV_DATA.	*/
+
+
+/***********************************************************************
+ *		MSG_GOPHER_SEND_REQUEST for GopherSocketClass
+ ***********************************************************************
+ * SYNOPSIS:	Send a request to the server.    
+ * PARAMETERS:	char *request, char* hostname, word port.    
+ * SIDE EFFECTS:none    
+ *
+ * STRATEGY:	(1) Append a newLine character at the end of a request.
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	AC	12/21/94   	Initial Revision
+ *
+ ***********************************************************************/
+@method GopherSocketClass, MSG_GOPHER_SEND_REQUEST
+{
+/* ---------------------------------------------------------------------
+ * NOTE:  One may need to include the hostname and the port number into
+ * 	  the address once we use TCPIP instead of Loopback to test the
+ * 	  client.
+ * ---------------------------------------------------------------------
+ */
+	word length = strlen(request);	
+	byte *string;
+	MemHandle tmpBlock;
+
+	tmpBlock = GopherAllocBlockWithLock(strlen(request)+1);
+	string = MemDeref(tmpBlock);
+
+	strncpy((char *)string, request, length);
+	string[length] = C_ENTER;
+
+	if (SocketSend(pself->GSI_dataSocket,
+		       string,
+		       length+1,
+		       0,
+		       (SocketAddress *) 0)) {
+	    FatalError(0);
+	}
+
+	MemFree(tmpBlock);
+
+}	/* End of MSG_GOPHER_SEND_REQUEST.	*/
+
+
+
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		Get's and Set's methods
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+
+
+/***********************************************************************
+ *		MSG_GOPHER_SOCKET_SET_DATA_SOCKET for GopherSocketClass
+ ***********************************************************************
+ * SYNOPSIS:	    
+ * PARAMETERS:	    
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	AC	12/15/94   	Initial Revision
+ *
+ ***********************************************************************/
+@method GopherSocketClass, MSG_GOPHER_SOCKET_SET_DATA_SOCKET
+{
+	pself->GSI_dataSocket = socket;
+}	/* End of MSG_GOPHER_SOCKET_SET_DATA_SOCKET.	*/
+
+
+/***********************************************************************
+ *		MSG_GOPHER_SOCKET_GET_DATA_SOCKET for GopherSocketClass
+ ***********************************************************************
+ * SYNOPSIS:	    
+ * PARAMETERS:	    
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	AC	12/15/94   	Initial Revision
+ *
+ ***********************************************************************/
+@method GopherSocketClass, MSG_GOPHER_SOCKET_GET_DATA_SOCKET
+{
+	return pself->GSI_dataSocket;
+}	/* End of MSG_GOPHER_SOCKET_GET_DATA_SOCKET.	*/
+
+
+/***********************************************************************
+ *		MSG_GOPHER_SOCKET_SET_LISTEN_SOCKET for GopherSocketClass
+ ***********************************************************************
+ * SYNOPSIS:	    
+ * PARAMETERS:	    
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	AC	12/15/94   	Initial Revision
+ *
+ ***********************************************************************/
+@method GopherSocketClass, MSG_GOPHER_SOCKET_SET_LISTEN_SOCKET
+{
+	pself->GSI_listenSocket = socket;
+}	/* End of MSG_GOPHER_SOCKET_SET_LISTEN_SOCKET.	*/
+
+
+/***********************************************************************
+ *		MSG_GOPHER_SOCKET_GET_LISTEN_SOCKET for GopherSocketClass
+ ***********************************************************************
+ * SYNOPSIS:	    
+ * PARAMETERS:	    
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	AC	12/15/94   	Initial Revision
+ *
+ ***********************************************************************/
+@method GopherSocketClass, MSG_GOPHER_SOCKET_GET_LISTEN_SOCKET
+{
+	return pself->GSI_listenSocket;
+}	/* End of MSG_GOPHER_SOCKET_GET_LISTEN_SOCKET.	*/
+
+
+/***********************************************************************
+ *		MSG_GOPHER_SOCKET_SET_THREAD_HANDLE for GopherSocketClass
+ ***********************************************************************
+ * SYNOPSIS:	Set the thread handle for the extra thread.    
+ * PARAMETERS:	Handle newThread    
+ * SIDE EFFECTS:none    
+ *
+ * STRATEGY:	none
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	AC	12/ 2/94   	Initial Revision
+ *
+ ***********************************************************************/
+@method GopherSocketClass, MSG_GOPHER_SOCKET_SET_THREAD_HANDLE
+{
+	pself->GSI_thread = newThread;
+}	/* End of MSG_GOPHER_SOCKET_SET_THREAD_HANDLE.	*/
+
+
+/***********************************************************************
+ *		MSG_GOPHER_SOCKET_GET_THREAD_HANDLE for GopherSocketClass
+ ***********************************************************************
+ * SYNOPSIS:	Get the thread handle for the extra thread.    
+ * PARAMETERS:	none    
+ * SIDE EFFECTS:none    
+ *
+ * STRATEGY:	none
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	AC	12/ 2/94   	Initial Revision
+ *
+ ***********************************************************************/
+@method GopherSocketClass, MSG_GOPHER_SOCKET_GET_THREAD_HANDLE
+{
+	return pself->GSI_thread;
+}	/* End of MSG_GOPHER_SOCKET_GET_THREAD_HANDLE.	*/
+
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		Communication methods
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+
+/***********************************************************************
+ *		MSG_GOPHER_CHANNEL_SET_UP for GopherSocketClass
+ ***********************************************************************
+ * SYNOPSIS:	Handles the setting up of socket(loopback) communication.    
+ * PARAMETERS:	none    
+ * SIDE EFFECTS:none    
+ *
+ * STRATEGY:	(1) Set up the socket communication
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	AC	12/ 2/94   	Initial Revision
+ *
+ ***********************************************************************/
+@method GopherSocketClass, MSG_GOPHER_CHANNEL_SET_UP
+{
+	ThreadHandle thread = pself->GSI_thread;
+
+	@call thread, NullChunk::MSG_GOPHER_SOCKET_THREAD_LISTEN(oself);
+
+	@send, forceQueue thread, NullChunk::MSG_GOPHER_SOCKET_THREAD_RECV
+		(oself);
+}	/* End of MSG_GOPHER_CHANNEL_SET_UP.	*/
+
+
+/***********************************************************************
+ *		MSG_GOPHER_CHANNEL_TEAR_DOWN for GopherSocketClass
+ ***********************************************************************
+ * SYNOPSIS:	Shut down the current socket communication channel.    
+ * PARAMETERS:	none    
+ * SIDE EFFECTS:none    
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	AC	12/ 3/94   	Initial Revision
+ *
+ ***********************************************************************/
+@method GopherSocketClass, MSG_GOPHER_CHANNEL_TEAR_DOWN
+{
+	if (pself->GSI_listenSocket) {
+	    SocketClose(pself->GSI_listenSocket);
+	}
+
+	SocketCloseSend(pself->GSI_dataSocket);
+}	/* End of MSG_GOPHER_CHANNEL_TEAR_DOWN.	*/
+
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		Methods
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+
+/***********************************************************************
+ *		MSG_GOPHER_SOCKET_THREAD_LISTEN for GopherSocketThreadClass
+ ***********************************************************************
+ * SYNOPSIS:	    
+ * PARAMETERS:	optr	gopherObj	    
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	AC	12/ 5/94   	Initial Revision
+ *
+ ***********************************************************************/
+@method GopherSocketThreadClass, MSG_GOPHER_SOCKET_THREAD_LISTEN
+{
+	Socket listenSocket, dataSocket;
+	GopherSocketAddress *address;
+
+	/* 
+	 * (1)  create a socket for listening 
+	 * (2)  bind it to the server port 
+	 * (3)  listen to it
+	 * (4)  wait for being accepted
+	 */
+	listenSocket = SocketCreate(SDT_STREAM);	
+	@send gopherObj::MSG_GOPHER_SOCKET_SET_LISTEN_SOCKET(listenSocket);
+	
+	MemLock(OptrToHandle(@theAddress));
+	address = LMemDerefHandles(OptrToHandle(@theAddress),
+				   OptrToChunk(@theAddress));
+	if (SocketBind(listenSocket, address->sa.SA_port, 0)) {
+	    FatalError(0);
+	} 
+	MemUnlock(OptrToHandle(@theAddress));
+	if (SocketListen(listenSocket, NUM_OF_PENDING_CONNECTIONS)) {
+	    FatalError(0);
+	}
+	dataSocket =  SocketAccept(listenSocket, SOCKET_NO_TIMEOUT);
+	@send gopherObj::MSG_GOPHER_SOCKET_SET_DATA_SOCKET(dataSocket);
+
+}	/* End of MSG_GOPHER_SOCKET_THREAD_LISTEN.	*/
+
+
+/***********************************************************************
+ *		MSG_GOPHER_SOCKET_THREAD_RECV for GopherSocketThreadClass
+ ***********************************************************************
+ * SYNOPSIS:	    
+ * PARAMETERS:	optr gopherObj    
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	AC	12/ 5/94   	Initial Revision
+ *
+ ***********************************************************************/
+@method GopherSocketThreadClass, MSG_GOPHER_SOCKET_THREAD_RECV
+{
+	Socket	dataSocket;
+	byte	tmpBuffer[GOPHER_READ_BUFFER_SIZE];
+	word	textLen;
+
+	dataSocket = @call gopherObj::MSG_GOPHER_SOCKET_GET_DATA_SOCKET();
+
+	while ((textLen = SocketRecv(dataSocket,
+		   	   	     tmpBuffer,
+		   	   	     GOPHER_READ_BUFFER_SIZE,
+		   	   	     SOCKET_NO_TIMEOUT,
+		   	   	     0,
+		   	   	     (SocketAddress *) 0)) != 0) {
+	    @call gopherObj::MSG_GOPHER_RECV_DATA(tmpBuffer, textLen);
+	}
+}	/* End of MSG_GOPHER_SOCKET_THREAD_RECV.	*/

@@ -1,0 +1,913 @@
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+	Copyright (c) Geoworks 1994 -- All Rights Reserved
+
+PROJECT:	Gopher Library
+MODULE:		UTILITY
+FILE:		gopherUtil.goc
+
+AUTHOR:		Alvin Cham, Oct 17, 1994
+
+ROUTINES:
+	Name			Description
+	----			-----------
+
+	GopherInitCacheFileArray
+				- Initialize the cache file array
+
+	GopherUpdateCacheFileArray
+				- Update the cache file array, delete an 
+				old entry, if necessary
+
+	GopherDeleteCacheFileAtIndex
+				- Delete a cache file array at given index
+
+	GopherCacheFileFound	
+				- Look for a cache file, based on cache file
+				ID
+
+	GopherCreateStringChunk	
+				- create a chunk and store a given string into
+				the chunk
+
+	GopherCacheStreamToFile
+				- cache a buffer into a file
+
+	GopherCacheFileSetUp	
+				- setting up for accessing a cache file
+
+	GopherCacheFileEnd	
+				- done accessing a cache file
+
+	GopherAllocBlockWithLock
+				- allocate a given size of block, and lock the
+				block
+
+	GopherPlusFindBlockType
+				- find a particular gopher+ attribute block					(+INFO, +ADMIN, etc)
+
+	GopherLookForNextLine
+				- look for the next newline character in
+				buffer
+
+	GopherFindTokenLength	
+				- return the length of a token
+
+	GopherGetCachedFileLine
+				- return a block that holds the string 
+				containing the given nth line of a cache file
+
+	GopherPlusFreeInfoChunks
+				- free all the chunks that holds gopher+ info
+
+	GopherCopyFileToBlock	
+				- copy a file to a memory block
+
+	GopherLanguageMapToString
+				- map a gopher language to a string
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	AC	10/17/94   	Initial version.
+
+DESCRIPTION:
+	Utility procedures for the gopher library.
+
+	$Id: gopherUtil.goc,v 1.1 97/04/04 18:05:01 newdeal Exp $
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+
+@ifndef	__GOPHER_UTIL_GOC
+@define __GOPHER_UTIL_GOC
+
+@include <gopherC.goh>
+
+
+/***********************************************************************
+ *		GopherInitCacheFileArray
+ ***********************************************************************
+ * SYNOPSIS:	Initialize the cache file array
+ * CALLED BY:	MSG_GOPHER_INITIALIZE
+ * RETURN:	ChunkHandle block
+ * SIDE EFFECTS:none
+ *	
+ * STRATEGY:	(1)  Create a chunk array
+ *		(2)  Append GOPHER_CACHE_FILE_ARRAY_SIZE elements into array
+ *		statically.
+ *		(3)  Mark each entry of array as invalid, to begin with.
+ *	
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	AC	1/ 9/95   	Initial Revision
+ *
+ ***********************************************************************/
+ChunkHandle
+GopherInitCacheFileArray (MemHandle infoBlock)
+{
+	ChunkHandle newChunk;
+	word i;
+	GopherCacheFileArrayElement element;
+	GopherCacheFileArrayElement *arrayElement;
+
+	MemLock(infoBlock);
+
+	if ((newChunk = ChunkArrayCreate(infoBlock, 
+				  	 sizeof(GopherCacheFileArrayElement),
+					 0,
+					 0)) == NullHandle) {
+	    MemUnlock(infoBlock);
+	    return newChunk;
+	}
+
+	element.GCFAE_valid = FALSE;
+
+	for (i = 0; i < GOPHER_CACHE_FILE_ARRAY_SIZE; i++) {
+	    if ((arrayElement = ChunkArrayAppendHandles(infoBlock, 
+							newChunk, 
+							0)) == NULL) {
+		MemUnlock(infoBlock);
+		return NullHandle;
+	    }
+	    memcpy(arrayElement, 
+		   &element, 
+		   sizeof(GopherCacheFileArrayElement));
+	}
+
+	MemUnlock(infoBlock);
+	return newChunk;
+}	/* End of GopherInitCacheFileArray.	*/
+
+
+/***********************************************************************
+ *		GopherUpdateCacheFileArray
+ ***********************************************************************
+ * SYNOPSIS:	Update the cache file array
+ * CALLED BY:	MSG_GOPHER_RECV_DATA
+ * RETURN:	none
+ * SIDE EFFECTS:none
+ *	
+ * STRATEGY:	(1)  Delete the cache file at current entry, if necessary
+ *		(2)  Update the new cached file at entry
+ *		(3)  Update entry index
+ *	
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	AC	1/ 9/95   	Initial Revision
+ *
+ ***********************************************************************/
+void
+GopherUpdateCacheFileArray (char *filename, optr gopherObj)
+{
+	MemHandle	infoBlock;
+	ChunkHandle	cacheFileArray;
+	word		index, fileID;
+	GopherCacheFileArrayElement *element;
+	
+	/* retrieve the needed info */
+	infoBlock = @call gopherObj::MSG_GOPHER_GET_INFO_BLOCK();
+	cacheFileArray = @call gopherObj::
+				MSG_GOPHER_GET_CACHE_FILE_ARRAY_CHUNK();
+	index = @call gopherObj::MSG_GOPHER_GET_CACHE_FILE_INDEX();
+	@call gopherObj::MSG_GOPHER_INC_CACHE_FILE_ID();
+	fileID = @call gopherObj::MSG_GOPHER_GET_CACHE_FILE_ID();
+
+	MemLock(infoBlock);
+
+	/* 
+	 * (1)  get the element at the current index
+	 * (2)  if entry is valid, then we want to delete the file 
+	 * (with the filename) because we don't want to store too many
+	 * cache files around
+	 * (4)  we update the entry with the newly created tmp file
+	 * (5)  update the index
+	 */
+	GopherDeleteCacheFileAtIndex(infoBlock, cacheFileArray, index);
+	element = ChunkArrayElementToPtrHandles(infoBlock, 
+						cacheFileArray,
+						index,
+						NULL);
+	/* update information to element */
+	element->GCFAE_valid = TRUE;
+	element->GCFAE_fileID = fileID;
+	strcpy(element->GCFAE_filename, filename);
+	
+	/* update index */
+	index = (index + 1) % GOPHER_CACHE_FILE_ARRAY_SIZE;
+
+	@call gopherObj::MSG_GOPHER_SET_CACHE_FILE_INDEX(index);
+	MemUnlock(infoBlock);
+}	/* End of GopherUpdateCacheFileArray.	*/
+
+
+/***********************************************************************
+ *		GopherDeleteCacheFileAtIndex
+ ***********************************************************************
+ * SYNOPSIS:	Delete a cache file at given index
+ * CALLED BY:	UTILITY
+ * RETURN:	nothing	
+ * SIDE EFFECTS:nothing
+ *	
+ * STRATEGY:	(1)  Find the element
+ *		(2)  Check if entry is valid
+ *		(3)  Delete the file with filename associated with that entry,
+ *	
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	AC	1/ 9/95   	Initial Revision
+ *
+ ***********************************************************************/
+void
+GopherDeleteCacheFileAtIndex 
+(MemHandle infoBlock, ChunkHandle array, word index)
+{
+	GopherCacheFileArrayElement *arrayElement;
+
+	arrayElement = ChunkArrayElementToPtrHandles(infoBlock,
+						     array,
+						     index,
+						     NULL); 
+
+	EC_ERROR_IF((arrayElement == NULL), 
+		ERROR_INVALID_CACHE_FILE_ARRAY_ELEMENT);
+
+	if (arrayElement->GCFAE_valid) {
+	    FilePushDir();
+	    FileSetStandardPath(SP_PRIVATE_DATA);
+
+	    FileDelete(arrayElement->GCFAE_filename);
+	    FilePopDir();
+	}
+}	/* End of GopherDeleteCacheFileAtIndex.	*/
+
+
+/***********************************************************************
+ *		GopherCacheFileFound
+ ***********************************************************************
+ * SYNOPSIS:	Check to see if the filename is currently cached.
+ * CALLED BY:	UTILTIY
+ * RETURN:	Boolean value
+ * SIDE EFFECTS:none
+ *	
+ * STRATEGY:	(1) go through each valid entry of the cache file array
+ * 		and match the fileID.
+ *	
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	AC	1/10/95   	Initial Revision
+ *
+ ***********************************************************************/
+Boolean
+GopherCacheFileFound (word fileID, optr gopherObj)
+{
+	GopherCacheFileArrayElement *arrayElement;
+	MemHandle infoBlock;
+	ChunkHandle cacheFileArray;
+	word i;
+
+	FilePushDir();
+	FileSetStandardPath(SP_PRIVATE_DATA);
+
+	infoBlock = @call gopherObj::MSG_GOPHER_GET_INFO_BLOCK();
+	cacheFileArray = @call gopherObj::
+				MSG_GOPHER_GET_CACHE_FILE_ARRAY_CHUNK();
+
+	MemLock(infoBlock);
+
+	for (i = 0; i < GOPHER_CACHE_FILE_ARRAY_SIZE; i++) {
+	    arrayElement = ChunkArrayElementToPtrHandles(infoBlock,
+						         cacheFileArray,
+						         i,
+						         NULL); 
+
+	    EC_ERROR_IF((arrayElement == NULL), 
+			ERROR_INVALID_CACHE_FILE_ARRAY_ELEMENT);
+
+	    if (arrayElement->GCFAE_valid) {
+		if (arrayElement->GCFAE_fileID == fileID) {
+		    /* we've found it */
+
+		    MemUnlock(infoBlock);
+		    FilePopDir();
+		    return TRUE;
+		}
+	    }
+	}
+
+	MemUnlock(infoBlock);
+    	FilePopDir();
+
+	/* not found */
+	return FALSE;
+}	/* End of GopherCacheFileFound.	*/
+
+
+/***********************************************************************
+ *		GopherCreateStringChunk
+ ***********************************************************************
+ * SYNOPSIS:	Extract a string and write it into an allocated chunk.
+ * CALLED BY:	Many GopherExtract routines
+ * 	RETURN:	ChunkHandle of the newly allocated chunk
+ * SIDE EFFECTS:
+ *		PRE-CONDITION:	the block must be locked.
+ * STRATEGY:	(1)	Allocate a chunk 
+ *		(2)	Write the string into the chunk
+ *			
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	AC	9/ 2/94   	Initial Revision
+ *
+ ***********************************************************************/
+ChunkHandle
+GopherCreateStringChunk (optr gopherObj, byte *buffer, word size)
+{
+	char		*stringPtr;	/* pointer to the string */
+	ChunkHandle	newChunk;	/* chunk handle of allocated space */
+	MemHandle	infoBlock;
+
+	/* 
+	 * First, get the info block, we will allocate a chunk where we will 
+	 * write the string. And finally, we return the chunk handle.
+	 */
+	infoBlock = @call gopherObj::MSG_GOPHER_GET_INFO_BLOCK();
+
+	MemLock(infoBlock); 
+	newChunk = LMemAlloc(infoBlock,size+1);
+	stringPtr = LMemDerefHandles(infoBlock, newChunk);
+
+	/* copy the string into the chunk */
+	strncpy(stringPtr, (char *)buffer, size);
+
+	/* null-terminate it */
+	stringPtr[size] = '\0';
+	MemUnlock(infoBlock);
+
+	return newChunk;
+}	/* End of GopherCreateStringChunk.	*/
+
+
+/***********************************************************************
+ *		GopherCacheStreamToFile
+ ***********************************************************************
+ * SYNOPSIS:	Cache the incoming stream into a file
+ * CALLED BY:	MSG_GOPHER_PARSE_ITEM
+ * PASS:	byte *buffer		- the buffer to parse
+ *		word numBytes		- # of bytes to parse
+ *		optr *gopherObj		- the gopher object
+ *		char *filename		- name of the tmp file to write to
+ * RETURN:	the length of buffer that got parsed
+ * SIDE EFFECTS:EOF may be set to FALSE
+ *		itemParsed may have been incremented
+ *		Pre-condition: file has already been created! 
+ *	
+ * STRATEGY:	(1) Find the last newline in the buffer
+ *		(2) Read up thru the last newline and copy the content
+ *		into a file
+ *		(3) check if we have reached EOF
+ *	
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	AC	10/ 6/94   	Initial Revision
+ *
+ ***********************************************************************/
+word
+GopherCacheStreamToFile 
+(byte *buffer, word numBytes, optr gopherObj, const char *filename)
+{
+	word 		count = 0;	/* length of parsed input */
+	word		lineLength;
+	FileHandle	tmpFileHandle;	/* temp file handle */
+	dword		fileSize;
+	Boolean		eof;
+	
+	if ((tmpFileHandle = GopherCacheFileSetUp(filename,
+						  &fileSize,
+						  (FILE_ACCESS_W | 
+						   FILE_DENY_W)))
+		== NullHandle) {
+		/* some error */
+	    return count;
+	}  
+        /* want to append to tmp file */
+	FilePos(tmpFileHandle, 0, FILE_POS_END);
+
+	/*
+	 * we keep on writing (line by line) into this temporary file
+	 * until we have either reached the EOF or the buffer won't
+	 * contain anymore complete lines.
+	 */
+
+	while ((lineLength = GopherDirectorySeparatorFound(&buffer[count], 
+					     		  numBytes, 
+							  gopherObj))
+			!= 0) {
+
+	    /* 
+	     * if we've reached EOF, then we have finished parsing 
+	     * we need to update the # of parsed item, and also we don't
+	     * want to write out the content of that last line, but at
+	     * the same time, we need to keep counting them as characters
+	     * read. 
+	     */
+	    eof = @call gopherObj::MSG_GOPHER_GET_EOF();
+
+	    if (eof) {
+		@call gopherObj::MSG_GOPHER_SET_EOF(TRUE);
+
+	    	(void) FileWrite(tmpFileHandle, &buffer[count], 
+				 lineLength, FALSE);
+		count += lineLength;
+		break;
+	    }
+	    (void) FileWrite(tmpFileHandle, &buffer[count], lineLength, FALSE);
+	    count += lineLength;
+	    numBytes -= lineLength;	    
+	}
+
+	/* closes the file here */
+	if (!GopherCacheFileEnd(tmpFileHandle)) {
+	    return -1;
+	}
+
+	return count;
+}	/* End of GopherCacheStreamToFile.	*/
+
+
+/***********************************************************************
+ *		GopherCacheFileSetUp
+ ***********************************************************************
+ * SYNOPSIS:	Do all sorts of things for setting up reading a cache file.
+ * CALLED BY:	UTILITY
+ * RETURN:	FileHandle	file;
+ * SIDE EFFECTS:
+ *		Should call GopherCacheFileEnd after the read!!
+ *		(1) File directory will be pushed
+ *		(2) File will be opened
+ *	
+ * STRATEGY:
+ *	
+ *		(1) Push the directory path
+ *		(2) Open the file with "filename"
+ *		(3) Reset file position
+ *		
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	AC	10/18/94   	Initial Revision
+ *
+ ***********************************************************************/
+FileHandle
+GopherCacheFileSetUp 
+(const char *filename, dword *filesize, FileAccessFlags faFlags)
+{
+	FileHandle file;
+
+	FilePushDir();
+	FileSetStandardPath(SP_PRIVATE_DATA);
+
+	file = FileOpen(filename, faFlags);
+	if (file) {
+	    *filesize = FileSize(file);
+	    (void) FilePos(file, 0, FILE_POS_START);
+	}
+	return file;
+}	/* End of GopherReadCacheFileSetUp.	*/
+
+
+/***********************************************************************
+ *		GopherCacheFileEnd
+ ***********************************************************************
+ * SYNOPSIS:	Perform all sorts of tasks after finishing reading the 
+ * 		cached file.
+ * CALLED BY:	UTILITY
+ * RETURN:	word	status	= -1 error occurred
+ * SIDE EFFECTS:
+ *		(1) Closes a file
+ *		(2) Pop the directory path
+ * STRATEGY:
+ *		(1) Closes the file
+ *		(2) pop the directory path
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	AC	10/18/94   	Initial Revision
+ *
+ ***********************************************************************/
+word
+GopherCacheFileEnd (FileHandle file)
+{
+	if (FileClose(file, FALSE) == -1) {
+	    /* error in closing the file */
+	    return 0;
+	}
+
+	FilePopDir();
+	return 1;	/* status ok */
+}	/* End of GopherCacheFileEnd.	*/
+
+
+/***********************************************************************
+ *		GopherAllocBlockWithLock
+ ***********************************************************************
+ * SYNOPSIS:	Allocate a temporary block with certain size and lock it.
+ * CALLED BY:	UTILITY
+ * RETURN:	MemHandle handle;
+ * SIDE EFFECTS:
+ *		(1) Block allocated with a lock
+ * STRATEGY:
+ *	
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	AC	10/18/94   	Initial Revision
+ *
+ ***********************************************************************/
+MemHandle
+GopherAllocBlockWithLock (word size)
+{
+	MemHandle tmpBlock;
+
+	tmpBlock = MemAlloc(size, HF_SWAPABLE, HAF_LOCK);
+	return tmpBlock;	
+}	/* End of GopherAllocBlockWithLock.	*/
+
+
+/***********************************************************************
+ *		GopherPlusFindBlockType
+ ***********************************************************************
+ * SYNOPSIS:	Determine the kind of information attribute block for a 
+ *		gopher+ item.
+ * CALLED BY:	UTILITY
+ * RETURN:	the length of bytes parsed
+ * SIDE EFFECTS:none
+ *	
+ * STRATEGY:	none
+ *	
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	AC	10/18/94   	Initial Revision
+ *
+ ***********************************************************************/
+word
+GopherPlusFindBlockType (byte *buffer, GopherPlusItemAttrInfoType *type)
+{
+	word	count = 0;
+	MemHandle	tmpBlock;
+	byte	*tmpBuffer;
+	word	length;
+
+	EC_ERROR_IF((buffer[count] != GOPHER_PLUS_INDICATOR), 
+		    ERROR_INVALID_GOPHER_PLUS_BLOCK_START_INDICATOR);
+	count++;	/* skip the '+' */
+
+	length = GopherFindTokenLength(&buffer[count]);
+
+	tmpBlock = GopherAllocBlockWithLock(length+1);
+	EC_ERROR_IF((tmpBlock == NullHandle), 
+		    ERROR_NO_MEMORY_TO_ALLOC_TMP_BLOCK);
+	tmpBuffer = MemDeref(tmpBlock);
+	memcpy(tmpBuffer, &buffer[count], length);
+	tmpBuffer[length] = '\0';	/* null-terminate it */
+
+	/* do some strcmp to determine the type */
+	if (!(strcmp((char *)tmpBuffer, "INFO"))) {
+	    *type = GPIAIT_INFO;
+	} else if (!(strcmp((char *)tmpBuffer, "ADMIN"))) {
+	    *type = GPIAIT_ADMIN;
+	} else if (!(strcmp((char *)tmpBuffer, "VIEWS"))) {
+	    *type = GPIAIT_VIEWS;
+	} else if (!(strcmp((char *)tmpBuffer, "ABSTRACT"))) {
+	    *type = GPIAIT_ABSTRACT;
+	} 
+	MemFree(tmpBlock);
+	return length+count;	
+}	/* End of GopherPlusFindBlockType */
+
+
+/***********************************************************************
+ *		GopherLookForNextLine
+ ***********************************************************************
+ * SYNOPSIS:	Skip reading everything in the current line
+ * CALLED BY:	UTILITY
+ * RETURN:	the length of bytes skipped
+ * SIDE EFFECTS:none
+ *	
+ * STRATEGY:	
+ *	
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	AC	10/18/94   	Initial Revision
+ *
+ ***********************************************************************/
+word
+GopherLookForNextLine (byte *buffer)
+{
+	word count;	
+
+	for (count = 0; buffer[count] != C_ENTER; count++);
+	return count+1;	/* skip the newline */
+}	/* End of GopherLookForNextLine.	*/
+
+
+/***********************************************************************
+ *		GopherFindTokenLength
+ ***********************************************************************
+ * SYNOPSIS:	Find the length of a token, usually refers to the attribute
+ *		field of an attribute block.
+ * CALLED BY:	UTILITY
+ * RETURN:	the length of the token
+ * SIDE EFFECTS:none
+ *	
+ * STRATEGY:	none
+ *	
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	AC	10/19/94   	Initial Revision
+ *
+ ***********************************************************************/
+word
+GopherFindTokenLength (byte *buffer)
+{
+	word	count = 0;
+	
+	while (buffer[count] != GOPHER_TOKEN_SEPARATOR) {
+	    EC_ERROR_IF((buffer[count] == C_ENTER), 
+			ERROR_INVALID_TOKEN_SEPARATOR);
+	    count++;
+	}
+	return count;
+}	/* End of GopherFindTokenLength.	*/
+
+
+/***********************************************************************
+ *		GopherGetCachedFileLine
+ ***********************************************************************
+ * SYNOPSIS:	Returns the block that contains the string that's in the 
+ * 		nth-line (starting at zero) of the cached file.
+ * CALLED BY:	UTILITY
+ * RETURN:	MemHandle block;
+ * SIDE EFFECTS:Allocate a locked block of memory
+ *	
+ * STRATEGY:
+ *	
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	AC	10/24/94   	Initial Revision
+ *
+ ***********************************************************************/
+MemHandle
+GopherGetCachedFileLine (word line, const char *filename)
+{
+	FileHandle file;
+	dword fileSize;
+	word length, lineNum, fileOffset1;
+	word fileOffset2 = 0;
+	MemHandle tmpBlock, strBlock;
+	byte *fileBuffer, *stringPtr;
+
+	if ((file = GopherCacheFileSetUp(filename,
+				     	 &fileSize,
+				     	 (FILE_ACCESS_R | FILE_DENY_W))) 
+		== NullHandle) {
+	    /* some error */
+	    return NullHandle;
+	}
+
+	/* transfer the content of the file into a buffer */
+	if ((tmpBlock = GopherCopyFileToBlock(file, fileSize)) == NullHandle) {
+	    /* something is wrong */
+	    return NullHandle;
+	}
+	fileBuffer = MemDeref(tmpBlock);
+
+	/* finding the two offsets */
+	for (lineNum = 0; lineNum < line+1; lineNum++) {
+	    fileOffset1 = fileOffset2;
+	    fileOffset2 += GopherLookForNextLine(&fileBuffer[fileOffset1]);
+	    EC_ERROR_IF((fileOffset1 > fileSize), 
+			ERROR_INVALID_FILE_OFFSET_POSITION);
+	}	
+
+	length = fileOffset2-fileOffset1;	/* length of line */
+	strBlock = GopherAllocBlockWithLock(length+1);
+	EC_ERROR_IF((strBlock == NullHandle), 
+		    ERROR_NO_MEMORY_TO_ALLOC_TMP_BLOCK);
+	stringPtr = MemDeref(strBlock);	
+	memcpy(stringPtr, &fileBuffer[fileOffset1], length);
+	stringPtr[length] = '\0';	/* null-terminate it */ 
+
+	MemFree(tmpBlock);	/* free the old file block */
+
+	if (!GopherCacheFileEnd(file)) {
+	    /* some error occurred in file close */
+	    return NullHandle;
+	}
+
+	return strBlock;
+}	/* End of GopherGetCachedFileLine.	*/
+
+
+/***********************************************************************
+ *		GopherPlusFreeInfoChunks
+ ***********************************************************************
+ * SYNOPSIS:	Free all the chunks that has been allocated when/after
+ *		fetching a gopher+ information screen.
+ * CALLED BY:	UTILITY
+ * RETURN:	none
+ * SIDE EFFECTS:none
+ *	
+ * STRATEGY:
+ *	
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	AC	11/14/94   	Initial Revision
+ *
+ ***********************************************************************/
+void
+GopherPlusFreeInfoChunks (optr gopherObj)
+{
+	MemHandle infoBlock;
+	GopherPlusItemAttrInfo itemAttrInfo;
+	GopherPlusItemAttrAdmin adminInfo;
+	GopherPlusViewChunkArray viewArray;
+	GopherPlusItemAttrAbstract abstractInfo;
+
+	infoBlock = @call gopherObj::MSG_GOPHER_GET_INFO_BLOCK();
+	MemLock(infoBlock);
+
+	/* get the record, and free the chunks, if necessary */
+	@call gopherObj::MSG_GOPHER_PLUS_GET_INFO_ATTR(&itemAttrInfo);
+	if (itemAttrInfo.GI_userVisibleName)
+	    LMemFreeHandles(infoBlock, itemAttrInfo.GI_userVisibleName);
+	if (itemAttrInfo.GI_selectorString)
+	    LMemFreeHandles(infoBlock, itemAttrInfo.GI_selectorString);
+	if (itemAttrInfo.GI_hostname);
+	    LMemFreeHandles(infoBlock, itemAttrInfo.GI_hostname);
+
+	/* get the record, and free the chunks again */
+	@call gopherObj::MSG_GOPHER_PLUS_GET_ADMIN_ATTR(&adminInfo);
+	if (adminInfo.GPIAA_email)
+	    LMemFreeHandles(infoBlock, adminInfo.GPIAA_email);
+
+	/* free the view array */
+ 	viewArray = @call gopherObj::MSG_GOPHER_PLUS_GET_VIEW_CHUNK();
+	if (viewArray) {
+	    ChunkArrayDeleteRange(ConstructOptr(infoBlock, viewArray),
+				  0, -1);
+	}
+
+	/* get the abstract chunk */
+	@call gopherObj::MSG_GOPHER_PLUS_GET_ABSTRACT_ATTR(&abstractInfo);
+	if (abstractInfo) 
+	    LMemFreeHandles(infoBlock, abstractInfo);
+	
+	MemUnlock(infoBlock);
+}	/* End of GopherPlusFreeInfoChunks.	*/
+
+
+
+/***********************************************************************
+ *		GopherCopyFileToBlock
+ ***********************************************************************
+ * SYNOPSIS:	Copy the content of a file to a temporary block.
+ * CALLED BY:	UTILITY
+ * RETURN:	the block's MemHandle
+ * SIDE EFFECTS:the block is locked when returned.
+ *	
+ * STRATEGY:	(1) Allocate a block with "size"
+ *		(2) Do a file read.
+ *	
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	AC	11/23/94   	Initial Revision
+ *
+ ***********************************************************************/
+MemHandle
+GopherCopyFileToBlock (FileHandle file, word size)
+{
+	MemHandle tmpFileBlock;
+	byte *fileBuffer;
+
+	if ((tmpFileBlock = GopherAllocBlockWithLock(size)) == NullHandle) {
+	    /* can't allocate a block */
+	    return NullHandle;
+	}
+	fileBuffer = MemDeref(tmpFileBlock);
+	if (FileRead(file, fileBuffer, size, TRUE) == -1) {
+	    /* error on fileread */
+	    MemFree(tmpFileBlock);
+	    return NullHandle;
+	}
+	return tmpFileBlock;
+}	/* End of GopherCopyFileToBlock.	*/
+
+
+/***********************************************************************
+ *		GopherLanguageMapToString
+ ***********************************************************************
+ * SYNOPSIS:	Mapping a language to the string that corresponds to that
+ *		language and return that string.
+ * CALLED BY:	UTILITY
+ * RETURN:	none
+ * SIDE EFFECTS:none
+ *	
+ * STRATEGY:
+ *	
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	AC	12/23/94   	Initial Revision
+ *
+ ***********************************************************************/
+void
+GopherLanguageMapToString (GopherLanguageType language, char *string)
+{
+	switch(language) {
+	    case GLT_DANISH:
+		strcpy(string, "Da_DK");
+		break;
+	    case GLT_DUTCH_BELGIUM:
+		strcpy(string, "Nl_BE");
+		break;
+	    case GLT_DUTCH:
+		strcpy(string, "Nl_NL");
+		break;
+	    case GLT_ENGLISH_GB:
+		strcpy(string, "En_GB");
+		break;
+	    case GLT_ENGLISH:
+		strcpy(string, "En_US");
+		break;
+	    case GLT_FINNISH:
+		strcpy(string, "Fi_FI");
+		break;
+	    case GLT_FRENCH_BELGIUM:
+		strcpy(string, "Fr_BE");
+		break;
+	    case GLT_FRENCH_CANADA:
+		strcpy(string, "Fr_CA");
+		break;
+	    case GLT_FRENCH_SWISS:
+		strcpy(string, "Fr_CH");
+		break;
+	    case GLT_FRENCH:
+		strcpy(string, "Fr_FR");
+		break;
+	    case GLT_GERMAN_SWISS:
+		strcpy(string, "De_CH");
+		break;
+	    case GLT_GERMAN:
+		strcpy(string, "De_DE");
+		break;
+	    case GLT_GREEK:
+		strcpy(string, "El_GR");
+		break;
+	    case GLT_ICELANDIC:
+		strcpy(string, "Is_IS");
+		break;
+	    case GLT_ITALIAN:
+		strcpy(string, "It_IT");
+		break;
+	    case GLT_JAPANESE:
+		strcpy(string, "Jp_JP");
+		break;
+	    case GLT_NORWEGIAN:
+		strcpy(string, "No_NO");
+		break;
+	    case GLT_PORTUGUESE:
+		strcpy(string, "Pt_PT");
+		break;
+	    case GLT_SPANISH:
+		strcpy(string, "Es_ES");
+		break;
+	    case GLT_SWEDISH:
+		strcpy(string, "Sv_SE");
+		break;
+	    case GLT_TURKISH:
+		strcpy(string, "Tr_TR");
+		break;
+	    default:
+		break;
+	}
+}	/* End of GopherLanguageMapToString.	*/
+
+@endif	/* __GOPHER_UTIL_GOC */
+
+
+
+
+
+
+
