@@ -1367,7 +1367,7 @@ Installed/Appl/Breadbox/BbxBrow:	ui ansic text spool \
 					impgraph impdoc \
 					modem \
 					ibms parentc wav mailhub socket \
-					js netutils cookies idialc \
+					netutils cookies idialc \
 					ppp  tcpip hsttcpip MAKEAPPL
 
 # sorry, executing CLEAN in the global makefile is not only bad style, it forces
@@ -1394,9 +1394,6 @@ Installed/Library/Breadbox/Html4Par:	kernel ui ansic text extgraph MAKELIB
 
 profpnt		: Installed/Library/ProfPnt
 Installed/Library/ProfPnt:		ansic MAKELIB
-
-js              : Installed/Library/JS
-Installed/Library/JS:		ansic math borlandc mapheap profpnt MAKELIB
 
 ibms    : Installed/Library/Breadbox/Ibms
 Installed/Library/Breadbox/Ibms:	ansic MAKELIB

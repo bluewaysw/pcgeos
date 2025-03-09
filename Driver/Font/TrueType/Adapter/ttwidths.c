@@ -508,7 +508,7 @@ EC(             ECCheckBounds( pairs ) );
                                 ++kernPair;
                                 ++kernValue;
 
-                                kernCount++;
+                                ++kernCount;
                         }
                 }
                 GEO_UNLOCK( kerningDir.tables->t.kern0.pairsBlock );
@@ -702,15 +702,9 @@ EC(     ECCheckBounds( (void*)fontBuf ) );
 
         if( fontMatrix->FM_flags & TF_ROTATED )
         {
-                TT_Fixed  xy, yx;
-
-
-                xy = - ( TrueType_GrMulWWFixed( styleMatrix.yy, fontMatrix->FM_21 ) );
-                yx = - ( TrueType_GrMulWWFixed( styleMatrix.xx, fontMatrix->FM_12 ) +
-                         TrueType_GrMulWWFixed( styleMatrix.xy, fontMatrix->FM_22 ) );
-
-                transMatrix->TM_matrix.xy = xy;
-                transMatrix->TM_matrix.yx = yx;
+                transMatrix->TM_matrix.yx = - ( TrueType_GrMulWWFixed( styleMatrix.xx, fontMatrix->FM_12 ) +
+                                                TrueType_GrMulWWFixed( styleMatrix.xy, fontMatrix->FM_22 ) );
+                transMatrix->TM_matrix.xy = - ( TrueType_GrMulWWFixed( styleMatrix.yy, fontMatrix->FM_21 ) );
         }
 }
 
@@ -936,7 +930,7 @@ static void AdjustFontBuf( TransformMatrix* transMatrix,
                            FontMatrix*      fontMatrix,         
                            FontBuf*         fontBuf )
 {
-        transMatrix->TM_heightY = fontBuf->FB_baselinePos.WBF_int;
+        transMatrix->TM_heightY = fontBuf->FB_baselinePos.WBF_int + BASELINE_CORRECTION;
 
         /* transformation if rotated or scaled */
         if( fontMatrix->FM_flags & TF_COMPLEX )
@@ -970,7 +964,6 @@ static void AdjustFontBuf( TransformMatrix* transMatrix,
                                                 WORD_TO_WWFIXEDASDWORD( savedScriptY + savedHeightY ), transMatrix->TM_matrix.xy ) );
                 }
         }
-        transMatrix->TM_heightY += BASELINE_CORRECTION;
 }
 
 

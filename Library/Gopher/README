@@ -1,0 +1,533 @@
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+	Copyright (c) Geoworks 1994 -- All Rights Reserved
+
+PROJECT:	Gopher Library
+MODULE:		Documentation
+FILE:		README
+
+AUTHOR:		Alvin Cham, Aug  8, 1994
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	AC	8/ 8/94   	Initial version.
+
+DESCRIPTION:
+	This file contains the documentation of the gopher library.
+
+	$Id: README,v 1.2.3.1 97/03/29 06:03:42 canavese Exp $
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+The Gopher Library
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+Contents:
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+Contents
+Notes
+Synopsis
+Class hierarchy
+Overall design
+Data structures
+Tasks
+How to use
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+Notes
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+(1) To compile the library, compile the trunk version because some of the
+socket stuff has yet been updated to the branch.
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+Synopsis: (Overview)
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+The Gopher Library consists of mainly the underlying methods/duties of 
+what a gopher client should perform or accomplish.  In general, it repeatly
+
+(1) sends a request to the gopher server
+(2) waits for the server's response 
+(3) decodes the server's response
+(4) waits and accepts a command from the user
+(5) converts the user command into a gopher client request form
+(6) back to step (1) again
+
+The library basically provides routines that would take care of the all of
+the above steps, except for (4), whose function is more directly toward the
+application using this library.  
+
+Steps (1) and (2) really has to deal with the communication between the
+client and the server.  The library provides two different types of 
+communication channels that one can use to run its applications.  One may
+either use a socket driver or a serial driver to send/receive information 
+between the two, although using the serial driver is geared toward testing
+the application between the sparc and the PC, while using the socket driver
+is more of the realistic approach. 
+
+Step (3) is to convert everything that the server spits out into some form
+of well-organized data structures so that data can be later manipulated
+with ease.  This step is simply just having the incoming stream of data 
+(from the server side) runs through the "parser", provided by the library,  
+and extracts the data into organized pieces.
+
+Step (5) happens after the user inputs some kind of command.   Based on the
+data that we have previously "parsed" and also the command of the user, we
+can generate a request, according to the gopher protocol format, and send
+it over the communication channel to the gopher server.
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+Class hierarchy:
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+				GopherClass
+				/	  \
+			       /	   \
+			      /		    \
+		GopherSerialClass	   GopherSocketClass
+
+					   GopherSocketThreadClass
+
+---------------------------------------------------------------------------
+GopherClass:
+
+This class contains messages that handles all of the basic functions of
+the gopher client, (e.g. parsing the input, and constructing the request 
+output).  In addition, it also provides messages handlers for its subclasses,
+GopherSerialClass and GopherSocketClass, (e.g. setting up, tearing down
+the channel communication channel).  
+
+---------------------------------------------------------------------------
+GopherSocketClass:
+
+This class basically inherits the GopherClass message handlers.  These
+messages will deal with the socket communication channel that is used as
+the information passing medium between the gopher client and the server.
+
+---------------------------------------------------------------------------
+GopherSocketThreadClass:
+
+In adddition to GopherSocketClass, this class is also used for socket testing
+of the gopher client.  Its primary purpose is to allow the process to create
+an extra thread to wait for the server's response.
+
+---------------------------------------------------------------------------
+GopherSerialClass:
+
+This class basically inherits the GopherClass message handlers.  These
+messages will deal with the serial communication channel that is used as
+the information passing medium between the gopher client and the server.
+
+---------------------------------------------------------------------------
+
+***************************************************************************
+IMPORTANT NOTE
+***************************************************************************
+Due to the unstable environment of the serial driver, the code for 
+GopherSerialClass has not been completed.  The problem lies when the server
+tries to send a large volume of data over the serial cable, and some of 
+the data will overflow the buffer and eventually be lost.
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+Overall design
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+The design of the library is to provide some primitive features of the gopher
+client.  It is aimed toward simplicity, and thus many application-dependent 
+features are left out.  The class hierarchy allows the application to subclass
+these library-defined classes and inherit their attributes, and at the same
+time, allows the application to add additional features.  The class hierarchy 
+also adds flexibility in that application can choose to perform extra tasks for
+certain operations.  
+
+The genreal way of how things work is as follows:  The UI of the application
+accepts user commands, these commands will then be transformed into a series
+of messages sent to the gopher object.  Then, the gopher object will send 
+messages to itself to perform the necessary operations.
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+Data Structures: (Instance data)
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+***************************** GopherClass ************************************
+
+	-GopherLanguageType	GI_language 
+	An instance to keep track of the language in which the gopher client
+	wants to retrieve from the server.  The default value is set to 
+	English, but allows the application to change the language by sending 
+	MSG_GOPHER_SET_LANGUAGE to the gopher object.
+
+	-MemHandle	GI_infoBlock
+	In MSG_GOPHER_INITIALIZE, a block is allocated to store all the 
+	information that are needed for the gopher object.  The kind of 
+	information that are being stored includes (1) a buffer for which 
+	data is being accepted from the server via a communication channel, 
+	(2) a chunk array of menu (directory) items, (3) the name (text 
+	string) of the current cached file being used, and (4) also some 
+	gopher+ attributes that need to be stored in text.   
+
+	-word	GI_dataBufferPos
+	This value keeps track of where the incoming data from the server
+	should be appended to the data buffer.  As we parse the incoming data,
+	we look for item separators (e.g. '\n').  So, for each call to
+	MSG_GOPHER_RECV_DATA, it is possible that we didn't finish parsing
+	all of the incoming data.  Those data will then be saved and to be
+	parsed when the next set of data comes in.  Its value is manipulated
+	in MSG_GOPHER_RECV_DATA.
+
+	-ChunkHandle	GI_dataBuffer
+	A chunk is reserved in the information block to store the incoming
+	data from the server.  Its manipulations are handled in 
+	MSG_GOPHER_RECV_DATA.
+
+	-ChunkHandle	GI_menuItemArray
+	A chunk is reserved to act as a chunk array of menu (directory items).
+	This chunk caches the current menu display, and thus allows quick
+	access to various attributes of a specific directory item.  (NOTE: this
+	chunk is only useful when we are displaying directory-type items)  
+	Each element (menu item) in the array is of type 'GopherItem' and 
+	consists of the following components:
+	
+		-GopherParseItemType	GI_type
+		Keeps track of the type of the item (text file, directory, etc)
+	
+		-ChunkHandle	GI_visibleName
+		This chunk stores the text strings that appears on the menu
+		page.  It has no other significance, except the application
+		may want to use this information as a history list, bookmark
+		entry.
+
+		-ChunkHandle	GI_selectorString
+		This chunk stores the selector string of the item.  This info
+		is invisible to the user and is primarily used for 
+		communicating with the gopher server.  Client request is 
+		constructed in MSG_GOPHER_CONSTRUCT_REQUEST by extracting this
+		info + other info.
+
+		-ChunkHandle	GI_hostname
+		This chunk stores the hostname of the item.  Again, the usage
+		is similar to GI_selectorString.
+
+		-word	GI_portNumber
+		Its value represents the port number of where the gopher
+		server is located.  Again, it is used when a client constructs
+		a request.
+
+		-Boolean	GI_gopherPlusInfo
+		Just a boolean flag to keep track whether the item carries
+		gopher+ attributes.  Some features can be limited if the item
+		doesn't have gopher+ attributes. 
+		
+	-GopherParseItemType	GI_curMenuType
+	Keeps track of the item type of the current menu... whether it is a 
+	text file, a directory menu, or others.... so that we can perform
+	parsing, displaying, or other data management with the correct item
+	type.
+
+	-ChunkHandle 		GI_cacheFileArray
+	The library supports a cache file feature.  This array keeps track 
+	of all the existing cache files currently available.  To conserve
+	memory, we only keep a static number of cached files (which is 
+	specified by GOPHER_CACHE_FILE_ARRAY_SIZE and is set at '3' right now)
+	The array will be updated each time a cache file is created, and will
+	keep the most recent cache files (which means another cache file is
+	likely to be deleted at the same time)  Each element of the array is
+	of type 'GopherCacheFileArrayElement' and the components of the 
+	array:
+	
+		-Boolean	GCFAE_valid
+		A boolean to specify whether the entry of the array is a 
+		valid one.
+
+		-char		GCFAE_filename[GOPHER_TMP_FILE_LENGTH]
+		The string for the cache filename
+
+		-word		GCFAE_fileID
+		The unique file ID for the cache file.  This is needed 
+		because the filenames that are generated by 
+		'FileCreateTempFile' will be re-used once that file 
+		(associated with that filename) is deleted.
+
+	-word	GI_cacheFileIndex
+	Keeps track of which entry to add/overwrite in the cache file array.
+	It works in a circular queue fashion.
+
+	-word	GI_cacheFileID
+	Gives a unique ID for each cache file ever created, it increments
+	each time when we create a cache file
+
+	-ChunkHandle	GI_curCacheFileName
+	A chunk is reserved to store the current cached filename to facilitate
+	access (open, close, etc) to that file.
+
+	-word	GI_itemParsed
+	Keeps track of the # of items that are parsed.  For text files, the 
+	value is either 0 or 1, depending on whether we finish parsing the 
+	whole file.  For directory-type items, the value equals to the # of
+	items in the menu, so that we can display all the items on the menu.
+
+	-Boolean	GI_eof
+	A boolean flag to represent the state of parsing we are in.  
+
+	*****	Gopher+ instances *****
+
+	-GopherPlusItemAttrInfo	GI_info
+	A chunk that stores the information provided by the "+INFO" block 
+	of a gopher+ attribute item.
+
+	-GopherPlusItemAttrAdmin	GI_admin
+	A chunk that stores the information provided by the "+ADMIN" block
+	of a gopher+ attribute item.
+
+	-GopherPlusViewChunkArray	GI_view
+	A chunk reserved for another chunk array, that stores all of the `
+	available different types of views for a gopher+ item.  Each element
+	consists of a chunk that stores the text string of the view.
+
+	-GopherPlusItemAttrAbstract	GI_abstract
+	A chunk that stores the text (abstract) for the gopher+ item.
+
+************************** GopherSocketClass *********************************
+
+	-Socket	GSI_dataSocket
+	Providing the ID of the socket that is transmitting data.
+
+	-Socket	GSI_listenSocket
+	Providing the ID of the socket that is listening for data.
+
+	-ThreadHandle	GSI_thread
+	Keeps track of the thread that waits for incoming data. 
+
+************************** GopherSerialClass *********************************
+
+	-Handle	GSI_driver	
+	Keeps track of the serial driver.
+
+	-Boolean GSI_portOpen
+	A boolean flag representing whether the serial port is currently
+	being opened.
+
+	***** some serial cable communication attributes
+
+	-word	GSI_comPort
+	-word	GSI_baudRate
+	-word	GSI_length	-- bit length
+	-word	GSI_parity	-- parity bit
+	-word	GSI_xStopBits	-- stop bit type
+	-word	GSI_mode
+	-word	GSI_flowControl
+	-word	GSI_modem
+	-word	GSI_modemStatus
+
+	-word	GSI_timerHandle	
+	Keeps track of the handle of the timer.  When receiving incoming data,
+	We use a one-shot timer to query the serial driver to see if any data
+	has been received.  At the end of each session of 
+	MSG_GOPHER_RECV_DATA, we will re-start the timer so that it will come
+	back to read some more data.  Of course, the first call to this 
+	routine is generated in MSG_GOPHER_CHANNEL_SET_UP, which is invoked
+	by MSG_GOPHER_INITIALIZE.
+
+	-word  GSI_timerID
+	The ID of the timer.
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+Tasks 
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+What does it do?
+----------------
+
+- In general, the library provides all of the ugly low-level work that needs
+to be done by the gopher client.  To be more specific, here is a list of tasks
+that the library can perform:
+
+(1) allocating spaces for information storage.
+(2) storing the needed information in a very organized, easy to access format.
+(3) setting up the communication channel.
+(4) figuring out the gopher item menu type from menu-to-menu and allows the
+applications to perform the operations accordingly to the type.
+(5) parsing the basic types (text files, directory menu items) of the server's
+incoming data.
+(6) providing handlers for displaying different item types.
+(7) constructing a gopher client's request in a format that can be recognized
+by the gopher server.
+(8) organizing cache file storage, and cleaning up cache file storage when
+the application exits.
+
+What doesn't it do?
+-------------------
+
+- In general, the library doesn't provide any application-dependent features 
+(e.g. UI).  
+
+(1)  The application needs to provide the link between the UI and the library.
+(2)  Applications should call MSG_GOPHER_INITIALIZE on startup and 
+MSG_GOPHER_SHUT_DOWN on quitting.
+(3)  Applications are responsible in sub-classing the handlers of the gopher
+library.  
+
+Here are a list of messages that applications MAY want to subclass.
+-------------------------------------------------------------------
+
+MSG_GOPHER_INITIALIZE -- if the application wants to initialize other 
+			 data on startup
+
+MSG_GOPHER_SHUT_DOWN -- this should be subclassed in parallel to 
+			MSG_GOPHER_INITIALIZE
+
+MSG_GOPHER_FETCH_NEW_DISPLAY -- if the application needs to perform certain
+				application-specific operations before 
+				fetching a new display.
+
+MSG_GOPHER_PARSE_ITEM -- if the application wants to perform certain 
+			 operations (parse items that belong to a newly 
+			 defined type, etc) each time 
+			 we want to parse something.
+
+MSG_GOPHER_CONSTRUCT_REQUEST -- if the application wants to construct a 
+				new type of gopher client request.
+
+Here is a list of messages that applications MUST subclass:
+-----------------------------------------------------------
+
+MSG_GOPHER_RECV_DATA -- the applications should provide the operations of
+			managing the data that has been received from the 
+			server.
+
+MSG_GOPHER_DISPLAY_DIRECTORY, MSG_GOPHER_DISPLAY_TEXT_FILE,
+MSG_GOPHER_DISPLAY_GOPHER_PLUS_INFO -- application must provide the displaying
+				       methods that agrees with the UI.
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+How to use?
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+1) How to create the "gopher object"?
+------------------------------------- 
+The application should define a new class (let's call it the GopherXClass for
+now), and make it a subclass of either the GopherSerialClass or the 
+GopherSocketClass (more preferable), depending on the communication type that
+the application is based on.  Then, we need to instantiate an object in
+GopherXClass.  Besides inheriting all of the attributes that are provided by
+the gopher library, additional application-based attributes/features can now
+be added in GopherXClass.
+
+2) How to set things up? 
+------------------------
+The "process" object of the application is responsible to subclass 
+MSG_GEN_PROCESS_OPEN_APPLICATION.  Besides making a call to its superclass, 
+it should also invoke the gopher object's MSG_GOPHER_INITIALIZE to set up
+all the things (allocating spaces, initializing chunk arrays, etc...).
+
+3) How to clear things up?
+--------------------------
+Before closing the application, it is nice to invoke the gopher object's 
+MSG_GOPHER_SHUT_DOWN.  The best place to locate this invocation would be 
+subclassing MSG_GEN_PROCESS_CLOSE_APPLICATION of the "process" object.
+
+4) How to display incoming data?
+--------------------------------
+First, we need to subclass MSG_GOPHER_RECV_DATA in GopherXClass.  In that 
+message, we should allow its superclass to receive the data first (make a 
+call to its superclass) and then we can check whether we have finished 
+parsing an item by checking the flag "pself->GI_eof". (remember that it is
+possible that we have only read a portion of what the server is sending to
+the client with each call to MSG_GOPHER_RECV_DATA)  Then, by providing a
+message in GopherXClass for each of the item type, (e.g. 
+MSG_GOPHER_DISPLAY_DIRECTORY, MSG_GOPHER_DISPLAY_TEXT_FILE, etc), we can 
+simply call MSG_GOPHER_DISPLAY and let the gopher library message handler to
+direct to the right message.
+
+5) How to access/modify various data from the library?
+------------------------------------------------------
+
+a call to
+
+- MSG_GOPHER_SET_LANGUAGE will change the language setting.
+
+- MSG_GOPHER_GET_LANGUAGE will retrieve the current language setting
+
+- MSG_GOPHER_GET_INFO_BLOCK will retrieve the handle of the block that stores
+all kinds of information of the gopher object.  In other words, whenever one
+needs to access the information of the gopher object, one would need to make
+a call to this message first.
+
+- MSG_GOPHER_GET_MENU_ITEM_ARRAY_CHUNK will return the chunk that consists
+of a chunk array of menu (directory) items.  For example, in order to retrieve
+an element of this chunk array, one would need to perform the following 
+operations:
+
+	a) a call to MSG_GOPHER_GET_INFO_BLOCK to retrieve the block
+	b) lock that block
+	c) a call to MSG_GOPHER_GET_MENU_ITEM_ARRAY_CHUNK to get the chunk
+	   of the chunk array
+	d) a call to ChunkArrayGetElementHandles 
+	
+	NOTE: element is of type "GopherItem"
+
+- MSG_GOPHER_GET_CUR_MENU_TYPE will retrieve the type of the current display.
+
+- MSG_GOPHER_SET_CUR_MENU_TYPE will set the type of the current display.
+
+- MSG_GOPHER_GET_CUR_CACHE_FILE_NAME_CHUNK will return the chunk that contains
+the current cached filename.
+
+- MSG_GOPHER_SET_CUR_CACHE_FILE_NAME will set the current cached filename
+
+- MSG_GOPHER_PLUS_GET_VIEW_CHUNK will retrieve the chunk of the chunk array
+that contains the available views of a gopher+ item.  An example of retrieval
+is:
+
+	a) a call to MSG_GOPHER_GET_INFO_BLOCK to retrieve the block
+	b) lock that block
+	c) a call to MSG_GOPHER_PLUS_GET_VIEW_CHUNK to get the chunk
+	   of the array
+	d) a call to ChunkArrayElementToPtrHandles to get the address of
+	   the element
+	e) deref the address to obtain the string.
+
+	(NOTE: look into gopherRequest.goc for sample code)
+
+
+6) How to add new item types? What needs to be done?
+----------------------------------------------------
+
+a) adding new types
+-------------------
+In some header file for the application, define new types there.  Start
+enumerating from the last entry of what is in the library (currently, it is
+GPIT_BOOKMARK).  E.g.
+
+	#define		GPIT_EXTRA	GPIT_BOOKMARK+1
+	#define		..... 
+
+b) the parsing stage -- the application must intercept MSG_GOPHER_PARSE_ITEM.
+The skeleton of the procedure should be similar to the one in GopherClass,
+with a huge "switch" statement with newly defined types.  The "default" case
+of this statement should be a call to its superclass.
+
+c) the displaying stage -- the application would need to intercept 
+MSG_GOPHER_DISPLAY.  The skeleton of the message should be very similar to
+the one in GopherClass.  The application would also need to add new messages
+(one for each new item type) to conform with its UI display.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
