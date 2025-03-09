@@ -13,106 +13,108 @@
 
 // "Local headers"
 static inline unsigned long swapEndian(unsigned long val);
+dword _pascal calculateScanlineBufferSize(dword width, BMFormat bitform);
+byte _pascal paethPredictor(byte a, byte b, byte c);
+static inline int abs(int x);
+static inline unsigned long swapEndian(unsigned long val);
+word _pascal mapGEOSToPNGColorType(word bitform);
+void _pascal filterScanline(void *lineptr, void *scanlineBuffer, void *prevLine, word width, word bytesPerPixel);
+
 
 /********************************************************************
     API
 ********************************************************************/
-Boolean _pascal _export pngExportBitmap(VMFileHandle srcfile, VMBlockHandle bmpblock, FileLongName destname, FileHandle destfile)
+Boolean _pascal pngExportBitmap(VMFileHandle srcfile, VMBlockHandle bmpblock, FileLongName destname, FileHandle destfile)
 {
     void *lineptr;
     word size;
-    GifStreamHandle handle;
+    dword scanlineSize;
+    MemHandle scanlineMem, prevLineMem;
+    void *scanlineBuffer, *prevLine;
     GifError stat = GE_NO_ERROR;
-    int width, height;
+    dword width, height;
     BMType bmptype;
     BMFormat bitform;
     SizeAsDWord size_xy;
     word y;
+    void *temp = NULL;
 
-    // determine bitmap size
+
+    // Determine bitmap size
     size_xy = BmpGetBitmapSize(srcfile, bmpblock, &stat);
-    if(stat != GE_NO_ERROR) return(stat);
+    if (stat != GE_NO_ERROR) return stat;
     width = DWORD_WIDTH(size_xy);
     height = DWORD_HEIGHT(size_xy);
 
-    // determine type
+    // Determine type
     bmptype = BmpGetBitmapType(srcfile, bmpblock, &stat);
-    if(stat != GE_NO_ERROR) return(stat);
+    if (stat != GE_NO_ERROR) return stat;
     bitform = bmptype & BMT_FORMAT;
 
-    if(bmptype & BMT_PALETTE)
+    // Calculate scanline buffer size
+    scanlineSize = calculateScanlineBufferSize(width, bitform);
+    if (scanlineSize == 0)
     {
-        RGBValue *palptr;
-        MemHandle palmem;
-
-        // get palette of this bitmap here
-        if(bitform == BMF_4BIT)
-        {
-            palmem = MemAlloc(sizeof(RGBValue) * 16, HF_FIXED, 0);
-
-            if(palmem)
-            {
-                palptr = (RGBValue*) MemDeref(palmem);
-                if(palptr) BmpGetBitmapPalette(srcfile, bmpblock, palptr, 16, &stat);
-            }
-        }
-        else // (bitform == BMF_8BIT)
-        {
-            palmem = MemAlloc(sizeof(RGBValue) * 256, HF_FIXED, 0);
-            if(palmem)
-            {
-                palptr = (RGBValue*) MemDeref(palmem);
-                if(palptr) BmpGetBitmapPalette(srcfile, bmpblock, palptr, 256, &stat);
-            }
-        }
-
-        if((palmem) && (palptr))
-        {
-            if(stat == GE_NO_ERROR)
-            {
-                // handle = GifExportStreamCreate(bitform, width, height, destname, destfile, palptr, &stat);
-            }
-            else
-            {
-                stat = GE_BLOCK_LOCK_FAILURE;
-            }
-
-            MemFree(palmem);
-        }
-        else
-        {
-            return(GE_OUT_OF_MEMORY);
-        }
-    }
-    else
-    {
-        //handle = GifExportStreamCreate(bitform, width, height, destname, destfile, 0, &stat);
+        return GE_INVALID_BITMAP; // Invalid format or scanline too large
     }
 
-    if(stat != GE_NO_ERROR) return(stat);
-
-    // loop reading all pixels
-    y = 0;
-    while((y != height) && (stat == GE_NO_ERROR))
+    // Allocate memory for the output scanline buffer and previous scanline buffer
+    scanlineMem = MemAlloc((word)scanlineSize, HF_SWAPABLE | HAF_ZERO_INIT, 0);
+    prevLineMem = MemAlloc((word)scanlineSize, HF_SWAPABLE | HAF_ZERO_INIT, 0);
+    if (!scanlineMem || !prevLineMem)
     {
-        if(HAL_COUNT(HugeArrayLock(srcfile, bmpblock, y , &lineptr, &size)))
+        if (scanlineMem) MemFree(scanlineMem);
+        if (prevLineMem) MemFree(prevLineMem);
+        return GE_OUT_OF_MEMORY;
+    }
+
+    scanlineBuffer = MemLock(scanlineMem);
+    prevLine = MemLock(prevLineMem);
+    if (!scanlineBuffer || !prevLine)
+    {
+        MemFree(scanlineMem);
+        MemFree(prevLineMem);
+        return GE_BLOCK_LOCK_FAILURE;
+    }
+
+    // write PNG header
+    writePngHeader(fileHan);
+
+    // write palette: only writes palette if one exists...
+    writePLTEChunk(fileHan, srcfile, bmpblock, bmptype, bitform);
+
+    // Loop reading all pixels
+    for (y = 0; y < height && stat == GE_NO_ERROR; y++)
+    {
+        if (HAL_COUNT(HugeArrayLock(srcfile, bmpblock, y, &lineptr, &size)))
         {
-            // stat = GifExportStreamWriteLine(handle, lineptr);
+            // Apply the best PNG filter to optimize compression
+            filterScanline(lineptr, scanlineBuffer, prevLine, width, scanlineSize);
+
+            // Process, deflate, and write scanlineBuffer to PNG
+            // Example: deflateAndWriteIDAT(scanlineBuffer, scanlineSize, destfile);
+
+            // Unlock the source scanline after processing
             HugeArrayUnlock(lineptr);
+
+            // Swap scanline buffers (prevLine becomes current)
+            temp = prevLine;
+            prevLine = scanlineBuffer;
+            scanlineBuffer = temp;
         }
         else
         {
-            // GifExportStreamDestroy(handle, TRUE);
-            return(GE_INVALID_BITMAP);
+            MemFree(scanlineMem);
+            MemFree(prevLineMem);
+            return GE_INVALID_BITMAP;
         }
-
-        y++;
     }
 
-    // finish writing the file
-    // stat = GifExportStreamDestroy(handle, FALSE);
+    // Free allocated memory
+    MemFree(scanlineMem);
+    MemFree(prevLineMem);
 
-    return(stat);
+    return stat;
 }
 
 /*********************************************************************/
@@ -152,55 +154,256 @@ Boolean _pascal writePngHeader(FileHandle file)
     return TRUE; // Successfully wrote PNG header
 }
 
-Boolean _pascal writePLTEChunk(FileHandle file, RGBValue *palette, word numEntries)
+Boolean _pascal writePLTEChunk(FileHandle file, VMFileHandle srcfile, VMBlockHandle bmpblock, BMType bmptype, BMFormat bitform)
 {
     pngChunkHeader header;
     dword crc;
     word bytesWritten;
     word i;
+    word numEntries = 0;
+    RGBValue *palPtr;
+    MemHandle palMem;
+    GifError stat = GE_NO_ERROR;
 
-    if (numEntries == 0 || numEntries > PNG_MAX_PALETTE_ENTRIES)
+    if (bmptype & BMT_PALETTE)
     {
-        return FALSE;
-    }
+        numEntries = (bitform == BMF_4BIT) ? 16 : 256;
 
-    // Write chunk header
-    header.length = swapEndian((dword)(numEntries * 3));  // Each entry is 3 bytes (RGB)
-    header.type = swapEndian((dword)PNG_CHUNK_PLTE);
+        // Get palette of this bitmap
+        palMem = MemAlloc((sizeof(RGBValue) * numEntries), HF_SWAPABLE, HAF_ZERO_INIT);
+        if (palMem)
+        {
+            palPtr = (RGBValue*) MemLock(palMem);
+            if (palPtr) BmpGetBitmapPalette(srcfile, bmpblock, palPtr, numEntries, &stat);
+        }
 
-    bytesWritten = FileWrite(file, &header, sizeof(header), FALSE);
-    if (bytesWritten != sizeof(header))
-    {
-        return FALSE;
-    }
-
-    // Write palette data
-    for (i = 0; i < numEntries; i++)
-    {
-        bytesWritten = FileWrite(file, &palette[i], 3, FALSE);
-        if (bytesWritten != 3)
+        if (numEntries == 0 || numEntries > PNG_MAX_PALETTE_ENTRIES)
         {
             return FALSE;
         }
-    }
 
-    // Compute and write CRC
-    crc = crc32(0, (unsigned char *)&header.type, sizeof(header.type));
-    crc = crc32(crc, (unsigned char *)palette, (dword)(numEntries * 3));
+        // Write chunk header
+        header.length = swapEndian((dword)(numEntries * 3));  // Each entry is 3 bytes (RGB)
+        header.type = swapEndian((dword)PNG_CHUNK_PLTE);
 
-    crc = swapEndian(crc);
-    bytesWritten = FileWrite(file, &crc, sizeof(crc), FALSE);
-    if (bytesWritten != sizeof(crc))
-    {
-        return FALSE;
+        bytesWritten = FileWrite(file, &header, sizeof(header), FALSE);
+        if (bytesWritten != sizeof(header))
+        {
+            return FALSE;
+        }
+
+        // Write palette data
+        for (i = 0; i < numEntries; i++)
+        {
+            bytesWritten = FileWrite(file, &palPtr[i], 3, FALSE);
+            if (bytesWritten != 3)
+            {
+                return FALSE;
+            }
+        }
+
+        MemFree(palMem);
+
+        // Compute and write CRC
+        crc = crc32(0, (unsigned char *)&header.type, sizeof(header.type));
+        crc = crc32(crc, (unsigned char *)palPtr, (dword)(numEntries * 3));
+
+        crc = swapEndian(crc);
+        bytesWritten = FileWrite(file, &crc, sizeof(crc), FALSE);
+        if (bytesWritten != sizeof(crc))
+        {
+            return FALSE;
+        }
     }
 
     return TRUE;
 }
 
 
+void _pascal filterScanline(void *lineptr, void *scanlineBuffer, void *prevLine, word width, word bytesPerPixel)
+{
+    word filterTypes[] = {PNG_FILTER_NONE, PNG_FILTER_SUB, PNG_FILTER_UP, PNG_FILTER_AVERAGE, PNG_FILTER_PAETH};
+    word bestFilter = PNG_FILTER_NONE;
+    dword bestSum = 0xFFFFFFFF; // Large initial value
+    word i, x;
+    byte testBuffer[PNG_MAX_SCANLINE_SIZE];
+
+    byte *out = (byte *)scanlineBuffer;
+    byte *in = (byte *)lineptr;
+    byte *prev = (byte *)prevLine;
+
+    // Determine the best filter dynamically
+    for (i = 0; i < 5; i++)
+    {
+        dword sum = 0;
+
+        // Apply the filter temporarily to testBuffer
+        testBuffer[0] = (byte)filterTypes[i];
+
+        switch (filterTypes[i])
+        {
+            case PNG_FILTER_NONE:
+                for (x = 0; x < width * bytesPerPixel; x++)
+                    testBuffer[x + 1] = in[x];
+                break;
+
+            case PNG_FILTER_SUB:
+                for (x = 0; x < width * bytesPerPixel; x++)
+                {
+                    byte left = (x >= bytesPerPixel) ? in[x - bytesPerPixel] : 0;
+                    testBuffer[x + 1] = in[x] - left;
+                }
+                break;
+
+            case PNG_FILTER_UP:
+                for (x = 0; x < width * bytesPerPixel; x++)
+                {
+                    byte above = prev ? prev[x] : 0;
+                    testBuffer[x + 1] = in[x] - above;
+                }
+                break;
+
+            case PNG_FILTER_AVERAGE:
+                for (x = 0; x < width * bytesPerPixel; x++)
+                {
+                    byte left = (x >= bytesPerPixel) ? in[x - bytesPerPixel] : 0;
+                    byte above = prev ? prev[x] : 0;
+                    testBuffer[x + 1] = in[x] - ((left + above) / 2);
+                }
+                break;
+
+            case PNG_FILTER_PAETH:
+                for (x = 0; x < width * bytesPerPixel; x++)
+                {
+                    byte left = (x >= bytesPerPixel) ? in[x - bytesPerPixel] : 0;
+                    byte above = prev ? prev[x] : 0;
+                    byte aboveLeft = (prev && x >= bytesPerPixel) ? prev[x - bytesPerPixel] : 0;
+                    testBuffer[x + 1] = in[x] - paethPredictor(left, above, aboveLeft);
+                }
+                break;
+        }
+
+        // Calculate sum of absolute values for better compression estimation
+        for (x = 1; x <= width * bytesPerPixel; x++) // Ignore first byte (filter type)
+        {
+            sum += abs((sword)testBuffer[x]);
+        }
+
+        // Choose the filter that produces the smallest sum
+        if (sum < bestSum)
+        {
+            bestSum = sum;
+            bestFilter = filterTypes[i];
+        }
+    }
+
+    // Apply the best filter to the actual scanlineBuffer
+    out[0] = (byte)bestFilter;
+
+    switch (bestFilter)
+    {
+        case PNG_FILTER_NONE:
+            for (x = 0; x < width * bytesPerPixel; x++)
+                out[x + 1] = in[x];
+            break;
+
+        case PNG_FILTER_SUB:
+            for (x = 0; x < width * bytesPerPixel; x++)
+            {
+                byte left = (x >= bytesPerPixel) ? in[x - bytesPerPixel] : 0;
+                out[x + 1] = in[x] - left;
+            }
+            break;
+
+        case PNG_FILTER_UP:
+            for (x = 0; x < width * bytesPerPixel; x++)
+            {
+                byte above = prev ? prev[x] : 0;
+                out[x + 1] = in[x] - above;
+            }
+            break;
+
+        case PNG_FILTER_AVERAGE:
+            for (x = 0; x < width * bytesPerPixel; x++)
+            {
+                byte left = (x >= bytesPerPixel) ? in[x - bytesPerPixel] : 0;
+                byte above = prev ? prev[x] : 0;
+                out[x + 1] = in[x] - ((left + above) / 2);
+            }
+            break;
+
+        case PNG_FILTER_PAETH:
+            for (x = 0; x < width * bytesPerPixel; x++)
+            {
+                byte left = (x >= bytesPerPixel) ? in[x - bytesPerPixel] : 0;
+                byte above = prev ? prev[x] : 0;
+                byte aboveLeft = (prev && x >= bytesPerPixel) ? prev[x - bytesPerPixel] : 0;
+                out[x + 1] = in[x] - paethPredictor(left, above, aboveLeft);
+            }
+            break;
+    }
+}
 
 
+dword _pascal calculateScanlineBufferSize(dword width, BMFormat bitform)
+{
+    dword rowSize;
+
+    // Determine base scanline size
+    switch (bitform & BMT_FORMAT)
+    {
+        case BMF_MONO:  rowSize = (width + 7) / 8; break;  // 1-bit per pixel
+        case BMF_4BIT:  rowSize = (width + 1) / 2; break;  // 4-bit per pixel
+        case BMF_8BIT:  rowSize = width; break;           // 8-bit per pixel
+        case BMF_24BIT: rowSize = width * 3; break;       // 24-bit RGB
+        default: return 0;  // Invalid format
+    }
+
+    // If mask bit is set, switch to RGBA (4 bytes per pixel)
+    if (bitform & BMT_MASK)
+    {
+        rowSize = width * 4;
+    }
+
+    return rowSize;
+}
+
+word _pascal mapGEOSToPNGColorType(word bitform)
+{
+    switch (bitform & BMT_FORMAT)
+    {
+        case BMF_MONO:
+            return PNG_COLOR_TYPE_GREY; // 1-bit grayscale (monochrome)
+
+        case BMF_4BIT:
+        case BMF_8BIT:
+            return (bitform & BMT_MASK) ? PNG_COLOR_TYPE_GREY_ALPHA : PNG_COLOR_TYPE_PALETTE; // Indexed or grayscale+alpha
+
+        case BMF_24BIT:
+            return (bitform & BMT_MASK) ? PNG_COLOR_TYPE_RGBA : PNG_COLOR_TYPE_RGB; // RGB or RGBA
+
+        default:
+            return 0xFFFF; // Invalid format
+    }
+}
+
+byte _pascal paethPredictor(byte a, byte b, byte c)
+{
+    sword p = a + b - c;
+    sword pa = abs(p - a);
+    sword pb = abs(p - b);
+    sword pc = abs(p - c);
+
+    if (pa <= pb && pa <= pc) return a;
+    if (pb <= pc) return b;
+    return c;
+}
+
+// abs function, GEOS probably has one somewhere...
+static inline int abs(int x)
+{
+    return x >= 0 ? x : -x;
+}
 
 // swap endianness
 static inline unsigned long swapEndian(unsigned long val)
