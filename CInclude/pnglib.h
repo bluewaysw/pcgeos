@@ -135,4 +135,9 @@ void            _pascal _export pngConvert16BitLineTo8Bit(unsigned char *line, u
 void            _pascal _export pngPad1BitTo4Bit(unsigned char *input, unsigned int width, unsigned char colorType, unsigned char bitDepth);
 void            _pascal _export pngPad2BitTo4Bit(unsigned char *input, unsigned int width, unsigned char colorType, unsigned char bitDepth);
 
+
+Boolean        _pascal _export pngExportBitmap(VMFileHandle srcfile, VMBlockHandle bmpblock, FileLongName destname, FileHandle destfile);
+Boolean        _pascal _export pngExportBitmapFName(VMFileHandle srcfile, VMBlockHandle bmpblock, PathName destname);
+Boolean        _pascal _export pngExportBitmapFHandle(VMFileHandle srcfile, VMBlockHandle bmpblock, FileHandle destfile);
+
 #endif

@@ -14,6 +14,7 @@ type            library, single, c-api
 library         geos
 library         ansic
 library         zlib
+library         extgraph
 
 export PNGIMPORTCONVERTFILE
 export PNGIMPORTCHECKHEADER
@@ -36,3 +37,7 @@ export PNGREMOVEALPHACHANNEL
 export PNGCONVERT16BITLINETO8BIT
 export PNGPAD1BITTO4BIT
 export PNGPAD2BITTO4BIT
+
+export PNGEXPORTBITMAP
+export PNGEXPORTBITMAPFNAME
+export PNGEXPORTBITMAPFHANDLE

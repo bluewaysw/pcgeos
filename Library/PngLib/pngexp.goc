@@ -1,0 +1,130 @@
+/********************************************************************
+ A simple and pretty incomplete PNG import libray for PC/GEOS.
+ Started in 08/2024 by MeyerK for the FreeGEOS project.
+
+ The code itself was written from scratch - relying heavily
+ on ChatGPT for the PNG-specific parts.
+ *******************************************************************/
+
+// Include our API
+#include "pnglib.h"
+@include <giflib.goh>
+@include <extgraph.goh>
+
+Boolean _pascal _export pngExportBitmap(VMFileHandle srcfile, VMBlockHandle bmpblock, FileLongName destname, FileHandle destfile)
+{
+    void *lineptr;
+    word size;
+    GifStreamHandle handle;
+    GifError stat = GE_NO_ERROR;
+    int width, height;
+    BMType bmptype;
+    BMFormat bitform;
+    SizeAsDWord size_xy;
+    word y;
+
+    // determine bitmap size
+    size_xy = BmpGetBitmapSize(srcfile, bmpblock, &stat);
+    if(stat != GE_NO_ERROR) return(stat);
+    width = DWORD_WIDTH(size_xy);
+    height = DWORD_HEIGHT(size_xy);
+
+    // determine type
+    bmptype = BmpGetBitmapType(srcfile, bmpblock, &stat);
+    if(stat != GE_NO_ERROR) return(stat);
+    bitform = bmptype & BMT_FORMAT;
+
+    if(bmptype & BMT_PALETTE)
+    {
+        RGBValue *palptr;
+        MemHandle palmem;
+
+        // get palette of this bitmap here
+        if(bitform == BMF_4BIT)
+        {
+            palmem = MemAlloc(sizeof(RGBValue) * 16, HF_FIXED, 0);
+
+            if(palmem)
+            {
+                palptr = (RGBValue*) MemDeref(palmem);
+                if(palptr) BmpGetBitmapPalette(srcfile, bmpblock, palptr, 16, &stat);
+            }
+        }
+        else
+        {
+            palmem = MemAlloc(sizeof(RGBValue) * 256, HF_FIXED, 0);
+            if(palmem)
+            {
+                palptr = (RGBValue*) MemDeref(palmem);
+                if(palptr) BmpGetBitmapPalette(srcfile, bmpblock, palptr, 256, &stat);
+            }
+        }
+
+        if((palmem) && (palptr))
+        {
+            if(stat == GE_NO_ERROR)
+            {
+                // handle = GifExportStreamCreate(bitform, width, height, destname, destfile, palptr, &stat);
+            }
+            else
+            {
+                stat = GE_BLOCK_LOCK_FAILURE;
+            }
+
+            MemFree(palmem);
+        }
+        else
+        {
+            return(GE_OUT_OF_MEMORY);
+        }
+    }
+    else
+    {
+        //handle = GifExportStreamCreate(bitform, width, height, destname, destfile, 0, &stat);
+    }
+
+    if(stat != GE_NO_ERROR) return(stat);
+
+    // loop reading all pixels
+    y = 0;
+    while((y != height) && (stat == GE_NO_ERROR))
+    {
+        if(HAL_COUNT(HugeArrayLock(srcfile, bmpblock, y , &lineptr, &size)))
+        {
+            // stat = GifExportStreamWriteLine(handle, lineptr);
+            HugeArrayUnlock(lineptr);
+        }
+        else
+        {
+            // GifExportStreamDestroy(handle, TRUE);
+            return(GE_INVALID_BITMAP);
+        }
+
+        y++;
+    }
+
+    // finish writing the file
+    // stat = GifExportStreamDestroy(handle, FALSE);
+
+    return(stat);
+}
+
+/*********************************************************************/
+Boolean _pascal _export pngExportBitmapFName(VMFileHandle srcfile, VMBlockHandle bmpblock, PathName destname)
+{
+	GifError stat = GE_NO_ERROR;
+	stat = pngExportBitmap(srcfile, bmpblock, destname, 0);
+
+	return(stat);
+}
+
+/*********************************************************************/
+
+Boolean _pascal _export pngExportBitmapFHandle(VMFileHandle srcfile, VMBlockHandle bmpblock, FileHandle destfile)
+{
+	GifError stat = GE_NO_ERROR;
+	stat = pngExportBitmap(srcfile, bmpblock, 0, destfile);
+
+	return(stat);
+}
+

@@ -12,6 +12,7 @@ entry LibraryEntry
 library	geos
 library ui
 library impex
+library extgraph
 library pnglib
 
 resource ExportInterface object

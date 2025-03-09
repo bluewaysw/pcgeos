@@ -12,6 +12,9 @@ global  PNGIMPORT: far
 global  PNGTESTFILE: far
 global  PNGEXPORT: far
 
+; build up the right palette from gstring
+global  PALGSTRINGCOLELEMENT: far
+global  MY_GRPARSEGSTRING:far
 
 	SetGeosConvention               ; set calling convention
 
@@ -190,7 +193,7 @@ InfoResource    segment lmem LMEM_TYPE_GENERAL, mask LMF_IN_RESOURCE
 		dw	fmt_1_name,fmt_1_mask
 		D_OPTR	0
 		dw	0,0
-		dw	8000h     ; Currently we only support import
+		dw	0C000h          ; 8000h = only support import, 0C000h = import and export
 		dw	0
 
 fmt_1_name      chunk   char
