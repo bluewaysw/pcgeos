@@ -6,6 +6,10 @@ This document provides an overview of the TrueType fonts included in the PC/GEOS
 
 | Font Family<br>Name | Source<br>URL    | License           | Styles      | Original<br>Filename        | PC/GEOS<br>Filename | Kerning | Hinting | Mapped to<br>Original Font | Adjustments<br>for PC/GEOS |
 |---------------------|------------------|-------------------|-------------|-----------------------------|---------------------|---------|---------|----------------------------|----------------------------|
+| Century 59          | [[S1]](#sources) | [[L1]](#licenses) | Regular     | C059-Roman.ttf              | c059re.ttf          | no      | yes     | Cranbrook    | [[A1]](#adjustments), [[A2]](#adjustments)  |
+|                     |                  |                   | Bold        | C059-Bold.ttf               | c059bo.ttf          |         |         |              |                                             |
+|                     |                  |                   | Italic      | C059-Italic.ttf             | c059it.ttf          |         |         |              |                                             |
+|                     |                  |                   | Bold Italic | C059-Bdita.ttf              | c059bi.ttf          |         |         |              |                                             |
 | Nimbus Mono         | [[S1]](#sources) | [[L1]](#licenses) | Regular     | NimbusMonoPS-Regular.ttf    | nmonore.ttf         | no      | yes     | URW Mono     | [[A1]](#adjustments), [[A2]](#adjustments)  |
 |                     |                  |                   | Bold        | NimbusMonoPS-Bold.ttf       | nmonobo.ttf         |         |         |              |                                             |
 |                     |                  |                   | Italic      | NimbusMonoPS-Italic.ttf     | nmonori.ttf         |         |         |              |                                             |
@@ -23,12 +27,12 @@ This document provides an overview of the TrueType fonts included in the PC/GEOS
 ## Sources
 The original font files were obtained from various sources. Below is a list of the sources for each font.
 
-S1. **URW++ base 35 fonts**:  [https://github.com/ArtifexSoftware/urw-base35-fonts/tree/master](https://github.com/ArtifexSoftware/urw-base35-fonts/tree/master)
+S1. **URW++ base 35 fonts**: [https://github.com/ArtifexSoftware/urw-base35-fonts/tree/master](https://github.com/ArtifexSoftware/urw-base35-fonts/tree/master)
 
 ## Licenses
 The fonts included in this distribution are subject to their respective licenses. Please review the individual license terms for each font.
 
-L1. **GNU Aferro General Public License**:  [https://www.gnu.org/licenses/agpl-3.0.txt](https://www.gnu.org/licenses/agpl-3.0.txt)
+L1. **GNU Aferro General Public License**: [https://www.gnu.org/licenses/agpl-3.0.txt](https://www.gnu.org/licenses/agpl-3.0.txt)
 
 ## Adjustments
 If any modifications have been made to the fonts (e.g., renaming, hinting optimization, or kerning adjustments), they are noted in the "Adjustments" column of the table.
