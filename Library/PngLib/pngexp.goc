@@ -11,6 +11,12 @@
 @include <giflib.goh>
 @include <extgraph.goh>
 
+// "Local headers"
+static inline unsigned long swapEndian(unsigned long val);
+
+/********************************************************************
+    API
+********************************************************************/
 Boolean _pascal _export pngExportBitmap(VMFileHandle srcfile, VMBlockHandle bmpblock, FileLongName destname, FileHandle destfile)
 {
     void *lineptr;
@@ -50,7 +56,7 @@ Boolean _pascal _export pngExportBitmap(VMFileHandle srcfile, VMBlockHandle bmpb
                 if(palptr) BmpGetBitmapPalette(srcfile, bmpblock, palptr, 16, &stat);
             }
         }
-        else
+        else // (bitform == BMF_8BIT)
         {
             palmem = MemAlloc(sizeof(RGBValue) * 256, HF_FIXED, 0);
             if(palmem)
@@ -126,5 +132,82 @@ Boolean _pascal _export pngExportBitmapFHandle(VMFileHandle srcfile, VMBlockHand
 	stat = pngExportBitmap(srcfile, bmpblock, 0, destfile);
 
 	return(stat);
+}
+
+/*********************************************************************
+    Internal functions
+**********************************************************************/
+
+Boolean _pascal writePngHeader(FileHandle file)
+{
+    word bytesWritten;
+
+    // Write the PNG signature to the file
+    bytesWritten = FileWrite(file, PNG_SIGNATURE, sizeof(PNG_SIGNATURE), FALSE);
+    if (bytesWritten != sizeof(PNG_SIGNATURE))
+    {
+        return FALSE; // Failed to write signature
+    }
+
+    return TRUE; // Successfully wrote PNG header
+}
+
+Boolean _pascal writePLTEChunk(FileHandle file, RGBValue *palette, word numEntries)
+{
+    pngChunkHeader header;
+    dword crc;
+    word bytesWritten;
+    word i;
+
+    if (numEntries == 0 || numEntries > PNG_MAX_PALETTE_ENTRIES)
+    {
+        return FALSE;
+    }
+
+    // Write chunk header
+    header.length = swapEndian((dword)(numEntries * 3));  // Each entry is 3 bytes (RGB)
+    header.type = swapEndian((dword)PNG_CHUNK_PLTE);
+
+    bytesWritten = FileWrite(file, &header, sizeof(header), FALSE);
+    if (bytesWritten != sizeof(header))
+    {
+        return FALSE;
+    }
+
+    // Write palette data
+    for (i = 0; i < numEntries; i++)
+    {
+        bytesWritten = FileWrite(file, &palette[i], 3, FALSE);
+        if (bytesWritten != 3)
+        {
+            return FALSE;
+        }
+    }
+
+    // Compute and write CRC
+    crc = crc32(0, (unsigned char *)&header.type, sizeof(header.type));
+    crc = crc32(crc, (unsigned char *)palette, (dword)(numEntries * 3));
+
+    crc = swapEndian(crc);
+    bytesWritten = FileWrite(file, &crc, sizeof(crc), FALSE);
+    if (bytesWritten != sizeof(crc))
+    {
+        return FALSE;
+    }
+
+    return TRUE;
+}
+
+
+
+
+
+// swap endianness
+static inline unsigned long swapEndian(unsigned long val)
+{
+    return ((val >> 24) & 0x000000FF) |
+           ((val >> 8) & 0x0000FF00) |
+           ((val << 8) & 0x00FF0000) |
+           ((val << 24) & 0xFF000000);
 }
 
