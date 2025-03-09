@@ -13,8 +13,8 @@ global  PNGTESTFILE: far
 global  PNGEXPORT: far
 
 ; build up the right palette from gstring
-global  PALGSTRINGCOLELEMENT: far
-global  MY_GRPARSEGSTRING:far
+; global  PALGSTRINGCOLELEMENT: far
+; global  MY_GRPARSEGSTRING:far
 
 	SetGeosConvention               ; set calling convention
 
@@ -168,8 +168,43 @@ TransGetImportOptions endp
 ;--------------------------------------------------------------------------------
 
 TransGetExportOptions proc far
-		xor     dx,dx
-		ret
+        push    ax                             ; 01ED 50
+        push    cx                             ; 01EE 51
+        push    bx                             ; 01EF 53
+        push    bp                             ; 01F0 55
+        push    si                             ; 01F1 56
+        push    di                             ; 01F2 57
+        push    ds                             ; 01F3 1E
+
+        mov     ax,MSG_GEN_ITEM_GROUP_GET_SELECTION
+        mov     bx,dx
+        mov     si,offset PngExpFormGroup
+        mov     di,mask MF_CALL
+        call    ObjMessage
+
+        push    ax
+        mov     ax,00002h
+        mov     cl,050h
+        mov     ch,040h
+        call    MemAlloc
+        xor     dx,dx
+        jc      iopt_err
+        push    ax
+        pop     ds
+        pop     ax
+        mov     [ds:00000h],ax          ; booleanOptions
+        call    MemUnlock
+        mov     dx,bx
+        clc
+iopt_err:
+        pop     ds                             ; 0236 1F
+        pop     di                             ; 0237 5F
+        pop     si                             ; 0238 5E
+        pop     bp                             ; 0239 5D
+        pop     bx                             ; 023A 5B
+        pop     cx                             ; 023B 59
+        pop     ax                             ; 023C 58
+        ret
 TransGetExportOptions endp
 
 ;--------------------------------------------------------------------------------
@@ -192,7 +227,7 @@ InfoResource    segment lmem LMEM_TYPE_GENERAL, mask LMF_IN_RESOURCE
 
 		dw	fmt_1_name,fmt_1_mask
 		D_OPTR	0
-		dw	0,0
+		D_OPTR  PngExportGroup
 		dw	0C000h          ; 8000h = only support import, 0C000h = import and export
 		dw	0
 
