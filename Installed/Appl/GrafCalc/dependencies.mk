@@ -28,8 +28,8 @@ bereich.eobj: geos.h heap.h geode.h resource.h ec.h object.h lmem.h \
                 driver.h thread.h print.h Internal/spoolInt.h serialDr.h \
                 parallDr.h hugearr.h fileEnum.h Ansi/stdio.h \
                 Ansi/string.h parse.h math.h initfile.h
-Calcvalue.obj \
-Calcvalue.eobj: stdapp.goh object.goh ui.goh Objects/metaC.goh \
+calcvalue.obj \
+calcvalue.eobj: stdapp.goh object.goh ui.goh Objects/metaC.goh \
                 Objects/inputC.goh Objects/clipbrd.goh \
                 Objects/uiInputC.goh iacp.goh Objects/winC.goh \
                 Objects/gProcC.goh alb.goh Objects/processC.goh \
@@ -48,8 +48,8 @@ Calcvalue.eobj: stdapp.goh object.goh ui.goh Objects/metaC.goh \
                 Objects/gValueC.goh Objects/gToolGC.goh \
                 Objects/helpCC.goh Main/grafcalc.goh Objects/colorC.goh \
                 UI/appui.goh
-Calcvalue.obj \
-Calcvalue.eobj: geos.h heap.h geode.h resource.h ec.h object.h lmem.h \
+calcvalue.obj \
+calcvalue.eobj: geos.h heap.h geode.h resource.h ec.h object.h lmem.h \
                 graphics.h fontID.h font.h color.h gstring.h timer.h vm.h \
                 dbase.h localize.h Ansi/ctype.h timedate.h file.h \
                 sllang.h system.h geoworks.h chunkarr.h Objects/helpCC.h \
@@ -88,8 +88,8 @@ edit.eobj: geos.h heap.h geode.h resource.h ec.h object.h lmem.h \
                 driver.h thread.h print.h Internal/spoolInt.h serialDr.h \
                 parallDr.h hugearr.h fileEnum.h Ansi/stdio.h \
                 Ansi/string.h parse.h math.h initfile.h
-Funktion.obj \
-Funktion.eobj: stdapp.goh object.goh ui.goh Objects/metaC.goh \
+funktion.obj \
+funktion.eobj: stdapp.goh object.goh ui.goh Objects/metaC.goh \
                 Objects/inputC.goh Objects/clipbrd.goh \
                 Objects/uiInputC.goh iacp.goh Objects/winC.goh \
                 Objects/gProcC.goh alb.goh Objects/processC.goh \
@@ -108,8 +108,8 @@ Funktion.eobj: stdapp.goh object.goh ui.goh Objects/metaC.goh \
                 Objects/gValueC.goh Objects/gToolGC.goh \
                 Objects/helpCC.goh Main/grafcalc.goh Objects/colorC.goh \
                 UI/appui.goh math.goh
-Funktion.obj \
-Funktion.eobj: geos.h heap.h geode.h resource.h ec.h object.h lmem.h \
+funktion.obj \
+funktion.eobj: geos.h heap.h geode.h resource.h ec.h object.h lmem.h \
                 graphics.h fontID.h font.h color.h gstring.h timer.h vm.h \
                 dbase.h localize.h Ansi/ctype.h timedate.h file.h \
                 sllang.h system.h geoworks.h chunkarr.h Objects/helpCC.h \
@@ -148,8 +148,8 @@ grprop.eobj: geos.h heap.h geode.h resource.h ec.h object.h lmem.h \
                 driver.h thread.h print.h Internal/spoolInt.h serialDr.h \
                 parallDr.h hugearr.h fileEnum.h Ansi/stdio.h \
                 Ansi/string.h parse.h math.h initfile.h
-Keyboard.obj \
-Keyboard.eobj: stdapp.goh object.goh ui.goh Objects/metaC.goh \
+keyboard.obj \
+keyboard.eobj: stdapp.goh object.goh ui.goh Objects/metaC.goh \
                 Objects/inputC.goh Objects/clipbrd.goh \
                 Objects/uiInputC.goh iacp.goh Objects/winC.goh \
                 Objects/gProcC.goh alb.goh Objects/processC.goh \
@@ -169,8 +169,8 @@ Keyboard.eobj: stdapp.goh object.goh ui.goh Objects/metaC.goh \
                 Objects/helpCC.goh Ansi/stdlib.h Ansi/stdio.h \
                 Ansi/string.h Main/grafcalc.goh Objects/colorC.goh \
                 UI/appui.goh
-Keyboard.obj \
-Keyboard.eobj: geos.h heap.h geode.h resource.h ec.h object.h lmem.h \
+keyboard.obj \
+keyboard.eobj: geos.h heap.h geode.h resource.h ec.h object.h lmem.h \
                 graphics.h fontID.h font.h color.h gstring.h timer.h vm.h \
                 dbase.h localize.h Ansi/ctype.h timedate.h file.h \
                 sllang.h system.h geoworks.h chunkarr.h Objects/helpCC.h \
@@ -179,8 +179,8 @@ Keyboard.eobj: geos.h heap.h geode.h resource.h ec.h object.h lmem.h \
                 driver.h thread.h print.h Internal/spoolInt.h serialDr.h \
                 parallDr.h hugearr.h fileEnum.h Ansi/stdio.h \
                 Ansi/string.h parse.h math.h initfile.h
-Options.obj \
-Options.eobj: stdapp.goh object.goh ui.goh Objects/metaC.goh \
+options.obj \
+options.eobj: stdapp.goh object.goh ui.goh Objects/metaC.goh \
                 Objects/inputC.goh Objects/clipbrd.goh \
                 Objects/uiInputC.goh iacp.goh Objects/winC.goh \
                 Objects/gProcC.goh alb.goh Objects/processC.goh \
@@ -199,8 +199,8 @@ Options.eobj: stdapp.goh object.goh ui.goh Objects/metaC.goh \
                 Objects/gValueC.goh Objects/gToolGC.goh \
                 Objects/helpCC.goh Main/grafcalc.goh Objects/colorC.goh \
                 UI/appui.goh
-Options.obj \
-Options.eobj: geos.h heap.h geode.h resource.h ec.h object.h lmem.h \
+options.obj \
+options.eobj: geos.h heap.h geode.h resource.h ec.h object.h lmem.h \
                 graphics.h fontID.h font.h color.h gstring.h timer.h vm.h \
                 dbase.h localize.h Ansi/ctype.h timedate.h file.h \
                 sllang.h system.h geoworks.h chunkarr.h Objects/helpCC.h \
@@ -209,8 +209,8 @@ Options.eobj: geos.h heap.h geode.h resource.h ec.h object.h lmem.h \
                 driver.h thread.h print.h Internal/spoolInt.h serialDr.h \
                 parallDr.h hugearr.h fileEnum.h Ansi/stdio.h \
                 Ansi/string.h parse.h math.h initfile.h
-Parser.obj \
-Parser.eobj: stdapp.goh object.goh ui.goh Objects/metaC.goh \
+parser.obj \
+parser.eobj: stdapp.goh object.goh ui.goh Objects/metaC.goh \
                 Objects/inputC.goh Objects/clipbrd.goh \
                 Objects/uiInputC.goh iacp.goh Objects/winC.goh \
                 Objects/gProcC.goh alb.goh Objects/processC.goh \
@@ -229,8 +229,8 @@ Parser.eobj: stdapp.goh object.goh ui.goh Objects/metaC.goh \
                 Objects/gValueC.goh Objects/gToolGC.goh \
                 Objects/helpCC.goh Main/grafcalc.goh Objects/colorC.goh \
                 UI/appui.goh
-Parser.obj \
-Parser.eobj: geos.h heap.h geode.h resource.h ec.h object.h lmem.h \
+parser.obj \
+parser.eobj: geos.h heap.h geode.h resource.h ec.h object.h lmem.h \
                 graphics.h fontID.h font.h color.h gstring.h timer.h vm.h \
                 dbase.h localize.h Ansi/ctype.h timedate.h file.h \
                 sllang.h system.h geoworks.h chunkarr.h Objects/helpCC.h \
