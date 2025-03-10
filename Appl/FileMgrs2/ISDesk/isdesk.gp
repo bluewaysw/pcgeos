@@ -86,21 +86,17 @@ resource AppSCMonikerResource shared lmem read-only
 resource AppSMMonikerResource shared lmem read-only
 resource AppSCGAMonikerResource shared lmem read-only
 
-ifdef GPC
-resource InitSCMonikerResourceOne shared lmem read-only
-resource InitSCMonikerResourceTwo shared lmem read-only
-resource InitSCMonikerResourceThree shared lmem read-only
-resource InitSCMonikerResourceFour shared lmem read-only
-resource InitSCMonikerResourceFive shared lmem read-only
-resource InitDOSSCMonikerResource shared lmem read-only
-resource InitDOSSCMonikerResource2 shared lmem read-only
-resource InitDOSSCMonikerResource3 shared lmem read-only
-resource InitDOSTCMonikerResource shared lmem read-only
-resource InitDOSTCMonikerResource2 shared lmem read-only
-endif
-resource NDStandardSCMonikerResource shared lmem read-only
-resource NDStandardSMMonikerResource shared lmem read-only
-resource NDStandardSCGAMonikerResource shared lmem read-only
+resource NDFirstSHCMonikerResource shared lmem read-only
+resource NDSecondSHCMonikerResource shared lmem read-only
+resource NDThirdSHCMonikerResource shared lmem read-only
+resource NDFirstSCMonikerResource shared lmem read-only
+resource NDSecondSCMonikerResource shared lmem read-only
+resource NDFirstSMMonikerResource shared lmem read-only
+resource NDFirstSCGAMonikerResource shared lmem read-only
+resource NDFirstTHCMonikerResource shared lmem read-only
+resource NDFirstTCMonikerResource shared lmem read-only
+resource NDFirstTMMonikerResource shared lmem read-only
+resource NDFirstTCGAMonikerResource shared lmem read-only
 
 resource AppDrivesSCMonikerResource shared lmem read-only
 resource AppDrivesSMMonikerResource shared lmem read-only
