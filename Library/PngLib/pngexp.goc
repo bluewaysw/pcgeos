@@ -51,62 +51,67 @@ Boolean _pascal pngExportBitmap(VMFileHandle srcfile, VMBlockHandle bmpblock, Fi
     // Allocate memory for the output scanline buffer and previous scanline buffer
     scanlineMem = MemAlloc((word)scanlineSize, HF_SWAPABLE, HAF_ZERO_INIT);
     prevLineMem = MemAlloc((word)scanlineSize, HF_SWAPABLE, HAF_ZERO_INIT);
-    if (!scanlineMem || !prevLineMem)
-    {
-        if (scanlineMem) MemFree(scanlineMem);
-        if (prevLineMem) MemFree(prevLineMem);
-        return GE_OUT_OF_MEMORY;
-    }
+    if (!scanlineMem || !prevLineMem) goto onerror;
+//     {
+//         if (scanlineMem) MemFree(scanlineMem);
+//         if (prevLineMem) MemFree(prevLineMem);
+//         return GE_OUT_OF_MEMORY;
+//     }
 
     scanlineBuffer = MemLock(scanlineMem);
     prevLine = MemLock(prevLineMem);
-    if (!scanlineBuffer || !prevLine)
-    {
-        MemFree(scanlineMem);
-        MemFree(prevLineMem);
-        return GE_BLOCK_LOCK_FAILURE;
-    }
+    if (!scanlineBuffer || !prevLine) goto onerror;
+//     {
+//         MemFree(scanlineMem);
+//         MemFree(prevLineMem);
+//         return GE_BLOCK_LOCK_FAILURE;
+//     }
 
     // start writing chunks
-    if (!writePngHeader(destfile))
-    {
-        MemFree(scanlineMem);
-        MemFree(prevLineMem);
-        return FALSE;
-    }
+    if (!writePngHeader(destfile)) goto onerror;
+//    {
+//        MemFree(scanlineMem);
+//        MemFree(prevLineMem);
+//        return FALSE;
+//    }
 
     // Write IHDR chunk
-    if (!writeIHDRChunk(destfile, width, height, bmptype, bitform))
-    {
-        MemFree(scanlineMem);
-        MemFree(prevLineMem);
-        return FALSE; // Failed to write IHDR
-    }
+    if (!writeIHDRChunk(destfile, width, height, bmptype, bitform)) goto onerror;
+//    {
+//        MemFree(scanlineMem);
+//        MemFree(prevLineMem);
+//        return FALSE; // Failed to write IHDR
+//    }
 
     // Write PLTE chunk (if applicable)
     writePLTEChunk(destfile, srcfile, bmpblock, bmptype, bitform);
 
     // Write IDAT chunk (handles scanline processing, filtering, and compression)
     if (!writeIDATChunk(destfile, scanlineBuffer, prevLine, scanlineSize, width, height, srcfile, bmpblock))
-    {
-        MemFree(scanlineMem);
-        MemFree(prevLineMem);
-        return FALSE; // Failed to write IDAT
-    }
+        goto onerror;
+//    {
+//        MemFree(scanlineMem);
+//        MemFree(prevLineMem);
+//        return FALSE; // Failed to write IDAT
+//    }
 
     // Write IEND chunk
-    if (!writeIENDChunk(destfile))
-    {
-        MemFree(scanlineMem);
-        MemFree(prevLineMem);
-        return FALSE; // Failed to write IEND
-    }
+    if (!writeIENDChunk(destfile)) goto onerror;
+//    {
+//        MemFree(scanlineMem);
+//        MemFree(prevLineMem);
+//        return FALSE; // Failed to write IEND
+//    }
 
     // Free allocated memory
     MemFree(scanlineMem);
     MemFree(prevLineMem);
-
     return GE_NO_ERROR;
+
+onerror:
+    MemFree(scanlineMem);
+    MemFree(prevLineMem);
+    return FALSE;
 }
 
 /*********************************************************************/
