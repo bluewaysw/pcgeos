@@ -12,26 +12,18 @@
 @include <extgraph.goh>
 #include "pngexp.h"
 
-
-
-// "Local headers"
-// static inline unsigned long swapEndian(unsigned long val);
-// dword _pascal calculateScanlineBufferSize(dword width, BMFormat bitform);
-// byte _pascal paethPredictor(byte a, byte b, byte c);
-// static inline int abs(int x);
-// static inline unsigned long swapEndian(unsigned long val);
-// word _pascal mapGEOSToPNGColorType(word bitform);
-// void _pascal filterScanline(void *lineptr, void *scanlineBuffer, void *prevLine, word width, word bytesPerPixel);
-
-
 /********************************************************************
     API
 ********************************************************************/
 Boolean _pascal pngExportBitmap(VMFileHandle srcfile, VMBlockHandle bmpblock, FileLongName destname, FileHandle destfile)
 {
-    dword scanlineSize, width, height;
-    MemHandle scanlineMem, prevLineMem;
-    void *scanlineBuffer, *prevLine;
+    dword scanlineSize;
+    dword width;
+    dword height;
+    MemHandle scanlineMem;
+    MemHandle prevLineMem;
+    void *scanlineBuffer;
+    void *prevLine;
     BMType bmptype;
     BMFormat bitform;
     SizeAsDWord size_xy;
@@ -72,6 +64,14 @@ Boolean _pascal pngExportBitmap(VMFileHandle srcfile, VMBlockHandle bmpblock, Fi
         MemFree(scanlineMem);
         MemFree(prevLineMem);
         return GE_BLOCK_LOCK_FAILURE;
+    }
+
+    // start writing chunks
+    if (!writePngHeader(destfile))
+    {
+        MemFree(scanlineMem);
+        MemFree(prevLineMem);
+        return FALSE;
     }
 
     // Write IHDR chunk
@@ -135,6 +135,9 @@ Boolean _pascal writePngHeader(FileHandle file)
 {
     word bytesWritten;
 
+    // make sure we are at the beginning of the file
+    FilePos(file, 0, FILE_POS_START);
+
     // Write the PNG signature to the file
     bytesWritten = FileWrite(file, PNG_SIGNATURE, sizeof(PNG_SIGNATURE), FALSE);
     if (bytesWritten != sizeof(PNG_SIGNATURE))
@@ -156,6 +159,7 @@ Boolean _pascal writePLTEChunk(FileHandle file, VMFileHandle srcfile, VMBlockHan
     RGBValue *palPtr;
     MemHandle palMem;
     GifError stat = GE_NO_ERROR;
+    byte rgb[3];
 
     if (bmptype & BMT_PALETTE)
     {
@@ -163,14 +167,23 @@ Boolean _pascal writePLTEChunk(FileHandle file, VMFileHandle srcfile, VMBlockHan
 
         // Get palette of this bitmap
         palMem = MemAlloc((sizeof(RGBValue) * numEntries), HF_SWAPABLE, HAF_ZERO_INIT);
-        if (palMem)
+        if (!palMem)
         {
-            palPtr = (RGBValue*) MemLock(palMem);
-            if (palPtr) BmpGetBitmapPalette(srcfile, bmpblock, palPtr, numEntries, &stat);
+            return FALSE; // Memory allocation failed
         }
+
+        palPtr = (RGBValue*) MemLock(palMem);
+        if (!palPtr)
+        {
+            MemFree(palMem);
+            return FALSE; // Memory lock failed
+        }
+
+        BmpGetBitmapPalette(srcfile, bmpblock, palPtr, numEntries, &stat);
 
         if (numEntries == 0 || numEntries > PNG_MAX_PALETTE_ENTRIES)
         {
+            MemFree(palMem);
             return FALSE;
         }
 
@@ -181,25 +194,33 @@ Boolean _pascal writePLTEChunk(FileHandle file, VMFileHandle srcfile, VMBlockHan
         bytesWritten = FileWrite(file, &header, sizeof(header), FALSE);
         if (bytesWritten != sizeof(header))
         {
+            MemFree(palMem);
             return FALSE;
         }
 
-        // Write palette data
+        // Initialize CRC calculation
+        crc = crc32(0, (byte *)&header.type, sizeof(header.type));
+
+        // Write palette data and update CRC per byte
         for (i = 0; i < numEntries; i++)
         {
-            bytesWritten = FileWrite(file, &palPtr[i], 3, FALSE);
+            rgb[0] = palPtr[i].RGB_red;
+            rgb[1] = palPtr[i].RGB_green;
+            rgb[2] = palPtr[i].RGB_blue;
+
+            bytesWritten = FileWrite(file, rgb, 3, FALSE);
             if (bytesWritten != 3)
             {
+                MemFree(palMem);
                 return FALSE;
             }
+
+            crc = crc32(crc, rgb, 3); // Update CRC correctly for each RGB triplet
         }
 
         MemFree(palMem);
 
-        // Compute and write CRC
-        crc = crc32(0, (unsigned char *)&header.type, sizeof(header.type));
-        crc = crc32(crc, (unsigned char *)palPtr, (dword)(numEntries * 3));
-
+        // Finalize CRC
         crc = swapEndian(crc);
         bytesWritten = FileWrite(file, &crc, sizeof(crc), FALSE);
         if (bytesWritten != sizeof(crc))
@@ -277,9 +298,9 @@ Boolean _pascal writeIDATChunk(FileHandle file, void *scanlineBuffer, void *prev
     z_stream zstrm;
     GifError stat = GE_NO_ERROR;
     word y;
+    pngChunkHeader idatHeader;
 
     // Initiate IDAT chunk
-    pngChunkHeader idatHeader;
     idatHeader.length = 0; // Placeholder for size
     idatHeader.type = swapEndian(PNG_CHUNK_IDAT);
 
