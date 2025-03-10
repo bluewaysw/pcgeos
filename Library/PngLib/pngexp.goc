@@ -10,15 +10,18 @@
 #include "pnglib.h"
 @include <giflib.goh>
 @include <extgraph.goh>
+#include "pngexp.h"
+
+
 
 // "Local headers"
-static inline unsigned long swapEndian(unsigned long val);
-dword _pascal calculateScanlineBufferSize(dword width, BMFormat bitform);
-byte _pascal paethPredictor(byte a, byte b, byte c);
-static inline int abs(int x);
-static inline unsigned long swapEndian(unsigned long val);
-word _pascal mapGEOSToPNGColorType(word bitform);
-void _pascal filterScanline(void *lineptr, void *scanlineBuffer, void *prevLine, word width, word bytesPerPixel);
+// static inline unsigned long swapEndian(unsigned long val);
+// dword _pascal calculateScanlineBufferSize(dword width, BMFormat bitform);
+// byte _pascal paethPredictor(byte a, byte b, byte c);
+// static inline int abs(int x);
+// static inline unsigned long swapEndian(unsigned long val);
+// word _pascal mapGEOSToPNGColorType(word bitform);
+// void _pascal filterScanline(void *lineptr, void *scanlineBuffer, void *prevLine, word width, word bytesPerPixel);
 
 
 /********************************************************************
@@ -26,19 +29,13 @@ void _pascal filterScanline(void *lineptr, void *scanlineBuffer, void *prevLine,
 ********************************************************************/
 Boolean _pascal pngExportBitmap(VMFileHandle srcfile, VMBlockHandle bmpblock, FileLongName destname, FileHandle destfile)
 {
-    void *lineptr;
-    word size;
-    dword scanlineSize;
+    dword scanlineSize, width, height;
     MemHandle scanlineMem, prevLineMem;
     void *scanlineBuffer, *prevLine;
-    GifError stat = GE_NO_ERROR;
-    dword width, height;
     BMType bmptype;
     BMFormat bitform;
     SizeAsDWord size_xy;
-    word y;
-    void *temp = NULL;
-
+    GifError stat = GE_NO_ERROR;
 
     // Determine bitmap size
     size_xy = BmpGetBitmapSize(srcfile, bmpblock, &stat);
@@ -77,44 +74,38 @@ Boolean _pascal pngExportBitmap(VMFileHandle srcfile, VMBlockHandle bmpblock, Fi
         return GE_BLOCK_LOCK_FAILURE;
     }
 
-    // write PNG header
-    writePngHeader(fileHan);
-
-    // write palette: only writes palette if one exists...
-    writePLTEChunk(fileHan, srcfile, bmpblock, bmptype, bitform);
-
-    // Loop reading all pixels
-    for (y = 0; y < height && stat == GE_NO_ERROR; y++)
+    // Write IHDR chunk
+    if (!writeIHDRChunk(destfile, width, height, bmptype, bitform))
     {
-        if (HAL_COUNT(HugeArrayLock(srcfile, bmpblock, y, &lineptr, &size)))
-        {
-            // Apply the best PNG filter to optimize compression
-            filterScanline(lineptr, scanlineBuffer, prevLine, width, scanlineSize);
+        MemFree(scanlineMem);
+        MemFree(prevLineMem);
+        return FALSE; // Failed to write IHDR
+    }
 
-            // Process, deflate, and write scanlineBuffer to PNG
-            // Example: deflateAndWriteIDAT(scanlineBuffer, scanlineSize, destfile);
+    // Write PLTE chunk (if applicable)
+    writePLTEChunk(destfile, srcfile, bmpblock, bmptype, bitform);
 
-            // Unlock the source scanline after processing
-            HugeArrayUnlock(lineptr);
+    // Write IDAT chunk (handles scanline processing, filtering, and compression)
+    if (!writeIDATChunk(destfile, scanlineBuffer, prevLine, scanlineSize, width, height, srcfile, bmpblock))
+    {
+        MemFree(scanlineMem);
+        MemFree(prevLineMem);
+        return FALSE; // Failed to write IDAT
+    }
 
-            // Swap scanline buffers (prevLine becomes current)
-            temp = prevLine;
-            prevLine = scanlineBuffer;
-            scanlineBuffer = temp;
-        }
-        else
-        {
-            MemFree(scanlineMem);
-            MemFree(prevLineMem);
-            return GE_INVALID_BITMAP;
-        }
+    // Write IEND chunk
+    if (!writeIENDChunk(destfile))
+    {
+        MemFree(scanlineMem);
+        MemFree(prevLineMem);
+        return FALSE; // Failed to write IEND
     }
 
     // Free allocated memory
     MemFree(scanlineMem);
     MemFree(prevLineMem);
 
-    return stat;
+    return GE_NO_ERROR;
 }
 
 /*********************************************************************/
@@ -137,7 +128,7 @@ Boolean _pascal _export pngExportBitmapFHandle(VMFileHandle srcfile, VMBlockHand
 }
 
 /*********************************************************************
-    Internal functions
+    Chunk writing functions
 **********************************************************************/
 
 Boolean _pascal writePngHeader(FileHandle file)
@@ -154,6 +145,7 @@ Boolean _pascal writePngHeader(FileHandle file)
     return TRUE; // Successfully wrote PNG header
 }
 
+/*********************************************************************/
 Boolean _pascal writePLTEChunk(FileHandle file, VMFileHandle srcfile, VMBlockHandle bmpblock, BMType bmptype, BMFormat bitform)
 {
     pngChunkHeader header;
@@ -219,9 +211,206 @@ Boolean _pascal writePLTEChunk(FileHandle file, VMFileHandle srcfile, VMBlockHan
     return TRUE;
 }
 
+/*********************************************************************/
+Boolean _pascal writeIHDRChunk(FileHandle file, dword width, dword height, BMType bmptype, BMFormat bitform)
+{
+    pngChunkHeader ihdrHeader;
+    dword crc;
+    pngIHDRData ihdrData;
 
+    // Prepare IHDR chunk header
+    ihdrHeader.length = swapEndian(sizeof(pngIHDRData));
+    ihdrHeader.type = swapEndian(PNG_CHUNK_IHDR);
 
+    // Determine color type from GEOS format
+    ihdrData.colorType = mapGEOSToPNGColorType(bmptype);
 
+    // Determine bit depth based on BMFormat
+    switch (bitform)
+    {
+        case BMF_MONO:  ihdrData.bitDepth = 1; break;
+        case BMF_4BIT:  ihdrData.bitDepth = 4; break;
+        case BMF_8BIT:  ihdrData.bitDepth = 8; break;
+        case BMF_24BIT: ihdrData.bitDepth = 8; break; // 8 bits per channel in truecolor
+        default:        return FALSE; // Unsupported format
+    }
+
+    // Set PNG standard fields
+    ihdrData.width = swapEndian(width);
+    ihdrData.height = swapEndian(height);
+    ihdrData.compressionMethod = 0; // Default PNG compression method
+    ihdrData.filterMethod = 0; // PNG allows adaptive filtering, default is 0
+    ihdrData.interlaceMethod = 0; // No interlacing
+
+    // Write IHDR chunk header
+    if (FileWrite(file, &ihdrHeader, sizeof(ihdrHeader), FALSE) != sizeof(ihdrHeader))
+    {
+        return FALSE; // Failed to write IHDR header
+    }
+
+    // Initialize CRC calculation
+    crc = crc32(0, (byte *)&ihdrHeader.type, sizeof(ihdrHeader.type));
+    crc = crc32(crc, (byte *)&ihdrData, sizeof(ihdrData));
+
+    // Write IHDR data
+    if (FileWrite(file, &ihdrData, sizeof(ihdrData), FALSE) != sizeof(ihdrData))
+    {
+        return FALSE; // Failed to write IHDR data
+    }
+
+    // Write CRC at the end of the IHDR chunk
+    crc = swapEndian(crc);
+    if (FileWrite(file, &crc, sizeof(crc), FALSE) != sizeof(crc))
+    {
+        return FALSE; // Failed to write IHDR CRC
+    }
+
+    return TRUE;
+}
+
+/*********************************************************************/
+Boolean _pascal writeIDATChunk(FileHandle file, void *scanlineBuffer, void *prevLine, dword scanlineSize, dword width, dword height, VMFileHandle srcfile, VMBlockHandle bmpblock)
+{
+    void *lineptr, *temp;
+    word size;
+    dword idatChunkSize = 0, idatChunkPos, crc;
+    z_stream zstrm;
+    GifError stat = GE_NO_ERROR;
+    word y;
+
+    // Initiate IDAT chunk
+    pngChunkHeader idatHeader;
+    idatHeader.length = 0; // Placeholder for size
+    idatHeader.type = swapEndian(PNG_CHUNK_IDAT);
+
+    // Store position of IDAT chunk size field
+    idatChunkPos = FilePos(file, 0, FILE_POS_RELATIVE);
+
+    // Write IDAT chunk header (size will be updated later)
+    if (FileWrite(file, &idatHeader, sizeof(idatHeader), FALSE) != sizeof(idatHeader))
+    {
+        return FALSE; // Failed to write chunk header
+    }
+
+    // Initialize CRC calculation
+    crc = crc32(0, (byte *)&idatHeader.type, sizeof(idatHeader.type));
+
+    // Initialize Zlib
+    zstrm.zalloc = Z_NULL;
+    zstrm.zfree = Z_NULL;
+    zstrm.opaque = Z_NULL;
+    if (deflateInit(&zstrm, Z_DEFAULT_COMPRESSION) != Z_OK)
+    {
+        return FALSE; // Compression initialization failed
+    }
+
+    // Loop through all scanlines
+    for (y = 0; y < height && stat == GE_NO_ERROR; y++)
+    {
+        if (HAL_COUNT(HugeArrayLock(srcfile, bmpblock, y, &lineptr, &size)))
+        {
+            // Apply best PNG filter
+            filterScanline(lineptr, scanlineBuffer, prevLine, width, scanlineSize);
+
+            // Deflate and append to IDAT chunk
+            if (!deflateScanline(scanlineBuffer, scanlineSize, &zstrm, file, &idatChunkSize, &crc))
+            {
+                deflateEnd(&zstrm);
+                return FALSE; // Compression failed
+            }
+
+            // Unlock source scanline
+            HugeArrayUnlock(lineptr);
+
+            // Swap scanline buffers
+            temp = prevLine;
+            prevLine = scanlineBuffer;
+            scanlineBuffer = temp;
+        }
+        else
+        {
+            deflateEnd(&zstrm);
+            return GE_INVALID_BITMAP;
+        }
+    }
+
+    // Finalize deflation
+    deflateEnd(&zstrm);
+
+    // Update IDAT chunk length
+    idatHeader.length = swapEndian(idatChunkSize);
+    FilePos(file, idatChunkPos, FILE_POS_START);
+    if (FileWrite(file, &idatHeader.length, sizeof(idatHeader.length), FALSE) != sizeof(idatHeader.length))
+    {
+        return FALSE; // Failed to update chunk length
+    }
+
+    // Write CRC at the end of the IDAT chunk
+    crc = swapEndian(crc);
+    if (FileWrite(file, &crc, sizeof(crc), FALSE) != sizeof(crc))
+    {
+        return FALSE; // Failed to write CRC
+    }
+
+    return TRUE;
+}
+
+/*********************************************************************/
+Boolean _pascal writeIENDChunk(FileHandle file)
+{
+    pngChunkHeader iendHeader;
+    dword crc;
+
+    // Prepare IEND chunk header
+    iendHeader.length = 0; // IEND has no data
+    iendHeader.type = swapEndian(PNG_CHUNK_IEND);
+
+    // Write IEND chunk header
+    if (FileWrite(file, &iendHeader, sizeof(iendHeader), FALSE) != sizeof(iendHeader))
+    {
+        return FALSE; // Failed to write IEND header
+    }
+
+    // Calculate CRC for IEND chunk
+    crc = crc32(0, (byte *)&iendHeader.type, sizeof(iendHeader.type));
+    crc = swapEndian(crc);
+
+    // Write CRC at the end of the IEND chunk
+    if (FileWrite(file, &crc, sizeof(crc), FALSE) != sizeof(crc))
+    {
+        return FALSE; // Failed to write IEND CRC
+    }
+
+    return TRUE;
+}
+
+/*********************************************************************
+    The "worker" functions
+*********************************************************************/
+dword _pascal calculateScanlineBufferSize(dword width, BMFormat bitform)
+{
+    dword rowSize;
+
+    // Determine base scanline size
+    switch (bitform & BMT_FORMAT)
+    {
+        case BMF_MONO:  rowSize = (width + 7) / 8; break;  // 1-bit per pixel
+        case BMF_4BIT:  rowSize = (width + 1) / 2; break;  // 4-bit per pixel
+        case BMF_8BIT:  rowSize = width; break;           // 8-bit per pixel
+        case BMF_24BIT: rowSize = width * 3; break;       // 24-bit RGB
+        default: return 0;  // Invalid format
+    }
+
+    // If mask bit is set, switch to RGBA (4 bytes per pixel)
+    if (bitform & BMT_MASK)
+    {
+        rowSize = width * 4;
+    }
+
+    return rowSize;
+}
+
+/*********************************************************************/
 void _pascal filterScanline(void *lineptr, void *scanlineBuffer, void *prevLine, word width, word bytesPerPixel)
 {
     word filterTypes[] = {PNG_FILTER_NONE, PNG_FILTER_SUB, PNG_FILTER_UP, PNG_FILTER_AVERAGE, PNG_FILTER_PAETH};
@@ -346,50 +535,89 @@ void _pascal filterScanline(void *lineptr, void *scanlineBuffer, void *prevLine,
     }
 }
 
-
-dword _pascal calculateScanlineBufferSize(dword width, BMFormat bitform)
+/*********************************************************************/
+Boolean _pascal deflateScanline(void *scanlineBuffer, dword scanlineSize, z_stream *zstrm, FileHandle file, dword *idatChunkSize, dword *crc)
 {
-    dword rowSize;
+    int ret;
+    dword compressedSize;
+    MemHandle outBufferMem;
+    byte *outBuffer;
 
-    // Determine base scanline size
-    switch (bitform & BMT_FORMAT)
+    // Allocate memory for the output buffer
+    outBufferMem = MemAlloc(PNG_CHUNK_SIZE_OUT, HF_SWAPABLE, HAF_ZERO_INIT);
+    if (!outBufferMem)
     {
-        case BMF_MONO:  rowSize = (width + 7) / 8; break;  // 1-bit per pixel
-        case BMF_4BIT:  rowSize = (width + 1) / 2; break;  // 4-bit per pixel
-        case BMF_8BIT:  rowSize = width; break;           // 8-bit per pixel
-        case BMF_24BIT: rowSize = width * 3; break;       // 24-bit RGB
-        default: return 0;  // Invalid format
+        return FALSE; // Memory allocation failed
     }
 
-    // If mask bit is set, switch to RGBA (4 bytes per pixel)
-    if (bitform & BMT_MASK)
+    outBuffer = (byte *)MemLock(outBufferMem);
+    if (!outBuffer)
     {
-        rowSize = width * 4;
+        MemFree(outBufferMem);
+        return FALSE; // Memory lock failed
     }
 
-    return rowSize;
+    // Set input for deflation
+    zstrm->next_in = (byte *)scanlineBuffer;
+    zstrm->avail_in = (word)scanlineSize;
+
+    // Deflate and append to IDAT chunk
+    do
+    {
+        zstrm->next_out = outBuffer;
+        zstrm->avail_out = PNG_CHUNK_SIZE_OUT;
+
+        ret = deflate(zstrm, Z_SYNC_FLUSH); // Ensure all output is flushed
+        if (ret != Z_OK && ret != Z_STREAM_END)
+        {
+            MemFree(outBufferMem);
+            return FALSE; // Compression failed
+        }
+
+        // Calculate the number of compressed bytes
+        compressedSize = PNG_CHUNK_SIZE_OUT - zstrm->avail_out;
+
+        // Write compressed data to the file
+        if (FileWrite(file, outBuffer, compressedSize, FALSE) != compressedSize)
+        {
+            MemFree(outBufferMem);
+            return FALSE; // Writing failed
+        }
+
+        // Update CRC and chunk size
+        *crc = crc32(*crc, outBuffer, compressedSize);
+        *idatChunkSize += compressedSize;
+
+    } while (zstrm->avail_in > 0);
+
+    // Free memory
+    MemFree(outBufferMem);
+
+    return TRUE;
 }
 
-word _pascal mapGEOSToPNGColorType(word bitform)
+/*********************************************************************/
+word _pascal mapGEOSToPNGColorType(BMType bmptype)
 {
-    switch (bitform & BMT_FORMAT)
+    switch (bmptype & BMT_FORMAT)
     {
         case BMF_MONO:
             return PNG_COLOR_TYPE_GREY; // 1-bit grayscale (monochrome)
 
         case BMF_4BIT:
         case BMF_8BIT:
-            return (bitform & BMT_MASK) ? PNG_COLOR_TYPE_GREY_ALPHA : PNG_COLOR_TYPE_PALETTE; // Indexed or grayscale+alpha
+            return (bmptype & BMT_MASK) ? PNG_COLOR_TYPE_GREY_ALPHA : PNG_COLOR_TYPE_PALETTE; // Indexed or grayscale+alpha
 
         case BMF_24BIT:
-            return (bitform & BMT_MASK) ? PNG_COLOR_TYPE_RGBA : PNG_COLOR_TYPE_RGB; // RGB or RGBA
+            return (bmptype & BMT_MASK) ? PNG_COLOR_TYPE_RGBA : PNG_COLOR_TYPE_RGB; // RGB or RGBA
 
         default:
             return 0xFFFF; // Invalid format
     }
 }
 
-byte _pascal paethPredictor(byte a, byte b, byte c)
+/*********************************************************************/
+static inline byte _pascal paethPredictor(byte a, byte b, byte c)
 {
     sword p = a + b - c;
     sword pa = abs(p - a);
@@ -401,12 +629,14 @@ byte _pascal paethPredictor(byte a, byte b, byte c)
     return c;
 }
 
+/*********************************************************************/
 // abs function, GEOS probably has one somewhere...
 static inline int abs(int x)
 {
     return x >= 0 ? x : -x;
 }
 
+/*********************************************************************/
 // swap endianness
 static inline unsigned long swapEndian(unsigned long val)
 {
