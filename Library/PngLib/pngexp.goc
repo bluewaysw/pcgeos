@@ -41,6 +41,7 @@ Boolean _pascal pngExportBitmap(VMFileHandle srcfile, VMBlockHandle bmpblock, Fi
     bitform = bmptype & BMT_FORMAT;
 
     // Calculate scanline buffer size
+    // PNG_MAX_SCANLINE_SIZE
     scanlineSize = calculateScanlineBufferSize(width, bitform);
     if (scanlineSize == 0)
     {
@@ -294,9 +295,10 @@ Boolean _pascal writeIDATChunk(FileHandle file, void *scanlineBuffer, void *prev
 {
     void *lineptr, *temp;
     word size;
-    dword idatChunkSize = 0, idatChunkPos, crc;
+    dword idatChunkSize = 0;
+    dword idatChunkPos = 0;
+    dword crc = 0;
     z_stream zstrm;
-    GifError stat = GE_NO_ERROR;
     word y;
     pngChunkHeader idatHeader;
 
@@ -326,7 +328,7 @@ Boolean _pascal writeIDATChunk(FileHandle file, void *scanlineBuffer, void *prev
     }
 
     // Loop through all scanlines
-    for (y = 0; y < height && stat == GE_NO_ERROR; y++)
+    for (y = 0; y < height; y++)
     {
         if (HAL_COUNT(HugeArrayLock(srcfile, bmpblock, y, &lineptr, &size)))
         {
@@ -337,6 +339,7 @@ Boolean _pascal writeIDATChunk(FileHandle file, void *scanlineBuffer, void *prev
             if (!deflateScanline(scanlineBuffer, scanlineSize, &zstrm, file, &idatChunkSize, &crc))
             {
                 deflateEnd(&zstrm);
+                HugeArrayUnlock(lineptr);
                 return FALSE; // Compression failed
             }
 
@@ -351,7 +354,7 @@ Boolean _pascal writeIDATChunk(FileHandle file, void *scanlineBuffer, void *prev
         else
         {
             deflateEnd(&zstrm);
-            return GE_INVALID_BITMAP;
+            return FALSE;
         }
     }
 
@@ -365,6 +368,7 @@ Boolean _pascal writeIDATChunk(FileHandle file, void *scanlineBuffer, void *prev
     {
         return FALSE; // Failed to update chunk length
     }
+    FilePos(file, 0, FILE_POS_END);
 
     // Write CRC at the end of the IDAT chunk
     crc = swapEndian(crc);
@@ -432,6 +436,23 @@ dword _pascal calculateScanlineBufferSize(dword width, BMFormat bitform)
 }
 
 /*********************************************************************/
+void _pascal filterScanline(void *lineptr, void *scanlineBuffer, void *prevLine, word width, word bytesPerPixel)
+{
+    word x;
+    byte *out = (byte *)scanlineBuffer;
+    byte *in = (byte *)lineptr;
+
+    // Force PNG_FILTER_NONE
+    out[0] = PNG_FILTER_NONE;
+
+    // Copy raw scanline data as-is
+    for (x = 0; x < width * bytesPerPixel; x++)
+    {
+        out[x + 1] = in[x];
+    }
+}
+
+/*
 void _pascal filterScanline(void *lineptr, void *scanlineBuffer, void *prevLine, word width, word bytesPerPixel)
 {
     word filterTypes[] = {PNG_FILTER_NONE, PNG_FILTER_SUB, PNG_FILTER_UP, PNG_FILTER_AVERAGE, PNG_FILTER_PAETH};
@@ -555,7 +576,7 @@ void _pascal filterScanline(void *lineptr, void *scanlineBuffer, void *prevLine,
             break;
     }
 }
-
+*/
 /*********************************************************************/
 Boolean _pascal deflateScanline(void *scanlineBuffer, dword scanlineSize, z_stream *zstrm, FileHandle file, dword *idatChunkSize, dword *crc)
 {
