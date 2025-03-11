@@ -6,9 +6,8 @@ pngimp.eobj: pnglib.h geos.h Ansi/stdio.h Ansi/stdlib.h Ansi/string.h \
                 zlib.h zconf.h file.h ec.h heap.h htmldrv.h product.h \
                 math.h timedate.h htmlfstr.h awatcher.h htmlprog.h
 pngexp.obj \
-pngexp.eobj: giflib.goh extgraph.goh Objects/winC.goh Objects/metaC.goh \
-                object.goh Objects/inputC.goh Objects/uiInputC.goh \
-                Objects/visC.goh
+pngexp.eobj: extgraph.goh Objects/winC.goh Objects/metaC.goh object.goh \
+                Objects/inputC.goh Objects/uiInputC.goh Objects/visC.goh
 pngexp.obj \
 pngexp.eobj: pnglib.h geos.h Ansi/stdio.h Ansi/stdlib.h Ansi/string.h \
                 graphics.h fontID.h font.h color.h vm.h lmem.h hugearr.h \

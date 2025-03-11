@@ -8,9 +8,9 @@ PngError _pascal pngExportBitmapFHandle(VMFileHandle srcfile, VMBlockHandle bmpb
 
 // Chunk Writing Functions
 Boolean _pascal writePngHeader(FileHandle file);
+Boolean _pascal writeIHDRChunk(FileHandle file, pngIHDRData* ihdrData);
 Boolean _pascal writePLTEChunk(FileHandle file, VMFileHandle srcfile, VMBlockHandle bmpblock, BMType bmptype, BMFormat bitform);
-Boolean _pascal writeIHDRChunk(FileHandle file, dword width, dword height, BMType bmptype, BMFormat bitform);
-Boolean _pascal writeIDATChunk(FileHandle file, void *scanlineBuffer, void *prevLine, dword scanlineSize, dword width, dword height, VMFileHandle srcfile, VMBlockHandle bmpblock);
+Boolean _pascal writeIDATChunk(FileHandle file, VMFileHandle srcfile, VMBlockHandle bmpblock, pngIHDRData* ihdrData);
 Boolean _pascal writeIENDChunk(FileHandle file);
 
 // Processing Functions
