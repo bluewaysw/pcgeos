@@ -110,6 +110,24 @@ typedef struct {
 #define PNG_COLOR_TYPE_GREY_ALPHA  4   /* Grayscale with alpha */
 #define PNG_COLOR_TYPE_RGBA        6   /* Truecolor with alpha */
 
+// Errors when exporting
+typedef enum {
+    PE_NO_ERROR,                        // used
+    PE_WRITE_PROBLEM,                   // used
+    PE_OUT_OF_MEMORY,                   // used
+    PE_INVALID_BITMAP,                  // used
+    PE_CANT_CREATE_DESTINATION_FILE,
+    PE_WRONG_FILE_FORMAT,
+    PE_INVALID_FILE,
+    PE_OUT_OF_DATA,
+    PE_CANT_OPEN_SOURCE_FILE,
+    PE_BLOCK_LOCK_FAILURE,              // used
+    PE_PALETTE_WRITE_FAILURE,
+    PE_NO_FILE_SPECIFYED,
+    PE_ALL_LINES_WRITTEN
+} PngError;
+
+
 /* Public API */
 VMBlockHandle   _pascal _export pngImportConvertFile(FileHandle fileHan, VMFileHandle vmFile);
 
@@ -135,9 +153,8 @@ void            _pascal _export pngConvert16BitLineTo8Bit(unsigned char *line, u
 void            _pascal _export pngPad1BitTo4Bit(unsigned char *input, unsigned int width, unsigned char colorType, unsigned char bitDepth);
 void            _pascal _export pngPad2BitTo4Bit(unsigned char *input, unsigned int width, unsigned char colorType, unsigned char bitDepth);
 
-
-Boolean        _pascal _export pngExportBitmap(VMFileHandle srcfile, VMBlockHandle bmpblock, FileLongName destname, FileHandle destfile);
-Boolean        _pascal _export pngExportBitmapFName(VMFileHandle srcfile, VMBlockHandle bmpblock, PathName destname);
-Boolean        _pascal _export pngExportBitmapFHandle(VMFileHandle srcfile, VMBlockHandle bmpblock, FileHandle destfile);
+PngError        _pascal _export pngExportBitmap(VMFileHandle srcfile, VMBlockHandle bmpblock, FileLongName destname, FileHandle destfile);
+PngError        _pascal _export pngExportBitmapFName(VMFileHandle srcfile, VMBlockHandle bmpblock, PathName destname);
+PngError        _pascal _export pngExportBitmapFHandle(VMFileHandle srcfile, VMBlockHandle bmpblock, FileHandle destfile);
 
 #endif

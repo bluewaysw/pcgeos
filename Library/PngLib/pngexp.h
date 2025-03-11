@@ -2,9 +2,9 @@
 #define __PNGEXPORT_H
 
 // Function Declarations
-Boolean _pascal pngExportBitmap(VMFileHandle srcfile, VMBlockHandle bmpblock, FileLongName destname, FileHandle destfile);
-Boolean _pascal pngExportBitmapFName(VMFileHandle srcfile, VMBlockHandle bmpblock, PathName destname);
-Boolean _pascal pngExportBitmapFHandle(VMFileHandle srcfile, VMBlockHandle bmpblock, FileHandle destfile);
+PngError _pascal pngExportBitmap(VMFileHandle srcfile, VMBlockHandle bmpblock, FileLongName destname, FileHandle destfile);
+PngError _pascal pngExportBitmapFName(VMFileHandle srcfile, VMBlockHandle bmpblock, PathName destname);
+PngError _pascal pngExportBitmapFHandle(VMFileHandle srcfile, VMBlockHandle bmpblock, FileHandle destfile);
 
 // Chunk Writing Functions
 Boolean _pascal writePngHeader(FileHandle file);
