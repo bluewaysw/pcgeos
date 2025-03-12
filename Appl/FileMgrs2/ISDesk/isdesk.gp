@@ -86,17 +86,23 @@ resource AppSCMonikerResource shared lmem read-only
 resource AppSMMonikerResource shared lmem read-only
 resource AppSCGAMonikerResource shared lmem read-only
 
-resource NDFirstSHCMonikerResource shared lmem read-only
-resource NDSecondSHCMonikerResource shared lmem read-only
-resource NDThirdSHCMonikerResource shared lmem read-only
-resource NDFirstSCMonikerResource shared lmem read-only
-resource NDSecondSCMonikerResource shared lmem read-only
-resource NDFirstSMMonikerResource shared lmem read-only
-resource NDFirstSCGAMonikerResource shared lmem read-only
-resource NDFirstTHCMonikerResource shared lmem read-only
-resource NDFirstTCMonikerResource shared lmem read-only
-resource NDFirstTMMonikerResource shared lmem read-only
-resource NDFirstTCGAMonikerResource shared lmem read-only
+resource NDStandardSCMonikerResource shared lmem read-only
+resource NDStandardSMMonikerResource shared lmem read-only
+resource NDStandardSCGAMonikerResource shared lmem read-only
+resource NDStandardTCMonikerResource shared lmem read-only
+resource NDStandardTMMonikerResource shared lmem read-only
+resource NDStandardTCGAMonikerResource shared lmem read-only
+resource InitSHCMonikerResource1 shared lmem read-only
+resource InitSHCMonikerResource2 shared lmem read-only
+resource InitSCMonikerResource shared lmem read-only
+resource InitSMMonikerResource shared lmem read-only
+resource InitTHCMonikerResource shared lmem read-only
+resource InitTCMonikerResource shared lmem read-only
+resource InitTMMonikerResource shared lmem read-only
+resource InitDOSSHCMonikerResource1 shared lmem read-only
+resource InitDOSSHCMonikerResource2 shared lmem read-only
+resource InitDOSTHCMonikerResource shared lmem read-only
+
 
 resource AppDrivesSCMonikerResource shared lmem read-only
 resource AppDrivesSMMonikerResource shared lmem read-only
