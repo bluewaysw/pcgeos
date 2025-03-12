@@ -16,7 +16,7 @@ Boolean _pascal writeIENDChunk(FileHandle file);
 // Processing Functions
 dword _pascal calculateScanlineBufferSize(dword width, BMFormat bitform);
 void _pascal filterScanline(void *lineptr, void *scanlineBuffer, void *prevLine, word width, word bytesPerPixel);
-Boolean _pascal deflateScanline(void *scanlineBuffer, dword scanlineSize, z_stream *zstrm, FileHandle file, dword *idatChunkSize, dword *crc);
+Boolean _pascal deflateScanline(void *scanlineBuffer, word scanlineSize, z_stream *zstrm, FileHandle file, dword *idatChunkSize, dword *crc);
 
 // Utility Functions
 word _pascal mapGEOSToPNGColorType(BMType bmptype);

@@ -251,40 +251,44 @@ Boolean _pascal writeIDATChunk(FileHandle file, VMFileHandle srcfile, VMBlockHan
     dword idatChunkPos = 0;
     dword crc = 0;
     z_stream zstrm;
-    word y;
+    word y = 0;
     pngChunkHeader idatHeader;
     Boolean stat = TRUE;
 
     MemHandle scanlineMem;
     MemHandle prevLineMem;
-    void *scanlineBuffer;
-    void *prevLine;
-    dword scanlineSize;
+    byte *scanlineBuffer;
+    byte *prevLine;
+    word scanlineSize;
 
-    FileHandle debugRaw;
+    byte* temp = (byte*) 0;
 
-    // Calculate scanline buffer size
-    // PNG_MAX_SCANLINE_SIZE
-    // scanlineSize = calculateScanlineBufferSize(ihdrData->width, bitform);
-    scanlineSize = PNG_MAX_SCANLINE_SIZE;
-    if (scanlineSize == 0)
-        return FALSE; // Invalid format or scanline too large
 
-    // Allocate memory for the output scanline buffer and previous scanline buffer
-    scanlineMem = MemAlloc((word)scanlineSize, HF_SWAPABLE, HAF_ZERO_INIT);
-    prevLineMem = MemAlloc((word)scanlineSize, HF_SWAPABLE, HAF_ZERO_INIT);
-    if (!scanlineMem || !prevLineMem)
+    if (HAL_COUNT(HugeArrayLock(srcfile, bmpblock, 0, &lineptr, &size)))
     {
-        return FALSE; // Memory allocation failed
+        scanlineSize = size + 1; // +1 for PNG filter byte
+        if (scanlineSize == 0)
+            return FALSE; // Invalid format or scanline too large
+
+        // Allocate memory for the output scanline buffer and previous scanline buffer
+        scanlineMem = MemAlloc(scanlineSize, HF_SWAPABLE, HAF_ZERO_INIT);
+        if (!scanlineMem)
+            return FALSE; // Memory allocation failed
+
+        prevLineMem = MemAlloc(scanlineSize, HF_SWAPABLE, HAF_ZERO_INIT);
+        if (!prevLineMem)
+            return FALSE; // Memory allocation failed
+
+        // Lock the memory
+        scanlineBuffer = MemLock(scanlineMem);
+        prevLine = MemLock(prevLineMem);
+
+        // Unlock source scanline
+        HugeArrayUnlock(lineptr);
     }
-
-    // Lock the memory
-    scanlineBuffer = MemLock(scanlineMem);
-    prevLine = MemLock(prevLineMem);
-    if (!scanlineBuffer || !prevLine)
+    else
     {
-        stat = FALSE;
-        goto onerror;
+        return FALSE; // Failed to lock scanline
     }
 
     // Initiate IDAT chunk
@@ -314,46 +318,43 @@ Boolean _pascal writeIDATChunk(FileHandle file, VMFileHandle srcfile, VMBlockHan
         goto onerror;
     }
 
-	// FilePushDir();
-	// FileSetStandardPath(SP_DOCUMENT);
-    // debugRaw = FileCreate("dbgraw.bin", (FCF_NATIVE | FILE_CREATE_TRUNCATE | FILE_ACCESS_RW | FILE_DENY_RW ), 0);
-    // FilePopDir();
-
     // Loop through all scanlines
     for (y = 0; y < ihdrData->height; y++)
     {
         if (HAL_COUNT(HugeArrayLock(srcfile, bmpblock, y, &lineptr, &size)))
         {
             // Apply best PNG filter
-            filterScanline(lineptr, scanlineBuffer, prevLine, ihdrData->width, 1);
+            // filterScanline(lineptr, scanlineBuffer, prevLine, ihdrData->width, 1);
 
-            // if (debugRaw)
-            // {
-            //     FileWrite(debugRaw, scanlineBuffer, size, FALSE);
-            // }
+            scanlineBuffer[0] = PNG_FILTER_NONE;
+            memcpy(scanlineBuffer + 1, lineptr, scanlineSize);
 
             // Deflate and append to IDAT chunk
-            if (!deflateScanline(scanlineBuffer, size, &zstrm, file, &idatChunkSize, &crc))
+            if (!deflateScanline(scanlineBuffer, scanlineSize, &zstrm, file, &idatChunkSize, &crc))
             {
+                EC_WARNING(-1);
+
                 deflateEnd(&zstrm);
                 HugeArrayUnlock(lineptr);
-                //stat = FALSE; // Compression failed
+                stat = FALSE; // Compression failed
                 break;
             }
 
             // Swap scanline buffers
-            memcpy(prevLine, scanlineBuffer, size);
+            // memcpy(prevLine, scanlineBuffer, scanlineSize);
+            temp = prevLine;
+            prevLine = scanlineBuffer;
+            scanlineBuffer = temp;
 
             // Unlock source scanline
             HugeArrayUnlock(lineptr);
         }
         else
         {
-            deflateEnd(&zstrm);
+            // deflateEnd(&zstrm);
+            break;
         }
     }
-
-    // FileClose(debugRaw, 0);
 
     // Finalize deflation
     deflateEnd(&zstrm);
@@ -639,7 +640,7 @@ void _pascal filterScanline(void *lineptr, void *scanlineBuffer, void *prevLine,
 }
 */
 /*********************************************************************/
-Boolean _pascal deflateScanline(void *scanlineBuffer, dword scanlineSize, z_stream *zstrm, FileHandle file, dword *idatChunkSize, dword *crc)
+Boolean _pascal deflateScanline(void *scanlineBuffer, word scanlineSize, z_stream *zstrm, FileHandle file, dword *idatChunkSize, dword *crc)
 {
     int ret;
     dword compressedSize;
@@ -662,7 +663,7 @@ Boolean _pascal deflateScanline(void *scanlineBuffer, dword scanlineSize, z_stre
 
     // Set input for deflation
     zstrm->next_in = (byte *)scanlineBuffer;
-    zstrm->avail_in = (word)scanlineSize;
+    zstrm->avail_in = scanlineSize;
 
     // Deflate and append to IDAT chunk
     do
