@@ -12,7 +12,8 @@ Boolean _pascal writeIENDChunk(FileHandle file);
 
 // Processing Functions
 dword _pascal calculateScanlineBufferSize(dword width, BMFormat bitform);
-void _pascal filterScanline(byte *lineptr, byte *scanlineBuffer, byte *prevLine, dword width, word bytesPerPixel);
+word _pascal calcBytesPerPixel(pngIHDRData* ihdrData);
+void _pascal filterScanline(byte* lineptr, byte* scanlineBuffer, byte *prevLine, word scanlineSize, word bytesPerPixel);
 Boolean _pascal deflateScanline(void *scanlineBuffer, word scanlineSize, z_stream *zstrm, FileHandle file, dword *idatChunkSize, dword *crc);
 
 // Utility Functions

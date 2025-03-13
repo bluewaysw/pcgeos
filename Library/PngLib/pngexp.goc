@@ -247,7 +247,8 @@ Boolean _pascal writePLTEChunk(FileHandle file, VMFileHandle srcfile, VMBlockHan
 Boolean _pascal writeIDATChunk(FileHandle file, VMFileHandle srcfile, VMBlockHandle bmpblock, pngIHDRData* ihdrData)
 {
     void *lineptr;
-    word size;
+    word scanlineSize = 0;
+    word scanlineSizeWithFilterByte = 0;
     dword idatChunkSize = 0;
     dword idatChunkPos = 0;
     dword crc = 0;
@@ -260,23 +261,22 @@ Boolean _pascal writeIDATChunk(FileHandle file, VMFileHandle srcfile, VMBlockHan
     MemHandle prevLineMem;
     byte *scanlineBuffer;
     byte *prevLine;
-    word scanlineSize;
-
     byte* temp = (byte*) 0;
+    word bytesPerPixel = calcBytesPerPixel(ihdrData);
 
 
-    if (HAL_COUNT(HugeArrayLock(srcfile, bmpblock, 0, &lineptr, &size)))
+    if (HAL_COUNT(HugeArrayLock(srcfile, bmpblock, 0, &lineptr, &scanlineSize)))
     {
-        scanlineSize = size + 1; // +1 for PNG filter byte
-        if (scanlineSize == 0)
+        scanlineSizeWithFilterByte = scanlineSize + 1; // +1 for PNG filter byte
+        if (scanlineSizeWithFilterByte == 0)
             return FALSE; // Invalid format or scanline too large
 
         // Allocate memory for the output scanline buffer and previous scanline buffer
-        scanlineMem = MemAlloc(scanlineSize, HF_SWAPABLE, HAF_ZERO_INIT);
+        scanlineMem = MemAlloc(scanlineSizeWithFilterByte, HF_SWAPABLE, HAF_ZERO_INIT);
         if (!scanlineMem)
             return FALSE; // Memory allocation failed
 
-        prevLineMem = MemAlloc(scanlineSize, HF_SWAPABLE, HAF_ZERO_INIT);
+        prevLineMem = MemAlloc(scanlineSizeWithFilterByte, HF_SWAPABLE, HAF_ZERO_INIT);
         if (!prevLineMem)
         {
             MemFree(scanlineMem);
@@ -325,16 +325,15 @@ Boolean _pascal writeIDATChunk(FileHandle file, VMFileHandle srcfile, VMBlockHan
     // Loop through all scanlines
     for (y = 0; y < ihdrData->height; y++)
     {
-        if (HAL_COUNT(HugeArrayLock(srcfile, bmpblock, y, &lineptr, &size)))
+        if (HAL_COUNT(HugeArrayLock(srcfile, bmpblock, y, &lineptr, &scanlineSize)))
         {
             // Apply best PNG filter
-            // filterScanline(lineptr, scanlineBuffer, prevLine, ihdrData->width, 1);
-
-            scanlineBuffer[0] = PNG_FILTER_NONE;
-            memcpy(scanlineBuffer + 1, lineptr, scanlineSize);
+            // scanlineBuffer[0] = PNG_FILTER_NONE;
+            // memcpy(scanlineBuffer + 1, lineptr, scanlineSize);
+            filterScanline(lineptr, scanlineBuffer, (y == 0) ? NULL : prevLine, scanlineSize, bytesPerPixel);
 
             // Deflate and append to IDAT chunk
-            if (!deflateScanline(scanlineBuffer, scanlineSize, &zstrm, file, &idatChunkSize, &crc))
+            if (!deflateScanline(scanlineBuffer, scanlineSizeWithFilterByte, &zstrm, file, &idatChunkSize, &crc))
             {
                 HugeArrayUnlock(lineptr);
                 stat = FALSE; // Compression failed
@@ -342,7 +341,7 @@ Boolean _pascal writeIDATChunk(FileHandle file, VMFileHandle srcfile, VMBlockHan
             }
 
             // Swap scanline buffers
-            // memcpy(prevLine, scanlineBuffer, scanlineSize);
+            // memcpy(prevLine, scanlineBuffer + 1, scanlineSize);
             temp = prevLine;
             prevLine = scanlineBuffer;
             scanlineBuffer = temp;
@@ -497,7 +496,37 @@ dword _pascal calculateScanlineBufferSize(dword width, BMFormat bitform)
     return rowSize;
 }
 
+word calcBytesPerPixel(pngIHDRData* ihdrData)
+{
+    word bytesPerPixel;
+
+    // Determine bytes per pixel based on PNG color type
+    switch (ihdrData->colorType)
+    {
+        case PNG_COLOR_TYPE_GREY:
+            bytesPerPixel = (ihdrData->bitDepth == 8) ? 1 : 2; // 1 byte for 8-bit, 2 for 16-bit
+            break;
+        case PNG_COLOR_TYPE_RGB:
+            bytesPerPixel = (ihdrData->bitDepth == 8) ? 3 : 6; // 3 bytes per pixel for 8-bit, 6 for 16-bit
+            break;
+        case PNG_COLOR_TYPE_PALETTE:
+            bytesPerPixel = 1; // 1 byte per pixel (index)
+            break;
+        case PNG_COLOR_TYPE_GREY_ALPHA:
+            bytesPerPixel = (ihdrData->bitDepth == 8) ? 2 : 4; // 2 bytes for 8-bit (gray+alpha), 4 for 16-bit
+            break;
+        case PNG_COLOR_TYPE_RGBA:
+            bytesPerPixel = (ihdrData->bitDepth == 8) ? 4 : 8; // 4 bytes for 8-bit RGBA, 8 for 16-bit
+            break;
+        default:
+        bytesPerPixel = 0; // Unsupported format
+    }
+
+    return bytesPerPixel;
+}
+
 /*********************************************************************/
+/*
 void _pascal filterScanline(byte *lineptr, byte *scanlineBuffer, byte *prevLine, dword width, word bytesPerPixel)
 {
     word x;
@@ -513,132 +542,166 @@ void _pascal filterScanline(byte *lineptr, byte *scanlineBuffer, byte *prevLine,
         out[x + 1] = in[x];
     }
 }
+*/
 
-/*
-void _pascal filterScanline(void *lineptr, void *scanlineBuffer, void *prevLine, word width, word bytesPerPixel)
+void _pascal filterScanline(byte* lineptr, byte* scanlineBuffer, byte *prevLine, word scanlineSize, word bytesPerPixel)
 {
     word filterTypes[] = {PNG_FILTER_NONE, PNG_FILTER_SUB, PNG_FILTER_UP, PNG_FILTER_AVERAGE, PNG_FILTER_PAETH};
-    word bestFilter = PNG_FILTER_NONE;
-    dword bestSum = 0xFFFFFFFF; // Large initial value
+    word bestFilter;
+    dword bestSum;
     word i, x;
-    byte testBuffer[PNG_MAX_SCANLINE_SIZE];
+    dword sum;
+    MemHandle testBufferMem;
+    byte *testBuffer;
+    byte *out;
+    byte *in;
+    byte *prev;
+    byte left, above, aboveLeft;
 
-    byte *out = (byte *)scanlineBuffer;
-    byte *in = (byte *)lineptr;
-    byte *prev = (byte *)prevLine;
+    // Initialize variables
+    bestFilter = PNG_FILTER_NONE;
+    bestSum = 0xFFFFFFFF; // Large initial value
+    testBufferMem = NullHandle;
+    testBuffer = NULL;
+    out = scanlineBuffer;
+    in = lineptr;
+    prev = prevLine;
 
-    // Determine the best filter dynamically
-    for (i = 0; i < 5; i++)
+/*
+    // Ensure first scanline is always FILTER_NONE
+    if (!prevLine)
     {
-        dword sum = 0;
-
-        // Apply the filter temporarily to testBuffer
-        testBuffer[0] = (byte)filterTypes[i];
-
-        switch (filterTypes[i])
-        {
-            case PNG_FILTER_NONE:
-                for (x = 0; x < width * bytesPerPixel; x++)
-                    testBuffer[x + 1] = in[x];
-                break;
-
-            case PNG_FILTER_SUB:
-                for (x = 0; x < width * bytesPerPixel; x++)
-                {
-                    byte left = (x >= bytesPerPixel) ? in[x - bytesPerPixel] : 0;
-                    testBuffer[x + 1] = in[x] - left;
-                }
-                break;
-
-            case PNG_FILTER_UP:
-                for (x = 0; x < width * bytesPerPixel; x++)
-                {
-                    byte above = prev ? prev[x] : 0;
-                    testBuffer[x + 1] = in[x] - above;
-                }
-                break;
-
-            case PNG_FILTER_AVERAGE:
-                for (x = 0; x < width * bytesPerPixel; x++)
-                {
-                    byte left = (x >= bytesPerPixel) ? in[x - bytesPerPixel] : 0;
-                    byte above = prev ? prev[x] : 0;
-                    testBuffer[x + 1] = in[x] - ((left + above) / 2);
-                }
-                break;
-
-            case PNG_FILTER_PAETH:
-                for (x = 0; x < width * bytesPerPixel; x++)
-                {
-                    byte left = (x >= bytesPerPixel) ? in[x - bytesPerPixel] : 0;
-                    byte above = prev ? prev[x] : 0;
-                    byte aboveLeft = (prev && x >= bytesPerPixel) ? prev[x - bytesPerPixel] : 0;
-                    testBuffer[x + 1] = in[x] - paethPredictor(left, above, aboveLeft);
-                }
-                break;
-        }
-
-        // Calculate sum of absolute values for better compression estimation
-        for (x = 1; x <= width * bytesPerPixel; x++) // Ignore first byte (filter type)
-        {
-            sum += abs((sword)testBuffer[x]);
-        }
-
-        // Choose the filter that produces the smallest sum
-        if (sum < bestSum)
-        {
-            bestSum = sum;
-            bestFilter = filterTypes[i];
-        }
+        bestFilter = PNG_FILTER_NONE;
     }
+    else
+    {
+        // Allocate test buffer dynamically (scanlineSize + 1 for filter byte)
+        testBufferMem = MemAlloc(scanlineSize + 1, HF_SWAPABLE, HAF_ZERO_INIT);
+        if (!testBufferMem) return; // Memory allocation failed
+
+        testBuffer = (byte *)MemLock(testBufferMem);
+        if (!testBuffer)
+        {
+            MemFree(testBufferMem);
+            return; // Memory lock failed
+        }
+
+        // Determine the best filter dynamically
+        for (i = 0; i < 5; i++)
+        {
+            sum = 0;
+            testBuffer[0] = (byte)filterTypes[i];
+
+            switch (filterTypes[i])
+            {
+                case PNG_FILTER_NONE:
+                    for (x = 0; x < scanlineSize; x++)
+                        testBuffer[x + 1] = in[x];
+                    break;
+
+                case PNG_FILTER_SUB:
+                    for (x = 0; x < scanlineSize; x++)
+                    {
+                        left = (x >= bytesPerPixel) ? in[x - bytesPerPixel] : 0;
+                        testBuffer[x + 1] = in[x] - left;
+                    }
+                    break;
+
+                case PNG_FILTER_UP:
+                    for (x = 0; x < scanlineSize; x++)
+                    {
+                        above = prev[x];
+                        testBuffer[x + 1] = in[x] - above;
+                    }
+                    break;
+
+                case PNG_FILTER_AVERAGE:
+                    for (x = 0; x < scanlineSize; x++)
+                    {
+                        left = (x >= bytesPerPixel) ? in[x - bytesPerPixel] : 0;
+                        above = prev[x];
+                        testBuffer[x + 1] = in[x] - ((left + above) / 2);
+                    }
+                    break;
+
+                case PNG_FILTER_PAETH:
+                    for (x = 0; x < scanlineSize; x++)
+                    {
+                        left = (x >= bytesPerPixel) ? in[x - bytesPerPixel] : 0;
+                        above = prev[x];
+                        aboveLeft = (x >= bytesPerPixel) ? prev[x - bytesPerPixel] : 0;
+                        testBuffer[x + 1] = in[x] - paethPredictor(left, above, aboveLeft);
+                    }
+                    break;
+            }
+
+            // Compute absolute sum of filtered values for comparison
+            for (x = 1; x < scanlineSize; x++) // Ignore first byte (filter type)
+            {
+                sum += abs((sword)testBuffer[x]);
+            }
+
+            // Choose the filter with the smallest sum
+            if (sum < bestSum)
+            {
+                bestSum = sum;
+                bestFilter = filterTypes[i];
+            }
+        }
+
+        // Free dynamically allocated buffer after best filter selection
+        MemFree(testBufferMem);
+    }
+*/
 
     // Apply the best filter to the actual scanlineBuffer
+    bestFilter = PNG_FILTER_UP;
     out[0] = (byte)bestFilter;
 
     switch (bestFilter)
     {
         case PNG_FILTER_NONE:
-            for (x = 0; x < width * bytesPerPixel; x++)
+            for (x = 0; x < scanlineSize; x++)
                 out[x + 1] = in[x];
             break;
 
         case PNG_FILTER_SUB:
-            for (x = 0; x < width * bytesPerPixel; x++)
+            for (x = 0; x < scanlineSize; x++)
             {
-                byte left = (x >= bytesPerPixel) ? in[x - bytesPerPixel] : 0;
+                left = (x >= bytesPerPixel) ? in[x - bytesPerPixel] : 0;
                 out[x + 1] = in[x] - left;
             }
             break;
 
         case PNG_FILTER_UP:
-            for (x = 0; x < width * bytesPerPixel; x++)
+            for (x = 0; x < scanlineSize; x++)
             {
-                byte above = prev ? prev[x] : 0;
+                above = (prev) ? prev[x] : 0;  // Ensure safe access
                 out[x + 1] = in[x] - above;
             }
             break;
 
         case PNG_FILTER_AVERAGE:
-            for (x = 0; x < width * bytesPerPixel; x++)
+            for (x = 0; x < scanlineSize; x++)
             {
-                byte left = (x >= bytesPerPixel) ? in[x - bytesPerPixel] : 0;
-                byte above = prev ? prev[x] : 0;
+                left = (x >= bytesPerPixel) ? in[x - bytesPerPixel] : 0;
+                above = prev[x];
                 out[x + 1] = in[x] - ((left + above) / 2);
             }
             break;
 
         case PNG_FILTER_PAETH:
-            for (x = 0; x < width * bytesPerPixel; x++)
+            for (x = 0; x < scanlineSize; x++)
             {
-                byte left = (x >= bytesPerPixel) ? in[x - bytesPerPixel] : 0;
-                byte above = prev ? prev[x] : 0;
-                byte aboveLeft = (prev && x >= bytesPerPixel) ? prev[x - bytesPerPixel] : 0;
+                left = (x >= bytesPerPixel) ? in[x - bytesPerPixel] : 0;
+                above = prev[x];
+                aboveLeft = (x >= bytesPerPixel) ? prev[x - bytesPerPixel] : 0;
                 out[x + 1] = in[x] - paethPredictor(left, above, aboveLeft);
             }
             break;
     }
 }
-*/
+
 /*********************************************************************/
 Boolean _pascal deflateScanline(void *scanlineBuffer, word scanlineSize, z_stream *zstrm, FileHandle file, dword *idatChunkSize, dword *crc)
 {
