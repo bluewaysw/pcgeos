@@ -6,9 +6,9 @@
 GEODE           = pnglib
 ASM_TO_OBJS     =
 UI_TO_RDFS      =
-SRCS            = common.h pngexp.h pngimp.h common.goc pngexp.goc\
-                  pngimp.goc
-OBJS            = common.obj pngexp.obj pngimp.obj
+SRCS            = common.h pngimp.h pngexp.h pngimp.goc common.goc\
+                  pngexp.goc
+OBJS            = pngimp.obj common.obj pngexp.obj
 LOBJS           =
 LIBOBJ          = $(DEVEL_DIR)/Include/$(GEODE).ldf
 LIBNAME         = pnglib
