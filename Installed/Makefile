@@ -94,7 +94,7 @@ minimalLibrary	: kernel swap sound net ui isui motif spool text mailbox \
 		  socket dhcp borlandrtl ffile streamc mailhub mailsmtp \
 		  modemc mailpop3 lot123ss csv \
 		  parentc wmlib rtf \
-		  jpeg giflib gif htmlimpx n2txt inetmsg extui \
+		  jpeg giflib gif png htmlimpx n2txt inetmsg extui \
 		  winword8 zlib dirlist minizip idialc eps impex_libs \
 		  thumbdb ftplib flllib sitelist int8087 intx87\
 		  basicdb gridlib gsol treplib hostif
@@ -300,6 +300,9 @@ Installed/Library/Breadbox/Impex/JPEG: ui impex ansic ijgjpeg math MAKELIB
 
 gif : Installed/Library/Breadbox/Impex/GIF
 Installed/Library/Breadbox/Impex/GIF: ui impex ansic extgraph giflib MAKELIB
+
+png : Installed/Library/Breadbox/Impex/PNG
+Installed/Library/Breadbox/Impex/PNG: ui impex extgraph pnglib MAKELIB
 
 wmf : Installed/Library/Trans/Graphics/Vector/Wmf
 Installed/Library/Trans/Graphics/Vector/Wmf: ui impex ansic MAKELIB
