@@ -426,7 +426,7 @@ Boolean _pascal writeIENDChunk(FileHandle file)
 
 /*********************************************************************
 *********************************************************************/
-void _pascal filterScanline(byte* scanlinePtr, byte* filteredScanlinePtr, byte *prevScanlinePtr, word scanlineSize, word bytesPerPixel)
+byte _pascal getFilterForScanline(byte* scanlinePtr, byte *prevScanlinePtr, word scanlineSize, word bytesPerPixel)
 {
     word filterTypes[] = {PNG_FILTER_NONE, PNG_FILTER_SUB, PNG_FILTER_UP, PNG_FILTER_AVERAGE, PNG_FILTER_PAETH};
     word bestFilter = PNG_FILTER_NONE;
@@ -435,7 +435,6 @@ void _pascal filterScanline(byte* scanlinePtr, byte* filteredScanlinePtr, byte *
     dword sum = 0;
     MemHandle testBufferMem = NullHandle;
     byte *testBuffer = NULL;
-    byte *out = filteredScanlinePtr;
     byte *in = scanlinePtr;
     byte *prev = prevScanlinePtr;
     byte left, above, aboveLeft = 0;
@@ -450,14 +449,14 @@ void _pascal filterScanline(byte* scanlinePtr, byte* filteredScanlinePtr, byte *
         // Allocate test buffer dynamically (scanlineSize + 1 for filter byte)
         testBufferMem = MemAlloc(scanlineSize + 1, HF_SWAPABLE, HAF_ZERO_INIT);
         if (!testBufferMem) {
-            return; // Memory allocation failed
+            return ((byte) PNG_FILTER_NONE); // Memory allocation failed
         }
 
         testBuffer = (byte *)MemLock(testBufferMem);
         if (!testBuffer)
         {
             MemFree(testBufferMem);
-            return; // Memory lock failed
+            return ((byte) PNG_FILTER_NONE); // Memory lock failed
         }
 
         // Determine the best filter dynamically
@@ -528,9 +527,25 @@ void _pascal filterScanline(byte* scanlinePtr, byte* filteredScanlinePtr, byte *
     }
 
     // Apply the best filter to the actual filteredScanlinePtr
-    out[0] = (byte)bestFilter;
+    return ((byte)bestFilter);
+}
 
-    switch (bestFilter)
+
+
+/*********************************************************************
+*********************************************************************/
+void _pascal filterScanline(byte* scanlinePtr, byte* filteredScanlinePtr, byte *prevScanlinePtr, word scanlineSize, word bytesPerPixel)
+{
+    word x = 0;
+    byte *out = filteredScanlinePtr;
+    byte *in = scanlinePtr;
+    byte *prev = prevScanlinePtr;
+    byte left, above, aboveLeft = 0;
+
+    // Apply the best filter to the actual filteredScanlinePtr
+    out[0] = getFilterForScanline(scanlinePtr, prevScanlinePtr, scanlineSize, bytesPerPixel);
+
+    switch (out[0])
     {
         case PNG_FILTER_NONE:
             for (x = 0; x < scanlineSize; x++)
