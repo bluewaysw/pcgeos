@@ -142,7 +142,7 @@ TokenMoniker	< <'ndPL'>,	NDPlayAndLearnFolderMonikerList	>
 TokenMoniker	< <'ndCU'>,	NDComputerUtilsFolderMonikerList >
 TokenMoniker	< <'ndAc'>,	NDAccessoriesFolderMonikerList	>
 TokenMoniker	< <'ndAO'>,	NDAddOnsFolderMonikerList	>
-TokenMoniker	< <'ndMS'>,	NDMainScreenMonikerList		>
+;TokenMoniker	< <'ndMS'>,	NDMainScreenMonikerList		>
 TokenMoniker	< <'ndSU'>,	NDSignUpMonikerList		>
 ;DOS files
 TokenMoniker	< <'dJPG'>,	GPCdJPGMonikerList		>
