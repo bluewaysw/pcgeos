@@ -21,16 +21,15 @@
 #define _TTMETRICS_H_
 
 
-void _pascal TrueType_Char_Metrics( 
+WWFixedAsDWord _pascal TrueType_Char_Metrics( 
                                    word                 character, 
                                    GCM_info             info, 
                                    const FontInfo*      fontInfo,
-	                               const OutlineEntry*  outlineEntry,  
+	                           const OutlineEntry*  outlineEntry,  
                                    TextStyle            stylesToImplement,
                                    WWFixedAsDWord       pointSize,
                                    Byte                 width,
                                    Byte                 weight,
-                                   dword*               result,
                                    MemHandle            varBlock );
 
 #endif /* _TTMETRICS_H_ */
