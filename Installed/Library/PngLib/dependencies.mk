@@ -1,7 +1,3 @@
-common.obj \
-common.eobj: 
-common.obj \
-common.eobj: common.h geos.h
 pngimp.obj \
 pngimp.eobj: 
 pngimp.obj \
@@ -10,6 +6,10 @@ pngimp.eobj: pnglib.h geos.h Ansi/stdio.h Ansi/stdlib.h Ansi/string.h \
                 zlib.h zconf.h file.h ec.h heap.h htmldrv.h product.h \
                 math.h timedate.h htmlfstr.h awatcher.h htmlprog.h \
                 pngimp.h common.h
+common.obj \
+common.eobj: 
+common.obj \
+common.eobj: common.h geos.h
 pngexp.obj \
 pngexp.eobj: extgraph.goh Objects/winC.goh Objects/metaC.goh object.goh \
                 Objects/inputC.goh Objects/uiInputC.goh Objects/visC.goh

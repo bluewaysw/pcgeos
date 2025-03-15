@@ -7,11 +7,11 @@
 #define FILE_WRITE_CHECKED(file, buffer, size) (FileWrite((file), (buffer), (size), FALSE) == (size))
 
 // Chunk Writing Functions
-Boolean _pascal writePngHeader(FileHandle file);
-Boolean _pascal writeIHDRChunk(FileHandle file, pngIHDRData* ihdrData);
-Boolean _pascal writePLTEChunk(FileHandle file, VMFileHandle srcfile, VMBlockHandle bmpblock, BMType bmptype, BMFormat bitform);
-Boolean _pascal writeIDATChunk(FileHandle file, VMFileHandle srcfile, VMBlockHandle bmpblock, pngIHDRData* ihdrData);
-Boolean _pascal writeIENDChunk(FileHandle file);
+PngError _pascal writePngHeader(FileHandle file);
+PngError _pascal writeIHDRChunk(FileHandle file, pngIHDRData* ihdrData);
+PngError _pascal writePLTEChunk(FileHandle file, VMFileHandle srcfile, VMBlockHandle bmpblock, BMType bmptype, BMFormat bitform);
+PngError _pascal writeIDATChunk(FileHandle file, VMFileHandle srcfile, VMBlockHandle bmpblock, pngIHDRData* ihdrData);
+PngError _pascal writeIENDChunk(FileHandle file);
 
 // Processing Functions
 dword _pascal calculateScanlineBufferSize(dword width, BMFormat bitform);

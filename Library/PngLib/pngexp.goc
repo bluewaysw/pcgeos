@@ -18,7 +18,7 @@
 
 /*********************************************************************
 *********************************************************************/
-PngError _pascal pngExportBitmap(VMFileHandle srcfile, VMBlockHandle bmpblock, FileLongName destname, FileHandle destfile)
+PngError _pascal _export pngExportBitmapFHandle(VMFileHandle srcfile, VMBlockHandle bmpblock, FileHandle destfile)
 {
     dword width = 0;
     dword height = 0;
@@ -55,7 +55,7 @@ PngError _pascal pngExportBitmap(VMFileHandle srcfile, VMBlockHandle bmpblock, F
         case BMF_4BIT:  ihdrData.bitDepth = 4; break;
         case BMF_8BIT:  ihdrData.bitDepth = 8; break;
         case BMF_24BIT: ihdrData.bitDepth = 8; break; // 8 bits per channel in truecolor
-        default:        return FALSE; // Unsupported format
+        default:        return PE_INVALID_BITMAP; // Unsupported format
     }
 
     // Set PNG standard fields
@@ -66,51 +66,33 @@ PngError _pascal pngExportBitmap(VMFileHandle srcfile, VMBlockHandle bmpblock, F
     ihdrData.interlaceMethod = 0; // No interlacing
 
     // start writing chunks
-    if (!writePngHeader(destfile)) {
-        stat = PE_WRITE_PROBLEM;
+    if ((stat = writePngHeader(destfile)) != PE_NO_ERROR) {
+        return stat;
     }
 
     // Write IHDR chunk
-    if (!writeIHDRChunk(destfile, &ihdrData)) {
-        stat = PE_WRITE_PROBLEM;
+    if ((stat = writeIHDRChunk(destfile, &ihdrData)) != PE_NO_ERROR) {
+        return stat;
     }
 
     // Write PLTE chunk (if applicable)
-    writePLTEChunk(destfile, srcfile, bmpblock, bmptype, bitform);
+    if ((stat = writePLTEChunk(destfile, srcfile, bmpblock, bmptype, bitform)) != PE_NO_ERROR) {
+        return stat;
+    }
 
     // Write IDAT chunk (handles scanline processing, filtering and compression)
-    if (!writeIDATChunk(destfile, srcfile, bmpblock, &ihdrData)) {
-        stat = PE_WRITE_PROBLEM;
+    if ((stat = writeIDATChunk(destfile, srcfile, bmpblock, &ihdrData)) != PE_NO_ERROR) {
+        return stat;
     }
 
     // Write IEND chunk
-    if (!writeIENDChunk(destfile)) {
-        stat = PE_WRITE_PROBLEM;
+    if ((stat = writeIENDChunk(destfile)) != PE_NO_ERROR) {
+        return stat;
     }
 
     return stat;
 }
 
-/*********************************************************************
-*********************************************************************/
-PngError _pascal _export pngExportBitmapFName(VMFileHandle srcfile, VMBlockHandle bmpblock, PathName destname)
-{
-	PngError stat = PE_NO_ERROR;
-
-	stat = pngExportBitmap(srcfile, bmpblock, destname, 0);
-
-	return(stat);
-}
-
-/*********************************************************************
-*********************************************************************/
-PngError _pascal _export pngExportBitmapFHandle(VMFileHandle srcfile, VMBlockHandle bmpblock, FileHandle destfile)
-{
-	PngError stat = PE_NO_ERROR;
-	stat = pngExportBitmap(srcfile, bmpblock, 0, destfile);
-
-	return(stat);
-}
 
 /*********************************************************************
 * Chunk writing functions
@@ -118,22 +100,22 @@ PngError _pascal _export pngExportBitmapFHandle(VMFileHandle srcfile, VMBlockHan
 
 /*********************************************************************
 *********************************************************************/
-Boolean _pascal writePngHeader(FileHandle file)
+PngError _pascal writePngHeader(FileHandle file)
 {
     // make sure we are at the beginning of the file
     FilePos(file, 0, FILE_POS_START);
 
     // Write the PNG signature to the file
     if (!FILE_WRITE_CHECKED(file, PNG_SIGNATURE, sizeof(PNG_SIGNATURE))) {
-        return FALSE; // Failed to write signature
+        return PE_WRITE_PROBLEM; // Failed to write signature
     }
 
-    return TRUE; // Successfully wrote PNG header
+    return PE_NO_ERROR; // Successfully wrote PNG header
 }
 
 /*********************************************************************
 *********************************************************************/
-Boolean _pascal writeIHDRChunk(FileHandle file, pngIHDRData* ihdrData)
+PngError _pascal writeIHDRChunk(FileHandle file, pngIHDRData* ihdrData)
 {
     pngChunkHeader ihdrHeader = {0};
     dword crc = 0;
@@ -144,7 +126,7 @@ Boolean _pascal writeIHDRChunk(FileHandle file, pngIHDRData* ihdrData)
 
     // Write IHDR chunk header
     if (!FILE_WRITE_CHECKED(file, &ihdrHeader, sizeof(ihdrHeader))) {
-        return FALSE; // Failed to write IHDR header
+        return PE_WRITE_PROBLEM; // Failed to write IHDR header
     }
 
     // Initialize CRC calculation
@@ -153,21 +135,21 @@ Boolean _pascal writeIHDRChunk(FileHandle file, pngIHDRData* ihdrData)
 
     // Write IHDR data
     if (!FILE_WRITE_CHECKED(file, ihdrData, sizeof(pngIHDRData))) {
-        return FALSE; // Failed to write IHDR data
+        return PE_WRITE_PROBLEM; // Failed to write IHDR data
     }
 
     // Write CRC at the end of the IHDR chunk
     crc = swapEndian(crc);
     if (!FILE_WRITE_CHECKED(file, &crc, sizeof(crc))) {
-        return FALSE; // Failed to write IHDR CRC
+        return PE_WRITE_PROBLEM; // Failed to write IHDR CRC
     }
 
-    return TRUE;
+    return PE_NO_ERROR;
 }
 
 /*********************************************************************
 *********************************************************************/
-Boolean _pascal writePLTEChunk(FileHandle file, VMFileHandle srcfile, VMBlockHandle bmpblock, BMType bmptype, BMFormat bitform)
+PngError _pascal writePLTEChunk(FileHandle file, VMFileHandle srcfile, VMBlockHandle bmpblock, BMType bmptype, BMFormat bitform)
 {
     pngChunkHeader header = {0};
     dword crc = 0;
@@ -177,7 +159,7 @@ Boolean _pascal writePLTEChunk(FileHandle file, VMFileHandle srcfile, VMBlockHan
     MemHandle palMem = NullHandle;
     EGError bmpErr = EGE_NO_ERROR;
     byte rgb[3] = {0};
-    Boolean stat = TRUE;
+    Boolean stat = PE_NO_ERROR;
 
     if (bmptype & BMT_PALETTE)
     {
@@ -185,20 +167,20 @@ Boolean _pascal writePLTEChunk(FileHandle file, VMFileHandle srcfile, VMBlockHan
         palMem = MemAlloc((sizeof(RGBValue) * numEntries), HF_SWAPABLE, HAF_ZERO_INIT);
 
         if (!palMem) {
-            stat = FALSE;
+            stat = PE_OUT_OF_MEMORY;
             goto exit;
         }
 
         palPtr = (RGBValue*) MemLock(palMem);
         if (!palPtr) {
-            stat = FALSE;
+            stat = PE_BLOCK_LOCK_FAILURE;
             goto exit;
         }
 
         // Get palette of this bitmap
         BmpGetBitmapPalette(srcfile, bmpblock, palPtr, numEntries, &bmpErr);
         if (bmpErr != EGE_NO_ERROR) {
-            stat = FALSE;
+            stat = PE_PALETTE_RETRIEVAL_FAILURE;
             goto exit;
         }
 
@@ -207,7 +189,7 @@ Boolean _pascal writePLTEChunk(FileHandle file, VMFileHandle srcfile, VMBlockHan
         header.type = swapEndian((dword)PNG_CHUNK_PLTE);
 
         if (!FILE_WRITE_CHECKED(file, &header, sizeof(header))) {
-            stat = FALSE;
+            stat = PE_WRITE_PROBLEM;
             goto exit;
         }
 
@@ -222,7 +204,7 @@ Boolean _pascal writePLTEChunk(FileHandle file, VMFileHandle srcfile, VMBlockHan
             rgb[2] = palPtr[i].RGB_blue;
 
             if (!FILE_WRITE_CHECKED(file, rgb, 3)) {
-                stat = FALSE;
+                stat = PE_WRITE_PROBLEM;
                 goto exit;
             }
 
@@ -232,7 +214,7 @@ Boolean _pascal writePLTEChunk(FileHandle file, VMFileHandle srcfile, VMBlockHan
         // Finalize CRC
         crc = swapEndian(crc);
         if (!FILE_WRITE_CHECKED(file, &crc, sizeof(crc))) {
-            stat = FALSE;
+            stat = PE_WRITE_PROBLEM;
             goto exit;
         }
     }
@@ -244,7 +226,7 @@ exit:
 
 /*********************************************************************
 *********************************************************************/
-Boolean _pascal writeIDATChunk(FileHandle file, VMFileHandle srcfile, VMBlockHandle bmpblock, pngIHDRData* ihdrData)
+PngError _pascal writeIDATChunk(FileHandle file, VMFileHandle srcfile, VMBlockHandle bmpblock, pngIHDRData* ihdrData)
 {
     void *scanlinePtr = NULL;
     word scanlineSize = 0;
@@ -256,7 +238,7 @@ Boolean _pascal writeIDATChunk(FileHandle file, VMFileHandle srcfile, VMBlockHan
     Boolean zstrmInited = FALSE;
     word y = 0;
     pngChunkHeader idatHeader = {0};
-    Boolean stat = TRUE; // the concept is: if anything fails, this is set to FALSE
+    PngError stat = PE_NO_ERROR; // the concept is: if anything fails, this is set to FALSE
 
     MemHandle filteredScanlineHan = NullHandle;
     MemHandle prevScanlineHan = NullHandle;
@@ -265,7 +247,7 @@ Boolean _pascal writeIDATChunk(FileHandle file, VMFileHandle srcfile, VMBlockHan
     word bytesPerPixel = calcBytesPerPixel(ihdrData);
 
     if (bytesPerPixel == 0) {
-        stat = FALSE; // Invalid format
+        stat = PE_OTHER_ERROR; // Invalid format
         goto exit;
     }
 
@@ -276,39 +258,39 @@ Boolean _pascal writeIDATChunk(FileHandle file, VMFileHandle srcfile, VMBlockHan
 
         scanlineSizeWithFilterByte = scanlineSize + 1; // +1 for PNG filter byte
         if (scanlineSizeWithFilterByte == 1) {
-            stat = FALSE; // Invalid format or scanline too smol
+            stat = PE_OTHER_ERROR; // Invalid format or scanline too smol
             goto exit;
         }
 
         // Allocate memory for the output scanline buffer and previous scanline buffer
         filteredScanlineHan = MemAlloc(scanlineSizeWithFilterByte, HF_SWAPABLE, HAF_ZERO_INIT);
         if (!filteredScanlineHan) {
-            stat = FALSE; // Memory allocation failed
+            stat = PE_OUT_OF_MEMORY; // Memory allocation failed
             goto exit;
         }
 
         prevScanlineHan = MemAlloc(scanlineSizeWithFilterByte, HF_SWAPABLE, HAF_ZERO_INIT);
         if (!prevScanlineHan) {
-            stat = FALSE; // Memory allocation failed
+            stat = PE_OUT_OF_MEMORY; // Memory allocation failed
             goto exit;
         }
 
         // Lock the memory
         filteredScanlinePtr = MemLock(filteredScanlineHan);
         if (!filteredScanlinePtr) {
-            stat = FALSE; // Memory lock failed
+            stat = PE_BLOCK_LOCK_FAILURE; // Memory lock failed
             goto exit;
         }
 
         prevScanlinePtr = MemLock(prevScanlineHan);
         if (!prevScanlinePtr) {
-            stat = FALSE; // Memory lock failed
+            stat = PE_BLOCK_LOCK_FAILURE; // Memory lock failed
             goto exit;
         }
     }
     else
     {
-        stat = FALSE; // Failed to lock scanline
+        stat = PE_OTHER_ERROR; // Failed to lock scanline
         goto exit;
     }
 
@@ -321,7 +303,7 @@ Boolean _pascal writeIDATChunk(FileHandle file, VMFileHandle srcfile, VMBlockHan
 
     // Write IDAT chunk header (size will be updated later)
     if (!FILE_WRITE_CHECKED(file, &idatHeader, sizeof(idatHeader))) {
-        stat = FALSE; // Failed to write chunk header
+        stat = PE_WRITE_PROBLEM; // Failed to write chunk header
         goto exit;
     }
 
@@ -333,7 +315,7 @@ Boolean _pascal writeIDATChunk(FileHandle file, VMFileHandle srcfile, VMBlockHan
     zstrm.zfree = Z_NULL;
     zstrm.opaque = Z_NULL;
     if (deflateInit(&zstrm, Z_DEFAULT_COMPRESSION) != Z_OK) {
-        stat = FALSE; // Compression initialization failed
+        stat = PE_OTHER_ERROR; // Compression initialization failed
         goto exit;
     } else {
         zstrmInited = TRUE;
@@ -354,7 +336,7 @@ Boolean _pascal writeIDATChunk(FileHandle file, VMFileHandle srcfile, VMBlockHan
             if (!deflateScanline(filteredScanlinePtr, scanlineSizeWithFilterByte, &zstrm, file, &idatChunkSize, &crc))
             {
                 HugeArrayUnlock(scanlinePtr);
-                stat = FALSE; // Compression failed
+                stat = PE_OTHER_ERROR; // Compression failed
                 break;
             }
 
@@ -371,7 +353,7 @@ Boolean _pascal writeIDATChunk(FileHandle file, VMFileHandle srcfile, VMBlockHan
     idatHeader.length = swapEndian(idatChunkSize);
     FilePos(file, idatChunkPos, FILE_POS_START);
     if (!FILE_WRITE_CHECKED(file, &idatHeader.length, sizeof(idatHeader.length))) {
-        stat = FALSE; // Failed to update chunk length
+        stat = PE_WRITE_PROBLEM; // Failed to update chunk length
         goto exit;
     }
     FilePos(file, 0, FILE_POS_END);
@@ -379,7 +361,7 @@ Boolean _pascal writeIDATChunk(FileHandle file, VMFileHandle srcfile, VMBlockHan
     // Write CRC at the end of the IDAT chunk
     crc = swapEndian(crc);
     if (!FILE_WRITE_CHECKED(file, &crc, sizeof(crc))) {
-        stat = FALSE; // Failed to write CRC
+        stat = PE_WRITE_PROBLEM; // Failed to write CRC
         goto exit;
     }
 
@@ -394,7 +376,7 @@ exit:
 
 /*********************************************************************
 *********************************************************************/
-Boolean _pascal writeIENDChunk(FileHandle file)
+PngError _pascal writeIENDChunk(FileHandle file)
 {
     pngChunkHeader iendHeader = {0};
     dword crc = {0};
@@ -405,7 +387,7 @@ Boolean _pascal writeIENDChunk(FileHandle file)
 
     // Write IEND chunk header
     if (!FILE_WRITE_CHECKED(file, &iendHeader, sizeof(iendHeader))) {
-        return FALSE; // Failed to write IEND header
+        return PE_WRITE_PROBLEM; // Failed to write IEND header
     }
 
     // Calculate CRC for IEND chunk
@@ -414,10 +396,10 @@ Boolean _pascal writeIENDChunk(FileHandle file)
 
     // Write CRC at the end of the IEND chunk
     if (!FILE_WRITE_CHECKED(file, &crc, sizeof(crc))) {
-        return FALSE; // Failed to write IEND CRC
+        return PE_WRITE_PROBLEM; // Failed to write IEND CRC
     }
 
-    return TRUE;
+    return PE_NO_ERROR;
 }
 
 /*********************************************************************
@@ -449,7 +431,7 @@ byte _pascal getFilterForScanline(byte* scanlinePtr, byte *prevScanlinePtr, word
     // **Allocate test buffer dynamically**
     testBufferMem = MemAlloc(scanlineSize + 1, HF_SWAPABLE, HAF_ZERO_INIT);
     if (!testBufferMem) {
-        return PNG_FILTER_NONE; // Memory allocation failed
+        return PE_OUT_OF_MEMORY; // Memory allocation failed
     }
 
     testBuffer = (byte *)MemLock(testBufferMem);
