@@ -6,11 +6,11 @@
 GEODE           = graphvwr
 ASMMOD          = asmmodManager.asm
 GRAPH           = quant.c quant.h
-IMPBMP          = imp_bmp.h impbmp.h impgif.h imppcx.h ibcommon.h\
-                  impbmp.goc impgif.goc imppcx.goc imp_bmp.goc
+IMPBMP          = ibcommon.h imp_bmp.h impbmp.h impgif.h imppcx.h\
+                  imp_bmp.goc impbmp.goc impgif.goc imppcx.goc
 MAIN            = bmpview.goc strings.goh
 UI_TO_RDFS      =
-OBJS            = quant.obj impbmp.obj impgif.obj imppcx.obj imp_bmp.obj\
+OBJS            = quant.obj imp_bmp.obj impbmp.obj impgif.obj imppcx.obj\
                   bmpview.obj
 COMMON          = bvdirmon.goh bvdirup.goh config.goh token.goh
 MODULES         = ASMMOD
