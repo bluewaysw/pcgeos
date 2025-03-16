@@ -97,8 +97,7 @@ minimalLibrary	: kernel swap sound net ui isui motif spool text mailbox \
 		  jpeg giflib gif png htmlimpx n2txt inetmsg extui \
 		  winword8 zlib dirlist minizip idialc eps impex_libs \
 		  thumbdb ftplib flllib sitelist int8087 intx87\
-		  basicdb gridlib gsol treplib hostif
-#ascii
+		  basicdb gridlib gsol treplib hostif ascii
 
 prefLibs	: prefvid prefts preftd \
 		  prefsnd prefos prefmous preflo preflf prefkbd \

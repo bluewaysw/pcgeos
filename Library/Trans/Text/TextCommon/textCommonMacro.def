@@ -1,0 +1,220 @@
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+	Copyright (c) GeoWorks 1992 -- All Rights Reserved
+
+PROJECT:	PC GEOS
+MODULE:		Text translation libraries
+FILE:		textCommonMacro.def
+
+AUTHOR:		Jenny Greenwood, 29 September 1992
+
+MACROS:
+	Name				Description
+	----				-----------
+	GetFormatHeap		Determines file format using buffer on heap
+	GetFormatStack		Determines file format using buffer on stack
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	jenny	9/29/92		Initial version
+
+DESCRIPTION:
+	Macros common to all text translation libraries based on
+	MasterSoft code.
+
+	$Id: textCommonMacro.def,v 1.1 97/04/07 11:29:47 newdeal Exp $
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		GetFormatHeap
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	Determines file format using a buffer on the heap
+
+PASS:		ax	- size of buffer to allocate
+		si	- file handle (open for read)	
+		bx	- segment of translation library routine to call
+		di	- offset of translation library routine to call
+
+RETURN:		ax	- TransError (0 = no error)
+		cx	- format number if valid format
+			  or NO_IDEA_FORMAT if not
+
+DESTROYED:	bx, di
+
+PSEUDO CODE/STRATEGY:
+
+		Allocate a buffer on the heap.
+		Read as much of the file as necessary to determine the
+		format.
+		Call the MasterSoft format check routine.
+		Free the buffer.
+
+KNOWN BUGS/SIDE EFFECTS/IDEAS:
+
+		When TRANS_GET_FORMAT_BUFFER_SIZE > 256,
+		TextCommonGetFormat uses this macro.
+
+		In general, a translation library should set
+		TRANS_GET_FORMAT_BUFFER_SIZE and call
+		TextCommonGetFormat from its TransGetFormat routine.
+		If the library needs to be able to call more than
+		one format-checking routine, however, and if the sizes
+		of the buffers required	for the routines differ
+		greatly (and at least one is > 256 bytes),
+		TransGetFormat may also call a TransGetFormatHeap
+		routine which does nothing but use GetFormatHeap. For
+		an example, see the WordStar translation library, the
+		only library which currently needs to do this.
+
+		See also the header for GetFormatStack, below in this file.
+
+REVISION HISTORY:
+		Name	Date		Description
+		----	----		-----------
+		Jenny	9/29/92		Initial version
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+
+GetFormatHeap	macro	
+		uses	dx, si, ds, es
+		.enter
+	;
+	; Allocate on the heap a buffer as large as necessary
+	; to determine the format.
+	;
+		push	ax
+		mov	cx, ((mask HF_SHARABLE or mask HF_SWAPABLE) or \
+			    ((mask HAF_LOCK) shl 8))
+		mov	bp, bx			; bp <- routine seg
+		call	MemAlloc
+		mov	ds, ax
+		pop	cx			; cx <- buffer size
+		jc	error
+		xchg	bp, bx			; bp <- block handle
+						; bx <- routine seg
+		clr	dx			; ds:dx <- buffer
+	;
+	; Read as much of the file as necessary.
+	;
+		clr	al			; flags <- 0
+		xchg	bx, si			; bx <- file handle
+						; si <- routine seg
+		call	FileRead
+		jc	noIdea			; if short read, can't check
+	;
+	; Call the MasterSoft format check routine.
+	;
+		pushdw	dsdx			; buffer
+		pushdw	sidi			; address of routine to call
+		mov	bx, segment dgroup
+		mov	ds, bx
+		call	PROCCALLFIXEDORMOVABLE_PASCAL
+		mov_tr	cx, ax			; cx <- format number
+		clr	ax			; ax <- 0 (TE_NO_ERROR)
+done:
+		mov	bx, bp
+		call	MemFree
+		.leave
+		ret
+noIdea:
+		clr	ax			; ax <- 0 (TE_NO_ERROR)
+		mov	cx, NO_IDEA_FORMAT
+		jmp	done
+error:
+		mov	ax, TE_OUT_OF_MEMORY
+		mov	cx, NO_IDEA_FORMAT
+		jmp	done
+endm
+
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		GetFormatStack
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	Determines file format using a buffer on the stack
+
+PASS:		si	- file handle (open for read)	
+		bx	- segment of translation library routine to call
+		di	- offset of translation library routine to call
+
+RETURN:		ax	- TransError (0 = no error)
+		cx	- format number if valid format
+			  or NO_IDEA_FORMAT if not
+
+DESTROYED:	bx, di
+
+PSEUDO CODE/STRATEGY:
+
+		Allocate a buffer on the stack.
+		Read as much of the file as necessary to determine the
+		format.
+		Call the MasterSoft format check routine.
+		Adjust the stack pointer.
+
+KNOWN BUGS/SIDE EFFECTS/IDEAS:
+
+		When TRANS_GET_FORMAT_BUFFER_SIZE <= 256,
+		TextCommonGetFormat uses this macro.
+
+		To maintain a simple interface consistent among all
+		text translation libraries, every library should call
+		TextCommonGetFormat from its TransGetFormat routine
+		rather than using this macro.
+
+		If a library needs to call more than one format-checking
+ 		routine, and the routines all require a buffer of <= 256
+		bytes, just set TRANS_GET_FORMAT_BUFFER_SIZE to the size of the largest
+		buffer. If any routine requires a buffer of > 256 bytes, 
+		see the header for GetFormatHeap, above in this file.
+
+REVISION HISTORY:
+		Name	Date		Description
+		----	----		-----------
+		Jenny	9/29/92		Initial version
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+
+GetFormatStack	macro
+		uses	dx, si, ds, es
+		.enter
+	;
+	; Allocate on the stack a buffer as large as necessary
+	; to determine the format.
+	;
+		segmov	ds, ss
+		mov	cx, TRANS_GET_FORMAT_BUFFER_SIZE
+		sub	sp, cx
+		mov	dx, sp			; ds:dx <- buffer		
+	;
+	; Read as much of the file as necessary
+	;
+		clr	al			; flags <- 0
+		xchg	bx, si			; bx <- file handle
+						; si <- seg of routine to call
+		call	FileRead
+		jc	noIdea			; if short read, must not
+						;  be a supported format
+	;
+	; Call the MasterSoft format check routine.
+	;
+		pushdw	dsdx			; buffer
+		pushdw	sidi			; address of routine to call
+		mov	bx, segment dgroup
+		mov	ds, bx
+		call	PROCCALLFIXEDORMOVABLE_PASCAL
+		mov_tr	cx, ax			; cx <- format number
+done:
+		clr	ax			; ax <- 0 (TE_NO_ERROR)
+	;
+	; Adjust the stack pointer.
+	;
+		add	sp, TRANS_GET_FORMAT_BUFFER_SIZE
+		.leave
+		ret
+noIdea:
+		mov	cx, NO_IDEA_FORMAT
+		jmp	done
+endm

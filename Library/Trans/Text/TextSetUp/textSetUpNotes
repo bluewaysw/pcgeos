@@ -1,0 +1,359 @@
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+	Copyright (c) GeoWorks 1992 -- All Rights Reserved
+
+PROJECT:	Impex
+MODULE:		Text Translation Libraries
+FILE:		textSetUpNotes
+
+AUTHOR: 	Jenny Greenwood, 2 September 1992
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	Jenny	9/2/92		Initial version
+
+DESCRIPTION:
+
+	How to create a new text translation library
+		based on code from MasterSoft
+		
+	$Id: textSetUpNotes,v 1.1.6.1 97/03/29 04:28:19 canavese Exp $
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+
+----------------------------------------------------------------
+----------------------------------------------------------------
+
+Our primary contact at MasterSoft is Karl Forster:
+
+<<<
+Karl is the technical guy that you should talk to about
+getting the stuff to compile...
+
+karl forster    
+mastersoft 
+6991 E Camelback Rd. Suite A320 Scottsdale, AZ 85251
+
+602-277-0900
+>>>
+
+I've also gotten information from Greg and Frank at the same phone
+number when Karl was out.
+
+MasterSoft people call Import "the FROM side" and Export "the TO side".
+
+----------------------------------------------------------------
+
+Install the original MasterSoft code into
+
+/staff/pcgeos/Library/Translation/Text/Original/<LibName>
+
+Don't bother to strip out the ^M characters you may notice if
+you look at the files; the textSetUp script will do it for you.
+
+----------------------------------------------------------------
+
+Run the script, textSetUp <libname> <LibName>, from your local
+Library/Translation/Text directory. This will set up the new
+directory, Library/Translation/Text/LibName, together with its
+standard subdirectories, in both your local development tree and
+the installed source tree. textSetUp will also copy the standard
+text translation library files in
+
+	/s/p/Library/Translation/Text/TextSetUp
+
+and the MasterSoft source files in
+
+	/s/p/Library/Translation/Text/Original/<LibName>
+
+to the appropriate directories in your local development tree.
+In your copies of the MasterSoft files, every call to malloc will
+become a call to textMalloc. See explanation in
+
+	Library/Translation/Text/TextCommonH/wfwos.h.
+
+----------------------------------------------------------------
+
+<LibName>/ExportC/w4w<number>t.c will contain the main export
+routine, ETYPE<number>T (argc argv).
+
+At the top of ExportC/w4w<number>t.c, add the line:
+
+#pragma Code ("MainExportC")
+
+Replace ETYPE<number>T (argc argv) with:
+
+ExportTo<LibName> (FileHandle source, FileHandle destination,
+		   int format_number, GeodeHandle geode,
+		   char *destName, char *destPath,
+		   DiskHandle destDisk)
+
+----------------------------------------------------------------
+
+<LibName>/ImportC/w4w<number>f.c will contain the main import
+routine, ETYPE<number>F (argc argv).
+
+At the top of ImportC/w4w<number>f.c, add the line:
+
+#pragma Code ("MainImportC")
+
+Replace ETYPE<number>T/F (argc argv) with:
+
+ImportFrom<LibName> (FileHandle source, FileHandle destination,
+		     int format_number, GeodeHandle geode,
+		     char *sourceName, char *sourcePath,
+		     DiskHandle sourceDisk)
+
+----------------------------------------------------------------
+
+Add this line at the top of the main import and export routines:
+
+geodeHandle = geode;
+
+This will allow textMalloc to use this library's heap for memory
+allocation.
+
+----------------------------------------------------------------
+
+Either the main routine or a routine it calls will set
+variables called something like "src" or "src_fh", "icf" or
+"icf_fh", and "tgt" or "tgt_fh", probably calling bf_open to do
+so. Replace this code with:
+
+Export:
+	icf = source;
+	tgt = destination;
+
+Import:
+	src = source;
+	icf = destination;
+
+Note that Impex opens these files before passing their handles to
+the MasterSoft code.
+
+----------------------------------------------------------------
+
+Leave as they are calls to bf_open which open temporary data
+files for use by the library. Such calls may well be preceded by calls
+to gen_fnam, which you should comment out. Note that bf_open calls
+ImpexCreateTempFile, which generates a unique file name and creates
+a file by that name in the Waste Basket directory.
+
+*** IMPORTANT:***
+
+If you run into a library where bf_open is called in order to open
+an existing file which is neither the source nor the destination,
+replace the call with a call to FileOpen (for an example, see
+MicrosoftWord/ImportC/trsty05f.c). bf_open will NOT open the file.
+
+----------------------------------------------------------------
+
+In the file <LibName>/Lib/libFormat.asm, fill in the fields
+in
+
+DefTransFormat	TF_NAME_OF_FIRST_TRANSFORMAT_CONSTANT, \
+		"first format name", \
+		"file search string - e.g. "*.doc"", \
+		0, \
+		0
+
+Define as many TransFormats here as necessary; how many you need
+will probably be apparent from the code you must modify to use
+format_number instead of ver_lvl (see below). See xlatLib.def for
+an explanation of DefTransFormat.
+
+----------------------------------------------------------------
+
+Now set up the enum in <LibName>/CommonH/libFormat.h to conform
+with the TransFormats you have just defined:
+
+enum {
+    TF_NAME_OF_FIRST_TRANSFORMAT_CONSTANT,
+    TF_NAME_OF_SECOND_TRANSFORMAT_CONSTANT
+    ...
+};
+
+----------------------------------------------------------------
+
+Replace the code to figure out the version from the ver_lvl
+variable with a switch statement on the format number:
+
+switch (format_number) {
+	case TF_NAME_OF_FIRST_TRANSFORMAT_CONSTANT:
+		...
+		brk;
+	case TF_NAME_OF_SECOND_TRANSFORMAT_CONSTANT:
+		...
+		brk;
+	...
+#if ERROR_CHECK
+	default:
+		return (TE_EXPORT_NOT_SUPPORTED);
+/* or
+		return (TE_IMPORT_NOT_SUPPORTED);
+
+   as the case may be */
+
+#endif
+
+Replace any other code that uses ver_lvl with code that uses
+format_number.
+
+----------------------------------------------------------------
+
+Replace or scrap (as appropriate) any code that tries to use
+the name of the source or destination file for something - usually
+there's a variable in the main routine called "p_srcnm" or "p_tgtnm"
+if such code exists.
+
+If the code is using the source or destination file name to generate,
+say, a style file name, preparatory to trying to open or create
+that style file, then generate the name from the sourceName or
+destName argument passed to the main routine, and use the sourcePath
+and sourceDisk (or destPath and destDisk) to change to the appropriate
+directory before opening/creating the file. (Note that p_srcnm and
+p_tgtnm, as originally conceived by MasterSoft, contained not just
+the file name but the entire path.)
+
+----------------------------------------------------------------
+
+Comment out:
+	* close(src);   close(icf);   close(tgt);
+	* unlink(icfname);
+	* calls to options and references to optflags
+	* references to ver_lvl
+	* calls to exopen and exclose
+	* references to DispDotSize and DispCurrentCount
+	* calls to routines whose names begin with "dsp"
+
+		EXCEPT for "dspbytes". LEAVE THOSE CALLS IN.
+
+	* calls to gen_fnam
+	* #includes of optione.h, fontdef.h, fontext.h
+	* #includes of header files we don't have
+	* #defines of SEEK_SET, SEEK_CUR, and SEEK_END
+	* #defines of TRUE and FALSE
+
+----------------------------------------------------------------
+
+Make sure all errors are getting passed back to Impex. MasterSoft
+routines don't always check for errors which may be returned :)
+Reform them. Note when you see "XTYPE(errorcode)" that "XTYPE" is
+defined as "return". By contrast, a call to err_exit(error code)
+will cause a jump right out of the MasterSoft code back to
+TextCommonImport or TextCommonExport, as the case may be, and will
+return the error code thither. In any situation where an error code
+is getting "XTYPE"ed and then ignored, and it's too hard to change
+things to pass it back up, replace the XTYPE with a call to err_exit.
+Similarly, if there's a call to err_exit where the error code
+could easily be passed back up through the MasterSoft code to
+TextImportCommon or TextExportCommon, replace the call with 
+"return (error code)".
+
+See TextCommonH/error.h for the definitions of RC_CHECK, RC_TEST,
+and the various RC_EXITs if you run across them.
+
+----------------------------------------------------------------
+
+Replace any calls to getclk with calls to TimerGetDateAndTime.
+See MultiMate/ExportC/trhdr10t.c and WordPerfect5X/ExportC/w4w07t.c
+for examples.
+
+----------------------------------------------------------------
+
+If your library uses floating point routines, you must call
+FloatInit() near the beginning of the main import or export routine
+(or both, if the routines get called during both import and export)
+in order to set up a floating point stack for your thread; call
+FloatExit() before returning from that main routine to get rid of
+the floating point stack. Additionally, you need to put the line
+
+floatFlag = TRUE;
+
+after each call to FloatInit() and the line
+
+floatFlag = FALSE;
+
+after each call to FloatExit() so that the common text translation
+library error-handling routine, err_exit, will know to call FloatExit
+if necessary. The default setting for floatFlag is FALSE, so don't
+bother with it unless you're calling FloatInit() and FloatExit().
+
+
+Replace any calls to 			with calls to
+
+	ftos			FloatFloatIEEE64ToAscii_StdFormat
+	atof			FloatAsciiToFloat
+
+----------------------------------------------------------------
+
+*** THIS IS VITAL ***:
+
+Follow the instructions in the file "howToPortC", disregarding the
+stuff about malloc.
+
+Note particularly that in <LibName>/ImportC/tran<num>f.c and
+<LibName>/ImportC/tran<num>t.c there will probably be routines
+called through pointers. These calls must be replaced by calls
+to ProcCallFixedOrMovable_pascal; there's an example in howToPortC.
+
+----------------------------------------------------------------
+
+In /s/p/Library/Translation/Text/TextCommonH:
+
+wfw.h is the main include file for all the libraries.
+wfwos.h contains macro definitions (eg. for read, write, unlink,
+textMalloc)
+
+----------------------------------------------------------------
+
+Errors you may encounter:
+
+Compilation errors:
+
+	1. Weird complaints about header files that are perfectly fine.
+
+		A file included before that one is messed up, probably
+		the one immediately before.
+
+	2. Complaints that stuff is defined more than once in the
+	   same segment.
+
+		Sometimes some global variables or types or routines
+		defined in the ExportC files will have the same names
+		as ones defined in the ImportC files. Change one set
+		of names, or comment out one of the definitions if the 
+		two things are identical. If the problem doesn't show
+		up when you grep in <LibName>, look in TextCommonC.
+
+Runtime errors:
+
+	1. You go off into space with an Illegal instruction message
+	   from Swat.
+
+		You didn't replace every occurrence of routine calls
+		made through pointers with calls to
+		ProcCallFixedOrMovable_pascal. See the example in
+		howToPortC.
+
+	2. You die with ILLEGAL_HANDLE either when you go to import
+	   from the metafile or when Impex tries to close the metafile
+	   or the source file.
+
+		You didn't comment out the MasterSoft calls to close
+		the metafile and the source file.
+
+	3. You die all over the place inexplicably, but then with
+	   ec all on (it might just be ec segment or something that's
+	   important; I can't remember) you die consistently when
+	   you're calling a routine which resides in another file
+	   and takes more than one argument.
+
+		You haven't made sure that every routine R called from
+		file A but defined in file B is declared extern
+		somewhere; the arguments for R are being pushed
+		in C order and popped in Pascal order. Read howToPortC
+		and get rid of those compile warnings!
+
+----------------------------------------------------------------

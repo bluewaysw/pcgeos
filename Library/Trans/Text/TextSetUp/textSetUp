@@ -1,0 +1,233 @@
+#!/bin/sh -
+#########################################################################
+#	Copyright (c) GeoWorks 1992 -- All Rights Reserved		#
+#									#
+# PROJECT:	Impex							#
+# MODULE:	Text translation libraries -- Set Up			#
+# FILE:		textSetUp						#
+#									#
+# AUTHOR:	Jenny Greenwood, 31 August 1992				#
+#									#
+# REVISION HISTORY:							#
+#	Name	Date		Desription				#
+#	----	----		----------				#
+#	jenny	8/31/92		Initial version				#
+#									#
+# DESCRIPTION:								#
+#									#
+#	Usage:	textSetUp libname LibName				#
+#									#
+#	Run this from							#
+#		/staff/pcgeos/???/Library/Translation/Text		#
+#	in your local development tree.					#
+#									#
+#	This shell script sets up a new text translation		#
+#	library based on code from MasterSoft.				#
+#									#
+#	$Id: textSetUp,v 1.1.6.1 97/03/29 04:28:18 canavese Exp $			#
+#									#
+#########################################################################
+
+#
+# Read this !
+#
+if [ "$1" = "" -o "$2" = "" -o "$3" = "" ]; then
+	echo
+	echo "Usage: textSetUp libName LibName geodename"
+	echo
+	echo "       Run this from"
+	echo
+	echo "       /staff/pcgeos/???/Library/Translation/Text"
+	echo
+	echo "       in your local development tree."
+	echo 
+	echo "This script creates a new directory, LibName, under" 
+	echo "/staff/pcgeos/???/Library/Translation/Text, and there sets up"
+	echo "a new text translation library based on code from MasterSoft."
+	echo "The first argument, libName, is used to name the libNameGeode.def"
+	echo "file. The third argument, geodename, is used to name the .gp"
+	echo "file and the compiled geode."
+	echo
+	echo "The script also sets up the necessary directories in the"
+	echo "installed source tree, creates a LibName directory under"
+	echo "Installed/Library/Translation/Text, and makes a soft link"
+	echo "in Installed/.../LibName to the as yet nonexistent Makefile"
+	echo "in the installed source tree."
+	echo
+	echo "Before you run mkmf, you should *CHECK* the files, if"
+	echo "any, that get assigned to LibName/CommonC to see whether"
+	echo "they're actually specific to exporting or importing and"
+	echo "not common at all."
+	echo
+	exit 1
+fi
+
+#
+# Set up directories under local and installed /s/p/Library/Translation/Text.
+#
+echo
+echo "Setting up local" $2 "directory."
+mkdir $2
+cd `otherdir`
+echo "Setting up" $2 "directory in installed source tree."
+mkdir $2
+cd $2
+grev new
+mkdir RCS
+mkdir Export
+mkdir Export/RCS
+mkdir ExportC
+mkdir ExportC/RCS
+mkdir Import
+mkdir Import/RCS
+mkdir ImportC
+mkdir ImportC/RCS
+mkdir CommonH
+mkdir CommonH/RCS
+mkdir Lib
+mkdir Lib/RCS
+ln -s ../TextCommonC
+cd `otherdir`
+cwd=`pwd`
+cd /staff/pcgeos/Installed/Library/Translation/Text
+echo "Setting up" $2 "directory under Installed."
+mkdir $2
+cd $2
+ln -s /staff/pcgeos/Library/Translation/Text/$2/Makefile
+cd $cwd
+
+#
+# Copy template files.
+#
+echo "Copying template files to local" $2 "directory."
+cp /staff/pcgeos/jenny/Library/Translation/Text/TextSetUp/Template/local.mk .
+cp /staff/pcgeos/jenny/Library/Translation/Text/TextSetUp/Template/template.gp  $3.gp
+
+# 
+# Substitute <geodename> for "geodename" in the copied files.
+#
+for file in *; do
+	chmod +w $file
+	sed -e s/"geodename"/"$3"/g $file > $file.new
+	mv $file.new $file
+done
+
+cp /staff/pcgeos/jenny/Library/Translation/Text/TextSetUp/Template/templateGeode.def $1Geode.def
+cp /staff/pcgeos/jenny/Library/Translation/Text/TextSetUp/Template/templateGlobal.def $1Global.def
+
+# 
+# Substitute <libname> and <LibName> for "template" and "Template" in the
+# copied files.
+#
+for file in *; do
+	chmod +w $file
+	sed -e s/"template"/"$1"/g -e s/"Template"/"$2"/g $file > $file.new
+	mv $file.new $file
+done
+
+#
+# Create these directories now so as not to see them in the preceding
+# for-loop.
+#
+mkdir Export
+mkdir Import
+mkdir Lib
+mkdir ImportC
+mkdir CommonH
+
+for file in /staff/pcgeos/jenny/Library/Translation/Text/TextSetUp/Template/lib*asm; do
+	cp $file Lib
+done
+for file in /staff/pcgeos/jenny/Library/Translation/Text/TextSetUp/Template/import*; do
+	cp $file Import
+done
+for file in /staff/pcgeos/jenny/Library/Translation/Text/TextSetUp/Template/export*; do
+	cp $file Export
+done
+cp /staff/pcgeos/jenny/Library/Translation/Text/TextSetUp/Template/getFormat.c ImportC
+cp /staff/pcgeos/jenny/Library/Translation/Text/TextSetUp/Template/libFormat.h CommonH
+cp /staff/pcgeos/jenny/Library/Translation/Text/TextSetUp/Template/textCommonC.h CommonH
+
+# 
+# Substitute <libname> and <LibName> for "template" and "Template" in the
+# most recently copied files.
+#
+for file in */*; do
+	chmod +w $file
+	sed -e s/"template"/"$1"/g -e s/"Template"/"$2"/g $file > $file.new
+	mv $file.new $file
+done
+
+#
+# Create these directories now so as not to see them in the preceding
+# for-loop.
+#
+mkdir ExportC
+mkdir CommonC
+ln -s ../TextCommonC
+
+#
+# Clean "^M" characters out of source files and copy files to
+# appropriate directories. Files whose names end in "f.c" ("f" for
+# "from") definitely belong in ImportC; files whose names end
+# in "t.c" ("t" for "to" ;) belong in ExportC.
+#
+# You should *CHECK* the files that get assigned to CommonC to see
+# whether they're actually specific to exporting or importing and not
+# common at all. 
+#
+echo "Copying MasterSoft source files to local" $2 "directory."
+for file in /staff/pcgeos/jenny/Library/Translation/Text/Original/$2/*; do
+	cat $file | tr -d '\015' > $file.clean
+	mv $file.clean $file
+	case $file in
+		*t\.c)	cp $file ExportC
+			;;
+		*f\.c)	cp $file ImportC
+			;;
+		*\.c)  	cp $file CommonC
+			;;
+		*\.h)  	cp $file CommonH
+			chmod +w CommonH/$file
+			;;
+	esac
+done
+
+#
+# See /s/p/Library/Translation/Text/TextCommonH/wfwos.h for explanation of
+# why we have to replace malloc with textMalloc.
+#
+files='echo *C/*'
+for file in $files; do
+	chmod +w $file
+	sed -e s/"malloc"/"textMalloc"/g $file > $file.new
+	mv $file.new $file
+done
+
+#
+# If CommonC is empty, remove it; otherwise create a
+# corresponding directory under /s/p/Library/Translation/Text/"LibName".
+#
+files=`echo CommonC/*`
+if [ "$files" ]; then
+	cd `otherdir`
+	mkdir CommonC
+	mkdir CommonC/RCS
+	cd `otherdir`
+	echo
+	echo "Be sure to check the following files to see whether"
+	echo "they belong in" $2"/ExportC or" $2"/ImportC"
+	echo "rather than" $2"/CommonC:"
+	echo
+	echo $files
+	echo
+else
+	rmdir CommonC
+fi
+
+echo
+echo "Now ... READ the notes in howToPortC and textSetUpNotes!"
+echo
+echo "           Welcome to the *EXCITING* world"
+echo "        of text translation library creation ;)"
+echo

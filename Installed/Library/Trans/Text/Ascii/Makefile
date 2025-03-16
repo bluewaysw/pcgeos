@@ -3,7 +3,7 @@
 #
 # If you edit it, you will lose your changes, should it be regenerated.
 #
-GEODE           = Ascii
+GEODE           = ascii
 EXPORT          = exportMain.asm exportManager.asm
 IMPORT          = importMain.asm importManager.asm importConstant.def
 LIB             = libFormat.asm libManager.asm
