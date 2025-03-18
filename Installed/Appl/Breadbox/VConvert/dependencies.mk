@@ -56,8 +56,8 @@ expobj.eobj: geos.h heap.h geode.h resource.h ec.h object.h lmem.h \
                 disk.h drive.h input.h char.h hwr.h win.h uDialog.h \
                 Objects/gInterC.h Objects/Text/tCommon.h stylesh.h \
                 driver.h thread.h print.h Internal/spoolInt.h serialDr.h \
-                parallDr.h hugearr.h fileEnum.h ansi/string.h \
-                ansi/stdio.h ansi/stdlib.h VConvert.h meta.h xlatLib.h \
+                parallDr.h hugearr.h fileEnum.h Ansi/string.h \
+                Ansi/stdio.h Ansi/stdlib.h VConvert.h meta.h xlatLib.h \
                 vconv_ui.h VCExport.h
 export.obj \
 export.eobj: stdapp.goh object.goh ui.goh Objects/metaC.goh \
@@ -86,8 +86,8 @@ export.eobj: geos.h heap.h geode.h resource.h ec.h object.h lmem.h \
                 disk.h drive.h input.h char.h hwr.h win.h uDialog.h \
                 Objects/gInterC.h Objects/Text/tCommon.h stylesh.h \
                 driver.h thread.h print.h Internal/spoolInt.h serialDr.h \
-                parallDr.h hugearr.h fileEnum.h ansi/string.h \
-                ansi/stdio.h ansi/stdlib.h VConvert.h meta.h xlatLib.h \
+                parallDr.h hugearr.h fileEnum.h Ansi/string.h \
+                Ansi/stdio.h Ansi/stdlib.h VConvert.h meta.h xlatLib.h \
                 vconv_ui.h VCExport.h
 grobj.obj \
 grobj.eobj: stdapp.goh object.goh ui.goh Objects/metaC.goh \
@@ -138,7 +138,7 @@ vconv.eobj: stdapp.goh object.goh ui.goh Objects/metaC.goh \
                 Objects/gGadgetC.goh Objects/gToolCC.goh \
                 Objects/gValueC.goh Objects/gToolGC.goh \
                 Objects/helpCC.goh Objects/gViewCC.goh \
-                Objects/text/tCtrlC.goh ruler.goh Objects/colorC.goh \
+                Objects/Text/tCtrlC.goh ruler.goh Objects/colorC.goh \
                 Objects/styles.goh vconv/vconv_ui.goh art/beta.goh \
                 art/appicon.goh
 vconv.obj \
@@ -149,8 +149,8 @@ vconv.eobj: geos.h heap.h geode.h resource.h ec.h object.h lmem.h \
                 disk.h drive.h input.h char.h hwr.h win.h uDialog.h \
                 Objects/gInterC.h Objects/Text/tCommon.h stylesh.h \
                 driver.h thread.h print.h Internal/spoolInt.h serialDr.h \
-                parallDr.h hugearr.h fileEnum.h ansi/string.h \
-                ansi/stdio.h ansi/stdlib.h ansi/ctype.h math.h initfile.h \
-                VConvert.h meta.h xlatLib.h vconv_ui.h
+                parallDr.h hugearr.h fileEnum.h Ansi/string.h \
+                Ansi/stdio.h Ansi/stdlib.h math.h initfile.h VConvert.h \
+                meta.h xlatLib.h vconv_ui.h
 
 vconvertEC.geo vconvert.geo : geos.ldf ui.ldf ansic.ldf text.ldf math.ldf meta.ldf grobj.ldf 
