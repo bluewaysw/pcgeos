@@ -22,7 +22,7 @@ This document provides an overview of the TrueType fonts included in the PC/GEOS
 |                |                |                 |Bold       |NimbusSans-Bold.ttf        |nsansbo.ttf        |       |       |             |                                     |
 |                |                |                 |Italic     |NimbusSans-Italic.ttf      |nsansri.ttf        |       |       |             |                                     |
 |                |                |                 |Bold Italic|NimbusSans-BoldItalic.ttf  |nsansbi.ttf        |       |       |             |                                     |
-|Standard Symbol PS|[[S1]](#sources)|[[L1]](#licenses)|Regular  |StandardSymbolPS.ttf       |symbolps.ttf       |no     |yes    |
+|Standard Symbols PS|[[S1]](#sources)|[[L1]](#licenses)|Regular |StandardSymbolPS.ttf       |symbolps.ttf       |no     |yes    |URW SymbolPS | [[C1]](#changes), [[C2]](#changes)  |
 
 ## Sources
 The original font files were obtained from various sources. Below is a list of the sources for each font.
@@ -37,5 +37,5 @@ L1. **GNU Aferro General Public License**: [https://www.gnu.org/licenses/agpl-3.
 ## Changes
 If any modifications have been made to the fonts (e.g. renaming or hinting optimization), they are noted in the "Changes for PC/GEOS" column of the table.
 
-C1. **Character set**: The included characters have been reduced to the PC/GEOS character set.
-C2. **Automatic hinting**: Auto-hinting applied to improve on-screen readability and rendering quality.
+C1. **Character set**: The included characters have been reduced to the PC/GEOS character set. 
+C2. **Automatic hinting**: Auto-hinting applied to improve on-screen readability and rendering quality. 
