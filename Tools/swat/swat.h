@@ -25,7 +25,7 @@
 
 #define SWAT	/* Include function definitions in rpc.h */
 
-#define REGS_32  1 /* Use 32 bit register communication (use 32 bit SWAT to work) */
+#define REGS_32  0 /* Use 32 bit register communication (use 32 bit SWAT to work) */
 
 #define DEBUG_OUTPUT_RPC_DATA_TO_FILE  0
 

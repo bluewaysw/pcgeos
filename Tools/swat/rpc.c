@@ -547,6 +547,7 @@ RpcSendV(int    	fd,
 #endif
 
 #if defined(_WIN32)
+#if 0
     if (commMode == CM_NPIPE) {
 	if (geosFD < 0) {
 	    Boolean returnVal;
@@ -576,6 +577,7 @@ RpcSendV(int    	fd,
 	}
 	return bytesWritten;
     }
+#endif
 #endif  /* _WIN32 case */
 
     /*
@@ -693,7 +695,10 @@ RpcSendV(int    	fd,
 
 #if defined(unix) || defined(_LINUX) || defined(_WIN32)
 	    //i = writev(fd, tiov, tiovlen);
-	    i = NetWare_WriteV(fd, tiov, tiovlen);
+	    //i = NetWare_WriteV(fd, tiov, tiovlen);
+#if defined(_WIN32)
+	    i = NPipe_WriteV(hCommunication, tiov, tiovlen, &overlapWrite);
+#endif
 #elif defined(_MSDOS)
 	    i = Serial_WriteV(tiov, tiovlen);
 //#elif defined(_WIN32)
@@ -719,7 +724,10 @@ RpcSendV(int    	fd,
 
 #if defined(unix) || defined(_LINUX) || defined(_WIN32)
 	//i = writev(fd, newiov, curiov+1);
-	i = NetWare_WriteV(fd, newiov, curiov+1);
+	//i = NetWare_WriteV(fd, newiov, curiov+1);
+#if defined(_WIN32)
+	i = NPipe_WriteV(hCommunication, newiov, curiov+1, &overlapWrite);
+#endif
 #elif defined(_MSDOS)
 	i = Serial_WriteV(newiov, curiov+1);
 /*#else defined(_WIN32)
@@ -1501,13 +1509,36 @@ RpcHandleStream(int	    stream, /* Stream that's ready */
     /*case CM_NETWARE:*/
     case CM_SERIAL_TCP:
     case CM_SERIAL:
+    case CM_NPIPE:
     {
 
 #if defined(unix) || defined(_LINUX) || defined(_WIN32)
 	//bytesRead = read(stream, bp, 1);
-	bytesRead = NetWare_Read(stream, bp,
-				 1);
-
+	//bytesRead = NetWare_Read(stream, bp,
+	//			 1);
+#if defined(_WIN32)
+	if (outstandingRead == TRUE) {
+	    WaitForSingleObject(overlapRead.hEvent, INFINITE);
+	    GetOverlappedResult(hCommunication, &overlapRead,
+				&numRead, FALSE);
+	    incomingLen = numRead;
+	    outstandingRead = FALSE;
+	    incomingRead = TRUE;
+	}
+	if (incomingRead == TRUE) {
+	    bcopy(incomingBuf, bp, incomingLen);
+	    incomingBuf[0] = '\0';
+	    bytesRead = incomingLen;
+	    incomingRead = FALSE;
+	} else {
+	    //bytesRead = Ntserial_Read(hCommunication, bp, 1,
+	    //			      &overlapRead, TRUE);
+	    bytesRead = NPipe_Read(hCommunication,
+				   bp,
+				   1,
+				   &overlapRead, TRUE);
+	}
+#endif
 #elif defined(_MSDOS)
 	bytesRead = Serial_Read(bp, 1);
 /*#elif defined(_WIN32)
@@ -1721,6 +1752,7 @@ RpcHandleStream(int	    stream, /* Stream that's ready */
 	break;
 #endif
 #if defined(_WIN32)
+#if 0
     case CM_NPIPE:
 	if (outstandingRead == TRUE) {
 	    WaitForSingleObject(overlapRead.hEvent, INFINITE);
@@ -1763,6 +1795,7 @@ RpcHandleStream(int	    stream, /* Stream that's ready */
 	    }
 	}
 	break;
+#endif
 #endif
     default:
 	assert(0);
@@ -2345,7 +2378,7 @@ RpcWait(int poll)
 	 * check for either case
 	 */
 	if (FD_ISSET(geosFD, &rpc_readMask)
-	    && ( (((commMode == CM_NETWARE) || (commMode == CM_SERIAL_TCP))  && Ipx_CheckPacket()))) {
+	    && ((commMode == CM_NETWARE) || (commMode == CM_SERIAL_TCP)  && Ipx_CheckPacket())) {
 	    nstreams += 1;
 	    FD_SET(geosFD, &readMask);
 	}
@@ -2355,6 +2388,80 @@ RpcWait(int poll)
 	/*
 	 * check if we should wait on the communications method, eg. npipe
 	 */
+	if ((geosFD >= 0) && (FD_ISSET(geosFD, &rpc_readMask))
+	    && (hCommunication != NULL))
+	{
+	    if (incomingRead == TRUE) {
+		/*
+		 * if already some stuff is already read
+		 */
+		nstreams += 1;
+		FD_SET(geosFD, &readMask);
+	    } else if (outstandingRead == TRUE) {
+		/*
+		 * if we are already waiting on it, keep waiting
+		 */
+		hwaits[nwaits++] = overlapRead.hEvent;
+	    } else {
+		/*
+		 * need to request data and wait for it
+		 */
+		switch(commMode) {
+		case CM_NPIPE:
+		    incomingLen = NPipe_Read(hCommunication,
+					     incomingBuf,
+					     1,
+					     &overlapRead, FALSE);
+		    if (incomingLen > 0) {
+			if (GetLastError() != ERROR_IO_PENDING) {
+			    /*
+			     * read hasn't read ALL the data yet
+			     */
+			    incomingRead = TRUE;
+			    outstandingRead = FALSE;
+			    nstreams += 1;
+			    FD_SET(geosFD, &readMask);
+			} else {
+			    /*
+			     * ALL data is ready
+			     */
+			    outstandingRead = TRUE;
+			}
+		    } else if (incomingLen == -1) {
+			/*
+			 * problem - read blew up
+			 */
+			DWORD lastError;
+
+			if (win32dbg == TRUE) {
+			    char buf[1000];
+
+			    WinUtil_SprintError(buf, "NPipe_Read");
+			    MessageFlush(buf);
+			}
+			lastError = GetLastError();
+			if ((lastError == ERROR_BROKEN_PIPE)
+			    || (lastError == ERROR_INVALID_HANDLE))
+			{
+			    Ibm_LostContact();
+			    goto afterRpcLoop;
+			}
+		    } else {
+			/*
+			 * incomingLen == 0; wait for data to arrive
+			 */
+			outstandingRead = TRUE;
+			/*
+			 * set the wait handle to the overlapped io event
+			 */
+			hwaits[nwaits++] = overlapRead.hEvent;
+		    }
+		    break;
+		}
+	    }
+	}
+
+#if 0
 	if ((geosFD >= 0) && (FD_ISSET(geosFD, &rpc_readMask)))
 	{
 		/*
@@ -2367,6 +2474,7 @@ RpcWait(int poll)
 		WSAResetEvent(wevent);
 		WSAEventSelect(NetWare_Socket(), wevent, FD_READ);
 	}
+#endif
 #if 0
 	/*
 	 * check if we should wait on the communications method, eg. npipe

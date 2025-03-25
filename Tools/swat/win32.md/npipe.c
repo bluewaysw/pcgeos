@@ -205,7 +205,7 @@ NPipe_ClientInit(char *name, HANDLE *pipe, LPOVERLAPPED ovlpR,
 	return FALSE;
     }
 
-    newPipeMode = PIPE_READMODE_MESSAGE | PIPE_WAIT;
+    newPipeMode = PIPE_READMODE_BYTE | PIPE_WAIT;
     
     returnCode = SetNamedPipeHandleState(*pipe, &newPipeMode, NULL, NULL);
 
