@@ -1,0 +1,241 @@
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+	Copyright (c) GeoWorks 1992 -- All Rights Reserved
+
+PROJECT:	PC GEOS
+MODULE:		
+FILE:		howToPortC
+
+AUTHOR: 	Jenny Greenwood, 2 September 1992
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	Jenny	9/2/92		Initial version
+
+DESCRIPTION:
+
+		How to port C code to run under GEOS
+		
+	$Id: howToPortC,v 1.1.6.1 97/03/29 04:28:17 canavese Exp $
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+
+-----------------------------------------------------------------------------
+-----------------------------------------------------------------------------
+
+From Maryann's setupNotes for Halcyon graphics translation libraries:
+
+3.)	Get rid of any control sequences left over from DOS edit
+		Meta-Q(query-replace)  ctrl Q then whatever ctrl seq to replace
+		or
+		Meta-x(replace-string) ditto
+
+4.)	change any // comments on preprocessor directive lines to standard
+	C comments
+
+5.)	comment out header files we don't have, e.g.
+			graph.h
+			fcntl.h
+
+6.)	add Ansi/ to the following:
+			stdio.h ( -> <Ansi/stdio.h>)
+			string.h
+			stdlib.h
+
+	Replace		malloc.h 	with	<Ansi/stdlib.h>
+	   "		memory.h	 "	<Ansi/string.h>
+
+	For non-AnsiC routines, chances are they're in <geoMisc.h>
+
+10.) 	In general, once it compiles, the code should work. Problems arise 
+	mainly from compiler differences. Beware of static near pointers and
+	assumptions about initialized memory.  
+
+-----------------------------------------------------------------------------
+
+In a header file included by all the .c files, you may want to include
+geos.h and any other .h files that will be useful to at least some of the
+.c files (e.g. Ansi/stdio.h). This will save you some time.
+For example, the text translation libraries' common header file contains
+
+#include    <geos.h>
+#include    <file.h>
+#include    <localize.h>
+#include    <resource.h>
+#include    <math.h>
+#include    <Ansi/stdlib.h>
+#include    <Ansi/string.h>
+#include    <Ansi/stdio.h>
+#include    <Ansi/ctype.h>
+#include    <geoMisc.h>        /* need for strlwr and strcmpi - Not AnsiC */
+
+You may not need all of these, of course.
+
+-----------------------------------------------------------------------------
+
+Change any #includes of the form
+
+#include "filename"
+
+to the form
+
+#include <filename>
+
+-----------------------------------------------------------------------------
+
+At the top of every .c file, put the line
+
+#pragma Comment ("@" __FILE__)
+
+This will enable Swat to see the file even if its pathname contains
+more than 50 characters; without this line, you may not be able to
+step through the C code once it's installed.
+
+-----------------------------------------------------------------------------
+
+I have been prefacing any comments I put in the text translation
+library files with "GeoComment:" just so anyone reading the file
+will be able to distinguish particularly Geo-relevant comments from
+the comments in the original file.
+
+-----------------------------------------------------------------------------
+
+Any routine calls made through pointers, e.g.
+
+      rc = (*(p_wpseq->tran)) ( src, icf, wp_code, buffer, p_wpseq->icf_code );
+
+you should change to, e.g. 
+
+      rc = (int)ProcCallFixedOrMovable_pascal( src, icf, wp_code, buffer,
+					      p_wpseq->icf_code,
+					      *(p_wpseq->tran));
+
+(In this case, (*(p_wpseq->tran)) returns an int; hence the cast.)
+
+-----------------------------------------------------------------------------
+
+Make sure that every routine R called from file A.c but defined in
+file B.c is declared extern somewhere; otherwise the stuff will compile,
+run, and die weird deaths because the arguments for R will be pushed
+in C order and popped in Pascal order. 
+
+You can accomplish this by just getting rid of *all* compilation warnings
+before starting to test, which you might as well do because you'll
+have to get rid of them eventually anyhow. Once you've gotten rid of
+all warnings that actually mean something, you can turn off the others
+with
+
+#pragma Off(Warn)
+
+e.g. If a routine takes 3 arguments but never does anything with 1 of
+them, and if there's a reason not to axe the unused parameter from the
+routine definition, you can kill the "Variable never used" warning by
+bracketing that routine with pragmas:
+
+#pragma Off(Warn)
+...routine...
+#pragma On(Warn)
+
+It's a good idea to preface any such bracketing with a GeoComment
+explaining what warnings you're getting rid of, how many there are,
+and how many routines you're turning off warnings for; otherwise
+someone later may come in, modify the file, and not realize that
+the only reason their changes aren't causing any warnings is that
+you turned all warnings off.
+
+-----------------------------------------------------------------------------
+
+You should break up the code into resources of reasonable size if
+the files themselves are enormous or tiny. 2K <= Reasonable Size < 6K.
+4K - 5K is good. You can agglomerate small files into a single resource
+called "Foo" by putting:
+
+#pragma Code ("Foo")
+
+at the top of each small file. Similarly, you can break up a huge file
+into multiple resources by putting lines reading 
+
+#pragma Code ("resource name")
+
+into the code. Ideally, routines should be in the same resource as
+the routines that call them, but that's often not feasible.
+
+-----------------------------------------------------------------------------
+
+malloc - here's a note Don wrote awhile ago:
+
+<<<
+This may or may not be news to some of you, but it is something
+important to remember:
+
+Our implementation of malloc is a linked set of memory blocks that are
+fixed. This is no limit to the amount of memory an application or
+library may malloc, other than the physical limit of a particular
+system (up to 640K, of course). 
+
+The question then arises, as we proceed through the translation
+libraries provided to us by Halcyon & MasterSoft, when should we
+change a malloc to a MemAlloc (or something else)? There are at least
+two cases I can think of:
+
+	1) A large (> 1K) block will be allocated for a long period of
+	   time (during an entire import or export), but will only be
+	   accessed infrequently. We can avoid the cost of keeping
+	   memory locked for a long period of time, while not needing
+	   to add much code to call MemLock & MemUnlock
+
+	2) A small allocation (< 200 bytes) for memory only used
+	   inside of a single routine should be changed to be an
+	   allocation on the stack. Making these sort of changes
+	   take very low priority.
+	
+The sizes I mention above are arbitrary - use your own judgement.
+>>>
+
+Also, there's a note about malloc in stdlib.h
+
+-----------------------------------------------------------------------------
+
+Errors you may encounter:
+
+Compilation errors:
+
+	1. Weird complaints about header files that are perfectly fine.
+
+		A file included before that one is messed up, probably
+		the one immediately before.
+
+Runtime errors:
+
+	1. You go off into space with an Illegal instruction message
+	   from Swat.
+
+		You didn't replace every occurrence of routine calls
+		made through pointers with calls to
+		ProcCallFixedOrMovable_pascal. See above.
+
+	3. You die all over the place inexplicably, but then with
+	   ec all on (it might just be ec segment or something that's
+	   important; I can't remember) you die consistently when
+	   you're calling a routine which resides in another file
+	   and takes more than one argument.
+
+		You haven't made sure that every routine R called from
+		file A.c but defined in file B.c is declared extern
+		somewhere; the arguments for R are being pushed
+		in C order and popped in Pascal order. See above and
+		get rid of those compilation warnings!
+
+	4. Swat can't see your file.
+
+		The pathname is more than 50 characters; you need
+		to add the pragma specified above.
+
+	5. C stub bugs can cause various problems, including leaps
+	   into the void. Ah woe.
+
+		Fix, fix, fix.
+
+----------------------------------------------------------------
+
