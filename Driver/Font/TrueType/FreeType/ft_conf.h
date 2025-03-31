@@ -246,7 +246,7 @@
 /* use assembler implemented funcions. These implementations use regs    */
 /* and instructions of 80386 processors.                                 */
 
-#define TT_CONFIG_OPTION_USE_ASSEMBLER_IMPLEMENTATION
+//#define TT_CONFIG_OPTION_USE_ASSEMBLER_IMPLEMENTATION
 
 
 /*************************************************************************/

@@ -111,14 +111,15 @@ TrueTypeGenWidths	proc	far
 	mov 	bx, es:GS_window
 	tst	bx
 	jnz	pass_matrix
-	push	0			;pass null ptr
-	push	0
+	push	bx			;pass null ptr
+	push	bx
 	jmp	pass_varblock
 
 pass_matrix:	
 	call	MemDerefDS
 	push 	ds			;pass ptr to window matrix
-	push 	W_TMatrix
+	mov	dx, W_TMatrix 
+	push 	dx
 
 pass_varblock:
 	segmov	ds, dgroup, dx
