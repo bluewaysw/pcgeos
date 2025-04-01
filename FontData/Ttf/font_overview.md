@@ -6,6 +6,10 @@ This document provides an overview of the TrueType fonts included in the PC/GEOS
 
 |Font Family Name|Source<br>URL   |License          |Styles     |Original<br>Filename       |PC/GEOS<br>Filename|Kerning|Hinting|Mapped to<br>Original Font| Changes<br>for PC/GEOS |
 |----------------|----------------|-----------------|-----------|---------------------------|-------------------|-------|-------|--------------------------|------------------------|
+|URW Bookman     |[[S1]](#sources)|[[L1]](#licenses)|Regular    |URWBookman-Light.ttf       |bookmre.ttf        |no     |yes    |???          | [[C1]](#changes), [[C2]](#changes)  |
+|                |                |                 |Bold       |URWBookman-Demi.ttf        |bookmbo.ttf        |       |       |             |                                     |
+|                |                |                 |Italic     |URWBookman-LightItalic.ttf |bookmit.ttf        |       |       |             |                                     |
+|                |                |                 |Bold Italic|URWBookman-DemiItalic.ttf  |bookmbi.ttf        |       |       |             |                                     |
 |Century 59      |[[S1]](#sources)|[[L1]](#licenses)|Regular    |C059-Roman.ttf             |c059re.ttf         |no     |yes    |Cranbrook    | [[C1]](#changes), [[C2]](#changes)  |
 |                |                |                 |Bold       |C059-Bold.ttf              |c059bo.ttf         |       |       |             |                                     |
 |                |                |                 |Italic     |C059-Italic.ttf            |c059it.ttf         |       |       |             |                                     |
