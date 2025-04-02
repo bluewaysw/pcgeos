@@ -129,7 +129,7 @@ minimalAppl	: minimalGame minimalUtils minimalTools minimalSavers \
 		  bbxchat bbxmail \
 		  newsread geozip sclock trayapps\
  	  	  hmbase pdfvu  bnkr30 ftpc \
- 	  	  instc instf foldered
+ 	  	  instc instf foldered grafcalc
 
 minimalUtils	: prefmgr
 
@@ -1804,3 +1804,6 @@ Installed/Appl/Tools/Localize:		ui text spool MAKEAPPL
 
 wlgen	: Installed/Appl/Tools/WListGen
 Installed/Appl/Tools/WListGen:			ui ansic wmlib MAKEAPPL
+
+grafcalc: Installed/Appl/GrafCalc
+Installed/Appl/GrafCalc:	ui ansic cell parse color math MAKEAPPL

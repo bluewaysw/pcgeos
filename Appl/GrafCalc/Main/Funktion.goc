@@ -1,25 +1,40 @@
 @include <stdapp.goh>
-@include "grafcalc.goh"
-@include "Ui/appui.goh"
-@include "lmacros.goh"
+@include "Main/grafcalc.goh"
+@include "UI/appui.goh"
+//@include "Main/lmacros.goh"
 #include "graphics.h"
 @include <Objects/colorC.goh>
 @include <math.goh>
 
-extern char ergebnis[90];
+//void Diagramm_zeichnen(GStateHandle gstate)
+//void Grafen_zeichnen(GStateHandle gstate)
+//double funktionswert_berechnen(char term[100], double x, byte stellenzahl)
+//void Grafen_zeichnen(GStateHandle gstate)
+//@extern method GCalcProcessClass, MSG_F_CHECK_CHANGED
+//@extern method GCalcProcessClass, MSG_GRAFIK_MODI_1_AKTIVIEREN_DEAKTIVIEREN
+//@extern method GCalcProcessClass, MSG_GRAFIK_MODI_2_AKTIVIEREN_DEAKTIVIEREN
+//@extern method GCalcProcessClass, MSG_GRAFIK_MODI_3_AKTIVIEREN_DEAKTIVIEREN
+//@extern method GCalcProcessClass, MSG_GRAFIK_MODI_4_AKTIVIEREN_DEAKTIVIEREN
+//@extern method GCalcProcessClass, MSG_GRAFIK_MODI_5_AKTIVIEREN_DEAKTIVIEREN
+//@extern method GCalcProcessClass, MSG_DELTAX_XEINGABE_EINSTELLEN
+//@extern method GCalcProcessClass, MSG_FUNKTIONSWERTE_BERECHNEN
+
+extern char ergebnis[100];
 extern double xfaktor;
 extern double yfaktor;
 extern double deltax;
 extern double deltay;
 extern int fvonx[321];
-extern Point punkt[321];
-extern WWFixedAsDWord dicke[5];
-extern word muster[5];
-extern long double digits;
+//extern Point punkt[321];
+extern WWFixedAsDWord dicke[6];
+extern word muster[6];
+extern double digits;
 extern byte hintergrund;
 extern byte x_achsen_teilung;
 extern byte ko_achsen;
 extern word arbeitsbereich;
+extern int  f_fehler;
+extern FloatFloatToAsciiFormatFlags format;
 byte schrift=1;
 sdword xverschieben=0;
 sdword yverschieben=0;
@@ -28,7 +43,6 @@ extern byte farbindex[5];
 #define URSPRUNG_X 160
 #define URSPRUNG_Y 80
 #define pi 3.141592654
-
 
 double FixedToFloatingpointnumber(WWFixedAsDWord fpn)
 {
@@ -48,53 +62,63 @@ FloatNum mod(FloatNum zahl1,FloatNum zahl2)
   FloatPopNumber(&zahl3);
   return(zahl3);
 }
-FloatNum div(FloatNum zahl1, FloatNum zahl2)
+double div(double zahl1, double zahl2)
 {
-  FloatNum zahl3;
+  /*double zahl3;
   FloatPushNumber(&zahl1);
   FloatPushNumber(&zahl2);
   FloatDIV();
-  FloatPopNumber(&zahl3);
-  return(zahl3);
+  FloatPopNumber(&zahl3);*/
+  return(zahl1 / zahl2);
 }
-FloatNum dividiere(FloatNum dividend,FloatNum divisor)
+double dividiere(double dividend,double divisor)
 {
-  FloatNum quotient;
+ /* FloatNum quotient;
   FloatPushNumber(&dividend);
   FloatPushNumber(&divisor);
   FloatDivide();
-  FloatPopNumber(&quotient);
-  return(quotient);
+  FloatPopNumber(&quotient);*/
+  return(dividend/divisor);
 }
-FloatNum abs(FloatNum zahl1)
+/*FloatNum abs(FloatNum zahl1)
 {
   FloatNum zahl3;
   FloatPushNumber(&zahl1);
   FloatAbs();
   FloatPopNumber(&zahl3);
   return(zahl3);
-}
-FloatNum round(FloatNum zahl1,sword zahl2)
+}*/
+double abs(double zahl1)
 {
-  FloatNum zahl3;
-  FloatPushNumber(&zahl1);
-  FloatRound(zahl2);
-  FloatPopNumber(&zahl3);
+  double zahl3;
+  FloatIEEE64ToGeos80(&zahl1);
+  FloatAbs();
+  FloatGeos80ToIEEE64(&zahl3);
   return(zahl3);
 }
-FloatNum sub(FloatNum minuend,FloatNum subtrahend)
+
+double round(double zahl1,sword zahl2)
 {
-  FloatNum differenz;
+  double zahl3;
+  FloatIEEE64ToGeos80(&zahl1);
+  FloatRound(zahl2);
+  FloatGeos80ToIEEE64(&zahl3);
+  return(zahl3);
+}
+double sub(double minuend,double subtrahend)
+{
+  /*FloatNum differenz;
 
   FloatPushNumber(&minuend);
   FloatPushNumber(&subtrahend);
   FloatSub();
-  FloatPopNumber(&differenz);
-  return(differenz);
+  FloatPopNumber(&differenz);*/
+  return(minuend-subtrahend);
 }
 void Diagramm_zeichnen(GStateHandle gstate)
 {
-  sdword ii,n,i,j,y1,y2,y3,y4,k;
+  sword n,j,y1,y2,y3,y4,k;
+  sword ij,i;
   sdword deltaxbetrag,deltaybetrag,zentrum_x;
   double x,y;
   char xstring[10];
@@ -110,7 +134,10 @@ void Diagramm_zeichnen(GStateHandle gstate)
     if (ko_achsen==1)
     {
      GrSetLineColor(gstate, CF_INDEX, C_BLACK,0,0);
-     GrSetLineWidth(gstate,0);
+     
+ 
+     GrSetLineWidth(gstate,MakeWWFixed(0));
+ 
      GrSetTextColor(gstate,CF_INDEX,C_BLACK,0,0);
      GrSetFont(gstate, FID_DTC_URW_SANS, MakeWWFixed(12));
      GrSetTextStyle(gstate,0x20,0); 	/*Bold einschalten*/
@@ -134,27 +161,34 @@ void Diagramm_zeichnen(GStateHandle gstate)
      GrDrawLine(gstate,URSPRUNG_X-xverschieben,0,URSPRUNG_X-xverschieben+4,4);      //  spitze
      GrSetFont(gstate, FID_DTC_URW_SANS, MakeWWFixed(10));
      GrSetTextStyle(gstate,0,0x20); 	/*Bold ausschalten*/
+ 
      // x-Achsen-Teilung normal
      if (x_achsen_teilung == 1)
       {
-	ii=0;zentrum_x=URSPRUNG_X-deltax;i=zentrum_x;k=0;
+	ij=0;zentrum_x=URSPRUNG_X-deltax;i=zentrum_x;k=0;
 	while (i<2*URSPRUNG_X+2*deltaxbetrag && k<14)
 	 {
+
 	       if (i<2*URSPRUNG_X-1 && i>=0)
-		if (ii>0)
+		if (ij>0)
 		 {
-                   		   x=dividiere(i-zentrum_x,25*xfaktor);
+                   //x=dividiere(i-zentrum_x,25*xfaktor);
+ 
+                   x=(double)(i-zentrum_x)/(double)(25*xfaktor);
 		   if (schrift==1)
 		    {
+
 		     LocalFixedToAscii(xstring,MakeWWFixed(x),3);
 		     GrDrawText(gstate,i-5,URSPRUNG_Y-yverschieben+5,xstring,strlen(xstring));
 		    }
 		   GrDrawVLine(gstate,i,URSPRUNG_Y-yverschieben-3,URSPRUNG_Y-yverschieben+4);
 		 }
+
 	       if (2*zentrum_x-i>=0 && i>=0 && i<2*URSPRUNG_X+2*deltaxbetrag)
-		if (ii>0)
+		if (ij>0)
 		 {
-                  		   x=-dividiere(i-zentrum_x,25 * xfaktor);
+               		   
+                   x=-dividiere(i-zentrum_x,25 * xfaktor);
 		   if (schrift==1)
 		   {
 		     LocalFixedToAscii(xstring,MakeWWFixed(x),4);
@@ -162,7 +196,10 @@ void Diagramm_zeichnen(GStateHandle gstate)
 		   }
 		  GrDrawVLine(gstate,2*zentrum_x-i,URSPRUNG_Y-yverschieben-3,URSPRUNG_Y-yverschieben+4);
 		 }
-	  ii++;i=zentrum_x+(sword)(round(ii*25,0));
+	  ij++;i=zentrum_x+(sword)(round(ij *25,0));
+
+
+
 	 }
 
       /*else
@@ -196,16 +233,16 @@ void Diagramm_zeichnen(GStateHandle gstate)
 	   i=URSPRUNG_X-deltax+(sword)(round(pi*ii*25,0));
          }*/
 
-
+//MessageBox("y-Achsenteiling");
      // y-Achsen-Teilung
-     ii=0;i=URSPRUNG_Y-deltay;k=0;
+     ij=0;i=URSPRUNG_Y-deltay;k=0;
      while (i<2*URSPRUNG_Y+2*deltaybetrag)
      {
 	  if (i<2*URSPRUNG_Y-1 && i>=0)
 	   {
 	    GrDrawHLine(gstate,URSPRUNG_X-xverschieben-3,i,URSPRUNG_X-xverschieben+4);
-                        y=-dividiere(i+deltay-URSPRUNG_Y,25 * yfaktor);
-	    if (ii!=0 && schrift==1)
+            y=-dividiere(i+deltay-URSPRUNG_Y,25 * yfaktor);
+	    if (ij!=0 && schrift==1)
 	     {
 	       LocalFixedToAscii(xstring,MakeWWFixed(y),4);
 	       GrDrawText(gstate,URSPRUNG_X-xverschieben+8,i-5,xstring,strlen(xstring));
@@ -215,23 +252,24 @@ void Diagramm_zeichnen(GStateHandle gstate)
 	   {
 	     GrDrawHLine(gstate,URSPRUNG_X-xverschieben-3,URSPRUNG_Y*2-2*deltay-i,URSPRUNG_X-xverschieben+4);
                          y=dividiere(i+deltay-URSPRUNG_Y,25 * yfaktor);
-	     if (ii!=0 && schrift==1)
+	     if (ij!=0 && schrift==1)
 	     {
 	       LocalFixedToAscii(xstring,MakeWWFixed(y),4);
 	       GrDrawText(gstate,URSPRUNG_X-xverschieben+8,URSPRUNG_Y*2-2*deltay-i-5,xstring,strlen(xstring));
 	     }
 	   }
-	 ii++;i=URSPRUNG_Y-deltay+(sword)(round(ii*25,0));
+//MessageBox("bis hier");
+	 ij++;i=URSPRUNG_Y-deltay+(sword)(round(ij*25,0));
      }
     }}
-
+//MessageBox("Raster beginnt");
   // Raster
   if (hintergrund==1)
    {
      GrSetLineColor(gstate,CF_INDEX,C_LIGHT_GRAY,0,0);
-     GrSetLineWidth(gstate,0);
+     GrSetLineWidth(gstate,MakeWWFixed(0));
 
-     i=URSPRUNG_X-deltax;	//x-achsen_teilung==0 bedeutet jetzt: keine Skalierung    
+     i=URSPRUNG_X-deltax;	//x-achsen_teilung==0 bedeutet jetzt: keine Skalierung
      j=0;                                                    //4./1. Quadrant
      while (i<2*URSPRUNG_X/*-1*/)
       {
@@ -253,10 +291,10 @@ void Diagramm_zeichnen(GStateHandle gstate)
 	     y1=URSPRUNG_Y-deltay-n*25;
 	   }
 	j++;
-	i=URSPRUNG_X-deltax+j*25;         
+	i=URSPRUNG_X-deltax+j*25;
       }
 							  //2./3. Quadrant
-     i=URSPRUNG_X-deltax-25;     
+     i=URSPRUNG_X-deltax-25;
      j=1;
      while (i>0)
       {
@@ -280,211 +318,10 @@ void Diagramm_zeichnen(GStateHandle gstate)
 	     y3=URSPRUNG_Y-deltay+n*25;
 	   }
 	j++;
-	i=URSPRUNG_X-deltax-j*25;         
+	i=URSPRUNG_X-deltax-j*25;
       }
    }
-}
-FloatNum funktionswert_berechnen(char term[100], double x, int *fehler, byte stellenzahl)
-{
-   int laenge, kopielaenge,i,z;
-   char txt[10]="";
-   char termkopie[100]="";
-   FloatNum ist;		
-        
-   i=0;kopielaenge=0;z=0;
-   laenge=strlen(term);
-   while (i<=laenge)
-   {
-        if (term[i]=='x')
-        {
-           LocalFixedToAscii(txt,MakeWWFixed(x),4);
-           strcat(termkopie,txt);
-           kopielaenge=strlen(termkopie)-1;
-        }
-        else termkopie[kopielaenge]=term[i];
-        i++;kopielaenge++;
-   }
-   /*termkopie[i+1]='\0';*/    /*darf offensichtlich nicht angefügt werden*/
-   strcpy(term,termkopie);z=0;
-
-   z=Parser_anwenden(term,ergebnis,stellenzahl);      
-
-   *fehler=z;
-   /*FloatAsciiToFloat(FAF_STORE_NUMBER,strlen(ergebnis),ergebnis, &ist);*/
-   /*oder:*/
-   FloatAsciiToFloat(FAF_PUSH_RESULT, strlen(ergebnis),ergebnis,0);
-   FloatPopNumber(&ist);
-  
-   return ist;
-}
-void Grafen_zeichnen(GStateHandle gstate)
-{
-   int i,n,j,laenge,k;
-   sword y;
-   double x,funktionswert;
-   char fterm[100];
-   char ftermkopie[100]="";
-   char term[100];
-   optr F_Name[5];
-   word auswahl;
-   char fl[5];
-   word grafmode[5];
-   int nd;	/*Fehlernummer für: Funktionswert nicht definiert*/
-   long double breite;
-   char dicke_str[2];
-
-    /*@call ColorSelector1::MSG_COLOR_SELECTOR_GET_COLOR(&farbe );	funktioniert nicht
-    lineColor[0]=farbe.CQ_redOrIndex;*/
-    farbindex[0]=@call Farbauswahl1::MSG_GEN_ITEM_GROUP_GET_SELECTION();
-    farbindex[1]=@call Farbauswahl2::MSG_GEN_ITEM_GROUP_GET_SELECTION();
-    farbindex[2]=@call Farbauswahl3::MSG_GEN_ITEM_GROUP_GET_SELECTION();
-    farbindex[3]=@call Farbauswahl4::MSG_GEN_ITEM_GROUP_GET_SELECTION();
-    farbindex[4]=@call Farbauswahl5::MSG_GEN_ITEM_GROUP_GET_SELECTION();
-    /*PatchColorSelectorGetColor(@ColorSelector2, &farbe );
-    rot[1]=farbe.CQ_redOrIndex; gruen[1]=farbe.CQ_green;blau[1]=farbe.CQ_blue;*/
-
-   F_Name[0]=@Funktionsterm1;F_Name[1]=@Funktionsterm2;F_Name[2]=@Funktionsterm3;F_Name[3]=@Funktionsterm4;F_Name[4]=@Funktionsterm5;
-   auswahl=@call F_Check::MSG_GEN_BOOLEAN_GROUP_GET_SELECTED_BOOLEANS();
-   grafmode[0]=@call DotConnected1::MSG_GEN_ITEM_GROUP_GET_SELECTION();
-   grafmode[1]=@call DotConnected2::MSG_GEN_ITEM_GROUP_GET_SELECTION();
-   grafmode[2]=@call DotConnected3::MSG_GEN_ITEM_GROUP_GET_SELECTION();
-   grafmode[3]=@call DotConnected4::MSG_GEN_ITEM_GROUP_GET_SELECTION();
-   grafmode[4]=@call DotConnected5::MSG_GEN_ITEM_GROUP_GET_SELECTION();
-   @call LinienDicke1::MSG_VIS_TEXT_GET_ALL_PTR(dicke_str);
-   FloatAsciiToFloat(FAF_PUSH_RESULT, strlen(dicke_str),dicke_str,0);
-   FloatPopNumber(&breite);
-   dicke[0]=MakeWWFixed(breite);
-   @call LinienDicke2::MSG_VIS_TEXT_GET_ALL_PTR(dicke_str);
-   FloatAsciiToFloat(FAF_PUSH_RESULT, strlen(dicke_str),dicke_str,0);
-   FloatPopNumber(&breite);
-   dicke[1]=MakeWWFixed(breite);
-   @call LinienDicke3::MSG_VIS_TEXT_GET_ALL_PTR(dicke_str);
-   FloatAsciiToFloat(FAF_PUSH_RESULT, strlen(dicke_str),dicke_str,0);
-   FloatPopNumber(&breite);
-   dicke[2]=MakeWWFixed(breite);
-   @call LinienDicke4::MSG_VIS_TEXT_GET_ALL_PTR(dicke_str);
-   FloatAsciiToFloat(FAF_PUSH_RESULT, strlen(dicke_str),dicke_str,0);
-   FloatPopNumber(&breite);
-   dicke[3]=MakeWWFixed(breite);
-   @call LinienDicke5::MSG_VIS_TEXT_GET_ALL_PTR(dicke_str);
-   FloatAsciiToFloat(FAF_PUSH_RESULT, strlen(dicke_str),dicke_str,0);
-   FloatPopNumber(&breite);
-   dicke[4]=MakeWWFixed(breite);
-   muster[0] = @call LinienMuster1::MSG_GEN_ITEM_GROUP_GET_SELECTION();
-   muster[1] = @call LinienMuster2::MSG_GEN_ITEM_GROUP_GET_SELECTION();
-   muster[2] = @call LinienMuster3::MSG_GEN_ITEM_GROUP_GET_SELECTION();
-   muster[3] = @call LinienMuster4::MSG_GEN_ITEM_GROUP_GET_SELECTION();
-   muster[4] = @call LinienMuster5::MSG_GEN_ITEM_GROUP_GET_SELECTION();
-   if (auswahl & 1) fl[0]='1';else fl[0]='0';
-   if (auswahl & 2) fl[1]='1';else fl[1]='0';
-   if (auswahl & 4) fl[2]='1';else fl[2]='0';
-   if (auswahl & 8) fl[3]='1';else fl[3]='0';
-   if (auswahl & 16) fl[4]='1';else fl[4]='0';
-
-   n=0;
-   while (n<5)
-   {        
-        //MessageNumberBox(selection);
-        /*if (auswahl & (2^n)) InfoBox("\01 ist aktiviert",n+1,"");*/
-        if (fl[n]=='1')
-        {
-           @call F_Name[n]::MSG_VIS_TEXT_GET_ALL_PTR(fterm);
-/*----------------------------------------------------------------------------------------------------------*/
-            laenge=strlen(fterm);j=0;		/* aus z.B. 2x  2*x machen*/
-            for (i=0;i<laenge;i++)
-            {   
-                 if ((fterm[i]>47) && (fterm[i]<58) && (fterm[i+1]=='x'))
-                 {
-                      ftermkopie[j]=fterm[i];
-                      j++;
-                      ftermkopie[j]='*';
-                      j++;
-                 }
-                else
-                {
-                      ftermkopie[j]=fterm[i];
-                      j++;
-                }
-           }
-           ftermkopie[j]='\0';
-           strcpy(fterm,ftermkopie);
-           strcpy(ftermkopie,"");
-/*----------------------------------------------------------------------------------------------------------*/
-           if (strlen(fterm)>0)
-           {               
-                GrSetLineColor(gstate,CF_INDEX,farbindex[n],0,0);   /*Reihenfolge gegenüber ColorQuad verändert*/
-                if (grafmode[n]==MODUS_DOT)
-                {	
-                   GrSetLineWidth(gstate,0);	/*Zurücksetzung muss sein, da sonst möglicherweise nicht gezeichnet wird*/
-                   for (i=0;i<=320;i++)
-                       {
-                           strcpy(term,fterm); nd=0;
-	       x =dividiere(i-160 + deltax,25*xfaktor);
-                           funktionswert = funktionswert_berechnen(term, x,&nd,4);
-                           if (nd==5) y=-32000;	/*Wenn der Funktionswert nicht definiert ist*/
-                           else
-	           y =80 - deltay - round(funktionswert*25*yfaktor,0);
-                           if ((y>=0) && (y<=160))
-	         GrDrawLine(gstate,i,y,i,y);	/*mit Point gibt es keine Farbe*/
-                       }
-                }
-                else 	/*connected*/
-                {	
-                    nd=0;
-                    GrSetLineWidth(gstate,dicke[n]);
-                    GrSetLineStyle(gstate,muster[n],0,0,0);
-                    GrSetLineColor(gstate,CF_INDEX,farbindex[n],0,0);
-                    for (i=0;i<=320;i++)                    /*322 Punkte werden berechnet*/
-                    {
-                           strcpy(term,fterm);
-	       x =dividiere(i-160 + deltax,25*xfaktor);
-                           funktionswert = funktionswert_berechnen(term, x,&nd,4);
-                           if (nd==5) fvonx[i]=-32000;	/*Wenn der Funktionswert nicht definiert ist*/
-                           else
-	            fvonx[i] =80 - deltay - round(funktionswert*25*yfaktor,0);	
-                    }
-	i=0;
-	while (sub(i,320)<0)
-                    {    k=0;
-	     while (((fvonx[i] > 160) || (fvonx[i] < 0)) && (i<320))
-	     /*über zusammenhängende außenliegende Punkte hinweggehen*/
-                         {
-                             i++;k++;
-                          }
-                          j=0;
-	      /*InfoBox("\01 Punkte \02 uebersprungen",k,"");*/
-                          /*Grafen vom oberen bzw. unteren Rand aus zeichnen*/
-                          if ((fvonx[i]<160) && (fvonx[i]>0) && (i>0) && (i<320) /*&& (k!=0)*/)	//nur wenn Punkte übersprungen wurden
-                          {
-//MessageBox("von draußen");
-                               if (fvonx[i]<fvonx[i+1]) 	//Anschluss vom oberen Rand aus zeichnen
-                                   GrDrawLine(gstate,i,0,i,fvonx[i]);
-                               if (fvonx[i]>fvonx[i+1]) 	//Anschluss vom unteren Rand aus zeichnen
-                                   GrDrawLine(gstate,i,160,i,fvonx[i]);
-                          }
-	      GrDrawLine(gstate,i,fvonx[i],i,fvonx[i]);		//den ersten Punkte innerhalb als Startpunkt setzen
-                          while ((fvonx[i]<160) && (fvonx[i]>0) && (i<=320) && !(  (i>1) && (abs(fvonx[i-1]-fvonx[i-2])<abs(fvonx[i]-fvonx[i-1])) && ((fvonx[i-1]-fvonx[i-2])*(fvonx[i]-fvonx[i-1])<0)  ))
-                           /*Punkte müssen drinnen liegen*/   /*und Graf muss stetig sein?*/                           
-                          {
-                               GrDrawLineTo(gstate,i,fvonx[i]);                              
-                               i++;
-                           }	       	                                                                
-                               /*Grafen bis zum oberen bzw. unteren Rand durchzeichnen*/
-                           if (((fvonx[i]>160) || (fvonx[i]<0)) && (i<320))
-                           {
-//MessageBox("nach draußen");
-                                   if ((fvonx[i-1]<fvonx[i]) && !((fvonx[i-2]-fvonx[i-1])*(fvonx[i-1]-fvonx[i])<0) )	//Anschluss zum unteren Rand für wachsende i
-                                      GrDrawLineTo(gstate,i,160);                                
-                                   if ((fvonx[i-1]>fvonx[i]) && !((fvonx[i-2]-fvonx[i-1])*(fvonx[i-1]-fvonx[i])<0) )	//Anschluss zum oberen Rand für wachsende i
-                                      GrDrawLineTo(gstate,i,0);
-                           }                                                          
-                           i++;	       
-                     }
-                }
-           }
-        }
-        n++;
-   }
+   //MessageBox("Diagramm beendet");
 }
 
 @extern method GCalcProcessClass, MSG_F_CHECK_CHANGED
@@ -503,8 +340,8 @@ void Grafen_zeichnen(GStateHandle gstate)
       if ((selectedBooleans & 2) == 0)
       {
           @call Funktionsterm2::MSG_GEN_SET_NOT_ENABLED(VUM_NOW);
-          @call F2_Mode_Trigger::MSG_GEN_SET_NOT_ENABLED(VUM_NOW);  
-          @call y2_von_x::MSG_VIS_TEXT_DELETE_ALL();        
+          @call F2_Mode_Trigger::MSG_GEN_SET_NOT_ENABLED(VUM_NOW);
+          @call y2_von_x::MSG_VIS_TEXT_DELETE_ALL();
       }
       else
       {
@@ -537,7 +374,7 @@ void Grafen_zeichnen(GStateHandle gstate)
       {
           @call Funktionsterm5::MSG_GEN_SET_NOT_ENABLED(VUM_NOW);
           @call F5_Mode_Trigger::MSG_GEN_SET_NOT_ENABLED(VUM_NOW);
-          @call y5_von_x::MSG_VIS_TEXT_DELETE_ALL(); 
+          @call y5_von_x::MSG_VIS_TEXT_DELETE_ALL();
       }
       else
       {
@@ -552,7 +389,7 @@ void Grafen_zeichnen(GStateHandle gstate)
                    else
                           if (changedBooleans & 8) @call Funktionsterm4::MSG_META_GRAB_FOCUS_EXCL();
 	      else
-	             if (changedBooleans & 16) @call Funktionsterm5::MSG_META_GRAB_FOCUS_EXCL(); 
+	             if (changedBooleans & 16) @call Funktionsterm5::MSG_META_GRAB_FOCUS_EXCL();
 }
 @extern method GCalcProcessClass, MSG_GRAFIK_MODI_1_AKTIVIEREN_DEAKTIVIEREN
 {
@@ -626,185 +463,111 @@ void Grafen_zeichnen(GStateHandle gstate)
      dx = @call Delta_X::MSG_GEN_VALUE_GET_VALUE();
      @call X_Eingabe::MSG_GEN_VALUE_SET_INCREMENT(dx);
 }
-@extern method GCalcProcessClass, MSG_FUNKTIONSWERTE_BERECHNEN
+
+@extern method GCalcProcessClass, MSG_SHOW_F1_MODE_INTERACTION
 {
-     long double x;
-     //long double y;
-     char fterm[100];
-     /*char ystring[15];*/
-     char x_str[10];
-     word auswahl;
-     int nd;
-     char fl[5];
-
-     auswahl=@call F_Check::MSG_GEN_BOOLEAN_GROUP_GET_SELECTED_BOOLEANS();
-     if (auswahl & 1) fl[0]='1';else fl[0]='0';
-     if (auswahl & 2) fl[1]='1';else fl[1]='0';
-     if (auswahl & 4) fl[2]='1';else fl[2]='0';
-     if (auswahl & 8) fl[3]='1';else fl[3]='0';
-     if (auswahl & 16) fl[4]='1';else fl[4]='0';
-     @call X_Eingabe::MSG_VIS_TEXT_GET_ALL_PTR(x_str);
-     FloatAsciiToFloat(FAF_PUSH_RESULT, strlen(x_str),x_str,0);
-      FloatPopNumber(&x);
-
-     @call Funktionsterm1::MSG_VIS_TEXT_GET_ALL_PTR(fterm);
-     if ((strlen(fterm)>0) & (fl[0]=='1'))
-     {
-         funktionswert_berechnen(fterm, x,&nd,digits);
-         /*if (nd!=5)
-             @call y1_von_x::MSG_VIS_TEXT_REPLACE_ALL_PTR(ergebnis, 0);
-         else */            
-             @call y1_von_x::MSG_VIS_TEXT_REPLACE_ALL_PTR(ergebnis, 0);
-     }
-     @call Funktionsterm2::MSG_VIS_TEXT_GET_ALL_PTR(fterm);
-
-     if ((strlen(fterm)>0) & (fl[1]=='1'))
-     {
-         funktionswert_berechnen(fterm, x,&nd,digits);
-         /*if (nd!=5)
-             LocalFixedToAscii(ystring,MakeWWFixed(y),4);
-         else
-             strcpy(ystring,"Error");*/
-        @call y2_von_x::MSG_VIS_TEXT_REPLACE_ALL_PTR(ergebnis, 0);
-      }
-     @call Funktionsterm3::MSG_VIS_TEXT_GET_ALL_PTR(fterm);
-
-     if ((strlen(fterm)>0) & (fl[2]=='1'))
-     {
-        funktionswert_berechnen(fterm, x,&nd,digits);
-         /*if (nd!=5)
-             LocalFixedToAscii(ystring,MakeWWFixed(y),4);
-         else
-             strcpy(ystring,"Error");*/
-        @call y3_von_x::MSG_VIS_TEXT_REPLACE_ALL_PTR(ergebnis, 0);
-     }
-     @call Funktionsterm4::MSG_VIS_TEXT_GET_ALL_PTR(fterm);
-
-     if ((strlen(fterm)>0) & (fl[3]=='1'))
-     {
-         funktionswert_berechnen(fterm, x,&nd,digits);
-         /*if (nd!=5)
-             LocalFixedToAscii(ystring,MakeWWFixed(y),4);
-         else
-             strcpy(ystring,"Error");*/
-        @call y4_von_x::MSG_VIS_TEXT_REPLACE_ALL_PTR(ergebnis, 0);
-     }
-     @call Funktionsterm5::MSG_VIS_TEXT_GET_ALL_PTR(fterm);
-
-     if ((strlen(fterm)>0) & (fl[4]=='1'))
-       {
-         funktionswert_berechnen(fterm, x,&nd,digits);
-         /*if (nd!=5)
-             LocalFixedToAscii(ystring,MakeWWFixed(y),4);
-         else
-             strcpy(ystring,"Error");*/
-        @call y5_von_x::MSG_VIS_TEXT_REPLACE_ALL_PTR(ergebnis, 0);
-       }
-}
-@extern method GCalcProcessClass, MSG_SHOW_F1_MODE_INTERACTION 
-{  
     word selection;
-  
+
     @call F1_Mode::MSG_GEN_INTERACTION_INITIATE();
-    selection=@call DotConnected1::MSG_GEN_ITEM_GROUP_GET_SELECTION(); 
+    selection=@call DotConnected1::MSG_GEN_ITEM_GROUP_GET_SELECTION();
     if (selection==0)
     {
         @call LinienMuster1::MSG_GEN_SET_ENABLED(VUM_DELAYED_VIA_APP_QUEUE);
-        @call LinienDicke1_Interaction::MSG_GEN_SET_ENABLED(VUM_DELAYED_VIA_APP_QUEUE);      
+        @call LinienDicke1_Interaction::MSG_GEN_SET_ENABLED(VUM_DELAYED_VIA_APP_QUEUE);
     }
     else
     {
         @call LinienMuster1::MSG_GEN_SET_NOT_ENABLED(VUM_DELAYED_VIA_APP_QUEUE);
         @call LinienDicke1_Interaction::MSG_GEN_SET_NOT_ENABLED(VUM_DELAYED_VIA_APP_QUEUE);
-    } 
-    if (arbeitsbereich!=3) 
+    }
+    if (arbeitsbereich!=3)
        @call Redraw1::MSG_GEN_SET_NOT_ENABLED(VUM_DELAYED_VIA_APP_QUEUE);
     else
-       @call Redraw1::MSG_GEN_SET_ENABLED(VUM_DELAYED_VIA_APP_QUEUE);    
+       @call Redraw1::MSG_GEN_SET_ENABLED(VUM_DELAYED_VIA_APP_QUEUE);
 }
-@extern method GCalcProcessClass, MSG_SHOW_F2_MODE_INTERACTION 
-{    
+@extern method GCalcProcessClass, MSG_SHOW_F2_MODE_INTERACTION
+{
     word selection;
-  
+
     @call F2_Mode::MSG_GEN_INTERACTION_INITIATE();
-    selection=@call DotConnected2::MSG_GEN_ITEM_GROUP_GET_SELECTION(); 
+    selection=@call DotConnected2::MSG_GEN_ITEM_GROUP_GET_SELECTION();
     if (selection==0)
     {
         @call LinienMuster2::MSG_GEN_SET_ENABLED(VUM_DELAYED_VIA_APP_QUEUE);
-        @call LinienDicke2_Interaction::MSG_GEN_SET_ENABLED(VUM_DELAYED_VIA_APP_QUEUE);      
+        @call LinienDicke2_Interaction::MSG_GEN_SET_ENABLED(VUM_DELAYED_VIA_APP_QUEUE);
     }
     else
     {
         @call LinienMuster2::MSG_GEN_SET_NOT_ENABLED(VUM_DELAYED_VIA_APP_QUEUE);
         @call LinienDicke2_Interaction::MSG_GEN_SET_NOT_ENABLED(VUM_DELAYED_VIA_APP_QUEUE);
-    } 
-    if (arbeitsbereich!=3) 
+    }
+    if (arbeitsbereich!=3)
        @call Redraw2::MSG_GEN_SET_NOT_ENABLED(VUM_DELAYED_VIA_APP_QUEUE);
     else
-       @call Redraw2::MSG_GEN_SET_ENABLED(VUM_DELAYED_VIA_APP_QUEUE);    
+       @call Redraw2::MSG_GEN_SET_ENABLED(VUM_DELAYED_VIA_APP_QUEUE);
 }
-@extern method GCalcProcessClass, MSG_SHOW_F3_MODE_INTERACTION 
-{    
+@extern method GCalcProcessClass, MSG_SHOW_F3_MODE_INTERACTION
+{
    word selection;
-  
+
     @call F3_Mode::MSG_GEN_INTERACTION_INITIATE();
-    selection=@call DotConnected3::MSG_GEN_ITEM_GROUP_GET_SELECTION(); 
+    selection=@call DotConnected3::MSG_GEN_ITEM_GROUP_GET_SELECTION();
     if (selection==0)
     {
         @call LinienMuster3::MSG_GEN_SET_ENABLED(VUM_DELAYED_VIA_APP_QUEUE);
-        @call LinienDicke3_Interaction::MSG_GEN_SET_ENABLED(VUM_DELAYED_VIA_APP_QUEUE);      
+        @call LinienDicke3_Interaction::MSG_GEN_SET_ENABLED(VUM_DELAYED_VIA_APP_QUEUE);
     }
     else
     {
         @call LinienMuster3::MSG_GEN_SET_NOT_ENABLED(VUM_DELAYED_VIA_APP_QUEUE);
         @call LinienDicke3_Interaction::MSG_GEN_SET_NOT_ENABLED(VUM_DELAYED_VIA_APP_QUEUE);
-    } 
-    if (arbeitsbereich!=3) 
+    }
+    if (arbeitsbereich!=3)
        @call Redraw3::MSG_GEN_SET_NOT_ENABLED(VUM_DELAYED_VIA_APP_QUEUE);
     else
-       @call Redraw3::MSG_GEN_SET_ENABLED(VUM_DELAYED_VIA_APP_QUEUE);        
+       @call Redraw3::MSG_GEN_SET_ENABLED(VUM_DELAYED_VIA_APP_QUEUE);
 }
-@extern method GCalcProcessClass, MSG_SHOW_F4_MODE_INTERACTION 
-{    
+@extern method GCalcProcessClass, MSG_SHOW_F4_MODE_INTERACTION
+{
     word selection;
-  
+
     @call F4_Mode::MSG_GEN_INTERACTION_INITIATE();
-    selection=@call DotConnected4::MSG_GEN_ITEM_GROUP_GET_SELECTION(); 
+    selection=@call DotConnected4::MSG_GEN_ITEM_GROUP_GET_SELECTION();
     if (selection==0)
     {
         @call LinienMuster4::MSG_GEN_SET_ENABLED(VUM_DELAYED_VIA_APP_QUEUE);
-        @call LinienDicke4_Interaction::MSG_GEN_SET_ENABLED(VUM_DELAYED_VIA_APP_QUEUE);      
+        @call LinienDicke4_Interaction::MSG_GEN_SET_ENABLED(VUM_DELAYED_VIA_APP_QUEUE);
     }
     else
     {
         @call LinienMuster4::MSG_GEN_SET_NOT_ENABLED(VUM_DELAYED_VIA_APP_QUEUE);
         @call LinienDicke4_Interaction::MSG_GEN_SET_NOT_ENABLED(VUM_DELAYED_VIA_APP_QUEUE);
-    } 
-    if (arbeitsbereich!=3) 
+    }
+    if (arbeitsbereich!=3)
        @call Redraw4::MSG_GEN_SET_NOT_ENABLED(VUM_DELAYED_VIA_APP_QUEUE);
     else
-       @call Redraw4::MSG_GEN_SET_ENABLED(VUM_DELAYED_VIA_APP_QUEUE);        
+       @call Redraw4::MSG_GEN_SET_ENABLED(VUM_DELAYED_VIA_APP_QUEUE);
 }
-@extern method GCalcProcessClass, MSG_SHOW_F5_MODE_INTERACTION 
-{    
+@extern method GCalcProcessClass, MSG_SHOW_F5_MODE_INTERACTION
+{
     word selection;
-  
+
     @call F5_Mode::MSG_GEN_INTERACTION_INITIATE();
-    selection=@call DotConnected5::MSG_GEN_ITEM_GROUP_GET_SELECTION(); 
+    selection=@call DotConnected5::MSG_GEN_ITEM_GROUP_GET_SELECTION();
     if (selection==0)
     {
         @call LinienMuster5::MSG_GEN_SET_ENABLED(VUM_DELAYED_VIA_APP_QUEUE);
-        @call LinienDicke5_Interaction::MSG_GEN_SET_ENABLED(VUM_DELAYED_VIA_APP_QUEUE);      
+        @call LinienDicke5_Interaction::MSG_GEN_SET_ENABLED(VUM_DELAYED_VIA_APP_QUEUE);
     }
     else
     {
         @call LinienMuster5::MSG_GEN_SET_NOT_ENABLED(VUM_DELAYED_VIA_APP_QUEUE);
         @call LinienDicke5_Interaction::MSG_GEN_SET_NOT_ENABLED(VUM_DELAYED_VIA_APP_QUEUE);
-    } 
-    if (arbeitsbereich!=3) 
+    }
+    if (arbeitsbereich!=3)
        @call Redraw5::MSG_GEN_SET_NOT_ENABLED(VUM_DELAYED_VIA_APP_QUEUE);
     else
-       @call Redraw5::MSG_GEN_SET_ENABLED(VUM_DELAYED_VIA_APP_QUEUE);    
+       @call Redraw5::MSG_GEN_SET_ENABLED(VUM_DELAYED_VIA_APP_QUEUE);
 }
 
 
