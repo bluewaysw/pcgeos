@@ -47,8 +47,8 @@ resource InitMod	code read-only shared discard-only
 #resource ttfile_TEXT 	fixed code read-only shared
 
 resource InterpEntry	code read-only shared
-resource InterpInfreq	code read-only shared
-resource InterpExtra	code read-only shared
+#resource InterpInfreq	code read-only shared
+#resource InterpExtra	code read-only shared
 
 #
 # XIP-enabled
