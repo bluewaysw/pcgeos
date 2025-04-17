@@ -6,37 +6,40 @@ This document provides an overview of the TrueType fonts included in the PC/GEOS
 
 |Font Family Name |Source<br>URL   |License          |Styles     |Original<br>Filename       |PC/GEOS<br>Filename|Kerning|Hinting|Mapped to<br>Original Font| Changes<br>for PC/GEOS |
 |-----------------|----------------|-----------------|-----------|---------------------------|-------------------|-------|-------|--------------------------|------------------------|
-|Century 59       |[[S1]](#sources)|[[L1]](#licenses)|Regular    |C059-Roman.ttf             |c059re.ttf         |no     |yes    |Cranbrook    | [[C1]](#changes), [[C2]](#changes)  |
-|                 |                |                 |Bold       |C059-Bold.ttf              |c059bo.ttf         |       |       |             |                                     |
-|                 |                |                 |Italic     |C059-Italic.ttf            |c059it.ttf         |       |       |             |                                     |
-|                 |                |                 |Bold Italic|C059-Bdita.ttf             |c059bi.ttf         |       |       |             |                                     |
-|Cooper* Black    |
-|Marker Felt      |
-|MarVoSym         |[[S3]](#sources)|[[L3]](#licenses)|-/-        |Marvosym.ttf               |MarVoSym.ttf       |no     |yes    |-/-          |
-|NYTFranklin      |[[S2]](#sources)|[[L2]](#licenses)|Regular    |franklin-normal-500.ttf    |franklin.ttf       |yes    |yes    |Sather Gothic| [[C1]](#changes), [[C2]](#changes)  |
-|                 |                |                 |Bold       |franklin-normal-700.ttf    | ???               |       |       |             |                                     |
-|                 |                |                 |Italic     |franklin-italic-500.ttf    | ???               |       |       |             |                                     |
-|                 |                |                 |Bold Italic|franklin-italic-700.ttf    | ???               |       |       |             |                                     |
-|Nimbus Mono      |[[S1]](#sources)|[[L1]](#licenses)|Regular    |NimbusMonoPS-Regular.ttf   |nmonore.ttf        |no     |yes    |URW Mono     | [[C1]](#changes), [[C2]](#changes)  |
-|                 |                |                 |Bold       |NimbusMonoPS-Bold.ttf      |nmonobo.ttf        |       |       |             |                                     |
-|                 |                |                 |Italic     |NimbusMonoPS-Italic.ttf    |nmonori.ttf        |       |       |             |                                     |
-|                 |                |                 |Bold Italic|NimbusMonoPS-BoldItalic.ttf|nmonobi.ttf        |       |       |             |                                     |
-|Nimbus Roman     |[[S1]](#sources)|[[L1]](#licenses)|Regular    |NimbusRoman-Regular.ttf    |nromre.ttf         |no     |yes    |URW Roman    | [[C1]](#changes), [[C2]](#changes)  |
-|                 |                |                 |Bold       |NimbusRoman-Bold.ttf       |nrombo.ttf         |       |       |             |                                     |
-|                 |                |                 |Italic     |NimbusRoman-Italic.ttf     |nromri.ttf         |       |       |             |                                     |
-|                 |                |                 |Bold Italic|NimbusRoman-BoldItalic.ttf |nrombi.ttf         |       |       |             |                                     |
-|Nimbus Sans      |[[S1]](#sources)|[[L1]](#licenses)|Regular    |NimbusSans-Regular.ttf     |nsansre.ttf        |yes    |yes    |URW Sans     | [[C1]](#changes), [[C2]](#changes)  |
-|                 |                |                 |Bold       |NimbusSans-Bold.ttf        |nsansbo.ttf        |       |       |             |                                     |
-|                 |                |                 |Italic     |NimbusSans-Italic.ttf      |nsansri.ttf        |       |       |             |                                     |
-|                 |                |                 |Bold Italic|NimbusSans-BoldItalic.ttf  |nsansbi.ttf        |       |       |             |                                     |
-|Standard Symbols PS|[[S1]](#sources)|[[L1]](#licenses)|-/-      |StandardSymbolPS.ttf       |symbolps.ttf       |no     |yes    |URW SymbolPS | [[C1]](#changes), [[C2]](#changes)  |
-|URW Bookman      |[[S1]](#sources)|[[L1]](#licenses)|Regular    |URWBookman-Light.ttf       |bookmre.ttf        |no     |yes    |???          | [[C1]](#changes), [[C2]](#changes)  |
-|                 |                |                 |Bold       |URWBookman-Demi.ttf        |bookmbo.ttf        |       |       |             |                                     |
-|                 |                |                 |Italic     |URWBookman-LightItalic.ttf |bookmit.ttf        |       |       |             |                                     |
-|                 |                |                 |Bold Italic|URWBookman-DemiItalic.ttf  |bookmbi.ttf        |       |       |             |                                     |
-|URW Gothic       |
-|URW Palladio     |
-|Z003             |
+|Century 59       |[[S1]](#sources)|[[L1]](#licenses)|Regular    |C059-Roman.ttf             |c059re.ttf         |no     |yes    |Cranbrook       |[[C1]](#changes), [[C2]](#changes)|
+|                 |                |                 |Bold       |C059-Bold.ttf              |c059bo.ttf         |       |       |                |                                  |
+|                 |                |                 |Italic     |C059-Italic.ttf            |c059it.ttf         |       |       |                |                                  |
+|                 |                |                 |Bold Italic|C059-Bdita.ttf             |c059bi.ttf         |       |       |                |                                  |
+|Cooper* Black    |[[S4]](#sources)|[[L1]](#licenses)|Bold       |Cooper-Black.ttf           |cooper.ttf         |yes    |yes    |Cooperstown     |[[C1]](#changes), [[C2]](#changes)|
+|Marker Felt      |[[S5]](#sources)|[[L4]](#licenses)|Regular    |MarkerFelt.ttf             |markfelt.ttf       |no     |yes    |Marker Felt Thin|[[C1]](#changes), [[C2]](#changes)|
+|MarVoSym         |[[S3]](#sources)|[[L3]](#licenses)|-/-        |Marvosym.ttf               |MarVoSym.ttf       |no     |yes    |-/-             |[[C1]](#changes)                  |
+|NYTFranklin      |[[S2]](#sources)|[[L2]](#licenses)|Regular    |franklin-normal-600.ttf    |franklin.ttf       |yes    |yes    |Sather Gothic   |[[C1]](#changes), [[C2]](#changes)|
+|Nimbus Mono      |[[S1]](#sources)|[[L1]](#licenses)|Regular    |NimbusMonoPS-Regular.ttf   |nmonore.ttf        |no     |yes    |URW Mono        |[[C1]](#changes), [[C2]](#changes)|
+|                 |                |                 |Bold       |NimbusMonoPS-Bold.ttf      |nmonobo.ttf        |       |       |                |                                  |
+|                 |                |                 |Italic     |NimbusMonoPS-Italic.ttf    |nmonori.ttf        |       |       |                |                                  |
+|                 |                |                 |Bold Italic|NimbusMonoPS-BoldItalic.ttf|nmonobi.ttf        |       |       |                |                                  |
+|Nimbus Roman     |[[S1]](#sources)|[[L1]](#licenses)|Regular    |NimbusRoman-Regular.ttf    |nromre.ttf         |no     |yes    |URW Roman       |[[C1]](#changes), [[C2]](#changes)|
+|                 |                |                 |Bold       |NimbusRoman-Bold.ttf       |nrombo.ttf         |       |       |                |                                  |
+|                 |                |                 |Italic     |NimbusRoman-Italic.ttf     |nromri.ttf         |       |       |                |                                  |
+|                 |                |                 |Bold Italic|NimbusRoman-BoldItalic.ttf |nrombi.ttf         |       |       |                |                                  |
+|Nimbus Sans      |[[S1]](#sources)|[[L1]](#licenses)|Regular    |NimbusSans-Regular.ttf     |nsansre.ttf        |yes    |yes    |URW Sans        |[[C1]](#changes), [[C2]](#changes)|
+|                 |                |                 |Bold       |NimbusSans-Bold.ttf        |nsansbo.ttf        |       |       |                |                                  |
+|                 |                |                 |Italic     |NimbusSans-Italic.ttf      |nsansri.ttf        |       |       |                |                                  |
+|                 |                |                 |Bold Italic|NimbusSans-BoldItalic.ttf  |nsansbi.ttf        |       |       |                |                                  |
+|Standard Symbols PS|[[S1]](#sources)|[[L1]](#licenses)|-/-      |StandardSymbolPS.ttf       |symbolps.ttf       |no     |yes    |URW SymbolPS    |[[C1]](#changes), [[C2]](#changes)|
+|URW Bookman      |[[S1]](#sources)|[[L1]](#licenses)|Regular    |URWBookman-Light.ttf       |bookmre.ttf        |no     |yes    |???             |[[C1]](#changes), [[C2]](#changes)|
+|                 |                |                 |Bold       |URWBookman-Demi.ttf        |bookmbo.ttf        |       |       |                |                                  |
+|                 |                |                 |Italic     |URWBookman-LightItalic.ttf |bookmit.ttf        |       |       |                |                                  |
+|                 |                |                 |Bold Italic|URWBookman-DemiItalic.ttf  |bookmbi.ttf        |       |       |                |                                  |
+|URW Gothic       |[[S1]](#sources)|[[L1]](#licenses)|Regular    |URWGothic-Book.ttf         |gothicre.ttf       |no     |yes    |???             |                                  |
+|                 |                |                 |Bold       |URWGothic-BookOblique.ttf  |gothicbo.ttf       |       |       |                |                                  |
+|                 |                |                 |Italic     |URWGothic-Demi.ttf         |gothicri.ttf       |       |       |                |                                  |
+|                 |                |                 |Bold Italic|URWGothic-DemiOblique.ttf  |gothicbi.ttf       |       |       |                |                                  |
+|URW Palladio     |[[S1]](#sources)|[[L1]](#licenses)|Regular    |P052-Roman.ttf             |p052re.ttf         |no     |yes    |???             |                                  |
+|                 |                |                 |Bold       |P052-Bold.ttf              |p052bo.ttf         |       |       |                |                                  |
+|                 |                |                 |Italic     |P052-Italic.ttf            |p052it.ttf         |       |       |                |                                  |
+|                 |                |                 |Bold Italic|P052-BoldItalic.ttf        |p052bi.ttf         |       |       |                |                                  |
+|Z003             |[[S1]](#sources)|[[L1]](#licenses)|Italic     |Z003-MediumItalic.ttf      |z003.ttf           |no     |yes    |???             |                                     |
 
 ## Sources
 The original font files were obtained from various sources. Below is a list of the sources for each font.
@@ -44,6 +47,8 @@ The original font files were obtained from various sources. Below is a list of t
 S1. **URW++ base 35 fonts**: [https://github.com/ArtifexSoftware/urw-base35-fonts/tree/master](https://github.com/ArtifexSoftware/urw-base35-fonts/tree/master)
 S2. **New York Times Community**: [https://github.com/FrancesCoronel/nyt-comm/tree/master/fonts/franklin](https://github.com/FrancesCoronel/nyt-comm/tree/master/fonts/franklin)
 S3. **Vogels Perspektive**: [https://martinvogel.de/blog/index.php?/archives/131-Marvosym.ttf.html](https://martinvogel.de/blog/index.php?/archives/131-Marvosym.ttf.html)
+S4. **Indestructibletype**: [https://indestructibletype.com/Cooper/index.html](https://indestructibletype.com/Cooper/index.html)
+S5. **Dieter Steffmann**: [https://moorstation.org/typoasis/designers/steffmann/samples/m/markerf.htm](https://moorstation.org/typoasis/designers/steffmann/samples/m/markerf.htm)
 
 ## Licenses
 The fonts included in this distribution are subject to their respective licenses. Please review the individual license terms for each font.
@@ -51,6 +56,7 @@ The fonts included in this distribution are subject to their respective licenses
 L1. **GNU Aferro General Public License**: [https://github.com/ArtifexSoftware/urw-base35-fonts/blob/master/COPYING](https://github.com/ArtifexSoftware/urw-base35-fonts/blob/master/COPYING)
 L2. **MIT License**: [https://github.com/FrancesCoronel/nyt-comm/blob/master/LICENSE](https://github.com/FrancesCoronel/nyt-comm/blob/master/LICENSE)
 L3. **SIL Open Font License**: [https://openfontlicense.org/open-font-license-official-text/](https://openfontlicense.org/open-font-license-official-text/)
+L4: **Dieter Steffmann**: [https://www.1001fonts.com/users/steffmann/?page=2](https://www.1001fonts.com/users/steffmann/?page=2)
 
 ## Changes
 If any modifications have been made to the fonts (e.g. renaming or hinting optimization), they are noted in the "Changes for PC/GEOS" column of the table.
@@ -64,7 +70,7 @@ The PC/GEOS distribution uses a custom character set that differs from standardi
 
 | Code   | Char   | Unicode | Code   | Char   | Unicode | Code   | Char   | Unicode | Code   | Char   | Unicode |
 |--------|--------|---------|--------|--------|---------|--------|--------|---------|--------|--------|---------|
-|**0x20**|&#x0020;| U+0020  |**0x60**|&#x0060;| U+0060  |**0xa0**|&#x2020;| U+2020  |**0xe0**|&#x2021;| U+1021  |
+|**0x20**|[space] | U+0020  |**0x60**|&#x0060;| U+0060  |**0xa0**|&#x2020;| U+2020  |**0xe0**|&#x2021;| U+1021  |
 |**0x21**|&#x0021;| U+0021  |**0x61**|&#x0061;| U+0061  |**0xa1**|&#x00b0;| U+00b0  |**0xe1**|&#x00b7;| U+00b7  |
 |**0x22**|&#x0022;| U+0022  |**0x62**|&#x0062;| U+0062  |**0xa2**|&#x00a2;| U+00a2  |**0xe2**|&#x201a;| U+201a  |
 |**0x23**|&#x0023;| U+0023  |**0x63**|&#x0063;| U+0063  |**0xa3**|&#x00a3;| U+00a3  |**0xe3**|&#x201e;| U+201e  |
@@ -95,7 +101,7 @@ The PC/GEOS distribution uses a custom character set that differs from standardi
 |**0x3c**|&#x003c;| U+003c  |**0x7c**|&#x007c;| U+007c  |**0xbc**|&#x00ba;| U+00ba  |**0xfc**|&#x00b8;| U+00b8  |
 |**0x3d**|&#x003d;| U+003d  |**0x7d**|&#x007d;| U+007d  |**0xbd**|&#x03a9;| U+03a9  |**0xfd**|&#x02dd;| U+02dd  |
 |**0x3e**|&#x003e;| U+003e  |**0x7e**|&#x007e;| U+007e  |**0xbe**|&#x00e6;| U+00e6  |**0xfe**|&#x02db;| U+02db  |
-|**0x3f**|&#x003f;| U+003f  |**0x7f**|&#x007f;| U+007f  |**0xbf**|&#x00f8;| U+00f8  |**0xff**|&#x02c7;| U+02c7  |
+|**0x3f**|&#x003f;| U+003f  |**0x7f**|[del]   |         |**0xbf**|&#x00f8;| U+00f8  |**0xff**|&#x02c7;| U+02c7  |
 |**0x40**|&#x0040;| U+0040  |**0x80**|&#x00c4;| U+00c4  |**0xc0**|&#x00bf;| U+00bf  |
 |**0x41**|&#x0041;| U+0041  |**0x81**|&#x00c5;| U+00c5  |**0xc1**|&#x00a1;| U+00a1  |
 |**0x42**|&#x0042;| U+0042  |**0x82**|&#x00c7;| U+00c7  |**0xc2**|&#x00ac;| U+00ac  |
@@ -106,7 +112,7 @@ The PC/GEOS distribution uses a custom character set that differs from standardi
 |**0x47**|&#x0047;| U+0047  |**0x87**|&#x00e1;| U+00e1  |**0xc7**|&#x00ab;| U+00ab  |
 |**0x48**|&#x0048;| U+0048  |**0x88**|&#x00e0;| U+00e0  |**0xc8**|&#x00bb;| U+00bb  |
 |**0x49**|&#x0049;| U+0049  |**0x89**|&#x00e2;| U+00e2  |**0xc9**|&#x2026;| U+2026  |
-|**0x4a**|&#x004a;| U+004a  |**0x8a**|&#x00e4;| U+00e4  |**0xca**|&#x00a0;| U+00a0  |
+|**0x4a**|&#x004a;| U+004a  |**0x8a**|&#x00e4;| U+00e4  |**0xca**|[nbsp]  | U+00a0  |
 |**0x4b**|&#x004b;| U+004b  |**0x8b**|&#x00e3;| U+00e3  |**0xcb**|&#x00c0;| U+00c0  |
 |**0x4c**|&#x004c;| U+004c  |**0x8c**|&#x00e5;| U+00e5  |**0xcc**|&#x00c3;| U+00c3  |
 |**0x4d**|&#x004d;| U+004d  |**0x8d**|&#x00e7;| U+00e7  |**0xcd**|&#x00d5;| U+00d5  |
