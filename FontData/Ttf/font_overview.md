@@ -10,10 +10,10 @@ This document provides an overview of the TrueType fonts included in the PC/GEOS
 |                 |                |                 |Bold       |C059-Bold.ttf              |c059bo.ttf         |       |       |                |                                  |
 |                 |                |                 |Italic     |C059-Italic.ttf            |c059it.ttf         |       |       |                |                                  |
 |                 |                |                 |Bold Italic|C059-Bdita.ttf             |c059bi.ttf         |       |       |                |                                  |
-|Cooper* Black    |[[S4]](#sources)|[[L1]](#licenses)|Bold       |Cooper-Black.ttf           |cooper.ttf         |yes    |yes    |Cooperstown     |[[C1]](#changes), [[C2]](#changes)|
+|Cooper* Black    |[[S4]](#sources)|[[L1]](#licenses)|Bold       |Cooper-Black.ttf           |cooper.ttf         |yes    |yes    |Cooperstown     |[[C1]](#changes), [[C2]](#changes), [[C3]](#changes)|
 |Marker Felt      |[[S5]](#sources)|[[L4]](#licenses)|Regular    |MarkerFelt.ttf             |markfelt.ttf       |no     |yes    |Marker Felt Thin|[[C1]](#changes), [[C2]](#changes)|
 |MarVoSym         |[[S3]](#sources)|[[L3]](#licenses)|-/-        |Marvosym.ttf               |MarVoSym.ttf       |no     |yes    |-/-             |[[C1]](#changes)                  |
-|NYTFranklin      |[[S2]](#sources)|[[L2]](#licenses)|Regular    |franklin-normal-600.ttf    |franklin.ttf       |yes    |yes    |Sather Gothic   |[[C1]](#changes), [[C2]](#changes)|
+|NYTFranklin      |[[S2]](#sources)|[[L2]](#licenses)|Regular    |franklin-normal-600.ttf    |franklin.ttf       |yes    |yes    |Sather Gothic   |[[C1]](#changes), [[C2]](#changes), [[C3]](#changes)|
 |Nimbus Mono      |[[S1]](#sources)|[[L1]](#licenses)|Regular    |NimbusMonoPS-Regular.ttf   |nmonore.ttf        |no     |yes    |URW Mono        |[[C1]](#changes), [[C2]](#changes)|
 |                 |                |                 |Bold       |NimbusMonoPS-Bold.ttf      |nmonobo.ttf        |       |       |                |                                  |
 |                 |                |                 |Italic     |NimbusMonoPS-Italic.ttf    |nmonori.ttf        |       |       |                |                                  |
@@ -31,15 +31,15 @@ This document provides an overview of the TrueType fonts included in the PC/GEOS
 |                 |                |                 |Bold       |URWBookman-Demi.ttf        |bookmbo.ttf        |       |       |                |                                  |
 |                 |                |                 |Italic     |URWBookman-LightItalic.ttf |bookmit.ttf        |       |       |                |                                  |
 |                 |                |                 |Bold Italic|URWBookman-DemiItalic.ttf  |bookmbi.ttf        |       |       |                |                                  |
-|URW Gothic       |[[S1]](#sources)|[[L1]](#licenses)|Regular    |URWGothic-Book.ttf         |gothicre.ttf       |no     |yes    |???             |                                  |
+|URW Gothic       |[[S1]](#sources)|[[L1]](#licenses)|Regular    |URWGothic-Book.ttf         |gothicre.ttf       |no     |yes    |???             |[[C1]](#changes), [[C2]](#changes)|
 |                 |                |                 |Bold       |URWGothic-BookOblique.ttf  |gothicbo.ttf       |       |       |                |                                  |
 |                 |                |                 |Italic     |URWGothic-Demi.ttf         |gothicri.ttf       |       |       |                |                                  |
 |                 |                |                 |Bold Italic|URWGothic-DemiOblique.ttf  |gothicbi.ttf       |       |       |                |                                  |
-|URW Palladio     |[[S1]](#sources)|[[L1]](#licenses)|Regular    |P052-Roman.ttf             |p052re.ttf         |no     |yes    |???             |                                  |
+|URW Palladio     |[[S1]](#sources)|[[L1]](#licenses)|Regular    |P052-Roman.ttf             |p052re.ttf         |no     |yes    |???             |[[C1]](#changes), [[C2]](#changes)|
 |                 |                |                 |Bold       |P052-Bold.ttf              |p052bo.ttf         |       |       |                |                                  |
 |                 |                |                 |Italic     |P052-Italic.ttf            |p052it.ttf         |       |       |                |                                  |
 |                 |                |                 |Bold Italic|P052-BoldItalic.ttf        |p052bi.ttf         |       |       |                |                                  |
-|Z003             |[[S1]](#sources)|[[L1]](#licenses)|Italic     |Z003-MediumItalic.ttf      |z003.ttf           |no     |yes    |???             |                                     |
+|Z003             |[[S1]](#sources)|[[L1]](#licenses)|Italic     |Z003-MediumItalic.ttf      |z003.ttf           |no     |yes    |???             |[[C1]](#changes), [[C2]](#changes)|
 
 ## Sources
 The original font files were obtained from various sources. Below is a list of the sources for each font.
@@ -62,7 +62,8 @@ L4: **Dieter Steffmann**: [https://www.1001fonts.com/users/steffmann/?page=2](ht
 If any modifications have been made to the fonts (e.g. renaming or hinting optimization), they are noted in the "Changes for PC/GEOS" column of the table.
 
 C1. **Character set**: The included characters have been reduced to the PC/GEOS character set. 
-C2. **Automatic hinting**: Auto-hinting applied to improve on-screen readability and rendering quality. 
+C2. **Automatic hinting**: Auto-hinting applied to improve on-screen readability and rendering quality.
+C3. **Subfamily changed**: Font subfamily changed to bold.
 
 ## Mapping the GEOS Character Set to Unicode
 
