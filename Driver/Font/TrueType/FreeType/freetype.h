@@ -410,9 +410,10 @@
                Reserved2,
                Reserved3,
                Reserved4;
-#endif
 
     TT_Short   metric_Data_Format;
+#endif
+
     TT_UShort  number_Of_HMetrics;
 
     /* The following fields are not defined by the TrueType specification */
@@ -456,9 +457,10 @@
                Reserved2,
                Reserved3,
                Reserved4;
-#endif
 
     TT_Short   metric_Data_Format;
+#endif
+
     TT_UShort  number_Of_VMetrics;
 
     /* The following fields are not defined by the TrueType specification */

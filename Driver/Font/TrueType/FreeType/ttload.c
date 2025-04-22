@@ -531,11 +531,12 @@
     header->Reserved2 = GET_Short();
     header->Reserved3 = GET_Short();
     header->Reserved4 = GET_Short();
-#else
-    SKIP( 20 );
-#endif
 
     header->metric_Data_Format = GET_Short();
+#else
+    SKIP( 22 );
+#endif
+
     header->number_Of_HMetrics = GET_UShort();
 
     FORGET_Frame();
