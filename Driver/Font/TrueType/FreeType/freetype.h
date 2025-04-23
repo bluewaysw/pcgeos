@@ -393,7 +393,10 @@
 #endif
     TT_FWord   Ascender;
     TT_FWord   Descender;
+
+#ifdef TT_CONFIG_OPTION_SUPPORT_OPTIONAL_FIELDS
     TT_FWord   Line_Gap;
+#endif
 
     TT_UFWord  advance_Width_Max;      /* advance width maximum */
 
@@ -440,7 +443,10 @@
 #endif
     TT_FWord   Ascender;
     TT_FWord   Descender;
+
+#ifdef TT_CONFIG_OPTION_SUPPORT_OPTIONAL_FIELDS
     TT_FWord   Line_Gap;
+#endif
 
     TT_UFWord  advance_Height_Max;      /* advance height maximum */
 

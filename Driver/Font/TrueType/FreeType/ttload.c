@@ -513,7 +513,12 @@
 #endif
     header->Ascender  = GET_Short();
     header->Descender = GET_Short();
+
+#ifdef TT_CONFIG_OPTION_SUPPORT_OPTIONAL_FIELDS
     header->Line_Gap  = GET_Short();
+#else
+    SKIP( 2 );
+#endif
 
     header->advance_Width_Max = GET_UShort();
 
