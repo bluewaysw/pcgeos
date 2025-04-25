@@ -2469,21 +2469,19 @@ static void Lock_Render_Pool( RAS_ARGS  TT_Outline*  glyph )
 #undef ras
 
   LOCAL_FUNC
-  TT_Error  TTRaster_Done( )
+  void  TTRaster_Done( )
   {
     TRaster_Instance*  ras = (TRaster_Instance*)engineInstance.raster_component;
 
 
     if ( !ras )
-      return TT_Err_Ok;
+      return;
 
     GEO_FREE( ras->buffer);
 
 #ifndef TT_CONFIG_OPTION_STATIC_RASTER
     FREE( ras );
 #endif
-
-    return TT_Err_Ok;
   }
 
 

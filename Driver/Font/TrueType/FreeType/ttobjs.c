@@ -523,8 +523,8 @@ extern TEngine_Instance engineInstance;
  *****************************************************************/
 
   LOCAL_FUNC
-  TT_Error  Context_Save( PExecution_Context  exec,
-                          PInstance           ins )
+  void  Context_Save( PExecution_Context  exec,
+                      PInstance           ins )
   {
     Int  i;
 
@@ -538,8 +538,6 @@ extern TEngine_Instance engineInstance;
 
     for ( i = 0; i < MAX_CODE_RANGES; ++i )
       ins->codeRangeTable[i] = exec->codeRangeTable[i];
-
-    return TT_Err_Ok;
   }
 
 
@@ -1315,7 +1313,7 @@ extern TEngine_Instance engineInstance;
  ******************************************************************/
 
   LOCAL_FUNC
-  TT_Error  TTObjs_Done( )
+  void  TTObjs_Done( )
   {
     /* destroy all active faces and contexts before releasing the */
     /* caches                                                     */
@@ -1325,8 +1323,6 @@ extern TEngine_Instance engineInstance;
     /* Now frees caches and cache classes */
     FREE( engineInstance.objs_exec_cache );
     FREE( engineInstance.objs_face_cache );
-
-    return TT_Err_Ok;
   }
 
 

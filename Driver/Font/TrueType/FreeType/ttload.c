@@ -760,12 +760,12 @@
  *
  *  Input  :  face     face table to look for
  *
- *  Output :  TT_Err_Ok.
+ *  Output :  void.
  *
  ******************************************************************/
 
   LOCAL_FUNC
-  TT_Error  Free_TrueType_Names( PFace  face )
+  void  Free_TrueType_Names( PFace  face )
   {
     TName_Table*  names = &face->nameTable;
 
@@ -779,8 +779,6 @@
     names->numNameRecords = 0;
     names->format         = 0;
     names->storageOffset  = 0;
-
-    return TT_Err_Ok;
   }
 
 
