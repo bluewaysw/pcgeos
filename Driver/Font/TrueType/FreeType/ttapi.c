@@ -98,9 +98,6 @@ extern TEngine_Instance engineInstance;
     /* Initalize components */
     if ( 
          TT_FAIL( TTCache_Init )  ||
-#ifdef TT_CONFIG_OPTION_EXTEND_ENGINE
-         TT_FAIL( TTExtend_Init ) ||
-#endif
          TT_FAIL( TTObjs_Init )   ||
          TT_FAIL( TTRaster_Init ) )
        goto Fail;
@@ -125,7 +122,7 @@ extern TEngine_Instance engineInstance;
  *
  *  Input  :  void
  *
- *  Output :  Error code.
+ *  Output :  void
  *
  *  MT-Note : Destroys an engine.  Not necessarily thread-safe
  *            depending on the implementations of ttmemory,
@@ -135,17 +132,12 @@ extern TEngine_Instance engineInstance;
  ******************************************************************/
 
   EXPORT_FUNC
-  TT_Error  TT_Done_FreeType( void )
+  void  TT_Done_FreeType( void )
   {
     TTRaster_Done();
     TTObjs_Done  ();
-#ifdef TT_CONFIG_OPTION_EXTEND_ENGINE
-    TTExtend_Done();
-#endif
     TTCache_Done ();
     TTMemory_Done();
-
-    return TT_Err_Ok;
   }
 
 

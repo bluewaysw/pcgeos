@@ -357,7 +357,7 @@ extern TEngine_Instance engineInstance;
 
 
   LOCAL_FUNC
-  TT_Error  TTCache_Done( )
+  void  TTCache_Done( )
   {
     /* We don't protect this function, as this is the end of the engine's */
     /* execution..                                                        */
@@ -372,7 +372,6 @@ extern TEngine_Instance engineInstance;
       FREE( element );
       element = next;
     }
-    return TT_Err_Ok;
   }
 
 

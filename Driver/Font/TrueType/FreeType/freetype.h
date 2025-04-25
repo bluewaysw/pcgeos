@@ -684,7 +684,7 @@
   /* Finalize the engine, and release all allocated objects. */
 
   EXPORT_DEF
-  TT_Error  TT_Done_FreeType( void );
+  void      TT_Done_FreeType( void );
 
 
   /* ----------------------- face management ----------------------- */

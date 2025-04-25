@@ -23,12 +23,6 @@
 #include "ttinterp.h"
 
 
-/* Add extensions definition */
-#ifdef TT_CONFIG_OPTION_EXTEND_ENGINE
-#include "ttextend.h"
-#endif
-
-
 #ifdef __GEOS__
 extern TEngine_Instance engineInstance;
 #endif  /* __GEOS__ */
@@ -981,11 +975,6 @@ extern TEngine_Instance engineInstance;
     Cache_Destroy( &face->instances );
     Cache_Destroy( &face->glyphs );
 
-    /* destroy the extensions */
-#ifdef TT_CONFIG_OPTION_EXTEND_ENGINE
-    Extension_Destroy( face );
-#endif
-
     /* freeing table directory */
     FREE( face->dirTables );
     face->numTables = 0;
@@ -1124,11 +1113,6 @@ extern TEngine_Instance engineInstance;
          )
 
       goto Fail;
-
-#ifdef TT_CONFIG_OPTION_EXTEND_ENGINE
-    if ( ( error = Extension_Create( face ) ) != TT_Err_Ok )
-      return error;
-#endif
 
     return TT_Err_Ok;
 

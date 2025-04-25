@@ -188,7 +188,7 @@
   TT_Error  TTCache_Init( );
 
   LOCAL_DEF
-  TT_Error  TTCache_Done( );
+  void      TTCache_Done( );
 
 
 #ifdef __cplusplus

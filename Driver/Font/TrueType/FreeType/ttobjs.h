@@ -552,13 +552,6 @@
 
     TCache  instances;   /* current instances for this face */
     TCache  glyphs;      /* current glyph containers for this face */
-
-    /* A typeless pointer to the face object extensions defined */
-    /* in the 'ttextend.*' files.                               */
-  #ifdef TT_CONFIG_OPTION_EXTEND_ENGINE
-    void*  extension;
-    Int    n_extensions;    /* number of extensions */
-  #endif
   };
 
 
