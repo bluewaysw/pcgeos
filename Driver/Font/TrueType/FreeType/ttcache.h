@@ -153,13 +153,13 @@
   /* doesn't need protection                                        */
 
   LOCAL_DEF
-  TT_Error  Cache_Create( PCache_Class      clazz,
+  void     Cache_Create( PCache_Class      clazz,
                           TCache*           cache );
 
   /* Destroys a cache and all its listed objects */
 
   LOCAL_DEF
-  TT_Error  Cache_Destroy( TCache*  cache );
+  void     Cache_Destroy( TCache*  cache );
 
 
   /* Extracts a new object from the cache */

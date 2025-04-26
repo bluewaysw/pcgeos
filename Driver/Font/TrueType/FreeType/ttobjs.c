@@ -1251,16 +1251,10 @@ extern TEngine_Instance engineInstance;
       goto Fail;
 
     /* create face cache */
-    error = Cache_Create( (PCache_Class)&objs_face_class, face_cache );
-    if ( error )
-      goto Fail;
-
+    Cache_Create( (PCache_Class)&objs_face_class, face_cache ); 
+    Cache_Create( (PCache_Class)&objs_exec_class, exec_cache );
+    
     engineInstance.objs_face_cache = face_cache;
-
-    error = Cache_Create( (PCache_Class)&objs_exec_class, exec_cache );
-    if ( error )
-      goto Fail;
-
     engineInstance.objs_exec_cache = exec_cache;
 
     engineInstance.objs_face_class      = (PCache_Class)&objs_face_class;
