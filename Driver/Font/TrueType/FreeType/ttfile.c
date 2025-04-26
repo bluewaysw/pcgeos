@@ -109,7 +109,7 @@
 #define STREAM2REC( x )  ( (TStream_Rec*)HANDLE_Val( x ) )
 
   static  TT_Error  Stream_Activate  ( PStream_Rec  stream );
-  static  TT_Error  Stream_Deactivate( PStream_Rec  stream );
+  static  void      Stream_Deactivate( PStream_Rec  stream );
 
 
 #ifndef TT_CONFIG_OPTION_THREAD_SAFE
@@ -246,7 +246,7 @@
  *
  *  Input  :  stream  target stream
  *
- *  Output :  Error code.
+ *  Output :  void.
  *
  ******************************************************************/
 
@@ -254,8 +254,6 @@
   TT_Error  TT_Done_Stream( TT_Stream*  stream )
   {
      HANDLE_Set( *stream, NULL );
-
-     return TT_Err_Ok;
   }
 
 
@@ -501,14 +499,14 @@
  *
  *  Input  :  stream  target stream
  *
- *  Output :
+ *  Output :  void.
  *
  ******************************************************************/
 
   EXPORT_FUNC
-  TT_Error  TT_Done_Stream( TT_Stream*  stream )
+  void  TT_Done_Stream( TT_Stream*  stream )
   {
-    return TT_Close_Stream( stream );
+    TT_Close_Stream( stream );
   }
 
 
@@ -704,7 +702,7 @@
  *
  *  Input  :  stream   the stream to deactivate
  *
- *  Output :  Error condition
+ *  Output :  void
  *
  *  Note   :  the function is called whenever a stream is deleted
  *            (_not_ when a stream handle's is closed due to an
@@ -713,12 +711,10 @@
  *
  ******************************************************************/
 
-  static  TT_Error  Stream_Deactivate( PStream_Rec  stream )
+  static  void  Stream_Deactivate( PStream_Rec  stream )
   {
     /* Save its current position within the file */
     stream->position = FilePos( stream->file, 0, FILE_POS_RELATIVE );  
-
-    return TT_Err_Ok;
   }
 
 
@@ -811,12 +807,12 @@
  *
  *  Input  :  stream         address of target TT_Stream structure
  *
- *  Output :  SUCCESS (always).
+ *  Output :  void.
  *
  ******************************************************************/
 
   LOCAL_FUNC
-  TT_Error  TT_Close_Stream( TT_Stream*  stream )
+  void  TT_Close_Stream( TT_Stream*  stream )
   {
     PStream_Rec  rec = STREAM2REC( *stream );
 
@@ -825,7 +821,6 @@
     FREE( rec );
 
     HANDLE_Set( *stream, NULL );
-    return TT_Err_Ok;
   }
 
 

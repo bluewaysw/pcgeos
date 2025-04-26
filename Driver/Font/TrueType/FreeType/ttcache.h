@@ -95,7 +95,7 @@
   typedef TT_Error  TConstructor( void*  object,
                                   void*  parent );
 
-  typedef TT_Error  TDestructor ( void*  object );
+  typedef void      TDestructor ( void*  object );
 
 
   /* A Cache class record holds the data necessary to define */
@@ -185,7 +185,7 @@
 
 
   LOCAL_DEF
-  TT_Error  TTCache_Init( );
+  void      TTCache_Init( );
 
   LOCAL_DEF
   void      TTCache_Done( );

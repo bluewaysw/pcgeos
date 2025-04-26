@@ -1006,7 +1006,6 @@
     if ( ( i = TT_LookUp_Table( face, TTAG_OS2 ) ) < 0 )
     {
       face->os2.version = 0xFFFF;
-      error = TT_Err_Ok;
       return TT_Err_Ok;
     }
 

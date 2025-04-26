@@ -846,7 +846,7 @@
   /* Release an outline. */
 
   EXPORT_DEF
-  TT_Error  TT_Done_Outline( TT_Outline*  outline );
+  void      TT_Done_Outline( TT_Outline*  outline );
 
 
   /* Render an outline into a bitmap. */

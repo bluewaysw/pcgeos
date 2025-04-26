@@ -348,11 +348,10 @@ extern TEngine_Instance engineInstance;
 
 
   LOCAL_FUNC
-  TT_Error  TTCache_Init( )
+  void  TTCache_Init( )
   {
     /* Create list elements mutex */
     FREE_Elements = NULL;
-    return TT_Err_Ok;
   }
 
 

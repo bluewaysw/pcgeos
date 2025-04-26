@@ -96,8 +96,9 @@ extern TEngine_Instance engineInstance;
 #define TT_FAIL( x )  ( error = x () ) != TT_Err_Ok
 
     /* Initalize components */
+    TTCache_Init();
+    
     if ( 
-         TT_FAIL( TTCache_Init )  ||
          TT_FAIL( TTObjs_Init )   ||
          TT_FAIL( TTRaster_Init ) )
        goto Fail;
@@ -878,14 +879,14 @@ extern TEngine_Instance engineInstance;
  *
  *  Input  :  outline        address of outline
  *
- *  Output :  Error code.
+ *  Output :  void.
  *
  *  MT-Safe : YES!
  *
  ******************************************************************/
 
   EXPORT_FUNC
-  TT_Error  TT_Done_Outline( TT_Outline*  outline )
+  void  TT_Done_Outline( TT_Outline*  outline )
   {
     if ( outline )
     {
@@ -896,10 +897,7 @@ extern TEngine_Instance engineInstance;
         FREE( outline->contours );
       }
       *outline = null_outline;
-      return TT_Err_Ok;
     }
-    else
-      return TT_Err_Invalid_Argument;
   }
 
 

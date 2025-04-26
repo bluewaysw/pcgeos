@@ -120,19 +120,17 @@ extern TEngine_Instance engineInstance;
  *
  *  Input  :  pts          pointer to the target glyph zone record
  *
- *  Return :  Error code.
+ *  Return :  void.
  *
  *****************************************************************/
 
   static
-  TT_Error  Done_Glyph_Zone( PGlyph_Zone  pts )
+  void  Done_Glyph_Zone( PGlyph_Zone  pts )
   {
     FREE( pts->contours );
     FREE( pts->touch );
     FREE( pts->cur );
     FREE( pts->org );
-
-    return TT_Err_Ok;
   }
 
 
@@ -262,12 +260,12 @@ extern TEngine_Instance engineInstance;
  *****************************************************************/
   #pragma code_seg(ttcache_TEXT)
   LOCAL_FUNC
-  TT_Error  _near Context_Destroy( void*  _context )
+  void  _near Context_Destroy( void*  _context )
   {
     PExecution_Context  exec = (PExecution_Context)_context;
 
     if ( !exec )
-      return TT_Err_Ok;
+      return;
 
     /* free composite load stack */
     FREE( exec->loadStack );
@@ -294,7 +292,6 @@ extern TEngine_Instance engineInstance;
     exec->instance = NULL;
     exec->face     = NULL;
 
-    return TT_Err_Ok;
   }
   #pragma code_seg()
 
@@ -606,18 +603,18 @@ extern TEngine_Instance engineInstance;
  *
  *  Input  :  _instance   the instance object to destroy
  *
- *  Output :  error code.
+ *  Output :  void.
  *
  ******************************************************************/
 #pragma code_seg(ttcache_TEXT)
   LOCAL_FUNC
-  TT_Error  _near Instance_Destroy( void* _instance )
+  void  _near Instance_Destroy( void* _instance )
   {
     PInstance  ins = (PInstance)_instance;
 
 
     if ( !_instance )
-      return TT_Err_Ok;
+      return;
 
 
     FREE( ins->cvt );
@@ -642,7 +639,6 @@ extern TEngine_Instance engineInstance;
     ins->owner = NULL;
     ins->valid = FALSE;
 
-    return TT_Err_Ok;
   }
 #pragma code_seg()
 
@@ -957,19 +953,19 @@ extern TEngine_Instance engineInstance;
  *
  *  Input  :  _face   typeless pointer to the face object to destroy
  *
- *  Output :  Error code.
+ *  Output :  void.
  *
  ******************************************************************/
   #pragma code_seg(ttcache_TEXT)
   LOCAL_FUNC
-  TT_Error  _near Face_Destroy( void*  _face )
+  void  _near Face_Destroy( void*  _face )
   {
     PFace   face = (PFace)_face;
     UShort  n;
 
 
     if ( !face )
-      return TT_Err_Ok;
+      return;
 
     /* first of all, destroys the cached sub-objects */
     Cache_Destroy( &face->instances );
@@ -1028,7 +1024,6 @@ extern TEngine_Instance engineInstance;
     Free_TrueType_Hdmx( face );
 #endif
 
-    return TT_Err_Ok;
   }
   #pragma code_seg()
 
@@ -1056,7 +1051,7 @@ extern TEngine_Instance engineInstance;
   #pragma code_seg(ttcache_TEXT)
   LOCAL_FUNC
   TT_Error  _near Face_Create( void*  _face,
-                         void*  _input )
+                               void*  _input )
   {
     TFont_Input*  input = (TFont_Input*)_input;
     PFace         face  = (PFace)_face;
@@ -1132,21 +1127,21 @@ extern TEngine_Instance engineInstance;
  *
  *  Input  :  _glyph  typeless pointer to the glyph record to destroy
  *
- *  Output :  Error code.
+ *  Output :  void.
  *
  ******************************************************************/
   #pragma code_seg(ttcache_TEXT)
   LOCAL_FUNC
-  TT_Error  _near Glyph_Destroy( void*  _glyph )
+  void  _near Glyph_Destroy( void*  _glyph )
   {
     PGlyph  glyph = (PGlyph)_glyph;
 
 
     if ( !glyph )
-      return TT_Err_Ok;
+      return;
 
     glyph->outline.owner = TRUE;
-    return TT_Done_Outline( &glyph->outline );
+    TT_Done_Outline( &glyph->outline );
   }
   #pragma code_seg()
 
