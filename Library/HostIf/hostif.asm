@@ -95,7 +95,8 @@ udata   segment
 udata   ends
 
 
-
+
+
 Resident	segment	resource
 
 HostIfProcessClass	mask CLASSF_NEVER_SAVED
@@ -159,7 +160,8 @@ HostIfInterrupt	endp
 Resident	ends
 
 
-
+
+
 Code	segment	resource
 
 COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -264,7 +266,8 @@ done:
 HostIfProcEventProcess	endm
 
 
-
+
+
 COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 		HostIfAttach
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -332,7 +335,8 @@ HostIfAttach	method dynamic HostIfProcessClass,
 HostIfAttach	endm
 
 
-
+
+
 COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 		HostIfDetach
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -370,7 +374,8 @@ HostIfDetach	method dynamic HostIfProcessClass,
 	ret
 HostIfDetach	endm
 
-
+
+
 COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 		HostIfDetect
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -404,6 +409,8 @@ HostIfDetect	proc	far
 		uses	bx, cx, dx, si, di
 
 		.enter
+		segmov	cx, cs
+		call	MemSegmentToHandle	;cx = handle
 
 		mov	si, ax		; API ID
 		mov	ax, HIF_API_CHECK
@@ -436,8 +443,7 @@ HOSTIFDETECT	proc	far 	apiid:word
 		.leave
 		GOTO	HostIfDetect
 HOSTIFDETECT	endp
-
-
+
 
 COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 		HostIfDetect
