@@ -243,7 +243,8 @@ OLScreenSpecUnbuild	method dynamic OLScreenClass,
 
 OLScreenSpecUnbuild	endm
 
-
+
+
 COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 		OLScreenNotify
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -448,7 +449,8 @@ callSuper:
 
 OLScreenNotify	endm
 
-
+
+
 COMMENT @----------------------------------------------------------------------
 
 METHOD:		OLScreenOpenWin -- MSG_VIS_OPEN_WIN for OLScreenClass

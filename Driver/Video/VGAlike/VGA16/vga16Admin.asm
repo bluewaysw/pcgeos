@@ -701,6 +701,7 @@ endif  ; not NT_DRIVER
 realDone:
 		pop	es
 donedone:
+donedone:
 		.leave
 		ret
 
