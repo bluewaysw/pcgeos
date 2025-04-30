@@ -550,7 +550,18 @@ VidTestVESA	proc	near
 		uses	di, bx, cx
 		.enter
 
-		push	es
+		push	ax
+		call	HostIfDetect
+		mov	ss:[hostIfVersion], ax	; save it
+		pop	ax
+
+		;push	es
+
+		; save away the mode number
+		mov	ss:[vesaMode], ax	; save it
+
+		mov	ax, DP_PRESENT		; yep, it's there
+		jmp	donedone
 
 		push	ax
 		mov	ax, HIF_API_VIDEO
@@ -689,6 +700,7 @@ done:
 endif  ; not NT_DRIVER
 realDone:
 		pop	es
+donedone:
 		.leave
 		ret
 
@@ -725,6 +737,7 @@ REVISION HISTORY:
 		Jim	09/90		Initial version
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+.ioenable
 
 if ALLOW_BIG_MOUSE_POINTER
 screenCategory	char	"screen0",0
