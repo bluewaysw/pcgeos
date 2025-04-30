@@ -61,6 +61,12 @@ VD_VESA_1920_1080_16             enum    VideoDevice
 VD_VESA_1920_1200_16             enum    VideoDevice
 VD_VESA_1920_1440_16             enum    VideoDevice
 VD_VESA_2048_1536_16             enum    VideoDevice
+
+; DPI based modes
+VD_VESA_DPI72_16             	 enum    VideoDevice
+VD_VESA_DPI96_16             	 enum    VideoDevice
+VD_VESA_DPI120_16             	 enum    VideoDevice
+
 endif
 
         ; the first thing in the segment is the DriverExtendedInfoTable
@@ -109,6 +115,9 @@ ifndef PRODUCT_WIN_DEMO
 			VGA1920_1200String,
 			VGA1920_1440String,
 			VGA2048_1536String,
+			VGA72DPIString,
+			VGA96DPIString,
+			VGA120DPIString,
 endif
 			0				; table terminator
 
@@ -153,5 +162,9 @@ LocalDefString VGA1920_1080String <"VESA Compatible SuperVGA: 1920x1080 64K-colo
 LocalDefString VGA1920_1200String <"VESA Compatible SuperVGA: 1920x1200 64K-color",0>
 LocalDefString VGA1920_1440String <"VESA Compatible SuperVGA: 1920x1440 64K-color",0>
 LocalDefString VGA2048_1536String <"VESA Compatible SuperVGA: 2048x1536 64K-color",0>
+
+LocalDefString VGA72DPIString <"VESA Compatible SuperVGA: 72 DPI 64K-color",0>
+LocalDefString VGA96DPIString <"VESA Compatible SuperVGA: 96 DPI 64K-color",0>
+LocalDefString VGA120DPIString <"VESA Compatible SuperVGA: 120 DPI 64K-color",0>
 endif
    

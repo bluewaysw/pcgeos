@@ -33,6 +33,8 @@ include library.def
 include ec.def
 include vm.def
 include dbase.def
+include file.def
+include gcnlist.def
 
 include object.def
 include graphics.def
@@ -42,12 +44,372 @@ include Objects/inputC.def
 
 include Objects/winC.def
 
+include Internal/interrup.def
+include Internal/im.def
+
+
 DefLib hostif.def
 
 HOST_API_INTERRUPT 	equ 	0xA0
 
 
+HostIfProcessClass	class	ProcessClass
+
+MSG_HOSTIF_DETECT		message
+
+MSG_HOSTIF_PROCESS_EVENTS	message
+
+HostIfProcessClass	endc
+
+Resident	segment	resource
+
+HostIfProcessClass	mask CLASSF_NEVER_SAVED
+
+
+COMMENT @----------------------------------------------------------------------
+
+FUNCTION:	HostIfInterrupt
+
+DESCRIPTION:	Host interface callback service routine.
+
+CALLED BY:	INT A0h (HOST_API_INTERRUPT)
+
+PASS:
+	none
+
+RETURN:
+	none
+
+DESTROYED:
+	none
+
+REGISTER/STACK USAGE:
+
+PSEUDO CODE/STRATEGY:
+
+KNOWN BUGS/SIDE EFFECTS/CAVEATS/IDEAS:
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	FR	4/6/25		Initial version
+
+------------------------------------------------------------------------------@
+HostIfInterrupt	proc	far
+
+	pushf
+
+	push	ax, bx, cx, dx, si, di, bp, ds, es
+	call	SysEnterInterrupt		; disable context switching
+	cld					;clear direction flag
+	INT_ON
+
+EC <	call	ECCheckStack						>
+
+	segmov	cx, cs
+	call	MemSegmentToHandle	;cx = handle
+
+	mov	bx, cx
+	call	MemOwner
+	;mov_trash	ax, bx
+	mov	ax, MSG_HOSTIF_PROCESS_EVENTS
+	mov	di, 0
+	call	ObjMessage
+
+	call	SysExitInterrupt
+	pop	ax, bx, cx, dx, si, di, bp, ds, es
+	popf
+	iret
+
+HostIfInterrupt	endp
+
+
+Resident	ends
+
 Code	segment	resource
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		HostIfProcDetect
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	Signs up for the DHCP GCN list.
+
+CALLED BY:	MSG_META_ATTACH
+
+PASS:		*ds:si	= EtherProcessClass object
+		ds:di	= EtherProcessClass instance data
+		ds:bx	= EtherProcessClass object (same as *ds:si)
+		es 	= segment of EtherProcessClass
+		ax	= message #
+RETURN:		ax - interface version, 0 mean no host interface found
+DESTROYED:	
+SIDE EFFECTS:	
+
+PSEUDO CODE/STRATEGY:
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	ed	7/03/00   	Initial version
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+HostIfProcDetect	method dynamic HostIfProcessClass, 
+					MSG_HOSTIF_DETECT
+	.enter
+
+	mov	ax, HIF_API_CHECK
+	call	HostIfCall
+
+	cmp	ax, HIF_OK
+	jne	failed
+	cmp	si, {word} cs:baseboxID
+	jne	failed
+	cmp	bx, {word} cs:baseboxID[2]
+	jne	failed
+	cmp	cx, {word} cs:baseboxID[4]
+	jne	failed
+	cmp	dx, {word} cs:baseboxID[6]
+	jne	failed
+
+	mov	ax, di
+done:
+	.leave
+	ret
+
+failed:
+	mov	ax, 0
+	jmp	done
+
+HostIfProcDetect	endm
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		HostIfProcEventProcess
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	Signs up for the DHCP GCN list.
+
+CALLED BY:	MSG_META_ATTACH
+
+PASS:		*ds:si	= EtherProcessClass object
+		ds:di	= EtherProcessClass instance data
+		ds:bx	= EtherProcessClass object (same as *ds:si)
+		es 	= segment of EtherProcessClass
+		ax	= message #
+RETURN:		
+DESTROYED:	
+SIDE EFFECTS:	
+
+PSEUDO CODE/STRATEGY:
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	ed	7/03/00   	Initial version
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+HostIfProcEventProcess	method dynamic HostIfProcessClass, 
+					MSG_HOSTIF_PROCESS_EVENTS
+	.enter
+
+	;
+	; process all host event
+	;
+eventLoop:
+	mov	ax, HIF_GET_EVENT
+	call	HostIfCall
+
+	cmp	ax, HIF_NOT_FOUND
+	je	done
+
+	; Record the message
+	mov	ax, MSG_META_NOTIFY
+	mov	cx, MANUFACTURER_ID_GEOWORKS
+	mov	dx, GWNT_HOST_DISPLAY_SIZE_CHANGE
+	mov	di, mask MF_RECORD
+	call	ObjMessage
+
+	; Send it to the GCN list
+	mov	bx, MANUFACTURER_ID_GEOWORKS
+	mov	ax, GCNSLT_HOST_NOTIFICATIONS
+	mov	cx, di		; event handle
+	clr	dx, bp		; no additional block sent
+				; not set status flag
+	call	GCNListSend
+
+	jmp	eventLoop
+done:
+
+	.leave
+	ret
+HostIfProcEventProcess	endm
+
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		HostIfAttach
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	Signs up for the DHCP GCN list.
+
+CALLED BY:	MSG_META_ATTACH
+
+PASS:		*ds:si	= EtherProcessClass object
+		ds:di	= EtherProcessClass instance data
+		ds:bx	= EtherProcessClass object (same as *ds:si)
+		es 	= segment of EtherProcessClass
+		ax	= message #
+RETURN:		
+DESTROYED:	
+SIDE EFFECTS:	
+
+PSEUDO CODE/STRATEGY:
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	ed	7/03/00   	Initial version
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+HostIfAttach	method dynamic HostIfProcessClass, 
+					MSG_META_ATTACH
+	.enter
+
+	; Commenting this out cuz it causes a crash. There is no default
+	; handler for this message, so we won't worry about it.
+		mov	di, offset HostIfProcessClass
+		call	ObjCallSuperNoLock
+
+	; 
+	; Setup interrupt handle
+	;
+		mov	ax, HOST_API_INTERRUPT
+		mov	bx, segment HostIfInterrupt		
+		mov	cx, offset HostIfInterrupt	; bx:cx <- fptr of my handler
+		call	SysCatchInterrupt
+
+	;
+	; Register event interrupt
+	;
+		mov	ax, HIF_SET_EVENT_INTERRUPT
+		call	HostIfCall
+
+	.leave
+	ret
+HostIfAttach	endm
+
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		HostIfDetach
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	Remove self from GCN list
+
+CALLED BY:	MSG_META_DETACH
+
+PASS:		*ds:si	= EtherProcessClass object
+		ds:di	= EtherProcessClass instance data
+		ds:bx	= EtherProcessClass object (same as *ds:si)
+		es 	= segment of EtherProcessClass
+		ax	= message #
+RETURN:		
+DESTROYED:	
+SIDE EFFECTS:	
+
+PSEUDO CODE/STRATEGY:
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	ed	7/03/00   	Initial version
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+HostIfDetach	method dynamic HostIfProcessClass, 
+					MSG_META_DETACH
+	uses	ax, bx, cx, dx
+	.enter
+
+	;mov	cx, ss:[0].TPD_threadHandle
+	;clr	dx
+	;mov	bx, MANUFACTURER_ID_GEOWORKS
+	;mov	cx, GCNSLT_TCPIP_STATUS_NOTIFICATIONS
+	;call	GCNListRemove
+
+	.leave
+	mov	di, offset HostIfProcessClass
+	call	ObjCallSuperNoLock
+
+	ret
+HostIfDetach	endm
+
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		HostIfEntry
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	Entry point for the kernel's benefit
+
+CALLED BY:	kernel
+PASS:		di	= LibraryCallTypes
+		cx	= handle of client, if LCT_NEW_CLIENT or LCT_CLIENT_EXIT
+RETURN:		carry set on error
+DESTROYED:	nothing
+
+PSEUDO CODE/STRATEGY:
+
+KNOWN BUGS/SIDE EFFECTS/IDEAS:
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	jcw	 3/24/91	Initial version
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+HostIfEntry	proc	far
+		uses	ds, si, cx, dx, ax, bp, es, bx
+		.enter
+		cmp	di, LCT_ATTACH
+		jne	checkDetach
+
+		segmov	es, dgroup, cx	; es, cx <- dgroup
+	;
+	; Detect host interface
+	;
+		call	HostIfDetect
+		tst	ax
+		jz	done	; 0 if not host API
+
+	; 
+	; Setup interrupt handle
+	;
+		mov	ax, HOST_API_INTERRUPT
+		mov	bx, segment HostIfInterrupt		
+		mov	cx, offset HostIfInterrupt	; bx:cx <- fptr of my handler
+		call	SysCatchInterrupt
+
+	;
+	; Register event interrupt
+	;
+		mov	ax, HIF_SET_EVENT_INTERRUPT
+		call	HostIfCall
+
+done:
+		.leave
+		clc		; no errors
+		ret
+checkDetach:
+		cmp	di, LCT_DETACH
+		jne	done
+	;
+	; Unregister event interrupt
+	;
+
+	; 
+	; Unset interrupt handler
+	;
+		call	SysResetInterrupt
+
+		jmp	done
+
+HostIfEntry	endp
 
 
 COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -77,54 +439,28 @@ REVISION HISTORY:
 
 	SetGeosConvention
 
-baseboxID	byte 	"XOBESAB1"
+baseboxID	byte 	"XOBESAB2"
 
 HostIfDetect	proc	far
 
 	;	
 	; Check host call if SSL interface is available
 	;
-		uses	cx, dx, si
+		uses	bx, cx, dx, si, di
 
 		.enter
+		segmov	cx, cs
+		call	MemSegmentToHandle	;cx = handle
 
-		mov	si, 0
-		mov	cx, 9
-		mov	ah, cs:baseboxID[si]
-next:
-		mov	dx, 38FFh
-		in	al, dx
-		dec	cx
+		mov	bx, cx
+		call	MemOwner
+		;mov_trash	ax, bx
+		mov	ax, MSG_HOSTIF_DETECT
+		mov	di, mask MF_CALL
+		call	ObjMessage
 
-		cmp	al, ah
-		je	start
-		cmp	cx, 0
-		jne	next
-		je	error
-start:
-		mov	cx, 7
-nextCompare:
-		inc	si
-		mov	ah, cs:baseboxID[si]
-		mov	dx, 38FFh
-		in	al, dx
-		cmp	al, ah
-		jne	error
-		dec	cx
-		cmp	cx, 0
-		jne	nextCompare
-
-		; matched 8 chars
-		mov	dx, 38FFh
-		in	al, dx
-		clr	ah		
-done:
 		.leave
 		ret
-		
-error:
-		mov	ax, 0
-		jmp    done
 
 HostIfDetect	endp
 
@@ -157,7 +493,53 @@ HOSTIFDETECT	proc	far
 HOSTIFDETECT	endp
 
 HostIfCall	proc	far
-		int	HOST_API_INTERRUPT
+
+		push	bp
+		mov	bp, dx
+
+		mov	dx, 38FFh
+
+		; interrupts off
+		INT_OFF
+
+		; ping/pong request/response record exchange
+		push	ax
+		in	ax, dx
+		pop	ax
+
+		; send request data
+		out	dx, ax
+		mov	ax, si
+		out	dx, ax
+		mov	ax, bx
+		out	dx, ax
+		mov	ax, cx
+		out	dx, ax
+		mov	ax, bp
+		out	dx, ax
+		mov	ax, di
+		out	dx, ax
+
+		; receive response data
+		in	ax, dx		; di
+		mov	di, ax 
+		in	ax, dx		; dx
+		mov	bp, ax
+		in	ax, dx		; cx
+		mov	cx, ax
+		in	ax, dx		; bx
+		mov	bx, ax
+		in	ax, dx		; si
+		mov	si, ax
+		in	ax, dx
+
+		; interrupts on
+		INT_ON
+
+		mov	dx, bp
+		pop	bp
+
+		.leave
 		ret
 HostIfCall	endp
 
