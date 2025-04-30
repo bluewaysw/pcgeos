@@ -43,6 +43,8 @@ UseDriver	Internal/powerDr.def
 include		Internal/grWinInt.def	; for cwinFieldxxx.asm
 include		Internal/window.def	; for cwinFieldxxx.asm
 
+include		geoworks.def
+
 ;-----------------------------------------------------------------------------
 ;	Include definitions for this module
 ;-----------------------------------------------------------------------------

@@ -189,10 +189,180 @@ EC<	call	VisCheckVisAssumption	; Make sure vis data exists >
 					; Children should NOT be geometrically
 					;	managed.
 	or	ds:[di].VCI_geoAttrs, mask VCGA_CUSTOM_MANAGE_CHILDREN
+
+	mov	cx, ds:[LMBH_handle]
+	mov	dx, si
+	mov	bx, MANUFACTURER_ID_GEOWORKS
+	mov	ax, GCNSLT_HOST_NOTIFICATIONS
+	call	GCNListAdd
+
 	ret
 
 OLScreenSpecBuild	endm
 
+
+COMMENT @----------------------------------------------------------------------
+
+METHOD:		OLMenuedWinVisUnbuild -- MSG_SPEC_UNBUILD
+		for OLMenuedWinClass
+
+DESCRIPTION:	Visibly unbuilds & destroys a menued window
+
+PASS:		*ds:si 	- instance data
+		es     	- segment of MetaClass
+		di 	- MSG_SPEC_UNBUILD
+
+RETURN:		nothing
+
+DESTROYED:	ax, bx, cx, dx, si, di, ds, es, bp
+
+REGISTER/STACK USAGE:
+
+PSEUDO CODE/STRATEGY:
+
+KNOWN BUGS/SIDE EFFECTS/CAVEATS/IDEAS:
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	Doug	1/90		Initial version
+
+------------------------------------------------------------------------------@
+
+OLScreenSpecUnbuild	method dynamic OLScreenClass,
+						MSG_SPEC_UNBUILD
+
+	mov	cx, ds:[LMBH_handle]
+	mov	dx, si
+	mov	bx, MANUFACTURER_ID_GEOWORKS
+	mov	ax, GCNSLT_HOST_NOTIFICATIONS
+	call	GCNListRemove
+
+	mov	di, offset OLScreenClass
+	GOTO	ObjCallSuperNoLock
+
+OLScreenSpecUnbuild	endm
+
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		OLScreenNotify
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	Notification that a GWNT_HARD_ICON_BAR_FUNCTION or
+		GWNT_STARTUP_INDEXED_APP has occurred - do a
+		NukeExpressMenu.
+
+CALLED BY:	MSG_META_NOTIFY, MSG_META_NOTIFY_WITH_DATA_BLOCK
+
+PASS:		*ds:si	= OLApplicationClass object
+		ds:di	= OLApplicationClass instance data
+		es 	= segment of OLApplicationClass
+		ax	= MSG_META_NOTIFY, MSG_META_NOTIFY_WITH_DATA_BLOCK
+
+		cx	= ManufacturerId
+		dx	= NotificationType
+		bp	= data
+
+RETURN:		nothing
+
+ALLOWED TO DESTROY:
+		ax, cx, dx, bp
+		bx, si, di, ds, es
+
+SIDE EFFECTS:
+
+PSEUDO CODE/STRATEGY:
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	brianc	3/22/93  	Initial version
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+OLScreenNotify	method	dynamic	OLScreenClass, MSG_META_NOTIFY
+	;
+	; make sure we've got what we're looking for
+	;
+	cmp	cx, MANUFACTURER_ID_GEOWORKS
+	jne	callSuper
+	cmp	dx, GWNT_HOST_DISPLAY_SIZE_CHANGE
+	jne	callSuper
+
+	push 	si, ds, di
+	; set the video mode again
+	mov	di, ds:[si]
+	add	di, ds:[di].Gen_offset
+	mov	bx, ds:[di].GSCI_videoDriver	
+
+	; get driver strategy
+	push	bx
+	call	GeodeInfoDriver		; ds:si = DriverInfoStruct
+
+	; call update escape function
+	mov	di, VID_ESC_UPDATE_DEVICE 
+	call	ds:[si].DIS_strategy
+
+	; update screen coordinates
+	pop	bx
+	pop	si, ds, di
+
+	push	si
+	push	ds
+					; Get info about driver
+	call	GeodeInfoDriver		; puts structure in ds:si
+
+	mov	cx, ds:[si].VDI_pageW	; x size
+	mov	dx, ds:[si].VDI_pageH	; y size
+
+	pop	ds
+	pop	si
+
+	mov	ax, MSG_VIS_SET_SIZE
+	call	ObjCallInstanceNoLock
+
+	push	ds, es, si
+	push	cx
+	mov	cx, 1
+	mov	ax, MSG_VIS_FIND_CHILD_AT_POSITION
+	call	ObjCallInstanceNoLock
+	mov	bx, cx
+	mov	si, dx
+	pop	cx
+	mov	ax, MSG_VIS_SET_SIZE
+
+	push	ax, di
+	mov	ax, MSG_VIS_SET_SIZE
+	mov	di, mask MF_CALL
+	call	ObjMessage
+
+	mov	ax, MSG_GEN_SET_NOT_USABLE
+	mov	dl, VUM_NOW
+	mov	di, mask MF_CALL or mask MF_FIXUP_DS
+	call	ObjMessage
+
+	mov	ax, MSG_GEN_SET_USABLE
+	mov	dl, VUM_NOW
+	mov	di, mask MF_CALL or mask MF_FIXUP_DS
+	call	ObjMessage
+
+	pop	ax, di
+
+	pop	ds, es, si
+
+	mov	ax, MSG_VIS_MARK_INVALID
+	mov	cl, mask VOF_IMAGE_INVALID or mask VOF_WINDOW_INVALID or mask VOF_IMAGE_UPDATE_PATH
+	mov	dl, VUM_NOW
+
+
+
+	mov	ax, MSG_VIS_INVAL_TREE
+	call	ObjCallInstanceNoLock
+
+callSuper:
+	mov	di, offset OLScreenClass
+	GOTO	ObjCallSuperNoLock
+
+OLScreenNotify	endm
 
 
 COMMENT @----------------------------------------------------------------------
