@@ -262,15 +262,15 @@
  *
  *  Input  :  cmap   pointer to cmap table
  *
- *  Output :  Error code.
+ *  Output :  void.
  *
  ******************************************************************/
 
   LOCAL_FUNC
-  TT_Error  CharMap_Free( PCMapTable  cmap )
+  void  CharMap_Free( PCMapTable  cmap )
   {
     if ( !cmap )
-      return TT_Err_Ok;
+      return;
 
     switch ( cmap->format )
     {
@@ -307,7 +307,6 @@
     }
 
     cmap->loaded = FALSE;
-    return TT_Err_Ok;
   }
 
 

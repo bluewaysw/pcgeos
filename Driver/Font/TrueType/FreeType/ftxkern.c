@@ -362,7 +362,7 @@ EC( ECCheckBounds( pairs ) );
  *
  *  Input  :  directory   pointer to the extension's kerning field
  *
- *  Output :  error code
+ *  Output :  void
  *
  *  Notes  :  This function is a destructor; it must be able
  *            to destroy partially built tables.
@@ -370,7 +370,7 @@ EC( ECCheckBounds( pairs ) );
  ******************************************************************/
 
   EXPORT_FUNC
-  TT_Error  TT_Kerning_Directory_Done( TT_Kerning*  directory )
+  void  TT_Kerning_Directory_Done( TT_Kerning*  directory )
   {
     TT_Kern_Subtable*  sub;
     UShort             n;
@@ -378,7 +378,7 @@ EC( ECCheckBounds( pairs ) );
 
     /* by convention */
     if ( !directory || directory->nTables == 0 )
-      return TT_Err_Ok;
+      return;
 
     /* scan the table directory and release loaded entries */
 
@@ -425,8 +425,6 @@ EC( ECCheckBounds( pairs ) );
 
     FREE( directory->tables );
     directory->nTables = 0;
-
-    return TT_Err_Ok;
   }
 
 
