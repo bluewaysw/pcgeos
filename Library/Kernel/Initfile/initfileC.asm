@@ -635,6 +635,8 @@ RETURN:		Carry	= Set to end enumeration
 DESTROYED:	AX, CX, DX, DI, SI, BP, DS
 
 KNOWN BUGS/SIDE EFFECTS/CAVEATS/IDEAS:
+	C callback from Borland my destroy ES, so we have to save it here.
+	WATCOM is configures to behave the same.
 
 REVISION HISTORY:
 	Name	Date		Description
@@ -643,7 +645,7 @@ REVISION HISTORY:
 
 ------------------------------------------------------------------------------@
 _INITFILEENUMSTRINGSECTION_callback	proc	far
-	uses	bx
+	uses	bx, es
 	.enter	inherit	INITFILEENUMSTRINGSECTION
 	mov	bp, bx				; stack frame => SS:BP
 

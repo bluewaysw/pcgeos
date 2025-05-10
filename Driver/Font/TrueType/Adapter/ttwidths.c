@@ -1002,9 +1002,9 @@ static void AdjustTransMatrix( TransformMatrix* transMatrix, FontMatrix* windowM
 
         /* normalize transformation matrix values */
         transMatrix->TM_matrix.xx = GrSDivWWFixed( transMatrix->TM_matrix.xx, windowMatrix->FM_11 );
-        transMatrix->TM_matrix.xy = GrSDivWWFixed( transMatrix->TM_matrix.xy, windowMatrix->FM_11 );
+        transMatrix->TM_matrix.yx = GrSDivWWFixed( transMatrix->TM_matrix.yx, windowMatrix->FM_11 );
+        transMatrix->TM_matrix.xy = GrSDivWWFixed( transMatrix->TM_matrix.xy, windowMatrix->FM_22 );
         transMatrix->TM_matrix.yy = GrSDivWWFixed( transMatrix->TM_matrix.yy, windowMatrix->FM_22 );
-        transMatrix->TM_matrix.yx = GrSDivWWFixed( transMatrix->TM_matrix.yx, windowMatrix->FM_22 );
 }
 
 

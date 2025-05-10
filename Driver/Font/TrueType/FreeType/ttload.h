@@ -52,14 +52,8 @@
 #else
   LOCAL_DEF TT_Error  Load_TrueType_Metrics_Header( PFace  face );
 #endif
-/*
-  LOCAL_DEF TT_Error  Load_TrueType_Any( PFace  face,
-                                         ULong  tag,
-                                         Long   offset,
-                                         void*  buffer,
-                                         Long*  length );
-*/
-  LOCAL_DEF TT_Error  Free_TrueType_Names( PFace  face );
+
+  LOCAL_DEF void      Free_TrueType_Names( PFace  face );
   LOCAL_DEF TT_Error  Free_TrueType_Hdmx ( PFace  face );
 
 
