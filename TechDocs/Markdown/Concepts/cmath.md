@@ -118,7 +118,8 @@ function names and the operations they perform.
 |FloatInt()       |(int) X     |returns integer of X, rounded down|
 |FloatIntFrac()   |            |separates X into integer and fraction|
 |FloatRound()     |            |rounds X to a given decimal places|
-**Table D-1** Basic FP Functions and corresponding C operations (if any)
+
+**Table 4-1** Basic FP Functions and corresponding C operations (if any)
 
 If you wish to call these routines directly rather than rely on the C 
 operations, you may manipulate the floating point stack directly. To add 
@@ -205,6 +206,7 @@ for more details on using these functions.
 |FloatLn1plusX()   |               |natural log of (1 + X)       |
 |FloatSqr()        |               |square of X                  |
 |FloatSqrt()       |sqrt()         |square root                  |
+
 **Table 4-2** Transcendental Floating Point Functions
 
 #### D.1.3 Random Number Generation

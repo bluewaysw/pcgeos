@@ -861,7 +861,7 @@ inch) respectively. This is necessary because the system expects these values
 to be in Points for other system operations. A conversion table is provided in 
 Table 8-1 for setting up these initial values.
 
-**Table 8-1** *Conversions to US Points*
+**Table 8-1** Conversions to US Points
 
 	Distance Unit		Multiplier  
 	Inches				72  

@@ -1014,7 +1014,8 @@ the color values and flags stored with the GState.
 |C_LIGHT_VIOLET|0x0D  |0xFF  |0x55  |0xFF  |
 |C_YELLOW      |0x0E  |0xFF  |0xFF  |0x55  |
 |C_WHITE       |0x0F  |0xFF  |0xFF  |0xFF  |
-**Table 24-1** Convenient Color Indexes
+
+**Table 24-1** Convenient Color Indexes  
 _These are the first 16 members of the Color enumerated type. For a full list 
 of available Color values, see the Routines reference or color.h._
 
@@ -1461,6 +1462,7 @@ whole is stored in a **DashPairArray**. Dash lengths will scale with the line wi
 |LS_DOTTED   |1      |1 2          |
 |LS_DASHDOT	 |2      |4 4 1 4      |
 |LS_DASHDDOT |3      |4 4 1 4 1 4  |
+
 **Table 24-2** Arrays for System Line Styles
 
 Line joins govern the behavior of angles and corners. Using the appropriate 
