@@ -179,7 +179,7 @@ Another important way of representing the symbol is as a *segment:offset* pair. 
 Some examples of address expressions are shown in Table 3-1.
 
 ----------
-**Table 3-1 Address Expressions**
+**Table 3-1** Address Expressions
 
 	Type							Example
 

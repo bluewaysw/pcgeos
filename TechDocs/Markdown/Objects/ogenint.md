@@ -2741,7 +2741,7 @@ moniker chosen by the Specific UI.
 The standard response triggers (and their visual monikers under OSF/Motif) 
 for each *GII_type* are shown in Table 7-1.
 
-**Table 7-1** *Standard Response Triggers*
+**Table 7-1** Standard Response Triggers
 
 	Interaction Type	Trigger Type	Moniker
 

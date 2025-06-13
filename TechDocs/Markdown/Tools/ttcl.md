@@ -294,7 +294,7 @@ the next character. For example, in the command:
 the first argument will be \\*a and the second \\{test.
 
 
-**Table 5-1 *Backslash Sequences***
+**Table 5-1** Backslash Sequences
 
 ----------
 
@@ -345,9 +345,7 @@ in octal (if the first character of the value of the first character is 0 (zero)
 in hexadecimal (if the first two characters of the value are 0x). The valid 
 operators are listed in Table 5-2 grouped in decreasing order of precedence.
 
-**Table 5-2 Valid Operators**
-
-----------
+**Table 5-2** Valid Operators
 
 	Operators			Description  
 	-   ~   !			Unary minus, bit-wise NOT, logical NOT  
@@ -2247,9 +2245,7 @@ automatically deleted.
 integer is a mask of bits that mean different things:
 
 
-**Table 5-3** *The State Subcommand: Block Information*
-
-----------
+**Table 5-3** The State Subcommand: Block Information
 
 	Mask		State			Mask		State  
 	0xf8000		Type			0x00200		Attached  
@@ -2263,9 +2259,7 @@ integer is a mask of bits that mean different things:
 When the integer is AND-ed with the mask for Type (0xf8000), the following 
 values indicate the following types of handles:
 
-**Table 5-4** *The State Subcommand: Block Type*
-
-----------
+**Table 5-4** The State Subcommand: Block Type
 
 	Mask		State  
 	0xe0000		Thread  

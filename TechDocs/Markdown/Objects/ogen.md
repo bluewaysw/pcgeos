@@ -1289,9 +1289,9 @@ modified keystrokes, which may confuse the user. In general, it is good
 practice to use the "control" key exclusively for keyboard accelerators to 
 prevent overlapping with GEOS keyboard acclelators and mnemonics.
 
-**Table 2-1** *Valid Action Keys for Keyboard Accelerators*  
-*These keys are only valid using the specific UI keyword. These Action Keys 
-must also be combined with valid Modifiers (alt, shift, or ctrl)*.  
+**Table 2-1** Valid Action Keys for Keyboard Accelerators.  
+_These keys are only valid using the specific UI keyword. These Action Keys 
+must also be combined with valid Modifiers (alt, shift, or ctrl)_
 
 	NUMPAD_0				SPACE		UP
 	NUMPAD_1				TAB			DOWN
