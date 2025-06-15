@@ -552,13 +552,6 @@
 
     TCache  instances;   /* current instances for this face */
     TCache  glyphs;      /* current glyph containers for this face */
-
-    /* A typeless pointer to the face object extensions defined */
-    /* in the 'ttextend.*' files.                               */
-  #ifdef TT_CONFIG_OPTION_EXTEND_ENGINE
-    void*  extension;
-    Int    n_extensions;    /* number of extensions */
-  #endif
   };
 
 
@@ -781,7 +774,7 @@
                           PInstance           ins );
 
   LOCAL_DEF
-  TT_Error  Context_Save( PExecution_Context  exec,
+  void      Context_Save( PExecution_Context  exec,
                           PInstance           ins );
 
   LOCAL_DEF
@@ -806,7 +799,7 @@
   /********************************************************************/
 
   LOCAL_DEF TT_Error  TTObjs_Init( );
-  LOCAL_DEF TT_Error  TTObjs_Done( );
+  LOCAL_DEF void      TTObjs_Done( );
 
 #ifdef __cplusplus
   }

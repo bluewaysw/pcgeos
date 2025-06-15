@@ -317,7 +317,7 @@ bitstream. Coordinates may be recorded either as absolute positions or as
 offsets from the last coordinate. See Table 21-1 for a list of components of this 
 bitstream. 
 
-**Table 21-1** *Components of the Ink's Bitstream*
+**Table 21-1** Components of the Ink's Bitstream
 
 	Bit Pattern					Meaning						Total Bits
 	00							0 offset							2

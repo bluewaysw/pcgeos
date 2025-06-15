@@ -123,9 +123,7 @@ TT_Error _pascal Init_FreeType()
  * PARAMETERS:     MemHandle varBlock
  *                    Memory handle to the block containing TrueType variables.None
  * 
- * RETURNS:        TT_Error
- *                    Returns `TT_Err_Ok` on successful cleanup, or an
- *                    error code if deinitialization fails.
+ * RETURNS:        void
  * 
  * STRATEGY:       - Call `TT_Done_FreeType()` to clean up resources
  *                   used by the FreeType library.
@@ -136,7 +134,7 @@ TT_Error _pascal Init_FreeType()
  *      15.07.22  JK        Initial Revision
  *******************************************************************/
 
-TT_Error _pascal Exit_FreeType(MemHandle varBlock) 
+void _pascal Exit_FreeType(MemHandle varBlock) 
 {
         if ( varBlock != NullHandle ) {
 
@@ -151,7 +149,7 @@ EC(         ECCheckBounds( (void*)trueTypeVars ) );
             MemUnlock( varBlock );
         }
 
-        return TT_Done_FreeType();
+        TT_Done_FreeType();
 }
 
 /********************************************************************

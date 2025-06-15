@@ -1651,7 +1651,7 @@ In OSF/Motif, the following table shows the standard triggers that will be
 provided with various hints (given a GIT_PROPERTIES GenInteraction that 
 is built as a dialog box):
 
-**Table 12-1** *Default Triggers supplied with a GIT_PROPERTIES dialog box.*
+**Table 12-1** Default Triggers supplied with a GIT_PROPERTIES dialog box.
 
 	Hint									Triggers Supplied
 
