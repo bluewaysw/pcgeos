@@ -393,7 +393,10 @@
 #endif
     TT_FWord   Ascender;
     TT_FWord   Descender;
+
+#ifdef TT_CONFIG_OPTION_SUPPORT_OPTIONAL_FIELDS
     TT_FWord   Line_Gap;
+#endif
 
     TT_UFWord  advance_Width_Max;      /* advance width maximum */
 
@@ -410,9 +413,10 @@
                Reserved2,
                Reserved3,
                Reserved4;
-#endif
 
     TT_Short   metric_Data_Format;
+#endif
+
     TT_UShort  number_Of_HMetrics;
 
     /* The following fields are not defined by the TrueType specification */
@@ -439,7 +443,10 @@
 #endif
     TT_FWord   Ascender;
     TT_FWord   Descender;
+
+#ifdef TT_CONFIG_OPTION_SUPPORT_OPTIONAL_FIELDS
     TT_FWord   Line_Gap;
+#endif
 
     TT_UFWord  advance_Height_Max;      /* advance height maximum */
 
@@ -456,9 +463,10 @@
                Reserved2,
                Reserved3,
                Reserved4;
-#endif
 
     TT_Short   metric_Data_Format;
+#endif
+
     TT_UShort  number_Of_VMetrics;
 
     /* The following fields are not defined by the TrueType specification */
@@ -676,7 +684,7 @@
   /* Finalize the engine, and release all allocated objects. */
 
   EXPORT_DEF
-  TT_Error  TT_Done_FreeType( void );
+  void      TT_Done_FreeType( void );
 
 
   /* ----------------------- face management ----------------------- */
@@ -838,7 +846,7 @@
   /* Release an outline. */
 
   EXPORT_DEF
-  TT_Error  TT_Done_Outline( TT_Outline*  outline );
+  void      TT_Done_Outline( TT_Outline*  outline );
 
 
   /* Render an outline into a bitmap. */

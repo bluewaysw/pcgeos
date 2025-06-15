@@ -123,7 +123,7 @@ extern "C" {
 
   /* Finalize it */
   LOCAL_DEF
-  TT_Error  TTRaster_Done( );
+  void      TTRaster_Done( );
 
 
 #ifdef __cplusplus

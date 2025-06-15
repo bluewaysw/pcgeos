@@ -1004,7 +1004,7 @@ which comes from the following command set: (see Table 4-2)
 
 ----------
 
-**Table 4-2 Patch Command Set**
+**Table 4-2** Patch Command Set
 
 	Form					Meaning					Example
 

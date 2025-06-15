@@ -244,6 +244,7 @@ Operators of the same precedence level are grouped from left to right; that is,
 |<=       |Boolean or string less-than-or-equal-to
 |>        |Boolean or string greater-than
 |>=       |Boolean or string greater-than-or-equal-to
+
 **Table 20-1** Parse Library Operators
 
  **:** This is a range separator. The range separator is a binary infix 

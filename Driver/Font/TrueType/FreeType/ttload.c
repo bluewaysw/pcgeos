@@ -513,7 +513,12 @@
 #endif
     header->Ascender  = GET_Short();
     header->Descender = GET_Short();
+
+#ifdef TT_CONFIG_OPTION_SUPPORT_OPTIONAL_FIELDS
     header->Line_Gap  = GET_Short();
+#else
+    SKIP( 2 );
+#endif
 
     header->advance_Width_Max = GET_UShort();
 
@@ -531,11 +536,12 @@
     header->Reserved2 = GET_Short();
     header->Reserved3 = GET_Short();
     header->Reserved4 = GET_Short();
-#else
-    SKIP( 20 );
-#endif
 
     header->metric_Data_Format = GET_Short();
+#else
+    SKIP( 22 );
+#endif
+
     header->number_Of_HMetrics = GET_UShort();
 
     FORGET_Frame();
@@ -754,12 +760,12 @@
  *
  *  Input  :  face     face table to look for
  *
- *  Output :  TT_Err_Ok.
+ *  Output :  void.
  *
  ******************************************************************/
 
   LOCAL_FUNC
-  TT_Error  Free_TrueType_Names( PFace  face )
+  void  Free_TrueType_Names( PFace  face )
   {
     TName_Table*  names = &face->nameTable;
 
@@ -773,8 +779,6 @@
     names->numNameRecords = 0;
     names->format         = 0;
     names->storageOffset  = 0;
-
-    return TT_Err_Ok;
   }
 
 
@@ -1002,7 +1006,6 @@
     if ( ( i = TT_LookUp_Table( face, TTAG_OS2 ) ) < 0 )
     {
       face->os2.version = 0xFFFF;
-      error = TT_Err_Ok;
       return TT_Err_Ok;
     }
 
