@@ -1973,7 +1973,7 @@ different, the two items may or may not be compatible.
 		PSCF_SMALLER		:1
 		PSCF_LARGER			:1
 		PSCF_CUSTOM_SIZE	:1
-PSCFeatures		end
+	PSCFeatures		end
 
 **Library:** Objects/Text/tCtrlC.def
 

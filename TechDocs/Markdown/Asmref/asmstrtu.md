@@ -274,7 +274,7 @@ bring it to the attention of the user.
 		TPCI_holdUpCompletionCount 	byte	; Number of things not wanting the message 
 											; stored in TEMP_PRINT_COMPLETION_EVENT to 
 											; be sent out just yet.
-TempPrintCtrlInstance			ends
+	TempPrintCtrlInstance			ends
 
 **Library:** spool.def
 

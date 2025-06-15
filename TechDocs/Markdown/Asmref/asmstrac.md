@@ -547,7 +547,7 @@ application has only one init file category.
 		ABI_endPoint			PointWWFixed
 		ABI_midPoint			PointWWFixed
 		ABI_radius				WWFixed	
-ArcBasicInit	ends
+	ArcBasicInit	ends
 
 **Library:** grobj.def
 
@@ -1292,7 +1292,7 @@ this structure specifies an offset from a previous cell position.
 		CF_parameters			FormatParameters
 		CF_callbackPtr			fptr
 		CF_callbackStruct		C_CallbackStruct
-CFormatStruct		ends
+	CFormatStruct		ends
 
 **Library:** parse.def
 

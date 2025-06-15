@@ -2114,7 +2114,7 @@ responsible for relaying the message to multiple text objects.
 		VTPAA_DROP_CAP					:1			;Use VisTextDropCapInfo
 		VTPAA_KEEP_LINES				:1			;Use VisTextKeepInfo
 										:4
-VisTextParaAttrAttributes				end
+	VisTextParaAttrAttributes				end
 
 **Library:** Objects/Text/tCommon.def
 

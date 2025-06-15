@@ -1181,7 +1181,7 @@ object.
 		SWSS_SIGN		:1		;sign of ratio (MUST BE BIT 14)
 		SWSS_MANTISSA	:4		;integer portion: 0-15
 		SWSS_FRACTION	:10		;fractional portion: 1/1024 to 1023/1024.
-SpecWinSizeSpec		end
+	SpecWinSizeSpec		end
 
 **Library:** Objects/visC.def
 
