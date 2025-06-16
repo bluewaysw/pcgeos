@@ -3,6 +3,7 @@
 ----------
 #### @alias
 	@alias(<protoMsg>) <messageDef>;
+
 The @alias keyword is used for messages which take conditional parameters in 
 an assembly handler. For example, if the assembly handler takes a word 
 parameter normally and a dword only if a certain flag is set, you will need to 
@@ -23,6 +24,7 @@ definition as would follow the @message keyword.
 #### @call
 	<ret> = @call [,<flags>] [{<cast_ret>}] \
 	<obj>::[{<cast_par>}]<msg>(<param>*);
+
 The @call keyword sends the specified message to the specified object and 
 makes the caller wait until the message is processed before continuing. The 
 arguments of @call are shown below:
@@ -125,6 +127,7 @@ keyword rather than @call.
 	<obj>::<class>::[{<cast_par>}]<msg>(<param>*) [<flags>]+;
 
 	@callsuper;
+
 The @callsuper keyword does two things: The most useful is to pass a received 
 message on to the superclass to ensure default behavior is preserved; the 
 second, and less used, acts just like @call but sends the message to the 
@@ -157,6 +160,7 @@ superclass.
 ----------
 #### @chunk
 	@chunk	<type> <name> [= <init>];
+
 The @chunk keyword declares a resource chunk containing data of some kind. 
 Data can be of any GEOS or C data type or structure, including a string of 
 characters. The chunk must be declared between the resource delimiters 
@@ -190,6 +194,7 @@ declare it in the other file with @extern. Objects are declared with @object.
 ----------
 #### @chunkArray
 	@chunkArray 	<stype> <aname> [= {<init>}];
+
 The @chunkArray keyword declares a Chunk Array, a special kind of chunk. Only 
 uniform-element-size chunk arrays may be declared with this keyword. It has 
 the following arguments:
@@ -214,6 +219,7 @@ no elements.
 ----------
 #### @class
 	@class	<cname>, <super> [, master [, variant]];
+
 The @class keyword begins a class definition. All instance data and messages 
 for the class are declared between @class and @endc. The arguments of @class 
 are listed below:
@@ -237,6 +243,7 @@ are listed below:
 ----------
 #### @classdecl
 	@classdecl <cname> [, neverSaved];
+
 The @classdecl keyword defines a given class structure in memory. Every new 
 class that will be used by an application must appear in an @classdecl 
 declaration. The arguments for this keyword are shown below:
@@ -254,6 +261,7 @@ saved along with state information.
 ----------
 #### @composite
 	@instance @composite <iname> = <linkFieldName>;
+
 The @composite keyword appears as a subcommand of @instance. It is a type 
 of instance data - it indicates that an object of this class can have several 
 children and that the @composite instance data field will be an optr to the first 
