@@ -227,7 +227,7 @@ type defined for that manufactuer ID.
 								:15
 		GCNLTF_SAVE_TO_STATE	:1	; set to indicate that list should be 
 									; saved to state.
-GCNListTypeFlags		end
+	GCNListTypeFlags		end
 
 **Library:** Objects/metaC.def
 
@@ -1107,7 +1107,7 @@ of the primary.
 										; even on systems that force documents
 										; completely into memory.
 									:2
-GenDocumentControlAttrs			end
+	GenDocumentControlAttrs			end
 
 **Library:** Objects/gDocCtrl.def
 
@@ -4493,8 +4493,8 @@ the reverse draw list.
 		GBCDP_rotateAnchor		GrObjHandleSpecification
 		GBCDP_skew				GrObjAnchoredSkewData
 		GBCDP_scale				GrObjAnchoredScaleData
-		align					word
-GrObjBodyCustomDuplicateParams					ends
+			align					word
+	GrObjBodyCustomDuplicateParams					ends
 
 **Library:** grobj.def
 
