@@ -1311,9 +1311,7 @@ would send the file DRIVER\VIDEO\DUMB\HGC\HGCEC.GEO (HGC.GEO if
 sending non-EC). Typing "pcs -S pcb" would send that file, and also 
 DRIVER\MOUSE\LOGIBUS\LOGIBUSE.GEO (or LOGIBUS.GEO). 
 
-**Table 10-1** *Destination of Files Sent by Pcs*
-
-----------
+**Table 10-1** Destination of Files Sent by Pcs
 
 	Development Directory 				Suffix 		Target Directory
 

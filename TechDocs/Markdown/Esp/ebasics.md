@@ -234,6 +234,7 @@ structures. The types are listed in Table 2-1.
 |lptr      |2    |Chunk handle (i.e. near pointer to a near pointer)     |
 |optr      |4    |object descriptor; high word is hptr, low word is lptr |
 |sptr      |2    |Segment address (or descriptor).                       |
+
 **Table 2-1** Major Esp Data Types  
 _These are the main Esp data types, with their size in bytes._
 
@@ -1102,6 +1103,7 @@ passing the "-m" flag to Esp.
 |\"                 |Double-quote             |
 |\000               |ASCII code in octal      |
 |\x00               |ASCII code in hexadecimal|
+
 **Table 2-2** Esp Escape Sequences
 
 ##### 2.3.4.1 Pseudo-Ops and Directives
@@ -1170,6 +1172,7 @@ If you use .TYPE with a code-related expression, the high byte is set thus:
 |13       |Procedure is a private static method    |
 |14       |Procedure is a dynamic method           |
 |15       |Procedure is a method                   |
+
 **Table 2-3** .TYPE high-byte return values
 
 **LENGTH and SIZE**

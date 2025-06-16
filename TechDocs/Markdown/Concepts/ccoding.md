@@ -17,7 +17,8 @@ handles several other types specific to GEOS. These are all defined in the file
 geos.h. Some of these types were carried over from the world of assembly 
 language and (along with the standard C types) are shown in Table 5-1.
 
-**Table 5-1** Basic Data Types  
+**Table 5-1** Basic Data Types
+
 |Type Name    |Description                                 |
 |-------------|--------------------------------------------|
 |byte         |An unsigned, 8-bit field.                   |
@@ -59,7 +60,8 @@ supported by your C compiler uses word-sized values. GEOS also allows
 byte-sized enumerated types with the **ByteEnum** type. Use of this type is 
 shown in Code Display 5-1.
 
-**Table 5-2** Flag Records and ByteEnum  
+**Table 5-2** Flag Records and ByteEnum
+
 |Type Name   |Description                   |
 |------------|------------------------------|
 |ByteFlags   |An 8-bit record of bit flags. |
@@ -172,7 +174,8 @@ There are over a dozen different types of handles that can be used by any sort
 of geode. These are listed in Table 5-3, along with a brief description of each. 
 All are 16-bit unsigned integers.
 
-**Table 5-3** Handle Types  
+**Table 5-3** Handle Types
+
 |Type Name       |Description                                       |
 |----------------|--------------------------------------------------|
 |Handle          |All-purpose handle.                               |
