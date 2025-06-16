@@ -7,6 +7,7 @@ define how the Glue linker will link the geode.
 ----------
 #### appobj
 	appobj	<name>
+
 The **appobj** field indicates the name of the application object. All geodes with 
 *appl* set under **type** (see below) must have an **appobj** entry. The *name* 
 argument should be the name of the object of **GenApplicationClass** specified 
@@ -16,6 +17,7 @@ in the application's **.goc** file.
 
 #### class
 	class	<name>
+
 The **class** field specifies the name of the object class to be bound to the geode's 
 process thread. This field has significance only if **process** is specified in the 
 geode's **type** field (see below). This should be the same as the **ProcessClass** 
@@ -26,6 +28,7 @@ of this connection). Note that this class binding will only be for the geode's f
 ----------
 #### driver
 	driver	<name> [noload]
+
 This field specifies another driver that is used by this geode. The *noload* flag 
 indicates that the used driver does not need to be loaded when the geode is first 
 launched. Most applications and libraries will not use exported routines from 
@@ -36,6 +39,7 @@ parallel driver.)
 ----------
 #### entry
 	entry	<name>
+
 This field is used by library geodes. The *name* argument is the name of the 
 library routine to be called by the kernel when the library is loaded or unloaded 
 and when a program using the library is loaded or unloaded.
@@ -43,6 +47,7 @@ and when a program using the library is loaded or unloaded.
 ----------
 #### exempt
 	exempt	<library-name>
+
 If you wish to exempt a certain library from Glue's platform checking, call it 
 out with the exempt keyword. Glue will not complain if you then use parts of 
 the library not normally available with platforms named in your **platform** 
@@ -51,6 +56,7 @@ statement.
 ----------
 #### export
 	export	<name> [as <name2>]
+
 This field identifies routines usable by geodes other than the one being 
 compiled; these routines are "exported" for use by other programs. Both forms 
 create entry point symbols for the routines. The first *name* argument must be 
@@ -65,6 +71,7 @@ World for an example of this usage.
 ----------
 #### incminor
 	incminor [<name>]
+
 The **incminor** directive is used at the end of a library's **.gp** file before new 
 routines are added (after a release of the library has already been made). After 
 this release, new **export** and **publish** directives will be put after this **incminor** 
@@ -84,6 +91,7 @@ the **protominor** label should be associated with the revision represented by t
 ----------
 #### library
 	library	<name> [noload]
+
 This field specifies another library that is used by this geode. The *noload* flag 
 indicates that the used library does not need to be loaded when the geode is 
 first launched (though symbolic information will be loaded in any case). Note 
@@ -159,6 +167,7 @@ Examples:
 ----------
 #### longname
 	longname "<string>"
+
 The **longname** field designates a 32-character name for the geode. This name 
 will be displayed with the geode's icon by GeoManager; all geodes should be 
 given a long name.
@@ -166,6 +175,7 @@ given a long name.
 ----------
 #### name
 	name	<pname>.<ext>
+
 The **name** field in the parameters file gives the geode a permanent name which 
 will be used by both the Glue linker and the Swat debugger. Every geode must 
 have a permanent name. Note that the *pname* argument must be no more than 
@@ -178,6 +188,7 @@ When Glue is linking an error-checking geode, it drops the fourth character of
 ----------
 #### nosort
 	nosort
+
 This keyword should appear before the list of resources. Normally glue will sort 
 the geode's resources to optimize their arrangement. This keyword turns off 
 that sorting. If you will generate .GYM (generic symbol) files for your geode, you 
@@ -188,6 +199,7 @@ you probably don't want to use this option.
 ----------
 #### platform
 	platform <name>
+
 The platform directive specifies that the Geode is compatible with the named 
 system. This gives a sign of how backwards-compatible the application is. If 
 multiple platforms are specified, Glue will make sure that the major protocol 
@@ -212,6 +224,7 @@ geode in an effort to avoid the error.
 ----------
 #### publish
 	publish <name>
+
 Normally, If a geode is required to run (via platform specifications) with a 
 version of a library that doesn't contain one of the entry points required by the 
 geode, glue will notify the user of the inconsistency, and the link will fail. 
@@ -248,6 +261,7 @@ output by glue:
 	resource <name> (read-only|preload|discardable|fixed|conforming|shared|\
 			 code|data|lmem|discard-only|swap-only|ui-object|object|\
 			 no-swap|no-discard)+
+
 The **resource** field indicates to Glue that the geode uses the named resource. 
 Not all resources used by a geode must be declared here, however. (Resources 
 are described in more detail in "GEOS Programming," Chapter 5.) Resources 
@@ -331,6 +345,7 @@ listed below:
 ----------
 #### stack
 	stack	<number>
+
 The **stack** field designates the size of the application's stack in bytes. The 
 default stack size is 2000 bytes. This field is not necessary for geodes unless 
 they require a different size stack (the Hello World sample uses a slightly 
@@ -340,6 +355,7 @@ with a process aspect.
 ----------
 #### tokenchars
 	tokenchars "<string>"
+
 This is one of two fields that identifies a unique token in GeoManager's token 
 database file (see **tokenid**, below). The **tokenchars** field must be a string of 
 four characters that identifies the geode's token. Note that these characters 
@@ -348,6 +364,7 @@ also appear in the geode file's extended attributes.
 ----------
 #### tokenid
 	tokenid	<number>
+
 This is the other of two fields that identifies a unique token in GeoManager's 
 token database file (see **tokenchars**, above). It must be a number 
 corresponding to the programmer's manufacturer ID number. Note that this 
@@ -357,6 +374,7 @@ number also appears in the geode file's extended attributes.
 #### type
 	type	(process|driver|appl|library)+ [single] [system] [uses-coproc]\
 			[needs-coproc] [has-gcm] [c-api]
+
 The **type** field in the parameters file designates certain characteristics of the 
 geode being compiled. These attributes correspond to the **GeodeAttrs** type 
 and determine how the Glue linker will put the geode together. The attributes 
@@ -400,6 +418,7 @@ so the kernel must call them with C calling conventions.
 ----------
 #### usernotes
 	usernotes "<string>"
+
 This field specifies text to be put in the **.geo** file's usernotes field. The text must 
 be within quotation marks and can be up to 100 characters long. It must 
 contain no line breaks. This can be useful for containing copyright notices in 

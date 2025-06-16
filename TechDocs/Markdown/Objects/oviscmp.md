@@ -362,6 +362,7 @@ cleared in the instance fields.
 ----------
 #### MSG_VIS_COMP_GET_GEO_ATTRS
 	word	MSG_VIS_COMP_GET_GEO_ATTRS();
+
 This message retrieves the flags set in the object's *VCI_geoAttrs* and 
 *VCI_geoDimensionAttrs* fields. The high byte of the return value represents 
 the dimension attributes, and the low byte represents the geometry 
@@ -433,6 +434,7 @@ Visible Objects" in "VisClass," Chapter 23.
 #### DWORD_CHILD_SPACING
 	word	DWORD_CHILD_SPACING(val);
 			SpacingAsDWord val;
+
 This macro extracts the child spacing from the given **SpacingAsDWord** 
 value. Use it with MSG_VIS_COMP_GET_CHILD_SPACING.
 
@@ -440,6 +442,7 @@ value. Use it with MSG_VIS_COMP_GET_CHILD_SPACING.
 #### DWORD_WRAP_SPACING
 	word	DWORD_WRAP_SPACING(val);
 			SpacingAsDWord val;
+
 This macro extracts the wrap spacing from the given **SpacingAsDWord** 
 value. Use it with MSG_VIS_COMP_GET_CHILD_SPACING.
 
@@ -457,6 +460,7 @@ MSG_VIS_COMP_GET_CHILD_SPACING.
 ----------
 #### MSG_VIS_COMP_GET_CHILD_SPACING
 	SpacingAsDWord	MSG_VIS_COMP_GET_CHILD_SPACING();
+
 This message returns the child spacing used by the composite. The high word 
 of the return value is the spacing between lines of wrapped children; the low 
 word is the horizontal spacing between children.
@@ -486,6 +490,7 @@ form the return value from the two spacing values.
 ----------
 #### MSG_VIS_COMP_GET_MINIMUM_SIZE
 	SizeAsDWord 	SG_VIS_COMP_GET_MINIMUM_SIZE();
+
 This message returns the minimum size of the composite. It is used by the 
 geometry manager if the composite has VCGDA_HAS_MINIMUM_SIZE set. 
 This message does not invalidate or update the object's geometry.
@@ -514,6 +519,7 @@ the same format as MAKE_SPACING_DWORD.
 #### MSG_VIS_COMP_GET_MARGINS
 	void	MSG_VIS_COMP_GET_MARGINS(
 			Rectangle *retValue);
+
 This message returns the margins the composite should use when 
 recalculating its child spacing. If you want a special left, top, right, or bottom 
 margin around the composite's children, intercept this message and return 
@@ -542,6 +548,7 @@ handler.
 ----------
 #### MSG_VIS_COMP_GET_WRAP_COUNT
 	word	MSG_VIS_COMP_GET_WRAP_COUNT();
+
 This message returns the number of children to be counted before wrapping 
 if the composite has VCGA_WRAP_AFTER_CHILD_COUNT set.
 

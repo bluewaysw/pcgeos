@@ -29,6 +29,7 @@
 		#define FILE_ACCESS_W		0x01
 		#define FILE_ACCESS_RW		0x02
 		#define FILE_NO_ERRORS		0x80
+
 When you open a file for bytewise access, you must pass a record of 
 **FileAccessFlags**. The **FileAccessFlags** record specifies two things: what 
 kind of access the caller wants, and what type of access is permitted to other 
@@ -86,6 +87,7 @@ the flags "(FILE_ACCESS_R | FILE_DENY_W)".
 		#define FILE_ATTR_HIDDEN 				FA_HIDDEN
 		#define FILE_ATTR_SYSTEM 				FA_SYSTEM
 		#define FILE_ATTR_VOLUME_LABEL 			FA_VOLUME
+
 Every DOS or GEOS file has certain attributes. These attributes mark such 
 things as whether the file is read-only. With GEOS files, the attributes can be 
 accessed by using the extended attribute FEA_FILE_ATTR. You can also 
@@ -166,6 +168,7 @@ This flag is set if the file is read-only.
 		#define FDAT_MONTH_OFFSET 				5
 		#define FDAT_DAY_OFFSET 				0
 		#define FDAT_BASE_YEAR 					1980
+
 Every GEOS file has two date and time stamps. One of them records the time 
 the file was created, and one records the time the file was last modified. These 
 stamps are recorded with the file's extended attributes; they are labeled 
@@ -262,6 +265,7 @@ Macros are provided to extract values from each of the fields of a
 										 * attribute's name; otherwise,
 										 * this is ignored. */
 	} FileExtendedAttrDesc;
+
 The routines to get and set extended attributes can be passed the attribute 
 FEA_MULTIPLE. In this case, they will also be passed the address of an array 
 of **FileExtAttrDesc** structures and the number of elements of the array. 
@@ -306,6 +310,7 @@ FEA_END_OF_LIST.
 		FEA_MULTIPLE = 0xfffe,
 		FEA_END_OF_LIST = 0xffff,
 	} FileExtendedAttribute;
+
 Every GEOS file has a set of extended attributes. These attributes can be 
 recovered with **FileGetPathExtAttributes()** or 
 **FileGetHandleExtAttributes()**. You can also use **FileEnum()** to search a 
@@ -1606,6 +1611,7 @@ Section 17.5.3 of the Concepts book.
 		#define FID_CHICAGO									0x0200
 		#define FID_ROMA									0x0001
 		#define FID_INVALID									0x0000
+
 Fonts are normally referenced by FontID.
 
 **Include:** fontID.h
@@ -1939,6 +1945,7 @@ Fonts are normally referenced by FontID.
 		GE_SEND_NOTIFICATION=8, 		/* sends encoded message */
 		GE_V_SEMAPHORE=10 				/* V's a specified semaphore*/
 	} GeneralEvent;
+
 These represent some of the miscellaneous events which can make up a 
 music buffer.
 
@@ -1976,6 +1983,7 @@ The **GenClass** defines some values meant to be used in the place of a
 		GDDT_POWER_MANAGEMENT = 10		/* Power management driver */
 		GDDT_TASK = 12					/* Task driver */
 	} GeodeDefaultDriverType;
+
 The default driver type has one value for each default driver type in GEOS. 
 This type is used with **GeodeGetDefaultDriver()** and 
 **GeodeSetDefaultDriver()**.
@@ -1995,6 +2003,7 @@ This type is used with **GeodeGetDefaultDriver()** and
 ----------
 #### GeodeHandle
 	typedef Handle GeodeHandle;
+
 A standard handle that contains information about a loaded geode. When a 
 geode has been loaded, it is referred to by its handle.
 
@@ -2024,6 +2033,7 @@ geode has been loaded, it is referred to by its handle.
 		GLE_DISK_TOO_FULL,
 		GLE_FIELD_DETACHING,
 	} GeodeLoadError;
+
 These errors may be returned by routines that load geodes, including 
 **UserLoadApplication()**, **GeodeUseLibrary()**, **GeodeUseDriver()**, and 
 **GeodeLoad()**.
@@ -2034,6 +2044,7 @@ These errors may be returned by routines that load geodes, including
 		TokenChars				GT_chars;
 		ManufacturerID			GT_manufID;
 	} GeodeToken;
+
 Defines a token identifier. The *GT_chars* field is four characters that identify 
 the token; *GT_manufID* is the identifying number of the manufacturer of the 
 item being referenced.
@@ -2055,6 +2066,7 @@ item being referenced.
 		GFT_DIRECTORY,
 		GFT_LINK
 	} GeosFileType;
+
 GEOS files are divided into several broad categories. You can find out a file's 
 category by getting its FEA_FILE_TYPE extended attribute. This attribute is 
 a member of the **GeosFileType** enumerated type. This type has the 
@@ -2365,6 +2377,7 @@ documented there.
 ----------
 #### GStateHandle
 	typedef Handle GStateHandle;
+
 GStates, or graphics states, are used to interpret graphics commands. Any 
 graphics command that draws anything takes a GStateHandle as an 
 argument. Each GState is associated with a window, and the graphics system 
@@ -2385,6 +2398,7 @@ structure instead of being drawn to screen.
 ----------
 #### GString
 	typedef void GString;
+
 A GString (short for "Graphics Strings") represents a string of graphics 
 commands. Each GString is made up of one or more GString elements, each 
 of which corresponds to some standard graphics command.
@@ -2773,6 +2787,7 @@ graphics commands.
 		#define IFCC_INTACT			0	/* Leave all characters unchanged. */
 		#define IFCC_UPCASE			1	/* Make all characters upper case. */
 		#define IFCC_DOWNCASE		2	/* Make all characters lower case. */
+
 This enumerated type describes how **InitFileRead...()** routines should 
 handle incoming strings.
 
@@ -2783,6 +2798,7 @@ handle incoming strings.
 		#define IFRF_READ_ALL	 	0x2000
 		#define IFRF_FIRST_ONLY	 	0x1000
 		#define IFRF_SIZE			0x0fff
+
 This record is used with the **InitFileRead...()** routines. The 
 IFRF_CHAR_CONVERT field is used to indicate whether strings being read 
 should be upcased, downcased, or left unaltered - the type is designated by a 
@@ -2813,6 +2829,7 @@ value left an offset of IFRF_CHAR_CONVERT_OFFSET.
 		IBT_PHONE_MESSAGE = 28,
 		IBT_CUSTOM_BACKGROUND = 30
 	} InkBackgrountType;
+
 This enumerated type is a set of standard background pictures for use with 
 the Ink Database routines.
 
@@ -2876,6 +2893,7 @@ the Ink Database routines.
 		 * MSG_META_START_SELECT) `til obj sends MSG_GEN_APPLICATION_INK_QUERY_REPLY
 		 * to the applicaiton object. */
 	} InkReturnValue;
+
 This enumerated type is used by objects to let the system know whether 
 incoming pointer events should be interpreted as mouse or pen data.
 
@@ -2884,6 +2902,7 @@ incoming pointer events should be interpreted as mouse or pen data.
 	typedef WordFlags InsertChildFlags
 		#define ICF_MARK_DIRTY			0x8000
 		#define ICF_OPTIONS				0x0003
+
 This record specifies how children are to be added to an object tree.
 
 ----------
@@ -2893,6 +2912,7 @@ This record specifies how children are to be added to an object tree.
 		#define ICO_LAST					1
 		#define ICO_BEFORE_REFERENCE		2
 		#define ICO_AFTER_REFERENCE			3
+
 This enumerated type determines how a child is added and is used with the 
 **InsertChildFlags** record. It has four enumerations, as shown above.
 
@@ -3096,6 +3116,7 @@ This enumerated type determines how a child is added and is used with the
 		#define IP_MUTE_TRIANGLE 			173
 		#define IP_OPEN_TRIANGLE 			174
 	} InstrumentPatch;
+
 These are standard simulated instruments. 
 
 ----------
@@ -3103,6 +3124,7 @@ These are standard simulated instruments.
 	typedef enum {
 		IT_STANDARD_TABLE=0 			/* default table */
 	} InstrumentTable;
+
 The sound library uses this enumerated type to keep track of which table of 
 simulated musical instruments to use.
 

@@ -138,6 +138,7 @@ as usual.
 	MSG_GEN_SYSTEM_GET_DEFAULT_SCREEN, 
 	MSG_GEN_SYSTEM_GET_DEFAULT_FIELD, 
 	MSG_GEN_SYSTEM_SET_DEFAULT_FIELD
+
 Some of the **GenSystemClass** instance data can be examined or changed 
 with messages. Applications may find out the current default screen or 
 default field with MSG_GEN_SYSTEM_GET_DEFAULT_SCREEN and 
@@ -156,6 +157,7 @@ MSG_GEN_SYSTEM_GET_DEFAULT_FIELD.
 ----------
 #### MSG_GEN_SYSTEM_GET_DEFAULT_SCREEN
 	optr	MSG_GEN_SYSTEM_GET_DEFAULT_SCREEN();
+
 This message returns the optr of the default GenScreen. By default, any 
 GenFields will be made visible children of this GenScreen.
 
@@ -172,6 +174,7 @@ GenFields will be made visible children of this GenScreen.
 ----------
 #### MSG_GEN_SYSTEM_GET_DEFAULT_FIELD
 	optr	MSG_GEN_SYSTEM_GET_DEFAULT_FIELD();
+
 This message returns the optr of the default GenField. By default, new 
 applications will be made generic children of this GenField.
 
@@ -189,6 +192,7 @@ applications will be made generic children of this GenField.
 #### MSG_GEN_SYSTEM_SET_DEFAULT_FIELD
 	void	MSG_GEN_SYSTEM_SET_DEFAULT_FIELD(
 			optr	defaultField);
+
 This message changes the default GenField for the GenSystem. By default, 
 new applications will be made generic children of this GenField.
 
@@ -209,6 +213,7 @@ new applications will be made generic children of this GenField.
 	MSG_GEN_SYSTEM_MARK_BUSY, MSG_GEN_SYSTEM_MARK_NOT_BUSY, 
 	MSG_GEN_SYSTEM_BRING_GEODE_TO_TOP, 
 	MSG_GEN_SYSTEM_LOWER_GEODE_TO_BOTTOM
+
 You may alter the pointer image in use at the system level with 
 MSG_GEN_SYSTEM_SET_PTR_IMAGE. Pass this message the **PointerDef** 
 image to use and the **PointerImageLevel** for the pointer image to 
@@ -242,6 +247,7 @@ MSG_GEN_SYSTEM_LOWER_GEODE_TO_BOTTOM to the GenSystem.
 	void	MSG_GEN_SYSTEM_SET_PTR_IMAGE(
 			optr			ptrImage,
 			PtrImageLevel	level);
+
 This message alters the system-wide pointer image. 
 
 **Source:** Unrestricted.
@@ -260,6 +266,7 @@ This message alters the system-wide pointer image.
 ----------
 #### MSG_GEN_SYSTEM_NOTIFY_SYS_MODAL_WIN_CHANGE
 	void	MSG_GEN_SYSTEM_NOTIFY_SYS_MODAL_WIN_CHANGE();
+
 This message is sent to the system object by the UI when it needs to check 
 the status of any system modal windows.
 
@@ -272,6 +279,7 @@ the status of any system modal windows.
 ----------
 #### MSG_GEN_SYSTEM_MARK_BUSY
 	void	MSG_GEN_SYSTEM_MARK_BUSY();
+
 This message is called by the GenField or GenApplication object while an 
 application is being launched but is not yet on screen. While marked busy, 
 the UI will continue to allow mouse events through. Each message sent to the 
@@ -289,6 +297,7 @@ messages need to be sent to take down the busy cursor.
 ----------
 #### MSG_GEN_SYSTEM_MARK_NOT_BUSY
 	void	MSG_GEN_SYSTEM_MARK_NOT_BUSY();
+
 This message is called by the GenField or GenApplication object when an 
 application no longer needs to mark an application busy that has been 
 brought on-screen.
@@ -305,6 +314,7 @@ brought on-screen.
 			word		geode,
 			word		layerID,
 			Handle		parentWindow);
+
 This message raises a geode's window layer to the top and gives that geode 
 the focus and target (if the geode if focusable/targetable). This message is 
 called from within the UI to implement "autoraise," the automatic raising of 
@@ -334,6 +344,7 @@ MSG_GEN_BRING_TO_TOP.
 			word		geode,
 			word		layerID,
 			Handle		parentWindow);
+
 This message lowers a geode's window layer to the bottom, releases any focus 
 and target exclusives, and assigns new focus and target exclusives to the 
 most suitable remaining geode. This message is called by the 
@@ -477,6 +488,7 @@ some of the following messages.
 
 ##### Background Bitmaps
 	MSG_GEN_FIELD_RESET_BG, MSG_GEN_FIELD_ENABLE_BITMAP
+
 The GenField object may have a bitmap attached to it, to display in the field 
 below the applications.
 
@@ -486,6 +498,7 @@ below the applications.
 	MSG_GEN_FIELD_OPEN_WINDOW_LIST, 
 	MSG_GEN_FIELD_GET_TOP_GEN_APPLICATION, 
 	MSG_GEN_FIELD_GET_LAUNCH_MODEL
+
 MSG_GEN_FIELD_EXIT_TO_DOS is sent when the field should exit the system 
 and return to the DOS prompt. This message is sent to the GenField object so 
 that fields may intercept it and perform their own shutdown maintenance. 
@@ -515,6 +528,7 @@ use for this field.
 ----------
 #### MSG_GEN_FIELD_EXIT_TO_DOS
 	void	MSG_GEN_FIELD_EXIT_TO_DOS();
+
 This message requests the GenField to exit the system and return to DOS. 
 The message is sent to the GenField so that custom fields (such as Welcome) 
 can intercept the message and react accordingly by initiating shutdown 
@@ -531,6 +545,7 @@ shutting down applications).
 ----------
 #### MSG_GEN_FIELD_ABOUT_TO_CLOSE
 	void	MSG_GEN_FIELD_ABOUT_TO_CLOSE();
+
 This message is sent by an environment application (like Welcome) to inform 
 a GenField that it is about to be closed. The GenField then has the option of 
 quitting any applications or waiting until the applications themselves are 
@@ -548,6 +563,7 @@ top of a GenField object.
 ----------
 #### MSG_GEN_FIELD_NO_APPS_RESTORED
 	void	MSG_GEN_FIELD_NO_APPS_RESTORED();
+
 This message serves as notification that no processes have been restarted 
 from the state file.
 
@@ -561,6 +577,7 @@ object.
 ----------
 #### MSG_GEN_FIELD_OPEN_WINDOW_LIST
 	void	MSG_GEN_FIELD_OPEN_WINDOW_LIST();
+
 This message may be sent by any object that wishes to bring up a GenField's 
 window list dialog (if available).
 
@@ -573,6 +590,7 @@ window list dialog (if available).
 ----------
 #### MSG_GEN_FIELD_GET_TOP_GEN_APPLICATION
 	optr	MSG_GEN_FIELD_GET_TOP_GEN_APPLICATION();
+
 This message returns the GenField's top application object.
 
 **Source:** Unrestricted.
@@ -586,6 +604,7 @@ This message returns the GenField's top application object.
 ----------
 #### MSG_GEN_FIELD_GET_LAUNCH_MODEL
 	word	MSG_GEN_FIELD_GET_LAUNCH_MODEL();
+
 This message returns the GenField's **UILaunchModel** in use.
 
 **Source:** Unrestricted.

@@ -393,6 +393,7 @@
 								 * client of the library. */
 		LCT_CLIENT_EXIT,		/* Library's client is about to be unloaded. */
 	} LibraryCallType
+
 This type is used by library entry point routines. Library entry point routines 
 take a value of this enumerated type to determine what, if anything, is to be 
 done.
@@ -417,6 +418,7 @@ done.
 		#define LE_ROUNDCAP				1
 		#define LE_SQUARECAP 			2
 		#define LAST_LINE_END_TYPE		LE_SQUARECAP
+
 Line ends determine how the graphics system will draw the end of a line 
 segment.
 
@@ -427,6 +429,7 @@ segment.
 		#define LJ_ROUND					1
 		#define LJ_BEVELED					2
 		#define LAST_LINE_JOIN_TYPE			LJ_BEVELED
+
 This enumerated type determines how the graphics system will draw corners 
 of rectangles and polylines.
 
@@ -440,6 +443,7 @@ of rectangles and polylines.
 		#define LS_DASHDDOT 				4
 		#define LS_CUSTOM 					5
 		#define MAX_DASH_ARRAY_PAIRS 		5
+
 The **LineStyle** type describes a line's "dottedness." Lines using custom 
 dashes will work with the **DashPairArray** structure.
 
@@ -455,6 +459,7 @@ dashes will work with the **DashPairArray** structure.
 		word			LMBH_freeList;
 		word			LMBH_totalFree;
 	} LMemBlockHeader;
+
 This structure is found at the beginning of every block which contains an 
 LMem heap. You can examine any of the fields by locking the block and 
 casting its address to a ***LMemBlockHeader**. You should not, however, 
@@ -512,6 +517,7 @@ automatically maintained by the LMem routines.
 		LMEM_TYPE_GSTRING,
 		LMEM_TYPE_DB_ITEMS
 	} LMemType;
+
 LMem heaps are created for many different purposes. Some of these 
 purposes require the heap to have special functionality. For this reason, 
 when you create an LMem heap, you must specify what it will be used for. 
@@ -714,6 +720,7 @@ blocks.
 	typedef ByteEnum MapColorToMono;
 		#define CMT_CLOSEST				0
 		#define CMT_DITHER 				1
+
 This type determines what the graphics system will do when trying to draw 
 in an unavailable color. It will either draw in the closest color, or else mix two 
 or more close colors to get as close as possible overall.
@@ -756,6 +763,7 @@ or more close colors to get as close as possible overall.
 		#define MEDIA_FIXED_DISK 		9
 		#define MEDIA_CUSTOM 			10
 	} MediaType;
+
 The **MediaType** enumerated type indicates how a disk is formatted. A 
 member of this enumerated type is returned by some disk-information 
 routines (e.g. **DriveGetDefaultMedia()**). A **MediaType** value is also 
@@ -788,6 +796,7 @@ passed to **DiskFormat()**, indicating how the disk should be formatted.
 									 * and MF_CAN_DISCARD_IF_DESPARATE
 									 * was passed */
 	} MessageErrors;
+
 A **MessageError** is returned by **ObjMessage()** in assembly to indicate 
 whether the message was successfully sent. This is not encountered by C 
 applications.
@@ -870,6 +879,7 @@ entries for the Goc keywords **@call** and **@send**.
 		#define MM_XOR 			5	/* XOR of new and old colors */
 		#define MM_SET 			6	/* set destination black */
 		#define MM_OR 			7	/* logical OR of new and old colors */
+
 The **MixMode** determines what the graphics system will do when drawing 
 one thing on top of another.
 
@@ -887,6 +897,7 @@ one thing on top of another.
 		#define MRF_PREVENT_PASS_THROUGH 			0x2000
 		#define MRF_SET_POINTER_IMAGE 				0x1000
 		#define MRF_CLEAR_POINTER_IMAGE 			0x0800
+
 These flags are used in various parts of the system that work with mouse 
 input. Which values are appropriate to pass will vary based on context.
 
@@ -897,6 +908,7 @@ input. Which values are appropriate to pass will vary based on context.
 		MouseReturnFlags 		flags;
 		optr 					ptrImage;
 	} MouseReturnParams;
+
 This structure is used in certain areas of the system which work with mouse 
 input.
 
@@ -918,6 +930,7 @@ input.
 		word					NAH_dataSize;	/* Size of data section of
 												 * each element */
 	} NameArrayHeader;
+
 Every name array must begin with a **NameArrayHeader**. Since name 
 arrays are special kinds of element arrays, the **NameArrayHeader** must 
 itself begin with an **ElementArrayHeader**. The structure contains one 
@@ -997,6 +1010,7 @@ change it.
 		#define OCF_IGNORE_DIRTY 			0x04
 		#define OCF_IN_RESOURCE 			0x02
 		#define OCF_IS_OBJECT 				0x01
+
 This record is stored at the beginning of each chunk and gives specific 
 information about the chunk. The flags are internal.
 
@@ -1009,6 +1023,7 @@ information about the chunk. The flags are internal.
 		optr				OLMBH_output;
 		word				OLMBH_resourceSize;
 	} ObjLMemBlockHeader;
+
 This is the standard Object Block header that begins every object block; you 
 can set additional header fields with the **@header** Goc keyword. The fields of 
 this structure are
@@ -1372,6 +1387,7 @@ The size of the object block (resource).
 		dword 	PCDSP_width;
 		dword 	PCDSP_height;
 	} PCDocSizeParams;
+
 Use this structure to communicate document sizes to a Print Control.
 
 ----------
@@ -1382,6 +1398,7 @@ Use this structure to communicate document sizes to a Print Control.
 		word 	PCMP_right; 		/* right margin */
 		word 	PCMP_bottom; 		/* bottom margin */
 	} PCMarginParams
+
 This structure holds information about a document's or printer's margins.
 
 ----------
@@ -1422,6 +1439,7 @@ This structure holds information about a document's or printer's margins.
 		byte	PD_image[STANDARD_CURSOR_IMAGE_SIZE];
 	} PointerDef;
 		 STANDARD_CURSOR_IMAGE_SIZE = 32
+
 This structure defines a mouse pointer.
 
 ----------
@@ -1430,6 +1448,7 @@ This structure defines a mouse pointer.
 		WWFixed 	PF_x;
 		WWFixed 	PF_y;
 	} PointWWFixed;
+
 These structures are used to specify graphics point coordinates. Which point 
 structure to use depends on size of the coordinate space and accuracy 
 required.
@@ -1479,6 +1498,7 @@ required.
 		PDT_CAMERA,
 		PDT_OTHER,
 	} PrinterDriverType;
+
 This enumerated type indicates the type of printer driver that we are 
 dealing with.
 
@@ -1508,6 +1528,7 @@ dealing with.
 		word	PN_major;
 		word	PN_minor;
 	} ProtocolNumber;
+
 Defines the protocol level of a file, geode, or document. *PN_major* represents 
 significant compatibility comparisons, and *PN_minor* represents less 
 significant differences. If the major protocol is different between two items, 
@@ -1534,6 +1555,7 @@ be incompatible.
 		word 		QSP_nLesser;
 		word 		QSP_nGreater;
 	} QuickSortParameters;
+
 This structure is passed to **ArrayQuickSort**. The fields have the following 
 meanings:
 
@@ -1574,6 +1596,7 @@ instead of searching for the median element.
 		word				RECP_column;
 		word				RECP_cellData;
 	} RangeEnumCallbackParams;
+
 This structure is passed to the callback routine for **RangeEnum()**.
 
 ----------
@@ -1587,6 +1610,7 @@ This structure is passed to the callback routine for **RangeEnum()**.
 		#define REF_CELL_FREED					0x04
 		#define REF_OTHER_ALLOC_OR_FREE			0x02
 		#define REF_COLUMN_FLAGS_MODIFIED		0x01
+
 These flags are used by RangeEnum().
 
 ----------
@@ -1601,6 +1625,7 @@ These flags are used by RangeEnum().
 		byte					REP_matchFlags;
 		word					*REP_locals;
 	} RangeEnumParams;
+
 This structure is used by two routines, **RangeEnum()** and 
 **CellGetExtent()**. When it is used by **RangeEnum()**, the structure specifies 
 all the details about how **RangeEnum()** will function. **CellGetExtent()** is 
@@ -1675,6 +1700,7 @@ don't have to initialize this; the routine will do so automatically.
 		sword	R_right;
 		sword	R_bottom;
 	} Rectangle;
+
 This structure represents a graphics rectangle.
 
 ----------
@@ -1685,6 +1711,7 @@ This structure represents a graphics rectangle.
 		sdword	RD_right;
 		sdword	RD_bottom;
 	} RectDWord;
+
 This structure represents a graphics rectangle.
 
 ----------
@@ -1710,6 +1737,7 @@ This structure represents a graphics rectangle.
 	typedef word Region;
 		#define EOREGREC				0x8000
 		#define EOREG_HIGH				 0x80
+
 This structure represents a region of a graphics coordinate space.
 
 Regions are described in terms of a rectangular array (thus the similarity to 
@@ -1744,6 +1772,7 @@ number is the first subsequent column in which the pixel is off; and so on.
 	typedef ByteEnum RegionFillRule;
 		#define ODD_EVEN			0
 		#define WINDING				1
+
 This enumerated type determines how a path or region should be filled. 
 Winding fill is more versatile, but requires that the path or polygon's edges 
 run in the correct direction.
@@ -1756,6 +1785,7 @@ run in the correct direction.
 		word	RN_change;
 		word	RN_engineering;
 	} ReleaseNumber;
+
 Used to record what version a file, document, or geode is. This represents the 
 release level; the most significant numbers are *RN_major* and *RN_minor*. The 
 other fields are typically used only internally to a manufacturer.
@@ -1773,6 +1803,7 @@ other fields are typically used only internally to a manufacturer.
 		RGB_GREEN(val) ( (val >> 8) & 0xff )
 		RGB_BLUE(val) ( (val >> 16) & 0xff )
 		RGB_INDEX(val) ( (val >> 24) & 0xff )
+
 See the **ColorQuad** data structure to find out the meanings of the fields.
 
 ----------
@@ -1814,6 +1845,7 @@ See the **ColorQuad** data structure to find out the meanings of the fields.
 		 word 	SFD_rate;
 		 word 	SFD_playFlags;
 	} SampleFormatDescription;
+
 This structure acts as a header for a sampled sound, giving format 
 information needed to properly interpret the sound data.
 
@@ -1895,6 +1927,7 @@ information needed to properly interpret the sound data.
 			Low byte is a fractional scale to use.
 			Thus, setting a subscript attr to 0x8020 would result in subscript
 			characters being printed half a line down and at 1/4 normal size. */
+
 This structure specifies the offset and scale factor with which sub- and 
 superscript characters should draw.
 
@@ -1921,6 +1954,7 @@ superscript characters should draw.
 		SE_PREVIOUS_OWNER_DIED	/* The current holder of the semaphore
 								 * exited abnormally */
 	} SemaphoreError;
+
 Determines the error encountered by semaphore and threadlock routines 
 such as **ThreadPSem()** and **ThreadPTimedSem()**.
 
@@ -2044,6 +2078,7 @@ such as **ThreadPSem()** and **ThreadPTimedSem()**.
 		#define SS_RSHIFT 				0x04
 		#define SS_FIRE_BUTTON_1 		0x02
 		#define SS_FIRE_BUTTON_2		0x01
+
 Modifiers which will be incorporated into input information. Corresponds to 
 alt keys, control keys, shift keys, or special system modifiers. Note that these 
 bits will only be set if not already accounted for; that is, if you are passed the 
@@ -2076,6 +2111,7 @@ character "E", the shift modifiers of this structure will not be marked.
 		#define SDEC_NONE 				0x0000
 		#define SDEC_ADSR 				0x0200
 		#define SDEC_DSP 				0x0400
+
 These fields encode information about what the sound driver is capable of in 
 terms of music synthesis.
 
@@ -2096,6 +2132,7 @@ terms of music synthesis.
 
 	#define SP_IMMEDIATE 			-1
 	#define SP_THEME 				+1
+
 If the user's sound device can't play all requested sounds, it will use 
 **SoundPriority** values to determine which sounds are the most important.
 
@@ -2114,6 +2151,7 @@ The highest priority sound you may construct using these values is
 		#define DeltaTick(time)  		SSDTT_TICKS, time
 		#define DeltaMS(time)  			SSDTT_MSEC, time
 		#define DeltaTempo(time) 		SSDTT_TEMPO, time
+
 These are the units by which you can specify a sound's duration: 
 milliseconds, timer "ticks" (each 1/60 second), or by means of an 
 independently supplied tempo.
@@ -2146,6 +2184,7 @@ independently supplied tempo.
 						VoiceOff(voice), DeltaTempo((duration/0x8))
 		#define Legato(voice,freq,duration,attack)  \
 						SoundNote(voice, freq, duration, attack)
+
 These are the "events" that make up a music buffer. 
 
 ----------
@@ -2365,6 +2404,7 @@ These are the "events" that make up a music buffer.
 		SP_PAGER_DRIVERS=53
 		SP_DUMMY=256
 	} StandardPath;
+
 Most routines which are passed disk handles can also be passed members of 
 the **StandardPath** enumerated type. Standard paths let applications access 
 files in a disk-independent manner. Standard paths are usually arranged in 
@@ -2463,6 +2503,7 @@ are arranged.
 		 SEF_SBI_FORMAT,
 		 SEF_CTI_FORMAT
 	} SupportedEnvelopeFormat;
+
 These values specify how a sound device can simulate musical instruments, 
 if it can at all.
 
@@ -2481,6 +2522,7 @@ if it can at all.
 		#define SCF_CRASHED 			0x04
 		#define SCF_MCA 				0x02
 		#define SCF_LOGGING				0x01
+
 The above flags indicate the system configuration. Any or all of these flags 
 may be set at a time; if a flag is set, the description is true. These flags are 
 used by the kernel and can be retrieved with **SysGetConfig()**.
@@ -2510,6 +2552,7 @@ used by the kernel and can be retrieved with **SysGetConfig()**.
 		#define SMT_PS2_60 				9
 		#define SMT_PS2_80 				10
 		#define SMT_PS1 				11
+
 A byte-sized value indicating the type of machine running GEOS. This value 
 can be retrieved with **SysGetConfig()**.
 
@@ -2526,6 +2569,7 @@ can be retrieved with **SysGetConfig()**.
 		#define SPT_80286 				2
 		#define SPT_80386 				3
 		#define SPT_80486 				4
+
 This enumerated type is a byte that indicates the type of processor on the 
 system running GEOS. It can be retrieved with **SysGetConfig()**.
 
@@ -2544,6 +2588,7 @@ system running GEOS. It can be retrieved with **SysGetConfig()**.
 		word 			SS_runQueue;		/* Runnable threads at end of
 											 * last second. */
 	} SysStats;
+
 This structure is returned by **SysStatistics()** and represents the current 
 performance statistics of GEOS.
 
@@ -2553,6 +2598,7 @@ performance statistics of GEOS.
 		word 	SSI_paragraphs;		/* Number of paragraphs swapped. */
 		word 	SSI_blocks;			/* Number of blocks swapped. */
 	} SysSwapInfo;
+
 Structure used to represent current swap activity in **SysStats** structure.
 
 ----------
@@ -2663,6 +2709,7 @@ Structure used to represent current swap activity in **SysStats** structure.
 		TE_SINGLE_STEP=16,
 		TE_BREAKPOINT=20
 	} ThreadException;
+
 Processor exceptions used primarily for debugging, these are used with 
 **ThreadHandleException()**.
 
@@ -2674,6 +2721,7 @@ Processor exceptions used primarily for debugging, these are used with
 		TGIT_THREAD_HANDLE,			/* handle of the thread */
 		TGIT_QUEUE_HANDLE,			/* handle of thread's event queue */
 	} ThreadGetInfoType;
+
 Used with the routine **ThreadGetInfo()**, it determines the type of 
 information returned by that routine. Use the macros TGI_PRIORITY and 
 TGI_RECENT_CPU_USAGE to separate the TGIT_PRIORITY_AND_USAGE 
@@ -2692,6 +2740,7 @@ value into its components.
 	typedef ByteFlags ThreadModifyFlags;
 		#define TMF_BASE_PRIO				0x80
 		#define TMF_ZERO_USAGE				0x40
+
 Used with **ThreadModify()**, these flags determine what aspect of the thread 
 is modified.
 
@@ -2713,6 +2762,7 @@ is modified.
 		word			TDAT_minutes;	/* Minute in the hour (0 through 59) */
 		word			TDAT_seconds;	/* Second in the minute (0 through 59) */
 	} TimerDateAndTime;
+
 This structure is used to keep track of the current time and date.
 
 ----------
@@ -2729,6 +2779,7 @@ This structure is used to keep track of the current time and date.
 		#define TS_CAPSLOCK				0x80
 		#define TS_NUMLOCK				0x40
 		#define TS_SCROLLLOCK			0x20
+
 This structure describes the state of certain "toggles" which will affect how 
 input is interpreted. These toggles correspond to the caps lock, num lock, and 
 scroll lock keys.
@@ -2750,6 +2801,7 @@ scroll lock keys.
 		ReleaseNumber	TE_release;		/* Release number of the token DB */
 		ProtocolNumber	TE_protocol;	/* Protocol number of the toke DB */
 	} TokenEntry;
+
 Used for the token entry in the map item of the token database, this structure 
 identifies the structures and other information of each token. The 
 *TE_monikerList* field points to a chunk containing the item numbers of the 
@@ -2759,6 +2811,7 @@ chunks of the token.
 #### TokenFlags
 	typedef WordFlags TokenFlags;
 		#define TF_NEED_RELOCATION				0x8000
+
 Used by token management routines, this flags record indicates whether the 
 token has fields which must be relocated when the token is loaded or 
 unloaded.
@@ -2771,6 +2824,7 @@ unloaded.
 		word			TGE_groupNum;		/* The number of the group. */
 		word			TGE_groupSize;		/* The size of the group. */
 	} TokenGroupEntry;
+
 Used to index token groups in the token database.
 
 ----------
@@ -2784,6 +2838,7 @@ Used to index token groups in the token database.
 		TGT_VGA_MONIKER_GROUP,		/* The TokenGroupEntry is a VGA moniker group. */
 		TGT_HGC_MONIKER_GROUP,		/* The TokenGroupEntry is an HGC moniker group. */
 	} TokenGroupType;
+
 This enumerated type describes which type of moniker group is stored in the 
 particular chunk.
 
@@ -2793,6 +2848,7 @@ particular chunk.
 		TIT_TOKEN_ENTRY,		/* The type is a TokenEntry structure. */
 		TIT_GROUP_ENTRY,		/* The type is a GroupEntry structure. */
 	} TokenIndexType;
+
 Used to indicate the types of structures that may be stored in the token 
 database's map item.
 
@@ -2832,6 +2888,7 @@ database's map item.
 		 TE_EXPORT_FILE_EMPTY, /* File to be exported is empty */
 		 TE_CUSTOM /* Custom error message */
 	} TransError;
+
 This enumerated type contains error values the impex library may wish to 
 generate when translating.
 
@@ -2860,6 +2917,7 @@ generate when translating.
 		DWFixed 		TM_e31;
 		DWFixed 		TM_e32;
 	} TransMatrix;
+
 The six variable elements of a coordinate transformation matrix.
 
 ----------
@@ -2887,6 +2945,7 @@ The six variable elements of a coordinate transformation matrix.
 		 TO_SYS_TARGET,
 		 TO_SYS_MODEL
 	} GenTravelOption;
+
 This enumerated type can be used to specify the recipient of a message. Note 
 that the values set up in the **TravelOption**, **VisTravelOption**, and 
 **GenTravelOption** have been set up as discrete values.
@@ -2913,6 +2972,7 @@ that the values set up in the **TravelOption**, **VisTravelOption**, and
 		#define UIFA_COPY 				0x04
 		#define UIFA_POPUP 				0x08
 		#define UIFA_PAN 				0x04
+
 These flags describe the context of the user's input, providing some modal 
 information. 
 
@@ -3001,6 +3061,7 @@ information.
 								VarDataEntry *extraData,
 								word dataType, void *handlerData);
 	} VarDataCHandler;
+
 An entry in a class' vardata handler table. The first field is the data type, 
 which acts as the entry's index in the handler table. The second field is a far 
 pointer to the handler routine.
@@ -3013,6 +3074,7 @@ pointer to the handler routine.
 								 * if the type has extra data. */
 	} VarDataEntry;
 	#define VDE_extraData		sizeof(VarDataEntry);
+
 Structure of a variable data entry. If the data type has no extra data, there 
 will be no *VDE_entrySize* field. The extra data begins at offset 
 *VDE_extraData*, defined above.
@@ -3023,6 +3085,7 @@ will be no *VDE_entrySize* field. The extra data begins at offset
 		#define VDF_TYPE			0xfffc	/* 14-bit data type */
 		#define VDF_EXTRA_DATA		0x0002	/* set if has extra data */
 		#define VDF_SAVE_TO_STATE	0x0001	/* set if type saved to state */
+
 This is a word record containing three fields. This word is stored in the 
 vardata structure's VDE_dataType field (see VarDataEntry, above).
 
@@ -3414,6 +3477,7 @@ getting access to the file.
 		sword	XYO_x;
 		sword	XYO_y;
 	} XYOffset;
+
 A graphics coordinate offset.
 
 ----------
@@ -3422,11 +3486,13 @@ A graphics coordinate offset.
 		word	XYS_width;
 		word	XYS_height;
 	} XYSize;
+
 A graphics size, in two dimensions.
 
 ----------
 #### XYValueAsDWord
 	typedef dword XYValueAsDWord;
+
 A graphics size, in two dimensions, expressed as a DWord.
 
 [Data Structures F-K](rstrf_k.md) <-- [Table of Contents](../routines.md)

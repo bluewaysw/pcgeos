@@ -783,6 +783,7 @@ in the cell file, you must not have the structure be an ungrouped item.
 		#define C_PRODUCT			C_U_PI
 		#define C_RADICAL			C_ROOT
 		#define C_LOZENGE			C_DIAMONDBULLET
+
 Text characters may be represented by the standard C type char or by the 
 GEOS type Chars. The difference shows up in debugging. If printing the value 
 of a string as char, then the debugger will output ASCII text. If the string is 
@@ -798,6 +799,7 @@ treated as Chars, then the debugger will print out the constant names.
 		word	CAH_curOffset;		/* For internal use only */
 		word	CAH_offset;			/* Offset from start of chunk to first element */
 	} ChunkArrayHeader;
+
 Every chunk array begins with a **ChunkArrayHeader**. This structure 
 contains information about the chunk array. Applications should never 
 change the contents of the **ChunkArrayHeader**; only the chunk array 
@@ -819,6 +821,7 @@ in the array.
 ----------
 #### ChunkHandle
 	typedef word ChunkHandle;
+
 Chunk handles are offsets into a local memory heap. To find the current 
 location of a chunk in an LMem heap, combine the segment address of the 
 heap with the chunk handle. From this location you can read the current 
@@ -843,6 +846,7 @@ offset of the chunk itself.
 		#define CLASSF_NEVER_SAVED						0x08
 		#define CLASSF_HAS_RELOC 						0x04
 		#define CLASSF_C_HANDLERS 						0x02
+
 This record is stored in the **ClassStruct** structure's *Class_flags* field. These 
 flags are internal and may not be set or retrieved directly. See the entry on 
 **@class** for more information about these flags.
@@ -927,6 +931,7 @@ See **ClipboardQueryItem()**.
 		#define CQNF_COPY 						0x1000
 		#define CQNF_NO_OPERATION 				0x0800
 		#define CQNF_UNUSED 					0x04ff
+
 These flags give information about the success or failure of a quick transfer 
 operation.
 
@@ -1259,6 +1264,7 @@ See entry for **ClipboardRequestItemFormat()**.
 		#define CF_GRAY			1
 		#define CF_SAME			2
 		#define CF_RGB			0x80
+
 Several color-related commands accept colors in a variety of formats. The 
 **ColorFlag** enumerated type is used to specify how the color is being 
 described. The **ColorFlag** is normally used as part of a **ColorQuad**. See 
@@ -1271,6 +1277,7 @@ described. The **ColorFlag** is normally used as part of a **ColorQuad**. See
 		#define CMM_ON_BLACK 0x04	/* Set this bit if you're drawing on black */
 		#define CMM_MAP_TYPE 0x01	/* Either CMT_CLOSEST or CMT_DITHER) */
 		#define LAST_MAP_MODE	(CMM_MAP_TYPE | CMM_ON_BLACK)
+
 This structure defines how the system will try to simulate colors not in the 
 palette. If the map type is CMT_CLOSEST, the closest available color will be 
 used. If the map type is CMT_DITHER, the system will mix together two or 
@@ -1285,6 +1292,7 @@ background, you may wish to set the CMM_ON_BLACK flag.
 		byte 			CQ_green;
 		byte 			CQ_blue;
 	} ColorQuad;
+
 This structure represents a color. The *CQ_info* field determines how the color 
 is being described. 
 
@@ -1318,6 +1326,7 @@ all ignored.
 	typedef struct {
 		RGBDelta				CT_data[125]; 
 	} ColorTransfer;
+
 This structure consists of a 5x5x5 matrix of **RGBDelta** structures. This and 
 be used to specify what sorts of adjustments to make to the color when 
 displaying to a specific device. For instance, some color printers will wipe out 
@@ -1360,6 +1369,7 @@ would suggest.
 		#define 	CCO_FIRST			0x0000
 		#define		CCO_LAST			0x7FFF
 		#define CCF_REFERENCE_OFFSET 0
+
 A record used when adding, moving, or removing children in an object tree. 
 The record has one flag and a value, as follows:
 
@@ -1445,6 +1455,7 @@ The *CREP_callback* routine should be declared _pascal.
 		DACSF_3_TO_1_ADPCM,
 		DACSF_4_TO_1_ADPCM
 	} DACSampleFormat;
+
 This structure specifies what sort of sampling should be used when recording 
 or playing a sampled sound.
 
@@ -1487,11 +1498,13 @@ or playing a sampled sound.
 		DOTW_FRIDAY,
 		DOTW_SATURDAY
 	} DayOfTheWeek;
+
 This enumerated type is used in the **TimerDateAndTime** structure.
 
 ----------
 #### DBGroup
 	typedef word DBGroup;
+
 This is the handle of a DB group. It is the VM handle of a DB group block. DB 
 group handles do not change when a file is copied, or when it is closed and 
 reopened.
@@ -1499,6 +1512,7 @@ reopened.
 ----------
 #### DBGroupAndItem
 	typedef	dword DBGroupAndItem;
+
 This is a dword which contains the group and item handles of a database 
 item. The high word is the item's Group handle; the low word is the item's 
 Item handle. 
@@ -1526,6 +1540,7 @@ Extracts the **DBItem** from a given **DBGroupAndItem**.
 ----------
 #### DBItem
 	typedef word DBItem;
+
 This is the handle of a DB item. The **DBItem** and **DBGroup** together 
 uniquely identify a DB item in a specified file.
 
@@ -1707,6 +1722,7 @@ uniquely identify a DB item in a specified file.
 		#define DEF_PROMPT				0x80	/* prompt user to return to GEOS */
 		#define DEF_FORCED_SHUTDOWN		0x40	/* force shutdown; no abort */
 		#define DEF_INTERACTIVE			0x20	/* program is interactive shell */
+
 Flags used with **DosExec()**. **DosExec()** executes a DOS program based on 
 these flags.
 
@@ -1727,6 +1743,7 @@ these flags.
 ----------
 #### DrawMask
 	typedef byte DrawMask[8];
+
 The graphics system uses this structure for defining custom draw masks.
 
 ----------
@@ -1754,6 +1771,7 @@ and other flags in the high four bits of a single byte.
 		#define DA_FILE_SYSTEM					0x8000
 		#define DA_CHARACTER					0x4000
 		#define DA_HAS_EXTENDED_INFO			0x2000
+
 This record contains flags that indicate a given driver's attributes. This 
 record is stored in the driver's **DriverInfoStruct** structure.
 
@@ -1784,6 +1802,7 @@ supported by a particular driver.
 		 DriverAttrs	DIS_driverAttributes;	/* driver's attribute flags */
 		 DriverType		DIS_driverType;			/* driver's type */
 	} DriverInfoStruct;
+
 This structure defines the characteristics of a particular driver. In general, 
 applications will not need to access this structure unless they use a driver 
 directly.
@@ -1805,6 +1824,7 @@ directly.
 		DRIVER_TYPE_TASK_SWITCH,		/* Task switch drivers */
 		DRIVER_TYPE_NETWORK				/* Network file system drivers */
 	} DriverType;
+
 This enumerated type has one value for each type of driver in the system. It 
 is used primarily with **GeodeUseDriver()** and its associated routines. Each 
 driver stores its type in its **DriverInfoStruct** structure.
@@ -1830,6 +1850,7 @@ driver stores its type in its **DriverInfoStruct** structure.
 		ChunkArrayHeader	EAH_meta;		/* chunk array header structure */
 		word				EAH_freePtr;	/* First free element */
 	} ElementArrayHeader;
+
 Every element array must begin with an **ElementArrayHeader**. Since 
 element arrays are special kinds of chunk arrays, the 
 **ElementArrayHeader** must itself begin with a **ChunkArrayHeader**. The 
@@ -1932,6 +1953,7 @@ examine or change this field.
 		#define ECF_LMEM_MOVE 				0x0010
 		#define ECF_UNLOCK_MOVE 			0x0008
 		#define ECF_VMEM_DISCARD 			0x0004
+
 Error checking flags are used when setting the system's error-checking level 
 with **SysSetECLevel()**. The flags above may be individually set or cleared. 
 It is important to use error checking when debugging; it can help catch 

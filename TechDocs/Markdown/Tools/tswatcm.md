@@ -336,6 +336,7 @@ Display 3-1).
 
 
 	help <command>
+
 When **help** is typed with another command as an argument, information 
 about that command is displayed (the same information as in the 
 interactive help mode). This command is frequently used in order to get 
@@ -646,25 +647,30 @@ satisfied. Once set, a breakpoint is given an integer number which can be
 obtained using the **list** subcommand (see Swat Display 3-4).
 
 	brk <addr> [<command>]
+
 The **brk** command without any subcommands sets an unconditional 
 breakpoint at the address specified in *addr*. If the *command* argument is 
 passed, the given swat command will be carried out when the breakpoint 
 is hit.
 
 	brk delete <break>*
+
 Deletes the given breakpoint(s), just as **clear**, above.
 
 	brk enable <break>*
+
 Enables the given breakpoint(s). Has no effect on previously enabled 
 breakpoints. If no breakpoint is given, all breakpoints for the current 
 patient are enabled.
 
 	brk disable <break>*
+
 Disables the given breakpoint(s). It has no effect on previously disabled 
 breakpoints. If no breakpoint is given, it disables all breakpoints for the 
 current patient.
 
 	brk list [<addr>]
+
 Lists all the breakpoints, whether they are enabled, where they are set, 
 their conditions, and what actions they will take if encountered. If *addr* 
 is given, it returns the breakpoint numbers of all breakpoints set at the 
@@ -758,10 +764,12 @@ value with which the register will be compared when the
 breakpoint is hit.
 
 	cbrk <addr> <criteria>*
+
 The basic cbrk command sets a fast conditional breakpoint at the address 
 specified in *addr*.
 
 	cbrk cond <break> <criteria>*
+
 Changes the criteria for the breakpoint. If no *criteria* is given the 
 breakpoint becomes a standard, unconditional breakpoint.
 

@@ -2,6 +2,7 @@
 ----------
 #### EC()
 	void	EC(line);
+
 This macro defines a line of code that will only be compiled into the 
 error-checking version of the geode. The *line* parameter of the macro is the 
 actual line of code. When the EC version of the program is compiled, the line 
@@ -11,6 +12,7 @@ the line will be ignored.
 ----------
 #### EC_BOUNDS()
 	void	EC_BOUNDS(addr);
+
 This macro adds an address check to the error-checking version of a program. 
 When the EC version of the program is compiled, the address check will be 
 included; when the non-EC version is compiled, the address check will be left 
@@ -25,6 +27,7 @@ to **FatalError()**.
 ----------
 #### EC_ERROR()
 	void	EC_ERROR(code);
+
 This macro inserts a call to **FatalError()** in the error-checking version of the 
 program and does nothing to the non-EC version. When the program gets to 
 this point, it will halt and put up an error message corresponding to the 
@@ -34,6 +37,7 @@ specified error *code*. If a condition should be checked before calling
 ----------
 #### EC_ERROR_IF()
 	void	EC_ERROR_IF(test, code);
+
 This macro inserts a conditional call to **FatalError()** in the error-checking 
 version of a program; it does nothing for the non-EC version. The *test* 
 parameter is a Boolean value that, if *true*, will cause the **FatalError()** call 
@@ -42,6 +46,7 @@ to be made. If test is *false*, **FatalError()** will not be called.
 ----------
 #### EC_WARNING()
 	EC_WARNING(word warningCode);
+
 This macro generates a warning for the debugger when executed by 
 error-checking code; it has no effect when in non-EC code.
 
@@ -50,6 +55,7 @@ error-checking code; it has no effect when in non-EC code.
 ----------
 #### EC_WARNING_IF()
 	EC_WARNING_IF(<expr>, word warningCode)
+
 When this macro is executed in error-checking code, it tests <*expr*>; if  <*expr*> 
 is non-zero, it generates a warning with code *warningCode* for the debugger.
 
@@ -61,6 +67,7 @@ In non-EC code, the macro has no effect (and <*expr*> is not evaluated).
 #### ECCheckBounds()
 	void	ECCheckBounds(
 			void	*address);
+
 This routine checks to see if the given pointer is within bounds of the block 
 into which it points. If assertions fail, a fatal error will occur.
 
@@ -70,6 +77,7 @@ into which it points. If assertions fail, a fatal error will occur.
 #### ECCheckChunkArray()
 	void	ECCheckChunkArray(
 			optr	o);
+
 This routine checks the validity of the specified chunk array. If the assertions 
 fail, a fatal error will occur.
 
@@ -80,6 +88,7 @@ fail, a fatal error will occur.
 	void	ECCheckChunkArrayHandles(
 			MemHandle mh,
 			ChunkHandle ch);
+
 This routine checks the validity of the specified chunk array. If the assertions 
 fail, a fatal error will occur.
 
@@ -89,6 +98,7 @@ fail, a fatal error will occur.
 #### ECCheckClass()
 	void	ECCheckClass(
 			ClassStruct *class);
+
 This routine checks that the given pointer actually references a class 
 definition. If the assertions fail, a fatal error will occur.
 
@@ -98,6 +108,7 @@ definition. If the assertions fail, a fatal error will occur.
 #### ECCheckDriverHandle()
 	void	ECCheckDriverHandle(
 			GeodeHandle gh);
+
 This routine checks that the passed handle actually references a driver. If the 
 assertions fail, a fatal error will occur.
 
@@ -107,6 +118,7 @@ assertions fail, a fatal error will occur.
 #### ECCheckEventHandle()
 	void	ECCheckEventHandle(
 			EventHandle eh);
+
 This routine checks that the passed handle actually references a stored 
 message. If the assertions fail, a fatal error will occur.
 
@@ -116,6 +128,7 @@ message. If the assertions fail, a fatal error will occur.
 #### ECCheckFileHandle()
 	void	ECCheckFileHandle(
 			FileHandle file);
+
 This routine checks that the passed handle actually is a file handle and 
 references a file. If the assertions fail, a fatal error will occur.
 
@@ -125,6 +138,7 @@ references a file. If the assertions fail, a fatal error will occur.
 #### ECCheckGeodeHandle()
 	void	ECCheckGeodeHandle(
 			GeodeHandle gh);
+
 This routine checks that the passed handle references a loaded geode. If the 
 assertions fail, a fatal error will occur.
 
@@ -134,6 +148,7 @@ assertions fail, a fatal error will occur.
 #### ECCheckGStateHandle()
 	void	ECCheckGStateHandle(
 			GStateHandle gsh);
+
 This routine checks that the passed handle references a GState. If the 
 assertions fail, a fatal error will occur.
 
@@ -144,6 +159,7 @@ assertions fail, a fatal error will occur.
 	void	ECCheckHugeArray(
 			VMFileHandle		vmFile,
 			VMBlockHandle		vmBlock);
+
 This routine checks the validity of the passed Huge Array. If the block passed 
 is not the directory block of a Huge Array, the routine fails.
 
@@ -153,6 +169,7 @@ is not the directory block of a Huge Array, the routine fails.
 #### ECCheckLibraryHandle()
 	void	ECCheckLibraryHandle(
 			GeodeHandle gh);
+
 This routine checks that the passed handle references a library. If the 
 assertions fail, a fatal error will occur.
 
@@ -162,6 +179,7 @@ assertions fail, a fatal error will occur.
 #### ECCheckLMemChunk()
 	void	ECCheckLMemChunk(
 			void * chunkPtr);
+
 This routine checks the validity of the chunk pointed to by *chunkPtr*. If the 
 assertions fail, a fatal error will occur.
 
@@ -171,6 +189,7 @@ assertions fail, a fatal error will occur.
 #### ECCheckLMemHandle()
 	void	ECCheckLMemHandle(
 			MemHandle mh);
+
 This routine checks that the passed handle is a memory handle and actually 
 references a local memory block. If the assertions fail, a fatal error will occur.
 
@@ -180,6 +199,7 @@ references a local memory block. If the assertions fail, a fatal error will occu
 #### ECCheckLMemHandleNS()
 	void	ECCheckLMemHandleNS(
 			MemHandle mh);
+
 This routine checks that the passed handle is a local memory handle; unlike 
 **ECCheckLMemHandle()**, however, it does not check sharing violations 
 (when threads are illegally using non-sharable memory). If the assertions 
@@ -191,6 +211,7 @@ fail, a fatal error will occur.
 #### ECCheckLMemObject()
 	void	ECCheckLMemObject(
 			optr	obj);
+
 This routine checks the validity of an object to ensure that it is an object 
 stored in an object block. If the assertions fail, a fatal error will occur.
 
@@ -201,6 +222,7 @@ stored in an object block. If the assertions fail, a fatal error will occur.
 	void	ECCheckLMemObjectHandles(
 			MemHandle mh,
 			ChunkHandle ch);
+
 This routine checks the validity of an object to ensure that it is an object 
 stored in an object block. If the assertions fail, a fatal error will occur.
 
@@ -210,6 +232,7 @@ stored in an object block. If the assertions fail, a fatal error will occur.
 #### ECCheckLMemOD()
 	void	ECCheckLMemOD(
 			optr	o);
+
 This routine checks the validity of the given local-memory-based object. If 
 assertions fail, a fatal error will occur.
 
@@ -220,6 +243,7 @@ assertions fail, a fatal error will occur.
 	void	ECCheckLMemODHandles(
 			MemHandle objHan,
 			ChunkHandle objCh);
+
 This routine checks the validity of the given local-memory-based object. If 
 assertions fail, a fatal error will occur.
 
@@ -229,6 +253,7 @@ assertions fail, a fatal error will occur.
 #### ECCheckMemHandle()
 	void	ECCheckMemHandle(
 			MemHandle mh);
+
 This routine checks that the passed handle is a memory handle that 
 references a memory block. If the assertions fail, a fatal error will occur.
 
@@ -238,6 +263,7 @@ references a memory block. If the assertions fail, a fatal error will occur.
 #### ECCheckMemHandleNS()
 	void	ECCheckMemHandleNS(
 			MemHandle mh);
+
 This routine checks that the passed handle references a memory block; 
 unlike **ECCheckMemHandle()**, however, it will not check for sharing 
 violations (when a thread illegally accesses a non-sharable block). If the 
@@ -249,6 +275,7 @@ assertions fail, a fatal error will occur.
 #### ECCheckObject()
 	void	ECCheckObject(
 			optr	obj);
+
 This routine checks the validity of the given locked object. If the assertions 
 fail, a fatal error will occur.
 
@@ -259,6 +286,7 @@ fail, a fatal error will occur.
 	void	ECCheckObjectHandles(
 			Memhandle mh,
 			ChunkHandle ch);
+
 This routine checks the validity of the given locked object. If the assertions 
 fail, a fatal error will occur.
 
@@ -266,6 +294,7 @@ fail, a fatal error will occur.
 #### ECCheckOD()
 	void	ECCheckOD(
 			optr	obj);
+
 This routine checks the validity of the given object. Unlike 
 **ECCheckLMemObject()**, however, it allows optrs of Process objects to be 
 specified. If assertions fail, a fatal error will occur.
@@ -275,6 +304,7 @@ specified. If assertions fail, a fatal error will occur.
 	void	ECCheckODHandles(
 			MemHandle objHan,
 			ChunkHandle objCh);
+
 This routine checks the validity of the given object. Unlike 
 **ECCheckLMemObjectHandles()**, however, it allows processes to be 
 specified. If assertions fail, a fatal error will occur.
@@ -285,6 +315,7 @@ specified. If assertions fail, a fatal error will occur.
 #### ECCheckProcessHandle()
 	void	ECCheckProcessHandle(
 			GeodeHandle gh);
+
 This routine checks that the passed handle actually references a process. If 
 the assertions fail, a fatal error will occur.
 
@@ -294,6 +325,7 @@ the assertions fail, a fatal error will occur.
 #### ECCheckQueueHandle()
 	void	ECCheckQueueHandle(
 			QueueHandle qh);
+
 This routine ensures the passed handle references an event queue. If the 
 assertions fail, a fatal error will occur.
 
@@ -303,6 +335,7 @@ assertions fail, a fatal error will occur.
 #### ECCheckResourceHandle()
 	void	ECCheckResourceHandle(
 			MemHandle mh);
+
 This routine ensures that the passed handle references a geode resource. If 
 the assertions fail, a fatal error will occur.
 
@@ -311,6 +344,7 @@ the assertions fail, a fatal error will occur.
 ----------
 #### ECCheckStack()
 	void	ECCheckStack();
+
 This routine checks to make sure the current stack has not overflown (and is 
 not about to). This routine also enforces a 100-byte gap between the stack 
 bottom and the stack pointer. If assertions fail, a fatal error will occur.
@@ -321,6 +355,7 @@ bottom and the stack pointer. If assertions fail, a fatal error will occur.
 #### ECCheckThreadHandle()
 	void	ECCheckThreadHandle(
 			ThreadHandle th);
+
 This routine checks that the passed handle actually references a thread. If 
 the assertions fail, a fatal error will occur.
 
@@ -330,6 +365,7 @@ the assertions fail, a fatal error will occur.
 #### ECCheckWindowHandle()
 	void	ECCheckWindowHandle(
 			WindowHandle wh);
+
 This routine checks that the passed handle actually references a window. If 
 the assertions fail, a fatal error will occur.
 
@@ -339,6 +375,7 @@ the assertions fail, a fatal error will occur.
 #### ECLMemExists()
 	void	ECLMemExists(
 			optr	o);
+
 This routine checks to see if the specified chunk exists. This routine should 
 be called by applications to check the chunk handle's validity. If the 
 assertions fail, a fatal error will occur.
@@ -350,6 +387,7 @@ assertions fail, a fatal error will occur.
 	void	ECLMemExistsHandles(
 			MemHandle mh,
 			ChunkHandle ch);
+
 This routine checks to see if the specified chunk exists. This routine should 
 be called by applications to check the chunk handle's validity. If the 
 assertions fail, a fatal error will occur.
@@ -360,6 +398,7 @@ assertions fail, a fatal error will occur.
 #### ECLMemValidateHandle()
 	void	ECLMemValidateHandle(
 			optr	o);
+
 This routine checks that the passed optr points to a local memory chunk. If 
 the assertions fail, a fatal error will occur.
 
@@ -370,6 +409,7 @@ the assertions fail, a fatal error will occur.
 	void	ECLMemValidateHandleHandles(
 			MemHandle mh,
 			ChunkHandle ch);
+
 This routine checks that the passed memory and chunk handles actually 
 reference a local memory chunk. If the assertions fail, a fatal error will occur.
 
@@ -379,6 +419,7 @@ reference a local memory chunk. If the assertions fail, a fatal error will occur
 #### ECLMemValidateHeap()
 	void	ECLMemValidateHeap(
 			MemHandle mh);
+
 This routine does a complete error-check of the LMem heap. It is used 
 internally and should not be needed by application programmers.
 
@@ -387,6 +428,7 @@ internally and should not be needed by application programmers.
 ----------
 #### ECMemVerifyHeap()
 	void	ECMemVerifyHeap()
+
 This routine makes sure the global heap is in a consistent state. If the 
 assertions fail, a fatal error will occur. This routine should likely not be called 
 by anything other than the EC kernel.
@@ -397,6 +439,7 @@ by anything other than the EC kernel.
 #### ECVMCheckMemHandle()
 	void	ECVMCheckMemHandle(
 			MemHandle han);
+
 This routine checks that the given memory handle is actually linked to a VM 
 block handle. If assertions fail, a fatal error will occur.
 
@@ -407,6 +450,7 @@ block handle. If assertions fail, a fatal error will occur.
 	void	ECVMCheckVMBlockHandle(
 			VMFileHandle file,
 			VMBlockHandle block);
+
 This routine checks the validity of the given VM file and block handles. If 
 assertions fail, a fatal error will occur.
 
@@ -416,6 +460,7 @@ assertions fail, a fatal error will occur.
 #### ECVMCheckVMFile()
 	void	ECVMCheckVMFile(
 		VMFileHandle file);
+
 This routine checks the validity of the given VM file handle. If assertions fail, 
 a fatal error will occur.
 
@@ -429,6 +474,7 @@ a fatal error will occur.
 			dword	callBackData,	/* This is passed to the Callback routine */
 			Boolean _pascal (*callback) (void *elementToAdd, 
 						void *elementFromArray, dword valueForCallback));
+
 This routine is used to add elements to an array. It is passed the address of a 
 potential element. It compares the element with each member of an element 
 array. If there are no matches, it adds the element to the array and sets the 
@@ -466,6 +512,7 @@ reference count by calling **ElementArrayAddReference()**.
 			dword			callBackData,	/* Passed to the Callback routine */
 			Boolean _pascal (*callback) (void *elementToAdd, 
 						void *elementFromArray, dword valueForCallback));
+
 This routine is exactly like **ElementArrayAddElement()** above, except 
 that the element array is specified by its global and chunk handles (instead 
 of with an optr).
@@ -484,6 +531,7 @@ reference count by calling **ElementArrayAddReferenceHandles()**.
 	void	ElementArrayAddReference(
 			optr	arr,		/* optr to element array */
 			word	token);		/* Index number of element */
+
 This routine increments the reference count of a member of an element array. 
 
 **Be Sure To:** Lock the block on the global heap before calling (unless it is fixed).
@@ -496,6 +544,7 @@ This routine increments the reference count of a member of an element array.
 			MemHandle		mh,			/* Handle of LMem heap's block */
 			ChunkHandle		ch,			/* Handle of element array */
 			word			token);		/* Index number of element */
+
 This routine is exactly like **ElementArrayAddReference()** above, except 
 that the element array is specified by its global and chunk handles (instead 
 of with an optr).
@@ -509,6 +558,7 @@ of with an optr).
 			word		elementSize,	/* Size of each element, or zero
 										 * for variable-sized */
 			word		headerSize);	/* Header size (zero for default) */
+
 This routine creates an element array in the indicated LMem heap. It creates 
 an **ElementArrayHeader** structure at the head of the chunk. If you want 
 to leave extra space before the start of the array, you can pass a larger header 
@@ -542,6 +592,7 @@ fixed). If you pass a header size, make sure it is larger than
 			word	elementSize,	/* Size of each element, or zero
 									 * for variable-sized */
 			word	headerSize);	/* Header size (zero for default) */
+
 This routine is just like **ElementArrayCreate()** above, except that the 
 element array is created in a pre-existing chunk. The contents of that chunk 
 will be overwritten.
@@ -559,6 +610,7 @@ pointers to chunks in that block.
 			word		elementSize,	/* Size of each element, or zero
 											 * for variable-sized */
 			word		headerSize);	/* Header size (zero for default) */
+
 This routine is exactly like **ElementArrayCreateAt()** above, except that 
 the element array is specified by its global and chunk handles (instead of 
 with an optr).
@@ -573,6 +625,7 @@ pointers to chunks in that block.
 	void	ElementArrayDelete(
 			optr	arr,		/* optr to element array */
 			word	token);		/* index of element to delete */
+
 This routine deletes an element from an element array regardless of its 
 reference count. The routine is passed the element array's optr and the token 
 for the element to delete.
@@ -593,6 +646,7 @@ elements are preserved.
 			MemHandle	mh,			/* Handle of LMem heap */
 			ChunkHandle	ch,			/* Chunk handle of element array */
 			word		token);		/* Index of element delete */
+
 This routine is exactly like **ElementArrayDelete()** above, except that the 
 element array is specified by its global and chunk handles (instead of with an 
 optr).
@@ -644,6 +698,7 @@ do a bytewise comparison of the elements.
 							(void *		elementChanged,
 							 void *		elementToCompare,
 							 dword		valueForCallback));
+
 This routine is exactly like **ElementArrayElementChanged()** above, 
 except that the element array is specified by its global and chunk handles 
 (instead of with an optr).
@@ -657,6 +712,7 @@ except that the element array is specified by its global and chunk handles
 			dword	callbackData,			/* This is passed to callback routine */
 			Boolean _pascal (*callback)				/* return true to count this element */
 						(void * element, dword cbData));
+
 This routine counts the number of active elements in an element array; that 
 is, elements which have a reference count of one or greater. It can be 
 instructed to count every element, or every element which matches certain 
@@ -680,6 +736,7 @@ pointer.
 			dword		callbackData,	/* This is passed to callback routine */
 			Boolean _pascal (*callback)	/* return true to count this element */
 						(void * element, dword cbData));
+
 This routine is exactly like **ElementArrayGetUsedCount()** above, except 
 that the element array is specified by its global and chunk handles (instead 
 of with an optr).
@@ -694,6 +751,7 @@ of with an optr).
 			dword	callbackData,	/* Passed to callback routine */
 			void _pascal (*callback) (void *element, dword valueForCallback));
 					/* Routine is called if element is actually removed */
+
 This routine decrements the reference count of the specified element. If the 
 reference count drops to zero, the element will be removed. If an element is 
 to be removed, **ElementArrayRemoveReference()** calls the callback 
@@ -721,6 +779,7 @@ elements are preserved.
 			dword		callbackData,	/* Passed to callback routine */
 			void _pascal (*callback) (void *element, dword valueForCallback));
 					/* Routine is called if element is actually removed */
+
 This routine is exactly like **ElementArrayRemoveReference()** above, 
 except that the element array is specified by its global and chunk handles 
 (instead of with an optr).
@@ -735,6 +794,7 @@ except that the element array is specified by its global and chunk handles
 			dword	callbackData,		/* Data passed to callback routine */
 			Boolean _pascal (*callback)	/* Return true to count this element */
 					(void *element, dword cbData));
+
 This routine is passed the token of an element array. It translates the token 
 into an index from some non-standard indexing scheme. The indexing 
 scheme can either number the elements from zero, counting only those 
@@ -756,6 +816,7 @@ passed, every used element will be counted.
 										 * callback routine */
 			Boolean _pascal (*callback)	/* Return true to count this element */
 					(void *element, dword cbData));
+
 This routine is exactly like **ElementArrayTokenToUsedIndex()** above, 
 except that the element array is specified by its global and chunk handles 
 (instead of with an optr).
@@ -770,6 +831,7 @@ except that the element array is specified by its global and chunk handles
 			dword	callbackData,		/* This is passed to the callback routine */
 			Boolean _pascal (*callback)	/* Return true to count this element */
 					(void *element, dword cbData));
+
 This routine takes an index into an element array from some non-standard 
 indexing scheme. The routine finds the element specified and returns the 
 element's token. The indexing scheme can either number the elements from 
@@ -794,6 +856,7 @@ returns CA_NULL_ELEMENT.
 			dword		callbackData,	/* Data passed to the callback routine */
 			Boolean _pascal (*callback)	/* Return true to count this element */
 					(void *element, dword cbData));
+
 This routine is exactly like **ElementArrayUsedIndexToToken()** above, 
 except that the element array is specified by its global and chunk handles 
 (instead of with an optr).
@@ -811,6 +874,7 @@ except that the element array is specified by its global and chunk handles
 										 * result of the evaluation */
 			word	bufSize,			/* Size of the scratch buffer */
 			CEvalStruct * evalParams);	/* Pointer to CEvalStruct structure */
+
 This routine evaluates a stream of parser tokens. It is used by the evaluator 
 portion of the parse library and will be used only rarely by applications.
 
@@ -820,6 +884,7 @@ portion of the parse library and will be used only rarely by applications.
 #### FatalError()
 	void	FatalError(
 			word errorCode);
+
 This routine causes a fatal error, leaving *errorCode* for the debugger.
 
 ----------
@@ -828,6 +893,7 @@ This routine causes a fatal error, leaving *errorCode* for the debugger.
 			FileHandle	fh,				/* File to close */
 			Boolean		noErrorFlag);	/* Set if app. can't handle
 										 * errors */
+
 This routine closes an open byte file. If the routine succeeds, it returns zero. 
 If the routine fails and *noErrorFlag* is *false* (i.e., zero), **FileClose()** returns a 
 member of the **FileError** enumerated type. If the routine fails and 
@@ -861,6 +927,7 @@ non-zero), the routine will fatal-error.
 			const char	* tail,			/* Path relative to handle */
 			Boolean		addDriveLetter);	/* Should path begin with drive
 											 * name? */
+
 This routine translates a GEOS directory specification into a complete path 
 string. It writes the string into the passed buffer. The directory is specified 
 by two arguments: The first, *disk*, is the handle of a disk; this may also be a 
@@ -909,6 +976,7 @@ path string will begin with the drive's name and a colon.
 			DiskHandle	sourceDisk,		/* These handles may be Standard */
 			DiskHandle	destDisk);		/* Path constants, or null to indi- 
 										 * cate current working directory */
+
 This routine makes a copy of a file. The source and destination are specified 
 with path strings. Each string specifies a path relative to the location 
 specified by the corresponding disk handle. If the handle is a disk handle, the 
@@ -946,6 +1014,7 @@ There was not enough room on the destination disk.
 			const char		* name,			/* relative to working directory */
 			FileCreateFlags	flags,			/* see below */
 			FileAttrs		attributes);	/* FileAttrs of new file */
+
 This routine creates a byte file. The file may be a DOS file or a GEOS byte file. 
 If the file is successfully opened, **FileCreate()** will return the file's handle; 
 otherwise, it will return a null handle and set the thread's error value.
@@ -1040,6 +1109,7 @@ format, or vice versa.
 #### FileCreateDir()
 	word	FileCreateDir( /* Returns error & sets thread's error value */
 			const char * name);		/* Relative path of new directory */
+
 This routine creates a new directory. The parameter is a path string; the path 
 is relative to the current directory. The last element of the path string must 
 be the directory to create.
@@ -1071,6 +1141,7 @@ The volume is write-protected.
 									 * file name replaces 14 trailing null
 									 * characters upon return */
 			FileAttrs	attributes);
+
 This routine creates and opens a temporary file in the directory specified. The 
 routine automatically selects a name for the temporary file. No creation flags 
 are needed, since the file will definitely be created anew and will be used only 
@@ -1092,6 +1163,7 @@ value to a member of the **FileError** enumerated type.
 #### FileDelete()
 	word	FileDelete( /* returns error */
 			const char  * name);   /* path relative to working directory */
+
 This routine deletes a file. If it is successful, it returns zero; otherwise, it 
 returns a **FileError**. Common errors include:
 
@@ -1116,6 +1188,7 @@ Some geode has that file open.
 #### FileDeleteDir()
 	word	FileDeleteDir( /* Returns error & sets thread's error value */
 			const char * name);	  /* Relative path of directory to delete */
+
 This argument deletes an existing directory. The parameter is a string which 
 specifies the directory's position relative to the current working directory. 
 The last element of the path string must be the name of the directory to 
@@ -1150,6 +1223,7 @@ before it can be deleted.
 #### FileDuplicateHandle()
 	FileHandle FileDuplicateHandle( /* Sets thread's error value */
 			FileHandle fh);
+
 This routine duplicates the handle of an open file and returns the duplicate 
 handle. The duplicate handle has the same read/write position as the 
 original. Both handles will have to be closed for the file to be closed. If there 
@@ -1167,6 +1241,7 @@ thread's error value.
 											 * here */
 			word			* numNoFit);	/* Number of files not handled is
 											 * written here */
+
 This routine is used to examine all the files in a directory. The routine can 
 filter the files by whether they have certain extended attributes. It creates a 
 buffer and writes information about the files in this buffer. This routine can 
@@ -1440,6 +1515,7 @@ array, **FileEnumLocateAttr()** will return a null pointer.
 	Boolean	FileEnumWildcard(
 			FileEnumCallbackData	* fecd,		/* Passed to callback routine */
 			word					frame);		/* Inherited stack frame */
+
 This routine is a utility used by **FileEnum()** and is rarely used by 
 applications. It checks to see if the virtual name of the current file (the file 
 currently being evaluated by **FileEnum()**) matches the pattern in the 
@@ -1459,6 +1535,7 @@ Otherwise, it returns *false*.
 #### FileFromTransferBlockID()
 	VMFileHandle	 FileFromTransferBlockID(id);
 			TransferBlockID id;
+
 This macro extracts a VMFileHandle from a value of type **TransferBlockID**.
 
 ----------
@@ -1481,6 +1558,7 @@ this routine sets the thread's error.
 	DiskHandle FileGetCurrentPath(
 			char *	buffer,			/* Path string is written here */
 			word	bufferSize);	/* Size of buffer in bytes */
+
 This routine writes the current path string (without drive specifier) to the 
 buffer provided. If the buffer is too small, it truncates the path to fit. It 
 returns the handle of the disk containing the current path. If the current 
@@ -1493,6 +1571,7 @@ will be returned.
 #### FileGetDateAndTime()
 	FileDateAndTime 	FileGetDateAndTime( /* sets thread's error value */
 			FileHandle fh);
+
 This routine finds out the time a file was last modified. This routine can be 
 called on GEOS or non-GEOS files. Note that you can also find out the 
 modification time of a file by checking the extended attribute 
@@ -1506,6 +1585,7 @@ FEA_MODIFICATION. If unsuccessful, it sets the thread's error value.
 #### FileGetDiskHandle()
 	DiskHandle FileGetDiskHandle( /* sets thread's error value */
 			FileHandle fh);
+
 This routine returns the handle of the disk containing an open file. If 
 unsuccessful, it sets the thread's error value.
 
@@ -1518,6 +1598,7 @@ unsuccessful, it sets the thread's error value.
 			FileExtendedAttribute	attr,		/* attribute to get */
 			void					* buffer,	/* attribute is written here */
 			word					bufSize);	/* length of buffer in bytes */
+
 This routine gets one or more extended attributes of an open file. (To get the 
 attributes of a file without opening it, call **FileGetPathExtAttributes()**.) If 
 a single attribute is requested, the attribute will be written in the buffer 
@@ -1557,6 +1638,7 @@ FEA_MULTIPLE, and using a **FileExtAttrDesc** to describe the attribute.
 			FileExtendedAttribute	attr,		/* attribute to get */
 			void					* buffer,	/* attribute is written here */
 			word					bufSize);	/* length of buffer in bytes */
+
 This routine gets one or more extended attributes of a GEOS file. If a single 
 attribute is requested, the attribute will be written in the buffer passed. If 
 several attributes are requested, *attr* should be set to FEA_MULTIPLE, and 
@@ -1593,6 +1675,7 @@ FEA_MULTIPLE, and using a **FileExtAttrDesc** to describe the attribute.
 			FileHandle		fh,
 			dword			filePos,	/* lock starting at this position... */
 			dword			regLength);	/* lock this many bytes */
+
 This routine puts a lock on a part of a byte file. It first checks to make sure 
 that there are no locks that overlap the region specified; if there are, it will 
 fail and return ERROR_ALREADY_LOCKED. If there are no locks, it will place 
@@ -1613,6 +1696,7 @@ applications use this mechanism, they have to make sure to call
 			DiskHandle		sourceDisk,	/* These handles may be Standard */
 			DiskHandle		destDisk);	/* Path constants, or null to indi- 
 										 * cate current working directory */
+
 This routine moves a file from one location to another. The source and 
 destination are specified with path strings. Each string specifies a path 
 relative to the location specified by the corresponding disk handle. If the 
@@ -1652,6 +1736,7 @@ There was not enough room on the destination disk.
 	FileHandle FileOpen( /* sets thread's error value */
 			const char			* name,		/* relative to working dir */
 			FileAccessFlags		flags);		/* Permissions/exclusions */
+
 This routine opens a file for bytewise access. The file may be a DOS file or a 
 GEOS byte file. If the file is successfully opened, **FileOpen()** will return the 
 file's handle; otherwise, it will return a null handle and set the thread's error 
@@ -1690,6 +1775,7 @@ write-protected volume.
 	StandardPath FileParseStandardPath(
 			DiskHandle		disk,
 			const char		** path);
+
 This routine is passed a full path (relative to the passed disk or a standard 
 path, if the disk handle is null) and finds the standard path which most 
 closely contains that path. It updates the pointer whose address is passed so 
@@ -1718,6 +1804,7 @@ makes it the current working directory.
 			FileHandle		fh,
 			dword			posOrOffset,
 			FilePosMode		mode);
+
 This routine changes the current file position. The position can be specified 
 in three ways, depending on the value of the *mode* argument:
 
@@ -1762,6 +1849,7 @@ directory stack. It does not change the current working directory.
 			word			count,			/* Length of buffer (in bytes) */
 			Boolean			noErrorFlag);	/* Set if app can't
 											 * handle errors */
+
 This routine copies data from a file into memory. It starts copying from the 
 current position in the file. If possible, it will copy enough data to fill the 
 buffer. If **FileRead()** reaches the end of the file, it sets the thread's error 
@@ -1782,6 +1870,7 @@ fatal-error if an error occurs (including an ERROR_SHORT_READ_WRITE).
 	word	FileRename(
 			const char * oldName,		/* Relative to working directory */
 			const char * newName);		/* Name only, without path */
+
 This routine changes a file's name. It cannot move a file to a different 
 directory; to do that, call **FileMove()**. If the routine is successful, it returns 
 zero; otherwise, it returns a **FileError**. Common errors include
@@ -1815,6 +1904,7 @@ file, and the name was not an appropriate native name.
 			word		bufSize,				/* Size of buffer (in bytes) */
 			const char *		path,				/* Relative path of file */
 			FileResolveStandardPathFlags flags);							/* Flags are described below */
+
 This routine finds a file relative to the current location, then writes the full 
 path to the file, starting at the root of the disk (*not* at a standard path). It 
 writes the path to the passed buffer, updating the pointer to point to the null 
@@ -1842,6 +1932,7 @@ and return accordingly.
 			const char	* path,		/* file's path relative to current
 									 * working directory */
 			FileAttrs	attr);		/* new attributes for the file */
+
 This routine changes the standard DOS attributes of a DOS or GEOS file. Note 
 that you can also change the attributes of a file by setting the extended 
 attribute FEA_FILE_ATTR.
@@ -1855,6 +1946,7 @@ attribute FEA_FILE_ATTR.
 	DiskHandle FileSetCurrentPath(
 			DiskHandle		disk,		/* May be a standard path constant */
 			const char		* path);	/* path string, null-terminated */
+
 This routine changes the current path. It is passed two parameters: The first 
 is the handle of the disk containing the new current path (this may be a 
 standard path constant). The second is a null-terminated path string. It is 
@@ -1877,6 +1969,7 @@ current path; this may be a standard path constant. If
 	word	FileSetDateAndTime( /* returns error */
 			FileHandle			fh,				/* handle of open file */
 			FileDateAndTime		dateAndTime);	/* new modification time */
+
 This routine changes a file's last-modification time-stamp. This routine can 
 be called on GEOS or non-GEOS files. Note that you can also change the 
 modification time of a file by changing the extended attribute 
@@ -1894,6 +1987,7 @@ the thread's error value.
 			FileExtendedAttribute	attr,		/* attribute to get */
 			const void				* buffer,	/* attribute is read from here */
 			word					bufSize);	/* length of buffer in bytes */
+
 This routine sets one or more extended attributes of an open GEOS file. (To 
 set the attributes of a file without opening it, call 
 **FileSetPathExtAttributes()**.) If a single attribute is specified, the 
@@ -1936,6 +2030,7 @@ FEA_MULTIPLE, and using a **FileExtAttrDesc** to describe the attribute.
 			FileExtendedAttribute	 attr,		/* attribute to get */
 			const void				* buffer,	/* attribute is read from here */
 			word					bufSize);	/* length of buffer in bytes */
+
 This routine sets one or more extended attributes of a file. If a single 
 attribute is specified, the attribute will be written in the buffer passed. If 
 several attributes are to be changed, *attr* should be set to FEA_MULTIPLE 
@@ -1975,6 +2070,7 @@ FEA_MULTIPLE, and using a **FileExtAttrDesc** to describe the attribute.
 #### FileSetStandardPath()
 	void	FileSetStandardPath(
 			StandardPath path);			/* StandardPath to set */
+
 This routine changes the current working directory to one of the system's 
 StandardPath directories. Pass a standard path.
 
@@ -1994,6 +2090,7 @@ This routine returns the size of the open file specified.
 	word	FileTruncate(
 			FileHandle		fh,			/* handle of open file */
 			dword			offset);	/* offset at which to truncate */
+
 This routine truncates the specified file at the passed offset. The *offset* 
 parameter can also be thought of as the desired file size.
 
@@ -2005,6 +2102,7 @@ parameter can also be thought of as the desired file size.
 			FileHandle		fh,				/* handle of open file
 			dword		filePos,				/* Release lock that starts here */
 			dword		regLength);				/* and is this long */
+
 This routine releases a lock on a part of a byte-file. The lock must have been 
 previously placed with **FileLockRecord()**.
 
@@ -2019,6 +2117,7 @@ previously placed with **FileLockRecord()**.
 			const void		* buf,			/* Copy from here into file */
 			word			count,			/* # of bytes to copy */
 			Boolean			noErrorFlag);	/* Set if can't handle errors */
+
 This routine copies a specified number of bytes from a buffer to the file. The 
 bytes are written starting with the current position in the file; any data 
 already at that location will be overwritten. **FileWrite()** returns the number 
@@ -2042,6 +2141,7 @@ fatal-error if an error occurs.
 	dword	FormatIDFromManufacturerAndType(mfr, type);
 			ManufacturerIDs 			mfr;
 			ClipboardItemFormat 			type;
+
 This macro takes a manufacturer ID and a format type (e.g. CIF_TEXT) and 
 combines them into a dword argument of the type 
 **ClipboardItemFormatID**.
@@ -2078,6 +2178,7 @@ actions, including possibly erasing other memory or crashing the system.
 #### FractionOf()
 	word	FractionOf(
 			WWFixedAsDWord		wwf);
+
 This macro returns the fractional portion of a **WWFixedAsDWord** value.
 
 **Include:** geos.h

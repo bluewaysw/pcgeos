@@ -333,6 +333,7 @@ the following arguments:
 ----------
 #### @define
 	@define <mname>[(<pdef>)] <macro>
+
 The @define directive defines a Goc macro. You can define C macros with the 
 \#define directive; macros that use Goc operators, keywords, or code must be 
 defined with @define. Similarly, macros defined with @define must be later 
@@ -361,6 +362,7 @@ the macro.
 ----------
 #### @deflib
 	@deflib <libName>
+
 Most Goc libraries will have a **.goh** header file. This file should begin with a 
 @deflib directive. This will see to it that no library header file is included more 
 than once in a given compilation. The file must end with an @endlib directive. 
@@ -377,6 +379,7 @@ stripped off. For example, if the library's header file is
 ----------
 #### @dispatch
 	@dispatch [noFree] [{<cast>}] <nObj>::<nMsg>::<event>;
+
 The @dispatch keyword sends a previously-encapsulated message to the 
 specified object. This keyword is analogous to @send; use @dispatchcall if the 
 event must be processed immediately. The encapsulated event must have been 
@@ -406,6 +409,7 @@ value. If no override is desired, specify this as null.
 ----------
 #### @dispatchcall
 	<ret> = @dispatchcall [noFree] [{<cast>}] <nObj>::<nMsg>::<event>;
+
 The @dispatchcall keyword sends a previously-encapsulated message to the 
 specified object. This keyword is analogous to @call; use @dispatch if the event 
 can be sent with no return values. The encapsulated event must have been 
@@ -437,6 +441,7 @@ value. If no override is desired, specify this as null.
 ----------
 #### @elementArray
 	@elementArray 	<stype> <aname> [= {<init>}];
+
 The @elementArray keyword declares an Element Array, a special kind of Chunk Array. 
 It has the following arguments:
 
@@ -454,6 +459,7 @@ no elements.
 ----------
 #### @end
 	@end	<segname>
+
 The @end keyword denotes the end of a resource block definition that had been 
 started with @start. Its one argument is the name of the resource segment.
 
@@ -465,6 +471,7 @@ started with @start. Its one argument is the name of the resource segment.
 ----------
 #### @endc
 	@endc
+
 The @endc keyword denotes the end of a class definition begun with @class. It 
 has no arguments.
 
@@ -473,6 +480,7 @@ has no arguments.
 ----------
 #### @endif
 	@endif
+
 The @endif directive denotes the end of a block of conditionally-compiled code. 
 It is used with @if, @ifdef, and @ifndef.
 
@@ -481,6 +489,7 @@ It is used with @if, @ifdef, and @ifndef.
 ----------
 #### @endlib
 	@endlib
+
 Most Goc libraries will have a .goh header file. This file should end with an 
 @endlib directive. This will see to it that no library header file is included more 
 than once in a given compilation. The file must begin with an @deflib directive.
@@ -490,6 +499,7 @@ than once in a given compilation. The file must begin with an @deflib directive.
 ----------
 #### @exportMessages
 	@exportMessages <expname>, <num>;
+
 The @exportMessages keyword sets aside a number of message spots so the 
 messages may be declared elsewhere. This allows users of the class to declare 
 messages that are guaranteed to be unique across all subclasses. Exported 
@@ -509,6 +519,7 @@ messages are declared with the @importMessage keyword. The arguments of
 #### @extern
 	@extern	<type> <name>;
 	@extern	method <cname>, <manme>+
+
 The @extern keyword allows code in a given compilation session to access 
 objects, chunks, monikers, and methods defined in another compilation 
 session. The compiler will assume the element exists and will be linked by the 
@@ -586,6 +597,7 @@ possible if you will be using @**call**, passing arguments, or what have you):
 ----------
 #### gcnList
 	gcnList(<manufID>,<lname>) = <oname> [, <oname>]*;
+
 The gcnList keyword, which does not have the keyword marker @ preceeding 
 it, puts the listed objects onto the specified notification list. GCN lists are 
 specified by both manufacturer ID and list type. The arguments of the gcnList 
@@ -610,6 +622,7 @@ Separate objects with commas.
 ----------
 #### @genChildren
 	@send @genChildren::<msg>(<params>);
+
 Any composite object in a generic object tree (therefore a subclass of 
 **GenClass**) can send a message that will be dispatched at once to all of its 
 children. Note that any message sent with @genChildren as the destination 
@@ -619,6 +632,7 @@ value and can not pass pointers in its parameters.
 ----------
 #### @genParent
 	[@send | @call]@genParent::<msg>(<params>);
+
 Any composite object in a generic object tree (therefore a subclass of 
 GenClass) can use the @genParent address to send a message to its **generic** 
 parent. This can be used with either @send or @call.
@@ -626,6 +640,7 @@ parent. This can be used with either @send or @call.
 ----------
 #### @gstring
 	@gstring <gsname> = {[<command> [, <command>]+]}
+
 The @gstring keyword lets you declare a GString in Goc source code.
 
 *gsname* - The name of the chunk which will contain the GString.
@@ -635,6 +650,7 @@ The @gstring keyword lets you declare a GString in Goc source code.
 ----------
 #### @header
 	@header	<type> [= <init>];
+
 The @header keyword sets the header of an object or data resource segment to 
 a custom structure. The structure must begin with an LMemBlockHeader or 
 ObjLMemBlockHeader. The arguments of @header are given below:
@@ -657,6 +673,7 @@ ObjLMemBlockHeader. The arguments of @header are given below:
 ----------
 #### @if
 	@if (<cond>)
+
 The @if directive denotes the beginning of a conditionally-compiled block of 
 code. If the expression detailed in *cond* equates to *true*, then the code between 
 the @if directive and the first corresponding @endif directive will be compiled 
@@ -684,6 +701,7 @@ macros, and Boolean operators (|| and &&).
 ----------
 #### @ifdef
 	@ifdef <item>
+
 The @ifdef directive is similar to the @if directive in use, except the condition 
 it evaluates is based solely on whether the *item* is defined or not (if *item* is 
 defined, the following code is compiled).
@@ -693,6 +711,7 @@ defined, the following code is compiled).
 ----------
 #### @ifndef
 	@ifndef <item>
+
 The @ifndef directive is similar to the @ifdef directive in use, except the 
 condition it evaluates is based solely on whether *item* is not defined (if *item* is 
 not defined, the following code is compiled).
@@ -702,6 +721,7 @@ not defined, the following code is compiled).
 ----------
 #### @importMessage
 	@importMessage <expname>, <messageDef>;
+
 The @importMessage keyword declares a message with a reserved message 
 number set aside earlier by @exportMessages. The arguments of this keyword 
 are given below:
@@ -719,6 +739,7 @@ the @message keyword for message declaration.
 ----------
 #### @include
 	@include <fname>
+
 The @include directive is used to include Goc files into a code file. It is similar 
 to the #include directive in C. Its only argument is a file name (*fname*) enclosed 
 in either angled brackets or quotation marks. If you use quotation marks, the 
@@ -732,6 +753,7 @@ will look first in the standard include directories.
 ----------
 #### @instance
 	@instance <insType> <iname> = <default>;
+
 The @instance keyword declares an instance data field for a class. This 
 keyword will appear between the class delimeters @class and @endc. Its 
 arguments are shown below:
@@ -789,6 +811,7 @@ should use the @vardata keyword rather than @instance.
 ----------
 #### @kbdAccelerator
 	@instance @kbdAccelerator <iname>;
+
 The @kbdAccelerator keyword follows @instance to create an instance data 
 field that will contain a keyboard accelerator. The *iname* argument is the name 
 of the instance data field.
@@ -800,6 +823,7 @@ of the instance data field.
 ----------
 #### @link
 	@instance @link <iname>;
+
 The @link keyword follows @instance to define a link instance data field 
 pointing to the object's next sibling in the object hierarchy. The *iname* 
 argument is the name of the instance data field. Note that the name of the link 
@@ -813,6 +837,7 @@ field must be set as the default value of the corresponding @composite field.
 ----------
 #### @message
 	@message	<retType> <mname>([@stack] <param>*);
+
 The @message keyword defines a message and its parameters and return 
 values. This keyword will appear within a class definition (i.e., between @class 
 and @endc). The message defined with @message will automatically be valid 
@@ -847,6 +872,7 @@ the parameter of that type.
 ----------
 #### @method
 	@method	[<hname>,] <cname>, <mname>+ [{<code>}];
+
 The @method keyword begins definition of a method (message handler). Its 
 arguments are listed below:
 
@@ -879,6 +905,7 @@ should be used as the method.
 ----------
 #### @noreloc
 	@noreloc <iname>;
+
 The @noreloc keyword specifies that an instance data field (defined in the 
 previous program statement) is not relocatable. Normally optr fields are 
 assumed to be relocatable and will be automatically relocated by the system 
@@ -891,6 +918,7 @@ when shutting down and coming back from a shutdown; by means of the
 		[<fieldName> = <init>;]*
 		[<varName> [= <init>];]*
 	}
+
 The @object keyword defines an object in an object resource block. It must 
 appear between @start and @end. Its arguments are defined below:
 
@@ -944,6 +972,7 @@ field will be set to its default value as defined by the class.
 ----------
 #### @optimize
 	@optimize
+
 This directive may be placed at the top of a **.goh** file. The directive instructs 
 Goc to generate a specially processed **.poh** file which contains all the 
 information of the **.goh** file, but is somewhat faster to compile. This **.poh** file is 
@@ -953,6 +982,7 @@ since the last compilation.
 ----------
 #### @protominor
 	@protominor <prototypeName>
+
 When creating a new version of an existing library, use the @**protominor** 
 keyword to declare new messages and variable data fields for a class. Suppose 
 your original class declaration looked like so:
@@ -981,6 +1011,7 @@ directive.
 ----------
 #### @prototype
 	@prototype <messageDef>;
+
 The @prototype keyword allows multiple messages to have the same pass and 
 return parameters. Use @prototype to define the pass and return values, then 
 use @message to declare the messages that have these parameters. The 
@@ -998,6 +1029,7 @@ message definition.
 ----------
 #### @record
 	<event> = @record <obj>::<msg>(<param>*);
+
 The @record keyword encapsulates an event for later use with @dispatch or 
 @dispatchcall. The arguments of @record are as follows:
 
@@ -1023,6 +1055,7 @@ when it is dispatched.
 #### @reloc
 	@reloc	<iname>, [(<count>, <struct>)] <ptrType>;
 	@reloc	<iname>, <fn>, [(<count>, <struct>)] <ptrType>;
+
 The @reloc keyword designates an instance data field that contains data 
 requiring relocation on startup. Note that this does not include instance fields 
 declared with the @composite and @link fields, but it does include any handle 
@@ -1059,6 +1092,7 @@ field, then put a zero (0) rather than a field name.
 ----------
 #### _reloc
 	@method [<hname>,] <cname>, _reloc { <code>};
+
 The _reloc keyword is used to write relocation handlers for classes, if you need 
 to relocate-unrelocate instance data when it's either read in or saved to state.
 
@@ -1071,6 +1105,7 @@ unrelocated by hand.
 ----------
 #### @reserveMessages
 	@reserveMessages <number>;
+
 The @reserveMessages keyword reserves the given number of message spots. 
 Messages are numbered sequentially according to the order of their 
 declaration; this keyword allows one or more numbers to be skipped in the 
@@ -1084,6 +1119,7 @@ versions obsolete. The single argument is the number of message spots to skip.
 ----------
 #### @send
 	@send	[<flags>+] [(<cast_ret>)] <obj>::[{<cast_par>}]<msg>(<param>*);
+
 The @send keyword sends a given message to the specified object. The message 
 will be sent and the sender's thread will continue executing without waiting for 
 a response. If return values or synchronization is important, use the @call 
@@ -1158,6 +1194,7 @@ immediately.
 ----------
 #### @specificUI
 	<fname>	= [@specificUI] <mod>* <key>;
+
 The @specificUI keyword is used when setting a keyboard accelerator instance 
 field in an object declaration. It tells the UI to allow the use of the keystrokes 
 specified, even if they are normally reserved for the specific UI. The keyword 
@@ -1180,6 +1217,7 @@ keyboard key or a letter enclosed in single quotation marks.
 ----------
 #### @stack
 	@message	<retType> <mname>([@stack] <param>*);
+
 This keyword may be used if the message might be sent from assembly 
 language code instead of Goc. It indicates that the arguments will be passed on 
 the stack; the handler will pop them off the stack in reverse order from the way 
@@ -1190,6 +1228,7 @@ they are listed in the declaration.
 ----------
 #### @start
 	@start	<segname> [, <flags>];
+
 The @start keyword indicates the beginning of a resource block. The end of the 
 block is denoted by the keyword @end. The arguments of @start are listed 
 below:
@@ -1212,6 +1251,7 @@ to a state file.
 ----------
 #### @uses
 	@uses <class>;
+
 If you know that a variant class will always be resolved to be a subclass of some 
 particular class, you can declare this with the @uses keyword. This will let the 
 variant class define handlers for the "used" superclass. The keyword uses the 
@@ -1228,6 +1268,7 @@ such that the used class is one of its ancestor classes.
 ----------
 #### @vardata
 	@vardata	<type> <vname>;
+
 The @vardata keyword creates a vardata data type for a class. Each type 
 created with @vardata can be simply the name of the type, or it can have 
 additional data (a single structure). The arguments of @vardata are given below:
@@ -1253,6 +1294,7 @@ place of a type.
 ----------
 #### @vardataAlias
 	@vardataAlias (<origName>) <newType> <newName>;
+
 The @vardataAlias keyword allows you to set up variable data fields with 
 varying amounts of extra data. That is, a single variable data field in the 
 instance chunk could have two different sizes and two different names. The 
@@ -1283,6 +1325,7 @@ the word void instead of a type.
 ----------
 #### @visChildren
 	@send @visChildren::<msg>(<params>);
+
 Any composite object in a visible object tree (therefore a subclass of 
 **VisCompClass**) can send a message that will be dispatched at once to all of its 
 children. Note that any message sent with @visChildren as the destination 
@@ -1292,6 +1335,7 @@ value.
 ----------
 #### @visParent
 	@send @visParent::<msg>(<params>);
+
 Any object in a visible tree can use @**visParent** as the destination of an @call 
 command. The message will be sent to the object's parent in the visible object 
 tree. The remainder of the command is the same as a normal @**call**.
@@ -1299,6 +1343,7 @@ tree. The remainder of the command is the same as a normal @**call**.
 ----------
 #### @visMoniker
 	@instance @visMoniker <iname>;
+
 The @visMoniker keyword follows @instance to create an instance data field 
 for a visual moniker. The iname argument is the name of the instance data 
 field.

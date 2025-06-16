@@ -6,6 +6,7 @@
 			word count, 
 			word elementSize,
 			PCB(int, compare, (const void *, const void *)));
+
 This is a standard quicksort routine. The callback routine must be decared 
 _pascal.
 
@@ -13,6 +14,7 @@ _pascal.
 #### QueueGetInfo()
 	word	QueueGetInfo(
 			QueueHandle qh);			/* queue to query */
+
 This routine returns information about a specific event queue. Pass the 
 handle of the queue; for information about the current process' queue, pass a 
 null handle. This routine returns the number of events (or messages) 
@@ -24,6 +26,7 @@ currently in the queue.
 #### QueueGetMessage()
 	EventHandle QueueGetMessage(
 			QueueHandle qh);			/* queue to query */
+
 This routine returns the next message on the given queue, blocking if the 
 queue is empty. When a new message is added to the empty queue, this 
 routine will unblock the thread and return the message. This routine is used 
@@ -37,6 +40,7 @@ almost exclusively by the kernel.
 			QueueHandle		qh,			/* queue to add event to */
 			EventHandle		event,		/* event to be added to queue */
 			MessageFlags	flags);		/* MF_INSERT_AT_FRONT or zero */
+
 This routine adds the specified *event* to the passed queue. The only valid flag 
 for this routine is MF_INSERT_AT_FRONT, which will put the event in the 
 first spot of the queue.
@@ -48,6 +52,7 @@ first spot of the queue.
 	Boolean	RangeEnum(
 			CellFunctionParameters	* cfp,		/* cell function parameters */
 			RangeEnumParams			* params);	/* special other parameters */
+
 This routine calls a callback routine for each cell in a specified range. This 
 routine is passed pointers to two structures, both of which are shown below. 
 It returns *false* if all the cells were processed, *true* if any of the cells caused 
@@ -96,6 +101,7 @@ wants to abort the **RangeEnum()**, it should return *true*.
 			byte					firstColumn,
 			word					lastRow,
 			byte					lastColumn);
+
 This routine returns *true* if there are any cells in the specified range. It is 
 passed a pointer to the **CellFunctionParameters** structure for the cell file, 
 as well as the indices of the first and last row, and the first and last column, 
@@ -108,6 +114,7 @@ of the range to check.
 	void	RangeInsert(
 			CellFunctionParameters	* cfp,		/* see RangeEnum() */
 			RangeInsertParams		* rep);		/* parameters structure */
+
 This routine shifts existing cells to make room for new ones. (It does not 
 actually create new cells.) Which cells are shifted, and in what direction, is 
 specified by the **RangeInsertParams()** structure. This structure has three 
@@ -147,6 +154,7 @@ Section 19.4.1 of the Concepts book.
 	void *	realloc(
 			void *		blockPtr,		/* address of memory to resize */
 			size_t		newSize);		/* New size of memory in bytes */
+
 The **malloc()** family of routines is provided for Standard C compatibility. If 
 a geode needs a small amount of fixed memory, it can call one of the routines. 
 The kernel will allocate a fixed block to satisfy the geode's **malloc()** requests; 
@@ -186,6 +194,7 @@ the memory. If you pass a different address, the results are undefined.
 			GeodeHandle 		driver,
 			SerialUnit 			unit,
 			Boolean 			linger);
+
 Close the stream to a serial port.
 
 ----------
@@ -194,6 +203,7 @@ Close the stream to a serial port.
 			GeodeHandle 		driver,
 			SerialUnit 			unit,
 			Boolean 			linger);
+
 Close the stream to a serial port, without actually resetting the port.
 
 ----------
@@ -202,6 +212,7 @@ Close the stream to a serial port, without actually resetting the port.
 			GeodeHandle 		driver,
 			SerialUnit			unit,
 			StreamRoles 		roles);
+
 Flush all data pending in a serial port's input or output buffer (depending on 
 the value of *roles*).
 
@@ -213,6 +224,7 @@ the value of *roles*).
 			SerialFormat *		format,
 			SerialMode *		mode,
 			SerialBaud *		baud);
+
 Get the format of a stream to a specified serial port.
 
 ----------
@@ -221,6 +233,7 @@ Get the format of a stream to a specified serial port.
 			GeodeHandle 		driver,
 			SerialUnit			unit,
 			SerialModem *		modem);
+
 Read a modem's hardware flow control bits.
 
 ----------
@@ -232,6 +245,7 @@ Read a modem's hardware flow control bits.
 			word 				inBuffSize,
 			word				outBuffSize,
 			word 				timeout);
+
 This routine opens a stream to the specified serial port. It is passed the 
 following arguments:
 
@@ -260,6 +274,7 @@ member of the **StreamError** enumerated type.
 			SerialUnit 			unit,
 			StreamRoles			role,
 			word *				bytesAvailable);
+
 Find out how much space is available in a serial buffer, or how much data is 
 waiting to be read.
 
@@ -272,6 +287,7 @@ waiting to be read.
 			word 			buffSize,
 			byte *			buffer,
 			word *			numBytesRead);
+
 Read data from a serial port and write it to a passed buffer.
 
 ----------
@@ -282,6 +298,7 @@ Read data from a serial port and write it to a passed buffer.
 			StreamBlocker 	blocker,
 			word 			buffSize,
 			byte *			dataByte);
+
 Read a byte of data from a serial port and write it to a passed variable.
 
 ----------
@@ -292,6 +309,7 @@ Read a byte of data from a serial port and write it to a passed variable.
 			SerialFormat 		format,
 			SerialMode		mode,
 			SerialBaud 		baud);
+
 Set the format for a stream to a specified serial port.
 
 ----------
@@ -300,6 +318,7 @@ Set the format for a stream to a specified serial port.
 			GeodeHandle 		driver,
 			SerialUnit			unit,
 			SerialModem 		modem);
+
 Set a modem's hardware flow control bits.
 
 ----------
@@ -311,6 +330,7 @@ Set a modem's hardware flow control bits.
 			word 				buffSize,
 			const byte *		buffer,
 			word *				numBytesWritten);
+
 Write data to a serial port.
 
 ----------
@@ -321,12 +341,14 @@ Write data to a serial port.
 			StreamBlocker 		blocker,
 			word 				buffSize,
 			byte				dataByte);
+
 Write one byte of data to a serial port.
 
 ----------
 #### SGC_MACHINE
 	byte	SGC_MACHINE(val);
 			dword	val;
+
 This macro is used to extract the machine type from a **SysGetConfig()** 
 return value.
 
@@ -336,6 +358,7 @@ return value.
 #### SGC_PROCESSOR
 	byte	SGC_PROCESSOR(val);
 			dword	val;
+
 This macro is used to extract the processor type from a **SysGetConfig()** 
 return value.
 
@@ -346,6 +369,7 @@ return value.
 	MemHandle 	SoundAllocMusic(
 			const word 		*song, 
 			word 			voices );
+
 This routine takes a pointer to a fixed buffer of music and returns a 
 **MemHandle** which may then be passed to **SoundPlayMusic()** to play the 
 music. If the music buffer is in a movable resource, you must initialize it 
@@ -361,6 +385,7 @@ Concepts book. The *voices* argument is the number of voices in the buffer.
 			word 			volume,
 			word 			DeltaType, 
 			word 			duration);
+
 This routine allocates a **MemHandle** which may be passed to 
 **SoundPlayMusicNote()**. You must provide all information about the note: 
 its frequency, volume, and duration. You may specify an instrument, passing 
@@ -384,6 +409,7 @@ half a second.
 			word 		priority,
 			word 		voices,
 			word 		tempo);
+
 This routine returns a token suitable for passing to 
 **SoundPlayMusicToStream()**. It is passed several arguments. The 
 **SoundStreamType** determines how much space to allocate for the stream 
@@ -396,6 +422,7 @@ must also pass a starting *tempo* for the music stream.
 ----------
 #### SoundAllocSampleStream()
 	MemHandle SoundAllocSampleStream(void);
+
 This routine allocates a sample stream handle. If the returned handle is *null*, 
 the library was unavailable (i.e. some other thread has grabbed exclusive 
 access).
@@ -404,6 +431,7 @@ access).
 #### SoundDisableSampleStream()
 	void 	SoundDisableSampleStream(
 			MemHandle 		mh);
+
 This routine disassociates the DAC player from the passed sample handle. 
 Before you play more sounds using the handle, you will have to call 
 **SoundEnableSampleStream()** again. 
@@ -416,6 +444,7 @@ Before you play more sounds using the handle, you will have to call
 			word 			rate,
 			word 			manufacturerID,
 			word 			format);
+
 This routine associates a DAC player with the allocated sample handle. You 
 must pass the sound handle, as returned by **SoundAllocSampleStream()**. 
 You must also pass certain pieces of information about the sound you will be 
@@ -427,6 +456,7 @@ identified by a *manufacturerID* and a **DACSampleFormat** value).
 #### SoundFreeMusic()
 	void 	SoundFreeMusic(
 			MemHandle 		mh);
+
 This routine frees up a music handle. The music must not be playing; call 
 **SoundStopMusic()** if you are not sure. You may not use the music handle 
 after calling this routine on it.
@@ -435,6 +465,7 @@ after calling this routine on it.
 #### SoundFreeMusicNote()
 	void SoundFreeMusicNote(
 			MemHandle 		mh);
+
 This routine frees up the passed note handle. The note must not be playing 
 when you call this routine; call **SoundStopMusicNote()** if you are not sure. 
 You should not try to use the note's handle after freeing it.
@@ -443,6 +474,7 @@ You should not try to use the note's handle after freeing it.
 #### SoundFreeMusicStream()
 	void SoundFreeMusicStream(
 			MemHandle 		mh);
+
 This routine frees up the music stream's token. No music must be playing via 
 the stream; call **SoundDisableMusicStream()** if you are not sure. Do not 
 try to use the stream after calling this routine on it.
@@ -451,12 +483,14 @@ try to use the stream after calling this routine on it.
 #### SoundFreeSampleStream()
 	void 	SoundFreeSampleStream(
 			MemHandle 		mh);
+
 This routine frees the passed sampled sound handle. You must not try to use 
 this handle after calling this routine on it.
 
 ----------
 #### SoundGetExclusive()
 	void	SoundGetExclusive(void);
+
 This routine grabs the exclusive semaphore for the sound library; if another 
 thread has already grabbed the exclusive, this routine will wait until the 
 exclusive is released. Sounds which are playing now will be permitted to 
@@ -467,6 +501,7 @@ to play new sounds. When done with the sound library exclusive, call
 ----------
 #### SoundGetExclusiveNB()
 	Boolean	SoundGetExclusiveNB(void);
+
 This routine grabs the exclusive semaphore for the sound library, doing so 
 even if some other thread has already grabbed the exclusive. Sounds which 
 are playing now will be permitted to finish, but from now on, only the thread 
@@ -481,6 +516,7 @@ When done with the sound library exclusive, call
 	void SoundInitMusic(
 			MemHandle 		mh, 
 			byte 			voices);
+
 This routine initializes a pre-defined simple music buffer structure. If the 
 music buffer is stored in a fixed block, you can call **SoundAllocMusic()** 
 instead. This allows a music buffer stored in a block referenced by a pointer 
@@ -493,6 +529,7 @@ to be playable using **SoundPlayMusic()**.
 			word			priority,
 			word 			tempo, 
 			char 			flags);
+
 This routine plays a buffer of music previously initialized by 
 **SoundInitMusic()** or allocated by **SoundAllocMusic()**. The *priority* value 
 will determine whether your sound will play if other sounds are already 
@@ -516,6 +553,7 @@ handle before you may use it to play music.
 			word 			priority, 
 			word			tempo,
 			word 			flags);
+
 This routine plays a buffer of music previously allocated by 
 **SoundAllocMusicNote()** - the return value of that function is passed as 
 *mh*. The *priority* value will determine whether your sound will play if other 
@@ -538,6 +576,7 @@ thread had grabbed the sound exclusive).
 			const word					* sample,
 			word 						size,
 			SampleFormatDescription 	*format);
+
 This routine plays a music buffer to a stream. Specify which stream to play 
 to by means of the token returned by **SoundAllocMusicStream()**. To play 
 music to the buffer, pass the size of the buffer you are playing and a pointer 
@@ -556,6 +595,7 @@ buffer after the GE_END_OF_SONG will be ignored.
 			word _far					* sample,
 			word 						size,
 			SampleFormatDescription 	* format);
+
 This routine passes sampled sound data to a DAC player. You must pass a 
 sample sound handle to this routine - to acquire such a handle, call 
 **SoundAllocSampleStream()**. The sample sound handle must be 
@@ -570,6 +610,7 @@ data.
 	Boolean 	SoundReallocMusic(
 			MemHandle 		mh,
 			word _far 		* song);
+
 This routine allows you to associate a new music buffer with an existing 
 music handle. The new music buffer must not have more voices than was 
 originally requested with **SoundAllocMusic()**. Do not call this routine with 
@@ -586,6 +627,7 @@ book to find out how to set up the buffer of music.
 			word 			timer,
 			word 			durat,
 			word _far		* instrum);
+
 This routine allows you to associate new note values with an existing note 
 handle. Do not call this routine with the handle of a note that may be playing; 
 call **SoundStopMusicNote()** on the handle if you are not sure. 
@@ -593,6 +635,7 @@ call **SoundStopMusicNote()** on the handle if you are not sure.
 ----------
 #### SoundReleaseExclusive()
 	void	SoundReleaseExclusive(void);
+
 This routine releases the sound library exclusive semaphore. You will not 
 need to call this routine unless your code calls **SoundGrabExclusive()** or 
 **SoundGrabExclusiveNB()**. This routine allows other threads to play 
@@ -603,6 +646,7 @@ had the exclusive, it will now grab the exclusive.
 #### SoundStopMusic()
 	Boolean 	SoundStopMusic(
 			MemHandle 		mh); 		/* Handle of music buffer */
+
 This routine stops the playing of a simple music buffer. It returns *true* if the 
 library was unavailable (i.e. some other thread has grabbed the exclusive).
 
@@ -610,6 +654,7 @@ library was unavailable (i.e. some other thread has grabbed the exclusive).
 #### SoundStopMusicNote()
 	Boolean 	SoundStopMusicNote(
 			MemHandle 		mh);
+
 This routine stops a note that is playing. Pass the handle of the note, as was 
 returned by **SoundAllocMusicNote()**. This routine returns true if the 
 sound library was unavailable (i.e. some other thread has grabbed the 
@@ -619,6 +664,7 @@ exclusive).
 #### SoundStopMusicStream()
 	Boolean 	SoundStopMusicStream(
 			MemHandle 		mh);
+
 This routine stops any music being played to the stream. All sounds are 
 flushed from the stream. It takes one argument, the token of the sound 
 stream, as returned by **SoundAllocMusicStream()**.
@@ -627,6 +673,7 @@ stream, as returned by **SoundAllocMusicStream()**.
 #### SoundStopSampleStream()
 	void 	SoundStopSampleStream(
 			MemHandle 		mh);
+
 This routine stops a sound playing through a previously allocated sampled 
 sound stream.
 
@@ -636,6 +683,7 @@ sound stream.
 			int 		width,			/* width of paper */
 			int 		height,			/* height of paper */
 			PageType 	pt);			/* type of page */
+
 This routine converts a width and height into a page size number.
 
 **Include:** spool.goh
@@ -648,6 +696,7 @@ This routine converts a width and height into a page size number.
 			int 		width,		/* width of paper */
 			int 		length,		/* length of paper */
 			PageLayout	layout);	/* default page layout /
+
 This routine defines and stores a new paper size for later use by the user.
 
 **Include:** spool.goh
@@ -659,6 +708,7 @@ This routine defines and stores a new paper size for later use by the user.
 			char 				*name,		/* name of printer */
 			PrinterDriverType 	type,		/* driver type */
 			int 				* retVal); 	/* Will hold printer number */
+
 Adds the printer to the list of currently installed printers and returns the 
 new printer number. This routine is normally called from within the 
 Preferences manager. Returns *true* if the printer already exists.
@@ -669,6 +719,7 @@ Preferences manager. Returns *true* if the printer already exists.
 #### SpoolDeletePaperSize()
 	Boolean 	SpoolDeletePaperSize(
 			word 	size);		/* size number to delete */
+
 This routine deletes a user-defined paper size.
 
 **Include:** spool.goh
@@ -677,6 +728,7 @@ This routine deletes a user-defined paper size.
 #### SpoolDeletePrinter()
 	void 	SpoolDeletePrinter(
 			int 	prtrNum);		/* printer number to delete */
+
 Deletes the requested printer from the system.
 
 **Include:** spool.goh
@@ -684,6 +736,7 @@ Deletes the requested printer from the system.
 ----------
 #### SpoolGetDefaultPrinter()
 	int 	SpoolGetDefaultPrinter(); /* Returns printer number */
+
 Returns the system-default printer, which is used (for example) by the 
 **PrintControlClass** as the default printer to print to.
 
@@ -693,6 +746,7 @@ Returns the system-default printer, which is used (for example) by the
 #### SpoolGetNumPaperSizes()
 	int 	SpoolGetNumPaperSizes(
 			PageType 	type);		/* type of page */
+
 Use this routine to find the number of paper sizes, both pre-defined and 
 user-defined, that should appear in a paper size list.
 
@@ -702,6 +756,7 @@ user-defined, that should appear in a paper size list.
 #### SpoolGetNumPrinters()
 	int 	SpoolGetNumPrinters(
 			PrinterDriverType		type);			/* driver type */
+
 This routine returns the number of installed printers with the given type.
 
 **Structures:**
@@ -724,6 +779,7 @@ This routine returns the number of installed printers with the given type.
 					 				 * value of SpoolGetNumPaperSizes() */
 			PageType 	pt,	 		/* type of page */
 			PageLayout 	*layout);	/* Will hold returned page layout */
+
 Use this routine to determine the dimensions of a paper size.
 
 **Include:** spool.goh
@@ -749,6 +805,7 @@ Use this routine to determine the dimensions of a paper size.
 			int 		size,		/* Must be between 0 and the return
 									 * value of SpoolGetNumPaperSizes() */
 			PageType	pt);		/* type of page */
+
 Use this routine to determine the string to be displayed for a specific paper 
 size. Upon return, *retValue* will point to a character string and the Boolean 
 return value will be *false* if successful. If any error occurs, or if the page type 
@@ -762,6 +819,7 @@ couldn't be found, the returned value will be *true*.
 			int 	*retValue,	/* On return, will point to length of string */
 			char 	*string,	/* returned name string */
 			int 	prtrNum);	/* printer number */
+
 This routine fills a buffer with the requested null-terminated printer name 
 string. If the printer could not be found, the return value will be *true* (set for 
 error).
@@ -772,6 +830,7 @@ error).
 #### SpoolSetDefaultPrinter()
 	void 	SpoolSetDefaultPrinter(
 			int prtrNum);		/* printer number */
+
 Sets the system-default printer, used (for example) by **PrintControlClass** 
 as the default printer. This routine is normally called from within the 
 Preferences manager.
@@ -783,6 +842,7 @@ Preferences manager.
 	void 	SpoolSetDocSize(
 			Boolean 		open;			/* false if document is closed */
 			PageSizeInfo 	* psr);			/* NULL if document is closed */
+
 This routine tells the application's **PageSizeControl** object the document's 
 size.
 
@@ -793,6 +853,7 @@ size.
 	void 	SpoolSetPaperSizeOrder(
 			void 	* ptr, 		/* Array of PageSizeOrder entries */
 			word 	number);	/* number of entries in array */
+
 This routine resets the order in which paper sizes are displayed to the user.
 
 **Include:** spool.goh
@@ -801,6 +862,7 @@ This routine resets the order in which paper sizes are displayed to the user.
 #### SpreadsheetInitFile()
 	VMBlockHandle SpreadsheetInitFile(
 			const SpreadsheetInitFileData			* ifd);
+
 This routine initializes a VM file for use by the spreadsheet object. It allocates 
 a spreadsheet map block in the file and initializes this block. The routine 
 returns the map block's handle; applications will need to remember this 
@@ -832,6 +894,7 @@ containing the file handle and the number of rows and columns to allocate.
 			GeodeHandle 		driver,
 			StreamToken 		stream,
 			Boolean 			linger);
+
 This routine shuts down a stream. It is passed the following arguments:
 
 *driver* - The **GeodeToken** of the stream driver.
@@ -850,6 +913,7 @@ member of the **StreamError** enumerated type.
 	StreamError StreamFlush (
 			GeodeHandle 		driver,
 			StreamToken 		stream);
+
 This routine flushes all the data pending in a stream. It is passed the 
 following arguments:
 
@@ -868,6 +932,7 @@ member of the **StreamError** enumerated type.
 			GeodeHandle			owner,
 			HeapFlags 			heapFlags,
 			StreamToken *		stream);
+
 This routine opens a stream. It is passed the following:
 
 *driver* - The **GeodeToken** of the stream driver.
@@ -891,6 +956,7 @@ enumerated type.
 			StreamToken 		stream,
 			StreamRoles 		role,
 			word *				bytesAvailable);
+
 This routine finds out either how much free space is available in a stream's 
 buffer, or how much data is waiting to be read. It is passed the following 
 arguments:
@@ -919,6 +985,7 @@ member of the **StreamError** enumerated type.
 			word 				buffSize,
 			byte *				buffer,
 			word *				numBytesRead);
+
 This routine reads data from a stream. The routine takes the following 
 arguments:
 
@@ -947,6 +1014,7 @@ not read all the data requested from the stream, it returns a member of the
 			StreamToken 		stream,
 			StreamBlocker 		blocker,
 			byte *		dataByte);
+
 This routine reads a single byte from a stream. It takes the following 
 arguments:
 
@@ -971,6 +1039,7 @@ member of the **StreamError** enumerated type.
 			word 				buffSize,
 			const byte *		buffer,
 			word *				numBytesWritten);
+
 This routine writes data to a stream. The routine takes the following 
 arguments:
 
@@ -1000,6 +1069,7 @@ enumerated type.
 			StreamToken 		stream,
 			StreamBlocker 		blocker,
 			byte 				dataByte);
+
 This routine writes a single byte to a stream. It takes the following 
 arguments:
 
@@ -1018,6 +1088,7 @@ member of the **StreamError** enumerated type.
 ----------
 #### SysGetConfig()
 	dword	SysGetConfig();
+
 This routine returns a set of values defining the system configuration. The 
 returned dword contains four byte values, listed below from least significant 
 byte to most significant byte:
@@ -1056,6 +1127,7 @@ from the returned dword.
 			const char		* variable,		/* environment variable */
 			char			* buffer,		/* buffer for return value */
 			word			bufSize);		/* maximum return string length */
+
 This routine looks up a specified DOS environment variable in the 
 environment buffer. It takes three parameters:
 
@@ -1077,6 +1149,7 @@ If the variable is not found, the error flag returned will be true.
 #### SysGetECLevel()
 	ErrorCheckingFlags SysGetECLevel(
 			MemHandle * checksumBlock);
+
 This routine checks the current error-checking level of the system. The 
 returned record of **ErrorCheckingFlags** describes which levels of error 
 checking are turned on and which are off. If checksum error checking 
@@ -1089,6 +1162,7 @@ which the checksum will be done.
 #### SysGetInfo()
 	dword	SysGetInfo(
 			SysGetInfoType info);		/* type of information to retrieve */
+
 This routine returns general system information. Pass the type of 
 information to be returned; the value returned depends on the type passed in 
 info. Note that the largest returned value is a dword; many different return 
@@ -1145,6 +1219,7 @@ SGIT_UI_PROCESS
 ----------
 #### SysGetPenMode()
 	Boolean	SysGetPenMode();
+
 This routine returns true if GEOS is running on a pen-based system, false if 
 it is not.
 
@@ -1155,6 +1230,7 @@ it is not.
 	DiskHandle SysLocateFileInDosPath( /* sets thread's error value */
 			const char		* fname,		/* file name */
 			char			* buffer);		/* returned path of file */
+
 This routine searches for a specified file along the search path specified in the 
 DOS environment variable PATH. The parameters are
 
@@ -1177,6 +1253,7 @@ with **ThreadGetError()**.
 			SysNotifyFlags		flags,			/* options to offer user */
 			const char 			* string1,		/* first string to display */
 			const char 			* string2);		/* second string to display */
+
 This routine causes the kernel to put up a standard notification dialog box on 
 the screen. This dialog box is white with a black border and is used nearly 
 exclusively for error notification by the kernel. Pass this routine the following 
@@ -1386,6 +1463,7 @@ with extreme care.
 #### SysStatistics()
 	void	SysStatistics(
 			SysStats * stats);			/* returned statistics */
+
 This routine returns system performance statistics. Pass it a pointer to an 
 empty **SysStats** structure; the routine will fill in the appropriate fields. 
 **SysStats** has the following structure:
@@ -1416,6 +1494,7 @@ empty **SysStats** structure; the routine will fill in the appropriate fields.
 			word			str2Size,
 			word			searchOptions,
 			word			*matchLen);
+
 TextSearchInString() searches in a single text chunk for a passed text string. 
 If a match is found, a pointer to that match (and the length of the match) are 
 returned in passed buffers. 
@@ -1451,6 +1530,7 @@ word itself is returned by the routine.)
 			VMBlockHandle	hugeArrayBlock,
 			word			searchOptions,
 			word			*matchLen);
+
 TextSearchInHugeArray() searches in a huge array for a passed text string. 
 If a match is found, a dword offset to the match (and the length of the match) 
 are returned in passed buffers. 
@@ -1481,6 +1561,7 @@ word itself is returned by the routine.)
 #### TGI_PRIORITY()
 	byte	TGI_PRIORITY(val);
 			word	val;
+
 This macro extracts the thread priority from the value returned by 
 **ThreadGetInfo()**.
 
@@ -1488,6 +1569,7 @@ This macro extracts the thread priority from the value returned by
 #### TGI_RECENT_CPU_USAGE()
 	byte	TGI_RECENT_CPU_USAGE(val);
 			word	val;
+
 This macro extracts the recent CPU usage from the value returned by 
 **ThreadGetInfo()**.
 
@@ -1495,6 +1577,7 @@ This macro extracts the recent CPU usage from the value returned by
 #### ThreadAllocSem()
 	SemaphoreHandle ThreadAllocSem(
 			word	value);			/* allowable locks on the semaphore */
+
 This routine allocates and initializes a new semaphore for private use by a 
 multithreaded application. Pass the value with which to initialize the 
 semaphore; this value represents the number of threads that can grab the 
@@ -1506,6 +1589,7 @@ will be one. The routine returns the handle of the new semaphore.
 ----------
 #### ThreadAllocThreadLock()
 	ThreadLockHandle ThreadAllocThreadLock();
+
 This routine allocates a special semaphore called a thread lock. With a 
 normal semaphore, a thread that grabs the semaphore twice without 
 releasing it will deadlock; with a thread lock, a thread can grab it more than 
@@ -1522,6 +1606,7 @@ In all other aspects, however, the thread lock resembles a normal semaphore.
 	void	ThreadAttachToQueue(
 			QueueHandle		qh,				/* queue to attach */
 			ClassStruct		* class);		/* primary class of thread */
+
 This routine attaches the calling thread to the passed event queue. This is 
 used only for event-driven threads. Typically, this routine is called when a 
 thread is created; attaching to queues is automatic in nearly all cases, and 
@@ -1547,6 +1632,7 @@ threads, and it is nearly always taken care of automatically by
 									/* Pointer to entry routine */
 			word	stackSize,		/* Size of the stack for the new thread */
 			GeodeHandle owner);		/* Geode that will own the new thread */
+
 This routine creates a new procedural thread for a process. If you need a new 
 event-driven thread, send MSG_PROCESS_CREATE_EVENT_THREAD to your 
 process object instead.
@@ -1625,6 +1711,7 @@ take any amount of time to complete.
 			optr	ackObject,	/* Object to receive destruction acknowledgment */
 			word	ackData);	/* Additional word of data to pass (as the low
 								 * word of optr for source of MSG_META_ACK) */
+
 This routine causes the current (calling) thread to exit and then destroy 
 itself. The thread is responsible for ensuring that it has no leftover resources 
 allocated or semaphores locked.
@@ -1649,6 +1736,7 @@ clean up after itself.
 #### ThreadFreeSem()
 	void	ThreadFreeSem(
 			SemaphoreHandle sem);			/* semaphore to be freed */
+
 This routine frees the specified semaphore that had been allocated with 
 **ThreadAllocSem()**. You must be sure that no threads are using the 
 semaphore or will use it after it has been freed. Subsequent access attempts 
@@ -1660,6 +1748,7 @@ could cause illegal handle errors or worse.
 #### ThreadFreeThreadLock()
 	void	ThreadFreeThreadLock(
 			ThreadLockHandle sem);				/* thread lock to be freed */
+
 This routine frees the specified thread lock that had been allocated with 
 **ThreadAllocThreadLock()**. You must be sure that no threads are using or 
 will use the thread lock after it has been freed. Subsequent attempts to grab 
@@ -1670,6 +1759,7 @@ or release the thread lock could cause illegal handle errors.
 ----------
 #### ThreadGetError()
 	word	ThreadGetError(void)
+
 This routine returns the thread's current error value.
 
 ----------
@@ -1677,6 +1767,7 @@ This routine returns the thread's current error value.
 	word	ThreadGetInfo(
 			ThreadHandle		th,		/* thread to get information about */
 			ThreadGetInfoType 	info);	/* type of information to get */
+
 This routine gets information about the specified thread. The information 
 desired is specified in the *info* parameter; the subject thread is specified in 
 the *th* parameter. If the thread handle passed is zero or a null handle, the 
@@ -1707,6 +1798,7 @@ event-driven, a null queue handle will be returned.
 #### ThreadGrabThreadLock()
 	void	ThreadGrabThreadLock(
 			ThreadLockHandle sem);				/* thread lock to grab */
+
 This routine attempts to grab the thread lock for the calling thread. If the 
 thread lock is currently held by another thread, the caller will block until the 
 lock becomes available. If the caller already has the thread lock, it will grab 
@@ -1727,6 +1819,7 @@ grabbed in the same order to minimize the potential for deadlock.
 			ThreadHandle		th,			/* thread to handle the exception */
 			ThreadExceptions	exception,	/* exception to handle */
 			void	(*handler)	());		/* pointer to handler */
+
 This routine allows a thread to set up a handler for a processor exception. 
 This can be useful for debugging purposes. Pass the following three 
 parameters:
@@ -1756,6 +1849,7 @@ pointer to use the GEOS default exception handler.
 			ThreadHandle		th,					/* thread to modify */
 			word				newBasePriority,	/* thread's new base priority */
 			ThreadModifyFlags	flags);				/* flags (see below) */
+
 This routine modifies the priority of the specified thread. Use it to either set 
 the base priority of the thread or reset the current CPU usage to zero. The 
 parameters should have the following values:
@@ -1781,6 +1875,7 @@ zero.
 	word	ThreadPrivAlloc(
 			word			wordsRequested,		/* number of words to allocate */
 			GeodeHandle		owner);				/* handle of geode to own data */
+
 This routine allocates a number of contiguous words in the private data of all 
 geodes (loaded and yet-to-be loaded). It is exactly the same as 
 **GeodePrivAlloc()**; see the entry for that routine.
@@ -1794,6 +1889,7 @@ geodes (loaded and yet-to-be loaded). It is exactly the same as
 	void	ThreadPrivFree(
 			word	range,				/* offset to first word to be freed */
 			word	wordsRequested);	/* number of words to free */
+
 This routine frees a number of contiguous private-data words previously 
 allocated with **ThreadPrivAlloc()**. It is similar to **GeodePrivFree()**; see 
 the entry for that routine for full information.
@@ -1806,6 +1902,7 @@ the entry for that routine for full information.
 #### ThreadPSem()
 	SemaphoreError ThreadPSem(
 			SemaphoreHandle sem);				/* semaphore to grab */
+
 This routine attempts to grab the passed semaphore via a "P" operation. If 
 the semaphore has already been grabbed, the thread will block until the 
 semaphore becomes available, even if it was grabbed by the same thread.
@@ -1834,6 +1931,7 @@ lock instead (see **ThreadAllocThreadLock()** for more information).
 	SemaphoreError ThreadPTimedSem(
 			SemaphoreHandle		sem,		/* semaphore to grab */
 			word				timeout);	/* ticks before timeout */
+
 This routine attempts to grab the passed semaphore via a "P" operation. If 
 the semaphore has already been grabbed, the thread will block for at most 
 the number of ticks specified in *timeout*.
@@ -1878,6 +1976,7 @@ lock instead, though there is no timeout equivalent for thread locks (see
 #### ThreadReleaseThreadLock()
 	void	ThreadReleaseThreadLock(
 			ThreadLockHandle sem);				/* threadlock to release */
+
 This routine releases the specified thread lock previously grabbed with 
 **ThreadGrabThreadLock()**. Pass the handle of the thread lock as returned 
 by **ThreadAllocThreadLock()**.
@@ -1891,6 +1990,7 @@ results are unpredictable.
 #### ThreadVSem()
 	void	ThreadVSem(
 			SemaphoreHandle sem);				/* semaphore to release */
+
 This routine releases a semaphore that was grabbed with ThreadPSem() or 
 **ThreadPTimedSem()**. Pass the handle of the semaphore as returned by 
 **ThreadAllocSem()**.
@@ -1903,6 +2003,7 @@ one of the above routines. The results are unpredictable.
 ----------
 #### TimerGetCount()
 	dword	TimerGetCount();
+
 This routine returns the value of the system counter. The returned value is 
 the number of ticks since GEOS started.
 
@@ -1912,6 +2013,7 @@ the number of ticks since GEOS started.
 #### TimerGetDateAndTime()
 	void	TimerGetDateAndTime(
 			TimerDateAndTime * dateAndTime);	/* buffer for returned values */
+
 This routine returns the current time and date. Pass it a pointer to an empty 
 **TimerDateAndTime** structure to be filled in by the routine.
 
@@ -1922,6 +2024,7 @@ This routine returns the current time and date. Pass it a pointer to an empty
 	void	TimerSetDateAndTime(
 			word					flags,			/* which item to set */
 			const TimerDateAndTime	* dateAndTime);	/* new values */
+
 This routine sets the current date and/or time of the system. Pass it the 
 following:
 
@@ -1938,6 +2041,7 @@ information to be set.
 #### TimerSleep()
 	void	TimerSleep(
 			word	ticks);		/* number of ticks the thread should sleep */
+
 This routine invokes a "sleep timer" that will put the calling thread to sleep 
 for the given number of ticks. At the end of the time, the thread will continue 
 executing with the next instruction.
@@ -1957,6 +2061,7 @@ synchronization.
 			Message		msg,			/* notification message */
 			word		interval,		/* interval for continual timers */
 			word		* id);			/* buffer for returned timer ID */
+
 This routine starts a timer of any type. The timer will run for the specified 
 number of ticks and then will send the given message to the destination 
 object. The message is sent with the flags MF_FORCE_QUEUE, 
@@ -2026,6 +2131,7 @@ wake a sleeping machine.
 	Boolean	TimerStop(
 			TimerHandle		th,		/* handle of timer to be stopped */
 			word			id);	/* timer ID (returned by TimerStart() */
+
 This routine stops a timer that had been started with **TimerStart()**. Pass it 
 the timer handle and the ID as returned by that routine (the ID of a continual 
 timer will always be zero).
@@ -2044,6 +2150,7 @@ destination an "all-safe" message with the MF_FORCE_QUEUE flag.
 #### TocDBLock()
 	void * TocDBLock(
 			DBGroupAndItem 		thing);
+
 Use this routine to lock a name array maintained by a PrefTocList object.
 
 **Include:** config.goh
@@ -2053,6 +2160,7 @@ Use this routine to lock a name array maintained by a PrefTocList object.
 	void * TocDBLockGetRef(
 			DBGroupAndItem 		thing,
 			optr				*refPtr);
+
 This routine locks a name array maintained by a PrefTocList object, 
 returning the item's pointer and optr.
 
@@ -2062,6 +2170,7 @@ returning the item's pointer and optr.
 #### TocFindCategory()
 	Boolean TocFindCategory(
 			TocCategoryStruct 		*cat);
+
 This routine searches a PrefTocList object's name list for a given token.
 
 **Structures**: 
@@ -2079,6 +2188,7 @@ This routine searches a PrefTocList object's name list for a given token.
 ----------
 #### TocGetFileHandle()
 	word TocGetFileHandle();
+
 Use this routine to get the handle of the file used by PrefTocLists to store 
 their name array data.
 
@@ -2090,6 +2200,7 @@ their name array data.
 			DBGroupAndItem 		array, 
 			const char 			*nameToFind,
 			const void 			*data);
+
 Use this routine to add a name to a name array maintained by a PrefTocList 
 object.
 
@@ -2101,6 +2212,7 @@ object.
 			DBGroupAndItem 		array, 
 			word 				element,
 			void 				*buffer);
+
 Use this routine to find a name in the name list maintained by a PrefTocList 
 object.
 
@@ -2112,6 +2224,7 @@ object.
 			DBGroupAndItem 		array, 
 			word 		element,
 			void 		*buffer);
+
 Use this routine to retrieve a given element from a name array maintained 
 by a PrefTocList object. 
 
@@ -2124,6 +2237,7 @@ by a PrefTocList object.
 			const char 			*nameToAdd,
 			NameArrayAddFlags 	flags,
 			const void 			*data);
+
 This routine adds a name to a sorted name array associated with a 
 PrefTocList object. 
 
@@ -2142,6 +2256,7 @@ PrefTocList object.
 			SortedNameArrayFindFlags 	flags,
 			void 						*buffer, 
 			word 						*elementNum);
+
 This routine looks up a name in a sorted name array associated with a 
 PrefTocList object.
 
@@ -2156,6 +2271,7 @@ PrefTocList object.
 #### TocUpdateCategory()
 	void TocUpdateCategory(
 			TocUpdateCategoryParams *params);
+
 Use this routine to update a PrefTocList object based upon the files in a given 
 directory with a given token.
 
@@ -2181,6 +2297,7 @@ directory with a given token.
 #### TOKEN_CHARS()
 	dword	TOKEN_CHARS(a, b, c, d);
 			char	a, b, c, d;
+
 This macro creates a single dword value from four given characters. This is 
 useful when creating a token characters value for a specific token.
 
@@ -2191,6 +2308,7 @@ useful when creating a token characters value for a specific token.
 			ManufacturerID	manufacturerID,		/* manufacturer ID for token */
 			optr			monikerList,		/* optr of moniker list */
 			TokenFlags		flags);				/* token flags */
+
 This routine adds a new token and moniker list to the token database. If the 
 token already exists in the token DB, the old will be replaced with the new. 
 This routine must only be called by a thread that can lock the block in which 
@@ -2220,6 +2338,7 @@ thereby invalidating all pointers to token database items.
 			dword			tokenChars,			/* four characters of token */
 			ManufacturerID	manufacturerID,		/* manufacturer ID of token */
 			TokenFlags		* flags);			/* returned token flags */
+
 This routine returns information about a specified token. Pass it the 
 following:
 
@@ -2244,6 +2363,7 @@ found in the token database. It returns zero if successful.
 			TokenRangeFlags 	tokenRangeFlags,
 			word 				headerSize,
 			ManufacturerID 		manufacturerID));
+
 This routine lists all the tokens in the token database. It allocates a new 
 block on the global heap and writes in it an array of **GeodeToken** structures. 
 This routine returns the actual tokens, not the token groups.
@@ -2260,6 +2380,7 @@ handle of the newly-allocated block and can be extracted with the macro
 #### TokenListTokensCountFromDWord()
 	word	TokenListTokensCountFromDWord(d);
 			dword	d;
+
 This macro extracts the number of tokens from the value returned by 
 **TokenListTokens()**.
 
@@ -2267,6 +2388,7 @@ This macro extracts the number of tokens from the value returned by
 #### TokenListTokensHandleFromDWord()
 	word	TokenListTokensHandleFromDWord(d);
 			dword	d;
+
 This routine extracts the MemHandle from the value returned by 
 **TokenListTokens()**.
 
@@ -2279,6 +2401,7 @@ This routine extracts the MemHandle from the value returned by
 			VisMonikerSearchFlags	searchFlags,	/* flags for finding token */
 			word					* blockSize,	/* returned block size */
 			MemHandle				* blockHandle);	/* returned block handle */
+
 This routine loads a specified token's moniker, allocating a new global 
 memory block for the moniker. The returned Boolean will be *true* if the 
 moniker was found, *false* otherwise. Information about the moniker is 
@@ -2319,6 +2442,7 @@ returned.
 			void					* buffer,			/* pointer to buffer for token */
 			word					bufSize,			/* size of passed buffer */
 			word					* bytesReturned);	/* number of bytes returned */
+
 This routine loads a specified token's moniker into a provided buffer. The 
 returned Boolean will be *true* if the moniker was found, *false* otherwise. The size 
 of the returned moniker will be returned in the word pointed to by the 
@@ -2359,6 +2483,7 @@ moniker that may be returned.
 			MemHandle				lmemBlock,		/* locked block for new chunk */
 			word					* chunkSize,	/* returned new chunk size */
 			ChunkHandle				* chunkHandle);	/* returned new chunk handle */
+
 This routine loads a specified token's moniker, allocating a new chunk in a 
 local memory block for the moniker. The returned Boolean will be *true* if the 
 moniker was found, *false* otherwise.
@@ -2400,6 +2525,7 @@ pointers to any chunk in the block.
 			ManufacturerID	manufacturerID,		/* manufacturer ID of token */
 			word			* blockSize,		/* returned size of new block */
 			MemHandle		* blockHandle);		/* returned handle of block */
+
 This routine loads the specified token's **TokenEntry** structure into a 
 newly-allocated global memory block. The returned Boolean will be *true* if the 
 token was found, *false* otherwise.
@@ -2427,6 +2553,7 @@ newly-allocated block will be returned.
 			dword			tokenChars,			/* four characters of token */
 			ManufacturerID	manufacturerID,		/* manufacturer ID of token */
 			TokenEntry		* buffer);			/* buffer for returned token */
+
 This routine loads the specified token's **TokenEntry** structure into a passed 
 buffer. The returned Boolean will be *true* if the token was found, *false* 
 otherwise. Pass this routine the following:
@@ -2451,6 +2578,7 @@ will be copied.
 			MemHandle		lmemBlock,			/* handle of block for chunk */
 			word			* chunkSize,		/* returned size of new chunk */
 			ChunkHandle		* chunkHandle);		/* returned chunk handle */
+
 This routine loads the specified token's **TokenEntry** structure into a 
 newly-allocated chunk. The returned Boolean will be *true* if the token was found, 
 *false* otherwise.
@@ -2484,6 +2612,7 @@ pointers to any chunk in the block.
 	void	* TokenLockTokenMoniker(
 			TokenMonikerInfo	tokenMonikerInfo);	/* The DB group and item numbers
 								 * as returned by TokenLookupMoniker() */
+
 This routine locks a token's moniker so it may be drawn; it returns a pointer 
 to the locked chunk containing the moniker information. Pass it the 
 structure returned by **TokenLookupMoniker()**.
@@ -2501,6 +2630,7 @@ drawing it.
 			DisplayType				displayType,		/* display type of token */
 			VisMonikerSearchFlags	searchFlags,		/* flags for finding token */
 			TokenMonikerInfo *		tokenMonikerInfo);	/* DB group and item of token */
+
 This routine finds and retrieves a pointer to the specific moniker for the 
 specified token, given also the token's display type and other attributes. Pass 
 the following:
@@ -2529,6 +2659,7 @@ in the token database, *false* otherwise.
 ----------
 #### TokenCloseLocalTokenDB()
 	void	TokenCloseLocalTokenDB()
+
 This routine closes the local token database.
 
 ----------
@@ -2537,6 +2668,7 @@ This routine closes the local token database.
 			TokenRangeFlags		tokenRangeFlags,
 			word				headerSize,
 			ManufacturerID		manufacturerID)
+
 This routine locates all the tokens that meet specified criteria, allocates a 
 block, and copies the tokens to that block. The upper word of the return value 
 is the number of matching tokens found; the lower word is the handle of the 
@@ -2545,6 +2677,7 @@ block which was allocated.
 ----------
 #### TokenOpenLocalTokenDB()
 	word	TokenOpenLocalTokenDB()
+
 This routine opens the local token database. It returns zero on success, and 
 a **VMStatus** error code on failure.
 
@@ -2555,6 +2688,7 @@ a **VMStatus** error code on failure.
 	Boolean	TokenRemoveToken(
 			dword			tokenChars,			/* four characters of token */
 			ManufacturerID	manufacturerID,		/* manufacturer ID of token */
+
 This routine removes the specified token and its moniker list from the token 
 database. It returns an error flag: if the token could not be found, the 
 returned flag is *true*; otherwise it is *false*. Pass the following:
@@ -2572,6 +2706,7 @@ for the token database entry.
 #### TokenUnlockTokenMoniker()
 	void	TokenUnlockTokenMoniker(
 			void * moniker);
+
 This routine unlocks a moniker that had been locked with 
 **TokenLockMoniker()**. Pass a pointer to the locked moniker, as returned by 
 the locking routine.
@@ -2582,6 +2717,7 @@ the locking routine.
 #### TypeFromFormatID()
 	word	TypeFromFormatID(id);
 			ClipboardItemFormatID	id;
+
 This macro extracts the word-sized format ID (of type 
 **ClipboardItemFormat**) from a **ClipboardFormatID** argument.
 

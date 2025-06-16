@@ -80,6 +80,7 @@ shown in Code Display 25-1. Each field is described later in this section.
 ### 25.1.1 The VCNI_attrs Field
 	VCNI_attrs, MSG_VIS_CONTENT_SET_ATTRS, 
 	MSG_VIS_CONTENT_GET_ATTRS
+
 The *VCNI_attrs* field is a record of **VisContentAttrs** that contains several 
 attributes which affect how the content object interacts with the view and 
 with the visible object tree. You can set these attributes with 
@@ -141,6 +142,7 @@ Chapter 9, for full information on view scrolling.
 	void	MSG_VIS_CONTENT_SET_ATTRS(
 			VisContentAttrs attrsToSet,
 			VisContentAttrs attrsToClear);
+
 This message sets the *VCNI_attrs* field of the content object according to the 
 passed values.
 
@@ -166,6 +168,7 @@ parameters, it will end up cleared.
 ----------
 #### MSG_VIS_CONTENT_GET_ATTRS
 	VisContentAttrs MSG_VIS_CONTENT_GET_ATTRS();
+
 This message returns the current contents of the object's *VCNI_attrs* field, a 
 record of **VisContentAttrs**.
 
@@ -233,6 +236,7 @@ detailed in "Messages Received from the View" below.
 ----------
 #### MSG_VIS_CONTENT_GET_WIN_SIZE
 	SizeAsDWord MSG_VIS_CONTENT_GET_WIN_SIZE();
+
 This message returns the size of the content object's associated window in 
 terms of width and height.
 
@@ -252,6 +256,7 @@ DWORD_WIDTH macros to extract the proper values.
 	VCNI_docOrigin, VCNI_scaleFactor, 
 	MSG_VIS_CONTENT_SET_DOC_BOUNDS, 
 	MSG_VIS_CONTENT_RECALC_SIZE_BASED_ON_VIEW
+
 The GenView object maintains quite a bit of information about the document 
 as managed by the content object. The content must also keep information 
 about the document and how the view is displaying it. This information is 
@@ -327,6 +332,7 @@ Messages that set these fields are discussed in section 25.2.2 below.
 			sdword	right,
 			sdword	top,
 			sdword	left);
+
 This message is used to set the document bounds of a content's large 
 document. The content will send MSG_GEN_VIEW_SET_DOC_BOUNDS to its 
 view and MSG_VIS_LAYER_SET_DOC_BOUNDS to each of its children with 
@@ -353,6 +359,7 @@ will result in a fatal error.
 ----------
 #### MSG_VIS_CONTENT_RECALC_SIZE_BASED_ON_VIEW
 	SizeAsDWord MSG_VIS_CONTENT_RECALC_SIZE_BASED_ON_VIEW();
+
 This message causes the content to recalculate its size based on the view's 
 geometry. It will try to set its width if it has VCNA_SAME_WIDTH_AS_VIEW 
 set, and it will try to set its height if it has VCNA_SAME_HEIGHT_AS_VIEW 
@@ -481,6 +488,7 @@ unlikely that you will ever send or intercept this message.
 #### MSG_VIS_CONTENT_TEST_IF_ACTIVE_OR_IMPLIED_WIN
 	Boolean	MSG_VIS_CONTENT_TEST_IF_ACTIVE_OR_IMPLIED_WIN(
 			WindowHandle window);
+
 This message checks to see if the passed window handle is the same as the 
 window of the object having either the implied or active mouse grab. This is 
 typically used by objects in a Specific UI library to determine if the mouse 
@@ -503,6 +511,7 @@ implied window, *false* otherwise.
 	void	MSG_VIS_CONTENT_UNWANTED_MOUSE_EVENT(
 			VisMouseGrab *mouseGrab,
 			word	inputState);
+
 This message is received by the content if a mouse event was received and 
 there was no active or implied grab. This is most frequently encountered 
 when the user presses a mouse button outside a modal dialog box. The 
@@ -558,6 +567,7 @@ original MSG_META_KBD_CHAR.
 #### 25.1.4.2 Focus and Target
 	VCNI_focusExcl, VCNI_targetExcl, 
 	MSG_META_CONTENT_APPLY_DEFAULT_FOCUS
+
 In addition to keeping track of which of its children have the mouse and 
 keyboard grabs, the content also keeps track of which objects have the focus 
 and target input exclusives. Both *VCNI_focusExcl* and VCNI_targetExcl 
@@ -572,6 +582,7 @@ are described in "Messages Received from the View" below.
 	MSG_VIS_CONTENT_RESUME_INPUT_FLOW, 
 	MSG_VIS_CONTENT_DISABLE_HOLD_UP, 
 	MSG_VIS_CONTENT_ENABLE_HOLD_UP
+
 GEOS allows a visible tree to hold up input - that is, input will be stored 
 elsewhere while the visible tree is doing something else. This can be useful if 
 complex tree operations are going on and you don't want input to go to the 
@@ -608,6 +619,7 @@ information hold-up. These messages are detailed below.
 ----------
 #### MSG_VIS_CONTENT_HOLD_UP_INPUT_FLOW
 	void	MSG_VIS_CONTENT_HOLD_UP_INPUT_FLOW();
+
 This message increments the count in *VCNI_holdUpInputCount*. If this count 
 is nonzero and HUIF_HOLD_UP_MODE_DISABLED is clear, subsequent input 
 events will be sent into the hold-up queue until either the flag is set or the 
@@ -625,6 +637,7 @@ MSG_VIS_CONTENT_RESUME_INPUT_FLOW.
 ----------
 #### MSG_VIS_CONTENT_RESUME_INPUT_FLOW
 	void	MSG_VIS_CONTENT_RESUME_INPUT_FLOW();
+
 This message decrements the count in *VCNI_holdUpInputCount*. If the count 
 becomes zero with this call, the hold-up event queue is flushed and all the 
 events in it are "played back." If the count goes below zero, GEOS will give an 
@@ -645,6 +658,7 @@ going below zero.
 ----------
 #### MSG_VIS_CONTENT_DISABLE_HOLD_UP
 	void	MSG_VIS_CONTENT_DISABLE_HOLD_UP();
+
 This message sets the HUIF_HOLD_UP_MODE_DISABLED flag, forcing all 
 input events to flow normally until the flag is cleared. In essence, it turns off 
 the hold-up mechanism.
@@ -658,6 +672,7 @@ the hold-up mechanism.
 ----------
 #### MSG_VIS_CONTENT_ENABLE_HOLD_UP
 	void	MSG_VIS_CONTENT_ENABLE_HOLD_UP();
+
 This message clears the HUIF_HOLD_UP_MODE_DISABLED flag, allowing 
 input events to be held up in the hold-up event queue.
 
@@ -804,6 +819,7 @@ VCNA_SAME_HEIGHT_AS_VIEW flags set in its *VCNI_attrs* field.
 	MSG_META_CONTENT_VIEW_SIZE_CHANGED, 
 	MSG_META_CONTENT_VIEW_CLOSING, 
 	MSG_META_CONTENT_VIEW_WIN_CLOSED
+
 As detailed in the discussions on GenView, the view sends a sequence of 
 messages to its content when the view is first opening and when it is closing. 
 These messages set up the content's visible instance data and prime the 
@@ -889,6 +905,7 @@ will once again be passed the view's optr.
 #### MSG_META_CONTENT_SET_VIEW
 	void	MSG_META_CONTENT_SET_VIEW(
 			optr	view);
+
 This message passes the optr of the GenView object that will display this 
 content object. The default handler will set the content's *VCNI_view* field to 
 the passed optr. This message is also used when the view has been shut 
@@ -912,6 +929,7 @@ content.
 			WindowHandle	viewWindow,
 			sdword			xOrigin,
 			sdword			yOrigin);
+
 This message notifies the content that the view's origin has changed. The 
 content will set its *VCNI_docOrigin* field to the passed values.
 
@@ -1017,6 +1035,7 @@ the view window is fully opened.
 			word			viewWidth,
 			word			viewHeight,
 			WindowHandle	viewWindow);
+
 This message is sent to the content whenever the view's size changes for any 
 reason. The passed height and width will be stored in the content's 
 *VCNI_viewHeight* and *VCNI_viewWidth* fields.
@@ -1040,6 +1059,7 @@ this message to apply translations for 32-bit coordinates.
 ----------
 #### MSG_META_CONTENT_VIEW_CLOSING
 	void	MSG_META_CONTENT_VIEW_CLOSING();
+
 This message indicates to the content that the view window is being shut 
 down. The content should remove the visible tree from the screen and should 
 prepare itself for the window to be closed.
@@ -1055,6 +1075,7 @@ when the view is taken off the screen.
 #### MSG_META_CONTENT_VIEW_WIN_CLOSED
 	void	MSG_META_CONTENT_VIEW_WIN_CLOSED(
 			WindowHandle viewWindow);
+
 This message indicates that the view's window has been shut down, taken off 
 the screen, and destroyed. The content responds to this message by 
 discarding the window handle stored in its *VCNI_window* field. The content 

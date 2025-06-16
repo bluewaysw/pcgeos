@@ -424,6 +424,7 @@ folder tree.
 
 ### 21.2.1 Getting Started
 	InkDBInit()
+
 To create an Ink Database, an application needs a file handle, perhaps the 
 file holding a GenDocument's data. Before calling any other Ink Database 
 functions, call **InkDBInit()** to set up the file correctly; this routine should be 
@@ -437,6 +438,7 @@ Database include **InkSetDocPageInfo()** and **InkSetDocGString()**.
 	InkNoteLoadPage(), InkNoteSavePage(), InkGetDocPageInfo(), 
 	InkSetDocPageInfo(), InkSetDocGString(), 
 	InkGetDocGString(), InkNoteGetNoteType()
+
 Assuming that the application is using text and ink objects to display the 
 information held in the Ink DB, use **InkNoteLoadPage()** and 
 **InkNoteSavePage()** to transfer information between the Ink object and the 
@@ -464,6 +466,7 @@ The background GString is stored in VM; call **GrLoadGString()** and
 	InkGetTitle(), InkSendTitleToTextObject(), 
 	InkFolderSetTitle(), InkFolderSetTitleFromTextObject(), 
 	InkNoteSetTitle(), InkNoteSetTitleFromTextObject()
+
 Each note may have two text strings which are helpful for identification: a 
 title and a set of keywords. These words may be used as the fields for a 
 computed search if the application supports these; regardless, the user will 
@@ -494,6 +497,7 @@ INK_DB_MAX_NOTE_KEYWORDS_SIZE.
 	InkFolderGetContents(), InkFolderGetNumChildren(), 
 	InkFolderDisplayChildInList(), InkFolderGetChildInfo(), 
 	InkFolderGetChildNumber(), InkNoteGetNumPages()
+
 Assuming the application allows the existence of more than one folder, it 
 must allow some way to move around within the folder tree. If the application 
 allows the user to change the structure of the folder tree, then it will need UI 
@@ -532,6 +536,7 @@ routine returns the passed child's place number within the folder.
 	InkFolderCreateSubFolder(), InkFolderMove(), 
 	InkFolderDelete(), InkNoteCreate(), InkNoteDelete(), 
 	InkNoteMove(), InkNoteCreatePage()
+
 Some Ink DB applications might just create a hierarchy of notes and not 
 allow the user to move or change notes. Applications that will move notes and 
 folders should use the following functions to make changes.
@@ -570,6 +575,7 @@ the date the note was created, call **InkNoteGetCreationDate()**.
 ### 21.2.7 Searching and Traversing the Tree
 	InkNoteFindByTitle(), InkNoteFindByKeywords(), 
 	InkFolderDepthFirstTraverse()
+
 Sometimes the user will remember what a note is called, but has lost it in the 
 tree of folders. Sometimes the user will want to find all notes which contain 
 a certain keyword. Use **InkNoteFindNoteByTitle()** to get a buffer 

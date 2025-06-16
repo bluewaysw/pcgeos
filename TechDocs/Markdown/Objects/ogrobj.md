@@ -1287,6 +1287,7 @@ default if they don't have their own action notification.
 #### MSG_GB_SUSPEND_ACTION_NOTIFICATION
 
 	void 	MSG_GB_SUSPEND_ACTION_NOTIFICATION();
+
 This message suspends action notification for all of a body's GrObjs. This 
 prevents all the GrObjs from sending out any action notification.
 
@@ -1513,6 +1514,7 @@ GrObjHead messages are, concerned with the current tool.
 #### MSG_GH_GET_CURRENT_TOOL
 	void 	MSG_GH_GET_CURRENT_TOOL (
 			CurrentToolValues 	*retVal);
+
 This message returns the value of the currently active tool.
 
 **Source:** Unrestricted.
@@ -1542,6 +1544,7 @@ return value.
 	void 	MSG_GH_SET_CURRENT_TOOL (
 			ClassStruct 	*class,
 			word 			initData);
+
 This message activates a tool.
 
 **Source:** Unrestricted.

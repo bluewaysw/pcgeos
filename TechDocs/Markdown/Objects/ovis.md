@@ -1083,6 +1083,7 @@ representation of the objects - either on the geometry or on the image itself.
 
 #### 23.4.2.3 The Initial GState
 	MSG_VIS_VUP_CREATE_GSTATE
+
 For any drawing to occur, a graphic state must exist. The graphic state 
 typically is associated with the GenView's window and is created 
 automatically, either when the window is first realized on the screen or when 
@@ -1102,6 +1103,7 @@ letting other objects use it.
 ----------
 #### MSG_VIS_VUP_CREATE_GSTATE
 	GStateHandle MSG_VIS_VUP_CREATE_GSTATE();
+
 This message travels up the visible object tree until it reaches either the root 
 object or a window group object. It then creates a graphic state associated 
 with that object; this graphic state is then used for the subsequent visual 
@@ -1124,6 +1126,7 @@ appropriately before returning.
 
 #### 23.4.2.4 Retrieving the Current Window Handle
 	MSG_VIS_QUERY_WINDOW
+
 Often a visible object will require the window handle of the window it's 
 currently residing in. Some objects, for example, will want to force visual 
 updates in real-time, and they can do this by using the current window 
@@ -1134,6 +1137,7 @@ opened, or it can retrieve it with MSG_VIS_QUERY_WINDOW.
 ----------
 #### MSG_VIS_QUERY_WINDOW
 	WindowHandle MSG_VIS_QUERY_WINDOW();
+
 This message returns the window handle of the window the object currently 
 resides in. In many cases, this will be the window handle of a GenView 
 window.
@@ -1155,6 +1159,7 @@ its current window handle.
 	MSG_VIS_BOUNDS_CHANGED, MSG_VIS_REDRAW_ENTIRE_OBJECT, 
 	MSG_VIS_INVALIDATE, MSG_VIS_MARK_INVALID, 
 	MSG_VIS_INVAL_TREE, MSG_VIS_VUP_ADD_RECT_TO_UPDATE_REGION
+
 If your visible tree contains a composite that manages its own children, 
 chances are you'll need to force a visual update after certain changes occur. 
 For example, if you have an object that can be moved with the mouse, it will 
@@ -1217,6 +1222,7 @@ marked invalid and included in the next visual update.
 	void	MSG_VIS_DRAW(
 			DrawFlags		drawFlags,
 			GStateHandle	gstate);
+
 This message causes the visible object to draw itself. The default behavior of 
 this message for composite objects is to pass the message on to all children. 
 There is no default behavior for **VisClass** for this message.
@@ -1280,6 +1286,7 @@ DC_CF_RGB.
 			word	right,
 			word	top,
 			word	left);
+
 The geometry manager sends this message when a geometry update changes 
 an object's bounds.
 
@@ -1302,6 +1309,7 @@ invalidates the entire passed range).
 ----------
 #### MSG_VIS_REDRAW_ENTIRE_OBJECT
 	void	MSG_VIS_REDRAW_ENTIRE_OBJECT();
+
 This message causes the object send itself a MSG_VIS_DRAW, creating and 
 destroying a GState for itself.
 
@@ -1315,6 +1323,7 @@ change, not as part of the visual update mechanism.
 ----------
 #### MSG_VIS_INVALIDATE
 		void	MSG_VIS_INVALIDATE();
+
 This message invalidates the entire region within the object's bounds. The 
 message will cause the window system to generate a MSG_META_EXPOSED 
 for the area covered by the bounds, causing a visual update to occur.
@@ -1329,6 +1338,7 @@ Must also be intercepted to work with scaled views.
 ----------
 #### MSG_VIS_INVAL_TREE
 	void	MSG_VIS_INVAL_TREE();
+
 This message has the effect of MSG_VIS_INVALIDATE on an entire branch of 
 the visible tree. The window system will generate MSG_META_EXPOSED for 
 each affected window.
@@ -1379,6 +1389,7 @@ handler, and subclassing may have unpredictable results.
 			word				right,
 			word				top,
 			word				left);
+
 This message adds the passed rectangular region to the window group's list 
 of regions that require visual update. The handler for this message will 
 ensure that the window group object for this branch of the tree marks the 
@@ -1418,6 +1429,7 @@ optimization for invalidation.
 #### 23.4.2.6 Updating Window Groups
 	MSG_VIS_VUP_UPDATE_WIN_GROUP, MSG_VIS_UPDATE_WIN_GROUP, 
 	MSG_VIS_UPDATE_WINDOWS_AND_IMAGE
+
 A window group is an object that has window in which visible objects are 
 displayed. Typically, you will not create your own window group objects, but 
 you may need to notify a window group when it needs to be updated visually. 
@@ -1437,6 +1449,7 @@ section to request or force a visual update for the window group.
 #### MSG_VIS_VUP_UPDATE_WIN_GROUP
 	Boolean	MSG_VIS_VUP_UPDATE_WIN_GROUP(
 			VisUpdateMode updateMode);
+
 This message travels up the visible tree from the recipient object to the first 
 window group encountered; it will then cause that window group to go 
 through a visible update by sending the window group object a 
@@ -2000,6 +2013,7 @@ different ways, see "VisComp," Chapter 24.
 #### 23.4.3.1 Object Position and Bounds
 	MSG_VIS_GET_POSITION, MSG_VIS_SET_POSITION, 
 	MSG_VIS_GET_BOUNDS
+
 An object's bounds determine both the location and the size of the object in 
 the document space. The object may reposition itself or resize itself at will; 
 for example, it may allow the user to move or resize it with the mouse. The 
@@ -2101,6 +2115,7 @@ returned in the structure pointed to.
 
 #### 23.4.3.2 Object Size
 	MSG_VIS_GET_SIZE, MSG_VIS_SET_SIZE
+
 A visible object's size is defined as its width and height. The width is the 
 difference between the object's left and right bounds; the height is the 
 difference between the object's top and bottom bounds.
@@ -2120,6 +2135,7 @@ You can manually calculate the size from that information.
 	void	MSG_VIS_SET_SIZE(
 			int	width,
 			int	height);
+
 This message sets the object's height and width to the passed values, 
 retaining the object's current position. The object's position will not be 
 recalculated as a result of the size change. 
@@ -2148,6 +2164,7 @@ object invalid with MSG_VIS_MARK_INVALID.
 ----------
 #### MSG_VIS_GET_SIZE
 	SizeAsDWord MSG_VIS_GET_SIZE();
+
 This message returns the current size (width and height) of the object. Both 
 values are word-sized integers and are returned in a single dword value. The 
 high word of this value is the object's width, and the low word is the object's 
@@ -2172,6 +2189,7 @@ DWORD_HEIGHT to extract the width and height; see page 1336.
 	MSG_VIS_RESET_TO_INITIAL_SIZE, MSG_VIS_POSITION_BRANCH, 
 	MSG_VIS_POSITION_AND_INVAL_IF_NEEDED, 
 	MSG_VIS_INVAL_ALL_GEOMETRY
+
 Geometry management consists of positioning and sizing visible objects 
 properly. This can be done manually by the programmer or automatically by 
 GEOS. If you wish to manually control your visible tree's geometry, set the 
@@ -2309,6 +2327,7 @@ message used only when absolutely necessary.
 ----------
 #### MSG_VIS_UPDATE_GEOMETRY
 	void	MSG_VIS_UPDATE_GEOMETRY();
+
 This message is sent during a visual update to cause objects to recalculate 
 their geometry. Applications can use this message to ensure that geometry 
 gets updated for a visual branch even if the branch is not currently drawn on 
@@ -2325,6 +2344,7 @@ geometry is strongly recommended, however.
 ----------
 #### MSG_VIS_NOTIFY_GEOMETRY_VALID
 	void	MSG_VIS_NOTIFY_GEOMETRY_VALID();
+
 This message is sent by the geometry manager to objects that have 
 VGA_NOTIFY_GEOMETRY_VALID set. The message is sent only after all 
 geometry messages have been handled for the object. It has no default 
@@ -2343,6 +2363,7 @@ valid.
 	SizeAsDWord MSG_VIS_RECALC_SIZE(
 			int	width,
 			int	height);
+
 This message takes the suggested height and width of the object and 
 recalculates the object's desired size based on them. Composite objects are 
 expected to pass this message to their children and then calculate their sizes 
@@ -2441,6 +2462,7 @@ appropriately.
 #### MSG_VIS_RESET_TO_INITIAL_SIZE
 	void	MSG_VIS_RESET_TO_INITIAL_SIZE(
 			VisUpdateMode updateMode);
+
 This message propagates down an entire visual branch, causing the objects 
 in it to reset their sizes to their original width and height. First it invalidates 
 the object's geometry, then it recalculates the geometry starting at the top.
@@ -2462,6 +2484,7 @@ update of the tree should occur.
 	void	MSG_VIS_POSITION_BRANCH(
 			word	xOrigin,
 			word	yOrigin);
+
 This message repositions an entire visible branch. It propagates down the 
 branch, causing each visible object to reposition itself based on the new 
 origins passed. Composites must pass the appropriate altered positions to 
@@ -2629,6 +2652,7 @@ information on supporting 32-bit graphic spaces with visible objects, see
 	MSG_VIS_GRAB_MOUSE, MSG_VIS_FORCE_GRAB_MOUSE, 
 	MSG_VIS_GRAB_LARGE_MOUSE, MSG_VIS_FORCE_GRAB_LARGE_MOUSE, 
 	MSG_VIS_RELEASE_MOUSE
+
 When an object "grabs the mouse," it requests that the UI send all future 
 mouse events directly to that object. Normally, mouse events will travel down 
 the visible object tree until they reach either the leaf object under the pointer 
@@ -2663,6 +2687,7 @@ Otherwise, the normal mouse grab messages will do.
 ----------
 #### MSG_VIS_GRAB_MOUSE
 	void	MSG_VIS_GRAB_MOUSE();
+
 A visible object sends itself this message (with @**call**) when it wants to 
 acquire the normal mouse grab. The message MSG_VIS_RELEASE_MOUSE 
 must be used to relinquish the grab.
@@ -2676,6 +2701,7 @@ must be used to relinquish the grab.
 ----------
 #### MSG_VIS_FORCE_GRAB_MOUSE
 	void	MSG_VIS_FORCE_GRAB_MOUSE();
+
 A visible object sends itself this message (with @**call**) when it wants to 
 forcibly grab the mouse input. The object will acquire the mouse grab even if 
 another object currently has it; the other object will receive a 
@@ -2691,6 +2717,7 @@ object must release the grab later with MSG_VIS_RELEASE_MOUSE.
 ----------
 #### MSG_VIS_GRAB_LARGE_MOUSE
 	void	MSG_VIS_GRAB_LARGE_MOUSE();
+
 A visible object sends itself this message (with @**call**) when it wants to 
 acquire the mouse grab and when it wants 32-bit coordinates. If the object 
 wants 16-bit coordinates, it should use MSG_VIS_GRAB_MOUSE, above. The 
@@ -2705,6 +2732,7 @@ object must relinquish the mouse grab with MSG_VIS_RELEASE_MOUSE.
 ----------
 #### MSG_VIS_FORCE_GRAB_LARGE_MOUSE
 	void	MSG_VIS_FORCE_GRAB_LARGE_MOUSE();
+
 A visible object sends itself this message (with @**call**) when it wants to 
 forcibly grab the mouse input and when it wants large (32-bit) input 
 coordinates. If it wants normal (16-bit) coordinates, it should use 
@@ -2797,6 +2825,7 @@ will be sent. VIFGF_MOUSE must also be set.
 ----------
 #### MSG_VIS_RELEASE_MOUSE
 	void	MSG_VIS_RELEASE_MOUSE();
+
 A visible object sends itself this message if it has the mouse grab and wants 
 to release it. Typically, this message will be called in the object's 
 MSG_META_END_SELECT handler. It works for both large and small grabs.
@@ -3018,6 +3047,7 @@ MSG_VIS_REMOVE_BUTTON_POST_PASSIVE.
 ----------
 #### MSG_VIS_ADD_BUTTON_PRE_PASSIVE
 	void	MSG_VIS_ADD_BUTTON_PRE_PASSIVE();
+
 A visible object sends itself this message (with @**call**) when it wants to gain 
 a pre-passive mouse grab. The object will receive all subsequent mouse 
 events in the form of MSG_META_PRE_PASSIVE\_... *before* the event's 
@@ -3039,6 +3069,7 @@ MSG_META_PRE_PASSIVE_... events it is interested in.
 ----------
 #### MSG_VIS_REMOVE_BUTTON_PRE_PASSIVE
 	void	MSG_VIS_REMOVE_BUTTON_PRE_PASSIVE();
+
 This message removes the pre-passive grab from a visible object.
 
 **Source:** Unrestricted.
@@ -3051,6 +3082,7 @@ a pre-passive grab and wants to release it.
 ----------
 #### MSG_VIS_ADD_BUTTON_POST_PASSIVE
 	void	MSG_VIS_ADD_BUTTON_POST_PASSIVE();
+
 A visible object sends itself this message (with @**call**) when it wants to gain 
 the post-passive mouse grab. The object will receive all subsequent mouse 
 events in the form of MSG_META_POST_PASSIVE\_... *after* the event's 
@@ -3071,6 +3103,7 @@ MSG_META_POST_PASSIVE_... events it is interested in.
 ----------
 #### MSG_VIS_REMOVE_BUTTON_POST_PASSIVE
 	void	MSG_VIS_REMOVE_BUTTON_POST_PASSIVE();
+
 This message removes any post-passive mouse grab from the object.
 
 **Source:** Unrestricted.
@@ -3112,6 +3145,7 @@ the view window.
 #### MSG_VIS_TAKE_GADGET_EXCL
 	void	MSG_VIS_TAKE_GADGET_EXCL(
 			optr	child);
+
 This message causes the passed object to be given the gadget exclusive. Any 
 object currently having the gadget exclusive will subsequently receive a 
 MSG_VIS_LOST_GADGET_EXCL. This is used primarily by the Specific UI.
@@ -3135,6 +3169,7 @@ will be given (normally the calling object).
 #### MSG_VIS_RELEASE_GADGET_EXCL
 	void	MSG_VIS_RELEASE_GADGET_EXCL(
 			optr	child);
+
 This message causes the passed object to release the gadget exclusive. The 
 object specified by *child* will then receive a MSG_VIS_LOST_GADGET_EXCL.
 
@@ -3156,6 +3191,7 @@ exclusive (normally the calling object).
 ----------
 #### MSG_VIS_LOST_GADGET_EXCL
 	void	MSG_VIS_LOST_GADGET_EXCL();
+
 This message, when received, indicates that the recipient has lost its hold on 
 the gadget exclusive. When an object receives this, it should release the 
 active mouse grab, if appropriate.
@@ -3170,6 +3206,7 @@ active mouse grab, if appropriate.
 #### MSG_VIS_VUP_QUERY_FOCUS_EXCL
 	void	MSG_VIS_VUP_QUERY_FOCUS_EXCL(
 			ObjectAndGrabParams *retValue);
+
 This message queries up the visible hierarchy to find the object having the 
 current focus in the current window. The current window is taken to be the 
 window in which the object receiving the message resides.
@@ -3212,6 +3249,7 @@ the type of hierarchical grab.
 #### MSG_VIS_FUP_QUERY_FOCUS_EXCL
 	void	MSG_VIS_FUP_QUERY_FOCUS_EXCL(
 			ObjectAndGrabParms *retValue);
+
 This message queries the focus hierarchy to see which object has the current 
 focus. The current focus object does not have to be in the caller's visible tree.
 
@@ -3235,6 +3273,7 @@ for MSG_VIS_VUP_QUERY_FOCUS_EXCL.
 ----------
 #### MSG_VIS_VUP_ALLOW_GLOBAL_TRANSFER
 	void	MSG_VIS_VUP_ALLOW_GLOBAL_TRANSFER();
+
 This message is sent by a visible object to itself when a quick-transfer 
 operation is underway and the pointer has to be allowed to leave the bounds 
 of the object's view window. This message will travel up to the content object, 
@@ -3253,6 +3292,7 @@ global transfer must be allowed outside its window.
 	MSG_VIS_VUP_GET_MOUSE_STATUS, 
 	MSG_VIS_VUP_TERMINATE_ACTIVE_MOUSE_FUNCTION, 
 	MSG_VIS_VUP_BUMP_MOUSE
+
 The UI can control the mouse image and events as they occur. Because the UI 
 is based on the visible classes, the messages that control the mouse status are 
 also available to you, though they will probably be of very little utility. These 
@@ -3265,6 +3305,7 @@ messages are given below.
 			int	right,
 			int	top,
 			int	left);
+
 A visible object requesting the mouse grab sends this message up the visible 
 tree. This message will be handled by a content object. It indicates a new set 
 of draggable bounds in case the user initiates a drag-scrolling operation. This 
@@ -3286,6 +3327,7 @@ message.
 ----------
 #### MSG_VIS_VUP_GET_MOUSE_STATUS
 	word	MSG_VIS_VUP_GET_MOUSE_STATUS();
+
 This message is rarely used by any objects outside the UI library. It returns 
 the information passed with the last mouse event. The word return value 
 contains two byte-sized sets of flags. The high byte is a list of the active UI 
@@ -3306,6 +3348,7 @@ not locally store the latest mouse information.
 ----------
 #### MSG_VIS_VUP_TERMINATE_ACTIVE_MOUSE_FUNCTION
 	void	MSG_VIS_VUP_TERMINATE_ACTIVE_MOUSE_FUNCTION();
+
 This message is sent by a visible object to itself to terminate any active mouse 
 function, forcing it to be a function of type "other." This message is used only 
 by the Specific UI library in cases where input synchronization problems 
@@ -3359,6 +3402,7 @@ keyboard grab, the object should send itself MSG_META_RELEASE_KBD.
 ----------
 #### MSG_META_GRAB_KBD
 	void	MSG_META_GRAB_KBD();
+
 A visible object will send itself this message (using @**call**) when it wants to 
 gain the keyboard grab. To release the grab, it must send itself a 
 MSG_META_RELEASE_KBD. If it wants to gain the exclusive regardless of 
@@ -3375,6 +3419,7 @@ MSG_META_KBD_CHAR to receive the subsequent keyboard events.
 ----------
 #### MSG_META_FORCE_GRAB_KBD
 	void	MSG_META_FORCE_GRAB_KBD();
+
 A visible object will send itself this message (using @**call**) when it wants to 
 gain the keyboard grab whether or not another object currently has it. To 
 release the grab, the object must later send itself 
@@ -3390,6 +3435,7 @@ keyboard grab.
 ----------
 #### MSG_META_RELEASE_KBD
 	void	MSG_META_RELEASE_KBD();
+
 A visible object that has the keyboard grab must send itself this message to 
 release the grab.
 
@@ -3402,6 +3448,7 @@ its keyboard grab.
 
 #### 23.4.4.3 Ink and Pen Events
 	MSG_VIS_QUERY_IF_OBJECT_HANDLES_INK
+
 If a visible object expects and wants Ink input, it should subclass the message 
 MSG_VIS_QUERY_IF_OBJECT_HANDLES_INK. This message queries the 
 visible object, which should return specific values based on the current input 
@@ -3489,6 +3536,7 @@ visible trees use the same format as normal object trees.
 
 ### 23.5.1 Creating and Destroying
 	MSG_VIS_DESTROY
+
 Visible objects are just like any other objects in the ways they are created and 
 destroyed. You can create visible objects in many ways; the easiest is to set 
 them up in a resource and simply load or duplicate the resource block at 
@@ -3513,6 +3561,7 @@ geometry and image so the tree will be updated properly.
 #### MSG_VIS_DESTROY
 	void	MSG_VIS_DESTROY(
 			VisUpdateMode updateMode);
+
 This message is the high level routine for destroying branches of visible trees. 
 This message will close and destroy the entire branch, unlinking any visible 
 objects in the branch under the recipient object. The parent of the removed 
@@ -3539,6 +3588,7 @@ This is extremely rare.
 	MSG_VIS_MOVE_CHILD, MSG_VIS_ADD_NON_DISCARDABLE_VM_CHILD, 
 	MSG_VIS_REMOVE_NON_DISCARDABLE_VM_CHILD, 
 	MSG_VIS_REMOVE_NON_DISCARDABLE
+
 Once you have objects instantiated, you can connect them together into an 
 object tree. If you know the structure of your tree beforehand, you can create 
 the tree explicitly in your **.goc** file, just as you would create your generic 
@@ -3666,6 +3716,7 @@ object. The results are unpredictable and will likely result in an error.
 #### MSG_VIS_REMOVE
 	void	MSG_VIS_REMOVE(
 			VisUpdateMode updateMode);
+
 This is the high-level message that closes (if necessary) and removes a visible 
 branch from the object tree. The parent of the branch is marked invalid for 
 visual update according to the passed **VisUpdateMode**.
@@ -3696,6 +3747,7 @@ VUM_MANUAL is not allowed.
 	void	MSG_VIS_REMOVE_CHILD(
 			optr				child,
 			CompChildFlags		flags);
+
 This message removes the specified child from the object tree. This message 
 should be rarely used and used with care; it does not close the visible branch 
 but simply removes it. Consider using the higher-level MSG_VIS_REMOVE 
@@ -3727,6 +3779,7 @@ can be difficult.
 	void	MSG_VIS_MOVE_CHILD(
 			optr				child,
 			CompChildFlags		flags);
+
 This message moves a child of the recipient to another location among its 
 siblings. It essentially removes the child from the branch and then re-adds it 
 in the same manner as MSG_VIS_ADD_CHILD. This message does not move 
@@ -3754,6 +3807,7 @@ MSG_VIS_ADD_CHILD above.
 	void	MSG_VIS_ADD_NON_DISCARDABLE_VM_CHILD(
 			optr				child,
 			CompChildFlags		flags);
+
 This message performs exactly the same as MSG_VIS_ADD_CHILD except 
 that it also increments the object's in-use count so it will never be discarded. 
 This is used on top objects in visible sub-trees that are saved to document 
@@ -3781,6 +3835,7 @@ ignored in this record.
 #### MSG_VIS_REMOVE_NON_DISCARDABLE_VM_CHILD
 	void	MSG_VIS_REMOVE_NON_DISCARDABLE_VM_CHILD(
 			optr	child);
+
 This message performs exactly the same as MSG_VIS_REMOVE_CHILD 
 except that it is used with MSG_VIS_ADD_NON_DISCARDABLE_VM_CHILD 
 rather than with MSG_VIS_ADD_CHILD. This message decrements the in-use 
@@ -3802,6 +3857,7 @@ performed by MSG_VIS_ADD_NON_DISCARDABLE_VM_CHILD.
 #### MSG_VIS_REMOVE_NON_DISCARDABLE
 	void	MSG_VIS_REMOVE_NON_DISCARDABLE(
 			VisUpdateMode		updateMode)
+
 This message performs exactly the same as MSG_VIS_REMOVE except that it 
 decrements the object's in-use count before removing it. This message should 
 therefore be used in conjunction with the adding message 
@@ -3825,6 +3881,7 @@ VUM_MANUAL is not allowed.
 #### 23.5.3 Getting Visible Tree Information
 	MSG_VIS_FIND_CHILD, MSG_VIS_FIND_CHILD_AT_POSITION, 
 	MSG_VIS_COUNT_CHILDREN, MSG_VIS_FIND_PARENT
+
 When an application manages a visible object tree, it will most likely need to 
 find children, count children, or get the optr of a particular object in the tree. 
 **VisClass** offers four messages to provide this bookkeeping information. 
@@ -3834,6 +3891,7 @@ These four messages are listed below.
 #### MSG_VIS_FIND_CHILD
 	word	MSG_VIS_FIND_CHILD(
 			optr	object);
+
 This message returns the zero-based position of the specified child among the 
 parent's children.
 
@@ -3856,6 +3914,7 @@ the message will also return -1.
 #### MSG_VIS_FIND_CHILD_AT_POSITION
 	optr	MSG_VIS_FIND_CHILD_AT_POSITION(
 			word	position);
+
 This message returns the optr of the child occupying the position specified 
 among the recipient's children.
 
@@ -3876,6 +3935,7 @@ retuned value will be NullOptr.
 ----------
 #### MSG_VIS_COUNT_CHILDREN
 	word	MSG_VIS_COUNT_CHILDREN();
+
 This message returns the number of children the recipient object has. The 
 count is not zero-based; if a composite has five children, this message will 
 return five.
@@ -3894,6 +3954,7 @@ return five.
 ----------
 #### MSG_VIS_FIND_PARENT
 	optr	MSG_VIS_FIND_PARENT();
+
 This message returns the optr of the recipient's parent composite.
 
 **Source:** Unrestricted.
@@ -3920,6 +3981,7 @@ and even to objects of a given class.
 #### 23.5.4.1 Contacting Parents and Children Directly
 	@visParent, @visChildren, MSG_VIS_CALL_PARENT, 
 	MSG_VIS_SEND_TO_PARENT, MSG_VIS_SEND_TO_CHILDREN
+
 To send a given message to an object's parent (to check valid bounds, to check 
 the parent's state, etc.), you can use the macro @**visParent**. To do this, 
 substitute the macro in place of the destination object's name, as follows:
@@ -3964,6 +4026,7 @@ return anything for the same reason the @**visChildren** macro can not.
 #### MSG_VIS_CALL_PARENT
 	void	MSG_VIS_CALL_PARENT(
 			EventHandle event);
+
 This message delivers the passed recorded event to the parent of the 
 recipient object. It acts as a call, executing immediately even across threads. 
 
@@ -3986,6 +4049,7 @@ should use the @**visParent** macro described above.
 #### MSG_VIS_SEND_TO_PARENT
 	void	MSG_VIS_SEND_TO_PARENT(
 			EventHandle event);
+
 This message delivers the passed recorded event to the parent of the 
 recipient object. It acts as a send, allowing the caller to continue execution 
 without waiting for the event to be handled.
@@ -4009,6 +4073,7 @@ should use the @**visParent** macro described above.
 #### MSG_VIS_SEND_TO_CHILDREN
 	void	MSG_VIS_SEND_TO_CHILDREN(
 			EventHandle event);
+
 This message delivers the passed recorded event to each of the recipient's 
 children. It acts as a message send and can not return values; there is no way 
 for a single message to call several objects and return values from each with 
@@ -4068,6 +4133,7 @@ up the tree that is of the specified class.
 #### MSG_VIS_VUP_FIND_OBJECT_OF_CLASS
 	optr	MSG_VIS_VUP_FIND_OBJECT_OF_CLASS(
 			ClassStruct *class);
+
 This message searches up the visible object tree until it encounters an object 
 of the specified class. It then returns the optr of that object.
 
@@ -4091,6 +4157,7 @@ would subclass this message. This practice is highly discouraged.
 #### MSG_VIS_VUP_TEST_FOR_OBJECT_OF_CLASS
 	Boolean	MSG_VIS_VUP_TEST_FOR_OBJECT_OF_CLASS(
 			ClassStruct *class);
+
 This message searches up the visible tree and determines whether an object 
 of the given class is in the tree.
 
@@ -4113,6 +4180,7 @@ to be searched for.
 #### MSG_VIS_VUP_CALL_OBJECT_OF_CLASS
 	void	MSG_VIS_VUP_CALL_OBJECT_OF_CLASS(
 			EventHandle event);
+
 This message searches up the visible tree until it encounters an object of the 
 proper class for the recorded event. The class is specified within the passed 
 *event*. When the first such object is found, it will be called with the classed 
@@ -4136,6 +4204,7 @@ determined by the event. This message returns nothing.
 #### MSG_VIS_VUP_SEND_TO_OBJECT_OF_CLASS
 	void	MSG_VIS_VUP_SEND_TO_OBJECT_OF_CLASS(
 			EventHandle event);
+
 This message searches up the visible tree until it encounters an object of the 
 proper class for the recorded event. The class is specified within the passed 
 *event*. When the first such object is found, the message will be delivered to 
@@ -4158,6 +4227,7 @@ MSG_VIS_VUP_SEND_TO_OBJECT_OF_CLASS.
 
 #### 23.5.4.3 Visible Upward Queries
 	MSG_VIS_VUP_QUERY
+
 You can create your own messages that get passed up the visible tree by 
 creating aliases of MSG_VIS_VUP_QUERY. MSG_VIS_VUP_QUERY, by itself, 
 does nothing useful; it simply gets passed up the visible tree without ever 
@@ -4183,6 +4253,7 @@ query can be invaluable in many different situations.
 ----------
 #### MSG_VIS_VUP_QUERY
 	void	MSG_VIS_VUP_QUERY();
+
 This message simply queries up the tree until it is handled. It is extensible 
 so visible objects can implement their own upward queries without adding 
 handlers to every class in between it and the query handler.
@@ -4217,6 +4288,7 @@ These two messages are detailed below.
 #### MSG_VIS_VUP_CALL_WIN_GROUP
 	void	MSG_VIS_VUP_CALL_WIN_GROUP(
 			EventHandle event);
+
 This message searches up the visible object tree until it encounters a window 
 group object. When the first window group is found, it will be called with the 
 classed event as if an @**call** had been used.
@@ -4243,6 +4315,7 @@ MSG_VIS_VUP_CALL_WIN_GROUP returns nothing.
 #### MSG_VIS_VIS_SEND_TO_WIN_GROUP
 	void	MSG_VIS_VIS_SEND_TO_WIN_GROUP(
 			EventHandle event);
+
 This message searches up the visible object tree until it encounters a window 
 group object. When the first window group is found, the passed event will be 
 delivered to that object as if an @**send** had been used directly.
@@ -4269,6 +4342,7 @@ delivered to the window object.
 ### 23.5.5 Visible Object Window Operations
 	MSG_VIS_OPEN_WIN, MSG_VIS_CLOSE_WIN, 
 	MSG_VIS_WIN_ABOUT_TO_BE_CLOSED, MSG_VIS_MOVE_RESIZE_WIN
+
 Typically, windows will be managed entirely by generic UI objects and the 
 Specific UI library currently in use. You can, however, manage your own 
 **VisClass**-based window objects by using messages normally used only by 
@@ -4279,6 +4353,7 @@ recommended. The four messages used for this purpose are detailed below.
 #### MSG_VIS_OPEN_WIN
 	void	MSG_VIS_OPEN_WIN(
 			WindowHandle parentWindow);
+
 This message is sent to a window or portal object to open its window. The 
 graphics window will be opened and drawn on the screen, and a visual 
 update will propagate down the displayed visible tree.
@@ -4299,6 +4374,7 @@ graphics window and set initial parameters (*VCI_window*).
 ----------
 #### MSG_VIS_CLOSE_WIN
 	void	MSG_VIS_CLOSE_WIN();
+
 This message is sent to a window or portal object that has its graphics 
 window currently on the screen. The window and its visible branch will be 
 closed (taken off the screen).
@@ -4313,6 +4389,7 @@ than simply closing the graphics window.
 ----------
 #### MSG_VIS_WIN_ABOUT_TO_BE_CLOSED
 	void	MSG_VIS_WIN_ABOUT_TO_BE_CLOSED();
+
 This message notifies the recipient that the window it's displayed in is about 
 to be closed. The default handler for this will remove the visible branch of the 
 window off the screen so no redraws will occur before the window closes.
@@ -4329,6 +4406,7 @@ object if the default behavior is not appropriate for the object.
 ----------
 #### MSG_VIS_MOVE_RESIZE_WIN
 	void	MSG_VIS_MOVE_RESIZE_WIN();
+
 This message causes the window object to move and/or resize itself based on 
 the bounds of its content object. This message is used only by window or 
 portal objects and is rarely, if ever, used by objects in your applications.
@@ -4347,6 +4425,7 @@ bounds of its content object.
 	MSG_VIS_LAYER_SET_DOC_BOUNDS, 
 	MSG_VIS_LAYER_GET_DOC_BOUNDS, 
 	MSG_VIS_LAYER_INSERT_OR_DELETE_SPACE
+
 The GEOS graphic space is built on a basis of 16-bit coordinates. A few 
 applications, however, will require much more space for their documents. 
 GEOS also supports the special use of 32-bit coordinates; applications using 
@@ -4416,6 +4495,7 @@ no default handler.
 #### MSG_VIS_LAYER_GET_DOC_BOUNDS
 	void	MSG_VIS_LAYER_GET_DOC_BOUNDS(
 			RectDWord *bounds);
+
 This message returns the 32-bit document bounds of a particular large 
 visible object. Typically, a VisContent will query its large children with this 
 message when it needs to know their bounds.
@@ -4446,6 +4526,7 @@ no default handler.
 ----------
 #### MSG_VIS_LAYER_INSERT_OR_DELETE_SPACE
 	void	MSG_VIS_LAYER_INSERT_OR_DELETE_SPACE()
+
 This message should be sent by one layer to another when it changes sizes. 
 An example would be a spreadsheet application with a graphic layer; when a 
 column in the spreadsheet resizes, the graphic layer must resize accordingly.
@@ -4686,6 +4767,7 @@ for these messages should cause a fatal error if their criteria are not met.
 #### MSG_VIS_VUP_EC_ENSURE_WINDOW_NOT_REFERENCED
 	void	MSG_VIS_VUP_EC_ENSURE_WINDOW_NOT_REFERENCED(
 			WindowHandle window);
+
 This message travels up the visible object tree, ensuring that the window 
 handle passed is not stored anywhere that it might cause trouble. This 
 message may be used when a window is being destroyed and its handle is 
@@ -4706,6 +4788,7 @@ about to be freed.
 #### MSG_VIS_VUP_EC_ENSURE_OBJ_BLOCK_NOT_REFERENCED
 	void	MSG_VIS_VUP_EC_ENSURE_OBJ_BLOCK_NOT_REFERENCED(
 			MemHandle objBlock);
+
 This message travels up the visible object tree, ensuring that the memory 
 handle (the handle of an object block) passed is not stored anywhere that it 
 might cause trouble. This message may be used just before the object block's 
@@ -4726,6 +4809,7 @@ handle is freed to ensure that no stale references will remain.
 #### MSG_VIS_VUP_EC_ENSURE_OD_NOT_REFERENCED
 	void	MSG_VIS_VUP_EC_ENSURE_OD_NOT_REFERENCED(
 			optr	object);
+
 This message travels up the visible object tree, ensuring that the optr passed 
 is not stored by any objects in the tree. This message may be sent when the 
 object is being destroyed; any objects methods encountering a match between 
