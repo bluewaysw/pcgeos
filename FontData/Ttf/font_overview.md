@@ -44,26 +44,26 @@ This document provides an overview of the TrueType fonts included in the PC/GEOS
 ## Sources
 The original font files were obtained from various sources. Below is a list of the sources for each font.
 
-S1. **URW++ base 35 fonts**: [https://github.com/ArtifexSoftware/urw-base35-fonts/tree/master](https://github.com/ArtifexSoftware/urw-base35-fonts/tree/master)
-S2. **New York Times Community**: [https://github.com/FrancesCoronel/nyt-comm/tree/master/fonts/franklin](https://github.com/FrancesCoronel/nyt-comm/tree/master/fonts/franklin)
-S3. **Vogels Perspektive**: [https://martinvogel.de/blog/index.php?/archives/131-Marvosym.ttf.html](https://martinvogel.de/blog/index.php?/archives/131-Marvosym.ttf.html)
-S4. **Indestructibletype**: [https://indestructibletype.com/Cooper/index.html](https://indestructibletype.com/Cooper/index.html)
-S5. **Dieter Steffmann**: [https://moorstation.org/typoasis/designers/steffmann/samples/m/markerf.htm](https://moorstation.org/typoasis/designers/steffmann/samples/m/markerf.htm)
+- **S1:** **URW++ base 35 fonts**: [https://github.com/ArtifexSoftware/urw-base35-fonts/tree/master](https://github.com/ArtifexSoftware/urw-base35-fonts/tree/master)
+- **S2:** **New York Times Community**: [https://github.com/FrancesCoronel/nyt-comm/tree/master/fonts/franklin](https://github.com/FrancesCoronel/nyt-comm/tree/master/fonts/franklin)
+- **S3:** **Vogels Perspektive**: [https://martinvogel.de/blog/index.php?/archives/131-Marvosym.ttf.html](https://martinvogel.de/blog/index.php?/archives/131-Marvosym.ttf.html)
+- **S4:** **Indestructibletype**: [https://indestructibletype.com/Cooper/index.html](https://indestructibletype.com/Cooper/index.html)
+- **S5:** **Dieter Steffmann**: [https://moorstation.org/typoasis/designers/steffmann/samples/m/markerf.htm](https://moorstation.org/typoasis/designers/steffmann/samples/m/markerf.htm)
 
 ## Licenses
 The fonts included in this distribution are subject to their respective licenses. Please review the individual license terms for each font.
 
-L1. **GNU Aferro General Public License**: [https://github.com/ArtifexSoftware/urw-base35-fonts/blob/master/COPYING](https://github.com/ArtifexSoftware/urw-base35-fonts/blob/master/COPYING)
-L2. **MIT License**: [https://github.com/FrancesCoronel/nyt-comm/blob/master/LICENSE](https://github.com/FrancesCoronel/nyt-comm/blob/master/LICENSE)
-L3. **SIL Open Font License**: [https://openfontlicense.org/open-font-license-official-text/](https://openfontlicense.org/open-font-license-official-text/)
-L4: **Dieter Steffmann**: [https://www.1001fonts.com/users/steffmann/?page=2](https://www.1001fonts.com/users/steffmann/?page=2)
+- **L1:** **GNU Aferro General Public License**: [https://github.com/ArtifexSoftware/urw-base35-fonts/blob/master/COPYING](https://github.com/ArtifexSoftware/urw-base35-fonts/blob/master/COPYING)
+- **L2:** **MIT License**: [https://github.com/FrancesCoronel/nyt-comm/blob/master/LICENSE](https://github.com/FrancesCoronel/nyt-comm/blob/master/LICENSE)
+- **L3:** **SIL Open Font License**: [https://openfontlicense.org/open-font-license-official-text/](https://openfontlicense.org/open-font-license-official-text/)
+- **L4:** **Dieter Steffmann**: [https://www.1001fonts.com/users/steffmann/?page=2](https://www.1001fonts.com/users/steffmann/?page=2)
 
 ## Changes
 If any modifications have been made to the fonts (e.g. renaming or hinting optimization), they are noted in the "Changes for PC/GEOS" column of the table.
 
-C1. **Character set**: The included characters have been reduced to the PC/GEOS character set. 
-C2. **Automatic hinting**: Auto-hinting applied to improve on-screen readability and rendering quality.
-C3. **Subfamily changed**: Font subfamily changed to bold.
+- **C1:** **Character set**: The included characters have been reduced to the PC/GEOS character set. 
+- **C2:** **Automatic hinting**: Auto-hinting applied to improve on-screen readability and rendering quality.
+- **C3:** **Subfamily changed**: Font subfamily changed to bold.
 
 ## Mapping the GEOS Character Set to Unicode
 
