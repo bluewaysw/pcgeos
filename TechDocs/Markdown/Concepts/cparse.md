@@ -258,7 +258,7 @@ the colon operator. The data portion of this token is the
 constant OP_RANGE_SEPARATOR. (The formatter will turn this 
 back into a colon.)
 
- **-** 	This can be either of two different operators. It can be a 
+ **-**  This can be either of two different operators. It can be a 
 negation operator. This is a unary prefix operator which 
 reverses the arithmetic sign of the operand. It can also be a 
 subtraction operator. This is a binary infix operator. The parser 
@@ -295,7 +295,7 @@ token is the constant OP_ DIVISION. The constant
 OP_DIVISION_GRAPHIC is functionally equivalent; however, 
 the formatter will display the operator as "".
 
- **\+**	This is the addition operator. It is a binary infix operator. It 
+ **\+** This is the addition operator. It is a binary infix operator. It 
 adds the two operands. The data portion of this token is the 
 constant OP_RANGE_ADDITION.
 
@@ -315,7 +315,7 @@ expression evaluates to 1.0 if both operands evaluate to
 identical values. The data portion of this token is the constant 
 OP_EQUAL.
 
- **<>**	This is the inequality operator. It is a binary infix operator. An 
+ **<>** This is the inequality operator. It is a binary infix operator. An 
 expression evaluates to 1.0 if the two operands evaluate to 
 different values. The data portion of this token is 
 OP_NOT_EQUAL. The constant OP_NOT_EQUAL_GRAPHIC is 
@@ -412,7 +412,7 @@ well-formed. The grammar is listed below. The basic units of the grammar
 are listed in ALL-CAPS; higher-level units are listed in italics. The string 
 must parse to a well-formed expression.
 
-expression:	
+expression:     
 >'(' expression ')'  
 NEG_OP expression  
 IDENTIFIER '(' function_args ')'  
@@ -431,7 +431,7 @@ arg_list:
 >expression  
 expression ',' arg_list
 
-base_item:	
+base_item:      
 >NUMBER  
 STRING  
 CELL_REF  
